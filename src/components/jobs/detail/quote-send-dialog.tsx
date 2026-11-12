@@ -6,7 +6,9 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { generateJobDocument, sendJobDocument, draftJobDocumentEmail } from "@/app/actions/job-documents";
 import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import { applySalutation } from "@/lib/contacts/tone";
+import { PremiumBanner } from "@/components/customers/premium-badge";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
 import { PrintButton } from "@/components/print/print-button";
@@ -30,13 +32,16 @@ function invalidAddress(list: string): string | null {
  * Položky bez ceny → varování s „Zpět — doplním ceny" / „Přesto odeslat".
  */
 export function QuoteSendDialog({
-  open, onOpenChange, quote, fallback,
+  open, onOpenChange, quote, fallback, premium = false, customerName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   quote: { id: string; number: string; status: string };
   /** Předvyplnění, když návrh e-mailu ze serveru selže. */
   fallback: { to: string; jobNumber: string; title: string; contact: string | null };
+  /** 9. 11.: prémiový zákazník — výrazný pruh „Pozor — prémiový zákazník" nahoře. */
+  premium?: boolean;
+  customerName?: string | null;
 }) {
   const { jobId, notify, refresh } = useJobDetail();
   const [step, setStep] = React.useState<Step>("preparing");
@@ -45,6 +50,8 @@ export function QuoteSendDialog({
   const [file, setFile] = React.useState<{ id: string; filename: string } | null>(null);
   const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
+  /** „Odeslat z" (jen super admin; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
   /** Text posledního návrhu ze serveru — po změně tykání se připraví znovu, jen když ho uživatel neupravil. */
   const lastDraftBody = React.useRef<string | null>(null);
@@ -116,6 +123,7 @@ export function QuoteSendDialog({
       setWarning(null);
       setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
+      setFromMailboxId(null);
       setStep("preparing");
     }
   }
@@ -147,6 +155,7 @@ export function QuoteSendDialog({
     try {
       const res = await sendJobDocument(jobId, file.id, {
         to, cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body,
+        ...(fromMailboxId ? { fromMailboxId } : {}),
       });
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
@@ -167,7 +176,7 @@ export function QuoteSendDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => step !== "sending" && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[8%] sm:max-w-2xl">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[8%] sm:max-w-2xl">
         <DialogHead
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
@@ -175,6 +184,7 @@ export function QuoteSendDialog({
           subtitle="Zkontroluj adresu a text — e-mail odejde z tvé schránky s PDF v příloze."
         />
         <form onSubmit={send} className="space-y-4 p-4 sm:p-5" noValidate>
+          {premium && <PremiumBanner customerName={customerName} />}
           <ErrorBox error={error} />
           {step === "preparing" ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
@@ -216,10 +226,17 @@ export function QuoteSendDialog({
                   <RotateCcw className="h-4 w-4" /> Zkusit PDF vytvořit znovu
                 </Button>
               )}
+              <SenderPicker
+                value={fromMailboxId}
+                onChange={setFromMailboxId}
+                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                className="px-1"
+              />
               <MailFields mail={mail} onChange={setMail} context={{ jobId }} idPrefix="quote-mail" onToneSaved={(c) => void redraft(c.salutation)} />
             </>
           )}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-popover/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-5 sm:-mb-5 sm:flex-row sm:justify-end sm:p-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
             <Button type="submit" variant="send" disabled={busy || !file}>
               {step === "sending" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

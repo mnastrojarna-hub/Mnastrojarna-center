@@ -209,6 +209,7 @@ export type SketchPlane =
   | { kind: "base"; name: PlaneName; offset: number }
   | { kind: "custom"; origin: Vec3; normal: Vec3; xDir: Vec3; label?: string };
 
+import { tr } from "./i18n";
 import type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
 

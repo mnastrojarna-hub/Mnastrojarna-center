@@ -2,13 +2,15 @@ import "server-only";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { addUsage } from "@/lib/ai/ai-call";
 import { checkRasterCompanies } from "./company-check";
-import { COMPANY_LEAK_WARNING } from "./decide";
+import { companyLeakWarning } from "./decide";
 import type { AiCallConfig } from "./detect-ai";
 import { checkImageOutput, decodeImage, encodeImageOutput, heicToJpeg, imagePages, maybeGray, rasterToJpeg } from "./image";
 import { buildRasterPdf, type OutPage } from "./pdf-raster";
 import { keepValuesOf, reburn } from "./pdf-pipeline";
 import { applyManual, burnable, normalizeRegion, sortRegions } from "./regions";
 import type { RuleContext } from "./rules";
+import { containsTerm } from "./rules";
+import { mergeNames, withCompanyNames } from "./company-names";
 import { normalizeText, sha256Hex } from "./text";
 import { runVision, type VisionAiCache } from "./vision";
 import type { AnonCategory, AnonRegion, AnonWarning, KeepField } from "./types";
@@ -29,9 +31,18 @@ export interface PhotoAnonInput {
   verify: boolean;
   fill: "background" | "white" | "black";
   manual?: AnonRegion[];
-  cache?: { v: 1; pages: Record<number, VisionAiCache> } | null;
+  cache?: PhotoAiCache | null;
   /** Výstup jako PDF (víc fotek jednoho výkresu / TIFF). */
   asPdf?: boolean;
+  /** Průběžné uložení cache AI po každé stránce (přerušený běh o zaplacený výsledek nepřijde). */
+  onCache?: (cache: PhotoAiCache) => Promise<void> | void;
+}
+
+export interface PhotoAiCache {
+  v: 1;
+  pages: Record<number, VisionAiCache>;
+  /** Názvy firem, které výstupní kontrola viděla — termíny pro další pokus (přežijí i smazání výsledků stránek). */
+  found?: string[];
 }
 
 export interface PhotoAnonResult {
@@ -56,7 +67,7 @@ export interface PhotoAnonResult {
   termInKeep: boolean;
   outputProblems: string[];
   keepValues: Partial<Record<KeepField, string>>;
-  cache: { v: 1; pages: Record<number, VisionAiCache> } | null;
+  cache: PhotoAiCache | null;
   unsupported: string | null;
   pages: number;
   /** Zdroj je v plném rozlišení (master, originál z e-mailu, PNG / TIFF, HEIC). */
@@ -103,7 +114,17 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
   const png = meta.format === "png";
   res.hasMaster = hasMaster;
   if (!hasMaster) res.warnings.push({ code: "no_master", message: "Fotka v nízkém rozlišení — zkontroluj (příště vyfoť v plném rozlišení)." });
-  const cache = input.cache ?? { v: 1 as const, pages: {} };
+  const cache: PhotoAiCache = input.cache ?? { v: 1 as const, pages: {} };
+  // termíny: zákazník z CRM + jména, která u tohoto souboru viděla dřívější výstupní kontrola (cache.found)
+  let ctx = withCompanyNames(input.ctx, cache.found ?? []);
+  /** Jména z výstupní kontroly, která ještě nejsou termínem → termíny (a cache pro další pokus). */
+  const learn = (names: readonly string[] | undefined): string[] => {
+    const fresh = (names ?? []).filter((n) => !containsTerm(n, ctx.terms));
+    if (!fresh.length) return [];
+    cache.found = mergeNames(cache.found, fresh);
+    ctx = withCompanyNames(ctx, fresh);
+    return fresh;
+  };
   const outPages: OutPage[] = [];
   let single: Uint8Array | null = null;
   let firstDrawing: boolean | null = null;
@@ -125,15 +146,19 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
       res.unsupported = `Obrázek nelze přečíst: ${err instanceof Error ? err.message.slice(0, 120) : "chyba"}`;
       return res;
     }
-    const cachedPage = cache.pages[p] ?? null;
-    const v = await runVision({
-      raster, mode: "photo", page: p, ctx: input.ctx, ai: cachedPage ? null : input.ai, systemExtra: input.systemExtra,
+    let cachedPage = cache.pages[p] ?? null;
+    let v = await runVision({
+      raster, mode: "photo", page: p, ctx, ai: cachedPage ? null : input.ai, systemExtra: input.systemExtra,
       keepValues: input.keepValues, verify: input.verify, fill: input.fill, cache: cachedPage,
     });
     res.usage = addUsage(res.usage, v.usage);
     res.calls += v.calls;
     if (v.fallback) res.fallback = true;
-    if (v.aiCache) cache.pages[p] = v.aiCache;
+    if (v.aiCache) {
+      cache.pages[p] = v.aiCache;
+      // zaplacený výsledek AI hned do cache (přerušený běh o něj nepřijde)
+      if (v.aiUsed && !cachedPage) await input.onCache?.(cache);
+    }
     // vícestránkový TIFF: stránka, která není výkres (průvodní dopis), se vynechá jako u PDF
     if (asPdf && v.isDrawing === false) {
       excluded.push(p);
@@ -164,21 +189,49 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
       if (r.text) res.texts.push({ regionId: id, category: r.category, text: r.text });
     }
     const manual = (input.manual ?? []).filter((m) => m.page === p);
-    const final = applyManual(auto, manual);
-    res.regions.push(...final);
-    const out = manual.length ? await reburn(v, final, input.fill) : v.raster;
+    let final = applyManual(auto, manual);
+    let out = manual.length ? await reburn(v, final, input.fill) : v.raster;
     // výstupní kontrola obrazem: zbyl v kopii název firmy? (vypálí se a ověří znovu, jinak kopie neprošla)
     if (input.ai) {
-      const cc = await checkRasterCompanies(out, p, input.ai, input.ctx, v.keep.map((k) => k.box), input.fill);
+      let cc = await checkRasterCompanies(out, p, input.ai, ctx, v.keep.map((k) => k.box), input.fill);
       res.usage = addUsage(res.usage, cc.usage);
       res.calls += cc.calls;
       if (cc.fallback) res.fallback = true;
       if (cc.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: p });
+      // Majitel 5. 11.: název, který detekce nevypsala a kontrola ho vidí → doplnit termíny a stránku projít znovu
+      // hned (přepis z cache, pravidla s novým termínem), ne až dalším pokusem
+      const fresh = learn(cc.names);
+      if (!cc.clean && fresh.length && (!input.ai.deadline || Date.now() < input.ai.deadline - 60_000)) {
+        res.warnings.push({ code: "terms_learned", message: `Kontrola kopie našla název firmy mimo termíny (${fresh[0]}) — strana ${p} zpracována znovu s doplněnými termíny.`, page: p });
+        cachedPage = cache.pages[p] ?? null;
+        v = await runVision({
+          raster, mode: "photo", page: p, ctx, ai: cachedPage ? null : input.ai, systemExtra: input.systemExtra,
+          keepValues: input.keepValues, verify: input.verify, fill: input.fill, cache: cachedPage,
+        });
+        res.usage = addUsage(res.usage, v.usage);
+        res.calls += v.calls;
+        const again: AnonRegion[] = [];
+        for (const r of v.regions) {
+          const k = `${p}|${r.category}|${Math.round(r.box.x)}|${Math.round(r.box.y)}|${Math.round(r.box.w)}|${Math.round(r.box.h)}`;
+          const id = `p${p}-${(await sha256Hex(k)).slice(0, 12)}`;
+          const n = normalizeRegion({ ...r, textHash: r.text ? await sha256Hex(normalizeText(r.text)) : undefined }, v.raster.width, v.raster.height, id);
+          if (!n) continue;
+          again.push(n);
+          if (r.text && !res.texts.some((t) => t.regionId === id)) res.texts.push({ regionId: id, category: r.category, text: r.text });
+        }
+        final = applyManual(again, manual);
+        out = manual.length ? await reburn(v, final, input.fill) : v.raster;
+        cc = await checkRasterCompanies(out, p, input.ai, ctx, v.keep.map((k) => k.box), input.fill);
+        res.usage = addUsage(res.usage, cc.usage);
+        res.calls += cc.calls;
+        learn(cc.names);
+      }
       if (!cc.clean) {
         res.outputProblems.push(`strana ${p}: zůstal název firmy`);
-        res.warnings.push({ code: "verify_leak", message: `${COMPANY_LEAK_WARNING} (strana ${p}).`, page: p });
+        res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p, cc.names, cc.why), page: p });
       }
     }
+    res.regions.push(...final);
 
     if (asPdf) {
       const img = maybeGray(out);
@@ -201,7 +254,7 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
   res.aiUsed = anyDrawing ? allAi : Boolean(input.ai) || Object.keys(cache.pages).length > 0;
   res.pxPerMm = pxs.length ? Math.min(...pxs) : null;
   res.regions = sortRegions(res.regions);
-  res.cache = Object.keys(cache.pages).length ? cache : null;
+  res.cache = Object.keys(cache.pages).length || (cache.found?.length ?? 0) ? cache : null;
   if (excluded.length && anyDrawing) {
     res.warnings.push({ code: "excluded_pages", message: `Vynecháno ${excluded.length} stran, které nejsou výkresem (dopis, faktura…).` });
   }

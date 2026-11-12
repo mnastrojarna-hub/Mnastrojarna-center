@@ -1,0 +1,578 @@
+# Druhé kolo: záložky pásu, výzvy stavového řádku, popisky entit, kontrola kót, diagnostika, import, knihovna (názvy rodin), nastavení
+
+# záložky a skupiny
+Tvorba	Create
+Plech	Sheet metal
+Svařence	Weldments
+Data	Data
+Obecné	General
+Myš a ovládání	Mouse & controls
+Klávesové zkratky	Keyboard shortcuts
+Soubory	Files
+Plochy / hrany	Faces / edges
+
+# stavový řádek a výzvy
+{0} · nebo zadejte hodnotu v poli · pravé tlačítko v poli = další způsoby · Esc zruší	{0} · or type a value in the field · right-click in the field = more options · Esc cancels
+Šroubový spoj: klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu) · Esc zruší	Bolted joint: click the cylindrical face of the hole (the clicked side = bolt head) · Esc cancels
+Vazba {0} vybrané (pohyblivé) komponenty · Esc zruší	Mate {0} of the selected (movable) component · Esc cancels
+Souosost: klikněte na válcovou plochu	Concentric: click a cylindrical face
+– klikněte na rovinnou plochu	– click a planar face
+Vazba: klikněte na {0} plochu cílové komponenty	Mate: click a {0} face of the target component
+válcovou	cylindrical
+rovinnou	planar
+Měření ({0}): klikněte na {1} entitu	Measure ({0}): click the {1} entity
+Měření ({0}): klikněte na {1} entitu – bod, hranu, plochu nebo těleso · najetím na hranu se nabídnou koncové body, střed a střed kružnice	Measure ({0}): click the {1} entity – a point, edge, face or body · hovering an edge offers its end points, midpoint and circle centre
+první	first
+druhou	second
+Měření hotovo – kliknutím začnete nové · Esc ukončí	Measurement done – click to start a new one · Esc exits
+Táhněte šipkami gizma (posun) nebo oblouky (otočení) · R přepne režim · Esc ukončí	Drag the gizmo arrows (move) or arcs (rotate) · R toggles the mode · Esc exits
+Stavím komponenty…	Building components…
+Komponenta vybrána: G = gizmo přesunu, vazby Kontakt/Zarovnat/Vystředit · pravé tlačítko = nabídka · Ctrl+klik = více	Component selected: G = move gizmo, mates Mate/Flush/Centre · right-click = menu · Ctrl+click = more
+Sestava · {0} komponent · filtr výběru: {1} · pravé tlačítko = nabídka	Assembly · {0} components · selection filter: {1} · right-click = menu
+Vyberte rovinnou plochu, na které se založí skica · Esc zruší	Select the planar face for the sketch · Esc cancels
+Táhněte šipkami gizma (posun 1 mm) nebo oblouky (otočení 15°) · R přepne režim · Hotovo potvrdí	Drag the gizmo arrows (move 1 mm) or arcs (rotate 15°) · R toggles the mode · Done confirms
+Skica na rovině {0} · kreslete myší, rozměry upravíte v panelu vpravo	Sketch on plane {0} · draw with the mouse, edit dimensions in the panel on the right
+Zaoblí/srazí se všechny hrany · Enter = OK, Esc = Storno	All edges will be filleted/chamfered · Enter = OK, Esc = Cancel
+Vyberte hrany v modelu (vybráno {0}) · Enter = OK	Select edges in the model ({0} selected) · Enter = OK
+Vyberte plochy, které se otevřou · Enter = OK	Select the faces to open · Enter = OK
+Vyberte plochy pro úkos · Enter = OK	Select the faces to draft · Enter = OK
+Klikněte na plochu, kam se má vrtat · Enter = OK	Click the face to drill into · Enter = OK
+Popisky zapnuté (Ctrl+Shift+L) · 	Labels on (Ctrl+Shift+L) ·
+Vybráno: {0}× {1} · pravé tlačítko = příkazy pro výběr · Esc zruší	Selected: {0}× {1} · right-click = commands for the selection · Esc clears
+Filtr výběru: {0} · klikněte na entitu · pravé tlačítko = nabídka	Selection filter: {0} · click an entity · right-click = menu
+Filtr: {0}	Filter: {0}
+průnik	interference
+průniky	interferences
+průniků	interferences
+Plochý (všechny díly)	Flat (all parts)
+Strukturovaný (podsestavy)	Structured (sub-assemblies)
+dle kusovníku	per bill of materials
+Číslo / norma	Number / standard
+Dílů	Parts
+Zdroj	Source
+parametrický díl	parametric part
+podsestava	sub-assembly
+soubor {0}	file {0}
+ s podložkou	 with washer
+ a maticí	 and nut
+nová sestava	new assembly
+nový díl	new part
+název	name
+barva	colour
+✗ řádek {0}: {1}{2}	✗ line {0}: {1}{2}
+Vyhazovač {0}	Ejector pin {0}
+sestava	assembly
+díl	part
+chyba	error
+Chyba	Error
+žádné	none
+Komponenty: {0}	Components: {0}
+Geometrie: {0}{1}	Geometry: {0}{1}
+ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid	NO solid body (faces only) – STEP export will not give a solid
+NEPLATNÁ (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat; opravte prvek označený ⚠	INVALID (self-intersecting or non-orientable faces) – STEP export may fail; fix the feature marked ⚠
+platná	valid
+1 těleso	1 body
+{0} těles	{0} bodies
+plášť	shell
+pláště	shells
+ · obálka {0} × {1} × {2} mm	 · envelope {0} × {1} × {2} mm
+ · objem Σ {0} cm³	 · volume Σ {0} cm³
+ · hmotnost Σ {0} kg	 · mass Σ {0} kg
+{0} (podsestava, {1} dílů)	{0} (sub-assembly, {1} parts)
+{0} entit	{0} entities
+
+# kontrola kót
+celkové rozměry	overall dimensions
+{0} (délka X)	{0} (length X)
+{0} (šířka Y)	{0} (width Y)
+{0} (výška Z)	{0} (height Z)
+{0} (hloubka díry)	{0} (hole depth)
+Ø{0} (zahloubení)	Ø{0} (counterbore)
+{0} (hloubka zahloubení)	{0} (counterbore depth)
+Ø{0} (kuželové zahloubení)	Ø{0} (countersink)
+{0} (výška)	{0} (height)
+{0} ({1})	{0} ({1})
+hloubka odebrání	cut depth
+výška vysunutí	extrusion height
+{0} (délka)	{0} (length)
+{0} (délka Ø{1})	{0} (length Ø{1})
+{0} (délka drážky)	{0} (slot length)
+{0} (šířka drážky)	{0} (slot width)
+Ø{0} (opsaná kružnice {1}-úhelníku)	Ø{0} (circumscribed circle of the {1}-gon)
+{0} (elipsa)	{0} (ellipse)
+{0}×45° (sražení)	{0}×45° (chamfer)
+{0} (tloušťka stěny)	{0} (wall thickness)
+{0} (rozteč)	{0} (spacing)
+Ø{0} (pružina)	Ø{0} (spring)
+Ø{0} (koule)	Ø{0} (sphere)
+{0} (stoupání)	{0} (pitch)
+
+# entity, výběr, odkazy
+rovinná	planar
+zakřivená	curved
+ · normála {0}	 · normal {0}
+svislá úsečka	vertical line
+vodorovná úsečka	horizontal line
+úsečka	line
+bod	point
+obecnou	general
+toroidní (zaoblení po oblouku)	toroidal (fillet along an arc)
+válcová	cylindrical
+kuželová plocha	conical face
+válcová plocha	cylindrical face
+rovinná plocha	planar face
+osa Z souř. systému	Z axis of the coordinate system
+souřadný systém	coordinate system
+směr	direction
+Směr pole	Pattern direction
+ · začátek	 · start
+ · konec	 · end
+ · střed	 · midpoint
+ · střed kružnice	 · circle centre
+Střed mezi	Midpoint between
+Mezi	Between
+Odsazení od	Offset from
+Průmět	Projection
+Průsečík	Intersection
+Bod na	Point on
+ (obráceně)	 (reversed)
+Osa X	X axis
+Globální osa X / Y / Z (níže)	Global X / Y / Z axis (below)
+Základní / podle osy (původní zadání)	Base / by axis (original input)
+otevřených ploch	faces to open
+rovinných ploch	planar faces
+ploch k odsazení	faces to offset
+ploch k odstranění	faces to remove
+ploch k zesílení	faces to thicken
+ploch ke zkosení	faces to draft
+Všechny hrany plochy	All edges of the face
+ Jmenovitý Ø {0} mm, stoupání {1} mm.	 Nominal Ø {0} mm, pitch {1} mm.
+ Jmenovitý Ø {0} mm, stoupání {1} mm{2}.	 Nominal Ø {0} mm, pitch {1} mm{2}.
+, jádro díry Ø {0} mm	, hole minor Ø {0} mm
+těleso jako celek	the body as a whole
+ · zobrazeno prvních {0} – upřesněte hledáním	 · showing the first {0} – refine the search
+ · těleso nemá žádné entity tohoto druhu (nejdřív vytvořte tvar)	 · the body has no entities of this kind (create a shape first)
+
+# měření a informace
+Souřadnice	Coordinates
+Těžiště	Centroid
+Poloměry	Radii
+Vrcholový úhel	Apex angle
+Ref. poloměr	Ref. radius
+Úhel oblouku	Arc angle
+Min. vzdálenost	Min. distance
+Bod 1	Point 1
+Bod 2	Point 2
+Vzdálenost středů	Centre distance
+Vzdálenost os	Axis distance
+ (doplněk {0}°)	 (supplement {0}°)
+Úhel k ose X	Angle to X axis
+Obvod	Circumference
+Nejmenší vzdálenost	Shortest distance
+Vzdálenost (rovnoběžné)	Distance (parallel)
+
+# skicář
+Kružnice	Circle
+Mnohoúhelník	Polygon
+Lomená čára	Polyline
+Oblouk	Arc
+Elipsa	Ellipse
+Spline	Spline
+klik na úsek, nebo táhněte přes více úseků (výkonný ořez)	click a segment, or drag across several segments (power trim)
+entita nebo řetězec, strana myší, vzdálenost číslem	an entity or a chain, side by mouse, distance by number
+klikněte u konce úsečky	click near the end of a line
+rozdělit úsečku/oblouk v bodě, kružnici 2 body	split a line/arc at a point, a circle at 2 points
+promítnout hrany modelu do roviny skici	project model edges into the sketch plane
+2 úsečky + poloměr	2 lines + radius
+2 úsečky + vzdálenost	2 lines + distance
+levý dolní roh	bottom-left corner
+pravý dolní roh	bottom-right corner
+pravý horní roh	top-right corner
+levý horní roh	top-left corner
+pravý kvadrant	right quadrant
+levý kvadrant	left quadrant
+horní kvadrant	top quadrant
+dolní kvadrant	bottom quadrant
+Zarovnání (vodítka)	Alignment (guides)
+Automatické vazby	Automatic constraints
+Přichytit k mřížce	Snap to grid
+vepsaná	inscribed
+opsaná	circumscribed
+Přeurčeno – konflikt ({0})	Over-defined – conflict ({0})
+Přeurčeno – nadbytečné vazby ({0})	Over-defined – redundant constraints ({0})
+Plně určeno	Fully defined
+Nedourčeno ({0} st. volnosti)	Under-defined ({0} degrees of freedom)
+
+# výkres
+Bez názvu	Untitled
+Rozměry v mm	Dimensions in mm
+Nepředepsané tolerance {0}	General tolerances {0}
+Hrany: {0}	Edges: {0}
+Číslo výkresu / normy	Drawing no. / standard
+Číslo výkresu / norma	Drawing no. / standard
+Značka	Mark
+Popis změny	Description of change
+Pozice	Item
+Poz.	Item
+Rev.	Rev.
+Hmotnost [kg]	Mass [kg]
+Hmotnost 1 ks [kg]	Mass per pc [kg]
+Hmotnost celkem [kg]	Total mass [kg]
+
+# svařence
+Plochá {0}×{1}	Flat {0}×{1}
+Čtyřhran {0}	Square {0}
+Poz.  Profil                 Ks   Délka [mm]  Řez A  Řez B  kg/ks	Item  Profile                Qty  Length [mm] Cut A  Cut B  kg/pc
+Pozice;Profil;Ks;Délka [mm];Řez A [°];Řez B [°];Hmotnost 1 ks [kg];Hmotnost celkem [kg];Prvek	Item;Profile;Qty;Length [mm];Cut A [°];Cut B [°];Mass per pc [kg];Total mass [kg];Feature
+Prvek                  Typ                           a/s   Délka [mm]  Objem [cm³]  kg	Feature                Type                          a/s   Length [mm] Volume [cm³] kg
+koutový	fillet
+koutový přerušovaný {0} ({1})	intermittent fillet {0} ({1})
+ (po obvodu)	 (all round)
+ (montážní)	 (field)
+Rozvin: {0} × {1} mm · tloušťka {2} mm · {3} ohybů	Flat pattern: {0} × {1} mm · thickness {2} mm · {3} bends
+nahoru	up
+dolů	down
+
+# sdílení a soubory
+ · chráněno heslem	 · password-protected
+ (příjemci se otevře rovnou výkres)	 (the recipient will see the drawing directly)
+ Pro velké modely (STEP) lze zapnout šifrované úložiště (viz dokumentace).	 For large models (STEP) the encrypted storage can be enabled (see the documentation).
+v šifrovaném úložišti	in encrypted storage
+Připravuji odkaz…	Preparing the link…
+výkres	drawing
+výkresy	drawings
+výkresů	drawings
+Zvolte úložiště.	Choose the storage.
+Zvolte omezenou platnost a úložiště.	Choose a limited validity and the storage.
+Uložte .mncad nebo STEP a pošlete soubor, nebo nastavte úložiště sdílení.	Save .mncad or STEP and send the file, or set up the sharing storage.
+; přeskočeno: {0}	; skipped: {0}
+soubor se nepodařilo načíst.	the file could not be loaded.
+Síťový model ({0} trojúhelníků) – vloženo jako těleso z plošek.	Mesh model ({0} triangles) – inserted as a faceted body.
+V SolidWorksu: Soubor → Uložit jako → typ „STEP AP214 (*.step)“.	In SolidWorks: File → Save As → type “STEP AP214 (*.step)”.
+V SolidWorksu: Soubor → Uložit jako → „STEP AP214 (*.step)“ (sestava se uloží jako jeden soubor).	In SolidWorks: File → Save As → “STEP AP214 (*.step)” (the assembly is saved as one file).
+Výkres uložte jako DXF (Soubor → Uložit jako → DXF) nebo 3D model jako STEP.	Save the drawing as DXF (File → Save As → DXF) or the 3D model as STEP.
+V Inventoru: Soubor → Exportovat → Formát CAD → typ „STEP (*.stp)“.	In Inventor: File → Export → CAD Format → type “STEP (*.stp)”.
+V Inventoru: Soubor → Exportovat → Formát CAD → „STEP (*.stp)“.	In Inventor: File → Export → CAD Format → “STEP (*.stp)”.
+Výkres exportujte jako DXF (Soubor → Exportovat → Formát DWG/DXF) nebo model jako STEP.	Export the drawing as DXF (File → Export → DWG/DXF format) or the model as STEP.
+V ZW3D: Soubor → Export → „STEP File (*.stp)“.	In ZW3D: File → Export → “STEP File (*.stp)”.
+V ZW3D: Soubor → Export → typ „STEP File (*.stp)“.	In ZW3D: File → Export → type “STEP File (*.stp)”.
+V CATII: File → Save As → typ „stp“.	In CATIA: File → Save As → type “stp”.
+V Creu: Soubor → Uložit kopii → „STEP (*.stp)“; v NX: File → Export → STEP.	In Creo: File → Save a Copy → “STEP (*.stp)”; in NX: File → Export → STEP.
+Použijte Soubor → Uložit kopii / Uložit jako → STEP (*.stp).	Use File → Save a Copy / Save As → STEP (*.stp).
+Parasolid vyžaduje licencované jádro Siemens. Ve zdrojovém programu exportujte STEP AP214.	Parasolid requires the licensed Siemens kernel. Export STEP AP214 from the source program.
+V Solid Edge: Uložit jako → typ „STEP (*.stp)“.	In Solid Edge: Save As → type “STEP (*.stp)”.
+Ve Fusion: Soubor → Exportovat → typ „STEP (*.step)“.	In Fusion: File → Export → type “STEP (*.step)”.
+V Rhinu: File → Export Selected → „STEP (*.stp)“.	In Rhino: File → Export Selected → “STEP (*.stp)”.
+V Blenderu: File → Export → „glTF 2.0 (.glb)“ nebo „STL“.	In Blender: File → Export → “glTF 2.0 (.glb)” or “STL”.
+Ve SketchUpu: Soubor → Exportovat → 3D model → „OBJ“ nebo „STL“, ty pak otevřete zde.	In SketchUp: File → Export → 3D Model → “OBJ” or “STL”, then open them here.
+Exportujte model jako OBJ nebo glTF (GLB).	Export the model as OBJ or glTF (GLB).
+Formát DWG je uzavřený (Autodesk). V AutoCADu, ZWCADu nebo DraftSightu použijte Uložit jako → „DXF (*.dxf)“ a otevřete DXF zde.	The DWG format is proprietary (Autodesk). In AutoCAD, ZWCAD or DraftSight use Save As → “DXF (*.dxf)” and open the DXF here.
+IFC je stavební formát. Exportujte geometrii jako STEP nebo OBJ.	IFC is a building format. Export the geometry as STEP or OBJ.
+Ve zdrojovém programu exportujte STEP AP214.	Export STEP AP214 from the source program.
+ACIS je licencované jádro (Spatial). Exportujte STEP AP214.	ACIS is a licensed kernel (Spatial). Export STEP AP214.
+
+# diagnostika
+Mnástrojárna CAD – diagnostika (bez dat dokumentu)	Mnástrojárna CAD – diagnostics (no document data)
+Čas: {0}	Time: {0}
+Prohlížeč: {0} ({1})	Browser: {0} ({1})
+Platforma: {0} · jazyk {1} · jader CPU {2} · paměť {3}	Platform: {0} · language {1} · CPU cores {2} · memory {3}
+Obrazovka: {0} · okno {1} · DPR {2} · dotyk {3}	Screen: {0} · window {1} · DPR {2} · touch {3}
+Softwarové vykreslování: {0}	Software rendering: {0}
+Jádro OCCT: {0}	OCCT kernel: {0}
+Grafický kontext WebGL byl během práce ztracen – nejčastěji po probuzení počítače, při přetížení grafické paměti, pádu ovladače grafiky nebo příliš mnoha otevřených 3D oknech.	The WebGL graphics context was lost while working – usually after the computer wakes up, when graphics memory is exhausted, after a graphics driver crash or with too many open 3D windows.
+Prohlížeč neposkytl WebGL, tedy hardwarově akcelerovanou grafiku, kterou 3D zobrazení potřebuje ({0}). Nejčastější příčiny: vypnutá grafická akcelerace v prohlížeči, vzdálená plocha nebo virtuální stroj bez grafické karty, zastaralý ovladač grafiky, firemní zásady prohlížeče.{1}	The browser did not provide WebGL, i.e. the hardware-accelerated graphics the 3D view needs ({0}). The most common causes: graphics acceleration disabled in the browser, a remote desktop or virtual machine without a graphics card, an outdated graphics driver, corporate browser policies.{1}
+bez bližšího důvodu	no further reason given
+ Podle identifikace prohlížeče jde o vzdálenou nebo virtuální relaci.	 According to the browser identification this is a remote or virtual session.
+WebGL je dostupné ({0}), ale 3D vykreslování se nepodařilo spustit: {1}. Může jít o vyčerpanou grafickou paměť nebo příliš mnoho otevřených 3D oken.	WebGL is available ({0}), but 3D rendering could not start: {1}. Graphics memory may be exhausted or too many 3D windows are open.
+
+# jádro
+Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.	The feature did not change the body (volume and face count stayed the same) – the tool does not overlap the body, lies outside it, or the kernel operation failed. Check the position and dimensions.
+Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.	The result has invalid geometry (self-intersecting or non-orientable faces) – STEP export may fail. Change the parameters: the profile must not be tangent to the body surface, the path must not self-intersect.
+Cyklická závislost: {0}	Cyclic dependency: {0}
+Neplatný název proměnné (písmena, číslice, podtržítko; nesmí začínat číslicí).	Invalid variable name (letters, digits, underscore; must not start with a digit).
+Proměnná je definovaná vícekrát.	The variable is defined more than once.
+Název je vyhrazen pro funkci/konstantu.	The name is reserved for a function/constant.
+Závisí na proměnné s chybou.	Depends on a variable with an error.
+Smrštění +{0} %	Shrinkage +{0} %
+Chladicí okruh	Cooling circuit
+Kanál {0}	Channel {0}
+Čep se závitem M20	Pin with M20 thread
+Zebra pruhy – návaznost a hladkost ploch	Zebra stripes – continuity and smoothness of faces
+Mapa křivosti – modrá vydutá, zelená rovina, červená vypuklá	Curvature map – blue concave, green flat, red convex
+Tloušťka stěn – červená pod limitem	Wall thickness – red below the limit
+
+# nastavení
+pravé tlačítko otáčí · prostřední posouvá · kolečko zoom · pravý klik (bez tahu) = nabídka	right button rotates · middle pans · wheel zooms · right click (no drag) = menu
+prostřední otáčí · Ctrl+prostřední posouvá · kolečko zoom	middle rotates · Ctrl+middle pans · wheel zooms
+levé otáčí · pravé posouvá · kolečko zoom	left rotates · right pans · wheel zooms
+
+#!dynamic – názvy rodin knihovny a volby materiálu se překládají za běhu (tr(family.name)), v kódu jako literál nejsou
+# knihovna – názvy rodin
+Závrtný šroub ({0}, b1 = {1}d)	Stud ({0}, b1 = {1}d)
+Axiální kuličkové ložisko	Thrust ball bearing
+Datumovka (vložka s datem)	Date stamp (date insert)
+Domeček vodicí tyče SHF (přírubový)	Shaft support SHF (flanged)
+Dosedka (opěrná podložka)	Rest button (support pad)
+Hadicový nátrubek se závitem	Threaded hose socket
+Hliníkový konstrukční profil s T-drážkou	Aluminium structural profile with T-slot
+Jehlové ložisko s tenkým pouzdrem HK	Drawn cup needle roller bearing HK
+Kluzné pouzdro (bronz)	Plain bush (bronze)
+Klínová řemenice	V-belt pulley
+Kolo s vnitřním ozubením (věnec)	Internal gear (ring gear)
+Kuličkové ložisko jednořadé	Single-row deep groove ball bearing
+Kuličkový šroub s přírubovou maticí SFU	Ball screw with flanged nut SFU
+Kuželové ozubené kolo s přímými zuby	Straight bevel gear
+Kuželový kolík (1:50)	Taper pin (1:50)
+Kuželíkové ložisko jednořadé	Single-row tapered roller bearing
+Křídlová matice	Wing nut
+Lineární kuličkové pouzdro LM…UU	Linear ball bushing LM…UU
+Ložiskové těleso stojaté UCP s vložkou	Pillow block housing UCP with insert
+Nástrčné šroubení přímé (push-in)	Straight push-in fitting
+Nýt s půlkulatou hlavou	Round head rivet
+O-kroužek	O-ring
+Opěrný sloupek	Support pillar
+Ozubená řemenice HTD	HTD timing pulley
+Ozubený hřeben	Gear rack
+Plochý vyhazovač	Blade ejector
+Plynová vzpěra	Gas spring
+Pneumatický miniválec ISO 6432 (kruhový)	Pneumatic mini cylinder ISO 6432 (round)
+Pneumatický válec ISO 15552 (profilový)	Pneumatic cylinder ISO 15552 (profile)
+Podložka plochá	Plain washer
+Podložka pro šrouby s těžkými pružnými kolíky (silná)	Washer for bolts with heavy spring pins (thick)
+Podložka velká	Large washer
+Pojistná matice s nylonovou vložkou	Nylon insert lock nut
+Pojistný kroužek pro díru	Circlip for bore
+Pojistný kroužek pro hřídel	Circlip for shaft
+Profil U (UPN)	U channel (UPN)
+Profilová kolejnice lineárního vedení HGR	Linear guide rail HGR
+Pružná podložka	Spring washer
+Pružný kolík (válcový, štěrbinový)	Spring pin (slotted)
+Příruba PN16 (EN 1092-1)	Flange PN16 (EN 1092-1)
+Samořezný šroub s půlkulatou hlavou a křížem (do plechu)	Pan head self-tapping screw with cross recess (sheet metal)
+Stavěcí šroub s důlkem (ISO 4029)	Set screw with cup point (ISO 4029)
+Stavěcí šroub s plochým koncem (ISO 4026)	Set screw with flat point (ISO 4026)
+Středicí kroužek	Locating ring
+T-matice do drážky profilu	T-nut for profile slot
+Talířová pružina	Disc spring
+Tažná šroubová pružina s očky	Extension spring with hooks
+Temperační spojka (rychlospojka – vsuvka)	Cooling coupling (quick coupling – plug)
+Tlačná šroubová pružina	Compression spring
+Trubka kruhová	Round tube
+Těleso lineárního pouzdra SC…UU	Linear bushing housing SC…UU
+Těsné pero	Parallel key
+Uzavřený profil (jäkl) čtvercový / obdélníkový	Hollow section, square / rectangular
+Vodicí pouzdro bez límce	Guide bush without flange
+Vodicí pouzdro s límcem	Guide bush with flange
+Vodicí sloupek bez límce (nalisovaný)	Guide pillar without flange (press-fit)
+Vodicí sloupek s límcem	Guide pillar with flange
+Vodicí tyč kalená broušená W (h6)	Hardened ground guide shaft W (h6)
+Vratný kolík	Return pin
+Vtoková vložka	Sprue bush
+Vyhazovací trubka	Ejector sleeve
+Vyhazovač válcový	Cylindrical ejector pin
+Zkrutná šroubová pružina	Torsion spring
+Zubová (vějířová) podložka s vnějším ozubením	External tooth lock washer
+Závitová ocelová trubka (R/G)	Threaded steel pipe (R/G)
+Závitová tyč	Threaded rod
+Závlačka	Split pin
+Úhelník L	L angle
+Úhelník pro hliníkové profily	Angle bracket for aluminium profiles
+Úsečové pero (Woodruff)	Woodruff key
+Čelní ozubené kolo s přímými zuby	Spur gear
+Čelní ozubené kolo se šikmými zuby	Helical gear
+Čtvercová tyč	Square bar
+Řetězové kolo pro válečkový řetěz	Roller chain sprocket
+Šestihranná matice	Hexagon nut
+Šestihranná matice nízká	Thin hexagon nut
+Šestihranná matice s přírubou	Hexagon flange nut
+Šikmý čep (pro posuvné čelisti)	Angle pin (for slides)
+Šnek (válcový, jednochodý)	Worm (cylindrical, single start)
+Šnekové kolo	Worm wheel
+Šroub s okem (závěsné oko)	Eye bolt (lifting eye)
+Šroub s půlkulatou hlavou s křížovou drážkou	Pan head screw with cross recess
+Šroub s půlkulatou hlavou s vnitřním šestihranem	Button head socket screw
+Šroub s válcovou hlavou s vnitřním šestihranem	Socket head cap screw
+Šroub se zápustnou hlavou s křížovou drážkou	Countersunk screw with cross recess
+Šroub se zápustnou hlavou s vnitřním šestihranem	Countersunk socket screw
+Šroub se šestihrannou hlavou, závit po hlavu	Hexagon head screw, fully threaded
+Šroub se šestihrannou hlavou, částečný závit	Hexagon head bolt, partially threaded
+Plochá tyč	Flat bar
+
+# knihovna – volby materiálu
+ocel	steel
+hliník	aluminium
+měď	copper
+CuSn7Zn4Pb7 (bronz)	CuSn7Zn4Pb7 (bronze)
+CuSn12	CuSn12
+ocel/PTFE (bezúdržbové)	steel/PTFE (maintenance-free)
+POM	POM
+NBR 70	NBR 70
+FKM (Viton) 75	FKM (Viton) 75
+EPDM 70	EPDM 70
+silikon 60	silicone 60
+
+# dynamicky překládané hodnoty map (názvy prvků, nástroje skici, typy ploch/křivek, pohledy, tolerance, skupiny pásu a knihovny, stavy vazeb)
+Vysunutí	Extrude
+Rotace	Revolve
+Zrcadlení	Mirror
+Vytáhnout	Push/Pull
+Zesílení	Thicken
+Prvek	Feature
+Sloučení	Combine
+Rozdělení	Split
+Kopie tělesa	Body copy
+Souřadný systém	Coordinate system
+Rozšíření	Extension
+Sloučení těles	Combine bodies
+Rozdělení na tělesa	Split into bodies
+Transformace	Transform
+Vytáhnout/Zatlačit	Push/Pull
+Komponenta	Component
+začátek hrany	edge start
+konec hrany	edge end
+střed hrany	edge midpoint
+kuželová	conical
+kulová	spherical
+toroidní	toroidal
+Bézierova	Bézier
+B-spline	B-spline
+rotační	revolved
+vysunutá	extruded
+odsazená	offset
+kružnice / oblouk	circle / arc
+elipsa	ellipse
+hyperbola	hyperbola
+parabola	parabola
+obecná	general
+B-spline (volná)	B-spline (freeform)
+Bézierova křivka	Bézier curve
+odsazená křivka	offset curve
+obecná křivka	general curve
+Souosost	Concentric
+Dostatečný úkos	Sufficient draft
+Malý úkos	Small draft
+Svislá stěna	Vertical wall
+Podkos (nelze vyhodit)	Undercut (cannot be ejected)
+Zepředu (hlavní)	Front (main)
+Shora	Top
+Zleva	Left
+Zprava	Right
+Zezadu	Back
+Zdola	Bottom
+Přímost	Straightness
+Rovinnost	Flatness
+Kruhovitost	Circularity
+Válcovitost	Cylindricity
+Tvar plochy	Profile of a surface
+Rovnoběžnost	Parallelism
+Kolmost	Perpendicularity
+Sklon	Angularity
+Soustřednost	Concentricity
+Souměrnost	Symmetry
+Házení	Runout
+Pohled: izometrie	View: isometric
+Pohled: přední	View: front
+Pohled: horní	View: top
+Pohled: pravý	View: right
+Pohled: zadní	View: back
+Pohled: spodní	View: bottom
+Pohled: levý	View: left
+Přizpůsobit model oknu	Fit model to window
+Perspektiva / pravoúhlá	Perspective / orthographic
+Nová skica	New sketch
+Otevřít / import	Open / import
+Zpět	Undo
+Znovu	Redo
+Výběr	Select
+Obdélník ze středu	Centre rectangle
+Obdélník 3 body	3-point rectangle
+Kružnice 2 body	2-point circle
+Kružnice 3 body	3-point circle
+Oblouk 3 body	3-point arc
+Oblouk středem	Centre arc
+Tečný oblouk	Tangent arc
+Drážka obloukem	Arc slot
+Oříznout	Trim
+Prodloužit	Extend
+Rozdělit	Split
+Promítnout hrany	Project edges
+Odsadit	Offset
+Zaoblit roh	Fillet corner
+Srazit roh	Chamfer corner
+Přesunout	Move
+Kopírovat	Copy
+Otočit	Rotate
+Lineární pole	Linear pattern
+Kruhové pole	Circular pattern
+Střed úsečky	Line midpoint
+Střed křivky	Curve centre
+Kvadrant	Quadrant
+Na křivce	On curve
+vrchol	vertex
+hranu	an edge
+plochu	a face
+rovinnou plochu / pomocnou rovinu	a planar face / datum plane
+hranu / válcovou plochu (osu)	an edge / cylindrical face (axis)
+entitu	an entity
+body	points
+vrcholy	vertices
+hrany	edges
+plochy	faces
+roviny	planes
+hrany / válce	edges / cylinders
+entity	entities
+splněno	satisfied
+konflikt – vazbu nelze splnit spolu s ostatními	conflict – the mate cannot be satisfied together with the others
+plocha nenalezena / díl se ještě staví	face not found / the part is still being built
+potlačeno	suppressed
+Podsestavy	Sub-assemblies
+Desky	Plates
+Tvarové díly	Cavity parts
+Spojovací materiál	Fasteners
+Kolíky a pera	Pins and keys
+Pojistné kroužky	Circlips
+Ložiska	Bearings
+Ozubení a řetězy	Gears and chains
+Ocelové profily a trubky	Steel profiles and tubes
+Pružiny a těsnění	Springs and seals
+Normálie forem	Mould standard parts
+Lineární technika	Linear motion
+Pneumatika a hydraulika	Pneumatics and hydraulics
+Hliníkové profily	Aluminium profiles
+Potrubí a příruby	Piping and flanges
+Pokročilé úpravy	Advanced edits
+Pole a kopie	Patterns and copies
+Pokročilé tvary	Advanced shapes
+Geometrie	Geometry
+Test	Test
+Ohyby	Bends
+Rozvin	Flat pattern
+Úpravy ploch	Surface edits
+Těleso ↔ plocha	Body ↔ surface
+Křivky	Curves
+Konstrukce	Structure
+Spoje	Joints
+Svary	Welds
+Výstupy	Outputs
+Prvky:	Features:
+
+# třetí kolo – slova bez diakritiky
+{0} (hustota podle: {1})	{0} (density per: {1})
+{0}: upravte parametry · Enter = OK, Esc = Storno	{0}: edit the parameters · Enter = OK, Esc = Cancel
+Historie	History
+Hmotnost (ρ {0})	Mass (ρ {0})
+Chyba: {0}	Error: {0}
+jen v odkazu (bez serveru)	in the link only (no server)
+Kolize: {0}	Interference: {0}
+List {0}/{1}	Sheet {0}/{1}
+List {0}	Sheet {0}
+perspektiva	perspective
+Pohled: {0}	View: {0}
+Rovina XY	Plane XY
+Rovina XZ	Plane XZ
+Rovina YZ	Plane YZ
+Stav {0}	Configuration {0}
+Stavy	Configurations
+Vazba: {0}	Mate: {0}
+Verze CADu: {0}	CAD version: {0}
+Vybrat ze seznamu	Select from list

@@ -1,16 +1,17 @@
 /** Spojovací materiál: šrouby, matice, podložky, závitové tyče. */
+import { tr } from "../i18n";
 import { uid, type Feature, type Vec2 } from "../types";
 import { has, length, metric, nums, score } from "./parse-util";
 import { ISO10642, ISO4762, ISO7380, METRIC, METRIC_SIZES, NUT, SETSCREW, WASHER } from "./tables";
 import type { Family, ParamSchema, Values } from "./types";
 import { chamferAll, cyl, fmt, hexPrism, num, part, revolveProfile, str, tube } from "./util";
 
-const sizeParam = (keys: string[] = METRIC_SIZES, def = "M8"): ParamSchema => ({ key: "size", label: "Závit", kind: "enum", options: keys.map((k) => ({ v: k, l: k })), default: def });
+const sizeParam = (keys: string[] = METRIC_SIZES, def = "M8"): ParamSchema => ({ key: "size", label: tr("Závit"), kind: "enum", options: keys.map((k) => ({ v: k, l: k })), default: def });
 const lenParam = (def = 30, label = "Délka l"): ParamSchema => ({ key: "l", label, kind: "number", min: 2, max: 3000, step: 5, unit: "mm", default: def });
-const gradeParam = (opts: string[], def: string): ParamSchema => ({ key: "grade", label: "Pevnost / materiál", kind: "enum", options: opts.map((o) => ({ v: o, l: o })), default: def });
+const gradeParam = (opts: string[], def: string): ParamSchema => ({ key: "grade", label: tr("Pevnost / materiál"), kind: "enum", options: opts.map((o) => ({ v: o, l: tr(o) })), default: def });
 
 const materialOf = (grade: string) => (/A2|A4|nerez/i.test(grade) ? "nerez" : "ocel");
-const socket = (s: number, t: number, zTop: number): Feature[] => hexPrism("Vnitřní šestihran", s, t, zTop - t, "cut");
+const socket = (s: number, t: number, zTop: number): Feature[] => hexPrism(tr("Vnitřní šestihran"), s, t, zTop - t, "cut");
 const cosmeticThread = (size: string, from: number, len: number): Feature => ({ id: uid(), name: `Závit ${size}`, type: "thread", designation: size, position: [0, 0, from], axis: "Z", length: len, modeled: false });
 
 /** Délka závitu b dle ISO 4014 / ISO 4762 (částečný závit). */
@@ -49,13 +50,13 @@ export const socketCap: Family = {
     const g = ISO4762[size] ?? ISO4762.M8;
     const d = METRIC[size].d;
     const l = num(v.l, 30);
-    return part(`Šroub ${size}×${fmt(l)} ISO 4762`, materialOf(str(v.grade)), [
-      cyl("Dřík", d, l, -l, "new"),
+    return part(tr("Šroub {0}×{1} ISO 4762", size, fmt(l)), materialOf(str(v.grade)), [
+      cyl(tr("Dřík"), d, l, -l, "new"),
       cyl("Hlava", g.dk, g.k, 0),
       ...socket(g.s, g.t, g.k),
       chamferAll(Math.max(0.3, d * 0.08)),
       cosmeticThread(size, -l, threadLen(d, l)),
-    ], `ISO 4762 – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
+    ], tr("ISO 4762 – {0}×{1} – {2}", size, fmt(l), v.grade), "#3a3f45");
   },
 };
 
@@ -82,8 +83,8 @@ const hexBolt = (id: string, std: string, full: boolean): Family => ({
     const m = METRIC[size] ?? METRIC.M8;
     const l = num(v.l, 40);
     const b = full ? l : threadLen(m.d, l);
-    return part(`Šroub ${size}×${fmt(l)} ${std}`, materialOf(str(v.grade)), [
-      cyl("Dřík", m.d, l, -l, "new"),
+    return part(tr("Šroub {0}×{1} {2}", size, fmt(l), std), materialOf(str(v.grade)), [
+      cyl(tr("Dřík"), m.d, l, -l, "new"),
       ...hexPrism("Hlava", m.s, m.k, 0),
       chamferAll(Math.min(0.6, m.d * 0.06)),
       cosmeticThread(size, -l, b),
@@ -115,12 +116,12 @@ export const buttonHead: Family = {
       const x = (g.dk / 2) * (1 - i / 8);
       cap.push([x, g.k - (R - Math.sqrt(Math.max(0, R * R - x * x)))]);
     }
-    return part(`Šroub ${size}×${fmt(l)} ISO 7380`, materialOf(str(v.grade)), [
-      cyl("Dřík", d, l, -l, "new"),
+    return part(tr("Šroub {0}×{1} ISO 7380", size, fmt(l)), materialOf(str(v.grade)), [
+      cyl(tr("Dřík"), d, l, -l, "new"),
       ...revolveProfile("Hlava", cap, "add"),
       ...socket(g.s, g.k * 0.6, g.k),
       cosmeticThread(size, -l, l),
-    ], `ISO 7380 – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
+    ], tr("ISO 7380 – {0}×{1} – {2}", size, fmt(l), v.grade), "#3a3f45");
   },
 };
 
@@ -141,12 +142,12 @@ export const countersunk: Family = {
     const d = METRIC[size].d;
     const l = num(v.l, 20);
     // hlava: horní plocha v z=0, kužel 90° dolů; délka l se měří od horní plochy hlavy
-    return part(`Šroub ${size}×${fmt(l)} ISO 10642`, materialOf(str(v.grade)), [
-      cyl("Dřík", d, l - g.k, -l, "new"),
+    return part(tr("Šroub {0}×{1} ISO 10642", size, fmt(l)), materialOf(str(v.grade)), [
+      cyl(tr("Dřík"), d, l - g.k, -l, "new"),
       ...revolveProfile("Hlava", [[0, 0], [g.dk / 2, 0], [d / 2, -g.k], [0, -g.k]], "add"),
       ...socket(g.s, g.k * 0.7, 0),
       cosmeticThread(size, -l, l - g.k),
-    ], `ISO 10642 – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
+    ], tr("ISO 10642 – {0}×{1} – {2}", size, fmt(l), v.grade), "#3a3f45");
   },
 };
 
@@ -169,9 +170,9 @@ const setScrew = (id: string, std: string, cup: boolean): Family => ({
     const m = METRIC[size] ?? METRIC.M6;
     const s = SETSCREW[size]?.s ?? 3;
     const l = num(v.l, 10);
-    const f: Feature[] = [cyl("Tělo", m.d, l, 0, "new"), ...socket(s, Math.min(l * 0.5, m.d * 0.6), l), chamferAll(m.d * 0.08)];
-    if (cup) f.push(cyl("Důlek", m.d * 0.55, m.d * 0.15, 0, "cut"));
-    return part(`Stavěcí šroub ${size}×${fmt(l)}`, materialOf(str(v.grade)), f, `${std} – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
+    const f: Feature[] = [cyl(tr("Tělo"), m.d, l, 0, "new"), ...socket(s, Math.min(l * 0.5, m.d * 0.6), l), chamferAll(m.d * 0.08)];
+    if (cup) f.push(cyl(tr("Důlek"), m.d * 0.55, m.d * 0.15, 0, "cut"));
+    return part(tr("Stavěcí šroub {0}×{1}", size, fmt(l)), materialOf(str(v.grade)), f, `${std} – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
   },
 });
 export const setScrewFlat = setScrew("iso4026", "ISO 4026", false);
@@ -185,7 +186,7 @@ const nut = (id: string, std: string, thin: boolean): Family => ({
   standards: [std, thin ? "DIN 439" : "DIN 934", "ČSN 02 1401"],
   keywords: ["matice", "nut", thin ? "nizka" : "sestihranna matice", std.toLowerCase()],
   params: [sizeParam(), gradeParam(["8", "10", "A2-70", "A4-80"], "8")],
-  sizes: { key: "size", columns: [{ key: "s", label: "s" }, { key: "m", label: thin ? "m (nízká)" : "m" }], rows: METRIC_SIZES.map((k) => ({ size: k, s: METRIC[k].s, m: thin ? NUT[k].mt : NUT[k].m })) },
+  sizes: { key: "size", columns: [{ key: "s", label: "s" }, { key: "m", label: thin ? tr("m (nízká)") : "m" }], rows: METRIC_SIZES.map((k) => ({ size: k, s: METRIC[k].s, m: thin ? NUT[k].mt : NUT[k].m })) },
   parse: (q) => {
     const kw = has(q, "matice", "nut", thin ? "439" : "934", std.toLowerCase().replace("iso ", ""));
     if (!kw || has(q, "pojist", "nylon", "nyloc", "samojist", "prirub", "kridl", "lock", "flange", "wing", "985", "7040", "6923", "315", "t-matice", "t matice", "tmatice", "kamen", "drazk", "slot", "kulickov")) return null;
@@ -199,9 +200,9 @@ const nut = (id: string, std: string, thin: boolean): Family => ({
     const size = str(v.size, "M8");
     const m = METRIC[size] ?? METRIC.M8;
     const h = thin ? NUT[size].mt : NUT[size].m;
-    return part(`Matice ${size} ${std}`, materialOf(str(v.grade)), [
+    return part(tr("Matice {0} {1}", size, std), materialOf(str(v.grade)), [
       ...hexPrism("Matice", m.s, h, 0, "new"),
-      cyl("Závitová díra", m.d - 1.0825 * m.p, h + 2, -1, "cut"),
+      cyl(tr("Závitová díra"), m.d - 1.0825 * m.p, h + 2, -1, "cut"),
       chamferAll(Math.min(0.5, m.p * 0.4)),
       cosmeticThread(size, 0, h),
     ], `${std} – ${size} – ${v.grade}`, "#3a3f45");
@@ -236,7 +237,7 @@ const washer = (id: string, std: string, large: boolean): Family => ({
     const size = str(v.size, "M8");
     const w = WASHER[size] ?? WASHER.M8;
     const [d2, h] = large ? [w.D2, w.H] : [w.d2, w.h];
-    return part(`Podložka ${size.replace("M", "")} ${large ? "DIN 9021" : std}`, materialOf(str(v.grade)), [tube("Podložka", d2, w.d1, h, 0, "new")], `${large ? "DIN 9021" : std} – ${size.replace("M", "")} – ${v.grade}`, "#9aa4ad");
+    return part(tr("Podložka {0} {1}", size.replace("M", ""), large ? "DIN 9021" : std), materialOf(str(v.grade)), [tube(tr("Podložka"), d2, w.d1, h, 0, "new")], `${large ? "DIN 9021" : std} – ${size.replace("M", "")} – ${v.grade}`, "#9aa4ad");
   },
 });
 export const washerIso7089 = washer("iso7089", "ISO 7089", false);
@@ -249,7 +250,7 @@ export const threadedRod: Family = {
   icon: "cylinder",
   standards: ["DIN 975", "DIN 976"],
   keywords: ["zavitova tyc", "zavitovka", "threaded rod", "din 975", "din 976"],
-  params: [sizeParam(), { key: "l", label: "Délka", kind: "number", min: 10, max: 3000, step: 10, unit: "mm", default: 1000 }, gradeParam(["4.8", "8.8", "A2", "A4"], "4.8")],
+  params: [sizeParam(), { key: "l", label: tr("Délka"), kind: "number", min: 10, max: 3000, step: 10, unit: "mm", default: 1000 }, gradeParam(["4.8", "8.8", "A2", "A4"], "4.8")],
   parse: (q) => {
     const kw = has(q, "zavitova tyc", "zavitovka", "tyc", "rod", "975", "976");
     if (!kw || has(q, "zavrtn", "stud", "938", "939", "vodici", "kalen", "brousen", "h6", "linear", "support", "domecek", "shf")) return null;
@@ -261,7 +262,7 @@ export const threadedRod: Family = {
     const size = str(v.size, "M8");
     const m = METRIC[size] ?? METRIC.M8;
     const l = num(v.l, 1000);
-    return part(`Závitová tyč ${size}×${fmt(l)}`, materialOf(str(v.grade)), [cyl("Tyč", m.d, l, 0, "new"), chamferAll(m.p * 0.5), cosmeticThread(size, 0, l)], `DIN 975 – ${size}×${fmt(l)} – ${v.grade}`, "#5b6670");
+    return part(tr("Závitová tyč {0}×{1}", size, fmt(l)), materialOf(str(v.grade)), [cyl(tr("Tyč"), m.d, l, 0, "new"), chamferAll(m.p * 0.5), cosmeticThread(size, 0, l)], tr("DIN 975 – {0}×{1} – {2}", size, fmt(l), v.grade), "#5b6670");
   },
 };
 

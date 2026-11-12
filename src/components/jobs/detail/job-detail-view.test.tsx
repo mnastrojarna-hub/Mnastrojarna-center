@@ -19,6 +19,7 @@ vi.mock("@/app/actions/job-files", () => ({
 vi.mock("@/app/actions/job-documents", () => ({
   generateJobDocument: vi.fn(), sendJobDocument: vi.fn(), draftJobDocumentEmail: vi.fn(),
 }));
+vi.mock("@/app/actions/job-consistency", () => ({ setJobValue: vi.fn(), alignJobConsistency: vi.fn() }));
 vi.mock("@/lib/jobs/upload-client", () => ({ uploadJobFiles: vi.fn(), uploadJobFile: vi.fn() }));
 vi.mock("@/components/jobs/capture/capture-button", () => ({
   CaptureButton: ({ label }: { label?: string }) => <button type="button">{label ?? "Vyfotit doklad"}</button>,
@@ -139,6 +140,34 @@ describe("Karta zakázky — render", () => {
     expect(html).toContain("Další akce"); // menu se smazáním
   });
 
+  it("křížová konzistence: hodnota = součet položek, nesoulad s opravou jedním klikem (4. 11.)", () => {
+    // vše sedí → hodnota odvozená z položek, žádný odznak
+    const ok = render(fixture());
+    expect(ok).toContain("= součet položek (1 s cenou)");
+    expect(ok).not.toContain('data-testid="consistency-badges"');
+    // případ majitele: součet položek ≠ hodnota, přijatá nabídka jinak → odznaky; oprava jen u položek
+    const bad = render(fixture({ value: 50_000 }));
+    expect(bad).toContain('data-issue="value_items"');
+    expect(bad).toMatch(/Součet položek 48\s000\sKč neodpovídá hodnotě zakázky 50\s000\sKč/);
+    expect(bad).toContain("Srovnat podle položek");
+    expect(bad).toContain('data-issue="value_quote"');
+    // vyfakturovaná → hodnota zamčená, bez opravy
+    const inv = render(fixture({ value: 50_000, invoiceNumber: "FV-2026-0001" }));
+    expect(inv).toContain("Vyfakturováno — hodnota je uzamčená.");
+    expect(inv).not.toContain("Srovnat podle položek");
+  });
+
+  it("9. 11.: prémiový zákazník — banner „Pozor — prémiový zákazník“ v hlavičce a štítek v liště", () => {
+    const html = render(fixture({ customerPremium: true }));
+    expect(html).toContain('data-testid="premium-banner"');
+    expect(html).toContain("Pozor — prémiový zákazník");
+    expect(html).toContain("Zakázka pro <strong class=\"font-semibold\">StrojMetal s.r.o.</strong> má přednost");
+    expect(html.match(/data-testid="premium-badge"/g)).toHaveLength(2); // lišta: mobil ikona, od sm „Prémiový"
+    const plain = render(fixture());
+    expect(plain).not.toContain("premium-banner");
+    expect(plain).not.toContain("premium-badge");
+  });
+
   it("zaměstnanec bez marží a bez mazání", () => {
     const html = render(fixture({ purchaseCost: null, margin: null }), WORKER);
     expect(html).not.toContain("Nákupní náklady");
@@ -184,6 +213,53 @@ describe("Karta zakázky — render", () => {
     expect(html).toContain('aria-label="Tisknout');
     expect(html).toContain("Zobrazit archiv (1)");
     expect(html).toContain("Přetáhni sem soubory");
+  });
+
+  it("záložka Dokumenty: výkres i 3D model (odznak = počet nearchivovaných = řádky v seznamu)", () => {
+    // majitel (5. 11.): „odznak Dokumenty říká 2, vidím jen výkres" — model musí být v seznamu vedle výkresu
+    const anon = {
+      status: "done" as const, filename: "D-1.pdf", at: null, by: null, actorKind: "ai" as const, reason: null, reviewed: true,
+      reviewedAt: null, counts: {}, total: 3, warnings: [], excludedPages: [], method: null, backfill: false, lockUntil: null,
+    };
+    const files: JobDetail["files"] = [
+      {
+        id: "d1", kind: "vykres", title: null, filename: "DIL-4711.pdf", mimeType: "application/pdf", sizeBytes: 1000, version: 1,
+        archived: false, replacedBy: null, quoteId: null, uploadedBy: null, createdAt: "2026-11-01T08:00:00Z", aiConfidence: null,
+        note: null, hasAiData: false, origin: "upload", issuer: "zakaznik", anon,
+      },
+      {
+        id: "m1", kind: "model_3d", title: null, filename: "DIL-4711.step", mimeType: "application/octet-stream", sizeBytes: 5000, version: 1,
+        archived: false, replacedBy: null, quoteId: null, uploadedBy: null, createdAt: "2026-11-01T08:01:00Z", aiConfidence: null,
+        note: null, hasAiData: false, origin: "upload", issuer: "zakaznik", anon: null,
+      },
+      {
+        id: "m0", kind: "model_3d", title: null, filename: "DIL-4711.step", mimeType: null, sizeBytes: 4000, version: 0,
+        archived: true, replacedBy: "m1", quoteId: null, uploadedBy: null, createdAt: "2026-10-31T08:00:00Z", aiConfidence: null,
+        note: null, hasAiData: false, origin: "upload", issuer: "zakaznik", anon: null,
+      },
+    ];
+    const html = render(fixture({ files }), ADMIN, "dokumenty");
+    expect(html).toContain("/api/jobs/files/d1");
+    expect(html).toContain("/api/jobs/files/m1");
+    expect(html).toContain("3D model");
+    expect(html).toContain("Pro dodavatele: 1 z 1 připraveno");
+    // odznak záložky = 2 nearchivované = 2 řádky
+    expect(html).toMatch(/Dokumenty<span[^>]*>2<\/span>/);
+    expect(html.match(/<li class="flex items-center gap-3 px-3 py-2\.5"/g)?.length).toBe(2);
+    expect(html).toContain("Zobrazit archiv (1)");
+  });
+
+  it("záložka Dokumenty: vystavené PDF nabídek s vazbou „k nabídce“ (odeslaná i archivovaná verze)", () => {
+    // texty potvrzení a zámek mazání (menu se vykreslí až po otevření) kryje lib/jobs/quote-files.test.ts
+    const pdf = (id: string, quoteId: string, version: number, archived = false): JobDetail["files"][number] => ({
+      id, kind: "nabidka", title: `Nabídka ${quoteId}`, filename: `nabidka-${quoteId}.pdf`, mimeType: "application/pdf", sizeBytes: 100,
+      version, archived, replacedBy: null, quoteId, uploadedBy: null, createdAt: "2026-09-05T08:00:00Z", aiConfidence: null,
+      note: null, hasAiData: false, origin: "generated", issuer: "my", anon: null,
+    });
+    const html = render(fixture({ files: [pdf("p2", "q2", 1), pdf("p1", "q1", 1)] }), ADMIN, "dokumenty");
+    expect(html).toContain("k nabídce NAB-2026-007-2");
+    expect(html).toContain("k nabídce NAB-2026-007");
+    expect(html).toMatch(/Dokumenty<span[^>]*>2<\/span>/);
   });
 
   it("záložka Historie: komentář, změna stavu, změny polí", () => {

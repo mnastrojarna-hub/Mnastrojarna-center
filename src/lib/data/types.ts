@@ -179,6 +179,11 @@ export interface SentItem {
   senderName?: string;
   /** mail = záznam odeslané pošty (emails), approval = starší log fronty schvalování. */
   source?: "mail" | "approval";
-  /** Druh zprávy pro barevný odznak. */
-  kind?: "email" | "quote" | "reminder" | "supplier";
+  /**
+   * Druh odeslané zprávy (odznak a filtr archivu) — odvozený z dat (objednávka dodavateli, předmět dokladu,
+   * položka fronty schvalování): odpověď / zpráva, nabídka, AI nabídka, potvrzení objednávky, dodací list,
+   * faktura, jiný dokument, upomínka, poptávka dodavateli, objednávka dodavateli (+ změna / storno), ostatní dodavateli.
+   */
+  kind?: "email" | "quote" | "ai_quote" | "confirmation" | "delivery_note" | "invoice" | "document" | "reminder"
+    | "rfq" | "po" | "po_change" | "po_cancel" | "supplier";
 }

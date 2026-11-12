@@ -4,8 +4,9 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Building2, Loader2, Lock, MapPin, Pencil, Plus, ReceiptText, Save, UserRound,
+  Building2, Loader2, Lock, MapPin, Pencil, Plus, ReceiptText, Save, TriangleAlert, UserRound,
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useAccess } from "@/components/access-provider";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button, type ButtonProps } from "@/components/ui/button";
@@ -203,7 +204,7 @@ export function CustomerDialog({
 
   const owner = owners.find((o) => o.id === values.ownerId);
   const fid = (k: CustomerField) => `cust-${k}`;
-  const input = (k: Exclude<CustomerField, "ownerId">, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
+  const input = (k: Exclude<CustomerField, "ownerId" | "isPremium">, props: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <Input
       id={fid(k)}
       value={values[k]}
@@ -245,8 +246,8 @@ export function CustomerDialog({
           if (dirty || busy) e.preventDefault();
         }}
         className={cn(
-          "top-0 flex h-[100dvh] max-w-3xl flex-col overflow-hidden rounded-none",
-          "sm:top-[4vh] sm:h-auto sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-xl",
+          "top-0 flex h-[100dvh] max-h-[100dvh] max-w-3xl flex-col overflow-hidden rounded-none",
+          "sm:top-[4dvh] sm:h-auto sm:max-h-[92dvh] sm:w-[calc(100%-2rem)] sm:rounded-xl",
         )}
         data-testid="customer-dialog"
       >
@@ -377,6 +378,27 @@ export function CustomerDialog({
             </FormSection>
 
             <FormSection icon={<ReceiptText />} tone="bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300" title="Obchodní podmínky">
+              {/* 9. 11.: prémiový zákazník — všechny jeho zakázky výrazně označené „Pozor, prémiový zákazník" */}
+              <div
+                className={cn(
+                  "flex items-start gap-3 rounded-lg border p-3 sm:col-span-2",
+                  values.isPremium ? "border-red-500/70 bg-red-50 dark:bg-red-950/30" : "bg-muted/30",
+                )}
+              >
+                <TriangleAlert className={cn("mt-0.5 h-4 w-4 shrink-0", values.isPremium ? "text-red-600 dark:text-red-400" : "text-muted-foreground")} aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <label htmlFor="cust-isPremium" className="text-sm font-medium">Prémiový zákazník</label>
+                  <p className="text-xs text-muted-foreground">
+                    Všechny jeho zakázky budou v Knize zakázek a všude jinde výrazně označené červeným „Pozor, prémiový zákazník“.
+                  </p>
+                </div>
+                <Switch
+                  id="cust-isPremium"
+                  checked={values.isPremium === true}
+                  onCheckedChange={(v) => set("isPremium", v)}
+                  data-testid="customer-premium-switch"
+                />
+              </div>
               <Field id={fid("paymentTermsDays")} label="Splatnost faktur (dní)" error={errors.paymentTermsDays} hint="Předvyplní se na fakturách.">
                 {input("paymentTermsDays", { inputMode: "numeric", placeholder: "počet dní" })}
               </Field>

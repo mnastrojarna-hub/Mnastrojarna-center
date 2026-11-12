@@ -2,6 +2,7 @@
  * Sestavy: umístění komponent, kusovník (BOM), rozložený pohled, zarovnání ploch a generátory
  * normálií a rámu vstřikovací formy. Čisté funkce – běží v prohlížeči i v testech.
  */
+import { tr } from "./i18n";
 import { emptyDoc, uid, type AsmComponent, type CadDoc, type ComponentSource, type Feature, type Placement, type Vec3 } from "./types";
 
 // ---------------- matice ----------------
@@ -266,7 +267,7 @@ export function flattenAssembly(doc: CadDoc): FlatComponent[] {
 export function makeSubassembly(asm: CadDoc, compIds: string[], name = "Podsestava"): { doc: CadDoc; id: string } {
   const comps = asm.components ?? [];
   const picked = comps.filter((c) => compIds.includes(c.id));
-  if (!picked.length) throw new Error("Vyberte komponenty pro podsestavu.");
+  if (!picked.length) throw new Error(tr("Vyberte komponenty pro podsestavu."));
   const sub: CadDoc = { ...emptyAssembly(name), components: picked.map((c) => ({ ...c, fixed: false })) };
   const id = uid();
   const comp: AsmComponent = { id, name, source: { kind: "asm", doc: sub }, placement: { position: [0, 0, 0], rotation: [0, 0, 0] }, group: "Podsestavy" };
@@ -281,7 +282,7 @@ export function dissolveSubassembly(asm: CadDoc, compId: string): CadDoc {
   const comps = asm.components ?? [];
   const i = comps.findIndex((c) => c.id === compId);
   const c = comps[i];
-  if (!c || c.source.kind !== "asm") throw new Error("Vybraná komponenta není podsestava.");
+  if (!c || c.source.kind !== "asm") throw new Error(tr("Vybraná komponenta není podsestava."));
   const children = (c.source.doc.components ?? []).map((ch) => ({ ...ch, id: uid(), placement: composePlacement(c.placement, ch.placement), hidden: ch.hidden || c.hidden }));
   const next = [...comps];
   next.splice(i, 1, ...children);
@@ -305,7 +306,7 @@ export function bomCsv(rows: BomRow[]): string {
     const t = s == null ? "" : String(s);
     return /[;"\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t;
   };
-  const head = ["Pozice", "Název", "Číslo výkresu / norma", "Ks", "Materiál", "Hmotnost 1 ks [kg]", "Hmotnost celkem [kg]", "Skupina"];
+  const head = [tr("Pozice"), tr("Název"), tr("Číslo výkresu / norma"), tr("Ks"), tr("Materiál"), tr("Hmotnost 1 ks [kg]"), tr("Hmotnost celkem [kg]"), tr("Skupina")];
   const lines = rows.map((r) =>
     [r.pos, r.name, r.number, r.qty, r.material, r.massKg != null ? r.massKg.toFixed(3).replace(".", ",") : "", r.massKg != null ? (r.massKg * r.qty).toFixed(3).replace(".", ",") : "", r.group].map(esc).join(";"),
   );
@@ -314,7 +315,7 @@ export function bomCsv(rows: BomRow[]): string {
 
 // ---------------- sestava ----------------
 
-export function emptyAssembly(name = "Nová sestava"): CadDoc {
+export function emptyAssembly(name = tr("Nová sestava")): CadDoc {
   return { ...emptyDoc(name), kind: "assembly", components: [] };
 }
 
@@ -355,13 +356,13 @@ export function screwISO4762(size: keyof typeof ISO4762 | string, length: number
   const d = Number(String(size).replace(/\D/g, "")) || 8;
   const g = ISO4762[size as string] ?? ISO4762.M8;
   const hex = uid();
-  return part(`Šroub ${size}×${length}`, "ocel", [
+  return part(tr("Šroub {0}×{1}", size, length), "ocel", [
     { id: uid(), name: "Dřík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, -length], axis: "Z", mode: "new" },
     { id: uid(), name: "Hlava", type: "cylinder", radius: g.dk / 2, height: g.k, position: [0, 0, 0], axis: "Z", mode: "add" },
-    sk(hex, "Šestihran", { kind: "base", name: "XY", offset: g.k }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: g.s / Math.sqrt(3), sides: 6, angle: 0 }]),
+    sk(hex, tr("Šestihran"), { kind: "base", name: "XY", offset: g.k }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: g.s / Math.sqrt(3), sides: 6, angle: 0 }]),
     { id: uid(), name: "Imbus", type: "extrude", sketchId: hex, distance: g.t, symmetric: false, reverse: true, mode: "cut" },
     { id: uid(), name: "Sražení", type: "chamfer", distance: Math.max(0.3, d * 0.08), edges: "all" },
-  ], `ISO 4762 – ${size}×${length} – 12.9`);
+  ], tr("ISO 4762 – {0}×{1} – 12.9", size, length));
 }
 
 /** DIN 912 = ISO 4762 (válcový šroub s vnitřním šestihranem). */
@@ -386,7 +387,7 @@ export const ISO7089: Record<string, [number, number, number]> = {
 
 export function washerISO7089(size: string): CadDoc {
   const [d1, d2, h] = ISO7089[size] ?? ISO7089.M8;
-  return part(`Podložka ${size}`, "ocel", [{ id: uid(), name: "Podložka", type: "tube", outer: d2, inner: d1, height: h, position: [0, 0, 0], axis: "Z", mode: "new" }], `ISO 7089 – ${size} – 200 HV`);
+  return part(tr("Podložka {0}", size), "ocel", [{ id: uid(), name: "Podložka", type: "tube", outer: d2, inner: d1, height: h, position: [0, 0, 0], axis: "Z", mode: "new" }], tr("ISO 7089 – {0} – 200 HV", size));
 }
 
 /** Šestihranná matice ISO 4032 – s (otvor klíče) / m (výška). */
@@ -407,61 +408,61 @@ export function nutISO4032(size: string): CadDoc {
   const [sw, m] = ISO4032[size] ?? ISO4032.M8;
   const d = Number(String(size).replace(/[^\d.]/g, "")) || 8;
   const hex = uid();
-  return part(`Matice ${size}`, "ocel", [
-    sk(hex, "Šestihran", { kind: "base", name: "XY", offset: 0 }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: sw / Math.sqrt(3), sides: 6, angle: 0 }]),
+  return part(tr("Matice {0}", size), "ocel", [
+    sk(hex, tr("Šestihran"), { kind: "base", name: "XY", offset: 0 }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: sw / Math.sqrt(3), sides: 6, angle: 0 }]),
     { id: uid(), name: "Tělo", type: "extrude", sketchId: hex, distance: m, symmetric: false, reverse: false, mode: "new" },
     { id: uid(), name: "Závit", type: "hole", position: [0, 0, m], axis: "Z", flip: false, diameter: d * 0.85, depth: 0, cbDiameter: 0, cbDepth: 0, kind: "tapped", thread: size },
-  ], `ISO 4032 – ${size} – 8`);
+  ], tr("ISO 4032 – {0} – 8", size));
 }
 
 /** Válcový kolík ISO 8734 (kalený). */
 export function dowelISO8734(d: number, length: number): CadDoc {
-  return part(`Kolík Ø${d}×${length}`, "ocel", [
+  return part(tr("Kolík Ø{0}×{1}", d, length), "ocel", [
     { id: uid(), name: "Kolík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Sražení", type: "chamfer", distance: Math.max(0.2, d * 0.1), edges: "all" },
-  ], `ISO 8734 – Ø${d}×${length} – A`);
+  ], tr("ISO 8734 – Ø{0}×{1} – A", d, length));
 }
 
 /** Tlačná pružina (konce bez broušení) – průměr pružiny D, drát d, volná délka L0, počet činných závitů n. */
 export function compressionSpring(D: number, wire: number, freeLength: number, turns: number): CadDoc {
-  return part(`Pružina tlačná ${D}×${wire}×${freeLength}`, "ocel", [
+  return part(tr("Pružina tlačná {0}×{1}×{2}", D, wire, freeLength), "ocel", [
     { id: uid(), name: "Pružina", type: "spring", radius: D / 2, pitch: freeLength / turns, turns, wire, position: [0, 0, 0], axis: "Z", mode: "new" },
-  ], `Pružina tlačná D${D} d${wire} L0=${freeLength}`);
+  ], tr("Pružina tlačná D{0} d{1} L0={2}", D, wire, freeLength));
 }
 
 /** Vodicí sloupek (typ s osazením, jako HASCO Z00 / Meusburger E1000 – zjednodušeně). */
 export function guidePillar(d: number, length: number, collar = 8): CadDoc {
-  return part(`Vodicí sloupek Ø${d}×${length}`, "1.7131", [
+  return part(tr("Vodicí sloupek Ø{0}×{1}", d, length), "1.7131", [
     { id: uid(), name: "Dřík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Límec", type: "cylinder", radius: d / 2 + 4, height: collar, position: [0, 0, 0], axis: "Z", mode: "add" },
     { id: uid(), name: "Náběh", type: "chamfer", distance: 1, edges: "all" },
-  ], `Vodicí sloupek Ø${d}×${length}`);
+  ], tr("Vodicí sloupek Ø{0}×{1}", d, length));
 }
 
 /** Vodicí pouzdro s límcem. */
 export function guideBush(d: number, length: number, collar = 8): CadDoc {
-  return part(`Vodicí pouzdro Ø${d}×${length}`, "1.7131", [
+  return part(tr("Vodicí pouzdro Ø{0}×{1}", d, length), "1.7131", [
     { id: uid(), name: "Tělo", type: "tube", outer: d + 8, inner: d, height: length, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Límec", type: "tube", outer: d + 16, inner: d, height: collar, position: [0, 0, length - collar], axis: "Z", mode: "add" },
-  ], `Vodicí pouzdro Ø${d}×${length}`);
+  ], tr("Vodicí pouzdro Ø{0}×{1}", d, length));
 }
 
 /** Vyhazovač s válcovou hlavou (DIN ISO 8694 / 6751 – zjednodušeně). */
 export function ejectorPin(d: number, length: number): CadDoc {
   const dh = d <= 3 ? d + 3 : d <= 6 ? d + 4 : d + 6;
   const kh = d <= 6 ? 3 : 5;
-  return part(`Vyhazovač Ø${d}×${length}`, "1.2516", [
+  return part(tr("Vyhazovač Ø{0}×{1}", d, length), "1.2516", [
     { id: uid(), name: "Hlava", type: "cylinder", radius: dh / 2, height: kh, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Dřík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, kh], axis: "Z", mode: "add" },
-  ], `ISO 8694 – Ø${d}×${length}`);
+  ], tr("ISO 8694 – Ø{0}×{1}", d, length));
 }
 
 /** Středicí kroužek. */
 export function locatingRing(d = 100, h = 10): CadDoc {
-  return part(`Středicí kroužek Ø${d}`, "ocel", [
+  return part(tr("Středicí kroužek Ø{0}", d), "ocel", [
     { id: uid(), name: "Kroužek", type: "tube", outer: d, inner: 36, height: h, position: [0, 0, 0], axis: "Z", mode: "new" },
     { id: uid(), name: "Sražení", type: "chamfer", distance: 1, edges: "all" },
-  ], `Středicí kroužek Ø${d}`);
+  ], tr("Středicí kroužek Ø{0}", d));
 }
 
 // ---------------- rám formy ----------------
@@ -511,7 +512,7 @@ function plate(name: string, w: number, l: number, t: number, holes: { x: number
  * Rám vstřikovací formy (dvoudeskový, standardní stavba jako HASCO/Meusburger) – sestava desek,
  * rozpěrek, vyhazovacího paketu, vodicích sloupků/pouzder, šroubů a vyhazovačů.
  */
-export function moldBase(p: MoldBaseParams = defaultMoldBase, name = "Rám formy"): CadDoc {
+export function moldBase(p: MoldBaseParams = defaultMoldBase, name = tr("Rám formy")): CadDoc {
   const W = p.width;
   const L = p.length;
   const inset = Math.max(p.pillar * 1.3, p.pillar / 2 + 20); // osa vodicích sloupků od okraje (min. 12 mm stěna u pouzdra)
@@ -536,10 +537,10 @@ export function moldBase(p: MoldBaseParams = defaultMoldBase, name = "Rám formy
 
   let z = 0;
   // pohyblivá strana (zdola)
-  const clampB = plate("Upínací deska pohyblivá", W + 50, L, p.clamp, [{ x: 0, y: 0, d: 40 }, ...screws.map(([x, y]) => ({ x, y, d: 13.5, cb: [20, 13] as [number, number], bottom: true }))], p.material, [], "D-01");
+  const clampB = plate(tr("Upínací deska pohyblivá"), W + 50, L, p.clamp, [{ x: 0, y: 0, d: 40 }, ...screws.map(([x, y]) => ({ x, y, d: 13.5, cb: [20, 13] as [number, number], bottom: true }))], p.material, [], "D-01");
   add(clampB, z, "Desky", [0, 0, 0], [0, 0], "#7d8a99");
   z += p.clamp;
-  const spacer = plate("Rozpěrka", p.spacerWidth, L, p.spacer, [], p.material, [], "D-02");
+  const spacer = plate(tr("Rozpěrka"), p.spacerWidth, L, p.spacer, [], p.material, [], "D-02");
   add(spacer, z, "Desky", [0, 0, 0], [-(W / 2 - p.spacerWidth / 2), 0], "#8f9cab");
   add(spacer, z, "Desky", [0, 0, 0], [W / 2 - p.spacerWidth / 2, 0], "#8f9cab");
   const ew = W - 2 * p.spacerWidth - 4;
@@ -549,26 +550,26 @@ export function moldBase(p: MoldBaseParams = defaultMoldBase, name = "Rám formy
     [-ew / 4, L / 5],
     [ew / 4, L / 5],
   ];
-  const ejPlate = plate("Vyhazovací deska", ew, L - 40, p.ejector, [], p.material, [], "D-03");
+  const ejPlate = plate(tr("Vyhazovací deska"), ew, L - 40, p.ejector, [], p.material, [], "D-03");
   add(ejPlate, z + 4, "Vyhazování", [0, 0, 0], [0, 0], "#b08b5a");
-  const retainer = plate("Kotevní deska vyhazovačů", ew, L - 40, p.retainer, pins.map(([x, y]) => ({ x, y, d: 6.2, cb: [11, 5] as [number, number] })), p.material, [], "D-04");
+  const retainer = plate(tr("Kotevní deska vyhazovačů"), ew, L - 40, p.retainer, pins.map(([x, y]) => ({ x, y, d: 6.2, cb: [11, 5] as [number, number] })), p.material, [], "D-04");
   add(retainer, z + 4 + p.ejector, "Vyhazování", [0, 0, 0], [0, 0], "#c49b65");
   z += p.spacer;
-  const support = plate("Opěrná deska", W, L, p.support, [...guides.map(([x, y]) => ({ x, y, d: p.pillar + 8.2 })), ...pins.map(([x, y]) => ({ x, y, d: 6.5 }))], p.material, [], "D-05");
+  const support = plate(tr("Opěrná deska"), W, L, p.support, [...guides.map(([x, y]) => ({ x, y, d: p.pillar + 8.2 })), ...pins.map(([x, y]) => ({ x, y, d: 6.5 }))], p.material, [], "D-05");
   add(support, z, "Desky", [0, 0, 0], [0, 0], "#9aa7b5");
   z += p.support;
   const bExtra: Feature[] = [];
-  const bPlate = plate("Tvarová deska pohyblivá", W, L, p.bPlate, [...guides.map(([x, y]) => ({ x, y, d: p.pillar + 0.2 })), ...pins.map(([x, y]) => ({ x, y, d: 6.1 }))], p.material, bExtra, "D-06");
+  const bPlate = plate(tr("Tvarová deska pohyblivá"), W, L, p.bPlate, [...guides.map(([x, y]) => ({ x, y, d: p.pillar + 0.2 })), ...pins.map(([x, y]) => ({ x, y, d: 6.1 }))], p.material, bExtra, "D-06");
   add(bPlate, z, "Desky", [0, 0, 0], [0, 0], "#5f87b3");
   const parting = z + p.bPlate;
   z = parting;
   const aExtra: Feature[] = p.cavity
     ? [{ id: uid(), name: "Dutina", type: "box", size: [p.cavity.w, p.cavity.l, p.cavity.depth], position: [0, 0, p.cavity.depth / 2], centered: true, mode: "cut" }]
     : [];
-  const aPlate = plate("Tvarová deska pevná", W, L, p.aPlate, guides.map(([x, y]) => ({ x, y, d: p.pillar + 8.2 })), p.material, aExtra, "D-07");
+  const aPlate = plate(tr("Tvarová deska pevná"), W, L, p.aPlate, guides.map(([x, y]) => ({ x, y, d: p.pillar + 8.2 })), p.material, aExtra, "D-07");
   add(aPlate, z, "Desky", [0, 0, 0], [0, 0], "#e0b24a");
   z += p.aPlate;
-  const clampA = plate("Upínací deska pevná", W + 50, L, p.clamp, [{ x: 0, y: 0, d: 36 }, ...screws.map(([x, y]) => ({ x, y, d: 13.5, cb: [20, 13] as [number, number] }))], p.material, [], "D-08");
+  const clampA = plate(tr("Upínací deska pevná"), W + 50, L, p.clamp, [{ x: 0, y: 0, d: 36 }, ...screws.map(([x, y]) => ({ x, y, d: 13.5, cb: [20, 13] as [number, number] }))], p.material, [], "D-08");
   add(clampA, z, "Desky", [0, 0, 0], [0, 0], "#7d8a99");
   const top = z + p.clamp;
   add(locatingRing(100, 10), top, "Normálie", [0, 0, 0], [0, 0], "#3a3f45");
@@ -590,7 +591,7 @@ export function moldBase(p: MoldBaseParams = defaultMoldBase, name = "Rám formy
   const pinDoc = ejectorPin(6, pinLen);
   for (const [x, y] of pins) add(pinDoc, p.clamp + 4 + p.ejector, "Vyhazování", [0, 0, 0], [x, y], "#e03930");
 
-  return { ...emptyAssembly(name), components: comps, material: p.material, props: { number: "SF-001", note: `Rám ${W}×${L}` } };
+  return { ...emptyAssembly(name), components: comps, material: p.material, props: { number: "SF-001", note: tr("Rám {0}×{1}", W, L) } };
 }
 
 // ---------------- pole a zrcadlení komponent ----------------
@@ -614,7 +615,7 @@ export function patternComponent(doc: CadDoc, compId: string, p: CompPattern): C
   const comps = doc.components ?? [];
   const i = comps.findIndex((c) => c.id === compId);
   const c = comps[i];
-  if (!c) throw new Error("Komponenta nenalezena.");
+  if (!c) throw new Error(tr("Komponenta nenalezena."));
   const n = Math.max(1, Math.round(p.count));
   const copies: AsmComponent[] = [];
   for (let k = 1; k < n; k++) {
@@ -643,7 +644,7 @@ export function mirrorComponent(doc: CadDoc, compId: string, plane: "XY" | "XZ" 
   const comps = doc.components ?? [];
   const i = comps.findIndex((c) => c.id === compId);
   const c = comps[i];
-  if (!c) throw new Error("Komponenta nenalezena.");
+  if (!c) throw new Error(tr("Komponenta nenalezena."));
   const k = plane === "YZ" ? 0 : plane === "XZ" ? 1 : 2;
   const S: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
   S[k * 4] = -1;

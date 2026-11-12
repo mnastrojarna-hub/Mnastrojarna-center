@@ -91,7 +91,8 @@ async function moveStage(c: Ctx, jobId: string, from: JobStage, patch: Row, note
 export async function closeJobAsLost(
   jobId: string, kind: "notOrdered" | "decline", input: { reason: LostReason; note?: string | null },
 ): Promise<Result> {
-  const c = await begin("margins");
+  // 9. 11.: uzavřít zakázku (speciální stav) smí každý se zakázkou — důvod povinný
+  const c = await begin("orders");
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   const allowed = kind === "decline" ? DECLINE_REASONS : NOT_ORDERED_REASONS;
@@ -121,7 +122,9 @@ export async function closeJobAsLost(
 
 /** „Obnovit poptávku": nerealizovaná zakázka zpět do stavu před prohrou (max. Nabídka); zamítnutá nabídka znovu odeslaná. */
 export async function reopenLostJob(jobId: string, input: { note?: string | null } = {}): Promise<Result> {
-  const c = await begin("margins");
+  // 9. 11.: návrat ze speciálního stavu smí každý se zakázkou; znovu odeslat zamítnutou nabídku (rozhodnutí o nabídce)
+  // jen obchodník / admin — ostatním se vrátí jen stav zakázky (nabídku pak obnoví „Zákazník se vrátil")
+  const c = await begin("orders");
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   try {
@@ -134,11 +137,12 @@ export async function reopenLostJob(jobId: string, input: { note?: string | null
       const { data: qs } = await c.db.from("quotes").select("id, revision").eq("job_id", jobId).eq("status", "zamitnuto")
         .eq("archived", false).order("revision", { ascending: false }).limit(1);
       const q = ((qs ?? []) as { id: string }[])[0];
-      if (q) {
+      // bez práva na nabídky jen stav zakázky — nabídka zůstane zamítnutá („Zákazník se vrátil" obchodník / admin)
+      if (q && c.can("margins")) {
         const { error } = await withChangeNote(c.db.from("quotes").update({ status: "odeslano" } as never)
           .eq("id", q.id).eq("status", "zamitnuto"), "poptávka obnovena");
         if (error) return fail(error);
-      } else {
+      } else if (!q) {
         to = "poptavka";
       }
     }
@@ -204,7 +208,6 @@ export async function recordProductionFailure(
   const reason = cleanText(input?.reason, 200);
   if (!reason) return fail("Vyber, co se stalo.");
   if (!input || !(input.next in FAILURE_NEXT)) return fail("Vyber, co dál.");
-  if (input.next === "cancel" && !c.can("margins")) return fail("Zrušit zakázku smí obchodník nebo admin — navrhni to.");
   const qty = cleanNumber(input.qty);
   if (qty !== null && (qty <= 0 || qty > 1_000_000)) return fail("Neplatný počet kusů.");
   if (input.itemId && !isUuid(input.itemId)) return fail("Položka nenalezena.");

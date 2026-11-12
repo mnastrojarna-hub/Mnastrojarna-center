@@ -40,18 +40,33 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       }
       return res;
     };
-    const [profilesRes, mailboxesRes, rules, salesContacts] = await Promise.all([
+    const [profilesRes, mailboxesRes, rules, stageChangers, salesContacts, queueMargins, activity] = await Promise.all([
       loadProfiles(),
       db
         .from("mailboxes")
         .select("id, email, display_name, owner_id, active, provider")
         .order("email", { ascending: true }),
       fetchCommissionRules(db, null, { withAuthors: true }).catch((): CommissionRuleView[] => []),
+      // „Smí ručně měnit stav zakázky" zvlášť — DB bez migrace 20261109100000 → bez něj (správa uživatelů jede dál)
+      Promise.resolve(db.from("profiles").select("id, can_change_stage"))
+        .then(({ data, error }) => new Set(error ? [] : ((data ?? []) as { id: string; can_change_stage: boolean | null }[])
+          .filter((r) => r.can_change_stage === true).map((r) => r.id)))
+        .catch(() => new Set<string>()),
       // „Kontakt pro obchod a ceny" zvlášť — DB bez migrace 20261103130000 → bez něj (správa uživatelů jede dál)
       Promise.resolve(db.from("profiles").select("id, sales_contact_id"))
         .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; sales_contact_id: string | null }[])
           .map((r) => [r.id, r.sales_contact_id ?? null] as const)))
         .catch(() => new Map<string, string | null>()),
+      // 9. 11. „Smí řešit frontu ke schválení" a „Vidí nákupní ceny a marže" zvlášť — DB bez migrace 20261109130000 → bez nich
+      Promise.resolve(db.from("profiles").select("id, can_resolve_queue, can_see_margins"))
+        .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; can_resolve_queue: boolean | null; can_see_margins: boolean | null }[])
+          .map((r) => [r.id, { queue: r.can_resolve_queue === true, margins: r.can_see_margins === true }] as const)))
+        .catch(() => new Map<string, { queue: boolean; margins: boolean }>()),
+      // 9. 11. poslední aktivita (kliknutí v aplikaci) zvlášť — DB bez migrace 20261109140000 → bez ní
+      Promise.resolve(db.from("profiles").select("id, last_active_at, last_active_path"))
+        .then(({ data, error }) => new Map(error ? [] : ((data ?? []) as { id: string; last_active_at: string | null; last_active_path: string | null }[])
+          .map((r) => [r.id, { at: r.last_active_at ?? null, path: r.last_active_path ?? null }] as const)))
+        .catch(() => new Map<string, { at: string | null; path: string | null }>()),
     ]);
     if (profilesRes.error) return { users: [], mailboxes: [], ready: true, error: profilesRes.error.message };
 
@@ -68,6 +83,8 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       position: p.position ?? null,
       commissionPercent: commissionToPercent(p.commission_rate),
       lastSeenAt: p.last_seen_at ?? null,
+      lastActiveAt: activity.get(p.id)?.at ?? null,
+      lastActivePath: activity.get(p.id)?.path ?? null,
       createdAt: p.created_at,
       commissionRules: rules.filter((r) => r.ownerId === p.id),
       quoteNeedsApproval: p.quote_needs_approval !== false,
@@ -78,6 +95,9 @@ export async function loadUsersPageData(): Promise<UsersPageData> {
       quoteApproverChangedAt: p.quote_approver_changed_at ?? null,
       canRfq: p.role !== "zamestnanec" || (p as Profile & { can_rfq?: boolean | null }).can_rfq === true,
       fullAccess: p.role !== "super_admin" && (p as Profile & { full_access?: boolean | null }).full_access === true,
+      canChangeStage: p.role !== "zamestnanec" || stageChangers.has(p.id),
+      canResolveQueue: p.role === "super_admin" || queueMargins.get(p.id)?.queue === true,
+      canSeeMargins: p.role !== "zamestnanec" || queueMargins.get(p.id)?.margins === true,
       salesContactId: salesContacts.get(p.id) ?? null,
     }));
 

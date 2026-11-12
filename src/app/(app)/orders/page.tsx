@@ -17,8 +17,8 @@ import { getFlowCounts } from "@/lib/data/flow-status";
 import { BookEmpty } from "@/components/jobs/book/book-empty";
 import { StageLegend } from "@/components/jobs/book/stage-legend";
 import {
-  DEFAULT_PARAMS, bookKpis, bookParamsToFilters, bookQuery, bookSegment, boardStages, countLabel, defaultStageFor, firstParam,
-  isFiltered, parseBookParams, segmentCounts, segmentStageCounts, sumValue, todayInPrague,
+  bookKpis, bookParamsToFilters, bookQuery, bookSegment, bookValue, boardStages, countLabel, defaultStageFor, firstParam,
+  isFiltered, parseBookParams, segmentCounts, segmentStageCounts, todayInPrague,
 } from "@/components/jobs/book/book-params";
 import { requireFeature, getAccess } from "@/lib/auth/session";
 import { FEATURE_HINTS, FEATURE_LABELS, type Feature } from "@/lib/auth/permissions";
@@ -62,14 +62,13 @@ export default async function OrdersPage({
   const margins = can("margins");
   const chipSegment = params.segment === "objednavky" || params.segment === "poptavky";
   const today = todayInPrague();
-  // „Hodnota v běhu" (jen s právem na marže) = VŠECHNY objednávky v běhu (bez DL na vše) — stejné filtry jako
-  // záložka Objednávky bez dalších filtrů, ne jen zobrazené řádky; dotaz do DB sdílí se seznamem (React cache).
+  // Dlaždice hodnoty (jen s právem na marže) = součet aktuálního pohledu: záložka + všechny filtry, CELÝ seznam
+  // (ne jen zobrazená stránka řádků) — počítá se z téhož výsledku listJobs jako seznam, bez dalšího dotazu.
   // „Po splatnosti" = vlastní dotaz přes celou knihu (vyfakturované jsou v Dokončených).
-  const [jobs, counts, options, running, overdueInvoices, production, flowCounts, quoteApprovers, exceptionCounts] = await Promise.all([
+  const [jobs, counts, options, overdueInvoices, production, flowCounts, quoteApprovers, exceptionCounts] = await Promise.all([
     listJobs(bookParamsToFilters(params)),
     getJobStageCounts(),
     getJobFormOptions(),
-    margins ? listJobs(bookParamsToFilters({ ...DEFAULT_PARAMS, segment: "objednavky" })) : Promise.resolve([]),
     countOverdueInvoices(today),
     listOperationLocations(),
     chipSegment ? getFlowCounts() : Promise.resolve({} as Record<string, number>),
@@ -109,13 +108,14 @@ export default async function OrdersPage({
           }
         />
 
-        <KpiStrip kpis={bookKpis(counts)} runningValue={margins ? sumValue(running) : null} overdueInvoices={overdueInvoices} />
+        <KpiStrip kpis={bookKpis(counts)} value={margins ? bookValue(jobs) : null} overdueInvoices={overdueInvoices} />
 
         <section aria-label="Filtry knihy" className="space-y-3 rounded-2xl border bg-card p-2.5 shadow-sm sm:p-3">
-          <SegmentTabs counts={segmentCounts(counts.byStage, counts.deliveredByStage)} />
-          <StageChips byStage={segmentStageCounts(counts.byStage, counts.deliveredByStage, params.segment)} />
+          <SegmentTabs counts={segmentCounts(counts.byStage, counts.deliveredByStage, counts.archivedByStage)} />
+          <StageChips byStage={segmentStageCounts(counts.byStage, counts.deliveredByStage, params.segment, counts.archivedByStage)} />
           {chipSegment && <FlowFilterChips counts={flowCounts} />}
-          <ExceptionChips counts={exceptionCounts} />
+          {/* 9. 11.: chip „Prémioví" — počet prémiových zakázek v aktuálním pohledu */}
+          <ExceptionChips counts={exceptionCounts} premium={params.premium ? jobs.length : jobs.filter((j) => j.customerPremium).length} />
           <BookToolbar options={options} production={production} />
         </section>
 

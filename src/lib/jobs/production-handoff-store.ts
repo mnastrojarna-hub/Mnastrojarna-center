@@ -1,7 +1,8 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { logAudit } from "@/lib/audit";
-import { describeSender, isSmtpConfigured, pickSmtpMailbox, type SmtpPreference } from "@/lib/email/send";
+import type { SmtpPreference } from "@/lib/email/send";
+import { resolveSender } from "@/lib/email/sender-rules";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { OPERATION_KINDS, isOperationKind, type DeadlineState, type OperationKind } from "@/lib/jobs/operations";
 import { cleanDate, cleanNumber, cleanText, fetchPaged, isUuid, one, personRef, todayIso } from "@/lib/jobs/mapping";
@@ -55,7 +56,11 @@ import type { PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 
 type Row = Record<string, unknown>;
 
-export type HandoffActor = { id: string | null; fullName: string; margins: boolean; mailAll: boolean; via: ActorVia };
+export type HandoffActor = {
+  id: string | null; fullName: string; margins: boolean; mailAll: boolean; via: ActorVia;
+  /** „Odeslat z" — schránka zvolená super adminem (ostatním se ignoruje, sender-rules.ts). */
+  fromMailboxId?: string | null;
+};
 
 const OPEN_PO: PurchaseOrderStatus[] = ["navrh", "vystavena", "odeslana", "potvrzena"];
 const RUNNING = new Set(["probiha", "problem"]);
@@ -1361,56 +1366,17 @@ export async function purchaseOrderMode(db: JobsDb): Promise<AutomationMode> {
   }
 }
 
-type BoxRow = { id: string; email: string; config: MailboxConfig; owner_id: string | null; active: boolean | null };
-
-/** Použitelná schránka uživatele pro odesílání (null = žádná). */
-export async function usableMailbox(db: JobsDb, userId: string | null | undefined): Promise<{ id: string; email: string } | null> {
-  if (!isUuid(userId)) return null;
-  const { data } = await db.from("mailboxes").select("id, email, config, owner_id, active, created_at").eq("owner_id", userId).order("created_at");
-  const pick = pickSmtpMailbox((data ?? []) as BoxRow[], { ownerId: userId });
-  if (!pick.ok || !pick.box) return null;
-  return (await isSmtpConfigured({ mailboxId: pick.box.id })) ? { id: pick.box.id, email: pick.box.email } : null;
-}
-
 /**
  * Odkud poslat objednávku — STEJNĚ pro každé odeslání (předání „Rovnou odeslat", automatika při předání,
- * schválení ve frontě, tlačítko „Odeslat" u kroku i v Nákupu, storno / změna): obchodník zakázky (s právem
- * na ceny — odpověď dodavatele bývá s cenami) má použitelnou schránku → jeho schránka (odpověď dodavatele
- * dojde jemu, požadavek majitele 4); jinak schránka toho, kdo posílá. Nikdy systémová ani schránka
- * zaměstnance. `mailAll` se už nerozhoduje (dřív jen s poštou všech schránek → nekonzistentní odesílatel).
+ * schválení ve frontě, tlačítko „Odeslat" u kroku i v Nákupu, storno / změna): ze schránky TOHO, KDO POSÍLÁ
+ * (majitel 9. 11.: „Když cokoliv odesílá Šponer, jde to ze Šponerova mailu…"), nikdy ze schránky obchodníka
+ * zakázky ani jiného kolegy. Jen super admin si může schránku vybrat (`fromMailboxId`, „Odeslat z") —
+ * pravidlo je v sender-rules.ts (resolveSender). Podpis = vlastník schránky, ze které objednávka odchází.
  */
-export async function purchaseOrderSender(db: JobsDb, approver: { id: string; mailAll?: boolean }, jobOwnerId: string | null):
+export async function purchaseOrderSender(actor: { id: string; fromMailboxId?: string | null }):
   Promise<{ from: SmtpPreference; signerId: string; mailboxEmail: string | null }> {
-  // super admin posílá ze SVÉ schránky (majitel 3. 11.), má-li ji použitelnou — ne ze schránky obchodníka
-  if (jobOwnerId && jobOwnerId !== approver.id && await isSuperAdmin(db, approver.id)) {
-    const own = await usableMailbox(db, approver.id);
-    if (own) return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: own.email };
-  }
-  if (jobOwnerId && jobOwnerId !== approver.id && await hasPriceRole(db, jobOwnerId)) {
-    const box = await usableMailbox(db, jobOwnerId);
-    if (box) return { from: { mailboxId: box.id, ownerId: jobOwnerId }, signerId: jobOwnerId, mailboxEmail: box.email };
-  }
-  // jinak jako každý e-mail uživatele (send.ts): vlastní schránka → firemní schránka → globální SMTP;
-  // nikdy osobní schránka jiného uživatele. Vlastní schránku bez odesílání send.ts odmítne (bez tiché náhrady).
-  const own = await usableMailbox(db, approver.id);
-  if (own) return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: own.email };
-  const fallback = await senderAddress({ ownerId: approver.id });
-  return { from: { ownerId: approver.id }, signerId: approver.id, mailboxEmail: fallback };
-}
-
-async function isSuperAdmin(db: JobsDb, userId: string): Promise<boolean> {
-  const { data } = await db.from("profiles").select("role").eq("id", userId).maybeSingle();
-  return (data as { role: string | null } | null)?.role === "super_admin";
-}
-
-/** Adresa, ze které by send.ts e-mail opravdu odeslal (null = odeslat nejde). */
-async function senderAddress(pref: SmtpPreference): Promise<string | null> {
-  try {
-    const d = await describeSender(pref);
-    return d.ok ? d.from ?? null : null;
-  } catch {
-    return null;
-  }
+  const d = await resolveSender(actor.id, { mailboxId: actor.fromMailboxId ?? null });
+  return { from: d.from, signerId: d.signerId, mailboxEmail: d.mailboxEmail };
 }
 
 // ── Fronta a odeslání ───────────────────────────────────────
@@ -1473,7 +1439,7 @@ const SENT_PO: PurchaseOrderStatus[] = ["odeslana", "potvrzena", "dodana"];
  * (jen výslovně `resend`), objednávku, kterou právě posílá někdo jiný, taky ne. Při chybě (i výjimce) se
  * řádek vrátí do fronty s důvodem.
  */
-export async function sendQueuedPurchaseOrder(db: JobsDb, sender: { id: string; fullName: string; mailAll: boolean }, poId: string,
+export async function sendQueuedPurchaseOrder(db: JobsDb, sender: { id: string; fullName: string; mailAll: boolean; fromMailboxId?: string | null }, poId: string,
   opts: { status?: "approved" | "auto_executed"; mail?: Partial<{ to: string; cc: string; subject: string; body: string }>; via?: "rucne" | "automaticky"; eventData?: Row; resend?: boolean } = {}):
   Promise<{ ok: true; emailId?: string; queueId: string | null } | { ok: false; error: string; queueId: string | null }> {
   const po = await fetchPurchaseOrder(db, poId);
@@ -1508,8 +1474,8 @@ export async function sendQueuedPurchaseOrder(db: JobsDb, sender: { id: string; 
   }
   const claimed = row;
   try {
-    const who = await purchaseOrderSender(db, sender, ownerId);
-    const built = await purchaseOrderMailFor(db, po, who.signerId, "issue", { fallbackName: sender.fullName });
+    const who = await purchaseOrderSender(sender);
+    const built = await purchaseOrderMailFor(db, po, who.signerId, "issue", { fallbackName: sender.fullName, from: who.from });
     const fromRow = queueMail(claimed, built);
     const mail = {
       to: opts.mail?.to ?? fromRow.to,
@@ -1524,7 +1490,7 @@ export async function sendQueuedPurchaseOrder(db: JobsDb, sender: { id: string; 
       if ("error" in stored) console.error(`[handoff] PDF objednávky ${po.number} s odesílatelem se nepřegenerovalo: ${stored.error}`);
     }
     const res = await sendPurchaseOrderCore(db, { id: sender.id, fullName: sender.fullName }, poId, mail, {
-      from: who.from, via: opts.via ?? "rucne", kind: "issue", eventData: { ...(opts.eventData ?? {}), queueId: claimed.id },
+      from: who.from, signerId: who.signerId, via: opts.via ?? "rucne", kind: "issue", eventData: { ...(opts.eventData ?? {}), queueId: claimed.id },
       auditActor: { id: sender.id, kind: "user", via: opts.via === "automaticky" ? "automaticky" : "rucne" },
     });
     if (!res.ok) {
@@ -1540,10 +1506,10 @@ export async function sendQueuedPurchaseOrder(db: JobsDb, sender: { id: string; 
 
 /**
  * Vyřízení řádku fronty „Objednávka dodavateli" (schválit = odeslat; zamítnout = objednávka zůstává vystavená).
- * Vystavení jde přes sendQueuedPurchaseOrder (schránka obchodníka zakázky, podpis odesílatele); změna /
+ * Vystavení jde přes sendQueuedPurchaseOrder (schránka toho, kdo schvaluje — super admin si může vybrat; podpis vlastníka schránky); změna /
  * storno / pozastavení stejným jádrem s druhem e-mailu. Oprávnění hlídá volající.
  */
-export async function resolvePurchaseOrderQueue(db: JobsDb, sender: { id: string; fullName: string; mailAll: boolean }, rowId: string,
+export async function resolvePurchaseOrderQueue(db: JobsDb, sender: { id: string; fullName: string; mailAll: boolean; fromMailboxId?: string | null }, rowId: string,
   action: "approved" | "rejected"): Promise<{ ok: true; sent: boolean } | { ok: false; error: string }> {
   const { data } = await db.from("approval_queue").select("id, status, summary, payload, target, order_id, owner_id, purchase_order_id").eq("id", rowId).maybeSingle();
   const row = data as (QueueRow & { purchase_order_id: string | null }) | null;
@@ -1570,16 +1536,16 @@ export async function resolvePurchaseOrderQueue(db: JobsDb, sender: { id: string
     return r.ok ? { ok: true, sent: true } : { ok: false, error: r.error };
   }
   if (!(await claimQueue(db, rowId, "approved"))) return { ok: false, error: "Položku už někdo vyřídil — obnov stránku." };
-  const { data: jobRow } = await db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
-  const who = await purchaseOrderSender(db, sender, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
+  const who = await purchaseOrderSender(sender);
   const p = row.payload ?? {};
   const built = await purchaseOrderMailFor(db, { ...po, revision: cleanNumber(p.revision) ?? undefined }, who.signerId, kind, {
     previousRequiredDate: (p.previousRequiredDate as string | undefined) ?? null, reason: (p.reason as string | undefined) ?? null, fallbackName: sender.fullName,
+    from: who.from,
   });
   const mail = queueMail(row, built);
   try {
     const res = await sendPurchaseOrderCore(db, { id: sender.id, fullName: sender.fullName }, po.id, mail, {
-      from: who.from, kind, reason: (p.reason as string | undefined) ?? null, eventData: { queueId: rowId },
+      from: who.from, signerId: who.signerId, kind, reason: (p.reason as string | undefined) ?? null, eventData: { queueId: rowId },
     });
     if (!res.ok) {
       await releaseQueue(db, row, res.error);
@@ -1597,17 +1563,17 @@ export async function resolvePurchaseOrderQueue(db: JobsDb, sender: { id: string
  * dodavatele): e-mail hned ze schránky podle pravidel odesílatele; když neodejde, řádek fronty „cancel"
  * (DB ho sama nevyřídí). Objednávka je po návratu vždy „Zrušena".
  */
-export async function stornoPurchaseOrderCore(db: JobsDb, actor: { id: string; fullName: string; mailAll: boolean }, poId: string,
+export async function stornoPurchaseOrderCore(db: JobsDb, actor: { id: string; fullName: string; mailAll: boolean; fromMailboxId?: string | null }, poId: string,
   opts: { cancelReason: string; mailReason?: string | null }): Promise<{ send: "odeslano" | "ceka_ve_fronte"; sendError?: string; number: string } | null> {
   const po = await fetchPurchaseOrder(db, poId);
   if (!po || po.status === "dodana") return null;
   const { data: jobRow } = await db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
   const ownerId = (jobRow as { owner_id: string | null } | null)?.owner_id ?? null;
-  const sender = await purchaseOrderSender(db, { id: actor.id, mailAll: actor.mailAll }, ownerId);
-  const mail = await purchaseOrderMailFor(db, po, sender.signerId, "cancel", { reason: opts.mailReason ?? null, fallbackName: actor.fullName });
+  const sender = await purchaseOrderSender({ id: actor.id, fromMailboxId: actor.fromMailboxId });
+  const mail = await purchaseOrderMailFor(db, po, sender.signerId, "cancel", { reason: opts.mailReason ?? null, fallbackName: actor.fullName, from: sender.from });
   let error: string;
   try {
-    const res = await sendPurchaseOrderCore(db, { id: actor.id, fullName: actor.fullName }, poId, mail, { from: sender.from, kind: "cancel", reason: opts.cancelReason });
+    const res = await sendPurchaseOrderCore(db, { id: actor.id, fullName: actor.fullName }, poId, mail, { from: sender.from, signerId: sender.signerId, kind: "cancel", reason: opts.cancelReason });
     if (res.ok) return { send: "odeslano", number: po.number };
     error = res.error;
   } catch (err) {
@@ -1718,9 +1684,9 @@ export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, job
   const metas = built && !("error" in built) ? built.groups : [];
   const sendNow = new Set(actor.margins ? (input.sendNow ?? []) : []);
   const mode = (data.purchaseOrders ?? []).length ? await purchaseOrderMode(db) : "approval";
-  // odkud by objednávka odešla (schránka obchodníka zakázky, jinak moje) — stejně jako sendQueuedPurchaseOrder
+  // odkud by objednávka odešla (moje schránka; super admin jeho volba) — stejně jako sendQueuedPurchaseOrder
   const senderBox = actor.margins && actor.id && (data.purchaseOrders ?? []).length
-    ? (await purchaseOrderSender(db, { id: actor.id }, ctx.job.ownerId)).mailboxEmail : null;
+    ? (await purchaseOrderSender({ id: actor.id, fromMailboxId: actor.fromMailboxId })).mailboxEmail : null;
   for (const p of data.purchaseOrders ?? []) {
     const meta = metas.find((m) => m.group === p.group) ?? null;
     const out: HandoffResult["purchaseOrders"][number] = {
@@ -1744,7 +1710,7 @@ export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, job
     }) : ["neznámá objednávka"];
     const auto = !human && mode === "full" && actor.margins && blockers.length === 0;
     if ((human || auto) && actor.id) {
-      const r = await sendQueuedPurchaseOrder(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll }, p.id, {
+      const r = await sendQueuedPurchaseOrder(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll, fromMailboxId: actor.fromMailboxId }, p.id, {
         status: human ? "approved" : "auto_executed", via: human ? "rucne" : "automaticky", eventData: { handoffId: result.handoffId, auto },
       });
       if (r.ok) out.send = "odeslano";
@@ -1777,7 +1743,7 @@ export async function productionHandoffCore(db: JobsDb, actor: HandoffActor, job
       if (!before || (before.status !== "odeslana" && before.status !== "potvrzena")) continue;
       const { data: now } = await db.from("purchase_orders").select("status").eq("id", id).maybeSingle();
       if ((now as { status: string } | null)?.status !== "zrusena") continue;
-      const s = await stornoPurchaseOrderCore(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll }, id, {
+      const s = await stornoPurchaseOrderCore(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll, fromMailboxId: actor.fromMailboxId }, id, {
         cancelReason: "Výroba ukončena dřív — krok přeskočen", mailReason: null,
       });
       if (s) stornos.push({ id, number: s.number, send: s.send, ...(s.sendError ? { sendError: s.sendError } : {}) });
@@ -2057,10 +2023,9 @@ export async function syncStepPurchaseOrder(db: JobsDb, actor: HandoffActor, ope
     if (actor.margins && change.notifySupplier && actor.id) {
       // čekající změnu odeslání nahradí (zabere ji — nikdo ji nepošle podruhé)
       const claimed = pendingChange ? await claimQueue(db, pendingChange.id, "approved") : false;
-      const { data: j } = await db.from("orders").select("owner_id").eq("id", jobId).maybeSingle();
-      const sender = await purchaseOrderSender(db, { id: actor.id, mailAll: actor.mailAll }, (j as { owner_id: string | null } | null)?.owner_id ?? null);
-      const mail = await purchaseOrderMailFor(db, { ...freshPo, revision }, sender.signerId, "change", { previousRequiredDate: previous, fallbackName: actor.fullName });
-      const sent = await sendPurchaseOrderCore(db, author, po.id, mail, { from: sender.from, kind: "change", eventData: { revision, ...(claimed && pendingChange ? { queueId: pendingChange.id } : {}) } });
+      const sender = await purchaseOrderSender({ id: actor.id, fromMailboxId: actor.fromMailboxId });
+      const mail = await purchaseOrderMailFor(db, { ...freshPo, revision }, sender.signerId, "change", { previousRequiredDate: previous, fallbackName: actor.fullName, from: sender.from });
+      const sent = await sendPurchaseOrderCore(db, author, po.id, mail, { from: sender.from, signerId: sender.signerId, kind: "change", eventData: { revision, ...(claimed && pendingChange ? { queueId: pendingChange.id } : {}) } });
       if (sent.ok) return { ok: true, hint: `Změna objednávky ${po.number} odeslána dodavateli.` };
       if (claimed && pendingChange) await releaseQueue(db, pendingChange, sent.error);
       hints.push(`Změnu se nepodařilo odeslat (${sent.error}) — čeká ve frontě.`);
@@ -2153,7 +2118,7 @@ export async function replaceStepSupplierCore(db: JobsDb, actor: HandoffActor, o
   const reason = `Změna dodavatele${fresh ? ` — nahrazeno ${fresh.number}` : ""}`;
   const hints: string[] = [];
   if (notify) {
-    const s = await stornoPurchaseOrderCore(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll }, old.id, { cancelReason: reason, mailReason: null });
+    const s = await stornoPurchaseOrderCore(db, { id: actor.id, fullName: actor.fullName, mailAll: actor.mailAll, fromMailboxId: actor.fromMailboxId }, old.id, { cancelReason: reason, mailReason: null });
     hints.push(s?.send === "odeslano"
       ? `Objednávka ${old.number} stornována u dodavatele.`
       : `Objednávka ${old.number} zrušena — storno čeká ve frontě na odeslání${s?.sendError ? ` (${s.sendError})` : ""}.`);
@@ -2216,7 +2181,7 @@ export async function autoAdvanceAfterDelivery(db: JobsDb, userId: string | null
     // plný přístup (2. 11.) = marže jako super admin; pošta všech schránek ne
     const margins = Boolean(p?.active) && (p?.role === "super_admin" || p?.role === "obchodnik" || p?.full_access === true);
     if (!margins) return manual;
-    const box = await purchaseOrderSender(db, { id: userId }, ctx.job.ownerId);
+    const box = await purchaseOrderSender({ id: userId });
     const plan = buildHandoffPlan(ctx, { kind: "dalsi_krok", operationId: next.id, margins, mailAll: p?.role === "super_admin", actorId: userId, automationMode: "full", senderEmail: box.mailboxEmail });
     const step = plan.steps[0];
     if (!step || step.operationId !== next.id) return manual;

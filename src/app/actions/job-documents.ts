@@ -10,6 +10,7 @@ import { getJob } from "@/lib/data/jobs";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { syncJobFromQuote } from "@/lib/jobs/quote-job-sync-store";
 import { isForward, isJobStage } from "@/lib/jobs/stages";
 import type { JobStage } from "@/lib/supabase/database.types";
 import { cleanText, isUuid, jobFilePath, translateDbError } from "@/lib/jobs/mapping";
@@ -27,6 +28,7 @@ import { renderConfirmationPdf, renderInvoicePdf, renderQuotePdf } from "@/lib/p
 import { addDaysIso, computeTotals, plural, todayIso, type DocItem } from "@/lib/pdf/types";
 import { invoiceBankWarning, spdVariableSymbol } from "@/lib/pdf/qr";
 import { sendMail, senderSignatureText } from "@/lib/email/send";
+import { resolveSender } from "@/lib/email/sender-rules";
 import { COMPANY } from "@/lib/company";
 import { refreshCompanyFromSettings } from "@/lib/company-server";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
@@ -643,11 +645,14 @@ async function docNumberForFile(
   return null;
 }
 
-/** Odešle uložený doklad zákazníkovi e-mailem (s PDF v příloze) z mé schránky. */
+/**
+ * Odešle uložený doklad zákazníkovi e-mailem (s PDF v příloze) z mé schránky. `fromMailboxId` = „Odeslat z"
+ * (jen super admin; ostatním se ignoruje — sender-rules.ts).
+ */
 export async function sendJobDocument(
   jobId: string,
   fileId: string,
-  mail: { to: string; cc?: string; subject: string; body: string },
+  mail: { to: string; cc?: string; subject: string; body: string; fromMailboxId?: string | null },
 ): Promise<ActionResult<{ sent: boolean; emailId: string }>> {
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   if (!isUuid(fileId)) return fail(FILE_NOT_FOUND);
@@ -732,6 +737,7 @@ export async function sendJobDocument(
     const html = documentEmailHtml(body, {
       companyName: COMPANY.name, slogan: COMPANY.slogan, web: COMPANY.web, accent: COMPANY.colors.red,
     });
+    const who = await resolveSender(user.id, { mailboxId: isUuid(mail.fromMailboxId) ? mail.fromMailboxId : null });
     const res = await sendMail({
       to: to.valid.join(", "),
       cc: cc.valid.length ? cc.valid.join(", ") : undefined,
@@ -739,14 +745,14 @@ export async function sendJobDocument(
       text: body,
       html,
       attachments: [{ filename: file.filename, content, contentType: file.mime_type || "application/pdf" }],
-      from: { ownerId: user.id },
+      from: who.from,
       jobId,
       senderId: user.id,
       // Pošta → Odeslané: doklad zákazníkovi u zákazníka; nákupní doklad (nabídka dodavatele) bez vazby
       customerId: file.issuer === "dodavatel" ? null : job.customer_id ?? null,
       // podpis je v textu z návrhu (dialog ho ukázal k úpravě) → grafický s logem místo firemní šablony;
       // bez podpisu v textu zůstane HTML výše (starý / vypnutý podpis)
-      signature: { userId: user.id, mode: "inline" },
+      signature: { userId: who.signerId, mode: "inline" },
     });
     if (!res.sent) return fail(res.reason ?? "E-mail se nepodařilo odeslat.");
 
@@ -762,6 +768,8 @@ export async function sendJobDocument(
         .eq("id", file.quote_id)
         .in("status", ["navrh_ai", "ke_schvaleni", "odeslano"]);
       if (error) console.error(`[job-documents] Označení nabídky jako odeslané selhalo: ${error.message}`);
+      // nabídka → zakázka (9. 11.): termín dodání běží od odeslání nabídky
+      else await syncJobFromQuote(db, jobId, { actorId: user.id, reason: "sent" });
     }
     // potvrzení: objednávku potvrdí DB z události e-mailu níže (podle revize odeslaného souboru);
     // zakázka bez dokladu objednávky (starší data) se posune sama zde

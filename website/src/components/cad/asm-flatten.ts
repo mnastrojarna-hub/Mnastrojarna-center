@@ -1,4 +1,5 @@
 /** Podsestavy v UI: zploštění stromu komponent na listové díly se světovými maticemi, vytváření a rozpouštění podsestav. */
+import { tr } from "@/cad/i18n";
 import { computeBom, emptyAssembly, eulerXYZ, placementMatrix, sourceKey, type BomRow, type Mat3 } from "@/cad/assembly";
 import { uid, type AsmComponent, type CadDoc, type Placement } from "@/cad/types";
 
@@ -98,7 +99,7 @@ export function bomOf(doc: CadDoc, flat: boolean, info: (c: AsmComponent) => { m
     }
     const leaves = flattenLeaves({ ...doc, components: [c] });
     const mass = leaves.reduce((s, l) => s + (info(l.comp).massKg ?? 0), 0);
-    subs.set(k, { pos: 0, name: `${c.name} (podsestava, ${leaves.length} dílů)`, number: c.number, qty: 1, material: "—", massKg: mass, group: "Podsestavy", ids: [c.id] });
+    subs.set(k, { pos: 0, name: tr("{0} (podsestava, {1} dílů)", c.name, leaves.length), number: c.number, qty: 1, material: "—", massKg: mass, group: "Podsestavy", ids: [c.id] });
   }
   const rows = [...subs.values(), ...parts];
   rows.forEach((r, i) => (r.pos = i + 1));

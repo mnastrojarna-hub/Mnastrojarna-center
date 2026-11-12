@@ -3,11 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowDown, CheckCircle2, Loader2, RefreshCw, ScanSearch, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowDown, CheckCircle2, Loader2, RefreshCw, ScanSearch, ShieldOff, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { anonApi, previewUrl } from "./anon-api";
 import { FileAnonBadge } from "./anon-badge";
+import { AnonDebugDetails } from "./anon-debug";
+import type { AnonDebugEntry } from "@/lib/anonymize/types";
 import { describeCounts, displayReason, drawingsWord, NOTHING_REMOVED, type AnonUiStatus } from "./anon-status";
 import { AnonymizeEditor } from "./anonymize-editor";
 
@@ -34,6 +36,8 @@ export interface AnonReviewRowView {
   crop?: { x: number; y: number; w: number; h: number } | null;
   /** Strana originálu pro miniaturu (první zahrnutá). */
   page?: number;
+  /** Diagnostika pokusů (jen super admin — server ji jinému nepošle). */
+  debug?: AnonDebugEntry[] | null;
 }
 
 const PREVIEWABLE = /\.(pdf|jpe?g|png|webp|tiff?)$/i;
@@ -101,10 +105,52 @@ export function AnonReviewList({ items, pendingFileIds, pendingCount }: { items:
     router.refresh();
   }
 
+  /** 12. 11. (majitel): „u nepovedených výkresů možnost použít bez anonymizace" — dodavatel dostane originál. */
+  async function keepOriginal(it: AnonReviewRowView) {
+    if (!window.confirm(`Použít „${it.filename}“ bez anonymizace?\n\nDodavatel dostane ORIGINÁL včetně názvu firmy a razítka. Anonymizovat jde kdykoli znovu z Dokumentů zakázky.`)) return;
+    setBusy(it.id);
+    const r = await anonApi.skip(it.id, "Použito bez anonymizace (anonymizace se nepovedla)");
+    setBusy(null);
+    if (!r.ok) return setMsg({ tone: "err", text: r.error });
+    setDone((s) => new Set(s).add(it.id));
+    setMsg({ tone: "ok", text: `${it.filename}: použije se originál bez anonymizace.` });
+    router.refresh();
+  }
+
+  /** 12. 11. (majitel): „tlačítko znovu anonymizovat vše, co se nepovedlo" — stejná cesta jako „Anonymizovat znovu" u řádku. */
+  async function retryAllFailed(ids: string[]) {
+    setBusy("retry-all");
+    let queued = 0;
+    for (let i = 0; i < ids.length; i += 200) {
+      const r = await anonApi.enqueue({ fileIds: ids.slice(i, i + 200), force: true });
+      if (!r.ok) {
+        setBusy(null);
+        setMsg({ tone: "err", text: queued ? `Zařazeno ${drawingsWord(queued)}, zbytek selhal: ${r.error}` : r.error });
+        router.refresh();
+        return;
+      }
+      queued += r.data.queued;
+    }
+    setBusy(null);
+    setMsg({ tone: "ok", text: `Znovu se anonymizuje ${drawingsWord(queued || ids.length)} — za chvíli budou hotové.` });
+    router.refresh();
+  }
+
   const visible = items.filter((i) => !done.has(i.id));
+  const failedIds = visible.filter((i) => i.status === "failed").map((i) => i.id);
 
   return (
     <div className="space-y-2" data-testid="anon-review">
+      {failedIds.length > 1 && (
+        <div className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2.5 text-sm text-rose-950 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100 sm:flex-row sm:items-center">
+          <span className="flex-1">
+            Anonymizace se nepovedla: <strong>{drawingsWord(failedIds.length)}</strong>.
+          </span>
+          <Button size="sm" variant="outline" className="min-h-11 sm:min-h-9" disabled={busy === "retry-all"} onClick={() => void retryAllFailed(failedIds)} data-testid="anon-retry-all">
+            {busy === "retry-all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Anonymizovat znovu vše, co se nepovedlo ({failedIds.length})
+          </Button>
+        </div>
+      )}
       {pendingCount > 0 && (
         <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2.5 text-sm text-sky-950 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100 sm:flex-row sm:items-center">
           <span className="flex-1">
@@ -154,15 +200,21 @@ export function AnonReviewList({ items, pendingFileIds, pendingCount }: { items:
                     {it.jobTitle ? ` · ${it.jobTitle}` : ""}
                   </p>
                   {reason && <p className={cn("text-xs", it.status === "failed" ? "text-red-700 dark:text-red-300" : "text-amber-800 dark:text-amber-300")}>{reason}</p>}
+                  <AnonDebugDetails entries={it.debug} />
                   {counts && <p className="text-xs"><span className="text-muted-foreground">Smaže se:</span> {counts}</p>}
                   {empty && <p className="flex items-start gap-1 text-xs font-medium text-amber-800 dark:text-amber-300"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {NOTHING_REMOVED}</p>}
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">
                 {it.status === "failed" ? (
-                  <Button size="sm" variant="outline" className="min-h-11 flex-1 sm:min-h-9" disabled={busy === it.id} onClick={() => void retry(it)}>
-                    {busy === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Anonymizovat znovu
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" className="min-h-11 flex-1 sm:min-h-9" disabled={busy === it.id} onClick={() => void retry(it)}>
+                      {busy === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Anonymizovat znovu
+                    </Button>
+                    <Button size="sm" variant="ghost" className="min-h-11 flex-1 sm:min-h-9" disabled={busy === it.id} onClick={() => void keepOriginal(it)} data-testid="anon-use-original">
+                      <ShieldOff className="h-4 w-4" /> Použít bez anonymizace
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button size="sm" variant="outline" className="min-h-11 flex-1 sm:min-h-9" onClick={() => setEditing(it)} data-testid="anon-review-open">

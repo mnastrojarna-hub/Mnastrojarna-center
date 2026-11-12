@@ -19,6 +19,7 @@
  *                /cad#r=<cesta>.<klíč>     úložiště, klíč náhodný
  *                /cad#r=<cesta>.<klíč>.p<sůl>   úložiště + heslo
  */
+import { cadLocale, tr } from "./i18n";
 import type { CadDoc } from "./types";
 
 export type ShareView = "model" | "drawing";
@@ -146,8 +147,8 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
   };
 
   const asStore = async (): Promise<ShareResult> => {
-    if (!store) throw new Error("Úložiště sdílení není nastavené (NEXT_PUBLIC_CAD_SHARE_URL / NEXT_PUBLIC_CAD_SHARE_KEY).");
-    if (!o.days) throw new Error("V úložišti musí mít odkaz omezenou platnost (max. 90 dní).");
+    if (!store) throw new Error(tr("Úložiště sdílení není nastavené (NEXT_PUBLIC_CAD_SHARE_URL / NEXT_PUBLIC_CAD_SHARE_KEY)."));
+    if (!o.days) throw new Error(tr("V úložišti musí mít odkaz omezenou platnost (max. 90 dní)."));
     const days = Math.min(90, Math.max(1, Math.round(o.days)));
     const raw = crypto.getRandomValues(new Uint8Array(32));
     let salt: Uint8Array | null = null;
@@ -167,9 +168,9 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
         body: body as BodyInit,
       });
     } catch {
-      throw new Error("Úložiště sdílení není dostupné (síť). Zkuste to znovu nebo pošlete soubor .mncad.");
+      throw new Error(tr("Úložiště sdílení není dostupné (síť). Zkuste to znovu nebo pošlete soubor .mncad."));
     }
-    if (!res.ok) throw new Error(`Úložiště sdílení odmítlo nahrání (${res.status}). Zkontrolujte nastavení bucketu „cad-share“.`);
+    if (!res.ok) throw new Error(tr("Úložiště sdílení odmítlo nahrání ({0}). Zkontrolujte nastavení bucketu „cad-share“.", res.status));
     const url = `${base}#r=${path.replace("/", "~").replace(/\.bin$/, "")}.${b64u(raw)}${salt ? ".p" + b64u(salt) : ""}`;
     return { url, mode: "store", bytes: body.length, exp, password: !!password };
   };
@@ -177,13 +178,13 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
   if (o.mode === "store") return asStore();
   if (o.mode === "link") {
     const r = await asLink();
-    if (r.url.length > LINK_MAX_CHARS) throw new Error(`Dokument je pro odkaz příliš velký (${Math.round(r.url.length / 1024)} kB, zřejmě importovaná geometrie). ${store ? "Zvolte úložiště." : "Uložte .mncad nebo STEP a pošlete soubor, nebo nastavte úložiště sdílení."}`);
+    if (r.url.length > LINK_MAX_CHARS) throw new Error(tr("Dokument je pro odkaz příliš velký ({0} kB, zřejmě importovaná geometrie). {1}", Math.round(r.url.length / 1024), store ? tr("Zvolte úložiště.") : tr("Uložte .mncad nebo STEP a pošlete soubor, nebo nastavte úložiště sdílení.")));
     return r;
   }
   // automaticky: krátký → v odkazu; dlouhý → úložiště, je-li k dispozici
   const r = await asLink();
   if (r.url.length <= LINK_WARN_CHARS || !store || !o.days) {
-    if (r.url.length > LINK_MAX_CHARS) throw new Error(`Dokument je pro odkaz příliš velký (${Math.round(r.url.length / 1024)} kB, zřejmě importovaná geometrie). ${store ? "Zvolte omezenou platnost a úložiště." : "Uložte .mncad nebo STEP a pošlete soubor, nebo nastavte úložiště sdílení."}`);
+    if (r.url.length > LINK_MAX_CHARS) throw new Error(tr("Dokument je pro odkaz příliš velký ({0} kB, zřejmě importovaná geometrie). {1}", Math.round(r.url.length / 1024), store ? tr("Zvolte omezenou platnost a úložiště.") : tr("Uložte .mncad nebo STEP a pošlete soubor, nebo nastavte úložiště sdílení.")));
     return r;
   }
   return asStore();
@@ -277,23 +278,23 @@ export async function openShareLink(parsed: ParsedShare, password?: string): Pro
 
 /** Text zprávy k odkazu (WhatsApp / e-mail). */
 export function shareMessage(docName: string, r: ShareResult): string {
-  const until = r.exp ? ` (platí do ${new Date(r.exp).toLocaleDateString("cs-CZ")})` : "";
-  return `Mnástrojárna CAD – sdílený dokument „${docName}“${until}:\n${r.url}${r.password ? "\n\nOdkaz je chráněný heslem – pošlu ho zvlášť." : ""}\n\nOtevře se v prohlížeči bez instalace (Chrome, Edge, Firefox, Safari).`;
+  const until = r.exp ? tr(" (platí do {0})", new Date(r.exp).toLocaleDateString(cadLocale())) : "";
+  return tr("Mnástrojárna CAD – sdílený dokument „{0}“{1}:\n{2}{3}\n\nOtevře se v prohlížeči bez instalace (Chrome, Edge, Firefox, Safari).", docName, until, r.url, r.password ? tr("\n\nOdkaz je chráněný heslem – pošlu ho zvlášť.") : "");
 }
 
 /** Důvod neotevření odkazu česky. */
 export function openErrorText(reason: Exclude<OpenResult, { ok: true }>["reason"], exp?: number | null): string {
   switch (reason) {
     case "expired":
-      return `Platnost sdíleného odkazu vypršela${exp ? ` (${new Date(exp).toLocaleDateString("cs-CZ")})` : ""}. Požádejte odesílatele o nové sdílení.`;
+      return tr("Platnost sdíleného odkazu vypršela{0}. Požádejte odesílatele o nové sdílení.", exp ? ` (${new Date(exp).toLocaleDateString(cadLocale())})` : "");
     case "password":
-      return "Nesprávné heslo.";
+      return tr("Nesprávné heslo.");
     case "notfound":
-      return "Sdílený dokument už v úložišti není (platnost vypršela nebo byl smazán). Požádejte odesílatele o nové sdílení.";
+      return tr("Sdílený dokument už v úložišti není (platnost vypršela nebo byl smazán). Požádejte odesílatele o nové sdílení.");
     case "network":
-      return "Úložiště sdílení není dostupné. Zkuste to znovu později.";
+      return tr("Úložiště sdílení není dostupné. Zkuste to znovu později.");
     default:
-      return "Odkaz není platný sdílený dokument Mnástrojárna CAD (zkontrolujte, zda se zkopíroval celý).";
+      return tr("Odkaz není platný sdílený dokument Mnástrojárna CAD (zkontrolujte, zda se zkopíroval celý).");
   }
 }
 export const CHECK_TAG = CHECK;

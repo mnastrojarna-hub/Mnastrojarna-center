@@ -15,17 +15,23 @@ import { JOB_PERSON_COLUMNS, formatFieldValue } from "@/lib/jobs/field-labels";
 import {
   jobInputToRow, validateJobInput, validateItems, jobItemToRow, quoteItemToRow, quoteInputToRow,
   computeItemTotals, diffJob, describeChanges, fieldEventMessage, stageEventMessage, aiFilledColumns,
-  quoteRevisionNumber, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
+  quoteRevisionNumber, quoteItemsFromJobItems, quoteRevisionValidUntil, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
   translateDbError, cleanNewContact, defaultCustomerContact, rowsToCustomerContacts, type JobChange,
 } from "@/lib/jobs/mapping";
 import type { JobStage, JobSource } from "@/lib/supabase/database.types";
 import type { ActionResult, JobInput, JobItemInput, JobQuoteInput } from "@/lib/jobs/types";
 import {
-  FLOW_QUOTE_COLUMNS, QUOTE_ACCEPT_BLOCKED, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, reasonRequired,
+  FLOW_QUOTE_COLUMNS, QUOTE_ACCEPT_BLOCKED, canMoveJobStage, quoteApprovalBlock, quoteFactsFromRow, quoteSendBlock, reasonRequired,
   userNeedsQuoteApproval,
 } from "@/lib/jobs/flow-status";
 import { approveQuoteCore, quoteSnapshotShaById, scheduleQuoteApprovalNotice } from "@/lib/jobs/quote-approval-store";
+import { deleteQuoteWithPdfs, quoteDeleteBlock, type QuoteSyncRow } from "@/lib/jobs/quote-file-sync";
 import { supersedeEditedMailChanges } from "@/lib/email/job-link-store";
+import {
+  invoicedValueBlock, itemsSaleValue, purchaseCostEditBlock, quotePriceWarning, activePurchaseOrders,
+} from "@/lib/jobs/consistency";
+import { applyJobValueToItems, loadJobMoneyContext, type JobMoneyContext } from "@/lib/jobs/consistency-store";
+import { syncJobFromQuote } from "@/lib/jobs/quote-job-sync-store";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -194,6 +200,8 @@ function rawValue(v: unknown, refs: Record<string, string>): string {
 /** Změna stavu + záznam do historie (sdílí setJobStage i nabídky). */
 /** Uzavření zakázky (nerealizováno / zrušeno) jen přes moveJobStage — s právem marže a důvodem. */
 const CLOSE_NEEDS_REASON = "Uzavřít zakázku jako nerealizovanou nebo zrušenou jde jen přes Korekci stavu s důvodem.";
+/** Ruční změna stavu bez práva přechodu (vyfakturováno, dokončeno … bez marží a bez „Smí ručně měnit stav zakázky"). */
+const STAGE_DENIED = "Do tohoto stavu přesune zakázku obchodník, admin nebo kdo smí ručně měnit stav — navrhni to.";
 
 /** Nabídka vzniká jen jako rozpracovaná / ke schválení; další stavy mění setQuoteState (práva, přechody). */
 const NEW_QUOTE_STATUSES = new Set(["navrh_ai", "ke_schvaleni"]);
@@ -311,8 +319,10 @@ export async function createJob(
     const totals = computeItemTotals(items.map((it) => ({
       quantity: it.quantity, unitPrice: it.unitPrice, purchaseUnitPrice: margins ? it.purchaseUnitPrice : null,
     })));
-    if (input.value === undefined && totals.value !== null) row.value = totals.value;
-    if (margins && input.purchaseCost === undefined && totals.purchaseCost !== null) row.purchase_cost = totals.purchaseCost;
+    // křížová konzistence (4. 11.): s nacenenými položkami je hodnota zakázky jejich součet (částka z hlavičky
+    // dokladu / formuláře ji nepřebije — DB by ji stejně srovnala); bez cen zůstane zadaná ručně
+    if (totals.value !== null) row.value = totals.value;
+    if (margins && totals.purchaseCost !== null) row.purchase_cost = totals.purchaseCost;
 
     if (!row.title) {
       row.title = cleanText(items[0]?.name, 300) ?? cleanText(items[0]?.drawingNumber, 300) ?? "Nová zakázka";
@@ -380,7 +390,7 @@ export async function createJob(
   }
 }
 
-export async function updateJob(id: string, patch: JobInput): Promise<ActionResult> {
+export async function updateJob(id: string, patch: JobInput): Promise<ActionResult<{ warning: string }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(id)) return fail(NOT_FOUND);
@@ -422,12 +432,41 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
     const contactErr = await resolveJobContact(db, before, row, rest);
     if (contactErr) return fail(contactErr);
 
-    const changes = diffJob(before, row);
+    let changes = diffJob(before, row);
     if (!isAdmin && changes.some((ch) => ch.field === "owner_id")) return fail(OWNER_ADMIN_ONLY);
     const fromStage = isJobStage(before.status) ? before.status : null;
     const stageTo = stage !== undefined && stage !== fromStage ? stage : null;
     if (stageTo && reasonRequired("job", stageTo)) return fail(CLOSE_NEEDS_REASON);
-    if (!changes.length && !stageTo) return { ok: true };
+    if (stageTo && !canMoveJobStage(c.can, stageTo)) return fail(STAGE_DENIED);
+
+    // křížová konzistence (4. 11.): hodnota s naceněnými položkami se rozpočítá na položky,
+    // vyfakturovaná zakázka se nepřeceňuje, nákup s objednávkami dodavatelům se mění v objednávce
+    let warning = "";
+    let valueTarget: number | null = null;
+    let money: JobMoneyContext | null = null;
+    if (changes.some((ch) => ch.field === "value" || ch.field === "purchase_cost")) {
+      money = await loadJobMoneyContext(db, id, { margins });
+      if (money) {
+        const cur = money.snapshot.currency || "CZK";
+        if (changes.some((ch) => ch.field === "value")) {
+          const block = invoicedValueBlock(money.snapshot);
+          if (block) return fail(block);
+          const next = cleanNumber(row.value);
+          if (itemsSaleValue(money.snapshot.items) !== null) {
+            if (next === null) return fail("Hodnotu zakázky nejde smazat, dokud mají položky ceny — smaž ceny v Položkách.");
+            valueTarget = next;
+            changes = changes.filter((ch) => ch.field !== "value");
+          } else {
+            warning = quotePriceWarning(money.snapshot.quotes ?? [], next, cur) ?? "";
+          }
+        }
+        if (changes.some((ch) => ch.field === "purchase_cost")) {
+          const block = purchaseCostEditBlock(money.snapshot.purchaseOrders ?? [], cleanNumber(row.purchase_cost), cur);
+          if (block) return fail(block);
+        }
+      }
+    }
+    if (!changes.length && !stageTo && valueTarget === null) return { ok: true };
 
     if (changes.length) {
       const update: Row = {};
@@ -481,13 +520,19 @@ export async function updateJob(id: string, patch: JobInput): Promise<ActionResu
       }
     }
 
+    if (valueTarget !== null && money) {
+      const applied = await applyJobValueToItems(db, money, valueTarget);
+      if (!applied.ok) return fail(applied.error);
+      if (applied.warning) warning = applied.warning;
+    }
+
     if (stageTo) {
       const err = await applyStage(db, id, fromStage, stageTo, user.id);
       if (err) return fail(err);
     }
 
     revalidateJob(id);
-    return { ok: true };
+    return { ok: true, ...(warning ? { warning } : {}) };
   } catch (err) {
     return fail(err);
   }
@@ -499,6 +544,8 @@ export async function setJobStage(id: string, stage: JobStage, note?: string): P
   if (!isUuid(id)) return fail(NOT_FOUND);
   if (!isJobStage(stage)) return fail("Neznámý stav zakázky.");
   if (reasonRequired("job", stage)) return fail(CLOSE_NEEDS_REASON);
+  // stejné právo jako Korekce stavu (moveJobStage): přechod, nebo „Smí ručně měnit stav zakázky"
+  if (!canMoveJobStage(c.can, stage)) return fail(STAGE_DENIED);
   try {
     const job = await loadJob(c.db, id, "id, status");
     if (!job) return fail(NOT_FOUND);
@@ -553,7 +600,7 @@ export async function deleteJob(id: string): Promise<ActionResult> {
 }
 
 // ── Položky a komentáře ─────────────────────────────────────
-export async function saveJobItems(jobId: string, items: JobItemInput[]): Promise<ActionResult> {
+export async function saveJobItems(jobId: string, items: JobItemInput[]): Promise<ActionResult<{ warning: string; value: number | null }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
@@ -562,15 +609,15 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
 
   try {
     const { db, user, margins } = c;
-    const job = await loadJob(db, jobId, "id, value");
+    const job = await loadJob(db, jobId, "id, value, currency, invoice_number, invoiced_at");
     if (!job) return fail(NOT_FOUND);
 
     const { data: oldData, error: oldErr } = await db
       .from("order_items")
-      .select("id, drawing_id, purchase_unit_price, note, drawing_number, name")
+      .select("id, drawing_id, purchase_unit_price, note, drawing_number, name, quantity, unit_price")
       .eq("order_id", jobId);
     if (oldErr) return fail(oldErr.message);
-    const old = new Map(((oldData ?? []) as { id: string; drawing_id: string | null; purchase_unit_price: number | null; note: string | null; drawing_number: string | null; name: string | null }[]).map((r) => [r.id, r]));
+    const old = new Map(((oldData ?? []) as { id: string; drawing_id: string | null; purchase_unit_price: number | null; note: string | null; drawing_number: string | null; name: string | null; quantity: number | string | null; unit_price: number | string | null }[]).map((r) => [r.id, r]));
 
     const rows = items.map((it, i): Row => {
       const r = jobItemToRow(it, i);
@@ -580,6 +627,15 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       if (prev?.drawing_id) r.drawing_id = prev.drawing_id;
       return { ...r, order_id: jobId };
     });
+
+    // vyfakturovaná zakázka: prodejní ceny a počty (i přidání / odebrání položky) už ne — jen dobropisem
+    const invoiceBlock = invoicedValueBlock({ invoiceNumber: job.invoice_number as string | null, invoicedAt: job.invoiced_at as string | null });
+    if (invoiceBlock) {
+      const priceKey = (q: unknown, p: unknown) => `${cleanNumber(q) ?? 0}|${cleanNumber(p) ?? ""}`;
+      const oldSig = [...old.values()].map((r) => `${r.id}:${priceKey(r.quantity, r.unit_price)}`).sort().join(",");
+      const newSig = items.map((it, i) => `${it.id && old.has(it.id) ? it.id : `new${i}`}:${priceKey(rows[i].quantity, rows[i].unit_price)}`).sort().join(",");
+      if (oldSig !== newSig) return fail(invoiceBlock);
+    }
 
     // upsert podle id: existující se upraví (dodávky a uzavření položek zůstanou), nové se vloží,
     // odebrané smažou. Vložení ani smazání stav zakázky neposouvá.
@@ -622,12 +678,22 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       unitPrice: r.unit_price as number | null,
       purchaseUnitPrice: r.purchase_unit_price as number | null,
     })));
+    // hodnota zakázky = Σ položek přepočte DB (trigger, se záznamem do historie); nákup podle nákupních
+    // cen položek jen bez objednávek dodavatelům (s nimi je nákup = Σ objednávek)
     const update: Row = {};
-    if (rows.some((r) => r.unit_price !== null)) update.value = totals.value;
-    if (margins && rows.some((r) => r.purchase_unit_price !== null)) update.purchase_cost = totals.purchaseCost;
+    if (rows.some((r) => r.unit_price !== null) && !invoiceBlock) update.value = totals.value;
+    let warning = "";
+    if (margins && rows.some((r) => r.purchase_unit_price !== null)) {
+      const { data: posData } = await db.from("purchase_orders").select("status").eq("job_id", jobId);
+      if (!activePurchaseOrders((posData ?? []) as { status: string }[]).length) update.purchase_cost = totals.purchaseCost;
+    }
     if (Object.keys(update).length) {
       const { error: upErr } = await db.from("orders").update(update as never).eq("id", jobId);
       if (upErr) return fail(upErr.message);
+    }
+    if (update.value !== undefined && cleanNumber(job.value) !== cleanNumber(update.value)) {
+      const ctx = await loadJobMoneyContext(db, jobId, { margins: false });
+      warning = (ctx && quotePriceWarning(ctx.snapshot.quotes ?? [], cleanNumber(update.value), String(job.currency || "CZK"))) || "";
     }
 
     // poznámky položek (nové / změněné) jako změny v historii — s textem, ne jen „Položky upraveny"
@@ -646,7 +712,7 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
       actorId: user.id,
     });
     revalidateJob(jobId);
-    return { ok: true };
+    return { ok: true, value: cleanNumber(update.value ?? job.value), ...(warning ? { warning } : {}) };
   } catch (err) {
     return fail(err);
   }
@@ -816,6 +882,8 @@ export async function createJobQuote(
       data: { quoteId, number, revision, total: totals.value, action: "created", ...(needsApproval ? { needsApproval: true } : {}) },
       actorId: user.id,
     });
+    // nabídka → zakázka (majitel 9. 11.): položky, ceny, hodnota, nákup a termín dodání podle nabídky
+    await syncJobFromQuote(db, jobId, { actorId: user.id, reason: "created" });
     if (needsApproval) await scheduleQuoteApprovalNotice({ quoteId, jobId, authorId: user.id });
     revalidateQuote(jobId);
     return { ok: true, id: quoteId, number, needsApproval };
@@ -909,6 +977,7 @@ export async function updateJobQuote(
         data: { quoteId, number: quote.number, action: "updated", total: update.total ?? null, approvalReset: resetApproval, contentChanged },
         actorId: user.id,
       });
+      await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "updated" });
     }
     if (pendingNow && (resetApproval || (!isAdmin && now.adminApprovalRequired && quote.approval_returned_at))) {
       await scheduleQuoteApprovalNotice({ quoteId, jobId: quote.job_id, authorId: user.id });
@@ -977,6 +1046,8 @@ export async function markJobQuoteSent(quoteId: string): Promise<ActionResult> {
         const err = await applyStage(db, quote.job_id, from, "nabidka", user.id);
         if (err) return fail(err);
       }
+      // termín dodání běží od odeslání nabídky
+      await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "sent" });
     }
     revalidateQuote(quote.job_id);
     return { ok: true };
@@ -1004,15 +1075,25 @@ export async function acceptJobQuote(quoteId: string): Promise<ActionResult> {
     if (error) return fail(error.message);
 
     const total = cleanNumber(quote.total);
+    // křížová konzistence (4. 11.) + nabídka → zakázka (9. 11.): přijatá nabídka = aktuální nabídka zakázky →
+    // položky (chybějící přibudou), prodejní ceny spárovaných položek, termín; hodnota zakázky = Σ položek (DB).
+    // Bez položek s cenou = cena nabídky.
+    const priced = await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "accepted", force: true });
+    const pricedCount = priced.pricesUpdated + priced.itemsCreated;
     const jobUpdate: Row = { quote_id: quoteId };
-    if (total !== null) jobUpdate.value = total;
+    if (total !== null && priced.skipped !== "invoiced") jobUpdate.value = total;
     const { error: jobErr } = await db.from("orders").update(jobUpdate as never).eq("id", quote.job_id);
     if (jobErr) return fail(jobErr.message);
 
-    const valueText = total !== null ? ` — hodnota zakázky ${formatFieldValue("value", total)}` : "";
+    // skutečná hodnota po přijetí (= Σ položek, když mají ceny) — může se lišit, když nešlo spárovat vše
+    const after = await loadJob(db, quote.job_id, "value");
+    const valueNow = cleanNumber(after?.value);
+    const valueText = valueNow !== null ? ` — hodnota zakázky ${formatFieldValue("value", valueNow)}` : "";
+    const differs = total !== null && valueNow !== null && Math.abs(total - valueNow) >= 0.005;
     await logJobEvent(db, {
-      jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} přijata zákazníkem${valueText}`,
-      data: { quoteId, number: quote.number, action: "accepted", total, previousValue: cleanNumber(job.value) },
+      jobId: quote.job_id, type: "quote",
+      message: `${quoteLabel(quote)} přijata zákazníkem${valueText}${pricedCount ? ` (ceny ${pricedCount} ${pricedCount === 1 ? "položky" : "položek"} podle nabídky)` : ""}${differs ? ` — pozor: nabídka je na ${formatFieldValue("value", total)}, položky zakázky se liší` : ""}`,
+      data: { quoteId, number: quote.number, action: "accepted", total, value: valueNow, previousValue: cleanNumber(job.value), itemsPriced: pricedCount },
       actorId: user.id,
     });
 
@@ -1062,16 +1143,34 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
   try {
-    const { db, user } = c;
+    const { db, user, margins } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
+
+    // majitel 5. 11.: nový doklad = aktuální data zakázky. Položky, počty a ceny nové verze jdou z AKTUÁLNÍCH
+    // položek zakázky (po změně ceny / počtu „nabídka nesedí" → nová verze to má správně, ne opsané ze staré);
+    // kde zakázka cenu nemá, zůstane z předchozí verze. Platnost se počítá znovu ode dneška. Bez položek
+    // zakázky se opíše předchozí verze.
+    const prevItems = (quote.items ?? []) as Row[];
+    let jobItems: Row[] = [];
+    if (quote.job_id) {
+      const { data: ji } = await db.from("order_items")
+        .select("position, drawing_id, drawing_number, name, description, material, quantity, unit, unit_price, purchase_unit_price, note")
+        .eq("order_id", quote.job_id).order("position");
+      jobItems = (ji ?? []) as Row[];
+    }
+    const fromJob = jobItems.length > 0;
+    const itemRows: Row[] = fromJob
+      ? quoteItemsFromJobItems(jobItems, prevItems, { margins })
+      : prevItems.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => k !== "id" && k !== "quote_id")));
+    const totals = computeItemTotals(itemRows.map((r) => ({ quantity: Number(r.quantity), unitPrice: cleanNumber(r.unit_price), purchaseUnitPrice: cleanNumber(r.purchase_unit_price) })));
 
     let rev = (quote.job_id ? await maxRevision(db, quote.job_id) : (quote.revision ?? 1)) + 1;
     const copy = {
       title: quote.title ?? null,
       currency: quote.currency ?? "CZK",
-      total: quote.total ?? null,
-      valid_until: quote.valid_until ?? null,
+      total: fromJob ? totals.value : quote.total ?? null,
+      valid_until: quoteRevisionValidUntil({ validUntil: (quote.valid_until as string | null) ?? null, createdAt: (quote.created_at as string | null) ?? null }),
       lead_time_days: quote.lead_time_days ?? null,
       delivery_terms: quote.delivery_terms ?? null,
       payment_terms: quote.payment_terms ?? null,
@@ -1106,10 +1205,7 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
     if (!createdId) return fail("Nepodařilo se vytvořit novou verzi nabídky.");
     const finalRev = rev;
 
-    const items = (quote.items ?? []).map((r) => ({
-      ...Object.fromEntries(Object.entries(r).filter(([k]) => k !== "id" && k !== "quote_id")),
-      quote_id: createdId,
-    }));
+    const items = itemRows.map((r) => ({ ...r, quote_id: createdId }));
     if (items.length) {
       const { error: itemErr } = await db.from("quote_items").insert(items as never);
       if (itemErr) {
@@ -1124,11 +1220,12 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
     if (quote.job_id) {
       await logJobEvent(db, {
         jobId: quote.job_id, type: "quote",
-        message: `Nová verze nabídky ${number} (verze ${finalRev}) — ${quote.number ?? "původní"} archivována${needsApproval ? PENDING_SUFFIX : ""}`,
-        data: { quoteId: createdId, number, revision: finalRev, previousQuoteId: quoteId, action: "revision", ...(needsApproval ? { needsApproval: true } : {}) },
+        message: `Nová verze nabídky ${number} (verze ${finalRev})${fromJob ? " podle aktuálních položek zakázky" : ""} — ${quote.number ?? "původní"} archivována${needsApproval ? PENDING_SUFFIX : ""}`,
+        data: { quoteId: createdId, number, revision: finalRev, previousQuoteId: quoteId, action: "revision", itemsFromJob: fromJob, validUntil: copy.valid_until, ...(needsApproval ? { needsApproval: true } : {}) },
         actorId: user.id,
       });
     }
+    if (quote.job_id) await syncJobFromQuote(db, quote.job_id, { actorId: user.id, reason: "revision" });
     if (needsApproval) await scheduleQuoteApprovalNotice({ quoteId: createdId, jobId: quote.job_id, authorId: user.id });
     revalidateQuote(quote.job_id);
     return { ok: true, id: createdId, number };
@@ -1161,7 +1258,12 @@ export async function setJobQuoteArchived(quoteId: string, archived: boolean): P
   }
 }
 
-export async function deleteJobQuote(quoteId: string): Promise<ActionResult> {
+/**
+ * Smazání nabídky: odeslanou (sent_at / odesláno / přijato) smazat nejde — jen archivovat (stejné
+ * pravidlo jako menu Nabídky). S nabídkou se smažou i všechna její vystavená PDF v Dokumentech
+ * (`removedFiles`); nahrané soubory s vazbou zůstanou bez vazby (lib/jobs/quote-files).
+ */
+export async function deleteJobQuote(quoteId: string): Promise<ActionResult<{ removedFiles: number }>> {
   const c = await begin("delete");
   if ("error" in c) return fail(c.error);
   if (!isUuid(quoteId)) return fail(QUOTE_NOT_FOUND);
@@ -1169,21 +1271,17 @@ export async function deleteJobQuote(quoteId: string): Promise<ActionResult> {
     const { db, user } = c;
     const quote = await loadQuote(db, quoteId);
     if (!quote) return fail(QUOTE_NOT_FOUND);
-    // orders.quote_id se vynuluje samo (on delete set null)
-    const { error } = await db.from("quotes").delete().eq("id", quoteId);
-    if (error) return fail(error.message);
-    await logAudit({
-      action: "quote_deleted", entity: "quotes", entityId: quoteId,
-      diff: { number: quote.number, jobId: quote.job_id, total: quote.total },
-    });
-    if (quote.job_id) {
-      await logJobEvent(db, {
-        jobId: quote.job_id, type: "quote", message: `${quoteLabel(quote)} smazána`,
-        data: { quoteId, number: quote.number, action: "deleted" }, actorId: user.id,
-      });
-    }
+    const sync: QuoteSyncRow = {
+      id: quote.id, number: quote.number, job_id: quote.job_id, status: quote.status,
+      sent_at: (quote.sent_at as string | null | undefined) ?? null, storage_path: (quote.storage_path as string | null | undefined) ?? null, total: quote.total,
+    };
+    const block = quoteDeleteBlock(sync);
+    if (block) return fail(block);
+    // orders.quote_id se vynuluje samo (on delete set null); audit a historie zapíše jádro
+    const r = await deleteQuoteWithPdfs(db, sync, user.id, { cause: "quote" });
+    if (!r.ok) return fail(r.error);
     revalidateQuote(quote.job_id);
-    return { ok: true };
+    return { ok: true, removedFiles: r.removedFiles };
   } catch (err) {
     return fail(err);
   }

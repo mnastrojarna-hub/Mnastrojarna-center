@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import type { PurchaseOrderListItem } from "@/lib/jobs/purchasing-types";
 import { PURCHASE_ORDER_STATUS_META, filterPurchaseOrders } from "@/lib/jobs/purchasing";
 import { StageBadge } from "@/components/jobs/stage-badge";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
+import { premiumFirst } from "@/lib/jobs/premium";
 import { ToastProvider, useNotify } from "@/components/jobs/detail/toast";
 import { formatMoney, longDate } from "@/components/jobs/detail/detail-helpers";
 import { PageHero } from "@/components/commissions/page-hero";
@@ -70,7 +73,10 @@ function Board({
   const notify = useNotify();
   const [refreshing, startRefresh] = React.useTransition();
   const [filter, setFilter] = React.useState<PurchaseFilter>(isFilter(initialFilter) ? initialFilter : "vse");
-  const [query, setQuery] = React.useState(initialQuery ?? "");
+  // hledání v adrese (?q= čte i server) — Zpět z karty zakázky vrátí stejný seznam, menu si ho pamatuje
+  const url = useUrlState({ q: initialQuery ?? "" });
+  const query = url.values.q;
+  const setQuery = (v: string) => url.set({ q: v }, { delay: 300 });
   const refresh = React.useCallback(() => startRefresh(() => router.refresh()), [router]);
 
   const stats = React.useMemo(() => FILTERS.map((f) => {
@@ -78,7 +84,8 @@ function Board({
     return { key: f.key, count: list.length, total: list.reduce((s, po) => s + po.total, 0) };
   }), [items, today]);
   const searched = React.useMemo(() => filterPurchaseOrders(items, query), [items, query]);
-  const visible = searched.filter((po) => matchesPurchaseFilter(po, filter, today));
+  // 9. 11.: objednávky k zakázkám prémiových zákazníků přednostně nahoře (stabilně)
+  const visible = premiumFirst(searched.filter((po) => matchesPurchaseFilter(po, filter, today)), (po) => po.customer?.isPremium);
   const visibleTotal = visible.reduce((s, po) => s + po.total, 0);
   const lateCount = stats.find((s) => s.key === "po_terminu")?.count ?? 0;
   const toSend = stats.find((s) => s.key === "k_odeslani")?.count ?? 0;
@@ -228,8 +235,16 @@ function OrderRow({
   const late = isPurchaseOrderLate(po, today);
   const cancelled = po.status === "zrusena";
   return (
-    <li className={cn("relative overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md", cancelled && "opacity-70")}>
+    <li
+      className={cn(
+        "relative overflow-hidden rounded-xl border bg-card shadow-sm transition hover:shadow-md",
+        po.customer?.isPremium && PREMIUM_ROW,
+        cancelled && "opacity-70",
+      )}
+      data-premium={po.customer?.isPremium ? "1" : undefined}
+    >
       <span className={cn("absolute inset-y-0 left-0 w-1.5", m.dot)} aria-hidden />
+      {po.customer?.isPremium && <span aria-hidden className={PREMIUM_STRIPE} />}
       <div className="grid gap-3 p-3 pl-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1.5fr)_minmax(0,1.2fr)_auto] lg:items-center">
         <div className="min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -249,6 +264,7 @@ function OrderRow({
             <Link href={`/orders/${po.job.id}?tab=${canSeePrices ? "nakup" : "vyroba"}`} className="group flex min-w-0 items-center gap-1.5">
               <span className="shrink-0 whitespace-nowrap font-mono text-xs font-bold text-primary group-hover:underline">{po.job.number}</span>
               <StageBadge stage={po.job.stage} size="xs" short />
+              {po.customer?.isPremium && <PremiumBadge label="flow" size="xs" />}
               <ArrowUpRight className="h-3 w-3 shrink-0 text-muted-foreground opacity-0 transition group-hover:opacity-100" />
             </Link>
           ) : (

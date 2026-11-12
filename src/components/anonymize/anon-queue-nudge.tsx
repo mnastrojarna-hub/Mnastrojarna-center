@@ -3,13 +3,15 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
+import { isFileViewerOpen } from "@/components/file-viewer/viewer-bus";
 
 /**
  * Neviditelný pomocník stránek se seznamem výkresů (Poptávky, Archiv výkresů): čekají-li výkresy na
  * anonymizaci, šťouchne do fronty (zpracuje route na serveru — bez plánovače i bez CRON_SECRET) a po
- * chvíli obnoví stránku, nejvýš ~5× (pak už jen při další návštěvě). Nic nevykresluje.
+ * chvíli obnoví stránku, nejvýš ~12× (≈ 5 min; odložený pokus po přechodné chybě má odklad 5 min — majitel
+ * 5. 11.: otevřená stránka ho má spustit sama). Nic nevykresluje.
  */
-export function AnonQueueNudge({ table = "job_files", ids, intervalMs = 25_000, rounds = 5 }: {
+export function AnonQueueNudge({ table = "job_files", ids, intervalMs = 25_000, rounds = 13 }: {
   table?: "job_files" | "drawings";
   ids: string[];
   intervalMs?: number;
@@ -25,6 +27,8 @@ export function AnonQueueNudge({ table = "job_files", ids, intervalMs = 25_000, 
     void nudgeAnonymize({ table, fileIds: list });
     const t = window.setInterval(() => {
       if (cancelled) return;
+      // otevřený prohlížeč dokumentu: neobnovovat (tvrdé načtení stránky by ho zavřelo) — další kolo to dožene
+      if (isFileViewerOpen()) return;
       n += 1;
       router.refresh();
       if (n >= rounds) window.clearInterval(t);

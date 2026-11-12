@@ -518,7 +518,10 @@ function FlowDialog({
     case "quote.approveSend":
       // #25: schválení + PDF + e-mail jedním krokem na serveru (zavřením se nic neschválí)
       return quote ? (
-        <QuoteApproveSendDialog open onOpenChange={onClose} jobId={jobId} quoteId={quote.id} number={qLabel} updatedAt={quote.updatedAt ?? null} onDone={onDone} />
+        <QuoteApproveSendDialog
+          open onOpenChange={onClose} jobId={jobId} quoteId={quote.id} number={qLabel} updatedAt={quote.updatedAt ?? null} onDone={onDone}
+          premium={job.customerPremium === true} customerName={job.customer?.name}
+        />
       ) : <MissingQuote onClose={onClose} />;
     case "quote.send":
       if (!quote) return <MissingQuote onClose={onClose} />;
@@ -528,6 +531,8 @@ function FlowDialog({
           onOpenChange={onClose}
           quote={quote}
           fallback={{ to: job.customerContactEmail ?? job.customerDetail?.email ?? "", jobNumber: job.number, title: job.title, contact: job.customerContact }}
+          premium={job.customerPremium === true}
+          customerName={job.customer?.name}
         />
       );
     case "quote.extend":

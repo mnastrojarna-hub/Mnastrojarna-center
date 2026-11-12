@@ -1,4 +1,5 @@
 /** Ložiska 2: kuželíková, axiální, jehlová, ložisková tělesa UCP a kluzná pouzdra. */
+import { tr } from "../i18n";
 import { uid, type Feature, type Vec2 } from "../types";
 import { has, nums, score } from "./parse-util";
 import type { Family } from "./types";
@@ -105,8 +106,8 @@ export const taperedBearing: Family = {
   standards: ["ISO 355", "DIN 720", "ČSN 02 4720"],
   keywords: ["kuzelikove lozisko", "kuzelik", "tapered roller bearing", "taper bearing", "30206", "32208"],
   params: [
-    { key: "code", label: "Označení", kind: "enum", options: enumOf(Object.keys(TAPERED), (k) => `${k} (${TAPERED[k].d}×${TAPERED[k].D}×${TAPERED[k].T})`), default: "30206" },
-    { key: "rollers", label: "Modelovat kuželíky", kind: "bool", default: true, hint: "vypněte u velkých sestav" },
+    { key: "code", label: tr("Označení"), kind: "enum", options: enumOf(Object.keys(TAPERED), (k) => `${k} (${TAPERED[k].d}×${TAPERED[k].D}×${TAPERED[k].T})`), default: "30206" },
+    { key: "rollers", label: tr("Modelovat kuželíky"), kind: "bool", default: true, hint: tr("vypněte u velkých sestav") },
   ],
   sizes: { key: "code", columns: [{ key: "d", label: "d" }, { key: "D", label: "D" }, { key: "T", label: "T" }, { key: "B", label: "B" }, { key: "C", label: "C" }], rows: Object.entries(TAPERED).map(([k, v]) => ({ code: k, ...v })) },
   parse: (q) => {
@@ -129,7 +130,7 @@ export const taperedBearing: Family = {
     const inner: Vec2[] = [[ri, 0], [rm + 0.5, 0], [rm - 1.2 + b.B * t * 0.3, b.B * 0.15], [rm - 1.2 - b.B * t * 0.3, b.B * 0.85], [rm + 1.2, b.B], [ri, b.B]];
     const ro = b.D / 2;
     const outer: Vec2[] = [[rm + 1.4 + b.C * t * 0.3, b.T - b.C], [ro, b.T - b.C], [ro, b.T], [rm + 1.4 - b.C * t * 0.3, b.T]];
-    const f: Feature[] = [...revolveProfile("Vnitřní kroužek", inner, "new"), ...revolveProfile("Vnější kroužek", outer, "add")];
+    const f: Feature[] = [...revolveProfile(tr("Vnitřní kroužek"), inner, "new"), ...revolveProfile(tr("Vnější kroužek"), outer, "add")];
     if (v.rollers !== false) {
       const dw = h * 0.45;
       const lw = b.B * 0.62;
@@ -137,7 +138,7 @@ export const taperedBearing: Family = {
       const roller: Feature = { id: uid(), name: "Kuželík", type: "cone", radius1: dw / 2, radius2: dw / 2 + lw * t * 0.5, height: lw, position: [rm, 0, b.B * 0.2], axis: "Z", mode: "add" };
       f.push(roller, { id: uid(), name: "Kuželíky", type: "pattern", featureId: roller.id, kind: "circular", count: z, angle: 360, axis: "Z", center: [0, 0, 0] });
     }
-    return part(`Kuželíkové ložisko ${code}`, "ocel", f, `${code} – ${b.d}×${b.D}×${b.T}`, "#b9c2cc");
+    return part(tr("Kuželíkové ložisko {0}", code), "ocel", f, `${code} – ${b.d}×${b.D}×${b.T}`, "#b9c2cc");
   },
 };
 
@@ -149,8 +150,8 @@ export const thrustBearing: Family = {
   standards: ["ISO 104", "DIN 711", "ČSN 02 4730"],
   keywords: ["axialni lozisko", "axialni", "thrust bearing", "thrust ball bearing", "51105", "51208"],
   params: [
-    { key: "code", label: "Označení", kind: "enum", options: enumOf(Object.keys(THRUST), (k) => `${k} (${THRUST[k].d}×${THRUST[k].D}×${THRUST[k].H})`), default: "51105" },
-    { key: "balls", label: "Modelovat kuličky", kind: "bool", default: true },
+    { key: "code", label: tr("Označení"), kind: "enum", options: enumOf(Object.keys(THRUST), (k) => `${k} (${THRUST[k].d}×${THRUST[k].D}×${THRUST[k].H})`), default: "51105" },
+    { key: "balls", label: tr("Modelovat kuličky"), kind: "bool", default: true },
   ],
   sizes: { key: "code", columns: [{ key: "d", label: "d" }, { key: "D", label: "D" }, { key: "H", label: "H" }], rows: Object.entries(THRUST).map(([k, v]) => ({ code: k, ...v })) },
   parse: (q) => {
@@ -167,13 +168,13 @@ export const thrustBearing: Family = {
     const w = b.H * 0.36; // tloušťka kroužku
     const dw = b.H * 0.5;
     const dm = (b.d + b.D) / 2;
-    const f: Feature[] = [tube("Hřídelový kroužek", b.D - 1, b.d, w, 0, "new"), tube("Tělesový kroužek", b.D, b.d + 1, w, b.H - w, "add")];
+    const f: Feature[] = [tube(tr("Hřídelový kroužek"), b.D - 1, b.d, w, 0, "new"), tube(tr("Tělesový kroužek"), b.D, b.d + 1, w, b.H - w, "add")];
     if (v.balls !== false) {
       const z = Math.max(8, Math.round((Math.PI * dm) / (dw * 1.5)));
       const ball: Feature = { id: uid(), name: "Kulička", type: "sphere", radius: dw / 2, position: [dm / 2, 0, b.H / 2], mode: "add" };
       f.push(ball, { id: uid(), name: "Kuličky", type: "pattern", featureId: ball.id, kind: "circular", count: z, angle: 360, axis: "Z", center: [0, 0, 0] });
     }
-    return part(`Axiální ložisko ${code}`, "ocel", f, `${code} – ${b.d}×${b.D}×${b.H}`, "#b9c2cc");
+    return part(tr("Axiální ložisko {0}", code), "ocel", f, `${code} – ${b.d}×${b.D}×${b.H}`, "#b9c2cc");
   },
 };
 
@@ -185,10 +186,10 @@ export const needleBearing: Family = {
   standards: ["ISO 3245", "DIN 618"],
   keywords: ["jehlove lozisko", "jehlove", "needle bearing", "needle roller", "hk"],
   params: [
-    { key: "code", label: "Označení", kind: "enum", options: enumOf(Object.keys(NEEDLE), (k) => `${k} (${NEEDLE[k].Fw}×${NEEDLE[k].D}×${NEEDLE[k].C})`), default: "HK1612" },
-    { key: "needles", label: "Modelovat jehly", kind: "bool", default: true },
+    { key: "code", label: tr("Označení"), kind: "enum", options: enumOf(Object.keys(NEEDLE), (k) => `${k} (${NEEDLE[k].Fw}×${NEEDLE[k].D}×${NEEDLE[k].C})`), default: "HK1612" },
+    { key: "needles", label: tr("Modelovat jehly"), kind: "bool", default: true },
   ],
-  sizes: { key: "code", columns: [{ key: "Fw", label: "Fw" }, { key: "D", label: "D" }, { key: "C", label: "C" }], rows: Object.entries(NEEDLE).map(([k, v]) => ({ code: k, ...v })) },
+  sizes: { key: "code", columns: [{ key: "Fw", label: tr("Fw") }, { key: "D", label: "D" }, { key: "C", label: "C" }], rows: Object.entries(NEEDLE).map(([k, v]) => ({ code: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "jehl", "needle");
     const code = (q.match(/\bhk\s?(\d{4})\b/) ?? [])[1];
@@ -203,14 +204,14 @@ export const needleBearing: Family = {
     const b = NEEDLE[code] ?? NEEDLE.HK1612;
     const t = (b.D - b.Fw) / 2;
     const dn = t * 0.6; // průměr jehly
-    const f: Feature[] = [tube("Pouzdro", b.D, b.Fw + dn * 1.1, b.C, 0, "new"), tube("Lem 1", b.D, b.Fw, t * 0.5, 0, "add"), tube("Lem 2", b.D, b.Fw, t * 0.5, b.C - t * 0.5, "add")];
+    const f: Feature[] = [tube("Pouzdro", b.D, b.Fw + dn * 1.1, b.C, 0, "new"), tube(tr("Lem 1"), b.D, b.Fw, t * 0.5, 0, "add"), tube(tr("Lem 2"), b.D, b.Fw, t * 0.5, b.C - t * 0.5, "add")];
     if (v.needles !== false) {
       const rm = b.Fw / 2 + dn / 2 + 0.05;
       const z = Math.max(10, Math.round((Math.PI * 2 * rm) / (dn * 1.35)));
       const n: Feature = cyl("Jehla", dn, b.C - t, t * 0.5, "add", "Z", [rm, 0]);
       f.push(n, { id: uid(), name: "Jehly", type: "pattern", featureId: n.id, kind: "circular", count: z, angle: 360, axis: "Z", center: [0, 0, 0] });
     }
-    return part(`Jehlové ložisko ${code}`, "ocel", f, `${code} – ${b.Fw}×${b.D}×${b.C}`, "#b9c2cc");
+    return part(tr("Jehlové ložisko {0}", code), "ocel", f, `${code} – ${b.Fw}×${b.D}×${b.C}`, "#b9c2cc");
   },
 };
 
@@ -221,7 +222,7 @@ export const plummerBlock: Family = {
   icon: "box",
   standards: ["JIS B 1559", "ISO 3228"],
   keywords: ["lozniskove teleso", "loziskove teleso", "ucp", "domek", "loziskovy domek", "plummer block", "pillow block", "stojate"],
-  params: [{ key: "code", label: "Označení", kind: "enum", options: enumOf(Object.keys(UCP), (k) => `${k} (d ${UCP[k].d})`), default: "UCP205" }],
+  params: [{ key: "code", label: tr("Označení"), kind: "enum", options: enumOf(Object.keys(UCP), (k) => `${k} (d ${UCP[k].d})`), default: "UCP205" }],
   sizes: { key: "code", columns: [{ key: "d", label: "d" }, { key: "a", label: "a" }, { key: "e", label: "e" }, { key: "h", label: "h" }, { key: "b", label: "b" }], rows: Object.entries(UCP).map(([k, v]) => ({ code: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "ucp", "domek", "domecek", "teleso", "plummer", "pillow");
@@ -244,11 +245,11 @@ export const plummerBlock: Family = {
       // vložka (kuličkové ložisko se širokým vnitřním kroužkem) – jako součást tělesa
       { id: uid(), name: "Vložka – vnější kroužek", type: "tube", outer: u.D, inner: u.D - (u.D - u.d) * 0.4, height: u.B, position: [0, -u.B / 2, u.h], axis: "Y", mode: "add" },
       { id: uid(), name: "Vložka – vnitřní kroužek", type: "tube", outer: u.d + (u.D - u.d) * 0.4, inner: u.d, height: u.B + 8, position: [0, -u.B / 2 - 4, u.h], axis: "Y", mode: "add" },
-      cyl("Díra 1", u.s, baseT + 2, -1, "cut", "Z", [-u.e / 2, 0]),
-      cyl("Díra 2", u.s, baseT + 2, -1, "cut", "Z", [u.e / 2, 0]),
+      cyl(tr("Díra 1"), u.s, baseT + 2, -1, "cut", "Z", [-u.e / 2, 0]),
+      cyl(tr("Díra 2"), u.s, baseT + 2, -1, "cut", "Z", [u.e / 2, 0]),
       { id: uid(), name: "Maznice", type: "cylinder", radius: 3, height: 10, position: [0, 0, u.h + u.D / 2 + 2], axis: "Z", mode: "add" },
     ];
-    return part(`Ložiskové těleso ${code}`, "ocel", f, `${code} – Ø${u.d} – rozteč ${u.e}`, "#7f8a96");
+    return part(tr("Ložiskové těleso {0}", code), "ocel", f, tr("{0} – Ø{1} – rozteč {2}", code, u.d, u.e), "#7f8a96");
   },
 };
 
@@ -260,12 +261,12 @@ export const bronzeBushing: Family = {
   standards: ["ISO 4379", "DIN 1850"],
   keywords: ["kluzne pouzdro", "kluzne", "bronzove pouzdro", "pouzdro", "plain bearing", "sleeve bearing", "bushing", "bronze"],
   params: [
-    { key: "d", label: "Vnitřní průměr d", kind: "enum", options: Object.keys(BUSHINGS).map((k) => ({ v: k, l: `Ø${k} (D ${BUSHINGS[Number(k)].D})` })), default: "20" },
-    { key: "l", label: "Délka l", kind: "number", min: 5, max: 200, step: 1, unit: "mm", default: 20 },
-    { key: "collar", label: "S límcem (tvar F)", kind: "bool", default: false },
-    { key: "mat", label: "Materiál", kind: "enum", options: ["CuSn7Zn4Pb7 (bronz)", "CuSn12", "ocel/PTFE (bezúdržbové)", "POM"].map((m) => ({ v: m, l: m })), default: "CuSn7Zn4Pb7 (bronz)" },
+    { key: "d", label: tr("Vnitřní průměr d"), kind: "enum", options: Object.keys(BUSHINGS).map((k) => ({ v: k, l: tr("Ø{0} (D {1})", k, BUSHINGS[Number(k)].D) })), default: "20" },
+    { key: "l", label: tr("Délka l"), kind: "number", min: 5, max: 200, step: 1, unit: "mm", default: 20 },
+    { key: "collar", label: tr("S límcem (tvar F)"), kind: "bool", default: false },
+    { key: "mat", label: tr("Materiál"), kind: "enum", options: ["CuSn7Zn4Pb7 (bronz)", "CuSn12", "ocel/PTFE (bezúdržbové)", "POM"].map((m) => ({ v: m, l: tr(m) })), default: "CuSn7Zn4Pb7 (bronz)" },
   ],
-  sizes: { key: "d", columns: [{ key: "D", label: "D" }, { key: "l", label: "l" }, { key: "Dc", label: "D límce" }], rows: Object.entries(BUSHINGS).map(([k, v]) => ({ d: k, ...v })) },
+  sizes: { key: "d", columns: [{ key: "D", label: "D" }, { key: "l", label: "l" }, { key: "Dc", label: tr("D límce") }], rows: Object.entries(BUSHINGS).map(([k, v]) => ({ d: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "kluzn", "bronz", "plain bearing", "sleeve", "bushing");
     if (!kw || has(q, "vodici", "guide", "lozisk")) return null;
@@ -282,9 +283,9 @@ export const bronzeBushing: Family = {
     const b = BUSHINGS[d] ?? BUSHINGS[20];
     const l = num(v.l, b.l);
     const f: Feature[] = [tube("Pouzdro", b.D, d, l, 0, "new")];
-    if (v.collar) f.push(tube("Límec", b.Dc, d, Math.max(2, (b.D - d) / 2), l - Math.max(2, (b.D - d) / 2), "add"));
+    if (v.collar) f.push(tube(tr("Límec"), b.Dc, d, Math.max(2, (b.D - d) / 2), l - Math.max(2, (b.D - d) / 2), "add"));
     f.push(chamferAll(0.5));
-    return part(`Kluzné pouzdro Ø${d}×${b.D}×${fmt(l)}`, /ocel|POM/.test(str(v.mat)) ? (str(v.mat).startsWith("POM") ? "pom" : "ocel") : "mosaz", f, `ISO 4379 – ${v.collar ? "F" : "C"} ${d}×${b.D}×${fmt(l)}`, "#c9a46a");
+    return part(tr("Kluzné pouzdro Ø{0}×{1}×{2}", d, b.D, fmt(l)), /ocel|POM/.test(str(v.mat)) ? (str(v.mat).startsWith("POM") ? "pom" : "ocel") : "mosaz", f, tr("ISO 4379 – {0} {1}×{2}×{3}", v.collar ? "F" : "C", d, b.D, fmt(l)), "#c9a46a");
   },
 };
 

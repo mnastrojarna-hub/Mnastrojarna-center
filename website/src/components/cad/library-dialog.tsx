@@ -1,5 +1,6 @@
 "use client";
 
+import { tr } from "@/cad/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
 import { GROUPS, LIBRARY, byGroup, defaults, familyById, loadFavorites, loadLibRecent, pushLibRecent, search, toggleFavorite, type Family, type ParamSchema, type SearchResult, type Values } from "@/cad/library";
@@ -77,7 +78,7 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
     try {
       return family.describe(values);
     } catch {
-      return family.name;
+      return tr(family.name);
     }
   }, [family, values]);
   useEffect(() => {
@@ -94,7 +95,7 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
         if (!alive) return;
         setResult(res);
         const bad = res.status.find((s) => !s.ok);
-        setError(bad ? bad.error ?? "Chyba stavby" : null);
+        setError(bad ? bad.error ?? tr("Chyba stavby") : null);
       } catch (e) {
         if (alive) setError((e as Error).message);
       } finally {
@@ -132,7 +133,7 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
 
   return (
     <Modal
-      title="Knihovna normálií"
+      title={tr("Knihovna normálií")}
       icon="table"
       tone="create"
       onClose={onClose}
@@ -140,16 +141,16 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
       footer={
         <>
           <span className="mr-auto text-[11.5px] text-[#6b7785]">
-            {LIBRARY.length} rodin · {GROUPS.length} skupin · <Kbd k="Enter" /> vloží · <Kbd k="Esc" /> zavře
+            {LIBRARY.length} {tr("rodin ·")}{" "}{GROUPS.length} {tr("skupin ·")}{" "}<Kbd k={tr("Enter")} /> {tr("vloží ·")}{" "}<Kbd k={tr("Esc")} /> {tr("zavře")}
           </span>
-          <Btn onClick={onClose}>Zavřít</Btn>
+          <Btn onClick={onClose}>{tr("Zavřít")}</Btn>
           {isAssembly && (
             <Btn onClick={() => insert(true)} disabled={!doc || !!error} primary>
-              Vložit do sestavy
+              {tr("Vložit do sestavy")}
             </Btn>
           )}
           <Btn onClick={() => insert(false)} disabled={!doc || !!error} primary={!isAssembly}>
-            {isAssembly ? "Otevřít jako nový díl" : "Vložit jako nový díl"}
+            {isAssembly ? tr("Otevřít jako nový díl") : tr("Vložit jako nový díl")}
           </Btn>
         </>
       }
@@ -166,11 +167,11 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
               onKeyDown={(e) => {
                 if (e.key === "Enter" && doc && !error) insert(isAssembly);
               }}
-              placeholder="Napište, co potřebujete: M8x30 · matice M10 · ložisko 6205 2RS · kolo m2 z24 · řetězka 08B z19 · IPE 200 L=1500 · jäkl 40x40x3 · pero 8x7x40 · pružina d1.6 D12 L40 n10"
+              placeholder={tr("Napište, co potřebujete: M8x30 · matice M10 · ložisko 6205 2RS · kolo m2 z24 · řetězka 08B z19 · IPE 200 L=1500 · jäkl 40x40x3 · pero 8x7x40 · pružina d1.6 D12 L40 n10")}
               className="h-10 w-full bg-transparent text-[13.5px] outline-none placeholder:text-[#a0a9b4]"
             />
             {q && (
-              <button type="button" onClick={() => setQ("")} className="text-[#8a95a3] hover:text-[#1f2933]" aria-label="Smazat">
+              <button type="button" onClick={() => setQ("")} className="text-[#8a95a3] hover:text-[#1f2933]" aria-label={tr("Smazat")}>
                 <CadIcon name="x" className="h-4 w-4" />
               </button>
             )}
@@ -179,15 +180,15 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
             {q.trim() ? (
               results.length ? (
                 <>
-                  <span className="rounded bg-[#e6f4ea] px-1.5 py-0.5 font-medium text-[#1e7d3a]">Rozpoznáno</span>
+                  <span className="rounded bg-[#e6f4ea] px-1.5 py-0.5 font-medium text-[#1e7d3a]">{tr("Rozpoznáno")}</span>
                   <span className="font-medium text-[#1f2933]">{designation}</span>
                   <span className="text-[#8a95a3]">· {family.standards[0]}</span>
                 </>
               ) : (
-                <span className="text-brand">Nic nenalezeno – zkuste normu (ISO 4762), název (matice, ložisko, jäkl) nebo rozměr (M8x30).</span>
+                <span className="text-brand">{tr("Nic nenalezeno – zkuste normu (ISO 4762), název (matice, ložisko, jäkl) nebo rozměr (M8x30).")}</span>
               )
             ) : (
-              <span>Příklady: „m8x30“ (imbus) · „šestihranný m8x30“ · „podložka 8“ · „kolík 6x30“ · „HEB 100 L=3000“ · „trubka 33.7x2.6“ · „vyhazovač 6x160“</span>
+              <span>{tr("Příklady: „m8x30“ (imbus) · „šestihranný m8x30“ · „podložka 8“ · „kolík 6x30“ · „HEB 100 L=3000“ · „trubka 33.7x2.6“ · „vyhazovač 6x160“")}</span>
             )}
           </p>
         </div>
@@ -196,9 +197,9 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
           {/* kategorie */}
           <nav className="w-52 shrink-0 overflow-y-auto border-r border-[#e3e8ee] bg-[#f7f9fb] py-2 text-[12.5px]">
             {[
-              { id: null, l: "Vše", n: LIBRARY.length, icon: "layers" as CadIconName },
-              { id: "fav", l: "Oblíbené", n: fav.length, icon: "check" as CadIconName },
-              { id: "recent", l: "Nedávno použité", n: loadLibRecent().length, icon: "undo" as CadIconName },
+              { id: null, l: tr("Vše"), n: LIBRARY.length, icon: "layers" as CadIconName },
+              { id: "fav", l: tr("Oblíbené"), n: fav.length, icon: "check" as CadIconName },
+              { id: "recent", l: tr("Nedávno použité"), n: loadLibRecent().length, icon: "undo" as CadIconName },
             ].map((g) => (
               <button key={String(g.id)} type="button" onClick={() => { setGroup(g.id); setQ(""); }} className={cn("flex w-full items-center gap-2 px-4 py-1.5 text-left", group === g.id && !q ? "bg-white font-semibold text-brand shadow-[inset_3px_0_0_#E03930]" : "text-[#3c4856] hover:bg-white/70")}>
                 <CadIcon name={g.icon} className="h-4 w-4" />
@@ -206,11 +207,11 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
                 <span className="font-mono text-[10.5px] text-[#8a95a3]">{g.n}</span>
               </button>
             ))}
-            <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">Kategorie</p>
+            <p className="px-4 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">{tr("Kategorie")}</p>
             {byGroup().map((g) => (
               <button key={g.group} type="button" onClick={() => { setGroup(g.group); setQ(""); }} className={cn("flex w-full items-center gap-2 px-4 py-1.5 text-left", group === g.group && !q ? "bg-white font-semibold text-brand shadow-[inset_3px_0_0_#E03930]" : "text-[#3c4856] hover:bg-white/70")}>
                 <CadIcon name={GROUP_ICON[g.group] ?? "cube"} tone="create" className="h-4 w-4" />
-                <span className="flex-1">{g.group}</span>
+                <span className="flex-1">{tr(g.group)}</span>
                 <span className="font-mono text-[10.5px] text-[#8a95a3]">{g.families.length}</span>
               </button>
             ))}
@@ -218,17 +219,17 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
 
           {/* seznam rodin */}
           <div className="w-[300px] shrink-0 overflow-y-auto border-r border-[#e3e8ee]">
-            {listed.length === 0 && <p className="p-4 text-[12.5px] text-[#6b7785]">{group === "fav" ? "Zatím žádné oblíbené – klikněte na hvězdičku u rodiny." : "Nic k zobrazení."}</p>}
+            {listed.length === 0 && <p className="p-4 text-[12.5px] text-[#6b7785]">{group === "fav" ? tr("Zatím žádné oblíbené – klikněte na hvězdičku u rodiny.") : tr("Nic k zobrazení.")}</p>}
             {listed.map(({ f, v, sub }, i) => (
               <div key={f.id + i} className={cn("group flex items-start gap-2.5 border-b border-[#f0f3f6] px-3 py-2", f.id === famId && (!v || JSON.stringify(v) === JSON.stringify(values)) ? "bg-[#eaf0f6]" : "hover:bg-[#f7f9fb]")}>
                 <button type="button" onClick={() => pick(f, v)} onDoubleClick={() => insert(isAssembly)} className="flex min-w-0 flex-1 items-start gap-2.5 text-left">
                   <CadIcon name={(f.icon as CadIconName) ?? "cube"} tone="create" className="mt-0.5 h-5 w-5 shrink-0" />
                   <span className="min-w-0">
-                    <span className="block truncate text-[12.5px] font-medium text-[#1f2933]">{f.name}</span>
+                    <span className="block truncate text-[12.5px] font-medium text-[#1f2933]">{tr(f.name)}</span>
                     <span className="block truncate text-[11px] text-[#6b7785]">{sub ?? f.standards.join(" · ")}</span>
                   </span>
                 </button>
-                <button type="button" title={fav.includes(f.id) ? "Odebrat z oblíbených" : "Přidat do oblíbených"} onClick={() => setFav(toggleFavorite(f.id))} className={cn("text-[14px] leading-none", fav.includes(f.id) ? "text-amber-500" : "text-[#c9d1da] opacity-0 group-hover:opacity-100 hover:text-amber-500")}>
+                <button type="button" title={fav.includes(f.id) ? tr("Odebrat z oblíbených") : tr("Přidat do oblíbených")} onClick={() => setFav(toggleFavorite(f.id))} className={cn("text-[14px] leading-none", fav.includes(f.id) ? "text-amber-500" : "text-[#c9d1da] opacity-0 group-hover:opacity-100 hover:text-amber-500")}>
                   ★
                 </button>
               </div>
@@ -240,7 +241,7 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
             <div className="mb-3 flex items-start gap-2">
               <CadIcon name={(family.icon as CadIconName) ?? "cube"} tone="create" className="mt-0.5 h-6 w-6 shrink-0" />
               <div className="min-w-0">
-                <p className="text-[13px] font-semibold leading-tight">{family.name}</p>
+                <p className="text-[13px] font-semibold leading-tight">{tr(family.name)}</p>
                 <p className="text-[11px] text-[#6b7785]">{family.standards.join(" · ")}</p>
               </div>
             </div>
@@ -250,11 +251,11 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
               ))}
             </div>
             <button type="button" onClick={() => setValues(defaults(family))} className="mt-3 text-[11.5px] text-[#6b7785] underline-offset-2 hover:text-brand hover:underline">
-              Výchozí hodnoty
+              {tr("Výchozí hodnoty")}
             </button>
             {sizes && sizeKey && (
               <div className="mt-4">
-                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">Tabulka rozměrů</p>
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">{tr("Tabulka rozměrů")}</p>
                 <div className="max-h-56 overflow-auto rounded border border-[#e3e8ee]">
                   <table className="w-full border-collapse text-[11px]">
                     <thead className="sticky top-0 bg-[#f3f6f9]">
@@ -293,16 +294,16 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="relative min-h-0 flex-1" style={{ background: "linear-gradient(180deg,#9fb1c4 0%,#d3dce6 52%,#f3f5f8 100%)" }}>
               <MiniViewport mesh={result?.mesh ?? null} color={doc?.color ?? "#b9c2cc"} />
-              {building && <span className="absolute right-3 top-3 rounded bg-white/85 px-2 py-0.5 font-mono text-[10.5px] text-[#5b6776]">stavím…</span>}
+              {building && <span className="absolute right-3 top-3 rounded bg-white/85 px-2 py-0.5 font-mono text-[10.5px] text-[#5b6776]">{tr("stavím…")}</span>}
               {error && <p className="absolute inset-x-3 bottom-3 rounded border border-brand/30 bg-white/95 px-2.5 py-1.5 text-[11.5px] text-brand-600">{error}</p>}
             </div>
             <div className={cn("border-t border-[#e3e8ee] bg-white p-3 transition-opacity", building && "opacity-50")}>
               <p className="truncate text-[13px] font-semibold">{designation}</p>
-              <Row k="Materiál" v={mat?.label ?? doc?.material ?? "—"} mono={false} />
+              <Row k={tr("Materiál")} v={mat?.label ?? doc?.material ?? "—"} mono={false} />
               {result?.metrics && (
                 <>
-                  <Row k="Rozměry" v={`${fmtNum(result.metrics.bbox[1][0] - result.metrics.bbox[0][0], 1)} × ${fmtNum(result.metrics.bbox[1][1] - result.metrics.bbox[0][1], 1)} × ${fmtNum(result.metrics.bbox[1][2] - result.metrics.bbox[0][2], 1)} mm`} />
-                  <Row k="Hmotnost" v={mass != null ? `${fmtNum(mass, mass < 0.1 ? 4 : 3)} kg` : "—"} strong />
+                  <Row k={tr("Rozměry")} v={`${fmtNum(result.metrics.bbox[1][0] - result.metrics.bbox[0][0], 1)} × ${fmtNum(result.metrics.bbox[1][1] - result.metrics.bbox[0][1], 1)} × ${fmtNum(result.metrics.bbox[1][2] - result.metrics.bbox[0][2], 1)} mm`} />
+                  <Row k={tr("Hmotnost")} v={mass != null ? `${fmtNum(mass, mass < 0.1 ? 4 : 3)} kg` : "—"} strong />
                 </>
               )}
             </div>

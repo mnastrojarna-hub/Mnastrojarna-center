@@ -25,7 +25,7 @@ import { CaptureDone } from "./capture-done";
 import { docFieldValues, planJobUpdate, planNewJob } from "@/lib/jobs/apply-extraction";
 import { normalizeExtracted, emptyExtracted } from "@/lib/jobs/extracted-normalize";
 import {
-  buildExistingTarget, buildNewTarget, initialReviewState, type ReviewModel, type ReviewTarget, type TargetJob,
+  buildExistingTarget, buildNewTarget, initialReviewState, syncLinkedTotals, type ReviewModel, type ReviewTarget, type TargetJob,
 } from "@/lib/jobs/capture-review";
 import objednavkaFixture from "@/lib/jobs/__fixtures__/capture/objednavka-strojmetal.json";
 import dodaciListFixture from "@/lib/jobs/__fixtures__/capture/dodaci-list-dodavatel.json";
@@ -122,6 +122,44 @@ describe("Vyfotit doklad — vykreslení", () => {
       "Založit novou zakázku", "Strojmetal a.s.", "už v zakázce", "4795-2026", "Doplnit k položce", "VK-2292",
       "Nabídka odeslaná", "Uložit fotku jako", "Na dokladu je 27. 11. 2026",
     ]) expect(html, t).toContain(t);
+  });
+
+  it("krok 3: hodnota zakázky = součet položek (živě), nesoulad s hlavičkou dokladu oranžově", () => {
+    const m = poModel({}, 1);
+    const sp = (h: string) => h.replace(/&nbsp;|\u00a0|\u202f/g, " ");
+    // doklad: 2 × 50 ks (1 180 + 960) = 107 000 = hlavička → pole je jen ke čtení „= součet položek"
+    const html = sp(renderToString(<CaptureReviewForm model={m} review={m.initial} targets={m.targets} onChange={noop} onPickJob={noop} pickingJob={false} />));
+    expect(html).toContain("= součet položek");
+    expect(html).toContain('data-testid="cap-linked-value"');
+    expect(html).toContain("107 000 Kč");
+    expect(html).toContain("2 položky s cenou");
+    expect(html).not.toContain("cap-linked-mismatch");
+    expect(html).toContain("= hodnota zakázky");
+
+    // člověk přepíše cenu položky → hodnota následuje, hlavička dokladu (107 000) nesedí → oranžová hláška
+    const edited = syncLinkedTotals({ ...m.initial, items: m.initial.items.map((i, n) => (n === 0 ? { ...i, unitPrice: "1000" } : i)) }, m.targets[1], true);
+    expect(edited.fields.value).toBe("98000");
+    const html2 = sp(renderToString(<CaptureReviewForm model={m} review={edited} targets={m.targets} onChange={noop} onPickJob={noop} pickingJob={false} />));
+    expect(html2).toContain("98 000 Kč");
+    expect(html2).toContain('data-testid="cap-linked-mismatch"');
+    expect(html2).toContain("Na dokladu je 107 000 Kč");
+    expect(html2).toContain("položky dávají 98 000 Kč");
+
+    // položky bez cen → ruční pole hodnoty (editovatelné), žádný součet
+    const manual = { ...m.initial, items: m.initial.items.map((i) => ({ ...i, unitPrice: "" })), fields: { ...m.initial.fields, value: "5000" } };
+    const html3 = sp(renderToString(<CaptureReviewForm model={m} review={manual} targets={m.targets} onChange={noop} onPickJob={noop} pickingJob={false} />));
+    expect(html3).not.toContain("cap-linked-value");
+    expect(html3).toContain('id="cap-field-value"');
+    expect(html3).toContain('value="5000"');
+
+    // existující zakázka s hodnotou: pole zamčené + info, že se hodnota po uložení přepočte ze všech položek
+    const ex = poModel();
+    const lockedTarget: ReviewTarget = { ...ex.targets[0], existing: { ...ex.targets[0].existing, value: "50000" } };
+    const exModel: ReviewModel = { ...ex, targets: [lockedTarget, ex.targets[1]] };
+    const review = { ...ex.initial, items: ex.initial.items.map((i) => ({ ...i, unitPrice: "960" })) };
+    const html4 = sp(renderToString(<CaptureReviewForm model={exModel} review={review} targets={exModel.targets} onChange={noop} onPickJob={noop} pickingJob={false} />));
+    expect(html4).toContain("přepočte ze součtu všech položek zakázky");
+    expect(html4).not.toContain("cap-linked-value");
   });
 
   it("krok 3: nová zakázka s novým zákazníkem a dodavatelský doklad", () => {

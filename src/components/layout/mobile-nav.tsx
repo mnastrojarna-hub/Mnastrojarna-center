@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { RememberedLink } from "@/components/nav/remembered-link";
 import { usePathname } from "next/navigation";
 import { ClipboardList, Inbox, MessageSquareQuote, Camera, Menu, Moon, Sun, LogOut, Loader2 } from "lucide-react";
 import { useTheme } from "next-themes";
@@ -23,6 +24,123 @@ export function mobileMenuCount(features: readonly Feature[], counts: Partial<Ba
   if (!counts) return 0;
   if (features.includes("quote_approval") && features.includes("dashboard")) return Math.max(0, counts.approvals ?? 0);
   return Math.max(0, counts.quotes ?? 0);
+}
+
+/** Posun (px) jedním směrem, po kterém se lišta schová / ukáže, a pásmo nahoře, kde je vždy vidět. */
+export const NAV_HIDE_AFTER = 24;
+export const NAV_SHOW_AFTER = 12;
+export const NAV_TOP_ZONE = 56;
+
+export interface NavScrollState {
+  hidden: boolean;
+  /** Posun nasbíraný jedním směrem (+ dolů, − nahoru). */
+  acc: number;
+}
+
+/**
+ * Lišta při posunu (majitel 7. 11.: „dole mi furt překáží menu"): dolů → schovat, nahoru → ukázat,
+ * nahoře na stránce vždy vidět. `top` = nová poloha posunu, `prevTop` = předchozí, `max` = konec obsahu
+ * (pružení na konci stránky na iOS lištu nevrací).
+ */
+export function navScrollStep(state: NavScrollState, prevTop: number, top: number, max: number): NavScrollState {
+  const t = Math.min(Math.max(0, top), Math.max(0, max));
+  const p = Math.min(Math.max(0, prevTop), Math.max(0, max));
+  if (t <= NAV_TOP_ZONE) return { hidden: false, acc: 0 };
+  const d = t - p;
+  if (d === 0) return state;
+  const acc = Math.sign(d) === Math.sign(state.acc) ? state.acc + d : d;
+  if (acc >= NAV_HIDE_AFTER) return { hidden: true, acc };
+  if (acc <= -NAV_SHOW_AFTER) return { hidden: false, acc };
+  return { hidden: state.hidden, acc };
+}
+
+/** Posun, který lištu neřídí: dialogy a vyskakovací menu (lištu stejně překrývají), malé vnitřní okénka. */
+function ignoredScroller(el: Element): boolean {
+  if (el.clientHeight < 160) return true;
+  return Boolean(el.closest("[role=dialog], [role=alertdialog], [data-radix-popper-content-wrapper], [role=menu], [role=listbox], nav"));
+}
+
+/** Je otevřený dialog přes obrazovku (ne vyskakovací nabídka / popover)? */
+export function overlayOpen(doc: Pick<Document, "querySelectorAll" | "body">): boolean {
+  if (doc.body?.hasAttribute("data-scroll-locked")) return true;
+  const open = doc.querySelectorAll('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]');
+  for (const el of Array.from(open)) if (!el.closest("[data-radix-popper-content-wrapper]")) return true;
+  return false;
+}
+
+/**
+ * Schovávání lišty: poslouchá posun <main> i vnitřních panelů (zachycením — posun prvků nebublá),
+ * schová ji i pod otevřeným dialogem / prohlížečem dokumentu (portál dialogu v <body>).
+ * Stav je i na <html data-mobile-nav> (CSS proměnná --mn-nav-offset pro přilepené prvky nad lištou).
+ */
+export function useAutoHideNav(pathname: string): { hidden: boolean; overlay: boolean; show: () => void } {
+  const [state, setState] = React.useState<NavScrollState>({ hidden: false, acc: 0 });
+  const [overlay, setOverlay] = React.useState(false);
+  const last = React.useRef(new WeakMap<Element, number>());
+  /** Panel, jehož posun lištu schoval (zavřené vlákno Pošty apod. → lišta zpět). */
+  const hider = React.useRef<Element | null>(null);
+
+  React.useEffect(() => {
+    const onScroll = (e: Event) => {
+      const el = e.target;
+      if (!(el instanceof Element) || ignoredScroller(el)) return;
+      const top = el.scrollTop;
+      const prev = last.current.get(el);
+      last.current.set(el, top);
+      if (prev === undefined || prev === top) return; // první událost prvku / jen vodorovný posun
+      const max = el.scrollHeight - el.clientHeight;
+      setState((s) => {
+        const n = navScrollStep(s, prev, top, max);
+        if (n.hidden && !s.hidden) hider.current = el;
+        return n.hidden === s.hidden && n.acc === s.acc ? s : n;
+      });
+    };
+    // ťuknutí, po kterém panel, co lištu schoval, zmizel (Zpět na seznam, zavřené vlákno) nebo je nahoře → lišta zpět
+    let raf = 0;
+    const onClick = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const h = hider.current;
+        if (h && (!h.isConnected || h.clientHeight === 0 || h.scrollTop <= NAV_TOP_ZONE)) {
+          hider.current = null;
+          setState((s) => (s.hidden ? { hidden: false, acc: 0 } : s));
+        }
+      });
+    };
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    document.addEventListener("click", onClick, { capture: true, passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      document.removeEventListener("scroll", onScroll, { capture: true });
+      document.removeEventListener("click", onClick, { capture: true });
+    };
+  }, []);
+
+  // otevřený dialog / prohlížeč dokumentu (portál Radixu v <body>) → lišta pryč
+  React.useEffect(() => {
+    const body = document.body;
+    const sync = () => setOverlay(overlayOpen(document));
+    sync();
+    const mo = new MutationObserver(sync);
+    mo.observe(body, { childList: true, attributes: true, attributeFilter: ["data-scroll-locked", "style"] });
+    return () => mo.disconnect();
+  }, []);
+
+  // jiná stránka → lišta zase vidět
+  React.useEffect(() => {
+    setState({ hidden: false, acc: 0 });
+  }, [pathname]);
+
+  const hidden = state.hidden || overlay;
+  React.useEffect(() => {
+    const root = document.documentElement;
+    if (hidden) root.setAttribute("data-mobile-nav", "hidden");
+    else root.removeAttribute("data-mobile-nav");
+  }, [hidden]);
+  React.useEffect(() => () => document.documentElement.removeAttribute("data-mobile-nav"), []);
+
+  const show = React.useCallback(() => setState({ hidden: false, acc: 0 }), []);
+  return { hidden, overlay, show };
 }
 
 function CountBadge({ n, className }: { n: number; className?: string }) {
@@ -55,6 +173,7 @@ export function MobileNav({ features, counts, user }: {
   const unread = badgeCounts.inbox ?? 0;
 
   React.useEffect(() => setMenuOpen(false), [pathname]);
+  const bar = useAutoHideNav(pathname);
 
   const items = [
     { title: "Zakázky", href: "/orders", icon: ClipboardList, feature: "orders" as Feature },
@@ -64,11 +183,21 @@ export function MobileNav({ features, counts, user }: {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex h-16 items-center justify-around border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+      <nav
+        className={cn(
+          "fixed inset-x-0 bottom-0 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] items-center justify-around border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden",
+          "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
+          // i s tlačítkem Vyfotit, které přesahuje lištu nahoru (-mt-6)
+          bar.hidden && "pointer-events-none translate-y-[calc(100%+2rem)]",
+        )}
+        data-testid="mobile-nav"
+        data-hidden={bar.hidden ? "1" : undefined}
+        onFocusCapture={bar.show}
+      >
         {items.map((item) => {
           const active = matchesNavPath(pathname, item.href);
           return (
-            <Link
+            <RememberedLink
               key={item.href}
               href={item.href}
               className={cn(
@@ -78,7 +207,7 @@ export function MobileNav({ features, counts, user }: {
             >
               <item.icon className="h-5 w-5" />
               {item.title}
-            </Link>
+            </RememberedLink>
           );
         })}
 
@@ -120,7 +249,7 @@ export function MobileNav({ features, counts, user }: {
       </nav>
 
       <Dialog open={menuOpen} onOpenChange={setMenuOpen}>
-        <DialogContent className="bottom-0 top-auto max-h-[85vh] translate-y-0 overflow-y-auto rounded-b-none p-4 sm:bottom-auto sm:top-[10%] sm:rounded-b-xl">
+        <DialogContent className="bottom-0 top-auto max-h-[85dvh] translate-y-0 overflow-y-auto rounded-b-none p-4 sm:bottom-auto sm:top-[10%] sm:rounded-b-xl">
           <DialogTitle className="mb-3">Menu</DialogTitle>
           <div className="space-y-4">
             {sections.map((section, i) => (
@@ -134,7 +263,7 @@ export function MobileNav({ features, counts, user }: {
                   {section.items.map((item) => {
                     const n = item.badgeKey ? badgeCounts[item.badgeKey] ?? 0 : 0;
                     return (
-                      <Link
+                      <RememberedLink
                         key={item.href}
                         href={item.href}
                         className={cn(
@@ -145,7 +274,7 @@ export function MobileNav({ features, counts, user }: {
                         <item.icon className={cn("h-4 w-4 shrink-0", item.color)} />
                         <span className="min-w-0 flex-1 truncate">{item.title}</span>
                         <CountBadge n={n} className="shrink-0" />
-                      </Link>
+                      </RememberedLink>
                     );
                   })}
                 </div>

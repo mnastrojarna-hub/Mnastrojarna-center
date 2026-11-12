@@ -27,6 +27,7 @@ import { HandoffStepCard } from "./handoff-step-card";
 import { AiLabel, SuggestionBanner } from "./handoff-suggestions";
 import { AdvanceOptions, FinishOptions, ReceiptBlock } from "./advance-options";
 import { HandoffResultView } from "./handoff-result";
+import { SenderPicker } from "@/components/mail/sender-picker";
 
 export interface HandoffDone {
   kind: HandoffKind;
@@ -325,7 +326,7 @@ export function ProductionHandoffDialog({
 
   const sheet = cn(
     "bottom-0 left-0 top-auto flex max-h-[94dvh] max-w-none translate-x-0 flex-col rounded-b-none",
-    "sm:bottom-auto sm:left-1/2 sm:top-[3%] sm:max-h-[94vh] sm:max-w-2xl sm:-translate-x-1/2 sm:rounded-xl",
+    "sm:bottom-auto sm:left-1/2 sm:top-[3%] sm:max-h-[94dvh] sm:max-w-2xl sm:-translate-x-1/2 sm:rounded-xl",
   );
 
   return (
@@ -647,6 +648,9 @@ function SendNowBlock({ plan, state, setState, plain, className }: {
             </span>
           </span>
         </label>
+      )}
+      {(auto || (canSend && state.sendNow && !disabled)) && (
+        <SenderPicker adminOnly value={state.fromMailboxId ?? null} onChange={(id) => setState({ ...state, fromMailboxId: id })} className="pl-6" />
       )}
       {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
     </div>

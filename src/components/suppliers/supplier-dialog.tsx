@@ -225,8 +225,8 @@ export function SupplierDialog({
           if (dirty || busy) e.preventDefault();
         }}
         className={cn(
-          "top-0 flex h-[100dvh] max-w-3xl flex-col overflow-hidden rounded-none",
-          "sm:top-[4vh] sm:h-auto sm:max-h-[92vh] sm:w-[calc(100%-2rem)] sm:rounded-xl",
+          "top-0 flex h-[100dvh] max-h-[100dvh] max-w-3xl flex-col overflow-hidden rounded-none",
+          "sm:top-[4dvh] sm:h-auto sm:max-h-[92dvh] sm:w-[calc(100%-2rem)] sm:rounded-xl",
         )}
         data-testid="supplier-dialog"
       >

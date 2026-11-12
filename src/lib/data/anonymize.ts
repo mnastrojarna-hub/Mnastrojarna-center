@@ -2,7 +2,7 @@ import "server-only";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import { getAccess } from "@/lib/auth/session";
 import type { FlowScope } from "@/lib/auth/flow-scope";
-import { chunks, countAnonReview, getAnonSummary, listAnonReview, type AnonReviewItem, type JobAnonBadge } from "@/lib/anonymize/queries";
+import { chunks, countAnonReview, getAnonSummary, listAnonReview, type AnonReviewItem, type JobAnonBadge, anonDebugFor } from "@/lib/anonymize/queries";
 import { anonRunnerHealth, BACKFILL_PRIORITY, type AnonDb } from "@/lib/anonymize/queue";
 
 /**
@@ -60,7 +60,10 @@ export async function getAnonReviewList(opts: { scope?: FlowScope | null; limit?
     const ids = [...new Set(items.map((i) => i.jobId))];
     const { data } = await c.from("orders").select("id, number, title").in("id", ids);
     const jobs = new Map(((data ?? []) as { id: string; number: string | null; title: string | null }[]).map((j) => [j.id, j]));
-    return items.map((i) => ({ ...i, jobNumber: jobs.get(i.jobId)?.number ?? null, jobTitle: jobs.get(i.jobId)?.title ?? null }));
+    // technický detail pokusů (surové chyby) jen super adminovi — zvlášť a best effort
+    const superAdmin = (await getAccess()).user?.role === "super_admin";
+    const debug = superAdmin ? await anonDebugFor(c, "job_files", items.map((i) => i.id)) : {};
+    return items.map((i) => ({ ...i, debug: debug[i.id] ?? null, jobNumber: jobs.get(i.jobId)?.number ?? null, jobTitle: jobs.get(i.jobId)?.title ?? null }));
   } catch (err) {
     console.error(`[data:anonymize:review] ${err instanceof Error ? err.message : String(err)}`);
     return [];

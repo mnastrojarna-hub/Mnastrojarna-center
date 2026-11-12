@@ -218,7 +218,8 @@ await T("2 · A (bez schvalování): nová nabídka → vystavit PDF (nic neodej
   st.quoteA = q;
   expect(q.subtitle.includes("schválení nepotřebuje, zákazníkovi ji pošleš tlačítkem Odeslat zákazníkovi"), `editor: text bez schválení (${q.subtitle.slice(0, 200)})`);
   expect(quoteDb(q.id) === "rozpracovana|false|false|-|-", `DB: rozpracovaná bez schvalování (${quoteDb(q.id)})`);
-  const ev = sql(`select message from job_events where job_id = ${lit(JA.id)} and type = 'quote' order by created_at desc limit 1`);
+  // 9. 11.: po vytvoření přibude i „Z nabídky … srovnáno" (nabídka → zakázka) — hledá se záznam o vytvoření
+  const ev = sql(`select message from job_events where job_id = ${lit(JA.id)} and type = 'quote' and message like ${lit(`Nabídka ${q.number} vytvořena%`)} order by created_at desc limit 1`);
   expect(ev === `Nabídka ${q.number} vytvořena`, `historie bez „čeká na schválení“ (${ev})`);
 
   const card = quoteCard(page, q.number);

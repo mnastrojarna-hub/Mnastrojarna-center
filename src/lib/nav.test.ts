@@ -52,6 +52,16 @@ describe("#25 navigace podle role", () => {
     expect(activeNavHref("/inbox", hrefs)).toBe("/inbox");
   });
 
+  it("9. 11.: Fronta ke schválení v menu jen se „Smí řešit frontu“ (super admin ji má v AI přehledu)", () => {
+    const hrefs = (s: AccessSubject) => navForFeatures(allowedFeatures(s, ctx)).flatMap((x) => x.items.map((i) => i.href));
+    expect(hrefs({ role: "zamestnanec", aiAccess: false, active: true, canResolveQueue: true })).toContain("/approvals");
+    expect(hrefs({ role: "obchodnik", aiAccess: false, active: true, canResolveQueue: true })).toContain("/approvals");
+    expect(hrefsOf("zamestnanec")).not.toContain("/approvals");
+    expect(hrefsOf("obchodnik")).not.toContain("/approvals");
+    expect(hrefsOf("super_admin")).not.toContain("/approvals");
+    expect(hrefsOf("super_admin")).toContain("/dashboard");
+  });
+
   it("neaktivní účet nevidí nic", () => {
     expect(navForFeatures(allowedFeatures({ role: "super_admin", aiAccess: true, active: false }, ctx))).toEqual([]);
   });

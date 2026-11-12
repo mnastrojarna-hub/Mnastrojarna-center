@@ -1,0 +1,1283 @@
+# CAD-Kern – Agent, Baugruppe, Build, Fehler, Erweiterungen (Flächen, Blech, Schweißkonstruktion, Erweitert), Features, Formate, Referenzen
+# Textbefehle des Agenten bleiben tschechisch (die Syntax wird nicht übersetzt) – nur die Beschreibung wird übersetzt.
+
+# agent
+Chyby proměnných: {0}	Variablenfehler: {0}
+Dokument: „{0}“ · {1} · materiál {2} · prvků {3} ({4} ✓{5}, {6} ✗){7}	Dokument: „{0}“ · {1} · Material {2} · Features {3} ({4} ✓{5}, {6} ✗){7}
+Díl z JSON	Teil aus JSON
+JSON nelze přečíst: {0}	JSON kann nicht gelesen werden: {0}
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava	Kollisionen: nicht geprüft – Befehl „kollision“ oder Schaltfläche Kollisionen auf der Registerkarte Baugruppe
+Kolize: {0} (zkontrolováno {1})	Kollisionen: {0} (geprüft {1})
+Proměnné: {0}	Variablen: {0}
+Prvek {0}: není objekt.	Feature {0}: kein Objekt.
+Prvek {0}: neznámý typ „{1}“. Povolené: {2}.	Feature {0}: unbekannter Typ „{1}“. Zulässig: {2}.
+Prázdný vstup.	Leere Eingabe.
+Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem {9} cm³ · ploch {10} · hran {11}	Abmessungen: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · Volumen {9} cm³ · Flächen {10} · Kanten {11}
+Rozměry: žádné těleso (jen skici / pomocná geometrie)	Abmessungen: kein Volumenkörper (nur Skizzen / Konstruktionsgeometrie)
+R{0}, hrany {1}	R{0}, Kanten {1}
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)	Baugruppe: die Körper der Komponenten werden getrennt aufgebaut (Volumen und Masse siehe Stückliste)
+Sestava: {0} komponent ({1} dílů po rozložení podsestav){2}{3}{4}	Baugruppe: {0} Komponenten ({1} Teile nach Auflösung der Unterbaugruppen){2}{3}{4}
+Text	Text
+bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; závit i s jemným stoupáním (M18×1,5) – jádro se dopočítá	ohne z = beginnt an der Körperoberfläche an dieser Stelle (laut Netz) und bohrt nach unten; Gewinde auch mit Feingewinde (M18×1,5) – der Kerndurchmesser wird berechnet
+celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy	ein ganzes .mncad-Dokument, ein Array von Features oder ein einzelnes Feature – Zugriff auf alle 36 Feature-Typen; ein Feature pro Zeile lässt sich mit Textbefehlen mischen
+další entity; předpona „pomocná“ = konstrukční	weitere Elemente; Präfix „hilfs“ = Konstruktionsgeometrie
+drážka	Langloch
+drážka potřebuje délku a šířku: drážka 40 10 [v x y] [úhel 0]	Langloch braucht Länge und Breite: langloch 40 10 [bei x y] [winkel 0]
+díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]	Bohrung braucht einen Durchmesser: bohrung 8,5 [tiefe 20 | durch] bei X Y [Z]
+elipsa potřebuje dvě poloosy: elipsa 30 20 [v x y]	Ellipse braucht zwei Halbachsen: ellipse 30 20 [bei x y]
+koule potřebuje průměr: koule D	Kugel braucht einen Durchmesser: kugel D
+koule průměr	Kugel nach Durchmesser
+kruhové {0}× / {1}°	kreisförmig {0}× / {1}°
+kružnice potřebuje průměr: kružnice 165 [v x y] (nebo poloměr 82,5)	Kreis braucht einen Durchmesser: kreis 165 [bei x y] (oder radius 82,5)
+kružnice průměrem (poloměr r: „poloměr 10“)	Kreis nach Durchmesser (Radius r: „radius 10“)
+kužel / komolý kužel	Kegel / Kegelstumpf
+kužel potřebuje dolní průměr, horní průměr a výšku: kužel D1 D2 H	Kegel braucht unteren Durchmesser, oberen Durchmesser und Höhe: kegel D1 D2 H
+kvádr potřebuje tři kladné rozměry: kvádr X Y Z	Quader braucht drei positive Maße: quader X Y Z
+kvádr; výchozí roh v počátku, „střed“ = vystředit	Quader; Ecke standardmäßig im Ursprung, „mitte“ = zentriert
+lineární {0}× po {1}{2}	linear {0}× alle {1}{2}
+materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)	Material = Dichteklasse (stahl, edelstahl, aluminium, messing, kupfer, kunststoff, titan, gusseisen, bronze) oder eine beliebige Bezeichnung für das Schriftfeld (ČSN 11 423, 1.0503)
+mnohoúhelník potřebuje počet stran a průměr opsané kružnice: mnohoúhelník 6 30 [v x y]	Polygon braucht die Seitenzahl und den Umkreisdurchmesser: vieleck 6 30 [bei x y]
+neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, bod, elipsa	unbekanntes Skizzenelement „{0}“ – rechteck, kreis, vieleck, langloch, linie, polylinie, punkt, ellipse
+neznámé pravidlo pro hrany „{0}“ – vše, horní, spodní, +Z/-Z/+X/-X/+Y/-Y, svislé, vodorovné, kruhové, rovné, poloměr N, delší N, kratší N	unbekannte Kantenregel „{0}“ – alle, oben, unten, +Z/-Z/+X/-X/+Y/-Y, senkrecht, waagerecht, rund, gerade, radius N, länger N, kürzer N
+neznámé pravidlo pro plochy „{0}“ – +Z/-Z/+X/-X/+Y/-Y, horní, spodní, boční, válcové, rovinné, největší	unbekannte Flächenregel „{0}“ – +Z/-Z/+X/-X/+Y/-Y, oben, unten, seitlich, zylindrisch, eben, grösste
+neznámý příkaz „{0}“ – příkazy: nový díl, kvádr, válec, koule, kužel, trubka, skica, obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, vysunout, rotovat, díra, zaoblit, srazit, skořepina, pole, zrcadlit, text, smazat poslední, stav, zobraz; nebo vložte JSON	unbekannter Befehl „{0}“ – Befehle: neu teil, quader, zylinder, kugel, kegel, rohr, skizze, rechteck, kreis, vieleck, langloch, linie, polylinie, extrudieren, drehen, bohrung, verrunden, fase, schale, muster, spiegeln, text, rückgängig, status, ansicht; oder JSON einfügen
+neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)	unbekanntes Gewinde „{0}“ – M2 bis M48, Regel- oder Feingewinde (M18×1,5)
+nová skica; entity i na dalších řádcích	neue Skizze; Elemente auch in den folgenden Zeilen
+nový dokument v nové záložce	neues Dokument in einer neuen Registerkarte
+nápis vystouplý / gravírovaný	erhabene / gravierte Beschriftung
+obdélník potřebuje šířku a výšku: obdélník 60 40 [v x y] (střed) nebo roh x y	Rechteck braucht Breite und Höhe: rechteck 60 40 [bei x y] (Mitte) oder ecke x y
+obdélník se středem (výchozí počátek) nebo rohem	Rechteck über Mittelpunkt (standardmäßig Ursprung) oder Ecke
+orotuje poslední skicu (výchozí osa Y skici, 360°)	dreht die letzte Skizze (standardmäßig Skizzen-Y-Achse, 360°)
+pohled: iso, přední, zadní, horní, spodní, levý, pravý	Ansicht: iso, vorne, hinten, oben, unten, links, rechts
+pole kruhové potřebuje počet: pole kruhové 6 [úhel 360] [osa Z]	Kreismuster braucht eine Anzahl: muster kreisförmig 6 [winkel 360] [achse Z]
+pole posledního prvku	Muster des letzten Features
+pole potřebuje počet a rozteč: pole 4 rozteč 25 [směr X] [počet 3 rozteč 20 směr Y]	Muster braucht Anzahl und Abstand: muster 4 abstand 25 [richtung X] [anzahl 3 abstand 20 richtung Y]
+pravidelný N-úhelník (D = opsaná kružnice)	regelmäßiges N-Eck (D = Umkreis)
+pravidla lze kombinovat (horní kruhové)	Regeln lassen sich kombinieren (oben rund)
+rovina {0}, {1} entit	Ebene {0}, {1} Elemente
+sestava: kontrola průniků komponent; výsledek zůstane v protokolu i ve stavu (řádek „Kolize:“)	Baugruppe: Prüfung auf Durchdringungen der Komponenten („kollision“); das Ergebnis bleibt im Protokoll und im Status (Zeile „Kollisionen:“)
+skořepina potřebuje tloušťku: skořepina 2 [otevřít +Z]	Schale braucht eine Wandstärke: schale 2 [öffnen +Z]
+správa	Verwaltung
+srazit potřebuje velikost: srazit 1 [hrany horní]	Fase braucht eine Größe: fase 1 [kanten oben]
+sražení hran	Kantenfase
+text potřebuje nápis v uvozovkách: text "ABC" výška 10 hloubka 1 v X Y [Z]	Text braucht die Beschriftung in Anführungszeichen: text "ABC" höhe 10 tiefe 1 bei X Y [Z]
+trubka potřebuje vnější průměr, vnitřní průměr a výšku: trubka D d H	Rohr braucht Außendurchmesser, Innendurchmesser und Höhe: rohr D d H
+trubka vnější / vnitřní průměr × výška	Rohr Außen- / Innendurchmesser × Höhe
+vydlabání, otevřené plochy pravidlem	Aushöhlen, offene Flächen nach Regel
+vysune poslední skicu	extrudiert die letzte Skizze
+vysunout potřebuje výšku: vysunout 20 [symetricky] [odebrat] [skrz]	Extrudieren braucht eine Höhe: extrudieren 20 [symmetrisch] [abziehen] [durch]
+válec potřebuje průměr a výšku: válec D H	Zylinder braucht Durchmesser und Höhe: zylinder D H
+válec průměr × výška	Zylinder Durchmesser × Höhe
+zaoblit potřebuje poloměr: zaoblit 2 [hrany svislé]	Verrunden braucht einen Radius: verrunden 2 [kanten senkrecht]
+zrcadlení tělesa	Körper spiegeln
+závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii	Gewinde auf einem Zylinder (außen) oder in einer Bohrung (innen); kosmetisch = nur in der Zeichnung, „modellieren“ = Gewindegänge in der Geometrie
+závit potřebuje délku: závit M18×1,5 délka 20	Gewinde braucht eine Länge: gewinde M18×1,5 länge 20
+závit potřebuje označení M2 až M48 (hrubé nebo jemné stoupání, např. M18×1,5): závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]{0}	Gewinde braucht eine Bezeichnung M2 bis M48 (Regel- oder Feingewinde, z. B. M18×1,5): gewinde M18×1,5 länge 20 bei 0 0 10 [achse Z] [innen] [modellieren]{0}
+{0} délka {1} mm, {2}, {3}, začátek [{4}], osa {5}	{0} Länge {1} mm, {2}, {3}, Anfang [{4}], Achse {5}
+{0} mm, hrany {1}	{0} mm, Kanten {1}
+{0} mm, otevřených ploch {1}	{0} mm, offene Flächen {1}
+{0}{1}{2} v [{3}], osa {4}	{0}{1}{2} bei [{3}], Achse {4}
+Ø{0} × {1} mm, osa {2}, {3}	Ø{0} × {1} mm, Achse {2}, {3}
+úsečka potřebuje dva body: úsečka x1 y1 x2 y2	Linie braucht zwei Punkte: linie x1 y1 x2 y2
+čára potřebuje body po dvojicích: čára x1 y1 x2 y2 x3 y3 … [uzavřít]	Polylinie braucht Punkte paarweise: polylinie x1 y1 x2 y2 x3 y3 … [schließen]
+
+# asm-kernel, assembly
+Sestava je zanořená příliš hluboko (nebo obsahuje sama sebe).	Die Baugruppe ist zu tief verschachtelt (oder enthält sich selbst).
+ISO 4032 – {0} – 8	ISO 4032 – {0} – 8
+ISO 4762 – {0}×{1} – 12.9	ISO 4762 – {0}×{1} – 12.9
+ISO 7089 – {0} – 200 HV	ISO 7089 – {0} – 200 HV
+ISO 8694 – Ø{0}×{1}	ISO 8694 – Ø{0}×{1}
+ISO 8734 – Ø{0}×{1} – A	ISO 8734 – Ø{0}×{1} – A
+Kolík Ø{0}×{1}	Stift Ø{0}×{1}
+Komponenta nenalezena.	Komponente nicht gefunden.
+Kotevní deska vyhazovačů	Auswerferhalteplatte
+Matice {0}	Mutter {0}
+Opěrná deska	Stützplatte
+Podložka {0}	Scheibe {0}
+Pružina tlačná D{0} d{1} L0={2}	Druckfeder D{0} d{1} L0={2}
+Pružina tlačná {0}×{1}×{2}	Druckfeder {0}×{1}×{2}
+Rozpěrka	Zwischenleiste
+Rám {0}×{1}	Rahmen {0}×{1}
+Středicí kroužek Ø{0}	Zentrierring Ø{0}
+Tvarová deska pevná	Formplatte düsenseitig
+Tvarová deska pohyblivá	Formplatte auswerferseitig
+Upínací deska pevná	Aufspannplatte düsenseitig
+Upínací deska pohyblivá	Aufspannplatte auswerferseitig
+Vodicí pouzdro Ø{0}×{1}	Führungsbuchse Ø{0}×{1}
+Vodicí sloupek Ø{0}×{1}	Führungssäule Ø{0}×{1}
+Vyberte komponenty pro podsestavu.	Wählen Sie die Komponenten für die Unterbaugruppe.
+Vybraná komponenta není podsestava.	Die gewählte Komponente ist keine Unterbaugruppe.
+Vyhazovací deska	Auswerferplatte
+Vyhazovač Ø{0}×{1}	Auswerferstift Ø{0}×{1}
+Šestihran	Sechskant
+Šroub {0}×{1}	Schraube {0}×{1}
+
+# build
+Chybí {0} – vyberte ji v parametrech.	{0} fehlt – wählen Sie sie in den Parametern.
+Cílová plocha je rovnoběžná s osou díry.	Die Zielfläche ist parallel zur Bohrungsachse.
+Cílová plocha je rovnoběžná se směrem vysunutí.	Die Zielfläche ist parallel zur Extrusionsrichtung.
+Cílová plocha neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).	Die Zielfläche liegt nicht vor der Skizzenebene in Extrusionsrichtung (versuchen Sie Richtung umkehren).
+Cílová plocha neleží ve směru vrtání (zkuste obrátit směr).	Die Zielfläche liegt nicht in Bohrrichtung (versuchen Sie, die Richtung umzukehren).
+Dráha musí být jedna souvislá křivka (bez větvení a mezer).	Der Pfad muss eine zusammenhängende Kurve sein (ohne Verzweigungen und Lücken).
+Dráha musí být jedna souvislá křivka.	Der Pfad muss eine zusammenhängende Kurve sein.
+Délka závitu musí být kladná.	Die Gewindelänge muss positiv sein.
+Hloubka díry musí být kladná.	Die Bohrungstiefe muss positiv sein.
+Hloubka díry musí být větší než hloubka zahloubení.	Die Bohrungstiefe muss größer als die Senkungstiefe sein.
+Hodnota musí být kladná.	Der Wert muss positiv sein.
+Každá skica musí mít uzavřený vnější profil.	Jede Skizze muss ein geschlossenes Außenprofil haben.
+Měřítko musí být kladné.	Der Maßstab muss positiv sein.
+Na zvolené straně roviny nic nezůstane – změňte stranu nebo posunutí.	Auf der gewählten Seite der Ebene bleibt nichts übrig – ändern Sie die Seite oder den Versatz.
+Není co rozříznout.	Nichts zu teilen.
+Není co skořepinovat.	Nichts zu schalen.
+Není co zaoblit – nejdřív vytvořte těleso.	Nichts zu verrunden – erstellen Sie zuerst einen Körper.
+Není co zrcadlit.	Nichts zu spiegeln.
+Není těleso k transformaci.	Kein Körper zum Transformieren.
+Není těleso pro úkos.	Kein Körper für die Formschräge.
+Není těleso – nejdřív vytvořte nebo importujte model.	Kein Körper – erstellen oder importieren Sie zuerst ein Modell.
+Není těleso.	Kein Körper.
+Není z čeho odebírat – nejdřív vytvořte těleso.	Nichts, wovon abgezogen werden kann – erstellen Sie zuerst einen Körper.
+Neplatné rozměry kuželu.	Ungültige Kegelmaße.
+Neznámý prvek rozšíření „{0}“ – modul není načten.	Unbekanntes Erweiterungs-Feature „{0}“ – das Modul ist nicht geladen.
+Neznámý závit „{0}“ – {1}.	Unbekanntes Gewinde „{0}“ – {1}.
+Normála roviny nesmí být nulová.	Die Ebenennormale darf nicht null sein.
+Odsazení lze použít jen u rovinné plochy nebo pomocné roviny.	Ein Versatz ist nur bei einer ebenen Fläche oder einer Bezugsebene möglich.
+Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).	Die Operation hat keinen Volumenkörper geliefert ({0}) – der Kern ist fehlgeschlagen; ändern Sie die Parameter (der Pfad darf sich nicht selbst schneiden und nicht tangential zur Oberfläche sein, das Profil muss geschlossen und senkrecht zum Pfad sein).
+Operace vrátila prázdné těleso – nejčastěji kvůli volným plochám v modelu (sešijte je nebo uzavřete do tělesa) nebo neplatné geometrii.	Die Operation hat einen leeren Körper geliefert – meist wegen freier Flächen im Modell (nähen Sie sie oder schließen Sie sie zu einem Körper) oder ungültiger Geometrie.
+Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie).	Die Operation ist mit diesen Parametern nicht möglich (z. B. zu großer Verrundungsradius oder ungültige Geometrie).
+Pole má příliš mnoho kusů (max. 400).	Das Muster hat zu viele Instanzen (max. 400).
+Poloměr musí být kladný.	Der Radius muss positiv sein.
+Profil a dráha musí být dvě různé skici.	Profil und Pfad müssen zwei verschiedene Skizzen sein.
+Profil je prázdný.	Das Profil ist leer.
+Průměr díry musí být kladný.	Der Bohrungsdurchmesser muss positiv sein.
+Průměr kuželového zahloubení musí být větší než průměr díry.	Der Durchmesser der Kegelsenkung muss größer als der Bohrungsdurchmesser sein.
+Písmo pro text se nepodařilo načíst – zkontrolujte připojení a zkuste to znovu.	Die Schrift für den Text konnte nicht geladen werden – prüfen Sie die Verbindung und versuchen Sie es erneut.
+Rozměry musí být kladné.	Die Maße müssen positiv sein.
+Skica dráhy „{0}“ je prázdná.	Die Pfadskizze „{0}“ ist leer.
+Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu).	Die Skizze enthält kein geschlossenes Profil (für ein offenes Profil Dünnwandig einschalten).
+Skica „{0}“ musí obsahovat čáru (úsečku, lomenou čáru nebo oblouk).	Die Skizze „{0}“ muss eine Kurve enthalten (Linie, Polylinie oder Bogen).
+Skica „{0}“ neobsahuje uzavřený profil.	Die Skizze „{0}“ enthält kein geschlossenes Profil.
+Skica „{0}“ obsahuje neplatný profil.	Die Skizze „{0}“ enthält ein ungültiges Profil.
+Skořepinu se nepodařilo vytvořit – jádro vrátilo těleso beze změny. Otevřete jen rovinné plochy (zaoblené plochy jádro otevřít neumí); u zaoblených hran musí být tloušťka stěny menší než poloměr zaoblení, nebo zaoblete až po skořepině.	Die Schale konnte nicht erstellt werden – der Kern hat den Körper unverändert zurückgegeben. Öffnen Sie nur ebene Flächen (verrundete Flächen kann der Kern nicht öffnen); bei verrundeten Kanten muss die Wandstärke kleiner als der Verrundungsradius sein, oder verrunden Sie erst nach der Schale.
+Směr pole nesmí být nulový.	Die Musterrichtung darf nicht null sein.
+Směr vysunutí nesmí ležet v rovině skici.	Die Extrusionsrichtung darf nicht in der Skizzenebene liegen.
+Tento typ pole (po křivce / podle skici / výplňové) zatím není v jádře k dispozici.	Dieser Mustertyp (entlang Kurve / skizzengesteuert / Füllmuster) ist im Kern noch nicht verfügbar.
+Tloušťka musí být kladná.	Die Dicke muss positiv sein.
+Tloušťka tenké stěny musí být kladná.	Die Wandstärke muss positiv sein.
+Ukončení díry „k ploše“ vyžaduje rovinnou plochu nebo pomocnou rovinu.	Die Bohrungsendbedingung „bis Fläche“ erfordert eine ebene Fläche oder eine Bezugsebene.
+Ukončení „k dalšímu“ potřebuje stávající těleso.	Die Endbedingung „bis zur nächsten“ braucht einen vorhandenen Körper.
+Ukončení „k dalšímu“ potřebuje těleso.	Die Endbedingung „bis zur nächsten“ braucht einen Körper.
+Ve směru operace není žádné těleso.	In Richtung der Operation gibt es keinen Körper.
+Ve směru vysunutí není další plocha tělesa (použijte Na vzdálenost nebo Skrz vše).	In Extrusionsrichtung gibt es keine weitere Körperfläche (verwenden Sie Blind oder Durch alles).
+Vnitřní chyba jádra – zkuste upravit parametry.	Interner Kernfehler – versuchen Sie, die Parameter zu ändern.
+Vnější průměr musí být větší než vnitřní.	Der Außendurchmesser muss größer als der Innendurchmesser sein.
+Vyberte hrany v modelu.	Wählen Sie Kanten im Modell.
+Vyberte plochu tělesa.	Wählen Sie eine Fläche des Körpers.
+Vyberte plochy, které se mají otevřít.	Wählen Sie die zu öffnenden Flächen.
+Vyberte plochy, které se mají zkosit.	Wählen Sie die Flächen für die Formschräge.
+Vyberte prvek (vysunutí, díra, primitivum…), který se má opakovat.	Wählen Sie das zu wiederholende Feature (Extrusion, Bohrung, Grundkörper…).
+Vybraný bod neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).	Der gewählte Punkt liegt nicht vor der Skizzenebene in Extrusionsrichtung (versuchen Sie Richtung umkehren).
+Vysunutí k ploše nevytvořilo těleso.	Extrudieren bis Fläche hat keinen Körper erzeugt.
+Vysunutí k zakřivené ploše se nezdařilo – plocha musí celý profil zakrýt. Zkuste „K dalšímu“ nebo rovinnou plochu.	Extrudieren bis zu einer gekrümmten Fläche ist fehlgeschlagen – die Fläche muss das ganze Profil abdecken. Versuchen Sie „Bis zur nächsten“ oder eine ebene Fläche.
+Vzdálenost vysunutí musí být kladná.	Die Extrusionslänge muss positiv sein.
+Výška písma a hloubka musí být kladné.	Schrifthöhe und Tiefe müssen positiv sein.
+Zadejte text.	Geben Sie den Text ein.
+Zahloubení musí mít větší průměr než díra a kladnou hloubku.	Die Senkung muss einen größeren Durchmesser als die Bohrung und eine positive Tiefe haben.
+Zesílení potřebuje těleso s plochami.	Verdicken braucht einen Körper mit Flächen.
+Závit potřebuje těleso (válcovou plochu).	Ein Gewinde braucht einen Körper (eine Zylinderfläche).
+bod díry	Bohrungspunkt
+plochu začátku	die Startfläche
+skica dráhy	Pfadskizze
+skica profilu	Profilskizze
+skica žebra	Rippenskizze
+vrchol ukončení	Endpunkt
+vrchol začátku	Startpunkt
+Úhel úkosu musí být mezi 0 a 45°.	Der Schrägenwinkel muss zwischen 0 und 45° liegen.
+Úkos a tenkou stěnu nelze kombinovat.	Formschräge und Dünnwandig lassen sich nicht kombinieren.
+Úkos lze použít jen při vysunutí kolmo na skicu.	Eine Formschräge ist nur beim Extrudieren senkrecht zur Skizze möglich.
+Úkos vysunutí musí být menší než 45°.	Die Extrusionsschräge muss kleiner als 45° sein.
+Šablonování potřebuje alespoň dvě skici (profily).	Ausformung braucht mindestens zwei Skizzen (Profile).
+Žebro potřebuje těleso, ke kterému se připojí.	Eine Rippe braucht einen Körper, an den sie anschließt.
+
+# worker, check, client
+Chyba CAD jádra.	Fehler des CAD-Kerns.
+Model je prázdný.	Das Modell ist leer.
+Těleso není k dispozici.	Der Körper ist nicht verfügbar.
+NEPLATNÁ geometrie ({0}) – sebeprotínající nebo neorientovatelné plochy; export STEP může selhat	UNGÜLTIGE Geometrie ({0}) – selbstschneidende oder nicht orientierbare Flächen; der STEP-Export kann fehlschlagen
+platná geometrie ({0})	gültige Geometrie ({0})
+žádné objemové těleso	kein Volumenkörper
+žádné objemové těleso – jen {0} {1} ({2} ploch)	kein Volumenkörper – nur {0} {1} ({2} Flächen)
+CAD jádro se nepodařilo načíst: 	Der CAD-Kern konnte nicht geladen werden:
+
+# defaults
+Celková délka	Gesamtlänge
+Délka závitu	Gewindelänge
+Hřídel s osazením	Welle mit Absatz
+Madlo s patkami (tažení)	Griff mit Füßen (Austragung)
+Neznámý prvek rozšíření „{0}“.	Unbekanntes Erweiterungs-Feature „{0}“.
+Plocha modelu	Modellfläche
+Průměr madla	Griffdurchmesser
+Přechodový kus (šablonování)	Übergangsstück (Ausformung)
+Příruba DN50	Flansch DN50
+Rozteč patek	Fußabstand
+Úhelník – konzola	Winkel – Konsole
+Čep M20 (závit, stavy, rovnice)	Bolzen M20 (Gewinde, Zustände, Gleichungen)
+
+# diagnostics
+3D okno nelze spustit	Das 3D-Fenster kann nicht gestartet werden
+3D okno přestalo fungovat	Das 3D-Fenster funktioniert nicht mehr
+Aktualizujte ovladač grafické karty (Windows Update nebo web výrobce: NVIDIA, AMD, Intel) a restartujte počítač.	Aktualisieren Sie den Grafiktreiber (Windows Update oder Website des Herstellers: NVIDIA, AMD, Intel) und starten Sie den Computer neu.
+Firefox: Nastavení → Obecné → Výkon → zapněte „Použít doporučená nastavení výkonu“ (hardwarová akcelerace); v about:config musí být webgl.disabled = false. Stav ukáže about:support → Grafika.	Firefox: Einstellungen → Allgemein → Leistung → „Empfohlene Leistungseinstellungen verwenden“ aktivieren (Hardwarebeschleunigung); in about:config muss webgl.disabled = false sein. Den Status zeigt about:support → Grafik.
+Nebo jiné zařízení – WebGL zvládá i běžný notebook či telefon z posledních let.	Oder ein anderes Gerät – WebGL schafft auch ein gewöhnliches Notebook oder Telefon der letzten Jahre.
+Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Jen se nezobrazí 3D model.	Die übrigen Teile des Programms funktionieren weiter: Menüs, Hilfe, Einstellungen, Öffnen und Speichern von Dateien, 2D-Skizze und Zeichnungen. Nur das 3D-Modell wird nicht angezeigt.
+Pracujete-li přes vzdálenou plochu (RDP), Citrix nebo ve virtuálním stroji, otevřete CAD přímo na počítači s grafickou kartou – vzdálené relace WebGL často neposkytují.	Wenn Sie über Remotedesktop (RDP), Citrix oder in einer virtuellen Maschine arbeiten, öffnen Sie das CAD direkt auf einem Computer mit Grafikkarte – Remotesitzungen stellen WebGL oft nicht bereit.
+Safari: aktualizujte macOS / iOS – WebGL je v Safari 16 a novějším zapnuté standardně. Ve starších verzích: Vývoj → Experimentální funkce → WebGL.	Safari: aktualisieren Sie macOS / iOS – WebGL ist in Safari 16 und neuer standardmäßig aktiviert. In älteren Versionen: Entwickler → Experimentelle Funktionen → WebGL.
+Událost: WebGL kontext ztracen	Ereignis: WebGL-Kontext verloren
+Zapněte v prohlížeči hardwarovou (grafickou) akceleraci a prohlížeč restartujte.	Aktivieren Sie im Browser die Hardware-(Grafik-)Beschleunigung und starten Sie den Browser neu.
+Zkuste jiný prohlížeč v aktuální verzi: Chrome, Edge, Firefox nebo Safari.	Versuchen Sie einen anderen aktuellen Browser: Chrome, Edge, Firefox oder Safari.
+chyba při vytváření WebGL kontextu	Fehler beim Erstellen des WebGL-Kontexts
+mimo prohlížeč	außerhalb eines Browsers
+prohlížeč neposkytl WebGL kontext (grafická akcelerace je vypnutá nebo nedostupná)	der Browser hat keinen WebGL-Kontext bereitgestellt (Grafikbeschleunigung ist deaktiviert oder nicht verfügbar)
+{0}: Nastavení → Systém → zapněte „Použít grafickou akceleraci, je-li k dispozici“ a prohlížeč restartujte. Stav grafiky ukáže adresa {1} (řádek WebGL musí být „Hardware accelerated“ nebo alespoň „Software only“).	{0}: Einstellungen → System → „Grafikbeschleunigung verwenden, falls verfügbar“ aktivieren und den Browser neu starten. Den Grafikstatus zeigt die Adresse {1} (die Zeile WebGL muss „Hardware accelerated“ oder mindestens „Software only“ lauten).
+
+# direct
+Odsazení by zrušilo celý válec – zvolte menší vzdálenost.	Der Versatz würde den ganzen Zylinder entfernen – wählen Sie einen kleineren Abstand.
+Odsazení plochy nevytvořilo objem – tento typ plochy zatím odsadit nelze.	Das Versetzen der Fläche hat kein Volumen erzeugt – dieser Flächentyp kann noch nicht versetzt werden.
+Plochu se nepodařilo odsadit – zkuste menší vzdálenost.	Die Fläche konnte nicht versetzt werden – versuchen Sie einen kleineren Abstand.
+Plochu {0} nelze odstranit. Odstranit lze díry, čepy, kuželová zahloubení a válcová zaoblení – rovinné plochy posuňte příkazem Vytáhnout/Zatlačit.	Fläche {0} kann nicht entfernt werden. Entfernt werden können Bohrungen, Zapfen, Kegelsenkungen und zylindrische Verrundungen – ebene Flächen verschieben Sie mit Ziehen / Drücken.
+Pružina může mít nejvýš 200 závitů.	Eine Feder kann höchstens 200 Windungen haben.
+Pružinu se nepodařilo vytvořit.	Die Feder konnte nicht erstellt werden.
+Průměr drátu musí být menší než průměr pružiny.	Der Drahtdurchmesser muss kleiner als der Federdurchmesser sein.
+Průměr drátu musí být menší než stoupání (závity by se protínaly).	Der Drahtdurchmesser muss kleiner als die Steigung sein (die Windungen würden sich schneiden).
+Rozměry pružiny musí být kladné.	Die Federmaße müssen positiv sein.
+Skica „{0}“ neobsahuje čáru žebra.	Die Skizze „{0}“ enthält keine Rippenlinie.
+Tloušťka nesmí být nulová.	Die Dicke darf nicht null sein.
+Tloušťka žebra musí být kladná.	Die Rippendicke muss positiv sein.
+Vyberte {0} v modelu.	Wählen Sie {0} im Modell.
+Vytáhnout/zatlačit lze jen rovinné plochy – pro zakřivené použijte Odsadit plochu.	Ziehen / Drücken ist nur bei ebenen Flächen möglich – für gekrümmte verwenden Sie Fläche versetzen.
+Vzdálenost nesmí být nulová.	Der Abstand darf nicht null sein.
+Zaoblení není rovnoběžné s osami – nelze jej odstranit.	Die Verrundung ist nicht achsparallel – sie kann nicht entfernt werden.
+Čára žebra je příliš krátká.	Die Rippenlinie ist zu kurz.
+Částečnou kuželovou plochu nelze odstranit.	Eine teilweise Kegelfläche kann nicht entfernt werden.
+Žebro na zvolené straně nenarazí na těleso – zaškrtněte „Obrátit stranu“.	Die Rippe trifft auf der gewählten Seite nicht auf den Körper – aktivieren Sie „Seite umkehren“.
+Žebro nenarazilo na těleso – přesuňte čáru blíž k tělesu nebo otočte stranu.	Die Rippe hat den Körper nicht getroffen – verschieben Sie die Linie näher an den Körper oder kehren Sie die Seite um.
+
+# drawing
+Datum	Datum
+Detail {0}: pohled {1} není na listu.	Detail {0}: Ansicht {1} ist nicht auf dem Blatt.
+Detail {0}: v kruhu není žádná geometrie.	Detail {0}: im Kreis ist keine Geometrie.
+Formát	Format
+Hmotnost	Masse
+Kreslil	Gezeichnet
+Materiál	Werkstoff
+Měřítko	Maßstab
+Název	Benennung
+Pohledy se v měřítku {0} nevejdou ani na A0.	Die Ansichten passen im Maßstab {0} nicht einmal auf A0.
+Pohledy se v měřítku {0} nevejdou na list {1}.	Die Ansichten passen im Maßstab {0} nicht auf das Blatt {1}.
+Promítání	Projektion
+Rovina řezu neprotíná těleso – upravte odsazení.	Die Schnittebene schneidet den Körper nicht – passen Sie den Versatz an.
+Tabulka děr	Bohrungstabelle
+Váš partner ve strojírenství	Ihr Partner im Maschinenbau
+Čára řezu leží mimo pohled.	Die Schnittlinie liegt außerhalb der Ansicht.
+Čáru řezu nelze zakreslit – zapněte pohled, ve kterém je rovina řezu vidět jako čára.	Die Schnittlinie kann nicht gezeichnet werden – schalten Sie eine Ansicht ein, in der die Schnittebene als Linie sichtbar ist.
+Číslo výkresu	Zeichnungsnummer
+Řez se nepodařilo vytvořit.	Der Schnitt konnte nicht erstellt werden.
+
+# ext/advanced
+0 = bez	0 = ohne
+0 = rozdělit rovnoměrně	0 = gleichmäßig verteilen
+0 = skrz	0 = durch
+0 = vepsaný do plochy	0 = in die Fläche einbeschrieben
+0,98 = téměř plný půlkruh	0,98 = fast voller Halbkreis
+Bod měřítka	Skalierungspunkt
+D × úhel	D × Winkel
+Do oblasti se nevejde žádná kopie – zmenšete rozteče nebo odstup.	In den Bereich passt keine Instanz – verringern Sie die Abstände oder den Rand.
+Druh	Art
+Dráha (skica)	Pfad (Skizze)
+Drážka (odebrat)	Nut (abziehen)
+Díry v bodech	Bohrungen an Punkten
+Dělicí rovina	Trennebene
+Dělicí rovina těleso neprotíná.	Die Trennebene schneidet den Körper nicht.
+Gravírovat	Gravieren
+Hloubka	Tiefe
+Hloubka / výška reliéfu	Relieftiefe / -höhe
+Hloubka zahloubení	Senkungstiefe
+Hrany	Kanten
+K hraně se nepodařilo najít plochu.	Zur Kante konnte keine Fläche gefunden werden.
+Kolem těžiště obálky	Um den Mittelpunkt der Hüllbox
+Kontrola geometrie	Geometrieprüfung
+Kontrolovat i geometrii ploch	Auch die Flächengeometrie prüfen
+Kopule	Kuppel
+Kopuli lze vytvořit jen na rovinné ploše.	Eine Kuppel ist nur auf einer ebenen Fläche möglich.
+Lem (přidat)	Steg (hinzufügen)
+Lem / drážka	Steg / Nut
+Lem a drážku lze vytvořit jen na rovinné ploše.	Steg und Nut sind nur auf einer ebenen Fläche möglich.
+Měřítko v bodě	Skalieren um Punkt
+Natočení kolem osy	Drehung um die Achse
+Natáčet podle tečny	An Tangente ausrichten
+Nepodařilo se určit poloměr – zadejte ho ručně.	Der Radius konnte nicht ermittelt werden – geben Sie ihn manuell ein.
+Oba poloměry musí být kladné.	Beide Radien müssen positiv sein.
+Oblast (uzavřená skica)	Bereich (geschlossene Skizze)
+Obrys plochy není uzavřený.	Die Flächenkontur ist nicht geschlossen.
+Obrátit smysl úkosu	Schrägenrichtung umkehren
+Odsazení roviny	Ebenenversatz
+Odstup od okraje	Randabstand
+Opakovaný prvek	Wiederholtes Feature
+Operace	Operation
+Operace s nástrojem	Operation mit dem Werkzeug
+Plné zaoblení	Vollverrundung
+Plocha je příliš úzká.	Die Fläche ist zu schmal.
+Plocha musí mít alespoň dvě hrany.	Die Fläche muss mindestens zwei Kanten haben.
+Po obvodu	Entlang des Umfangs
+Podél osy	Entlang der Achse
+Podíl šířky	Breitenanteil
+Pole by mělo {0} kopií – zvětšete rozteče (max. 400).	Das Muster hätte {0} Instanzen – vergrößern Sie die Abstände (max. 400).
+Pole podél křivky	Muster entlang Kurve
+Poloměr / velikost	Radius / Größe
+Poloměr na konci R2	Endradius R2
+Poloměr na začátku R1	Anfangsradius R1
+Poloměr základny	Grundradius
+Posun kopie	Versatz der Instanz
+Posun podél osy	Versatz entlang der Achse
+Počet kopií	Anzahl der Instanzen
+Profil (skica)	Profil (Skizze)
+Proměnné zaoblení	Variable Verrundung
+Prvek (nástroj)	Feature (Werkzeug)
+Průměr	Durchmesser
+Průměr musí být kladný.	Der Durchmesser muss positiv sein.
+Písmo pro text není načteno.	Die Schrift für den Text ist nicht geladen.
+Písmo pro text se nepodařilo stáhnout.	Die Schrift für den Text konnte nicht heruntergeladen werden.
+Rovina zrcadlení	Spiegelebene
+Rovinná plocha	Ebene Fläche
+Rozteč X	Abstand X
+Rozteč Y	Abstand Y
+Rozteč po křivce	Abstand entlang der Kurve
+Rozteč × počet přesahuje délku dráhy ({0} mm).	Abstand × Anzahl überschreitet die Pfadlänge ({0} mm).
+Rozteče musí být kladné.	Die Abstände müssen positiv sein.
+Sjednocení ploch	Flächen zusammenführen
+Sjednocení ploch selhalo – těleso zůstává beze změny.	Das Zusammenführen der Flächen ist fehlgeschlagen – der Körper bleibt unverändert.
+Sjednotit plochy	Flächen zusammenführen
+Skica neobsahuje body ani kružnice.	Die Skizze enthält weder Punkte noch Kreise.
+Skica neobsahuje uzavřený profil.	Die Skizze enthält kein geschlossenes Profil.
+Skica oblasti musí obsahovat uzavřený profil.	Die Bereichsskizze muss ein geschlossenes Profil enthalten.
+Skica s body	Skizze mit Punkten
+Směr textu	Textrichtung
+Srazit místo zaoblit	Fasen statt verrunden
+Sražení	Fase
+Sražení D1×D2 / D×úhel	Fase D1×D2 / D×Winkel
+Střední plocha	Mittelfläche
+Střídavě (šachovnice)	Versetzt (Schachbrett)
+Text na válci	Text auf Zylinder
+Tloušťka stěn	Wandstärke
+Tolerance tečnosti	Tangententoleranz
+Těleso má nulový objem.	Der Körper hat kein Volumen.
+Těleso není platné: {0}{1}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.	Der Körper ist ungültig: {0}{1}. Versuchen Sie „Flächen zusammenführen“ oder ändern Sie die vorherigen Features.
+Vrtat v kladném směru normály	In positiver Normalenrichtung bohren
+Vyberte dřívější prvek s tělesem (vysunutí, díra, primitivum…).	Wählen Sie ein früheres Feature mit Körper (Extrusion, Bohrung, Grundkörper…).
+Vyberte plochu v modelu.	Wählen Sie eine Fläche im Modell.
+Vyberte prvky, které se mají zrcadlit (nebo zaškrtněte Všechny).	Wählen Sie die zu spiegelnden Features (oder aktivieren Sie Alle).
+Vyberte válcovou plochu.	Wählen Sie eine Zylinderfläche.
+Vyberte {0} v parametrech prvku.	Wählen Sie {0} in den Feature-Parametern.
+Vystouplý	Erhaben
+Vzdálenost D1	Abstand D1
+Vzdálenost D1 musí být kladná.	Der Abstand D1 muss positiv sein.
+Vzdálenost D2	Abstand D2
+Vzdálenost D2 musí být kladná.	Der Abstand D2 muss positiv sein.
+Válcová plocha	Zylinderfläche
+Výchozí hrany	Startkanten
+Výplňové pole	Füllmuster
+Výška	Höhe
+Výška / hloubka	Höhe / Tiefe
+Výška kopule	Kuppelhöhe
+Výška musí být kladná.	Die Höhe muss positiv sein.
+Výška písma	Schrifthöhe
+Všechny dosavadní prvky	Alle bisherigen Features
+Zadání	Eingabe
+Zaoblení	Verrundung
+Zaoblení řetězce	Kettenverrundung
+Zkrut	Verdrehung
+Znovu použít nástroj	Werkzeug wiederverwenden
+Zrcadlení prvků	Features spiegeln
+Zrcadlit prvky	Features spiegeln
+body, středy kružnic	Punkte, Kreismittelpunkte
+eliptická kopule (nebo důlek) na rovinné ploše	elliptische Kuppel (oder Mulde) auf einer ebenen Fläche
+jen pro D × úhel	nur für D × Winkel
+jen pro D1 × D2	nur für D1 × D2
+kopie prvku rozmístěné po dráze ze skici	Instanzen eines Features entlang eines Skizzenpfads
+kopie prvku v mřížce uvnitř uzavřené skici	Instanzen eines Features im Raster innerhalb einer geschlossenen Skizze
+najde nejtenčí stěnu tělesa (vzorkování sítě)	findet die dünnste Wand des Körpers (Netzabtastung)
+nesymetrické sražení dvěma vzdálenostmi nebo vzdáleností a úhlem	asymmetrische Fase mit zwei Abständen oder Abstand und Winkel
+ověří platnost tělesa (OpenCascade BRepCheck); chyby se zobrazí u prvku	prüft die Gültigkeit des Körpers (OpenCascade BRepCheck); Fehler werden am Feature angezeigt
+poloměr se po hraně mění od R1 k R2	der Radius ändert sich entlang der Kante von R1 nach R2
+použije se, není-li zaškrtnuto Kolem těžiště	wird verwendet, wenn Um den Mittelpunkt nicht aktiviert ist
+použije těleso dřívějšího prvku znovu jinou operací (přidat → odebrat, průnik…)	verwendet den Körper eines früheren Features mit einer anderen Operation erneut (hinzufügen → abziehen, Schnittmenge…)
+skicu dráhy	die Pfadskizze
+skicu oblasti	die Bereichsskizze
+skicu profilu	die Profilskizze
+skicu s body	die Skizze mit Punkten
+sloučí sousední souplošné plochy a hrany (po importu STEP, po booleovských operacích)	führt benachbarte koplanare Flächen und Kanten zusammen (nach STEP-Import, nach booleschen Operationen)
+stejná díra v každém bodě (nebo středu kružnice) vybrané skici	dieselbe Bohrung an jedem Punkt (oder Kreismittelpunkt) der gewählten Skizze
+stěny nad i pod dělicí rovinou se ukosí směrem od ní (tvárník/tvárnice)	die Wände über und unter der Trennebene werden von ihr weg geneigt (Kern/Matrize)
+vyberte jednu hranu – zaoblí se celý tečně navazující řetězec	wählen Sie eine Kante – die ganze tangential anschließende Kette wird verrundet
+vystouplý lem nebo drážka podél obrysu rovinné plochy (dosedání tvárníku a tvárnice)	erhabener Steg oder Nut entlang der Kontur einer ebenen Fläche (Tauchkante von Kern und Matrize)
+vystouplý nebo gravírovaný nápis na válcové ploše (radiální promítnutí)	erhabene oder gravierte Beschriftung auf einer Zylinderfläche (radiale Projektion)
+vysunutí profilu s otáčením kolem osy (šroubovitá drážka, vrták…)	Extrusion eines Profils mit Drehung um die Achse (Schraubennut, Bohrer…)
+zaoblí celou úzkou plochu (žebro, lem) do půlkruhu	verrundet eine ganze schmale Fläche (Rippe, Steg) zum Halbkreis
+zrcadlí vybrané dřívější prvky (ne celé těleso) podle roviny	spiegelt gewählte frühere Features (nicht den ganzen Körper) an einer Ebene
+zvětší/zmenší těleso kolem zadaného bodu (např. smrštění kolem středu dutiny)	vergrößert/verkleinert den Körper um den angegebenen Punkt (z. B. Schwindung um die Mitte der Kavität)
+záporný = opačný smysl	negativ = Gegenrichtung
+{0} potřebuje těleso – nejdřív vytvořte vysunutí nebo primitivum.	{0} braucht einen Körper – erstellen Sie zuerst eine Extrusion oder einen Grundkörper.
+{0} se nepodařilo vytvořit – zkuste menší hodnoty nebo jiné hrany.	{0} konnte nicht erstellt werden – versuchen Sie kleinere Werte oder andere Kanten.
+{0} se nepodařilo vytvořit.	{0} konnte nicht erstellt werden.
+Ø zahloubení	Senkungs-Ø
+Úhel	Winkel
+Úhel musí být mezi 0° a 90°.	Der Winkel muss zwischen 0° und 90° liegen.
+Úhel zkrutu	Verdrehwinkel
+Úhel úkosu	Schrägenwinkel
+Úkos	Formschräge
+Úkos od dělicí roviny	Formschräge ab Trennebene
+Úkos se nepodařilo vytvořit – zkuste menší úhel nebo jinou dělicí rovinu.	Die Formschräge konnte nicht erstellt werden – versuchen Sie einen kleineren Winkel oder eine andere Trennebene.
+úzká plocha mezi dvěma hranami	schmale Fläche zwischen zwei Kanten
+Šířka	Breite
+Šířka a výška musí být kladné.	Breite und Höhe müssen positiv sein.
+Šířka lemu/drážky je větší než plocha – zmenšete ji.	Die Breite von Steg/Nut ist größer als die Fläche – verringern Sie sie.
+Prvek rozšíření {0} je už zaregistrovaný.	Das Erweiterungs-Feature {0} ist bereits registriert.
+
+# ext/sheetmetal-flat
+Nejdřív vytvořte Základní plech (karta Plech).	Erstellen Sie zuerst ein Grundblech (Registerkarte Blech).
+Ohyb {0}: {1}° {2}, R{3}, BA {4} mm	Biegung {0}: {1}° {2}, R{3}, BA {4} mm
+Ohyb {0}: úhel {1}°, {2}, vnitřní R {3} mm, délka osy {4} mm, BA {5} mm	Biegung {0}: Winkel {1}°, {2}, Innen-R {3} mm, Achslänge {4} mm, BA {5} mm
+Prvek „{0}“ není plechový – v rozvinu je vynechán.	Das Feature „{0}“ ist kein Blech-Feature – in der Abwicklung wird es ausgelassen.
+Skica ohybu musí obsahovat úsečku (čáru ohybu).	Die Biegeskizze muss eine Linie (Biegelinie) enthalten.
+Skica plechu neobsahuje uzavřený profil.	Die Blechskizze enthält kein geschlossenes Profil.
+Základní plech nemá přiřazenou skicu.	Dem Grundblech ist keine Skizze zugewiesen.
+{0} - rozvin, plech t={1} mm	{0} - Abwicklung, Blech t={1} mm
+{0}: bez skici – vynechán.	{0}: ohne Skizze – ausgelassen.
+{0}: bod úlevy neleží na plechu – vynechán.	{0}: der Freistichpunkt liegt nicht auf dem Blech – ausgelassen.
+{0}: hrana neleží na rovné ploše plechu.	{0}: die Kante liegt nicht auf einer ebenen Blechfläche.
+{0}: hranu ohybu se nepodařilo určit – otevřete prvek a vyberte hranu znovu.	{0}: die Biegekante konnte nicht ermittelt werden – öffnen Sie das Feature und wählen Sie die Kante erneut.
+{0}: není vybrána hrana.	{0}: keine Kante gewählt.
+{0}: neznámý plechový prvek – vynechán.	{0}: unbekanntes Blech-Feature – ausgelassen.
+{0}: ohyb lze založit jen na celé rovné hraně obrysu plechu (ne na oblouku ani části hrany).	{0}: eine Biegung ist nur auf einer ganzen geraden Konturkante des Blechs möglich (nicht auf einem Bogen oder Kantenteil).
+{0}: prolis se v rozvinu nezobrazuje (tvářený prvek).	{0}: die Sicke wird in der Abwicklung nicht dargestellt (Umformelement).
+{0}: vyberte skicu s čárou ohybu.	{0}: wählen Sie eine Skizze mit der Biegelinie.
+{0}: výřez neleží na rovné ploše plechu – v rozvinu vynechán.	{0}: der Ausschnitt liegt nicht auf einer ebenen Blechfläche – in der Abwicklung ausgelassen.
+{0}: výřez zasahuje mimo obrys – v rozvinu je zobrazen jako samostatná křivka.	{0}: der Ausschnitt reicht über die Kontur hinaus – in der Abwicklung als eigene Kurve dargestellt.
+{0}: čára ohybu musí ležet na ploše plechu (skica na ploše nebo rovině plechu).	{0}: die Biegelinie muss auf der Blechfläche liegen (Skizze auf der Fläche oder Ebene des Blechs).
+Žádné ohyby – díl je rovný plech.	Keine Biegungen – das Teil ist ein ebenes Blech.
+
+# ext/sheetmetal
+0 = dle parametrů plechu	0 = laut Blechparametern
+Délka lemu	Falzlänge
+Délka příruby	Laschenlänge
+Délka příruby musí být kladná.	Die Laschenlänge muss positiv sein.
+Hloubka úlevy	Freistichtiefe
+Hrana musí ležet mezi plochou plechu a boční plochou (rovná hrana obrysu).	Die Kante muss zwischen der Blechfläche und einer Seitenfläche liegen (gerade Konturkante).
+Hrana {0} v tělese neexistuje – vyberte hranu znovu.	Kante {0} existiert im Körper nicht – wählen Sie die Kante erneut.
+Hrany lemu	Falzkanten
+Hrany ohybu	Biegekanten
+K normále skici	Zur Skizzennormalen
+Kapka	Tropfen
+Kruhová	Rund
+Lem	Falz
+Materiál uvnitř	Material innen
+Nad skicu	Über die Skizze
+Nejdřív vytvořte Základní plech.	Erstellen Sie zuerst ein Grundblech.
+Obdélník	Rechteck
+Od normály skici	Von der Skizzennormalen weg
+Ohnout na opačnou stranu	Zur Gegenseite biegen
+Ohyb lze založit jen na rovné hraně plechu (ne na oblouku).	Eine Biegung ist nur auf einer geraden Blechkante möglich (nicht auf einem Bogen).
+Ohyb podle čáry	Biegung an Linie
+Ohyb vně	Biegung außen
+Ohyb z hrany	Kantenlasche
+Ohýbaná strana	Gebogene Seite
+Osa prolisu musí ležet na ploše plechu.	Die Sickenachse muss auf der Blechfläche liegen.
+Osa prolisu má nulovou délku.	Die Sickenachse hat die Länge null.
+Osa výřezu	Ausschnittachse
+Otevřený	Offen
+Oválná	Oval
+Parametry plechu	Blechparameter
+Pod skicu	Unter die Skizze
+Poloha materiálu	Materiallage
+Prolis (žebro)	Sicke (Rippe)
+Rohová úleva	Eckfreistich
+Rozvin → DXF	Abwicklung → DXF
+Rozvin → SVG	Abwicklung → SVG
+Rozvinout	Abwickeln
+Skica musí obsahovat úsečku.	Die Skizze muss eine Linie enthalten.
+Skica obrysu	Konturskizze
+Skica obrysu plechu musí být uzavřená.	Die Konturskizze des Blechs muss geschlossen sein.
+Skica s osou prolisu	Skizze mit Sickenachse
+Skica s čárou ohybu	Skizze mit Biegelinie
+Skica výřezu	Ausschnittskizze
+Skica výřezu musí být uzavřená.	Die Ausschnittskizze muss geschlossen sein.
+Směr ohybu	Biegerichtung
+Směr tloušťky	Dickenrichtung
+Střed úlevy	Freistichmitte
+Symetricky	Symmetrisch
+Tabulka ohybů	Biegetabelle
+Tloušťka plechu	Blechdicke
+Tloušťka plechu musí být kladná.	Die Blechdicke muss positiv sein.
+Tvar	Form
+Typ lemu	Falztyp
+Uzavřený	Geschlossen
+Velikost (Ø / strana)	Größe (Ø / Seite)
+Vlevo od čáry	Links der Linie
+Vnitřní poloměr	Innenradius
+Vnitřní poloměr (otevřený)	Innenradius (offen)
+Vnitřní poloměr ohybu	Innerer Biegeradius
+Vpravo od čáry	Rechts der Linie
+Vyberte hranu plechu, ze které se má ohyb vytvořit.	Wählen Sie die Blechkante, von der die Biegung ausgehen soll.
+Vyberte {0} (musí být v historii před tímto prvkem).	Wählen Sie {0} (muss in der Historie vor diesem Feature liegen).
+Výřez	Ausschnitt
+Zahnout na opačnou stranu	Zur Gegenseite falzen
+Základní plech	Grundblech
+obrys, díry, čáry ohybů a tabulka ohybů (AutoCAD, laser, ohraňovací lis)	Kontur, Bohrungen, Biegelinien und Biegetabelle (AutoCAD, Laser, Abkantpresse)
+ocel 0,44 · hliník 0,40 · nerez 0,45	Stahl 0,44 · Aluminium 0,40 · Edelstahl 0,45
+plochý díl (rozvin) z historie ohybů – potlačením prvku se vrátí ohnutý tvar	ebenes Teil (Abwicklung) aus der Biegehistorie – durch Unterdrücken des Features kehrt die gebogene Form zurück
+pořadí, úhly, poloměry a BA všech ohybů	Reihenfolge, Winkel, Radien und BA aller Biegungen
+příruba pod úhlem z vybrané hrany plechu	Lasche unter einem Winkel von der gewählten Blechkante
+rovné hrany obrysu plechu	gerade Konturkanten des Blechs
+rozvin s čarami ohybů pro tisk/náhled	Abwicklung mit Biegelinien zum Drucken/Ansehen
+skicu obrysu plechu	die Konturskizze des Blechs
+skicu s osou prolisu	die Skizze mit der Sickenachse
+skicu s čárou ohybu	die Skizze mit der Biegelinie
+skicu výřezu	die Ausschnittskizze
+tloušťka, poloměr ohybu a K-faktor pro další prvky	Dicke, Biegeradius und K-Faktor für die folgenden Features
+uzavřená skica na ploše plechu → otvor skrz	geschlossene Skizze auf der Blechfläche → Durchbruch
+uzavřená skica → deska o tloušťce plechu	geschlossene Skizze → Platte in Blechdicke
+vylisované žebro podél úsečky ve skice (zjednodušeně: zaoblený výstupek)	eingeprägte Rippe entlang einer Skizzenlinie (vereinfacht: gerundete Erhebung)
+zahnutý okraj 180° – uzavřený nebo otevřený	um 180° umgelegter Rand – geschlossen oder offen
+Úhel ohybu	Biegewinkel
+Úhel ohybu musí být 1–180°.	Der Biegewinkel muss 1–180° betragen.
+Úleva ohybu	Biegefreistich
+úsečka ve skice na ploše plechu rozdělí plech a jednu stranu ohne	eine Linie in einer Skizze auf der Blechfläche teilt das Blech und biegt eine Seite
+Čtvercová	Quadratisch
+Čára ohybu musí ležet na ploše plechu (skica na horní nebo spodní ploše) a procházet materiálem.	Die Biegelinie muss auf der Blechfläche liegen (Skizze auf der Ober- oder Unterseite) und durch das Material verlaufen.
+Čára ohybu musí rozdělit plech na dvě části (leží mimo plech nebo u okraje).	Die Biegelinie muss das Blech in zwei Teile teilen (sie liegt außerhalb des Blechs oder am Rand).
+čtvercový nebo kruhový výřez v rohu mezi ohyby	quadratischer oder runder Ausschnitt in der Ecke zwischen Biegungen
+Šířka úlevy	Freistichbreite
+Žádná	Keine
+
+# ext/surface
++ (po normále)	+ (entlang der Normalen)
++ strana	+ Seite
+3D křivka pro tažení (pružiny, závity, spirálové drážky)	3D-Kurve für Austragungen (Federn, Gewinde, Spiralnuten)
+Cílové plochy	Zielflächen
+Délka musí být kladná.	Die Länge muss positiv sein.
+Délka prodloužení	Verlängerungslänge
+Frenet (profil se natáčí s dráhou)	Frenet (das Profil dreht sich mit dem Pfad)
+Hloubka závitu	Gewindetiefe
+Hloubka závitu musí být kladná.	Die Gewindetiefe muss positiv sein.
+Hrany smyčky	Schleifenkanten
+Jedna plocha objem neuzavírá – přidejte další plochy.	Eine einzelne Fläche schließt kein Volumen ein – fügen Sie weitere Flächen hinzu.
+K sešití jsou potřeba alespoň dvě volné plochy.	Zum Nähen sind mindestens zwei freie Flächen nötig.
+Kruh (drát)	Kreis (Draht)
+Křivka průniku	Schnittkurve
+Křivky (skici v pořadí)	Kurven (Skizzen in Reihenfolge)
+Levotočivá	Linksgängig
+Nahradit plochu (posun)	Fläche ersetzen (verschieben)
+Nahradit plochu lze jen na tělese (solidu).	Fläche ersetzen ist nur an einem Volumenkörper möglich.
+Nejdřív vytvořte plochu nebo těleso s hranami.	Erstellen Sie zuerst eine Fläche oder einen Körper mit Kanten.
+Nejdřív vytvořte plochu nebo těleso.	Erstellen Sie zuerst eine Fläche oder einen Körper.
+Nejdřív vytvořte plochu.	Erstellen Sie zuerst eine Fläche.
+Nejdřív vytvořte těleso nebo plochu.	Erstellen Sie zuerst einen Körper oder eine Fläche.
+Nejsou žádné volné plochy k uzavření.	Es gibt keine freien Flächen zum Schließen.
+Nejsou žádné volné plochy k zesílení.	Es gibt keine freien Flächen zum Verdicken.
+Nejvýš 200 závitů.	Höchstens 200 Windungen.
+Není co oříznout – vytvořte nejdřív plochu.	Nichts zu trimmen – erstellen Sie zuerst eine Fläche.
+Není co sešít – nejdřív vytvořte plochy.	Nichts zu nähen – erstellen Sie zuerst Flächen.
+Náběh (otáček)	Anlauf (Umdrehungen)
+Náběh závitu se nepodařilo vytvořit – zmenšete počet otáček náběhu nebo hloubku závitu.	Der Gewindeanlauf konnte nicht erstellt werden – verringern Sie die Anlaufumdrehungen oder die Gewindetiefe.
+Obě části	Beide Teile
+Odsazená plocha	Versetzte Fläche
+Odsazení	Versatz
+Odsazení nesmí být nulové.	Der Versatz darf nicht null sein.
+Opačný směr	Richtung umkehren
+Osa	Achse
+Osa rotace (ve skice)	Drehachse (in der Skizze)
+Oříznout rovinou	Mit Ebene trimmen
+Oříznout skicou	Mit Skizze trimmen
+Plochu se nepodařilo zesílit – zkuste menší tloušťku nebo nejdřív plochy sešijte.	Die Fläche konnte nicht verdickt werden – versuchen Sie eine kleinere Dicke oder nähen Sie die Flächen zuerst.
+Plochy	Flächen
+Plochy na sebe nenavazují – nejdřív je sešijte.	Die Flächen schließen nicht aneinander an – nähen Sie sie zuerst.
+Plochy netvoří jednu souvislou skořepinu – nejdřív je sešijte (Sešít plochy) nebo zvětšete toleranci.	Die Flächen bilden keine zusammenhängende Schale – nähen Sie sie zuerst (Flächen nähen) oder erhöhen Sie die Toleranz.
+Plochy neuzavírají objem – chybí některá stěna nebo jsou mezery.	Die Flächen schließen kein Volumen ein – eine Wand fehlt oder es gibt Lücken.
+Plochy neuzavírají objem – zkontrolujte, že na sebe navazují (Sešít plochy).	Die Flächen schließen kein Volumen ein – prüfen Sie, ob sie aneinander anschließen (Flächen nähen).
+Plochy neuzavírají objem – {0} volných hran (chybí stěna nebo jsou mezery; zvětšete toleranci).	Die Flächen schließen kein Volumen ein – {0} freie Kanten (eine Wand fehlt oder es gibt Lücken; erhöhen Sie die Toleranz).
+Plochy tělesa	Körperflächen
+Plošná rotace	Flächenrotation
+Plošné vysunutí	Flächenextrusion
+Po normále	Entlang der Normalen
+Poloměr	Radius
+Poloměr šroubovice	Helixradius
+Poloměr, stoupání i počet závitů musí být kladné.	Radius, Steigung und Windungszahl müssen positiv sein.
+Ponechat	Behalten
+Ponechat stranu	Seite behalten
+Posun	Verschiebung
+Počet závitů	Windungszahl
+Prodloužit plochu	Fläche verlängern
+Profil	Profil
+Profil skici plochu neprotíná.	Das Skizzenprofil schneidet die Fläche nicht.
+Promítnout skicu na plochu	Skizze auf Fläche projizieren
+Promítnutá křivka na vybranou plochu nedopadá.	Die projizierte Kurve trifft die gewählte Fläche nicht.
+Proti normále	Gegen die Normale
+Průměr drátu	Drahtdurchmesser
+Průměr drátu musí být kladný a menší než stoupání.	Der Drahtdurchmesser muss positiv und kleiner als die Steigung sein.
+Přímkové plochy (bez vyhlazení)	Regelflächen (ohne Glättung)
+Rovina	Ebene
+Rovina model neprotíná.	Die Ebene schneidet das Modell nicht.
+Rovina plochu neprotíná na zvolené straně nic nezůstalo – otočte stranu.	Die Ebene schneidet die Fläche nicht, auf der gewählten Seite blieb nichts übrig – kehren Sie die Seite um.
+Rovina těleso neprotíná.	Die Ebene schneidet den Körper nicht.
+Rozdělit lze jen těleso (solid).	Nur ein Volumenkörper kann geteilt werden.
+Rozdělit těleso	Körper teilen
+Sešít plochy	Flächen nähen
+Skica	Skizze
+Skica (křivka)	Skizze (Kurve)
+Skica (profil)	Skizze (Profil)
+Skica (uzavřený profil)	Skizze (geschlossenes Profil)
+Skica musí obsahovat uzavřený profil.	Die Skizze muss ein geschlossenes Profil enthalten.
+Skica profilu	Profilskizze
+Skica „{0}“ je prázdná.	Die Skizze „{0}“ ist leer.
+Skica „{0}“ musí obsahovat uzavřený profil.	Die Skizze „{0}“ muss ein geschlossenes Profil enthalten.
+Skica „{0}“ neobsahuje křivku.	Die Skizze „{0}“ enthält keine Kurve.
+Skica „{0}“ neobsahuje souvislou křivku ani uzavřený profil.	Die Skizze „{0}“ enthält weder eine zusammenhängende Kurve noch ein geschlossenes Profil.
+Stoupání	Steigung
+Strana	Seite
+Střed začátku	Startmittelpunkt
+Svislá Y	Vertikal Y
+Symetricky na obě strany	Symmetrisch nach beiden Seiten
+Tažení plochy	Flächenaustragung
+Tažení po šroubovici	Austragung entlang Helix
+Tažení po šroubovici nevytvořilo objem – profil musí být uzavřený.	Die Austragung entlang der Helix hat kein Volumen erzeugt – das Profil muss geschlossen sein.
+Tažení po šroubovici se nepodařilo – profil se nesmí protínat sám se sebou (zmenšete profil nebo zvětšete stoupání).	Die Austragung entlang der Helix ist fehlgeschlagen – das Profil darf sich nicht selbst schneiden (verkleinern Sie das Profil oder erhöhen Sie die Steigung).
+Tloušťka	Dicke
+Tolerance	Toleranz
+Tolerance sešití	Nähtoleranz
+Tuto plochu se nepodařilo odsadit – zkuste menší vzdálenost.	Diese Fläche konnte nicht versetzt werden – versuchen Sie einen kleineren Abstand.
+Uzavřít do tělesa	Zu Körper schließen
+Vnitřek profilu	Innenseite des Profils
+Vnitřní (v díře)	Innen (in Bohrung)
+Vnějšek	Außenseite
+Vnější (na válci)	Außen (auf Zylinder)
+Vodorovná X	Horizontal X
+Vyberte alespoň dvě hrany tvořící uzavřenou smyčku.	Wählen Sie mindestens zwei Kanten, die eine geschlossene Schleife bilden.
+Vyberte cílovou plochu.	Wählen Sie die Zielfläche.
+Vyberte plochu k prodloužení.	Wählen Sie die zu verlängernde Fläche.
+Vyberte plochy k odsazení.	Wählen Sie die zu versetzenden Flächen.
+Vyberte {0} (skica musí být v historii před tímto prvkem).	Wählen Sie {0} (die Skizze muss in der Historie vor diesem Feature liegen).
+Vybraná plocha už v modelu není.	Die gewählte Fläche ist nicht mehr im Modell.
+Vybrané hrany netvoří souvislou uzavřenou smyčku.	Die gewählten Kanten bilden keine zusammenhängende geschlossene Schleife.
+Vzdálenost	Abstand
+Vzdálenost musí být kladná.	Der Abstand muss positiv sein.
+Výsledek je prázdný.	Das Ergebnis ist leer.
+Výsledek není těleso.	Das Ergebnis ist kein Volumenkörper.
+Z vybraných hran se nepodařilo vytvořit plochu – smyčka musí být uzavřená.	Aus den gewählten Kanten konnte keine Fläche erstellt werden – die Schleife muss geschlossen sein.
+Zachovat původní plochu	Ursprüngliche Fläche behalten
+Zakřivenou plochu tohoto typu nelze prodloužit – použijte Odsazenou plochu nebo ji vytvořte znovu větší.	Eine gekrümmte Fläche dieses Typs kann nicht verlängert werden – verwenden Sie Versetzte Fläche oder erstellen Sie sie größer neu.
+Zesílení nevytvořilo objem – zkuste menší tloušťku.	Verdicken hat kein Volumen erzeugt – versuchen Sie eine kleinere Dicke.
+Zesílit plochu	Fläche verdicken
+Záplata z hran	Flicken aus Kanten
+Závit	Gewinde
+Závit 60°	Gewinde 60°
+hladká plocha vyplní uzavřenou smyčku vybraných hran (N-stranná výplň)	eine glatte Fläche füllt die geschlossene Schleife der gewählten Kanten (N-seitige Füllung)
+jen Závit 60°: jako u závitového kalibru – hřbet prvního závitu je od začátku vybroušený a během zadaných otáček se zvedá do plného profilu (0 = bez náběhu)	nur Gewinde 60°: wie bei einer Gewindelehre – die Spitze des ersten Gewindegangs ist ab dem Anfang abgeschliffen und steigt über die angegebenen Umdrehungen zum vollen Profil an (0 = ohne Anlauf)
+kopie plochy odsazená po normále (bez výběru = všechny volné plochy)	Kopie der Fläche entlang der Normalen versetzt (ohne Auswahl = alle freien Flächen)
+křivka skici (i otevřená) vysunutá do plochy	Skizzenkurve (auch offen) zu einer Fläche extrudiert
+křivky skici promítnuté po normále skici na vybranou plochu	Skizzenkurven entlang der Skizzennormalen auf die gewählte Fläche projiziert
+nic = všechny volné plochy	nichts = alle freien Flächen
+odřízne část volných ploch na jedné straně základní roviny	schneidet den Teil der freien Flächen auf einer Seite einer Grundebene ab
+otevřený profil rotovaný kolem osy skici	offenes Profil um eine Skizzenachse gedreht
+otevřený profil tažený po dráze (druhá skica)	offenes Profil entlang eines Pfads (zweite Skizze) ausgetragen
+plocha přes 2 a více křivek (v různých rovinách)	Fläche durch 2 oder mehr Kurven (in verschiedenen Ebenen)
+poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	Radius = die Oberfläche, an der das Gewinde beginnt: Zylinder oder Bohrung (Kern); die Tiefe geht ins Material
+poloměr válce / díry	Radius des Zylinders / der Bohrung
+pro profil Kruh	für das Profil Kreis
+pro profil Závit 60°	für das Profil Gewinde 60°
+profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka	Profil (Kreis, Gewinde 60° oder Skizze) entlang einer Helix ausgetragen – Gewinde, Feder, Spiralnut
+průsečnice tělesa/ploch se základní rovinou (3D křivka pro další tažení)	Schnittkurve von Körper/Flächen mit einer Grundebene (3D-Kurve für weitere Austragungen)
+rovinná plocha se zvětší o danou délku po obvodu; zakřivená v parametrech plochy	eine ebene Fläche wird um die angegebene Länge entlang des Umfangs vergrößert; eine gekrümmte in den Flächenparametern
+rovinná plocha tělesa se posune po normále a sousední plochy se dotáhnou	eine ebene Körperfläche wird entlang der Normalen verschoben und die Nachbarflächen werden nachgezogen
+rozřízne solid základní rovinou – obě části zůstanou, nebo jen jedna	teilt den Volumenkörper mit einer Grundebene – beide Teile bleiben, oder nur einer
+skicu s křivkou	die Skizze mit der Kurve
+skicu s profilem	die Skizze mit dem Profil
+skicu s uzavřeným profilem	die Skizze mit dem geschlossenen Profil
+spojí volné plochy do jedné skořepiny	verbindet freie Flächen zu einer Schale
+uzavřené volné plochy → solid (lze sloučit/odebrat s existujícím tělesem)	geschlossene freie Flächen → Volumenkörper (lässt sich mit dem vorhandenen Körper vereinigen/abziehen)
+uzavřený profil skici promítnutý na plochy – ponechá vnitřek nebo vnějšek	geschlossenes Skizzenprofil auf die Flächen projiziert – behält Innen- oder Außenseite
+uzavřený profil skici → rovinná plocha (i s otvory)	geschlossenes Skizzenprofil → ebene Fläche (auch mit Öffnungen)
+uzavřený profil v rovině XZ u začátku šroubovice	geschlossenes Profil in der XZ-Ebene am Anfang der Helix
+z volných ploch vznikne solid dané tloušťky	aus freien Flächen entsteht ein Volumenkörper mit der angegebenen Dicke
+záporné = opačným směrem	negativ = in Gegenrichtung
+záporně dovnitř	negativ nach innen
+Šablonování ploch	Flächenausformung
+Šablonování potřebuje alespoň dvě skici.	Ausformung braucht mindestens zwei Skizzen.
+Šroubovice	Helix
+− strana	− Seite
+
+# ext/weld-layout
+Bodový	Punktschweißung
+Celkem na profil:	Gesamt je Profil:
+Dole	Unten
+Hmotnost svařence (profily): {0} kg	Masse der Schweißkonstruktion (Profile): {0} kg
+I svar	I-Naht
+Jäkl obdélníkový	Rechteckrohr
+Jäkl čtvercový	Quadratrohr
+Koutový	Kehlnaht
+Kulatina	Rundstahl
+Lemový	Bördelnaht
+Nahoře	Oben
+Nosník HEB	HEB-Träger
+Nosník IPE	IPE-Träger
+Plochá tyč	Flachstahl
+Profil U (UPN)	U-Profil (UPN)
+Profil UPN {0} není v tabulce.	Profil UPN {0} ist nicht in der Tabelle.
+Profil je po ořezání spojů záporný – zvolte menší profil nebo jiný typ spoje.	Das Profil ist nach dem Trimmen der Verbindungen negativ – wählen Sie ein kleineres Profil oder einen anderen Verbindungstyp.
+Profil {0} {1} není v tabulce.	Profil {0} {1} ist nicht in der Tabelle.
+Profil;Ks;Délka celkem [m];Hmotnost [kg]	Profil;Stk;Gesamtlänge [m];Masse [kg]
+Rozměr	Abmessung
+Rozměry rámu jsou menší než dvojnásobek profilu.	Die Rahmenmaße sind kleiner als das Doppelte des Profils.
+Střed	Mitte
+Svarový kov celkem: {0} kg	Schweißgut gesamt: {0} kg
+Tloušťka stěny	Wanddicke
+Tloušťka stěny jäklu je příliš velká.	Die Wanddicke des Hohlprofils ist zu groß.
+Tloušťka stěny trubky je příliš velká.	Die Wanddicke des Rohrs ist zu groß.
+Tloušťka úhelníku je příliš velká.	Die Dicke des Winkels ist zu groß.
+Trubka kruhová	Rundrohr
+U svar	U-Naht
+V svar	V-Naht
+Vlevo	Links
+Vlevo dole	Links unten
+Vlevo nahoře	Links oben
+Vpravo	Rechts
+Vpravo dole	Rechts unten
+Vpravo nahoře	Rechts oben
+{0} profilu musí být kladný.	{0} des Profils muss positiv sein.
+½V svar	½V-Naht
+Úhelník L	L-Winkel
+Úsečka profilu má nulovou délku.	Die Profillinie hat die Länge null.
+Čtyřhranná tyč	Vierkantstahl
+Žádné konstrukční profily (přidejte prvek Konstrukční profil nebo Rám z profilů).	Keine Konstruktionsprofile (fügen Sie das Feature Konstruktionsprofil oder Profilrahmen hinzu).
+Žádné svary (přidejte Svarovou housenku nebo Značku svaru).	Keine Schweißnähte (fügen Sie eine Schweißraupe oder ein Schweißsymbol hinzu).
+
+# ext/weld
++ (kladná)	+ (positiv)
+0 = po celé délce	0 = über die ganze Länge
+Deska	Platte
+Dvě vnitřní plochy rohu	Zwei Innenflächen der Ecke
+Délka svaru	Nahtlänge
+Délka úseku	Abschnittslänge
+Díra je větší než deska.	Die Bohrung ist größer als die Platte.
+Díry v řadě (X)	Bohrungen je Reihe (X)
+Díry ve sloupci (Y)	Bohrungen je Spalte (Y)
+Hloubka rámu (Y)	Rahmentiefe (Y)
+Housenku lze zatím vést jen po rovné hraně.	Eine Raupe kann vorerst nur entlang einer geraden Kante geführt werden.
+Hrana musí ležet mezi dvěma plochami tělesa.	Die Kante muss zwischen zwei Flächen des Körpers liegen.
+Hrana není vnitřní (konkávní) – housenka se dělá jen do vnitřního rohu mezi dvěma plochami.	Die Kante ist nicht innen (konkav) – eine Raupe wird nur in die Innenecke zwischen zwei Flächen gelegt.
+Hrana {0} v tělese neexistuje – vyberte ji znovu.	Kante {0} existiert im Körper nicht – wählen Sie sie erneut.
+Hrany koutu	Kehlkanten
+ISO 2553 – uloží se k dílu, zobrazí se v tabulce svarů a na výkresu	ISO 2553 – wird beim Teil gespeichert, in der Schweißtabelle und auf der Zeichnung angezeigt
+Jako samostatná tělesa	Als getrennte Körper
+Konstrukční profil	Konstruktionsprofil
+Kusovník řezů	Zuschnittliste
+Mezera ve spoji	Fugenspalt
+Montážní svar	Baustellennaht
+Na zvolené straně roviny nezůstal žádný materiál.	Auf der gewählten Seite der Ebene blieb kein Material übrig.
+Natočení profilu	Profildrehung
+Není co ořezat – nejdřív vytvořte profily.	Nichts zu trimmen – erstellen Sie zuerst Profile.
+Není těleso – nejdřív vytvořte profily.	Kein Körper – erstellen Sie zuerst Profile.
+Obrys plochy nelze zmenšit o zadané hodnoty – zvolte menší zmenšení/zaoblení.	Die Flächenkontur kann nicht um die angegebenen Werte verkleinert werden – wählen Sie eine kleinere Verkleinerung/Rundung.
+Odstup děr od okraje	Randabstand der Bohrungen
+Ořezat rovinou	Mit Ebene trimmen
+Plocha {0} v tělese neexistuje – vyberte ji znovu.	Fläche {0} existiert im Körper nicht – wählen Sie sie erneut.
+Plochy styčníku jsou rovnoběžné – vyberte dvě plochy svírající úhel.	Die Knotenblechflächen sind parallel – wählen Sie zwei Flächen, die einen Winkel bilden.
+Plochá	Flach
+Pokos	Gehrung
+Poznámka (metoda, ISO 4063)	Anmerkung (Verfahren, ISO 4063)
+Prodloužit konec	Ende verlängern
+Prodloužit začátek	Anfang verlängern
+Profil má po zkrácení nulovou délku.	Das Profil hat nach dem Kürzen die Länge null.
+Průměr D	Durchmesser D
+Průměr díry	Bohrungsdurchmesser
+Přerušovaný svar	Unterbrochene Naht
+Rameno 1	Schenkel 1
+Rameno 2	Schenkel 2
+Rohy obdélníků	Rechteckecken
+Rozměry desky musí být kladné.	Die Plattenmaße müssen positiv sein.
+Rozměry styčníku musí být kladné.	Die Knotenblechmaße müssen positiv sein.
+Rozteč (přerušovaný)	Teilung (unterbrochen)
+Rozteč úseků	Abschnittsteilung
+Rám z profilů	Profilrahmen
+Skica neobsahuje žádné úsečky (oblouky se pro profily zatím nepoužijí).	Die Skizze enthält keine Linien (Bögen werden für Profile noch nicht verwendet).
+Skica s úsečkami	Skizze mit Linien
+Spoj v rohu	Eckverbindung
+Sražení špiček	Spitzenfase
+Styčník	Knotenblech
+Styčník lze vložit jen mezi rovinné plochy.	Ein Knotenblech kann nur zwischen ebenen Flächen eingefügt werden.
+Střed X	Mitte X
+Střed Y	Mitte Y
+Svar na druhé straně	Naht auf der Gegenseite
+Svar po obvodu	Rundumnaht
+Svarová housenka	Schweißraupe
+Tabulka svarů	Schweißtabelle
+Tloušťka víčka	Deckeldicke
+Tloušťka víčka musí být kladná.	Die Deckeldicke muss positiv sein.
+Trubka	Rohr
+Tupý	Stumpf
+Typ svaru	Nahtart
+Velikost (UPN/IPE/HEB)	Größe (UPN/IPE/HEB)
+Velikost a / s	Größe a / s
+Velikost svaru a	Nahtdicke a
+Velikost svaru musí být kladná.	Die Nahtdicke muss positiv sein.
+Vyberte hranu vnitřního rohu v modelu.	Wählen Sie eine Innenkante im Modell.
+Vyberte přesně dvě rovinné plochy, které svírají roh.	Wählen Sie genau zwei ebene Flächen, die eine Ecke bilden.
+Vyberte skicu s úsečkami (musí být v historii před tímto prvkem).	Wählen Sie eine Skizze mit Linien (muss in der Historie vor diesem Feature liegen).
+Vyberte čelní plochu profilu v modelu.	Wählen Sie eine Stirnfläche des Profils im Modell.
+Vysunout opačně	Entgegengesetzt extrudieren
+Víčko	Deckel
+Víčko lze udělat jen na rovinné čelní ploše.	Ein Deckel ist nur auf einer ebenen Stirnfläche möglich.
+Výška / rameno b	Höhe / Schenkel b
+Výška rámu (Z)	Rahmenhöhe (Z)
+Zaoblení rohů	Eckenrundung
+Zapustit dovnitř profilu	In das Profil einsetzen
+Zarovnání	Ausrichtung
+Zmenšení od obrysu	Verkleinerung ab Kontur
+Značka svaru	Schweißsymbol
+destička na otevřený konec profilu (vyberte čelní plochy)	Platte auf dem offenen Profilende (wählen Sie die Stirnflächen)
+délky a úhly řezů profilů, hmotnosti, CSV	Zuschnittlängen und -winkel der Profile, Massen, CSV
+délky svarů a svarový kov	Nahtlängen und Schweißgut
+koutový svar a×a podél vnitřní hrany (vyberte hrany)	Kehlnaht a×a entlang einer Innenkante (wählen Sie die Kanten)
+kvádrový rám: dva obdélníky (pokos) + 4 sloupky	Quaderrahmen: zwei Rechtecke (Gehrung) + 4 Pfosten
+obdélníková deska (patka, příložka) s volitelným polem děr	rechteckige Platte (Fußplatte, Lasche) mit optionalem Bohrungsmuster
+odřízne vše na jedné straně roviny (zkrácení profilů)	schneidet alles auf einer Seite der Ebene ab (Kürzen von Profilen)
+profily (jäkl, trubka, L, U, IPE…) podél úseček skici, rohy pokos/tupý	Profile (Hohlprofil, Rohr, L, U, IPE…) entlang von Skizzenlinien, Ecken Gehrung/stumpf
+trojúhelníková výztuha v rohu dvou profilů (vyberte 2 vnitřní plochy)	dreieckige Versteifung in der Ecke zweier Profile (wählen Sie 2 Innenflächen)
+víčko lícuje s koncem	der Deckel schließt bündig mit dem Ende ab
+záporné = zkrátit	negativ = kürzen
+Čelní plochy	Stirnflächen
+Čtyřhran	Vierkant
+Šířka / rameno a	Breite / Schenkel a
+Šířka rámu (X)	Rahmenbreite (X)
+Žádný	Keiner
+− (záporná)	− (negativ)
+
+# feat/fillet
+Boční plochy nejsou rovnoběžné – plný rádius vyžaduje dvě rovnoběžné boční plochy.	Die Seitenflächen sind nicht parallel – eine Vollverrundung erfordert zwei parallele Seitenflächen.
+Boční plochy splývají – vzdálenost mezi nimi je nulová.	Die Seitenflächen fallen zusammen – ihr Abstand ist null.
+Druhá vzdálenost sražení musí být kladná.	Der zweite Fasenabstand muss positiv sein.
+Hrany ve vrcholu jsou degenerované – roh nelze srazit.	Die Kanten am Eckpunkt sind degeneriert – die Ecke kann nicht gefast werden.
+Mezi bočními plochami leží {0} ploch – vyberte prostřední plochu, která se má zaoblit.	Zwischen den Seitenflächen liegen {0} Flächen – wählen Sie die Mittelfläche, die verrundet werden soll.
+Mezi bočními plochami není žádná prostřední plocha (plocha sousedící s oběma).	Zwischen den Seitenflächen gibt es keine Mittelfläche (eine an beide angrenzende Fläche).
+Není co srazit – nejdřív vytvořte těleso.	Nichts zu fasen – erstellen Sie zuerst einen Körper.
+Oba poloměry (R1 i R2) musí být kladné.	Beide Radien (R1 und R2) müssen positiv sein.
+Odkaz v poli „{0}“ musí být plocha modelu.	Die Referenz im Feld „{0}“ muss eine Modellfläche sein.
+Plný rádius se nepodařilo vytvořit (booleovská operace jádra selhala).	Die Vollverrundung konnte nicht erstellt werden (die boolesche Operation des Kerns ist fehlgeschlagen).
+Plný rádius se nepodařilo vytvořit – prostřední plocha není obdélník kolmý na boční plochy a přibližné zaoblení selhalo.	Die Vollverrundung konnte nicht erstellt werden – die Mittelfläche ist kein zu den Seitenflächen senkrechtes Rechteck und die näherungsweise Verrundung ist fehlgeschlagen.
+Plný rádius: boční i prostřední plochy musí být rovinné.	Vollverrundung: Seiten- und Mittelflächen müssen eben sein.
+Poloměr u hrany {0} musí být kladný.	Der Radius an Kante {0} muss positiv sein.
+Prostřední plocha musí sousedit s oběma bočními plochami.	Die Mittelfläche muss an beide Seitenflächen angrenzen.
+Referenční odkaz sražení musí být plocha modelu.	Die Fasenreferenz muss eine Modellfläche sein.
+Referenční plocha musí sousedit se všemi vybranými hranami (hrana {0} s ní nesousedí).	Die Referenzfläche muss an alle gewählten Kanten angrenzen (Kante {0} grenzt nicht an sie).
+Roh nelze srazit – body sražení neurčují čtyřstěn.	Die Ecke kann nicht gefast werden – die Fasenpunkte bestimmen kein Tetraeder.
+Sražení vrcholu se nepodařilo (booleovská operace jádra selhala).	Die Eckenfase ist fehlgeschlagen (die boolesche Operation des Kerns ist fehlgeschlagen).
+Sražení {0} mm nelze provést – vzdálenost je pro vybrané hrany příliš velká nebo se sražení kříží.	Die Fase {0} mm ist nicht möglich – der Abstand ist für die gewählten Kanten zu groß oder die Fasen kreuzen sich.
+Ve vrcholu [{0}] se musí stýkat právě 3 hrany (nalezeno {1}).	Am Eckpunkt [{0}] müssen genau 3 Kanten zusammentreffen ({1} gefunden).
+Velikost sražení musí být kladná.	Die Fasengröße muss positiv sein.
+Vyberte referenční plochu – na ní se měří první vzdálenost sražení.	Wählen Sie die Referenzfläche – auf ihr wird der erste Fasenabstand gemessen.
+Vyberte vrcholy, které se mají srazit.	Wählen Sie die zu fasenden Eckpunkte.
+Vyberte {0}.	Wählen Sie {0}.
+Vybrané sady ploch nemají společnou hranu – zaoblení plocha–plocha není kde vytvořit.	Die gewählten Flächensätze haben keine gemeinsame Kante – eine Fläche-Fläche-Verrundung kann nirgends erstellt werden.
+Vzdálenost D{0} = {1} mm je delší než hrana {2} ({3} mm).	Der Abstand D{0} = {1} mm ist länger als Kante {2} ({3} mm).
+Všechny tři vzdálenosti sražení vrcholu musí být kladné.	Alle drei Abstände der Eckenfase müssen positiv sein.
+Zaoblení R{0} nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.	Die Verrundung R{0} ist nicht möglich – der Radius ist für die gewählten Kanten zu groß oder die Verrundungen kreuzen sich.
+Zaoblení plocha–plocha R{0} nelze provést – poloměr je pro společné hrany příliš velký.	Die Fläche-Fläche-Verrundung R{0} ist nicht möglich – der Radius ist für die gemeinsamen Kanten zu groß.
+boční plochu 1	Seitenfläche 1
+boční plochu 2	Seitenfläche 2
+druhou sadu ploch	den zweiten Flächensatz
+prostřední plochu	die Mittelfläche
+první sadu ploch	den ersten Flächensatz
+Úhel sražení musí být mezi 0° a 90°.	Der Fasenwinkel muss zwischen 0° und 90° liegen.
+
+# feat/pattern
+Do obrysu se s touto roztečí a okrajem nevejde žádný kus – zmenšete rozteč nebo okraj.	In die Kontur passt mit diesem Abstand und Rand keine Instanz – verringern Sie den Abstand oder den Rand.
+Druhý směr pole	Zweite Musterrichtung
+Druhý směr pole je rovnoběžný s prvním – zvolte jiný směr.	Die zweite Musterrichtung ist parallel zur ersten – wählen Sie eine andere Richtung.
+Jinou tloušťku lze zadat jen u rovinných ploch (plocha {0} je {1}).	Eine andere Dicke ist nur bei ebenen Flächen möglich (Fläche {0} ist {1}).
+Křivka pole je prázdná.	Die Musterkurve ist leer.
+Křivka pole musí být jedna souvislá čára (bez větvení a mezer).	Die Musterkurve muss eine zusammenhängende Linie sein (ohne Verzweigungen und Lücken).
+Křivka ve skice „{0}“ má nulovou délku.	Die Kurve in der Skizze „{0}“ hat die Länge null.
+Osa pole	Musterachse
+Pole má příliš mnoho kusů ({0}, max. {1}).	Das Muster hat zu viele Instanzen ({0}, max. {1}).
+Pole se na křivku nevejde (délka {0} mm) – zmenšete rozteč nebo počet kusů.	Das Muster passt nicht auf die Kurve (Länge {0} mm) – verringern Sie den Abstand oder die Anzahl.
+Protější stěnu skořepiny u plochy {0} se nepodařilo najít – jinou tloušťku zde nelze použít.	Die gegenüberliegende Schalenwand zu Fläche {0} wurde nicht gefunden – eine andere Dicke ist hier nicht möglich.
+Prvek „{0}“ nelze opakovat – pole umí opakovat jen prvky s nástrojovým tělesem (vysunutí, rotace, díra, primitiva, tažení, šablonování, text), které jsou v historii před polem a nejsou potlačené.	Das Feature „{0}“ kann nicht wiederholt werden – ein Muster wiederholt nur Features mit Werkzeugkörper (Extrusion, Rotation, Bohrung, Grundkörper, Austragung, Ausformung, Text), die in der Historie vor dem Muster liegen und nicht unterdrückt sind.
+Rozteč pole nesmí být nulová.	Der Musterabstand darf nicht null sein.
+Rozteč ve druhém směru nesmí být nulová.	Der Abstand in der zweiten Richtung darf nicht null sein.
+Rozteč výplňového pole musí být kladná.	Der Abstand des Füllmusters muss positiv sein.
+Skica „{0}“ neobsahuje uzavřený obrys pro výplň.	Die Skizze „{0}“ enthält keine geschlossene Kontur für die Füllung.
+Skica „{0}“ neobsahuje žádné body – nakreslete body (nástroj Bod) v místech kopií.	Die Skizze „{0}“ enthält keine Punkte – zeichnen Sie Punkte (Werkzeug Punkt) an den Stellen der Instanzen.
+Skořepina nevytvořila objem – zkuste menší tloušťku.	Die Schale hat kein Volumen erzeugt – versuchen Sie eine kleinere Wandstärke.
+Skořepinu se nepodařilo vytvořit – zkuste menší tloušťku nebo jiné plochy.	Die Schale konnte nicht erstellt werden – versuchen Sie eine kleinere Wandstärke oder andere Flächen.
+Tečna křivky	Kurventangente
+Výplňové pole má příliš mnoho kusů ({0}, max. {1}) – zvětšete rozteč.	Das Füllmuster hat zu viele Instanzen ({0}, max. {1}) – vergrößern Sie den Abstand.
+Všechny body skici „{0}“ leží v místě zdrojového prvku – přidejte další body.	Alle Punkte der Skizze „{0}“ liegen an der Stelle des Quell-Features – fügen Sie weitere Punkte hinzu.
+plochy, které se mají otevřít	die zu öffnenden Flächen
+plochy, které se mají zkosit	die Flächen für die Formschräge
+skica křivky pole	Musterkurvenskizze
+skica obrysu výplně	Füllkonturskizze
+skica s body pole	Musterpunktskizze
+{0} nesmí být nulový.	{0} darf nicht null sein.
+
+# feat/refs-more
+Cílová rovina je rovnoběžná se směrem posunu – vyberte plochu, která není kolmá na posouvanou plochu.	Die Zielebene ist parallel zur Verschieberichtung – wählen Sie eine Fläche, die nicht senkrecht zur verschobenen Fläche steht.
+Délka zobrazení osy musí být kladná.	Die Anzeigelänge der Achse muss positiv sein.
+Pomocná geometrie „{0}“ musí být v historii před prvkem „{1}“ – přesuňte ji výš.	Die Konstruktionsgeometrie „{0}“ muss in der Historie vor dem Feature „{1}“ liegen – verschieben Sie sie nach oben.
+Pro Vytáhnout/Zatlačit použijte ukončení Na vzdálenost, K vrcholu, K ploše nebo Odsazeně od plochy.	Für Ziehen / Drücken verwenden Sie die Endbedingung Blind, Bis Eckpunkt, Bis Fläche oder Versetzt von Fläche.
+Vyberte rovinné plochy v modelu.	Wählen Sie ebene Flächen im Modell.
+Vybrané plochy už leží v cílové rovině – není co posouvat.	Die gewählten Flächen liegen bereits in der Zielebene – nichts zu verschieben.
+Zvolte osu modelem: hranu, válcovou plochu, dva body, globální osu, pomocnou rovinu, průsečnici rovin nebo pomocnou osu.	Wählen Sie die Achse über das Modell: eine Kante, eine Zylinderfläche, zwei Punkte, eine globale Achse, eine Bezugsebene, eine Ebenenschnittlinie oder eine Bezugsachse.
+Závit potřebuje těleso (válcovou plochu nebo díru).	Ein Gewinde braucht einen Körper (eine Zylinderfläche oder eine Bohrung).
+cílový bod posunu	den Zielpunkt der Verschiebung
+polohu podstavy	die Grundflächenposition
+střed koule	den Kugelmittelpunkt
+střed textu	den Textmittelpunkt
+střed transformace	das Transformationszentrum
+vrchol / bod	den Eckpunkt / Punkt
+výchozí bod posunu	den Startpunkt der Verschiebung
+začátek závitu	den Gewindeanfang
+
+# feat/sweep-loft
+Chybí skica profilu – vyberte ji v parametrech (nebo zvolte kruhový profil bez skici).	Die Profilskizze fehlt – wählen Sie sie in den Parametern (oder wählen Sie ein Kreisprofil ohne Skizze).
+Dráha má nulovou délku.	Der Pfad hat die Länge null.
+Každý profil šablonování musí být jiná skica.	Jedes Ausformungsprofil muss eine andere Skizze sein.
+Měřítko profilu na konci musí být kladné.	Der Profilmaßstab am Ende muss positiv sein.
+Osová / vodicí křivka musí být jiná skica než profily.	Die Mittel-/Leitkurve muss eine andere Skizze als die Profile sein.
+Poloměr kruhového profilu musí být kladný.	Der Radius des Kreisprofils muss positiv sein.
+Skica {0} („{1}“)	Skizze {0} („{1}“)
+Skica „{0}“ neobsahuje profil pro tenkou stěnu.	Die Skizze „{0}“ enthält kein Profil für die dünne Wand.
+Tažení	Austragung
+Tažení podél křivky nevytvořilo těleso.	Die Austragung entlang der Kurve hat keinen Körper erzeugt.
+Tažení podél křivky se nepodařilo – zkontrolujte, že řezy leží na dráze a dráha je hladká.	Die Austragung entlang der Kurve ist fehlgeschlagen – prüfen Sie, ob die Schnitte auf dem Pfad liegen und der Pfad glatt ist.
+Tažení s kroucením / měřítkem	Austragung mit Verdrehung / Skalierung
+Tažení s pevnou orientací profilu	Austragung mit fester Profilausrichtung
+Tloušťka tenké stěny je větší než poloměr kruhového profilu.	Die Wandstärke ist größer als der Radius des Kreisprofils.
+Transformace profilu se nezdařila.	Die Profiltransformation ist fehlgeschlagen.
+Uzavřené šablonování	Geschlossene Ausformung
+Uzavřené šablonování nelze kombinovat s bodem na začátku / konci.	Eine geschlossene Ausformung lässt sich nicht mit einem Start-/Endpunkt kombinieren.
+Uzavřené šablonování nelze kombinovat s osovou / vodicí křivkou.	Eine geschlossene Ausformung lässt sich nicht mit einer Mittel-/Leitkurve kombinieren.
+Uzavřené šablonování potřebuje alespoň tři profily.	Eine geschlossene Ausformung braucht mindestens drei Profile.
+Vodicí křivka musí být jiná skica než dráha.	Die Leitkurve muss eine andere Skizze als der Pfad sein.
+koncový bod šablonování	den Endpunkt der Ausformung
+počáteční bod šablonování	den Startpunkt der Ausformung
+skica osové křivky	Mittelkurvenskizze
+skica vodicí křivky	Leitkurvenskizze
+{0} musí mít uzavřený vnější profil.	{0} muss ein geschlossenes Außenprofil haben.
+{0} nevytvořilo objemové těleso – zkontrolujte, že profil je uzavřený, leží kolmo na začátek dráhy a dráha se neprotíná.	{0} hat keinen Volumenkörper erzeugt – prüfen Sie, ob das Profil geschlossen ist, senkrecht zum Pfadanfang liegt und der Pfad sich nicht selbst schneidet.
+{0}: jádro nevrátilo plášť.	{0}: der Kern hat keine Hülle zurückgegeben.
+{0}: plášť se nepodařilo uzavřít do tělesa.	{0}: die Hülle konnte nicht zu einem Körper geschlossen werden.
+Šablonování	Ausformung
+Šablonování do bodu nelze kombinovat s osovou / vodicí křivkou.	Eine Ausformung zu einem Punkt lässt sich nicht mit einer Mittel-/Leitkurve kombinieren.
+Šablonování nevytvořilo těleso – zkontrolujte profily.	Die Ausformung hat keinen Körper erzeugt – prüfen Sie die Profile.
+Šablonování podél křivky	Ausformung entlang Kurve
+Šablonování potřebuje alespoň dvě skici (profily), nebo jednu skicu a bod.	Ausformung braucht mindestens zwei Skizzen (Profile) oder eine Skizze und einen Punkt.
+Šablonování se nepodařilo – profily se nejspíš kříží nebo mají neslučitelný tvar.	Die Ausformung ist fehlgeschlagen – die Profile kreuzen sich wahrscheinlich oder haben unverträgliche Formen.
+
+# formats
+DWG se nepodařilo vytvořit ({0}): {1}	Die DWG konnte nicht erstellt werden ({0}): {1}
+DWG skici se nepodařilo vytvořit ({0}): {1}	Die Skizzen-DWG konnte nicht erstellt werden ({0}): {1}
+Neznámá verze DWG: {0}.	Unbekannte DWG-Version: {0}.
+Binární DXF není podporované – uložte DXF jako ASCII.	Binäres DXF wird nicht unterstützt – speichern Sie die DXF als ASCII.
+DXF neobsahuje sekci ENTITIES.	Die DXF enthält keinen Abschnitt ENTITIES.
+Soubor je binární DWG, ne DXF.	Die Datei ist eine binäre DWG, keine DXF.
+3D tisk – PrusaSlicer, Cura, Bambu	3D-Druck – PrusaSlicer, Cura, Bambu
+3D tisk, CAM	3D-Druck, CAM
+BREP OpenCascade (.brep)	OpenCascade BREP (.brep)
+CAD/CAM – SolidWorks, Inventor, ZW3D, CATIA, Fusion	CAD/CAM – SolidWorks, Inventor, ZW3D, CATIA, Fusion
+Neznámý formát exportu: {0}	Unbekanntes Exportformat: {0}
+OBJ (.obj)	OBJ (.obj)
+Přesná geometrie pro FreeCAD/OCCT	Exakte Geometrie für FreeCAD/OCCT
+STEP AP214 (.step)	STEP AP214 (.step)
+STL binární (.stl)	STL binär (.stl)
+Starší prohlížeče a CAE	Ältere Viewer und CAE
+VRML 2.0 (.wrl)	VRML 2.0 (.wrl)
+Vizualizace, Blender	Visualisierung, Blender
+Web, AR, prezentace (metry, Y nahoru)	Web, AR, Präsentationen (Meter, Y nach oben)
+glTF binární (.glb)	glTF binär (.glb)
+DXF neobsahuje čáry, kružnice ani oblouky.	Die DXF enthält weder Linien noch Kreise oder Bögen.
+Formát .{0} není podporovaný. Otevřete STEP, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF nebo DXF.	Das Format .{0} wird nicht unterstützt. Öffnen Sie STEP, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF oder DXF.
+IGES převeden přes OpenCascade na síť.	IGES über OpenCascade in ein Netz umgewandelt.
+Model je velký, přestavba může trvat déle.	Das Modell ist groß, der Neuaufbau kann länger dauern.
+Načteno {0} entit{1}.	{0} Elemente geladen{1}.
+Soubor nevypadá jako BREP OpenCascade.	Die Datei sieht nicht wie ein OpenCascade BREP aus.
+Soubor nevypadá jako STEP (chybí hlavička ISO-10303-21).	Die Datei sieht nicht wie STEP aus (der Header ISO-10303-21 fehlt).
+glTF je v metrech – převedeno na mm (×1000), osa Y → Z.	glTF ist in Metern – in mm umgerechnet (×1000), Y-Achse → Z.
+{0}: nativní formát programu {1} je uzavřený a v prohlížeči ho bez licencovaného převodníku nepřečte žádný CAD. {2} Pak otevřete soubor STEP zde.	{0}: das native Format von {1} ist proprietär und kein Browser-CAD kann es ohne lizenzierten Konverter lesen. {2} Öffnen Sie dann die STEP-Datei hier.
+BREP neobsahuje 3D těleso.	Das BREP enthält keinen 3D-Körper.
+Formát {0} musí být před vložením převeden (otevřete soubor znovu).	Das Format {0} muss vor dem Einfügen umgewandelt werden (öffnen Sie die Datei erneut).
+STL neobsahuje plochy.	Die STL enthält keine Flächen.
+Soubor BREP se nepodařilo načíst.	Die BREP-Datei konnte nicht geladen werden.
+Soubor STL se nepodařilo přečíst.	Die STL-Datei konnte nicht gelesen werden.
+3MF: archiv neobsahuje 3D model.	3MF: das Archiv enthält kein 3D-Modell.
+PLY: chybí hlavička.	PLY: Header fehlt.
+PLY: neznámý typ {0}.	PLY: unbekannter Typ {0}.
+glTF odkazuje na externí soubor „{0}“ – použijte formát GLB (vše v jednom souboru). (buffer {1})	Das glTF verweist auf die externe Datei „{0}“ – verwenden Sie das Format GLB (alles in einer Datei). (Buffer {1})
+glTF: chybí binární data.	glTF: Binärdaten fehlen.
+{0}: soubor neobsahuje žádné trojúhelníky.	{0}: die Datei enthält keine Dreiecke.
+IGES lze načíst jen v prohlížeči.	IGES kann nur im Browser geladen werden.
+IGES neobsahuje plochy ani tělesa (jen křivky?).	Das IGES enthält weder Flächen noch Körper (nur Kurven?).
+IGES se nepodařilo přečíst (poškozený soubor nebo nepodporované entity).	Das IGES konnte nicht gelesen werden (beschädigte Datei oder nicht unterstützte Elemente).
+Převodník IGES se nenačetl.	Der IGES-Konverter wurde nicht geladen.
+Převodník IGES se nepodařilo stáhnout.	Der IGES-Konverter konnte nicht heruntergeladen werden.
+Nepodporovaná komprese ZIP ({0}).	Nicht unterstützte ZIP-Komprimierung ({0}).
+Poškozený ZIP archiv.	Beschädigtes ZIP-Archiv.
+Soubor není platný ZIP archiv.	Die Datei ist kein gültiges ZIP-Archiv.
+
+# inspect
+Bod	Punkt
+Bod {0}	Punkt {0}
+Hrana	Kante
+Hrana {0}	Kante {0}
+Plocha	Fläche
+Plocha {0}	Fläche {0}
+Těleso	Körper
+
+# mold, params, pdf
+PA6 (silon)	PA6 (Polyamid)
+PC (polykarbonát)	PC (Polycarbonat)
+PMMA (plexisklo)	PMMA (Acrylglas)
+PP (polypropylen)	PP (Polypropylen)
+PS (polystyren)	PS (Polystyrol)
+Ø{0} mm, {1} větví	Ø{0} mm, {1} Zweige
+Dělení nulou.	Division durch null.
+Neočekávané „{0}“ ve výrazu.	Unerwartetes „{0}“ im Ausdruck.
+Neplatný znak „{0}“ ve výrazu.	Ungültiges Zeichen „{0}“ im Ausdruck.
+Neznámá funkce „{0}“.	Unbekannte Funktion „{0}“.
+Neznámá proměnná „{0}“.	Unbekannte Variable „{0}“.
+Neúplný výraz.	Unvollständiger Ausdruck.
+Prázdný výraz.	Leerer Ausdruck.
+Ve výrazu chybí „{0}“.	Im Ausdruck fehlt „{0}“.
+Výsledek výrazu není konečné číslo.	Das Ergebnis des Ausdrucks ist keine endliche Zahl.
+{0}: parametr „{1}“ neexistuje.	{0}: der Parameter „{1}“ existiert nicht.
+Písmo se nenačetlo.	Die Schrift wurde nicht geladen.
+Výkres	Zeichnung
+
+# ref-resolve
+1. bod	1. Punkt
+1. plochu	1. Fläche
+1. rovinu	1. Ebene
+2. bod	2. Punkt
+2. plochu	2. Fläche
+2. rovinu	2. Ebene
+3. bod	3. Punkt
+Bod leží na přímce – rovinu nelze určit.	Der Punkt liegt auf der Geraden – die Ebene kann nicht bestimmt werden.
+Bod „{0}“ entity skici neexistuje.	Der Punkt „{0}“ des Skizzenelements existiert nicht.
+Body leží na jedné přímce – rovinu nelze určit.	Die Punkte liegen auf einer Geraden – die Ebene kann nicht bestimmt werden.
+Cíl průmětu musí být rovinná plocha, osa válce nebo přímá hrana.	Das Projektionsziel muss eine ebene Fläche, eine Zylinderachse oder eine gerade Kante sein.
+Entita skici odkazu neexistuje.	Das referenzierte Skizzenelement existiert nicht.
+Hrana je rovnoběžná s plochou – průsečík neexistuje.	Die Kante ist parallel zur Fläche – es gibt keinen Schnittpunkt.
+Hrana není kruhová – střed kružnice nelze určit (použijte střed hrany).	Die Kante ist nicht kreisförmig – der Kreismittelpunkt kann nicht bestimmt werden (verwenden Sie die Kantenmitte).
+Hrany leží na jedné přímce – rovinu nelze určit.	Die Kanten liegen auf einer Geraden – die Ebene kann nicht bestimmt werden.
+Nulový směr – vyberte jinou geometrii.	Nullrichtung – wählen Sie eine andere Geometrie.
+Odkaz na {0} vyžaduje těleso – nejdřív vytvořte tvar.	Eine Referenz auf {0} erfordert einen Körper – erstellen Sie zuerst eine Form.
+Odkaz neurčuje {0} (vyberte hranu, válcovou nebo rovinnou plochu).	Die Referenz bestimmt {0} nicht (wählen Sie eine Kante, eine Zylinder- oder eine ebene Fläche).
+Odkaz neurčuje {0} (vyberte rovinnou plochu nebo pomocnou rovinu).	Die Referenz bestimmt {0} nicht (wählen Sie eine ebene Fläche oder eine Bezugsebene).
+Odkaz neurčuje {0}.	Die Referenz bestimmt {0} nicht.
+Odkaz pomocné geometrie „{0}“ je cyklický.	Die Referenz der Konstruktionsgeometrie „{0}“ ist zyklisch.
+Odkazovaná {0} už v modelu není – vyberte ji znovu.	Die referenzierte {0} ist nicht mehr im Modell – wählen Sie sie erneut.
+Osa X souřadného systému je rovnoběžná s osou Z – zvolte jiný směr X.	Die X-Achse des Koordinatensystems ist parallel zur Z-Achse – wählen Sie eine andere X-Richtung.
+Pomocná rovina odkazu neexistuje.	Die referenzierte Bezugsebene existiert nicht.
+První odkaz musí být přímá hrana.	Die erste Referenz muss eine gerade Kante sein.
+Roviny jsou rovnoběžné – průsečnice neexistuje.	Die Ebenen sind parallel – es gibt keine Schnittlinie.
+Skica odkazu neexistuje.	Die referenzierte Skizze existiert nicht.
+Vyberte bod a hranu (směr).	Wählen Sie einen Punkt und eine Kante (Richtung).
+Vyberte bod a plochu.	Wählen Sie einen Punkt und eine Fläche.
+Vyberte dva body.	Wählen Sie zwei Punkte.
+Vyberte dvě přímé hrany.	Wählen Sie zwei gerade Kanten.
+Vyberte hranu a plochu.	Wählen Sie eine Kante und eine Fläche.
+Vyberte hranu pro tečnu.	Wählen Sie eine Kante für die Tangente.
+Vyberte hranu.	Wählen Sie eine Kante.
+Vyberte přímou hranu (osu otáčení).	Wählen Sie eine gerade Kante (Drehachse).
+Vyberte přímou hranu nebo válcovou plochu.	Wählen Sie eine gerade Kante oder eine Zylinderfläche.
+Vyberte přímou hranu.	Wählen Sie eine gerade Kante.
+Vyberte rovinnou plochu nebo pomocnou rovinu.	Wählen Sie eine ebene Fläche oder eine Bezugsebene.
+Vyberte rovinu/plochu, se kterou má být tečná rovina rovnoběžná.	Wählen Sie die Ebene/Fläche, zu der die Tangentialebene parallel sein soll.
+Vyberte úsečku ve skice jako osu rotace.	Wählen Sie eine Linie in der Skizze als Drehachse.
+Zvolená rovina je kolmá na osu válce – tečná rovina neexistuje.	Die gewählte Ebene steht senkrecht zur Zylinderachse – es gibt keine Tangentialebene.
+druhý bod	den zweiten Punkt
+pomocný bod	den Bezugspunkt
+počátek souřadného systému	den Ursprung des Koordinatensystems
+první bod	den ersten Punkt
+{0} odkazu neexistuje – vyberte ji znovu.	Die referenzierte {0} existiert nicht – wählen Sie sie erneut.
+{0} „{1}“ je potlačená.	{0} „{1}“ ist unterdrückt.
+
+# refs
+3 body: {0}	3 Punkte: {0}
+Bod na hraně v % délky	Punkt auf Kante in % der Länge
+Bod skici ({0})	Skizzenpunkt ({0})
+Bodem a normálou	Punkt und Normale
+Bodem a přímkou	Punkt und Gerade
+Dovnitř	Nach innen
+Dva body	Zwei Punkte
+Dvě tloušťky	Zwei Dicken
+Dvěma body	Durch zwei Punkte
+Dvěma hranami	Durch zwei Kanten
+Globální osa X / Y / Z	Globale X- / Y- / Z-Achse
+Hrana modelu	Modellkante
+Hrana {0}{1}	Kante {0}{1}
+K dalšímu	Bis zur nächsten
+K ploše	Bis Fläche
+K tělesu	Bis Körper
+K vrcholu	Bis Eckpunkt
+Kolmo na křivku v bodě	Senkrecht zur Kurve im Punkt
+Kolmo na rovinu (normála)	Senkrecht zur Ebene (Normale)
+Kolmo na {0} v {1}	Senkrecht zu {0} in {1}
+Konec hrany	Kantenende
+Mezi dvěma body (poměr)	Zwischen zwei Punkten (Verhältnis)
+Na střed	Mittig
+Na vzdálenost	Blind
+Normála	Normale
+Normála plochy	Flächennormale
+Od plochy	Von Fläche
+Od vrcholu	Von Eckpunkt
+Odsazení od roviny skici	Versatz von der Skizzenebene
+Odsazený bod podél hrany	Versetzter Punkt entlang Kante
+Odsazeně od plochy	Versetzt von Fläche
+Osa X / Y / Z	X- / Y- / Z-Achse
+Osa X skici (vodorovná)	Skizzen-X-Achse (horizontal)
+Osa Y skici (svislá)	Skizzen-Y-Achse (vertikal)
+Osa válcové plochy	Achse der Zylinderfläche
+Osa {0}	{0}-Achse
+Pod úhlem k ploše kolem hrany	Unter Winkel zur Fläche um Kante
+Pod úhlem od normály	Unter Winkel zur Normalen
+Podél hrany / osy válce	Entlang Kante / Zylinderachse
+Poloha na hraně (%)	Position auf Kante (%)
+Pomocná osa	Bezugsachse
+Pomocná osa / osa Z souř. systému	Bezugsachse / Z-Achse des Koordinatensystems
+Pomocná rovina	Bezugsebene
+Pomocná rovina (+ odsazení)	Bezugsebene (+ Versatz)
+Pomocná rovina (normála)	Bezugsebene (Normale)
+Pomocná rovina{0}	Bezugsebene{0}
+Pomocný bod	Bezugspunkt
+Poměr (0 = první bod, 1 = druhý)	Verhältnis (0 = erster Punkt, 1 = zweiter)
+Počátek	Ursprung
+Počátek souřadnic	Koordinatenursprung
+Průmět bodu na plochu	Projektion des Punkts auf Fläche
+Průsečnice dvou rovin	Schnittlinie zweier Ebenen
+Průsečík hrany s plochou	Schnittpunkt von Kante und Fläche
+Rovina skici	Skizzenebene
+Rovina {0}{1}	Ebene {0}{1}
+Rovnoběžně s plochou (+ odsazení)	Parallel zur Fläche (+ Versatz)
+Skrz vše	Durch alles
+Střed hrany	Kantenmitte
+Střed kružnice / oblouku	Kreis-/Bogenmittelpunkt
+Střed mezi dvěma body	Mitte zwischen zwei Punkten
+Střed plochy	Flächenmitte
+Střední mezi dvěma plochami	Mittig zwischen zwei Flächen
+Střední rovina	Mittelebene
+Střední: {0} / {1}	Mittig: {0} / {1}
+Tečně k válci	Tangential zum Zylinder
+Tečně k {0} ∥ {1}	Tangential zu {0} ∥ {1}
+Třemi body	Durch drei Punkte
+Vektor (čísla)	Vektor (Zahlen)
+Vektor {0}	Vektor {0}
+Ven	Nach außen
+Vlastní (počátek, normála, X)	Benutzerdefiniert (Ursprung, Normale, X)
+Vlastní ({0})	Benutzerdefiniert ({0})
+Vrchol / koncový bod	Eckpunkt / Endpunkt
+Vrchol {0}	Eckpunkt {0}
+Vzdálenost (mm)	Abstand (mm)
+X, Y, Z v mm (nebo @dx,dy,dz od posledního bodu)	X, Y, Z in mm (oder @dx,dy,dz vom letzten Punkt)
+Zadat souřadnice…	Koordinaten eingeben…
+Začátek hrany	Kantenanfang
+Základní rovina + odsazení	Grundebene + Versatz
+bod + hrana udávající směr + vzdálenost	Punkt + Kante als Richtung + Abstand
+bod + plocha	Punkt + Fläche
+bod 0, 0, 0	Punkt 0, 0, 0
+hrana (směr)	Kante (Richtung)
+klikněte na hranu	klicken Sie auf eine Kante
+klikněte na hranu a zadejte procenta	klicken Sie auf eine Kante und geben Sie Prozent ein
+klikněte na hranu – bod v polovině délky	klicken Sie auf eine Kante – Punkt in der Mitte der Länge
+klikněte na kruhovou hranu	klicken Sie auf eine Kreiskante
+klikněte na plochu – těžiště	klicken Sie auf eine Fläche – Schwerpunkt
+klikněte na vrchol tělesa	klicken Sie auf einen Eckpunkt des Körpers
+kruhová hrana	Kreiskante
+po nejbližší plochu tělesa (první stěna)	bis zur nächsten Körperfläche (erste Wand)
+po první stěnu stávajícího tělesa	bis zur ersten Wand des vorhandenen Körpers
+po rovinu odsazenou od vybrané plochy	bis zu einer von der gewählten Fläche versetzten Ebene
+po rovinu procházející vybraným bodem	bis zu einer Ebene durch den gewählten Punkt
+po vybranou plochu (i zakřivenou)	bis zur gewählten Fläche (auch gekrümmt)
+přes celé těleso	durch den ganzen Körper
+přímá hrana + plocha	gerade Kante + Fläche
+slepé vysunutí o zadanou délku	blinde Extrusion um die angegebene Länge
+symetricky na obě strany (celková délka)	symmetrisch nach beiden Seiten (Gesamtlänge)
+vyberte dva body	wählen Sie zwei Punkte
+vyberte dva body a zadejte poměr 0–1	wählen Sie zwei Punkte und geben Sie ein Verhältnis 0–1 ein
+{0}° k {1} kolem {2}	{0}° zu {1} um {2}
+Úhel {0}°	Winkel {0}°
+Čára ve skici	Linie in Skizze
+— nevybráno —	— nicht gewählt —
+
+# settings, share, sketch-tools, vault, mesh-metrics
+Alt	Alt
+Ctrl	Strg
+Shift	Umschalt
+Soubor není nastavení Mnástrojárna CAD.	Die Datei ist keine Mnástrojárna-CAD-Einstellungsdatei.
+Dokument je pro odkaz příliš velký ({0} kB, zřejmě importovaná geometrie). {1}	Das Dokument ist für einen Link zu groß ({0} kB, vermutlich importierte Geometrie). {1}
+Nesprávné heslo.	Falsches Passwort.
+Odkaz není platný sdílený dokument Mnástrojárna CAD (zkontrolujte, zda se zkopíroval celý).	Der Link ist kein gültiges geteiltes Mnástrojárna-CAD-Dokument (prüfen Sie, ob er vollständig kopiert wurde).
+Platnost sdíleného odkazu vypršela{0}. Požádejte odesílatele o nové sdílení.	Der geteilte Link ist abgelaufen{0}. Bitten Sie den Absender, ihn erneut zu teilen.
+Sdílený dokument už v úložišti není (platnost vypršela nebo byl smazán). Požádejte odesílatele o nové sdílení.	Das geteilte Dokument ist nicht mehr im Speicher (abgelaufen oder gelöscht). Bitten Sie den Absender, es erneut zu teilen.
+V úložišti musí mít odkaz omezenou platnost (max. 90 dní).	Im Speicher muss der Link eine begrenzte Gültigkeit haben (max. 90 Tage).
+Úložiště sdílení není dostupné (síť). Zkuste to znovu nebo pošlete soubor .mncad.	Der Freigabespeicher ist nicht erreichbar (Netzwerk). Versuchen Sie es erneut oder senden Sie die .mncad-Datei.
+Úložiště sdílení není dostupné. Zkuste to znovu později.	Der Freigabespeicher ist nicht erreichbar. Versuchen Sie es später erneut.
+Úložiště sdílení není nastavené (NEXT_PUBLIC_CAD_SHARE_URL / NEXT_PUBLIC_CAD_SHARE_KEY).	Der Freigabespeicher ist nicht konfiguriert (NEXT_PUBLIC_CAD_SHARE_URL / NEXT_PUBLIC_CAD_SHARE_KEY).
+Úložiště sdílení odmítlo nahrání ({0}). Zkontrolujte nastavení bucketu „cad-share“.	Der Freigabespeicher hat den Upload abgelehnt ({0}). Prüfen Sie die Einstellungen des Buckets „cad-share“.
+Poloměr opsané	Umkreisradius
+Poloměr osy	Achsradius
+Poloměr vepsané	Inkreisradius
+Poloosa a	Halbachse a
+Poloosa b	Halbachse b
+Heslo musí mít alespoň 4 znaky.	Das Passwort muss mindestens 4 Zeichen haben.
+Úložiště prohlížeče není dostupné.	Der Browserspeicher ist nicht verfügbar.
+1.1730 (C45U) – desky	1.1730 (C45U) – Platten
+1.2311 (40CrMnMo7) – formy	1.2311 (40CrMnMo7) – Formen
+1.2343 (X38CrMoV5-1) – kalená	1.2343 (X38CrMoV5-1) – gehärtet
+1.2516 – vyhazovače	1.2516 – Auswerfer
+1.2738 (40CrMnNiMo8-6-4)	1.2738 (40CrMnNiMo8-6-4)
+1.7131 (16MnCr5) – vedení	1.7131 (16MnCr5) – Führungen
+Měď	Kupfer
+Nerez	Edelstahl
+POM (plast)	POM (Kunststoff)
+Titan	Titan
+
+# drobné
+Ks	Stk
+ks ·	Stk ·
+  {0} {1} ks   {2} m   {3} kg	  {0} {1} Stk   {2} m   {3} kg
+ (platí do {0})	 (gültig bis {0})
+\n\nOdkaz je chráněný heslem – pošlu ho zvlášť.	\n\nDer Link ist passwortgeschützt – das Passwort sende ich separat.
+Mnástrojárna CAD – sdílený dokument „{0}“{1}:\n{2}{3}\n\nOtevře se v prohlížeči bez instalace (Chrome, Edge, Firefox, Safari).	Mnástrojárna CAD – geteiltes Dokument „{0}“{1}:\n{2}{3}\n\nÖffnet sich im Browser ohne Installation (Chrome, Edge, Firefox, Safari).
+
+
+# souhrny prvků ve stavovém textu
+vlastní	benutzerdefiniert
+kružnice Ø{0}	Kreis Ø{0}
+obdélník {0}×{1}	Rechteck {0}×{1}
+{0}-úhelník	{0}-Eck
+drážka {0}×{1}	Langloch {0}×{1}
+čára {0} b.	Polylinie {0} Pkt.
+skrz vše	durch alles
+, symetricky	, symmetrisch
+ (střed)	 (zentriert)
+vnitřní (v díře)	innen (in Bohrung)
+vnější (na válci)	außen (auf Zylinder)
+modelované drážky	modellierte Gänge
+kosmetický (jen výkres)	kosmetisch (nur Zeichnung)
+{0}{1} (jádro Ø{2})	{0}{1} (Kern Ø{2})
+ hl. {0}	 Tiefe {0}
+ skrz	 durch
+ hloubka {0}	 Tiefe {0}
+ zahl. Ø{0}×{1}	 Senkung Ø{0}×{1}
+ kuž. Ø{0}	 Kegelsenk. Ø{0}
+vše	alle
+ × {0}× po {1}	 × {0}× alle {1}
+rovina {0}{1}	Ebene {0}{1}

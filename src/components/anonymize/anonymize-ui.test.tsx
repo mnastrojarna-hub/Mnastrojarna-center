@@ -13,7 +13,8 @@ vi.mock("@/components/access-provider", () => ({
 }));
 
 import { FileAnonBadge, JobAnonBadge } from "./anon-badge";
-import { describeCounts, drawingsWord, fileAnonLabel, jobAnonBadge, sendQueueText } from "./anon-status";
+import { describeCounts, drawingsWord, fileAnonLabel, inWords, jobAnonBadge, retryInMs, sendQueueText } from "./anon-status";
+import { AnonDebugDetails, describeDebugEntry } from "./anon-debug";
 import { AnonReviewList } from "./anon-review-section";
 import { AnonymizeToolButton, AnonymizeToolDialog, toolRejectReason } from "./anonymize-tool-dialog";
 import { AnonymizeEditor } from "./anonymize-editor";
@@ -59,6 +60,46 @@ describe("stavy anonymizace — texty", () => {
     expect(drawingsWord(3)).toBe("3 výkresy");
     expect(drawingsWord(0)).toBe("0 výkresů");
     expect(drawingsWord(7)).toBe("7 výkresů");
+  });
+
+  it("odznak během práce systému čte jako „pracuje“ (majitel 5. 11.): odložený pokus, opakování n/3, převzetí; „Zkusit znovu“ jen zaseknuté", () => {
+    const now = Date.parse("2026-11-05T10:00:00Z");
+    const later = (min: number) => new Date(now + min * 60_000).toISOString();
+    const busy = "AI je teď přetížená — zkusí se znovu automaticky za chvíli.";
+    const delayed = fileAnonLabel({ status: "pending", reason: busy, lockUntil: later(5), attempts: 3, now });
+    expect(delayed.label).toBe("Pokračuje za 5 min…");
+    expect(delayed.tone).toBe("busy");
+    expect(delayed.hint).toMatch(/Další pokus proběhne sám za 5 min/);
+    expect(fileAnonLabel({ status: "pending", reason: busy, lockUntil: later(45), now }).label).toBe("Pokračuje za 45 min…");
+    expect(fileAnonLabel({ status: "pending", reason: busy, lockUntil: later(0.3), now }).label).toBe("Pokračuje za chvíli…");
+    // prošlý zámek = k zpracování hned → opakuje se (ne „pokračuje za −1 min")
+    expect(fileAnonLabel({ status: "pending", reason: busy, lockUntil: later(-1), attempts: 2, now }).label).toBe("Zkouší se znovu (2/3)…");
+    expect(fileAnonLabel({ status: "pending", reason: busy, attempts: 1, now }).label).toBe("Zkouší se znovu…");
+    const running = fileAnonLabel({ status: "processing", reason: busy, lockUntil: later(6), attempts: 2, now });
+    expect(running.label).toBe("Zkouší se znovu (2/3)…");
+    expect(running.tone).toBe("busy");
+    expect(fileAnonLabel({ status: "processing", attempts: 1, lockUntil: later(6), now }).label).toBe("Anonymizuje se…");
+    // denní limit má přednost před zámkem (zámek = zítra)
+    expect(fileAnonLabel({ status: "pending", reason: "Denní limit AI pro automatiku je vyčerpán — pokračuje zítra (nebo spusť ručně).", lockUntil: later(600), now }).label).toBe("Čeká (denní limit)");
+    // zaseknuté (UI přestalo čekat) → varování, ne „selhalo"
+    expect(fileAnonLabel({ status: "pending", stalled: true, now }).tone).toBe("warn");
+    expect(retryInMs("pending", later(2), now)).toBe(120_000);
+    expect(retryInMs("processing", later(2), now)).toBeNull();
+    expect(inWords(100 * 60_000)).toBe("za 2 h");
+    // konečné stavy beze změny
+    expect(fileAnonLabel({ status: "failed", reason: "V anonymizované kopii zůstal název firmy — kopie se nepoužije. Klikni Anonymizovat znovu (nebo pošli výkres jako PDF přímo z CAD)." }).label).toBe("Anonymizace selhala");
+  });
+
+  it("technický detail pokusů (jen správce): čitelný řádek, bez surové chyby v hlavním odznaku", () => {
+    const e = { at: "2026-11-05T09:00:00Z", run: "ab12cd34", attempt: 2, stage: "pipeline", ms: 48_200, status: "pending", reason: "x", error: "APIConnectionTimeoutError: Request timed out.", kind: "timeout", calls: 2, usd: 0.4123, retryNow: true };
+    expect(describeDebugEntry(e)).toBe("2. pokus · zpracování (detekce, vypálení, kontrola) · 48 s · čeká / opakuje se · hned znovu v témže běhu · AI 2× (0.41 USD) · chyba: APIConnectionTimeoutError: Request timed out.");
+    expect(describeDebugEntry({ at: "2026-11-05T09:00:00Z", run: null, attempt: 3, stage: "decide", ms: 900, status: "pending", delayMs: 5 * 60_000, next: 11 })).toBe("3. pokus · rozhodnutí o výsledku · 0.9 s · čeká / opakuje se · další pokus za 5 min · pokračuje stranou 11");
+    const out = html(<AnonDebugDetails entries={[e]} />);
+    expect(out).toContain('data-testid="anon-debug"');
+    expect(out).toContain("jen správce");
+    expect(out).toContain("[ab12cd34]");
+    expect(html(<AnonDebugDetails entries={[]} />)).toBe("");
+    expect(html(<AnonDebugDetails entries={null} />)).toBe("");
   });
 
   it("hláška fronty odeslání: rod, množné číslo, selhání, odchází", () => {
@@ -137,6 +178,19 @@ describe("render komponent anonymizace", () => {
     expect(out).toContain("Název firmy se na výkrese nenašel");
     expect(out).toMatch(/data-approve="editor"[^>]*>|data-approve="editor"/);
     expect(out).toContain('data-approve="direct"');
+  });
+
+  it("12. 11.: nahoře „Anonymizovat znovu vše, co se nepovedlo (n)“ — jen když selhaly aspoň dva", () => {
+    const failed = (id: string) => ({ id, jobId: "j1", jobNumber: "Z-26-001", jobTitle: null, filename: `${id}.pdf`, anonFilename: null, status: "failed" as const, reason: "Uložení kopie selhalo", counts: {}, at: null });
+    const two = html(<AnonReviewList pendingCount={0} pendingFileIds={[]} items={[failed("a"), failed("b"), failed("c")]} />);
+    expect(two).toContain("Anonymizovat znovu vše, co se nepovedlo (3)");
+    expect(two).toContain('data-testid="anon-retry-all"');
+    expect(two).toContain("3 výkresy");
+    // 12. 11.: u nepovedeného výkresu i „Použít bez anonymizace" (originál)
+    expect(two).toContain("Použít bez anonymizace");
+    expect(two).toContain('data-testid="anon-use-original"');
+    const one = html(<AnonReviewList pendingCount={0} pendingFileIds={[]} items={[failed("a")]} />);
+    expect(one).not.toContain("anon-retry-all");
   });
 
   it("samostatný nástroj odmítne nepodporovaný formát předem (ne „selhala“)", () => {

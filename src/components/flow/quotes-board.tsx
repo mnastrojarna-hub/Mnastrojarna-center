@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Archive, ArchiveRestore, ArrowRight, Eye, FileText, Search, Undo2, X } from "lucide-react";
@@ -22,6 +23,8 @@ import { cn } from "@/lib/utils";
 import { FlowEmpty } from "./flow-header";
 import { FlowActionBar, FlowProposalChip } from "./flow-actions";
 import { PrintButton } from "@/components/print/print-button";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
+import { premiumFirst } from "@/lib/jobs/premium";
 import { czDay, filterQuotes } from "./flow-utils";
 import { STATE_PARAM, actionPalette, parseStateParam, stateParamValue, type FlowQuoteInfo } from "./flow-state";
 
@@ -41,7 +44,7 @@ export interface FlowQuote extends Omit<FlowQuoteInfo, "id"> {
   itemCount: number;
   createdBy: { id: string; name: string } | null;
   job: { id: string; number: string; title: string; stage: JobStage } | null;
-  customer: { id: string; name: string } | null;
+  customer: { id: string; name: string; isPremium?: boolean } | null;
   /** Jediná otevřená nabídka zakázky (zamítnutí zakázku uzavře). */
   onlyOpen: boolean;
 }
@@ -94,9 +97,13 @@ function Board({
   approver?: boolean;
 }) {
   const [states, setStates] = React.useState<string[]>(() => parseStateParam(initialStates, QUOTE_ORDER, OPEN_QUOTE));
-  const [q, setQ] = React.useState("");
+  // hledání v adrese (stavy ?stav= drží change() níž) — Zpět vrátí stejný seznam, menu si ho pamatuje
+  const url = useUrlState({ q: "" });
+  const q = url.values.q;
+  const setQ = (v: string) => url.set({ q: v }, { delay: 300 });
   const chips = React.useMemo(() => chipsOf(quotes, counts), [quotes, counts]);
-  const shown = React.useMemo(() => filterQuotes(quotes, { states, q }), [quotes, states, q]);
+  // 9. 11.: nabídky prémiových zákazníků přednostně nahoře (stabilně)
+  const shown = React.useMemo(() => premiumFirst(filterQuotes(quotes, { states, q }), (x) => x.customer?.isPremium), [quotes, states, q]);
   // vykreslit po dávkách (stovky řádků = pomalé první zobrazení hlavně na mobilu); nový filtr = od začátku
   const [limit, setLimit] = React.useState(QUOTE_PAGE);
   React.useEffect(() => setLimit(QUOTE_PAGE), [states, q]);
@@ -230,9 +237,15 @@ function QuoteRow({ quote, today, canPrice, approver }: { quote: FlowQuote; toda
 
   return (
     <li
-      className={cn("relative overflow-hidden rounded-xl border bg-card p-3 pl-4 shadow-sm transition hover:shadow-md", display === "archivovana" && "opacity-75")}
+      className={cn(
+        "relative overflow-hidden rounded-xl border bg-card p-3 pl-4 shadow-sm transition hover:shadow-md",
+        quote.customer?.isPremium && PREMIUM_ROW,
+        display === "archivovana" && "opacity-75",
+      )}
       data-quote-state={display}
+      data-premium={quote.customer?.isPremium ? "1" : undefined}
     >
+      {quote.customer?.isPremium && <span aria-hidden className={PREMIUM_STRIPE} />}
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", awaiting ? "bg-amber-500" : FLOW_PALETTE[meta.palette].dot)} />
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="min-w-0 flex-1 space-y-1.5">
@@ -248,6 +261,7 @@ function QuoteRow({ quote, today, canPrice, approver }: { quote: FlowQuote; toda
                 : display === "ke_schvaleni" ? approvalHint(quote) : null}
               data-flow-state={`quote.${display}`}
             />
+            {quote.customer?.isPremium && <PremiumBadge label="flow" size="xs" />}
           </div>
           {quote.proposal && quote.job && (
             <FlowProposalChip jobId={quote.job.id} proposal={quote.proposal.value} stamp={quote.proposal.stamp} canDecide={quote.proposal.canDecide} />
@@ -316,6 +330,7 @@ function QuoteRow({ quote, today, canPrice, approver }: { quote: FlowQuote; toda
             target={{
               jobId: quote.job?.id ?? null, jobNumber: quote.job?.number ?? quote.number, quote: quote.facts, today,
               onlyOpenQuote: quote.onlyOpen, quoteAuthor: quote.createdBy?.name ?? null,
+              premium: quote.customer?.isPremium === true, customerName: quote.customer?.name ?? null,
             }}
             canPrice={canPrice}
             next={quote.next}

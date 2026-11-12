@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { createJobQuote, updateJobQuote } from "@/app/actions/jobs";
 import { useAccess } from "@/components/access-provider";
 import { quoteApproverWho, quoteAwaitsText, userNeedsQuoteApproval } from "@/lib/jobs/flow-status";
+import { PremiumBanner } from "@/components/customers/premium-badge";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
 import { ItemsEditor } from "./items-editor";
@@ -31,7 +32,7 @@ function Field({ label, icon: Icon, children, hint }: { label: string; icon: typ
  * Ceny doplní člověk; DPH 21 %, platnost +30 dní.
  */
 export function QuoteEditorDialog({
-  open, onOpenChange, initial, quoteId, quoteNumber, approved, currency = "CZK", authorId,
+  open, onOpenChange, initial, quoteId, quoteNumber, approved, currency = "CZK", authorId, premium = false, customerName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -43,6 +44,9 @@ export function QuoteEditorDialog({
   currency?: string;
   /** Autor upravované nabídky (kdo ji schválí — vlastní nikdo). Nová nabídka = přihlášený. */
   authorId?: string | null;
+  /** 9. 11.: prémiový zákazník — výrazný pruh „Pozor — prémiový zákazník" nahoře. */
+  premium?: boolean;
+  customerName?: string | null;
 }) {
   const { jobId, perms, notify, refresh } = useJobDetail();
   const access = useAccess();
@@ -109,7 +113,7 @@ export function QuoteEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[5%] sm:max-w-5xl">
+      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[5%] sm:max-w-5xl">
         <DialogHead
           icon={editing ? Pencil : FilePlus2}
           tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"
@@ -125,6 +129,7 @@ export function QuoteEditorDialog({
           }
         />
         <form onSubmit={submit} className="space-y-5 p-4 sm:p-5" noValidate>
+          {premium && <PremiumBanner customerName={customerName} />}
           <ErrorBox error={error} />
           {editing && approved && !superAdmin && (
             <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">

@@ -3,6 +3,7 @@
 import * as React from "react";
 import { AlertTriangle, Eye, ExternalLink, Info, Loader2, Paperclip, RotateCcw, Save, Send } from "lucide-react";
 import { RecipientInput, isValidRecipient, tokensOf, type RecipientContext } from "@/components/mail/recipient-field";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 import { ToneToggle, type ToneChange } from "@/components/contacts/tone-toggle";
 import { applySalutation } from "@/lib/contacts/tone";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -170,6 +171,8 @@ export function DocumentSendDialog({
   const [pending, setPending] = React.useState<{ filename: string; force: boolean } | null>(null);
   const [blocked, setBlocked] = React.useState(false);
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
+  /** „Odeslat z" (jen super admin; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
   const onPreparedRef = React.useRef(onPrepared);
   onPreparedRef.current = onPrepared;
@@ -273,6 +276,7 @@ export function DocumentSendDialog({
       setError(null);
       setBlocked(false);
       setMail({ to: "", cc: "", subject: "", body: "" });
+      setFromMailboxId(null);
       setStep("preparing");
     }
   }
@@ -333,6 +337,7 @@ export function DocumentSendDialog({
       }
       const res = await sendJobDocument(jobId, target.id, {
         to: out.to.trim(), cc: out.cc.trim() || undefined, subject: out.subject.trim(), body: out.body,
+        ...(fromMailboxId ? { fromMailboxId } : {}),
       });
       if (!res.ok) {
         setError(res.error ?? "E-mail se nepodařilo odeslat.");
@@ -375,7 +380,7 @@ export function DocumentSendDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => step !== "sending" && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
+      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
         <DialogHead
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
@@ -443,6 +448,15 @@ export function DocumentSendDialog({
                 </Button>
               )}
               {!blocked && (
+                <SenderPicker
+                  value={fromMailboxId}
+                  onChange={setFromMailboxId}
+                  onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                  disabled={step === "sending"}
+                  className="px-1"
+                />
+              )}
+              {!blocked && (
                 <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} onToneSaved={(c) => void redraft(c.salutation)} />
               )}
               {hasPlaceholder && (
@@ -450,7 +464,8 @@ export function DocumentSendDialog({
               )}
             </>
           )}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-popover/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-5 sm:-mb-5 sm:flex-row sm:justify-end sm:p-4">
             <Button type="button" variant="ghost" className="h-11 sm:h-10" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
             {/* faktura: „Vystavit, neposílat" jen před vystavením (vystavenou zavře i Zrušit) */}
             {saveOnly && (pending || (file && !deferred)) && !blocked && (

@@ -14,6 +14,7 @@ import {
   ProductionLine, SourceMark, formatMoney,
 } from "@/components/jobs/book/job-cells";
 import { groupByStage, moveJobStage } from "@/components/jobs/book/book-params";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
 import { nextStage, stageMeta } from "@/lib/jobs/stages";
 import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
 import type { FlowActionKey } from "@/lib/jobs/flow-status";
@@ -95,7 +96,7 @@ export function JobBoard({
 
   return (
     <div className="relative">
-      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 scrollbar-thin md:snap-none">
+      <div data-scroll-key="board" className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-3 scrollbar-thin md:snap-none">
         {columns.map((col) => {
           const m = stageMeta(col.stage);
           const Icon = m.icon;
@@ -247,10 +248,14 @@ function BoardCard({
       className={cn(
         "group relative cursor-grab overflow-hidden rounded-lg border bg-card p-2.5 pl-3.5 shadow-sm transition active:cursor-grabbing",
         "hover:border-foreground/15 hover:shadow-md focus-within:ring-2 focus-within:ring-ring/40",
+        // 9. 11.: prémiový zákazník — červený okraj, podklad a pruh vpravo (levý pruh = barva stavu)
+        job.customerPremium && PREMIUM_ROW,
         dragging && "rotate-1 opacity-50",
       )}
+      data-premium={job.customerPremium ? "1" : undefined}
     >
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1", m.bar)} />
+      {job.customerPremium && <span aria-hidden className={PREMIUM_STRIPE} />}
       <div className="flex items-center gap-1.5">
         <Link
           href={`/orders/${job.id}`}
@@ -265,6 +270,7 @@ function BoardCard({
         <CustomerNoteMark note={job.customerNote} />
         <GripVertical className="ml-auto h-3.5 w-3.5 text-muted-foreground/50" aria-hidden />
       </div>
+      {job.customerPremium && <PremiumBadge label="full" size="xs" className="mt-1.5" />}
       <p className="mt-1 truncate text-sm font-semibold">{job.customer?.name ?? <span className="italic text-muted-foreground">Bez zákazníka</span>}</p>
       <p className="truncate text-xs text-muted-foreground">{job.title || "Bez názvu"}</p>
       <CustomerDocNumber job={job} className="mt-1.5" />

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { RememberedLink } from "@/components/nav/remembered-link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, Sparkles, Camera, Mail, Trash2, MoreHorizontal, Banknote, Package, FileText, Paperclip,
@@ -26,7 +27,8 @@ import { DocumentsMenu } from "./documents-menu";
 import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
 import { ConfirmDialog } from "./confirm-dialog";
 import { MergeJobDialog } from "./merge-job-dialog";
-import { PRIORITY_META, PRIORITY_ORDER, formatMoney, formatQty } from "./detail-helpers";
+import { PRIORITY_META, PRIORITY_ORDER, formatMoney, formatQty, longDate } from "./detail-helpers";
+import { currentOffer } from "@/lib/jobs/quote-job-sync";
 import { ProductionHeaderBadges } from "@/components/jobs/production/production-chip";
 import { FlowActionBar, FlowNextHint, FlowProposalLine, FlowStageChip, FlowTrail, StageStamp } from "./flow-header";
 import { QuoteApprovalFlag } from "@/components/flow-status/quote-approval-flag";
@@ -34,6 +36,7 @@ import { approvalHint, jobApprovalFlag } from "./approval";
 import { useAccess } from "@/components/access-provider";
 import { quoteApproverWhoFor } from "@/lib/jobs/flow-status";
 import { ExceptionBanners } from "./exception-banners";
+import { PremiumBadge, PremiumBanner } from "@/components/customers/premium-badge";
 
 /** Lepicí lišta nahoře: zpět, číslo + stav, hlavní akce (na mobilu jen ikony). */
 /** Čip DL v hlavičce: číslo z delivery_notes (jediný zdroj čísla DL); starší data bez řádku → ze souborů. */
@@ -55,14 +58,22 @@ export function JobToolbar({ job }: { job: JobDetail }) {
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
           <Button asChild variant="ghost" size="icon-sm" className="shrink-0">
-            <Link href="/orders" aria-label="Zpět do Knihy zakázek" title="Kniha zakázek">
+            {/* zpět do knihy s posledními filtry (paměť stránky) */}
+            <RememberedLink href="/orders" aria-label="Zpět do Knihy zakázek" title="Kniha zakázek">
               <ArrowLeft className="h-4 w-4" />
-            </Link>
+            </RememberedLink>
           </Button>
           {/* číslo se raději zkrátí (celé v title), štítek schválení zůstane vždy vidět */}
           <span className="min-w-0 truncate font-mono text-sm font-bold tracking-tight" title={job.number}>{job.number}</span>
           <StageBadge stage={job.stage} size="xs" short className="hidden min-[400px]:inline-flex sm:hidden" />
           <StageBadge stage={job.stage} size="sm" className="hidden sm:inline-flex" />
+          {/* 9. 11.: prémiový zákazník — vidět i po odrolování (mobil jen ikona, text v title) */}
+          {job.customerPremium && (
+            <>
+              <PremiumBadge label="icon" size="xs" className="sm:hidden" />
+              <PremiumBadge label="compact" size="xs" className="hidden sm:inline-flex" />
+            </>
+          )}
           {approval && approval.flag.kind !== "approved" && (
             <>
               {/* mobil: jen ikona (text v title / pro čtečky), od sm krátký text — nikdy useknutý */}
@@ -204,15 +215,18 @@ function SourceBadge({ job }: { job: JobDetail }) {
   );
 }
 
-function Stat({ icon: Icon, tone, label, children }: { icon: typeof Banknote; tone: string; label: string; children: React.ReactNode }) {
+function Stat({ icon: Icon, tone, label, children, sub, title }: {
+  icon: typeof Banknote; tone: string; label: string; children: React.ReactNode; sub?: React.ReactNode; title?: string;
+}) {
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-lg bg-background/70 px-2.5 py-1.5 ring-1 ring-border/60 sm:gap-2.5 sm:px-3 sm:py-2">
+    <div title={title} className="flex min-w-0 items-center gap-2 rounded-lg bg-background/70 px-2.5 py-1.5 ring-1 ring-border/60 sm:gap-2.5 sm:px-3 sm:py-2">
       <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-md sm:h-8 sm:w-8", tone)}>
         <Icon className="h-4 w-4" />
       </span>
       <div className="min-w-0">
         <div className="truncate text-[10px] font-medium uppercase tracking-wide text-muted-foreground sm:text-[11px]">{label}</div>
         <div className="truncate text-sm font-semibold tabular-nums">{children}</div>
+        {sub && <div className="truncate text-[11px] text-muted-foreground">{sub}</div>}
       </div>
     </div>
   );
@@ -230,6 +244,8 @@ export function JobHeader({ job }: { job: JobDetail }) {
   const approvalWho = quoteApproverWhoFor(job.flowQuotes?.find((q) => q.id === approval?.flag.quoteId), quoteApprovers);
   const m = stageMeta(job.stage);
   const currentQuotes = job.quotes.filter((q) => !q.archived).length;
+  // aktuální nabídka (přijatá, jinak nejnovější platná verze) — její číslo a platnost (9. 11.)
+  const offer = currentOffer(job.quotes, job.quotes.find((q) => q.accepted)?.id ?? null);
   const currentFiles = job.files.filter((f) => !f.archived).length;
 
   return (
@@ -240,6 +256,8 @@ export function JobHeader({ job }: { job: JobDetail }) {
     >
       <div className={cn("h-1.5 w-full", m.bar)} />
       <div className="space-y-4 p-4 sm:p-5">
+        {/* 9. 11.: prémiový zákazník — výrazně nahoře (živě ze zákazníka) */}
+        {job.customerPremium && <PremiumBanner customerName={job.customer?.name} />}
         {/* výjimky v toku: nová revize výkresu (výrazně, dokud ji někdo nevezme na vědomí), reklamace, bez objednávky */}
         <ExceptionBanners job={job} />
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -321,8 +339,17 @@ export function JobHeader({ job }: { job: JobDetail }) {
           <Stat icon={Package} tone="bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300" label="Položky">
             {job.itemCount ? `${job.itemCount} · ${formatQty(job.totalQuantity)} ks` : <span className="font-normal text-muted-foreground">žádné</span>}
           </Stat>
-          <Stat icon={FileText} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" label="Nabídky">
-            {currentQuotes || <span className="font-normal text-muted-foreground">žádná</span>}
+          <Stat
+            icon={FileText} tone="bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" label="Nabídky"
+            title={offer ? `Aktuální nabídka ${offer.number}${offer.validUntil ? ` — platí do ${longDate(offer.validUntil) ?? offer.validUntil}` : ""}` : undefined}
+            sub={offer?.validUntil ? <span data-testid="header-offer-valid">platí do {longDate(offer.validUntil) ?? offer.validUntil}</span> : undefined}
+          >
+            {currentQuotes ? (
+              <>
+                {currentQuotes}
+                {offer && <span className="font-mono text-xs font-medium text-muted-foreground" data-testid="header-current-offer"> · {offer.number}</span>}
+              </>
+            ) : <span className="font-normal text-muted-foreground">žádná</span>}
           </Stat>
           <Stat icon={Paperclip} tone="bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300" label="Dokumenty">
             {currentFiles || <span className="font-normal text-muted-foreground">žádné</span>}

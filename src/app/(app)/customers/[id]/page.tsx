@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { RememberedLink } from "@/components/nav/remembered-link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft, Banknote, BookOpen, Building2, CalendarClock, ClipboardList, ExternalLink, FileBox, FileText, Globe, Hash,
@@ -13,6 +14,8 @@ import { CustomerDialog } from "@/components/customers/customer-dialog";
 import { ContactsManager } from "@/components/customers/contacts-manager";
 import { FriendlyEmpty } from "@/components/customers/friendly-empty";
 import { JobMiniList } from "@/components/customers/job-mini-list";
+import { PremiumBadge } from "@/components/customers/premium-badge";
+import { PremiumToggle } from "@/components/customers/premium-toggle";
 import { addressLine, avatarToneFor, initialsOf, websiteHref } from "@/components/customers/model";
 import { NewJobDialog } from "@/components/jobs/new-job-dialog";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
@@ -60,17 +63,26 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
   return (
     <div className="space-y-5">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link href="/customers"><ArrowLeft /> Všichni zákazníci</Link>
+        <RememberedLink href="/customers"><ArrowLeft /> Všichni zákazníci</RememberedLink>
       </Button>
 
       {/* Hlavička */}
-      <section className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-green-50 via-card to-card p-4 shadow-sm dark:from-green-500/[0.08] sm:p-5">
+      <section
+        className={cn(
+          "relative overflow-hidden rounded-2xl border bg-gradient-to-br from-green-50 via-card to-card p-4 shadow-sm dark:from-green-500/[0.08] sm:p-5",
+          c.isPremium && "border-red-500/70 from-red-50 ring-1 ring-red-500/30 dark:from-red-500/[0.10]",
+        )}
+        data-premium={c.isPremium ? "1" : undefined}
+      >
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <span className={cn("flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-lg font-bold", avatarToneFor(c.name))}>
             {initialsOf(c.name)}
           </span>
           <div className="min-w-0 flex-1 space-y-1.5">
-            <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{c.name}</h1>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">{c.name}</h1>
+              {c.isPremium && <PremiumBadge label="full" />}
+            </div>
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               {c.customerNumber && (
                 <span className="inline-flex items-center gap-0.5 rounded-md bg-green-600 px-2 py-0.5 font-semibold text-white" title="Naše číslo zákazníka">
@@ -86,6 +98,8 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 </span>
               )}
             </div>
+            {/* 9. 11.: prémiový zákazník — všechny jeho zakázky výrazně označené (přepne každý, kdo smí zákazníka upravit) */}
+            <PremiumToggle customerId={c.id} value={c.isPremium} className="pt-1" />
           </div>
           <div className="flex flex-wrap gap-2 sm:justify-end">
             <CustomerDialog customer={c} owners={owners} />

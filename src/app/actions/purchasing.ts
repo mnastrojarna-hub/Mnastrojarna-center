@@ -33,7 +33,6 @@ import { lineDeviations, loadDeviationContext } from "@/lib/jobs/po-deviations-s
 import type { PoDeviation } from "@/lib/jobs/po-deviations";
 import { nextStepAfterConfirmedHint, purchaseOrderSender, type HandoffActor } from "@/lib/jobs/production-handoff-store";
 import { autoHandoffForPurchaseOrder, resetStepsOfCancelledPurchaseOrder, type PoAutoResult } from "@/lib/jobs/production-po-auto";
-import { getAccess } from "@/lib/auth/session";
 import { OPERATION_KINDS, isOperationKind } from "@/lib/jobs/operations";
 import type {
   JobCommissionView, PurchaseItem, PurchaseOrderDraft, PurchaseOrderDraftInput, PurchaseOrderMail,
@@ -79,6 +78,11 @@ async function begin(): Promise<Ctx | { error: string }> {
 /** Kdo předává do výroby po vystavení / odeslání objednávky (Nákup = obchodník / admin). */
 function poActor(c: Ctx): HandoffActor {
   return { id: c.user.id, fullName: c.user.fullName, margins: true, mailAll: false, via: "rucne" };
+}
+
+/** „Odeslat z" z klienta: jen platné id (platí jen pro super admina — ověří sender-rules.ts). */
+function uuidOrNull(v: unknown): string | null {
+  return typeof v === "string" && isUuid(v) ? v : null;
 }
 
 function fail(err: unknown): { ok: false; error: string } {
@@ -314,7 +318,9 @@ export async function updateSupplierQuote(id: string, input: Partial<SupplierQuo
     }
 
     // vítězná nabídka → plánovaný nákup zakázky drží krok
-    if (quote.selected && "total" in row && row.total !== null && row.total !== quote.total) {
+    // (s objednávkami dodavatelům je nákup = Σ objednávek — DB, migrace 20261104120000)
+    const { data: activePo } = await db.from("purchase_orders").select("id").eq("job_id", quote.jobId).neq("status", "zrusena").limit(1);
+    if (quote.selected && "total" in row && row.total !== null && row.total !== quote.total && !((activePo ?? []) as unknown[]).length) {
       const job = await loadJob(db, quote.jobId, "id, purchase_cost");
       if (job) {
         const err = await patchJob(c, quote.jobId, job, { purchase_cost: row.total }, {}, { supplierQuoteId: id });
@@ -710,6 +716,12 @@ export async function updatePurchaseOrder(
     const required = "required_date" in row ? (row.required_date as string | null) : po.requiredDate;
     const orderDate = "order_date" in row ? (row.order_date as string) : po.orderDate;
     if (required && required < orderDate) return fail("Požadovaný termín dodání je před datem objednávky.");
+    // odeslaná objednávka: dodavatel zná termín a datum — změna jen jako „změna objednávky" (termín kroku výroby)
+    const requiredChanged = "required_date" in row && (row.required_date ?? null) !== (po.requiredDate ?? null);
+    const orderDateChanged = "order_date" in row && row.order_date !== po.orderDate;
+    if ((requiredChanged || orderDateChanged) && !isPurchaseOrderEditable(po.status)) {
+      return fail(PO_SENT_DATE_LOCKED);
+    }
 
     let newRows: PurchaseItemRowInput[] | null = null;
     let prices: { itemId: string; unitPrice: unknown }[] | null = null;
@@ -814,6 +826,11 @@ export async function updatePurchaseOrder(
     // dopady do zakázky
     let hint: string | undefined;
     let stage: JobStage | undefined;
+    // požadovaný termín neodeslané objednávky → termín navázaného (posledního otevřeného) kroku výroby
+    if (requiredChanged && required) {
+      const synced = await syncStepEndFromPurchaseOrder(c, po.jobId, id, po.number, required);
+      if (synced) hint = [hint, synced].filter(Boolean).join(" ");
+    }
     const job = await loadJob(db, po.jobId, "id, status, supplier_promised_date");
     if (job) {
       // slíbený termín dodavatele = termín zakázky jen od objednávky posledního otevřeného kroku výroby
@@ -866,6 +883,34 @@ export async function updatePurchaseOrder(
   } catch (err) {
     return fail(err);
   }
+}
+
+const PO_SENT_DATE_LOCKED = "Objednávka už odešla dodavateli — termín ani datum objednávky tady změnit nejde. Změň termín kroku výroby (Technologie / Výroba) — vznikne změna objednávky, kterou dodavateli pošleš.";
+
+/** Termín kroku výroby podle požadovaného termínu objednávky (jen krok navázaný na objednávku, ne konečný termín zákazníka). */
+async function syncStepEndFromPurchaseOrder(c: Ctx, jobId: string, poId: string, poNumber: string | null, required: string): Promise<string | null> {
+  const { data } = await c.db.from("job_operations")
+    .select("id, title, kind, planned_end, ends_at_customer_date, status, position")
+    .eq("purchase_order_id", poId).in("status", ["ceka", "probiha", "problem"])
+    .order("position", { ascending: false }).limit(1);
+  const op = ((data ?? []) as { id: string; title: string | null; kind: string; planned_end: string | null; ends_at_customer_date: boolean | null }[])[0];
+  if (!op || op.planned_end === required) return null;
+  const name = op.title?.trim() || (isOperationKind(op.kind) ? OPERATION_KINDS[op.kind].label : "výroby");
+  if (op.ends_at_customer_date) {
+    return `Krok ${name} končí termínem zákazníka (${czDate(op.planned_end ?? "")}) — jeho termín se podle objednávky nemění.`;
+  }
+  const { error } = await c.db.from("job_operations").update({ planned_end: required, deadline_source: "rucne" } as never).eq("id", op.id);
+  if (error) {
+    console.error(`[purchasing] Termín kroku podle objednávky ${poNumber ?? poId}: ${error.message}`);
+    return null;
+  }
+  await logJobEvent(c.db, {
+    jobId, type: "field",
+    message: `Výroba: ${name} — termín ${op.planned_end ? czDate(op.planned_end) : "—"} → ${czDate(required)} (podle požadovaného termínu objednávky ${poNumber ?? ""})`.replace(/ \)/, ")"),
+    data: { production: "updated", operationId: op.id, purchaseOrderId: poId, fields: ["planned_end"] },
+    actorId: c.user.id, entity: "operation", entityId: op.id,
+  });
+  return null;
 }
 
 /**
@@ -960,7 +1005,7 @@ function drawingChangeMode(po: PurchaseOrderView, drawingChange: boolean | undef
  */
 export async function draftPurchaseOrderEmail(
   id: string,
-  opts: { drawingChange?: boolean } = {},
+  opts: { drawingChange?: boolean; fromMailboxId?: string | null } = {},
 ): Promise<ActionResult<{
   to: string; cc: string; recipientReason: string; supplierId: string | null; subject: string; body: string; attachmentName: string;
   mode: "issue" | "change"; attachments: PoMailAttachmentView[]; missingDrawing: string[]; deviations: { ref: string; lines: string[] }[];
@@ -974,9 +1019,9 @@ export async function draftPurchaseOrderEmail(
     const change = drawingChangeMode(po, opts.drawingChange);
     await refreshCompanyFromSettings();
     const me = await fetchProfileContact(c.db, c.user.id);
-    // podpis toho, z čí schránky objednávka odejde (stejná volba jako sendPurchaseOrder)
-    const { data: jobRow } = await c.db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
-    const sender = await purchaseOrderSender(c.db, { id: c.user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
+    // podpis toho, z čí schránky objednávka odejde (stejná volba jako sendPurchaseOrder: moje schránka,
+    // super admin si může vybrat jinou)
+    const sender = await purchaseOrderSender({ id: c.user.id, fromMailboxId: uuidOrNull(opts?.fromMailboxId) });
     const signatureText = await senderSignatureText(sender.signerId, sender.from);
     // dodavatel → e-mail pro objednávky (karta dodavatele), tykání / vykání podepisujícího s adresátem
     const pick = await recipientsFor(c.db, "objednavka_dodavateli", { supplierId: po.supplier?.id ?? null }).catch(() => null);
@@ -1049,7 +1094,7 @@ function drawingChangeRefs(extras: PoMailExtras): string[] {
 export async function sendPurchaseOrder(
   id: string,
   mail: PurchaseOrderMail,
-  opts: { attachmentIds?: string[]; drawingChange?: boolean } = {},
+  opts: { attachmentIds?: string[]; drawingChange?: boolean; fromMailboxId?: string | null } = {},
 ): Promise<ActionResult<{ sent: boolean; emailId?: string; queued?: boolean; production?: PoAutoResult }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -1061,9 +1106,8 @@ export async function sendPurchaseOrder(
     const po = await fetchPurchaseOrder(db, id);
     if (!po) return fail(PO_NOT_FOUND);
     // jádro: PDF v příloze, stav Odeslána, schránka odeslání; čekající řádek fronty („issue") vyřídí DB trigger.
-    // Odesílá se ze schránky obchodníka zakázky, když ji má použitelnou (jako každé odeslání objednávky).
-    const { data: jobRow } = await db.from("orders").select("owner_id").eq("id", po.jobId).maybeSingle();
-    const sender = await purchaseOrderSender(db, { id: user.id }, (jobRow as { owner_id: string | null } | null)?.owner_id ?? null);
+    // Odesílá se z MÉ schránky (majitel 9. 11.); vybrat jinou smí jen super admin („Odeslat z").
+    const sender = await purchaseOrderSender({ id: user.id, fromMailboxId: uuidOrNull(opts?.fromMailboxId) });
     const author = { id: user.id, fullName: user.fullName };
     const change = drawingChangeMode(po, opts?.drawingChange);
     if (opts?.drawingChange) {
@@ -1078,7 +1122,7 @@ export async function sendPurchaseOrder(
       if ("error" in stored) return fail(`PDF objednávky se nepodařilo přegenerovat: ${stored.error}`);
     }
     const res = await sendPurchaseOrderCore(db, author, id, mail, {
-      from: sender.from, kind: change ? "change" : "issue", ...(attachmentIds ? { attachmentIds } : {}),
+      from: sender.from, signerId: sender.signerId, kind: change ? "change" : "issue", ...(attachmentIds ? { attachmentIds } : {}),
       ...(opts?.drawingChange ? { eventData: { drawingChange: true } } : {}),
     });
     if (!res.ok) return fail(res.error);
@@ -1102,7 +1146,7 @@ export async function sendPurchaseOrder(
  */
 export async function notifySuppliers(
   jobId: string,
-  input: { kind: "cancel" | "hold"; purchaseOrderIds: string[]; reason?: string; mails?: Record<string, Partial<PurchaseOrderMail>> },
+  input: { kind: "cancel" | "hold"; purchaseOrderIds: string[]; reason?: string; mails?: Record<string, Partial<PurchaseOrderMail>>; fromMailboxId?: string | null },
 ): Promise<ActionResult<{ sent: string[]; queued: string[]; cancelled: string[]; errors: string[] }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -1113,7 +1157,6 @@ export async function notifySuppliers(
   const reason = cleanText(input.reason, 500) ?? (input.kind === "cancel" ? "Zákazník zakázku zrušil" : "Zakázka je pozastavená");
   try {
     const { db, user } = c;
-    const { can } = await getAccess();
     const { data: jobRow } = await db.from("orders").select("id, owner_id").eq("id", jobId).maybeSingle();
     if (!jobRow) return fail(JOB_NOT_FOUND);
     const ownerId = (jobRow as { owner_id: string | null }).owner_id ?? null;
@@ -1134,11 +1177,11 @@ export async function notifySuppliers(
         }
         continue;
       }
-      const sender = await purchaseOrderSender(db, { id: user.id, mailAll: can("mail_all") }, ownerId);
-      const built = await purchaseOrderMailFor(db, po, sender.signerId, input.kind, { reason, fallbackName: user.fullName });
+      const sender = await purchaseOrderSender({ id: user.id, fromMailboxId: uuidOrNull(input.fromMailboxId) });
+      const built = await purchaseOrderMailFor(db, po, sender.signerId, input.kind, { reason, fallbackName: user.fullName, from: sender.from });
       const over = input.mails?.[poId] ?? {};
       const mail = { to: over.to ?? built.to, cc: over.cc, subject: over.subject ?? built.subject, body: over.body ?? built.body };
-      const res = await sendPurchaseOrderCore(db, { id: user.id, fullName: user.fullName }, poId, mail, { from: sender.from, kind: input.kind, reason });
+      const res = await sendPurchaseOrderCore(db, { id: user.id, fullName: user.fullName }, poId, mail, { from: sender.from, signerId: sender.signerId, kind: input.kind, reason });
       if (res.ok) { sent.push(poId); continue; }
       // e-mail neodešel → fronta (cancel / hold), DB ho sama nevyřídí
       const { error: qErr } = await db.from("approval_queue").insert({

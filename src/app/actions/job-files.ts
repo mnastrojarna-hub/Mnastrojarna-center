@@ -9,6 +9,7 @@ import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
 import { logAudit } from "@/lib/audit";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
+import { isInvoiceRelease, releaseJobInvoiceCore, type InvoiceRelease } from "@/lib/jobs/invoice-release";
 import { FILE_KINDS, isJobFileKind, JOB_FILE_MAX_BYTES } from "@/lib/jobs/file-kinds";
 import {
   isUuid, jobFilePath, jobMasterPath, cleanText, cleanNumber, JOB_FILE_SELECT, translateDbError, type FileRow,
@@ -18,6 +19,8 @@ import type { DocIssuerKey, JobFileKind, JobFileOrigin } from "@/lib/supabase/da
 import type { ActionResult, JobFile } from "@/lib/jobs/types";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { kickInBackground } from "@/lib/anonymize/queue";
+import { isOurQuotePdf, quotePdfSentBlock } from "@/lib/jobs/quote-files";
+import { deleteQuoteWithPdfs, loadQuoteForSync, quoteDeleteBlock, quotePdfRows, syncQuoteStoragePath } from "@/lib/jobs/quote-file-sync";
 
 /**
  * Dokumenty zakázky. Soubor jde z prohlížeče PŘÍMO do Supabase Storage
@@ -250,7 +253,31 @@ export async function updateJobFile(
   }
 }
 
-export async function deleteJobFile(fileId: string): Promise<ActionResult> {
+export type { InvoiceRelease };
+
+/**
+ * Po smazání posledního PDF faktury z aplikace: zrušit vystavení faktury u zakázky (releaseJobInvoiceCore — RPC
+ * release_job_invoice: číslo, datum, splatnost, záznam v knize faktur; čítač řady FV zpět, když bylo číslo poslední)
+ * a vrátit stav „Vyfakturováno" na „Dodáno zákazníkovi". Jiná zbylá PDF faktury / uhrazená faktura → nic.
+ */
+async function releaseInvoiceAfterDelete(db: JobsDb, jobId: string, actorId: string, filename: string): Promise<InvoiceRelease | null> {
+  const { count } = await db.from("job_files").select("id", { count: "exact", head: true })
+    .eq("job_id", jobId).eq("kind", "faktura").eq("archived", false);
+  if ((count ?? 0) > 0) return null;
+  const { data: job } = await db.from("orders").select("invoice_number").eq("id", jobId).maybeSingle();
+  const j = (job ?? {}) as { invoice_number?: string | null };
+  const number = (j.invoice_number ?? "").trim();
+  if (!number) return null;
+  const r = await releaseJobInvoiceCore(db, jobId, number, actorId, `smazáno PDF ${filename}`);
+  return isInvoiceRelease(r) ? r : null;
+}
+
+/**
+ * Smazání dokumentu. Naše vystavené PDF nabídky je s nabídkou svázané (lib/jobs/quote-files):
+ * PDF odeslané nabídky smazat nejde; poslední PDF nabídky bere nabídku s sebou (`quoteDeleted`),
+ * starší / jiná verze nabídku nechá (jen srovná quotes.storage_path).
+ */
+export async function deleteJobFile(fileId: string): Promise<ActionResult<{ quoteDeleted: { id: string; number: string | null } | null; invoiceReleased: InvoiceRelease | null }>> {
   const c = await begin("delete");
   if ("error" in c) return fail(c.error);
   if (!isUuid(fileId)) return fail(FILE_NOT_FOUND);
@@ -258,6 +285,12 @@ export async function deleteJobFile(fileId: string): Promise<ActionResult> {
     const { db, user } = c;
     const file = await loadFile(db, fileId);
     if (!file) return fail(FILE_NOT_FOUND);
+
+    // nabídka ↔ PDF: zámek odeslané nabídky rozhoduje DB (ne stav z prohlížeče)
+    const quote = file.quote_id && isOurQuotePdf({ kind: file.kind as JobFileKind, origin: (file.origin ?? null) as JobFileOrigin | null, quoteId: file.quote_id })
+      ? await loadQuoteForSync(db, file.quote_id)
+      : null;
+    if (quote && quoteDeleteBlock(quote)) return fail(quotePdfSentBlock(quote.number));
 
     // smazání nejnovější verze → předchozí verze se zase stane aktuální
     const { data: prev } = file.archived
@@ -293,10 +326,31 @@ export async function deleteJobFile(fileId: string): Promise<ActionResult> {
     await logJobEvent(db, {
       jobId: file.job_id, type: "file",
       message: `Dokument smazán: ${kindLabel(kind)} — ${file.filename}`,
-      data: { fileId, action: "deleted" }, actorId: user.id,
+      data: { fileId, action: "deleted", ...(quote ? { quoteId: quote.id } : {}) }, actorId: user.id,
     });
+
+    // faktura (6. 11.): smazání posledního PDF faktury z aplikace = zrušení vystavení — číslo, datum a záznam
+    // faktury se uvolní, „Vyfakturováno" se vrátí na „Dodáno" a hned jde vystavit novou fakturu (stejné číslo,
+    // když bylo v řadě poslední)
+    const invoiceReleased = kind === "faktura" && file.origin === "generated" && !prevIds.length
+      ? await releaseInvoiceAfterDelete(db, file.job_id, user.id, file.filename)
+      : null;
+
+    // nabídka ↔ PDF: bez dalšího PDF nabídka zmizí i z Nabídek; jinak jen srovnat odkaz na aktuální PDF
+    let quoteDeleted: { id: string; number: string | null } | null = null;
+    if (quote) {
+      const rest = await quotePdfRows(db, quote.id);
+      if (!rest.length) {
+        const r = await deleteQuoteWithPdfs(db, quote, user.id, { cause: "file", filename: file.filename });
+        if (r.ok) quoteDeleted = { id: quote.id, number: quote.number };
+        else console.error(`[job-files] Smazání nabídky k PDF selhalo: ${r.error}`);
+      } else {
+        await syncQuoteStoragePath(db, quote, file.storage_path ?? null, rest);
+      }
+    }
     revalidateFiles(file.job_id);
-    return { ok: true };
+    if (invoiceReleased) revalidatePath("/", "layout");
+    return { ok: true, quoteDeleted, invoiceReleased };
   } catch (err) {
     return fail(err);
   }

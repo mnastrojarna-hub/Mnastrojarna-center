@@ -54,12 +54,14 @@ function Cell({
 }
 
 export function ItemsEditor({
-  drafts, onChange, columns = {}, emptyHint, specs,
+  drafts, onChange, columns = {}, emptyHint, specs, jobValue,
 }: {
   drafts: ItemDraft[];
   onChange: (next: ItemDraft[]) => void;
   columns?: ItemsEditorColumns;
   emptyHint?: string;
+  /** Uložená hodnota zakázky — editor ukáže, jaká bude po uložení (= součet položek s cenou). */
+  jobValue?: number | null;
   /** Štítky z výkresu (materiál, hmotnost, TZ / PÚ) podle klíče konceptu (= id položky). */
   specs?: Record<string, DrawingSpecView | null | undefined>;
 }) {
@@ -240,6 +242,16 @@ export function ItemsEditor({
           <dd className="text-right tabular-nums">{formatQty(totals.quantity)}</dd>
           <dt className="font-medium">Celkem bez DPH</dt>
           <dd className="text-right font-bold tabular-nums">{formatMoney(totals.net, currency)}</dd>
+          {jobValue !== undefined && (
+            // hodnota zakázky = součet položek (křížová konzistence 4. 11.) — bez cen zůstane ruční
+            <dd className="col-span-2 -mt-0.5 text-right text-[11px] text-muted-foreground" data-testid="items-job-value">
+              {totals.net === null
+                ? `Hodnota zakázky zůstane ${formatMoney(jobValue ?? null, currency)} (položky bez cen).`
+                : jobValue !== null && Math.abs(jobValue - totals.net) < 0.005
+                  ? "= hodnota zakázky"
+                  : `Hodnota zakázky ${formatMoney(jobValue ?? null, currency)} → po uložení ${formatMoney(totals.net, currency)}`}
+            </dd>
+          )}
           {columns.vat && totals.net !== null && (
             <>
               <dt className="text-muted-foreground">DPH</dt>

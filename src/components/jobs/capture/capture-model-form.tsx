@@ -12,7 +12,7 @@ type ModelReview = Extract<BatchDocReview, { kind: "model" }>;
 
 /** Sekce 3D modelu: formát (jen štítek), číslo dílu, revize, název a vazba na položku. */
 export function CaptureModelForm({
-  doc, state, onChange, itemOptions, idPrefix, disabled,
+  doc, state, onChange, itemOptions, idPrefix, disabled, duplicateInTarget = true,
 }: {
   doc: ModelReview;
   state: ModelReviewState;
@@ -20,6 +20,8 @@ export function CaptureModelForm({
   itemOptions: ItemOption[];
   idPrefix: string;
   disabled?: boolean;
+  /** Model je už u CÍLOVÉ zakázky (volba); u jiné zakázky jen informace — uloží se i sem. */
+  duplicateInTarget?: boolean;
 }) {
   const set = (patch: Partial<ModelReviewState>) => onChange({ ...state, ...patch });
   const format = state.format ?? doc.meta.format;
@@ -30,7 +32,12 @@ export function CaptureModelForm({
         3D model
         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide", TONES.violet)}>{format ?? "neznámý formát"}</span>
       </p>
-      {doc.duplicateOf && <DuplicateNotice dup={doc.duplicateOf} value={state.onDuplicate} onChange={(onDuplicate) => set({ onDuplicate })} />}
+      {doc.duplicateOf && duplicateInTarget && <DuplicateNotice dup={doc.duplicateOf} value={state.onDuplicate} onChange={(onDuplicate) => set({ onDuplicate })} />}
+      {doc.duplicateOf && !duplicateInTarget && (
+        <p className="rounded-xl border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-950 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100">
+          Model je už i u zakázky {doc.duplicateOf.jobNumber} — uloží se i sem.
+        </p>
+      )}
       <div className="grid gap-2.5 sm:grid-cols-2">
         <div>
           <FieldLabel htmlFor={`${idPrefix}-number`}>Číslo dílu / výkresu</FieldLabel>

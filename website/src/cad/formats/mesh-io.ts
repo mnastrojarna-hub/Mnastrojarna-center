@@ -3,6 +3,7 @@
  * Čisté funkce bez DOM – běží v hlavním vlákně, ve workeru i v Node (testy).
  * Interní konvence: milimetry, osa Z nahoru.
  */
+import { tr } from "../i18n";
 import { readZip, writeZip } from "./zip";
 
 export type TriMesh = { positions: Float32Array; indices: Uint32Array };
@@ -87,7 +88,7 @@ function merge(parts: TriMesh[]): TriMesh {
 }
 
 function assertMesh(m: TriMesh, what: string): TriMesh {
-  if (!m.indices.length) throw new Error(`${what}: soubor neobsahuje žádné trojúhelníky.`);
+  if (!m.indices.length) throw new Error(tr("{0}: soubor neobsahuje žádné trojúhelníky.", what));
   return m;
 }
 
@@ -219,7 +220,7 @@ const PLY_SIZE: Record<string, number> = { char: 1, int8: 1, uchar: 1, uint8: 1,
 export function parsePLY(buf: ArrayBuffer | Uint8Array): TriMesh {
   const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
   const headEnd = dec.decode(u8.subarray(0, Math.min(u8.length, 8192))).indexOf("end_header");
-  if (headEnd < 0) throw new Error("PLY: chybí hlavička.");
+  if (headEnd < 0) throw new Error(tr("PLY: chybí hlavička."));
   const headerText = dec.decode(u8.subarray(0, headEnd));
   let bodyStart = headEnd + "end_header".length;
   while (u8[bodyStart] === 13 || u8[bodyStart] === 10) {
@@ -275,7 +276,7 @@ export function parsePLY(buf: ArrayBuffer | Uint8Array): TriMesh {
         case "uint": case "uint32": v = dv.getUint32(o, le); break;
         case "float": case "float32": v = dv.getFloat32(o, le); break;
         case "double": case "float64": v = dv.getFloat64(o, le); break;
-        default: throw new Error(`PLY: neznámý typ ${t}.`);
+        default: throw new Error(tr("PLY: neznámý typ {0}.", t));
       }
       o += PLY_SIZE[t];
       return v;
@@ -352,14 +353,14 @@ export function parseGLTF(input: ArrayBuffer | Uint8Array, externalBuffers?: Rec
 
   const buffers = (json.buffers ?? []).map((b, i) => {
     if (!b.uri) {
-      if (!bin) throw new Error("glTF: chybí binární data.");
+      if (!bin) throw new Error(tr("glTF: chybí binární data."));
       return bin;
     }
     const m = /^data:[^;]*;base64,(.*)$/.exec(b.uri);
     if (m) return b64Decode(m[1]);
     const ext = externalBuffers?.[b.uri] ?? externalBuffers?.[decodeURIComponent(b.uri)];
     if (ext) return ext;
-    throw new Error(`glTF odkazuje na externí soubor „${b.uri}“ – použijte formát GLB (vše v jednom souboru). (buffer ${i})`);
+    throw new Error(tr("glTF odkazuje na externí soubor „{0}“ – použijte formát GLB (vše v jednom souboru). (buffer {1})", b.uri, i));
   });
 
   const readAcc = (ai: number): Float64Array => {
@@ -487,7 +488,7 @@ const UNIT_3MF: Record<string, number> = { micron: 0.001, millimeter: 1, centime
 export async function parse3MF(buf: ArrayBuffer | Uint8Array): Promise<TriMesh> {
   const entries = readZip(buf);
   const models = entries.filter((e) => /\.model$/i.test(e.name));
-  if (!models.length) throw new Error("3MF: archiv neobsahuje 3D model.");
+  if (!models.length) throw new Error(tr("3MF: archiv neobsahuje 3D model."));
   const parts: TriMesh[] = [];
   for (const entry of models) {
     const xml = dec.decode(await entry.read());
@@ -579,16 +580,5 @@ export function writeWRL(m: TriMesh, name: string, color: [number, number, numbe
   for (let i = 0; i < w.positions.length; i += 3) pts.push(`${f(w.positions[i])} ${f(w.positions[i + 1])} ${f(w.positions[i + 2])}`);
   const idx: string[] = [];
   for (let i = 0; i < w.indices.length; i += 3) idx.push(`${w.indices[i]} ${w.indices[i + 1]} ${w.indices[i + 2]} -1`);
-  return `#VRML V2.0 utf8
-# Mnastrojarna CAD – ${name.replace(/\n/g, " ")} (jednotky: mm)
-Shape {
-  appearance Appearance { material Material { diffuseColor ${color.join(" ")} specularColor 0.6 0.6 0.6 shininess 0.4 } }
-  geometry IndexedFaceSet {
-    solid TRUE
-    creaseAngle 0.5
-    coord Coordinate { point [ ${pts.join(", ")} ] }
-    coordIndex [ ${idx.join(", ")} ]
-  }
-}
-`;
+  return `#VRML V2.0 utf8\n# Mnastrojarna CAD – ${name.replace(/\n/g, " ")} (jednotky: mm)\nShape {\n  appearance Appearance { material Material { diffuseColor ${color.join(" ")} specularColor 0.6 0.6 0.6 shininess 0.4 } }\n  geometry IndexedFaceSet {\n    solid TRUE\n    creaseAngle 0.5\n    coord Coordinate { point [ ${pts.join(", ")} ] }\n    coordIndex [ ${idx.join(", ")} ]\n  }\n}\n`;
 }

@@ -8,7 +8,7 @@ import { MachiningStory } from "@/components/machining-story";
 import { ServicesIndex } from "@/components/services-index";
 import { VideoShowcase } from "@/components/video-showcase";
 import { getDict } from "@/content";
-import { CAD_LINKS } from "@/content/cad-links";
+import { CAD_LINKS, cadAppHref, cadDocsHref } from "@/content/cad-links";
 import { ALL_PHOTOS, CASES } from "@/content/cases";
 import { REFERENCES, SALES, SERVICE_FACTS, SERVICE_ORDER, VIDEOS, YOUTUBE_CHANNEL } from "@/content/site";
 import { href, type Locale } from "@/i18n/config";
@@ -276,7 +276,7 @@ export function HomeView({ locale }: { locale: Locale }) {
       {/* ================= CAD pás ================= */}
       <div className="border-y border-ink-700/10 bg-white py-8">
         <div className="container flex flex-col items-start justify-between gap-5 lg:flex-row lg:items-center">
-          <Link href={CAD_LINKS.app} className="group flex items-center gap-4 font-display text-2xl font-bold uppercase text-ink-700 md:text-3xl" data-cursor="CAD">
+          <Link href={cadAppHref(locale)} className="group flex items-center gap-4 font-display text-2xl font-bold uppercase text-ink-700 md:text-3xl" data-cursor="CAD">
             <span className="rounded-full bg-brand px-3 py-1 font-mono text-[11px] tracking-widest text-white">{t.nav.cadBadge}</span>
             Mnástrojárna CAD
             <Icon name="arrow" className="h-6 w-6 text-brand transition-transform duration-500 group-hover:translate-x-2" />
@@ -284,10 +284,10 @@ export function HomeView({ locale }: { locale: Locale }) {
           <div className="flex flex-col gap-3 lg:items-end">
             <p className="text-[15px] text-ink-700/65">{h.cadStrip}</p>
             <div className="flex flex-wrap gap-2">
-              <Link href={CAD_LINKS.app} className="btn-primary !px-4 !py-2 !text-[13px]">
+              <Link href={cadAppHref(locale)} className="btn-primary !px-4 !py-2 !text-[13px]">
                 {t.nav.cad} <Icon name="arrow" className="h-4 w-4" />
               </Link>
-              <Link href={CAD_LINKS.docs} className="btn-ghost !px-4 !py-2 !text-[13px]">
+              <Link href={cadDocsHref(locale)} className="btn-ghost !px-4 !py-2 !text-[13px]">
                 <Icon name="book" className="h-4 w-4 text-brand" /> {t.nav.cadDocsLong}
               </Link>
               <a href={CAD_LINKS.pdf} download className="btn-ghost !px-4 !py-2 !text-[13px]">

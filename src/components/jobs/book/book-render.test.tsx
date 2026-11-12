@@ -112,7 +112,7 @@ describe("Kniha zakázek — vykreslení", () => {
     const counts = { byStage, overdue: 2, dueThisWeek: 1, active: 13, total: 16 };
     const html = render(
       <>
-        <KpiStrip kpis={bookKpis(counts)} runningValue={524100} />
+        <KpiStrip kpis={bookKpis(counts)} value={{ sum: 524100, count: 7 }} />
         <SegmentTabs counts={segmentCounts(byStage)} />
         <StageChips byStage={byStage} />
         <BookToolbar options={OPTIONS} />
@@ -123,6 +123,10 @@ describe("Kniha zakázek — vykreslení", () => {
     expect(html).toContain("Objednávky v běhu");
     expect(html).toContain("Po termínu");
     expect(html).toMatch(/524\s100\sKč/);
+    // dlaždice hodnoty = aktuální pohled: záložka Objednávky, vybraný stav = filtr → „podle filtru" + počet
+    expect(html).toContain("Hodnota objednávek v běhu");
+    expect(html).toContain("podle filtru · 7 zakázek");
+    expect(html).toContain("Archiv");
     expect(html).toContain("Poptávky &amp; nabídky");
     expect(html).toContain("Ve výrobě");
     expect(html).toContain("stages=ve_vyrobe"); // odkazy nesou aktuální výběr
@@ -136,7 +140,7 @@ describe("Kniha zakázek — vykreslení", () => {
     const seg = segmentCounts(byStage, delivered);
     const html = render(
       <>
-        <KpiStrip kpis={bookKpis(counts)} runningValue={1000} />
+        <KpiStrip kpis={bookKpis(counts)} value={{ sum: 1000, count: 1 }} />
         <SegmentTabs counts={seg} />
         <StageChips byStage={segmentStageCounts(byStage, delivered, "objednavky")} />
         <FlowFilterChips counts={{ "order.dorucena": 3, "fulfilment.dokoncena": 9 }} />
@@ -144,9 +148,10 @@ describe("Kniha zakázek — vykreslení", () => {
       </>,
     );
     expect(html).toContain("objednávka → dodací list");
-    expect(html).toContain("objednávky bez DL, bez DPH");
+    expect(html).toContain("objednávky bez DL · 1 zakázka");
     expect(html).toContain("Objednané zakázky bez dodacího listu — v běhu.");
-    expect(html).toContain("Dodané zákazníkovi (vystavený DL), vyfakturované a zaplacené.");
+    expect(html).toContain("Dodané zákazníkovi (vystavený DL) a vyfakturované — čekají na zaplacení.");
+    expect(html).toContain("Dodané a zaplacené zakázky — hotovo, uloženo v archivu.");
     // v Objednávkách nejsou chipy Dodáno zákazníkovi / Vyfakturováno ani „Vše dodáno"
     expect(html).not.toContain("stages=dodano_zakaznikovi");
     expect(html).not.toContain("stages=fakturovano");
@@ -164,10 +169,26 @@ describe("Kniha zakázek — vykreslení", () => {
     );
     expect(done).toContain("stages=dodano_zakaznikovi");
     expect(done).toContain("stages=fakturovano");
+    // Dokončeno (zaplaceno) je v Archivu, ne v Dokončených
+    expect(done).not.toContain("stages=dokonceno");
     expect(done).toContain('value="dl_potvrzen"');
     expect(done).not.toContain('value="k_expedici"');
     const empty = render(<BookEmpty segment="dokoncene" filtered={false} options={OPTIONS} defaultStage="objednavka" userId="u1" />);
     expect(empty).toContain("vystavíš dodací list na celou dodávku");
+    // Archiv: dlaždice hodnoty podle záložky, bez filtru = popis záložky; jediný stav = bez chipů
+    const archive = render(
+      <>
+        <KpiStrip kpis={bookKpis(counts)} value={{ sum: 250000, count: 12 }} />
+        <StageChips byStage={segmentStageCounts(byStage, delivered, "archiv", { dokonceno: 12 })} />
+      </>,
+      { ...DEFAULT_PARAMS, segment: "archiv" },
+    );
+    expect(archive).toContain("Hodnota v archivu");
+    expect(archive).toContain("dodané a zaplacené · 12 zakázek");
+    expect(archive).not.toContain("podle filtru");
+    expect(archive).not.toContain("stages=dokonceno");
+    const archiveEmpty = render(<BookEmpty segment="archiv" filtered={false} options={OPTIONS} defaultStage="objednavka" userId="u1" />);
+    expect(archiveEmpty).toContain("Archiv je zatím prázdný");
   });
 
   it("výroba, platba a domluvy v řádku i na kartě tabule", () => {
@@ -209,7 +230,7 @@ describe("Kniha zakázek — vykreslení", () => {
     };
     const html = render(
       <>
-        <KpiStrip kpis={bookKpis(counts)} runningValue={null} overdueInvoices={2} />
+        <KpiStrip kpis={bookKpis(counts)} value={null} overdueInvoices={2} />
         <BookToolbar options={OPTIONS} production={production} />
       </>,
       { ...DEFAULT_PARAMS, step: "tepelne_zpracovani", payment: "po_splatnosti" },
@@ -240,5 +261,28 @@ describe("Kniha zakázek — vykreslení", () => {
     accessState.features = ["orders", "margins"];
     const sales = render(<JobForm options={OPTIONS} initial={init} onSubmit={() => {}} />);
     expect(sales).toContain("Nákup / MJ");
+  });
+
+  it("9. 11.: prémiový zákazník — řádek i karta tabule výrazně červeně „Pozor, prémiový zákazník“, ostatní beze změny", () => {
+    const premium = job({ id: "jp", number: "Z-2026-777", customerPremium: true, customer: { id: "c9", name: "Hitachi Energy", customerNumber: "ZK0009", ico: null } });
+    const rows = render(<JobRows jobs={[premium, job()]} today="2026-10-22" />);
+    // jen prémiová zakázka: štítek s výstražnou ikonou, červený okraj / podklad a pruh
+    expect(rows.match(/data-testid="premium-badge"/g)).toHaveLength(1);
+    expect(rows.match(/data-premium="1"/g)).toHaveLength(1);
+    expect(rows).toContain("Pozor, prémiový zákazník"); // od sm celý text
+    expect(rows).toContain(">Prémiový<"); // mobil: ikona + „Prémiový"
+    expect(rows).toContain("Prémiový zákazník"); // úzký sloupec širokého desktopu
+    expect(rows).toMatch(/<li[^>]*border-red-500\/70[^>]*data-premium="1"/);
+    expect(rows).toContain("dark:bg-red-950/30"); // tmavý režim
+    // štítek je silnější než chip priority: plná červená s bílým textem
+    expect(rows).toMatch(/data-testid="premium-badge"[^>]*bg-red-600[^>]*text-white|bg-red-600[^>]*text-white[^>]*data-testid="premium-badge"/);
+    const plain = render(<JobRows jobs={[job()]} today="2026-10-22" />);
+    expect(plain).not.toContain("premium-badge");
+    expect(plain).not.toContain("data-premium");
+
+    const board = render(<JobBoard jobs={[premium, job()]} stages={["objednavka", "potvrzeno"]} today="2026-10-22" />);
+    expect(board.match(/data-testid="premium-badge"/g)).toHaveLength(1);
+    expect(board.match(/data-premium="1"/g)).toHaveLength(1);
+    expect(board).toContain("Pozor, prémiový zákazník");
   });
 });

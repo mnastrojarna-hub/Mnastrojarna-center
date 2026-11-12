@@ -14,6 +14,7 @@
  * Zkosení (`kind`): equal / twoDistances (D1 na referenční ploše, D2) / distanceAngle (D na referenční ploše + úhel)
  *  / vertex (sražení rohu třemi vzdálenostmi podél hran vrcholu) + tangentChain.
  */
+import { tr } from "../i18n";
 import * as r from "replicad";
 import { vertexPositions } from "../inspect";
 import { entityIndex, pointOf, V, type ResolveCtx } from "../ref-resolve";
@@ -72,7 +73,7 @@ export function pickEdges(body: Shape, edges: number[] | "all", tangentChain?: b
   if (edges === "all") return null;
   const all = body.edges;
   const picked = edges.map((i) => all[i]).filter(Boolean);
-  if (!picked.length) throw new Error("Vyberte hrany v modelu.");
+  if (!picked.length) throw new Error(tr("Vyberte hrany v modelu."));
   return tangentChain ? tangentChainOf(body, picked) : picked;
 }
 
@@ -122,12 +123,12 @@ function facesOf(body: Shape, refs: Ref[] | undefined, idx: number[] | undefined
   const ids = new Set<number>();
   for (const ref of refs ?? []) {
     if (isPlaceholder(ref)) continue;
-    if (ref.kind !== "face") throw new Error(`Odkaz v poli „${what}“ musí být plocha modelu.`);
+    if (ref.kind !== "face") throw new Error(tr("Odkaz v poli „{0}“ musí být plocha modelu.", what));
     ids.add(entityIndex(body, "face", ref.index, ref.sig));
   }
   for (const i of idx ?? []) if (all[i]) ids.add(i);
   const out = [...ids].map((i) => all[i]);
-  if (!out.length) throw new Error(`Vyberte ${what}.`);
+  if (!out.length) throw new Error(tr("Vyberte {0}.", what));
   return out;
 }
 
@@ -137,16 +138,16 @@ const pair = (a: number, b: number): r.FilletRadius => (Math.abs(a - b) < 1e-9 ?
 
 function fillet(f: FilletF, ctx: FeatCtx): Shape {
   const body = ctx.body;
-  if (!body) throw new Error("Není co zaoblit – nejdřív vytvořte těleso.");
+  if (!body) throw new Error(tr("Není co zaoblit – nejdřív vytvořte těleso."));
   const kind = f.kind ?? "constant";
   if (kind === "faceFace") return faceFaceFillet(body, f);
   if (kind === "fullRound") return fullRoundFillet(body, f);
-  if (!(f.radius > 0)) throw new Error("Poloměr musí být kladný.");
+  if (!(f.radius > 0)) throw new Error(tr("Poloměr musí být kladný."));
   const r2 = f.r2 ?? f.radius;
-  if (kind === "asymmetric" && !(r2 > 0)) throw new Error("Oba poloměry (R1 i R2) musí být kladné.");
+  if (kind === "asymmetric" && !(r2 > 0)) throw new Error(tr("Oba poloměry (R1 i R2) musí být kladné."));
   if (kind === "variable") {
     for (const [k, v] of [...Object.entries(f.radii ?? {}), ...Object.entries(f.radii2 ?? {})]) {
-      if (!(v > 0)) throw new Error(`Poloměr u hrany ${Number(k) + 1} musí být kladný.`);
+      if (!(v > 0)) throw new Error(tr("Poloměr u hrany {0} musí být kladný.", Number(k) + 1));
     }
   }
   const picked = pickEdges(body, f.edges, f.tangentChain);
@@ -161,19 +162,19 @@ function fillet(f: FilletF, ctx: FeatCtx): Shape {
     }
     return f.radius;
   };
-  return occt(() => body.clone().fillet(radiusOf), `Zaoblení R${fmt(f.radius)} nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.`);
+  return occt(() => body.clone().fillet(radiusOf), tr("Zaoblení R{0} nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.", fmt(f.radius)));
 }
 
 function faceFaceFillet(body: Shape, f: FilletF): Shape {
-  if (!(f.radius > 0)) throw new Error("Poloměr musí být kladný.");
-  const A = facesOf(body, f.faceRefs, f.faces, "první sadu ploch");
-  const B = facesOf(body, f.faceRefs2, f.faces2, "druhou sadu ploch");
+  if (!(f.radius > 0)) throw new Error(tr("Poloměr musí být kladný."));
+  const A = facesOf(body, f.faceRefs, f.faces, tr("první sadu ploch"));
+  const B = facesOf(body, f.faceRefs2, f.faces2, tr("druhou sadu ploch"));
   const edgesOf = edgeCache();
   const common = body.edges.filter((e) => A.some((a) => has(edgesOf(a), e) && B.some((b) => !b.isSame(a) && has(edgesOf(b), e))));
-  if (!common.length) throw new Error("Vybrané sady ploch nemají společnou hranu – zaoblení plocha–plocha není kde vytvořit.");
+  if (!common.length) throw new Error(tr("Vybrané sady ploch nemají společnou hranu – zaoblení plocha–plocha není kde vytvořit."));
   return occt(
     () => body.clone().fillet((e) => (has(common, e) ? f.radius : null)),
-    `Zaoblení plocha–plocha R${fmt(f.radius)} nelze provést – poloměr je pro společné hrany příliš velký.`,
+    tr("Zaoblení plocha–plocha R{0} nelze provést – poloměr je pro společné hrany příliš velký.", fmt(f.radius)),
   );
 }
 
@@ -182,32 +183,32 @@ function faceFaceFillet(body: Shape, f: FilletF): Shape {
  * Obdélníková M kolmá na A/B: přesně (odříznout hranol M × r, přidat půlválec). Jinak dvojité zaoblení r·(1 − 1e-4).
  */
 function fullRoundFillet(body: Shape, f: FilletF): Shape {
-  const A = facesOf(body, f.faceRefs, f.faces, "boční plochu 1");
-  const B = facesOf(body, f.faceRefs2, f.faces2, "boční plochu 2");
+  const A = facesOf(body, f.faceRefs, f.faces, tr("boční plochu 1"));
+  const B = facesOf(body, f.faceRefs2, f.faces2, tr("boční plochu 2"));
   const edgesOf = edgeCache();
   const tol = tolOf(body);
   const touch = (x: r.Face, y: r.Face) => !x.isSame(y) && edgesOf(x).some((e) => has(edgesOf(y), e));
   let mids: r.Face[];
-  if (f.faceRefsMid?.length) mids = facesOf(body, f.faceRefsMid, undefined, "prostřední plochu");
+  if (f.faceRefsMid?.length) mids = facesOf(body, f.faceRefsMid, undefined, tr("prostřední plochu"));
   else {
     mids = body.faces.filter((m) => !has(A, m) && !has(B, m) && A.some((a) => touch(a, m)) && B.some((b) => touch(b, m)));
-    if (!mids.length) throw new Error("Mezi bočními plochami není žádná prostřední plocha (plocha sousedící s oběma).");
-    if (mids.length > 1) throw new Error(`Mezi bočními plochami leží ${mids.length} ploch – vyberte prostřední plochu, která se má zaoblit.`);
+    if (!mids.length) throw new Error(tr("Mezi bočními plochami není žádná prostřední plocha (plocha sousedící s oběma)."));
+    if (mids.length > 1) throw new Error(tr("Mezi bočními plochami leží {0} ploch – vyberte prostřední plochu, která se má zaoblit.", mids.length));
   }
   const exact: { prism: Shape; half: Shape }[] = [];
   const approx: { e: r.Edge; radius: number }[] = [];
   for (const m of mids) {
     const a = A.find((x) => touch(x, m));
     const b = B.find((x) => touch(x, m));
-    if (!a || !b) throw new Error("Prostřední plocha musí sousedit s oběma bočními plochami.");
-    if ([a, b, m].some((x) => x.geomType !== "PLANE")) throw new Error("Plný rádius: boční i prostřední plochy musí být rovinné.");
+    if (!a || !b) throw new Error(tr("Prostřední plocha musí sousedit s oběma bočními plochami."));
+    if ([a, b, m].some((x) => x.geomType !== "PLANE")) throw new Error(tr("Plný rádius: boční i prostřední plochy musí být rovinné."));
     const na = V.norm(vt(a.normalAt()));
     const nb = V.norm(vt(b.normalAt()));
     const nm = V.norm(vt(m.normalAt()));
-    if (Math.abs(V.dot(na, nb)) < COS1) throw new Error("Boční plochy nejsou rovnoběžné – plný rádius vyžaduje dvě rovnoběžné boční plochy.");
+    if (Math.abs(V.dot(na, nb)) < COS1) throw new Error(tr("Boční plochy nejsou rovnoběžné – plný rádius vyžaduje dvě rovnoběžné boční plochy."));
     const w = Math.abs(V.dot(V.sub(vt(b.center), vt(a.center)), na));
     const rad = w / 2;
-    if (!(rad > tol)) throw new Error("Boční plochy splývají – vzdálenost mezi nimi je nulová.");
+    if (!(rad > tol)) throw new Error(tr("Boční plochy splývají – vzdálenost mezi nimi je nulová."));
     const me = edgesOf(m);
     const eA = me.filter((e) => has(edgesOf(a), e));
     const eB = me.filter((e) => has(edgesOf(b), e));
@@ -239,10 +240,10 @@ function fullRoundFillet(body: Shape, f: FilletF): Shape {
   if (approx.length) {
     out = occt(
       () => out.clone().fillet((e) => approx.find((x) => x.e.isSame(e))?.radius ?? null),
-      "Plný rádius se nepodařilo vytvořit – prostřední plocha není obdélník kolmý na boční plochy a přibližné zaoblení selhalo.",
+      tr("Plný rádius se nepodařilo vytvořit – prostřední plocha není obdélník kolmý na boční plochy a přibližné zaoblení selhalo."),
     );
   }
-  for (const { prism, half } of exact) out = occt(() => out.cut(prism).fuse(half), "Plný rádius se nepodařilo vytvořit (booleovská operace jádra selhala).");
+  for (const { prism, half } of exact) out = occt(() => out.cut(prism).fuse(half), tr("Plný rádius se nepodařilo vytvořit (booleovská operace jádra selhala)."));
   return out;
 }
 
@@ -250,32 +251,32 @@ function fullRoundFillet(body: Shape, f: FilletF): Shape {
 
 function chamfer(f: ChamferF, ctx: FeatCtx): Shape {
   const body = ctx.body;
-  if (!body) throw new Error("Není co srazit – nejdřív vytvořte těleso.");
+  if (!body) throw new Error(tr("Není co srazit – nejdřív vytvořte těleso."));
   const kind = f.kind ?? "equal";
   if (kind === "vertex") return vertexChamfer(body, f, rctx(ctx));
-  if (!(f.distance > 0)) throw new Error("Velikost sražení musí být kladná.");
-  const fail = `Sražení ${fmt(f.distance)} mm nelze provést – vzdálenost je pro vybrané hrany příliš velká nebo se sražení kříží.`;
+  if (!(f.distance > 0)) throw new Error(tr("Velikost sražení musí být kladná."));
+  const fail = tr("Sražení {0} mm nelze provést – vzdálenost je pro vybrané hrany příliš velká nebo se sražení kříží.", fmt(f.distance));
   if (kind === "equal") {
     const picked = pickEdges(body, f.edges, f.tangentChain);
     return occt(() => body.clone().chamfer(picked ? (e) => (has(picked, e) ? f.distance : null) : f.distance), fail);
   }
   // dvě vzdálenosti / vzdálenost + úhel: první vzdálenost se měří na referenční ploše
-  if (!f.faceRef || isPlaceholder(f.faceRef)) throw new Error("Vyberte referenční plochu – na ní se měří první vzdálenost sražení.");
-  if (f.faceRef.kind !== "face") throw new Error("Referenční odkaz sražení musí být plocha modelu.");
+  if (!f.faceRef || isPlaceholder(f.faceRef)) throw new Error(tr("Vyberte referenční plochu – na ní se měří první vzdálenost sražení."));
+  if (f.faceRef.kind !== "face") throw new Error(tr("Referenční odkaz sražení musí být plocha modelu."));
   const face = body.faces[entityIndex(body, "face", f.faceRef.index, f.faceRef.sig)];
   const faceEdges = face.edges;
   const picked = pickEdges(body, f.edges, f.tangentChain) ?? faceEdges;
   const off = picked.find((e) => !has(faceEdges, e));
-  if (off) throw new Error(`Referenční plocha musí sousedit se všemi vybranými hranami (hrana ${indexOf(body.edges, off) + 1} s ní nesousedí).`);
+  if (off) throw new Error(tr("Referenční plocha musí sousedit se všemi vybranými hranami (hrana {0} s ní nesousedí).", indexOf(body.edges, off) + 1));
   const selectedFace = (ff: r.FaceFinder) => ff.when(({ element }) => face.isSame(element));
   let cfg: r.ChamferRadius;
   if (kind === "twoDistances") {
     const d2 = f.d2 ?? f.distance;
-    if (!(d2 > 0)) throw new Error("Druhá vzdálenost sražení musí být kladná.");
+    if (!(d2 > 0)) throw new Error(tr("Druhá vzdálenost sražení musí být kladná."));
     cfg = { distances: [f.distance, d2], selectedFace };
   } else {
     const angle = f.angle ?? 45;
-    if (!(angle > 0 && angle < 90)) throw new Error("Úhel sražení musí být mezi 0° a 90°.");
+    if (!(angle > 0 && angle < 90)) throw new Error(tr("Úhel sražení musí být mezi 0° a 90°."));
     cfg = { distance: f.distance, angle, selectedFace };
   }
   return occt(() => body.clone().chamfer((e) => (has(picked, e) ? cfg : null)), fail);
@@ -284,14 +285,14 @@ function chamfer(f: ChamferF, ctx: FeatCtx): Shape {
 /** Sražení vrcholu: roh (tři hrany) se odřízne rovinou body ve vzdálenostech D1–D3 podél hran (v pořadí čísel hran). */
 function vertexChamfer(body: Shape, f: ChamferF, rc: ResolveCtx): Shape {
   const d = [f.distance, f.d2 ?? f.distance, f.d3 ?? f.d2 ?? f.distance];
-  if (d.some((x) => !(x > 0))) throw new Error("Všechny tři vzdálenosti sražení vrcholu musí být kladné.");
+  if (d.some((x) => !(x > 0))) throw new Error(tr("Všechny tři vzdálenosti sražení vrcholu musí být kladné."));
   const pts: Vec3[] = [];
   for (const ref of f.vertexRefs ?? []) if (!isPlaceholder(ref)) pts.push(pointOf(rc, ref, "vrchol"));
   if (f.vertices?.length) {
     const vp = vertexPositions(body);
     for (const i of f.vertices) if (i * 3 + 2 < vp.length) pts.push([vp[i * 3], vp[i * 3 + 1], vp[i * 3 + 2]]);
   }
-  if (!pts.length) throw new Error("Vyberte vrcholy, které se mají srazit.");
+  if (!pts.length) throw new Error(tr("Vyberte vrcholy, které se mají srazit."));
   const all = body.edges;
   const tol = tolOf(body);
   const tools: Shape[] = [];
@@ -304,26 +305,26 @@ function vertexChamfer(body: Shape, f: ChamferF, rc: ResolveCtx): Shape {
         return s || t ? { e, fromStart: s } : null;
       })
       .filter((x): x is { e: r.Edge; fromStart: boolean } => !!x);
-    if (at.length !== 3) throw new Error(`Ve vrcholu [${fmtVec(P)}] se musí stýkat právě 3 hrany (nalezeno ${at.length}).`);
+    if (at.length !== 3) throw new Error(tr("Ve vrcholu [{0}] se musí stýkat právě 3 hrany (nalezeno {1}).", fmtVec(P), at.length));
     const Q = at.map(({ e, fromStart }, k) => {
-      if (d[k] >= e.length) throw new Error(`Vzdálenost D${k + 1} = ${fmt(d[k])} mm je delší než hrana ${indexOf(all, e) + 1} (${fmt(e.length)} mm).`);
+      if (d[k] >= e.length) throw new Error(tr("Vzdálenost D{0} = {1} mm je delší než hrana {2} ({3} mm).", k + 1, fmt(d[k]), indexOf(all, e) + 1, fmt(e.length)));
       const t = d[k] / e.length;
       return vt(e.pointAt(fromStart ? t : 1 - t));
     });
     const dirs = Q.map((q) => V.norm(V.sub(q, P)));
     const inward = V.add(V.add(dirs[0], dirs[1]), dirs[2]);
-    if (V.len(inward) < 1e-9) throw new Error("Hrany ve vrcholu jsou degenerované – roh nelze srazit.");
+    if (V.len(inward) < 1e-9) throw new Error(tr("Hrany ve vrcholu jsou degenerované – roh nelze srazit."));
     // vrchol nástroje mírně vně tělesa, aby boční stěny čtyřstěnu nesplývaly s plochami tělesa
     const Vp = V.sub(P, V.mul(V.norm(inward), Math.min(...d) * 0.05));
     tools.push(
       occt(
         () => r.makeSolid([r.makePolygon([Vp, Q[0], Q[1]]), r.makePolygon([Vp, Q[1], Q[2]]), r.makePolygon([Vp, Q[2], Q[0]]), r.makePolygon([Q[0], Q[1], Q[2]])]) as Shape,
-        "Roh nelze srazit – body sražení neurčují čtyřstěn.",
+        tr("Roh nelze srazit – body sražení neurčují čtyřstěn."),
       ),
     );
   }
   let out: Shape = body;
-  for (const t of tools) out = occt(() => out.cut(t), "Sražení vrcholu se nepodařilo (booleovská operace jádra selhala).");
+  for (const t of tools) out = occt(() => out.cut(t), tr("Sražení vrcholu se nepodařilo (booleovská operace jádra selhala)."));
   return out;
 }
 

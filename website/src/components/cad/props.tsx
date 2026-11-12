@@ -1,5 +1,6 @@
 "use client";
 
+import { tr } from "@/cad/i18n";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ALL_THREADS, FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
 import { getExt, type ExtParam } from "@/cad/ext/registry";
@@ -164,7 +165,7 @@ export function Num({
         )}
       >
         {shownExpr != null && (
-          <button type="button" title="Parametr je navázaný na proměnné – kliknutím vazbu zrušíte" onClick={(e) => (e.preventDefault(), unbind())} className="ml-1.5 rounded bg-sky-600 px-1 font-mono text-[10px] font-bold italic text-white hover:bg-brand">
+          <button type="button" title={tr("Parametr je navázaný na proměnné – kliknutím vazbu zrušíte")} onClick={(e) => (e.preventDefault(), unbind())} className="ml-1.5 rounded bg-sky-600 px-1 font-mono text-[10px] font-bold italic text-white hover:bg-brand">
             ƒx
           </button>
         )}
@@ -240,9 +241,9 @@ export function Check({ label, value, onChange }: { label: string; value: boolea
 }
 
 const MODES: { v: BoolMode; l: string }[] = [
-  { v: "add", l: "Přidat" },
-  { v: "cut", l: "Odebrat" },
-  { v: "intersect", l: "Průnik" },
+  { v: "add", l: tr("Přidat") },
+  { v: "cut", l: tr("Odebrat") },
+  { v: "intersect", l: tr("Průnik") },
 ];
 export const AXES: { v: Axis; l: string }[] = [
   { v: "X", l: "X" },
@@ -251,15 +252,15 @@ export const AXES: { v: Axis; l: string }[] = [
 ];
 /** Roviny kolmé na osu (pro řez, úkos): offset se měří ve směru osy. */
 export const AXIS_PLANES: { v: PlaneName; l: string; axis: Axis }[] = [
-  { v: "XY", l: "XY ⟂ Z", axis: "Z" },
-  { v: "XZ", l: "XZ ⟂ Y", axis: "Y" },
-  { v: "YZ", l: "YZ ⟂ X", axis: "X" },
+  { v: "XY", l: tr("XY ⟂ Z"), axis: "Z" },
+  { v: "XZ", l: tr("XZ ⟂ Y"), axis: "Y" },
+  { v: "YZ", l: tr("YZ ⟂ X"), axis: "X" },
 ];
 const HOLE_KINDS: { v: HoleKind; l: string }[] = [
-  { v: "simple", l: "Vrtaná" },
-  { v: "counterbore", l: "Válc. zahl." },
-  { v: "countersink", l: "Kuž. zahl." },
-  { v: "tapped", l: "Závit" },
+  { v: "simple", l: tr("Vrtaná") },
+  { v: "counterbore", l: tr("Válc. zahl.") },
+  { v: "countersink", l: tr("Kuž. zahl.") },
+  { v: "tapped", l: tr("Závit") },
 ];
 const TOOL_TYPES = ["extrude", "revolve", "box", "cylinder", "sphere", "cone", "tube", "hole", "sweep", "loft", "text"];
 
@@ -298,12 +299,12 @@ export function FeatureProps({
   const before = idx >= 0 ? doc.features.slice(0, idx) : doc.features;
   const sketches = before.filter((x) => x.type === "sketch");
   const toolFeatures = before.filter((x) => TOOL_TYPES.includes(x.type) && x.id !== f.id);
-  const mode = "mode" in f ? <Seg label="Operace" value={f.mode === "new" ? "add" : f.mode} options={MODES} onChange={(v) => set({ mode: v })} /> : null;
+  const mode = "mode" in f ? <Seg label={tr("Operace")} value={f.mode === "new" ? "add" : f.mode} options={MODES} onChange={(v) => set({ mode: v })} /> : null;
   const custom = getFeatureForm(f.type);
 
   return (
     <div className="space-y-3.5">
-      <Field label="Název">
+      <Field label={tr("Název")}>
         <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" value={f.name} onChange={(e) => set({ name: e.target.value })} />
       </Field>
       {(() => {
@@ -315,8 +316,8 @@ export function FeatureProps({
             return (
               <>
                 <Info>Rovina: {planeLabel(f.plane)} · {f.entities.length} entit</Info>
-                <PlaneDefField label="Rovina skici (asociativní)" value={f.planeDef} allowNone noneLabel="Pevná rovina (jak byla založena)" onChange={(planeDef) => set({ planeDef })} />
-                {f.planeDef && <Info>Rovina se přepočítá při každé změně modelu (např. posune-li se plocha, na které skica leží).</Info>}
+                <PlaneDefField label={tr("Rovina skici (asociativní)")} value={f.planeDef} allowNone noneLabel={tr("Pevná rovina (jak byla založena)")} onChange={(planeDef) => set({ planeDef })} />
+                {f.planeDef && <Info>{tr("Rovina se přepočítá při každé změně modelu (např. posune-li se plocha, na které skica leží).")}</Info>}
               </>
             );
           case "extrude": {
@@ -324,22 +325,22 @@ export function FeatureProps({
             return (
               <>
                 <SketchPick value={f.sketchId} sketches={sketches} onChange={(v) => set({ sketchId: v })} />
-                <ExtentField label="Ukončení (směr 1)" value={ext1} defaultDistance={f.distance} onChange={(extent) => set({ extent, distance: "d" in extent ? extent.d : f.distance, symmetric: extent.kind === "midPlane" })} />
+                <ExtentField label={tr("Ukončení (směr 1)")} value={ext1} defaultDistance={f.distance} onChange={(extent) => set({ extent, distance: "d" in extent ? extent.d : f.distance, symmetric: extent.kind === "midPlane" })} />
                 <div className="flex flex-wrap gap-4">
-                  <Check label="Opačný směr" value={f.reverse} onChange={(v) => set({ reverse: v })} />
-                  <Check label="Druhý směr" value={!!f.extent2} onChange={(on) => set({ extent2: on ? { kind: "blind", d: f.distance } : undefined })} />
+                  <Check label={tr("Opačný směr")} value={f.reverse} onChange={(v) => set({ reverse: v })} />
+                  <Check label={tr("Druhý směr")} value={!!f.extent2} onChange={(on) => set({ extent2: on ? { kind: "blind", d: f.distance } : undefined })} />
                 </div>
-                {f.extent2 && <ExtentField label="Ukončení (směr 2)" value={f.extent2} defaultDistance={f.distance} kinds={["blind", "throughAll", "toNext", "toVertex", "toFace", "offsetFromFace", "toBody"]} onChange={(extent2) => set({ extent2 })} />}
-                <Details summary="Začátek, směr, tenká stěna, úkos, kroucení…" open={!!(f.from || f.dir || f.thin || f.draftAngle || f.twist || f.endScale || f.outerOnly)}>
+                {f.extent2 && <ExtentField label={tr("Ukončení (směr 2)")} value={f.extent2} defaultDistance={f.distance} kinds={["blind", "throughAll", "toNext", "toVertex", "toFace", "offsetFromFace", "toBody"]} onChange={(extent2) => set({ extent2 })} />}
+                <Details summary={tr("Začátek, směr, tenká stěna, úkos, kroucení…")} open={!!(f.from || f.dir || f.thin || f.draftAngle || f.twist || f.endScale || f.outerOnly)}>
                   <StartField value={f.from} onChange={(from) => set({ from })} />
                   <DirectionField value={f.dir} onChange={(dir) => set({ dir })} />
                   <ThinField value={f.thin} onChange={(thin) => set({ thin })} />
                   <div className="grid grid-cols-3 gap-2">
-                    <Num label="Úkos" value={f.draftAngle ?? 0} suffix="°" hint="0 = bez úkosu" bind={b("draftAngle")} onChange={(v) => set({ draftAngle: Math.max(-44, Math.min(44, v)) })} />
-                    <Num label="Kroucení" value={f.twist ?? 0} suffix="°" bind={b("twist")} onChange={(v) => set({ twist: v })} />
-                    <Num label="Měřítko konce" value={f.endScale ?? 1} suffix="×" min={0.01} step={0.1} bind={b("endScale")} onChange={(v) => set({ endScale: v })} />
+                    <Num label={tr("Úkos")} value={f.draftAngle ?? 0} suffix="°" hint={tr("0 = bez úkosu")} bind={b("draftAngle")} onChange={(v) => set({ draftAngle: Math.max(-44, Math.min(44, v)) })} />
+                    <Num label={tr("Kroucení")} value={f.twist ?? 0} suffix="°" bind={b("twist")} onChange={(v) => set({ twist: v })} />
+                    <Num label={tr("Měřítko konce")} value={f.endScale ?? 1} suffix="×" min={0.01} step={0.1} bind={b("endScale")} onChange={(v) => set({ endScale: v })} />
                   </div>
-                  <Check label="Jen vnější obrys (ignorovat otvory profilu)" value={!!f.outerOnly} onChange={(v) => set({ outerOnly: v })} />
+                  <Check label={tr("Jen vnější obrys (ignorovat otvory profilu)")} value={!!f.outerOnly} onChange={(v) => set({ outerOnly: v })} />
                 </Details>
                 {mode}
               </>
@@ -350,14 +351,14 @@ export function FeatureProps({
               <>
                 <SketchPick value={f.sketchId} sketches={sketches} onChange={(v) => set({ sketchId: v })} />
                 <AxisField value={f.axisDef} sketch={sketches.find((x) => x.id === f.sketchId)} onChange={(axisDef) => set({ axisDef, axis: axisDef?.kind === "sketchX" ? "x" : "y" })} />
-                <Num label="Úhel" value={f.angle} min={0.01} suffix="°" bind={b("angle")} onChange={(v) => set({ angle: Math.min(360, v) })} />
+                <Num label={tr("Úhel")} value={f.angle} min={0.01} suffix="°" bind={b("angle")} onChange={(v) => set({ angle: Math.min(360, v) })} />
                 <Seg
-                  label="Směr"
+                  label={tr("Směr")}
                   value={f.symmetric ? "sym" : f.angle2 ? "two" : "one"}
-                  options={[{ v: "one", l: "Jeden směr" }, { v: "sym", l: "Střední rovina" }, { v: "two", l: "Dva směry" }]}
+                  options={[{ v: "one", l: tr("Jeden směr") }, { v: "sym", l: tr("Střední rovina") }, { v: "two", l: tr("Dva směry") }]}
                   onChange={(v) => set(v === "sym" ? { symmetric: true, angle2: undefined } : v === "two" ? { symmetric: false, angle2: f.angle2 ?? 90 } : { symmetric: false, angle2: undefined })}
                 />
-                {!!f.angle2 && !f.symmetric && <Num label="Úhel (směr 2)" value={f.angle2} min={0.01} suffix="°" bind={b("angle2")} onChange={(v) => set({ angle2: Math.min(360, v) })} />}
+                {!!f.angle2 && !f.symmetric && <Num label={tr("Úhel (směr 2)")} value={f.angle2} min={0.01} suffix="°" bind={b("angle2")} onChange={(v) => set({ angle2: Math.min(360, v) })} />}
                 <ThinField value={f.thin} onChange={(thin) => set({ thin })} />
                 {mode}
               </>
@@ -365,10 +366,10 @@ export function FeatureProps({
           case "sweep":
             return (
               <>
-                <SketchPick label="Profil (uzavřená skica)" value={f.profileId} sketches={sketches} onChange={(v) => set({ profileId: v })} />
-                <SketchPick label="Dráha (křivka)" value={f.pathId} sketches={sketches} onChange={(v) => set({ pathId: v })} />
-                <Check label="Natáčet profil podle křivky (Frenet)" value={f.frenet} onChange={(v) => set({ frenet: v })} />
-                <Info>Profil by měl ležet v rovině kolmé na začátek dráhy. Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá.</Info>
+                <SketchPick label={tr("Profil (uzavřená skica)")} value={f.profileId} sketches={sketches} onChange={(v) => set({ profileId: v })} />
+                <SketchPick label={tr("Dráha (křivka)")} value={f.pathId} sketches={sketches} onChange={(v) => set({ pathId: v })} />
+                <Check label={tr("Natáčet profil podle křivky (Frenet)")} value={f.frenet} onChange={(v) => set({ frenet: v })} />
+                <Info>{tr("Profil by měl ležet v rovině kolmé na začátek dráhy. Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá.")}</Info>
                 {mode}
               </>
             );
@@ -378,33 +379,33 @@ export function FeatureProps({
             return (
               <>
                 <div>
-                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Profily (v pořadí)</p>
+                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Profily (v pořadí)")}</p>
                   <ol className="space-y-1.5">
                     {ids.map((id, k) => (
                       <li key={k} className="flex items-center gap-1.5">
                         <span className="w-5 text-center font-mono text-[11px] text-ink-700/45">{k + 1}</span>
                         <select className={selectCls} value={id} onChange={(e) => setIds(ids.map((x, j) => (j === k ? e.target.value : x)))}>
-                          <option value="">— vyberte skicu —</option>
+                          <option value="">{tr("— vyberte skicu —")}</option>
                           {sketches.map((s) => (
                             <option key={s.id} value={s.id}>
                               {s.name}
                             </option>
                           ))}
                         </select>
-                        <button type="button" title="Posunout nahoru" disabled={!k} className="rounded px-1 text-ink-700/50 hover:text-ink-700 disabled:opacity-25" onClick={() => setIds(ids.map((x, j) => (j === k - 1 ? ids[k] : j === k ? ids[k - 1] : x)))}>
+                        <button type="button" title={tr("Posunout nahoru")} disabled={!k} className="rounded px-1 text-ink-700/50 hover:text-ink-700 disabled:opacity-25" onClick={() => setIds(ids.map((x, j) => (j === k - 1 ? ids[k] : j === k ? ids[k - 1] : x)))}>
                           ↑
                         </button>
-                        <button type="button" title="Odebrat" disabled={ids.length <= 2} className="rounded px-1 text-ink-700/50 hover:text-brand disabled:opacity-25" onClick={() => setIds(ids.filter((_, j) => j !== k))}>
+                        <button type="button" title={tr("Odebrat")} disabled={ids.length <= 2} className="rounded px-1 text-ink-700/50 hover:text-brand disabled:opacity-25" onClick={() => setIds(ids.filter((_, j) => j !== k))}>
                           ×
                         </button>
                       </li>
                     ))}
                   </ol>
                   <button type="button" className="mt-1.5 text-[12px] font-medium text-brand hover:underline" onClick={() => setIds([...ids, sketches.find((s) => !ids.includes(s.id))?.id ?? ""])}>
-                    + Přidat profil
+                    {tr("+ Přidat profil")}
                   </button>
                 </div>
-                <Check label="Přímkové plochy (bez vyhlazení)" value={f.ruled} onChange={(v) => set({ ruled: v })} />
+                <Check label={tr("Přímkové plochy (bez vyhlazení)")} value={f.ruled} onChange={(v) => set({ ruled: v })} />
                 {mode}
               </>
             );
@@ -412,9 +413,9 @@ export function FeatureProps({
           case "box":
             return (
               <>
-                <Vec label="Rozměry (X × Y × Z)" value={f.size} bind={b("size")} onChange={(v) => set({ size: v })} />
-                <Vec label="Poloha" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
-                <Check label="Poloha = střed kvádru" value={f.centered} onChange={(v) => set({ centered: v })} />
+                <Vec label={tr("Rozměry (X × Y × Z)")} value={f.size} bind={b("size")} onChange={(v) => set({ size: v })} />
+                <Vec label={tr("Poloha")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Check label={tr("Poloha = střed kvádru")} value={f.centered} onChange={(v) => set({ centered: v })} />
                 {mode}
               </>
             );
@@ -422,19 +423,19 @@ export function FeatureProps({
             return (
               <>
                 <div className="grid grid-cols-2 gap-2">
-                  <Num label="Průměr" value={f.radius * 2} min={0.001} bind={b("radius")} bindFactor={2} onChange={(v) => set({ radius: v / 2 })} />
-                  <Num label="Výška" value={f.height} min={0.001} bind={b("height")} onChange={(v) => set({ height: v })} />
+                  <Num label={tr("Průměr")} value={f.radius * 2} min={0.001} bind={b("radius")} bindFactor={2} onChange={(v) => set({ radius: v / 2 })} />
+                  <Num label={tr("Výška")} value={f.height} min={0.001} bind={b("height")} onChange={(v) => set({ height: v })} />
                 </div>
-                <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
-                <Vec label="Poloha podstavy" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Seg label={tr("Osa")} value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
+                <Vec label={tr("Poloha podstavy")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
                 {mode}
               </>
             );
           case "sphere":
             return (
               <>
-                <Num label="Průměr" value={f.radius * 2} min={0.001} bind={b("radius")} bindFactor={2} onChange={(v) => set({ radius: v / 2 })} />
-                <Vec label="Střed" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Num label={tr("Průměr")} value={f.radius * 2} min={0.001} bind={b("radius")} bindFactor={2} onChange={(v) => set({ radius: v / 2 })} />
+                <Vec label={tr("Střed")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
                 {mode}
               </>
             );
@@ -442,12 +443,12 @@ export function FeatureProps({
             return (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <Num label="Ø dole" value={f.radius1 * 2} min={0} bind={b("radius1")} bindFactor={2} onChange={(v) => set({ radius1: v / 2 })} />
-                  <Num label="Ø nahoře" value={f.radius2 * 2} min={0} bind={b("radius2")} bindFactor={2} onChange={(v) => set({ radius2: v / 2 })} />
-                  <Num label="Výška" value={f.height} min={0.001} bind={b("height")} onChange={(v) => set({ height: v })} />
+                  <Num label={tr("Ø dole")} value={f.radius1 * 2} min={0} bind={b("radius1")} bindFactor={2} onChange={(v) => set({ radius1: v / 2 })} />
+                  <Num label={tr("Ø nahoře")} value={f.radius2 * 2} min={0} bind={b("radius2")} bindFactor={2} onChange={(v) => set({ radius2: v / 2 })} />
+                  <Num label={tr("Výška")} value={f.height} min={0.001} bind={b("height")} onChange={(v) => set({ height: v })} />
                 </div>
-                <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
-                <Vec label="Poloha podstavy" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Seg label={tr("Osa")} value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
+                <Vec label={tr("Poloha podstavy")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
                 {mode}
               </>
             );
@@ -455,12 +456,12 @@ export function FeatureProps({
             return (
               <>
                 <div className="grid grid-cols-3 gap-2">
-                  <Num label="Ø vnější" value={f.outer} min={0.001} bind={b("outer")} onChange={(v) => set({ outer: v })} />
-                  <Num label="Ø vnitřní" value={f.inner} min={0} bind={b("inner")} onChange={(v) => set({ inner: v })} />
-                  <Num label="Délka" value={f.height} min={0.001} bind={b("height")} onChange={(v) => set({ height: v })} />
+                  <Num label={tr("Ø vnější")} value={f.outer} min={0.001} bind={b("outer")} onChange={(v) => set({ outer: v })} />
+                  <Num label={tr("Ø vnitřní")} value={f.inner} min={0} bind={b("inner")} onChange={(v) => set({ inner: v })} />
+                  <Num label={tr("Délka")} value={f.height} min={0.001} bind={b("height")} onChange={(v) => set({ height: v })} />
                 </div>
-                <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
-                <Vec label="Poloha podstavy" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Seg label={tr("Osa")} value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
+                <Vec label={tr("Poloha podstavy")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
                 {mode}
               </>
             );
@@ -470,9 +471,9 @@ export function FeatureProps({
             const t = threadByName(f.designation);
             return (
               <>
-                <Field label="Závit (ISO metrický – hrubé i jemné stoupání)">
+                <Field label={tr("Závit (ISO metrický – hrubé i jemné stoupání)")}>
                   <select className={selectCls} value={t?.name ?? ""} onChange={(e) => set({ designation: e.target.value })}>
-                    {!t && <option value="">— vyberte —</option>}
+                    {!t && <option value="">{tr("— vyberte —")}</option>}
                     {ALL_THREADS.map((x) => (
                       <option key={x.name} value={x.name}>
                         {x.name}{x.name.includes("×") ? "" : ` × ${fmtMm(x.pitch)}`}
@@ -480,16 +481,16 @@ export function FeatureProps({
                     ))}
                   </select>
                 </Field>
-                <Check label="Vnitřní závit (v díře)" value={!!f.internal} onChange={(v) => set({ internal: v })} />
-                <Num label="Délka závitu" value={f.length} min={0.1} bind={b("length")} onChange={(v) => set({ length: v })} />
-                <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
-                <Vec label="Začátek závitu (na ose)" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
-                <Check label="Modelovat závitové drážky" value={f.modeled} onChange={(v) => set({ modeled: v })} />
+                <Check label={tr("Vnitřní závit (v díře)")} value={!!f.internal} onChange={(v) => set({ internal: v })} />
+                <Num label={tr("Délka závitu")} value={f.length} min={0.1} bind={b("length")} onChange={(v) => set({ length: v })} />
+                <Seg label={tr("Osa")} value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
+                <Vec label={tr("Začátek závitu (na ose)")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Check label={tr("Modelovat závitové drážky")} value={f.modeled} onChange={(v) => set({ modeled: v })} />
                 <Info>
                   {f.modeled
-                    ? "Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk."
-                    : "Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese. Doporučeno pro výrobní dokumentaci."}
-                  {t && ` Jmenovitý Ø ${fmtMm(t.d)} mm, stoupání ${fmtMm(t.pitch)} mm.`}
+                    ? tr("Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk.")
+                    : tr("Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese. Doporučeno pro výrobní dokumentaci.")}
+                  {t && tr(" Jmenovitý Ø {0} mm, stoupání {1} mm.", fmtMm(t.d), fmtMm(t.pitch))}
                 </Info>
               </>
             );
@@ -499,133 +500,133 @@ export function FeatureProps({
             return (
               <>
                 {f.type === "fillet" ? (
-                  <Num label="Poloměr" value={f.radius} min={0.01} step={0.5} bind={b("radius")} onChange={(v) => set({ radius: v })} />
+                  <Num label={tr("Poloměr")} value={f.radius} min={0.01} step={0.5} bind={b("radius")} onChange={(v) => set({ radius: v })} />
                 ) : (
-                  <Num label="Velikost sražení" value={f.distance} min={0.01} step={0.5} bind={b("distance")} onChange={(v) => set({ distance: v })} />
+                  <Num label={tr("Velikost sražení")} value={f.distance} min={0.01} step={0.5} bind={b("distance")} onChange={(v) => set({ distance: v })} />
                 )}
-                <Seg label="Hrany" value={f.edges === "all" ? "all" : "pick"} options={[{ v: "pick", l: "Vybrané" }, { v: "all", l: "Všechny" }]} onChange={(v) => set({ edges: v === "all" ? "all" : [] })} />
+                <Seg label={tr("Hrany")} value={f.edges === "all" ? "all" : "pick"} options={[{ v: "pick", l: tr("Vybrané") }, { v: "all", l: tr("Všechny") }]} onChange={(v) => set({ edges: v === "all" ? "all" : [] })} />
                 {f.edges !== "all" && <PickInfo n={f.edges.length} what="hran" hint={pickHint} onClear={() => set({ edges: [] })} />}
               </>
             );
           case "shell":
             return (
               <>
-                <Num label="Tloušťka stěny" value={f.thickness} min={0.01} step={0.5} bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
-                <PickInfo n={f.faces.length} what="otevřených ploch" hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Num label={tr("Tloušťka stěny")} value={f.thickness} min={0.01} step={0.5} bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
+                <PickInfo n={f.faces.length} what={tr("otevřených ploch")} hint={pickHint} onClear={() => set({ faces: [] })} />
               </>
             );
           case "pushPull":
             return (
               <>
-                <Num label="Vzdálenost" value={f.distance} step={0.5} hint="+ ven · − dovnitř" bind={b("distance")} onChange={(v) => set({ distance: v })} />
-                <PickInfo n={f.faces.length} what="rovinných ploch" hint={pickHint} onClear={() => set({ faces: [] })} />
-                <Info>Přímá úprava: plocha se posune po své normále. Kladná hodnota přidá materiál, záporná odebere.</Info>
+                <Num label={tr("Vzdálenost")} value={f.distance} step={0.5} hint={tr("+ ven · − dovnitř")} bind={b("distance")} onChange={(v) => set({ distance: v })} />
+                <PickInfo n={f.faces.length} what={tr("rovinných ploch")} hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Info>{tr("Přímá úprava: plocha se posune po své normále. Kladná hodnota přidá materiál, záporná odebere.")}</Info>
               </>
             );
           case "offsetFace":
             return (
               <>
-                <Num label="Odsazení" value={f.distance} step={0.1} hint="+ ven · − dovnitř" bind={b("distance")} onChange={(v) => set({ distance: v })} />
-                <PickInfo n={f.faces.length} what="ploch k odsazení" hint={pickHint} onClear={() => set({ faces: [] })} />
-                <Info>Funguje i na zakřivených plochách – např. odsazení stěny díry o +0,5 mm díru zmenší.</Info>
+                <Num label={tr("Odsazení")} value={f.distance} step={0.1} hint={tr("+ ven · − dovnitř")} bind={b("distance")} onChange={(v) => set({ distance: v })} />
+                <PickInfo n={f.faces.length} what={tr("ploch k odsazení")} hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Info>{tr("Funguje i na zakřivených plochách – např. odsazení stěny díry o +0,5 mm díru zmenší.")}</Info>
               </>
             );
           case "deleteFace":
             return (
               <>
-                <PickInfo n={f.faces.length} what="ploch k odstranění" hint={pickHint} onClear={() => set({ faces: [] })} />
-                <Info>Odstraní díry, čepy, kuželová zahloubení a válcová zaoblení (obnoví ostrou hranu). Vhodné pro úpravy importovaných modelů.</Info>
+                <PickInfo n={f.faces.length} what={tr("ploch k odstranění")} hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Info>{tr("Odstraní díry, čepy, kuželová zahloubení a válcová zaoblení (obnoví ostrou hranu). Vhodné pro úpravy importovaných modelů.")}</Info>
               </>
             );
           case "thicken":
             return (
               <>
-                <Num label="Tloušťka" value={f.thickness} step={0.5} hint="+ ven · − dovnitř" bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
-                <PickInfo n={f.faces.length} what="ploch k zesílení" hint={pickHint} onClear={() => set({ faces: [] })} />
+                <Num label={tr("Tloušťka")} value={f.thickness} step={0.5} hint={tr("+ ven · − dovnitř")} bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
+                <PickInfo n={f.faces.length} what={tr("ploch k zesílení")} hint={pickHint} onClear={() => set({ faces: [] })} />
                 {mode}
               </>
             );
           case "rib":
             return (
               <>
-                <SketchPick label="Čára žebra (otevřená skica)" value={f.sketchId} sketches={sketches} onChange={(v) => set({ sketchId: v })} />
-                <Num label="Tloušťka" value={f.thickness} min={0.01} step={0.5} bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
+                <SketchPick label={tr("Čára žebra (otevřená skica)")} value={f.sketchId} sketches={sketches} onChange={(v) => set({ sketchId: v })} />
+                <Num label={tr("Tloušťka")} value={f.thickness} min={0.01} step={0.5} bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
                 <Seg
-                  label="Směr tloušťky"
+                  label={tr("Směr tloušťky")}
                   value={f.direction}
                   options={[
-                    { v: "normal", l: "Kolmo na skicu" },
-                    { v: "inPlane", l: "V rovině skici" },
+                    { v: "normal", l: tr("Kolmo na skicu") },
+                    { v: "inPlane", l: tr("V rovině skici") },
                   ]}
                   onChange={(v) => set({ direction: v })}
                 />
-                <Check label="Obrátit stranu" value={f.flip} onChange={(v) => set({ flip: v })} />
-                <Info>Žebro se protáhne od čáry až k tělesu. Stranu, kde narazí na materiál, najde automaticky.</Info>
+                <Check label={tr("Obrátit stranu")} value={f.flip} onChange={(v) => set({ flip: v })} />
+                <Info>{tr("Žebro se protáhne od čáry až k tělesu. Stranu, kde narazí na materiál, najde automaticky.")}</Info>
               </>
             );
           case "spring":
             return (
               <>
                 <div className="grid grid-cols-2 gap-2">
-                  <Num label="Průměr pružiny" value={f.radius * 2} min={0.01} bind={b("radius")} bindFactor={2} onChange={(v) => set({ radius: v / 2 })} />
-                  <Num label="Průměr drátu" value={f.wire} min={0.01} step={0.1} bind={b("wire")} onChange={(v) => set({ wire: v })} />
-                  <Num label="Stoupání" value={f.pitch} min={0.01} step={0.5} bind={b("pitch")} onChange={(v) => set({ pitch: v })} />
-                  <Num label="Počet závitů" value={f.turns} min={0.25} step={0.5} suffix="" bind={b("turns")} onChange={(v) => set({ turns: v })} />
+                  <Num label={tr("Průměr pružiny")} value={f.radius * 2} min={0.01} bind={b("radius")} bindFactor={2} onChange={(v) => set({ radius: v / 2 })} />
+                  <Num label={tr("Průměr drátu")} value={f.wire} min={0.01} step={0.1} bind={b("wire")} onChange={(v) => set({ wire: v })} />
+                  <Num label={tr("Stoupání")} value={f.pitch} min={0.01} step={0.5} bind={b("pitch")} onChange={(v) => set({ pitch: v })} />
+                  <Num label={tr("Počet závitů")} value={f.turns} min={0.25} step={0.5} suffix="" bind={b("turns")} onChange={(v) => set({ turns: v })} />
                 </div>
-                <Info>Volná délka {Math.round(f.pitch * f.turns * 100) / 100} mm</Info>
-                <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
-                <Vec label="Poloha" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Info>{tr("Volná délka")}{" "}{Math.round(f.pitch * f.turns * 100) / 100} mm</Info>
+                <Seg label={tr("Osa")} value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
+                <Vec label={tr("Poloha")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
                 {mode}
               </>
             );
           case "draft":
             return (
               <>
-                <Num label="Úhel úkosu" value={f.angle} suffix="°" step={0.5} bind={b("angle")} onChange={(v) => set({ angle: Math.max(-44, Math.min(44, v)) })} />
-                <PlaneDefField label="Neutrální rovina" value={f.planeDef} allowNone noneLabel="Základní rovina (níže)" onChange={(planeDef) => set({ planeDef })} />
+                <Num label={tr("Úhel úkosu")} value={f.angle} suffix="°" step={0.5} bind={b("angle")} onChange={(v) => set({ angle: Math.max(-44, Math.min(44, v)) })} />
+                <PlaneDefField label={tr("Neutrální rovina")} value={f.planeDef} allowNone noneLabel={tr("Základní rovina (níže)")} onChange={(planeDef) => set({ planeDef })} />
                 {!f.planeDef && (
                   <>
-                    <Seg label="Základní rovina" value={f.plane} options={AXIS_PLANES} onChange={(v) => set({ plane: v })} />
-                    <Num label={`Poloha roviny (${AXIS_PLANES.find((p) => p.v === f.plane)?.axis})`} value={f.offset} bind={b("offset")} onChange={(v) => set({ offset: v })} />
+                    <Seg label={tr("Základní rovina")} value={f.plane} options={AXIS_PLANES} onChange={(v) => set({ plane: v })} />
+                    <Num label={tr("Poloha roviny ({0})", AXIS_PLANES.find((p) => p.v === f.plane)?.axis)} value={f.offset} bind={b("offset")} onChange={(v) => set({ offset: v })} />
                   </>
                 )}
-                <PickInfo n={f.faces.length} what="ploch ke zkosení" hint={pickHint} onClear={() => set({ faces: [] })} />
+                <PickInfo n={f.faces.length} what={tr("ploch ke zkosení")} hint={pickHint} onClear={() => set({ faces: [] })} />
               </>
             );
           case "split": {
             const ax = AXIS_PLANES.find((p) => p.v === f.plane)?.axis ?? "Z";
             return (
               <>
-                <PlaneDefField label="Řezná rovina" value={f.planeDef} allowNone noneLabel="Základní rovina (níže)" onChange={(planeDef) => set({ planeDef })} />
+                <PlaneDefField label={tr("Řezná rovina")} value={f.planeDef} allowNone noneLabel={tr("Základní rovina (níže)")} onChange={(planeDef) => set({ planeDef })} />
                 {!f.planeDef && (
                   <>
-                    <Seg label="Základní rovina" value={f.plane} options={AXIS_PLANES} onChange={(v) => set({ plane: v })} />
-                    <Num label={`Poloha roviny (${ax})`} value={f.offset} bind={b("offset")} onChange={(v) => set({ offset: v })} />
+                    <Seg label={tr("Základní rovina")} value={f.plane} options={AXIS_PLANES} onChange={(v) => set({ plane: v })} />
+                    <Num label={tr("Poloha roviny ({0})", ax)} value={f.offset} bind={b("offset")} onChange={(v) => set({ offset: v })} />
                   </>
                 )}
-                <Seg label="Ponechat" value={f.keep} options={[{ v: "negative", l: f.planeDef ? "Proti normále" : `Stranu −${ax}` }, { v: "positive", l: f.planeDef ? "Ve směru normály" : `Stranu +${ax}` }]} onChange={(v) => set({ keep: v })} />
+                <Seg label={tr("Ponechat")} value={f.keep} options={[{ v: "negative", l: f.planeDef ? tr("Proti normále") : tr("Stranu −{0}", ax) }, { v: "positive", l: f.planeDef ? tr("Ve směru normály") : tr("Stranu +{0}", ax) }]} onChange={(v) => set({ keep: v })} />
               </>
             );
           }
           case "transform":
             return (
               <>
-                <Vec label="Posunutí" value={f.translate} bind={b("translate")} onChange={(v) => set({ translate: v })} />
+                <Vec label={tr("Posunutí")} value={f.translate} bind={b("translate")} onChange={(v) => set({ translate: v })} />
                 <div className="grid grid-cols-2 gap-2">
-                  <Num label="Otočení" value={f.rotateAngle} suffix="°" bind={b("rotateAngle")} onChange={(v) => set({ rotateAngle: v })} />
-                  <Num label="Měřítko" value={f.scale} min={0.0001} step={0.1} suffix="×" bind={b("scale")} onChange={(v) => set({ scale: v })} />
+                  <Num label={tr("Otočení")} value={f.rotateAngle} suffix="°" bind={b("rotateAngle")} onChange={(v) => set({ rotateAngle: v })} />
+                  <Num label={tr("Měřítko")} value={f.scale} min={0.0001} step={0.1} suffix="×" bind={b("scale")} onChange={(v) => set({ scale: v })} />
                 </div>
-                <Seg label="Osa otočení (přes počátek)" value={f.rotateAxis} options={AXES} onChange={(v) => set({ rotateAxis: v })} />
-                <Info>Pořadí: měřítko → otočení → posunutí, vše vůči počátku souřadnic.</Info>
+                <Seg label={tr("Osa otočení (přes počátek)")} value={f.rotateAxis} options={AXES} onChange={(v) => set({ rotateAxis: v })} />
+                <Info>{tr("Pořadí: měřítko → otočení → posunutí, vše vůči počátku souřadnic.")}</Info>
               </>
             );
           case "datum":
             return (
               <>
-                <PlaneDefField label="Definice roviny" value={f.planeDef} allowNone noneLabel="Ručně (počátek a normála níže)" onChange={(planeDef) => set({ planeDef })} />
-                {f.planeDef && <Info>Počátek a normála níže se dopočítají z definice při každé změně modelu.</Info>}
-                <Vec label="Počátek" value={f.origin} bind={b("origin")} onChange={(v) => set({ origin: v })} />
-                <Vec label="Normála" value={f.normal} onChange={(v) => set({ normal: v })} />
+                <PlaneDefField label={tr("Definice roviny")} value={f.planeDef} allowNone noneLabel={tr("Ručně (počátek a normála níže)")} onChange={(planeDef) => set({ planeDef })} />
+                {f.planeDef && <Info>{tr("Počátek a normála níže se dopočítají z definice při každé změně modelu.")}</Info>}
+                <Vec label={tr("Počátek")} value={f.origin} bind={b("origin")} onChange={(v) => set({ origin: v })} />
+                <Vec label={tr("Normála")} value={f.normal} onChange={(v) => set({ normal: v })} />
                 <div className="flex flex-wrap gap-1.5">
                   {(
                     [
@@ -639,40 +640,40 @@ export function FeatureProps({
                     </button>
                   ))}
                 </div>
-                <Num label="Velikost zobrazení" value={f.size} min={1} bind={b("size")} onChange={(v) => set({ size: v })} />
-                <Info>Pomocná rovina nevytváří geometrii. Použijte ji pro novou skicu (Nová skica → pomocná rovina).</Info>
+                <Num label={tr("Velikost zobrazení")} value={f.size} min={1} bind={b("size")} onChange={(v) => set({ size: v })} />
+                <Info>{tr("Pomocná rovina nevytváří geometrii. Použijte ji pro novou skicu (Nová skica → pomocná rovina).")}</Info>
               </>
             );
           case "text":
             return (
               <>
-                <Field label="Text">
+                <Field label={tr("Text")}>
                   <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand" value={f.text} maxLength={120} onChange={(e) => set({ text: e.target.value })} />
                 </Field>
                 <div className="grid grid-cols-2 gap-2">
-                  <Num label="Výška písma" value={f.height} min={0.5} bind={b("height")} onChange={(v) => set({ height: v })} />
-                  <Num label="Hloubka" value={f.depth} min={0.01} step={0.1} bind={b("depth")} onChange={(v) => set({ depth: v })} />
+                  <Num label={tr("Výška písma")} value={f.height} min={0.5} bind={b("height")} onChange={(v) => set({ height: v })} />
+                  <Num label={tr("Hloubka")} value={f.depth} min={0.01} step={0.1} bind={b("depth")} onChange={(v) => set({ depth: v })} />
                 </div>
-                <Seg label="Způsob" value={f.mode} options={[{ v: "cut", l: "Gravírovat" }, { v: "add", l: "Vystoupit" }]} onChange={(v) => set({ mode: v })} />
+                <Seg label={tr("Způsob")} value={f.mode} options={[{ v: "cut", l: tr("Gravírovat") }, { v: "add", l: tr("Vystoupit") }]} onChange={(v) => set({ mode: v })} />
                 {f.plane.kind === "base" ? (
                   <div className="grid grid-cols-[1fr_96px] items-end gap-2">
-                    <Seg label="Rovina" value={f.plane.name} options={[{ v: "XY", l: "XY" }, { v: "XZ", l: "XZ" }, { v: "YZ", l: "YZ" }]} onChange={(v) => set({ plane: { kind: "base", name: v, offset: f.plane.kind === "base" ? f.plane.offset : 0 } })} />
-                    <Num label="Odsazení" value={f.plane.offset} bind={b("plane.offset")} onChange={(v) => set({ plane: { ...f.plane, offset: v } })} />
+                    <Seg label={tr("Rovina")} value={f.plane.name} options={[{ v: "XY", l: "XY" }, { v: "XZ", l: "XZ" }, { v: "YZ", l: "YZ" }]} onChange={(v) => set({ plane: { kind: "base", name: v, offset: f.plane.kind === "base" ? f.plane.offset : 0 } })} />
+                    <Num label={tr("Odsazení")} value={f.plane.offset} bind={b("plane.offset")} onChange={(v) => set({ plane: { ...f.plane, offset: v } })} />
                   </div>
                 ) : (
                   <Info>Rovina: {planeLabel(f.plane)}</Info>
                 )}
-                <Vec label="Střed textu (v rovině)" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
-                <Num label="Natočení" value={f.angle} suffix="°" bind={b("angle")} onChange={(v) => set({ angle: v })} />
+                <Vec label={tr("Střed textu (v rovině)")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />
+                <Num label={tr("Natočení")} value={f.angle} suffix="°" bind={b("angle")} onChange={(v) => set({ angle: v })} />
               </>
             );
           case "pattern": {
             const pcount = "count" in f ? f.count : 4;
             return (
               <>
-                <Field label="Opakovaný prvek">
+                <Field label={tr("Opakovaný prvek")}>
                   <select className={selectCls} value={f.featureId} onChange={(e) => set({ featureId: e.target.value })}>
-                    <option value="">— vyberte —</option>
+                    <option value="">{tr("— vyberte —")}</option>
                     {toolFeatures.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.name}
@@ -681,9 +682,9 @@ export function FeatureProps({
                   </select>
                 </Field>
                 <Seg
-                  label="Typ pole"
+                  label={tr("Typ pole")}
                   value={f.kind}
-                  options={[{ v: "linear", l: "Lineární" }, { v: "circular", l: "Kruhové" }]}
+                  options={[{ v: "linear", l: tr("Lineární") }, { v: "circular", l: tr("Kruhové") }]}
                   onChange={(v) =>
                     set(v === "linear" ? { kind: v, spacing: 20, direction: [1, 0, 0], count: pcount } : { kind: v, angle: 360, axis: "Z", center: [0, 0, 0], count: pcount })
                   }
@@ -691,35 +692,35 @@ export function FeatureProps({
                 {f.kind === "linear" ? (
                   <>
                     <div className="grid grid-cols-2 gap-2">
-                      <Num label="Počet kusů" value={f.count} min={1} suffix="ks" bind={b("count")} onChange={(v) => set({ count: Math.round(v) })} />
-                      <Num label="Rozteč" value={f.spacing} bind={b("spacing")} onChange={(v) => set({ spacing: v })} />
+                      <Num label={tr("Počet kusů")} value={f.count} min={1} suffix="ks" bind={b("count")} onChange={(v) => set({ count: Math.round(v) })} />
+                      <Num label={tr("Rozteč")} value={f.spacing} bind={b("spacing")} onChange={(v) => set({ spacing: v })} />
                     </div>
-                    <Vec label="Směr 1" value={f.direction} onChange={(v) => set({ direction: v })} />
+                    <Vec label={tr("Směr 1")} value={f.direction} onChange={(v) => set({ direction: v })} />
                     <Check
-                      label="Druhý směr (mřížka)"
+                      label={tr("Druhý směr (mřížka)")}
                       value={(f.count2 ?? 1) > 1}
                       onChange={(on) => set(on ? { count2: 2, spacing2: f.spacing2 ?? f.spacing, direction2: f.direction2 ?? (Math.abs(f.direction[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0]) } : { count2: 1 })}
                     />
                     {(f.count2 ?? 1) > 1 && (
                       <>
                         <div className="grid grid-cols-2 gap-2">
-                          <Num label="Počet (směr 2)" value={f.count2 ?? 2} min={1} suffix="ks" bind={b("count2")} onChange={(v) => set({ count2: Math.round(v) })} />
-                          <Num label="Rozteč (směr 2)" value={f.spacing2 ?? f.spacing} bind={b("spacing2")} onChange={(v) => set({ spacing2: v })} />
+                          <Num label={tr("Počet (směr 2)")} value={f.count2 ?? 2} min={1} suffix="ks" bind={b("count2")} onChange={(v) => set({ count2: Math.round(v) })} />
+                          <Num label={tr("Rozteč (směr 2)")} value={f.spacing2 ?? f.spacing} bind={b("spacing2")} onChange={(v) => set({ spacing2: v })} />
                         </div>
-                        <Vec label="Směr 2" value={f.direction2 ?? [0, 1, 0]} onChange={(v) => set({ direction2: v })} />
+                        <Vec label={tr("Směr 2")} value={f.direction2 ?? [0, 1, 0]} onChange={(v) => set({ direction2: v })} />
                       </>
                     )}
                   </>
                 ) : f.kind !== "circular" ? (
-                  <Info>Tento typ pole (po křivce / podle skici / výplňové) připravuje modul polí.</Info>
+                  <Info>{tr("Tento typ pole (po křivce / podle skici / výplňové) připravuje modul polí.")}</Info>
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-2">
-                      <Num label="Počet kusů" value={f.count} min={2} suffix="ks" bind={b("count")} onChange={(v) => set({ count: Math.round(v) })} />
-                      <Num label="Celkový úhel" value={f.angle} suffix="°" min={1} bind={b("angle")} onChange={(v) => set({ angle: Math.min(360, v) })} />
+                      <Num label={tr("Počet kusů")} value={f.count} min={2} suffix="ks" bind={b("count")} onChange={(v) => set({ count: Math.round(v) })} />
+                      <Num label={tr("Celkový úhel")} value={f.angle} suffix="°" min={1} bind={b("angle")} onChange={(v) => set({ angle: Math.min(360, v) })} />
                     </div>
-                    <Seg label="Osa" value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
-                    <Vec label="Střed" value={f.center} bind={b("center")} onChange={(v) => set({ center: v })} />
+                    <Seg label={tr("Osa")} value={f.axis} options={AXES} onChange={(v) => set({ axis: v })} />
+                    <Vec label={tr("Střed")} value={f.center} bind={b("center")} onChange={(v) => set({ center: v })} />
                   </>
                 )}
               </>
@@ -728,18 +729,18 @@ export function FeatureProps({
           case "mirror":
             return (
               <>
-                <PlaneDefField label="Rovina zrcadlení" value={f.planeDef} allowNone noneLabel="Základní rovina (níže)" onChange={(planeDef) => set({ planeDef })} />
+                <PlaneDefField label={tr("Rovina zrcadlení")} value={f.planeDef} allowNone noneLabel={tr("Základní rovina (níže)")} onChange={(planeDef) => set({ planeDef })} />
                 {!f.planeDef && (
                   <>
-                    <Seg label="Základní rovina" value={f.plane} options={[{ v: "YZ", l: "YZ" }, { v: "XZ", l: "XZ" }, { v: "XY", l: "XY" }]} onChange={(v) => set({ plane: v })} />
-                    <Num label="Posunutí roviny" value={f.offset} bind={b("offset")} onChange={(v) => set({ offset: v })} />
+                    <Seg label={tr("Základní rovina")} value={f.plane} options={[{ v: "YZ", l: "YZ" }, { v: "XZ", l: "XZ" }, { v: "XY", l: "XY" }]} onChange={(v) => set({ plane: v })} />
+                    <Num label={tr("Posunutí roviny")} value={f.offset} bind={b("offset")} onChange={(v) => set({ offset: v })} />
                   </>
                 )}
-                <Check label="Ponechat originál (sloučit)" value={f.keepOriginal} onChange={(v) => set({ keepOriginal: v })} />
+                <Check label={tr("Ponechat originál (sloučit)")} value={f.keepOriginal} onChange={(v) => set({ keepOriginal: v })} />
               </>
             );
           case "import":
-            return <Info>Importovaný soubor: {f.fileName} ({f.format.toUpperCase()}). Na model můžete navázat dalšími prvky (díry, zaoblení, odebrání…).</Info>;
+            return <Info>{tr("Importovaný soubor:")}{" "}{f.fileName} ({f.format.toUpperCase()}{tr("). Na model můžete navázat dalšími prvky (díry, zaoblení, odebrání…).")}</Info>;
         }
       })()}
     </div>
@@ -779,61 +780,61 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
   };
   return (
     <>
-      <Seg label="Typ díry" value={kind} options={HOLE_KINDS} onChange={changeKind} />
+      <Seg label={tr("Typ díry")} value={kind} options={HOLE_KINDS} onChange={changeKind} />
       {kind === "tapped" ? (
         <>
-          <Field label="Závit (hrubé i jemné stoupání)">
+          <Field label={tr("Závit (hrubé i jemné stoupání)")}>
             <select className={selectCls} value={thread && ALL_THREADS.some((x) => x.name === thread.name) ? thread.name : "custom"} onChange={(e) => e.target.value !== "custom" && set({ thread: e.target.value, diameter: threadByName(e.target.value)?.tap ?? f.diameter })}>
-              {!(thread && ALL_THREADS.some((x) => x.name === thread.name)) && <option value="custom">{thread ? `${thread.name} (vlastní stoupání)` : "— vyberte nebo zadejte níže —"}</option>}
+              {!(thread && ALL_THREADS.some((x) => x.name === thread.name)) && <option value="custom">{thread ? tr("{0} (vlastní stoupání)", thread.name) : tr("— vyberte nebo zadejte níže —")}</option>}
               {ALL_THREADS.map((t) => (
                 <option key={t.name} value={t.name}>
-                  {t.name}{t.name.includes("×") ? "" : ` × ${fmtMm(t.pitch)}`} · vrták Ø{fmtMm(t.tap)}
+                  {t.name}{t.name.includes("×") ? "" : ` × ${fmtMm(t.pitch)}`} {tr("· vrták Ø")}{fmtMm(t.tap)}
                 </option>
               ))}
             </select>
           </Field>
-          <Field label="Označení závitu (text)">
-            <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-brand" aria-label="Označení závitu díry" value={f.thread ?? ""} placeholder="např. M18×1,5" onChange={(e) => { const t = threadByName(e.target.value); set(t ? { thread: e.target.value, diameter: t.tap } : { thread: e.target.value }); }} />
-            {!thread && (f.thread ?? "").trim() && <span className="mt-1 block text-[11px] text-brand-600">Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).</span>}
+          <Field label={tr("Označení závitu (text)")}>
+            <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-brand" aria-label={tr("Označení závitu díry")} value={f.thread ?? ""} placeholder={tr("např. M18×1,5")} onChange={(e) => { const t = threadByName(e.target.value); set(t ? { thread: e.target.value, diameter: t.tap } : { thread: e.target.value }); }} />
+            {!thread && (f.thread ?? "").trim() && <span className="mt-1 block text-[11px] text-brand-600">{tr("Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).")}</span>}
           </Field>
-          <Num label="Hloubka závitu" value={f.threadDepth ?? 0} min={0} hint="0 = celá" bind={b("threadDepth")} onChange={(v) => set({ threadDepth: v })} />
-          {thread && <Info>Vrtá se jádrový průměr Ø{fmtMm(thread.tap)} mm, závit {thread.name} se uvede ve výkrese.</Info>}
+          <Num label={tr("Hloubka závitu")} value={f.threadDepth ?? 0} min={0} hint={tr("0 = celá")} bind={b("threadDepth")} onChange={(v) => set({ threadDepth: v })} />
+          {thread && <Info>{tr("Vrtá se jádrový průměr Ø")}{fmtMm(thread.tap)} {tr("mm, závit")}{" "}{thread.name} {tr("se uvede ve výkrese.")}</Info>}
         </>
       ) : (
         <>
-          <Field label="Pro šroub (průchozí díra ISO 273)">
+          <Field label={tr("Pro šroub (průchozí díra ISO 273)")}>
             <select className={selectCls} value={forScrewFit?.name ?? ""} onChange={(e) => pickScrew(e.target.value)}>
-              <option value="">— vlastní průměr —</option>
+              <option value="">{tr("— vlastní průměr —")}</option>
               {METRIC_THREADS.map((t) => (
                 <option key={t.name} value={t.name}>
-                  {t.name} · Ø{fmtMm(clearOf(t))}
+                  {t.name} {tr("· Ø")}{fmtMm(clearOf(t))}
                 </option>
               ))}
             </select>
           </Field>
-          <Seg label="Řada ISO 273" value={fit} options={[{ v: "fine", l: "Jemná" }, { v: "medium", l: "Střední" }, { v: "coarse", l: "Hrubá" }]} onChange={(v) => (forScrewFit ? pickScrew(forScrewFit.name, v) : set({ fit: v }))} />
-          <Num label="Průměr" value={f.diameter} min={0.01} bind={b("diameter")} onChange={(v) => set({ diameter: v })} />
+          <Seg label={tr("Řada ISO 273")} value={fit} options={[{ v: "fine", l: tr("Jemná") }, { v: "medium", l: tr("Střední") }, { v: "coarse", l: tr("Hrubá") }]} onChange={(v) => (forScrewFit ? pickScrew(forScrewFit.name, v) : set({ fit: v }))} />
+          <Num label={tr("Průměr")} value={f.diameter} min={0.01} bind={b("diameter")} onChange={(v) => set({ diameter: v })} />
           {kind === "counterbore" && (
             <div className="grid grid-cols-2 gap-2">
-              <Num label="Ø zahloubení" value={f.cbDiameter} min={0} bind={b("cbDiameter")} onChange={(v) => set({ cbDiameter: v })} />
-              <Num label="Hl. zahloubení" value={f.cbDepth} min={0} bind={b("cbDepth")} onChange={(v) => set({ cbDepth: v })} />
+              <Num label={tr("Ø zahloubení")} value={f.cbDiameter} min={0} bind={b("cbDiameter")} onChange={(v) => set({ cbDiameter: v })} />
+              <Num label={tr("Hl. zahloubení")} value={f.cbDepth} min={0} bind={b("cbDepth")} onChange={(v) => set({ cbDepth: v })} />
             </div>
           )}
           {kind === "countersink" && (
             <div className="grid grid-cols-2 gap-2">
-              <Num label="Ø zahloubení" value={f.csDiameter ?? 0} min={0} bind={b("csDiameter")} onChange={(v) => set({ csDiameter: v })} />
-              <Num label="Úhel" value={f.csAngle ?? 90} min={30} suffix="°" bind={b("csAngle")} onChange={(v) => set({ csAngle: Math.min(170, v) })} />
+              <Num label={tr("Ø zahloubení")} value={f.csDiameter ?? 0} min={0} bind={b("csDiameter")} onChange={(v) => set({ csDiameter: v })} />
+              <Num label={tr("Úhel")} value={f.csAngle ?? 90} min={30} suffix="°" bind={b("csAngle")} onChange={(v) => set({ csAngle: Math.min(170, v) })} />
             </div>
           )}
         </>
       )}
-      <ExtentField label="Ukončení" value={endExt} kinds={["blind", "throughAll", "toNext", "toFace"]} defaultDistance={f.depth || 10} onChange={setEnd} />
-      {end.kind === "blind" && <Num label="Úhel špičky vrtáku" value={f.tipAngle ?? 118} min={60} suffix="°" bind={b("tipAngle")} onChange={(v) => set({ tipAngle: Math.min(170, v) })} />}
-      {!f.points?.length && <Vec label="Bod na povrchu" value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />}
-      <RefListField label="Polohy děr (více naráz)" value={f.points ?? []} onChange={(points) => set({ points: points.length ? points : undefined })} />
-      <DirectionField label="Osa díry" allowNormal={false} value={f.dirDef ?? { kind: "axis", axis: f.axis }} onChange={(d) => (!d || d.kind === "axis" ? set({ axis: d?.axis ?? f.axis, dirDef: undefined }) : set({ dirDef: d }))} />
-      <Check label="Vrtat v kladném směru osy" value={f.flip} onChange={(v) => set({ flip: v })} />
-      <p className="text-[11px] text-ink-700/50">Tip: klikněte na plochu modelu – bod a osa se doplní automaticky. Více děr: „Přidat body klikem“ (vrcholy, středy kružnic, body skici přes pravé tlačítko).</p>
+      <ExtentField label={tr("Ukončení")} value={endExt} kinds={["blind", "throughAll", "toNext", "toFace"]} defaultDistance={f.depth || 10} onChange={setEnd} />
+      {end.kind === "blind" && <Num label={tr("Úhel špičky vrtáku")} value={f.tipAngle ?? 118} min={60} suffix="°" bind={b("tipAngle")} onChange={(v) => set({ tipAngle: Math.min(170, v) })} />}
+      {!f.points?.length && <Vec label={tr("Bod na povrchu")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />}
+      <RefListField label={tr("Polohy děr (více naráz)")} value={f.points ?? []} onChange={(points) => set({ points: points.length ? points : undefined })} />
+      <DirectionField label={tr("Osa díry")} allowNormal={false} value={f.dirDef ?? { kind: "axis", axis: f.axis }} onChange={(d) => (!d || d.kind === "axis" ? set({ axis: d?.axis ?? f.axis, dirDef: undefined }) : set({ dirDef: d }))} />
+      <Check label={tr("Vrtat v kladném směru osy")} value={f.flip} onChange={(v) => set({ flip: v })} />
+      <p className="text-[11px] text-ink-700/50">{tr("Tip: klikněte na plochu modelu – bod a osa se doplní automaticky. Více děr: „Přidat body klikem“ (vrcholy, středy kružnic, body skici přes pravé tlačítko).")}</p>
     </>
   );
 }
@@ -842,7 +843,7 @@ export function SketchPick({ value, sketches, onChange, label = "Profil (skica)"
   return (
     <Field label={label}>
       <select className={selectCls} value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">— vyberte skicu —</option>
+        <option value="">{tr("— vyberte skicu —")}</option>
         {sketches.map((s) => (
           <option key={s.id} value={s.id}>
             {s.name}
@@ -857,11 +858,11 @@ export function PickInfo({ n, what, hint, onClear }: { n: number; what: string; 
   return (
     <div className="rounded-lg border border-dashed border-brand/40 bg-brand/5 p-3 text-[12px] text-ink-700">
       <p>
-        <strong>{n}</strong> {what} vybráno. {hint ?? "Klikáním v modelu přidáváte / odebíráte."}
+        <strong>{n}</strong> {what} {tr("vybráno.")}{" "}{hint ?? tr("Klikáním v modelu přidáváte / odebíráte.")}
       </p>
       {n > 0 && (
         <button type="button" onClick={onClear} className="mt-1 text-brand underline">
-          Zrušit výběr
+          {tr("Zrušit výběr")}
         </button>
       )}
     </div>
@@ -872,92 +873,92 @@ export function PickInfo({ n, what, hint, onClear }: { n: number; what: string; 
 
 export function EntityProps({ e, onChange }: { e: SketchEntity; onChange: (n: SketchEntity) => void }) {
   const set = (p: Partial<SketchEntity>) => onChange({ ...e, ...p } as SketchEntity);
-  const title = { line: "Úsečka", arc: "Oblouk", rect: "Obdélník", circle: "Kružnice", polygon: "Mnohoúhelník", slot: "Drážka", polyline: "Lomená čára", point: "Bod", ellipse: "Elipsa", spline: "Spline" }[e.type];
+  const title = { line: tr("Úsečka"), arc: tr("Oblouk"), rect: tr("Obdélník"), circle: tr("Kružnice"), polygon: tr("Mnohoúhelník"), slot: tr("Drážka"), polyline: tr("Lomená čára"), point: tr("Bod"), ellipse: tr("Elipsa"), spline: tr("Spline") }[e.type];
   const arcInfo = e.type === "arc" ? arcGeomInfo(e.a, e.b, e.c) : null;
   return (
     <div className="space-y-3">
       <p className="text-[12px] font-semibold uppercase tracking-wider text-brand">{title}</p>
       {e.type === "line" && (
         <>
-          <Vec label="Počátek" value={e.a} onChange={(v) => set({ a: v })} />
-          <Vec label="Konec" value={e.b} onChange={(v) => set({ b: v })} />
+          <Vec label={tr("Počátek")} value={e.a} onChange={(v) => set({ a: v })} />
+          <Vec label={tr("Konec")} value={e.b} onChange={(v) => set({ b: v })} />
           <LineLength e={e} onChange={onChange} />
         </>
       )}
-      {e.type === "point" && <Vec label="Poloha" value={e.p} onChange={(v) => set({ p: v })} />}
+      {e.type === "point" && <Vec label={tr("Poloha")} value={e.p} onChange={(v) => set({ p: v })} />}
       {e.type === "ellipse" && (
         <>
-          <Vec label="Střed" value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
+          <Vec label={tr("Střed")} value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
           <div className="grid grid-cols-2 gap-2">
-            <Num label="Hlavní poloosa" value={e.rx} min={0.001} onChange={(v) => set({ rx: v })} />
-            <Num label="Vedlejší poloosa" value={e.ry} min={0.001} onChange={(v) => set({ ry: v })} />
+            <Num label={tr("Hlavní poloosa")} value={e.rx} min={0.001} onChange={(v) => set({ rx: v })} />
+            <Num label={tr("Vedlejší poloosa")} value={e.ry} min={0.001} onChange={(v) => set({ ry: v })} />
           </div>
-          <Num label="Natočení" value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
+          <Num label={tr("Natočení")} value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
         </>
       )}
       {(e.type === "spline" || e.type === "polyline") && (
         <>
           <div className="max-h-60 space-y-1.5 overflow-y-auto pr-1">
             {e.points.map((pt, i) => (
-              <Vec key={i} label={`Bod ${i + 1}`} value={pt} onChange={(v: Vec2) => set({ points: e.points.map((q, k) => (k === i ? v : q)) } as Partial<SketchEntity>)} />
+              <Vec key={i} label={tr("Bod {0}", i + 1)} value={pt} onChange={(v: Vec2) => set({ points: e.points.map((q, k) => (k === i ? v : q)) } as Partial<SketchEntity>)} />
             ))}
           </div>
-          <Check label="Uzavřená" value={e.closed} onChange={(v) => set({ closed: v } as Partial<SketchEntity>)} />
+          <Check label={tr("Uzavřená")} value={e.closed} onChange={(v) => set({ closed: v } as Partial<SketchEntity>)} />
         </>
       )}
       {e.type === "arc" && (
         <>
-          <Vec label="Počátek" value={e.a} onChange={(v) => set({ a: v })} />
-          <Vec label="Bod na oblouku" value={e.b} onChange={(v) => set({ b: v })} />
-          <Vec label="Konec" value={e.c} onChange={(v) => set({ c: v })} />
+          <Vec label={tr("Počátek")} value={e.a} onChange={(v) => set({ a: v })} />
+          <Vec label={tr("Bod na oblouku")} value={e.b} onChange={(v) => set({ b: v })} />
+          <Vec label={tr("Konec")} value={e.c} onChange={(v) => set({ c: v })} />
           {arcInfo && (
             <p className="font-mono text-[11.5px] text-ink-700/60">
-              R {Math.round(arcInfo.r * 1000) / 1000} · střed {Math.round(arcInfo.c[0] * 100) / 100} ; {Math.round(arcInfo.c[1] * 100) / 100}
+              R {Math.round(arcInfo.r * 1000) / 1000} {tr("· střed")}{" "}{Math.round(arcInfo.c[0] * 100) / 100} ; {Math.round(arcInfo.c[1] * 100) / 100}
             </p>
           )}
         </>
       )}
       {e.type === "circle" && (
         <>
-          <Vec label="Střed" value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
-          <Num label="Průměr" value={e.r * 2} min={0.001} onChange={(v) => set({ r: v / 2 })} />
+          <Vec label={tr("Střed")} value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
+          <Num label={tr("Průměr")} value={e.r * 2} min={0.001} onChange={(v) => set({ r: v / 2 })} />
         </>
       )}
       {e.type === "rect" && (
         <>
-          <Vec label="Střed" value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
+          <Vec label={tr("Střed")} value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
           <div className="grid grid-cols-2 gap-2">
-            <Num label="Šířka" value={e.w} min={0.001} onChange={(v) => set({ w: v })} />
-            <Num label="Výška" value={e.h} min={0.001} onChange={(v) => set({ h: v })} />
+            <Num label={tr("Šířka")} value={e.w} min={0.001} onChange={(v) => set({ w: v })} />
+            <Num label={tr("Výška")} value={e.h} min={0.001} onChange={(v) => set({ h: v })} />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Num label="Zaoblení rohů" value={e.r} min={0} onChange={(v) => set({ r: v })} />
-            <Num label="Natočení" value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
+            <Num label={tr("Zaoblení rohů")} value={e.r} min={0} onChange={(v) => set({ r: v })} />
+            <Num label={tr("Natočení")} value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
           </div>
         </>
       )}
       {e.type === "polygon" && (
         <>
-          <Vec label="Střed" value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
+          <Vec label={tr("Střed")} value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
           <div className="grid grid-cols-2 gap-2">
-            <Num label="Počet stran" value={e.sides} min={3} suffix="" onChange={(v) => set({ sides: Math.round(v) })} />
-            <Num label="Opsaný průměr" value={e.r * 2} min={0.001} onChange={(v) => set({ r: v / 2 })} />
+            <Num label={tr("Počet stran")} value={e.sides} min={3} suffix="" onChange={(v) => set({ sides: Math.round(v) })} />
+            <Num label={tr("Opsaný průměr")} value={e.r * 2} min={0.001} onChange={(v) => set({ r: v / 2 })} />
           </div>
-          <Num label="Rozměr přes plochy" value={2 * e.r * Math.cos(Math.PI / Math.max(3, e.sides))} min={0.001} onChange={(v) => set({ r: v / 2 / Math.cos(Math.PI / Math.max(3, e.sides)) })} />
-          <Num label="Natočení" value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
+          <Num label={tr("Rozměr přes plochy")} value={2 * e.r * Math.cos(Math.PI / Math.max(3, e.sides))} min={0.001} onChange={(v) => set({ r: v / 2 / Math.cos(Math.PI / Math.max(3, e.sides)) })} />
+          <Num label={tr("Natočení")} value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
         </>
       )}
       {e.type === "slot" && (
         <>
-          <Vec label="Střed" value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
+          <Vec label={tr("Střed")} value={[e.cx, e.cy]} onChange={(v: Vec2) => set({ cx: v[0], cy: v[1] })} />
           <div className="grid grid-cols-2 gap-2">
-            <Num label="Celková délka" value={e.length} min={0.001} onChange={(v) => set({ length: v })} />
-            <Num label="Šířka" value={e.width} min={0.001} onChange={(v) => set({ width: v })} />
+            <Num label={tr("Celková délka")} value={e.length} min={0.001} onChange={(v) => set({ length: v })} />
+            <Num label={tr("Šířka")} value={e.width} min={0.001} onChange={(v) => set({ width: v })} />
           </div>
-          <Num label="Natočení" value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
+          <Num label={tr("Natočení")} value={e.angle} suffix="°" onChange={(v) => set({ angle: v })} />
         </>
       )}
-      <Check label="Pomocná geometrie (netvoří profil)" value={!!e.construction} onChange={(v) => set({ construction: v })} />
+      <Check label={tr("Pomocná geometrie (netvoří profil)")} value={!!e.construction} onChange={(v) => set({ construction: v })} />
     </div>
   );
 }
@@ -980,8 +981,8 @@ function LineLength({ e, onChange }: { e: Extract<SketchEntity, { type: "line" }
   };
   return (
     <div className="grid grid-cols-2 gap-2">
-      <Num label="Délka" value={len} min={0.001} onChange={(v) => setPolar(v, ang)} />
-      <Num label="Úhel" value={ang} suffix="°" onChange={(v) => setPolar(len, v)} />
+      <Num label={tr("Délka")} value={len} min={0.001} onChange={(v) => setPolar(v, ang)} />
+      <Num label={tr("Úhel")} value={ang} suffix="°" onChange={(v) => setPolar(len, v)} />
     </div>
   );
 }
@@ -996,12 +997,12 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
   const data = f.data ?? {};
   // funkčně nad aktuálními daty prvku – změna hloubky těsně následovaná jinou změnou se nepřepíše zastaralou kopií
   const patch = (p: Record<string, unknown>) => set((cur) => ({ data: { ...((cur as Extract<Feature, { type: "ext" }>).data ?? {}), ...p } }));
-  if (!def) return <p className="text-[12px] text-brand-600">Modul prvku „{f.ext}“ není načten.</p>;
+  if (!def) return <p className="text-[12px] text-brand-600">{tr("Modul prvku „")}{f.ext}{tr("“ není načten.")}</p>;
   if (ui?.Form) {
     const Form = ui.Form;
     return <Form f={f} doc={doc} onChange={patch} />;
   }
-  if (!def.params?.length) return <p className="text-[12px] text-ink-700/55">{def.hint ?? "Prvek nemá parametry."}</p>;
+  if (!def.params?.length) return <p className="text-[12px] text-ink-700/55">{def.hint ?? tr("Prvek nemá parametry.")}</p>;
   return (
     <>
       {def.params.map((p: ExtParam) => {
@@ -1020,7 +1021,7 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
           case "enum":
             return <Seg key={p.key} label={p.label} value={String(v ?? p.options[0]?.v ?? "")} options={p.options} onChange={(x) => patch({ [p.key]: x })} />;
           case "mode":
-            return <Seg key={p.key} label="Operace" value={String(v === "new" ? "add" : (v ?? "add"))} options={MODES as unknown as { v: string; l: string }[]} onChange={(x) => patch({ [p.key]: x })} />;
+            return <Seg key={p.key} label={tr("Operace")} value={String(v === "new" ? "add" : (v ?? "add"))} options={MODES as unknown as { v: string; l: string }[]} onChange={(x) => patch({ [p.key]: x })} />;
           case "text":
             return (
               <Field key={p.key} label={p.label}>
@@ -1033,7 +1034,7 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
             return (
               <Field key={p.key} label={p.label}>
                 <select className="w-full rounded-lg border border-ink-700/12 bg-white px-2 py-1.5 text-[13px]" value={String(v ?? "")} onChange={(e) => patch({ [p.key]: e.target.value })}>
-                  <option value="">— vyberte skicu —</option>
+                  <option value="">{tr("— vyberte skicu —")}</option>
                   {sketches.map((sk) => (
                     <option key={sk.id} value={sk.id}>
                       {sk.name}
@@ -1061,7 +1062,7 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
             return (
               <Field key={p.key} label={p.label}>
                 <select className="w-full rounded-lg border border-ink-700/12 bg-white px-2 py-1.5 text-[13px]" value={String(v ?? "")} onChange={(e) => patch({ [p.key]: e.target.value })}>
-                  <option value="">— vyberte prvek —</option>
+                  <option value="">{tr("— vyberte prvek —")}</option>
                   {toolFeatures.map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}
@@ -1075,7 +1076,7 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
             const n = Array.isArray(v) ? (v as number[]).length : 0;
             return (
               <div key={p.key} className="rounded-lg border border-dashed border-ink-700/20 p-2.5 text-[12.5px]">
-                <span className="font-medium">{p.label}:</span> {n ? `${n} vybráno` : `vyberte v modelu (${p.kind === "faces" ? "plochy" : "hrany"})`}
+                <span className="font-medium">{p.label}:</span> {n ? tr("{0} vybráno", n) : tr("vyberte v modelu ({0})", p.kind === "faces" ? "plochy" : "hrany")}
                 {n > 0 && (
                   <button type="button" className="ml-2 text-brand hover:underline" onClick={() => patch({ [p.key]: [] })}>
                     vymazat

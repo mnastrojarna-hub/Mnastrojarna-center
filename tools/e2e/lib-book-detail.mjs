@@ -33,26 +33,36 @@ export const PRE_DELIVERY = ["objednavka", "potvrzeno", "ve_vyrobe", "dodano_k_n
 /** Zboží u zákazníka podle stavu (stages.ts DELIVERED_STAGES). */
 export const DONE = ["dodano_zakaznikovi", "fakturovano", "dokonceno"];
 
-/** Stavy záložek (chipy, sloupce tabule) — 31. 10.: Objednávky jen do vystavení DL, Dokončené od DL. */
+/**
+ * Stavy záložek (chipy, sloupce tabule) — 31. 10.: Objednávky jen do vystavení DL, Dokončené od DL;
+ * 4. 11.: Dokončené jen nezaplacené, Archiv = dodané a zaplacené (Dokončeno, nebo paid_at).
+ */
 export const SEGMENTS = {
   objednavky: [...PRE_DELIVERY, "pozastaveno", "reklamace"],
   poptavky: ["poptavka", "naceneni", "nabidka"],
-  dokoncene: DONE,
+  dokoncene: ["dodano_zakaznikovi", "fakturovano"],
+  archiv: ["dokonceno"],
   nerealizovane: ["nerealizovano", "zruseno"],
   vse: ALL_STAGES,
 };
-/** Stavy řádků v záložce: v Dokončených i stav před dodáním, když je dodáno vše (stav se neposunul). */
-export const SEGMENT_ROWS = { ...SEGMENTS, dokoncene: [...PRE_DELIVERY, ...DONE] };
+/**
+ * Stavy řádků v záložce: v Dokončených i stav před dodáním, když je dodáno vše (stav se neposunul);
+ * v Archivu navíc dodané zaplacené v jakémkoli stavu po dodání.
+ */
+export const SEGMENT_ROWS = { ...SEGMENTS, dokoncene: [...PRE_DELIVERY, ...SEGMENTS.dokoncene], archiv: [...PRE_DELIVERY, ...DONE] };
 
 /** SQL: zboží je u zákazníka (= isDeliveredToCustomer v stages.ts). */
 export const DELIVERED_SQL = `(status::text in (${DONE.map((s) => `'${s}'`).join(",")}) or (status::text in (${PRE_DELIVERY.map((s) => `'${s}'`).join(",")}) and items_count > 0 and items_delivered >= items_count))`;
+/** SQL: zaplaceno (= isPaidJob v stages.ts: datum úhrady nebo stav Dokončeno). */
+export const PAID_SQL = "(status::text = 'dokonceno' or paid_at is not null)";
 
 /** SQL podmínka záložky Knihy (stejně jako bookParamsToFilters + filterJobs; volitelně jen stav `stage`). */
 export function segmentWhere(key, stage = null) {
   const only = stage ? ` and status::text = '${stage}'` : "";
   const base = "merged_into_id is null";
   if (key === "objednavky") return `${base} and status::text in (${SEGMENTS.objednavky.map((s) => `'${s}'`).join(",")}) and not ${DELIVERED_SQL}${only}`;
-  if (key === "dokoncene") return `${base} and ${DELIVERED_SQL}${only}`;
+  if (key === "dokoncene") return `${base} and ${DELIVERED_SQL} and not ${PAID_SQL}${only}`;
+  if (key === "archiv") return `${base} and ${DELIVERED_SQL} and ${PAID_SQL}${only}`;
   return `${base} and status::text in (${SEGMENTS[key].map((s) => `'${s}'`).join(",")})${only}`;
 }
 
@@ -61,9 +71,14 @@ export function dbSegmentCount(key, stage = null) {
   return Number(sql(`select count(*) from orders where ${segmentWhere(key, stage)}`));
 }
 
+/** Hodnota záložky podle DB = součet orders.value zakázek záložky (volitelně zúžené další SQL podmínkou = filtr). */
+export function dbSegmentValue(key, extraWhere = "") {
+  return Number(sql(`select coalesce(round(sum(value), 2), 0) from orders where ${segmentWhere(key)}${extraWhere ? ` and ${extraWhere}` : ""}`));
+}
+
 /** Hodnota v běhu podle DB = součet orders.value objednávek v běhu (bez DL na vše). */
 export function dbRunningValue() {
-  return Number(sql(`select coalesce(round(sum(value), 2), 0) from orders where ${segmentWhere("objednavky")}`));
+  return dbSegmentValue("objednavky");
 }
 
 /** Barva plného chipu stavu (shoda se stages.ts → „solid"). */
@@ -108,15 +123,50 @@ export async function eventually(fn, { timeout = 12_000, interval = 250 } = {}) 
 }
 
 /**
- * Počká na hydrataci prvku (React připojí __reactProps…) a na konec streamování
- * (žádná skrytá kopie div#S:…[hidden]) — kliknutí před hydratací se ztrácí.
+ * Počká na DOKONČENOU hydrataci prvku a na konec streamování (žádná skrytá kopie div#S:…[hidden]) — kliknutí
+ * / změna před hydratací se ztrácí. `__reactProps` React připojuje už při renderu hydratace (před commitem);
+ * když v tu chvíli přijde klik a hydratace čeká na chunk (velký formulář v hlavičce), React ji synchronně
+ * nedokončí a událost zahodí (03: „Nová zakázka" se neotevřela, řazení / záložka se nepřepnuly). Proto se
+ * kontroluje i commit: kořen už není „dehydrated" a na cestě k němu není nehydratovaná hranice Suspense — a to
+ * pro všechno, na co se v <main> kliká (hranice se hydratují po jedné; neshoda hydratace #418 v jiné hranici
+ * by jinak klik na Tabuli / záložku spolkla).
  */
 export async function waitHydrated(page, css, timeout = 15_000) {
   await page.waitForFunction((sel) => {
     const el = document.querySelector(sel);
     if (!el) return false;
     if (document.querySelector('div[hidden][id^="S:"]')) return false;
-    return Object.keys(el).some((k) => k.startsWith("__reactProps"));
+    const fiberOf = (x) => { const k = Object.keys(x).find((n) => n.startsWith("__reactFiber")); return k ? x[k] : null; };
+    // vlákno (fiber) prvku: od něj ke kořenu žádná hranice Suspense ještě „dehydrated" (HTML ze serveru čeká
+    // na chunk / hydrataci) a kořen s dokončenou hydratací — jinak React klik / change zahodí (synchronní
+    // hydrataci nedokončí, nepřehrává; po neshodě hydratace #418 překreslí hranici a klik padne do prázdna)
+    const committed = (fiber) => {
+      for (let f = fiber, i = 0; f && i < 2000; f = f.return, i++) {
+        if (f.tag === 13 && f.memoizedState && f.memoizedState.dehydrated) return false;
+        if (f.tag === 3) {
+          const current = f.stateNode && f.stateNode.current;
+          return Boolean(current) && !(current.memoizedState && current.memoizedState.isDehydrated);
+        }
+      }
+      return false; // vlákno z přerušeného pokusu o hydrataci (bez kořene) — čekat na další
+    };
+    if (!Object.keys(el).some((k) => k.startsWith("__reactProps"))) return false;
+    const own = fiberOf(el);
+    if (!own || !committed(own)) return false;
+    // i všechno, na co se v <main> kliká: hranice Suspense se hydratují po jedné (líně) — prvek bez vlákna je
+    // ještě HTML ze serveru (ledaže je to statické HTML přes dangerouslySetInnerHTML)
+    for (const x of document.querySelectorAll('main a[href], main button, main input, main select, main textarea, main [role="button"]')) {
+      const f = fiberOf(x);
+      if (f) {
+        if (!committed(f)) return false;
+        continue;
+      }
+      let p = x.parentElement; let pf = null;
+      while (p && !(pf = fiberOf(p))) p = p.parentElement;
+      if (pf && pf.memoizedProps && pf.memoizedProps.dangerouslySetInnerHTML) continue;
+      return false;
+    }
+    return true;
   }, css, { timeout });
 }
 
@@ -211,6 +261,8 @@ export function createJob(f) {
     invoice_number: lit(f.invoiceNumber ?? null),
     invoice_date: f.invoiceDays === undefined ? "null" : `current_date + ${Number(f.invoiceDays)}`,
     invoice_due_date: f.invoiceDueDays === undefined ? "null" : `current_date + ${Number(f.invoiceDueDays)}`,
+    // datum úhrady (Archiv); u stavu Dokončeno ho doplní trigger sám
+    paid_at: f.paidDays === undefined ? "null" : `current_date + ${Number(f.paidDays)}`,
     note: lit(f.note ?? null),
   };
   const row = sql(`insert into orders (${Object.keys(cols).join(", ")}) values (${Object.values(cols).join(", ")}) returning id || '|' || number`).split("\n")[0];

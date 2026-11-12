@@ -2,6 +2,7 @@
  * Sestavy v jádře (worker): stavba komponent s mezipamětí podle obsahu (stejné díly se staví jen jednou),
  * složení sestavy do jednoho tělesa (compound) pro export/výkres a kontrola kolizí.
  */
+import { tr } from "./i18n";
 import * as r from "replicad";
 import { flattenAssembly, MAX_DEPTH, sourceKey } from "./assembly";
 import { buildDoc, buildShape, shapeResult } from "./build";
@@ -55,7 +56,7 @@ export function placed(s: Shape, p: Placement): Shape {
 
 /** Sestava → jedno těleso (compound) se všemi viditelnými komponentami na svých místech. */
 export async function assemblyShape(doc: CadDoc, depth = 0): Promise<Shape | null> {
-  if (depth > MAX_DEPTH) throw new Error("Sestava je zanořená příliš hluboko (nebo obsahuje sama sebe).");
+  if (depth > MAX_DEPTH) throw new Error(tr("Sestava je zanořená příliš hluboko (nebo obsahuje sama sebe)."));
   const shapes: Shape[] = [];
   for (const c of doc.components ?? []) {
     if (c.hidden) continue;

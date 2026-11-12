@@ -3,6 +3,7 @@
  * Odkazy na plochy/hrany/vrcholy se hledají podle indexu a kontrolují otiskem (Sig); když se po úpravě
  * historie indexy posunou, entita se znovu najde podle otisku (typ + střed + velikost).
  */
+import { tr } from "./i18n";
 import * as r from "replicad";
 import { planeBasis } from "./defaults";
 import { entityInfo, vertexPositions } from "./inspect";
@@ -24,7 +25,7 @@ export const V = {
   len: (a: Vec3) => Math.hypot(a[0], a[1], a[2]),
   norm: (a: Vec3): Vec3 => {
     const l = Math.hypot(a[0], a[1], a[2]);
-    if (l < 1e-12) throw new Error("Nulový směr – vyberte jinou geometrii.");
+    if (l < 1e-12) throw new Error(tr("Nulový směr – vyberte jinou geometrii."));
     return [a[0] / l, a[1] / l, a[2] / l];
   },
   lerp: (a: Vec3, b: Vec3, t: number): Vec3 => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
@@ -99,8 +100,8 @@ export function findBySig(body: Shape, kind: "face" | "edge" | "vertex", sig: Si
 /** Index entity: ověří otisk a v případě posunu indexů entitu znovu najde. */
 export function entityIndex(body: Shape | null, kind: "face" | "edge" | "vertex", index: number, sig?: Sig): number {
   const what = kind === "face" ? "plocha" : kind === "edge" ? "hrana" : "vrchol";
-  if (!body) throw new Error(`Odkaz na ${what === "plocha" ? "plochu" : what === "hrana" ? "hranu" : "vrchol"} vyžaduje těleso – nejdřív vytvořte tvar.`);
-  if (index < 0 && !sig) throw new Error(`Vyberte ${what === "plocha" ? "plochu" : what === "hrana" ? "hranu" : "vrchol"} v modelu.`);
+  if (!body) throw new Error(tr("Odkaz na {0} vyžaduje těleso – nejdřív vytvořte tvar.", what === "plocha" ? "plochu" : what === "hrana" ? "hranu" : "vrchol"));
+  if (index < 0 && !sig) throw new Error(tr("Vyberte {0} v modelu.", what === "plocha" ? "plochu" : what === "hrana" ? "hranu" : "vrchol"));
   if (index >= 0) {
     const cur = sigOf(body, kind, index);
     if (cur && (!sig || sigMatch(cur, sig, tolOf(body) * 10))) return index;
@@ -110,18 +111,18 @@ export function entityIndex(body: Shape | null, kind: "face" | "edge" | "vertex"
     if (i >= 0) return i;
   }
   if (index >= 0 && sigOf(body, kind, index)) return index; // otisk neodpovídá, ale entita existuje – použít (uživatel vidí výsledek)
-  throw new Error(`Odkazovaná ${what} už v modelu není – vyberte ji znovu.`);
+  throw new Error(tr("Odkazovaná {0} už v modelu není – vyberte ji znovu.", what));
 }
 
 // ---------------- řešení odkazů ----------------
 
 function sketchPoint(ctx: ResolveCtx, ref: Extract<Ref, { kind: "sketchPt" }>): Vec3 {
   const sk = ctx.sketches.get(ref.sketchId) ?? (ctx.features.find((f) => f.id === ref.sketchId && f.type === "sketch") as SketchF | undefined);
-  if (!sk) throw new Error("Skica odkazu neexistuje.");
+  if (!sk) throw new Error(tr("Skica odkazu neexistuje."));
   const e = sk.entities.find((x) => x.id === ref.entityId);
-  if (!e) throw new Error("Entita skici odkazu neexistuje.");
+  if (!e) throw new Error(tr("Entita skici odkazu neexistuje."));
   const kp = keyPoints(e)[ref.k];
-  if (!kp) throw new Error(`Bod „${ref.k}“ entity skici neexistuje.`);
+  if (!kp) throw new Error(tr("Bod „{0}“ entity skici neexistuje.", ref.k));
   return sketchTo3D(sk.plane, kp);
 }
 
@@ -132,17 +133,17 @@ export function sketchTo3D(plane: SketchPlane, p: [number, number]): Vec3 {
 
 function datumOf(ctx: ResolveCtx, id: string) {
   const d = ctx.features.find((f) => f.id === id);
-  if (!d || d.type !== "datum") throw new Error("Pomocná rovina odkazu neexistuje.");
+  if (!d || d.type !== "datum") throw new Error(tr("Pomocná rovina odkazu neexistuje."));
   return d;
 }
 
 /** Souřadný systém (prvek csys): počátek, osa X ortogonalizovaná vůči ose Z, osa Y = Z × X. */
 export function csysBasis(ctx: ResolveCtx, f: Extract<Feature, { type: "csys" }>): { origin: Vec3; x: Vec3; y: Vec3; z: Vec3 } {
-  const origin = pointOf(ctx, f.origin, "počátek souřadného systému");
+  const origin = pointOf(ctx, f.origin, tr("počátek souřadného systému"));
   const z = resolveDirection(ctx, f.zDir, { normal: [0, 0, 1] });
   const x0 = resolveDirection(ctx, f.xDir, { normal: [1, 0, 0] });
   const xp = V.sub(x0, V.mul(z, V.dot(x0, z)));
-  if (V.len(xp) < 1e-6) throw new Error("Osa X souřadného systému je rovnoběžná s osou Z – zvolte jiný směr X.");
+  if (V.len(xp) < 1e-6) throw new Error(tr("Osa X souřadného systému je rovnoběžná s osou Z – zvolte jiný směr X."));
   const x = V.norm(xp);
   return { origin, x, y: V.cross(z, x), z };
 }
@@ -151,21 +152,21 @@ const datumStack = new Set<string>();
 /** Geometrie pomocné osy / bodu / souřadného systému podle id prvku (s ochranou proti cyklickému odkazu). */
 function datumGeo(ctx: ResolveCtx, id: string, want: "axis" | "point"): Geo {
   const f = ctx.features.find((x) => x.id === id);
-  const label = want === "axis" ? "Pomocná osa" : "Pomocný bod";
-  if (!f || (f.type !== "csys" && f.type !== (want === "axis" ? "datumAxis" : "datumPoint"))) throw new Error(`${label} odkazu neexistuje – vyberte ji znovu.`);
-  if (f.suppressed) throw new Error(`${label} „${f.name}“ je potlačená.`);
-  if (datumStack.has(id)) throw new Error(`Odkaz pomocné geometrie „${f.name}“ je cyklický.`);
+  const label = want === "axis" ? tr("Pomocná osa") : tr("Pomocný bod");
+  if (!f || (f.type !== "csys" && f.type !== (want === "axis" ? "datumAxis" : "datumPoint"))) throw new Error(tr("{0} odkazu neexistuje – vyberte ji znovu.", label));
+  if (f.suppressed) throw new Error(tr("{0} „{1}“ je potlačená.", label, f.name));
+  if (datumStack.has(id)) throw new Error(tr("Odkaz pomocné geometrie „{0}“ je cyklický.", f.name));
   datumStack.add(id);
   try {
     if (f.type === "csys") {
       const b = csysBasis(ctx, f);
-      return { point: b.origin, dir: b.z, plane: { origin: b.origin, normal: b.z, xDir: b.x }, kindLabel: want === "axis" ? "osa Z souř. systému" : "souřadný systém" };
+      return { point: b.origin, dir: b.z, plane: { origin: b.origin, normal: b.z, xDir: b.x }, kindLabel: want === "axis" ? tr("osa Z souř. systému") : tr("souřadný systém") };
     }
     if (f.type === "datumAxis") {
       const a = resolveAxis(ctx, f.def, null);
-      return { point: a.origin, dir: a.dir, kindLabel: "pomocná osa" };
+      return { point: a.origin, dir: a.dir, kindLabel: tr("pomocná osa") };
     }
-    return { point: pointOf(ctx, f.ref, "pomocný bod"), kindLabel: "pomocný bod" };
+    return { point: pointOf(ctx, f.ref, tr(tr("pomocný bod"))), kindLabel: tr("pomocný bod") };
   } finally {
     datumStack.delete(id);
   }
@@ -193,7 +194,7 @@ export function resolveRef(ctx: ResolveCtx, ref: Ref): Geo {
       if (at === "start") point = vt(edge.startPoint);
       else if (at === "end") point = vt(edge.endPoint);
       else if (at === "center") {
-        if (!info.center) throw new Error("Hrana není kruhová – střed kružnice nelze určit (použijte střed hrany).");
+        if (!info.center) throw new Error(tr("Hrana není kruhová – střed kružnice nelze určit (použijte střed hrany)."));
         point = info.center;
       } else if (typeof at === "object") point = vt(edge.pointAt(at.t));
       else point = vt(edge.pointAt(0.5));
@@ -208,14 +209,14 @@ export function resolveRef(ctx: ResolveCtx, ref: Ref): Geo {
       const c = info.center!;
       if (info.normal) {
         const n = V.norm(info.normal);
-        return { point: c, dir: n, plane: { origin: c, normal: n, xDir: V.perp(n) }, kindLabel: "rovinná plocha" };
+        return { point: c, dir: n, plane: { origin: c, normal: n, xDir: V.perp(n) }, kindLabel: tr("rovinná plocha") };
       }
       if (info.axis) {
         const d = V.norm(info.axis.dir);
         // bod na ose nejblíže středu plochy
         const o = info.axis.origin;
         const t = V.dot(V.sub(c, o), d);
-        return { point: V.add(o, V.mul(d, t)), dir: d, plane: { origin: V.add(o, V.mul(d, t)), normal: d, xDir: V.perp(d) }, radius: info.radius, kindLabel: info.surface === "CONE" ? "kuželová plocha" : "válcová plocha" };
+        return { point: V.add(o, V.mul(d, t)), dir: d, plane: { origin: V.add(o, V.mul(d, t)), normal: d, xDir: V.perp(d) }, radius: info.radius, kindLabel: info.surface === "CONE" ? tr("kuželová plocha") : tr("válcová plocha") };
       }
       const n = V.norm(vt(body.faces[i].normalAt(body.faces[i].center)));
       return { point: c, dir: n, plane: { origin: c, normal: n, xDir: V.perp(n) }, kindLabel: "plocha" };
@@ -225,7 +226,7 @@ export function resolveRef(ctx: ResolveCtx, ref: Ref): Geo {
     case "datum": {
       const d = datumOf(ctx, ref.featureId);
       const n = V.norm(d.normal);
-      return { point: d.origin, dir: n, plane: { origin: d.origin, normal: n, xDir: V.norm(d.xDir) }, kindLabel: "pomocná rovina" };
+      return { point: d.origin, dir: n, plane: { origin: d.origin, normal: n, xDir: V.norm(d.xDir) }, kindLabel: tr("pomocná rovina") };
     }
     case "datumAxis":
       return datumGeo(ctx, ref.featureId, "axis");
@@ -237,21 +238,21 @@ export function resolveRef(ctx: ResolveCtx, ref: Ref): Geo {
 }
 
 export function pointOf(ctx: ResolveCtx, ref: Ref | undefined, what = "bod"): Vec3 {
-  if (!ref) throw new Error(`Vyberte ${what}.`);
+  if (!ref) throw new Error(tr("Vyberte {0}.", what));
   const g = resolveRef(ctx, ref);
-  if (!g.point) throw new Error(`Odkaz neurčuje ${what}.`);
+  if (!g.point) throw new Error(tr("Odkaz neurčuje {0}.", what));
   return g.point;
 }
-export function dirOf(ctx: ResolveCtx, ref: Ref | undefined, what = "směr"): Vec3 {
-  if (!ref) throw new Error(`Vyberte ${what}.`);
+export function dirOf(ctx: ResolveCtx, ref: Ref | undefined, what = tr("směr")): Vec3 {
+  if (!ref) throw new Error(tr("Vyberte {0}.", what));
   const g = resolveRef(ctx, ref);
-  if (!g.dir) throw new Error(`Odkaz neurčuje ${what} (vyberte hranu, válcovou nebo rovinnou plochu).`);
+  if (!g.dir) throw new Error(tr("Odkaz neurčuje {0} (vyberte hranu, válcovou nebo rovinnou plochu).", what));
   return g.dir;
 }
 export function planeOfRef(ctx: ResolveCtx, ref: Ref | undefined, what = "rovinu"): ResolvedPlane {
-  if (!ref) throw new Error(`Vyberte ${what}.`);
+  if (!ref) throw new Error(tr("Vyberte {0}.", what));
   const g = resolveRef(ctx, ref);
-  if (!g.plane) throw new Error(`Odkaz neurčuje ${what} (vyberte rovinnou plochu nebo pomocnou rovinu).`);
+  if (!g.plane) throw new Error(tr("Odkaz neurčuje {0} (vyberte rovinnou plochu nebo pomocnou rovinu).", what));
   return g.plane;
 }
 
@@ -259,20 +260,20 @@ function derived(ctx: ResolveCtx, ref: Extract<Ref, { kind: "derived" }>): Geo {
   const a = ref.args;
   switch (ref.op) {
     case "mid": {
-      if (a.length < 2) throw new Error("Vyberte dva body.");
+      if (a.length < 2) throw new Error(tr("Vyberte dva body."));
       const pts = a.map((x) => pointOf(ctx, x));
       return { point: V.mul(pts.reduce((s, p) => V.add(s, p), [0, 0, 0] as Vec3), 1 / pts.length) };
     }
     case "between":
-      if (a.length < 2) throw new Error("Vyberte dva body.");
+      if (a.length < 2) throw new Error(tr("Vyberte dva body."));
       return { point: V.lerp(pointOf(ctx, a[0]), pointOf(ctx, a[1]), ref.v ?? 0.5) };
     case "offset": {
-      if (a.length < 2) throw new Error("Vyberte bod a hranu (směr).");
+      if (a.length < 2) throw new Error(tr("Vyberte bod a hranu (směr)."));
       const d = dirOf(ctx, a[1]);
       return { point: V.add(pointOf(ctx, a[0]), V.mul(d, ref.v ?? 0)), dir: d };
     }
     case "project": {
-      if (a.length < 2) throw new Error("Vyberte bod a plochu.");
+      if (a.length < 2) throw new Error(tr("Vyberte bod a plochu."));
       const p = pointOf(ctx, a[0]);
       const g = resolveRef(ctx, a[1]);
       if (g.plane && !g.radius) {
@@ -283,21 +284,21 @@ function derived(ctx: ResolveCtx, ref: Extract<Ref, { kind: "derived" }>): Geo {
         const t = V.dot(V.sub(p, g.point), g.dir);
         return { point: V.add(g.point, V.mul(g.dir, t)), dir: g.dir };
       }
-      throw new Error("Cíl průmětu musí být rovinná plocha, osa válce nebo přímá hrana.");
+      throw new Error(tr("Cíl průmětu musí být rovinná plocha, osa válce nebo přímá hrana."));
     }
     case "intersect": {
-      if (a.length < 2) throw new Error("Vyberte hranu a plochu.");
+      if (a.length < 2) throw new Error(tr("Vyberte hranu a plochu."));
       const l = resolveRef(ctx, a[0]);
       const pl = planeOfRef(ctx, a[1], "plochu");
-      if (!l.point || !l.dir) throw new Error("První odkaz musí být přímá hrana.");
+      if (!l.point || !l.dir) throw new Error(tr("První odkaz musí být přímá hrana."));
       const den = V.dot(l.dir, pl.normal);
-      if (Math.abs(den) < 1e-9) throw new Error("Hrana je rovnoběžná s plochou – průsečík neexistuje.");
+      if (Math.abs(den) < 1e-9) throw new Error(tr("Hrana je rovnoběžná s plochou – průsečík neexistuje."));
       const t = V.dot(V.sub(pl.origin, l.point), pl.normal) / den;
       return { point: V.add(l.point, V.mul(l.dir, t)) };
     }
     case "percent": {
       const e = a[0];
-      if (!e || e.kind !== "edge") throw new Error("Vyberte hranu.");
+      if (!e || e.kind !== "edge") throw new Error(tr("Vyberte hranu."));
       return resolveRef(ctx, { ...e, at: { t: Math.max(0, Math.min(1, ref.v ?? 0.5)) } });
     }
   }
@@ -314,7 +315,7 @@ export function resolveDirection(ctx: ResolveCtx, d: Direction | undefined, base
     case "edge":
       return dirOf(ctx, d.ref);
     case "twoPoints":
-      return V.norm(V.sub(pointOf(ctx, d.b, "druhý bod"), pointOf(ctx, d.a, "první bod")));
+      return V.norm(V.sub(pointOf(ctx, d.b, tr("druhý bod")), pointOf(ctx, d.a, tr("první bod"))));
     case "faceNormal":
       return dirOf(ctx, d.ref);
     case "vector":
@@ -327,7 +328,7 @@ export function resolveDirection(ctx: ResolveCtx, d: Direction | undefined, base
     }
     case "tangent": {
       const g = resolveRef(ctx, d.ref);
-      if (!g.dir) throw new Error("Vyberte hranu pro tečnu.");
+      if (!g.dir) throw new Error(tr("Vyberte hranu pro tečnu."));
       return g.dir;
     }
   }
@@ -346,7 +347,7 @@ export function resolveAxis(ctx: ResolveCtx, def: AxisDef | undefined, sk: Sketc
     case "sketchLine": {
       const id = def && def.kind === "sketchLine" ? def.entityId : "";
       const e = sk?.entities.find((x) => x.id === id);
-      if (!e || e.type !== "line") throw new Error("Vyberte úsečku ve skice jako osu rotace.");
+      if (!e || e.type !== "line") throw new Error(tr("Vyberte úsečku ve skice jako osu rotace."));
       const p = sketchTo3D(sk!.plane, e.a);
       const q = sketchTo3D(sk!.plane, e.b);
       return { origin: p, dir: V.norm(V.sub(q, p)) };
@@ -354,13 +355,13 @@ export function resolveAxis(ctx: ResolveCtx, def: AxisDef | undefined, sk: Sketc
     case "edge":
     case "cylFace": {
       const g = resolveRef(ctx, (def as { ref: Ref }).ref);
-      if (!g.dir || !g.point) throw new Error("Vyberte přímou hranu nebo válcovou plochu.");
+      if (!g.dir || !g.point) throw new Error(tr("Vyberte přímou hranu nebo válcovou plochu."));
       return { origin: g.point, dir: g.dir };
     }
     case "twoPoints": {
       const dd = def as Extract<AxisDef, { kind: "twoPoints" }>;
-      const p = pointOf(ctx, dd.a, "první bod");
-      return { origin: p, dir: V.norm(V.sub(pointOf(ctx, dd.b, "druhý bod"), p)) };
+      const p = pointOf(ctx, dd.a, tr("první bod"));
+      return { origin: p, dir: V.norm(V.sub(pointOf(ctx, dd.b, tr("druhý bod")), p)) };
     }
     case "global":
       return { origin: [0, 0, 0], dir: axisVec((def as { axis: Axis }).axis) };
@@ -370,10 +371,10 @@ export function resolveAxis(ctx: ResolveCtx, def: AxisDef | undefined, sk: Sketc
     }
     case "twoPlanes": {
       const dd = def as Extract<AxisDef, { kind: "twoPlanes" }>;
-      const a = planeOfRef(ctx, dd.a, "1. rovinu");
-      const b = planeOfRef(ctx, dd.b, "2. rovinu");
+      const a = planeOfRef(ctx, dd.a, tr("1. rovinu"));
+      const b = planeOfRef(ctx, dd.b, tr("2. rovinu"));
       const dir0 = V.cross(a.normal, b.normal);
-      if (V.len(dir0) < 1e-6) throw new Error("Roviny jsou rovnoběžné – průsečnice neexistuje.");
+      if (V.len(dir0) < 1e-6) throw new Error(tr("Roviny jsou rovnoběžné – průsečnice neexistuje."));
       const dir = V.norm(dir0);
       // bod průsečnice nejblíže počátku roviny A: řešení soustavy n_a·p = d_a, n_b·p = d_b, dir·p = dir·o_a
       const da = V.dot(a.normal, a.origin);
@@ -399,23 +400,23 @@ export function resolvePlaneDef(ctx: ResolveCtx, p: PlaneDef): ResolvedPlane {
     }
     case "face": {
       const g = resolveRef(ctx, p.ref);
-      if (!g.plane || g.radius) throw new Error("Vyberte rovinnou plochu nebo pomocnou rovinu.");
+      if (!g.plane || g.radius) throw new Error(tr("Vyberte rovinnou plochu nebo pomocnou rovinu."));
       const n = p.flip ? V.mul(g.plane.normal, -1) : g.plane.normal;
       return { origin: V.add(g.plane.origin, V.mul(n, p.offset ?? 0)), normal: n, xDir: g.plane.xDir };
     }
     case "threePoints": {
-      const [a, b, c] = [pointOf(ctx, p.a, "1. bod"), pointOf(ctx, p.b, "2. bod"), pointOf(ctx, p.c, "3. bod")];
+      const [a, b, c] = [pointOf(ctx, p.a, tr("1. bod")), pointOf(ctx, p.b, tr("2. bod")), pointOf(ctx, p.c, tr("3. bod"))];
       const x = V.norm(V.sub(b, a));
       const n0 = V.cross(x, V.sub(c, a));
-      if (V.len(n0) < 1e-9) throw new Error("Body leží na jedné přímce – rovinu nelze určit.");
+      if (V.len(n0) < 1e-9) throw new Error(tr("Body leží na jedné přímce – rovinu nelze určit."));
       return { origin: a, normal: V.norm(n0), xDir: x };
     }
     case "pointLine": {
       const pt = pointOf(ctx, p.p);
       const l = resolveRef(ctx, p.line);
-      if (!l.dir || !l.point) throw new Error("Vyberte přímou hranu.");
+      if (!l.dir || !l.point) throw new Error(tr("Vyberte přímou hranu."));
       const n0 = V.cross(l.dir, V.sub(pt, l.point));
-      if (V.len(n0) < 1e-9) throw new Error("Bod leží na přímce – rovinu nelze určit.");
+      if (V.len(n0) < 1e-9) throw new Error(tr("Bod leží na přímce – rovinu nelze určit."));
       return { origin: pt, normal: V.norm(n0), xDir: l.dir };
     }
     case "pointNormal": {
@@ -426,13 +427,13 @@ export function resolvePlaneDef(ctx: ResolveCtx, p: PlaneDef): ResolvedPlane {
     case "angle": {
       const f = planeOfRef(ctx, p.face, "plochu");
       const e = resolveRef(ctx, p.edge);
-      if (!e.dir || !e.point) throw new Error("Vyberte přímou hranu (osu otáčení).");
+      if (!e.dir || !e.point) throw new Error(tr("Vyberte přímou hranu (osu otáčení)."));
       const n = V.norm(V.rotate(f.normal, e.dir, p.deg));
       return { origin: e.point, normal: n, xDir: e.dir };
     }
     case "mid": {
-      const a = planeOfRef(ctx, p.a, "1. plochu");
-      const b = planeOfRef(ctx, p.b, "2. plochu");
+      const a = planeOfRef(ctx, p.a, tr("1. plochu"));
+      const b = planeOfRef(ctx, p.b, tr("2. plochu"));
       const na = a.normal;
       const nb = b.normal;
       if (Math.abs(V.dot(na, nb)) > 0.999) {
@@ -444,19 +445,19 @@ export function resolvePlaneDef(ctx: ResolveCtx, p: PlaneDef): ResolvedPlane {
     }
     case "tangentCyl": {
       const cyl = resolveRef(ctx, p.face);
-      if (!cyl.radius || !cyl.dir || !cyl.point) throw new Error("Vyberte válcovou plochu.");
+      if (!cyl.radius || !cyl.dir || !cyl.point) throw new Error(tr("Vyberte válcovou plochu."));
       const thr = resolveRef(ctx, p.through);
       const m = thr.plane?.normal ?? thr.dir;
-      if (!m) throw new Error("Vyberte rovinu/plochu, se kterou má být tečná rovina rovnoběžná.");
+      if (!m) throw new Error(tr("Vyberte rovinu/plochu, se kterou má být tečná rovina rovnoběžná."));
       const mp0 = V.sub(m, V.mul(cyl.dir, V.dot(m, cyl.dir)));
-      if (V.len(mp0) < 1e-9) throw new Error("Zvolená rovina je kolmá na osu válce – tečná rovina neexistuje.");
+      if (V.len(mp0) < 1e-9) throw new Error(tr("Zvolená rovina je kolmá na osu válce – tečná rovina neexistuje."));
       const mp = V.norm(mp0);
       return { origin: V.add(cyl.point, V.mul(mp, cyl.radius)), normal: mp, xDir: cyl.dir };
     }
     case "normalToCurve": {
       const at = pointOf(ctx, p.at);
       const c = resolveRef(ctx, p.curve);
-      if (!c.dir) throw new Error("Vyberte hranu.");
+      if (!c.dir) throw new Error(tr("Vyberte hranu."));
       let t = c.dir;
       if (p.curve.kind === "edge" && ctx.body) {
         // tečna v místě nejblíže bodu (pro oblouky)
@@ -479,10 +480,10 @@ export function resolvePlaneDef(ctx: ResolveCtx, p: PlaneDef): ResolvedPlane {
     case "twoEdges": {
       const a = resolveRef(ctx, p.a);
       const b = resolveRef(ctx, p.b);
-      if (!a.dir || !a.point || !b.dir || !b.point) throw new Error("Vyberte dvě přímé hrany.");
+      if (!a.dir || !a.point || !b.dir || !b.point) throw new Error(tr("Vyberte dvě přímé hrany."));
       const cr = V.cross(a.dir, b.dir);
       const n = V.len(cr) < 1e-6 ? V.cross(a.dir, V.sub(b.point, a.point)) : cr;
-      if (V.len(n) < 1e-9) throw new Error("Hrany leží na jedné přímce – rovinu nelze určit.");
+      if (V.len(n) < 1e-9) throw new Error(tr("Hrany leží na jedné přímce – rovinu nelze určit."));
       return { origin: a.point, normal: V.norm(n), xDir: a.dir };
     }
     case "datum": {

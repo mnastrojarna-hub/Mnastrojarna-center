@@ -54,6 +54,8 @@ export const ACCOUNTS = [
   // Odeslané doklady (src/lib/email/odeslana-posta.integration.test.ts): obchodník odesílatel + obchodník zakázky
   { user: "odeslane-a@nastrojarstvi.test", pass: "OdeslaneA-Heslo-1", imap: true, pop3: true },
   { user: "odeslane-b@nastrojarstvi.test", pass: "OdeslaneB-Heslo-1", imap: true, pop3: true },
+  // 9. 11. „každý ze své schránky": zaměstnanec s plným přístupem a vlastní schránkou (Šponer)
+  { user: "odeslane-e@nastrojarstvi.test", pass: "OdeslaneE-Heslo-1", imap: true, pop3: true },
 ];
 
 function makeMessages(user) {

@@ -48,18 +48,22 @@ export function useMailActionRunner(opts: {
   const navigateOnClose = React.useRef<string | null>(null);
   const { onLinked, onNotice, onChoices } = opts;
 
-  /** Přílohy k roztřídění? → dialog dávky (true), jinak false (dnešní tok). */
-  const openCapture = React.useCallback(async (key: MailActionKey, t: MailActionTarget, fixedJobId: string | null): Promise<boolean> => {
+  /**
+   * Přílohy k roztřídění? → dialog dávky (handled), jinak dnešní tok (plán vrací, kolik příloh u pevného cíle
+   * už bylo — hláška). Chyba plánu = hláška a hotovo.
+   */
+  const openCapture = React.useCallback(async (key: MailActionKey, t: MailActionTarget, fixedJobId: string | null, relink = false): Promise<{ handled: boolean; alreadyStored: number }> => {
     const plan = await mailCapturePlanAction(t.emailId, fixedJobId);
     if (!plan.ok) {
       onNotice({ ok: false, text: plan.error });
-      return true;
+      return { handled: true, alreadyStored: 0 };
     }
-    // už u zakázky (souběh) nebo bez příloh → dnešní tok
-    if (plan.files === 0 || (plan.jobId && !fixedJobId)) return false;
+    const alreadyStored = plan.skipped.filter((x) => x.jobFileId).length;
+    // už u zakázky (souběh) nebo bez (nových) příloh → dnešní tok
+    if (plan.files === 0 || (plan.jobId && !fixedJobId)) return { handled: false, alreadyStored };
     navigateOnClose.current = null;
-    setCapture({ threadId: t.threadId, emailId: t.emailId, key, jobId: fixedJobId, plan });
-    return true;
+    setCapture({ threadId: t.threadId, emailId: t.emailId, key, jobId: fixedJobId, relink, plan });
+    return { handled: true, alreadyStored };
   }, [onNotice]);
 
   const run = React.useCallback(async (key: MailActionKey, t: MailActionTarget): Promise<void> => {
@@ -78,7 +82,7 @@ export function useMailActionRunner(opts: {
     let navigating = false;
     try {
       // přílohy (výkresy, objednávka, poptávka…) → roztřídění dávkou focení s kontrolou
-      if (CAPTURE_MAIL_ACTIONS.includes(key) && !t.jobId && (await openCapture(key, t, null))) return;
+      if (CAPTURE_MAIL_ACTIONS.includes(key) && !t.jobId && (await openCapture(key, t, null)).handled) return;
       if (key === "quote.create" || key === "job.create") {
         const res = await createJobFromEmail(t.emailId);
         if (!res.ok || !res.id) return onNotice({ ok: false, text: res.error ?? "Zakázku se nepodařilo založit." });
@@ -112,20 +116,24 @@ export function useMailActionRunner(opts: {
   }, [router, can, onLinked, onNotice, onChoices, openCapture]);
 
   /**
-   * „Přidat k zakázce" (vybraná zakázka): přílohy e-mailu roztřídí dávka s pevným cílem; bez příloh
-   * jen přiřazení vlákna. Vrací text hlášky, null = otevřel se dialog (hlášku pošle jeho dokončení).
+   * „Přidat k zakázce" i „Změnit" (vybraná zakázka): přílohy e-mailu roztřídí dávka s pevným cílem — co už
+   * u zakázky je (stejný obsah), se znovu neukládá; bez (nových) příloh jen přiřazení / přesun vlákna.
+   * Hlášku pošle dokončení dialogu, nebo rovnou tato funkce.
    */
   const assign = React.useCallback(async (t: MailActionTarget, job: Pick<JobPick, "id" | "number">): Promise<void> => {
     setBusy({ threadId: t.threadId, key: "job.assign" });
+    const relink = Boolean(t.jobId && t.jobId !== job.id);
     try {
-      if (await openCapture("job.assign", t, job.id)) return;
+      const cap = await openCapture("job.assign", t, job.id, relink);
+      if (cap.handled) return;
       // bez vlákna (stránky toku) = přiřadit e-mail (vlákno se přiřadí s ním)
       const r = t.threadId
         ? await setThreadJobAction(t.threadId, job.id)
         : await linkEmailToJob(t.emailId, job.id).then((x) => ({ ...x, jobId: job.id, jobNumber: job.number, changes: 0 }));
       if (!r.ok) return onNotice({ ok: false, text: r.error ?? "E-mail se nepodařilo přiřadit." });
       onLinked(t.threadId, r.jobId ?? job.id, r.jobNumber ?? job.number);
-      onNotice({ ok: true, text: `Vlákno přiřazeno k ${r.jobNumber ?? job.number}${r.changes ? ` — z e-mailu zapsáno ${r.changes} změn(y)` : ""}.` });
+      const stored = cap.alreadyStored ? ` — ${cap.alreadyStored === 1 ? "příloha už u zakázky je" : `přílohy už u zakázky jsou (${cap.alreadyStored})`}` : "";
+      onNotice({ ok: true, text: `Vlákno ${relink ? "přesunuto" : "přiřazeno"} k ${r.jobNumber ?? job.number}${r.changes ? ` — z e-mailu zapsáno ${r.changes} změn(y)` : ""}${stored}.` });
     } catch {
       onNotice({ ok: false, text: "Spojení se nepovedlo — zkus to znovu." });
     } finally {

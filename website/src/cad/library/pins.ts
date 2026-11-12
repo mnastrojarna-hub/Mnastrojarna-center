@@ -1,4 +1,5 @@
 /** Kolíky, pera, pojistné kroužky, O-kroužky, pružiny. */
+import { tr } from "../i18n";
 import { uid, type Feature, type Vec2 } from "../types";
 import { dims, has, length, nums, score, tagged } from "./parse-util";
 import { KEYS, ORING_CS, RINGS, SPRING_PIN, keyByWidth } from "./tables";
@@ -6,7 +7,7 @@ import type { Family, ParamSchema } from "./types";
 import { box, chamferAll, cyl, fmt, nearest, num, part, revolveProfile, sketch, str, tube, XY } from "./util";
 
 const dParam = (def: number, label = "Průměr d"): ParamSchema => ({ key: "d", label, kind: "number", min: 1, max: 100, step: 1, unit: "mm", default: def });
-const lParam = (def: number): ParamSchema => ({ key: "l", label: "Délka l", kind: "number", min: 2, max: 1000, step: 2, unit: "mm", default: def });
+const lParam = (def: number): ParamSchema => ({ key: "l", label: tr("Délka l"), kind: "number", min: 2, max: 1000, step: 2, unit: "mm", default: def });
 
 function parsePin(q: string, words: string[]) {
   const kw = has(q, ...words);
@@ -38,11 +39,11 @@ const dowel = (id: string, std: string, name: string, extraKw: string[], round: 
   make: (v) => {
     const d = num(v.d, 6);
     const l = num(v.l, 30);
-    return part(`Kolík Ø${fmt(d)}×${fmt(l)} ${std}`, id === "din6325" ? "1.7131" : "ocel", [cyl("Kolík", d, l, 0, "new"), chamferAll(round ? d * 0.15 : Math.min(0.6, d * 0.1))], `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
+    return part(tr("Kolík Ø{0}×{1} {2}", fmt(d), fmt(l), std), id === "din6325" ? "1.7131" : "ocel", [cyl(tr("Kolík"), d, l, 0, "new"), chamferAll(round ? d * 0.15 : Math.min(0.6, d * 0.1))], `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
   },
 });
-export const dowelIso8734 = dowel("iso8734", "ISO 8734", "Válcový kolík kalený (m6)", ["8734", "kaleny", "6325"], false);
-export const dowelIso2338 = dowel("iso2338", "ISO 2338", "Válcový kolík nekalený (h8)", ["2338", "nekaleny", "din 7"], true);
+export const dowelIso8734 = dowel("iso8734", "ISO 8734", tr("Válcový kolík kalený (m6)"), ["8734", "kaleny", "6325"], false);
+export const dowelIso2338 = dowel("iso2338", "ISO 2338", tr("Válcový kolík nekalený (h8)"), ["2338", "nekaleny", "din 7"], true);
 
 export const springPin: Family = {
   id: "iso8752",
@@ -51,7 +52,7 @@ export const springPin: Family = {
   icon: "tube",
   standards: ["ISO 8752", "DIN 1481"],
   keywords: ["pruzny kolik", "sterbinovy", "spring pin", "roll pin", "iso 8752", "din 1481"],
-  params: [{ key: "d", label: "Průměr d", kind: "enum", options: Object.keys(SPRING_PIN).map((k) => ({ v: k, l: `Ø${k}` })), default: "6" }, lParam(30)],
+  params: [{ key: "d", label: tr("Průměr d"), kind: "enum", options: Object.keys(SPRING_PIN).map((k) => ({ v: k, l: `Ø${k}` })), default: "6" }, lParam(30)],
   parse: (q) => {
     const hit = parsePin(q, ["pruzn", "sterbin", "spring pin", "roll pin", "8752", "1481"]);
     if (!hit) return null;
@@ -64,7 +65,7 @@ export const springPin: Family = {
     const l = num(v.l, 30);
     const s = SPRING_PIN[d] ?? d * 0.2;
     const gap = Math.max(0.5, d * 0.25);
-    return part(`Pružný kolík Ø${fmt(d)}×${fmt(l)}`, "ocel", [tube("Kolík", d, d - 2 * s, l, 0, "new"), box("Štěrbina", [gap, d, l + 2], [0, d / 2, l / 2], "cut"), chamferAll(Math.min(s * 0.5, 0.4))], `ISO 8752 – ${fmt(d)}×${fmt(l)}`, "#5b6670");
+    return part(tr("Pružný kolík Ø{0}×{1}", fmt(d), fmt(l)), "ocel", [tube(tr("Kolík"), d, d - 2 * s, l, 0, "new"), box(tr("Štěrbina"), [gap, d, l + 2], [0, d / 2, l / 2], "cut"), chamferAll(Math.min(s * 0.5, 0.4))], tr("ISO 8752 – {0}×{1}", fmt(d), fmt(l)), "#5b6670");
   },
 };
 
@@ -76,11 +77,11 @@ export const key6885: Family = {
   standards: ["DIN 6885", "ČSN 02 2562"],
   keywords: ["pero", "tesne pero", "klin", "key", "feather key", "din 6885", "6885"],
   params: [
-    { key: "form", label: "Tvar", kind: "enum", options: [{ v: "A", l: "A – zaoblené konce" }, { v: "B", l: "B – rovné konce" }, { v: "C", l: "C – jeden konec zaoblený" }], default: "A" },
-    { key: "b", label: "Šířka b", kind: "enum", options: KEYS.map((k) => ({ v: String(k.b), l: `${k.b}×${k.h} (hřídel ${k.from}–${k.to})` })), default: "8" },
-    { key: "l", label: "Délka l", kind: "number", min: 6, max: 400, step: 2, unit: "mm", default: 40 },
+    { key: "form", label: tr("Tvar"), kind: "enum", options: [{ v: "A", l: tr("A – zaoblené konce") }, { v: "B", l: tr("B – rovné konce") }, { v: "C", l: tr("C – jeden konec zaoblený") }], default: "A" },
+    { key: "b", label: tr("Šířka b"), kind: "enum", options: KEYS.map((k) => ({ v: String(k.b), l: tr("{0}×{1} (hřídel {2}–{3})", k.b, k.h, k.from, k.to) })), default: "8" },
+    { key: "l", label: tr("Délka l"), kind: "number", min: 6, max: 400, step: 2, unit: "mm", default: 40 },
   ],
-  sizes: { key: "b", columns: [{ key: "h", label: "h" }, { key: "t1", label: "t1 hřídel" }, { key: "t2", label: "t2 náboj" }, { key: "shaft", label: "hřídel d" }], rows: KEYS.map((k) => ({ b: String(k.b), h: k.h, t1: k.t1, t2: k.t2, shaft: `${k.from}–${k.to}` })) },
+  sizes: { key: "b", columns: [{ key: "h", label: "h" }, { key: "t1", label: tr("t1 hřídel") }, { key: "t2", label: tr("t2 náboj") }, { key: "shaft", label: tr("hřídel d") }], rows: KEYS.map((k) => ({ b: String(k.b), h: k.h, t1: k.t1, t2: k.t2, shaft: `${k.from}–${k.to}` })) },
   parse: (q) => {
     const kw = has(q, "pero", "tesne", "key", "6885", "klin");
     if (!kw || has(q, "pruzin", "kolik", "woodruff", "6888", "usecov", "kulickov", "sfu", "remenic", "t-matice", "kamen")) return null;
@@ -104,11 +105,11 @@ export const key6885: Family = {
     const f: Feature[] = [];
     if (form === "B") f.push(box("Pero", [l, k.b, k.h], [0, 0, k.h / 2], "new"));
     else {
-      const sk = sketch("Pero – profil", XY(0), form === "A" ? [{ id: uid(), type: "slot", cx: 0, cy: 0, length: l, width: k.b, angle: 0 }] : [{ id: uid(), type: "polyline", closed: true, points: cForm(l, k.b) }]);
+      const sk = sketch(tr("Pero – profil"), XY(0), form === "A" ? [{ id: uid(), type: "slot", cx: 0, cy: 0, length: l, width: k.b, angle: 0 }] : [{ id: uid(), type: "polyline", closed: true, points: cForm(l, k.b) }]);
       f.push(sk, { id: uid(), name: "Pero", type: "extrude", sketchId: sk.id, distance: k.h, symmetric: false, reverse: false, mode: "new" });
     }
     f.push(chamferAll(Math.min(0.4, k.h * 0.06)));
-    return part(`Pero ${form} ${k.b}×${k.h}×${fmt(l)}`, "ocel", f, `DIN 6885 – ${form} ${k.b}×${k.h}×${fmt(l)}`, "#aeb6bf");
+    return part(tr("Pero {0} {1}×{2}×{3}", form, k.b, k.h, fmt(l)), "ocel", f, tr("DIN 6885 – {0} {1}×{2}×{3}", form, k.b, k.h, fmt(l)), "#aeb6bf");
   },
 };
 /** Tvar C: jeden konec zaoblený (půlkruh z úseček). */
@@ -129,8 +130,8 @@ const ring = (id: string, std: string, external: boolean): Family => ({
   icon: "tube",
   standards: [std, external ? "ČSN 02 2930" : "ČSN 02 2931"],
   keywords: ["pojistny krouzek", "segrovka", "seeger", "circlip", "retaining ring", std.toLowerCase(), external ? "hridel" : "dira"],
-  params: [{ key: "d", label: external ? "Průměr hřídele d" : "Průměr díry D", kind: "enum", options: RINGS.map((r) => ({ v: String(r.d), l: `${r.d}` })), default: "25" }],
-  sizes: { key: "d", columns: [{ key: "s", label: "s" }, { key: "b", label: "b" }, { key: "g", label: external ? "d2 drážka" : "D2 drážka" }], rows: RINGS.map((r) => ({ d: String(r.d), s: r.s, b: r.b, g: external ? r.d2 : r.D2 })) },
+  params: [{ key: "d", label: external ? tr("Průměr hřídele d") : tr("Průměr díry D"), kind: "enum", options: RINGS.map((r) => ({ v: String(r.d), l: `${r.d}` })), default: "25" }],
+  sizes: { key: "d", columns: [{ key: "s", label: "s" }, { key: "b", label: "b" }, { key: "g", label: external ? tr("d2 drážka") : tr("D2 drážka") }], rows: RINGS.map((r) => ({ d: String(r.d), s: r.s, b: r.b, g: external ? r.d2 : r.D2 })) },
   parse: (q) => {
     const kw = has(q, "pojistn", "segrov", "seeger", "circlip", "retaining", std.toLowerCase().replace("din ", ""));
     if (!kw || has(q, "matice", "nut", "podloz", "washer")) return null;
@@ -148,15 +149,15 @@ const ring = (id: string, std: string, external: boolean): Family => ({
     const earD = r.b * 1.5;
     const earR = external ? inner / 2 - earD / 2 + 0.2 : outer / 2 + earD / 2 - 0.2;
     const f: Feature[] = [
-      tube("Kroužek", outer, inner, r.s, 0, "new"),
-      box("Rozevření", [gap, outer, r.s + 2], [0, external ? -outer / 2 + 1 : -outer / 2 + 1, r.s / 2], "cut"),
+      tube(tr("Kroužek"), outer, inner, r.s, 0, "new"),
+      box(tr("Rozevření"), [gap, outer, r.s + 2], [0, external ? -outer / 2 + 1 : -outer / 2 + 1, r.s / 2], "cut"),
     ];
     for (const sgn of [-1, 1]) {
       const x = sgn * (gap / 2 + earD / 2);
       const y = -Math.sqrt(Math.max(0, earR * earR - x * x));
-      f.push(cyl("Ouško", earD, r.s, 0, "add", "Z", [x, y]), cyl("Otvor ouška", earD * 0.4, r.s + 2, -1, "cut", "Z", [x, y]));
+      f.push(cyl(tr("Ouško"), earD, r.s, 0, "add", "Z", [x, y]), cyl(tr("Otvor ouška"), earD * 0.4, r.s + 2, -1, "cut", "Z", [x, y]));
     }
-    return part(`Pojistný kroužek ${r.d} ${std}`, "ocel", f, `${std} – ${r.d}×${r.s}`, "#3a3f45");
+    return part(tr("Pojistný kroužek {0} {1}", r.d, std), "ocel", f, `${std} – ${r.d}×${r.s}`, "#3a3f45");
   },
 });
 export const ringDin471 = ring("din471", "DIN 471", true);
@@ -170,9 +171,9 @@ export const oRing: Family = {
   standards: ["ISO 3601", "DIN 3771"],
   keywords: ["o-krouzek", "okrouzek", "o krouzek", "oring", "o-ring", "tesneni", "iso 3601"],
   params: [
-    { key: "d1", label: "Vnitřní průměr d1", kind: "number", min: 1, max: 500, step: 0.5, unit: "mm", default: 20 },
-    { key: "d2", label: "Průřez d2", kind: "enum", options: ORING_CS.map((c) => ({ v: String(c), l: String(c) })), default: "3" },
-    { key: "mat", label: "Materiál", kind: "enum", options: ["NBR 70", "FKM (Viton) 75", "EPDM 70", "silikon 60"].map((m) => ({ v: m, l: m })), default: "NBR 70" },
+    { key: "d1", label: tr("Vnitřní průměr d1"), kind: "number", min: 1, max: 500, step: 0.5, unit: "mm", default: 20 },
+    { key: "d2", label: tr("Průřez d2"), kind: "enum", options: ORING_CS.map((c) => ({ v: String(c), l: String(c) })), default: "3" },
+    { key: "mat", label: tr("Materiál"), kind: "enum", options: ["NBR 70", "FKM (Viton) 75", "EPDM 70", "silikon 60"].map((m) => ({ v: m, l: m })), default: "NBR 70" },
   ],
   parse: (q) => {
     const kw = has(q, "o-krouzek", "okrouzek", "o krouzek", "oring", "o-ring", "tesnici krouzek");
@@ -187,8 +188,8 @@ export const oRing: Family = {
   make: (v) => {
     const d1 = num(v.d1, 20);
     const d2 = num(v.d2, 3);
-    const sk = sketch("Průřez", { kind: "base", name: "XZ", offset: 0 }, [{ id: uid(), type: "circle", cx: d1 / 2 + d2 / 2, cy: 0, r: d2 / 2 }]);
-    return part(`O-kroužek ${fmt(d1)}×${fmt(d2)}`, "pom", [sk, { id: uid(), name: "O-kroužek", type: "revolve", sketchId: sk.id, angle: 360, axis: "y", mode: "new" }], `ISO 3601 – ${fmt(d1)}×${fmt(d2)} – ${v.mat}`, "#222222");
+    const sk = sketch(tr("Průřez"), { kind: "base", name: "XZ", offset: 0 }, [{ id: uid(), type: "circle", cx: d1 / 2 + d2 / 2, cy: 0, r: d2 / 2 }]);
+    return part(tr("O-kroužek {0}×{1}", fmt(d1), fmt(d2)), "pom", [sk, { id: uid(), name: "O-kroužek", type: "revolve", sketchId: sk.id, angle: 360, axis: "y", mode: "new" }], tr("ISO 3601 – {0}×{1} – {2}", fmt(d1), fmt(d2), v.mat), "#222222");
   },
 };
 
@@ -200,10 +201,10 @@ export const compressionSpring: Family = {
   standards: ["DIN 2095", "EN 13906-1"],
   keywords: ["pruzina", "tlacna pruzina", "spring", "compression spring", "din 2095"],
   params: [
-    { key: "d", label: "Průměr drátu d", kind: "number", min: 0.2, max: 20, step: 0.1, unit: "mm", default: 1.6 },
-    { key: "D", label: "Vnější průměr De", kind: "number", min: 1, max: 300, step: 0.5, unit: "mm", default: 12 },
-    { key: "L", label: "Volná délka L0", kind: "number", min: 2, max: 1000, step: 1, unit: "mm", default: 40 },
-    { key: "n", label: "Počet činných závitů n", kind: "number", min: 1, max: 60, step: 0.5, unit: "", default: 8 },
+    { key: "d", label: tr("Průměr drátu d"), kind: "number", min: 0.2, max: 20, step: 0.1, unit: "mm", default: 1.6 },
+    { key: "D", label: tr("Vnější průměr De"), kind: "number", min: 1, max: 300, step: 0.5, unit: "mm", default: 12 },
+    { key: "L", label: tr("Volná délka L0"), kind: "number", min: 2, max: 1000, step: 1, unit: "mm", default: 40 },
+    { key: "n", label: tr("Počet činných závitů n"), kind: "number", min: 1, max: 60, step: 0.5, unit: "", default: 8 },
   ],
   parse: (q) => {
     const kw = has(q, "pruzin", "spring", "2095");
@@ -236,7 +237,7 @@ export const compressionSpring: Family = {
     const L = num(v.L, 40);
     const n = Math.max(1, num(v.n, 8));
     const pitch = Math.max(d * 1.05, (L - d) / n);
-    return part(`Pružina ${fmt(d)}×${fmt(D)}×${fmt(L)}`, "ocel", [{ id: uid(), name: "Pružina", type: "spring", radius: (D - d) / 2, pitch, turns: n, wire: d, position: [0, 0, 0], axis: "Z", mode: "new" }], `DIN 2095 – ${fmt(d)}×${fmt(D)}×${fmt(L)} – n ${n}`, "#5b6670");
+    return part(tr("Pružina {0}×{1}×{2}", fmt(d), fmt(D), fmt(L)), "ocel", [{ id: uid(), name: "Pružina", type: "spring", radius: (D - d) / 2, pitch, turns: n, wire: d, position: [0, 0, 0], axis: "Z", mode: "new" }], tr("DIN 2095 – {0}×{1}×{2} – n {3}", fmt(d), fmt(D), fmt(L), n), "#5b6670");
   },
 };
 

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   parseDecimal, formatDecimalInput, initialFormState, validateJobForm, emptyItem, isItemEmpty, lineTotal,
-  formTotals, findSameCustomer, firstErrorKey, customerOwnerOf, ownerHint, type JobFormState,
+  formTotals, formValueHint, findSameCustomer, firstErrorKey, customerOwnerOf, ownerHint, type JobFormState,
 } from "./job-form-model";
 
 const C1 = "3f2b8c1e-1d2a-4c3b-9a8e-7f6d5c4b3a21";
@@ -76,8 +76,8 @@ describe("položky", () => {
       { ...emptyItem(), name: "B", quantity: "1,5", unitPrice: "", purchaseUnitPrice: "4" },
       { ...emptyItem(), quantity: "9", unitPrice: "" },
     ];
-    expect(formTotals(items, true)).toEqual({ value: 20, purchase: 18 });
-    expect(formTotals(items, false)).toEqual({ value: 20, purchase: null });
+    expect(formTotals(items, true)).toEqual({ value: 20, purchase: 18, unpriced: 1, count: 2 });
+    expect(formTotals(items, false)).toEqual({ value: 20, purchase: null, unpriced: 1, count: 2 });
   });
 });
 
@@ -176,5 +176,40 @@ describe("obchodník podle zákazníka (2. 11.)", () => {
     expect(ownerHint(st("c1", "u2"), opts, false)).toBe("jiný než obchodník zákazníka (ručně)");
     expect(ownerHint(st("c2", "u2"), opts, false)).toBe("podle zákazníka");
     expect(ownerHint(st("c2", "u2"), opts, true)).toBe("zvolen ručně (zákazník obchodníka nemá)");
+  });
+});
+
+// ── Nová zakázka: hodnota = součet položek (křížová konzistence 4. 11.) ──
+describe("hodnota zakázky z položek (Nová zakázka)", () => {
+  const row = (over: Partial<ReturnType<typeof emptyItem>>) => ({ ...emptyItem(), name: "Díl", ...over });
+
+  it("formTotals: Σ(počet × cena) jen nacenených, počítá položky bez ceny, prázdné řádky ignoruje", () => {
+    expect(formTotals([], true)).toEqual({ value: null, purchase: null, unpriced: 0, count: 0 });
+    const items = [
+      row({ quantity: "50", unitPrice: "1 180", purchaseUnitPrice: "700" }),
+      row({ quantity: "50", unitPrice: "960" }),
+      row({ quantity: "3", unitPrice: "" }),
+      emptyItem(), // prázdný řádek se při uložení zahodí
+    ];
+    expect(formTotals(items, true)).toEqual({ value: 107_000, purchase: 35_000, unpriced: 1, count: 3 });
+    expect(formTotals(items, false).purchase).toBeNull();
+    // neplatné číslo = bez ceny (formulář ho odmítne při uložení)
+    expect(formTotals([row({ quantity: "2", unitPrice: "abc" })], true)).toEqual({ value: null, purchase: null, unpriced: 1, count: 1 });
+  });
+
+  it("uložené položky nesou ceny, ze kterých createJob hodnotu spočítá (ve formuláři není samostatné pole hodnoty)", () => {
+    const { values, errors } = validateJobForm(base({ items: [row({ quantity: "2", unitPrice: "1 234,5" }), row({ quantity: "1" })] }), { margins: true });
+    expect(errors).toEqual({});
+    expect(values!.items.map((i) => i.unitPrice)).toEqual([1234.5, null]);
+    expect("value" in values!).toBe(false);
+    expect(formTotals(base({ items: [row({ quantity: "2", unitPrice: "1 234,5" }), row({ quantity: "1" })] }).items, true)).toMatchObject({ value: 2469, unpriced: 1 });
+  });
+
+  it("patička: hláška o součtu položek", () => {
+    expect(formValueHint({ value: null, unpriced: 2 })).toBe("Cena se doplní později (nacenění dělá člověk).");
+    expect(formValueHint({ value: 100, unpriced: 0 })).toBe("= hodnota zakázky (součet položek)");
+    expect(formValueHint({ value: 100, unpriced: 1 })).toBe("= hodnota zakázky (součet položek, 1 položka bez ceny)");
+    expect(formValueHint({ value: 100, unpriced: 3 })).toBe("= hodnota zakázky (součet položek, 3 položky bez ceny)");
+    expect(formValueHint({ value: 100, unpriced: 7 })).toBe("= hodnota zakázky (součet položek, 7 položek bez ceny)");
   });
 });

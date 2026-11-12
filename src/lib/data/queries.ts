@@ -9,10 +9,11 @@ import type {
   EmailItem, ApprovalItem, QuoteItem, DrawingItem, CommissionRow, BadgeCounts,
 } from "@/lib/data/types";
 import { periodStart } from "@/lib/data/periods";
-import { getAccess } from "@/lib/auth/session";
+import { getAccess, getSessionUser } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
+import { hiddenQueueTypes } from "@/lib/auth/approval-queue-access";
 import { CLOSED_STAGES } from "@/lib/jobs/stages";
-import { usableMailbox } from "@/lib/jobs/production-handoff-store";
+import { resolveSender } from "@/lib/email/sender-rules";
 import { fetchPaged, isUuid } from "@/lib/jobs/mapping";
 import type { JobListItem } from "@/lib/jobs/types";
 import { getEmails as getMailEmails, getSentMail, getUnreadCount, getMailScope } from "@/lib/data/mail";
@@ -76,19 +77,23 @@ export async function getEmails(): Promise<EmailItem[]> {
 export type ApprovalQueueItem = ApprovalItem & {
   proposedBy: string;
   quoteHref?: string | null;
-  /** Řádek „Objednávka dodavateli": PDF, zakázka a odkud e-mail odejde (schránka obchodníka zakázky, jinak moje). */
+  /** Řádek „Objednávka dodavateli": PDF, zakázka a odkud e-mail odejde (ze schránky toho, kdo schválí — moje). */
   purchaseOrder?: ApprovalPurchaseOrder | null;
 };
 
 export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
-  if (!(await allowedAccess("dashboard"))) return [];
+  // super admin (AI přehled) vše; 9. 11. „Smí řešit frontu ke schválení" bez AI návrhů nabídek (approval-queue-access)
+  const access = await allowedAccess("dashboard", "approval_queue");
+  if (!access) return [];
   const db = await supa();
   if (!db) return [];
-  const { data, error } = await db
+  const hidden = hiddenQueueTypes(access.can);
+  let query = db
     .from("approval_queue")
     .select("*, po:purchase_orders!purchase_order_id(id, number, file_id, job_id, creator:profiles!created_by(id, full_name, email), job:orders!job_id(owner_id))")
-    .eq("status", "pending")
-    .order("created_at", { ascending: false });
+    .eq("status", "pending");
+  if (hidden.length) query = query.not("type", "in", `(${hidden.join(",")})`);
+  const { data, error } = await query.order("created_at", { ascending: false });
   warn("approval_queue", error);
   if (error || !data) return [];
   type PoEmbed = {
@@ -96,28 +101,24 @@ export async function getApprovalQueue(): Promise<ApprovalQueueItem[]> {
     creator?: { full_name: string | null; email: string | null } | { full_name: string | null; email: string | null }[] | null;
     job?: { owner_id: string | null } | { owner_id: string | null }[] | null;
   };
-  // odkud objednávka odejde: schránka obchodníka zakázky (použitelná), jinak toho, kdo schvaluje
-  const senders = new Map<string, string | null>();
-  for (const a of data as (ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null })[]) {
-    const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
-    const job = po ? (Array.isArray(po.job) ? po.job[0] ?? null : po.job ?? null) : null;
-    const owner = job?.owner_id ?? null;
-    if (a.type !== "purchase_order" || !owner || senders.has(owner)) continue;
+  // odkud objednávka odejde: ze schránky toho, kdo ji schválí (= já; majitel 9. 11. — každý ze své schránky,
+  // super admin si může v řádku vybrat jinou)
+  let mySender: string | null = null;
+  if ((data as ApprovalItemRow[]).some((a) => a.type === "purchase_order")) {
     try {
-      const box = await usableMailbox(db as never, owner);
-      senders.set(owner, box?.email ?? null);
+      const me = await getSessionUser();
+      mySender = me ? (await resolveSender(me.id)).mailboxEmail : null;
     } catch {
-      senders.set(owner, null);
+      mySender = null;
     }
   }
   const poOf = (a: ApprovalItemRow & { po?: PoEmbed | PoEmbed[] | null }): ApprovalPurchaseOrder | null => {
     if (a.type !== "purchase_order") return null;
     const po = Array.isArray(a.po) ? a.po[0] ?? null : a.po ?? null;
     if (!po?.id) return null;
-    const job = Array.isArray(po.job) ? po.job[0] ?? null : po.job ?? null;
     return {
       id: po.id, number: po.number ?? null, fileId: po.file_id ?? null, jobId: po.job_id ?? a.order_id ?? null,
-      senderEmail: job?.owner_id ? senders.get(job.owner_id) ?? null : null,
+      senderEmail: mySender,
       kind: ((a.payload as { kind?: unknown } | null)?.kind as ApprovalPurchaseOrder["kind"] | undefined) ?? "issue",
     };
   };
@@ -155,7 +156,7 @@ export interface ApprovalPurchaseOrder {
   number: string | null;
   fileId: string | null;
   jobId: string | null;
-  /** Schránka obchodníka zakázky, ze které e-mail odejde (null = schránka toho, kdo schvaluje). */
+  /** Adresa, ze které e-mail odejde, když ho schválím já (moje schránka; null = odeslat nejde / neznámá). */
   senderEmail: string | null;
   kind: "issue" | "change" | "cancel" | "hold";
 }
@@ -171,13 +172,17 @@ export interface ResolvedApproval {
 }
 
 export async function getResolvedApprovals(limit = 6): Promise<ResolvedApproval[]> {
-  if (!(await allowedAccess("dashboard"))) return [];
+  const access = await allowedAccess("dashboard", "approval_queue");
+  if (!access) return [];
   const db = await supa();
   if (!db) return [];
-  const { data, error } = await db
+  const hidden = hiddenQueueTypes(access.can);
+  let query = db
     .from("approval_queue")
     .select("id, type, title, status, resolved_at, resolved_by, resolver:profiles!resolved_by(id, full_name, email)")
-    .neq("status", "pending")
+    .neq("status", "pending");
+  if (hidden.length) query = query.not("type", "in", `(${hidden.join(",")})`);
+  const { data, error } = await query
     .not("resolved_at", "is", null)
     .order("resolved_at", { ascending: false })
     .limit(Math.max(1, Math.min(50, limit)));
@@ -399,7 +404,11 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
       db.from("orders").select("id", { count: "exact", head: true }).not("status", "in", `(${CLOSED_STAGES.join(",")})`),
       can("dashboard")
         ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
-        : Promise.resolve({ count: 0 }),
+        // 9. 11.: „Smí řešit frontu ke schválení" — odznak stránky Fronta ke schválení (bez AI návrhů nabídek)
+        : can("approval_queue")
+          ? db.from("approval_queue").select("id", { count: "exact", head: true }).eq("status", "pending")
+            .not("type", "in", `(${hiddenQueueTypes(can).join(",")})`)
+          : Promise.resolve({ count: 0 }),
       getUnreadCount(),
       peerApprover ? listPendingQuoteApprovals().then((l) => l.length) : Promise.resolve(0),
     ]);
@@ -414,7 +423,7 @@ export async function getBadgeCounts(): Promise<BadgeCounts> {
       confirmations: n("confirmations"),
       orders: orders.count ?? 0,
       // AI přehled = fronta AI návrhů + ruční nabídky kolegů ke schválení (panel „Nabídky ke schválení")
-      approvals: can("dashboard") ? (approvals.count ?? 0) + n("quotes_pending_manual") : 0,
+      approvals: can("dashboard") ? (approvals.count ?? 0) + n("quotes_pending_manual") : can("approval_queue") ? approvals.count ?? 0 : 0,
     };
   } catch {
     return empty;
@@ -430,6 +439,8 @@ export interface PendingQuoteApproval {
   /** Název zakázky (řádek fronty říká, k čemu nabídka je). */
   jobTitle?: string | null;
   customerName: string | null;
+  /** Prémiový zákazník (9. 11.) — štítek „Pozor, prémiový zákazník". */
+  customerPremium?: boolean;
   authorName: string | null;
   total: number | null;
   currency: string;
@@ -458,8 +469,8 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
       let qb = db.from("quotes")
         .select([
           "id, number, job_id, total, currency, updated_at, created_at",
-          "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name))",
-          "customer:customers!customer_id(name)",
+          "job:orders!job_id(id, number, title, status, customer:customers!customer_id(name, is_premium))",
+          "customer:customers!customer_id(name, is_premium)",
           "creator:profiles!created_by(full_name, email)",
           "items:quote_items!quote_id(unit_price)",
         ].join(", "))
@@ -489,7 +500,9 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
     for (const r of data) {
       const id = String(r.id);
       if (queued.has(id)) continue;
-      const job = first(r.job as Embed<{ id: string; number: string | null; title?: string | null; status: string; customer?: Embed<{ name: string }> }>);
+      type Cust = { name: string; is_premium?: boolean | null };
+      const job = first(r.job as Embed<{ id: string; number: string | null; title?: string | null; status: string; customer?: Embed<Cust> }>);
+      const cust = first(r.customer as Embed<Cust>) ?? first(job?.customer);
       if (job && closed.includes(job.status)) continue;
       const creator = first(r.creator as Embed<{ full_name: string | null; email: string | null }>);
       const items = (Array.isArray(r.items) ? r.items : []) as { unit_price: number | string | null }[];
@@ -500,7 +513,8 @@ export async function listPendingQuoteApprovals(): Promise<PendingQuoteApproval[
         jobId: job?.id ?? ((r.job_id as string | null) ?? null),
         jobNumber: job?.number ?? null,
         jobTitle: job?.title?.trim() || null,
-        customerName: first(r.customer as Embed<{ name: string }>)?.name ?? first(job?.customer)?.name ?? null,
+        customerName: cust?.name ?? null,
+        ...(cust?.is_premium === true ? { customerPremium: true } : {}),
         authorName: (creator?.full_name ?? "").trim() || (creator?.email ?? "").trim() || null,
         total: total !== null && Number.isFinite(total) ? total : null,
         currency: (r.currency as string | null) || "CZK",

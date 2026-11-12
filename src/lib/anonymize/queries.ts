@@ -1,6 +1,6 @@
 import "server-only";
 import type { AnonDb } from "./queue";
-import type { AnonStatus, AnonSummary } from "./types";
+import type { AnonDebugEntry, AnonStatus, AnonSummary } from "./types";
 
 /**
  * Čtení pro UI (odznaky v Poptávkách, sekce „Anonymizace výkresů" se selháními, Dashboard). Viditelnost
@@ -84,6 +84,8 @@ export interface AnonReviewItem {
   crop: { x: number; y: number; w: number; h: number } | null;
   /** Strana originálu pro miniaturu (první zahrnutá — dopis na straně 1 se do „Po" nedostane). */
   page: number;
+  /** Diagnostika pokusů (volající ji pustí jen super adminovi). */
+  debug: AnonDebugEntry[] | null;
 }
 
 const REVIEW_SELECT = "id, job_id, filename, anon_filename, anon_status, anon_reason, anon_summary, anon_at, anon_regions, anon_pages";
@@ -115,7 +117,27 @@ function toItem(r: Record<string, unknown>): AnonReviewItem {
     id: String(r.id), jobId: String(r.job_id), filename: String(r.filename ?? ""), anonFilename: (r.anon_filename as string | null) ?? null,
     status: r.anon_status as AnonStatus, reason: (r.anon_reason as string | null) ?? null, summary: (r.anon_summary as AnonSummary | null) ?? null,
     at: (r.anon_at as string | null) ?? null, crop: cropOf(r.anon_regions, page), page,
+    debug: null,
   };
+}
+
+/**
+ * Diagnostika pokusů (anon_debug) pro dané soubory — zvlášť a best effort (sloupec přibyl migrací
+ * 20261105110000; bez něj prázdno, ne chyba). Volající ji pustí jen super adminovi.
+ */
+export async function anonDebugFor(db: AnonDb, table: "job_files" | "drawings" | "drawing_anon_adhoc", ids: string[]): Promise<Record<string, AnonDebugEntry[]>> {
+  const out: Record<string, AnonDebugEntry[]> = {};
+  if (!ids.length) return out;
+  try {
+    for (const part of chunks([...new Set(ids)])) {
+      const { data, error } = await db.from(table).select("id, anon_debug").in("id", part);
+      if (error) return out;
+      for (const r of (data ?? []) as { id: string; anon_debug: unknown }[]) if (Array.isArray(r.anon_debug)) out[r.id] = r.anon_debug as AnonDebugEntry[];
+    }
+  } catch {
+    // jen diagnostika
+  }
+  return out;
 }
 
 /**

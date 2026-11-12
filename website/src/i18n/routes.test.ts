@@ -8,7 +8,9 @@ import { CASES } from "@/content/cases";
 import { LOCALES, SERVICE_IDS, alternates, href, resolvePath, type PageKey } from "./config";
 
 const APP = path.resolve(__dirname, "../app");
-const base = { cs: "(cs)/(site)", en: "(en)", de: "(de)" } as const;
+// stránky webu leží ve skupině (site) (hlavička + patička); aplikace CAD je mimo ni
+const fileOf = (l: (typeof LOCALES)[number], p: string, ...rest: string[]) =>
+  l === "cs" ? path.join(APP, "(cs)/(site)", p === "/" ? "" : p, ...rest) : path.join(APP, `(${l})`, p.replace(new RegExp(`^/${l}`), `/${l}/(site)`), ...rest);
 const KEYS: PageKey[] = ["home", "services", "cases", "machinery", "quality", "references", "about", "contact", "careers", "privacy", "maintenance"];
 
 describe("lokalizované trasy", () => {
@@ -16,19 +18,19 @@ describe("lokalizované trasy", () => {
     for (const l of LOCALES)
       for (const k of KEYS) {
         const p = href(l, k);
-        const file = path.join(APP, base[l], p === "/" ? "" : p, "page.tsx");
+        const file = fileOf(l, p, "page.tsx");
         expect(fs.existsSync(file), `${l} ${k} → ${file}`).toBe(true);
       }
   });
   it("služby: [slug] route ve všech jazycích a zpětné rozpoznání adresy", () => {
     for (const l of LOCALES) {
-      expect(fs.existsSync(path.join(APP, base[l], href(l, "services"), "[slug]", "page.tsx"))).toBe(true);
+      expect(fs.existsSync(fileOf(l, href(l, "services"), "[slug]", "page.tsx"))).toBe(true);
       for (const id of SERVICE_IDS) expect(resolvePath(href(l, "service", id))).toEqual({ locale: l, key: "service", serviceId: id });
     }
   });
   it("zakázky: [slug] route a rozpoznání adresy ve všech jazycích", () => {
     for (const l of LOCALES) {
-      expect(fs.existsSync(path.join(APP, base[l], href(l, "cases"), "[slug]", "page.tsx"))).toBe(true);
+      expect(fs.existsSync(fileOf(l, href(l, "cases"), "[slug]", "page.tsx"))).toBe(true);
       for (const c of CASES) expect(resolvePath(href(l, "case", c.slug.cs))).toEqual({ locale: l, key: "case", caseId: c.slug.cs });
     }
   });

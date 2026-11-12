@@ -1,0 +1,840 @@
+# DE – Formulare, Panels, Skizze, Einstellungen, Teilen, Start
+# fillet-form
+Boční plocha 1	Seitenfläche 1
+Boční plocha 2	Seitenfläche 2
+D (na ref. ploše)	D (auf Ref.-Fläche)
+D1 (na ref. ploše)	D1 (auf Ref.-Fläche)
+D1 se měří na referenční ploše, D2 na sousední ploše. Vybrané hrany musí s referenční plochou sousedit; „Všechny hrany plochy“ srazí celý její obvod.	D1 wird auf der Referenzfläche gemessen, D2 auf der Nachbarfläche. Die gewählten Kanten müssen an die Referenzfläche grenzen; „Alle Kanten der Fläche“ fast ihren gesamten Umfang.
+D2 (sousední plocha)	D2 (Nachbarfläche)
+Druh sražení	Fasenart
+Druh zaoblení	Verrundungsart
+Jádro šíří zaoblení po tečně navazujících hranách (hrana → oblouk → hrana) i samo; volba rozšíří i výběr, se kterým pracuje tabulka a počet hran.	Der Kern setzt die Verrundung entlang tangential anschließender Kanten (Kante → Bogen → Kante) von selbst fort; die Option erweitert auch die Auswahl, mit der Tabelle und Kantenzahl arbeiten.
+Každá hrana může mít vlastní poloměr; liší-li se začátek a konec, mění se poloměr podél hrany lineárně. Řídicí body uprostřed hrany jádro neumožňuje; tečně navazující hrany tvoří jeden přechod se společným poloměrem.	Jede Kante kann einen eigenen Radius haben; unterscheiden sich Anfang und Ende, ändert sich der Radius entlang der Kante linear. Steuerpunkte in Kantenmitte unterstützt der Kern nicht; tangential anschließende Kanten bilden einen Übergang mit gemeinsamem Radius.
+Konstantní	Konstant
+Odebrat hranu	Kante entfernen
+Plný	Vollrundung
+Plocha–plocha	Fläche–Fläche
+Poloměr = polovina vzdálenosti rovnoběžných bočních ploch; prostřední plocha se nahradí válcem tečným k oběma. Prostřední plochu lze vynechat, je-li mezi bočními plochami jediná. Obdélníková prostřední plocha kolmá na boční se zaoblí přesně, jiná přibližně.	Radius = halber Abstand der parallelen Seitenflächen; die Mittelfläche wird durch einen zu beiden tangentialen Zylinder ersetzt. Die Mittelfläche kann entfallen, wenn zwischen den Seitenflächen nur eine liegt. Eine rechteckige, zu den Seiten senkrechte Mittelfläche wird exakt verrundet, andere näherungsweise.
+Poloměr se mění lineárně od začátku hrany (R1) k jejímu konci (R2). Začátek hrany určuje model – běží-li přechod obráceně, hodnoty prohoďte. Eliptické (asymetrické) zaoblení s různou vzdáleností na každé ploše jádro OCCT neumí.	Der Radius ändert sich linear vom Kantenanfang (R1) zum Kantenende (R2). Den Kantenanfang bestimmt das Modell – läuft der Übergang verkehrt, vertauschen Sie die Werte. Elliptische (asymmetrische) Verrundungen mit unterschiedlichem Abstand je Fläche unterstützt der OCCT-Kern nicht.
+Poloměry hran	Kantenradien
+Pro tabulku poloměrů vyberte hrany klikem v modelu – u volby „Všechny“ platí výchozí poloměr.	Für die Radientabelle wählen Sie Kanten per Klick im Modell – bei „Alle“ gilt der Standardradius.
+Prohodit R1 ↔ R2	R1 ↔ R2 tauschen
+Prostřední plocha (zaoblí se)	Mittelfläche (wird verrundet)
+R konec	R Ende
+R začátek	R Anfang
+R1 (začátek hrany)	R1 (Kantenanfang)
+R1 → R2	R1 → R2
+R2 (konec hrany)	R2 (Kantenende)
+Referenční plocha	Referenzfläche
+Roh se odřízne rovinou procházející body ve vzdálenostech D1–D3 od vrcholu podél jeho tří hran (v pořadí čísel hran). Ve vrcholu se musí stýkat právě tři hrany.	Die Ecke wird durch eine Ebene abgeschnitten, die durch Punkte in den Abständen D1–D3 vom Eckpunkt entlang seiner drei Kanten verläuft (in Reihenfolge der Kantennummern). Im Eckpunkt müssen genau drei Kanten zusammentreffen.
+Sada ploch 1	Flächensatz 1
+Sada ploch 2	Flächensatz 2
+Stejné	Gleich
+Tabulka	Tabelle
+Velikost sražení	Fasengröße
+Vrchol	Eckpunkt
+Vrcholy	Eckpunkte
+Vybrané	Ausgewählte
+Vzdálenost D se měří na referenční ploše; úhel svírá sražení s touto plochou (druhá vzdálenost = D · tg úhlu, 45° = symetrické).	Der Abstand D wird auf der Referenzfläche gemessen; der Winkel liegt zwischen Fase und dieser Fläche (zweiter Abstand = D · tan Winkel, 45° = symmetrisch).
+Výchozí poloměr	Standardradius
+Zaoblí se hrany, které má plocha z první sady společné s plochou z druhé sady (např. horní plocha × všechny boční = celý obvod).	Verrundet werden Kanten, die eine Fläche des ersten Satzes mit einer Fläche des zweiten Satzes gemeinsam hat (z. B. Oberseite × alle Seitenflächen = gesamter Umfang).
+plocha, na které se měří první vzdálenost	Fläche, auf der der erste Abstand gemessen wird
+vrcholů zadaných indexem.	per Index angegebene Eckpunkte.
+Úhel od ref. plochy	Winkel zur Ref.-Fläche
+Šířit výběr po tečně navazujících hranách	Auswahl entlang tangentialer Kanten fortsetzen
+# more-forms
++ ven · − dovnitř	+ nach außen · − nach innen
+1. rovina (plocha / pomocná rovina)	1. Ebene (Fläche / Bezugsebene)
+2. rovina (plocha / pomocná rovina)	2. Ebene (Fläche / Bezugsebene)
+Cílová plocha / pomocná rovina	Zielfläche / Bezugsebene
+Definice osy	Achsendefinition
+Do bodu	Zum Punkt
+Druhý bod	Zweiter Punkt
+Délka zobrazení	Anzeigelänge
+Globální osa X / Y / Z středem (níže)	Globale Achse X / Y / Z durch die Mitte (unten)
+Globální osa otočení	Globale Drehachse
+Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese (kružnice válce / jádra díry se kótuje označením). Doporučeno pro výrobní dokumentaci.	Kosmetisches Gewinde: die Geometrie ändert sich nicht, das Gewinde erscheint in der Zeichnung (der Kreis des Zylinders / Bohrungskerns wird mit der Bezeichnung bemaßt). Empfohlen für Fertigungsunterlagen.
+Modelovat závitové drážky	Gewinderillen modellieren
+Neznámé označení – zadejte M2 až M48, volitelně se stoupáním (M18×1,5).	Unbekannte Bezeichnung – geben Sie M2 bis M48 ein, optional mit Steigung (M18×1,5).
+Odsazení od plochy (0 = až k ploše)	Versatz von der Fläche (0 = bis zur Fläche)
+Osa X (ortogonalizuje se vůči Z)	X-Achse (wird zu Z orthogonalisiert)
+Osa Z	Z-Achse
+Osa Z kvádru	Z-Achse des Quaders
+Osa otočení	Drehachse
+Otočení	Drehung
+Označení (text)	Bezeichnung (Text)
+Označení závitu	Gewindebezeichnung
+Pevná rovina ({0})	Feste Ebene ({0})
+Poloha (začátek osy)	Position (Achsenanfang)
+Poloha = střed kvádru	Position = Quadermitte
+Poloha podstavy	Position der Grundfläche
+Pomocná osa / osa Z souřadného systému	Bezugsachse / Z-Achse eines Koordinatensystems
+Pomocná osa nevytváří geometrii. Použijte ji jako osu rotace, otočení či kruhového pole, nebo jako směr (volba „Pomocná osa“ v poli osy / směru).	Eine Bezugsachse erzeugt keine Geometrie. Verwenden Sie sie als Rotations-, Dreh- oder Kreismusterachse oder als Richtung (Option „Bezugsachse“ im Achsen-/Richtungsfeld).
+Posun z bodu do bodu	Verschiebung von Punkt zu Punkt
+Posunout z bodu do bodu (přičte se k posunutí výše)	Von Punkt zu Punkt verschieben (wird zur Verschiebung oben addiert)
+Posunutí	Verschiebung
+Pořadí: měřítko (kolem středu) → otočení (kolem zadané osy, nebo globální osy středem) → posunutí (čísla + z bodu do bodu).	Reihenfolge: Skalierung (um die Mitte) → Drehung (um die angegebene Achse oder eine globale Achse durch die Mitte) → Verschiebung (Zahlen + von Punkt zu Punkt).
+První bod	Erster Punkt
+Průměr pružiny	Federdurchmesser
+Přímá hrana	Gerade Kante
+Přímá úprava: plocha se posune po své normále. Kladná hodnota přidá materiál, záporná odebere.	Direkte Bearbeitung: die Fläche wird entlang ihrer Normalen verschoben. Ein positiver Wert fügt Material hinzu, ein negativer entfernt es.
+Rovina textu	Textebene
+Souřadný systém nevytváří geometrii. Jeho počátek lze použít jako bod („Pomocný bod“), osu Z jako osu („Pomocná osa“) a rovinu XY jako rovinu skici (definice roviny „Rovnoběžně s plochou“ → odkaz na souřadný systém).	Ein Koordinatensystem erzeugt keine Geometrie. Sein Ursprung kann als Punkt („Bezugspunkt“), seine Z-Achse als Achse („Bezugsachse“) und seine XY-Ebene als Skizzenebene verwendet werden (Ebenendefinition „Parallel zur Fläche“ → Verweis auf das Koordinatensystem).
+Střed měřítka a otáčení	Mitte von Skalierung und Drehung
+Střed textu (v rovině)	Textmitte (in der Ebene)
+Střed textu odkazem	Textmitte per Referenz
+Tip: začátek = střed kružnice konce válce / díry (⋯ → Střed kružnice), osa = „Podél hrany / osy válce“ s válcovou plochou.	Tipp: Anfang = Mittelpunkt des Endkreises von Zylinder / Bohrung (⋯ → Kreismittelpunkt), Achse = „Entlang Kante / Zylinderachse“ mit einer Zylinderfläche.
+Ukončení	Endbedingung
+Velikost zobrazení	Anzeigegröße
+Vnitřní závit (v díře)	Innengewinde (in einer Bohrung)
+Volná délka	Freie Länge
+Vrchol / bod	Eckpunkt / Punkt
+Vymazat = počátek	Leeren = Ursprung
+Vymazat = zpět na čísla	Leeren = zurück zu Zahlen
+Vystoupit	Verlassen
+Vzdálenost se spočítá ze středu každé vybrané plochy po cílovou rovinu podél normály plochy (každá plocha zvlášť).	Der Abstand wird vom Mittelpunkt jeder gewählten Fläche bis zur Zielebene entlang der Flächennormale berechnet (jede Fläche einzeln).
+Válcová / kuželová plocha	Zylinder- / Kegelfläche
+Z bodu	Vom Punkt
+Zadat čísly (naposledy	Numerisch eingeben (zuletzt
+Začátek závitu (na ose)	Gewindeanfang (auf der Achse)
+Způsob	Methode
+Způsoby zadání: vrchol, střed / začátek / konec hrany, střed kružnice, střed plochy, bod v % délky hrany, střed mezi body, mezi body v poměru, odsazený podél hrany, průmět na plochu, průsečík hrany s plochou, počátek, souřadnice, bod skici. Bod pak slouží jako poloha díry, primitiva, střed otáčení…	Eingabearten: Eckpunkt, Kantenmitte / -anfang / -ende, Kreismittelpunkt, Flächenmittelpunkt, Punkt bei % der Kantenlänge, Mitte zwischen Punkten, zwischen Punkten im Verhältnis, versetzt entlang einer Kante, Projektion auf eine Fläche, Schnittpunkt Kante–Fläche, Ursprung, Koordinaten, Skizzenpunkt. Der Punkt dient dann als Bohrungsposition, Grundkörperposition, Drehmitte…
+Základní rovina + odsazení (níže)	Grundebene + Versatz (unten)
+Závit (ISO metrický – hrubé i jemné stoupání)	Gewinde (ISO-metrisch – Regel- und Feingewinde)
+Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dává Plochy → Tažení po šroubovici (profil Závit 60°).	Das Gewinde wird als Rillen modelliert (vereinfacht, ohne Steigung) – geeignet für Visualisierung und 3D-Druck. Eine echte Schraubenlinie liefert Flächen → Austragung entlang Schraubenlinie (Profil Gewinde 60°).
+např. M18×1,5	z. B. M18×1,5
+pomocná osa	Bezugsachse
+pomocná rovina	Bezugsebene
+pravé tlačítko / ⋯ = další způsoby	rechte Taste / ⋯ = weitere Möglichkeiten
+volitelné	optional
+volitelné – bod se promítne do roviny	optional – der Punkt wird in die Ebene projiziert
+volitelné – jinak počátek	optional – sonst der Ursprung
+{0} (vlastní stoupání)	{0} (eigene Steigung)
+{0} libovolným směrem (hrana, osa válce, dva body, normála plochy, vektor)	{0} in beliebiger Richtung (Kante, Zylinderachse, zwei Punkte, Flächennormale, Vektor)
+Ø dole	Ø unten
+Ø nahoře	Ø oben
+Ø vnitřní	Ø innen
+— vyberte nebo zadejte níže —	— wählen oder unten eingeben —
+— žádná {0} před tímto prvkem —	— keine {0} vor diesem Feature —
+# pattern-form
+Bez směru tahu (podle roviny)	Ohne Entformungsrichtung (nach Ebene)
+Body skici ({0}) – klikem vynechat	Skizzenpunkte ({0}) – per Klick auslassen
+Celková délka (směr 2)	Gesamtlänge (Richtung 2)
+Celkový úhel	Gesamtwinkel
+Druh pole	Musterart
+Druhý směr (mřížka)	Zweite Richtung (Raster)
+Index kusu = (pořadí ve směru 1 − 1) × {0} + (pořadí ve směru 2 − 1); 0 = zdroj.	Index der Instanz = (Reihenfolge in Richtung 1 − 1) × {0} + (Reihenfolge in Richtung 2 − 1); 0 = Quelle.
+Jedna booleovská operace (kopie se nejdřív sloučí – rychlejší u velkých polí)	Eine boolesche Operation (Kopien werden zuerst vereinigt – schneller bei großen Mustern)
+Jiná tloušťka vybraných stěn{0}	Andere Dicke gewählter Wände{0}
+Kolmo na směr tahu středem tělesa	Senkrecht zur Entformungsrichtung durch die Körpermitte
+Kopie vzniknou v každém bodě skici (střed obalového kvádru zdroje se promítne do roviny skici; bod v místě zdroje se nepočítá).	Kopien entstehen an jedem Skizzenpunkt (die Mitte des Hüllquaders der Quelle wird in die Skizzenebene projiziert; ein Punkt an der Quellposition zählt nicht).
+Krok mezi kusy	Schritt zwischen Instanzen
+Kruhově	Kreisförmig
+Kusy se rozmístí po délce křivky od jejího začátku; u uzavřené křivky po celém obvodu. Referenční bod zdroje = střed jeho obalového kvádru: kopie se posunou o vzdálenost bodu křivky od jejího začátku a (u tečného natočení) otočí kolem tohoto středu.	Die Instanzen werden entlang der Kurve ab ihrem Anfang verteilt; bei geschlossener Kurve über den gesamten Umfang. Referenzpunkt der Quelle = Mitte ihres Hüllquaders: Kopien werden um den Abstand des Kurvenpunkts vom Kurvenanfang verschoben und (bei tangentialer Ausrichtung) um diese Mitte gedreht.
+Kusy se číslují od 1 (0 = zdroj).	Instanzen werden ab 1 nummeriert (0 = Quelle).
+Kusy se číslují v pořadí řad (zdola nahoru, zleva doprava), u kruhového od středu po prstencích.	Instanzen werden reihenweise nummeriert (von unten nach oben, von links nach rechts), beim Kreismuster von der Mitte ringweise.
+Lze vybrat více prvků naráz (např. díru i zahloubení).	Mehrere Features können gleichzeitig gewählt werden (z. B. Bohrung und Senkung).
+Mřížka	Raster
+Natočení kopií	Ausrichtung der Kopien
+Natáčet kopie kolem osy (vypnuto = jen posunout)	Kopien um die Achse drehen (aus = nur verschieben)
+Neutrální rovina	Neutrale Ebene
+Okraj od obrysu	Rand zur Kontur
+Opakované prvky	Wiederholte Features
+Pevné (jen posun)	Fest (nur Verschiebung)
+Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Dělicí křivka a stupňovitý úkos zatím nejsou k dispozici.	Die Flächen werden um den Winkel um ihre Schnittlinie mit der neutralen Ebene geneigt; die Entformungsrichtung bestimmt, zu welcher Seite sich die Schräge öffnet (bei vorgegebener Ebene dreht sie nur deren Orientierung). Ohne Ebene und Richtung gilt die Grundebene. Trennkurve und gestufte Schräge sind noch nicht verfügbar.
+Po křivce	Entlang Kurve
+Podle skici	Nach Skizze
+Podle tečny křivky	Nach Kurventangente
+Pokročilé	Erweitert
+Pole nemá skicu – osy X/Y skici znamenají globální osy počátkem souřadnic.	Das Muster hat keine Skizze – die Skizzenachsen X/Y bedeuten die globalen Achsen durch den Ursprung.
+Pole opakuje existující prvek – nejdřív vytvořte díru, vysunutí nebo jiné těleso.	Ein Muster wiederholt ein vorhandenes Feature – erzeugen Sie zuerst eine Bohrung, eine Extrusion oder einen anderen Körper.
+Poloha roviny ({0})	Ebenenlage ({0})
+Počet (směr 2)	Anzahl (Richtung 2)
+Počet kusů	Anzahl der Instanzen
+Při „celkové délce“ platí zadaná délka pro celé pole (krok = délka ÷ (počet − 1)), ve druhém směru stejně.	Bei „Gesamtlänge“ gilt die eingegebene Länge für das ganze Muster (Schritt = Länge ÷ (Anzahl − 1)), in der zweiten Richtung ebenso.
+Přidat stěnu s jinou tloušťkou	Wand mit anderer Dicke hinzufügen
+Rovnoměrně po celém úhlu (krok = úhel ÷ počet)	Gleichmäßig über den gesamten Winkel (Schritt = Winkel ÷ Anzahl)
+Rozteč (0 = rovnoměrně)	Abstand (0 = gleichmäßig)
+Rozteč (směr 2)	Abstand (Richtung 2)
+Rozšířit na tečně navazující plochy	Auf tangential anschließende Flächen erweitern
+Skica křivky (dráha)	Kurvenskizze (Pfad)
+Skica obrysu (uzavřený)	Konturskizze (geschlossen)
+Skica zatím neobsahuje body – nakreslete je nástrojem Bod v místech kopií.	Die Skizze enthält noch keine Punkte – zeichnen Sie sie mit dem Werkzeug Punkt an den Stellen der Kopien.
+Směr 1	Richtung 1
+Směr 2	Richtung 2
+Směr tahu (otevírání formy)	Entformungsrichtung (Formöffnung)
+Stěna u vybrané rovinné plochy dostane vlastní tloušťku (silnější dno, tenčí víko). Otevřené plochy a zakřivené stěny nelze.	Die Wand an der gewählten ebenen Fläche erhält eine eigene Dicke (dickerer Boden, dünnerer Deckel). Geöffnete Flächen und gekrümmte Wände sind nicht möglich.
+Střídavé řady (každá druhá řada posunutá o půl kroku)	Versetzte Reihen (jede zweite Reihe um einen halben Schritt verschoben)
+Střídavě	Versetzt
+Symetricky na obě strany od zdroje	Symmetrisch zu beiden Seiten der Quelle
+Vynechané kusy (indexy)	Ausgelassene Instanzen (Indizes)
+Vynechat kusy (klikněte na pozici)	Instanzen auslassen (auf die Position klicken)
+Vyplní vnitřek obrysu (otvory v obrysu se vynechají) kusy v dané rozteči; žádný kus není blíže k obrysu než okraj. Počátek rozložení = zdrojový prvek, leží-li v obrysu, jinak střed obrysu. Nejvýše 400 kusů.	Füllt das Innere der Kontur (Löcher in der Kontur werden ausgelassen) mit Instanzen im angegebenen Abstand; keine Instanz liegt näher an der Kontur als der Rand. Ursprung der Verteilung = das Quell-Feature, wenn es in der Kontur liegt, sonst die Konturmitte. Höchstens 400 Instanzen.
+Vzdálenost zadaná jako	Abstand angegeben als
+Výplň	Füllung
+Zadat odkazem (hrana, 2 body, plocha, úhel…)	Per Referenz angeben (Kante, 2 Punkte, Fläche, Winkel…)
+Zadat osu odkazem (hrana, válcová plocha, 2 body, pomocná rovina…)	Achse per Referenz angeben (Kante, Zylinderfläche, 2 Punkte, Bezugsebene…)
+Zadat osu čísly (osa + střed)	Achse numerisch angeben (Achse + Mitte)
+Zadat směr tahu (hrana, 2 body, osa, normála plochy…)	Entformungsrichtung angeben (Kante, 2 Punkte, Achse, Flächennormale…)
+Zadat čísly (vektor)	Numerisch angeben (Vektor)
+Zesílit ven (stěna přiroste vně původního povrchu)	Nach außen verdicken (die Wand wächst außerhalb der ursprünglichen Oberfläche)
+Základní rovina	Grundebene
+Základní rovina (níže)	Grundebene (unten)
+klikem vynechat	per Klick auslassen
+např. 2, 5, 7	z. B. 2, 5, 7
+vynechán – klikem vrátit	ausgelassen – per Klick zurückholen
+zdrojový prvek	Quell-Feature
+Řádky = směr 2 (zdola nahoru), sloupce = směr 1.	Zeilen = Richtung 2 (von unten nach oben), Spalten = Richtung 1.
+# sweep-loft-form
++ Přidat profil	+ Profil hinzufügen
+0 = 10 % vzdálenosti profilů	0 = 10 % des Profilabstands
+1 = beze změny	1 = unverändert
+Dráha (křivka)	Pfad (Kurve)
+Délka náběhu	Anlauflänge
+Frenet	Frenet
+Kolmo na profil	Senkrecht zum Profil
+Koncový bod	Endpunkt
+Kroucení	Verdrehung
+Kružnice (bez skici)	Kreis (ohne Skizze)
+Měřítko profilu na konci	Profilmaßstab am Ende
+Okrajová podmínka	Randbedingung
+Orientace profilu podél dráhy	Profilausrichtung entlang des Pfads
+Osová a vodicí křivka, tenká stěna	Mittellinie und Leitkurve, dünne Wand
+Osová křivka (volitelně)	Mittellinie (optional)
+Otáčky	Umdrehungen
+Pevná orientace	Feste Ausrichtung
+Posunout nahoru	Nach oben verschieben
+Počáteční bod	Anfangspunkt
+Pravoúhlý	Rechtwinklig
+Profil (uzavřená skica)	Profil (geschlossene Skizze)
+Profil by měl ležet v rovině kolmé na začátek dráhy (kružnice bez skici se tam umístí sama). Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá. Pevná orientace = profil se po dráze jen posouvá (nenatáčí se). Vodicí křivka natáčí profil směrem k ní. Kroucení a měřítko se staví z řezů podél dráhy (hladké šablonování) – výsledek je u dlouhých drah mírně přibližný. Transformovaný přechod je určen pro hladké dráhy.	Das Profil sollte in einer Ebene senkrecht zum Pfadanfang liegen (ein Kreis ohne Skizze wird dort automatisch platziert). Der Pfad kann Linien, Bögen und Polylinien enthalten – er muss zusammenhängend sein. Feste Ausrichtung = das Profil wird entlang des Pfads nur verschoben (nicht gedreht). Eine Leitkurve dreht das Profil zu ihr hin. Verdrehung und Maßstab werden aus Schnitten entlang des Pfads aufgebaut (glatte Ausformung) – bei langen Pfaden ist das Ergebnis leicht angenähert. Der transformierte Übergang ist für glatte Pfade gedacht.
+Profily (v pořadí)	Profile (in Reihenfolge)
+Profily jsou uzavřené skici v různých rovinách (otvory se šablonují, mají-li všechny profily stejný počet). Stačí i jeden profil a bod (kužel / jehlan). Uzavřené šablonování potřebuje alespoň tři profily. Okrajové podmínky „kolmo“ / „směr“ jsou aproximace pomocným řezem v délce náběhu. Osová křivka má procházet profily (řezy se podél ní prokládají); vodicí křivka natáčí řezy směrem k sobě (použije se první). Osovou / vodicí křivku nelze kombinovat s bodem ani uzavřením.	Profile sind geschlossene Skizzen in verschiedenen Ebenen (Löcher werden ausgeformt, wenn alle Profile gleich viele haben). Ein Profil und ein Punkt genügen (Kegel / Pyramide). Eine geschlossene Ausformung braucht mindestens drei Profile. Die Randbedingungen „senkrecht“ / „Richtung“ werden durch einen Hilfsschnitt in Anlauflänge angenähert. Die Mittellinie soll durch die Profile verlaufen (Schnitte werden entlang ihr interpoliert); eine Leitkurve dreht die Schnitte zu sich hin (die erste wird verwendet). Mittellinie / Leitkurve lassen sich nicht mit Punkt oder Schließen kombinieren.
+Průměr kruhového profilu	Durchmesser des Kreisprofils
+Přechod v rozích dráhy	Übergang an Pfadecken
+Skončit v bodě (špička)	In einem Punkt enden (Spitze)
+Sledovat dráhu	Dem Pfad folgen
+Směr na konci	Richtung am Ende
+Směr na začátku	Richtung am Anfang
+Transformovaný	Transformiert
+Uzavřené (poslední profil se napojí na první)	Geschlossen (das letzte Profil schließt an das erste an)
+Vodicí křivka (volitelně)	Leitkurve (optional)
+Vodicí křivka, kroucení, měřítko, tenká stěna, přechod v rozích…	Leitkurve, Verdrehung, Maßstab, dünne Wand, Übergang an Ecken…
+Zaoblený	Gerundet
+Začátek a konec: šablonování do bodu, okrajové podmínky	Anfang und Ende: Ausformung zu einem Punkt, Randbedingungen
+Začít v bodě (špička)	In einem Punkt beginnen (Spitze)
+podél celé dráhy	entlang des gesamten Pfads
+# library-dialog
+Chyba stavby	Aufbaufehler
+Kategorie	Kategorien
+Napište, co potřebujete: M8x30 · matice M10 · ložisko 6205 2RS · kolo m2 z24 · řetězka 08B z19 · IPE 200 L=1500 · jäkl 40x40x3 · pero 8x7x40 · pružina d1.6 D12 L40 n10	Geben Sie ein, was Sie brauchen: M8x30 · Mutter M10 · Lager 6205 2RS · Zahnrad m2 z24 · Kettenrad 08B z19 · IPE 200 L=1500 · Vierkantrohr 40x40x3 · Passfeder 8x7x40 · Feder d1.6 D12 L40 n10
+Nedávno použité	Zuletzt verwendet
+Nic k zobrazení.	Nichts anzuzeigen.
+Nic nenalezeno – zkuste normu (ISO 4762), název (matice, ložisko, jäkl) nebo rozměr (M8x30).	Nichts gefunden – versuchen Sie eine Norm (ISO 4762), einen Namen (Mutter, Lager, Vierkantrohr) oder eine Größe (M8x30).
+Oblíbené	Favoriten
+Odebrat z oblíbených	Aus Favoriten entfernen
+Otevřít jako nový díl	Als neues Teil öffnen
+Přidat do oblíbených	Zu Favoriten hinzufügen
+Příklady: „m8x30“ (imbus) · „šestihranný m8x30“ · „podložka 8“ · „kolík 6x30“ · „HEB 100 L=3000“ · „trubka 33.7x2.6“ · „vyhazovač 6x160“	Beispiele: „m8x30“ (Innensechskant) · „Sechskant m8x30“ · „Scheibe 8“ · „Stift 6x30“ · „HEB 100 L=3000“ · „Rohr 33.7x2.6“ · „Auswerfer 6x160“
+Rozměry	Abmessungen
+Rozpoznáno	Erkannt
+Tabulka rozměrů	Maßtabelle
+Vložit do sestavy	In Baugruppe einfügen
+Vložit jako nový díl	Als neues Teil einfügen
+Výchozí hodnoty	Standardwerte
+Vše	Alle
+Zatím žádné oblíbené – klikněte na hvězdičku u rodiny.	Noch keine Favoriten – klicken Sie auf den Stern bei einer Familie.
+rodin ·	Familien ·
+skupin ·	Gruppen ·
+stavím…	wird aufgebaut…
+vloží ·	fügt ein ·
+zavře	schließt
+# manager
++ Nový stav z aktuálních hodnot	+ Neue Konfiguration aus aktuellen Werten
++ Přidat proměnnou	+ Variable hinzufügen
+Aktivní stav	Aktive Konfiguration
+Duplikovat	Duplizieren
+Historie je prázdná. Začněte skicou (karta Tvorba → Skica) nebo vložte primitivum.	Die Historie ist leer. Beginnen Sie mit einer Skizze (Registerkarte Erstellen → Skizze) oder fügen Sie einen Grundkörper ein.
+Hodnota	Wert
+Nabídka	Menü
+Nejdřív založte proměnné (karta Proměnné).	Legen Sie zuerst Variablen an (Registerkarte Variablen).
+Označení materiálu do razítka	Werkstoffbezeichnung für das Schriftfeld
+Posunout níž	Nach unten verschieben
+Posunout výš	Nach oben verschieben
+Potlačené prvky	Unterdrückte Features
+Potlačit prvek	Feature unterdrücken
+Proměnné řídí rozměry modelu. V poli parametru napište název proměnné nebo výraz (např.	Variablen steuern die Modellmaße. Geben Sie in ein Parameterfeld einen Variablennamen oder Ausdruck ein (z. B.
+Přejmenovat	Umbenennen
+Smazat stav	Konfiguration löschen
+Stavy (konfigurace) jsou varianty dílu: jiné hodnoty proměnných a potlačené prvky – např. „M8“, „M10“, „bez děr“.	Konfigurationen sind Varianten des Teils: andere Variablenwerte und unterdrückte Features – z. B. „M8“, „M10“, „ohne Bohrungen“.
+Upravit	Bearbeiten
+Upravit parametry	Parameter bearbeiten
+Upravit skicu	Skizze bearbeiten
+Vazby parametrů	Parameterbindungen
+Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše; přenáší se odkazem i souborem	Freitext für das Schriftfeld der Zeichnung, z. B. ČSN 11 423 oder 1.0503 – die Dichte stammt aus der Werkstoffklasse oben; wird per Link und Datei übertragen
+Výchozí	Standard
+Výraz	Ausdruck
+Zapnout prvek	Feature aktivieren
+Zrušit vazbu	Bindung aufheben
+# mini-viewport, mold-panel
+Náhled 3D vyžaduje WebGL – vložit lze i tak.	Die 3D-Vorschau benötigt WebGL – einfügen geht trotzdem.
+Analýza ploch	Flächenanalyse
+Barevná mapa úkosů	Farbkarte der Entformungsschrägen
+Bez podkosů ✓ Díl lze vyhodit ve zvoleném směru.	Keine Hinterschnitte ✓ Das Teil lässt sich in der gewählten Richtung entformen.
+Chlazení	Kühlung
+Dutina formy musí být o smrštění větší než výlisek. Přidá do historie dílu měřítko (lze kdykoli upravit nebo potlačit).	Die Formkavität muss um die Schwindung größer sein als das Formteil. Fügt der Teilehistorie eine Skalierung hinzu (jederzeit änderbar oder unterdrückbar).
+Díry do dílu	Bohrungen in das Teil
+Hloubka pod dutinou	Tiefe unter der Kavität
+Meandr rovnoběžných vrtů propojených příčnými vrty. Doporučená vzdálenost od dutiny 2–3 × Ø.	Ein Mäander paralleler Bohrungen, verbunden durch Querbohrungen. Empfohlener Abstand zur Kavität 2–3 × Ø.
+Min. úkos	Min. Schräge
+Minimální tloušťka	Mindestdicke
+Měřítko dutiny	Kavitätsmaßstab
+Navrhnout dělicí rovinu	Trennebene vorschlagen
+Navrženo	Vorgeschlagen
+Nejdřív vytvořte nebo otevřete těleso.	Erzeugen oder öffnen Sie zuerst einen Körper.
+Návrh pravidelného rozmístění vyhazovačů v půdorysu dílu. Na díl se přidají díry, do sestavy skutečné vyhazovače.	Vorschlag einer regelmäßigen Auswerferanordnung in der Draufsicht des Teils. Dem Teil werden Bohrungen, der Baugruppe echte Auswerfer hinzugefügt.
+Obrátit směr	Richtung umkehren
+Podkosy na {0} % povrchu – díl nelze vyhodit bez posuvných čelistí.	Hinterschnitte auf {0} % der Oberfläche – das Teil lässt sich ohne Schieber nicht entformen.
+Použít smrštění	Schwindung anwenden
+Počet větví	Anzahl der Zweige
+Přesah	Überstand
+Smrštění	Schwindung
+Směr vyhození	Entformungsrichtung
+Vlastní hodnota…	Eigener Wert…
+Vrtat do dílu (negativ)	In das Teil bohren (Negativ)
+Vyhazovače	Auswerfer
+Vyhazovače do sestavy	Auswerfer in die Baugruppe
+Ø kanálu	Kanal-Ø
+Úkosy	Entformungsschrägen
+# pick-list
+Další ›	Weiter ›
+Hledat	Suchen
+Kružnice / oblouky	Kreise / Bögen
+Kulové	Kugelförmig
+Kuželové	Kegelförmig
+Načítám… {0}	Wird geladen… {0}
+Ostatní (křivky)	Sonstige (Kurven)
+Ostatní (volné)	Sonstige (Freiform)
+Použít střed kružnice / oblouku	Kreis-/Bogenmittelpunkt verwenden
+Rovinné	Eben
+Toroidní	Torusförmig
+Válcové	Zylindrisch
+Všechny hrany	Alle Kanten
+Všechny plochy	Alle Flächen
+např. 12, válcová, 30; 20	z. B. 12, zylindrisch, 30; 20
+střed kružnice	Kreismittelpunkt
+střed {0}	Mitte {0}
+{0} z {1} položek	{0} von {1} Einträgen
+Úsečky	Linien
+číslo, typ, souřadnice…	Nummer, Typ, Koordinaten…
+‹ Předchozí	‹ Zurück
+# props
+). Na model můžete navázat dalšími prvky (díry, zaoblení, odebrání…).	). Sie können das Modell mit weiteren Features fortsetzen (Bohrungen, Verrundungen, Ausschnitte…).
+0 = bez úkosu	0 = keine Schräge
+0 = celá	0 = ganze
+Bod na oblouku	Punkt auf dem Bogen
+Bod na povrchu	Punkt auf der Oberfläche
+Definice roviny	Ebenendefinition
+Druhý směr	Zweite Richtung
+Dva směry	Zwei Richtungen
+Funguje i na zakřivených plochách – např. odsazení stěny díry o +0,5 mm díru zmenší.	Funktioniert auch auf gekrümmten Flächen – z. B. verkleinert ein Versatz der Bohrungswand um +0,5 mm die Bohrung.
+Hl. zahloubení	Senktiefe
+Hlavní poloosa	Große Halbachse
+Hrubá	Grob
+Importovaný soubor:	Importierte Datei:
+Jeden směr	Eine Richtung
+Jemná	Fein
+Jen vnější obrys (ignorovat otvory profilu)	Nur Außenkontur (Profillöcher ignorieren)
+Klikáním v modelu přidáváte / odebíráte.	Durch Klicken im Modell fügen Sie hinzu / entfernen Sie.
+Kolmo na skicu	Senkrecht zur Skizze
+Konec	Ende
+Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese. Doporučeno pro výrobní dokumentaci.	Kosmetisches Gewinde: die Geometrie ändert sich nicht, das Gewinde erscheint in der Zeichnung. Empfohlen für Fertigungsunterlagen.
+Kuž. zahl.	Kegelsenkung
+Modul prvku „	Feature-Modul „
+Měřítko konce	Maßstab am Ende
+Natáčet profil podle křivky (Frenet)	Profil mit der Kurve drehen (Frenet)
+Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).	Unbekannte Bezeichnung – M2 bis M48, optional mit Steigung (M18×1,5).
+Obrátit stranu	Seite umkehren
+Odstraní díry, čepy, kuželová zahloubení a válcová zaoblení (obnoví ostrou hranu). Vhodné pro úpravy importovaných modelů.	Entfernt Bohrungen, Zapfen, Kegelsenkungen und zylindrische Verrundungen (stellt die scharfe Kante wieder her). Geeignet zur Bearbeitung importierter Modelle.
+Opsaný průměr	Umkreisdurchmesser
+Osa díry	Bohrungsachse
+Osa otočení (přes počátek)	Drehachse (durch den Ursprung)
+Označení závitu (text)	Gewindebezeichnung (Text)
+Označení závitu díry	Gewindebezeichnung der Bohrung
+Parametr je navázaný na proměnné – kliknutím vazbu zrušíte	Der Parameter ist an Variablen gebunden – Klick hebt die Bindung auf
+Pevná rovina (jak byla založena)	Feste Ebene (wie angelegt)
+Polohy děr (více naráz)	Bohrungspositionen (mehrere auf einmal)
+Pomocná geometrie (netvoří profil)	Konstruktionsgeometrie (bildet kein Profil)
+Pomocná rovina nevytváří geometrii. Použijte ji pro novou skicu (Nová skica → pomocná rovina).	Eine Bezugsebene erzeugt keine Geometrie. Verwenden Sie sie für eine neue Skizze (Neue Skizze → Bezugsebene).
+Ponechat originál (sloučit)	Original behalten (vereinigen)
+Posunutí roviny	Ebenenversatz
+Počet stran	Seitenzahl
+Počátek a normála níže se dopočítají z definice při každé změně modelu.	Ursprung und Normale unten werden bei jeder Modelländerung aus der Definition neu berechnet.
+Pořadí: měřítko → otočení → posunutí, vše vůči počátku souřadnic.	Reihenfolge: Skalierung → Drehung → Verschiebung, alles bezogen auf den Koordinatenursprung.
+Pro šroub (průchozí díra ISO 273)	Für Schraube (Durchgangsloch ISO 273)
+Profil by měl ležet v rovině kolmé na začátek dráhy. Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá.	Das Profil sollte in einer Ebene senkrecht zum Pfadanfang liegen. Der Pfad kann Linien, Bögen und Polylinien enthalten – er muss zusammenhängend sein.
+Prvek nemá parametry.	Das Feature hat keine Parameter.
+Průnik	Schnittmenge
+Rovina se přepočítá při každé změně modelu (např. posune-li se plocha, na které skica leží).	Die Ebene wird bei jeder Modelländerung neu berechnet (z. B. wenn sich die Fläche verschiebt, auf der die Skizze liegt).
+Rovina skici (asociativní)	Skizzenebene (assoziativ)
+Rozměr přes plochy	Maß über Flächen
+Ručně (počátek a normála níže)	Manuell (Ursprung und Normale unten)
+Stranu +{0}	Seite +{0}
+Stranu −{0}	Seite −{0}
+Střední	Mittel
+Tento typ pole (po křivce / podle skici / výplňové) připravuje modul polí.	Diese Musterart (entlang Kurve / nach Skizze / Füllung) bereitet das Mustermodul vor.
+Tip: klikněte na plochu modelu – bod a osa se doplní automaticky. Více děr: „Přidat body klikem“ (vrcholy, středy kružnic, body skici přes pravé tlačítko).	Tipp: Klicken Sie auf eine Modellfläche – Punkt und Achse werden automatisch ergänzt. Mehrere Bohrungen: „Punkte per Klick hinzufügen“ (Eckpunkte, Kreismittelpunkte, Skizzenpunkte über die rechte Taste).
+Typ díry	Bohrungstyp
+Typ pole	Musterart
+Ukončení (směr 1)	Endbedingung (Richtung 1)
+Ukončení (směr 2)	Endbedingung (Richtung 2)
+Uzavřená	Geschlossen
+V rovině skici	In der Skizzenebene
+Ve směru normály	In Normalenrichtung
+Vedlejší poloosa	Kleine Halbachse
+Vrtaná	Gebohrt
+Vrtat v kladném směru osy	In positiver Achsrichtung bohren
+Vrtá se jádrový průměr Ø	Gebohrt wird der Kerndurchmesser Ø
+Válc. zahl.	Zylindersenkung
+Všechny	Alle
+XY ⟂ Z	XY ⟂ Z
+XZ ⟂ Y	XZ ⟂ Y
+YZ ⟂ X	YZ ⟂ X
+Začátek, směr, tenká stěna, úkos, kroucení…	Anfang, Richtung, dünne Wand, Schräge, Verdrehung…
+Zrušit výběr	Auswahl aufheben
+Závit (hrubé i jemné stoupání)	Gewinde (Regel- und Feingewinde)
+Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk.	Das Gewinde wird als Rillen modelliert (vereinfacht, ohne Steigung) – geeignet für Visualisierung und 3D-Druck.
+mm, závit	mm, Gewinde
+se uvede ve výkrese.	erscheint in der Zeichnung.
+vyberte v modelu ({0})	im Modell wählen ({0})
+vybráno.	ausgewählt.
+· střed	· Mitte
+· vrták Ø	· Bohrer Ø
+· Ø	· Ø
+Úhel (směr 2)	Winkel (Richtung 2)
+Úhel špičky vrtáku	Bohrerspitzenwinkel
+Čára žebra (otevřená skica)	Rippenlinie (offene Skizze)
+Řada ISO 273	Reihe ISO 273
+Řezná rovina	Schnittebene
+Žebro se protáhne od čáry až k tělesu. Stranu, kde narazí na materiál, najde automaticky.	Die Rippe wird von der Linie bis zum Körper gezogen. Die Seite, auf der sie auf Material trifft, findet sie automatisch.
+— vlastní průměr —	— eigener Durchmesser —
+— vyberte prvek —	— Feature wählen —
+— vyberte —	— wählen —
+“ není načten.	“ ist nicht geladen.
+# ref-field
++ Přidat {0} klikem	+ {0} per Klick hinzufügen
++ XYZ	+ XYZ
++ výběr	+ Auswahl
+1. hrana	1. Kante
+1. plocha	1. Fläche
+1. rovina / plocha	1. Ebene / Fläche
+2. bod (směr X)	2. Punkt (X-Richtung)
+2. hrana	2. Kante
+2. plocha	2. Fläche
+2. rovina / plocha	2. Ebene / Fläche
+Bod na křivce	Punkt auf Kurve
+Další způsoby zadání (pravé tlačítko)	Weitere Eingabearten (rechte Taste)
+Hrana (osa otáčení)	Kante (Drehachse)
+Hrana (tečna)	Kante (Tangente)
+Hrana / válcová plocha	Kante / Zylinderfläche
+K bodu	Zum Punkt
+Klikejte na {0} v modelu… (Esc = konec)	Klicken Sie auf {0} im Modell… (Esc = Ende)
+Klikněte v modelu ({0})…	Klicken Sie im Modell ({0})…
+Křivka (hrana)	Kurve (Kante)
+Obrátit	Umkehren
+Od bodu	Vom Punkt
+Osa rotace	Rotationsachse
+Plocha (výchozí)	Fläche (Standard)
+Plocha / pomocná rovina	Fläche / Bezugsebene
+Použít aktuální výběr	Aktuelle Auswahl verwenden
+Pravé tlačítko / dlouhý stisk: další způsoby zadání	Rechte Taste / langes Drücken: weitere Eingabearten
+Přidat bod zadaný souřadnicemi	Punkt per Koordinaten hinzufügen
+Přidat vybrané entity	Gewählte Elemente hinzufügen
+Přímka (hrana)	Gerade (Kante)
+Rovnoběžně s plochou	Parallel zur Fläche
+Tenká stěna (profil jako stěna dané tloušťky, funguje i pro otevřený profil)	Dünne Wand (Profil als Wand gegebener Dicke, auch für offenes Profil)
+Tloušťka dovnitř	Dicke nach innen
+Tloušťka ven	Dicke nach außen
+Vyberte {0}	Wählen Sie {0}
+Vybrat hranu klikem	Kante per Klick wählen
+Vybrat plochu klikem	Fläche per Klick wählen
+Vybrat ze seznamu…	Aus Liste wählen…
+X; Y; Z  nebo  @dx; dy; dz	X; Y; Z  oder  @dx; dy; dz
+Zadat souřadnice	Koordinaten eingeben
+Zadejte X; Y; Z (např. 10; 20; 0 nebo @5; 0; 0)	Geben Sie X; Y; Z ein (z. B. 10; 20; 0 oder @5; 0; 0)
+Začátek	Anfang
+seznam ploch / hran / vrcholů s filtrem a hledáním	Liste der Flächen / Kanten / Eckpunkte mit Filter und Suche
+{0}: klikejte na body (Esc = konec)	{0}: Punkte anklicken (Esc = Ende)
+{0}: vyberte {1}	{0}: wählen Sie {1}
+{0}: vyberte {1} ({2}/{3})	{0}: wählen Sie {1} ({2}/{3})
+{0}: vybrat ze seznamu	{0}: aus Liste wählen
+Úhel od normály (kolem osy Y skici)	Winkel zur Normalen (um die Y-Achse der Skizze)
+Úsečka	Linie
+— skica nemá úsečku —	— die Skizze hat keine Linie —
+— vyberte pomocnou osu / souř. systém —	— Bezugsachse / Koord.-System wählen —
+# ribbon, selection
+Další příkazy (pravé tlačítko)	Weitere Befehle (rechte Taste)
+Rychlé příkazy pro výběr	Schnellbefehle für die Auswahl
+Těleso / tvar	Körper / Form
+# settings-dialog
+(AES-256): nedávné soubory, záložky a rozpracovaný model se uloží v tomto prohlížeči tak, že je bez hesla nikdo nepřečte.	(AES-256): zuletzt verwendete Dateien, Tabs und das in Arbeit befindliche Modell werden in diesem Browser so gespeichert, dass sie ohne Passwort niemand lesen kann.
+(otevřený JSON) do vašeho počítače. Pro výměnu s jinými CAD použijte STEP AP214 – otevře ho ZW3D, SolidWorks, Inventor, CATIA, NX, Creo i SolidEdge.	(offenes JSON) auf Ihren Computer. Für den Austausch mit anderen CAD-Systemen verwenden Sie STEP AP214 – es öffnet in ZW3D, SolidWorks, Inventor, CATIA, NX, Creo und Solid Edge.
+0 = automaticky podle přiblížení	0 = automatisch nach Zoom
+Automatické vazby při kreslení	Automatische Beziehungen beim Zeichnen
+Chování	Verhalten
+Desetinná místa (délky)	Dezimalstellen (Längen)
+Desetinná místa (úhly)	Dezimalstellen (Winkel)
+Délkové jednotky	Längeneinheiten
+Hesla se neshodují.	Die Passwörter stimmen nicht überein.
+Heslo znovu	Passwort wiederholen
+Heslo úložiště	Speicherpasswort
+ISO A (USA)	ISO A (USA)
+ISO E (Evropa)	ISO E (Europa)
+Import	Import
+Informační štítky (rozměry, hmotnost)	Infoanzeigen (Abmessungen, Masse)
+Jednotky a přesnost	Einheiten und Genauigkeit
+Jméno a příjmení	Vor- und Nachname
+Klikněte na zkratku a stiskněte novou kombinaci. Esc zruší záznam.	Klicken Sie auf ein Tastenkürzel und drücken Sie die neue Kombination. Esc bricht die Aufzeichnung ab.
+Kreslil (do razítka)	Gezeichnet von (Schriftfeld)
+Krok mřížky [mm]	Rasterschritt [mm]
+Kvalita sítě (přesnost zobrazení)	Netzqualität (Darstellungsgenauigkeit)
+Milimetry (mm)	Millimeter (mm)
+Modely a výkresy zůstávají jen v otevřené kartě a v souborech, které si sami uložíte do počítače. Po zavření karty v prohlížeči nic nezůstane – vhodné pro dokumentaci pod NDA i na sdílených počítačích.	Modelle und Zeichnungen bleiben nur im geöffneten Tab und in den Dateien, die Sie selbst auf Ihren Computer speichern. Nach dem Schließen des Tabs bleibt im Browser nichts zurück – geeignet für Unterlagen unter NDA und für gemeinsam genutzte Computer.
+Modely se ukládají jako soubory	Modelle werden als Dateien gespeichert
+Navigační krychle (ViewCube)	Navigationswürfel (ViewCube)
+Nedávné soubory, šablony a ukázky	Zuletzt verwendete Dateien, Vorlagen und Beispiele
+Normální	Normal
+Nové heslo	Neues Passwort
+Nové heslo (min. 4 znaky)	Neues Passwort (mind. 4 Zeichen)
+Obnovit výchozí	Standard wiederherstellen
+Obrátit směr kolečka	Radrichtung umkehren
+Odemknout	Entsperren
+Osový kříž vlevo dole	Achsenkreuz unten links
+Palce (in)	Zoll (in)
+Po dokončení skici rovnou nabídnout vysunutí	Nach Abschluss der Skizze direkt Extrusion anbieten
+Potvrzovat mazání prvků a komponent	Löschen von Features und Komponenten bestätigen
+Pozadí pracovní plochy	Hintergrund des Arbeitsbereichs
+Počet nedávných souborů	Anzahl zuletzt verwendeter Dateien
+Pravoúhlé promítání jako výchozí	Orthogonale Projektion als Standard
+Při ukládání a exportu se zeptat na místo a název souboru	Beim Speichern und Exportieren nach Ort und Dateinamen fragen
+Přiblížení ke kurzoru	Zoom zum Cursor
+Přichytávat k mřížce	Am Raster fangen
+Rozpracovaná práce v prohlížeči (ochrana dokumentace)	Arbeitsstand im Browser (Dokumentenschutz)
+Schéma myši	Mausschema
+Silné	Dick
+Skryté hrany	Verdeckte Kanten
+Smazat všechny dokumenty uložené v tomto prohlížeči? Nastavení zůstane.	Alle in diesem Browser gespeicherten Dokumente löschen? Die Einstellungen bleiben.
+Styl Inventor/ZW3D – zrychluje tvorbu prvních těles	Stil Inventor/ZW3D – beschleunigt das Erstellen der ersten Körper
+Stínovaný	Schattiert
+Tenké	Dünn
+Tloušťka hran	Kantenstärke
+Uložené dokumenty byly smazány.	Gespeicherte Dokumente wurden gelöscht.
+Volitelně lze zapnout	Optional lässt sich aktivieren
+Vrátit vše na výchozí hodnoty	Alles auf Standardwerte zurücksetzen
+Vymazat vše uložené v prohlížeči	Alles im Browser Gespeicherte löschen
+Vypnout a smazat uložené	Deaktivieren und Gespeichertes löschen
+Vypnout úložiště a smazat všechny dokumenty uložené v tomto prohlížeči?	Speicher deaktivieren und alle in diesem Browser gespeicherten Dokumente löschen?
+Vypnuto = soubory se rovnou stáhnou pod výchozím názvem do složky Stažené (bez dialogu) – vhodné pro automatizaci a AI agenty.	Aus = Dateien werden direkt unter dem Standardnamen in den Ordner Downloads heruntergeladen (ohne Dialog) – geeignet für Automatisierung und KI-Agenten.
+Výchozí formát listu	Standard-Blattformat
+Výchozí materiál nového dílu	Standardwerkstoff eines neuen Teils
+Výchozí styl zobrazení	Standard-Darstellungsstil
+Výchozí: neukládat.	Standard: nicht speichern.
+Zamknout (do zavření karty)	Sperren (bis zum Schließen des Tabs)
+Zapnout šifrované úložiště	Verschlüsselten Speicher aktivieren
+Zobrazovat značky vazeb	Beziehungssymbole anzeigen
+jemnější = pomalejší přepočet	feiner = langsamere Neuberechnung
+kolečko přibližuje k místu pod kurzorem, ne do středu	das Rad zoomt zur Stelle unter dem Cursor, nicht zur Mitte
+odemčeno pro tuto kartu	für diesen Tab entsperrt
+stiskněte…	drücken Sie…
+vodorovně/svisle/totožnost/tečně se přidají při přichycení	horizontal/vertikal/deckungsgleich/tangential werden beim Fangen hinzugefügt
+zamčeno	gesperrt
+zapnuté	aktiviert
+Úložiště vypnuto, uložené dokumenty smazány.	Speicher deaktiviert, gespeicherte Dokumente gelöscht.
+Úvodní obrazovka při spuštění	Startbildschirm beim Start
+Šifrované úložiště je	Der verschlüsselte Speicher ist
+Šifrované úložiště je zapnuté a odemčené. Heslo si zapamatujte – bez něj data nelze obnovit.	Der verschlüsselte Speicher ist aktiviert und entsperrt. Merken Sie sich das Passwort – ohne es lassen sich die Daten nicht wiederherstellen.
+šifrované úložiště s heslem	verschlüsselter Speicher mit Passwort
+Jazyk rozhraní	Sprache der Oberfläche
+Jazyk	Sprache
+přepnutí znovu načte aplikaci; rozpracovaná práce zůstane uložená	Umschalten lädt die Anwendung neu; der Arbeitsstand bleibt gespeichert
+# share-dialog
+ Velké modely (importovaný STEP) do odkazu nevejdou – pošlete soubor .mncad nebo STEP.	 Große Modelle (importiertes STEP) passen nicht in einen Link – senden Sie die .mncad- oder STEP-Datei.
+ Velké modely jdou do úložiště zašifrované (AES-256); klíč je jen v odkazu a soubor se po vypršení platnosti smaže.	 Große Modelle gehen verschlüsselt (AES-256) in den Speicher; der Schlüssel steht nur im Link und die Datei wird nach Ablauf gelöscht.
+): WhatsApp, e-mail, Teams a Slack ho přenesou, SMS ne. U e-mailu raději „Kopírovat odkaz“ a vložit do zprávy.	): WhatsApp, E-Mail, Teams und Slack übertragen ihn, SMS nicht. Bei E-Mail besser „Link kopieren“ und in die Nachricht einfügen.
+. Příjemce odkaz otevře v prohlížeči bez instalace a registrace – může model prohlížet, otáčet, měřit, řezat, prohlédnout výkresy a uložit si kopii. Jde o	. Der Empfänger öffnet den Link im Browser ohne Installation und Registrierung – er kann das Modell ansehen, drehen, messen, schneiden, die Zeichnungen durchsehen und eine Kopie speichern. Es handelt sich um eine
+1 den	1 Tag
+: vaše další úpravy se do odkazu nepromítnou, pošlete nový. Odkaz funguje pro 2, 3 i více lidí najednou, kdekoli na světě.	: Ihre weiteren Änderungen gelangen nicht in den Link, senden Sie einen neuen. Der Link funktioniert für 2, 3 und mehr Personen gleichzeitig, überall auf der Welt.
+Dlouhý odkaz (	Langer Link (
+Heslo (volitelné)	Passwort (optional)
+Heslo k odkazu	Link-Passwort
+Heslo pošlete jiným kanálem (SMS, telefon). Bez něj odkaz nikdo neotevře.	Senden Sie das Passwort über einen anderen Kanal (SMS, Telefon). Ohne es kann niemand den Link öffnen.
+Jméno odesílatele	Name des Absenders
+Kde je dokument:	Wo das Dokument liegt:
+Kopírovat odkaz	Link kopieren
+Kopírovat zprávu	Nachricht kopieren
+Kopírování se nezdařilo – označte odkaz a zkopírujte ho ručně.	Kopieren fehlgeschlagen – markieren Sie den Link und kopieren Sie ihn manuell.
+Mnástrojárna CAD – {0}	Mnástrojárna CAD – {0}
+Nabídka sdílení systému (Teams, Messenger, Signal…)	Systemfreigabe (Teams, Messenger, Signal…)
+Ochrana dokumentace:	Dokumentenschutz:
+Odesílatel (volitelné)	Absender (optional)
+Odkaz	Link
+Odkaz zkopírován – vložte ho do zprávy (Ctrl+V).	Link kopiert – fügen Sie ihn in eine Nachricht ein (Strg+V).
+Otevře WhatsApp s připravenou zprávou	Öffnet WhatsApp mit vorbereiteter Nachricht
+Otevře nový e-mail s odkazem	Öffnet eine neue E-Mail mit dem Link
+Platnost odkazu	Gültigkeit des Links
+Platí do:	Gültig bis:
+Po vypršení se odkaz neotevře; stačí dokument sdílet znovu.	Nach Ablauf lässt sich der Link nicht mehr öffnen; teilen Sie das Dokument einfach erneut.
+S heslem je odkaz bez hesla nečitelný.	Mit Passwort ist der Link ohne Passwort nicht lesbar.
+Sdílený odkaz	Geteilter Link
+Sdílet odkazem	Per Link teilen
+Sdílet…	Teilen…
+Sdílíte:	Sie teilen:
+Zkopírováno ✓	Kopiert ✓
+Zkopíruje hotový text zprávy s odkazem	Kopiert einen fertigen Nachrichtentext mit dem Link
+Zkopíruje odkaz do schránky	Kopiert den Link in die Zwischenablage
+Zpráva s odkazem zkopírována.	Nachricht mit Link kopiert.
+bez hesla	ohne Passwort
+bez omezení	unbegrenzt
+dokument je uložený jen v odkazu, na server se nic neposílá	das Dokument ist nur im Link gespeichert, an den Server wird nichts gesendet
+např. Vít Volný, Mnástrojárna	z. B. Vít Volný, Mnástrojárna
+odkaz obsahuje dokument zkomprimovaný v části za „#“, kterou prohlížeč na server nikdy neposílá – dokument existuje jen ve zprávě, kterou pošlete.	der Link enthält das Dokument komprimiert im Teil nach „#“, den der Browser nie an den Server sendet – das Dokument existiert nur in der Nachricht, die Sie senden.
+snímek	Momentaufnahme
+zašifrováno v úložišti do {0}, klíč je jen v odkazu	verschlüsselt im Speicher bis {0}, der Schlüssel steht nur im Link
+{0} dní	{0} Tage
+# sketcher
+ · {0} otevř.	 · {0} offen
+2 body	2 Punkte
+2 body + osa	2 Punkte + Achse
+2 kružnice/oblouky	2 Kreise/Bögen
+2 úsečky	2 Linien
+2 úsečky nebo 2 kružnice	2 Linien oder 2 Kreise
+Automatické vazby	Automatische Beziehungen
+Automatické vazby při kreslení (vodorovně, svisle, totožnost, bod na křivce, střed, rovnoběžně, kolmo, tečně)	Automatische Beziehungen beim Zeichnen (horizontal, vertikal, deckungsgleich, Punkt auf Kurve, Mitte, parallel, senkrecht, tangential)
+Barvy entit: modře nedourčená · černě plně určená · červeně přeurčená nebo v konfliktu	Elementfarben: blau unterbestimmt · schwarz vollständig bestimmt · rot überbestimmt oder im Konflikt
+Bod na kružnici (nebo zadejte průměr/poloměr, Enter)	Punkt auf dem Kreis (oder Durchmesser/Radius eingeben, Enter)
+Bod {0} ze 3 na kružnici	Punkt {0} von 3 auf dem Kreis
+Bod – entita	Punkt – Element
+Body leží na přímce.	Die Punkte liegen auf einer Geraden.
+Body obdélníku leží na přímce.	Die Rechteckpunkte liegen auf einer Geraden.
+Body rozdělení kružnice jsou totožné.	Die Teilungspunkte des Kreises fallen zusammen.
+Cílový bod	Zielpunkt
+Cílový směr	Zielrichtung
+Další bod · Enter / dvojklik ukončí · klik na 1. bod uzavře	Nächster Punkt · Enter / Doppelklick beendet · Klick auf den 1. Punkt schließt
+Další bod · Esc / pravé tl. ukončí řetěz	Nächster Punkt · Esc / rechte Taste beendet die Kette
+Druhá entita/bod, nebo umístění kóty	Zweites Element/Punkt oder Maßplatzierung
+Druhá úsečka	Zweite Linie
+Druhý bod průměru	Zweiter Durchmesserpunkt
+Druhý bod rozdělení kružnice	Zweiter Teilungspunkt des Kreises
+Druhý roh (směr a šířka první strany)	Zweite Ecke (Richtung und Breite der ersten Seite)
+Dvě kružnice	Zwei Kreise
+Dvě úsečky	Zwei Linien
+Délka oblouku	Bogenlänge
+Enter/dvojklik ukončí	Enter/Doppelklick beendet
+Entita	Element
+Entitu nelze o tuto vzdálenost odsadit (větší než poloměr).	Das Element lässt sich nicht um diesen Abstand versetzen (größer als der Radius).
+Export skici DXF	Skizze als DXF exportieren
+Hodnota kóty	Maßwert
+Import DXF…	DXF importieren…
+Jako pomocná geometrie	Als Konstruktionsgeometrie
+Jen hrany v rovině skici (±0,01 mm)	Nur Kanten in der Skizzenebene (±0,01 mm)
+Klikněte dovnitř křivky, ne na její konec.	Klicken Sie in die Kurve hinein, nicht auf ihr Ende.
+Klikněte na body nebo entity (2 výběry)	Klicken Sie auf Punkte oder Elemente (2 Auswahlen)
+Klikněte na entitu nebo bod	Klicken Sie auf ein Element oder einen Punkt
+Klikněte na křivku v místě rozdělení (kružnice: 2 body)	Klicken Sie auf die Kurve an der Teilungsstelle (Kreis: 2 Punkte)
+Klikněte na osu zrcadlení (úsečku)	Klicken Sie auf die Spiegelachse (eine Linie)
+Klikněte na úsek k odstranění, nebo táhněte přes více úseků	Klicken Sie auf das zu entfernende Segment oder ziehen Sie über mehrere Segmente
+Klikněte na úsečku nebo osu zrcadlení.	Klicken Sie auf eine Linie oder die Spiegelachse.
+Klikněte u konce úsečky, která se má prodloužit	Klicken Sie nahe dem Ende der zu verlängernden Linie
+Kolineárně	Kollinear
+Kolmo	Senkrecht
+Konec (proti směru hodin)	Ende (gegen den Uhrzeigersinn)
+Konec hlavní poloosy	Ende der großen Halbachse
+Konec oblouku	Bogenende
+Konec osy (proti směru hodin)	Achsenende (gegen den Uhrzeigersinn)
+Konec tečného oblouku	Ende des Tangentenbogens
+Konec úsečky / oblouku, na který navázat	Ende der Linie / des Bogens, an das angeschlossen wird
+Kopírovat…	Kopieren…
+Kreslení	Zeichnen
+Krok pole (vzdálenost a směr)	Musterschritt (Abstand und Richtung)
+Kružnice / oblouk	Kreis / Bogen
+Kružnice: klikněte na druhý bod rozdělení.	Kreis: Klicken Sie auf den zweiten Teilungspunkt.
+Kóta by skicu přeurčila – ponechána jako referenční.	Das Maß würde die Skizze überbestimmen – als Referenz belassen.
+Kóta délky oblouku	Bogenlängenmaß
+Kótovat při kreslení – hodnoty zadané číslem u kurzoru vloží řídicí kótu	Beim Zeichnen bemaßen – am Cursor eingegebene Zahlen fügen ein steuerndes Maß ein
+Model zatím nemá žádné hrany (nejdřív vytvořte těleso).	Das Modell hat noch keine Kanten (erzeugen Sie zuerst einen Körper).
+Měřítko…	Skalieren…
+Normální geometrie	Normale Geometrie
+Nová poloha bodu	Neue Punktposition
+Nástroje	Werkzeuge
+Odsadit celý navazující řetězec úseček a oblouků	Die gesamte zusammenhängende Kette aus Linien und Bögen versetzen
+Odsadit…	Versetzen…
+Odsazení je větší než poloměr oblouku v řetězci.	Der Versatz ist größer als ein Bogenradius in der Kette.
+Okótovat	Bemaßen
+Opsaný	Umschrieben
+Otočit…	Drehen…
+Pevně	Fixiert
+Pomocná geometrie	Konstruktionsgeometrie
+Počet kusů (360°)	Anzahl der Instanzen (360°)
+Počáteční bod úsečky	Anfangspunkt der Linie
+Promítnout	Projizieren
+Promítnout hrany modelu	Modellkanten projizieren
+Promítnuto {0} hran.	{0} Kanten projiziert.
+Protější roh (nebo šířka Tab výška, Enter)	Gegenüberliegende Ecke (oder Breite Tab Höhe, Enter)
+První bod průměru	Erster Durchmesserpunkt
+První roh	Erste Ecke
+První roh (nebo X;Y, Enter)	Erste Ecke (oder X;Y, Enter)
+První úsečka	Erste Linie
+Přesunout…	Verschieben…
+Přichytit k mřížce	Am Raster fangen
+Referenční bod	Referenzpunkt
+Roh (nebo šířka Tab výška, Enter)	Ecke (oder Breite Tab Höhe, Enter)
+Roh nelze upravit (hodnota je příliš velká nebo úsečky jsou rovnoběžné).	Die Ecke kann nicht geändert werden (der Wert ist zu groß oder die Linien sind parallel).
+Rozdělit lze úsečku, oblouk nebo kružnici – tvary nejdřív rozložte.	Teilen lassen sich Linie, Bogen oder Kreis – Formen zuerst zerlegen.
+Rozdělit v bodě…	Im Punkt teilen…
+Rozložit na úsečky a oblouky	In Linien und Bögen zerlegen
+Soustředně	Konzentrisch
+Stejná velikost	Gleiche Größe
+Strana myší, vzdálenost klikem nebo číslem + Enter	Seite per Maus, Abstand per Klick oder Zahl + Enter
+Střed druhého oblouku (nebo délka Tab úhel)	Mittelpunkt des zweiten Bogens (oder Länge Tab Winkel)
+Střed elipsy	Ellipsenmittelpunkt
+Střed kruhového pole	Mittelpunkt des Kreismusters
+Střed kružnice	Kreismittelpunkt
+Střed mnohoúhelníku	Polygonmittelpunkt
+Střed měřítka	Skalierungsmitte
+Střed obdélníku	Rechteckmitte
+Střed oblouku osy drážky	Mittelpunkt des Langlochachsenbogens
+Střed otáčení	Drehmitte
+Střed prvního oblouku	Mittelpunkt des ersten Bogens
+Svisle	Vertikal
+Symetrie	Symmetrie
+Tab · Enter	Tab · Enter
+Tažení neprotnulo žádnou křivku.	Das Ziehen hat keine Kurve gekreuzt.
+Tento úsek nelze oříznout (kružnice potřebuje 2 průsečíky).	Dieses Segment kann nicht getrimmt werden (ein Kreis braucht 2 Schnittpunkte).
+Tečný oblouk nelze vytvořit.	Der Tangentenbogen kann nicht erzeugt werden.
+Tečně	Tangential
+Totožnost	Deckungsgleich
+Tuto kombinaci nelze okótovat.	Diese Kombination lässt sich nicht bemaßen.
+Uchopení	Fang
+Uchopení: {0}	Fang: {0}
+Uchopování	Fangen
+Umístěte bod	Platzieren Sie den Punkt
+Upravit hodnotu…	Wert bearbeiten…
+Vazba „{0}“ přidána.	Beziehung „{0}“ hinzugefügt.
+Vazba „{0}“: {1}.	Beziehung „{0}“: {1}.
+Vazbu „{0}“ nelze přidat – je v konfliktu s jinými vazbami/kótami.	Beziehung „{0}“ kann nicht hinzugefügt werden – sie steht im Konflikt mit anderen Beziehungen/Maßen.
+Ve středu	Mittelpunkt
+Vepsaný	Einbeschrieben
+Vepsaný: bod = vrchol (poloměr opsané kružnice) · Opsaný: bod = střed strany (poloměr vepsané kružnice)	Einbeschrieben: Punkt = Eckpunkt (Umkreisradius) · Umschrieben: Punkt = Seitenmitte (Inkreisradius)
+Vodorovně	Horizontal
+Vrchol / střed strany (nebo poloměr Tab počet stran, Enter)	Eckpunkt / Seitenmitte (oder Radius Tab Seitenzahl, Enter)
+Vyberte druhý bod nebo úsečku.	Wählen Sie den zweiten Punkt oder eine Linie.
+Vyberte entitu (řetězec) k odsazení	Wählen Sie das zu versetzende Element (Kette)
+Vyberte entity (Shift přidává), pak Enter	Wählen Sie Elemente (Umschalt fügt hinzu), dann Enter
+Vyberte úsečku.	Wählen Sie eine Linie.
+Vybrat vše	Alles auswählen
+Vybráno {0} – Enter / pravé tl. pokračuje	{0} ausgewählt – Enter / rechte Taste fährt fort
+Vzdálenost bodů	Punktabstand
+Výška obdélníku	Rechteckhöhe
+Všechny hrany (kolmý průmět)	Alle Kanten (senkrechte Projektion)
+Zadejte vzdálenost odsazení.	Geben Sie den Versatzabstand ein.
+Zadávat poloměr (přepnout na průměr)	Radius eingeben (auf Durchmesser umschalten)
+Zadávat průměr (přepnout na poloměr)	Durchmesser eingeben (auf Radius umschalten)
+Zarovnání (vodítka)	Ausrichtung (Hilfslinien)
+Začněte na konci úsečky nebo oblouku.	Beginnen Sie am Ende einer Linie oder eines Bogens.
+Začátek (poloměr)	Anfang (Radius)
+Začátek oblouku	Bogenanfang
+Začátek osy (poloměr)	Achsenanfang (Radius)
+Změnit na referenční	In Referenzmaß ändern
+Změnit na řídicí	In steuerndes Maß ändern
+Zrcadlit…	Spiegeln…
+Zrušit příkaz	Befehl abbrechen
+Zvolte hrany vpravo nahoře a potvrďte „Promítnout“	Wählen Sie oben rechts die Kanten und bestätigen Sie „Projizieren“
+Základní bod	Basispunkt
+bod + křivka	Punkt + Kurve
+bod + úsečka	Punkt + Linie
+bod nebo entita	Punkt oder Element
+body křivky, Enter ukončí	Kurvenpunkte, Enter beendet
+drážka {0} – střed	Langloch {0} – Mitte
+drážka {0} – střed oblouku	Langloch {0} – Bogenmitte
+dva body na průměru	zwei Punkte auf dem Durchmesser
+inteligentní kóta – klikněte na entity	intelligentes Maß – klicken Sie auf Elemente
+krok {0} mm	Schritt {0} mm
+kružnice {0} Ø{1} – střed	Kreis {0} Ø{1} – Mitte
+kružnice {0} – {1}	Kreis {0} – {1}
+mřížka	Raster
+natočený obdélník: 2 rohy první strany + výška	gedrehtes Rechteck: 2 Ecken der ersten Seite + Höhe
+navazuje tečně na konec úsečky/oblouku	schließt tangential an das Ende einer Linie/eines Bogens an
+obdélník {0} – střed	Rechteck {0} – Mitte
+obdélník {0} – {1}	Rechteck {0} – {1}
+oblouk {0} – bod na oblouku	Bogen {0} – Punkt auf dem Bogen
+oblouk {0} – konec	Bogen {0} – Ende
+oblouk {0} – začátek	Bogen {0} – Anfang
+odsazení > poloměr	Versatz > Radius
+počátek skici [0; 0]	Skizzenursprung [0; 0]
+střed, hlavní poloosa, vedlejší poloosa	Mitte, große Halbachse, kleine Halbachse
+střed, začátek a konec osy, šířka	Mitte, Achsenanfang und -ende, Breite
+střed, začátek, konec	Mitte, Anfang, Ende
+začátek, konec, bod na oblouku	Anfang, Ende, Punkt auf dem Bogen
+{0} mm · {1}°	{0} mm · {1}°
+{0} mm · řetězec {1}	{0} mm · Kette {1}
+{0} stran · R {1} ({2})	{0} Seiten · R {1} ({2})
+{0} {1} – bod {2}	{0} {1} – Punkt {2}
+{0} {1} – střed	{0} {1} – Mitte
+Úsečku nelze k ničemu prodloužit.	Die Linie kann zu nichts verlängert werden.
+úseček · vloží se jako pevné (plně určené)	Linien · werden als fixiert (vollständig bestimmt) eingefügt
+úsečka + oblouk / 2 oblouky	Linie + Bogen / 2 Bögen
+úsečka nebo 2 body	Linie oder 2 Punkte
+úsečka {0} – konec	Linie {0} – Ende
+úsečka {0} – střed	Linie {0} – Mitte
+úsečka {0} – začátek	Linie {0} – Anfang
+Řetězec	Kette
+řetěz úseček, Esc ukončí	Linienkette, Esc beendet
+Šířka drážky	Langlochbreite
+Šířka drážky musí být menší než dvojnásobek poloměru osy.	Die Langlochbreite muss kleiner als der doppelte Achsenradius sein.
+šířka > poloměr	Breite > Radius
+šířka {0}	Breite {0}
+Δ {0} ; {1}	Δ {0} ; {1}
+# start-screen
+(24 kapitol, postupy krok za krokem, FAQ) ·	(24 Kapitel, Schritt-für-Schritt-Anleitungen, FAQ) ·
+) i vazby na proměnné (	) und Bindungen an Variablen (
+, STEP). Po zavření karty nic nezůstane. Šifrované úložiště s heslem lze zapnout v Nastavení → Soubory.	, STEP). Nach dem Schließen des Tabs bleibt nichts zurück. Der verschlüsselte Speicher mit Passwort lässt sich unter Einstellungen → Dateien aktivieren.
+Do každého číselného pole lze psát výrazy (	In jedes Zahlenfeld lassen sich Ausdrücke eingeben (
+Dokumentace a návod k obsluze	Dokumentation und Bedienungsanleitung
+Dokumentace a návod k obsluze (otevře se v nové záložce)	Dokumentation und Bedienungsanleitung (öffnet sich in einem neuen Tab)
+Díl	Teil
+Nedávné	Zuletzt verwendet
+Nevíte si rady?	Brauchen Sie Hilfe?
+Nezobrazovat při spuštění (lze zapnout v Nastavení)	Beim Start nicht anzeigen (in den Einstellungen aktivierbar)
+Nápověda a tipy	Hilfe und Tipps
+Návod a dokumentace	Anleitung und Dokumentation
+Odebrat ze seznamu	Aus der Liste entfernen
+Pokračovat v práci	Weiterarbeiten
+Pravé tlačítko na plochu, hranu, bod nebo komponentu otevře nabídku s úpravami pro danou entitu.	Ein Rechtsklick auf eine Fläche, Kante, einen Punkt oder eine Komponente öffnet ein Menü mit Bearbeitungen für dieses Element.
+Příručka PDF ke stažení	PDF-Handbuch zum Herunterladen
+Rozpracovaná práce je uložená šifrovaně. Zadejte heslo úložiště:	Der Arbeitsstand ist verschlüsselt gespeichert. Geben Sie das Speicherpasswort ein:
+Ukázkové modely	Beispielmodelle
+Výkres z modelu: karta Výkres → Nový výkres. Kusovník se přidá automaticky u sestav.	Zeichnung aus dem Modell: Registerkarte Zeichnung → Neue Zeichnung. Bei Baugruppen wird die Stückliste automatisch hinzugefügt.
+Zatím žádné soubory. Vše, co uložíte nebo otevřete, se objeví tady (šifrovaně, jen pro vás).	Noch keine Dateien. Alles, was Sie speichern oder öffnen, erscheint hier (verschlüsselt, nur für Sie).
+Začít	Starten
+otevře paletu příkazů – napište „díra“, „výkres“, „zaoblit“…	öffnet die Befehlspalette – geben Sie „Bohrung“, „Zeichnung“, „Verrunden“… ein
+prvků	Features
+příručka PDF ke stažení	PDF-Handbuch zum Herunterladen
+v prohlížeči se nic neukládá – rozpracovaná práce žije jen v této kartě a v souborech, které si uložíte do svého počítače (	im Browser wird nichts gespeichert – der Arbeitsstand lebt nur in diesem Tab und in den Dateien, die Sie auf Ihren Computer speichern (
+vpravo nahoře.	oben rechts.
+· parametrický 3D/2D CAD · díly · sestavy · výkresy · formy	· parametrisches 3D/2D-CAD · Teile · Baugruppen · Zeichnungen · Formen
+· v programu tlačítko	· im Programm die Schaltfläche
+# viewport, viewport-fallback
+Co zkusit	Was Sie versuchen können
+Nápověda a dokumentace	Hilfe und Dokumentation
+Zkopírovat diagnostiku	Diagnose kopieren
+Zkusit znovu	Erneut versuchen
+nedostupné	nicht verfügbar
+· WebGL:	· WebGL:
+· jádro:	· Kern:
+Hrana {0} · {1} · délka ≈ {2} mm	Kante {0} · {1} · Länge ≈ {2} mm
+Izometrie (domů)	Isometrie (Start)
+Plocha {0} · {1}{2}	Fläche {0} · {1}{2}
+Vrchol {0} · [{1}; {2}; {3}]	Eckpunkt {0} · [{1}; {2}; {3}]
+WebGL kontext byl ztracen	Der WebGL-Kontext ging verloren
+WebGL není dostupné	WebGL ist nicht verfügbar
+křivka	Kurve

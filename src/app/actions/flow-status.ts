@@ -6,6 +6,7 @@ import { userActor, withChangeNote } from "@/lib/supabase/actor-headers";
 import { checkFeature, getAccess } from "@/lib/auth/session";
 import type { Feature } from "@/lib/auth/permissions";
 import type { CurrentUser } from "@/lib/data/current-user";
+import { syncJobFromQuote } from "@/lib/jobs/quote-job-sync-store";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { isJobStage } from "@/lib/jobs/stages";
 import { cleanDate, cleanText, isUuid, todayIso, translateDbError } from "@/lib/jobs/mapping";
@@ -15,7 +16,7 @@ import type {
 } from "@/lib/supabase/database.types";
 import {
   FLOW_ORDER_COLUMNS, FLOW_QUOTE_COLUMNS, INQUIRY_STATES, ORDER_STATES, QUOTE_ADMIN_ONLY, QUOTE_STATES, actorName,
-  canTransition, flowFactsFromRow, isInquiryStatus, isLostReason, isOrderDocStatus,
+  canMoveJobStage, canTransition, flowFactsFromRow, isInquiryStatus, isLostReason, isOrderDocStatus,
   isQuoteState, lostReasonLabel, lostReasonsFor, paymentKey, quoteFactsFromRow, quoteLabel, quoteSendBlock, reasonRequired,
   relativeStampTime, stageEffect, transitionFeature, userNeedsQuoteApproval, type ActionCtx, type PaymentState, type StageEffect,
 } from "@/lib/jobs/flow-status";
@@ -419,13 +420,18 @@ async function applyQuote(
       const err = await update({ status: "odeslano", sent_at: now, sent_via: "rucne" });
       if (err) return err;
       await log(`${evLabel} odeslána zákazníkovi (jinak než e-mailem)`, "sent", { via: "rucne" });
+      // nabídka → zakázka (9. 11.): termín dodání běží od odeslání nabídky
+      if (jobId) await syncJobFromQuote(c.db, jobId, { actorId: c.user.id, reason: "sent" });
     }
   } else if (to === "prijata") {
     const err = await update({ status: "prijato" });
     if (err) return err;
     if (jobId) {
+      // křížová konzistence (4. 11.) + nabídka → zakázka (9. 11.): přijatá nabídka → položky zakázky (chybějící
+      // přibudou, ceny spárovaných podle nabídky), termín; hodnota = Σ položek (DB)
+      const priced = await syncJobFromQuote(c.db, jobId, { actorId: c.user.id, reason: "accepted", force: true });
       const jobPatch: Row = { quote_id: quoteId };
-      if (quote.total !== null && quote.total !== undefined) jobPatch.value = quote.total;
+      if (quote.total !== null && quote.total !== undefined && priced.skipped !== "invoiced") jobPatch.value = quote.total;
       await c.db.from("orders").update(jobPatch as never).eq("id", jobId);
     }
     await log(`${evLabel} přijata zákazníkem`, "accepted");
@@ -459,7 +465,7 @@ async function applyQuote(
  */
 export async function approveAndSendQuote(
   quoteId: string,
-  email?: { to: string; cc?: string; subject: string; body: string } | null,
+  email?: { to: string; cc?: string; subject: string; body: string; fromMailboxId?: string | null } | null,
   /** Ze seznamu / karty: schválí jen nezměněnou nabídku (quotes.updated_at, §15.11). */
   opts: { expectedUpdatedAt?: string | null } = {},
 ): Promise<FlowResult> {
@@ -479,7 +485,7 @@ export async function approveAndSendQuote(
       const { generateJobDocument, sendJobDocument } = await import("@/app/actions/job-documents");
       const doc = await generateJobDocument(jobId, "nabidka", { quoteId, reuse: true });
       if (!doc.ok || !doc.fileId) return fail(doc.error ?? "PDF nabídky se nepodařilo vystavit.");
-      const sent = await sendJobDocument(jobId, doc.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body });
+      const sent = await sendJobDocument(jobId, doc.fileId, { to: email.to, cc: email.cc, subject: email.subject, body: email.body, fromMailboxId: email.fromMailboxId ?? null });
       if (!sent.ok) return fail(sent.error ?? "Odeslání e-mailem selhalo.");
       return quoteResult(c.db, quoteId, jobId);
     }
@@ -680,7 +686,8 @@ export async function moveJobStage(
   const c = await begin("orders");
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail(NOT_FOUND);
-  if (!c.can(transitionFeature("job", stage))) return deny();
+  // právo přechodu, nebo „Smí ručně měnit stav zakázky" (stage_any, 9. 11.) — DB to hlídá u uzavření taky
+  if (!canMoveJobStage(c.can, stage)) return deny();
   const text = note(opts.note);
   try {
     const [job, quotes] = await Promise.all([

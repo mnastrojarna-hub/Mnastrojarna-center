@@ -376,7 +376,8 @@ describe.skipIf(!ENABLED)("konec toku: DL → faktura → platba ↔ lokální S
     const ok = await prod.setInvoiceInfo(b.id, { invoiceNumber: `EXTV-${TAG}`, invoiceDate: "2026-10-25" });
     expect(ok.ok, ok.error).toBe(true);
     const inv = (await invoicesOf(b.id))[0];
-    expect(Number(inv.subtotal)).toBe(10_000);
+    // hodnota zakázky = Σ položek (křížová konzistence 4. 11.): 1 × 900
+    expect(Number(inv.subtotal)).toBe(900);
     expect([0, 21]).toContain(Number(inv.vat_rate));
     expect(Number(inv.total)).toBeCloseTo(Number(inv.subtotal) + Number(inv.vat_amount), 2);
     expect(Number(inv.vat_amount)).toBeCloseTo(Number(inv.subtotal) * Number(inv.vat_rate) / 100, 2);
@@ -432,9 +433,9 @@ describe.skipIf(!ENABLED)("konec toku: DL → faktura → platba ↔ lokální S
     let inv = await invoicesOf(j.id);
     expect(inv).toHaveLength(1);
     expect(inv[0]).toMatchObject({ number: `EXT-${TAG}`, storage_path: null, issue_date: "2026-10-25", due_date: "2026-11-24", status: "vystavena" });
-    // review A2 #7: základ = hodnota zakázky (bez DPH), celkem = základ + DPH výchozí sazby
-    expect(Number(inv[0].subtotal)).toBe(10_000);
-    expect(Number(inv[0].total)).toBeCloseTo(10_000 + Number(inv[0].vat_amount), 2);
+    // review A2 #7: základ = hodnota zakázky (bez DPH) = Σ položek 1 × 5 000, celkem = základ + DPH výchozí sazby
+    expect(Number(inv[0].subtotal)).toBe(5_000);
+    expect(Number(inv[0].total)).toBeCloseTo(5_000 + Number(inv[0].vat_amount), 2);
     const fix = await prod.setInvoiceInfo(j.id, { invoiceNumber: `EXT2-${TAG}` });
     expect(fix.ok, fix.error).toBe(true);
     inv = await invoicesOf(j.id);

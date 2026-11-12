@@ -4,10 +4,12 @@ import * as React from "react";
 import { FileText, Loader2, Send } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { PremiumBanner } from "@/components/customers/premium-badge";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { draftQuoteEmail } from "@/app/actions/job-documents";
 import { approveAndSendQuote } from "@/app/actions/flow-status";
 import { MailFields, mailDraftError, type MailDraft } from "./document-send-dialog";
+import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
 
 /**
  * „Schválit a odeslat“ (#25, jen super admin): návrh e-mailu se připraví BEZ PDF (draftQuoteEmail),
@@ -15,7 +17,7 @@ import { MailFields, mailDraftError, type MailDraft } from "./document-send-dial
  * Zavřením se nic neschválí.
  */
 export function QuoteApproveSendDialog({
-  open, onOpenChange, jobId, quoteId, number, onDone, updatedAt = null,
+  open, onOpenChange, jobId, quoteId, number, onDone, updatedAt = null, premium = false, customerName,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -25,11 +27,16 @@ export function QuoteApproveSendDialog({
   /** quotes.updated_at, jak ho uživatel viděl — změněnou nabídku server neschválí. */
   updatedAt?: string | null;
   onDone: (message: string) => void;
+  /** 9. 11.: prémiový zákazník — výrazný pruh „Pozor — prémiový zákazník" nahoře. */
+  premium?: boolean;
+  customerName?: string | null;
 }) {
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   const [filename, setFilename] = React.useState<string | null>(null);
   const [step, setStep] = React.useState<"preparing" | "form" | "sending">("preparing");
   const [error, setError] = React.useState<string | null>(null);
+  /** „Odeslat z" (super admin; null = jeho schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
 
   React.useEffect(() => {
@@ -38,6 +45,7 @@ export function QuoteApproveSendDialog({
       return;
     }
     const token = ++run.current;
+    setFromMailboxId(null);
     setStep("preparing");
     setError(null);
     draftQuoteEmail(jobId, quoteId).then((d) => {
@@ -66,7 +74,7 @@ export function QuoteApproveSendDialog({
     try {
       const res = await approveAndSendQuote(
         quoteId,
-        { to: mail.to.trim(), cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body },
+        { to: mail.to.trim(), cc: mail.cc.trim() || undefined, subject: mail.subject.trim(), body: mail.body, ...(fromMailboxId ? { fromMailboxId } : {}) },
         { expectedUpdatedAt: updatedAt },
       );
       if (!res.ok) {
@@ -84,7 +92,7 @@ export function QuoteApproveSendDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => step !== "sending" && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94vh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
+      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94dvh] w-[calc(100%-1rem)] overflow-y-auto sm:top-[6%] sm:max-w-2xl">
         <DialogHead
           icon={Send}
           tone="bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-400"
@@ -92,6 +100,7 @@ export function QuoteApproveSendDialog({
           subtitle="Po potvrzení se nabídka schválí, vystaví se PDF a e-mail odejde z tvé schránky."
         />
         <form onSubmit={submit} className="space-y-4 p-4 sm:p-5" noValidate>
+          {premium && <PremiumBanner customerName={customerName} />}
           <ErrorBox error={error} />
           {step === "preparing" ? (
             <div className="flex flex-col items-center gap-3 py-10 text-center text-sm text-muted-foreground">
@@ -107,10 +116,18 @@ export function QuoteApproveSendDialog({
                   <span className="shrink-0 text-xs text-muted-foreground">vystaví se po schválení</span>
                 </p>
               )}
+              <SenderPicker
+                value={fromMailboxId}
+                onChange={setFromMailboxId}
+                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                disabled={step === "sending"}
+                className="px-1"
+              />
               <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} />
             </>
           )}
-          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col-reverse gap-2 border-t bg-popover/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-5 sm:-mb-5 sm:flex-row sm:justify-end sm:p-4">
             <Button type="button" variant="ghost" className="min-h-11 sm:min-h-9" onClick={() => onOpenChange(false)} disabled={step === "sending"}>Zrušit</Button>
             <Button type="submit" variant="send" className="min-h-11 sm:min-h-9" disabled={step !== "form"}>
               {step === "sending" ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}

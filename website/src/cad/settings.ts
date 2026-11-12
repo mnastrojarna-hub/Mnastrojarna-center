@@ -1,3 +1,4 @@
+import { cadLocale, tr } from "./i18n";
 import { vaultGet, vaultRemove, vaultSet } from "./vault";
 /** Uživatelské nastavení CAD – uložené v prohlížeči (localStorage), s exportem/importem JSON. */
 import type { DisplayMode, MouseScheme } from "@/components/cad/viewport";
@@ -141,7 +142,7 @@ export const exportSettings = (s: Settings) => JSON.stringify({ app: "mnastrojar
 
 export function importSettings(json: string): Settings {
   const o = JSON.parse(json) as { app?: string; settings?: Partial<Settings> };
-  if (o.app !== "mnastrojarna-cad-settings" || !o.settings) throw new Error("Soubor není nastavení Mnástrojárna CAD.");
+  if (o.app !== "mnastrojarna-cad-settings" || !o.settings) throw new Error(tr("Soubor není nastavení Mnástrojárna CAD."));
   return { ...DEFAULT_SETTINGS, ...o.settings, shortcuts: { ...DEFAULT_SHORTCUTS, ...(o.settings.shortcuts ?? {}) } };
 }
 
@@ -152,7 +153,7 @@ const INCH = 25.4;
 /** Formát délky podle nastavení (interně vždy mm). */
 export function fmtLen(mm: number, s: Pick<Settings, "units" | "decimals">): string {
   const v = s.units === "inch" ? mm / INCH : mm;
-  return `${v.toLocaleString("cs-CZ", { minimumFractionDigits: 0, maximumFractionDigits: s.decimals })} ${s.units === "inch" ? "in" : "mm"}`;
+  return `${v.toLocaleString(cadLocale(), { minimumFractionDigits: 0, maximumFractionDigits: s.decimals })} ${s.units === "inch" ? "in" : "mm"}`;
 }
 
 /** Převod zadané hodnoty v uživatelských jednotkách na mm. */
@@ -206,9 +207,9 @@ export async function readRecentDoc(id: string): Promise<string | null> {
 /** Normalizace zkratky z KeyboardEvent na tvar „Ctrl+Shift+K“. */
 export function keyCombo(e: KeyboardEvent): string {
   const parts: string[] = [];
-  if (e.ctrlKey || e.metaKey) parts.push("Ctrl");
-  if (e.altKey) parts.push("Alt");
-  if (e.shiftKey && e.key.length > 1) parts.push("Shift");
+  if (e.ctrlKey || e.metaKey) parts.push(tr("Ctrl"));
+  if (e.altKey) parts.push(tr("Alt"));
+  if (e.shiftKey && e.key.length > 1) parts.push(tr("Shift"));
   let k = e.key;
   if (k === " ") k = "Space";
   if (k.length === 1) k = k.toUpperCase();

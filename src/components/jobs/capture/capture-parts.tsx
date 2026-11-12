@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Sparkles, Lock, FileSymlink, Copy } from "lucide-react";
+import { AlertTriangle, Copy, ExternalLink, FileSymlink, Info, Lock, Sparkles, XCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { NativeSelect } from "@/components/jobs/book/native-select";
@@ -9,7 +10,7 @@ import { formatIsoDate } from "@/lib/jobs/field-labels";
 import { FILE_KINDS } from "@/lib/jobs/file-kinds";
 import { BATCH_TYPES } from "@/lib/jobs/capture-batch";
 import type { ChipGroup } from "@/lib/jobs/capture-review";
-import type { BatchDocType, DuplicateRef, ItemLinkChoice, ItemOption } from "@/lib/jobs/capture-batch-types";
+import type { BatchDocType, BatchWarning, BatchWarningAction, DuplicateRef, ItemLinkChoice, ItemOption } from "@/lib/jobs/capture-batch-types";
 import { cn } from "@/lib/utils";
 
 /** Barevné dlaždice ikon sekcí (stejná paleta jako formulář zakázky). */
@@ -369,5 +370,45 @@ export function ItemLinkSelect({
         </option>
       ))}
     </NativeSelect>
+  );
+}
+
+/** Upozornění s rozhodnutím na místě (tlačítka akcí, odkazy); informace bez akce vypadá jako informace. */
+export function WarningRow({ w, disabled, onAction }: { w: BatchWarning; disabled?: boolean; onAction: (w: BatchWarning, a: BatchWarningAction) => void }) {
+  // ⚠ bez vlastní akce: aspoň „Beru na vědomí" (rozhodnutí člověka, schová ⚠) — nikdy ⚠, na které nejde kliknout
+  const actions: BatchWarningAction[] = w.actions.length ? w.actions : w.severity === "warn" ? [{ kind: "ack", label: "Beru na vědomí" }] : [];
+  return (
+    <li
+      data-testid="capture-warning"
+      data-code={w.code}
+      data-severity={w.severity}
+      className={cn(
+        "rounded-xl border p-2.5 text-xs",
+        w.severity === "block"
+          ? "border-red-200 bg-red-50 text-red-900 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-100"
+          : w.severity === "warn"
+            ? "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100"
+            : "border-sky-200 bg-sky-50 text-sky-950 dark:border-sky-500/30 dark:bg-sky-500/10 dark:text-sky-100",
+      )}
+    >
+      <p className="flex items-start gap-1.5">
+        {w.severity === "block" ? <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : w.severity === "warn" ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-500" /> : <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+        <span>{w.message}</span>
+      </p>
+      {(actions.length > 0 && !disabled) || w.links?.length ? (
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {!disabled && actions.map((a, n) => (
+            <Button key={n} type="button" size="sm" variant={n === 0 && w.severity !== "info" ? "default" : "outline"} className="h-8" onClick={() => onAction(w, a)} data-testid="capture-warning-action">
+              {a.label}
+            </Button>
+          ))}
+          {w.links?.map((l) => (
+            <a key={l.href} href={l.href} target="_blank" rel="noreferrer" className="inline-flex h-8 items-center gap-1 rounded-md px-2 font-medium text-sky-800 underline-offset-2 hover:underline dark:text-sky-300">
+              <ExternalLink className="h-3.5 w-3.5" /> {l.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </li>
   );
 }

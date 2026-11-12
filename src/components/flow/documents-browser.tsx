@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { Archive, Download, ExternalLink, FolderOpen, Lock, Search, Sparkles, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -47,9 +48,14 @@ const PAGE = 60;
  * fotek, na mobilu seznam.
  */
 export function DocumentsBrowser({ files, today }: { files: FlowFile[]; today: string }) {
-  const [kind, setKind] = React.useState<JobFileKind | "vse">("vse");
-  const [archived, setArchived] = React.useState(false);
-  const [q, setQ] = React.useState("");
+  // druh, archiv a hledání v adrese (Zpět z karty zakázky vrátí stejný výběr; menu si ho pamatuje)
+  const url = useUrlState({ druh: "vse", archiv: "", q: "" });
+  const kind: JobFileKind | "vse" = (FILE_KIND_ORDER as string[]).includes(url.values.druh) ? (url.values.druh as JobFileKind) : "vse";
+  const setKind = (k: JobFileKind | "vse") => url.set({ druh: k });
+  const archived = url.values.archiv === "1";
+  const setArchived = (v: boolean) => url.set({ archiv: v ? "1" : "" });
+  const q = url.values.q;
+  const setQ = (v: string) => url.set({ q: v }, { delay: 300 });
   // stránkování se při změně filtru vrací na začátek
   const filterKey = `${kind}|${archived}|${q}`;
   const [page, setPage] = React.useState({ key: filterKey, limit: PAGE });

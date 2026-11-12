@@ -4,6 +4,7 @@
  * UI plechových dílů: ikony, formuláře ohybu z hrany / lemu (ukládají geometrii vybraných hran pro rozvin v UI)
  * a akce Rozvin → DXF / SVG a Tabulka ohybů.
  */
+import { tr } from "@/cad/i18n";
 import { useEffect } from "react";
 import { cad } from "@/cad/client";
 import { getExt, type ExtParam } from "@/cad/ext/registry";
@@ -48,8 +49,8 @@ function FlangeForm({ f, onChange }: ExtFormProps) {
       for (const i of edges) {
         try {
           const info = await cad.inspect({ kind: "part" }, { kind: "edge", index: i });
-          const a = parseVec(info.rows.find((r) => r[0] === "Začátek")?.[1]);
-          const b = parseVec(info.rows.find((r) => r[0] === "Konec")?.[1]);
+          const a = parseVec(info.rows.find((r) => r[0] === tr("Začátek"))?.[1]);
+          const b = parseVec(info.rows.find((r) => r[0] === tr("Konec"))?.[1]);
           out.push(a && b ? { a, b } : null);
         } catch {
           out.push(null);
@@ -82,7 +83,7 @@ function FlangeForm({ f, onChange }: ExtFormProps) {
           case "edges":
             return (
               <div key={p.key} className="rounded-lg border border-dashed border-ink-700/20 p-2.5 text-[12.5px]">
-                <span className="font-medium">{p.label}:</span> {edges.length ? `${edges.length} vybráno` : "klikněte na rovnou hranu plechu v modelu"}
+                <span className="font-medium">{p.label}:</span> {edges.length ? tr("{0} vybráno", edges.length) : tr("klikněte na rovnou hranu plechu v modelu")}
                 {edges.length > 0 && (
                   <button type="button" className="ml-2 text-brand hover:underline" onClick={() => onChange({ edges: [], edgeGeom: [] })}>
                     vymazat
@@ -122,7 +123,7 @@ async function exportFlat(api: ExtActionApi, kind: "dxf" | "svg") {
     const lay = await layoutFromDoc(api.doc);
     if (kind === "dxf") api.download(`${safe(api.doc.name)}_rozvin.dxf`, flatToDxf(lay, api.doc.name), "application/dxf");
     else api.download(`${safe(api.doc.name)}_rozvin.svg`, flatToSvg(lay, api.doc.name), "image/svg+xml");
-    api.flash(lay.warnings.length ? `Rozvin uložen (${lay.bends.length} ohybů). Upozornění: ${lay.warnings[0]}` : `Rozvin uložen – ${lay.bends.length} ohybů, ${Math.round((lay.bbox[1][0] - lay.bbox[0][0]) * 10) / 10} × ${Math.round((lay.bbox[1][1] - lay.bbox[0][1]) * 10) / 10} mm.`);
+    api.flash(lay.warnings.length ? tr("Rozvin uložen ({0} ohybů). Upozornění: {1}", lay.bends.length, lay.warnings[0]) : tr("Rozvin uložen – {0} ohybů, {1} × {2} mm.", lay.bends.length, Math.round((lay.bbox[1][0] - lay.bbox[0][0]) * 10) / 10, Math.round((lay.bbox[1][1] - lay.bbox[0][1]) * 10) / 10));
   } catch (e) {
     api.flash((e as Error).message);
   }
@@ -134,7 +135,7 @@ registerExtUi("sheet.table", {
   action: async (api) => {
     try {
       const lay = await layoutFromDoc(api.doc);
-      api.notice("Tabulka ohybů", bendTable(lay));
+      api.notice(tr("Tabulka ohybů"), bendTable(lay));
     } catch (e) {
       api.flash((e as Error).message);
     }

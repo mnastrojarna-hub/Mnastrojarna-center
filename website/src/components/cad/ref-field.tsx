@@ -7,6 +7,7 @@
  *  – zvolit z nabídky pravého tlačítka / tlačítka ⋯ (střed hrany, střed kružnice, mezi dvěma body, průsečík…).
  * Výběr v 3D směruje aplikace přes `RefPickContext`.
  */
+import { tr } from "@/cad/i18n";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { cad } from "@/cad/client";
 import {
@@ -123,7 +124,7 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
   const pickPlain = () => {
     if (!ctx) return;
     if (active) return ctx.request(null);
-    startPick(want, `${label}: vyberte ${WANT_LABEL[want]}`, (r) => {
+    startPick(want, tr("{0}: vyberte {1}", label, tr(WANT_LABEL[want])), (r) => {
       onChange(r);
       ctx.request(null);
     });
@@ -138,7 +139,7 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
     const step = () => {
       const k = o.picks[got.length];
       setOpt({ o, got: [...got] });
-      startPick(k.want === "point" ? "point" : k.want, `${o.label}: vyberte ${k.label} (${got.length + 1}/${o.picks.length})`, (r) => {
+      startPick(k.want === "point" ? "point" : k.want, tr("{0}: vyberte {1} ({2}/{3})", o.label, k.label, got.length + 1, o.picks.length), (r) => {
         got.push(r);
         if (got.length < o.picks.length) step();
         else {
@@ -163,7 +164,7 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
   const commitText = () => {
     const p = parseXyz(text, ctx?.lastPoint ?? null);
     if (!p) {
-      setErr("Zadejte X; Y; Z (např. 10; 20; 0 nebo @5; 0; 0)");
+      setErr(tr("Zadejte X; Y; Z (např. 10; 20; 0 nebo @5; 0; 0)"));
       return;
     }
     setErr(null);
@@ -176,12 +177,12 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
   };
   const entries: RMenuEntry[] = [
     ...(want === "point" || want === "any" || want === "vertex" ? POINT_OPTIONS.filter((o) => want !== "vertex" || ["vertex", "edgeMid", "edgeStart", "edgeEnd", "center", "faceCenter", "percent", "mid", "between", "offset", "project", "intersect", "origin", "xyz"].includes(o.id)).map((o) => ({ id: o.id, label: o.label, icon: o.picks[0]?.want === "edge" ? "edge" : o.picks[0]?.want === "face" ? "face" : "point", hint: o.hint, onClick: () => runOption(o) })) : []),
-    ...(want === "face" || want === "plane" ? [{ id: "face", label: "Vybrat plochu klikem", icon: "face", onClick: pickPlain }] : []),
-    ...(want === "edge" || want === "axis" ? [{ id: "edge", label: "Vybrat hranu klikem", icon: "edge", onClick: pickPlain }] : []),
-    { id: "list", label: "Vybrat ze seznamu…", icon: "table", hint: "seznam ploch / hran / vrcholů s filtrem a hledáním", onClick: () => setList(true) },
+    ...(want === "face" || want === "plane" ? [{ id: "face", label: tr("Vybrat plochu klikem"), icon: "face", onClick: pickPlain }] : []),
+    ...(want === "edge" || want === "axis" ? [{ id: "edge", label: tr("Vybrat hranu klikem"), icon: "edge", onClick: pickPlain }] : []),
+    { id: "list", label: tr("Vybrat ze seznamu…"), icon: "table", hint: tr("seznam ploch / hran / vrcholů s filtrem a hledáním"), onClick: () => setList(true) },
     { divider: true },
-    { id: "sel", label: "Použít aktuální výběr", icon: "select", disabled: !ctx?.selectionRefs.length, onClick: useSelection },
-    { id: "clear", label: "Vymazat", icon: "delete", onClick: () => onChange({ kind: want === "face" || want === "plane" ? "face" : want === "edge" || want === "axis" ? "edge" : "vertex", index: -1 }) },
+    { id: "sel", label: tr("Použít aktuální výběr"), icon: "select", disabled: !ctx?.selectionRefs.length, onClick: useSelection },
+    { id: "clear", label: tr("Vymazat"), icon: "delete", onClick: () => onChange({ kind: want === "face" || want === "plane" ? "face" : want === "edge" || want === "axis" ? "edge" : "vertex", index: -1 }) },
   ];
 
   return (
@@ -197,7 +198,7 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
           <input
             autoFocus
             className="w-full rounded-lg border border-brand px-2 py-1 text-[12.5px] outline-none"
-            placeholder="X; Y; Z  nebo  @dx; dy; dz"
+            placeholder={tr("X; Y; Z  nebo  @dx; dy; dz")}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
@@ -229,7 +230,7 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
           onPointerUp={cancelPress}
           onPointerCancel={cancelPress}
           onPointerLeave={cancelPress}
-          title="Pravé tlačítko / dlouhý stisk: další způsoby zadání"
+          title={tr("Pravé tlačítko / dlouhý stisk: další způsoby zadání")}
         >
           <button
             type="button"
@@ -239,14 +240,14 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
             }}
             className={cn("flex-1 truncate text-left", empty && !active && "text-ink-700/45")}
           >
-            {active ? (opt ? `${opt.o.label} – ${opt.got.length + 1}/${opt.o.picks.length}…` : `Klikněte v modelu (${WANT_LABEL[want]})…`) : empty ? `Vyberte ${WANT_LABEL[want]}` : refLabel(value)}
+            {active ? (opt ? `${opt.o.label} – ${opt.got.length + 1}/${opt.o.picks.length}…` : tr("Klikněte v modelu ({0})…", WANT_LABEL[want])) : empty ? tr("Vyberte {0}", WANT_LABEL[want]) : refLabel(value)}
           </button>
           {allowXyz && (
-            <button type="button" title="Zadat souřadnice" onClick={() => setTyping(true)} className="rounded px-1 font-mono text-[11px] text-ink-700/60 hover:bg-steel-100">
+            <button type="button" title={tr("Zadat souřadnice")} onClick={() => setTyping(true)} className="rounded px-1 font-mono text-[11px] text-ink-700/60 hover:bg-steel-100">
               xyz
             </button>
           )}
-          <button type="button" title="Další způsoby zadání (pravé tlačítko)" onClick={(e) => setMenu({ x: e.clientX, y: e.clientY })} className="rounded px-1.5 text-[13px] leading-none text-ink-700/70 hover:bg-steel-100">
+          <button type="button" title={tr("Další způsoby zadání (pravé tlačítko)")} onClick={(e) => setMenu({ x: e.clientX, y: e.clientY })} className="rounded px-1.5 text-[13px] leading-none text-ink-700/70 hover:bg-steel-100">
             ⋯
           </button>
         </div>
@@ -259,7 +260,7 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
           doc={ctx.doc}
           counts={ctx.counts}
           want={want}
-          title={`${label}: vybrat ze seznamu`}
+          title={tr("{0}: vybrat ze seznamu", label)}
           onPick={(r) => {
             onChange(r);
             setList(false);
@@ -310,18 +311,18 @@ export function ExtentField({ label, value, onChange, kinds, defaultDistance = 2
           ))}
         </select>
       </label>
-      {(value.kind === "blind" || value.kind === "midPlane") && <NumIn label={value.kind === "midPlane" ? "Celková délka" : "Vzdálenost"} value={value.d} min={0.001} onChange={(d) => onChange({ ...value, d })} />}
-      {value.kind === "toVertex" && <RefField label="Vrchol / bod" value={value.ref} want="point" onChange={(ref) => onChange({ ...value, ref })} />}
+      {(value.kind === "blind" || value.kind === "midPlane") && <NumIn label={value.kind === "midPlane" ? tr("Celková délka") : tr("Vzdálenost")} value={value.d} min={0.001} onChange={(d) => onChange({ ...value, d })} />}
+      {value.kind === "toVertex" && <RefField label={tr("Vrchol / bod")} value={value.ref} want="point" onChange={(ref) => onChange({ ...value, ref })} />}
       {value.kind === "toFace" && (
         <>
-          <RefField label="Plocha / pomocná rovina" value={value.ref} want="face" onChange={(ref) => onChange({ ...value, ref })} />
-          <NumIn label="Odsazení od plochy (0 = až k ploše)" value={value.offset ?? 0} onChange={(offset) => onChange({ ...value, offset })} />
+          <RefField label={tr("Plocha / pomocná rovina")} value={value.ref} want="face" onChange={(ref) => onChange({ ...value, ref })} />
+          <NumIn label={tr("Odsazení od plochy (0 = až k ploše)")} value={value.offset ?? 0} onChange={(offset) => onChange({ ...value, offset })} />
         </>
       )}
       {value.kind === "offsetFromFace" && (
         <>
-          <RefField label="Plocha / pomocná rovina" value={value.ref} want="face" onChange={(ref) => onChange({ ...value, ref })} />
-          <NumIn label="Odsazení" value={value.d} onChange={(d) => onChange({ ...value, d })} />
+          <RefField label={tr("Plocha / pomocná rovina")} value={value.ref} want="face" onChange={(ref) => onChange({ ...value, ref })} />
+          <NumIn label={tr("Odsazení")} value={value.d} onChange={(d) => onChange({ ...value, d })} />
         </>
       )}
       <p className="text-[11px] text-ink-700/45">{cur.hint}</p>
@@ -329,7 +330,7 @@ export function ExtentField({ label, value, onChange, kinds, defaultDistance = 2
   );
 }
 
-export function DirectionField({ label = "Směr", value, onChange, allowNormal = true }: { label?: string; value: Direction | undefined; onChange: (d: Direction | undefined) => void; allowNormal?: boolean }) {
+export function DirectionField({ label = tr("Směr"), value, onChange, allowNormal = true }: { label?: string; value: Direction | undefined; onChange: (d: Direction | undefined) => void; allowNormal?: boolean }) {
   const v: Direction = value ?? { kind: "normal" };
   const list = allowNormal ? DIRECTION_KINDS : DIRECTION_KINDS.filter((k) => k.v !== "normal");
   const change = (kind: Direction["kind"]) => {
@@ -378,15 +379,15 @@ export function DirectionField({ label = "Směr", value, onChange, allowNormal =
           ))}
         </div>
       )}
-      {v.kind === "angle" && <NumIn label="Úhel od normály (kolem osy Y skici)" suffix="°" value={v.deg} onChange={(deg) => onChange({ kind: "angle", deg })} />}
+      {v.kind === "angle" && <NumIn label={tr("Úhel od normály (kolem osy Y skici)")} suffix="°" value={v.deg} onChange={(deg) => onChange({ kind: "angle", deg })} />}
       {v.kind === "twoPoints" && (
         <>
-          <RefField label="Od bodu" value={v.a} want="point" onChange={(a) => onChange({ ...v, a })} />
-          <RefField label="K bodu" value={v.b} want="point" onChange={(b) => onChange({ ...v, b })} />
+          <RefField label={tr("Od bodu")} value={v.a} want="point" onChange={(a) => onChange({ ...v, a })} />
+          <RefField label={tr("K bodu")} value={v.b} want="point" onChange={(b) => onChange({ ...v, b })} />
         </>
       )}
-      {(v.kind === "edge" || v.kind === "tangent") && <RefField label={v.kind === "edge" ? "Hrana / válcová plocha" : "Hrana (tečna)"} value={v.ref} want="axis" onChange={(ref) => onChange({ ...v, ref })} />}
-      {v.kind === "faceNormal" && <RefField label="Plocha" value={v.ref} want="face" onChange={(ref) => onChange({ ...v, ref })} />}
+      {(v.kind === "edge" || v.kind === "tangent") && <RefField label={v.kind === "edge" ? tr("Hrana / válcová plocha") : tr("Hrana (tečna)")} value={v.ref} want="axis" onChange={(ref) => onChange({ ...v, ref })} />}
+      {v.kind === "faceNormal" && <RefField label={tr("Plocha")} value={v.ref} want="face" onChange={(ref) => onChange({ ...v, ref })} />}
     </div>
   );
 }
@@ -396,7 +397,7 @@ export function StartField({ value, onChange }: { value: StartFrom | undefined; 
   return (
     <div className="space-y-2 rounded-lg border border-ink-700/10 bg-steel-50/60 p-2">
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Začátek</span>
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Začátek")}</span>
         <select
           className={selectCls}
           value={v.kind}
@@ -412,9 +413,9 @@ export function StartField({ value, onChange }: { value: StartFrom | undefined; 
           ))}
         </select>
       </label>
-      {v.kind === "offset" && <NumIn label="Odsazení" value={v.d} onChange={(d) => onChange({ kind: "offset", d })} />}
-      {v.kind === "face" && <RefField label="Plocha" value={v.ref} want="face" onChange={(ref) => onChange({ kind: "face", ref })} />}
-      {v.kind === "vertex" && <RefField label="Vrchol / bod" value={v.ref} want="point" onChange={(ref) => onChange({ kind: "vertex", ref })} />}
+      {v.kind === "offset" && <NumIn label={tr("Odsazení")} value={v.d} onChange={(d) => onChange({ kind: "offset", d })} />}
+      {v.kind === "face" && <RefField label={tr("Plocha")} value={v.ref} want="face" onChange={(ref) => onChange({ kind: "face", ref })} />}
+      {v.kind === "vertex" && <RefField label={tr("Vrchol / bod")} value={v.ref} want="point" onChange={(ref) => onChange({ kind: "vertex", ref })} />}
     </div>
   );
 }
@@ -424,7 +425,7 @@ export function ThinField({ value, onChange }: { value: Thin | undefined; onChan
     <div className="space-y-2 rounded-lg border border-ink-700/10 bg-steel-50/60 p-2">
       <label className="flex items-center gap-2 text-[12.5px]">
         <input type="checkbox" checked={!!value} onChange={(e) => onChange(e.target.checked ? { side: "one", t1: 2 } : undefined)} className="accent-brand" />
-        Tenká stěna (profil jako stěna dané tloušťky, funguje i pro otevřený profil)
+        {tr("Tenká stěna (profil jako stěna dané tloušťky, funguje i pro otevřený profil)")}
       </label>
       {value && (
         <>
@@ -436,8 +437,8 @@ export function ThinField({ value, onChange }: { value: Thin | undefined; onChan
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <NumIn label={value.side === "two" ? "Tloušťka ven" : "Tloušťka"} value={value.t1} min={0.01} onChange={(t1) => onChange({ ...value, t1 })} />
-            {value.side === "two" && <NumIn label="Tloušťka dovnitř" value={value.t2 ?? value.t1} min={0.01} onChange={(t2) => onChange({ ...value, t2 })} />}
+            <NumIn label={value.side === "two" ? tr("Tloušťka ven") : tr("Tloušťka")} value={value.t1} min={0.01} onChange={(t1) => onChange({ ...value, t1 })} />
+            {value.side === "two" && <NumIn label={tr("Tloušťka dovnitř")} value={value.t2 ?? value.t1} min={0.01} onChange={(t2) => onChange({ ...value, t2 })} />}
           </div>
         </>
       )}
@@ -475,7 +476,7 @@ export function AxisField({ value, onChange, sketch }: { value: AxisDef | undefi
   return (
     <div className="space-y-2 rounded-lg border border-ink-700/10 bg-steel-50/60 p-2">
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Osa rotace</span>
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Osa rotace")}</span>
         <select className={selectCls} value={v.kind} onChange={(e) => change(e.target.value as AxisDef["kind"])}>
           {AXIS_KINDS.map((k) => (
             <option key={k.v} value={k.v}>
@@ -486,10 +487,10 @@ export function AxisField({ value, onChange, sketch }: { value: AxisDef | undefi
       </label>
       {v.kind === "sketchLine" && (
         <select className={selectCls} value={v.entityId} onChange={(e) => onChange({ kind: "sketchLine", entityId: e.target.value })}>
-          {!lines.length && <option value="">— skica nemá úsečku —</option>}
+          {!lines.length && <option value="">{tr("— skica nemá úsečku —")}</option>}
           {lines.map((l, i) => (
             <option key={l.id} value={l.id}>
-              Úsečka {i + 1}
+              {tr("Úsečka")}{" "}{i + 1}
             </option>
           ))}
         </select>
@@ -503,20 +504,20 @@ export function AxisField({ value, onChange, sketch }: { value: AxisDef | undefi
           ))}
         </div>
       )}
-      {v.kind === "edge" && <RefField label="Hrana" value={v.ref} want="edge" onChange={(ref) => onChange({ kind: "edge", ref })} />}
-      {v.kind === "cylFace" && <RefField label="Válcová plocha" value={v.ref} want="face" onChange={(ref) => onChange({ kind: "cylFace", ref })} />}
+      {v.kind === "edge" && <RefField label={tr("Hrana")} value={v.ref} want="edge" onChange={(ref) => onChange({ kind: "edge", ref })} />}
+      {v.kind === "cylFace" && <RefField label={tr("Válcová plocha")} value={v.ref} want="face" onChange={(ref) => onChange({ kind: "cylFace", ref })} />}
       {v.kind === "twoPoints" && (
         <>
-          <RefField label="První bod" value={v.a} want="point" onChange={(a) => onChange({ ...v, a })} />
-          <RefField label="Druhý bod" value={v.b} want="point" onChange={(b) => onChange({ ...v, b })} />
+          <RefField label={tr("První bod")} value={v.a} want="point" onChange={(a) => onChange({ ...v, a })} />
+          <RefField label={tr("Druhý bod")} value={v.b} want="point" onChange={(b) => onChange({ ...v, b })} />
         </>
       )}
       {v.kind === "datum" && <DatumPick value={v.featureId} onChange={(featureId) => onChange({ kind: "datum", featureId })} />}
-      {v.kind === "datumAxis" && <DatumPick types={["datumAxis", "csys"]} placeholder="— vyberte pomocnou osu / souř. systém —" value={v.featureId} onChange={(featureId) => onChange({ kind: "datumAxis", featureId })} />}
+      {v.kind === "datumAxis" && <DatumPick types={["datumAxis", "csys"]} placeholder={tr("— vyberte pomocnou osu / souř. systém —")} value={v.featureId} onChange={(featureId) => onChange({ kind: "datumAxis", featureId })} />}
       {v.kind === "twoPlanes" && (
         <>
-          <RefField label="1. rovina / plocha" value={v.a} want="face" onChange={(a) => onChange({ ...v, a })} />
-          <RefField label="2. rovina / plocha" value={v.b} want="face" onChange={(b) => onChange({ ...v, b })} />
+          <RefField label={tr("1. rovina / plocha")} value={v.a} want="face" onChange={(a) => onChange({ ...v, a })} />
+          <RefField label={tr("2. rovina / plocha")} value={v.b} want="face" onChange={(b) => onChange({ ...v, b })} />
         </>
       )}
     </div>
@@ -541,7 +542,7 @@ function DatumPick({ value, onChange, types = ["datum"], placeholder = "— vybe
 const PLANES: PlaneName[] = ["XY", "XZ", "YZ"];
 
 /** Definice roviny (15 způsobů) – pro skicu, pomocnou rovinu, zrcadlení, řez, úkos. */
-export function PlaneDefField({ label = "Rovina", value, onChange, allowNone, noneLabel = "Základní / podle osy (původní zadání)" }: { label?: string; value: PlaneDef | undefined; onChange: (p: PlaneDef | undefined) => void; allowNone?: boolean; noneLabel?: string }) {
+export function PlaneDefField({ label = tr("Rovina"), value, onChange, allowNone, noneLabel = tr("Základní / podle osy (původní zadání)") }: { label?: string; value: PlaneDef | undefined; onChange: (p: PlaneDef | undefined) => void; allowNone?: boolean; noneLabel?: string }) {
   const NOF: Ref = { kind: "face", index: -1 };
   const NOV: Ref = { kind: "vertex", index: -1 };
   const NOE: Ref = { kind: "edge", index: -1 };
@@ -598,74 +599,74 @@ export function PlaneDefField({ label = "Rovina", value, onChange, allowNone, no
               </button>
             ))}
           </div>
-          <NumIn label="Odsazení" value={v.offset} onChange={(offset) => onChange({ ...v, offset })} />
+          <NumIn label={tr("Odsazení")} value={v.offset} onChange={(offset) => onChange({ ...v, offset })} />
         </>
       )}
       {v?.kind === "face" && (
         <>
-          <RefField label="Plocha / pomocná rovina" value={v.ref} want="face" onChange={(ref) => onChange({ ...v, ref })} />
+          <RefField label={tr("Plocha / pomocná rovina")} value={v.ref} want="face" onChange={(ref) => onChange({ ...v, ref })} />
           <div className="grid grid-cols-2 gap-2">
-            <NumIn label="Odsazení" value={v.offset ?? 0} onChange={(offset) => onChange({ ...v, offset })} />
+            <NumIn label={tr("Odsazení")} value={v.offset ?? 0} onChange={(offset) => onChange({ ...v, offset })} />
             <label className="mt-5 flex items-center gap-2 text-[12.5px]">
-              <input type="checkbox" checked={!!v.flip} onChange={(e) => onChange({ ...v, flip: e.target.checked })} className="accent-brand" /> Obrátit
+              <input type="checkbox" checked={!!v.flip} onChange={(e) => onChange({ ...v, flip: e.target.checked })} className="accent-brand" /> {tr("Obrátit")}
             </label>
           </div>
         </>
       )}
       {v?.kind === "threePoints" && (
         <>
-          <RefField label="1. bod" value={v.a} want="point" onChange={(a) => onChange({ ...v, a })} />
-          <RefField label="2. bod (směr X)" value={v.b} want="point" onChange={(b) => onChange({ ...v, b })} />
-          <RefField label="3. bod" value={v.c} want="point" onChange={(c) => onChange({ ...v, c })} />
+          <RefField label={tr("1. bod")} value={v.a} want="point" onChange={(a) => onChange({ ...v, a })} />
+          <RefField label={tr("2. bod (směr X)")} value={v.b} want="point" onChange={(b) => onChange({ ...v, b })} />
+          <RefField label={tr("3. bod")} value={v.c} want="point" onChange={(c) => onChange({ ...v, c })} />
         </>
       )}
       {v?.kind === "pointLine" && (
         <>
-          <RefField label="Bod" value={v.p} want="point" onChange={(p) => onChange({ ...v, p })} />
-          <RefField label="Přímka (hrana)" value={v.line} want="edge" onChange={(line) => onChange({ ...v, line })} />
+          <RefField label={tr("Bod")} value={v.p} want="point" onChange={(p) => onChange({ ...v, p })} />
+          <RefField label={tr("Přímka (hrana)")} value={v.line} want="edge" onChange={(line) => onChange({ ...v, line })} />
         </>
       )}
       {v?.kind === "pointNormal" && (
         <>
-          <RefField label="Bod" value={v.p} want="point" onChange={(p) => onChange({ ...v, p })} />
-          <DirectionField label="Normála" value={v.dir} allowNormal={false} onChange={(dir) => onChange({ ...v, dir: dir ?? { kind: "axis", axis: "Z" } })} />
+          <RefField label={tr("Bod")} value={v.p} want="point" onChange={(p) => onChange({ ...v, p })} />
+          <DirectionField label={tr("Normála")} value={v.dir} allowNormal={false} onChange={(dir) => onChange({ ...v, dir: dir ?? { kind: "axis", axis: "Z" } })} />
         </>
       )}
       {v?.kind === "angle" && (
         <>
-          <RefField label="Plocha (výchozí)" value={v.face} want="face" onChange={(face) => onChange({ ...v, face })} />
-          <RefField label="Hrana (osa otáčení)" value={v.edge} want="edge" onChange={(edge) => onChange({ ...v, edge })} />
-          <NumIn label="Úhel" suffix="°" value={v.deg} onChange={(deg) => onChange({ ...v, deg })} />
+          <RefField label={tr("Plocha (výchozí)")} value={v.face} want="face" onChange={(face) => onChange({ ...v, face })} />
+          <RefField label={tr("Hrana (osa otáčení)")} value={v.edge} want="edge" onChange={(edge) => onChange({ ...v, edge })} />
+          <NumIn label={tr("Úhel")} suffix="°" value={v.deg} onChange={(deg) => onChange({ ...v, deg })} />
         </>
       )}
       {v?.kind === "mid" && (
         <>
-          <RefField label="1. plocha" value={v.a} want="face" onChange={(a) => onChange({ ...v, a })} />
-          <RefField label="2. plocha" value={v.b} want="face" onChange={(b) => onChange({ ...v, b })} />
+          <RefField label={tr("1. plocha")} value={v.a} want="face" onChange={(a) => onChange({ ...v, a })} />
+          <RefField label={tr("2. plocha")} value={v.b} want="face" onChange={(b) => onChange({ ...v, b })} />
         </>
       )}
       {v?.kind === "tangentCyl" && (
         <>
-          <RefField label="Válcová plocha" value={v.face} want="face" onChange={(face) => onChange({ ...v, face })} />
-          <RefField label="Rovnoběžně s plochou" value={v.through} want="face" onChange={(through) => onChange({ ...v, through })} />
+          <RefField label={tr("Válcová plocha")} value={v.face} want="face" onChange={(face) => onChange({ ...v, face })} />
+          <RefField label={tr("Rovnoběžně s plochou")} value={v.through} want="face" onChange={(through) => onChange({ ...v, through })} />
         </>
       )}
       {v?.kind === "normalToCurve" && (
         <>
-          <RefField label="Křivka (hrana)" value={v.curve} want="edge" onChange={(curve) => onChange({ ...v, curve })} />
-          <RefField label="Bod na křivce" value={v.at} want="point" onChange={(at) => onChange({ ...v, at })} />
+          <RefField label={tr("Křivka (hrana)")} value={v.curve} want="edge" onChange={(curve) => onChange({ ...v, curve })} />
+          <RefField label={tr("Bod na křivce")} value={v.at} want="point" onChange={(at) => onChange({ ...v, at })} />
         </>
       )}
       {v?.kind === "twoEdges" && (
         <>
-          <RefField label="1. hrana" value={v.a} want="edge" onChange={(a) => onChange({ ...v, a })} />
-          <RefField label="2. hrana" value={v.b} want="edge" onChange={(b) => onChange({ ...v, b })} />
+          <RefField label={tr("1. hrana")} value={v.a} want="edge" onChange={(a) => onChange({ ...v, a })} />
+          <RefField label={tr("2. hrana")} value={v.b} want="edge" onChange={(b) => onChange({ ...v, b })} />
         </>
       )}
       {v?.kind === "datum" && (
         <>
           <DatumPick value={v.featureId} onChange={(featureId) => onChange({ ...v, featureId })} />
-          <NumIn label="Odsazení" value={v.offset ?? 0} onChange={(offset) => onChange({ ...v, offset })} />
+          <NumIn label={tr("Odsazení")} value={v.offset ?? 0} onChange={(offset) => onChange({ ...v, offset })} />
         </>
       )}
       {v?.kind === "custom" && (
@@ -673,7 +674,7 @@ export function PlaneDefField({ label = "Rovina", value, onChange, allowNone, no
           {(["origin", "normal", "xDir"] as const).map((k) => (
             <div key={k} className="grid grid-cols-3 gap-1">
               {[0, 1, 2].map((i) => (
-                <NumIn key={i} label={`${{ origin: "Počátek", normal: "Normála", xDir: "Osa X" }[k]} ${"XYZ"[i]}`} suffix="" value={v[k][i]} onChange={(n) => onChange({ ...v, [k]: v[k].map((c, j) => (j === i ? n : c)) as Vec3 })} />
+                <NumIn key={i} label={`${{ origin: tr("Počátek"), normal: tr("Normála"), xDir: tr("Osa X") }[k]} ${"XYZ"[i]}`} suffix="" value={v[k][i]} onChange={(n) => onChange({ ...v, [k]: v[k].map((c, j) => (j === i ? n : c)) as Vec3 })} />
               ))}
             </div>
           ))}
@@ -698,7 +699,7 @@ export function RefListField({ label, value, onChange, want = "point" }: { label
       ctx.request({
         id,
         want,
-        label: `${label}: klikejte na body (Esc = konec)`,
+        label: tr("{0}: klikejte na body (Esc = konec)", label),
         onPick: (r) => {
           value = [...value, r];
           onChange(value);
@@ -718,23 +719,23 @@ export function RefListField({ label, value, onChange, want = "point" }: { label
           <div className="flex-1">
             <RefField compact label={`${ITEM_LABEL[want]} ${i + 1}`} value={r} want={want} onChange={(nr) => onChange(value.map((x, k) => (k === i ? nr : x)))} />
           </div>
-          <button type="button" onClick={() => onChange(value.filter((_, k) => k !== i))} className="rounded px-1.5 text-[13px] text-ink-700/50 hover:bg-steel-100" title="Odebrat">
+          <button type="button" onClick={() => onChange(value.filter((_, k) => k !== i))} className="rounded px-1.5 text-[13px] text-ink-700/50 hover:bg-steel-100" title={tr("Odebrat")}>
             ×
           </button>
         </div>
       ))}
       <div className="flex gap-1">
         <button type="button" onClick={addPick} className={cn("flex-1 rounded-md border border-dashed px-2 py-1.5 text-[12px]", active ? "border-brand bg-brand/5 text-brand" : "border-ink-700/25 text-ink-700/70 hover:bg-steel-100")}>
-          {active ? `Klikejte na ${ITEMS_LABEL[want]} v modelu… (Esc = konec)` : `+ Přidat ${ITEMS_LABEL[want]} klikem`}
+          {active ? tr("Klikejte na {0} v modelu… (Esc = konec)", tr(ITEMS_LABEL[want])) : tr("+ Přidat {0} klikem", tr(ITEMS_LABEL[want]))}
         </button>
         {(want === "point" || want === "any") && (
-          <button type="button" onClick={() => onChange([...value, { kind: "xyz", p: [0, 0, 0] }])} className="rounded-md border border-ink-700/12 bg-white px-2 py-1.5 text-[12px]" title="Přidat bod zadaný souřadnicemi">
-            + XYZ
+          <button type="button" onClick={() => onChange([...value, { kind: "xyz", p: [0, 0, 0] }])} className="rounded-md border border-ink-700/12 bg-white px-2 py-1.5 text-[12px]" title={tr("Přidat bod zadaný souřadnicemi")}>
+            {tr("+ XYZ")}
           </button>
         )}
         {!!ctx?.selectionRefs.length && (
-          <button type="button" onClick={() => onChange([...value, ...ctx.selectionRefs])} className="rounded-md border border-ink-700/12 bg-white px-2 py-1.5 text-[12px]" title="Přidat vybrané entity">
-            + výběr
+          <button type="button" onClick={() => onChange([...value, ...ctx.selectionRefs])} className="rounded-md border border-ink-700/12 bg-white px-2 py-1.5 text-[12px]" title={tr("Přidat vybrané entity")}>
+            {tr("+ výběr")}
           </button>
         )}
       </div>

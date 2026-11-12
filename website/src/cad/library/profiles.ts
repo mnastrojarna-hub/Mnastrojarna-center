@@ -1,11 +1,12 @@
 /** Ocelové profily a trubky (hutní materiál) – vysunuté 2D profily podél osy Z. */
+import { tr } from "../i18n";
 import type { Vec2 } from "../types";
 import { dims, has, length, nums, score } from "./parse-util";
 import { ANGLES, CHS, HEA, HEB, HOLLOW, IPE, UPN, type IProfile } from "./tables";
 import type { Family, ParamSchema } from "./types";
 import { cyl, extrudePoly, fmt, hexPrism, nearest, num, part, rnd, str, tube } from "./util";
 
-const lenParam = (def = 1000): ParamSchema => ({ key: "l", label: "Délka L", kind: "number", min: 1, max: 12000, step: 10, unit: "mm", default: def });
+const lenParam = (def = 1000): ParamSchema => ({ key: "l", label: tr("Délka L"), kind: "number", min: 1, max: 12000, step: 10, unit: "mm", default: def });
 const STEEL = "ocel";
 const COLOR = "#7f8a96";
 
@@ -64,7 +65,7 @@ const iFamily = (id: string, name: string, table: Record<string, IProfile>, kw: 
   icon: "box",
   standards: id === "ipe" ? ["EN 10365", "DIN 1025-5"] : id === "hea" ? ["EN 10365", "DIN 1025-3"] : ["EN 10365", "DIN 1025-2"],
   keywords: [...kw, "nosnik", "profil", "beam", "i profil"],
-  params: [{ key: "size", label: "Velikost", kind: "enum", options: Object.keys(table).map((k) => ({ v: k, l: `${id.toUpperCase()} ${k}` })), default: def }, lenParam()],
+  params: [{ key: "size", label: tr("Velikost"), kind: "enum", options: Object.keys(table).map((k) => ({ v: k, l: `${id.toUpperCase()} ${k}` })), default: def }, lenParam()],
   sizes: { key: "size", columns: [{ key: "h", label: "h" }, { key: "b", label: "b" }, { key: "tw", label: "tw" }, { key: "tf", label: "tf" }, { key: "r", label: "r" }], rows: Object.entries(table).map(([k, v]) => ({ size: k, ...v })) },
   parse: (q) => {
     const k = has(q, ...kw);
@@ -78,12 +79,12 @@ const iFamily = (id: string, name: string, table: Record<string, IProfile>, kw: 
   make: (v) => {
     const p = table[str(v.size, def)] ?? table[def];
     const l = num(v.l, 1000);
-    return part(`${id.toUpperCase()} ${str(v.size, def)} L${fmt(l)}`, STEEL, extrudePoly(`${id.toUpperCase()} ${v.size}`, iProfile(p), l, "new"), `${id.toUpperCase()} ${str(v.size, def)} – S235JR – L=${fmt(l)}`, COLOR);
+    return part(`${id.toUpperCase()} ${str(v.size, def)} L${fmt(l)}`, STEEL, extrudePoly(`${id.toUpperCase()} ${v.size}`, iProfile(p), l, "new"), tr("{0} {1} – S235JR – L={2}", id.toUpperCase(), str(v.size, def), fmt(l)), COLOR);
   },
 });
-export const ipe = iFamily("ipe", "Nosník IPE", IPE, ["ipe"], "200");
-export const hea = iFamily("hea", "Nosník HEA", HEA, ["hea", "he a"], "200");
-export const heb = iFamily("heb", "Nosník HEB", HEB, ["heb", "he b"], "200");
+export const ipe = iFamily("ipe", tr("Nosník IPE"), IPE, ["ipe"], "200");
+export const hea = iFamily("hea", tr("Nosník HEA"), HEA, ["hea", "he a"], "200");
+export const heb = iFamily("heb", tr("Nosník HEB"), HEB, ["heb", "he b"], "200");
 
 export const upn: Family = {
   id: "upn",
@@ -92,7 +93,7 @@ export const upn: Family = {
   icon: "box",
   standards: ["EN 10365", "DIN 1026-1"],
   keywords: ["upn", "u profil", "profil u", "unp", "u 100", "channel"],
-  params: [{ key: "size", label: "Velikost", kind: "enum", options: Object.keys(UPN).map((k) => ({ v: k, l: `UPN ${k}` })), default: "100" }, lenParam()],
+  params: [{ key: "size", label: tr("Velikost"), kind: "enum", options: Object.keys(UPN).map((k) => ({ v: k, l: `UPN ${k}` })), default: "100" }, lenParam()],
   sizes: { key: "size", columns: [{ key: "h", label: "h" }, { key: "b", label: "b" }, { key: "tw", label: "tw" }, { key: "tf", label: "tf" }], rows: Object.entries(UPN).map(([k, v]) => ({ size: k, ...v })) },
   parse: (q) => {
     const k = has(q, "upn", "unp", "u profil", "profil u", "channel") || (/(^|\s)u\s?\d{2,3}\b/.test(q) ? 1 : 0);
@@ -106,7 +107,7 @@ export const upn: Family = {
   make: (v) => {
     const p = UPN[str(v.size, "100")] ?? UPN["100"];
     const l = num(v.l, 1000);
-    return part(`UPN ${str(v.size, "100")} L${fmt(l)}`, STEEL, extrudePoly("UPN", uProfile(p), l, "new"), `UPN ${str(v.size, "100")} – S235JR – L=${fmt(l)}`, COLOR);
+    return part(tr("UPN {0} L{1}", str(v.size, "100"), fmt(l)), STEEL, extrudePoly("UPN", uProfile(p), l, "new"), tr("UPN {0} – S235JR – L={1}", str(v.size, "100"), fmt(l)), COLOR);
   },
 };
 
@@ -118,7 +119,7 @@ export const angle: Family = {
   standards: ["EN 10056-1", "DIN 1028/1029"],
   keywords: ["uhelnik", "l profil", "profil l", "angle", "l 50x50x5"],
   params: [
-    { key: "size", label: "Rozměr a×b×t", kind: "enum", options: ANGLES.map((a) => ({ v: `${a.a}x${a.b}x${a.t}`, l: `L ${a.a}×${a.b}×${a.t}` })), default: "50x50x5" },
+    { key: "size", label: tr("Rozměr a×b×t"), kind: "enum", options: ANGLES.map((a) => ({ v: `${a.a}x${a.b}x${a.t}`, l: tr("L {0}×{1}×{2}", a.a, a.b, a.t) })), default: "50x50x5" },
     lenParam(),
   ],
   parse: (q) => {
@@ -140,7 +141,7 @@ export const angle: Family = {
     const [a, b, t] = str(v.size, "50x50x5").split("x").map(Number);
     const row = ANGLES.find((x) => x.a === a && x.b === b && x.t === t) ?? ANGLES[8];
     const l = num(v.l, 1000);
-    return part(`L ${a}×${b}×${t} L${fmt(l)}`, STEEL, extrudePoly("Úhelník", lProfile(row.a, row.b, row.t, row.r), l, "new"), `L ${a}×${b}×${t} – S235JR – L=${fmt(l)}`, COLOR);
+    return part(tr("L {0}×{1}×{2} L{3}", a, b, t, fmt(l)), STEEL, extrudePoly(tr("Úhelník"), lProfile(row.a, row.b, row.t, row.r), l, "new"), tr("L {0}×{1}×{2} – S235JR – L={3}", a, b, t, fmt(l)), COLOR);
   },
 };
 
@@ -152,9 +153,9 @@ export const hollow: Family = {
   standards: ["EN 10219", "EN 10210"],
   keywords: ["jakl", "jekl", "uzavreny profil", "ctvercovy profil", "obdelnikovy profil", "shs", "rhs", "tenkostenny", "profil 40x40"],
   params: [
-    { key: "w", label: "Šířka w", kind: "number", min: 10, max: 400, step: 5, unit: "mm", default: 40 },
-    { key: "h", label: "Výška h", kind: "number", min: 10, max: 400, step: 5, unit: "mm", default: 40 },
-    { key: "t", label: "Tloušťka stěny t", kind: "number", min: 1, max: 16, step: 0.5, unit: "mm", default: 3 },
+    { key: "w", label: tr("Šířka w"), kind: "number", min: 10, max: 400, step: 5, unit: "mm", default: 40 },
+    { key: "h", label: tr("Výška h"), kind: "number", min: 10, max: 400, step: 5, unit: "mm", default: 40 },
+    { key: "t", label: tr("Tloušťka stěny t"), kind: "number", min: 1, max: 16, step: 0.5, unit: "mm", default: 3 },
     lenParam(),
   ],
   sizes: { key: "w", columns: [{ key: "h", label: "h" }, { key: "t", label: "t" }], rows: HOLLOW.map(([w, h, t]) => ({ w, h, t })) },
@@ -179,7 +180,7 @@ export const hollow: Family = {
     const h = num(v.h, 40);
     const t = Math.min(num(v.t, 3), Math.min(w, h) / 2 - 0.5);
     const l = num(v.l, 1000);
-    return part(`Jäkl ${fmt(w)}×${fmt(h)}×${fmt(t)} L${fmt(l)}`, STEEL, [...extrudePoly("Vnější obrys", hollowOuter(w, h, 2 * t), l, "new"), ...extrudePoly("Dutina", hollowOuter(w - 2 * t, h - 2 * t, t), l + 2, "cut", -1)], `${w === h ? "SHS" : "RHS"} ${fmt(w)}×${fmt(h)}×${fmt(t)} – S235JRH – L=${fmt(l)}`, COLOR);
+    return part(tr("Jäkl {0}×{1}×{2} L{3}", fmt(w), fmt(h), fmt(t), fmt(l)), STEEL, [...extrudePoly(tr("Vnější obrys"), hollowOuter(w, h, 2 * t), l, "new"), ...extrudePoly("Dutina", hollowOuter(w - 2 * t, h - 2 * t, t), l + 2, "cut", -1)], tr("{0} {1}×{2}×{3} – S235JRH – L={4}", w === h ? "SHS" : "RHS", fmt(w), fmt(h), fmt(t), fmt(l)), COLOR);
   },
 };
 
@@ -191,8 +192,8 @@ export const chs: Family = {
   standards: ["EN 10220", "EN 10219", "DIN 2448"],
   keywords: ["trubka", "chs", "kruhova trubka", "tube", "pipe", "roura"],
   params: [
-    { key: "D", label: "Vnější průměr D", kind: "number", min: 4, max: 1000, step: 0.1, unit: "mm", default: 33.7 },
-    { key: "t", label: "Tloušťka stěny t", kind: "number", min: 0.5, max: 40, step: 0.1, unit: "mm", default: 2.6 },
+    { key: "D", label: tr("Vnější průměr D"), kind: "number", min: 4, max: 1000, step: 0.1, unit: "mm", default: 33.7 },
+    { key: "t", label: tr("Tloušťka stěny t"), kind: "number", min: 0.5, max: 40, step: 0.1, unit: "mm", default: 2.6 },
     lenParam(),
   ],
   sizes: { key: "D", columns: [{ key: "t", label: "t" }], rows: CHS.map(([D, t]) => ({ D, t })) },
@@ -218,7 +219,7 @@ export const chs: Family = {
     const D = num(v.D, 33.7);
     const t = Math.min(num(v.t, 2.6), D / 2 - 0.2);
     const l = num(v.l, 1000);
-    return part(`Trubka Ø${fmt(D)}×${fmt(t)} L${fmt(l)}`, STEEL, [tube("Trubka", D, D - 2 * t, l, 0, "new")], `TR Ø${fmt(D)}×${fmt(t)} – S235JRH – L=${fmt(l)}`, COLOR);
+    return part(tr("Trubka Ø{0}×{1} L{2}", fmt(D), fmt(t), fmt(l)), STEEL, [tube("Trubka", D, D - 2 * t, l, 0, "new")], tr("TR Ø{0}×{1} – S235JRH – L={2}", fmt(D), fmt(t), fmt(l)), COLOR);
   },
 };
 
@@ -232,11 +233,11 @@ const bar = (id: string, name: string, kind: "flat" | "round" | "square" | "hex"
   params:
     kind === "flat"
       ? [
-          { key: "w", label: "Šířka", kind: "number", min: 10, max: 500, step: 5, unit: "mm", default: 40 },
-          { key: "t", label: "Tloušťka", kind: "number", min: 2, max: 100, step: 1, unit: "mm", default: 8 },
+          { key: "w", label: tr("Šířka"), kind: "number", min: 10, max: 500, step: 5, unit: "mm", default: 40 },
+          { key: "t", label: tr("Tloušťka"), kind: "number", min: 2, max: 100, step: 1, unit: "mm", default: 8 },
           lenParam(),
         ]
-      : [{ key: "d", label: kind === "round" ? "Průměr" : kind === "hex" ? "Otvor klíče (SW)" : "Strana", kind: "number", min: 3, max: 400, step: 1, unit: "mm", default: 20 }, lenParam(kind === "round" ? 500 : 1000)],
+      : [{ key: "d", label: kind === "round" ? tr("Průměr") : kind === "hex" ? tr("Otvor klíče (SW)") : tr("Strana"), kind: "number", min: 3, max: 400, step: 1, unit: "mm", default: 20 }, lenParam(kind === "round" ? 500 : 1000)],
   parse: (q) => {
     const k = has(q, ...kw);
     if (!k) return null;
@@ -259,17 +260,17 @@ const bar = (id: string, name: string, kind: "flat" | "round" | "square" | "hex"
     if (kind === "flat") {
       const w = num(v.w, 40);
       const t = num(v.t, 8);
-      return part(`Plochá ${fmt(w)}×${fmt(t)} L${fmt(l)}`, STEEL, [{ id: "b", name: "Plochá tyč", type: "box", size: [w, t, l], position: [0, 0, l / 2], centered: true, mode: "new" }], `PLO ${fmt(w)}×${fmt(t)} – S235JR – L=${fmt(l)}`, COLOR);
+      return part(tr("Plochá {0}×{1} L{2}", fmt(w), fmt(t), fmt(l)), STEEL, [{ id: "b", name: "Plochá tyč", type: "box", size: [w, t, l], position: [0, 0, l / 2], centered: true, mode: "new" }], tr("PLO {0}×{1} – S235JR – L={2}", fmt(w), fmt(t), fmt(l)), COLOR);
     }
     const d = num(v.d, 20);
-    if (kind === "round") return part(`Kulatina Ø${fmt(d)} L${fmt(l)}`, STEEL, [cyl("Kulatina", d, l, 0, "new")], `KR Ø${fmt(d)} – S235JR / 11 375 – L=${fmt(l)}`, COLOR);
-    if (kind === "square") return part(`Čtvercová tyč ${fmt(d)} L${fmt(l)}`, STEEL, [{ id: "b", name: "Čtvercová tyč", type: "box", size: [d, d, l], position: [0, 0, l / 2], centered: true, mode: "new" }], `4HR ${fmt(d)} – S235JR – L=${fmt(l)}`, COLOR);
-    return part(`Šestihran SW${fmt(d)} L${fmt(l)}`, STEEL, hexPrism("Šestihranná tyč", d, l, 0, "new"), `6HR ${fmt(d)} – 11 375 – L=${fmt(l)}`, COLOR);
+    if (kind === "round") return part(tr("Kulatina Ø{0} L{1}", fmt(d), fmt(l)), STEEL, [cyl("Kulatina", d, l, 0, "new")], tr("KR Ø{0} – S235JR / 11 375 – L={1}", fmt(d), fmt(l)), COLOR);
+    if (kind === "square") return part(tr("Čtvercová tyč {0} L{1}", fmt(d), fmt(l)), STEEL, [{ id: "b", name: "Čtvercová tyč", type: "box", size: [d, d, l], position: [0, 0, l / 2], centered: true, mode: "new" }], tr("4HR {0} – S235JR – L={1}", fmt(d), fmt(l)), COLOR);
+    return part(tr("Šestihran SW{0} L{1}", fmt(d), fmt(l)), STEEL, hexPrism(tr("Šestihranná tyč"), d, l, 0, "new"), tr("6HR {0} – 11 375 – L={1}", fmt(d), fmt(l)), COLOR);
   },
 });
-export const flatBar = bar("flat", "Plochá tyč", "flat", ["plocha", "plochac", "plocha tyc", "pasovina", "flat bar"]);
+export const flatBar = bar("flat", tr("Plochá tyč"), "flat", ["plocha", "plochac", "plocha tyc", "pasovina", "flat bar"]);
 export const roundBar = bar("round", "Kulatina", "round", ["kulatina", "kulata tyc", "round bar", "kr "]);
-export const squareBar = bar("square", "Čtvercová tyč", "square", ["ctvercova tyc", "ctyrhran", "4hr", "square bar"]);
-export const hexBar = bar("hexbar", "Šestihranná tyč", "hex", ["sestihran", "sestihranna tyc", "6hr", "hex bar", "sw"]);
+export const squareBar = bar("square", tr("Čtvercová tyč"), "square", ["ctvercova tyc", "ctyrhran", "4hr", "square bar"]);
+export const hexBar = bar("hexbar", tr("Šestihranná tyč"), "hex", ["sestihran", "sestihranna tyc", "6hr", "hex bar", "sw"]);
 
 export const PROFILES: Family[] = [ipe, hea, heb, upn, angle, hollow, chs, flatBar, roundBar, squareBar, hexBar];

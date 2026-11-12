@@ -1,4 +1,5 @@
 /** Hliníkové konstrukční profily s T-drážkou (item / Bosch Rexroth styl), T-matice a úhelníky. */
+import { tr } from "../i18n";
 import { uid, type Feature, type Vec2 } from "../types";
 import { has, length, nums, score } from "./parse-util";
 import type { Family, ParamSchema } from "./types";
@@ -63,11 +64,11 @@ export const tslotProfile: Family = {
   standards: ["item MB", "Bosch Rexroth", "EN AW-6063 T66"],
   keywords: ["hlinikovy profil", "alu profil", "konstrukcni profil", "t-drazka", "t drazka", "item", "bosch", "rexroth", "strut profile", "t-slot", "extrusion", "drazka"],
   params: [
-    { key: "size", label: "Rozměr", kind: "enum", options: TSLOT_SIZES.map((s) => ({ v: s, l: `${s.replace("x", "×")} – drážka ${seriesOf(s).s}` })), default: "40x40" },
-    { key: "l", label: "Délka L", kind: "number", min: 10, max: 6000, step: 10, unit: "mm", default: 1000 },
-    { key: "core", label: "Středová díra pro závit", kind: "bool", default: true },
+    { key: "size", label: tr("Rozměr"), kind: "enum", options: TSLOT_SIZES.map((s) => ({ v: s, l: tr("{0} – drážka {1}", s.replace("x", "×"), seriesOf(s).s) })), default: "40x40" },
+    { key: "l", label: tr("Délka L"), kind: "number", min: 10, max: 6000, step: 10, unit: "mm", default: 1000 },
+    { key: "core", label: tr("Středová díra pro závit"), kind: "bool", default: true },
   ],
-  sizes: { key: "size", columns: [{ key: "s", label: "drážka" }, { key: "thread", label: "závit čela" }], rows: TSLOT_SIZES.map((s) => ({ size: s, s: seriesOf(s).s, thread: seriesOf(s).thread })) },
+  sizes: { key: "size", columns: [{ key: "s", label: tr("drážka") }, { key: "thread", label: tr("závit čela") }], rows: TSLOT_SIZES.map((s) => ({ size: s, s: seriesOf(s).s, thread: seriesOf(s).thread })) },
   parse: (q) => {
     const kw = has(q, "hlinik", "alu", "item", "bosch", "rexroth", "t-draz", "t draz", "drazk", "t-slot", "slot");
     if (!kw || has(q, "matice", "nut", "uhelnik", "bracket")) return null;
@@ -94,9 +95,9 @@ export const tslotProfile: Family = {
     if (v.core !== false) {
       const nx = Math.round(W / p.g);
       const ny = Math.round(H / p.g);
-      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) f.push(cyl(`Středová díra ${i + 1}.${j + 1}`, p.core, l + 2, -1, "cut", "Z", [-W / 2 + p.g / 2 + i * p.g, -H / 2 + p.g / 2 + j * p.g]));
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) f.push(cyl(tr("Středová díra {0}.{1}", i + 1, j + 1), p.core, l + 2, -1, "cut", "Z", [-W / 2 + p.g / 2 + i * p.g, -H / 2 + p.g / 2 + j * p.g]));
     }
-    return part(`Profil ${size.replace("x", "×")} L${fmt(l)}`, ALU, f, `Profil ${size.replace("x", "×")} drážka ${p.s} – L ${fmt(l)} mm`, COLOR);
+    return part(tr("Profil {0} L{1}", size.replace("x", "×"), fmt(l)), ALU, f, tr("Profil {0} drážka {1} – L {2} mm", size.replace("x", "×"), p.s, fmt(l)), COLOR);
   },
 };
 
@@ -113,9 +114,9 @@ export const tNut: Family = {
   standards: ["item", "Bosch Rexroth", "DIN 508 (podobné)"],
   keywords: ["t-matice", "t matice", "matice do drazky", "kamen do drazky", "t-nut", "slot nut", "din 508"],
   params: [
-    { key: "slot", label: "Drážka", kind: "enum", options: Object.keys(TNUT_SLOTS).map((k) => ({ v: k, l: `drážka ${k}` })), default: "8" },
-    { key: "thread", label: "Závit", kind: "enum", options: ["M4", "M5", "M6", "M8", "M10"].map((m) => ({ v: m, l: m })), default: "M6" },
-    { key: "l", label: "Délka", kind: "number", min: 8, max: 60, step: 1, unit: "mm", default: 20 },
+    { key: "slot", label: tr("Drážka"), kind: "enum", options: Object.keys(TNUT_SLOTS).map((k) => ({ v: k, l: tr("drážka {0}", k) })), default: "8" },
+    { key: "thread", label: tr("Závit"), kind: "enum", options: ["M4", "M5", "M6", "M8", "M10"].map((m) => ({ v: m, l: m })), default: "M6" },
+    { key: "l", label: tr("Délka"), kind: "number", min: 8, max: 60, step: 1, unit: "mm", default: 20 },
   ],
   parse: (q) => {
     const kw = has(q, "t-matice", "t matice", "tmatice", "kamen", "t-nut", "slot nut", "din 508");
@@ -129,7 +130,7 @@ export const tNut: Family = {
     const s = TNUT_SLOTS[str(v.slot, "8")] ?? TNUT_SLOTS["8"];
     const l = num(v.l, 20);
     const td = Number(str(v.thread, "M6").replace("M", "")) || 6;
-    return part(`T-matice ${v.slot}/${v.thread}`, "ocel", [box("Tělo", [l, s.w, s.h], [0, 0, s.h / 2], "new"), box("Krk", [l, s.neck, 2], [0, 0, s.h + 1], "add"), chamferAll(0.4), cyl("Závitová díra", td * 0.85, s.h + 4, -1, "cut")], `T-matice drážka ${v.slot} – ${v.thread} – L${fmt(l)}`, "#5b6670");
+    return part(tr("T-matice {0}/{1}", v.slot, v.thread), "ocel", [box(tr("Tělo"), [l, s.w, s.h], [0, 0, s.h / 2], "new"), box("Krk", [l, s.neck, 2], [0, 0, s.h + 1], "add"), chamferAll(0.4), cyl(tr("Závitová díra"), td * 0.85, s.h + 4, -1, "cut")], tr("T-matice drážka {0} – {1} – L{2}", v.slot, v.thread, fmt(l)), "#5b6670");
   },
 };
 
@@ -141,8 +142,8 @@ export const angleBracket: Family = {
   standards: ["item", "Bosch Rexroth"],
   keywords: ["uhelnik pro profil", "uhelnik", "spojovaci uhelnik", "angle bracket", "corner bracket", "gusset"],
   params: [
-    { key: "size", label: "Řada", kind: "enum", options: ["20", "30", "40", "45", "80"].map((k) => ({ v: k, l: `${k} (drážka ${seriesOf(`${k}x${k}`).s})` })), default: "40" },
-    { key: "w", label: "Šířka", kind: "number", min: 15, max: 160, step: 1, unit: "mm", default: 38 },
+    { key: "size", label: tr("Řada"), kind: "enum", options: ["20", "30", "40", "45", "80"].map((k) => ({ v: k, l: tr("{0} (drážka {1})", k, seriesOf(`${k}x${k}`).s) })), default: "40" },
+    { key: "w", label: tr("Šířka"), kind: "number", min: 15, max: 160, step: 1, unit: "mm", default: 38 },
   ],
   parse: (q) => {
     const kw = has(q, "uhelnik", "bracket", "gusset");
@@ -157,15 +158,15 @@ export const angleBracket: Family = {
     const t = Math.max(3, a * 0.12);
     const hole = seriesOf(`${a}x${a}`).thread === "M5" ? 5.5 : seriesOf(`${a}x${a}`).thread === "M8" ? 9 : 11;
     // trojúhelníkové žebro v rovině XZ (skica x → X, y → Z), symetricky vysunuté o t
-    const ribSk = sketch("Žebro – profil", XZ(0), [{ id: uid(), type: "polyline", closed: true, points: [[t - 0.1, t - 0.1], [a - 1, t - 0.1], [t - 0.1, a - 1]] }]);
+    const ribSk = sketch(tr("Žebro – profil"), XZ(0), [{ id: uid(), type: "polyline", closed: true, points: [[t - 0.1, t - 0.1], [a - 1, t - 0.1], [t - 0.1, a - 1]] }]);
     const rib: Feature[] = [ribSk, { id: uid(), name: "Žebro", type: "extrude", sketchId: ribSk.id, distance: t, symmetric: true, reverse: false, mode: "add" }];
-    return part(`Úhelník ${a}×${a}`, ALU, [
-      box("Rameno 1", [a, w, t], [a / 2, 0, t / 2], "new"),
-      box("Rameno 2", [t, w, a], [t / 2, 0, a / 2], "add"),
+    return part(tr("Úhelník {0}×{1}", a, a), ALU, [
+      box(tr("Rameno 1"), [a, w, t], [a / 2, 0, t / 2], "new"),
+      box(tr("Rameno 2"), [t, w, a], [t / 2, 0, a / 2], "add"),
       ...rib,
-      cyl("Díra 1", hole, t + 2, -1, "cut", "Z", [a * 0.6, 0]),
+      cyl(tr("Díra 1"), hole, t + 2, -1, "cut", "Z", [a * 0.6, 0]),
       { id: uid(), name: "Díra 2", type: "cylinder", radius: hole / 2, height: t + 2, position: [-1, 0, a * 0.6], axis: "X", mode: "cut" },
-    ], `Úhelník ${a}×${a}×${fmt(w)}`, COLOR);
+    ], tr("Úhelník {0}×{1}×{2}", a, a, fmt(w)), COLOR);
   },
 };
 

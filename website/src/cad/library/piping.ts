@@ -1,4 +1,5 @@
 /** Potrubí a příruby: závitové trubky EN 10255, příruby PN16 EN 1092-1, hadicové nátrubky. */
+import { tr } from "../i18n";
 import { uid, type Feature } from "../types";
 import { has, length, nums, score } from "./parse-util";
 import type { Family } from "./types";
@@ -56,10 +57,10 @@ export const threadedPipe: Family = {
   standards: ["EN 10255", "BS 1387", "ISO 65", "DIN 2440"],
   keywords: ["zavitova trubka", "trubka dn", "ocelova trubka", "plynarska trubka", "threaded pipe", "gas pipe", "din 2440", "en 10255", "trubka"],
   params: [
-    { key: "size", label: "Jmenovitá velikost", kind: "enum", options: Object.keys(PIPES).map((k) => ({ v: k, l: `R ${k}" (DN${PIPES[k].dn}, Ø${PIPES[k].od})` })), default: "1/2" },
-    { key: "l", label: "Délka L", kind: "number", min: 10, max: 6000, step: 10, unit: "mm", default: 1000 },
+    { key: "size", label: tr("Jmenovitá velikost"), kind: "enum", options: Object.keys(PIPES).map((k) => ({ v: k, l: tr("R {0}\" (DN{1}, Ø{2})", k, PIPES[k].dn, PIPES[k].od) })), default: "1/2" },
+    { key: "l", label: tr("Délka L"), kind: "number", min: 10, max: 6000, step: 10, unit: "mm", default: 1000 },
   ],
-  sizes: { key: "size", columns: [{ key: "dn", label: "DN" }, { key: "od", label: "Ø vnější" }, { key: "t", label: "stěna" }], rows: Object.entries(PIPES).map(([k, v]) => ({ size: k, ...v })) },
+  sizes: { key: "size", columns: [{ key: "dn", label: "DN" }, { key: "od", label: tr("Ø vnější") }, { key: "t", label: tr("stěna") }], rows: Object.entries(PIPES).map(([k, v]) => ({ size: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "zavitova trubka", "trubk", "pipe", "2440", "10255", "plynar", "dn");
     if (!kw || has(q, "prirub", "flange", "chs", "bezesv", "presn", "natrubek", "hadic", "sroubeni", "spojk", "vsuvk", "vyhazovaci", "trubkov", "z42", "pneumat")) return null;
@@ -75,14 +76,14 @@ export const threadedPipe: Family = {
     const size = str(v.size, "1/2");
     const p = PIPES[size] ?? PIPES["1/2"];
     const l = num(v.l, 1000);
-    return part(`Trubka R ${size}" L${fmt(l)}`, "ocel", [tube("Trubka", p.od, p.od - 2 * p.t, l, 0, "new")], `EN 10255 – R ${size}" (DN${p.dn}) × ${fmt(l)}`, "#7f8a96");
+    return part(tr("Trubka R {0}\" L{1}", size, fmt(l)), "ocel", [tube("Trubka", p.od, p.od - 2 * p.t, l, 0, "new")], tr("EN 10255 – R {0}\" (DN{1}) × {2}", size, p.dn, fmt(l)), "#7f8a96");
   },
 };
 
 const TYPES = [
-  { v: "01", l: "01 – plochá přivařovací" },
-  { v: "05", l: "05 – zaslepovací" },
-  { v: "11", l: "11 – krková přivařovací" },
+  { v: "01", l: tr("01 – plochá přivařovací") },
+  { v: "05", l: tr("05 – zaslepovací") },
+  { v: "11", l: tr("11 – krková přivařovací") },
 ];
 export const flangePN16: Family = {
   id: "flangePN16",
@@ -92,10 +93,10 @@ export const flangePN16: Family = {
   standards: ["EN 1092-1", "PN16", "DIN 2573/2633"],
   keywords: ["priruba", "pn16", "pn 16", "en 1092", "flange", "zaslepovaci", "krkova", "dn50", "dn80", "dn100"],
   params: [
-    { key: "dn", label: "DN", kind: "enum", options: Object.keys(FLANGES).map((k) => ({ v: k, l: `${k} (D ${FLANGES[k].D})` })), default: "DN50" },
-    { key: "type", label: "Typ", kind: "enum", options: TYPES, default: "01" },
+    { key: "dn", label: "DN", kind: "enum", options: Object.keys(FLANGES).map((k) => ({ v: k, l: tr("{0} (D {1})", k, FLANGES[k].D) })), default: "DN50" },
+    { key: "type", label: tr("Typ"), kind: "enum", options: TYPES, default: "01" },
   ],
-  sizes: { key: "dn", columns: [{ key: "D", label: "D" }, { key: "k", label: "k" }, { key: "n", label: "děr" }, { key: "l", label: "Ø děr" }, { key: "b", label: "b" }], rows: Object.entries(FLANGES).map(([k, v]) => ({ dn: k, ...v })) },
+  sizes: { key: "dn", columns: [{ key: "D", label: "D" }, { key: "k", label: "k" }, { key: "n", label: tr("děr") }, { key: "l", label: tr("Ø děr") }, { key: "b", label: "b" }], rows: Object.entries(FLANGES).map(([k, v]) => ({ dn: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "prirub", "flange", "pn16", "pn 16", "1092");
     if (!kw || has(q, "matice", "nut", "vozik", "lozisk")) return null;
@@ -109,15 +110,15 @@ export const flangePN16: Family = {
     const key = str(v.dn, "DN50");
     const fl = FLANGES[key] ?? FLANGES.DN50;
     const type = str(v.type, "01");
-    const f: Feature[] = [cyl("Příruba", fl.D, fl.b, 0, "new"), chamferAll(1), cyl("Těsnicí lišta", fl.d1, 2, fl.b, "add")];
+    const f: Feature[] = [cyl(tr("Příruba"), fl.D, fl.b, 0, "new"), chamferAll(1), cyl(tr("Těsnicí lišta"), fl.d1, 2, fl.b, "add")];
     if (type === "11") {
       const neckH = fl.b * 2.2;
       f.push(...revolveProfile("Krk", [[fl.pipe / 2 - 1, 0], [fl.pipe / 2 + fl.b * 0.9, 0], [fl.pipe / 2 + 4, -neckH], [fl.pipe / 2 - 1, -neckH]], "add"));
     }
     if (type !== "05") f.push(cyl("Otvor", fl.pipe + (type === "11" ? -2 * 3.2 : 1), fl.b * 4 + 10, -fl.b * 3, "cut"));
-    const hole: Feature = cyl("Díra pro šroub", fl.l, fl.b + 6, -2, "cut", "Z", [fl.k / 2, 0]);
+    const hole: Feature = cyl(tr("Díra pro šroub"), fl.l, fl.b + 6, -2, "cut", "Z", [fl.k / 2, 0]);
     f.push(hole, { id: uid(), name: "Díry pro šrouby", type: "pattern", featureId: hole.id, kind: "circular", count: fl.n, angle: 360, axis: "Z", center: [0, 0, 0] });
-    return part(`Příruba ${key} PN16 typ ${type}`, "ocel", f, `EN 1092-1 – ${type} – ${key} – PN16`, "#7f8a96");
+    return part(tr("Příruba {0} PN16 typ {1}", key, type), "ocel", f, tr("EN 1092-1 – {0} – {1} – PN16", type, key), "#7f8a96");
   },
 };
 
@@ -131,8 +132,8 @@ export const hoseBarb: Family = {
   standards: ["DIN 2827 (podobné)"],
   keywords: ["hadicovy natrubek", "natrubek", "hadicova spojka", "trn", "hose barb", "hose tail", "hose fitting"],
   params: [
-    { key: "thread", label: "Závit", kind: "enum", options: Object.keys(G_OD).map((k) => ({ v: k, l: k })), default: "G1/2" },
-    { key: "hose", label: "Hadice Ø", kind: "number", min: 4, max: 50, step: 1, unit: "mm", default: 13 },
+    { key: "thread", label: tr("Závit"), kind: "enum", options: Object.keys(G_OD).map((k) => ({ v: k, l: k })), default: "G1/2" },
+    { key: "hose", label: tr("Hadice Ø"), kind: "number", min: 4, max: 50, step: 1, unit: "mm", default: 13 },
   ],
   parse: (q) => {
     const kw = has(q, "natrubek", "hadicov", "hose barb", "hose tail", "trn");
@@ -148,7 +149,7 @@ export const hoseBarb: Family = {
     const prof: [number, number][] = [[0, 0], [hose / 2 - 0.5, 0]];
     for (let i = 0; i < 3; i++) prof.push([hose / 2 + 1, 6 + i * 6], [hose / 2 - 0.5, 6 + i * 6 + 0.2], [hose / 2 - 0.5, 12 + i * 6]);
     prof.push([0, 24]);
-    return part(`Nátrubek ${v.thread} Ø${fmt(hose)}`, "mosaz", [...revolveProfile("Trn", prof, "new"), ...hexPrism("Šestihran", th.s, 6, 24, "add"), cyl("Závit", th.od, 12, 30, "add"), cyl("Kanál", hose * 0.6, 50, -1, "cut")], `Nátrubek ${v.thread} – Ø${fmt(hose)}`, "#c9a46a");
+    return part(tr("Nátrubek {0} Ø{1}", v.thread, fmt(hose)), "mosaz", [...revolveProfile("Trn", prof, "new"), ...hexPrism(tr("Šestihran"), th.s, 6, 24, "add"), cyl(tr("Závit"), th.od, 12, 30, "add"), cyl(tr("Kanál"), hose * 0.6, 50, -1, "cut")], tr("Nátrubek {0} – Ø{1}", v.thread, fmt(hose)), "#c9a46a");
   },
 };
 

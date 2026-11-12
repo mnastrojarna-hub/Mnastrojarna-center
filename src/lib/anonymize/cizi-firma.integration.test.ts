@@ -72,7 +72,9 @@ describe.skipIf(!LOCAL_ENABLED)("firma v razítku ≠ zákazník z CRM ↔ loká
     return data as Record<string, unknown>;
   }
   const row = async (id: string) => ((await svc.from("job_files").select("*").eq("id", id).single()).data as Record<string, unknown>);
-  const runQueue = (ids: string[]) => runner.processQueue({ ids, fanOut: false, deadline: Date.now() + 200_000, maxFiles: 10 });
+  const runQueue = (ids: string[]) => runner.processQueue({ ids, fanOut: false, deadline: Date.now() + 200_000, maxFiles: 10, retryBackoffMs: [0, 0] });
+  const cacheRow = async (bytes: Uint8Array) => ((await svc.from("drawing_anon_ai_cache").select("cache").eq("src_sha256", sha(bytes)).maybeSingle()).data as { cache: { found?: string[]; vector?: Record<string, unknown> } } | null)?.cache ?? null;
+  const debugOf = async (id: string) => ((await svc.from("job_files").select("anon_debug").eq("id", id).single()).data as { anon_debug: { attempt: number; stage: string; status: string; kind?: string; error?: string; retryNow?: boolean }[] }).anon_debug ?? [];
   async function download(p: string): Promise<Uint8Array> {
     const { data, error } = await svc.storage.from("job-files").download(p);
     if (error || !data) throw new Error(error?.message ?? "prázdné");
@@ -156,10 +158,11 @@ describe.skipIf(!LOCAL_ENABLED)("firma v razítku ≠ zákazník z CRM ↔ loká
     expect(Buffer.from(out).toString("latin1")).not.toMatch(/BRISK|Tabor|KOVOTEX|HYDROTEK|ALFAPLAST/);
   });
 
-  it("název v kopii zůstane → kopie se nepoužije: pokus znovu, pak selhalo s důvodem (nic ke kontrole)", async () => {
+  it("název v kopii zůstane (přes číslo výkresu, nejde vypálit) → kopie se nepoužije: 3 pokusy hned za sebou v JEDNOM běhu, pak selhalo s důvodem (nic ke kontrole, nic k naklikání)", async () => {
     const fx = await buildForeignCompanyPdf({ stamp: `${STAMP}B` });
     const dn = fx.kept.find((k) => k.label === "číslo výkresu")!;
-    // AI výstupní kontrola vidí „firmu" přes číslo výkresu (to se nikdy nevypálí) → neprošlo
+    // AI výstupní kontrola vidí „firmu" přes číslo výkresu (to se nikdy nevypálí) → neprošlo; BRISK už je termín
+    // (z razítka) → stránka se znovu neprochází, celý pokus se opakuje (nová detekce)
     fake.setFakeAnonHandler((req) => {
       if (req.call === "vector") return vectorFor(fx);
       if (req.call !== "company_check") return null;
@@ -168,19 +171,73 @@ describe.skipIf(!LOCAL_ENABLED)("firma v razítku ≠ zákazník z CRM ↔ loká
       return { items: [{ img: 0, x: Math.round(dn.box.x * k), y: Math.round(dn.box.y * k), w: Math.round(dn.box.w * k), h: Math.round(dn.box.h * k), text: "BRISK", role: "owner", form: "text" }] };
     });
     const f = await addFile(`BT-${STAMP}B.pdf`, fx.bytes);
-    await runQueue([f.id as string]);
-    let r = await row(f.id as string);
-    expect(r.anon_status).toBe("pending");
-    expect(String(r.anon_reason)).toMatch(/zůstal název firmy.*zkusí se znovu/);
-    expect(share.pickShareFile(r as never).ok).toBe(false);
-    await runQueue([f.id as string]);
-    r = await row(f.id as string);
+    const o = await runQueue([f.id as string]);
+    // majitel 5. 11.: dřív 1. pokus pending → (šťouchnutí) → 2. pokus failed „Klikni Anonymizovat znovu" → klik → 3. pokus
+    expect(o.results.map((x) => `${x.status}#${x.attempt}`)).toEqual(["pending#1", "pending#2", "failed#3"]);
+    expect(o.results.slice(0, 2).every((x) => x.retryNow)).toBe(true);
+    const r = await row(f.id as string);
     expect(r.anon_status).toBe("failed");
+    expect(r.anon_attempts).toBe(3);
     expect(String(r.anon_reason)).toMatch(/zůstal název firmy — kopie se nepoužije/);
     const d = share.pickShareFile(r as never);
     expect(d.ok).toBe(false);
     expect(!d.ok && d.reason).toBe("failed");
     expect(r.anon_path).toBeNull();
+    // jména z výkresu přežila opakování (cache se neresetuje celá — další pokus je má jako termíny od začátku)
+    expect((await cacheRow(fx.bytes))?.found ?? []).toEqual(expect.arrayContaining([expect.stringMatching(/BRISK/)]));
+    const dbg = await debugOf(f.id as string);
+    expect(dbg.map((e) => `${e.attempt}:${e.status}:${e.kind}`)).toEqual(["1:pending:company_leak", "2:pending:company_leak", "3:failed:decide"]);
+    expect(dbg[0].error).toMatch(/zůstal název firmy/);
+  });
+
+  it("název, který detekce nevypsala, uvidí až kontrola kopie → doplní se jako termín a stránka se projde znovu v témže pokusu → hotovo na první pokus", async () => {
+    const fx = await buildForeignCompanyPdf({ stamp: `${STAMP}D` });
+    const dn = fx.kept.find((k) => k.label === "číslo výkresu")!;
+    let checks = 0;
+    fake.setFakeAnonHandler((req) => {
+      if (req.call === "vector") return vectorFor(fx);
+      if (req.call !== "company_check") return null;
+      // 1. průchod (3 kola kontroly): „NOVAFIRMA" pořád vidět — jméno mimo termíny → stránka znovu; pak už čisto
+      if (checks++ >= 3) return { items: [] };
+      const ov = req.images[0];
+      const k = ov.s * (300 / 72);
+      return { items: [{ img: 0, x: Math.round(dn.box.x * k), y: Math.round(dn.box.y * k), w: Math.round(dn.box.w * k), h: Math.round(dn.box.h * k), text: "NOVAFIRMA", role: "owner", form: "text" }] };
+    });
+    const f = await addFile(`BT-${STAMP}D.pdf`, fx.bytes);
+    const o = await runQueue([f.id as string]);
+    expect(o.results.map((x) => `${x.status}#${x.attempt}`)).toEqual(["done#1"]);
+    const r = await row(f.id as string);
+    expect(r.anon_status, String(r.anon_reason)).toBe("done");
+    expect(r.anon_attempts).toBe(1);
+    const warnings = ((r.anon_summary as { warnings?: { message: string }[] }).warnings ?? []).map((w) => w.message);
+    expect(warnings.some((w) => /NOVAFIRMA.*zpracována znovu s doplněnými termíny/.test(w)), warnings.join(" | ")).toBe(true);
+    expect((await cacheRow(fx.bytes))?.found ?? []).toContain("NOVAFIRMA");
+    // 3 kola na 1. průchodu + 1 po novém průchodu + 2. strana
+    expect(checks).toBe(5);
+  });
+
+  it("přetížená AI při detekci (529) → tentýž běh to zkusí hned znovu a dokončí (vektor nespadne tiše na „jen pravidla“); výsledek AI je v cache hned", async () => {
+    const fx = await buildForeignCompanyPdf({ stamp: `${STAMP}E` });
+    let vectors = 0;
+    fake.setFakeAnonHandler((req) => {
+      if (req.call !== "vector") return null;
+      return vectors++ === 0 ? { $error: "overloaded" } : vectorFor(fx);
+    });
+    const f = await addFile(`BT-${STAMP}E.pdf`, fx.bytes);
+    const o = await runQueue([f.id as string]);
+    expect(o.results.map((x) => `${x.status}#${x.attempt}`)).toEqual(["pending#1", "done#2"]);
+    const r = await row(f.id as string);
+    expect(r.anon_status, String(r.anon_reason)).toBe("done");
+    expect(r.anon_attempts).toBe(2);
+    expect(vectors).toBe(2);
+    const dbg = await debugOf(f.id as string);
+    expect(dbg[0]).toMatchObject({ attempt: 1, stage: "pipeline", status: "pending", kind: "ai_busy", retryNow: true });
+    expect(dbg[0].error).toMatch(/AiCallError/);
+    expect(dbg[1]).toMatchObject({ attempt: 2, status: "done" });
+    // v kopii žádná firma (AI z 2. pokusu označila křivky / Type3)
+    const { gone } = await inks(await download(String(r.anon_path)), fx);
+    for (const g of gone) expect(g.ink, g.label).toBeLessThan(0.003);
+    expect(Object.keys((await cacheRow(fx.bytes))?.vector ?? {})).toContain("1");
   });
 
   it("migrace: stará hotová kopie → fronta (backfill), kopie anon-v2.0 zůstane; přepočet vytvoří novou kopii", async () => {

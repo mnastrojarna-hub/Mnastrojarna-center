@@ -4,6 +4,7 @@
  * UI svařenců: ikony, formuláře (konstrukční profil, rám, housenka – ukládá délky hran pro tabulku svarů)
  * a akce Kusovník řezů (text + CSV) / Tabulka svarů.
  */
+import { tr } from "@/cad/i18n";
 import { useEffect } from "react";
 import { cad } from "@/cad/client";
 import { ALIGN_OPTIONS, beadData, cutListCsv, cutListText, PROFILE_FAMILIES, weldTableText, type ProfileFamily } from "@/cad/ext/weld-layout";
@@ -37,7 +38,7 @@ function ProfileFields({ f, onChange }: ExtFormProps) {
   return (
     <>
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Profil</span>
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Profil")}</span>
         <select className={inputCls} value={fam} onChange={(e) => onChange({ family: e.target.value })}>
           {PROFILE_FAMILIES.map((p) => (
             <option key={p.v} value={p.v}>
@@ -48,7 +49,7 @@ function ProfileFields({ f, onChange }: ExtFormProps) {
       </label>
       {table && (
         <label className="block">
-          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Velikost</span>
+          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Velikost")}</span>
           <select className={inputCls} value={String(data.size ?? Object.keys(table)[0])} onChange={(e) => onChange({ size: e.target.value })}>
             {Object.keys(table).map((k) => (
               <option key={k} value={k}>
@@ -58,15 +59,15 @@ function ProfileFields({ f, onChange }: ExtFormProps) {
           </select>
         </label>
       )}
-      {(fam === "shs" || fam === "square") && <Num label={fam === "shs" ? "Rozměr a×a" : "Rozměr a"} value={n("w", 40)} min={1} bind={`${f.id}:data.w`} onChange={(v) => onChange({ w: v })} />}
+      {(fam === "shs" || fam === "square") && <Num label={fam === "shs" ? tr("Rozměr a×a") : tr("Rozměr a")} value={n("w", 40)} min={1} bind={`${f.id}:data.w`} onChange={(v) => onChange({ w: v })} />}
       {(fam === "rhs" || fam === "L" || fam === "flat") && (
         <div className="grid grid-cols-2 gap-2">
-          <Num label={fam === "L" ? "Rameno a" : "Šířka"} value={n("w", 40)} min={1} bind={`${f.id}:data.w`} onChange={(v) => onChange({ w: v })} />
-          {fam !== "flat" && <Num label={fam === "L" ? "Rameno b" : "Výška"} value={n("h", 40)} min={1} bind={`${f.id}:data.h`} onChange={(v) => onChange({ h: v })} />}
+          <Num label={fam === "L" ? tr("Rameno a") : tr("Šířka")} value={n("w", 40)} min={1} bind={`${f.id}:data.w`} onChange={(v) => onChange({ w: v })} />
+          {fam !== "flat" && <Num label={fam === "L" ? tr("Rameno b") : tr("Výška")} value={n("h", 40)} min={1} bind={`${f.id}:data.h`} onChange={(v) => onChange({ h: v })} />}
         </div>
       )}
-      {(fam === "chs" || fam === "round") && <Num label="Průměr D" value={n("d", 33.7)} min={1} bind={`${f.id}:data.d`} onChange={(v) => onChange({ d: v })} />}
-      {(fam === "shs" || fam === "rhs" || fam === "chs" || fam === "L" || fam === "flat") && <Num label={fam === "flat" ? "Tloušťka" : "Tloušťka stěny t"} value={n("t", 3)} min={0.5} step={0.5} bind={`${f.id}:data.t`} onChange={(v) => onChange({ t: v })} />}
+      {(fam === "chs" || fam === "round") && <Num label={tr("Průměr D")} value={n("d", 33.7)} min={1} bind={`${f.id}:data.d`} onChange={(v) => onChange({ d: v })} />}
+      {(fam === "shs" || fam === "rhs" || fam === "chs" || fam === "L" || fam === "flat") && <Num label={fam === "flat" ? tr("Tloušťka") : tr("Tloušťka stěny t")} value={n("t", 3)} min={0.5} step={0.5} bind={`${f.id}:data.t`} onChange={(v) => onChange({ t: v })} />}
     </>
   );
 }
@@ -80,9 +81,9 @@ function MemberForm(props: ExtFormProps) {
   return (
     <div className="space-y-3">
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Skica s úsečkami (osy profilů)</span>
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Skica s úsečkami (osy profilů)")}</span>
         <select className={inputCls} value={String(data.sketchId ?? "")} onChange={(e) => onChange({ sketchId: e.target.value })}>
-          <option value="">— vyberte skicu —</option>
+          <option value="">{tr("— vyberte skicu —")}</option>
           {sketches.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name}
@@ -93,7 +94,7 @@ function MemberForm(props: ExtFormProps) {
       <ProfileFields {...props} />
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Zarovnání k ose</span>
+          <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Zarovnání k ose")}</span>
           <select className={inputCls} value={String(data.align ?? "center")} onChange={(e) => onChange({ align: e.target.value })}>
             {ALIGN_OPTIONS.map((a) => (
               <option key={a.v} value={a.v}>
@@ -102,20 +103,20 @@ function MemberForm(props: ExtFormProps) {
             ))}
           </select>
         </label>
-        <Num label="Natočení" value={n("angle", 0)} step={15} suffix="°" bind={`${f.id}:data.angle`} onChange={(v) => onChange({ angle: v })} />
+        <Num label={tr("Natočení")} value={n("angle", 0)} step={15} suffix="°" bind={`${f.id}:data.angle`} onChange={(v) => onChange({ angle: v })} />
       </div>
-      <Seg label="Spoj v rohu" value={String(data.corner ?? "mitre")} options={[{ v: "mitre", l: "Pokos" }, { v: "butt", l: "Tupý" }, { v: "none", l: "Žádný" }]} onChange={(v) => onChange({ corner: v })} />
+      <Seg label={tr("Spoj v rohu")} value={String(data.corner ?? "mitre")} options={[{ v: "mitre", l: tr("Pokos") }, { v: "butt", l: tr("Tupý") }, { v: "none", l: tr("Žádný") }]} onChange={(v) => onChange({ corner: v })} />
       <div className="grid grid-cols-3 gap-2">
-        <Num label="Mezera" value={n("gap", 0)} min={0} step={0.5} bind={`${f.id}:data.gap`} onChange={(v) => onChange({ gap: v })} />
-        <Num label="Prodl. začátek" value={n("extStart", 0)} bind={`${f.id}:data.extStart`} onChange={(v) => onChange({ extStart: v })} />
-        <Num label="Prodl. konec" value={n("extEnd", 0)} bind={`${f.id}:data.extEnd`} onChange={(v) => onChange({ extEnd: v })} />
+        <Num label={tr("Mezera")} value={n("gap", 0)} min={0} step={0.5} bind={`${f.id}:data.gap`} onChange={(v) => onChange({ gap: v })} />
+        <Num label={tr("Prodl. začátek")} value={n("extStart", 0)} bind={`${f.id}:data.extStart`} onChange={(v) => onChange({ extStart: v })} />
+        <Num label={tr("Prodl. konec")} value={n("extEnd", 0)} bind={`${f.id}:data.extEnd`} onChange={(v) => onChange({ extEnd: v })} />
       </div>
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" className="accent-[#E03930]" checked={!!data.separate} onChange={(e) => onChange({ separate: e.target.checked })} />
-        Jako samostatná tělesa (nespojovat)
+        {tr("Jako samostatná tělesa (nespojovat)")}
       </label>
-      <Seg label="Operace" value={data.mode === "new" ? "new" : "add"} options={[{ v: "add", l: "Přidat" }, { v: "new", l: "Nové těleso" }]} onChange={(v) => onChange({ mode: v })} />
-      <p className="text-[11px] leading-snug text-ink-700/50">Rohy: profily, které se ve skice stýkají koncovými body, se v rohu ořežou pokosem (obě stejně) nebo tupě (první profil průběžný, druhý zkrácený). Volné konce lze prodloužit/zkrátit.</p>
+      <Seg label={tr("Operace")} value={data.mode === "new" ? "new" : "add"} options={[{ v: "add", l: tr("Přidat") }, { v: "new", l: tr("Nové těleso") }]} onChange={(v) => onChange({ mode: v })} />
+      <p className="text-[11px] leading-snug text-ink-700/50">{tr("Rohy: profily, které se ve skice stýkají koncovými body, se v rohu ořežou pokosem (obě stejně) nebo tupě (první profil průběžný, druhý zkrácený). Volné konce lze prodloužit/zkrátit.")}</p>
     </div>
   );
 }
@@ -128,13 +129,13 @@ function FrameForm(props: ExtFormProps) {
     <div className="space-y-3">
       <ProfileFields {...props} />
       <div className="grid grid-cols-3 gap-2">
-        <Num label="Šířka X" value={n("width", 600)} min={10} bind={`${f.id}:data.width`} onChange={(v) => onChange({ width: v })} />
-        <Num label="Hloubka Y" value={n("depth", 400)} min={10} bind={`${f.id}:data.depth`} onChange={(v) => onChange({ depth: v })} />
-        <Num label="Výška Z" value={n("height", 800)} min={10} bind={`${f.id}:data.height`} onChange={(v) => onChange({ height: v })} />
+        <Num label={tr("Šířka X")} value={n("width", 600)} min={10} bind={`${f.id}:data.width`} onChange={(v) => onChange({ width: v })} />
+        <Num label={tr("Hloubka Y")} value={n("depth", 400)} min={10} bind={`${f.id}:data.depth`} onChange={(v) => onChange({ depth: v })} />
+        <Num label={tr("Výška Z")} value={n("height", 800)} min={10} bind={`${f.id}:data.height`} onChange={(v) => onChange({ height: v })} />
       </div>
-      <Seg label="Rohy obdélníků" value={String(data.corner ?? "mitre")} options={[{ v: "mitre", l: "Pokos" }, { v: "butt", l: "Tupý" }]} onChange={(v) => onChange({ corner: v })} />
-      <Seg label="Operace" value={data.mode === "new" ? "new" : "add"} options={[{ v: "add", l: "Přidat" }, { v: "new", l: "Nové těleso" }]} onChange={(v) => onChange({ mode: v })} />
-      <p className="text-[11px] leading-snug text-ink-700/50">Spodní a horní obdélník + 4 sloupky tupě mezi nimi. Vnější rozměry rámu odpovídají zadání.</p>
+      <Seg label={tr("Rohy obdélníků")} value={String(data.corner ?? "mitre")} options={[{ v: "mitre", l: tr("Pokos") }, { v: "butt", l: tr("Tupý") }]} onChange={(v) => onChange({ corner: v })} />
+      <Seg label={tr("Operace")} value={data.mode === "new" ? "new" : "add"} options={[{ v: "add", l: tr("Přidat") }, { v: "new", l: tr("Nové těleso") }]} onChange={(v) => onChange({ mode: v })} />
+      <p className="text-[11px] leading-snug text-ink-700/50">{tr("Spodní a horní obdélník + 4 sloupky tupě mezi nimi. Vnější rozměry rámu odpovídají zadání.")}</p>
     </div>
   );
 }
@@ -166,25 +167,25 @@ function BeadForm({ f, onChange }: ExtFormProps) {
   return (
     <div className="space-y-3">
       <div className="rounded-lg border border-dashed border-ink-700/20 p-2.5 text-[12.5px]">
-        <span className="font-medium">Hrany koutu:</span> {b.edges.length ? `${b.edges.length} vybráno (${Math.round(b.edgeLens.reduce((s, x) => s + x, 0))} mm)` : "klikněte na hranu vnitřního rohu v modelu"}
+        <span className="font-medium">{tr("Hrany koutu:")}</span> {b.edges.length ? tr("{0} vybráno ({1} mm)", b.edges.length, Math.round(b.edgeLens.reduce((s, x) => s + x, 0))) : tr("klikněte na hranu vnitřního rohu v modelu")}
         {b.edges.length > 0 && (
           <button type="button" className="ml-2 text-brand hover:underline" onClick={() => onChange({ edges: [], edgeLens: [] })}>
             vymazat
           </button>
         )}
       </div>
-      <Num label="Velikost svaru a" value={b.a} min={0.5} step={0.5} bind={`${f.id}:data.a`} onChange={(v) => onChange({ a: v })} />
+      <Num label={tr("Velikost svaru a")} value={b.a} min={0.5} step={0.5} bind={`${f.id}:data.a`} onChange={(v) => onChange({ a: v })} />
       <label className="flex items-center gap-2 text-[13px]">
         <input type="checkbox" className="accent-[#E03930]" checked={b.intermittent} onChange={(e) => onChange({ intermittent: e.target.checked })} />
-        Přerušovaný svar
+        {tr("Přerušovaný svar")}
       </label>
       {b.intermittent && (
         <div className="grid grid-cols-2 gap-2">
-          <Num label="Délka úseku" value={b.segLen} min={1} onChange={(v) => onChange({ segLen: v })} />
-          <Num label="Rozteč" value={b.pitch} min={1} onChange={(v) => onChange({ pitch: v })} />
+          <Num label={tr("Délka úseku")} value={b.segLen} min={1} onChange={(v) => onChange({ segLen: v })} />
+          <Num label={tr("Rozteč")} value={b.pitch} min={1} onChange={(v) => onChange({ pitch: v })} />
         </div>
       )}
-      <p className="text-[11px] leading-snug text-ink-700/50">Koutový svar a×a se vymodeluje jako trojúhelníkový hranol podél hrany; objem svarového kovu ≈ a²/2 × délka (Tabulka svarů).</p>
+      <p className="text-[11px] leading-snug text-ink-700/50">{tr("Koutový svar a×a se vymodeluje jako trojúhelníkový hranol podél hrany; objem svarového kovu ≈ a²/2 × délka (Tabulka svarů).")}</p>
     </div>
   );
 }
@@ -200,13 +201,13 @@ const safe = (s: string) => (s || "svarenec").normalize("NFD").replace(/[̀-ͯ]/
 registerExtUi("weld.cutList", {
   action: (api) => {
     const text = cutListText(api.doc);
-    api.notice("Kusovník řezů", text);
-    if (!text.startsWith("Žádné")) {
+    api.notice(tr("Kusovník řezů"), text);
+    if (!text.startsWith(tr("Žádné"))) {
       api.download(`${safe(api.doc.name)}_kusovnik_rezu.csv`, cutListCsv(api.doc), "text/csv;charset=utf-8");
-      api.flash("Kusovník řezů uložen jako CSV (Excel).");
+      api.flash(tr("Kusovník řezů uložen jako CSV (Excel)."));
     }
   },
 });
 registerExtUi("weld.weldTable", {
-  action: (api) => api.notice("Tabulka svarů", weldTableText(api.doc)),
+  action: (api) => api.notice(tr("Tabulka svarů"), weldTableText(api.doc)),
 });

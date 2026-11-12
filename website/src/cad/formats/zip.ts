@@ -1,3 +1,4 @@
+import { tr } from "../i18n";
 /** Minimální ZIP (3MF): čtení (store + deflate přes DecompressionStream) a zápis (store) – bez závislostí. */
 
 const CRC_TABLE = (() => {
@@ -35,13 +36,13 @@ export function readZip(buf: ArrayBuffer | Uint8Array): ZipEntry[] {
       break;
     }
   }
-  if (eocd < 0) throw new Error("Soubor není platný ZIP archiv.");
+  if (eocd < 0) throw new Error(tr("Soubor není platný ZIP archiv."));
   const count = dv.getUint16(eocd + 10, true);
   let p = dv.getUint32(eocd + 16, true);
   const dec = new TextDecoder();
   const out: ZipEntry[] = [];
   for (let k = 0; k < count; k++) {
-    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("Poškozený ZIP archiv.");
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error(tr("Poškozený ZIP archiv."));
     const method = dv.getUint16(p + 10, true);
     const csize = dv.getUint32(p + 20, true);
     const nlen = dv.getUint16(p + 28, true);
@@ -59,7 +60,7 @@ export function readZip(buf: ArrayBuffer | Uint8Array): ZipEntry[] {
         const raw = u8.subarray(start, start + csize);
         if (method === 0) return raw.slice();
         if (method === 8) return inflateRaw(raw);
-        throw new Error(`Nepodporovaná komprese ZIP (${method}).`);
+        throw new Error(tr("Nepodporovaná komprese ZIP ({0}).", method));
       },
     });
   }

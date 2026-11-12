@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import {
   Building2, ChevronRight, ClipboardList, Hash, Mail, MapPin, Phone, Search, SearchX, Sparkles, UserRound, Users, X,
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { CustomerDialog, type OwnerOption } from "@/components/customers/customer-dialog";
 import { FriendlyEmpty } from "@/components/customers/friendly-empty";
+import { PREMIUM_ROW, PremiumBadge } from "@/components/customers/premium-badge";
 import {
   CUSTOMER_FILTERS, avatarToneFor, customerFilterCounts, filterCustomers, initialsOf,
   type CustomerFilter, type CustomerView,
@@ -54,8 +56,12 @@ export function CustomersBrowser({
   owners: OwnerOption[];
   userId: string;
 }) {
-  const [q, setQ] = React.useState("");
-  const [filter, setFilter] = React.useState<CustomerFilter>("vse");
+  // hledání a filtr v adrese (Zpět z karty zákazníka vrátí stejný seznam; položka menu si ho pamatuje)
+  const url = useUrlState({ q: "", filtr: "vse" });
+  const q = url.values.q;
+  const setQ = (v: string) => url.set({ q: v }, { delay: 300 });
+  const filter: CustomerFilter = CUSTOMER_FILTERS.some((f) => f.key === url.values.filtr) ? (url.values.filtr as CustomerFilter) : "vse";
+  const setFilter = (f: CustomerFilter) => url.set({ filtr: f });
   const counts = React.useMemo(() => customerFilterCounts(customers, userId), [customers, userId]);
   const shown = React.useMemo(() => filterCustomers(customers, { q, filter, userId }), [customers, q, filter, userId]);
 
@@ -161,7 +167,13 @@ export function CustomersBrowser({
 function CustomerRowItem({ customer: c, owners }: { customer: CustomerView; owners: OwnerOption[] }) {
   const place = [c.city, c.country !== "CZ" ? c.country : null].filter(Boolean).join(", ");
   return (
-    <li className="group relative flex items-start gap-3 rounded-xl border bg-card p-3 shadow-sm transition hover:border-green-500/40 hover:shadow-md sm:items-center">
+    <li
+      className={cn(
+        "group relative flex items-start gap-3 rounded-xl border bg-card p-3 shadow-sm transition hover:border-green-500/40 hover:shadow-md sm:items-center",
+        c.isPremium && PREMIUM_ROW,
+      )}
+      data-premium={c.isPremium ? "1" : undefined}
+    >
       <span
         aria-hidden
         className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold", avatarToneFor(c.name))}
@@ -183,6 +195,7 @@ function CustomerRowItem({ customer: c, owners }: { customer: CustomerView; owne
                 <Hash className="h-3 w-3" />{c.customerNumber}
               </span>
             )}
+            {c.isPremium && <PremiumBadge label="short" size="xs" />}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
             {c.ico && <span>IČO {c.ico}</span>}

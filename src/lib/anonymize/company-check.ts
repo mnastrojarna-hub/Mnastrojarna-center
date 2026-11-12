@@ -32,8 +32,20 @@ export interface CompanyCheckInput {
   fill: readonly number[];
   /** Smazat i logo bez čitelného názvu (volba „logo"). */
   logo: boolean;
-  /** Kola kontroly (kontrola → vypálení nálezů → kontrola); výchozí 2. */
+  /** Kola kontroly (kontrola → vypálení nálezů → kontrola); výchozí podle zbývajícího času (2–3). */
   rounds?: number;
+}
+
+/** Třetí kolo kontroly (další levné volání) jen když do termínu zbývá aspoň tolik. */
+export const THIRD_ROUND_MIN_LEFT_MS = 90_000;
+
+/**
+ * Počet kol kontroly podle času: majitel 5. 11. („někdy to musí dělat na třikrát") — dřív dvě kola: nález
+ * ve druhém kole (druhý výskyt názvu, který AI v prvním kole nevypsala) = kopie neprošla a celý běh se
+ * opakoval. Třetí kolo je jedno levné volání navíc a většinu takových případů dořeší hned.
+ */
+export function checkRounds(deadline: number, now = Date.now()): number {
+  return deadline - now >= THIRD_ROUND_MIN_LEFT_MS ? 3 : 2;
 }
 
 export interface CompanyCheckOutcome {
@@ -43,9 +55,17 @@ export interface CompanyCheckOutcome {
   healed: Box[];
   /** Počet nálezů v poslední kontrole. */
   leaks: number;
+  /**
+   * Čitelné názvy firem, které kontrola ve výstupu viděla (přepis AI; i ty, které se podařilo vypálit).
+   * Volající je přidá k termínům — další stránky / další pokus je pak najdou pravidly v textové vrstvě
+   * (všechny výskyty), ne jen jako box z obrazu.
+   */
+  names: string[];
   usage: AiUsage | null;
   calls: number;
   fallback: boolean;
+  /** 12. 11.: proč nález nešlo vypálit (do hlášky „zůstal název firmy" — diagnostika). */
+  why?: string;
 }
 
 const MAX_IMAGES = 6;
@@ -70,6 +90,29 @@ export function isCompanyLeak(it: Pick<CompanyItem, "role" | "text" | "form">, k
   if (!/\p{L}{2,}/u.test(t)) return it.form === "curves" || logo;
   if (isTechnicalText(t)) return false;
   return !kept(t);
+}
+
+/**
+ * Box bez chráněných oblastí (číslo výkresu, materiál…): zbytek jako až 4 obdélníky na každou chráněnou
+ * oblast (12. 11.: cesta „E:\\KVK\\2026\\26-130 …" obsahovala číslo výkresu → celý nález byl „nejde opravit"
+ * a kopie neprošla; teď se vypálí vše kolem čísla a číslo zůstane).
+ */
+export function subtractBoxes(box: Box, cut: readonly Box[]): Box[] {
+  let parts: Box[] = [box];
+  for (const k of cut) {
+    const next: Box[] = [];
+    for (const p of parts) {
+      const x1 = Math.max(p.x, k.x), y1 = Math.max(p.y, k.y);
+      const x2 = Math.min(p.x + p.w, k.x + k.w), y2 = Math.min(p.y + p.h, k.y + k.h);
+      if (x2 <= x1 || y2 <= y1) { next.push(p); continue; }
+      if (y1 > p.y) next.push({ x: p.x, y: p.y, w: p.w, h: y1 - p.y });
+      if (y2 < p.y + p.h) next.push({ x: p.x, y: y2, w: p.w, h: p.y + p.h - y2 });
+      if (x1 > p.x) next.push({ x: p.x, y: y1, w: x1 - p.x, h: y2 - y1 });
+      if (x2 < p.x + p.w) next.push({ x: x2, y: y1, w: p.x + p.w - x2, h: y2 - y1 });
+    }
+    parts = next;
+  }
+  return parts.filter((p) => p.w >= 2 && p.h >= 2);
 }
 
 function overlapArea(a: Box, b: Box): number {
@@ -99,8 +142,8 @@ function clamp(b: Box, W: number, H: number): Box | null {
 }
 
 export async function checkAndHealCompanies(input: CompanyCheckInput): Promise<CompanyCheckOutcome> {
-  const out: CompanyCheckOutcome = { clean: false, healed: [], leaks: 0, usage: null, calls: 0, fallback: false };
-  const rounds = Math.max(1, input.rounds ?? 2);
+  const out: CompanyCheckOutcome = { clean: false, healed: [], leaks: 0, names: [], usage: null, calls: 0, fallback: false };
+  const rounds = Math.max(1, input.rounds ?? checkRounds(input.ai.deadline));
   for (let round = 0; round < rounds; round++) {
     const specs = await imagesFor(input.raster, input.focus, input.page);
     const r = await checkCompanies(input.ai, { images: specs, extra: { round, page: input.page, width: input.raster.width, height: input.raster.height } });
@@ -111,21 +154,28 @@ export async function checkAndHealCompanies(input: CompanyCheckInput): Promise<C
     let unhealable = 0;
     for (const it of asArray<CompanyItem>(r.data?.items)) {
       if (!isCompanyLeak(it, input.keepTerms, input.logo, input.terms ?? [])) continue;
+      const txt = String(it.text ?? "").replace(/[\r\n]+/g, " ").trim();
+      if (/\p{L}{2,}/u.test(txt) && !isTechnicalText(txt) && !out.names.includes(txt)) out.names.push(txt.slice(0, 120));
       const spec = specs.find((s) => s.index === it.img);
       // únik bez použitelných souřadnic nejde opravit → kopie neprošla (nikdy „asi v pořádku")
-      if (!spec || !boxInsideSent(spec, it.x, it.y, it.w, it.h)) { unhealable++; continue; }
+      if (!spec || !boxInsideSent(spec, it.x, it.y, it.w, it.h)) { unhealable++; out.why ??= "AI neurčila, kde přesně je"; continue; }
       const raw: Box = { x: spec.crop.x + it.x / spec.s, y: spec.crop.y + it.y / spec.s, w: it.w / spec.s, h: it.h / spec.s };
       const pad = Math.max(2, 0.15 * Math.min(raw.w, raw.h));
       const box: Box = { x: raw.x - pad, y: raw.y - pad, w: raw.w + 2 * pad, h: raw.h + 2 * pad };
-      // číslo výkresu / materiál se nikdy nevypálí — nález přes ně = neprošlo
-      if (input.keepBoxes.some((k) => overlapArea(k, box) > 0.5 * Math.max(1, k.w * k.h))) { unhealable++; continue; }
-      boxes.push(box);
+      // číslo výkresu / materiál se nikdy nevypálí: nález přes ně se vypálí KOLEM nich (12. 11.); když chráněná
+      // oblast pokrývá skoro celý nález, opravit nejde → neprošlo
+      const keeps = input.keepBoxes.filter((k) => overlapArea(k, box) > 0);
+      if (!keeps.length) { boxes.push(box); continue; }
+      const covered = keeps.reduce((sum, k) => sum + overlapArea(k, box), 0);
+      if (covered >= 0.8 * box.w * box.h) { unhealable++; out.why ??= "leží přes číslo výkresu / materiál (chráněné pole)"; continue; }
+      boxes.push(...subtractBoxes(box, keeps));
     }
     out.leaks = boxes.length + unhealable;
     if (!out.leaks) {
       out.clean = true;
       return out;
     }
+    if (!unhealable && round === rounds - 1) out.why ??= "po doplnění už nezbyl čas na další kontrolu";
     if (unhealable || round === rounds - 1) return out;
     for (const b of boxes) out.healed.push(burnGraphic(input.raster, b, input.fill).box);
   }

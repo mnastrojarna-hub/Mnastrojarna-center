@@ -408,24 +408,31 @@ describe.skipIf(!LOCAL_ENABLED)("anonymizace se spustí sama hned po nahrání (
     }
   }, 180_000);
 
-  it("chyba prostředí („Path2D is not defined“ jako na Vercelu) → pending „zkusí se znovu automaticky“, další běh soubor dokončí; nikdy „poškozené“", async () => {
+  it("chyba prostředí („Path2D is not defined“ jako na Vercelu) → TENTÝŽ běh soubor zopakuje a dokončí (majitel 5. 11.); nikdy „poškozené“; diagnostika v anon_debug", async () => {
     const job = await newJob();
     const id = await insertFile(job, "vykres-porucha.pdf");
     const { sha256Hex } = await import("./text");
     const fault = path.join(process.env.AI_FAKE_ANON!, `${await sha256Hex(pdf)}.fault.json`);
     writeFileSync(fault, JSON.stringify({ message: "Path2D is not defined" }));
     const { processQueue } = await import("./runner");
-    await processQueue({ ids: [id], fanOut: false, deadline: Date.now() + 200_000 });
-    const st1 = await status(id);
+    const o = await processQueue({ ids: [id], fanOut: false, deadline: Date.now() + 200_000, retryBackoffMs: [0, 0] });
     expect(existsSync(fault)).toBe(false);
-    expect(st1.anon_status).toBe("pending");
-    expect(st1.anon_attempts).toBe(1);
-    expect(st1.anon_reason).toBe("Anonymizace se nepovedla kvůli technické chybě při zpracování — zkusí se znovu automaticky.");
-    await processQueue({ ids: [id], fanOut: false, deadline: Date.now() + 200_000 });
+    // 1. pokus: pending bez odkladu (retryNow) → běh ho vzal hned znovu → 2. pokus hotovo
+    expect(o.results.map((r) => `${r.status}#${r.attempt}`)).toEqual(["pending#1", "done#2"]);
+    expect(o.retried).toBe(1);
     const st2 = await status(id);
     expect(finished(st2.anon_status), `${st2.anon_status}: ${st2.anon_reason}`).toBe(true);
     expect(st2.anon_attempts).toBe(2);
     expect(String(st2.anon_reason ?? "")).not.toMatch(/poškozené|zaheslované/);
+    // diagnostika (jen super admin): surová chyba, fáze, pokus, běh; uživatelský důvod zůstal česky
+    const { data } = await svc.from("job_files").select("anon_debug").eq("id", id).single();
+    const dbg = (data as { anon_debug: { attempt: number; stage: string; status: string; error?: string; kind?: string; run: string | null; retryNow?: boolean; reason?: string }[] }).anon_debug;
+    expect(dbg).toHaveLength(2);
+    expect(dbg[0]).toMatchObject({ attempt: 1, stage: "terms", status: "pending", error: "Path2D is not defined", kind: "internal", run: o.runId, retryNow: true });
+    expect(dbg[0].reason).toBe("Anonymizace se nepovedla kvůli technické chybě při zpracování — zkusí se znovu automaticky.");
+    // 2. pokus: hotovo (vlastní běh, nebo převzetí kopie stejného souboru z dřívějších testů sady — „twin")
+    expect(dbg[1]).toMatchObject({ attempt: 2, status: "done", run: o.runId });
+    expect(["finish", "twin"]).toContain(dbg[1].stage);
   }, 120_000);
 
   it("Nastavení: nedosažitelná adresa a zaseknutý výkres → jasné varování", async () => {

@@ -99,6 +99,33 @@
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  /*
+   * Okno aplikace samo neroluje (roluje <main> a vnitřní panely). Bez této pojistky prohlížeč bere posun,
+   * který roluvaný prvek nespotřebuje (vodorovná složka gesta na touchpadu / Magic Mouse, tažení dolů na
+   * telefonu), jako gesto historie „zpět" nebo „obnovit stránku" — a to zavíralo otevřený prohlížeč dokumentu
+   * (majitel 4. 11.: „otevřu PDF, točím kolečkem a PDF se zavře"). Vlastní Zpět / Esc / ✕ fungují dál.
+   */
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+  /*
+   * Spodní lišta na telefonu (majitel 7. 11.: „dole mi furt překáží menu"): při posunu dolů se schová,
+   * při posunu nahoru / nahoře na stránce se vrátí. Přilepené prvky nad ní (lišta „Neuložené změny",
+   * detail vlákna Pošty) stojí na --mn-nav-offset = aktuální výška lišty (0 na počítači).
+   */
+  :root {
+    --mn-nav-offset: calc(4rem + env(safe-area-inset-bottom));
+  }
+  :root[data-mobile-nav="hidden"] {
+    --mn-nav-offset: env(safe-area-inset-bottom);
+  }
+  @media (min-width: 768px) {
+    :root,
+    :root[data-mobile-nav="hidden"] {
+      --mn-nav-offset: 0px;
+    }
+  }
 }
 
 @layer utilities {

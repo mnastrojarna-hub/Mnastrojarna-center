@@ -1,11 +1,19 @@
 import DxfParser from "dxf-parser";
 import { ModelImportError } from "../types";
 import { aciColor, insunitsToMm, plainText, trueColor, type DrawColor, type DrawEntity, type DrawLayer, type Drawing2D, type Pt } from "../drawing2d";
+import {
+  detectDecimalSeparator, dimFallbackGeometry, dimTextFrame, dimTextHeight, dimValueText, mergeDimStyle, readableAngle, resolveDimText,
+  type DimDef, type DimStyle,
+} from "../dimension";
 
 /**
  * DXF (ASCII) → 2D výkres: hladiny, čáry, polyčáry s oblouky, kružnice, oblouky, elipsy, spliny,
  * body, texty, MTEXT, bloky (INSERT, i vnořené a pole), kóty (anonymní bloky *D), SOLID.
  * Texty v kódové stránce výkresu ($DWGCODEPAGE, od R2007 UTF-8) — čeština bez rozsypaných znaků.
+ *
+ * Kóty: číslo kóty je text v jejím bloku *D…; když chybí (kóta bez bloku, prázdný text, „<>",
+ * výška 0), doplní se hodnota z kóty (viz ../dimension). Styl kót (DIMSTYLE, $DIM… v hlavičce,
+ * přepis DSTYLE v XDATA kóty) dxf-parser nečte — přečte ho `scanDimInfo` přímo z textu DXF.
  */
 
 type Any = any;
@@ -51,12 +59,157 @@ export function decodeDxf(bytes: Uint8Array): string {
 
 const P = (p: Any): Pt => [Number(p?.x ?? 0), Number(p?.y ?? 0)];
 
+type TextEntity = Extract<DrawEntity, { kind: "text" }>;
+
 interface Ctx {
   out: DrawEntity[];
   blocks: Record<string, Any>;
   layers: Map<string, DrawLayer>;
   skipped: Map<string, number>;
   depth: number;
+  /** Styly kót a údaje kót, které dxf-parser nečte. */
+  dims: DimInfo;
+  /** Výchozí výška textu ($TEXTSIZE) pro texty s výškou 0. */
+  textSize: number;
+  /** Právě vykreslovaná kóta: texty z jejího bloku a výška textu podle stylu. */
+  curDim: { texts: TextEntity[]; height: number } | null;
+  /** Texty všech kót (desetinný oddělovač výkresu). */
+  dimTexts: string[];
+  /** Doplnění textů kót až po přečtení celého výkresu (oddělovač). */
+  fixups: ((sep: string) => void)[];
+}
+
+// ───────────────────────── styly kót (surové čtení DXF) ─────────────────────────
+
+/** Údaje kóty mimo dxf-parser: styl (3), natočení textu (53, stupně), přepis stylu z XDATA (DSTYLE). */
+interface DimExtra {
+  style?: string;
+  textRot?: number;
+  /** Kód 1 přesně (dxf-parser hodnoty ořezává — „ " = potlačený text by se ztratil). */
+  text?: string;
+  ov: DimStyle;
+}
+
+export interface DimInfo {
+  header: DimStyle;
+  /** Styl kót podle jména (velkými písmeny). */
+  styles: Map<string, DimStyle>;
+  /** Kóta podle handle (velkými písmeny). */
+  dims: Map<string, DimExtra>;
+  textSize?: number;
+}
+
+/** Kód skupiny proměnné kóty (DIMSTYLE / XDATA DSTYLE) → pole stylu. */
+function setDimVar(st: DimStyle, code: number, raw: string): void {
+  const n = Number(raw.trim());
+  switch (code) {
+    case 3: st.post = raw.trim(); return;
+    case 40: if (Number.isFinite(n)) st.scale = n; return;
+    case 41: if (Number.isFinite(n)) st.asz = n; return;
+    case 47: if (Number.isFinite(n)) st.tp = n; return;
+    case 48: if (Number.isFinite(n)) st.tm = n; return;
+    case 71: if (Number.isFinite(n)) st.tol = n !== 0; return;
+    case 140: if (Number.isFinite(n)) st.txt = n; return;
+    case 144: if (Number.isFinite(n)) st.lfac = n; return;
+    case 271: if (Number.isFinite(n)) st.dec = n; return;
+    case 272: if (Number.isFinite(n)) st.tdec = n; return;
+    case 179: if (Number.isFinite(n)) st.adec = n; return;
+    default:
+  }
+}
+
+const HEADER_DIM_VARS: Record<string, number> = {
+  $DIMPOST: 3, $DIMSCALE: 40, $DIMASZ: 41, $DIMTP: 47, $DIMTM: 48, $DIMTOL: 71, $DIMTXT: 140, $DIMLFAC: 144,
+  $DIMDEC: 271, $DIMTDEC: 272, $DIMADEC: 179,
+};
+
+/**
+ * Jeden průchod páry (kód, hodnota) textu DXF: proměnné kót z hlavičky, tabulka DIMSTYLE a u každé
+ * kóty (ENTITIES i BLOCKS) styl, natočení textu a přepis stylu v XDATA (1001 ACAD / 1000 DSTYLE).
+ */
+export function scanDimInfo(text: string): DimInfo {
+  const info: DimInfo = { header: {}, styles: new Map(), dims: new Map() };
+  const lines = text.split(/\r?\n/);
+  let section = "";
+  let headerVar = "";
+  let entity = "";
+  let style: { name: string; st: DimStyle } | null = null;
+  let dim: (DimExtra & { handle?: string }) | null = null;
+  let xdataApp = "";
+  let dstyle = 0; // 0 = mimo, 1 = čeká „{", 2 = uvnitř
+  let dvar = -1;
+  const flush = () => {
+    if (style?.name) info.styles.set(style.name.toUpperCase(), style.st);
+    if (dim?.handle) {
+      const d: DimExtra = { ov: dim.ov };
+      if (dim.style !== undefined) d.style = dim.style;
+      if (dim.textRot !== undefined) d.textRot = dim.textRot;
+      if (dim.text !== undefined) d.text = dim.text;
+      info.dims.set(dim.handle.toUpperCase(), d);
+    }
+    style = null;
+    dim = null;
+    xdataApp = "";
+    dstyle = 0;
+    dvar = -1;
+  };
+  for (let i = 0; i + 1 < lines.length; i += 2) {
+    const code = parseInt(lines[i], 10);
+    if (!Number.isFinite(code)) continue;
+    const raw = lines[i + 1];
+    if (code === 0) {
+      flush();
+      entity = raw.trim();
+      if (entity === "ENDSEC") section = "";
+      if (entity === "DIMSTYLE" && section === "TABLES") style = { name: "", st: {} };
+      if (entity === "DIMENSION" && (section === "ENTITIES" || section === "BLOCKS")) dim = { ov: {} };
+      continue;
+    }
+    if (entity === "SECTION" && code === 2) {
+      section = raw.trim();
+      continue;
+    }
+    if (section === "HEADER") {
+      if (code === 9) headerVar = raw.trim();
+      else if (headerVar === "$TEXTSIZE" && code === 40) {
+        const n = Number(raw.trim());
+        if (Number.isFinite(n) && n > 0) info.textSize = n;
+      } else if (headerVar in HEADER_DIM_VARS) setDimVar(info.header, HEADER_DIM_VARS[headerVar], raw);
+      continue;
+    }
+    if (style) {
+      if (code === 2) style.name = raw.trim();
+      else setDimVar(style.st, code, raw);
+      continue;
+    }
+    if (dim) {
+      if (code === 1001) {
+        xdataApp = raw.trim().toUpperCase();
+        dstyle = 0;
+      } else if (xdataApp === "ACAD") {
+        if (code === 1000 && raw.trim().toUpperCase() === "DSTYLE") dstyle = 1;
+        else if (code === 1002 && dstyle === 1 && raw.trim() === "{") dstyle = 2;
+        else if (code === 1002 && raw.trim() === "}") dstyle = 0;
+        else if (dstyle === 2) {
+          if (code === 1070 && dvar < 0) dvar = Number(raw.trim());
+          else if (dvar >= 0) {
+            setDimVar(dim.ov, dvar, raw);
+            dvar = -1;
+          }
+        }
+      } else if (!xdataApp) {
+        if (code === 5) dim.handle = raw.trim();
+        else if (code === 3) dim.style = raw.trim();
+        else if (code === 1) dim.text = raw.replace(/\r$/, "");
+        else if (code === 53) {
+          const n = Number(raw.trim());
+          if (Number.isFinite(n)) dim.textRot = n;
+        }
+      }
+    }
+  }
+  flush();
+  return info;
 }
 
 function layerColor(ctx: Ctx, name: string): DrawColor {
@@ -230,8 +383,8 @@ function emit(ctx: Ctx, e: Any, m: M2, inheritLayer: string | null, blockColor: 
       const v = Number(e.valign ?? 0);
       const useEnd = (h !== 0 || v !== 0) && e.endPoint && h !== 3 && h !== 5;
       const base = P(useEnd ? e.endPoint : e.startPoint);
-      push({
-        kind: "text", layer, color, p: tp(m, ...base), text, height: Number(e.textHeight ?? 2.5) * sy(m),
+      pushText(ctx, {
+        kind: "text", layer, color, p: tp(m, ...base), text, height: textHeight(ctx, e.textHeight) * sy(m),
         rotation: (Number(e.rotation ?? 0) * Math.PI) / 180 + rot(m), hAlign: H_ALIGN[h] ?? "left",
         vAlign: h === 4 ? "middle" : V_ALIGN[v] ?? "baseline",
       });
@@ -244,26 +397,22 @@ function emit(ctx: Ctx, e: Any, m: M2, inheritLayer: string | null, blockColor: 
       const hA = (["left", "center", "right"] as const)[(ap - 1) % 3] ?? "left";
       const vA = (["top", "middle", "bottom"] as const)[Math.floor((ap - 1) / 3)] ?? "top";
       const dir = e.directionVector ? Math.atan2(Number(e.directionVector.y ?? 0), Number(e.directionVector.x ?? 1)) : (Number(e.rotation ?? 0) * Math.PI) / 180;
-      push({
-        kind: "text", layer, color, p: tp(m, ...P(e.position)), text, height: Number(e.height ?? 2.5) * sy(m),
+      pushText(ctx, {
+        kind: "text", layer, color, p: tp(m, ...P(e.position)), text, height: textHeight(ctx, e.height) * sy(m),
         rotation: dir + rot(m), hAlign: hA, vAlign: vA, width: e.width ? Number(e.width) * sx(m) : undefined,
       });
       return;
     }
-    case "INSERT":
-    case "DIMENSION": {
-      const name = String(e.type === "DIMENSION" ? e.block ?? "" : e.name ?? "");
+    case "DIMENSION":
+      emitDimension(ctx, e, m, layer, color);
+      return;
+    case "INSERT": {
+      const name = String(e.name ?? "");
       const block = ctx.blocks[name];
       if (!block || ctx.depth > 16) return;
       const bp = P(block.position);
       const insColor = color;
       const ents = (block.entities ?? []) as Any[];
-      if (e.type === "DIMENSION") {
-        ctx.depth++;
-        for (const be of ents) emit(ctx, be, m, layer, insColor);
-        ctx.depth--;
-        return;
-      }
       const ip = P(e.position);
       const xs = Number(e.xScale ?? 1) || 1;
       const ys = Number(e.yScale ?? 1) || 1;
@@ -295,6 +444,80 @@ function emit(ctx: Ctx, e: Any, m: M2, inheritLayer: string | null, blockColor: 
   }
 }
 
+/** Výška textu: 0 / chybí = podle stylu kóty (uvnitř kóty), jinak $TEXTSIZE. */
+function textHeight(ctx: Ctx, raw: unknown): number {
+  const h = Number(raw);
+  if (raw !== undefined && raw !== null && Number.isFinite(h) && h > 0) return h;
+  return ctx.curDim?.height ?? (raw === undefined ? 2.5 : ctx.textSize);
+}
+
+function pushText(ctx: Ctx, t: TextEntity) {
+  ctx.out.push(t);
+  if (ctx.curDim) {
+    ctx.curDim.texts.push(t);
+    ctx.dimTexts.push(t.text);
+  }
+}
+
+const optPt = (p: Any): Pt | null => (p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)) ? [Number(p.x), Number(p.y)] : null);
+const deg = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? (v * Math.PI) / 180 : null);
+
+/**
+ * Kóta: blok *D… (geometrie i text), bez bloku náhradní kresba. Když z kóty nevzejde žádný text
+ * (chybí, prázdný, jen formátování), doplní se hodnota; „<>" v textu bloku se nahradí hodnotou.
+ */
+function emitDimension(ctx: Ctx, e: Any, m: M2, layer: string, color: DrawColor) {
+  if (ctx.depth > 16) return;
+  const extra = e.handle !== undefined ? ctx.dims.dims.get(String(e.handle).toUpperCase()) : undefined;
+  const named = extra?.style ? ctx.dims.styles.get(extra.style.toUpperCase()) : ctx.dims.styles.get("STANDARD");
+  const style = mergeDimStyle(ctx.dims.header, named, extra?.ov);
+  const def: DimDef = {
+    type: Number(e.dimensionType ?? 0),
+    p10: optPt(e.anchorPoint), p11: optPt(e.middleOfText), p13: optPt(e.linearOrAngularPoint1), p14: optPt(e.linearOrAngularPoint2),
+    p15: optPt(e.diameterOrRadiusPoint), p16: optPt(e.arcPoint),
+    angle: deg(e.angle), textRotation: deg(extra?.textRot), measurement: typeof e.actualMeasurement === "number" ? e.actualMeasurement : null,
+    text: extra?.text ?? (typeof e.text === "string" ? e.text : null),
+  };
+  const block = e.block ? ctx.blocks[String(e.block)] : undefined;
+  const ents = (block?.entities ?? []) as Any[];
+  const height = dimTextHeight(style);
+  const prev = ctx.curDim;
+  const cur = { texts: [] as TextEntity[], height };
+  ctx.curDim = cur;
+  ctx.depth++;
+  try {
+    if (ents.length) {
+      for (const be of ents) emit(ctx, be, m, layer, color);
+    } else {
+      for (const g of dimFallbackGeometry(def, style)) {
+        if (g.kind === "line") ctx.out.push({ kind: "line", layer, color, a: tp(m, ...g.a), b: tp(m, ...g.b) });
+        else if (g.kind === "polyline") ctx.out.push({ kind: "polyline", layer, color, points: g.points.map((p) => tp(m, ...p)), closed: g.closed });
+        else ctx.out.push({ kind: "curve", layer, color, points: arcPoints(g.c, g.r, g.start, g.end).map((p) => tp(m, ...p)), closed: false });
+      }
+    }
+  } finally {
+    ctx.depth--;
+    ctx.curDim = prev;
+  }
+  ctx.fixups.push((sep) => {
+    const value = dimValueText(def, style, sep);
+    for (const t of cur.texts) if (t.text.includes("<>")) t.text = value ? t.text.replace(/<>/g, value) : t.text.replace(/<>/g, "").trim();
+    if (cur.texts.some((t) => t.text.trim())) return;
+    const resolved = resolveDimText(def.text, value);
+    const text = resolved === null ? "" : plainText(resolved).trim();
+    const frame = text ? dimTextFrame(def) : null;
+    if (!frame) return;
+    const o = tp(m, 0, 0);
+    const d = tp(m, Math.cos(frame.rotation), Math.sin(frame.rotation));
+    const dl = Math.hypot(d[0] - o[0], d[1] - o[1]);
+    if (!(dl > 0)) return;
+    ctx.out.push({
+      kind: "text", layer, color, p: tp(m, ...frame.p), text, height: height * (Math.abs(det(m)) / dl),
+      rotation: readableAngle(Math.atan2(d[1] - o[1], d[0] - o[0])), hAlign: "center", vAlign: "middle",
+    });
+  });
+}
+
 /** DXF bajty → 2D výkres. */
 export function parseDxf(bytes: Uint8Array): Drawing2D {
   const head = new TextDecoder("latin1").decode(bytes.subarray(0, 22));
@@ -302,8 +525,11 @@ export function parseDxf(bytes: Uint8Array): Drawing2D {
     throw new ModelImportError("Binární DXF zatím neumím zobrazit — ulož výkres jako DXF (ASCII) nebo DWG.");
   }
   let dxf: Any;
+  let dims: DimInfo;
   try {
-    dxf = new DxfParser().parseSync(decodeDxf(bytes));
+    const text = decodeDxf(bytes);
+    dxf = new DxfParser().parseSync(text);
+    dims = scanDimInfo(text);
   } catch (e) {
     throw new ModelImportError(`DXF se nepodařilo přečíst (${e instanceof Error ? e.message : "poškozený soubor"}).`);
   }
@@ -315,7 +541,10 @@ export function parseDxf(bytes: Uint8Array): Drawing2D {
     const color: DrawColor = typeof l.color === "number" && ci !== 7 ? trueColor(l.color) : aciColor(ci);
     layers.set(name, { name, color, off: l.visible === false || l.frozen === true || ci < 0 });
   }
-  const ctx: Ctx = { out: [], blocks: dxf.blocks ?? {}, layers, skipped: new Map(), depth: 0 };
+  const ctx: Ctx = {
+    out: [], blocks: dxf.blocks ?? {}, layers, skipped: new Map(), depth: 0, dims, textSize: dims.textSize ?? 2.5,
+    curDim: null, dimTexts: [], fixups: [],
+  };
   const scale = insunitsToMm(Number(dxf.header?.$INSUNITS ?? 0));
   const m: M2 = scale === 1 ? I : [scale, 0, 0, scale, 0, 0];
   for (const e of (dxf.entities ?? []) as Any[]) {
@@ -326,6 +555,10 @@ export function parseDxf(bytes: Uint8Array): Drawing2D {
       ctx.skipped.set(String(e.type), (ctx.skipped.get(String(e.type)) ?? 0) + 1);
     }
   }
+  // texty kót až teď — desetinný oddělovač podle kót, které výkres už má (jinak čárka)
+  const sep = detectDecimalSeparator(ctx.dimTexts) ?? ",";
+  for (const f of ctx.fixups) f(sep);
+  ctx.out = ctx.out.filter((x) => x.kind !== "text" || x.text.trim() !== "");
   const warnings: string[] = [];
   const skippedTotal = [...ctx.skipped.values()].reduce((a, b) => a + b, 0);
   if (skippedTotal) warnings.push(`Některé prvky výkresu se nezobrazí (${[...ctx.skipped.keys()].slice(0, 5).join(", ")}).`);

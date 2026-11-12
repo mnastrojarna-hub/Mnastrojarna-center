@@ -21,6 +21,7 @@ const modules = [
   { key: "supplier_invoice", label: "Faktury dodavatelů", desc: "Rozdělení faktury dodavatele na zakázky a režii (jinak čeká na potvrzení super adminem)", recommended: "approval" },
   { key: "mail_job_link", label: "Přiřazení pošty k zakázce", desc: "Jistá shoda (vlákno, naše číslo) se přiřadí hned; jinak jen návrh „Patří k Z-…?“", recommended: "full" },
   { key: "mail_job_changes", label: "Pokyny zákazníka z e-mailu do položek", desc: "„Prosím kalit“, „30 ks místo 20“ se hned propíše do položky (viditelně, vrátit jedním ťuknutím); jinak jen návrh", recommended: "full" },
+  { key: "mail_job_stage", label: "Speciální stav zakázky z pošty", desc: "Reklamace, nerealizováno (jiný dodavatel, cena), storno objednávky, pozastavení a pokračování podle e-mailu zákazníka — přepnout hned (vrátit / změnit jedním ťuknutím); jinak návrh ve frontě a ve vlákně", recommended: "approval" },
 ] as const;
 
 export function AutomationSettings({ initial }: { initial?: Record<string, Mode> }) {

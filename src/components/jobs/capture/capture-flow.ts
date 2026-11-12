@@ -4,10 +4,12 @@ import {
   type CaptureFileRef, type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
 import { BATCH_TYPES, distinctJobCount, pagesKey } from "@/lib/jobs/capture-batch";
+import { cleanNumber } from "@/lib/jobs/mapping";
+import { docNumbersEqual } from "@/lib/jobs/matching";
 import { applyGroupFills } from "@/lib/jobs/capture-batch-reconcile";
 import type {
   BatchApplyState, BatchDocType, BatchGroupReview, BatchGroupState, BatchResult, BatchReviewModel, BatchSort,
-  BatchSortModel, BatchWarning, DocApplyState, DocExtractStatus, DocExtractSummary,
+  BatchSortModel, BatchWarning, DocApplyState, DocExtractStatus, DocExtractSummary, DuplicateRef, ItemLinkChoice,
 } from "@/lib/jobs/capture-batch-types";
 import { needsExtract } from "@/components/jobs/capture/batch-sort";
 
@@ -390,7 +392,101 @@ export function mergeBatchState(
     const same = was && a && b && was.kind === st.kind && a.type === b.type && pagesKey(a.pageIds) === pagesKey(b.pageIds);
     docs[docId] = same ? was : st;
   }
-  return { ...next, groups, docs };
+  let merged: BatchApplyState = { ...next, groups, docs, ...(prev.ack?.length ? { ack: prev.ack } : {}) };
+  // skupina s jiným cílem než dřív: vazby výkresů / modelů ze starého cíle neplatí (položka jiné zakázky,
+  // „ai-0" je u jiného cíle jiný řádek) → znovu podle čísla výkresu
+  for (const g of groups) {
+    const old = prev.groups.find((o) => sameIds(o.docIds, g.docIds));
+    if (old && old.job.targetKey !== g.job.targetKey) merged = relinkGroupDocs(review, merged, g.key);
+  }
+  return merged;
+}
+
+// ── Vazby výkresů / modelů na položky ──────────────────────
+function sameLink(a: ItemLinkChoice, b: ItemLinkChoice): boolean {
+  if (a.mode !== b.mode) return false;
+  if (a.mode === "item" && b.mode === "item") return a.itemId === b.itemId;
+  if (a.mode === "docItem" && b.mode === "docItem") return a.itemKey === b.itemKey;
+  return true;
+}
+
+/** Vazba platí pro aktuální cíl skupiny (řádek v Položkách / položka cílové zakázky). */
+export function linkValid(review: BatchReviewModel, state: BatchApplyState, groupKey: string, link: ItemLinkChoice): boolean {
+  const g = state.groups.find((x) => x.key === groupKey);
+  if (!g) return false;
+  if (link.mode === "add" || link.mode === "none") return true;
+  if (link.mode === "docItem") return g.job.items.some((i) => i.key === link.itemKey);
+  const rg = review.groups.find((x) => x.key === groupKey);
+  return Boolean(rg?.itemOptions[g.job.targetKey]?.some((o) => sameLink(o.link, link)));
+}
+
+function dupOf(review: BatchReviewModel, docId: string): DuplicateRef | null {
+  const r = review.docs.find((d) => d.docId === docId);
+  return r && (r.kind === "drawing" || r.kind === "model") ? r.duplicateOf : null;
+}
+
+/** Výkres / model je už u CÍLOVÉ zakázky skupiny (jen tehdy se nabízí „neukládat znovu / nová verze"). */
+export function duplicateInTarget(review: BatchReviewModel, state: BatchApplyState, docId: string): DuplicateRef | null {
+  const dup = dupOf(review, docId);
+  if (!dup) return null;
+  const g = state.groups.find((x) => x.docIds.includes(docId));
+  return g && g.job.targetKey === dup.jobId ? dup : null;
+}
+
+/**
+ * Po změně cíle skupiny: vazby výkresů / modelů znovu podle čísla výkresu (řádek Položek, položka cílové
+ * zakázky), jinak výchozí vazba serveru pro tento cíl, jinak nová položka / bez vazby. „Neukládat znovu"
+ * platí jen, když je výkres u cílové zakázky.
+ */
+export function relinkGroupDocs(review: BatchReviewModel, state: BatchApplyState, groupKey: string): BatchApplyState {
+  const g = state.groups.find((x) => x.key === groupKey);
+  if (!g) return state;
+  const rg = review.groups.find((x) => x.key === groupKey);
+  const options = rg?.itemOptions[g.job.targetKey] ?? [];
+  const initGroup = review.initial.groups.find((x) => x.key === groupKey);
+  let docs = state.docs;
+  for (const docId of g.docIds) {
+    const d = docs[docId];
+    if (!d || (d.kind !== "drawing" && d.kind !== "model")) continue;
+    const num = d.state.drawingNumber.trim();
+    const row = num ? g.job.items.find((i) => i.drawingNumber && docNumbersEqual(i.drawingNumber, num)) : undefined;
+    const opt = num ? options.find((o) => o.link.mode === "item" && o.drawingNumber && docNumbersEqual(o.drawingNumber, num)) : undefined;
+    const init = review.initial.docs[docId];
+    const initLink = init && (init.kind === "drawing" || init.kind === "model") && initGroup?.job.targetKey === g.job.targetKey ? init.state.link : null;
+    let link: ItemLinkChoice;
+    if (row) link = { mode: "docItem", itemKey: row.key };
+    else if (opt) link = opt.link;
+    else if (initLink && linkValid(review, state, groupKey, initLink)) link = initLink;
+    else if (linkValid(review, state, groupKey, d.state.link) && d.state.link.mode !== "none") link = d.state.link;
+    else link = num ? { mode: "add" } : { mode: "none" };
+    const dup = dupOf(review, docId);
+    const inTarget = Boolean(dup && dup.jobId === g.job.targetKey && !dup.weak);
+    const onDuplicate = inTarget ? d.state.onDuplicate ?? "skip" : null;
+    if (sameLink(link, d.state.link) && onDuplicate === d.state.onDuplicate) continue;
+    docs = { ...docs, [docId]: { ...d, state: { ...d.state, link, onDuplicate } } as DocApplyState };
+  }
+  return docs === state.docs ? state : { ...state, docs };
+}
+
+/** Výkres / model s vazbou, která pro cíl skupiny neplatí (položka jiné zakázky). */
+export function invalidLinkDoc(review: BatchReviewModel, state: BatchApplyState, locked: Set<string> = new Set()): { docId: string; groupKey: string; label: string } | null {
+  for (const g of state.groups) {
+    for (const docId of g.docIds) {
+      if (locked.has(docId)) continue;
+      const d = state.docs[docId];
+      if (!d || (d.kind !== "drawing" && d.kind !== "model")) continue;
+      if (!linkValid(review, state, g.key, d.state.link)) {
+        return { docId, groupKey: g.key, label: `${d.kind === "model" ? "3D model" : "Výkres"}${d.state.drawingNumber ? ` ${d.state.drawingNumber}` : ""}` };
+      }
+    }
+  }
+  return null;
+}
+
+/** Přidat rozhodnutí do `ack` (bez duplicit). */
+export function withAck(state: BatchApplyState, ...ids: string[]): BatchApplyState {
+  const ack = [...new Set([...(state.ack ?? []), ...ids])];
+  return { ...state, ack };
 }
 
 /** Výběr cílů skupin pro nový požadavek kontroly (aby server nepřepsal volbu uživatele). */
@@ -469,8 +565,50 @@ export function confirmedGroups(state: BatchApplyState | null): string[] {
 }
 
 /** Upozornění je vyřešené stavem formuláře (blokující přestane blokovat). */
-export function warningResolved(w: BatchWarning, state: BatchApplyState): boolean {
+export function warningResolved(w: BatchWarning, state: BatchApplyState, review?: BatchReviewModel | null): boolean {
   const group = w.groupKey ? state.groups.find((g) => g.key === w.groupKey) : null;
+  // rozhodnutí člověka tlačítkem v upozornění („Platí POM", „Ponechat oba", „Jsou to listy téhož výkresu")
+  if (state.ack?.includes(w.id)) return true;
+  const drawingCard = (id: string) => {
+    const d = state.docs[id];
+    return d && (d.kind === "drawing" || d.kind === "model") ? d : null;
+  };
+  const rowOf = (id: string) => {
+    const d = drawingCard(id);
+    const g = state.groups.find((x) => x.docIds.includes(id));
+    return d && g && d.state.link.mode === "docItem" ? g.job.items.find((i) => i.key === (d.state.link as { itemKey: string }).itemKey) ?? null : null;
+  };
+  switch (w.code) {
+    case "material_conflict": {
+      // „Platí materiál z výkresu" = položka má materiál výkresu
+      const ids = w.docIds.filter((id) => drawingCard(id));
+      return ids.length > 0 && ids.every((id) => {
+        const d = drawingCard(id);
+        const row = rowOf(id);
+        return Boolean(d && d.kind === "drawing" && row && row.material.trim() && row.material.trim() === d.state.material.trim());
+      });
+    }
+    case "quantity_conflict": {
+      // počet v Položkách je rozhodnutí člověka — upravený řádek = informace „Platí poptávka: 8 ks" už neplatí
+      if (!review) return false;
+      return w.docIds.some((id) => {
+        const row = rowOf(id);
+        const g = state.groups.find((x) => x.docIds.includes(id));
+        const init = review.initial.groups.find((x) => x.key === g?.key)?.job.items.find((i) => i.key === row?.key);
+        return Boolean(row && init && (cleanNumber(row.quantity) ?? 0) !== (cleanNumber(init.quantity) ?? 0));
+      });
+    }
+    case "drawing_item_shared": {
+      // výkresy už nemíří na tutéž položku
+      const links = w.docIds.map((id) => drawingCard(id)?.state.link).filter(Boolean) as ItemLinkChoice[];
+      return links.length < 2 || links.some((l) => !sameLink(l, links[0]));
+    }
+    case "also_in_job":
+      // výkres teď jde do zakázky, kde už je → rozhoduje „Neukládat znovu / Nová verze" na kartě
+      return Boolean(review && w.docIds.every((id) => duplicateInTarget(review, state, id)));
+    default:
+      break;
+  }
   switch (w.code) {
     case "customer_conflict":
     case "customer_written_differently":
@@ -479,12 +617,35 @@ export function warningResolved(w: BatchWarning, state: BatchApplyState): boolea
       return Boolean(group?.job.targetKey);
     case "already_saved":
     case "duplicate_doc":
+      // výkresy / modely: duplicitní jen u CÍLOVÉ zakázky (jinde se uloží i sem); v dávce dvakrát → vyřešeno,
+      // když se čísla na kartách liší (OCR přečetla podobné číslo, člověk ho opravil)
+      if (w.code === "already_saved" && review && w.docIds.every((id) => drawingCard(id)) && w.docIds.every((id) => !duplicateInTarget(review, state, id))) return true;
+      if (w.code === "duplicate_doc" && w.docIds.length > 1 && w.docIds.every((id) => drawingCard(id))) {
+        const nums = w.docIds.map((id) => drawingCard(id)!.state.drawingNumber.trim());
+        if (nums.some((n) => !docNumbersEqual(n, nums[0]))) return true;
+      }
       return w.docIds.length > 0 && w.docIds.every((id) => {
         const d = state.docs[id];
         const sortDoc = state.sort.docs.find((x) => x.id === id);
         if (!sortDoc || sortDoc.excluded) return true;
         if (!d || d.kind === "file") return false;
         return d.kind === "business" ? d.state.onDuplicate !== null || d.state.fileOnly : d.state.onDuplicate !== null;
+      });
+    case "drawing_quantity_missing":
+      // počet doplněný na kartě výkresu NEBO v řádku Položek, na který výkres míří
+      return w.docIds.length > 0 && w.docIds.every((id) => {
+        const d = state.docs[id];
+        if (!d || d.kind !== "drawing") return false;
+        if ((cleanNumber(d.state.quantity) ?? 0) > 0) return true;
+        const link = d.state.link;
+        const row = link.mode === "docItem" && group ? group.job.items.find((i) => i.key === link.itemKey) : null;
+        return Boolean(row && (cleanNumber(row.quantity) ?? 0) > 0);
+      });
+    case "unlinked_drawing":
+    case "unlinked_model":
+      return w.docIds.length > 0 && w.docIds.every((id) => {
+        const d = state.docs[id];
+        return Boolean(d && (d.kind === "drawing" || d.kind === "model") && d.state.link.mode !== "none");
       });
     default:
       return false;
@@ -493,7 +654,7 @@ export function warningResolved(w: BatchWarning, state: BatchApplyState): boolea
 
 /** Blokující upozornění, která ještě nejsou vyřešená. */
 export function openBlocks(review: BatchReviewModel, state: BatchApplyState): BatchWarning[] {
-  return review.warnings.filter((w) => w.severity === "block" && !warningResolved(w, state));
+  return review.warnings.filter((w) => w.severity === "block" && !warningResolved(w, state, review));
 }
 
 /** Co ještě chybí, než jde dávka uložit, a kde (skupina / doklad) — pro skok „Ukázat". */
@@ -513,6 +674,8 @@ export function batchProblemAt(review: BatchReviewModel, state: BatchApplyState,
   }
   const block = openBlocks(review, state)[0];
   if (block) return { message: block.message, ...(block.groupKey ? { groupKey: block.groupKey } : {}), ...(block.docIds[0] ? { docId: block.docIds[0] } : {}) };
+  const bad = invalidLinkDoc(review, state, locked);
+  if (bad) return { message: `${bad.label}: vybraná položka patří k jiné zakázce — vyber u výkresu „Patří k položce“.`, groupKey: bad.groupKey, docId: bad.docId };
   for (const [docId, d] of Object.entries(state.docs)) {
     if (locked.has(docId) || d.kind !== "business" || d.state.fileOnly) continue;
     if (BATCH_TYPES[d.state.type].side !== "supplier") continue;

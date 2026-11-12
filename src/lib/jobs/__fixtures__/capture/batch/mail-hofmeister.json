@@ -1,0 +1,73 @@
+{
+  "docKind": "poptavka",
+  "issuer": "zakaznik",
+  "documentNumber": "",
+  "documentDate": "",
+  "customer": {
+    "name": "HOFMEISTER s.r.o.",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "CZ",
+    "email": "",
+    "phone": "",
+    "contactPerson": "Petr Fous"
+  },
+  "contactPosition": "",
+  "supplier": {
+    "name": "",
+    "ico": "",
+    "dic": "",
+    "street": "",
+    "city": "",
+    "zip": "",
+    "country": "",
+    "email": "",
+    "phone": "",
+    "contactPerson": ""
+  },
+  "customerOrderNumber": "",
+  "customerInquiryNumber": "",
+  "ourQuoteNumber": "",
+  "ourJobNumber": "",
+  "ourOrderConfirmationNumber": "",
+  "supplierNumberAtCustomer": "",
+  "requiredDeliveryDate": "",
+  "promisedDeliveryDate": "",
+  "items": [
+    {
+      "drawingNumber": "A290-7904-Y832",
+      "revision": "",
+      "name": "",
+      "description": "",
+      "material": "POM",
+      "quantity": 8,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    },
+    {
+      "drawingNumber": "A290-7904-Y823",
+      "revision": "",
+      "name": "",
+      "description": "",
+      "material": "POM",
+      "quantity": 4,
+      "unit": "ks",
+      "unitPrice": 0,
+      "deliveryDate": ""
+    }
+  ],
+  "totalWithoutVat": 0,
+  "currency": "",
+  "paymentTerms": "",
+  "deliveryTerms": "",
+  "deliveryLeadTime": null,
+  "note": "Materiál POM",
+  "summary": "Poptávka na 2 díly z POM dle výkresů A290-7904-Y832 (8 ks) a A290-7904-Y823 (4 ks).",
+  "confidence": 0.9,
+  "needsClarification": [],
+  "roleEmails": []
+}

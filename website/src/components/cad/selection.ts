@@ -1,4 +1,5 @@
 /** Výběr entit ve 3D (jako filtr výběru v ZW3D). */
+import { tr } from "@/cad/i18n";
 import type { Vec3 } from "@/cad/types";
 
 export type SelFilter = "all" | "feature" | "face" | "edge" | "vertex" | "body" | "component" | "subasm";
@@ -9,7 +10,7 @@ export const FILTER_LABEL: Record<SelFilter, string> = {
   face: "Plocha",
   edge: "Hrana",
   vertex: "Bod",
-  body: "Těleso / tvar",
+  body: tr("Těleso / tvar"),
   component: "Komponenta",
   subasm: "Podsestava",
 };
@@ -38,7 +39,7 @@ export const KIND_LABEL: Record<SelItem["kind"], string> = {
   face: "Plocha",
   edge: "Hrana",
   vertex: "Bod",
-  body: "Těleso",
+  body: tr("Těleso"),
   component: "Komponenta",
   feature: "Prvek",
 };

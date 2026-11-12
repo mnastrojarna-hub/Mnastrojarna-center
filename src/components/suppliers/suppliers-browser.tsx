@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import {
   BadgeCheck, ClipboardList, Clock, Factory, Globe, Mail, MapPin, Phone, Receipt, Search, SearchX, Star, UserRound, X,
 } from "lucide-react";
@@ -25,9 +26,14 @@ export function SuppliersBrowser({ suppliers, initialQuery = "", invoiceCounts =
   /** Počet faktur dodavatele — jen kdo vidí Faktury dodavatelů (zatím super admin), jinak null. */
   invoiceCounts?: Record<string, number> | null;
 }) {
-  const [q, setQ] = React.useState(initialQuery);
-  const [tech, setTech] = React.useState<string | null>(null);
-  const [topRated, setTopRated] = React.useState(false);
+  // hledání a filtry v adrese (?q= čte i server; Zpět vrátí stejný seznam, menu si ho pamatuje)
+  const url = useUrlState({ q: initialQuery, technologie: "", top: "" });
+  const q = url.values.q;
+  const setQ = (v: string) => url.set({ q: v }, { delay: 300 });
+  const tech: string | null = url.values.technologie || null;
+  const setTech = (v: string | null) => url.set({ technologie: v ?? "" });
+  const topRated = url.values.top === "1";
+  const setTopRated = (v: boolean) => url.set({ top: v ? "1" : "" });
 
   const suggestions = React.useMemo<SupplierSuggestions>(() => ({
     technologies: tagSuggestions(suppliers, "technologies"),
@@ -82,7 +88,7 @@ export function SuppliersBrowser({ suppliers, initialQuery = "", invoiceCounts =
           </div>
           <button
             type="button"
-            onClick={() => setTopRated((v) => !v)}
+            onClick={() => setTopRated(!topRated)}
             aria-pressed={topRated}
             className={cn(
               "inline-flex h-10 items-center justify-center gap-1.5 rounded-md border px-3 text-sm font-medium transition",

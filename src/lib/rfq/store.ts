@@ -5,6 +5,7 @@ import { refreshCompanyFromSettings } from "@/lib/company-server";
 import { getSetting } from "@/lib/settings";
 import { logAudit } from "@/lib/audit";
 import { sendMail, senderSignatureText } from "@/lib/email/send";
+import { resolveSender, signatureForDecision, type SenderDecision } from "@/lib/email/sender-rules";
 import { logJobEvent, type JobsDb } from "@/lib/jobs/events";
 import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { cleanDate, cleanNumber, cleanText, fetchPaged, isUuid, jobFilePath, one } from "@/lib/jobs/mapping";
@@ -271,6 +272,15 @@ export interface RfqInput {
   skipPending?: boolean;
   /** Výkresy, které uživatel z poptávky vyřadil. */
   excludeDrawingIds?: string[];
+  /** „Odeslat z" (jen super admin; ostatní posílají vždy ze své schránky — sender-rules.ts). */
+  fromMailboxId?: string | null;
+}
+
+/** Odkud poptávka odejde: moje schránka (super admin: jeho volba) + podpis vlastníka té schránky. */
+async function rfqSender(user: RfqActor, input: Pick<RfqInput, "fromMailboxId">): Promise<{ who: SenderDecision; signature: string }> {
+  const mailboxId = typeof input.fromMailboxId === "string" && /^[0-9a-f-]{36}$/i.test(input.fromMailboxId) ? input.fromMailboxId : null;
+  const who = await resolveSender(user.id, { mailboxId });
+  return { who, signature: await signatureForDecision(who) };
 }
 
 const EMAIL_RE = /^[^\s@<>",;]+@[^\s@<>",;]+\.[^\s@<>",;]{2,}$/;
@@ -404,7 +414,7 @@ export async function previewRfq(dbIn: JobsDb, user: RfqActor, input: RfqInput):
   const p = await prepare(db, input, number);
   if ("error" in p) return p;
   await refreshCompanyFromSettings();
-  const signature = await senderSignatureText(user.id, { ownerId: user.id });
+  const { signature } = await rfqSender(user, input);
   const mails: RfqPreview["mails"] = [];
   const pdfName = rfqPdfFileName(`PD-${year}-NNN`);
   for (const r of p.recipients) {
@@ -534,7 +544,7 @@ export async function createAndSendRound(dbIn: JobsDb, user: RfqActor, input: Rf
   }).select("id").single();
   if (error || !round) return { error: RFQ_TABLES_MISSING.test(error?.message ?? "") ? "Chybí migrace poptávek dodavatelům (20261031160000)." : error?.message ?? "Kolo se nepodařilo založit." };
   const roundId = (round as { id: string }).id;
-  const signature = await senderSignatureText(user.id, { ownerId: user.id });
+  const { who, signature } = await rfqSender(user, input);
   const files = await attachmentsFor(db, p, Boolean(input.skipPending));
   const result: RfqSendResult = { roundId, number, sent: 0, waiting: 0, failed: [] };
   let rank = 0;
@@ -558,7 +568,7 @@ export async function createAndSendRound(dbIn: JobsDb, user: RfqActor, input: Rf
       result.failed.push({ supplier: r.supplier.name, error: "Text obsahuje údaj zákazníka — zkontroluj poznámku a položky." });
       continue;
     }
-    const outcome = await deliver(db, user, { roundId, recipientId, number, jobId: p.job.id, supplier: r.supplier, emails: r.emails, mail, pdf, files, drawingIds: p.drawings.filter((d) => d.status !== "blocked").map((d) => d.id), names: Object.fromEntries(p.drawings.map((d) => [d.id, d.name])) });
+    const outcome = await deliver(db, user, { who, roundId, recipientId, number, jobId: p.job.id, supplier: r.supplier, emails: r.emails, mail, pdf, files, drawingIds: p.drawings.filter((d) => d.status !== "blocked").map((d) => d.id), names: Object.fromEntries(p.drawings.map((d) => [d.id, d.name])) });
     if (outcome === "sent") result.sent++;
     else if (outcome === "waiting") result.waiting++;
     else result.failed.push({ supplier: r.supplier.name, error: outcome.error });
@@ -579,6 +589,8 @@ export async function createAndSendRound(dbIn: JobsDb, user: RfqActor, input: Rf
 }
 
 interface DeliverInput {
+  /** Odkud (resolveSender — moje schránka, super admin jeho volba). */
+  who: SenderDecision;
   roundId: string; recipientId: string; number: string; jobId: string; supplier: { id: string; name: string }; emails: string[];
   mail: { subject: string; body: string }; pdf: { fileId: string; buffer: Buffer; filename: string };
   files: { ready: { filename: string; content: Buffer; contentType: string }[]; pending: string[]; readyIds: string[] };
@@ -590,7 +602,10 @@ async function deliver(db: Db, user: RfqActor, d: DeliverInput): Promise<"sent" 
   if (d.files.pending.length) {
     const q = await enqueueSend(db as never, {
       kind: "supplier_inquiry", jobId: d.jobId, refId: d.roundId, createdBy: user.id,
-      payload: { to: d.emails, subject: d.mail.subject, body: d.mail.body, extraFileIds: [d.pdf.fileId], recipientLabel: `dodavateli ${d.supplier.name} (poptávka ${d.number})`, neutralNames: { ...d.names, [d.pdf.fileId]: d.pdf.filename } },
+      payload: {
+        to: d.emails, subject: d.mail.subject, body: d.mail.body, extraFileIds: [d.pdf.fileId], recipientLabel: `dodavateli ${d.supplier.name} (poptávka ${d.number})`, neutralNames: { ...d.names, [d.pdf.fileId]: d.pdf.filename },
+        ...(d.who.chosenMailboxId ? { fromMailboxId: d.who.chosenMailboxId } : {}),
+      },
       fileIds: [...d.files.readyIds, ...d.files.pending],
     });
     if (!q.ok) {
@@ -605,8 +620,8 @@ async function deliver(db: Db, user: RfqActor, d: DeliverInput): Promise<"sent" 
   const res = await sendMail({
     to: d.emails.join(", "), subject: d.mail.subject, text: d.mail.body,
     attachments: [{ filename: d.pdf.filename, content: d.pdf.buffer, contentType: "application/pdf" }, ...d.files.ready],
-    from: { ownerId: user.id }, jobId: d.jobId, senderId: user.id, supplierId: d.supplier.id,
-    signature: { userId: user.id, mode: "inline" }, category: "k_zakazce",
+    from: d.who.from, jobId: d.jobId, senderId: user.id, supplierId: d.supplier.id,
+    signature: { userId: d.who.signerId, mode: "inline" }, category: "k_zakazce",
   });
   if (!res.sent) {
     // K odeslání: stejná zpráva odejde tlačítkem „Přijmout a odeslat" (výkresy přes ochranu jen anonymizované)
@@ -614,6 +629,7 @@ async function deliver(db: Db, user: RfqActor, d: DeliverInput): Promise<"sent" 
       created_by: user.id, status: "failed", last_error: (res.reason ?? "Odeslání selhalo.").slice(0, 1000), attempts: 1,
       payload: {
         mode: "new", to: d.emails.join(", "), subject: d.mail.subject, body: d.mail.body, jobId: d.jobId,
+        ...(d.who.chosenMailboxId ? { fromMailboxId: d.who.chosenMailboxId } : {}),
         attachments: [{ kind: "job", ref: d.pdf.fileId, filename: d.pdf.filename }, ...d.files.readyIds.map((id) => ({ kind: "job", ref: id, filename: d.names[id] }))],
       },
     }).select("id").maybeSingle();

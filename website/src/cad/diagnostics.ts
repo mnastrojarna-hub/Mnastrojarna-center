@@ -1,3 +1,4 @@
+import { tr } from "./i18n";
 /**
  * Diagnostika prostředí pro 3D okno a podporu: dostupnost WebGL, prohlížeč, jádro, chyba.
  * Nikdy neobsahuje data dokumentu (geometrii, názvy dílů, historii) – lze ji bez obav poslat e-mailem.
@@ -18,13 +19,13 @@ export type WebGLProbe = {
 /** Ověří, zda prohlížeč poskytne WebGL kontext (zkouší WebGL 2, pak WebGL 1). Bez vedlejších účinků. */
 export function probeWebGL(): WebGLProbe {
   const none = (reason: string): WebGLProbe => ({ ok: false, api: null, vendor: null, renderer: null, software: false, reason });
-  if (typeof document === "undefined") return none("mimo prohlížeč");
+  if (typeof document === "undefined") return none(tr("mimo prohlížeč"));
   try {
     const c = document.createElement("canvas");
     const attrs: WebGLContextAttributes = { failIfMajorPerformanceCaveat: false, antialias: false, alpha: true };
     const gl2 = c.getContext("webgl2", attrs) as WebGL2RenderingContext | null;
     const gl = gl2 ?? ((c.getContext("webgl", attrs) ?? c.getContext("experimental-webgl", attrs)) as WebGLRenderingContext | null);
-    if (!gl) return none("prohlížeč neposkytl WebGL kontext (grafická akcelerace je vypnutá nebo nedostupná)");
+    if (!gl) return none(tr("prohlížeč neposkytl WebGL kontext (grafická akcelerace je vypnutá nebo nedostupná)"));
     const dbg = gl.getExtension("WEBGL_debug_renderer_info") as { UNMASKED_VENDOR_WEBGL: number; UNMASKED_RENDERER_WEBGL: number } | null;
     const vendor = String(dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : gl.getParameter(gl.VENDOR));
     const renderer = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER));
@@ -36,7 +37,7 @@ export function probeWebGL(): WebGLProbe {
     }
     return { ok: true, api: gl2 ? "webgl2" : "webgl", vendor, renderer, software, reason: null };
   } catch (e) {
-    return none((e as Error)?.message || "chyba při vytváření WebGL kontextu");
+    return none((e as Error)?.message || tr("chyba při vytváření WebGL kontextu"));
   }
 }
 
@@ -57,28 +58,28 @@ export function explainRenderFailure(f: RenderFailure, ua = typeof navigator ===
   const remote = /Citrix|VMware|VirtualBox|Hyper-V|RDP/i.test(ua);
   const steps: string[] = [];
   if (b === "chrome" || b === "edge") {
-    steps.push(`${b === "edge" ? "Edge" : "Chrome"}: Nastavení → Systém → zapněte „Použít grafickou akceleraci, je-li k dispozici“ a prohlížeč restartujte. Stav grafiky ukáže adresa ${b === "edge" ? "edge://gpu" : "chrome://gpu"} (řádek WebGL musí být „Hardware accelerated“ nebo alespoň „Software only“).`);
+    steps.push(tr("{0}: Nastavení → Systém → zapněte „Použít grafickou akceleraci, je-li k dispozici“ a prohlížeč restartujte. Stav grafiky ukáže adresa {1} (řádek WebGL musí být „Hardware accelerated“ nebo alespoň „Software only“).", b === "edge" ? "Edge" : "Chrome", b === "edge" ? "edge://gpu" : "chrome://gpu"));
   } else if (b === "firefox") {
-    steps.push("Firefox: Nastavení → Obecné → Výkon → zapněte „Použít doporučená nastavení výkonu“ (hardwarová akcelerace); v about:config musí být webgl.disabled = false. Stav ukáže about:support → Grafika.");
+    steps.push(tr("Firefox: Nastavení → Obecné → Výkon → zapněte „Použít doporučená nastavení výkonu“ (hardwarová akcelerace); v about:config musí být webgl.disabled = false. Stav ukáže about:support → Grafika."));
   } else if (b === "safari") {
-    steps.push("Safari: aktualizujte macOS / iOS – WebGL je v Safari 16 a novějším zapnuté standardně. Ve starších verzích: Vývoj → Experimentální funkce → WebGL.");
+    steps.push(tr("Safari: aktualizujte macOS / iOS – WebGL je v Safari 16 a novějším zapnuté standardně. Ve starších verzích: Vývoj → Experimentální funkce → WebGL."));
   } else {
-    steps.push("Zapněte v prohlížeči hardwarovou (grafickou) akceleraci a prohlížeč restartujte.");
+    steps.push(tr("Zapněte v prohlížeči hardwarovou (grafickou) akceleraci a prohlížeč restartujte."));
   }
-  steps.push("Pracujete-li přes vzdálenou plochu (RDP), Citrix nebo ve virtuálním stroji, otevřete CAD přímo na počítači s grafickou kartou – vzdálené relace WebGL často neposkytují.");
-  steps.push("Aktualizujte ovladač grafické karty (Windows Update nebo web výrobce: NVIDIA, AMD, Intel) a restartujte počítač.");
-  steps.push("Zkuste jiný prohlížeč v aktuální verzi: Chrome, Edge, Firefox nebo Safari.");
-  steps.push("Nebo jiné zařízení – WebGL zvládá i běžný notebook či telefon z posledních let.");
+  steps.push(tr("Pracujete-li přes vzdálenou plochu (RDP), Citrix nebo ve virtuálním stroji, otevřete CAD přímo na počítači s grafickou kartou – vzdálené relace WebGL často neposkytují."));
+  steps.push(tr("Aktualizujte ovladač grafické karty (Windows Update nebo web výrobce: NVIDIA, AMD, Intel) a restartujte počítač."));
+  steps.push(tr("Zkuste jiný prohlížeč v aktuální verzi: Chrome, Edge, Firefox nebo Safari."));
+  steps.push(tr("Nebo jiné zařízení – WebGL zvládá i běžný notebook či telefon z posledních let."));
   const cause = f.lost
-    ? "Grafický kontext WebGL byl během práce ztracen – nejčastěji po probuzení počítače, při přetížení grafické paměti, pádu ovladače grafiky nebo příliš mnoha otevřených 3D oknech."
+    ? tr("Grafický kontext WebGL byl během práce ztracen – nejčastěji po probuzení počítače, při přetížení grafické paměti, pádu ovladače grafiky nebo příliš mnoha otevřených 3D oknech.")
     : !f.probe.ok
-      ? `Prohlížeč neposkytl WebGL, tedy hardwarově akcelerovanou grafiku, kterou 3D zobrazení potřebuje (${f.probe.reason ?? "bez bližšího důvodu"}). Nejčastější příčiny: vypnutá grafická akcelerace v prohlížeči, vzdálená plocha nebo virtuální stroj bez grafické karty, zastaralý ovladač grafiky, firemní zásady prohlížeče.${remote ? " Podle identifikace prohlížeče jde o vzdálenou nebo virtuální relaci." : ""}`
-      : `WebGL je dostupné (${f.probe.renderer ?? f.probe.api}), ale 3D vykreslování se nepodařilo spustit: ${f.error.message}. Může jít o vyčerpanou grafickou paměť nebo příliš mnoho otevřených 3D oken.`;
+      ? tr("Prohlížeč neposkytl WebGL, tedy hardwarově akcelerovanou grafiku, kterou 3D zobrazení potřebuje ({0}). Nejčastější příčiny: vypnutá grafická akcelerace v prohlížeči, vzdálená plocha nebo virtuální stroj bez grafické karty, zastaralý ovladač grafiky, firemní zásady prohlížeče.{1}", f.probe.reason ?? tr("bez bližšího důvodu"), remote ? tr(" Podle identifikace prohlížeče jde o vzdálenou nebo virtuální relaci.") : "")
+      : tr("WebGL je dostupné ({0}), ale 3D vykreslování se nepodařilo spustit: {1}. Může jít o vyčerpanou grafickou paměť nebo příliš mnoho otevřených 3D oken.", f.probe.renderer ?? f.probe.api, f.error.message);
   return {
-    title: f.lost ? "3D okno přestalo fungovat" : "3D okno nelze spustit",
+    title: f.lost ? tr("3D okno přestalo fungovat") : tr("3D okno nelze spustit"),
     cause,
     steps,
-    note: "Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Jen se nezobrazí 3D model.",
+    note: tr("Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Jen se nezobrazí 3D model."),
   };
 }
 
@@ -91,22 +92,22 @@ export function collectDiagnostics(o: { error?: Error | null; probe?: WebGLProbe
   const probe = o.probe ?? probeWebGL();
   const nav = n as (Navigator & { deviceMemory?: number; userAgentData?: { platform?: string } }) | null;
   const lines = [
-    "Mnástrojárna CAD – diagnostika (bez dat dokumentu)",
-    `Verze CADu: ${CAD_VERSION}`,
-    `Čas: ${new Date().toISOString()}`,
+    tr("Mnástrojárna CAD – diagnostika (bez dat dokumentu)"),
+    tr("Verze CADu: {0}", CAD_VERSION),
+    tr("Čas: {0}", new Date().toISOString()),
     `Adresa: ${w ? w.location.origin + w.location.pathname : "–"}`,
-    `Prohlížeč: ${n?.userAgent ?? "–"} (${browserOf(n?.userAgent ?? "")})`,
-    `Platforma: ${nav?.userAgentData?.platform || nav?.platform || "–"} · jazyk ${n?.language ?? "–"} · jader CPU ${n?.hardwareConcurrency ?? "–"} · paměť ${nav?.deviceMemory ? `${nav.deviceMemory} GB` : "–"}`,
-    `Obrazovka: ${w ? `${w.screen.width}×${w.screen.height}` : "–"} · okno ${w ? `${w.innerWidth}×${w.innerHeight}` : "–"} · DPR ${w?.devicePixelRatio ?? "–"} · dotyk ${yes(n && n.maxTouchPoints > 0)}`,
+    tr("Prohlížeč: {0} ({1})", n?.userAgent ?? "–", browserOf(n?.userAgent ?? "")),
+    tr("Platforma: {0} · jazyk {1} · jader CPU {2} · paměť {3}", nav?.userAgentData?.platform || nav?.platform || "–", n?.language ?? "–", n?.hardwareConcurrency ?? "–", nav?.deviceMemory ? `${nav.deviceMemory} GB` : "–"),
+    tr("Obrazovka: {0} · okno {1} · DPR {2} · dotyk {3}", w ? `${w.screen.width}×${w.screen.height}` : "–", w ? `${w.innerWidth}×${w.innerHeight}` : "–", w?.devicePixelRatio ?? "–", yes(n && n.maxTouchPoints > 0)),
     `WebGL: ${probe.ok ? `dostupné (${probe.api}) · ${probe.renderer ?? "?"} · ${probe.vendor ?? "?"}` : `nedostupné – ${probe.reason ?? "?"}`}`,
-    `Softwarové vykreslování: ${yes(probe.software)}`,
+    tr("Softwarové vykreslování: {0}", yes(probe.software)),
     `WebAssembly: ${yes(typeof WebAssembly !== "undefined")} · SharedArrayBuffer: ${yes(typeof SharedArrayBuffer !== "undefined")} · crossOriginIsolated: ${yes(w && (w as Window & { crossOriginIsolated?: boolean }).crossOriginIsolated)}`,
-    `Jádro OCCT: ${o.core ?? "–"}`,
+    tr("Jádro OCCT: {0}", o.core ?? "–"),
     `Online: ${yes(n?.onLine ?? true)} · cookies: ${yes(n?.cookieEnabled)}`,
   ];
-  if (o.lost) lines.push("Událost: WebGL kontext ztracen");
+  if (o.lost) lines.push(tr("Událost: WebGL kontext ztracen"));
   if (o.error) {
-    lines.push(`Chyba: ${o.error.message || String(o.error)}`);
+    lines.push(tr("Chyba: {0}", o.error.message || String(o.error)));
     const st = (o.error.stack ?? "").split("\n").slice(1, 4).map((l) => "  " + l.trim());
     lines.push(...st);
   }

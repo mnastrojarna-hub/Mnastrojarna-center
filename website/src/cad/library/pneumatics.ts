@@ -1,4 +1,5 @@
 /** Pneumatika: válce ISO 15552 a ISO 6432, nástrčné šroubení (zjednodušené geometrie). */
+import { tr } from "../i18n";
 import { uid, type Feature } from "../types";
 import { has, nums, score } from "./parse-util";
 import type { Family } from "./types";
@@ -47,11 +48,11 @@ export const cylinderIso15552: Family = {
   standards: ["ISO 15552", "VDMA 24562", "DIN ISO 6431"],
   keywords: ["pneumaticky valec", "pneumaticky", "valec iso 15552", "15552", "vdma", "6431", "pneumatic cylinder", "festo dsbc", "smc"],
   params: [
-    { key: "bore", label: "Průměr pístu", kind: "enum", options: Object.keys(ISO15552).map((k) => ({ v: k, l: `Ø${k} (${ISO15552[Number(k)].AM} mm)` })), default: "50" },
-    { key: "stroke", label: "Zdvih", kind: "number", min: 10, max: 2000, step: 5, unit: "mm", default: 100 },
-    { key: "extended", label: "Vysunutá pístnice", kind: "bool", default: false },
+    { key: "bore", label: tr("Průměr pístu"), kind: "enum", options: Object.keys(ISO15552).map((k) => ({ v: k, l: tr("Ø{0} ({1} mm)", k, ISO15552[Number(k)].AM) })), default: "50" },
+    { key: "stroke", label: tr("Zdvih"), kind: "number", min: 10, max: 2000, step: 5, unit: "mm", default: 100 },
+    { key: "extended", label: tr("Vysunutá pístnice"), kind: "bool", default: false },
   ],
-  sizes: { key: "bore", columns: [{ key: "AM", label: "AM" }, { key: "MM", label: "pístnice" }, { key: "KK", label: "závit" }, { key: "port", label: "přípoj" }], rows: Object.entries(ISO15552).map(([k, v]) => ({ bore: k, ...v })) },
+  sizes: { key: "bore", columns: [{ key: "AM", label: "AM" }, { key: "MM", label: tr("pístnice") }, { key: "KK", label: tr("závit") }, { key: "port", label: tr("přípoj") }], rows: Object.entries(ISO15552).map(([k, v]) => ({ bore: k, ...v })) },
   parse: (q) => (has(q, "6432", "mini", "kruhov", "kulat") ? null : parseCyl(q, Object.keys(ISO15552).map(Number), ["pneumat", "valec", "15552", "vdma", "6431", "cylinder", "dsbc", "dnc"])),
   describe: (v) => `Válec ISO 15552 Ø${v.bore}×${fmt(num(v.stroke))}`,
   make: (v) => {
@@ -62,14 +63,14 @@ export const cylinderIso15552: Family = {
     const ext = v.extended ? stroke : 0;
     const f: Feature[] = [
       { id: uid(), name: "Tělo (profil)", type: "cylinder", radius: bore / 2 + 4, height: stroke, position: [0, 0, c.cap], axis: "Z", mode: "new" },
-      box("Víko zadní", [c.AM, c.AM, c.cap], [0, 0, c.cap / 2], "add"),
-      box("Víko přední", [c.AM, c.AM, c.cap], [0, 0, L - c.cap / 2], "add"),
+      box(tr("Víko zadní"), [c.AM, c.AM, c.cap], [0, 0, c.cap / 2], "add"),
+      box(tr("Víko přední"), [c.AM, c.AM, c.cap], [0, 0, L - c.cap / 2], "add"),
     ];
     const o = c.AM / 2 - c.tie;
-    for (const [i, [x, y]] of [[-o, -o], [o, -o], [o, o], [-o, o]].entries()) f.push(cyl(`Táhlo ${i + 1}`, c.tie, L, 0, "add", "Z", [x, y]), cyl(`Matice táhla ${i + 1}`, c.tie * 1.6, c.tie * 0.8, L, "add", "Z", [x, y]));
-    f.push(cyl("Pístnice", c.MM, c.cap + 10 + ext, L - 2, "add"), cyl("Vedení pístnice", c.MM + 8, 6, L, "add"));
+    for (const [i, [x, y]] of [[-o, -o], [o, -o], [o, o], [-o, o]].entries()) f.push(cyl(tr("Táhlo {0}", i + 1), c.tie, L, 0, "add", "Z", [x, y]), cyl(tr("Matice táhla {0}", i + 1), c.tie * 1.6, c.tie * 0.8, L, "add", "Z", [x, y]));
+    f.push(cyl(tr("Pístnice"), c.MM, c.cap + 10 + ext, L - 2, "add"), cyl(tr("Vedení pístnice"), c.MM + 8, 6, L, "add"));
     f.push({ id: uid(), name: "Přípoj 1", type: "cylinder", radius: 5, height: c.AM / 2 + 1, position: [0, 0, c.cap / 2], axis: "Y", mode: "cut" }, { id: uid(), name: "Přípoj 2", type: "cylinder", radius: 5, height: c.AM / 2 + 1, position: [0, 0, L - c.cap / 2], axis: "Y", mode: "cut" });
-    return part(`Válec ISO 15552 Ø${bore}×${fmt(stroke)}`, "hlinik", f, `ISO 15552 – Ø${bore}×${fmt(stroke)} – ${c.KK} – ${c.port}`, "#d6d9dd");
+    return part(tr("Válec ISO 15552 Ø{0}×{1}", bore, fmt(stroke)), "hlinik", f, tr("ISO 15552 – Ø{0}×{1} – {2} – {3}", bore, fmt(stroke), c.KK, c.port), "#d6d9dd");
   },
 };
 
@@ -81,11 +82,11 @@ export const cylinderIso6432: Family = {
   standards: ["ISO 6432", "CETOP RP 52 P"],
   keywords: ["minivalec", "kruhovy valec", "valec iso 6432", "6432", "mini cylinder", "round cylinder", "dsnu"],
   params: [
-    { key: "bore", label: "Průměr pístu", kind: "enum", options: Object.keys(ISO6432).map((k) => ({ v: k, l: `Ø${k}` })), default: "20" },
-    { key: "stroke", label: "Zdvih", kind: "number", min: 10, max: 500, step: 5, unit: "mm", default: 50 },
-    { key: "extended", label: "Vysunutá pístnice", kind: "bool", default: false },
+    { key: "bore", label: tr("Průměr pístu"), kind: "enum", options: Object.keys(ISO6432).map((k) => ({ v: k, l: `Ø${k}` })), default: "20" },
+    { key: "stroke", label: tr("Zdvih"), kind: "number", min: 10, max: 500, step: 5, unit: "mm", default: 50 },
+    { key: "extended", label: tr("Vysunutá pístnice"), kind: "bool", default: false },
   ],
-  sizes: { key: "bore", columns: [{ key: "OD", label: "Ø těla" }, { key: "MM", label: "pístnice" }, { key: "KK", label: "závit" }], rows: Object.entries(ISO6432).map(([k, v]) => ({ bore: k, ...v })) },
+  sizes: { key: "bore", columns: [{ key: "OD", label: tr("Ø těla") }, { key: "MM", label: tr("pístnice") }, { key: "KK", label: tr("závit") }], rows: Object.entries(ISO6432).map(([k, v]) => ({ bore: k, ...v })) },
   parse: (q) => {
     if (!has(q, "6432", "mini", "kruhov", "kulat", "dsnu")) return null;
     return parseCyl(q, Object.keys(ISO6432).map(Number), ["pneumat", "valec", "6432", "mini", "cylinder", "dsnu", "kruhov"]);
@@ -98,15 +99,15 @@ export const cylinderIso6432: Family = {
     const cap = c.OD * 0.8;
     const L = stroke + 2 * cap;
     const ext = v.extended ? stroke : 0;
-    return part(`Miniválec ISO 6432 Ø${bore}×${fmt(stroke)}`, "nerez", [
-      cyl("Tělo", c.OD, L, 0, "new"),
-      cyl("Víko zadní", c.OD + 2, cap, 0, "add"),
-      cyl("Víko přední", c.OD + 2, cap, L - cap, "add"),
-      cyl("Závit zadní", c.MM + 2, c.OD * 0.5, -c.OD * 0.5, "add"),
-      cyl("Pístnice", c.MM, c.OD * 0.8 + ext, L, "add"),
+    return part(tr("Miniválec ISO 6432 Ø{0}×{1}", bore, fmt(stroke)), "nerez", [
+      cyl(tr("Tělo"), c.OD, L, 0, "new"),
+      cyl(tr("Víko zadní"), c.OD + 2, cap, 0, "add"),
+      cyl(tr("Víko přední"), c.OD + 2, cap, L - cap, "add"),
+      cyl(tr("Závit zadní"), c.MM + 2, c.OD * 0.5, -c.OD * 0.5, "add"),
+      cyl(tr("Pístnice"), c.MM, c.OD * 0.8 + ext, L, "add"),
       { id: uid(), name: "Přípoj 1", type: "cylinder", radius: 2.5, height: c.OD / 2 + 2, position: [0, 0, cap / 2], axis: "Y", mode: "cut" },
       { id: uid(), name: "Přípoj 2", type: "cylinder", radius: 2.5, height: c.OD / 2 + 2, position: [0, 0, L - cap / 2], axis: "Y", mode: "cut" },
-    ], `ISO 6432 – Ø${bore}×${fmt(stroke)} – ${c.KK}`, "#b9c2cc");
+    ], tr("ISO 6432 – Ø{0}×{1} – {2}", bore, fmt(stroke), c.KK), "#b9c2cc");
   },
 };
 
@@ -119,8 +120,8 @@ export const pushInFitting: Family = {
   standards: ["ISO 14743"],
   keywords: ["nastrcne sroubeni", "sroubeni", "nastrcna spojka", "push-in fitting", "push in", "fitting", "qs"],
   params: [
-    { key: "tube", label: "Hadice Ø", kind: "enum", options: [4, 6, 8, 10, 12].map((x) => ({ v: String(x), l: `Ø${x}` })), default: "8" },
-    { key: "thread", label: "Závit", kind: "enum", options: Object.keys(FIT_THREADS).map((k) => ({ v: k, l: k })), default: "G1/4" },
+    { key: "tube", label: tr("Hadice Ø"), kind: "enum", options: [4, 6, 8, 10, 12].map((x) => ({ v: String(x), l: `Ø${x}` })), default: "8" },
+    { key: "thread", label: tr("Závit"), kind: "enum", options: Object.keys(FIT_THREADS).map((k) => ({ v: k, l: k })), default: "G1/4" },
   ],
   parse: (q) => {
     const kw = has(q, "sroubeni", "nastrcn", "push-in", "push in", "fitting", "qs");
@@ -135,14 +136,14 @@ export const pushInFitting: Family = {
     const t = num(v.tube, 8);
     const th = FIT_THREADS[str(v.thread, "G1/4")] ?? FIT_THREADS["G1/4"];
     const bodyD = t + 6;
-    return part(`Šroubení Ø${t} ${v.thread}`, "mosaz", [
-      cyl("Závit", th.od, 8, 0, "new"),
+    return part(tr("Šroubení Ø{0} {1}", t, v.thread), "mosaz", [
+      cyl(tr("Závit"), th.od, 8, 0, "new"),
       chamferAll(0.4),
-      ...hexPrism("Šestihran", th.s, 5, 8, "add"),
-      cyl("Tělo", bodyD, 10, 13, "add"),
-      tube("Uvolňovací kroužek", t + 4, t + 0.2, 3, 23, "add"),
-      cyl("Kanál", t * 0.65, 30, -1, "cut"),
-    ], `Šroubení push-in Ø${t} – ${v.thread}`, "#c9a46a");
+      ...hexPrism(tr("Šestihran"), th.s, 5, 8, "add"),
+      cyl(tr("Tělo"), bodyD, 10, 13, "add"),
+      tube(tr("Uvolňovací kroužek"), t + 4, t + 0.2, 3, 23, "add"),
+      cyl(tr("Kanál"), t * 0.65, 30, -1, "cut"),
+    ], tr("Šroubení push-in Ø{0} – {1}", t, v.thread), "#c9a46a");
   },
 };
 

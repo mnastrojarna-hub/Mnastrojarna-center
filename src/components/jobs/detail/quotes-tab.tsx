@@ -25,6 +25,7 @@ import { approvedToast, returnedSuffix } from "@/components/flow/quote-approval-
 import { quoteApprovedStamp, quoteCardFlag } from "./approval";
 import type { ActionResult, JobDetail, JobQuote } from "@/lib/jobs/types";
 import { cn, relativeTime } from "@/lib/utils";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
 import { useJobDetail } from "./detail-context";
 import { ConfirmDialog } from "./confirm-dialog";
 import { QuoteEditorDialog } from "./quote-editor-dialog";
@@ -32,6 +33,7 @@ import { QuoteSendDialog } from "./quote-send-dialog";
 import { PersonChip } from "./inline-field";
 import { PrintButton } from "@/components/print/print-button";
 import { useFlowActions } from "./flow-actions";
+import { pdfVersionsText, quoteDeletePlan } from "@/lib/jobs/quote-files";
 import {
   quoteActions, quoteDisplayOf, splitQuotes, quoteFormFromJob, quoteFormFromQuote, formatMoney, formatQty, longDate,
   type QuoteAction, type QuoteFormState,
@@ -83,8 +85,8 @@ const FLOW_KEY: Partial<Record<QuoteAction, FlowActionKey>> = {
 };
 
 function QuoteCard({
-  quote, jobId, onDialog, compact,
-}: { quote: JobQuote; jobId: string; onDialog: (d: Dialogs) => void; compact?: boolean }) {
+  quote, jobId, onDialog, compact, premium = false,
+}: { quote: JobQuote; jobId: string; onDialog: (d: Dialogs) => void; compact?: boolean; premium?: boolean }) {
   const { perms, notify, refresh } = useJobDetail();
   const flow = useFlowActions();
   const [busy, setBusy] = React.useState<QuoteAction | null>(null);
@@ -147,8 +149,18 @@ function QuoteCard({
   const menuActions = actions.filter((a) => MENU[a] && a !== "requestApproval" && a !== "returnToAuthor");
 
   return (
-    <article className={cn("relative overflow-hidden rounded-xl border bg-card shadow-sm", quote.archived && "opacity-75", quote.accepted && "ring-2 ring-green-500/40")}>
+    <article
+      className={cn(
+        "relative overflow-hidden rounded-xl border bg-card shadow-sm",
+        // 9. 11.: nabídka prémiového zákazníka — stejně výrazně jako v Knize
+        premium && PREMIUM_ROW,
+        quote.archived && "opacity-75",
+        quote.accepted && "ring-2 ring-green-500/40",
+      )}
+      data-premium={premium ? "1" : undefined}
+    >
       <span className={cn("absolute inset-y-0 left-0 w-1.5", FLOW_PALETTE[meta.palette].dot)} aria-hidden />
+      {premium && <span aria-hidden className={PREMIUM_STRIPE} />}
       <div className="space-y-3 p-4 pl-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 space-y-1">
@@ -156,6 +168,7 @@ function QuoteCard({
               <FileText className="h-4 w-4 text-violet-500" />
               <span className="font-mono text-sm font-bold">{quote.number}</span>
               <span className="rounded bg-muted px-1.5 py-px text-[11px] font-medium text-muted-foreground">rev. {quote.revision}</span>
+              {premium && <PremiumBadge label="flow" size="xs" />}
               {/* #25: čekající nabídku označuje výrazný štítek pod číslem — fialový chip by „Neschválená“ jen opakoval */}
               {!(flag && flag.kind === "pending") && <QuoteStateBadge quote={quote} />}
               {quote.accepted && (
@@ -385,6 +398,8 @@ export function QuotesTab({ job }: { job: JobDetail }) {
     setDialog({ kind: "none" });
   };
   const fallbackTo = job.customerContactEmail ?? job.customerDetail?.email ?? "";
+  // nabídka ↔ PDF: s nabídkou se smažou i její vystavená PDF v Dokumentech (nahrané soubory jen bez vazby)
+  const deletePlan = dialog.kind === "delete" ? quoteDeletePlan(dialog.quote, job.files) : null;
 
   const newQuote = () => setDialog({ kind: "editor", initial: quoteFormFromJob(job) });
 
@@ -419,7 +434,7 @@ export function QuotesTab({ job }: { job: JobDetail }) {
       ) : (
         <div className="space-y-3">
           {current.map((q) => (
-            <QuoteCard key={q.id} quote={q} jobId={job.id} onDialog={setDialog} />
+            <QuoteCard key={q.id} quote={q} jobId={job.id} onDialog={setDialog} premium={job.customerPremium === true} />
           ))}
         </div>
       )}
@@ -438,7 +453,7 @@ export function QuotesTab({ job }: { job: JobDetail }) {
           {showArchive && (
             <div className="mt-3 space-y-3">
               {archived.map((q) => (
-                <QuoteCard key={q.id} quote={q} jobId={job.id} onDialog={setDialog} compact />
+                <QuoteCard key={q.id} quote={q} jobId={job.id} onDialog={setDialog} compact premium={job.customerPremium === true} />
               ))}
             </div>
           )}
@@ -454,6 +469,8 @@ export function QuotesTab({ job }: { job: JobDetail }) {
         approved={dialog.kind === "editor" ? Boolean(dialog.quote?.approvedBy) : false}
         currency={dialog.kind === "editor" ? dialog.quote?.currency ?? job.currency : job.currency}
         authorId={dialog.kind === "editor" ? dialog.quote?.createdBy?.id ?? null : undefined}
+        premium={job.customerPremium === true}
+        customerName={job.customer?.name}
       />
       {dialog.kind === "send" && (
         <QuoteSendDialog
@@ -461,6 +478,8 @@ export function QuotesTab({ job }: { job: JobDetail }) {
           onOpenChange={close}
           quote={dialog.quote}
           fallback={{ to: fallbackTo, jobNumber: job.number, title: job.title, contact: job.customerContact }}
+          premium={job.customerPremium === true}
+          customerName={job.customer?.name}
         />
       )}
       {dialog.kind === "accept" && (
@@ -497,12 +516,17 @@ export function QuotesTab({ job }: { job: JobDetail }) {
           onConfirm={async () => {
             const res = await deleteJobQuote(dialog.quote.id);
             if (!res.ok) return res.error ?? "Nepovedlo se.";
-            notify("success", `Nabídka ${dialog.quote.number} smazána.`);
+            notify("success", res.removedFiles ? `Nabídka ${dialog.quote.number} smazána i s PDF v Dokumentech.` : `Nabídka ${dialog.quote.number} smazána.`);
             refresh();
             return null;
           }}
         >
-          Nabídka zmizí i s položkami. Pokud ji chceš jen schovat, použij raději <em>Archivovat</em>.
+          Nabídka zmizí i s položkami
+          {deletePlan && deletePlan.pdfs > 0 && (
+            <> a <strong className="text-foreground">smaže se i její PDF v Dokumentech</strong> ({pdfVersionsText(deletePlan.pdfs)})</>
+          )}.
+          {deletePlan && deletePlan.linked > 0 && <> Nahrané soubory k nabídce ({deletePlan.linked}) zůstanou v Dokumentech bez vazby.</>}
+          {" "}Pokud ji chceš jen schovat, použij raději <em>Archivovat</em>.
         </ConfirmDialog>
       )}
     </div>

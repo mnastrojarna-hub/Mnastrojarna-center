@@ -147,10 +147,11 @@ describe("rozhodnutí: kopie s názvem firmy nikdy hotovo", () => {
     // varování „doplněno a ověřeno znovu“ (uzdravený únik) samo o sobě kopii nezastaví
     expect(decideAnonStatus({ ...base, warnings: [{ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu." }] }).status).toBe("done");
   });
-  it("automatické opakování: jen s AI, jen 1. pokus, ne po ručním uložení", () => {
+  it("automatické opakování: jen s AI, v rámci 3 rychlých pokusů (majitel 5. 11.: třetí pokus dělá systém, ne člověk), ne po ručním uložení", () => {
     const r = { status: "failed" as const, reason: COMPANY_LEAK_TEXT, aiUsed: true, manualSave: false, attempts: 1 };
     expect(companyLeakRetry(r)).toBe(true);
-    expect(companyLeakRetry({ ...r, attempts: 2 })).toBe(false);
+    expect(companyLeakRetry({ ...r, attempts: 2 })).toBe(true);
+    expect(companyLeakRetry({ ...r, attempts: 3 })).toBe(false);
     expect(companyLeakRetry({ ...r, aiUsed: false })).toBe(false);
     expect(companyLeakRetry({ ...r, manualSave: true })).toBe(false);
     expect(companyLeakRetry({ ...r, reason: "Jiná chyba" })).toBe(false);

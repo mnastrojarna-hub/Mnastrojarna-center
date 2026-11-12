@@ -12,6 +12,7 @@ import {
   CustomerDocNumber, CustomerNoteMark, DeadlineBlock, DrawingChips, JobCounters, JobValue, PaymentMark, PeopleStack,
   PriorityMark, ProductionLine, SourceMark,
 } from "@/components/jobs/book/job-cells";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
 import { stageMeta } from "@/lib/jobs/stages";
 import type { JobListItem } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
@@ -117,9 +118,13 @@ function JobRow({ job, today, access }: { job: JobListItem; today: string; acces
       className={cn(
         "group relative overflow-hidden rounded-xl border bg-card shadow-sm transition",
         "hover:border-foreground/15 hover:shadow-md focus-within:ring-2 focus-within:ring-ring/40",
+        // 9. 11.: prémiový zákazník — červený okraj, podklad a pruh vpravo (levý pruh = barva stavu)
+        job.customerPremium && PREMIUM_ROW,
       )}
+      data-premium={job.customerPremium ? "1" : undefined}
     >
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", m.bar)} />
+      {job.customerPremium && <span aria-hidden className={PREMIUM_STRIPE} />}
       <div className={cn(LAYOUT, "py-3 pl-5 pr-3")}>
         {/* číslo + příznaky + číslo dokladu zákazníka (na mobilu je doklad u zákazníka) */}
         <div className="order-1 flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 lg:order-none [grid-area:id] xl:flex-col xl:items-start">
@@ -135,6 +140,7 @@ function JobRow({ job, today, access }: { job: JobListItem; today: string; acces
             <SourceMark source={job.source} aiFilled={job.aiFilled} />
             <CustomerNoteMark note={job.customerNote} />
           </span>
+          {job.customerPremium && <PremiumBadge label="book" size="xs" />}
           <CustomerDocNumber job={job} className="hidden lg:inline-flex" />
         </div>
 

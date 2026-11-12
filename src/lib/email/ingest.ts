@@ -22,7 +22,8 @@ import { outgoingCategory, ruleCategorize } from "@/lib/email/mail-rules";
 import { decodePart, mimeLeaves, isAttachmentLeaf, type AttachmentMeta } from "@/lib/email/mime-parts";
 import { replyHeaders, replySubject } from "@/lib/email/threading";
 import { createAdminClient, hasServiceKey, isSupabaseConfigured } from "@/lib/supabase/server";
-import { aiMailActor, loadMailJobAiBudget, processEmailForJobs, MAIL_JOB_CHANGES_MAX_AGE_DAYS, type MailJobActor } from "@/lib/email/job-link-store";
+import { aiMailActor, loadMailJobAiBudget, processEmailForJobs, stageSignalForLinkedEmail, MAIL_JOB_CHANGES_MAX_AGE_DAYS, type MailJobActor } from "@/lib/email/job-link-store";
+import { mailStageLearningPrompt } from "@/lib/email/mail-stage-store";
 import { categoryAfterLink, STRONG_SIGNALS } from "@/lib/email/job-match";
 import { aiActor, cronActor, type ActorContext } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
@@ -378,7 +379,8 @@ export async function ingestEmailsProgress(
   if (!isFresh.some(Boolean)) return { processed: emails.length, ingested: 0 };
 
   const wantsAi = useAi && emails.some((e, i) => isFresh[i] && (e.direction ?? "in") === "in" && isRecent(e.receivedAt, policy.recentDays));
-  const rules = wantsAi ? await getAgentInstructions("email") : undefined; // slovní pravidla agenta
+  // slovní pravidla agenta + naučené korekce stavů zakázky z pošty (job_signal)
+  const rules = wantsAi ? [await getAgentInstructions("email"), await mailStageLearningPrompt()].filter(Boolean).join("\n\n") : undefined;
   const replyMode = wantsAi ? await getModuleMode("reply") : "approval"; // 'full' = odeslat hned
   // odpověď jde ze schránky, kam e-mail přišel; pošta globálního účtu (bez schránky) = firemní schránka
   const replyFrom = box ? { mailboxId: box } : { system: true as const };
@@ -470,6 +472,8 @@ export async function ingestEmailsProgress(
     if (!inserted) continue; // souběžně už uloženo
     count++;
     const emailId = (inserted as { id: string }).id;
+    // signál stavu zakázky z AI (zvlášť — vložení e-mailu na novém sloupci nezávisí)
+    if (analysis?.job_signal) await db.from("emails").update({ ai_job_signal: analysis.job_signal } as never).eq("id", emailId);
     await saveAttachments(db, emailId, e);
     try {
       jobActor ??= aiMailActor(opts.ownerId ?? null);
@@ -555,8 +559,9 @@ export async function aiCategorizeStored(
   if (!(await isMailAiEnabled())) return { done: 0, error: "AI je vypnutá nebo chybí Claude API klíč (Nastavení)." };
   const db = createAdminClient({ actor: aiActor(opts.ownerId ?? null, "email-ingest", "email") });
   const { data } = await db.from("emails").select("id, from_email, subject, body_text, owner_id, order_id, job_link_source, supplier_id, customer_id").in("id", ids.slice(0, 100));
-  const rules = await getAgentInstructions("email");
+  const rules = [await getAgentInstructions("email"), await mailStageLearningPrompt()].filter(Boolean).join("\n\n");
   let done = 0;
+  let stageActor: MailJobActor | null = null;
   type StoredRow = {
     id: string; from_email: string | null; subject: string | null; body_text: string | null;
     order_id?: string | null; job_link_source?: string | null; supplier_id?: string | null; customer_id?: string | null;
@@ -583,6 +588,15 @@ export async function aiCategorizeStored(
         ai_confidence: clamp(a.confidence, 0, 1, 0), ai_summary: a.summary ?? null, ai_pending: false,
       } as never).eq("id", row.id);
       done++;
+      if (a.job_signal) {
+        await db.from("emails").update({ ai_job_signal: a.job_signal } as never).eq("id", row.id);
+        // už přiřazený k zakázce: stav zakázky z pošty teď (vytěžení proběhlo bez AI)
+        if (row.order_id && a.job_signal.kind !== "none") {
+          stageActor ??= aiMailActor(opts.ownerId ?? null);
+          await stageSignalForLinkedEmail(stageActor, row.id).catch((err: unknown) =>
+            console.error(`[mail:ai] Stav zakázky z e-mailu selhal: ${err instanceof Error ? err.message : String(err)}`));
+        }
+      }
     } catch (err) {
       console.error(`[mail:ai] Dotřídění selhalo: ${err instanceof Error ? err.message : String(err)}`);
     }

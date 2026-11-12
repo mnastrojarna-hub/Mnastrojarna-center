@@ -165,7 +165,8 @@ describe.skipIf(!ENABLED)("Kniha a karta zakázky — podrobné stavy ↔ lokál
     expect(preview).toMatchObject({ ok: true, from: "nabidka", reasonRequired: true, allowed: true });
     expect(preview.lines?.join("\n")).toContain(`Nabídka ${PREFIX}-Q1 → Zamítnutá`);
     as("worker");
-    expect((await jf.previewJobStage(jobId, "nerealizovano")).allowed).toBe(false);
+    expect((await jf.previewJobStage(jobId, "nerealizovano")).allowed).toBe(true); // 9. 11.: speciální stavy každý
+    expect((await jf.previewJobStage(jobId, "dokonceno")).allowed).toBe(false);
     as("sales");
     expect(await flow.moveJobStage(jobId, "objednavka", { note: "telefonem" })).toMatchObject({ ok: true, stage: "objednavka", orderStatus: "dorucena" });
     const mine = await data.listJobs({ group: "vse", changedBy: id("sales") });

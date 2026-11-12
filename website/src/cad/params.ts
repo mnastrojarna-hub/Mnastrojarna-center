@@ -3,6 +3,7 @@
  * vazby parametrů prvků na výrazy a stavy (konfigurace) – obdoba „Správce rovnic“ v ZW3D/Inventoru.
  * Goniometrické funkce pracují ve stupních.
  */
+import { tr } from "./i18n";
 import type { CadDoc, Feature, Variable } from "./types";
 
 type Tok = { t: "num"; v: number } | { t: "id"; v: string } | { t: "op"; v: string };
@@ -57,7 +58,7 @@ function tokenize(src: string): Tok[] {
       i++;
       continue;
     }
-    throw new Error(`Neplatný znak „${c}“ ve výrazu.`);
+    throw new Error(tr("Neplatný znak „{0}“ ve výrazu.", c));
   }
   return out;
 }
@@ -83,12 +84,12 @@ export function exprRefs(expr: string): string[] {
 /** Vyhodnotí výraz; neznámá proměnná nebo chyba syntaxe → Error s českou zprávou. */
 export function evalExpr(expr: string, scope: Record<string, number> = {}): number {
   const toks = tokenize(expr);
-  if (!toks.length) throw new Error("Prázdný výraz.");
+  if (!toks.length) throw new Error(tr("Prázdný výraz."));
   let p = 0;
   const peek = () => toks[p];
   const isOp = (v: string) => peek()?.t === "op" && peek()!.v === v;
   const expect = (v: string) => {
-    if (!isOp(v)) throw new Error(`Ve výrazu chybí „${v}“.`);
+    if (!isOp(v)) throw new Error(tr("Ve výrazu chybí „{0}“.", v));
     p++;
   };
 
@@ -108,7 +109,7 @@ export function evalExpr(expr: string, scope: Record<string, number> = {}): numb
     while (isOp("*") || isOp("/")) {
       const op = toks[p++].v;
       const r = parseUnary();
-      if (op === "/" && r === 0) throw new Error("Dělení nulou.");
+      if (op === "/" && r === 0) throw new Error(tr("Dělení nulou."));
       v = op === "*" ? v * r : v / r;
     }
     return v;
@@ -136,7 +137,7 @@ export function evalExpr(expr: string, scope: Record<string, number> = {}): numb
   };
   const parsePrimary = (): number => {
     const t = toks[p];
-    if (!t) throw new Error("Neúplný výraz.");
+    if (!t) throw new Error(tr("Neúplný výraz."));
     if (t.t === "num") {
       p++;
       return t.v;
@@ -151,7 +152,7 @@ export function evalExpr(expr: string, scope: Record<string, number> = {}): numb
       p++;
       if (isOp("(")) {
         const fn = FUNCS[t.v.toLowerCase()];
-        if (!fn) throw new Error(`Neznámá funkce „${t.v}“.`);
+        if (!fn) throw new Error(tr("Neznámá funkce „{0}“.", t.v));
         p++;
         const args: number[] = [];
         if (!isOp(")")) {
@@ -166,14 +167,14 @@ export function evalExpr(expr: string, scope: Record<string, number> = {}): numb
       }
       if (t.v in scope) return scope[t.v];
       if (t.v in CONSTS) return CONSTS[t.v];
-      throw new Error(`Neznámá proměnná „${t.v}“.`);
+      throw new Error(tr("Neznámá proměnná „{0}“.", t.v));
     }
-    throw new Error(`Neočekávané „${t.v}“ ve výrazu.`);
+    throw new Error(tr("Neočekávané „{0}“ ve výrazu.", t.v));
   };
 
   const v = parseExpr();
-  if (p < toks.length) throw new Error(`Neočekávané „${toks[p].v}“ ve výrazu.`);
-  if (!Number.isFinite(v)) throw new Error("Výsledek výrazu není konečné číslo.");
+  if (p < toks.length) throw new Error(tr("Neočekávané „{0}“ ve výrazu.", toks[p].v));
+  if (!Number.isFinite(v)) throw new Error(tr("Výsledek výrazu není konečné číslo."));
   return v;
 }
 
@@ -196,9 +197,9 @@ export function resolveVariables(vars: Variable[] = [], overrides: Record<string
   const errors: Record<string, string> = {};
   const byName = new Map<string, Variable>();
   for (const v of vars) {
-    if (!VAR_NAME.test(v.name)) errors[v.name] = "Neplatný název proměnné (písmena, číslice, podtržítko; nesmí začínat číslicí).";
-    else if (byName.has(v.name)) errors[v.name] = "Proměnná je definovaná vícekrát.";
-    else if (v.name in FUNCS || v.name in CONSTS) errors[v.name] = "Název je vyhrazen pro funkci/konstantu.";
+    if (!VAR_NAME.test(v.name)) errors[v.name] = tr("Neplatný název proměnné (písmena, číslice, podtržítko; nesmí začínat číslicí).");
+    else if (byName.has(v.name)) errors[v.name] = tr("Proměnná je definovaná vícekrát.");
+    else if (v.name in FUNCS || v.name in CONSTS) errors[v.name] = tr("Název je vyhrazen pro funkci/konstantu.");
     else byName.set(v.name, v);
   }
   const state = new Map<string, "visiting" | "done">();
@@ -206,7 +207,7 @@ export function resolveVariables(vars: Variable[] = [], overrides: Record<string
     if (state.get(name) === "done") return name in values;
     if (state.get(name) === "visiting") {
       const cyc = [...chain.slice(chain.indexOf(name)), name].join(" → ");
-      for (const n of chain.slice(chain.indexOf(name))) errors[n] = `Cyklická závislost: ${cyc}`;
+      for (const n of chain.slice(chain.indexOf(name))) errors[n] = tr("Cyklická závislost: {0}", cyc);
       return false;
     }
     const v = byName.get(name);
@@ -228,7 +229,7 @@ export function resolveVariables(vars: Variable[] = [], overrides: Record<string
       } catch (e) {
         errors[name] = (e as Error).message;
       }
-    } else if (!errors[name]) errors[name] = "Závisí na proměnné s chybou.";
+    } else if (!errors[name]) errors[name] = tr("Závisí na proměnné s chybou.");
     state.set(name, "done");
     return name in values;
   };
@@ -283,7 +284,7 @@ export function resolveDoc(doc: CadDoc): { doc: CadDoc; values: Record<string, n
     if (!f) continue; // vazba na smazaný prvek – ignorovat
     try {
       const v = evalExpr(expr, values);
-      if (!setPath(f as unknown as Record<string, unknown>, path, v)) errors.push(`${f.name}: parametr „${path}“ neexistuje.`);
+      if (!setPath(f as unknown as Record<string, unknown>, path, v)) errors.push(tr("{0}: parametr „{1}“ neexistuje.", f.name, path));
     } catch (e) {
       errors.push(`${f.name} (${path}): ${(e as Error).message}`);
     }

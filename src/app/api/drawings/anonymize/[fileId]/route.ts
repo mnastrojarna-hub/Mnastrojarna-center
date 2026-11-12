@@ -1,5 +1,6 @@
 import { anonGuard, json, loadSubject, readBody, tableParam } from "@/lib/anonymize/route-helpers";
 import { defaultDeadline, saveManualRegions, validateManualRegions } from "@/lib/anonymize/service";
+import { anonDebugFor } from "@/lib/anonymize/queries";
 import type { AnonRegion, KeepField } from "@/lib/anonymize/types";
 
 export const runtime = "nodejs";
@@ -89,6 +90,8 @@ export async function GET(req: Request, { params }: Ctx) {
     reviewedAt: r.anon_reviewed_at ?? null, reviewedBy: r.anon_reviewed_by ?? null, summary: r.anon_summary ?? null, pages: r.anon_pages ?? null,
     regions: regions.map((g) => (texts[g.id] ? { ...g, text: texts[g.id] } : g)), hasAfter: Boolean(r.anon_path),
     ...(lines ? { lines } : {}), ...(keep ? { keep } : {}), ...(titleBlock !== undefined ? { titleBlock } : {}),
+    // diagnostika pokusů (fáze, čas, surová chyba) jen super adminovi — běžný uživatel vidí jen českou větu v reason
+    ...(guard.user.role === "super_admin" ? { debug: (await anonDebugFor(guard.db, table, [fileId]))[fileId] ?? [], attempts: r.anon_attempts ?? null } : {}),
   });
 }
 

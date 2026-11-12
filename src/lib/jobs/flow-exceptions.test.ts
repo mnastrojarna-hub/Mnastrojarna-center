@@ -34,8 +34,9 @@ describe("výjimky v toku — akce", () => {
     const quote = exceptionActions(f({ stage: "nabidka", inquiryStatus: "zpracovana" }), SALES);
     expect(quote).toContain("job.notOrdered");
     expect(quote).not.toContain("job.decline");
-    // zaměstnanec bez práva na marže prohru neuzavírá (navrhne ji existujícím „Navrhnout…")
-    expect(exceptionActions(f({ stage: "poptavka" }), WORKER)).not.toContain("job.notOrdered");
+    // 9. 11.: speciální stavy smí každý — i zaměstnanec bez práva na marže uzavře prohru (s důvodem)
+    expect(exceptionActions(f({ stage: "poptavka" }), WORKER)).toEqual(expect.arrayContaining(["job.notOrdered", "job.decline"]));
+    expect(exceptionActions(f({ stage: "nerealizovano" }), WORKER)).toContain("job.reopenLost");
     // pořadí = FLOW_EXCEPTION_KEYS
     const keys = exceptionActions(f({ stage: "poptavka" }), SALES);
     expect([...keys].sort((a, b) => FLOW_EXCEPTION_KEYS.indexOf(a) - FLOW_EXCEPTION_KEYS.indexOf(b))).toEqual(keys);
@@ -101,7 +102,7 @@ describe("výjimky v toku — akce", () => {
   it("důvody: Výroba se nepovedla jen u zrušení", () => {
     expect(lostReasonsFor("job", "zruseno")).toContain("vyroba");
     expect(lostReasonsFor("job", "nerealizovano")).not.toContain("vyroba");
-    expect(FLOW_ACTIONS["job.notOrdered"].feature).toBe("margins");
+    expect(FLOW_ACTIONS["job.notOrdered"].feature).toBe("orders");
   });
 
   it("fakta z řádku DB (sloupce migrace 20261031150000)", () => {

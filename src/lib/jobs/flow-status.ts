@@ -618,7 +618,7 @@ export function canTransition(phase: TransitionPhase, from: string | null, to: s
 }
 
 /**
- * Právo potřebné k přechodu (kap. 7 #7): negativní a finanční konce, schválení a odeslání nabídky = margins,
+ * Právo potřebné k přechodu (kap. 7 #7): negativní konce toku dokladů, finanční konce zakázky, schválení a odeslání nabídky = margins,
  * obnovení stornované objednávky = delete (admin), korekce hlavního stavu = orders, jinak workflow.
  */
 export function transitionFeature(phase: ReasonPhase, to: string, from?: string | null): Feature {
@@ -640,8 +640,19 @@ export function transitionFeature(phase: ReasonPhase, to: string, from?: string 
     if (from === "stornovana") return "delete";
     return "workflow";
   }
-  // negativní konce a finanční konce (vyfakturováno, dokončeno = zaplaceno) = margins
-  return to === "nerealizovano" || to === "zruseno" || to === "fakturovano" || to === "dokonceno" ? "margins" : "orders";
+  // 9. 11.: speciální stavy (pozastaveno, reklamace, nerealizováno, zrušeno) a návrat z nich smí každý se zakázkou
+  // („každý by měl mít možnost … přepnout zakázku do speciálních stavů") — u uzavření s povinným důvodem;
+  // finanční konce (vyfakturováno, dokončeno = zaplaceno) = margins, nebo „Smí ručně měnit stav zakázky" (canMoveJobStage)
+  return to === "fakturovano" || to === "dokonceno" ? "margins" : "orders";
+}
+
+/**
+ * Smí uživatel ručně přesunout zakázku do stavu `to` (Korekce stavu, kniha, náhled; server moveJobStage)?
+ * Právo přechodu (transitionFeature), nebo 9. 11. „Smí ručně měnit stav zakázky" (stage_any — zaměstnanec Šponer):
+ * kterýkoli stav dopředu i dozadu včetně koncových. Důvod u uzavření (reasonRequired) platí dál pro všechny.
+ */
+export function canMoveJobStage(can: (f: Feature) => boolean, to: string): boolean {
+  return can(transitionFeature("job", to)) || can("stage_any");
 }
 
 export function reasonRequired(phase: ReasonPhase, to: string): boolean {
@@ -1298,6 +1309,7 @@ const AGENT_LABELS: Record<string, string> = {
   "email-ingest": "e-mail",
   "ai-quote": "nabídka",
   "cron-mail": "pošta",
+  "mail-stage": "pošta",
   cron: "plánovač",
 };
 
@@ -1743,9 +1755,9 @@ export const FLOW_ACTIONS: Record<FlowActionKey, FlowActionMeta> = {
   "payment.settle": act({ key: "payment.settle", label: "Zaplaceno", icon: CircleCheckBig, intent: "secondary", feature: "margins", kind: "dialog" }),
   "job.correct": act({ key: "job.correct", label: "Korekce stavu…", icon: Cog, intent: "secondary", feature: "orders", kind: "dialog" }),
   // ── výjimky v toku (31. 10.): jedno srozumitelné tlačítko pro to, co se stalo ──
-  "job.notOrdered": act({ key: "job.notOrdered", label: "Zákazník neobjednal…", icon: CircleSlash, intent: "danger", feature: "margins", needsReason: true, kind: "dialog" }),
-  "job.decline": act({ key: "job.decline", label: "Nebudeme nabízet…", icon: CircleX, intent: "danger", feature: "margins", needsReason: true, kind: "dialog" }),
-  "job.reopenLost": act({ key: "job.reopenLost", label: "Obnovit poptávku", icon: Undo, intent: "secondary", feature: "margins", kind: "dialog" }),
+  "job.notOrdered": act({ key: "job.notOrdered", label: "Zákazník neobjednal…", icon: CircleSlash, intent: "danger", feature: "orders", needsReason: true, kind: "dialog" }),
+  "job.decline": act({ key: "job.decline", label: "Nebudeme nabízet…", icon: CircleX, intent: "danger", feature: "orders", needsReason: true, kind: "dialog" }),
+  "job.reopenLost": act({ key: "job.reopenLost", label: "Obnovit poptávku", icon: Undo, intent: "secondary", feature: "orders", kind: "dialog" }),
   "job.pause": act({ key: "job.pause", label: "Pozastavit…", icon: PauseCircle, intent: "secondary", feature: "orders", kind: "dialog" }),
   "job.resume": act({ key: "job.resume", label: "Pokračovat", icon: PlayCircle, intent: "primary", feature: "orders", kind: "dialog" }),
   "production.failed": act({ key: "production.failed", label: "Výroba se nepovedla…", icon: PackageX, intent: "secondary", feature: "orders", kind: "dialog" }),

@@ -29,6 +29,11 @@ export interface JobListItem {
   stage: JobStage;
   priority: PriorityLevel;
   customer: JobCustomerRef | null;
+  /**
+   * Zákazník je prémiový (customers.is_premium) — zakázka se všude výrazně označí „Pozor, prémiový zákazník".
+   * Živě ze zákazníka (mapping.ts isPremiumCustomer), ne kopie na zakázce. Chybí = ne.
+   */
+  customerPremium?: boolean;
   customerOrderNumber: string | null;
   customerInquiryNumber: string | null;
   drawingNumbers: string[];
@@ -247,6 +252,10 @@ export interface JobFile {
   locked?: FileLock;
   /** Anonymizace výkresu pro dodavatele (null = netýká se — náš doklad, jiný typ souboru). */
   anon?: JobFileAnon | null;
+  /** Položka zakázky, ke které dokument patří (job_files.order_item_id). */
+  orderItemId?: string | null;
+  /** Číslo výkresu, které AI z dokumentu přečetla (ai_extracted.drawingNumber). */
+  drawingNumber?: string | null;
 }
 
 export type JobFileAnonStatus = "pending" | "processing" | "done" | "review" | "failed" | "unsupported" | "skipped";
@@ -273,8 +282,10 @@ export interface JobFileAnon {
   method: string | null;
   /** Starý výkres z doby před anonymizací (backfill) — čeká na „Zpracovat staré výkresy", nic neběží. */
   backfill?: boolean;
-  /** Zámek běhu (processing) — po termínu je běh přerušený a převezme ho další běh. */
+  /** Zámek běhu (processing) — po termínu je běh přerušený a převezme ho další běh; u pending = odložený pokus. */
   lockUntil?: string | null;
+  /** Počet pokusů (claim) — odznak „Zkouší znovu (2/3)…". */
+  attempts?: number | null;
 }
 
 export type FileLock = "price" | "unapproved" | "stale" | null;
@@ -439,12 +450,19 @@ export interface JobFilters {
    * false = jen bez DL na vše (Kniha → Objednávky v běhu). Bez hodnoty = bez ohledu na dodání.
    */
   deliveredToCustomer?: boolean;
+  /**
+   * Zaplaceno (isPaidJob: datum úhrady nebo stav Dokončeno): true = jen zaplacené (Kniha → Archiv),
+   * false = jen nezaplacené (Kniha → Dokončené). Bez hodnoty = bez ohledu na úhradu.
+   */
+  paid?: boolean;
   /** Kdo naposledy změnil hlavní stav nebo dílčí stav (uuid). */
   changedBy?: string;
   /** Výjimka v toku (bez_po, reklamace, pozastaveno, vykres, opraveno). */
   exception?: string;
   /** Důvod prohry / storna (Nerealizované & zrušené). */
   lostReason?: string;
+  /** Jen zakázky prémiových zákazníků (Kniha → chip „Prémioví"). */
+  premium?: boolean;
   sort?: JobSort;
   dir?: "asc" | "desc";
   limit?: number;

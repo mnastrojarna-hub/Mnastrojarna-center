@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import {
   ExternalLink, Download, MoreHorizontal, Upload, Pencil, Archive, ArchiveRestore, Trash2, Sparkles, FileText,
-  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send, Lock,
+  ChevronLeft, ChevronRight, Loader2, Eye, EyeOff, FolderOpen, X, Send, Lock, FileDown, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { fileLockText } from "@/components/flow/file-lock";
 import { Button } from "@/components/ui/button";
@@ -20,13 +21,14 @@ import type { JobDocumentKind } from "@/app/actions/job-documents";
 import { setJobFileArchived, updateJobFile, deleteJobFile } from "@/app/actions/job-files";
 import { FILE_KINDS, FILE_KIND_ORDER, JOB_FILE_ACCEPT } from "@/lib/jobs/file-kinds";
 import type { JobFileKind } from "@/lib/supabase/database.types";
-import type { JobFile, JobQuote } from "@/lib/jobs/types";
+import type { JobFile } from "@/lib/jobs/types";
 import { cn, relativeTime } from "@/lib/utils";
 import { formatTimestamp } from "@/lib/jobs/field-labels";
 import { useJobDetail } from "./detail-context";
 import { ConfirmDialog, DialogHead, ErrorBox } from "./confirm-dialog";
 import { UploadDropzone, UploadQueue } from "./upload-controls";
 import { groupFiles, replacedByLabel, isImageFile, isPdfFile, formatBytes } from "./detail-helpers";
+import { fileDeletePlan, pdfVersionsText, type QuoteRef } from "@/lib/jobs/quote-files";
 import { anonApi, downloadUrl as anonDownloadUrl } from "@/components/anonymize/anon-api";
 import { nudgeAnonymize } from "@/lib/anonymize/nudge-client";
 import { unsupportedHowTo } from "@/lib/anonymize/candidate";
@@ -35,6 +37,8 @@ import {
 } from "@/components/anonymize/anon-file-menu";
 import { AnonymizeEditor } from "@/components/anonymize/anonymize-editor";
 import { PrintButton, PrintMenuItem } from "@/components/print/print-button";
+import { convertDrawingToPdf } from "@/components/file-viewer/convert-pdf";
+import { convertNote, isCadDrawingName } from "@/lib/jobs/drawing-convert-names";
 
 /** Doklady, které jde z karty poslat zákazníkovi e-mailem (PDF v příloze). */
 const SENDABLE: Partial<Record<JobFileKind, { kind: JobDocumentKind; what: string }>> = {
@@ -50,6 +54,28 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
   const [broken, setBroken] = React.useState(false);
   const k = FILE_KINDS[file.kind] ?? FILE_KINDS.ostatni;
   const Icon = isPdfFile(file) ? FileText : k.icon;
+  // výkres (i fotka výkresu) → prohlížeč se sadou výkresů zakázky (swipe), ostatní fotky → galerie
+  if (isImageFile(file) && !broken && file.kind === "vykres") {
+    return (
+      <a
+        href={fileUrl(file.id)}
+        target="_blank"
+        rel="noopener noreferrer"
+        data-filename={file.filename}
+        className="group/thumb relative h-14 w-14 shrink-0 overflow-hidden rounded-lg border bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={`Otevřít ${file.filename}`}
+      >
+        <img
+          src={fileUrl(file.id)}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={() => setBroken(true)}
+          className="h-full w-full object-cover transition group-hover/thumb:scale-105"
+        />
+      </a>
+    );
+  }
   if (isImageFile(file) && !broken) {
     return (
       <button
@@ -86,13 +112,17 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
 }
 
 function FileRow({
-  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload, anonStalled,
+  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload, anonStalled, onConvertPdf, converting,
 }: {
+  /** Výkres DXF / DWG → PDF (nový dokument zakázky). */
+  onConvertPdf?: (f: JobFile) => void;
+  /** Právě se převádí na PDF. */
+  converting?: boolean;
   file: JobFile;
   /** Anonymizace čeká déle než obvykle (UI přestalo čekat) → „Zkusit znovu" místo spinneru. */
   anonStalled?: boolean;
   all: JobFile[];
-  quotes: Pick<JobQuote, "id" | "number">[];
+  quotes: QuoteRef[];
   onEdit: (f: JobFile) => void;
   onDelete: (f: JobFile) => void;
   onPreview: (f: JobFile) => void;
@@ -108,6 +138,8 @@ function FileRow({
   const versionInput = React.useRef<HTMLInputElement>(null);
   const replaced = replacedByLabel(file, all);
   const quote = file.quoteId ? quotes.find((q) => q.id === file.quoteId) : null;
+  // nabídka ↔ PDF: poslední PDF nabídky bere nabídku s sebou, PDF odeslané nabídky smazat nejde (server hlídá znovu)
+  const deletePlan = fileDeletePlan(file, all, quotes);
   /** Má hotovou / ke kontrole kopii pro dodavatele → stažení originálu se označí „interně". */
   const forSupplier = supplierReady(file);
 
@@ -136,8 +168,10 @@ function FileRow({
             href={fileUrl(file.id)}
             target="_blank"
             rel="noopener noreferrer"
+            data-filename={file.filename}
+            data-testid="file-open"
             onClick={(e) => {
-              if (isImageFile(file)) {
+              if (isImageFile(file) && file.kind !== "vykres") {
                 e.preventDefault();
                 onPreview(file);
               }
@@ -184,8 +218,8 @@ function FileRow({
         <PrintButton href={fileUrl(file.id)} filename={file.filename} label={forSupplier ? "Tisknout originál (interně)" : "Tisknout"} />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" aria-label="Další akce dokumentu" disabled={busy}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+            <Button variant="ghost" size="icon-sm" aria-label="Další akce dokumentu" disabled={busy || converting}>
+              {busy || converting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -200,6 +234,11 @@ function FileRow({
               <a href={fileUrl(file.id, true)}><Download /> {forSupplier ? "Stáhnout originál (interně)" : "Stáhnout"}</a>
             </DropdownMenuItem>
             <PrintMenuItem href={fileUrl(file.id)} filename={file.filename} label={forSupplier ? "Tisknout originál (interně)" : "Tisknout"} />
+            {onConvertPdf && !file.archived && isCadDrawingName(file.filename) && (
+              <DropdownMenuItem onSelect={() => onConvertPdf(file)} data-testid="file-convert-pdf">
+                <FileDown /> Převést na PDF
+              </DropdownMenuItem>
+            )}
             {forSupplier && (
               <PrintMenuItem href={anonDownloadUrl(file.id)} filename={file.anon?.filename ?? null} label="Tisknout pro dodavatele (anonymizovaný)" testId="print-anon-menu-item" />
             )}
@@ -223,9 +262,15 @@ function FileRow({
             {perms.canDelete && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => onDelete(file)} className="text-red-600 focus:text-red-700 dark:text-red-400">
-                  <Trash2 className="!text-current" /> Smazat
-                </DropdownMenuItem>
+                {deletePlan.kind === "blocked" ? (
+                  <DropdownMenuItem disabled title={deletePlan.reason} data-testid="file-delete-blocked">
+                    <Lock /> Smazat — nabídka {deletePlan.quote.number} už byla odeslána
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onSelect={() => onDelete(file)} className="text-red-600 focus:text-red-700 dark:text-red-400">
+                    <Trash2 className="!text-current" /> {deletePlan.kind === "quoteGoes" ? `Smazat (i nabídku ${deletePlan.quote.number})` : "Smazat"}
+                  </DropdownMenuItem>
+                )}
               </>
             )}
           </DropdownMenuContent>
@@ -273,7 +318,7 @@ function FileEditDialog({ file, onOpenChange }: { file: JobFile; onOpenChange: (
 
   return (
     <Dialog open onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[10%] sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:top-[10%] sm:max-w-lg">
         <DialogHead icon={Pencil} tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300" title="Upravit dokument" subtitle={file.filename} />
         <form onSubmit={submit} className="space-y-4 p-5">
           <ErrorBox error={error} />
@@ -344,7 +389,7 @@ function Lightbox({ images, index, onIndex, onClose }: { images: JobFile[]; inde
       <DialogContent
         aria-describedby={undefined}
         hideClose
-        className="top-0 h-[100dvh] max-w-none rounded-none border-0 bg-black/95 p-0 text-white sm:top-[3%] sm:h-[94vh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:rounded-xl"
+        className="top-0 h-[100dvh] max-h-[100dvh] max-w-none rounded-none border-0 bg-black/95 p-0 text-white sm:top-[3%] sm:h-[94dvh] sm:max-h-[94dvh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:rounded-xl"
       >
         <div className="flex items-center gap-2 px-4 py-3">
           <DialogTitle className="min-w-0 flex-1 truncate text-sm font-medium text-white">{f.title || f.filename}</DialogTitle>
@@ -408,41 +453,114 @@ function LockedFileRow({ file }: { file: JobFile }) {
   );
 }
 
+/** Souhrn hromadného převodu DXF / DWG → PDF. */
+export interface CadPdfSummary {
+  total: number;
+  converted: string[];
+  skipped: string[];
+  failed: { name: string; error: string }[];
+}
+
+/** „Převedeno 3 z 4; 1 se nepodařilo: X.dwg" (+ přeskočené, které PDF už mají). */
+export function cadPdfSummaryText(s: CadPdfSummary): string {
+  const parts = [`Převedeno ${s.converted.length} z ${s.total}`];
+  if (s.skipped.length) parts.push(`${s.skipped.length} už PDF ${s.skipped.length === 1 ? "má" : "mají"} (přeskočeno)`);
+  if (s.failed.length) parts.push(`${s.failed.length} se nepodařil${s.failed.length === 1 ? "o" : s.failed.length <= 4 ? "y" : "o"}: ${s.failed.map((f) => f.name).join(", ")}`);
+  return parts.join("; ") + ".";
+}
+
 /** Záložka Dokumenty — po druzích, s verzemi a archivem. */
-export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick<JobQuote, "id" | "number">[] }) {
+export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: QuoteRef[] }) {
   const { jobId, notify, refresh } = useJobDetail();
   const { can, features } = useAccess();
   // oprávnění dorazí na klient po načtení layoutu; server akce je hlídá znovu
   const canSend = features.length === 0 || can("documents");
   const [sending, setSending] = React.useState<JobFile | null>(null);
-  const [showArchive, setShowArchive] = React.useState(false);
+  // rozbalený archiv starších verzí v adrese karty (Zpět / obnovení ho zachová)
+  const url = useUrlState({ archiv: "" }, { remember: false });
+  const showArchive = url.values.archiv === "1";
+  const setShowArchive = (v: boolean) => url.set({ archiv: v ? "1" : "" });
   const [editing, setEditing] = React.useState<JobFile | null>(null);
   const [deleting, setDeleting] = React.useState<JobFile | null>(null);
   const [preview, setPreview] = React.useState<number | null>(null);
   const [anonEditing, setAnonEditing] = React.useState<JobFile | null>(null);
   const [reviewDl, setReviewDl] = React.useState<JobFile | null>(null);
+  // převod výkresů DXF / DWG na PDF: jednotlivě (menu) i hromadně (postupně, s průběhem a souhrnem)
+  const [convertingIds, setConvertingIds] = React.useState<Set<string>>(new Set());
+  const [bulk, setBulk] = React.useState<{ done: number; total: number; current: string } | null>(null);
+  const [bulkSummary, setBulkSummary] = React.useState<CadPdfSummary | null>(null);
+  const cadFiles = files.filter((f) => !f.archived && !f.locked && isCadDrawingName(f.filename));
+  const cadWithoutPdf = cadFiles.filter((c) => !files.some((f) => !f.archived && f.note === convertNote(c.filename)));
+
+  async function convertOne(f: JobFile) {
+    setConvertingIds((s) => new Set(s).add(f.id));
+    try {
+      const r = await convertDrawingToPdf(f.id);
+      if (!r.ok) notify("error", `${f.filename}: ${r.error}`);
+      else notify("success", `${f.filename} převeden na PDF → ${r.file.filename}${r.file.version && r.file.version > 1 ? ` (v${r.file.version})` : ""}.`);
+      refresh();
+    } finally {
+      setConvertingIds((s) => {
+        const n = new Set(s);
+        n.delete(f.id);
+        return n;
+      });
+    }
+  }
+
+  async function convertAll() {
+    const list = cadFiles;
+    if (!list.length || bulk) return;
+    setBulkSummary(null);
+    const sum: CadPdfSummary = { total: list.length, converted: [], skipped: [], failed: [] };
+    for (let i = 0; i < list.length; i++) {
+      const f = list[i];
+      setBulk({ done: i, total: list.length, current: f.filename });
+      const r = await convertDrawingToPdf(f.id, { skipIfConverted: true });
+      if (!r.ok) sum.failed.push({ name: f.filename, error: r.error });
+      else if (r.skipped) sum.skipped.push(f.filename);
+      else sum.converted.push(f.filename);
+    }
+    setBulk(null);
+    setBulkSummary(sum);
+    notify(sum.failed.length ? "error" : "success", cadPdfSummaryText(sum));
+    refresh();
+  }
 
   // výkresy v anonymizaci → šťouchnout do fronty (zpracuje route na serveru, bez plánovače) a obnovovat,
-  // dokud nedoběhnou. Když se 5 min nic nezmění, přestat čekat a ukázat „Zkusit znovu" (žádný nekonečný spinner).
-  const anonKey = files.filter(anonInFlight).map((f) => `${f.id}:${f.anon?.status}`).join(",");
+  // dokud nedoběhnou. Klíč = vše, co se při postupu mění (stav, pokus, zámek, důvod) — každý postup vynuluje
+  // čekání. Majitel 5. 11.: odložený pokus (zámek v budoucnu — přetížená AI, 5/15/45 min) a převzetí
+  // přerušeného běhu (zámek 6 min) musí spustit otevřená stránka SAMA, hned po uplynutí zámku; „Zkusit znovu"
+  // se ukáže až když se 5 min (resp. 2 min po zámku) nic neděje — žádný nekonečný spinner, ale ani planý
+  // „selhalo" uprostřed práce systému.
+  const anonInFlightFiles = files.filter(anonInFlight);
+  const anonKey = anonInFlightFiles.map((f) => `${f.id}:${f.anon?.status}:${f.anon?.attempts ?? ""}:${f.anon?.lockUntil ?? ""}:${f.anon?.reason ?? ""}`).join(",");
+  const anonMaxLock = Math.max(0, ...anonInFlightFiles.map((f) => Date.parse(f.anon?.lockUntil ?? "") || 0));
   const [anonStalled, setAnonStalled] = React.useState(false);
   React.useEffect(() => {
     setAnonStalled(false);
     if (!anonKey) return;
+    const started = Date.now();
+    const stallAt = Math.max(started + 5 * 60_000, anonMaxLock + 2 * 60_000);
     void nudgeAnonymize({ jobId });
     let n = 0;
-    const t = window.setInterval(() => {
+    let nudgedSinceDue = true;
+    let t = 0;
+    const tick = () => {
       n += 1;
-      if (n > 50) {
-        window.clearInterval(t);
-        setAnonStalled(true);
-        return;
-      }
-      if (n % 3 === 0) void nudgeAnonymize({ jobId });
+      const now = Date.now();
+      if (now > stallAt) { setAnonStalled(true); return; }
+      const lockLeft = anonMaxLock - now;
+      const due = lockLeft <= 0; // bez zámku / po zámku: soubor je k zpracování → šťouchat
+      if (due && (!nudgedSinceDue || n % 3 === 0)) { nudgedSinceDue = true; void nudgeAnonymize({ jobId }); }
+      if (!due) nudgedSinceDue = false;
       refresh();
-    }, 6000);
-    return () => window.clearInterval(t);
-  }, [anonKey, jobId, refresh]);
+      // odložený pokus daleko v budoucnu: obnovovat zvolna, těsně před uplynutím zámku zase hustě
+      t = window.setTimeout(tick, lockLeft > 60_000 ? 30_000 : 6_000);
+    };
+    t = window.setTimeout(tick, 6_000);
+    return () => window.clearTimeout(t);
+  }, [anonKey, anonMaxLock, jobId, refresh]);
 
   async function anonAction(f: JobFile, action: "enqueue" | "approve" | "skip") {
     if (action === "enqueue") {
@@ -465,7 +583,9 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
 
   const groups = groupFiles(files);
   const archivedCount = files.filter((f) => f.archived).length;
-  const visibleImages = files.filter((f) => !f.locked && isImageFile(f) && (showArchive || !f.archived));
+  const deletingPlan = deleting ? fileDeletePlan(deleting, files, quotes) : { kind: "file" as const };
+  // galerie fotek; výkresy (i jako obrázek) listuje prohlížeč výkresů zakázky
+  const visibleImages = files.filter((f) => !f.locked && isImageFile(f) && f.kind !== "vykres" && (showArchive || !f.archived));
   const openPreview = (f: JobFile) => {
     const i = visibleImages.findIndex((x) => x.id === f.id);
     if (i >= 0) setPreview(i);
@@ -482,6 +602,41 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-card px-3 py-2 text-sm" data-testid="anon-supplier-bar">
           <span className="text-muted-foreground">{supplierLine}</span>
           <SupplierPackButton jobId={jobId} files={files} onEdit={setAnonEditing} />
+        </div>
+      )}
+
+      {cadFiles.length > 0 && (
+        <div className="rounded-xl border bg-card px-3 py-2 text-sm" data-testid="cad-pdf-bar">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-muted-foreground">
+              {bulk
+                ? <>Převádím {bulk.done + 1} / {bulk.total}: <strong className="font-medium text-foreground">{bulk.current}</strong>…</>
+                : <>Výkresy DXF / DWG: {cadFiles.length}{cadWithoutPdf.length < cadFiles.length ? ` (${cadFiles.length - cadWithoutPdf.length} už ${cadFiles.length - cadWithoutPdf.length === 1 ? "má" : "mají"} PDF)` : ""} — PDF otevře každý.</>}
+            </span>
+            <Button type="button" size="sm" variant="outline" onClick={() => void convertAll()} disabled={!!bulk} data-testid="cad-pdf-all">
+              {bulk ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
+              {cadFiles.length === 1 ? "Převést DXF / DWG na PDF" : "Převést všechny DXF / DWG na PDF"}
+            </Button>
+          </div>
+          {bulk && (
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={bulk.total} aria-valuenow={bulk.done}>
+              <div className="h-full bg-primary transition-all" style={{ width: `${Math.round((bulk.done / bulk.total) * 100)}%` }} />
+            </div>
+          )}
+          {bulkSummary && !bulk && (
+            <div
+              className={cn("mt-2 flex items-start gap-2 rounded-lg px-2.5 py-2 text-xs", bulkSummary.failed.length ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200" : "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200")}
+              role="status"
+              data-testid="cad-pdf-summary"
+            >
+              {bulkSummary.failed.length ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> : <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />}
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{cadPdfSummaryText(bulkSummary)}</p>
+                {bulkSummary.failed.map((x) => <p key={x.name} className="mt-0.5"><strong>{x.name}</strong>: {x.error}</p>)}
+              </div>
+              <button type="button" onClick={() => setBulkSummary(null)} className="rounded p-0.5 hover:bg-black/5" aria-label="Zavřít souhrn"><X className="h-3.5 w-3.5" /></button>
+            </div>
+          )}
         </div>
       )}
 
@@ -516,6 +671,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
                         key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview}
                         onSend={canSend ? setSending : undefined} onAnonEdit={setAnonEditing} onAnonAction={(x, a) => void anonAction(x, a)} onReviewDownload={setReviewDl}
                         anonStalled={anonStalled && anonInFlight(f)}
+                        onConvertPdf={(x) => void convertOne(x)} converting={convertingIds.has(f.id)}
                       />
                     )
                   ))}
@@ -529,7 +685,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
       {archivedCount > 0 && (
         <button
           type="button"
-          onClick={() => setShowArchive((s) => !s)}
+          onClick={() => setShowArchive(!showArchive)}
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
           {showArchive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -566,13 +722,30 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Pick
           onConfirm={async () => {
             const res = await deleteJobFile(deleting.id);
             if (!res.ok) return res.error ?? "Nepovedlo se.";
-            notify("success", `Dokument ${deleting.filename} smazán.`);
+            const inv = res.invoiceReleased;
+            notify("success", res.quoteDeleted
+              ? `Dokument ${deleting.filename} smazán i s nabídkou${res.quoteDeleted.number ? ` ${res.quoteDeleted.number}` : ""}.`
+              : inv
+                ? `Faktura ${inv.number} zrušena — teď můžeš vystavit novou (tlačítko „Vystavit fakturu“ na kartě)${inv.numberFree ? ", dostane stejné číslo" : ""}.`
+                : `Dokument ${deleting.filename} smazán.`);
             refresh();
             return null;
           }}
         >
           <strong className="text-foreground">{deleting.title || deleting.filename}</strong> (v{deleting.version}) zmizí i z úložiště.
-          Když jde jen o starou verzi, stačí ji <em>archivovat</em>.
+          {deletingPlan.kind === "quoteGoes" && (
+            <>
+              {" "}<strong className="text-foreground">Smaže se i nabídka {deletingPlan.quote.number}</strong> v záložce Nabídky (toto je její poslední PDF) — včetně položek.
+              Pokud chceš jen nové PDF, místo mazání vystav nabídku znovu.
+            </>
+          )}
+          {deletingPlan.kind === "quoteStays" && (
+            <> Nabídka {deletingPlan.quote.number} zůstane — má ještě {pdfVersionsText(deletingPlan.others)} PDF.</>
+          )}
+          {deleting.kind === "faktura" && deleting.origin === "generated" && (
+            <> <strong className="text-foreground">Faktura se tím zruší</strong> — zakázka půjde vyfakturovat znovu (tlačítko „Vystavit fakturu“), a když je to poslední vystavená faktura, nová dostane stejné číslo. Platby zůstávají.</>
+          )}
+          {deletingPlan.kind !== "quoteGoes" && deleting.kind !== "faktura" && <> Když jde jen o starou verzi, stačí ji <em>archivovat</em>.</>}
         </ConfirmDialog>
       )}
       {anonEditing && (

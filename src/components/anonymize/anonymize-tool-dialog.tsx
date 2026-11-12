@@ -135,7 +135,7 @@ export function AnonymizeToolDialog({ open, onOpenChange }: { open: boolean; onO
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined} className="top-0 flex max-h-[100dvh] w-full flex-col rounded-none sm:top-[5%] sm:max-h-[90vh] sm:w-[calc(100%-2rem)] sm:max-w-2xl sm:rounded-xl" data-testid="anon-tool">
+      <DialogContent aria-describedby={undefined} className="top-0 flex max-h-[100dvh] w-full flex-col rounded-none sm:top-[5%] sm:max-h-[90dvh] sm:w-[calc(100%-2rem)] sm:max-w-2xl sm:rounded-xl" data-testid="anon-tool">
         <div className="flex items-start gap-3 border-b px-4 py-3.5 pr-12">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><EyeOff className="h-5 w-5" /></span>
           <div className="min-w-0">

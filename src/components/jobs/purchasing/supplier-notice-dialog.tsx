@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { notifySuppliers } from "@/app/actions/purchasing";
+import { SenderPicker } from "@/components/mail/sender-picker";
 import type { PurchaseOrderStatus } from "@/lib/supabase/database.types";
 
 export interface NoticePurchaseOrder {
@@ -20,8 +21,8 @@ const OPEN: PurchaseOrderStatus[] = ["vystavena", "odeslana", "potvrzena"];
 
 /**
  * Zakázka zrušená / pozastavená s otevřenými objednávkami (E.6): obchodník / admin jedním dialogem
- * stornuje nebo pozastaví objednávky u dodavatelů. Odeslané dostanou e-mail hned (ze schránky obchodníka
- * zakázky), neodeslané se jen zruší; když e-mail neodejde, čeká ve frontě ke schválení.
+ * stornuje nebo pozastaví objednávky u dodavatelů. Odeslané dostanou e-mail hned (z mé schránky; super admin si
+ * může vybrat jinou), neodeslané se jen zruší; když e-mail neodejde, čeká ve frontě ke schválení.
  */
 export function SupplierNoticeDialog({
   open, onOpenChange, jobId, kind, purchaseOrders, onDone,
@@ -38,13 +39,16 @@ export function SupplierNoticeDialog({
   const [reason, setReason] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  /** „Odeslat z" (jen super admin; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const cancel = kind === "cancel";
+  const anySent = list.some((p) => picked.includes(p.id) && (p.status === "odeslana" || p.status === "potvrzena"));
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      const r = await notifySuppliers(jobId, { kind, purchaseOrderIds: picked, reason: reason.trim() || undefined });
+      const r = await notifySuppliers(jobId, { kind, purchaseOrderIds: picked, reason: reason.trim() || undefined, ...(fromMailboxId ? { fromMailboxId } : {}) });
       if (!r.ok) { setError(r.error ?? "Nepodařilo se."); return; }
       const parts = [
         r.sent?.length ? `odesláno ${r.sent.length}` : null,
@@ -98,6 +102,7 @@ export function SupplierNoticeDialog({
             <Textarea id="notice-reason" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} className="text-base sm:text-sm"
               placeholder={cancel ? "Zákazník zakázku zrušil" : "Zakázka je pozastavená"} />
           </div>
+          {open && anySent && <SenderPicker value={fromMailboxId} onChange={setFromMailboxId} disabled={busy} />}
           <ErrorBox error={error} />
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Zpět</Button>

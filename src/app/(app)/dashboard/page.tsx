@@ -12,6 +12,7 @@ import { AiConfidence } from "@/components/ai-confidence";
 import { CaptureButton } from "@/components/jobs/capture/capture-button";
 import { FriendlyEmpty } from "@/components/customers/friendly-empty";
 import { JobMiniList } from "@/components/customers/job-mini-list";
+import { premiumFirst } from "@/lib/jobs/premium";
 import { CLOSED_STAGES, STAGES, STAGE_ORDER } from "@/lib/jobs/stages";
 import { bookKpis, segmentOfStage } from "@/components/jobs/book/book-params";
 import { requireFeature, getAccess } from "@/lib/auth/session";
@@ -290,7 +291,8 @@ export default async function DashboardPage() {
                 <CheckCircle2 className="h-4 w-4 shrink-0" /> Žádná zakázka po termínu. Paráda.
               </p>
             ) : (
-              <JobMiniList jobs={overdue} showCustomer />
+              // 9. 11.: prémioví zákazníci přednostně nahoře
+              <JobMiniList jobs={premiumFirst(overdue, (j) => j.customerPremium)} showCustomer />
             )}
           </Panel>
 

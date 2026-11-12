@@ -4,6 +4,7 @@
  * řetězce, rozdělení v bodě, projekce hran modelu do roviny skici a další způsoby tvorby tvarů
  * (obdélník 3 body, kružnice 2 body, mnohoúhelník vepsaný/opsaný, drážka obloukem).
  */
+import { tr } from "./i18n";
 import { planeBasis } from "./defaults";
 import { evalExpr } from "./params";
 import { arcGeom, prims, type Prim } from "./sketch";
@@ -613,7 +614,7 @@ export const defaultOpts: DrawOpts = { autoDim: true, diameter: true, sides: 6, 
 export type DynField = { key: string; label: string; suffix?: string };
 export function dynSpec(tool: string, n: number, picks: number, phase: number, o: DrawOpts): DynField[] {
   const XY: DynField[] = [{ key: "x", label: "X", suffix: "mm" }, { key: "y", label: "Y", suffix: "mm" }];
-  const LA: DynField[] = [{ key: "len", label: "Délka", suffix: "mm" }, { key: "ang", label: "Úhel", suffix: "°" }];
+  const LA: DynField[] = [{ key: "len", label: tr("Délka"), suffix: "mm" }, { key: "ang", label: tr("Úhel"), suffix: "°" }];
   const F = (key: string, label: string, suffix = "mm"): DynField => ({ key, label, suffix });
   switch (tool) {
     case "line":
@@ -623,40 +624,40 @@ export function dynSpec(tool: string, n: number, picks: number, phase: number, o
       return n ? LA : XY;
     case "rect":
     case "rectCenter":
-      return n ? [F("w", "Šířka"), F("h", "Výška")] : XY;
+      return n ? [F("w", tr("Šířka")), F("h", tr("Výška"))] : XY;
     case "rect3":
-      return n === 0 ? XY : n === 1 ? [F("w", "Šířka"), F("ang", "Úhel", "°")] : [F("h", "Výška")];
+      return n === 0 ? XY : n === 1 ? [F("w", tr("Šířka")), F("ang", tr("Úhel"), "°")] : [F("h", tr("Výška"))];
     case "circle":
-      return n ? [F("r", o.diameter ? "Průměr" : "Poloměr")] : XY;
+      return n ? [F("r", o.diameter ? tr("Průměr") : tr("Poloměr"))] : XY;
     case "circle2":
-      return n ? [F("d", "Průměr")] : XY;
+      return n ? [F("d", tr("Průměr"))] : XY;
     case "circle3":
     case "point":
       return n ? [] : XY;
     case "arc":
-      return n === 0 ? XY : n === 1 ? LA : [F("r", "Poloměr")];
+      return n === 0 ? XY : n === 1 ? LA : [F("r", tr("Poloměr"))];
     case "arcCenter":
-      return n === 0 ? XY : n === 1 ? [F("r", "Poloměr")] : [F("sweep", "Úhel", "°")];
+      return n === 0 ? XY : n === 1 ? [F("r", tr("Poloměr"))] : [F("sweep", tr("Úhel"), "°")];
     case "arcTangent":
-      return n ? [F("r", "Poloměr")] : [];
+      return n ? [F("r", tr("Poloměr"))] : [];
     case "polygon":
-      return n ? [F("r", o.circumscribed ? "Poloměr vepsané" : "Poloměr opsané"), F("sides", "Stran", "")] : XY;
+      return n ? [F("r", o.circumscribed ? tr("Poloměr vepsané") : tr("Poloměr opsané")), F("sides", "Stran", "")] : XY;
     case "slot":
-      return n === 0 ? XY : n === 1 ? LA : [F("w", "Šířka")];
+      return n === 0 ? XY : n === 1 ? LA : [F("w", tr("Šířka"))];
     case "slotArc":
-      return n === 0 ? XY : n === 1 ? [F("r", "Poloměr osy")] : n === 2 ? [F("sweep", "Úhel", "°")] : [F("w", "Šířka")];
+      return n === 0 ? XY : n === 1 ? [F("r", tr("Poloměr osy"))] : n === 2 ? [F("sweep", tr("Úhel"), "°")] : [F("w", tr("Šířka"))];
     case "ellipse":
-      return n === 0 ? XY : n === 1 ? [F("rx", "Poloosa a"), F("ang", "Úhel", "°")] : [F("ry", "Poloosa b")];
+      return n === 0 ? XY : n === 1 ? [F("rx", tr("Poloosa a")), F("ang", tr("Úhel"), "°")] : [F("ry", tr("Poloosa b"))];
     case "offset":
-      return picks ? [F("d", "Vzdálenost")] : [];
+      return picks ? [F("d", tr("Vzdálenost"))] : [];
     case "move":
     case "copy":
     case "patternLinear":
       return phase && n ? LA : [];
     case "rotate":
-      return phase && n === 2 ? [F("ang", "Úhel", "°")] : [];
+      return phase && n === 2 ? [F("ang", tr("Úhel"), "°")] : [];
     case "scale":
-      return phase && n === 2 ? [F("k", "Měřítko", "×")] : [];
+      return phase && n === 2 ? [F("k", tr("Měřítko"), "×")] : [];
     default:
       return [];
   }

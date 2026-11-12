@@ -10,6 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { anonApi, previewUrl, type AnonStateDto, type AnonTableParam } from "./anon-api";
 import { FileAnonBadge } from "./anon-badge";
+import { AnonDebugDetails } from "./anon-debug";
 import { ANON_CATEGORY_COLOR, ANON_CATEGORY_LABELS, describeCounts, displayReason, NOTHING_REMOVED, type AnonUiStatus } from "./anon-status";
 import {
   addRect, anchorScroll, clampZoom, diffCounts, fromServer, lineAt, lineState, needsKeepConfirm, pinchZoom, rectFromDrag, stampZoom, titleBlockBox,
@@ -334,7 +335,7 @@ export function AnonymizeEditor({ open, onOpenChange, fileId, table, sourceName,
         aria-describedby={undefined}
         hideClose
         onOpenAutoFocus={(e) => e.preventDefault()}
-        className="top-0 flex h-[100dvh] max-w-none flex-col rounded-none border-0 sm:top-[2%] sm:h-[96vh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:rounded-xl sm:border"
+        className="top-0 flex h-[100dvh] max-h-[100dvh] max-w-none flex-col rounded-none border-0 sm:top-[2%] sm:h-[96dvh] sm:max-h-[96dvh] sm:w-[calc(100%-2rem)] sm:max-w-6xl sm:rounded-xl sm:border"
         data-testid="anon-editor"
       >
         <header className="flex items-center gap-2 border-b px-3 py-2 sm:px-4 sm:py-2.5">
@@ -501,6 +502,8 @@ export function AnonymizeEditor({ open, onOpenChange, fileId, table, sourceName,
                 {warnings.slice(0, 6).map((w, i) => <li key={`${w.code}-${i}`}>• {w.message}</li>)}
               </ul>
             )}
+            {/* jen super admin (server jinému debug nepošle): fáze, čas a surová chyba každého pokusu */}
+            <AnonDebugDetails entries={state?.debug} />
             <ul className="divide-y rounded-lg border">
               {pageItems.length === 0 && <li className="px-3 py-3 text-sm text-muted-foreground">Na této straně nic smazáno není.</li>}
               {pageItems.map((r, i) => {

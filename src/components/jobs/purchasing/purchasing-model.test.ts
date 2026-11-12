@@ -5,7 +5,7 @@ import {
   matchesPurchaseFilter, ownerAssignedStamp, purchaseChips, purchaseDraftFrom, purchaseNextStep, purchaseSteps,
   receiptDraftsFrom, receiptDraftsToInput, validateReceiptDrafts, purchaseDraftsToInput, purchaseDraftsTotal,
   purchaseOrderFormFromDraft, purchaseOrderFormToInput, supplierQuoteFormFrom, supplierQuoteFormNew, supplierQuoteFormToInput,
-  validatePurchaseDrafts, validatePurchaseOrderForm, validateSupplierQuoteForm,
+  supplierQuoteTotalMismatch, validatePurchaseDrafts, validatePurchaseOrderForm, validateSupplierQuoteForm,
 } from "./purchasing-model";
 
 const sp = (s: string) => s.replace(/[  ]/g, " ");
@@ -240,5 +240,19 @@ describe("převzetí od dodavatele", () => {
       ["po_terminu", null, "+3 dny"],
     ]);
     expect(purchaseChips({ status: "dodana", requiredDate: "2026-10-20", confirmedDate: null, receipt: { done: 2, total: 2, partial: false } }, "2026-10-23")).toEqual([]);
+  });
+});
+
+describe("nabídka dodavatele: zadaná cena × součet položek (křížová konzistence 4. 11.)", () => {
+  const item = (price: string) => ({ ...emptyPurchaseDraft(), name: "Díl", quantity: "10", unitPrice: price });
+
+  it("hláška jen když se zadaná částka liší od součtu plně nacenených položek", () => {
+    expect(supplierQuoteTotalMismatch({ total: "", items: [item("100")] })).toBeNull(); // celkem = Σ položek
+    expect(supplierQuoteTotalMismatch({ total: "1000", items: [item("100")] })).toBeNull(); // sedí
+    expect(supplierQuoteTotalMismatch({ total: "1 200,50", items: [item("100")] })).toEqual({ explicit: 1200.5, sum: 1000, diff: 200.5 });
+    expect(supplierQuoteTotalMismatch({ total: "900", items: [item("100")] })).toEqual({ explicit: 900, sum: 1000, diff: -100 });
+    expect(supplierQuoteTotalMismatch({ total: "900", items: [item("100"), item("")] })).toBeNull(); // položka bez ceny → součet neúplný
+    expect(supplierQuoteTotalMismatch({ total: "900", items: [] })).toBeNull();
+    expect(supplierQuoteTotalMismatch({ total: "abc", items: [item("100")] })).toBeNull();
   });
 });

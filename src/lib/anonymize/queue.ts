@@ -36,6 +36,11 @@ export type SubjectRow = Record<string, unknown> & {
   anon_at: string | null;
   anon_via: string | null;
   anon_priority: number;
+  /**
+   * Diagnostika posledních pokusů (jen super admin). Záměrně NENÍ v ANON_COLS (nasazený kód může běžet dřív než
+   * migrace 20261105110000) — claim vrací celý řádek (f.*), jinde se čte zvlášť a best effort.
+   */
+  anon_debug?: unknown;
 };
 
 export interface Subject {

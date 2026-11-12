@@ -4,6 +4,7 @@
  * měřítko v bodě, díry v bodech skici, booleovská operace s dřívějším nástrojem, kontrola a sjednocení geometrie.
  * Běží ve web workeru i v Node (testy). Vše se registruje přes `registerExt`.
  */
+import { tr } from "../i18n";
 import * as r from "replicad";
 import { planeOf, sketchDrawing, sketchPathWire } from "../build";
 import { findLoops, loopPolygon, nestLoops, pointInPolygon } from "../sketch";
@@ -34,7 +35,7 @@ const norm = (a: Vec3): Vec3 => {
 };
 const near = (a: Vec3, b: Vec3, eps = 1e-5) => len(sub(a, b)) < eps;
 
-const MODE_PARAM = { key: "mode", label: "Operace", kind: "mode" } as const;
+const MODE_PARAM = { key: "mode", label: tr("Operace"), kind: "mode" } as const;
 const PLANE_OPTS = [
   { v: "XY", l: "XY" },
   { v: "XZ", l: "XZ" },
@@ -42,22 +43,22 @@ const PLANE_OPTS = [
 ];
 
 function needBody(ctx: ExtBuildCtx, what = "Tento prvek"): Shape {
-  if (!ctx.body) throw new Error(`${what} potřebuje těleso – nejdřív vytvořte vysunutí nebo primitivum.`);
+  if (!ctx.body) throw new Error(tr("{0} potřebuje těleso – nejdřív vytvořte vysunutí nebo primitivum.", what));
   return ctx.body;
 }
 function needSketch(ctx: ExtBuildCtx, id: string, role = "skicu"): SketchF {
   const sk = ctx.sketches.get(id);
-  if (!sk) throw new Error(`Vyberte ${role} v parametrech prvku.`);
+  if (!sk) throw new Error(tr("Vyberte {0} v parametrech prvku.", role));
   return sk;
 }
 function needTool(ctx: ExtBuildCtx, id: string) {
   const t = ctx.tools.get(id);
-  if (!t) throw new Error("Vyberte dřívější prvek s tělesem (vysunutí, díra, primitivum…).");
+  if (!t) throw new Error(tr("Vyberte dřívější prvek s tělesem (vysunutí, díra, primitivum…)."));
   return t;
 }
 function applyMode(body: Shape | null, tool: Shape, mode: BoolMode): Shape {
   if (!body) {
-    if (mode === "cut" || mode === "intersect") throw new Error("Není z čeho odebírat – nejdřív vytvořte těleso.");
+    if (mode === "cut" || mode === "intersect") throw new Error(tr("Není z čeho odebírat – nejdřív vytvořte těleso."));
     return tool;
   }
   if (mode === "cut") return body.cut(tool);
@@ -73,17 +74,17 @@ function axisPlane(name: PlaneName, offset: number, flip = false): r.Plane {
 function pickEdges(body: Shape, idx: number[]): r.Edge[] {
   const all = body.edges;
   const out = [...new Set(idx)].map((i) => all[i]).filter(Boolean);
-  if (!out.length) throw new Error("Vyberte hrany v modelu.");
+  if (!out.length) throw new Error(tr("Vyberte hrany v modelu."));
   return out;
 }
 function pickFace(body: Shape, idx: number[]): r.Face {
   const f = body.faces[idx[0] ?? -1];
-  if (!f) throw new Error("Vyberte plochu v modelu.");
+  if (!f) throw new Error(tr("Vyberte plochu v modelu."));
   return f;
 }
 function faceOfEdge(body: Shape, e: r.Edge): r.Face {
   const f = body.faces.find((ff) => ff.edges.some((x) => x.isSame(e)));
-  if (!f) throw new Error("K hraně se nepodařilo najít plochu.");
+  if (!f) throw new Error(tr("K hraně se nepodařilo najít plochu."));
   return f;
 }
 function bboxDiag(s: Shape) {
@@ -92,12 +93,12 @@ function bboxDiag(s: Shape) {
 }
 function wrapShape(ocShape: unknown, what: string): Shape {
   const s = r.cast(ocShape as never) as unknown as Shape;
-  if (!s || (s as unknown as { isNull?: boolean }).isNull) throw new Error(`${what} se nepodařilo vytvořit.`);
+  if (!s || (s as unknown as { isNull?: boolean }).isNull) throw new Error(tr("{0} se nepodařilo vytvořit.", what));
   return s;
 }
 function finish(mk: OC, what: string): Shape {
   mk.Build(new (oc().Message_ProgressRange)());
-  if (!mk.IsDone()) throw new Error(`${what} se nepodařilo vytvořit – zkuste menší hodnoty nebo jiné hrany.`);
+  if (!mk.IsDone()) throw new Error(tr("{0} se nepodařilo vytvořit – zkuste menší hodnoty nebo jiné hrany.", what));
   return wrapShape(mk.Shape(), what);
 }
 
@@ -105,32 +106,32 @@ function finish(mk: OC, what: string): Shape {
 
 registerExt({
   ext: "adv.varFillet",
-  label: "Proměnné zaoblení",
+  label: tr("Proměnné zaoblení"),
   icon: "adv-varfillet",
   tone: "feature",
   tab: "create",
   group: "Pokročilé úpravy",
   big: true,
-  hint: "poloměr se po hraně mění od R1 k R2",
+  hint: tr("poloměr se po hraně mění od R1 k R2"),
   pick: { kind: "edges", key: "edges" },
   rollback: true,
   make: (_doc, extra) => ({ edges: extra?.edges ?? [], r1: 2, r2: 6 }),
   params: [
-    { key: "edges", label: "Hrany", kind: "edges" },
-    { key: "r1", label: "Poloměr na začátku R1", kind: "number", min: 0.01, step: 0.5 },
-    { key: "r2", label: "Poloměr na konci R2", kind: "number", min: 0.01, step: 0.5 },
+    { key: "edges", label: tr("Hrany"), kind: "edges" },
+    { key: "r1", label: tr("Poloměr na začátku R1"), kind: "number", min: 0.01, step: 0.5 },
+    { key: "r2", label: tr("Poloměr na konci R2"), kind: "number", min: 0.01, step: 0.5 },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Zaoblení");
+    const body = needBody(ctx, tr("Zaoblení"));
     const r1 = num(d, "r1");
     const r2 = num(d, "r2");
-    if (!(r1 > 0 && r2 > 0)) throw new Error("Oba poloměry musí být kladné.");
+    if (!(r1 > 0 && r2 > 0)) throw new Error(tr("Oba poloměry musí být kladné."));
     const edges = pickEdges(body, ids(d, "edges"));
     const o = oc();
     const mk = new o.BRepFilletAPI_MakeFillet(body.wrapped, o.ChFi3d_FilletShape.ChFi3d_Rational);
     try {
       for (const e of edges) mk.Add(r1, r2, e.wrapped);
-      return finish(mk, "Proměnné zaoblení");
+      return finish(mk, tr("Proměnné zaoblení"));
     } finally {
       mk.delete();
     }
@@ -141,28 +142,28 @@ registerExt({
 
 registerExt({
   ext: "adv.fullRound",
-  label: "Plné zaoblení",
+  label: tr("Plné zaoblení"),
   icon: "adv-fullround",
   tone: "feature",
   tab: "create",
   group: "Pokročilé úpravy",
-  hint: "zaoblí celou úzkou plochu (žebro, lem) do půlkruhu",
+  hint: tr("zaoblí celou úzkou plochu (žebro, lem) do půlkruhu"),
   pick: { kind: "faces", key: "faces" },
   rollback: true,
   make: (_doc, extra) => ({ faces: extra?.faces ?? [], ratio: 0.98 }),
   params: [
-    { key: "faces", label: "Střední plocha", kind: "faces", hint: "úzká plocha mezi dvěma hranami" },
-    { key: "ratio", label: "Podíl šířky", kind: "number", unit: "", min: 0.5, max: 0.995, step: 0.01, hint: "0,98 = téměř plný půlkruh" },
+    { key: "faces", label: tr("Střední plocha"), kind: "faces", hint: tr("úzká plocha mezi dvěma hranami") },
+    { key: "ratio", label: tr("Podíl šířky"), kind: "number", unit: "", min: 0.5, max: 0.995, step: 0.01, hint: tr("0,98 = téměř plný půlkruh") },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Plné zaoblení");
+    const body = needBody(ctx, tr("Plné zaoblení"));
     const face = pickFace(body, ids(d, "faces"));
     const edges = [...face.edges].sort((a, b) => b.length - a.length);
-    if (edges.length < 2) throw new Error("Plocha musí mít alespoň dvě hrany.");
+    if (edges.length < 2) throw new Error(tr("Plocha musí mít alespoň dvě hrany."));
     const long = edges.slice(0, 2);
     const width = r.measureArea(face) / Math.max(1e-6, (long[0].length + long[1].length) / 2);
     const radius = (width / 2) * Math.min(0.995, Math.max(0.5, num(d, "ratio", 0.98)));
-    if (!(radius > 1e-4)) throw new Error("Plocha je příliš úzká.");
+    if (!(radius > 1e-4)) throw new Error(tr("Plocha je příliš úzká."));
     return body.clone().fillet((e) => (long.some((x) => x.isSame(e)) ? radius : null) as never) as Shape;
   },
 });
@@ -201,25 +202,25 @@ export function tangentChain(body: Shape, seeds: r.Edge[], angleDeg = 2): r.Edge
 
 registerExt({
   ext: "adv.chainFillet",
-  label: "Zaoblení řetězce",
+  label: tr("Zaoblení řetězce"),
   icon: "adv-chain",
   tone: "feature",
   tab: "create",
   group: "Pokročilé úpravy",
-  hint: "vyberte jednu hranu – zaoblí se celý tečně navazující řetězec",
+  hint: tr("vyberte jednu hranu – zaoblí se celý tečně navazující řetězec"),
   pick: { kind: "edges", key: "edges" },
   rollback: true,
   make: (_doc, extra) => ({ edges: extra?.edges ?? [], radius: 2, angle: 2, chamfer: false }),
   params: [
-    { key: "edges", label: "Výchozí hrany", kind: "edges" },
-    { key: "radius", label: "Poloměr / velikost", kind: "number", min: 0.01, step: 0.5 },
-    { key: "angle", label: "Tolerance tečnosti", kind: "number", unit: "°", min: 0, max: 45, step: 0.5 },
-    { key: "chamfer", label: "Srazit místo zaoblit", kind: "bool" },
+    { key: "edges", label: tr("Výchozí hrany"), kind: "edges" },
+    { key: "radius", label: tr("Poloměr / velikost"), kind: "number", min: 0.01, step: 0.5 },
+    { key: "angle", label: tr("Tolerance tečnosti"), kind: "number", unit: "°", min: 0, max: 45, step: 0.5 },
+    { key: "chamfer", label: tr("Srazit místo zaoblit"), kind: "bool" },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Zaoblení řetězce");
+    const body = needBody(ctx, tr("Zaoblení řetězce"));
     const radius = num(d, "radius");
-    if (!(radius > 0)) throw new Error("Poloměr musí být kladný.");
+    if (!(radius > 0)) throw new Error(tr("Poloměr musí být kladný."));
     const chain = tangentChain(body, pickEdges(body, ids(d, "edges")), num(d, "angle", 2));
     const cfg = (e: r.Edge) => (chain.some((x) => x.isSame(e)) ? radius : null);
     return (bool(d, "chamfer") ? body.clone().chamfer(cfg as never) : body.clone().fillet(cfg as never)) as Shape;
@@ -230,40 +231,40 @@ registerExt({
 
 registerExt({
   ext: "adv.chamfer2",
-  label: "Sražení D1×D2 / D×úhel",
+  label: tr("Sražení D1×D2 / D×úhel"),
   icon: "adv-chamfer2",
   tone: "feature",
   tab: "create",
   group: "Pokročilé úpravy",
   big: true,
-  hint: "nesymetrické sražení dvěma vzdálenostmi nebo vzdáleností a úhlem",
+  hint: tr("nesymetrické sražení dvěma vzdálenostmi nebo vzdáleností a úhlem"),
   pick: { kind: "edges", key: "edges" },
   rollback: true,
   make: (_doc, extra) => ({ edges: extra?.edges ?? [], kind: "dd", d1: 2, d2: 1, angle: 30 }),
   params: [
-    { key: "edges", label: "Hrany", kind: "edges" },
+    { key: "edges", label: tr("Hrany"), kind: "edges" },
     {
       key: "kind",
-      label: "Zadání",
+      label: tr("Zadání"),
       kind: "enum",
       options: [
-        { v: "dd", l: "D1 × D2" },
-        { v: "da", l: "D × úhel" },
+        { v: "dd", l: tr("D1 × D2") },
+        { v: "da", l: tr("D × úhel") },
       ],
     },
-    { key: "d1", label: "Vzdálenost D1", kind: "number", min: 0.01, step: 0.5 },
-    { key: "d2", label: "Vzdálenost D2", kind: "number", min: 0.01, step: 0.5, hint: "jen pro D1 × D2" },
-    { key: "angle", label: "Úhel", kind: "number", unit: "°", min: 1, max: 89, step: 1, hint: "jen pro D × úhel" },
+    { key: "d1", label: tr("Vzdálenost D1"), kind: "number", min: 0.01, step: 0.5 },
+    { key: "d2", label: tr("Vzdálenost D2"), kind: "number", min: 0.01, step: 0.5, hint: tr("jen pro D1 × D2") },
+    { key: "angle", label: tr("Úhel"), kind: "number", unit: "°", min: 1, max: 89, step: 1, hint: tr("jen pro D × úhel") },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Sražení");
+    const body = needBody(ctx, tr("Sražení"));
     const d1 = num(d, "d1");
     const d2 = num(d, "d2");
     const ang = num(d, "angle", 30);
-    if (!(d1 > 0)) throw new Error("Vzdálenost D1 musí být kladná.");
+    if (!(d1 > 0)) throw new Error(tr("Vzdálenost D1 musí být kladná."));
     const byAngle = str(d, "kind", "dd") === "da";
-    if (!byAngle && !(d2 > 0)) throw new Error("Vzdálenost D2 musí být kladná.");
-    if (byAngle && !(ang > 0 && ang < 90)) throw new Error("Úhel musí být mezi 0° a 90°.");
+    if (!byAngle && !(d2 > 0)) throw new Error(tr("Vzdálenost D2 musí být kladná."));
+    if (byAngle && !(ang > 0 && ang < 90)) throw new Error(tr("Úhel musí být mezi 0° a 90°."));
     const edges = pickEdges(body, ids(d, "edges"));
     const o = oc();
     const mk = new o.BRepFilletAPI_MakeChamfer(body.wrapped);
@@ -273,7 +274,7 @@ registerExt({
         if (byAngle) mk.AddDA(d1, (ang * Math.PI) / 180, e.wrapped, f.wrapped);
         else mk.Add(d1, d2, e.wrapped, f.wrapped);
       }
-      return finish(mk, "Sražení");
+      return finish(mk, tr("Sražení"));
     } finally {
       mk.delete();
     }
@@ -284,26 +285,26 @@ registerExt({
 
 registerExt({
   ext: "adv.mirrorFeatures",
-  label: "Zrcadlit prvky",
+  label: tr("Zrcadlit prvky"),
   icon: "adv-mirrorfeat",
   tone: "pattern",
   tab: "create",
   group: "Pole a kopie",
   big: true,
-  hint: "zrcadlí vybrané dřívější prvky (ne celé těleso) podle roviny",
+  hint: tr("zrcadlí vybrané dřívější prvky (ne celé těleso) podle roviny"),
   make: () => ({ features: [], all: false, plane: "YZ", offset: 0 }),
   params: [
-    { key: "all", label: "Všechny dosavadní prvky", kind: "bool" },
-    { key: "plane", label: "Rovina zrcadlení", kind: "enum", options: PLANE_OPTS },
-    { key: "offset", label: "Odsazení roviny", kind: "number", step: 1 },
+    { key: "all", label: tr("Všechny dosavadní prvky"), kind: "bool" },
+    { key: "plane", label: tr("Rovina zrcadlení"), kind: "enum", options: PLANE_OPTS },
+    { key: "offset", label: tr("Odsazení roviny"), kind: "number", step: 1 },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Zrcadlení prvků");
+    const body = needBody(ctx, tr("Zrcadlení prvků"));
     const plane = (["XY", "XZ", "YZ"].includes(str(d, "plane")) ? str(d, "plane") : "YZ") as PlaneName;
     const off = num(d, "offset");
     const origin: Vec3 = plane === "YZ" ? [off, 0, 0] : plane === "XZ" ? [0, off, 0] : [0, 0, off];
     const list = bool(d, "all") ? [...ctx.tools.keys()] : (Array.isArray(d.features) ? (d.features as string[]) : []).concat(typeof d.feature === "string" && d.feature ? [d.feature] : []);
-    if (!list.length) throw new Error("Vyberte prvky, které se mají zrcadlit (nebo zaškrtněte Všechny).");
+    if (!list.length) throw new Error(tr("Vyberte prvky, které se mají zrcadlit (nebo zaškrtněte Všechny)."));
     let acc = body;
     for (const id of list) {
       const t = needTool(ctx, id);
@@ -318,25 +319,25 @@ registerExt({
 
 registerExt({
   ext: "adv.curvePattern",
-  label: "Pole podél křivky",
+  label: tr("Pole podél křivky"),
   icon: "adv-curvepattern",
   tone: "pattern",
   tab: "create",
   group: "Pole a kopie",
   big: true,
-  hint: "kopie prvku rozmístěné po dráze ze skici",
+  hint: tr("kopie prvku rozmístěné po dráze ze skici"),
   make: () => ({ feature: "", path: "", count: 5, spacing: 0, follow: true }),
   params: [
-    { key: "feature", label: "Opakovaný prvek", kind: "feature" },
-    { key: "path", label: "Dráha (skica)", kind: "sketch" },
-    { key: "count", label: "Počet kopií", kind: "number", unit: "", min: 1, max: 500, step: 1 },
-    { key: "spacing", label: "Rozteč po křivce", kind: "number", min: 0, step: 1, hint: "0 = rozdělit rovnoměrně" },
-    { key: "follow", label: "Natáčet podle tečny", kind: "bool" },
+    { key: "feature", label: tr("Opakovaný prvek"), kind: "feature" },
+    { key: "path", label: tr("Dráha (skica)"), kind: "sketch" },
+    { key: "count", label: tr("Počet kopií"), kind: "number", unit: "", min: 1, max: 500, step: 1 },
+    { key: "spacing", label: tr("Rozteč po křivce"), kind: "number", min: 0, step: 1, hint: tr("0 = rozdělit rovnoměrně") },
+    { key: "follow", label: tr("Natáčet podle tečny"), kind: "bool" },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Pole podél křivky");
+    const body = needBody(ctx, tr("Pole podél křivky"));
     const t = needTool(ctx, str(d, "feature"));
-    const sk = needSketch(ctx, str(d, "path"), "skicu dráhy");
+    const sk = needSketch(ctx, str(d, "path"), tr("skicu dráhy"));
     const wire = sketchPathWire(sk);
     const L = wire.length;
     const count = Math.max(1, Math.round(num(d, "count", 5)));
@@ -349,7 +350,7 @@ registerExt({
     let acc = body;
     for (let i = 1; i < count; i++) {
       const s = spacing > 0 ? (spacing * i) / L : i / Math.max(1, count - (wire.isClosed ? 0 : 1));
-      if (s > 1 + 1e-9) throw new Error(`Rozteč × počet přesahuje délku dráhy (${Math.round(L)} mm).`);
+      if (s > 1 + 1e-9) throw new Error(tr("Rozteč × počet přesahuje délku dráhy ({0} mm).", Math.round(L)));
       const p = V(wire.pointAt(Math.min(1, s)));
       let copy = t.tool.clone();
       if (bool(d, "follow", true)) {
@@ -368,31 +369,31 @@ registerExt({
 
 registerExt({
   ext: "adv.fillPattern",
-  label: "Výplňové pole",
+  label: tr("Výplňové pole"),
   icon: "adv-fillpattern",
   tone: "pattern",
   tab: "create",
   group: "Pole a kopie",
-  hint: "kopie prvku v mřížce uvnitř uzavřené skici",
+  hint: tr("kopie prvku v mřížce uvnitř uzavřené skici"),
   make: () => ({ feature: "", region: "", dx: 20, dy: 20, margin: 5, stagger: false }),
   params: [
-    { key: "feature", label: "Opakovaný prvek", kind: "feature" },
-    { key: "region", label: "Oblast (uzavřená skica)", kind: "sketch" },
-    { key: "dx", label: "Rozteč X", kind: "number", min: 0.1, step: 1 },
-    { key: "dy", label: "Rozteč Y", kind: "number", min: 0.1, step: 1 },
-    { key: "margin", label: "Odstup od okraje", kind: "number", min: 0, step: 1 },
-    { key: "stagger", label: "Střídavě (šachovnice)", kind: "bool" },
+    { key: "feature", label: tr("Opakovaný prvek"), kind: "feature" },
+    { key: "region", label: tr("Oblast (uzavřená skica)"), kind: "sketch" },
+    { key: "dx", label: tr("Rozteč X"), kind: "number", min: 0.1, step: 1 },
+    { key: "dy", label: tr("Rozteč Y"), kind: "number", min: 0.1, step: 1 },
+    { key: "margin", label: tr("Odstup od okraje"), kind: "number", min: 0, step: 1 },
+    { key: "stagger", label: tr("Střídavě (šachovnice)"), kind: "bool" },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Výplňové pole");
+    const body = needBody(ctx, tr("Výplňové pole"));
     const t = needTool(ctx, str(d, "feature"));
-    const sk = needSketch(ctx, str(d, "region"), "skicu oblasti");
+    const sk = needSketch(ctx, str(d, "region"), tr("skicu oblasti"));
     const dx = num(d, "dx", 20);
     const dy = num(d, "dy", 20);
-    if (!(dx > 0 && dy > 0)) throw new Error("Rozteče musí být kladné.");
+    if (!(dx > 0 && dy > 0)) throw new Error(tr("Rozteče musí být kladné."));
     const margin = Math.max(0, num(d, "margin", 0));
     const { loops } = findLoops(sk.entities);
-    if (!loops.length) throw new Error("Skica oblasti musí obsahovat uzavřený profil.");
+    if (!loops.length) throw new Error(tr("Skica oblasti musí obsahovat uzavřený profil."));
     const nested = nestLoops(loops);
     const outers = nested.filter((x) => x.depth % 2 === 0).map((x) => loopPolygon(x.loop));
     const holes = nested.filter((x) => x.depth % 2 === 1).map((x) => loopPolygon(x.loop));
@@ -427,8 +428,8 @@ registerExt({
         const p: Vec2 = [seed[0] + i * dx + (bool(d, "stagger") && j % 2 ? dx / 2 : 0), seed[1] + j * dy];
         if (inside(p)) pts.push(p);
       }
-    if (!pts.length) throw new Error("Do oblasti se nevejde žádná kopie – zmenšete rozteče nebo odstup.");
-    if (pts.length > 400) throw new Error(`Pole by mělo ${pts.length} kopií – zvětšete rozteče (max. 400).`);
+    if (!pts.length) throw new Error(tr("Do oblasti se nevejde žádná kopie – zmenšete rozteče nebo odstup."));
+    if (pts.length > 400) throw new Error(tr("Pole by mělo {0} kopií – zvětšete rozteče (max. 400).", pts.length));
     let acc = body;
     const nrm = V(plane.zDir);
     for (const p of pts) {
@@ -447,27 +448,27 @@ registerExt({
 
 registerExt({
   ext: "adv.twist",
-  label: "Zkrut",
+  label: tr("Zkrut"),
   icon: "adv-twist",
   tone: "create",
   tab: "create",
   group: "Pokročilé tvary",
   big: true,
-  hint: "vysunutí profilu s otáčením kolem osy (šroubovitá drážka, vrták…)",
+  hint: tr("vysunutí profilu s otáčením kolem osy (šroubovitá drážka, vrták…)"),
   make: (doc) => ({ sketch: [...doc.features].reverse().find((f) => f.type === "sketch")?.id ?? "", height: 40, angle: 90, mode: "add" }),
   params: [
-    { key: "sketch", label: "Profil (skica)", kind: "sketch" },
-    { key: "height", label: "Výška", kind: "number", min: 0.01, step: 1 },
-    { key: "angle", label: "Úhel zkrutu", kind: "number", unit: "°", step: 5, hint: "záporný = opačný smysl" },
+    { key: "sketch", label: tr("Profil (skica)"), kind: "sketch" },
+    { key: "height", label: tr("Výška"), kind: "number", min: 0.01, step: 1 },
+    { key: "angle", label: tr("Úhel zkrutu"), kind: "number", unit: "°", step: 5, hint: tr("záporný = opačný smysl") },
     MODE_PARAM,
   ],
   build: (d, ctx) => {
-    const sk = needSketch(ctx, str(d, "sketch"), "skicu profilu");
+    const sk = needSketch(ctx, str(d, "sketch"), tr("skicu profilu"));
     const h = num(d, "height");
     const ang = num(d, "angle");
-    if (!(h > 0)) throw new Error("Výška musí být kladná.");
+    if (!(h > 0)) throw new Error(tr("Výška musí být kladná."));
     const dr = sketchDrawing(sk);
-    if (!dr) throw new Error("Skica neobsahuje uzavřený profil.");
+    if (!dr) throw new Error(tr("Skica neobsahuje uzavřený profil."));
     const s = dr.sketchOnPlane(planeOf(sk.plane)).extrude(h, { twistAngle: ang }) as Shape;
     return applyMode(ctx.body, s, modeOf(d, ctx.body ? "add" : "new"));
   },
@@ -477,34 +478,34 @@ registerExt({
 
 registerExt({
   ext: "adv.dome",
-  label: "Kopule",
+  label: tr("Kopule"),
   icon: "adv-dome",
   tone: "create",
   tab: "create",
   group: "Pokročilé tvary",
-  hint: "eliptická kopule (nebo důlek) na rovinné ploše",
+  hint: tr("eliptická kopule (nebo důlek) na rovinné ploše"),
   pick: { kind: "faces", key: "faces" },
   rollback: true,
   make: (_doc, extra) => ({ faces: extra?.faces ?? [], height: 10, radius: 0, mode: "add" }),
   params: [
-    { key: "faces", label: "Rovinná plocha", kind: "faces" },
-    { key: "height", label: "Výška kopule", kind: "number", min: 0.01, step: 1 },
-    { key: "radius", label: "Poloměr základny", kind: "number", min: 0, step: 1, hint: "0 = vepsaný do plochy" },
+    { key: "faces", label: tr("Rovinná plocha"), kind: "faces" },
+    { key: "height", label: tr("Výška kopule"), kind: "number", min: 0.01, step: 1 },
+    { key: "radius", label: tr("Poloměr základny"), kind: "number", min: 0, step: 1, hint: tr("0 = vepsaný do plochy") },
     MODE_PARAM,
   ],
   build: (d, ctx) => {
     const body = needBody(ctx, "Kopule");
     const face = pickFace(body, ids(d, "faces"));
-    if (face.geomType !== "PLANE") throw new Error("Kopuli lze vytvořit jen na rovinné ploše.");
+    if (face.geomType !== "PLANE") throw new Error(tr("Kopuli lze vytvořit jen na rovinné ploše."));
     const h = num(d, "height");
-    if (!(h > 0)) throw new Error("Výška musí být kladná.");
+    if (!(h > 0)) throw new Error(tr("Výška musí být kladná."));
     const c = V(face.center);
     const n = norm(V(face.normalAt(face.center)));
     let R = num(d, "radius");
     if (!(R > 0)) {
       // vepsaný poloměr: nejmenší vzdálenost středu k hranám plochy
       R = Math.min(...face.edges.map((e) => Math.min(len(sub(c, V(e.startPoint))), len(sub(c, V(e.endPoint))), len(sub(c, V(e.pointAt(0.5)))))));
-      if (!(R > 0.01)) throw new Error("Nepodařilo se určit poloměr – zadejte ho ručně.");
+      if (!(R > 0.01)) throw new Error(tr("Nepodařilo se určit poloměr – zadejte ho ručně."));
     }
     const mode = modeOf(d, "add");
     const dir = mode === "cut" ? mul(n, -1) : n;
@@ -533,9 +534,9 @@ export async function registerAdvFont(data: ArrayBuffer | string) {
 function ensureAdvFont(): Promise<void> {
   if (!advFont) {
     advFont = (async () => {
-      if (typeof fetch !== "function" || typeof location === "undefined") throw new Error("Písmo pro text není načteno.");
+      if (typeof fetch !== "function" || typeof location === "undefined") throw new Error(tr("Písmo pro text není načteno."));
       const res = await fetch(new URL("/fonts/Roboto-Bold.ttf", location.origin).toString());
-      if (!res.ok) throw new Error("Písmo pro text se nepodařilo stáhnout.");
+      if (!res.ok) throw new Error(tr("Písmo pro text se nepodařilo stáhnout."));
       await r.loadFont(await res.arrayBuffer(), ADV_FONT, true);
     })();
     advFont.catch(() => (advFont = null));
@@ -545,7 +546,7 @@ function ensureAdvFont(): Promise<void> {
 
 /** Osa a poloměr válcové plochy (BRepAdaptor_Surface → gp_Cylinder). */
 export function cylinderOf(face: r.Face): { loc: Vec3; dir: Vec3; R: number } {
-  if (face.geomType !== "CYLINDRE") throw new Error("Vyberte válcovou plochu.");
+  if (face.geomType !== "CYLINDRE") throw new Error(tr("Vyberte válcovou plochu."));
   const o = oc();
   const ad = new o.BRepAdaptor_Surface(face.wrapped, false);
   try {
@@ -561,49 +562,49 @@ export function cylinderOf(face: r.Face): { loc: Vec3; dir: Vec3; R: number } {
 
 registerExt({
   ext: "adv.textOnCyl",
-  label: "Text na válci",
+  label: tr("Text na válci"),
   icon: "adv-textcyl",
   tone: "create",
   tab: "create",
   group: "Pokročilé tvary",
-  hint: "vystouplý nebo gravírovaný nápis na válcové ploše (radiální promítnutí)",
+  hint: tr("vystouplý nebo gravírovaný nápis na válcové ploše (radiální promítnutí)"),
   pick: { kind: "faces", key: "faces" },
   rollback: true,
   make: (_doc, extra) => ({ faces: extra?.faces ?? [], text: "MNÁSTROJÁRNA", size: 6, depth: 0.6, along: "around", angle: 0, shift: 0, mode: "cut" }),
   params: [
-    { key: "faces", label: "Válcová plocha", kind: "faces" },
-    { key: "text", label: "Text", kind: "text" },
-    { key: "size", label: "Výška písma", kind: "number", min: 0.5, step: 0.5 },
-    { key: "depth", label: "Hloubka / výška reliéfu", kind: "number", min: 0.05, step: 0.1 },
+    { key: "faces", label: tr("Válcová plocha"), kind: "faces" },
+    { key: "text", label: tr("Text"), kind: "text" },
+    { key: "size", label: tr("Výška písma"), kind: "number", min: 0.5, step: 0.5 },
+    { key: "depth", label: tr("Hloubka / výška reliéfu"), kind: "number", min: 0.05, step: 0.1 },
     {
       key: "along",
-      label: "Směr textu",
+      label: tr("Směr textu"),
       kind: "enum",
       options: [
-        { v: "around", l: "Po obvodu" },
-        { v: "axis", l: "Podél osy" },
+        { v: "around", l: tr("Po obvodu") },
+        { v: "axis", l: tr("Podél osy") },
       ],
     },
-    { key: "angle", label: "Natočení kolem osy", kind: "number", unit: "°", step: 5 },
-    { key: "shift", label: "Posun podél osy", kind: "number", step: 1 },
+    { key: "angle", label: tr("Natočení kolem osy"), kind: "number", unit: "°", step: 5 },
+    { key: "shift", label: tr("Posun podél osy"), kind: "number", step: 1 },
     {
       key: "mode",
-      label: "Operace",
+      label: tr("Operace"),
       kind: "enum",
       options: [
-        { v: "cut", l: "Gravírovat" },
-        { v: "add", l: "Vystouplý" },
+        { v: "cut", l: tr("Gravírovat") },
+        { v: "add", l: tr("Vystouplý") },
       ],
     },
   ],
   build: async (d, ctx) => {
-    const body = needBody(ctx, "Text na válci");
+    const body = needBody(ctx, tr("Text na válci"));
     const face = pickFace(body, ids(d, "faces"));
     const text = str(d, "text").trim();
-    if (!text) throw new Error("Zadejte text.");
+    if (!text) throw new Error(tr("Zadejte text."));
     const size = num(d, "size", 6);
     const depth = num(d, "depth", 0.6);
-    if (!(size > 0 && depth > 0)) throw new Error("Výška písma a hloubka musí být kladné.");
+    if (!(size > 0 && depth > 0)) throw new Error(tr("Výška písma a hloubka musí být kladné."));
     const { loc, dir, R } = cylinderOf(face);
     const cut = str(d, "mode", "cut") !== "add";
     // radiální směr k středu vybrané plochy, natočený o úhel
@@ -642,23 +643,23 @@ registerExt({
 
 registerExt({
   ext: "adv.partingDraft",
-  label: "Úkos od dělicí roviny",
+  label: tr("Úkos od dělicí roviny"),
   icon: "adv-partdraft",
   tone: "feature",
   tab: "create",
   group: "Pokročilé úpravy",
-  hint: "stěny nad i pod dělicí rovinou se ukosí směrem od ní (tvárník/tvárnice)",
+  hint: tr("stěny nad i pod dělicí rovinou se ukosí směrem od ní (tvárník/tvárnice)"),
   make: () => ({ angle: 2, plane: "XY", offset: 0, flip: false }),
   params: [
-    { key: "angle", label: "Úhel úkosu", kind: "number", unit: "°", min: 0.1, max: 45, step: 0.5 },
-    { key: "plane", label: "Dělicí rovina", kind: "enum", options: PLANE_OPTS },
-    { key: "offset", label: "Odsazení roviny", kind: "number", step: 1 },
-    { key: "flip", label: "Obrátit smysl úkosu", kind: "bool" },
+    { key: "angle", label: tr("Úhel úkosu"), kind: "number", unit: "°", min: 0.1, max: 45, step: 0.5 },
+    { key: "plane", label: tr("Dělicí rovina"), kind: "enum", options: PLANE_OPTS },
+    { key: "offset", label: tr("Odsazení roviny"), kind: "number", step: 1 },
+    { key: "flip", label: tr("Obrátit smysl úkosu"), kind: "bool" },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Úkos");
+    const body = needBody(ctx, tr("Úkos"));
     const angle = num(d, "angle", 2);
-    if (!(angle > 0 && angle < 90)) throw new Error("Úhel musí být mezi 0° a 90°.");
+    if (!(angle > 0 && angle < 90)) throw new Error(tr("Úhel musí být mezi 0° a 90°."));
     const plane = (["XY", "XZ", "YZ"].includes(str(d, "plane")) ? str(d, "plane") : "XY") as PlaneName;
     const off = num(d, "offset");
     const flip = bool(d, "flip");
@@ -667,7 +668,7 @@ registerExt({
     const res = body.clone().split(pl);
     const halves = [res.positive, res.negative] as (Shape | null | undefined)[];
     const solids = halves.filter((h): h is Shape => !!h && !(h as unknown as { isNull?: boolean }).isNull);
-    if (!solids.length) throw new Error("Dělicí rovina těleso neprotíná.");
+    if (!solids.length) throw new Error(tr("Dělicí rovina těleso neprotíná."));
     const drafted = solids.map((half) => {
       const cz = half.boundingBox.center as Vec3;
       const above = dot(sub(cz, V(pl.origin)), n) >= 0;
@@ -677,7 +678,7 @@ registerExt({
       try {
         return half.draft(angle, (ff) => ff.when(({ element }) => sides.some((s) => s.isSame(element as r.Face))), pull) as Shape;
       } catch {
-        throw new Error("Úkos se nepodařilo vytvořit – zkuste menší úhel nebo jinou dělicí rovinu.");
+        throw new Error(tr("Úkos se nepodařilo vytvořit – zkuste menší úhel nebo jinou dělicí rovinu."));
       }
     });
     let acc = drafted[0];
@@ -690,38 +691,38 @@ registerExt({
 
 registerExt({
   ext: "adv.lipGroove",
-  label: "Lem / drážka",
+  label: tr("Lem / drážka"),
   icon: "adv-lip",
   tone: "feature",
   tab: "create",
   group: "Pokročilé tvary",
-  hint: "vystouplý lem nebo drážka podél obrysu rovinné plochy (dosedání tvárníku a tvárnice)",
+  hint: tr("vystouplý lem nebo drážka podél obrysu rovinné plochy (dosedání tvárníku a tvárnice)"),
   pick: { kind: "faces", key: "faces" },
   rollback: true,
   make: (_doc, extra) => ({ faces: extra?.faces ?? [], kind: "lip", width: 3, depth: 2, inset: 0 }),
   params: [
-    { key: "faces", label: "Rovinná plocha", kind: "faces" },
+    { key: "faces", label: tr("Rovinná plocha"), kind: "faces" },
     {
       key: "kind",
-      label: "Druh",
+      label: tr("Druh"),
       kind: "enum",
       options: [
-        { v: "lip", l: "Lem (přidat)" },
-        { v: "groove", l: "Drážka (odebrat)" },
+        { v: "lip", l: tr("Lem (přidat)") },
+        { v: "groove", l: tr("Drážka (odebrat)") },
       ],
     },
-    { key: "width", label: "Šířka", kind: "number", min: 0.1, step: 0.5 },
-    { key: "depth", label: "Výška / hloubka", kind: "number", min: 0.1, step: 0.5 },
-    { key: "inset", label: "Odstup od okraje", kind: "number", min: 0, step: 0.5 },
+    { key: "width", label: tr("Šířka"), kind: "number", min: 0.1, step: 0.5 },
+    { key: "depth", label: tr("Výška / hloubka"), kind: "number", min: 0.1, step: 0.5 },
+    { key: "inset", label: tr("Odstup od okraje"), kind: "number", min: 0, step: 0.5 },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Lem / drážka");
+    const body = needBody(ctx, tr("Lem / drážka"));
     const face = pickFace(body, ids(d, "faces"));
-    if (face.geomType !== "PLANE") throw new Error("Lem a drážku lze vytvořit jen na rovinné ploše.");
+    if (face.geomType !== "PLANE") throw new Error(tr("Lem a drážku lze vytvořit jen na rovinné ploše."));
     const width = num(d, "width", 3);
     const depth = num(d, "depth", 2);
     const inset = Math.max(0, num(d, "inset"));
-    if (!(width > 0 && depth > 0)) throw new Error("Šířka a výška musí být kladné.");
+    if (!(width > 0 && depth > 0)) throw new Error(tr("Šířka a výška musí být kladné."));
     const n = norm(V(face.normalAt(face.center)));
     const c = V(face.center);
     const xd = norm(Math.abs(n[0]) < 0.9 ? cross(n, [1, 0, 0]) : cross(n, [0, 1, 0]));
@@ -748,7 +749,7 @@ registerExt({
         j = segs.findIndex((sg, i) => !used[i] && near(sg.b, end, 1e-4));
         rev = true;
       }
-      if (j < 0) throw new Error("Obrys plochy není uzavřený.");
+      if (j < 0) throw new Error(tr("Obrys plochy není uzavřený."));
       used[j] = true;
       cur = segs[j];
       const pts = rev ? [cur.b, ...[...cur.pts.slice(1)].reverse()] : cur.pts;
@@ -764,7 +765,7 @@ registerExt({
     const outline = pen.close();
     const outerD = inset > 0 ? outline.offset(-inset) : outline;
     const innerD = outline.offset(-(inset + width));
-    if (!innerD || innerD.boundingBox.width < 1e-6) throw new Error("Šířka lemu/drážky je větší než plocha – zmenšete ji.");
+    if (!innerD || innerD.boundingBox.width < 1e-6) throw new Error(tr("Šířka lemu/drážky je větší než plocha – zmenšete ji."));
     const ring = outerD.cut(innerD);
     const groove = str(d, "kind", "lip") === "groove";
     const tool = ring.sketchOnPlane(plane).extrude(groove ? -depth : depth) as Shape;
@@ -776,22 +777,22 @@ registerExt({
 
 registerExt({
   ext: "adv.scaleAbout",
-  label: "Měřítko v bodě",
+  label: tr("Měřítko v bodě"),
   icon: "adv-scale",
   tone: "pattern",
   tab: "create",
   group: "Pole a kopie",
-  hint: "zvětší/zmenší těleso kolem zadaného bodu (např. smrštění kolem středu dutiny)",
+  hint: tr("zvětší/zmenší těleso kolem zadaného bodu (např. smrštění kolem středu dutiny)"),
   make: () => ({ factor: 1.02, useCenter: true, center: [0, 0, 0] }),
   params: [
-    { key: "factor", label: "Měřítko", kind: "number", unit: "×", min: 0.001, step: 0.01 },
-    { key: "useCenter", label: "Kolem těžiště obálky", kind: "bool" },
-    { key: "center", label: "Bod měřítka", kind: "vec3", hint: "použije se, není-li zaškrtnuto Kolem těžiště" },
+    { key: "factor", label: tr("Měřítko"), kind: "number", unit: "×", min: 0.001, step: 0.01 },
+    { key: "useCenter", label: tr("Kolem těžiště obálky"), kind: "bool" },
+    { key: "center", label: tr("Bod měřítka"), kind: "vec3", hint: tr("použije se, není-li zaškrtnuto Kolem těžiště") },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Měřítko");
+    const body = needBody(ctx, tr("Měřítko"));
     const k = num(d, "factor", 1);
-    if (!(k > 0)) throw new Error("Měřítko musí být kladné.");
+    if (!(k > 0)) throw new Error(tr("Měřítko musí být kladné."));
     const c = bool(d, "useCenter", true) ? (body.boundingBox.center as Vec3) : vec3(d, "center");
     return body.clone().scale(k, c) as Shape;
   },
@@ -801,33 +802,33 @@ registerExt({
 
 registerExt({
   ext: "adv.holesAtPoints",
-  label: "Díry v bodech",
+  label: tr("Díry v bodech"),
   icon: "adv-holes",
   tone: "cut",
   tab: "create",
   group: "Pokročilé tvary",
   big: true,
-  hint: "stejná díra v každém bodě (nebo středu kružnice) vybrané skici",
+  hint: tr("stejná díra v každém bodě (nebo středu kružnice) vybrané skici"),
   make: (doc) => ({ sketch: [...doc.features].reverse().find((f) => f.type === "sketch")?.id ?? "", diameter: 6.6, depth: 0, cbDiameter: 11, cbDepth: 0, flip: false }),
   params: [
-    { key: "sketch", label: "Skica s body", kind: "sketch", hint: "body, středy kružnic" },
-    { key: "diameter", label: "Průměr", kind: "number", min: 0.1, step: 0.5 },
-    { key: "depth", label: "Hloubka", kind: "number", min: 0, step: 1, hint: "0 = skrz" },
-    { key: "cbDiameter", label: "Ø zahloubení", kind: "number", min: 0, step: 0.5, hint: "0 = bez" },
-    { key: "cbDepth", label: "Hloubka zahloubení", kind: "number", min: 0, step: 0.5 },
-    { key: "flip", label: "Vrtat v kladném směru normály", kind: "bool" },
+    { key: "sketch", label: tr("Skica s body"), kind: "sketch", hint: tr("body, středy kružnic") },
+    { key: "diameter", label: tr("Průměr"), kind: "number", min: 0.1, step: 0.5 },
+    { key: "depth", label: tr("Hloubka"), kind: "number", min: 0, step: 1, hint: tr("0 = skrz") },
+    { key: "cbDiameter", label: tr("Ø zahloubení"), kind: "number", min: 0, step: 0.5, hint: tr("0 = bez") },
+    { key: "cbDepth", label: tr("Hloubka zahloubení"), kind: "number", min: 0, step: 0.5 },
+    { key: "flip", label: tr("Vrtat v kladném směru normály"), kind: "bool" },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Díry v bodech");
-    const sk = needSketch(ctx, str(d, "sketch"), "skicu s body");
+    const body = needBody(ctx, tr("Díry v bodech"));
+    const sk = needSketch(ctx, str(d, "sketch"), tr("skicu s body"));
     const dia = num(d, "diameter", 6.6);
-    if (!(dia > 0)) throw new Error("Průměr musí být kladný.");
+    if (!(dia > 0)) throw new Error(tr("Průměr musí být kladný."));
     const pts: Vec2[] = [];
     for (const e of sk.entities) {
       if (e.type === "point") pts.push(e.p);
       else if (e.type === "circle") pts.push([e.cx, e.cy]);
     }
-    if (!pts.length) throw new Error("Skica neobsahuje body ani kružnice.");
+    if (!pts.length) throw new Error(tr("Skica neobsahuje body ani kružnice."));
     const plane = planeOf(sk.plane);
     const n = norm(V(plane.zDir));
     const dir = bool(d, "flip") ? n : mul(n, -1);
@@ -853,20 +854,20 @@ registerExt({
 
 registerExt({
   ext: "adv.combineTool",
-  label: "Znovu použít nástroj",
+  label: tr("Znovu použít nástroj"),
   icon: "adv-combine",
   tone: "feature",
   tab: "create",
   group: "Pole a kopie",
-  hint: "použije těleso dřívějšího prvku znovu jinou operací (přidat → odebrat, průnik…)",
+  hint: tr("použije těleso dřívějšího prvku znovu jinou operací (přidat → odebrat, průnik…)"),
   make: () => ({ feature: "", mode: "cut", offset: [0, 0, 0] }),
   params: [
-    { key: "feature", label: "Prvek (nástroj)", kind: "feature" },
+    { key: "feature", label: tr("Prvek (nástroj)"), kind: "feature" },
     MODE_PARAM,
-    { key: "offset", label: "Posun kopie", kind: "vec3" },
+    { key: "offset", label: tr("Posun kopie"), kind: "vec3" },
   ],
   build: (d, ctx) => {
-    const body = needBody(ctx, "Operace s nástrojem");
+    const body = needBody(ctx, tr("Operace s nástrojem"));
     const t = needTool(ctx, str(d, "feature"));
     const off = vec3(d, "offset");
     const tool = (len(off) > 1e-9 ? t.tool.clone().translate(off) : t.tool.clone()) as Shape;
@@ -889,7 +890,7 @@ export function checkShape(body: Shape): string[] {
     body.edges.forEach((e, i) => {
       if (!an.IsValid(e.wrapped)) bad.push(`hrana ${i + 1}`);
     });
-    return bad.length ? bad : ["těleso jako celek"];
+    return bad.length ? bad : [tr("těleso jako celek")];
   } finally {
     an.delete();
   }
@@ -897,38 +898,38 @@ export function checkShape(body: Shape): string[] {
 
 registerExt({
   ext: "adv.check",
-  label: "Kontrola geometrie",
+  label: tr("Kontrola geometrie"),
   icon: "adv-check",
   tone: "tool",
   tab: "tools",
   group: "Geometrie",
   big: true,
-  hint: "ověří platnost tělesa (OpenCascade BRepCheck); chyby se zobrazí u prvku",
+  hint: tr("ověří platnost tělesa (OpenCascade BRepCheck); chyby se zobrazí u prvku"),
   make: () => ({ strict: true }),
-  params: [{ key: "strict", label: "Kontrolovat i geometrii ploch", kind: "bool" }],
+  params: [{ key: "strict", label: tr("Kontrolovat i geometrii ploch"), kind: "bool" }],
   build: (_d, ctx) => {
-    const body = needBody(ctx, "Kontrola geometrie");
+    const body = needBody(ctx, tr("Kontrola geometrie"));
     const bad = checkShape(body);
-    if (bad.length) throw new Error(`Těleso není platné: ${bad.slice(0, 6).join(", ")}${bad.length > 6 ? "…" : ""}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.`);
-    if (!(r.measureVolume(body) > 0)) throw new Error("Těleso má nulový objem.");
+    if (bad.length) throw new Error(tr("Těleso není platné: {0}{1}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.", bad.slice(0, 6).join(", "), bad.length > 6 ? "…" : ""));
+    if (!(r.measureVolume(body) > 0)) throw new Error(tr("Těleso má nulový objem."));
     return body; // beze změny (null by těleso odstranilo)
   },
 });
 
 registerExt({
   ext: "adv.simplify",
-  label: "Sjednotit plochy",
+  label: tr("Sjednotit plochy"),
   icon: "adv-simplify",
   tone: "tool",
   tab: "tools",
   group: "Geometrie",
-  hint: "sloučí sousední souplošné plochy a hrany (po importu STEP, po booleovských operacích)",
+  hint: tr("sloučí sousední souplošné plochy a hrany (po importu STEP, po booleovských operacích)"),
   make: () => ({}),
   build: (_d, ctx) => {
-    const body = needBody(ctx, "Sjednocení ploch");
+    const body = needBody(ctx, tr("Sjednocení ploch"));
     const before = body.faces.length;
     const out = body.clone().simplify() as Shape;
-    if (!(r.measureVolume(out) > 0)) throw new Error("Sjednocení ploch selhalo – těleso zůstává beze změny.");
+    if (!(r.measureVolume(out) > 0)) throw new Error(tr("Sjednocení ploch selhalo – těleso zůstává beze změny."));
     void before;
     return out;
   },
@@ -937,12 +938,12 @@ registerExt({
 /** Pro UI: akce analýzy tloušťky stěn (počítá se v UI nad sítí) je registrována jako tlačítko bez prvku. */
 registerExt({
   ext: "adv.wallThickness",
-  label: "Tloušťka stěn",
+  label: tr("Tloušťka stěn"),
   icon: "adv-wall",
   tone: "tool",
   tab: "tools",
   group: "Geometrie",
-  hint: "najde nejtenčí stěnu tělesa (vzorkování sítě)",
+  hint: tr("najde nejtenčí stěnu tělesa (vzorkování sítě)"),
   action: true,
   scope: "part",
   make: () => ({}),

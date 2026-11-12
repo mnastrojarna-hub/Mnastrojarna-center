@@ -47,13 +47,17 @@ const nextConfig = {
   // výchozím seznamu Next.js). pdfjs-dist se bundluje (klientské náhledy PDF ho importují přes
   // new URL(…, import.meta.url), což externí balík nedovolí); worker se v Node předává přímo
   // (globalThis.pdfjsWorker) a písma / cmaps se čtou z node_modules (tracing níže).
-  serverExternalPackages: ["@react-pdf/renderer", "@napi-rs/canvas", "heic-decode", "libheif-js"],
+  // Převod výkresu DXF / DWG na PDF (/api/jobs/files/[id]/pdf): LibreDWG (emscripten, wasm z node_modules)
+  // a fontkit (písmo do pdf-lib) se načítají za běhu z node_modules, nebalí se.
+  serverExternalPackages: ["@react-pdf/renderer", "@napi-rs/canvas", "heic-decode", "libheif-js", "@mlightcad/libredwg-web", "fontkit"],
   // Zahrnout fonty do serverless funkce generující PDF + SQL migrace pro průvodce
   outputFileTracingIncludes: {
     // PDF se generuje i v akcích zakázek (uložení do dokumentů, odeslání nabídky)
     "/**": ["./public/fonts/**"],
     "/api/pdf/**": ["./public/fonts/**"],
     "/api/setup/**": ["./supabase/migrations/**"],
+    // převod DWG → PDF: libredwg-web.wasm se čte z disku podle cesty (tracing ho sám nenajde)
+    "/api/jobs/files/**": ["./public/fonts/**", "./node_modules/@mlightcad/libredwg-web/wasm/**"],
     // Anonymizace výkresů vykresluje JEN v těchto routách (nikdy v server action) — přímo po nahrání
     // (after(), src/lib/anonymize/runner.ts): focení, dávka, stažení pošty, plánovače, šťouchnutí z UI
     "/api/drawings/anonymize/**": ANON_TRACE,

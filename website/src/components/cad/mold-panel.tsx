@@ -1,5 +1,6 @@
 "use client";
 
+import { tr } from "@/cad/i18n";
 import { useState } from "react";
 import { DRAFT_COLORS, DRAFT_LABELS, SHRINKAGE, defaultCooling, type CoolingParams, type DraftClass, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
 import type { Vec3 } from "@/cad/types";
@@ -56,65 +57,65 @@ export function MoldPanel({
   const sign = (p: Vec3) => (p[0] + p[1] + p[2] < 0 ? -1 : 1);
 
   return (
-    <FloatPanel title="Formařské nástroje" icon="layers" tone="create" onClose={onClose} width={300} initial={{ x: 12, y: 12 }}>
+    <FloatPanel title={tr("Formařské nástroje")} icon="layers" tone="create" onClose={onClose} width={300} initial={{ x: 12, y: 12 }}>
       <Segmented
         size="sm"
         value={tab}
         options={[
-          { v: "draft", l: "Úkosy" },
-          { v: "surface", l: "Plochy" },
-          { v: "shrink", l: "Smrštění" },
-          { v: "eject", l: "Vyhazovače" },
-          { v: "cool", l: "Chlazení" },
+          { v: "draft", l: tr("Úkosy") },
+          { v: "surface", l: tr("Plochy") },
+          { v: "shrink", l: tr("Smrštění") },
+          { v: "eject", l: tr("Vyhazovače") },
+          { v: "cool", l: tr("Chlazení") },
         ]}
         onChange={setTab}
       />
       {tab === "draft" && (
         <div className="mt-3 space-y-2">
-          <Toggle label="Barevná mapa úkosů" checked={draft.on} onChange={(on) => setDraft({ ...draft, on })} />
+          <Toggle label={tr("Barevná mapa úkosů")} checked={draft.on} onChange={(on) => setDraft({ ...draft, on })} />
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Směr vyhození</p>
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Směr vyhození")}</p>
               <Segmented size="sm" value={axisOf(draft.pull)} options={[{ v: "X", l: "X" }, { v: "Y", l: "Y" }, { v: "Z", l: "Z" }]} onChange={(a) => setDraft({ ...draft, on: true, pull: [a === "X" ? sign(draft.pull) : 0, a === "Y" ? sign(draft.pull) : 0, a === "Z" ? sign(draft.pull) : 0] as Vec3 })} />
             </div>
-            <Num label="Min. úkos" value={draft.minDeg} step={0.5} min={0} suffix="°" onChange={(v) => setDraft({ ...draft, on: true, minDeg: v })} />
+            <Num label={tr("Min. úkos")} value={draft.minDeg} step={0.5} min={0} suffix="°" onChange={(v) => setDraft({ ...draft, on: true, minDeg: v })} />
           </div>
           <Btn onClick={() => setDraft({ ...draft, on: true, pull: draft.pull.map((v) => -v) as Vec3 })} className="w-full">
-            Obrátit směr
+            {tr("Obrátit směr")}
           </Btn>
           {draftResult && (
             <div className="space-y-1 pt-1">
               {([0, 1, 2, 3] as DraftClass[]).map((k) => (
                 <div key={k} className="flex items-center gap-2 text-[12px]">
                   <span className="h-3 w-3 rounded-sm" style={{ background: DRAFT_COLORS[k] }} />
-                  <span className="flex-1">{DRAFT_LABELS[k]}</span>
+                  <span className="flex-1">{tr(DRAFT_LABELS[k])}</span>
                   <span className="font-mono text-[11px] text-[#5b6776]">{fmtNum((draftResult.areas[k] / total) * 100, 1)} %</span>
                 </div>
               ))}
               <p className={cn("mt-1 rounded px-2 py-1 text-[11.5px]", draftResult.undercutRatio > 0 ? "bg-brand/10 text-brand-600" : "bg-emerald-50 text-emerald-700")}>
-                {draftResult.undercutRatio > 0 ? `Podkosy na ${fmtNum(draftResult.undercutRatio * 100, 1)} % povrchu – díl nelze vyhodit bez posuvných čelistí.` : "Bez podkosů ✓ Díl lze vyhodit ve zvoleném směru."}
+                {draftResult.undercutRatio > 0 ? tr("Podkosy na {0} % povrchu – díl nelze vyhodit bez posuvných čelistí.", fmtNum(draftResult.undercutRatio * 100, 1)) : tr("Bez podkosů ✓ Díl lze vyhodit ve zvoleném směru.")}
               </p>
             </div>
           )}
           <div className="border-t border-[#edf1f5] pt-2">
             <Btn onClick={onParting} className="w-full" disabled={!bbox}>
-              Navrhnout dělicí rovinu
+              {tr("Navrhnout dělicí rovinu")}
             </Btn>
-            {partingZ && <Row k="Dělicí rovina" v={`Z = ${fmtNum(partingZ.z, 2)} mm · obvod ${fmtNum(partingZ.perimeter, 0)} mm`} />}
+            {partingZ && <Row k={tr("Dělicí rovina")} v={`Z = ${fmtNum(partingZ.z, 2)} mm · obvod ${fmtNum(partingZ.perimeter, 0)} mm`} />}
           </div>
         </div>
       )}
 
       {tab === "surface" && (
         <div className="mt-3 space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Analýza ploch</p>
+          <p className="text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Analýza ploch")}</p>
           <div className="space-y-1">
             {(
               [
                 ["none", "Vypnuto"],
-                ["zebra", "Zebra pruhy – návaznost a hladkost ploch"],
-                ["curvature", "Mapa křivosti – modrá vydutá, zelená rovina, červená vypuklá"],
-                ["thickness", "Tloušťka stěn – červená pod limitem"],
+                ["zebra", tr("Zebra pruhy – návaznost a hladkost ploch")],
+                ["curvature", tr("Mapa křivosti – modrá vydutá, zelená rovina, červená vypuklá")],
+                ["thickness", tr("Tloušťka stěn – červená pod limitem")],
               ] as [SurfaceSetup["mode"], string][]
             ).map(([m, l]) => (
               <label key={m} className={cn("flex cursor-pointer items-start gap-2 rounded px-2 py-1 text-[12px]", surface.mode === m ? "bg-[#eef2f6]" : "hover:bg-[#f7f9fb]")}>
@@ -123,13 +124,13 @@ export function MoldPanel({
               </label>
             ))}
           </div>
-          {surface.mode === "thickness" && <Num label="Minimální tloušťka" value={surface.limit} step={0.5} min={0.1} onChange={(v) => setSurface({ ...surface, limit: v })} />}
+          {surface.mode === "thickness" && <Num label={tr("Minimální tloušťka")} value={surface.limit} step={0.5} min={0.1} onChange={(v) => setSurface({ ...surface, limit: v })} />}
           {surface.info && <p className="rounded bg-[#eef2f6] px-2 py-1 text-[11.5px] text-[#4a5664]">{surface.info}</p>}
         </div>
       )}
       {tab === "shrink" && (
         <div className="mt-3 space-y-2">
-          <p className="text-[11.5px] leading-relaxed text-[#6b7785]">Dutina formy musí být o smrštění větší než výlisek. Přidá do historie dílu měřítko (lze kdykoli upravit nebo potlačit).</p>
+          <p className="text-[11.5px] leading-relaxed text-[#6b7785]">{tr("Dutina formy musí být o smrštění větší než výlisek. Přidá do historie dílu měřítko (lze kdykoli upravit nebo potlačit).")}</p>
           <select
             value={custom != null ? "custom" : shrinkId}
             onChange={(e) => {
@@ -146,26 +147,26 @@ export function MoldPanel({
                 {s.label} – {s.pct} %
               </option>
             ))}
-            <option value="custom">Vlastní hodnota…</option>
+            <option value="custom">{tr("Vlastní hodnota…")}</option>
           </select>
-          {custom != null && <Num label="Smrštění" value={custom} step={0.1} min={0} suffix="%" onChange={setCustom} />}
-          <Row k="Měřítko dutiny" v={`× ${(1 + pct / 100).toFixed(4)}`} strong />
+          {custom != null && <Num label={tr("Smrštění")} value={custom} step={0.1} min={0} suffix="%" onChange={setCustom} />}
+          <Row k={tr("Měřítko dutiny")} v={`× ${(1 + pct / 100).toFixed(4)}`} strong />
           <Btn primary className="w-full" onClick={() => onShrink(pct)}>
-            Použít smrštění {pct} %
+            {tr("Použít smrštění")}{" "}{pct} %
           </Btn>
         </div>
       )}
 
       {tab === "eject" && (
         <div className="mt-3 space-y-2">
-          <p className="text-[11.5px] leading-relaxed text-[#6b7785]">Návrh pravidelného rozmístění vyhazovačů v půdorysu dílu. Na díl se přidají díry, do sestavy skutečné vyhazovače.</p>
-          <Row k="Navrženo" v={ejectors.length ? `${ejectors.length} × Ø${ejectors[0].d} mm` : "—"} />
+          <p className="text-[11.5px] leading-relaxed text-[#6b7785]">{tr("Návrh pravidelného rozmístění vyhazovačů v půdorysu dílu. Na díl se přidají díry, do sestavy skutečné vyhazovače.")}</p>
+          <Row k={tr("Navrženo")} v={ejectors.length ? `${ejectors.length} × Ø${ejectors[0].d} mm` : "—"} />
           <div className="grid grid-cols-2 gap-2">
             <Btn disabled={!bbox} onClick={() => onEjectors(ejectors, "holes")}>
-              Díry do dílu
+              {tr("Díry do dílu")}
             </Btn>
             <Btn disabled={!bbox} onClick={() => onEjectors(ejectors, "pins")}>
-              Vyhazovače do sestavy
+              {tr("Vyhazovače do sestavy")}
             </Btn>
           </div>
         </div>
@@ -174,21 +175,21 @@ export function MoldPanel({
       {tab === "cool" && cool && (
         <div className="mt-3 space-y-2">
           <div className="grid grid-cols-2 gap-2">
-            <Num label="Ø kanálu" value={cool.diameter} min={4} onChange={(v) => setCool({ ...cool, diameter: v })} />
-            <Num label="Hloubka pod dutinou" value={cool.depth} min={5} onChange={(v) => setCool({ ...cool, depth: v })} />
-            <Num label="Počet větví" value={cool.rows} min={1} step={1} suffix="" onChange={(v) => setCool({ ...cool, rows: Math.round(v) })} />
-            <Num label="Přesah" value={cool.overhang} min={0} onChange={(v) => setCool({ ...cool, overhang: v })} />
+            <Num label={tr("Ø kanálu")} value={cool.diameter} min={4} onChange={(v) => setCool({ ...cool, diameter: v })} />
+            <Num label={tr("Hloubka pod dutinou")} value={cool.depth} min={5} onChange={(v) => setCool({ ...cool, depth: v })} />
+            <Num label={tr("Počet větví")} value={cool.rows} min={1} step={1} suffix="" onChange={(v) => setCool({ ...cool, rows: Math.round(v) })} />
+            <Num label={tr("Přesah")} value={cool.overhang} min={0} onChange={(v) => setCool({ ...cool, overhang: v })} />
           </div>
-          <p className="text-[11.5px] text-[#6b7785]">Meandr rovnoběžných vrtů propojených příčnými vrty. Doporučená vzdálenost od dutiny 2–3 × Ø.</p>
+          <p className="text-[11.5px] text-[#6b7785]">{tr("Meandr rovnoběžných vrtů propojených příčnými vrty. Doporučená vzdálenost od dutiny 2–3 × Ø.")}</p>
           <div className="grid grid-cols-2 gap-2">
-            <Btn onClick={() => onCooling(cool, "part")}>Vrtat do dílu (negativ)</Btn>
-            <Btn onClick={() => onCooling(cool, "component")}>Vložit do sestavy</Btn>
+            <Btn onClick={() => onCooling(cool, "part")}>{tr("Vrtat do dílu (negativ)")}</Btn>
+            <Btn onClick={() => onCooling(cool, "component")}>{tr("Vložit do sestavy")}</Btn>
           </div>
         </div>
       )}
       {tab === "cool" && !cool && (
         <p className="mt-3 flex items-center gap-2 text-[12px] text-[#6b7785]">
-          <CadIcon name="info" className="h-4 w-4" /> Nejdřív vytvořte nebo otevřete těleso.
+          <CadIcon name="info" className="h-4 w-4" /> {tr("Nejdřív vytvořte nebo otevřete těleso.")}
         </p>
       )}
     </FloatPanel>

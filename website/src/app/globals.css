@@ -377,12 +377,7 @@ html.has-cursor .cursor-ring {
   text-transform: uppercase;
   text-align: center;
 }
-html.has-cursor body,
-html.has-cursor a,
-html.has-cursor button,
-html.has-cursor [data-cursor] {
-  cursor: none;
-}
+/* systémový kurzor zůstává viditelný (vlastní kurzor vypnut) */
 
 /* vertikální sloupce fotek v hero */
 .photo-col {

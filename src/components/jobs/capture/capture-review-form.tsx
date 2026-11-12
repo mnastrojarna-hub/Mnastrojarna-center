@@ -19,9 +19,9 @@ import {
 } from "@/components/jobs/capture/capture-parts";
 import {
   CAPTURE_CHIPS, CHIP_GROUPS, MERGE_FIELD_LABELS, REVIEW_FIELDS, REVIEW_FIELD_KEYS, REVIEW_GROUPS, answerPairQuestion, changeChip, chipByKey, defaultCustomerChoice,
-  defaultSupplierChoice, emptyReviewItem, hiddenFieldCount, isAiValue, isFieldLocked, openPairQuestions, proposeStage, switchTarget,
-  totalsCheckText, visibleFieldGroups,
-  type MergeField, type PartyChoice, type ReviewFieldGroup, type ReviewFieldKey, type ReviewItem,
+  defaultSupplierChoice, emptyReviewItem, hiddenFieldCount, isAiValue, isFieldLocked, linkedTotal, linkedTotalMismatch, openPairQuestions, proposeStage,
+  switchTarget, syncLinkedTotals, totalsCheckText, visibleFieldGroups,
+  type LinkedTotal, type MergeField, type PartyChoice, type ReviewFieldGroup, type ReviewFieldKey, type ReviewItem,
   type ReviewModel, type ReviewState, type ReviewTarget,
 } from "@/lib/jobs/capture-review";
 import { isSupplierSideDoc } from "@/lib/jobs/matching";
@@ -95,6 +95,9 @@ export function CaptureReviewForm({ model, review, targets, onChange, onPickJob,
   // ve skupině dávky jsou zákaznická pole zakázky; dodavatele řeší sekce dokladů
   const supplierSide = !embedded && isSupplierSideDoc(review);
   const set = (patch: Partial<ReviewState>) => onChange({ ...review, ...patch });
+  // položky mají ceny → hodnota zakázky (u dodavatelského dokladu nákup) = jejich součet (křížová konzistence 4. 11.)
+  const linked = linkedTotal(review, model.margins, { supplierSide });
+  const setItems = (patch: Partial<ReviewState>) => onChange(syncLinkedTotals({ ...review, ...patch }, target, model.margins, { supplierSide }));
 
   // faktura dodavatele jde do Faktur dodavatelů (ne do zakázky) — zakázka, údaje ani druh dokumentu se nevyplňují
   if (!embedded && review.chip === "faktura_dodavatel") {
@@ -121,8 +124,8 @@ export function CaptureReviewForm({ model, review, targets, onChange, onPickJob,
       )}
       <CustomerSection model={model} review={review} target={target} idPrefix={idPrefix} onChange={(customer) => set({ customer })} />
       {supplierSide && <SupplierSection model={model} review={review} target={target} idPrefix={idPrefix} onChange={(supplier) => set({ supplier })} />}
-      <FieldsSection model={model} review={review} target={target} embedded={embedded} idPrefix={idPrefix} onChange={(fields) => set({ fields })} />
-      <ItemsSection model={model} review={review} target={target} supplierSide={supplierSide} itemSources={embedded?.itemSources} idPrefix={idPrefix} onChange={set} />
+      <FieldsSection model={model} review={review} target={target} embedded={embedded} idPrefix={idPrefix} linked={linked} onChange={(fields) => set({ fields })} />
+      <ItemsSection model={model} review={review} target={target} supplierSide={supplierSide} itemSources={embedded?.itemSources} idPrefix={idPrefix} onChange={setItems} />
       {!embedded?.hideStage && <StageSection review={review} target={target} onChange={(stage) => set({ stage })} />}
       {!embedded && <FileSection review={review} onChange={set} />}
     </div>
@@ -586,7 +589,7 @@ function embeddedFieldGroups(visible: ReviewFieldKey[], target: ReviewTarget, fi
 }
 
 function FieldsSection({
-  model, review, target, onChange, embedded, idPrefix,
+  model, review, target, onChange, embedded, idPrefix, linked,
 }: {
   model: ReviewModel;
   review: ReviewState;
@@ -594,6 +597,8 @@ function FieldsSection({
   onChange: (f: ReviewState["fields"]) => void;
   embedded?: CaptureReviewEmbedded;
   idPrefix: string;
+  /** Celková částka odvozená ze součtu položek (null = položky bez cen). */
+  linked: LinkedTotal | null;
 }) {
   const [showAll, setShowAll] = React.useState(false);
   const args = { chip: review.chip, target, fields: review.fields, margins: model.margins };
@@ -635,6 +640,7 @@ function FieldsSection({
                     aiUsed={model.aiUsed}
                     currency={currency}
                     idPrefix={idPrefix}
+                    linked={linked}
                     source={embedded?.fieldSources[key] && review.fields[key]?.trim()
                       && review.fields[key] === model.initial.fields[key] ? embedded.fieldSources[key] : undefined}
                     onChange={(v) => onChange({ ...review.fields, [key]: v })}
@@ -660,7 +666,7 @@ function FieldsSection({
 }
 
 function ReviewFieldInput({
-  k, target, review, aiUsed, currency, onChange, idPrefix, source,
+  k, target, review, aiUsed, currency, onChange, idPrefix, source, linked,
 }: {
   k: ReviewFieldKey;
   target: ReviewTarget;
@@ -671,6 +677,7 @@ function ReviewFieldInput({
   idPrefix: string;
   /** Údaj doplněný z jiného dokladu dávky. */
   source?: FieldSource;
+  linked: LinkedTotal | null;
 }) {
   const meta = REVIEW_FIELDS[k];
   const id = `${idPrefix}-field-${k}`;
@@ -680,10 +687,30 @@ function ReviewFieldInput({
   const ai = !locked && !fromDoc && isAiValue(target, review, k, aiUsed);
   const conflict = target.conflicts[k];
   const full = k === "title" || k === "deliveryMethod";
+  // hodnota zakázky / nákup = součet nacenených položek (živě; po uložení totéž vynutí DB)
+  const derived = linked?.key === k ? linked : null;
+  const docTotal = derived ? (target.proposed[k] ?? "") : "";
+  const mismatch = derived && !locked
+    ? linkedTotalMismatch(docTotal || value, derived.sum, derived.key, currency, docTotal ? "doc" : "typed")
+    : null;
 
   let control: React.ReactNode;
   if (locked) {
     control = <Input id={id} readOnly value={displayValue(k, value)} className={LOCKED_FIELD} />;
+  } else if (derived) {
+    control = (
+      <div className="relative">
+        <Input
+          id={id}
+          readOnly
+          value={moneyLabel(String(derived.sum), currency) ?? String(derived.sum)}
+          className="cursor-default border-emerald-300 bg-emerald-50/60 pr-12 text-right font-semibold tabular-nums dark:border-emerald-500/40 dark:bg-emerald-500/10"
+          data-testid={`${idPrefix}-linked-${k}`}
+          aria-describedby={`${id}-hint`}
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{currency}</span>
+      </div>
+    );
   } else if (meta.type === "currency") {
     control = (
       <NativeSelect id={id} value={value || "CZK"} onChange={(e) => onChange(e.target.value)} className={cn(ai && AI_FIELD, fromDoc && SOURCE_FIELD)}>
@@ -710,9 +737,12 @@ function ReviewFieldInput({
     );
   }
 
+  const linkedMark = derived && !locked
+    ? <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400" title="Počítá se ze součtu položek">= součet položek</span>
+    : undefined;
   return (
     <div className={cn(full && "sm:col-span-2")}>
-      <FieldLabel htmlFor={id} extra={locked ? <LockedMark /> : fromDoc && source ? <SourceMark label={source.label} /> : ai ? <AiMark /> : undefined}>{meta.label}</FieldLabel>
+      <FieldLabel htmlFor={id} extra={locked ? <LockedMark /> : linkedMark ?? (fromDoc && source ? <SourceMark label={source.label} /> : ai ? <AiMark /> : undefined)}>{meta.label}</FieldLabel>
       {control}
       {conflict && (
         <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-800 dark:text-amber-300">
@@ -720,7 +750,25 @@ function ReviewFieldInput({
           Na dokladu je {displayValue(k, conflict)} — zakázka má jinou hodnotu (nepřepisuji, změň v kartě zakázky).
         </p>
       )}
-      {!conflict && meta.hint && !locked && <p className="mt-1 text-[11px] text-muted-foreground">{meta.hint}</p>}
+      {mismatch && (
+        <p className="mt-1 flex items-start gap-1 text-[11px] text-amber-800 dark:text-amber-300" data-testid={`${idPrefix}-linked-mismatch`}>
+          <AlertTriangle className="mt-px h-3 w-3 shrink-0 text-amber-500" />
+          {mismatch}
+        </p>
+      )}
+      {derived && !locked && !mismatch && (
+        <p id={`${id}-hint`} className="mt-1 text-[11px] text-muted-foreground">
+          {derived.priced} {derived.priced === 1 ? "položka s cenou" : derived.priced < 5 ? "položky s cenou" : "položek s cenou"}
+          {derived.unpriced ? `, ${derived.unpriced} bez ceny` : ""} — změnu udělej u položky.
+        </p>
+      )}
+      {derived && locked && (
+        <p className="mt-1 flex items-start gap-1 text-[11px] text-muted-foreground">
+          <Info className="mt-px h-3 w-3 shrink-0" />
+          Po uložení se {k === "value" ? "hodnota zakázky" : "nákupní náklady"} přepočte ze součtu všech položek zakázky ({moneyLabel(String(derived.sum), currency)} z tohoto dokladu).
+        </p>
+      )}
+      {!conflict && !derived && meta.hint && !locked && <p className="mt-1 text-[11px] text-muted-foreground">{meta.hint}</p>}
     </div>
   );
 }
@@ -848,8 +896,9 @@ function ItemsSection({
         </ol>
       )}
       {total > 0 && (
-        <p className="mt-2 text-right text-xs text-muted-foreground">
+        <p className="mt-2 text-right text-xs text-muted-foreground" data-testid={`${idPrefix}-items-total`}>
           Celkem {priceMode === "purchase" ? "nákup" : ""} <span className="font-semibold tabular-nums text-foreground">{moneyLabel(String(total), currency)}</span> bez DPH
+          {priceMode === "sale" ? " = hodnota zakázky" : priceMode === "purchase" ? " = nákupní náklady" : ""}
         </p>
       )}
     </Section>

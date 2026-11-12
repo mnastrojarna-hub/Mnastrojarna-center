@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  AlertCircle, CheckCircle2, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
+  AlertCircle, ArrowLeftRight, CheckCircle2, Coins, ListChecks, Crown, Briefcase, Wrench, Users, Sparkles, MoreHorizontal, Pencil,
   KeyRound, Send, UserCheck, UserX, Trash2, Search, Mail, X, Loader2, Phone, Clock, FileSignature, FileCheck2, ShieldCheck, Handshake,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -28,9 +29,14 @@ import { ROLE_LABELS } from "@/lib/auth/permissions";
 import type { ManagedUser, MailboxOption } from "@/components/users/types";
 import type { UserRole } from "@/lib/supabase/database.types";
 import { cn, relativeTime } from "@/lib/utils";
+import { compareLastActive, describeLastActive, type ActivityTone } from "@/lib/activity";
 
 type Notify = (tone: "success" | "error", text: string) => void;
 type Filter = "all" | UserRole | "inactive" | "ai";
+const USER_FILTERS: Filter[] = ["all", "super_admin", "obchodnik", "zamestnanec", "inactive", "ai"];
+function isUserFilter(v: string): v is Filter {
+  return (USER_FILTERS as string[]).includes(v);
+}
 
 const ROLE_ICONS: Record<UserRole, React.ComponentType<{ className?: string }>> = {
   super_admin: Crown,
@@ -51,8 +57,14 @@ export function UserManagement({
   aiForAll: boolean;
 }) {
   const router = useRouter();
-  const [query, setQuery] = React.useState("");
-  const [filter, setFilter] = React.useState<Filter>("all");
+  // hledání a filtr v adrese (Zpět vrátí stejný seznam)
+  const url = useUrlState({ q: "", filtr: "all", razeni: "" });
+  const query = url.values.q;
+  const setQuery = (v: string) => url.set({ q: v }, { delay: 300 });
+  const filter: Filter = isUserFilter(url.values.filtr) ? url.values.filtr : "all";
+  const setFilter = (f: Filter) => url.set({ filtr: f });
+  // 9. 11.: řazení podle poslední aktivity (kdo systém nepoužívá, je na konci)
+  const byActivity = url.values.razeni === "aktivita";
   const [toast, setToast] = React.useState<{ tone: "success" | "error"; text: string; id: number } | null>(null);
 
   const notify = React.useCallback<Notify>((tone, text) => setToast({ tone, text, id: Date.now() }), []);
@@ -100,6 +112,7 @@ export function UserManagement({
     if (!q) return true;
     return [u.fullName, u.email, u.position ?? "", u.phone ?? ""].some((s) => s.toLowerCase().includes(q));
   });
+  if (byActivity) visible.sort((a, b) => compareLastActive(a.lastActiveAt, b.lastActiveAt));
 
   const chips: { key: Filter; label: string; count: number; icon: React.ComponentType<{ className?: string }>; tone: string }[] = [
     { key: "all", label: "Všichni", count: stats.all, icon: Users, tone: "bg-foreground/10 text-foreground" },
@@ -148,6 +161,16 @@ export function UserManagement({
               aria-label="Hledat uživatele"
             />
           </div>
+          <Button
+            variant={byActivity ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => url.set({ razeni: byActivity ? "" : "aktivita" })}
+            aria-pressed={byActivity}
+            data-sort-activity={byActivity ? "on" : "off"}
+            title="Seřadit podle poslední aktivity (kdy kdo naposledy něco v systému udělal)"
+          >
+            <Clock className="h-4 w-4" /> {byActivity ? "Podle aktivity" : "Řadit podle aktivity"}
+          </Button>
           {filter !== "all" && (
             <Button variant="ghost" size="sm" onClick={() => setFilter("all")}>
               <X className="h-4 w-4" /> Zrušit filtr
@@ -212,6 +235,47 @@ export function UserManagement({
         </div>
       )}
     </div>
+  );
+}
+
+const ACTIVITY_TONES: Record<ActivityTone, string> = {
+  recent: "text-emerald-700 dark:text-emerald-400",
+  normal: "text-foreground/75",
+  // déle než 7 dní / nikdy — tlumeně: na první pohled, kdo systém nepoužívá
+  stale: "text-muted-foreground/70",
+  never: "text-muted-foreground/70 italic",
+};
+
+/**
+ * 9. 11. „Naposledy aktivní" — kdy uživatel naposledy něco v aplikaci udělal (kliknutí / klávesa, ~1 min) a kde.
+ * Přesný čas a poslední přihlášení v title (majitel: přihlášení je nepodstatné, zajímá ho poslední kliknutí).
+ */
+export function LastActive({ user }: { user: Pick<ManagedUser, "lastActiveAt" | "lastActivePath" | "lastSeenAt"> }) {
+  const v = describeLastActive(user.lastActiveAt, user.lastActivePath);
+  const title = [
+    v.exact ? `Naposledy aktivní ${v.exact}` : "Zatím žádná aktivita v aplikaci",
+    v.page ? `stránka: ${v.page}` : null,
+    user.lastSeenAt ? `přihlášen ${relativeTime(user.lastSeenAt)}` : "zatím nepřihlášen",
+  ].filter(Boolean).join(" · ");
+  return (
+    // relativní čas se mezi serverem a prohlížečem může lišit o minutu
+    <span
+      data-last-active={v.tone}
+      title={title}
+      className={cn("inline-flex min-w-0 max-w-full items-start gap-1 text-[11px] leading-4", ACTIVITY_TONES[v.tone])}
+      suppressHydrationWarning
+    >
+      {v.tone === "recent" ? (
+        <span className="mx-0.5 mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+      ) : (
+        <Clock className="mt-0.5 h-3 w-3 shrink-0" />
+      )}
+      {/* úzký sloupec na desktopu: stránka se zalomí pod čas (neořezávat) */}
+      <span className="min-w-0 break-words" suppressHydrationWarning>
+        <span className="whitespace-nowrap">{v.tone === "never" ? v.label : `Naposledy aktivní ${v.label}`}</span>
+        {v.page ? <span className="text-muted-foreground"> · {v.page}</span> : null}
+      </span>
+    </span>
   );
 }
 
@@ -490,11 +554,46 @@ function UserRow({
             <span className="truncate">poptává dodavatele</span>
           </button>
         )}
-        {/* relativní čas se mezi serverem a prohlížečem může lišit o minutu */}
-        <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground" suppressHydrationWarning>
-          <Clock className="h-3 w-3" />
-          {user.lastSeenAt ? `přihlášen ${relativeTime(user.lastSeenAt)}` : "zatím nepřihlášen"}
-        </span>
+        {/* 9. 11.: zaměstnanec smí ručně měnit stav zakázky (obchodník a super admin vždy — štítek nepotřebují) */}
+        {user.role === "zamestnanec" && user.canChangeStage === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-stage-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-teal-500/30 bg-teal-500/10 px-2 py-0.5 text-[11px] font-medium text-teal-700 transition hover:bg-teal-500/15 hover:shadow-sm dark:text-teal-300"
+            title="Ručně mění stav zakázky dopředu i dozadu, včetně Vyfakturováno a Dokončeno — změnit v Upravit"
+          >
+            <ArrowLeftRight className="h-3 w-3 shrink-0" />
+            <span className="truncate">mění stav zakázky</span>
+          </button>
+        )}
+        {/* 9. 11.: řeší frontu ke schválení (super admin vždy — štítek nepotřebuje) */}
+        {user.role !== "super_admin" && user.canResolveQueue === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-queue-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-2 py-0.5 text-[11px] font-medium text-fuchsia-700 transition hover:bg-fuchsia-500/15 hover:shadow-sm dark:text-fuchsia-300"
+            title="Schvaluje odchozí e-maily, objednávky dodavatelům a změny stavu z pošty (Fronta ke schválení) — změnit v Upravit"
+          >
+            <ListChecks className="h-3 w-3 shrink-0" />
+            <span className="truncate">řeší frontu</span>
+          </button>
+        )}
+        {/* 9. 11.: zaměstnanec vidí nákupní ceny a marže (obchodník a super admin vždy) */}
+        {user.role === "zamestnanec" && user.canSeeMargins === true && (
+          <button
+            type="button"
+            onClick={() => setDialog("edit")}
+            data-margins-user="on"
+            className="inline-flex max-w-full items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 transition hover:bg-emerald-500/15 hover:shadow-sm dark:text-emerald-300"
+            title="Vidí nákupní ceny a marže — změnit v Upravit"
+          >
+            <Coins className="h-3 w-3 shrink-0" />
+            <span className="truncate">vidí marže</span>
+          </button>
+        )}
+        <LastActive user={user} />
       </div>
 
       {/* Schránky */}

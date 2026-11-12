@@ -160,9 +160,9 @@ export function DebugBar() {
   if (!mounted) return null;
 
   return (
-    // Mobil: malá plovoucí pilulka nad spodní navigací (nepřekrývá ji); desktop: lišta přes celou šířku.
+    // Mobil: malá plovoucí pilulka nad spodní navigací (nepřekrývá ji, při schované liště jde dolů — --mn-nav-offset); desktop: lišta přes celou šířku.
     // z-40: nad navigací (z-30), ale pod dialogy (z-50) — nezakryje jejich tlačítka.
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-40 flex flex-col items-end md:bottom-0 md:items-stretch">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[var(--mn-nav-offset,0px)] z-40 flex flex-col items-end motion-safe:transition-[bottom] md:bottom-0 md:items-stretch">
       {/* Vyskakovací panel */}
       {open && (
         <div className="pointer-events-auto mx-auto flex h-[min(60vh,520px)] w-full max-w-screen-2xl flex-col overflow-hidden border-t border-border bg-card/98 shadow-2xl backdrop-blur-md">

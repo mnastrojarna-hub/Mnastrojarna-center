@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,6 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { StageBadge } from "@/components/jobs/stage-badge";
+import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
+import { premiumFirst } from "@/lib/jobs/premium";
 import { createJobQuote, saveJobItems, updateJob } from "@/app/actions/jobs";
 import { stageMeta } from "@/lib/jobs/stages";
 import type { JobStage, PriorityLevel, QuoteStatus } from "@/lib/supabase/database.types";
@@ -41,6 +44,8 @@ export interface PricingJob {
   priority: PriorityLevel;
   customerName: string | null;
   customerNumber: string | null;
+  /** Prémiový zákazník (9. 11.) — štítek „Pozor, prémiový zákazník". */
+  customerPremium?: boolean;
   customerInquiryNumber: string | null;
   customerRequiredDate: string | null;
   dueDate: string | null;
@@ -167,9 +172,15 @@ export function PricingBoard({
   /** Rozbalit tuto zakázku (odkaz „Nacenit" z Poptávek), jinak první. */
   initialOpenId?: string | null;
 }) {
-  const [openId, setOpenId] = React.useState<string | null>(
+  const [openId, setOpenIdState] = React.useState<string | null>(
     initialOpenId && jobs.some((j) => j.id === initialOpenId) ? initialOpenId : (jobs[0]?.id ?? null),
   );
+  // rozbalená zakázka v adrese (?job=, čte ji i server) — Zpět z karty zakázky vrátí stejný stav
+  const url = useUrlState({ job: "" });
+  const setOpenId = React.useCallback((id: string | null) => {
+    setOpenIdState(id);
+    url.set({ job: id ?? "" });
+  }, [url.set]); // eslint-disable-line react-hooks/exhaustive-deps
   const [results, setResults] = React.useState<Record<string, Result>>({});
   // výkres vedle položek (jen počítač): panel se drží, i když se píšou ceny; nic nenaviguje
   const [dock, setDock] = React.useState<DrawingTarget | null>(null);
@@ -224,15 +235,26 @@ export function PricingBoard({
     // vždy stejná struktura (seznam první) — zapnutí panelu nepřipojí formuláře znovu
     <div className={cn(docked && "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(340px,40%)] lg:items-start lg:gap-4")}>
     <ul className="min-w-0 space-y-2">
-      {jobs.map((job) => {
+      {/* 9. 11.: prémioví zákazníci přednostně nahoře (stabilně) */}
+      {premiumFirst(jobs, (j) => j.customerPremium).map((job) => {
         const open = openId === job.id;
         const unpriced = job.items.filter((i) => i.unitPrice === null).length;
         const priced = job.items.length > 0 && unpriced === 0;
         const quotes = job.quotes.filter((q) => !q.archived);
         const m = stageMeta(job.stage);
         return (
-          <li key={job.id} id={`job-${job.id}`} className={cn("relative scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm transition", open && "shadow-md ring-1 ring-amber-300/60 dark:ring-amber-500/30")}>
+          <li
+            key={job.id}
+            id={`job-${job.id}`}
+            className={cn(
+              "relative scroll-mt-24 overflow-hidden rounded-xl border bg-card shadow-sm transition",
+              job.customerPremium && PREMIUM_ROW,
+              open && "shadow-md ring-1 ring-amber-300/60 dark:ring-amber-500/30",
+            )}
+            data-premium={job.customerPremium ? "1" : undefined}
+          >
             <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", m.bar)} />
+            {job.customerPremium && <span aria-hidden className={PREMIUM_STRIPE} />}
             <button
               type="button"
               onClick={() => setOpenId(open ? null : job.id)}
@@ -243,6 +265,7 @@ export function PricingBoard({
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="font-mono text-sm font-bold">{job.number}</span>
                   <StageBadge stage={job.stage} size="sm" />
+                  {job.customerPremium && <PremiumBadge label="flow" size="xs" />}
                   {job.priority === "vysoka" && (
                     <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-1.5 py-0.5 text-[10.5px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-300">
                       <Flame className="h-3 w-3" /> Spěchá
@@ -293,6 +316,7 @@ export function PricingBoard({
                     quote: job.flow.snapshot.activeQuote, today,
                     onlyOpenQuote: job.flow.quotes.filter((q) => !q.archived && q.status !== "zamitnuto").length === 1,
                     quoteAuthor: job.flow.quoteAuthor ?? null,
+                    premium: job.customerPremium === true, customerName: job.customerName,
                   }}
                   next={job.flow.next}
                   menu={job.flow.menu}
@@ -390,6 +414,7 @@ function PricingPanel({
   const [validity, setValidity] = React.useState("30");
   const [busy, setBusy] = React.useState<null | "save" | "quote">(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [notice, setNotice] = React.useState<string | null>(null);
   // uložený stav — po uložení se posune (položky si drží id, editor se znovu nepřipojí)
   const [baseline, setBaseline] = React.useState(() => signature(initial));
   const dirty = signature(rows) !== baseline || !job.items.length;
@@ -439,6 +464,8 @@ function PricingPanel({
   async function persist(items: JobItemInput[]): Promise<string | null> {
     const saved = await saveJobItems(job.id, items);
     if (!saved.ok) return saved.error ?? "Nacenění se nepodařilo uložit.";
+    // cena už neodpovídá odeslané / přijaté nabídce → upozornit (uložení proběhlo)
+    setNotice(saved.warning || null);
     const up = await updateJob(job.id, { pricedById: me.id, ...(job.stage === "poptavka" ? { stage: "naceneni" as const } : {}) });
     if (!up.ok) return up.error ?? "Ceny jsou uložené, ale nepodařilo se zapsat, kdo nacenil.";
     return null;
@@ -706,9 +733,22 @@ function PricingPanel({
           {summary.unpriced > 0 && (
             <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">bez ceny: {summary.unpriced}</span>
           )}
+          {/* hodnota zakázky = součet položek (křížová konzistence 4. 11.) — uloží se se stejným číslem */}
+          {summary.unpriced < nums.length && (
+            <span className="text-xs text-muted-foreground" data-testid="pricing-job-value">
+              {job.value !== null && Math.abs(job.value - summary.sale) < 0.005
+                ? "= hodnota zakázky"
+                : `hodnota zakázky ${money(job.value, cur)} → po uložení ${money(summary.sale, cur)}`}
+            </span>
+          )}
         </div>
       </div>
 
+      {notice && (
+        <p role="status" className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100" data-testid="pricing-notice">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {notice}
+        </p>
+      )}
       {error && (
         <p role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {error}

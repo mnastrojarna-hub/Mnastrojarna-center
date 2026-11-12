@@ -153,7 +153,8 @@ await test("390 px: ve výrobě → „Výroba se nepovedla…“ (2 ks zmetek, 
   await dlg.getByRole("radio", { name: "Chyba výroby" }).click();
   await dlg.getByLabel("Zmetků (ks)").fill("2");
   await dlg.getByRole("radio", { name: "Vyrobit znovu" }).click();
-  expect(await dlg.getByRole("radio", { name: "Zrušit zakázku" }).count() === 0, "zaměstnanec zakázku nezruší");
+  // 9. 11.: speciální stavy smí každý — i zaměstnanec může zakázku zrušit (důvod „Výroba se nepovedla")
+  expect(await dlg.getByRole("radio", { name: "Zrušit zakázku" }).count() === 1, "zaměstnanec smí zakázku zrušit");
   await expectNoOverflow(page, "dialog Výroba se nepovedla 390 px");
   await snap(page, "02-vyroba-se-nepovedla-390");
   await dlg.getByRole("button", { name: "Zapsat a vyrobit znovu" }).click();

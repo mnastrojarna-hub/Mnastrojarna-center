@@ -19,10 +19,12 @@ import { applySalutation } from "@/lib/contacts/tone";
 import { useAutomation } from "@/components/automation-provider";
 import { OUTBOUND_APPROVAL_TYPES, type ApprovalItem } from "@/lib/data/types";
 import { resolveApproval, updateApprovalBody } from "@/app/actions/approvals";
+import { SenderPicker } from "@/components/mail/sender-picker";
 import { relativeTime, cn } from "@/lib/utils";
 import { ActorStamp } from "@/components/flow-status/actor-stamp";
 import type { ApprovalPurchaseOrder, ResolvedApproval } from "@/lib/data/queries";
 import { PrintButton } from "@/components/print/print-button";
+import { MailStageApproval } from "@/components/mail/mail-stage-signal";
 
 /** Položka fronty; proposedBy = kdo návrh připravil („✨ AI", „Systém (plánovač)"); quoteHref = „Otevřít nabídku". */
 type QueueItem = ApprovalItem & { proposedBy?: string; quoteHref?: string | null; purchaseOrder?: ApprovalPurchaseOrder | null };
@@ -80,6 +82,8 @@ function ApprovalRow({
   const [busy, setBusy] = React.useState<"approve" | "reject" | "save" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [learned, setLearned] = React.useState(false);
+  /** „Odeslat z" (jen super admin, v rozbaleném řádku; null = moje schránka). */
+  const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
 
   const isOutbound = OUTBOUND_APPROVAL_TYPES.includes(item.rawType);
   // objednávka dodavateli: šablona serveru (ne AI) — PDF, odkud odejde, odeslat / upravit e-mail / zamítnout
@@ -88,7 +92,7 @@ function ApprovalRow({
   const approve = async () => {
     setBusy("approve");
     setError(null);
-    const res = await resolveApproval(item.id, "approved");
+    const res = await resolveApproval(item.id, "approved", fromMailboxId ? { fromMailboxId } : {});
     setBusy(null);
     if (res.ok) onResolved(item.id);
     else setError(res.error ?? "Chyba");
@@ -250,6 +254,7 @@ function ApprovalRow({
             </>
           ) : (
             <>
+              {(isOutbound || po) && <SenderPicker adminOnly value={fromMailboxId} onChange={setFromMailboxId} disabled={busy !== null} />}
               <pre className="whitespace-pre-wrap rounded-md bg-background p-3 font-sans text-sm">{savedBody || "—"}</pre>
               <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
@@ -326,7 +331,10 @@ export function ApprovalQueue({
           </div>
         )}
 
-        {items.map((item) => (
+        {items.map((item) => item.rawType === "job_stage" ? (
+          // stav zakázky z pošty: stav a důvod jde před potvrzením změnit (vlastní řádek s výběrem)
+          <MailStageApproval key={item.id} approvalId={item.id} title={item.title} createdAt={item.createdAt} onResolved={onResolved} />
+        ) : (
           <ApprovalRow key={item.id} item={item} compact={compact} onResolved={onResolved} />
         ))}
 

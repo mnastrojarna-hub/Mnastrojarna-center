@@ -3,7 +3,7 @@ import { addUsage } from "@/lib/ai/ai-call";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { boxInsideSent, fitForClaude } from "./claude-image";
 import { refineCut } from "./cut-refine";
-import { COMPANY_LEAK_WARNING } from "./decide";
+import { companyLeakWarning } from "./decide";
 import { checkAndHealCompanies, checkRasterCompanies, type CompanyCheckOutcome } from "./company-check";
 import { companyLeaks, crossTextTermHits, discoverCompanyNames, mergeNames, withCompanyNames } from "./company-names";
 import { asArray, asNumber, detectVector, isCategory, isRemovableCompany, type AiCallConfig, type AiImageSpec, type CompanyItem, type VectorPageResult } from "./detect-ai";
@@ -69,6 +69,11 @@ export interface PdfAnonInput {
   requireDrawing?: boolean;
   /** Výstupní kontrola kopie obrazem přes AI (výchozí ano, když je AI). */
   checkCompanies?: boolean;
+  /**
+   * Průběžné uložení cache AI (po každém výsledku AI — detekce dávky, stránka skenu), ne až na konci běhu:
+   * přerušený běh (termín funkce, pád) o zaplacený výsledek nepřijde a další pokus je rychlý (majitel 5. 11.).
+   */
+  onCache?: (cache: PdfAiCache) => Promise<void> | void;
 }
 
 export interface PdfRegionText {
@@ -101,6 +106,10 @@ export interface PdfPageResult {
   keepValues?: Partial<Record<KeepField, string>>;
   /** Výstupní kontrola: v kopii stránky zůstal název firmy (kopie se nepoužije). */
   companyLeak?: boolean;
+  /** Názvy firem, které výstupní kontrola obrazem (AI) na stránce viděla — termíny pro další stránky / pokus. */
+  checkNames?: string[];
+  /** Proč zbylý název nešlo vypálit (diagnostika do hlášky). */
+  leakWhy?: string;
 }
 
 /** Keep hodnoty z nalezených polí (jen rozumně vypadající číslo výkresu / revize). */
@@ -141,6 +150,8 @@ export interface PdfAnonResult {
   isCad: boolean;
   /** Názvy firem nalezené na výkresu (jen v paměti — texty smazaných oblastí). */
   companyNames: string[];
+  /** Chyba volání AI detekce (zachycená → varování ai_failed); služba ji poctivě roztřídí (přetížení, klíč…). */
+  aiError?: unknown;
 }
 
 const RENDER_FAIL = "Písmo se nevykreslilo (chybí fonty pdf.js) — anonymizace PDF selhala.";
@@ -315,7 +326,10 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
             cache.pageConf[pg.index] = conf;
           }
         }
+        // zaplacený výsledek hned do cache (přerušený běh o něj nepřijde)
+        await input.onCache?.(cache);
       } catch (err) {
+        res.aiError = err;
         res.warnings.push({ code: "ai_failed", message: `AI detekce selhala (${err instanceof Error ? err.message : "chyba"}) — použita jen pravidla.` });
       }
     }
@@ -333,6 +347,15 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     cache.found = mergeNames(cache.found, ruleNames, aiNames);
     res.companyNames = [...cache.found];
     const run: PdfAnonInput = { ...input, ctx: withCompanyNames(input.ctx, cache.found) };
+    /** Jména z výstupní kontroly, která ještě nejsou termínem → termíny pro zbytek běhu (a cache pro další pokus). */
+    const learn = (names: readonly string[] | undefined): string[] => {
+      const fresh = (names ?? []).filter((n) => !containsTerm(n, run.ctx.terms));
+      if (!fresh.length) return [];
+      cache.found = mergeNames(cache.found, fresh);
+      res.companyNames = [...cache.found];
+      run.ctx = withCompanyNames(run.ctx, fresh);
+      return fresh;
+    };
 
     // 3) Stránky (před každou další kontrola času — zbytek naváže další běh s cache)
     const outPages: OutPage[] = [];
@@ -343,9 +366,18 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
         for (const rest of pages.slice(i)) rest.page.cleanup();
         break;
       }
-      const pr = p.vision
+      let pr = p.vision
         ? await visionPage(p, run, cache, res)
         : await vectorPage(p, run, cache, res);
+      // Majitel 5. 11. („někdy to musí dělat na třikrát"): kontrola kopie viděla název, který nebyl mezi termíny
+      // (firma z razítka, kterou detekce nevypsala) → doplnit termíny a stránku projít ZNOVU hned v tomto běhu
+      // (pravidla najdou všechny výskyty v textové vrstvě / přepisu, výsledek AI z cache), ne až dalším pokusem.
+      const fresh = learn(pr.checkNames);
+      if (pr.included && pr.companyLeak && fresh.length && Date.now() < input.deadline - PAGE_RESERVE_MS) {
+        res.warnings.push({ code: "terms_learned", message: `Kontrola kopie našla název firmy mimo termíny (${fresh[0]}) — strana ${p.info.page} zpracována znovu s doplněnými termíny.`, page: p.info.page });
+        pr = p.vision ? await visionPage(p, run, cache, res) : await vectorPage(p, run, cache, res);
+        learn(pr.checkNames);
+      }
       res.pages.push(pr);
       if (pr.included && pr.out) outPages.push(pr.out);
       p.page.cleanup();
@@ -362,7 +394,7 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     // výstupní kontrola: v kopii zůstal název firmy → kopie se nikdy nepoužije
     for (const p of included.filter((x) => x.companyLeak)) {
       res.outputProblems.push(`strana ${p.page}: zůstal název firmy`);
-      res.warnings.push({ code: "verify_leak", message: `${COMPANY_LEAK_WARNING} (strana ${p.page}).`, page: p.page });
+      res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p.page, p.checkNames, p.leakWhy), page: p.page });
     }
     if (res.pages.some((p) => p.inkFailed)) res.failure = RENDER_FAIL;
     else if (res.pages.some((p) => p.blank)) {
@@ -715,7 +747,7 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
       const burnedPt = pxRects.map((r) => ({ x: r.box.x / s, y: r.box.y / s, w: r.box.w / s, h: r.box.h / s }));
       const leaks = textCompanyLeaks(leakLines, input.ctx, burnedPt, protectedPt, itemById);
       if (!leaks.length) break;
-      if (round === 2) { result.companyLeak = true; break; }
+      if (round === 2) { result.companyLeak = true; result.leakWhy ??= "v textové vrstvě i po třetím doplnění"; break; }
       for (const l of leaks) {
         const pad = 0.2 * l.em;
         const box = toPx({ x: l.box.x - pad, y: l.box.y - pad, w: l.box.w + 2 * pad, h: l.box.h + 2 * pad }, s);
@@ -741,6 +773,8 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
       if (aiCheck.fallback) res.fallback = true;
       aiHealPt = aiCheck.healed.map((b) => ({ x: b.x / s, y: b.y / s, w: b.w / s, h: b.h / s }));
       if (aiCheck.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: info.page });
+      result.checkNames = aiCheck.names;
+      result.leakWhy = aiCheck.why;
     }
     if (aiCheck && !aiCheck.clean) result.companyLeak = true;
 
@@ -906,6 +940,8 @@ async function visionPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
   if (v.aiCache) {
     cache.vision[info.page] = v.aiCache;
     if (v.aiUsed) cache.pageConf = { ...(cache.pageConf ?? {}), [info.page]: v.confidence };
+    // zaplacený výsledek AI skenu hned do cache (přerušený běh o něj nepřijde)
+    if (v.aiUsed) await input.onCache?.(cache);
   }
   res.warnings.push(...v.warnings);
   if (v.customerStandard) res.customerStandard = true;
@@ -943,6 +979,8 @@ async function visionPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
     if (cc.fallback) res.fallback = true;
     if (cc.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: info.page });
     if (!cc.clean) result.companyLeak = true;
+    result.checkNames = cc.names;
+    result.leakWhy = cc.why;
   }
   const img = maybeGray(out);
   const jpeg = await encodeJpeg(img, 85);

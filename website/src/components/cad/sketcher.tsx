@@ -1,5 +1,6 @@
 "use client";
 
+import { cadLocale, tr } from "@/cad/i18n";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { evalExpr } from "@/cad/params";
 import { arcGeom, circleFrom3, entityPath, findLoops, keyPoints, loopPolygon, prims, type Prim } from "@/cad/sketch";
@@ -179,19 +180,19 @@ export function useSketchSnaps(): SnapSettings {
 }
 
 export const CON_INFO: Record<ConType, { label: string; icon: CadIconName; glyph: string; hint: string }> = {
-  horizontal: { label: "Vodorovně", icon: "cHorizontal", glyph: "H", hint: "úsečka nebo 2 body" },
-  vertical: { label: "Svisle", icon: "cVertical", glyph: "V", hint: "úsečka nebo 2 body" },
-  coincident: { label: "Totožnost", icon: "cCoincident", glyph: "●", hint: "2 body" },
-  parallel: { label: "Rovnoběžně", icon: "cParallel", glyph: "∥", hint: "2 úsečky" },
-  perpendicular: { label: "Kolmo", icon: "cPerpendicular", glyph: "⊥", hint: "2 úsečky" },
-  tangent: { label: "Tečně", icon: "cTangent", glyph: "T", hint: "úsečka + oblouk / 2 oblouky" },
-  equal: { label: "Stejná velikost", icon: "cEqual", glyph: "=", hint: "2 úsečky nebo 2 kružnice" },
-  fixed: { label: "Pevně", icon: "cFixed", glyph: "⚓", hint: "bod nebo entita" },
-  concentric: { label: "Soustředně", icon: "cConcentric", glyph: "◎", hint: "2 kružnice/oblouky" },
-  midpoint: { label: "Ve středu", icon: "cMidpoint", glyph: "M", hint: "bod + úsečka" },
-  pointOnCurve: { label: "Bod na křivce", icon: "cPointOnCurve", glyph: "⊙", hint: "bod + křivka" },
-  symmetric: { label: "Symetrie", icon: "cSymmetric", glyph: "⋈", hint: "2 body + osa" },
-  collinear: { label: "Kolineárně", icon: "cCollinear", glyph: "≡", hint: "2 úsečky" },
+  horizontal: { label: tr("Vodorovně"), icon: "cHorizontal", glyph: "H", hint: tr("úsečka nebo 2 body") },
+  vertical: { label: tr("Svisle"), icon: "cVertical", glyph: "V", hint: tr("úsečka nebo 2 body") },
+  coincident: { label: tr("Totožnost"), icon: "cCoincident", glyph: "●", hint: tr("2 body") },
+  parallel: { label: tr("Rovnoběžně"), icon: "cParallel", glyph: "∥", hint: tr("2 úsečky") },
+  perpendicular: { label: tr("Kolmo"), icon: "cPerpendicular", glyph: "⊥", hint: tr("2 úsečky") },
+  tangent: { label: tr("Tečně"), icon: "cTangent", glyph: "T", hint: tr("úsečka + oblouk / 2 oblouky") },
+  equal: { label: tr("Stejná velikost"), icon: "cEqual", glyph: "=", hint: tr("2 úsečky nebo 2 kružnice") },
+  fixed: { label: tr("Pevně"), icon: "cFixed", glyph: "⚓", hint: tr("bod nebo entita") },
+  concentric: { label: tr("Soustředně"), icon: "cConcentric", glyph: "◎", hint: tr("2 kružnice/oblouky") },
+  midpoint: { label: tr("Ve středu"), icon: "cMidpoint", glyph: "M", hint: tr("bod + úsečka") },
+  pointOnCurve: { label: tr("Bod na křivce"), icon: "cPointOnCurve", glyph: "⊙", hint: tr("bod + křivka") },
+  symmetric: { label: tr("Symetrie"), icon: "cSymmetric", glyph: "⋈", hint: tr("2 body + osa") },
+  collinear: { label: tr("Kolineárně"), icon: "cCollinear", glyph: "≡", hint: tr("2 úsečky") },
 };
 
 const TOOL_LABEL: Partial<Record<SketchTool, string>> = {
@@ -246,60 +247,60 @@ const SEL_TOOLS = new Set<SketchTool>(["mirror", "move", "copy", "rotate", "scal
  * `setSketchSnap`) přidají skupinu přepínačů uchopení s živým stavem; bez nich zůstává panel uchopení ve skicáři.
  */
 export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => void; snapGrid: boolean; setSnapGrid: (v: boolean) => void; onExportDxf: () => void; onImportDxf: () => void; snaps?: SnapSettings; setSnap?: (k: keyof SnapSettings, v: boolean) => void }): RGroup[] {
-  const T = (t: SketchTool, icon: CadIconName, kbd?: string, hint?: string): RItem => ({ id: t, label: TOOL_LABEL[t] ?? t, icon, tone: "sketch", kbd, hint, active: p.tool === t, onClick: () => p.setTool(t) });
+  const T = (t: SketchTool, icon: CadIconName, kbd?: string, hint?: string): RItem => ({ id: t, label: tr(TOOL_LABEL[t] ?? t), icon, tone: "sketch", kbd, hint, active: p.tool === t, onClick: () => p.setTool(t) });
   const E = (t: SketchTool, icon: CadIconName, kbd?: string, hint?: string): RItem => ({ ...T(t, icon, kbd, hint), tone: "feature" });
   const K = (c: ConType): RItem => ({ id: `con-${c}`, label: CON_INFO[c].label, icon: CON_INFO[c].icon, tone: "pattern", hint: CON_INFO[c].hint, active: p.tool === `con-${c}`, onClick: () => p.setTool(`con-${c}`) });
   const snapGroup: RGroup[] =
     p.snaps && p.setSnap
       ? [
           {
-            label: "Uchopení",
+            label: tr("Uchopení"),
             big: 0,
             items: [
-              ...SNAP_ORDER.map((k): RItem => ({ id: `snap-${k}`, label: SNAP_LABEL[k], icon: "magnet", tone: "view", active: p.snaps![k], onClick: () => p.setSnap!(k, !p.snaps![k]) })),
-              { id: "snap-infer", label: "Zarovnání (vodítka)", icon: "magnet", tone: "view", active: p.snaps.infer, onClick: () => p.setSnap!("infer", !p.snaps!.infer) },
-              { id: "snap-auto", label: "Automatické vazby", icon: "cCoincident", tone: "pattern", active: p.snaps.auto, onClick: () => p.setSnap!("auto", !p.snaps!.auto) },
+              ...SNAP_ORDER.map((k): RItem => ({ id: `snap-${k}`, label: tr(SNAP_LABEL[k]), icon: "magnet", tone: "view", active: p.snaps![k], onClick: () => p.setSnap!(k, !p.snaps![k]) })),
+              { id: "snap-infer", label: tr("Zarovnání (vodítka)"), icon: "magnet", tone: "view", active: p.snaps.infer, onClick: () => p.setSnap!("infer", !p.snaps!.infer) },
+              { id: "snap-auto", label: tr("Automatické vazby"), icon: "cCoincident", tone: "pattern", active: p.snaps.auto, onClick: () => p.setSnap!("auto", !p.snaps!.auto) },
             ],
           },
         ]
       : [];
   const groups: RGroup[] = [
     {
-      label: "Kreslení",
+      label: tr("Kreslení"),
       big: 5,
       items: [
         T("select", "select", "V"),
-        T("line", "line", "L", "řetěz úseček, Esc ukončí"),
+        T("line", "line", "L", tr("řetěz úseček, Esc ukončí")),
         T("rect", "rect", "R"),
         T("circle", "circle", "C"),
-        T("arc", "arc", "A", "začátek, konec, bod na oblouku"),
-        T("polyline", "polyline", "K", "Enter/dvojklik ukončí"),
-        T("centerline", "centerline", "X", "pomocná osa"),
+        T("arc", "arc", "A", tr("začátek, konec, bod na oblouku")),
+        T("polyline", "polyline", "K", tr("Enter/dvojklik ukončí")),
+        T("centerline", "centerline", "X", tr("pomocná osa")),
         T("point", "point", "B"),
         T("rectCenter", "rectCenter"),
         T("circle3", "circle3"),
         T("polygon", "polygon", "P"),
-        T("arcCenter", "arcCenter", undefined, "střed, začátek, konec"),
-        T("arcTangent", "arcTangent", undefined, "navazuje tečně na konec úsečky/oblouku"),
+        T("arcCenter", "arcCenter", undefined, tr("střed, začátek, konec")),
+        T("arcTangent", "arcTangent", undefined, tr("navazuje tečně na konec úsečky/oblouku")),
         T("slot", "slot", "S"),
-        T("ellipse", "ellipse", "E", "střed, hlavní poloosa, vedlejší poloosa"),
-        T("spline", "spline", "N", "body křivky, Enter ukončí"),
-        T("rect3", "rect", undefined, "natočený obdélník: 2 rohy první strany + výška"),
-        T("circle2", "circle", undefined, "dva body na průměru"),
-        T("slotArc", "slot", undefined, "střed, začátek a konec osy, šířka"),
+        T("ellipse", "ellipse", "E", tr("střed, hlavní poloosa, vedlejší poloosa")),
+        T("spline", "spline", "N", tr("body křivky, Enter ukončí")),
+        T("rect3", "rect", undefined, tr("natočený obdélník: 2 rohy první strany + výška")),
+        T("circle2", "circle", undefined, tr("dva body na průměru")),
+        T("slotArc", "slot", undefined, tr("střed, začátek a konec osy, šířka")),
       ],
     },
     {
-      label: "Úpravy",
+      label: tr("Úpravy"),
       big: 2,
       items: [
-        E("trim", "trim", "T", "klik na úsek, nebo táhněte přes více úseků (výkonný ořez)"),
-        E("offset", "offset", "O", "entita nebo řetězec, strana myší, vzdálenost číslem"),
-        E("extend", "extend", undefined, "klikněte u konce úsečky"),
-        E("split", "split", undefined, "rozdělit úsečku/oblouk v bodě, kružnici 2 body"),
-        E("project", "face", undefined, "promítnout hrany modelu do roviny skici"),
-        E("fillet", "fillet", undefined, "2 úsečky + poloměr"),
-        E("chamfer", "chamfer", undefined, "2 úsečky + vzdálenost"),
+        E("trim", "trim", "T", tr("klik na úsek, nebo táhněte přes více úseků (výkonný ořez)")),
+        E("offset", "offset", "O", tr("entita nebo řetězec, strana myší, vzdálenost číslem")),
+        E("extend", "extend", undefined, tr("klikněte u konce úsečky")),
+        E("split", "split", undefined, tr("rozdělit úsečku/oblouk v bodě, kružnici 2 body")),
+        E("project", "face", undefined, tr("promítnout hrany modelu do roviny skici")),
+        E("fillet", "fillet", undefined, tr("2 úsečky + poloměr")),
+        E("chamfer", "chamfer", undefined, tr("2 úsečky + vzdálenost")),
         E("move", "move"),
         E("copy", "copy"),
         E("rotate", "rotate"),
@@ -312,30 +313,30 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
       ],
     },
     {
-      label: "Vazby",
+      label: tr("Vazby"),
       big: 0,
       items: (["horizontal", "vertical", "coincident", "parallel", "perpendicular", "tangent", "equal", "concentric", "midpoint", "pointOnCurve", "symmetric", "collinear", "fixed"] as ConType[]).map(K),
     },
-    { label: "Kóty", items: [{ ...T("dimension", "dimension", "D", "inteligentní kóta – klikněte na entity"), tone: "tool" }] },
+    { label: tr("Kóty"), items: [{ ...T("dimension", "dimension", "D", tr("inteligentní kóta – klikněte na entity")), tone: "tool" }] },
     {
-      label: "Nástroje",
+      label: tr("Nástroje"),
       big: 1,
       items: [
         { ...T("measure", "measure", "M"), tone: "tool" },
-        { id: "grid", label: "Přichytit k mřížce", icon: "grid", tone: "view", kbd: "G", active: p.snapGrid, onClick: () => p.setSnapGrid(!p.snapGrid) },
-        { id: "dxf", label: "Export skici DXF", icon: "export", tone: "file", onClick: p.onExportDxf },
-        { id: "imp", label: "Import DXF…", icon: "open", tone: "file", onClick: p.onImportDxf },
+        { id: "grid", label: tr("Přichytit k mřížce"), icon: "grid", tone: "view", kbd: "G", active: p.snapGrid, onClick: () => p.setSnapGrid(!p.snapGrid) },
+        { id: "dxf", label: tr("Export skici DXF"), icon: "export", tone: "file", onClick: p.onExportDxf },
+        { id: "imp", label: tr("Import DXF…"), icon: "open", tone: "file", onClick: p.onImportDxf },
       ],
     },
   ];
   // pořadí jako v desktopových CADech: kreslení → vazby a kóty → úpravy → nástroje; uchopení (přepínače) až na konci
   const by = (l: string) => groups.find((g) => g.label === l)!;
-  return [by("Kreslení"), by("Vazby"), by("Kóty"), by("Úpravy"), by("Nástroje"), ...snapGroup];
+  return [by(tr("Kreslení")), by(tr("Vazby")), by(tr("Kóty")), by(tr("Úpravy")), by(tr("Nástroje")), ...snapGroup];
 }
 
 // ======================= geometrie pomocí =======================
 
-const fmt = (n: number, d = 2) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString("cs-CZ");
+const fmt = (n: number, d = 2) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString(cadLocale());
 const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 const R4 = (p: Vec2): Vec2 => [r4(p[0]), r4(p[1])];
 const sub = (a: Vec2, b: Vec2): Vec2 => [a[0] - b[0], a[1] - b[1]];
@@ -742,7 +743,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   /** štítky bodů skici (O, P1…) – leží přesně na bodu a nepřijímají kliknutí, klik na štítek = klik na bod (uchopení) */
   const sketchHints = useMemo(() => {
     if (!hints) return [] as { id: string; x: number; y: number; title: string }[];
-    const pts: { p: Vec2; title: string }[] = [{ p: [0, 0], title: "počátek skici [0; 0]" }];
+    const pts: { p: Vec2; title: string }[] = [{ p: [0, 0], title: tr("počátek skici [0; 0]") }];
     const f2 = (v: number) => (Math.round(v * 100) / 100).toString().replace(".", ",");
     const lab = (p: Vec2, what: string) => `${what} [${f2(p[0])}; ${f2(p[1])}]`;
     entities.forEach((e, i) => {
@@ -751,27 +752,27 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         const ca = Math.cos((e.angle * Math.PI) / 180);
         const sa = Math.sin((e.angle * Math.PI) / 180);
         const corner = (sx: number, sy: number): Vec2 => [e.cx + (sx * e.w) / 2 * ca - (sy * e.h) / 2 * sa, e.cy + (sx * e.w) / 2 * sa + (sy * e.h) / 2 * ca];
-        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `obdélník ${n} – střed`) });
-        for (const [sx, sy, name] of [[-1, -1, "levý dolní roh"], [1, -1, "pravý dolní roh"], [1, 1, "pravý horní roh"], [-1, 1, "levý horní roh"]] as [number, number, string][]) pts.push({ p: corner(sx, sy), title: lab(corner(sx, sy), `obdélník ${n} – ${name}`) });
+        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], tr("obdélník {0} – střed", n)) });
+        for (const [sx, sy, name] of [[-1, -1, tr("levý dolní roh")], [1, -1, tr("pravý dolní roh")], [1, 1, tr("pravý horní roh")], [-1, 1, tr("levý horní roh")]] as [number, number, string][]) pts.push({ p: corner(sx, sy), title: lab(corner(sx, sy), tr("obdélník {0} – {1}", n, name)) });
       } else if (e.type === "circle") {
-        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `kružnice ${n} Ø${f2(2 * e.r)} – střed`) });
-        for (const [dx, dy, name] of [[1, 0, "pravý kvadrant"], [-1, 0, "levý kvadrant"], [0, 1, "horní kvadrant"], [0, -1, "dolní kvadrant"]] as [number, number, string][]) pts.push({ p: [e.cx + dx * e.r, e.cy + dy * e.r], title: lab([e.cx + dx * e.r, e.cy + dy * e.r], `kružnice ${n} – ${name}`) });
-      } else if (e.type === "polygon" || e.type === "ellipse") pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `${e.type === "polygon" ? "mnohoúhelník" : "elipsa"} ${n} – střed`) });
+        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], tr("kružnice {0} Ø{1} – střed", n, f2(2 * e.r))) });
+        for (const [dx, dy, name] of [[1, 0, tr("pravý kvadrant")], [-1, 0, tr("levý kvadrant")], [0, 1, tr("horní kvadrant")], [0, -1, tr("dolní kvadrant")]] as [number, number, string][]) pts.push({ p: [e.cx + dx * e.r, e.cy + dy * e.r], title: lab([e.cx + dx * e.r, e.cy + dy * e.r], tr("kružnice {0} – {1}", n, name)) });
+      } else if (e.type === "polygon" || e.type === "ellipse") pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], tr("{0} {1} – střed", e.type === "polygon" ? "mnohoúhelník" : "elipsa", n)) });
       else if (e.type === "slot") {
         const ca = Math.cos((e.angle * Math.PI) / 180);
         const sa = Math.sin((e.angle * Math.PI) / 180);
-        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], `drážka ${n} – střed`) });
-        for (const sgn of [-1, 1]) { const q: Vec2 = [e.cx + (sgn * e.length) / 2 * ca, e.cy + (sgn * e.length) / 2 * sa]; pts.push({ p: q, title: lab(q, `drážka ${n} – střed oblouku`) }); }
+        pts.push({ p: [e.cx, e.cy], title: lab([e.cx, e.cy], tr("drážka {0} – střed", n)) });
+        for (const sgn of [-1, 1]) { const q: Vec2 = [e.cx + (sgn * e.length) / 2 * ca, e.cy + (sgn * e.length) / 2 * sa]; pts.push({ p: q, title: lab(q, tr("drážka {0} – střed oblouku", n)) }); }
       } else if (e.type === "line") {
-        pts.push({ p: e.a, title: lab(e.a, `úsečka ${n} – začátek`) });
-        pts.push({ p: e.b, title: lab(e.b, `úsečka ${n} – konec`) });
+        pts.push({ p: e.a, title: lab(e.a, tr("úsečka {0} – začátek", n)) });
+        pts.push({ p: e.b, title: lab(e.b, tr("úsečka {0} – konec", n)) });
         const m: Vec2 = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2];
-        pts.push({ p: m, title: lab(m, `úsečka ${n} – střed`) });
-      } else if (e.type === "polyline" || e.type === "spline") e.points.forEach((q, k) => pts.push({ p: q, title: lab(q, `${e.type === "polyline" ? "čára" : "spline"} ${n} – bod ${k + 1}`) }));
+        pts.push({ p: m, title: lab(m, tr("úsečka {0} – střed", n)) });
+      } else if (e.type === "polyline" || e.type === "spline") e.points.forEach((q, k) => pts.push({ p: q, title: lab(q, tr("{0} {1} – bod {2}", e.type === "polyline" ? "čára" : "spline", n, k + 1)) }));
       else if (e.type === "arc") {
-        pts.push({ p: e.a, title: lab(e.a, `oblouk ${n} – začátek`) });
-        pts.push({ p: e.c, title: lab(e.c, `oblouk ${n} – konec`) });
-        pts.push({ p: e.b, title: lab(e.b, `oblouk ${n} – bod na oblouku`) });
+        pts.push({ p: e.a, title: lab(e.a, tr("oblouk {0} – začátek", n)) });
+        pts.push({ p: e.c, title: lab(e.c, tr("oblouk {0} – konec", n)) });
+        pts.push({ p: e.b, title: lab(e.b, tr("oblouk {0} – bod na oblouku", n)) });
       } else if (e.type === "point") pts.push({ p: e.p, title: lab(e.p, `bod ${n}`) });
     });
     const out: { id: string; x: number; y: number; title: string }[] = [];
@@ -986,7 +987,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     }
     const res = solveSketch(entities, [...constraints, c], dims);
     if (!res.ok) {
-      note(`Vazbu „${CON_INFO[type].label}“ nelze přidat – je v konfliktu s jinými vazbami/kótami.`);
+      note(tr("Vazbu „{0}“ nelze přidat – je v konfliktu s jinými vazbami/kótami.", CON_INFO[type].label));
       return false;
     }
     onChange({ entities: res.entities, constraints: [...constraints, c], dims }, true);
@@ -997,7 +998,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const pk = es.map((e) => pickOfEntity(e, keyPoints(e).mid ?? keyPoints(e).center ?? entityPath(e).pts[0] ?? [0, 0]));
     const m = matchConstraint(type, pk);
     if (Array.isArray(m)) {
-      if (applyConstraint(type, m)) note(`Vazba „${CON_INFO[type].label}“ přidána.`);
+      if (applyConstraint(type, m)) note(tr("Vazba „{0}“ přidána.", CON_INFO[type].label));
       setTool("select");
     } else if (es.length === 1 && es[0].type === "line" && type === "fixed") {
       applyConstraint(type, [{ e: es[0].id, k: "self" }]);
@@ -1010,12 +1011,12 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const m = new Map(entities.map((e) => [e.id, e]));
     const d: SketchDim = { id: uid(), type, refs, value: 0, driving: true, offset: sub(at, anchor) };
     const v = measureDim(m, d);
-    if (v == null) return note("Tuto kombinaci nelze okótovat.");
+    if (v == null) return note(tr("Tuto kombinaci nelze okótovat."));
     d.value = r4(v);
     const nextDims = [...dims, d];
     onChange({ dims: nextDims }, true);
     setAsk({
-      label: type === "angle" ? "Úhel" : type === "radius" ? "Poloměr" : type === "diameter" ? "Průměr" : type === "arcLength" ? "Délka oblouku" : "Vzdálenost",
+      label: type === "angle" ? tr("Úhel") : type === "radius" ? tr("Poloměr") : type === "diameter" ? tr("Průměr") : type === "arcLength" ? tr("Délka oblouku") : tr("Vzdálenost"),
       value: d.value,
       suffix: type === "angle" ? "°" : "mm",
       at,
@@ -1026,7 +1027,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const next = list.map((d) => (d.id === id ? { ...d, value: val, driving: true } : d));
     const res = solveSketch(entities, constraints, next);
     if (!res.ok) {
-      note("Kóta by skicu přeurčila – ponechána jako referenční.");
+      note(tr("Kóta by skicu přeurčila – ponechána jako referenční."));
       onChange({ dims: list.map((d) => (d.id === id ? { ...d, driving: false } : d)) }, true);
       return;
     }
@@ -1289,7 +1290,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       case "rect3": {
         if (next.length < 3) return step();
         const e = rectFrom3(next[0], next[1], p);
-        if (!e) return note("Body obdélníku leží na přímce.");
+        if (!e) return note(tr("Body obdélníku leží na přímce."));
         return finish([e], [...coinc(e.id, cornerKey(e, next[0]), 0), ...coinc(e.id, cornerKey(e, next[1]), 1)], dimsFor(e));
       }
       case "circle": {
@@ -1308,7 +1309,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       case "circle3": {
         if (next.length < 3) return step();
         const cc = circleFrom3(next[0], next[1], p);
-        if (!cc) return note("Body leží na přímce.");
+        if (!cc) return note(tr("Body leží na přímce."));
         const id = uid();
         return finish([{ id, type: "circle", cx: r4(cc.c[0]), cy: r4(cc.c[1]), r: r4(cc.r) }], [...onCurve(id, 0), ...onCurve(id, 1), ...onCurve(id, 2)]);
       }
@@ -1327,11 +1328,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
       case "arcTangent": {
         if (!pts.length) {
-          if (!s.ref || s.kind !== "end") return note("Začněte na konci úsečky nebo oblouku.");
+          if (!s.ref || s.kind !== "end") return note(tr("Začněte na konci úsečky nebo oblouku."));
           return step();
         }
         const arc = tangentArc(entities, ptRefs[0], pts[0], p);
-        if (!arc) return note("Tečný oblouk nelze vytvořit.");
+        if (!arc) return note(tr("Tečný oblouk nelze vytvořit."));
         const cons: SketchConstraint[] = [];
         if (ptRefs[0] && snaps.auto) {
           cons.push({ id: uid(), type: "coincident", refs: [ptRefs[0], { e: arc.id, k: "a" }] });
@@ -1373,7 +1374,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         const [c, st, en] = next;
         const w = Math.abs(dist(p, c) - dist(st, c)) * 2;
         const r = slotArcEntities(c, st, en, w);
-        if (!r) return note("Šířka drážky musí být menší než dvojnásobek poloměru osy.");
+        if (!r) return note(tr("Šířka drážky musí být menší než dvojnásobek poloměru osy."));
         const cons = [...r.constraints, ...(nextRefs[0] && snaps.auto ? [{ id: uid(), type: "coincident" as const, refs: [nextRefs[0]!, { e: r.entities[0].id, k: "center" }] }] : [])];
         return finish(r.entities, cons);
       }
@@ -1404,16 +1405,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const ch = offsetChainOf(src);
     if (ch) {
       const dAbs = Math.abs(typedD ?? Math.min(...ch.segs.map((sg) => distToEntity(emap.get(sg.id)!, raw).d)));
-      if (dAbs < 1e-6) return note("Zadejte vzdálenost odsazení.");
+      if (dAbs < 1e-6) return note(tr("Zadejte vzdálenost odsazení."));
       const out = offsetChain(ch.segs, ch.closed, chainSide(ch.segs, raw) * dAbs, src.construction);
-      if (!out) return note("Odsazení je větší než poloměr oblouku v řetězci.");
+      if (!out) return note(tr("Odsazení je větší než poloměr oblouku v řetězci."));
       lastVal.current.offset = dAbs;
       addEntities(out);
     } else {
       const dAbs = Math.abs(typedD ?? distToEntity(src, raw).d);
-      if (dAbs < 1e-6) return note("Zadejte vzdálenost odsazení.");
+      if (dAbs < 1e-6) return note(tr("Zadejte vzdálenost odsazení."));
       const o = offsetEntity(src, r4(dAbs * offsetSide(src, raw)));
-      if (!o) return note("Entitu nelze o tuto vzdálenost odsadit (větší než poloměr).");
+      if (!o) return note(tr("Entitu nelze o tuto vzdálenost odsadit (větší než poloměr)."));
       lastVal.current.offset = dAbs;
       addEntities([o]);
     }
@@ -1428,14 +1429,14 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         if (!id) return;
         const r = trim(entities, id, raw);
         if (r) commitEdit(r);
-        else note("Tento úsek nelze oříznout (kružnice potřebuje 2 průsečíky).");
+        else note(tr("Tento úsek nelze oříznout (kružnice potřebuje 2 průsečíky)."));
         return;
       }
       case "extend": {
         if (!id) return;
         const r = extend(entities, id, raw);
         if (r) commitEdit(r);
-        else note("Úsečku nelze k ničemu prodloužit.");
+        else note(tr("Úsečku nelze k ničemu prodloužit."));
         return;
       }
       case "split": {
@@ -1446,17 +1447,17 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         if (se.type === "circle") {
           if (!pts.length) {
             setPts([sn.p]);
-            return note("Kružnice: klikněte na druhý bod rozdělení.");
+            return note(tr("Kružnice: klikněte na druhý bod rozdělení."));
           }
           const r = splitCircle(entities, se.id, pts[0], sn.p);
           setPts([]);
           if (r) commitEdit(r);
-          else note("Body rozdělení kružnice jsou totožné.");
+          else note(tr("Body rozdělení kružnice jsou totožné."));
           return;
         }
         const r = splitAt(entities, se.id, sn.p);
         if (r) commitEdit(r);
-        else note(se.type === "line" || se.type === "arc" ? "Klikněte dovnitř křivky, ne na její konec." : "Rozdělit lze úsečku, oblouk nebo kružnici – tvary nejdřív rozložte.");
+        else note(se.type === "line" || se.type === "arc" ? tr("Klikněte dovnitř křivky, ne na její konec.") : tr("Rozdělit lze úsečku, oblouk nebo kružnici – tvary nejdřív rozložte."));
         return;
       }
       case "offset": {
@@ -1470,18 +1471,18 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
       case "fillet":
       case "chamfer": {
-        if (!e || e.type !== "line") return note("Vyberte úsečku.");
+        if (!e || e.type !== "line") return note(tr("Vyberte úsečku."));
         if (!picks.length) return setPicks([{ kind: "line", ref: { e: e.id, k: "self" } }]);
         if (picks[0].ref.e === e.id) return;
         const id1 = picks[0].ref.e;
         setAsk({
-          label: tool === "fillet" ? "Poloměr" : "Vzdálenost",
+          label: tool === "fillet" ? tr("Poloměr") : tr("Vzdálenost"),
           value: lastVal.current[tool],
           at: raw,
           onOk: (v) => {
             lastVal.current[tool] = v;
             const r = tool === "fillet" ? filletLines(entities, id1, e.id, v) : chamferLines(entities, id1, e.id, v);
-            if (!r) return note("Roh nelze upravit (hodnota je příliš velká nebo úsečky jsou rovnoběžné).");
+            if (!r) return note(tr("Roh nelze upravit (hodnota je příliš velká nebo úsečky jsou rovnoběžné)."));
             // vazby rohu nahradit: totožnost konců s novou entitou (+ tečnost u zaoblení)
             const added = r.find((x) => !entities.some((o) => o.id === x.id))!;
             const l1 = r.find((x) => x.id === id1) as Extract<SketchEntity, { type: "line" }>;
@@ -1512,7 +1513,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (m === "more") return setPicks(all);
       if (!m) {
         setPicks([]);
-        return note(`Vazba „${CON_INFO[tool.slice(4) as ConType].label}“: ${CON_INFO[tool.slice(4) as ConType].hint}.`);
+        return note(tr("Vazba „{0}“: {1}.", CON_INFO[tool.slice(4) as ConType].label, CON_INFO[tool.slice(4) as ConType].hint));
       }
       applyConstraint(tool.slice(4) as ConType, m);
       setPicks([]);
@@ -1535,7 +1536,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       case "mirror": {
         const id = hitEntity(raw, new Set(ids));
         const ax = id ? entities.find((x) => x.id === id) : undefined;
-        if (!ax || ax.type !== "line") return note("Klikněte na úsečku nebo osu zrcadlení.");
+        if (!ax || ax.type !== "line") return note(tr("Klikněte na úsečku nebo osu zrcadlení."));
         const T = xfMirror(ax.a, ax.b);
         const copies = chosen.map((x) => transformEntity(x, T, true));
         const sym: SketchConstraint[] = [];
@@ -1570,7 +1571,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         if (!pts.length) return setPts([p]);
         const step = sub(p, pts[0]);
         setAsk({
-          label: "Počet kusů",
+          label: tr("Počet kusů"),
           value: lastVal.current.count,
           suffix: "ks",
           at: raw,
@@ -1584,7 +1585,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
       case "patternCircular": {
         setAsk({
-          label: "Počet kusů (360°)",
+          label: tr("Počet kusů (360°)"),
           value: lastVal.current.ccount,
           suffix: "ks",
           at: raw,
@@ -1646,11 +1647,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         setPicks([picks[0], pk]);
         return;
       }
-      if (picks[0].kind === "point") return note("Vyberte druhý bod nebo úsečku.");
+      if (picks[0].kind === "point") return note(tr("Vyberte druhý bod nebo úsečku."));
     }
     const d = dimFromPicks(picks, raw);
     if (d) placeDim(d.type, d.refs, raw, d.anchor);
-    else note("Tuto kombinaci nelze okótovat.");
+    else note(tr("Tuto kombinaci nelze okótovat."));
     setPicks([]);
   };
 
@@ -1665,40 +1666,40 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const m = new Map(entities.map((x) => [x.id, x]));
     if (ps.length === 1) {
       const p = ps[0];
-      if (p.kind === "point") return { title: "Bod", rows: [["X", fmt(p.p[0], 3)], ["Y", fmt(p.p[1], 3)]] };
+      if (p.kind === "point") return { title: tr("Bod"), rows: [["X", fmt(p.p[0], 3)], ["Y", fmt(p.p[1], 3)]] };
       if (p.kind === "line") {
         const l = refLine(m, p.ref)!;
-        return { title: "Úsečka", rows: [["Délka", `${fmt(dist(l[0], l[1]), 3)} mm`], ["Úhel k ose X", `${fmt(((angDeg(l[0], l[1]) % 360) + 360) % 360, 2)}°`]] };
+        return { title: tr("Úsečka"), rows: [[tr("Délka"), `${fmt(dist(l[0], l[1]), 3)} mm`], [tr("Úhel k ose X"), `${fmt(((angDeg(l[0], l[1]) % 360) + 360) % 360, 2)}°`]] };
       }
       if (p.kind === "circle") {
         const c = refCircle(m, p.ref)!;
-        return { title: "Kružnice / oblouk", rows: [["Poloměr", `${fmt(c.r, 3)} mm`], ["Průměr", `${fmt(c.r * 2, 3)} mm`], ["Obvod", `${fmt(2 * Math.PI * c.r, 3)} mm`], ["Střed", `${fmt(c.c[0], 2)} ; ${fmt(c.c[1], 2)}`]] };
+        return { title: tr("Kružnice / oblouk"), rows: [[tr("Poloměr"), `${fmt(c.r, 3)} mm`], [tr("Průměr"), `${fmt(c.r * 2, 3)} mm`], [tr("Obvod"), `${fmt(2 * Math.PI * c.r, 3)} mm`], [tr("Střed"), `${fmt(c.c[0], 2)} ; ${fmt(c.c[1], 2)}`]] };
       }
-      return { title: "Entita", rows: [] };
+      return { title: tr("Entita"), rows: [] };
     }
     const [a, b] = ps;
     const P = (x: Pick): Vec2 | null => (x.kind === "point" ? x.p : null);
     const pa = P(a);
     const pb = P(b);
-    if (pa && pb) return { title: "Vzdálenost bodů", line: [pa, pb], rows: [["Vzdálenost", `${fmt(dist(pa, pb), 3)} mm`], ["ΔX", fmt(Math.abs(pb[0] - pa[0]), 3)], ["ΔY", fmt(Math.abs(pb[1] - pa[1]), 3)], ["Úhel", `${fmt(angDeg(pa, pb), 2)}°`]] };
+    if (pa && pb) return { title: tr("Vzdálenost bodů"), line: [pa, pb], rows: [[tr("Vzdálenost"), `${fmt(dist(pa, pb), 3)} mm`], ["ΔX", fmt(Math.abs(pb[0] - pa[0]), 3)], ["ΔY", fmt(Math.abs(pb[1] - pa[1]), 3)], [tr("Úhel"), `${fmt(angDeg(pa, pb), 2)}°`]] };
     if (a.kind === "line" && b.kind === "line") {
       const la = refLine(m, a.ref)!;
       const lb = refLine(m, b.ref)!;
       const ang = angleBetween(la[0], la[1], lb[0], lb[1]);
-      const rows: [string, string][] = [["Úhel", `${fmt(ang, 3)}° (${fmt(180 - ang, 3)}°)`]];
-      if (ang < 0.01 || ang > 179.99) rows.push(["Vzdálenost (rovnoběžné)", `${fmt(distToEntity(m.get(a.ref.e)!, lb[0]).d, 3)} mm`]);
-      return { title: "Dvě úsečky", rows };
+      const rows: [string, string][] = [[tr("Úhel"), `${fmt(ang, 3)}° (${fmt(180 - ang, 3)}°)`]];
+      if (ang < 0.01 || ang > 179.99) rows.push([tr("Vzdálenost (rovnoběžné)"), `${fmt(distToEntity(m.get(a.ref.e)!, lb[0]).d, 3)} mm`]);
+      return { title: tr("Dvě úsečky"), rows };
     }
     const pt = pa ?? pb;
     const other = pa ? b : a;
     if (pt) {
       const r = distToEntity(m.get(other.ref.e)!, pt);
-      return { title: "Bod – entita", line: [pt, r.p], rows: [["Nejmenší vzdálenost", `${fmt(r.d, 3)} mm`]] };
+      return { title: tr("Bod – entita"), line: [pt, r.p], rows: [[tr("Nejmenší vzdálenost"), `${fmt(r.d, 3)} mm`]] };
     }
     const ca = refCircle(m, a.ref);
     const cb = refCircle(m, b.ref);
-    if (ca && cb) return { title: "Dvě kružnice", line: [ca.c, cb.c], rows: [["Vzdálenost středů", `${fmt(dist(ca.c, cb.c), 3)} mm`], ["Mezera", `${fmt(dist(ca.c, cb.c) - ca.r - cb.r, 3)} mm`]] };
-    return { title: "Měření", rows: [] };
+    if (ca && cb) return { title: tr("Dvě kružnice"), line: [ca.c, cb.c], rows: [[tr("Vzdálenost středů"), `${fmt(dist(ca.c, cb.c), 3)} mm`], [tr("Mezera"), `${fmt(dist(ca.c, cb.c) - ca.r - cb.r, 3)} mm`]] };
+    return { title: tr("Měření"), rows: [] };
   };
 
   // ---------- myš ----------
@@ -1817,7 +1818,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (!clicked && d.path.length > 1) {
         const r = powerTrim(entities, d.path);
         if (r) commitEdit(r);
-        else note("Tažení neprotnulo žádnou křivku.");
+        else note(tr("Tažení neprotnulo žádnou křivku."));
         return;
       }
     }
@@ -1860,7 +1861,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const d = ann ? dims.find((x) => x.id === ann.id) : null;
     if (d) {
       const m = new Map(entities.map((x) => [x.id, x]));
-      setAsk({ label: "Hodnota kóty", value: r4(measureDim(m, d) ?? d.value), suffix: d.type === "angle" ? "°" : "mm", at: toMm(ev.clientX, ev.clientY), onOk: (v) => setDimValue(d.id, v) });
+      setAsk({ label: tr("Hodnota kóty"), value: r4(measureDim(m, d) ?? d.value), suffix: d.type === "angle" ? "°" : "mm", at: toMm(ev.clientX, ev.clientY), onOk: (v) => setDimValue(d.id, v) });
     }
   };
 
@@ -1905,47 +1906,47 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       const d = dims.find((x) => x.id === ann.id);
       setSelAnn(ann.id);
       if (d) {
-        entries.push({ divider: true, label: "Kóta" });
-        entries.push({ id: "edit", label: "Upravit hodnotu…", icon: "edit", onClick: () => setAsk({ label: "Hodnota kóty", value: d.value, suffix: d.type === "angle" ? "°" : "mm", at: raw, onOk: (v) => setDimValue(d.id, v) }) });
-        entries.push({ id: "drv", label: d.driving ? "Změnit na referenční" : "Změnit na řídicí", icon: "dimension", onClick: () => (d.driving ? onChange({ dims: dims.map((x) => (x.id === d.id ? { ...x, driving: false } : x)) }, true) : setDimValue(d.id, measureDim(new Map(entities.map((x) => [x.id, x])), d) ?? d.value)) });
-      } else entries.push({ divider: true, label: `Vazba: ${CON_INFO[constraints.find((c) => c.id === ann.id)?.type ?? "fixed"].label}` });
-      entries.push({ id: "del", label: "Smazat", icon: "trash", tone: "cut", kbd: "Del", onClick: () => onChange({ constraints: constraints.filter((c) => c.id !== ann.id), dims: dims.filter((x) => x.id !== ann.id) }, true) });
+        entries.push({ divider: true, label: tr("Kóta") });
+        entries.push({ id: "edit", label: tr("Upravit hodnotu…"), icon: "edit", onClick: () => setAsk({ label: tr("Hodnota kóty"), value: d.value, suffix: d.type === "angle" ? "°" : "mm", at: raw, onOk: (v) => setDimValue(d.id, v) }) });
+        entries.push({ id: "drv", label: d.driving ? tr("Změnit na referenční") : tr("Změnit na řídicí"), icon: "dimension", onClick: () => (d.driving ? onChange({ dims: dims.map((x) => (x.id === d.id ? { ...x, driving: false } : x)) }, true) : setDimValue(d.id, measureDim(new Map(entities.map((x) => [x.id, x])), d) ?? d.value)) });
+      } else entries.push({ divider: true, label: tr("Vazba: {0}", CON_INFO[constraints.find((c) => c.id === ann.id)?.type ?? "fixed"].label) });
+      entries.push({ id: "del", label: tr("Smazat"), icon: "trash", tone: "cut", kbd: "Del", onClick: () => onChange({ constraints: constraints.filter((c) => c.id !== ann.id), dims: dims.filter((x) => x.id !== ann.id) }, true) });
     } else if (current.length) {
       const es = entities.filter((e) => current.includes(e.id));
       const pk = es.map((e) => pickOfEntity(e, raw));
-      entries.push({ divider: true, label: es.length === 1 ? TYPE_LABEL[es[0].type] : `${es.length} entit` });
-      entries.push({ id: "del", label: "Smazat", icon: "trash", tone: "cut", kbd: "Del", onClick: () => { commitEdit(entities.filter((x) => !current.includes(x.id))); setSelection([]); } });
-      entries.push({ id: "cons", label: es[0].construction ? "Normální geometrie" : "Pomocná geometrie", icon: "construction", onClick: () => toggleConstruction(current) });
-      entries.push({ id: "copy", label: "Kopírovat…", icon: "copy", onClick: () => setTool("copy") });
-      entries.push({ id: "move", label: "Přesunout…", icon: "move", onClick: () => setTool("move") });
-      entries.push({ id: "rot", label: "Otočit…", icon: "rotate", onClick: () => setTool("rotate") });
-      entries.push({ id: "mir", label: "Zrcadlit…", icon: "mirror", onClick: () => setTool("mirror") });
-      entries.push({ id: "sc", label: "Měřítko…", icon: "scale", onClick: () => setTool("scale") });
-      if (es.length === 1) entries.push({ id: "off", label: "Odsadit…", icon: "offset", onClick: () => { setTool("offset"); setTimeout(() => setPicks([{ kind: "entity", ref: { e: es[0].id, k: "self" } }]), 0); } });
-      if (es.some((e) => ["rect", "polygon", "slot", "polyline"].includes(e.type))) entries.push({ id: "exp", label: "Rozložit na úsečky a oblouky", icon: "explode", onClick: () => doExplode(current) });
-      if (es.length === 1 && (es[0].type === "line" || es[0].type === "arc" || es[0].type === "circle")) entries.push({ id: "split", label: "Rozdělit v bodě…", icon: "split", onClick: () => setTool("split") });
-      entries.push({ id: "dim", label: "Okótovat", icon: "dimension", kbd: "D", onClick: () => setTool("dimension") });
+      entries.push({ divider: true, label: es.length === 1 ? tr(TYPE_LABEL[es[0].type]) : tr("{0} entit", es.length) });
+      entries.push({ id: "del", label: tr("Smazat"), icon: "trash", tone: "cut", kbd: "Del", onClick: () => { commitEdit(entities.filter((x) => !current.includes(x.id))); setSelection([]); } });
+      entries.push({ id: "cons", label: es[0].construction ? tr("Normální geometrie") : tr("Pomocná geometrie"), icon: "construction", onClick: () => toggleConstruction(current) });
+      entries.push({ id: "copy", label: tr("Kopírovat…"), icon: "copy", onClick: () => setTool("copy") });
+      entries.push({ id: "move", label: tr("Přesunout…"), icon: "move", onClick: () => setTool("move") });
+      entries.push({ id: "rot", label: tr("Otočit…"), icon: "rotate", onClick: () => setTool("rotate") });
+      entries.push({ id: "mir", label: tr("Zrcadlit…"), icon: "mirror", onClick: () => setTool("mirror") });
+      entries.push({ id: "sc", label: tr("Měřítko…"), icon: "scale", onClick: () => setTool("scale") });
+      if (es.length === 1) entries.push({ id: "off", label: tr("Odsadit…"), icon: "offset", onClick: () => { setTool("offset"); setTimeout(() => setPicks([{ kind: "entity", ref: { e: es[0].id, k: "self" } }]), 0); } });
+      if (es.some((e) => ["rect", "polygon", "slot", "polyline"].includes(e.type))) entries.push({ id: "exp", label: tr("Rozložit na úsečky a oblouky"), icon: "explode", onClick: () => doExplode(current) });
+      if (es.length === 1 && (es[0].type === "line" || es[0].type === "arc" || es[0].type === "circle")) entries.push({ id: "split", label: tr("Rozdělit v bodě…"), icon: "split", onClick: () => setTool("split") });
+      entries.push({ id: "dim", label: tr("Okótovat"), icon: "dimension", kbd: "D", onClick: () => setTool("dimension") });
       if (es.length === 1 && es[0].type === "arc") {
         const arc = es[0];
-        entries.push({ id: "alen", label: "Kóta délky oblouku", icon: "dimension", onClick: () => placeDim("arcLength", [{ e: arc.id, k: "self" }], raw, circleFrom3(arc.a, arc.b, arc.c)?.c ?? raw) });
+        entries.push({ id: "alen", label: tr("Kóta délky oblouku"), icon: "dimension", onClick: () => placeDim("arcLength", [{ e: arc.id, k: "self" }], raw, circleFrom3(arc.a, arc.b, arc.c)?.c ?? raw) });
       }
       const applicable = (Object.keys(CON_INFO) as ConType[]).filter((t) => Array.isArray(matchConstraint(t, pk)));
       if (applicable.length) {
-        entries.push({ divider: true, label: "Vazby" });
+        entries.push({ divider: true, label: tr("Vazby") });
         for (const t of applicable) entries.push({ id: `c-${t}`, label: CON_INFO[t].label, icon: CON_INFO[t].icon, tone: "pattern", onClick: () => { const m = matchConstraint(t, pk); if (Array.isArray(m)) applyConstraint(t, m); } });
       }
     } else {
-      entries.push({ divider: true, label: "Uchopování" });
+      entries.push({ divider: true, label: tr("Uchopování") });
       const on = (v: boolean, l: string) => `${v ? "✓" : "○"}  ${l}`;
-      for (const k of SNAP_ORDER) entries.push({ id: `s-${k}`, label: on(snaps[k], SNAP_LABEL[k]), icon: "magnet", onClick: () => setSnap(k, !snaps[k]) });
-      entries.push({ id: "s-infer", label: on(snaps.infer, "Zarovnání (vodítka)"), icon: "magnet", onClick: () => setSnap("infer", !snaps.infer) });
-      entries.push({ id: "s-auto", label: on(snaps.auto, "Automatické vazby"), icon: "cCoincident", onClick: () => setSnap("auto", !snaps.auto) });
-      if (setSnapGrid) entries.push({ id: "grid", label: on(snapGrid, "Přichytit k mřížce"), icon: "grid", kbd: "G", onClick: () => setSnapGrid(!snapGrid) });
+      for (const k of SNAP_ORDER) entries.push({ id: `s-${k}`, label: on(snaps[k], tr(SNAP_LABEL[k])), icon: "magnet", onClick: () => setSnap(k, !snaps[k]) });
+      entries.push({ id: "s-infer", label: on(snaps.infer, tr("Zarovnání (vodítka)")), icon: "magnet", onClick: () => setSnap("infer", !snaps.infer) });
+      entries.push({ id: "s-auto", label: on(snaps.auto, tr("Automatické vazby")), icon: "cCoincident", onClick: () => setSnap("auto", !snaps.auto) });
+      if (setSnapGrid) entries.push({ id: "grid", label: on(snapGrid, tr("Přichytit k mřížce")), icon: "grid", kbd: "G", onClick: () => setSnapGrid(!snapGrid) });
       entries.push({ divider: true });
-      entries.push({ id: "fit", label: "Zobrazit vše", icon: "fit", kbd: "F", onClick: fit });
-      entries.push({ id: "all", label: "Vybrat vše", icon: "select", kbd: "Ctrl+A", onClick: () => setSelection(entities.map((e) => e.id)) });
-      if (tool !== "select") entries.push({ id: "cancel", label: "Zrušit příkaz", icon: "x", kbd: "Esc", onClick: () => setTool("select") });
-      if (onFinish) entries.push({ id: "finish", label: "Dokončit skicu", icon: "check", tone: "pattern", onClick: onFinish });
+      entries.push({ id: "fit", label: tr("Zobrazit vše"), icon: "fit", kbd: "F", onClick: fit });
+      entries.push({ id: "all", label: tr("Vybrat vše"), icon: "select", kbd: "Ctrl+A", onClick: () => setSelection(entities.map((e) => e.id)) });
+      if (tool !== "select") entries.push({ id: "cancel", label: tr("Zrušit příkaz"), icon: "x", kbd: "Esc", onClick: () => setTool("select") });
+      if (onFinish) entries.push({ id: "finish", label: tr("Dokončit skicu"), icon: "check", tone: "pattern", onClick: onFinish });
     }
     setCtx({ x: ev.clientX, y: ev.clientY, entries });
   };
@@ -2071,7 +2072,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     // promítnuté hrany jsou vázané na model → pevné (plně určené), jako „převést entity“ v SolidWorks
     const fixed: SketchConstraint[] = projected.map((e) => ({ id: uid(), type: "fixed", refs: [{ e: e.id, k: "self" }], value: paramsOf(e) }));
     addEntities(projected, fixed);
-    note(`Promítnuto ${projected.length} hran.`);
+    note(tr("Promítnuto {0} hran.", projected.length));
     setTool("select");
   };
   // zvýraznění řetězce při odsazení
@@ -2231,7 +2232,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const ghost = (es: SketchEntity[]) => es.map((e) => <polyline key={e.id} points={entityPath(e).pts.map(P).join(" ")} {...stroke} />);
     if (SEL_TOOLS.has(tool) && phase === 1) {
       const chosen = entities.filter((e) => sel.has(e.id));
-      if ((tool === "move" || tool === "copy") && pts.length) return <g>{ghost(chosen.map((e) => transformEntity(e, xfMove(sub(c, pts[0])), true)))}{label(c, `Δ ${fmt(c[0] - pts[0][0])} ; ${fmt(c[1] - pts[0][1])}`)}</g>;
+      if ((tool === "move" || tool === "copy") && pts.length) return <g>{ghost(chosen.map((e) => transformEntity(e, xfMove(sub(c, pts[0])), true)))}{label(c, tr("Δ {0} ; {1}", fmt(c[0] - pts[0][0]), fmt(c[1] - pts[0][1])))}</g>;
       if (tool === "rotate" && pts.length === 2) {
         const a = dynNum("ang") ?? angDeg(pts[0], c) - angDeg(pts[0], pts[1]);
         return <g>{ghost(chosen.map((e) => transformEntity(e, xfRotate(pts[0], a), true)))}{label(c, `${fmt(a)}°`)}</g>;
@@ -2240,7 +2241,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         const k = dynNum("k") ?? dist(pts[0], c) / (dist(pts[0], pts[1]) || 1);
         return <g>{ghost(chosen.map((e) => transformEntity(e, xfScale(pts[0], k), true)))}{label(c, `× ${fmt(k, 3)}`)}</g>;
       }
-      if (tool === "patternLinear" && pts.length) return <g>{ghost(linearPattern(chosen, sub(c, pts[0]), lastVal.current.count))}{label(c, `krok ${fmt(dist(pts[0], c))} mm`)}</g>;
+      if (tool === "patternLinear" && pts.length) return <g>{ghost(linearPattern(chosen, sub(c, pts[0]), lastVal.current.count))}{label(c, tr("krok {0} mm", fmt(dist(pts[0], c))))}</g>;
       if (tool === "patternCircular") return <g>{ghost(circularPattern(chosen, c, lastVal.current.ccount))}</g>;
       if (tool === "mirror") {
         const id = hitEntity(c, sel);
@@ -2257,7 +2258,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (ch) {
         const dAbs = Math.abs(dT ?? Math.min(...ch.segs.map((sg) => distToEntity(emap.get(sg.id)!, c).d)));
         const out = offsetChain(ch.segs, ch.closed, chainSide(ch.segs, c) * dAbs, src.construction);
-        return out ? <g>{ghost(out)}{label(c, `${fmt(dAbs)} mm · řetězec ${ch.segs.length}`)}</g> : label(c, "odsazení > poloměr");
+        return out ? <g>{ghost(out)}{label(c, tr("{0} mm · řetězec {1}", fmt(dAbs), ch.segs.length))}</g> : label(c, tr("odsazení > poloměr"));
       }
       const d = Math.abs(dT ?? distToEntity(src, c).d) * offsetSide(src, c);
       const o2 = offsetEntity(src, d);
@@ -2287,7 +2288,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         return (
           <g>
             <polyline points={[last, c].map(P).join(" ")} {...stroke} />
-            {label(c, `${fmt(dist(last, c))} mm · ${fmt(((angDeg(last, c) % 360) + 360) % 360)}°`)}
+            {label(c, tr("{0} mm · {1}°", fmt(dist(last, c)), fmt(((angDeg(last, c) % 360) + 360) % 360)))}
           </g>
         );
       case "polyline":
@@ -2306,7 +2307,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         );
       }
       case "rect3": {
-        if (pts.length === 1) return <g><polyline points={[pts[0], c].map(P).join(" ")} {...stroke} />{label(c, `${fmt(dist(pts[0], c))} mm · ${fmt(((angDeg(pts[0], c) % 360) + 360) % 360)}°`)}</g>;
+        if (pts.length === 1) return <g><polyline points={[pts[0], c].map(P).join(" ")} {...stroke} />{label(c, tr("{0} mm · {1}°", fmt(dist(pts[0], c)), fmt(((angDeg(pts[0], c) % 360) + 360) % 360)))}</g>;
         const r3 = rectFrom3(pts[0], pts[1], c);
         return r3 ? <g><polygon points={entityPath(r3).pts.map(P).join(" ")} {...stroke} fill="rgba(37,99,235,.05)" />{label(c, `${fmt(r3.w)} × ${fmt(r3.h)}`)}</g> : <polyline points={[pts[0], pts[1]].map(P).join(" ")} {...stroke} />;
       }
@@ -2321,7 +2322,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
             <g>
               <circle cx={cx} cy={cy} r={r * view.scale} {...stroke} strokeDasharray="2 4" />
               {pg && <polygon points={entityPath(pg).pts.map(P).join(" ")} {...stroke} fill="rgba(37,99,235,.05)" />}
-              {label(c, `${opts.sides} stran · R ${fmt(r)} (${opts.circumscribed ? "vepsaná" : "opsaná"})`)}
+              {label(c, tr("{0} stran · R {1} ({2})", opts.sides, fmt(r), opts.circumscribed ? tr("vepsaná") : tr("opsaná")))}
             </g>
           );
         }
@@ -2345,7 +2346,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         }
         const w = Math.abs(dist(c, pts[0]) - dist(pts[1], pts[0])) * 2;
         const sa = slotArcEntities(pts[0], pts[1], pts[2], w);
-        return sa ? <g>{ghost(sa.entities)}{label(c, `šířka ${fmt(w)}`)}</g> : label(c, "šířka > poloměr");
+        return sa ? <g>{ghost(sa.entities)}{label(c, tr("šířka {0}", fmt(w)))}</g> : label(c, tr("šířka > poloměr"));
       }
       case "circle3": {
         if (pts.length < 2) return <polyline points={[...pts, c].map(P).join(" ")} {...stroke} />;
@@ -2399,12 +2400,12 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const dofText =
     status.status === "over"
       ? status.conflicts.length
-        ? `Přeurčeno – konflikt (${status.conflicts.length})`
-        : `Přeurčeno – nadbytečné vazby (${status.redundant.length})`
+        ? tr("Přeurčeno – konflikt ({0})", status.conflicts.length)
+        : tr("Přeurčeno – nadbytečné vazby ({0})", status.redundant.length)
       : status.dof === 0
-        ? "Plně určeno"
+        ? tr("Plně určeno")
         : status.dof > 0
-          ? `Nedourčeno (${status.dof} st. volnosti)`
+          ? tr("Nedourčeno ({0} st. volnosti)", status.dof)
           : "…";
 
   return (
@@ -2497,7 +2498,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           <button
             key={k}
             type="button"
-            title={`Uchopení: ${SNAP_LABEL[k]}`}
+            title={tr("Uchopení: {0}", tr(SNAP_LABEL[k]))}
             onClick={() => setSnap(k, !snaps[k])}
             className={cn("grid h-6 w-6 place-items-center rounded", snaps[k] ? "bg-[#dbeafe] text-[#1d4ed8]" : "text-[#9aa5b1] hover:bg-[#eef2f6]")}
           >
@@ -2507,39 +2508,39 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           </button>
         ))}
         <span className="mx-0.5 h-4 w-px bg-[#d5dbe2]" />
-        <button type="button" title="Zarovnání (vodítka)" onClick={() => setSnap("infer", !snaps.infer)} className={cn("rounded px-1.5 text-[10.5px] font-semibold", snaps.infer ? "bg-[#cffafe] text-[#0e7490]" : "text-[#9aa5b1]")}>
+        <button type="button" title={tr("Zarovnání (vodítka)")} onClick={() => setSnap("infer", !snaps.infer)} className={cn("rounded px-1.5 text-[10.5px] font-semibold", snaps.infer ? "bg-[#cffafe] text-[#0e7490]" : "text-[#9aa5b1]")}>
           ⋯
         </button>
-        <Tgl on={snaps.auto} title="Automatické vazby při kreslení (vodorovně, svisle, totožnost, bod na křivce, střed, rovnoběžně, kolmo, tečně)" onClick={() => setSnap("auto", !snaps.auto)}>
+        <Tgl on={snaps.auto} title={tr("Automatické vazby při kreslení (vodorovně, svisle, totožnost, bod na křivce, střed, rovnoběžně, kolmo, tečně)")} onClick={() => setSnap("auto", !snaps.auto)}>
           AV
         </Tgl>
-        <Tgl on={opts.autoDim} title="Kótovat při kreslení – hodnoty zadané číslem u kurzoru vloží řídicí kótu" onClick={() => setOpt("autoDim", !opts.autoDim)} className="bg-[#dbeafe] text-[#1d4ed8]">
-          Kóty
+        <Tgl on={opts.autoDim} title={tr("Kótovat při kreslení – hodnoty zadané číslem u kurzoru vloží řídicí kótu")} onClick={() => setOpt("autoDim", !opts.autoDim)} className="bg-[#dbeafe] text-[#1d4ed8]">
+          {tr("Kóty")}
         </Tgl>
         {(tool === "circle" || tool === "circle2") && (
-          <Tgl on title={opts.diameter ? "Zadávat průměr (přepnout na poloměr)" : "Zadávat poloměr (přepnout na průměr)"} onClick={() => setOpt("diameter", !opts.diameter)} className="bg-[#ede9fe] text-[#6d28d9]">
+          <Tgl on title={opts.diameter ? tr("Zadávat průměr (přepnout na poloměr)") : tr("Zadávat poloměr (přepnout na průměr)")} onClick={() => setOpt("diameter", !opts.diameter)} className="bg-[#ede9fe] text-[#6d28d9]">
             {opts.diameter ? "Ø" : "R"}
           </Tgl>
         )}
         {tool === "polygon" && (
           <>
-            <Tgl on title="Vepsaný: bod = vrchol (poloměr opsané kružnice) · Opsaný: bod = střed strany (poloměr vepsané kružnice)" onClick={() => setOpt("circumscribed", !opts.circumscribed)} className="bg-[#ede9fe] text-[#6d28d9]">
-              {opts.circumscribed ? "Opsaný" : "Vepsaný"}
+            <Tgl on title={tr("Vepsaný: bod = vrchol (poloměr opsané kružnice) · Opsaný: bod = střed strany (poloměr vepsané kružnice)")} onClick={() => setOpt("circumscribed", !opts.circumscribed)} className="bg-[#ede9fe] text-[#6d28d9]">
+              {opts.circumscribed ? tr("Opsaný") : tr("Vepsaný")}
             </Tgl>
             <input
               type="number"
               min={3}
               max={64}
               value={opts.sides}
-              title="Počet stran"
+              title={tr("Počet stran")}
               onChange={(e) => setOpt("sides", Math.max(3, Math.min(64, Math.round(Number(e.target.value) || 6))))}
               className="h-5 w-10 rounded border border-[#cfd6de] px-1 text-[10.5px]"
             />
           </>
         )}
         {tool === "offset" && (
-          <Tgl on={opts.chain} title="Odsadit celý navazující řetězec úseček a oblouků" onClick={() => setOpt("chain", !opts.chain)} className="bg-[#ede9fe] text-[#6d28d9]">
-            Řetězec
+          <Tgl on={opts.chain} title={tr("Odsadit celý navazující řetězec úseček a oblouků")} onClick={() => setOpt("chain", !opts.chain)} className="bg-[#ede9fe] text-[#6d28d9]">
+            {tr("Řetězec")}
           </Tgl>
         )}
       </div>
@@ -2549,28 +2550,28 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         <div className="absolute right-3 top-3 w-64 rounded-md border border-[#cfd6de] bg-white/95 p-3 text-[12px] shadow-lg backdrop-blur" onPointerDown={(e) => e.stopPropagation()}>
           <p className="mb-1.5 flex items-center gap-1.5 font-semibold">
             <CadIcon name="face" tone="feature" className="h-4 w-4" />
-            Promítnout hrany modelu
+            {tr("Promítnout hrany modelu")}
           </p>
           {!modelLines?.length ? (
-            <p className="text-[#6b7785]">Model zatím nemá žádné hrany (nejdřív vytvořte těleso).</p>
+            <p className="text-[#6b7785]">{tr("Model zatím nemá žádné hrany (nejdřív vytvořte těleso).")}</p>
           ) : (
             <>
               <label className="flex cursor-pointer items-center gap-2 py-0.5">
-                <input type="radio" name="proj" checked={!opts.projAll} onChange={() => setOpt("projAll", false)} /> Jen hrany v rovině skici (±0,01 mm)
+                <input type="radio" name="proj" checked={!opts.projAll} onChange={() => setOpt("projAll", false)} /> {tr("Jen hrany v rovině skici (±0,01 mm)")}
               </label>
               <label className="flex cursor-pointer items-center gap-2 py-0.5">
-                <input type="radio" name="proj" checked={opts.projAll} onChange={() => setOpt("projAll", true)} /> Všechny hrany (kolmý průmět)
+                <input type="radio" name="proj" checked={opts.projAll} onChange={() => setOpt("projAll", true)} /> {tr("Všechny hrany (kolmý průmět)")}
               </label>
               <label className="mt-1 flex cursor-pointer items-center gap-2 py-0.5">
-                <input type="checkbox" checked={opts.projConstruction} onChange={(e) => setOpt("projConstruction", e.target.checked)} /> Jako pomocná geometrie
+                <input type="checkbox" checked={opts.projConstruction} onChange={(e) => setOpt("projConstruction", e.target.checked)} /> {tr("Jako pomocná geometrie")}
               </label>
-              <p className="mt-1 text-[#6b7785]">{projected.length} úseček · vloží se jako pevné (plně určené)</p>
+              <p className="mt-1 text-[#6b7785]">{projected.length} {tr("úseček · vloží se jako pevné (plně určené)")}</p>
               <div className="mt-2 flex gap-2">
                 <button type="button" onClick={doProject} disabled={!projected.length} className="rounded bg-[#2563eb] px-2.5 py-1 text-[11.5px] font-semibold text-white disabled:opacity-40">
-                  Promítnout
+                  {tr("Promítnout")}
                 </button>
                 <button type="button" onClick={() => setTool("select")} className="rounded border border-[#cfd6de] px-2.5 py-1 text-[11.5px]">
-                  Zrušit
+                  {tr("Zrušit")}
                 </button>
               </div>
             </>
@@ -2596,7 +2597,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
                   </span>
                   {f.suffix && <span className="text-[#9aa5b1]">{f.suffix}</span>}
                   {dyn.locked[i] && (
-                    <svg viewBox="0 0 12 12" className="h-3 w-3 text-[#1d4ed8]" aria-label="zamčeno">
+                    <svg viewBox="0 0 12 12" className="h-3 w-3 text-[#1d4ed8]" aria-label={tr("zamčeno")}>
                       <rect x={2} y={5} width={8} height={6} rx={1} fill="currentColor" />
                       <path d="M4 5V3.5a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" strokeWidth={1.4} />
                     </svg>
@@ -2604,7 +2605,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
                 </span>
               );
             })}
-            <span className="ml-1 text-[9.5px] text-[#9aa5b1]">Tab · Enter</span>
+            <span className="ml-1 text-[9.5px] text-[#9aa5b1]">{tr("Tab · Enter")}</span>
           </div>
         );
       })()}
@@ -2643,15 +2644,15 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       {/* výzva + stav */}
       <div className="pointer-events-none absolute bottom-3 left-3 right-3 flex flex-wrap items-center gap-1.5 font-mono text-[10.5px] text-[#26303b]">
         <span className="rounded border border-[#c9d1da] bg-white/90 px-2 py-0.5">
-          X {cursor ? fmt(cursor[0]) : "—"} · Y {cursor ? fmt(cursor[1]) : "—"}
+          X {cursor ? fmt(cursor[0]) : "—"} {tr("· Y")}{" "}{cursor ? fmt(cursor[1]) : "—"}
         </span>
-        <span className="rounded border border-[#c9d1da] bg-white/90 px-2 py-0.5">mřížka {fmt(gridStep)}</span>
+        <span className="rounded border border-[#c9d1da] bg-white/90 px-2 py-0.5">{tr("mřížka")}{" "}{fmt(gridStep)}</span>
         <span className="rounded border border-[#c9d1da] bg-white/90 px-2 py-0.5">
-          {loops.length} profil{loops.length === 1 ? "" : loops.length > 1 && loops.length < 5 ? "y" : "ů"}
-          {openCount ? ` · ${openCount} otevř.` : ""}
+          {loops.length} profil{loops.length === 1 ? "" : loops.length > 1 && loops.length < 5 ? "y" : tr("ů")}
+          {openCount ? tr(" · {0} otevř.", openCount) : ""}
         </span>
         <span
-          title="Barvy entit: modře nedourčená · černě plně určená · červeně přeurčená nebo v konfliktu"
+          title={tr("Barvy entit: modře nedourčená · černě plně určená · červeně přeurčená nebo v konfliktu")}
           className={cn("rounded border px-2 py-0.5", status.status === "over" ? "border-red-300 bg-red-50 text-red-700" : status.status === "full" ? "border-green-300 bg-green-50 text-green-700" : "border-[#bfdbfe] bg-[#eff6ff] text-[#1d4ed8]")}
         >
           {dofText}
@@ -2668,74 +2669,74 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
 const TYPE_LABEL: Record<SketchEntity["type"], string> = { line: "Úsečka", arc: "Oblouk", rect: "Obdélník", circle: "Kružnice", polygon: "Mnohoúhelník", slot: "Drážka", polyline: "Lomená čára", point: "Bod", ellipse: "Elipsa", spline: "Spline" };
 
 function promptFor(tool: SketchTool, n: number, picks: number, phase: number, selN: number): string {
-  if (SEL_TOOLS.has(tool) && phase === 0) return selN ? `Vybráno ${selN} – Enter / pravé tl. pokračuje` : "Vyberte entity (Shift přidává), pak Enter";
+  if (SEL_TOOLS.has(tool) && phase === 0) return selN ? tr("Vybráno {0} – Enter / pravé tl. pokračuje", selN) : tr("Vyberte entity (Shift přidává), pak Enter");
   switch (tool) {
     case "select":
       return "";
     case "line":
     case "centerline":
-      return n ? "Další bod · Esc / pravé tl. ukončí řetěz" : "Počáteční bod úsečky";
+      return n ? tr("Další bod · Esc / pravé tl. ukončí řetěz") : tr("Počáteční bod úsečky");
     case "polyline":
     case "spline":
-      return n ? "Další bod · Enter / dvojklik ukončí · klik na 1. bod uzavře" : "První bod";
+      return n ? tr("Další bod · Enter / dvojklik ukončí · klik na 1. bod uzavře") : tr("První bod");
     case "rect":
-      return n ? "Protější roh (nebo šířka Tab výška, Enter)" : "První roh (nebo X;Y, Enter)";
+      return n ? tr("Protější roh (nebo šířka Tab výška, Enter)") : tr("První roh (nebo X;Y, Enter)");
     case "rectCenter":
-      return n ? "Roh (nebo šířka Tab výška, Enter)" : "Střed obdélníku";
+      return n ? tr("Roh (nebo šířka Tab výška, Enter)") : tr("Střed obdélníku");
     case "rect3":
-      return n === 0 ? "První roh" : n === 1 ? "Druhý roh (směr a šířka první strany)" : "Výška obdélníku";
+      return n === 0 ? tr("První roh") : n === 1 ? tr("Druhý roh (směr a šířka první strany)") : tr("Výška obdélníku");
     case "circle":
-      return n ? "Bod na kružnici (nebo zadejte průměr/poloměr, Enter)" : "Střed kružnice";
+      return n ? tr("Bod na kružnici (nebo zadejte průměr/poloměr, Enter)") : tr("Střed kružnice");
     case "circle2":
-      return n ? "Druhý bod průměru" : "První bod průměru";
+      return n ? tr("Druhý bod průměru") : tr("První bod průměru");
     case "circle3":
-      return `Bod ${n + 1} ze 3 na kružnici`;
+      return tr("Bod {0} ze 3 na kružnici", n + 1);
     case "arc":
-      return n === 0 ? "Začátek oblouku" : n === 1 ? "Konec oblouku" : "Bod na oblouku";
+      return n === 0 ? tr("Začátek oblouku") : n === 1 ? tr("Konec oblouku") : tr("Bod na oblouku");
     case "arcCenter":
-      return n === 0 ? "Střed" : n === 1 ? "Začátek (poloměr)" : "Konec (proti směru hodin)";
+      return n === 0 ? tr("Střed") : n === 1 ? tr("Začátek (poloměr)") : tr("Konec (proti směru hodin)");
     case "arcTangent":
-      return n ? "Konec tečného oblouku" : "Konec úsečky / oblouku, na který navázat";
+      return n ? tr("Konec tečného oblouku") : tr("Konec úsečky / oblouku, na který navázat");
     case "ellipse":
-      return n === 0 ? "Střed elipsy" : n === 1 ? "Konec hlavní poloosy" : "Vedlejší poloosa";
+      return n === 0 ? tr("Střed elipsy") : n === 1 ? tr("Konec hlavní poloosy") : tr("Vedlejší poloosa");
     case "point":
-      return "Umístěte bod";
+      return tr("Umístěte bod");
     case "polygon":
-      return n ? "Vrchol / střed strany (nebo poloměr Tab počet stran, Enter)" : "Střed mnohoúhelníku";
+      return n ? tr("Vrchol / střed strany (nebo poloměr Tab počet stran, Enter)") : tr("Střed mnohoúhelníku");
     case "slot":
-      return n === 0 ? "Střed prvního oblouku" : n === 1 ? "Střed druhého oblouku (nebo délka Tab úhel)" : "Šířka drážky";
+      return n === 0 ? tr("Střed prvního oblouku") : n === 1 ? tr("Střed druhého oblouku (nebo délka Tab úhel)") : tr("Šířka drážky");
     case "slotArc":
-      return n === 0 ? "Střed oblouku osy drážky" : n === 1 ? "Začátek osy (poloměr)" : n === 2 ? "Konec osy (proti směru hodin)" : "Šířka drážky";
+      return n === 0 ? tr("Střed oblouku osy drážky") : n === 1 ? tr("Začátek osy (poloměr)") : n === 2 ? tr("Konec osy (proti směru hodin)") : tr("Šířka drážky");
     case "trim":
-      return "Klikněte na úsek k odstranění, nebo táhněte přes více úseků";
+      return tr("Klikněte na úsek k odstranění, nebo táhněte přes více úseků");
     case "extend":
-      return "Klikněte u konce úsečky, která se má prodloužit";
+      return tr("Klikněte u konce úsečky, která se má prodloužit");
     case "split":
-      return n ? "Druhý bod rozdělení kružnice" : "Klikněte na křivku v místě rozdělení (kružnice: 2 body)";
+      return n ? tr("Druhý bod rozdělení kružnice") : tr("Klikněte na křivku v místě rozdělení (kružnice: 2 body)");
     case "project":
-      return "Zvolte hrany vpravo nahoře a potvrďte „Promítnout“";
+      return tr("Zvolte hrany vpravo nahoře a potvrďte „Promítnout“");
     case "offset":
-      return picks ? "Strana myší, vzdálenost klikem nebo číslem + Enter" : "Vyberte entitu (řetězec) k odsazení";
+      return picks ? tr("Strana myší, vzdálenost klikem nebo číslem + Enter") : tr("Vyberte entitu (řetězec) k odsazení");
     case "fillet":
     case "chamfer":
-      return picks ? "Druhá úsečka" : "První úsečka";
+      return picks ? tr("Druhá úsečka") : tr("První úsečka");
     case "mirror":
-      return "Klikněte na osu zrcadlení (úsečku)";
+      return tr("Klikněte na osu zrcadlení (úsečku)");
     case "move":
     case "copy":
-      return n ? "Cílový bod" : "Základní bod";
+      return n ? tr("Cílový bod") : tr("Základní bod");
     case "rotate":
-      return n === 0 ? "Střed otáčení" : n === 1 ? "Referenční bod" : "Cílový směr";
+      return n === 0 ? tr("Střed otáčení") : n === 1 ? tr("Referenční bod") : tr("Cílový směr");
     case "scale":
-      return n === 0 ? "Střed měřítka" : n === 1 ? "Referenční bod" : "Nová poloha bodu";
+      return n === 0 ? tr("Střed měřítka") : n === 1 ? tr("Referenční bod") : tr("Nová poloha bodu");
     case "patternLinear":
-      return n ? "Krok pole (vzdálenost a směr)" : "Základní bod";
+      return n ? tr("Krok pole (vzdálenost a směr)") : tr("Základní bod");
     case "patternCircular":
-      return "Střed kruhového pole";
+      return tr("Střed kruhového pole");
     case "dimension":
-      return picks ? "Druhá entita/bod, nebo umístění kóty" : "Klikněte na entitu nebo bod";
+      return picks ? tr("Druhá entita/bod, nebo umístění kóty") : tr("Klikněte na entitu nebo bod");
     case "measure":
-      return "Klikněte na body nebo entity (2 výběry)";
+      return tr("Klikněte na body nebo entity (2 výběry)");
     default:
       if (tool.startsWith("con-")) {
         const c = CON_INFO[tool.slice(4) as ConType];
@@ -2844,9 +2845,9 @@ function SnapGlyph({ at, kind }: { at: Vec2; kind: SnapKind }) {
     <g transform={`translate(${at[0]},${at[1]})`} color="#0e7490" pointerEvents="none">
       <GlyphShape kind={kind} />
       <g transform="translate(10,-12)">
-        <rect x={0} y={-10} width={SNAP_LABEL[kind].length * 6.2 + 10} height={15} rx={3} fill="#ecfeff" stroke="#0e7490" strokeWidth={0.8} />
+        <rect x={0} y={-10} width={tr(SNAP_LABEL[kind]).length * 6.2 + 10} height={15} rx={3} fill="#ecfeff" stroke="#0e7490" strokeWidth={0.8} />
         <text x={5} y={1} fontSize={10.5} fill="#0e7490" fontFamily="Roboto, Arial">
-          {SNAP_LABEL[kind]}
+          {tr(SNAP_LABEL[kind])}
         </text>
       </g>
     </g>

@@ -30,7 +30,7 @@ interface Ctx {
   db: JobsDb;
   user: CurrentUser;
   actor: HandoffActor;
-  can: (f: "dashboard" | "margins" | "mail_all") => boolean;
+  can: (f: "dashboard" | "margins" | "mail_all" | "approval_queue") => boolean;
 }
 
 async function begin(): Promise<Ctx | { error: string }> {
@@ -78,10 +78,10 @@ export async function prepareProductionHandoff(
       const derived = deriveHandoffKind(ctx.job.status, ctx.ops);
       if ("error" in derived) return fail(derived.error, derived.code);
     }
-    // odkud objednávka odejde: schránka obchodníka zakázky, jinak moje (stejně jako každé odeslání)
+    // odkud objednávka odejde: z mé schránky (každý ze své; super admin si v dialogu může vybrat jinou)
     const [mode, box] = await Promise.all([
       purchaseOrderMode(c.db),
-      c.actor.margins ? purchaseOrderSender(c.db, { id: c.user.id }, ctx.job.ownerId) : Promise.resolve(null),
+      c.actor.margins ? purchaseOrderSender({ id: c.user.id }) : Promise.resolve(null),
     ]);
     const plan = buildHandoffPlan(ctx, {
       ...opts, margins: c.actor.margins, mailAll: c.actor.mailAll, actorId: c.user.id, automationMode: mode, senderEmail: box?.mailboxEmail ?? null,
@@ -101,7 +101,9 @@ export async function submitProductionHandoff(
   if ("error" in c) return fail(c.error);
   if (!isUuid(jobId)) return fail("Zakázka nenalezena.");
   try {
-    const res = await productionHandoffCore(c.db, c.actor, jobId, input, { source: "ui" });
+    // „Odeslat z" (jen super admin — pravidlo ověří sender-rules.ts při každém odeslání)
+    const fromMailboxId = typeof input?.fromMailboxId === "string" && isUuid(input.fromMailboxId) ? input.fromMailboxId : null;
+    const res = await productionHandoffCore(c.db, { ...c.actor, fromMailboxId }, jobId, input, { source: "ui" });
     if (!res.ok) return fail(res.error, res.code, res.issues);
     revalidateHandoff(jobId);
     return { ok: true, result: res.result };
@@ -172,7 +174,9 @@ export async function reissueStepPurchaseOrder(operationId: string): Promise<Act
 }
 
 /** „Odeslat" objednávku kroku (obchodník / admin): zabere řádek fronty a odešle; při chybě ho vrátí. */
-export async function sendStepPurchaseOrder(purchaseOrderId: string, mail?: Partial<PurchaseOrderMail>): Promise<ActionResult<{ sent: boolean; emailId?: string }>> {
+export async function sendStepPurchaseOrder(
+  purchaseOrderId: string, mail?: Partial<PurchaseOrderMail>, opts: { fromMailboxId?: string | null } = {},
+): Promise<ActionResult<{ sent: boolean; emailId?: string }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
   if (!c.actor.margins) return fail("Objednávku dodavateli odešle obchodník nebo admin.", "FORBIDDEN");
@@ -182,8 +186,9 @@ export async function sendStepPurchaseOrder(purchaseOrderId: string, mail?: Part
     const { data } = await c.db.from("purchase_orders").select("id, job_id, created_by, job:orders!job_id(owner_id)").eq("id", purchaseOrderId).maybeSingle();
     const po = data as { id: string; job_id: string; created_by: string | null; job?: { owner_id: string | null } | { owner_id: string | null }[] | null } | null;
     if (!po) return fail("Objednávka nenalezena.");
-    // cizí objednávku (zakázka jiného obchodníka) posílá jen super admin — stejně jako ve frontě (mayResolve)
-    if (!c.can("dashboard")) {
+    // cizí objednávku (zakázka jiného obchodníka) posílá jen super admin — stejně jako ve frontě (mayResolve);
+    // 9. 11. i kolega se „Smí řešit frontu ke schválení" (objednávku ve frontě vyřídí taky)
+    if (!c.can("dashboard") && !c.can("approval_queue")) {
       const owner = (Array.isArray(po.job) ? po.job[0] : po.job)?.owner_id ?? null;
       const { data: q } = await c.db.from("approval_queue").select("owner_id").eq("purchase_order_id", po.id).eq("status", "pending");
       const rowOwners = ((q ?? []) as { owner_id: string | null }[]).map((r) => r.owner_id);
@@ -191,7 +196,8 @@ export async function sendStepPurchaseOrder(purchaseOrderId: string, mail?: Part
         return fail("Objednávku k cizí zakázce odešle její obchodník nebo admin.", "FORBIDDEN");
       }
     }
-    const res = await sendQueuedPurchaseOrder(c.db, { id: c.user.id, fullName: c.user.fullName, mailAll: c.actor.mailAll }, purchaseOrderId, {
+    const fromMailboxId = typeof opts?.fromMailboxId === "string" && isUuid(opts.fromMailboxId) ? opts.fromMailboxId : null;
+    const res = await sendQueuedPurchaseOrder(c.db, { id: c.user.id, fullName: c.user.fullName, mailAll: c.actor.mailAll, fromMailboxId }, purchaseOrderId, {
       mail: mail ? { to: mail.to, cc: mail.cc, subject: mail.subject, body: mail.body } : undefined,
     });
     if (!res.ok) return fail(res.error);

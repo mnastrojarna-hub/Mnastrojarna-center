@@ -9,6 +9,7 @@ import { userActor } from "@/lib/supabase/actor-headers";
 import { logAudit } from "@/lib/audit";
 import { getVisibleEmailRow } from "@/lib/data/mail";
 import { describeSender, sendMail, type OutgoingAttachment } from "@/lib/email/send";
+import { isRealSuperAdmin, resolveSender } from "@/lib/email/sender-rules";
 import { outgoingSignature } from "@/lib/email/signature-server";
 import { loadEmailAttachment, MAX_ATTACHMENT_BYTES } from "@/lib/email/attachments";
 import { replyHeaders, splitAddresses } from "@/lib/email/threading";
@@ -33,8 +34,9 @@ import type { EmailCategory as DbEmailCategory } from "@/lib/supabase/database.t
 /**
  * Psaní e-mailů z aplikace: nová zpráva, odpověď, odpovědět všem, přeposlání (s původními
  * přílohami), přílohy z počítače (podepsané nahrání do úložiště) i z dokumentů zakázky, podpis.
- * Odesílá se přes sendMail({ ownerId, replyMailboxId }) — vlastní schránka, u odpovědi schránka,
- * kam e-mail přišel (je-li moje nebo firemní), jinak firemní / globální SMTP; nikdy cizí osobní.
+ * Odesílá se přes resolveSender (sender-rules.ts) — vlastní schránka, u odpovědi schránka, kam e-mail
+ * přišel (je-li moje nebo firemní), jinak firemní / globální SMTP; nikdy cizí osobní. Jen super admin si
+ * může vybrat jinou schránku („Odeslat z").
  */
 
 type Db = SupabaseClient;
@@ -80,6 +82,8 @@ export interface SendComposedInput {
   jobId?: string | null;
   /** Zpráva z fronty K odeslání (opakované odeslání ze stejného okna — bez dvojí položky ve frontě). */
   outboxId?: string | null;
+  /** „Odeslat z" — jen super admin (ostatní vždy ze své schránky; ověří sender-rules.ts). */
+  fromMailboxId?: string | null;
 }
 
 export interface SendComposedResult {
@@ -115,6 +119,8 @@ function cleanList(v: string | undefined): { valid: string[]; invalid: string[] 
 export async function composeContextAction(input: { sourceEmailId?: string | null; jobId?: string | null }): Promise<{
   ok: boolean; error?: string; from?: string; fromError?: string; signature?: string;
   jobId?: string | null; jobFiles?: { id: string; filename: string; sizeBytes: number | null }[];
+  /** Super admin — okno psaní ukáže výběr „Odeslat z" (ostatní posílají vždy ze své schránky). */
+  canChooseSender?: boolean;
 }> {
   const access = await checkFeature("mail");
   if ("error" in access) return { ok: false, error: access.error };
@@ -134,9 +140,10 @@ export async function composeContextAction(input: { sourceEmailId?: string | nul
   const signature = await outgoingSignature({ userId: access.user.id, mailboxEmail: sender.ok ? sender.from : null })
     .then((s) => s.text.trim())
     .catch(() => "");
-  const jobFiles = jobId ? await jobFilesFor(c, jobId) : [];
+  const [jobFiles, canChooseSender] = await Promise.all([jobId ? jobFilesFor(c, jobId) : Promise.resolve([]), isRealSuperAdmin(access.user.id)]);
   return {
     ok: true,
+    canChooseSender,
     from: sender.ok ? sender.from : undefined,
     fromError: sender.ok ? undefined : sender.reason,
     signature,
@@ -503,6 +510,8 @@ function outboxPayload(input: SendComposedInput): SendComposedInput {
       .filter((a) => a && (a.kind === "upload" || a.kind === "job" || a.kind === "original") && typeof a.ref === "string")
       .map((a) => ({ kind: a.kind, ref: a.ref.slice(0, 500), filename: a.filename?.slice(0, 200), contentType: a.contentType?.slice(0, 100), ...(a.original === true ? { original: true } : {}) })),
     jobId: isUuidLike(input.jobId) ? input.jobId : null,
+    // volba super admina „Odeslat z" — při opakovaném odeslání se znovu ověří (sender-rules.ts)
+    ...(isUuidLike(input.fromMailboxId) ? { fromMailboxId: input.fromMailboxId } : {}),
   };
 }
 
@@ -775,6 +784,10 @@ async function composeAndSend(user: SessionUser, input: SendComposedInput): Prom
     ? replyHeaders({ messageId: source.message_id, references: source.message_refs, subject: source.subject })
     : null;
   const jobId = (input.jobId && isUuidLike(input.jobId) ? input.jobId : null) ?? source?.order_id ?? null;
+  const who = await resolveSender(access.user.id, {
+    mailboxId: input.fromMailboxId && isUuidLike(input.fromMailboxId) ? input.fromMailboxId : null,
+    replyMailboxId: source?.mailbox_id ?? null,
+  });
   const res = await sendMail({
     to: to.valid.join(", "),
     cc: cc.valid.length ? cc.valid.join(", ") : undefined,
@@ -782,7 +795,7 @@ async function composeAndSend(user: SessionUser, input: SendComposedInput): Prom
     subject,
     text: body,
     attachments: attachments.length ? attachments : undefined,
-    from: { ownerId: access.user.id, replyMailboxId: source?.mailbox_id ?? null },
+    from: who.from,
     senderId: access.user.id,
     inReplyTo: headers?.inReplyTo ?? null,
     references: headers?.references ?? null,
@@ -790,7 +803,7 @@ async function composeAndSend(user: SessionUser, input: SendComposedInput): Prom
     customerId: source?.customer_id ?? null,
     supplierId: source?.supplier_id ?? null,
     // podpis vložilo okno psaní (uživatel ho mohl upravit / smazat) → jen převést na grafický, nepřidávat
-    signature: { userId: access.user.id, mode: "inline" },
+    signature: { userId: who.signerId, mode: "inline" },
     // odpověď / přeposlání: kategorie zprávy, na kterou odpovídám (jinak podle předmětu)
     category: source && input.mode !== "forward" && isDbEmailCategory(source.category) && source.category !== "spam" && source.category !== "ostatni"
       ? source.category : undefined,

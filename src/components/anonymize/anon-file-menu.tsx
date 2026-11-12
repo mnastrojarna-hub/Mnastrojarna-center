@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { anonApi, downloadUrl, previewUrl, type AnonTableParam, type SendQueueDto } from "./anon-api";
 import { PrintButton } from "@/components/print/print-button";
 import { FileAnonBadge } from "./anon-badge";
-import { describeCounts, displayReason, isBudgetWait, NOTHING_REMOVED, sendQueueText, sendQueueWhat, type AnonUiStatus } from "./anon-status";
+import { describeCounts, displayReason, inWords, isBudgetWait, NOTHING_REMOVED, retryInMs, sendQueueText, sendQueueWhat, type AnonUiStatus } from "./anon-status";
 
 /**
  * Anonymizace v Dokumentech zakázky (spec §6.2): položky menu dokumentu, viditelná akce „Pro dodavatele",
@@ -48,7 +48,7 @@ function relevant(f: JobFile): boolean {
 export function AnonFileBadge({ file, stalled }: { file: JobFile; stalled?: boolean }) {
   const a = anonOf(file);
   if (!a.status || !relevant(file)) return null;
-  return <FileAnonBadge status={a.status} reviewed={a.reviewed} reason={a.reason} total={a.total} backfill={Boolean(file.anon?.backfill)} stalled={stalled} />;
+  return <FileAnonBadge status={a.status} reviewed={a.reviewed} reason={a.reason} total={a.total} backfill={Boolean(file.anon?.backfill)} stalled={stalled} lockUntil={file.anon?.lockUntil ?? null} attempts={file.anon?.attempts ?? null} />;
 }
 
 /** Výkres čeká / běží na serveru (ne starý výkres z backfillu — ten se sám nespouští). */
@@ -174,7 +174,7 @@ export function AnonMenuItems({
       )}
       {a.status !== "skipped" && a.status !== "unsupported" && (
         <DropdownMenuItem onSelect={() => onAction(file, "skip")}>
-          <ShieldOff /> Neanonymizovat (náš výkres)
+          <ShieldOff /> {a.status === "failed" ? "Použít bez anonymizace (originál)" : "Neanonymizovat (náš výkres)"}
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />
@@ -189,7 +189,7 @@ export function ReviewDownloadDialog({ file, onClose, onEdit }: { file: JobFile;
   const empty = file.anon?.total === 0;
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="top-[3%] max-h-[94dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg">
         <div className="space-y-3 p-5">
           <DialogTitle>Výkres je ke kontrole</DialogTitle>
           <p className="text-sm text-muted-foreground">{file.anon?.reason ?? "AI si u tohoto výkresu není jistá."} Před odesláním dodavateli zkontroluj náhled „Po“.</p>
@@ -197,7 +197,7 @@ export function ReviewDownloadDialog({ file, onClose, onEdit }: { file: JobFile;
           {EDITABLE.test(file.filename) && (
             <figure className="overflow-hidden rounded-lg border bg-white">
               {imgOk ? (
-                <img src={previewUrl(file.id, { variant: "anon", v: file.anon?.at ?? null, w: 1200 })} alt="Náhled „Po“ — co dostane dodavatel" className="max-h-[42vh] w-full object-contain" onError={() => setImgOk(false)} data-testid="anon-review-preview" />
+                <img src={previewUrl(file.id, { variant: "anon", v: file.anon?.at ?? null, w: 1200 })} alt="Náhled „Po“ — co dostane dodavatel" className="max-h-[42dvh] w-full object-contain" onError={() => setImgOk(false)} data-testid="anon-review-preview" />
               ) : (
                 <p className="p-4 text-center text-sm text-muted-foreground">Náhled se nepodařilo načíst — otevři ho v editoru.</p>
               )}
@@ -275,7 +275,7 @@ export function SupplierPackButton({ jobId, files, onEdit }: { jobId: string; fi
       </Button>
       {open && (
         <Dialog open onOpenChange={(o) => !busy && setOpen(o)}>
-          <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92vh] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg">
+          <DialogContent aria-describedby={undefined} className="top-[4%] max-h-[92dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-lg">
             <div className="space-y-3 p-5">
               <DialogTitle>Balíček pro kooperanta (ZIP)</DialogTitle>
               <p className="text-sm text-muted-foreground">Jen anonymizované kopie výkresů s anonymními názvy — bez názvu firmy zákazníka. Co nejde přiložit, vypíše CHYBI.txt.</p>
@@ -360,6 +360,9 @@ export function AnonSummaryLine({ file, onRetry, stalled }: { file: JobFile; onR
     return <p className={cn("mt-0.5 text-[11px]", a.status === "failed" ? "text-red-700 dark:text-red-300" : "text-muted-foreground")}>{reason}{retry}</p>;
   }
   if (a.status === "pending" && isBudgetWait(a.status, a.reason)) return <p className="mt-0.5 text-[11px] text-muted-foreground">{a.reason}</p>;
+  // odložený automatický pokus: důvod + kdy pokračuje (systém to udělá sám, nic se neklikat)
+  const wait = retryInMs(a.status, a.lockUntil);
+  if (wait !== null) return <p className="mt-0.5 text-[11px] text-muted-foreground" data-testid="anon-retry-later">{displayReason("failed", a.reason) ?? "Předchozí pokus se nepovedl."} Pokračuje sám {inWords(wait)}.</p>;
   if (a.status !== "done" && a.status !== "review") return null;
   const c = describeCounts(a.counts);
   return (

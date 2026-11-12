@@ -19,6 +19,8 @@ interface SearchEntry {
   href: string;
   keywords: string;
   stage?: JobStage;
+  /** Prémiový zákazník (zakázky, nabídky, zákazníci) — štítek v paletě; hledá se i „premiovy". */
+  premium?: boolean;
   /** Zakázky: čísla jejích nabídek (hledá se i podle nich — i kolegových; hint „nab. …" ukáže paleta). */
   quoteNumbers?: string[];
 }
@@ -64,9 +66,11 @@ export async function GET() {
         hint: [j.customer?.name, j.customerOrderNumber ? `obj. ${j.customerOrderNumber}` : null].filter(Boolean).join(" · "),
         href: `/orders/${j.id}`,
         stage: j.stage,
+        ...(j.customerPremium ? { premium: true } : {}),
         keywords: kw(
           j.number, j.title, j.customer?.name, j.customer?.customerNumber, j.customerOrderNumber,
           j.customerInquiryNumber, j.invoiceNumber, ...j.drawingNumbers, ...(quoteNumbers.get(j.id) ?? []),
+          j.customerPremium ? "premiovy zakaznik" : null,
         ),
         quoteNumbers: quoteNumbers.get(j.id),
       })),
@@ -75,7 +79,8 @@ export async function GET() {
         label: c.name,
         hint: [c.customerNumber, c.ico ? `IČO ${c.ico}` : null, c.city].filter(Boolean).join(" · "),
         href: `/customers/${c.id}`,
-        keywords: kw(c.name, c.customerNumber, c.ico, c.dic, c.city, c.contactPerson, c.email),
+        ...(c.isPremium ? { premium: true } : {}),
+        keywords: kw(c.name, c.customerNumber, c.ico, c.dic, c.city, c.contactPerson, c.email, c.isPremium ? "premiovy zakaznik" : null),
       })),
       suppliers: suppliers.map((s) => ({
         id: s.id,
@@ -90,6 +95,7 @@ export async function GET() {
         hint: [q.customer?.name, q.job?.number].filter(Boolean).join(" · "),
         href: q.job ? `/orders/${q.job.id}` : "/quotes",
         stage: q.job?.stage,
+        ...(q.customer?.isPremium ? { premium: true } : {}),
         keywords: kw(q.number, q.title, q.customer?.name, q.job?.number, q.job?.title, ...q.items.map((it) => it.drawingNumber)),
       })),
       drawings: drawings.map((d) => ({

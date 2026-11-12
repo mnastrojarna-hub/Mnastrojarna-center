@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUrlState } from "@/components/nav/use-url-state";
 import {
   Sparkles, PlusCircle, PencilLine, Paperclip, FileText, MessageCircle, Mail, Send, Loader2, ArrowRight, History,
   ListChecks, UserRound, StickyNote, ShieldCheck, type LucideIcon,
@@ -16,6 +17,7 @@ import { VIA_META, actorKindIcon, actorName, lostReasonLabel, stateMeta, type Fl
 import type { JobEvent } from "@/lib/jobs/types";
 import { cn, relativeTime } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
+import { MailStageHistoryActions } from "@/components/mail/mail-stage-signal";
 import {
   HISTORY_PHASES, autoLabel, dedupeEvents, eventChanges, eventPhase, eventStage, eventStamp, eventTone, isNoteEvent, type HistoryPhase,
 } from "./detail-helpers";
@@ -117,6 +119,8 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
 
         {e.type === "comment" ? (
           <div className="mt-1 whitespace-pre-wrap rounded-lg rounded-tl-none bg-blue-50 px-3 py-2 text-sm dark:bg-blue-500/10">{e.message}</div>
+        ) : mailAction === "mail_stage" ? (
+          <MailStageEventBody e={e} />
         ) : fromMail ? (
           <MailEventBody e={e} />
         ) : noteEvent ? (
@@ -180,6 +184,34 @@ function EventItem({ e, last }: { e: JobEvent; last: boolean }) {
   );
 }
 
+/**
+ * Přepnutí zakázky do speciálního stavu podle e-mailu (9. 11.): text, odkaz na e-mail a — dokud se stav
+ * od té doby nezměnil a přepnutí nikdo nevrátil — „Vrátit" / „Změnit…" (opravu se AI naučí).
+ */
+function MailStageEventBody({ e }: { e: JobEvent }) {
+  const { notify, refresh } = useJobDetail();
+  const d = e.data ?? {};
+  const signalId = typeof d.signalId === "string" ? d.signalId : null;
+  const threadId = typeof d.threadId === "string" ? d.threadId : null;
+  const open = !d.undoneAt;
+  return (
+    <div className="mt-1 space-y-1.5 rounded-lg rounded-tl-none border border-fuchsia-200 bg-fuchsia-50/60 px-3 py-2 text-sm dark:border-fuchsia-500/30 dark:bg-fuchsia-500/10" data-testid="history-mail-stage-event">
+      <p className="break-words">{e.message}</p>
+      {!open && <p className="text-xs text-muted-foreground">Opraveno — přepnutí vráceno.</p>}
+      {signalId && open ? (
+        <MailStageHistoryActions
+          signalId={signalId} threadId={threadId}
+          onDone={(t) => { notify("success", t); refresh(); }} onError={(t) => notify("error", t)}
+        />
+      ) : threadId ? (
+        <a href={`/inbox?vlakno=${encodeURIComponent(threadId)}&detail=1`} className="inline-flex items-center gap-1 text-xs font-medium text-foreground/80 underline-offset-2 hover:underline">
+          <Mail className="h-3 w-3" /> Otevřít e-mail
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 /** Událost „Z e-mailu od …: …" — technická / obchodní informace z pošty k zakázce (Pošta B). */
 function MailEventBody({ e }: { e: JobEvent }) {
   const d = e.data ?? {};
@@ -205,8 +237,12 @@ export function HistoryTab({ events: raw }: { events: JobEvent[] }) {
   const { jobId, notify, refresh } = useJobDetail();
   const [text, setText] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const [filter, setFilter] = React.useState<Filter>("vse");
-  const [person, setPerson] = React.useState("");
+  // filtr fáze a osoby v adrese karty (Zpět / obnovení je zachová)
+  const url = useUrlState({ historie: "vse", kdo: "" }, { remember: false });
+  const filter: Filter = url.values.historie === "vse" || HISTORY_PHASES.some((p) => p.key === url.values.historie) ? (url.values.historie as Filter) : "vse";
+  const setFilter = (f: Filter) => url.set({ historie: f });
+  const person = url.values.kdo;
+  const setPerson = (v: string) => url.set({ kdo: v });
   const personId = React.useId();
 
   const events = React.useMemo(() => dedupeEvents(raw), [raw]);

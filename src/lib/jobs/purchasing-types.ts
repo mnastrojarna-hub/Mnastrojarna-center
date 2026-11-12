@@ -140,7 +140,8 @@ export interface PurchaseReceiptInput {
 /** Řádek přehledu „Objednávky dodavatelům" (s položkami — převzetí jde i z přehledu). */
 export interface PurchaseOrderListItem extends PurchaseOrderView {
   job: { id: string; number: string; title: string; stage: JobStage } | null;
-  customer: { id: string; name: string } | null;
+  /** isPremium = prémiový zákazník zakázky (9. 11.) — štítek „Pozor, prémiový zákazník". */
+  customer: { id: string; name: string; isPremium?: boolean } | null;
   itemCount: number;
   drawingNumbers: string[];
   /** #25: bez práva na nákupní ceny — ceny, volný text, PDF a akce skryté (maskPurchaseOrderListItem). */

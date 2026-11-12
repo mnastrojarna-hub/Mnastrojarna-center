@@ -1,0 +1,738 @@
+# Deutsche Übersetzungen der CAD-Oberfläche – Schlüssel = tschechischer Quelltext (Tab) Übersetzung. Erzeugt src/cad/i18n/de.ts (scripts/cad-i18n-build.mjs).
+# agent-console
+(run, getDocument, setDocument, status, guide). Úplný návod a schéma:	(run, getDocument, setDocument, status, guide). Vollständige Anleitung und Schema:
+. Nic z toho neodesílá data mimo tento prohlížeč.	. Nichts davon sendet Daten aus diesem Browser hinaus.
+Ctrl+Shift+K otevře konzoli kdykoli · Ctrl+Enter provede · příkazy se připojují k otevřenému dokumentu	Strg+Umschalt+K öffnet die Konsole jederzeit · Strg+Enter führt aus · Befehle werden an das geöffnete Dokument angehängt
+Dokument (JSON) zkopírován.	Dokument (JSON) kopiert.
+Kopírovat dokument (JSON)	Dokument kopieren (JSON)
+Kopírovat návod pro AI	Anleitung für KI kopieren
+Kopírovat protokol	Protokoll kopieren
+Kopírování se nezdařilo.	Kopieren fehlgeschlagen.
+Návod pro AI zkopírován – vložte ho agentovi do zadání.	KI-Anleitung kopiert – fügen Sie sie in die Aufgabe des Agenten ein.
+Návod s příkazy, formátem JSON a API pro AI agenty	Anleitung mit Befehlen, JSON-Format und API für KI-Agenten
+Pro skripty je k dispozici	Für Skripte steht bereit
+Prohlížeč nedovolil číst schránku – vložte text do pole (Ctrl+V) a stiskněte Provést.	Der Browser erlaubte das Lesen der Zwischenablage nicht – fügen Sie den Text in das Feld ein (Strg+V) und drücken Sie Ausführen.
+Protokol	Protokoll
+Protokol a stav dokumentu	Protokoll und Dokumentstatus
+Protokol zkopírován.	Protokoll kopiert.
+Provede příkazy (Ctrl+Enter)	Führt die Befehle aus (Strg+Enter)
+Provádím…	Wird ausgeführt…
+Provést	Ausführen
+Příkazy nebo JSON	Befehle oder JSON
+Schránka je prázdná.	Die Zwischenablage ist leer.
+Seznam příkazů	Befehlsliste
+Skrýt seznam příkazů	Befehlsliste ausblenden
+Stav dokumentu	Dokumentstatus
+Textové příkazy nebo JSON	Textbefehle oder JSON
+Textové příkazy – pro AI agenty, automatizaci i rychlé zadání	Textbefehle – für KI-Agenten, Automatisierung und schnelle Eingabe
+Vložit ze schránky a provést	Aus Zwischenablage einfügen und ausführen
+Vloží text ze schránky a hned ho provede	Fügt den Text aus der Zwischenablage ein und führt ihn sofort aus
+Vymazat	Löschen
+Vypíše rozměry, objem a seznam prvků se stavem	Gibt Abmessungen, Volumen und die Feature-Liste mit Status aus
+Zatím nic. Po „Provést“ se tu objeví řádek ✓ / ✗ pro každý příkaz a textový stav dokumentu (rozměry, objem, prvky) – zpětná vazba pro agenta bez obrázku.	Noch nichts. Nach „Ausführen“ erscheint hier für jeden Befehl eine Zeile ✓ / ✗ und der textliche Dokumentstatus (Abmessungen, Volumen, Features) – Rückmeldung für einen Agenten ohne Bild.
+Zavřít	Schließen
+Zkopíruje otevřený dokument jako JSON (.mncad)	Kopiert das geöffnete Dokument als JSON (.mncad)
+# asm-panel
+(střed)	(Mitte)
+Barva	Farbe
+Celkem	Gesamt
+Deska A (pevná)	Platte A (fest)
+Deska B (pohyblivá)	Platte B (beweglich)
+Dutina v desce A (kapsa pro tvarovou vložku)	Kavität in Platte A (Tasche für den Formeinsatz)
+Délka Y	Länge Y
+Export CSV (Excel)	CSV-Export (Excel)
+Jen natočení – normály rovnoběžně	Nur Ausrichtung – Normalen parallel
+Kapsa X	Tasche X
+Kapsa Y	Tasche Y
+Klikněte na plochu této komponenty a pak na plochu jiné komponenty. Vazba se uloží a přepočítá při každém pohybu.	Klicken Sie auf eine Fläche dieser Komponente und dann auf eine Fläche einer anderen Komponente. Die Verknüpfung wird gespeichert und bei jeder Bewegung neu berechnet.
+Klikněte na válcovou plochu díry…	Klicken Sie auf die Zylinderfläche einer Bohrung…
+Kontakt + ztotožnění středů ploch	Kontakt + Flächenmittelpunkte deckungsgleich
+Kotevní deska	Aufspannplatte
+Kruhové	Kreisförmig
+Ks	Stk.
+Lineární	Linear
+Materiál (kusovník)	Werkstoff (Stückliste)
+Materiál desek	Plattenwerkstoff
+Matice	Mutter
+Natočení X / Y / Z [°]	Drehung X / Y / Z [°]
+Osy válcových ploch (čep v díře, šroub v díře)	Achsen von Zylinderflächen (Stift in Bohrung, Schraube in Bohrung)
+Otočit (flip)	Umdrehen (Flip)
+Pole komponenty	Komponentenmuster
+Poloha [mm]	Position [mm]
+Potlačit	Unterdrücken
+Počet	Anzahl
+Přepočítat vazby	Verknüpfungen neu berechnen
+Rovinné plochy pod zadaným úhlem	Ebene Flächen unter vorgegebenem Winkel
+Rovinné plochy proti sobě, v jedné rovině	Ebene Flächen gegenüber, in einer Ebene
+Rovinné plochy rovnoběžně v zadané vzdálenosti	Ebene Flächen parallel im vorgegebenen Abstand
+Rovinné plochy souhlasně v jedné rovině	Ebene Flächen gleichgerichtet in einer Ebene
+Rovnoběžně	Parallel
+Rozbalit podsestavu	Unterbaugruppe aufklappen
+Rozteč	Abstand
+Sestava je prázdná. Na kartě Sestava vložte díl, normálii nebo vygenerujte rám formy.	Die Baugruppe ist leer. Fügen Sie auf der Registerkarte Baugruppe ein Teil oder ein Normteil ein oder erzeugen Sie einen Formaufbau.
+Skrýt	Ausblenden
+Skupina	Gruppe
+Smazat vazbu	Verknüpfung löschen
+Směr	Richtung
+Střed osy	Achsenmitte
+Ukotvená (nepohyblivá)	Fixiert (unbeweglich)
+Upínací desky	Aufspannplatten
+Vazby	Verknüpfungen
+Vazby (trvalé – uloží se do sestavy)	Verknüpfungen (dauerhaft – werden in der Baugruppe gespeichert)
+Velikost rámu (šířka × délka)	Formaufbaugröße (Breite × Länge)
+Vložit šroub ISO 4762 do díry…	Schraube ISO 4762 in Bohrung einfügen…
+Vyberte typ vazby, pak klikněte na plochu této komponenty a na plochu cílové komponenty.	Wählen Sie den Verknüpfungstyp und klicken Sie dann auf eine Fläche dieser Komponente und auf eine Fläche der Zielkomponente.
+Vystředit	Zentrieren
+Vytvořit pole (	Muster erzeugen (
+Vytvořit rám formy	Formaufbau erzeugen
+Vytvoří kompletní dvoudeskový rám: upínací desky, tvarové desky A/B, opěrnou desku, rozpěrky, vyhazovací paket, 4 vodicí sloupky s pouzdry (jeden přesazený proti obrácené montáži), šrouby ISO 4762, vyhazovače a středicí kroužek. Výška formy	Erzeugt einen kompletten Zweiplatten-Formaufbau: Aufspannplatten, Formplatten A/B, Stützplatte, Zwischenleisten, Auswerferpaket, 4 Führungssäulen mit Buchsen (eine versetzt gegen verkehrte Montage), Schrauben ISO 4762, Auswerfer und Zentrierring. Formhöhe
+Výkres sestavy s kusovníkem	Baugruppenzeichnung mit Stückliste
+Výška rozpěrek	Höhe der Zwischenleisten
+Zapnout	Einschalten
+Zobrazit	Anzeigen
+Zrcadlení komponenty	Komponente spiegeln
+Zrcadlit komponentu	Komponente spiegeln
+Zrcadlí se poloha a natočení; geometrie dílu zůstává (přesné pro symetrické díly).	Position und Drehung werden gespiegelt; die Teilegeometrie bleibt (exakt für symmetrische Teile).
+Závit podle průměru díry (ISO 273), délka podle sevřené tloušťky; hlava na straně kliknutí. Přidá se vazba Souosost.	Gewinde nach Bohrungsdurchmesser (ISO 273), Länge nach Klemmlänge; Kopf auf der angeklickten Seite. Eine Verknüpfung Koaxial wird hinzugefügt.
+ks ·	Stk. ·
+Ø vodicích sloupků	Ø Führungssäulen
+Číslo / norma	Nummer / Norm
+Šroubový spoj do díry	Schraubverbindung in Bohrung
+Šířka X	Breite X
+Šířka rozpěrek	Breite der Zwischenleisten
+# cad-app
+ (úroveň {0})	 (Ebene {0})
+! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})	! Zeile {0}: an [{1}; {2}] gibt es keine Körperoberfläche – die Bohrung beginnt am Hüllquader des Körpers ({3})
+.mncad díl nebo STEP/IGES/STL… jako komponenta	.mncad-Teil oder STEP/IGES/STL… als Komponente
+103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.	103 Familien: Schrauben, Lager, Zahnräder, Profile, Formnormalien… Einfach „M8x30“ eingeben.
+24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce	24 Kapitel, Schritt-für-Schritt-Anleitungen, FAQ – öffnet sich in einem neuen Tab
+2D profil na rovině nebo ploše	2D-Profil auf einer Ebene oder Fläche
+3D okno: nedostupné (WebGL)	3D-Ansicht: nicht verfügbar (WebGL)
+3D tisk	3D-Druck
+3D tisk s jednotkami	3D-Druck mit Einheiten
+Aktivní dokument – název lze přepsat	Aktives Dokument – der Name kann geändert werden
+Analýza	Analyse
+Barva komponenty	Komponentenfarbe
+Barva plochy	Flächenfarbe
+Barva tělesa	Körperfarbe
+Bez kolizí ✓	Keine Kollisionen ✓
+Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu	Keine Kollisionen ✓ – das Ergebnis steht im Kollisionsfenster und im Dokumentstatus
+Bílý (tisk)	Weiß (Druck)
+CAD jádro se nepodařilo načíst. Zkuste prosím aktuální Chrome, Edge, Firefox nebo Safari.	Der CAD-Kern konnte nicht geladen werden. Bitte versuchen Sie ein aktuelles Chrome, Edge, Firefox oder Safari.
+Celá dokumentace jako PDF k tisku a offline čtení.	Die gesamte Dokumentation als PDF zum Drucken und Offline-Lesen.
+Chladicí kanály vyvrtány do dílu (prvky Kanál/Propojka v historii).	Kühlkanäle in das Teil gebohrt (Features Kanal/Verbindung in der Historie).
+Diagnostika zkopírována do schránky – vložte ji do e-mailu pro podporu.	Diagnose in die Zwischenablage kopiert – fügen Sie sie in eine E-Mail an den Support ein.
+Dobrý den,\n\nposílám model z Mnástrojárna CAD – soubor {0} jsem si stáhl do počítače a přikládám ho.\n\nMnožství:\nMateriál:\nTermín:\n\nS pozdravem\n	Guten Tag,\n\nich sende ein Modell aus Mnástrojárna CAD – die Datei {0} habe ich heruntergeladen und füge sie bei.\n\nStückzahl:\nWerkstoff:\nTermin:\n\nMit freundlichen Grüßen\n
+Dokončit skicu	Skizze beenden
+Dokumentace	Dokumentation
+Dokumentace a návod	Dokumentation und Anleitung
+Dokumentace a návod k obsluze (web)	Dokumentation und Bedienungsanleitung (Web)
+Dokumentace a návod k obsluze (web)…	Dokumentation und Bedienungsanleitung (Web)…
+Drátový	Drahtmodell
+Duplikovat (+ posun X)	Duplizieren (+ Versatz X)
+Díl zadaný textem nebo JSON – pro AI agenty, automatizaci i rychlé modelování.	Ein per Text oder JSON eingegebenes Teil – für KI-Agenten, Automatisierung und schnelles Modellieren.
+Díl {0} vložen do sestavy.	Teil {0} in die Baugruppe eingefügt.
+Díly	Teile
+Entita skici	Skizzenelement
+Export	Export
+Export 3D	3D-Export
+Export {0} hotov: {1} ({2})	{0}-Export fertig: {1} ({2})
+Export {0} zrušen.	{0}-Export abgebrochen.
+Filtr	Filter
+Filtr výběru	Auswahlfilter
+Filtr výběru (co se vybírá kliknutím)	Auswahlfilter (was ein Klick auswählt)
+Formařské nástroje	Formenbau-Werkzeuge
+Formy	Formen
+Formát .{0} nelze otevřít přímo	Das Format .{0} kann nicht direkt geöffnet werden
+Grafit	Graphit
+Heslo sdíleného dokumentu	Passwort des geteilten Dokuments
+Hliník	Aluminium
+Hmotnostní vlastnosti	Masseeigenschaften
+Horní	Oben
+Hotovo	Fertig
+Hranu ani bod nelze smazat samostatně – vyberte plochu (Odstranit plochu) nebo prvek v historii.	Eine Kante oder ein Punkt kann nicht einzeln gelöscht werden – wählen Sie eine Fläche (Fläche entfernen) oder ein Feature in der Historie.
+Hustota	Dichte
+Importovaný soubor nelze upravovat historií – lze jen umístit.	Eine importierte Datei kann nicht über die Historie bearbeitet werden – sie kann nur positioniert werden.
+Izolovat (skrýt ostatní)	Isolieren (andere ausblenden)
+Izometrie	Isometrie
+Jen poprvé – poté se načítá z mezipaměti.	Nur beim ersten Mal – danach wird aus dem Cache geladen.
+Jádro se nenačetlo	Der Kern wurde nicht geladen
+Kamera	Kamera
+Klikněte na bod, hranu, plochu nebo těleso. Druhá entita změří vzdálenost a úhel mezi nimi.	Klicken Sie auf einen Punkt, eine Kante, eine Fläche oder einen Körper. Ein zweites Element misst Abstand und Winkel dazwischen.
+Klikněte na rovinnou plochu modelu.	Klicken Sie auf eine ebene Fläche des Modells.
+Klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu).	Klicken Sie auf die Zylinderfläche einer Bohrung (angeklickte Seite = Schraubenkopf).
+Klikněte na válcovou plochu díry.	Klicken Sie auf die Zylinderfläche einer Bohrung.
+Klávesové zkratky a ovládání	Tastenkürzel und Bedienung
+Klávesové zkratky a ovládání myší	Tastenkürzel und Mausbedienung
+Knihovna	Bibliothek
+Knihovna normálií	Normteilbibliothek
+Knihovna normálií (šrouby, ložiska, ozubená kola, profily…)	Normteilbibliothek (Schrauben, Lager, Zahnräder, Profile…)
+Knihovna normálií…	Normteilbibliothek…
+Kolize	Kollisionen
+Kolize ({0})	Kollisionen ({0})
+Kompletní návod k obsluze: 24 kapitol, postupy, FAQ (otevře se v nové záložce).	Vollständige Bedienungsanleitung: 24 Kapitel, Vorgehensweisen, FAQ (öffnet sich in einem neuen Tab).
+Komponenta je ukotvená – nejdřív ji uvolněte.	Die Komponente ist fixiert – lösen Sie sie zuerst.
+Komponenta zrcadlena (poloha a natočení; geometrie dílu se nezrcadlí).	Komponente gespiegelt (Position und Drehung; die Teilegeometrie wird nicht gespiegelt).
+Komponenta ·	Komponente ·
+Komponenta · {0}	Komponente · {0}
+Konstrukční prvky	Konstruktionselemente
+Kontakt	Kontakt
+Kontroluji kolize…	Kollisionen werden geprüft…
+Kopírovat výsledky	Ergebnisse kopieren
+Koule	Kugel
+Kusovník	Stückliste
+Kusovník – {0}	Stückliste – {0}
+Kužel	Kegel
+Kvádr	Quader
+Křivost min {0} · max {1} 1/mm (plná barva při ±{2})	Krümmung min {0} · max {1} 1/mm (volle Farbe bei ±{2})
+Levý	Links
+Litina	Gusseisen
+Max. bod	Max. Punkt
+Mazání	Löschen
+Min. bod	Min. Punkt
+Mnástrojárna	Mnástrojárna
+Model importován – můžete na něj navázat dalšími prvky.	Modell importiert – Sie können mit weiteren Features fortfahren.
+Modrošedý přechod	Blaugrauer Verlauf
+Modrá	Blau
+Mosaz	Messing
+Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.	Maus wie ZW3D/SolidWorks, Einheiten, Tastenkürzel, Zeichnungen.
+Měření	Messen
+Měřit	Messen
+Měřit délku / odsud	Länge messen / von hier
+Měřit odsud	Von hier messen
+Mřížka a osy	Raster und Achsen
+Na rovinné ploše modelu…	Auf einer ebenen Fläche des Modells…
+Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…	Schreiben Sie, was Sie tun möchten – „Bohrung“, „Zeichnung“, „Verrunden“…
+Nastavení	Einstellungen
+Nastavení (Ctrl+,)	Einstellungen (Strg+,)
+Nastavení…	Einstellungen…
+Načítám CAD jádro OpenCascade	CAD-Kern OpenCascade wird geladen
+Načítám jádro OpenCascade…	OpenCascade-Kern wird geladen…
+Načítám {0}…	{0} wird geladen…
+Nejdřív klikněte na plochu vybrané (pohyblivé) komponenty.	Klicken Sie zuerst auf eine Fläche der gewählten (beweglichen) Komponente.
+Nejdřív nakreslete skicu (profil).	Zeichnen Sie zuerst eine Skizze (Profil).
+Nejtenčí stěna ≈ {0} mm · průměr {1} mm · pod limitem {2} % vzorků	Dünnste Wand ≈ {0} mm · Durchschnitt {1} mm · {2} % der Proben unter dem Grenzwert
+Není co smazat – vyberte prvek v historii, plochu nebo komponentu a stiskněte Delete.	Nichts zu löschen – wählen Sie ein Feature in der Historie, eine Fläche oder eine Komponente und drücken Sie Entf.
+Není těleso k přesunutí.	Es gibt keinen Körper zum Verschieben.
+Neprůhledné	Undurchsichtig
+Neznámý formát „{0}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.	Unbekanntes Format „{0}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.
+Normálie	Normteile
+Nová prázdná sestava	Neue leere Baugruppe
+Nová sestava	Neue Baugruppe
+Nová skica na ploše	Neue Skizze auf Fläche
+Nová záložka	Neuer Tab
+Nové měření	Neue Messung
+Nový díl	Neues Teil
+Nový díl v nové záložce	Neues Teil in neuem Tab
+Nový výkres	Neue Zeichnung
+Nápověda	Hilfe
+Nápověda: dokumentace a návod k obsluze, příručka PDF, klávesové zkratky	Hilfe: Dokumentation und Bedienungsanleitung, PDF-Handbuch, Tastenkürzel
+Název dokumentu	Dokumentname
+OCCT · {0}	OCCT · {0}
+OK (Enter)	OK (Enter)
+OK – potvrdit prvek	OK – Feature bestätigen
+Objem	Volumen
+Ocel	Stahl
+Odebrat	Entfernen
+Odebrat ze sestavy	Aus Baugruppe entfernen
+Odebrat {0} komponent ze sestavy?	{0} Komponenten aus der Baugruppe entfernen?
+Odsadit plochu	Fläche versetzen
+Odsazené a odvozené roviny	Versetzte und abgeleitete Ebenen
+Odsazení od plochy (mm, kladně ve směru normály plochy)	Versatz von der Fläche (mm, positiv in Richtung der Flächennormale)
+Odsazení roviny {0} (mm, kladně ve směru normály)	Versatz der Ebene {0} (mm, positiv in Normalenrichtung)
+Odstranit plochu	Fläche entfernen
+OpenCascade BREP (.brep)	OpenCascade BREP (.brep)
+Otevřen sdílený dokument „{0}“{1}.	Geteiltes Dokument „{0}“ geöffnet{1}.
+Otevřeno: {0}	Geöffnet: {0}
+Otevřené dokumenty	Geöffnete Dokumente
+Otevřete díl nebo sestavu (.mncad, STEP…) a rovnou vznikne výkres s pohledy a razítkem.	Öffnen Sie ein Teil oder eine Baugruppe (.mncad, STEP…) – es entsteht sofort eine Zeichnung mit Ansichten und Schriftfeld.
+Otevřít	Öffnen
+Otevřít / Import	Öffnen / Import
+Otevřít / importovat	Öffnen / importieren
+Otevřít / importovat (Ctrl+O)	Öffnen / importieren (Strg+O)
+Otevřít / importovat…	Öffnen / importieren…
+Otevřít podsestavu	Unterbaugruppe öffnen
+Otevřít vybranou	Ausgewählte öffnen
+Otočení (15°)	Drehung (15°)
+Otočení kolem obecné osy nelze uložit – otáčejte po jednom oblouku.	Eine Drehung um eine beliebige Achse kann nicht gespeichert werden – drehen Sie jeweils um einen Bogen.
+Otočit stranu	Seite umdrehen
+Otáčení: levé · Posun: pravé	Drehen: links · Verschieben: rechts
+Otáčení: pravé tl. · Posun: prostřední	Drehen: rechte Taste · Verschieben: Mitte
+Otáčení: prostřední · Posun: Ctrl+prostřední	Drehen: Mitte · Verschieben: Strg+Mitte
+Ovládání	Bedienung
+Ovládání a zkratky	Bedienung und Tastenkürzel
+Ovládání myši	Mausbedienung
+Označení materiálu (razítko)	Werkstoffbezeichnung (Schriftfeld)
+Paleta příkazů	Befehlspalette
+Paleta příkazů (Ctrl+K)	Befehlspalette (Strg+K)
+Parametrizace	Parametrisierung
+Perspektiva	Perspektive
+Plocha {0} {1}{2} mm	Fläche {0} {1}{2} mm
+Plochu se nepodařilo načíst.	Die Fläche konnte nicht geladen werden.
+Plochy nejsou rovnoběžné – založena půlicí rovina.	Die Flächen sind nicht parallel – eine Halbierungsebene wurde erstellt.
+Podsestava	Unterbaugruppe
+Podsestava {0}	Unterbaugruppe {0}
+Podsestava · {0}	Unterbaugruppe · {0}
+Pohledy	Ansichten
+Pole	Muster
+Pole opakuje existující prvek – nejdřív vytvořte díru nebo vysunutí.	Ein Muster wiederholt ein vorhandenes Feature – erzeugen Sie zuerst eine Bohrung oder eine Extrusion.
+Pole: {0} komponent.	Muster: {0} Komponenten.
+Poloha	Position
+Pomocné roviny	Bezugsebenen
+Popisky pro výběr myší (F1 / E2 / V3) – {0}	Auswahlbeschriftungen für die Maus (F1 / E2 / V3) – {0}
+Poptat	Anfragen
+Poptat výrobu (STEP + e-mail)	Fertigung anfragen (STEP + E-Mail)
+Posun (1 mm)	Verschieben (1 mm)
+Povrch	Oberfläche
+Pozadí	Hintergrund
+Pravoúhlá	Orthogonal
+Pravý	Rechts
+Primitiva	Grundkörper
+Program	Programm
+Proměnné	Variablen
+Proměnné najdete v levém panelu – záložka Proměnné.	Die Variablen finden Sie im linken Bereich – Registerkarte Variablen.
+Provést příkaz: {0}	Befehl ausführen: {0}
+Pružina	Feder
+Prázdná sestava: komponenty, vazby, podsestavy, kusovník.	Leere Baugruppe: Komponenten, Verknüpfungen, Unterbaugruppen, Stückliste.
+Prázdný díl: skica → vysunutí → prvky. Parametrická historie.	Leeres Teil: Skizze → Extrusion → Features. Parametrische Historie.
+Prázdný model	Leeres Modell
+Průhledné	Transparent
+Průhledný	Transparent
+Pusťte soubor – otevře se v nové záložce CADu	Datei loslassen – sie öffnet sich in einem neuen CAD-Tab
+Přední	Vorne
+Přepnout na: {0}	Wechseln zu: {0}
+Přepočítávám…	Wird neu berechnet…
+Přesun	Verschieben
+Přesun komponenty	Komponente verschieben
+Přesun tělesa	Körper verschieben
+Přesunout / otočit	Verschieben / drehen
+Přesunout / otočit (gizmo)	Verschieben / drehen (Gizmo)
+Přetažený obsah neobsahuje soubor – u Outlooku přetáhněte přílohu, ne text zprávy; případně ji nejdřív uložte na plochu.	Der abgelegte Inhalt enthält keine Datei – ziehen Sie in Outlook den Anhang, nicht den Nachrichtentext; oder speichern Sie ihn zuerst auf dem Desktop.
+Připravuji {0}…	{0} wird vorbereitet…
+Připravuji {0}… {1} s – složitá geometrie; prvky s ⚠ (neplatná geometrie) export výrazně zpomalují	{0} wird vorbereitet… {1} s – komplexe Geometrie; Features mit ⚠ (ungültige Geometrie) verlangsamen den Export erheblich
+Přizpůsobit	Einpassen
+Přímé úpravy	Direkte Bearbeitung
+Přímé úpravy ploch se dělají v dílu – otevřete ho (Upravit díl).	Direkte Flächenbearbeitungen erfolgen im Teil – öffnen Sie es (Teil bearbeiten).
+Příručka PDF	PDF-Handbuch
+Příručka PDF – stáhnout	PDF-Handbuch – herunterladen
+Půlicí rovina	Halbierungsebene
+Reference	Referenz
+Rotovat	Drehen
+Rovina 3 body	Ebene durch 3 Punkte
+Rovina XY (půdorys)	Ebene XY (Draufsicht)
+Rovina XZ (nárys)	Ebene XZ (Vorderansicht)
+Rovina YZ (bokorys)	Ebene YZ (Seitenansicht)
+Rovnoběžně s vybranou plochou…	Parallel zur gewählten Fläche…
+Rozložení	Explosion
+Rozložený pohled	Explosionsansicht
+Rozložit	Explodieren
+Rozměry (X × Y × Z)	Abmessungen (X × Y × Z)
+Rozpustit podsestavu	Unterbaugruppe auflösen
+Rozpustit vybranou	Ausgewählte auflösen
+Rozříznout	Trennen
+Rám formy	Formaufbau
+Rám formy {0}×{1}	Formaufbau {0}×{1}
+Rám vstřikovací formy	Spritzgieß-Formaufbau
+Rám vstřikovací formy…	Spritzgieß-Formaufbau…
+STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad	STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad
+STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad	STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad
+STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad · u nativních formátů (Parasolid, SolidWorks…) poradíme převod	STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad · bei nativen Formaten (Parasolid, SolidWorks…) beraten wir zur Konvertierung
+STL (.stl)	STL (.stl)
+Sdílený dokument	Geteiltes Dokument
+Sdílený dokument je chráněný heslem	Das geteilte Dokument ist passwortgeschützt
+Sdílený odkaz nelze otevřít	Der geteilte Link kann nicht geöffnet werden
+Sdílet	Teilen
+Sdílet odkazem (WhatsApp, e-mail, Teams…)	Per Link teilen (WhatsApp, E-Mail, Teams…)
+Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči	Per Link teilen (WhatsApp, E-Mail, Teams…) – der Empfänger öffnet das Teil im Browser
+Sdílet odkazem…	Per Link teilen…
+Sestava	Baugruppe
+Sestava z aktuálního dílu	Baugruppe aus dem aktuellen Teil
+Sestava – {0}	Baugruppe – {0}
+Sestavy	Baugruppen
+Seznam otevřených dokumentů	Liste der geöffneten Dokumente
+Skica ·	Skizze ·
+Skicu lze založit jen na rovinné ploše.	Eine Skizze kann nur auf einer ebenen Fläche angelegt werden.
+Skořepina	Schale
+Skořepina (otevřít plochu)	Schale (Fläche öffnen)
+Skrýt těleso	Körper ausblenden
+Složit	Zusammenklappen
+Smazat	Löschen
+Smazat celé těleso, tj. všechny prvky v historii dílu?	Den gesamten Körper löschen, d. h. alle Features in der Teilehistorie?
+Smazat entitu	Element löschen
+Smazat prvek	Feature löschen
+Smazat prvek „{0}“?	Feature „{0}“ löschen?
+Smazat {0} prvků z historie?	{0} Features aus der Historie löschen?
+Smrštění {0} % přidáno do historie jako měřítko.	Schwindung {0} % als Skalierung zur Historie hinzugefügt.
+SolidWorks – prostřední otáčí, Ctrl+prostř. posouvá	SolidWorks – Mitte dreht, Strg+Mitte verschiebt
+Soubor	Datei
+Soubor není platný projekt Mnástrojárna CAD.	Die Datei ist kein gültiges Mnástrojárna-CAD-Projekt.
+Soubor se nepodařilo načíst.	Die Datei konnte nicht geladen werden.
+Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.	Die Datei ist nicht mehr im Browserspeicher – öffnen Sie sie aus der .mncad-Datei.
+Soubor vložen jako komponenta sestavy.	Datei als Baugruppenkomponente eingefügt.
+Souosost potřebuje válcovou nebo kuželovou plochu (díra, čep, šroub).	Koaxial braucht eine Zylinder- oder Kegelfläche (Bohrung, Stift, Schraube).
+Souř. systém	Koord.-System
+Souřadnice {0}	Koordinaten {0}
+Spodní	Unten
+Správce historie	Historien-Manager
+Srazit	Fasen
+Srazit hranu	Kante fasen
+Stavy (konfigurace) najdete v levém panelu – záložka Stavy.	Konfigurationen finden Sie im linken Bereich – Registerkarte Konfigurationen.
+Stavy dílu	Teilkonfigurationen
+Stavím komponenty…	Komponenten werden aufgebaut…
+Stavím rám formy…	Formaufbau wird aufgebaut…
+Storno	Abbrechen
+Storno (Esc)	Abbrechen (Esc)
+Styl	Stil
+Styl zobrazení	Darstellungsstil
+Stínovaný s hranami	Schattiert mit Kanten
+Středicí kroužek	Zentrierring
+Střední rovina mezi 2 plochami	Mittelebene zwischen 2 Flächen
+Světlý	Hell
+Tato vazba potřebuje rovinnou plochu.	Diese Verknüpfung braucht eine ebene Fläche.
+Tažení potřebuje dvě skici: profil a dráhu.	Austragen braucht zwei Skizzen: Profil und Pfad.
+Textové příkazy (AI)	Textbefehle (KI)
+Textové příkazy – pro AI agenty a automatizaci	Textbefehle – für KI-Agenten und Automatisierung
+Textové příkazy – pro AI agenty i rychlé zadání	Textbefehle – für KI-Agenten und schnelle Eingabe
+Teď klikněte na plochu cílové komponenty.	Klicken Sie jetzt auf eine Fläche der Zielkomponente.
+Teď klikněte na plochu jiné komponenty.	Klicken Sie jetzt auf eine Fläche einer anderen Komponente.
+Topologie	Topologie
+Touchpad – levé otáčí, pravé posouvá	Touchpad – links dreht, rechts verschiebt
+Tuto entitu nelze použít – vyberte 	Dieses Element kann nicht verwendet werden – wählen Sie
+Táhněte šipkami (posun, krok 1 mm) nebo oblouky (otočení, krok 15°). R přepne posun/otočení.	Ziehen Sie an den Pfeilen (Verschieben, Schritt 1 mm) oder Bögen (Drehen, Schritt 15°). R schaltet Verschieben/Drehen um.
+Třemi body (3 vybrané vrcholy)	Durch drei Punkte (3 gewählte Eckpunkte)
+Ukládám model STEP a otevírám e-mail…	STEP-Modell wird gespeichert und E-Mail geöffnet…
+Ukončit měření	Messung beenden
+Ukotvit	Fixieren
+Ukázkové díly	Beispielteile
+Ukázky	Beispiele
+Uloženo: {0}	Gespeichert: {0}
+Uložit díl (.mncad)	Teil speichern (.mncad)
+Uložit jako…	Speichern unter…
+Uložit kopii…	Kopie speichern…
+Uložit projekt	Projekt speichern
+Uložit projekt (.mncad)	Projekt speichern (.mncad)
+Uložit projekt (Ctrl+S)	Projekt speichern (Strg+S)
+Upravit díl	Teil bearbeiten
+Upravit díl (v kontextu)	Teil bearbeiten (im Kontext)
+Uvolnit	Lösen
+V sestavě se prvky nepřidávají – otevřete díl (pravé tlačítko → Upravit díl).	In einer Baugruppe werden keine Features hinzugefügt – öffnen Sie das Teil (Rechtsklick → Teil bearbeiten).
+VRML (.wrl)	VRML (.wrl)
+Vazba Kontakt…	Verknüpfung Kontakt…
+Vazba uložena – přepočítá se při každém pohybu komponent.	Verknüpfung gespeichert – sie wird bei jeder Bewegung der Komponenten neu berechnet.
+Vedení	Führungen
+Vlastnosti	Eigenschaften
+Vložen šroub {0}×{1}{2}{3} – vazba Souosost.	Schraube {0}×{1}{2}{3} eingefügt – Verknüpfung Koaxial.
+Vložit	Einfügen
+Vložit díl / model	Teil / Modell einfügen
+Vodicí pouzdro	Führungsbuchse
+Vodicí sloupek	Führungssäule
+Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše	Freitext für das Schriftfeld der Zeichnung, z. B. ČSN 11 423 oder 1.0503 – die Dichte stammt aus der Werkstoffklasse oben
+Vyberte dvě rovinné plochy.	Wählen Sie zwei ebene Flächen.
+Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu).	Wählen Sie die zu entfernende Komponente (Klick in der 3D-Ansicht oder im Baum).
+Vyberte komponenty (filtr Komponenta, Ctrl+klik).	Wählen Sie Komponenten (Filter Komponente, Strg+Klick).
+Vyberte plochu (filtr Plocha) a zopakujte příkaz.	Wählen Sie eine Fläche (Filter Fläche) und wiederholen Sie den Befehl.
+Vyberte plochu.	Wählen Sie eine Fläche.
+Vyberte rovinnou plochu.	Wählen Sie eine ebene Fläche.
+Vyberte vrchol (filtr Bod).	Wählen Sie einen Eckpunkt (Filter Punkt).
+Vybráno	Ausgewählt
+Vyhazovač	Auswerfer
+Vyhazování	Auswerfen
+Vysunout	Extrudieren
+Vytvořit podsestavu z vybraných ({0})	Unterbaugruppe aus Auswahl erzeugen ({0})
+Vytvořit z vybraných (Ctrl+klik)	Aus Auswahl erzeugen (Strg+Klick)
+Vytáhnout / Zatlačit	Ziehen / Drücken
+Vzhled	Darstellung
+Výchozí barva	Standardfarbe
+Výkres PDF / DXF / DWG…	Zeichnung PDF / DXF / DWG…
+Výkres načten jako skica ({0} entit).	Zeichnung als Skizze geladen ({0} Elemente).
+Výkres – {0}	Zeichnung – {0}
+Výkresová dokumentace	Zeichnungsdokumentation
+Výsledné těleso není platné (sebeprotínající plochy) nebo nemá žádný solid – export STEP může selhat. Opravte prvek označený ⚠ v historii.	Der resultierende Körper ist ungültig (selbstdurchdringende Flächen) oder hat keinen Volumenkörper – der STEP-Export kann fehlschlagen. Korrigieren Sie das mit ⚠ markierte Feature in der Historie.
+Wavefront OBJ (.obj)	Wavefront OBJ (.obj)
+WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní	WhatsApp, E-Mail, Teams – der Empfänger öffnet das Teil im Browser, gültig z. B. 10 Tage
+XY s odsazením…	XY mit Versatz…
+XZ s odsazením…	XZ mit Versatz…
+YZ s odsazením…	YZ mit Versatz…
+ZW3D – pravé otáčí, prostřední posouvá	ZW3D – rechts dreht, Mitte verschiebt
+ZW3D, SolidWorks, Inventor, CATIA, Creo, CAM	ZW3D, SolidWorks, Inventor, CATIA, Creo, CAM
+Zadejte heslo, které vám odesílatel poslal zvlášť (SMS, telefon…).	Geben Sie das Passwort ein, das Ihnen der Absender separat geschickt hat (SMS, Telefon…).
+Zadní	Hinten
+Zaoblení se dělá v dílu – otevřete ho (Upravit díl).	Verrundungen werden im Teil erstellt – öffnen Sie es (Teil bearbeiten).
+Zaoblit	Verrunden
+Zaoblit hranu	Kante verrunden
+Zarovnat	Ausrichten
+Zavřít záložku (prostřední tlačítko)	Tab schließen (mittlere Taste)
+Zavřít {0}	{0} schließen
+Zavřít: {0}	Schließen: {0}
+Zesílit	Verdicken
+Zkopírovat diagnostiku (bez dat dokumentu)	Diagnose kopieren (ohne Dokumentdaten)
+Zkopírováno do schránky.	In die Zwischenablage kopiert.
+Znovu (Ctrl+Y)	Wiederholen (Strg+Y)
+Zobrazení	Ansicht
+Zobrazit těleso	Körper anzeigen
+Zobrazit vše	Alles anzeigen
+Zpět (Ctrl+Z)	Rückgängig (Strg+Z)
+Zpět na web mnastrojarna.cz	Zurück zur Website mnastrojarna.cz
+Zrcadlit	Spiegeln
+Zrušit	Abbrechen
+Zrušit výběr ({0})	Auswahl aufheben ({0})
+Zrušit řez	Schnitt aufheben
+Základní editace	Grundbearbeitung
+analýza úkosů, smrštění, dělicí rovina, vyhazovače, chlazení	Entformungsschrägen-Analyse, Schwindung, Trennebene, Auswerfer, Kühlung
+bez objemového tělesa	ohne Volumenkörper
+bez omezení platnosti	ohne Ablauf
+bod, hranu nebo plochu	einen Punkt, eine Kante oder eine Fläche
+entit · Ctrl/Shift+klik přidá/odebere	Elemente · Strg/Umschalt+Klick fügt hinzu/entfernt
+filtr výběru Bod → vyberte 3 vrcholy	Auswahlfilter Punkt → 3 Eckpunkte wählen
+g/cm³)	g/cm³)
+gizmo – posun 1 mm, otočení 15°	Gizmo – Verschieben 1 mm, Drehen 15°
+gravírování / reliéf	Gravur / Relief
+informace o vybrané entitě	Informationen zum gewählten Element
+kolize: otevřený dokument není sestava	Kollisionen: das geöffnete Dokument ist keine Baugruppe
+kompletní příručka k tisku a offline čtení	vollständiges Handbuch zum Drucken und Offline-Lesen
+kompletní rám vstřikovací formy	kompletter Spritzgieß-Formaufbau
+komponent ·	Komponenten ·
+kontrola průniků komponent	Prüfung der Durchdringungen von Komponenten
+kvádr 100 60 20 · díra 8,5 skrz v 20 30 · zaoblit 2 hrany svislé · JSON dokumentu · window.mncad	box 100 60 20 · hole 8.5 through at 20 30 · fillet 2 edges vertical · Dokument-JSON · window.mncad
+mm ·	mm ·
+napište název příkazu („díra“, „výkres“, „zaoblit“…)	Befehlsnamen eingeben („Bohrung“, „Zeichnung“, „Verrunden“…)
+nejdřív vyberte 1 rovinnou plochu	wählen Sie zuerst 1 ebene Fläche
+nejdřív vyberte 2 plochy	wählen Sie zuerst 2 Flächen
+není těleso, na jehož povrch by se prvek umístil – zadejte i souřadnici z	es gibt keinen Körper, auf dessen Oberfläche das Feature platziert werden könnte – geben Sie auch die z-Koordinate ein
+není žádná skica – nejdřív „skica XY: …“	es gibt keine Skizze – zuerst „skica XY: …“
+není žádný prvek, na který by se pole / zrcadlení vztahovalo	es gibt kein Feature, auf das sich das Muster / die Spiegelung beziehen könnte
+neplatná geometrie	ungültige Geometrie
+nový soubor / jiné místo	neue Datei / anderer Ort
+objem, plocha, hmotnost	Volumen, Fläche, Masse
+odebere vybrané komponenty ze sestavy	entfernt die gewählten Komponenten aus der Baugruppe
+odebere zaoblení, díry… a zacelí těleso	entfernt Verrundungen, Bohrungen… und schließt den Körper
+otevře se v nové záložce: pohledy, řezy, kóty, razítko → PDF/DXF/DWG/SVG	öffnet sich in einem neuen Tab: Ansichten, Schnitte, Bemaßung, Schriftfeld → PDF/DXF/DWG/SVG
+platí do {0}	gültig bis {0}
+položek kusovníku	Stücklistenpositionen
+pomocná osa – hrana, válec, 2 body, průsečnice rovin…	Bezugsachse – Kante, Zylinder, 2 Punkte, Schnittlinie von Ebenen…
+pomocná rovina – 12 způsobů zadání	Bezugsebene – 12 Definitionsarten
+pomocný bod – vrchol, střed, průsečík, odsazení…	Bezugspunkt – Eckpunkt, Mitte, Schnittpunkt, Versatz…
+posun vybraných ploch	Verschieben der gewählten Flächen
+pravidlo výběru podporují zaoblení, sražení a skořepina	Auswahlregeln unterstützen Verrundung, Fase und Schale
+pravoúhlá	orthogonal
+profil po dráze	Profil entlang eines Pfads
+prvek s chybou	Feature mit Fehler
+prvek s upozorněním	Feature mit Hinweis
+prvky s upozorněním	Features mit Hinweis
+přechod mezi profily	Übergang zwischen Profilen
+přesná geometrie OCCT	exakte OCCT-Geometrie
+smaže upravovaný / vybraný prvek, vybranou plochu (Odstranit plochu) nebo celé těleso	löscht das bearbeitete / gewählte Feature, die gewählte Fläche (Fläche entfernen) oder den gesamten Körper
+souřadný systém z bodu a směrů	Koordinatensystem aus Punkt und Richtungen
+starší prohlížeče	ältere Browser
+textový příkaz (Nápověda → Textové příkazy)	Textbefehl (Hilfe → Textbefehle)
+v sestavě „	in Baugruppe „
+verze programu, prohlížeč, WebGL, jádro, chyba – pro e-mail podpoře	Programmversion, Browser, WebGL, Kern, Fehler – für eine E-Mail an den Support
+vrtaná, zahloubená, se závitem	gebohrt, gesenkt, mit Gewinde
+vybráno	ausgewählt
+vzdálenost, úhel, poloměr mezi body, hranami, plochami	Abstand, Winkel, Radius zwischen Punkten, Kanten, Flächen
+výrobu	Fertigung
+web, AR, prezentace	Web, AR, Präsentation
+z otevřené skici	aus der offenen Skizze
+zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	fragt nach Ort und Namen; weitere Strg+S speichern in dieselbe Datei
+{0} děr pro vyhazovače přidáno do historie.	{0} Auswerferbohrungen zur Historie hinzugefügt.
+{0} otevřen jako nový díl.	{0} als neues Teil geöffnet.
+{0} vložen do sestavy.	{0} in die Baugruppe eingefügt.
+· Y	· Y
+· Z	· Z
+· snímek – vaše úpravy se odesílateli nepromítnou	· Momentaufnahme – Ihre Änderungen gelangen nicht zum Absender zurück
+· zkontrolováno	· geprüft
+Ø{0} × 150	Ø{0} × 150
+Ø{0} × {1}	Ø{0} × {1}
+Úprava dílu	Teil wird bearbeitet
+Úprava podsestavy	Unterbaugruppe wird bearbeitet
+Úpravy	Bearbeiten
+Úvodní obrazovka	Startbildschirm
+Černá	Schwarz
+Červená	Rot
+Řez	Schnitt
+Řez modelem	Schnittansicht
+Šablonovat	Ausformen
+Šablonování potřebuje alespoň dvě skici v různých rovinách.	Ausformung braucht mindestens zwei Skizzen in verschiedenen Ebenen.
+Šroub ISO 4762	Schraube ISO 4762
+šroubovice s průřezem	Schraubenlinie mit Querschnitt
+šrouby, ložiska, ozubená kola, profily… – stačí napsat	Schrauben, Lager, Zahnräder, Profile… – einfach eingeben
+šrouby, ložiska, ozubená kola, profily… – stačí napsat „M8x30“	Schrauben, Lager, Zahnräder, Profile… – einfach „M8x30“ eingeben
+štítky na plochách, hranách a vrcholech: klik na štítek = klik na entitu; pro AI agenty, automatizaci a dotyk	Beschriftungen auf Flächen, Kanten und Eckpunkten: Klick auf die Beschriftung = Klick auf das Element; für KI-Agenten, Automatisierung und Touch
+Žebro	Rippe
+Žlutá	Gelb
+Žádný průnik komponent	Keine Durchdringung von Komponenten
+žádná hrana neodpovídá pravidlu „{0}“ (hran celkem {1})	keine Kante entspricht der Regel „{0}“ (insgesamt {1} Kanten)
+žádná plocha neodpovídá pravidlu „{0}“ (ploch celkem {1})	keine Fläche entspricht der Regel „{0}“ (insgesamt {1} Flächen)
+žádné těleso – nejdřív vytvořte tvar (kvádr, vysunutí…)	kein Körper – erzeugen Sie zuerst eine Form (Quader, Extrusion…)
+← Zpět do sestavy	← Zurück zur Baugruppe
+→ {0} (shell) – otevřeno ploch: {1} – výsledek po výpočtu níže	→ {0} (shell) – geöffnete Flächen: {1} – Ergebnis nach der Berechnung unten
+→ {0} ({1}) přidán – výsledek po výpočtu níže	→ {0} ({1}) hinzugefügt – Ergebnis nach der Berechnung unten
+→ {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} Kanten nach Regel „{3}“ – Ergebnis nach der Berechnung unten
+⚠ kolize: {0} – {1}	⚠ Kollisionen: {0} – {1}
+✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ Dokument „{0}“ ({1} Features) – öffnet sich in einem neuen Tab
+✓ kolize: žádné ({0} komponent)	✓ Kollisionen: keine ({0} Komponenten)
+✓ materiál = {0}	✓ Werkstoff = {0}
+✓ materiál „{0}“ = označení do razítka; hustota zůstává podle třídy „{1}“ ({2} g/cm³) – pro jinou hustotu zadejte: materiál {3}	✓ Werkstoff „{0}“ = Bezeichnung für das Schriftfeld; die Dichte bleibt nach Klasse „{1}“ ({2} g/cm³) – für eine andere Dichte eingeben: materiál {3}
+✓ odstraněn prvek „{0}“	✓ Feature „{0}“ entfernt
+✓ pohled {0}	✓ Ansicht {0}
+✓ {0} {1} do skici „{2}“	✓ {0} {1} in Skizze „{2}“
+✓ {0} „{1}“ – nová záložka	✓ {0} „{1}“ – neuer Tab
+✗ není co odstranit	✗ nichts zu entfernen
+✗ stavba selhala – prvky {0} nebyly ověřeny	✗ Aufbau fehlgeschlagen – Features {0} wurden nicht überprüft
+✗ řádek {0}: {1}	✗ Zeile {0}: {1}
+# cad-loader, command-palette
+Mnástrojárna CAD vyžaduje JavaScript.	Mnástrojárna CAD benötigt JavaScript.
+Enter	Enter
+Esc	Esc
+Hledat příkaz… (např. „díra“, „výkres“, „zaoblit“)	Befehl suchen… (z. B. „Bohrung“, „Zeichnung“, „Verrunden“)
+Nic nenalezeno.	Nichts gefunden.
+příkazů	Befehle
+výběr	Auswahl
+# drawing-workspace
++ List	+ Blatt
++ Přidat revizi	+ Revision hinzufügen
+1. klik = kam šipka ukazuje, 2. klik = umístění. ({0}/2)	1. Klick = wohin der Pfeil zeigt, 2. Klick = Platzierung. ({0}/2)
+2 body + umístění kótovací čáry	2 Punkte + Platzierung der Maßlinie
+A, B, C…	A, B, C…
+Aktivní nástroj:	Aktives Werkzeug:
+Auto	Auto
+Auto + Ø	Auto + Ø
+Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.	Auto + Ø ist nur eine Grundlage: Funktionsmaße, Toleranzen (H8, ±0,1) und Oberflächen ergänzen Sie von Hand. „Maßprüfung“ im Abschnitt Maße und Anmerkungen zeigt, was fehlt.
+Automaticky	Automatisch
+Celkové	Gesamt
+Celý list	Ganzes Blatt
+Charakteristika	Merkmal
+Chybí {0} z {1} očekávaných kót	{0} von {1} erwarteten Maßen fehlen
+DWG se nepodařilo vytvořit.	Die DWG konnte nicht erstellt werden.
+DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).	DWG wird direkt im Browser geschrieben (Layer OBRYS/SKRYTE/OSY/KOTY, Linientypen und -stärken, Versionen AutoCAD 2000–2018+). DXF liegt im Format AutoCAD R12 für ältere und Open-Source-Programme vor (LibreCAD, QCAD).
+DWG {0} uloženo: {1}	DWG {0} gespeichert: {1}
+DWG {0} – přímo do AutoCADu, ZWCADu, BricsCADu	DWG {0} – direkt in AutoCAD, ZWCAD, BricsCAD
+DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD	DXF (AutoCAD R12) – öffnet in AutoCAD, ZWCAD, DraftSight, LibreCAD
+Detail	Detail
+Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu ({0}/3).	Detail: 1. Klick = Mitte, 2. Klick = Radius, 3. Klick = Platzierung auf dem Blatt ({0}/3).
+Detailní pohledy	Detailansichten
+Doplnit obvyklé (ISO 2768-mK, hrany 0,5×45°, poznámka k modelu)	Übliches ergänzen (ISO 2768-mK, Kanten 0,5×45°, Modellhinweis)
+Drsnost	Oberflächenrauheit
+Dvojklik = přejmenovat	Doppelklick = umbenennen
+Formát listu	Blattformat
+Generuji DWG ({0})…	DWG wird erzeugt ({0})…
+Generuji PDF…	PDF wird erzeugt…
+Geom. tolerance	Form- und Lagetoleranz
+H8 / ±0,1	H8 / ±0,1
+ISO A (US)	ISO A (US)
+ISO E (EU)	ISO E (EU)
+Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno {0}/3.	Klicken Sie auf 2 Geometriepunkte (Fang an Eckpunkten) und dann auf die Position der Maßlinie. Ausgewählt {0}/3.
+Klikněte na místo ve výkresu.	Klicken Sie auf eine Stelle in der Zeichnung.
+Kontrola kót – co chybí	Maßprüfung – was fehlt
+Kusovník CSV	Stückliste CSV
+Kusovník nad razítkem (	Stückliste über dem Schriftfeld (
+Kóta	Maß
+Kóty	Maße
+Kóty a poznámky	Maße und Anmerkungen
+Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu.	Maße und Anmerkungen sind assoziativ – sie folgen der Ansichtsgeometrie auch nach Modelländerungen. Sie werden im Dokument gespeichert.
+List	Blatt
+List 1	Blatt 1
+List {0}	Blatt {0}
+Na výšku	Hochformat
+Na šířku	Querformat
+Nekótované rozměry dle 3D modelu (STEP)	Nicht bemaßte Maße gemäß 3D-Modell (STEP)
+Nepředepsané tolerance	Allgemeintoleranzen
+Nástroj „Detail“ (L): střed, poloměr, umístění.	Werkzeug „Detail“ (L): Mitte, Radius, Platzierung.
+Název listu	Blattname
+Odstranit list	Blatt entfernen
+Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.	Aus der Feature-Historie abgeleitet – eine Hilfsliste, kein Ersatz für die Prüfung durch den Konstrukteur. Ein fehlendes Maß fügen Sie mit dem Werkzeug Maß hinzu (2 Punkte + Abstand); die Toleranz (H8, ±0,1) tragen Sie beim Maß in der Liste im Feld „Suffix“ ein.
+Opracování hran	Kantenbearbeitung
+Osy děr a válců	Achsen von Bohrungen und Zylindern
+PDF se nepodařilo vytvořit.	Die PDF konnte nicht erstellt werden.
+PDF uloženo: {0}	PDF gespeichert: {0}
+Po vložení zůstat v nástroji (jinak se po jednom vložení vypne)	Nach dem Platzieren im Werkzeug bleiben (sonst schaltet es nach einer Platzierung ab)
+Poloha roviny	Ebenenlage
+Pozice komponent – balónky (	Positionen der Komponenten – Positionsnummern (
+Poznámka	Anmerkung
+Poznámka v patičce	Anmerkung in der Fußzeile
+Promítám pohledy…	Ansichten werden projiziert…
+Přidat list	Blatt hinzufügen
+Přizpůsobit (F)	Einpassen (F)
+Přípona kóty	Maßsuffix
+Ra 3,2 / Rz 25	Ra 3,2 / Rz 25
+Razítko	Schriftfeld
+Revize	Revision
+Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres	Per Link teilen (WhatsApp, E-Mail, Teams…) – beim Empfänger öffnet sich direkt die Zeichnung
+Skryté hrany (čárkovaně)	Verdeckte Kanten (gestrichelt)
+Skrýt kontrolu kót	Maßprüfung ausblenden
+Smazat detail	Detail löschen
+Smazat revizi	Revision löschen
+Smazat vše (	Alles löschen (
+Střed detailu musí ležet v některém pohledu.	Die Detailmitte muss in einer der Ansichten liegen.
+Svislá	Senkrecht
+Tabulka děr (X, Y, Ø v půdorysu)	Bohrungstabelle (X, Y, Ø in der Draufsicht)
+Tabulka revizí	Revisionstabelle
+Text poznámky	Anmerkungstext
+Tisk	Drucken
+Tolerance nebo přípona kóty (zobrazí se za hodnotou)	Toleranz oder Maßsuffix (wird hinter dem Wert angezeigt)
+Verze DWG	DWG-Version
+Verze souboru DWG	DWG-Dateiversion
+Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.	Fertigungsanforderungen und Anmerkungen werden nicht automatisch in die Zeichnung übernommen – nur ausgefüllte erscheinen.
+Výška písma [mm]	Schrifthöhe [mm]
+Všech {0} očekávaných kót je na listu	Alle {0} erwarteten Maße sind auf dem Blatt
+XY (vodor.)	XY (horiz.)
+XZ (čelní)	XZ (Vorderansicht)
+YZ (boční)	YZ (Seitenansicht)
+Zobrazení a kóty	Ansichten und Maße
+Zobrazit řez se šrafováním	Schnitt mit Schraffur anzeigen
+Zpět do 3D (Esc)	Zurück zu 3D (Esc)
+Základna	Bezug
+detailní pohled: střed, poloměr, umístění	Detailansicht: Mitte, Radius, Platzierung
+např. ISO 2768-mK	z. B. ISO 2768-mK
+např. Kalit 58 ± 2 HRC	z. B. Härten 58 ± 2 HRC
+např. MN-2026-001	z. B. MN-2026-001
+např. Nekótované rozměry dle 3D modelu (STEP)	z. B. Nicht bemaßte Maße gemäß 3D-Modell (STEP)
+např. Ostré hrany srazit 0,5×45°	z. B. Scharfe Kanten brechen 0,5×45°
+např. srazit 0,5×45°	z. B. fasen 0,5×45°
+odkazová čára + text	Hinweislinie + Text
+označení do razítka, např. ČSN 11 423	Bezeichnung für das Schriftfeld, z. B. ČSN 11 423
+pol.)	Pos.)
+popis změny	Änderungsbeschreibung
+rámeček ISO 1101 s odkazem	ISO-1101-Rahmen mit Hinweislinie
+volný text na listu	Freitext auf dem Blatt
+značka ISO 1302 na povrch	ISO-1302-Symbol auf eine Oberfläche
+{0} {1}×{2} mm · {3} · {4} ms	{0} {1}×{2} mm · {3} · {4} ms
+· Esc ukončí	· Esc beendet
+· ISO	· ISO
+Řez A–A	Schnitt A–A
+Šikmá	Schräg
+Žádné	Keine
+# ext ui
+Nejdřív vytvořte těleso.	Erzeugen Sie zuerst einen Körper.
+Nejtenčí stěna: {0} mm\nu bodu X {1} · Y {2} · Z {3}\n\nPrůměrná tloušťka vzorků: {4} mm ({5} vzorků, {6} ms)\n\nMetoda: paprsek dovnitř z těžiště trojúhelníků sítě k protější stěně. U velmi hrubé sítě zvyšte kvalitu sítě v Nastavení → Zobrazení.	Dünnste Wand: {0} mm\nam Punkt X {1} · Y {2} · Z {3}\n\nMittlere Probendicke: {4} mm ({5} Proben, {6} ms)\n\nMethode: Strahl vom Schwerpunkt der Netzdreiecke nach innen bis zur gegenüberliegenden Wand. Bei sehr grobem Netz erhöhen Sie die Netzqualität unter Einstellungen → Ansicht.
+Odsazení roviny [mm]	Ebenenversatz [mm]
+Prvky k zrcadlení	Zu spiegelnde Features
+Tloušťku se nepodařilo změřit (otevřená síť?).	Die Dicke konnte nicht gemessen werden (offenes Netz?).
+Žádné dřívější prvky s tělesem.	Keine früheren Features mit Körper.
+Rozvin uložen ({0} ohybů). Upozornění: {1}	Abwicklung gespeichert ({0} Biegungen). Hinweis: {1}
+Rozvin uložen – {0} ohybů, {1} × {2} mm.	Abwicklung gespeichert – {0} Biegungen, {1} × {2} mm.
+klikněte na rovnou hranu plechu v modelu	klicken Sie auf eine gerade Blechkante im Modell
+{0} vybráno	{0} ausgewählt
+Hloubka Y	Tiefe Y
+Hrany koutu:	Kehlnahtkanten:
+Jako samostatná tělesa (nespojovat)	Als separate Körper (nicht verbinden)
+Koutový svar a×a se vymodeluje jako trojúhelníkový hranol podél hrany; objem svarového kovu ≈ a²/2 × délka (Tabulka svarů).	Eine Kehlnaht a×a wird als Dreiecksprisma entlang der Kante modelliert; Schweißgutvolumen ≈ a²/2 × Länge (Schweißnahttabelle).
+Kusovník řezů uložen jako CSV (Excel).	Zuschnittliste als CSV gespeichert (Excel).
+Mezera	Spalt
+Natočení	Drehung
+Nové těleso	Neuer Körper
+Prodl. konec	Ende verlängern
+Prodl. začátek	Anfang verlängern
+Přidat	Hinzufügen
+Rameno a	Schenkel a
+Rameno b	Schenkel b
+Rohy: profily, které se ve skice stýkají koncovými body, se v rohu ořežou pokosem (obě stejně) nebo tupě (první profil průběžný, druhý zkrácený). Volné konce lze prodloužit/zkrátit.	Ecken: Profile, deren Skizzenlinien sich in Endpunkten treffen, werden an der Ecke auf Gehrung (beide gleich) oder stumpf (erstes Profil durchlaufend, zweites gekürzt) getrimmt. Freie Enden können verlängert/gekürzt werden.
+Rozměr a	Maß a
+Rozměr a×a	Maß a×a
+Skica s úsečkami (osy profilů)	Skizze mit Linien (Profilachsen)
+Spodní a horní obdélník + 4 sloupky tupě mezi nimi. Vnější rozměry rámu odpovídají zadání.	Unteres und oberes Rechteck + 4 Pfosten stumpf dazwischen. Die Außenmaße des Rahmens entsprechen der Eingabe.
+Výška Z	Höhe Z
+Zarovnání k ose	Ausrichtung zur Achse
+klikněte na hranu vnitřního rohu v modelu	klicken Sie auf eine Innenecken-Kante im Modell
+{0} vybráno ({1} mm)	{0} ausgewählt ({1} mm)
+— vyberte skicu —	— Skizze wählen —

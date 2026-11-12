@@ -1,0 +1,436 @@
+# Normteilbibliothek – Teilenamen, Parameter, Bezeichnungen
+
+# alu-profiles
+Drážka	Nut
+Délka	Länge
+Délka L	Länge L
+Díra 1	Bohrung 1
+Profil {0} L{1}	Profil {0} L{1}
+Profil {0} drážka {1} – L {2} mm	Profil {0} Nut {1} – L {2} mm
+Středová díra pro závit	Mittelbohrung für Gewinde
+Středová díra {0}.{1}	Mittelbohrung {0}.{1}
+T-matice drážka {0} – {1} – L{2}	Nutenstein Nut {0} – {1} – L{2}
+T-matice {0}/{1}	Nutenstein {0}/{1}
+Tělo	Körper
+Závitová díra	Gewindebohrung
+drážka {0}	Nut {0}
+závit čela	Stirngewinde
+{0} (drážka {1})	{0} (Nut {1})
+{0} – drážka {1}	{0} – Nut {1}
+Úhelník {0}×{1}	Winkel {0}×{1}
+Úhelník {0}×{1}×{2}	Winkel {0}×{1}×{2}
+Řada	Baureihe
+Žebro – profil	Rippe – Profil
+
+# bearings
+2RS – gumová těsnění	2RS – Gummidichtungen
+2Z – plechové kryty	2Z – Deckscheiben
+Krytí	Abdichtung
+Krytí 1	Abdichtung 1
+Krytí 2	Abdichtung 2
+Ložisko {0}{1}	Lager {0}{1}
+Modelovat kuličky	Kugeln modellieren
+Označení	Bezeichnung
+Vnitřní kroužek	Innenring
+Vnější kroužek	Außenring
+otevřené	offen
+vypněte u velkých sestav	bei großen Baugruppen ausschalten
+
+# bearings2
+Axiální ložisko {0}	Axiallager {0}
+D límce	Bund-D
+Délka l	Länge l
+Díra 2	Bohrung 2
+Hřídelový kroužek	Wellenscheibe
+ISO 4379 – {0} {1}×{2}×{3}	ISO 4379 – {0} {1}×{2}×{3}
+Jehlové ložisko {0}	Nadellager {0}
+Kluzné pouzdro Ø{0}×{1}×{2}	Gleitbuchse Ø{0}×{1}×{2}
+Kuželíkové ložisko {0}	Kegelrollenlager {0}
+Lem 1	Bord 1
+Lem 2	Bord 2
+Ložiskové těleso {0}	Lagergehäuse {0}
+Límec	Bund
+Modelovat jehly	Nadeln modellieren
+Modelovat kuželíky	Kegelrollen modellieren
+S límcem (tvar F)	Mit Bund (Form F)
+Tělesový kroužek	Gehäusescheibe
+Vnitřní průměr d	Innendurchmesser d
+{0} – Ø{1} – rozteč {2}	{0} – Ø{1} – Abstand {2}
+
+# fasteners
+DIN 975 – {0}×{1} – {2}	DIN 975 – {0}×{1} – {2}
+Dřík	Schaft
+Důlek	Ringschneide
+ISO 10642 – {0}×{1} – {2}	ISO 10642 – {0}×{1} – {2}
+ISO 4762 – {0}×{1} – {2}	ISO 4762 – {0}×{1} – {2}
+ISO 7380 – {0}×{1} – {2}	ISO 7380 – {0}×{1} – {2}
+Matice {0} {1}	Mutter {0} {1}
+Pevnost / materiál	Festigkeit / Werkstoff
+Podložka	Scheibe
+Podložka {0} {1}	Scheibe {0} {1}
+Stavěcí šroub {0}×{1}	Gewindestift {0}×{1}
+Tyč	Stange
+Vnitřní šestihran	Innensechskant
+Závitová tyč {0}×{1}	Gewindestange {0}×{1}
+m (nízká)	m (niedrig)
+Šroub {0}×{1} ISO 10642	Schraube {0}×{1} ISO 10642
+Šroub {0}×{1} ISO 4762	Schraube {0}×{1} ISO 4762
+Šroub {0}×{1} ISO 7380	Schraube {0}×{1} ISO 7380
+Šroub {0}×{1} {2}	Schraube {0}×{1} {2}
+
+# fasteners2
+DIN 127 – B {0}	DIN 127 – B {0}
+DIN 315 – {0}	DIN 315 – {0}
+DIN 580 – {0}	DIN 580 – {0}
+DIN 660 – {0}×{1} – {2}	DIN 660 – {0}×{1} – {2}
+DIN 6798 – A {0}	DIN 6798 – A {0}
+DIN 6923 – {0} – {1}	DIN 6923 – {0} – {1}
+DIN 7349 – {0}	DIN 7349 – {0}
+DIN 7981 – {0}×{1}	DIN 7981 – {0}×{1}
+DIN 985 – {0} – {1}	DIN 985 – {0} – {1}
+ISO 7045 – {0}×{1} – {2}	ISO 7045 – {0}×{1} – {2}
+ISO 7046 – {0}×{1} – {2}	ISO 7046 – {0}×{1} – {2}
+Křídlo 1	Flügel 1
+Křídlo 2	Flügel 2
+Křídlová matice {0}	Flügelmutter {0}
+Kříž 1	Kreuz 1
+Kříž 2	Kreuz 2
+Límec vložky	Einsatzbund
+Nylonová vložka	Nyloneinsatz
+Náboj	Nabe
+Nýt Ø{0}×{1}	Niet Ø{0}×{1}
+Ozubená příruba	Sperrverzahnter Flansch
+Podložka {0} DIN 7349	Scheibe {0} DIN 7349
+Pojistná matice {0}	Sicherungsmutter {0}
+Pružná podložka {0}	Federring {0}
+Průměr d	Durchmesser d
+Příruba	Flansch
+Přírubová matice {0}	Flanschmutter {0}
+Rozříznutí	Schlitz
+Samořezný šroub {0}×{1}	Blechschraube {0}×{1}
+Velikost	Größe
+Zubová podložka {0}	Zahnscheibe {0}
+Závrtný šroub {0}×{1}	Stiftschraube {0}×{1}
+Zářez	Kerbe
+ocel pozink	Stahl verzinkt
+pružinová ocel	Federstahl
+Šroub	Schraube
+Šroub s okem {0}	Ringschraube {0}
+Šroub {0}×{1} ISO 7045	Schraube {0}×{1} ISO 7045
+Šroub {0}×{1} ISO 7046	Schraube {0}×{1} ISO 7046
+
+# gears
+0 = bez náboje	0 = ohne Nabe
+0 = plný	0 = voll
+Bočnice	Bordscheibe
+Bočnice 1	Bordscheibe 1
+Bočnice 2	Bordscheibe 2
+Drážka pro pero DIN 6885	Passfedernut DIN 6885
+Délka náboje	Nabenlänge
+Díra	Bohrung
+Díra d	Bohrung d
+HTD {0}-{1}-{2}	HTD {0}-{1}-{2}
+Hřeben	Zahnstange
+Hřeben m{0} {1} zubů	Zahnstange m{0} {1} Zähne
+ISO 606 – {0}-{1} z{2}	ISO 606 – {0}-{1} z{2}
+Korekce x	Profilverschiebung x
+Modul m	Modul m
+Náboj Ø	Naben-Ø
+Ozubené kolo m{0} z{1}	Stirnrad m{0} z{1}
+Ozubené kolo m{0} z{1} b{2} α{3}° x{4}	Stirnrad m{0} z{1} b{2} α{3}° x{4}
+Ozubení	Verzahnung
+Ozubení{0}	Verzahnung{0}
+Ozubený hřeben m{0} L{1} b{2}	Zahnstange m{0} L{1} b{2}
+Počet drážek	Anzahl der Nuten
+Počet zubů	Zähnezahl
+Počet zubů z	Zähnezahl z
+Profil řemene	Riemenprofil
+Tloušťka věnce	Kranzdicke
+Vnitřní ozubení	Innenverzahnung
+Vnitřní ozubení m{0} z{1} b{2}	Innenverzahnung m{0} z{1} b{2}
+Výpočtový průměr dp	Teilkreisdurchmesser dp
+Výška tělesa	Körperhöhe
+Věnec	Kranz
+Věnec m{0} z{1}	Zahnkranz m{0} z{1}
+d1 váleček	d1 Rolle
+dvouřadý (-2)	zweireihig (-2)
+jednořadý (-1)	einreihig (-1)
+třířadý (-3)	dreireihig (-3)
+Úhel záběru	Eingriffswinkel
+Řady	Reihen
+Řemenice	Riemenscheibe
+Řemenice HTD {0} z{1}	HTD-Riemenscheibe {0} z{1}
+Řemenice {0} dp{1}	Riemenscheibe {0} dp{1}
+Řemenice {0} {1}×{2}	Riemenscheibe {0} {1}×{2}
+Řetěz	Kette
+Řetězové kolo {0}-{1} z{2}	Kettenrad {0}-{1} z{2}
+Řetězové kolo {0}-{1} z{2} – dp {3}	Kettenrad {0}-{1} z{2} – dp {3}
+Šířka b	Breite b
+Šířka řemene	Riemenbreite
+
+# gears2
+0 = bez hřídelových konců	0 = ohne Wellenenden
+45° = soukolí 1:1 (miter)	45° = Radpaar 1:1 (Miter)
+Délka hřídelových konců	Länge der Wellenenden
+Délka ozubené části	Länge des verzahnten Teils
+Hřídel 1	Welle 1
+Hřídel 2	Welle 2
+Jádro	Kern
+Kuželové kolo m{0} z{1}	Kegelrad m{0} z{1}
+Kuželové kolo m{0} z{1} δ{2}° b{3}	Kegelrad m{0} z{1} δ{2}° b{3}
+Modul m (osový)	Modul m (axial)
+Modul m (vnější)	Modul m (außen)
+Normálný modul mn	Normalmodul mn
+Ořez dole	Beschnitt unten
+Ořez nahoře	Beschnitt oben
+Počet chodů	Gangzahl
+Počet zubů z2	Zähnezahl z2
+Průměr hřídele	Wellendurchmesser
+Smysl stoupání	Steigungsrichtung
+Součinitel průměru q	Durchmesserfaktor q
+Součinitel q šneku	Schneckenfaktor q
+Vnitřní profil	Innenprofil
+Vnější profil	Außenprofil
+levý (L)	links (L)
+pravý (R)	rechts (R)
+pro zakřivení (hrdlo) zubů	für die Zahnkrümmung (Kehle)
+{0} – řez {1}	{0} – Schnitt {1}
+Úhel roztečného kužele δ	Teilkegelwinkel δ
+Úhel sklonu β	Schrägungswinkel β
+Šikmé kolo mn{0} z{1} β{2}°	Schrägstirnrad mn{0} z{1} β{2}°
+Šikmé kolo mn{0} z{1} β{2}°{3} b{4} – d {5}	Schrägstirnrad mn{0} z{1} β{2}°{3} b{4} – d {5}
+Šikmé ozubení	Schrägverzahnung
+Šnek m{0} q{1}	Schnecke m{0} q{1}
+Šnek m{0} q{1} z{2} d1 {3} L{4}	Schnecke m{0} q{1} z{2} d1 {3} L{4}
+Šnekové kolo m{0} z{1}	Schneckenrad m{0} z{1}
+Šnekové kolo m{0} z{1} b{2} – d2 {3} γ{4}°	Schneckenrad m{0} z{1} b{2} – d2 {3} γ{4}°
+Šířka ozubení b	Zahnbreite b
+
+# linear
+Domeček SHF{0}	Wellenbock SHF{0}
+Drážka 1	Nut 1
+Drážka 2	Nut 2
+Drážka L	Nut L
+Drážka P	Nut R
+Díra příruby	Flanschbohrung
+Hřídel	Welle
+Kanál kolejnice	Schienenkanal
+Kolejnice HGR{0} L{1}	Schiene HGR{0} L{1}
+Koncovka 1	Endkappe 1
+Koncovka 2	Endkappe 2
+Konec 1	Ende 1
+Konec 2	Ende 2
+Kuličkový šroub SFU{0} L{1}	Kugelgewindetrieb SFU{0} L{1}
+Obrobené konce (osazení)	Bearbeitete Enden (Absätze)
+Osazení 1	Absatz 1
+Poloha matice	Mutterposition
+Pouzdro LM{0}UU	Linearkugellager LM{0}UU
+Příruba matice	Mutterflansch
+SFU{0}-{1} + matice DIN 69051	SFU{0}-{1} + Mutter DIN 69051
+SHF{0} – rozteč {1}	SHF{0} – Abstand {1}
+Těleso SC{0}UU	Gehäuse SC{0}UU
+Vodicí tyč W{0} L{1}	Führungswelle W{0} L{1}
+Vozík	Wagen
+Vozík lineárního vedení HGH (úzký)	Linearführungswagen HGH (schmal)
+Vozík lineárního vedení HGW (přírubový)	Linearführungswagen HGW (Flansch)
+Vozík {0}{1}	Wagen {0}{1}
+W{0} h6 × {1} – kalená 60 HRC	W{0} h6 × {1} – gehärtet 60 HRC
+díra	Bohrung
+matice L	Mutter L
+matice Ø	Mutter Ø
+příruba Ø	Flansch Ø
+rozteč	Abstand
+stoupání	Steigung
+tloušťka	Dicke
+výška osy	Achshöhe
+
+# mold-parts
+Dosedka Ø{0}×{1}	Auflageknopf Ø{0}×{1}
+Opěrný sloupek Ø{0}×{1}	Stützsäule Ø{0}×{1}
+Opěrný sloupek Ø{0}×{1} – {2}	Stützsäule Ø{0}×{1} – {2}
+Průměr těla d1	Körperdurchmesser d1
+Rádius dosedací plochy	Radius der Anlagefläche
+Vratný kolík Ø{0}×{1}	Rückdrückstift Ø{0}×{1}
+Vstupní průměr vtoku	Angusseinlaufdurchmesser
+Vtoková vložka Ø{0}×{1}	Angussbuchse Ø{0}×{1}
+Vtoková vložka Ø{0}×{1} – d{2} – SR{3}	Angussbuchse Ø{0}×{1} – d{2} – SR{3}
+Zahloubení	Senkung
+Závitová díra 1	Gewindebohrung 1
+Závitová díra 2	Gewindebohrung 2
+
+# mold2
+Datumovka Ø{0}	Datumsstempel Ø{0}
+Délka ploché části	Länge des flachen Teils
+Hadice Ø	Schlauch-Ø
+Kanál	Kanal
+Lisovací část	Formteil
+Mezikruží	Ringfläche
+Plochá část	Flacher Teil
+Plochý vyhazovač {0}×{1}×{2}	Flachauswerfer {0}×{1}×{2}
+Průměr dříku d	Schaftdurchmesser d
+Průřez a × b	Querschnitt a × b
+Temperační spojka {0}	Temperierkupplung {0}
+Vnitřní průměr d1	Innendurchmesser d1
+Vnější průměr d	Außendurchmesser d
+Vodicí pouzdro Z11 Ø{0}×{1}	Führungsbuchse Z11 Ø{0}×{1}
+Vodicí sloupek Z01 Ø{0}×{1}	Führungssäule Z01 Ø{0}×{1}
+Vodicí část	Führungsteil
+Vyhazovací trubka Ø{0}/{1}×{2}	Auswerferhülse Ø{0}/{1}×{2}
+Zápich	Einstich
+d1 (lisovací)	d1 (Formteil)
+Čep	Bolzen
+Šikmý čep Ø{0} × {1} – {2}°	Schrägbolzen Ø{0} × {1} – {2}°
+Šikmý čep Ø{0}×{1} {2}°	Schrägbolzen Ø{0}×{1} {2}°
+Šipka – vložka	Pfeil – Einsatz
+
+# pins
+A – zaoblené konce	A – gerundete Enden
+B – rovné konce	B – gerade Enden
+C – jeden konec zaoblený	C – ein Ende gerundet
+D2 drážka	D2 Nut
+DIN 2095 – {0}×{1}×{2} – n {3}	DIN 2095 – {0}×{1}×{2} – n {3}
+DIN 6885 – {0} {1}×{2}×{3}	DIN 6885 – {0} {1}×{2}×{3}
+ISO 3601 – {0}×{1} – {2}	ISO 3601 – {0}×{1} – {2}
+ISO 8752 – {0}×{1}	ISO 8752 – {0}×{1}
+Kolík	Stift
+Kolík Ø{0}×{1} {2}	Stift Ø{0}×{1} {2}
+Kroužek	Ring
+O-kroužek {0}×{1}	O-Ring {0}×{1}
+Otvor ouška	Ösenloch
+Ouško	Öse
+Pero {0} {1}×{2}×{3}	Passfeder {0} {1}×{2}×{3}
+Pero – profil	Passfeder – Profil
+Pojistný kroužek {0} {1}	Sicherungsring {0} {1}
+Počet činných závitů n	Anzahl federnder Windungen n
+Pružina {0}×{1}×{2}	Feder {0}×{1}×{2}
+Pružný kolík Ø{0}×{1}	Spannstift Ø{0}×{1}
+Průměr drátu d	Drahtdurchmesser d
+Průměr díry D	Bohrungsdurchmesser D
+Průměr hřídele d	Wellendurchmesser d
+Průřez	Querschnitt
+Průřez d2	Querschnitt d2
+Rozevření	Öffnung
+Vnější průměr De	Außendurchmesser De
+Volná délka L0	Freie Länge L0
+Válcový kolík kalený (m6)	Zylinderstift gehärtet (m6)
+Válcový kolík nekalený (h8)	Zylinderstift ungehärtet (h8)
+d2 drážka	d2 Nut
+hřídel d	Welle d
+t1 hřídel	t1 Welle
+t2 náboj	t2 Nabe
+{0}×{1} (hřídel {2}–{3})	{0}×{1} (Welle {2}–{3})
+Štěrbina	Schlitz
+
+# pins2
+DIN 6888 – {0}×{1}	DIN 6888 – {0}×{1}
+Drážky pro pojistný kroužek	Nuten für Sicherungsring
+ISO 1234 – {0}×{1}	ISO 1234 – {0}×{1}
+ISO 2339 – {0}×{1} – 1:50	ISO 2339 – {0}×{1} – 1:50
+Kuželový kolík Ø{0}×{1}	Kegelstift Ø{0}×{1}
+Průměr d (menší konec)	Durchmesser d (kleines Ende)
+Rýha	Kerbe
+Rýhovaný kolík s rýhami na polovině délky	Kerbstift mit Kerben auf halber Länge
+Rýhovaný kolík s rýhami po celé délce	Kerbstift mit Kerben über die ganze Länge
+Rýhovaný kolík Ø{0}×{1}	Kerbstift Ø{0}×{1}
+Seříznutí	Anschnitt
+Větev 1	Schenkel 1
+Větev 2	Schenkel 2
+Závlačka {0}×{1}	Splint {0}×{1}
+Úsečové pero {0}×{1}	Scheibenfeder {0}×{1}
+Čep bez hlavy	Bolzen ohne Kopf
+Čep s hlavou (hřídelový čep)	Bolzen mit Kopf
+Čep Ø{0}×{1} {2}	Bolzen Ø{0}×{1} {2}
+
+# piping
+01 – plochá přivařovací	01 – glatter Flansch zum Schweißen
+05 – zaslepovací	05 – Blindflansch
+11 – krková přivařovací	11 – Vorschweißflansch
+Díra pro šroub	Schraubenloch
+Jmenovitá velikost	Nennweite
+Nátrubek {0} Ø{1}	Muffe {0} Ø{1}
+Nátrubek {0} – Ø{1}	Muffe {0} – Ø{1}
+Příruba {0} PN16 typ {1}	Flansch {0} PN16 Typ {1}
+Trubka R {0}" L{1}	Rohr R {0}" L{1}
+Typ	Typ
+Těsnicí lišta	Dichtleiste
+děr	Löcher
+stěna	Wand
+Ø děr	Loch-Ø
+Ø vnější	Außen-Ø
+
+# pneumatics
+ISO 15552 – Ø{0}×{1} – {2} – {3}	ISO 15552 – Ø{0}×{1} – {2} – {3}
+ISO 6432 – Ø{0}×{1} – {2}	ISO 6432 – Ø{0}×{1} – {2}
+Matice táhla {0}	Zugankermutter {0}
+Miniválec ISO 6432 Ø{0}×{1}	Minizylinder ISO 6432 Ø{0}×{1}
+Průměr pístu	Kolbendurchmesser
+Pístnice	Kolbenstange
+Táhlo {0}	Zuganker {0}
+Uvolňovací kroužek	Löseting
+Vedení pístnice	Kolbenstangenführung
+Vysunutá pístnice	Ausgefahrene Kolbenstange
+Válec ISO 15552 Ø{0}×{1}	Zylinder ISO 15552 Ø{0}×{1}
+Víko přední	Vorderdeckel
+Víko zadní	Hinterdeckel
+Zdvih	Hub
+Závit zadní	Gewinde hinten
+pístnice	Kolbenstange
+přípoj	Anschluss
+závit	Gewinde
+Ø těla	Körper-Ø
+Šroubení push-in Ø{0} – {1}	Steckverschraubung Ø{0} – {1}
+Šroubení Ø{0} {1}	Verschraubung Ø{0} {1}
+
+# profiles
+Jäkl {0}×{1}×{2} L{3}	Hohlprofil {0}×{1}×{2} L{3}
+Kulatina Ø{0} L{1}	Rundstahl Ø{0} L{1}
+Nosník HEA	HEA-Träger
+Otvor klíče (SW)	Schlüsselweite (SW)
+PLO {0}×{1} – S235JR – L={2}	FL {0}×{1} – S235JR – L={2}
+Plochá {0}×{1} L{2}	Flachstahl {0}×{1} L{2}
+Rozměr a×b×t	Abmessung a×b×t
+TR Ø{0}×{1} – S235JRH – L={2}	RO Ø{0}×{1} – S235JRH – L={2}
+Tloušťka stěny t	Wanddicke t
+Trubka Ø{0}×{1} L{2}	Rohr Ø{0}×{1} L{2}
+UPN {0} L{1}	UPN {0} L{1}
+UPN {0} – S235JR – L={1}	UPN {0} – S235JR – L={1}
+Vnější obrys	Außenkontur
+Vnější průměr D	Außendurchmesser D
+Výška h	Höhe h
+{0} {1}×{2}×{3} – S235JRH – L={4}	{0} {1}×{2}×{3} – S235JRH – L={4}
+Úhelník	Winkel
+Čtvercová tyč	Vierkantstahl
+Čtvercová tyč {0} L{1}	Vierkantstahl {0} L{1}
+Šestihran SW{0} L{1}	Sechskant SW{0} L{1}
+Šestihranná tyč	Sechskantstahl
+Šířka w	Breite w
+
+# springs2
+DIN 2088 – {0}×{1} – n {2}	DIN 2088 – {0}×{1} – n {2}
+DIN 2093 – {0} {1}×{2}×{3}{4}	DIN 2093 – {0} {1}×{2}×{3}{4}
+DIN 2097 – {0}×{1}×{2} – n {3}	DIN 2097 – {0}×{1}×{2} – n {3}
+Délka ramen	Schenkellänge
+Délka těla Lk	Körperlänge Lk
+Očko 1	Öse 1
+Očko 2	Öse 2
+Plynová vzpěra {0} z{1}	Gasdruckfeder {0} h{1}
+Plynová vzpěra {0} – zdvih {1} – {2} N	Gasdruckfeder {0} – Hub {1} – {2} N
+Počet v sloupci	Anzahl im Paket
+Počet závitů n	Windungszahl n
+Pístnice/válec	Kolbenstange/Zylinder
+Síla	Kraft
+Talíř {0}	Teller {0}
+Talířová pružina {0}×{1}×{2}	Tellerfeder {0}×{1}×{2}
+Tažná pružina {0}×{1}×{2}	Zugfeder {0}×{1}×{2}
+Vysunutá	Ausgefahren
+Válec	Zylinder
+Zkrutná pružina {0}×{1} n{2}	Schenkelfeder {0}×{1} n{2}
+vedle sebe (do sebe)	nebeneinander (ineinander)
+za sebou (střídavě)	hintereinander (wechselsinnig)
+Úhel ramen	Schenkelwinkel
+Řada – De×Di×t	Reihe – De×Di×t
+Řazení	Schichtung
+
+# util
+Drážka pro pero	Passfedernut
+{0} – profil	{0} – Profil

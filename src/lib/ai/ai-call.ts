@@ -94,6 +94,11 @@ export function aiFailureMessage(err: unknown): string {
   return AI_FAILURE_MESSAGE[failure];
 }
 
+/** Chyba z volání Claude API (SDK) nebo naše AiCallError — záchyt služby ji třídí podle typu, ne podle textu. */
+export function isAiError(err: unknown): boolean {
+  return err instanceof AiCallError || err instanceof Anthropic.AnthropicError;
+}
+
 /** Smí se po chybě zkusit znovu (limit útraty, klíč, odmítnutí ne). */
 export function isRetryable(failure: AiFailure): boolean {
   return failure === "rate_limit" || failure === "overloaded" || failure === "other" || failure === "max_tokens";

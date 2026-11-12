@@ -138,18 +138,53 @@ describe("druhy odeslané pošty", () => {
   it("odvození z předmětu", () => {
     expect(inferSentKind("Cenová nabídka NAB-2026-001 — Mnástrojárna s.r.o.")).toBe("quote");
     expect(inferSentKind("Upomínka — faktura 2026001")).toBe("reminder");
-    expect(inferSentKind("Poptávka dodavateli: frézování dílu")).toBe("supplier");
+    expect(inferSentKind("Připomenutí nabídky NAB-2026-001 — Mnástrojárna s.r.o.")).toBe("reminder");
+    expect(inferSentKind("Poptávka dodavateli: frézování dílu")).toBe("rfq");
     expect(inferSentKind("Re: Poptávka výkres 123")).toBe("email");
     expect(inferSentKind("Re: Cenová nabídka")).toBe("email");
     expect(inferSentKind("")).toBe("email");
     expect(inferSentKind(null)).toBe("email");
   });
+
+  it("druh odeslané pošty podle dokladu a vazeb (archiv třídí vše, co odchází)", () => {
+    // doklady zákazníkovi (předměty z document-emails)
+    expect(inferSentKind("Potvrzení objednávky č. 4500123 – Mnástrojárna s.r.o.")).toBe("confirmation");
+    expect(inferSentKind("Dodací list DL-2026-012 k objednávce č. 4500123 – Mnástrojárna s.r.o.")).toBe("delivery_note");
+    expect(inferSentKind("Faktura 2026001 – Mnástrojárna s.r.o. (objednávka č. 4500123)")).toBe("invoice");
+    expect(inferSentKind("Dokument k zakázce Z-2026-001 – držák")).toBe("document");
+    expect(inferSentKind("Cenová nabídka NAB-2026-004 – držák (Vaše poptávka č. P-77)")).toBe("quote");
+    // dodavateli: poptávka (RFQ) podle vazby na dodavatele, objednávka podle vazby na objednávku / čísla OV-
+    expect(inferSentKind("Poptávka P-2026-003 — frézování", { supplierId: "s1" })).toBe("rfq");
+    expect(inferSentKind("Poptávka P-2026-003")).toBe("email"); // bez vazby na dodavatele to může být odpověď zákazníkovi
+    expect(inferSentKind("Objednávka OV-2026-004 — Mnástrojárna s.r.o.", { purchaseOrderId: "po1" })).toBe("po");
+    expect(inferSentKind("Objednávka OV-2026-004 — Mnástrojárna s.r.o.")).toBe("po");
+    expect(inferSentKind("Změna objednávky OV-2026-004", { purchaseOrderId: "po1" })).toBe("po_change");
+    expect(inferSentKind("Pozastavení objednávky OV-2026-004", { purchaseOrderId: "po1" })).toBe("po_change");
+    expect(inferSentKind("Storno objednávky OV-2026-004", { purchaseOrderId: "po1" })).toBe("po_cancel");
+    expect(inferSentKind("Objednávka u dodavatele Kovo", { supplierId: "s1" })).toBe("po");
+    expect(inferSentKind("", { purchaseOrderId: "po1" })).toBe("po");
+    // odpověď dodavateli zůstává běžnou zprávou; jiná zpráva dodavateli = ostatní
+    expect(inferSentKind("Re: Poptávka P-2026-003", { supplierId: "s1" })).toBe("email");
+    expect(inferSentKind("Termín dodání", { supplierId: "s1" })).toBe("supplier");
+    expect(inferSentKind("Termín dodání", { customerId: "c1" })).toBe("email");
+    // fronta schvalování: AI nabídka, poptávka dodavateli, objednávka dodavateli podle názvu
+    expect(sentKindFromApproval("quote")).toBe("ai_quote");
+    expect(sentKindFromApproval("supplier_request")).toBe("rfq");
+    expect(sentKindFromApproval("purchase_order", "Objednávka OV-2026-004 — Kovo")).toBe("po");
+    expect(sentKindFromApproval("purchase_order", "Změna objednávky OV-2026-004 — Kovo")).toBe("po_change");
+    expect(sentKindFromApproval("purchase_order", "Storno objednávky OV-2026-004 — Kovo")).toBe("po_cancel");
+    for (const k of SENT_KINDS) expect(SENT_KIND_STYLE[k].label.length).toBeGreaterThan(2);
+    expect(new Set(SENT_KINDS.map((k) => SENT_KIND_STYLE[k].label)).size).toBe(SENT_KINDS.length);
+  });
   it("převod mezi typem fronty a druhem", () => {
-    for (const k of SENT_KINDS) expect(sentKindFromApproval(approvalTypeForKind(k))).toBe(k);
+    for (const k of ["reminder", "rfq", "po", "email"] as const) expect(sentKindFromApproval(approvalTypeForKind(k))).toBe(k);
+    expect(approvalTypeForKind("quote")).toBe("quote");
+    expect(approvalTypeForKind("po_cancel")).toBe("purchase_order");
     expect(sentKindFromApproval("categorization")).toBe("email");
-    expect(sentItemKind({ rawType: "quote" })).toBe("quote");
+    expect(sentItemKind({ rawType: "quote" })).toBe("ai_quote"); // položka fronty „quote" = nabídka připravená AI
+    expect(sentItemKind({ rawType: "quote", kind: "quote" })).toBe("quote");
     expect(sentItemKind({ rawType: "quote", kind: "reminder" })).toBe("reminder");
-    expect(SENT_KIND_STYLE.email.label).toBe("E-mail");
+    expect(SENT_KIND_STYLE.email.label).toBe("Odpověď / zpráva");
   });
 });
 
@@ -227,7 +262,7 @@ describe("sloučení odeslané pošty", () => {
       [appr("a1", "Jan@Firma.cz", "2026-10-22T10:00:00Z", true, "quote")],
     );
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ id: "m1", auto: true, kind: "quote", rawType: "quote", type: "Nabídka", body: "tělo" });
+    expect(out[0]).toMatchObject({ id: "m1", auto: true, kind: "ai_quote", rawType: "quote", type: "AI nabídka", body: "tělo" });
   });
 
   it("starší záznamy fronty bez protějšku zůstanou a řadí se od nejnovějšího", () => {
@@ -388,7 +423,7 @@ describe("filtr Inboxu", () => {
 describe("filtr odeslané pošty", () => {
   const items: SentItem[] = [
     { id: "1", type: "E-mail", rawType: "email_reply", title: "Re: poptávka", target: "jan@firma.cz", body: "", sentAt: "2026-10-22T10:00:00Z", auto: false, kind: "email", jobNumber: "Z-2026-001" },
-    { id: "2", type: "Nabídka", rawType: "quote", title: "Cenová nabídka NAB-2026-002", target: "eva@firma.cz", body: "", sentAt: "2026-10-21T10:00:00Z", auto: true },
+    { id: "2", type: "Nabídka", rawType: "quote", title: "Cenová nabídka NAB-2026-002", target: "eva@firma.cz", body: "", sentAt: "2026-10-21T10:00:00Z", auto: true, kind: "quote" },
     { id: "3", type: "Upomínka", rawType: "reminder", title: "Upomínka", target: "x@y.cz", body: "", sentAt: "2026-10-20T10:00:00Z", auto: false },
   ];
   it("podle druhu, automatiky a hledání", () => {
@@ -399,7 +434,8 @@ describe("filtr odeslané pošty", () => {
     expect(filterSent(items, { kind: "all", query: "eva nabidka" }).map((i) => i.id)).toEqual(["2"]);
   });
   it("počty", () => {
-    expect(countSentKinds(items)).toEqual({ all: 3, email: 1, quote: 1, reminder: 1, supplier: 0, auto: 1 });
+    expect(countSentKinds(items)).toMatchObject({ all: 3, email: 1, quote: 1, reminder: 1, supplier: 0, po: 0, rfq: 0, auto: 1 });
+    expect(Object.keys(countSentKinds(items)).sort()).toEqual(["all", "auto", ...SENT_KINDS].sort());
   });
 });
 

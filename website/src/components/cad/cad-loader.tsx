@@ -1,5 +1,6 @@
 "use client";
 
+import { setLang, tr, type CadLang } from "@/cad/i18n";
 import dynamic from "next/dynamic";
 
 const CadApp = dynamic(() => import("./cad-app").then((m) => m.CadApp), {
@@ -11,11 +12,13 @@ const CadApp = dynamic(() => import("./cad-app").then((m) => m.CadApp), {
   ),
 });
 
-export function CadLoader() {
+/** Jazyk se nastaví před načtením aplikace (modulová proměnná), takže se všechny texty vykreslí rovnou správně. */
+export function CadLoader({ lang = "cs" }: { lang?: CadLang }) {
+  setLang(lang);
   return (
     <>
       <CadApp />
-      <noscript>Mnástrojárna CAD vyžaduje JavaScript.</noscript>
+      <noscript>{tr("Mnástrojárna CAD vyžaduje JavaScript.")}</noscript>
     </>
   );
 }

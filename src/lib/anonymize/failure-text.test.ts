@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  classifyFailure, FAST_ATTEMPTS, INTERNAL_FINAL_TEXT, INTERNAL_RETRY_TEXT, LEGACY_PDF_FAILURE_TEXT, LEGACY_TECH_FAILURE_TEXT, MAX_ATTEMPTS,
+  AI_BUSY_TEXT, classifyAiFailure, classifyFailure, FAST_ATTEMPTS, INTERNAL_FINAL_TEXT, INTERNAL_RETRY_TEXT, LEGACY_PDF_FAILURE_TEXT, LEGACY_TECH_FAILURE_TEXT, MAX_ATTEMPTS,
   PDF_INVALID_TEXT, PDF_PASSWORD_TEXT, retryPlan, userFacingFailure,
 } from "./failure-text";
 import { subjectOf } from "./queue";
@@ -36,6 +36,25 @@ describe("hláška selhání pro uživatele (žádná surová anglická chyba, p
     const gone = classifyFailure("Soubor se nepodařilo stáhnout: Object not found");
     expect(gone.transient).toBe(false);
     expect(gone.text).toBe("Originál souboru v úložišti chybí — nahraj ho znovu.");
+  });
+  it("typované selhání AI (majitel 5. 11.): přetížení / čas / nečitelná odpověď = přechodné; klíč, limit, odmítnutí = konečné", () => {
+    expect(classifyAiFailure("overloaded")).toEqual({ kind: "ai_busy", text: AI_BUSY_TEXT, transient: true });
+    expect(classifyAiFailure("rate_limit").transient).toBe(true);
+    expect(classifyAiFailure("timeout")).toMatchObject({ kind: "timeout", transient: true });
+    expect(classifyAiFailure("other")).toMatchObject({ kind: "internal", text: INTERNAL_RETRY_TEXT, transient: true });
+    expect(classifyAiFailure("max_tokens").transient).toBe(true);
+    for (const f of ["auth", "spend_limit"] as const) {
+      const r = classifyAiFailure(f);
+      expect(r.transient).toBe(false);
+      expect(r.text).toMatch(/klikni Anonymizovat znovu/);
+    }
+    const inv = classifyAiFailure("invalid_request", "AI požadavek odmítla (soubor je pro ni nečitelný nebo příliš velký) — vyplň ručně.");
+    expect(inv).toEqual({ kind: "ai_final", text: "AI požadavek odmítla (soubor je pro ni nečitelný nebo příliš velký) — klikni Anonymizovat znovu.", transient: false });
+    expect(classifyAiFailure("refusal").text).toMatch(/^AI výkres odmítla zpracovat — klikni/);
+    // česká hláška AI schovaná ve varování pipeline („AI detekce selhala (…)") je taky přechodná, ne „vada souboru"
+    expect(classifyFailure("AI detekce selhala (AI je teď přetížená — zkus to za chvíli, nebo vyplň ručně.) — použita jen pravidla.")).toMatchObject({ kind: "ai_busy", transient: true });
+    expect(classifyFailure("AI nestihla doklad přečíst včas — vyplň ručně, nebo to zkus znovu.").transient).toBe(true);
+    expect(classifyFailure("AI vrátila nečitelnou odpověď — zkus doklad nahrát znovu.").transient).toBe(true);
   });
   it("dřívější nepravdivé hlášky se u starých řádků zobrazí poctivě", () => {
     expect(userFacingFailure(LEGACY_PDF_FAILURE_TEXT)).toBe(INTERNAL_RETRY_TEXT);

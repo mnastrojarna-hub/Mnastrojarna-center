@@ -1,3 +1,4 @@
+import { tr } from "@/cad/i18n";
 /** Geometrické veličiny trojúhelníkové sítě (mm). Čisté funkce — testováno ve vitestu. */
 
 export type RawMesh = { position: Float32Array | number[]; index?: Uint32Array | number[] | null };
@@ -64,19 +65,19 @@ export function meshMetrics(meshes: RawMesh[]): Metrics {
 
 /** Hustoty v g/cm³. */
 export const MATERIALS = [
-  { id: "ocel", label: "Ocel", density: 7.85 },
-  { id: "nerez", label: "Nerez", density: 7.95 },
-  { id: "hlinik", label: "Hliník", density: 2.7 },
-  { id: "mosaz", label: "Mosaz", density: 8.5 },
-  { id: "med", label: "Měď", density: 8.96 },
-  { id: "titan", label: "Titan", density: 4.43 },
-  { id: "pom", label: "POM (plast)", density: 1.41 },
-  { id: "1.2311", label: "1.2311 (40CrMnMo7) – formy", density: 7.85 },
-  { id: "1.2343", label: "1.2343 (X38CrMoV5-1) – kalená", density: 7.8 },
-  { id: "1.2738", label: "1.2738 (40CrMnNiMo8-6-4)", density: 7.85 },
-  { id: "1.1730", label: "1.1730 (C45U) – desky", density: 7.85 },
-  { id: "1.7131", label: "1.7131 (16MnCr5) – vedení", density: 7.85 },
-  { id: "1.2516", label: "1.2516 – vyhazovače", density: 7.85 },
+  { id: "ocel", label: tr("Ocel"), density: 7.85 },
+  { id: "nerez", label: tr("Nerez"), density: 7.95 },
+  { id: "hlinik", label: tr("Hliník"), density: 2.7 },
+  { id: "mosaz", label: tr("Mosaz"), density: 8.5 },
+  { id: "med", label: tr("Měď"), density: 8.96 },
+  { id: "titan", label: tr("Titan"), density: 4.43 },
+  { id: "pom", label: tr("POM (plast)"), density: 1.41 },
+  { id: "1.2311", label: tr("1.2311 (40CrMnMo7) – formy"), density: 7.85 },
+  { id: "1.2343", label: tr("1.2343 (X38CrMoV5-1) – kalená"), density: 7.8 },
+  { id: "1.2738", label: tr("1.2738 (40CrMnNiMo8-6-4)"), density: 7.85 },
+  { id: "1.1730", label: tr("1.1730 (C45U) – desky"), density: 7.85 },
+  { id: "1.7131", label: tr("1.7131 (16MnCr5) – vedení"), density: 7.85 },
+  { id: "1.2516", label: tr("1.2516 – vyhazovače"), density: 7.85 },
 ] as const;
 
 /** Hmotnost v kg z objemu v mm³ a hustoty v g/cm³. */

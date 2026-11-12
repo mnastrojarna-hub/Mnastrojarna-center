@@ -20,7 +20,7 @@ import { CaptureBatchDone } from "@/components/jobs/capture/capture-batch-done";
 import {
   INITIAL_FLOW, allTargets, batchProblemAt, batchSaveProblem, canRead, captureReducer, chosenTargets, confirmedGroups, currentSummaries,
   currentTarget, docExtractStatus, extractingCount, jobGroupsToSave, jobsGenitive, mergeAllPlan, missingExtracts, readyRefs,
-  reviewProblem, savedDocIds,
+  reviewProblem, savedDocIds, withAck,
   type CaptureFlowState, type CaptureStep, type PageDraft,
 } from "@/components/jobs/capture/capture-flow";
 import {
@@ -690,6 +690,43 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         editSort(setDocType(s.sort, a.docId, a.type));
         dispatch({ type: "backToSort" });
         return;
+      case "ack":
+        // „Platí POM (z e-mailu)", „Ponechat oba", „Jsou to listy téhož výkresu" — rozhodnutí, nic se nemění
+        dispatch({ type: "batchEdit", state: withAck(st, w.id) });
+        return;
+      case "use_drawing_material": {
+        // materiál položky = materiál z výkresu (řádek Položek, na který výkres míří)
+        const d = a.docId ? st.docs[a.docId] : undefined;
+        const value = (a.value ?? "").trim();
+        if (!d || d.kind !== "drawing" || !value) { dispatch({ type: "batchEdit", state: withAck(st, w.id) }); return; }
+        const link = d.state.link;
+        const groups = link.mode === "docItem"
+          ? st.groups.map((g) => (g.docIds.includes(a.docId!)
+            ? { ...g, job: { ...g.job, items: g.job.items.map((i) => (i.key === link.itemKey ? { ...i, material: value } : i)) } }
+            : g))
+          : st.groups;
+        dispatch({ type: "batchEdit", state: withAck({ ...st, groups }, w.id) });
+        return;
+      }
+      case "link_item": {
+        // „Druhý výkres je A290-7904-Y823" — vazba na řádek Položek a číslo na kartě
+        const d = a.docId ? st.docs[a.docId] : undefined;
+        if (!d || (d.kind !== "drawing" && d.kind !== "model") || (!a.itemKey && !a.itemId)) return;
+        if (savedDocIds(s.batchResult).has(a.docId!)) { dispatch({ type: "failed", error: LOCKED_SORT, step: "review" }); return; }
+        const g = st.groups.find((x) => x.docIds.includes(a.docId!));
+        const row = a.itemKey ? g?.job.items.find((i) => i.key === a.itemKey) : undefined;
+        const next = {
+          ...d,
+          state: {
+            ...d.state,
+            link: a.itemKey ? { mode: "docItem" as const, itemKey: a.itemKey } : { mode: "item" as const, itemId: a.itemId! },
+            drawingNumber: a.value?.trim() || d.state.drawingNumber,
+            ...(d.kind === "drawing" && row?.quantity ? { quantity: row.quantity } : {}),
+          },
+        } as typeof d;
+        dispatch({ type: "batchEdit", state: { ...st, docs: { ...st.docs, [a.docId!]: next } } });
+        return;
+      }
       case "skip_duplicate":
       case "save_version": {
         const ids = a.docId ? [a.docId] : w.docIds;
@@ -836,6 +873,9 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
       : null;
   const waitingCount = batch ? extractingCount(state) : 0;
   const lockedDocs = React.useMemo(() => savedDocIds(state.batchResult), [state.batchResult]);
+  // po částečném uložení: důvod u každého neuloženého dokladu (u karty s nápravou)
+  const failedDocs = React.useMemo(() => Object.fromEntries((state.batchResult?.docs ?? [])
+    .filter((d) => !d.ok && d.error).map((d) => [d.docId, d.error!])), [state.batchResult]);
   const activeDocs = state.sort.docs.filter((d) => !d.excluded).length;
   const batchProblem = state.batchReview && state.batchState ? batchSaveProblem(state.batchReview, state.batchState, lockedDocs) : null;
   const withSort = Boolean(batch && (!batch.skipSort || step === "sort"));
@@ -868,8 +908,8 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
         // kliknutí uvnitř dialogu nesmí probublat do řádku knihy, ze kterého se otevřel
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "top-0 flex h-[100dvh] max-w-6xl flex-col overflow-hidden rounded-none p-0",
-          "sm:top-[3vh] sm:h-[94vh] sm:w-[calc(100%-2rem)] sm:rounded-2xl",
+          "top-0 flex h-[100dvh] max-h-[100dvh] max-w-6xl flex-col overflow-hidden rounded-none p-0",
+          "sm:top-[3dvh] sm:h-[94dvh] sm:max-h-[94dvh] sm:w-[calc(100%-2rem)] sm:rounded-2xl",
         )}
       >
         <div className="flex shrink-0 items-center gap-3 border-b px-3 py-2.5 sm:px-5 sm:py-3">
@@ -952,6 +992,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
                   batch={batch}
                   local={local}
                   locked={lockedDocs}
+                  failed={failedDocs}
                   picking={pickingGroup}
                   onChange={(st) => dispatch({ type: "batchEdit", state: st })}
                   onPickJob={async (groupKey, id) => {
@@ -1006,7 +1047,7 @@ export function CaptureDialog({ open, onOpenChange, jobId, expectedKind, onSaved
           // mobil: fotka nahoře a odjede s formulářem (tlačítko „Fotka" vrátí nahoru); počítač: vedle sebe
           <div ref={reviewScroll} className="relative min-h-0 flex-1 overflow-y-auto scrollbar-thin lg:flex lg:overflow-hidden">
             <div className={cn("border-b bg-muted/20 p-2 sm:p-3 lg:w-[42%] lg:shrink-0 lg:border-b-0 lg:border-r", !showPreview && "hidden lg:block")}>
-              <CapturePages pages={viewer} className="h-[46vh] sm:h-[52vh] lg:h-full" />
+              <CapturePages pages={viewer} className="h-[46dvh] sm:h-[52dvh] lg:h-full" />
             </div>
             <div className="scrollbar-thin p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
               <button
@@ -1146,7 +1187,9 @@ function saveAllLabel(state: CaptureFlowState, locked: Set<string>): string {
   const jobs = state.batchReview && state.batchState
     ? distinctJobCount(jobGroupsToSave(state.batchReview, state.batchState).filter((g) => g.docIds.some((id) => !locked.has(id))))
     : 1;
-  return jobs > 1 ? `Uložit vše do ${jobsGenitive(jobs)} (${docs})` : `Uložit vše (${docs})`;
+  // po částečném uložení: „Uložit zbývající (1)" — uložené doklady zůstávají (ne „jen jeden")
+  const what = locked.size ? "Uložit zbývající" : "Uložit vše";
+  return jobs > 1 ? `${what} do ${jobsGenitive(jobs)} (${docs})` : `${what} (${docs})`;
 }
 
 /** Souhrn nad „Uložit vše" („2 zakázky · 6 dokladů · + nový zákazník…"). */

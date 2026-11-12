@@ -7,7 +7,9 @@ import type {
   JobQuote, JobQuoteItem, JobFile, JobFileAnon, JobFileAnonStatus, JobEvent, JobEventType, JobFilters, JobCustomerDetail, JobCustomerContact,
   JobCustomerRef, PersonRef, JobSort, JobPaymentFilter,
 } from "@/lib/jobs/types";
-import { STAGE_ORDER, CLOSED_STAGES, DELIVERED_STAGES, isJobStage, stageGroup, STAGES, isDeliveredToCustomer } from "@/lib/jobs/stages";
+import {
+  STAGE_ORDER, CLOSED_STAGES, DELIVERED_STAGES, isJobStage, stageGroup, STAGES, isDeliveredToCustomer, isPaidJob, isArchivedJob,
+} from "@/lib/jobs/stages";
 import { isJobFileKind } from "@/lib/jobs/file-kinds";
 import { isOperationKind } from "@/lib/jobs/operations";
 import { effectiveDeadline, deadlineInfo, pragueToday, type DeadlineInput } from "@/lib/jobs/deadlines";
@@ -453,6 +455,108 @@ export function aiFilledColumns(events: { type: string; data: unknown; created_a
 
 // ── Nabídky a soubory ───────────────────────────────────────
 /** Číslo nové verze nabídky: NAB-2026-031 → NAB-2026-031-R2 (stará přípona -Rn se odřízne). */
+/** Řádek položky (zakázky nebo nabídky) pro sestavení nové verze nabídky — sloupce DB, hodnoty i jako text. */
+export interface QuoteRevisionSourceItem {
+  position?: number | null;
+  drawing_id?: string | null;
+  drawing_number?: string | null;
+  name?: string | null;
+  description?: string | null;
+  material?: string | null;
+  quantity?: number | string | null;
+  unit?: string | null;
+  unit_price?: number | string | null;
+  purchase_unit_price?: number | string | null;
+  vat_rate?: number | string | null;
+  note?: string | null;
+}
+
+const QUOTE_DEFAULT_VALID_DAYS = 30;
+
+/**
+ * Platnost nové verze nabídky (majitel 5. 11.: „nový doklad už má mít aktuální datum"): počítá se znovu
+ * ODE DNEŠKA — stejně dlouhá, jakou měla předchozí verze (1–365 dní od jejího vzniku), jinak 30 dní.
+ * Opsat starou platnost nejde: nová verze by mohla vzniknout už prošlá.
+ */
+export function quoteRevisionValidUntil(prev: { validUntil?: string | null; createdAt?: string | null }, today: string = todayIso()): string {
+  let days = QUOTE_DEFAULT_VALID_DAYS;
+  if (prev.validUntil && prev.createdAt) {
+    const from = Date.parse(String(prev.createdAt).slice(0, 10));
+    const to = Date.parse(String(prev.validUntil).slice(0, 10));
+    const d = Math.round((to - from) / 86_400_000);
+    if (Number.isFinite(d) && d >= 1 && d <= 365) days = d;
+  }
+  const t = new Date(`${today}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + days);
+  return t.toISOString().slice(0, 10);
+}
+
+function validVat(v: unknown): number | null {
+  const n = cleanNumber(v);
+  return n !== null && n >= 0 && n <= 100 ? n : null;
+}
+
+/** Nejčastější sazba DPH položek předchozí verze (jinak 21 %). */
+function dominantVatRate(items: QuoteRevisionSourceItem[]): number {
+  const counts = new Map<number, number>();
+  for (const it of items) {
+    const v = validVat(it.vat_rate);
+    if (v !== null) counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  let best = 21;
+  let bestN = 0;
+  for (const [v, n] of counts) if (n > bestN) { best = v; bestN = n; }
+  return best;
+}
+
+function drawingKey(v: unknown): string {
+  // „VK-1", „VK 1" i „vk1" je totéž číslo výkresu
+  return String(v ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Položky nové verze nabídky z AKTUÁLNÍCH položek zakázky (majitel 5. 11.: nový doklad = aktuální data —
+ * po změně počtu nebo ceny v zakázce „nabídka nesedí" a nová verze to má mít správně, ne opsané ze staré).
+ *  - položky, počty, názvy, materiál, jednotky a prodejní ceny ze zakázky;
+ *  - kde zakázka cenu nemá, zůstane cena z předchozí verze (párování podle čísla výkresu, bez něj podle pořadí);
+ *  - DPH a poznámka pro zákazníka z předchozí verze (poznámka položky zakázky je interní — na nabídku nepatří);
+ *  - nákupní cena jen s právem na marže.
+ */
+export function quoteItemsFromJobItems(
+  jobItems: QuoteRevisionSourceItem[],
+  prevItems: QuoteRevisionSourceItem[],
+  opts: { margins: boolean },
+): Record<string, unknown>[] {
+  const prev = [...prevItems].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
+  const byDrawing = new Map<string, QuoteRevisionSourceItem>();
+  for (const it of prev) {
+    const k = drawingKey(it.drawing_number);
+    if (k && !byDrawing.has(k)) byDrawing.set(k, it);
+  }
+  const vat = dominantVatRate(prev);
+  const sorted = [...jobItems].sort((a, b) => Number(a.position ?? 0) - Number(b.position ?? 0));
+  return sorted.map((it, i) => {
+    const k = drawingKey(it.drawing_number);
+    const match = k ? byDrawing.get(k) : prev[i];
+    const unitPrice = cleanMoney(it.unit_price) ?? cleanMoney(match?.unit_price);
+    const purchase = opts.margins ? (cleanMoney(it.purchase_unit_price) ?? cleanMoney(match?.purchase_unit_price)) : null;
+    return {
+      position: i,
+      drawing_id: it.drawing_id ?? null,
+      drawing_number: cleanText(it.drawing_number, 200) ?? cleanText(match?.drawing_number, 200),
+      name: cleanText(it.name, 500) ?? cleanText(match?.name, 500),
+      description: cleanText(it.description, 5000) ?? cleanText(match?.description, 5000),
+      material: cleanText(it.material, 200) ?? cleanText(match?.material, 200),
+      quantity: cleanQuantity(it.quantity),
+      unit: cleanText(it.unit, 20) ?? cleanText(match?.unit, 20) ?? "ks",
+      unit_price: unitPrice,
+      vat_rate: validVat(match?.vat_rate) ?? vat,
+      purchase_unit_price: purchase,
+      note: cleanText(match?.note, 2000),
+    };
+  });
+}
+
 export function quoteRevisionNumber(number: string, revision: number): string {
   const base = number.trim().replace(/-R\d+$/i, "");
   return `${base}-R${revision}`;
@@ -565,7 +669,7 @@ export const JOB_LIST_SELECT = [
   PRODUCTION_LIST_COLUMNS,
   "customer_note, delivery_note_confirmed_at, invoice_number, invoice_due_date, paid_at",
   FLOW_LIST_COLUMNS,
-  "customer:customers!customer_id(id, name, customer_number, ico)",
+  "customer:customers!customer_id(id, name, customer_number, ico, is_premium)",
   `owner:profiles!owner_id(${PERSON})`,
   `assignee:profiles!assignee_id(${PERSON})`,
   `creator:profiles!created_by(${PERSON})`,
@@ -583,7 +687,7 @@ export const JOB_LIST_SELECT = [
 
 export const JOB_DETAIL_SELECT = [
   "*",
-  "customer:customers!customer_id(id, name, customer_number, supplier_number_at_customer, ico, dic, street, city, zip, country, email, phone, contact_person, delivery_address, payment_terms_days, address, contacts:customer_contacts!customer_id(id, name, position, email, phone, is_primary))",
+  "customer:customers!customer_id(id, name, customer_number, supplier_number_at_customer, ico, dic, is_premium, street, city, zip, country, email, phone, contact_person, delivery_address, payment_terms_days, address, contacts:customer_contacts!customer_id(id, name, position, email, phone, is_primary))",
   `owner:profiles!owner_id(${PERSON})`,
   `assignee:profiles!assignee_id(${PERSON})`,
   `creator:profiles!created_by(${PERSON})`,
@@ -618,15 +722,15 @@ export const JOB_QUOTE_SELECT = [
 export const QUOTE_LIST_SELECT = [
   JOB_QUOTE_SELECT,
   "job:orders!job_id(id, number, title, status, quote_id)",
-  "customer:customers!customer_id(id, name)",
+  "customer:customers!customer_id(id, name, is_premium)",
 ].join(", ");
 
 export const JOB_FILE_SELECT = [
   "id, job_id, kind, title, filename, mime_type, size_bytes, storage_path, version, archived, replaced_by",
-  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin",
+  "quote_id, ai_extracted, ai_confidence, note, created_at, uploaded_by, issuer, origin, order_item_id",
   // anonymizace výkresů (odznak, menu) — bez anon_ai_cache (velké, jen pro službu)
   "anon_status, anon_filename, anon_at, anon_by, anon_actor_kind, anon_reason, anon_reviewed_at, anon_reviewed_by, anon_summary, anon_pages, anon_method",
-  "anon_priority, anon_lock_until",
+  "anon_priority, anon_lock_until, anon_attempts",
   `uploader:profiles!uploaded_by(${PERSON})`,
 ].join(", ");
 
@@ -639,7 +743,7 @@ export const JOB_EVENT_SELECT =
   `id, job_id, type, message, data, actor_id, actor_kind, actor_name, via, agent, entity, created_at, actor:profiles!actor_id(${PERSON})`;
 
 /** Počty Knihy: stav, termíny a dodané položky (zakázka dodaná celá, i když se stav neposunul → Dokončené). */
-export const JOB_COUNT_SELECT = "id, status, due_date, customer_required_date, max_tolerated_date, supplier_promised_date, items_count, items_delivered";
+export const JOB_COUNT_SELECT = "id, status, due_date, customer_required_date, max_tolerated_date, supplier_promised_date, items_count, items_delivered, paid_at";
 
 export const MATCH_JOB_SELECT = [
   "id, number, title, status, created_at, customer_id, customer_order_number, customer_inquiry_number, customer_contact_email",
@@ -679,6 +783,8 @@ export interface CustomerEmbed {
   delivery_address?: string | null;
   payment_terms_days?: number | null;
   address?: string | null;
+  /** Prémiový zákazník (20261109150000) — zvýraznění všech jeho zakázek. */
+  is_premium?: boolean | null;
   contacts?: CustomerContactEmbed[] | null;
 }
 
@@ -871,7 +977,7 @@ export interface QuoteRow {
   returner?: Embed<PersonEmbed>;
   items?: ItemRow[] | null;
   job?: Embed<{ id: string; number: string | null; title: string | null; status: string; quote_id?: string | null }>;
-  customer?: Embed<{ id: string; name: string }>;
+  customer?: Embed<{ id: string; name: string; is_premium?: boolean | null }>;
 }
 
 export interface FileRow {
@@ -892,6 +998,7 @@ export interface FileRow {
   note?: string | null;
   created_at: string;
   uploaded_by?: string | null;
+  order_item_id?: string | null;
   issuer?: string | null;
   origin?: string | null;
   anon_status?: string | null;
@@ -907,6 +1014,7 @@ export interface FileRow {
   anon_method?: string | null;
   anon_priority?: number | null;
   anon_lock_until?: string | null;
+  anon_attempts?: number | null;
   uploader?: Embed<PersonEmbed>;
   job?: Embed<{ id: string; number: string | null; title: string | null; customer?: Embed<{ name: string }> }>;
 }
@@ -949,6 +1057,14 @@ function customerRef(c: Embed<CustomerEmbed>): JobCustomerRef | null {
   const x = one(c);
   if (!x || !x.id) return null;
   return { id: x.id, name: x.name, customerNumber: x.customer_number ?? null, ico: x.ico ?? null };
+}
+
+/**
+ * Prémiový zákazník (9. 11.): zakázka se zvýrazní „Pozor, prémiový zákazník". Čte se živě ze zákazníka (embed),
+ * na zakázku se nekopíruje — přepnutí v kartě zákazníka se hned projeví na všech jeho zakázkách.
+ */
+export function isPremiumCustomer(c: Embed<{ is_premium?: boolean | null }>): boolean {
+  return one(c)?.is_premium === true;
 }
 
 function stageOf(v: unknown): JobStage {
@@ -1071,6 +1187,7 @@ export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
     stage: stageOf(row.status),
     priority: isPriority(row.priority) ? row.priority : "stredni",
     customer: customerRef(row.customer),
+    customerPremium: isPremiumCustomer(row.customer),
     customerOrderNumber: row.customer_order_number ?? null,
     customerInquiryNumber: row.customer_inquiry_number ?? null,
     drawingNumbers,
@@ -1231,6 +1348,9 @@ export function rowToJobFile(row: FileRow): JobFile {
     issuer: FILE_ISSUERS.includes(row.issuer as DocIssuerKey) ? (row.issuer as DocIssuerKey) : null,
     origin: FILE_ORIGINS.includes(row.origin as JobFileOrigin) ? (row.origin as JobFileOrigin) : null,
     anon: rowToFileAnon(row),
+    // výkres ↔ položka (prohlížeč výkresů zakázky: počet kusů a materiál v hlavičce)
+    ...(row.order_item_id !== undefined ? { orderItemId: row.order_item_id ?? null } : {}),
+    ...((row.kind === "vykres" || row.kind === "model_3d") && ai && typeof ai.drawingNumber === "string" && ai.drawingNumber.trim() ? { drawingNumber: ai.drawingNumber.trim().slice(0, 120) } : {}),
   };
 }
 
@@ -1269,6 +1389,7 @@ export function rowToFileAnon(row: FileRow): JobFileAnon | null {
     // backfill = priorita ≥ 9 (BACKFILL_PRIORITY v lib/anonymize/queue)
     backfill: status === "pending" && (row.anon_priority ?? 0) >= 9,
     lockUntil: row.anon_lock_until ?? null,
+    attempts: typeof row.anon_attempts === "number" ? row.anon_attempts : null,
   };
 }
 
@@ -1525,7 +1646,7 @@ export function matchesFlow(
 /** Fulltext (všechna slova musí sedět, bez diakritiky) + termín + výroba (operace, místo) + platba. */
 export function filterJobs(
   items: JobListItem[],
-  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer" | "exception" | "lostReason">,
+  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer" | "paid" | "exception" | "lostReason" | "premium">,
   today: Date = pragueToday(),
 ): JobListItem[] {
   const exception = filters.exception && isExceptionFilter(filters.exception) ? filters.exception : null;
@@ -1535,8 +1656,13 @@ export function filterJobs(
   const location = searchNormalize((filters.location ?? "").trim());
   const todayDay = todayIso(today);
   const delivered = filters.deliveredToCustomer;
+  const paid = filters.paid;
   return items.filter((j) => {
+    // 9. 11.: jen zakázky prémiových zákazníků (chip „Prémioví")
+    if (filters.premium && !j.customerPremium) return false;
     if (typeof delivered === "boolean" && isDeliveredToCustomer(j) !== delivered) return false;
+    // Archiv (zaplacené) ↔ Dokončené (dodané, čekají na peníze)
+    if (typeof paid === "boolean" && isPaidJob(j) !== paid) return false;
     // výjimky v toku (Bez objednávky, Reklamace, Pozastaveno, Nová revize výkresu, Opraveno) a důvod prohry
     if (exception && !matchesException(j, exception)) return false;
     if (lostReason && (j.flow?.lostReason ?? "neuvedeno") !== lostReason) return false;
@@ -1597,6 +1723,11 @@ export interface JobStageCounts {
    * v Knize patří do Dokončených, ne do Objednávek v běhu (isDeliveredToCustomer).
    */
   deliveredByStage: Partial<Record<JobStage, number>>;
+  /**
+   * Zakázky v Archivu Knihy po stavech: zboží u zákazníka a zaplaceno (isArchivedJob) — Dokončeno vždy,
+   * Dodáno zákazníkovi / Vyfakturováno (i stav před dodáním s dodaným vším) jen s datem úhrady.
+   */
+  archivedByStage: Partial<Record<JobStage, number>>;
   active: number;
   overdue: number;
   dueThisWeek: number;
@@ -1605,7 +1736,7 @@ export interface JobStageCounts {
 
 export function emptyStageCounts(): JobStageCounts {
   const byStage = Object.fromEntries(STAGE_ORDER.map((s) => [s, 0])) as Record<JobStage, number>;
-  return { byStage, deliveredByStage: {}, active: 0, overdue: 0, dueThisWeek: 0, total: 0 };
+  return { byStage, deliveredByStage: {}, archivedByStage: {}, active: 0, overdue: 0, dueThisWeek: 0, total: 0 };
 }
 
 /** Počty pro chipy filtrů a přehled. */
@@ -1613,6 +1744,7 @@ export function countJobStages(
   rows: {
     status: string; due_date?: string | null; customer_required_date?: string | null; max_tolerated_date?: string | null;
     supplier_promised_date?: string | null; items_count?: number | string | null; items_delivered?: number | string | null;
+    paid_at?: string | null;
   }[],
   today: Date = pragueToday(),
 ): JobStageCounts {
@@ -1621,10 +1753,14 @@ export function countJobStages(
     const stage = stageOf(r.status);
     out.total++;
     out.byStage[stage]++;
+    const flow = { itemsCount: num(r.items_count), itemsDelivered: num(r.items_delivered) };
     // jen „opožděný" stav (před dodáním, dodáno vše); Dodáno zákazníkovi a dál se počítá podle stavu
-    if (!DELIVERED_STAGES.includes(stage)
-        && isDeliveredToCustomer({ stage, flow: { itemsCount: num(r.items_count), itemsDelivered: num(r.items_delivered) } })) {
+    if (!DELIVERED_STAGES.includes(stage) && isDeliveredToCustomer({ stage, flow })) {
       out.deliveredByStage[stage] = (out.deliveredByStage[stage] ?? 0) + 1;
+    }
+    // Archiv: dodáno a zaplaceno (Dokončeno vždy; jinak podle data úhrady)
+    if (isArchivedJob({ stage, flow, paidAt: r.paid_at ?? null })) {
+      out.archivedByStage[stage] = (out.archivedByStage[stage] ?? 0) + 1;
     }
     if (!CLOSED_STAGES.includes(stage)) out.active++;
     const info = deadlineInfo({

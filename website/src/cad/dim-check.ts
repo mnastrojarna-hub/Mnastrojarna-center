@@ -4,6 +4,7 @@
  * (automatické i uživatelské). Automatické kótování je jen pomocný základ – tato kontrola ukáže, co chybí.
  * Čisté funkce (testovatelné v Node).
  */
+import { tr } from "./i18n";
 import { threadByName, threadLabel } from "./defaults";
 import type { CadDoc, Feature, Vec3 } from "./types";
 
@@ -39,9 +40,9 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
     const L = bbox[1][0] - bbox[0][0];
     const W = bbox[1][1] - bbox[0][1];
     const H = bbox[1][2] - bbox[0][2];
-    push(out, "lin", L, `${fmt(L)} (délka X)`, "celkové rozměry");
-    push(out, "lin", W, `${fmt(W)} (šířka Y)`, "celkové rozměry");
-    push(out, "lin", H, `${fmt(H)} (výška Z)`, "celkové rozměry");
+    push(out, "lin", L, tr("{0} (délka X)", fmt(L)), tr("celkové rozměry"));
+    push(out, "lin", W, tr("{0} (šířka Y)", fmt(W)), tr("celkové rozměry"));
+    push(out, "lin", H, tr("{0} (výška Z)", fmt(H)), tr("celkové rozměry"));
   }
   const sketchUsed = new Set(doc.features.flatMap((f) => ("sketchId" in f && typeof f.sketchId === "string" ? [f.sketchId] : "profileId" in f ? [f.profileId] : [])));
   for (const f of doc.features as Feature[]) {
@@ -55,30 +56,30 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
           const t = threadByName(f.thread);
           push(out, "thread", t?.d ?? parseFloat(f.thread.replace(/^m/i, "")), `${cnt}${threadLabel(f.thread)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}`, src);
         } else push(out, "dia", f.diameter, `${cnt}Ø${fmt(f.diameter)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"}`, src);
-        if (f.depth > 0) push(out, "lin", f.depth, `${fmt(f.depth)} (hloubka díry)`, src);
+        if (f.depth > 0) push(out, "lin", f.depth, tr("{0} (hloubka díry)", fmt(f.depth)), src);
         if (f.cbDiameter > 0) {
-          push(out, "dia", f.cbDiameter, `Ø${fmt(f.cbDiameter)} (zahloubení)`, src);
-          push(out, "lin", f.cbDepth, `${fmt(f.cbDepth)} (hloubka zahloubení)`, src);
+          push(out, "dia", f.cbDiameter, tr("Ø{0} (zahloubení)", fmt(f.cbDiameter)), src);
+          push(out, "lin", f.cbDepth, tr("{0} (hloubka zahloubení)", fmt(f.cbDepth)), src);
         }
-        if (f.csDiameter) push(out, "dia", f.csDiameter, `Ø${fmt(f.csDiameter)} (kuželové zahloubení)`, src);
+        if (f.csDiameter) push(out, "dia", f.csDiameter, tr("Ø{0} (kuželové zahloubení)", fmt(f.csDiameter)), src);
         break;
       }
       case "cylinder":
         push(out, "dia", 2 * f.radius, `Ø${fmt(2 * f.radius)}`, src);
-        push(out, "lin", f.height, `${fmt(f.height)} (výška)`, src);
+        push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
         break;
       case "tube":
         push(out, "dia", f.outer, `Ø${fmt(f.outer)}`, src);
         if (f.inner > 0) push(out, "dia", f.inner, `Ø${fmt(f.inner)}`, src);
-        push(out, "lin", f.height, `${fmt(f.height)} (výška)`, src);
+        push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
         break;
       case "sphere":
-        push(out, "dia", 2 * f.radius, `Ø${fmt(2 * f.radius)} (koule)`, src);
+        push(out, "dia", 2 * f.radius, tr("Ø{0} (koule)", fmt(2 * f.radius)), src);
         break;
       case "cone":
         push(out, "dia", 2 * f.radius1, `Ø${fmt(2 * f.radius1)}`, src);
         if (f.radius2 > 0) push(out, "dia", 2 * f.radius2, `Ø${fmt(2 * f.radius2)}`, src);
-        push(out, "lin", f.height, `${fmt(f.height)} (výška)`, src);
+        push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
         break;
       case "box":
         for (const v of f.size) push(out, "lin", v, `${fmt(v)}`, src);
@@ -88,7 +89,7 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
         const d = f.extent?.kind === "blind" ? f.extent.d : f.distance;
         // průchozí odebrání (řez skrz celý díl): délka nástroje není rozměr součásti
         if (f.mode === "cut" && bbox && d >= Math.max(bbox[1][0] - bbox[0][0], bbox[1][1] - bbox[0][1], bbox[1][2] - bbox[0][2]) - 1e-6) break;
-        push(out, "lin", d, `${fmt(d)} (${f.mode === "cut" ? "hloubka odebrání" : "výška vysunutí"})`, src);
+        push(out, "lin", d, tr("{0} ({1})", fmt(d), f.mode === "cut" ? tr("hloubka odebrání") : tr("výška vysunutí")), src);
         break;
       }
       case "revolve": {
@@ -102,18 +103,18 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
           const pts: Vec2Like[] = e.type === "polyline" ? e.points : e.type === "line" ? [e.a, e.b] : e.type === "rect" ? [[e.cx - e.w / 2, e.cy - e.h / 2], [e.cx + e.w / 2, e.cy + e.h / 2]] : [];
           for (const p of pts) if (Math.abs(p[rad]) > 1e-6) push(out, "dia", 2 * Math.abs(p[rad]), `Ø${fmt(2 * Math.abs(p[rad]))}`, src);
           if (e.type === "rect") {
-            push(out, "lin", e.type === "rect" ? (ax === 0 ? e.w : e.h) : 0, `${fmt(ax === 0 ? e.w : e.h)} (délka)`, src);
+            push(out, "lin", e.type === "rect" ? (ax === 0 ? e.w : e.h) : 0, tr("{0} (délka)", fmt(ax === 0 ? e.w : e.h)), src);
             continue;
           }
           for (let i = 1; i < pts.length; i++) {
             const a = pts[i - 1];
             const b = pts[i];
-            if (Math.abs(a[rad] - b[rad]) < 1e-6 && Math.abs(a[ax] - b[ax]) > 1e-6) push(out, "lin", Math.abs(a[ax] - b[ax]), `${fmt(Math.abs(a[ax] - b[ax]))} (délka Ø${fmt(2 * Math.abs(a[rad]))})`, src);
+            if (Math.abs(a[rad] - b[rad]) < 1e-6 && Math.abs(a[ax] - b[ax]) > 1e-6) push(out, "lin", Math.abs(a[ax] - b[ax]), tr("{0} (délka Ø{1})", fmt(Math.abs(a[ax] - b[ax])), fmt(2 * Math.abs(a[rad]))), src);
           }
           if (e.type === "polyline" && e.closed && pts.length > 2) {
             const a = pts[pts.length - 1];
             const b = pts[0];
-            if (Math.abs(a[rad] - b[rad]) < 1e-6 && Math.abs(a[ax] - b[ax]) > 1e-6) push(out, "lin", Math.abs(a[ax] - b[ax]), `${fmt(Math.abs(a[ax] - b[ax]))} (délka Ø${fmt(2 * Math.abs(a[rad]))})`, src);
+            if (Math.abs(a[rad] - b[rad]) < 1e-6 && Math.abs(a[ax] - b[ax]) > 1e-6) push(out, "lin", Math.abs(a[ax] - b[ax]), tr("{0} (délka Ø{1})", fmt(Math.abs(a[ax] - b[ax])), fmt(2 * Math.abs(a[rad]))), src);
           }
         }
         break;
@@ -145,12 +146,12 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
             push(out, "lin", e.h, `${fmt(e.h)}`, src);
             if (e.r > 0) push(out, "rad", e.r, `R${fmt(e.r)} (rohy)`, src);
           } else if (e.type === "slot") {
-            push(out, "lin", e.length, `${fmt(e.length)} (délka drážky)`, src);
-            push(out, "lin", e.width, `${fmt(e.width)} (šířka drážky)`, src);
-          } else if (e.type === "polygon") push(out, "dia", 2 * e.r, `Ø${fmt(2 * e.r)} (opsaná kružnice ${e.sides}-úhelníku)`, src);
+            push(out, "lin", e.length, tr("{0} (délka drážky)", fmt(e.length)), src);
+            push(out, "lin", e.width, tr("{0} (šířka drážky)", fmt(e.width)), src);
+          } else if (e.type === "polygon") push(out, "dia", 2 * e.r, tr("Ø{0} (opsaná kružnice {1}-úhelníku)", fmt(2 * e.r), e.sides), src);
           else if (e.type === "ellipse") {
-            push(out, "lin", 2 * e.rx, `${fmt(2 * e.rx)} (elipsa)`, src);
-            push(out, "lin", 2 * e.ry, `${fmt(2 * e.ry)} (elipsa)`, src);
+            push(out, "lin", 2 * e.rx, tr("{0} (elipsa)", fmt(2 * e.rx)), src);
+            push(out, "lin", 2 * e.ry, tr("{0} (elipsa)", fmt(2 * e.ry)), src);
           }
         }
         break;
@@ -158,20 +159,20 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
         push(out, "rad", f.radius, `R${fmt(f.radius)}`, src);
         break;
       case "chamfer":
-        push(out, "lin", f.distance, `${fmt(f.distance)}×45° (sražení)`, src);
+        push(out, "lin", f.distance, tr("{0}×45° (sražení)", fmt(f.distance)), src);
         break;
       case "shell":
-        push(out, "lin", f.thickness, `${fmt(f.thickness)} (tloušťka stěny)`, src);
+        push(out, "lin", f.thickness, tr("{0} (tloušťka stěny)", fmt(f.thickness)), src);
         break;
       case "pattern":
         if (f.kind === "linear") {
-          push(out, "lin", f.spacing, `${fmt(f.spacing)} (rozteč)`, src);
-          if (f.spacing2) push(out, "lin", f.spacing2, `${fmt(f.spacing2)} (rozteč)`, src);
+          push(out, "lin", f.spacing, tr("{0} (rozteč)", fmt(f.spacing)), src);
+          if (f.spacing2) push(out, "lin", f.spacing2, tr("{0} (rozteč)", fmt(f.spacing2)), src);
         }
         break;
       case "spring":
-        push(out, "dia", 2 * f.radius, `Ø${fmt(2 * f.radius)} (pružina)`, src);
-        push(out, "lin", f.pitch, `${fmt(f.pitch)} (stoupání)`, src);
+        push(out, "dia", 2 * f.radius, tr("Ø{0} (pružina)", fmt(2 * f.radius)), src);
+        push(out, "lin", f.pitch, tr("{0} (stoupání)", fmt(f.pitch)), src);
         break;
       default:
         break;

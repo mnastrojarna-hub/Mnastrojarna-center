@@ -57,6 +57,8 @@ export interface HandoffState {
   acceptLate: boolean;
   /** „Rovnou odeslat dodavateli" (jen s právem na ceny). */
   sendNow: boolean;
+  /** „Odeslat z" — jen super admin (null / neuvedeno = moje schránka; server pravidlo ověří). */
+  fromMailboxId?: string | null;
   note: string;
   /** Další krok: připravený krok / jiný krok. */
   advance: "next" | "other";
@@ -741,6 +743,7 @@ export function inputFromState(plan: HandoffPlan, state: HandoffState): HandoffI
   if (fd) input.finalDate = fd;
   if (state.updateCustomerDate && plan.permissions.canConfirmCustomerDate) input.updateCustomerDate = true;
   if (state.sendNow && plan.permissions.canSend && newOrderCount(state) > 0) input.sendNow = ["*"];
+  if (state.fromMailboxId && plan.permissions.canSend) input.fromMailboxId = state.fromMailboxId;
   const cur = plan.current;
   const running = cur && (cur.status === "probiha" || cur.status === "problem");
   if ((state.kind === "dalsi_krok" || state.kind === "ukonceni") && cur && running) {

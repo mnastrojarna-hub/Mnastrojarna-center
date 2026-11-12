@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import {
   Building2, UserRound, Hash, FileDigit, Users, Factory, Truck, StickyNote, Tag, Calculator, Percent,
-  ShoppingCart, ReceiptText, MessageSquareQuote, Banknote, MapPin, ClipboardList, X, Plus, Loader2,
+  ShoppingCart, ReceiptText, MessageSquareQuote, MapPin, ClipboardList, X, Plus, Loader2,
   CalendarDays, BadgeCheck, PenLine, ExternalLink, Handshake, Lock, type LucideIcon,
 } from "lucide-react";
 import type { JobDetail } from "@/lib/jobs/types";
@@ -23,6 +23,7 @@ import type { JobPurchasing } from "@/lib/jobs/purchasing-types";
 import { TechnologyCard } from "./technology-card";
 import { JobContactPicker } from "./contact-picker";
 import { PrintButton } from "@/components/print/print-button";
+import { ConsistencyBadges, JobValueField, PurchaseCostField, useJobConsistency } from "./consistency-ui";
 
 /** „změna · J. Novák · před 2 dny" pod klíčovým polem (M12). */
 function FieldStamp({ stamps, column }: { stamps?: Record<string, ChangeStamp>; column: string }) {
@@ -227,11 +228,21 @@ export function OverviewTab({ job, fieldStamps, production, purchasing }: {
   const personDisplay = (o: SelectOption | null) =>
     o ? <PersonChip name={o.label} /> : <span className="text-muted-foreground">— nikdo —</span>;
 
+  // křížová kontrola údajů (hodnota × položky, nákup × objednávky, kusy, termíny) — 4. 11.
+  const issues = useJobConsistency(job, purchasing);
+  const moneyIssues = (field: string) => issues.filter((i) => i.field === field);
+  const otherIssues = issues.filter((i) => i.field !== "value" && i.field !== "purchaseCost");
+
   const cd = job.customerDetail;
   const address = cd ? [cd.street, [cd.zip, cd.city].filter(Boolean).join(" "), cd.country && cd.country !== "CZ" ? cd.country : null].filter(Boolean).join(", ") : "";
 
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {otherIssues.length > 0 && (
+        <section aria-label="Údaje zakázky, které spolu nesedí" className="md:col-span-2 xl:col-span-3" data-testid="consistency-overview">
+          <ConsistencyBadges issues={otherIssues} />
+        </section>
+      )}
       {job.customerNote && (
         <section
           aria-label="Domluvy se zákazníkem"
@@ -362,19 +373,18 @@ export function OverviewTab({ job, fieldStamps, production, purchasing }: {
           <p className="-mt-2 text-[11px] text-muted-foreground" data-testid="step-suppliers">Kroky dělá: {stepSuppliers.join(", ")}</p>
         )}
         <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2">
-          <JobField
-            field="value" kind="money" currency={job.currency} label="Prodejní hodnota (bez DPH)" value={job.value}
-            icon={Banknote} iconClass="text-emerald-500" placeholder="Doplnit částku"
-            hint="Počítá se z položek, nebo z přijaté nabídky."
-          />
+          <JobValueField job={job} />
           <FieldStamp stamps={fieldStamps} column="value" />
           {perms.margins && (
-            <JobField
-              field="purchaseCost" kind="money" currency={job.currency} label="Nákupní náklady" value={job.purchaseCost}
-              icon={ShoppingCart} iconClass="text-emerald-500" placeholder="Doplnit nákup"
-            />
+            <PurchaseCostField job={job} purchasing={purchasing}>
+              <JobField
+                field="purchaseCost" kind="money" currency={job.currency} label="Nákupní náklady" value={job.purchaseCost}
+                icon={ShoppingCart} iconClass="text-emerald-500" placeholder="Doplnit nákup"
+              />
+            </PurchaseCostField>
           )}
         </div>
+        <ConsistencyBadges issues={[...moneyIssues("value"), ...moneyIssues("purchaseCost")]} />
         {perms.margins && (
           <div className={cn(
             "flex items-center justify-between rounded-lg px-3 py-2 text-sm",

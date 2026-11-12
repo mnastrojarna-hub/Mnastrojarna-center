@@ -13,7 +13,11 @@ export interface ManagedUser {
   position: string | null;
   /** Provize v procentech (8.5 = 8,5 %). */
   commissionPercent: number;
+  /** Poslední přihlášení (pro majitele nepodstatné — zůstává jen v title). */
   lastSeenAt: string | null;
+  /** 9. 11.: poslední skutečná akce v aplikaci (kliknutí / klávesa, ~1 min) a stránka, kde k ní došlo. */
+  lastActiveAt?: string | null;
+  lastActivePath?: string | null;
   createdAt: string;
   /** Smlouvy o provizi (historie, nejnovější první); prázdné = sazba z profilu. */
   commissionRules?: CommissionRuleView[];
@@ -29,6 +33,18 @@ export interface ManagedUser {
   quoteApproverChangedAt?: string | null;
   /** 31. 10.: smí poptávat dodavatele (profil can_rfq; obchodník a super admin vždy). Výchozí ne. */
   canRfq?: boolean;
+  /**
+   * 9. 11.: smí ručně měnit stav zakázky dopředu i dozadu, včetně koncových stavů (profil can_change_stage;
+   * obchodník a super admin vždy). Výchozí ne.
+   */
+  canChangeStage?: boolean;
+  /**
+   * 9. 11.: smí řešit frontu ke schválení (profil can_resolve_queue; super admin vždy) — odchozí e-maily, objednávky
+   * dodavatelům, stav zakázky z pošty; AI návrh nabídky ne. Výchozí ne.
+   */
+  canResolveQueue?: boolean;
+  /** 9. 11.: vidí nákupní ceny a marže (profil can_see_margins; obchodník a super admin vždy). Výchozí ne. */
+  canSeeMargins?: boolean;
   /**
    * 2. 11.: „Plný přístup" (profil full_access; ne u super admina) — vše jako super admin kromě pošty ostatních
    * schránek a správy uživatelů. Výchozí ne.

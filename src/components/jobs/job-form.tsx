@@ -13,7 +13,7 @@ import { Combobox, type ComboOption } from "@/components/jobs/book/combobox";
 import { NativeSelect } from "@/components/jobs/book/native-select";
 import { StagePicker } from "@/components/jobs/book/stage-picker";
 import {
-  DATE_FIELDS, PRIORITIES, UNITS, MAX_TITLE, emptyItem, findSameCustomer, firstErrorKey, formTotals, initialFormState,
+  DATE_FIELDS, PRIORITIES, UNITS, MAX_TITLE, emptyItem, findSameCustomer, firstErrorKey, formTotals, formValueHint, initialFormState,
   customerOwnerOf, lineTotal, ownerHint, ownerPreview, validateJobForm, type ItemDraft, type JobFormErrors, type JobFormInitial, type JobFormState, type JobFormValues,
 } from "@/components/jobs/book/job-form-model";
 import { formatMoney } from "@/components/jobs/book/job-cells";
@@ -522,10 +522,11 @@ export function JobForm({
           stickyFooter && "sticky bottom-0 z-20 -mx-4 bg-popover/95 px-4 pb-3 backdrop-blur sm:-mx-6 sm:px-6",
         )}
       >
-        <div className="text-sm text-muted-foreground">
+        <div className="text-sm text-muted-foreground" data-testid="job-form-totals">
           {totals.value !== null ? (
             <span>
               Hodnota: <strong className="text-foreground tabular-nums">{formatMoney(totals.value)}</strong>
+              <span className="ml-1 text-xs">{formValueHint(totals)}</span>
               {margins && totals.purchase !== null && (
                 <>
                   {" · "}nákup <span className="tabular-nums">{formatMoney(totals.purchase)}</span>
@@ -541,7 +542,7 @@ export function JobForm({
               )}
             </span>
           ) : (
-            <span className="text-xs">Cena se doplní později (nacenění dělá člověk).</span>
+            <span className="text-xs">{formValueHint(totals)}</span>
           )}
         </div>
         <div className="flex gap-2">

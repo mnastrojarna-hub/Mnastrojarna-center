@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import {
   JOURNAL_CONFLICT, applyGroupFills, canAutoApplyBatch, groupBatch, groupDocOf, journalConflictOf, mergeGroupDoc, primaryDocId, reconcileGroup,
-  sameDocParty,
+  sameDocParty, sharedItemWarnings,
   sanitizeBatchApplyState, swapParties, type GroupDraft, type GroupJobCandidate, type ReconcileDoc,
 } from "./capture-batch-reconcile";
 import type { BatchApplyState, BatchDocType, BatchPage, BatchReviewModel, DocApplyState, DocExtractSummary } from "./capture-batch-types";
 import type { ExtractedBusinessDoc, ExtractedItem, ExtractedParty } from "./capture-types";
 import { emptyExtracted, emptyParty } from "./extracted-normalize";
 import type { JobDetail } from "./types";
-import { BATCH_TYPES } from "./capture-batch";
+import { BATCH_TYPES, blankDraft } from "./capture-batch";
 
 const OUR = "04304080";
 const STROJ: ExtractedParty = { ...emptyParty(), name: "STROJMETAL, a. s.", ico: "45274649", contactPerson: "Ing. Dvořák" };
@@ -293,10 +293,16 @@ describe("primární doklad a sloučení", () => {
     const s3 = res.docStates[v3.id];
     expect(s3.kind === "drawing" && s3.state.link).toEqual({ mode: "none" });
     expect(res.warnings.some((w) => w.code === "unlinked_drawing" && w.docIds[0] === v3.id)).toBe(true);
-    // skupina bez obchodního dokladu s položkami → výkres založí položku
-    const alone = reconcile([rd("vykres", { extract: { kind: "drawing", drawing: drawing("7000-01", "A") } })], { group: { targetRequired: true } });
+    // skupina bez obchodního dokladu s položkami → výkres založí položku: VIDITELNÝ řádek v Položkách
+    // (číslo, revize, název z výkresu, počet prázdný = „doplň počet"), výkres na něj míří vazbou docItem
+    const vd = rd("vykres", { extract: { kind: "drawing", drawing: drawing("7000-01", "A") } });
+    const alone = reconcile([vd], { group: { targetRequired: true } });
     const sa = Object.values(alone.docStates)[0];
-    expect(sa.kind === "drawing" && sa.state.link).toEqual({ mode: "add" });
+    expect(sa.kind === "drawing" && sa.state.link).toEqual({ mode: "docItem", itemKey: `draw-${vd.id}` });
+    expect(alone.state.job.items).toEqual([expect.objectContaining({ key: `draw-${vd.id}`, drawingNumber: "7000-01", revision: "A", quantity: "", unit: "ks" })]);
+    expect(alone.review.itemSources[`draw-${vd.id}`]?.[0]?.label).toBe("z výkresu 7000-01");
+    expect(alone.review.itemOptions[""].map((o2) => o2.link.mode)).toEqual(["docItem", "add", "none"]);
+    expect(alone.warnings.some((w) => w.code === "drawing_quantity_missing")).toBe(true);
     expect(alone.state.job.targetKey).toBe("");
     expect(alone.warnings.find((w) => w.code === "target_required")?.severity).toBe("block");
   });
@@ -569,5 +575,118 @@ describe("duplicita obchodního dokladu — stejný doklad, ne jen stejné čís
     expect(sameDocParty({ customer: { name: "STROJMETAL, a. s." } }, order, { ico: "", name: "STROJMETAL, a. s." })).toBe("yes");
     expect(sameDocParty({ documentNumber: "1001" }, order, STROJ)).toBe("unknown");
     expect(sameDocParty(null, order, null)).toBe("unknown");
+  });
+});
+
+// ── Text e-mailu jako doklad dávky (majitel 6. 11.) ──────────
+describe("text e-mailu jako doklad bez souboru", () => {
+  const STEEL: ExtractedParty = { ...emptyParty(), name: "STEELING, s.r.o.", ico: "08542311", dic: "CZ08542311", city: "Prostějov", zip: "796 01", email: "jan.cejka@steeling.cz", phone: "+420 777 248 197", contactPerson: "Jan Čejka" };
+  const mailDoc = (over: Partial<ExtractedBusinessDoc> = {}) => bdoc({ docKind: "poptavka", issuer: "zakaznik", customer: STEEL, requiredDeliveryDate: "2026-12-15", summary: "Poptávka – stud bolt M42", items: [item("SDF000637.4", { quantity: 20, name: "" })], ...over });
+  const mail = (over: Partial<ExtractedBusinessDoc> = {}) => rd("poptavka_zakaznik", { id: "mail", doc: mailDoc(over), source: "mail", aiUsed: false, bundleKey: "mail:1" });
+  const stud = () => rd("vykres", { extract: { kind: "drawing", drawing: { ...drawing("SDF000637.4", "A"), title: "Stud bolt M42" } }, aiUsed: true });
+
+  it("e-mail + výkres bez objednávky: text je primární — zákazník z podpisu (nový), kontakt, položka z textu s počtem, výkres na ni míří, název z výkresu", () => {
+    const v = stud();
+    const res = reconcile([mail(), v]);
+    expect(res.review.docIds).toEqual([v.id]);                 // text e-mailu nemá kartu
+    expect(res.state.docIds).toEqual([v.id]);
+    expect(res.review.primaryDocId).toBeNull();
+    expect(res.docs.map((d) => d.docId)).toEqual([v.id]);
+    const job = res.state.job;
+    expect(job.targetKey).toBe("new");
+    expect(job.stage).toBe("poptavka");
+    expect(job.customer).toEqual({ mode: "new", party: STEEL });
+    expect(job.fields).toMatchObject({ customerContact: "Jan Čejka", customerContactEmail: "jan.cejka@steeling.cz", customerContactPhone: "+420 777 248 197", customerRequiredDate: "2026-12-15" });
+    expect(res.review.fieldSources.customerContact?.label).toBe("z podpisu e-mailu");
+    expect(res.review.fieldSources.customerRequiredDate?.label).toBe("z textu e-mailu");
+    expect(job.items.map((i) => [i.key, i.drawingNumber, i.quantity, i.name, i.revision])).toEqual([["ai-0", "SDF000637.4", "20", "Stud bolt M42", "A"]]);
+    const st = res.docStates[v.id];
+    expect(st.kind === "drawing" && st.state.link).toEqual({ mode: "docItem", itemKey: "ai-0" });
+    expect(st.kind === "drawing" && st.state.quantity).toBe("20");
+    const dr = res.docs[0];
+    expect(dr.kind === "drawing" && dr.sources?.quantity).toBe("z textu e-mailu");
+    expect(res.state.job.fields.title).toBe("Stud bolt M42 SDF000637.4");
+    expect(res.state.jobDraftTitle).toBe("Stud bolt M42 SDF000637.4");
+    expect(res.warnings.some((w) => w.code === "drawing_quantity_missing" || w.code === "unlinked_drawing")).toBe(false);
+    expect(res.warnings.every((w) => !w.docIds.includes("mail"))).toBe(true);
+  });
+
+  it("e-mail bez počtu v textu: výkres založí viditelný řádek s prázdným počtem (doplň počet), zákazník odesílatele podle CRM", () => {
+    const v = stud();
+    const m = rd("poptavka_zakaznik", { id: "mail", doc: mailDoc({ items: [] }), source: "mail", customerMatch: { id: "c1", name: "Steeling s.r.o.", reason: "odesílatel e-mailu", score: 95 } });
+    const res = reconcile([m, v]);
+    expect(res.state.job.customer).toEqual({ mode: "existing", id: "c1", name: "Steeling s.r.o.", reason: "odesílatel e-mailu" });
+    expect(res.state.job.items.map((i) => [i.key, i.drawingNumber, i.quantity])).toEqual([[`draw-${v.id}`, "SDF000637.4", ""]]);
+    const st = res.docStates[v.id];
+    expect(st.kind === "drawing" && st.state.link).toEqual({ mode: "docItem", itemKey: `draw-${v.id}` });
+    expect(res.warnings.some((w) => w.code === "drawing_quantity_missing")).toBe(true);
+  });
+
+  it("e-mail + přiložená objednávka: objednávka je primární (položky, počty), text e-mailu jen doplní kontakt a nehlásí druhou objednávku", () => {
+    const o = rd("objednavka_zakaznik", { doc: order({ customer: { ...STROJ, contactPerson: "", phone: "" } }), bundleKey: "mail:1" });
+    const m = rd("objednavka_zakaznik", { id: "mail", doc: mailDoc({ docKind: "objednavka", customer: { ...emptyParty(), name: "Strojmetal", contactPerson: "Petra Nová", email: "petra@strojmetal.cz", phone: "777 123 456" }, items: [item("4711-02", { quantity: 99 })] }), source: "mail", bundleKey: "mail:1" });
+    const grouped = groupBatch({ docs: [m, o], ourIco: OUR });
+    expect(grouped.groups).toHaveLength(1);
+    expect(grouped.warnings.some((w) => w.code === "multiple_orders")).toBe(false);
+    const res = reconcile([o, m], { group: grouped.groups[0] });
+    expect(res.review.primaryDocId).toBe(o.id);
+    expect(res.state.job.items.map((i) => [i.drawingNumber, i.quantity])).toEqual([["4711-02", "10"], ["4711-03", "10"]]);
+    expect(res.state.job.fields).toMatchObject({ customerOrderNumber: "PO-4471", customerContact: "Petra Nová", customerContactPhone: "777 123 456" });
+    expect(res.review.fieldSources.customerContact?.label).toBe("z textu e-mailu");
+    expect(res.state.docIds).toEqual([o.id]);
+  });
+
+  it("uložení: řádek z výkresu (draw-<id>) a položky z textu e-mailu (ai-*) projdou kontrolou stavu", () => {
+    const pages: BatchPage[] = [{ id: "p1", fileId: "f1", page: 1, source: "pdf_page", label: "v.pdf", aiLabel: "", duplicateOf: null }];
+    const sort = { docs: [blankDraft("d1", "vykres", ["p1"])], excludedPageIds: [] };
+    const job = { chip: "poptavka_zakaznik", targetKey: "new", customer: { mode: "none" }, supplier: { mode: "none" }, fields: {}, items: [{ key: "draw-d1", drawingNumber: "7000-01", revision: "", name: "", material: "", quantity: "5", unit: "ks", unitPrice: "", purchaseUnitPrice: "", description: "", note: "", aiFilled: true }, { key: "ai-0", drawingNumber: "7000-02", revision: "", name: "", material: "", quantity: "3", unit: "ks", unitPrice: "", purchaseUnitPrice: "", description: "", note: "", aiFilled: true }], merges: [], stage: "poptavka", docNote: "" };
+    const docs = { d1: { kind: "drawing", state: { drawingNumber: "7000-01", revision: "", title: "", material: "", dimensions: "", generalTolerance: "", tightestTolerance: "", quantity: "", link: { mode: "docItem", itemKey: "draw-d1" }, archive: true, note: "", onDuplicate: null } } };
+    const raw = { sort, groups: [{ key: "g1", docIds: ["d1"], job, customerConfirmed: false, jobDraftTitle: "" }], docs };
+    const ok = sanitizeBatchApplyState(raw, { pages, margins: true, ourIco: OUR, mailItems: true });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) {
+      expect(ok.state.groups[0].job.items.map((i) => i.key)).toEqual(["draw-d1", "ai-0"]);
+      const d = ok.state.docs.d1;
+      expect(d.kind === "drawing" && d.state.link).toEqual({ mode: "docItem", itemKey: "draw-d1" });
+    }
+    // bez textu e-mailu položky ai-* skupina bez dokladu zákazníka přidat nesmí; draw- ano
+    const bad = sanitizeBatchApplyState(raw, { pages, margins: true, ourIco: OUR });
+    expect(bad.ok).toBe(false);
+    const onlyDraw = sanitizeBatchApplyState({ ...raw, groups: [{ ...raw.groups[0], job: { ...job, items: [job.items[0]] } }] }, { pages, margins: true, ourIco: OUR });
+    expect(onlyDraw.ok).toBe(true);
+  });
+});
+
+describe("sharedItemWarnings — dva výkresy na jedné položce (OCR podobné číslo)", () => {
+  const drawingSt = (num: string, itemKey: string): DocApplyState => ({
+    kind: "drawing",
+    state: {
+      drawingNumber: num, revision: "", title: "", material: "", dimensions: "", generalTolerance: "", tightestTolerance: "", quantity: "1",
+      link: { mode: "docItem", itemKey }, archive: true, note: "", onDuplicate: null,
+    },
+  });
+  const opts = [
+    { link: { mode: "docItem" as const, itemKey: "ai-0" }, label: "Y832", drawingNumber: "A290-7904-Y832", revision: "" },
+    { link: { mode: "docItem" as const, itemKey: "ai-1" }, label: "Y823", drawingNumber: "A290-7904-Y823", revision: "" },
+    { link: { mode: "add" as const }, label: "Založit", drawingNumber: "", revision: "" },
+  ];
+  const docs = [
+    { id: "d1", type: "vykres" as const, filename: "A290-7904-Y832.pdf", documentNumber: "A290-7904-Y832" },
+    { id: "d2", type: "vykres" as const, filename: "A290-7904-Y823.pdf", documentNumber: "A290-7904-Y832" },
+  ];
+
+  it("navrhne výkres podle názvu souboru → volná položka; „listy téhož výkresu“ jako druhá volba; nikdy neblokuje", () => {
+    const ws = sharedItemWarnings(docs, { d1: drawingSt("A290-7904-Y832", "ai-0"), d2: drawingSt("A290-7904-Y832", "ai-0") }, opts, { "docItem:ai-1": "4" }, "g1");
+    expect(ws).toHaveLength(1);
+    expect(ws[0]).toMatchObject({ code: "drawing_item_shared", severity: "warn", docIds: ["d1", "d2"], groupKey: "g1" });
+    expect(ws[0].actions).toEqual([
+      { kind: "link_item", docId: "d2", itemKey: "ai-1", value: "A290-7904-Y823", label: "„A290-7904-Y823.pdf“ je A290-7904-Y823 (4 ks)" },
+      { kind: "ack", label: "Jsou to listy téhož výkresu" },
+    ]);
+  });
+
+  it("každý výkres na své položce / žádná volná položka → nic", () => {
+    expect(sharedItemWarnings(docs, { d1: drawingSt("A290-7904-Y832", "ai-0"), d2: drawingSt("A290-7904-Y823", "ai-1") }, opts, {}, "g1")).toEqual([]);
+    expect(sharedItemWarnings(docs, { d1: drawingSt("A290-7904-Y832", "ai-0"), d2: drawingSt("A290-7904-Y832", "ai-0") }, opts.slice(0, 1), {}, "g1")).toEqual([]);
   });
 });

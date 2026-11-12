@@ -331,7 +331,7 @@ await T("8 · „Hotovo — posunout dál…“: převzato 1 z 2 ks → „Posla
 });
 
 // ── 9. Schválení ve frontě adminem → ze schránky obchodníka ──
-await T("9 · super admin schválí objednávku v AI přehledu → e-mail s PDF ze schránky obchodníka zakázky", async (ctx) => {
+await T("9 · super admin schválí objednávku v AI přehledu → bez volby z jeho schránky (majitel 9. 11.), „Odeslat z“ vybere schránku obchodníka → e-mail s PDF z ní", async (ctx) => {
   const page = await ctx.newPage();
   await login(page, USERS.admin);
   await page.goto(`${BASE}/dashboard`);
@@ -342,16 +342,30 @@ await T("9 · super admin schválí objednávku v AI přehledu → e-mail s PDF 
   await row.waitFor({ timeout: 20_000 });
   const rt = norm(await row.innerText());
   const ownerBox = one(`select email from mailboxes where owner_id = ${lit(ID.obchod)} order by created_at limit 1`);
-  expect(rt.includes("Odešle se z:") && (!ownerBox || rt.includes(ownerBox)), `„Odešle se z: ${ownerBox}“ (${rt})`);
+  const ownerBoxId = one(`select id from mailboxes where owner_id = ${lit(ID.obchod)} order by created_at limit 1`);
+  // výchozí odesílatel = ten, kdo schvaluje (super admin), ne obchodník zakázky
+  expect(rt.includes("Odešle se z:") && (!ownerBox || !rt.includes(`Odešle se z: ${ownerBox}`)), `„Odešle se z:“ ne ze schránky obchodníka (${rt})`);
   expect(rt.includes("Otevřít PDF"), "„Otevřít PDF“");
   await shot(page, S("9-queue"));
+  if (ownerBoxId) {
+    // jen super admin: v rozbaleném řádku „Odeslat z“ → schránka obchodníka
+    await row.getByRole("button", { name: "Zobrazit e-mail" }).click();
+    const pick = row.locator('select[aria-label="Odeslat z"]');
+    await pick.waitFor({ timeout: 20_000 });
+    await pick.selectOption(ownerBoxId);
+    await shot(page, S("9-sender-pick"));
+  }
   const t0 = Date.now();
   await row.getByRole("button", { name: "Odeslat objednávku" }).click();
   const mail = await waitMail(MAIL.tepkal, (m) => m.subject.includes(tep.number) && Date.parse(m.receivedAt) >= t0 - 5000, 30_000);
   expect(mail, "e-mail dodavateli dorazil");
   expect(mail.attachments?.some((a) => a.contentType === "application/pdf"), "PDF v příloze");
-  expect(!ownerBox || String(mail.envelopeFrom ?? mail.from).includes(ownerBox), `odesláno ze schránky obchodníka (${mail.from} / ${mail.envelopeFrom})`);
+  expect(!ownerBox || String(mail.envelopeFrom ?? mail.from).includes(ownerBox), `odesláno ze zvolené schránky obchodníka (${mail.from} / ${mail.envelopeFrom})`);
   await eventually(async () => expect(pos(A).find((x) => x.id === tep.id).status === "odeslana", "objednávka odeslaná"));
+  // Odeslané patří vlastníkovi schránky, ze které objednávka odešla
+  if (ownerBoxId) {
+    await eventually(async () => expect(one(`select owner_id from emails where purchase_order_id = ${lit(tep.id)} and direction = 'out' order by received_at desc limit 1`) === ID.obchod, "Odeslané: vlastník = obchodník (schránka)"));
+  }
 });
 
 // ── 10. Plná automatika ──────────────────────────────────────

@@ -33,6 +33,11 @@ export interface CustomerView {
   supplierNumberAtCustomer: string | null;
   note: string | null;
   owner: PersonLite | null;
+  /**
+   * Prémiový zákazník (9. 11.) — všechny jeho zakázky jsou všude výrazně označené „Pozor, prémiový zákazník".
+   * Přepíná každý, kdo smí zákazníka upravit (karta zákazníka).
+   */
+  isPremium: boolean;
   /** Rozpracované zakázky (bez dokončených, nerealizovaných a zrušených). */
   activeJobs: number;
   totalJobs: number;
@@ -73,6 +78,7 @@ export interface CustomerRow {
   supplier_number_at_customer?: string | null;
   note?: string | null;
   owner_id?: string | null;
+  is_premium?: boolean | null;
   created_at?: string | null;
   owner?: Embed<{ id: string; full_name: string | null; email?: string | null }>;
   jobs?: { status: string; value: number | string | null }[] | null;
@@ -91,7 +97,7 @@ export interface ContactRow {
 export const CUSTOMER_SELECT = [
   "id, name, customer_number, ico, dic, street, city, zip, address, country, email, phone",
   "contact_person, website, payment_terms_days, delivery_address, supplier_number_at_customer",
-  "note, owner_id, created_at",
+  "note, owner_id, is_premium, created_at",
   "owner:profiles!owner_id(id, full_name, email)",
   "jobs:orders!customer_id(status, value)",
 ].join(", ");
@@ -143,6 +149,7 @@ export function rowToCustomerView(r: CustomerRow): CustomerView {
     supplierNumberAtCustomer: text(r.supplier_number_at_customer),
     note: text(r.note),
     owner: personLite(r.owner),
+    isPremium: r.is_premium === true,
     activeJobs,
     totalJobs: jobs.length,
     revenue: Math.round(revenue * 100) / 100,
@@ -202,6 +209,8 @@ export interface CustomerFormValues {
   note: string;
   /** uuid obchodníka nebo "" (bez obchodníka). */
   ownerId: string;
+  /** Prémiový zákazník (9. 11.); chybí = beze změny (starší klient). */
+  isPremium?: boolean;
 }
 
 export type CustomerField = keyof CustomerFormValues;
@@ -209,7 +218,7 @@ export type CustomerField = keyof CustomerFormValues;
 export const EMPTY_CUSTOMER_FORM: CustomerFormValues = {
   name: "", customerNumber: "", ico: "", dic: "", street: "", city: "", zip: "", country: "CZ",
   email: "", phone: "", contactPerson: "", website: "", paymentTermsDays: "", deliveryAddress: "",
-  supplierNumberAtCustomer: "", note: "", ownerId: "",
+  supplierNumberAtCustomer: "", note: "", ownerId: "", isPremium: false,
 };
 
 export function customerFormFromView(c: CustomerView): CustomerFormValues {
@@ -231,6 +240,7 @@ export function customerFormFromView(c: CustomerView): CustomerFormValues {
     supplierNumberAtCustomer: c.supplierNumberAtCustomer ?? "",
     note: c.note ?? "",
     ownerId: c.owner?.id ?? "",
+    isPremium: c.isPremium === true,
   };
 }
 

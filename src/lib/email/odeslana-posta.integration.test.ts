@@ -12,7 +12,9 @@ import { LOCAL_ENABLED, loadLocalEnv, localAdmin, localSql } from "@/test/local-
  * out) a ten vidí ve složce Odeslané (RPC mail_threads i archiv /sent) ten, kdo ho poslal — obchodník
  * i super admin — a majitel schránky, ze které odešel; nikdo cizí. Majitel 3. 11.: „Pošlu objednávku
  * dodavateli a v Poště nevidím, že jsme mu něco poslali."
- * Cesty: objednávka dodavateli (vystavení ze schránky obchodníka zakázky, změna, storno, pozastavení),
+ * Majitel 9. 11.: každý posílá ze SVÉ schránky (Šponer ze Šponerovy, Volný z Volného), schránku si vybírá jen
+ * super admin — a odeslaný e-mail patří do Odeslaných vlastníka schránky, ze které opravdu odešel.
+ * Cesty: objednávka dodavateli (vystavení ze schránky odesílatele, změna, storno, pozastavení),
  * objednávka přes frontu ke schválení, objednávka po anonymizaci výkresů (fronta odeslání), doklady
  * zákazníkovi (potvrzení, dodací list, faktura; super admin bez schránky přes globální SMTP), AI nabídka,
  * schválená odpověď z fronty, okno psaní; zápis při chybě vazby (záznam vznikne i bez vazeb).
@@ -27,8 +29,10 @@ type Srv = {
   close: () => Promise<void>;
 };
 
-type Key = "a" | "b" | "c" | "d";
-const session = vi.hoisted(() => ({ current: null as null | { id: string; email: string; fullName: string; role: string } }));
+type Key = "a" | "b" | "c" | "d" | "e";
+const session = vi.hoisted(() => ({
+  current: null as null | { id: string; email: string; fullName: string; role: string; fullAccess?: boolean; realRole?: string; feat?: string },
+}));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => { void Promise.resolve().then(fn).catch(() => undefined); } }));
@@ -48,15 +52,18 @@ vi.mock("@/lib/auth/session", () => {
   const FEATURES: Record<string, string[]> = {
     obchodnik: SALES,
     super_admin: [...SALES, "mail_all", "dashboard", "settings", "users"],
+    // plný přístup (2. 11.): vše jako super admin kromě uživatelů a pošty všech schránek
+    plny: [...SALES, "dashboard", "settings"],
   };
   const user = () => {
     const u = session.current!;
     return { ...u, initials: "XX", roleLabel: u.role, aiAccess: true, active: true, hasProfile: true };
   };
-  const can = (f: string) => (FEATURES[session.current?.role ?? ""] ?? []).includes(f);
+  const feat = () => session.current?.feat ?? session.current?.role ?? "";
+  const can = (f: string) => (FEATURES[feat()] ?? []).includes(f);
   return {
     getSessionUser: async () => user(),
-    getAccess: async () => ({ user: user(), ctx: {}, features: FEATURES[session.current!.role], can }),
+    getAccess: async () => ({ user: user(), ctx: {}, features: FEATURES[feat()], can }),
     checkFeature: async (f: string) => (can(f) ? { user: user() } : { error: "Bez oprávnění." }),
     apiRequire: async () => ({ user: user() }),
     requireUser: async () => user(),
@@ -67,12 +74,13 @@ vi.mock("@/lib/auth/session", () => {
 const TAG = `ODP${Date.now().toString(36).toUpperCase()}`;
 const BOX_A = { user: "odeslane-a@nastrojarstvi.test", pass: "OdeslaneA-Heslo-1" };
 const BOX_B = { user: "odeslane-b@nastrojarstvi.test", pass: "OdeslaneB-Heslo-1" };
+const BOX_E = { user: "odeslane-e@nastrojarstvi.test", pass: "OdeslaneE-Heslo-1" };
 
 describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad je zapsaný a vidí ho odesílatel", () => {
   let srv: Srv;
   let db: SupabaseClient;
   const users = {} as Record<Key, { id: string; email: string; name: string; role: string }>;
-  const boxes = {} as Record<"a" | "b", string>;
+  const boxes = {} as Record<"a" | "b" | "e", string>;
   let customerId = "";
   let supplierId = "";
   let jobId = "";
@@ -83,7 +91,10 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
 
   const as = (k: Key) => {
     const u = users[k];
-    session.current = { id: u.id, email: u.email, fullName: u.name, role: u.role };
+    // plný přístup: aplikace ho vidí jako super admina (role), skutečná role v DB je zaměstnanec (getCurrentUser)
+    session.current = k === "e"
+      ? { id: u.id, email: u.email, fullName: u.name, role: "super_admin", fullAccess: true, realRole: u.role, feat: "plny" }
+      : { id: u.id, email: u.email, fullName: u.name, role: u.role };
   };
 
   /** Odeslaný e-mail ve složce Odeslané (vlákna) a v archivu odeslané pošty — pro uživatele `k`. */
@@ -147,20 +158,21 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
 
     const NAMES: Record<Key, [string, string]> = {
       a: ["Adam Odesílatel", "obchodnik"], b: ["Bára Zakázková", "obchodnik"], c: ["Cyril Cizí", "obchodnik"], d: ["Dana Adminová", "super_admin"],
+      e: ["Emil Plný", "zamestnanec"],
     };
-    for (const k of ["a", "b", "c", "d"] as Key[]) {
+    for (const k of ["a", "b", "c", "d", "e"] as Key[]) {
       const email = `${TAG.toLowerCase()}-${k}@local.test`;
       const { data: u, error } = await db.auth.admin.createUser({ email, password: `Heslo-${TAG}-1!`, email_confirm: true, user_metadata: { full_name: NAMES[k][0] } });
       if (error) throw new Error(error.message);
       users[k] = { id: u.user!.id, email, name: NAMES[k][0], role: NAMES[k][1] };
-      await db.from("profiles").update({ role: NAMES[k][1], full_name: NAMES[k][0], active: true }).eq("id", u.user!.id);
+      await db.from("profiles").update({ role: NAMES[k][1], full_name: NAMES[k][0], active: true, ...(k === "e" ? { full_access: true } : {}) }).eq("id", u.user!.id);
     }
     const cfg = (b: { user: string; pass: string }) => ({
       imap_host: "127.0.0.1", imap_port: srv.ports.imaps, imap_tls: "tls", imap_user: b.user, imap_password: b.pass,
       smtp_host: "127.0.0.1", smtp_port: srv.ports.smtps, smtp_tls: "tls", smtp_user: b.user, smtp_password: b.pass,
     });
-    await db.from("mailboxes").delete().in("email", [BOX_A.user, BOX_B.user]);
-    for (const [k, b] of [["a", BOX_A], ["b", BOX_B]] as const) {
+    await db.from("mailboxes").delete().in("email", [BOX_A.user, BOX_B.user, BOX_E.user]);
+    for (const [k, b] of [["a", BOX_A], ["b", BOX_B], ["e", BOX_E]] as const) {
       const { data: m, error } = await db.from("mailboxes").insert({ provider: "imap", email: b.user, owner_id: users[k].id, active: true, config: cfg(b) }).select("id").single();
       if (error) throw new Error(error.message);
       boxes[k] = (m as { id: string }).id;
@@ -203,25 +215,30 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
     await srv?.close();
   }, 120_000);
 
-  it("objednávka dodavateli: obchodník pošle ze schránky obchodníka zakázky → v Odeslaných u odesílatele, majitele schránky i admina", async () => {
+  it("objednávka dodavateli: obchodník A pošle objednávku zakázky obchodníka B → z A-ho schránky (majitel 9. 11.), v Odeslaných u A i admina", async () => {
     const poId = await newPo("vystavena", 1);
     const { purchaseOrderSender } = await handoff();
-    const sender = await purchaseOrderSender(db as never, { id: users.a.id }, users.b.id);
-    expect(sender.from).toEqual({ mailboxId: boxes.b, ownerId: users.b.id });
+    // dřív: schránka obchodníka zakázky (B) — teď vždy toho, kdo posílá
+    const sender = await purchaseOrderSender({ id: users.a.id });
+    expect(sender).toMatchObject({ from: { ownerId: users.a.id }, signerId: users.a.id, mailboxEmail: BOX_A.user });
+    // ani požadovaná schránka kolegy to nezmění (vybírat smí jen super admin)
+    expect(await purchaseOrderSender({ id: users.a.id, fromMailboxId: boxes.b })).toMatchObject({ from: { ownerId: users.a.id }, signerId: users.a.id });
     const docs = await po();
     const view = (await (await data()).fetchPurchaseOrder(db as never, poId))!;
-    const mail = await docs.purchaseOrderMailFor(db as never, view, users.b.id, "issue");
-    const res = await docs.sendPurchaseOrderCore(db as never, { id: users.a.id, fullName: users.a.name }, poId, { ...mail, to: SUP_MAIL, subject: `Objednávka OV-${TAG}-1` }, { from: sender.from });
+    const mail = await docs.purchaseOrderMailFor(db as never, view, sender.signerId, "issue", { from: sender.from });
+    const res = await docs.sendPurchaseOrderCore(db as never, { id: users.a.id, fullName: users.a.name }, poId, { ...mail, to: SUP_MAIL, subject: `Objednávka OV-${TAG}-1` }, { from: sender.from, signerId: sender.signerId });
     expect(res.ok, JSON.stringify(res)).toBe(true);
     const emailId = (res as { emailId?: string }).emailId!;
     expect(emailId).toBeTruthy();
     expect(row(emailId)).toEqual({
-      direction: "out", mailbox: boxes.b, owner: users.a.id, job: jobId, supplier: supplierId, customer: "-", po: poId, category: "objednavka", attachments: true, sentCopy: "ok",
+      direction: "out", mailbox: boxes.a, owner: users.a.id, job: jobId, supplier: supplierId, customer: "-", po: poId, category: "objednavka", attachments: true, sentCopy: "ok",
     });
-    // příloha (PDF objednávky) uložená u záznamu, kopie ve složce Odeslané na serveru (IMAP APPEND)
+    // příloha (PDF objednávky) uložená u záznamu, kopie ve složce Odeslané na serveru (IMAP APPEND) — A, ne B
     expect(Number(localSql(`select count(*) from email_attachments where email_id = '${emailId}' and mime_type = 'application/pdf'`))).toBe(1);
-    expect(srv.folder(BOX_B.user, "Sent").some((m) => String(m.raw ?? "").includes(`OV-${TAG}-1`))).toBe(true);
-    await expectVisible(emailId, ["a", "b", "d"], ["c"]);
+    expect(srv.folder(BOX_A.user, "Sent").some((m) => String(m.raw ?? "").includes(`OV-${TAG}-1`))).toBe(true);
+    expect(srv.folder(BOX_B.user, "Sent").some((m) => String(m.raw ?? "").includes(`OV-${TAG}-1`))).toBe(false);
+    expect(localSql(`select sent_mailbox_id from purchase_orders where id = '${poId}'`)).toBe(boxes.a);
+    await expectVisible(emailId, ["a", "d"], ["c"]);
   }, 120_000);
 
   it("objednávka: změna, storno a pozastavení z vlastní schránky odesílatele → každé v Odeslaných", async () => {
@@ -248,20 +265,42 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
     expect(localSql(`select status from purchase_orders where id = '${p2}'`)).toBe("zrusena");
   }, 180_000);
 
-  it("objednávka přes frontu ke schválení: super admin schválí → odejde ze schránky obchodníka zakázky, vidí ji admin i obchodník", async () => {
+  it("objednávka přes frontu ke schválení: super admin schválí → ze schránky, kterou vybral (B); bez volby ze své (bez schránky → globální SMTP)", async () => {
     const p3 = await newPo("vystavena", 3);
     localSql(`insert into approval_queue (type, title, payload, target, status, order_id, owner_id, purchase_order_id)
       values ('purchase_order', 'Objednávka OV-${TAG}-3', '{"kind":"issue","subject":"Objednávka OV-${TAG}-3","to":"${SUP_MAIL}"}', '${SUP_MAIL}', 'pending', '${jobId}', '${users.b.id}', '${p3}')`);
     const qid = localSql(`select id from approval_queue where purchase_order_id = '${p3}'`);
     as("d");
     const { resolveApproval } = await import("@/app/actions/approvals");
-    const r = await resolveApproval(qid, "approved");
+    // super admin vybral „Odeslat z: schránka B" → odejde z ní a patří do Odeslaných B (vlastník schránky)
+    const r = await resolveApproval(qid, "approved", { fromMailboxId: boxes.b });
     expect(r, JSON.stringify(r)).toMatchObject({ ok: true });
     const emailId = poMail(p3);
     expect(emailId).toBeTruthy();
-    expect(row(emailId)).toMatchObject({ direction: "out", mailbox: boxes.b, owner: users.d.id, job: jobId, supplier: supplierId, po: p3, category: "objednavka", attachments: true });
+    expect(row(emailId)).toMatchObject({ direction: "out", mailbox: boxes.b, owner: users.b.id, job: jobId, supplier: supplierId, po: p3, category: "objednavka", attachments: true });
+    expect(srv.folder(BOX_B.user, "Sent").some((m) => String(m.raw ?? "").includes(`OV-${TAG}-3`))).toBe(true);
     await expectVisible(emailId, ["d", "b"], ["c"]);
-  }, 120_000);
+
+    as("d");
+    // bez volby: ze schránky super admina — nemá ji → globální SMTP (dřív: schránka obchodníka zakázky)
+    const p3b = await newPo("vystavena", 31);
+    localSql(`insert into approval_queue (type, title, payload, target, status, order_id, owner_id, purchase_order_id)
+      values ('purchase_order', 'Objednávka OV-${TAG}-31', '{"kind":"issue","subject":"Objednávka OV-${TAG}-31","to":"${SUP_MAIL}"}', '${SUP_MAIL}', 'pending', '${jobId}', '${users.b.id}', '${p3b}')`);
+    const q2 = localSql(`select id from approval_queue where purchase_order_id = '${p3b}'`);
+    const r2 = await resolveApproval(q2, "approved");
+    expect(r2, JSON.stringify(r2)).toMatchObject({ ok: true });
+    expect(row(poMail(p3b))).toMatchObject({ direction: "out", mailbox: "-", owner: users.d.id, po: p3b });
+
+    // obchodník B schválí objednávku své zakázky s požadavkem na schránku A → stejně ze své (B)
+    const p3c = await newPo("vystavena", 32);
+    localSql(`insert into approval_queue (type, title, payload, target, status, order_id, owner_id, purchase_order_id)
+      values ('purchase_order', 'Objednávka OV-${TAG}-32', '{"kind":"issue","subject":"Objednávka OV-${TAG}-32","to":"${SUP_MAIL}"}', '${SUP_MAIL}', 'pending', '${jobId}', '${users.b.id}', '${p3c}')`);
+    const q3 = localSql(`select id from approval_queue where purchase_order_id = '${p3c}'`);
+    as("b");
+    const r3 = await resolveApproval(q3, "approved", { fromMailboxId: boxes.a });
+    expect(r3, JSON.stringify(r3)).toMatchObject({ ok: true });
+    expect(row(poMail(p3c))).toMatchObject({ direction: "out", mailbox: boxes.b, owner: users.b.id, po: p3c });
+  }, 180_000);
 
   it("objednávka po anonymizaci výkresů (fronta odeslání) → v Odeslaných s dodavatelem a objednávkou", async () => {
     const p4 = await newPo("vystavena", 4);
@@ -354,6 +393,71 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
     expect(row(c.emailId!)).toMatchObject({ direction: "out", mailbox: boxes.a, owner: users.a.id, job: jobId, sentCopy: "ok" });
     await expectVisible(c.emailId!, ["a", "d"], ["c"]);
   }, 120_000);
+
+  it("majitel 9. 11.: zaměstnanec (plný přístup) i obchodník posílají vždy ze své schránky; jen super admin vybírá (a špatnou volbu odmítne)", async () => {
+    const lastFrom = (needle: string) => srv.sent.filter((m) => m.raw.includes(needle)).map((m) => m.from.replace(/^MAIL FROM:\s*<|>.*$/gi, "")).pop();
+
+    // zaměstnanec s plným přístupem a vlastní schránkou pošle objednávku zakázky obchodníka B (i s „volbou" schránky B)
+    const p7 = await newPo("vystavena", 7);
+    as("e");
+    const { sendPurchaseOrder } = await import("@/app/actions/purchasing");
+    const s7 = await sendPurchaseOrder(p7, { to: SUP_MAIL, subject: `Objednávka OV-${TAG}-7`, body: "Dobrý den,\nobjednáváme." }, { attachmentIds: [], fromMailboxId: boxes.b });
+    expect(s7.ok, s7.error).toBe(true);
+    expect(row(poMail(p7))).toMatchObject({ direction: "out", mailbox: boxes.e, owner: users.e.id, po: p7, supplier: supplierId, sentCopy: "ok" });
+    expect(lastFrom(`OV-${TAG}-7`)).toBe(BOX_E.user);
+    expect(localSql(`select sent_mailbox_id from purchase_orders where id = '${p7}'`)).toBe(boxes.e);
+
+    // doklad zákazníkovi: obchodník A s požadavkem na schránku B → ze své (A); super admin s volbou B → z B (Odeslané B)
+    const { sendJobDocument } = await import("@/app/actions/job-documents");
+    const upload = async (n: number) => {
+      const p = `zakazky/${jobId}/${TAG}-pravidlo-${n}.pdf`;
+      paths.push(p);
+      const { error } = await db.storage.from("job-files").upload(p, Buffer.from(`%PDF-1.4\n% ${TAG} ${n}\n`), { contentType: "application/pdf", upsert: true });
+      if (error) throw new Error(error.message);
+      return localSql(`insert into job_files (job_id, kind, title, filename, mime_type, storage_path, size_bytes, origin, issuer)
+        values ('${jobId}', 'dodaci_list', 'DL', 'dl-${TAG}-${n}.pdf', 'application/pdf', '${p}', 30, 'generated', 'my') returning id`).split("\n")[0];
+    };
+    as("a");
+    const fa = await upload(1);
+    const da = await sendJobDocument(jobId, fa, { to: CUST_MAIL, subject: `DL A ${TAG}`, body: "Dobrý den,\nv příloze.", fromMailboxId: boxes.b });
+    expect(da.ok, da.error).toBe(true);
+    expect(row(da.emailId!)).toMatchObject({ mailbox: boxes.a, owner: users.a.id });
+    expect(lastFrom(`DL A ${TAG}`)).toBe(BOX_A.user);
+
+    as("d");
+    const fd = await upload(2);
+    const dd = await sendJobDocument(jobId, fd, { to: CUST_MAIL, subject: `DL D ${TAG}`, body: "Dobrý den,\nv příloze.", fromMailboxId: boxes.b });
+    expect(dd.ok, dd.error).toBe(true);
+    expect(row(dd.emailId!)).toMatchObject({ mailbox: boxes.b, owner: users.b.id, sentCopy: "ok" });
+    expect(lastFrom(`DL D ${TAG}`)).toBe(BOX_B.user);
+    await expectVisible(dd.emailId!, ["b", "d"], ["c"]);
+
+    as("d");
+    // super admin vybere schránku bez odesílání → NEodejde potichu odjinud, řekne proč
+    const { data: nb, error: nbErr } = await db.from("mailboxes").insert({
+      provider: "imap", email: `bez-smtp-${TAG.toLowerCase()}@nastrojarstvi.test`, owner_id: users.c.id, active: true,
+      config: { imap_host: "127.0.0.1", imap_port: srv.ports.imaps, imap_user: "x", imap_password: "y" },
+    }).select("id").single();
+    if (nbErr) throw new Error(nbErr.message);
+    const fx = await upload(3);
+    const before = Number(localSql(`select count(*) from emails where subject = 'DL X ${TAG}'`));
+    const dx = await sendJobDocument(jobId, fx, { to: CUST_MAIL, subject: `DL X ${TAG}`, body: "x", fromMailboxId: (nb as { id: string }).id });
+    expect(dx.ok).toBe(false);
+    expect(dx.error).toMatch(/nemá nastavené odesílání/);
+    expect(Number(localSql(`select count(*) from emails where subject = 'DL X ${TAG}'`))).toBe(before);
+    await db.from("mailboxes").delete().eq("id", (nb as { id: string }).id);
+
+    // okno psaní: super admin pošle ze schránky A; obchodník C (bez schránky) s volbou A → ne z A (globální SMTP)
+    const { sendComposedAction } = await import("@/app/actions/mail-compose");
+    const cd = await sendComposedAction({ mode: "new", to: CUST_MAIL, subject: `Psaní D ${TAG}`, body: "Dobrý den.", fromMailboxId: boxes.a });
+    expect(cd.ok, cd.error).toBe(true);
+    expect(row(cd.emailId!)).toMatchObject({ mailbox: boxes.a, owner: users.a.id });
+    as("c");
+    const cc = await sendComposedAction({ mode: "new", to: CUST_MAIL, subject: `Psaní C ${TAG}`, body: "Dobrý den.", fromMailboxId: boxes.a });
+    expect(cc.ok, cc.error).toBe(true);
+    expect(row(cc.emailId!)).toMatchObject({ mailbox: "-", owner: users.c.id });
+    expect(lastFrom(`Psaní C ${TAG}`)).not.toBe(BOX_A.user);
+  }, 180_000);
 
   it("záznam vznikne i když vazba neprojde (smazaná zakázka) a zpráva už uložená stažením Odeslaných se jen doplní", async () => {
     const { recordSentMail } = await import("@/lib/email/send");

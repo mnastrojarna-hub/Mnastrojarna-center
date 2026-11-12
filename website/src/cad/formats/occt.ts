@@ -2,6 +2,7 @@
  * IGES → síť přes occt-import-js (OpenCascade ve WebAssembly, LGPL-2.1).
  * Načítá se líně z /public/vendor (kopíruje scripts/vendor-occt.mjs) – hlavní balík zůstává malý.
  */
+import { tr } from "../i18n";
 import type { TriMesh } from "./mesh-io";
 
 export const OCCT_VERSION = "0.0.23";
@@ -19,12 +20,12 @@ function loadOcct(): Promise<Occt> {
     loading = new Promise<Factory>((resolve, reject) => {
       const w = globalThis as unknown as { occtimportjs?: Factory };
       if (w.occtimportjs) return resolve(w.occtimportjs);
-      if (typeof document === "undefined") return reject(new Error("IGES lze načíst jen v prohlížeči."));
+      if (typeof document === "undefined") return reject(new Error(tr("IGES lze načíst jen v prohlížeči.")));
       const s = document.createElement("script");
       s.src = BASE + "occt-import-js.js";
       s.async = true;
-      s.onload = () => (w.occtimportjs ? resolve(w.occtimportjs) : reject(new Error("Převodník IGES se nenačetl.")));
-      s.onerror = () => reject(new Error("Převodník IGES se nepodařilo stáhnout."));
+      s.onload = () => (w.occtimportjs ? resolve(w.occtimportjs) : reject(new Error(tr("Převodník IGES se nenačetl."))));
+      s.onerror = () => reject(new Error(tr("Převodník IGES se nepodařilo stáhnout.")));
       document.head.appendChild(s);
     }).then((factory) => factory({ locateFile: (f) => BASE + f }));
     loading.catch(() => (loading = null));
@@ -34,7 +35,7 @@ function loadOcct(): Promise<Occt> {
 
 /** Výsledek occt-import-js → jedna síť (mm). */
 export function occtToMesh(res: OcctResult): TriMesh {
-  if (!res?.success) throw new Error("IGES se nepodařilo přečíst (poškozený soubor nebo nepodporované entity).");
+  if (!res?.success) throw new Error(tr("IGES se nepodařilo přečíst (poškozený soubor nebo nepodporované entity)."));
   const pos: number[] = [];
   const idx: number[] = [];
   for (const m of res.meshes) {
@@ -44,7 +45,7 @@ export function occtToMesh(res: OcctResult): TriMesh {
     if (m.index) for (let i = 0; i < m.index.array.length; i++) idx.push(m.index.array[i] + off);
     else for (let i = 0; i < p.length / 3; i++) idx.push(off + i);
   }
-  if (!idx.length) throw new Error("IGES neobsahuje plochy ani tělesa (jen křivky?).");
+  if (!idx.length) throw new Error(tr("IGES neobsahuje plochy ani tělesa (jen křivky?)."));
   return { positions: new Float32Array(pos), indices: new Uint32Array(idx) };
 }
 

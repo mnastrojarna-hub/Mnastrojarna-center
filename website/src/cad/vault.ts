@@ -1,3 +1,4 @@
+import { tr } from "./i18n";
 /**
  * Úložiště rozpracované práce v prohlížeči – ochrana dokumentace (NDA).
  *
@@ -68,9 +69,9 @@ async function rememberSession(k: CryptoKey) {
 
 /** Zapne šifrované úložiště s novým heslem (dosud uložené nešifrované dokumenty se smažou). */
 export async function enableEncrypted(pass: string): Promise<void> {
-  if (pass.length < 4) throw new Error("Heslo musí mít alespoň 4 znaky.");
+  if (pass.length < 4) throw new Error(tr("Heslo musí mít alespoň 4 znaky."));
   const l = ls();
-  if (!l) throw new Error("Úložiště prohlížeče není dostupné.");
+  if (!l) throw new Error(tr("Úložiště prohlížeče není dostupné."));
   wipeStoredDocuments();
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const k = await deriveKey(pass, salt);
