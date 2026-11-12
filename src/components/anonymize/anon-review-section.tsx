@@ -105,10 +105,40 @@ export function AnonReviewList({ items, pendingFileIds, pendingCount }: { items:
     router.refresh();
   }
 
+  /** 12. 11. (majitel): „tlačítko znovu anonymizovat vše, co se nepovedlo" — stejná cesta jako „Anonymizovat znovu" u řádku. */
+  async function retryAllFailed(ids: string[]) {
+    setBusy("retry-all");
+    let queued = 0;
+    for (let i = 0; i < ids.length; i += 200) {
+      const r = await anonApi.enqueue({ fileIds: ids.slice(i, i + 200), force: true });
+      if (!r.ok) {
+        setBusy(null);
+        setMsg({ tone: "err", text: queued ? `Zařazeno ${drawingsWord(queued)}, zbytek selhal: ${r.error}` : r.error });
+        router.refresh();
+        return;
+      }
+      queued += r.data.queued;
+    }
+    setBusy(null);
+    setMsg({ tone: "ok", text: `Znovu se anonymizuje ${drawingsWord(queued || ids.length)} — za chvíli budou hotové.` });
+    router.refresh();
+  }
+
   const visible = items.filter((i) => !done.has(i.id));
+  const failedIds = visible.filter((i) => i.status === "failed").map((i) => i.id);
 
   return (
     <div className="space-y-2" data-testid="anon-review">
+      {failedIds.length > 1 && (
+        <div className="flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2.5 text-sm text-rose-950 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-100 sm:flex-row sm:items-center">
+          <span className="flex-1">
+            Anonymizace se nepovedla: <strong>{drawingsWord(failedIds.length)}</strong>.
+          </span>
+          <Button size="sm" variant="outline" className="min-h-11 sm:min-h-9" disabled={busy === "retry-all"} onClick={() => void retryAllFailed(failedIds)} data-testid="anon-retry-all">
+            {busy === "retry-all" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Anonymizovat znovu vše, co se nepovedlo ({failedIds.length})
+          </Button>
+        </div>
+      )}
       {pendingCount > 0 && (
         <div className="flex flex-col gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-3 py-2.5 text-sm text-sky-950 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100 sm:flex-row sm:items-center">
           <span className="flex-1">
