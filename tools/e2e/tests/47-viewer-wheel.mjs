@@ -137,6 +137,42 @@ for (const [label, viewport] of [["PC 1920×1080", { width: 1920, height: 1080 }
   });
 }
 
+// Majitel 12. 11.: „pokud je výkres PDF přiblížený, nejde scrolovat dolů a nahoru a nejde použít ručička"
+await test("PC: přiblížené PDF — kolečko posouvá dolů i nahoru, tažením myší („ručička“) jde posouvat do stran i nahoru/dolů", async () => {
+  await withContext(browser, errors, async (ctx) => {
+    const page = await ctx.newPage();
+    await page.setViewportSize({ width: 1366, height: 768 });
+    await login(page, USERS.admin);
+    await openFile(page, job, "dlouhy-vykres.pdf");
+    const zoomIn = layer(page).getByRole("button", { name: "Přiblížit" });
+    for (let i = 0; i < 3; i++) await zoomIn.click();
+    await page.waitForTimeout(1200);
+    const pdf = layer(page).getByTestId("pdf-view");
+    const st = () => pdf.evaluate((el) => ({ top: el.scrollTop, left: el.scrollLeft, maxTop: el.scrollHeight - el.clientHeight, maxLeft: el.scrollWidth - el.clientWidth }));
+    const s0 = await st();
+    expect(s0.maxLeft > 50, `přiblížené PDF je širší než okno (${JSON.stringify(s0)})`);
+    await page.mouse.move(683, 400);
+    for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, 300); await page.waitForTimeout(100); }
+    await page.waitForTimeout(400);
+    const s1 = await st();
+    expect(s1.top > s0.top + 200, `kolečko dolů posune přiblížené PDF (${s0.top} → ${s1.top})`);
+    for (let i = 0; i < 3; i++) { await page.mouse.wheel(0, -300); await page.waitForTimeout(100); }
+    await page.waitForTimeout(400);
+    const s2 = await st();
+    expect(s2.top < s1.top - 200, `kolečko nahoru posune zpět (${s1.top} → ${s2.top})`);
+    // ručička: chytit a táhnout doleva nahoru → obsah jede doprava dolů
+    expect(await pdf.evaluate((el) => getComputedStyle(el).cursor) === "grab", "kurzor ručička nad přiblíženým PDF");
+    await page.mouse.move(800, 500);
+    await page.mouse.down();
+    await page.mouse.move(600, 300, { steps: 8 });
+    expect(await pdf.getAttribute("data-dragging") === "1", "při tažení kurzor zavřená ručička");
+    await page.mouse.up();
+    const s3 = await st();
+    expect(s3.left > s2.left + 150 && s3.top > s2.top + 150, `tažením se posunulo (${JSON.stringify(s2)} → ${JSON.stringify(s3)})`);
+    expect(await layer(page).isVisible(), "prohlížeč zůstal otevřený");
+  });
+});
+
 await test("PC: obrázek — kolečko dolů ho posune, prohlížeč zůstane otevřený", async () => {
   await withContext(browser, errors, async (ctx) => {
     const page = await ctx.newPage();

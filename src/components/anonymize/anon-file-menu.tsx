@@ -174,7 +174,7 @@ export function AnonMenuItems({
       )}
       {a.status !== "skipped" && a.status !== "unsupported" && (
         <DropdownMenuItem onSelect={() => onAction(file, "skip")}>
-          <ShieldOff /> Neanonymizovat (náš výkres)
+          <ShieldOff /> {a.status === "failed" ? "Použít bez anonymizace (originál)" : "Neanonymizovat (náš výkres)"}
         </DropdownMenuItem>
       )}
       <DropdownMenuSeparator />

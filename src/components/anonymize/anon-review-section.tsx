@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowDown, CheckCircle2, Loader2, RefreshCw, ScanSearch, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowDown, CheckCircle2, Loader2, RefreshCw, ScanSearch, ShieldOff, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { anonApi, previewUrl } from "./anon-api";
@@ -105,6 +105,18 @@ export function AnonReviewList({ items, pendingFileIds, pendingCount }: { items:
     router.refresh();
   }
 
+  /** 12. 11. (majitel): „u nepovedených výkresů možnost použít bez anonymizace" — dodavatel dostane originál. */
+  async function keepOriginal(it: AnonReviewRowView) {
+    if (!window.confirm(`Použít „${it.filename}“ bez anonymizace?\n\nDodavatel dostane ORIGINÁL včetně názvu firmy a razítka. Anonymizovat jde kdykoli znovu z Dokumentů zakázky.`)) return;
+    setBusy(it.id);
+    const r = await anonApi.skip(it.id, "Použito bez anonymizace (anonymizace se nepovedla)");
+    setBusy(null);
+    if (!r.ok) return setMsg({ tone: "err", text: r.error });
+    setDone((s) => new Set(s).add(it.id));
+    setMsg({ tone: "ok", text: `${it.filename}: použije se originál bez anonymizace.` });
+    router.refresh();
+  }
+
   /** 12. 11. (majitel): „tlačítko znovu anonymizovat vše, co se nepovedlo" — stejná cesta jako „Anonymizovat znovu" u řádku. */
   async function retryAllFailed(ids: string[]) {
     setBusy("retry-all");
@@ -195,9 +207,14 @@ export function AnonReviewList({ items, pendingFileIds, pendingCount }: { items:
               </div>
               <div className="flex shrink-0 gap-2">
                 {it.status === "failed" ? (
-                  <Button size="sm" variant="outline" className="min-h-11 flex-1 sm:min-h-9" disabled={busy === it.id} onClick={() => void retry(it)}>
-                    {busy === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Anonymizovat znovu
-                  </Button>
+                  <>
+                    <Button size="sm" variant="outline" className="min-h-11 flex-1 sm:min-h-9" disabled={busy === it.id} onClick={() => void retry(it)}>
+                      {busy === it.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Anonymizovat znovu
+                    </Button>
+                    <Button size="sm" variant="ghost" className="min-h-11 flex-1 sm:min-h-9" disabled={busy === it.id} onClick={() => void keepOriginal(it)} data-testid="anon-use-original">
+                      <ShieldOff className="h-4 w-4" /> Použít bez anonymizace
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button size="sm" variant="outline" className="min-h-11 flex-1 sm:min-h-9" onClick={() => setEditing(it)} data-testid="anon-review-open">
