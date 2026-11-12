@@ -704,6 +704,7 @@ export const CAD_FAQ: { q: string; a: string }[] = [
   { q: "Jak udělám výrobní výkres do PDF nebo DWG?", a: "Pás Výkres → Nový výkres. Zvolte pohledy a formát listu, doplňte kóty, drsnosti a tolerance tažením, případně řez a detail, a stiskněte PDF, DXF nebo DWG. U sestavy se přidá kusovník s pozicemi." },
   { q: "Zvládne sestavy a velké rámy forem?", a: "Ano – komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled a průvodce rámem vstřikovací formy s normáliemi. Komfortně zvládá sestavy o desítkách až stovkách komponent; výkon závisí na vašem počítači." },
   { q: "Jak vložím šroub M8×30 nebo profil IPE 200?", a: "Stiskněte Ctrl+L a napište „ISO 4762 M8x30“ nebo „IPE 200 1500“. Knihovna má 103 rodin normálií (šrouby, matice, podložky, kolíky, ložiska, ozubená a řetězová kola, řemenice, profily, pružiny, normálie forem, lineární technika, pneumatika, potrubí)." },
+  { q: "Je rozhraní i v angličtině nebo němčině?", a: "Ano. Anglická verze běží na mnastrojarna.cz/en/cad, německá na mnastrojarna.cz/de/cad; přepnout lze také v Nastavení → Jazyk rozhraní (volba se pamatuje v prohlížeči). Přeložené jsou pás karet, formuláře, hlášky jádra, knihovna normálií, razítko výkresu i textové příkazy – konzole rozumí příkazům česky, anglicky i německy (např. „box 100 60 12“, „quader 100 60 12“). Dokumentace je zatím česky; stránky /en/cad/documentation a /de/cad/dokumentation shrnují ovládání." },
   { q: "Funguje na mobilu a tabletu?", a: "Ano. Nabídky a formuláře se na telefonu otevírají jako spodní listy, model otáčíte prstem, dlouhý stisk nahrazuje pravé tlačítko. Pro delší práci doporučujeme počítač nebo tablet s klávesnicí." },
   { q: "Funguje offline?", a: "Po prvním načtení běží výpočty i export lokálně v prohlížeči. Pro načtení aplikace a knihovny písem je potřeba připojení; rozpracovanou práci si ukládejte do souboru (ve výchozím režimu se v prohlížeči nic neuchovává)." },
   { q: "Kde jsou moje soubory uložené? Uvidí je někdo jiný?", a: "Jen tam, kam si je sami uložíte (.mncad, STEP, PDF…). Ve výchozím režimu CAD do prohlížeče nic neukládá – po zavření karty rozpracovaná práce zmizí, takže dokumentaci pod NDA neuvidí nikdo další ani na sdíleném počítači. Kdo chce obnovu práce a nedávné soubory, zapne šifrované úložiště s heslem; bez hesla jsou data nečitelná. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu." },
@@ -736,7 +737,7 @@ export const CAD_FEATURES = [
   "Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení",
   "Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání",
   "Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic",
-  "Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba",
+  "Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba",
 ];
 
 /** Rychlý start jako HowTo pro strukturovaná data. */

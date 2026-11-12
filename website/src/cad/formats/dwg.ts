@@ -4,6 +4,7 @@
  * Vrstvy, barvy ACI, typy čar a tloušťky odpovídají našemu DXF (OBRYS/SKRYTE/OSY/KOTY/SRAFY/RAM/TEXT).
  * Modul se načítá líně (import()) – hlavní bundle CAD zůstává malý.
  */
+import { tr } from "../i18n";
 import {
   ACadVersion,
   Arc,
@@ -183,7 +184,7 @@ function addText(ctx: Ctx, t: DText, H: number) {
  */
 export async function drawingToDwg(d: Pick<DrawingResult, "polys" | "texts" | "sheet">, opts: { version?: DwgVersion } = {}): Promise<ArrayBuffer> {
   const version = opts.version ?? "R2018";
-  if (!ACAD[version]) throw new Error(`Neznámá verze DWG: ${version}.`);
+  if (!ACAD[version]) throw new Error(tr("Neznámá verze DWG: {0}.", version));
   try {
     const ctx = newDocument(version);
     const H = d.sheet.h;
@@ -191,7 +192,7 @@ export async function drawingToDwg(d: Pick<DrawingResult, "polys" | "texts" | "s
     for (const t of d.texts) addText(ctx, t, H);
     return toBuffer(ctx.doc);
   } catch (e) {
-    throw new Error(`DWG se nepodařilo vytvořit (${version}): ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(tr("DWG se nepodařilo vytvořit ({0}): {1}", version, e instanceof Error ? e.message : String(e)));
   }
 }
 
@@ -203,7 +204,7 @@ const norm = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
 /** Skica (2D entity v mm) → DWG: úsečky, kružnice a oblouky přesně, ostatní jako křivky (LWPOLYLINE). */
 export async function sketchToDwg(entities: SketchEntity[], opts: { version?: DwgVersion } = {}): Promise<ArrayBuffer> {
   const version = opts.version ?? "R2018";
-  if (!ACAD[version]) throw new Error(`Neznámá verze DWG: ${version}.`);
+  if (!ACAD[version]) throw new Error(tr("Neznámá verze DWG: {0}.", version));
   try {
     const ctx = newDocument(version);
     const main = ctx.layers.get("OBRYS")!;
@@ -237,6 +238,6 @@ export async function sketchToDwg(entities: SketchEntity[], opts: { version?: Dw
     }
     return toBuffer(ctx.doc);
   } catch (e) {
-    throw new Error(`DWG skici se nepodařilo vytvořit (${version}): ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(tr("DWG skici se nepodařilo vytvořit ({0}): {1}", version, e instanceof Error ? e.message : String(e)));
   }
 }

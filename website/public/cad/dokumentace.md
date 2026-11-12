@@ -21,7 +21,7 @@
 - Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
 - Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání
 - Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic
-- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba
+- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba
 
 ## Obsah
 
@@ -806,6 +806,10 @@ Ano – komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled a p
 **Jak vložím šroub M8×30 nebo profil IPE 200?**
 
 Stiskněte Ctrl+L a napište „ISO 4762 M8x30“ nebo „IPE 200 1500“. Knihovna má 103 rodin normálií (šrouby, matice, podložky, kolíky, ložiska, ozubená a řetězová kola, řemenice, profily, pružiny, normálie forem, lineární technika, pneumatika, potrubí).
+
+**Je rozhraní i v angličtině nebo němčině?**
+
+Ano. Anglická verze běží na mnastrojarna.cz/en/cad, německá na mnastrojarna.cz/de/cad; přepnout lze také v Nastavení → Jazyk rozhraní (volba se pamatuje v prohlížeči). Přeložené jsou pás karet, formuláře, hlášky jádra, knihovna normálií, razítko výkresu i textové příkazy – konzole rozumí příkazům česky, anglicky i německy (např. „box 100 60 12“, „quader 100 60 12“). Dokumentace je zatím česky; stránky /en/cad/documentation a /de/cad/dokumentation shrnují ovládání.
 
 **Funguje na mobilu a tabletu?**
 

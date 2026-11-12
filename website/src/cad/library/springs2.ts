@@ -1,4 +1,5 @@
 /** Pružiny 2: tažné (s očky), zkrutné, talířové DIN 2093, plynové vzpěry. */
+import { tr } from "../i18n";
 import { uid, type Feature, type Vec2 } from "../types";
 import { dims, has, nums, score, tagged } from "./parse-util";
 import type { Family } from "./types";
@@ -40,10 +41,10 @@ export const extensionSpring: Family = {
   standards: ["DIN 2097", "EN 13906-2"],
   keywords: ["tazna pruzina", "tazna", "pruzina s ocky", "extension spring", "tension spring", "din 2097"],
   params: [
-    { key: "d", label: "Průměr drátu d", kind: "number", min: 0.2, max: 12, step: 0.1, unit: "mm", default: 1.6 },
-    { key: "D", label: "Vnější průměr De", kind: "number", min: 1, max: 200, step: 0.5, unit: "mm", default: 12 },
-    { key: "L", label: "Délka těla Lk", kind: "number", min: 2, max: 1000, step: 1, unit: "mm", default: 40 },
-    { key: "n", label: "Počet závitů n", kind: "number", min: 1, max: 200, step: 1, unit: "", default: 10 },
+    { key: "d", label: tr("Průměr drátu d"), kind: "number", min: 0.2, max: 12, step: 0.1, unit: "mm", default: 1.6 },
+    { key: "D", label: tr("Vnější průměr De"), kind: "number", min: 1, max: 200, step: 0.5, unit: "mm", default: 12 },
+    { key: "L", label: tr("Délka těla Lk"), kind: "number", min: 2, max: 1000, step: 1, unit: "mm", default: 40 },
+    { key: "n", label: tr("Počet závitů n"), kind: "number", min: 1, max: 200, step: 1, unit: "", default: 10 },
   ],
   parse: (q) => parseSpring(q, ["tazna", "s ocky", "extension spring", "tension spring", "2097"]),
   describe: (v) => `Tažná pružina ${fmt(num(v.d))}×${fmt(num(v.D))}×${fmt(num(v.L))} – n=${v.n}`,
@@ -54,11 +55,11 @@ export const extensionSpring: Family = {
     const n = Math.max(1, num(v.n, 10));
     const Rm = (D - d) / 2;
     const pitch = Math.max(d * 1.02, (L - d) / n);
-    return part(`Tažná pružina ${fmt(d)}×${fmt(D)}×${fmt(L)}`, "ocel", [
+    return part(tr("Tažná pružina {0}×{1}×{2}", fmt(d), fmt(D), fmt(L)), "ocel", [
       { id: uid(), name: "Tělo pružiny", type: "spring", radius: Rm, pitch, turns: n, wire: d, position: [0, 0, d / 2], axis: "Z", mode: "new" },
-      ...loopX("Očko 1", -Rm + d, Rm, d),
-      ...loopX("Očko 2", L + Rm - d, Rm, d),
-    ], `DIN 2097 – ${fmt(d)}×${fmt(D)}×${fmt(L)} – n ${n}`, "#5b6670");
+      ...loopX(tr("Očko 1"), -Rm + d, Rm, d),
+      ...loopX(tr("Očko 2"), L + Rm - d, Rm, d),
+    ], tr("DIN 2097 – {0}×{1}×{2} – n {3}", fmt(d), fmt(D), fmt(L), n), "#5b6670");
   },
 };
 
@@ -70,11 +71,11 @@ export const torsionSpring: Family = {
   standards: ["DIN 2088", "EN 13906-3"],
   keywords: ["zkrutna pruzina", "zkrutna", "torzni pruzina", "torsion spring", "din 2088"],
   params: [
-    { key: "d", label: "Průměr drátu d", kind: "number", min: 0.2, max: 12, step: 0.1, unit: "mm", default: 2 },
-    { key: "D", label: "Vnější průměr De", kind: "number", min: 2, max: 200, step: 0.5, unit: "mm", default: 16 },
-    { key: "n", label: "Počet závitů n", kind: "number", min: 1, max: 60, step: 0.5, unit: "", default: 5 },
-    { key: "leg", label: "Délka ramen", kind: "number", min: 2, max: 300, step: 1, unit: "mm", default: 30 },
-    { key: "angle", label: "Úhel ramen", kind: "number", min: 0, max: 180, step: 15, unit: "°", default: 90 },
+    { key: "d", label: tr("Průměr drátu d"), kind: "number", min: 0.2, max: 12, step: 0.1, unit: "mm", default: 2 },
+    { key: "D", label: tr("Vnější průměr De"), kind: "number", min: 2, max: 200, step: 0.5, unit: "mm", default: 16 },
+    { key: "n", label: tr("Počet závitů n"), kind: "number", min: 1, max: 60, step: 0.5, unit: "", default: 5 },
+    { key: "leg", label: tr("Délka ramen"), kind: "number", min: 2, max: 300, step: 1, unit: "mm", default: 30 },
+    { key: "angle", label: tr("Úhel ramen"), kind: "number", min: 0, max: 180, step: 15, unit: "°", default: 90 },
   ],
   parse: (q) => {
     const hit = parseSpring(q, ["zkrutn", "torzn", "torsion", "2088"]);
@@ -92,12 +93,12 @@ export const torsionSpring: Family = {
     const Rm = (D - d) / 2;
     const pitch = d * 1.05;
     const L = pitch * n;
-    return part(`Zkrutná pružina ${fmt(d)}×${fmt(D)} n${n}`, "ocel", [
+    return part(tr("Zkrutná pružina {0}×{1} n{2}", fmt(d), fmt(D), n), "ocel", [
       { id: uid(), name: "Závity", type: "spring", radius: Rm, pitch, turns: n, wire: d, position: [0, 0, d / 2], axis: "Z", mode: "new" },
       { id: uid(), name: "Rameno 1", type: "cylinder", radius: d / 2, height: leg, position: [Rm, 0, d / 2], axis: "Y", mode: "add" },
       // druhé rameno: tangenta na konci vinutí (úhel n·360 + angle)
       { id: uid(), name: "Rameno 2", type: "cylinder", radius: d / 2, height: leg, position: [Rm * Math.cos(a), Rm * Math.sin(a), L - d / 2], axis: "Y", mode: "add" },
-    ], `DIN 2088 – ${fmt(d)}×${fmt(D)} – n ${n}`, "#5b6670");
+    ], tr("DIN 2088 – {0}×{1} – n {2}", fmt(d), fmt(D), n), "#5b6670");
   },
 };
 
@@ -131,11 +132,11 @@ export const discSpring: Family = {
   standards: ["DIN 2093", "EN 16983"],
   keywords: ["talirova pružina", "talirova", "talir", "disc spring", "belleville", "din 2093"],
   params: [
-    { key: "size", label: "Řada – De×Di×t", kind: "enum", options: DISC.map((x) => ({ v: discKey(x), l: `${x.s}  ${x.De}×${x.Di}×${x.t} (h0 ${x.h0})` })), default: "A-20x10.2x1.1" },
-    { key: "count", label: "Počet v sloupci", kind: "number", min: 1, max: 20, step: 1, unit: "", default: 1 },
-    { key: "stack", label: "Řazení", kind: "enum", options: [{ v: "series", l: "za sebou (střídavě)" }, { v: "parallel", l: "vedle sebe (do sebe)" }], default: "series" },
+    { key: "size", label: tr("Řada – De×Di×t"), kind: "enum", options: DISC.map((x) => ({ v: discKey(x), l: tr("{0}  {1}×{2}×{3} (h0 {4})", x.s, x.De, x.Di, x.t, x.h0) })), default: "A-20x10.2x1.1" },
+    { key: "count", label: tr("Počet v sloupci"), kind: "number", min: 1, max: 20, step: 1, unit: "", default: 1 },
+    { key: "stack", label: tr("Řazení"), kind: "enum", options: [{ v: "series", l: tr("za sebou (střídavě)") }, { v: "parallel", l: tr("vedle sebe (do sebe)") }], default: "series" },
   ],
-  sizes: { key: "size", columns: [{ key: "De", label: "De" }, { key: "Di", label: "Di" }, { key: "t", label: "t" }, { key: "h0", label: "h0" }], rows: DISC.map((x) => ({ size: discKey(x), ...x })) },
+  sizes: { key: "size", columns: [{ key: "De", label: tr("De") }, { key: "Di", label: tr("Di") }, { key: "t", label: "t" }, { key: "h0", label: "h0" }], rows: DISC.map((x) => ({ size: discKey(x), ...x })) },
   parse: (q) => {
     const kw = has(q, "talir", "disc spring", "belleville", "2093");
     if (!kw) return null;
@@ -158,10 +159,10 @@ export const discSpring: Family = {
     for (let i = 0; i < n; i++) {
       const up = parallel || i % 2 === 0;
       const prof: Vec2[] = up ? [[x.Di / 2, z + x.h0], [x.De / 2, z], [x.De / 2, z + x.t], [x.Di / 2, z + x.h0 + x.t]] : [[x.Di / 2, z], [x.De / 2, z + x.h0], [x.De / 2, z + x.h0 + x.t], [x.Di / 2, z + x.t]];
-      f.push(...revolveProfile(`Talíř ${i + 1}`, prof, i === 0 ? "new" : "add"));
+      f.push(...revolveProfile(tr("Talíř {0}", i + 1), prof, i === 0 ? "new" : "add"));
       z += parallel ? x.t : x.t + x.h0;
     }
-    return part(`Talířová pružina ${x.De}×${x.Di}×${x.t}`, "ocel", f, `DIN 2093 – ${x.s} ${x.De}×${x.Di}×${x.t}${n > 1 ? ` – ${n}× ${parallel ? "vedle sebe" : "za sebou"}` : ""}`, "#5b6670");
+    return part(tr("Talířová pružina {0}×{1}×{2}", x.De, x.Di, x.t), "ocel", f, tr("DIN 2093 – {0} {1}×{2}×{3}{4}", x.s, x.De, x.Di, x.t, n > 1 ? ` – ${n}× ${parallel ? "vedle sebe" : "za sebou"}` : ""), "#5b6670");
   },
 };
 
@@ -174,10 +175,10 @@ export const gasStrut: Family = {
   standards: ["Stabilus / Suspa (rozměrová řada)"],
   keywords: ["plynova vzpera", "plynova", "vzpera", "gas spring", "gas strut", "stabilus"],
   params: [
-    { key: "size", label: "Pístnice/válec", kind: "enum", options: Object.keys(GAS).map((k) => ({ v: k, l: `Ø${k.replace("/", " / Ø")}` })), default: "8/19" },
-    { key: "stroke", label: "Zdvih", kind: "number", min: 20, max: 600, step: 5, unit: "mm", default: 100 },
-    { key: "force", label: "Síla", kind: "number", min: 50, max: 5000, step: 10, unit: "N", default: 300 },
-    { key: "extended", label: "Vysunutá", kind: "bool", default: true },
+    { key: "size", label: tr("Pístnice/válec"), kind: "enum", options: Object.keys(GAS).map((k) => ({ v: k, l: `Ø${k.replace("/", tr(" / Ø"))}` })), default: "8/19" },
+    { key: "stroke", label: tr("Zdvih"), kind: "number", min: 20, max: 600, step: 5, unit: "mm", default: 100 },
+    { key: "force", label: tr("Síla"), kind: "number", min: 50, max: 5000, step: 10, unit: "N", default: 300 },
+    { key: "extended", label: tr("Vysunutá"), kind: "bool", default: true },
   ],
   parse: (q) => {
     const kw = has(q, "plynov", "vzper", "gas spring", "gas strut", "stabilus");
@@ -195,13 +196,13 @@ export const gasStrut: Family = {
     const ext = v.extended !== false ? stroke : 0;
     const body = stroke + 30;
     const eye = g.cyl * 0.9;
-    return part(`Plynová vzpěra ${v.size} z${fmt(stroke)}`, "ocel", [
-      cyl("Válec", g.cyl, body, 0, "new"),
-      cyl("Pístnice", g.rod, 15 + ext, body, "add"),
+    return part(tr("Plynová vzpěra {0} z{1}", v.size, fmt(stroke)), "ocel", [
+      cyl(tr("Válec"), g.cyl, body, 0, "new"),
+      cyl(tr("Pístnice"), g.rod, 15 + ext, body, "add"),
       chamferAll(0.5),
       { id: uid(), name: "Oko 1", type: "tube", outer: eye, inner: eye * 0.4, height: g.rod, position: [0, -g.rod / 2, -eye / 2 + 1], axis: "Y", mode: "add" },
       { id: uid(), name: "Oko 2", type: "tube", outer: eye, inner: eye * 0.4, height: g.rod, position: [0, -g.rod / 2, body + 15 + ext + eye / 2 - 1], axis: "Y", mode: "add" },
-    ], `Plynová vzpěra ${v.size} – zdvih ${fmt(stroke)} – ${v.force} N`, "#3a3f45");
+    ], tr("Plynová vzpěra {0} – zdvih {1} – {2} N", v.size, fmt(stroke), v.force), "#3a3f45");
   },
 };
 

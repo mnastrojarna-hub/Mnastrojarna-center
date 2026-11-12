@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { CASES } from "@/content/cases";
+import { cadAppHref, cadDocsHref } from "@/content/cad-links";
 import { SITE } from "@/content/site";
 import { LOCALES, LOCALE_META, SERVICE_IDS, alternates, href, type PageKey } from "@/i18n/config";
 
@@ -29,7 +30,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...PAGES.flatMap(([k, p, f]) => entry(k, p, f)),
     ...SERVICE_IDS.flatMap((id) => entry("service", 0.85, "monthly", id)),
     ...CASES.flatMap((c) => entry("case", 0.75, "yearly", c.slug.cs)),
-    { url: `${SITE.url}/cad`, lastModified: now, priority: 0.9, changeFrequency: "monthly" },
-    { url: `${SITE.url}/cad/dokumentace`, lastModified: now, priority: 0.85, changeFrequency: "monthly" },
+    ...LOCALES.map((l) => ({ url: `${SITE.url}${cadAppHref(l)}`, lastModified: now, priority: 0.9, changeFrequency: "monthly" as const, alternates: { languages: Object.fromEntries(LOCALES.map((x) => [LOCALE_META[x].hreflang, `${SITE.url}${cadAppHref(x)}`])) } })),
+    ...LOCALES.map((l) => ({ url: `${SITE.url}${cadDocsHref(l)}`, lastModified: now, priority: l === "cs" ? 0.85 : 0.6, changeFrequency: "monthly" as const, alternates: { languages: Object.fromEntries(LOCALES.map((x) => [LOCALE_META[x].hreflang, `${SITE.url}${cadDocsHref(x)}`])) } })),
   ];
 }

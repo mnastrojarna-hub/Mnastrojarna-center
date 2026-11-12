@@ -1,0 +1,436 @@
+# Knihovna normalizovaných dílů – názvy dílů, parametry, označení
+
+# alu-profiles
+Drážka	Slot
+Délka	Length
+Délka L	Length L
+Díra 1	Hole 1
+Profil {0} L{1}	Profile {0} L{1}
+Profil {0} drážka {1} – L {2} mm	Profile {0} slot {1} – L {2} mm
+Středová díra pro závit	Centre hole for thread
+Středová díra {0}.{1}	Centre hole {0}.{1}
+T-matice drážka {0} – {1} – L{2}	T-nut slot {0} – {1} – L{2}
+T-matice {0}/{1}	T-nut {0}/{1}
+Tělo	Body
+Závitová díra	Threaded hole
+drážka {0}	slot {0}
+závit čela	end-face thread
+{0} (drážka {1})	{0} (slot {1})
+{0} – drážka {1}	{0} – slot {1}
+Úhelník {0}×{1}	Angle bracket {0}×{1}
+Úhelník {0}×{1}×{2}	Angle bracket {0}×{1}×{2}
+Řada	Series
+Žebro – profil	Rib – profile
+
+# bearings
+2RS – gumová těsnění	2RS – rubber seals
+2Z – plechové kryty	2Z – metal shields
+Krytí	Sealing
+Krytí 1	Sealing 1
+Krytí 2	Sealing 2
+Ložisko {0}{1}	Bearing {0}{1}
+Modelovat kuličky	Model the balls
+Označení	Designation
+Vnitřní kroužek	Inner ring
+Vnější kroužek	Outer ring
+otevřené	open
+vypněte u velkých sestav	turn off for large assemblies
+
+# bearings2
+Axiální ložisko {0}	Thrust bearing {0}
+D límce	Flange D
+Délka l	Length l
+Díra 2	Hole 2
+Hřídelový kroužek	Shaft washer
+ISO 4379 – {0} {1}×{2}×{3}	ISO 4379 – {0} {1}×{2}×{3}
+Jehlové ložisko {0}	Needle bearing {0}
+Kluzné pouzdro Ø{0}×{1}×{2}	Plain bush Ø{0}×{1}×{2}
+Kuželíkové ložisko {0}	Tapered roller bearing {0}
+Lem 1	Lip 1
+Lem 2	Lip 2
+Ložiskové těleso {0}	Bearing housing {0}
+Límec	Flange
+Modelovat jehly	Model the needles
+Modelovat kuželíky	Model the rollers
+S límcem (tvar F)	With flange (form F)
+Tělesový kroužek	Housing washer
+Vnitřní průměr d	Inner diameter d
+{0} – Ø{1} – rozteč {2}	{0} – Ø{1} – spacing {2}
+
+# fasteners
+DIN 975 – {0}×{1} – {2}	DIN 975 – {0}×{1} – {2}
+Dřík	Shank
+Důlek	Cup point
+ISO 10642 – {0}×{1} – {2}	ISO 10642 – {0}×{1} – {2}
+ISO 4762 – {0}×{1} – {2}	ISO 4762 – {0}×{1} – {2}
+ISO 7380 – {0}×{1} – {2}	ISO 7380 – {0}×{1} – {2}
+Matice {0} {1}	Nut {0} {1}
+Pevnost / materiál	Grade / material
+Podložka	Washer
+Podložka {0} {1}	Washer {0} {1}
+Stavěcí šroub {0}×{1}	Set screw {0}×{1}
+Tyč	Rod
+Vnitřní šestihran	Hexagon socket
+Závitová tyč {0}×{1}	Threaded rod {0}×{1}
+m (nízká)	m (thin)
+Šroub {0}×{1} ISO 10642	Screw {0}×{1} ISO 10642
+Šroub {0}×{1} ISO 4762	Screw {0}×{1} ISO 4762
+Šroub {0}×{1} ISO 7380	Screw {0}×{1} ISO 7380
+Šroub {0}×{1} {2}	Screw {0}×{1} {2}
+
+# fasteners2
+DIN 127 – B {0}	DIN 127 – B {0}
+DIN 315 – {0}	DIN 315 – {0}
+DIN 580 – {0}	DIN 580 – {0}
+DIN 660 – {0}×{1} – {2}	DIN 660 – {0}×{1} – {2}
+DIN 6798 – A {0}	DIN 6798 – A {0}
+DIN 6923 – {0} – {1}	DIN 6923 – {0} – {1}
+DIN 7349 – {0}	DIN 7349 – {0}
+DIN 7981 – {0}×{1}	DIN 7981 – {0}×{1}
+DIN 985 – {0} – {1}	DIN 985 – {0} – {1}
+ISO 7045 – {0}×{1} – {2}	ISO 7045 – {0}×{1} – {2}
+ISO 7046 – {0}×{1} – {2}	ISO 7046 – {0}×{1} – {2}
+Křídlo 1	Wing 1
+Křídlo 2	Wing 2
+Křídlová matice {0}	Wing nut {0}
+Kříž 1	Cross 1
+Kříž 2	Cross 2
+Límec vložky	Insert collar
+Nylonová vložka	Nylon insert
+Náboj	Hub
+Nýt Ø{0}×{1}	Rivet Ø{0}×{1}
+Ozubená příruba	Serrated flange
+Podložka {0} DIN 7349	Washer {0} DIN 7349
+Pojistná matice {0}	Lock nut {0}
+Pružná podložka {0}	Spring washer {0}
+Průměr d	Diameter d
+Příruba	Flange
+Přírubová matice {0}	Flange nut {0}
+Rozříznutí	Split
+Samořezný šroub {0}×{1}	Self-tapping screw {0}×{1}
+Velikost	Size
+Zubová podložka {0}	Serrated lock washer {0}
+Závrtný šroub {0}×{1}	Stud {0}×{1}
+Zářez	Slot
+ocel pozink	zinc-plated steel
+pružinová ocel	spring steel
+Šroub	Screw
+Šroub s okem {0}	Eye bolt {0}
+Šroub {0}×{1} ISO 7045	Screw {0}×{1} ISO 7045
+Šroub {0}×{1} ISO 7046	Screw {0}×{1} ISO 7046
+
+# gears
+0 = bez náboje	0 = no hub
+0 = plný	0 = solid
+Bočnice	Flange
+Bočnice 1	Flange 1
+Bočnice 2	Flange 2
+Drážka pro pero DIN 6885	Keyway DIN 6885
+Délka náboje	Hub length
+Díra	Hole
+Díra d	Bore d
+HTD {0}-{1}-{2}	HTD {0}-{1}-{2}
+Hřeben	Rack
+Hřeben m{0} {1} zubů	Rack m{0} {1} teeth
+ISO 606 – {0}-{1} z{2}	ISO 606 – {0}-{1} z{2}
+Korekce x	Profile shift x
+Modul m	Module m
+Náboj Ø	Hub Ø
+Ozubené kolo m{0} z{1}	Spur gear m{0} z{1}
+Ozubené kolo m{0} z{1} b{2} α{3}° x{4}	Spur gear m{0} z{1} b{2} α{3}° x{4}
+Ozubení	Toothing
+Ozubení{0}	Toothing{0}
+Ozubený hřeben m{0} L{1} b{2}	Gear rack m{0} L{1} b{2}
+Počet drážek	Number of grooves
+Počet zubů	Number of teeth
+Počet zubů z	Number of teeth z
+Profil řemene	Belt profile
+Tloušťka věnce	Rim thickness
+Vnitřní ozubení	Internal gear
+Vnitřní ozubení m{0} z{1} b{2}	Internal gear m{0} z{1} b{2}
+Výpočtový průměr dp	Pitch diameter dp
+Výška tělesa	Body height
+Věnec	Ring
+Věnec m{0} z{1}	Ring gear m{0} z{1}
+d1 váleček	d1 roller
+dvouřadý (-2)	duplex (-2)
+jednořadý (-1)	simplex (-1)
+třířadý (-3)	triplex (-3)
+Úhel záběru	Pressure angle
+Řady	Strands
+Řemenice	Pulley
+Řemenice HTD {0} z{1}	HTD pulley {0} z{1}
+Řemenice {0} dp{1}	Pulley {0} dp{1}
+Řemenice {0} {1}×{2}	Pulley {0} {1}×{2}
+Řetěz	Chain
+Řetězové kolo {0}-{1} z{2}	Sprocket {0}-{1} z{2}
+Řetězové kolo {0}-{1} z{2} – dp {3}	Sprocket {0}-{1} z{2} – dp {3}
+Šířka b	Width b
+Šířka řemene	Belt width
+
+# gears2
+0 = bez hřídelových konců	0 = no shaft ends
+45° = soukolí 1:1 (miter)	45° = 1:1 gear pair (mitre)
+Délka hřídelových konců	Shaft end length
+Délka ozubené části	Toothed length
+Hřídel 1	Shaft 1
+Hřídel 2	Shaft 2
+Jádro	Core
+Kuželové kolo m{0} z{1}	Bevel gear m{0} z{1}
+Kuželové kolo m{0} z{1} δ{2}° b{3}	Bevel gear m{0} z{1} δ{2}° b{3}
+Modul m (osový)	Module m (axial)
+Modul m (vnější)	Module m (outer)
+Normálný modul mn	Normal module mn
+Ořez dole	Trim bottom
+Ořez nahoře	Trim top
+Počet chodů	Number of starts
+Počet zubů z2	Number of teeth z2
+Průměr hřídele	Shaft diameter
+Smysl stoupání	Hand of helix
+Součinitel průměru q	Diameter factor q
+Součinitel q šneku	Worm factor q
+Vnitřní profil	Inner profile
+Vnější profil	Outer profile
+levý (L)	left (L)
+pravý (R)	right (R)
+pro zakřivení (hrdlo) zubů	for the throat curvature of the teeth
+{0} – řez {1}	{0} – section {1}
+Úhel roztečného kužele δ	Pitch cone angle δ
+Úhel sklonu β	Helix angle β
+Šikmé kolo mn{0} z{1} β{2}°	Helical gear mn{0} z{1} β{2}°
+Šikmé kolo mn{0} z{1} β{2}°{3} b{4} – d {5}	Helical gear mn{0} z{1} β{2}°{3} b{4} – d {5}
+Šikmé ozubení	Helical toothing
+Šnek m{0} q{1}	Worm m{0} q{1}
+Šnek m{0} q{1} z{2} d1 {3} L{4}	Worm m{0} q{1} z{2} d1 {3} L{4}
+Šnekové kolo m{0} z{1}	Worm wheel m{0} z{1}
+Šnekové kolo m{0} z{1} b{2} – d2 {3} γ{4}°	Worm wheel m{0} z{1} b{2} – d2 {3} γ{4}°
+Šířka ozubení b	Face width b
+
+# linear
+Domeček SHF{0}	Shaft support SHF{0}
+Drážka 1	Groove 1
+Drážka 2	Groove 2
+Drážka L	Groove L
+Drážka P	Groove R
+Díra příruby	Flange hole
+Hřídel	Shaft
+Kanál kolejnice	Rail channel
+Kolejnice HGR{0} L{1}	Rail HGR{0} L{1}
+Koncovka 1	End cap 1
+Koncovka 2	End cap 2
+Konec 1	End 1
+Konec 2	End 2
+Kuličkový šroub SFU{0} L{1}	Ball screw SFU{0} L{1}
+Obrobené konce (osazení)	Machined ends (steps)
+Osazení 1	Step 1
+Poloha matice	Nut position
+Pouzdro LM{0}UU	Bushing LM{0}UU
+Příruba matice	Nut flange
+SFU{0}-{1} + matice DIN 69051	SFU{0}-{1} + nut DIN 69051
+SHF{0} – rozteč {1}	SHF{0} – spacing {1}
+Těleso SC{0}UU	Housing SC{0}UU
+Vodicí tyč W{0} L{1}	Guide shaft W{0} L{1}
+Vozík	Carriage
+Vozík lineárního vedení HGH (úzký)	Linear guide carriage HGH (narrow)
+Vozík lineárního vedení HGW (přírubový)	Linear guide carriage HGW (flanged)
+Vozík {0}{1}	Carriage {0}{1}
+W{0} h6 × {1} – kalená 60 HRC	W{0} h6 × {1} – hardened 60 HRC
+díra	hole
+matice L	nut L
+matice Ø	nut Ø
+příruba Ø	flange Ø
+rozteč	spacing
+stoupání	lead
+tloušťka	thickness
+výška osy	centre height
+
+# mold-parts
+Dosedka Ø{0}×{1}	Rest button Ø{0}×{1}
+Opěrný sloupek Ø{0}×{1}	Support pillar Ø{0}×{1}
+Opěrný sloupek Ø{0}×{1} – {2}	Support pillar Ø{0}×{1} – {2}
+Průměr těla d1	Body diameter d1
+Rádius dosedací plochy	Seat radius
+Vratný kolík Ø{0}×{1}	Return pin Ø{0}×{1}
+Vstupní průměr vtoku	Sprue inlet diameter
+Vtoková vložka Ø{0}×{1}	Sprue bush Ø{0}×{1}
+Vtoková vložka Ø{0}×{1} – d{2} – SR{3}	Sprue bush Ø{0}×{1} – d{2} – SR{3}
+Zahloubení	Counterbore
+Závitová díra 1	Threaded hole 1
+Závitová díra 2	Threaded hole 2
+
+# mold2
+Datumovka Ø{0}	Date stamp Ø{0}
+Délka ploché části	Flat part length
+Hadice Ø	Hose Ø
+Kanál	Channel
+Lisovací část	Moulding part
+Mezikruží	Annulus
+Plochá část	Flat part
+Plochý vyhazovač {0}×{1}×{2}	Blade ejector {0}×{1}×{2}
+Průměr dříku d	Shank diameter d
+Průřez a × b	Cross-section a × b
+Temperační spojka {0}	Cooling coupling {0}
+Vnitřní průměr d1	Inner diameter d1
+Vnější průměr d	Outer diameter d
+Vodicí pouzdro Z11 Ø{0}×{1}	Guide bush Z11 Ø{0}×{1}
+Vodicí sloupek Z01 Ø{0}×{1}	Guide pillar Z01 Ø{0}×{1}
+Vodicí část	Guide part
+Vyhazovací trubka Ø{0}/{1}×{2}	Ejector sleeve Ø{0}/{1}×{2}
+Zápich	Undercut
+d1 (lisovací)	d1 (moulding)
+Čep	Pin
+Šikmý čep Ø{0} × {1} – {2}°	Angle pin Ø{0} × {1} – {2}°
+Šikmý čep Ø{0}×{1} {2}°	Angle pin Ø{0}×{1} {2}°
+Šipka – vložka	Arrow – insert
+
+# pins
+A – zaoblené konce	A – rounded ends
+B – rovné konce	B – square ends
+C – jeden konec zaoblený	C – one end rounded
+D2 drážka	D2 groove
+DIN 2095 – {0}×{1}×{2} – n {3}	DIN 2095 – {0}×{1}×{2} – n {3}
+DIN 6885 – {0} {1}×{2}×{3}	DIN 6885 – {0} {1}×{2}×{3}
+ISO 3601 – {0}×{1} – {2}	ISO 3601 – {0}×{1} – {2}
+ISO 8752 – {0}×{1}	ISO 8752 – {0}×{1}
+Kolík	Pin
+Kolík Ø{0}×{1} {2}	Pin Ø{0}×{1} {2}
+Kroužek	Ring
+O-kroužek {0}×{1}	O-ring {0}×{1}
+Otvor ouška	Lug hole
+Ouško	Lug
+Pero {0} {1}×{2}×{3}	Key {0} {1}×{2}×{3}
+Pero – profil	Key – profile
+Pojistný kroužek {0} {1}	Circlip {0} {1}
+Počet činných závitů n	Number of active coils n
+Pružina {0}×{1}×{2}	Spring {0}×{1}×{2}
+Pružný kolík Ø{0}×{1}	Spring pin Ø{0}×{1}
+Průměr drátu d	Wire diameter d
+Průměr díry D	Hole diameter D
+Průměr hřídele d	Shaft diameter d
+Průřez	Cross-section
+Průřez d2	Cross-section d2
+Rozevření	Opening
+Vnější průměr De	Outer diameter De
+Volná délka L0	Free length L0
+Válcový kolík kalený (m6)	Hardened dowel pin (m6)
+Válcový kolík nekalený (h8)	Unhardened dowel pin (h8)
+d2 drážka	d2 groove
+hřídel d	shaft d
+t1 hřídel	t1 shaft
+t2 náboj	t2 hub
+{0}×{1} (hřídel {2}–{3})	{0}×{1} (shaft {2}–{3})
+Štěrbina	Slit
+
+# pins2
+DIN 6888 – {0}×{1}	DIN 6888 – {0}×{1}
+Drážky pro pojistný kroužek	Circlip grooves
+ISO 1234 – {0}×{1}	ISO 1234 – {0}×{1}
+ISO 2339 – {0}×{1} – 1:50	ISO 2339 – {0}×{1} – 1:50
+Kuželový kolík Ø{0}×{1}	Taper pin Ø{0}×{1}
+Průměr d (menší konec)	Diameter d (small end)
+Rýha	Groove
+Rýhovaný kolík s rýhami na polovině délky	Grooved pin with grooves on half the length
+Rýhovaný kolík s rýhami po celé délce	Grooved pin with grooves along the full length
+Rýhovaný kolík Ø{0}×{1}	Grooved pin Ø{0}×{1}
+Seříznutí	Chamfer
+Větev 1	Leg 1
+Větev 2	Leg 2
+Závlačka {0}×{1}	Split pin {0}×{1}
+Úsečové pero {0}×{1}	Woodruff key {0}×{1}
+Čep bez hlavy	Pin without head
+Čep s hlavou (hřídelový čep)	Pin with head (clevis pin)
+Čep Ø{0}×{1} {2}	Pin Ø{0}×{1} {2}
+
+# piping
+01 – plochá přivařovací	01 – plate flange
+05 – zaslepovací	05 – blind flange
+11 – krková přivařovací	11 – welding-neck flange
+Díra pro šroub	Bolt hole
+Jmenovitá velikost	Nominal size
+Nátrubek {0} Ø{1}	Socket {0} Ø{1}
+Nátrubek {0} – Ø{1}	Socket {0} – Ø{1}
+Příruba {0} PN16 typ {1}	Flange {0} PN16 type {1}
+Trubka R {0}" L{1}	Pipe R {0}" L{1}
+Typ	Type
+Těsnicí lišta	Raised face
+děr	holes
+stěna	wall
+Ø děr	Hole Ø
+Ø vnější	Outer Ø
+
+# pneumatics
+ISO 15552 – Ø{0}×{1} – {2} – {3}	ISO 15552 – Ø{0}×{1} – {2} – {3}
+ISO 6432 – Ø{0}×{1} – {2}	ISO 6432 – Ø{0}×{1} – {2}
+Matice táhla {0}	Tie-rod nut {0}
+Miniválec ISO 6432 Ø{0}×{1}	Mini cylinder ISO 6432 Ø{0}×{1}
+Průměr pístu	Piston diameter
+Pístnice	Piston rod
+Táhlo {0}	Tie rod {0}
+Uvolňovací kroužek	Release ring
+Vedení pístnice	Rod guide
+Vysunutá pístnice	Extended piston rod
+Válec ISO 15552 Ø{0}×{1}	Cylinder ISO 15552 Ø{0}×{1}
+Víko přední	Front cap
+Víko zadní	Rear cap
+Zdvih	Stroke
+Závit zadní	Rear thread
+pístnice	piston rod
+přípoj	port
+závit	thread
+Ø těla	Body Ø
+Šroubení push-in Ø{0} – {1}	Push-in fitting Ø{0} – {1}
+Šroubení Ø{0} {1}	Fitting Ø{0} {1}
+
+# profiles
+Jäkl {0}×{1}×{2} L{3}	Hollow section {0}×{1}×{2} L{3}
+Kulatina Ø{0} L{1}	Round bar Ø{0} L{1}
+Nosník HEA	HEA beam
+Otvor klíče (SW)	Key opening (AF)
+PLO {0}×{1} – S235JR – L={2}	FLAT {0}×{1} – S235JR – L={2}
+Plochá {0}×{1} L{2}	Flat {0}×{1} L{2}
+Rozměr a×b×t	Size a×b×t
+TR Ø{0}×{1} – S235JRH – L={2}	TUBE Ø{0}×{1} – S235JRH – L={2}
+Tloušťka stěny t	Wall thickness t
+Trubka Ø{0}×{1} L{2}	Tube Ø{0}×{1} L{2}
+UPN {0} L{1}	UPN {0} L{1}
+UPN {0} – S235JR – L={1}	UPN {0} – S235JR – L={1}
+Vnější obrys	Outer outline
+Vnější průměr D	Outer diameter D
+Výška h	Height h
+{0} {1}×{2}×{3} – S235JRH – L={4}	{0} {1}×{2}×{3} – S235JRH – L={4}
+Úhelník	Angle
+Čtvercová tyč	Square bar
+Čtvercová tyč {0} L{1}	Square bar {0} L{1}
+Šestihran SW{0} L{1}	Hexagon AF{0} L{1}
+Šestihranná tyč	Hexagon bar
+Šířka w	Width w
+
+# springs2
+DIN 2088 – {0}×{1} – n {2}	DIN 2088 – {0}×{1} – n {2}
+DIN 2093 – {0} {1}×{2}×{3}{4}	DIN 2093 – {0} {1}×{2}×{3}{4}
+DIN 2097 – {0}×{1}×{2} – n {3}	DIN 2097 – {0}×{1}×{2} – n {3}
+Délka ramen	Leg length
+Délka těla Lk	Body length Lk
+Očko 1	Hook 1
+Očko 2	Hook 2
+Plynová vzpěra {0} z{1}	Gas spring {0} s{1}
+Plynová vzpěra {0} – zdvih {1} – {2} N	Gas spring {0} – stroke {1} – {2} N
+Počet v sloupci	Number in stack
+Počet závitů n	Number of coils n
+Pístnice/válec	Rod/cylinder
+Síla	Force
+Talíř {0}	Disc {0}
+Talířová pružina {0}×{1}×{2}	Disc spring {0}×{1}×{2}
+Tažná pružina {0}×{1}×{2}	Extension spring {0}×{1}×{2}
+Vysunutá	Extended
+Válec	Cylinder
+Zkrutná pružina {0}×{1} n{2}	Torsion spring {0}×{1} n{2}
+vedle sebe (do sebe)	parallel (nested)
+za sebou (střídavě)	in series (alternating)
+Úhel ramen	Leg angle
+Řada – De×Di×t	Series – De×Di×t
+Řazení	Stacking
+
+# util
+Drážka pro pero	Keyway
+{0} – profil	{0} – profile

@@ -254,7 +254,8 @@ export function Motion() {
     return () => window.removeEventListener("pointermove", onMove);
   }, []);
 
-  return <Cursor />;
+  // Vlastní kurzor (bod + kroužek) vypnut na přání – systémový kurzor je čitelnější. Komponenta Cursor zůstává k případnému návratu.
+  return null;
 }
 
 /** Vlastní kurzor: bod + kroužek, nad [data-cursor] zobrazí popisek. Jen pro myš.

@@ -1,0 +1,840 @@
+# EN – formuláře prvků, panely, skica, nastavení, sdílení, start
+# fillet-form
+Boční plocha 1	Side face 1
+Boční plocha 2	Side face 2
+D (na ref. ploše)	D (on ref. face)
+D1 (na ref. ploše)	D1 (on ref. face)
+D1 se měří na referenční ploše, D2 na sousední ploše. Vybrané hrany musí s referenční plochou sousedit; „Všechny hrany plochy“ srazí celý její obvod.	D1 is measured on the reference face, D2 on the adjacent face. The selected edges must border the reference face; “All edges of the face” chamfers its whole perimeter.
+D2 (sousední plocha)	D2 (adjacent face)
+Druh sražení	Chamfer type
+Druh zaoblení	Fillet type
+Jádro šíří zaoblení po tečně navazujících hranách (hrana → oblouk → hrana) i samo; volba rozšíří i výběr, se kterým pracuje tabulka a počet hran.	The kernel propagates the fillet along tangent-continuous edges (edge → arc → edge) by itself; this option also extends the selection used by the table and the edge count.
+Každá hrana může mít vlastní poloměr; liší-li se začátek a konec, mění se poloměr podél hrany lineárně. Řídicí body uprostřed hrany jádro neumožňuje; tečně navazující hrany tvoří jeden přechod se společným poloměrem.	Each edge can have its own radius; if start and end differ, the radius changes linearly along the edge. Control points in the middle of an edge are not supported by the kernel; tangent-continuous edges form one blend with a common radius.
+Konstantní	Constant
+Odebrat hranu	Remove edge
+Plný	Full round
+Plocha–plocha	Face–face
+Poloměr = polovina vzdálenosti rovnoběžných bočních ploch; prostřední plocha se nahradí válcem tečným k oběma. Prostřední plochu lze vynechat, je-li mezi bočními plochami jediná. Obdélníková prostřední plocha kolmá na boční se zaoblí přesně, jiná přibližně.	Radius = half the distance between the parallel side faces; the middle face is replaced by a cylinder tangent to both. The middle face can be omitted if there is only one between the side faces. A rectangular middle face perpendicular to the sides is rounded exactly, others approximately.
+Poloměr se mění lineárně od začátku hrany (R1) k jejímu konci (R2). Začátek hrany určuje model – běží-li přechod obráceně, hodnoty prohoďte. Eliptické (asymetrické) zaoblení s různou vzdáleností na každé ploše jádro OCCT neumí.	The radius changes linearly from the edge start (R1) to its end (R2). The edge start is defined by the model – if the blend runs the other way, swap the values. The OCCT kernel does not support elliptic (asymmetric) fillets with a different distance on each face.
+Poloměry hran	Edge radii
+Pro tabulku poloměrů vyberte hrany klikem v modelu – u volby „Všechny“ platí výchozí poloměr.	For the radius table select edges by clicking in the model – with “All” the default radius applies.
+Prohodit R1 ↔ R2	Swap R1 ↔ R2
+Prostřední plocha (zaoblí se)	Middle face (gets rounded)
+R konec	R end
+R začátek	R start
+R1 (začátek hrany)	R1 (edge start)
+R1 → R2	R1 → R2
+R2 (konec hrany)	R2 (edge end)
+Referenční plocha	Reference face
+Roh se odřízne rovinou procházející body ve vzdálenostech D1–D3 od vrcholu podél jeho tří hran (v pořadí čísel hran). Ve vrcholu se musí stýkat právě tři hrany.	The corner is cut by a plane through points at distances D1–D3 from the vertex along its three edges (in edge-number order). Exactly three edges must meet at the vertex.
+Sada ploch 1	Face set 1
+Sada ploch 2	Face set 2
+Stejné	Equal
+Tabulka	Table
+Velikost sražení	Chamfer size
+Vrchol	Vertex
+Vrcholy	Vertices
+Vybrané	Selected
+Vzdálenost D se měří na referenční ploše; úhel svírá sražení s touto plochou (druhá vzdálenost = D · tg úhlu, 45° = symetrické).	Distance D is measured on the reference face; the angle is between the chamfer and this face (second distance = D · tan angle, 45° = symmetric).
+Výchozí poloměr	Default radius
+Zaoblí se hrany, které má plocha z první sady společné s plochou z druhé sady (např. horní plocha × všechny boční = celý obvod).	Edges shared by a face from the first set and a face from the second set are rounded (e.g. top face × all side faces = whole perimeter).
+plocha, na které se měří první vzdálenost	face on which the first distance is measured
+vrcholů zadaných indexem.	vertices given by index.
+Úhel od ref. plochy	Angle from ref. face
+Šířit výběr po tečně navazujících hranách	Propagate selection along tangent edges
+# more-forms
++ ven · − dovnitř	+ outward · − inward
+1. rovina (plocha / pomocná rovina)	1st plane (face / datum plane)
+2. rovina (plocha / pomocná rovina)	2nd plane (face / datum plane)
+Cílová plocha / pomocná rovina	Target face / datum plane
+Definice osy	Axis definition
+Do bodu	To point
+Druhý bod	Second point
+Délka zobrazení	Display length
+Globální osa X / Y / Z středem (níže)	Global X / Y / Z axis through the centre (below)
+Globální osa otočení	Global rotation axis
+Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese (kružnice válce / jádra díry se kótuje označením). Doporučeno pro výrobní dokumentaci.	Cosmetic thread: the geometry does not change, the thread appears in the drawing (the cylinder / hole core circle is dimensioned with the designation). Recommended for manufacturing documentation.
+Modelovat závitové drážky	Model the thread grooves
+Neznámé označení – zadejte M2 až M48, volitelně se stoupáním (M18×1,5).	Unknown designation – enter M2 to M48, optionally with pitch (M18×1.5).
+Odsazení od plochy (0 = až k ploše)	Offset from the face (0 = up to the face)
+Osa X (ortogonalizuje se vůči Z)	X axis (orthogonalised against Z)
+Osa Z	Z axis
+Osa Z kvádru	Box Z axis
+Osa otočení	Rotation axis
+Otočení	Rotation
+Označení (text)	Designation (text)
+Označení závitu	Thread designation
+Pevná rovina ({0})	Fixed plane ({0})
+Poloha (začátek osy)	Position (axis start)
+Poloha = střed kvádru	Position = box centre
+Poloha podstavy	Base position
+Pomocná osa / osa Z souřadného systému	Datum axis / Z axis of a coordinate system
+Pomocná osa nevytváří geometrii. Použijte ji jako osu rotace, otočení či kruhového pole, nebo jako směr (volba „Pomocná osa“ v poli osy / směru).	A datum axis creates no geometry. Use it as a revolve, rotation or circular pattern axis, or as a direction (the “Datum axis” option in an axis / direction field).
+Posun z bodu do bodu	Move from point to point
+Posunout z bodu do bodu (přičte se k posunutí výše)	Move from point to point (added to the translation above)
+Posunutí	Translation
+Pořadí: měřítko (kolem středu) → otočení (kolem zadané osy, nebo globální osy středem) → posunutí (čísla + z bodu do bodu).	Order: scale (about the centre) → rotation (about the given axis, or a global axis through the centre) → translation (numbers + point to point).
+První bod	First point
+Průměr pružiny	Spring diameter
+Přímá hrana	Straight edge
+Přímá úprava: plocha se posune po své normále. Kladná hodnota přidá materiál, záporná odebere.	Direct edit: the face moves along its normal. A positive value adds material, a negative one removes it.
+Rovina textu	Text plane
+Souřadný systém nevytváří geometrii. Jeho počátek lze použít jako bod („Pomocný bod“), osu Z jako osu („Pomocná osa“) a rovinu XY jako rovinu skici (definice roviny „Rovnoběžně s plochou“ → odkaz na souřadný systém).	A coordinate system creates no geometry. Its origin can be used as a point (“Datum point”), its Z axis as an axis (“Datum axis”) and its XY plane as a sketch plane (plane definition “Parallel to face” → reference to the coordinate system).
+Střed měřítka a otáčení	Centre of scaling and rotation
+Střed textu (v rovině)	Text centre (in the plane)
+Střed textu odkazem	Text centre by reference
+Tip: začátek = střed kružnice konce válce / díry (⋯ → Střed kružnice), osa = „Podél hrany / osy válce“ s válcovou plochou.	Tip: start = centre of the end circle of the cylinder / hole (⋯ → Circle centre), axis = “Along edge / cylinder axis” with a cylindrical face.
+Ukončení	End condition
+Velikost zobrazení	Display size
+Vnitřní závit (v díře)	Internal thread (in a hole)
+Volná délka	Free length
+Vrchol / bod	Vertex / point
+Vymazat = počátek	Clear = origin
+Vymazat = zpět na čísla	Clear = back to numbers
+Vystoupit	Leave
+Vzdálenost se spočítá ze středu každé vybrané plochy po cílovou rovinu podél normály plochy (každá plocha zvlášť).	The distance is computed from the centre of each selected face to the target plane along the face normal (each face separately).
+Válcová / kuželová plocha	Cylindrical / conical face
+Z bodu	From point
+Zadat čísly (naposledy	Enter numerically (last
+Začátek závitu (na ose)	Thread start (on the axis)
+Způsob	Method
+Způsoby zadání: vrchol, střed / začátek / konec hrany, střed kružnice, střed plochy, bod v % délky hrany, střed mezi body, mezi body v poměru, odsazený podél hrany, průmět na plochu, průsečík hrany s plochou, počátek, souřadnice, bod skici. Bod pak slouží jako poloha díry, primitiva, střed otáčení…	Ways to define it: vertex, edge midpoint / start / end, circle centre, face centre, point at % of edge length, midpoint between points, between points by ratio, offset along an edge, projection onto a face, edge–face intersection, origin, coordinates, sketch point. The point then serves as a hole position, primitive position, rotation centre…
+Základní rovina + odsazení (níže)	Base plane + offset (below)
+Závit (ISO metrický – hrubé i jemné stoupání)	Thread (ISO metric – coarse and fine pitch)
+Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dává Plochy → Tažení po šroubovici (profil Závit 60°).	The thread is modelled as grooves (simplified, without pitch) – suitable for visualisation and 3D printing. A real helix is made with Surfaces → Helix sweep (Thread 60° profile).
+např. M18×1,5	e.g. M18×1.5
+pomocná osa	datum axis
+pomocná rovina	datum plane
+pravé tlačítko / ⋯ = další způsoby	right button / ⋯ = more options
+volitelné	optional
+volitelné – bod se promítne do roviny	optional – the point is projected onto the plane
+volitelné – jinak počátek	optional – otherwise the origin
+{0} (vlastní stoupání)	{0} (custom pitch)
+{0} libovolným směrem (hrana, osa válce, dva body, normála plochy, vektor)	{0} in any direction (edge, cylinder axis, two points, face normal, vector)
+Ø dole	Ø bottom
+Ø nahoře	Ø top
+Ø vnitřní	Ø inner
+— vyberte nebo zadejte níže —	— select or enter below —
+— žádná {0} před tímto prvkem —	— no {0} before this feature —
+# pattern-form
+Bez směru tahu (podle roviny)	No pull direction (by the plane)
+Body skici ({0}) – klikem vynechat	Sketch points ({0}) – click to skip
+Celková délka (směr 2)	Total length (direction 2)
+Celkový úhel	Total angle
+Druh pole	Pattern type
+Druhý směr (mřížka)	Second direction (grid)
+Index kusu = (pořadí ve směru 1 − 1) × {0} + (pořadí ve směru 2 − 1); 0 = zdroj.	Instance index = (order in direction 1 − 1) × {0} + (order in direction 2 − 1); 0 = source.
+Jedna booleovská operace (kopie se nejdřív sloučí – rychlejší u velkých polí)	One boolean operation (copies are merged first – faster for large patterns)
+Jiná tloušťka vybraných stěn{0}	Different thickness of selected walls{0}
+Kolmo na směr tahu středem tělesa	Perpendicular to the pull direction through the body centre
+Kopie vzniknou v každém bodě skici (střed obalového kvádru zdroje se promítne do roviny skici; bod v místě zdroje se nepočítá).	Copies are created at every sketch point (the centre of the source's bounding box is projected onto the sketch plane; a point at the source location does not count).
+Krok mezi kusy	Step between instances
+Kruhově	Circular
+Kusy se rozmístí po délce křivky od jejího začátku; u uzavřené křivky po celém obvodu. Referenční bod zdroje = střed jeho obalového kvádru: kopie se posunou o vzdálenost bodu křivky od jejího začátku a (u tečného natočení) otočí kolem tohoto středu.	Instances are spread along the curve from its start; along the whole perimeter for a closed curve. The source reference point = the centre of its bounding box: copies are moved by the distance of the curve point from its start and (with tangent orientation) rotated about this centre.
+Kusy se číslují od 1 (0 = zdroj).	Instances are numbered from 1 (0 = source).
+Kusy se číslují v pořadí řad (zdola nahoru, zleva doprava), u kruhového od středu po prstencích.	Instances are numbered row by row (bottom to top, left to right); for circular from the centre by rings.
+Lze vybrat více prvků naráz (např. díru i zahloubení).	Several features can be selected at once (e.g. a hole and its counterbore).
+Mřížka	Grid
+Natočení kopií	Orientation of copies
+Natáčet kopie kolem osy (vypnuto = jen posunout)	Rotate copies about the axis (off = translate only)
+Neutrální rovina	Neutral plane
+Okraj od obrysu	Margin from the outline
+Opakované prvky	Repeated features
+Pevné (jen posun)	Fixed (translate only)
+Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Dělicí křivka a stupňovitý úkos zatím nejsou k dispozici.	Faces are tilted by the angle about their intersection with the neutral plane; the pull direction defines which way the draft opens (with a given plane it only flips its orientation). Without a plane or direction the base plane applies. A parting curve and stepped draft are not available yet.
+Po křivce	Along a curve
+Podle skici	By sketch
+Podle tečny křivky	By the curve tangent
+Pokročilé	Advanced
+Pole nemá skicu – osy X/Y skici znamenají globální osy počátkem souřadnic.	The pattern has no sketch – the sketch X/Y axes mean the global axes through the origin.
+Pole opakuje existující prvek – nejdřív vytvořte díru, vysunutí nebo jiné těleso.	A pattern repeats an existing feature – create a hole, an extrusion or another body first.
+Poloha roviny ({0})	Plane position ({0})
+Počet (směr 2)	Count (direction 2)
+Počet kusů	Number of instances
+Při „celkové délce“ platí zadaná délka pro celé pole (krok = délka ÷ (počet − 1)), ve druhém směru stejně.	With “total length” the given length applies to the whole pattern (step = length ÷ (count − 1)), likewise in the second direction.
+Přidat stěnu s jinou tloušťkou	Add a wall with a different thickness
+Rovnoměrně po celém úhlu (krok = úhel ÷ počet)	Evenly over the whole angle (step = angle ÷ count)
+Rozteč (0 = rovnoměrně)	Spacing (0 = evenly)
+Rozteč (směr 2)	Spacing (direction 2)
+Rozšířit na tečně navazující plochy	Extend to tangent-continuous faces
+Skica křivky (dráha)	Curve sketch (path)
+Skica obrysu (uzavřený)	Outline sketch (closed)
+Skica zatím neobsahuje body – nakreslete je nástrojem Bod v místech kopií.	The sketch contains no points yet – draw them with the Point tool where the copies should be.
+Směr 1	Direction 1
+Směr 2	Direction 2
+Směr tahu (otevírání formy)	Pull direction (mould opening)
+Stěna u vybrané rovinné plochy dostane vlastní tloušťku (silnější dno, tenčí víko). Otevřené plochy a zakřivené stěny nelze.	The wall at the selected planar face gets its own thickness (thicker bottom, thinner lid). Opened faces and curved walls are not supported.
+Střídavé řady (každá druhá řada posunutá o půl kroku)	Staggered rows (every second row shifted by half a step)
+Střídavě	Staggered
+Symetricky na obě strany od zdroje	Symmetric on both sides of the source
+Vynechané kusy (indexy)	Skipped instances (indices)
+Vynechat kusy (klikněte na pozici)	Skip instances (click a position)
+Vyplní vnitřek obrysu (otvory v obrysu se vynechají) kusy v dané rozteči; žádný kus není blíže k obrysu než okraj. Počátek rozložení = zdrojový prvek, leží-li v obrysu, jinak střed obrysu. Nejvýše 400 kusů.	Fills the inside of the outline (holes in the outline are skipped) with instances at the given spacing; no instance is closer to the outline than the margin. Layout origin = the source feature if it lies inside the outline, otherwise the outline centre. At most 400 instances.
+Vzdálenost zadaná jako	Distance given as
+Výplň	Fill
+Zadat odkazem (hrana, 2 body, plocha, úhel…)	Enter by reference (edge, 2 points, face, angle…)
+Zadat osu odkazem (hrana, válcová plocha, 2 body, pomocná rovina…)	Enter the axis by reference (edge, cylindrical face, 2 points, datum plane…)
+Zadat osu čísly (osa + střed)	Enter the axis numerically (axis + centre)
+Zadat směr tahu (hrana, 2 body, osa, normála plochy…)	Enter the pull direction (edge, 2 points, axis, face normal…)
+Zadat čísly (vektor)	Enter numerically (vector)
+Zesílit ven (stěna přiroste vně původního povrchu)	Thicken outward (the wall grows outside the original surface)
+Základní rovina	Base plane
+Základní rovina (níže)	Base plane (below)
+klikem vynechat	click to skip
+např. 2, 5, 7	e.g. 2, 5, 7
+vynechán – klikem vrátit	skipped – click to restore
+zdrojový prvek	source feature
+Řádky = směr 2 (zdola nahoru), sloupce = směr 1.	Rows = direction 2 (bottom to top), columns = direction 1.
+# sweep-loft-form
++ Přidat profil	+ Add profile
+0 = 10 % vzdálenosti profilů	0 = 10 % of the profile distance
+1 = beze změny	1 = no change
+Dráha (křivka)	Path (curve)
+Délka náběhu	Lead-in length
+Frenet	Frenet
+Kolmo na profil	Normal to the profile
+Koncový bod	End point
+Kroucení	Twist
+Kružnice (bez skici)	Circle (without a sketch)
+Měřítko profilu na konci	Profile scale at the end
+Okrajová podmínka	Boundary condition
+Orientace profilu podél dráhy	Profile orientation along the path
+Osová a vodicí křivka, tenká stěna	Centreline and guide curve, thin wall
+Osová křivka (volitelně)	Centreline (optional)
+Otáčky	Turns
+Pevná orientace	Fixed orientation
+Posunout nahoru	Move up
+Počáteční bod	Start point
+Pravoúhlý	Right-angled
+Profil (uzavřená skica)	Profile (closed sketch)
+Profil by měl ležet v rovině kolmé na začátek dráhy (kružnice bez skici se tam umístí sama). Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá. Pevná orientace = profil se po dráze jen posouvá (nenatáčí se). Vodicí křivka natáčí profil směrem k ní. Kroucení a měřítko se staví z řezů podél dráhy (hladké šablonování) – výsledek je u dlouhých drah mírně přibližný. Transformovaný přechod je určen pro hladké dráhy.	The profile should lie in a plane perpendicular to the start of the path (a circle without a sketch is placed there automatically). The path can contain lines, arcs and polylines – it must be continuous. Fixed orientation = the profile only translates along the path (does not rotate). A guide curve turns the profile towards it. Twist and scale are built from sections along the path (smooth loft) – for long paths the result is slightly approximate. The transformed transition is meant for smooth paths.
+Profily (v pořadí)	Profiles (in order)
+Profily jsou uzavřené skici v různých rovinách (otvory se šablonují, mají-li všechny profily stejný počet). Stačí i jeden profil a bod (kužel / jehlan). Uzavřené šablonování potřebuje alespoň tři profily. Okrajové podmínky „kolmo“ / „směr“ jsou aproximace pomocným řezem v délce náběhu. Osová křivka má procházet profily (řezy se podél ní prokládají); vodicí křivka natáčí řezy směrem k sobě (použije se první). Osovou / vodicí křivku nelze kombinovat s bodem ani uzavřením.	Profiles are closed sketches in different planes (holes are lofted when all profiles have the same number). One profile and a point is enough (cone / pyramid). A closed loft needs at least three profiles. The “normal” / “direction” boundary conditions are approximated by an auxiliary section at the lead-in length. The centreline should pass through the profiles (sections are interpolated along it); a guide curve turns the sections towards itself (the first one is used). A centreline / guide curve cannot be combined with a point or closing.
+Průměr kruhového profilu	Circular profile diameter
+Přechod v rozích dráhy	Transition at path corners
+Skončit v bodě (špička)	End at a point (tip)
+Sledovat dráhu	Follow the path
+Směr na konci	Direction at the end
+Směr na začátku	Direction at the start
+Transformovaný	Transformed
+Uzavřené (poslední profil se napojí na první)	Closed (the last profile joins the first)
+Vodicí křivka (volitelně)	Guide curve (optional)
+Vodicí křivka, kroucení, měřítko, tenká stěna, přechod v rozích…	Guide curve, twist, scale, thin wall, corner transition…
+Zaoblený	Rounded
+Začátek a konec: šablonování do bodu, okrajové podmínky	Start and end: loft to a point, boundary conditions
+Začít v bodě (špička)	Start at a point (tip)
+podél celé dráhy	along the whole path
+# library-dialog
+Chyba stavby	Build error
+Kategorie	Categories
+Napište, co potřebujete: M8x30 · matice M10 · ložisko 6205 2RS · kolo m2 z24 · řetězka 08B z19 · IPE 200 L=1500 · jäkl 40x40x3 · pero 8x7x40 · pružina d1.6 D12 L40 n10	Type what you need: M8x30 · nut M10 · bearing 6205 2RS · gear m2 z24 · sprocket 08B z19 · IPE 200 L=1500 · square tube 40x40x3 · key 8x7x40 · spring d1.6 D12 L40 n10
+Nedávno použité	Recently used
+Nic k zobrazení.	Nothing to show.
+Nic nenalezeno – zkuste normu (ISO 4762), název (matice, ložisko, jäkl) nebo rozměr (M8x30).	Nothing found – try a standard (ISO 4762), a name (nut, bearing, square tube) or a size (M8x30).
+Oblíbené	Favourites
+Odebrat z oblíbených	Remove from favourites
+Otevřít jako nový díl	Open as a new part
+Přidat do oblíbených	Add to favourites
+Příklady: „m8x30“ (imbus) · „šestihranný m8x30“ · „podložka 8“ · „kolík 6x30“ · „HEB 100 L=3000“ · „trubka 33.7x2.6“ · „vyhazovač 6x160“	Examples: “m8x30” (socket head) · “hex m8x30” · “washer 8” · “pin 6x30” · “HEB 100 L=3000” · “tube 33.7x2.6” · “ejector 6x160”
+Rozměry	Dimensions
+Rozpoznáno	Recognised
+Tabulka rozměrů	Size table
+Vložit do sestavy	Insert into assembly
+Vložit jako nový díl	Insert as a new part
+Výchozí hodnoty	Default values
+Vše	All
+Zatím žádné oblíbené – klikněte na hvězdičku u rodiny.	No favourites yet – click the star next to a family.
+rodin ·	families ·
+skupin ·	groups ·
+stavím…	building…
+vloží ·	inserts ·
+zavře	closes
+# manager
++ Nový stav z aktuálních hodnot	+ New configuration from current values
++ Přidat proměnnou	+ Add variable
+Aktivní stav	Active configuration
+Duplikovat	Duplicate
+Historie je prázdná. Začněte skicou (karta Tvorba → Skica) nebo vložte primitivum.	The history is empty. Start with a sketch (Create tab → Sketch) or insert a primitive.
+Hodnota	Value
+Nabídka	Menu
+Nejdřív založte proměnné (karta Proměnné).	Create variables first (Variables tab).
+Označení materiálu do razítka	Material designation for the title block
+Posunout níž	Move down
+Posunout výš	Move up
+Potlačené prvky	Suppressed features
+Potlačit prvek	Suppress feature
+Proměnné řídí rozměry modelu. V poli parametru napište název proměnné nebo výraz (např.	Variables drive the model dimensions. In a parameter field type a variable name or an expression (e.g.
+Přejmenovat	Rename
+Smazat stav	Delete configuration
+Stavy (konfigurace) jsou varianty dílu: jiné hodnoty proměnných a potlačené prvky – např. „M8“, „M10“, „bez děr“.	Configurations are variants of the part: different variable values and suppressed features – e.g. “M8”, “M10”, “no holes”.
+Upravit	Edit
+Upravit parametry	Edit parameters
+Upravit skicu	Edit sketch
+Vazby parametrů	Parameter bindings
+Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše; přenáší se odkazem i souborem	Free text for the drawing title block, e.g. ČSN 11 423 or 1.0503 – the density comes from the material class above; it is carried by link and file
+Výchozí	Default
+Výraz	Expression
+Zapnout prvek	Enable feature
+Zrušit vazbu	Remove binding
+# mini-viewport, mold-panel
+Náhled 3D vyžaduje WebGL – vložit lze i tak.	The 3D preview needs WebGL – you can still insert.
+Analýza ploch	Face analysis
+Barevná mapa úkosů	Draft colour map
+Bez podkosů ✓ Díl lze vyhodit ve zvoleném směru.	No undercuts ✓ The part can be ejected in the chosen direction.
+Chlazení	Cooling
+Dutina formy musí být o smrštění větší než výlisek. Přidá do historie dílu měřítko (lze kdykoli upravit nebo potlačit).	The mould cavity must be larger than the moulding by the shrinkage. Adds a scale to the part history (can be edited or suppressed any time).
+Díry do dílu	Holes into the part
+Hloubka pod dutinou	Depth below the cavity
+Meandr rovnoběžných vrtů propojených příčnými vrty. Doporučená vzdálenost od dutiny 2–3 × Ø.	A meander of parallel bores connected by cross bores. Recommended distance from the cavity 2–3 × Ø.
+Min. úkos	Min. draft
+Minimální tloušťka	Minimum thickness
+Měřítko dutiny	Cavity scale
+Navrhnout dělicí rovinu	Suggest parting plane
+Navrženo	Suggested
+Nejdřív vytvořte nebo otevřete těleso.	Create or open a body first.
+Návrh pravidelného rozmístění vyhazovačů v půdorysu dílu. Na díl se přidají díry, do sestavy skutečné vyhazovače.	A proposal for a regular layout of ejector pins in the part's top view. Holes are added to the part, real ejector pins to the assembly.
+Obrátit směr	Reverse direction
+Podkosy na {0} % povrchu – díl nelze vyhodit bez posuvných čelistí.	Undercuts on {0} % of the surface – the part cannot be ejected without slides.
+Použít smrštění	Apply shrinkage
+Počet větví	Number of branches
+Přesah	Overlap
+Smrštění	Shrinkage
+Směr vyhození	Ejection direction
+Vlastní hodnota…	Custom value…
+Vrtat do dílu (negativ)	Drill into the part (negative)
+Vyhazovače	Ejector pins
+Vyhazovače do sestavy	Ejector pins into the assembly
+Ø kanálu	Channel Ø
+Úkosy	Drafts
+# pick-list
+Další ›	Next ›
+Hledat	Search
+Kružnice / oblouky	Circles / arcs
+Kulové	Spherical
+Kuželové	Conical
+Načítám… {0}	Loading… {0}
+Ostatní (křivky)	Other (curves)
+Ostatní (volné)	Other (free-form)
+Použít střed kružnice / oblouku	Use the circle / arc centre
+Rovinné	Planar
+Toroidní	Toroidal
+Válcové	Cylindrical
+Všechny hrany	All edges
+Všechny plochy	All faces
+např. 12, válcová, 30; 20	e.g. 12, cylindrical, 30; 20
+střed kružnice	circle centre
+střed {0}	centre {0}
+{0} z {1} položek	{0} of {1} items
+Úsečky	Lines
+číslo, typ, souřadnice…	number, type, coordinates…
+‹ Předchozí	‹ Previous
+# props
+). Na model můžete navázat dalšími prvky (díry, zaoblení, odebrání…).	). You can continue the model with further features (holes, fillets, cuts…).
+0 = bez úkosu	0 = no draft
+0 = celá	0 = full
+Bod na oblouku	Point on the arc
+Bod na povrchu	Point on the surface
+Definice roviny	Plane definition
+Druhý směr	Second direction
+Dva směry	Two directions
+Funguje i na zakřivených plochách – např. odsazení stěny díry o +0,5 mm díru zmenší.	Works on curved faces too – e.g. offsetting a hole wall by +0.5 mm makes the hole smaller.
+Hl. zahloubení	Counterbore depth
+Hlavní poloosa	Major semi-axis
+Hrubá	Coarse
+Importovaný soubor:	Imported file:
+Jeden směr	One direction
+Jemná	Fine
+Jen vnější obrys (ignorovat otvory profilu)	Outer outline only (ignore profile holes)
+Klikáním v modelu přidáváte / odebíráte.	Click in the model to add / remove.
+Kolmo na skicu	Normal to the sketch
+Konec	End
+Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese. Doporučeno pro výrobní dokumentaci.	Cosmetic thread: the geometry does not change, the thread appears in the drawing. Recommended for manufacturing documentation.
+Kuž. zahl.	Countersink
+Modul prvku „	Feature module “
+Měřítko konce	End scale
+Natáčet profil podle křivky (Frenet)	Rotate the profile with the curve (Frenet)
+Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).	Unknown designation – M2 to M48, optionally with pitch (M18×1.5).
+Obrátit stranu	Flip side
+Odstraní díry, čepy, kuželová zahloubení a válcová zaoblení (obnoví ostrou hranu). Vhodné pro úpravy importovaných modelů.	Removes holes, pins, countersinks and cylindrical fillets (restores the sharp edge). Suitable for editing imported models.
+Opsaný průměr	Circumscribed diameter
+Osa díry	Hole axis
+Osa otočení (přes počátek)	Rotation axis (through the origin)
+Označení závitu (text)	Thread designation (text)
+Označení závitu díry	Hole thread designation
+Parametr je navázaný na proměnné – kliknutím vazbu zrušíte	The parameter is bound to variables – click to remove the binding
+Pevná rovina (jak byla založena)	Fixed plane (as created)
+Polohy děr (více naráz)	Hole positions (several at once)
+Pomocná geometrie (netvoří profil)	Construction geometry (does not form the profile)
+Pomocná rovina nevytváří geometrii. Použijte ji pro novou skicu (Nová skica → pomocná rovina).	A datum plane creates no geometry. Use it for a new sketch (New sketch → datum plane).
+Ponechat originál (sloučit)	Keep the original (merge)
+Posunutí roviny	Plane offset
+Počet stran	Number of sides
+Počátek a normála níže se dopočítají z definice při každé změně modelu.	The origin and normal below are recomputed from the definition on every model change.
+Pořadí: měřítko → otočení → posunutí, vše vůči počátku souřadnic.	Order: scale → rotation → translation, all relative to the coordinate origin.
+Pro šroub (průchozí díra ISO 273)	For a screw (clearance hole ISO 273)
+Profil by měl ležet v rovině kolmé na začátek dráhy. Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá.	The profile should lie in a plane perpendicular to the start of the path. The path can contain lines, arcs and polylines – it must be continuous.
+Prvek nemá parametry.	The feature has no parameters.
+Průnik	Intersect
+Rovina se přepočítá při každé změně modelu (např. posune-li se plocha, na které skica leží).	The plane is recomputed on every model change (e.g. when the face the sketch lies on moves).
+Rovina skici (asociativní)	Sketch plane (associative)
+Rozměr přes plochy	Size across faces
+Ručně (počátek a normála níže)	Manually (origin and normal below)
+Stranu +{0}	Side +{0}
+Stranu −{0}	Side −{0}
+Střední	Medium
+Tento typ pole (po křivce / podle skici / výplňové) připravuje modul polí.	This pattern type (along a curve / by sketch / fill) is prepared by the pattern module.
+Tip: klikněte na plochu modelu – bod a osa se doplní automaticky. Více děr: „Přidat body klikem“ (vrcholy, středy kružnic, body skici přes pravé tlačítko).	Tip: click a face of the model – the point and axis are filled in automatically. Several holes: “Add points by clicking” (vertices, circle centres, sketch points via the right button).
+Typ díry	Hole type
+Typ pole	Pattern type
+Ukončení (směr 1)	End condition (direction 1)
+Ukončení (směr 2)	End condition (direction 2)
+Uzavřená	Closed
+V rovině skici	In the sketch plane
+Ve směru normály	Along the normal
+Vedlejší poloosa	Minor semi-axis
+Vrtaná	Drilled
+Vrtat v kladném směru osy	Drill in the positive axis direction
+Vrtá se jádrový průměr Ø	The core diameter Ø is drilled
+Válc. zahl.	Counterbore
+Všechny	All
+XY ⟂ Z	XY ⟂ Z
+XZ ⟂ Y	XZ ⟂ Y
+YZ ⟂ X	YZ ⟂ X
+Začátek, směr, tenká stěna, úkos, kroucení…	Start, direction, thin wall, draft, twist…
+Zrušit výběr	Clear selection
+Závit (hrubé i jemné stoupání)	Thread (coarse and fine pitch)
+Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk.	The thread is modelled as grooves (simplified, without pitch) – suitable for visualisation and 3D printing.
+mm, závit	mm, thread
+se uvede ve výkrese.	appears in the drawing.
+vyberte v modelu ({0})	select in the model ({0})
+vybráno.	selected.
+· střed	· centre
+· vrták Ø	· drill Ø
+· Ø	· Ø
+Úhel (směr 2)	Angle (direction 2)
+Úhel špičky vrtáku	Drill point angle
+Čára žebra (otevřená skica)	Rib line (open sketch)
+Řada ISO 273	ISO 273 series
+Řezná rovina	Cutting plane
+Žebro se protáhne od čáry až k tělesu. Stranu, kde narazí na materiál, najde automaticky.	The rib extends from the line up to the body. It finds the side where it meets material automatically.
+— vlastní průměr —	— custom diameter —
+— vyberte prvek —	— select a feature —
+— vyberte —	— select —
+“ není načten.	” is not loaded.
+# ref-field
++ Přidat {0} klikem	+ Add {0} by clicking
++ XYZ	+ XYZ
++ výběr	+ selection
+1. hrana	1st edge
+1. plocha	1st face
+1. rovina / plocha	1st plane / face
+2. bod (směr X)	2nd point (X direction)
+2. hrana	2nd edge
+2. plocha	2nd face
+2. rovina / plocha	2nd plane / face
+Bod na křivce	Point on curve
+Další způsoby zadání (pravé tlačítko)	More input options (right button)
+Hrana (osa otáčení)	Edge (rotation axis)
+Hrana (tečna)	Edge (tangent)
+Hrana / válcová plocha	Edge / cylindrical face
+K bodu	To point
+Klikejte na {0} v modelu… (Esc = konec)	Click {0} in the model… (Esc = finish)
+Klikněte v modelu ({0})…	Click in the model ({0})…
+Křivka (hrana)	Curve (edge)
+Obrátit	Reverse
+Od bodu	From point
+Osa rotace	Revolve axis
+Plocha (výchozí)	Face (default)
+Plocha / pomocná rovina	Face / datum plane
+Použít aktuální výběr	Use current selection
+Pravé tlačítko / dlouhý stisk: další způsoby zadání	Right button / long press: more input options
+Přidat bod zadaný souřadnicemi	Add a point by coordinates
+Přidat vybrané entity	Add selected entities
+Přímka (hrana)	Line (edge)
+Rovnoběžně s plochou	Parallel to face
+Tenká stěna (profil jako stěna dané tloušťky, funguje i pro otevřený profil)	Thin wall (profile as a wall of given thickness, works for an open profile too)
+Tloušťka dovnitř	Thickness inward
+Tloušťka ven	Thickness outward
+Vyberte {0}	Select {0}
+Vybrat hranu klikem	Pick an edge by clicking
+Vybrat plochu klikem	Pick a face by clicking
+Vybrat ze seznamu…	Select from list…
+X; Y; Z  nebo  @dx; dy; dz	X; Y; Z  or  @dx; dy; dz
+Zadat souřadnice	Enter coordinates
+Zadejte X; Y; Z (např. 10; 20; 0 nebo @5; 0; 0)	Enter X; Y; Z (e.g. 10; 20; 0 or @5; 0; 0)
+Začátek	Start
+seznam ploch / hran / vrcholů s filtrem a hledáním	list of faces / edges / vertices with filter and search
+{0}: klikejte na body (Esc = konec)	{0}: click points (Esc = finish)
+{0}: vyberte {1}	{0}: select {1}
+{0}: vyberte {1} ({2}/{3})	{0}: select {1} ({2}/{3})
+{0}: vybrat ze seznamu	{0}: select from list
+Úhel od normály (kolem osy Y skici)	Angle from the normal (about the sketch Y axis)
+Úsečka	Line
+— skica nemá úsečku —	— the sketch has no line —
+— vyberte pomocnou osu / souř. systém —	— select a datum axis / coord. system —
+# ribbon, selection
+Další příkazy (pravé tlačítko)	More commands (right button)
+Rychlé příkazy pro výběr	Quick commands for the selection
+Těleso / tvar	Body / shape
+# settings-dialog
+(AES-256): nedávné soubory, záložky a rozpracovaný model se uloží v tomto prohlížeči tak, že je bez hesla nikdo nepřečte.	(AES-256): recent files, tabs and the work in progress are stored in this browser so that nobody can read them without the password.
+(otevřený JSON) do vašeho počítače. Pro výměnu s jinými CAD použijte STEP AP214 – otevře ho ZW3D, SolidWorks, Inventor, CATIA, NX, Creo i SolidEdge.	(open JSON) to your computer. For exchange with other CAD systems use STEP AP214 – it opens in ZW3D, SolidWorks, Inventor, CATIA, NX, Creo and Solid Edge.
+0 = automaticky podle přiblížení	0 = automatic by zoom
+Automatické vazby při kreslení	Automatic constraints while drawing
+Chování	Behaviour
+Desetinná místa (délky)	Decimal places (lengths)
+Desetinná místa (úhly)	Decimal places (angles)
+Délkové jednotky	Length units
+Hesla se neshodují.	The passwords do not match.
+Heslo znovu	Password again
+Heslo úložiště	Storage password
+ISO A (USA)	ISO A (USA)
+ISO E (Evropa)	ISO E (Europe)
+Import	Import
+Informační štítky (rozměry, hmotnost)	Info badges (dimensions, mass)
+Jednotky a přesnost	Units and precision
+Jméno a příjmení	First and last name
+Klikněte na zkratku a stiskněte novou kombinaci. Esc zruší záznam.	Click a shortcut and press the new combination. Esc cancels recording.
+Kreslil (do razítka)	Drawn by (title block)
+Krok mřížky [mm]	Grid step [mm]
+Kvalita sítě (přesnost zobrazení)	Mesh quality (display accuracy)
+Milimetry (mm)	Millimetres (mm)
+Modely a výkresy zůstávají jen v otevřené kartě a v souborech, které si sami uložíte do počítače. Po zavření karty v prohlížeči nic nezůstane – vhodné pro dokumentaci pod NDA i na sdílených počítačích.	Models and drawings stay only in the open tab and in the files you save to your computer yourself. Nothing remains in the browser after the tab is closed – suitable for documentation under NDA and for shared computers.
+Modely se ukládají jako soubory	Models are saved as files
+Navigační krychle (ViewCube)	Navigation cube (ViewCube)
+Nedávné soubory, šablony a ukázky	Recent files, templates and samples
+Normální	Normal
+Nové heslo	New password
+Nové heslo (min. 4 znaky)	New password (min. 4 characters)
+Obnovit výchozí	Restore defaults
+Obrátit směr kolečka	Reverse wheel direction
+Odemknout	Unlock
+Osový kříž vlevo dole	Axis triad bottom left
+Palce (in)	Inches (in)
+Po dokončení skici rovnou nabídnout vysunutí	Offer extrude right after finishing a sketch
+Potvrzovat mazání prvků a komponent	Confirm deleting features and components
+Pozadí pracovní plochy	Workspace background
+Počet nedávných souborů	Number of recent files
+Pravoúhlé promítání jako výchozí	Orthographic projection by default
+Při ukládání a exportu se zeptat na místo a název souboru	Ask for location and file name when saving and exporting
+Přiblížení ke kurzoru	Zoom to cursor
+Přichytávat k mřížce	Snap to grid
+Rozpracovaná práce v prohlížeči (ochrana dokumentace)	Work in progress in the browser (document protection)
+Schéma myši	Mouse scheme
+Silné	Thick
+Skryté hrany	Hidden edges
+Smazat všechny dokumenty uložené v tomto prohlížeči? Nastavení zůstane.	Delete all documents stored in this browser? Settings remain.
+Styl Inventor/ZW3D – zrychluje tvorbu prvních těles	Inventor/ZW3D style – speeds up creating the first bodies
+Stínovaný	Shaded
+Tenké	Thin
+Tloušťka hran	Edge thickness
+Uložené dokumenty byly smazány.	Stored documents were deleted.
+Volitelně lze zapnout	Optionally you can enable
+Vrátit vše na výchozí hodnoty	Reset everything to defaults
+Vymazat vše uložené v prohlížeči	Delete everything stored in the browser
+Vypnout a smazat uložené	Disable and delete stored
+Vypnout úložiště a smazat všechny dokumenty uložené v tomto prohlížeči?	Disable the storage and delete all documents stored in this browser?
+Vypnuto = soubory se rovnou stáhnou pod výchozím názvem do složky Stažené (bez dialogu) – vhodné pro automatizaci a AI agenty.	Off = files are downloaded straight to the Downloads folder under the default name (no dialog) – suitable for automation and AI agents.
+Výchozí formát listu	Default sheet size
+Výchozí materiál nového dílu	Default material of a new part
+Výchozí styl zobrazení	Default display style
+Výchozí: neukládat.	Default: do not store.
+Zamknout (do zavření karty)	Lock (until the tab is closed)
+Zapnout šifrované úložiště	Enable encrypted storage
+Zobrazovat značky vazeb	Show constraint symbols
+jemnější = pomalejší přepočet	finer = slower recompute
+kolečko přibližuje k místu pod kurzorem, ne do středu	the wheel zooms towards the point under the cursor, not the centre
+odemčeno pro tuto kartu	unlocked for this tab
+stiskněte…	press…
+vodorovně/svisle/totožnost/tečně se přidají při přichycení	horizontal/vertical/coincident/tangent are added when snapping
+zamčeno	locked
+zapnuté	enabled
+Úložiště vypnuto, uložené dokumenty smazány.	Storage disabled, stored documents deleted.
+Úvodní obrazovka při spuštění	Start screen at launch
+Šifrované úložiště je	Encrypted storage is
+Šifrované úložiště je zapnuté a odemčené. Heslo si zapamatujte – bez něj data nelze obnovit.	Encrypted storage is enabled and unlocked. Remember the password – without it the data cannot be recovered.
+šifrované úložiště s heslem	encrypted storage with a password
+Jazyk rozhraní	Interface language
+Jazyk	Language
+přepnutí znovu načte aplikaci; rozpracovaná práce zůstane uložená	switching reloads the application; work in progress stays saved
+# share-dialog
+ Velké modely (importovaný STEP) do odkazu nevejdou – pošlete soubor .mncad nebo STEP.	 Large models (imported STEP) do not fit into a link – send the .mncad or STEP file.
+ Velké modely jdou do úložiště zašifrované (AES-256); klíč je jen v odkazu a soubor se po vypršení platnosti smaže.	 Large models go to the storage encrypted (AES-256); the key is only in the link and the file is deleted after expiry.
+): WhatsApp, e-mail, Teams a Slack ho přenesou, SMS ne. U e-mailu raději „Kopírovat odkaz“ a vložit do zprávy.	): WhatsApp, e-mail, Teams and Slack carry it, SMS does not. For e-mail prefer “Copy link” and paste it into the message.
+. Příjemce odkaz otevře v prohlížeči bez instalace a registrace – může model prohlížet, otáčet, měřit, řezat, prohlédnout výkresy a uložit si kopii. Jde o	. The recipient opens the link in a browser without installation or registration – they can view, rotate, measure and section the model, look at the drawings and save a copy. It is a
+1 den	1 day
+: vaše další úpravy se do odkazu nepromítnou, pošlete nový. Odkaz funguje pro 2, 3 i více lidí najednou, kdekoli na světě.	: your further edits are not reflected in the link, send a new one. The link works for 2, 3 or more people at once, anywhere in the world.
+Dlouhý odkaz (	Long link (
+Heslo (volitelné)	Password (optional)
+Heslo k odkazu	Link password
+Heslo pošlete jiným kanálem (SMS, telefon). Bez něj odkaz nikdo neotevře.	Send the password through another channel (SMS, phone). Without it nobody can open the link.
+Jméno odesílatele	Sender name
+Kde je dokument:	Where the document is:
+Kopírovat odkaz	Copy link
+Kopírovat zprávu	Copy message
+Kopírování se nezdařilo – označte odkaz a zkopírujte ho ručně.	Copying failed – select the link and copy it manually.
+Mnástrojárna CAD – {0}	Mnástrojárna CAD – {0}
+Nabídka sdílení systému (Teams, Messenger, Signal…)	System share menu (Teams, Messenger, Signal…)
+Ochrana dokumentace:	Document protection:
+Odesílatel (volitelné)	Sender (optional)
+Odkaz	Link
+Odkaz zkopírován – vložte ho do zprávy (Ctrl+V).	Link copied – paste it into a message (Ctrl+V).
+Otevře WhatsApp s připravenou zprávou	Opens WhatsApp with a prepared message
+Otevře nový e-mail s odkazem	Opens a new e-mail with the link
+Platnost odkazu	Link validity
+Platí do:	Valid until:
+Po vypršení se odkaz neotevře; stačí dokument sdílet znovu.	After expiry the link no longer opens; just share the document again.
+S heslem je odkaz bez hesla nečitelný.	With a password the link is unreadable without it.
+Sdílený odkaz	Shared link
+Sdílet odkazem	Share by link
+Sdílet…	Share…
+Sdílíte:	You are sharing:
+Zkopírováno ✓	Copied ✓
+Zkopíruje hotový text zprávy s odkazem	Copies a ready message text with the link
+Zkopíruje odkaz do schránky	Copies the link to the clipboard
+Zpráva s odkazem zkopírována.	Message with the link copied.
+bez hesla	no password
+bez omezení	unlimited
+dokument je uložený jen v odkazu, na server se nic neposílá	the document is stored only in the link, nothing is sent to a server
+např. Vít Volný, Mnástrojárna	e.g. Vít Volný, Mnástrojárna
+odkaz obsahuje dokument zkomprimovaný v části za „#“, kterou prohlížeč na server nikdy neposílá – dokument existuje jen ve zprávě, kterou pošlete.	the link contains the document compressed in the part after “#”, which the browser never sends to a server – the document exists only in the message you send.
+snímek	snapshot
+zašifrováno v úložišti do {0}, klíč je jen v odkazu	encrypted in the storage until {0}, the key is only in the link
+{0} dní	{0} days
+# sketcher
+ · {0} otevř.	 · {0} open
+2 body	2 points
+2 body + osa	2 points + axis
+2 kružnice/oblouky	2 circles/arcs
+2 úsečky	2 lines
+2 úsečky nebo 2 kružnice	2 lines or 2 circles
+Automatické vazby	Automatic constraints
+Automatické vazby při kreslení (vodorovně, svisle, totožnost, bod na křivce, střed, rovnoběžně, kolmo, tečně)	Automatic constraints while drawing (horizontal, vertical, coincident, point on curve, midpoint, parallel, perpendicular, tangent)
+Barvy entit: modře nedourčená · černě plně určená · červeně přeurčená nebo v konfliktu	Entity colours: blue under-defined · black fully defined · red over-defined or in conflict
+Bod na kružnici (nebo zadejte průměr/poloměr, Enter)	Point on the circle (or enter diameter/radius, Enter)
+Bod {0} ze 3 na kružnici	Point {0} of 3 on the circle
+Bod – entita	Point – entity
+Body leží na přímce.	The points are collinear.
+Body obdélníku leží na přímce.	The rectangle points are collinear.
+Body rozdělení kružnice jsou totožné.	The circle split points coincide.
+Cílový bod	Target point
+Cílový směr	Target direction
+Další bod · Enter / dvojklik ukončí · klik na 1. bod uzavře	Next point · Enter / double-click finishes · click on the 1st point closes
+Další bod · Esc / pravé tl. ukončí řetěz	Next point · Esc / right button ends the chain
+Druhá entita/bod, nebo umístění kóty	Second entity/point, or dimension placement
+Druhá úsečka	Second line
+Druhý bod průměru	Second diameter point
+Druhý bod rozdělení kružnice	Second circle split point
+Druhý roh (směr a šířka první strany)	Second corner (direction and width of the first side)
+Dvě kružnice	Two circles
+Dvě úsečky	Two lines
+Délka oblouku	Arc length
+Enter/dvojklik ukončí	Enter/double-click finishes
+Entita	Entity
+Entitu nelze o tuto vzdálenost odsadit (větší než poloměr).	The entity cannot be offset by this distance (greater than the radius).
+Export skici DXF	Export sketch to DXF
+Hodnota kóty	Dimension value
+Import DXF…	Import DXF…
+Jako pomocná geometrie	As construction geometry
+Jen hrany v rovině skici (±0,01 mm)	Only edges in the sketch plane (±0.01 mm)
+Klikněte dovnitř křivky, ne na její konec.	Click inside the curve, not at its end.
+Klikněte na body nebo entity (2 výběry)	Click points or entities (2 selections)
+Klikněte na entitu nebo bod	Click an entity or a point
+Klikněte na křivku v místě rozdělení (kružnice: 2 body)	Click the curve at the split point (circle: 2 points)
+Klikněte na osu zrcadlení (úsečku)	Click the mirror axis (a line)
+Klikněte na úsek k odstranění, nebo táhněte přes více úseků	Click the segment to remove, or drag across several segments
+Klikněte na úsečku nebo osu zrcadlení.	Click a line or the mirror axis.
+Klikněte u konce úsečky, která se má prodloužit	Click near the end of the line to extend
+Kolineárně	Collinear
+Kolmo	Perpendicular
+Konec (proti směru hodin)	End (counter-clockwise)
+Konec hlavní poloosy	End of the major semi-axis
+Konec oblouku	Arc end
+Konec osy (proti směru hodin)	Axis end (counter-clockwise)
+Konec tečného oblouku	End of the tangent arc
+Konec úsečky / oblouku, na který navázat	End of the line / arc to continue from
+Kopírovat…	Copy…
+Kreslení	Draw
+Krok pole (vzdálenost a směr)	Pattern step (distance and direction)
+Kružnice / oblouk	Circle / arc
+Kružnice: klikněte na druhý bod rozdělení.	Circle: click the second split point.
+Kóta by skicu přeurčila – ponechána jako referenční.	The dimension would over-define the sketch – kept as reference.
+Kóta délky oblouku	Arc length dimension
+Kótovat při kreslení – hodnoty zadané číslem u kurzoru vloží řídicí kótu	Dimension while drawing – values typed at the cursor insert a driving dimension
+Model zatím nemá žádné hrany (nejdřív vytvořte těleso).	The model has no edges yet (create a body first).
+Měřítko…	Scale…
+Normální geometrie	Normal geometry
+Nová poloha bodu	New point position
+Nástroje	Tools
+Odsadit celý navazující řetězec úseček a oblouků	Offset the whole connected chain of lines and arcs
+Odsadit…	Offset…
+Odsazení je větší než poloměr oblouku v řetězci.	The offset is greater than an arc radius in the chain.
+Okótovat	Dimension
+Opsaný	Circumscribed
+Otočit…	Rotate…
+Pevně	Fixed
+Pomocná geometrie	Construction geometry
+Počet kusů (360°)	Number of instances (360°)
+Počáteční bod úsečky	Line start point
+Promítnout	Project
+Promítnout hrany modelu	Project model edges
+Promítnuto {0} hran.	{0} edges projected.
+Protější roh (nebo šířka Tab výška, Enter)	Opposite corner (or width Tab height, Enter)
+První bod průměru	First diameter point
+První roh	First corner
+První roh (nebo X;Y, Enter)	First corner (or X;Y, Enter)
+První úsečka	First line
+Přesunout…	Move…
+Přichytit k mřížce	Snap to grid
+Referenční bod	Reference point
+Roh (nebo šířka Tab výška, Enter)	Corner (or width Tab height, Enter)
+Roh nelze upravit (hodnota je příliš velká nebo úsečky jsou rovnoběžné).	The corner cannot be modified (the value is too large or the lines are parallel).
+Rozdělit lze úsečku, oblouk nebo kružnici – tvary nejdřív rozložte.	Only a line, arc or circle can be split – explode shapes first.
+Rozdělit v bodě…	Split at point…
+Rozložit na úsečky a oblouky	Explode into lines and arcs
+Soustředně	Concentric
+Stejná velikost	Equal
+Strana myší, vzdálenost klikem nebo číslem + Enter	Side by mouse, distance by click or number + Enter
+Střed druhého oblouku (nebo délka Tab úhel)	Centre of the second arc (or length Tab angle)
+Střed elipsy	Ellipse centre
+Střed kruhového pole	Circular pattern centre
+Střed kružnice	Circle centre
+Střed mnohoúhelníku	Polygon centre
+Střed měřítka	Scale centre
+Střed obdélníku	Rectangle centre
+Střed oblouku osy drážky	Centre of the slot axis arc
+Střed otáčení	Rotation centre
+Střed prvního oblouku	Centre of the first arc
+Svisle	Vertical
+Symetrie	Symmetric
+Tab · Enter	Tab · Enter
+Tažení neprotnulo žádnou křivku.	The drag did not cross any curve.
+Tento úsek nelze oříznout (kružnice potřebuje 2 průsečíky).	This segment cannot be trimmed (a circle needs 2 intersections).
+Tečný oblouk nelze vytvořit.	The tangent arc cannot be created.
+Tečně	Tangent
+Totožnost	Coincident
+Tuto kombinaci nelze okótovat.	This combination cannot be dimensioned.
+Uchopení	Snapping
+Uchopení: {0}	Snap: {0}
+Uchopování	Snapping
+Umístěte bod	Place the point
+Upravit hodnotu…	Edit value…
+Vazba „{0}“ přidána.	Constraint “{0}” added.
+Vazba „{0}“: {1}.	Constraint “{0}”: {1}.
+Vazbu „{0}“ nelze přidat – je v konfliktu s jinými vazbami/kótami.	Constraint “{0}” cannot be added – it conflicts with other constraints/dimensions.
+Ve středu	Midpoint
+Vepsaný	Inscribed
+Vepsaný: bod = vrchol (poloměr opsané kružnice) · Opsaný: bod = střed strany (poloměr vepsané kružnice)	Inscribed: point = vertex (circumscribed radius) · Circumscribed: point = side midpoint (inscribed radius)
+Vodorovně	Horizontal
+Vrchol / střed strany (nebo poloměr Tab počet stran, Enter)	Vertex / side midpoint (or radius Tab number of sides, Enter)
+Vyberte druhý bod nebo úsečku.	Select the second point or a line.
+Vyberte entitu (řetězec) k odsazení	Select the entity (chain) to offset
+Vyberte entity (Shift přidává), pak Enter	Select entities (Shift adds), then Enter
+Vyberte úsečku.	Select a line.
+Vybrat vše	Select all
+Vybráno {0} – Enter / pravé tl. pokračuje	{0} selected – Enter / right button continues
+Vzdálenost bodů	Distance between points
+Výška obdélníku	Rectangle height
+Všechny hrany (kolmý průmět)	All edges (orthogonal projection)
+Zadejte vzdálenost odsazení.	Enter the offset distance.
+Zadávat poloměr (přepnout na průměr)	Enter radius (switch to diameter)
+Zadávat průměr (přepnout na poloměr)	Enter diameter (switch to radius)
+Zarovnání (vodítka)	Alignment (guides)
+Začněte na konci úsečky nebo oblouku.	Start at the end of a line or arc.
+Začátek (poloměr)	Start (radius)
+Začátek oblouku	Arc start
+Začátek osy (poloměr)	Axis start (radius)
+Změnit na referenční	Change to reference
+Změnit na řídicí	Change to driving
+Zrcadlit…	Mirror…
+Zrušit příkaz	Cancel command
+Zvolte hrany vpravo nahoře a potvrďte „Promítnout“	Choose the edges at the top right and confirm “Project”
+Základní bod	Base point
+bod + křivka	point + curve
+bod + úsečka	point + line
+bod nebo entita	point or entity
+body křivky, Enter ukončí	curve points, Enter finishes
+drážka {0} – střed	slot {0} – centre
+drážka {0} – střed oblouku	slot {0} – arc centre
+dva body na průměru	two points on the diameter
+inteligentní kóta – klikněte na entity	smart dimension – click entities
+krok {0} mm	step {0} mm
+kružnice {0} Ø{1} – střed	circle {0} Ø{1} – centre
+kružnice {0} – {1}	circle {0} – {1}
+mřížka	grid
+natočený obdélník: 2 rohy první strany + výška	rotated rectangle: 2 corners of the first side + height
+navazuje tečně na konec úsečky/oblouku	tangent continuation from the end of a line/arc
+obdélník {0} – střed	rectangle {0} – centre
+obdélník {0} – {1}	rectangle {0} – {1}
+oblouk {0} – bod na oblouku	arc {0} – point on arc
+oblouk {0} – konec	arc {0} – end
+oblouk {0} – začátek	arc {0} – start
+odsazení > poloměr	offset > radius
+počátek skici [0; 0]	sketch origin [0; 0]
+střed, hlavní poloosa, vedlejší poloosa	centre, major semi-axis, minor semi-axis
+střed, začátek a konec osy, šířka	centre, axis start and end, width
+střed, začátek, konec	centre, start, end
+začátek, konec, bod na oblouku	start, end, point on arc
+{0} mm · {1}°	{0} mm · {1}°
+{0} mm · řetězec {1}	{0} mm · chain {1}
+{0} stran · R {1} ({2})	{0} sides · R {1} ({2})
+{0} {1} – bod {2}	{0} {1} – point {2}
+{0} {1} – střed	{0} {1} – centre
+Úsečku nelze k ničemu prodloužit.	The line cannot be extended to anything.
+úseček · vloží se jako pevné (plně určené)	lines · inserted as fixed (fully defined)
+úsečka + oblouk / 2 oblouky	line + arc / 2 arcs
+úsečka nebo 2 body	line or 2 points
+úsečka {0} – konec	line {0} – end
+úsečka {0} – střed	line {0} – midpoint
+úsečka {0} – začátek	line {0} – start
+Řetězec	Chain
+řetěz úseček, Esc ukončí	chain of lines, Esc finishes
+Šířka drážky	Slot width
+Šířka drážky musí být menší než dvojnásobek poloměru osy.	The slot width must be less than twice the axis radius.
+šířka > poloměr	width > radius
+šířka {0}	width {0}
+Δ {0} ; {1}	Δ {0} ; {1}
+# start-screen
+(24 kapitol, postupy krok za krokem, FAQ) ·	(24 chapters, step-by-step procedures, FAQ) ·
+) i vazby na proměnné (	) and bindings to variables (
+, STEP). Po zavření karty nic nezůstane. Šifrované úložiště s heslem lze zapnout v Nastavení → Soubory.	, STEP). Nothing remains after the tab is closed. Encrypted storage with a password can be enabled in Settings → Files.
+Do každého číselného pole lze psát výrazy (	Expressions can be typed into every numeric field (
+Dokumentace a návod k obsluze	Documentation and user guide
+Dokumentace a návod k obsluze (otevře se v nové záložce)	Documentation and user guide (opens in a new tab)
+Díl	Part
+Nedávné	Recent
+Nevíte si rady?	Need help?
+Nezobrazovat při spuštění (lze zapnout v Nastavení)	Do not show at launch (can be enabled in Settings)
+Nápověda a tipy	Help and tips
+Návod a dokumentace	Guide and documentation
+Odebrat ze seznamu	Remove from the list
+Pokračovat v práci	Continue working
+Pravé tlačítko na plochu, hranu, bod nebo komponentu otevře nabídku s úpravami pro danou entitu.	Right-clicking a face, edge, point or component opens a menu with edits for that entity.
+Příručka PDF ke stažení	PDF manual to download
+Rozpracovaná práce je uložená šifrovaně. Zadejte heslo úložiště:	The work in progress is stored encrypted. Enter the storage password:
+Ukázkové modely	Sample models
+Výkres z modelu: karta Výkres → Nový výkres. Kusovník se přidá automaticky u sestav.	Drawing from the model: Drawing tab → New drawing. The BOM is added automatically for assemblies.
+Zatím žádné soubory. Vše, co uložíte nebo otevřete, se objeví tady (šifrovaně, jen pro vás).	No files yet. Everything you save or open appears here (encrypted, only for you).
+Začít	Start
+otevře paletu příkazů – napište „díra“, „výkres“, „zaoblit“…	opens the command palette – type “hole”, “drawing”, “fillet”…
+prvků	features
+příručka PDF ke stažení	PDF manual to download
+v prohlížeči se nic neukládá – rozpracovaná práce žije jen v této kartě a v souborech, které si uložíte do svého počítače (	nothing is stored in the browser – the work in progress lives only in this tab and in the files you save to your computer (
+vpravo nahoře.	at the top right.
+· parametrický 3D/2D CAD · díly · sestavy · výkresy · formy	· parametric 3D/2D CAD · parts · assemblies · drawings · moulds
+· v programu tlačítko	· in the program the button
+# viewport, viewport-fallback
+Co zkusit	What to try
+Nápověda a dokumentace	Help and documentation
+Zkopírovat diagnostiku	Copy diagnostics
+Zkusit znovu	Try again
+nedostupné	unavailable
+· WebGL:	· WebGL:
+· jádro:	· kernel:
+Hrana {0} · {1} · délka ≈ {2} mm	Edge {0} · {1} · length ≈ {2} mm
+Izometrie (domů)	Isometric (home)
+Plocha {0} · {1}{2}	Face {0} · {1}{2}
+Vrchol {0} · [{1}; {2}; {3}]	Vertex {0} · [{1}; {2}; {3}]
+WebGL kontext byl ztracen	The WebGL context was lost
+WebGL není dostupné	WebGL is not available
+křivka	curve

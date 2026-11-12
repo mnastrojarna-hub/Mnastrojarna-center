@@ -3,6 +3,7 @@
  * vytáhnout/zatlačit plochu, odsadit plochu, odstranit plochu, zesílit plochy, žebro, pružina.
  * Běží ve workeru i v Node (testy).
  */
+import { tr } from "./i18n";
 import * as r from "replicad";
 import { arcPoints, type Seg } from "./sketch";
 import type { Axis, Feature, Vec2, Vec3 } from "./types";
@@ -28,7 +29,7 @@ function shapeDiag(s: Shape) {
 export function pickFaces(body: Shape, idx: number[], what = "plochy"): r.Face[] {
   const all = body.faces;
   const picked = [...new Set(idx)].map((k) => all[k]).filter(Boolean);
-  if (!picked.length) throw new Error(`Vyberte ${what} v modelu.`);
+  if (!picked.length) throw new Error(tr("Vyberte {0} v modelu.", what));
   return picked;
 }
 
@@ -69,9 +70,9 @@ function slab(face: r.Face, t: number): Shape {
   try {
     mk.MakeThickSolidBySimple(face.wrapped, t);
     mk.Build(new o.Message_ProgressRange());
-    if (!mk.IsDone()) throw new Error("Plochu se nepodařilo odsadit – zkuste menší vzdálenost.");
+    if (!mk.IsDone()) throw new Error(tr("Plochu se nepodařilo odsadit – zkuste menší vzdálenost."));
     const s = r.cast(mk.Shape()) as unknown as Shape;
-    if (!(Math.abs(r.measureVolume(s)) > 0)) throw new Error("Odsazení plochy nevytvořilo objem – tento typ plochy zatím odsadit nelze.");
+    if (!(Math.abs(r.measureVolume(s)) > 0)) throw new Error(tr("Odsazení plochy nevytvořilo objem – tento typ plochy zatím odsadit nelze."));
     return s;
   } finally {
     mk.delete();
@@ -86,9 +87,9 @@ function fuseAll(parts: Shape[]): Shape {
 
 /** Vytáhnout / zatlačit rovinné plochy po normále. */
 export function pushPull(body: Shape, faces: number[], distance: number): Shape {
-  if (!distance) throw new Error("Vzdálenost nesmí být nulová.");
+  if (!distance) throw new Error(tr("Vzdálenost nesmí být nulová."));
   const picked = pickFaces(body, faces);
-  if (picked.some((f) => f.geomType !== "PLANE")) throw new Error("Vytáhnout/zatlačit lze jen rovinné plochy – pro zakřivené použijte Odsadit plochu.");
+  if (picked.some((f) => f.geomType !== "PLANE")) throw new Error(tr("Vytáhnout/zatlačit lze jen rovinné plochy – pro zakřivené použijte Odsadit plochu."));
   const tools = picked.map((f) => slab(f, distance));
   const tool = fuseAll(tools);
   return distance > 0 ? body.fuse(tool) : body.cut(tool);
@@ -96,7 +97,7 @@ export function pushPull(body: Shape, faces: number[], distance: number): Shape 
 
 /** Odsadit plochy (rovinné i zakřivené): kladně ven z materiálu, záporně dovnitř. */
 export function offsetFaces(body: Shape, faces: number[], distance: number): Shape {
-  if (!distance) throw new Error("Vzdálenost nesmí být nulová.");
+  if (!distance) throw new Error(tr("Vzdálenost nesmí být nulová."));
   const picked = pickFaces(body, faces);
   const tool = fuseAll(
     picked.map((f) => {
@@ -105,7 +106,7 @@ export function offsetFaces(body: Shape, faces: number[], distance: number): Sha
         // posun válcové plochy = mezikruží mezi R a R ± d (díra se zmenší / čep zesílí)
         const outward = info.convex ? 1 : -1; // normála ven z materiálu míří od osy (čep) nebo k ose (díra)
         const R2 = info.R + outward * distance;
-        if (R2 <= 1e-6) throw new Error("Odsazení by zrušilo celý válec – zvolte menší vzdálenost.");
+        if (R2 <= 1e-6) throw new Error(tr("Odsazení by zrušilo celý válec – zvolte menší vzdálenost."));
         const [ri, ro] = [Math.min(info.R, R2), Math.max(info.R, R2)];
         return revolveAbout([[ri, info.v0], [ro, info.v0], [ro, info.v1], [ri, info.v1]], info.loc, info.dir);
       }
@@ -117,7 +118,7 @@ export function offsetFaces(body: Shape, faces: number[], distance: number): Sha
 
 /** Zesílit plochy na desku tloušťky t (výsledek = samostatné těleso). */
 export function thickenFaces(body: Shape, faces: number[], thickness: number): Shape {
-  if (!thickness) throw new Error("Tloušťka nesmí být nulová.");
+  if (!thickness) throw new Error(tr("Tloušťka nesmí být nulová."));
   return fuseAll(pickFaces(body, faces).map((f) => slab(f, thickness)));
 }
 
@@ -197,18 +198,18 @@ export function deleteFaces(body: Shape, faces: number[]): Shape {
   for (const face of picked) {
     const info = revolutionInfo(face);
     if (!info) {
-      const kind = face.geomType === "PLANE" ? "rovinnou" : face.geomType === "TORUS" ? "toroidní (zaoblení po oblouku)" : "obecnou";
-      throw new Error(`Plochu ${kind} nelze odstranit. Odstranit lze díry, čepy, kuželová zahloubení a válcová zaoblení – rovinné plochy posuňte příkazem Vytáhnout/Zatlačit.`);
+      const kind = face.geomType === "PLANE" ? tr("rovinnou") : face.geomType === "TORUS" ? tr("toroidní (zaoblení po oblouku)") : tr("obecnou");
+      throw new Error(tr("Plochu {0} nelze odstranit. Odstranit lze díry, čepy, kuželová zahloubení a válcová zaoblení – rovinné plochy posuňte příkazem Vytáhnout/Zatlačit.", kind));
     }
     const solidAxis = info.convex; // materiál u osy = čep / vypuklé zaoblení
     if (info.full) {
       const tool = revolveAbout(info.profile, info.loc, info.dir);
       acc = solidAxis ? acc.cut(tool) : acc.fuse(tool);
     } else {
-      if (info.kind !== "cyl") throw new Error("Částečnou kuželovou plochu nelze odstranit.");
+      if (info.kind !== "cyl") throw new Error(tr("Částečnou kuželovou plochu nelze odstranit."));
       const bb = face.boundingBox.bounds as [Vec3, Vec3];
       const box = r.makeBox(bb[0], bb[1]) as Shape;
-      if (!(r.measureVolume(box) > 1e-9)) throw new Error("Zaoblení není rovnoběžné s osami – nelze jej odstranit.");
+      if (!(r.measureVolume(box) > 1e-9)) throw new Error(tr("Zaoblení není rovnoběžné s osami – nelze jej odstranit."));
       acc = solidAxis ? acc.fuse(box) : acc.cut(box);
     }
   }
@@ -252,8 +253,8 @@ export function ribTool(body: Shape, sk: SketchF, segs: Seg[], plane: r.Plane, t
 }
 
 function ribSide(body: Shape, sk: SketchF, segs: Seg[], plane: r.Plane, thickness: number, direction: "normal" | "inPlane", flip: boolean): Shape {
-  if (!(thickness > 0)) throw new Error("Tloušťka žebra musí být kladná.");
-  if (!segs.length) throw new Error(`Skica „${sk.name}“ neobsahuje čáru žebra.`);
+  if (!(thickness > 0)) throw new Error(tr("Tloušťka žebra musí být kladná."));
+  if (!segs.length) throw new Error(tr("Skica „{0}“ neobsahuje čáru žebra.", sk.name));
   const pts = chainPoints(segs);
   const D = shapeDiag(body) * 3 + 100;
   const n = vec(plane.zDir);
@@ -265,7 +266,7 @@ function ribSide(body: Shape, sk: SketchF, segs: Seg[], plane: r.Plane, thicknes
     const b = pts[pts.length - 1];
     const chord: Vec2 = [b[0] - a[0], b[1] - a[1]];
     const L = Math.hypot(...chord);
-    if (L < 1e-6) throw new Error("Čára žebra je příliš krátká.");
+    if (L < 1e-6) throw new Error(tr("Čára žebra je příliš krátká."));
     const s = flip ? -1 : 1;
     const perp: Vec2 = [(-chord[1] / L) * s, (chord[0] / L) * s];
     const far = pts.map((p) => [p[0] + perp[0] * D, p[1] + perp[1] * D] as Vec2).reverse();
@@ -287,7 +288,7 @@ function ribSide(body: Shape, sk: SketchF, segs: Seg[], plane: r.Plane, thicknes
       d = d ? d.fuse(rect) : rect;
       if (i > 1) d = d.fuse(r.drawCircle(thickness / 2).translate(a[0], a[1]));
     }
-    if (!d) throw new Error("Čára žebra je příliš krátká.");
+    if (!d) throw new Error(tr("Čára žebra je příliš krátká."));
     const s = flip ? 1 : -1;
     tool = d.sketchOnPlane(plane).extrude(s * D) as Shape;
     const m: Vec2 = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2];
@@ -302,24 +303,24 @@ function ribSide(body: Shape, sk: SketchF, segs: Seg[], plane: r.Plane, thicknes
     return dist < Math.max(1e-3, thickness * 0.06);
   });
   v.delete();
-  if (!pieces.length) throw new Error("Žebro nenarazilo na těleso – přesuňte čáru blíž k tělesu nebo otočte stranu.");
-  for (const p of pieces) if (shapeDiag(p) > D * 0.5) throw new Error("Žebro na zvolené straně nenarazí na těleso – zaškrtněte „Obrátit stranu“.");
+  if (!pieces.length) throw new Error(tr("Žebro nenarazilo na těleso – přesuňte čáru blíž k tělesu nebo otočte stranu."));
+  for (const p of pieces) if (shapeDiag(p) > D * 0.5) throw new Error(tr("Žebro na zvolené straně nenarazí na těleso – zaškrtněte „Obrátit stranu“."));
   return fuseAll(pieces);
 }
 
 /** Šroubovice s kruhovým průřezem (pružina, závitový drát). */
 export function springSolid(f: { radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis }): Shape {
-  if (!(f.radius > 0 && f.pitch > 0 && f.turns > 0 && f.wire > 0)) throw new Error("Rozměry pružiny musí být kladné.");
-  if (f.wire >= f.pitch) throw new Error("Průměr drátu musí být menší než stoupání (závity by se protínaly).");
-  if (f.wire / 2 >= f.radius) throw new Error("Průměr drátu musí být menší než průměr pružiny.");
-  if (f.turns > 200) throw new Error("Pružina může mít nejvýš 200 závitů.");
+  if (!(f.radius > 0 && f.pitch > 0 && f.turns > 0 && f.wire > 0)) throw new Error(tr("Rozměry pružiny musí být kladné."));
+  if (f.wire >= f.pitch) throw new Error(tr("Průměr drátu musí být menší než stoupání (závity by se protínaly)."));
+  if (f.wire / 2 >= f.radius) throw new Error(tr("Průměr drátu musí být menší než průměr pružiny."));
+  if (f.turns > 200) throw new Error(tr("Pružina může mít nejvýš 200 závitů."));
   const dir: Vec3 = f.axis === "X" ? [1, 0, 0] : f.axis === "Y" ? [0, 1, 0] : [0, 0, 1];
   const helix = r.makeHelix(f.pitch, f.pitch * f.turns, f.radius, f.position, dir);
   const start = vec(helix.startPoint);
   const tangent = norm(vec(helix.tangentAt(0)));
   const profile = r.assembleWire([r.makeCircle(f.wire / 2, start, tangent)]);
   const s = r.genericSweep(profile, helix, { frenet: true }, false) as Shape;
-  if (!(r.measureVolume(s) > 0)) throw new Error("Pružinu se nepodařilo vytvořit.");
+  if (!(r.measureVolume(s) > 0)) throw new Error(tr("Pružinu se nepodařilo vytvořit."));
   return s;
 }
 

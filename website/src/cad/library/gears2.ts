@@ -1,4 +1,5 @@
 /** Ozubení 2: šikmá kola (šablonování natočených evolventních profilů), kuželová kola, šnek a šnekové kolo. */
+import { tr } from "../i18n";
 import { uid, type Feature, type Vec2 } from "../types";
 import { involuteGearProfile } from "./gears";
 import { has, nums, score, tagged } from "./parse-util";
@@ -10,13 +11,13 @@ const DEG = Math.PI / 180;
 const MODULES = [1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8].map((x) => ({ v: String(x), l: String(x) }));
 
 const boreParams: ParamSchema[] = [
-  { key: "bore", label: "Díra d", kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 0, hint: "0 = plný" },
-  { key: "keyway", label: "Drážka pro pero DIN 6885", kind: "bool", default: true },
+  { key: "bore", label: tr("Díra d"), kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 0, hint: tr("0 = plný") },
+  { key: "keyway", label: tr("Drážka pro pero DIN 6885"), kind: "bool", default: true },
 ];
 
 function boreFeatures(bore: number, keyway: boolean, height: number, z0 = 0): Feature[] {
   if (!(bore > 0)) return [];
-  const f: Feature[] = [cyl("Díra", bore, height + 2, z0 - 1, "cut")];
+  const f: Feature[] = [cyl(tr("Díra"), bore, height + 2, z0 - 1, "cut")];
   if (keyway) {
     const k = keyForShaft(bore);
     f.push(keywayCut(bore, k.b, k.t2, height, z0));
@@ -32,7 +33,7 @@ function helicalFeatures(name: string, profile: Vec2[], b: number, twistRad: num
   const ids: string[] = [];
   for (let i = 0; i < sections; i++) {
     const t = i / (sections - 1);
-    const sk = sketch(`${name} – řez ${i + 1}`, XY(rnd(b * t, 4)), [{ id: uid(), type: "polyline", closed: true, points: rot(profile, twistRad * t) }]);
+    const sk = sketch(tr("{0} – řez {1}", name, i + 1), XY(rnd(b * t, 4)), [{ id: uid(), type: "polyline", closed: true, points: rot(profile, twistRad * t) }]);
     f.push(sk);
     ids.push(sk.id);
   }
@@ -48,11 +49,11 @@ export const helicalGear: Family = {
   standards: ["ISO 53", "DIN 3960", "ČSN 01 4607"],
   keywords: ["sikme ozubeni", "sikme kolo", "sikmymi zuby", "helical gear", "uhel sklonu", "beta"],
   params: [
-    { key: "mn", label: "Normálný modul mn", kind: "enum", options: MODULES, default: "2" },
-    { key: "z", label: "Počet zubů z", kind: "number", min: 10, max: 120, step: 1, unit: "", default: 20 },
-    { key: "beta", label: "Úhel sklonu β", kind: "number", min: 5, max: 45, step: 1, unit: "°", default: 15 },
-    { key: "hand", label: "Smysl stoupání", kind: "enum", options: [{ v: "R", l: "pravý (R)" }, { v: "L", l: "levý (L)" }], default: "R" },
-    { key: "b", label: "Šířka b", kind: "number", min: 2, max: 200, step: 1, unit: "mm", default: 20 },
+    { key: "mn", label: tr("Normálný modul mn"), kind: "enum", options: MODULES, default: "2" },
+    { key: "z", label: tr("Počet zubů z"), kind: "number", min: 10, max: 120, step: 1, unit: "", default: 20 },
+    { key: "beta", label: tr("Úhel sklonu β"), kind: "number", min: 5, max: 45, step: 1, unit: "°", default: 15 },
+    { key: "hand", label: tr("Smysl stoupání"), kind: "enum", options: [{ v: "R", l: tr("pravý (R)") }, { v: "L", l: tr("levý (L)") }], default: "R" },
+    { key: "b", label: tr("Šířka b"), kind: "number", min: 2, max: 200, step: 1, unit: "mm", default: 20 },
     ...boreParams,
   ],
   parse: (q) => {
@@ -83,7 +84,7 @@ export const helicalGear: Family = {
     const twist = ((v.hand === "L" ? -1 : 1) * (b * Math.tan(beta))) / rp; // rad – otočení profilu po šířce
     const sections = Math.max(3, Math.min(6, Math.ceil(Math.abs(twist) / 0.12) + 1));
     const bore = v.bore === undefined ? Math.round(mt * z * 0.25) : num(v.bore);
-    return part(`Šikmé kolo mn${fmt(mn)} z${z} β${fmt(num(v.beta, 15))}°`, "ocel", [...helicalFeatures("Šikmé ozubení", profile, b, twist, sections), ...boreFeatures(bore, v.keyway !== false, b)], `Šikmé kolo mn${fmt(mn)} z${z} β${fmt(num(v.beta, 15))}°${v.hand ?? "R"} b${fmt(b)} – d ${fmt(mt * z)}`, "#c9a46a");
+    return part(tr("Šikmé kolo mn{0} z{1} β{2}°", fmt(mn), z, fmt(num(v.beta, 15))), "ocel", [...helicalFeatures(tr("Šikmé ozubení"), profile, b, twist, sections), ...boreFeatures(bore, v.keyway !== false, b)], tr("Šikmé kolo mn{0} z{1} β{2}°{3} b{4} – d {5}", fmt(mn), z, fmt(num(v.beta, 15)), v.hand ?? "R", fmt(b), fmt(mt * z)), "#c9a46a");
   },
 };
 
@@ -95,10 +96,10 @@ export const bevelGear: Family = {
   standards: ["ISO 23509", "DIN 3971"],
   keywords: ["kuzelove kolo", "kuzelove ozubeni", "bevel gear", "miter gear", "kuzelovy prevod"],
   params: [
-    { key: "m", label: "Modul m (vnější)", kind: "enum", options: MODULES, default: "2" },
-    { key: "z", label: "Počet zubů z", kind: "number", min: 10, max: 100, step: 1, unit: "", default: 20 },
-    { key: "delta", label: "Úhel roztečného kužele δ", kind: "number", min: 10, max: 80, step: 1, unit: "°", default: 45, hint: "45° = soukolí 1:1 (miter)" },
-    { key: "b", label: "Šířka ozubení b", kind: "number", min: 2, max: 100, step: 1, unit: "mm", default: 12 },
+    { key: "m", label: tr("Modul m (vnější)"), kind: "enum", options: MODULES, default: "2" },
+    { key: "z", label: tr("Počet zubů z"), kind: "number", min: 10, max: 100, step: 1, unit: "", default: 20 },
+    { key: "delta", label: tr("Úhel roztečného kužele δ"), kind: "number", min: 10, max: 80, step: 1, unit: "°", default: 45, hint: tr("45° = soukolí 1:1 (miter)") },
+    { key: "b", label: tr("Šířka ozubení b"), kind: "number", min: 2, max: 100, step: 1, unit: "mm", default: 12 },
     ...boreParams,
   ],
   parse: (q) => {
@@ -125,18 +126,18 @@ export const bevelGear: Family = {
     const outer = involuteGearProfile(m, z, 20, 0, 3);
     const inner = outer.map(([x, y]) => [rnd(x * scale, 5), rnd(y * scale, 5)] as Vec2);
     const h = bb * Math.cos(delta); // osová výška ozubené části
-    const s1 = sketch("Vnější profil", XY(0), [{ id: uid(), type: "polyline", closed: true, points: outer }]);
-    const s2 = sketch("Vnitřní profil", XY(rnd(h, 4)), [{ id: uid(), type: "polyline", closed: true, points: inner }]);
+    const s1 = sketch(tr("Vnější profil"), XY(0), [{ id: uid(), type: "polyline", closed: true, points: outer }]);
+    const s2 = sketch(tr("Vnitřní profil"), XY(rnd(h, 4)), [{ id: uid(), type: "polyline", closed: true, points: inner }]);
     const hubH = Math.max(m * 2, bb * 0.6);
     const hubD = m * (z - 2.5) * scale * 0.9;
     const bore = v.bore === undefined ? Math.round(m * z * 0.2) : num(v.bore);
-    return part(`Kuželové kolo m${fmt(m)} z${z}`, "ocel", [
+    return part(tr("Kuželové kolo m{0} z{1}", fmt(m), z), "ocel", [
       s1,
       s2,
       { id: uid(), name: "Kuželové ozubení", type: "loft", sketchIds: [s1.id, s2.id], ruled: true, mode: "new" },
-      cyl("Náboj", hubD, hubH, h, "add"),
+      cyl(tr("Náboj"), hubD, hubH, h, "add"),
       ...boreFeatures(bore, v.keyway !== false, h + hubH),
-    ], `Kuželové kolo m${fmt(m)} z${z} δ${fmt(num(v.delta, 45))}° b${fmt(bb)}`, "#c9a46a");
+    ], tr("Kuželové kolo m{0} z{1} δ{2}° b{3}", fmt(m), z, fmt(num(v.delta, 45)), fmt(bb)), "#c9a46a");
   },
 };
 
@@ -148,12 +149,12 @@ export const worm: Family = {
   standards: ["DIN 3975", "ISO 1122"],
   keywords: ["snek", "sneky", "worm", "worm shaft", "snekovy prevod"],
   params: [
-    { key: "m", label: "Modul m (osový)", kind: "enum", options: MODULES, default: "2" },
-    { key: "q", label: "Součinitel průměru q", kind: "number", min: 6, max: 20, step: 1, unit: "", default: 10, hint: "d1 = m·q" },
-    { key: "starts", label: "Počet chodů", kind: "number", min: 1, max: 4, step: 1, unit: "", default: 1 },
-    { key: "l", label: "Délka ozubené části", kind: "number", min: 5, max: 300, step: 1, unit: "mm", default: 40 },
-    { key: "shaft", label: "Průměr hřídele", kind: "number", min: 0, max: 100, step: 1, unit: "mm", default: 0, hint: "0 = bez hřídelových konců" },
-    { key: "shaftL", label: "Délka hřídelových konců", kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 30 },
+    { key: "m", label: tr("Modul m (osový)"), kind: "enum", options: MODULES, default: "2" },
+    { key: "q", label: tr("Součinitel průměru q"), kind: "number", min: 6, max: 20, step: 1, unit: "", default: 10, hint: tr("d1 = m·q") },
+    { key: "starts", label: tr("Počet chodů"), kind: "number", min: 1, max: 4, step: 1, unit: "", default: 1 },
+    { key: "l", label: tr("Délka ozubené části"), kind: "number", min: 5, max: 300, step: 1, unit: "mm", default: 40 },
+    { key: "shaft", label: tr("Průměr hřídele"), kind: "number", min: 0, max: 100, step: 1, unit: "mm", default: 0, hint: tr("0 = bez hřídelových konců") },
+    { key: "shaftL", label: tr("Délka hřídelových konců"), kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 30 },
   ],
   parse: (q) => {
     const kw = has(q, "snek", "worm");
@@ -177,16 +178,16 @@ export const worm: Family = {
     const df = d1 - 2.5 * m;
     const wire = 1.7 * m; // zjednodušení: závit jako kruhový průřez (místo lichoběžníku ZA)
     const pitch = Math.PI * m * starts;
-    const f: Feature[] = [cyl("Jádro", df + 0.2 * m, l, 0, "new")];
+    const f: Feature[] = [cyl(tr("Jádro"), df + 0.2 * m, l, 0, "new")];
     for (let s = 0; s < starts; s++) {
       f.push({ id: uid(), name: `Chod ${s + 1}`, type: "spring", radius: d1 / 2, pitch, turns: Math.max(1, (l - wire) / pitch), wire, position: [0, 0, wire / 2 + (s * pitch) / starts], axis: "Z", mode: "add" });
     }
     // oříznutí závitu na délku l (konce stoupání)
-    f.push(cyl("Ořez dole", d1 + 3 * m, l, -l, "cut"), cyl("Ořez nahoře", d1 + 3 * m, l, l, "cut"));
+    f.push(cyl(tr("Ořez dole"), d1 + 3 * m, l, -l, "cut"), cyl(tr("Ořez nahoře"), d1 + 3 * m, l, l, "cut"));
     const shaft = num(v.shaft, 0);
     const sl = num(v.shaftL, 30);
-    if (shaft > 0 && sl > 0) f.push(cyl("Hřídel 1", shaft, sl, -sl, "add"), cyl("Hřídel 2", shaft, sl, l, "add"), chamferAll(0.5));
-    return part(`Šnek m${fmt(m)} q${fmt(qf)}`, "ocel", f, `Šnek m${fmt(m)} q${fmt(qf)} z${starts} d1 ${fmt(d1)} L${fmt(l)}`, "#c9a46a");
+    if (shaft > 0 && sl > 0) f.push(cyl(tr("Hřídel 1"), shaft, sl, -sl, "add"), cyl(tr("Hřídel 2"), shaft, sl, l, "add"), chamferAll(0.5));
+    return part(tr("Šnek m{0} q{1}", fmt(m), fmt(qf)), "ocel", f, tr("Šnek m{0} q{1} z{2} d1 {3} L{4}", fmt(m), fmt(qf), starts, fmt(d1), fmt(l)), "#c9a46a");
   },
 };
 
@@ -198,10 +199,10 @@ export const wormWheel: Family = {
   standards: ["DIN 3975", "ISO 1122"],
   keywords: ["snekove kolo", "worm wheel", "worm gear", "kolo pro snek"],
   params: [
-    { key: "m", label: "Modul m", kind: "enum", options: MODULES, default: "2" },
-    { key: "z", label: "Počet zubů z2", kind: "number", min: 20, max: 120, step: 1, unit: "", default: 30 },
-    { key: "q", label: "Součinitel q šneku", kind: "number", min: 6, max: 20, step: 1, unit: "", default: 10, hint: "pro zakřivení (hrdlo) zubů" },
-    { key: "b", label: "Šířka b", kind: "number", min: 4, max: 100, step: 1, unit: "mm", default: 16 },
+    { key: "m", label: tr("Modul m"), kind: "enum", options: MODULES, default: "2" },
+    { key: "z", label: tr("Počet zubů z2"), kind: "number", min: 20, max: 120, step: 1, unit: "", default: 30 },
+    { key: "q", label: tr("Součinitel q šneku"), kind: "number", min: 6, max: 20, step: 1, unit: "", default: 10, hint: tr("pro zakřivení (hrdlo) zubů") },
+    { key: "b", label: tr("Šířka b"), kind: "number", min: 4, max: 100, step: 1, unit: "mm", default: 16 },
     ...boreParams,
   ],
   parse: (q) => {
@@ -226,7 +227,7 @@ export const wormWheel: Family = {
     const rp = (m * z) / 2;
     const twist = (b * Math.tan(gamma)) / rp;
     const bore = v.bore === undefined ? Math.round(m * z * 0.2) : num(v.bore);
-    return part(`Šnekové kolo m${fmt(m)} z${z}`, "mosaz", [...helicalFeatures("Ozubení", profile, b, twist, 2), ...boreFeatures(bore, v.keyway !== false, b)], `Šnekové kolo m${fmt(m)} z${z} b${fmt(b)} – d2 ${fmt(m * z)} γ${fmt(gamma / DEG)}°`, "#c9a46a");
+    return part(tr("Šnekové kolo m{0} z{1}", fmt(m), z), "mosaz", [...helicalFeatures(tr("Ozubení"), profile, b, twist, 2), ...boreFeatures(bore, v.keyway !== false, b)], tr("Šnekové kolo m{0} z{1} b{2} – d2 {3} γ{4}°", fmt(m), z, fmt(b), fmt(m * z), fmt(gamma / DEG)), "#c9a46a");
   },
 };
 

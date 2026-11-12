@@ -1,10 +1,12 @@
 "use client";
+import { tr, type CadLang } from "./i18n";
+import type { EdgeLite, FaceLite } from "./agent";
 import type { DrawingMeta, DrawingOptions, DrawingResult } from "./drawing";
 import type { Interference, MateFaceInfo } from "./asm-kernel";
 import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
 import type { DatumDisplay } from "./feat/refs-more";
 import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
-import type { BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo } from "./types";
+import type { BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo, Vec3 } from "./types";
 
 let worker: Worker | null = null;
 let seq = 0;
@@ -18,10 +20,10 @@ function w() {
       if (!p) return;
       pending.delete(e.data.id);
       if (e.data.ok) p.resolve(e.data.result);
-      else p.reject(new Error(e.data.error || "Chyba CAD jádra."));
+      else p.reject(new Error(e.data.error || tr("Chyba CAD jádra.")));
     };
     worker.onerror = (e) => {
-      for (const p of pending.values()) p.reject(new Error("CAD jádro se nepodařilo načíst: " + (e.message || "")));
+      for (const p of pending.values()) p.reject(new Error(tr("CAD jádro se nepodařilo načíst: ") + (e.message || "")));
       pending.clear();
       worker?.terminate();
       worker = null;
@@ -38,9 +40,15 @@ function call<T>(msg: Record<string, unknown>): Promise<T> {
   });
 }
 
+export type TopologyResult = { faces: FaceLite[]; edges: EdgeLite[]; bbox: [Vec3, Vec3]; metrics: NonNullable<BuildResult["metrics"]> };
+
 export const cad = {
   init: () => call<void>({ op: "init" }),
+  /** jazyk hlášek jádra a textů výkresu (cs / en / de) – nastaví se při startu a při přepnutí jazyka */
+  setLang: (lang: CadLang) => call<void>({ op: "lang", lang }),
   build: (doc: CadDoc) => call<BuildResult>({ op: "build", doc }),
+  /** sestaví dokument a v jednom kroku vrátí plochy a hrany pro výběr pravidlem (bez závodu s dalšími sestaveními) */
+  topology: (doc: CadDoc) => call<TopologyResult | null>({ op: "topology", doc }),
   face: (index: number) => call<FaceInfo | null>({ op: "face", index }),
   /** geometrie + otisk odkazu nad aktuálním tělesem (pro formuláře a náhledy) */
   refInfo: (doc: CadDoc, ref: Ref) => call<{ geo: Geo | null; sig: Sig | null; error?: string }>({ op: "refInfo", doc, ref }),

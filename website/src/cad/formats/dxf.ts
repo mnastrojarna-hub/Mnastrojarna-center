@@ -3,6 +3,7 @@
  * POLYLINE/VERTEX, ELLIPSE a SPLINE (aproximace lomenou čarou). Jednotky dle $INSUNITS → mm.
  * Bloky (INSERT), texty a kóty se přeskakují.
  */
+import { tr } from "../i18n";
 import { uid, type SketchEntity, type Vec2 } from "../types";
 
 const UNITS: Record<number, number> = { 0: 1, 1: 25.4, 2: 304.8, 3: 1609344, 4: 1, 5: 10, 6: 1000, 7: 1e6, 8: 0.0000254, 9: 0.0254, 10: 914.4, 13: 0.001, 14: 100 };
@@ -36,8 +37,8 @@ function all(e: Ent, code: number): number[] {
 export type DxfResult = { entities: SketchEntity[]; skipped: Record<string, number>; unitScale: number };
 
 export function parseDXF(text: string): DxfResult {
-  if (/^AC10\d\d/.test(text.slice(0, 6))) throw new Error("Soubor je binární DWG, ne DXF.");
-  if (text.startsWith("AutoCAD Binary DXF")) throw new Error("Binární DXF není podporované – uložte DXF jako ASCII.");
+  if (/^AC10\d\d/.test(text.slice(0, 6))) throw new Error(tr("Soubor je binární DWG, ne DXF."));
+  if (text.startsWith("AutoCAD Binary DXF")) throw new Error(tr("Binární DXF není podporované – uložte DXF jako ASCII."));
   const P = pairs(text);
   let scale = 1;
   // hlavička
@@ -50,7 +51,7 @@ export function parseDXF(text: string): DxfResult {
   // sekce ENTITIES
   let start = -1;
   for (let i = 0; i + 1 < P.length; i++) if (P[i].code === 0 && P[i].value === "SECTION" && P[i + 1].code === 2 && P[i + 1].value === "ENTITIES") start = i + 2;
-  if (start < 0) throw new Error("DXF neobsahuje sekci ENTITIES.");
+  if (start < 0) throw new Error(tr("DXF neobsahuje sekci ENTITIES."));
   const ents: Ent[] = [];
   for (let i = start; i < P.length; i++) {
     const p = P[i];

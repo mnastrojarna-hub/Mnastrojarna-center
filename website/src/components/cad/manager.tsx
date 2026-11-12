@@ -1,5 +1,6 @@
 "use client";
 
+import { cadLocale, tr } from "@/cad/i18n";
 import { useState } from "react";
 import { featureIcon, featureTone } from "@/cad/defaults";
 import { resolveDoc } from "@/cad/params";
@@ -75,10 +76,10 @@ export function Manager({
     setFeatures(next);
   };
   const featureMenu = (f: Feature): RMenuEntry[] => [
-    { id: "edit", label: f.type === "sketch" ? "Upravit skicu" : "Upravit parametry", icon: "edit", onClick: () => onSelect(f) },
-    { id: "rename", label: "Přejmenovat", icon: "text", onClick: () => setRenaming(f.id) },
-    { id: "supp", label: f.suppressed ? "Zapnout prvek" : "Potlačit prvek", icon: "eye", onClick: () => setFeatures(doc.features.map((x) => (x.id === f.id ? ({ ...x, suppressed: !x.suppressed } as Feature) : x))) },
-    { id: "dup", label: "Duplikovat", icon: "copy", onClick: () => {
+    { id: "edit", label: f.type === "sketch" ? tr("Upravit skicu") : tr("Upravit parametry"), icon: "edit", onClick: () => onSelect(f) },
+    { id: "rename", label: tr("Přejmenovat"), icon: "text", onClick: () => setRenaming(f.id) },
+    { id: "supp", label: f.suppressed ? tr("Zapnout prvek") : tr("Potlačit prvek"), icon: "eye", onClick: () => setFeatures(doc.features.map((x) => (x.id === f.id ? ({ ...x, suppressed: !x.suppressed } as Feature) : x))) },
+    { id: "dup", label: tr("Duplikovat"), icon: "copy", onClick: () => {
       const i = doc.features.findIndex((x) => x.id === f.id);
       const copy = { ...structuredClone(f), id: uid(), name: `${f.name} (kopie)` } as Feature;
       const next = [...doc.features];
@@ -86,10 +87,10 @@ export function Manager({
       setFeatures(next);
     } },
     { divider: true },
-    { id: "up", label: "Posunout výš", icon: "up", onClick: () => move(f.id, -1) },
-    { id: "down", label: "Posunout níž", icon: "down", onClick: () => move(f.id, 1) },
+    { id: "up", label: tr("Posunout výš"), icon: "up", onClick: () => move(f.id, -1) },
+    { id: "down", label: tr("Posunout níž"), icon: "down", onClick: () => move(f.id, 1) },
     { divider: true },
-    { id: "del", label: "Smazat", icon: "trash", tone: "cut", kbd: "Del", onClick: () => setFeatures(doc.features.filter((x) => x.id !== f.id)) },
+    { id: "del", label: tr("Smazat"), icon: "trash", tone: "cut", kbd: "Del", onClick: () => setFeatures(doc.features.filter((x) => x.id !== f.id)) },
   ];
 
   return (
@@ -97,9 +98,9 @@ export function Manager({
       <div className="flex shrink-0 border-b border-[#d5dbe2] bg-[#f3f6f9] text-[11.5px]">
         {(
           [
-            ["history", "Historie", "tree"],
-            ["vars", "Proměnné", "variables"],
-            ["configs", "Stavy", "configs"],
+            ["history", tr("Historie"), "tree"],
+            ["vars", tr("Proměnné"), "variables"],
+            ["configs", tr("Stavy"), "configs"],
           ] as [Tab, string, CadIconName][]
         ).map(([t, l, i]) => (
           <button
@@ -122,16 +123,16 @@ export function Manager({
           </div>
           <div className="ml-5 border-l border-dashed border-[#cdd5de] pl-1">
             {[
-              ["XY", "Rovina XY"],
-              ["XZ", "Rovina XZ"],
-              ["YZ", "Rovina YZ"],
+              ["XY", tr("Rovina XY")],
+              ["XZ", tr("Rovina XZ")],
+              ["YZ", tr("Rovina YZ")],
             ].map(([k, l]) => (
               <div key={k} className="flex items-center gap-2 px-2 py-[3px] text-[12px] text-[#6b7785]">
                 <CadIcon name="datum" tone="ref" className="h-3.5 w-3.5" />
                 {l}
               </div>
             ))}
-            {doc.features.length === 0 && <p className="m-2 rounded border border-dashed border-[#cdd5de] p-3 text-[11.5px] leading-relaxed text-[#6b7785]">Historie je prázdná. Začněte skicou (karta Tvorba → Skica) nebo vložte primitivum.</p>}
+            {doc.features.length === 0 && <p className="m-2 rounded border border-dashed border-[#cdd5de] p-3 text-[11.5px] leading-relaxed text-[#6b7785]">{tr("Historie je prázdná. Začněte skicou (karta Tvorba → Skica) nebo vložte primitivum.")}</p>}
             {doc.features.map((f) => {
               const st = status?.find((s) => s.id === f.id);
               const isActive = f.id === activeId || f.id === sketchId;
@@ -179,7 +180,7 @@ export function Manager({
                     )}
                     <button
                       type="button"
-                      title="Nabídka"
+                      title={tr("Nabídka")}
                       className="hidden rounded px-1 text-[#6b7785] hover:bg-white group-hover:block"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -203,24 +204,24 @@ export function Manager({
 
       <div className="shrink-0 space-y-2 border-t border-[#d5dbe2] bg-[#f7f9fb] p-3">
         <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">Materiál</span>
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">{tr("Materiál")}</span>
           <select value={doc.material} onChange={(e) => onCommit({ ...doc, material: e.target.value })} className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1 text-[12.5px]">
             {MATERIALS.map((x) => (
               <option key={x.id} value={x.id}>
-                {x.label} ({x.density} g/cm³)
+                {x.label} ({x.density} {tr("g/cm³)")}
               </option>
             ))}
           </select>
         </label>
         <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">Označení materiálu (razítko)</span>
+          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">{tr("Označení materiálu (razítko)")}</span>
           <input
             type="text"
             key={`mn-${doc.materialName ?? ""}`}
             defaultValue={doc.materialName ?? ""}
-            placeholder={MATERIALS.find((x) => x.id === doc.material)?.label ?? "Ocel"}
-            title="Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše; přenáší se odkazem i souborem"
-            aria-label="Označení materiálu do razítka"
+            placeholder={MATERIALS.find((x) => x.id === doc.material)?.label ?? tr("Ocel")}
+            title={tr("Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše; přenáší se odkazem i souborem")}
+            aria-label={tr("Označení materiálu do razítka")}
             onBlur={(e) => {
               const t = e.target.value.trim();
               const cls = MATERIALS.find((x) => x.id === doc.material)?.label;
@@ -233,9 +234,9 @@ export function Manager({
         </label>
         {(doc.configs?.length ?? 0) > 0 && (
           <label className="block">
-            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">Aktivní stav</span>
+            <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[#6b7785]">{tr("Aktivní stav")}</span>
             <select value={doc.activeConfig ?? ""} onChange={(e) => onCommit({ ...doc, activeConfig: e.target.value || null })} className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1 text-[12.5px]">
-              <option value="">Výchozí</option>
+              <option value="">{tr("Výchozí")}</option>
               {doc.configs!.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -249,7 +250,7 @@ export function Manager({
   );
 }
 
-const fmt = (n: number | undefined) => (n == null || !Number.isFinite(n) ? "—" : (Math.round(n * 1e4) / 1e4).toLocaleString("cs-CZ"));
+const fmt = (n: number | undefined) => (n == null || !Number.isFinite(n) ? "—" : (Math.round(n * 1e4) / 1e4).toLocaleString(cadLocale()));
 
 function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Record<string, number>; errors: string[]; onCommit: (d: CadDoc) => void }) {
   const vars = doc.variables ?? [];
@@ -258,14 +259,14 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-2 text-[12px]">
       <p className="px-1 pb-2 leading-relaxed text-[#6b7785]">
-        Proměnné řídí rozměry modelu. V poli parametru napište název proměnné nebo výraz (např. <code className="rounded bg-[#eef2f6] px-1">=d/2+3</code>).
+        {tr("Proměnné řídí rozměry modelu. V poli parametru napište název proměnné nebo výraz (např.")}{" "}<code className="rounded bg-[#eef2f6] px-1">=d/2+3</code>).
       </p>
       <table className="w-full border-collapse">
         <thead>
           <tr className="text-left text-[10px] uppercase tracking-wider text-[#8a95a3]">
-            <th className="px-1 pb-1 font-semibold">Název</th>
-            <th className="px-1 pb-1 font-semibold">Výraz</th>
-            <th className="px-1 pb-1 text-right font-semibold">Hodnota</th>
+            <th className="px-1 pb-1 font-semibold">{tr("Název")}</th>
+            <th className="px-1 pb-1 font-semibold">{tr("Výraz")}</th>
+            <th className="px-1 pb-1 text-right font-semibold">{tr("Hodnota")}</th>
             <th />
           </tr>
         </thead>
@@ -294,7 +295,7 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
               </td>
               <td className="whitespace-nowrap p-0.5 text-right font-mono text-[#0e7490]">{fmt(values[v.name])}</td>
               <td className="p-0.5 text-right">
-                <button type="button" title="Smazat" onClick={() => set(vars.filter((_, k) => k !== i))} className="rounded p-0.5 text-[#8a95a3] hover:text-brand">
+                <button type="button" title={tr("Smazat")} onClick={() => set(vars.filter((_, k) => k !== i))} className="rounded p-0.5 text-[#8a95a3] hover:text-brand">
                   <CadIcon name="trash" className="h-3.5 w-3.5" />
                 </button>
               </td>
@@ -311,7 +312,7 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
         }}
         className="mt-2 w-full rounded border border-dashed border-[#b9c3cd] py-1.5 text-[12px] text-[#26303b] hover:border-brand hover:text-brand"
       >
-        + Přidat proměnnou
+        {tr("+ Přidat proměnnou")}
       </button>
       {errors.length > 0 && (
         <div className="mt-2 space-y-1">
@@ -324,7 +325,7 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
       )}
       {bindings.length > 0 && (
         <div className="mt-4">
-          <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">Vazby parametrů</p>
+          <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">{tr("Vazby parametrů")}</p>
           {bindings.map(([k, expr]) => {
             const [fid, path] = k.split(":");
             const f = doc.features.find((x) => x.id === fid);
@@ -336,7 +337,7 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
                 <code className="rounded bg-[#eef2f6] px-1 font-mono text-[11px] text-[#0e7490]">{expr}</code>
                 <button
                   type="button"
-                  title="Zrušit vazbu"
+                  title={tr("Zrušit vazbu")}
                   onClick={() => {
                     const b = { ...(doc.bindings ?? {}) };
                     delete b[k];
@@ -362,10 +363,10 @@ function Configs({ doc, values, onCommit }: { doc: CadDoc; values: Record<string
   const vars = doc.variables ?? [];
   return (
     <div className="min-h-0 flex-1 overflow-y-auto p-2 text-[12px]">
-      <p className="px-1 pb-2 leading-relaxed text-[#6b7785]">Stavy (konfigurace) jsou varianty dílu: jiné hodnoty proměnných a potlačené prvky – např. „M8“, „M10“, „bez děr“.</p>
+      <p className="px-1 pb-2 leading-relaxed text-[#6b7785]">{tr("Stavy (konfigurace) jsou varianty dílu: jiné hodnoty proměnných a potlačené prvky – např. „M8“, „M10“, „bez děr“.")}</p>
       <label className={cn("mb-1 flex cursor-pointer items-center gap-2 rounded px-2 py-1.5", !doc.activeConfig ? "bg-[#dbe7f5]" : "hover:bg-[#edf2f7]")}>
         <input type="radio" checked={!doc.activeConfig} onChange={() => onCommit({ ...doc, activeConfig: null })} className="accent-[#E03930]" />
-        <span className="font-medium">Výchozí</span>
+        <span className="font-medium">{tr("Výchozí")}</span>
       </label>
       {configs.map((c) => (
         <div key={c.id} className="mb-1 rounded border border-[#e3e8ee]">
@@ -376,16 +377,16 @@ function Configs({ doc, values, onCommit }: { doc: CadDoc; values: Record<string
               onBlur={(e) => e.target.value.trim() && e.target.value !== c.name && set(configs.map((x) => (x.id === c.id ? { ...x, name: e.target.value.trim() } : x)))}
               className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-1 font-medium hover:border-[#cfd6de] focus:border-brand focus:outline-none"
             />
-            <button type="button" onClick={() => setOpen(open === c.id ? null : c.id)} className="text-[#6b7785] hover:text-[#1f2933]" title="Upravit">
+            <button type="button" onClick={() => setOpen(open === c.id ? null : c.id)} className="text-[#6b7785] hover:text-[#1f2933]" title={tr("Upravit")}>
               <CadIcon name={open === c.id ? "chevronDown" : "chevronRight"} className="h-3.5 w-3.5" />
             </button>
-            <button type="button" onClick={() => set(configs.filter((x) => x.id !== c.id), doc.activeConfig === c.id ? null : doc.activeConfig)} className="text-[#8a95a3] hover:text-brand" title="Smazat stav">
+            <button type="button" onClick={() => set(configs.filter((x) => x.id !== c.id), doc.activeConfig === c.id ? null : doc.activeConfig)} className="text-[#8a95a3] hover:text-brand" title={tr("Smazat stav")}>
               <CadIcon name="trash" className="h-3.5 w-3.5" />
             </button>
           </div>
           {open === c.id && (
             <div className="space-y-2 border-t border-[#e3e8ee] p-2">
-              {vars.length === 0 && <p className="text-[11px] text-[#8a95a3]">Nejdřív založte proměnné (karta Proměnné).</p>}
+              {vars.length === 0 && <p className="text-[11px] text-[#8a95a3]">{tr("Nejdřív založte proměnné (karta Proměnné).")}</p>}
               {vars.map((v) => (
                 <label key={v.name} className="flex items-center gap-2">
                   <span className="w-20 truncate font-mono">{v.name}</span>
@@ -405,7 +406,7 @@ function Configs({ doc, values, onCommit }: { doc: CadDoc; values: Record<string
               ))}
               {doc.features.length > 0 && (
                 <div>
-                  <p className="pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">Potlačené prvky</p>
+                  <p className="pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">{tr("Potlačené prvky")}</p>
                   <div className="max-h-40 space-y-0.5 overflow-y-auto">
                     {doc.features.map((f) => (
                       <label key={f.id} className="flex items-center gap-2 text-[11.5px]">
@@ -431,12 +432,12 @@ function Configs({ doc, values, onCommit }: { doc: CadDoc; values: Record<string
           const id = uid();
           const snapshot: Record<string, number> = {};
           for (const v of vars) if (Number.isFinite(values[v.name])) snapshot[v.name] = values[v.name];
-          set([...configs, { id, name: `Stav ${configs.length + 1}`, values: snapshot, suppressed: [] }], id);
+          set([...configs, { id, name: tr("Stav {0}", configs.length + 1), values: snapshot, suppressed: [] }], id);
           setOpen(id);
         }}
         className="mt-2 w-full rounded border border-dashed border-[#b9c3cd] py-1.5 text-[12px] text-[#26303b] hover:border-brand hover:text-brand"
       >
-        + Nový stav z aktuálních hodnot
+        {tr("+ Nový stav z aktuálních hodnot")}
       </button>
     </div>
   );

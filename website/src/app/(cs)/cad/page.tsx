@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "Mnástrojárna CAD – online 3D/2D CAD zdarma",
   description:
     "Profesionální parametrický 3D CAD v prohlížeči zdarma: díly, sestavy, rámy forem, výkresy s kusovníkem (PDF/DXF), proměnné a stavy. Import a export STEP, IGES, BREP, STL, 3MF, glTF, OBJ, DXF. Jádro OpenCascade, bez instalace.",
-  alternates: { canonical: "/cad" },
+  alternates: { canonical: "/cad", languages: { cs: "/cad", en: "/en/cad", de: "/de/cad" } },
   openGraph: { url: `${SITE.url}/cad`, title: "Mnástrojárna CAD – online 3D/2D CAD zdarma", siteName: SITE.name, locale: "cs_CZ", type: "website" },
 };
 

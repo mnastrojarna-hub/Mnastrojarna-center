@@ -5,6 +5,7 @@
  * Čáry dle ISO 128: obrys 0,5 · skryté 0,25 čárkovaně · osy a kóty 0,18 · šrafy 0,18.
  * Výstup: geometrie listu (polys/texts) → SVG, DXF (R12, LTYPE/vrstvy) a PDF (src/cad/pdf.ts).
  */
+import { cadLocale, tr } from "./i18n";
 import * as r from "replicad";
 import type { PlaneName, Vec2, Vec3 } from "./types";
 
@@ -524,7 +525,7 @@ export function hatch(segsPolys: Vec2[][], spacing = 2.5, angleDeg = 45): Vec2[]
 
 // ---------------------------------------------------------------- formát čísel
 
-const fmt = (n: number) => (Math.round(n * 100) / 100).toLocaleString("cs-CZ");
+const fmt = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale());
 
 // ---------------------------------------------------------------- hlavní funkce
 
@@ -564,9 +565,9 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   if (opts.section) {
     try {
       section = makeSection(shape, opts.section.plane, opts.section.offset);
-      if (!section) warnings.push("Rovina řezu neprotíná těleso – upravte odsazení.");
+      if (!section) warnings.push(tr("Rovina řezu neprotíná těleso – upravte odsazení."));
     } catch {
-      warnings.push("Řez se nepodařilo vytvořit.");
+      warnings.push(tr("Řez se nepodařilo vytvořit."));
     }
   }
   let iso: View | null = null;
@@ -624,12 +625,12 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     if (opts.scale === "auto") scale = bestScale(sheet) ?? STANDARD_SCALES[STANDARD_SCALES.length - 1];
     else {
       scale = opts.scale;
-      if (!fits(sheet, scale)) warnings.push(`Pohledy se v měřítku ${scaleLabel(scale)} nevejdou na list ${sheet}.`);
+      if (!fits(sheet, scale)) warnings.push(tr("Pohledy se v měřítku {0} nevejdou na list {1}.", scaleLabel(scale), sheet));
     }
   } else if (opts.scale !== "auto") {
     scale = opts.scale;
     sheet = SHEET_ORDER.find((n) => fits(n, scale)) ?? "A0";
-    if (!fits(sheet, scale)) warnings.push(`Pohledy se v měřítku ${scaleLabel(scale)} nevejdou ani na A0.`);
+    if (!fits(sheet, scale)) warnings.push(tr("Pohledy se v měřítku {0} nevejdou ani na A0.", scaleLabel(scale)));
   } else {
     const pick = SHEET_ORDER.find((n) => (bestScale(n) ?? 0) >= 0.5);
     sheet = pick ?? "A0";
@@ -756,11 +757,11 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   for (const d of opts.details ?? []) {
     const p = placed.get(d.view);
     if (!p) {
-      warnings.push(`Detail ${d.label}: pohled ${d.view} není na listu.`);
+      warnings.push(tr("Detail {0}: pohled {1} není na listu.", d.label, d.view));
       continue;
     }
     const res = detailView(d, p, SW, SH, TBH, polys, texts, details);
-    if (!res) warnings.push(`Detail ${d.label}: v kruhu není žádná geometrie.`);
+    if (!res) warnings.push(tr("Detail {0}: v kruhu není žádná geometrie.", d.label));
   }
   // pozice (balónky) komponent sestavy
   const balloons: NonNullable<DrawingResult["balloons"]> = [];
@@ -1019,7 +1020,7 @@ function cuttingPlane(plane: PlaneName, offset: number, placed: Map<string, Plac
   const cam = SECTION_CAM[plane];
   const parent = [...placed.values()].find((p) => p.key !== "section" && Math.abs(dot(p.cam.d, n)) < 1e-6);
   if (!parent) {
-    warnings.push("Čáru řezu nelze zakreslit – zapněte pohled, ve kterém je rovina řezu vidět jako čára.");
+    warnings.push(tr("Čáru řezu nelze zakreslit – zapněte pohled, ve kterém je rovina řezu vidět jako čára."));
     return;
   }
   // přímka v obraze rodiče: body p, pro které p·n = offset
@@ -1051,7 +1052,7 @@ function cuttingPlane(plane: PlaneName, offset: number, placed: Map<string, Plac
   const by1 = parent.py + parent.h * parent.s + 6;
   const clip = clipSegment(ends[0], ends[1], bx0, by0, bx1, by1);
   if (!clip) {
-    warnings.push("Čára řezu leží mimo pohled.");
+    warnings.push(tr("Čára řezu leží mimo pohled."));
     return;
   }
   const [a, b] = clip;
@@ -1165,28 +1166,28 @@ function titleBlock(W: number, H: number, sheet: SheetName, scale: number, proje
   };
   // levý blok – firma
   T(x + 3, y + 8.5, "Mnástrojárna s.r.o.", 4.6, true, true);
-  T(x + 3, y + 13.5, "Váš partner ve strojírenství", 2.6);
+  T(x + 3, y + 13.5, tr("Váš partner ve strojírenství"), 2.6);
   T(x + 3, y + 18, "www.mnastrojarna.cz", 2.4);
   polys.push({ layer: "title", pts: [[x, y + 21], [x + L, y + 21]] });
-  T(x + 3, y + 25, "Promítání", 2);
+  T(x + 3, y + 25, tr("Promítání"), 2);
   projectionSymbol(polys, x + 4, y + 27.5, projection);
   T(x + 30, y + 33, projection === "E" ? "ISO E" : "ISO A", 3, true);
   // pravá část
-  cell(L, 0, "Název", (meta.name || "Bez názvu").slice(0, 46), 4.2, true);
-  cell(L, r1, "Číslo výkresu", (meta.number ?? "").slice(0, 26), 3.4, true);
-  cell(115, r1, "Materiál", (meta.material ?? "").slice(0, 28));
-  cell(L, r2, "Měřítko", scaleLabel(scale), 3.2, true);
-  cell(75, r2, "Formát", sheet);
-  cell(92, r2, "Hmotnost", meta.massKg != null ? `${fmt(meta.massKg)} kg` : "—");
-  cell(117, r2, "Kreslil", (meta.author ?? "").slice(0, 16));
-  cell(145, r2, "Datum", meta.date ?? new Date().toLocaleDateString("cs-CZ"), 2.8);
+  cell(L, 0, tr("Název"), (meta.name || tr("Bez názvu")).slice(0, 46), 4.2, true);
+  cell(L, r1, tr("Číslo výkresu"), (meta.number ?? "").slice(0, 26), 3.4, true);
+  cell(115, r1, tr("Materiál"), (meta.material ?? "").slice(0, 28));
+  cell(L, r2, tr("Měřítko"), scaleLabel(scale), 3.2, true);
+  cell(75, r2, tr("Formát"), sheet);
+  cell(92, r2, tr("Hmotnost"), meta.massKg != null ? `${fmt(meta.massKg)} kg` : "—");
+  cell(117, r2, tr("Kreslil"), (meta.author ?? "").slice(0, 16));
+  cell(145, r2, tr("Datum"), meta.date ?? new Date().toLocaleDateString(cadLocale()), 2.8);
   cell(166, r2, "Rev.", meta.revision ?? "–");
   // poznámka nad razítkem a list
   const ny = y - bomHeight(meta.bom) - extraAbove;
   // výrobní požadavky (tolerance, hrany) jen když je uživatel zadal – nic se nedoplňuje automaticky
-  T(x, ny - 5.5, ["Rozměry v mm", meta.tolerance?.trim() ? `Nepředepsané tolerance ${meta.tolerance.trim()}` : "", meta.edges?.trim() ? `Hrany: ${meta.edges.trim()}` : ""].filter(Boolean).join(" · "), 2.5);
+  T(x, ny - 5.5, [tr("Rozměry v mm"), meta.tolerance?.trim() ? tr("Nepředepsané tolerance {0}", meta.tolerance.trim()) : "", meta.edges?.trim() ? tr("Hrany: {0}", meta.edges.trim()) : ""].filter(Boolean).join(" · "), 2.5);
   // poznámka k modelu jen na vyžádání (razítko → „Poznámka v patičce“) – nic nenaznačuje úplnost dokumentace automaticky
-  T(x, ny - 1.8, [meta.note?.trim() ?? "", `List ${meta.sheetIndex ?? 1}/${meta.sheetCount ?? 1}`].filter(Boolean).join(" · "), 2.5);
+  T(x, ny - 1.8, [meta.note?.trim() ?? "", tr("List {0}/{1}", meta.sheetIndex ?? 1, meta.sheetCount ?? 1)].filter(Boolean).join(" · "), 2.5);
 }
 
 // ---------------------------------------------------------------- kusovník (ISO 7573)
@@ -1194,12 +1195,12 @@ function titleBlock(W: number, H: number, sheet: SheetName, scale: number, proje
 const BOM_ROW = 7;
 /** sloupce: Pozice | Název | Číslo výkresu/normy | Ks | Materiál | Hmotnost (součet = šířka razítka) */
 const BOM_COLS: [string, number][] = [
-  ["Poz.", 12],
-  ["Název", 52],
-  ["Číslo výkresu / normy", 40],
+  [tr("Poz."), 12],
+  [tr("Název"), 52],
+  [tr("Číslo výkresu / normy"), 40],
   ["Ks", 12],
-  ["Materiál", 36],
-  ["Hmotnost", 28],
+  [tr("Materiál"), 36],
+  [tr("Hmotnost"), 28],
 ];
 
 const bomHeight = (bom?: BomItem[]) => (bom?.length ? (bom.length + 1) * BOM_ROW : 0);
@@ -1245,7 +1246,7 @@ function partsList(x: number, yBottom: number, bom: BomItem[], polys: Poly[], te
 
 const HOLE_ROW = 5.5;
 const HOLE_COLS: [string, number][] = [
-  ["Značka", 24],
+  [tr("Značka"), 24],
   ["X", 40],
   ["Y", 40],
   ["Ø", 40],
@@ -1295,7 +1296,7 @@ function holeTable(x: number, yBottom: number, rows: HoleRow[], polys: Poly[], t
     if (cx < x + TB.w - 1e-6) polys.push({ layer: "title", pts: [[cx, y0], [cx, y0 + h]] });
   }
   const cell = (col: number, rowBottom: number, s: string, bold = false) => texts.push({ x: colX[col] + HOLE_COLS[col][1] / 2, y: rowBottom - 1.6, s, size: 2.6, bold, anchor: "middle", layer: "text" });
-  HOLE_COLS.forEach(([label], i) => cell(i, y0 + HOLE_ROW, i === 0 ? "Tabulka děr" : label, true));
+  HOLE_COLS.forEach(([label], i) => cell(i, y0 + HOLE_ROW, i === 0 ? tr("Tabulka děr") : label, true));
   const countByD = new Map<number, number>();
   for (const r of rows) countByD.set(r.d, (countByD.get(r.d) ?? 0) + 1);
   rows.forEach((r, i) => {
@@ -1311,10 +1312,10 @@ function holeTable(x: number, yBottom: number, rows: HoleRow[], polys: Poly[], t
 // ---------------------------------------------------------------- tabulka revizí
 
 const REV_COLS: [string, number][] = [
-  ["Rev.", 12],
-  ["Datum", 24],
-  ["Popis změny", 66],
-  ["Kreslil", 22],
+  [tr("Rev."), 12],
+  [tr("Datum"), 24],
+  [tr("Popis změny"), 66],
+  [tr("Kreslil"), 22],
 ];
 const REV_ROW = 6;
 
@@ -1467,7 +1468,7 @@ export function bomToCsv(bom: BomItem[]): string {
     return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const num = (n?: number) => (n == null ? "" : String(Math.round(n * 1000) / 1000).replace(".", ","));
-  const rows = [["Pozice", "Název", "Číslo výkresu / normy", "Ks", "Materiál", "Hmotnost [kg]", "Poznámka"].join(";")];
+  const rows = [[tr("Pozice"), tr("Název"), tr("Číslo výkresu / normy"), tr("Ks"), tr("Materiál"), tr("Hmotnost [kg]"), tr("Poznámka")].join(";")];
   for (const it of [...bom].sort((a, b) => a.pos - b.pos)) rows.push([q(it.pos), q(it.name), q(it.number), num(it.qty), q(it.material), num(it.massKg), q(it.note)].join(";"));
   return "﻿" + rows.join("\r\n") + "\r\n";
 }
@@ -1604,7 +1605,7 @@ export function toDxf(H: number, polys: Poly[], texts: DText[]) {
 
 import type { DrawingAnnotation, GdtSymbol } from "./types";
 
-const fmtVal = (n: number) => (Math.round(n * 100) / 100).toLocaleString("cs-CZ");
+const fmtVal = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale());
 
 /** souřadnice pohledu → list; `view: "sheet"` = už v mm listu */
 export function annToSheet(views: PlacedView[], view: string, q: Vec2): Vec2 {

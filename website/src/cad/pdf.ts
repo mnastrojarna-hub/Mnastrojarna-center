@@ -2,6 +2,7 @@
  * Vektorové PDF výkresu (jsPDF, MIT) s vloženým písmem Roboto (čeština).
  * Rozměr listu v mm, tloušťky a typy čar dle ISO 128, otočené texty.
  */
+import { tr } from "./i18n";
 import { LAYER_STYLE, type DrawingResult } from "./drawing";
 
 export type PdfFonts = { regular: ArrayBuffer; bold?: ArrayBuffer };
@@ -11,7 +12,7 @@ let fontCache: Promise<PdfFonts> | null = null;
 /** Načte písma z /fonts (prohlížeč). */
 function loadFonts(): Promise<PdfFonts> {
   if (!fontCache) {
-    const get = (u: string) => fetch(u).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error("Písmo se nenačetlo."))));
+    const get = (u: string) => fetch(u).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(tr("Písmo se nenačetlo.")))));
     fontCache = Promise.all([get("/fonts/Roboto-Regular.ttf"), get("/fonts/Roboto-Bold.ttf").catch(() => undefined)]).then(([regular, bold]) => ({ regular, bold }));
     fontCache.catch(() => (fontCache = null));
   }
@@ -39,7 +40,7 @@ export async function drawingToPdf(d: Pick<DrawingResult, "sheet" | "polys" | "t
   const f = fonts ?? (await loadFonts());
   const { w, h } = d.sheet;
   const pdf = new jsPDF({ orientation: w >= h ? "landscape" : "portrait", unit: "mm", format: [Math.min(w, h), Math.max(w, h)], compress: true });
-  pdf.setProperties({ title: d.title ?? "Výkres", creator: "Mnástrojárna CAD", author: "Mnástrojárna s.r.o." });
+  pdf.setProperties({ title: d.title ?? tr("Výkres"), creator: "Mnástrojárna CAD", author: "Mnástrojárna s.r.o." });
   pdf.addFileToVFS("Roboto-Regular.ttf", toBase64(f.regular));
   pdf.addFont("Roboto-Regular.ttf", "Roboto", "normal");
   if (f.bold) {

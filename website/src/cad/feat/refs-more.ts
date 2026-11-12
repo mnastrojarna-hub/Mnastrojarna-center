@@ -7,6 +7,7 @@
  *  – pomocná osa (`datumAxis`), pomocný bod (`datumPoint`), souřadný systém (`csys`) – bez geometrie, jen ověření.
  * Vše přes `registerFeatureBuilder`; stavitel nástrojového prvku uloží nástroj do `ctx.tools` (pro pole / zrcadlení).
  */
+import { tr } from "../i18n";
 import * as r from "replicad";
 import { applyMode, planeOf, threadProfile, THREAD_HINT } from "../build";
 import { planeBasis, threadByName } from "../defaults";
@@ -38,7 +39,7 @@ export function checkDatumOrder(f: Feature, ctx: { features: Feature[]; index: n
   for (const id of ids) {
     const k = ctx.features.findIndex((x) => x.id === id);
     if (k < 0) continue; // chybějící prvek ohlásí řešič odkazů
-    if (k >= ctx.index) throw new Error(`Pomocná geometrie „${ctx.features[k].name}“ musí být v historii před prvkem „${f.name}“ – přesuňte ji výš.`);
+    if (k >= ctx.index) throw new Error(tr("Pomocná geometrie „{0}“ musí být v historii před prvkem „{1}“ – přesuňte ji výš.", ctx.features[k].name, f.name));
   }
 }
 
@@ -88,7 +89,7 @@ function toolBuilder<T extends Feature["type"]>(type: T, make: (f: F<T>, ctx: Fe
 
 toolBuilder("box", (f, ctx) => {
   const [w, h, d] = f.size;
-  if (!(w > 0 && h > 0 && d > 0)) throw new Error("Rozměry musí být kladné.");
+  if (!(w > 0 && h > 0 && d > 0)) throw new Error(tr("Rozměry musí být kladné."));
   const at = placeOf(f, ctx);
   const c1: Vec3 = f.centered ? [at[0] - w / 2, at[1] - h / 2, at[2] - d / 2] : at;
   const box = r.makeBox(c1, [c1[0] + w, c1[1] + h, c1[2] + d]) as Shape;
@@ -96,26 +97,26 @@ toolBuilder("box", (f, ctx) => {
 });
 
 toolBuilder("cylinder", (f, ctx) => {
-  if (!(f.radius > 0 && f.height > 0)) throw new Error("Rozměry musí být kladné.");
-  return r.makeCylinder(f.radius, f.height, placeOf(f, ctx, "polohu podstavy"), dirDefOf(f, ctx)) as Shape;
+  if (!(f.radius > 0 && f.height > 0)) throw new Error(tr("Rozměry musí být kladné."));
+  return r.makeCylinder(f.radius, f.height, placeOf(f, ctx, tr("polohu podstavy")), dirDefOf(f, ctx)) as Shape;
 });
 
 toolBuilder("sphere", (f, ctx) => {
-  if (!(f.radius > 0)) throw new Error("Poloměr musí být kladný.");
-  return r.makeSphere(f.radius).translate(placeOf(f, ctx, "střed koule")) as Shape;
+  if (!(f.radius > 0)) throw new Error(tr("Poloměr musí být kladný."));
+  return r.makeSphere(f.radius).translate(placeOf(f, ctx, tr("střed koule"))) as Shape;
 });
 
 toolBuilder("cone", (f, ctx) => {
-  if (!(f.height > 0) || f.radius1 < 0 || f.radius2 < 0 || f.radius1 + f.radius2 <= 0) throw new Error("Neplatné rozměry kuželu.");
+  if (!(f.height > 0) || f.radius1 < 0 || f.radius2 < 0 || f.radius1 + f.radius2 <= 0) throw new Error(tr("Neplatné rozměry kuželu."));
   const s = revolvedZ([[0, 0], [Math.max(f.radius1, 1e-4), 0], [Math.max(f.radius2, 1e-4), f.height], [0, f.height]]);
-  return alignZ(s, dirDefOf(f, ctx)).translate(placeOf(f, ctx, "polohu podstavy"));
+  return alignZ(s, dirDefOf(f, ctx)).translate(placeOf(f, ctx, tr("polohu podstavy")));
 });
 
 toolBuilder("tube", (f, ctx) => {
-  if (!(f.outer > f.inner && f.inner >= 0 && f.height > 0)) throw new Error("Vnější průměr musí být větší než vnitřní.");
+  if (!(f.outer > f.inner && f.inner >= 0 && f.height > 0)) throw new Error(tr("Vnější průměr musí být větší než vnitřní."));
   let t = r.makeCylinder(f.outer / 2, f.height) as Shape;
   if (f.inner > 0) t = t.cut(r.makeCylinder(f.inner / 2, f.height));
-  return alignZ(t, dirDefOf(f, ctx)).translate(placeOf(f, ctx, "polohu podstavy"));
+  return alignZ(t, dirDefOf(f, ctx)).translate(placeOf(f, ctx, tr("polohu podstavy")));
 });
 
 // ---------------- pružina, závit, text ----------------
@@ -127,12 +128,12 @@ toolBuilder("spring", (f, ctx) => {
 });
 
 toolBuilder("thread", (f, ctx) => {
-  if (!ctx.body) throw new Error("Závit potřebuje těleso (válcovou plochu nebo díru).");
+  if (!ctx.body) throw new Error(tr("Závit potřebuje těleso (válcovou plochu nebo díru)."));
   if (!f.modeled) return null; // kosmetický závit – jen ve výkrese
   const t = threadByName(f.designation);
-  if (!t) throw new Error(`Neznámý závit „${f.designation}“ – ${THREAD_HINT}.`);
-  if (!(f.length > 0)) throw new Error("Délka závitu musí být kladná.");
-  return alignZ(revolvedZ(threadProfile(t, f.length, f.internal)), dirDefOf(f, ctx)).translate(placeOf(f, ctx, "začátek závitu"));
+  if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.designation, tr(THREAD_HINT)));
+  if (!(f.length > 0)) throw new Error(tr("Délka závitu musí být kladná."));
+  return alignZ(revolvedZ(threadProfile(t, f.length, f.internal)), dirDefOf(f, ctx)).translate(placeOf(f, ctx, tr("začátek závitu")));
 });
 
 const FONT_FAMILY = "MnRoboto";
@@ -152,20 +153,20 @@ async function ensureFont() {
   try {
     await fontLoading;
   } catch {
-    throw new Error("Písmo pro text se nepodařilo načíst – zkontrolujte připojení a zkuste to znovu.");
+    throw new Error(tr("Písmo pro text se nepodařilo načíst – zkontrolujte připojení a zkuste to znovu."));
   }
 }
 
 toolBuilder("text", async (f, ctx) => {
-  if (!f.text.trim()) throw new Error("Zadejte text.");
-  if (!(f.height > 0 && f.depth > 0)) throw new Error("Výška písma a hloubka musí být kladné.");
+  if (!f.text.trim()) throw new Error(tr("Zadejte text."));
+  if (!(f.height > 0 && f.depth > 0)) throw new Error(tr("Výška písma a hloubka musí být kladné."));
   await ensureFont();
   const c = rc(ctx);
   const plane: SketchPlane = f.planeDef ? planeDefToSketchPlane(c, f.planeDef, planeDefLabel(f.planeDef)) : f.plane;
   let pos: Vec2 = f.position;
   if (f.positionRef) {
     // střed textu = kolmý průmět odkazovaného bodu do roviny textu
-    const p = pointOf(c, f.positionRef, "střed textu");
+    const p = pointOf(c, f.positionRef, tr("střed textu"));
     const b = planeBasis(plane);
     const d = V.sub(p, b.origin);
     pos = [V.dot(d, b.x), V.dot(d, b.y)];
@@ -182,11 +183,11 @@ toolBuilder("text", async (f, ctx) => {
 // ---------------- transformace ----------------
 
 registerFeatureBuilder("transform", (f, ctx) => {
-  if (!ctx.body) throw new Error("Není těleso k transformaci.");
-  if (!(f.scale > 0)) throw new Error("Měřítko musí být kladné.");
+  if (!ctx.body) throw new Error(tr("Není těleso k transformaci."));
+  if (!(f.scale > 0)) throw new Error(tr("Měřítko musí být kladné."));
   checkDatumOrder(f, ctx);
   const c = rc(ctx);
-  const center: Vec3 = f.centerRef ? pointOf(c, f.centerRef, "střed transformace") : [0, 0, 0];
+  const center: Vec3 = f.centerRef ? pointOf(c, f.centerRef, tr("střed transformace")) : [0, 0, 0];
   let s: Shape = ctx.body;
   if (Math.abs(f.scale - 1) > 1e-12) s = s.scale(f.scale, center);
   if (f.rotateAngle) {
@@ -194,14 +195,14 @@ registerFeatureBuilder("transform", (f, ctx) => {
     s = s.rotate(f.rotateAngle, ax.origin, ax.dir);
   }
   let t = f.translate;
-  if (f.translateRef) t = V.add(t, V.sub(pointOf(c, f.translateRef.b, "cílový bod posunu"), pointOf(c, f.translateRef.a, "výchozí bod posunu")));
+  if (f.translateRef) t = V.add(t, V.sub(pointOf(c, f.translateRef.b, tr("cílový bod posunu")), pointOf(c, f.translateRef.a, tr("výchozí bod posunu"))));
   if (t.some((v) => v)) s = s.translate(t);
   return s;
 });
 
 /** Osa bez skici (transformace, pomocná osa): osy skici tu nemají smysl. */
 function axisOf(c: ResolveCtx, def: AxisDef) {
-  if (def.kind === "sketchX" || def.kind === "sketchY" || def.kind === "sketchLine") throw new Error("Zvolte osu modelem: hranu, válcovou plochu, dva body, globální osu, pomocnou rovinu, průsečnici rovin nebo pomocnou osu.");
+  if (def.kind === "sketchX" || def.kind === "sketchY" || def.kind === "sketchLine") throw new Error(tr("Zvolte osu modelem: hranu, válcovou plochu, dva body, globální osu, pomocnou rovinu, průsečnici rovin nebo pomocnou osu."));
   return resolveAxis(c, def, null);
 }
 
@@ -213,37 +214,37 @@ export function pushPullDistance(c: ResolveCtx, e: Extent, center: Vec3, n: Vec3
     case "blind":
       return e.d;
     case "toVertex":
-      return V.dot(V.sub(pointOf(c, e.ref, "vrchol / bod"), center), n);
+      return V.dot(V.sub(pointOf(c, e.ref, tr("vrchol / bod")), center), n);
     case "toFace":
     case "offsetFromFace": {
       const pl = planeOfRef(c, e.ref, "plochu");
       const o = V.add(pl.origin, V.mul(pl.normal, e.kind === "toFace" ? (e.offset ?? 0) : e.d));
       const den = V.dot(n, pl.normal);
-      if (Math.abs(den) < 1e-6) throw new Error("Cílová rovina je rovnoběžná se směrem posunu – vyberte plochu, která není kolmá na posouvanou plochu.");
+      if (Math.abs(den) < 1e-6) throw new Error(tr("Cílová rovina je rovnoběžná se směrem posunu – vyberte plochu, která není kolmá na posouvanou plochu."));
       return V.dot(V.sub(o, center), pl.normal) / den;
     }
     default:
-      throw new Error("Pro Vytáhnout/Zatlačit použijte ukončení Na vzdálenost, K vrcholu, K ploše nebo Odsazeně od plochy.");
+      throw new Error(tr("Pro Vytáhnout/Zatlačit použijte ukončení Na vzdálenost, K vrcholu, K ploše nebo Odsazeně od plochy."));
   }
 }
 
 registerFeatureBuilder("pushPull", (f, ctx) => {
   const body = ctx.body;
-  if (!body) throw new Error("Není těleso – nejdřív vytvořte nebo importujte model.");
+  if (!body) throw new Error(tr("Není těleso – nejdřív vytvořte nebo importujte model."));
   checkDatumOrder(f, ctx);
   const e = f.extent;
   if (!e || e.kind === "blind") return pushPull(body, f.faces, e ? e.d : f.distance);
   const c = rc(ctx);
   const faces = [...new Set(f.faces)].filter((i) => body.faces[i]);
-  if (!faces.length) throw new Error("Vyberte rovinné plochy v modelu.");
+  if (!faces.length) throw new Error(tr("Vyberte rovinné plochy v modelu."));
   const jobs = faces.map((i) => {
     const face = body.faces[i];
-    if (face.geomType !== "PLANE") throw new Error("Vytáhnout/zatlačit lze jen rovinné plochy – pro zakřivené použijte Odsadit plochu.");
+    if (face.geomType !== "PLANE") throw new Error(tr("Vytáhnout/zatlačit lze jen rovinné plochy – pro zakřivené použijte Odsadit plochu."));
     const n = V.norm(vt(face.normalAt(face.center)));
     return { index: i, sig: sigOf(body, "face", i), d: pushPullDistance(c, e, vt(face.center), n) };
   });
   const live = jobs.filter((j) => Math.abs(j.d) > 1e-6); // plocha už v cílové rovině → beze změny
-  if (!live.length) throw new Error("Vybrané plochy už leží v cílové rovině – není co posouvat.");
+  if (!live.length) throw new Error(tr("Vybrané plochy už leží v cílové rovině – není co posouvat."));
   // stejná vzdálenost pro všechny plochy → jedna operace; jinak postupně (plochy se po každém kroku znovu najdou otiskem)
   if (live.every((j) => Math.abs(j.d - live[0].d) < 1e-6)) return pushPull(body, live.map((j) => j.index), live[0].d);
   let acc = body;
@@ -255,7 +256,7 @@ registerFeatureBuilder("pushPull", (f, ctx) => {
 
 registerFeatureBuilder("datumAxis", (f, ctx) => {
   checkDatumOrder(f, ctx);
-  if (!(f.length > 0)) throw new Error("Délka zobrazení osy musí být kladná.");
+  if (!(f.length > 0)) throw new Error(tr("Délka zobrazení osy musí být kladná."));
   axisOf(rc(ctx), f.def);
   return null;
 });

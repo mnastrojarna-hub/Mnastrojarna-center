@@ -10,6 +10,7 @@
  * booleovskou operaci s `ctx.body` si modul dělá sám (`mode` v datech: "new" | "add" | "cut" | "intersect").
  * Pro Pole/Zrcadlení lze zaregistrovat nástrojové těleso: `ctx.tools.set(featureId, { tool, mode })`.
  */
+import { tr } from "../i18n";
 import type * as r from "replicad";
 import type { BoolMode, CadDoc, Feature } from "../types";
 
@@ -91,7 +92,7 @@ export type ExtDef = {
 const defs = new Map<string, ExtDef>();
 
 export function registerExt(def: ExtDef) {
-  if (defs.has(def.ext)) throw new Error(`Prvek rozšíření ${def.ext} je už zaregistrovaný.`);
+  if (defs.has(def.ext)) throw new Error(tr("Prvek rozšíření {0} je už zaregistrovaný.", def.ext));
   defs.set(def.ext, def);
   return def;
 }

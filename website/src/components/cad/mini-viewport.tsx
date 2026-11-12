@@ -1,5 +1,6 @@
 "use client";
 
+import { tr } from "@/cad/i18n";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import * as THREE from "three";
@@ -149,7 +150,7 @@ export function MiniViewport({ mesh, color = "#b9c2cc", className, spin = true }
 
   return (
     <div ref={host} className={cn(className ?? "h-full w-full", !glOk && "grid place-items-center")}>
-      {!glOk && <span className="px-2 text-center text-[11px] text-[#6b7785]">Náhled 3D vyžaduje WebGL – vložit lze i tak.</span>}
+      {!glOk && <span className="px-2 text-center text-[11px] text-[#6b7785]">{tr("Náhled 3D vyžaduje WebGL – vložit lze i tak.")}</span>}
     </div>
   );
 }

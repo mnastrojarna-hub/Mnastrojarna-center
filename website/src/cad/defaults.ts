@@ -1,4 +1,5 @@
 /** Výchozí parametry prvků, roviny skic a ukázkové modely. */
+import { tr } from "./i18n";
 import { getExt } from "./ext/registry";
 import type { CadDoc, Feature, FeatureType, SketchPlane, Vec2, Vec3 } from "./types";
 import { uid } from "./types";
@@ -29,7 +30,7 @@ export const FEATURE_LABEL: Record<FeatureType, string> = {
   split: "Rozříznout",
   transform: "Transformace",
   datum: "Rovina",
-  text: "Text",
+  text: tr("Text"),
   thread: "Závit",
   pushPull: "Vytáhnout/Zatlačit",
   deleteFace: "Odstranit plochu",
@@ -114,8 +115,8 @@ export const threadLabel = (name?: string) => threadByName(name)?.name ?? (name 
 
 /** Popisek prvku (včetně prvků rozšíření). */
 export function featureLabel(f: Pick<Feature, "type"> & { ext?: string }): string {
-  if (f.type === "ext") return getExt((f as { ext: string }).ext)?.label ?? (f as { ext: string }).ext;
-  return FEATURE_LABEL[f.type];
+  if (f.type === "ext") return tr(getExt((f as { ext: string }).ext)?.label ?? (f as { ext: string }).ext);
+  return tr(FEATURE_LABEL[f.type]);
 }
 /** Ikona prvku pro strom a formulář. */
 export function featureIcon(f: Pick<Feature, "type"> & { ext?: string }): string {
@@ -129,14 +130,14 @@ export function featureTone(f: Pick<Feature, "type"> & { ext?: string }): string
 /** Nový prvek rozšíření s výchozími daty (extra = např. vybrané plochy). */
 export function newExtFeature(doc: CadDoc, ext: string, extra: Record<string, unknown> = {}): Feature {
   const def = getExt(ext);
-  if (!def) throw new Error(`Neznámý prvek rozšíření „${ext}“.`);
+  if (!def) throw new Error(tr("Neznámý prvek rozšíření „{0}“.", ext));
   const n = doc.features.filter((f) => f.type === "ext" && f.ext === ext).length + 1;
-  return { id: uid(), name: `${def.label} ${n}`, type: "ext", ext, data: def.make(doc, extra) };
+  return { id: uid(), name: `${tr(def.label)} ${n}`, type: "ext", ext, data: def.make(doc, extra) };
 }
 
 export function nextName(doc: CadDoc, type: FeatureType) {
   const n = doc.features.filter((f) => f.type === type).length + 1;
-  return `${FEATURE_LABEL[type]} ${n}`;
+  return `${tr(FEATURE_LABEL[type])} ${n}`;
 }
 
 export type NewFeatureType = Exclude<FeatureType, "sketch" | "import" | "pattern" | "ext">;
@@ -278,7 +279,7 @@ export const norm = (a: Vec3): Vec3 => {
 };
 
 export function planeLabel(p: SketchPlane) {
-  if (p.kind === "custom") return p.label ?? "Plocha modelu";
+  if (p.kind === "custom") return p.label ?? tr("Plocha modelu");
   return `${p.name}${p.offset ? ` + ${p.offset} mm` : ""}`;
 }
 
@@ -290,7 +291,7 @@ export function exampleFlange(): CadDoc {
   return {
     app: "mnastrojarna-cad",
     version: 2,
-    name: "Příruba DN50",
+    name: tr("Příruba DN50"),
     material: "ocel",
     features: [
       {
@@ -317,7 +318,7 @@ export function exampleShaft(): CadDoc {
   return {
     app: "mnastrojarna-cad",
     version: 2,
-    name: "Hřídel s osazením",
+    name: tr("Hřídel s osazením"),
     material: "ocel",
     features: [
       {
@@ -350,7 +351,7 @@ export function exampleBracket(): CadDoc {
   return {
     app: "mnastrojarna-cad",
     version: 2,
-    name: "Úhelník – konzola",
+    name: tr("Úhelník – konzola"),
     material: "hlinik",
     features: [
       {
@@ -386,9 +387,9 @@ export function exampleHandle(): CadDoc {
     name: "Madlo s patkami",
     material: "nerez",
     variables: [
-      { name: "rozpeti", expr: "120", note: "Rozteč patek" },
+      { name: "rozpeti", expr: "120", note: tr("Rozteč patek") },
       { name: "vyska", expr: "60" },
-      { name: "d", expr: "16", note: "Průměr madla" },
+      { name: "d", expr: "16", note: tr("Průměr madla") },
     ],
     features: [
       {
@@ -420,11 +421,11 @@ export function exampleBolt(): CadDoc {
   return {
     app: "mnastrojarna-cad",
     version: 2,
-    name: "Čep se závitem M20",
+    name: tr("Čep se závitem M20"),
     material: "ocel",
     variables: [
-      { name: "L", expr: "80", note: "Celková délka" },
-      { name: "Lz", expr: "30", note: "Délka závitu" },
+      { name: "L", expr: "80", note: tr("Celková délka") },
+      { name: "Lz", expr: "30", note: tr("Délka závitu") },
     ],
     configs: [
       { id: "k1", name: "Čep 80", values: { L: 80, Lz: 30 }, suppressed: [] },
@@ -456,7 +457,7 @@ export function exampleFunnel(): CadDoc {
   return {
     app: "mnastrojarna-cad",
     version: 2,
-    name: "Přechodový kus (šablonování)",
+    name: tr("Přechodový kus (šablonování)"),
     material: "nerez",
     features: [
       { id: a, name: "Čtverec 200", type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [{ id: uid(), type: "rect", cx: 0, cy: 0, w: 200, h: 200, r: 20, angle: 0 }] },
@@ -472,10 +473,10 @@ export function exampleFunnel(): CadDoc {
 }
 
 export const EXAMPLES = [
-  { id: "flange", label: "Příruba DN50", make: exampleFlange },
-  { id: "shaft", label: "Hřídel s osazením", make: exampleShaft },
-  { id: "bracket", label: "Úhelník – konzola", make: exampleBracket },
-  { id: "handle", label: "Madlo s patkami (tažení)", make: exampleHandle },
-  { id: "bolt", label: "Čep M20 (závit, stavy, rovnice)", make: exampleBolt },
-  { id: "funnel", label: "Přechodový kus (šablonování)", make: exampleFunnel },
+  { id: "flange", label: tr("Příruba DN50"), make: exampleFlange },
+  { id: "shaft", label: tr("Hřídel s osazením"), make: exampleShaft },
+  { id: "bracket", label: tr("Úhelník – konzola"), make: exampleBracket },
+  { id: "handle", label: tr("Madlo s patkami (tažení)"), make: exampleHandle },
+  { id: "bolt", label: tr("Čep M20 (závit, stavy, rovnice)"), make: exampleBolt },
+  { id: "funnel", label: tr("Přechodový kus (šablonování)"), make: exampleFunnel },
 ];

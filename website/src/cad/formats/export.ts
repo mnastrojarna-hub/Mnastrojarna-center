@@ -1,16 +1,17 @@
 /** Export tělesa do 3D formátů (běží ve workeru nebo v Node; předpokládá setOC). */
+import { tr } from "../i18n";
 import * as r from "replicad";
 import type { ExportFormat } from "../types";
 import { write3MF, writeBinarySTL, writeGLB, writeOBJ, writeWRL, type NormalMesh } from "./mesh-io";
 
 export const EXPORT_FORMATS: { id: ExportFormat; ext: string; mime: string; label: string; hint: string }[] = [
-  { id: "step", ext: "step", mime: "application/step", label: "STEP AP214 (.step)", hint: "CAD/CAM – SolidWorks, Inventor, ZW3D, CATIA, Fusion" },
-  { id: "brep", ext: "brep", mime: "application/octet-stream", label: "BREP OpenCascade (.brep)", hint: "Přesná geometrie pro FreeCAD/OCCT" },
-  { id: "stl", ext: "stl", mime: "model/stl", label: "STL binární (.stl)", hint: "3D tisk, CAM" },
-  { id: "3mf", ext: "3mf", mime: "model/3mf", label: "3MF (.3mf)", hint: "3D tisk – PrusaSlicer, Cura, Bambu" },
-  { id: "obj", ext: "obj", mime: "model/obj", label: "OBJ (.obj)", hint: "Vizualizace, Blender" },
-  { id: "glb", ext: "glb", mime: "model/gltf-binary", label: "glTF binární (.glb)", hint: "Web, AR, prezentace (metry, Y nahoru)" },
-  { id: "wrl", ext: "wrl", mime: "model/vrml", label: "VRML 2.0 (.wrl)", hint: "Starší prohlížeče a CAE" },
+  { id: "step", ext: "step", mime: "application/step", label: tr("STEP AP214 (.step)"), hint: tr("CAD/CAM – SolidWorks, Inventor, ZW3D, CATIA, Fusion") },
+  { id: "brep", ext: "brep", mime: "application/octet-stream", label: tr("BREP OpenCascade (.brep)"), hint: tr("Přesná geometrie pro FreeCAD/OCCT") },
+  { id: "stl", ext: "stl", mime: "model/stl", label: tr("STL binární (.stl)"), hint: tr("3D tisk, CAM") },
+  { id: "3mf", ext: "3mf", mime: "model/3mf", label: tr("3MF (.3mf)"), hint: tr("3D tisk – PrusaSlicer, Cura, Bambu") },
+  { id: "obj", ext: "obj", mime: "model/obj", label: tr("OBJ (.obj)"), hint: tr("Vizualizace, Blender") },
+  { id: "glb", ext: "glb", mime: "model/gltf-binary", label: tr("glTF binární (.glb)"), hint: tr("Web, AR, prezentace (metry, Y nahoru)") },
+  { id: "wrl", ext: "wrl", mime: "model/vrml", label: tr("VRML 2.0 (.wrl)"), hint: tr("Starší prohlížeče a CAE") },
 ];
 
 function bboxDiag(s: r.Shape3D) {
@@ -50,6 +51,6 @@ export async function exportShape(shape: r.Shape3D, format: ExportFormat, name: 
     case "wrl":
       return toBuf(enc.encode(writeWRL(meshOf(shape), name)));
     default:
-      throw new Error(`Neznámý formát exportu: ${String(format)}`);
+      throw new Error(tr("Neznámý formát exportu: {0}", String(format)));
   }
 }

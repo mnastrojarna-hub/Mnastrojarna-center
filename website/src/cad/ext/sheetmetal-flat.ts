@@ -6,6 +6,7 @@
  * o délce BA + L (BA = π/180 · úhel · (R + K·t)), ohyb podle čáry jen přidá čáry ohybu. Panely (rovinné části plechu)
  * si pamatují svůj 3D rámec, aby šlo hranu vybranou v modelu najít a zobrazit ve 2D rozvinu.
  */
+import { cadLocale, tr } from "../i18n";
 import { cross, norm, planeBasis, toWorld } from "../defaults";
 import { arcPoints, circleFrom3, findLoops, pointInPolygon, type Loop, type Seg } from "../sketch";
 import type { CadDoc, Feature, SketchEntity, SketchPlane, Vec2, Vec3 } from "../types";
@@ -128,7 +129,7 @@ const mapSeg = (s: Seg, f: (p: Vec2) => Vec2): Seg => (s.kind === "line" ? { kin
 /** Skica → vnější obrys + díry (největší smyčka = obrys). */
 export function sketchLoops(entities: SketchEntity[]): { outer: Seg[]; holes: Seg[][] } {
   const { loops } = findLoops(entities.filter((e) => !e.construction));
-  if (!loops.length) throw new Error("Skica plechu neobsahuje uzavřený profil.");
+  if (!loops.length) throw new Error(tr("Skica plechu neobsahuje uzavřený profil."));
   const ranked = loops.map((l) => ({ l, area: Math.abs(polygonArea(segsPolygon(loopSegs(l)))) })).sort((a, b) => b.area - a.area);
   return { outer: loopSegs(ranked[0].l), holes: ranked.slice(1).map((x) => loopSegs(x.l)) };
 }
@@ -138,7 +139,7 @@ function lineEntity(entities: SketchEntity[]): [Vec2, Vec2] {
     if (e.type === "line") return [e.a, e.b];
     if (e.type === "polyline" && e.points.length >= 2) return [e.points[0], e.points[1]];
   }
-  throw new Error("Skica ohybu musí obsahovat úsečku (čáru ohybu).");
+  throw new Error(tr("Skica ohybu musí obsahovat úsečku (čáru ohybu)."));
 }
 
 // ---------------- výpočet rozvinu ----------------
@@ -191,10 +192,10 @@ function outwardOf(outer: Seg[], a: Vec2, b: Vec2): Vec2 {
  */
 export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.features.length): Promise<FlatLayout> {
   const bi = baseFeatureIndex(doc, upTo);
-  if (bi < 0) throw new Error("Nejdřív vytvořte Základní plech (karta Plech).");
+  if (bi < 0) throw new Error(tr("Nejdřív vytvořte Základní plech (karta Plech)."));
   const base = doc.features[bi] as ExtF;
   const sk = doc.features.find((f) => f.id === base.data.sketchId && f.type === "sketch") as Extract<Feature, { type: "sketch" }> | undefined;
-  if (!sk) throw new Error("Základní plech nemá přiřazenou skicu.");
+  if (!sk) throw new Error(tr("Základní plech nemá přiřazenou skicu."));
   const params = sheetParamsAt(doc, bi + 1);
   const t = params.t;
   const { outer, holes } = sketchLoops(sk.entities);
@@ -217,7 +218,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
     if (f.suppressed) continue;
     if (f.type === "sketch" || f.type === "datum") continue;
     if (f.type !== "ext" || !f.ext.startsWith("sheet.")) {
-      ctx.warnings.push(`Prvek „${f.name}“ není plechový – v rozvinu je vynechán.`);
+      ctx.warnings.push(tr("Prvek „{0}“ není plechový – v rozvinu je vynechán.", f.name));
       continue;
     }
     const p = sheetParamsAt(doc, i);
@@ -229,7 +230,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
       case "sheet.flange":
       case "sheet.hem": {
         const edges = (data.edges as number[] | undefined) ?? [];
-        if (!edges.length) throw new Error(`${f.name}: není vybrána hrana.`);
+        if (!edges.length) throw new Error(tr("{0}: není vybrána hrana.", f.name));
         const hem = f.ext === "sheet.hem";
         const angle = hem ? 180 : num(data.angle, 90);
         const length = num(data.length, hem ? 10 : 20);
@@ -237,16 +238,16 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
         const ba = bendAllowance(angle, R, t, p.k);
         for (const ei of edges) {
           const eg = await resolve(i, ei);
-          if (!eg) throw new Error(`${f.name}: hranu ohybu se nepodařilo určit – otevřete prvek a vyberte hranu znovu.`);
+          if (!eg) throw new Error(tr("{0}: hranu ohybu se nepodařilo určit – otevřete prvek a vyberte hranu znovu.", f.name));
           const hit = findPanel(ctx, [eg.a, eg.b]);
-          if (!hit) throw new Error(`${f.name}: hrana neleží na rovné ploše plechu.`);
+          if (!hit) throw new Error(tr("{0}: hrana neleží na rovné ploše plechu.", f.name));
           const { panel, onTop } = hit;
           const la = local3(panel.frame, eg.a);
           const lb = local3(panel.frame, eg.b);
           const fa = flatOf(panel.toFlat, [la[0], la[1]]);
           const fb = flatOf(panel.toFlat, [lb[0], lb[1]]);
           const seg = findSegment(ctx.outer, fa, fb, Math.max(ctx.tol * 2, 0.05));
-          if (!seg) throw new Error(`${f.name}: ohyb lze založit jen na celé rovné hraně obrysu plechu (ne na oblouku ani části hrany).`);
+          if (!seg) throw new Error(tr("{0}: ohyb lze založit jen na celé rovné hraně obrysu plechu (ne na oblouku ani části hrany).", f.name));
           const s = ctx.outer[seg.index] as Extract<Seg, { kind: "line" }>;
           // přesné body obrysu
           const A: Vec2 = seg.reversed ? s.b : s.a;
@@ -300,12 +301,12 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
       }
       case "sheet.bend": {
         const bsk = doc.features.find((x) => x.id === data.sketchId && x.type === "sketch") as Extract<Feature, { type: "sketch" }> | undefined;
-        if (!bsk) throw new Error(`${f.name}: vyberte skicu s čárou ohybu.`);
+        if (!bsk) throw new Error(tr("{0}: vyberte skicu s čárou ohybu.", f.name));
         const [q0, q1] = lineEntity(bsk.entities);
         const p0 = toWorld(bsk.plane, q0);
         const p1 = toWorld(bsk.plane, q1);
         const hit = findPanel(ctx, [p0, p1]);
-        if (!hit) throw new Error(`${f.name}: čára ohybu musí ležet na ploše plechu (skica na ploše nebo rovině plechu).`);
+        if (!hit) throw new Error(tr("{0}: čára ohybu musí ležet na ploše plechu (skica na ploše nebo rovině plechu).", f.name));
         const { panel, onTop } = hit;
         const l0 = local3(panel.frame, p0);
         const l1 = local3(panel.frame, p1);
@@ -344,7 +345,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
       case "sheet.cut": {
         const csk = doc.features.find((x) => x.id === data.sketchId && x.type === "sketch") as Extract<Feature, { type: "sketch" }> | undefined;
         if (!csk) {
-          ctx.warnings.push(`${f.name}: bez skici – vynechán.`);
+          ctx.warnings.push(tr("{0}: bez skici – vynechán.", f.name));
           break;
         }
         const { loops } = findLoops(csk.entities.filter((e) => !e.construction));
@@ -353,7 +354,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
           const pts = segsPolygon(segs).slice(0, 3).map((q) => toWorld(csk.plane, q));
           const hit = findPanel(ctx, pts);
           if (!hit) {
-            ctx.warnings.push(`${f.name}: výřez neleží na rovné ploše plechu – v rozvinu vynechán.`);
+            ctx.warnings.push(tr("{0}: výřez neleží na rovné ploše plechu – v rozvinu vynechán.", f.name));
             continue;
           }
           const m = (q: Vec2): Vec2 => {
@@ -362,7 +363,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
           };
           const hole = segs.map((s) => mapSeg(s, m));
           const poly = segsPolygon(ctx.outer);
-          if (!segsPolygon(hole).every((q) => pointInPolygon(q, poly))) ctx.warnings.push(`${f.name}: výřez zasahuje mimo obrys – v rozvinu je zobrazen jako samostatná křivka.`);
+          if (!segsPolygon(hole).every((q) => pointInPolygon(q, poly))) ctx.warnings.push(tr("{0}: výřez zasahuje mimo obrys – v rozvinu je zobrazen jako samostatná křivka.", f.name));
           ctx.holes.push(hole);
         }
         break;
@@ -372,7 +373,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
         if (!pt) break;
         const hit = findPanel(ctx, [pt], true);
         if (!hit) {
-          ctx.warnings.push(`${f.name}: bod úlevy neleží na plechu – vynechán.`);
+          ctx.warnings.push(tr("{0}: bod úlevy neleží na plechu – vynechán.", f.name));
           break;
         }
         const l3 = local3(hit.panel.frame, pt);
@@ -392,10 +393,10 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
         break;
       }
       case "sheet.rib":
-        ctx.warnings.push(`${f.name}: prolis se v rozvinu nezobrazuje (tvářený prvek).`);
+        ctx.warnings.push(tr("{0}: prolis se v rozvinu nezobrazuje (tvářený prvek).", f.name));
         break;
       default:
-        ctx.warnings.push(`${f.name}: neznámý plechový prvek – vynechán.`);
+        ctx.warnings.push(tr("{0}: neznámý plechový prvek – vynechán.", f.name));
     }
   }
   const all = [...segsPolygon(ctx.outer), ...ctx.holes.flatMap(segsPolygon)];
@@ -406,7 +407,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
 // ---------------- DXF / SVG / tabulka ----------------
 
 const fmt = (n: number) => (Math.round(n * 100) / 100).toString();
-const fmtCs = (n: number) => (Math.round(n * 100) / 100).toLocaleString("cs-CZ");
+const fmtCs = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale());
 
 function arcParams(s: Extract<Seg, { kind: "arc" }>): { c: Vec2; r: number; start: number; end: number } | null {
   const circ = circleFrom3(s.a, s.m, s.b);
@@ -449,16 +450,16 @@ export function flatToDxf(l: FlatLayout, name = "Rozvin"): string {
     add(0, "LINE", 8, "OHYBY_ZONA", 10, f(b.a[0]), 20, f(b.a[1]), 30, 0, 11, f(b.b[0]), 21, f(b.b[1]), 31, 0);
     add(0, "LINE", 8, "OHYBY_ZONA", 10, f(b.a2[0]), 20, f(b.a2[1]), 30, 0, 11, f(b.b2[0]), 21, f(b.b2[1]), 31, 0);
     const mid: Vec2 = [(m[0] + m2[0]) / 2, (m[1] + m2[1]) / 2];
-    text(mid[0] + 1, mid[1] + 1, Math.max(1.5, Math.min(3.5, l.t * 1.2)), `${b.n}: ${fmt(b.angle)}° ${b.dir === "up" ? "NAHORU" : "DOLU"} R${fmt(b.radius)}`, "OHYBY");
+    text(mid[0] + 1, mid[1] + 1, Math.max(1.5, Math.min(3.5, l.t * 1.2)), tr("{0}: {1}° {2} R{3}", b.n, fmt(b.angle), b.dir === "up" ? "NAHORU" : "DOLU", fmt(b.radius)), "OHYBY");
   }
   // tabulka ohybů pod rozvinem
   const h = Math.max(2, Math.min(4, l.t * 1.5));
   let y = l.bbox[0][1] - 4 * h;
   const x = l.bbox[0][0];
-  text(x, y, h, `${name} - rozvin, plech t=${fmt(l.t)} mm`);
+  text(x, y, h, tr("{0} - rozvin, plech t={1} mm", name, fmt(l.t)));
   for (const b of l.bends) {
     y -= 1.6 * h;
-    text(x, y, h, `Ohyb ${b.n}: ${fmt(b.angle)}° ${b.dir === "up" ? "nahoru" : "dolu"}, R${fmt(b.radius)}, BA ${fmt(b.ba)} mm`);
+    text(x, y, h, tr("Ohyb {0}: {1}° {2}, R{3}, BA {4} mm", b.n, fmt(b.angle), b.dir === "up" ? "nahoru" : "dolu", fmt(b.radius), fmt(b.ba)));
   }
   add(0, "ENDSEC", 0, "EOF");
   return o.join("\n") + "\n";
@@ -502,7 +503,7 @@ export function flatToSvg(l: FlatLayout, name = "Rozvin"): string {
   parts.push(`<text x="${M}" y="${ty}" font-size="4" font-weight="700">${esc(name)} – rozvin · t = ${fmtCs(l.t)} mm</text>`);
   for (const b of l.bends) {
     ty += 6;
-    parts.push(`<text x="${M}" y="${ty}" font-size="3.2">Ohyb ${b.n}: ${fmtCs(b.angle)}° ${b.dir === "up" ? "nahoru" : "dolů"}, R ${fmtCs(b.radius)}, BA ${fmtCs(b.ba)} mm</text>`);
+    parts.push(`<text x="${M}" y="${ty}" font-size="3.2">${tr("Ohyb {0}: {1}° {2}, R{3}, BA {4} mm", b.n, fmtCs(b.angle), b.dir === "up" ? tr("nahoru") : tr("dolů"), fmtCs(b.radius), fmtCs(b.ba))}</text>`);
   }
   parts.push("</svg>");
   return parts.join("");
@@ -510,9 +511,9 @@ export function flatToSvg(l: FlatLayout, name = "Rozvin"): string {
 
 export function bendTable(l: FlatLayout): string {
   const [[x0, y0], [x1, y1]] = l.bbox;
-  const lines = [`Rozvin: ${fmtCs(x1 - x0)} × ${fmtCs(y1 - y0)} mm · tloušťka ${fmtCs(l.t)} mm · ${l.bends.length} ohybů`, ""];
-  if (!l.bends.length) lines.push("Žádné ohyby – díl je rovný plech.");
-  for (const b of l.bends) lines.push(`Ohyb ${b.n}: úhel ${fmtCs(b.angle)}°, ${b.dir === "up" ? "nahoru" : "dolů"}, vnitřní R ${fmtCs(b.radius)} mm, délka osy ${fmtCs(d2(b.a, b.b))} mm, BA ${fmtCs(b.ba)} mm`);
+  const lines = [tr("Rozvin: {0} × {1} mm · tloušťka {2} mm · {3} ohybů", fmtCs(x1 - x0), fmtCs(y1 - y0), fmtCs(l.t), l.bends.length), ""];
+  if (!l.bends.length) lines.push(tr("Žádné ohyby – díl je rovný plech."));
+  for (const b of l.bends) lines.push(tr("Ohyb {0}: úhel {1}°, {2}, vnitřní R {3} mm, délka osy {4} mm, BA {5} mm", b.n, fmtCs(b.angle), b.dir === "up" ? tr("nahoru") : tr("dolů"), fmtCs(b.radius), fmtCs(d2(b.a, b.b)), fmtCs(b.ba)));
   if (l.warnings.length) lines.push("", ...l.warnings.map((w) => "⚠ " + w));
   return lines.join("\n");
 }

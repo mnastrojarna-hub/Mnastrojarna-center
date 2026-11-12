@@ -12,6 +12,7 @@
  *
  * Stavitel vrací nové těleso; nástroj ukládá do `ctx.tools`, aby pole a zrcadlení dál fungovaly.
  */
+import { tr } from "../i18n";
 import * as r from "replicad";
 import { applyMode, combine, needSketch, planeOf, profileSketch, sketchPathWire, sketchWires } from "../build";
 import { pointOf, resolveDirection, V, type ResolveCtx } from "../ref-resolve";
@@ -47,38 +48,38 @@ export function profileWires(sk: SketchF, thin?: Thin): PWire[] {
     out.push({ wire: face.outerWire(), depth: 0, area });
     for (const w of inner) out.push({ wire: w, depth: 1, area: 0 });
   }
-  if (!out.length) throw new Error(`Skica „${sk.name}“ neobsahuje profil pro tenkou stěnu.`);
+  if (!out.length) throw new Error(tr("Skica „{0}“ neobsahuje profil pro tenkou stěnu.", sk.name));
   return out;
 }
 
 /** Kruhový profil bez skici: kružnice (nebo mezikruží u tenké stěny) se středem `center` kolmo na `normal`. */
 export function circleProfile(radius: number, center: Vec3, normal: Vec3, thin?: Thin): PWire[] {
-  if (!(radius > 0)) throw new Error("Poloměr kruhového profilu musí být kladný.");
+  if (!(radius > 0)) throw new Error(tr("Poloměr kruhového profilu musí být kladný."));
   const circ = (rad: number, depth: number): PWire => ({ wire: r.assembleWire([r.makeCircle(rad, center, normal)]), depth, area: Math.PI * rad * rad });
   if (!thin) return [circ(radius, 0)];
   const t1 = Math.abs(thin.t1);
   const t2 = Math.abs(thin.t2 ?? thin.t1);
-  if (!(t1 > 0)) throw new Error("Tloušťka tenké stěny musí být kladná.");
+  if (!(t1 > 0)) throw new Error(tr("Tloušťka tenké stěny musí být kladná."));
   const [ro, ri] = thin.side === "one" ? [radius + t1, radius] : thin.side === "in" ? [radius, radius - t1] : thin.side === "mid" ? [radius + t1 / 2, radius - t1 / 2] : [radius + t1, radius - t2];
-  if (!(ri > 1e-6)) throw new Error("Tloušťka tenké stěny je větší než poloměr kruhového profilu.");
+  if (!(ri > 1e-6)) throw new Error(tr("Tloušťka tenké stěny je větší než poloměr kruhového profilu."));
   return [circ(ro, 0), circ(ri, 1)];
 }
 
 /** Největší vnější obrys a otvory (seřazené podle plochy) jedné sady drátů. */
 function outerAndHoles(ws: PWire[], what: string): { outer: r.Wire; holes: r.Wire[] } {
   const outer = ws.filter((w) => w.depth === 0).sort((a, b) => b.area - a.area)[0]?.wire;
-  if (!outer) throw new Error(`${what} musí mít uzavřený vnější profil.`);
+  if (!outer) throw new Error(tr("{0} musí mít uzavřený vnější profil.", what));
   return { outer, holes: ws.filter((w) => w.depth === 1).sort((a, b) => b.area - a.area).map((w) => w.wire) };
 }
 
 function asWire(s: r.AnyShape | unknown): r.Wire {
   if (s instanceof r.Wire) return s;
-  throw new Error("Transformace profilu se nezdařila.");
+  throw new Error(tr("Transformace profilu se nezdařila."));
 }
 
 function ensureSolid(s: Shape, what: string): Shape {
   const v = r.measureVolume(s);
-  if (!(v > 1e-9)) throw new Error(`${what} nevytvořilo objemové těleso – zkontrolujte, že profil je uzavřený, leží kolmo na začátek dráhy a dráha se neprotíná.`);
+  if (!(v > 1e-9)) throw new Error(tr("{0} nevytvořilo objemové těleso – zkontrolujte, že profil je uzavřený, leží kolmo na začátek dráhy a dráha se neprotíná.", what));
   return s;
 }
 
@@ -94,7 +95,7 @@ export function sampleCurve(w: r.Wire, n: number): { p: Vec3; t: Vec3; s: number
     if (i) cum.push(cum[i - 1] + V.len(V.sub(pts[i], pts[i - 1])));
   }
   const L = cum[M];
-  if (!(L > 1e-9)) throw new Error("Dráha má nulovou délku.");
+  if (!(L > 1e-9)) throw new Error(tr("Dráha má nulovou délku."));
   const out: { p: Vec3; t: Vec3; s: number }[] = [];
   for (let k = 0; k < n; k++) {
     const target = (L * k) / (n - 1);
@@ -185,21 +186,21 @@ export function thruSections(wires: r.Wire[], o: { ruled: boolean; solid?: boole
     b.Build();
     s = r.cast(b.Shape());
   } catch {
-    throw new Error("Šablonování se nepodařilo – profily se nejspíš kříží nebo mají neslučitelný tvar.");
+    throw new Error(tr("Šablonování se nepodařilo – profily se nejspíš kříží nebo mají neslučitelný tvar."));
   } finally {
     b.delete();
   }
-  if (!r.isShape3D(s)) throw new Error("Šablonování nevytvořilo těleso – zkontrolujte profily.");
+  if (!r.isShape3D(s)) throw new Error(tr("Šablonování nevytvořilo těleso – zkontrolujte profily."));
   return s;
 }
 
 /** Uzavřený plášť → těleso (ShapeFix_Solid). */
 function shellToSolid(shell: Shape, what: string): Shape {
   const sh = shell instanceof r.Shell ? shell : (shell as unknown as { shells?: r.Shell[] }).shells?.[0];
-  if (!sh) throw new Error(`${what}: jádro nevrátilo plášť.`);
+  if (!sh) throw new Error(tr("{0}: jádro nevrátilo plášť.", what));
   const solid = r.makeSolid([sh]);
   const v = r.measureVolume(solid);
-  if (!(Math.abs(v) > 1e-9)) throw new Error(`${what}: plášť se nepodařilo uzavřít do tělesa.`);
+  if (!(Math.abs(v) > 1e-9)) throw new Error(tr("{0}: plášť se nepodařilo uzavřít do tělesa.", what));
   return solid;
 }
 
@@ -222,10 +223,10 @@ export function pipeShell(spine: r.Wire, sections: r.Wire[], o: { guide?: r.Wire
     if (o.guide) b.SetMode(o.guide.wrapped, false, oc.BRepFill_TypeOfContact.BRepFill_NoContact);
     for (const w of sections) b.Add(w.wrapped, false, !!o.correction);
     b.Build();
-    if (!b.IsDone()) throw new Error("Tažení podél křivky se nepodařilo – zkontrolujte, že řezy leží na dráze a dráha je hladká.");
+    if (!b.IsDone()) throw new Error(tr("Tažení podél křivky se nepodařilo – zkontrolujte, že řezy leží na dráze a dráha je hladká."));
     b.MakeSolid();
     const s = r.cast(b.Shape());
-    if (!r.isShape3D(s)) throw new Error("Tažení podél křivky nevytvořilo těleso.");
+    if (!r.isShape3D(s)) throw new Error(tr("Tažení podél křivky nevytvořilo těleso."));
     return s;
   } finally {
     gc.forEach((x) => x.delete());
@@ -236,18 +237,18 @@ export function pipeShell(spine: r.Wire, sections: r.Wire[], o: { guide?: r.Wire
 
 /** Nástrojové těleso tažení. */
 export function sweepTool(f: SweepF, ctx: FeatCtx): Shape {
-  const path = needSketch(ctx, f.pathId, "skica dráhy");
+  const path = needSketch(ctx, f.pathId, tr("skica dráhy"));
   const spine = sketchPathWire(path);
   const useCircle = f.circleRadius != null;
-  if (useCircle && !(f.circleRadius! > 0)) throw new Error("Poloměr kruhového profilu musí být kladný.");
-  if (!useCircle && !f.profileId) throw new Error("Chybí skica profilu – vyberte ji v parametrech (nebo zvolte kruhový profil bez skici).");
-  const prof = useCircle ? null : needSketch(ctx, f.profileId, "skica profilu");
-  if (prof && prof.id === path.id) throw new Error("Profil a dráha musí být dvě různé skici.");
-  const guideSk = f.guideId ? needSketch(ctx, f.guideId, "skica vodicí křivky") : null;
-  if (guideSk && guideSk.id === path.id) throw new Error("Vodicí křivka musí být jiná skica než dráha.");
+  if (useCircle && !(f.circleRadius! > 0)) throw new Error(tr("Poloměr kruhového profilu musí být kladný."));
+  if (!useCircle && !f.profileId) throw new Error(tr("Chybí skica profilu – vyberte ji v parametrech (nebo zvolte kruhový profil bez skici)."));
+  const prof = useCircle ? null : needSketch(ctx, f.profileId, tr("skica profilu"));
+  if (prof && prof.id === path.id) throw new Error(tr("Profil a dráha musí být dvě různé skici."));
+  const guideSk = f.guideId ? needSketch(ctx, f.guideId, tr("skica vodicí křivky")) : null;
+  if (guideSk && guideSk.id === path.id) throw new Error(tr("Vodicí křivka musí být jiná skica než dráha."));
   const guide = guideSk ? sketchPathWire(guideSk) : undefined;
   const scaleEnd = f.scaleEnd ?? 1;
-  if (!(scaleEnd > 0)) throw new Error("Měřítko profilu na konci musí být kladné.");
+  if (!(scaleEnd > 0)) throw new Error(tr("Měřítko profilu na konci musí být kladné."));
   const twist = (f.twist ?? 0) + (f.twistTurns ?? 0) * 360;
 
   const start = sampleCurve(spine, 2)[0];
@@ -260,16 +261,16 @@ export function sweepTool(f: SweepF, ctx: FeatCtx): Shape {
     const n = Math.max(2, Math.min(64, 2 + Math.ceil(turning(spine) / 10) + Math.ceil(Math.abs(twist) / 15)));
     const frames = pathFrames(spine, n, { xHint, guide, fixed: !!f.keepNormal });
     const loftOf = (w: r.Wire) => thruSections(frames.map((fr) => wireToFrame(w, frames[0], fr, twist * fr.s, 1 + (scaleEnd - 1) * fr.s)), { ruled: false, compat: false });
-    return ensureSolid(combine(wires.map(({ wire, depth }) => ({ solid: loftOf(wire), depth }))), "Tažení s kroucením / měřítkem");
+    return ensureSolid(combine(wires.map(({ wire, depth }) => ({ solid: loftOf(wire), depth }))), tr("Tažení s kroucením / měřítkem"));
   }
   // 2) pevná orientace profilu → pevný rámec (všechny řezy rovnoběžné)
   if (f.keepNormal) {
     const fixed = { p: start.p, t: start.t, n: xHint && perpTo(xHint, start.t) ? perpTo(xHint, start.t)! : V.perp(start.t) };
-    return ensureSolid(combine(wires.map(({ wire, depth }) => ({ solid: pipeShell(spine, [wire], { fixed, guide, transition }), depth }))), "Tažení s pevnou orientací profilu");
+    return ensureSolid(combine(wires.map(({ wire, depth }) => ({ solid: pipeShell(spine, [wire], { fixed, guide, transition }), depth }))), tr("Tažení s pevnou orientací profilu"));
   }
   // 3) běžné tažení (Frenet / korigovaný Frenet, vodicí křivka, přechod v rozích)
   const cfg: r.GenericSweepConfig = { frenet: f.frenet, transitionMode: transition, auxiliarySpine: guide };
-  return ensureSolid(combine(wires.map(({ wire, depth }) => ({ solid: r.genericSweep(wire, spine, cfg) as Shape, depth }))), "Tažení");
+  return ensureSolid(combine(wires.map(({ wire, depth }) => ({ solid: r.genericSweep(wire, spine, cfg) as Shape, depth }))), tr("Tažení"));
 }
 
 // ---------------- šablonování ----------------
@@ -294,14 +295,14 @@ function condShift(rc: ResolveCtx, sk: SketchF, section: r.Wire, toward: Vec3, c
 export function loftTool(f: LoftF, ctx: FeatCtx): Shape {
   const rc = rctx(ctx);
   const sks = f.sketchIds.map((id, k) => needSketch(ctx, id, `skica ${k + 1}`));
-  const start = f.startPoint ? pointOf(rc, f.startPoint, "počáteční bod šablonování") : undefined;
-  const end = f.endPoint ? pointOf(rc, f.endPoint, "koncový bod šablonování") : undefined;
-  if (!sks.length || sks.length + (start ? 1 : 0) + (end ? 1 : 0) < 2) throw new Error("Šablonování potřebuje alespoň dvě skici (profily), nebo jednu skicu a bod.");
-  if (new Set(sks.map((s) => s.id)).size !== sks.length) throw new Error("Každý profil šablonování musí být jiná skica.");
-  if (f.closed && (start || end)) throw new Error("Uzavřené šablonování nelze kombinovat s bodem na začátku / konci.");
-  if (f.closed && sks.length < 3) throw new Error("Uzavřené šablonování potřebuje alespoň tři profily.");
+  const start = f.startPoint ? pointOf(rc, f.startPoint, tr("počáteční bod šablonování")) : undefined;
+  const end = f.endPoint ? pointOf(rc, f.endPoint, tr("koncový bod šablonování")) : undefined;
+  if (!sks.length || sks.length + (start ? 1 : 0) + (end ? 1 : 0) < 2) throw new Error(tr("Šablonování potřebuje alespoň dvě skici (profily), nebo jednu skicu a bod."));
+  if (new Set(sks.map((s) => s.id)).size !== sks.length) throw new Error(tr("Každý profil šablonování musí být jiná skica."));
+  if (f.closed && (start || end)) throw new Error(tr("Uzavřené šablonování nelze kombinovat s bodem na začátku / konci."));
+  if (f.closed && sks.length < 3) throw new Error(tr("Uzavřené šablonování potřebuje alespoň tři profily."));
 
-  const sets = sks.map((sk, k) => outerAndHoles(profileWires(sk, f.thin), `Skica ${k + 1} („${sk.name}“)`));
+  const sets = sks.map((sk, k) => outerAndHoles(profileWires(sk, f.thin), tr("Skica {0} („{1}“)", k + 1, sk.name)));
   let outer = sets.map((s) => s.outer);
   const nHoles = sets[0].holes.length;
   const sameHoles = nHoles > 0 && sets.every((s) => s.holes.length === nHoles);
@@ -325,23 +326,23 @@ export function loftTool(f: LoftF, ctx: FeatCtx): Shape {
   const cut = (s: Shape, tools: Shape[]) => tools.reduce((acc, t) => acc.cut(t), s);
   // osová / vodicí křivka → trubkový plášť s více řezy
   if (f.centerlineId || f.guideIds?.length) {
-    if (f.closed) throw new Error("Uzavřené šablonování nelze kombinovat s osovou / vodicí křivkou.");
-    if (start || end) throw new Error("Šablonování do bodu nelze kombinovat s osovou / vodicí křivkou.");
-    const center = f.centerlineId ? needSketch(ctx, f.centerlineId, "skica osové křivky") : null;
-    const guides = (f.guideIds ?? []).filter(Boolean).map((id) => needSketch(ctx, id, "skica vodicí křivky"));
-    if ([center, ...guides].some((g) => g && sks.some((s) => s.id === g.id))) throw new Error("Osová / vodicí křivka musí být jiná skica než profily.");
+    if (f.closed) throw new Error(tr("Uzavřené šablonování nelze kombinovat s osovou / vodicí křivkou."));
+    if (start || end) throw new Error(tr("Šablonování do bodu nelze kombinovat s osovou / vodicí křivkou."));
+    const center = f.centerlineId ? needSketch(ctx, f.centerlineId, tr("skica osové křivky")) : null;
+    const guides = (f.guideIds ?? []).filter(Boolean).map((id) => needSketch(ctx, id, tr("skica vodicí křivky")));
+    if ([center, ...guides].some((g) => g && sks.some((s) => s.id === g.id))) throw new Error(tr("Osová / vodicí křivka musí být jiná skica než profily."));
     const spine = center ? sketchPathWire(center) : r.assembleWire(outer.slice(1).map((w, i) => r.makeLine(bboxCenter(outer[i]), bboxCenter(w))));
     const guide = guides.length ? sketchPathWire(guides[0]) : undefined;
     const body = pipeShell(spine, outer, { guide });
-    return ensureSolid(cut(body, holes.map((h) => pipeShell(spine, h, { guide }))), "Šablonování podél křivky");
+    return ensureSolid(cut(body, holes.map((h) => pipeShell(spine, h, { guide }))), tr("Šablonování podél křivky"));
   }
   if (f.closed) {
-    const ring = (ws: r.Wire[]) => shellToSolid(thruSections([...ws, ws[0]], { ruled: f.ruled, solid: false }), "Uzavřené šablonování");
-    return ensureSolid(cut(ring(outer), holes.map(ring)), "Uzavřené šablonování");
+    const ring = (ws: r.Wire[]) => shellToSolid(thruSections([...ws, ws[0]], { ruled: f.ruled, solid: false }), tr("Uzavřené šablonování"));
+    return ensureSolid(cut(ring(outer), holes.map(ring)), tr("Uzavřené šablonování"));
   }
   const body = thruSections(outer, { ruled: f.ruled, start, end });
   const holeSolids = holes.length && outer.length >= 2 ? holes.map((h) => thruSections(h, { ruled: f.ruled })) : [];
-  return ensureSolid(cut(body, holeSolids), "Šablonování");
+  return ensureSolid(cut(body, holeSolids), tr("Šablonování"));
 }
 
 // ---------------- registrace ----------------

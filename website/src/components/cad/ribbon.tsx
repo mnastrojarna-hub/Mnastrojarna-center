@@ -1,5 +1,6 @@
 "use client";
 
+import { tr } from "@/cad/i18n";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
@@ -212,7 +213,7 @@ function Floating({ anchor, close, children }: { anchor: HTMLElement; close: () 
           <div className="mx-auto mb-1 mt-2 h-1 w-10 rounded-full bg-[#cfd6de]" />
           <div className="py-1 [&_button]:min-h-[44px] [&_button]:text-[14px]">{children}</div>
           <button type="button" onClick={close} className="mx-3 mt-1 h-11 w-[calc(100%-24px)] rounded-lg bg-[#eef2f6] text-[14px] font-medium text-[#26303b]">
-            Zavřít
+            {tr("Zavřít")}
           </button>
         </div>
       </>,
@@ -286,7 +287,7 @@ export function HudBar({ x, y, entries, onMore, onClose, max = 4 }: { x: number;
       ref={ref}
       data-cad-menu
       role="toolbar"
-      aria-label="Rychlé příkazy pro výběr"
+      aria-label={tr("Rychlé příkazy pro výběr")}
       className="fixed z-[58] flex items-center gap-0.5 rounded-lg border border-[#cfd6de] bg-white/95 p-1 shadow-[0_8px_24px_-8px_rgba(15,23,42,.35)] backdrop-blur"
       style={pos}
       onPointerDown={(e) => e.stopPropagation()}
@@ -306,7 +307,7 @@ export function HudBar({ x, y, entries, onMore, onClose, max = 4 }: { x: number;
           <span className="hidden sm:inline">{it.label}</span>
         </button>
       ))}
-      <button type="button" title="Další příkazy (pravé tlačítko)" onClick={onMore} className="h-8 rounded-md px-2 text-[14px] leading-none text-[#6b7785] hover:bg-[#e3e9f0]">
+      <button type="button" title={tr("Další příkazy (pravé tlačítko)")} onClick={onMore} className="h-8 rounded-md px-2 text-[14px] leading-none text-[#6b7785] hover:bg-[#e3e9f0]">
         ⋯
       </button>
     </div>

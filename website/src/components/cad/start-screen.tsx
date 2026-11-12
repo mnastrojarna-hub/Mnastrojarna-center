@@ -1,5 +1,6 @@
 "use client";
 
+import { cadLocale, langMeta, tr } from "@/cad/i18n";
 import { useEffect, useState } from "react";
 import { loadRecent, removeRecent, type RecentDoc } from "@/cad/settings";
 import { isUnlocked, notifyVault, persistMode, unlock, VAULT_EVENT } from "@/cad/vault";
@@ -49,32 +50,32 @@ export function StartScreen({
       setPass("");
       setPassErr(null);
       notifyVault();
-    } else setPassErr("Nesprávné heslo.");
+    } else setPassErr(tr("Nesprávné heslo."));
   };
   return (
     <div className="fixed inset-0 z-[65] flex flex-col bg-[#eef1f5] text-[#1f2933]">
       <header className="flex h-12 shrink-0 items-center gap-3 bg-gradient-to-b from-[#262b31] to-[#1c2025] px-5 text-white">
         <LogoMark className="h-7 w-7" />
         <span className="font-display text-[15px] font-bold uppercase tracking-tight">
-          Mnástrojárna <span className="text-brand">CAD</span>
+          {tr("Mnástrojárna")}{" "}<span className="text-brand">CAD</span>
         </span>
-        <span className="hidden text-[12px] text-white/50 sm:inline">· parametrický 3D/2D CAD · díly · sestavy · výkresy · formy</span>
+        <span className="hidden text-[12px] text-white/50 sm:inline">{tr("· parametrický 3D/2D CAD · díly · sestavy · výkresy · formy")}</span>
         <span className="flex-1" />
-        <a href={CAD_LINKS.docs} target="_blank" rel="noopener" title="Dokumentace a návod k obsluze (otevře se v nové záložce)" className="hidden items-center gap-1.5 rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10 sm:inline-flex">
+        <a href={langMeta().docs} target="_blank" rel="noopener" title={tr("Dokumentace a návod k obsluze (otevře se v nové záložce)")} className="hidden items-center gap-1.5 rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10 sm:inline-flex">
           <CadIcon name="info" className="h-4 w-4" />
-          Návod a dokumentace
+          {tr("Návod a dokumentace")}
         </a>
-        <a href={CAD_LINKS.pdf} download title="Příručka PDF ke stažení" className="hidden items-center gap-1.5 rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10 md:inline-flex">
+        <a href={CAD_LINKS.pdf} download title={tr("Příručka PDF ke stažení")} className="hidden items-center gap-1.5 rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10 md:inline-flex">
           <CadIcon name="drawing" className="h-4 w-4" />
-          Příručka PDF
+          {tr("Příručka PDF")}
         </a>
         <button type="button" onClick={onClose} className="rounded border border-white/20 px-3 py-1 text-[12px] hover:bg-white/10">
-          Pokračovat v práci <Kbd k="Esc" />
+          {tr("Pokračovat v práci")}{" "}<Kbd k={tr("Esc")} />
         </button>
       </header>
       <div className="mx-auto grid w-full max-w-6xl flex-1 gap-8 overflow-y-auto p-6 lg:grid-cols-[1fr_380px] lg:p-10">
         <section>
-          <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Začít</h2>
+          <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">{tr("Začít")}</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             {actions.map((a) => (
               <button
@@ -111,7 +112,7 @@ export function StartScreen({
             </div>
           )}
 
-          <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Ukázkové modely</h2>
+          <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">{tr("Ukázkové modely")}</h2>
           <div className="flex flex-wrap gap-2">
             {examples.map((e) => (
               <button key={e.id} type="button" onClick={e.run} className="rounded-full border border-[#d5dbe2] bg-white px-3.5 py-1.5 text-[12.5px] hover:border-brand hover:text-brand">
@@ -120,48 +121,48 @@ export function StartScreen({
             ))}
           </div>
 
-          <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Nápověda a tipy</h2>
+          <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">{tr("Nápověda a tipy")}</h2>
           <ul className="grid gap-2 text-[12.5px] text-[#3c4856] sm:grid-cols-2">
             <li className="rounded-md border border-brand/30 bg-[#fff7f6] p-3 sm:col-span-2">
-              <strong className="text-[#1f2933]">Nevíte si rady?</strong>{" "}
-              <a href={CAD_LINKS.docs} target="_blank" rel="noopener" className="font-medium text-brand underline-offset-2 hover:underline">
-                Dokumentace a návod k obsluze
+              <strong className="text-[#1f2933]">{tr("Nevíte si rady?")}</strong>{" "}
+              <a href={langMeta().docs} target="_blank" rel="noopener" className="font-medium text-brand underline-offset-2 hover:underline">
+                {tr("Dokumentace a návod k obsluze")}
               </a>{" "}
-              (24 kapitol, postupy krok za krokem, FAQ) ·{" "}
+              {tr("(24 kapitol, postupy krok za krokem, FAQ) ·")}{" "}
               <a href={CAD_LINKS.pdf} download className="font-medium text-brand underline-offset-2 hover:underline">
-                příručka PDF ke stažení
+                {tr("příručka PDF ke stažení")}
               </a>{" "}
-              · v programu tlačítko <strong>Nápověda</strong> vpravo nahoře.
+              {tr("· v programu tlačítko")}{" "}<strong>{tr("Nápověda")}</strong> {tr("vpravo nahoře.")}
             </li>
             <li className="rounded-md border border-[#e3e8ee] bg-white p-3">
-              <Kbd k="Ctrl+K" /> otevře paletu příkazů – napište „díra“, „výkres“, „zaoblit“…
+              <Kbd k="Ctrl+K" /> {tr("otevře paletu příkazů – napište „díra“, „výkres“, „zaoblit“…")}
             </li>
-            <li className="rounded-md border border-[#e3e8ee] bg-white p-3">Pravé tlačítko na plochu, hranu, bod nebo komponentu otevře nabídku s úpravami pro danou entitu.</li>
-            <li className="rounded-md border border-[#e3e8ee] bg-white p-3">Do každého číselného pole lze psát výrazy (<code>25/2</code>) i vazby na proměnné (<code>=d1*2</code>).</li>
-            <li className="rounded-md border border-[#e3e8ee] bg-white p-3">Výkres z modelu: karta Výkres → Nový výkres. Kusovník se přidá automaticky u sestav.</li>
+            <li className="rounded-md border border-[#e3e8ee] bg-white p-3">{tr("Pravé tlačítko na plochu, hranu, bod nebo komponentu otevře nabídku s úpravami pro danou entitu.")}</li>
+            <li className="rounded-md border border-[#e3e8ee] bg-white p-3">{tr("Do každého číselného pole lze psát výrazy (")}<code>25/2</code>{tr(") i vazby na proměnné (")}<code>=d1*2</code>).</li>
+            <li className="rounded-md border border-[#e3e8ee] bg-white p-3">{tr("Výkres z modelu: karta Výkres → Nový výkres. Kusovník se přidá automaticky u sestav.")}</li>
           </ul>
         </section>
 
         <aside>
-          <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">Nedávné</h2>
+          <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">{tr("Nedávné")}</h2>
           {mode === "none" && (
             <p className="rounded-md border border-dashed border-[#cdd5de] bg-white/60 p-4 text-[12.5px] leading-relaxed text-[#6b7785]">
-              <strong className="text-[#1f2933]">Ochrana dokumentace:</strong> v prohlížeči se nic neukládá – rozpracovaná práce žije jen v této kartě a v souborech, které si uložíte do svého počítače (<code>.mncad</code>, STEP). Po zavření karty nic nezůstane. Šifrované úložiště s heslem lze zapnout v Nastavení → Soubory.
+              <strong className="text-[#1f2933]">{tr("Ochrana dokumentace:")}</strong> {tr("v prohlížeči se nic neukládá – rozpracovaná práce žije jen v této kartě a v souborech, které si uložíte do svého počítače (")}<code>.mncad</code>{tr(", STEP). Po zavření karty nic nezůstane. Šifrované úložiště s heslem lze zapnout v Nastavení → Soubory.")}
             </p>
           )}
           {mode === "encrypted" && !unlocked && (
             <div className="rounded-md border border-[#d5dbe2] bg-white p-4">
-              <p className="text-[12.5px] text-[#3c4856]">Rozpracovaná práce je uložená šifrovaně. Zadejte heslo úložiště:</p>
+              <p className="text-[12.5px] text-[#3c4856]">{tr("Rozpracovaná práce je uložená šifrovaně. Zadejte heslo úložiště:")}</p>
               <div className="mt-2 flex gap-2">
-                <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void tryUnlock()} placeholder="Heslo úložiště" aria-label="Heslo úložiště" className="min-w-0 flex-1 rounded border border-[#cfd6de] px-2 py-1.5 text-[13px] outline-none focus:border-brand" />
+                <input type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void tryUnlock()} placeholder={tr("Heslo úložiště")} aria-label={tr("Heslo úložiště")} className="min-w-0 flex-1 rounded border border-[#cfd6de] px-2 py-1.5 text-[13px] outline-none focus:border-brand" />
                 <button type="button" onClick={() => void tryUnlock()} className="rounded bg-brand px-3 py-1.5 text-[12.5px] font-semibold text-white hover:bg-brand-600">
-                  Odemknout
+                  {tr("Odemknout")}
                 </button>
               </div>
               {passErr && <p className="mt-1 text-[12px] text-brand">{passErr}</p>}
             </div>
           )}
-          {mode === "encrypted" && unlocked && recent.length === 0 && <p className="rounded-md border border-dashed border-[#cdd5de] bg-white/60 p-4 text-[12.5px] text-[#6b7785]">Zatím žádné soubory. Vše, co uložíte nebo otevřete, se objeví tady (šifrovaně, jen pro vás).</p>}
+          {mode === "encrypted" && unlocked && recent.length === 0 && <p className="rounded-md border border-dashed border-[#cdd5de] bg-white/60 p-4 text-[12.5px] text-[#6b7785]">{tr("Zatím žádné soubory. Vše, co uložíte nebo otevřete, se objeví tady (šifrovaně, jen pro vás).")}</p>}
           <ul className="space-y-1.5">
             {recent.map((r) => (
               <li key={r.id} className="group flex items-center gap-3 rounded-md border border-[#e3e8ee] bg-white p-2 hover:border-brand/40">
@@ -173,13 +174,13 @@ export function StartScreen({
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium">{r.name}</span>
                     <span className="block text-[11px] text-[#8a95a3]">
-                      {r.kind === "assembly" ? "Sestava" : "Díl"} · {r.features} {r.kind === "assembly" ? "komp." : "prvků"} · {new Date(r.at).toLocaleString("cs-CZ", { dateStyle: "short", timeStyle: "short" })}
+                      {r.kind === "assembly" ? tr("Sestava") : tr("Díl")} · {r.features} {r.kind === "assembly" ? "komp." : tr("prvků")} · {new Date(r.at).toLocaleString(cadLocale(), { dateStyle: "short", timeStyle: "short" })}
                     </span>
                   </span>
                 </button>
                 <button
                   type="button"
-                  title="Odebrat ze seznamu"
+                  title={tr("Odebrat ze seznamu")}
                   onClick={() => {
                     void removeRecent(r.id).then(loadRecent).then(setRecent);
                   }}
@@ -192,7 +193,7 @@ export function StartScreen({
           </ul>
           <label className={cn("mt-6 flex cursor-pointer items-center gap-2 text-[12px] text-[#6b7785]")}>
             <input type="checkbox" className="accent-[#E03930]" onChange={(e) => e.target.checked && onDisable()} />
-            Nezobrazovat při spuštění (lze zapnout v Nastavení)
+            {tr("Nezobrazovat při spuštění (lze zapnout v Nastavení)")}
           </label>
         </aside>
       </div>

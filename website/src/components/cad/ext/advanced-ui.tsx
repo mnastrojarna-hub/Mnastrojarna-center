@@ -1,4 +1,5 @@
 /** UI pokročilého modelování: ikony, vlastní formulář zrcadlení více prvků, akce „Tloušťka stěn“ (vzorkování sítě). */
+import { cadLocale, tr } from "@/cad/i18n";
 import type { Feature, MeshData } from "@/cad/types";
 import { registerIcon } from "./icons";
 import { registerExtUi, type ExtFormProps } from "./registry";
@@ -36,13 +37,13 @@ function MirrorForm({ f, doc, onChange }: ExtFormProps) {
     <div className="space-y-3">
       <label className={row}>
         <input type="checkbox" className="accent-[#E03930]" checked={all} onChange={(e) => onChange({ all: e.target.checked })} />
-        Všechny dosavadní prvky
+        {tr("Všechny dosavadní prvky")}
       </label>
       {!all && (
         <div>
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Prvky k zrcadlení</p>
+          <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Prvky k zrcadlení")}</p>
           <div className="max-h-44 space-y-1 overflow-y-auto rounded-lg border border-ink-700/10 p-2">
-            {before.length === 0 && <p className="text-[11.5px] text-ink-700/50">Žádné dřívější prvky s tělesem.</p>}
+            {before.length === 0 && <p className="text-[11.5px] text-ink-700/50">{tr("Žádné dřívější prvky s tělesem.")}</p>}
             {before.map((x) => (
               <label key={x.id} className={row}>
                 <input type="checkbox" className="accent-[#E03930]" checked={sel.includes(x.id)} onChange={(e) => onChange({ features: e.target.checked ? [...sel, x.id] : sel.filter((s) => s !== x.id) })} />
@@ -53,7 +54,7 @@ function MirrorForm({ f, doc, onChange }: ExtFormProps) {
         </div>
       )}
       <div>
-        <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Rovina zrcadlení</p>
+        <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Rovina zrcadlení")}</p>
         <div className="flex rounded-lg bg-steel-100 p-0.5">
           {["XY", "XZ", "YZ"].map((p) => (
             <button key={p} type="button" onClick={() => onChange({ plane: p })} className={`flex-1 rounded-md py-1 text-[12.5px] ${plane === p ? "bg-white font-semibold shadow-sm" : "text-ink-700/60"}`}>
@@ -63,7 +64,7 @@ function MirrorForm({ f, doc, onChange }: ExtFormProps) {
         </div>
       </div>
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">Odsazení roviny [mm]</span>
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Odsazení roviny [mm]")}</span>
         <input type="number" step={1} value={offset} onChange={(e) => onChange({ offset: Number(e.target.value) || 0 })} className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-brand" />
       </label>
     </div>
@@ -135,15 +136,15 @@ export function wallThickness(mesh: MeshData, samples = 600): { min: number; at:
 registerExtUi("adv.wallThickness", {
   action: (api) => {
     const mesh = api.result?.mesh;
-    if (!mesh || !mesh.triangles.length) return api.flash("Nejdřív vytvořte těleso.");
+    if (!mesh || !mesh.triangles.length) return api.flash(tr("Nejdřív vytvořte těleso."));
     const t0 = performance.now();
     const res = wallThickness(mesh);
-    const f = (n: number) => (Math.round(n * 100) / 100).toLocaleString("cs-CZ");
+    const f = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale());
     const ms = Math.round(performance.now() - t0);
-    if (!res.count) return api.flash("Tloušťku se nepodařilo změřit (otevřená síť?).");
+    if (!res.count) return api.flash(tr("Tloušťku se nepodařilo změřit (otevřená síť?)."));
     api.notice(
-      "Tloušťka stěn",
-      `Nejtenčí stěna: ${f(res.min)} mm\nu bodu X ${f(res.at[0])} · Y ${f(res.at[1])} · Z ${f(res.at[2])}\n\nPrůměrná tloušťka vzorků: ${f(res.avg)} mm (${res.count} vzorků, ${ms} ms)\n\nMetoda: paprsek dovnitř z těžiště trojúhelníků sítě k protější stěně. U velmi hrubé sítě zvyšte kvalitu sítě v Nastavení → Zobrazení.`,
+      tr("Tloušťka stěn"),
+      tr("Nejtenčí stěna: {0} mm\nu bodu X {1} · Y {2} · Z {3}\n\nPrůměrná tloušťka vzorků: {4} mm ({5} vzorků, {6} ms)\n\nMetoda: paprsek dovnitř z těžiště trojúhelníků sítě k protější stěně. U velmi hrubé sítě zvyšte kvalitu sítě v Nastavení → Zobrazení.", f(res.min), f(res.at[0]), f(res.at[1]), f(res.at[2]), f(res.avg), res.count, ms),
     );
   },
 });

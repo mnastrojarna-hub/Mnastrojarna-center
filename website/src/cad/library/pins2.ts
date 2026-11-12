@@ -1,4 +1,5 @@
 /** Kolíky a pera 2: kuželové a rýhované kolíky, úsečová pera, hřídelové čepy, závlačky. */
+import { tr } from "../i18n";
 import { uid, type Feature } from "../types";
 import { dims, has, length, nums, score } from "./parse-util";
 import type { Family, ParamSchema } from "./types";
@@ -6,7 +7,7 @@ import { box, chamferAll, cyl, fmt, nearest, num, part, str, tube } from "./util
 
 const G = "Kolíky a pera";
 const dEnum = (vals: number[], def: number, label = "Průměr d"): ParamSchema => ({ key: "d", label, kind: "enum", options: vals.map((v) => ({ v: String(v), l: `Ø${v}` })), default: String(def) });
-const lParam = (def: number): ParamSchema => ({ key: "l", label: "Délka l", kind: "number", min: 4, max: 400, step: 2, unit: "mm", default: def });
+const lParam = (def: number): ParamSchema => ({ key: "l", label: tr("Délka l"), kind: "number", min: 4, max: 400, step: 2, unit: "mm", default: def });
 
 function parseDL(q: string, words: string[], dVals: number[]) {
   const kw = has(q, ...words);
@@ -29,13 +30,13 @@ export const taperPin: Family = {
   icon: "cone",
   standards: ["ISO 2339", "DIN 1 B", "ČSN 02 2153"],
   keywords: ["kuzelovy kolik", "kuzelovy", "taper pin", "iso 2339", "din 1"],
-  params: [dEnum(TAPER_D, 6, "Průměr d (menší konec)"), lParam(40)],
+  params: [dEnum(TAPER_D, 6, tr("Průměr d (menší konec)")), lParam(40)],
   parse: (q) => (has(q, "kolo", "lozisk", "gear") ? null : parseDL(q, ["kuzelovy kolik", "kuzelov", "taper pin", "2339"], TAPER_D)),
   describe: (v) => `ISO 2339 – ${v.d}×${fmt(num(v.l))}`,
   make: (v) => {
     const d = num(v.d, 6);
     const l = num(v.l, 40);
-    return part(`Kuželový kolík Ø${fmt(d)}×${fmt(l)}`, "ocel", [{ id: uid(), name: "Kolík", type: "cone", radius1: d / 2, radius2: d / 2 + l / 100, height: l, position: [0, 0, 0], axis: "Z", mode: "new" }, chamferAll(Math.min(0.5, d * 0.1))], `ISO 2339 – ${fmt(d)}×${fmt(l)} – 1:50`, "#aeb6bf");
+    return part(tr("Kuželový kolík Ø{0}×{1}", fmt(d), fmt(l)), "ocel", [{ id: uid(), name: "Kolík", type: "cone", radius1: d / 2, radius2: d / 2 + l / 100, height: l, position: [0, 0, 0], axis: "Z", mode: "new" }, chamferAll(Math.min(0.5, d * 0.1))], tr("ISO 2339 – {0}×{1} – 1:50", fmt(d), fmt(l)), "#aeb6bf");
   },
 };
 
@@ -57,12 +58,12 @@ const groovedPin = (id: string, std: string, name: string, half: boolean): Famil
     const d = num(v.d, 6);
     const l = num(v.l, 30);
     const gl = half ? l / 2 : l * 0.9;
-    const groove: Feature = box("Rýha", [d * 0.12, d * 0.18, gl], [0, d / 2, l - gl / 2 - (half ? 0 : l * 0.05)], "cut");
-    return part(`Rýhovaný kolík Ø${fmt(d)}×${fmt(l)}`, "ocel", [cyl("Kolík", d, l, 0, "new"), chamferAll(Math.min(0.5, d * 0.1)), groove, { id: uid(), name: "Rýhy", type: "pattern", featureId: groove.id, kind: "circular", count: 3, angle: 360, axis: "Z", center: [0, 0, 0] }], `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
+    const groove: Feature = box(tr("Rýha"), [d * 0.12, d * 0.18, gl], [0, d / 2, l - gl / 2 - (half ? 0 : l * 0.05)], "cut");
+    return part(tr("Rýhovaný kolík Ø{0}×{1}", fmt(d), fmt(l)), "ocel", [cyl(tr("Kolík"), d, l, 0, "new"), chamferAll(Math.min(0.5, d * 0.1)), groove, { id: uid(), name: "Rýhy", type: "pattern", featureId: groove.id, kind: "circular", count: 3, angle: 360, axis: "Z", center: [0, 0, 0] }], `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
   },
 });
-export const groovedDin1473 = groovedPin("din1473", "DIN 1473", "Rýhovaný kolík s rýhami po celé délce", false);
-export const groovedDin1474 = groovedPin("din1474", "DIN 1474", "Rýhovaný kolík s rýhami na polovině délky", true);
+export const groovedDin1473 = groovedPin("din1473", "DIN 1473", tr("Rýhovaný kolík s rýhami po celé délce"), false);
+export const groovedDin1474 = groovedPin("din1474", "DIN 1474", tr("Rýhovaný kolík s rýhami na polovině délky"), true);
 
 /** DIN 6888 – úsečová (Woodruff) pera: b × d1, h. */
 export const WOODRUFF: { b: number; d1: number; h: number }[] = [
@@ -85,7 +86,7 @@ export const woodruffKey: Family = {
   icon: "box",
   standards: ["DIN 6888", "ISO 3912"],
   keywords: ["usecove pero", "usecove", "woodruff", "pulmesic", "din 6888", "6888"],
-  params: [{ key: "size", label: "b × d1", kind: "enum", options: WOODRUFF.map((w) => ({ v: `${w.b}x${w.d1}`, l: `${w.b}×${w.d1} (h ${w.h})` })), default: "5x16" }],
+  params: [{ key: "size", label: tr("b × d1"), kind: "enum", options: WOODRUFF.map((w) => ({ v: `${w.b}x${w.d1}`, l: tr("{0}×{1} (h {2})", w.b, w.d1, w.h) })), default: "5x16" }],
   sizes: { key: "size", columns: [{ key: "b", label: "b" }, { key: "d1", label: "d1" }, { key: "h", label: "h" }], rows: WOODRUFF.map((w) => ({ size: `${w.b}x${w.d1}`, ...w })) },
   parse: (q) => {
     const kw = has(q, "usecov", "woodruff", "pulmesic", "6888");
@@ -99,7 +100,7 @@ export const woodruffKey: Family = {
     const [b, d1] = str(v.size, "5x16").split("x").map(Number);
     const w = WOODRUFF.find((x) => x.b === b && x.d1 === d1) ?? WOODRUFF[5];
     // kotouč Ø d1 šířky b (osa Y), seříznutý na výšku h
-    return part(`Úsečové pero ${w.b}×${w.d1}`, "ocel", [{ id: uid(), name: "Kotouč", type: "cylinder", radius: w.d1 / 2, height: w.b, position: [0, -w.b / 2, 0], axis: "Y", mode: "new" }, box("Seříznutí", [w.d1 + 2, w.b + 2, w.d1], [0, 0, w.h - w.d1 / 2 - w.d1 / 2 + 0], "cut"), chamferAll(0.2)], `DIN 6888 – ${w.b}×${w.d1}`, "#aeb6bf");
+    return part(tr("Úsečové pero {0}×{1}", w.b, w.d1), "ocel", [{ id: uid(), name: "Kotouč", type: "cylinder", radius: w.d1 / 2, height: w.b, position: [0, -w.b / 2, 0], axis: "Y", mode: "new" }, box(tr("Seříznutí"), [w.d1 + 2, w.b + 2, w.d1], [0, 0, w.h - w.d1 / 2 - w.d1 / 2 + 0], "cut"), chamferAll(0.2)], tr("DIN 6888 – {0}×{1}", w.b, w.d1), "#aeb6bf");
   },
 };
 
@@ -111,7 +112,7 @@ const clevisPin = (id: string, std: string, name: string, head: boolean): Family
   icon: "cylinder",
   standards: [std, head ? "ISO 2341 B" : "ISO 2340 B"],
   keywords: ["cep", "hridelovy cep", "cep s hlavou", "clevis pin", std.toLowerCase(), head ? "1444" : "1443"],
-  params: [dEnum(CLEVIS_D, 12), lParam(60), { key: "groove", label: "Drážky pro pojistný kroužek", kind: "bool", default: true }],
+  params: [dEnum(CLEVIS_D, 12), lParam(60), { key: "groove", label: tr("Drážky pro pojistný kroužek"), kind: "bool", default: true }],
   parse: (q) => {
     if (has(q, "kolik", "pero", "retez", "lozisk", "m20", "zavit")) return null;
     if (has(q, "sikm", "angle pin", "cam pin", "celist", "slider")) return null;
@@ -122,20 +123,20 @@ const clevisPin = (id: string, std: string, name: string, head: boolean): Family
   make: (v) => {
     const d = num(v.d, 12);
     const l = num(v.l, 60);
-    const f: Feature[] = [cyl("Čep", d, l, 0, "new")];
+    const f: Feature[] = [cyl(tr("Čep"), d, l, 0, "new")];
     if (head) f.push(cyl("Hlava", d * 1.5, d * 0.5, l, "add"));
     f.push(chamferAll(Math.min(1, d * 0.08)));
     if (v.groove !== false) {
       const w = Math.max(0.8, d * 0.1);
       const dg = d - 2 * Math.max(0.4, d * 0.05);
-      f.push(tube("Drážka 1", d + 2, dg, w, d * 0.5, "cut"));
-      if (!head) f.push(tube("Drážka 2", d + 2, dg, w, l - d * 0.5 - w, "cut"));
+      f.push(tube(tr("Drážka 1"), d + 2, dg, w, d * 0.5, "cut"));
+      if (!head) f.push(tube(tr("Drážka 2"), d + 2, dg, w, l - d * 0.5 - w, "cut"));
     }
-    return part(`Čep Ø${fmt(d)}×${fmt(l)} ${std}`, "ocel", f, `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
+    return part(tr("Čep Ø{0}×{1} {2}", fmt(d), fmt(l), std), "ocel", f, `${std} – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
   },
 });
-export const clevisDin1444 = clevisPin("din1444", "DIN 1444", "Čep s hlavou (hřídelový čep)", true);
-export const clevisDin1443 = clevisPin("din1443", "DIN 1443", "Čep bez hlavy", false);
+export const clevisDin1444 = clevisPin("din1444", "DIN 1444", tr("Čep s hlavou (hřídelový čep)"), true);
+export const clevisDin1443 = clevisPin("din1443", "DIN 1443", tr("Čep bez hlavy"), false);
 
 const SPLIT_D = [1, 1.2, 1.6, 2, 2.5, 3.2, 4, 5, 6.3, 8];
 export const splitPin: Family = {
@@ -153,11 +154,11 @@ export const splitPin: Family = {
     const l = num(v.l, 25);
     const w = d / 2; // průměr jedné větve (půlkruhový drát zjednodušen na kruh)
     const f: Feature[] = [
-      cyl("Větev 1", w, l, 0, "new", "Z", [-w / 2, 0]),
-      cyl("Větev 2", w, l, 0, "add", "Z", [w / 2, 0]),
+      cyl(tr("Větev 1"), w, l, 0, "new", "Z", [-w / 2, 0]),
+      cyl(tr("Větev 2"), w, l, 0, "add", "Z", [w / 2, 0]),
       { id: uid(), name: "Oko", type: "tube", outer: d * 2.2, inner: d * 2.2 - 2 * w, height: w, position: [0, -w / 2, l + d * 1.1 - w * 0.3], axis: "Y", mode: "add" },
     ];
-    return part(`Závlačka ${fmt(d)}×${fmt(l)}`, "ocel", f, `ISO 1234 – ${fmt(d)}×${fmt(l)}`, "#aeb6bf");
+    return part(tr("Závlačka {0}×{1}", fmt(d), fmt(l)), "ocel", f, tr("ISO 1234 – {0}×{1}", fmt(d), fmt(l)), "#aeb6bf");
   },
 };
 

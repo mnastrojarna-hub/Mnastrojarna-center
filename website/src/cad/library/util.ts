@@ -1,4 +1,5 @@
 /** Pomocné funkce pro generátory normálií. */
+import { tr } from "../i18n";
 import { emptyDoc, uid, type Axis, type CadDoc, type Feature, type SketchEntity, type SketchPlane, type Vec2, type Vec3 } from "../types";
 
 export const num = (v: unknown, d = 0): number => {
@@ -40,26 +41,26 @@ export const chamferAll = (d: number): Feature => ({ id: uid(), name: "Sražení
 
 /** Šestihran v rovině XY (s = otvor klíče) vysunutý od z o výšku k (nahoru). */
 export function hexPrism(name: string, s: number, k: number, z: number, mode: "new" | "add" | "cut" = "add"): Feature[] {
-  const sk = sketch(`${name} – profil`, XY(z), [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: s / Math.sqrt(3), sides: 6, angle: 0 }]);
+  const sk = sketch(tr("{0} – profil", name), XY(z), [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: s / Math.sqrt(3), sides: 6, angle: 0 }]);
   return [sk, { id: uid(), name, type: "extrude", sketchId: sk.id, distance: k, symmetric: false, reverse: false, mode }];
 }
 
 /** Rotační těleso kolem osy Z z profilu (r, z) – polovina řezu. */
 export function revolveProfile(name: string, profile: Vec2[], mode: "new" | "add" | "cut" = "new"): Feature[] {
   // skica v rovině XZ: x = poloměr, y = z (osa rotace = osa Y skici = globální Z)
-  const sk = sketch(`${name} – profil`, XZ(0), [{ id: uid(), type: "polyline", closed: true, points: profile }]);
+  const sk = sketch(tr("{0} – profil", name), XZ(0), [{ id: uid(), type: "polyline", closed: true, points: profile }]);
   return [sk, { id: uid(), name, type: "revolve", sketchId: sk.id, angle: 360, axis: "y", mode }];
 }
 
 /** Uzavřená lomená čára v XY vysunutá podél Z. */
 export function extrudePoly(name: string, points: Vec2[], height: number, mode: "new" | "add" | "cut" = "new", z = 0, symmetric = false): Feature[] {
-  const sk = sketch(`${name} – profil`, XY(z), [{ id: uid(), type: "polyline", closed: true, points }]);
+  const sk = sketch(tr("{0} – profil", name), XY(z), [{ id: uid(), type: "polyline", closed: true, points }]);
   return [sk, { id: uid(), name, type: "extrude", sketchId: sk.id, distance: height, symmetric, reverse: false, mode }];
 }
 
 /** Drážka pro pero v díře (DIN 6885): šířka b, hloubka t2 nad poloměrem díry, podél Z. */
 export function keywayCut(bore: number, b: number, t2: number, height: number, z = 0): Feature {
-  return box("Drážka pro pero", [b, t2 + 1, height + 2], [0, bore / 2 + (t2 + 1) / 2 - 1, z + height / 2], "cut");
+  return box(tr("Drážka pro pero"), [b, t2 + 1, height + 2], [0, bore / 2 + (t2 + 1) / 2 - 1, z + height / 2], "cut");
 }
 
 /** Body na kružnici. */

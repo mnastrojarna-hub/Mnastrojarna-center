@@ -1,5 +1,6 @@
 "use client";
 
+import { cadLocale, tr } from "@/cad/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
@@ -50,7 +51,7 @@ export function CommandPalette({ commands, onClose, extra }: { commands: Command
       .map((c) => ({ c, s: Math.max(fuzzyScore(q, c.label), fuzzyScore(q, `${c.group} ${c.label}`) * 0.8, c.hint ? fuzzyScore(q, c.hint) * 0.5 : 0) }))
       .filter((x) => x.s > 0)
       .sort((a, b) => b.s - a.s);
-    const list = (q ? scored : scored.sort((a, b) => a.c.group.localeCompare(b.c.group, "cs"))).slice(0, 60).map((x) => x.c);
+    const list = (q ? scored : scored.sort((a, b) => tr(a.c.group).localeCompare(tr(b.c.group), cadLocale()))).slice(0, 60).map((x) => x.c);
     const ex = q.trim() && extra ? extra(q.trim()) : []; // např. textový příkaz „díra 8,5 skrz v 20 30“ → Provést
     return [...ex, ...list];
   }, [commands, q]);
@@ -86,19 +87,19 @@ export function CommandPalette({ commands, onClose, extra }: { commands: Command
               } else if (e.key === "Enter" && results[sel]) run(results[sel]);
               else if (e.key === "Escape") onClose();
             }}
-            placeholder="Hledat příkaz… (např. „díra“, „výkres“, „zaoblit“)"
+            placeholder={tr("Hledat příkaz… (např. „díra“, „výkres“, „zaoblit“)")}
             className="h-11 w-full bg-transparent text-[14px] outline-none placeholder:text-[#9aa5b1]"
           />
-          <Kbd k="Esc" />
+          <Kbd k={tr("Esc")} />
         </div>
         <div ref={listRef} className="max-h-[52vh] overflow-y-auto py-1">
-          {results.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-[#6b7785]">Nic nenalezeno.</p>}
+          {results.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-[#6b7785]">{tr("Nic nenalezeno.")}</p>}
           {results.map((c, i) => {
             const head = !q && c.group !== lastGroup;
             lastGroup = c.group;
             return (
               <div key={c.id}>
-                {head && <p className="px-4 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">{c.group}</p>}
+                {head && <p className="px-4 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-[#8a95a3]">{tr(c.group)}</p>}
                 <button
                   type="button"
                   data-i={i}
@@ -120,12 +121,12 @@ export function CommandPalette({ commands, onClose, extra }: { commands: Command
         </div>
         <div className="flex items-center gap-4 border-t border-[#e3e8ee] bg-[#f7f9fb] px-4 py-1.5 text-[11px] text-[#6b7785]">
           <span>
-            <Kbd k="↑" /> <Kbd k="↓" /> výběr
+            <Kbd k="↑" /> <Kbd k="↓" /> {tr("výběr")}
           </span>
           <span>
-            <Kbd k="Enter" /> spustit
+            <Kbd k={tr("Enter")} /> spustit
           </span>
-          <span className="ml-auto">{results.length} příkazů</span>
+          <span className="ml-auto">{results.length} {tr("příkazů")}</span>
         </div>
       </div>
     </div>

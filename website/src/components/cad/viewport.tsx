@@ -1,5 +1,6 @@
 "use client";
 
+import { tr } from "@/cad/i18n";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import * as THREE from "three";
@@ -257,7 +258,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         const [x, y, z] = toScreen(p);
         if (!inside(x, y, z)) continue;
         const dir = axisName(nv);
-        out.push({ id: `F${fi + 1}`, kind: "face", index: fi, x, y, p: best, title: `Plocha ${fi + 1} · ${planar ? "rovinná" : "zakřivená"}${dir ? ` · normála ${dir}` : ""}` });
+        out.push({ id: `F${fi + 1}`, kind: "face", index: fi, x, y, p: best, title: tr("Plocha {0} · {1}{2}", fi + 1, planar ? tr("rovinná") : tr("zakřivená"), dir ? tr(" · normála {0}", dir) : "") });
       }
       const L = m.lines;
       let edges = 0;
@@ -275,12 +276,12 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         if (!visible(p, tol * 2)) continue;
         const [x, y, z] = toScreen(p);
         if (!inside(x, y, z)) continue;
-        let kind = "křivka";
+        let kind = tr("křivka");
         if (nSeg === 1) {
           const d = new THREE.Vector3(L[(start + 1) * 3] - L[start * 3], L[(start + 1) * 3 + 1] - L[start * 3 + 1], L[(start + 1) * 3 + 2] - L[start * 3 + 2]).normalize();
-          kind = Math.abs(d.z) > 0.99 ? "svislá úsečka" : Math.abs(d.z) < 0.01 ? "vodorovná úsečka" : "úsečka";
+          kind = Math.abs(d.z) > 0.99 ? tr("svislá úsečka") : Math.abs(d.z) < 0.01 ? tr("vodorovná úsečka") : tr("úsečka");
         }
-        out.push({ id: `E${ei + 1}`, kind: "edge", index: ei, x, y, p: [p.x, p.y, p.z], title: `Hrana ${ei + 1} · ${kind} · délka ≈ ${Math.round(len * 10) / 10} mm` });
+        out.push({ id: `E${ei + 1}`, kind: "edge", index: ei, x, y, p: [p.x, p.y, p.z], title: tr("Hrana {0} · {1} · délka ≈ {2} mm", ei + 1, kind, Math.round(len * 10) / 10) });
         edges++;
       }
     }
@@ -292,7 +293,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         if (!visible(p, tol * 2)) continue;
         const [x, y, z] = toScreen(p);
         if (!inside(x, y, z)) continue;
-        out.push({ id: `V${i / 3 + 1}`, kind: "vertex", index: i / 3, x, y, p: [p.x, p.y, p.z], title: `Vrchol ${i / 3 + 1} · [${Math.round(p.x * 100) / 100}; ${Math.round(p.y * 100) / 100}; ${Math.round(p.z * 100) / 100}]` });
+        out.push({ id: `V${i / 3 + 1}`, kind: "vertex", index: i / 3, x, y, p: [p.x, p.y, p.z], title: tr("Vrchol {0} · [{1}; {2}; {3}]", i / 3 + 1, Math.round(p.x * 100) / 100, Math.round(p.y * 100) / 100, Math.round(p.z * 100) / 100) });
         nv++;
       }
     }
@@ -326,7 +327,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const probe = probeWebGL();
     let renderer: THREE.WebGLRenderer;
     try {
-      if (!probe.ok) throw new Error(probe.reason ?? "WebGL není dostupné");
+      if (!probe.ok) throw new Error(probe.reason ?? tr("WebGL není dostupné"));
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
     } catch (e) {
       propsRef.current.onRenderError?.({ error: e instanceof Error ? e : new Error(String(e)), probe });
@@ -334,7 +335,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     }
     const onLost = (ev: Event) => {
       ev.preventDefault();
-      propsRef.current.onRenderError?.({ error: new Error("WebGL kontext byl ztracen"), probe, lost: true });
+      propsRef.current.onRenderError?.({ error: new Error(tr("WebGL kontext byl ztracen")), probe, lost: true });
     };
     renderer.domElement.addEventListener("webglcontextlost", onLost);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -1497,12 +1498,12 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
 
   /** stěny krychle ve světových souřadnicích: n = normála ven, u = směr nahoru na stěně */
   const faces: { v: ViewName; label: string; n: Vec3; u: Vec3 }[] = [
-    { v: "front", label: "Přední", n: [0, -1, 0], u: [0, 0, 1] },
-    { v: "back", label: "Zadní", n: [0, 1, 0], u: [0, 0, 1] },
-    { v: "right", label: "Pravý", n: [1, 0, 0], u: [0, 0, 1] },
-    { v: "left", label: "Levý", n: [-1, 0, 0], u: [0, 0, 1] },
-    { v: "top", label: "Horní", n: [0, 0, 1], u: [0, 1, 0] },
-    { v: "bottom", label: "Spodní", n: [0, 0, -1], u: [0, -1, 0] },
+    { v: "front", label: tr("Přední"), n: [0, -1, 0], u: [0, 0, 1] },
+    { v: "back", label: tr("Zadní"), n: [0, 1, 0], u: [0, 0, 1] },
+    { v: "right", label: tr("Pravý"), n: [1, 0, 0], u: [0, 0, 1] },
+    { v: "left", label: tr("Levý"), n: [-1, 0, 0], u: [0, 0, 1] },
+    { v: "top", label: tr("Horní"), n: [0, 0, 1], u: [0, 1, 0] },
+    { v: "bottom", label: tr("Spodní"), n: [0, 0, -1], u: [0, -1, 0] },
   ];
   const faceMatrix = (n: Vec3, u: Vec3) => {
     const r: Vec3 = [u[1] * n[2] - u[2] * n[1], u[2] * n[0] - u[0] * n[2], u[0] * n[1] - u[1] * n[0]];
@@ -1551,7 +1552,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
                   onClick={() => fitTo(f.v)}
                   className="absolute inset-0 grid place-items-center border border-slate-400/70 bg-gradient-to-br from-white to-slate-200 text-[9px] font-semibold uppercase tracking-wide text-slate-600 [backface-visibility:hidden] hover:from-amber-100 hover:to-amber-200 hover:text-slate-900"
                   style={{ transform: faceMatrix(f.n, f.u) }}
-                  title={`Pohled: ${f.label}`}
+                  title={tr("Pohled: {0}", f.label)}
                 >
                   {f.label}
                 </button>
@@ -1559,7 +1560,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
             </div>
           </div>
         </div>
-        <button type="button" onClick={() => fitTo("iso")} title="Izometrie (domů)" className="absolute -left-6 -top-1 rounded p-1 text-slate-500 hover:bg-white/70 hover:text-slate-800">
+        <button type="button" onClick={() => fitTo("iso")} title={tr("Izometrie (domů)")} className="absolute -left-6 -top-1 rounded p-1 text-slate-500 hover:bg-white/70 hover:text-slate-800">
           <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 11l9-7 9 7M5 9v11h14V9" />
           </svg>

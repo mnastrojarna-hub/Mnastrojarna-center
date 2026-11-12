@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 /* CAD jádro ve web workeru: OpenCascade (WASM) + replicad. UI zůstává plynulé i při složitých operacích. */
+import { setLang, tr, type CadLang } from "./i18n";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { buildDoc, faceInfo } from "./build";
@@ -33,10 +34,12 @@ function init() {
 type Req =
   | { id: number; op: "init" }
   | { id: number; op: "build"; doc: CadDoc }
+  | { id: number; op: "topology"; doc: CadDoc }
   | { id: number; op: "face"; index: number }
   | { id: number; op: "export"; format: ExportFormat; doc: CadDoc }
   | { id: number; op: "asmParts"; parts: { key: string; source: ComponentSource }[] }
   | { id: number; op: "asmFace"; key: string; index: number }
+  | { id: number; op: "lang"; lang: CadLang }
   | { id: number; op: "interference"; doc: CadDoc }
   | { id: number; op: "mateFace"; key: string; index: number }
   | { id: number; op: "cylFace"; key: string; radius: number }
@@ -61,6 +64,10 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
     await init();
     switch (m.op) {
       case "init":
+        ctx.postMessage({ id: m.id, ok: true });
+        break;
+      case "lang":
+        setLang(m.lang);
         ctx.postMessage({ id: m.id, ok: true });
         break;
       case "build": {
@@ -134,9 +141,40 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         ctx.postMessage({ id: m.id, ok: true, result: b ? faceInfo(b, m.index) : null });
         break;
       }
+      case "topology": {
+        // sestavení + inspekce všech ploch a hran v jednom kroku: mezi sestavením a inspekcí nemůže přijít jiné sestavení (jiná záložka)
+        const res = await buildDoc(m.doc);
+        const sh = res.body;
+        if (!sh || !res.metrics) {
+          ctx.postMessage({ id: m.id, ok: true, result: null });
+          break;
+        }
+        const faces = [];
+        for (let i = 0; i < res.metrics.faces; i++) {
+          try {
+            const info = entityInfo(sh, { kind: "face", index: i });
+            faces.push({ index: i, planar: info.surface === "PLANE", normal: info.normal, center: info.center, area: info.area, surface: info.surface });
+          } catch {
+            faces.push({ index: i, planar: false });
+          }
+        }
+        const edges = [];
+        for (let i = 0; i < res.metrics.edges; i++) {
+          try {
+            const info = entityInfo(sh, { kind: "edge", index: i });
+            edges.push({ index: i, curve: info.curve ?? info.title, dir: info.dir, center: info.center ?? info.mid ?? info.point, radius: info.radius, length: info.length });
+          } catch {
+            edges.push({ index: i });
+          }
+        }
+        body?.delete?.();
+        body = sh;
+        ctx.postMessage({ id: m.id, ok: true, result: { faces, edges, bbox: res.metrics.bbox, metrics: res.metrics } });
+        break;
+      }
       case "inspect": {
         const sh = shapeFor(m.src, body, cachedBody);
-        if (!sh) throw new Error("Těleso není k dispozici.");
+        if (!sh) throw new Error(tr("Těleso není k dispozici."));
         const info = entityInfo(sh, m.ref, m.density);
         if (m.src.kind === "comp") sh.delete?.();
         ctx.postMessage({ id: m.id, ok: true, result: info });
@@ -145,7 +183,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       case "measureEnt": {
         const sa = shapeFor(m.a.src, body, cachedBody);
         const sb = m.b ? shapeFor(m.b.src, body, cachedBody) : null;
-        if (!sa) throw new Error("Těleso není k dispozici.");
+        if (!sa) throw new Error(tr("Těleso není k dispozici."));
         const res = measureEntities(sa, m.a.ref, sb, m.b?.ref ?? null);
         if (m.a.src.kind === "comp") sa.delete?.();
         if (sb && m.b?.src.kind === "comp") sb.delete?.();
@@ -163,7 +201,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         break;
       case "export": {
         const b = await shapeOfDoc(m.doc);
-        if (!b) throw new Error("Model je prázdný.");
+        if (!b) throw new Error(tr("Model je prázdný."));
         const buf = await exportShape(b, m.format, m.doc.name);
         ctx.postMessage({ id: m.id, ok: true, result: buf }, [buf]);
         break;
@@ -175,7 +213,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         const key = JSON.stringify({ f: dd.features, v: dd.variables, c: dd.configs, a: dd.activeConfig, b: dd.bodies, k: dd.kind, comp: dd.components, mates: dd.mates });
         if (drawCache?.key !== key) {
           const b = await shapeOfDoc(dd);
-          if (!b) throw new Error("Model je prázdný.");
+          if (!b) throw new Error(tr("Model je prázdný."));
           drawCache?.body.delete?.();
           drawCache = { key, body: b };
         }
@@ -184,7 +222,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       }
     }
   } catch (err) {
-    ctx.postMessage({ id: m.id, ok: false, error: err instanceof Error ? err.message : "Chyba CAD jádra." });
+    ctx.postMessage({ id: m.id, ok: false, error: err instanceof Error ? err.message : tr("Chyba CAD jádra.") });
   }
 };
 

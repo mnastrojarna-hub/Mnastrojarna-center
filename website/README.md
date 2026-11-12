@@ -59,7 +59,7 @@ Vše respektuje `prefers-reduced-motion`.
 - Každý jazyk má **vlastní SEO adresy**, vlastní `<html lang>`, `hreflang` alternativy (cs-CZ, en, de, x-default) a sitemapu.
 - Přepínač jazyků v hlavičce vede na **stejnou stránku** v jiném jazyce.
 - Poptávka v EN/DE: hlášky v daném jazyce, rozpočty v CZK s přepočtem na EUR, zahraniční VAT ID, potvrzovací e-mail zákazníkovi v jeho jazyce. Interní e-mail obchodníkovi zůstává česky (s údajem „Jazyk webu“).
-- Online CAD (`/cad`) má zatím jen české rozhraní (EN/DE stránky na to upozorňují).
+- **Online CAD má tři jazyky rozhraní:** `/cad` (čeština), `/en/cad` (angličtina), `/de/cad` (němčina); přepínač je v Nastavení → Jazyk rozhraní (volba se pamatuje v prohlížeči). Zdrojové texty v kódu jsou česky a obalené `tr("…")` (`src/cad/i18n`); překlady se píší do TSV v `scripts/i18n/<jazyk>/*.tsv` (`klíč<TAB>překlad`, sekce `#!dynamic` pro texty překládané za běhu) a generují do `src/cad/i18n/en.ts` / `de.ts` příkazem `node scripts/cad-i18n-build.mjs --check` (hlásí chybějící klíče); nové české texty v kódu obalí `node scripts/cad-i18n-codemod.mjs <soubory>`. Jazyk se posílá i do web workeru (hlášky jádra), do razítka výkresu, knihovny a textových příkazů – konzole přijímá příkazy česky, anglicky i německy (`box 100 60 12`, `quader 100 60 12`). Anglická/německá stránka dokumentace (`/en/cad/documentation`, `/de/cad/dokumentation`) shrnuje ovládání a odkazuje na úplnou českou příručku. Test: `src/cad/i18n/i18n.test.ts`, `src/cad/agent-i18n.test.ts`, e2e `e2e/cad-lang.e2e.cjs`.
 
 **Kde jsou texty:**
 - `src/content/cs.ts` – český slovník (zdroj), `en.ts`, `de.ts` – překlady se stejnou strukturou (hlídá TypeScript i test). Text v `*hvězdičkách*` se v nadpisech zobrazí červeně.

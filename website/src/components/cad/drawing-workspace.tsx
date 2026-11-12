@@ -4,6 +4,7 @@
  * Výkresové prostředí (jako list výkresu v ZW3D / Inventoru): vlevo nastavení listu, pohledů, řezu,
  * kót a razítka; uprostřed živý náhled listu (kolečko = zoom, tažení = posun); nahoře export PDF / DWG / DXF / SVG / tisk.
  */
+import { cadLocale, tr } from "@/cad/i18n";
 import { saveFile } from "@/lib/save-file";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
@@ -39,17 +40,17 @@ type Props = {
 type AnnTool = "dim" | "note" | "roughness" | "gdt" | "datum" | "text" | "detail";
 type DimKind = "auto" | "aligned" | "horizontal" | "vertical";
 const ANN_TOOLS: { id: AnnTool; label: string; kbd: string; hint: string }[] = [
-  { id: "dim", label: "Kóta", kbd: "D", hint: "2 body + umístění kótovací čáry" },
-  { id: "note", label: "Poznámka", kbd: "N", hint: "odkazová čára + text" },
-  { id: "roughness", label: "Drsnost", kbd: "R", hint: "značka ISO 1302 na povrch" },
-  { id: "gdt", label: "Geom. tolerance", kbd: "G", hint: "rámeček ISO 1101 s odkazem" },
-  { id: "datum", label: "Základna", kbd: "B", hint: "A, B, C…" },
-  { id: "text", label: "Text", kbd: "T", hint: "volný text na listu" },
-  { id: "detail", label: "Detail", kbd: "L", hint: "detailní pohled: střed, poloměr, umístění" },
+  { id: "dim", label: tr("Kóta"), kbd: "D", hint: tr("2 body + umístění kótovací čáry") },
+  { id: "note", label: tr("Poznámka"), kbd: "N", hint: tr("odkazová čára + text") },
+  { id: "roughness", label: tr("Drsnost"), kbd: "R", hint: tr("značka ISO 1302 na povrch") },
+  { id: "gdt", label: tr("Geom. tolerance"), kbd: "G", hint: tr("rámeček ISO 1101 s odkazem") },
+  { id: "datum", label: tr("Základna"), kbd: "B", hint: tr("A, B, C…") },
+  { id: "text", label: tr("Text"), kbd: "T", hint: tr("volný text na listu") },
+  { id: "detail", label: tr("Detail"), kbd: "L", hint: tr("detailní pohled: střed, poloměr, umístění") },
 ];
 /** nástroje, které se po jednom vložení vypnou (kóty a detaily zůstávají aktivní pro sérii) */
 const ONE_SHOT = new Set<DrawingAnnotation["type"]>(["text", "note", "roughness", "gdt", "datum"]);
-const ANN_LABEL: Record<DrawingAnnotation["type"], string> = { dim: "Kóta", note: "Poznámka", roughness: "Drsnost", gdt: "Tolerance", datum: "Základna", text: "Text" };
+const ANN_LABEL: Record<DrawingAnnotation["type"], string> = { dim: tr("Kóta"), note: tr("Poznámka"), roughness: tr("Drsnost"), gdt: tr("Tolerance"), datum: tr("Základna"), text: tr("Text") };
 
 const OPTS_KEY = "mn-cad-drawing-opts-v1";
 
@@ -65,7 +66,7 @@ function printSvg(svg: string, w: number, h: number) {
   document.body.appendChild(iframe);
   const d = iframe.contentDocument!;
   d.open();
-  d.write(`<!doctype html><html><head><title>Výkres</title><style>@page{size:${w}mm ${h}mm;margin:0}html,body{margin:0}svg{width:${w}mm;height:${h}mm;display:block}</style></head><body>${svg}</body></html>`);
+  d.write(`<!doctype html><html><head><title>${tr("Výkres")}</title><style>@page{size:${w}mm ${h}mm;margin:0}html,body{margin:0}svg{width:${w}mm;height:${h}mm;display:block}</style></head><body>${svg}</body></html>`);
   d.close();
   setTimeout(() => {
     iframe.contentWindow?.focus();
@@ -96,7 +97,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     number: doc.props?.number ?? "",
     author: doc.props?.author ?? "",
     revision: doc.props?.revision ?? "",
-    date: new Date().toLocaleDateString("cs-CZ"),
+    date: new Date().toLocaleDateString(cadLocale()),
     tolerance: "", // výrobní požadavky (tolerance, hrany) se nedoplňují automaticky – uvedou se jen zadané
   }));
   const [showBom, setShowBom] = useState(!!bom?.length);
@@ -123,7 +124,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const sheets = useMemo(() => drawings ?? [], [drawings]);
   const [sheetIdx, setSheetIdx] = useState(0);
   const saved = sheets[sheetIdx];
-  const [sheetName, setSheetName] = useState(saved?.name ?? "List 1");
+  const [sheetName, setSheetName] = useState(saved?.name ?? tr("List 1"));
   const [ann, setAnn] = useState<DrawingAnnotation[]>(() => saved?.annotations ?? []);
   const [annTool, setAnnTool] = useState<AnnTool | null>(null);
   const [dimKind, setDimKind] = useState<DimKind>("auto");
@@ -140,7 +141,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     else setOpts(loadOpts());
     if (sv?.meta) setMeta((m) => ({ ...m, ...(sv.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
     setAnn(sv?.annotations ?? []);
-    setSheetName(sv?.name ?? `List ${sheetIdx + 1}`);
+    setSheetName(sv?.name ?? tr("List {0}", sheetIdx + 1));
     setAnnTool(null);
     setAnnPts([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,7 +187,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const cur = sheets.length ? [...sheets] : [];
     cur[sheetIdx] = sheetDoc();
     const n = cur.length + 1;
-    cur.push({ id: uid(), name: `List ${n}`, options: { ...defaultDrawingOptions, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] });
+    cur.push({ id: uid(), name: tr("List {0}", n), options: { ...defaultDrawingOptions, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] });
     dirty.current = false;
     onDrawingsChange(cur);
     setSheetIdx(n - 1);
@@ -264,13 +265,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (!out) return;
     try {
       const saved = await saveFile(`${base}_vykres.pdf`, async () => {
-        flash("Generuji PDF…");
+        flash(tr("Generuji PDF…"));
         const { drawingToPdf } = await import("@/cad/pdf");
         return drawingToPdf({ ...out, title: meta.name });
       }, "application/pdf");
-      if (saved) flash(`PDF uloženo: ${saved.name}`);
+      if (saved) flash(tr("PDF uloženo: {0}", saved.name));
     } catch (e) {
-      flash((e as Error).message || "PDF se nepodařilo vytvořit.");
+      flash((e as Error).message || tr("PDF se nepodařilo vytvořit."));
     }
   };
 
@@ -278,13 +279,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (!out) return;
     try {
       const saved = await saveFile(`${base}_vykres.dwg`, async () => {
-        flash(`Generuji DWG (${dwgVer})…`);
+        flash(tr("Generuji DWG ({0})…", dwgVer));
         const { drawingToDwg } = await import("@/cad/formats/dwg");
         return drawingToDwg(out, { version: dwgVer });
       }, "application/acad");
-      if (saved) flash(`DWG ${dwgVer} uloženo: ${saved.name}`);
+      if (saved) flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name));
     } catch (e) {
-      flash((e as Error).message || "DWG se nepodařilo vytvořit.");
+      flash((e as Error).message || tr("DWG se nepodařilo vytvořit."));
     }
   };
 
@@ -463,7 +464,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         const [C, Rp, At] = pts;
         const v = viewAt(res.views, C);
         if (!v) {
-          flash("Střed detailu musí ležet v některém pohledu.");
+          flash(tr("Střed detailu musí ležet v některém pohledu."));
           return setAnnPts([]);
         }
         const c = sheetToAnn(v, C);
@@ -491,11 +492,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           <path d="M3 15h18M13 15v5M6 8h6M6 11h4" />
         </svg>
         <p className="min-w-0 truncate text-[13px] font-semibold">
-          Výkres <span className="font-normal text-ink-700/50">· {doc.name}</span>
+          {tr("Výkres")}{" "}<span className="font-normal text-ink-700/50">· {doc.name}</span>
         </p>
         {res && (
           <span className="hidden rounded-md bg-steel-100 px-2 py-0.5 font-mono text-[11px] text-ink-700/70 sm:inline">
-            {res.sheet.name} · {res.scale} · ISO {opts.projection}
+            {res.sheet.name} · {res.scale} {tr("· ISO")}{" "}{opts.projection}
           </span>
         )}
         <div className="flex-1" />
@@ -503,7 +504,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           PDF
         </Btn>
         <span className="inline-flex items-stretch overflow-hidden rounded-md border border-ink-700/15 bg-white">
-          <button type="button" onClick={exportDwg} disabled={!res} title={`DWG ${DWG_VERSIONS.find((v) => v.id === dwgVer)?.hint ?? ""} – přímo do AutoCADu, ZWCADu, BricsCADu`} className="px-3 py-1.5 text-[12.5px] font-medium hover:bg-steel-100 disabled:opacity-40">
+          <button type="button" onClick={exportDwg} disabled={!res} title={tr("DWG {0} – přímo do AutoCADu, ZWCADu, BricsCADu", DWG_VERSIONS.find((v) => v.id === dwgVer)?.hint ?? "")} className="px-3 py-1.5 text-[12.5px] font-medium hover:bg-steel-100 disabled:opacity-40">
             DWG
           </button>
           <select
@@ -517,8 +518,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 /* ignore */
               }
             }}
-            aria-label="Verze DWG"
-            title="Verze souboru DWG"
+            aria-label={tr("Verze DWG")}
+            title={tr("Verze souboru DWG")}
             className="border-l border-ink-700/15 bg-steel-100 px-1.5 text-[11px] text-ink-700/80 outline-none"
           >
             {DWG_VERSIONS.map((v) => (
@@ -528,15 +529,15 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             ))}
           </select>
         </span>
-        <Btn onClick={() => out && download(`${base}_vykres.dxf`, out.dxf, "application/dxf")} disabled={!res} title="DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD">
+        <Btn onClick={() => out && download(`${base}_vykres.dxf`, out.dxf, "application/dxf")} disabled={!res} title={tr("DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD")}>
           DXF
         </Btn>
         <Btn onClick={() => out && download(`${base}_vykres.svg`, out.svg, "image/svg+xml")} disabled={!res}>
           SVG
         </Btn>
-        {bom?.length ? <Btn onClick={() => download(`${base}_kusovnik.csv`, bomToCsv(bom), "text/csv;charset=utf-8")}>Kusovník CSV</Btn> : null}
+        {bom?.length ? <Btn onClick={() => download(`${base}_kusovnik.csv`, bomToCsv(bom), "text/csv;charset=utf-8")}>{tr("Kusovník CSV")}</Btn> : null}
         <Btn onClick={() => out && printSvg(out.svg, out.sheet.w, out.sheet.h)} disabled={!res}>
-          Tisk
+          {tr("Tisk")}
         </Btn>
         {onShare && (
           <>
@@ -546,14 +547,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 if (dirty.current) persistNow(); // rozpracované razítko / poznámky do dokumentu ještě před vytvořením odkazu
                 onShare?.();
               }}
-              title="Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres">
-              Sdílet
+              title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres")}>
+              {tr("Sdílet")}
             </Btn>
           </>
         )}
         <div className="mx-1 h-6 w-px bg-ink-700/10" />
-        <Btn onClick={close} title="Zpět do 3D (Esc)">
-          Zavřít
+        <Btn onClick={close} title={tr("Zpět do 3D (Esc)")}>
+          {tr("Zavřít")}
         </Btn>
       </header>
       {/* listy výkresu */}
@@ -564,7 +565,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               type="button"
               onClick={() => switchSheet(i)}
               onDoubleClick={() => {
-                const n = window.prompt("Název listu", i === sheetIdx ? sheetName : sh.name);
+                const n = window.prompt(tr("Název listu"), i === sheetIdx ? sheetName : sh.name);
                 if (n?.trim()) {
                   if (i === sheetIdx) {
                     setSheetName(n.trim());
@@ -572,29 +573,29 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   } else onDrawingsChange?.(sheets.map((x, k) => (k === i ? { ...x, name: n.trim() } : x)));
                 }
               }}
-              title="Dvojklik = přejmenovat"
+              title={tr("Dvojklik = přejmenovat")}
             >
               {i === sheetIdx ? sheetName : sh.name}
             </button>
             {sheets.length > 1 && (
-              <button type="button" title="Odstranit list" onClick={() => removeSheet(i)} className="hidden text-ink-700/40 hover:text-brand group-hover:inline">
+              <button type="button" title={tr("Odstranit list")} onClick={() => removeSheet(i)} className="hidden text-ink-700/40 hover:text-brand group-hover:inline">
                 ×
               </button>
             )}
           </div>
         ))}
-        <button type="button" onClick={addSheet} disabled={!onDrawingsChange} className="mb-0.5 rounded px-2 py-0.5 text-[12px] text-ink-700/60 hover:bg-white/60 hover:text-brand disabled:opacity-40" title="Přidat list">
-          + List
+        <button type="button" onClick={addSheet} disabled={!onDrawingsChange} className="mb-0.5 rounded px-2 py-0.5 text-[12px] text-ink-700/60 hover:bg-white/60 hover:text-brand disabled:opacity-40" title={tr("Přidat list")}>
+          {tr("+ List")}
         </button>
         <span className="ml-auto pb-1 text-[11px] text-ink-700/45">
-          List {sheetIdx + 1}/{Math.max(1, sheets.length)}
+          {tr("List")}{" "}{sheetIdx + 1}/{Math.max(1, sheets.length)}
         </span>
       </div>
 
       <div className="flex min-h-0 flex-1">
         {/* nastavení */}
         <aside className="w-[272px] shrink-0 overflow-y-auto border-r border-black/10 bg-white">
-          <Section title="Kóty a poznámky">
+          <Section title={tr("Kóty a poznámky")}>
             <div className="grid grid-cols-3 gap-1">
               {ANN_TOOLS.map((t) => (
                 <button
@@ -615,7 +616,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <div className="mt-2 flex rounded-md bg-steel-100 p-0.5">
                 {(["auto", "aligned", "horizontal", "vertical"] as DimKind[]).map((k) => (
                   <button key={k} type="button" onClick={() => setDimKind(k)} className={cn("flex-1 rounded px-1 py-0.5 text-[11px]", dimKind === k ? "bg-white shadow-sm" : "text-ink-700/60")}>
-                    {k === "auto" ? "Auto" : k === "aligned" ? "Šikmá" : k === "horizontal" ? "Vodor." : "Svislá"}
+                    {k === "auto" ? tr("Auto") : k === "aligned" ? tr("Šikmá") : k === "horizontal" ? "Vodor." : tr("Svislá")}
                   </button>
                 ))}
               </div>
@@ -623,19 +624,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             {annTool && (
               <div data-active-tool className="mt-2 flex items-center justify-between gap-2 rounded-md border border-brand/30 bg-brand/5 px-2 py-1 text-[11px]">
                 <span>
-                  <strong className="text-brand">Aktivní nástroj: {ANN_TOOLS.find((t) => t.id === annTool)?.label ?? annTool}</strong> · Esc ukončí
+                  <strong className="text-brand">{tr("Aktivní nástroj:")}{" "}{ANN_TOOLS.find((t) => t.id === annTool)?.label ?? annTool}</strong> {tr("· Esc ukončí")}
                 </span>
-                <label className="flex shrink-0 items-center gap-1 text-ink-700/70" title="Po vložení zůstat v nástroji (jinak se po jednom vložení vypne)">
+                <label className="flex shrink-0 items-center gap-1 text-ink-700/70" title={tr("Po vložení zůstat v nástroji (jinak se po jednom vložení vypne)")}>
                   <input type="checkbox" checked={repeatTool} onChange={(e) => setRepeatTool(e.target.checked)} /> opakovat
                 </label>
               </div>
             )}
             <p className="mt-2 text-[11px] leading-snug text-ink-700/55">
-              {annTool ? (annTool === "detail" ? `Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu (${annPts.length}/3).` : annTool === "dim" ? `Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno ${annPts.length}/3.` : annTool === "note" || annTool === "gdt" ? `1. klik = kam šipka ukazuje, 2. klik = umístění. (${annPts.length}/2)` : "Klikněte na místo ve výkresu.") : "Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu."}
+              {annTool ? (annTool === "detail" ? tr("Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu ({0}/3).", annPts.length) : annTool === "dim" ? tr("Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno {0}/3.", annPts.length) : annTool === "note" || annTool === "gdt" ? tr("1. klik = kam šipka ukazuje, 2. klik = umístění. ({0}/2)", annPts.length) : tr("Klikněte na místo ve výkresu.")) : tr("Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu.")}
             </p>
             <div className="mt-2">
               <button type="button" onClick={() => setCheckOpen((v) => !v)} className="w-full rounded-md border border-ink-700/15 px-2 py-1 text-[11.5px] hover:bg-steel-100">
-                {checkOpen ? "Skrýt kontrolu kót" : "Kontrola kót – co chybí"}
+                {checkOpen ? tr("Skrýt kontrolu kót") : tr("Kontrola kót – co chybí")}
               </button>
               {checkOpen &&
                 (() => {
@@ -643,7 +644,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   const missing = items.filter((i) => !i.present);
                   return (
                     <div data-dim-check className="mt-1 rounded-md border border-ink-700/10 bg-steel-100/60 p-2 text-[11px]">
-                      <p className="font-semibold">{missing.length ? `Chybí ${missing.length} z ${items.length} očekávaných kót` : `Všech ${items.length} očekávaných kót je na listu`}</p>
+                      <p className="font-semibold">{missing.length ? tr("Chybí {0} z {1} očekávaných kót", missing.length, items.length) : tr("Všech {0} očekávaných kót je na listu", items.length)}</p>
                       {missing.length > 0 && (
                         <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
                           {missing.map((m, i) => (
@@ -655,7 +656,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                           ))}
                         </ul>
                       )}
-                      <p className="mt-1 leading-snug text-ink-700/55">Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.</p>
+                      <p className="mt-1 leading-snug text-ink-700/55">{tr("Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.")}</p>
                     </div>
                   );
                 })()}
@@ -664,14 +665,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto">
                 {ann.map((a, i) => (
                   <li key={a.id} className="flex items-center gap-2 rounded px-1.5 py-0.5 text-[11.5px] hover:bg-steel-100">
-                    <span className="w-16 shrink-0 text-ink-700/50">{ANN_LABEL[a.type]}</span>
+                    <span className="w-16 shrink-0 text-ink-700/50">{tr(ANN_LABEL[a.type])}</span>
                     <span className="min-w-0 flex-1 truncate">{a.type === "dim" ? `${a.kind === "horizontal" ? "↔" : a.kind === "vertical" ? "↕" : "⤢"} ${a.view}` : a.type === "note" || a.type === "text" ? a.text : a.type === "roughness" ? a.ra : a.type === "gdt" ? `${GDT_LABEL[a.symbol]} ${a.value}${a.datum ? " " + a.datum : ""}` : a.label}</span>
                     {a.type === "dim" && (
                       <input
                         value={a.suffix ?? ""}
-                        placeholder="H8 / ±0,1"
-                        title="Tolerance nebo přípona kóty (zobrazí se za hodnotou)"
-                        aria-label="Přípona kóty"
+                        placeholder={tr("H8 / ±0,1")}
+                        title={tr("Tolerance nebo přípona kóty (zobrazí se za hodnotou)")}
+                        aria-label={tr("Přípona kóty")}
                         onChange={(e) => {
                           const v = e.target.value;
                           setAnn((l) => l.map((x) => (x.id === a.id && x.type === "dim" ? { ...x, suffix: v } : x)));
@@ -682,7 +683,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                     )}
                     <button
                       type="button"
-                      title="Smazat"
+                      title={tr("Smazat")}
                       onClick={() => {
                         setAnn((l) => l.filter((_, k) => k !== i));
                         markDirty();
@@ -704,14 +705,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 }}
                 className="mt-1 text-[11px] text-ink-700/50 hover:text-brand"
               >
-                Smazat vše ({ann.length})
+                {tr("Smazat vše (")}{ann.length})
               </button>
             )}
           </Section>
-          <Section title="List">
-            <Row label="Formát">
-              <select className={inputCls} aria-label="Formát listu" value={opts.sheet} onChange={(e) => set("sheet", e.target.value as DrawingOptions["sheet"])}>
-                <option value="auto">Automaticky</option>
+          <Section title={tr("List")}>
+            <Row label={tr("Formát")}>
+              <select className={inputCls} aria-label={tr("Formát listu")} value={opts.sheet} onChange={(e) => set("sheet", e.target.value as DrawingOptions["sheet"])}>
+                <option value="auto">{tr("Automaticky")}</option>
                 {(["A4", "A3", "A2", "A1", "A0"] as SheetName[]).map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -719,10 +720,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 ))}
               </select>
             </Row>
-            <Seg value={opts.orientation} onChange={(v) => set("orientation", v)} options={[{ v: "landscape", l: "Na šířku" }, { v: "portrait", l: "Na výšku" }]} />
-            <Row label="Měřítko">
+            <Seg value={opts.orientation} onChange={(v) => set("orientation", v)} options={[{ v: "landscape", l: tr("Na šířku") }, { v: "portrait", l: tr("Na výšku") }]} />
+            <Row label={tr("Měřítko")}>
               <select className={inputCls} value={scaleValue} onChange={(e) => set("scale", e.target.value === "auto" ? "auto" : Number(e.target.value))}>
-                <option value="auto">Automaticky</option>
+                <option value="auto">{tr("Automaticky")}</option>
                 {STANDARD_SCALES.map((s) => (
                   <option key={s} value={String(s)}>
                     {scaleLabel(s)}
@@ -730,27 +731,27 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 ))}
               </select>
             </Row>
-            <Row label="Promítání">
-              <Seg value={opts.projection} onChange={(v) => set("projection", v)} options={[{ v: "E", l: "ISO E (EU)" }, { v: "A", l: "ISO A (US)" }]} />
+            <Row label={tr("Promítání")}>
+              <Seg value={opts.projection} onChange={(v) => set("projection", v)} options={[{ v: "E", l: tr("ISO E (EU)") }, { v: "A", l: tr("ISO A (US)") }]} />
             </Row>
           </Section>
 
-          <Section title="Pohledy">
+          <Section title={tr("Pohledy")}>
             <div className="grid grid-cols-2 gap-1">
               {(["front", "top", "left", "right", "back", "bottom", "iso"] as (ViewKey | "iso")[]).map((k) => (
                 <Check key={k} checked={opts.views[k]} onChange={(v) => setView(k, v)} disabled={k === "front"}>
-                  {VIEW_LABEL[k]}
+                  {tr(VIEW_LABEL[k])}
                 </Check>
               ))}
             </div>
           </Section>
 
-          <Section title="Řez A–A">
+          <Section title={tr("Řez A–A")}>
             <Check
               checked={!!opts.section}
               onChange={(v) => set("section", v ? { plane: "XZ", offset: centerOf("XZ") } : null)}
             >
-              Zobrazit řez se šrafováním
+              {tr("Zobrazit řez se šrafováním")}
             </Check>
             {opts.section && (
               <>
@@ -758,50 +759,50 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   value={opts.section.plane}
                   onChange={(p) => set("section", { plane: p, offset: centerOf(p) })}
                   options={[
-                    { v: "XZ", l: "XZ (čelní)" },
-                    { v: "YZ", l: "YZ (boční)" },
-                    { v: "XY", l: "XY (vodor.)" },
+                    { v: "XZ", l: tr("XZ (čelní)") },
+                    { v: "YZ", l: tr("YZ (boční)") },
+                    { v: "XY", l: tr("XY (vodor.)") },
                   ]}
                 />
-                <Row label="Poloha roviny">
+                <Row label={tr("Poloha roviny")}>
                   <NumInput value={opts.section.offset} onChange={(n) => set("section", { ...opts.section!, offset: n })} suffix="mm" />
                 </Row>
               </>
             )}
           </Section>
 
-          <Section title="Zobrazení a kóty">
+          <Section title={tr("Zobrazení a kóty")}>
             <Check checked={opts.hidden} onChange={(v) => set("hidden", v)}>
-              Skryté hrany (čárkovaně)
+              {tr("Skryté hrany (čárkovaně)")}
             </Check>
             <Check checked={opts.centerLines} onChange={(v) => set("centerLines", v)}>
-              Osy děr a válců
+              {tr("Osy děr a válců")}
             </Check>
-            <Row label="Kóty">
-              <Seg value={opts.dimensions} onChange={(v) => set("dimensions", v)} options={[{ v: "none", l: "Žádné" }, { v: "overall", l: "Celkové" }, { v: "auto", l: "Auto + Ø" }]} />
+            <Row label={tr("Kóty")}>
+              <Seg value={opts.dimensions} onChange={(v) => set("dimensions", v)} options={[{ v: "none", l: tr("Žádné") }, { v: "overall", l: tr("Celkové") }, { v: "auto", l: tr("Auto + Ø") }]} />
             </Row>
-            <p className="-mt-1 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.</p>
+            <p className="-mt-1 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">{tr("Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.")}</p>
             {bom?.length ? (
               <Check checked={showBom} onChange={setShowBom}>
-                Kusovník nad razítkem ({bom.length} pol.)
+                {tr("Kusovník nad razítkem (")}{bom.length} {tr("pol.)")}
               </Check>
             ) : null}
             {balloons?.length ? (
               <Check checked={opts.balloons !== false} onChange={(v) => set("balloons", v)}>
-                Pozice komponent – balónky ({balloons.length})
+                {tr("Pozice komponent – balónky (")}{balloons.length})
               </Check>
             ) : null}
             <Check checked={!!opts.holeTable} onChange={(v) => set("holeTable", v)}>
-              Tabulka děr (X, Y, Ø v půdorysu)
+              {tr("Tabulka děr (X, Y, Ø v půdorysu)")}
             </Check>
           </Section>
 
-          <Section title="Detailní pohledy">
-            {(opts.details ?? []).length === 0 && <p className="text-[11px] text-ink-700/50">Nástroj „Detail“ (L): střed, poloměr, umístění.</p>}
+          <Section title={tr("Detailní pohledy")}>
+            {(opts.details ?? []).length === 0 && <p className="text-[11px] text-ink-700/50">{tr("Nástroj „Detail“ (L): střed, poloměr, umístění.")}</p>}
             {(opts.details ?? []).map((d) => (
               <div key={d.id} className="flex items-center gap-2 py-0.5 text-[12px]">
                 <span className="w-6 font-semibold">{d.label}</span>
-                <span className="text-ink-700/55">{VIEW_LABEL[d.view as ViewKey] ?? d.view}</span>
+                <span className="text-ink-700/55">{tr(VIEW_LABEL[d.view as ViewKey] ?? d.view)}</span>
                 <select
                   className="ml-auto rounded border border-ink-700/15 bg-white px-1 py-0.5 text-[11.5px]"
                   value={String(d.scale)}
@@ -813,56 +814,56 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                     </option>
                   ))}
                 </select>
-                <button type="button" title="Smazat detail" onClick={() => set("details", (opts.details ?? []).filter((x) => x.id !== d.id))} className="text-ink-700/40 hover:text-brand">
+                <button type="button" title={tr("Smazat detail")} onClick={() => set("details", (opts.details ?? []).filter((x) => x.id !== d.id))} className="text-ink-700/40 hover:text-brand">
                   ×
                 </button>
               </div>
             ))}
           </Section>
 
-          <Section title="Razítko">
-            <Row label="Název">
+          <Section title={tr("Razítko")}>
+            <Row label={tr("Název")}>
               <TextInput value={meta.name} onChange={(v) => setM({ name: v })} />
             </Row>
-            <Row label="Číslo výkresu">
-              <TextInput value={meta.number ?? ""} onChange={(v) => setM({ number: v })} onBlur={persistProps} placeholder="např. MN-2026-001" />
+            <Row label={tr("Číslo výkresu")}>
+              <TextInput value={meta.number ?? ""} onChange={(v) => setM({ number: v })} onBlur={persistProps} placeholder={tr("např. MN-2026-001")} />
             </Row>
             <div className="grid grid-cols-2 gap-2">
-              <Row label="Kreslil">
+              <Row label={tr("Kreslil")}>
                 <TextInput value={meta.author ?? ""} onChange={(v) => setM({ author: v })} onBlur={persistProps} />
               </Row>
-              <Row label="Revize">
+              <Row label={tr("Revize")}>
                 <TextInput value={meta.revision ?? ""} onChange={(v) => setM({ revision: v })} onBlur={persistProps} placeholder="A" />
               </Row>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Row label="Datum">
+              <Row label={tr("Datum")}>
                 <TextInput value={meta.date ?? ""} onChange={(v) => setM({ date: v })} />
               </Row>
-              <Row label="Nepředepsané tolerance">
-                <TextInput value={meta.tolerance ?? ""} onChange={(v) => setM({ tolerance: v })} placeholder="např. ISO 2768-mK" />
+              <Row label={tr("Nepředepsané tolerance")}>
+                <TextInput value={meta.tolerance ?? ""} onChange={(v) => setM({ tolerance: v })} placeholder={tr("např. ISO 2768-mK")} />
               </Row>
             </div>
-            <Row label="Opracování hran">
-              <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder="např. srazit 0,5×45°" />
+            <Row label={tr("Opracování hran")}>
+              <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder={tr("např. srazit 0,5×45°")} />
             </Row>
-            <Row label="Poznámka v patičce">
-              <TextInput value={meta.note ?? ""} onChange={(v) => setM({ note: v })} placeholder="např. Nekótované rozměry dle 3D modelu (STEP)" />
+            <Row label={tr("Poznámka v patičce")}>
+              <TextInput value={meta.note ?? ""} onChange={(v) => setM({ note: v })} placeholder={tr("např. Nekótované rozměry dle 3D modelu (STEP)")} />
             </Row>
             <p className="-mt-0.5 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">
-              Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.{" "}
+              {tr("Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.")}{" "}
               {!meta.tolerance && !meta.edges && !meta.note && (
-                <button type="button" className="text-brand underline-offset-2 hover:underline" onClick={() => setM({ tolerance: "ISO 2768-mK", edges: "srazit 0,5×45°", note: "Nekótované rozměry dle 3D modelu (STEP)" })}>
-                  Doplnit obvyklé (ISO 2768-mK, hrany 0,5×45°, poznámka k modelu)
+                <button type="button" className="text-brand underline-offset-2 hover:underline" onClick={() => setM({ tolerance: "ISO 2768-mK", edges: "srazit 0,5×45°", note: tr("Nekótované rozměry dle 3D modelu (STEP)") })}>
+                  {tr("Doplnit obvyklé (ISO 2768-mK, hrany 0,5×45°, poznámka k modelu)")}
                 </button>
               )}
             </p>
-            <Row label="Materiál">
-              <TextInput value={meta.material} onChange={(v) => setM({ material: v })} onBlur={() => onMaterialChange?.(meta.material)} placeholder="označení do razítka, např. ČSN 11 423" />
+            <Row label={tr("Materiál")}>
+              <TextInput value={meta.material} onChange={(v) => setM({ material: v })} onBlur={() => onMaterialChange?.(meta.material)} placeholder={tr("označení do razítka, např. ČSN 11 423")} />
             </Row>
           </Section>
 
-          <Section title="Tabulka revizí">
+          <Section title={tr("Tabulka revizí")}>
             {(meta.revisions ?? []).map((r, i) => (
               <div key={i} className="mb-1.5 rounded border border-ink-700/10 p-1.5">
                 <div className="grid grid-cols-[2.2rem_1fr_1fr] gap-1">
@@ -871,8 +872,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   <TextInput value={r.author ?? ""} placeholder="kreslil" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, author: v } : x)) })} />
                 </div>
                 <div className="mt-1 flex gap-1">
-                  <TextInput value={r.note} placeholder="popis změny" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, note: v } : x)) })} />
-                  <button type="button" title="Smazat revizi" onClick={() => setM({ revisions: (meta.revisions ?? []).filter((_, k) => k !== i) })} className="px-1 text-ink-700/40 hover:text-brand">
+                  <TextInput value={r.note} placeholder={tr("popis změny")} onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, note: v } : x)) })} />
+                  <button type="button" title={tr("Smazat revizi")} onClick={() => setM({ revisions: (meta.revisions ?? []).filter((_, k) => k !== i) })} className="px-1 text-ink-700/40 hover:text-brand">
                     ×
                   </button>
                 </div>
@@ -883,15 +884,15 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               onClick={() => {
                 const list: RevisionItem[] = meta.revisions ?? [];
                 const next = String.fromCharCode(65 + Math.min(25, list.length));
-                setM({ revisions: [...list, { rev: next, date: new Date().toLocaleDateString("cs-CZ"), note: "", author: meta.author ?? "" }], revision: next });
+                setM({ revisions: [...list, { rev: next, date: new Date().toLocaleDateString(cadLocale()), note: "", author: meta.author ?? "" }], revision: next });
               }}
               className="w-full rounded border border-dashed border-ink-700/25 py-1 text-[12px] hover:border-brand hover:text-brand"
             >
-              + Přidat revizi
+              {tr("+ Přidat revizi")}
             </button>
           </Section>
           <p className="px-4 pb-5 text-[11px] leading-relaxed text-ink-700/45">
-            DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).
+            {tr("DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).")}
           </p>
         </aside>
 
@@ -943,7 +944,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <div className="absolute inset-0 grid place-items-center text-white/80">
               <div className="text-center">
                 <span className="mx-auto block h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-                <p className="mt-3 text-[13px]">Promítám pohledy…</p>
+                <p className="mt-3 text-[13px]">{tr("Promítám pohledy…")}</p>
               </div>
             </div>
           )}
@@ -955,14 +956,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <ZoomBtn onClick={() => setViewTf((v) => zoomAt(v, 1 / 1.25, canvas.current))}>−</ZoomBtn>
             <span className="w-12 text-center font-mono text-[11px] text-ink-700/70">{Math.round((view.z / 3.78) * 100)} %</span>
             <ZoomBtn onClick={() => setViewTf((v) => zoomAt(v, 1.25, canvas.current))}>+</ZoomBtn>
-            <button type="button" className="rounded-md px-2 py-1 text-[11.5px] font-medium hover:bg-steel-100" onClick={fit} title="Přizpůsobit (F)">
-              Celý list
+            <button type="button" className="rounded-md px-2 py-1 text-[11.5px] font-medium hover:bg-steel-100" onClick={fit} title={tr("Přizpůsobit (F)")}>
+              {tr("Celý list")}
             </button>
           </div>
 
           {/* stavový řádek */}
           <div className="pointer-events-none absolute bottom-3 left-3 flex flex-wrap gap-2 font-mono text-[11px]">
-            <span className="rounded-full bg-white/90 px-3 py-1 text-ink-700/70">{busy ? "Přepočítávám…" : res ? `${res.sheet.name} ${res.sheet.w}×${res.sheet.h} mm · ${res.scale} · ${ms} ms` : "—"}</span>
+            <span className="rounded-full bg-white/90 px-3 py-1 text-ink-700/70">{busy ? tr("Přepočítávám…") : res ? tr("{0} {1}×{2} mm · {3} · {4} ms", res.sheet.name, res.sheet.w, res.sheet.h, res.scale, ms) : "—"}</span>
             {res?.warnings.map((w) => (
               <span key={w} className="rounded-full bg-amber-100 px-3 py-1 text-amber-900">
                 {w}
@@ -996,34 +997,34 @@ function AnnPrompt({ kind, x, y, onDone, onCancel }: { kind: AnnTool; x: number;
   );
   return (
     <div className="fixed z-[60] w-72 space-y-2 rounded-lg border border-ink-700/15 bg-white p-3 shadow-2xl" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
-      {kind === "note" && field("text", "Text poznámky", "např. Ostré hrany srazit 0,5×45°")}
+      {kind === "note" && field("text", tr("Text poznámky"), tr("např. Ostré hrany srazit 0,5×45°"))}
       {kind === "text" && (
         <>
-          {field("text", "Text", "např. Kalit 58 ± 2 HRC")}
-          {field("size", "Výška písma [mm]")}
+          {field("text", "Text", tr("např. Kalit 58 ± 2 HRC"))}
+          {field("size", tr("Výška písma [mm]"))}
         </>
       )}
-      {kind === "roughness" && field("ra", "Drsnost", "Ra 3,2 / Rz 25")}
+      {kind === "roughness" && field("ra", "Drsnost", tr("Ra 3,2 / Rz 25"))}
       {kind === "gdt" && (
         <>
           <label className="block">
-            <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wider text-ink-700/50">Charakteristika</span>
+            <span className="mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wider text-ink-700/50">{tr("Charakteristika")}</span>
             <select value={v.symbol} onChange={(e) => setV({ ...v, symbol: e.target.value })} className={inputCls}>
               {(Object.keys(GDT_LABEL) as GdtSymbol[]).map((k) => (
                 <option key={k} value={k}>
-                  {GDT_LABEL[k]}
+                  {tr(GDT_LABEL[k])}
                 </option>
               ))}
             </select>
           </label>
           <div className="grid grid-cols-2 gap-2">
             {field("value", "Tolerance", "0,05")}
-            {field("datum", "Základna", "A")}
+            {field("datum", tr("Základna"), "A")}
           </div>
         </>
       )}
       <div className="flex justify-end gap-2 pt-1">
-        <Btn onClick={onCancel}>Storno</Btn>
+        <Btn onClick={onCancel}>{tr("Storno")}</Btn>
         <Btn primary onClick={submit}>
           OK
         </Btn>

@@ -1,4 +1,5 @@
 /** Načtení importovaného tělesa v jádře (běží ve workeru i v Node). Převody ostatních formátů: ./import.ts. */
+import { tr } from "../i18n";
 import * as r from "replicad";
 import type { Feature } from "../types";
 
@@ -24,8 +25,8 @@ export function importBREP(text: string): r.Shape3D {
     raw = null;
   }
   const shape = raw ? (r.cast(raw as never) as r.AnyShape) : null;
-  if (!shape || (shape as { isNull?: boolean }).isNull) throw new Error("Soubor BREP se nepodařilo načíst.");
-  if (!(shape instanceof r._3DShape)) throw new Error("BREP neobsahuje 3D těleso.");
+  if (!shape || (shape as { isNull?: boolean }).isNull) throw new Error(tr("Soubor BREP se nepodařilo načíst."));
+  if (!(shape instanceof r._3DShape)) throw new Error(tr("BREP neobsahuje 3D těleso."));
   return shape as r.Shape3D;
 }
 
@@ -43,7 +44,7 @@ export function importSTLBody(bytes: Uint8Array): r.Shape3D {
   try {
     const reader = keep(new oc.StlAPI_Reader());
     const raw = keep(new oc.TopoDS_Shell());
-    if (!reader.Read(raw, file)) throw new Error("Soubor STL se nepodařilo přečíst.");
+    if (!reader.Read(raw, file)) throw new Error(tr("Soubor STL se nepodařilo přečíst."));
     const sew = keep(new oc.BRepBuilderAPI_Sewing(1e-6, true, true, true, false));
     sew.Add(raw);
     sew.Perform();
@@ -58,7 +59,7 @@ export function importSTLBody(bytes: Uint8Array): r.Shape3D {
       const solid = fix.SolidFromShell(oc.TopoDS.Shell(ex.Current()));
       solids.push(r.cast(solid));
     }
-    if (!solids.length) throw new Error("STL neobsahuje plochy.");
+    if (!solids.length) throw new Error(tr("STL neobsahuje plochy."));
     return (solids.length === 1 ? solids[0] : r.makeCompound(solids)) as r.Shape3D;
   } finally {
     try {
@@ -80,6 +81,6 @@ export async function importBody(f: ImportFeature): Promise<r.Shape3D> {
     case "brep":
       return importBREP(new TextDecoder().decode(bytes));
     default:
-      throw new Error(`Formát ${String(f.format).toUpperCase()} musí být před vložením převeden (otevřete soubor znovu).`);
+      throw new Error(tr("Formát {0} musí být před vložením převeden (otevřete soubor znovu).", String(f.format).toUpperCase()));
   }
 }

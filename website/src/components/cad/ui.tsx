@@ -1,5 +1,6 @@
 "use client";
 
+import { tr } from "@/cad/i18n";
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
@@ -50,7 +51,7 @@ export function FloatPanel({
         <CadIcon name={icon} tone={tone} className="h-4 w-4" />
         <p className="flex-1 text-[12.5px] font-semibold">{title}</p>
         {onClose && (
-          <button type="button" onClick={onClose} className="rounded p-0.5 text-[#6b7785] hover:bg-[#eef2f6]" aria-label="Zavřít">
+          <button type="button" onClick={onClose} className="rounded p-0.5 text-[#6b7785] hover:bg-[#eef2f6]" aria-label={tr("Zavřít")}>
             <CadIcon name="x" className="h-3.5 w-3.5" />
           </button>
         )}
@@ -73,7 +74,7 @@ export function Modal({ title, icon, tone = "tool", onClose, children, width = "
         <div className="flex items-center gap-2 rounded-t-lg border-b border-[#e3e8ee] bg-gradient-to-b from-[#f7f9fb] to-[#eef2f6] px-4 py-2.5">
           <CadIcon name={icon} tone={tone} className="h-5 w-5" />
           <p className="flex-1 text-[13.5px] font-semibold">{title}</p>
-          <button type="button" onClick={onClose} className="rounded p-1 text-[#6b7785] hover:bg-[#e3e9f0]" aria-label="Zavřít">
+          <button type="button" onClick={onClose} className="rounded p-1 text-[#6b7785] hover:bg-[#e3e9f0]" aria-label={tr("Zavřít")}>
             <CadIcon name="x" className="h-4 w-4" />
           </button>
         </div>

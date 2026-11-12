@@ -6,6 +6,7 @@
  * přes `cad.refInfo` po dávkách (UI nezamrzne), nejvýš 300 položek na druh, stránkování po 40.
  * Počty entit dává `counts` (z `BuildResult.metrics` / vrcholů); bez nich se indexy zkoušejí, dokud jádro nehlásí konec.
  */
+import { tr } from "@/cad/i18n";
 import { useEffect, useMemo, useState } from "react";
 import { cad } from "@/cad/client";
 import { fmtVec, type Ref, type Sig } from "@/cad/refs";
@@ -26,23 +27,23 @@ const KIND_LABEL: Record<Kind, { one: string; many: string }> = { face: { one: "
 const SURF: Record<string, string> = { PLANE: "rovinná", CYLINDRE: "válcová", CONE: "kuželová", SPHERE: "kulová", TORUS: "toroidní", BEZIER_SURFACE: "Bézierova", BSPLINE_SURFACE: "B-spline", REVOLUTION_SURFACE: "rotační", EXTRUSION_SURFACE: "vysunutá", OFFSET_SURFACE: "odsazená" };
 const CURV: Record<string, string> = { LINE: "úsečka", CIRCLE: "kružnice / oblouk", ELLIPSE: "elipsa", HYPERBOLA: "hyperbola", PARABOLA: "parabola", BEZIER_CURVE: "Bézierova", BSPLINE_CURVE: "B-spline", OFFSET_CURVE: "odsazená" };
 const FACE_FILTERS: { v: string; l: string }[] = [
-  { v: "", l: "Všechny plochy" },
-  { v: "PLANE", l: "Rovinné" },
-  { v: "CYLINDRE", l: "Válcové" },
-  { v: "CONE", l: "Kuželové" },
-  { v: "SPHERE", l: "Kulové" },
-  { v: "TORUS", l: "Toroidní" },
-  { v: "other", l: "Ostatní (volné)" },
+  { v: "", l: tr("Všechny plochy") },
+  { v: "PLANE", l: tr("Rovinné") },
+  { v: "CYLINDRE", l: tr("Válcové") },
+  { v: "CONE", l: tr("Kuželové") },
+  { v: "SPHERE", l: tr("Kulové") },
+  { v: "TORUS", l: tr("Toroidní") },
+  { v: "other", l: tr("Ostatní (volné)") },
 ];
 const EDGE_FILTERS: { v: string; l: string }[] = [
-  { v: "", l: "Všechny hrany" },
-  { v: "LINE", l: "Úsečky" },
-  { v: "CIRCLE", l: "Kružnice / oblouky" },
-  { v: "other", l: "Ostatní (křivky)" },
+  { v: "", l: tr("Všechny hrany") },
+  { v: "LINE", l: tr("Úsečky") },
+  { v: "CIRCLE", l: tr("Kružnice / oblouky") },
+  { v: "other", l: tr("Ostatní (křivky)") },
 ];
 
 const fmt = (v: number, d = 2) => String(Math.round(v * 10 ** d) / 10 ** d).replace(".", ",");
-const typeLabel = (r: Row) => (r.kind === "face" ? (SURF[r.type] ?? "obecná") : r.kind === "edge" ? (CURV[r.type] ?? "křivka") : "bod");
+const typeLabel = (r: Row) => (r.kind === "face" ? tr(SURF[r.type] ?? "obecná") : r.kind === "edge" ? tr(CURV[r.type] ?? "křivka") : tr("bod"));
 const sizeLabel = (r: Row) => (r.kind === "face" ? `${fmt(r.size, 1)} mm²` : r.kind === "edge" ? `${fmt(r.size)} mm` : "");
 const refOf = (kind: Kind, index: number): Ref => (kind === "face" ? { kind, index } : kind === "edge" ? { kind, index, at: "mid" } : { kind, index });
 
@@ -55,7 +56,7 @@ export function kindsFor(want: Want): Kind[] {
   return ["vertex", "edge", "face"];
 }
 
-export function PickList({ doc, counts, want, onPick, onClose, title = "Vybrat ze seznamu" }: { doc: CadDoc; counts?: PickCounts; want: Want; onPick: (ref: Ref) => void; onClose: () => void; title?: string }) {
+export function PickList({ doc, counts, want, onPick, onClose, title = tr("Vybrat ze seznamu") }: { doc: CadDoc; counts?: PickCounts; want: Want; onPick: (ref: Ref) => void; onClose: () => void; title?: string }) {
   const kinds = useMemo(() => kindsFor(want), [want]);
   const [kind, setKind] = useState<Kind>(kinds[0]);
   const [rows, setRows] = useState<Row[]>([]);
@@ -112,7 +113,7 @@ export function PickList({ doc, counts, want, onPick, onClose, title = "Vybrat z
         if (kind === "edge" && ["LINE", "CIRCLE"].includes(r.type)) return false;
       } else if (filter && r.type !== filter) return false;
       if (!q) return true;
-      const text = `${KIND_LABEL[r.kind].one} ${r.index + 1} ${typeLabel(r)} ${fmtVec(r.center)} ${r.radius != null ? `r ${fmt(r.radius)} ø ${fmt(r.radius * 2)}` : ""}`.toLowerCase().replace(/,/g, ".");
+      const text = `${tr(KIND_LABEL[r.kind].one)} ${r.index + 1} ${typeLabel(r)} ${fmtVec(r.center)} ${r.radius != null ? `r ${fmt(r.radius)} ø ${fmt(r.radius * 2)}` : ""}`.toLowerCase().replace(/,/g, ".");
       return q.split(/\s+/).every((w) => text.includes(w));
     });
   }, [rows, filter, query, kind]);
@@ -128,20 +129,20 @@ export function PickList({ doc, counts, want, onPick, onClose, title = "Vybrat z
   };
 
   return (
-    <Modal title={title} icon="select" tone="tool" onClose={onClose} width="max-w-2xl" footer={<Btn onClick={onClose}>Zavřít</Btn>}>
+    <Modal title={title} icon="select" tone="tool" onClose={onClose} width="max-w-2xl" footer={<Btn onClick={onClose}>{tr("Zavřít")}</Btn>}>
       <div className="space-y-2">
         {kinds.length > 1 && (
           <div className="flex rounded-md bg-[#eef2f6] p-0.5">
             {kinds.map((k) => (
               <button key={k} type="button" onClick={() => { setKind(k); setFilter(""); }} className={cn("flex-1 rounded px-2 py-1 text-[12.5px] font-medium transition", kind === k ? "bg-white text-[#1f2933] shadow-sm" : "text-[#5b6776] hover:text-[#1f2933]")}>
-                {KIND_LABEL[k].many}
+                {tr(KIND_LABEL[k].many)}
               </button>
             ))}
           </div>
         )}
         <div className={cn("grid gap-2", filters.length ? "grid-cols-2" : "grid-cols-1")}>
           {!!filters.length && (
-            <Field label="Typ">
+            <Field label={tr("Typ")}>
               <select className={inputCls} value={filter} onChange={(e) => { setFilter(e.target.value); setPage(0); }}>
                 {filters.map((o) => (
                   <option key={o.v} value={o.v}>
@@ -151,30 +152,30 @@ export function PickList({ doc, counts, want, onPick, onClose, title = "Vybrat z
               </select>
             </Field>
           )}
-          <Field label="Hledat" hint="číslo, typ, souřadnice…">
-            <input className={inputCls} value={query} placeholder="např. 12, válcová, 30; 20" onChange={(e) => { setQuery(e.target.value); setPage(0); }} />
+          <Field label={tr("Hledat")} hint={tr("číslo, typ, souřadnice…")}>
+            <input className={inputCls} value={query} placeholder={tr("např. 12, válcová, 30; 20")} onChange={(e) => { setQuery(e.target.value); setPage(0); }} />
           </Field>
         </div>
         <p className="text-[11px] text-[#6b7785]">
-          {loading ? `Načítám… ${rows.length}` : `${shown.length} z ${rows.length} položek`}
-          {truncated && ` · zobrazeno prvních ${LIMIT} – upřesněte hledáním`}
-          {!loading && !rows.length && " · těleso nemá žádné entity tohoto druhu (nejdřív vytvořte tvar)"}
+          {loading ? tr("Načítám… {0}", rows.length) : tr("{0} z {1} položek", shown.length, rows.length)}
+          {truncated && tr(" · zobrazeno prvních {0} – upřesněte hledáním", LIMIT)}
+          {!loading && !rows.length && tr(" · těleso nemá žádné entity tohoto druhu (nejdřív vytvořte tvar)")}
         </p>
         <ul className="max-h-[48vh] divide-y divide-[#edf1f5] overflow-y-auto rounded border border-[#e3e8ee]">
           {slice.map((r) => (
             <li key={`${r.kind}${r.index}`} className="flex items-center gap-2 px-2 py-1 text-[12.5px] hover:bg-[#f3f6f9]">
               <button type="button" onClick={() => pick(r)} className="flex flex-1 flex-wrap items-baseline gap-x-3 text-left">
                 <span className="w-[86px] shrink-0 font-medium">
-                  {KIND_LABEL[r.kind].one} {r.index + 1}
+                  {tr(KIND_LABEL[r.kind].one)} {r.index + 1}
                 </span>
                 <span className="w-[112px] shrink-0 text-[#4a5664]">{typeLabel(r)}</span>
                 <span className="w-[96px] shrink-0 font-mono text-[11.5px] text-[#4a5664]">{sizeLabel(r)}</span>
                 {r.radius != null && <span className="font-mono text-[11.5px] text-[#4a5664]">R {fmt(r.radius)}</span>}
-                <span className="font-mono text-[11px] text-[#8a95a3]">{r.kind === "vertex" ? fmtVec(r.center) : `střed ${fmtVec(r.center)}`}</span>
+                <span className="font-mono text-[11px] text-[#8a95a3]">{r.kind === "vertex" ? fmtVec(r.center) : tr("střed {0}", fmtVec(r.center))}</span>
               </button>
               {r.kind === "edge" && r.radius != null && (want === "point" || want === "any" || want === "vertex") && (
-                <button type="button" onClick={() => pick(r, "center")} className="shrink-0 rounded border border-[#cfd6de] px-1.5 py-0.5 text-[11px] hover:bg-white" title="Použít střed kružnice / oblouku">
-                  střed kružnice
+                <button type="button" onClick={() => pick(r, "center")} className="shrink-0 rounded border border-[#cfd6de] px-1.5 py-0.5 text-[11px] hover:bg-white" title={tr("Použít střed kružnice / oblouku")}>
+                  {tr("střed kružnice")}
                 </button>
               )}
             </li>
@@ -183,13 +184,13 @@ export function PickList({ doc, counts, want, onPick, onClose, title = "Vybrat z
         {pages > 1 && (
           <div className="flex items-center justify-between text-[12px]">
             <Btn onClick={() => setPage(Math.max(0, cur - 1))} disabled={cur === 0}>
-              ‹ Předchozí
+              {tr("‹ Předchozí")}
             </Btn>
             <span className="text-[#6b7785]">
-              Strana {cur + 1} / {pages}
+              {tr("Strana")}{" "}{cur + 1} / {pages}
             </span>
             <Btn onClick={() => setPage(Math.min(pages - 1, cur + 1))} disabled={cur >= pages - 1}>
-              Další ›
+              {tr("Další ›")}
             </Btn>
           </div>
         )}

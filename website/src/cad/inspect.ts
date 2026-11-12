@@ -2,6 +2,7 @@
  * Dotazy na topologii tělesa (worker): informace o ploše/hraně/bodu/tělese a měření mezi entitami
  * (vzdálenost přes BRepExtrema_DistShapeShape, úhel, poloměr, délka).
  */
+import { cadLocale, tr } from "./i18n";
 import * as r from "replicad";
 import { eulerXYZ, type Mat3 } from "./assembly";
 import { placed } from "./asm-kernel";
@@ -67,7 +68,7 @@ const CURV: Record<string, string> = {
   OTHER_CURVE: "obecná křivka",
 };
 
-const f = (n: number, d = 3) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString("cs-CZ", { maximumFractionDigits: d });
+const f = (n: number, d = 3) => (Math.round(n * 10 ** d) / 10 ** d).toLocaleString(cadLocale(), { maximumFractionDigits: d });
 const fv = (v: Vec3, d = 3) => v.map((x) => f(x, d)).join(" ; ");
 const vt = (v: r.Vector): Vec3 => [v.x, v.y, v.z];
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -125,11 +126,11 @@ function subShape(shape: Shape, ref: EntRef): r.AnyShape | null {
 
 export function entityInfo(shape: Shape, ref: EntRef, density = 7.85): EntityInfo {
   const oc = r.getOC() as unknown as OcAny;
-  if (ref.kind === "point") return { title: "Bod", rows: [["Souřadnice", fv(ref.point)]], point: ref.point };
+  if (ref.kind === "point") return { title: tr("Bod"), rows: [[tr("Souřadnice"), fv(ref.point)]], point: ref.point };
   if (ref.kind === "vertex") {
     const p = vertexAt(shape, ref.index);
-    if (!p) return { title: "Bod", rows: [["Chyba", "vrchol nenalezen"]] };
-    return { title: `Bod ${ref.index + 1}`, rows: [["X", f(p[0])], ["Y", f(p[1])], ["Z", f(p[2])]], point: p };
+    if (!p) return { title: tr("Bod"), rows: [[tr("Chyba"), "vrchol nenalezen"]] };
+    return { title: tr("Bod {0}", ref.index + 1), rows: [[tr("X"), f(p[0])], [tr("Y"), f(p[1])], [tr("Z"), f(p[2])]], point: p };
   }
   if (ref.kind === "body") {
     const vol = r.measureVolume(shape);
@@ -142,27 +143,27 @@ export function entityInfo(shape: Shape, ref: EntRef, density = 7.85): EntityInf
       com = undefined;
     }
     const rows: Row[] = [
-      ["Objem", `${f(vol, 2)} mm³`],
-      ["Povrch", `${f(area, 2)} mm²`],
-      ["Hmotnost (ρ " + f(density, 2) + ")", `${f((vol / 1e6) * density, 4)} kg`],
-      ["Rozměry", fv(sub(bb[1], bb[0]), 2) + " mm"],
-      ["Plochy / hrany", `${shape.faces.length} / ${shape.edges.length}`],
+      [tr("Objem"), `${f(vol, 2)} mm³`],
+      [tr("Povrch"), `${f(area, 2)} mm²`],
+      [tr("Hmotnost (ρ {0})", f(density, 2)), `${f((vol / 1e6) * density, 4)} kg`],
+      [tr("Rozměry"), fv(sub(bb[1], bb[0]), 2) + " mm"],
+      [tr("Plochy / hrany"), `${shape.faces.length} / ${shape.edges.length}`],
     ];
-    if (com) rows.push(["Těžiště", fv(com, 2)]);
-    return { title: "Těleso", rows, center: com, area };
+    if (com) rows.push([tr("Těžiště"), fv(com, 2)]);
+    return { title: tr("Těleso"), rows, center: com, area };
   }
   if (ref.kind === "face") {
     const face = shape.faces[ref.index];
-    if (!face) return { title: "Plocha", rows: [["Chyba", "plocha nenalezena"]] };
+    if (!face) return { title: tr("Plocha"), rows: [[tr("Chyba"), "plocha nenalezena"]] };
     const type = face.geomType as string;
     const area = r.measureArea(face);
     const c = vt(face.center);
-    const info: EntityInfo = { title: `Plocha ${ref.index + 1}`, rows: [["Typ", SURF[type] ?? type], ["Plocha", `${f(area, 2)} mm²`], ["Střed", fv(c, 2)]], center: c, area, surface: type };
+    const info: EntityInfo = { title: tr("Plocha {0}", ref.index + 1), rows: [[tr("Typ"), tr(SURF[type] ?? type)], [tr("Plocha"), `${f(area, 2)} mm²`], [tr("Střed"), fv(c, 2)]], center: c, area, surface: type };
     if (type === "PLANE") {
       try {
         const n = vt(face.normalAt(face.center));
         info.normal = n;
-        info.rows.push(["Normála", fv(n, 4)]);
+        info.rows.push([tr("Normála"), fv(n, 4)]);
       } catch {
         /* normálu nelze určit */
       }
@@ -176,19 +177,19 @@ export function entityInfo(shape: Shape, ref: EntRef, density = 7.85): EntityInf
         const d = pnt(ax.Direction());
         info.radius = cyl.Radius();
         info.axis = { origin: o, dir: d };
-        info.rows.push(["Poloměr", `${f(info.radius)} mm`], ["Průměr", `Ø ${f(info.radius * 2)} mm`], ["Osa", fv(norm(d), 4)]);
+        info.rows.push([tr("Poloměr"), `${f(info.radius)} mm`], [tr("Průměr"), `Ø ${f(info.radius * 2)} mm`], [tr("Osa"), fv(norm(d), 4)]);
       } else if (type === "CONE") {
         const cone = ad.Cone() as unknown as { RefRadius(): number; SemiAngle(): number; Axis(): { Location(): never; Direction(): never } };
         const ax = cone.Axis();
         info.axis = { origin: pnt(ax.Location()), dir: pnt(ax.Direction()) };
-        info.rows.push(["Vrcholový úhel", `${f((Math.abs(cone.SemiAngle()) * 360) / Math.PI, 3)}°`], ["Ref. poloměr", `${f(cone.RefRadius())} mm`]);
+        info.rows.push([tr("Vrcholový úhel"), `${f((Math.abs(cone.SemiAngle()) * 360) / Math.PI, 3)}°`], [tr("Ref. poloměr"), `${f(cone.RefRadius())} mm`]);
       } else if (type === "SPHERE") {
         const sp = ad.Sphere() as unknown as { Radius(): number };
         info.radius = sp.Radius();
-        info.rows.push(["Poloměr", `${f(info.radius)} mm`]);
+        info.rows.push([tr("Poloměr"), `${f(info.radius)} mm`]);
       } else if (type === "TORUS") {
         const t = ad.Torus() as unknown as { MajorRadius(): number; MinorRadius(): number };
-        info.rows.push(["Poloměry", `${f(t.MajorRadius())} / ${f(t.MinorRadius())} mm`]);
+        info.rows.push([tr("Poloměry"), `${f(t.MajorRadius())} / ${f(t.MinorRadius())} mm`]);
       }
       (ad as unknown as { delete(): void }).delete();
     } catch {
@@ -197,16 +198,16 @@ export function entityInfo(shape: Shape, ref: EntRef, density = 7.85): EntityInf
     return info;
   }
   const edge = shape.edges[ref.index];
-  if (!edge) return { title: "Hrana", rows: [["Chyba", "hrana nenalezena"]] };
+  if (!edge) return { title: tr("Hrana"), rows: [[tr("Chyba"), "hrana nenalezena"]] };
   const type = edge.geomType as string;
   const length = edge.length;
   const a = vt(edge.startPoint);
   const b = vt(edge.endPoint);
-  const info: EntityInfo = { title: `Hrana ${ref.index + 1}`, rows: [["Typ", CURV[type] ?? type], ["Délka", `${f(length)} mm`]], length, curve: type };
+  const info: EntityInfo = { title: tr("Hrana {0}", ref.index + 1), rows: [[tr("Typ"), tr(CURV[type] ?? type)], [tr("Délka"), `${f(length)} mm`]], length, curve: type };
   if (type === "LINE") {
     info.dir = norm(sub(b, a));
     info.mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-    info.rows.push(["Začátek", fv(a, 2)], ["Konec", fv(b, 2)], ["Směr", fv(info.dir, 4)]);
+    info.rows.push([tr("Začátek"), fv(a, 2)], [tr("Konec"), fv(b, 2)], [tr("Směr"), fv(info.dir, 4)]);
   }
   if (type === "CIRCLE") {
     try {
@@ -216,8 +217,8 @@ export function entityInfo(shape: Shape, ref: EntRef, density = 7.85): EntityInf
       info.center = c;
       info.axis = { origin: c, dir: pnt(circ.Axis().Direction()) };
       const full = edge.isClosed;
-      info.rows.push(["Poloměr", `${f(info.radius)} mm`], ["Průměr", `Ø ${f(info.radius * 2)} mm`], ["Střed", fv(c, 2)]);
-      if (!full) info.rows.push(["Úhel oblouku", `${f(((length / info.radius) * 180) / Math.PI, 2)}°`]);
+      info.rows.push([tr("Poloměr"), `${f(info.radius)} mm`], [tr("Průměr"), `Ø ${f(info.radius * 2)} mm`], [tr("Střed"), fv(c, 2)]);
+      if (!full) info.rows.push([tr("Úhel oblouku"), `${f(((length / info.radius) * 180) / Math.PI, 2)}°`]);
     } catch {
       /* bez kružnice */
     }
@@ -263,7 +264,7 @@ export function measureEntities(sa: Shape, ra: EntRef, sb: Shape | null, rb: Ent
       res.distance = d;
       res.p1 = p1;
       res.p2 = p2;
-      res.rows.push(["Min. vzdálenost", `${f(d)} mm`], ["ΔX / ΔY / ΔZ", sub(p2, p1).map((x) => f(Math.abs(x))).join(" / ")], ["Bod 1", fv(p1, 2)], ["Bod 2", fv(p2, 2)]);
+      res.rows.push([tr("Min. vzdálenost"), `${f(d)} mm`], ["ΔX / ΔY / ΔZ", sub(p2, p1).map((x) => f(Math.abs(x))).join(" / ")], [tr("Bod 1"), fv(p1, 2)], [tr("Bod 2"), fv(p2, 2)]);
       res.gfx.points.push(p1, p2);
       if (d > 1e-9) {
         res.gfx.lines.push([p1, p2]);
@@ -276,14 +277,14 @@ export function measureEntities(sa: Shape, ra: EntRef, sb: Shape | null, rb: Ent
   const ca = ia.center ?? ia.point ?? ia.axis?.origin;
   const cb = ib.center ?? ib.point ?? ib.axis?.origin;
   if ((ia.radius != null || ib.radius != null) && ca && cb) {
-    res.rows.push(["Vzdálenost středů", `${f(len(sub(cb, ca)))} mm`]);
+    res.rows.push([tr("Vzdálenost středů"), `${f(len(sub(cb, ca)))} mm`]);
     if (ia.axis && ib.axis && Math.abs(Math.abs(dot(norm(ia.axis.dir), norm(ib.axis.dir))) - 1) < 1e-6) {
       // rovnoběžné osy: kolmá vzdálenost os
       const d = norm(ia.axis.dir);
       const w = sub(ib.axis.origin, ia.axis.origin);
       const t = dot(w, d);
       const perp = len(sub(w, [d[0] * t, d[1] * t, d[2] * t]));
-      res.rows.push(["Vzdálenost os", `${f(perp)} mm`]);
+      res.rows.push([tr("Vzdálenost os"), `${f(perp)} mm`]);
     }
   }
   // úhel
@@ -295,7 +296,7 @@ export function measureEntities(sa: Shape, ra: EntRef, sb: Shape | null, rb: Ent
     const mixed = (!!ia.normal && !ia.dir) !== (!!ib.normal && !ib.dir) && (ia.dir || ib.dir) && (ia.normal || ib.normal);
     if (mixed) ang = Math.abs(90 - ang); // úhel přímky k rovině
     res.angle = ang;
-    res.rows.push(["Úhel", `${f(ang, 3)}°${ang > 90 ? ` (doplněk ${f(180 - ang, 3)}°)` : ""}`]);
+    res.rows.push([tr("Úhel"), `${f(ang, 3)}°${ang > 90 ? tr(" (doplněk {0}°)", f(180 - ang, 3)) : ""}`]);
     if (res.p1 && res.p2) res.gfx.labels.push({ pos: res.p2, text: `∠ ${f(Math.min(ang, 180 - ang), 2)}°` });
   }
   return res;

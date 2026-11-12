@@ -1,4 +1,5 @@
 /** Ozubení: čelní kola s evolventou, vnitřní ozubení, hřebeny, řetězová kola, ozubené a klínové řemenice. */
+import { tr } from "../i18n";
 import type { Feature, Vec2 } from "../types";
 import { has, nums, score, tagged } from "./parse-util";
 import { CHAINS, HTD, keyForShaft } from "./tables";
@@ -89,18 +90,18 @@ export function sprocketProfile(p: number, d1: number, z: number): { pts: Vec2[]
 }
 
 const boreParams: ParamSchema[] = [
-  { key: "bore", label: "Díra d", kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 0, hint: "0 = plný" },
-  { key: "keyway", label: "Drážka pro pero DIN 6885", kind: "bool", default: true },
-  { key: "hub", label: "Náboj Ø", kind: "number", min: 0, max: 500, step: 1, unit: "mm", default: 0, hint: "0 = bez náboje" },
-  { key: "hubL", label: "Délka náboje", kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 0 },
+  { key: "bore", label: tr("Díra d"), kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 0, hint: tr("0 = plný") },
+  { key: "keyway", label: tr("Drážka pro pero DIN 6885"), kind: "bool", default: true },
+  { key: "hub", label: tr("Náboj Ø"), kind: "number", min: 0, max: 500, step: 1, unit: "mm", default: 0, hint: tr("0 = bez náboje") },
+  { key: "hubL", label: tr("Délka náboje"), kind: "number", min: 0, max: 300, step: 1, unit: "mm", default: 0 },
 ];
 
 function boreFeatures(bore: number, keyway: boolean, hub: number, hubL: number, width: number): Feature[] {
   const f: Feature[] = [];
-  if (hub > 0 && hubL > 0) f.push(cyl("Náboj", hub, hubL, width, "add"));
+  if (hub > 0 && hubL > 0) f.push(cyl(tr("Náboj"), hub, hubL, width, "add"));
   const total = width + (hub > 0 ? hubL : 0);
   if (bore > 0) {
-    f.push(cyl("Díra", bore, total + 2, -1, "cut"));
+    f.push(cyl(tr("Díra"), bore, total + 2, -1, "cut"));
     if (keyway) {
       const k = keyForShaft(bore);
       f.push(keywayCut(bore, k.b, k.t2, total, 0));
@@ -119,11 +120,11 @@ export const spurGear: Family = {
   standards: ["ISO 53", "DIN 867", "ČSN 01 4607"],
   keywords: ["ozubene kolo", "ozubeni", "kolo", "gear", "spur gear", "pastorek", "pinion", "modul"],
   params: [
-    { key: "m", label: "Modul m", kind: "enum", options: [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map((x) => ({ v: String(x), l: String(x) })), default: "2" },
-    { key: "z", label: "Počet zubů z", kind: "number", min: 8, max: 200, step: 1, unit: "", default: 24 },
-    { key: "b", label: "Šířka b", kind: "number", min: 1, max: 300, step: 1, unit: "mm", default: 20 },
-    { key: "x", label: "Korekce x", kind: "number", min: -0.5, max: 0.8, step: 0.05, unit: "", default: 0 },
-    { key: "alpha", label: "Úhel záběru", kind: "enum", options: [{ v: "20", l: "20°" }, { v: "14.5", l: "14,5°" }, { v: "25", l: "25°" }], default: "20" },
+    { key: "m", label: tr("Modul m"), kind: "enum", options: [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].map((x) => ({ v: String(x), l: String(x) })), default: "2" },
+    { key: "z", label: tr("Počet zubů z"), kind: "number", min: 8, max: 200, step: 1, unit: "", default: 24 },
+    { key: "b", label: tr("Šířka b"), kind: "number", min: 1, max: 300, step: 1, unit: "mm", default: 20 },
+    { key: "x", label: tr("Korekce x"), kind: "number", min: -0.5, max: 0.8, step: 0.05, unit: "", default: 0 },
+    { key: "alpha", label: tr("Úhel záběru"), kind: "enum", options: [{ v: "20", l: "20°" }, { v: "14.5", l: "14,5°" }, { v: "25", l: "25°" }], default: "20" },
     ...boreParams,
   ],
   parse: (q) => {
@@ -152,7 +153,7 @@ export const spurGear: Family = {
     const b = num(v.b, 10 * m);
     const bore = v.bore === undefined ? autoBore(m * z) : num(v.bore);
     const pts = involuteGearProfile(m, z, num(v.alpha, 20), num(v.x, 0));
-    return part(`Ozubené kolo m${fmt(m)} z${z}`, "ocel", [...extrudePoly("Ozubení", pts, b, "new"), ...boreFeatures(bore, v.keyway !== false, num(v.hub), num(v.hubL), b)], `Ozubené kolo m${fmt(m)} z${z} b${fmt(b)} α${v.alpha ?? 20}° x${fmt(num(v.x))}`, "#c9a46a");
+    return part(tr("Ozubené kolo m{0} z{1}", fmt(m), z), "ocel", [...extrudePoly(tr("Ozubení"), pts, b, "new"), ...boreFeatures(bore, v.keyway !== false, num(v.hub), num(v.hubL), b)], tr("Ozubené kolo m{0} z{1} b{2} α{3}° x{4}", fmt(m), z, fmt(b), v.alpha ?? 20, fmt(num(v.x))), "#c9a46a");
   },
 };
 
@@ -164,10 +165,10 @@ export const internalGear: Family = {
   standards: ["ISO 53", "DIN 867"],
   keywords: ["vnitrni ozubeni", "venec", "internal gear", "ring gear", "planetov"],
   params: [
-    { key: "m", label: "Modul m", kind: "enum", options: [1, 1.25, 1.5, 2, 2.5, 3, 4, 5].map((x) => ({ v: String(x), l: String(x) })), default: "2" },
-    { key: "z", label: "Počet zubů z", kind: "number", min: 20, max: 200, step: 1, unit: "", default: 60 },
-    { key: "b", label: "Šířka b", kind: "number", min: 1, max: 300, step: 1, unit: "mm", default: 20 },
-    { key: "rim", label: "Tloušťka věnce", kind: "number", min: 2, max: 100, step: 1, unit: "mm", default: 8 },
+    { key: "m", label: tr("Modul m"), kind: "enum", options: [1, 1.25, 1.5, 2, 2.5, 3, 4, 5].map((x) => ({ v: String(x), l: String(x) })), default: "2" },
+    { key: "z", label: tr("Počet zubů z"), kind: "number", min: 20, max: 200, step: 1, unit: "", default: 60 },
+    { key: "b", label: tr("Šířka b"), kind: "number", min: 1, max: 300, step: 1, unit: "mm", default: 20 },
+    { key: "rim", label: tr("Tloušťka věnce"), kind: "number", min: 2, max: 100, step: 1, unit: "mm", default: 8 },
   ],
   parse: (q) => {
     const kw = has(q, "vnitrni ozub", "venec", "internal gear", "ring gear", "planet");
@@ -185,7 +186,7 @@ export const internalGear: Family = {
     // mezery vnitřního kola = „zuby“ vnějšího profilu s prohozeným hlavovým/patním převýšením
     const cutter = involuteGearProfile(m, z, 20, 0.25);
     const outer = m * (z / 2 + 1.25) * 2 + 2 * rim;
-    return part(`Věnec m${fmt(m)} z${z}`, "ocel", [cyl("Věnec", outer, b, 0, "new"), ...extrudePoly("Vnitřní ozubení", cutter, b + 2, "cut", -1)], `Vnitřní ozubení m${fmt(m)} z${z} b${fmt(b)}`, "#c9a46a");
+    return part(tr("Věnec m{0} z{1}", fmt(m), z), "ocel", [cyl(tr("Věnec"), outer, b, 0, "new"), ...extrudePoly(tr("Vnitřní ozubení"), cutter, b + 2, "cut", -1)], tr("Vnitřní ozubení m{0} z{1} b{2}", fmt(m), z, fmt(b)), "#c9a46a");
   },
 };
 
@@ -197,10 +198,10 @@ export const rack: Family = {
   standards: ["DIN 867"],
   keywords: ["hreben", "ozubeny hreben", "rack", "gear rack"],
   params: [
-    { key: "m", label: "Modul m", kind: "enum", options: [1, 1.5, 2, 2.5, 3, 4, 5, 6].map((x) => ({ v: String(x), l: String(x) })), default: "2" },
-    { key: "n", label: "Počet zubů", kind: "number", min: 2, max: 500, step: 1, unit: "", default: 40 },
-    { key: "b", label: "Šířka b", kind: "number", min: 2, max: 200, step: 1, unit: "mm", default: 20 },
-    { key: "h", label: "Výška tělesa", kind: "number", min: 2, max: 200, step: 1, unit: "mm", default: 20 },
+    { key: "m", label: tr("Modul m"), kind: "enum", options: [1, 1.5, 2, 2.5, 3, 4, 5, 6].map((x) => ({ v: String(x), l: String(x) })), default: "2" },
+    { key: "n", label: tr("Počet zubů"), kind: "number", min: 2, max: 500, step: 1, unit: "", default: 40 },
+    { key: "b", label: tr("Šířka b"), kind: "number", min: 2, max: 200, step: 1, unit: "mm", default: 20 },
+    { key: "h", label: tr("Výška tělesa"), kind: "number", min: 2, max: 200, step: 1, unit: "mm", default: 20 },
   ],
   parse: (q) => {
     const kw = has(q, "hreben", "rack");
@@ -218,7 +219,7 @@ export const rack: Family = {
   make: (v) => {
     const m = num(v.m, 2);
     const n = Math.max(2, Math.round(num(v.n, 40)));
-    return part(`Hřeben m${fmt(m)} ${n} zubů`, "ocel", [...extrudePoly("Hřeben", rackProfile(m, n, num(v.h, 20)), num(v.b, 20), "new")], `Ozubený hřeben m${fmt(m)} L${fmt(Math.PI * m * n)} b${fmt(num(v.b, 20))}`, "#c9a46a");
+    return part(tr("Hřeben m{0} {1} zubů", fmt(m), n), "ocel", [...extrudePoly(tr("Hřeben"), rackProfile(m, n, num(v.h, 20)), num(v.b, 20), "new")], tr("Ozubený hřeben m{0} L{1} b{2}", fmt(m), fmt(Math.PI * m * n), fmt(num(v.b, 20))), "#c9a46a");
   },
 };
 
@@ -230,12 +231,12 @@ export const sprocket: Family = {
   standards: ["ISO 606", "DIN 8187/8188", "ČSN 01 4811"],
   keywords: ["retezove kolo", "retezka", "retez", "sprocket", "chain wheel", "08b", "10b", "12b", "16b"],
   params: [
-    { key: "chain", label: "Řetěz", kind: "enum", options: Object.keys(CHAINS).map((k) => ({ v: k, l: `${k} (p=${CHAINS[k].p})` })), default: "08B" },
-    { key: "z", label: "Počet zubů z", kind: "number", min: 7, max: 150, step: 1, unit: "", default: 19 },
-    { key: "rows", label: "Řady", kind: "enum", options: [{ v: "1", l: "jednořadý (-1)" }, { v: "2", l: "dvouřadý (-2)" }, { v: "3", l: "třířadý (-3)" }], default: "1" },
+    { key: "chain", label: tr("Řetěz"), kind: "enum", options: Object.keys(CHAINS).map((k) => ({ v: k, l: tr("{0} (p={1})", k, CHAINS[k].p) })), default: "08B" },
+    { key: "z", label: tr("Počet zubů z"), kind: "number", min: 7, max: 150, step: 1, unit: "", default: 19 },
+    { key: "rows", label: tr("Řady"), kind: "enum", options: [{ v: "1", l: tr("jednořadý (-1)") }, { v: "2", l: tr("dvouřadý (-2)") }, { v: "3", l: tr("třířadý (-3)") }], default: "1" },
     ...boreParams,
   ],
-  sizes: { key: "chain", columns: [{ key: "p", label: "p" }, { key: "d1", label: "d1 váleček" }, { key: "b1", label: "b1" }], rows: Object.entries(CHAINS).map(([k, v]) => ({ chain: k, ...v })) },
+  sizes: { key: "chain", columns: [{ key: "p", label: "p" }, { key: "d1", label: tr("d1 váleček") }, { key: "b1", label: "b1" }], rows: Object.entries(CHAINS).map(([k, v]) => ({ chain: k, ...v })) },
   parse: (q) => {
     const kw = has(q, "retez", "sprocket", "chain");
     const chain = (q.match(/\b(0?5b|06b|08b|10b|12b|16b|20b|24b)(?:-\d)?\b/) ?? [])[1] ?? (kw ? (q.match(/\b(35|40|50|60|80)\b/) ?? [])[1] : undefined);
@@ -250,7 +251,7 @@ export const sprocket: Family = {
   },
   describe: (v) => {
     const c = CHAINS[str(v.chain)] ?? CHAINS["08B"];
-    return `Řetězové kolo ${v.chain}-${v.rows ?? 1} z${v.z} – dp ${fmt(c.p / Math.sin(Math.PI / num(v.z, 19)))}`;
+    return tr("Řetězové kolo {0}-{1} z{2} – dp {3}", v.chain, v.rows ?? 1, v.z, fmt(c.p / Math.sin(Math.PI / num(v.z, 19))));
   },
   make: (v) => {
     const code = str(v.chain, "08B");
@@ -262,7 +263,7 @@ export const sprocket: Family = {
     const pt = c.p * 1.1 + 0.4 * c.p; // rozteč řad (přibližně)
     const f: Feature[] = [];
     for (let i = 0; i < rows; i++) {
-      f.push(...extrudePoly(`Ozubení${rows > 1 ? " " + (i + 1) : ""}`, pts, bf, i === 0 ? "new" : "add", i * pt));
+      f.push(...extrudePoly(tr("Ozubení{0}", rows > 1 ? " " + (i + 1) : ""), pts, bf, i === 0 ? "new" : "add", i * pt));
       if (i < rows - 1) f.push(cyl("Mezikus", dp - c.d1 - 2 * c.p * 0.2, pt - bf, i * pt + bf, "add"));
     }
     const width = (rows - 1) * pt + bf;
@@ -271,7 +272,7 @@ export const sprocket: Family = {
     const hubL = num(v.hubL);
     f.push(...boreFeatures(bore, v.keyway !== false, hub, hubL, width));
     if (c.p >= 12.7) f.push(chamferAll(Math.min(0.5, c.p * 0.03)));
-    return part(`Řetězové kolo ${code}-${rows} z${z}`, "ocel", f, `ISO 606 – ${code}-${rows} z${z}`, "#9aa4ad");
+    return part(tr("Řetězové kolo {0}-{1} z{2}", code, rows, z), "ocel", f, tr("ISO 606 – {0}-{1} z{2}", code, rows, z), "#9aa4ad");
   },
 };
 
@@ -283,10 +284,10 @@ export const htdPulley: Family = {
   standards: ["ISO 13050", "HTD"],
   keywords: ["ozubena remenice", "remenice htd", "htd", "timing pulley", "5m", "8m", "gt2"],
   params: [
-    { key: "profile", label: "Profil", kind: "enum", options: Object.keys(HTD).map((k) => ({ v: k, l: `HTD ${k}` })), default: "5M" },
-    { key: "z", label: "Počet zubů z", kind: "number", min: 10, max: 200, step: 1, unit: "", default: 32 },
-    { key: "w", label: "Šířka řemene", kind: "enum", options: [9, 15, 20, 25, 30, 50, 85].map((x) => ({ v: String(x), l: `${x} mm` })), default: "15" },
-    { key: "flanges", label: "Bočnice", kind: "bool", default: true },
+    { key: "profile", label: tr("Profil"), kind: "enum", options: Object.keys(HTD).map((k) => ({ v: k, l: `HTD ${k}` })), default: "5M" },
+    { key: "z", label: tr("Počet zubů z"), kind: "number", min: 10, max: 200, step: 1, unit: "", default: 32 },
+    { key: "w", label: tr("Šířka řemene"), kind: "enum", options: [9, 15, 20, 25, 30, 50, 85].map((x) => ({ v: String(x), l: `${x} mm` })), default: "15" },
+    { key: "flanges", label: tr("Bočnice"), kind: "bool", default: true },
     ...boreParams,
   ],
   parse: (q) => {
@@ -307,16 +308,16 @@ export const htdPulley: Family = {
     const w = num(v.w, 15) + (h.p >= 8 ? 3 : 2);
     const dp = (z * h.p) / Math.PI;
     const da = dp - 2 * h.pld;
-    const f: Feature[] = [cyl("Tělo", da, w, 0, "new")];
+    const f: Feature[] = [cyl(tr("Tělo"), da, w, 0, "new")];
     const groove: Feature = cyl("Zub", h.r * 2, w + 2, -1, "cut", "Z", [da / 2 - h.h + h.r, 0]);
     f.push(groove, { id: groove.id + "p", name: "Zuby", type: "pattern", featureId: groove.id, kind: "circular", count: z, angle: 360, axis: "Z", center: [0, 0, 0] });
     if (v.flanges !== false) {
       const fd = da + 2 * h.h + 2;
-      f.push(cyl("Bočnice 1", fd, 1.2, -1.2, "add"), cyl("Bočnice 2", fd, 1.2, w, "add"));
+      f.push(cyl(tr("Bočnice 1"), fd, 1.2, -1.2, "add"), cyl(tr("Bočnice 2"), fd, 1.2, w, "add"));
     }
     const bore = v.bore === undefined ? autoBore(dp) : num(v.bore);
     f.push(...boreFeatures(bore, v.keyway !== false, num(v.hub), num(v.hubL), w + (v.flanges !== false ? 1.2 : 0)));
-    return part(`Řemenice HTD ${str(v.profile, "5M")} z${z}`, "hlinik", f, `HTD ${str(v.profile, "5M")}-${z}-${v.w}`, "#d6d9dd");
+    return part(tr("Řemenice HTD {0} z{1}", str(v.profile, "5M"), z), "hlinik", f, tr("HTD {0}-{1}-{2}", str(v.profile, "5M"), z, v.w), "#d6d9dd");
   },
 };
 
@@ -335,9 +336,9 @@ export const vPulley: Family = {
   standards: ["ISO 4183", "DIN 2211"],
   keywords: ["klinova remenice", "remenice", "v-belt pulley", "spz", "spa", "spb", "spc"],
   params: [
-    { key: "profile", label: "Profil řemene", kind: "enum", options: Object.keys(VBELT).map((k) => ({ v: k, l: k })), default: "SPA" },
-    { key: "dp", label: "Výpočtový průměr dp", kind: "number", min: 50, max: 1000, step: 5, unit: "mm", default: 125 },
-    { key: "grooves", label: "Počet drážek", kind: "number", min: 1, max: 8, step: 1, unit: "", default: 2 },
+    { key: "profile", label: tr("Profil řemene"), kind: "enum", options: Object.keys(VBELT).map((k) => ({ v: k, l: k })), default: "SPA" },
+    { key: "dp", label: tr("Výpočtový průměr dp"), kind: "number", min: 50, max: 1000, step: 5, unit: "mm", default: 125 },
+    { key: "grooves", label: tr("Počet drážek"), kind: "number", min: 1, max: 8, step: 1, unit: "", default: 2 },
     ...boreParams,
   ],
   parse: (q) => {
@@ -368,7 +369,7 @@ export const vPulley: Family = {
     }
     prof.push([da / 2, width], [0, width]);
     const bore = v.bore === undefined ? autoBore(dp) : num(v.bore);
-    return part(`Řemenice ${str(v.profile, "SPA")} dp${fmt(dp)}`, "ocel", [...revolveProfile("Řemenice", prof, "new"), ...boreFeatures(bore, v.keyway !== false, num(v.hub), num(v.hubL), width)], `Řemenice ${str(v.profile, "SPA")} ${fmt(dp)}×${n}`, "#7f8a96");
+    return part(tr("Řemenice {0} dp{1}", str(v.profile, "SPA"), fmt(dp)), "ocel", [...revolveProfile(tr("Řemenice"), prof, "new"), ...boreFeatures(bore, v.keyway !== false, num(v.hub), num(v.hubL), width)], tr("Řemenice {0} {1}×{2}", str(v.profile, "SPA"), fmt(dp), n), "#7f8a96");
   },
 };
 

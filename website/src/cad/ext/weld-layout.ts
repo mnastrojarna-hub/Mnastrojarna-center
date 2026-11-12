@@ -3,6 +3,7 @@
  * (spoje pokos / tupý / žádný, prodloužení konců), kusovník řezů, tabulka svarů a značka svaru pro výkres.
  * Běží v UI i v jádře.
  */
+import { cadLocale, tr } from "../i18n";
 import { toWorld } from "../defaults";
 import { HEB, IPE, UPN, type IProfile } from "../library/tables";
 import type { DText, Poly } from "../drawing";
@@ -30,28 +31,28 @@ export type ProfileSpec = { family: ProfileFamily; w: number; h: number; t: numb
 export type Align = "center" | "bl" | "bc" | "br" | "cl" | "cr" | "tl" | "tc" | "tr";
 
 export const PROFILE_FAMILIES: { v: ProfileFamily; l: string }[] = [
-  { v: "shs", l: "Jäkl čtvercový" },
-  { v: "rhs", l: "Jäkl obdélníkový" },
-  { v: "chs", l: "Trubka kruhová" },
-  { v: "L", l: "Úhelník L" },
-  { v: "U", l: "Profil U (UPN)" },
-  { v: "IPE", l: "Nosník IPE" },
-  { v: "HEB", l: "Nosník HEB" },
-  { v: "flat", l: "Plochá tyč" },
-  { v: "round", l: "Kulatina" },
-  { v: "square", l: "Čtyřhranná tyč" },
+  { v: "shs", l: tr("Jäkl čtvercový") },
+  { v: "rhs", l: tr("Jäkl obdélníkový") },
+  { v: "chs", l: tr("Trubka kruhová") },
+  { v: "L", l: tr("Úhelník L") },
+  { v: "U", l: tr("Profil U (UPN)") },
+  { v: "IPE", l: tr("Nosník IPE") },
+  { v: "HEB", l: tr("Nosník HEB") },
+  { v: "flat", l: tr("Plochá tyč") },
+  { v: "round", l: tr("Kulatina") },
+  { v: "square", l: tr("Čtyřhranná tyč") },
 ];
 
 export const ALIGN_OPTIONS: { v: Align; l: string }[] = [
-  { v: "center", l: "Střed" },
-  { v: "bl", l: "Vlevo dole" },
-  { v: "bc", l: "Dole" },
-  { v: "br", l: "Vpravo dole" },
-  { v: "cl", l: "Vlevo" },
-  { v: "cr", l: "Vpravo" },
-  { v: "tl", l: "Vlevo nahoře" },
-  { v: "tc", l: "Nahoře" },
-  { v: "tr", l: "Vpravo nahoře" },
+  { v: "center", l: tr("Střed") },
+  { v: "bl", l: tr("Vlevo dole") },
+  { v: "bc", l: tr("Dole") },
+  { v: "br", l: tr("Vpravo dole") },
+  { v: "cl", l: tr("Vlevo") },
+  { v: "cr", l: tr("Vpravo") },
+  { v: "tl", l: tr("Vlevo nahoře") },
+  { v: "tc", l: tr("Nahoře") },
+  { v: "tr", l: tr("Vpravo nahoře") },
 ];
 
 export const DEFAULT_PROFILE: ProfileSpec = { family: "shs", w: 40, h: 40, t: 3, d: 33.7, size: "100" };
@@ -62,7 +63,7 @@ export function profileSpec(data: Record<string, unknown>): ProfileSpec {
   return { family: PROFILE_FAMILIES.some((f) => f.v === fam) ? fam : "shs", w: n("w", 40), h: n("h", 40), t: n("t", 3), d: n("d", 33.7), size: String(data.size ?? "100") };
 }
 
-const fmt = (n: number) => (Math.round(n * 100) / 100).toLocaleString("cs-CZ");
+const fmt = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale());
 
 function arcPts(cx: number, cy: number, r: number, a0: number, a1: number, n = 4): Vec2[] {
   const out: Vec2[] = [];
@@ -128,57 +129,57 @@ function bboxOf(pts: Vec2[]): [number, number, number, number] {
 export function sectionOf(p: ProfileSpec): Section {
   const { family: fam, w, h, t, d } = p;
   const pos = (v: number, what: string) => {
-    if (!(v > 0)) throw new Error(`${what} profilu musí být kladný.`);
+    if (!(v > 0)) throw new Error(tr("{0} profilu musí být kladný.", what));
   };
   switch (fam) {
     case "shs":
     case "rhs": {
       const W = w;
       const H = fam === "shs" ? w : h;
-      pos(W, "Rozměr"); pos(H, "Rozměr"); pos(t, "Tloušťka stěny");
-      if (2 * t >= Math.min(W, H)) throw new Error("Tloušťka stěny jäklu je příliš velká.");
+      pos(W, tr("Rozměr")); pos(H, tr("Rozměr")); pos(t, tr("Tloušťka stěny"));
+      if (2 * t >= Math.min(W, H)) throw new Error(tr("Tloušťka stěny jäklu je příliš velká."));
       const outer = rounded(W, H, 2 * t);
       const inner = rounded(W - 2 * t, H - 2 * t, t);
       return { outer, inner, circle: null, area: polygonArea(outer) - polygonArea(inner), designation: fam === "shs" ? `Jäkl ${fmt(W)}×${fmt(W)}×${fmt(t)}` : `Jäkl ${fmt(W)}×${fmt(H)}×${fmt(t)}`, bbox: bboxOf(outer) };
     }
     case "chs": {
-      pos(d, "Průměr"); pos(t, "Tloušťka stěny");
-      if (2 * t >= d) throw new Error("Tloušťka stěny trubky je příliš velká.");
+      pos(d, tr("Průměr")); pos(t, tr("Tloušťka stěny"));
+      if (2 * t >= d) throw new Error(tr("Tloušťka stěny trubky je příliš velká."));
       const ro = d / 2;
       const ri = d / 2 - t;
       return { outer: null, inner: null, circle: { ro, ri }, area: Math.PI * (ro * ro - ri * ri), designation: `Trubka Ø${fmt(d)}×${fmt(t)}`, bbox: [-ro, -ro, ro, ro] };
     }
     case "L": {
-      pos(w, "Rameno"); pos(h, "Rameno"); pos(t, "Tloušťka");
-      if (t >= Math.min(w, h)) throw new Error("Tloušťka úhelníku je příliš velká.");
+      pos(w, "Rameno"); pos(h, "Rameno"); pos(t, tr("Tloušťka"));
+      if (t >= Math.min(w, h)) throw new Error(tr("Tloušťka úhelníku je příliš velká."));
       const outer = lOutline(w, h, t, t);
       return { outer, inner: null, circle: null, area: polygonArea(outer), designation: `L ${fmt(w)}×${fmt(h)}×${fmt(t)}`, bbox: bboxOf(outer) };
     }
     case "U": {
       const tab = UPN[p.size];
-      if (!tab) throw new Error(`Profil UPN ${p.size} není v tabulce.`);
+      if (!tab) throw new Error(tr("Profil UPN {0} není v tabulce.", p.size));
       const outer = uOutline(tab);
       return { outer, inner: null, circle: null, area: polygonArea(outer), designation: `UPN ${p.size}`, bbox: bboxOf(outer) };
     }
     case "IPE":
     case "HEB": {
       const tab = (fam === "IPE" ? IPE : HEB)[p.size];
-      if (!tab) throw new Error(`Profil ${fam} ${p.size} není v tabulce.`);
+      if (!tab) throw new Error(tr("Profil {0} {1} není v tabulce.", fam, p.size));
       const outer = iOutline(tab);
       return { outer, inner: null, circle: null, area: polygonArea(outer), designation: `${fam} ${p.size}`, bbox: bboxOf(outer) };
     }
     case "flat": {
-      pos(w, "Šířka"); pos(t, "Tloušťka");
+      pos(w, tr("Šířka")); pos(t, tr("Tloušťka"));
       const outer = rounded(w, t, 0);
-      return { outer, inner: null, circle: null, area: w * t, designation: `Plochá ${fmt(w)}×${fmt(t)}`, bbox: bboxOf(outer) };
+      return { outer, inner: null, circle: null, area: w * t, designation: tr("Plochá {0}×{1}", fmt(w), fmt(t)), bbox: bboxOf(outer) };
     }
     case "square": {
-      pos(w, "Rozměr");
+      pos(w, tr("Rozměr"));
       const outer = rounded(w, w, 0);
-      return { outer, inner: null, circle: null, area: w * w, designation: `Čtyřhran ${fmt(w)}`, bbox: bboxOf(outer) };
+      return { outer, inner: null, circle: null, area: w * w, designation: tr("Čtyřhran {0}", fmt(w)), bbox: bboxOf(outer) };
     }
     case "round": {
-      pos(d, "Průměr");
+      pos(d, tr("Průměr"));
       return { outer: null, inner: null, circle: { ro: d / 2, ri: 0 }, area: (Math.PI * d * d) / 4, designation: `Kulatina Ø${fmt(d)}`, bbox: [-d / 2, -d / 2, d / 2, d / 2] };
     }
   }
@@ -249,7 +250,7 @@ export type MemberLayout = {
 export function memberFrame(seg: Seg3): { u: Vec3; X: Vec3; Y: Vec3; L: number } {
   const d = sub(seg.b, seg.a);
   const L = len(d);
-  if (L < 1e-6) throw new Error("Úsečka profilu má nulovou délku.");
+  if (L < 1e-6) throw new Error(tr("Úsečka profilu má nulovou délku."));
   const u = mul(d, 1 / L);
   let up = norm(seg.up);
   if (len(cross(up, u)) < 1e-6) up = Math.abs(u[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
@@ -376,7 +377,7 @@ export function layoutMembers(segs: Seg3[], o: LayoutOptions): MemberLayout[] {
   }
   out.forEach((m, i) => {
     m.outerLen = m.axisLen + Math.max(0, tipExt[i][0]) + Math.max(0, tipExt[i][1]);
-    if (m.axisLen <= 0) throw new Error("Profil je po ořezání spojů záporný – zvolte menší profil nebo jiný typ spoje.");
+    if (m.axisLen <= 0) throw new Error(tr("Profil je po ořezání spojů záporný – zvolte menší profil nebo jiný typ spoje."));
   });
   return out;
 }
@@ -433,7 +434,7 @@ export function frameSegments(f: FrameData): { rect: Seg3[]; posts: Seg3[]; sec:
   const corners = sectionCorners(sec, "center", 0);
   const secW = 2 * extentAlong(corners, 1, 0);
   const secH = 2 * extentAlong(corners, 0, 1);
-  if (f.width <= 2 * secW || f.depth <= 2 * secW || f.height <= 2 * secH) throw new Error("Rozměry rámu jsou menší než dvojnásobek profilu.");
+  if (f.width <= 2 * secW || f.depth <= 2 * secW || f.height <= 2 * secH) throw new Error(tr("Rozměry rámu jsou menší než dvojnásobek profilu."));
   const x0 = secW / 2;
   const x1 = f.width - secW / 2;
   const y0 = secW / 2;
@@ -508,13 +509,13 @@ export function cutList(doc: CadDoc): { rows: CutRow[]; totals: { designation: s
 
 export function cutListText(doc: CadDoc): string {
   const { rows, totals } = cutList(doc);
-  if (!rows.length) return "Žádné konstrukční profily (přidejte prvek Konstrukční profil nebo Rám z profilů).";
-  const lines = ["Poz.  Profil                 Ks   Délka [mm]  Řez A  Řez B  kg/ks"];
+  if (!rows.length) return tr("Žádné konstrukční profily (přidejte prvek Konstrukční profil nebo Rám z profilů).");
+  const lines = [tr("Poz.  Profil                 Ks   Délka [mm]  Řez A  Řez B  kg/ks")];
   for (const r of rows) lines.push(`${String(r.pos).padEnd(5)} ${r.designation.padEnd(22)} ${String(r.count).padStart(3)}   ${fmt(r.length).padStart(9)}  ${(r.angleA ? fmt(r.angleA) + "°" : "90°").padEnd(6)} ${(r.angleB ? fmt(r.angleB) + "°" : "90°").padEnd(6)} ${fmt(r.massEach)}`);
   lines.push("");
-  lines.push("Celkem na profil:");
-  for (const t of totals) lines.push(`  ${t.designation.padEnd(22)} ${String(t.count).padStart(3)} ks   ${fmt(t.length / 1000)} m   ${fmt(t.mass)} kg`);
-  lines.push(`Hmotnost svařence (profily): ${fmt(totals.reduce((s, t) => s + t.mass, 0))} kg`);
+  lines.push(tr("Celkem na profil:"));
+  for (const t of totals) lines.push(tr("  {0} {1} ks   {2} m   {3} kg", t.designation.padEnd(22), String(t.count).padStart(3), fmt(t.length / 1000), fmt(t.mass)));
+  lines.push(tr("Hmotnost svařence (profily): {0} kg", fmt(totals.reduce((s, t) => s + t.mass, 0))));
   return lines.join("\n");
 }
 
@@ -522,10 +523,10 @@ export function cutListCsv(doc: CadDoc): string {
   const { rows, totals } = cutList(doc);
   const q = (s: string | number) => `"${String(s).replace(/"/g, '""')}"`;
   const n = (x: number) => String(Math.round(x * 100) / 100).replace(".", ",");
-  const out = ["Pozice;Profil;Ks;Délka [mm];Řez A [°];Řez B [°];Hmotnost 1 ks [kg];Hmotnost celkem [kg];Prvek"];
+  const out = [tr("Pozice;Profil;Ks;Délka [mm];Řez A [°];Řez B [°];Hmotnost 1 ks [kg];Hmotnost celkem [kg];Prvek")];
   for (const r of rows) out.push([r.pos, q(r.designation), r.count, n(r.length), n(r.angleA), n(r.angleB), n(r.massEach), n(r.massEach * r.count), q(r.feature)].join(";"));
   out.push("");
-  out.push("Profil;Ks;Délka celkem [m];Hmotnost [kg]");
+  out.push(tr("Profil;Ks;Délka celkem [m];Hmotnost [kg]"));
   for (const t of totals) out.push([q(t.designation), t.count, n(t.length / 1000), n(t.mass)].join(";"));
   return "﻿" + out.join("\r\n") + "\r\n";
 }
@@ -556,10 +557,10 @@ export function weldTable(doc: CadDoc): WeldRow[] {
       const b = beadData(f.data);
       const length = b.edgeLens.reduce((s, L) => s + weldLength(L, b), 0);
       const volume = ((b.a * b.a) / 2) * length;
-      rows.push({ feature: f.name, type: b.intermittent ? `koutový přerušovaný ${fmt(b.segLen)} (${fmt(b.pitch)})` : "koutový", a: b.a, length, volume, mass: volume * STEEL_DENSITY });
+      rows.push({ feature: f.name, type: b.intermittent ? tr("koutový přerušovaný {0} ({1})", fmt(b.segLen), fmt(b.pitch)) : tr("koutový"), a: b.a, length, volume, mass: volume * STEEL_DENSITY });
     } else if (f.ext === "weld.symbol") {
       const s = symbolData(f.data);
-      rows.push({ feature: f.name, type: `${SYMBOL_TYPES.find((t) => t.v === s.kind)?.l ?? s.kind}${s.allAround ? " (po obvodu)" : ""}${s.field ? " (montážní)" : ""}`, a: s.size, length: s.length, volume: s.kind === "fillet" ? ((s.size * s.size) / 2) * s.length : 0, mass: s.kind === "fillet" ? ((s.size * s.size) / 2) * s.length * STEEL_DENSITY : 0 });
+      rows.push({ feature: f.name, type: `${SYMBOL_TYPES.find((t) => t.v === s.kind)?.l ?? s.kind}${s.allAround ? tr(" (po obvodu)") : ""}${s.field ? tr(" (montážní)") : ""}`, a: s.size, length: s.length, volume: s.kind === "fillet" ? ((s.size * s.size) / 2) * s.length : 0, mass: s.kind === "fillet" ? ((s.size * s.size) / 2) * s.length * STEEL_DENSITY : 0 });
     }
   }
   return rows;
@@ -567,10 +568,10 @@ export function weldTable(doc: CadDoc): WeldRow[] {
 
 export function weldTableText(doc: CadDoc): string {
   const rows = weldTable(doc);
-  if (!rows.length) return "Žádné svary (přidejte Svarovou housenku nebo Značku svaru).";
-  const lines = ["Prvek                  Typ                           a/s   Délka [mm]  Objem [cm³]  kg"];
+  if (!rows.length) return tr("Žádné svary (přidejte Svarovou housenku nebo Značku svaru).");
+  const lines = [tr("Prvek                  Typ                           a/s   Délka [mm]  Objem [cm³]  kg")];
   for (const r of rows) lines.push(`${r.feature.padEnd(22)} ${r.type.padEnd(29)} ${fmt(r.a).padStart(4)}  ${fmt(r.length).padStart(10)}  ${fmt(r.volume / 1000).padStart(11)}  ${fmt(r.mass)}`);
-  lines.push(`Svarový kov celkem: ${fmt(rows.reduce((s, r) => s + r.mass, 0))} kg`);
+  lines.push(tr("Svarový kov celkem: {0} kg", fmt(rows.reduce((s, r) => s + r.mass, 0))));
   return lines.join("\n");
 }
 
@@ -578,13 +579,13 @@ export function weldTableText(doc: CadDoc): string {
 
 export type SymbolKind = "fillet" | "V" | "halfV" | "U" | "I" | "square" | "spot";
 export const SYMBOL_TYPES: { v: SymbolKind; l: string }[] = [
-  { v: "fillet", l: "Koutový" },
-  { v: "V", l: "V svar" },
-  { v: "halfV", l: "½V svar" },
-  { v: "U", l: "U svar" },
-  { v: "I", l: "I svar" },
-  { v: "square", l: "Lemový" },
-  { v: "spot", l: "Bodový" },
+  { v: "fillet", l: tr("Koutový") },
+  { v: "V", l: tr("V svar") },
+  { v: "halfV", l: tr("½V svar") },
+  { v: "U", l: tr("U svar") },
+  { v: "I", l: tr("I svar") },
+  { v: "square", l: tr("Lemový") },
+  { v: "spot", l: tr("Bodový") },
 ];
 export type SymbolData = { kind: SymbolKind; size: number; length: number; pitch: number; allAround: boolean; field: boolean; otherSide: boolean; note: string };
 export function symbolData(data: Record<string, unknown>): SymbolData {

@@ -2,6 +2,7 @@
  * Formařské nástroje: analýza úkosů, smrštění materiálu, návrh vyhazovačů a chladicích kanálů.
  * Čisté funkce nad sítí modelu (MeshData) – běží v UI i v testech, bez OCCT.
  */
+import { tr } from "./i18n";
 import type { CadDoc, Feature, MeshData, Vec3 } from "./types";
 import { uid } from "./types";
 
@@ -9,15 +10,15 @@ import { uid } from "./types";
 
 /** Typická lineární smrštění vstřikovaných materiálů [%] (střed rozsahu dle výrobců granulátů). */
 export const SHRINKAGE: { id: string; label: string; pct: number }[] = [
-  { id: "pp", label: "PP (polypropylen)", pct: 1.5 },
+  { id: "pp", label: tr("PP (polypropylen)"), pct: 1.5 },
   { id: "pe-hd", label: "PE-HD", pct: 2.0 },
   { id: "abs", label: "ABS", pct: 0.55 },
-  { id: "pc", label: "PC (polykarbonát)", pct: 0.65 },
-  { id: "pa6", label: "PA6 (silon)", pct: 1.2 },
-  { id: "pa66-gf30", label: "PA66 GF30", pct: 0.5 },
+  { id: "pc", label: tr("PC (polykarbonát)"), pct: 0.65 },
+  { id: "pa6", label: tr("PA6 (silon)"), pct: 1.2 },
+  { id: "pa66-gf30", label: tr("PA66 GF30"), pct: 0.5 },
   { id: "pom", label: "POM", pct: 2.0 },
-  { id: "pmma", label: "PMMA (plexisklo)", pct: 0.45 },
-  { id: "ps", label: "PS (polystyren)", pct: 0.5 },
+  { id: "pmma", label: tr("PMMA (plexisklo)"), pct: 0.45 },
+  { id: "ps", label: tr("PS (polystyren)"), pct: 0.5 },
   { id: "tpe", label: "TPE", pct: 1.5 },
 ];
 
@@ -27,7 +28,7 @@ export const shrinkageScale = (pct: number) => 1 + pct / 100;
 /** Přidá do historie dílu transformaci měřítka „Smrštění“ (dutina formy = zvětšený díl). */
 export function applyShrinkage(doc: CadDoc, pct: number): CadDoc {
   const scale = Math.round(shrinkageScale(pct) * 1e6) / 1e6;
-  const f: Feature = { id: uid(), name: `Smrštění +${pct} %`, type: "transform", translate: [0, 0, 0], rotateAxis: "Z", rotateAngle: 0, scale };
+  const f: Feature = { id: uid(), name: tr("Smrštění +{0} %", pct), type: "transform", translate: [0, 0, 0], rotateAxis: "Z", rotateAngle: 0, scale };
   return { ...doc, features: [...doc.features, f] };
 }
 
@@ -166,7 +167,7 @@ export const defaultCooling = (bbox: [Vec3, Vec3]): CoolingParams => {
  * příčnými vrty (meandr). Vloží se jako komponenta do sestavy formy, nebo jako
  * negativ (mode "cut") do desky.
  */
-export function coolingCircuit(p: CoolingParams, name = "Chladicí okruh"): CadDoc {
+export function coolingCircuit(p: CoolingParams, name = tr("Chladicí okruh")): CadDoc {
   const [min, max] = p.bbox;
   const z = min[2] - p.depth;
   const x0 = min[0] - p.overhang;
@@ -175,14 +176,14 @@ export function coolingCircuit(p: CoolingParams, name = "Chladicí okruh"): CadD
   const ys: number[] = [];
   for (let i = 0; i < p.rows; i++) ys.push(p.rows === 1 ? (min[1] + max[1]) / 2 : min[1] + ((max[1] - min[1]) * i) / (p.rows - 1));
   ys.forEach((y, i) => {
-    features.push({ id: uid(), name: `Kanál ${i + 1}`, type: "cylinder", radius: p.diameter / 2, height: x1 - x0, position: [x0, y, z], axis: "X", mode: i === 0 ? "new" : "add" });
+    features.push({ id: uid(), name: tr("Kanál {0}", i + 1), type: "cylinder", radius: p.diameter / 2, height: x1 - x0, position: [x0, y, z], axis: "X", mode: i === 0 ? "new" : "add" });
   });
   // propojky střídavě na koncích (meandr)
   for (let i = 0; i + 1 < ys.length; i++) {
     const x = i % 2 === 0 ? x1 - p.diameter : x0 + p.diameter;
     features.push({ id: uid(), name: `Propojka ${i + 1}`, type: "cylinder", radius: p.diameter / 2, height: ys[i + 1] - ys[i], position: [x, ys[i], z], axis: "Y", mode: "add" });
   }
-  return { app: "mnastrojarna-cad", version: 2, name, material: "ocel", features, color: "#1c7ed6", props: { note: `Ø${p.diameter} mm, ${p.rows} větví` } };
+  return { app: "mnastrojarna-cad", version: 2, name, material: "ocel", features, color: "#1c7ed6", props: { note: tr("Ø{0} mm, {1} větví", p.diameter, p.rows) } };
 }
 
 // ---------------- dělicí rovina (odhad) ----------------

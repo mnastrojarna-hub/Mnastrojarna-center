@@ -1,0 +1,1283 @@
+# Jádro CADu – agent, sestava, build, chyby, rozšíření (plochy, plech, svařence, pokročilé), prvky, formáty, odkazy
+# Textové příkazy agenta zůstávají česky (syntaxe se nepřekládá) – překládá se jen popis.
+
+# agent
+Chyby proměnných: {0}	Variable errors: {0}
+Dokument: „{0}“ · {1} · materiál {2} · prvků {3} ({4} ✓{5}, {6} ✗){7}	Document: “{0}” · {1} · material {2} · features {3} ({4} ✓{5}, {6} ✗){7}
+Díl z JSON	Part from JSON
+JSON nelze přečíst: {0}	Cannot read JSON: {0}
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava	Interference: not checked – use the “clash” command or the Interference button on the Assembly tab
+Kolize: {0} (zkontrolováno {1})	Interference: {0} (checked {1})
+Proměnné: {0}	Variables: {0}
+Prvek {0}: není objekt.	Feature {0}: not an object.
+Prvek {0}: neznámý typ „{1}“. Povolené: {2}.	Feature {0}: unknown type “{1}”. Allowed: {2}.
+Prázdný vstup.	Empty input.
+Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem {9} cm³ · ploch {10} · hran {11}	Size: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · volume {9} cm³ · faces {10} · edges {11}
+Rozměry: žádné těleso (jen skici / pomocná geometrie)	Size: no solid body (sketches / construction geometry only)
+R{0}, hrany {1}	R{0}, edges {1}
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)	Assembly: component bodies are built separately (see the bill of materials for volume and mass)
+Sestava: {0} komponent ({1} dílů po rozložení podsestav){2}{3}{4}	Assembly: {0} components ({1} parts after expanding sub-assemblies){2}{3}{4}
+Text	Text
+bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; závit i s jemným stoupáním (M18×1,5) – jádro se dopočítá	without z = starts on the body surface at that point (from the mesh) and drills downwards; the thread may have a fine pitch (M18×1,5) – the minor diameter is computed
+celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy	a whole .mncad document, an array of features or a single feature – gives access to all 36 feature types; one feature per line can be mixed with text commands
+další entity; předpona „pomocná“ = konstrukční	more entities; the prefix “construction” = construction geometry
+drážka	slot
+drážka potřebuje délku a šířku: drážka 40 10 [v x y] [úhel 0]	slot needs a length and a width: slot 40 10 [at x y] [angle 0]
+díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]	hole needs a diameter: hole 8.5 [depth 20 | through] at X Y [Z]
+elipsa potřebuje dvě poloosy: elipsa 30 20 [v x y]	ellipse needs two semi-axes: ellipse 30 20 [at x y]
+koule potřebuje průměr: koule D	sphere needs a diameter: sphere D
+koule průměr	sphere by diameter
+kruhové {0}× / {1}°	circular {0}× / {1}°
+kružnice potřebuje průměr: kružnice 165 [v x y] (nebo poloměr 82,5)	circle needs a diameter: circle 165 [at x y] (or radius 82.5)
+kružnice průměrem (poloměr r: „poloměr 10“)	circle by diameter (radius r: “radius 10”)
+kužel / komolý kužel	cone / frustum
+kužel potřebuje dolní průměr, horní průměr a výšku: kužel D1 D2 H	cone needs a bottom diameter, a top diameter and a height: cone D1 D2 H
+kvádr potřebuje tři kladné rozměry: kvádr X Y Z	box needs three positive dimensions: box X Y Z
+kvádr; výchozí roh v počátku, „střed“ = vystředit	box; corner at the origin by default, “center” = centred
+lineární {0}× po {1}{2}	linear {0}× every {1}{2}
+materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)	material = density class (steel, stainless, aluminium, brass, copper, plastic, titanium, cast iron, bronze) or any designation for the title block (ČSN 11 423, 1.0503)
+mnohoúhelník potřebuje počet stran a průměr opsané kružnice: mnohoúhelník 6 30 [v x y]	polygon needs the number of sides and the circumscribed diameter: polygon 6 30 [at x y]
+neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, bod, elipsa	unknown sketch entity “{0}” – rect, circle, polygon, slot, line, polyline, point, ellipse
+neznámé pravidlo pro hrany „{0}“ – vše, horní, spodní, +Z/-Z/+X/-X/+Y/-Y, svislé, vodorovné, kruhové, rovné, poloměr N, delší N, kratší N	unknown edge rule “{0}” – all, top, bottom, +Z/-Z/+X/-X/+Y/-Y, vertical, horizontal, circular, straight, radius N, longer N, shorter N
+neznámé pravidlo pro plochy „{0}“ – +Z/-Z/+X/-X/+Y/-Y, horní, spodní, boční, válcové, rovinné, největší	unknown face rule “{0}” – +Z/-Z/+X/-X/+Y/-Y, top, bottom, side, cylindrical, planar, largest
+neznámý příkaz „{0}“ – příkazy: nový díl, kvádr, válec, koule, kužel, trubka, skica, obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, vysunout, rotovat, díra, zaoblit, srazit, skořepina, pole, zrcadlit, text, smazat poslední, stav, zobraz; nebo vložte JSON	unknown command “{0}” – commands: new part, box, cylinder, sphere, cone, tube, sketch, rect, circle, polygon, slot, line, polyline, extrude, revolve, hole, fillet, chamfer, shell, pattern, mirror, text, undo, status, view; or paste JSON
+neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)	unknown thread “{0}” – M2 to M48, coarse or fine pitch (M18×1,5)
+nová skica; entity i na dalších řádcích	new sketch; entities may follow on the next lines
+nový dokument v nové záložce	new document in a new tab
+nápis vystouplý / gravírovaný	raised / engraved lettering
+obdélník potřebuje šířku a výšku: obdélník 60 40 [v x y] (střed) nebo roh x y	rectangle needs a width and a height: rect 60 40 [at x y] (centre) or corner x y
+obdélník se středem (výchozí počátek) nebo rohem	rectangle by centre (origin by default) or by corner
+orotuje poslední skicu (výchozí osa Y skici, 360°)	revolves the last sketch (sketch Y axis by default, 360°)
+pohled: iso, přední, zadní, horní, spodní, levý, pravý	view: iso, front, back, top, bottom, left, right
+pole kruhové potřebuje počet: pole kruhové 6 [úhel 360] [osa Z]	circular pattern needs a count: pattern circular 6 [angle 360] [axis Z]
+pole posledního prvku	pattern of the last feature
+pole potřebuje počet a rozteč: pole 4 rozteč 25 [směr X] [počet 3 rozteč 20 směr Y]	pattern needs a count and a spacing: pattern 4 spacing 25 [direction X] [count 3 spacing 20 direction Y]
+pravidelný N-úhelník (D = opsaná kružnice)	regular N-gon (D = circumscribed circle)
+pravidla lze kombinovat (horní kruhové)	rules can be combined (top circular)
+rovina {0}, {1} entit	plane {0}, {1} entities
+sestava: kontrola průniků komponent; výsledek zůstane v protokolu i ve stavu (řádek „Kolize:“)	assembly: checks component interference (“clash”); the result stays in the log and in the status (“Interference:” line)
+skořepina potřebuje tloušťku: skořepina 2 [otevřít +Z]	shell needs a thickness: shell 2 [open +Z]
+správa	management
+srazit potřebuje velikost: srazit 1 [hrany horní]	chamfer needs a size: chamfer 1 [edges top]
+sražení hran	edge chamfer
+text potřebuje nápis v uvozovkách: text "ABC" výška 10 hloubka 1 v X Y [Z]	text needs the lettering in quotes: text "ABC" height 10 depth 1 at X Y [Z]
+trubka potřebuje vnější průměr, vnitřní průměr a výšku: trubka D d H	tube needs an outer diameter, an inner diameter and a height: tube D d H
+trubka vnější / vnitřní průměr × výška	tube outer / inner diameter × height
+vydlabání, otevřené plochy pravidlem	hollowing, open faces by rule
+vysune poslední skicu	extrudes the last sketch
+vysunout potřebuje výšku: vysunout 20 [symetricky] [odebrat] [skrz]	extrude needs a height: extrude 20 [symmetric] [cut] [through]
+válec potřebuje průměr a výšku: válec D H	cylinder needs a diameter and a height: cylinder D H
+válec průměr × výška	cylinder diameter × height
+zaoblit potřebuje poloměr: zaoblit 2 [hrany svislé]	fillet needs a radius: fillet 2 [edges vertical]
+zrcadlení tělesa	mirror the body
+závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii	thread on a cylinder (external) or in a hole (internal); cosmetic = drawing only, “modeled” = grooves in the geometry
+závit potřebuje délku: závit M18×1,5 délka 20	thread needs a length: thread M18×1.5 length 20
+závit potřebuje označení M2 až M48 (hrubé nebo jemné stoupání, např. M18×1,5): závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]{0}	thread needs a designation M2 to M48 (coarse or fine pitch, e.g. M18×1.5): thread M18×1.5 length 20 at 0 0 10 [axis Z] [internal] [modeled]{0}
+{0} délka {1} mm, {2}, {3}, začátek [{4}], osa {5}	{0} length {1} mm, {2}, {3}, start [{4}], axis {5}
+{0} mm, hrany {1}	{0} mm, edges {1}
+{0} mm, otevřených ploch {1}	{0} mm, open faces {1}
+{0}{1}{2} v [{3}], osa {4}	{0}{1}{2} at [{3}], axis {4}
+Ø{0} × {1} mm, osa {2}, {3}	Ø{0} × {1} mm, axis {2}, {3}
+úsečka potřebuje dva body: úsečka x1 y1 x2 y2	line needs two points: line x1 y1 x2 y2
+čára potřebuje body po dvojicích: čára x1 y1 x2 y2 x3 y3 … [uzavřít]	polyline needs points in pairs: polyline x1 y1 x2 y2 x3 y3 … [closed]
+
+# asm-kernel, assembly
+Sestava je zanořená příliš hluboko (nebo obsahuje sama sebe).	The assembly is nested too deeply (or contains itself).
+ISO 4032 – {0} – 8	ISO 4032 – {0} – 8
+ISO 4762 – {0}×{1} – 12.9	ISO 4762 – {0}×{1} – 12.9
+ISO 7089 – {0} – 200 HV	ISO 7089 – {0} – 200 HV
+ISO 8694 – Ø{0}×{1}	ISO 8694 – Ø{0}×{1}
+ISO 8734 – Ø{0}×{1} – A	ISO 8734 – Ø{0}×{1} – A
+Kolík Ø{0}×{1}	Pin Ø{0}×{1}
+Komponenta nenalezena.	Component not found.
+Kotevní deska vyhazovačů	Ejector retainer plate
+Matice {0}	Nut {0}
+Opěrná deska	Support plate
+Podložka {0}	Washer {0}
+Pružina tlačná D{0} d{1} L0={2}	Compression spring D{0} d{1} L0={2}
+Pružina tlačná {0}×{1}×{2}	Compression spring {0}×{1}×{2}
+Rozpěrka	Spacer block
+Rám {0}×{1}	Frame {0}×{1}
+Středicí kroužek Ø{0}	Locating ring Ø{0}
+Tvarová deska pevná	Fixed cavity plate
+Tvarová deska pohyblivá	Moving cavity plate
+Upínací deska pevná	Fixed clamping plate
+Upínací deska pohyblivá	Moving clamping plate
+Vodicí pouzdro Ø{0}×{1}	Guide bush Ø{0}×{1}
+Vodicí sloupek Ø{0}×{1}	Guide pillar Ø{0}×{1}
+Vyberte komponenty pro podsestavu.	Select the components for the sub-assembly.
+Vybraná komponenta není podsestava.	The selected component is not a sub-assembly.
+Vyhazovací deska	Ejector plate
+Vyhazovač Ø{0}×{1}	Ejector pin Ø{0}×{1}
+Šestihran	Hexagon
+Šroub {0}×{1}	Screw {0}×{1}
+
+# build
+Chybí {0} – vyberte ji v parametrech.	Missing {0} – select it in the parameters.
+Cílová plocha je rovnoběžná s osou díry.	The target face is parallel to the hole axis.
+Cílová plocha je rovnoběžná se směrem vysunutí.	The target face is parallel to the extrusion direction.
+Cílová plocha neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).	The target face is not in front of the sketch plane in the extrusion direction (try Reverse direction).
+Cílová plocha neleží ve směru vrtání (zkuste obrátit směr).	The target face is not in the drilling direction (try reversing the direction).
+Dráha musí být jedna souvislá křivka (bez větvení a mezer).	The path must be one continuous curve (no branches or gaps).
+Dráha musí být jedna souvislá křivka.	The path must be one continuous curve.
+Délka závitu musí být kladná.	The thread length must be positive.
+Hloubka díry musí být kladná.	The hole depth must be positive.
+Hloubka díry musí být větší než hloubka zahloubení.	The hole depth must be greater than the counterbore depth.
+Hodnota musí být kladná.	The value must be positive.
+Každá skica musí mít uzavřený vnější profil.	Every sketch must have a closed outer profile.
+Měřítko musí být kladné.	The scale must be positive.
+Na zvolené straně roviny nic nezůstane – změňte stranu nebo posunutí.	Nothing remains on the chosen side of the plane – change the side or the offset.
+Není co rozříznout.	Nothing to split.
+Není co skořepinovat.	Nothing to shell.
+Není co zaoblit – nejdřív vytvořte těleso.	Nothing to fillet – create a body first.
+Není co zrcadlit.	Nothing to mirror.
+Není těleso k transformaci.	There is no body to transform.
+Není těleso pro úkos.	There is no body to draft.
+Není těleso – nejdřív vytvořte nebo importujte model.	There is no body – create or import a model first.
+Není těleso.	There is no body.
+Není z čeho odebírat – nejdřív vytvořte těleso.	Nothing to cut from – create a body first.
+Neplatné rozměry kuželu.	Invalid cone dimensions.
+Neznámý prvek rozšíření „{0}“ – modul není načten.	Unknown extension feature “{0}” – the module is not loaded.
+Neznámý závit „{0}“ – {1}.	Unknown thread “{0}” – {1}.
+Normála roviny nesmí být nulová.	The plane normal must not be zero.
+Odsazení lze použít jen u rovinné plochy nebo pomocné roviny.	An offset can only be used with a planar face or a datum plane.
+Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).	The operation did not return a solid ({0}) – the kernel failed; change the parameters (the path must not self-intersect or be tangent to the surface, the profile must be closed and perpendicular to the path).
+Operace vrátila prázdné těleso – nejčastěji kvůli volným plochám v modelu (sešijte je nebo uzavřete do tělesa) nebo neplatné geometrii.	The operation returned an empty body – usually because of free surfaces in the model (sew them or close them into a solid) or invalid geometry.
+Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie).	The operation cannot be performed with these parameters (e.g. a fillet radius that is too large, or invalid geometry).
+Pole má příliš mnoho kusů (max. 400).	The pattern has too many instances (max. 400).
+Poloměr musí být kladný.	The radius must be positive.
+Profil a dráha musí být dvě různé skici.	The profile and the path must be two different sketches.
+Profil je prázdný.	The profile is empty.
+Průměr díry musí být kladný.	The hole diameter must be positive.
+Průměr kuželového zahloubení musí být větší než průměr díry.	The countersink diameter must be greater than the hole diameter.
+Písmo pro text se nepodařilo načíst – zkontrolujte připojení a zkuste to znovu.	The text font could not be loaded – check your connection and try again.
+Rozměry musí být kladné.	The dimensions must be positive.
+Skica dráhy „{0}“ je prázdná.	The path sketch “{0}” is empty.
+Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu).	The sketch contains no closed profile (enable Thin wall for an open profile).
+Skica „{0}“ musí obsahovat čáru (úsečku, lomenou čáru nebo oblouk).	Sketch “{0}” must contain a curve (line, polyline or arc).
+Skica „{0}“ neobsahuje uzavřený profil.	Sketch “{0}” contains no closed profile.
+Skica „{0}“ obsahuje neplatný profil.	Sketch “{0}” contains an invalid profile.
+Skořepinu se nepodařilo vytvořit – jádro vrátilo těleso beze změny. Otevřete jen rovinné plochy (zaoblené plochy jádro otevřít neumí); u zaoblených hran musí být tloušťka stěny menší než poloměr zaoblení, nebo zaoblete až po skořepině.	The shell could not be created – the kernel returned the body unchanged. Open planar faces only (the kernel cannot open filleted faces); with filleted edges the wall thickness must be smaller than the fillet radius, or fillet after shelling.
+Směr pole nesmí být nulový.	The pattern direction must not be zero.
+Směr vysunutí nesmí ležet v rovině skici.	The extrusion direction must not lie in the sketch plane.
+Tento typ pole (po křivce / podle skici / výplňové) zatím není v jádře k dispozici.	This pattern type (along curve / sketch driven / fill) is not available in the kernel yet.
+Tloušťka musí být kladná.	The thickness must be positive.
+Tloušťka tenké stěny musí být kladná.	The thin-wall thickness must be positive.
+Ukončení díry „k ploše“ vyžaduje rovinnou plochu nebo pomocnou rovinu.	The hole end condition “up to face” requires a planar face or a datum plane.
+Ukončení „k dalšímu“ potřebuje stávající těleso.	The end condition “up to next” needs an existing body.
+Ukončení „k dalšímu“ potřebuje těleso.	The end condition “up to next” needs a body.
+Ve směru operace není žádné těleso.	There is no body in the direction of the operation.
+Ve směru vysunutí není další plocha tělesa (použijte Na vzdálenost nebo Skrz vše).	There is no further body face in the extrusion direction (use Blind or Through all).
+Vnitřní chyba jádra – zkuste upravit parametry.	Internal kernel error – try changing the parameters.
+Vnější průměr musí být větší než vnitřní.	The outer diameter must be greater than the inner diameter.
+Vyberte hrany v modelu.	Select edges in the model.
+Vyberte plochu tělesa.	Select a face of the body.
+Vyberte plochy, které se mají otevřít.	Select the faces to open.
+Vyberte plochy, které se mají zkosit.	Select the faces to draft.
+Vyberte prvek (vysunutí, díra, primitivum…), který se má opakovat.	Select the feature (extrusion, hole, primitive…) to repeat.
+Vybraný bod neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).	The selected point is not in front of the sketch plane in the extrusion direction (try Reverse direction).
+Vysunutí k ploše nevytvořilo těleso.	Extrude up to face did not create a body.
+Vysunutí k zakřivené ploše se nezdařilo – plocha musí celý profil zakrýt. Zkuste „K dalšímu“ nebo rovinnou plochu.	Extrude up to a curved face failed – the face must cover the whole profile. Try “Up to next” or a planar face.
+Vzdálenost vysunutí musí být kladná.	The extrusion distance must be positive.
+Výška písma a hloubka musí být kladné.	The text height and depth must be positive.
+Zadejte text.	Enter the text.
+Zahloubení musí mít větší průměr než díra a kladnou hloubku.	The counterbore must have a larger diameter than the hole and a positive depth.
+Zesílení potřebuje těleso s plochami.	Thicken needs a body with faces.
+Závit potřebuje těleso (válcovou plochu).	A thread needs a body (a cylindrical face).
+bod díry	hole point
+plochu začátku	start face
+skica dráhy	path sketch
+skica profilu	profile sketch
+skica žebra	rib sketch
+vrchol ukončení	end vertex
+vrchol začátku	start vertex
+Úhel úkosu musí být mezi 0 a 45°.	The draft angle must be between 0 and 45°.
+Úkos a tenkou stěnu nelze kombinovat.	Draft and thin wall cannot be combined.
+Úkos lze použít jen při vysunutí kolmo na skicu.	Draft can only be used when extruding perpendicular to the sketch.
+Úkos vysunutí musí být menší než 45°.	The extrusion draft must be less than 45°.
+Šablonování potřebuje alespoň dvě skici (profily).	Loft needs at least two sketches (profiles).
+Žebro potřebuje těleso, ke kterému se připojí.	A rib needs a body to attach to.
+
+# worker, check, client
+Chyba CAD jádra.	CAD kernel error.
+Model je prázdný.	The model is empty.
+Těleso není k dispozici.	The body is not available.
+NEPLATNÁ geometrie ({0}) – sebeprotínající nebo neorientovatelné plochy; export STEP může selhat	INVALID geometry ({0}) – self-intersecting or non-orientable faces; STEP export may fail
+platná geometrie ({0})	valid geometry ({0})
+žádné objemové těleso	no solid body
+žádné objemové těleso – jen {0} {1} ({2} ploch)	no solid body – only {0} {1} ({2} faces)
+CAD jádro se nepodařilo načíst: 	The CAD kernel could not be loaded:
+
+# defaults
+Celková délka	Overall length
+Délka závitu	Thread length
+Hřídel s osazením	Stepped shaft
+Madlo s patkami (tažení)	Handle with feet (sweep)
+Neznámý prvek rozšíření „{0}“.	Unknown extension feature “{0}”.
+Plocha modelu	Model face
+Průměr madla	Handle diameter
+Přechodový kus (šablonování)	Transition piece (loft)
+Příruba DN50	Flange DN50
+Rozteč patek	Foot spacing
+Úhelník – konzola	Angle bracket
+Čep M20 (závit, stavy, rovnice)	Pin M20 (thread, states, equations)
+
+# diagnostics
+3D okno nelze spustit	The 3D view cannot start
+3D okno přestalo fungovat	The 3D view stopped working
+Aktualizujte ovladač grafické karty (Windows Update nebo web výrobce: NVIDIA, AMD, Intel) a restartujte počítač.	Update the graphics driver (Windows Update or the vendor's website: NVIDIA, AMD, Intel) and restart the computer.
+Firefox: Nastavení → Obecné → Výkon → zapněte „Použít doporučená nastavení výkonu“ (hardwarová akcelerace); v about:config musí být webgl.disabled = false. Stav ukáže about:support → Grafika.	Firefox: Settings → General → Performance → enable “Use recommended performance settings” (hardware acceleration); in about:config webgl.disabled must be false. about:support → Graphics shows the status.
+Nebo jiné zařízení – WebGL zvládá i běžný notebook či telefon z posledních let.	Or another device – any ordinary laptop or phone from recent years handles WebGL.
+Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Jen se nezobrazí 3D model.	The rest of the program keeps working: menus, help, settings, opening and saving files, the 2D sketch and drawings. Only the 3D model is not displayed.
+Pracujete-li přes vzdálenou plochu (RDP), Citrix nebo ve virtuálním stroji, otevřete CAD přímo na počítači s grafickou kartou – vzdálené relace WebGL často neposkytují.	If you work over Remote Desktop (RDP), Citrix or in a virtual machine, open the CAD directly on a computer with a graphics card – remote sessions often do not provide WebGL.
+Safari: aktualizujte macOS / iOS – WebGL je v Safari 16 a novějším zapnuté standardně. Ve starších verzích: Vývoj → Experimentální funkce → WebGL.	Safari: update macOS / iOS – WebGL is enabled by default in Safari 16 and later. In older versions: Develop → Experimental Features → WebGL.
+Událost: WebGL kontext ztracen	Event: WebGL context lost
+Zapněte v prohlížeči hardwarovou (grafickou) akceleraci a prohlížeč restartujte.	Enable hardware (graphics) acceleration in the browser and restart it.
+Zkuste jiný prohlížeč v aktuální verzi: Chrome, Edge, Firefox nebo Safari.	Try another up-to-date browser: Chrome, Edge, Firefox or Safari.
+chyba při vytváření WebGL kontextu	error creating the WebGL context
+mimo prohlížeč	outside a browser
+prohlížeč neposkytl WebGL kontext (grafická akcelerace je vypnutá nebo nedostupná)	the browser did not provide a WebGL context (graphics acceleration is disabled or unavailable)
+{0}: Nastavení → Systém → zapněte „Použít grafickou akceleraci, je-li k dispozici“ a prohlížeč restartujte. Stav grafiky ukáže adresa {1} (řádek WebGL musí být „Hardware accelerated“ nebo alespoň „Software only“).	{0}: Settings → System → enable “Use graphics acceleration when available” and restart the browser. The address {1} shows the graphics status (the WebGL line must read “Hardware accelerated” or at least “Software only”).
+
+# direct
+Odsazení by zrušilo celý válec – zvolte menší vzdálenost.	The offset would remove the whole cylinder – choose a smaller distance.
+Odsazení plochy nevytvořilo objem – tento typ plochy zatím odsadit nelze.	Offsetting the face did not create a volume – this face type cannot be offset yet.
+Plochu se nepodařilo odsadit – zkuste menší vzdálenost.	The face could not be offset – try a smaller distance.
+Plochu {0} nelze odstranit. Odstranit lze díry, čepy, kuželová zahloubení a válcová zaoblení – rovinné plochy posuňte příkazem Vytáhnout/Zatlačit.	Face {0} cannot be removed. Holes, bosses, countersinks and cylindrical fillets can be removed – move planar faces with Push / Pull.
+Pružina může mít nejvýš 200 závitů.	A spring can have at most 200 coils.
+Pružinu se nepodařilo vytvořit.	The spring could not be created.
+Průměr drátu musí být menší než průměr pružiny.	The wire diameter must be smaller than the spring diameter.
+Průměr drátu musí být menší než stoupání (závity by se protínaly).	The wire diameter must be smaller than the pitch (the coils would intersect).
+Rozměry pružiny musí být kladné.	The spring dimensions must be positive.
+Skica „{0}“ neobsahuje čáru žebra.	Sketch “{0}” contains no rib line.
+Tloušťka nesmí být nulová.	The thickness must not be zero.
+Tloušťka žebra musí být kladná.	The rib thickness must be positive.
+Vyberte {0} v modelu.	Select {0} in the model.
+Vytáhnout/zatlačit lze jen rovinné plochy – pro zakřivené použijte Odsadit plochu.	Only planar faces can be pushed/pulled – use Offset face for curved ones.
+Vzdálenost nesmí být nulová.	The distance must not be zero.
+Zaoblení není rovnoběžné s osami – nelze jej odstranit.	The fillet is not parallel to the axes – it cannot be removed.
+Čára žebra je příliš krátká.	The rib line is too short.
+Částečnou kuželovou plochu nelze odstranit.	A partial conical face cannot be removed.
+Žebro na zvolené straně nenarazí na těleso – zaškrtněte „Obrátit stranu“.	The rib does not hit the body on the chosen side – tick “Flip side”.
+Žebro nenarazilo na těleso – přesuňte čáru blíž k tělesu nebo otočte stranu.	The rib did not hit the body – move the line closer to the body or flip the side.
+
+# drawing
+Datum	Date
+Detail {0}: pohled {1} není na listu.	Detail {0}: view {1} is not on the sheet.
+Detail {0}: v kruhu není žádná geometrie.	Detail {0}: there is no geometry inside the circle.
+Formát	Format
+Hmotnost	Mass
+Kreslil	Drawn by
+Materiál	Material
+Měřítko	Scale
+Název	Title
+Pohledy se v měřítku {0} nevejdou ani na A0.	The views do not fit even on A0 at scale {0}.
+Pohledy se v měřítku {0} nevejdou na list {1}.	The views do not fit on sheet {1} at scale {0}.
+Promítání	Projection
+Rovina řezu neprotíná těleso – upravte odsazení.	The section plane does not intersect the body – adjust the offset.
+Tabulka děr	Hole table
+Váš partner ve strojírenství	Your partner in engineering
+Čára řezu leží mimo pohled.	The section line lies outside the view.
+Čáru řezu nelze zakreslit – zapněte pohled, ve kterém je rovina řezu vidět jako čára.	The section line cannot be drawn – enable a view in which the section plane is seen edge-on.
+Číslo výkresu	Drawing number
+Řez se nepodařilo vytvořit.	The section could not be created.
+
+# ext/advanced
+0 = bez	0 = none
+0 = rozdělit rovnoměrně	0 = distribute evenly
+0 = skrz	0 = through
+0 = vepsaný do plochy	0 = inscribed in the face
+0,98 = téměř plný půlkruh	0.98 = almost a full semicircle
+Bod měřítka	Scale point
+D × úhel	D × angle
+Do oblasti se nevejde žádná kopie – zmenšete rozteče nebo odstup.	No instance fits in the region – reduce the spacing or the margin.
+Druh	Kind
+Dráha (skica)	Path (sketch)
+Drážka (odebrat)	Groove (cut)
+Díry v bodech	Holes at points
+Dělicí rovina	Parting plane
+Dělicí rovina těleso neprotíná.	The parting plane does not intersect the body.
+Gravírovat	Engrave
+Hloubka	Depth
+Hloubka / výška reliéfu	Relief depth / height
+Hloubka zahloubení	Counterbore depth
+Hrany	Edges
+K hraně se nepodařilo najít plochu.	No face could be found for the edge.
+Kolem těžiště obálky	About the bounding-box centre
+Kontrola geometrie	Geometry check
+Kontrolovat i geometrii ploch	Also check face geometry
+Kopule	Dome
+Kopuli lze vytvořit jen na rovinné ploše.	A dome can only be created on a planar face.
+Lem (přidat)	Lip (add)
+Lem / drážka	Lip / groove
+Lem a drážku lze vytvořit jen na rovinné ploše.	A lip or groove can only be created on a planar face.
+Měřítko v bodě	Scale about point
+Natočení kolem osy	Rotation about the axis
+Natáčet podle tečny	Align to tangent
+Nepodařilo se určit poloměr – zadejte ho ručně.	The radius could not be determined – enter it manually.
+Oba poloměry musí být kladné.	Both radii must be positive.
+Oblast (uzavřená skica)	Region (closed sketch)
+Obrys plochy není uzavřený.	The face outline is not closed.
+Obrátit smysl úkosu	Reverse draft direction
+Odsazení roviny	Plane offset
+Odstup od okraje	Margin from the edge
+Opakovaný prvek	Repeated feature
+Operace	Operation
+Operace s nástrojem	Operation with the tool
+Plné zaoblení	Full round fillet
+Plocha je příliš úzká.	The face is too narrow.
+Plocha musí mít alespoň dvě hrany.	The face must have at least two edges.
+Po obvodu	Along the perimeter
+Podél osy	Along the axis
+Podíl šířky	Width fraction
+Pole by mělo {0} kopií – zvětšete rozteče (max. 400).	The pattern would have {0} instances – increase the spacing (max. 400).
+Pole podél křivky	Pattern along curve
+Poloměr / velikost	Radius / size
+Poloměr na konci R2	End radius R2
+Poloměr na začátku R1	Start radius R1
+Poloměr základny	Base radius
+Posun kopie	Instance offset
+Posun podél osy	Offset along the axis
+Počet kopií	Number of instances
+Profil (skica)	Profile (sketch)
+Proměnné zaoblení	Variable fillet
+Prvek (nástroj)	Feature (tool)
+Průměr	Diameter
+Průměr musí být kladný.	The diameter must be positive.
+Písmo pro text není načteno.	The text font is not loaded.
+Písmo pro text se nepodařilo stáhnout.	The text font could not be downloaded.
+Rovina zrcadlení	Mirror plane
+Rovinná plocha	Planar face
+Rozteč X	Spacing X
+Rozteč Y	Spacing Y
+Rozteč po křivce	Spacing along the curve
+Rozteč × počet přesahuje délku dráhy ({0} mm).	Spacing × count exceeds the path length ({0} mm).
+Rozteče musí být kladné.	The spacings must be positive.
+Sjednocení ploch	Face merging
+Sjednocení ploch selhalo – těleso zůstává beze změny.	Face merging failed – the body remains unchanged.
+Sjednotit plochy	Merge faces
+Skica neobsahuje body ani kružnice.	The sketch contains no points or circles.
+Skica neobsahuje uzavřený profil.	The sketch contains no closed profile.
+Skica oblasti musí obsahovat uzavřený profil.	The region sketch must contain a closed profile.
+Skica s body	Sketch with points
+Směr textu	Text direction
+Srazit místo zaoblit	Chamfer instead of fillet
+Sražení	Chamfer
+Sražení D1×D2 / D×úhel	Chamfer D1×D2 / D×angle
+Střední plocha	Middle face
+Střídavě (šachovnice)	Staggered (checkerboard)
+Text na válci	Text on cylinder
+Tloušťka stěn	Wall thickness
+Tolerance tečnosti	Tangency tolerance
+Těleso má nulový objem.	The body has zero volume.
+Těleso není platné: {0}{1}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.	The body is not valid: {0}{1}. Try “Merge faces” or edit the previous features.
+Vrtat v kladném směru normály	Drill in the positive normal direction
+Vyberte dřívější prvek s tělesem (vysunutí, díra, primitivum…).	Select an earlier feature with a body (extrusion, hole, primitive…).
+Vyberte plochu v modelu.	Select a face in the model.
+Vyberte prvky, které se mají zrcadlit (nebo zaškrtněte Všechny).	Select the features to mirror (or tick All).
+Vyberte válcovou plochu.	Select a cylindrical face.
+Vyberte {0} v parametrech prvku.	Select {0} in the feature parameters.
+Vystouplý	Raised
+Vzdálenost D1	Distance D1
+Vzdálenost D1 musí být kladná.	Distance D1 must be positive.
+Vzdálenost D2	Distance D2
+Vzdálenost D2 musí být kladná.	Distance D2 must be positive.
+Válcová plocha	Cylindrical face
+Výchozí hrany	Starting edges
+Výplňové pole	Fill pattern
+Výška	Height
+Výška / hloubka	Height / depth
+Výška kopule	Dome height
+Výška musí být kladná.	The height must be positive.
+Výška písma	Text height
+Všechny dosavadní prvky	All previous features
+Zadání	Input
+Zaoblení	Fillet
+Zaoblení řetězce	Chain fillet
+Zkrut	Twist
+Znovu použít nástroj	Reuse tool
+Zrcadlení prvků	Mirror features
+Zrcadlit prvky	Mirror features
+body, středy kružnic	points, circle centres
+eliptická kopule (nebo důlek) na rovinné ploše	elliptical dome (or dimple) on a planar face
+jen pro D × úhel	only for D × angle
+jen pro D1 × D2	only for D1 × D2
+kopie prvku rozmístěné po dráze ze skici	instances of a feature placed along a sketch path
+kopie prvku v mřížce uvnitř uzavřené skici	instances of a feature in a grid inside a closed sketch
+najde nejtenčí stěnu tělesa (vzorkování sítě)	finds the thinnest wall of the body (mesh sampling)
+nesymetrické sražení dvěma vzdálenostmi nebo vzdáleností a úhlem	asymmetric chamfer by two distances or a distance and an angle
+ověří platnost tělesa (OpenCascade BRepCheck); chyby se zobrazí u prvku	checks the validity of the body (OpenCascade BRepCheck); errors are shown on the feature
+poloměr se po hraně mění od R1 k R2	the radius changes along the edge from R1 to R2
+použije se, není-li zaškrtnuto Kolem těžiště	used when About the centre is not ticked
+použije těleso dřívějšího prvku znovu jinou operací (přidat → odebrat, průnik…)	reuses the body of an earlier feature with another operation (add → cut, intersect…)
+skicu dráhy	the path sketch
+skicu oblasti	the region sketch
+skicu profilu	the profile sketch
+skicu s body	the sketch with points
+sloučí sousední souplošné plochy a hrany (po importu STEP, po booleovských operacích)	merges adjacent coplanar faces and edges (after STEP import, after boolean operations)
+stejná díra v každém bodě (nebo středu kružnice) vybrané skici	the same hole at every point (or circle centre) of the selected sketch
+stěny nad i pod dělicí rovinou se ukosí směrem od ní (tvárník/tvárnice)	the walls above and below the parting plane are drafted away from it (core/cavity)
+vyberte jednu hranu – zaoblí se celý tečně navazující řetězec	select one edge – the whole tangent chain is filleted
+vystouplý lem nebo drážka podél obrysu rovinné plochy (dosedání tvárníku a tvárnice)	a raised lip or a groove along the outline of a planar face (core/cavity shut-off)
+vystouplý nebo gravírovaný nápis na válcové ploše (radiální promítnutí)	raised or engraved lettering on a cylindrical face (radial projection)
+vysunutí profilu s otáčením kolem osy (šroubovitá drážka, vrták…)	extrusion of a profile with rotation about the axis (helical groove, drill…)
+zaoblí celou úzkou plochu (žebro, lem) do půlkruhu	rounds a whole narrow face (rib, lip) into a semicircle
+zrcadlí vybrané dřívější prvky (ne celé těleso) podle roviny	mirrors the selected earlier features (not the whole body) about a plane
+zvětší/zmenší těleso kolem zadaného bodu (např. smrštění kolem středu dutiny)	scales the body up/down about the given point (e.g. shrinkage about the cavity centre)
+záporný = opačný smysl	negative = opposite direction
+{0} potřebuje těleso – nejdřív vytvořte vysunutí nebo primitivum.	{0} needs a body – create an extrusion or a primitive first.
+{0} se nepodařilo vytvořit – zkuste menší hodnoty nebo jiné hrany.	{0} could not be created – try smaller values or other edges.
+{0} se nepodařilo vytvořit.	{0} could not be created.
+Ø zahloubení	Counterbore Ø
+Úhel	Angle
+Úhel musí být mezi 0° a 90°.	The angle must be between 0° and 90°.
+Úhel zkrutu	Twist angle
+Úhel úkosu	Draft angle
+Úkos	Draft
+Úkos od dělicí roviny	Draft from parting plane
+Úkos se nepodařilo vytvořit – zkuste menší úhel nebo jinou dělicí rovinu.	The draft could not be created – try a smaller angle or another parting plane.
+úzká plocha mezi dvěma hranami	narrow face between two edges
+Šířka	Width
+Šířka a výška musí být kladné.	The width and height must be positive.
+Šířka lemu/drážky je větší než plocha – zmenšete ji.	The lip/groove width is larger than the face – reduce it.
+Prvek rozšíření {0} je už zaregistrovaný.	Extension feature {0} is already registered.
+
+# ext/sheetmetal-flat
+Nejdřív vytvořte Základní plech (karta Plech).	Create a Base flange first (Sheet metal tab).
+Ohyb {0}: {1}° {2}, R{3}, BA {4} mm	Bend {0}: {1}° {2}, R{3}, BA {4} mm
+Ohyb {0}: úhel {1}°, {2}, vnitřní R {3} mm, délka osy {4} mm, BA {5} mm	Bend {0}: angle {1}°, {2}, inner R {3} mm, axis length {4} mm, BA {5} mm
+Prvek „{0}“ není plechový – v rozvinu je vynechán.	Feature “{0}” is not a sheet-metal feature – it is omitted from the flat pattern.
+Skica ohybu musí obsahovat úsečku (čáru ohybu).	The bend sketch must contain a line (bend line).
+Skica plechu neobsahuje uzavřený profil.	The sheet sketch contains no closed profile.
+Základní plech nemá přiřazenou skicu.	The base flange has no sketch assigned.
+{0} - rozvin, plech t={1} mm	{0} - flat pattern, sheet t={1} mm
+{0}: bez skici – vynechán.	{0}: no sketch – omitted.
+{0}: bod úlevy neleží na plechu – vynechán.	{0}: the relief point is not on the sheet – omitted.
+{0}: hrana neleží na rovné ploše plechu.	{0}: the edge is not on a flat face of the sheet.
+{0}: hranu ohybu se nepodařilo určit – otevřete prvek a vyberte hranu znovu.	{0}: the bend edge could not be determined – open the feature and select the edge again.
+{0}: není vybrána hrana.	{0}: no edge is selected.
+{0}: neznámý plechový prvek – vynechán.	{0}: unknown sheet-metal feature – omitted.
+{0}: ohyb lze založit jen na celé rovné hraně obrysu plechu (ne na oblouku ani části hrany).	{0}: a bend can only be based on a whole straight edge of the sheet outline (not on an arc or part of an edge).
+{0}: prolis se v rozvinu nezobrazuje (tvářený prvek).	{0}: the bead is not shown in the flat pattern (formed feature).
+{0}: vyberte skicu s čárou ohybu.	{0}: select a sketch with the bend line.
+{0}: výřez neleží na rovné ploše plechu – v rozvinu vynechán.	{0}: the cut-out is not on a flat face of the sheet – omitted from the flat pattern.
+{0}: výřez zasahuje mimo obrys – v rozvinu je zobrazen jako samostatná křivka.	{0}: the cut-out extends beyond the outline – shown as a separate curve in the flat pattern.
+{0}: čára ohybu musí ležet na ploše plechu (skica na ploše nebo rovině plechu).	{0}: the bend line must lie on the sheet face (sketch on the face or plane of the sheet).
+Žádné ohyby – díl je rovný plech.	No bends – the part is a flat sheet.
+
+# ext/sheetmetal
+0 = dle parametrů plechu	0 = per sheet parameters
+Délka lemu	Hem length
+Délka příruby	Flange length
+Délka příruby musí být kladná.	The flange length must be positive.
+Hloubka úlevy	Relief depth
+Hrana musí ležet mezi plochou plechu a boční plochou (rovná hrana obrysu).	The edge must lie between the sheet face and a side face (straight outline edge).
+Hrana {0} v tělese neexistuje – vyberte hranu znovu.	Edge {0} does not exist in the body – select the edge again.
+Hrany lemu	Hem edges
+Hrany ohybu	Bend edges
+K normále skici	Towards the sketch normal
+Kapka	Teardrop
+Kruhová	Round
+Lem	Hem
+Materiál uvnitř	Material inside
+Nad skicu	Above the sketch
+Nejdřív vytvořte Základní plech.	Create a Base flange first.
+Obdélník	Rectangle
+Od normály skici	Away from the sketch normal
+Ohnout na opačnou stranu	Bend to the opposite side
+Ohyb lze založit jen na rovné hraně plechu (ne na oblouku).	A bend can only be based on a straight sheet edge (not on an arc).
+Ohyb podle čáry	Sketched bend
+Ohyb vně	Bend outside
+Ohyb z hrany	Edge flange
+Ohýbaná strana	Bent side
+Osa prolisu musí ležet na ploše plechu.	The bead axis must lie on the sheet face.
+Osa prolisu má nulovou délku.	The bead axis has zero length.
+Osa výřezu	Cut-out axis
+Otevřený	Open
+Oválná	Obround
+Parametry plechu	Sheet parameters
+Pod skicu	Below the sketch
+Poloha materiálu	Material position
+Prolis (žebro)	Bead (rib)
+Rohová úleva	Corner relief
+Rozvin → DXF	Flat pattern → DXF
+Rozvin → SVG	Flat pattern → SVG
+Rozvinout	Flatten
+Skica musí obsahovat úsečku.	The sketch must contain a line.
+Skica obrysu	Outline sketch
+Skica obrysu plechu musí být uzavřená.	The sheet outline sketch must be closed.
+Skica s osou prolisu	Sketch with the bead axis
+Skica s čárou ohybu	Sketch with the bend line
+Skica výřezu	Cut-out sketch
+Skica výřezu musí být uzavřená.	The cut-out sketch must be closed.
+Směr ohybu	Bend direction
+Směr tloušťky	Thickness direction
+Střed úlevy	Relief centre
+Symetricky	Symmetric
+Tabulka ohybů	Bend table
+Tloušťka plechu	Sheet thickness
+Tloušťka plechu musí být kladná.	The sheet thickness must be positive.
+Tvar	Shape
+Typ lemu	Hem type
+Uzavřený	Closed
+Velikost (Ø / strana)	Size (Ø / side)
+Vlevo od čáry	Left of the line
+Vnitřní poloměr	Inner radius
+Vnitřní poloměr (otevřený)	Inner radius (open)
+Vnitřní poloměr ohybu	Inner bend radius
+Vpravo od čáry	Right of the line
+Vyberte hranu plechu, ze které se má ohyb vytvořit.	Select the sheet edge the bend should start from.
+Vyberte {0} (musí být v historii před tímto prvkem).	Select {0} (it must precede this feature in the history).
+Výřez	Cut-out
+Zahnout na opačnou stranu	Fold to the opposite side
+Základní plech	Base flange
+obrys, díry, čáry ohybů a tabulka ohybů (AutoCAD, laser, ohraňovací lis)	outline, holes, bend lines and bend table (AutoCAD, laser, press brake)
+ocel 0,44 · hliník 0,40 · nerez 0,45	steel 0.44 · aluminium 0.40 · stainless 0.45
+plochý díl (rozvin) z historie ohybů – potlačením prvku se vrátí ohnutý tvar	flat part (flat pattern) from the bend history – suppress the feature to return to the bent shape
+pořadí, úhly, poloměry a BA všech ohybů	order, angles, radii and BA of all bends
+příruba pod úhlem z vybrané hrany plechu	an angled flange from the selected sheet edge
+rovné hrany obrysu plechu	straight edges of the sheet outline
+rozvin s čarami ohybů pro tisk/náhled	flat pattern with bend lines for printing/preview
+skicu obrysu plechu	the sheet outline sketch
+skicu s osou prolisu	the sketch with the bead axis
+skicu s čárou ohybu	the sketch with the bend line
+skicu výřezu	the cut-out sketch
+tloušťka, poloměr ohybu a K-faktor pro další prvky	thickness, bend radius and K-factor for the following features
+uzavřená skica na ploše plechu → otvor skrz	a closed sketch on the sheet face → through cut
+uzavřená skica → deska o tloušťce plechu	a closed sketch → plate of the sheet thickness
+vylisované žebro podél úsečky ve skice (zjednodušeně: zaoblený výstupek)	a pressed rib along a sketch line (simplified: a rounded bump)
+zahnutý okraj 180° – uzavřený nebo otevřený	a 180° folded edge – closed or open
+Úhel ohybu	Bend angle
+Úhel ohybu musí být 1–180°.	The bend angle must be 1–180°.
+Úleva ohybu	Bend relief
+úsečka ve skice na ploše plechu rozdělí plech a jednu stranu ohne	a line in a sketch on the sheet face splits the sheet and bends one side
+Čtvercová	Square
+Čára ohybu musí ležet na ploše plechu (skica na horní nebo spodní ploše) a procházet materiálem.	The bend line must lie on the sheet face (sketch on the top or bottom face) and pass through the material.
+Čára ohybu musí rozdělit plech na dvě části (leží mimo plech nebo u okraje).	The bend line must split the sheet into two parts (it lies outside the sheet or at the edge).
+čtvercový nebo kruhový výřez v rohu mezi ohyby	a square or round cut-out in the corner between bends
+Šířka úlevy	Relief width
+Žádná	None
+
+# ext/surface
++ (po normále)	+ (along the normal)
++ strana	+ side
+3D křivka pro tažení (pružiny, závity, spirálové drážky)	3D curve for sweeps (springs, threads, helical grooves)
+Cílové plochy	Target faces
+Délka musí být kladná.	The length must be positive.
+Délka prodloužení	Extension length
+Frenet (profil se natáčí s dráhou)	Frenet (the profile rotates with the path)
+Hloubka závitu	Thread depth
+Hloubka závitu musí být kladná.	The thread depth must be positive.
+Hrany smyčky	Loop edges
+Jedna plocha objem neuzavírá – přidejte další plochy.	A single face does not enclose a volume – add more faces.
+K sešití jsou potřeba alespoň dvě volné plochy.	At least two free faces are needed for sewing.
+Kruh (drát)	Circle (wire)
+Křivka průniku	Intersection curve
+Křivky (skici v pořadí)	Curves (sketches in order)
+Levotočivá	Left-handed
+Nahradit plochu (posun)	Replace face (move)
+Nahradit plochu lze jen na tělese (solidu).	Replace face only works on a solid.
+Nejdřív vytvořte plochu nebo těleso s hranami.	Create a surface or a body with edges first.
+Nejdřív vytvořte plochu nebo těleso.	Create a surface or a body first.
+Nejdřív vytvořte plochu.	Create a surface first.
+Nejdřív vytvořte těleso nebo plochu.	Create a body or a surface first.
+Nejsou žádné volné plochy k uzavření.	There are no free faces to close.
+Nejsou žádné volné plochy k zesílení.	There are no free faces to thicken.
+Nejvýš 200 závitů.	At most 200 turns.
+Není co oříznout – vytvořte nejdřív plochu.	Nothing to trim – create a surface first.
+Není co sešít – nejdřív vytvořte plochy.	Nothing to sew – create surfaces first.
+Náběh (otáček)	Lead-in (turns)
+Náběh závitu se nepodařilo vytvořit – zmenšete počet otáček náběhu nebo hloubku závitu.	The thread lead-in could not be created – reduce the number of lead-in turns or the thread depth.
+Obě části	Both parts
+Odsazená plocha	Offset surface
+Odsazení	Offset
+Odsazení nesmí být nulové.	The offset must not be zero.
+Opačný směr	Reverse direction
+Osa	Axis
+Osa rotace (ve skice)	Axis of revolution (in the sketch)
+Oříznout rovinou	Trim with plane
+Oříznout skicou	Trim with sketch
+Plochu se nepodařilo zesílit – zkuste menší tloušťku nebo nejdřív plochy sešijte.	The surface could not be thickened – try a smaller thickness or sew the surfaces first.
+Plochy	Faces
+Plochy na sebe nenavazují – nejdřív je sešijte.	The faces are not connected – sew them first.
+Plochy netvoří jednu souvislou skořepinu – nejdřív je sešijte (Sešít plochy) nebo zvětšete toleranci.	The faces do not form one continuous shell – sew them first (Sew surfaces) or increase the tolerance.
+Plochy neuzavírají objem – chybí některá stěna nebo jsou mezery.	The faces do not enclose a volume – a wall is missing or there are gaps.
+Plochy neuzavírají objem – zkontrolujte, že na sebe navazují (Sešít plochy).	The faces do not enclose a volume – check that they are connected (Sew surfaces).
+Plochy neuzavírají objem – {0} volných hran (chybí stěna nebo jsou mezery; zvětšete toleranci).	The faces do not enclose a volume – {0} free edges (a wall is missing or there are gaps; increase the tolerance).
+Plochy tělesa	Body faces
+Plošná rotace	Surface revolve
+Plošné vysunutí	Surface extrude
+Po normále	Along the normal
+Poloměr	Radius
+Poloměr šroubovice	Helix radius
+Poloměr, stoupání i počet závitů musí být kladné.	The radius, pitch and number of turns must all be positive.
+Ponechat	Keep
+Ponechat stranu	Keep side
+Posun	Move
+Počet závitů	Number of turns
+Prodloužit plochu	Extend surface
+Profil	Profile
+Profil skici plochu neprotíná.	The sketch profile does not intersect the surface.
+Promítnout skicu na plochu	Project sketch onto surface
+Promítnutá křivka na vybranou plochu nedopadá.	The projected curve does not land on the selected face.
+Proti normále	Against the normal
+Průměr drátu	Wire diameter
+Průměr drátu musí být kladný a menší než stoupání.	The wire diameter must be positive and smaller than the pitch.
+Přímkové plochy (bez vyhlazení)	Ruled surfaces (no smoothing)
+Rovina	Plane
+Rovina model neprotíná.	The plane does not intersect the model.
+Rovina plochu neprotíná na zvolené straně nic nezůstalo – otočte stranu.	The plane does not intersect the surface, nothing remains on the chosen side – flip the side.
+Rovina těleso neprotíná.	The plane does not intersect the body.
+Rozdělit lze jen těleso (solid).	Only a solid can be split.
+Rozdělit těleso	Split body
+Sešít plochy	Sew surfaces
+Skica	Sketch
+Skica (křivka)	Sketch (curve)
+Skica (profil)	Sketch (profile)
+Skica (uzavřený profil)	Sketch (closed profile)
+Skica musí obsahovat uzavřený profil.	The sketch must contain a closed profile.
+Skica profilu	Profile sketch
+Skica „{0}“ je prázdná.	Sketch “{0}” is empty.
+Skica „{0}“ musí obsahovat uzavřený profil.	Sketch “{0}” must contain a closed profile.
+Skica „{0}“ neobsahuje křivku.	Sketch “{0}” contains no curve.
+Skica „{0}“ neobsahuje souvislou křivku ani uzavřený profil.	Sketch “{0}” contains neither a continuous curve nor a closed profile.
+Stoupání	Pitch
+Strana	Side
+Střed začátku	Start centre
+Svislá Y	Vertical Y
+Symetricky na obě strany	Symmetric to both sides
+Tažení plochy	Surface sweep
+Tažení po šroubovici	Helical sweep
+Tažení po šroubovici nevytvořilo objem – profil musí být uzavřený.	The helical sweep did not create a volume – the profile must be closed.
+Tažení po šroubovici se nepodařilo – profil se nesmí protínat sám se sebou (zmenšete profil nebo zvětšete stoupání).	The helical sweep failed – the profile must not self-intersect (reduce the profile or increase the pitch).
+Tloušťka	Thickness
+Tolerance	Tolerance
+Tolerance sešití	Sewing tolerance
+Tuto plochu se nepodařilo odsadit – zkuste menší vzdálenost.	This face could not be offset – try a smaller distance.
+Uzavřít do tělesa	Close into solid
+Vnitřek profilu	Inside of the profile
+Vnitřní (v díře)	Internal (in a hole)
+Vnějšek	Outside
+Vnější (na válci)	External (on a cylinder)
+Vodorovná X	Horizontal X
+Vyberte alespoň dvě hrany tvořící uzavřenou smyčku.	Select at least two edges forming a closed loop.
+Vyberte cílovou plochu.	Select the target face.
+Vyberte plochu k prodloužení.	Select the face to extend.
+Vyberte plochy k odsazení.	Select the faces to offset.
+Vyberte {0} (skica musí být v historii před tímto prvkem).	Select {0} (the sketch must precede this feature in the history).
+Vybraná plocha už v modelu není.	The selected face is no longer in the model.
+Vybrané hrany netvoří souvislou uzavřenou smyčku.	The selected edges do not form a continuous closed loop.
+Vzdálenost	Distance
+Vzdálenost musí být kladná.	The distance must be positive.
+Výsledek je prázdný.	The result is empty.
+Výsledek není těleso.	The result is not a solid.
+Z vybraných hran se nepodařilo vytvořit plochu – smyčka musí být uzavřená.	No surface could be created from the selected edges – the loop must be closed.
+Zachovat původní plochu	Keep the original surface
+Zakřivenou plochu tohoto typu nelze prodloužit – použijte Odsazenou plochu nebo ji vytvořte znovu větší.	A curved surface of this type cannot be extended – use Offset surface or recreate it larger.
+Zesílení nevytvořilo objem – zkuste menší tloušťku.	Thicken did not create a volume – try a smaller thickness.
+Zesílit plochu	Thicken surface
+Záplata z hran	Patch from edges
+Závit	Thread
+Závit 60°	Thread 60°
+hladká plocha vyplní uzavřenou smyčku vybraných hran (N-stranná výplň)	a smooth surface fills the closed loop of the selected edges (N-sided patch)
+jen Závit 60°: jako u závitového kalibru – hřbet prvního závitu je od začátku vybroušený a během zadaných otáček se zvedá do plného profilu (0 = bez náběhu)	Thread 60° only: as on a thread gauge – the crest of the first thread is ground away from the start and rises to the full profile over the given turns (0 = no lead-in)
+kopie plochy odsazená po normále (bez výběru = všechny volné plochy)	a copy of the surface offset along the normal (no selection = all free faces)
+křivka skici (i otevřená) vysunutá do plochy	a sketch curve (even open) extruded into a surface
+křivky skici promítnuté po normále skici na vybranou plochu	sketch curves projected along the sketch normal onto the selected face
+nic = všechny volné plochy	none = all free faces
+odřízne část volných ploch na jedné straně základní roviny	cuts away the part of the free faces on one side of a base plane
+otevřený profil rotovaný kolem osy skici	an open profile revolved about a sketch axis
+otevřený profil tažený po dráze (druhá skica)	an open profile swept along a path (second sketch)
+plocha přes 2 a více křivek (v různých rovinách)	a surface through 2 or more curves (in different planes)
+poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	radius = the surface where the thread starts: the cylinder, or the hole (minor diameter); the depth goes into the material
+poloměr válce / díry	radius of the cylinder / hole
+pro profil Kruh	for the Circle profile
+pro profil Závit 60°	for the Thread 60° profile
+profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka	a profile (circle, 60° thread or sketch) swept along a helix – thread, spring, helical groove
+průsečnice tělesa/ploch se základní rovinou (3D křivka pro další tažení)	the intersection of the body/surfaces with a base plane (3D curve for further sweeps)
+rovinná plocha se zvětší o danou délku po obvodu; zakřivená v parametrech plochy	a planar surface is enlarged by the given length along its perimeter; a curved one in the surface parameters
+rovinná plocha tělesa se posune po normále a sousední plochy se dotáhnou	a planar face of the body is moved along its normal and the neighbouring faces are extended
+rozřízne solid základní rovinou – obě části zůstanou, nebo jen jedna	splits the solid with a base plane – both parts remain, or only one
+skicu s křivkou	the sketch with the curve
+skicu s profilem	the sketch with the profile
+skicu s uzavřeným profilem	the sketch with the closed profile
+spojí volné plochy do jedné skořepiny	joins free faces into one shell
+uzavřené volné plochy → solid (lze sloučit/odebrat s existujícím tělesem)	closed free faces → solid (can be merged with / cut from the existing body)
+uzavřený profil skici promítnutý na plochy – ponechá vnitřek nebo vnějšek	a closed sketch profile projected onto the faces – keeps the inside or the outside
+uzavřený profil skici → rovinná plocha (i s otvory)	a closed sketch profile → planar surface (holes allowed)
+uzavřený profil v rovině XZ u začátku šroubovice	a closed profile in the XZ plane at the start of the helix
+z volných ploch vznikne solid dané tloušťky	free faces become a solid of the given thickness
+záporné = opačným směrem	negative = opposite direction
+záporně dovnitř	negative = inwards
+Šablonování ploch	Surface loft
+Šablonování potřebuje alespoň dvě skici.	Loft needs at least two sketches.
+Šroubovice	Helix
+− strana	− side
+
+# ext/weld-layout
+Bodový	Spot
+Celkem na profil:	Total per profile:
+Dole	Bottom
+Hmotnost svařence (profily): {0} kg	Weldment mass (profiles): {0} kg
+I svar	Square butt weld
+Jäkl obdélníkový	Rectangular hollow section
+Jäkl čtvercový	Square hollow section
+Koutový	Fillet
+Kulatina	Round bar
+Lemový	Edge weld
+Nahoře	Top
+Nosník HEB	HEB beam
+Nosník IPE	IPE beam
+Plochá tyč	Flat bar
+Profil U (UPN)	U channel (UPN)
+Profil UPN {0} není v tabulce.	Profile UPN {0} is not in the table.
+Profil je po ořezání spojů záporný – zvolte menší profil nebo jiný typ spoje.	The profile is negative after trimming the joints – choose a smaller profile or another joint type.
+Profil {0} {1} není v tabulce.	Profile {0} {1} is not in the table.
+Profil;Ks;Délka celkem [m];Hmotnost [kg]	Profile;Qty;Total length [m];Mass [kg]
+Rozměr	Size
+Rozměry rámu jsou menší než dvojnásobek profilu.	The frame dimensions are smaller than twice the profile size.
+Střed	Centre
+Svarový kov celkem: {0} kg	Total weld metal: {0} kg
+Tloušťka stěny	Wall thickness
+Tloušťka stěny jäklu je příliš velká.	The hollow-section wall thickness is too large.
+Tloušťka stěny trubky je příliš velká.	The tube wall thickness is too large.
+Tloušťka úhelníku je příliš velká.	The angle thickness is too large.
+Trubka kruhová	Round tube
+U svar	U butt weld
+V svar	V butt weld
+Vlevo	Left
+Vlevo dole	Bottom left
+Vlevo nahoře	Top left
+Vpravo	Right
+Vpravo dole	Bottom right
+Vpravo nahoře	Top right
+{0} profilu musí být kladný.	The profile {0} must be positive.
+½V svar	½V butt weld
+Úhelník L	L angle
+Úsečka profilu má nulovou délku.	The profile line has zero length.
+Čtyřhranná tyč	Square bar
+Žádné konstrukční profily (přidejte prvek Konstrukční profil nebo Rám z profilů).	No structural profiles (add a Structural profile or a Profile frame feature).
+Žádné svary (přidejte Svarovou housenku nebo Značku svaru).	No welds (add a Weld bead or a Weld symbol).
+
+# ext/weld
++ (kladná)	+ (positive)
+0 = po celé délce	0 = along the whole length
+Deska	Plate
+Dvě vnitřní plochy rohu	Two inner faces of the corner
+Délka svaru	Weld length
+Délka úseku	Segment length
+Díra je větší než deska.	The hole is larger than the plate.
+Díry v řadě (X)	Holes per row (X)
+Díry ve sloupci (Y)	Holes per column (Y)
+Hloubka rámu (Y)	Frame depth (Y)
+Housenku lze zatím vést jen po rovné hraně.	A bead can only follow a straight edge for now.
+Hrana musí ležet mezi dvěma plochami tělesa.	The edge must lie between two faces of the body.
+Hrana není vnitřní (konkávní) – housenka se dělá jen do vnitřního rohu mezi dvěma plochami.	The edge is not internal (concave) – a bead is only made in the inner corner between two faces.
+Hrana {0} v tělese neexistuje – vyberte ji znovu.	Edge {0} does not exist in the body – select it again.
+Hrany koutu	Corner edges
+ISO 2553 – uloží se k dílu, zobrazí se v tabulce svarů a na výkresu	ISO 2553 – saved with the part, shown in the weld table and on the drawing
+Jako samostatná tělesa	As separate bodies
+Konstrukční profil	Structural profile
+Kusovník řezů	Cut list
+Mezera ve spoji	Joint gap
+Montážní svar	Field weld
+Na zvolené straně roviny nezůstal žádný materiál.	No material remains on the chosen side of the plane.
+Natočení profilu	Profile rotation
+Není co ořezat – nejdřív vytvořte profily.	Nothing to trim – create profiles first.
+Není těleso – nejdřív vytvořte profily.	There is no body – create profiles first.
+Obrys plochy nelze zmenšit o zadané hodnoty – zvolte menší zmenšení/zaoblení.	The face outline cannot be reduced by the given values – choose a smaller reduction/rounding.
+Odstup děr od okraje	Hole distance from the edge
+Ořezat rovinou	Trim with plane
+Plocha {0} v tělese neexistuje – vyberte ji znovu.	Face {0} does not exist in the body – select it again.
+Plochy styčníku jsou rovnoběžné – vyberte dvě plochy svírající úhel.	The gusset faces are parallel – select two faces that form an angle.
+Plochá	Flat
+Pokos	Mitre
+Poznámka (metoda, ISO 4063)	Note (process, ISO 4063)
+Prodloužit konec	Extend end
+Prodloužit začátek	Extend start
+Profil má po zkrácení nulovou délku.	The profile has zero length after shortening.
+Průměr D	Diameter D
+Průměr díry	Hole diameter
+Přerušovaný svar	Intermittent weld
+Rameno 1	Leg 1
+Rameno 2	Leg 2
+Rohy obdélníků	Rectangle corners
+Rozměry desky musí být kladné.	The plate dimensions must be positive.
+Rozměry styčníku musí být kladné.	The gusset dimensions must be positive.
+Rozteč (přerušovaný)	Pitch (intermittent)
+Rozteč úseků	Segment pitch
+Rám z profilů	Profile frame
+Skica neobsahuje žádné úsečky (oblouky se pro profily zatím nepoužijí).	The sketch contains no lines (arcs are not used for profiles yet).
+Skica s úsečkami	Sketch with lines
+Spoj v rohu	Corner joint
+Sražení špiček	Tip chamfer
+Styčník	Gusset
+Styčník lze vložit jen mezi rovinné plochy.	A gusset can only be inserted between planar faces.
+Střed X	Centre X
+Střed Y	Centre Y
+Svar na druhé straně	Weld on the other side
+Svar po obvodu	All-round weld
+Svarová housenka	Weld bead
+Tabulka svarů	Weld table
+Tloušťka víčka	Cap thickness
+Tloušťka víčka musí být kladná.	The cap thickness must be positive.
+Trubka	Tube
+Tupý	Butt
+Typ svaru	Weld type
+Velikost (UPN/IPE/HEB)	Size (UPN/IPE/HEB)
+Velikost a / s	Size a / s
+Velikost svaru a	Weld size a
+Velikost svaru musí být kladná.	The weld size must be positive.
+Vyberte hranu vnitřního rohu v modelu.	Select an inner corner edge in the model.
+Vyberte přesně dvě rovinné plochy, které svírají roh.	Select exactly two planar faces that form a corner.
+Vyberte skicu s úsečkami (musí být v historii před tímto prvkem).	Select a sketch with lines (it must precede this feature in the history).
+Vyberte čelní plochu profilu v modelu.	Select an end face of the profile in the model.
+Vysunout opačně	Extrude in reverse
+Víčko	End cap
+Víčko lze udělat jen na rovinné čelní ploše.	An end cap can only be made on a planar end face.
+Výška / rameno b	Height / leg b
+Výška rámu (Z)	Frame height (Z)
+Zaoblení rohů	Corner rounding
+Zapustit dovnitř profilu	Inset into the profile
+Zarovnání	Alignment
+Zmenšení od obrysu	Reduction from the outline
+Značka svaru	Weld symbol
+destička na otevřený konec profilu (vyberte čelní plochy)	a plate on the open end of a profile (select the end faces)
+délky a úhly řezů profilů, hmotnosti, CSV	profile cut lengths and angles, masses, CSV
+délky svarů a svarový kov	weld lengths and weld metal
+koutový svar a×a podél vnitřní hrany (vyberte hrany)	a fillet weld a×a along an inner edge (select the edges)
+kvádrový rám: dva obdélníky (pokos) + 4 sloupky	a box frame: two rectangles (mitred) + 4 posts
+obdélníková deska (patka, příložka) s volitelným polem děr	a rectangular plate (base plate, splice plate) with an optional hole pattern
+odřízne vše na jedné straně roviny (zkrácení profilů)	cuts away everything on one side of the plane (shortening profiles)
+profily (jäkl, trubka, L, U, IPE…) podél úseček skici, rohy pokos/tupý	profiles (hollow section, tube, L, U, IPE…) along sketch lines, corners mitred/butt
+trojúhelníková výztuha v rohu dvou profilů (vyberte 2 vnitřní plochy)	a triangular stiffener in the corner of two profiles (select 2 inner faces)
+víčko lícuje s koncem	the cap is flush with the end
+záporné = zkrátit	negative = shorten
+Čelní plochy	End faces
+Čtyřhran	Square
+Šířka / rameno a	Width / leg a
+Šířka rámu (X)	Frame width (X)
+Žádný	None
+− (záporná)	− (negative)
+
+# feat/fillet
+Boční plochy nejsou rovnoběžné – plný rádius vyžaduje dvě rovnoběžné boční plochy.	The side faces are not parallel – a full round requires two parallel side faces.
+Boční plochy splývají – vzdálenost mezi nimi je nulová.	The side faces coincide – the distance between them is zero.
+Druhá vzdálenost sražení musí být kladná.	The second chamfer distance must be positive.
+Hrany ve vrcholu jsou degenerované – roh nelze srazit.	The edges at the vertex are degenerate – the corner cannot be chamfered.
+Mezi bočními plochami leží {0} ploch – vyberte prostřední plochu, která se má zaoblit.	There are {0} faces between the side faces – select the middle face to be rounded.
+Mezi bočními plochami není žádná prostřední plocha (plocha sousedící s oběma).	There is no middle face between the side faces (a face adjacent to both).
+Není co srazit – nejdřív vytvořte těleso.	Nothing to chamfer – create a body first.
+Oba poloměry (R1 i R2) musí být kladné.	Both radii (R1 and R2) must be positive.
+Odkaz v poli „{0}“ musí být plocha modelu.	The reference in field “{0}” must be a model face.
+Plný rádius se nepodařilo vytvořit (booleovská operace jádra selhala).	The full round could not be created (the kernel boolean operation failed).
+Plný rádius se nepodařilo vytvořit – prostřední plocha není obdélník kolmý na boční plochy a přibližné zaoblení selhalo.	The full round could not be created – the middle face is not a rectangle perpendicular to the side faces and the approximate fillet failed.
+Plný rádius: boční i prostřední plochy musí být rovinné.	Full round: the side faces and the middle face must be planar.
+Poloměr u hrany {0} musí být kladný.	The radius at edge {0} must be positive.
+Prostřední plocha musí sousedit s oběma bočními plochami.	The middle face must be adjacent to both side faces.
+Referenční odkaz sražení musí být plocha modelu.	The chamfer reference must be a model face.
+Referenční plocha musí sousedit se všemi vybranými hranami (hrana {0} s ní nesousedí).	The reference face must be adjacent to all selected edges (edge {0} is not adjacent to it).
+Roh nelze srazit – body sražení neurčují čtyřstěn.	The corner cannot be chamfered – the chamfer points do not define a tetrahedron.
+Sražení vrcholu se nepodařilo (booleovská operace jádra selhala).	The vertex chamfer failed (the kernel boolean operation failed).
+Sražení {0} mm nelze provést – vzdálenost je pro vybrané hrany příliš velká nebo se sražení kříží.	The {0} mm chamfer cannot be made – the distance is too large for the selected edges or the chamfers cross.
+Ve vrcholu [{0}] se musí stýkat právě 3 hrany (nalezeno {1}).	Exactly 3 edges must meet at vertex [{0}] ({1} found).
+Velikost sražení musí být kladná.	The chamfer size must be positive.
+Vyberte referenční plochu – na ní se měří první vzdálenost sražení.	Select the reference face – the first chamfer distance is measured on it.
+Vyberte vrcholy, které se mají srazit.	Select the vertices to chamfer.
+Vyberte {0}.	Select {0}.
+Vybrané sady ploch nemají společnou hranu – zaoblení plocha–plocha není kde vytvořit.	The selected face sets have no common edge – there is nowhere to create a face–face fillet.
+Vzdálenost D{0} = {1} mm je delší než hrana {2} ({3} mm).	Distance D{0} = {1} mm is longer than edge {2} ({3} mm).
+Všechny tři vzdálenosti sražení vrcholu musí být kladné.	All three vertex chamfer distances must be positive.
+Zaoblení R{0} nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.	The R{0} fillet cannot be made – the radius is too large for the selected edges or the fillets cross.
+Zaoblení plocha–plocha R{0} nelze provést – poloměr je pro společné hrany příliš velký.	The R{0} face–face fillet cannot be made – the radius is too large for the common edges.
+boční plochu 1	side face 1
+boční plochu 2	side face 2
+druhou sadu ploch	the second face set
+prostřední plochu	the middle face
+první sadu ploch	the first face set
+Úhel sražení musí být mezi 0° a 90°.	The chamfer angle must be between 0° and 90°.
+
+# feat/pattern
+Do obrysu se s touto roztečí a okrajem nevejde žádný kus – zmenšete rozteč nebo okraj.	No instance fits inside the outline with this spacing and margin – reduce the spacing or the margin.
+Druhý směr pole	Second pattern direction
+Druhý směr pole je rovnoběžný s prvním – zvolte jiný směr.	The second pattern direction is parallel to the first – choose another direction.
+Jinou tloušťku lze zadat jen u rovinných ploch (plocha {0} je {1}).	A different thickness can only be set for planar faces (face {0} is {1}).
+Křivka pole je prázdná.	The pattern curve is empty.
+Křivka pole musí být jedna souvislá čára (bez větvení a mezer).	The pattern curve must be one continuous line (no branches or gaps).
+Křivka ve skice „{0}“ má nulovou délku.	The curve in sketch “{0}” has zero length.
+Osa pole	Pattern axis
+Pole má příliš mnoho kusů ({0}, max. {1}).	The pattern has too many instances ({0}, max. {1}).
+Pole se na křivku nevejde (délka {0} mm) – zmenšete rozteč nebo počet kusů.	The pattern does not fit on the curve (length {0} mm) – reduce the spacing or the count.
+Protější stěnu skořepiny u plochy {0} se nepodařilo najít – jinou tloušťku zde nelze použít.	The opposite shell wall for face {0} could not be found – a different thickness cannot be used here.
+Prvek „{0}“ nelze opakovat – pole umí opakovat jen prvky s nástrojovým tělesem (vysunutí, rotace, díra, primitiva, tažení, šablonování, text), které jsou v historii před polem a nejsou potlačené.	Feature “{0}” cannot be repeated – a pattern can only repeat features with a tool body (extrusion, revolve, hole, primitives, sweep, loft, text) that precede the pattern in the history and are not suppressed.
+Rozteč pole nesmí být nulová.	The pattern spacing must not be zero.
+Rozteč ve druhém směru nesmí být nulová.	The spacing in the second direction must not be zero.
+Rozteč výplňového pole musí být kladná.	The fill pattern spacing must be positive.
+Skica „{0}“ neobsahuje uzavřený obrys pro výplň.	Sketch “{0}” contains no closed outline for the fill.
+Skica „{0}“ neobsahuje žádné body – nakreslete body (nástroj Bod) v místech kopií.	Sketch “{0}” contains no points – draw points (Point tool) where the instances should be.
+Skořepina nevytvořila objem – zkuste menší tloušťku.	The shell did not create a volume – try a smaller thickness.
+Skořepinu se nepodařilo vytvořit – zkuste menší tloušťku nebo jiné plochy.	The shell could not be created – try a smaller thickness or other faces.
+Tečna křivky	Curve tangent
+Výplňové pole má příliš mnoho kusů ({0}, max. {1}) – zvětšete rozteč.	The fill pattern has too many instances ({0}, max. {1}) – increase the spacing.
+Všechny body skici „{0}“ leží v místě zdrojového prvku – přidejte další body.	All points of sketch “{0}” lie at the source feature – add more points.
+plochy, které se mají otevřít	the faces to open
+plochy, které se mají zkosit	the faces to draft
+skica křivky pole	pattern curve sketch
+skica obrysu výplně	fill outline sketch
+skica s body pole	pattern points sketch
+{0} nesmí být nulový.	{0} must not be zero.
+
+# feat/refs-more
+Cílová rovina je rovnoběžná se směrem posunu – vyberte plochu, která není kolmá na posouvanou plochu.	The target plane is parallel to the move direction – select a face that is not perpendicular to the moved face.
+Délka zobrazení osy musí být kladná.	The axis display length must be positive.
+Pomocná geometrie „{0}“ musí být v historii před prvkem „{1}“ – přesuňte ji výš.	Construction geometry “{0}” must precede feature “{1}” in the history – move it up.
+Pro Vytáhnout/Zatlačit použijte ukončení Na vzdálenost, K vrcholu, K ploše nebo Odsazeně od plochy.	For Push / Pull use the end condition Blind, Up to vertex, Up to face or Offset from face.
+Vyberte rovinné plochy v modelu.	Select planar faces in the model.
+Vybrané plochy už leží v cílové rovině – není co posouvat.	The selected faces already lie in the target plane – nothing to move.
+Zvolte osu modelem: hranu, válcovou plochu, dva body, globální osu, pomocnou rovinu, průsečnici rovin nebo pomocnou osu.	Choose the axis from the model: an edge, a cylindrical face, two points, a global axis, a datum plane, a plane intersection or a datum axis.
+Závit potřebuje těleso (válcovou plochu nebo díru).	A thread needs a body (a cylindrical face or a hole).
+cílový bod posunu	the move target point
+polohu podstavy	the base position
+střed koule	the sphere centre
+střed textu	the text centre
+střed transformace	the transformation centre
+vrchol / bod	the vertex / point
+výchozí bod posunu	the move start point
+začátek závitu	the thread start
+
+# feat/sweep-loft
+Chybí skica profilu – vyberte ji v parametrech (nebo zvolte kruhový profil bez skici).	The profile sketch is missing – select it in the parameters (or choose a circular profile without a sketch).
+Dráha má nulovou délku.	The path has zero length.
+Každý profil šablonování musí být jiná skica.	Each loft profile must be a different sketch.
+Měřítko profilu na konci musí být kladné.	The profile scale at the end must be positive.
+Osová / vodicí křivka musí být jiná skica než profily.	The centreline / guide curve must be a different sketch from the profiles.
+Poloměr kruhového profilu musí být kladný.	The circular profile radius must be positive.
+Skica {0} („{1}“)	Sketch {0} (“{1}”)
+Skica „{0}“ neobsahuje profil pro tenkou stěnu.	Sketch “{0}” contains no profile for the thin wall.
+Tažení	Sweep
+Tažení podél křivky nevytvořilo těleso.	The sweep along the curve did not create a body.
+Tažení podél křivky se nepodařilo – zkontrolujte, že řezy leží na dráze a dráha je hladká.	The sweep along the curve failed – check that the sections lie on the path and the path is smooth.
+Tažení s kroucením / měřítkem	Sweep with twist / scale
+Tažení s pevnou orientací profilu	Sweep with fixed profile orientation
+Tloušťka tenké stěny je větší než poloměr kruhového profilu.	The thin-wall thickness is larger than the circular profile radius.
+Transformace profilu se nezdařila.	The profile transformation failed.
+Uzavřené šablonování	Closed loft
+Uzavřené šablonování nelze kombinovat s bodem na začátku / konci.	A closed loft cannot be combined with a start / end point.
+Uzavřené šablonování nelze kombinovat s osovou / vodicí křivkou.	A closed loft cannot be combined with a centreline / guide curve.
+Uzavřené šablonování potřebuje alespoň tři profily.	A closed loft needs at least three profiles.
+Vodicí křivka musí být jiná skica než dráha.	The guide curve must be a different sketch from the path.
+koncový bod šablonování	the loft end point
+počáteční bod šablonování	the loft start point
+skica osové křivky	centreline sketch
+skica vodicí křivky	guide curve sketch
+{0} musí mít uzavřený vnější profil.	{0} must have a closed outer profile.
+{0} nevytvořilo objemové těleso – zkontrolujte, že profil je uzavřený, leží kolmo na začátek dráhy a dráha se neprotíná.	{0} did not create a solid – check that the profile is closed, lies perpendicular to the start of the path and the path does not self-intersect.
+{0}: jádro nevrátilo plášť.	{0}: the kernel did not return a shell.
+{0}: plášť se nepodařilo uzavřít do tělesa.	{0}: the shell could not be closed into a solid.
+Šablonování	Loft
+Šablonování do bodu nelze kombinovat s osovou / vodicí křivkou.	A loft to a point cannot be combined with a centreline / guide curve.
+Šablonování nevytvořilo těleso – zkontrolujte profily.	The loft did not create a body – check the profiles.
+Šablonování podél křivky	Loft along curve
+Šablonování potřebuje alespoň dvě skici (profily), nebo jednu skicu a bod.	Loft needs at least two sketches (profiles), or one sketch and a point.
+Šablonování se nepodařilo – profily se nejspíš kříží nebo mají neslučitelný tvar.	The loft failed – the profiles probably cross or have incompatible shapes.
+
+# formats
+DWG se nepodařilo vytvořit ({0}): {1}	The DWG could not be created ({0}): {1}
+DWG skici se nepodařilo vytvořit ({0}): {1}	The sketch DWG could not be created ({0}): {1}
+Neznámá verze DWG: {0}.	Unknown DWG version: {0}.
+Binární DXF není podporované – uložte DXF jako ASCII.	Binary DXF is not supported – save the DXF as ASCII.
+DXF neobsahuje sekci ENTITIES.	The DXF contains no ENTITIES section.
+Soubor je binární DWG, ne DXF.	The file is a binary DWG, not a DXF.
+3D tisk – PrusaSlicer, Cura, Bambu	3D printing – PrusaSlicer, Cura, Bambu
+3D tisk, CAM	3D printing, CAM
+BREP OpenCascade (.brep)	OpenCascade BREP (.brep)
+CAD/CAM – SolidWorks, Inventor, ZW3D, CATIA, Fusion	CAD/CAM – SolidWorks, Inventor, ZW3D, CATIA, Fusion
+Neznámý formát exportu: {0}	Unknown export format: {0}
+OBJ (.obj)	OBJ (.obj)
+Přesná geometrie pro FreeCAD/OCCT	Exact geometry for FreeCAD/OCCT
+STEP AP214 (.step)	STEP AP214 (.step)
+STL binární (.stl)	Binary STL (.stl)
+Starší prohlížeče a CAE	Older viewers and CAE
+VRML 2.0 (.wrl)	VRML 2.0 (.wrl)
+Vizualizace, Blender	Visualisation, Blender
+Web, AR, prezentace (metry, Y nahoru)	Web, AR, presentations (metres, Y up)
+glTF binární (.glb)	Binary glTF (.glb)
+DXF neobsahuje čáry, kružnice ani oblouky.	The DXF contains no lines, circles or arcs.
+Formát .{0} není podporovaný. Otevřete STEP, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF nebo DXF.	The .{0} format is not supported. Open STEP, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF or DXF.
+IGES převeden přes OpenCascade na síť.	IGES converted to a mesh via OpenCascade.
+Model je velký, přestavba může trvat déle.	The model is large, rebuilding may take longer.
+Načteno {0} entit{1}.	Loaded {0} entities{1}.
+Soubor nevypadá jako BREP OpenCascade.	The file does not look like an OpenCascade BREP.
+Soubor nevypadá jako STEP (chybí hlavička ISO-10303-21).	The file does not look like STEP (the ISO-10303-21 header is missing).
+glTF je v metrech – převedeno na mm (×1000), osa Y → Z.	glTF is in metres – converted to mm (×1000), Y axis → Z.
+{0}: nativní formát programu {1} je uzavřený a v prohlížeči ho bez licencovaného převodníku nepřečte žádný CAD. {2} Pak otevřete soubor STEP zde.	{0}: the native format of {1} is proprietary and no browser CAD can read it without a licensed converter. {2} Then open the STEP file here.
+BREP neobsahuje 3D těleso.	The BREP contains no 3D body.
+Formát {0} musí být před vložením převeden (otevřete soubor znovu).	The {0} format must be converted before inserting (open the file again).
+STL neobsahuje plochy.	The STL contains no faces.
+Soubor BREP se nepodařilo načíst.	The BREP file could not be loaded.
+Soubor STL se nepodařilo přečíst.	The STL file could not be read.
+3MF: archiv neobsahuje 3D model.	3MF: the archive contains no 3D model.
+PLY: chybí hlavička.	PLY: header missing.
+PLY: neznámý typ {0}.	PLY: unknown type {0}.
+glTF odkazuje na externí soubor „{0}“ – použijte formát GLB (vše v jednom souboru). (buffer {1})	The glTF references an external file “{0}” – use the GLB format (everything in one file). (buffer {1})
+glTF: chybí binární data.	glTF: binary data missing.
+{0}: soubor neobsahuje žádné trojúhelníky.	{0}: the file contains no triangles.
+IGES lze načíst jen v prohlížeči.	IGES can only be loaded in the browser.
+IGES neobsahuje plochy ani tělesa (jen křivky?).	The IGES contains no surfaces or solids (curves only?).
+IGES se nepodařilo přečíst (poškozený soubor nebo nepodporované entity).	The IGES could not be read (corrupt file or unsupported entities).
+Převodník IGES se nenačetl.	The IGES converter did not load.
+Převodník IGES se nepodařilo stáhnout.	The IGES converter could not be downloaded.
+Nepodporovaná komprese ZIP ({0}).	Unsupported ZIP compression ({0}).
+Poškozený ZIP archiv.	Corrupt ZIP archive.
+Soubor není platný ZIP archiv.	The file is not a valid ZIP archive.
+
+# inspect
+Bod	Point
+Bod {0}	Point {0}
+Hrana	Edge
+Hrana {0}	Edge {0}
+Plocha	Face
+Plocha {0}	Face {0}
+Těleso	Body
+
+# mold, params, pdf
+PA6 (silon)	PA6 (nylon)
+PC (polykarbonát)	PC (polycarbonate)
+PMMA (plexisklo)	PMMA (acrylic)
+PP (polypropylen)	PP (polypropylene)
+PS (polystyren)	PS (polystyrene)
+Ø{0} mm, {1} větví	Ø{0} mm, {1} branches
+Dělení nulou.	Division by zero.
+Neočekávané „{0}“ ve výrazu.	Unexpected “{0}” in the expression.
+Neplatný znak „{0}“ ve výrazu.	Invalid character “{0}” in the expression.
+Neznámá funkce „{0}“.	Unknown function “{0}”.
+Neznámá proměnná „{0}“.	Unknown variable “{0}”.
+Neúplný výraz.	Incomplete expression.
+Prázdný výraz.	Empty expression.
+Ve výrazu chybí „{0}“.	“{0}” is missing in the expression.
+Výsledek výrazu není konečné číslo.	The result of the expression is not a finite number.
+{0}: parametr „{1}“ neexistuje.	{0}: parameter “{1}” does not exist.
+Písmo se nenačetlo.	The font did not load.
+Výkres	Drawing
+
+# ref-resolve
+1. bod	1st point
+1. plochu	1st face
+1. rovinu	1st plane
+2. bod	2nd point
+2. plochu	2nd face
+2. rovinu	2nd plane
+3. bod	3rd point
+Bod leží na přímce – rovinu nelze určit.	The point lies on the line – the plane cannot be determined.
+Bod „{0}“ entity skici neexistuje.	Point “{0}” of the sketch entity does not exist.
+Body leží na jedné přímce – rovinu nelze určit.	The points are collinear – the plane cannot be determined.
+Cíl průmětu musí být rovinná plocha, osa válce nebo přímá hrana.	The projection target must be a planar face, a cylinder axis or a straight edge.
+Entita skici odkazu neexistuje.	The referenced sketch entity does not exist.
+Hrana je rovnoběžná s plochou – průsečík neexistuje.	The edge is parallel to the face – there is no intersection.
+Hrana není kruhová – střed kružnice nelze určit (použijte střed hrany).	The edge is not circular – the circle centre cannot be determined (use the edge midpoint).
+Hrany leží na jedné přímce – rovinu nelze určit.	The edges are collinear – the plane cannot be determined.
+Nulový směr – vyberte jinou geometrii.	Zero direction – select other geometry.
+Odkaz na {0} vyžaduje těleso – nejdřív vytvořte tvar.	A reference to {0} requires a body – create a shape first.
+Odkaz neurčuje {0} (vyberte hranu, válcovou nebo rovinnou plochu).	The reference does not define {0} (select an edge, a cylindrical or a planar face).
+Odkaz neurčuje {0} (vyberte rovinnou plochu nebo pomocnou rovinu).	The reference does not define {0} (select a planar face or a datum plane).
+Odkaz neurčuje {0}.	The reference does not define {0}.
+Odkaz pomocné geometrie „{0}“ je cyklický.	The construction geometry reference “{0}” is cyclic.
+Odkazovaná {0} už v modelu není – vyberte ji znovu.	The referenced {0} is no longer in the model – select it again.
+Osa X souřadného systému je rovnoběžná s osou Z – zvolte jiný směr X.	The X axis of the coordinate system is parallel to the Z axis – choose another X direction.
+Pomocná rovina odkazu neexistuje.	The referenced datum plane does not exist.
+První odkaz musí být přímá hrana.	The first reference must be a straight edge.
+Roviny jsou rovnoběžné – průsečnice neexistuje.	The planes are parallel – there is no intersection line.
+Skica odkazu neexistuje.	The referenced sketch does not exist.
+Vyberte bod a hranu (směr).	Select a point and an edge (direction).
+Vyberte bod a plochu.	Select a point and a face.
+Vyberte dva body.	Select two points.
+Vyberte dvě přímé hrany.	Select two straight edges.
+Vyberte hranu a plochu.	Select an edge and a face.
+Vyberte hranu pro tečnu.	Select an edge for the tangent.
+Vyberte hranu.	Select an edge.
+Vyberte přímou hranu (osu otáčení).	Select a straight edge (axis of rotation).
+Vyberte přímou hranu nebo válcovou plochu.	Select a straight edge or a cylindrical face.
+Vyberte přímou hranu.	Select a straight edge.
+Vyberte rovinnou plochu nebo pomocnou rovinu.	Select a planar face or a datum plane.
+Vyberte rovinu/plochu, se kterou má být tečná rovina rovnoběžná.	Select the plane/face the tangent plane should be parallel to.
+Vyberte úsečku ve skice jako osu rotace.	Select a line in the sketch as the axis of revolution.
+Zvolená rovina je kolmá na osu válce – tečná rovina neexistuje.	The chosen plane is perpendicular to the cylinder axis – there is no tangent plane.
+druhý bod	the second point
+pomocný bod	the datum point
+počátek souřadného systému	the coordinate system origin
+první bod	the first point
+{0} odkazu neexistuje – vyberte ji znovu.	The referenced {0} does not exist – select it again.
+{0} „{1}“ je potlačená.	{0} “{1}” is suppressed.
+
+# refs
+3 body: {0}	3 points: {0}
+Bod na hraně v % délky	Point on edge at % of length
+Bod skici ({0})	Sketch point ({0})
+Bodem a normálou	Point and normal
+Bodem a přímkou	Point and line
+Dovnitř	Inwards
+Dva body	Two points
+Dvě tloušťky	Two thicknesses
+Dvěma body	Through two points
+Dvěma hranami	Through two edges
+Globální osa X / Y / Z	Global X / Y / Z axis
+Hrana modelu	Model edge
+Hrana {0}{1}	Edge {0}{1}
+K dalšímu	Up to next
+K ploše	Up to face
+K tělesu	Up to body
+K vrcholu	Up to vertex
+Kolmo na křivku v bodě	Normal to curve at point
+Kolmo na rovinu (normála)	Normal to plane
+Kolmo na {0} v {1}	Normal to {0} at {1}
+Konec hrany	Edge end
+Mezi dvěma body (poměr)	Between two points (ratio)
+Na střed	Mid-plane
+Na vzdálenost	Blind
+Normála	Normal
+Normála plochy	Face normal
+Od plochy	From face
+Od vrcholu	From vertex
+Odsazení od roviny skici	Offset from the sketch plane
+Odsazený bod podél hrany	Offset point along edge
+Odsazeně od plochy	Offset from face
+Osa X / Y / Z	X / Y / Z axis
+Osa X skici (vodorovná)	Sketch X axis (horizontal)
+Osa Y skici (svislá)	Sketch Y axis (vertical)
+Osa válcové plochy	Cylindrical face axis
+Osa {0}	{0} axis
+Pod úhlem k ploše kolem hrany	At angle to face about edge
+Pod úhlem od normály	At angle from normal
+Podél hrany / osy válce	Along edge / cylinder axis
+Poloha na hraně (%)	Position on edge (%)
+Pomocná osa	Datum axis
+Pomocná osa / osa Z souř. systému	Datum axis / coordinate system Z axis
+Pomocná rovina	Datum plane
+Pomocná rovina (+ odsazení)	Datum plane (+ offset)
+Pomocná rovina (normála)	Datum plane (normal)
+Pomocná rovina{0}	Datum plane{0}
+Pomocný bod	Datum point
+Poměr (0 = první bod, 1 = druhý)	Ratio (0 = first point, 1 = second)
+Počátek	Origin
+Počátek souřadnic	Coordinate origin
+Průmět bodu na plochu	Point projected onto face
+Průsečnice dvou rovin	Intersection of two planes
+Průsečík hrany s plochou	Intersection of edge and face
+Rovina skici	Sketch plane
+Rovina {0}{1}	Plane {0}{1}
+Rovnoběžně s plochou (+ odsazení)	Parallel to face (+ offset)
+Skrz vše	Through all
+Střed hrany	Edge midpoint
+Střed kružnice / oblouku	Circle / arc centre
+Střed mezi dvěma body	Midpoint between two points
+Střed plochy	Face centre
+Střední mezi dvěma plochami	Midway between two faces
+Střední rovina	Mid-plane
+Střední: {0} / {1}	Mid: {0} / {1}
+Tečně k válci	Tangent to cylinder
+Tečně k {0} ∥ {1}	Tangent to {0} ∥ {1}
+Třemi body	Through three points
+Vektor (čísla)	Vector (numbers)
+Vektor {0}	Vector {0}
+Ven	Outwards
+Vlastní (počátek, normála, X)	Custom (origin, normal, X)
+Vlastní ({0})	Custom ({0})
+Vrchol / koncový bod	Vertex / end point
+Vrchol {0}	Vertex {0}
+Vzdálenost (mm)	Distance (mm)
+X, Y, Z v mm (nebo @dx,dy,dz od posledního bodu)	X, Y, Z in mm (or @dx,dy,dz from the last point)
+Zadat souřadnice…	Enter coordinates…
+Začátek hrany	Edge start
+Základní rovina + odsazení	Base plane + offset
+bod + hrana udávající směr + vzdálenost	point + edge giving the direction + distance
+bod + plocha	point + face
+bod 0, 0, 0	point 0, 0, 0
+hrana (směr)	edge (direction)
+klikněte na hranu	click an edge
+klikněte na hranu a zadejte procenta	click an edge and enter the percentage
+klikněte na hranu – bod v polovině délky	click an edge – the point at half its length
+klikněte na kruhovou hranu	click a circular edge
+klikněte na plochu – těžiště	click a face – its centroid
+klikněte na vrchol tělesa	click a vertex of the body
+kruhová hrana	circular edge
+po nejbližší plochu tělesa (první stěna)	up to the nearest body face (first wall)
+po první stěnu stávajícího tělesa	up to the first wall of the existing body
+po rovinu odsazenou od vybrané plochy	up to a plane offset from the selected face
+po rovinu procházející vybraným bodem	up to a plane through the selected point
+po vybranou plochu (i zakřivenou)	up to the selected face (even curved)
+přes celé těleso	through the whole body
+přímá hrana + plocha	straight edge + face
+slepé vysunutí o zadanou délku	blind extrusion by the given length
+symetricky na obě strany (celková délka)	symmetric to both sides (total length)
+vyberte dva body	select two points
+vyberte dva body a zadejte poměr 0–1	select two points and enter a ratio 0–1
+{0}° k {1} kolem {2}	{0}° to {1} about {2}
+Úhel {0}°	Angle {0}°
+Čára ve skici	Line in sketch
+— nevybráno —	— not selected —
+
+# settings, share, sketch-tools, vault, mesh-metrics
+Alt	Alt
+Ctrl	Ctrl
+Shift	Shift
+Soubor není nastavení Mnástrojárna CAD.	The file is not a Mnástrojárna CAD settings file.
+Dokument je pro odkaz příliš velký ({0} kB, zřejmě importovaná geometrie). {1}	The document is too large for a link ({0} kB, probably imported geometry). {1}
+Nesprávné heslo.	Wrong password.
+Odkaz není platný sdílený dokument Mnástrojárna CAD (zkontrolujte, zda se zkopíroval celý).	The link is not a valid shared Mnástrojárna CAD document (check that it was copied completely).
+Platnost sdíleného odkazu vypršela{0}. Požádejte odesílatele o nové sdílení.	The shared link has expired{0}. Ask the sender to share it again.
+Sdílený dokument už v úložišti není (platnost vypršela nebo byl smazán). Požádejte odesílatele o nové sdílení.	The shared document is no longer in storage (it expired or was deleted). Ask the sender to share it again.
+V úložišti musí mít odkaz omezenou platnost (max. 90 dní).	A link in storage must have a limited validity (max. 90 days).
+Úložiště sdílení není dostupné (síť). Zkuste to znovu nebo pošlete soubor .mncad.	The sharing storage is unavailable (network). Try again or send the .mncad file.
+Úložiště sdílení není dostupné. Zkuste to znovu později.	The sharing storage is unavailable. Try again later.
+Úložiště sdílení není nastavené (NEXT_PUBLIC_CAD_SHARE_URL / NEXT_PUBLIC_CAD_SHARE_KEY).	The sharing storage is not configured (NEXT_PUBLIC_CAD_SHARE_URL / NEXT_PUBLIC_CAD_SHARE_KEY).
+Úložiště sdílení odmítlo nahrání ({0}). Zkontrolujte nastavení bucketu „cad-share“.	The sharing storage rejected the upload ({0}). Check the settings of the “cad-share” bucket.
+Poloměr opsané	Circumscribed radius
+Poloměr osy	Centreline radius
+Poloměr vepsané	Inscribed radius
+Poloosa a	Semi-axis a
+Poloosa b	Semi-axis b
+Heslo musí mít alespoň 4 znaky.	The password must have at least 4 characters.
+Úložiště prohlížeče není dostupné.	Browser storage is not available.
+1.1730 (C45U) – desky	1.1730 (C45U) – plates
+1.2311 (40CrMnMo7) – formy	1.2311 (40CrMnMo7) – moulds
+1.2343 (X38CrMoV5-1) – kalená	1.2343 (X38CrMoV5-1) – hardened
+1.2516 – vyhazovače	1.2516 – ejectors
+1.2738 (40CrMnNiMo8-6-4)	1.2738 (40CrMnNiMo8-6-4)
+1.7131 (16MnCr5) – vedení	1.7131 (16MnCr5) – guides
+Měď	Copper
+Nerez	Stainless steel
+POM (plast)	POM (plastic)
+Titan	Titanium
+
+# drobné
+Ks	Qty
+ks ·	pcs ·
+  {0} {1} ks   {2} m   {3} kg	  {0} {1} pcs   {2} m   {3} kg
+ (platí do {0})	 (valid until {0})
+\n\nOdkaz je chráněný heslem – pošlu ho zvlášť.	\n\nThe link is password-protected – I will send the password separately.
+Mnástrojárna CAD – sdílený dokument „{0}“{1}:\n{2}{3}\n\nOtevře se v prohlížeči bez instalace (Chrome, Edge, Firefox, Safari).	Mnástrojárna CAD – shared document “{0}”{1}:\n{2}{3}\n\nIt opens in the browser without installation (Chrome, Edge, Firefox, Safari).
+
+
+# souhrny prvků ve stavovém textu
+vlastní	custom
+kružnice Ø{0}	circle Ø{0}
+obdélník {0}×{1}	rectangle {0}×{1}
+{0}-úhelník	{0}-gon
+drážka {0}×{1}	slot {0}×{1}
+čára {0} b.	polyline {0} pts
+skrz vše	through all
+, symetricky	, symmetric
+ (střed)	 (centred)
+vnitřní (v díře)	internal (in hole)
+vnější (na válci)	external (on cylinder)
+modelované drážky	modelled grooves
+kosmetický (jen výkres)	cosmetic (drawing only)
+{0}{1} (jádro Ø{2})	{0}{1} (minor Ø{2})
+ hl. {0}	 depth {0}
+ skrz	 through
+ hloubka {0}	 depth {0}
+ zahl. Ø{0}×{1}	 cbore Ø{0}×{1}
+ kuž. Ø{0}	 csink Ø{0}
+vše	all
+ × {0}× po {1}	 × {0}× every {1}
+rovina {0}{1}	plane {0}{1}

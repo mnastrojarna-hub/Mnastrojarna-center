@@ -6,6 +6,7 @@
  * nebo vrátí neplatnou geometrii (sebeprotínající plochy), se kterou pak selže export STEP. Stav „✓“ u prvku
  * musí znamenat, že výsledek je platné objemové těleso a že se operace skutečně projevila.
  */
+import { tr } from "./i18n";
 import * as r from "replicad";
 
 export type Shape = r.Shape3D;
@@ -109,7 +110,7 @@ export function sameSignature(a: ShapeSignature | null, b: ShapeSignature | null
 
 /** Lidský popis stavu geometrie pro protokol a stav dokumentu. */
 export function describeCheck(c: ShapeCheck): string {
-  if (!c.solids) return c.shells ? `žádné objemové těleso – jen ${c.shells} ${c.shells === 1 ? "plášť" : "pláště"} (${c.faces} ploch)` : "žádné objemové těleso";
-  const base = c.solids === 1 ? "1 těleso" : `${c.solids} těles`;
-  return c.valid ? `platná geometrie (${base})` : `NEPLATNÁ geometrie (${base}) – sebeprotínající nebo neorientovatelné plochy; export STEP může selhat`;
+  if (!c.solids) return c.shells ? tr("žádné objemové těleso – jen {0} {1} ({2} ploch)", c.shells, c.shells === 1 ? tr("plášť") : tr("pláště"), c.faces) : tr("žádné objemové těleso");
+  const base = c.solids === 1 ? tr("1 těleso") : tr("{0} těles", c.solids);
+  return c.valid ? tr("platná geometrie ({0})", base) : tr("NEPLATNÁ geometrie ({0}) – sebeprotínající nebo neorientovatelné plochy; export STEP může selhat", base);
 }

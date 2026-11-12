@@ -8,6 +8,7 @@
  * Zdrojem je nástrojové těleso dřívějšího prvku (`ctx.tools`), lze jich opakovat více naráz (`featureIds`).
  * Referenční bod zdroje (po křivce / podle skici / výplň) = střed obalového kvádru nástroje.
  */
+import { tr } from "../i18n";
 import * as r from "replicad";
 import { applyMode, axisPlane, needSketch, sketchPathWire } from "../build";
 import { planeBasis } from "../defaults";
@@ -47,23 +48,23 @@ function bboxCenter(shapes: Shape[]): Vec3 {
 /** Zdrojové nástroje pole (`featureIds` má přednost, `featureId` = zpětná kompatibilita). */
 export function sourceTools(f: PatternF, ctx: FeatCtx): Tool[] {
   const ids = [...new Set((f.featureIds?.length ? f.featureIds : [f.featureId]).filter(Boolean))];
-  if (!ids.length) throw new Error(ERR_SOURCE);
+  if (!ids.length) throw new Error(tr(ERR_SOURCE));
   return ids.map((id) => {
     const t = ctx.tools.get(id);
     if (t) return t;
     const src = ctx.doc.features.find((x) => x.id === id);
-    if (!src) throw new Error(ERR_SOURCE);
-    throw new Error(`Prvek „${src.name}“ nelze opakovat – pole umí opakovat jen prvky s nástrojovým tělesem (vysunutí, rotace, díra, primitiva, tažení, šablonování, text), které jsou v historii před polem a nejsou potlačené.`);
+    if (!src) throw new Error(tr(ERR_SOURCE));
+    throw new Error(tr("Prvek „{0}“ nelze opakovat – pole umí opakovat jen prvky s nástrojovým tělesem (vysunutí, rotace, díra, primitiva, tažení, šablonování, text), které jsou v historii před polem a nejsou potlačené.", src.name));
   });
 }
 
-const unit = (d: Vec3, what = "Směr pole"): Vec3 => {
+const unit = (d: Vec3, what = tr("Směr pole")): Vec3 => {
   const len = V.len(d);
-  if (len < 1e-12) throw new Error(`${what} nesmí být nulový.`);
+  if (len < 1e-12) throw new Error(tr("{0} nesmí být nulový.", what));
   return V.mul(d, 1 / len);
 };
 const checkCount = (n: number) => {
-  if (n > PATTERN_MAX) throw new Error(`Pole má příliš mnoho kusů (${n}, max. ${PATTERN_MAX}).`);
+  if (n > PATTERN_MAX) throw new Error(tr("Pole má příliš mnoho kusů ({0}, max. {1}).", n, PATTERN_MAX));
 };
 const skipSet = (f: PatternF) => new Set((f.skip ?? []).map((k) => Math.round(k)));
 const translateBy = (d: Vec3): Xf => (s) => s.translate(d);
@@ -75,12 +76,12 @@ function linearInstances(f: Extract<PatternF, { kind: "linear" }>, ctx: FeatCtx)
   const n2 = Math.max(1, Math.round(f.count2 ?? 1));
   checkCount(n1 * n2);
   const d1 = f.dirDef ? resolveDirection(rc(ctx), f.dirDef, { normal: [0, 0, 1] }) : unit(f.direction);
-  const d2: Vec3 = n2 > 1 ? (f.dirDef2 ? resolveDirection(rc(ctx), f.dirDef2, { normal: [0, 0, 1] }) : unit(f.direction2 ?? [0, 1, 0], "Druhý směr pole")) : [0, 0, 0];
-  if (n2 > 1 && Math.abs(V.dot(d1, d2)) > 0.9999) throw new Error("Druhý směr pole je rovnoběžný s prvním – zvolte jiný směr.");
+  const d2: Vec3 = n2 > 1 ? (f.dirDef2 ? resolveDirection(rc(ctx), f.dirDef2, { normal: [0, 0, 1] }) : unit(f.direction2 ?? [0, 1, 0], tr("Druhý směr pole"))) : [0, 0, 0];
+  if (n2 > 1 && Math.abs(V.dot(d1, d2)) > 0.9999) throw new Error(tr("Druhý směr pole je rovnoběžný s prvním – zvolte jiný směr."));
   const total = f.spacingMode === "total";
   const sp2 = f.spacing2 ?? f.spacing;
-  if (n1 > 1 && !(Math.abs(f.spacing) > 1e-9)) throw new Error("Rozteč pole nesmí být nulová.");
-  if (n2 > 1 && !(Math.abs(sp2) > 1e-9)) throw new Error("Rozteč ve druhém směru nesmí být nulová.");
+  if (n1 > 1 && !(Math.abs(f.spacing) > 1e-9)) throw new Error(tr("Rozteč pole nesmí být nulová."));
+  if (n2 > 1 && !(Math.abs(sp2) > 1e-9)) throw new Error(tr("Rozteč ve druhém směru nesmí být nulová."));
   const step1 = total ? (n1 > 1 ? f.spacing / (n1 - 1) : 0) : f.spacing;
   const step2 = total ? (n2 > 1 ? sp2 / (n2 - 1) : 0) : sp2;
   const skip = skipSet(f);
@@ -101,7 +102,7 @@ function circularInstances(f: Extract<PatternF, { kind: "circular" }>, ctx: Feat
   const n = Math.max(1, Math.round(f.count));
   const sym = !!f.symmetric;
   checkCount(sym ? 2 * n - 1 : n);
-  const ax = f.axisDef ? resolveAxis(rc(ctx), f.axisDef, null) : { origin: f.center, dir: unit(axisVec(f.axis), "Osa pole") };
+  const ax = f.axisDef ? resolveAxis(rc(ctx), f.axisDef, null) : { origin: f.center, dir: unit(axisVec(f.axis), tr("Osa pole")) };
   const angle = Math.abs(f.angle) || 360;
   const equal = f.equalSpacing ?? angle >= 360;
   const step = n > 1 ? (equal ? angle / n : angle / (n - 1)) : 0;
@@ -127,7 +128,7 @@ type Walk = { e: r.Edge; flip: boolean; len: number };
 /** Hrany drátu seřazené za sebou (s případným otočením), aby se dalo jít po délce. */
 function orderedEdges(wire: r.Wire): Walk[] {
   const edges = wire.edges;
-  if (!edges.length) throw new Error("Křivka pole je prázdná.");
+  if (!edges.length) throw new Error(tr("Křivka pole je prázdná."));
   const P = (e: r.Edge, end: 0 | 1) => vt(end ? e.endPoint : e.startPoint);
   const [lo, hi] = wire.boundingBox.bounds as [Vec3, Vec3];
   const diag = Math.max(1, V.len(V.sub(hi, lo)));
@@ -166,7 +167,7 @@ function orderedEdges(wire: r.Wire): Walk[] {
     }
     if (!found) break;
   }
-  if (used.some((u) => !u)) throw new Error("Křivka pole musí být jedna souvislá čára (bez větvení a mezer).");
+  if (used.some((u) => !u)) throw new Error(tr("Křivka pole musí být jedna souvislá čára (bez větvení a mezer)."));
   return walk;
 }
 
@@ -180,22 +181,22 @@ function alongCurve(walk: Walk[], s: number): { p: Vec3; t: Vec3 } {
     if (rest <= w.len + 1e-9 || lastOne) {
       const u = w.len > 1e-12 ? Math.max(0, Math.min(1, rest / w.len)) : 0;
       const t = w.flip ? 1 - u : u;
-      const tan = unit(vt(w.e.tangentAt(t)), "Tečna křivky");
+      const tan = unit(vt(w.e.tangentAt(t)), tr("Tečna křivky"));
       return { p: vt(w.e.pointAt(t)), t: w.flip ? V.mul(tan, -1) : tan };
     }
     rest -= w.len;
   }
-  throw new Error("Křivka pole je prázdná.");
+  throw new Error(tr("Křivka pole je prázdná."));
 }
 
 function curveInstances(f: Extract<PatternF, { kind: "curve" }>, ctx: FeatCtx, tools: Tool[]): Inst[] {
-  const sk = needSketch(ctx, f.sketchId, "skica křivky pole");
+  const sk = needSketch(ctx, f.sketchId, tr("skica křivky pole"));
   const n = Math.max(1, Math.round(f.count));
   checkCount(n);
   const wire = sketchPathWire(sk);
   const walk = orderedEdges(wire);
   const L = walk.reduce((a, w) => a + w.len, 0);
-  if (!(L > 1e-9)) throw new Error(`Křivka ve skice „${sk.name}“ má nulovou délku.`);
+  if (!(L > 1e-9)) throw new Error(tr("Křivka ve skice „{0}“ má nulovou délku.", sk.name));
   const first = walk[0];
   const last = walk[walk.length - 1];
   const closed = V.len(V.sub(vt(first.flip ? first.e.endPoint : first.e.startPoint), vt(last.flip ? last.e.startPoint : last.e.endPoint))) < 1e-6 * Math.max(1, L);
@@ -203,7 +204,7 @@ function curveInstances(f: Extract<PatternF, { kind: "curve" }>, ctx: FeatCtx, t
   const pos: number[] = [];
   for (let i = 0; i < n; i++) {
     const s = sp > 0 ? i * sp : n > 1 ? (closed ? (L * i) / n : (L * i) / (n - 1)) : 0;
-    if (s > L + 1e-6) throw new Error(`Pole se na křivku nevejde (délka ${Math.round(L * 100) / 100} mm) – zmenšete rozteč nebo počet kusů.`);
+    if (s > L + 1e-6) throw new Error(tr("Pole se na křivku nevejde (délka {0} mm) – zmenšete rozteč nebo počet kusů.", Math.round(L * 100) / 100));
     pos.push(s);
   }
   const normal = planeBasis(sk.plane).n;
@@ -239,9 +240,9 @@ function projectToSketch(plane: SketchPlane, p: Vec3): { p3: Vec3; p2: Vec2 } {
 }
 
 function sketchInstances(f: Extract<PatternF, { kind: "sketch" }>, ctx: FeatCtx, tools: Tool[]): Inst[] {
-  const sk = needSketch(ctx, f.sketchId, "skica s body pole");
+  const sk = needSketch(ctx, f.sketchId, tr("skica s body pole"));
   const pts = sk.entities.flatMap((e) => (e.type === "point" ? [e.p] : []));
-  if (!pts.length) throw new Error(`Skica „${sk.name}“ neobsahuje žádné body – nakreslete body (nástroj Bod) v místech kopií.`);
+  if (!pts.length) throw new Error(tr("Skica „{0}“ neobsahuje žádné body – nakreslete body (nástroj Bod) v místech kopií.", sk.name));
   checkCount(pts.length);
   const ref = projectToSketch(sk.plane, bboxCenter(tools.map((t) => t.tool)));
   const skip = skipSet(f);
@@ -252,7 +253,7 @@ function sketchInstances(f: Extract<PatternF, { kind: "sketch" }>, ctx: FeatCtx,
     if (V.len(d) < 1e-6) return; // bod v místě zdroje = zdroj sám
     out.push({ i, xf: translateBy(d) });
   });
-  if (!out.length) throw new Error(`Všechny body skici „${sk.name}“ leží v místě zdrojového prvku – přidejte další body.`);
+  if (!out.length) throw new Error(tr("Všechny body skici „{0}“ leží v místě zdrojového prvku – přidejte další body.", sk.name));
   return out;
 }
 
@@ -305,11 +306,11 @@ export function fillPoints(outer: Vec2[][], holes: Vec2[][], o: Vec2, spacing: n
 }
 
 function fillInstances(f: Extract<PatternF, { kind: "fill" }>, ctx: FeatCtx, tools: Tool[]): Inst[] {
-  const sk = needSketch(ctx, f.sketchId, "skica obrysu výplně");
-  if (!(f.spacing > 1e-9)) throw new Error("Rozteč výplňového pole musí být kladná.");
+  const sk = needSketch(ctx, f.sketchId, tr("skica obrysu výplně"));
+  if (!(f.spacing > 1e-9)) throw new Error(tr("Rozteč výplňového pole musí být kladná."));
   const margin = Math.max(0, f.margin || 0);
   const { loops } = findLoops(sk.entities);
-  if (!loops.length) throw new Error(`Skica „${sk.name}“ neobsahuje uzavřený obrys pro výplň.`);
+  if (!loops.length) throw new Error(tr("Skica „{0}“ neobsahuje uzavřený obrys pro výplň.", sk.name));
   const nested = nestLoops(loops);
   const outer = nested.filter((x) => x.depth % 2 === 0).map((x) => loopPolygon(x.loop));
   const holes = nested.filter((x) => x.depth % 2 === 1).map((x) => loopPolygon(x.loop));
@@ -319,8 +320,8 @@ function fillInstances(f: Extract<PatternF, { kind: "fill" }>, ctx: FeatCtx, too
   const ys = outer.flatMap((p) => p.map((q) => q[1]));
   const o: Vec2 = refInside ? ref.p2 : [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2];
   const pts = fillPoints(outer, holes, o, f.spacing, margin, f.layout ?? "grid");
-  if (!pts.length) throw new Error("Do obrysu se s touto roztečí a okrajem nevejde žádný kus – zmenšete rozteč nebo okraj.");
-  if (pts.length > PATTERN_MAX) throw new Error(`Výplňové pole má příliš mnoho kusů (${pts.length}, max. ${PATTERN_MAX}) – zvětšete rozteč.`);
+  if (!pts.length) throw new Error(tr("Do obrysu se s touto roztečí a okrajem nevejde žádný kus – zmenšete rozteč nebo okraj."));
+  if (pts.length > PATTERN_MAX) throw new Error(tr("Výplňové pole má příliš mnoho kusů ({0}, max. {1}) – zvětšete rozteč.", pts.length, PATTERN_MAX));
   const skip = skipSet(f);
   const out: Inst[] = [];
   pts.forEach((p, i) => {
@@ -367,7 +368,7 @@ export function patternInstances(f: PatternF, ctx: FeatCtx, tools: Tool[]): Inst
 }
 
 registerFeatureBuilder("pattern", (f, ctx) => {
-  if (!ctx.body) throw new Error("Není těleso.");
+  if (!ctx.body) throw new Error(tr("Není těleso."));
   const tools = sourceTools(f, ctx);
   const inst = patternInstances(f, ctx, tools);
   if (!inst.length) return null;
@@ -379,7 +380,7 @@ registerFeatureBuilder("pattern", (f, ctx) => {
 const pickedFaces = (body: Shape, idx: number[], what: string) => {
   const all = body.faces;
   const picked = [...new Set(idx)].map((k) => all[k]).filter(Boolean);
-  if (!picked.length) throw new Error(`Vyberte ${what}.`);
+  if (!picked.length) throw new Error(tr("Vyberte {0}.", what));
   return picked;
 };
 
@@ -393,9 +394,9 @@ function thickSolid(body: Shape, faces: r.Face[], offset: number, join: "interse
   try {
     for (const f of faces) list.Append(f.wrapped);
     mk.MakeThickSolidByJoin(body.wrapped, list, offset, 1e-3, oc.BRepOffset_Mode.BRepOffset_Skin, false, false, join === "arc" ? oc.GeomAbs_JoinType.GeomAbs_Arc : oc.GeomAbs_JoinType.GeomAbs_Intersection, false);
-    if (!mk.IsDone()) throw new Error("Skořepinu se nepodařilo vytvořit – zkuste menší tloušťku nebo jiné plochy.");
+    if (!mk.IsDone()) throw new Error(tr("Skořepinu se nepodařilo vytvořit – zkuste menší tloušťku nebo jiné plochy."));
     const s = r.cast(mk.Shape()) as unknown as Shape;
-    if (!(Math.abs(r.measureVolume(s)) > 0)) throw new Error("Skořepina nevytvořila objem – zkuste menší tloušťku.");
+    if (!(Math.abs(r.measureVolume(s)) > 0)) throw new Error(tr("Skořepina nevytvořila objem – zkuste menší tloušťku."));
     return s;
   } finally {
     mk.delete();
@@ -405,11 +406,11 @@ function thickSolid(body: Shape, faces: r.Face[], offset: number, join: "interse
 
 registerFeatureBuilder("shell", (f: ShellF, ctx) => {
   const body = ctx.body;
-  if (!body) throw new Error("Není co skořepinovat.");
+  if (!body) throw new Error(tr("Není co skořepinovat."));
   const t = f.thickness;
-  if (!(t > 0)) throw new Error("Tloušťka musí být kladná.");
+  if (!(t > 0)) throw new Error(tr("Tloušťka musí být kladná."));
   const all = body.faces;
-  const picked = pickedFaces(body, f.faces, "plochy, které se mají otevřít");
+  const picked = pickedFaces(body, f.faces, tr("plochy, které se mají otevřít"));
   const outward = !!f.outward;
   let out: Shape;
   if (outward) {
@@ -425,7 +426,7 @@ registerFeatureBuilder("shell", (f: ShellF, ctx) => {
     .filter(({ k, v }) => all[k] && Number.isFinite(v) && v > 0 && Math.abs(v - t) > 1e-9 && !f.faces.includes(k));
   for (const { k, v } of extra) {
     const of = all[k];
-    if (of.geomType !== "PLANE") throw new Error(`Jinou tloušťku lze zadat jen u rovinných ploch (plocha ${k + 1} je ${of.geomType === "CYLINDRE" ? "válcová" : "zakřivená"}).`);
+    if (of.geomType !== "PLANE") throw new Error(tr("Jinou tloušťku lze zadat jen u rovinných ploch (plocha {0} je {1}).", k + 1, of.geomType === "CYLINDRE" ? tr("válcová") : tr("zakřivená")));
     const n = faceNormal(of);
     const o = vt(of.center);
     // protější stěna skořepiny: rovnoběžná, ve vzdálenosti t, normála dovnitř dutiny (dovnitř) / ven (ven)
@@ -446,7 +447,7 @@ registerFeatureBuilder("shell", (f: ShellF, ctx) => {
         best = i;
       }
     });
-    if (best < 0) throw new Error(`Protější stěnu skořepiny u plochy ${k + 1} se nepodařilo najít – jinou tloušťku zde nelze použít.`);
+    if (best < 0) throw new Error(tr("Protější stěnu skořepiny u plochy {0} se nepodařilo najít – jinou tloušťku zde nelze použít.", k + 1));
     out = pushPull(out, [best], v - t);
   }
   return out;
@@ -492,10 +493,10 @@ export function tangentFaces(body: Shape, picked: number[]): number[] {
 
 registerFeatureBuilder("draft", (f: DraftF, ctx) => {
   const body = ctx.body;
-  if (!body) throw new Error("Není těleso pro úkos.");
-  if (!(Math.abs(f.angle) > 0 && Math.abs(f.angle) < 45)) throw new Error("Úhel úkosu musí být mezi 0 a 45°.");
+  if (!body) throw new Error(tr("Není těleso pro úkos."));
+  if (!(Math.abs(f.angle) > 0 && Math.abs(f.angle) < 45)) throw new Error(tr("Úhel úkosu musí být mezi 0 a 45°."));
   const idx = f.tangentChain ? tangentFaces(body, f.faces) : f.faces;
-  const picked = pickedFaces(body, idx, "plochy, které se mají zkosit");
+  const picked = pickedFaces(body, idx, tr("plochy, které se mají zkosit"));
   const pull = f.pull ? resolveDirection(rc(ctx), f.pull, { normal: [0, 0, 1] }) : null;
   let neutral: r.Plane;
   if (f.planeDef) {

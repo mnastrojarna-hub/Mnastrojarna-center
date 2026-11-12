@@ -2,6 +2,7 @@
  * Stavba modelu z historie prvků nad jádrem OpenCascade (replicad).
  * Běží ve web workeru (prohlížeč) i v Node (testy). Předpokládá zavolané setOC().
  */
+import { tr } from "./i18n";
 import * as r from "replicad";
 import { checkShape, describeCheck, sameSignature, signatureOf, tryFixShape, type ShapeSignature } from "./check";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
@@ -87,7 +88,7 @@ function oriented(s: Shape, axis: Axis, position: Vec3): Shape {
 
 export function applyMode(body: Shape | null, tool: Shape, mode: BoolMode): Shape {
   if (!body) {
-    if (mode === "cut" || mode === "intersect") throw new Error("Není z čeho odebírat – nejdřív vytvořte těleso.");
+    if (mode === "cut" || mode === "intersect") throw new Error(tr("Není z čeho odebírat – nejdřív vytvořte těleso."));
     return tool;
   }
   if (mode === "cut") return body.cut(tool);
@@ -110,7 +111,7 @@ const planeFrom = (p: { origin: Vec3; normal: Vec3; xDir: Vec3 }) => new r.Plane
 export function thinDrawing(d: r.Drawing, thin: Thin): r.Drawing {
   const t1 = Math.abs(thin.t1);
   const t2 = Math.abs(thin.t2 ?? thin.t1);
-  if (!(t1 > 0)) throw new Error("Tloušťka tenké stěny musí být kladná.");
+  if (!(t1 > 0)) throw new Error(tr("Tloušťka tenké stěny musí být kladná."));
   switch (thin.side) {
     case "one":
       return d.offset(t1).cut(d);
@@ -127,7 +128,7 @@ export function thinDrawing(d: r.Drawing, thin: Thin): r.Drawing {
 export function profileSketch(sk: SketchF, plane: r.Plane, o: { outerOnly?: boolean; thin?: Thin }, shift: Vec3 = [0, 0, 0]): r.SketchInterface {
   const d = sketchDrawing(sk, o.outerOnly);
   if (d) return (o.thin ? thinDrawing(d, o.thin) : d).sketchOnPlane(plane) as r.SketchInterface;
-  if (!o.thin) throw new Error("Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu).");
+  if (!o.thin) throw new Error(tr("Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu)."));
   const t1 = Math.abs(o.thin.t1);
   const t = o.thin.side === "two" ? (t1 + Math.abs(o.thin.t2 ?? t1)) / 2 : o.thin.side === "mid" ? t1 / 2 : t1;
   let w = sketchPathWire(sk);
@@ -158,25 +159,25 @@ export function nearestSolid(parts: Shape, o: Vec3, d: Vec3): { solid: Shape; fa
       best = sl;
     }
   }
-  if (!best) throw new Error("Ve směru operace není žádné těleso.");
+  if (!best) throw new Error(tr("Ve směru operace není žádné těleso."));
   return { solid: best, far: maxProj(best, o, d) };
 }
 
 export function needSketch(ctx: { sketches: Map<string, SketchF> }, id: string, role = "skica"): SketchF {
   const sk = ctx.sketches.get(id);
-  if (!sk) throw new Error(`Chybí ${role} – vyberte ji v parametrech.`);
+  if (!sk) throw new Error(tr("Chybí {0} – vyberte ji v parametrech.", role));
   return sk;
 }
 
 /** Uzavřené smyčky skici jako dráty v prostoru, s hloubkou vnoření (0 = vnější obrys, 1 = otvor…). */
 export function sketchWires(sk: SketchF, plane: r.Plane = planeOf(sk.plane)): { wire: r.Wire; depth: number; area: number }[] {
   const { loops } = findLoops(sk.entities);
-  if (!loops.length) throw new Error(`Skica „${sk.name}“ neobsahuje uzavřený profil.`);
+  if (!loops.length) throw new Error(tr("Skica „{0}“ neobsahuje uzavřený profil.", sk.name));
   return nestLoops(loops).map(({ loop, depth, area }) => {
     const d = loopDrawing(loop);
-    if (!d) throw new Error(`Skica „${sk.name}“ obsahuje neplatný profil.`);
+    if (!d) throw new Error(tr("Skica „{0}“ obsahuje neplatný profil.", sk.name));
     const s = d.sketchOnPlane(plane) as r.Sketch;
-    if (!s.wire) throw new Error(`Skica „${sk.name}“ obsahuje neplatný profil.`);
+    if (!s.wire) throw new Error(tr("Skica „{0}“ obsahuje neplatný profil.", sk.name));
     return { wire: s.wire, depth, area };
   });
 }
@@ -213,10 +214,10 @@ export function sketchPathWire(sk: SketchF): r.Wire {
     }
   }
   if (closedEdges.length && !segs.length) {
-    if (closedEdges.length > 1) throw new Error("Dráha musí být jedna souvislá křivka.");
+    if (closedEdges.length > 1) throw new Error(tr("Dráha musí být jedna souvislá křivka."));
     return r.assembleWire(closedEdges);
   }
-  if (!segs.length) throw new Error(`Skica dráhy „${sk.name}“ je prázdná.`);
+  if (!segs.length) throw new Error(tr("Skica dráhy „{0}“ je prázdná.", sk.name));
   const ordered = chainSegs(segs);
   const edges = ordered.map((s) => (s.kind === "line" ? r.makeLine(W(s.a), W(s.b)) : r.makeThreePointArc(W(s.a), W(s.m), W(s.b))));
   return r.assembleWire(edges);
@@ -234,7 +235,7 @@ export function sketchChain(sk: SketchF): Seg[] {
       if (e.closed && e.points.length > 2) segs.push({ kind: "line", a: e.points[e.points.length - 1], b: e.points[0] });
     }
   }
-  if (!segs.length) throw new Error(`Skica „${sk.name}“ musí obsahovat čáru (úsečku, lomenou čáru nebo oblouk).`);
+  if (!segs.length) throw new Error(tr("Skica „{0}“ musí obsahovat čáru (úsečku, lomenou čáru nebo oblouk).", sk.name));
   return chainSegs(segs);
 }
 
@@ -276,7 +277,7 @@ export function chainSegs(segs: Seg[]): Seg[] {
     }
     if (!found) break;
   }
-  if (used.some((u) => !u)) throw new Error("Dráha musí být jedna souvislá křivka (bez větvení a mezer).");
+  if (used.some((u) => !u)) throw new Error(tr("Dráha musí být jedna souvislá křivka (bez větvení a mezer)."));
   return chain;
 }
 
@@ -286,7 +287,7 @@ export function combine(parts: { solid: Shape; depth: number }[]): Shape {
     if (!acc) acc = solid;
     else acc = depth % 2 === 0 ? acc.fuse(solid) : acc.cut(solid);
   }
-  if (!acc) throw new Error("Profil je prázdný.");
+  if (!acc) throw new Error(tr("Profil je prázdný."));
   return acc;
 }
 
@@ -312,7 +313,7 @@ function ensureFont(): Promise<void> {
     fontReady.catch(() => (fontReady = null));
   }
   return fontReady.catch(() => {
-    throw new Error("Písmo pro text se nepodařilo načíst – zkontrolujte připojení a zkuste to znovu.");
+    throw new Error(tr("Písmo pro text se nepodařilo načíst – zkontrolujte připojení a zkuste to znovu."));
   });
 }
 
@@ -329,27 +330,27 @@ function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { th
   let d = f.diameter;
   if (kind === "tapped") {
     const t = threadByName(f.thread);
-    if (!t) throw new Error(`Neznámý závit „${f.thread ?? ""}“ – ${THREAD_HINT}.`);
+    if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.thread ?? "", tr(THREAD_HINT)));
     d = t.tap;
   }
-  if (!(d > 0)) throw new Error("Průměr díry musí být kladný.");
+  if (!(d > 0)) throw new Error(tr("Průměr díry musí být kladný."));
   const big = body ? bboxDiag(body) * 2 + V.len(V.sub(at, body.boundingBox.center as Vec3)) * 2 + 10 : 1000;
   const rd = d / 2;
   const B = big; // přesah nad povrch
   const pts: [number, number][] = [[0, -B]];
   if (kind === "counterbore") {
-    if (!(f.cbDiameter > d && f.cbDepth > 0)) throw new Error("Zahloubení musí mít větší průměr než díra a kladnou hloubku.");
+    if (!(f.cbDiameter > d && f.cbDepth > 0)) throw new Error(tr("Zahloubení musí mít větší průměr než díra a kladnou hloubku."));
     pts.push([f.cbDiameter / 2, -B], [f.cbDiameter / 2, f.cbDepth], [rd, f.cbDepth]);
   } else if (kind === "countersink") {
     const csD = f.csDiameter ?? 0;
-    if (!(csD > d)) throw new Error("Průměr kuželového zahloubení musí být větší než průměr díry.");
+    if (!(csD > d)) throw new Error(tr("Průměr kuželového zahloubení musí být větší než průměr díry."));
     const angle = Math.min(170, Math.max(30, f.csAngle ?? 90));
     pts.push([csD / 2, -B], [csD / 2, 0], [rd, csDepthOf(csD, d, angle)]);
   } else pts.push([rd, -B]);
   if (end.through) pts.push([rd, big], [0, big]);
   else {
-    if (!(end.depth > 0)) throw new Error("Hloubka díry musí být kladná.");
-    if (kind === "counterbore" && end.depth <= f.cbDepth) throw new Error("Hloubka díry musí být větší než hloubka zahloubení.");
+    if (!(end.depth > 0)) throw new Error(tr("Hloubka díry musí být kladná."));
+    if (kind === "counterbore" && end.depth <= f.cbDepth) throw new Error(tr("Hloubka díry musí být větší než hloubka zahloubení."));
     const tip = Math.min(170, Math.max(60, f.tipAngle ?? 118));
     pts.push([rd, end.depth], [0, end.flat ? end.depth : end.depth + rd / Math.tan((tip * Math.PI) / 360)]);
   }
@@ -375,7 +376,7 @@ function revolvedAlongAny(profile: [number, number][], dir: Vec3, at: Vec3): Sha
 function holeTools(f: HoleF, ctx: Ctx): Shape {
   const rc = rctx(ctx);
   const body = ctx.body;
-  const pts: Vec3[] = f.points?.length ? f.points.map((p) => pointOf(rc, p, "bod díry")) : [f.position];
+  const pts: Vec3[] = f.points?.length ? f.points.map((p) => pointOf(rc, p, tr("bod díry"))) : [f.position];
   let dir: Vec3;
   if (f.dirDef) {
     const d = resolveDirection(rc, f.dirDef, { normal: axisVec(f.axis) });
@@ -387,16 +388,16 @@ function holeTools(f: HoleF, ctx: Ctx): Shape {
     if (end.kind === "throughAll") return holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false });
     if (end.kind === "toFace") {
       const g = resolveRef(rc, end.ref);
-      if (!g.plane || g.radius) throw new Error("Ukončení díry „k ploše“ vyžaduje rovinnou plochu nebo pomocnou rovinu.");
+      if (!g.plane || g.radius) throw new Error(tr("Ukončení díry „k ploše“ vyžaduje rovinnou plochu nebo pomocnou rovinu."));
       const n = g.plane.normal;
       const den = V.dot(dir, n);
-      if (Math.abs(den) < 1e-9) throw new Error("Cílová plocha je rovnoběžná s osou díry.");
+      if (Math.abs(den) < 1e-9) throw new Error(tr("Cílová plocha je rovnoběžná s osou díry."));
       const o2 = V.add(g.plane.origin, V.mul(n, (end.offset ?? 0) * (den > 0 ? -1 : 1)));
       const t = V.dot(V.sub(o2, at), n) / den;
-      if (!(t > 1e-6)) throw new Error("Cílová plocha neleží ve směru vrtání (zkuste obrátit směr).");
+      if (!(t > 1e-6)) throw new Error(tr("Cílová plocha neleží ve směru vrtání (zkuste obrátit směr)."));
       return holeToolAt(f, body, at, dir, { through: false, depth: t, flat: true });
     }
-    if (!body) throw new Error("Ukončení „k dalšímu“ potřebuje těleso.");
+    if (!body) throw new Error(tr("Ukončení „k dalšímu“ potřebuje těleso."));
     const T = holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false });
     const inside = T.intersect(body);
     return nearestSolid(inside, at, dir).solid;
@@ -430,8 +431,8 @@ export const THREAD_HINT = "zadejte M2 až M48, hrubé nebo jemné stoupání (n
 /** Zjednodušený modelovaný závit: soustava V-drážek (vizuálně i hmotnostně odpovídá závitu). */
 function threadTool(f: Extract<Feature, { type: "thread" }>): Shape {
   const t = threadByName(f.designation);
-  if (!t) throw new Error(`Neznámý závit „${f.designation}“ – ${THREAD_HINT}.`);
-  if (!(f.length > 0)) throw new Error("Délka závitu musí být kladná.");
+  if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.designation, tr(THREAD_HINT)));
+  if (!(f.length > 0)) throw new Error(tr("Délka závitu musí být kladná."));
   return revolved(threadProfile(t, f.length, f.internal), f.axis, f.position);
 }
 
@@ -452,13 +453,13 @@ function extrudeTool(f: ExtrudeF, ctx: Ctx): Shape {
   // začátek
   let shift = 0;
   if (f.from?.kind === "offset") shift = f.from.d;
-  else if (f.from?.kind === "face" || f.from?.kind === "vertex") shift = V.dot(V.sub(pointOf(rc, f.from.ref, f.from.kind === "face" ? "plochu začátku" : "vrchol začátku"), origin0), n0);
+  else if (f.from?.kind === "face" || f.from?.kind === "vertex") shift = V.dot(V.sub(pointOf(rc, f.from.ref, f.from.kind === "face" ? tr("plochu začátku") : tr("vrchol začátku")), origin0), n0);
   const shiftV = V.mul(n0, shift);
   if (shift) plane = plane.translate(shiftV);
   const origin = V.add(origin0, shiftV);
   // směr
   const dirV = resolveDirection(rc, f.dir, { normal: n0, xDir });
-  if (Math.abs(V.dot(dirV, n0)) < 1e-6) throw new Error("Směr vysunutí nesmí ležet v rovině skici.");
+  if (Math.abs(V.dot(dirV, n0)) < 1e-6) throw new Error(tr("Směr vysunutí nesmí ležet v rovině skici."));
   const d1 = f.reverse ? V.mul(dirV, -1) : dirV;
   const ext1: Extent = f.extent ?? (f.symmetric ? { kind: "midPlane", d: f.distance } : { kind: "blind", d: f.distance });
   const sketch = () => profileSketch(sk, plane, { outerOnly: f.outerOnly, thin: f.thin }, shiftV);
@@ -468,11 +469,11 @@ function extrudeTool(f: ExtrudeF, ctx: Ctx): Shape {
 
   const side = (dir: Vec3, ext: Extent): Shape => {
     const blind = (dist: number): Shape => {
-      if (!(dist > 1e-9)) throw new Error("Vzdálenost vysunutí musí být kladná.");
+      if (!(dist > 1e-9)) throw new Error(tr("Vzdálenost vysunutí musí být kladná."));
       if (Math.abs(draft) > 1e-6) {
-        if (Math.abs(draft) >= 45) throw new Error("Úkos vysunutí musí být menší než 45°.");
-        if (Math.abs(Math.abs(V.dot(dir, n0)) - 1) > 1e-6) throw new Error("Úkos lze použít jen při vysunutí kolmo na skicu.");
-        if (f.thin) throw new Error("Úkos a tenkou stěnu nelze kombinovat.");
+        if (Math.abs(draft) >= 45) throw new Error(tr("Úkos vysunutí musí být menší než 45°."));
+        if (Math.abs(Math.abs(V.dot(dir, n0)) - 1) > 1e-6) throw new Error(tr("Úkos lze použít jen při vysunutí kolmo na skicu."));
+        if (f.thin) throw new Error(tr("Úkos a tenkou stěnu nelze kombinovat."));
         const off = dist * Math.tan((draft * Math.PI) / 180);
         const sh = V.mul(dir, dist);
         return combine(
@@ -496,9 +497,9 @@ function extrudeTool(f: ExtrudeF, ctx: Ctx): Shape {
       case "throughAll":
         return blind(big);
       case "toVertex": {
-        const p = pointOf(rc, ext.ref, "vrchol ukončení");
+        const p = pointOf(rc, ext.ref, tr("vrchol ukončení"));
         const t = V.dot(V.sub(p, origin), dir);
-        if (!(t > 1e-6)) throw new Error("Vybraný bod neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).");
+        if (!(t > 1e-6)) throw new Error(tr("Vybraný bod neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr)."));
         return blind(t);
       }
       case "toFace":
@@ -509,34 +510,34 @@ function extrudeTool(f: ExtrudeF, ctx: Ctx): Shape {
           // rovinná plocha / pomocná rovina: přesně rovinným řezem (platí i pro šikmou plochu)
           const nn = g.plane.normal;
           const den = V.dot(dir, nn);
-          if (Math.abs(den) < 1e-9) throw new Error("Cílová plocha je rovnoběžná se směrem vysunutí.");
+          if (Math.abs(den) < 1e-9) throw new Error(tr("Cílová plocha je rovnoběžná se směrem vysunutí."));
           const toward = V.mul(nn, den > 0 ? -1 : 1); // normála mířící zpět k profilu
           const o2 = V.add(g.plane.origin, V.mul(toward, off));
           const tC = V.dot(V.sub(o2, origin), nn) / den;
-          if (!(tC > 1e-6)) throw new Error("Cílová plocha neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr).");
+          if (!(tC > 1e-6)) throw new Error(tr("Cílová plocha neleží před rovinou skici ve směru vysunutí (zkuste Opačný směr)."));
           const T = blind(big);
           const res = T.split(new r.Plane(o2, V.perp(nn), nn));
           const keep = asShape(V.dot(V.sub(origin, o2), nn) >= 0 ? res.positive : res.negative);
-          if (!keep) throw new Error("Vysunutí k ploše nevytvořilo těleso.");
+          if (!keep) throw new Error(tr("Vysunutí k ploše nevytvořilo těleso."));
           return keep;
         }
-        if (off) throw new Error("Odsazení lze použít jen u rovinné plochy nebo pomocné roviny.");
-        if (!body || ext.ref.kind !== "face") throw new Error("Vyberte plochu tělesa.");
+        if (off) throw new Error(tr("Odsazení lze použít jen u rovinné plochy nebo pomocné roviny."));
+        if (!body || ext.ref.kind !== "face") throw new Error(tr("Vyberte plochu tělesa."));
         const i = entityIndex(body, "face", ext.ref.index, ext.ref.sig);
         try {
           return sketch().extrudeUntil(body.faces[i], { extrusionDirection: dir }) as Shape;
         } catch {
-          throw new Error("Vysunutí k zakřivené ploše se nezdařilo – plocha musí celý profil zakrýt. Zkuste „K dalšímu“ nebo rovinnou plochu.");
+          throw new Error(tr("Vysunutí k zakřivené ploše se nezdařilo – plocha musí celý profil zakrýt. Zkuste „K dalšímu“ nebo rovinnou plochu."));
         }
       }
       case "toNext":
       case "toBody": {
-        if (!body) throw new Error("Ukončení „k dalšímu“ potřebuje stávající těleso.");
+        if (!body) throw new Error(tr("Ukončení „k dalšímu“ potřebuje stávající těleso."));
         const T = blind(big);
         const removing = f.mode === "cut" || f.mode === "intersect";
         const parts = removing ? T.intersect(body) : T.cut(body);
         const near = nearestSolid(parts, origin, dir);
-        if (!removing && near.far > big * 0.95) throw new Error("Ve směru vysunutí není další plocha tělesa (použijte Na vzdálenost nebo Skrz vše).");
+        if (!removing && near.far > big * 0.95) throw new Error(tr("Ve směru vysunutí není další plocha tělesa (použijte Na vzdálenost nebo Skrz vše)."));
         return near.solid;
       }
     }
@@ -571,9 +572,9 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
     case "revolve":
       return revolveTool(f, ctx);
     case "sweep": {
-      const prof = needSketch(ctx, f.profileId, "skica profilu");
-      const path = needSketch(ctx, f.pathId, "skica dráhy");
-      if (prof.id === path.id) throw new Error("Profil a dráha musí být dvě různé skici.");
+      const prof = needSketch(ctx, f.profileId, tr("skica profilu"));
+      const path = needSketch(ctx, f.pathId, tr("skica dráhy"));
+      if (prof.id === path.id) throw new Error(tr("Profil a dráha musí být dvě různé skici."));
       const spine = sketchPathWire(path);
       return combine(
         sketchWires(prof).map(({ wire, depth }) => {
@@ -583,10 +584,10 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
       );
     }
     case "loft": {
-      if (f.sketchIds.length < 2) throw new Error("Šablonování potřebuje alespoň dvě skici (profily).");
+      if (f.sketchIds.length < 2) throw new Error(tr("Šablonování potřebuje alespoň dvě skici (profily)."));
       const sets = f.sketchIds.map((id, k) => sketchWires(needSketch(ctx, id, `skica ${k + 1}`)));
       const outer = sets.map((ws) => ws.filter((w) => w.depth === 0).sort((a, b) => b.area - a.area)[0]?.wire);
-      if (outer.some((w) => !w)) throw new Error("Každá skica musí mít uzavřený vnější profil.");
+      if (outer.some((w) => !w)) throw new Error(tr("Každá skica musí mít uzavřený vnější profil."));
       let s = r.loft(outer as r.Wire[], { ruled: f.ruled }) as Shape;
       // otvory: jen pokud mají všechny skici stejný počet
       const holes = sets.map((ws) => ws.filter((w) => w.depth === 1).sort((a, b) => b.area - a.area));
@@ -597,26 +598,26 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
     }
     case "box": {
       const [w, h, d] = f.size;
-      if (!(w > 0 && h > 0 && d > 0)) throw new Error("Rozměry musí být kladné.");
+      if (!(w > 0 && h > 0 && d > 0)) throw new Error(tr("Rozměry musí být kladné."));
       const [x, y, z] = f.position;
       const c1: Vec3 = f.centered ? [x - w / 2, y - h / 2, z - d / 2] : [x, y, z];
       return r.makeBox(c1, [c1[0] + w, c1[1] + h, c1[2] + d]);
     }
     case "cylinder":
-      if (!(f.radius > 0 && f.height > 0)) throw new Error("Rozměry musí být kladné.");
+      if (!(f.radius > 0 && f.height > 0)) throw new Error(tr("Rozměry musí být kladné."));
       return r.makeCylinder(f.radius, f.height, f.position, axisVec(f.axis));
     case "sphere":
-      if (!(f.radius > 0)) throw new Error("Poloměr musí být kladný.");
+      if (!(f.radius > 0)) throw new Error(tr("Poloměr musí být kladný."));
       return r.makeSphere(f.radius).translate(f.position);
     case "cone":
-      if (!(f.height > 0) || f.radius1 < 0 || f.radius2 < 0 || f.radius1 + f.radius2 <= 0) throw new Error("Neplatné rozměry kuželu.");
+      if (!(f.height > 0) || f.radius1 < 0 || f.radius2 < 0 || f.radius1 + f.radius2 <= 0) throw new Error(tr("Neplatné rozměry kuželu."));
       return revolved(
         [[0, 0], [Math.max(f.radius1, 1e-4), 0], [Math.max(f.radius2, 1e-4), f.height], [0, f.height]],
         f.axis,
         f.position,
       );
     case "tube": {
-      if (!(f.outer > f.inner && f.inner >= 0 && f.height > 0)) throw new Error("Vnější průměr musí být větší než vnitřní.");
+      if (!(f.outer > f.inner && f.inner >= 0 && f.height > 0)) throw new Error(tr("Vnější průměr musí být větší než vnitřní."));
       let t = r.makeCylinder(f.outer / 2, f.height) as Shape;
       if (f.inner > 0) t = t.cut(r.makeCylinder(f.inner / 2, f.height));
       return oriented(t, f.axis, f.position);
@@ -626,8 +627,8 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
     case "thread":
       return f.modeled ? threadTool(f) : null;
     case "text": {
-      if (!f.text.trim()) throw new Error("Zadejte text.");
-      if (!(f.height > 0 && f.depth > 0)) throw new Error("Výška písma a hloubka musí být kladné.");
+      if (!f.text.trim()) throw new Error(tr("Zadejte text."));
+      if (!(f.height > 0 && f.depth > 0)) throw new Error(tr("Výška písma a hloubka musí být kladné."));
       await ensureFont();
       let d = r.drawText(f.text, { fontSize: f.height, fontFamily: FONT_FAMILY });
       const c = d.boundingBox.center;
@@ -655,7 +656,7 @@ export function edgeFilter(body: Shape, edges: number[] | "all") {
   if (edges === "all") return null;
   const all = body.edges;
   const picked = edges.map((i) => all[i]).filter(Boolean);
-  if (!picked.length) throw new Error("Vyberte hrany v modelu.");
+  if (!picked.length) throw new Error(tr("Vyberte hrany v modelu."));
   return picked;
 }
 
@@ -693,13 +694,13 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
     const sig = signatureOf(next);
     let warning: string | undefined;
     if (body && expectsChange(f) && sameSignature(bodySig, sig)) {
-      if (f.type === "shell") throw new Error("Skořepinu se nepodařilo vytvořit – jádro vrátilo těleso beze změny. Otevřete jen rovinné plochy (zaoblené plochy jádro otevřít neumí); u zaoblených hran musí být tloušťka stěny menší než poloměr zaoblení, nebo zaoblete až po skořepině.");
-      warning = "Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.";
+      if (f.type === "shell") throw new Error(tr("Skořepinu se nepodařilo vytvořit – jádro vrátilo těleso beze změny. Otevřete jen rovinné plochy (zaoblené plochy jádro otevřít neumí); u zaoblených hran musí být tloušťka stěny menší než poloměr zaoblení, nebo zaoblete až po skořepině."));
+      warning = tr("Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.");
     }
     // platnost výsledku: jen u prvků, které mění těleso (jinak by se kontrola opakovala zbytečně); velká tělesa se kontrolují až na konci
     if (expectsChange(f) && sig && sig.faces <= 400) {
       let chk = checkShape(next);
-      if (body && bodySig && !chk.solids && bodySig.faces > 0) throw new Error(`Operace nevrátila objemové těleso (${describeCheck(chk)}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).`);
+      if (body && bodySig && !chk.solids && bodySig.faces > 0) throw new Error(tr("Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).", describeCheck(chk)));
       if (!chk.valid) {
         const fixed = tryFixShape(next);
         if (fixed) {
@@ -707,7 +708,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           chk = checkShape(next);
         }
       }
-      if (!chk.valid) warning = `${warning ? warning + " " : ""}Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.`;
+      if (!chk.valid) warning = (warning ? warning + " " : "") + tr("Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.");
     }
     bodySig = sig;
     status.push(warning ? { id: f.id, ok: true, warning } : { id: f.id, ok: true });
@@ -754,7 +755,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
             features[i] = { ...f, origin: p.origin, normal: p.normal, xDir: p.xDir };
             resolved.datums[f.id] = p;
           }
-          if (Math.hypot(...f.normal) < 1e-9) throw new Error("Normála roviny nesmí být nulová.");
+          if (Math.hypot(...f.normal) < 1e-9) throw new Error(tr("Normála roviny nesmí být nulová."));
           break;
         }
         case "import": {
@@ -764,44 +765,44 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
         }
         case "fillet":
         case "chamfer": {
-          if (!body) throw new Error("Není co zaoblit – nejdřív vytvořte těleso.");
+          if (!body) throw new Error(tr("Není co zaoblit – nejdřív vytvořte těleso."));
           const size = f.type === "fillet" ? f.radius : f.distance;
-          if (!(size > 0)) throw new Error("Hodnota musí být kladná.");
+          if (!(size > 0)) throw new Error(tr("Hodnota musí být kladná."));
           const picked = edgeFilter(body, f.edges);
           const cfg = picked ? (e: r.Edge) => (picked.some((p) => p.isSame(e)) ? size : null) : size;
           next = f.type === "fillet" ? body.clone().fillet(cfg as never) : body.clone().chamfer(cfg as never);
           break;
         }
         case "shell": {
-          if (!body) throw new Error("Není co skořepinovat.");
-          if (!(f.thickness > 0)) throw new Error("Tloušťka musí být kladná.");
+          if (!body) throw new Error(tr("Není co skořepinovat."));
+          if (!(f.thickness > 0)) throw new Error(tr("Tloušťka musí být kladná."));
           const all = body.faces;
           const picked = f.faces.map((k) => all[k]).filter(Boolean);
-          if (!picked.length) throw new Error("Vyberte plochy, které se mají otevřít.");
+          if (!picked.length) throw new Error(tr("Vyberte plochy, které se mají otevřít."));
           next = body.clone().shell(Math.abs(f.thickness), (ff) => ff.when(({ element }) => picked.some((p) => p.isSame(element as r.Face))));
           break;
         }
         case "draft": {
-          if (!body) throw new Error("Není těleso pro úkos.");
-          if (!(Math.abs(f.angle) > 0 && Math.abs(f.angle) < 45)) throw new Error("Úhel úkosu musí být mezi 0 a 45°.");
+          if (!body) throw new Error(tr("Není těleso pro úkos."));
+          if (!(Math.abs(f.angle) > 0 && Math.abs(f.angle) < 45)) throw new Error(tr("Úhel úkosu musí být mezi 0 a 45°."));
           const all = body.faces;
           const picked = f.faces.map((k) => all[k]).filter(Boolean);
-          if (!picked.length) throw new Error("Vyberte plochy, které se mají zkosit.");
+          if (!picked.length) throw new Error(tr("Vyberte plochy, které se mají zkosit."));
           const neutral = f.planeDef ? planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef)) : axisPlane(f.plane, f.offset);
           next = body.clone().draft(f.angle, (ff) => ff.when(({ element }) => picked.some((p) => p.isSame(element as r.Face))), neutral);
           break;
         }
         case "split": {
-          if (!body) throw new Error("Není co rozříznout.");
+          if (!body) throw new Error(tr("Není co rozříznout."));
           const res = body.clone().split(f.planeDef ? planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef)) : axisPlane(f.plane, f.offset));
           const keep = asShape(f.keep === "positive" ? res.positive : res.negative);
-          if (!keep) throw new Error("Na zvolené straně roviny nic nezůstane – změňte stranu nebo posunutí.");
+          if (!keep) throw new Error(tr("Na zvolené straně roviny nic nezůstane – změňte stranu nebo posunutí."));
           next = keep;
           break;
         }
         case "transform": {
-          if (!body) throw new Error("Není těleso k transformaci.");
-          if (!(f.scale > 0)) throw new Error("Měřítko musí být kladné.");
+          if (!body) throw new Error(tr("Není těleso k transformaci."));
+          if (!(f.scale > 0)) throw new Error(tr("Měřítko musí být kladné."));
           let s: Shape = body;
           if (Math.abs(f.scale - 1) > 1e-12) s = s.scale(f.scale, [0, 0, 0]);
           if (f.rotateAngle) s = s.rotate(f.rotateAngle, [0, 0, 0], axisVec(f.rotateAxis));
@@ -810,22 +811,22 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
           break;
         }
         case "pattern": {
-          if (!body) throw new Error("Není těleso.");
+          if (!body) throw new Error(tr("Není těleso."));
           const src = tools.get(f.featureId);
-          if (!src) throw new Error("Vyberte prvek (vysunutí, díra, primitivum…), který se má opakovat.");
+          if (!src) throw new Error(tr("Vyberte prvek (vysunutí, díra, primitivum…), který se má opakovat."));
           let acc: Shape = body;
           if (f.kind === "linear") {
             const n1 = Math.max(1, Math.round(f.count));
             const n2 = Math.max(1, Math.round(f.count2 ?? 1));
             const unit = (d: Vec3): Vec3 => {
               const len = Math.hypot(d[0], d[1], d[2]);
-              if (!len) throw new Error("Směr pole nesmí být nulový.");
+              if (!len) throw new Error(tr("Směr pole nesmí být nulový."));
               return [d[0] / len, d[1] / len, d[2] / len];
             };
             const d1 = unit(f.direction);
             const d2 = n2 > 1 ? unit(f.direction2 ?? [0, 1, 0]) : ([0, 0, 0] as Vec3);
             const s2 = f.spacing2 ?? f.spacing;
-            if (n1 * n2 > 400) throw new Error("Pole má příliš mnoho kusů (max. 400).");
+            if (n1 * n2 > 400) throw new Error(tr("Pole má příliš mnoho kusů (max. 400)."));
             for (let a = 0; a < n1; a++)
               for (let b = 0; b < n2; b++) {
                 if (!a && !b) continue;
@@ -833,41 +834,41 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
                 acc = applyMode(acc, src.tool.clone().translate(off), src.mode);
               }
           } else if (f.kind === "circular") {
-            if (f.count > 400) throw new Error("Pole má příliš mnoho kusů (max. 400).");
+            if (f.count > 400) throw new Error(tr("Pole má příliš mnoho kusů (max. 400)."));
             for (let k = 1; k < Math.max(1, Math.round(f.count)); k++) {
               const step = (f.angle >= 360 ? 360 / f.count : f.angle / Math.max(1, f.count - 1)) * k;
               acc = applyMode(acc, src.tool.clone().rotate(step, f.center, axisVec(f.axis)), src.mode);
             }
-          } else throw new Error("Tento typ pole (po křivce / podle skici / výplňové) zatím není v jádře k dispozici.");
+          } else throw new Error(tr("Tento typ pole (po křivce / podle skici / výplňové) zatím není v jádře k dispozici."));
           next = acc;
           break;
         }
         case "pushPull":
-          if (!body) throw new Error("Není těleso – nejdřív vytvořte nebo importujte model.");
+          if (!body) throw new Error(tr("Není těleso – nejdřív vytvořte nebo importujte model."));
           next = pushPull(body, f.faces, f.distance);
           break;
         case "offsetFace":
-          if (!body) throw new Error("Není těleso – nejdřív vytvořte nebo importujte model.");
+          if (!body) throw new Error(tr("Není těleso – nejdřív vytvořte nebo importujte model."));
           next = offsetFaces(body, f.faces, f.distance);
           break;
         case "deleteFace":
-          if (!body) throw new Error("Není těleso – nejdřív vytvořte nebo importujte model.");
+          if (!body) throw new Error(tr("Není těleso – nejdřív vytvořte nebo importujte model."));
           next = deleteFaces(body, f.faces);
           break;
         case "thicken": {
-          if (!body) throw new Error("Zesílení potřebuje těleso s plochami.");
+          if (!body) throw new Error(tr("Zesílení potřebuje těleso s plochami."));
           const tool = thickenFaces(body, f.faces, f.thickness);
           next = f.mode === "new" ? tool : applyMode(body, tool, f.mode);
           break;
         }
         case "rib": {
-          if (!body) throw new Error("Žebro potřebuje těleso, ke kterému se připojí.");
-          const sk = needSketch(ctxOf(), f.sketchId, "skica žebra");
+          if (!body) throw new Error(tr("Žebro potřebuje těleso, ke kterému se připojí."));
+          const sk = needSketch(ctxOf(), f.sketchId, tr("skica žebra"));
           next = body.fuse(ribTool(body, sk, sketchChain(sk), planeOf(sk.plane), f.thickness, f.direction, f.flip));
           break;
         }
         case "mirror": {
-          if (!body) throw new Error("Není co zrcadlit.");
+          if (!body) throw new Error(tr("Není co zrcadlit."));
           const origin: Vec3 = f.plane === "YZ" ? [f.offset, 0, 0] : f.plane === "XZ" ? [0, f.offset, 0] : [0, 0, f.offset];
           const m = (f.planeDef ? body.clone().mirror(planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef))) : body.clone().mirror(f.plane, origin)) as Shape;
           next = f.keepOriginal ? body.fuse(m) : m;
@@ -875,14 +876,14 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity): Promise<
         }
         case "ext": {
           const def = getExt(f.ext);
-          if (!def) throw new Error(`Neznámý prvek rozšíření „${f.ext}“ – modul není načten.`);
+          if (!def) throw new Error(tr("Neznámý prvek rozšíření „{0}“ – modul není načten.", f.ext));
           if (!def.build) break;
           const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools });
           if (out !== null && out !== undefined) next = out; // null = prvek bez geometrie (těleso zůstává)
           break;
         }
         default: {
-          if (f.type === "thread" && !body) throw new Error("Závit potřebuje těleso (válcovou plochu).");
+          if (f.type === "thread" && !body) throw new Error(tr("Závit potřebuje těleso (válcovou plochu)."));
           const tool = await toolOf(f, ctxOf());
           if (!tool) break;
           const mode = modeOf(f);
@@ -909,11 +910,11 @@ function expectsChange(f: Feature): boolean {
 
 function humanError(e: unknown): string {
   if (e instanceof Error && e.message && !/^\d+$/.test(e.message)) {
-    if (/deleted/i.test(e.message)) return "Vnitřní chyba jádra – zkuste upravit parametry.";
-    if (/has not type|is null/i.test(e.message)) return "Operace vrátila prázdné těleso – nejčastěji kvůli volným plochám v modelu (sešijte je nebo uzavřete do tělesa) nebo neplatné geometrii.";
+    if (/deleted/i.test(e.message)) return tr("Vnitřní chyba jádra – zkuste upravit parametry.");
+    if (/has not type|is null/i.test(e.message)) return tr("Operace vrátila prázdné těleso – nejčastěji kvůli volným plochám v modelu (sešijte je nebo uzavřete do tělesa) nebo neplatné geometrii.");
     return e.message;
   }
-  return "Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie).";
+  return tr("Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie).");
 }
 
 export async function buildDoc(doc: CadDoc, opts: { tolerance?: number } = {}): Promise<BuildResult & { body: Shape | null }> {

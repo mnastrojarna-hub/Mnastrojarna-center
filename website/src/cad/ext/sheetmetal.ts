@@ -6,6 +6,7 @@
  * spojené s tělesem. Rozvin se počítá analyticky (sheetmetal-flat.ts) s BA = π/180·α·(R + K·t).
  * replicad/build.ts se načítají líně, aby modul nešel do hlavního balíčku UI.
  */
+import { tr } from "../i18n";
 import type * as R from "replicad";
 import { planeBasis, toWorld } from "../defaults";
 import type { CadDoc, Feature, Vec2, Vec3 } from "../types";
@@ -37,7 +38,7 @@ function bboxDiag(s: Shape) {
 type SketchF = Extract<Feature, { type: "sketch" }>;
 function needSketch(ctx: ExtBuildCtx, id: unknown, what = "skicu"): SketchF {
   const sk = ctx.sketches.get(String(id ?? ""));
-  if (!sk) throw new Error(`Vyberte ${what} (musí být v historii před tímto prvkem).`);
+  if (!sk) throw new Error(tr("Vyberte {0} (musí být v historii před tímto prvkem).", what));
   return sk;
 }
 
@@ -45,12 +46,12 @@ function needSketch(ctx: ExtBuildCtx, id: unknown, what = "skicu"): SketchF {
 export async function sheetEdge(body: Shape, idx: number): Promise<EdgeGeom & { faceN: Vec3; sideN: Vec3; len: number }> {
   const r = await rep();
   const edge = body.edges[idx];
-  if (!edge) throw new Error(`Hrana ${idx + 1} v tělese neexistuje – vyberte hranu znovu.`);
-  if (edge.geomType !== "LINE") throw new Error("Ohyb lze založit jen na rovné hraně plechu (ne na oblouku).");
+  if (!edge) throw new Error(tr("Hrana {0} v tělese neexistuje – vyberte hranu znovu.", idx + 1));
+  if (edge.geomType !== "LINE") throw new Error(tr("Ohyb lze založit jen na rovné hraně plechu (ne na oblouku)."));
   const a = vt(edge.startPoint);
   const b = vt(edge.endPoint);
   const adj = body.faces.filter((f) => f.geomType === "PLANE" && f.edges.some((e) => e.isSame(edge)));
-  if (adj.length < 2) throw new Error("Hrana musí ležet mezi plochou plechu a boční plochou (rovná hrana obrysu).");
+  if (adj.length < 2) throw new Error(tr("Hrana musí ležet mezi plochou plechu a boční plochou (rovná hrana obrysu)."));
   const ranked = adj.map((f) => ({ f, area: r.measureArea(f) })).sort((x, y) => y.area - x.area);
   const flat = ranked[0].f;
   const side = ranked[ranked.length - 1].f;
@@ -98,7 +99,7 @@ function sketchLine(sk: SketchF): [Vec2, Vec2] {
     if (e.type === "line") return [e.a, e.b];
     if (e.type === "polyline" && e.points.length >= 2) return [e.points[0], e.points[1]];
   }
-  throw new Error("Skica musí obsahovat úsečku.");
+  throw new Error(tr("Skica musí obsahovat úsečku."));
 }
 
 /** Je materiál tělesa na straně +n od bodu p? (sonda malou krychlí) */
@@ -115,22 +116,22 @@ async function materialOn(body: Shape, p: Vec3, n: Vec3, t: number): Promise<boo
 }
 
 const SHEET_PARAMS = [
-  { key: "t", label: "Tloušťka plechu", kind: "number" as const, min: 0.1, step: 0.5 },
-  { key: "r", label: "Vnitřní poloměr ohybu", kind: "number" as const, min: 0.05, step: 0.5 },
-  { key: "k", label: "K-faktor", kind: "number" as const, min: 0, max: 1, step: 0.01, unit: "", hint: "ocel 0,44 · hliník 0,40 · nerez 0,45" },
+  { key: "t", label: tr("Tloušťka plechu"), kind: "number" as const, min: 0.1, step: 0.5 },
+  { key: "r", label: tr("Vnitřní poloměr ohybu"), kind: "number" as const, min: 0.05, step: 0.5 },
+  { key: "k", label: "K-faktor", kind: "number" as const, min: 0, max: 1, step: 0.01, unit: "", hint: tr("ocel 0,44 · hliník 0,40 · nerez 0,45") },
 ];
 
 // ---------------- prvky ----------------
 
 registerExt({
   ext: "sheet.params",
-  label: "Parametry plechu",
+  label: tr("Parametry plechu"),
   icon: "sheet-params",
   tone: "ref",
   tab: "sheet",
   group: "Plech",
   order: 1,
-  hint: "tloušťka, poloměr ohybu a K-faktor pro další prvky",
+  hint: tr("tloušťka, poloměr ohybu a K-faktor pro další prvky"),
   make: (doc) => ({ ...sheetParamsAt(doc, doc.features.length) }),
   params: SHEET_PARAMS,
   build: (_d, ctx) => ctx.body,
@@ -138,30 +139,30 @@ registerExt({
 
 registerExt({
   ext: "sheet.base",
-  label: "Základní plech",
+  label: tr("Základní plech"),
   icon: "sheet-base",
   tone: "create",
   tab: "sheet",
   group: "Plech",
   big: true,
   order: 0,
-  hint: "uzavřená skica → deska o tloušťce plechu",
+  hint: tr("uzavřená skica → deska o tloušťce plechu"),
   make: (doc) => {
     const sk = [...doc.features].reverse().find((f) => f.type === "sketch");
     return { sketchId: sk?.id ?? "", direction: "normal", ...sheetParamsAt(doc, doc.features.length) };
   },
   params: [
-    { key: "sketchId", label: "Skica obrysu", kind: "sketch" },
-    { key: "direction", label: "Směr tloušťky", kind: "enum", options: [{ v: "normal", l: "Nad skicu" }, { v: "reverse", l: "Pod skicu" }, { v: "symmetric", l: "Symetricky" }] },
+    { key: "sketchId", label: tr("Skica obrysu"), kind: "sketch" },
+    { key: "direction", label: tr("Směr tloušťky"), kind: "enum", options: [{ v: "normal", l: tr("Nad skicu") }, { v: "reverse", l: tr("Pod skicu") }, { v: "symmetric", l: tr("Symetricky") }] },
     ...SHEET_PARAMS,
   ],
   build: async (d, ctx) => {
     const { sketchDrawing, planeOf } = await bld();
-    const sk = needSketch(ctx, d.sketchId, "skicu obrysu plechu");
+    const sk = needSketch(ctx, d.sketchId, tr("skicu obrysu plechu"));
     const dr = sketchDrawing(sk);
-    if (!dr) throw new Error("Skica obrysu plechu musí být uzavřená.");
+    if (!dr) throw new Error(tr("Skica obrysu plechu musí být uzavřená."));
     const t = num(d.t, 2);
-    if (!(t > 0)) throw new Error("Tloušťka plechu musí být kladná.");
+    if (!(t > 0)) throw new Error(tr("Tloušťka plechu musí být kladná."));
     const plane = planeOf(sk.plane);
     const dir = d.direction;
     let s = dr.sketchOnPlane(plane).extrude(dir === "reverse" ? -t : t) as Shape;
@@ -174,29 +175,29 @@ registerExt({
 });
 
 const FLANGE_PARAMS = [
-  { key: "edges", label: "Hrany ohybu", kind: "edges" as const, hint: "rovné hrany obrysu plechu" },
-  { key: "length", label: "Délka příruby", kind: "number" as const, min: 0.1 },
-  { key: "angle", label: "Úhel ohybu", kind: "number" as const, min: 1, max: 180, unit: "°" },
-  { key: "radius", label: "Vnitřní poloměr", kind: "number" as const, min: 0, step: 0.5, hint: "0 = dle parametrů plechu" },
-  { key: "flip", label: "Ohnout na opačnou stranu", kind: "bool" as const },
-  { key: "position", label: "Poloha materiálu", kind: "enum" as const, options: [{ v: "bendOutside", l: "Ohyb vně" }, { v: "materialInside", l: "Materiál uvnitř" }] },
-  { key: "relief", label: "Úleva ohybu", kind: "enum" as const, options: [{ v: "none", l: "Žádná" }, { v: "rect", l: "Obdélník" }, { v: "obround", l: "Oválná" }] },
-  { key: "reliefWidth", label: "Šířka úlevy", kind: "number" as const, min: 0.1 },
-  { key: "reliefDepth", label: "Hloubka úlevy", kind: "number" as const, min: 0 },
+  { key: "edges", label: tr("Hrany ohybu"), kind: "edges" as const, hint: tr("rovné hrany obrysu plechu") },
+  { key: "length", label: tr("Délka příruby"), kind: "number" as const, min: 0.1 },
+  { key: "angle", label: tr("Úhel ohybu"), kind: "number" as const, min: 1, max: 180, unit: "°" },
+  { key: "radius", label: tr("Vnitřní poloměr"), kind: "number" as const, min: 0, step: 0.5, hint: tr("0 = dle parametrů plechu") },
+  { key: "flip", label: tr("Ohnout na opačnou stranu"), kind: "bool" as const },
+  { key: "position", label: tr("Poloha materiálu"), kind: "enum" as const, options: [{ v: "bendOutside", l: tr("Ohyb vně") }, { v: "materialInside", l: tr("Materiál uvnitř") }] },
+  { key: "relief", label: tr("Úleva ohybu"), kind: "enum" as const, options: [{ v: "none", l: tr("Žádná") }, { v: "rect", l: tr("Obdélník") }, { v: "obround", l: tr("Oválná") }] },
+  { key: "reliefWidth", label: tr("Šířka úlevy"), kind: "number" as const, min: 0.1 },
+  { key: "reliefDepth", label: tr("Hloubka úlevy"), kind: "number" as const, min: 0 },
 ];
 
 /** Společná stavba ohybu z hrany / lemu. */
 async function buildFlange(d: Record<string, unknown>, ctx: ExtBuildCtx, hem: boolean): Promise<Shape> {
-  if (!ctx.body) throw new Error("Nejdřív vytvořte Základní plech.");
+  if (!ctx.body) throw new Error(tr("Nejdřív vytvořte Základní plech."));
   const r = await rep();
   const p = sheetParamsAt(ctx.doc, ctx.index);
   const t = p.t;
   const edges = (d.edges as number[] | undefined) ?? [];
-  if (!edges.length) throw new Error("Vyberte hranu plechu, ze které se má ohyb vytvořit.");
+  if (!edges.length) throw new Error(tr("Vyberte hranu plechu, ze které se má ohyb vytvořit."));
   const angle = hem ? 180 : num(d.angle, 90);
-  if (!(angle > 0 && angle <= 180)) throw new Error("Úhel ohybu musí být 1–180°.");
+  if (!(angle > 0 && angle <= 180)) throw new Error(tr("Úhel ohybu musí být 1–180°."));
   const length = num(d.length, hem ? 10 : 20);
-  if (!(length > 0)) throw new Error("Délka příruby musí být kladná.");
+  if (!(length > 0)) throw new Error(tr("Délka příruby musí být kladná."));
   const R = hem ? (d.kind === "closed" ? Math.max(0.05, 0.1 * t) : bendRadius(d, p)) : bendRadius(d, p);
   let body: Shape = ctx.body;
   const infos = [];
@@ -245,7 +246,7 @@ async function buildFlange(d: Record<string, unknown>, ctx: ExtBuildCtx, hem: bo
 
 registerExt({
   ext: "sheet.flange",
-  label: "Ohyb z hrany",
+  label: tr("Ohyb z hrany"),
   icon: "sheet-flange",
   tone: "create",
   tab: "sheet",
@@ -253,7 +254,7 @@ registerExt({
   big: true,
   order: 0,
   kbd: "Shift+F",
-  hint: "příruba pod úhlem z vybrané hrany plechu",
+  hint: tr("příruba pod úhlem z vybrané hrany plechu"),
   pick: { kind: "edges", key: "edges" },
   rollback: true,
   make: (doc, extra) => ({ edges: (extra?.edges as number[]) ?? [], length: 20, angle: 90, radius: 0, flip: false, position: "bendOutside", relief: "none", reliefWidth: sheetParamsAt(doc, doc.features.length).t, reliefDepth: 0 }),
@@ -263,52 +264,52 @@ registerExt({
 
 registerExt({
   ext: "sheet.hem",
-  label: "Lem",
+  label: tr("Lem"),
   icon: "sheet-hem",
   tone: "create",
   tab: "sheet",
   group: "Ohyby",
   order: 1,
-  hint: "zahnutý okraj 180° – uzavřený nebo otevřený",
+  hint: tr("zahnutý okraj 180° – uzavřený nebo otevřený"),
   pick: { kind: "edges", key: "edges" },
   rollback: true,
   make: (_doc, extra) => ({ edges: (extra?.edges as number[]) ?? [], length: 8, kind: "open", radius: 0, flip: false, position: "bendOutside" }),
   params: [
-    { key: "edges", label: "Hrany lemu", kind: "edges" },
-    { key: "length", label: "Délka lemu", kind: "number", min: 0.1 },
-    { key: "kind", label: "Typ lemu", kind: "enum", options: [{ v: "open", l: "Otevřený" }, { v: "closed", l: "Uzavřený" }, { v: "teardrop", l: "Kapka" }] },
-    { key: "radius", label: "Vnitřní poloměr (otevřený)", kind: "number", min: 0, step: 0.5, hint: "0 = dle parametrů plechu" },
-    { key: "flip", label: "Zahnout na opačnou stranu", kind: "bool" },
+    { key: "edges", label: tr("Hrany lemu"), kind: "edges" },
+    { key: "length", label: tr("Délka lemu"), kind: "number", min: 0.1 },
+    { key: "kind", label: tr("Typ lemu"), kind: "enum", options: [{ v: "open", l: tr("Otevřený") }, { v: "closed", l: tr("Uzavřený") }, { v: "teardrop", l: tr("Kapka") }] },
+    { key: "radius", label: tr("Vnitřní poloměr (otevřený)"), kind: "number", min: 0, step: 0.5, hint: tr("0 = dle parametrů plechu") },
+    { key: "flip", label: tr("Zahnout na opačnou stranu"), kind: "bool" },
   ],
   build: (d, ctx) => buildFlange(d, ctx, true),
 });
 
 registerExt({
   ext: "sheet.bend",
-  label: "Ohyb podle čáry",
+  label: tr("Ohyb podle čáry"),
   icon: "sheet-bend",
   tone: "create",
   tab: "sheet",
   group: "Ohyby",
   order: 2,
-  hint: "úsečka ve skice na ploše plechu rozdělí plech a jednu stranu ohne",
+  hint: tr("úsečka ve skice na ploše plechu rozdělí plech a jednu stranu ohne"),
   make: (doc) => {
     const sk = [...doc.features].reverse().find((f) => f.type === "sketch");
     return { sketchId: sk?.id ?? "", angle: 90, radius: 0, side: "left", direction: "up" };
   },
   params: [
-    { key: "sketchId", label: "Skica s čárou ohybu", kind: "sketch" },
-    { key: "angle", label: "Úhel ohybu", kind: "number", min: 1, max: 179, unit: "°" },
-    { key: "radius", label: "Vnitřní poloměr", kind: "number", min: 0, step: 0.5, hint: "0 = dle parametrů plechu" },
-    { key: "side", label: "Ohýbaná strana", kind: "enum", options: [{ v: "left", l: "Vlevo od čáry" }, { v: "right", l: "Vpravo od čáry" }] },
-    { key: "direction", label: "Směr ohybu", kind: "enum", options: [{ v: "up", l: "K normále skici" }, { v: "down", l: "Od normály skici" }] },
+    { key: "sketchId", label: tr("Skica s čárou ohybu"), kind: "sketch" },
+    { key: "angle", label: tr("Úhel ohybu"), kind: "number", min: 1, max: 179, unit: "°" },
+    { key: "radius", label: tr("Vnitřní poloměr"), kind: "number", min: 0, step: 0.5, hint: tr("0 = dle parametrů plechu") },
+    { key: "side", label: tr("Ohýbaná strana"), kind: "enum", options: [{ v: "left", l: tr("Vlevo od čáry") }, { v: "right", l: tr("Vpravo od čáry") }] },
+    { key: "direction", label: tr("Směr ohybu"), kind: "enum", options: [{ v: "up", l: tr("K normále skici") }, { v: "down", l: tr("Od normály skici") }] },
   ],
   build: async (d, ctx) => {
-    if (!ctx.body) throw new Error("Nejdřív vytvořte Základní plech.");
+    if (!ctx.body) throw new Error(tr("Nejdřív vytvořte Základní plech."));
     const r = await rep();
     const p = sheetParamsAt(ctx.doc, ctx.index);
     const t = p.t;
-    const sk = needSketch(ctx, d.sketchId, "skicu s čárou ohybu");
+    const sk = needSketch(ctx, d.sketchId, tr("skicu s čárou ohybu"));
     const [q0, q1] = sketchLine(sk);
     const pb = planeBasis(sk.plane);
     const p0 = toWorld(sk.plane, q0);
@@ -323,7 +324,7 @@ registerExt({
     const pm = mul(add(p0, p1), 0.5);
     const matAbove = await materialOn(ctx.body, pm, ns, t);
     const matBelow = await materialOn(ctx.body, pm, mul(ns, -1), t);
-    if (!matAbove && !matBelow) throw new Error("Čára ohybu musí ležet na ploše plechu (skica na horní nebo spodní ploše) a procházet materiálem.");
+    if (!matAbove && !matBelow) throw new Error(tr("Čára ohybu musí ležet na ploše plechu (skica na horní nebo spodní ploše) a procházet materiálem."));
     const down = d.direction === "down";
     const nEff = down ? mul(ns, -1) : ns;
     // vnitřní plocha ohybu: horní (ve směru nEff) plocha plechu
@@ -341,7 +342,7 @@ registerExt({
         return 0;
       }
     };
-    if (vol(fixed) < 1e-6 || vol(moving) < 1e-6) throw new Error("Čára ohybu musí rozdělit plech na dvě části (leží mimo plech nebo u okraje).");
+    if (vol(fixed) < 1e-6 || vol(moving) < 1e-6) throw new Error(tr("Čára ohybu musí rozdělit plech na dvě části (leží mimo plech nebo u okraje)."));
     // rozsah materiálu podél osy ohybu
     const corners = strip.boundingBox.bounds;
     const us = [corners[0], corners[1]].flatMap((c) => [[c[0], corners[0][1], corners[0][2]], [c[0], corners[1][1], corners[1][2]]]);
@@ -364,24 +365,24 @@ registerExt({
 
 registerExt({
   ext: "sheet.cut",
-  label: "Výřez",
+  label: tr("Výřez"),
   icon: "sheet-cut",
   tone: "cut",
   tab: "sheet",
   group: "Plech",
   order: 2,
-  hint: "uzavřená skica na ploše plechu → otvor skrz",
+  hint: tr("uzavřená skica na ploše plechu → otvor skrz"),
   make: (doc) => {
     const sk = [...doc.features].reverse().find((f) => f.type === "sketch");
     return { sketchId: sk?.id ?? "" };
   },
-  params: [{ key: "sketchId", label: "Skica výřezu", kind: "sketch" }],
+  params: [{ key: "sketchId", label: tr("Skica výřezu"), kind: "sketch" }],
   build: async (d, ctx) => {
-    if (!ctx.body) throw new Error("Nejdřív vytvořte Základní plech.");
+    if (!ctx.body) throw new Error(tr("Nejdřív vytvořte Základní plech."));
     const { sketchDrawing, planeOf } = await bld();
-    const sk = needSketch(ctx, d.sketchId, "skicu výřezu");
+    const sk = needSketch(ctx, d.sketchId, tr("skicu výřezu"));
     const dr = sketchDrawing(sk);
-    if (!dr) throw new Error("Skica výřezu musí být uzavřená.");
+    if (!dr) throw new Error(tr("Skica výřezu musí být uzavřená."));
     const plane = planeOf(sk.plane);
     const BIG = bboxDiag(ctx.body) * 2 + 50;
     const n = plane.zDir;
@@ -392,22 +393,22 @@ registerExt({
 
 registerExt({
   ext: "sheet.relief",
-  label: "Rohová úleva",
+  label: tr("Rohová úleva"),
   icon: "sheet-relief",
   tone: "cut",
   tab: "sheet",
   group: "Plech",
   order: 3,
-  hint: "čtvercový nebo kruhový výřez v rohu mezi ohyby",
+  hint: tr("čtvercový nebo kruhový výřez v rohu mezi ohyby"),
   make: (doc) => ({ point: [0, 0, 0], kind: "round", size: 2 * sheetParamsAt(doc, doc.features.length).t, axis: "Z" }),
   params: [
-    { key: "point", label: "Střed úlevy", kind: "vec3" },
-    { key: "kind", label: "Tvar", kind: "enum", options: [{ v: "round", l: "Kruhová" }, { v: "rect", l: "Čtvercová" }] },
-    { key: "size", label: "Velikost (Ø / strana)", kind: "number", min: 0.1 },
-    { key: "axis", label: "Osa výřezu", kind: "enum", options: [{ v: "X", l: "X" }, { v: "Y", l: "Y" }, { v: "Z", l: "Z" }] },
+    { key: "point", label: tr("Střed úlevy"), kind: "vec3" },
+    { key: "kind", label: tr("Tvar"), kind: "enum", options: [{ v: "round", l: tr("Kruhová") }, { v: "rect", l: tr("Čtvercová") }] },
+    { key: "size", label: tr("Velikost (Ø / strana)"), kind: "number", min: 0.1 },
+    { key: "axis", label: tr("Osa výřezu"), kind: "enum", options: [{ v: "X", l: "X" }, { v: "Y", l: "Y" }, { v: "Z", l: "Z" }] },
   ],
   build: async (d, ctx) => {
-    if (!ctx.body) throw new Error("Nejdřív vytvořte Základní plech.");
+    if (!ctx.body) throw new Error(tr("Nejdřív vytvořte Základní plech."));
     const r = await rep();
     const pt = (Array.isArray(d.point) ? d.point : [0, 0, 0]) as Vec3;
     const size = num(d.size, 4);
@@ -428,28 +429,28 @@ registerExt({
 
 registerExt({
   ext: "sheet.rib",
-  label: "Prolis (žebro)",
+  label: tr("Prolis (žebro)"),
   icon: "sheet-rib",
   tone: "feature",
   tab: "sheet",
   group: "Plech",
   order: 4,
-  hint: "vylisované žebro podél úsečky ve skice (zjednodušeně: zaoblený výstupek)",
+  hint: tr("vylisované žebro podél úsečky ve skice (zjednodušeně: zaoblený výstupek)"),
   make: (doc) => {
     const sk = [...doc.features].reverse().find((f) => f.type === "sketch");
     return { sketchId: sk?.id ?? "", width: 6, height: 2 };
   },
   params: [
-    { key: "sketchId", label: "Skica s osou prolisu", kind: "sketch" },
-    { key: "width", label: "Šířka", kind: "number", min: 0.5 },
-    { key: "height", label: "Výška", kind: "number", min: 0.1 },
+    { key: "sketchId", label: tr("Skica s osou prolisu"), kind: "sketch" },
+    { key: "width", label: tr("Šířka"), kind: "number", min: 0.5 },
+    { key: "height", label: tr("Výška"), kind: "number", min: 0.1 },
   ],
   build: async (d, ctx) => {
-    if (!ctx.body) throw new Error("Nejdřív vytvořte Základní plech.");
+    if (!ctx.body) throw new Error(tr("Nejdřív vytvořte Základní plech."));
     const r = await rep();
     const { planeOf } = await bld();
     const p = sheetParamsAt(ctx.doc, ctx.index);
-    const sk = needSketch(ctx, d.sketchId, "skicu s osou prolisu");
+    const sk = needSketch(ctx, d.sketchId, tr("skicu s osou prolisu"));
     const [q0, q1] = sketchLine(sk);
     const wdt = num(d.width, 6);
     const hgt = num(d.height, 2);
@@ -459,11 +460,11 @@ registerExt({
     const pm = mul(add(p0, toWorld(sk.plane, q1)), 0.5);
     const matAbove = await materialOn(ctx.body, pm, pb.n, p.t);
     const matBelow = await materialOn(ctx.body, pm, mul(pb.n, -1), p.t);
-    if (!matAbove && !matBelow) throw new Error("Osa prolisu musí ležet na ploše plechu.");
+    if (!matAbove && !matBelow) throw new Error(tr("Osa prolisu musí ležet na ploše plechu."));
     const dx = q1[0] - q0[0];
     const dy = q1[1] - q0[1];
     const len = Math.hypot(dx, dy);
-    if (len < 1e-6) throw new Error("Osa prolisu má nulovou délku.");
+    if (len < 1e-6) throw new Error(tr("Osa prolisu má nulovou délku."));
     const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
     const rect = r.drawRectangle(len, wdt).translate(len / 2, 0).rotate(ang, [0, 0]).translate(q0[0], q0[1]);
     // výstupek směrem ven z materiálu, zaoblený shora
@@ -480,14 +481,14 @@ registerExt({
 
 registerExt({
   ext: "sheet.unfold",
-  label: "Rozvinout",
+  label: tr("Rozvinout"),
   icon: "sheet-unfold",
   tone: "pattern",
   tab: "sheet",
   group: "Rozvin",
   big: true,
   order: 0,
-  hint: "plochý díl (rozvin) z historie ohybů – potlačením prvku se vrátí ohnutý tvar",
+  hint: tr("plochý díl (rozvin) z historie ohybů – potlačením prvku se vrátí ohnutý tvar"),
   make: () => ({}),
   params: [],
   build: async (_d, ctx) => {
@@ -528,9 +529,9 @@ registerExt({
 });
 
 // akce (UI): export rozvinu, tabulka ohybů
-registerExt({ ext: "sheet.dxf", label: "Rozvin → DXF", icon: "sheet-dxf", tone: "file", tab: "sheet", group: "Rozvin", order: 1, hint: "obrys, díry, čáry ohybů a tabulka ohybů (AutoCAD, laser, ohraňovací lis)", make: () => ({}), action: true, scope: "both" });
-registerExt({ ext: "sheet.svg", label: "Rozvin → SVG", icon: "sheet-dxf", tone: "file", tab: "sheet", group: "Rozvin", order: 2, hint: "rozvin s čarami ohybů pro tisk/náhled", make: () => ({}), action: true, scope: "both" });
-registerExt({ ext: "sheet.table", label: "Tabulka ohybů", icon: "sheet-table", tone: "tool", tab: "sheet", group: "Rozvin", order: 3, hint: "pořadí, úhly, poloměry a BA všech ohybů", make: () => ({}), action: true, scope: "both" });
+registerExt({ ext: "sheet.dxf", label: tr("Rozvin → DXF"), icon: "sheet-dxf", tone: "file", tab: "sheet", group: "Rozvin", order: 1, hint: tr("obrys, díry, čáry ohybů a tabulka ohybů (AutoCAD, laser, ohraňovací lis)"), make: () => ({}), action: true, scope: "both" });
+registerExt({ ext: "sheet.svg", label: tr("Rozvin → SVG"), icon: "sheet-dxf", tone: "file", tab: "sheet", group: "Rozvin", order: 2, hint: tr("rozvin s čarami ohybů pro tisk/náhled"), make: () => ({}), action: true, scope: "both" });
+registerExt({ ext: "sheet.table", label: tr("Tabulka ohybů"), icon: "sheet-table", tone: "tool", tab: "sheet", group: "Rozvin", order: 3, hint: tr("pořadí, úhly, poloměry a BA všech ohybů"), make: () => ({}), action: true, scope: "both" });
 
 /** Pomocné exporty pro testy a UI. */
 export { baseFeatureIndex, bendAllowance, sheetParamsAt };

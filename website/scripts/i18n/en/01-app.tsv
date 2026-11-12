@@ -1,0 +1,738 @@
+# Anglické překlady rozhraní CADu – klíč = český zdrojový text (tabulátor) překlad. Generuje src/cad/i18n/en.ts (scripts/cad-i18n-build.mjs).
+# agent-console
+(run, getDocument, setDocument, status, guide). Úplný návod a schéma:	(run, getDocument, setDocument, status, guide). Full guide and schema:
+. Nic z toho neodesílá data mimo tento prohlížeč.	. None of this sends data outside this browser.
+Ctrl+Shift+K otevře konzoli kdykoli · Ctrl+Enter provede · příkazy se připojují k otevřenému dokumentu	Ctrl+Shift+K opens the console any time · Ctrl+Enter runs · commands are appended to the open document
+Dokument (JSON) zkopírován.	Document (JSON) copied.
+Kopírovat dokument (JSON)	Copy document (JSON)
+Kopírovat návod pro AI	Copy guide for AI
+Kopírovat protokol	Copy log
+Kopírování se nezdařilo.	Copying failed.
+Návod pro AI zkopírován – vložte ho agentovi do zadání.	AI guide copied – paste it into the agent's instructions.
+Návod s příkazy, formátem JSON a API pro AI agenty	Guide with commands, JSON format and API for AI agents
+Pro skripty je k dispozici	For scripts there is
+Prohlížeč nedovolil číst schránku – vložte text do pole (Ctrl+V) a stiskněte Provést.	The browser did not allow reading the clipboard – paste the text into the field (Ctrl+V) and press Run.
+Protokol	Log
+Protokol a stav dokumentu	Log and document status
+Protokol zkopírován.	Log copied.
+Provede příkazy (Ctrl+Enter)	Runs the commands (Ctrl+Enter)
+Provádím…	Running…
+Provést	Run
+Příkazy nebo JSON	Commands or JSON
+Schránka je prázdná.	The clipboard is empty.
+Seznam příkazů	Command list
+Skrýt seznam příkazů	Hide command list
+Stav dokumentu	Document status
+Textové příkazy nebo JSON	Text commands or JSON
+Textové příkazy – pro AI agenty, automatizaci i rychlé zadání	Text commands – for AI agents, automation and quick input
+Vložit ze schránky a provést	Paste from clipboard and run
+Vloží text ze schránky a hned ho provede	Pastes the clipboard text and runs it immediately
+Vymazat	Clear
+Vypíše rozměry, objem a seznam prvků se stavem	Prints dimensions, volume and the feature list with status
+Zatím nic. Po „Provést“ se tu objeví řádek ✓ / ✗ pro každý příkaz a textový stav dokumentu (rozměry, objem, prvky) – zpětná vazba pro agenta bez obrázku.	Nothing yet. After “Run” a ✓ / ✗ line appears here for every command, plus the textual document status (dimensions, volume, features) – feedback for an agent without an image.
+Zavřít	Close
+Zkopíruje otevřený dokument jako JSON (.mncad)	Copies the open document as JSON (.mncad)
+# asm-panel
+(střed)	(centre)
+Barva	Colour
+Celkem	Total
+Deska A (pevná)	Plate A (fixed)
+Deska B (pohyblivá)	Plate B (moving)
+Dutina v desce A (kapsa pro tvarovou vložku)	Cavity in plate A (pocket for the cavity insert)
+Délka Y	Length Y
+Export CSV (Excel)	Export CSV (Excel)
+Jen natočení – normály rovnoběžně	Orientation only – normals parallel
+Kapsa X	Pocket X
+Kapsa Y	Pocket Y
+Klikněte na plochu této komponenty a pak na plochu jiné komponenty. Vazba se uloží a přepočítá při každém pohybu.	Click a face of this component, then a face of another component. The mate is stored and recomputed on every move.
+Klikněte na válcovou plochu díry…	Click the cylindrical face of a hole…
+Kontakt + ztotožnění středů ploch	Contact + coincident face centres
+Kotevní deska	Clamping plate
+Kruhové	Circular
+Ks	Qty
+Lineární	Linear
+Materiál (kusovník)	Material (BOM)
+Materiál desek	Plate material
+Matice	Nut
+Natočení X / Y / Z [°]	Rotation X / Y / Z [°]
+Osy válcových ploch (čep v díře, šroub v díře)	Axes of cylindrical faces (pin in hole, screw in hole)
+Otočit (flip)	Flip
+Pole komponenty	Component pattern
+Poloha [mm]	Position [mm]
+Potlačit	Suppress
+Počet	Count
+Přepočítat vazby	Recompute mates
+Rovinné plochy pod zadaným úhlem	Planar faces at a given angle
+Rovinné plochy proti sobě, v jedné rovině	Planar faces facing each other, in one plane
+Rovinné plochy rovnoběžně v zadané vzdálenosti	Planar faces parallel at a given distance
+Rovinné plochy souhlasně v jedné rovině	Planar faces aligned in one plane
+Rovnoběžně	Parallel
+Rozbalit podsestavu	Expand sub-assembly
+Rozteč	Spacing
+Sestava je prázdná. Na kartě Sestava vložte díl, normálii nebo vygenerujte rám formy.	The assembly is empty. On the Assembly tab insert a part or a standard part, or generate a mould base.
+Skrýt	Hide
+Skupina	Group
+Smazat vazbu	Delete mate
+Směr	Direction
+Střed osy	Axis centre
+Ukotvená (nepohyblivá)	Fixed (immovable)
+Upínací desky	Clamping plates
+Vazby	Mates
+Vazby (trvalé – uloží se do sestavy)	Mates (persistent – stored in the assembly)
+Velikost rámu (šířka × délka)	Mould base size (width × length)
+Vložit šroub ISO 4762 do díry…	Insert ISO 4762 screw into hole…
+Vyberte typ vazby, pak klikněte na plochu této komponenty a na plochu cílové komponenty.	Choose a mate type, then click a face of this component and a face of the target component.
+Vystředit	Centre
+Vytvořit pole (	Create pattern (
+Vytvořit rám formy	Create mould base
+Vytvoří kompletní dvoudeskový rám: upínací desky, tvarové desky A/B, opěrnou desku, rozpěrky, vyhazovací paket, 4 vodicí sloupky s pouzdry (jeden přesazený proti obrácené montáži), šrouby ISO 4762, vyhazovače a středicí kroužek. Výška formy	Creates a complete two-plate mould base: clamping plates, cavity plates A/B, support plate, spacers, ejector pack, 4 guide pillars with bushes (one offset against reversed assembly), ISO 4762 screws, ejector pins and locating ring. Mould height
+Výkres sestavy s kusovníkem	Assembly drawing with BOM
+Výška rozpěrek	Spacer height
+Zapnout	Enable
+Zobrazit	Show
+Zrcadlení komponenty	Mirror component
+Zrcadlit komponentu	Mirror component
+Zrcadlí se poloha a natočení; geometrie dílu zůstává (přesné pro symetrické díly).	Position and orientation are mirrored; the part geometry stays (exact for symmetric parts).
+Závit podle průměru díry (ISO 273), délka podle sevřené tloušťky; hlava na straně kliknutí. Přidá se vazba Souosost.	Thread by hole diameter (ISO 273), length by clamped thickness; head on the clicked side. A Concentric mate is added.
+ks ·	pcs ·
+Ø vodicích sloupků	Ø guide pillars
+Číslo / norma	Number / standard
+Šroubový spoj do díry	Bolted joint into hole
+Šířka X	Width X
+Šířka rozpěrek	Spacer width
+# cad-app
+ (úroveň {0})	 (level {0})
+! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})	! line {0}: there is no body surface at [{1}; {2}] – the hole starts at the body's bounding box ({3})
+.mncad díl nebo STEP/IGES/STL… jako komponenta	.mncad part or STEP/IGES/STL… as a component
+103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.	103 families: screws, bearings, gears, profiles, mould standards… Just type “M8x30”.
+24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce	24 chapters, step-by-step procedures, FAQ – opens in a new tab
+2D profil na rovině nebo ploše	2D profile on a plane or face
+3D okno: nedostupné (WebGL)	3D view: unavailable (WebGL)
+3D tisk	3D printing
+3D tisk s jednotkami	3D printing with units
+Aktivní dokument – název lze přepsat	Active document – the name can be edited
+Analýza	Analysis
+Barva komponenty	Component colour
+Barva plochy	Face colour
+Barva tělesa	Body colour
+Bez kolizí ✓	No interferences ✓
+Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu	No interferences ✓ – the result is in the Interference panel and in the document status
+Bílý (tisk)	White (print)
+CAD jádro se nepodařilo načíst. Zkuste prosím aktuální Chrome, Edge, Firefox nebo Safari.	The CAD kernel could not be loaded. Please try a current Chrome, Edge, Firefox or Safari.
+Celá dokumentace jako PDF k tisku a offline čtení.	The whole documentation as a PDF for printing and offline reading.
+Chladicí kanály vyvrtány do dílu (prvky Kanál/Propojka v historii).	Cooling channels drilled into the part (Channel/Connector features in the history).
+Diagnostika zkopírována do schránky – vložte ji do e-mailu pro podporu.	Diagnostics copied to the clipboard – paste them into an e-mail to support.
+Dobrý den,\n\nposílám model z Mnástrojárna CAD – soubor {0} jsem si stáhl do počítače a přikládám ho.\n\nMnožství:\nMateriál:\nTermín:\n\nS pozdravem\n	Hello,\n\nI am sending a model from Mnástrojárna CAD – I downloaded the file {0} and attach it.\n\nQuantity:\nMaterial:\nRequired date:\n\nKind regards\n
+Dokončit skicu	Finish sketch
+Dokumentace	Documentation
+Dokumentace a návod	Documentation and guide
+Dokumentace a návod k obsluze (web)	Documentation and user guide (web)
+Dokumentace a návod k obsluze (web)…	Documentation and user guide (web)…
+Drátový	Wireframe
+Duplikovat (+ posun X)	Duplicate (+ offset X)
+Díl zadaný textem nebo JSON – pro AI agenty, automatizaci i rychlé modelování.	A part entered as text or JSON – for AI agents, automation and quick modelling.
+Díl {0} vložen do sestavy.	Part {0} inserted into the assembly.
+Díly	Parts
+Entita skici	Sketch entity
+Export	Export
+Export 3D	Export 3D
+Export {0} hotov: {1} ({2})	{0} export done: {1} ({2})
+Export {0} zrušen.	{0} export cancelled.
+Filtr	Filter
+Filtr výběru	Selection filter
+Filtr výběru (co se vybírá kliknutím)	Selection filter (what a click selects)
+Formařské nástroje	Mould tools
+Formy	Moulds
+Formát .{0} nelze otevřít přímo	The .{0} format cannot be opened directly
+Grafit	Graphite
+Heslo sdíleného dokumentu	Password of the shared document
+Hliník	Aluminium
+Hmotnostní vlastnosti	Mass properties
+Horní	Top
+Hotovo	Done
+Hranu ani bod nelze smazat samostatně – vyberte plochu (Odstranit plochu) nebo prvek v historii.	An edge or a point cannot be deleted on its own – select a face (Delete face) or a feature in the history.
+Hustota	Density
+Importovaný soubor nelze upravovat historií – lze jen umístit.	An imported file cannot be edited by the history – it can only be positioned.
+Izolovat (skrýt ostatní)	Isolate (hide others)
+Izometrie	Isometric
+Jen poprvé – poté se načítá z mezipaměti.	Only the first time – afterwards it loads from the cache.
+Jádro se nenačetlo	The kernel did not load
+Kamera	Camera
+Klikněte na bod, hranu, plochu nebo těleso. Druhá entita změří vzdálenost a úhel mezi nimi.	Click a point, edge, face or body. A second entity measures the distance and angle between them.
+Klikněte na rovinnou plochu modelu.	Click a planar face of the model.
+Klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu).	Click the cylindrical face of a hole (clicked side = screw head).
+Klikněte na válcovou plochu díry.	Click the cylindrical face of a hole.
+Klávesové zkratky a ovládání	Keyboard shortcuts and controls
+Klávesové zkratky a ovládání myší	Keyboard shortcuts and mouse controls
+Knihovna	Library
+Knihovna normálií	Standard parts library
+Knihovna normálií (šrouby, ložiska, ozubená kola, profily…)	Standard parts library (screws, bearings, gears, profiles…)
+Knihovna normálií…	Standard parts library…
+Kolize	Interference
+Kolize ({0})	Interferences ({0})
+Kompletní návod k obsluze: 24 kapitol, postupy, FAQ (otevře se v nové záložce).	Complete user guide: 24 chapters, procedures, FAQ (opens in a new tab).
+Komponenta je ukotvená – nejdřív ji uvolněte.	The component is fixed – release it first.
+Komponenta zrcadlena (poloha a natočení; geometrie dílu se nezrcadlí).	Component mirrored (position and orientation; the part geometry is not mirrored).
+Komponenta ·	Component ·
+Komponenta · {0}	Component · {0}
+Konstrukční prvky	Design features
+Kontakt	Contact
+Kontroluji kolize…	Checking interferences…
+Kopírovat výsledky	Copy results
+Koule	Sphere
+Kusovník	Bill of materials
+Kusovník – {0}	Bill of materials – {0}
+Kužel	Cone
+Kvádr	Box
+Křivost min {0} · max {1} 1/mm (plná barva při ±{2})	Curvature min {0} · max {1} 1/mm (full colour at ±{2})
+Levý	Left
+Litina	Cast iron
+Max. bod	Max. point
+Mazání	Delete
+Min. bod	Min. point
+Mnástrojárna	Mnástrojárna
+Model importován – můžete na něj navázat dalšími prvky.	Model imported – you can continue with further features.
+Modrošedý přechod	Blue-grey gradient
+Modrá	Blue
+Mosaz	Brass
+Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy.	Mouse like ZW3D/SolidWorks, units, shortcuts, drawings.
+Měření	Measurement
+Měřit	Measure
+Měřit délku / odsud	Measure length / from here
+Měřit odsud	Measure from here
+Mřížka a osy	Grid and axes
+Na rovinné ploše modelu…	On a planar face of the model…
+Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…	Type what you want to do – “hole”, “drawing”, “fillet”…
+Nastavení	Settings
+Nastavení (Ctrl+,)	Settings (Ctrl+,)
+Nastavení…	Settings…
+Načítám CAD jádro OpenCascade	Loading the OpenCascade CAD kernel
+Načítám jádro OpenCascade…	Loading the OpenCascade kernel…
+Načítám {0}…	Loading {0}…
+Nejdřív klikněte na plochu vybrané (pohyblivé) komponenty.	First click a face of the selected (moving) component.
+Nejdřív nakreslete skicu (profil).	Draw a sketch (profile) first.
+Nejtenčí stěna ≈ {0} mm · průměr {1} mm · pod limitem {2} % vzorků	Thinnest wall ≈ {0} mm · average {1} mm · {2} % of samples below the limit
+Není co smazat – vyberte prvek v historii, plochu nebo komponentu a stiskněte Delete.	Nothing to delete – select a feature in the history, a face or a component and press Delete.
+Není těleso k přesunutí.	There is no body to move.
+Neprůhledné	Opaque
+Neznámý formát „{0}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.	Unknown format “{0}” – step, stl, brep, obj, glb, 3mf, wrl, mncad.
+Normálie	Standard parts
+Nová prázdná sestava	New empty assembly
+Nová sestava	New assembly
+Nová skica na ploše	New sketch on face
+Nová záložka	New tab
+Nové měření	New measurement
+Nový díl	New part
+Nový díl v nové záložce	New part in a new tab
+Nový výkres	New drawing
+Nápověda	Help
+Nápověda: dokumentace a návod k obsluze, příručka PDF, klávesové zkratky	Help: documentation and user guide, PDF manual, keyboard shortcuts
+Název dokumentu	Document name
+OCCT · {0}	OCCT · {0}
+OK (Enter)	OK (Enter)
+OK – potvrdit prvek	OK – confirm feature
+Objem	Volume
+Ocel	Steel
+Odebrat	Remove
+Odebrat ze sestavy	Remove from assembly
+Odebrat {0} komponent ze sestavy?	Remove {0} components from the assembly?
+Odsadit plochu	Offset face
+Odsazené a odvozené roviny	Offset and derived planes
+Odsazení od plochy (mm, kladně ve směru normály plochy)	Offset from the face (mm, positive along the face normal)
+Odsazení roviny {0} (mm, kladně ve směru normály)	Offset of plane {0} (mm, positive along the normal)
+Odstranit plochu	Delete face
+OpenCascade BREP (.brep)	OpenCascade BREP (.brep)
+Otevřen sdílený dokument „{0}“{1}.	Shared document “{0}” opened{1}.
+Otevřeno: {0}	Opened: {0}
+Otevřené dokumenty	Open documents
+Otevřete díl nebo sestavu (.mncad, STEP…) a rovnou vznikne výkres s pohledy a razítkem.	Open a part or assembly (.mncad, STEP…) and a drawing with views and title block is created right away.
+Otevřít	Open
+Otevřít / Import	Open / Import
+Otevřít / importovat	Open / import
+Otevřít / importovat (Ctrl+O)	Open / import (Ctrl+O)
+Otevřít / importovat…	Open / import…
+Otevřít podsestavu	Open sub-assembly
+Otevřít vybranou	Open selected
+Otočení (15°)	Rotation (15°)
+Otočení kolem obecné osy nelze uložit – otáčejte po jednom oblouku.	A rotation about a general axis cannot be stored – rotate one arc at a time.
+Otočit stranu	Flip side
+Otáčení: levé · Posun: pravé	Rotate: left · Pan: right
+Otáčení: pravé tl. · Posun: prostřední	Rotate: right button · Pan: middle
+Otáčení: prostřední · Posun: Ctrl+prostřední	Rotate: middle · Pan: Ctrl+middle
+Ovládání	Controls
+Ovládání a zkratky	Controls and shortcuts
+Ovládání myši	Mouse controls
+Označení materiálu (razítko)	Material designation (title block)
+Paleta příkazů	Command palette
+Paleta příkazů (Ctrl+K)	Command palette (Ctrl+K)
+Parametrizace	Parametrisation
+Perspektiva	Perspective
+Plocha {0} {1}{2} mm	Face {0} {1}{2} mm
+Plochu se nepodařilo načíst.	The face could not be loaded.
+Plochy nejsou rovnoběžné – založena půlicí rovina.	The faces are not parallel – a bisecting plane was created.
+Podsestava	Sub-assembly
+Podsestava {0}	Sub-assembly {0}
+Podsestava · {0}	Sub-assembly · {0}
+Pohledy	Views
+Pole	Pattern
+Pole opakuje existující prvek – nejdřív vytvořte díru nebo vysunutí.	A pattern repeats an existing feature – create a hole or an extrusion first.
+Pole: {0} komponent.	Pattern: {0} components.
+Poloha	Position
+Pomocné roviny	Datum planes
+Popisky pro výběr myší (F1 / E2 / V3) – {0}	Selection labels for the mouse (F1 / E2 / V3) – {0}
+Poptat	Request quote
+Poptat výrobu (STEP + e-mail)	Request manufacturing (STEP + e-mail)
+Posun (1 mm)	Move (1 mm)
+Povrch	Surface
+Pozadí	Background
+Pravoúhlá	Orthographic
+Pravý	Right
+Primitiva	Primitives
+Program	Program
+Proměnné	Variables
+Proměnné najdete v levém panelu – záložka Proměnné.	Variables are in the left panel – Variables tab.
+Provést příkaz: {0}	Run command: {0}
+Pružina	Spring
+Prázdná sestava: komponenty, vazby, podsestavy, kusovník.	Empty assembly: components, mates, sub-assemblies, BOM.
+Prázdný díl: skica → vysunutí → prvky. Parametrická historie.	Empty part: sketch → extrude → features. Parametric history.
+Prázdný model	Empty model
+Průhledné	Transparent
+Průhledný	Transparent
+Pusťte soubor – otevře se v nové záložce CADu	Drop the file – it opens in a new CAD tab
+Přední	Front
+Přepnout na: {0}	Switch to: {0}
+Přepočítávám…	Recomputing…
+Přesun	Move
+Přesun komponenty	Move component
+Přesun tělesa	Move body
+Přesunout / otočit	Move / rotate
+Přesunout / otočit (gizmo)	Move / rotate (gizmo)
+Přetažený obsah neobsahuje soubor – u Outlooku přetáhněte přílohu, ne text zprávy; případně ji nejdřív uložte na plochu.	The dropped content contains no file – in Outlook drag the attachment, not the message text; or save it to the desktop first.
+Připravuji {0}…	Preparing {0}…
+Připravuji {0}… {1} s – složitá geometrie; prvky s ⚠ (neplatná geometrie) export výrazně zpomalují	Preparing {0}… {1} s – complex geometry; features with ⚠ (invalid geometry) slow the export down considerably
+Přizpůsobit	Fit
+Přímé úpravy	Direct edits
+Přímé úpravy ploch se dělají v dílu – otevřete ho (Upravit díl).	Direct face edits are done in the part – open it (Edit part).
+Příručka PDF	PDF manual
+Příručka PDF – stáhnout	PDF manual – download
+Půlicí rovina	Bisecting plane
+Reference	Reference
+Rotovat	Revolve
+Rovina 3 body	Plane through 3 points
+Rovina XY (půdorys)	Plane XY (top)
+Rovina XZ (nárys)	Plane XZ (front)
+Rovina YZ (bokorys)	Plane YZ (side)
+Rovnoběžně s vybranou plochou…	Parallel to the selected face…
+Rozložení	Explode
+Rozložený pohled	Exploded view
+Rozložit	Explode
+Rozměry (X × Y × Z)	Dimensions (X × Y × Z)
+Rozpustit podsestavu	Dissolve sub-assembly
+Rozpustit vybranou	Dissolve selected
+Rozříznout	Split
+Rám formy	Mould base
+Rám formy {0}×{1}	Mould base {0}×{1}
+Rám vstřikovací formy	Injection mould base
+Rám vstřikovací formy…	Injection mould base…
+STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad	STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad
+STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad	STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad
+STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad · u nativních formátů (Parasolid, SolidWorks…) poradíme převod	STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad · for native formats (Parasolid, SolidWorks…) we can advise on conversion
+STL (.stl)	STL (.stl)
+Sdílený dokument	Shared document
+Sdílený dokument je chráněný heslem	The shared document is password protected
+Sdílený odkaz nelze otevřít	The shared link cannot be opened
+Sdílet	Share
+Sdílet odkazem (WhatsApp, e-mail, Teams…)	Share by link (WhatsApp, e-mail, Teams…)
+Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči	Share by link (WhatsApp, e-mail, Teams…) – the recipient opens the part in a browser
+Sdílet odkazem…	Share by link…
+Sestava	Assembly
+Sestava z aktuálního dílu	Assembly from the current part
+Sestava – {0}	Assembly – {0}
+Sestavy	Assemblies
+Seznam otevřených dokumentů	List of open documents
+Skica ·	Sketch ·
+Skicu lze založit jen na rovinné ploše.	A sketch can only be created on a planar face.
+Skořepina	Shell
+Skořepina (otevřít plochu)	Shell (open face)
+Skrýt těleso	Hide body
+Složit	Collapse
+Smazat	Delete
+Smazat celé těleso, tj. všechny prvky v historii dílu?	Delete the whole body, i.e. all features in the part history?
+Smazat entitu	Delete entity
+Smazat prvek	Delete feature
+Smazat prvek „{0}“?	Delete feature “{0}”?
+Smazat {0} prvků z historie?	Delete {0} features from the history?
+Smrštění {0} % přidáno do historie jako měřítko.	Shrinkage {0} % added to the history as a scale.
+SolidWorks – prostřední otáčí, Ctrl+prostř. posouvá	SolidWorks – middle rotates, Ctrl+middle pans
+Soubor	File
+Soubor není platný projekt Mnástrojárna CAD.	The file is not a valid Mnástrojárna CAD project.
+Soubor se nepodařilo načíst.	The file could not be loaded.
+Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.	The file is no longer in the browser's memory – open it from the .mncad file.
+Soubor vložen jako komponenta sestavy.	File inserted as an assembly component.
+Souosost potřebuje válcovou nebo kuželovou plochu (díra, čep, šroub).	Concentric needs a cylindrical or conical face (hole, pin, screw).
+Souř. systém	Coord. system
+Souřadnice {0}	Coordinates {0}
+Spodní	Bottom
+Správce historie	History manager
+Srazit	Chamfer
+Srazit hranu	Chamfer edge
+Stavy (konfigurace) najdete v levém panelu – záložka Stavy.	Configurations are in the left panel – Configurations tab.
+Stavy dílu	Part configurations
+Stavím komponenty…	Building components…
+Stavím rám formy…	Building the mould base…
+Storno	Cancel
+Storno (Esc)	Cancel (Esc)
+Styl	Style
+Styl zobrazení	Display style
+Stínovaný s hranami	Shaded with edges
+Středicí kroužek	Locating ring
+Střední rovina mezi 2 plochami	Mid-plane between 2 faces
+Světlý	Light
+Tato vazba potřebuje rovinnou plochu.	This mate needs a planar face.
+Tažení potřebuje dvě skici: profil a dráhu.	Sweep needs two sketches: a profile and a path.
+Textové příkazy (AI)	Text commands (AI)
+Textové příkazy – pro AI agenty a automatizaci	Text commands – for AI agents and automation
+Textové příkazy – pro AI agenty i rychlé zadání	Text commands – for AI agents and quick input
+Teď klikněte na plochu cílové komponenty.	Now click a face of the target component.
+Teď klikněte na plochu jiné komponenty.	Now click a face of another component.
+Topologie	Topology
+Touchpad – levé otáčí, pravé posouvá	Touchpad – left rotates, right pans
+Tuto entitu nelze použít – vyberte 	This entity cannot be used – select
+Táhněte šipkami (posun, krok 1 mm) nebo oblouky (otočení, krok 15°). R přepne posun/otočení.	Drag the arrows (move, 1 mm steps) or the arcs (rotate, 15° steps). R toggles move/rotate.
+Třemi body (3 vybrané vrcholy)	Through three points (3 selected vertices)
+Ukládám model STEP a otevírám e-mail…	Saving the STEP model and opening e-mail…
+Ukončit měření	End measurement
+Ukotvit	Fix
+Ukázkové díly	Sample parts
+Ukázky	Samples
+Uloženo: {0}	Saved: {0}
+Uložit díl (.mncad)	Save part (.mncad)
+Uložit jako…	Save as…
+Uložit kopii…	Save a copy…
+Uložit projekt	Save project
+Uložit projekt (.mncad)	Save project (.mncad)
+Uložit projekt (Ctrl+S)	Save project (Ctrl+S)
+Upravit díl	Edit part
+Upravit díl (v kontextu)	Edit part (in context)
+Uvolnit	Release
+V sestavě se prvky nepřidávají – otevřete díl (pravé tlačítko → Upravit díl).	Features are not added in an assembly – open the part (right-click → Edit part).
+VRML (.wrl)	VRML (.wrl)
+Vazba Kontakt…	Contact mate…
+Vazba uložena – přepočítá se při každém pohybu komponent.	Mate stored – it is recomputed whenever components move.
+Vedení	Guides
+Vlastnosti	Properties
+Vložen šroub {0}×{1}{2}{3} – vazba Souosost.	Screw {0}×{1}{2}{3} inserted – Concentric mate.
+Vložit	Insert
+Vložit díl / model	Insert part / model
+Vodicí pouzdro	Guide bush
+Vodicí sloupek	Guide pillar
+Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše	Free text for the drawing title block, e.g. ČSN 11 423 or 1.0503 – the density comes from the material class above
+Vyberte dvě rovinné plochy.	Select two planar faces.
+Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu).	Select the component to remove (click in the 3D view or in the tree).
+Vyberte komponenty (filtr Komponenta, Ctrl+klik).	Select components (Component filter, Ctrl+click).
+Vyberte plochu (filtr Plocha) a zopakujte příkaz.	Select a face (Face filter) and repeat the command.
+Vyberte plochu.	Select a face.
+Vyberte rovinnou plochu.	Select a planar face.
+Vyberte vrchol (filtr Bod).	Select a vertex (Point filter).
+Vybráno	Selected
+Vyhazovač	Ejector pin
+Vyhazování	Ejection
+Vysunout	Extrude
+Vytvořit podsestavu z vybraných ({0})	Create sub-assembly from selected ({0})
+Vytvořit z vybraných (Ctrl+klik)	Create from selected (Ctrl+click)
+Vytáhnout / Zatlačit	Push / Pull
+Vzhled	Appearance
+Výchozí barva	Default colour
+Výkres PDF / DXF / DWG…	Drawing PDF / DXF / DWG…
+Výkres načten jako skica ({0} entit).	Drawing loaded as a sketch ({0} entities).
+Výkres – {0}	Drawing – {0}
+Výkresová dokumentace	Drawing documentation
+Výsledné těleso není platné (sebeprotínající plochy) nebo nemá žádný solid – export STEP může selhat. Opravte prvek označený ⚠ v historii.	The resulting body is not valid (self-intersecting faces) or has no solid – STEP export may fail. Fix the feature marked ⚠ in the history.
+Wavefront OBJ (.obj)	Wavefront OBJ (.obj)
+WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní	WhatsApp, e-mail, Teams – the recipient opens the part in a browser, valid e.g. 10 days
+XY s odsazením…	XY with offset…
+XZ s odsazením…	XZ with offset…
+YZ s odsazením…	YZ with offset…
+ZW3D – pravé otáčí, prostřední posouvá	ZW3D – right rotates, middle pans
+ZW3D, SolidWorks, Inventor, CATIA, Creo, CAM	ZW3D, SolidWorks, Inventor, CATIA, Creo, CAM
+Zadejte heslo, které vám odesílatel poslal zvlášť (SMS, telefon…).	Enter the password the sender gave you separately (SMS, phone…).
+Zadní	Back
+Zaoblení se dělá v dílu – otevřete ho (Upravit díl).	Fillets are made in the part – open it (Edit part).
+Zaoblit	Fillet
+Zaoblit hranu	Fillet edge
+Zarovnat	Align
+Zavřít záložku (prostřední tlačítko)	Close tab (middle button)
+Zavřít {0}	Close {0}
+Zavřít: {0}	Close: {0}
+Zesílit	Thicken
+Zkopírovat diagnostiku (bez dat dokumentu)	Copy diagnostics (without document data)
+Zkopírováno do schránky.	Copied to the clipboard.
+Znovu (Ctrl+Y)	Redo (Ctrl+Y)
+Zobrazení	View
+Zobrazit těleso	Show body
+Zobrazit vše	Show all
+Zpět (Ctrl+Z)	Undo (Ctrl+Z)
+Zpět na web mnastrojarna.cz	Back to mnastrojarna.cz
+Zrcadlit	Mirror
+Zrušit	Cancel
+Zrušit výběr ({0})	Clear selection ({0})
+Zrušit řez	Cancel section
+Základní editace	Basic editing
+analýza úkosů, smrštění, dělicí rovina, vyhazovače, chlazení	draft analysis, shrinkage, parting plane, ejector pins, cooling
+bez objemového tělesa	no solid body
+bez omezení platnosti	no expiry
+bod, hranu nebo plochu	a point, edge or face
+entit · Ctrl/Shift+klik přidá/odebere	entities · Ctrl/Shift+click adds/removes
+filtr výběru Bod → vyberte 3 vrcholy	Point selection filter → select 3 vertices
+g/cm³)	g/cm³)
+gizmo – posun 1 mm, otočení 15°	gizmo – move 1 mm, rotate 15°
+gravírování / reliéf	engraving / relief
+informace o vybrané entitě	information about the selected entity
+kolize: otevřený dokument není sestava	interference: the open document is not an assembly
+kompletní příručka k tisku a offline čtení	complete manual for printing and offline reading
+kompletní rám vstřikovací formy	complete injection mould base
+komponent ·	components ·
+kontrola průniků komponent	check component interferences
+kvádr 100 60 20 · díra 8,5 skrz v 20 30 · zaoblit 2 hrany svislé · JSON dokumentu · window.mncad	box 100 60 20 · hole 8.5 through at 20 30 · fillet 2 edges vertical · document JSON · window.mncad
+mm ·	mm ·
+napište název příkazu („díra“, „výkres“, „zaoblit“…)	type a command name (“hole”, “drawing”, “fillet”…)
+nejdřív vyberte 1 rovinnou plochu	first select 1 planar face
+nejdřív vyberte 2 plochy	first select 2 faces
+není těleso, na jehož povrch by se prvek umístil – zadejte i souřadnici z	there is no body on whose surface the feature could be placed – enter the z coordinate too
+není žádná skica – nejdřív „skica XY: …“	there is no sketch – first “sketch XY: …”
+není žádný prvek, na který by se pole / zrcadlení vztahovalo	there is no feature for the pattern / mirror to apply to
+neplatná geometrie	invalid geometry
+nový soubor / jiné místo	new file / another location
+objem, plocha, hmotnost	volume, area, mass
+odebere vybrané komponenty ze sestavy	removes the selected components from the assembly
+odebere zaoblení, díry… a zacelí těleso	removes fillets, holes… and heals the body
+otevře se v nové záložce: pohledy, řezy, kóty, razítko → PDF/DXF/DWG/SVG	opens in a new tab: views, sections, dimensions, title block → PDF/DXF/DWG/SVG
+platí do {0}	valid until {0}
+položek kusovníku	BOM items
+pomocná osa – hrana, válec, 2 body, průsečnice rovin…	datum axis – edge, cylinder, 2 points, intersection of planes…
+pomocná rovina – 12 způsobů zadání	datum plane – 12 ways to define it
+pomocný bod – vrchol, střed, průsečík, odsazení…	datum point – vertex, centre, intersection, offset…
+posun vybraných ploch	move the selected faces
+pravidlo výběru podporují zaoblení, sražení a skořepina	selection rules are supported by fillet, chamfer and shell
+pravoúhlá	orthographic
+profil po dráze	profile along a path
+prvek s chybou	feature with an error
+prvek s upozorněním	feature with a warning
+prvky s upozorněním	features with warnings
+přechod mezi profily	transition between profiles
+přesná geometrie OCCT	exact OCCT geometry
+smaže upravovaný / vybraný prvek, vybranou plochu (Odstranit plochu) nebo celé těleso	deletes the edited / selected feature, the selected face (Delete face) or the whole body
+souřadný systém z bodu a směrů	coordinate system from a point and directions
+starší prohlížeče	older browsers
+textový příkaz (Nápověda → Textové příkazy)	text command (Help → Text commands)
+v sestavě „	in assembly “
+verze programu, prohlížeč, WebGL, jádro, chyba – pro e-mail podpoře	program version, browser, WebGL, kernel, error – for an e-mail to support
+vrtaná, zahloubená, se závitem	drilled, counterbored, tapped
+vybráno	selected
+vzdálenost, úhel, poloměr mezi body, hranami, plochami	distance, angle, radius between points, edges, faces
+výrobu	manufacturing
+web, AR, prezentace	web, AR, presentation
+z otevřené skici	from the open sketch
+zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	asks where and under what name; further Ctrl+S saves to the same file
+{0} děr pro vyhazovače přidáno do historie.	{0} ejector pin holes added to the history.
+{0} otevřen jako nový díl.	{0} opened as a new part.
+{0} vložen do sestavy.	{0} inserted into the assembly.
+· Y	· Y
+· Z	· Z
+· snímek – vaše úpravy se odesílateli nepromítnou	· snapshot – your edits are not sent back to the sender
+· zkontrolováno	· checked
+Ø{0} × 150	Ø{0} × 150
+Ø{0} × {1}	Ø{0} × {1}
+Úprava dílu	Editing part
+Úprava podsestavy	Editing sub-assembly
+Úpravy	Modify
+Úvodní obrazovka	Start screen
+Černá	Black
+Červená	Red
+Řez	Section
+Řez modelem	Section view
+Šablonovat	Loft
+Šablonování potřebuje alespoň dvě skici v různých rovinách.	Loft needs at least two sketches in different planes.
+Šroub ISO 4762	ISO 4762 screw
+šroubovice s průřezem	helix with a cross-section
+šrouby, ložiska, ozubená kola, profily… – stačí napsat	screws, bearings, gears, profiles… – just type
+šrouby, ložiska, ozubená kola, profily… – stačí napsat „M8x30“	screws, bearings, gears, profiles… – just type “M8x30”
+štítky na plochách, hranách a vrcholech: klik na štítek = klik na entitu; pro AI agenty, automatizaci a dotyk	labels on faces, edges and vertices: clicking a label = clicking the entity; for AI agents, automation and touch
+Žebro	Rib
+Žlutá	Yellow
+Žádný průnik komponent	No component interference
+žádná hrana neodpovídá pravidlu „{0}“ (hran celkem {1})	no edge matches the rule “{0}” ({1} edges in total)
+žádná plocha neodpovídá pravidlu „{0}“ (ploch celkem {1})	no face matches the rule “{0}” ({1} faces in total)
+žádné těleso – nejdřív vytvořte tvar (kvádr, vysunutí…)	no body – create a shape first (box, extrusion…)
+← Zpět do sestavy	← Back to assembly
+→ {0} (shell) – otevřeno ploch: {1} – výsledek po výpočtu níže	→ {0} (shell) – faces opened: {1} – result after computation below
+→ {0} ({1}) přidán – výsledek po výpočtu níže	→ {0} ({1}) added – result after computation below
+→ {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} edges by rule “{3}” – result after computation below
+⚠ kolize: {0} – {1}	⚠ interferences: {0} – {1}
+✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ document “{0}” ({1} features) – opens in a new tab
+✓ kolize: žádné ({0} komponent)	✓ interferences: none ({0} components)
+✓ materiál = {0}	✓ material = {0}
+✓ materiál „{0}“ = označení do razítka; hustota zůstává podle třídy „{1}“ ({2} g/cm³) – pro jinou hustotu zadejte: materiál {3}	✓ material “{0}” = designation for the title block; density stays by class “{1}” ({2} g/cm³) – for another density enter: material {3}
+✓ odstraněn prvek „{0}“	✓ feature “{0}” removed
+✓ pohled {0}	✓ view {0}
+✓ {0} {1} do skici „{2}“	✓ {0} {1} into sketch “{2}”
+✓ {0} „{1}“ – nová záložka	✓ {0} “{1}” – new tab
+✗ není co odstranit	✗ nothing to remove
+✗ stavba selhala – prvky {0} nebyly ověřeny	✗ build failed – features {0} were not verified
+✗ řádek {0}: {1}	✗ line {0}: {1}
+# cad-loader, command-palette
+Mnástrojárna CAD vyžaduje JavaScript.	Mnástrojárna CAD requires JavaScript.
+Enter	Enter
+Esc	Esc
+Hledat příkaz… (např. „díra“, „výkres“, „zaoblit“)	Search command… (e.g. “hole”, “drawing”, “fillet”)
+Nic nenalezeno.	Nothing found.
+příkazů	commands
+výběr	selection
+# drawing-workspace
++ List	+ Sheet
++ Přidat revizi	+ Add revision
+1. klik = kam šipka ukazuje, 2. klik = umístění. ({0}/2)	1st click = where the arrow points, 2nd click = placement. ({0}/2)
+2 body + umístění kótovací čáry	2 points + dimension line placement
+A, B, C…	A, B, C…
+Aktivní nástroj:	Active tool:
+Auto	Auto
+Auto + Ø	Auto + Ø
+Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.	Auto + Ø is only a starting point: add functional dimensions, tolerances (H8, ±0.1) and surface finishes manually. “Dimension check” in the Dimensions and notes section shows what is missing.
+Automaticky	Automatic
+Celkové	Overall
+Celý list	Whole sheet
+Charakteristika	Characteristic
+Chybí {0} z {1} očekávaných kót	{0} of {1} expected dimensions missing
+DWG se nepodařilo vytvořit.	The DWG could not be created.
+DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).	DWG is written directly in the browser (layers OBRYS/SKRYTE/OSY/KOTY, line types and widths, AutoCAD 2000–2018+ versions). DXF is in AutoCAD R12 format for older and open-source programs (LibreCAD, QCAD).
+DWG {0} uloženo: {1}	DWG {0} saved: {1}
+DWG {0} – přímo do AutoCADu, ZWCADu, BricsCADu	DWG {0} – straight into AutoCAD, ZWCAD, BricsCAD
+DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD	DXF (AutoCAD R12) – opens in AutoCAD, ZWCAD, DraftSight, LibreCAD
+Detail	Detail
+Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu ({0}/3).	Detail: 1st click = centre, 2nd click = radius, 3rd click = placement on the sheet ({0}/3).
+Detailní pohledy	Detail views
+Doplnit obvyklé (ISO 2768-mK, hrany 0,5×45°, poznámka k modelu)	Fill in the usual (ISO 2768-mK, edges 0.5×45°, model note)
+Drsnost	Surface finish
+Dvojklik = přejmenovat	Double-click = rename
+Formát listu	Sheet size
+Generuji DWG ({0})…	Generating DWG ({0})…
+Generuji PDF…	Generating PDF…
+Geom. tolerance	Geom. tolerance
+H8 / ±0,1	H8 / ±0.1
+ISO A (US)	ISO A (US)
+ISO E (EU)	ISO E (EU)
+Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno {0}/3.	Click 2 geometry points (snapping to vertices), then the dimension line position. Selected {0}/3.
+Klikněte na místo ve výkresu.	Click a position in the drawing.
+Kontrola kót – co chybí	Dimension check – what is missing
+Kusovník CSV	BOM CSV
+Kusovník nad razítkem (	BOM above the title block (
+Kóta	Dimension
+Kóty	Dimensions
+Kóty a poznámky	Dimensions and notes
+Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu.	Dimensions and notes are associative – they follow the view geometry even after the model changes. They are stored in the document.
+List	Sheet
+List 1	Sheet 1
+List {0}	Sheet {0}
+Na výšku	Portrait
+Na šířku	Landscape
+Nekótované rozměry dle 3D modelu (STEP)	Undimensioned sizes per 3D model (STEP)
+Nepředepsané tolerance	General tolerances
+Nástroj „Detail“ (L): střed, poloměr, umístění.	“Detail” tool (L): centre, radius, placement.
+Název listu	Sheet name
+Odstranit list	Remove sheet
+Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.	Derived from the feature history – a helper list, not a substitute for a designer's check. Add a missing dimension with the Dimension tool (2 points + offset); enter the tolerance (H8, ±0.1) in the “suffix” field of the dimension in the list.
+Opracování hran	Edge treatment
+Osy děr a válců	Axes of holes and cylinders
+PDF se nepodařilo vytvořit.	The PDF could not be created.
+PDF uloženo: {0}	PDF saved: {0}
+Po vložení zůstat v nástroji (jinak se po jednom vložení vypne)	Stay in the tool after placing (otherwise it switches off after one placement)
+Poloha roviny	Plane position
+Pozice komponent – balónky (	Component positions – balloons (
+Poznámka	Note
+Poznámka v patičce	Footer note
+Promítám pohledy…	Projecting views…
+Přidat list	Add sheet
+Přizpůsobit (F)	Fit (F)
+Přípona kóty	Dimension suffix
+Ra 3,2 / Rz 25	Ra 3.2 / Rz 25
+Razítko	Title block
+Revize	Revision
+Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres	Share by link (WhatsApp, e-mail, Teams…) – the recipient opens the drawing directly
+Skryté hrany (čárkovaně)	Hidden edges (dashed)
+Skrýt kontrolu kót	Hide dimension check
+Smazat detail	Delete detail
+Smazat revizi	Delete revision
+Smazat vše (	Delete all (
+Střed detailu musí ležet v některém pohledu.	The detail centre must lie in one of the views.
+Svislá	Vertical
+Tabulka děr (X, Y, Ø v půdorysu)	Hole table (X, Y, Ø in the top view)
+Tabulka revizí	Revision table
+Text poznámky	Note text
+Tisk	Print
+Tolerance nebo přípona kóty (zobrazí se za hodnotou)	Tolerance or dimension suffix (shown after the value)
+Verze DWG	DWG version
+Verze souboru DWG	DWG file version
+Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.	Manufacturing requirements and notes are not added to the drawing automatically – only filled-in ones appear.
+Výška písma [mm]	Text height [mm]
+Všech {0} očekávaných kót je na listu	All {0} expected dimensions are on the sheet
+XY (vodor.)	XY (horiz.)
+XZ (čelní)	XZ (front)
+YZ (boční)	YZ (side)
+Zobrazení a kóty	Views and dimensions
+Zobrazit řez se šrafováním	Show section with hatching
+Zpět do 3D (Esc)	Back to 3D (Esc)
+Základna	Datum
+detailní pohled: střed, poloměr, umístění	detail view: centre, radius, placement
+např. ISO 2768-mK	e.g. ISO 2768-mK
+např. Kalit 58 ± 2 HRC	e.g. Harden 58 ± 2 HRC
+např. MN-2026-001	e.g. MN-2026-001
+např. Nekótované rozměry dle 3D modelu (STEP)	e.g. Undimensioned sizes per 3D model (STEP)
+např. Ostré hrany srazit 0,5×45°	e.g. Break sharp edges 0.5×45°
+např. srazit 0,5×45°	e.g. chamfer 0.5×45°
+odkazová čára + text	leader line + text
+označení do razítka, např. ČSN 11 423	designation for the title block, e.g. ČSN 11 423
+pol.)	pos.)
+popis změny	change description
+rámeček ISO 1101 s odkazem	ISO 1101 frame with leader
+volný text na listu	free text on the sheet
+značka ISO 1302 na povrch	ISO 1302 symbol on a surface
+{0} {1}×{2} mm · {3} · {4} ms	{0} {1}×{2} mm · {3} · {4} ms
+· Esc ukončí	· Esc ends
+· ISO	· ISO
+Řez A–A	Section A–A
+Šikmá	Aligned
+Žádné	None
+# ext ui
+Nejdřív vytvořte těleso.	Create a body first.
+Nejtenčí stěna: {0} mm\nu bodu X {1} · Y {2} · Z {3}\n\nPrůměrná tloušťka vzorků: {4} mm ({5} vzorků, {6} ms)\n\nMetoda: paprsek dovnitř z těžiště trojúhelníků sítě k protější stěně. U velmi hrubé sítě zvyšte kvalitu sítě v Nastavení → Zobrazení.	Thinnest wall: {0} mm\nat point X {1} · Y {2} · Z {3}\n\nAverage sample thickness: {4} mm ({5} samples, {6} ms)\n\nMethod: a ray inward from the centroid of mesh triangles to the opposite wall. For a very coarse mesh raise the mesh quality in Settings → View.
+Odsazení roviny [mm]	Plane offset [mm]
+Prvky k zrcadlení	Features to mirror
+Tloušťku se nepodařilo změřit (otevřená síť?).	The thickness could not be measured (open mesh?).
+Žádné dřívější prvky s tělesem.	No earlier features with a body.
+Rozvin uložen ({0} ohybů). Upozornění: {1}	Flat pattern saved ({0} bends). Warning: {1}
+Rozvin uložen – {0} ohybů, {1} × {2} mm.	Flat pattern saved – {0} bends, {1} × {2} mm.
+klikněte na rovnou hranu plechu v modelu	click a straight sheet edge in the model
+{0} vybráno	{0} selected
+Hloubka Y	Depth Y
+Hrany koutu:	Fillet weld edges:
+Jako samostatná tělesa (nespojovat)	As separate bodies (do not join)
+Koutový svar a×a se vymodeluje jako trojúhelníkový hranol podél hrany; objem svarového kovu ≈ a²/2 × délka (Tabulka svarů).	A fillet weld a×a is modelled as a triangular prism along the edge; weld metal volume ≈ a²/2 × length (Weld table).
+Kusovník řezů uložen jako CSV (Excel).	Cut list saved as CSV (Excel).
+Mezera	Gap
+Natočení	Rotation
+Nové těleso	New body
+Prodl. konec	Extend end
+Prodl. začátek	Extend start
+Přidat	Add
+Rameno a	Leg a
+Rameno b	Leg b
+Rohy: profily, které se ve skice stýkají koncovými body, se v rohu ořežou pokosem (obě stejně) nebo tupě (první profil průběžný, druhý zkrácený). Volné konce lze prodloužit/zkrátit.	Corners: profiles whose sketch lines meet at end points are trimmed at the corner with a mitre (both equally) or a butt joint (first profile continuous, second shortened). Free ends can be extended/shortened.
+Rozměr a	Size a
+Rozměr a×a	Size a×a
+Skica s úsečkami (osy profilů)	Sketch with lines (profile axes)
+Spodní a horní obdélník + 4 sloupky tupě mezi nimi. Vnější rozměry rámu odpovídají zadání.	Bottom and top rectangle + 4 posts butt-jointed between them. The outer frame dimensions match the input.
+Výška Z	Height Z
+Zarovnání k ose	Alignment to the axis
+klikněte na hranu vnitřního rohu v modelu	click an inner corner edge in the model
+{0} vybráno ({1} mm)	{0} selected ({1} mm)
+— vyberte skicu —	— select a sketch —
