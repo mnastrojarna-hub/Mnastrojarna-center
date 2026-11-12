@@ -49,6 +49,15 @@ export interface Decision {
 
 /** Varování výstupní kontroly: v kopii zůstal název firmy (začátek hlášky — za ním strana). */
 export const COMPANY_LEAK_WARNING = "V anonymizované kopii zůstal název firmy";
+/**
+ * Varování „zůstal název firmy" pro stranu (12. 11.): s názvy, které kontrola kopie viděla — v historii pokusů je
+ * hned vidět, co zůstalo (firma z razítka, nebo planý poplach typu výrobce materiálu, který patří do „Ponechat").
+ * Text vždy začíná COMPANY_LEAK_WARNING (na tom stojí decideAnonStatus).
+ */
+export function companyLeakWarning(page: number, names?: readonly string[] | null): string {
+  const shown = [...new Set((names ?? []).map((n) => n.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 3).map((n) => n.slice(0, 60));
+  return `${COMPANY_LEAK_WARNING}${shown.length ? ` „${shown.join("“, „")}“` : ""} (strana ${page}).`;
+}
 /** Důvod selhání, když v kopii zůstal název firmy — kopie se nikdy nepoužije. */
 export const COMPANY_LEAK_TEXT = "V anonymizované kopii zůstal název firmy — kopie se nepoužije. Klikni Anonymizovat znovu (nebo pošli výkres jako PDF přímo z CAD).";
 /** Totéž při automatickém opakování (nová detekce AI). */

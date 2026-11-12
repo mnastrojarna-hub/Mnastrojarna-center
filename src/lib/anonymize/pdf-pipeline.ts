@@ -3,7 +3,7 @@ import { addUsage } from "@/lib/ai/ai-call";
 import type { AiUsage } from "@/lib/jobs/capture-batch-types";
 import { boxInsideSent, fitForClaude } from "./claude-image";
 import { refineCut } from "./cut-refine";
-import { COMPANY_LEAK_WARNING } from "./decide";
+import { companyLeakWarning } from "./decide";
 import { checkAndHealCompanies, checkRasterCompanies, type CompanyCheckOutcome } from "./company-check";
 import { companyLeaks, crossTextTermHits, discoverCompanyNames, mergeNames, withCompanyNames } from "./company-names";
 import { asArray, asNumber, detectVector, isCategory, isRemovableCompany, type AiCallConfig, type AiImageSpec, type CompanyItem, type VectorPageResult } from "./detect-ai";
@@ -392,7 +392,7 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     // výstupní kontrola: v kopii zůstal název firmy → kopie se nikdy nepoužije
     for (const p of included.filter((x) => x.companyLeak)) {
       res.outputProblems.push(`strana ${p.page}: zůstal název firmy`);
-      res.warnings.push({ code: "verify_leak", message: `${COMPANY_LEAK_WARNING} (strana ${p.page}).`, page: p.page });
+      res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p.page, p.checkNames), page: p.page });
     }
     if (res.pages.some((p) => p.inkFailed)) res.failure = RENDER_FAIL;
     else if (res.pages.some((p) => p.blank)) {

@@ -7,7 +7,7 @@ import { logUsage, spentToday } from "./budget";
 import { isAnonCandidate, isUnsupportedExt, needsDrawingCheck, sourceFormat, unsupportedHowTo, UNSUPPORTED_PREFIX } from "./candidate";
 import { accToDecide, COMPANY_LEAK_RETRY_TEXT, COMPANY_LEAK_WARNING, companyLeakRetry, decideAnonStatus, mergeBatch, type DecideInput } from "./decide";
 import { consumeFakeFault, isFakeAnon, termsPrompt, usageUsd, type AiCallConfig } from "./detect-ai";
-import { anonFilename, outputExt, rebaseTwinFilename } from "./filename";
+import { anonFilename, anonOutPath, outputExt, rebaseTwinFilename } from "./filename";
 import { classifyAiFailure, classifyFailure, FAST_ATTEMPTS, retryPlan, userFacingFailure, type FailureInfo } from "./failure-text";
 import { describeSummary, summarize } from "./regions";
 import {
@@ -502,7 +502,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
           const { data: tj } = await db.from("orders").select("number").eq("id", String(tw.job_id)).maybeSingle();
           twinName = rebaseTwinFilename(twinName, (tj as { number: string | null } | null)?.number ?? null, await drawingIndex(db, s));
         }
-        const newPath = `${s.outPrefix}${crypto.randomUUID()}-${String(twinName ?? "vykres.pdf")}`;
+        const newPath = anonOutPath(s.outPrefix, crypto.randomUUID(), twinName ?? "vykres.pdf");
         const { error: cpErr } = await db.storage.from("job-files").copy(String(tw.anon_path), newPath);
         if (!cpErr) {
           const regions = ((tw.anon_regions ?? []) as AnonRegion[]).map((r) => ({ ...r, source: "cache" as const }));
@@ -681,7 +681,7 @@ async function anonymizeOneInner(db: AnonDb, table: AnonTable, row: SubjectRow, 
       await afterSettled(db, s);
       return { id: s.id, table, status: retry as AnonStatus, reason: r, retryNow: leakRetry, attempt };
     }
-    const outPath = `${s.outPrefix}${crypto.randomUUID()}-${name.filename}`;
+    const outPath = anonOutPath(s.outPrefix, crypto.randomUUID(), name.filename);
     stage = "upload";
     const { error: upErr } = await db.storage.from(s.bucket).upload(outPath, out.bytes, { contentType: out.mime, upsert: false });
     if (upErr) throw new Error(`Uložení anonymizované kopie selhalo: ${upErr.message}`);

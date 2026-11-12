@@ -4,6 +4,7 @@
  */
 
 import { containsTerm, type Term } from "./rules";
+import { safeStorageName } from "@/lib/jobs/mapping";
 
 // eslint-disable-next-line no-control-regex
 const FORBIDDEN = /[\\/:*?"<>|\u0000-\u001f\u007f]/g;
@@ -101,4 +102,13 @@ export function rebaseTwinFilename(name: string | null | undefined, twinJobNumbe
   const job = cleanNamePart(own.jobNumber) || "vykres";
   const idx = own.index > 0 ? Math.floor(own.index) : 1;
   return `${job}-V${idx}${m[1]}`;
+}
+
+/**
+ * Klíč anonymizované kopie v úložišti (12. 11.): Supabase Storage odmítá diakritiku a další znaky v klíči
+ * („Invalid key" u „Příloha_bez_názvu…pdf") — do cesty jde jen bezpečný název; zobrazovaný název
+ * (anon_filename) zůstává s diakritikou.
+ */
+export function anonOutPath(prefix: string, uuid: string, filename: string | null | undefined): string {
+  return `${prefix}${uuid}-${safeStorageName(String(filename ?? "") || "vykres.pdf")}`;
 }
