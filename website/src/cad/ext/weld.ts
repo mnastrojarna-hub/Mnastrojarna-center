@@ -3,6 +3,7 @@
  * rám z profilů, ořez rovinou, víčka, styčníky, svarové housenky, desky, značky svarů ISO 2553
  * a akce Kusovník řezů / Tabulka svarů (UI). Geometrie: OpenCascade přes replicad (líně načtené).
  */
+import { extPlane, hasPlaneDef } from "./place";
 import { tr } from "../i18n";
 import type * as R from "replicad";
 import { registerExt, type ExtBuildCtx, type Shape } from "./registry";
@@ -219,6 +220,7 @@ registerExt({
   hint: tr("obdélníková deska (patka, příložka) s volitelným polem děr"),
   make: () => ({ plane: "XY", offset: 0, cx: 0, cy: 0, w: 200, h: 150, t: 10, flip: false, nx: 0, ny: 0, hole: 13, margin: 25, mode: "add" }),
   params: [
+    { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Rovina"), kind: "enum", options: [{ v: "XY", l: "XY" }, { v: "XZ", l: "XZ" }, { v: "YZ", l: "YZ" }] },
     { key: "offset", label: tr("Odsazení roviny"), kind: "number" },
     { key: "cx", label: tr("Střed X"), kind: "number" },
@@ -239,7 +241,7 @@ registerExt({
     const h = num(data.h, 150);
     const t = num(data.t, 10);
     if (!(w > 0 && h > 0 && t > 0)) throw new Error(tr("Rozměry desky musí být kladné."));
-    const plane = r.makePlane(String(data.plane ?? "XY") as "XY" | "XZ" | "YZ", num(data.offset, 0));
+    const plane = hasPlaneDef(data) ? extPlane(data, ctx) : r.makePlane(String(data.plane ?? "XY") as "XY" | "XZ" | "YZ", num(data.offset, 0));
     let d = r.drawRectangle(w, h).translate(num(data.cx, 0), num(data.cy, 0));
     const nx = Math.round(num(data.nx, 0));
     const ny = Math.round(num(data.ny, 0));
@@ -274,15 +276,17 @@ registerExt({
   hint: tr("odřízne vše na jedné straně roviny (zkrácení profilů)"),
   make: () => ({ plane: "XY", offset: 0, keep: "+" }),
   params: [
+    { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Rovina"), kind: "enum", options: [{ v: "XY", l: "XY" }, { v: "XZ", l: "XZ" }, { v: "YZ", l: "YZ" }] },
     { key: "offset", label: tr("Odsazení"), kind: "number" },
     { key: "keep", label: tr("Ponechat stranu"), kind: "enum", options: [{ v: "+", l: tr("+ (kladná)") }, { v: "-", l: tr("− (záporná)") }] },
   ],
   build: async (data, ctx) => {
     if (!ctx.body) throw new Error(tr("Není co ořezat – nejdřív vytvořte profily."));
-    const axis: Vec3 = data.plane === "YZ" ? [1, 0, 0] : data.plane === "XZ" ? [0, 1, 0] : [0, 0, 1];
+    const byRef = hasPlaneDef(data) ? extPlane(data, ctx) : null;
+    const axis: Vec3 = byRef ? [byRef.zDir.x, byRef.zDir.y, byRef.zDir.z] : data.plane === "YZ" ? [1, 0, 0] : data.plane === "XZ" ? [0, 1, 0] : [0, 0, 1];
     const sign = data.keep === "-" ? -1 : 1;
-    const origin = mul(axis, num(data.offset, 0));
+    const origin: Vec3 = byRef ? [byRef.origin.x, byRef.origin.y, byRef.origin.z] : mul(axis, num(data.offset, 0));
     const box = await halfSpace(origin, mul(axis, sign));
     const out = ctx.body.clone().intersect(box) as Shape;
     const r = await rep();

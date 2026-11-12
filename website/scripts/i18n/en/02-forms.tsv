@@ -348,17 +348,14 @@ Jen vnější obrys (ignorovat otvory profilu)	Outer outline only (ignore profil
 Klikáním v modelu přidáváte / odebíráte.	Click in the model to add / remove.
 Kolmo na skicu	Normal to the sketch
 Konec	End
-Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese. Doporučeno pro výrobní dokumentaci.	Cosmetic thread: the geometry does not change, the thread appears in the drawing. Recommended for manufacturing documentation.
 Kuž. zahl.	Countersink
 Modul prvku „	Feature module “
 Měřítko konce	End scale
-Natáčet profil podle křivky (Frenet)	Rotate the profile with the curve (Frenet)
 Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).	Unknown designation – M2 to M48, optionally with pitch (M18×1.5).
 Obrátit stranu	Flip side
 Odstraní díry, čepy, kuželová zahloubení a válcová zaoblení (obnoví ostrou hranu). Vhodné pro úpravy importovaných modelů.	Removes holes, pins, countersinks and cylindrical fillets (restores the sharp edge). Suitable for editing imported models.
 Opsaný průměr	Circumscribed diameter
 Osa díry	Hole axis
-Osa otočení (přes počátek)	Rotation axis (through the origin)
 Označení závitu (text)	Thread designation (text)
 Označení závitu díry	Hole thread designation
 Parametr je navázaný na proměnné – kliknutím vazbu zrušíte	The parameter is bound to variables – click to remove the binding
@@ -370,9 +367,7 @@ Ponechat originál (sloučit)	Keep the original (merge)
 Posunutí roviny	Plane offset
 Počet stran	Number of sides
 Počátek a normála níže se dopočítají z definice při každé změně modelu.	The origin and normal below are recomputed from the definition on every model change.
-Pořadí: měřítko → otočení → posunutí, vše vůči počátku souřadnic.	Order: scale → rotation → translation, all relative to the coordinate origin.
 Pro šroub (průchozí díra ISO 273)	For a screw (clearance hole ISO 273)
-Profil by měl ležet v rovině kolmé na začátek dráhy. Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá.	The profile should lie in a plane perpendicular to the start of the path. The path can contain lines, arcs and polylines – it must be continuous.
 Prvek nemá parametry.	The feature has no parameters.
 Průnik	Intersect
 Rovina se přepočítá při každé změně modelu (např. posune-li se plocha, na které skica leží).	The plane is recomputed on every model change (e.g. when the face the sketch lies on moves).
@@ -382,10 +377,8 @@ Ručně (počátek a normála níže)	Manually (origin and normal below)
 Stranu +{0}	Side +{0}
 Stranu −{0}	Side −{0}
 Střední	Medium
-Tento typ pole (po křivce / podle skici / výplňové) připravuje modul polí.	This pattern type (along a curve / by sketch / fill) is prepared by the pattern module.
 Tip: klikněte na plochu modelu – bod a osa se doplní automaticky. Více děr: „Přidat body klikem“ (vrcholy, středy kružnic, body skici přes pravé tlačítko).	Tip: click a face of the model – the point and axis are filled in automatically. Several holes: “Add points by clicking” (vertices, circle centres, sketch points via the right button).
 Typ díry	Hole type
-Typ pole	Pattern type
 Ukončení (směr 1)	End condition (direction 1)
 Ukončení (směr 2)	End condition (direction 2)
 Uzavřená	Closed
@@ -403,10 +396,8 @@ YZ ⟂ X	YZ ⟂ X
 Začátek, směr, tenká stěna, úkos, kroucení…	Start, direction, thin wall, draft, twist…
 Zrušit výběr	Clear selection
 Závit (hrubé i jemné stoupání)	Thread (coarse and fine pitch)
-Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk.	The thread is modelled as grooves (simplified, without pitch) – suitable for visualisation and 3D printing.
 mm, závit	mm, thread
 se uvede ve výkrese.	appears in the drawing.
-vyberte v modelu ({0})	select in the model ({0})
 vybráno.	selected.
 · střed	· centre
 · vrták Ø	· drill Ø
@@ -419,7 +410,6 @@ vybráno.	selected.
 Žebro se protáhne od čáry až k tělesu. Stranu, kde narazí na materiál, najde automaticky.	The rib extends from the line up to the body. It finds the side where it meets material automatically.
 — vlastní průměr —	— custom diameter —
 — vyberte prvek —	— select a feature —
-— vyberte —	— select —
 “ není načten.	” is not loaded.
 # ref-field
 + Přidat {0} klikem	+ Add {0} by clicking

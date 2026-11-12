@@ -429,13 +429,20 @@ function holeTools(f: HoleF, ctx: Ctx, strict = false): Shape {
   const tools = pts.map((at) => {
     if (end.kind === "blind") return holeToolAt(f, body, at, dir, { through: false, depth: f.depth, flat: false }, strict);
     if (end.kind === "throughAll") return holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false }, strict);
-    if (end.kind === "toFace") {
+    if (end.kind === "toVertex") {
+      const p = pointOf(rc, end.ref, tr("cílový bod díry"));
+      const t = V.dot(V.sub(p, at), dir);
+      if (!(t > 1e-6)) throw new Error(tr("Cílový bod neleží ve směru vrtání (zkuste obrátit směr)."));
+      return holeToolAt(f, body, at, dir, { through: false, depth: t, flat: true }, strict);
+    }
+    if (end.kind === "toFace" || end.kind === "offsetFromFace") {
       const g = resolveRef(rc, end.ref);
       if (!g.plane || g.radius) throw new Error(tr("Ukončení díry „k ploše“ vyžaduje rovinnou plochu nebo pomocnou rovinu."));
       const n = g.plane.normal;
       const den = V.dot(dir, n);
       if (Math.abs(den) < 1e-9) throw new Error(tr("Cílová plocha je rovnoběžná s osou díry."));
-      const o2 = V.add(g.plane.origin, V.mul(n, (end.offset ?? 0) * (den > 0 ? -1 : 1)));
+      const off = end.kind === "offsetFromFace" ? end.d : (end.offset ?? 0);
+      const o2 = V.add(g.plane.origin, V.mul(n, off * (den > 0 ? -1 : 1)));
       const t = V.dot(V.sub(o2, at), n) / den;
       if (!(t > 1e-6)) throw new Error(tr("Cílová plocha neleží ve směru vrtání (zkuste obrátit směr)."));
       return holeToolAt(f, body, at, dir, { through: false, depth: t, flat: true }, strict);
@@ -975,7 +982,9 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
         }
         case "split": {
           if (!body) throw new Error(tr("Není co rozříznout."));
-          const res = body.clone().split(f.planeDef ? planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef)) : axisPlane(f.plane, f.offset));
+          // `faceRef` (starší zápis v JSON) = rovina vybrané plochy; ve formuláři je to volba „Rovina plochy“ v poli Řezná rovina
+          const cutDef: PlaneDef | undefined = f.planeDef ?? (f.faceRef ? { kind: "face", ref: f.faceRef } : undefined);
+          const res = body.clone().split(cutDef ? planeFrom(resolvePlaneDef(rctx(ctxOf()), cutDef)) : axisPlane(f.plane, f.offset));
           const keep = asShape(f.keep === "positive" ? res.positive : res.negative);
           if (!keep) throw new Error(tr("Na zvolené straně roviny nic nezůstane – změňte stranu nebo posunutí."));
           next = keep;
@@ -1089,7 +1098,19 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
         case "mirror": {
           if (!body) throw new Error(tr("Není co zrcadlit."));
           const origin: Vec3 = f.plane === "YZ" ? [f.offset, 0, 0] : f.plane === "XZ" ? [0, f.offset, 0] : [0, 0, f.offset];
-          const m = (f.planeDef ? body.clone().mirror(planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef))) : body.clone().mirror(f.plane, origin)) as Shape;
+          const mirrored = (s: Shape) => (f.planeDef ? s.clone().mirror(planeFrom(resolvePlaneDef(rctx(ctxOf()), f.planeDef))) : s.clone().mirror(f.plane, origin)) as Shape;
+          if (f.featureIds?.length) {
+            // zrcadlení jen vybraných prvků: zrcadlí se jejich nástrojová tělesa a uplatní stejnou operací (přidat / odebrat)
+            let acc: Shape = body;
+            for (const id of f.featureIds) {
+              const t = tools.get(id);
+              if (!t) throw new Error(tr("Zrcadlený prvek „{0}“ nemá nástrojové těleso – zrcadlit lze vysunutí, rotace, primitiva, díry, tažení a text.", features.find((x) => x.id === id)?.name ?? id));
+              acc = applyMode(acc, mirrored(t.tool), t.mode === "new" ? "add" : t.mode);
+            }
+            next = acc;
+            break;
+          }
+          const m = mirrored(body);
           next = f.keepOriginal ? body.fuse(m) : m;
           break;
         }
@@ -1097,7 +1118,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
           const def = getExt(f.ext);
           if (!def) throw new Error(tr("Neznámý prvek rozšíření „{0}“ – modul není načten.", f.ext));
           if (!def.build) break;
-          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools, bodies: new Map<string, Shape>([...(body ? [[activeName, body] as [string, Shape]] : []), ...others]), activeBody: activeName });
+          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools, bodies: new Map<string, Shape>([...(body ? [[activeName, body] as [string, Shape]] : []), ...others]), activeBody: activeName, resolvePlane: (pd) => resolvePlaneDef(rctx(ctxOf()), pd), resolvePoint: (ref) => pointOf(rctx(ctxOf()), ref, tr("bod prvku")) });
           if (out !== null && out !== undefined) next = out; // null = prvek bez geometrie (těleso zůstává)
           break;
         }

@@ -13,9 +13,9 @@ import { makeFromText } from "@/cad/library";
 import { cad, isCancelled } from "@/cad/client";
 import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
 import { isUnlocked, notifyVault, persistMode, restoreSession, VAULT_EVENT, vaultGet, vaultSet, wipeStoredDocuments } from "@/cad/vault";
-import { keyCombo, loadSettings, pushRecent, readRecentDoc, saveSettings, storeRecentDoc, type Settings } from "@/cad/settings";
+import { DEFAULT_SKETCH_SHORTCUTS, keyCombo, loadSettings, pushRecent, readRecentDoc, saveSettings, shortcutOf, storeRecentDoc, type Settings } from "@/cad/settings";
 import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
-import { extByTab, getExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
+import { allExt, extByTab, getExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
@@ -39,7 +39,7 @@ import { getExtUi, type ExtActionApi } from "./ext";
 import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
-import { SettingsDialog } from "./settings-dialog";
+import { SettingsDialog, SHORTCUT_LABELS } from "./settings-dialog";
 import { AgentConsole } from "./agent-console";
 import { ShareDialog } from "./share-dialog";
 import { Btn, Modal as UiModal } from "./ui";
@@ -47,6 +47,7 @@ import { StartScreen } from "./start-screen";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
+import { AskHost, askNumber } from "./ask-dialog";
 import { ComputeChip, progressLabel } from "./compute-chip";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { FEATURE_TONE, Manager } from "./manager";
@@ -521,10 +522,15 @@ export function CadApp() {
           case "new":
             flush();
             currentBody = null;
-            d = op.assembly ? emptyAssembly(op.name) : emptyDoc(op.name);
+            {
+              // bez zadaného názvu („nový díl“) dostane dokument číslovaný výchozí název, aby se záložky nejmenovaly stejně
+              const dflt = op.assembly ? tr("Nová sestava") : tr("Nový díl");
+              const name = op.name === dflt ? freshNameRef.current(dflt) : op.name;
+              d = op.assembly ? emptyAssembly(name) : emptyDoc(name);
+            }
             openNew = true;
             changed = true;
-            log.push(tr("✓ {0} „{1}“ – nová záložka", op.assembly ? tr("nová sestava") : tr("nový díl"), op.name));
+            log.push(tr("✓ {0} „{1}“ – nová záložka", op.assembly ? tr("nová sestava") : tr("nový díl"), d.name));
             break;
           case "meta": {
             d = { ...d, ...op.patch };
@@ -2018,7 +2024,15 @@ export function CadApp() {
     if (withCurrent && !isAsm && doc.features.length) a.components = [partComponent(doc, {}, { group: "Díly", fixed: true, color: doc.color ?? "#b9c2cc" })];
     openDocInTab(a);
   };
-  const newDoc = () => openDocInTab(emptyDoc());
+  /** výchozí název nového dokumentu, který ještě žádná záložka nemá: „Nový díl“, „Nový díl 2“, „Nový díl 3“… */
+  const freshName = (base: string) => {
+    const taken = new Set([histRef.current.present.name, ...docTabsRef.current.map((t) => t.title)]);
+    if (!taken.has(base)) return base;
+    for (let n = 2; ; n++) if (!taken.has(`${base} ${n}`)) return `${base} ${n}`;
+  };
+  const freshNameRef = useRef(freshName);
+  freshNameRef.current = freshName;
+  const newDoc = () => openDocInTab(emptyDoc(freshName(tr("Nový díl"))));
   const openFile = async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext === "mncad" || ext === "json") {
@@ -2207,6 +2221,15 @@ export function CadApp() {
         e.preventDefault();
         return deleteSelection();
       }
+      // zkratky prvků rozšíření (Shift+F příruba plechu, Shift+W svar…) – stejná akce jako tlačítko na pásu karet
+      if (e.shiftKey && e.key.length === 1) {
+        const want = `SHIFT+${e.key.toUpperCase()}`;
+        const def = allExt().find((d) => d.kbd && d.kbd.replace(/\s+/g, "").toUpperCase() === want);
+        if (def) {
+          e.preventDefault();
+          return addExt(def);
+        }
+      }
       // zkratky dle nastavení (Nastavení → Klávesové zkratky)
       const sc = prefs.shortcuts;
       const combo = keyCombo(e).toUpperCase();
@@ -2216,9 +2239,14 @@ export function CadApp() {
       if (is("view.fit")) vp.current?.fit();
       if (is("feature.extrude") && !isAsm) addFeature("extrude");
       if (is("feature.hole") && !isAsm) addFeature("hole");
-      if (is("feature.fillet") && !isAsm) addFeature("fillet");
-      if (is("feature.chamfer") && !isAsm) addFeature("chamfer");
-      if (is("sketch.new") && !isAsm) createSketch({ kind: "base", name: "XY", offset: 0 });
+      // zaoblení / sražení: vybrané hrany se použijí rovnou (stejně jako tlačítko na pásu karet)
+      if (is("feature.fillet") && !isAsm) (selEdges.length ? addWithEdges("fillet") : addFeature("fillet"));
+      if (is("feature.chamfer") && !isAsm) (selEdges.length ? addWithEdges("chamfer") : addFeature("chamfer"));
+      // nová skica: na vybrané rovinné ploše hned, jinak nabídka rovin u kurzoru (dřív vždy mlčky rovina XY)
+      if (is("sketch.new") && !isAsm) {
+        if (selFaces.length === 1) void sketchOnFace(selFaces[0]);
+        else setCtx({ x: lastPtr.current?.x ?? window.innerWidth / 2, y: lastPtr.current?.y ?? window.innerHeight / 3, entries: sketchPlanes });
+      }
       if (is("tool.measure")) toggleMeasure();
       if (is("tool.section")) toggleSection();
       if (is("view.ortho")) setPref("ortho", !prefs.ortho);
@@ -2287,12 +2315,8 @@ export function CadApp() {
   const hasBody = isAsm ? asmViews.length > 0 : !!result?.mesh;
 
   // ---------- pás karet ----------
-  const askNum = (label: string, def: number) => {
-    const raw = window.prompt(label, String(def));
-    if (raw === null) return null;
-    const v = Number(raw.replace(",", "."));
-    return Number.isFinite(v) ? v : null;
-  };
+  /** dotaz na číslo vlastním dialogem (výrazy i proměnné dílu); null = zrušeno */
+  const askNum = (label: string, def: number) => askNumber(label, def, { unit: "mm", scope: resolved.values, hint: tr("Lze zadat i výraz (25/2) nebo proměnnou dílu. Enter potvrdí, Esc zruší.") });
   const selVerts = selection.filter((x): x is Extract<SelItem, { kind: "vertex" }> => x.kind === "vertex" && !x.compId).map((x) => x.point);
   const v3 = {
     sub: (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
@@ -2306,15 +2330,15 @@ export function CadApp() {
       return [a[0] / l, a[1] / l, a[2] / l];
     },
   };
-  const offsetPlane = (name: "XY" | "XZ" | "YZ") => () => {
-    const d = askNum(tr("Odsazení roviny {0} (mm, kladně ve směru normály)", name), 10);
+  const offsetPlane = (name: "XY" | "XZ" | "YZ") => async () => {
+    const d = await askNum(tr("Odsazení roviny {0} (mm, kladně ve směru normály)", name), 10);
     if (d !== null) createSketch({ kind: "base", name, offset: d });
   };
   const parallelFace = async () => {
     const i = selFaces[0];
     const info = await cad.face(i);
     if (!info?.planar) return flash(tr("Vyberte rovinnou plochu."));
-    const d = askNum(tr("Odsazení od plochy (mm, kladně ve směru normály plochy)"), 10);
+    const d = await askNum(tr("Odsazení od plochy (mm, kladně ve směru normály plochy)"), 10);
     if (d === null) return;
     createSketch({ kind: "custom", origin: v3.add(info.origin, v3.mul(info.normal, d)), normal: info.normal, xDir: info.xDir, label: tr("Plocha {0} {1}{2} mm", i + 1, d >= 0 ? "+" : "", d) });
   };
@@ -2765,7 +2789,7 @@ export function CadApp() {
                 ? tr("Vyberte plochy pro úkos · Enter = OK")
                 : active.type === "hole"
                   ? tr("Klikněte na plochu, kam se má vrtat · Enter = OK")
-                  : tr("{0}: upravte parametry · Enter = OK, Esc = Storno", featureLabel(active))
+                  : featurePrompt(active)
           : selection.length
             ? (hintsOn ? tr("Popisky zapnuté (Ctrl+Shift+L) · ") : "") + tr("Vybráno: {0}× {1} · pravé tlačítko = příkazy pro výběr · Esc zruší", selection.length, tr(KIND_LABEL[selection[0].kind]).toLowerCase())
             : tr("Filtr výběru: {0} · klikněte na entitu · pravé tlačítko = nabídka", tr(FILTER_LABEL[selFilter]));
@@ -2840,7 +2864,7 @@ export function CadApp() {
       { id: "p.library", label: tr("Knihovna normálií (šrouby, ložiska, ozubená kola, profily…)"), group: "Program", icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => setLibraryOpen({}) },
       { id: "p.settings", label: tr("Nastavení"), group: "Program", icon: "settings", kbd: "Ctrl+,", run: () => setSettingsOpen(true) },
       { id: "p.start", label: tr("Úvodní obrazovka"), group: "Program", icon: "home", run: () => setStartOpen(true) },
-      { id: "p.help", label: tr("Klávesové zkratky a ovládání"), group: "Program", icon: "help", run: () => setNotice({ title: tr("Ovládání a zkratky"), body: HELP }) },
+      { id: "p.help", label: tr("Klávesové zkratky a ovládání"), group: "Program", icon: "help", run: () => setNotice({ title: tr("Ovládání a zkratky"), body: helpText(prefs.shortcuts) }) },
       { id: "p.docs", label: tr("Dokumentace a návod k obsluze (web)"), group: "Program", icon: "info", run: () => window.open(langMeta().docs, "_blank", "noopener") },
       { id: "p.pdf", label: tr("Příručka PDF – stáhnout"), group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
       { id: "p.share", label: tr("Sdílet odkazem (WhatsApp, e-mail, Teams…)"), group: "Program", icon: "share", run: () => setShareOpen(true) },
@@ -2986,7 +3010,7 @@ export function CadApp() {
                     { id: "docs", label: tr("Dokumentace a návod k obsluze (web)"), icon: "info", hint: tr("24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce"), onClick: () => window.open(langMeta().docs, "_blank", "noopener") },
                     { id: "pdf", label: tr("Příručka PDF – stáhnout"), icon: "drawing", hint: tr("kompletní příručka k tisku a offline čtení"), onClick: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
                     { divider: true, label: tr("Ovládání") },
-                    { id: "help", label: tr("Klávesové zkratky a ovládání myší"), icon: "help", onClick: () => setNotice({ title: tr("Ovládání a zkratky"), body: HELP }) },
+                    { id: "help", label: tr("Klávesové zkratky a ovládání myší"), icon: "help", onClick: () => setNotice({ title: tr("Ovládání a zkratky"), body: helpText(prefs.shortcuts) }) },
                     { id: "palette", label: tr("Paleta příkazů"), icon: "palette", kbd: "Ctrl+K", hint: tr("napište název příkazu („díra“, „výkres“, „zaoblit“…)"), onClick: () => setPaletteOpen(true) },
                     { id: "settings", label: tr("Nastavení…"), icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
                     { divider: true },
@@ -3082,7 +3106,7 @@ export function CadApp() {
                     { divider: true },
                     { id: "library", label: tr("Knihovna normálií…"), icon: "table", tone: "pattern", kbd: "Ctrl+L", onClick: () => setLibraryOpen({}) },
                     { id: "settings", label: tr("Nastavení…"), icon: "settings", kbd: "Ctrl+,", onClick: () => setSettingsOpen(true) },
-                    { id: "help", label: tr("Klávesové zkratky a ovládání"), icon: "help", onClick: () => setNotice({ title: tr("Ovládání a zkratky"), body: HELP }) },
+                    { id: "help", label: tr("Klávesové zkratky a ovládání"), icon: "help", onClick: () => setNotice({ title: tr("Ovládání a zkratky"), body: helpText(prefs.shortcuts) }) },
                     { id: "docs", label: tr("Dokumentace a návod k obsluze (web)…"), icon: "info", onClick: () => window.open(langMeta().docs, "_blank", "noopener") },
                     { id: "pdf", label: tr("Příručka PDF – stáhnout"), icon: "drawing", onClick: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
                   ]}
@@ -3687,6 +3711,7 @@ export function CadApp() {
           />
         )}
         <ComputeChip onCancel={cancelCompute} />
+        <AskHost />
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
         {shareOpen && <ShareDialog doc={doc} view={drawingOpen ? "drawing" : "model"} onClose={() => setShareOpen(false)} onFlash={flash} />}
         {agentOpen && <AgentConsole onClose={() => setAgentOpen(false)} run={(t) => runAgentRef.current(t)} getDocJson={() => JSON.stringify(histRef.current.present, null, 1)} status={agentStatus} />}
@@ -3798,20 +3823,52 @@ export function CadApp() {
   );
 }
 
-const HELP = `Myš (lze přepnout na kartě Zobrazení → Ovládání myši):
-• ZW3D: pravé tlačítko táhnout = otáčení, prostřední = posun, kolečko = zoom k kurzoru, pravý klik = nabídka
-• SolidWorks: prostřední = otáčení, Ctrl+prostřední = posun
-• Touchpad: levé = otáčení, pravé = posun
+/** Řádek nápovědy při úpravě prvku: co se právě vybírá v modelu a jak jinak to lze zadat (seznam, pravidlo, pole formuláře). */
+function featurePrompt(f: Feature): string {
+  const picked = (n: number, what: "faces" | "edges") =>
+    what === "faces" ? tr("{0}: klikáním vyberte plochy v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno", featureLabel(f), n) : tr("{0}: klikáním vyberte hrany v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno", featureLabel(f), n);
+  if (f.type === "ext") {
+    const pick = getExt(f.ext)?.pick;
+    if (pick) return picked(Array.isArray((f.data ?? {})[pick.key]) ? ((f.data ?? {})[pick.key] as unknown[]).length : 0, pick.kind);
+  }
+  if (f.type === "pushPull" || f.type === "offsetFace" || f.type === "deleteFace" || f.type === "thicken") return picked(f.faces.length, "faces");
+  if (f.type === "mirror") return tr("Zrcadlení: rovinu zvolte ve formuláři – základní rovinu, nebo plochu modelu tlačítkem Vybrat v poli Rovina zrcadlení · Enter = OK, Esc = Storno");
+  if (f.type === "pattern") return tr("Pole: počet, rozteč a směr zadejte ve formuláři – směr podél hrany nebo osy válce vyberete tlačítkem Vybrat v poli směru · Enter = OK, Esc = Storno");
+  return tr("{0}: upravte parametry · Enter = OK, Esc = Storno", featureLabel(f));
+}
 
-Klávesy:
-0 izometrie · 1 přední · 2 horní · 3 pravý · 4 zadní · 5 spodní · 6 levý
-F přizpůsobit · P pravoúhlá/perspektiva · M měření · X řez
-E vysunutí · H díra · Enter = OK · Esc = Storno · Delete = smazat prvek
-Ctrl+Z / Ctrl+Y zpět / znovu · Ctrl+S uložit · Ctrl+O otevřít
-
-Skica: V výběr · L úsečka · R obdélník · C kružnice · A oblouk · P mnohoúhelník · S drážka
-
-Parametry: do pole lze psát výrazy (25/2) nebo vazby na proměnné (=d1*2).`;
+/** Nápověda k ovládání: klávesy podle aktuálního nastavení (3D i skica) a zkratky prvků rozšíření, v jazyce rozhraní. */
+function helpText(shortcuts: Record<string, string> | null | undefined): string {
+  const k = (id: string) => shortcutOf(shortcuts, id) || "—";
+  const sketch = Object.keys(DEFAULT_SKETCH_SHORTCUTS)
+    .map((id) => `${k(id)} ${tr(SHORTCUT_LABELS[id] ?? id).toLowerCase()}`)
+    .join(" · ");
+  const ext = allExt()
+    .filter((d) => d.kbd)
+    .map((d) => `${d.kbd} ${d.label.toLowerCase()}`)
+    .join(" · ");
+  return [
+    tr("Myš (lze přepnout na kartě Zobrazení → Ovládání myši):"),
+    tr("• ZW3D: pravé tlačítko táhnout = otáčení, prostřední = posun, kolečko = zoom k kurzoru, pravý klik = nabídka"),
+    tr("• SolidWorks: prostřední = otáčení, Ctrl+prostřední = posun"),
+    tr("• Touchpad: levé = otáčení, pravé = posun"),
+    "",
+    tr("Klávesy ve 3D (lze změnit v Nastavení → Klávesové zkratky):"),
+    tr("{0} izometrie · {1} přední · {2} horní · {3} pravý · {4} zadní · {5} spodní · {6} levý", k("view.iso"), k("view.front"), k("view.top"), k("view.right"), k("view.back"), k("view.bottom"), k("view.left")),
+    tr("{0} přizpůsobit · {1} pravoúhlá / perspektiva · {2} měření · {3} řez", k("view.fit"), k("view.ortho"), k("tool.measure"), k("tool.section")),
+    tr("{0} vysunutí · {1} díra · {2} zaoblení · {3} sražení (vybrané hrany se použijí rovnou) · {4} nová skica (na vybrané ploše, jinak nabídne roviny)", k("feature.extrude"), k("feature.hole"), k("feature.fillet"), k("feature.chamfer"), k("sketch.new")),
+    tr("Enter = OK · Esc = Storno · Delete = smazat prvek · G = posun komponenty v sestavě · R = přepnout posun / otočení u gizma"),
+    tr("Ctrl+Z / Ctrl+Y zpět / znovu · Ctrl+S uložit · Ctrl+O otevřít"),
+    tr("Ctrl+K paleta příkazů · Ctrl+L knihovna normálií · Ctrl+, nastavení · Ctrl+Shift+K textové příkazy · Ctrl+Shift+L popisky entit"),
+    ...(ext ? [tr("Prvky rozšíření: {0}", ext)] : []),
+    "",
+    tr("Skica (lze změnit v Nastavení → Klávesové zkratky, skupina Skica):"),
+    sketch,
+    tr("Dotyk ve skice: dlouhý stisk = kontextová nabídka, dva prsty = posun a zoom."),
+    "",
+    tr("Parametry: do pole lze psát výrazy (25/2) nebo vazby na proměnné (=d1*2)."),
+  ].join("\n");
+}
 
 function statusOf(result: BuildResult | null, id: string) {
   return result?.status.find((s) => s.id === id);

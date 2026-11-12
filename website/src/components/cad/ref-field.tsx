@@ -7,6 +7,7 @@
  *  – zvolit z nabídky pravého tlačítka / tlačítka ⋯ (střed hrany, střed kružnice, mezi dvěma body, průsečík…).
  * Výběr v 3D směruje aplikace přes `RefPickContext`.
  */
+import { askNumber } from "./ask-dialog";
 import { tr } from "@/cad/i18n";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { cad } from "@/cad/client";
@@ -151,13 +152,13 @@ export function RefField({ label, value, onChange, want = "point", allowXyz = wa
     };
     step();
   };
-  const finishOption = (o: PointOption, got: Ref[]) => {
+  const finishOption = async (o: PointOption, got: Ref[]) => {
     let v: number | undefined;
     if (o.needsValue) {
-      const raw = window.prompt(o.needsValue.label, String(o.needsValue.def));
-      if (raw === null) return;
-      v = Number(raw.replace(",", "."));
-      if (!Number.isFinite(v)) return;
+      // hodnota volby (poměr na hraně, odsazení…) vlastním dialogem místo systémového okna
+      const n = await askNumber(o.needsValue.label, o.needsValue.def);
+      if (n === null) return;
+      v = n;
     }
     onChange(o.make(got, v));
   };

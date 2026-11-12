@@ -6,6 +6,7 @@
  * spojené s tělesem. Rozvin se počítá analyticky (sheetmetal-flat.ts) s BA = π/180·α·(R + K·t).
  * replicad/build.ts se načítají líně, aby modul nešel do hlavního balíčku UI.
  */
+import { extPoint } from "./place";
 import { tr } from "../i18n";
 import type * as R from "replicad";
 import { planeBasis, toWorld } from "../defaults";
@@ -402,6 +403,7 @@ registerExt({
   hint: tr("čtvercový nebo kruhový výřez v rohu mezi ohyby"),
   make: (doc) => ({ point: [0, 0, 0], kind: "round", size: 2 * sheetParamsAt(doc, doc.features.length).t, axis: "Z" }),
   params: [
+    { key: "pointRef", label: tr("Střed úlevy odkazem"), kind: "point", hint: tr("vrchol, střed hrany, bod skici… – má přednost před souřadnicemi níže") },
     { key: "point", label: tr("Střed úlevy"), kind: "vec3" },
     { key: "kind", label: tr("Tvar"), kind: "enum", options: [{ v: "round", l: tr("Kruhová") }, { v: "rect", l: tr("Čtvercová") }] },
     { key: "size", label: tr("Velikost (Ø / strana)"), kind: "number", min: 0.1 },
@@ -410,7 +412,7 @@ registerExt({
   build: async (d, ctx) => {
     if (!ctx.body) throw new Error(tr("Nejdřív vytvořte Základní plech."));
     const r = await rep();
-    const pt = (Array.isArray(d.point) ? d.point : [0, 0, 0]) as Vec3;
+    const pt = extPoint(d, ctx, "point");
     const size = num(d.size, 4);
     const axis = d.axis === "X" ? [1, 0, 0] : d.axis === "Y" ? [0, 1, 0] : [0, 0, 1];
     const L = bboxDiag(ctx.body) * 2;

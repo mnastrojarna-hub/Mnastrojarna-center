@@ -24,7 +24,9 @@ do 3D okna (výběr hran a ploch pravidlem).
    dokument; \`await window.mncad.setDocument(docOrJson)\` ho nahradí; \`await window.mncad.status()\` vrátí stav
    jako text; \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
    \`window.mncad.openConsole()\` otevře konzoli; \`await window.mncad.exportFile("step")\` (step, stl, brep, obj, glb,
-   3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor.
+   3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor;
+   \`window.mncad.progress()\` vrátí průběh běžícího výpočtu (\`{ label, index, total, name, seconds }\` nebo \`null\`) a
+   \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem).
 
 Všechny rozměry jsou v **milimetrech**, úhly ve stupních, desetinná čárka i tečka jsou povolené, „Ø“ před číslem
 se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu kvádru (bez „střed“) nebo ve středu válce.
@@ -38,24 +40,98 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`kvádr X Y Z [střed] [v x y z] [odebrat]\` | kvádr; roh v počátku, „střed“ = vystředit |
 | \`válec D H [osa X|Y|Z] [v x y z] [odebrat]\` | válec průměr × výška, osa Z |
 | \`koule D [v x y z]\` · \`kužel D1 D2 H\` · \`trubka D d H\` | další primitiva (průměry) |
-| \`skica XY|XZ|YZ [odsazení N]: entita; entita…\` | skica; entity i na dalších řádcích |
+| \`skica XY|XZ|YZ [odsazení N]: entita; entita…\` | skica na základní rovině; entity i na dalších řádcích |
+| \`skica počátek x y z normála nx ny nz [osax ux uy uz]: …\` | skica na obecné rovině (viz „Souřadnice skici ve 3D“) |
 | \`obdélník W H [v x y]\` / \`obdélník W H roh x y\` | obdélník středem (výchozí počátek) nebo rohem |
 | \`kružnice D [v x y]\` / \`kružnice poloměr r\` | kružnice |
-| \`mnohoúhelník N D [v x y]\` · \`drážka L W [úhel a]\` · \`úsečka x1 y1 x2 y2\` · \`čára x1 y1 x2 y2 … [uzavřít]\` · \`bod x y\` · \`elipsa rx ry\` | další entity; předpona \`pomocná\` = konstrukční |
+| \`mnohoúhelník N D [v x y]\` · \`drážka L W [úhel a]\` · \`úsečka x1 y1 x2 y2\` · \`bod x y\` · \`elipsa rx ry\` | další entity; předpona \`pomocná\` = konstrukční |
+| \`čára x1 y1 x2 y2 [r N] x3 y3 … [uzavřít]\` | lomená čára; \`r N\` za bodem zaoblí tento roh poloměrem N (vzniknou úsečky a tečné oblouky) |
+| \`oblouk x1 y1 xm ym x2 y2\` | oblouk třemi body: začátek, bod na oblouku, konec |
+| \`spline x1 y1 x2 y2 x3 y3 … [uzavřít]\` | hladká křivka přes zadané body |
 | \`vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]\` | vysune poslední skicu |
-| \`rotovat [úhel] [osa X|Y|Z]\` | orotuje poslední skicu (výchozí osa Y skici, 360°) |
-| \`díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]\` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; \`závit M6\` vrtá jádro |
+| \`rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]\` | orotuje poslední skicu (výchozí osa Y skici, 360°); \`odebrat\` = vysoustružit profil z tělesa |
+| \`díra D [hloubka H|skrz [obousměrně]] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]\` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; \`skrz\` vrtá **od zadaného bodu jen ve směru vrtání** (materiál nad bodem zůstane), \`obousměrně\` na obě strany; \`závit M6\` vrtá jádro |
+| \`díra D … směr vx vy vz\` · \`díra D … sklon úhel [směr +X]\` | šikmá díra: \`směr\` = směr vrtání vektorem; \`sklon\` = odklon od osy díry (výchozí k +X u osy Z) |
+| \`díra D skrz v x1 y1 z1 v x2 y2 z2 …\` | více děr jedním příkazem (každá poloha třemi souřadnicemi) |
 | \`zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z|-Z|+X|-X|+Y|-Y] [poloměr N] [delší N] [kratší N]\` | pravidla lze kombinovat: \`hrany horní kruhové\` |
 | \`srazit C [hrany …]\` | sražení hran, stejná pravidla |
 | \`skořepina T [otevřít +Z|horní|boční|největší]\` | vydlabání; otevřené plochy pravidlem |
 | \`pole N rozteč P [směr X|Y|Z] [N2 rozteč P2 směr Y]\` · \`pole kruhové N [úhel 360] [osa Z] [v cx cy cz]\` | pole posledního prvku |
 | \`zrcadlit XY|XZ|YZ [odsazení N]\` | zrcadlení tělesa |
 | \`text "ABC" výška H hloubka D v x y [z] [gravírovat]\` | nápis vystouplý / gravírovaný |
-| \`smazat poslední\` · \`stav\` · \`zobraz iso|přední|horní…\` | správa |
+| \`těleso N\` · \`rozdělit XY|XZ|YZ [odsazení N] [jako Název]\` · \`kopie [těleso N] [posun dx dy dz] [jako Název]\` · \`sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]\` | více těles v dílu (viz níže) |
+| \`prvek <typ|rozšíření> klíč=hodnota …\` | kterýkoli typ prvku i prvek rozšíření bez JSON (viz níže) |
+| \`normálie <označení> [v x y z]\` | díl z knihovny (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta |
+| \`vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit]\` | sestava: vloží díl z otevřené záložky jako komponentu |
+| \`výkres\` | otevře výkres otevřeného dokumentu v záložce |
+| \`smazat poslední\` · \`stav\` · \`zobraz iso|přední|horní…\` · \`kolize\` | správa; kolize = kontrola průniků komponent sestavy |
 
 Booleovský režim: první tvarový prvek vytvoří těleso, další se **přidávají**; \`odebrat\` odečte, \`průnik\` ponechá
 průnik, \`nové\` založí další samostatné těleso. Pravidla hran/ploch se vyhodnocují na aktuálním tělese (před
-příkazem) – pořadí příkazů je tedy důležité.
+příkazem) – pořadí příkazů je tedy důležité. Stejné příkazy fungují anglicky (box, hole, arc, spline, body, combine,
+feature…) a německy (quader, bohrung, bogen, körper, kombinieren, element…); seznam vypíše hláška o neznámém příkazu.
+
+### Vstup: řádky a JSON lze míchat
+
+Vstup se zpracuje **po řádcích**. Řádek, který je celý JSON (\`{ … }\` nebo \`[ … ]\`), přidá prvek nebo prvky a může
+stát kdekoli – i jako první řádek, za kterým následují textové příkazy. Jako jeden JSON se vstup bere jen tehdy, když
+se tak dá přečíst celý (dokument .mncad, pole prvků, JSON rozepsaný na více řádků). Protokol je v pořadí řádků
+vstupu, stav dokumentu se vypíše jednou na konci (\`stav\` uprostřed vstupu vypíše stav v tom okamžiku).
+
+### Souřadnice skici ve 3D
+
+Bod skici \`(u; v)\` leží ve 3D v bodě \`počátek + u·X_skici + v·Y_skici\`, kde \`Y_skici = normála × X_skici\`:
+
+| Rovina | počátek | X skici | Y skici | normála (směr vysunutí) | bod (u; v) ve 3D |
+| --- | --- | --- | --- | --- | --- |
+| \`XY\` [odsazení d] | (0; 0; d) | +X | +Y | +Z | (u; v; d) |
+| \`XZ\` [odsazení d] | (0; −d; 0) | +X | +Z | −Y | (u; −d; v) |
+| \`YZ\` [odsazení d] | (d; 0; 0) | +Y | +Z | +X | (d; u; v) |
+| obecná: \`počátek o\`, \`normála n\`, \`osax x\` | o | x (kolmo na n) | n × x | n | o + u·x + v·(n × x) |
+
+- \`rotovat\` otáčí kolem osy **Y skici** procházející počátkem skici (\`osa X\` = kolem osy X skici). U skici v rovině
+  XZ je tedy osou rotace osa **Z** modelu a souřadnice \`u\` profilu je poloměr – tak se kreslí soustružené díly
+  (profil \`skica XZ: čára r1 z1 r2 z2 … uzavřít\`, pak \`rotovat\`).
+- \`vysunout H\` jde ve směru normály (u roviny XZ směrem −Y), \`obráceně\` opačně, \`symetricky\` na obě strany.
+- U obecné roviny se bez \`osax\` zvolí X skici kolmo na normálu co nejblíž ose X modelu (u normály ±X ose Y). V JSON je
+  to \`"plane": { "kind": "custom", "origin": [x,y,z], "normal": [nx,ny,nz], "xDir": [ux,uy,uz] }\`.
+
+### Více těles v dílu
+
+Díl má vždy jedno **aktivní těleso**, se kterým pracují prvky, a libovolný počet dalších těles (výchozí názvy
+„Těleso 1“, „Těleso 2“…; v příkazech stačí číslo).
+
+- \`válec 30 40 v 50 30 20 nové těleso Čep\` – prvek s \`nové\` založí další těleso (název je volitelný) a to se stane aktivním.
+- \`těleso 1\` – další prvky pracují s Tělesem 1; \`díra 8 skrz v 20 30 20 těleso 1\` – jen tento prvek.
+- \`rozdělit XY odsazení 10 jako Spodek\` – rovina rozdělí aktivní těleso; strana ve směru normály zůstane, opačná je nové těleso.
+- \`kopie těleso Spodek posun 0 0 -30 jako Kopie\` – další těleso jako posunutá kopie.
+- \`sloučit 1 Čep [odebrat|průnik] [ponechat]\` – sjednotí (odečte, pronikne) nástrojové těleso do cílového; \`ponechat\` nástroj nezruší.
+- \`stav\` vypíše řádek \`Tělesa:\` s názvy, objemy a označením aktivního. V JSON jsou to prvky \`splitBodies\`, \`copyBody\`,
+  \`combine\`, pole \`body\` u prvku (cílové těleso) a \`"mode": "new"\` s novým názvem v \`body\` (nové těleso).
+
+### Obecný příkaz \`prvek\` – všechny typy bez JSON
+
+\`prvek <typ> klíč=hodnota klíč=hodnota …\` vytvoří prvek kteréhokoli typu (sweep, loft, draft, transform, datum, rib,
+spring…) i prvek rozšíření (\`prvek sheet.bend …\`, \`prvek "Zkrut" …\` – id nebo popisek z pásu karet).
+
+- Klíče jsou pole prvku ze schématu níže; u rozšíření klíč parametru nebo jeho český popisek. \`název="…"\` pojmenuje prvek.
+- Hodnoty: číslo (\`12,5\`), \`ano\` / \`ne\`, seznam \`10;0;5\`, text v uvozovkách, JSON (\`planeDef={"kind":"base","name":"XY","offset":12}\`).
+- Skici a prvky se zadávají názvem (\`profileId="Skica 1"\`) nebo \`$last\`; plochy a hrany čísly (\`faces=1;4;5\`) nebo
+  pravidlem (\`faces=boční\`, \`edges=horní;kruhové\`).
+- Neznámý klíč nebo typ skončí chybou s výčtem platných – tak lze parametry zjistit.
+
+\`\`\`
+skica XY: obdélník 20 20
+prvek adv.twist sketch=$last height=30 angle=45
+prvek chamfer distance=1 edges=horní;rovné
+\`\`\`
+
+### Průběh a zrušení výpočtu
+
+Během delšího výpočtu ukazuje program u spodního okraje „Počítám prvek k/n: název · čas“ s tlačítkem **Zrušit**; totéž
+vrací \`window.mncad.progress()\` a \`window.mncad.cancel()\`. Zrušený běh konzole dokument nezmění. Po výpočtu je
+v protokolu u delších prvků čas (\`✓ Pole 1 (pattern) · 7,9 s\`) a celkový čas. Jádro si pamatuje stav po prvcích:
+další příkaz přidaný na konec historie přepočítá jen nový prvek.
 
 ### Příklad – příruba DN50 (6 řádků)
 

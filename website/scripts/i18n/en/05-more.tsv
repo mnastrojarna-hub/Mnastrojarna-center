@@ -146,7 +146,6 @@ ploch k odstranění	faces to remove
 ploch k zesílení	faces to thicken
 ploch ke zkosení	faces to draft
 Všechny hrany plochy	All edges of the face
- Jmenovitý Ø {0} mm, stoupání {1} mm.	 Nominal Ø {0} mm, pitch {1} mm.
  Jmenovitý Ø {0} mm, stoupání {1} mm{2}.	 Nominal Ø {0} mm, pitch {1} mm{2}.
 , jádro díry Ø {0} mm	, hole minor Ø {0} mm
 těleso jako celek	the body as a whole

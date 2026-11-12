@@ -18,7 +18,15 @@ import type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from 
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
 
 /** Ukončení díry. */
-export type HoleEnd = { kind: "blind" } | { kind: "throughAll" } | { kind: "toNext" } | { kind: "toFace"; ref: Ref; offset?: number };
+export type HoleEnd =
+  | { kind: "blind" }
+  | { kind: "throughAll" }
+  | { kind: "toNext" }
+  | { kind: "toFace"; ref: Ref; offset?: number }
+  /** dno v úrovni bodu (vrchol, střed hrany, bod skici…) měřeno podél osy díry */
+  | { kind: "toVertex"; ref: Ref }
+  /** dno ve vzdálenosti `d` před plochou (totéž co „k ploše“ s odsazením – stejný zápis jako u vysunutí) */
+  | { kind: "offsetFromFace"; ref: Ref; d: number };
 /** Řada průchozích děr ISO 273 (jemná / střední / hrubá). */
 export type HoleFit = "fine" | "medium" | "coarse";
 

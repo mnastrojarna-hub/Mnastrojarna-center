@@ -12,7 +12,8 @@
  */
 import { tr } from "../i18n";
 import type * as r from "replicad";
-import type { BoolMode, CadDoc, Feature } from "../types";
+import type { PlaneDef, Ref } from "../refs";
+import type { BoolMode, CadDoc, Feature, Vec3 } from "../types";
 
 export type Shape = r.Shape3D;
 export type SketchF = Extract<Feature, { type: "sketch" }>;
@@ -34,6 +35,10 @@ export type ExtBuildCtx = {
   bodies?: Map<string, Shape>;
   /** název aktivního (cílového) tělesa */
   activeBody?: string | null;
+  /** vyřeší rovinu zadanou odkazem nad tělesem před prvkem (parametr druhu „plane“) */
+  resolvePlane?: (def: PlaneDef) => { origin: Vec3; normal: Vec3; xDir: Vec3 };
+  /** vyřeší bod zadaný odkazem nad tělesem před prvkem (parametr druhu „point“) */
+  resolvePoint?: (ref: Ref) => Vec3;
 };
 
 /** Parametr pro automatický formulář. */
@@ -51,7 +56,11 @@ export type ExtParam =
   | { key: string; label: string; kind: "feature"; hint?: string }
   /** plochy/hrany vybrané v modelu (uloží number[]); UI přepne výběr */
   | { key: string; label: string; kind: "faces" | "edges"; hint?: string }
-  | { key: string; label: string; kind: "mode" };
+  | { key: string; label: string; kind: "mode" }
+  /** rovina zadaná odkazem (plocha, tři body, pomocná rovina…): ukládá `PlaneDef`; prázdné = základní rovina a odsazení prvku */
+  | { key: string; label: string; kind: "plane"; hint?: string }
+  /** bod zadaný odkazem (vrchol, střed hrany, bod skici…): ukládá `Ref`; prázdné = souřadnice prvku */
+  | { key: string; label: string; kind: "point"; hint?: string };
 
 export type ExtTab = "create" | "surface" | "sheet" | "weld" | "tools" | "asm" | "drawing";
 
