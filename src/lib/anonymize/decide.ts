@@ -54,9 +54,9 @@ export const COMPANY_LEAK_WARNING = "V anonymizované kopii zůstal název firmy
  * hned vidět, co zůstalo (firma z razítka, nebo planý poplach typu výrobce materiálu, který patří do „Ponechat").
  * Text vždy začíná COMPANY_LEAK_WARNING (na tom stojí decideAnonStatus).
  */
-export function companyLeakWarning(page: number, names?: readonly string[] | null): string {
+export function companyLeakWarning(page: number, names?: readonly string[] | null, why?: string | null): string {
   const shown = [...new Set((names ?? []).map((n) => n.replace(/\s+/g, " ").trim()).filter(Boolean))].slice(0, 3).map((n) => n.slice(0, 60));
-  return `${COMPANY_LEAK_WARNING}${shown.length ? ` „${shown.join("“, „")}“` : ""} (strana ${page}).`;
+  return `${COMPANY_LEAK_WARNING}${shown.length ? ` „${shown.join("“, „")}“` : ""} (strana ${page}${why ? `; ${why}` : ""}).`;
 }
 /** Důvod selhání, když v kopii zůstal název firmy — kopie se nikdy nepoužije. */
 export const COMPANY_LEAK_TEXT = "V anonymizované kopii zůstal název firmy — kopie se nepoužije. Klikni Anonymizovat znovu (nebo pošli výkres jako PDF přímo z CAD).";
