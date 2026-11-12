@@ -108,6 +108,8 @@ export interface PdfPageResult {
   companyLeak?: boolean;
   /** Názvy firem, které výstupní kontrola obrazem (AI) na stránce viděla — termíny pro další stránky / pokus. */
   checkNames?: string[];
+  /** Proč zbylý název nešlo vypálit (diagnostika do hlášky). */
+  leakWhy?: string;
 }
 
 /** Keep hodnoty z nalezených polí (jen rozumně vypadající číslo výkresu / revize). */
@@ -392,7 +394,7 @@ export async function anonymizePdf(input: PdfAnonInput): Promise<PdfAnonResult> 
     // výstupní kontrola: v kopii zůstal název firmy → kopie se nikdy nepoužije
     for (const p of included.filter((x) => x.companyLeak)) {
       res.outputProblems.push(`strana ${p.page}: zůstal název firmy`);
-      res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p.page, p.checkNames), page: p.page });
+      res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p.page, p.checkNames, p.leakWhy), page: p.page });
     }
     if (res.pages.some((p) => p.inkFailed)) res.failure = RENDER_FAIL;
     else if (res.pages.some((p) => p.blank)) {
@@ -745,7 +747,7 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
       const burnedPt = pxRects.map((r) => ({ x: r.box.x / s, y: r.box.y / s, w: r.box.w / s, h: r.box.h / s }));
       const leaks = textCompanyLeaks(leakLines, input.ctx, burnedPt, protectedPt, itemById);
       if (!leaks.length) break;
-      if (round === 2) { result.companyLeak = true; break; }
+      if (round === 2) { result.companyLeak = true; result.leakWhy ??= "v textové vrstvě i po třetím doplnění"; break; }
       for (const l of leaks) {
         const pad = 0.2 * l.em;
         const box = toPx({ x: l.box.x - pad, y: l.box.y - pad, w: l.box.w + 2 * pad, h: l.box.h + 2 * pad }, s);
@@ -772,6 +774,7 @@ async function vectorPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
       aiHealPt = aiCheck.healed.map((b) => ({ x: b.x / s, y: b.y / s, w: b.w / s, h: b.h / s }));
       if (aiCheck.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: info.page });
       result.checkNames = aiCheck.names;
+      result.leakWhy = aiCheck.why;
     }
     if (aiCheck && !aiCheck.clean) result.companyLeak = true;
 
@@ -977,6 +980,7 @@ async function visionPage(p: PageCtx, input: PdfAnonInput, cache: PdfAiCache, re
     if (cc.healed.length) res.warnings.push({ code: "verify_leak", message: "Kontrola kopie našla zbylý název firmy — doplněno a ověřeno znovu.", page: info.page });
     if (!cc.clean) result.companyLeak = true;
     result.checkNames = cc.names;
+    result.leakWhy = cc.why;
   }
   const img = maybeGray(out);
   const jpeg = await encodeJpeg(img, 85);

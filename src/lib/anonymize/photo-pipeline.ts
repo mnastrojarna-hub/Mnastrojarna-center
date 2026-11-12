@@ -228,7 +228,7 @@ export async function anonymizeImage(input: PhotoAnonInput): Promise<PhotoAnonRe
       }
       if (!cc.clean) {
         res.outputProblems.push(`strana ${p}: zůstal název firmy`);
-        res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p, cc.names), page: p });
+        res.warnings.push({ code: "verify_leak", message: companyLeakWarning(p, cc.names, cc.why), page: p });
       }
     }
     res.regions.push(...final);
