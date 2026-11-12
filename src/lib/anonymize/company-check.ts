@@ -141,25 +141,57 @@ function clamp(b: Box, W: number, H: number): Box | null {
   return x2 - x >= 8 && y2 - y >= 8 ? { x, y, w: x2 - x, h: y2 - y } : null;
 }
 
+/**
+ * Box z AI → px zaslaného obrázku: mírně přes okraj se ořízne (AI občas vrátí box kousek za hranou); úplně mimo
+ * nebo nulový = nepoužitelný (12. 11. „DEL" — „AI neurčila, kde přesně je").
+ */
+export function usableSentBox(spec: Pick<AiImageSpec, "outW" | "outH">, x: number, y: number, w: number, h: number): { x: number; y: number; w: number; h: number } | null {
+  if (boxInsideSent(spec, x, y, w, h)) return { x, y, w, h };
+  if (![x, y, w, h].every((v) => Number.isFinite(v)) || w <= 0 || h <= 0) return null;
+  const x1 = Math.max(0, x), y1 = Math.max(0, y);
+  const x2 = Math.min(spec.outW, x + w), y2 = Math.min(spec.outH, y + h);
+  if (x2 - x1 < 2 || y2 - y1 < 2) return null;
+  return (x2 - x1) * (y2 - y1) >= 0.4 * w * h ? { x: x1, y: y1, w: x2 - x1, h: y2 - y1 } : null;
+}
+
+/** Čtvrtiny strany (s 4% přesahem) — ostřejší obrázky, když AI název v přehledu vidí, ale neumí ho umístit. */
+export function quadrantFocus(W: number, H: number): { box: Box; label: string }[] {
+  const ox = 0.04 * W, oy = 0.04 * H;
+  const hw = W / 2, hh = H / 2;
+  return [
+    { box: { x: 0, y: 0, w: hw + ox, h: hh + oy }, label: "levá horní čtvrtina" },
+    { box: { x: hw - ox, y: 0, w: hw + ox, h: hh + oy }, label: "pravá horní čtvrtina" },
+    { box: { x: 0, y: hh - oy, w: hw + ox, h: hh + oy }, label: "levá dolní čtvrtina" },
+    { box: { x: hw - ox, y: hh - oy, w: hw + ox, h: hh + oy }, label: "pravá dolní čtvrtina" },
+  ];
+}
+
+/** Kolo navíc (lokalizace na čtvrtinách) jen když do termínu zbývá aspoň tolik. */
+const LOCATE_ROUND_MIN_LEFT_MS = 45_000;
+
 export async function checkAndHealCompanies(input: CompanyCheckInput): Promise<CompanyCheckOutcome> {
   const out: CompanyCheckOutcome = { clean: false, healed: [], leaks: 0, names: [], usage: null, calls: 0, fallback: false };
-  const rounds = Math.max(1, input.rounds ?? checkRounds(input.ai.deadline));
+  let rounds = Math.max(1, input.rounds ?? checkRounds(input.ai.deadline));
+  let focus = input.focus;
+  let tiled = false;
   for (let round = 0; round < rounds; round++) {
-    const specs = await imagesFor(input.raster, input.focus, input.page);
+    const specs = await imagesFor(input.raster, focus, input.page);
     const r = await checkCompanies(input.ai, { images: specs, extra: { round, page: input.page, width: input.raster.width, height: input.raster.height } });
     out.usage = addUsage(out.usage, r.meta.usage);
     out.calls++;
     if (r.meta.fallback) out.fallback = true;
     const boxes: Box[] = [];
-    let unhealable = 0;
+    let blocked = 0;
+    let lost = 0;
     for (const it of asArray<CompanyItem>(r.data?.items)) {
       if (!isCompanyLeak(it, input.keepTerms, input.logo, input.terms ?? [])) continue;
       const txt = String(it.text ?? "").replace(/[\r\n]+/g, " ").trim();
       if (/\p{L}{2,}/u.test(txt) && !isTechnicalText(txt) && !out.names.includes(txt)) out.names.push(txt.slice(0, 120));
-      const spec = specs.find((s) => s.index === it.img);
-      // únik bez použitelných souřadnic nejde opravit → kopie neprošla (nikdy „asi v pořádku")
-      if (!spec || !boxInsideSent(spec, it.x, it.y, it.w, it.h)) { unhealable++; out.why ??= "AI neurčila, kde přesně je"; continue; }
-      const raw: Box = { x: spec.crop.x + it.x / spec.s, y: spec.crop.y + it.y / spec.s, w: it.w / spec.s, h: it.h / spec.s };
+      const spec = specs.find((s) => s.index === it.img) ?? (specs.length === 1 ? specs[0] : undefined);
+      const sb = spec ? usableSentBox(spec, it.x, it.y, it.w, it.h) : null;
+      // únik bez použitelných souřadnic: další kolo na ostřejších čtvrtinách strany (12. 11.); když ani tak, neprošlo
+      if (!spec || !sb) { lost++; continue; }
+      const raw: Box = { x: spec.crop.x + sb.x / spec.s, y: spec.crop.y + sb.y / spec.s, w: sb.w / spec.s, h: sb.h / spec.s };
       const pad = Math.max(2, 0.15 * Math.min(raw.w, raw.h));
       const box: Box = { x: raw.x - pad, y: raw.y - pad, w: raw.w + 2 * pad, h: raw.h + 2 * pad };
       // číslo výkresu / materiál se nikdy nevypálí: nález přes ně se vypálí KOLEM nich (12. 11.); když chráněná
@@ -167,16 +199,32 @@ export async function checkAndHealCompanies(input: CompanyCheckInput): Promise<C
       const keeps = input.keepBoxes.filter((k) => overlapArea(k, box) > 0);
       if (!keeps.length) { boxes.push(box); continue; }
       const covered = keeps.reduce((sum, k) => sum + overlapArea(k, box), 0);
-      if (covered >= 0.8 * box.w * box.h) { unhealable++; out.why ??= "leží přes číslo výkresu / materiál (chráněné pole)"; continue; }
+      if (covered >= 0.8 * box.w * box.h) { blocked++; continue; }
       boxes.push(...subtractBoxes(box, keeps));
     }
-    out.leaks = boxes.length + unhealable;
+    out.leaks = boxes.length + blocked + lost;
     if (!out.leaks) {
       out.clean = true;
+      out.why = undefined;
       return out;
     }
-    if (!unhealable && round === rounds - 1) out.why ??= "po doplnění už nezbyl čas na další kontrolu";
-    if (unhealable || round === rounds - 1) return out;
+    if (blocked) {
+      out.why = "leží přes číslo výkresu / materiál (chráněné pole)";
+      return out;
+    }
+    if (lost) {
+      out.why = "AI neurčila, kde přesně je";
+      // první ztráta polohy: další kolo s ostřejšími čtvrtinami strany (a kolo navíc na ověření, je-li čas)
+      if (!tiled) {
+        tiled = true;
+        focus = [...quadrantFocus(input.raster.width, input.raster.height), ...input.focus];
+        if (round >= rounds - 2 && input.ai.deadline - Date.now() >= LOCATE_ROUND_MIN_LEFT_MS) rounds = Math.min(rounds + 1, 4);
+      }
+    }
+    if (round === rounds - 1) {
+      out.why ??= "po doplnění už nezbyl čas na další kontrolu";
+      return out;
+    }
     for (const b of boxes) out.healed.push(burnGraphic(input.raster, b, input.fill).box);
   }
   return out;
