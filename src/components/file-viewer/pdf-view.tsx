@@ -9,7 +9,7 @@ import { loadPdfJs as loadLib } from "./pdfjs";
 /**
  * PDF přímo v aplikaci (pdf.js) — funguje stejně na počítači i na telefonu (Android neumí PDF
  * v kartě zobrazit, iOS ho otevře bez cesty zpět). Strany se kreslí postupně podle posunu,
- * přiblížení tlačítky, Ctrl+kolečkem nebo dvěma prsty.
+ * přiblížení tlačítky, Ctrl+kolečkem nebo dvěma prsty; posun kolečkem, posuvníky nebo tažením myší („ručička").
  */
 
 /** Největší plátno (px²) — iOS víc nevykreslí. */
@@ -103,6 +103,32 @@ export function PdfView({ data, className }: { data: Uint8Array; className?: str
     }
   };
 
+  // 12. 11. (majitel): „ručička" — přiblížený výkres jde myší chytit a posouvat (dotyk dál roluje nativně)
+  const drag = React.useRef<{ id: number; x: number; y: number; left: number; top: number } | null>(null);
+  const [dragging, setDragging] = React.useState(false);
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el || e.pointerType !== "mouse" || e.button !== 0) return;
+    if (el.scrollHeight <= el.clientHeight + 1 && el.scrollWidth <= el.clientWidth + 1) return;
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, left: el.scrollLeft, top: el.scrollTop };
+    el.setPointerCapture?.(e.pointerId);
+    setDragging(true);
+    e.preventDefault();
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    const el = scrollRef.current;
+    if (!d || !el || e.pointerId !== d.id) return;
+    el.scrollLeft = d.left - (e.clientX - d.x);
+    el.scrollTop = d.top - (e.clientY - d.y);
+  };
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!drag.current || e.pointerId !== drag.current.id) return;
+    scrollRef.current?.releasePointerCapture?.(e.pointerId);
+    drag.current = null;
+    setDragging(false);
+  };
+
   // aktuální strana podle posunu
   const onScroll = () => {
     const el = scrollRef.current;
@@ -132,8 +158,13 @@ export function PdfView({ data, className }: { data: Uint8Array; className?: str
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
-        className="min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-thin"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        className={cn("min-h-0 flex-1 overflow-auto overscroll-contain scrollbar-thin select-none", dragging ? "cursor-grabbing" : "cursor-grab")}
         style={{ touchAction: "pan-x pan-y" }}
+        data-dragging={dragging ? "1" : undefined}
         data-testid="pdf-view"
       >
         {error ? (
