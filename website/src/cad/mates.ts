@@ -6,10 +6,23 @@
  */
 import { apply3, eulerXYZ, mul3, rotMatrix, rotationBetween, transformPoint, type Mat3 } from "./assembly";
 import { tr } from "./i18n";
+import { initMate, isKinMate, kinResidual, placementOf, pivotOf, poseOf, resNorm, solvePoses, worldOf, wrap, type KinCtx, type Pose } from "./mates-kin";
 import type { AsmComponent, CadDoc, Mate, MateRef, MateType, MeshData, Placement, Vec3 } from "./types";
 
-/** Geometrie plochy v souřadnicích komponenty nejvyšší úrovně. U válce/kužele: `normal` = směr osy, `origin` = bod na ose. */
-export type FaceGeo = { kind: "plane" | "cylinder" | "other"; origin: Vec3; normal: Vec3; radius?: number };
+/**
+ * Geometrie plochy / hrany / vrcholu v souřadnicích komponenty nejvyšší úrovně. U válce/kužele: `normal` = směr osy, `origin` = bod na ose;
+ * koule: `origin` = střed; „point“ = vrchol; hrana „line“ (`origin` = začátek, `normal` = směr, `pts` = konce), „circle“ (střed, osa,
+ * poloměr), „curve“ (`pts` = body lomené čáry). `pts` + `tris` (+ `nrm`) = síť plochy (vačka).
+ */
+export type FaceGeo = {
+  kind: "plane" | "cylinder" | "other" | "sphere" | "point" | "line" | "circle" | "curve";
+  origin: Vec3;
+  normal: Vec3;
+  radius?: number;
+  pts?: Vec3[];
+  tris?: number[];
+  nrm?: Vec3[];
+};
 export type GeoProvider = (ref: MateRef) => FaceGeo | null;
 export type MateStatus = "ok" | "conflict" | "missing" | "suppressed";
 
@@ -21,6 +34,22 @@ export const MATE_LABEL: Record<MateType, string> = {
   angle: "Úhel",
   parallel: "Rovnoběžně",
   fixed: "Ukotvit",
+  perpendicular: "Kolmo",
+  tangent: "Tečně",
+  coincident: "Shodně",
+  symmetric: "Symetricky",
+  width: "Šířka",
+  path: "Dráha",
+  slot: "Drážka",
+  hinge: "Závěs",
+  lock: "Zámek",
+  limitDistance: "Mez vzdálenosti",
+  limitAngle: "Mez úhlu",
+  gear: "Ozubená kola",
+  rack: "Hřeben a pastorek",
+  screw: "Šroub",
+  cam: "Vačka",
+  universal: "Kardan",
 };
 
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
@@ -99,6 +128,9 @@ export function solveOne(mate: Mate, moving: Placement, gA: FaceGeo, worldB: Fac
     }
     case "fixed":
       return moving;
+    default:
+      // pokročilé a mechanické vazby řeší solveMates (projekce + globální řešič) – potřebují polohy obou komponent
+      return moving;
   }
 }
 
@@ -130,10 +162,48 @@ export function residual(mate: Mate, wA: FaceGeo, wB: FaceGeo): number {
     }
     case "fixed":
       return 0;
+    default:
+      return 0;
   }
 }
 
-export type SolveResult = { components: AsmComponent[]; status: Record<string, MateStatus>; moved: string[] };
+/** `mates` = vazby s doplněným výchozím stavem (Ozubení, Šroub, Hřeben, Kardan, Závěs, Zámek) – volající je uloží do dokumentu. */
+export type SolveResult = { components: AsmComponent[]; status: Record<string, MateStatus>; moved: string[]; mates?: Mate[] };
+
+/** Geometrie odkazu s mezipamětí po dobu jednoho řešení (síť vačky se tak nepřevádí při každém vyhodnocení). */
+export function memoGeo(geo: GeoProvider): GeoProvider {
+  const cache = new Map<string, FaceGeo | null>();
+  return (ref) => {
+    const k = `${mateRefKey(ref)}:${ref.ent ?? ""}`;
+    if (!cache.has(k)) cache.set(k, geo(ref));
+    return cache.get(k)!;
+  };
+}
+
+/** Kontext globálního řešiče nad komponentami (polohy z mapy, úhly do ±180°, nebo podle `ang`). */
+export function kinCtx(poses: Map<string, Pose>, geo: GeoProvider, ang?: KinCtx["ang"]): KinCtx {
+  return { pose: (id) => poses.get(id), geo, ang: ang ?? ((_k, d) => wrap(d)) };
+}
+
+/** Komponenty, se kterými může hýbat globální řešič: nepevné komponenty v souvislé skupině vazeb, která obsahuje některou z `seeds`. */
+export function kinCluster(mates: Mate[], seeds: Set<string>, isFixed: (id: string) => boolean): { vars: string[]; mates: Mate[] } {
+  const active = mates.filter((m) => !m.suppressed && m.type !== "fixed");
+  const refsOf = (m: Mate) => [m.a, m.b, m.c, m.d].filter((r): r is MateRef => !!r).map((r) => r.compId);
+  const set = new Set(seeds);
+  for (let grow = true; grow; ) {
+    grow = false;
+    for (const m of active) {
+      const ids = refsOf(m);
+      if (ids.some((id) => set.has(id) && !isFixed(id)) && ids.some((id) => !set.has(id))) {
+        ids.forEach((id) => set.add(id));
+        grow = true;
+      }
+    }
+  }
+  const vars = [...set].filter((id) => !isFixed(id));
+  const used = active.filter((m) => refsOf(m).some((id) => vars.includes(id)));
+  return { vars, mates: used };
+}
 
 /**
  * Sekvenční řešení všech vazeb. `anchorId` = komponenta, kterou uživatel právě přesunul (bere se jako pevná).
@@ -142,11 +212,11 @@ export type SolveResult = { components: AsmComponent[]; status: Record<string, M
 export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | null, passes = 2): SolveResult {
   const comps = (doc.components ?? []).map((c) => ({ ...c }));
   const byId = new Map(comps.map((c) => [c.id, c]));
-  const mates = doc.mates ?? [];
+  const mates0 = doc.mates ?? [];
   const status: Record<string, MateStatus> = {};
   const moved = new Set<string>();
   // vazba Ukotvit = komponenta se chová jako ukotvená i bez příznaku `fixed`; uplatní se dřív, než se určí implicitní kotva (první komponenta)
-  for (const m of mates) {
+  for (const m of mates0) {
     if (m.suppressed) status[m.id] = "suppressed";
     else if (m.type === "fixed") {
       const c = byId.get(m.a.compId);
@@ -163,9 +233,54 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
     if (!anyFixed && comps[0]?.id === id && anchorId == null) return true;
     return false;
   };
+  // pokročilé a mechanické vazby: výchozí stav stupňů volnosti z aktuálních poloh (jen sestavy, které je mají – původní beze změny)
+  const hasKin = mates0.some((m) => !m.suppressed && isKinMate(m.type));
+  const kgeo = hasKin ? memoGeo(geo) : geo;
+  const posesNow = () => new Map(comps.map((c) => [c.id, poseOf(c.placement)] as const));
+  let initMates: Mate[] | undefined;
+  let mates = mates0;
+  if (hasKin) {
+    const ctx0 = kinCtx(posesNow(), kgeo);
+    const next = mates0.map((m) => (m.suppressed ? m : initMate(m, ctx0)));
+    if (next.some((m, i) => m !== mates0[i])) mates = initMates = next;
+  }
+  /** projekce jedné pokročilé vazby: pohne jen pohyblivou komponentou (nejmenší změna polohy) */
+  const project = (m: Mate, movId: string, movRef: MateRef) => {
+    const poses = posesNow();
+    const ctx = kinCtx(poses, kgeo);
+    const g = kgeo(movRef);
+    const P = poses.get(movId)!;
+    const pivot = g ? worldOf(P, g).origin : P.p;
+    const r0 = kinResidual(m, ctx);
+    if (!r0) return false;
+    if (resNorm(r0) < 1e-9) return true;
+    solvePoses(poses, [{ id: movId, pivot }], () => kinResidual(m, ctx) ?? [], { maxIter: 40 });
+    const c = byId.get(movId)!;
+    const pl = placementOf(poses.get(movId)!);
+    const next = { position: rv(pl.position), rotation: pl.rotation };
+    if (JSON.stringify(next) !== JSON.stringify(c.placement)) {
+      c.placement = next;
+      moved.add(movId);
+    }
+    return true;
+  };
   for (let pass = 0; pass < passes; pass++) {
     for (const m of mates) {
       if (m.suppressed || m.type === "fixed") continue;
+      if (isKinMate(m.type)) {
+        const aFix = isFixed(m.a.compId);
+        const movRef = aFix && !isFixed(m.b.compId) ? m.b : m.a;
+        if (!byId.get(m.a.compId) || !byId.get(m.b.compId)) {
+          status[m.id] = "missing";
+          continue;
+        }
+        if (isFixed(movRef.compId)) {
+          status[m.id] = resNorm(kinResidual(m, kinCtx(posesNow(), kgeo))) < 1e-3 ? "ok" : "conflict";
+          continue;
+        }
+        status[m.id] = project(m, movRef.compId, movRef) ? "ok" : "missing";
+        continue;
+      }
       const gA = geo(m.a);
       const gB = geo(m.b);
       const cA = byId.get(m.a.compId);
@@ -205,9 +320,36 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
       status[m.id] = "ok";
     }
   }
+  // globální řešič: sekvenční průchody neuzavřou smyčky (klika – ojnice – píst) ani vztahy stupňů volnosti – dořeší je společně
+  if (hasKin) {
+    const poses = posesNow();
+    const ctx = kinCtx(poses, kgeo);
+    const seeds = new Set(mates.filter((m) => !m.suppressed && isKinMate(m.type)).flatMap((m) => [m.a, m.b, m.c, m.d].filter((r): r is MateRef => !!r).map((r) => r.compId)));
+    const cl = kinCluster(mates, seeds, isFixed);
+    const resid = () => cl.mates.flatMap((m) => kinResidual(m, ctx) ?? []);
+    const r0 = resid();
+    if (cl.vars.length && r0.reduce((s, v) => s + v * v, 0) > 1e-14) {
+      solvePoses(poses, cl.vars.map((id) => ({ id, pivot: pivotOf(id, cl.mates, ctx) })), resid, { maxIter: 80 });
+      for (const id of cl.vars) {
+        const c = byId.get(id)!;
+        const pl = placementOf(poses.get(id)!);
+        const next = { position: rv(pl.position), rotation: pl.rotation };
+        if (JSON.stringify(next) !== JSON.stringify(c.placement)) {
+          c.placement = next;
+          moved.add(id);
+        }
+      }
+    }
+  }
   // kontrola zbytků po všech průchodech (konflikty)
+  const ctxEnd = hasKin ? kinCtx(posesNow(), kgeo) : null;
   for (const m of mates) {
     if (m.suppressed || m.type === "fixed" || status[m.id] === "missing") continue;
+    if (isKinMate(m.type)) {
+      const r = kinResidual(m, ctxEnd!);
+      status[m.id] = !r ? "missing" : resNorm(r) > 1e-3 ? "conflict" : "ok";
+      continue;
+    }
     const gA = geo(m.a);
     const gB = geo(m.b);
     const cA = byId.get(m.a.compId);
@@ -215,7 +357,7 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
     if (!gA || !gB || !cA || !cB) continue;
     if (residual(m, worldGeo(cA.placement, gA), worldGeo(cB.placement, gB)) > 1e-3) status[m.id] = "conflict";
   }
-  return { components: comps, status, moved: [...moved] };
+  return { components: comps, status, moved: [...moved], ...(initMates ? { mates: initMates } : {}) };
 }
 
 /** Klíč pro mezipaměť geometrie plochy. */
@@ -227,13 +369,30 @@ export const matesOf = (doc: CadDoc, compId: string) => (doc.mates ?? []).filter
 // ---------------- rozpracovaná vazba (panel vazeb): typy, výchozí hodnota, ukotvení ----------------
 
 /** Typ vazby v UI; „center“ = Kontakt se ztotožněním středů ploch. */
-export type MateMode = "mate" | "flush" | "center" | "concentric" | "distance" | "angle" | "parallel";
+export type MateMode = "mate" | "flush" | "center" | "concentric" | "distance" | "angle" | "parallel" | KinMateType;
+/** Pokročilé a mechanické druhy vazeb (zadávání: cad/mate-spec.ts). */
+export type KinMateType = Exclude<MateType, "mate" | "flush" | "concentric" | "distance" | "angle" | "parallel" | "fixed">;
 /**
  * Rozpracovaná vazba (stav UI): `a` = plocha pohyblivé komponenty `compId`, `b` = plocha cílové komponenty. U Vzdálenosti / Úhlu
  * se po výběru obou ploch čeká na potvrzení hodnoty (`value` = předvyplněná naměřená, `flip` = orientace, při které díl zůstane, kde je).
  * Režim „dir“ není vazba: jde o výběr plochy v modelu pro směr pole komponenty (`dir` = převzatý směr ve světových souřadnicích).
  */
-export type PendingMate = { mode: MateMode | "dir"; compId: string; a?: MateRef; b?: MateRef; value?: number; flip?: boolean; dir?: Vec3 };
+export type PendingMate = {
+  mode: MateMode | "dir";
+  compId: string;
+  a?: MateRef;
+  b?: MateRef;
+  value?: number;
+  flip?: boolean;
+  dir?: Vec3;
+  /** pokročilé vazby: další odkazy, meze, vynechané nepovinné odkazy, cílová komponenta (Zámek) */
+  c?: MateRef;
+  d?: MateRef;
+  min?: number;
+  max?: number;
+  skip?: ("c" | "d")[];
+  target?: string;
+};
 
 /** Druh plochy, kterou vazba potřebuje: Souosost válcovou (nebo kuželovou), ostatní rovinnou. */
 export const mateFaceKind = (mode: PendingMate["mode"]): "plane" | "cylinder" => (mode === "concentric" ? "cylinder" : "plane");
@@ -246,6 +405,14 @@ export function mateFromPending(p: PendingMate, id: string): Mate | null {
   const m: Mate = { id, type: p.mode === "center" ? "mate" : p.mode, a: p.a, b: p.b };
   if (p.mode === "center") m.center = true;
   if (mateNeedsValue(p.mode)) m.value = typeof p.value === "number" && Number.isFinite(p.value) ? p.value : 0;
+  else if (isKinMate(m.type)) {
+    // pokročilé vazby: další odkazy, hodnota (poměr, stoupání…) a meze jen tam, kde je druh vazby používá
+    if (p.c) m.c = p.c;
+    if (p.d) m.d = p.d;
+    if (typeof p.value === "number" && Number.isFinite(p.value)) m.value = p.value;
+    if (typeof p.min === "number" && Number.isFinite(p.min)) m.min = p.min;
+    if (typeof p.max === "number" && Number.isFinite(p.max)) m.max = p.max;
+  }
   if (p.flip) m.flip = true;
   return m;
 }
@@ -308,7 +475,7 @@ export function removeMate(doc: CadDoc, mateId: string): CadDoc {
 }
 
 /** Úprava existující vazby (hodnota, otočení, potlačení, název); potlačení / zapnutí vazby Ukotvit komponentu uvolní / ukotví. */
-export function patchMate(doc: CadDoc, mateId: string, patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name">>): CadDoc {
+export function patchMate(doc: CadDoc, mateId: string, patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name" | "min" | "max">>): CadDoc {
   const m = (doc.mates ?? []).find((x) => x.id === mateId);
   if (!m) return doc;
   const next = { ...doc, mates: (doc.mates ?? []).map((x) => (x.id === mateId ? { ...x, ...patch } : x)) };
@@ -324,7 +491,7 @@ export type FaceRow = { face: number; kind: "plane" | "cylinder"; cone?: boolean
 
 /** Plocha dílu → řádek seznamu podle světového umístění dílu (null u ploch, které vazby neumí – koule, torus, volné plochy). */
 export function faceRow(face: number, info: PartFace, world: Placement, area?: number): FaceRow | null {
-  if (info.kind === "other") return null;
+  if (info.kind !== "plane" && info.kind !== "cylinder") return null;
   const w = worldGeo(world, info);
   if (info.kind === "plane") return { face, kind: "plane", origin: rv(w.origin), normal: rv(w.normal), area };
   const [t0, t1] = info.extent ?? [0, 0];

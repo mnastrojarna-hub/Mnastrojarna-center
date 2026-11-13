@@ -183,7 +183,6 @@ vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	mate „{0}“ is i
 vazba „{0}“ v sestavě není – vazby: {1}	mate „{0}“ is not in the assembly – mates: {1}
 vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…"	mate „{0}“: what to do? value=N | flip | suppress | unsuppress | delete | name "…"
 vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	mate „{0}“: unknown change „{1}“ – value=N | flip | suppress | unsuppress | delete | name "…" (start a new mate with its type: contact, flush, center, concentric, distance, angle, parallel, fixed)
-vazba {0} ({1}) nemá hodnotu – hodnotu má jen Vzdálenost a Úhel	mate {0} ({1}) has no value – only Distance and Angle have one
 vazba {0} v sestavě není – vazby: {1}	mate {0} is not in the assembly – mates: {1}
 vazba {0}: chybí cílová komponenta B – {1}	mate {0}: target component B missing – {1}
 vazba {0}: chybí komponenta A – {1}	mate {0}: component A missing – {1}

@@ -1,0 +1,238 @@
+# Wave 7 – sestavy: pokročilé a mechanické vazby, pohybová studie (angličtina)
+  hodnota z geometrie: {0} – změna: sestava vazba {1} hodnota=N	  value from geometry: {0} – change: assembly mate {1} value=N
+  vybráno: {0}	  picked: {0}
+ · kolize	 · interference
+ · načteno prvních {0} ploch / hran dílu	 · first {0} faces / edges of the part loaded
+ · natáčí se	 · rotates
+ · stopa „{0}“ {1}	 · trace “{0}” {1}
+ (komponenta je B vazby – hodnoty s opačným znaménkem)	 (the component is B of the mate – values with opposite sign)
+ (nepovinné)	 (optional)
+ {0}: rozsah pohybu X {1} · Y {2} · Z {3} mm{4} · konec {5}	 {0}: range of motion X {1} · Y {2} · Z {3} mm{4} · end {5}
+ ⚠ kolize: {0}	 ⚠ interference: {0}
+ ⚠ nesplněné vazby: {0}	 ⚠ unsatisfied mates: {0}
+ dokola	 in a loop
+ stopa {0}	 trace {0}
+(vazba chybí)	(mate missing)
+{0} ot/min	{0} rpm
+{0} vazba {1}: {2} · {3}	{0} mate {1}: {2} · {3}
+{0}{1} komponenty „{2}“ je {3} – vazba potřebuje {4}; {5}	{0}{1} of component “{2}” is {3} – the mate needs {4}; {5}
+{0}chybí entita komponenty „{1}“ ({2}) – zadejte F-číslo / E-číslo / V-číslo (sestava plochy "{1}", měřit) nebo pravidlo; {3}	{0}missing entity of component “{1}” ({2}) – give an F / E / V number (assembly faces "{1}", measure) or a rule; {3}
+{0}komponenta „{1}“ nemá {2} – {3}	{0}component “{1}” has no {2} – {3}
+{0}komponenta „{1}“: nic neodpovídá „{2}“ – {3}	{0}component “{1}”: nothing matches “{2}” – {3}
+■ přehrávání zastaveno	■ playback stopped
+▶ přehrávání {0} kroků ({1} s){2}	▶ playing {0} steps ({1} s){2}
+⚠ geometrii vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ the mate geometry could not be loaded from the kernel – assembly mates recomputes the mate once the parts are built
+⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)	⚠ unsatisfied mates in {0} steps (the mechanism locked up or the motor exceeded a limit)
+⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)	⚠ first interference at step {0} (t = {1} s): “{2}” × “{3}” ({4} mm³)
+⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně	⚠ the {0} mate cannot be satisfied together with the others – assembly mates, assembly mate {1} suppress|delete|flip
+✓ motor {0} odebrán	✓ motor {0} removed
+✓ motor {0}: {1}{2}	✓ motor {0}: {1}{2}
+✓ pohybová studie smazána	✓ motion study deleted
+Bez dosedacích rovin (osová poloha zůstane)	Without seating planes (axial position is kept)
+Bod v souřadnicích komponenty [mm]	Point in component coordinates [mm]
+CSV pohybové studie ({0} řádků):	Motion study CSV ({0} rows):
+čas	time
+Čas [s]	Time [s]
+čas studie musí být kladný [s]	study time must be positive [s]
+Časová osa	Timeline
+číslo hrany začíná E1	edge numbers start at E1
+číslo motoru	motor number
+číslo vrcholu začíná V1	vertex numbers start at V1
+Délka studie	Study length
+Hledat (např. válcová, Ø8, hrana, +Z)…	Search (e.g. cylindrical, Ø8, edge, +Z)…
+Hledat entitu	Search entity
+hodnota musí být kladná	the value must be positive
+Hodnoty	Values
+Hrany a vrcholy vyberte ze seznamu; plochy lze vybrat i kliknutím v modelu.	Pick edges and vertices from the list; faces can also be clicked in the model.
+hřeben: za modulem čekám „zuby z“ (počet zubů pastorku)	rack: after the module I expect “teeth z” (pinion tooth count)
+hřeben: zadejte „modul m zuby z“ (dráha na otáčku = π·m·z) nebo „dráha N“	rack: give “module m teeth z” (travel per revolution = π·m·z) or “travel N”
+Klikněte na plochu vybrané (pohyblivé) komponenty.	Click a face of the selected (moving) component.
+kolize	interference
+Kolize: žádné ve všech krocích	Interference: none in any step
+komponenta „{0}“ nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub – lineární motor potřebuje posuvnou vazbu	component “{0}” has no Distance, Slot, Path, Concentric or Screw mate – a linear motor needs a sliding mate
+komponenta „{0}“ nemá vazbu Závěs, Souosost ani Šroub – rotační motor potřebuje osu (sestava vazba závěs "{0}" … "Rám" …)	component “{0}” has no Hinge, Concentric or Screw mate – a rotary motor needs an axis (assembly mate hinge "{0}" … "Frame" …)
+Komponenta nemá vhodnou entitu ({0}).	The component has no suitable entity ({0}).
+Komponenta stopy	Trace component
+Kontrolovat kolize v každém kroku (pomalejší)	Check interference in every step (slower)
+krok	step
+Krok	Step
+Krok „{0}“ potřebuje: {1}	Step “{0}” needs: {1}
+Krok {0} (t = {1} s, motory {2}):	Step {0} (t = {1} s, motors {2}):
+krok {0}/{1} · t = {2} s · motory {3}	step {0}/{1} · t = {2} s · motors {3}
+krok musí být kladný	the step must be positive
+kroky	steps
+levý závit	left-hand thread
+lineární motor potřebuje vazbu Vzdálenost, Drážka, Dráha, Souosost nebo Šroub – vazba „{0}“ je {1}	a linear motor needs a Distance, Slot, Path, Concentric or Screw mate – mate “{0}” is {1}
+max	max
+Max	Max
+Mechanické	Mechanical
+Mechanické vazby	Mechanical mates
+mechanické vazby: vztah stupňů volnosti (otáčení A ↔ otáčení / posuv B); bez plochy se vezme osa z vazby Závěs / Souosost komponenty nebo největší válec, bez hodnoty poměr poloměrů / stoupání ISO / 2π·r	mechanical mates: relation of degrees of freedom (rotation of A ↔ rotation / translation of B); without a face the axis of the component's Hinge / Concentric mate or the largest cylinder is used, without a value the radius ratio / ISO pitch / 2π·r
+min	min
+Min	Min
+modul	module
+Motor {0}	Motor {0}
+motor {0} ve studii není – motorů: {1}	motor {0} is not in the study – motors: {1}
+motor {0}: {1}	motor {0}: {1}
+motor {0}: chybí geometrie vazby „{1}“	motor {0}: geometry of mate “{1}” is missing
+motor: {0}	motor: {0}
+motor: chybí komponenta nebo vazba – {0}	motor: component or mate missing – {0}
+motor: rozsah od–do je nulový – např. 0..360	motor: the from–to range is zero – e.g. 0..360
+motor: vazba číslem nebo názvem – pohyb motor rotační vazba 3 0..360	motor: mate by number or name – motion motor rotary mate 3 0..360
+Motory	Motors
+motory na vazbách, kroky, kolize, přehrání a export	motors on mates, steps, interference, playback and export
+Načítám plochy, hrany a vrcholy komponenty…	Loading faces, edges and vertices of the component…
+Nahrávám video…	Recording video…
+Nesplněné vazby	Unsatisfied mates
+nesplněno {0}	unsatisfied {0}
+Odebrat motor	Remove motor
+ot/min	rpm
+ozubení: zuby z1 z2 – počty zubů kola A a kola B	gear: teeth z1 z2 – tooth counts of gear A and gear B
+Pauza	Pause
+Počet kroků	Number of steps
+počet kroků: 1 až 2000	number of steps: 1 to 2000
+počet zubů musí být kladný	the tooth count must be positive
+Počítám krok {0} z {1}…	Computing step {0} of {1}…
+Pohyb	Motion
+pohyb export: csv | png | webm	motion export: csv | png | webm
+pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa "<X>" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	motion motor rotary|linear "<component>"|mate <N> <from>..<to> [step S | steps N] [time T] [rpm R | speed V] [collisions] [trace "<X>" [point x y z]] · motion status|run|play|stop|step N|export csv|png|webm|delete
+pohyb motor: neznámá volba „{0}“ – {1}	motion motor: unknown option “{0}” – {1}
+pohyb: neznámý podpříkaz „{0}“ – {1}	motion: unknown subcommand “{0}” – {1}
+pohyb: otevřený dokument „{0}“ není sestava	motion: the open document “{0}” is not an assembly
+Pohybová studie	Motion study
+pohybová studie nemá žádný motor – pohyb motor rotační "Klika" 0..360	the motion study has no motor – motion motor rotary "Crank" 0..360
+pohybová studie nemá žádný motor – přidejte rotační nebo lineární motor	the motion study has no motor – add a rotary or linear motor
+pohybová studie sestavy: motor na vazbě Závěs / Souosost / Šroub (°) nebo Vzdálenost / Drážka / Dráha (mm), řešič spočítá polohy všech komponent v každém kroku (mechanické vazby, meze), volitelně kolize a stopa bodu; tabulka poloh CSV, přehrání v 3D okně; window.mncad.motion()	assembly motion study: motor on a Hinge / Concentric / Screw mate (°) or a Distance / Slot / Path mate (mm), the solver computes the positions of all components in every step (mechanical mates, limits), optionally interference and a point trace; position table CSV, playback in the 3D view; window.mncad.motion()
+Pohybová studie: {0} kroků · {1} s · motory: {2}	Motion study: {0} steps · {1} s · motors: {2}
+Pohybová studie: motorů {0} · kroků {1} · {2} s{3} – pohyb stav	Motion study: {0} motors · {1} steps · {2} s{3} – motion status
+Pohybová studie: motorů {0} · kroků {1} · {2} s{3}{4}	Motion study: {0} motors · {1} steps · {2} s{3}{4}
+Pohybová studie: žádná – pohyb motor rotační "Klika" 0..360 [krok 5] [kolize]	Motion study: none – motion motor rotary "Crank" 0..360 [step 5] [collisions]
+Pokročilé vazby	Advanced mates
+pokročilé vazby jako v panelu sestavy: entita = F12 (plocha), E5 (hrana), V3 (vrchol) nebo pravidlo (+Z, válcová Ø8, koule, kružnice Ø40); Šířka a Závěs berou dvě plochy na straně, Drážka dva konce; meze min / max	advanced mates as in the assembly panel: entity = F12 (face), E5 (edge), V3 (vertex) or a rule (+Z, cylindrical Ø8, sphere, circle Ø40); Width and Hinge take two faces per side, Slot two ends; limits min / max
+poloha {0} mm	position {0} mm
+poměr {0}	ratio {0}
+Prohlížeč neumí nahrát video z 3D okna – použijte snímky PNG.	The browser cannot record video from the 3D view – use PNG frames.
+Přehrát	Play
+Přeskočit	Skip
+Přidat motor	Add motor
+Rotační	Rotary
+rotační motor potřebuje vazbu Souosost, Závěs nebo Šroub – vazba „{0}“ je {1}	a rotary motor needs a Concentric, Hinge or Screw mate – mate “{0}” is {1}
+rovina „{0}“{1}	plane “{0}”{1}
+rovina souměrnosti: chybí komponenta	symmetry plane: component missing
+rovina souměrnosti: zadejte rovinnou plochu (F12, +X…) – rovina "Rám" F3, nebo rovina F3 (plocha komponenty B)	symmetry plane: give a planar face (F12, +X…) – about "Frame" F3, or about F3 (face of component B)
+rychlost	speed
+Rychlost	Speed
+Rychlost (mm/s) místo rozsahu	Speed (mm/s) instead of range
+Rychlost (ot/min) místo rozsahu	Speed (rpm) instead of range
+Sestava nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub.	The assembly has no Distance, Slot, Path, Concentric or Screw mate.
+Sestava nemá vazbu Závěs, Souosost ani Šroub.	The assembly has no Hinge, Concentric or Screw mate.
+sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu|ozubení|hřeben|šroub|vačka|kardan "A" <plocha|E5|V3> [2. plocha] "B" <plocha> [2. plocha] [rovina "C" <plocha>] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [min N] [max N] [poloha N] [obráceně|levý|vnitřní] [název "…"]	assembly mate perpendicular|tangent|coincident|symmetric|width|path|slot|hinge|lock|limit distance|limit angle|gear|rack|screw|cam|universal "A" <face|E5|V3> [2nd face] "B" <face> [2nd face] [about "C" <face>] [ratio N | teeth z1 z2 | pitch P | travel mm/rev | module m teeth z] [min N] [max N] [position N] [flip|left|internal] [name "…"]
+Smyčka	Loop
+Snímek 3D okna se nepodařilo pořídit.	Could not capture the 3D view.
+Snímky PNG	PNG frames
+Snímky PNG ({0}) se uloží z 3D okna (jen v aplikaci)	PNG frames ({0}) are saved from the 3D view (in the app only)
+stejný smysl otáčení	same direction of rotation
+Stopa bodu komponenty	Trace a component point
+Stopa X	Trace X
+Stopa Y	Trace Y
+Stopa Z	Trace Z
+stopa: zadejte komponentu – stopa "Ojnice" [bod x y z] (bod v souřadnicích komponenty)	trace: give a component – trace "Rod" [point x y z] (point in component coordinates)
+stoupání {0} mm	pitch {0} mm
+Tabulka CSV	CSV table
+Uloženo {0} snímků PNG (ZIP) a tabulka CSV.	Saved {0} PNG frames (ZIP) and a CSV table.
+vazba {0} ({1}) nemá hodnotu – hodnotu má Vzdálenost, Úhel, Ozubení (poměr), Šroub (stoupání), Hřeben (mm/ot) a Drážka (poloha)	mate {0} ({1}) has no value – values exist for Distance, Angle, Gears (ratio), Screw (pitch), Rack (mm/rev) and Slot (position)
+vazba {0} ({1}) nemá meze – meze má Mez vzdálenosti a Mez úhlu	mate {0} ({1}) has no limits – limits exist for Distance limit and Angle limit
+Vazba {0}: {1} – klikněte na plochu v modelu nebo vyberte ze seznamu · Esc zruší	Mate {0}: {1} – click a face in the model or pick from the list · Esc cancels
+vazba {0}: hodnota musí být kladná	mate {0}: the value must be positive
+vazba {0}: min {1} je větší než max {2}	mate {0}: min {1} is greater than max {2}
+vazba {0}: neznámá volba „{1}“ – {2}	mate {0}: unknown option “{1}” – {2}
+Vazba {0}: vyberte cílovou komponentu v panelu a potvrďte · Esc zruší	Mate {0}: choose the target component in the panel and confirm · Esc cancels
+vazba {0}: zadejte meze – min N max N (nebo od N do M, N..M)	mate {0}: give limits – min N max N (or from N to M, N..M)
+Vazba {0}: zkontrolujte hodnoty a potvrďte v panelu komponenty · Esc zruší	Mate {0}: check the values and confirm in the component panel · Esc cancels
+Vazba motoru	Motor mate
+vazba motoru je potlačená	the motor mate is suppressed
+vazba motoru v sestavě není	the motor mate is not in the assembly
+vazba Šířka: jazýček potřebuje dvě rovinné plochy (nebo čep) – sestava vazba šířka "A" F1 F2 "B" F3 F4	Width mate: the tab needs two planar faces (or a pin) – assembly mate width "A" F1 F2 "B" F3 F4
+vazba Závěs: dosedací roviny zadejte obě (A i B), nebo žádnou	Hinge mate: give both seating planes (A and B), or none
+Vazby splněny ve všech krocích	Mates satisfied in all steps
+vhodné: {0}{1}	suitable: {0}{1}
+Video WebM	WebM video
+Video WebM se nahraje z 3D okna (jen v aplikaci)	WebM video is recorded from the 3D view (in the app only)
+Video WebM uloženo ({0} snímků, {1} fps).	WebM video saved ({0} frames, {1} fps).
+vnitřní dotyk	internal contact
+Všechny entity vazby jsou vybrané – potvrďte vazbu v panelu komponenty.	All entities of the mate are picked – confirm the mate in the component panel.
+Vypočítat pohyb	Compute motion
+Zatím žádný motor. Rotační motor otáčí komponentou na vazbě Závěs / Souosost / Šroub, lineární ji posouvá na vazbě Vzdálenost / Drážka / Dráha / Souosost.	No motor yet. A rotary motor turns a component on a Hinge / Concentric / Screw mate, a linear motor moves it on a Distance / Slot / Path / Concentric mate.
+zuby	teeth
+žádná vhodná entita ({0})	no suitable entity ({0})
+začátek {0}	start {0}
+rotační motor	rotary motor
+lineární motor	linear motor
+#!dynamic – popisky druhů vazeb, kroky a nápověda průvodce vazbou a druhy entit se překládají za běhu (tr(MATE_LABEL[…]), tr(spec.label))
+Shodně	Coincident
+Dráha	Path
+Závěs	Hinge
+Zámek	Lock
+Mez vzdálenosti	Distance limit
+Mez úhlu	Angle limit
+Ozubená kola	Gears
+Hřeben a pastorek	Rack and pinion
+Vačka	Cam
+Kardan	Universal joint
+Rovina nebo osa A kolmo na rovinu nebo osu B	Plane or axis A perpendicular to plane or axis B
+Rovina / osa této komponenty	Plane / axis of this component
+Rovina / osa cílové komponenty	Plane / axis of the target component
+Válec, koule nebo rovina se dotýká válce, koule nebo roviny	A cylinder, sphere or plane touches a cylinder, sphere or plane
+Vnitřní dotyk / druhá strana roviny	Internal contact / other side of the plane
+Plocha této komponenty	Face of this component
+Plocha cílové komponenty	Face of the target component
+Vrchol, střed koule / kružnice nebo osa na vrchol, rovinu nebo osu	Vertex, centre of a sphere / circle or axis onto a vertex, plane or axis
+Bod / osa / rovina této komponenty	Point / axis / plane of this component
+Bod / osa / rovina cílové komponenty	Point / axis / plane of the target component
+Plocha A je zrcadlovým obrazem plochy B podle roviny souměrnosti	Face A is the mirror image of face B about the symmetry plane
+Opačná orientace normál	Opposite normal orientation
+Protější plocha	Opposite face
+Rovina souměrnosti (libovolná komponenta)	Symmetry plane (any component)
+Jazýček (dvě plochy nebo čep) uprostřed drážky (dvě stěny)	Tab (two faces or a pin) centred in a groove (two walls)
+1. plocha jazýčku (nebo čep)	1st tab face (or pin)
+2. plocha jazýčku	2nd tab face
+1. stěna drážky	1st groove wall
+2. stěna drážky	2nd groove wall
+Bod komponenty se pohybuje po hraně (úsečka, kružnice, křivka)	A component point moves along an edge (line, circle, curve)
+Bod této komponenty (vrchol, střed)	Point of this component (vertex, centre)
+Dráha – hrana cílové komponenty	Path – edge of the target component
+Čep se pohybuje v drážce mezi jejími konci	A pin moves in a slot between its ends
+Čep (válcová plocha)	Pin (cylindrical face)
+1. konec drážky (válcová plocha)	1st slot end (cylindrical face)
+2. konec drážky (válcová plocha)	2nd slot end (cylindrical face)
+Souosost + dosedací roviny (nebo pevná osová poloha) – otáčení kolem osy	Concentric + seating planes (or a fixed axial position) – rotation about the axis
+Osa (válcová plocha) této komponenty	Axis (cylindrical face) of this component
+Osa (válcová plocha) cílové komponenty	Axis (cylindrical face) of the target component
+Dosedací rovina této komponenty	Seating plane of this component
+Dosedací rovina cílové komponenty	Seating plane of the target component
+Komponenty drží vzájemnou polohu (jako jeden celek)	The components keep their relative position (as one unit)
+Vzdálenost ploch se smí měnit jen v rozsahu min–max	The face distance may only change within min–max
+Plochy souhlasně	Faces aligned
+Plocha / bod této komponenty	Face / point of this component
+Rovina cílové komponenty	Plane of the target component
+Úhel ploch / os se smí měnit jen v rozsahu min–max	The angle of faces / axes may only change within min–max
+Kola se otáčejí kolem svých os v převodovém poměru (otáčky A : otáčky B = zuby B : zuby A)	The gears turn about their axes in the gear ratio (speed A : speed B = teeth B : teeth A)
+Převodový poměr A : B	Gear ratio A : B
+Stejný smysl otáčení (vnitřní ozubení, řemen)	Same direction of rotation (internal gear, belt)
+Osa kola této komponenty	Gear axis of this component
+Osa druhého kola	Axis of the other gear
+Otočení pastorku posune hřeben (posuv na otáčku = π · roztečný průměr)	Turning the pinion moves the rack (travel per revolution = π · pitch diameter)
+Posuv hřebenu na otáčku	Rack travel per revolution
+Obrácený směr	Reversed direction
+Osa pastorku	Pinion axis
+Hřeben – rovina zubů nebo hrana ve směru pohybu	Rack – tooth plane or an edge in the direction of travel
+Souosost + otočení o otáčku posune o stoupání	Concentric + one turn advances by the pitch
+Levý závit	Left-hand thread
+Válcová plocha této komponenty (matice)	Cylindrical face of this component (nut)
+Válcová plocha šroubu	Cylindrical face of the screw
+Zdvihátko (rovina, váleček, koule, hrot) zůstává v dotyku s plochou vačky	The follower (plane, roller, sphere, point) stays in contact with the cam face
+Zdvihátko – rovina, váleček, koule nebo vrchol	Follower – plane, roller, sphere or vertex
+Plocha vačky	Cam face
+Kardanův kloub: natočení výstupního hřídele podle vstupního (tan θ2 = tan θ1 / cos β)	Universal joint: the output shaft turns with the input shaft (tan θ2 = tan θ1 / cos β)
+Vstupní hřídel (osa)	Input shaft (axis)
+Výstupní hřídel (osa)	Output shaft (axis)

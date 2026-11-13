@@ -4,7 +4,7 @@
  * popisy děr pod stálým úhlem 45°. Žádný text nesmí překrýt jiný text, obrys pohledu, izometrii ani razítko
  * a žádná čára kóty nesmí přeškrtnout text – co se čistě umístit nedá, se vynechá a nahlásí.
  */
-import { annotationGeometry, annToSheet, dimLabel, type DrawingResult, type PlacedView } from "./drawing";
+import { annotationGeometry, annToSheet, dimLabel, sheetToAnn, type DrawingResult, type PlacedView } from "./drawing";
 import { boxesOverlap, calloutLines, calloutTexts, CALLOUT_SIZE, symbolsAsGeometry, textBox, textWidth, type Box } from "./drawing-symbols";
 import type { DrawingAnnotation, Vec2 } from "./types";
 
@@ -236,7 +236,7 @@ export class DimLayout {
         this.boxes.push(...texts);
         this.segs.push(...segs);
         this.leaders.push(...segs);
-        const at: Vec2 = [(K[0] - view.px) / view.s + view.x0, (K[1] - view.py) / view.s + view.y0];
+        const at: Vec2 = sheetToAnn(view, K);
         const round = (q: Vec2): Vec2 => [Math.round(q[0] * 1000) / 1000, Math.round(q[1] * 1000) / 1000];
         this.placed.push({ key: req.key, ann: { type: "callout", view: req.view, auto: req.key, tip: round(tip), at: round(at), lines: req.lines, ...(req.circle ? { circle: req.circle } : {}) } as NewAnn, boxes: texts, segs });
         return true;

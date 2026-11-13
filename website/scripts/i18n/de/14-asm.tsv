@@ -1,0 +1,238 @@
+# Wave 7 – sestavy: pokročilé a mechanické vazby, pohybová studie (němčina)
+  hodnota z geometrie: {0} – změna: sestava vazba {1} hodnota=N	  Wert aus der Geometrie: {0} – ändern: baugruppe verknüpfung {1} wert=N
+  vybráno: {0}	  gewählt: {0}
+ · kolize	 · Kollisionen
+ · načteno prvních {0} ploch / hran dílu	 · erste {0} Flächen / Kanten des Teils geladen
+ · natáčí se	 · dreht sich
+ · stopa „{0}“ {1}	 · Spur „{0}“ {1}
+ (komponenta je B vazby – hodnoty s opačným znaménkem)	 (die Komponente ist B der Verknüpfung – Werte mit umgekehrtem Vorzeichen)
+ (nepovinné)	 (optional)
+ {0}: rozsah pohybu X {1} · Y {2} · Z {3} mm{4} · konec {5}	 {0}: Bewegungsbereich X {1} · Y {2} · Z {3} mm{4} · Ende {5}
+ ⚠ kolize: {0}	 ⚠ Kollision: {0}
+ ⚠ nesplněné vazby: {0}	 ⚠ nicht erfüllte Verknüpfungen: {0}
+ dokola	 in Schleife
+ stopa {0}	 Spur {0}
+(vazba chybí)	(Verknüpfung fehlt)
+{0} ot/min	{0} U/min
+{0} vazba {1}: {2} · {3}	{0} Verknüpfung {1}: {2} · {3}
+{0}{1} komponenty „{2}“ je {3} – vazba potřebuje {4}; {5}	{0}{1} der Komponente „{2}“ ist {3} – die Verknüpfung braucht {4}; {5}
+{0}chybí entita komponenty „{1}“ ({2}) – zadejte F-číslo / E-číslo / V-číslo (sestava plochy "{1}", měřit) nebo pravidlo; {3}	{0}Entität der Komponente „{1}“ fehlt ({2}) – F- / E- / V-Nummer angeben (baugruppe flächen "{1}", messen) oder eine Regel; {3}
+{0}komponenta „{1}“ nemá {2} – {3}	{0}Komponente „{1}“ hat kein {2} – {3}
+{0}komponenta „{1}“: nic neodpovídá „{2}“ – {3}	{0}Komponente „{1}“: nichts passt zu „{2}“ – {3}
+■ přehrávání zastaveno	■ Wiedergabe angehalten
+▶ přehrávání {0} kroků ({1} s){2}	▶ Wiedergabe von {0} Schritten ({1} s){2}
+⚠ geometrii vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ Geometrie der Verknüpfung konnte nicht aus dem Kern geladen werden – baugruppe verknüpfungen rechnet sie nach dem Aufbau der Teile neu
+⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)	⚠ nicht erfüllte Verknüpfungen in {0} Schritten (Mechanismus blockiert oder Antrieb über eine Grenze hinaus)
+⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)	⚠ erste Kollision in Schritt {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)
+⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně	⚠ Verknüpfung {0} lässt sich nicht zusammen mit den anderen erfüllen – baugruppe verknüpfungen, baugruppe verknüpfung {1} unterdrücken|löschen|umkehren
+✓ motor {0} odebrán	✓ Antrieb {0} entfernt
+✓ motor {0}: {1}{2}	✓ Antrieb {0}: {1}{2}
+✓ pohybová studie smazána	✓ Bewegungsstudie gelöscht
+Bez dosedacích rovin (osová poloha zůstane)	Ohne Anlageebenen (axiale Lage bleibt)
+Bod v souřadnicích komponenty [mm]	Punkt in Komponentenkoordinaten [mm]
+CSV pohybové studie ({0} řádků):	CSV der Bewegungsstudie ({0} Zeilen):
+čas	Zeit
+Čas [s]	Zeit [s]
+čas studie musí být kladný [s]	Studiendauer muss positiv sein [s]
+Časová osa	Zeitachse
+číslo hrany začíná E1	Kantennummern beginnen bei E1
+číslo motoru	Antriebsnummer
+číslo vrcholu začíná V1	Eckpunktnummern beginnen bei V1
+Délka studie	Studiendauer
+Hledat (např. válcová, Ø8, hrana, +Z)…	Suchen (z. B. zylindrisch, Ø8, Kante, +Z)…
+Hledat entitu	Entität suchen
+hodnota musí být kladná	der Wert muss positiv sein
+Hodnoty	Werte
+Hrany a vrcholy vyberte ze seznamu; plochy lze vybrat i kliknutím v modelu.	Kanten und Eckpunkte aus der Liste wählen; Flächen auch per Klick im Modell.
+hřeben: za modulem čekám „zuby z“ (počet zubů pastorku)	Zahnstange: nach dem Modul erwarte ich „zähne z“ (Zähnezahl des Ritzels)
+hřeben: zadejte „modul m zuby z“ (dráha na otáčku = π·m·z) nebo „dráha N“	Zahnstange: „modul m zähne z“ (Weg pro Umdrehung = π·m·z) oder „weg N“ angeben
+Klikněte na plochu vybrané (pohyblivé) komponenty.	Klicken Sie auf eine Fläche der gewählten (beweglichen) Komponente.
+kolize	Kollisionen
+Kolize: žádné ve všech krocích	Kollisionen: keine in allen Schritten
+komponenta „{0}“ nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub – lineární motor potřebuje posuvnou vazbu	Komponente „{0}“ hat keine Verknüpfung Abstand, Langloch, Pfad, Konzentrisch oder Schraube – ein Linearantrieb braucht eine Schiebeverknüpfung
+komponenta „{0}“ nemá vazbu Závěs, Souosost ani Šroub – rotační motor potřebuje osu (sestava vazba závěs "{0}" … "Rám" …)	Komponente „{0}“ hat keine Verknüpfung Scharnier, Konzentrisch oder Schraube – ein Drehantrieb braucht eine Achse (baugruppe verknüpfung scharnier "{0}" … "Rahmen" …)
+Komponenta nemá vhodnou entitu ({0}).	Die Komponente hat keine passende Entität ({0}).
+Komponenta stopy	Komponente der Spur
+Kontrolovat kolize v každém kroku (pomalejší)	Kollisionen in jedem Schritt prüfen (langsamer)
+krok	Schritt
+Krok	Schritt
+Krok „{0}“ potřebuje: {1}	Schritt „{0}“ braucht: {1}
+Krok {0} (t = {1} s, motory {2}):	Schritt {0} (t = {1} s, Antriebe {2}):
+krok {0}/{1} · t = {2} s · motory {3}	Schritt {0}/{1} · t = {2} s · Antriebe {3}
+krok musí být kladný	der Schritt muss positiv sein
+kroky	Schritte
+levý závit	Linksgewinde
+lineární motor potřebuje vazbu Vzdálenost, Drážka, Dráha, Souosost nebo Šroub – vazba „{0}“ je {1}	ein Linearantrieb braucht eine Verknüpfung Abstand, Langloch, Pfad, Konzentrisch oder Schraube – Verknüpfung „{0}“ ist {1}
+max	max
+Max	Max
+Mechanické	Mechanisch
+Mechanické vazby	Mechanische Verknüpfungen
+mechanické vazby: vztah stupňů volnosti (otáčení A ↔ otáčení / posuv B); bez plochy se vezme osa z vazby Závěs / Souosost komponenty nebo největší válec, bez hodnoty poměr poloměrů / stoupání ISO / 2π·r	mechanische Verknüpfungen: Beziehung der Freiheitsgrade (Drehung von A ↔ Drehung / Verschiebung von B); ohne Fläche wird die Achse der Scharnier- / Konzentrisch-Verknüpfung der Komponente oder der größte Zylinder genommen, ohne Wert das Radienverhältnis / ISO-Steigung / 2π·r
+min	min
+Min	Min
+modul	Modul
+Motor {0}	Antrieb {0}
+motor {0} ve studii není – motorů: {1}	Antrieb {0} ist nicht in der Studie – Antriebe: {1}
+motor {0}: {1}	Antrieb {0}: {1}
+motor {0}: chybí geometrie vazby „{1}“	Antrieb {0}: Geometrie der Verknüpfung „{1}“ fehlt
+motor: {0}	Antrieb: {0}
+motor: chybí komponenta nebo vazba – {0}	Antrieb: Komponente oder Verknüpfung fehlt – {0}
+motor: rozsah od–do je nulový – např. 0..360	Antrieb: Bereich von–bis ist null – z. B. 0..360
+motor: vazba číslem nebo názvem – pohyb motor rotační vazba 3 0..360	Antrieb: Verknüpfung per Nummer oder Name – bewegung antrieb dreh verknüpfung 3 0..360
+Motory	Antriebe
+motory na vazbách, kroky, kolize, přehrání a export	Antriebe an Verknüpfungen, Schritte, Kollisionen, Wiedergabe und Export
+Načítám plochy, hrany a vrcholy komponenty…	Lade Flächen, Kanten und Eckpunkte der Komponente…
+Nahrávám video…	Nehme Video auf…
+Nesplněné vazby	Nicht erfüllte Verknüpfungen
+nesplněno {0}	nicht erfüllt {0}
+Odebrat motor	Antrieb entfernen
+ot/min	U/min
+ozubení: zuby z1 z2 – počty zubů kola A a kola B	Zahnrad: zähne z1 z2 – Zähnezahlen von Rad A und Rad B
+Pauza	Pause
+Počet kroků	Anzahl Schritte
+počet kroků: 1 až 2000	Anzahl Schritte: 1 bis 2000
+počet zubů musí být kladný	die Zähnezahl muss positiv sein
+Počítám krok {0} z {1}…	Berechne Schritt {0} von {1}…
+Pohyb	Bewegung
+pohyb export: csv | png | webm	bewegung export: csv | png | webm
+pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa "<X>" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	bewegung antrieb dreh|linear "<Komponente>"|verknüpfung <N> <von>..<bis> [schritt S | schritte N] [zeit T] [u/min R | geschwindigkeit V] [kollisionen] [spur "<X>" [punkt x y z]] · bewegung status|starten|abspielen|stop|schritt N|export csv|png|webm|löschen
+pohyb motor: neznámá volba „{0}“ – {1}	bewegung antrieb: unbekannte Option „{0}“ – {1}
+pohyb: neznámý podpříkaz „{0}“ – {1}	bewegung: unbekannter Unterbefehl „{0}“ – {1}
+pohyb: otevřený dokument „{0}“ není sestava	bewegung: das geöffnete Dokument „{0}“ ist keine Baugruppe
+Pohybová studie	Bewegungsstudie
+pohybová studie nemá žádný motor – pohyb motor rotační "Klika" 0..360	die Bewegungsstudie hat keinen Antrieb – bewegung antrieb dreh "Kurbel" 0..360
+pohybová studie nemá žádný motor – přidejte rotační nebo lineární motor	die Bewegungsstudie hat keinen Antrieb – fügen Sie einen Dreh- oder Linearantrieb hinzu
+pohybová studie sestavy: motor na vazbě Závěs / Souosost / Šroub (°) nebo Vzdálenost / Drážka / Dráha (mm), řešič spočítá polohy všech komponent v každém kroku (mechanické vazby, meze), volitelně kolize a stopa bodu; tabulka poloh CSV, přehrání v 3D okně; window.mncad.motion()	Bewegungsstudie der Baugruppe: Antrieb an Scharnier / Konzentrisch / Schraube (°) oder Abstand / Langloch / Pfad (mm), der Löser berechnet die Lage aller Komponenten in jedem Schritt (mechanische Verknüpfungen, Grenzen), optional Kollisionen und Punktspur; Lagetabelle CSV, Wiedergabe im 3D-Fenster; window.mncad.motion()
+Pohybová studie: {0} kroků · {1} s · motory: {2}	Bewegungsstudie: {0} Schritte · {1} s · Antriebe: {2}
+Pohybová studie: motorů {0} · kroků {1} · {2} s{3} – pohyb stav	Bewegungsstudie: {0} Antriebe · {1} Schritte · {2} s{3} – bewegung status
+Pohybová studie: motorů {0} · kroků {1} · {2} s{3}{4}	Bewegungsstudie: {0} Antriebe · {1} Schritte · {2} s{3}{4}
+Pohybová studie: žádná – pohyb motor rotační "Klika" 0..360 [krok 5] [kolize]	Bewegungsstudie: keine – bewegung antrieb dreh "Kurbel" 0..360 [schritt 5] [kollisionen]
+Pokročilé vazby	Erweiterte Verknüpfungen
+pokročilé vazby jako v panelu sestavy: entita = F12 (plocha), E5 (hrana), V3 (vrchol) nebo pravidlo (+Z, válcová Ø8, koule, kružnice Ø40); Šířka a Závěs berou dvě plochy na straně, Drážka dva konce; meze min / max	erweiterte Verknüpfungen wie im Baugruppenpanel: Entität = F12 (Fläche), E5 (Kante), V3 (Eckpunkt) oder Regel (+Z, zylindrisch Ø8, kugel, kreis Ø40); Breite und Scharnier nehmen zwei Flächen je Seite, Langloch zwei Enden; Grenzen min / max
+poloha {0} mm	Lage {0} mm
+poměr {0}	Übersetzung {0}
+Prohlížeč neumí nahrát video z 3D okna – použijte snímky PNG.	Der Browser kann kein Video aus dem 3D-Fenster aufnehmen – verwenden Sie PNG-Bilder.
+Přehrát	Abspielen
+Přeskočit	Überspringen
+Přidat motor	Antrieb hinzufügen
+Rotační	Drehend
+rotační motor potřebuje vazbu Souosost, Závěs nebo Šroub – vazba „{0}“ je {1}	ein Drehantrieb braucht eine Verknüpfung Konzentrisch, Scharnier oder Schraube – Verknüpfung „{0}“ ist {1}
+rovina „{0}“{1}	Ebene „{0}“{1}
+rovina souměrnosti: chybí komponenta	Symmetrieebene: Komponente fehlt
+rovina souměrnosti: zadejte rovinnou plochu (F12, +X…) – rovina "Rám" F3, nebo rovina F3 (plocha komponenty B)	Symmetrieebene: ebene Fläche angeben (F12, +X…) – um "Rahmen" F3, oder um F3 (Fläche der Komponente B)
+rychlost	Geschwindigkeit
+Rychlost	Geschwindigkeit
+Rychlost (mm/s) místo rozsahu	Geschwindigkeit (mm/s) statt Bereich
+Rychlost (ot/min) místo rozsahu	Geschwindigkeit (U/min) statt Bereich
+Sestava nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub.	Die Baugruppe hat keine Verknüpfung Abstand, Langloch, Pfad, Konzentrisch oder Schraube.
+Sestava nemá vazbu Závěs, Souosost ani Šroub.	Die Baugruppe hat keine Verknüpfung Scharnier, Konzentrisch oder Schraube.
+sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu|ozubení|hřeben|šroub|vačka|kardan "A" <plocha|E5|V3> [2. plocha] "B" <plocha> [2. plocha] [rovina "C" <plocha>] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [min N] [max N] [poloha N] [obráceně|levý|vnitřní] [název "…"]	baugruppe verknüpfung senkrecht|tangential|koinzident|symmetrisch|breite|pfad|langloch|scharnier|sperren|abstandsgrenze|winkelgrenze|zahnrad|zahnstange|schraube|nocken|kardangelenk "A" <Fläche|E5|V3> [2. Fläche] "B" <Fläche> [2. Fläche] [um "C" <Fläche>] [übersetzung N | zähne z1 z2 | steigung P | weg mm/U | modul m zähne z] [min N] [max N] [lage N] [umkehren|links|innen] [name "…"]
+Smyčka	Schleife
+Snímek 3D okna se nepodařilo pořídit.	Das 3D-Fenster konnte nicht aufgenommen werden.
+Snímky PNG	PNG-Bilder
+Snímky PNG ({0}) se uloží z 3D okna (jen v aplikaci)	PNG-Bilder ({0}) werden aus dem 3D-Fenster gespeichert (nur in der Anwendung)
+stejný smysl otáčení	gleicher Drehsinn
+Stopa bodu komponenty	Spur eines Komponentenpunkts
+Stopa X	Spur X
+Stopa Y	Spur Y
+Stopa Z	Spur Z
+stopa: zadejte komponentu – stopa "Ojnice" [bod x y z] (bod v souřadnicích komponenty)	Spur: Komponente angeben – spur "Pleuel" [punkt x y z] (Punkt in Komponentenkoordinaten)
+stoupání {0} mm	Steigung {0} mm
+Tabulka CSV	CSV-Tabelle
+Uloženo {0} snímků PNG (ZIP) a tabulka CSV.	{0} PNG-Bilder (ZIP) und eine CSV-Tabelle gespeichert.
+vazba {0} ({1}) nemá hodnotu – hodnotu má Vzdálenost, Úhel, Ozubení (poměr), Šroub (stoupání), Hřeben (mm/ot) a Drážka (poloha)	Verknüpfung {0} ({1}) hat keinen Wert – Werte haben Abstand, Winkel, Zahnräder (Übersetzung), Schraube (Steigung), Zahnstange (mm/U) und Langloch (Lage)
+vazba {0} ({1}) nemá meze – meze má Mez vzdálenosti a Mez úhlu	Verknüpfung {0} ({1}) hat keine Grenzen – Grenzen haben Abstandsgrenze und Winkelgrenze
+Vazba {0}: {1} – klikněte na plochu v modelu nebo vyberte ze seznamu · Esc zruší	Verknüpfung {0}: {1} – Fläche im Modell anklicken oder aus der Liste wählen · Esc bricht ab
+vazba {0}: hodnota musí být kladná	Verknüpfung {0}: der Wert muss positiv sein
+vazba {0}: min {1} je větší než max {2}	Verknüpfung {0}: min {1} ist größer als max {2}
+vazba {0}: neznámá volba „{1}“ – {2}	Verknüpfung {0}: unbekannte Option „{1}“ – {2}
+Vazba {0}: vyberte cílovou komponentu v panelu a potvrďte · Esc zruší	Verknüpfung {0}: Zielkomponente im Panel wählen und bestätigen · Esc bricht ab
+vazba {0}: zadejte meze – min N max N (nebo od N do M, N..M)	Verknüpfung {0}: Grenzen angeben – min N max N (oder von N bis M, N..M)
+Vazba {0}: zkontrolujte hodnoty a potvrďte v panelu komponenty · Esc zruší	Verknüpfung {0}: Werte prüfen und im Komponentenpanel bestätigen · Esc bricht ab
+Vazba motoru	Verknüpfung des Antriebs
+vazba motoru je potlačená	die Verknüpfung des Antriebs ist unterdrückt
+vazba motoru v sestavě není	die Verknüpfung des Antriebs ist nicht in der Baugruppe
+vazba Šířka: jazýček potřebuje dvě rovinné plochy (nebo čep) – sestava vazba šířka "A" F1 F2 "B" F3 F4	Verknüpfung Breite: die Lasche braucht zwei ebene Flächen (oder einen Stift) – baugruppe verknüpfung breite "A" F1 F2 "B" F3 F4
+vazba Závěs: dosedací roviny zadejte obě (A i B), nebo žádnou	Verknüpfung Scharnier: beide Anlageebenen (A und B) angeben oder keine
+Vazby splněny ve všech krocích	Verknüpfungen in allen Schritten erfüllt
+vhodné: {0}{1}	geeignet: {0}{1}
+Video WebM	WebM-Video
+Video WebM se nahraje z 3D okna (jen v aplikaci)	WebM-Video wird aus dem 3D-Fenster aufgenommen (nur in der Anwendung)
+Video WebM uloženo ({0} snímků, {1} fps).	WebM-Video gespeichert ({0} Bilder, {1} fps).
+vnitřní dotyk	Innenberührung
+Všechny entity vazby jsou vybrané – potvrďte vazbu v panelu komponenty.	Alle Entitäten der Verknüpfung sind gewählt – Verknüpfung im Komponentenpanel bestätigen.
+Vypočítat pohyb	Bewegung berechnen
+Zatím žádný motor. Rotační motor otáčí komponentou na vazbě Závěs / Souosost / Šroub, lineární ji posouvá na vazbě Vzdálenost / Drážka / Dráha / Souosost.	Noch kein Antrieb. Ein Drehantrieb dreht eine Komponente an Scharnier / Konzentrisch / Schraube, ein Linearantrieb verschiebt sie an Abstand / Langloch / Pfad / Konzentrisch.
+zuby	Zähne
+žádná vhodná entita ({0})	keine passende Entität ({0})
+začátek {0}	Anfang {0}
+rotační motor	Drehantrieb
+lineární motor	Linearantrieb
+#!dynamic – popisky druhů vazeb, kroky a nápověda průvodce vazbou a druhy entit se překládají za běhu (tr(MATE_LABEL[…]), tr(spec.label))
+Shodně	Koinzident
+Dráha	Pfad
+Závěs	Scharnier
+Zámek	Sperre
+Mez vzdálenosti	Abstandsgrenze
+Mez úhlu	Winkelgrenze
+Ozubená kola	Zahnräder
+Hřeben a pastorek	Zahnstange und Ritzel
+Vačka	Nocken
+Kardan	Kardangelenk
+Rovina nebo osa A kolmo na rovinu nebo osu B	Ebene oder Achse A senkrecht zu Ebene oder Achse B
+Rovina / osa této komponenty	Ebene / Achse dieser Komponente
+Rovina / osa cílové komponenty	Ebene / Achse der Zielkomponente
+Válec, koule nebo rovina se dotýká válce, koule nebo roviny	Zylinder, Kugel oder Ebene berührt Zylinder, Kugel oder Ebene
+Vnitřní dotyk / druhá strana roviny	Innenberührung / andere Seite der Ebene
+Plocha této komponenty	Fläche dieser Komponente
+Plocha cílové komponenty	Fläche der Zielkomponente
+Vrchol, střed koule / kružnice nebo osa na vrchol, rovinu nebo osu	Eckpunkt, Kugel- / Kreismittelpunkt oder Achse auf Eckpunkt, Ebene oder Achse
+Bod / osa / rovina této komponenty	Punkt / Achse / Ebene dieser Komponente
+Bod / osa / rovina cílové komponenty	Punkt / Achse / Ebene der Zielkomponente
+Plocha A je zrcadlovým obrazem plochy B podle roviny souměrnosti	Fläche A ist das Spiegelbild von Fläche B an der Symmetrieebene
+Opačná orientace normál	Entgegengesetzte Normalenrichtung
+Protější plocha	Gegenüberliegende Fläche
+Rovina souměrnosti (libovolná komponenta)	Symmetrieebene (beliebige Komponente)
+Jazýček (dvě plochy nebo čep) uprostřed drážky (dvě stěny)	Lasche (zwei Flächen oder Stift) mittig in einer Nut (zwei Wände)
+1. plocha jazýčku (nebo čep)	1. Laschenfläche (oder Stift)
+2. plocha jazýčku	2. Laschenfläche
+1. stěna drážky	1. Nutwand
+2. stěna drážky	2. Nutwand
+Bod komponenty se pohybuje po hraně (úsečka, kružnice, křivka)	Ein Komponentenpunkt bewegt sich entlang einer Kante (Linie, Kreis, Kurve)
+Bod této komponenty (vrchol, střed)	Punkt dieser Komponente (Eckpunkt, Mittelpunkt)
+Dráha – hrana cílové komponenty	Pfad – Kante der Zielkomponente
+Čep se pohybuje v drážce mezi jejími konci	Ein Stift bewegt sich im Langloch zwischen dessen Enden
+Čep (válcová plocha)	Stift (Zylinderfläche)
+1. konec drážky (válcová plocha)	1. Langlochende (Zylinderfläche)
+2. konec drážky (válcová plocha)	2. Langlochende (Zylinderfläche)
+Souosost + dosedací roviny (nebo pevná osová poloha) – otáčení kolem osy	Konzentrisch + Anlageebenen (oder feste axiale Lage) – Drehung um die Achse
+Osa (válcová plocha) této komponenty	Achse (Zylinderfläche) dieser Komponente
+Osa (válcová plocha) cílové komponenty	Achse (Zylinderfläche) der Zielkomponente
+Dosedací rovina této komponenty	Anlageebene dieser Komponente
+Dosedací rovina cílové komponenty	Anlageebene der Zielkomponente
+Komponenty drží vzájemnou polohu (jako jeden celek)	Die Komponenten halten ihre relative Lage (wie eine Einheit)
+Vzdálenost ploch se smí měnit jen v rozsahu min–max	Der Flächenabstand darf sich nur im Bereich min–max ändern
+Plochy souhlasně	Flächen gleichgerichtet
+Plocha / bod této komponenty	Fläche / Punkt dieser Komponente
+Rovina cílové komponenty	Ebene der Zielkomponente
+Úhel ploch / os se smí měnit jen v rozsahu min–max	Der Winkel von Flächen / Achsen darf sich nur im Bereich min–max ändern
+Kola se otáčejí kolem svých os v převodovém poměru (otáčky A : otáčky B = zuby B : zuby A)	Die Räder drehen sich um ihre Achsen im Übersetzungsverhältnis (Drehzahl A : Drehzahl B = Zähne B : Zähne A)
+Převodový poměr A : B	Übersetzung A : B
+Stejný smysl otáčení (vnitřní ozubení, řemen)	Gleicher Drehsinn (Innenverzahnung, Riemen)
+Osa kola této komponenty	Radachse dieser Komponente
+Osa druhého kola	Achse des anderen Rades
+Otočení pastorku posune hřeben (posuv na otáčku = π · roztečný průměr)	Drehen des Ritzels verschiebt die Zahnstange (Weg pro Umdrehung = π · Teilkreisdurchmesser)
+Posuv hřebenu na otáčku	Zahnstangenweg pro Umdrehung
+Obrácený směr	Umgekehrte Richtung
+Osa pastorku	Ritzelachse
+Hřeben – rovina zubů nebo hrana ve směru pohybu	Zahnstange – Zahnebene oder Kante in Bewegungsrichtung
+Souosost + otočení o otáčku posune o stoupání	Konzentrisch + eine Umdrehung verschiebt um die Steigung
+Levý závit	Linksgewinde
+Válcová plocha této komponenty (matice)	Zylinderfläche dieser Komponente (Mutter)
+Válcová plocha šroubu	Zylinderfläche der Schraube
+Zdvihátko (rovina, váleček, koule, hrot) zůstává v dotyku s plochou vačky	Der Stößel (Ebene, Rolle, Kugel, Spitze) bleibt in Kontakt mit der Nockenfläche
+Zdvihátko – rovina, váleček, koule nebo vrchol	Stößel – Ebene, Rolle, Kugel oder Eckpunkt
+Plocha vačky	Nockenfläche
+Kardanův kloub: natočení výstupního hřídele podle vstupního (tan θ2 = tan θ1 / cos β)	Kardangelenk: Drehung der Abtriebswelle nach der Antriebswelle (tan θ2 = tan θ1 / cos β)
+Vstupní hřídel (osa)	Antriebswelle (Achse)
+Výstupní hřídel (osa)	Abtriebswelle (Achse)

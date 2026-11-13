@@ -202,6 +202,8 @@ export const cad = {
   /** porovnání dílu s referenčním modelem (STEP / BREP / STL): objemy, rozdílová tělesa, mapa odchylek – viz compare.ts */
   compare: (doc: CadDoc, file: ReferenceFile, opts?: CompareOptions) => call<CompareResult>({ op: "compare", doc, file, opts }),
   mateFace: (key: string, index: number) => call<MateFaceInfo | null>({ op: "mateFace", key, index }),
+  /** hrana / vrchol dílu nebo jemná síť plochy („mesh“) pro pokročilé vazby sestavy */
+  mateEnt: (key: string, index: number, ent: "edge" | "vertex" | "mesh") => call<MateFaceInfo | null>({ op: "mateEnt", key, index, ent }),
   cylFace: (key: string, radius: number) => call<number>({ op: "cylFace", key, radius }),
   inspect: (src: ShapeSrc, ref: EntRef, density?: number) => call<EntityInfo>({ op: "inspect", src, ref, density }),
   measureEnt: (a: { src: ShapeSrc; ref: EntRef }, b: { src: ShapeSrc; ref: EntRef } | null) => call<MeasureResult>({ op: "measureEnt", a, b }),

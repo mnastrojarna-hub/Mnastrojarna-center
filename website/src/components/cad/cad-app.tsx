@@ -8,7 +8,8 @@ import { flushSync } from "react-dom";
 import type { Interference } from "@/cad/asm-kernel";
 import { apply3, boltStack, bomCsv, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
-import { mateFromPending, measureMateIn, releaseComponent, solveMates, type FaceGeo, type MateStatus } from "@/cad/mates";
+import { MATE_LABEL, mateFromPending, measureMateIn, releaseComponent, solveMates, type FaceGeo, type MateStatus } from "@/cad/mates";
+import { ensureMateRefs, entKey, refGeo } from "@/cad/mate-geo";
 import { bodiesAt, isNewBodyMode, nextBodyName } from "@/cad/bodies";
 import { makeFromText } from "@/cad/library";
 import { cad, isCancelled } from "@/cad/client";
@@ -62,6 +63,9 @@ import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect"
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
 import { measureApi, measureLog } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
+import { kinPickFromModel } from "./asm-mates-kin";
+import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
+import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
 import { AskHost, askNumber } from "./ask-dialog";
 import { ComputeChip, progressLabel } from "./compute-chip";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
@@ -217,6 +221,8 @@ export function CadApp() {
   docRef.current = doc;
   const [bomOpen, setBomOpen] = useState(false);
   const [moldOpen, setMoldOpen] = useState(false);
+  const [motionOpen, setMotionOpen] = useState(false); // pohybová studie sestavy (motion-panel.tsx)
+  const motionShow = useMotionView();
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
   // nastavení, paleta, úvodní obrazovka, formařské nástroje
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -454,6 +460,8 @@ export function CadApp() {
       return list.map((p) => ({ key: p.key, result: asmCache.current.get(p.key) ?? null }));
     },
     mateFace: (key, i) => cad.mateFace(key, i),
+    mateEnt: (key, i, e) => cad.mateEnt(key, i, e),
+    interference: (d) => cad.interference(d),
     cylFace: (key, r) => cad.cylFace(key, r),
     isCone: (key, i) => cad.inspect({ kind: "comp", key, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }, { kind: "face", index: i }).then((e) => e.surface === "CONE", () => false),
     geo: mateGeo.current,
@@ -810,6 +818,11 @@ export function CadApp() {
               mateStatusRef.current = r.mateStatus;
               setMateStatus(r.mateStatus);
             }
+            if (r.motion) {
+              // pohybová studie: panel se otevře a vyzvedne pokyn (přehrát, krok, export snímků)
+              if (r.motion.open || r.motion.play) setMotionOpen(true);
+              pushMotionSignal(r.motion);
+            }
             if (r.stackChanged) {
               asmStackRef.current = stack;
               setAsmStack(stack);
@@ -1077,6 +1090,23 @@ export function CadApp() {
       drawingStatus: async (o) => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, op) => cad.drawing(doc, meta, op), { sheet: o?.sheet, extras: drawEnvRef.current })).text,
       exportDrawing: async (format, o) => (await import("@/cad/drawing-export")).exportDrawing(histRef.current.present, format, o ?? {}, (doc, meta, op) => cad.drawing(doc, meta, op), drawEnvRef.current),
       measure: (a, b) => measureApi(histRef.current.present, a, b),
+      motion: async (cmd) => {
+        if (cmd?.trim()) {
+          const before = JSON.stringify(histRef.current.present.motion ?? null);
+          const out = await runAgentRef.current(`pohyb ${cmd}`);
+          const bad = out.split("\n").find((l) => l.startsWith("✗"));
+          if (bad) throw new Error(bad);
+          // změněná studie se do dokumentu promítne až po vykreslení
+          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
+        }
+        const d = histRef.current.present;
+        if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
+        const k = await import("@/cad/asm-agent-kin");
+        const { motionCsv, motionSummary } = await import("@/cad/motion");
+        const res = await k.motionRun(d, asmEnvRef.current());
+        const nm = (id: string) => d.components?.find((c) => c.id === id)?.name ?? id;
+        return { steps: k.motionTable(d, res), summary: motionSummary(res, d), collision: res.collision ? { ...res.collision, a: nm(res.collision.a), b: nm(res.collision.b) } : null, csv: motionCsv(res, d) };
+      },
       bom: async (opts) => {
         const d = histRef.current.present;
         if (d.kind !== "assembly") throw new Error(tr("kusovník: otevřený dokument „{0}“ není sestava", d.name));
@@ -1351,9 +1381,11 @@ export function CadApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asmVer, leaves]);
 
+  // pohybová studie: zobrazená poloha kroku (bez zápisu do dokumentu)
+  const motionLeaves = useMemo(() => (isAsm && motionShow.pose ? flattenLeaves({ ...doc, components: (doc.components ?? []).map((c) => (motionShow.pose![c.id] ? { ...c, placement: motionShow.pose![c.id] } : c)) }) : null), [isAsm, doc, motionShow.pose]);
   const asmViews = useMemo<AsmView[]>(() => {
     if (!isAsm) return [];
-    const comps = leaves.filter((l) => !l.hidden);
+    const comps = (motionLeaves ?? leaves).filter((l) => !l.hidden);
     const centers = new Map<string, Vec3>();
     for (const l of comps) {
       const r = asmCache.current.get(l.key);
@@ -1387,7 +1419,7 @@ export function CadApp() {
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAsm, leaves, asmVer, explode, asmSel, mate, clashes]);
+  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashes]);
 
   const asmPartInfo = useCallback(
     (c: AsmComponent) => {
@@ -1466,42 +1498,14 @@ export function CadApp() {
   const geoProvider = (d: CadDoc) => (ref: MateRef): FaceGeo | null => {
     const leaf = leafOf(ref, d);
     if (!leaf || ref.face < 0) return null;
-    const info = mateGeo.current.get(`${leaf.key}:${ref.face}`);
-    if (!info || info.kind === "other") return null;
     const top = d.components?.find((c) => c.id === ref.compId);
     if (!top) return null;
-    const relPl = matrixToPlacement(mul4(invPlacementMatrix(top.placement), leaf.matrix));
-    return { kind: info.kind, origin: transformPoint(relPl, info.origin), normal: apply3(rotMatrix(relPl.rotation), info.normal), radius: info.radius };
+    // plochy, hrany, vrcholy i síť vačky (cad/mate-geo.ts) v souřadnicích komponenty nejvyšší úrovně
+    return refGeo(mateGeo.current.get(entKey(leaf.key, ref)), matrixToPlacement(mul4(invPlacementMatrix(top.placement), leaf.matrix)));
   };
-  /** doplní chybějící geometrii ploch (a indexy válcových ploch u normálií) – async přes worker */
-  const ensureMateGeo = async (d: CadDoc): Promise<Mate[]> => {
-    const mates = (d.mates ?? []).map((m) => ({ ...m, a: { ...m.a }, b: { ...m.b } }));
-    for (const m of mates) {
-      for (const ref of [m.a, m.b]) {
-        const leaf = leafOf(ref, d);
-        if (!leaf) continue;
-        if (ref.face < 0 && ref.radius) {
-          try {
-            const idx = await cad.cylFace(leaf.key, ref.radius);
-            if (idx >= 0) ref.face = idx;
-          } catch {
-            /* díl se ještě staví */
-          }
-        }
-        if (ref.face < 0) continue;
-        const key = `${leaf.key}:${ref.face}`;
-        if (!mateGeo.current.has(key)) {
-          try {
-            const info = await cad.mateFace(leaf.key, ref.face);
-            if (info) mateGeo.current.set(key, info);
-          } catch {
-            /* díl se ještě staví */
-          }
-        }
-      }
-    }
-    return mates;
-  };
+  /** doplní chybějící geometrii ploch, hran, vrcholů a sítí vaček (a indexy válcových ploch u normálií) – async přes worker */
+  const ensureMateGeo = (d: CadDoc): Promise<Mate[]> =>
+    ensureMateRefs(d.mates ?? [], (ref) => leafOf(ref, d)?.key ?? null, mateGeo.current, { face: (k, i) => cad.mateFace(k, i), ent: (k, i, e) => cad.mateEnt(k, i, e), cylFace: (k, r) => cad.cylFace(k, r) });
   const resolveMates = async (d: CadDoc, anchorId?: string | null) => {
     if (d.kind !== "assembly" || !d.mates?.length) {
       setMateStatus({});
@@ -1510,6 +1514,7 @@ export function CadApp() {
     const mates = await ensureMateGeo(d);
     const withMates = { ...d, mates };
     const r = solveMates(withMates, geoProvider(withMates), anchorId);
+    if (r.mates) mates.splice(0, mates.length, ...r.mates); // pokročilé vazby: výchozí stav stupňů volnosti se uloží do dokumentu
     setMateStatus(r.status);
     const matesChanged = JSON.stringify(mates) !== JSON.stringify(d.mates);
     if (!r.moved.length && !matesChanged) return;
@@ -1534,6 +1539,14 @@ export function CadApp() {
       // směr pole komponenty z plochy v modelu: normála roviny / osa válce ve světových souřadnicích – převezme si ho panel komponenty
       if (info.kind === "other") return flash(tr("Směr lze převzít jen z rovinné nebo válcové plochy."));
       setMate({ ...mate, dir: apply3(rotMatrix(matrixToPlacement(leaf.matrix).rotation), info.normal) });
+      return;
+    }
+    if (isKinMode(mate.mode)) {
+      // pokročilé vazby: plocha doplní další krok průvodce, vyhoví-li druhu a komponentě kroku
+      const r = kinPickFromModel(mate, leaf.topId, { compId: leaf.topId, leaf: leaf.id !== leaf.topId ? leaf.id : undefined, face }, info);
+      if (r.error) return flash(r.error);
+      mateGeo.current.set(`${leaf.key}:${face}`, info);
+      setMate(r.next!);
       return;
     }
     const needCyl = mate.mode === "concentric";
@@ -2912,8 +2925,12 @@ export function CadApp() {
           { id: "m1", label: tr("Kontakt"), icon: "datum", tone: "ref", disabled: !asmSel, active: mate?.mode === "mate", onClick: () => asmSel && startMate(asmSel, "mate") },
           { id: "m2", label: tr("Zarovnat"), icon: "datum", tone: "ref", disabled: !asmSel, active: mate?.mode === "flush", onClick: () => asmSel && startMate(asmSel, "flush") },
           { id: "m3", label: tr("Vystředit"), icon: "datum", tone: "ref", disabled: !asmSel, active: mate?.mode === "center", onClick: () => asmSel && startMate(asmSel, "center") },
+          // pokročilé a mechanické vazby (cad/mate-spec.ts) – průvodce v panelu komponenty
+          { id: "mAdv", label: tr("Pokročilé"), icon: "cPerpendicular", tone: "ref", disabled: !asmSel, active: !!mate && ADVANCED.includes(mate.mode as never), menu: ADVANCED.map((t) => ({ id: t, label: tr(MATE_LABEL[t]), icon: "datum" as CadIconName, active: mate?.mode === t, onClick: () => asmSel && startMate(asmSel, t) })) },
+          { id: "mMech", label: tr("Mechanické"), icon: "patternCircular", tone: "ref", disabled: !asmSel, active: !!mate && MECHANICAL.includes(mate.mode as never), menu: MECHANICAL.map((t) => ({ id: t, label: tr(MATE_LABEL[t]), icon: "datum" as CadIconName, active: mate?.mode === t, onClick: () => asmSel && startMate(asmSel, t) })) },
         ],
       },
+      { label: tr("Pohyb"), items: [{ id: "motion", label: tr("Pohybová studie"), icon: "rotate", tone: "pattern", active: motionOpen, disabled: !(doc.components?.length ?? 0), onClick: () => setMotionOpen((v) => !v), hint: tr("motory na vazbách, kroky, kolize, přehrání a export") }] },
       {
         label: tr("Analýza"),
         big: 2,
@@ -3517,7 +3534,7 @@ export function CadApp() {
                   snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
                   selection={measure ? measureSel : mate ? mateSelection(mate, mateHover) : selection}
                   onPick={onPick}
-                  measure={measureGfx}
+                  measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
                   vertices={result?.vertices ?? null}
                   faceColors={doc.faceColors}
                   bodyHidden={bodyHidden}
@@ -3689,6 +3706,9 @@ export function CadApp() {
               />
             )}
             {compareOpen && !isAsm && <CompareDialog doc={buildDocView} vp={vp} onView={setCmpView} onClose={() => setCompareOpen(false)} />}
+            {motionOpen && isAsm && (
+              <MotionPanel doc={doc} env={() => asmEnvRef.current()} onDoc={commit} onClose={() => setMotionOpen(false)} snapshot={() => vp.current?.snapshot() ?? null} canvas={() => document.querySelector<HTMLCanvasElement>("main canvas")} flash={flash} />
+            )}
             {isAsm && explode > 0 && (
               <FloatPanel title={tr("Rozložený pohled")} icon="transform" onClose={() => setExplode(0)}>
                 <input type="range" min={0} max={3} step={0.05} value={explode} onChange={(e) => setExplode(Number(e.target.value))} className="w-full accent-[#E03930]" />
@@ -3798,7 +3818,7 @@ export function CadApp() {
                   mate={mate?.compId === asmSel ? mate : null}
                   onMatePatch={(p) => setMate((m) => (p && m ? { ...m, ...p } : null))}
                   onMateFace={(leafId, face) => void onMateFace(leafId, face)}
-                  onMateConfirm={(value) => mate && finishMate({ ...mate, value })}
+                  onMateConfirm={(value, patch) => mate && finishMate({ ...mate, ...patch, value })}
                   onFaceHover={setMateHover}
                   onPattern={patternSelected}
                   onMirror={mirrorSelected}

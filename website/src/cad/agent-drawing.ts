@@ -12,6 +12,8 @@
  */
 import { tr } from "./i18n";
 import type { DrawingOptions, ViewKey, ViewRotation } from "./drawing";
+import { parseDrawingViews, type ViewsCmd } from "./agent-drawing-views";
+import type { FitShow } from "./drawing-fits";
 import type { GdtSymbol, PlaneName, Vec2 } from "./types";
 
 /** Pohled jako cíl značky / kóty: pohled modelu (front…), „section“ (řez), „iso“, „detail:A“ (detail), „model:<název>“ (další model). */
@@ -42,8 +44,10 @@ export type DrawingCmd =
   | { k: "set"; opts: Partial<DrawingOptions>; summary: string[] }
   /** kótovat chytře / celkově / nic / základní (Auto + Ø), řetězově / od základny */
   | { k: "dim"; mode: "smart" | "overall" | "none" | "auto"; style?: "chain" | "baseline" }
-  /** tolerance ke kótě podle popisku / hodnoty */
-  | { k: "tol"; target: string; tol: string }
+  /** tolerance ke kótě podle popisku / hodnoty; `fit` = výkres uložení (pole ISO 286, kontrola), `show` = zobrazení úchylek u kóty */
+  | { k: "tol"; target: string; tol: string; fit?: boolean; show?: FitShow }
+  /** pomocné pohledy, řezy lomenou čarou, částečné řezy, přerušení, uložení, značky revizí, zóny (cad/agent-drawing-views.ts) */
+  | { k: "views"; cmd: ViewsCmd }
   /** údaje u razítka: poznámka, nepředepsané tolerance, hrany, drsnost */
   | { k: "meta"; field: "note" | "tolerance" | "edges" | "roughness"; value: string }
   /** stav výkresu: aktivní list, zadaný list nebo všechny */
@@ -271,6 +275,8 @@ const SUB: Record<string, DrawingCmd["k"] | "note" | "tolerance" | "edges" | "ro
 export function parseDrawing(tokens: string[], raw?: string): DrawingCmd | null {
   if (!tokens.length) return null;
   const rt = rawTokens(raw ?? tokens.map((t) => (/\s/.test(t) ? `"${t}"` : t)).join(" "));
+  const vw = parseDrawingViews(rt);
+  if (vw) return vw.op === "fit-set" ? { k: "tol", target: vw.target, tol: vw.code, fit: true, ...(vw.show ? { show: vw.show } : {}) } : { k: "views", cmd: vw };
   const more = parseDrawingMore(rt);
   if (more) return more;
   const sub = SUB[fold(tokens[0])];
@@ -580,6 +586,11 @@ function viewRef(rt: RawTok[], i: number): [ViewRef, number] {
   if (!t) throw new Error(tr("chybí pohled – přední, horní, levý, pravý, zadní, spodní, iso, řez, detail A nebo \"název modelu\""));
   const f = fold(t.s);
   if (!t.q && VIEW_WORDS[f]) return [VIEW_WORDS[f], 1];
+  // řez lomenou čarou „řez B“ / „řez B-B“ (A–A = řez rovinou), pomocný pohled „B“ / „pomocný B“
+  const cutL = isKw(rt[i + 1], AT_W) ? null : /^([b-z])(?:[-–]?\1)?$/i.exec(rt[i + 1]?.s ?? "");
+  if (!t.q && SECTION_W.has(f) && cutL) return [`cut:${cutL[1].toUpperCase()}`, 2];
+  if (!t.q && ["pomocny", "aux", "auxiliary", "hilfsansicht"].includes(f) && /^[a-z]$/i.test(rt[i + 1]?.s ?? "")) return [`aux:${rt[i + 1].s.toUpperCase()}`, 2];
+  if (!t.q && /^[b-z]$/i.test(t.s)) return [`aux:${t.s.toUpperCase()}`, 1];
   if (!t.q && SECTION_W.has(f)) return ["section", /^a-?a$/i.test(rt[i + 1]?.s ?? "") ? 2 : 1];
   if (!t.q && DETAIL_W.has(f)) {
     const l = rt[i + 1];

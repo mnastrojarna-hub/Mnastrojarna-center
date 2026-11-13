@@ -8,7 +8,7 @@ import { drawingDoc } from "./drawing-doc";
 import { drawingModelShapes } from "./drawing-models";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { makeSmartDrawing } from "./drawing-dims";
-import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOfDoc } from "./asm-kernel";
+import { cachedBody, findCylFace, interference, mateEdgeInfo, mateFaceInfo, mateFaceMesh, mateVertexInfo, partEntry, shapeOfDoc } from "./asm-kernel";
 import { compareTransferables, compareWithReference, type CompareOptions, type ReferenceFile } from "./compare";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
@@ -52,6 +52,7 @@ type Req =
   | { id: number; op: "interference"; doc: CadDoc }
   | { id: number; op: "compare"; doc: CadDoc; file: ReferenceFile; opts?: CompareOptions }
   | { id: number; op: "mateFace"; key: string; index: number }
+  | { id: number; op: "mateEnt"; key: string; index: number; ent: "edge" | "vertex" | "mesh" }
   | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
@@ -281,6 +282,10 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
       }
       case "mateFace":
         ctx.postMessage({ id: m.id, ok: true, result: mateFaceInfo(m.key, m.index) });
+        break;
+      case "mateEnt":
+        // hrana / vrchol / jemná síť plochy pro pokročilé vazby sestavy (Dráha, Shodně, Vačka)
+        ctx.postMessage({ id: m.id, ok: true, result: m.ent === "edge" ? mateEdgeInfo(m.key, m.index) : m.ent === "vertex" ? mateVertexInfo(m.key, m.index) : mateFaceMesh(m.key, m.index) });
         break;
       case "cylFace":
         ctx.postMessage({ id: m.id, ok: true, result: findCylFace(m.key, m.radius) });

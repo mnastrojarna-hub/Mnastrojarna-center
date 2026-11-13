@@ -15,15 +15,17 @@
 import { getLang, tr } from "./i18n";
 import { MATERIALS, massKg } from "@/lib/mesh-metrics";
 import { defaultMoldBase, type BomRow, type CompPattern, type MoldBaseParams } from "./assembly";
-import { MATE_LABEL, axisLabel, dirLabel, sortFaceRows, type FaceRow, type MateStatus } from "./mates";
+import { MATE_LABEL, axisLabel, dirLabel, sortFaceRows, type FaceRow, type KinMateType, type MateStatus } from "./mates";
+import { isKinMate } from "./mates-kin";
+import type { MotionCmd } from "./agent-motion";
 import type { AsmComponent, BuildResult, CadDoc, Mate, Vec3 } from "./types";
 
 /* ───────────────────────── typy ───────────────────────── */
 
-/** Plocha komponenty: číslo (`F12` → index 11, u podsestavy `F3@Díl`) nebo pravidlo (slova a průměr). */
-export type FaceSpec = { index?: number; leaf?: string; rule: string[]; diameter?: number; radius?: number; raw: string };
-/** Druh vazby v textu (`center` = Kontakt se ztotožněním středů, jako tlačítko Vystředit). */
-export type MateKind = "mate" | "flush" | "center" | "concentric" | "distance" | "angle" | "parallel" | "fixed";
+/** Plocha komponenty: číslo (`F12` → index 11, u podsestavy `F3@Díl`; hrana `E5`, vrchol `V3` → `ent`) nebo pravidlo (slova a průměr). */
+export type FaceSpec = { index?: number; leaf?: string; rule: string[]; diameter?: number; radius?: number; raw: string; ent?: "edge" | "vertex" };
+/** Druh vazby v textu (`center` = Kontakt se ztotožněním středů, jako tlačítko Vystředit); pokročilé a mechanické vazby viz KinMateType. */
+export type MateKind = "mate" | "flush" | "center" | "concentric" | "distance" | "angle" | "parallel" | "fixed" | KinMateType;
 export type CompPatch = {
   at?: Vec3;
   move?: Vec3;
@@ -40,9 +42,27 @@ export type CompPatch = {
 export type AsmCmd =
   | { k: "list" }
   | { k: "faces"; comp: string; kind?: "plane" | "cylinder" }
-  | { k: "mate"; kind: MateKind; a: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; value?: number; flip: boolean; center: boolean; name?: string }
+  | {
+      k: "mate";
+      kind: MateKind;
+      a: string;
+      faceA?: FaceSpec;
+      b?: string;
+      faceB?: FaceSpec;
+      value?: number;
+      flip: boolean;
+      center: boolean;
+      name?: string;
+      /** pokročilé vazby: druhá plocha A / B (Šířka, Závěs, Drážka), rovina souměrnosti (komponenta `c`, plocha `faceC`), meze */
+      faceA2?: FaceSpec;
+      faceB2?: FaceSpec;
+      c?: string;
+      faceC?: FaceSpec;
+      min?: number;
+      max?: number;
+    }
   | { k: "mates" }
-  | { k: "mateEdit"; ref: string; value?: number; flip?: boolean; suppress?: boolean; del?: boolean; name?: string }
+  | { k: "mateEdit"; ref: string; value?: number; flip?: boolean; suppress?: boolean; del?: boolean; name?: string; min?: number; max?: number }
   | { k: "comp"; comp: string; patch: CompPatch }
   | { k: "remove"; comps: string[] }
   | { k: "duplicate"; comp: string; offset: Vec3 }
@@ -60,7 +80,9 @@ export type AsmCmd =
   | { k: "moldbase"; params: MoldBaseParams; name?: string }
   | { k: "tabs" }
   | { k: "tab"; target: string | number }
-  | { k: "closeTab"; target?: string | number };
+  | { k: "closeTab"; target?: string | number }
+  /** pohybová studie (`pohyb …`, cad/agent-motion.ts) */
+  | { k: "motion"; cmd: MotionCmd };
 
 /* ───────────────────────── tokeny a slova ───────────────────────── */
 
@@ -127,6 +149,22 @@ const MATE_KIND: Record<string, MateKind> = Object.fromEntries(
       ["angle", "úhel", "angle", "winkel"],
       ["parallel", "rovnoběžně", "rovnoběžnost", "parallel"],
       ["fixed", "ukotvit", "ukotvení", "fixed", "fix", "anchor", "fixiert", "fixieren", "fest"],
+      ["perpendicular", "kolmo", "kolmost", "kolmý", "kolmá", "perpendicular", "perp", "senkrecht", "rechtwinklig"],
+      ["tangent", "tečně", "tečnost", "tečná", "tangent", "tangential", "tangente"],
+      ["coincident", "shodně", "shodnost", "shoda", "coincident", "coincidence", "koinzident", "deckungsgleich", "zusammenfallend"],
+      ["symmetric", "symetricky", "symetrie", "souměrně", "souměrnost", "symmetric", "symmetry", "symmetrisch", "symmetrie"],
+      ["width", "šířka", "šířkou", "width", "breite"],
+      ["path", "dráha", "dráze", "path", "pfad", "bahn"],
+      ["slot", "drážka", "drážce", "slot", "langloch"],
+      ["hinge", "závěs", "pant", "hinge", "scharnier"],
+      ["lock", "zámek", "zamknout", "lock", "locked", "sperren", "gesperrt", "starr"],
+      ["limitDistance", "mez-vzdálenosti", "limit-distance", "limitdistance", "distance-limit", "abstandsgrenze", "grenzabstand"],
+      ["limitAngle", "mez-úhlu", "limit-angle", "limitangle", "angle-limit", "winkelgrenze", "grenzwinkel"],
+      ["gear", "ozubení", "ozubené", "soukolí", "převod", "gear", "gears", "zahnrad", "zahnräder", "getriebe"],
+      ["rack", "hřeben", "pastorek", "rack", "pinion", "rack-pinion", "zahnstange", "ritzel"],
+      ["screw", "šroub", "šroubový", "závit", "screw", "thread", "schraube", "gewinde"],
+      ["cam", "vačka", "vačkou", "cam", "nocken", "kurvenscheibe"],
+      ["universal", "kardan", "kardanový", "universal", "universal-joint", "ujoint", "kreuzgelenk", "kardangelenk"],
     ] as const
   ).flatMap(([k, ...w]) => w.map((x) => [fold(x), k as MateKind])),
 );
@@ -173,10 +211,16 @@ const F_CYL = W("válcová", "válcové", "válcovou", "kuželová", "kuželové
 const F_LARGEST = W("největší", "largest", "biggest", "max", "größte", "grösste", "groesste", "grosste");
 const F_SMALLEST = W("nejmenší", "smallest", "min", "kleinste");
 const F_DIAM = W("ø", "⌀", "průměr", "prumer", "diameter", "durchmesser", "dm");
+/** pokročilé vazby: koule, hrany (kružnice, úsečka) a vrcholy */
+export const F_SPHERE = W("koule", "kulová", "kulovou", "sphere", "spherical", "kugel");
+export const F_CIRCLE = W("kružnice", "kružnici", "oblouk", "circle", "arc", "kreis", "bogen");
+export const F_LINE = W("úsečka", "úsečku", "přímka", "přímku", "line", "linie", "gerade", "strecke");
+export const F_POINT = W("vrchol", "vertex", "ecke");
+const KIND_WORDS = [F_PLANE, F_CYL, F_SPHERE, F_CIRCLE, F_LINE, F_POINT];
 const isFaceWord = (tk: Tok | undefined): boolean => {
   if (!tk || tk.q) return false;
   const w = fold(tk.t);
-  return /^f\d+(@.+)?$/.test(w) || w in SIDE || F_PLANE.has(w) || F_CYL.has(w) || F_LARGEST.has(w) || F_SMALLEST.has(w) || F_DIAM.has(w) || /^[øØ⌀]\d/.test(tk.t) || /^r\d+([.,]\d+)?$/.test(w);
+  return /^[fev]\d+(@.+)?$/.test(w) || w in SIDE || KIND_WORDS.some((k) => k.has(w)) || F_LARGEST.has(w) || F_SMALLEST.has(w) || F_DIAM.has(w) || /^[øØ⌀]\d/.test(tk.t) || /^r\d+([.,]\d+)?$/.test(w);
 };
 
 /* ───────────────────────── čtení ───────────────────────── */
@@ -223,19 +267,35 @@ function compArg(c: Cur, usage: string): string {
   return t.t.trim();
 }
 
-/** plocha za názvem komponenty: `F12`, `F3@Díl`, pravidlo (`+Z`, `horní`, `největší`, `válcová Ø8`, `Ø10`, `R4`) */
-function faceArg(c: Cur): FaceSpec | undefined {
+/**
+ * plocha za názvem komponenty: `F12`, `F3@Díl`, hrana `E5`, vrchol `V3`, pravidlo (`+Z`, `horní`, `největší`, `válcová Ø8`, `Ø10`, `R4`,
+ * `koule`, `kružnice Ø40`, `úsečka +X`). `split` = další plocha začíná dalším číslem plochy, druhým směrem nebo druhým druhem
+ * (dvě plochy jedné komponenty za sebou: `F3 F5`, `+X -X`). „min N“ / „max N“ jsou meze vazby, ne pravidlo plochy.
+ */
+function faceArg(c: Cur, split = false): FaceSpec | undefined {
   const raw: string[] = [];
   const spec: FaceSpec = { rule: [], raw: "" };
-  while (isFaceWord(c.peek()) || (raw.length && isNum(c.peek()?.t ?? "") && !c.peek()!.q && (F_CYL.has(fold(raw[raw.length - 1])) || F_DIAM.has(fold(raw[raw.length - 1]))))) {
+  while (isFaceWord(c.peek()) || (raw.length && isNum(c.peek()?.t ?? "") && !c.peek()!.q && (F_CYL.has(fold(raw[raw.length - 1])) || F_CIRCLE.has(fold(raw[raw.length - 1])) || F_DIAM.has(fold(raw[raw.length - 1]))))) {
+    const w0 = c.word();
+    if ((w0 === "min" || w0 === "max") && isNum(c.peek(1)?.t ?? "")) break;
+    if (split && raw.length) {
+      const isIdx = /^[fev]\d/.test(w0);
+      if (isIdx && (spec.index !== undefined || spec.rule.length)) break;
+      if (w0 in SIDE && spec.rule.some((x) => x in SIDE)) break;
+      if (KIND_WORDS.some((k) => k.has(w0) && spec.rule.some((x) => k.has(x) || KIND_WORDS.some((k2) => k2.has(x))))) break;
+      if (spec.index !== undefined && !isNum(c.peek()?.t ?? "")) break;
+      // „Ø10 -Z“ = válec Ø10 a rovina −Z (Závěs: osa + dosedací rovina)
+      if ((spec.diameter !== undefined || spec.radius !== undefined) && (w0 in SIDE || KIND_WORDS.some((k) => k.has(w0)))) break;
+    }
     const t = c.next()!.t;
     raw.push(t);
     const w = fold(t);
-    const f = /^f(\d+)(?:@(.+))?$/.exec(w);
+    const f = /^([fev])(\d+)(?:@(.+))?$/.exec(w);
     if (f) {
-      if (Number(f[1]) < 1) throw new Error(tr("číslo plochy začíná F1"));
-      spec.index = Number(f[1]) - 1;
-      if (f[2]) spec.leaf = t.slice(t.indexOf("@") + 1);
+      if (Number(f[2]) < 1) throw new Error(f[1] === "e" ? tr("číslo hrany začíná E1") : f[1] === "v" ? tr("číslo vrcholu začíná V1") : tr("číslo plochy začíná F1"));
+      spec.index = Number(f[2]) - 1;
+      if (f[1] !== "f") spec.ent = f[1] === "e" ? "edge" : "vertex";
+      if (f[3]) spec.leaf = t.slice(t.indexOf("@") + 1);
     } else if (/^[øØ⌀]\d/.test(t) || (isNum(t) && raw.length > 1)) spec.diameter = num(t);
     else if (/^r\d/.test(w)) spec.radius = num(t.slice(1));
     else if (!F_DIAM.has(w)) spec.rule.push(w);
@@ -244,6 +304,12 @@ function faceArg(c: Cur): FaceSpec | undefined {
   spec.raw = raw.join(" ");
   return spec;
 }
+
+/** slova pravidel ploch pro výběr entit pokročilých vazeb (cad/asm-agent-kin.ts) */
+export const faceArgWords = () => ({ plane: F_PLANE, cyl: F_CYL, side: SIDE, largest: F_LARGEST, smallest: F_SMALLEST });
+
+/** čtení tokenů pro další parsery sestavy (pohybová studie) */
+export { Cur as AsmCursor, W as asmWords, isNum as asmIsNum, num as asmNum };
 
 /** číslo nebo název (záložka, vazba) */
 const target = (t: Tok): string | number => (!t.q && /^#?\d+$/.test(t.t) ? Number(t.t.replace("#", "")) : t.t.trim());
@@ -612,7 +678,18 @@ const MATE_ACTION = (c: Cur, k = 0) => c.is(O.value, k) || c.is(O.flip, k) || c.
 function parseMate(c: Cur): AsmCmd {
   const MATE_USE = tr("sestava vazba kontakt|zarovnat|vystředit|souosost|vzdálenost|úhel|rovnoběžně \"A\" <plocha A> \"B\" <plocha B> [hodnota N] [obráceně] [název \"…\"] · sestava vazba ukotvit \"A\" · sestava vazba <č.|\"název\"> hodnota=N|obráceně|potlačit|zapnout|smazat");
   if (c.done) throw new Error(tr("vazba: {0}", MATE_USE));
-  const kind = c.peek()!.q ? undefined : MATE_KIND[c.word()];
+  let kind = c.peek()!.q ? undefined : MATE_KIND[c.word()];
+  // víceslovné názvy: „mez vzdálenosti“, „limit angle“, „hřeben a pastorek“, „universal joint“
+  if (!kind && LIMIT_WORD.has(c.word())) {
+    kind = DIST_WORD.has(c.word(1)) ? "limitDistance" : ANGLE_WORD.has(c.word(1)) ? "limitAngle" : undefined;
+    if (kind) c.i++;
+  }
+  if (kind && isKinMate(kind as KinMateType) && !(c.peek(1) && MATE_ACTION(c, 1))) {
+    c.i++;
+    if (kind === "rack" && AND_WORD.has(c.word()) && MATE_KIND[c.word(1)] === "rack") c.i += 2;
+    if (kind === "universal" && JOINT_WORD.has(c.word())) c.i++;
+    return parseKinMate(c, kind as KinMateType);
+  }
   if (kind && !(c.peek(1) && MATE_ACTION(c, 1))) {
     c.i++;
     const a = compArg(c, tr("vazba {0}: chybí komponenta A – {1}", tr(kindLabel(kind)), MATE_USE));
@@ -667,9 +744,125 @@ function parseMate(c: Cur): AsmCmd {
     } else if (c.is(O.name)) {
       c.i++;
       out.name = c.str(tr("název"));
+    } else if (c.is(KO.min) || c.is(KO.max)) {
+      const k = c.is(KO.min) ? "min" : "max";
+      c.i++;
+      out[k] = c.num(k);
+    } else if (c.is(KO.ratio) || c.is(KO.pitch) || c.is(KO.travel) || c.is(KO.pos)) {
+      c.i++;
+      out.value = c.num(tr("hodnota"));
     } else throw new Error(tr("vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)", ref.t, c.peek()!.t));
   }
-  if (out.value === undefined && out.flip === undefined && out.suppress === undefined && !out.del && out.name === undefined) throw new Error(tr("vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\"", ref.t));
+  if (out.value === undefined && out.flip === undefined && out.suppress === undefined && !out.del && out.name === undefined && out.min === undefined && out.max === undefined) throw new Error(tr("vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\"", ref.t));
+  return out;
+}
+
+const LIMIT_WORD = W("mez", "limit", "grenze", "grenzwert");
+const DIST_WORD = W("vzdálenosti", "vzdálenost", "distance", "abstand", "abstands");
+const ANGLE_WORD = W("úhlu", "úhel", "angle", "winkel", "winkels");
+const AND_WORD = W("a", "and", "und", "&");
+const JOINT_WORD = W("joint", "kloub", "gelenk");
+/** volby pokročilých vazeb */
+const KO = {
+  ratio: W("poměr", "převodový", "ratio", "übersetzung", "uebersetzung", "verhältnis", "verhaeltnis"),
+  teeth: W("zuby", "zubů", "zubu", "teeth", "zähne", "zaehne", "zähnezahl"),
+  pitch: W("stoupání", "pitch", "lead", "steigung"),
+  travel: W("dráha", "posuv", "na-otáčku", "travel", "per-rev", "weg", "vorschub"),
+  module: W("modul", "module", "modulus"),
+  from: W("od", "from", "von"),
+  to: W("do", "to", "bis"),
+  min: W("min", "minimum"),
+  max: W("max", "maximum"),
+  left: W("levý", "levotočivý", "levotočivě", "left", "left-hand", "lh", "links", "linksgängig"),
+  internal: W("vnitřní", "vnitřně", "stejně", "internal", "inner", "same", "innen", "innenverzahnung", "gleichsinnig"),
+  about: W("rovina", "podle", "souměrnosti", "about", "mirror", "um", "bezüglich", "spiegelebene", "symmetrieebene"),
+  pos: W("poloha", "position", "pos", "lage"),
+};
+/** vazby, které potřebují dvě plochy na jedné straně (Šířka: 2 plochy jazýčku a 2 stěny drážky; Drážka: 2 konce; Závěs: osa + dosedací rovina) */
+const TWO_A = new Set<MateKind>(["width", "hinge"]);
+const TWO_B = new Set<MateKind>(["width", "slot", "hinge"]);
+const KIN_USE = () =>
+  tr(
+    "sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu|ozubení|hřeben|šroub|vačka|kardan \"A\" <plocha|E5|V3> [2. plocha] \"B\" <plocha> [2. plocha] [rovina \"C\" <plocha>] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [min N] [max N] [poloha N] [obráceně|levý|vnitřní] [název \"…\"]",
+  );
+
+/** Pokročilá / mechanická vazba: komponenty, plochy (u Šířky / Drážky / Závěsu po dvou), rovina souměrnosti, poměr, stoupání, meze. */
+function parseKinMate(c: Cur, kind: KinMateType): AsmCmd {
+  const label = tr(MATE_LABEL[kind]);
+  const a = compArg(c, tr("vazba {0}: chybí komponenta A – {1}", label, KIN_USE()));
+  const out: Extract<AsmCmd, { k: "mate" }> = { k: "mate", kind, a, flip: false, center: false };
+  if (kind !== "lock") {
+    const fa = faceArg(c, TWO_A.has(kind));
+    if (fa) out.faceA = fa;
+    if (TWO_A.has(kind)) {
+      const fa2 = faceArg(c);
+      if (fa2) out.faceA2 = fa2;
+    }
+  }
+  out.b = compArg(c, tr("vazba {0}: chybí cílová komponenta B – {1}", label, KIN_USE()));
+  if (kind !== "lock") {
+    const fb = faceArg(c, TWO_B.has(kind));
+    if (fb) out.faceB = fb;
+    if (TWO_B.has(kind)) {
+      const fb2 = faceArg(c);
+      if (fb2) out.faceB2 = fb2;
+    }
+  }
+  const val = (what: string) => {
+    c.i++;
+    out.value = c.num(what);
+  };
+  while (!c.done) {
+    const tk = c.peek()!;
+    const rng = !tk.q ? /^([+-]?\d+(?:[.,]\d+)?)(?:\.\.|…)([+-]?\d+(?:[.,]\d+)?)$/.exec(tk.t) : null;
+    if (rng) {
+      c.i++;
+      out.min = num(rng[1]);
+      out.max = num(rng[2]);
+    } else if (c.is(KO.about)) {
+      c.i++;
+      if (c.peek()?.q || (c.peek() && !isFaceWord(c.peek()))) out.c = compArg(c, tr("rovina souměrnosti: chybí komponenta"));
+      const fc = faceArg(c);
+      if (!fc) throw new Error(tr("rovina souměrnosti: zadejte rovinnou plochu (F12, +X…) – rovina \"Rám\" F3, nebo rovina F3 (plocha komponenty B)"));
+      out.faceC = fc;
+    } else if (c.is(O.value) || c.is(KO.ratio) || c.is(KO.pitch) || c.is(KO.travel)) val(tr("hodnota"));
+    else if (c.is(KO.pos)) val(tr("poloha"));
+    else if (c.is(KO.teeth)) {
+      c.i++;
+      const z1 = c.num(tr("zuby"));
+      const z2 = isNum(c.peek()?.t ?? "") && !c.peek()!.q ? c.num(tr("zuby")) : undefined;
+      if (!(z1 > 0) || (z2 !== undefined && !(z2 > 0))) throw new Error(tr("počet zubů musí být kladný"));
+      if (kind === "rack") {
+        if (out.value === undefined) throw new Error(tr("hřeben: zadejte „modul m zuby z“ (dráha na otáčku = π·m·z) nebo „dráha N“"));
+        out.value = Math.PI * out.value * z1;
+      } else if (z2 === undefined) throw new Error(tr("ozubení: zuby z1 z2 – počty zubů kola A a kola B"));
+      else out.value = z2 / z1;
+    } else if (c.is(KO.module)) {
+      c.i++;
+      out.value = c.num(tr("modul"));
+      if (!c.is(KO.teeth)) throw new Error(tr("hřeben: za modulem čekám „zuby z“ (počet zubů pastorku)"));
+    } else if (c.is(KO.min) || c.is(KO.from)) {
+      c.i++;
+      out.min = c.num(tr("min"));
+      if (c.is(KO.to)) {
+        c.i++;
+        out.max = c.num(tr("max"));
+      }
+    } else if (c.is(KO.max) || c.is(KO.to)) {
+      c.i++;
+      out.max = c.num(tr("max"));
+    } else if (c.is(O.flip) || c.is(KO.left) || c.is(KO.internal)) {
+      c.i++;
+      out.flip = true;
+    } else if (c.is(O.name)) {
+      c.i++;
+      out.name = c.str(tr("název"));
+    } else if (isNum(tk.t) && !tk.q && out.value === undefined) out.value = c.num(tr("hodnota"));
+    else throw new Error(tr("vazba {0}: neznámá volba „{1}“ – {2}", label, tk.t, KIN_USE()));
+  }
+  if ((kind === "limitDistance" || kind === "limitAngle") && out.min === undefined && out.max === undefined) throw new Error(tr("vazba {0}: zadejte meze – min N max N (nebo od N do M, N..M)", label));
+  if (out.min !== undefined && out.max !== undefined && out.min > out.max) throw new Error(tr("vazba {0}: min {1} je větší než max {2}", label, out.min, out.max));
+  if ((kind === "gear" || kind === "screw" || kind === "rack") && out.value !== undefined && !(out.value > 0)) throw new Error(tr("vazba {0}: hodnota musí být kladná", label));
   return out;
 }
 
@@ -801,14 +994,36 @@ export function matesSummary(doc: CadDoc, status?: Record<string, MateStatus>): 
 /** Text vazby: „Souosost „Čep“ F3 → „Deska“ F7 · 5 mm · obráceně“. */
 export function mateText(doc: CadDoc, m: Mate): string {
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
-  const face = (r: Mate["a"]) => (r.face >= 0 ? ` F${r.face + 1}` : r.radius ? ` R${fmt(r.radius)}` : "");
+  const face = (r: Mate["a"]) => (r.face >= 0 ? ` ${r.ent === "edge" ? "E" : r.ent === "vertex" ? "V" : "F"}${r.face + 1}` : r.radius ? ` R${fmt(r.radius)}` : "");
   const label = m.name ?? (m.type === "mate" && m.center ? tr("Vystředit") : tr(MATE_LABEL[m.type]));
-  const parts = [m.type === "fixed" ? `${label} „${name(m.a.compId)}“` : `${label} „${name(m.a.compId)}“${face(m.a)} → „${name(m.b.compId)}“${face(m.b)}`];
+  const parts = [m.type === "fixed" ? `${label} „${name(m.a.compId)}“` : `${label} „${name(m.a.compId)}“${face(m.a)}${m.c && m.type !== "symmetric" && m.c.compId === m.a.compId ? `+${face(m.c).trim()}` : ""} → „${name(m.b.compId)}“${face(m.b)}${m.d ? `+${face(m.d).trim()}` : ""}${m.c && m.type === "slot" ? `+${face(m.c).trim()}` : ""}`];
   if (m.type === "distance") parts.push(`${fmt(m.value ?? 0)} mm`);
   if (m.type === "angle") parts.push(`${fmt(m.value ?? 0)}°`);
-  if (m.flip) parts.push(tr("obráceně"));
+  parts.push(...kinMateParts(m, face, name));
+  if (m.flip) parts.push(m.type === "screw" ? tr("levý závit") : m.type === "gear" ? tr("stejný smysl otáčení") : m.type === "tangent" ? tr("vnitřní dotyk") : tr("obráceně"));
   if (m.suppressed) parts.push(tr("potlačeno"));
   return parts.join(" · ");
+}
+
+/** Hodnoty pokročilé vazby do textu: poměr, stoupání, dráha na otáčku, meze, poloha v drážce, rovina souměrnosti. */
+function kinMateParts(m: Mate, face: (r: Mate["a"]) => string, name: (id: string) => string): string[] {
+  switch (m.type) {
+    case "gear":
+      return [tr("poměr {0}", fmt(m.value ?? 1, 4))];
+    case "screw":
+      return [tr("stoupání {0} mm", fmt(m.value ?? 0, 4))];
+    case "rack":
+      return [tr("{0} mm/ot", fmt(m.value ?? 0, 4))];
+    case "slot":
+      return m.value !== undefined ? [tr("poloha {0} mm", fmt(m.value))] : [];
+    case "symmetric":
+      return m.c ? [tr("rovina „{0}“{1}", name(m.c.compId), face(m.c))] : [];
+    case "limitDistance":
+    case "limitAngle":
+      return [`⟨${m.min !== undefined ? fmt(m.min) : "−∞"}; ${m.max !== undefined ? fmt(m.max) : "∞"}⟩${m.type === "limitAngle" ? "°" : " mm"}`];
+    default:
+      return [];
+  }
 }
 
 /** Výpis vazeb (`sestava vazby`): číslo, druh, komponenty a plochy, hodnota, stav. */
@@ -860,6 +1075,8 @@ export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>)
   const items = comps.slice(0, MAX).map((c) => `${c.name} ${pt(c.placement.position)}${rotText(c.placement.rotation)}${isFixed(doc, c) ? " ⚓" : ""}${c.hidden ? tr(" (skrytá)") : ""}${c.source.kind === "asm" ? tr(" (podsestava)") : ""}`);
   const out = [tr("Komponenty: {0}", items.join(" · ") || tr("žádné")) + (comps.length > MAX ? tr(" … a dalších {0} (sestava)", comps.length - MAX) : "")];
   if (doc.mates?.length) out.push(tr("Vazby: {0}", matesSummary(doc, status)));
+  const ms = doc.motion;
+  if (ms?.motors.length) out.push(tr("Pohybová studie: motorů {0} · kroků {1} · {2} s{3} – pohyb stav", ms.motors.length, ms.steps, fmt(ms.duration, 3), ms.collisions ? tr(" · kolize") : ""));
   return out;
 }
 

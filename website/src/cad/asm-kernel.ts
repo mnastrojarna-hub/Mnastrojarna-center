@@ -7,6 +7,7 @@ import * as r from "replicad";
 import { flattenAssembly, MAX_DEPTH, sourceKey } from "./assembly";
 import { buildDoc, buildShape, shapeResult } from "./build";
 import { missingBlobs } from "./blobs";
+import { subShapes } from "./fastbox";
 import type { BuildResult, CadDoc, ComponentSource, Placement, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -115,7 +116,22 @@ export function cachedBody(key: string): Shape | null {
 // ---------------- geometrie ploch pro vazby ----------------
 
 /** Geometrie plochy dílu (lokální souřadnice dílu) pro trvalé vazby: rovina (normála) nebo válec/kužel (osa). */
-export type MateFaceInfo = { kind: "plane" | "cylinder" | "other"; origin: Vec3; normal: Vec3; radius?: number; /** rozsah válce podél osy (parametr t od origin) */ extent?: [number, number] };
+export type MateFaceInfo = {
+  /** plocha: rovina / válec (kužel) / koule / jiná; hrana (mateEdgeInfo): úsečka / kružnice / křivka; vrchol: bod */
+  kind: "plane" | "cylinder" | "other" | "sphere" | "line" | "circle" | "curve" | "point";
+  origin: Vec3;
+  normal: Vec3;
+  radius?: number;
+  /** rozsah válce podél osy (parametr t od origin) */
+  extent?: [number, number];
+  /** body hrany (úsečka: začátek a konec; křivka: lomená čára) nebo vrcholy sítě plochy (mateFaceMesh) */
+  pts?: Vec3[];
+  /** síť plochy: trojúhelníky (indexy do pts) a normály ve vrcholech */
+  tris?: number[];
+  nrm?: Vec3[];
+  /** délka hrany */
+  length?: number;
+};
 
 type OcAny = Record<string, new (...a: unknown[]) => Record<string, (...a: unknown[]) => unknown>>;
 const P3 = (p: { X(): number; Y(): number; Z(): number }): Vec3 => [p.X(), p.Y(), p.Z()];
@@ -129,6 +145,18 @@ export function mateFaceInfoOf(body: Shape, index: number): MateFaceInfo | null 
   if (type === "PLANE") {
     const n = face.normalAt(c);
     return { kind: "plane", origin, normal: [n.x, n.y, n.z] };
+  }
+  if (type === "SPHERE") {
+    try {
+      const oc = r.getOC() as unknown as OcAny;
+      const ad = new oc.BRepAdaptor_Surface(face.wrapped);
+      const sp = ad.Sphere() as { Location(): { X(): number; Y(): number; Z(): number }; Radius(): number };
+      const out: MateFaceInfo = { kind: "sphere", origin: P3(sp.Location()), normal: [0, 0, 1], radius: sp.Radius() };
+      (ad as unknown as { delete(): void }).delete();
+      return out;
+    } catch {
+      return { kind: "other", origin, normal: [0, 0, 1] };
+    }
   }
   if (type === "CYLINDRE" || type === "CONE") {
     try {
@@ -160,6 +188,78 @@ export function mateFaceInfoOf(body: Shape, index: number): MateFaceInfo | null 
 export function mateFaceInfo(key: string, index: number): MateFaceInfo | null {
   const b = cachedBody(key);
   return b ? mateFaceInfoOf(b, index) : null;
+}
+
+/** Geometrie hrany dílu pro vazby (Dráha, Shodně, Hřeben): úsečka (začátek, směr), kružnice (střed, osa, poloměr), jiná křivka (body). */
+export function mateEdgeInfoOf(body: Shape, index: number): MateFaceInfo | null {
+  const edge = body.edges[index];
+  if (!edge) return null;
+  const type = edge.geomType as string;
+  const V = (v: { x: number; y: number; z: number }): Vec3 => [v.x, v.y, v.z];
+  const a = V(edge.startPoint);
+  const b = V(edge.endPoint);
+  const length = edge.length;
+  if (type === "LINE") {
+    const d: Vec3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const l = Math.hypot(...d) || 1;
+    return { kind: "line", origin: a, normal: [d[0] / l, d[1] / l, d[2] / l], pts: [a, b], length };
+  }
+  const N = Math.max(16, Math.min(400, Math.ceil(length / 0.5)));
+  const pts: Vec3[] = [];
+  for (let i = 0; i <= N; i++) pts.push(V(edge.pointAt(i / N)));
+  if (type === "CIRCLE") {
+    try {
+      const oc = r.getOC() as unknown as OcAny;
+      const ad = new oc.BRepAdaptor_Curve(edge.wrapped);
+      const c = ad.Circle() as { Axis(): { Location(): { X(): number; Y(): number; Z(): number }; Direction(): { X(): number; Y(): number; Z(): number } }; Radius(): number };
+      const ax = c.Axis();
+      const out: MateFaceInfo = { kind: "circle", origin: P3(ax.Location()), normal: P3(ax.Direction()), radius: c.Radius(), pts, length };
+      (ad as unknown as { delete(): void }).delete();
+      return out;
+    } catch {
+      /* jako obecná křivka */
+    }
+  }
+  return { kind: "curve", origin: a, normal: [0, 0, 1], pts, length };
+}
+
+export function mateEdgeInfo(key: string, index: number): MateFaceInfo | null {
+  const b = cachedBody(key);
+  return b ? mateEdgeInfoOf(b, index) : null;
+}
+
+/** Poloha vrcholu dílu (přesně z jádra) jako geometrie „point“. */
+export function mateVertexInfo(key: string, index: number): MateFaceInfo | null {
+  const b = cachedBody(key);
+  if (!b) return null;
+  const oc = r.getOC() as unknown as { BRep_Tool: { Pnt(v: unknown): { X(): number; Y(): number; Z(): number; delete(): void } } };
+  let i = 0;
+  let out: MateFaceInfo | null = null;
+  for (const v of subShapes(b, "VERTEX")) {
+    if (i++ === index) {
+      const p = oc.BRep_Tool.Pnt(v);
+      out = { kind: "point", origin: [p.X(), p.Y(), p.Z()], normal: [0, 0, 1] };
+      p.delete();
+    }
+    (v as { delete(): void }).delete();
+  }
+  return out;
+}
+
+/** Jemná síť jedné plochy dílu (vačka): vrcholy, trojúhelníky a normály; `tol` = odchylka tětivy [mm]. */
+export function mateFaceMesh(key: string, index: number, tol = 0.002): MateFaceInfo | null {
+  const b = cachedBody(key);
+  const face = b?.faces[index];
+  if (!face) return null;
+  const info = mateFaceInfoOf(b!, index);
+  const m = face.mesh({ tolerance: tol, angularTolerance: 0.05 });
+  const pts: Vec3[] = [];
+  const nrm: Vec3[] = [];
+  for (let i = 0; i + 2 < m.vertices.length; i += 3) {
+    pts.push([m.vertices[i], m.vertices[i + 1], m.vertices[i + 2]]);
+    nrm.push([m.normals[i] ?? 0, m.normals[i + 1] ?? 0, m.normals[i + 2] ?? 1]);
+  }
+  return { ...(info ?? { kind: "other", origin: pts[0] ?? [0, 0, 0], normal: [0, 0, 1] }), pts, tris: [...m.triangles], nrm };
 }
 
 /** Index válcové plochy dílu s daným poloměrem (největší plocha) – pro automatické vazby normálií (šroub v díře). */
