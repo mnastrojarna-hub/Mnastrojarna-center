@@ -2942,7 +2942,6 @@ export const EN: Record<string, string> = {
  "Sdílený dokument už v úložišti není (platnost vypršela nebo byl smazán). Požádejte odesílatele o nové sdílení.": "The shared document is no longer in storage (it expired or was deleted). Ask the sender to share it again.",
  "Sdílený odkaz": "Shared link",
  "Sdílený odkaz nelze otevřít": "The shared link cannot be opened",
- "Sdílet": "Share",
  "Sdílet odkazem": "Share by link",
  "Sdílet odkazem (WhatsApp, e-mail, Teams…)": "Share by link (WhatsApp, e-mail, Teams…)",
  "Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči": "Share by link (WhatsApp, e-mail, Teams…) – the recipient opens the part in a browser",

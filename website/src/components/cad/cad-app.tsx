@@ -38,6 +38,7 @@ import { saveFile } from "@/lib/save-file";
 import { track } from "../analytics";
 import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
+import { ShareCta } from "./share-cta";
 import { CommandPalette, type Command } from "./command-palette";
 import { getExtUi, type ExtActionApi } from "./ext";
 import { LibraryDialog } from "./library-dialog";
@@ -3066,17 +3067,12 @@ export function CadApp() {
           </span>
           <QBtn icon="measure" title={tr("Paleta příkazů (Ctrl+K)")} onClick={() => setPaletteOpen(true)} />
           <QBtn icon="settings" title={tr("Nastavení (Ctrl+,)")} onClick={() => setSettingsOpen(true)} />
-          <button
-            type="button"
+          <ShareCta
+            compact
             onClick={() => setShareOpen(true)}
             disabled={!doc.features.length && !doc.components?.length}
             title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči")}
-            aria-label={tr("Sdílet")}
-            className="flex h-7 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-white/85 hover:bg-white/10 disabled:opacity-40"
-          >
-            <CadIcon name="share" className="h-4 w-4" />
-            <span className="hidden md:inline">{tr("Sdílet")}</span>
-          </button>
+          />
           <div className="relative">
             <button
               type="button"

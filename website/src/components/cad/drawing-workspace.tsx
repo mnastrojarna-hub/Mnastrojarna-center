@@ -17,6 +17,7 @@ import type { SmartDims } from "@/cad/drawing-dims";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
+import { ShareCta } from "./share-cta";
 
 type Props = {
   doc: CadDoc;
@@ -775,14 +776,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         {onShare && (
           <>
             <div className="mx-1 h-6 w-px bg-ink-700/10" />
-            <Btn
+            <ShareCta
+              compact
               onClick={() => {
                 if (dirty.current) persistNow(); // rozpracované razítko / poznámky do dokumentu ještě před vytvořením odkazu
                 onShare?.();
               }}
-              title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres")}>
-              {tr("Sdílet")}
-            </Btn>
+              title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres")}
+            />
           </>
         )}
         <div className="mx-1 h-6 w-px bg-ink-700/10" />
