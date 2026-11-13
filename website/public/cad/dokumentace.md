@@ -832,6 +832,7 @@ nový díl Příruba DN50 · skica XY: kružnice 165 · vysunout 18 · trubka 88
 - vazba kolmo e1 e2, vazba shodně e1.a počátek, kóta délka e1 80, kóta průměr e2 Ø20 (řídicí; referenční jen měří). Po každém řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno.
 - skica plocha F6: … (číslo jako u popisků Ctrl+Shift+L, nebo horní, +X), odsazení N, obráceně; skica rovina "Rovina 1": … na pomocné rovině.
 - Výkres: výkres A3 …, kótovat, výkres tolerance Ø40 h6, výkres stav / window.mncad.drawingStatus(). Návod pro AI obsahuje pravidla kótování a tři vzorové příklady (hřídel, příruba, deska).
+- Podle předlohy vždy kontrola 1:1: návod pro AI ukládá agentům před modelováním vypsat všechny kóty předlohy, chybějící kótu nevymýšlet, ale zeptat se (odhadnout z měřítka, nebo ji někdo doplní), a na konci porovnat model a výkres s předlohou kótu po kótě a plochu po ploše a odhady vypsat v závěrečné zprávě.
 
 ## 22. Omezení a poctivé srovnání s desktopovými CADy
 

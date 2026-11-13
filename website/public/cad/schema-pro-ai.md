@@ -141,12 +141,17 @@ Na ně odkazují vazby a kóty:
 - Kóta je **řídicí** (změní geometrii); `referenční` (`reference`, `Referenz`) jen měří a hodnotu lze vynechat.
 - Po každém řádku `vazba` / `kóta` (a na konci bloku skici, přibyly-li entity) se skica **vyřeší** a protokol napíše
   stav jako skicář: `Plně určeno`, `Nedourčeno (N st. volnosti)` nebo ⚠ `Přeurčeno – konflikt / nadbytečné vazby` s výčtem
-  vazeb v rozporu. Nenajde-li řešič řešení, geometrie zůstane a vazby i kóty zůstanou uložené (opravíte je ve skicáři –
-  klik na značku vazby nebo kótu, Delete – nebo v JSON: pole `constraints` a `dims` skici).
+  vazeb v rozporu (⚠ jen u skici přeurčené už předem, např. z JSON).
+- Vazba nebo kóta, která by skicu **přeurčila** (je v rozporu s dosavadními, nebo nadbytečná), se **nepřidá**: protokol
+  napíše `✗ kóta délka e1 20 ve skice „Skica 1“ nepřidána – v rozporu s dosavadními vazbami a kótami` (nebo
+  `– nadbytečná: …`) a ostatní položky téhož řádku se přidají. Jen měřící kótu zapíšete s `referenční`. Uložené vazby
+  a kóty opravíte ve skicáři (klik na značku vazby nebo kótu, Delete) nebo v JSON (pole `constraints` a `dims` skici).
+- Vazby, kóty a entity mimo blok skici jdou do skici **otevřené ve skicáři** (pokud ten vstup nezaložil vlastní skicu),
+  jinak do poslední skice dokumentu.
 - Chybný odkaz skončí chybou s očekávaným zápisem na řádku, kde je (`✗ řádek 7: vazba kolmo: „e5“ je kružnice / oblouk,
   čeká se úsečka – zápis: vazba kolmo e1 e2 (dvě úsečky)`); takový řádek nic nepřidá.
-- Vazba `tečně` mezi úsečkou a obloukem, které už sdílejí koncový bod (`shodně`), se vyhodnotí jako nadbytečná – drážku
-  kreslete entitou `drážka`, zaoblený roh `čára … r N`, případně tečnost vynechte.
+- Vazba `tečně` mezi úsečkou a obloukem, které už sdílejí koncový bod (`shodně`), se vyhodnotí jako nadbytečná a nepřidá
+  se – drážku kreslete entitou `drážka`, zaoblený roh `čára … r N`, případně tečnost vynechte.
 
 **Skica na ploše modelu nebo na pomocné rovině:** `skica plocha F6: …` – číslo plochy jako popisky pro výběr
 (`window.mncad.hints()`, Ctrl+Shift+L; F1 = první plocha), nebo pravidlem jako u skořepiny: `skica plocha horní`,
@@ -301,9 +306,11 @@ Dokument je JSON objekt:
   pro agenty je jednodušší použít textové příkazy s pravidly (`hrany svislé`, `otevřít +Z`).
 - Výběr hran/ploch indexy (`edges`, `faces`, `faces2`, `vertices`, u rozšíření `data.faces` / `data.edges`) může nést
   **otisky** `edgeSigs` / `faceSigs` / `faceSigs2` / `vertexSigs` (u rozšíření `data.facesSigs` …): mapa „index → otisk
-  { t: typ, c: střed, s: délka / plocha }“ entity tělesa před prvkem. Program je doplní sám při výběru v modelu, ze seznamu
-  i pravidlem v textovém příkazu; při stavbě se podle nich indexy znovu najdou, když úprava dřívějšího prvku hrany/plochy
-  přečísluje (nenalezená entita = ⚠ a použije se původní index). V ručně psaném JSON je lze vynechat.
+  { t: typ, c: střed, s: délka / plocha, r: poloměr válce / koule / kružnice, n: počet hran / ploch / vrcholů tělesa }“ entity
+  tělesa před prvkem. Program je doplní sám při výběru v modelu, ze seznamu i pravidlem v textovém příkazu; při stavbě se
+  podle nich indexy znovu najdou, když úprava dřívějšího prvku hrany/plochy přečísluje. Změna rozměru bez změny topologie
+  (stejné `n`) ponechá index bez varování; ⚠ s původním indexem jen tehdy, když se topologie změnila a entita podle otisku
+  nenašla. V ručně psaném JSON je lze vynechat.
 - Sestava: `"kind": "assembly"`, `"components": [ { "name": "Díl", "source": { "kind": "part", "doc": { …dokument dílu… } },
   "placement": { "position": [0,0,0], "rotation": [0,0,0] } } ]`, vazby `"mates"`.
 
@@ -359,8 +366,11 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
 4. **Kontrola:** `výkres stav` – musí platit „Duplicity: žádné“ a „Kontrola kót: všech … je na listu“. Řádek
    „Vynecháno“ říká proč (např. „zapněte pohled spodní“, „zapněte řez osou“, „nevešlo se“ → `výkres A2` nebo jiné
    měřítko) – opravte a spusťte `kótovat` znovu.
-5. **Tolerance** jen na funkční rozměry: `výkres tolerance Ø30 h6`, `výkres tolerance 50 ±0,05`,
+5. **Tolerance** jen na funkční rozměry: `výkres tolerance Ø30 h6`, `výkres tolerance 42 ±0,05`,
    `výkres tolerance M20 6g`, `výkres tolerance Ø50 H7` (kóta se najde podle popisku; nejednoznačná → chyba se seznamem).
+   **Pomocná kóta v závorce** („(50)“ – nejdelší článek řetězu) se netoleruje (ISO 129-1): příkaz ji odmítne a vypíše
+   ostatní články řetězu – tolerujte některý z nich. Tolerance zůstane u kóty i po změně modelu, dokud kóta existuje
+   (průměr podle hodnoty, délka podle polohy čel); zmizí-li kóta, tolerance se ztratí – zkontrolujte `výkres stav`.
 6. **Razítko:** `výkres nepředepsané ISO 2768-mK`, `výkres hrany ISO 13715 -0,3`, `výkres drsnost Ra 3,2`,
    `výkres poznámka "…"`.
 7. `výkres stav` naposledy, pak export (výkres → PDF / DXF / DWG / SVG).
@@ -373,7 +383,8 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
 - **Rotační díl** (osa vodorovně): průměry osazení naskládané na straně (nejmenší nejblíž dílu, rozestup 7 mm), délky
   osazení **řetězově na jedné čáře**, celková délka ve vnější řadě (`kótovat od základny` = všechny délky od jednoho čela);
   zápich šířkou (v řetězu) a Ø popisem; sražení „1,5×45°“ a zaoblení „R1“ jednou s počtem „2×“; vnější závit
-  „M20×1,5“ místo Ø a zvlášť délka závitu.
+  „M20×1,5“ místo Ø a zvlášť délka závitu. Příčná díra: poloha podél osy **od bližšího čela**, radiálně od osy.
+- Další modely na listu (komponenta, vložený soubor) se Chytrými kótami nekótují – kóty patří jen pohledům hlavního dílu.
 - **Hranolový díl:** celkové rozměry délka × šířka × výška jednou; polohy děr od základních hran (levá / spodní) v pohledu,
   kde jsou díry kružnicemi; souměrně rozmístěné díry roztečí od osy souměrnosti; kruhové pole roztečnou kružnicí „Ø120“
   na osové kružnici + „rovnoměrně“ (nebo úhel).
@@ -454,6 +465,58 @@ Hotový výkres (horní pohled = půdorys s dírami): `4× M8 ↧10` + `Ø6,8 �
 `90` a `50` (závitové díry), `60` (průchozí díry); kapsa `50` × `30`, hloubka `↧8`, `4× R5` (kapsa je uprostřed – bez
 polohových kót); celkové `120` × `80`; v předním pohledu tloušťka `20`.
 
+## Model nebo výkres podle předlohy – kontrola 1:1 (povinné)
+
+Když podle předlohy (výkres PDF, obrázek, ruční skica, 3D model zákazníka) stavíte model nebo překreslujete výkres,
+výsledek musí předloze odpovídat **1:1 – plocha po ploše, kóta po kótě**, samozřejmě s ohledem na zadání. Nejčastější
+chyby jsou nepřesnost (zaokrouhlení, záměna průměru a poloměru, posunutá díra, prohozená strana) a rozměr „dopočítaný od oka“.
+
+### 1. Před modelováním – soupis kót předlohy
+
+- Projděte předlohu pohled po pohledu a vypište **všechny** kóty do tabulky: číslo · prvek (osazení, díra, drážka,
+  sražení…) · hodnota přesně, jak je napsaná (desetinná místa, `Ø` / `R` / `M`, počet `4×`) · tolerance · pohled.
+- Spočítejte prvky: osazení, díry (po skupinách), drážky, závity, sražení, zaoblení.
+- Ověřte, že soupis je úplný a uzavřený: řetěz délek = celková délka, rozteč × počet = rozsah, průměry na sebe navazují,
+  každá díra má průměr, hloubku a polohu ve dvou směrech.
+- Co chybí nebo je nejasné, si poznamenejte – **nikdy to nedoplňujte potichu**.
+
+### 2. Chybí kóta? Zeptejte se
+
+- Rozměr nevymýšlejte. Zastavte se a zeptejte se zadavatele, například:
+  „Na výkrese chybí šířka drážky na Ø40 (přední pohled). Mám ji odhadnout z měřítka výkresu (1:2 → asi 6 mm,
+  přesnost asi ±0,5 mm), nebo ji doplníte?“
+- Odhad z měřítka jen se souhlasem: změřte ho na předloze v měřítku listu (u podkladu ve skice nejdřív **Kalibrovat
+  měřítko**), zaokrouhlete rozumně a odhad viditelně označte – v modelu proměnnou s názvem `odhad_…`, na výkrese
+  `výkres poznámka "Rozměry označené ≈ jsou odhadnuty z měřítka – ověřit"`.
+- Běžíte-li bez člověka a zeptat se nejde, odhad použijte, ale v závěrečné zprávě ho uveďte jako **první bod**.
+
+### 3. Po dokončení – kontrola 1:1 (vždy, i když vše hlásí ✓)
+
+Model:
+
+- `stav` → rozměry X / Y / Z, objem, počet ploch a seznam prvků s parametry. Porovnejte celkové rozměry (a hmotnost nebo
+  objem, uvádí-li je předloha).
+- **Kóta po kótě:** ke každému řádku soupisu najděte prvek v modelu a porovnejte hodnotu **přesně** – odchylka ani
+  v setinách není „skoro dobře“.
+- **Plocha po ploše:** počet děr, osazení a drážek musí sedět; s popisky `F1` / `E2` (`window.mncad.hints()`) ověřte
+  polohu a stranu (díra na správné straně, drážka na správném osazení, závit na správném konci).
+- Je-li k dispozici 3D model zákazníka (STEP), použijte Nástroje → **Porovnat s referencí**: rozdíl objemů a seznam
+  rozdílových oblastí musí být prázdný (jen numerický šum).
+
+Výkres:
+
+- `výkres stav` → kóty po pohledech. Porovnejte se soupisem předlohy řádek po řádku: každá kóta předlohy je na výkrese
+  se stejnou hodnotou a tolerancí, žádná nechybí, žádná nepřebývá, „Duplicity: žádné“.
+- Stejné pohledy, řezy, měřítko a formát jako předloha (pokud zadání neříká jinak) a stejné razítko (materiál, číslo
+  výkresu, nepředepsané tolerance, drsnost).
+
+### 4. Závěrečná zpráva
+
+- Tabulka: kóta předlohy · hodnota v modelu / na výkrese · ✓ nebo odchylka.
+- Odchylky, které zadání výslovně požaduje (jiný materiál, zjednodušení…), označte jako **záměrné**.
+- Seznam odhadnutých rozměrů a kdo je má potvrdit; otevřené otázky.
+- Napište „odpovídá předloze 1:1“ jen tehdy, když jsou všechny řádky ✓ a žádný odhad nezůstal nepotvrzený.
+
 ## Stav prvku: ✓ / ⚠ / ✗ – co znamená
 
 - Výsledek prvku se v protokolu vypíše **až po výpočtu** (řádek „→ … přidán“ jen potvrzuje zařazení do historie).
@@ -492,6 +555,7 @@ polohových kót); celkové `120` × `80`; v předním pohledu tloušťka `20`.
    vrátí poslední prvek.
 4. `stav` vrátí rozměry (X/Y/Z rozsah), objem, řádek Geometrie (platná / neplatná / bez tělesa), počet ploch a hran
    a seznam prvků se stavem ✓ / ⚠ / ✗ – podle toho ověřte, že model odpovídá výkresu (např. 165 × 165 × 48 mm).
+   Pracujete-li podle předlohy, na konci vždy proveďte **kontrolu 1:1** (oddíl „Model nebo výkres podle předlohy“).
    U sestavy přibude řádek Sestava (komponenty, obálka, objem, hmotnost) a Kolize (`kolize` spustí kontrolu).
 5. Výstupy: Soubor → Export 3D (STEP, STL…), Výkres → PDF/DXF/DWG, Sdílet odkazem (odkaz pro lidi), Uložit
    projekt (.mncad). Tyto akce otevírají systémový dialog uložení – to je jediné místo, kde je potřeba klik.
@@ -786,7 +850,7 @@ export type SketchUnderlay = {
   pxPerPt?: number;
 };
 
-export type Sig = { t: string; c: Vec3; s: number };
+export type Sig = { t: string; c: Vec3; s: number; r?: number; n?: number };
 
 /** Místo na hraně: začátek, konec, střed délky, střed kružnice/oblouku, nebo parametr 0–1. */
 export type EdgeAt = "start" | "end" | "mid" | "center" | { t: number };
