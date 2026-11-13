@@ -23,6 +23,8 @@ export type Settings = {
   invertZoom: boolean;
   zoomToCursor: boolean;
   confirmDelete: boolean;
+  /** mikronávody u ikon pásu karet (bublina: co příkaz dělá, kdy ho použít, co vybrat, postup) */
+  microTips: boolean;
   // jednotky
   units: "mm" | "inch";
   decimals: 1 | 2 | 3 | 4;
@@ -143,6 +145,7 @@ export const DEFAULT_SETTINGS: Settings = {
   invertZoom: false,
   zoomToCursor: true,
   confirmDelete: false,
+  microTips: true,
   units: "mm",
   decimals: 2,
   angleDecimals: 1,

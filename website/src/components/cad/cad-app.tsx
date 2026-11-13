@@ -104,7 +104,7 @@ const EXPORTS: { f: ExportFormat; label: string; ext: string; mime: string; hint
   { f: "brep", label: tr("OpenCascade BREP (.brep)"), ext: "brep", mime: "application/octet-stream", hint: tr("přesná geometrie OCCT") },
   { f: "stl", label: tr("STL (.stl)"), ext: "stl", mime: "model/stl", hint: tr("3D tisk") },
   { f: "3mf", label: tr("3MF (.3mf)"), ext: "3mf", mime: "model/3mf", hint: tr("3D tisk s jednotkami") },
-  { f: "obj", label: tr("Wavefront OBJ (.obj)"), ext: "obj", mime: "model/obj", hint: "vizualizace" },
+  { f: "obj", label: tr("Wavefront OBJ (.obj)"), ext: "obj", mime: "model/obj", hint: tr("vizualizace") },
   { f: "glb", label: tr("glTF binární (.glb)"), ext: "glb", mime: "model/gltf-binary", hint: tr("web, AR, prezentace") },
   { f: "wrl", label: tr("VRML (.wrl)"), ext: "wrl", mime: "model/vrml", hint: tr("starší prohlížeče") },
 ];
@@ -2141,6 +2141,10 @@ export function CadApp() {
       flash((e as Error).message);
     }
   };
+  // důvody neaktivních tlačítek – ukazuje je mikronávod (micro-tip.tsx)
+  const WHY_PART = tr("Jen v dílu, ne v sestavě.");
+  const WHY_BODY = tr("Nejdřív vytvořte nebo vložte těleso – model je zatím prázdný.");
+  const WHY_COMP = tr("Nejdřív vyberte komponentu (ve stromu sestavy nebo v modelu).");
   const extGroups = (tab: ExtTab): RGroup[] => {
     const by = new Map<string, ExtDef[]>();
     for (const d of extByTab(tab)) by.set(d.group, [...(by.get(d.group) ?? []), d]);
@@ -2149,7 +2153,7 @@ export function CadApp() {
       return {
         label: tr(label),
         big: sorted.filter((d) => d.big).length,
-        items: sorted.map((d) => ({ id: d.ext, label: d.label, icon: d.icon ?? "cube", tone: d.tone ?? "create", hint: d.hint, kbd: d.kbd, disabled: !d.action && (d.scope === "assembly" ? !isAsm : d.scope === "both" ? false : isAsm), onClick: () => addExt(d) })),
+        items: sorted.map((d) => ({ id: d.ext, label: d.label, icon: d.icon ?? "cube", tone: d.tone ?? "create", hint: d.hint, kbd: d.kbd, disabled: !d.action && (d.scope === "assembly" ? !isAsm : d.scope === "both" ? false : isAsm), why: d.scope === "assembly" ? tr("Jen v sestavě.") : WHY_PART, onClick: () => addExt(d) })),
       };
     });
   };
@@ -2771,17 +2775,17 @@ export function CadApp() {
     { id: "xy", label: tr("Rovina XY (půdorys)"), icon: "datum", tone: "ref", onClick: () => createSketch({ kind: "base", name: "XY", offset: 0 }) },
     { id: "xz", label: tr("Rovina XZ (nárys)"), icon: "datum", tone: "ref", onClick: () => createSketch({ kind: "base", name: "XZ", offset: 0 }) },
     { id: "yz", label: tr("Rovina YZ (bokorys)"), icon: "datum", tone: "ref", onClick: () => createSketch({ kind: "base", name: "YZ", offset: 0 }) },
-    { id: "face", label: tr("Na rovinné ploše modelu…"), icon: "face", tone: "sketch", disabled: !hasBody, onClick: () => { setPlanePick(true); setActiveId(null); flash(tr("Klikněte na rovinnou plochu modelu.")); } },
+    { id: "face", label: tr("Na rovinné ploše modelu…"), icon: "face", tone: "sketch", disabled: !hasBody, why: WHY_BODY, onClick: () => { setPlanePick(true); setActiveId(null); flash(tr("Klikněte na rovinnou plochu modelu.")); } },
     { divider: true, label: tr("Odsazené a odvozené roviny") },
     { id: "xyo", label: tr("XY s odsazením…"), icon: "datum", tone: "ref", onClick: offsetPlane("XY") },
     { id: "xzo", label: tr("XZ s odsazením…"), icon: "datum", tone: "ref", onClick: offsetPlane("XZ") },
     { id: "yzo", label: tr("YZ s odsazením…"), icon: "datum", tone: "ref", onClick: offsetPlane("YZ") },
-    { id: "faceOff", label: tr("Rovnoběžně s vybranou plochou…"), icon: "face", tone: "sketch", disabled: selFaces.length !== 1, hint: tr("nejdřív vyberte 1 rovinnou plochu"), onClick: parallelFace },
-    { id: "mid", label: tr("Střední rovina mezi 2 plochami"), icon: "face", tone: "sketch", disabled: selFaces.length !== 2, hint: tr("nejdřív vyberte 2 plochy"), onClick: midPlane },
-    { id: "pts", label: tr("Třemi body (3 vybrané vrcholy)"), icon: "datum", tone: "ref", disabled: selVerts.length !== 3, hint: tr("filtr výběru Bod → vyberte 3 vrcholy"), onClick: threePoints },
+    { id: "faceOff", label: tr("Rovnoběžně s vybranou plochou…"), icon: "face", tone: "sketch", disabled: selFaces.length !== 1, hint: tr("nejdřív vyberte 1 rovinnou plochu"), why: tr("nejdřív vyberte 1 rovinnou plochu"), onClick: parallelFace },
+    { id: "mid", label: tr("Střední rovina mezi 2 plochami"), icon: "face", tone: "sketch", disabled: selFaces.length !== 2, hint: tr("nejdřív vyberte 2 plochy"), why: tr("nejdřív vyberte 2 plochy"), onClick: midPlane },
+    { id: "pts", label: tr("Třemi body (3 vybrané vrcholy)"), icon: "datum", tone: "ref", disabled: selVerts.length !== 3, hint: tr("filtr výběru Bod → vyberte 3 vrcholy"), why: tr("filtr výběru Bod → vyberte 3 vrcholy"), onClick: threePoints },
     ...(datums.length ? ([{ divider: true, label: tr("Pomocné roviny") }, ...datums.map((d) => ({ id: d.id, label: d.name, icon: "datum" as CadIconName, tone: "ref" as const, onClick: () => createSketch({ kind: "custom", origin: d.origin, normal: d.normal, xDir: d.xDir, label: d.name }) }))] as RMenuEntry[]) : []),
   ];
-  const exportEntries: RMenuEntry[] = EXPORTS.map((e) => ({ id: e.f, label: e.label, icon: "export", tone: "file", hint: e.hint, disabled: !hasBody, onClick: () => exportModel(e.f) }));
+  const exportEntries: RMenuEntry[] = EXPORTS.map((e) => ({ id: e.f, label: e.label, icon: "export", tone: "file", hint: e.hint, disabled: !hasBody, why: WHY_BODY, onClick: () => exportModel(e.f) }));
 
   // ---------- formařské nástroje ----------
   const draftResult = useMemo<DraftResult | null>(() => (draftSetup.on && !isAsm && result?.mesh ? draftAnalysis(result.mesh, draftSetup.pull, draftSetup.minDeg) : null), [draftSetup, result, isAsm]);
@@ -2883,7 +2887,7 @@ export function CadApp() {
           { id: "offsetFace", label: tr("Odsadit plochu"), icon: "offsetFace", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("offsetFace") : addFeature("offsetFace")) },
           { id: "deleteFace", label: tr("Odstranit plochu"), icon: "deleteFace", tone: "cut", onClick: () => (selFaces.length ? addWithFaces("deleteFace") : addFeature("deleteFace")), hint: tr("odebere zaoblení, díry… a zacelí těleso") },
           { id: "thicken", label: tr("Zesílit"), icon: "thicken", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("thicken") : addFeature("thicken")) },
-          { id: "faceColor", label: tr("Barva plochy"), icon: "palette", tone: "view", disabled: !selFaces.length, menu: [COLORS[6], COLORS[4], COLORS[5], COLORS[0], COLORS[7]].map((c) => ({ id: c.c, label: `● ${c.l}`, icon: "palette" as CadIconName, onClick: () => setFaceColor(selFaces, c.c) })).concat([{ id: "reset", label: tr("Výchozí barva"), icon: "palette" as CadIconName, onClick: () => setFaceColor(selFaces, null) }]) },
+          { id: "faceColor", label: tr("Barva plochy"), icon: "palette", tone: "view", disabled: !selFaces.length, why: tr("Nejdřív vyberte plochu (filtr výběru Plocha)."), menu: [COLORS[6], COLORS[4], COLORS[5], COLORS[0], COLORS[7]].map((c) => ({ id: c.c, label: `● ${c.l}`, icon: "palette" as CadIconName, onClick: () => setFaceColor(selFaces, c.c) })).concat([{ id: "reset", label: tr("Výchozí barva"), icon: "palette" as CadIconName, onClick: () => setFaceColor(selFaces, null) }]) },
         ],
       },
       {
@@ -2946,8 +2950,8 @@ export function CadApp() {
         label: tr("Přesun"),
         big: 2,
         items: [
-          { id: "gz", label: tr("Přesunout / otočit"), icon: "transform", tone: "pattern", kbd: "G", disabled: !asmSel, active: gizmoOn?.target === "component", onClick: () => (gizmoOn ? setGizmoOn(null) : asmSel && startCompGizmo(asmSel)) },
-          { id: "delete", label: tr("Odebrat"), icon: "trash", tone: "cut", kbd: "Del", disabled: !asmSel && !selection.length, onClick: deleteSelection, hint: tr("odebere vybrané komponenty ze sestavy") },
+          { id: "gz", label: tr("Přesunout / otočit"), icon: "transform", tone: "pattern", kbd: "G", disabled: !asmSel, why: WHY_COMP, active: gizmoOn?.target === "component", onClick: () => (gizmoOn ? setGizmoOn(null) : asmSel && startCompGizmo(asmSel)) },
+          { id: "delete", label: tr("Odebrat"), icon: "trash", tone: "cut", kbd: "Del", disabled: !asmSel && !selection.length, why: WHY_COMP, onClick: deleteSelection, hint: tr("odebere vybrané komponenty ze sestavy") },
           {
             id: "sub",
             label: tr("Podsestava"),
@@ -2965,8 +2969,8 @@ export function CadApp() {
                   setSelection([]);
                 },
               },
-              { id: "dis", label: tr("Rozpustit vybranou"), icon: "layers", disabled: doc.components?.find((c) => c.id === asmSel)?.source.kind !== "asm", onClick: () => asmSel && commit(dissolveSubassembly(doc, asmSel)) },
-              { id: "open", label: tr("Otevřít vybranou"), icon: "edit", disabled: doc.components?.find((c) => c.id === asmSel)?.source.kind !== "asm", onClick: () => { const c = doc.components?.find((x) => x.id === asmSel); if (c) editPartInContext(c); } },
+              { id: "dis", label: tr("Rozpustit vybranou"), icon: "layers", disabled: doc.components?.find((c) => c.id === asmSel)?.source.kind !== "asm", why: tr("Vybraná komponenta není podsestava."), onClick: () => asmSel && commit(dissolveSubassembly(doc, asmSel)) },
+              { id: "open", label: tr("Otevřít vybranou"), icon: "edit", disabled: doc.components?.find((c) => c.id === asmSel)?.source.kind !== "asm", why: tr("Vybraná komponenta není podsestava."), onClick: () => { const c = doc.components?.find((x) => x.id === asmSel); if (c) editPartInContext(c); } },
             ],
           },
         ],
@@ -2976,21 +2980,21 @@ export function CadApp() {
         label: tr("Vazby"),
         big: 0,
         items: [
-          { id: "m1", label: tr("Kontakt"), icon: "datum", tone: "ref", disabled: !asmSel, active: mate?.mode === "mate", onClick: () => asmSel && startMate(asmSel, "mate") },
-          { id: "m2", label: tr("Zarovnat"), icon: "datum", tone: "ref", disabled: !asmSel, active: mate?.mode === "flush", onClick: () => asmSel && startMate(asmSel, "flush") },
-          { id: "m3", label: tr("Vystředit"), icon: "datum", tone: "ref", disabled: !asmSel, active: mate?.mode === "center", onClick: () => asmSel && startMate(asmSel, "center") },
+          { id: "m1", label: tr("Kontakt"), icon: "datum", tone: "ref", disabled: !asmSel, why: WHY_COMP, active: mate?.mode === "mate", onClick: () => asmSel && startMate(asmSel, "mate") },
+          { id: "m2", label: tr("Zarovnat"), icon: "datum", tone: "ref", disabled: !asmSel, why: WHY_COMP, active: mate?.mode === "flush", onClick: () => asmSel && startMate(asmSel, "flush") },
+          { id: "m3", label: tr("Vystředit"), icon: "datum", tone: "ref", disabled: !asmSel, why: WHY_COMP, active: mate?.mode === "center", onClick: () => asmSel && startMate(asmSel, "center") },
           // pokročilé a mechanické vazby (cad/mate-spec.ts) – průvodce v panelu komponenty
-          { id: "mAdv", label: tr("Pokročilé"), icon: "cPerpendicular", tone: "ref", disabled: !asmSel, active: !!mate && ADVANCED.includes(mate.mode as never), menu: ADVANCED.map((t) => ({ id: t, label: tr(MATE_LABEL[t]), icon: "datum" as CadIconName, active: mate?.mode === t, onClick: () => asmSel && startMate(asmSel, t) })) },
-          { id: "mMech", label: tr("Mechanické"), icon: "patternCircular", tone: "ref", disabled: !asmSel, active: !!mate && MECHANICAL.includes(mate.mode as never), menu: MECHANICAL.map((t) => ({ id: t, label: tr(MATE_LABEL[t]), icon: "datum" as CadIconName, active: mate?.mode === t, onClick: () => asmSel && startMate(asmSel, t) })) },
+          { id: "mAdv", label: tr("Pokročilé"), icon: "cPerpendicular", tone: "ref", disabled: !asmSel, why: WHY_COMP, active: !!mate && ADVANCED.includes(mate.mode as never), menu: ADVANCED.map((t) => ({ id: t, label: tr(MATE_LABEL[t]), icon: "datum" as CadIconName, active: mate?.mode === t, onClick: () => asmSel && startMate(asmSel, t) })) },
+          { id: "mMech", label: tr("Mechanické"), icon: "patternCircular", tone: "ref", disabled: !asmSel, why: WHY_COMP, active: !!mate && MECHANICAL.includes(mate.mode as never), menu: MECHANICAL.map((t) => ({ id: t, label: tr(MATE_LABEL[t]), icon: "datum" as CadIconName, active: mate?.mode === t, onClick: () => asmSel && startMate(asmSel, t) })) },
         ],
       },
-      { label: tr("Pohyb"), items: [{ id: "motion", label: tr("Pohybová studie"), icon: "rotate", tone: "pattern", active: motionOpen, disabled: !(doc.components?.length ?? 0), onClick: () => setMotionOpen((v) => !v), hint: tr("motory na vazbách, kroky, kolize, přehrání a export") }] },
+      { label: tr("Pohyb"), items: [{ id: "motion", label: tr("Pohybová studie"), icon: "rotate", tone: "pattern", active: motionOpen, disabled: !(doc.components?.length ?? 0), why: tr("Sestava zatím nemá komponenty."), onClick: () => setMotionOpen((v) => !v), hint: tr("motory na vazbách, kroky, kolize, přehrání a export") }] },
       {
         label: tr("Analýza"),
         big: 2,
         items: [
-          { id: "clash", label: tr("Kolize"), icon: "section", tone: "cut", disabled: !hasBody, active: !!clashes?.length, onClick: runInterference, hint: tr("kontrola průniků komponent") },
-          { id: "bom", label: tr("Kusovník"), icon: "table", tone: "tool", disabled: !bom.length, onClick: () => setBomOpen(true) },
+          { id: "clash", label: tr("Kolize"), icon: "section", tone: "cut", disabled: !hasBody, why: WHY_BODY, active: !!clashes?.length, onClick: runInterference, hint: tr("kontrola průniků komponent") },
+          { id: "bom", label: tr("Kusovník"), icon: "table", tone: "tool", disabled: !bom.length, why: tr("Sestava zatím nemá komponenty."), onClick: () => setBomOpen(true) },
           { id: "exp", label: explode ? tr("Složit") : tr("Rozložit"), icon: "transform", tone: "pattern", active: explode > 0, onClick: () => setExplode((e) => (e ? 0 : 1.2)) },
         ],
       },
@@ -3010,7 +3014,7 @@ export function CadApp() {
         label: tr("Analýza"),
         big: 2,
         items: [
-          { id: "measure", label: tr("Měřit"), icon: "measure", tone: "tool", kbd: "M", active: measure, disabled: !hasBody, onClick: toggleMeasure, hint: tr("vzdálenost, úhel, poloměr mezi body, hranami, plochami") },
+          { id: "measure", label: tr("Měřit"), icon: "measure", tone: "tool", kbd: "M", active: measure, disabled: !hasBody, why: WHY_BODY, onClick: toggleMeasure, hint: tr("vzdálenost, úhel, poloměr mezi body, hranami, plochami") },
           { id: "inspect", label: tr("Vlastnosti"), icon: "info", tone: "tool", active: inspectOpen, onClick: () => setInspectOpen((v) => !v), hint: tr("informace o vybrané entitě") },
           {
             id: "filter",
@@ -3019,9 +3023,9 @@ export function CadApp() {
             tone: "tool",
             menu: (Object.keys(FILTER_LABEL) as SelFilter[]).filter((f) => isAsm || (f !== "component" && f !== "subasm")).map((f) => ({ id: f, label: tr(FILTER_LABEL[f]), icon: "select" as CadIconName, active: selFilter === f, onClick: () => setSelFilter(f) })),
           },
-          { id: "mass", label: tr("Hmotnost"), icon: "mass", tone: "tool", disabled: !hasBody, onClick: () => setMassOpen(true), hint: tr("objem, plocha, hmotnost") },
-          { id: "section", label: tr("Řez"), icon: "section", tone: "tool", kbd: "X", active: !!section, disabled: !hasBody, onClick: toggleSection },
-          { id: "compare", label: tr("Porovnat s referencí"), icon: "xray", tone: "tool", active: compareOpen, disabled: isAsm || !hasBody, onClick: () => setCompareOpen((v) => !v), hint: tr("odchylky od modelu zákazníka (STEP): objemy, chybějící prvky, barevná mapa") },
+          { id: "mass", label: tr("Hmotnost"), icon: "mass", tone: "tool", disabled: !hasBody, why: WHY_BODY, onClick: () => setMassOpen(true), hint: tr("objem, plocha, hmotnost") },
+          { id: "section", label: tr("Řez"), icon: "section", tone: "tool", kbd: "X", active: !!section, disabled: !hasBody, why: WHY_BODY, onClick: toggleSection },
+          { id: "compare", label: tr("Porovnat s referencí"), icon: "xray", tone: "tool", active: compareOpen, disabled: isAsm || !hasBody, why: isAsm ? WHY_PART : WHY_BODY, onClick: () => setCompareOpen((v) => !v), hint: tr("odchylky od modelu zákazníka (STEP): objemy, chybějící prvky, barevná mapa") },
         ],
       },
       {
@@ -3032,7 +3036,7 @@ export function CadApp() {
           { id: "cfg", label: tr("Stavy dílu"), icon: "configs", tone: "tool", onClick: () => { setPanels(true); flash(tr("Stavy (konfigurace) najdete v levém panelu – záložka Stavy.")); } },
         ],
       },
-      { label: tr("Formy"), items: [{ id: "moldtools", label: tr("Formařské nástroje"), icon: "layers", tone: "create", active: moldTools, disabled: isAsm || !hasBody, onClick: () => setMoldTools((v) => !v), hint: tr("analýza úkosů, smrštění, dělicí rovina, vyhazovače, chlazení") }] },
+      { label: tr("Formy"), items: [{ id: "moldtools", label: tr("Formařské nástroje"), icon: "layers", tone: "create", active: moldTools, disabled: isAsm || !hasBody, why: isAsm ? WHY_PART : WHY_BODY, onClick: () => setMoldTools((v) => !v), hint: tr("analýza úkosů, smrštění, dělicí rovina, vyhazovače, chlazení") }] },
     ],
     view: [
       {
@@ -3092,7 +3096,7 @@ export function CadApp() {
       },
     ],
     drawing: [
-      { label: tr("Výkresová dokumentace"), items: [{ id: "drw", label: tr("Nový výkres"), icon: "drawing", tone: "file", disabled: !hasBody, onClick: openDrawingTab, hint: tr("otevře se v nové záložce: pohledy, řezy, kóty, razítko → PDF/DXF/DWG/SVG") }] },
+      { label: tr("Výkresová dokumentace"), items: [{ id: "drw", label: tr("Nový výkres"), icon: "drawing", tone: "file", disabled: !hasBody, why: WHY_BODY, onClick: openDrawingTab, hint: tr("otevře se v nové záložce: pohledy, řezy, kóty, razítko → PDF/DXF/DWG/SVG") }] },
     ],
     data: [
       {
@@ -3124,7 +3128,7 @@ export function CadApp() {
             tone: "create",
             menu: [
               { id: "na", label: tr("Nová prázdná sestava"), icon: "layers", onClick: () => newAssembly(false) },
-              { id: "nc", label: tr("Sestava z aktuálního dílu"), icon: "layers", disabled: isAsm || !doc.features.length, onClick: () => newAssembly(true) },
+              { id: "nc", label: tr("Sestava z aktuálního dílu"), icon: "layers", disabled: isAsm || !doc.features.length, why: isAsm ? WHY_PART : WHY_BODY, onClick: () => newAssembly(true) },
               { id: "mold", label: tr("Rám vstřikovací formy…"), icon: "layers", onClick: () => setMoldOpen(true) },
             ],
           },
@@ -3535,6 +3539,7 @@ export function CadApp() {
         </div>
 
         <Ribbon
+          ctx={curTab}
           groups={groups[curTab]}
           right={
             sketch ? (

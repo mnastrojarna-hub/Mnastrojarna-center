@@ -286,7 +286,7 @@ function GrooveForm(props: ExtFormProps) {
         <Num label={tr("Tloušťka t")} value={g.t} min={0} step={1} hint={tr("0 = z modelu")} onChange={(v) => onChange({ t: v })} />
       </div>
       <div className="grid grid-cols-2 gap-x-3 gap-y-1">
-        {!def.double && <Check label={tr("Podložka")} value={g.backing} onChange={(v) => onChange({ backing: v })} />}
+        {!def.double && <Check label={tr("Podložka kořene")} value={g.backing} onChange={(v) => onChange({ backing: v })} />}
         <Check label={tr("Obrátit stranu svaru")} value={g.flip} onChange={(v) => onChange({ flip: v })} />
         <Check label={tr("Montážní svar")} value={g.field} onChange={(v) => onChange({ field: v })} />
       </div>

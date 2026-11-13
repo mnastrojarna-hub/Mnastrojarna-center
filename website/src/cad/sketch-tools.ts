@@ -641,7 +641,7 @@ export function dynSpec(tool: string, n: number, picks: number, phase: number, o
     case "arcTangent":
       return n ? [F("r", tr("Poloměr"))] : [];
     case "polygon":
-      return n ? [F("r", o.circumscribed ? tr("Poloměr vepsané") : tr("Poloměr opsané")), F("sides", "Stran", "")] : XY;
+      return n ? [F("r", o.circumscribed ? tr("Poloměr vepsané") : tr("Poloměr opsané")), F("sides", tr("Stran"), "")] : XY;
     case "slot":
       return n === 0 ? XY : n === 1 ? LA : [F("w", tr("Šířka"))];
     case "slotArc":

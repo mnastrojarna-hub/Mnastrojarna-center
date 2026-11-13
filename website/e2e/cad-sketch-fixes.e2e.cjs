@@ -74,7 +74,7 @@ const pdfBytes = () => {
 async function startSlowUnderlay(p, delay) {
   await p.route('**/vendor/pdfjs-*/pdf.min.mjs', async (r) => { await new Promise((res) => setTimeout(res, delay)); await r.continue(); });
   const chooser = p.waitForEvent('filechooser', { timeout: 8000 }).catch(() => null);
-  await p.locator('button[title^="Podklad…"]').first().click();
+  await p.locator('[data-ribbon] button[aria-label^="Podklad…"]').first().click();
   const fc = await chooser;
   if (!fc) return false;
   await fc.setFiles({ name: 'vykres.pdf', mimeType: 'application/pdf', buffer: pdfBytes() });
@@ -147,7 +147,7 @@ async function startSlowUnderlay(p, delay) {
     const fixed = ((await h.sketch()).constraints || []).filter((c) => c.type === 'fixed').length;
     ok(L0.length === 2 && fixed === 2, `C: dvě úsečky, ukotvení zadané ${fixed}`);
     await p.keyboard.press('Control+a'); await p.waitForTimeout(150);
-    await p.locator('button[title^="Přesunout"]').first().click();
+    await p.locator('[data-ribbon] button[aria-label^="Přesunout"]').first().click();
     await p.waitForTimeout(200);
     const v = await h.viewOf();
     const from = [5, 40]; const to = [25, 60];
@@ -162,7 +162,7 @@ async function startSlowUnderlay(p, delay) {
     ok(fx.length === 2 && nearPt(fx[0], [L0[1][0][0] + dx, L0[1][0][1] + dy], 0.02) && nearPt(fx[1], [L0[1][1][0] + dx, L0[1][1][1] + dy], 0.02), `C: vazby „Pevně“ jdou s úsečkou: ${JSON.stringify(fx)}`);
     // otočení o 90° kolem počátku zadané číslem
     await p.keyboard.press('Control+a'); await p.waitForTimeout(150);
-    await p.locator('button[title^="Otočit"]').first().click();
+    await p.locator('[data-ribbon] button[aria-label^="Otočit"]').first().click();
     await p.waitForTimeout(200);
     const vr = await h.viewOf();
     const o = h.at(vr, [0, 0]);
@@ -214,7 +214,7 @@ async function startSlowUnderlay(p, delay) {
     await p.waitForTimeout(500);
     ok(await h.openSketch(), 'F: skica otevřená');
     const chooser = p.waitForEvent('filechooser', { timeout: 8000 }).catch(() => null);
-    await p.locator('button[title^="Podklad…"]').first().click();
+    await p.locator('[data-ribbon] button[aria-label^="Podklad…"]').first().click();
     const fc = await chooser;
     if (fc) await fc.setFiles({ name: 'vykres.pdf', mimeType: 'application/pdf', buffer: pdfBytes() });
     await p.waitForSelector('[data-sketch-underlay-img]', { timeout: 30000 }).catch(() => {});
@@ -239,7 +239,7 @@ async function startSlowUnderlay(p, delay) {
     ok(await h.openSketch(), 'G: Skizze geöffnet');
     const png = Buffer.from((await p.evaluate(() => { const c = document.createElement('canvas'); c.width = 400; c.height = 200; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 400, 200); g.fillStyle = '#000'; g.fillRect(50, 99, 300, 2); return c.toDataURL('image/png'); })).split(',')[1], 'base64');
     const chooser = p.waitForEvent('filechooser', { timeout: 8000 }).catch(() => null);
-    await p.locator('button[title^="Unterlage…"], button[title^="Podklad…"]').first().click();
+    await p.locator('[data-ribbon] button[aria-label^="Unterlage…"], [data-ribbon] button[aria-label^="Podklad…"]').first().click();
     const fc = await chooser;
     if (fc) await fc.setFiles({ name: 'podklad.png', mimeType: 'image/png', buffer: png });
     await p.waitForSelector('[data-sketch-underlay-img]', { timeout: 15000 }).catch(() => {});

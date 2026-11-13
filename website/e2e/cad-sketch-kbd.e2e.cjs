@@ -244,7 +244,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   // B1: vložení obrázku z pásu karet (bez podkladu se rovnou otevře výběr souboru)
   {
     const chooser = p.waitForEvent('filechooser', { timeout: 8000 }).catch(() => null);
-    await p.locator('button[title^="Podklad…"]').first().click();
+    await p.locator('[data-ribbon] button[aria-label^="Podklad…"]').first().click();
     const fc = await chooser;
     ok(!!fc, 'pás karet → „Podklad…“ otevřel výběr souboru');
     if (fc) await fc.setFiles({ name: 'podklad.png', mimeType: 'image/png', buffer: png });
@@ -390,7 +390,7 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
     const { jsPDF } = require('jspdf');
     const pdf = new jsPDF(); pdf.line(10, 10, 50, 10);
     const ch = q.waitForEvent('filechooser', { timeout: 8000 }).catch(() => null);
-    await q.locator('button[title^="Podklad…"]').first().click();
+    await q.locator('[data-ribbon] button[aria-label^="Podklad…"]').first().click();
     const fc = await ch;
     if (fc) await fc.setFiles({ name: 'blok.pdf', mimeType: 'application/pdf', buffer: Buffer.from(pdf.output('arraybuffer')) });
     await q.waitForSelector('[data-ul-error]', { timeout: 30000 }).catch(() => {});

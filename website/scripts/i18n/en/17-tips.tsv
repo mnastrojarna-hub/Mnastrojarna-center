@@ -1,0 +1,33 @@
+# Vlna 10 – mikronávody u ikon pásu karet (micro-tip.tsx, důvody neaktivních tlačítek, nastavení)
+Kdy použít	When to use
+Vyberte	Select
+Postup	Steps
+Příkaz	Command
+Tip	Tip
+Mikronávody u ikon	Micro-guides on icons
+Po najetí myší (na dotyku dlouhým stiskem) ukáže u ikony pásu karet krátký návod: co dělá, kdy ji použít, co vybrat a jak postupovat	On hover (long press on touch) a ribbon icon shows a short guide: what it does, when to use it, what to select and how to proceed
+Jen v dílu, ne v sestavě.	Only in a part, not in an assembly.
+Jen v sestavě.	Only in an assembly.
+Nejdřív vytvořte nebo vložte těleso – model je zatím prázdný.	Create or insert a body first – the model is still empty.
+Nejdřív vyberte komponentu (ve stromu sestavy nebo v modelu).	Select a component first (in the assembly tree or in the model).
+Nejdřív vyberte plochu (filtr výběru Plocha).	Select a face first (selection filter Face).
+Vybraná komponenta není podsestava.	The selected component is not a subassembly.
+Sestava zatím nemá komponenty.	The assembly has no components yet.
+Export PDF	Export PDF
+Export DWG	Export DWG
+Export DXF	Export DXF
+Export SVG	Export SVG
+Výkres se ještě počítá – počkejte na pohledy.	The drawing is still being computed – wait for the views.
+Výkres bez dokumentu výkresu nemá další listy.	A drawing without a drawing document has no further sheets.
+# opravy popisků a nápověd podle kontroly obsahu mikronávodů
+vizualizace	visualisation
+Stran	Sides
+Vazby skici	Constraints
+konstrukční čára – osa rotace nebo zrcadlení	construction line – axis for revolve or mirror
+délka do Tabulky svarů; 0 = neuvedena (délka i objem 0)	length for the Weld table; 0 = not given (length and volume 0)
+pomocná 3D křivka (pružina, závit) – těleso po šroubovici vytvoří Tažení po šroubovici	reference 3D curve (spring, thread) – for a solid along a helix use Helical sweep
+průsečnice tělesa/ploch s rovinou (pomocná 3D křivka; do skici ji převede Promítnout hrany)	intersection of the body/surfaces with a plane (reference 3D curve; Project edges brings it into a sketch)
+odřízne část volných ploch na jedné straně roviny	cuts away the part of the free faces on one side of a plane
+rozřízne solid rovinou – obě části zůstanou, nebo jen jedna	splits the solid with a plane – both parts remain, or only one
+zaoblený výstupek podél úsečky ve skice (zjednodušeně, v rozvinu chybí – tvářené žebro je Žebro podél dráhy)	a rounded bump along a sketch line (simplified, missing in the flat pattern – a formed bead is Bead along path)
+Podložka kořene	Backing strip

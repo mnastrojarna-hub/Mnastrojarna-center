@@ -337,7 +337,7 @@ const SETTINGS_KEY = 'mn-cad-settings-v2';
   await p.keyboard.press('m'); await p.waitForTimeout(100);
   ok((await tool()) === 'circle', 'uvolněná klávesa M nic nedělá');
   await p.keyboard.press('v'); await p.waitForTimeout(100);
-  ok((await p.locator('button[title^="Úsečka (Q)"]').count()) >= 1, 'pás karet ukazuje novou klávesu: „Úsečka (Q)“');
+  ok((await p.locator('[data-ribbon] button[aria-keyshortcuts="Q"]', { hasText: 'Úsečka' }).count()) >= 1, 'pás karet ukazuje novou klávesu: „Úsečka (Q)“');
   const stored = await p.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}').shortcuts || {}, SETTINGS_KEY);
   ok(stored['sketch.line'] === 'Q' && stored['feature.extrude'] === 'E' && stored['sketch.ellipse'] === 'E', 'uloženo v nastavení (sketch.line = Q; klávesa E zároveň pro 3D i skicu)');
   // dříve uložené nastavení bez příkazů skici: po načtení platí výchozí klávesy skici

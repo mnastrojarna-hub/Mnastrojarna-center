@@ -447,7 +447,7 @@ registerExt({
   tab: "sheet",
   group: "Plech",
   order: 4,
-  hint: tr("vylisované žebro podél úsečky ve skice (zjednodušeně: zaoblený výstupek)"),
+  hint: tr("zaoblený výstupek podél úsečky ve skice (zjednodušeně, v rozvinu chybí – tvářené žebro je Žebro podél dráhy)"),
   make: (doc) => {
     const sk = [...doc.features].reverse().find((f) => f.type === "sketch");
     return { sketchId: sk?.id ?? "", width: 6, height: 2 };
