@@ -5,7 +5,7 @@
  *  – entity z řady bodů (lomená čára, spline, řetěz úseček),
  *  – pohled „zobrazit vše“, když zadaný bod leží mimo plátno.
  */
-import { analyzeSketch, paramsOf } from "./sketch-solver";
+import { analyzeSketch, paramsOf, refPoint } from "./sketch-solver";
 import type { CoordInput } from "./sketch-tools";
 import type { CanvasSize, SketchView } from "./sketch-touch";
 import { clampScale, mmToCanvas } from "./sketch-touch";
@@ -48,6 +48,9 @@ const r4 = (v: number) => Math.round(v * 1e4) / 1e4;
 export function parseCoordList(text: string): CoordList {
   const clean = text
     .replace(/[−–]/g, "-")
+    // oddělovač tisíců z Excelu / českého formátu („1 234,5“ s pevnou mezerou) – mezera mezi číslicí a trojicí číslic
+    // se vypustí; obyčejná mezera a tabulátor dál oddělují čísla
+    .replace(/(\d)[\u00a0\u2007\u202f](?=\d{3}(?!\d))/g, "$1")
     .replace(/[   ]/g, " ")
     .replace(/[()[\]{}]/g, " ")
     .replace(/(^|[\s;,])[xy]\s*[=:]?\s*(?=[+-]?[\d.,])/gim, "$1");
@@ -191,6 +194,59 @@ export function entitiesFromPoints(kind: ChainKind, pts: Vec2[], o: { fixed?: bo
     else if (isFixed(i + 1)) constraints.push(fixedPoint(id, "b", pts[i + 1]));
   }
   return { entities, constraints, anchor: constraints.some((c) => c.type === "fixed") ? "points" : "none" };
+}
+
+// ======================= číselné zadání u kurzoru =======================
+
+/** Znaky číselného zadání u kurzoru: číslice, desetinná čárka / tečka, oddělovač `;`, relativně `@`, polárně `<`, výrazy. */
+export const DYN_CHAR = /^[0-9.,;@<+*/()\-]$/;
+
+/**
+ * Patří stisk klávesy do číselného zadání u kurzoru? Bez modifikátorů ano. Znaky psané přes AltGr (Windows hlásí
+ * Ctrl+Alt, např. `@` a `<` na české a německé klávesnici) nebo Option na Macu také – jinak by se `@10;5` tiše
+ * změnilo na absolutní `10;5`. Číslice s Alt / Ctrl+Alt bez AltGr a cokoli s Cmd zůstávají zkratkami.
+ */
+export function isDynKey(e: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; getModifierState?: (k: string) => boolean }): boolean {
+  if (!DYN_CHAR.test(e.key)) return false;
+  if (!e.ctrlKey && !e.metaKey && !e.altKey) return true;
+  if (e.getModifierState?.("AltGraph")) return true;
+  if (e.metaKey || /^[0-9]$/.test(e.key)) return false;
+  return e.altKey;
+}
+
+// ======================= přesun, otočení a změna měřítka ukotvených entit =======================
+
+/**
+ * Vazby „Pevně“ vybraných entit po přesunu / otočení / změně měřítka: pevná poloha jde s entitou (`moved` = entity
+ * po transformaci, `ids` = vybrané entity). Bez toho by řešič vrátil entity zadané souřadnicemi zpět na místo a příkaz
+ * by tiše nic neudělal. Vazby ostatních entit se nemění.
+ */
+export function moveAnchors(constraints: SketchConstraint[], moved: SketchEntity[], ids: ReadonlySet<string>): SketchConstraint[] {
+  const m = new Map(moved.map((e) => [e.id, e]));
+  return constraints.map((c) => {
+    const r = c.refs[0];
+    if (c.type !== "fixed" || !r || !ids.has(r.e)) return c;
+    const e = m.get(r.e);
+    if (!e) return c;
+    if (r.k === "self") return { ...c, value: paramsOf(e) };
+    const p = refPoint(m, r);
+    return p ? { ...c, value: [p[0], p[1]] } : c;
+  });
+}
+
+/** Největší odchylka parametrů entit `ids` mezi dvěma stavy skici (mm) – zda řešič entity po přesunu vrátil. */
+export function maxShift(a: SketchEntity[], b: SketchEntity[], ids: ReadonlySet<string>): number {
+  const mb = new Map(b.map((e) => [e.id, e]));
+  let worst = 0;
+  for (const e of a) {
+    if (!ids.has(e.id)) continue;
+    const f = mb.get(e.id);
+    if (!f) continue;
+    const pa = paramsOf(e);
+    const pb = paramsOf(f);
+    for (let i = 0; i < pa.length; i++) worst = Math.max(worst, Math.abs(pa[i] - (pb[i] ?? pa[i])));
+  }
+  return worst;
 }
 
 // ======================= pohled =======================

@@ -8,6 +8,7 @@
  * `.mncad` se při uložení vloží zpět jako base64 (`embedBlobs`) – uložené soubory zůstávají samostatné a staré soubory se
  * při otevření převedou na odkazy (`internBlobs`).
  */
+import { pruneUnderlays } from "./sketch-underlay";
 import type { CadDoc, Feature } from "./types";
 
 export const BLOB_PREFIX = "mnblob:";
@@ -188,9 +189,11 @@ export function internBlobs(saved: CadDoc): CadDoc {
 
 /**
  * Dokument k uložení (.mncad, export pro AI, sdílení): data importů se přidají do mapy `blobs` (každá jen jednou), takže soubor
- * je samostatný. `inline: true` = base64 přímo v prvcích / komponentách (starší formát).
+ * je samostatný. `inline: true` = base64 přímo v prvcích / komponentách (starší formát). Podklady skic, které v dokumentu
+ * už nejsou, se vypustí (`pruneUnderlays`).
  */
-export function embedBlobs(doc: CadDoc, opts: { inline?: boolean } = {}): SavedDoc {
+export function embedBlobs(doc0: CadDoc, opts: { inline?: boolean } = {}): SavedDoc {
+  const doc = pruneUnderlays(doc0); // podklad smazané skici se neukládá ani nesdílí
   if (opts.inline) {
     const memo = new Map<string, string>();
     return mapDoc(doc, (data) => {

@@ -1,0 +1,5 @@
+# Opravy po kontrole skicáře: přesun ukotvených entit, odmítnutí vazeb a kót, které by skicu přeurčily (agent-sketch.ts)
+{0} ve skice „{1}“ nepřidána – {2}	{0} in Skizze „{1}“ nicht hinzugefügt – {2}
+Část výběru zůstala na místě – drží ji vazby nebo kóty k entitám mimo výběr (např. „Pevně“, kóta od počátku). Vyberte i je, nebo vazbu smažte.	Ein Teil der Auswahl ist an seinem Platz geblieben – ihn halten Bedingungen oder Bemaßungen zu Elementen außerhalb der Auswahl (z. B. „Fixiert“, Bemaßung vom Ursprung). Wählen Sie diese mit aus oder löschen Sie die Bedingung.
+nadbytečná: tutéž geometrii už určují dosavadní vazby a kóty	redundant: die vorhandenen Bedingungen und Bemaßungen bestimmen diese Geometrie bereits
+v rozporu s dosavadními vazbami a kótami	im Widerspruch zu den vorhandenen Bedingungen und Bemaßungen

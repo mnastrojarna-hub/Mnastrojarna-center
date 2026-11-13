@@ -341,7 +341,18 @@ function parseOpts(tokens: string[]): Opts {
 }
 /** `skica plocha F3 [odsazení N] [obráceně]` · `skica rovina <název pomocné roviny> [odsazení N]` (null = jiná rovina) */
 function sketchOnSpec(tk: string[], o: Opts): Pick<SketchOnOp, "on" | "offset" | "flip"> | null {
-  const i = tk.findIndex((t) => canon(t) === "face" || canon(t) === "plane");
+  // slova za volbou (název „Horní plocha“, materiál…) nejsou umístění skici – přeskočí se jako v parseOpts
+  const isKey = (t: string) => NUM_OPTS.has(canon(t)) || WORD_OPTS.has(canon(t)) || FLAGS.has(canon(t));
+  let i = -1;
+  for (let j = 0; j < tk.length && i < 0; j++) {
+    const c = canon(tk[j]);
+    if (c === "face" || c === "plane") i = j;
+    else if (c === "axis" || c === "direction" || c === "thread") {
+      // jedno slovo, nebo směr třemi čísly
+      if (j + 1 < tk.length && isNum(tk[j + 1])) for (let n = 0; n < 3 && j + 1 < tk.length && isNum(tk[j + 1]); n++) j++;
+      else if (j + 1 < tk.length && !isKey(tk[j + 1])) j++;
+    } else if (WORD_OPTS.has(c)) while (j + 1 < tk.length && !isKey(tk[j + 1])) j++;
+  }
   if (i < 0) return null;
   const rest: string[] = [];
   for (const t of tk.slice(i + 1)) {

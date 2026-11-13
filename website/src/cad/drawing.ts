@@ -91,6 +91,14 @@ export type DrawingOptions = {
   smartOff?: string[];
   /** místo navíc pro kóty mezi pohledy a kolem nich [mm] (Chytré kóty) */
   dimRoom?: number;
+  /**
+   * volné místo pro kóty (Chytré kóty): když se list s celým `dimRoom` nevejde, místo mezi pohledy a kolem nich se zmenší
+   * až na `dimRoomMin` a pohledy smí sahat i vedle razítka – formát ani měřítko se kvůli místu pro kóty nemění. Záporná
+   * hodnota (jen s `dimPads`, kde je místo pro kóty vyhrazené zvlášť) zmenší i výchozí okraj 14 mm a mezeru 24 mm.
+   */
+  dimRoomMin?: number;
+  /** místo pro kóty vedle jednotlivých pohledů [mm listu] (Chytré kóty: podle jejich skutečného rozmístění v předchozím průchodu) */
+  dimPads?: Record<string, Partial<Record<"l" | "t" | "r" | "b", number>>>;
   /** pozice komponent (balónky) – jen sestavy s meta.components */
   balloons?: boolean;
   /** tabulka děr (souřadnice a průměry děr v půdorysu) */
@@ -642,7 +650,7 @@ function rotV(v: Vec3, rot: ViewRotation): Vec3 {
   return [c * v[0] + s * w[0] + k * d[0] || 0, c * v[1] + s * w[1] + k * d[1] || 0, c * v[2] + s * w[2] + k * d[2] || 0];
 }
 /** kamera pohledu při daném otočení hlavního pohledu */
-const camOf = (key: ViewKey | "iso", rot: ViewRotation): Cam => (rot ? { d: rotV(CAMS[key].d, rot), x: rotV(CAMS[key].x, rot) } : CAMS[key]);
+export const camOf = (key: ViewKey | "iso", rot: ViewRotation): Cam => (rot ? { d: rotV(CAMS[key].d, rot), x: rotV(CAMS[key].x, rot) } : CAMS[key]);
 
 /**
  * Mezipaměť projekcí (HLR je nejdražší krok): pro totéž těleso a směr pohledu se počítá jen jednou a drží viditelné i skryté
@@ -1103,7 +1111,7 @@ const M_LEFT = 20; // ISO 5457: okraj pro vazbu
 const M = 10;
 const TB = { w: 180, h: 38 };
 let GAP = 24; // mezera mezi pohledy (místo pro kóty); chytré kóty ji zvětší (opts.dimRoom)
-let DIM_ROOM = 14;
+const DIM_ROOM = 14;
 /** řada kót průměrů vedle pohledu: odstup první kótovací čáry od obrysu, rozteč čar a nejvyšší počet kót [mm listu] */
 const STACK_BASE = 9;
 const STACK_PITCH = 6.5;
@@ -1301,8 +1309,9 @@ function turnedCylinders(circles: Circle[]): { a: Vec3; base: Vec3; items: Stack
 export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partial<DrawingOptions> = {}, extra: Record<string, r.Shape3D> = {}): DrawingResult {
   const opts: DrawingOptions = { ...defaultDrawingOptions, ...options, views: { ...defaultDrawingOptions.views, ...(options.views ?? {}) } };
   const rot = asRotation(opts.rotation);
-  GAP = 24 + (opts.dimRoom ?? 0);
-  DIM_ROOM = 14 + (opts.dimRoom ?? 0);
+  const ROOM = opts.dimRoom ?? 0;
+  const loose = opts.dimRoomMin != null;
+  const ROOM_MIN = Math.min(ROOM, opts.dimRoomMin ?? ROOM);
   const warnings: string[] = [];
   const circlesAll = opts.centerLines || opts.dimensions === "auto" || opts.holeTable ? circlesOf(shape) : [];
   const holeView: ViewKey = opts.views.top ? "top" : "front";
@@ -1364,6 +1373,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
   const centerView = views.get("front") ?? null;
   const sectionCell: Cell | null = section ? { v: section.view, col: farCol, row: 1, pad: noPad() } : null;
+  for (const c of sectionCell ? [...cells, sectionCell] : cells) for (const [k, p] of Object.entries(opts.dimPads?.[c.v.key] ?? {})) c.pad[k as Side] = Math.max(c.pad[k as Side], (p ?? 0) + 2);
   const cellOf = (key: string) => (key === "section" ? sectionCell : cells.find((c) => c.v.key === key)) ?? null;
 
   // --- plán kót, které potřebují místo vedle pohledu (řady průměrů soustružených os)
@@ -1421,7 +1431,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const dims = opts.dimensions !== "none" && x.m.view !== "iso";
     extras.push({ v: x.v, pad: { l: dims ? 15 : 5, t: dims ? 15 : 5, r: 5, b: 12 }, scale: x.m.scale, name: x.m.name });
   }
-  type Arrangement = { ok: boolean; items: Item[]; W: number; H: number; area: Rect; bounds: Rect; fixed: Rect[] };
+  type Arrangement = { ok: boolean; items: Item[]; W: number; H: number; area: Rect; bounds: Rect; fixed: Rect[]; room: number };
   const arrange = (n: SheetName, s: number, force = false): Arrangement | null => {
     const [W, H] = sheetDims(n);
     // plocha pro pohledy: rám bez pásu razítka (kóty kolem pohledů do ní patří)
@@ -1429,22 +1439,39 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const bounds: Rect = { x: M_LEFT + 4, y: M + 4, w: W - M_LEFT - M - 8, h: H - 2 * M - 8 };
     const fixed: Rect[] = [{ x: W - M - TB.w - 3, y: H - M - TBH - 12, w: TB.w + 3, h: TBH + 12 }];
     if (meta.revisions?.length) fixed.push({ x: W - M - 124 - 3, y: M, w: 127, h: 6 + (meta.revisions.length + 1) * 6 + 3 });
-    const tryGrid = (list: Cell[]) => {
+    const frame: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M };
+    /** mřížka s mezerou 24 + room a okrajem DIM_ROOM + room; `loose` = pohledy smí i vedle razítka (jen ne do něj) */
+    const tryGrid = (list: Cell[], room: number) => {
+      GAP = 24 + room;
       const g = gridLayout(list, s);
       const rects = list.map((c) => g.rectOf(c));
-      const ext = boundsOf(rects.map((q, i) => inflate(q, atLeast(list[i].pad, DIM_ROOM))));
-      return { list, rects, ext, fits: ext.w <= area.w + 1e-6 && ext.h <= area.h + 1e-6 };
+      const feet = rects.map((q, i) => inflate(q, atLeast(list[i].pad, DIM_ROOM + room)));
+      const ext = boundsOf(feet);
+      let fits = ext.w <= area.w + 1e-6 && ext.h <= area.h + 1e-6;
+      if (!fits && loose && ext.w <= frame.w + 1e-6 && ext.h <= frame.h + 1e-6) {
+        const dx = area.x - ext.x;
+        const dy = area.y - ext.y;
+        fits = !feet.some((f) => fixed.some((q) => overlaps({ ...f, x: f.x + dx, y: f.y + dy }, q)));
+      }
+      return { list, rects, ext, fits };
     };
     // řez nejdřív v řadě s hlavním pohledem (promítací čáry); když se tam nevejde, hledá se pro něj volné místo na listu
-    let grid = sectionCell ? tryGrid([...cells, sectionCell]) : tryGrid(cells);
-    let secFree = false;
-    if (sectionCell && !grid.fits) {
-      const base = tryGrid(cells);
-      if (base.fits || !force) {
-        grid = base;
-        secFree = true;
+    const pick = (room: number) => {
+      let grid = sectionCell ? tryGrid([...cells, sectionCell], room) : tryGrid(cells, room);
+      let secFree = false;
+      if (sectionCell && !grid.fits) {
+        const base = tryGrid(cells, room);
+        if (base.fits || !force) {
+          grid = base;
+          secFree = true;
+        }
       }
-    }
+      return { grid, secFree, room };
+    };
+    // místo pro kóty: celé, a když se list nevejde, menší (až ROOM_MIN) – formát se kvůli místu pro kóty nezvětší
+    let pk = pick(ROOM);
+    for (const room of [(ROOM + ROOM_MIN) / 2, ROOM_MIN]) if (!pk.grid.fits && room < pk.room) pk = pick(room);
+    const { grid, secFree } = pk;
     if (!grid.fits && !force) return null;
     let ok = grid.fits;
     const ox = area.x - grid.ext.x;
@@ -1476,7 +1503,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       if (!force) return null;
       lost(e, scales[scales.length - 1]);
     }
-    return { ok, items, W, H, area, bounds, fixed };
+    return { ok, items, W, H, area, bounds, fixed, room: pk.room };
   };
   const fits = (n: SheetName, s: number) => !!arrange(n, s);
   const bestScale = (n: SheetName) => STANDARD_SCALES.find((s) => fits(n, s)) ?? null;
@@ -1504,13 +1531,14 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
 
   // bez izometrie se celé rozvržení vystředí do volné plochy listu (s izometrií zůstává vlevo nahoře a izometrie dostane zbytek)
   if (!iso) {
-    const foot = (it: Item) => inflate(it.rect, it.grid ? atLeast(it.pad, DIM_ROOM) : it.pad);
+    const foot = (it: Item) => inflate(it.rect, it.grid ? atLeast(it.pad, DIM_ROOM + arr.room) : it.pad);
     const bb = boundsOf(arr.items.map(foot));
     const dx = Math.max(0, (arr.area.w - bb.w) / 2) - (bb.x - arr.area.x);
     const dy = Math.max(0, (arr.area.h - bb.h) / 2) - (bb.y - arr.area.y);
     const moved = arr.items.map((it) => ({ ...it, rect: { ...it.rect, x: it.rect.x + dx, y: it.rect.y + dy } }));
     // pohledy mimo mřížku nesmí po posunu vyjet z rámu ani do razítka
-    if (moved.every((it) => it.grid || it.lost || (inside(foot(it), arr.bounds) && !arr.fixed.some((f) => overlaps(foot(it), f))))) arr.items = moved;
+    // (volné rozvržení: ani pohledy mřížky, které sahají vedle razítka)
+    if (moved.every((it) => (it.grid && !loose) || it.lost || (inside(foot(it), it.grid ? { x: M_LEFT, y: M, w: arr.W - M_LEFT - M, h: arr.H - 2 * M } : arr.bounds) && !arr.fixed.some((f) => overlaps(foot(it), f))))) arr.items = moved;
   }
 
   const placed = new Map<string, Placed>();

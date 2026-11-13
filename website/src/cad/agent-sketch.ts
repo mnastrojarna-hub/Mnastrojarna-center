@@ -500,13 +500,15 @@ export function solveSketchFeature(sk: SketchF): { feature: SketchF; ok: boolean
   return { feature: { ...sk, entities }, ok: res.ok && analysis.status !== "over", analysis, text: dofText(analysis) + detail + fail };
 }
 
-/** poslední skica dokumentu, nebo skica bloku (založená tímto vstupem) */
-function targetSketch(features: Feature[], target?: SketchTarget): number {
+/** skica bloku (založená tímto vstupem), jinak skica otevřená ve skicáři (`openId`), jinak poslední skica dokumentu */
+function targetSketch(features: Feature[], target?: SketchTarget, openId?: string | null): number {
   if (target) {
     const i = features.findIndex((f) => f.id === target.id && f.type === "sketch");
     if (i < 0) throw new Error(tr("skica z řádku {0} nevznikla – entity, vazby a kóty nemají kam (opravte řádek {0})", target.line));
     return i;
   }
+  const open = openId ? features.findIndex((f) => f.id === openId && f.type === "sketch") : -1;
+  if (open >= 0) return open;
   for (let i = features.length - 1; i >= 0; i--) if (features[i].type === "sketch") return i;
   throw new Error(tr("není žádná skica – nejdřív „skica XY: …“"));
 }
@@ -514,9 +516,12 @@ function targetSketch(features: Feature[], target?: SketchTarget): number {
 /**
  * Provede operaci skici nad historií prvků (pole se upraví na místě) a vrátí řádky protokolu.
  * Entity dostanou id e1, e2…; po vazbách a kótách (a na konci bloku skici s vazbami) se skica vyřeší.
+ * Cíl: skica bloku, jinak skica otevřená ve skicáři (`openSketchId`), jinak poslední skica. Vazba nebo kóta, která by
+ * skicu přeurčila (v rozporu, nebo nadbytečná), se nepřidá – protokol ji ohlásí ✗ (skica nezůstane tiše přeurčená
+ * a textem by nešla opravit).
  */
-export function applySketchOp(features: Feature[], op: SketchOp): string[] {
-  const i = targetSketch(features, op.sketch);
+export function applySketchOp(features: Feature[], op: SketchOp, openSketchId?: string | null): string[] {
+  const i = targetSketch(features, op.sketch, openSketchId);
   const sk = features[i] as SketchF;
   if (op.k === "entities") {
     const ents = withTextIds(sk.entities, op.entities);
@@ -532,21 +537,62 @@ export function applySketchOp(features: Feature[], op: SketchOp): string[] {
     return out;
   }
   const w = new Work(sk);
-  let text: string[];
-  let next: SketchF;
-  if (op.k === "constraints") {
-    const made = op.items.flatMap((s) => buildConstraint(w, s));
-    next = { ...sk, entities: [...sk.entities, ...w.extraEntities], constraints: [...(sk.constraints ?? []), ...w.extraCons, ...made] };
-    text = made.map((c) => describeConstraint(c, w.map));
-  } else {
-    const made = op.items.map((s) => buildDim(w, s));
-    next = { ...sk, entities: [...sk.entities, ...w.extraEntities], constraints: [...(sk.constraints ?? []), ...w.extraCons], dims: [...(sk.dims ?? []), ...made] };
-    text = made.map((d) => describeDim(d, w.map));
+  // celý řádek se nejdřív přečte (chybný odkaz = chyba řádku, nic se nepřidá); položky se pak přidávají po jedné
+  type Item = { cons: SketchConstraint[]; dim?: SketchDim; text: string };
+  const items: Item[] =
+    op.k === "constraints"
+      ? op.items.map((s) => {
+          const cons = buildConstraint(w, s);
+          return { cons, text: cons.map((c) => describeConstraint(c, w.map)).join(", ") };
+        })
+      : op.items.map((s) => {
+          const dim = buildDim(w, s);
+          return { cons: [], dim, text: describeDim(dim, w.map) };
+        });
+  const refsOf = (x: Item) => [...x.cons, ...(x.dim ? [x.dim] : [])].flatMap((c) => c.refs.map((r) => r.e));
+  const bad = (a: SketchAnalysis) => new Set([...a.conflicts, ...a.redundant]);
+  let cur: SketchF = { ...sk, entities: [...sk.entities, ...w.extraEntities], constraints: [...(sk.constraints ?? []), ...w.extraCons] };
+  let last = solveSketchFeature(cur);
+  const before = bad(last.analysis); // přeurčení, které ve skice bylo už předtím, se novým položkám nepřičítá
+  const kept: Item[] = [];
+  const refused: string[] = [];
+  for (const x of items) {
+    const trial: SketchF = { ...cur, constraints: [...(cur.constraints ?? []), ...x.cons], ...(x.dim ? { dims: [...(cur.dims ?? []), x.dim] } : {}) };
+    const r = solveSketchFeature(trial);
+    const fresh = [...bad(r.analysis)].filter((id) => !before.has(id));
+    if (fresh.length || (last.ok && !r.ok)) {
+      const own = new Set([...x.cons.map((c) => c.id), ...(x.dim ? [x.dim.id] : [])]);
+      const conflict = r.analysis.conflicts.some((id) => !before.has(id)) || (!r.ok && r.analysis.status !== "over");
+      const ents = new Map(trial.entities.map((e) => [e.id, e]));
+      const others = fresh
+        .filter((id) => !own.has(id))
+        .map((id) => {
+          const c = trial.constraints?.find((q) => q.id === id);
+          if (c) return describeConstraint(c, ents);
+          const d = trial.dims?.find((q) => q.id === id);
+          return d ? tr("kóta {0}", describeDim(d, ents)) : id;
+        });
+      const what = op.k === "constraints" ? tr("vazba {0}", x.text) : tr("kóta {0}", x.text);
+      const why = conflict ? tr("v rozporu s dosavadními vazbami a kótami") : tr("nadbytečná: tutéž geometrii už určují dosavadní vazby a kóty");
+      refused.push(`✗ ${tr("{0} ve skice „{1}“ nepřidána – {2}", what, sk.name, why)}${others.length ? ` (${others.join(", ")})` : ""}`);
+      continue;
+    }
+    cur = r.feature;
+    last = r;
+    kept.push(x);
   }
-  const r = solveSketchFeature(next);
-  features[i] = r.feature;
-  const head = op.k === "constraints" ? tr("vazby ve skice „{0}“: {1}", sk.name, text.join(", ")) : tr("kóty ve skice „{0}“: {1}", sk.name, text.join(", "));
-  return [`${r.ok ? "✓" : "⚠"} ${head} → ${r.text}`];
+  if (!kept.length) return refused;
+  // pomocný bod počátku jen pro přidané položky
+  const used = new Set(kept.flatMap(refsOf));
+  const extra = new Set(w.extraEntities.filter((e) => !used.has(e.id)).map((e) => e.id));
+  if (extra.size) {
+    last = solveSketchFeature({ ...cur, entities: cur.entities.filter((e) => !extra.has(e.id)), constraints: (cur.constraints ?? []).filter((c) => !c.refs.some((r) => extra.has(r.e))) });
+    cur = last.feature;
+  }
+  features[i] = cur;
+  const text = kept.map((x) => x.text).join(", ");
+  const head = op.k === "constraints" ? tr("vazby ve skice „{0}“: {1}", sk.name, text) : tr("kóty ve skice „{0}“: {1}", sk.name, text);
+  return [`${last.ok ? "✓" : "⚠"} ${head} → ${last.text}`, ...refused];
 }
 
 /* ───────────────────────── stav skici pro textový stav ───────────────────────── */

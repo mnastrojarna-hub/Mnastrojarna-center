@@ -26,6 +26,7 @@ import {
   xfMove,
   xfRotate,
   xfScale,
+  type Xf,
 } from "@/cad/sketch-ops";
 import { analyzeSketch, measureDim, paramsOf, refCircle, refLine, refPoint, solveSketch, type EntityState, type SketchAnalysis } from "@/cad/sketch-solver";
 import {
@@ -55,7 +56,7 @@ import {
   type AutoRef,
   type DrawOpts,
 } from "@/cad/sketch-tools";
-import { LINE_CHAIN_MAX, PASTE_FIX_LIMIT, PASTE_MAX_POINTS, anchorPoints, entitiesFromPoints, fitView, fixedPoint, parseCoordList, pointVisible, pruneRedundant, typedAnchor, type ChainKind, type CoordList } from "@/cad/sketch-kbd";
+import { LINE_CHAIN_MAX, PASTE_FIX_LIMIT, PASTE_MAX_POINTS, anchorPoints, entitiesFromPoints, fitView, fixedPoint, isDynKey, maxShift, moveAnchors, parseCoordList, pointVisible, pruneRedundant, typedAnchor, type ChainKind, type CoordList } from "@/cad/sketch-kbd";
 import { LongPress, TOUCH_SLOP_PX, TouchTracker, canvasToMm, clickSlop, movedBeyond, pinchView } from "@/cad/sketch-touch";
 import { calibrateUnderlay, moveUnderlay, replaceBitmap, underlayCorners, underlayWidth } from "@/cad/sketch-underlay";
 import { uid, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchRef, type SketchUnderlay, type Vec2 } from "@/cad/types";
@@ -970,14 +971,18 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const tolMm = () => ptrPx(10) / view.scale;
 
   // ---------- změny + řešič ----------
+  /** entity po posledním vyřešení v commitEdit (přesun / otočení / měřítko porovná, zda je řešič nevrátil) */
+  const solvedRef = useRef<SketchEntity[]>([]);
   const commitEdit = useCallback(
     (next: SketchEntity[], cons = constraints, dms = dims, commit = true, weights?: Record<string, number>, quick = false): boolean => {
       const cl = cleanup(next, cons, dms);
       if (!cl.constraints.length && !cl.dims.some((d) => d.driving)) {
+        solvedRef.current = next;
         onChange({ entities: next, constraints: cl.constraints, dims: cl.dims }, commit);
         return true;
       }
       const res = solveSketch(next, cl.constraints, cl.dims, { weights, dof: !quick, maxIter: quick ? 25 : 60 });
+      solvedRef.current = res.entities;
       onChange({ entities: res.entities, constraints: cl.constraints, dims: cl.dims }, commit);
       return res.ok;
     },
@@ -1725,15 +1730,24 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     }
     setUlMode(m);
   };
+  // skicář zavřený (dokončení skici, jiná záložka) během načítání podkladu: výsledek se zahodí – jinak by zpožděný zápis
+  // přepsal dokument stavem z doby před načítáním, nebo dokument jiné záložky
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const ulRun = async (msg: string, job: () => Promise<void>) => {
     setUlBusy(msg);
     setUlErr(null);
     try {
       await job();
     } catch (e) {
-      setUlErr(e instanceof Error ? e.message : String(e));
+      if (alive.current) setUlErr(e instanceof Error ? e.message : String(e));
     } finally {
-      setUlBusy(null);
+      if (alive.current) setUlBusy(null);
     }
   };
   /** Nový podklad ze souboru: obrázek PNG / JPG, nebo první stránka PDF ve skutečné velikosti. Nahradí dosavadní podklad. */
@@ -1752,6 +1766,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         u = await pdfUnderlay(data, 1, file.name, center);
         rememberPdf(u.id, data);
       } else u = await imageUnderlay(file, { center, fit: fitMm });
+      if (!alive.current) return;
       setUlMode(null);
       setCalib([]);
       setUl(u);
@@ -1770,6 +1785,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     void ulRun(tr("Převádím čáry PDF na entity…"), async () => {
       const r = await pdfPageEntities(data, u, { construction: ulCons });
       rememberPdf(u.id, data);
+      if (!alive.current) return;
       if (!r.entities.length) throw new Error(r.paths ? tr("Na stránce nejsou čáry delší než 0,02 mm.") : tr("Stránka PDF nemá vektorové čáry (je to sken nebo obrázek?) – podklad lze jen obkreslit."));
       addEntitiesRef.current(r.entities);
       setSelection([]); // stovky vložených entit se nevybírají (panel vlastností by ukázal jen poslední)
@@ -1783,7 +1799,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     void ulRun(tr("Načítám stranu {0}…", page), async () => {
       const n = await pdfUnderlay(data, page, u.name, [u.x, u.y]);
       rememberPdf(u.id, data);
-      setUl(replaceBitmap(u, n));
+      if (alive.current) setUl(replaceBitmap(u, n));
     });
   };
   /** Původní PDF podkladu; když v této relaci není (dokument otevřený znovu), požádá o jeho výběr a akci provede potom. */
@@ -1968,6 +1984,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     if (SEL_TOOLS.has(tool)) return selToolClick(raw, ev);
   };
 
+  /**
+   * Přesun / otočení / změna měřítka výběru: vazby „Pevně“ vybraných entit (body zadané souřadnicemi) jdou s nimi,
+   * vybrané entity drží řešič na novém místě (jako tažená entita). Vrátí-li je vazba k entitě mimo výběr, ohlásí se to.
+   */
+  const transformSel = (T: Xf) => {
+    const next = entities.map((x) => (sel.has(x.id) ? transformEntity(x, T) : x));
+    commitEdit(next, moveAnchors(constraints, next, sel), dims, true, Object.fromEntries([...sel].map((id) => [id, 1])));
+    if (maxShift(solvedRef.current, next, sel) > 1e-3) note(tr("Část výběru zůstala na místě – drží ji vazby nebo kóty k entitám mimo výběr (např. „Pevně“, kóta od počátku). Vyberte i je, nebo vazbu smažte."));
+  };
+
   const selToolClick = (raw: Vec2, ev: React.PointerEvent) => {
     if (phase === 0) {
       const id = hitEntity(raw);
@@ -1994,7 +2020,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       case "copy": {
         if (!pts.length) return setPts([p]);
         const T = xfMove(sub(p, pts[0]));
-        if (tool === "move") commitEdit(entities.map((x) => (sel.has(x.id) ? transformEntity(x, T) : x)));
+        if (tool === "move") transformSel(T);
         else addEntities(chosen.map((x) => transformEntity(x, T, true)));
         if (tool === "copy" && ev.shiftKey) return;
         setTool("select");
@@ -2004,10 +2030,10 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       case "scale": {
         if (pts.length < 2) return setPts([...pts, p]);
         const [c, r0] = pts;
-        if (tool === "rotate") commitEdit(entities.map((x) => (sel.has(x.id) ? transformEntity(x, xfRotate(c, dynNum("ang") ?? angDeg(c, p) - angDeg(c, r0))) : x)));
+        if (tool === "rotate") transformSel(xfRotate(c, dynNum("ang") ?? angDeg(c, p) - angDeg(c, r0)));
         else {
           const k = dynNum("k") ?? dist(c, p) / (dist(c, r0) || 1);
-          if (k > 1e-6) commitEdit(entities.map((x) => (sel.has(x.id) ? transformEntity(x, xfScale(c, k)) : x)));
+          if (k > 1e-6) transformSel(xfScale(c, k));
         }
         setDyn(emptyDyn);
         setTool("select");
@@ -2529,10 +2555,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         return;
       }
       // číselné zadání u kurzoru: psaní hodnot, Tab = další pole (zámek), Enter = potvrdit, Esc = smazat
-      if (spec.length && !(e.ctrlKey || e.metaKey || e.altKey)) {
+      // znaky psané přes AltGr / Option (@ a < na české a německé klávesnici) patří do zadání, ne ke zkratkám
+      if (spec.length && (!(e.ctrlKey || e.metaKey || e.altKey) || isDynKey(e))) {
         const cur = dyn.texts[dyn.active] ?? "";
         const sepLike = (e.key === "x" || e.key === "X") && cur.trim().length > 0 && spec.length > 1;
-        if (/^[0-9.,;@<+*/()\-]$/.test(e.key)) {
+        if (isDynKey(e)) {
           e.preventDefault();
           setDyn((d) => {
             const texts = [...d.texts];

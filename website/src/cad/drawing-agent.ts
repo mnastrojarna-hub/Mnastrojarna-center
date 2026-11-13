@@ -6,7 +6,7 @@
  */
 import type { DrawingCmd } from "./agent-drawing";
 import { VIEW_CS } from "./agent-drawing";
-import { angleGeom, annToSheet, defaultDrawingOptions, dimLabel, isRadialDim, scaleLabel, withAnnotations, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView } from "./drawing";
+import { angleGeom, annToSheet, defaultDrawingOptions, dimLabel, isRadialDim, modelViewKey, scaleLabel, withAnnotations, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView } from "./drawing";
 import { linMeaning, type SmartDims } from "./drawing-dims";
 import { calloutLines } from "./drawing-symbols";
 import { threadsOfDoc } from "./drawing-doc";
@@ -18,7 +18,9 @@ export type SmartResult = DrawingResult & { smart?: SmartDims };
 export type DrawingCompute = (doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions>) => Promise<SmartResult>;
 
 const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
-const VIEW_NAME = (k: string) => tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
+/** název pohledu; pohled dalšího modelu na listu (`m:<id>`) názvem modelu z voleb listu */
+const VIEW_NAME = (k: string, o?: Partial<DrawingOptions>) =>
+  k.startsWith("m:") ? (o?.models?.find((m) => modelViewKey(m.id) === k)?.name ?? k) : tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
 
 /** Volby nového výkresu: Chytré kóty (uložené výkresy si ponechají svůj režim kót; makeDrawing má dál výchozí „auto“). */
 export const NEW_DRAWING_OPTIONS: DrawingOptions = { ...defaultDrawingOptions, dimensions: "smart" };
@@ -47,6 +49,17 @@ export function sheetMeta(doc: CadDoc, s: DrawingDoc): DrawingMeta {
 }
 
 /**
+ * Přípona kóty rozdělená na část, kterou tvoří Chytré kóty samy (stoupání závitu „×1,5“ na začátku; „)“ pomocné kóty
+ * a „ (=90)“ stejných roztečí na konci), a úpravu uživatele mezi nimi (tolerance „h6“, „±0,05“, „-6g“).
+ */
+export function splitSuffix(a: { prefix?: string; suffix?: string }): { head: string; user: string; tail: string } {
+  const s = a.suffix ?? "";
+  const head = a.prefix === "M" ? (/^×\d+(?:[.,]\d+)?/.exec(s)?.[0] ?? "") : "";
+  const tail = a.prefix === "(" ? (s.endsWith(")") ? ")" : "") : a.prefix && /^\d+× $/.test(a.prefix) ? (/ \(=[^()]*\)$/.exec(s)?.[0] ?? "") : "";
+  return { head, user: s.slice(head.length, s.length - tail.length), tail };
+}
+
+/**
  * Sloučí vygenerované Chytré kóty do poznámek listu. `force` = přegenerovat (i smazané vygenerované); jinak jen když se
  * změnil model nebo rozvržení (`smartGen`). Vrátí null, když není co měnit.
  */
@@ -62,7 +75,12 @@ export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOption
       if (!o || o.type !== a.type) return a;
       const keep = { ...a, id: o.id } as DrawingAnnotation;
       if (keep.type === "dim" && o.type === "dim") {
-        if (o.suffix !== undefined && o.suffix !== keep.suffix) keep.suffix = o.suffix;
+        // přenese se jen úprava uživatele (tolerance) – ne přípona, kterou stará kóta měla vygenerovanou (stoupání, závorka)
+        const user = splitSuffix(o).user;
+        if (user) {
+          const n = splitSuffix(keep);
+          keep.suffix = `${n.head}${user}${n.tail}`;
+        }
         if (o.text !== undefined && o.text !== keep.text) keep.text = o.text;
       }
       if (keep.type === "callout" && o.type === "callout" && o.tol) keep.tol = o.tol;
@@ -199,7 +217,7 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
       const m = mergeSmart(sheet().annotations, o, res.smart, true)!;
       put({ ...sheet(), options: { ...o, smartGen: m.gen, smartOff: [] } as unknown as Record<string, unknown>, annotations: m.annotations });
       const rep = res.smart.report;
-      const per = Object.entries(rep.perView).map(([k, n]) => `${VIEW_NAME(k)} ${n}`).join(", ");
+      const per = Object.entries(rep.perView).map(([k, n]) => `${VIEW_NAME(k, o)} ${n}`).join(", ");
       log.push(tr("✓ Chytré kóty ({0}): {1} kót a popisů – {2} · očekávaných rozměrů {3}", o.dimStyle === "baseline" ? tr("od základny") : tr("řetězově"), res.smart.annotations.filter((a) => a.type !== "centerline").length, per || "—", rep.expected));
       for (const s of rep.skipped) log.push(tr("! vynecháno: {0}", s));
       return { doc, log, changed: true, open: true };
@@ -216,23 +234,34 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
           put({ ...sheet(), options: { ...sheetOptions(sheet()), smartGen: m.gen } as unknown as Record<string, unknown>, annotations: anns });
         }
       }
-      const hits = findDims(views, anns, cmd.target);
+      const so = sheetOptions(sheet());
+      let hits = findDims(views, anns, cmd.target);
       if (!hits.length) throw new Error(tr("kóta „{0}“ na výkrese není – kóty: {1}", cmd.target, anns.filter((a) => a.type === "dim" || a.type === "callout").map((a) => annLabel(views, a)).join(", ") || "—"));
-      if (hits.length > 1) throw new Error(tr("kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji (např. celým popiskem)", cmd.target, hits.length, hits.map((a) => `${annLabel(views, a)} (${VIEW_NAME(a.view)})`).join(", ")));
+      // pomocná kóta v závorce se netoleruje (ISO 129-1): shoduje-li se zadání i s jinou kótou, platí ta jiná
+      const isRef = (a: DrawingAnnotation) => a.type === "dim" && a.prefix === "(";
+      if (hits.some(isRef) && !hits.every(isRef)) hits = hits.filter((a) => !isRef(a));
+      if (hits.every(isRef)) {
+        const ref = hits[0] as Extract<DrawingAnnotation, { type: "dim" }>;
+        const chain = ref.auto?.startsWith("len:c:");
+        const others = anns.filter((a) => a.type === "dim" && !isRef(a) && a.view === ref.view && a.kind === ref.kind && (!chain || !!a.auto?.startsWith("len:c:")));
+        throw new Error(tr("kóta „{0}“ je pomocná (v závorce) – pomocná kóta se netoleruje (ISO 129-1); tolerujte jiný článek řetězu: {1}", annLabel(views, ref), others.map((a) => annLabel(views, a)).join(", ") || "—"));
+      }
+      if (hits.length > 1) throw new Error(tr("kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji (např. celým popiskem)", cmd.target, hits.length, hits.map((a) => `${annLabel(views, a)} (${VIEW_NAME(a.view, so)})`).join(", ")));
       const h = hits[0];
       const fit = /^[A-Za-z]{1,2}\d/.test(cmd.tol); // lícování (h6, H7, 6H) bez mezery, ±0,1 také bez mezery (ISO 129)
       const next = anns.map((a) => {
         if (a.id !== h.id) return a;
         if (a.type === "dim") {
-          // závit: „M20×1,5“ + „-6g“ (stoupání v příponě zůstane); jinak přípona = tolerance (dřívější se nahradí)
-          const thread = a.prefix === "M";
-          const base = thread ? (a.suffix ?? "").replace(/-.*$/, "") : "";
-          return { ...a, suffix: `${base}${thread ? "-" : ""}${fit || /^[±+-]/.test(cmd.tol) || thread ? cmd.tol : ` ${cmd.tol}`}` };
+          // závit: „M20×1,5“ + „-6g“; jinak tolerance za hodnotou. Vygenerovaná část přípony (stoupání, „ (=90)“) zůstane,
+          // dřívější tolerance se nahradí
+          const p = splitSuffix(a);
+          const t = a.prefix === "M" ? `-${cmd.tol}` : fit || /^[±+-]/.test(cmd.tol) ? cmd.tol : ` ${cmd.tol}`;
+          return { ...a, suffix: `${p.head}${t}${p.tail}` };
         }
         return a.type === "callout" ? { ...a, tol: cmd.tol } : a;
       });
       put({ ...sheet(), annotations: next });
-      log.push(tr("✓ tolerance {0} → {1} ({2})", cmd.tol, annLabel(views, next.find((a) => a.id === h.id)!), VIEW_NAME(h.view)));
+      log.push(tr("✓ tolerance {0} → {1} ({2})", cmd.tol, annLabel(views, next.find((a) => a.id === h.id)!), VIEW_NAME(h.view, so)));
       return { doc, log, changed: true, open: false };
     }
     case "status": {
@@ -268,17 +297,17 @@ export async function drawingStatus(doc0: CadDoc, compute: DrawingCompute): Prom
   const views = res.views;
   const L: string[] = [];
   const mode = o.dimensions === "smart" ? tr("Chytré kóty ({0})", o.dimStyle === "baseline" ? tr("od základny") : tr("řetězově")) : o.dimensions === "auto" ? tr("Auto + Ø (zapečené)") : o.dimensions === "overall" ? tr("jen celkové (zapečené)") : tr("bez automatických kót");
-  L.push(tr("Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}", s.name, has ? "" : tr(" (zatím neuložený – výchozí volby)"), res.sheet.name, o.orientation === "portrait" ? tr("na výšku") : tr("na šířku"), res.scale, [...views.map((v) => VIEW_NAME(v.key)), ...(o.views.iso ? [VIEW_NAME("iso")] : [])].join(", ") || "—", mode));
+  L.push(tr("Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}", s.name, has ? "" : tr(" (zatím neuložený – výchozí volby)"), res.sheet.name, o.orientation === "portrait" ? tr("na výšku") : tr("na šířku"), res.scale, [...views.map((v) => VIEW_NAME(v.key, o)), ...(o.views.iso ? [VIEW_NAME("iso")] : [])].join(", ") || "—", mode));
   const dims = anns.filter((a) => a.type === "dim" || a.type === "callout");
   L.push(tr("Kóty a popisy ({0}, z toho vygenerovaných {1}):", dims.length, dims.filter((a) => a.auto).length));
   const byView = new Map<string, string[]>();
   for (const a of dims) byView.set(a.view, [...(byView.get(a.view) ?? []), annLabel(views, a) + (a.auto ? "" : " *")]);
-  for (const [k, list] of byView) L.push(`  ${VIEW_NAME(k)}: ${list.join(" · ")}`);
+  for (const [k, list] of byView) L.push(`  ${VIEW_NAME(k, o)}: ${list.join(" · ")}`);
   if (dims.some((a) => !a.auto)) L.push(tr("  (* = vlastní kóta uživatele)"));
   const others = anns.filter((a) => a.type !== "dim" && a.type !== "callout");
   if (others.length) L.push(tr("Poznámky a značky: {0}", others.map((a) => annLabel(views, a)).join(" · ")));
   const dup = dimDuplicates(views, dims);
-  L.push(dup.length ? tr("Duplicity ({0}): {1}", dup.length, dup.map((g) => g.map((a) => `${annLabel(views, a)} (${VIEW_NAME(a.view)})`).join(" = ")).join("; ")) : tr("Duplicity: žádné"));
+  L.push(dup.length ? tr("Duplicity ({0}): {1}", dup.length, dup.map((g) => g.map((a) => `${annLabel(views, a)} (${VIEW_NAME(a.view, o)})`).join(" = ")).join("; ")) : tr("Duplicity: žádné"));
   const out = withAnnotations(res, anns);
   const bbox = docBbox(res);
   const chk = dimCheck(doc, bbox, out.texts);

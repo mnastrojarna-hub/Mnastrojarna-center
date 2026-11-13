@@ -66,9 +66,11 @@ export class DimLayout {
   /** obsazené texty (překážky) a čáry umístěných kót */
   readonly boxes: Box[] = [];
   readonly segs: Seg[] = [];
+  /** odkazové čáry a police umístěných popisů (odkazy se nesmí křížit – nebylo by jasné, který popis patří ke kterému prvku) */
+  private readonly leaders: Seg[] = [];
   private readonly rects: Box[];
   private readonly area: Box;
-  readonly placed: { key: string; ann: NewAnn; side?: Side; row?: number }[] = [];
+  readonly placed: { key: string; ann: NewAnn; side?: Side; row?: number; boxes?: Box[]; segs?: Seg[] }[] = [];
 
   constructor(d: Pick<DrawingResult, "views" | "sheet" | "texts" | "polys">) {
     this.views = d.views;
@@ -154,11 +156,29 @@ export class DimLayout {
         if (this.segs.some(([p, q]) => overlapCollinear(p, q, g.segs[2][0], g.segs[2][1]))) continue;
         this.boxes.push(g.text);
         this.segs.push(...g.segs);
-        this.placed.push({ key: req.key, ann: this.linAnn(req, g.offset), side, row });
+        this.placed.push({ key: req.key, ann: this.linAnn(req, g.offset), side, row, boxes: [g.text], segs: g.segs });
         return { side, row };
       }
     }
     return null;
+  }
+
+  /** Jak daleko za obrys pohledu sahají umístěné kóty a popisy [mm listu] – místo, které je kolem pohledu třeba nechat. */
+  overhang(): Record<string, Record<"l" | "t" | "r" | "b", number>> {
+    const out: Record<string, Record<"l" | "t" | "r" | "b", number>> = {};
+    for (const p of this.placed) {
+      const r = this.rectOfView(p.ann.view);
+      if (!r) continue;
+      const o = (out[p.ann.view] ??= { l: 0, t: 0, r: 0, b: 0 });
+      const pts: Vec2[] = [...(p.boxes ?? []).flatMap((b): Vec2[] => [[b.x0, b.y0], [b.x1, b.y1]]), ...(p.segs ?? []).flat()];
+      for (const [x, y] of pts) {
+        o.l = Math.max(o.l, r.x0 - x);
+        o.r = Math.max(o.r, x - r.x1);
+        o.t = Math.max(o.t, r.y0 - y);
+        o.b = Math.max(o.b, y - r.y1);
+      }
+    }
+    return out;
   }
 
   /** Osa souměrnosti v pohledu (čára, žádný text – bez kontroly místa). */
@@ -212,16 +232,27 @@ export class DimLayout {
         if (this.boxes.some((o) => segs.some(([p, q]) => segHitsBox(p, q, o, 0.2)))) continue;
         const own = this.rectOfView(req.view);
         if (this.rects.some((rr) => rr !== own && segs.some(([p, q]) => segHitsBox(p, q, rr, -0.5)))) continue;
+        if (this.leaders.some(([p, q]) => segs.some(([a, b]) => segsCross(p, q, a, b)))) continue;
         this.boxes.push(...texts);
         this.segs.push(...segs);
+        this.leaders.push(...segs);
         const at: Vec2 = [(K[0] - view.px) / view.s + view.x0, (K[1] - view.py) / view.s + view.y0];
         const round = (q: Vec2): Vec2 => [Math.round(q[0] * 1000) / 1000, Math.round(q[1] * 1000) / 1000];
-        this.placed.push({ key: req.key, ann: { type: "callout", view: req.view, auto: req.key, tip: round(tip), at: round(at), lines: req.lines, ...(req.circle ? { circle: req.circle } : {}) } as NewAnn });
+        this.placed.push({ key: req.key, ann: { type: "callout", view: req.view, auto: req.key, tip: round(tip), at: round(at), lines: req.lines, ...(req.circle ? { circle: req.circle } : {}) } as NewAnn, boxes: texts, segs });
         return true;
       }
     }
     return false;
   }
+}
+
+/** dvě úsečky se vlastně kříží (průsečík uvnitř obou, ne jen dotyk koncem) */
+export function segsCross(p: Vec2, q: Vec2, a: Vec2, b: Vec2): boolean {
+  const o = (u: Vec2, v: Vec2, w: Vec2) => {
+    const x = (v[0] - u[0]) * (w[1] - u[1]) - (v[1] - u[1]) * (w[0] - u[0]);
+    return Math.abs(x) < 1e-9 ? 0 : Math.sign(x);
+  };
+  return o(p, q, a) * o(p, q, b) < 0 && o(a, b, p) * o(a, b, q) < 0;
 }
 
 /** dvě úsečky na téže přímce, které se překrývají (kóty přes sebe) */

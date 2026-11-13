@@ -62,6 +62,13 @@ describe("úložiště dat importů podle otisku", () => {
     expect(internBlobs(small)).toBe(small);
   });
 
+  it("uložení / sdílení: podklad skici, která v dokumentu už není, se nezapíše", () => {
+    const u = { id: "u", src: "data:image/png;base64,AAAA", w: 4, h: 2, x: 0, y: 0, mmPerPx: 1, angle: 0, opacity: 0.5 };
+    const d: CadDoc = { ...part("x"), features: [{ id: "s1", name: "Skica 1", type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [] }], underlays: { s1: u, smazana: { ...u, id: "u2" } } };
+    expect(Object.keys(embedBlobs(d).underlays ?? {})).toEqual(["s1"]);
+    expect(Object.keys(embedBlobs(d, { inline: true }).underlays ?? {})).toEqual(["s1"]);
+    expect(embedBlobs({ ...d, features: [] }).underlays).toBeUndefined();
+  });
   it("chybějící data: seznam a srozumitelná chyba", () => {
     const d = part("mnblob:00000000deadbeefzz");
     expect(missingBlobs(d)).toEqual(["mnblob:00000000deadbeefzz"]);

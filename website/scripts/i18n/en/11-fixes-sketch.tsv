@@ -1,0 +1,5 @@
+# Opravy po kontrole skicáře: přesun ukotvených entit, odmítnutí vazeb a kót, které by skicu přeurčily (agent-sketch.ts)
+{0} ve skice „{1}“ nepřidána – {2}	{0} in sketch “{1}” not added – {2}
+Část výběru zůstala na místě – drží ji vazby nebo kóty k entitám mimo výběr (např. „Pevně“, kóta od počátku). Vyberte i je, nebo vazbu smažte.	Part of the selection stayed in place – it is held by constraints or dimensions to entities outside the selection (e.g. “Fixed”, a dimension from the origin). Select those too, or delete the constraint.
+nadbytečná: tutéž geometrii už určují dosavadní vazby a kóty	redundant: the existing constraints and dimensions already define this geometry
+v rozporu s dosavadními vazbami a kótami	conflicts with the existing constraints and dimensions

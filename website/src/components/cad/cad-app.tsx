@@ -63,7 +63,7 @@ import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Wa
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool, type SketcherHandle } from "./sketcher";
-import { applySketchPatch } from "@/cad/sketch-underlay";
+import { applySketchPatch, pruneUnderlays } from "@/cad/sketch-underlay";
 import { SectionControls } from "./section-panel";
 import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
@@ -592,8 +592,9 @@ export function CadApp() {
           case "entities":
           case "constraints":
           case "dims":
-            // entity (id e1, e2…), vazby a kóty do skici bloku; po vazbách / kótách a na konci bloku se skica vyřeší (agent-sketch.ts)
-            log.push(...applySketchOp(d.features, op));
+            // entity (id e1, e2…), vazby a kóty do skici bloku, jinak do skici otevřené ve skicáři (nezaložil-li tento vstup
+            // vlastní skicu), jinak do poslední; po vazbách / kótách a na konci bloku se skica vyřeší (agent-sketch.ts)
+            log.push(...applySketchOp(d.features, op, openNew || added.some((f) => f.type === "sketch") ? null : sketchId));
             changed = true;
             break;
           case "sketchOn": {
@@ -923,7 +924,7 @@ export function CadApp() {
       try {
         // ochrana dokumentace: bez zapnutého šifrovaného úložiště se do prohlížeče nic nezapisuje
         if (persistMode() !== "encrypted" || !isUnlocked()) return;
-        const json = JSON.stringify(doc);
+        const json = JSON.stringify(pruneUnderlays(doc)); // bez podkladů smazaných skic
         void vaultSet(STORE, json);
         const strip: DocTab[] = docTabs.length ? docTabs : fallbackTabs();
         void vaultSet(TABS_KEY, JSON.stringify({ active: tabId, tabs: strip.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(strip, tabId) ? docId.current : did, srcTabId })) }));
@@ -2391,10 +2392,11 @@ export function CadApp() {
   const setSketchPatch = useCallback(
     (patch: SketchPatch, record = true) => {
       if (!sketchId) return;
-      const next = applySketchPatch(doc, sketchId, patch); // podklad skici jde do doc.underlays, ne do prvku
-      (record ? commit : live)(next);
+      // podklad skici jde do doc.underlays, ne do prvku; funkčně nad aktuálním dokumentem a jen dokud v něm skica je –
+      // zpožděný zápis (načtení podkladu) po zavření skici / přepnutí záložky nepřepíše jiný dokument
+      (record ? commitWith : liveWith)((d) => (d.features.some((f) => f.id === sketchId) ? applySketchPatch(d, sketchId, patch) : d));
     },
-    [doc, sketchId, commit, live],
+    [sketchId, commitWith, liveWith],
   );
 
   const mat = MATERIALS.find((m) => m.id === doc.material) ?? MATERIALS[0];

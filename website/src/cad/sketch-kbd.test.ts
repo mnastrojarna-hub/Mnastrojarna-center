@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PASTE_FIX_LIMIT, PASTE_MAX_POINTS, POINT_FIX_MAX, anchorPoints, entitiesFromPoints, fitView, fixedPoint, parseCoordList, pointVisible, pruneRedundant, typedAnchor } from "./sketch-kbd";
+import { PASTE_FIX_LIMIT, PASTE_MAX_POINTS, POINT_FIX_MAX, anchorPoints, entitiesFromPoints, fitView, fixedPoint, isDynKey, maxShift, moveAnchors, parseCoordList, pointVisible, pruneRedundant, typedAnchor } from "./sketch-kbd";
+import { transformEntity, xfMove, xfRotate, xfScale } from "./sketch-ops";
 import { analyzeSketch, solveSketch } from "./sketch-solver";
 import { parseInput } from "./sketch-tools";
 import { mmToCanvas } from "./sketch-touch";
@@ -271,5 +272,52 @@ describe("pohled po zadání bodu mimo plátno (pointVisible, fitView)", () => {
     const row = fitView([[0, 7], [1000, 7]], size)!;
     expect(row.scale).toBeCloseTo(800 / 1500, 9);
     expect(pointVisible(row, size, [1000, 7])).toBe(true);
+  });
+});
+
+describe("opravy po kontrole: vložení z Excelu, AltGr, přesun ukotvených entit", () => {
+  it("oddělovač tisíců jako pevná mezera (český Excel) nerozdělí číslo", () => {
+    expect(pts("1 234,5\t1 200\n10\t20")).toEqual([[1234.5, 1200], [10, 20]]);
+    expect(pts("1 234 567 2 000")).toEqual([[1234567, 2000]]);
+    // obyčejná mezera a tabulátor dál oddělují čísla; pevná mezera mimo trojici číslic také
+    expect(pts("1 234\n10 20")).toEqual([[1, 234], [10, 20]]);
+    expect(pts("10 20")).toEqual([[10, 20]]);
+  });
+  it("číselné zadání: znaky přes AltGr (Ctrl+Alt) a Option, zkratky s Ctrl / Cmd ne", () => {
+    const k = (key: string, m: { ctrl?: boolean; alt?: boolean; meta?: boolean; altGr?: boolean } = {}) =>
+      isDynKey({ key, ctrlKey: !!m.ctrl, altKey: !!m.alt, metaKey: !!m.meta, getModifierState: (s: string) => s === "AltGraph" && !!m.altGr });
+    expect(k("5")).toBe(true);
+    expect(k("@", { ctrl: true, alt: true })).toBe(true); // Windows, AltGr+V na české klávesnici
+    expect(k("<", { ctrl: true, alt: true, altGr: true })).toBe(true);
+    expect(k("@", { alt: true })).toBe(true); // Option na Macu
+    expect(k("2", { ctrl: true, alt: true, altGr: true })).toBe(true);
+    expect(k("2", { ctrl: true, alt: true })).toBe(false); // Ctrl+Alt+2 bez AltGr = zkratka
+    expect(k("1", { alt: true })).toBe(false);
+    expect(k("-", { ctrl: true })).toBe(false); // Ctrl+− = zoom prohlížeče
+    expect(k("@", { meta: true })).toBe(false);
+    expect(k("a", { ctrl: true, alt: true, altGr: true })).toBe(false);
+  });
+  it("přesun / otočení / změna měřítka: vazba „Pevně“ jde s entitou, řešič ji nevrátí", () => {
+    const line: SketchEntity = { id: "L", type: "line", a: [0, 0], b: [30, 10] };
+    const pl: SketchEntity = { id: "P", type: "polyline", points: [[0, 0], [10, 0], [10, 10]], closed: false };
+    const free: SketchEntity = { id: "F", type: "line", a: [100, 0], b: [100, 10] };
+    const cons: SketchConstraint[] = [fixedPoint("L", "a", [0, 0]), fixedPoint("L", "b", [30, 10]), { id: "s", type: "fixed", refs: [{ e: "P", k: "self" }], value: [0, 0, 10, 0, 10, 10] }, fixedPoint("F", "a", [100, 0])];
+    const ids = new Set(["L", "P"]);
+    const d: Vec2 = [20, 20];
+    const moved = [line, pl, free].map((e) => (ids.has(e.id) ? transformEntity(e, xfMove(d)) : e));
+    // bez úpravy vazeb řešič úsečku vrátí na místo (původní chyba)
+    expect(maxShift(solveSketch(moved, cons).entities, moved, ids)).toBeGreaterThan(10);
+    const next = moveAnchors(cons, moved, ids);
+    const res = solveSketch(moved, next);
+    expect(res.ok).toBe(true);
+    expect(maxShift(res.entities, moved, ids)).toBeLessThan(1e-6);
+    expect(next[0].value).toEqual([20, 20]);
+    expect(next[1].value).toEqual([50, 30]);
+    expect(next[2].value).toEqual([20, 20, 30, 20, 30, 30]);
+    expect(next[3]).toBe(cons[3]); // nevybraná entita: vazba beze změny
+    const rot = [line].map((e) => transformEntity(e, xfRotate([0, 0], 90)));
+    expect(moveAnchors(cons, rot, new Set(["L"]))[1].value!.map((v) => Math.round(v * 1e6) / 1e6)).toEqual([-10, 30]);
+    const sc = [line].map((e) => transformEntity(e, xfScale([0, 0], 2)));
+    expect(moveAnchors(cons, sc, new Set(["L"]))[1].value).toEqual([60, 20]);
   });
 });

@@ -9,7 +9,7 @@
 import { cadLocale, tr } from "@/cad/i18n";
 import { extractPdfPaths, pdfPathsToEntities, type Mat, type PdfEntities } from "@/cad/pdf-vector";
 import { loadPdfJs, pdfDocOptions } from "@/cad/pdfjs";
-import { UNDERLAY_MAX_SIDE, newUnderlay, pdfPageUnderlay, pdfScaleLabel, pdfToSketch, rotateUnderlay, setUnderlayWidth, shrinkToFit, underlayMatrix, underlayWidth, type BitmapEncode } from "@/cad/sketch-underlay";
+import { UNDERLAY_MAX_SIDE, fieldNum, newUnderlay, parseFieldNum, pdfPageUnderlay, pdfScaleLabel, pdfToSketch, rotateUnderlay, setUnderlayWidth, shrinkToFit, underlayMatrix, underlayWidth, type BitmapEncode } from "@/cad/sketch-underlay";
 import type { SketchEntity, SketchUnderlay, Vec2 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { useEffect, useRef, useState } from "react";
@@ -178,15 +178,14 @@ export function UnderlayImage({ u }: { u: SketchUnderlay }) {
 export type UnderlayMode = "calib" | "move" | null;
 
 const num = (v: number, d = 2) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(cadLocale());
-const parse = (s: string) => Number(s.trim().replace(/\s/g, "").replace(",", "."));
 
 /** Číselné pole, které změnu potvrdí Enterem nebo opuštěním (Esc vrátí původní hodnotu). */
 function NumField({ value, onCommit, suffix, title, data }: { value: number; onCommit: (v: number) => void; suffix: string; title: string; data: string }) {
   const [t, setT] = useState<string | null>(null);
-  const shown = t ?? num(value, 3);
+  const shown = t ?? fieldNum(value, 3); // bez oddělovače tisíců – po úpravě se musí přečíst zpět stejně
   const done = () => {
     if (t == null) return;
-    const v = parse(t);
+    const v = parseFieldNum(t);
     setT(null);
     if (Number.isFinite(v)) onCommit(v);
   };

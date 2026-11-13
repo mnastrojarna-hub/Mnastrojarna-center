@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PT_MM, UNDERLAY_MAX_CHARS, UNDERLAY_MAX_SIDE, UNDERLAY_MIN_SIDE, applySketchPatch, calibrateUnderlay, fitBitmap, moveUnderlay, newUnderlay, normAngle, pdfPageUnderlay, pdfScaleLabel, pdfToSketch, replaceBitmap, rotateUnderlay, setUnderlayWidth, shrinkToFit, sketchToUnderlay, underlayContains, underlayCorners, underlayMatrix, underlayToSketch, underlayWidth, type BitmapEncode } from "./sketch-underlay";
+import { PT_MM, UNDERLAY_MAX_CHARS, UNDERLAY_MAX_SIDE, UNDERLAY_MIN_SIDE, applySketchPatch, calibrateUnderlay, fieldNum, fitBitmap, moveUnderlay, newUnderlay, normAngle, parseFieldNum, pdfPageUnderlay, pdfScaleLabel, pdfToSketch, pruneUnderlays, replaceBitmap, rotateUnderlay, setUnderlayWidth, shrinkToFit, sketchToUnderlay, underlayContains, underlayCorners, underlayMatrix, underlayToSketch, underlayWidth, type BitmapEncode } from "./sketch-underlay";
 import type { CadDoc, Feature, SketchUnderlay, Vec2 } from "./types";
 
 const U = (o: Partial<SketchUnderlay> = {}): SketchUnderlay => ({ id: "u1", src: "data:image/png;base64,AAAA", w: 400, h: 200, x: 0, y: 0, mmPerPx: 0.5, angle: 0, opacity: 0.6, ...o });
@@ -230,5 +230,37 @@ describe("stránka PDF jako podklad", () => {
     expect(underlayWidth(img)).toBeCloseTo(underlayWidth(U()), 9);
     expect(img.name).toBe("b.png");
     expect("page" in img || "pxPerPt" in img).toBe(false);
+  });
+});
+
+describe("opravy po kontrole: podklad smazané skici, číslo v poli šířky", () => {
+  const doc = (ids: string[], underlays: Record<string, SketchUnderlay>): CadDoc => ({ app: "mnastrojarna-cad", version: 2, name: "D", material: "ocel", features: ids.map((id) => ({ id, name: id, type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: [] }) as Feature), underlays });
+  it("pruneUnderlays: podklad skici, která v dokumentu už není, se zahodí; jinak týž objekt", () => {
+    const d = doc(["s1"], { s1: U(), gone: U({ id: "u2" }) });
+    const p = pruneUnderlays(d);
+    expect(Object.keys(p.underlays ?? {})).toEqual(["s1"]);
+    expect(Object.keys(d.underlays ?? {})).toEqual(["s1", "gone"]); // vstup se nemění
+    expect("underlays" in pruneUnderlays(doc([], { gone: U() }))).toBe(false);
+    const same = doc(["s1"], { s1: U() });
+    expect(pruneUnderlays(same)).toBe(same);
+    const none = doc(["s1"], {});
+    delete none.underlays;
+    expect(pruneUnderlays(none)).toBe(none);
+  });
+  it("pole šířky: bez oddělovače tisíců; čtení „1.234,5“, „1,234.5“, „1 600“ i desetinné čárky / tečky", () => {
+    expect(fieldNum(1500, 3, "de-DE")).toBe("1500");
+    expect(fieldNum(1234.5678, 3, "de-DE")).toBe("1234,568");
+    expect(fieldNum(1500.25, 3, "en-US")).toBe("1500.25");
+    expect(fieldNum(1500, 3, "cs-CZ")).toBe("1500");
+    expect(parseFieldNum("1600")).toBe(1600);
+    expect(parseFieldNum("1500,5")).toBe(1500.5);
+    expect(parseFieldNum("1500.5")).toBe(1500.5);
+    expect(parseFieldNum("1.234,5")).toBe(1234.5);
+    expect(parseFieldNum("1,234.5")).toBe(1234.5);
+    expect(parseFieldNum("1 600")).toBe(1600);
+    expect(parseFieldNum("1.600.000")).toBe(1600000);
+    expect(parseFieldNum(" -12,5 ")).toBe(-12.5);
+    expect(Number.isNaN(parseFieldNum("abc"))).toBe(true);
+    expect(Number.isNaN(parseFieldNum(""))).toBe(true);
   });
 });

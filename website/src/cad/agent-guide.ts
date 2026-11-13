@@ -146,12 +146,17 @@ Na ně odkazují vazby a kóty:
 - Kóta je **řídicí** (změní geometrii); \`referenční\` (\`reference\`, \`Referenz\`) jen měří a hodnotu lze vynechat.
 - Po každém řádku \`vazba\` / \`kóta\` (a na konci bloku skici, přibyly-li entity) se skica **vyřeší** a protokol napíše
   stav jako skicář: \`Plně určeno\`, \`Nedourčeno (N st. volnosti)\` nebo ⚠ \`Přeurčeno – konflikt / nadbytečné vazby\` s výčtem
-  vazeb v rozporu. Nenajde-li řešič řešení, geometrie zůstane a vazby i kóty zůstanou uložené (opravíte je ve skicáři –
-  klik na značku vazby nebo kótu, Delete – nebo v JSON: pole \`constraints\` a \`dims\` skici).
+  vazeb v rozporu (⚠ jen u skici přeurčené už předem, např. z JSON).
+- Vazba nebo kóta, která by skicu **přeurčila** (je v rozporu s dosavadními, nebo nadbytečná), se **nepřidá**: protokol
+  napíše \`✗ kóta délka e1 20 ve skice „Skica 1“ nepřidána – v rozporu s dosavadními vazbami a kótami\` (nebo
+  \`– nadbytečná: …\`) a ostatní položky téhož řádku se přidají. Jen měřící kótu zapíšete s \`referenční\`. Uložené vazby
+  a kóty opravíte ve skicáři (klik na značku vazby nebo kótu, Delete) nebo v JSON (pole \`constraints\` a \`dims\` skici).
+- Vazby, kóty a entity mimo blok skici jdou do skici **otevřené ve skicáři** (pokud ten vstup nezaložil vlastní skicu),
+  jinak do poslední skice dokumentu.
 - Chybný odkaz skončí chybou s očekávaným zápisem na řádku, kde je (\`✗ řádek 7: vazba kolmo: „e5“ je kružnice / oblouk,
   čeká se úsečka – zápis: vazba kolmo e1 e2 (dvě úsečky)\`); takový řádek nic nepřidá.
-- Vazba \`tečně\` mezi úsečkou a obloukem, které už sdílejí koncový bod (\`shodně\`), se vyhodnotí jako nadbytečná – drážku
-  kreslete entitou \`drážka\`, zaoblený roh \`čára … r N\`, případně tečnost vynechte.
+- Vazba \`tečně\` mezi úsečkou a obloukem, které už sdílejí koncový bod (\`shodně\`), se vyhodnotí jako nadbytečná a nepřidá
+  se – drážku kreslete entitou \`drážka\`, zaoblený roh \`čára … r N\`, případně tečnost vynechte.
 
 **Skica na ploše modelu nebo na pomocné rovině:** \`skica plocha F6: …\` – číslo plochy jako popisky pro výběr
 (\`window.mncad.hints()\`, Ctrl+Shift+L; F1 = první plocha), nebo pravidlem jako u skořepiny: \`skica plocha horní\`,
@@ -364,8 +369,11 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
 4. **Kontrola:** \`výkres stav\` – musí platit „Duplicity: žádné“ a „Kontrola kót: všech … je na listu“. Řádek
    „Vynecháno“ říká proč (např. „zapněte pohled spodní“, „zapněte řez osou“, „nevešlo se“ → \`výkres A2\` nebo jiné
    měřítko) – opravte a spusťte \`kótovat\` znovu.
-5. **Tolerance** jen na funkční rozměry: \`výkres tolerance Ø30 h6\`, \`výkres tolerance 50 ±0,05\`,
+5. **Tolerance** jen na funkční rozměry: \`výkres tolerance Ø30 h6\`, \`výkres tolerance 42 ±0,05\`,
    \`výkres tolerance M20 6g\`, \`výkres tolerance Ø50 H7\` (kóta se najde podle popisku; nejednoznačná → chyba se seznamem).
+   **Pomocná kóta v závorce** („(50)“ – nejdelší článek řetězu) se netoleruje (ISO 129-1): příkaz ji odmítne a vypíše
+   ostatní články řetězu – tolerujte některý z nich. Tolerance zůstane u kóty i po změně modelu, dokud kóta existuje
+   (průměr podle hodnoty, délka podle polohy čel); zmizí-li kóta, tolerance se ztratí – zkontrolujte \`výkres stav\`.
 6. **Razítko:** \`výkres nepředepsané ISO 2768-mK\`, \`výkres hrany ISO 13715 -0,3\`, \`výkres drsnost Ra 3,2\`,
    \`výkres poznámka "…"\`.
 7. \`výkres stav\` naposledy, pak export (výkres → PDF / DXF / DWG / SVG).
@@ -378,7 +386,8 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
 - **Rotační díl** (osa vodorovně): průměry osazení naskládané na straně (nejmenší nejblíž dílu, rozestup 7 mm), délky
   osazení **řetězově na jedné čáře**, celková délka ve vnější řadě (\`kótovat od základny\` = všechny délky od jednoho čela);
   zápich šířkou (v řetězu) a Ø popisem; sražení „1,5×45°“ a zaoblení „R1“ jednou s počtem „2×“; vnější závit
-  „M20×1,5“ místo Ø a zvlášť délka závitu.
+  „M20×1,5“ místo Ø a zvlášť délka závitu. Příčná díra: poloha podél osy **od bližšího čela**, radiálně od osy.
+- Další modely na listu (komponenta, vložený soubor) se Chytrými kótami nekótují – kóty patří jen pohledům hlavního dílu.
 - **Hranolový díl:** celkové rozměry délka × šířka × výška jednou; polohy děr od základních hran (levá / spodní) v pohledu,
   kde jsou díry kružnicemi; souměrně rozmístěné díry roztečí od osy souměrnosti; kruhové pole roztečnou kružnicí „Ø120“
   na osové kružnici + „rovnoměrně“ (nebo úhel).
