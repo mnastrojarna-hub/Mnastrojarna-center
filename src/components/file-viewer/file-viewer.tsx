@@ -16,6 +16,7 @@ import { swipeAllowed, swipeDirection, swipeGateOf, type SwipeGate, type SwipePo
 import { drawingNumberText, drawingQuantityText, isServerRasterName, type DrawingInfo } from "@/lib/jobs/drawing-set";
 import { jobFileIdFromHref } from "@/lib/jobs/drawing-convert-names";
 import { ConvertPdfButton } from "./convert-pdf-button";
+import { MAX_MODEL_BYTES } from "@/lib/viewer3d/tessellation";
 
 // three.js + OpenCascade jen když se otevírá 3D model
 const ModelViewer = dynamic(() => import("@/components/viewer3d/model-viewer").then((m) => m.ModelViewer), {
@@ -65,22 +66,39 @@ async function readWithProgress(res: Response, onProgress: (done: number, total:
   const total = Number(res.headers.get("content-length") ?? 0);
   if (!res.body) return new Uint8Array(await res.arrayBuffer());
   const reader = res.body.getReader();
+  // známá velikost → jedno pole předem (u 150 MB modelu ušetří kopii celého souboru v paměti)
+  let out: Uint8Array | null = total > 0 ? new Uint8Array(total) : null;
   const chunks: Uint8Array[] = [];
   let done = 0;
+  let lastReport = 0;
   for (;;) {
     const r = await reader.read();
     if (r.done) break;
-    chunks.push(r.value);
+    if (out && done + r.value.length <= out.length) out.set(r.value, done);
+    else {
+      // delší než hlášená velikost (komprese) → dál po kouscích
+      if (out) {
+        chunks.push(out.subarray(0, done));
+        out = null;
+      }
+      chunks.push(r.value);
+    }
     done += r.value.length;
-    onProgress(done, total);
+    const now = Date.now();
+    if (now - lastReport > 100) {
+      lastReport = now;
+      onProgress(done, total);
+    }
   }
-  const out = new Uint8Array(done);
+  onProgress(done, total);
+  if (out) return done === out.length ? out : out.slice(0, done);
+  const all = new Uint8Array(done);
   let o = 0;
   for (const c of chunks) {
-    out.set(c, o);
+    all.set(c, o);
     o += c.length;
   }
-  return out;
+  return all;
 }
 
 /** Název z cesty podepsané URL úložiště (…/soubor.step?token=…). */
@@ -113,7 +131,9 @@ export function FileViewer({
   // TIFF / HEIC dokumentu zakázky: originál se nestahuje, náhled strany připraví server
   const rasterDirect = !request.blob && isServerRasterName(request.filename) && rasterPreviewHref(request.href, 1) !== null;
   const [raster, setRaster] = React.useState<RasterState | null>(null);
-  const [state, setState] = React.useState<{ loading: true; done: number; total: number } | { loading: false; error: string } | { loading: false; data: Loaded }>({ loading: true, done: 0, total: 0 });
+  const [state, setState] = React.useState<
+    { loading: true; done: number; total: number } | { loading: false; error: string } | { loading: false; tooBig: number } | { loading: false; data: Loaded }
+  >({ loading: true, done: 0, total: 0 });
   const [mode, setMode] = React.useState<"3d" | "pages">("3d");
 
   React.useEffect(() => {
@@ -144,6 +164,13 @@ export function FileViewer({
           return;
         }
         const ct = res.headers.get("content-type") ?? "";
+        // obří soubor by prohlížeč (RAM) nezvládl → nestahovat do paměti, rovnou nabídnout stažení
+        const declared = Number(res.headers.get("content-length") ?? 0);
+        if (declared > MAX_MODEL_BYTES) {
+          ac.abort();
+          setState({ loading: false, tooBig: declared });
+          return;
+        }
         const bytes = await readWithProgress(res, (done, total) => setState({ loading: true, done, total }));
         const filename = request.filename || filenameFromDisposition(res.headers.get("content-disposition")) || filenameFromUrl(res.url) || "soubor";
         const sniffed = sniffFile(bytes, filename, ct);
@@ -391,6 +418,14 @@ export function FileViewer({
           </div>
         ) : "error" in state ? (
           <Message icon={AlertTriangle} tone="text-amber-500" title="Soubor nejde otevřít" text={state.error} />
+        ) : "tooBig" in state ? (
+          <Message
+            icon={AlertTriangle}
+            tone="text-amber-500"
+            title="Soubor je pro prohlížeč příliš velký"
+            text={`Soubor má ${fmtSize(state.tooBig)} — v prohlížeči by došla paměť. Stáhni ho a otevři v CADu (nebo v programu, který ho umí).`}
+            action={<a href={downloadHref(request.href)} data-no-viewer="" className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background"><Download className="h-4 w-4" /> Stáhnout {request.filename ?? "soubor"}</a>}
+          />
         ) : data && isModel && modelBytes ? (
           <>
             {/* 3D zůstává načtené i při přepnutí na stránky PDF */}
@@ -400,6 +435,7 @@ export function FileViewer({
                 format={data.has3D ? "pdf" : data.sniffed.format!}
                 name={data.filename}
                 formatLabel={data.has3D ? "3D PDF" : data.sniffed.label}
+                download={{ href: data.blobUrl, filename: data.filename }}
               />
             </div>
             {data.has3D && mode === "pages" && (
