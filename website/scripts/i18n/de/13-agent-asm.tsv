@@ -183,7 +183,6 @@ vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	Verknüpfung „{0}
 vazba „{0}“ v sestavě není – vazby: {1}	Verknüpfung „{0}“ ist nicht in der Baugruppe – Verknüpfungen: {1}
 vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…"	Verknüpfung „{0}“: was tun? wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…"
 vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	Verknüpfung „{0}“: unbekannte Änderung „{1}“ – wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…" (neue Verknüpfung mit der Art beginnen: kontakt, bündig, zentrieren, konzentrisch, abstand, winkel, parallel, fixiert)
-vazba {0} ({1}) nemá hodnotu – hodnotu má jen Vzdálenost a Úhel	Verknüpfung {0} ({1}) hat keinen Wert – nur Abstand und Winkel haben einen
 vazba {0} v sestavě není – vazby: {1}	Verknüpfung {0} ist nicht in der Baugruppe – Verknüpfungen: {1}
 vazba {0}: chybí cílová komponenta B – {1}	Verknüpfung {0}: Zielkomponente B fehlt – {1}
 vazba {0}: chybí komponenta A – {1}	Verknüpfung {0}: Komponente A fehlt – {1}

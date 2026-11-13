@@ -1,5 +1,6 @@
 /** 2D geometrie skici — čisté funkce bez CAD jádra (testované ve vitestu). */
 import type { SketchEntity, Vec2 } from "./types";
+import { hasTangents, hermitePoints } from "./spline-tangent";
 
 export type Seg = { kind: "line"; a: Vec2; b: Vec2 } | { kind: "arc"; a: Vec2; m: Vec2; b: Vec2 };
 /** Uzavřený profil: buď smyčka segmentů, nebo analytický tvar (přesnější v jádře). */
@@ -102,7 +103,7 @@ export function shapeSegs(e: SketchEntity): Seg[] | null {
       return arcsThrough(ellipsePoints(e, 48), true);
     case "spline":
       if (e.points.length < 2) return null;
-      return arcsThrough(splinePoints(e.points, e.closed, 12), e.closed);
+      return arcsThrough(hasTangents(e) ? hermitePoints(e, 12) : splinePoints(e.points, e.closed, 12), e.closed);
     default:
       return null;
   }
@@ -330,7 +331,7 @@ export function sketchToDxf(entities: SketchEntity[]): string {
 export function entityPath(e: SketchEntity): { pts: Vec2[]; closed: boolean } {
   if (e.type === "point") return { pts: [e.p], closed: false };
   if (e.type === "ellipse") return { pts: ellipsePoints(e, 72), closed: true };
-  if (e.type === "spline") return { pts: splinePoints(e.points, e.closed, 16), closed: e.closed };
+  if (e.type === "spline") return { pts: hasTangents(e) ? hermitePoints(e, 16) : splinePoints(e.points, e.closed, 16), closed: e.closed };
   if (e.type === "circle") return { pts: loopPolygon({ kind: "circle", cx: e.cx, cy: e.cy, r: e.r, sourceIds: [] }), closed: true };
   if (e.type === "line") return { pts: [e.a, e.b], closed: false };
   if (e.type === "arc") return { pts: arcPoints(e.a, e.b, e.c, 32), closed: false };

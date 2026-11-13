@@ -7,11 +7,13 @@
  */
 import type { DrawingCmd, SheetRef, TitleField } from "./agent-drawing";
 import { VIEW_CS } from "./agent-drawing";
-import { defaultDrawingOptions, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
+import { defaultDrawingOptions, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
 import { linMeaning, type SmartDims } from "./drawing-dims";
 import { threadsOfDoc } from "./drawing-doc";
-import { annLabel, annList, agentToSheet, agentToView, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
+import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
+import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
+import { applyViewsCmd, viewsStatusLines } from "./drawing-views-agent";
 import { cadLocale, tr } from "./i18n";
 import { MATERIALS } from "../lib/mesh-metrics";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec3 } from "./types";
@@ -28,7 +30,7 @@ export type DrawingEnv = { extras?: (doc: CadDoc) => DrawingExtras; tabs?: () =>
 const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
 /** název pohledu; pohled dalšího modelu na listu (`m:<id>`) názvem modelu z voleb listu */
 const VIEW_NAME = (k: string, o?: Partial<DrawingOptions>) =>
-  k.startsWith("m:") ? (o?.models?.find((m) => modelViewKey(m.id) === k)?.name ?? k) : tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
+  k.startsWith("m:") ? (o?.models?.find((m) => modelViewKey(m.id) === k)?.name ?? k) : k.startsWith("aux:") ? tr("pohled {0}", k.slice(4)) : k.startsWith("cut:") ? tr("řez {0}–{0}", k.slice(4)) : tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
 
 // ---------------------------------------------------------------- aktivní list (textové příkazy ↔ výkresové prostředí)
 
@@ -151,9 +153,23 @@ export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOption
         if (o.text !== undefined && o.text !== keep.text) keep.text = o.text;
       }
       if (keep.type === "callout" && o.type === "callout" && o.tol) keep.tol = o.tol;
+      // revize (trojúhelník) a zobrazení úchylek uložení zůstávají u přegenerované kóty
+      if (o.rev) keep.rev = o.rev;
+      if (o.tolShow) keep.tolShow = o.tolShow;
       return keep;
     });
-  return { annotations: [...user, ...gen], gen: smart.gen };
+  // vygenerovaná kóta s úpravou uživatele (tolerance, revize), která se tentokrát nevešla, zůstane (souřadnice pohledu jdou s ním)
+  const dropped = new Set(smart.report.dropped ?? []);
+  const have = new Set(gen.map((a) => a.auto));
+  const kept = ann.filter((a) => a.auto && dropped.has(a.auto) && !have.has(a.auto) && !off.has(a.auto) && userEdited(a));
+  return { annotations: [...user, ...gen, ...kept], gen: smart.gen };
+}
+
+/** vygenerovaná poznámka s úpravou uživatele (tolerance / přípona, vlastní text, revize, zobrazení úchylek) */
+function userEdited(a: DrawingAnnotation): boolean {
+  if (a.rev || a.tolShow) return true;
+  if (a.type === "dim") return !!splitSuffix(a).user.trim() || a.text !== undefined;
+  return a.type === "callout" && !!a.tol?.trim();
 }
 
 // ---------------------------------------------------------------- popisky a duplicity
@@ -285,6 +301,15 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
       if (hits.length > 1) throw new Error(tr("kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji (např. celým popiskem)", cmd.target, hits.length, hits.map((a) => `${annLabel(views, a)} (${VIEW_NAME(a.view, so)})`).join(", ")));
       const h = hits[0];
       const fit = /^[A-Za-z]{1,2}\d/.test(cmd.tol); // lícování (h6, H7, 6H) bez mezery, ±0,1 také bez mezery (ISO 129)
+      // pole tolerance ISO 286 (H7, g6, H7/g6): úchylky podle jmenovitého rozměru kóty (výkres uložení je vyžaduje)
+      const holeD = h.type === "callout" ? /Ø(\d+(?:[.,]\d+)?)/.exec(h.lines[0] ?? "") : null;
+      const iso = parseFit(cmd.tol) && ((h.type === "dim" && h.prefix !== "M") || holeD) ? cmd.tol.replace(/\s+/g, "") : null;
+      const nominal = !iso ? 0 : h.type === "dim" ? dimValue(views, h) : Number(holeD![1].replace(",", "."));
+      if (cmd.fit) {
+        if (!parseFit(cmd.tol)) throw new Error(tr("„{0}“ není pole tolerance ISO 286 – např. H7, g6, js6, H7/g6", cmd.tol));
+        if (!iso) throw new Error(tr("uložení ISO 286 patří ke kótě rozměru nebo díry (Ø40, 25, Ø12 skrz) – u závitu použijte výkres tolerance M8 6H"));
+        if (!(iso && (iso.includes("/") ? iso.split("/").every((z) => fitDeviations(nominal, z)) : fitDeviations(nominal, iso)))) throw new Error(tr("pole {0} není pro rozměr {1} mm v ISO 286 definováno (tabulky do 500 mm)", cmd.tol, fmtN(nominal)));
+      }
       const next = anns.map((a) => {
         if (a.id !== h.id) return a;
         if (a.type === "dim") {
@@ -292,13 +317,19 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
           // dřívější tolerance se nahradí
           const p = splitSuffix(a);
           const t = a.prefix === "M" ? `-${cmd.tol}` : fit || /^[±+-]/.test(cmd.tol) ? cmd.tol : ` ${cmd.tol}`;
-          return { ...a, suffix: `${p.head}${t}${p.tail}` };
+          return { ...a, suffix: `${p.head}${t}${p.tail}`, ...(cmd.show ? { tolShow: cmd.show } : {}) };
         }
-        return a.type === "callout" ? { ...a, tol: cmd.tol } : a;
+        return a.type === "callout" ? { ...a, tol: cmd.tol, ...(cmd.show ? { tolShow: cmd.show } : {}) } : a;
       });
       put({ ...sheet(), annotations: next });
-      log.push(tr("✓ tolerance {0} → {1} ({2})", cmd.tol, annLabel(views, next.find((a) => a.id === h.id)!), VIEW_NAME(h.view, so)));
+      const dev = iso ? fitSuffix(nominal, iso, cmd.show ?? h.tolShow ?? so.fitShow ?? "dev") : "";
+      log.push(tr("✓ tolerance {0} → {1} ({2})", cmd.tol, annLabel(views, next.find((a) => a.id === h.id)!) + (dev ? ` ${dev}` : ""), VIEW_NAME(h.view, so)));
       return done({ changed: true, open: false });
+    }
+    case "views": {
+      const r = await applyViewsCmd({ doc, sheet, put, compute: computeSheet }, cmd.cmd);
+      log.push(...r.log);
+      return done({ changed: r.changed, open: r.open });
     }
     case "status": {
       const st = await drawingStatus(doc, compute, { sheet: cmd.sheet, extras });
@@ -605,6 +636,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   L.push(tr("U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}", m.tolerance?.trim() || "—", m.edges?.trim() || "—", m.note?.trim() || "—"));
   L.push(...titleLines(doc, doc.drawings![idx]));
   if (o.models?.length) L.push(tr("Další modely: {0}", o.models.map((x) => `„${x.name}“ (${VIEW_NAME(x.view)}, ${x.scale === "auto" ? tr("auto") : scaleLabel(x.scale)})`).join(" · ")));
+  L.push(...viewsStatusLines(res, o, anns, s.meta as Partial<DrawingMeta>));
   L.push(...viewRangeLines(res, o));
   if (res.warnings.length) L.push(tr("Varování výkresu: {0}", res.warnings.join("; ")));
   return { text: L.join("\n"), changed };
@@ -616,6 +648,11 @@ function docBbox(res: DrawingResult): [Vec3, Vec3] | null {
   const t = res.views.find((v) => v.key === "top");
   const l = res.views.find((v) => v.key === "left" || v.key === "right");
   if (!f) return null;
-  const W = t ? t.h : l ? l.w : 0;
-  return [[0, 0, 0], [f.w, W, f.h]];
+  // skutečný rozsah (přerušený pohled je na listu kratší)
+  const size = (v: PlacedView) => {
+    const e = viewExtent(v);
+    return [e.x1 - e.x0, e.y1 - e.y0];
+  };
+  const W = t ? size(t)[1] : l ? size(l)[0] : 0;
+  return [[0, 0, 0], [size(f)[0], W, size(f)[1]]];
 }

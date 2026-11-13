@@ -1,0 +1,102 @@
+# Tvary 7. vlny: zaoblení se setbackem, eliptické / kuželosečkové zaoblení, úkos s dělicí křivkou, stupňovitý úkos
+# (feat/fillet-shapes.ts, feat/draft-parting.ts, agent-shapes.ts, forms/fillet-form.tsx, forms/pattern-form.tsx, shape-presets.tsx)
+ (+{0} vrcholů vlastní)	 (+{0} Ecken eigen)
+, dělicí křivka „{0}“{1}	, Trennlinie „{0}“{1}
+, kuželosečka rho {0}	, Kegelschnitt rho {0}
+, neutrální rovina {0}	, neutrale Ebene {0}
+, stupňovitý	, gestuft
+{0}°, ploch {1}	{0}°, {1} Flächen
+D1 (první plocha)	D1 (erste Fläche)
+D2 (druhá plocha)	D2 (zweite Fläche)
+Dělicí čára má {0} úseků – každý se zkosí kolem své roviny; mezi nerovnoběžnými úseky vzniknou drobné přechodové stupně.	Die Trennlinie hat {0} Abschnitte – jeder wird um seine eigene Ebene geneigt; zwischen nicht parallelen Abschnitten entstehen kleine Übergangsstufen.
+Dělicí křivka	Trennlinie
+Dělicí křivka (skica)	Trennlinie (Skizze)
+Dělicí křivka je rovinná (skica kolmá na tah) – stupňovitý úkos je zde totožný s úkosem kolem dělicí roviny.	Die Trennlinie ist eben (Skizze senkrecht zur Entformungsrichtung) – die gestufte Schräge ist hier identisch mit der Schräge um die Trennebene.
+Dělicí křivka je zakřivená – úkos se počítá po {0} rovinných úsecích (přibližně, mezi úseky drobné stupně).	Die Trennlinie ist gekrümmt – die Schräge wird in {0} ebenen Abschnitten berechnet (näherungsweise, kleine Stufen zwischen den Abschnitten).
+Dělicí křivka leží mimo těleso.	Die Trennlinie liegt außerhalb des Körpers.
+Dělicí křivka musí být jedna souvislá čára (skica „{0}“ má mezery nebo větve).	Die Trennlinie muss eine zusammenhängende Linie sein (Skizze „{0}“ hat Lücken oder Verzweigungen).
+Dělicí křivka musí mít aspoň dva body.	Die Trennlinie braucht mindestens zwei Punkte.
+Dělicí křivka se ve směru kolmém na tah vrací – každému místu smí odpovídat jediná výška (svislé skoky jsou dovoleny).	Die Trennlinie läuft quer zur Entformungsrichtung zurück – jeder Stelle darf nur eine Höhe entsprechen (senkrechte Sprünge sind erlaubt).
+Dělicí plocha těleso nerozdělila – zkontrolujte polohu skici dělicí křivky.	Die Trennfläche hat den Körper nicht geteilt – prüfen Sie die Lage der Trennlinien-Skizze.
+dvě vzdálenosti D1 × D2, elipsa nebo kuželosečka (rho)	zwei Abstände D1 × D2, Ellipse oder Kegelschnitt (rho)
+Eliptické / kuželosečkové	Elliptisch / Kegelschnitt
+eliptické / kuželosečkové zaoblení: D1 na horní (první) ploše, D2 na druhé; rho = kuželosečka (0,5 parabola)	elliptische / Kegelschnitt-Verrundung: D1 auf der oberen (ersten) Fläche, D2 auf der zweiten; rho = Kegelschnitt (0,5 Parabel)
+eliptické D1 {0} × D2 {1}{2}, hrany {3}	elliptisch D1 {0} × D2 {1}{2}, Kanten {3}
+Eliptické zaoblení	Elliptische Verrundung
+Eliptické zaoblení D1 {0} × D2 {1} nelze provést – vzdálenosti jsou pro vybrané hrany příliš velké nebo se zaoblení kříží.	Elliptische Verrundung D1 {0} × D2 {1} nicht möglich – die Abstände sind für die gewählten Kanten zu groß oder die Verrundungen schneiden sich.
+Eliptické zaoblení hrany {0} se nepodařilo vytvořit (šablonování průřezů selhalo).	Die elliptische Verrundung der Kante {0} konnte nicht erzeugt werden (Loft der Querschnitte fehlgeschlagen).
+eliptické zaoblení potřebuje vzdálenosti: zaoblit eliptické D1 D2 hrany <pravidlo> [rho 0,5]	eine elliptische Verrundung braucht Abstände: verrunden elliptisch D1 D2 kanten <Regel> [rho 0,5]
+Eliptické zaoblení: {0} z {1} hran není přímka mezi rovinnými plochami ani kruhová hrana se stálým průřezem – průřez je tam proložen šablonováním (přibližně).	Elliptische Verrundung: {0} von {1} Kanten sind weder eine Gerade zwischen ebenen Flächen noch eine Kreiskante mit konstantem Querschnitt – der Querschnitt wird dort per Loft angenähert.
+Hrana {0} je zčásti vypuklá a zčásti vnitřní – eliptické zaoblení ji neumí; rozdělte ji nebo použijte konstantní zaoblení.	Kante {0} ist teils konvex, teils konkav – die elliptische Verrundung kann sie nicht; teilen Sie sie oder verwenden Sie eine konstante Verrundung.
+Hrana {0} nesousedí právě se dvěma plochami – eliptické zaoblení na ní nelze vytvořit.	Kante {0} grenzt nicht an genau zwei Flächen – darauf ist keine elliptische Verrundung möglich.
+Kuželosečka (rho)	Kegelschnitt (rho)
+Neutrální prvek	Neutrales Element
+obě strany od dělicí čáry, i stupňovitý	beide Seiten ab der Trennlinie, auch gestuft
+Obě vzdálenosti eliptického zaoblení (D1 i D2) musí být kladné.	Beide Abstände der elliptischen Verrundung (D1 und D2) müssen positiv sein.
+Odebrat vrchol	Ecke entfernen
+odkazem	per Referenz
+Parametr kuželosečky rho musí být mezi 0 a 1 (0,5 = parabola, menší = elipsa, větší = hyperbola).	Der Kegelschnitt-Parameter rho muss zwischen 0 und 1 liegen (0,5 = Parabel, kleiner = Ellipse, größer = Hyperbel).
+Plocha pro D1 (volitelně)	Fläche für D1 (optional)
+Plochu nelze zkosit kolem dělicí křivky – plocha je kolmá na směr tahu nebo ji jádro neumí naklopit.	Die Fläche kann nicht um die Trennlinie geneigt werden – sie steht senkrecht zur Entformungsrichtung oder der Kern kann sie nicht kippen.
+Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Úkos na obě strany od dělicí čáry a stupňovitý úkos: přepněte Neutrální prvek na Dělicí křivka.	Die Flächen werden um den Winkel um ihre Schnittlinie mit der neutralen Ebene gekippt; die Entformungsrichtung bestimmt, wohin sich die Schräge öffnet (bei gegebener Ebene dreht sie nur deren Orientierung). Ohne Ebene und Richtung gilt die Grundebene. Schräge zu beiden Seiten einer Trennlinie und gestufte Schräge: Neutrales Element auf Trennlinie umschalten.
+Plochy se rozdělí dělicí křivkou; části nad ní se zkosí ve směru tahu, části pod ní proti němu – dělicí čára zůstane na místě a díl je v ní nejširší. Skica kolmá na tah = rovinná dělicí křivka (dělicí rovina pro obě strany, přesně). Skica rovnoběžná s tahem (např. v nárysu) = profil dělicí čáry promítnutý podél normály skici: přímé úseky přesně, oblouky a spline po rovinných úsecích (přibližně), svislé skoky = stupně. Stupňovitý úkos zkosí každý úsek od vlastní roviny kolmé na tah a sousední úseky spojí stupňovými plochami.	Die Flächen werden durch die Trennlinie geteilt; Teile oberhalb werden in Entformungsrichtung geneigt, Teile unterhalb dagegen – die Trennlinie bleibt an ihrem Platz und das Teil ist dort am breitesten. Skizze senkrecht zur Entformung = ebene Trennlinie (Trennebene für beide Seiten, exakt). Skizze parallel zur Entformung (z. B. in der Vorderansicht) = Profil der Trennlinie, entlang der Skizzennormale projiziert: gerade Abschnitte exakt, Bögen und Splines in ebenen Abschnitten (näherungsweise), senkrechte Sprünge = Stufen. Die gestufte Schräge neigt jeden Abschnitt um seine eigene Ebene senkrecht zur Entformung und verbindet benachbarte Abschnitte mit Stufenflächen.
+Poloměr se mění lineárně od začátku hrany (R1) k jejímu konci (R2). Začátek hrany určuje model – běží-li přechod obráceně, hodnoty prohoďte. Různou vzdálenost na každé ploše (eliptický průřez) má druh „Eliptické / kuželosečkové“.	Der Radius ändert sich linear vom Kantenanfang (R1) zum Kantenende (R2). Den Kantenanfang bestimmt das Modell – läuft der Übergang andersherum, tauschen Sie die Werte. Unterschiedliche Abstände auf jeder Fläche (elliptischer Querschnitt) bietet die Art „Elliptisch / Kegelschnitt“.
+Prohodit D1 ↔ D2	D1 ↔ D2 tauschen
+Průřez je oblouk elipsy (nebo kuželosečky s parametrem rho) tečný k oběma plochám: D1 se odměří na první ploše, D2 na druhé. První plocha = plocha z pole výše, jinak plocha s normálou nejvíc nahoru (+Z, pak +Y, +X). Přímá hrana mezi rovinnými plochami a kruhová hrana se stálým průřezem (rovina ⟂ osa, souosý válec/kužel) jsou přesné; jiné hrany se proloží šablonováním průřezů (přibližně, ⚠). Vnitřní hrany materiál přidají.	Der Querschnitt ist ein Ellipsenbogen (oder Kegelschnitt mit Parameter rho), tangential zu beiden Flächen: D1 wird auf der ersten Fläche gemessen, D2 auf der zweiten. Erste Fläche = Fläche aus dem Feld oben, sonst die Fläche, deren Normale am stärksten nach oben zeigt (+Z, dann +Y, +X). Eine gerade Kante zwischen ebenen Flächen und eine Kreiskante mit konstantem Querschnitt (Ebene ⟂ Achse, koaxialer Zylinder/Kegel) sind exakt; andere Kanten werden per Loft der Querschnitte angenähert (⚠). Konkave Kanten fügen Material hinzu.
+Přidat vrchol s jiným setbackem	Ecke mit anderem Rückversatz hinzufügen
+R{0}, setback {1}{2}, hrany {3}	R{0}, Rückversatz {1}{2}, Kanten {3}
+Rho (0,5 = parabola, menší = plošší, větší = ostřejší)	Rho (0,5 = Parabel, kleiner = flacher, größer = spitzer)
+rho kuželosečky musí být mezi 0 a 1 (0,5 = parabola)	rho des Kegelschnitts muss zwischen 0 und 1 liegen (0,5 = Parabel)
+roh tří a více hran uzavře hladká záplata	ein glatter Patch schließt eine Ecke aus drei oder mehr Kanten
+Rovina dělicí křivky těleso neprotíná – celé těleso se zkosí na jednu stranu.	Die Ebene der Trennlinie schneidet den Körper nicht – der ganze Körper wird zu einer Seite geneigt.
+Rovina skici dělicí křivky musí být kolmá na směr tahu (rovinná dělicí křivka), nebo s ním rovnoběžná (profil dělicí čáry, např. skica v nárysu). Odchylka je {0}°.	Die Skizzenebene der Trennlinie muss senkrecht zur Entformungsrichtung (ebene Trennlinie) oder parallel dazu sein (Profil der Trennlinie, z. B. Skizze in der Vorderansicht). Die Abweichung beträgt {0}°.
+Rozdělení tělesa dělicí plochou se nepodařilo (booleovská operace jádra selhala).	Das Teilen des Körpers an der Trennfläche ist fehlgeschlagen (Boolesche Operation des Kerns fehlgeschlagen).
+Setback	Rückversatz
+Setback (od vrcholu podél hran)	Rückversatz (von der Ecke entlang der Kanten)
+Setback {0} mm je delší než hrana u vrcholu [{1}] ({2} mm).	Rückversatz {0} mm ist länger als eine Kante an der Ecke [{1}] ({2} mm).
+Setback {0} mm je pro poloměr R{1} příliš malý – zvolte setback alespoň rovný poloměru.	Rückversatz {0} mm ist für den Radius R{1} zu klein – wählen Sie einen Rückversatz mindestens gleich dem Radius.
+Setback {0} mm: ve vrcholu se nepodařilo najít konce všech zaoblení – setback je nejspíš delší než hrana nebo se zaoblení jinde kříží.	Rückversatz {0} mm: An der Ecke wurden nicht alle Verrundungsenden gefunden – der Rückversatz ist vermutlich länger als eine Kante oder die Verrundungen schneiden sich anderswo.
+setback musí být kladný: zaoblit 3 hrany <pravidlo> setback 5	der Rückversatz muss positiv sein: verrunden 3 kanten <Regel> rückversatz 5
+Setback musí být kladný.	Der Rückversatz muss positiv sein.
+Setback nelze použít ({0}) – tyto rohy mají výchozí zaoblení vrcholu.	Rückversatz nicht anwendbar ({0}) – diese Ecken behalten die Standard-Eckverrundung.
+setback pro vrchol musí být kladný	der Rückversatz für eine Ecke muss positiv sein
+setback pro vrchol: vrchol V3 8 (číslo vrcholu a setback) nebo vrchol x y z 8	Rückversatz für eine Ecke: ecke V3 8 (Eckennummer und Rückversatz) oder ecke x y z 8
+Setback u vrcholu musí být kladný.	Der Rückversatz an einer Ecke muss positiv sein.
+Setback: hraniční plochu rohu se nepodařilo vytvořit.	Rückversatz: Die Randfläche der Ecke konnte nicht erzeugt werden.
+Setback: mezi vybranými hranami není vrchol, ve kterém by se stýkaly aspoň 3 hrany – použito běžné zaoblení.	Rückversatz: Keine Ecke, an der sich mindestens 3 gewählte Kanten treffen – normale Verrundung verwendet.
+Setback: odříznutí rohu se nepodařilo (booleovská operace jádra selhala).	Rückversatz: Das Abschneiden der Ecke ist fehlgeschlagen (Boolesche Operation des Kerns fehlgeschlagen).
+Setback: roh není tvořen rovinnými plochami mezi zaoblenými hranami (plocha rohu má {0} konců zaoblení místo 2).	Rückversatz: Die Ecke besteht nicht aus ebenen Flächen zwischen den verrundeten Kanten (eine Eckfläche hat {0} Verrundungsenden statt 2).
+Setback: roviny rohu jsou rovnoběžné – roh nelze uzavřít.	Rückversatz: Die Ebenen der Ecke sind parallel – die Ecke kann nicht geschlossen werden.
+Setback: z ploch rohu se nepodařilo uzavřít těleso.	Rückversatz: Aus den Eckflächen konnte kein Körper geschlossen werden.
+Setback: záplata rohu navazuje s odchylkou tečen {0}° (G1 přibližně).	Rückversatz: Der Eck-Patch schließt mit einer Tangentenabweichung von {0}° an (G1 näherungsweise).
+Setback: záplata rohu nenavazuje na okolní plochy ({0} volných hran) – zkuste jiný setback.	Rückversatz: Der Eck-Patch schließt nicht an die umliegenden Flächen an ({0} freie Kanten) – versuchen Sie einen anderen Rückversatz.
+Setback: záplatu rohu (N-stranná plocha G1) se nepodařilo spočítat.	Rückversatz: Der Eck-Patch (N-seitige G1-Fläche) konnte nicht berechnet werden.
+Skica dělicí křivky „{0}“ neobsahuje žádnou křivku.	Die Trennlinien-Skizze „{0}“ enthält keine Kurve.
+směr tahu: +Z | -Z | +X … nebo tři čísla (směr 0 0 1)	Entformungsrichtung: +Z | -Z | +X … oder drei Zahlen (richtung 0 0 1)
+Stupňovitý úkos (každý úsek od vlastní roviny, spojené stupni)	Gestufte Schräge (jeder Abschnitt um eigene Ebene, mit Stufen verbunden)
+stupňovitý úkos potřebuje dělicí křivku: úkos 3 plochy boční dělicí "Skica 2" stupňovitý	eine gestufte Schräge braucht eine Trennlinie: schräge 3 flächen seite trennlinie "Skizze 2" gestuft
+Stupňovitý úkos: {0} šikmých úseků – neutrální rovina kolmá na tah prochází středem úseku.	Gestufte Schräge: {0} schräge Abschnitte – die neutrale Ebene senkrecht zur Entformung geht durch die Abschnittsmitte.
+Svislé úseky dělicí křivky ({0}) nelze použít jako neutrální – plochy po obou stranách spojí stupňové plochy.	Senkrechte Abschnitte der Trennlinie ({0}) können nicht neutral sein – Stufenflächen verbinden die Flächen auf beiden Seiten.
+Úkos kolem dělicí křivky nevrátil těleso.	Die Schräge um die Trennlinie hat keinen Körper geliefert.
+Úkos kolem dělicí křivky se nepodařilo dopočítat (sousední plochy nelze znovu protnout) – zmenšete úhel nebo upravte výběr ploch.	Die Schräge um die Trennlinie konnte nicht berechnet werden (Nachbarflächen lassen sich nicht neu schneiden) – verkleinern Sie den Winkel oder passen Sie die Flächenauswahl an.
+Úkos není k dispozici.	Schräge ist nicht verfügbar.
+úkos ploch; s dělicí křivkou se části nad ní a pod ní zkosí od ní na obě strany, stupňovitý = každý úsek od vlastní roviny	Flächenschräge; mit Trennlinie werden die Teile ober- und unterhalb von ihr zu beiden Seiten geneigt, gestuft = jeder Abschnitt um eigene Ebene
+úkos potřebuje plochy: úkos 3 plochy boční | +X -X | F3 F5 … [dělicí "Skica 2"]	eine Schräge braucht Flächen: schräge 3 flächen seite | +X -X | F3 F5 … [trennlinie "Skizze 2"]
+úkos potřebuje úhel a plochy: úkos 3 plochy boční [dělicí "Skica 2"] [stupňovitý] [směr +Z]	eine Schräge braucht Winkel und Flächen: schräge 3 flächen seite [trennlinie "Skizze 2"] [gestuft] [richtung +Z]
+Úkos s dělicí křivkou	Schräge mit Trennlinie
+úkos všech ploch nedává smysl – vyberte boční plochy: úkos 3 plochy boční	alle Flächen zu neigen ist sinnlos – wählen Sie die Seitenflächen: schräge 3 flächen seite
+úkos: rovina XY | XZ | YZ (neutrální rovina), „{0}“ není základní rovina	Schräge: ebene XY | XZ | YZ (neutrale Ebene), „{0}“ ist keine Grundebene
+Úsek dělicí křivky je příliš strmý (víc než 60° od kolmice na tah) – zkosit kolem něj nelze; použijte stupňovitý úkos nebo svislý skok.	Ein Abschnitt der Trennlinie ist zu steil (mehr als 60° von der Senkrechten zur Entformung) – keine Schräge darum möglich; verwenden Sie eine gestufte Schräge oder einen senkrechten Sprung.
+Ve vrcholu, kde se stýkají aspoň tři vybrané hrany, zaoblení skončí ve vzdálenosti setback od vrcholu a roh uzavře hladká N-stranná záplata, tečná (G1) k zaoblením i k plochám rohu. Setback musí být alespoň rovný poloměru (stejná hodnota ≈ běžný kulový roh). Přesně pro rohy z rovinných ploch a přímých hran; jiné rohy dostanou běžné zaoblení vrcholu a prvek zobrazí ⚠.	An einer Ecke, an der sich mindestens drei gewählte Kanten treffen, enden die Verrundungen im Rückversatz-Abstand von der Ecke und ein glatter N-seitiger Patch schließt die Ecke, tangential (G1) zu den Verrundungen und den Eckflächen. Der Rückversatz muss mindestens gleich dem Radius sein (gleicher Wert ≈ übliche Kugelecke). Exakt für Ecken aus ebenen Flächen und geraden Kanten; andere Ecken erhalten die normale Eckverrundung und das Element zeigt ⚠.
+vrchol [{0}]: plochy rohu nejsou rovinné	Ecke [{0}]: die Eckflächen sind nicht eben
+vrchol {0}: hrany nejsou přímé	Ecke {0}: die Kanten sind nicht gerade
+vrchol {0}: nejsou vybrány všechny jeho hrany	Ecke {0}: nicht alle ihre Kanten sind gewählt
+Vyberte plochy, které se mají zkosit (obvykle boční plochy, přes které vede dělicí křivka).	Wählen Sie die zu neigenden Flächen (meist die Seitenflächen, über die die Trennlinie läuft).
+Vyberte skicu dělicí křivky (skica musí být v historii před úkosem).	Wählen Sie die Trennlinien-Skizze (sie muss im Verlauf vor der Schräge stehen).
+výchozí = poloměr	Standard = Radius
+Zaoblení není k dispozici.	Verrundung ist nicht verfügbar.
+Zaoblení se setbackem	Verrundung mit Rückversatz
+zaoblení se setbackem potřebuje poloměr: zaoblit R hrany <pravidlo> setback S	eine Verrundung mit Rückversatz braucht einen Radius: verrunden R kanten <Regel> rückversatz S
+zaoblení se setbackem: zaoblení skončí S od vrcholu se 3+ hranami, roh uzavře hladká záplata G1 (výchozí S = R)	Verrundung mit Rückversatz: die Verrundungen enden S vor einer Ecke mit 3+ Kanten, ein glatter G1-Patch schließt die Ecke (Standard S = R)
+Zkosené části tělesa se nepodařilo sloučit (booleovská operace jádra selhala) – zmenšete úhel.	Die geneigten Teile des Körpers konnten nicht vereinigt werden (Boolesche Operation des Kerns fehlgeschlagen) – verkleinern Sie den Winkel.
+Setback {0} mm: oblast rohu zasahuje do jiné části tělesa – zvolte menší setback.	Rückversatz {0} mm: Der Eckbereich reicht in einen anderen Teil des Körpers – wählen Sie einen kleineren Rückversatz.

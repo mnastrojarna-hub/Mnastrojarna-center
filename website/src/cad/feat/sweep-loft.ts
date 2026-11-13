@@ -19,6 +19,8 @@ import { pointOf, resolveDirection, V, type ResolveCtx } from "../ref-resolve";
 import type { Thin } from "../refs";
 import type { Feature, Vec3 } from "../types";
 import { registerFeatureBuilder, type FeatCtx } from "./registry";
+import { smoothClosedLoft } from "./loft-smooth";
+import { noteFeatureWarning } from "../feature-notes";
 
 type Shape = r.Shape3D;
 type SketchF = Extract<Feature, { type: "sketch" }>;
@@ -335,6 +337,18 @@ export function loftTool(f: LoftF, ctx: FeatCtx): Shape {
     const guide = guides.length ? sketchPathWire(guides[0]) : undefined;
     const body = pipeShell(spine, outer, { guide });
     return ensureSolid(cut(body, holes.map((h) => pipeShell(spine, h, { guide }))), tr("Šablonování podél křivky"));
+  }
+  if (f.closed && f.smooth) {
+    // uzavřené hladce: periodická plocha přes všechny profily (C2 i ve švu) – loft-smooth.ts
+    let dev = 0;
+    const ring = (ws: r.Wire[]) => {
+      const res = smoothClosedLoft(ws);
+      dev = Math.max(dev, res.deviation);
+      return res.solid;
+    };
+    const solid = ensureSolid(cut(ring(outer), holes.map(ring)), tr("Uzavřené hladké šablonování"));
+    if (dev > 0.01) noteFeatureWarning(tr("Uzavřené hladce: plocha prochází profily s odchylkou až {0} mm (profily se prokládají hladce – ostré rohy se zaoblí).", Math.round(dev * 1000) / 1000));
+    return solid;
   }
   if (f.closed) {
     const ring = (ws: r.Wire[]) => shellToSolid(thruSections([...ws, ws[0]], { ruled: f.ruled, solid: false }), tr("Uzavřené šablonování"));

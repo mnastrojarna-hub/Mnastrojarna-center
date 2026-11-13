@@ -1,0 +1,223 @@
+# Výkres vlna 7: pomocné pohledy, řezy lomenou čarou, částečné řezy, přerušení, uložení ISO 286, revize a zóny (balík drawing)
+ (hladká křivka)	 (glatte Kurve)
+ (skryté)	 (ausgeblendet)
+ vlnovka	 Wellenlinie
+ · na listu x {0}…{1}, y {2}…{3}{4}	 · auf dem Blatt x {0}…{1}, y {2}…{3}{4}
+ – na listu {0} místo {1} mm	 – auf dem Blatt {0} statt {1} mm
++ mezní	+ Grenzmaße
++ úchylky	+ Abmaße
+, křivka	, Kurve
+, otočeno	, umgekehrt
+, podél	, entlang
+2 kliky v pohledu: začátek a konec vynechané části (směr podle delšího posunu)	2 Klicks in einer Ansicht: Anfang und Ende des ausgelassenen Teils (Richtung nach der längeren Bewegung)
+3 body: konec hlavního ramena, vrchol (osa otočení), konec šikmého ramena	3 Punkte: Ende des Hauptschenkels, Scheitel (Drehachse), Ende des schrägen Schenkels
+Dolní úchylka	Unteres Abmaß
+Dotaz na uložení	Passungsabfrage
+Díra (velká)	Bohrung (groß)
+Esc ruší	Esc bricht ab
+Hladká hranice (křivka od ruky)	Glatte Grenze (Freihandkurve)
+Hloubka částečného řezu od přední strany [mm]	Tiefe des Ausbruchs von vorne [mm]
+Horní úchylka	Oberes Abmaß
+Hotovo (Enter)	Fertig (Enter)
+Hřídel (malá)	Welle (klein)
+ISO 286: jmenovitý rozměr {0} mm je mimo tabulky (0 až {1} mm)	ISO 286: Nennmaß {0} mm liegt außerhalb der Tabellen (0 bis {1} mm)
+ISO 286: pole {0} není pro rozměr {1} mm definováno	ISO 286: Toleranzklasse {0} ist für das Maß {1} mm nicht definiert
+ISO 286: stupeň přesnosti IT{0} neexistuje (IT1 až IT18)	ISO 286: Toleranzgrad IT{0} existiert nicht (IT1 bis IT18)
+Jmenovitý rozměr [mm]	Nennmaß [mm]
+Klikněte do pohledu.	Klicken Sie in eine Ansicht.
+Klikněte na hranu šikmé plochy v pohledu.	Klicken Sie auf die Kante der schrägen Fläche in einer Ansicht.
+Konec vynechané části [mm modelu]	Ende des ausgelassenen Teils [mm Modell]
+Kreslit trojúhelník revize {0} u změněných kót (revizi kótě přiřadíte v seznamu kót)	Änderungsdreieck {0} an geänderten Maßen zeichnen (Änderung dem Maß in der Maßliste zuordnen)
+Kóty s polem tolerance (H7, g6)	Maße mit Toleranzklasse (H7, g6)
+Max.	Max.
+Mezera mezi částmi na listu [mm]	Lücke zwischen den Teilen auf dem Blatt [mm]
+Min.	Min.
+Natočený řez	Gedrehter Schnitt
+POHLED {0}	ANSICHT {0}
+Pohled na řez z druhé strany	Schnitt von der anderen Seite ansehen
+Pohled podél hrany místo kolmo na ni	Ansicht entlang der Kante statt senkrecht darauf
+Pohled z opačné strany	Ansicht von der Gegenseite
+Pohled {0}	Ansicht {0}
+Pohled {0} se na list nevejde – zvolte větší formát nebo menší měřítko.	Ansicht {0} passt nicht auf das Blatt – größeres Format oder kleineren Maßstab wählen.
+Pohled {0}: {1}	Ansicht {0}: {1}
+Pomocné pohledy a řezy	Hilfsansichten und Schnitte
+Pomocné pohledy: {0}	Hilfsansichten: {0}
+Pomocný pohled	Hilfsansicht
+Pomocný pohled ukáže šikmou plochu ve skutečném tvaru; zalomený a natočený řez vedou čáru řezu přes několik prvků; přerušení zkrátí dlouhý díl – kóty drží skutečnou délku.	Eine Hilfsansicht zeigt eine schräge Fläche in wahrer Gestalt; abgesetzter und gedrehter Schnitt führen die Schnittlinie durch mehrere Elemente; eine Unterbrechung verkürzt ein langes Teil – Maße behalten die wahre Länge.
+Pomocný pohled {0} vložen.	Hilfsansicht {0} eingefügt.
+Přerušení	Unterbrechung
+Přerušení vloženo.	Unterbrechung eingefügt.
+Přerušení {0}	Unterbrechung {0}
+Přerušení {0}…{1} leží mimo pohled {2} ({3}…{4}).	Unterbrechung {0}…{1} liegt außerhalb der Ansicht {2} ({3}…{4}).
+Přerušení: pohled {0} není na listu.	Unterbrechung: Ansicht {0} ist nicht auf dem Blatt.
+Přerušení: zvolte dva různé body.	Unterbrechung: zwei verschiedene Punkte wählen.
+Přerušení: {0}	Unterbrechungen: {0}
+Revize změny (trojúhelník)	Änderungsindex (Dreieck)
+Revize, ve které se údaj změnil – trojúhelník u kóty	Änderung, in der sich die Angabe geändert hat – Dreieck am Maß
+Smazat pohled	Ansicht löschen
+Smazat přerušení	Unterbrechung löschen
+Smazat částečný řez	Ausbruch löschen
+Smazat řez	Schnitt löschen
+Stupeň přesnosti IT	Toleranzgrad IT
+Tabulka uložení (ISO 286)	Passungstabelle (ISO 286)
+Tabulka uložení na listu	Passungstabelle auf dem Blatt
+Tabulka uložení se na list nevejde – zvolte větší formát.	Die Passungstabelle passt nicht auf das Blatt – größeres Format wählen.
+Trojúhelníky revizí:	Änderungsdreiecke:
+Uložení (H7/g6)	Passung (H7/g6)
+Uložení ISO 286 (pole tolerance a úchylky)	Passung ISO 286 (Toleranzklasse und Abmaße)
+Uložení ISO 286 (zobrazení {0}, tabulka {1}): {2}	Passungen ISO 286 (Anzeige {0}, Tabelle {1}): {2}
+Uložení ISO 286 – Ø{0}	Passung ISO 286 – Ø{0}
+Uložení, revize a zóny	Passungen, Änderungen und Zonen
+Vlnovka místo cikcaku	Wellenlinie statt Zickzack
+Zadání ještě není úplné.	Die Eingabe ist noch nicht vollständig.
+Zalomený řez	Abgesetzter Schnitt
+Začátek vynechané části [mm modelu]	Anfang des ausgelassenen Teils [mm Modell]
+Zobrazení úchylek u kóty	Anzeige der Abmaße am Maß
+Základní úchylka	Grundabmaß
+Zóna	Zone
+Zóny listu (ISO 5457) a sloupec Zóna v revizích	Blattzonen (ISO 5457) und Spalte Zone in den Änderungen
+Zóny listu: {0} · trojúhelníky revizí: {1}	Blattzonen: {0} · Änderungsdreiecke: {1}
+ano	ja
+body oblasti v pohledu (≥ 3), Enter nebo klik na první bod = hotovo	Punkte des Bereichs in einer Ansicht (≥ 3), Enter oder Klick auf den ersten Punkt = fertig
+body čáry řezu v pohledu (úseky se přichytí vodorovně / svisle), Enter = hotovo	Punkte der Schnittlinie in einer Ansicht (Abschnitte rasten waagerecht / senkrecht ein), Enter = fertig
+hladká hranice	glatte Grenze
+hrana pohledu {0}–{1}	Ansichtskante {0}–{1}
+hrana pomocného pohledu má nulovou délku	die Kante der Hilfsansicht hat die Länge null
+jen značka	nur Kurzzeichen
+mezní rozměry	Grenzmaße
+na listu není žádné přerušení	auf dem Blatt gibt es keine Unterbrechung
+na listu není žádný částečný řez	auf dem Blatt gibt es keinen Ausbruch
+na výkrese	in der Zeichnung
+natočený	gedreht
+natočený řez: ramena leží na sobě – zvolte jiný bod	gedrehter Schnitt: die Schenkel liegen aufeinander – anderen Punkt wählen
+natočený řez: zadejte 3 body – konec hlavního ramena, vrchol (střed otočení) a konec natočeného ramena	gedrehter Schnitt: 3 Punkte angeben – Ende des Hauptschenkels, Scheitel (Drehpunkt) und Ende des gedrehten Schenkels
+otočit	umkehren
+plocha F{0}	Fläche F{0}
+plocha F{0} v tělese není – těleso má {1} ploch	Fläche F{0} ist nicht im Körper – der Körper hat {1} Flächen
+podle listu	wie Blatt
+podél	entlang
+podél hrany	entlang der Kante
+pohled kolmo na šikmou plochu: klik na její hranu v pohledu, pak umístění (Enter = zarovnaně)	Ansicht senkrecht auf eine schräge Fläche: Klick auf ihre Kante in einer Ansicht, dann die Platzierung (Enter = ausgerichtet)
+pohled není přerušený	die Ansicht ist nicht unterbrochen
+pohled {0}	Ansicht {0}
+pohled {0} nemá směr promítání	Ansicht {0} hat keine Projektionsrichtung
+pole {0} není pro rozměr {1} mm v ISO 286 definováno (tabulky do 500 mm)	Toleranzklasse {0} ist in ISO 286 für das Maß {1} mm nicht definiert (Tabellen bis 500 mm)
+pomocný pohled	Hilfsansicht
+pomocný pohled (POHLED B, metoda šipky): kolmo na šikmou plochu viděnou jako hrana v rodičovském pohledu (skutečný tvar), podél hrany, podle rovinné plochy F… nebo směru; zarovnaně s rodičem, šipka s písmenem	Hilfsansicht (ANSICHT B, Pfeilmethode): senkrecht auf eine schräge Fläche, die in der Elternansicht als Kante erscheint (wahre Gestalt), entlang einer Kante, nach einer ebenen Fläche F… oder einer Richtung; ausgerichtet zur Elternansicht, Pfeil mit Buchstabe
+pomocný pohled potřebuje hranu, směr nebo plochu	die Hilfsansicht braucht eine Kante, eine Richtung oder eine Fläche
+pomocný pohled {0} na listu není – pomocné pohledy: {1}	Hilfsansicht {0} ist nicht auf dem Blatt – Hilfsansichten: {1}
+pomocný pohled: hrana = dva body x1 y1 x2 y2 (mm modelu v rovině rodičovského pohledu)	Hilfsansicht: Kante = zwei Punkte x1 y1 x2 y2 (mm Modell in der Ebene der Elternansicht)
+pomocný pohled: nečekané „{0}“ – {1}	Hilfsansicht: unerwartet „{0}“ – {1}
+pomocný pohled: plocha F{0} není rovinná	Hilfsansicht: Fläche F{0} ist nicht eben
+pomocný pohled: plocha jako F7 (číslo plochy z příkazu měřit / výběru)	Hilfsansicht: Fläche als F7 (Flächennummer aus messen / Auswahl)
+pomocný pohled: směr = tři čísla dx dy dz (k pozorovateli, souřadnice modelu)	Hilfsansicht: Richtung = drei Zahlen dx dy dz (zum Betrachter, Modellkoordinaten)
+pomocný pohled: směr má nulovou délku	Hilfsansicht: die Richtung hat die Länge null
+pomocný pohled: u hrany zadejte rodičovský pohled (přední, horní…)	Hilfsansicht: bei einer Kante die Elternansicht angeben (vorne, oben…)
+pomocný pohled: zadejte hranu, plochu nebo směr – {0}	Hilfsansicht: Kante, Fläche oder Richtung angeben – {0}
+přechodné	Übergangspassung
+přerušení	Unterbrechung
+přerušení jde do pravoúhlého pohledu nebo řezu A–A	eine Unterbrechung gehört in eine Normalansicht oder den Schnitt A–A
+přerušení {0} na listu není – je jich {1}	Unterbrechung {0} ist nicht auf dem Blatt – es gibt {1}
+přerušení: mezera musí být kladná (mm listu)	Unterbrechung: die Lücke muss positiv sein (mm Blatt)
+přerušení: nečekané „{0}“ – {1}	Unterbrechung: unerwartet „{0}“ – {1}
+přerušení: osa pohledu x (vodorovně) nebo y (svisle) – {0}	Unterbrechung: Ansichtsachse x (waagerecht) oder y (senkrecht) – {0}
+přerušení: zadejte odkud a kam – od 50 do 250 (mm modelu podél osy pohledu)	Unterbrechung: von und bis angeben – von 50 bis 250 (mm Modell entlang der Ansichtsachse)
+přerušený pohled: dlouhý díl se zkrátí (i v pohledech ve stejné promítací čáře), kóty přes přerušení drží skutečnou délku	unterbrochene Ansicht: ein langes Teil wird verkürzt (auch in Ansichten auf derselben Projektionslinie), Maße über die Unterbrechung behalten die wahre Länge
+přesah {0}…{1}	Übermaß {0}…{1}
+revize {0} v tabulce není – nejdřív výkres revize {0} "popis změny" (revize: {1})	Änderung {0} ist nicht in der Tabelle – zuerst zeichnung änderung {0} "Änderungsbeschreibung" (Änderungen: {1})
+rodičovský pohled {0} není na listu	Elternansicht {0} ist nicht auf dem Blatt
+s přesahem	Übermaßpassung
+s vůlí	Spielpassung
+smazat: číslo (od 1) nebo vše	löschen: Nummer (ab 1) oder alle
+směr je shodný se směrem všech pohledů na listu – zapněte pohled, ve kterém je plocha vidět z boku	die Richtung stimmt mit allen Ansichten auf dem Blatt überein – eine Ansicht einschalten, in der die Fläche von der Seite zu sehen ist
+směr pomocného pohledu je shodný se směrem rodičovského pohledu – vyberte šikmou hranu nebo jiný pohled	die Richtung der Hilfsansicht stimmt mit der Elternansicht überein – schräge Kante oder andere Ansicht wählen
+tolerance uložení ISO 286 (díry A…ZC, hřídele a…zc, IT1…IT18 do 500 mm): úchylky „(+0,025/0)“ nebo mezní rozměry u kóty, Tabulka uložení na listu, dotaz na vůli / přesah	Passungstoleranzen ISO 286 (Bohrungen A…ZC, Wellen a…zc, IT1…IT18 bis 500 mm): Abmaße „(+0,025/0)“ oder Grenzmaße am Maß, Passungstabelle auf dem Blatt, Abfrage von Spiel / Übermaß
+trojúhelník revize u změněné kóty (volitelně pro každou revizi), zóny listu ISO 5457 a sloupec Zóna v tabulce revizí	Änderungsdreieck an einem geänderten Maß (wahlweise je Änderung), Blattzonen nach ISO 5457 und Spalte Zone in der Änderungstabelle
+uložení ISO 286 patří ke kótě rozměru nebo díry (Ø40, 25, Ø12 skrz) – u závitu použijte výkres tolerance M8 6H	eine Passung nach ISO 286 gehört zu einem Maß oder einer Bohrung (Ø40, 25, Ø12 durch) – beim Gewinde zeichnung toleranz M8 6H verwenden
+uložení: „{0}“ není pole tolerance díry (velké písmeno, např. H7)	Passung: „{0}“ ist keine Bohrungs-Toleranzklasse (Großbuchstabe, z. B. H7)
+uložení: „{0}“ není pole tolerance hřídele (malé písmeno, např. g6)	Passung: „{0}“ ist keine Wellen-Toleranzklasse (Kleinbuchstabe, z. B. g6)
+umístit x y (mm listu od levého dolního rohu)	platzieren x y (mm Blatt von der linken unteren Ecke)
+vlna	Welle
+vlnovka	Wellenlinie
+výkres pohled pomocný <rodič> hrana x1 y1 x2 y2 [podél] [otočit] [umístit x y] · výkres pohled pomocný [<rodič>] plocha F7 · výkres pohled pomocný [<rodič>] směr dx dy dz · výkres pohled pomocný smazat B	zeichnung ansicht hilfsansicht <eltern> kante x1 y1 x2 y2 [entlang] [umkehren] [platzieren x y] · zeichnung ansicht hilfsansicht [<eltern>] fläche F7 · zeichnung ansicht hilfsansicht [<eltern>] richtung dx dy dz · zeichnung ansicht hilfsansicht löschen B
+výkres přerušení <pohled> x|y od 50 do 250 [mezera 8] [vlnovka|cikcak] · výkres přerušení smazat [číslo|vše]	zeichnung unterbrechung <ansicht> x|y von 50 bis 250 [lücke 8] [welle|zickzack] · zeichnung unterbrechung löschen [nummer|alle]
+výkres revize <písmeno> značky ano|ne	zeichnung änderung <buchstabe> dreiecke ja|nein
+výkres revize značka <písmeno> na <kóta>[, <kóta>…] · výkres revize značka smazat na <kóta>	zeichnung änderung zeichen <buchstabe> auf <maß>[, <maß>…] · zeichnung änderung zeichen löschen auf <maß>
+výkres uložení <kóta> <pole> se provádí jako výkres tolerance	zeichnung passung <maß> <klasse> wird wie zeichnung toleranz ausgeführt
+výkres uložení <kóta> H7 [zobrazení odchylky|mezní|značka] · výkres uložení tabulka ano|ne · výkres uložení zobrazení odchylky|mezní|značka · výkres uložení dotaz 40 H7/g6	zeichnung passung <maß> H7 [anzeige abmaße|grenzmaße|kurzzeichen] · zeichnung passung tabelle ja|nein · zeichnung passung anzeige abmaße|grenzmaße|kurzzeichen · zeichnung passung abfrage 40 H7/g6
+výkres uložení dotaz <rozměr> <pole> – např. dotaz 40 H7/g6	zeichnung passung abfrage <maß> <klasse> – z. B. abfrage 40 H7/g6
+výkres zóny ano|ne	zeichnung zonen ja|nein
+výkres řez natočený <rodič> body x1 y1 xv yv x2 y2 (konec hlavního ramena, vrchol, konec natočeného ramena) [otočit] [umístit x y]	zeichnung schnitt gedreht <eltern> punkte x1 y1 xv yv x2 y2 (Ende des Hauptschenkels, Scheitel, Ende des gedrehten Schenkels) [umkehren] [platzieren x y]
+výkres řez smazat <písmeno> – řez lomenou čarou (B, C…); řez A–A vypne: výkres řez ne	zeichnung schnitt löschen <buchstabe> – abgesetzter / gedrehter Schnitt (B, C…); Schnitt A–A schaltet aus: zeichnung schnitt nein
+výkres řez zalomený <rodič> body x1 y1 x2 y2 x3 y3 … [otočit] [umístit x y]	zeichnung schnitt abgesetzt <eltern> punkte x1 y1 x2 y2 x3 y3 … [umkehren] [platzieren x y]
+výkres řez částečný <pohled> body x1 y1 x2 y2 x3 y3 … hloubka 12 [křivka] · výkres řez částečný smazat [číslo|vše]	zeichnung schnitt teilschnitt <ansicht> punkte x1 y1 x2 y2 x3 y3 … tiefe 12 [kurve] · zeichnung schnitt teilschnitt löschen [nummer|alle]
+vůle až {0}, přesah až {1}	Spiel bis {0}, Übermaß bis {1}
+vůle {0}…{1}	Spiel {0}…{1}
+zadaná čára {0}–{1} (není hranou pohledu)	angegebene Linie {0}–{1} (keine Ansichtskante)
+zalomený	abgesetzt
+značka	Kurzzeichen
+zobrazení uložení: odchylky, mezní (rozměry) nebo značka	Passungsanzeige: Abmaße, Grenzmaße oder Kurzzeichen
+{0} {1} hloubka {2} ({3} bodů{4})	{0} {1} Tiefe {2} ({3} Punkte{4})
+{0} {1}: {2}/{3} (mezní rozměry {4} až {5})	{0} {1}: {2}/{3} (Grenzmaße {4} bis {5})
+{0}, hrana {1}–{2}	{0}, Kante {1}–{2}
+{0}: chybí pohled – přední, horní, levý, pravý, zadní, spodní nebo řez	{0}: Ansicht fehlt – vorne, oben, links, rechts, hinten, unten oder Schnitt
+{0}: neznámý pohled „{1}“ – přední, horní, levý, pravý, zadní, spodní, řez, pohled B	{0}: unbekannte Ansicht „{1}“ – vorne, oben, links, rechts, hinten, unten, Schnitt, Ansicht B
+Ø{0} {1}: díra {2}/{3}, hřídel {4}/{5}, {6} ({7})	Ø{0} {1}: Bohrung {2}/{3}, Welle {4}/{5}, {6} ({7})
+úchylky	Abmaße
+Částečné řezy: {0}	Ausbrüche: {0}
+Částečný {0}	Ausbruch {0}
+Částečný řez	Ausbruch
+Částečný řez ({0}): {1}	Ausbruch ({0}): {1}
+Částečný řez vložen.	Ausbruch eingefügt.
+Částečný řez: pohled {0} není na listu.	Ausbruch: Ansicht {0} ist nicht auf dem Blatt.
+částečný řez	Ausbruch
+částečný řez jde do pravoúhlého pohledu (přední, horní, levý, pravý, zadní, spodní)	ein Ausbruch gehört in eine Normalansicht (vorne, oben, links, rechts, hinten, unten)
+částečný řez se nepodařilo vytvořit	der Ausbruch konnte nicht erstellt werden
+částečný řez {0} na listu není – je jich {1}	Ausbruch {0} ist nicht auf dem Blatt – es gibt {1}
+částečný řez: body jsou dvojice čísel x y	Ausbruch: Punkte sind Zahlenpaare x y
+částečný řez: hloubka musí být kladná	Ausbruch: die Tiefe muss positiv sein
+částečný řez: nečekané „{0}“ – {1}	Ausbruch: unerwartet „{0}“ – {1}
+částečný řez: oblast potřebuje alespoň 3 body	Ausbruch: der Bereich braucht mindestens 3 Punkte
+částečný řez: oblast potřebuje alespoň 3 body – {0}	Ausbruch: der Bereich braucht mindestens 3 Punkte – {0}
+částečný řez: zadejte hloubku od přední strany – hloubka 12 (mm)	Ausbruch: Tiefe von vorne angeben – tiefe 12 (mm)
+ŘEZ {0}–{0}	SCHNITT {0}–{0}
+Řez {0}–{0} vložen.	Schnitt {0}–{0} eingefügt.
+Řez {0}–{0}: pohled {1} není na listu.	Schnitt {0}–{0}: Ansicht {1} ist nicht auf dem Blatt.
+Řez {0}–{0}: {1}	Schnitt {0}–{0}: {1}
+Řezy lomenou čarou: {0}	Abgesetzte / gedrehte Schnitte: {0}
+řez	Schnitt
+řez lomenou čarou (ŘEZ B–B): zalomený (rovnoběžné úseky se skoky), natočený (rameno otočené do roviny); částečný řez oblastí pohledu do hloubky se šrafováním a hranicí od ruky	Schnitt entlang einer Linie (SCHNITT B–B): abgesetzt (parallele Abschnitte mit Versätzen), gedreht (Schenkel in die Ebene gedreht); Ausbruch eines Ansichtsbereichs bis zu einer Tiefe mit Schraffur und Freihandgrenze
+řez potřebuje alespoň dva body čáry řezu	der Schnitt braucht mindestens zwei Punkte der Schnittlinie
+řez {0}–{0}	Schnitt {0}–{0}
+řez {0}–{0} na listu není – řezy lomenou čarou: {1}	Schnitt {0}–{0} ist nicht auf dem Blatt – abgesetzte / gedrehte Schnitte: {1}
+řez {0}–{0} se nepodařilo vytvořit	Schnitt {0}–{0} konnte nicht erstellt werden
+řez: body jsou dvojice čísel x y	Schnitt: Punkte sind Zahlenpaare x y
+řez: dva shodné body čáry řezu	Schnitt: zwei gleiche Punkte der Schnittlinie
+řez: nečekané „{0}“ – {1}	Schnitt: unerwartet „{0}“ – {1}
+„{0}“ na listu není – kóty a značky ukáže výkres stav	„{0}“ ist nicht auf dem Blatt – Bemaßungen und Symbole zeigt zeichnung status
+„{0}“ není pole tolerance ISO 286 – např. H7, g6, js6, H7/g6	„{0}“ ist keine Toleranzklasse nach ISO 286 – z. B. H7, g6, js6, H7/g6
+„{0}“ není zápis uložení ISO 286 – např. H7, g6, H7/g6	„{0}“ ist keine Passung nach ISO 286 – z. B. H7, g6, H7/g6
+⚠ pomocný pohled {0} uložen, ale na listu není: {1}	⚠ Hilfsansicht {0} gespeichert, aber nicht auf dem Blatt: {1}
+⚠ přerušení {0} uloženo, ale: {1}	⚠ Unterbrechung {0} gespeichert, aber: {1}
+⚠ částečný řez {0} uložen, ale: {1}	⚠ Ausbruch {0} gespeichert, aber: {1}
+⚠ řez {0}–{0} uložen, ale na listu není: {1}	⚠ Schnitt {0}–{0} gespeichert, aber nicht auf dem Blatt: {1}
+✓ Tabulka uložení vypnuta	✓ Passungstabelle aus
+✓ Tabulka uložení zapnuta – zatím žádná kóta s polem tolerance (výkres uložení Ø40 H7)	✓ Passungstabelle an – noch kein Maß mit Toleranzklasse (zeichnung passung Ø40 H7)
+✓ Tabulka uložení: {0} řádků – {1}	✓ Passungstabelle: {0} Zeilen – {1}
+✓ pomocný pohled {0} (z pohledu {1}, {2}, {3}) – na listu x {4}…{5}, y {6}…{7}; souřadnice pohledu: výkres stav	✓ Hilfsansicht {0} (aus Ansicht {1}, {2}, {3}) – auf dem Blatt x {4}…{5}, y {6}…{7}; Ansichtskoordinaten: zeichnung status
+✓ pomocný pohled {0} smazán	✓ Hilfsansicht {0} gelöscht
+✓ přerušení {0} smazáno	✓ Unterbrechung {0} gelöscht
+✓ přerušení {0} v pohledu {1} ({2} {3}…{4}): na listu {5} mm místo {6} mm, kóty přes přerušení drží skutečnou délku	✓ Unterbrechung {0} in Ansicht {1} ({2} {3}…{4}): {5} mm auf dem Blatt statt {6} mm, Maße über die Unterbrechung behalten die wahre Länge
+✓ revize {0}: trojúhelníky se nekreslí	✓ Änderung {0}: Dreiecke werden nicht gezeichnet
+✓ revize {0}: trojúhelníky u změněných kót se kreslí	✓ Änderung {0}: Dreiecke an geänderten Maßen werden gezeichnet
+✓ smazána všechna přerušení ({0})	✓ alle Unterbrechungen gelöscht ({0})
+✓ smazány všechny částečné řezy ({0})	✓ alle Ausbrüche gelöscht ({0})
+✓ trojúhelník revize odebrán u: {0}	✓ Änderungsdreieck entfernt an: {0}
+✓ trojúhelník revize {0} u: {1}	✓ Änderungsdreieck {0} an: {1}
+✓ uložení na listu: {0}	✓ Passungen auf dem Blatt: {0}
+✓ zóny listu vypnuty	✓ Blattzonen aus
+✓ zóny listu zapnuty (ISO 5457) – tabulka revizí má sloupec Zóna	✓ Blattzonen an (ISO 5457) – die Änderungstabelle hat eine Spalte Zone
+✓ částečný řez {0} smazán	✓ Ausbruch {0} gelöscht
+✓ částečný řez {0} v pohledu {1}: oblast {2} bodů{3}, hloubka {4} mm od přední strany	✓ Ausbruch {0} in Ansicht {1}: Bereich mit {2} Punkten{3}, Tiefe {4} mm von vorne
+✓ řez {0}–{0} smazán	✓ Schnitt {0}–{0} gelöscht
+✓ řez {0}–{0} {1} (pohled {2}, {3} bodů) – na listu x {4}…{5}, y {6}…{7}	✓ Schnitt {0}–{0} {1} (Ansicht {2}, {3} Punkte) – auf dem Blatt x {4}…{5}, y {6}…{7}

@@ -3,3 +3,5 @@ import "./fillet";
 import "./pattern";
 import "./sweep-loft";
 import "./refs-more";
+import "./fillet-shapes";
+import "./draft-parting";

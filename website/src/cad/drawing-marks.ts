@@ -6,7 +6,7 @@
  */
 import type { ManualDim, MarkSpec, MarkTarget, AnnPatch } from "./agent-drawing";
 import { VIEW_CS } from "./agent-drawing";
-import { angleGeom, annotationGeometry, annToSheet, dimLabel, GDT_LABEL, isRadialDim, modelViewKey, pickViewEnt, scaleLabel, sheetToAnn, textBox, type DimAnn, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt } from "./drawing";
+import { angleGeom, annotationGeometry, annToSheet, viewExtent, dimLabel, GDT_LABEL, isRadialDim, modelViewKey, pickViewEnt, scaleLabel, sheetToAnn, textBox, type DimAnn, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt } from "./drawing";
 import { calloutLines } from "./drawing-symbols";
 import { tr } from "./i18n";
 import { uid, type DrawingAnnotation, type Vec2, type Vec3 } from "./types";
@@ -79,7 +79,7 @@ export function findDims(views: PlacedView[], anns: DrawingAnnotation[], target:
 export const shortId = (i: number) => `a${i + 1}`;
 const isId = (t: string) => /^a\d+$/i.test(t.trim());
 const NAME = (k: string, o?: Partial<DrawingOptions>) =>
-  k.startsWith("m:") ? (o?.models?.find((m) => modelViewKey(m.id) === k)?.name ?? k) : tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
+  k.startsWith("m:") ? (o?.models?.find((m) => modelViewKey(m.id) === k)?.name ?? k) : k.startsWith("aux:") ? tr("pohled {0}", k.slice(4)) : k.startsWith("cut:") ? tr("řez {0}–{0}", k.slice(4)) : tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
 
 /** Seznam „a1 Ø40 (přední)“ pro chybové hlášky a stav. */
 export function annList(views: PlacedView[], anns: DrawingAnnotation[], o?: Partial<DrawingOptions>, filter: (a: DrawingAnnotation) => boolean = () => true): string {
@@ -119,7 +119,8 @@ const up = (c: { d: Vec3; x: Vec3 }): Vec3 => [c.d[1] * c.x[2] - c.d[2] * c.x[1]
 /** název osy modelu ve směru vektoru (X, −Y…) nebo prázdný u šikmého směru */
 const axisName = (v: Vec3) => {
   const k = v.findIndex((x) => Math.abs(Math.abs(x) - 1) < 1e-6);
-  return k < 0 ? "" : `${v[k] < 0 ? "−" : ""}${AX[k]}`;
+  // šikmý směr (pomocný pohled, řez lomenou čarou): vektor v souřadnicích modelu
+  return k < 0 ? `[${v.map((x) => fmtN(Math.round(x * 1000) / 1000)).join("; ")}]` : `${v[k] < 0 ? "−" : ""}${AX[k]}`;
 };
 
 /** bod agenta (x, y nahoru) → souřadnice pohledu (y dolů) a zpět */
@@ -145,7 +146,11 @@ export function findView(res: Pick<DrawingResult, "views">, o: Partial<DrawingOp
 }
 
 /** rozsah pohledu v souřadnicích agenta: x0…x1, y0…y1 (mm modelu v rovině pohledu, y nahoru) */
-export const viewBox = (v: PlacedView) => ({ x0: v.x0, x1: v.x0 + v.w, y0: -(v.y0 + v.h), y1: -v.y0 });
+export const viewBox = (v: PlacedView) => {
+  // přerušený pohled: skutečný rozsah (souřadnice kót a značek jsou skutečné)
+  const e = viewExtent(v);
+  return { x0: e.x0, x1: e.x1, y0: -e.y1, y1: -e.y0 };
+};
 
 /**
  * Přichycení bodu ke geometrii pohledu jako myš (do `tolSheet` mm listu): konec hrany / střed kružnice, jinak pata na hraně

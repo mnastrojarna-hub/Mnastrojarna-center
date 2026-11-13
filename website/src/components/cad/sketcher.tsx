@@ -5,7 +5,9 @@ import { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, use
 import { flushSync } from "react-dom";
 import { evalExpr } from "@/cad/params";
 import { currentShortcuts, keyCombo, shortcutOf, sketchShortcutAction } from "@/cad/settings";
-import { arcGeom, circleFrom3, entityPath, findLoops, keyPoints, loopPolygon, prims, type Prim } from "@/cad/sketch";
+import { arcGeom, circleFrom3, entityPath, findLoops, keyPoints, loopPolygon, prims, splinePoints, type Prim } from "@/cad/sketch";
+import { applyTangentHandle, tangentHandles, tangentIndex } from "@/cad/spline-tangent";
+import { SplineTangentHandles, SplineTangentPanel } from "./spline-tangent-ui";
 import {
   allIntersections,
   angleBetween,
@@ -434,8 +436,9 @@ function handlesOf(e: SketchEntity): Handle[] {
     case "arc":
       return [{ key: "a", p: e.a }, { key: "b", p: e.b }, { key: "c", p: e.c }];
     case "polyline":
-    case "spline":
       return e.points.map((p, i) => ({ key: `p${i}`, p }));
+    case "spline": // body + úchyty tečen „t{i}“ (spline-tangent.ts)
+      return [...e.points.map((p, i) => ({ key: `p${i}`, p })), ...tangentHandles(e, splinePoints).map((h) => ({ key: h.key, p: h.p }))];
     case "circle":
       return [{ key: "c", p: [e.cx, e.cy] }, { key: "r", p: [e.cx + e.r, e.cy] }];
     case "rect":
@@ -458,6 +461,7 @@ function applyHandle(e: SketchEntity, key: string, p: Vec2): SketchEntity {
       return { ...e, [key]: p } as SketchEntity;
     case "polyline":
     case "spline": {
+      if (e.type === "spline" && tangentIndex(key) !== null) return applyTangentHandle(e, key, p);
       const i = Number(key.slice(1));
       return { ...e, points: e.points.map((q, k) => (k === i ? p : q)) };
     }
@@ -3001,6 +3005,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     return null;
   })();
 
+  // vybraný spline (jediný) – úchyty a panel tečen
+  const selOne = sel.size === 1 && tool === "select" ? entities.find((x) => sel.has(x.id)) : undefined;
+  const selSpline = selOne?.type === "spline" ? selOne : undefined;
   // vybraný prvek – úchyty
   const handles = [...sel].flatMap((id) => {
     const e = entities.find((x) => x.id === id);
@@ -3075,8 +3082,10 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
             : [],
         )}
         {annNodes}
+        {selSpline && <SplineTangentHandles e={selSpline} toPx={toPx} />}
         {handles.map((h) => {
           const [x, y] = toPx(h.p);
+          if (/^t\d+$/.test(h.key)) return null; // úchyt tečny kreslí SplineTangentHandles
           return <rect key={h.id + h.key} x={x - 4.5} y={y - 4.5} width={9} height={9} rx={1.5} fill="#fff" stroke="#E03930" strokeWidth={1.6} />;
         })}
         {pts.map((p, i) => {
@@ -3262,6 +3271,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           </div>
         );
       })()}
+
+      {/* tečny vybraného splinu */}
+      {selSpline && <SplineTangentPanel e={selSpline} onChange={(ne) => commitEdit(entities.map((x) => (x.id === ne.id ? ne : x)), constraints, dims, true)} />}
 
       {/* výsledek měření */}
       {tool === "measure" && measureRes && (

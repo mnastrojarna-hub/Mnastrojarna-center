@@ -15,7 +15,6 @@ Odebrat hranu	Remove edge
 Plný	Full round
 Plocha–plocha	Face–face
 Poloměr = polovina vzdálenosti rovnoběžných bočních ploch; prostřední plocha se nahradí válcem tečným k oběma. Prostřední plochu lze vynechat, je-li mezi bočními plochami jediná. Obdélníková prostřední plocha kolmá na boční se zaoblí přesně, jiná přibližně.	Radius = half the distance between the parallel side faces; the middle face is replaced by a cylinder tangent to both. The middle face can be omitted if there is only one between the side faces. A rectangular middle face perpendicular to the sides is rounded exactly, others approximately.
-Poloměr se mění lineárně od začátku hrany (R1) k jejímu konci (R2). Začátek hrany určuje model – běží-li přechod obráceně, hodnoty prohoďte. Eliptické (asymetrické) zaoblení s různou vzdáleností na každé ploše jádro OCCT neumí.	The radius changes linearly from the edge start (R1) to its end (R2). The edge start is defined by the model – if the blend runs the other way, swap the values. The OCCT kernel does not support elliptic (asymmetric) fillets with a different distance on each face.
 Poloměry hran	Edge radii
 Pro tabulku poloměrů vyberte hrany klikem v modelu – u volby „Všechny“ platí výchozí poloměr.	For the radius table select edges by clicking in the model – with “All” the default radius applies.
 Prohodit R1 ↔ R2	Swap R1 ↔ R2
@@ -141,7 +140,6 @@ Neutrální rovina	Neutral plane
 Okraj od obrysu	Margin from the outline
 Opakované prvky	Repeated features
 Pevné (jen posun)	Fixed (translate only)
-Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Dělicí křivka a stupňovitý úkos zatím nejsou k dispozici.	Faces are tilted by the angle about their intersection with the neutral plane; the pull direction defines which way the draft opens (with a given plane it only flips its orientation). Without a plane or direction the base plane applies. A parting curve and stepped draft are not available yet.
 Po křivce	Along a curve
 Podle skici	By sketch
 Podle tečny křivky	By the curve tangent

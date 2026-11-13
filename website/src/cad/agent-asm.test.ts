@@ -332,7 +332,7 @@ describe("provedení: plochy, vazby, komponenty (náhradní jádro)", () => {
     expect(r.doc.mates![0].suppressed).toBe(true);
     expect(r.mateStatus![r.doc.mates![0].id]).toBe("suppressed");
     await expect(run(d, "sestava vazba 9 smazat", env)).rejects.toThrow(/vazba 9 v sestavě není – vazby: 1. Souosost, 2. Kontakt, 3. Vzdálenost/);
-    await expect(run(d, "sestava vazba 1 hodnota=5", env)).rejects.toThrow(/hodnotu má jen Vzdálenost a Úhel/);
+    await expect(run(d, "sestava vazba 1 hodnota=5", env)).rejects.toThrow(/nemá hodnotu – hodnotu má Vzdálenost, Úhel, Ozubení/);
     await expect(run(d, 'sestava vazba kontakt "Čep" F2 "Deska" F2', env)).rejects.toThrow(/A: plocha F2 komponenty „Čep“ je válcová Ø10 – vazba potřebuje rovinnou plochu/);
     await expect(run(d, 'sestava vazba kontakt "Čep" F1 "Čep" F3', env)).rejects.toThrow(/dvě různé komponenty/);
   });

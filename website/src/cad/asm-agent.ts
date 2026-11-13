@@ -48,6 +48,10 @@ import {
   type TabInfo,
 } from "./agent-asm";
 import { tr } from "./i18n";
+import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin";
+import { kinHasLimits, kinHasValue } from "./mate-spec";
+import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
+import { isKinMate } from "./mates-kin";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import {
   MATE_LABEL,
@@ -79,6 +83,8 @@ export type AsmEnv = {
   parts: (list: { key: string; source: ComponentSource }[]) => Promise<{ key: string; result: BuildResult | null }[]>;
   /** geometrie plochy dílu (souřadnice dílu) */
   mateFace: (key: string, index: number) => Promise<PartFace | null>;
+  /** hrana / vrchol dílu nebo jemná síť plochy (vačka) – pokročilé vazby */
+  mateEnt?: (key: string, index: number, ent: "edge" | "vertex" | "mesh") => Promise<PartFace | null>;
   /** index válcové plochy dílu s daným poloměrem (−1 = není) */
   cylFace: (key: string, radius: number) => Promise<number>;
   /** je válcová plocha ve skutečnosti kuželová? */
@@ -91,6 +97,8 @@ export type AsmEnv = {
   stack?: { asm: CadDoc; key: string }[];
   /** záložky dokumentů (jen v aplikaci) */
   tabs?: { list: () => TabInfo[]; activate: (id: string) => Promise<CadDoc>; close: (id: string) => Promise<CadDoc> };
+  /** kontrola kolizí sestavy v jádře (pohybová studie s kolizemi) */
+  interference?: (doc: CadDoc) => Promise<{ a: string; b: string; volume: number }[]>;
 };
 
 export type AsmResult = {
@@ -105,13 +113,15 @@ export type AsmResult = {
   switched?: boolean;
   /** změnil se zásobník úprav v kontextu (`env.stack`) */
   stackChanged?: boolean;
+  /** pohybová studie: pokyn pro panel v aplikaci (přehrát, zastavit, krok, export snímků) */
+  motion?: MotionSignal;
 };
 
 /* ───────────────────────── díly, plochy, řešič ───────────────────────── */
 
-const leafId = (l: FlatComponent) => l.path.join("/");
+export const leafId = (l: FlatComponent) => l.path.join("/");
 /** názvy na cestě listu (komponenta nejvyšší úrovně › … › díl) */
-function pathNames(doc: CadDoc, path: string[]): string[] {
+export function pathNames(doc: CadDoc, path: string[]): string[] {
   const out: string[] = [];
   let comps = doc.components ?? [];
   for (const id of path) {
@@ -124,7 +134,7 @@ function pathNames(doc: CadDoc, path: string[]): string[] {
 }
 
 /** postaví díly listů (jednou na klíč) a vrátí výsledky podle klíče */
-async function ensureBuilt(env: AsmEnv, leaves: FlatComponent[]): Promise<Map<string, BuildResult | null>> {
+export async function ensureBuilt(env: AsmEnv, leaves: FlatComponent[]): Promise<Map<string, BuildResult | null>> {
   const need = new Map<string, ComponentSource>();
   for (const l of leaves) need.set(l.key, l.comp.source);
   if (!need.size) return new Map();
@@ -132,7 +142,7 @@ async function ensureBuilt(env: AsmEnv, leaves: FlatComponent[]): Promise<Map<st
   return new Map(res.map((r) => [r.key, r.result]));
 }
 
-async function faceInfo(env: AsmEnv, key: string, index: number): Promise<PartFace | null> {
+export async function faceInfo(env: AsmEnv, key: string, index: number): Promise<PartFace | null> {
   const k = `${key}:${index}`;
   const hit = env.geo.get(k);
   if (hit) return hit;
@@ -225,12 +235,9 @@ export function geoProvider(doc: CadDoc, env: AsmEnv): GeoProvider {
   return (ref) => {
     const l = leaves.get(ref.leaf ?? ref.compId);
     if (!l || ref.face < 0) return null;
-    const info = env.geo.get(`${l.key}:${ref.face}`);
-    if (!info || info.kind === "other") return null;
     const top = doc.components?.find((c) => c.id === ref.compId);
     if (!top) return null;
-    const rel = composePlacement(invertPlacement(top.placement), l.placement);
-    return { kind: info.kind, origin: transformPoint(rel, info.origin), normal: apply3(rotMatrix(rel.rotation), info.normal), radius: info.radius };
+    return refGeo(env.geo.get(entKey(l.key, ref)), composePlacement(invertPlacement(top.placement), l.placement));
   };
 }
 
@@ -242,35 +249,27 @@ export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | nul
   if (doc.kind !== "assembly" || !doc.mates?.length) return { doc, status: {}, moved: [] };
   const flat = flattenAssembly(doc);
   const byLeaf = new Map(flat.map((l) => [leafId(l), l]));
-  const mates = doc.mates.map((m) => ({ ...m, a: { ...m.a }, b: { ...m.b } }));
   const used = new Map<string, FlatComponent>();
-  for (const m of mates) for (const r of [m.a, m.b]) {
-    const l = byLeaf.get(r.leaf ?? r.compId);
+  for (const m of doc.mates) for (const r of [m.a, m.b, m.c, m.d]) {
+    const l = r && byLeaf.get(r.leaf ?? r.compId);
     if (l) used.set(leafId(l), l);
   }
   await ensureBuilt(env, [...used.values()]);
-  for (const m of mates)
-    for (const ref of [m.a, m.b]) {
-      const l = byLeaf.get(ref.leaf ?? ref.compId);
-      if (!l) continue;
-      if (ref.face < 0 && ref.radius) {
-        const idx = await env.cylFace(l.key, ref.radius).catch(() => -1);
-        if (idx >= 0) ref.face = idx;
-      }
-      if (ref.face >= 0) await faceInfo(env, l.key, ref.face);
-    }
-  const withMates = { ...doc, mates };
+  // plochy, hrany, vrcholy, sítě vaček a indexy válcových ploch normálií (cad/mate-geo.ts – stejně jako v aplikaci)
+  const mates = await ensureMateRefs(doc.mates, (ref) => byLeaf.get(ref.leaf ?? ref.compId)?.key ?? null, env.geo, { face: env.mateFace, ent: env.mateEnt, cylFace: env.cylFace });
+  let withMates = { ...doc, mates };
   const r = solveMates(withMates, geoProvider(withMates, env), anchorId);
+  if (r.mates) withMates = { ...withMates, mates: r.mates }; // zachycený výchozí stav pokročilých vazeb
   const byId = new Map(r.components.map((c) => [c.id, c.placement]));
   return { doc: { ...withMates, components: (doc.components ?? []).map((c) => (r.moved.includes(c.id) && byId.has(c.id) ? { ...c, placement: byId.get(c.id)! } : c)) }, status: r.status, moved: r.moved };
 }
 
 /* ───────────────────────── provedení ───────────────────────── */
 
-const STATUS_WORD = (s?: MateStatus) => (s === "ok" ? "ok" : s === "conflict" ? tr("konflikt") : s === "missing" ? tr("chybí plocha") : s === "suppressed" ? tr("potlačeno") : "?");
+export const STATUS_WORD = (s?: MateStatus) => (s === "ok" ? "ok" : s === "conflict" ? tr("konflikt") : s === "missing" ? tr("chybí plocha") : s === "suppressed" ? tr("potlačeno") : "?");
 const posText = (c: AsmComponent) => `${tr("poloha {0}", pt(c.placement.position))}${c.placement.rotation.some((x) => Math.abs(x) > 1e-9) ? ` · ${tr("natočení {0}", pt(c.placement.rotation))}` : ""}`;
 /** „„Čep“ poloha […] · „Deska“ …“ pro pohnuté komponenty */
-const movedText = (doc: CadDoc, ids: string[]) =>
+export const movedText = (doc: CadDoc, ids: string[]) =>
   ids
     .map((id) => doc.components?.find((c) => c.id === id))
     .filter((c): c is AsmComponent => !!c)
@@ -310,6 +309,7 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
     }
     case "mate": {
       asmOnly();
+      if (cmd.kind !== "center" && isKinMate(cmd.kind)) return applyKinMate(d, cmd, env);
       const A = findComp(d, cmd.a);
       if (cmd.kind === "fixed") {
         if (hasFixedMate(d, A.id)) {
@@ -365,12 +365,19 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         next = removeMate(d, m.id);
         what.push(tr("smazána"));
       } else {
-        const patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name">> = {};
+        const patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name" | "min" | "max">> = {};
         if (cmd.value !== undefined) {
-          if (!mateNeedsValue(m.type)) throw new Error(tr("vazba {0} ({1}) nemá hodnotu – hodnotu má jen Vzdálenost a Úhel", no, tr(MATE_LABEL[m.type])));
+          if (!mateNeedsValue(m.type) && !kinHasValue(m.type) && m.type !== "slot") throw new Error(tr("vazba {0} ({1}) nemá hodnotu – hodnotu má Vzdálenost, Úhel, Ozubení (poměr), Šroub (stoupání), Hřeben (mm/ot) a Drážka (poloha)", no, tr(MATE_LABEL[m.type])));
+          if ((m.type === "gear" || m.type === "screw" || m.type === "rack") && !(cmd.value > 0)) throw new Error(tr("hodnota musí být kladná"));
           patch.value = cmd.value;
-          what.push(tr("hodnota {0}", `${fmt(cmd.value)}${m.type === "angle" ? "°" : " mm"}`));
+          what.push(tr("hodnota {0}", `${fmt(cmd.value, 4)}${m.type === "angle" ? "°" : m.type === "gear" ? "" : " mm"}`));
         }
+        for (const k of ["min", "max"] as const)
+          if (cmd[k] !== undefined) {
+            if (!kinHasLimits(m.type)) throw new Error(tr("vazba {0} ({1}) nemá meze – meze má Mez vzdálenosti a Mez úhlu", no, tr(MATE_LABEL[m.type])));
+            patch[k] = cmd[k];
+            what.push(`${k} ${fmt(cmd[k]!)}`);
+          }
         if (cmd.flip) {
           if (m.type === "fixed") throw new Error(tr("vazbu Ukotvit nelze otočit"));
           patch.flip = !m.flip;
@@ -695,6 +702,9 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       log.push(tr("✓ záložka „{0}“ zavřena – aktivní je „{1}“", hit.title, now?.title ?? doc.name));
       return done(doc, false, { switched: true });
     }
+    case "motion":
+      asmOnly();
+      return applyMotionCmd(d, cmd.cmd, env);
   }
 }
 

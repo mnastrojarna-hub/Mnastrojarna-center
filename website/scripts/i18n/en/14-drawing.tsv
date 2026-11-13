@@ -1,0 +1,223 @@
+# Výkres vlna 7: pomocné pohledy, řezy lomenou čarou, částečné řezy, přerušení, uložení ISO 286, revize a zóny (balík drawing)
+ (hladká křivka)	 (smooth curve)
+ (skryté)	 (hidden)
+ vlnovka	 wavy line
+ · na listu x {0}…{1}, y {2}…{3}{4}	 · on sheet x {0}…{1}, y {2}…{3}{4}
+ – na listu {0} místo {1} mm	 – on sheet {0} instead of {1} mm
++ mezní	+ limits
++ úchylky	+ deviations
+, křivka	, curve
+, otočeno	, flipped
+, podél	, along
+2 kliky v pohledu: začátek a konec vynechané části (směr podle delšího posunu)	2 clicks in a view: start and end of the removed part (direction by the longer move)
+3 body: konec hlavního ramena, vrchol (osa otočení), konec šikmého ramena	3 points: end of the main leg, vertex (rotation axis), end of the inclined leg
+Dolní úchylka	Lower deviation
+Dotaz na uložení	Fit query
+Díra (velká)	Hole (upper case)
+Esc ruší	Esc cancels
+Hladká hranice (křivka od ruky)	Smooth boundary (freehand curve)
+Hloubka částečného řezu od přední strany [mm]	Depth of the broken-out section from the front [mm]
+Horní úchylka	Upper deviation
+Hotovo (Enter)	Done (Enter)
+Hřídel (malá)	Shaft (lower case)
+ISO 286: jmenovitý rozměr {0} mm je mimo tabulky (0 až {1} mm)	ISO 286: nominal size {0} mm is outside the tables (0 to {1} mm)
+ISO 286: pole {0} není pro rozměr {1} mm definováno	ISO 286: tolerance class {0} is not defined for size {1} mm
+ISO 286: stupeň přesnosti IT{0} neexistuje (IT1 až IT18)	ISO 286: tolerance grade IT{0} does not exist (IT1 to IT18)
+Jmenovitý rozměr [mm]	Nominal size [mm]
+Klikněte do pohledu.	Click into a view.
+Klikněte na hranu šikmé plochy v pohledu.	Click the edge of the inclined face in a view.
+Konec vynechané části [mm modelu]	End of the removed part [model mm]
+Kreslit trojúhelník revize {0} u změněných kót (revizi kótě přiřadíte v seznamu kót)	Draw the revision {0} triangle at changed dimensions (assign the revision to a dimension in the dimension list)
+Kóty s polem tolerance (H7, g6)	Dimensions with a tolerance class (H7, g6)
+Max.	Max.
+Mezera mezi částmi na listu [mm]	Gap between the parts on the sheet [mm]
+Min.	Min.
+Natočený řez	Aligned section
+POHLED {0}	VIEW {0}
+Pohled na řez z druhé strany	View the section from the other side
+Pohled podél hrany místo kolmo na ni	View along the edge instead of normal to it
+Pohled z opačné strany	View from the opposite side
+Pohled {0}	View {0}
+Pohled {0} se na list nevejde – zvolte větší formát nebo menší měřítko.	View {0} does not fit on the sheet – choose a larger format or a smaller scale.
+Pohled {0}: {1}	View {0}: {1}
+Pomocné pohledy a řezy	Auxiliary views and sections
+Pomocné pohledy: {0}	Auxiliary views: {0}
+Pomocný pohled	Auxiliary view
+Pomocný pohled ukáže šikmou plochu ve skutečném tvaru; zalomený a natočený řez vedou čáru řezu přes několik prvků; přerušení zkrátí dlouhý díl – kóty drží skutečnou délku.	An auxiliary view shows an inclined face in its true shape; stepped and aligned sections run the cutting line through several features; a break shortens a long part – dimensions keep the true length.
+Pomocný pohled {0} vložen.	Auxiliary view {0} inserted.
+Přerušení	Break
+Přerušení vloženo.	Break inserted.
+Přerušení {0}	Break {0}
+Přerušení {0}…{1} leží mimo pohled {2} ({3}…{4}).	Break {0}…{1} lies outside view {2} ({3}…{4}).
+Přerušení: pohled {0} není na listu.	Break: view {0} is not on the sheet.
+Přerušení: zvolte dva různé body.	Break: choose two different points.
+Přerušení: {0}	Breaks: {0}
+Revize změny (trojúhelník)	Revision of the change (triangle)
+Revize, ve které se údaj změnil – trojúhelník u kóty	Revision in which the item changed – triangle at the dimension
+Smazat pohled	Delete view
+Smazat přerušení	Delete break
+Smazat částečný řez	Delete broken-out section
+Smazat řez	Delete section
+Stupeň přesnosti IT	Tolerance grade IT
+Tabulka uložení (ISO 286)	Fit table (ISO 286)
+Tabulka uložení na listu	Fit table on the sheet
+Tabulka uložení se na list nevejde – zvolte větší formát.	The fit table does not fit on the sheet – choose a larger format.
+Trojúhelníky revizí:	Revision triangles:
+Uložení (H7/g6)	Fit (H7/g6)
+Uložení ISO 286 (pole tolerance a úchylky)	ISO 286 fit (tolerance class and deviations)
+Uložení ISO 286 (zobrazení {0}, tabulka {1}): {2}	ISO 286 fits (display {0}, table {1}): {2}
+Uložení ISO 286 – Ø{0}	ISO 286 fit – Ø{0}
+Uložení, revize a zóny	Fits, revisions and zones
+Vlnovka místo cikcaku	Wavy line instead of zigzag
+Zadání ještě není úplné.	The input is not complete yet.
+Zalomený řez	Stepped section
+Začátek vynechané části [mm modelu]	Start of the removed part [model mm]
+Zobrazení úchylek u kóty	Deviation display at the dimension
+Základní úchylka	Fundamental deviation
+Zóna	Zone
+Zóny listu (ISO 5457) a sloupec Zóna v revizích	Sheet zones (ISO 5457) and a Zone column in revisions
+Zóny listu: {0} · trojúhelníky revizí: {1}	Sheet zones: {0} · revision triangles: {1}
+ano	yes
+body oblasti v pohledu (≥ 3), Enter nebo klik na první bod = hotovo	points of the region in a view (≥ 3), Enter or a click on the first point = done
+body čáry řezu v pohledu (úseky se přichytí vodorovně / svisle), Enter = hotovo	points of the cutting line in a view (segments snap horizontal / vertical), Enter = done
+hladká hranice	smooth boundary
+hrana pohledu {0}–{1}	view edge {0}–{1}
+hrana pomocného pohledu má nulovou délku	the auxiliary view edge has zero length
+jen značka	code only
+mezní rozměry	limits
+na listu není žádné přerušení	there is no break on the sheet
+na listu není žádný částečný řez	there is no broken-out section on the sheet
+na výkrese	on the drawing
+natočený	aligned
+natočený řez: ramena leží na sobě – zvolte jiný bod	aligned section: the legs overlap – choose another point
+natočený řez: zadejte 3 body – konec hlavního ramena, vrchol (střed otočení) a konec natočeného ramena	aligned section: enter 3 points – end of the main leg, vertex (centre of rotation) and end of the rotated leg
+otočit	flip
+plocha F{0}	face F{0}
+plocha F{0} v tělese není – těleso má {1} ploch	face F{0} is not in the body – the body has {1} faces
+podle listu	as sheet
+podél	along
+podél hrany	along the edge
+pohled kolmo na šikmou plochu: klik na její hranu v pohledu, pak umístění (Enter = zarovnaně)	view normal to an inclined face: click its edge in a view, then the placement (Enter = aligned)
+pohled není přerušený	the view is not broken
+pohled {0}	view {0}
+pohled {0} nemá směr promítání	view {0} has no projection direction
+pole {0} není pro rozměr {1} mm v ISO 286 definováno (tabulky do 500 mm)	tolerance class {0} is not defined in ISO 286 for size {1} mm (tables up to 500 mm)
+pomocný pohled	auxiliary view
+pomocný pohled (POHLED B, metoda šipky): kolmo na šikmou plochu viděnou jako hrana v rodičovském pohledu (skutečný tvar), podél hrany, podle rovinné plochy F… nebo směru; zarovnaně s rodičem, šipka s písmenem	auxiliary view (VIEW B, reference arrow method): normal to an inclined face seen as an edge in the parent view (true shape), along an edge, by a planar face F… or a direction; aligned with the parent, arrow with a letter
+pomocný pohled potřebuje hranu, směr nebo plochu	the auxiliary view needs an edge, a direction or a face
+pomocný pohled {0} na listu není – pomocné pohledy: {1}	auxiliary view {0} is not on the sheet – auxiliary views: {1}
+pomocný pohled: hrana = dva body x1 y1 x2 y2 (mm modelu v rovině rodičovského pohledu)	auxiliary view: edge = two points x1 y1 x2 y2 (model mm in the plane of the parent view)
+pomocný pohled: nečekané „{0}“ – {1}	auxiliary view: unexpected “{0}” – {1}
+pomocný pohled: plocha F{0} není rovinná	auxiliary view: face F{0} is not planar
+pomocný pohled: plocha jako F7 (číslo plochy z příkazu měřit / výběru)	auxiliary view: face as F7 (face number from measure / selection)
+pomocný pohled: směr = tři čísla dx dy dz (k pozorovateli, souřadnice modelu)	auxiliary view: direction = three numbers dx dy dz (towards the viewer, model coordinates)
+pomocný pohled: směr má nulovou délku	auxiliary view: the direction has zero length
+pomocný pohled: u hrany zadejte rodičovský pohled (přední, horní…)	auxiliary view: with an edge, give the parent view (front, top…)
+pomocný pohled: zadejte hranu, plochu nebo směr – {0}	auxiliary view: give an edge, a face or a direction – {0}
+přechodné	transition
+přerušení	break
+přerušení jde do pravoúhlého pohledu nebo řezu A–A	a break goes into an orthographic view or section A–A
+přerušení {0} na listu není – je jich {1}	break {0} is not on the sheet – there are {1}
+přerušení: mezera musí být kladná (mm listu)	break: the gap must be positive (sheet mm)
+přerušení: nečekané „{0}“ – {1}	break: unexpected “{0}” – {1}
+přerušení: osa pohledu x (vodorovně) nebo y (svisle) – {0}	break: view axis x (horizontal) or y (vertical) – {0}
+přerušení: zadejte odkud a kam – od 50 do 250 (mm modelu podél osy pohledu)	break: give from and to – from 50 to 250 (model mm along the view axis)
+přerušený pohled: dlouhý díl se zkrátí (i v pohledech ve stejné promítací čáře), kóty přes přerušení drží skutečnou délku	broken view: a long part is shortened (also in views on the same projection line), dimensions across the break keep the true length
+přesah {0}…{1}	interference {0}…{1}
+revize {0} v tabulce není – nejdřív výkres revize {0} "popis změny" (revize: {1})	revision {0} is not in the table – first drawing revision {0} "change description" (revisions: {1})
+rodičovský pohled {0} není na listu	parent view {0} is not on the sheet
+s přesahem	interference
+s vůlí	clearance
+smazat: číslo (od 1) nebo vše	delete: number (from 1) or all
+směr je shodný se směrem všech pohledů na listu – zapněte pohled, ve kterém je plocha vidět z boku	the direction equals that of every view on the sheet – turn on a view in which the face is seen edge-on
+směr pomocného pohledu je shodný se směrem rodičovského pohledu – vyberte šikmou hranu nebo jiný pohled	the auxiliary view direction equals the parent view direction – choose an inclined edge or another view
+tolerance uložení ISO 286 (díry A…ZC, hřídele a…zc, IT1…IT18 do 500 mm): úchylky „(+0,025/0)“ nebo mezní rozměry u kóty, Tabulka uložení na listu, dotaz na vůli / přesah	ISO 286 fit tolerances (holes A…ZC, shafts a…zc, IT1…IT18 up to 500 mm): deviations “(+0.025/0)” or limits at the dimension, fit table on the sheet, clearance / interference query
+trojúhelník revize u změněné kóty (volitelně pro každou revizi), zóny listu ISO 5457 a sloupec Zóna v tabulce revizí	revision triangle at a changed dimension (optional per revision), ISO 5457 sheet zones and a Zone column in the revision table
+uložení ISO 286 patří ke kótě rozměru nebo díry (Ø40, 25, Ø12 skrz) – u závitu použijte výkres tolerance M8 6H	an ISO 286 fit belongs to a size or hole dimension (Ø40, 25, Ø12 thru) – for a thread use drawing tolerance M8 6H
+uložení: „{0}“ není pole tolerance díry (velké písmeno, např. H7)	fit: “{0}” is not a hole tolerance class (upper case, e.g. H7)
+uložení: „{0}“ není pole tolerance hřídele (malé písmeno, např. g6)	fit: “{0}” is not a shaft tolerance class (lower case, e.g. g6)
+umístit x y (mm listu od levého dolního rohu)	place x y (sheet mm from the lower left corner)
+vlna	wave
+vlnovka	wavy line
+výkres pohled pomocný <rodič> hrana x1 y1 x2 y2 [podél] [otočit] [umístit x y] · výkres pohled pomocný [<rodič>] plocha F7 · výkres pohled pomocný [<rodič>] směr dx dy dz · výkres pohled pomocný smazat B	drawing view auxiliary <parent> edge x1 y1 x2 y2 [along] [flip] [place x y] · drawing view auxiliary [<parent>] face F7 · drawing view auxiliary [<parent>] direction dx dy dz · drawing view auxiliary delete B
+výkres přerušení <pohled> x|y od 50 do 250 [mezera 8] [vlnovka|cikcak] · výkres přerušení smazat [číslo|vše]	drawing break <view> x|y from 50 to 250 [gap 8] [wave|zigzag] · drawing break delete [number|all]
+výkres revize <písmeno> značky ano|ne	drawing revision <letter> marks yes|no
+výkres revize značka <písmeno> na <kóta>[, <kóta>…] · výkres revize značka smazat na <kóta>	drawing revision mark <letter> on <dimension>[, <dimension>…] · drawing revision mark delete on <dimension>
+výkres uložení <kóta> <pole> se provádí jako výkres tolerance	drawing fit <dimension> <class> runs as drawing tolerance
+výkres uložení <kóta> H7 [zobrazení odchylky|mezní|značka] · výkres uložení tabulka ano|ne · výkres uložení zobrazení odchylky|mezní|značka · výkres uložení dotaz 40 H7/g6	drawing fit <dimension> H7 [show deviations|limits|code] · drawing fit table yes|no · drawing fit show deviations|limits|code · drawing fit query 40 H7/g6
+výkres uložení dotaz <rozměr> <pole> – např. dotaz 40 H7/g6	drawing fit query <size> <class> – e.g. query 40 H7/g6
+výkres zóny ano|ne	drawing zones yes|no
+výkres řez natočený <rodič> body x1 y1 xv yv x2 y2 (konec hlavního ramena, vrchol, konec natočeného ramena) [otočit] [umístit x y]	drawing section aligned <parent> points x1 y1 xv yv x2 y2 (end of the main leg, vertex, end of the rotated leg) [flip] [place x y]
+výkres řez smazat <písmeno> – řez lomenou čarou (B, C…); řez A–A vypne: výkres řez ne	drawing section delete <letter> – stepped / aligned section (B, C…); section A–A is turned off with: drawing section no
+výkres řez zalomený <rodič> body x1 y1 x2 y2 x3 y3 … [otočit] [umístit x y]	drawing section stepped <parent> points x1 y1 x2 y2 x3 y3 … [flip] [place x y]
+výkres řez částečný <pohled> body x1 y1 x2 y2 x3 y3 … hloubka 12 [křivka] · výkres řez částečný smazat [číslo|vše]	drawing section partial <view> points x1 y1 x2 y2 x3 y3 … depth 12 [spline] · drawing section partial delete [number|all]
+vůle až {0}, přesah až {1}	clearance up to {0}, interference up to {1}
+vůle {0}…{1}	clearance {0}…{1}
+zadaná čára {0}–{1} (není hranou pohledu)	given line {0}–{1} (not a view edge)
+zalomený	stepped
+značka	code
+zobrazení uložení: odchylky, mezní (rozměry) nebo značka	fit display: deviations, limits or code
+{0} {1} hloubka {2} ({3} bodů{4})	{0} {1} depth {2} ({3} points{4})
+{0} {1}: {2}/{3} (mezní rozměry {4} až {5})	{0} {1}: {2}/{3} (limits {4} to {5})
+{0}, hrana {1}–{2}	{0}, edge {1}–{2}
+{0}: chybí pohled – přední, horní, levý, pravý, zadní, spodní nebo řez	{0}: view missing – front, top, left, right, back, bottom or section
+{0}: neznámý pohled „{1}“ – přední, horní, levý, pravý, zadní, spodní, řez, pohled B	{0}: unknown view “{1}” – front, top, left, right, back, bottom, section, view B
+Ø{0} {1}: díra {2}/{3}, hřídel {4}/{5}, {6} ({7})	Ø{0} {1}: hole {2}/{3}, shaft {4}/{5}, {6} ({7})
+úchylky	deviations
+Částečné řezy: {0}	Broken-out sections: {0}
+Částečný {0}	Broken-out {0}
+Částečný řez	Broken-out section
+Částečný řez ({0}): {1}	Broken-out section ({0}): {1}
+Částečný řez vložen.	Broken-out section inserted.
+Částečný řez: pohled {0} není na listu.	Broken-out section: view {0} is not on the sheet.
+částečný řez	broken-out section
+částečný řez jde do pravoúhlého pohledu (přední, horní, levý, pravý, zadní, spodní)	a broken-out section goes into an orthographic view (front, top, left, right, back, bottom)
+částečný řez se nepodařilo vytvořit	the broken-out section could not be created
+částečný řez {0} na listu není – je jich {1}	broken-out section {0} is not on the sheet – there are {1}
+částečný řez: body jsou dvojice čísel x y	broken-out section: points are pairs of numbers x y
+částečný řez: hloubka musí být kladná	broken-out section: the depth must be positive
+částečný řez: nečekané „{0}“ – {1}	broken-out section: unexpected “{0}” – {1}
+částečný řez: oblast potřebuje alespoň 3 body	broken-out section: the region needs at least 3 points
+částečný řez: oblast potřebuje alespoň 3 body – {0}	broken-out section: the region needs at least 3 points – {0}
+částečný řez: zadejte hloubku od přední strany – hloubka 12 (mm)	broken-out section: enter the depth from the front – depth 12 (mm)
+ŘEZ {0}–{0}	SECTION {0}–{0}
+Řez {0}–{0} vložen.	Section {0}–{0} inserted.
+Řez {0}–{0}: pohled {1} není na listu.	Section {0}–{0}: view {1} is not on the sheet.
+Řez {0}–{0}: {1}	Section {0}–{0}: {1}
+Řezy lomenou čarou: {0}	Stepped / aligned sections: {0}
+řez	section
+řez lomenou čarou (ŘEZ B–B): zalomený (rovnoběžné úseky se skoky), natočený (rameno otočené do roviny); částečný řez oblastí pohledu do hloubky se šrafováním a hranicí od ruky	section along a polyline (SECTION B–B): stepped (parallel segments with jogs), aligned (leg rotated into the plane); broken-out section of a view region down to a depth with hatching and a freehand boundary
+řez potřebuje alespoň dva body čáry řezu	the section needs at least two points of the cutting line
+řez {0}–{0}	section {0}–{0}
+řez {0}–{0} na listu není – řezy lomenou čarou: {1}	section {0}–{0} is not on the sheet – stepped / aligned sections: {1}
+řez {0}–{0} se nepodařilo vytvořit	section {0}–{0} could not be created
+řez: body jsou dvojice čísel x y	section: points are pairs of numbers x y
+řez: dva shodné body čáry řezu	section: two identical points of the cutting line
+řez: nečekané „{0}“ – {1}	section: unexpected “{0}” – {1}
+„{0}“ na listu není – kóty a značky ukáže výkres stav	“{0}” is not on the sheet – drawing status lists dimensions and marks
+„{0}“ není pole tolerance ISO 286 – např. H7, g6, js6, H7/g6	“{0}” is not an ISO 286 tolerance class – e.g. H7, g6, js6, H7/g6
+„{0}“ není zápis uložení ISO 286 – např. H7, g6, H7/g6	“{0}” is not an ISO 286 fit – e.g. H7, g6, H7/g6
+⚠ pomocný pohled {0} uložen, ale na listu není: {1}	⚠ auxiliary view {0} saved but not on the sheet: {1}
+⚠ přerušení {0} uloženo, ale: {1}	⚠ break {0} saved, but: {1}
+⚠ částečný řez {0} uložen, ale: {1}	⚠ broken-out section {0} saved, but: {1}
+⚠ řez {0}–{0} uložen, ale na listu není: {1}	⚠ section {0}–{0} saved but not on the sheet: {1}
+✓ Tabulka uložení vypnuta	✓ Fit table off
+✓ Tabulka uložení zapnuta – zatím žádná kóta s polem tolerance (výkres uložení Ø40 H7)	✓ Fit table on – no dimension with a tolerance class yet (drawing fit Ø40 H7)
+✓ Tabulka uložení: {0} řádků – {1}	✓ Fit table: {0} rows – {1}
+✓ pomocný pohled {0} (z pohledu {1}, {2}, {3}) – na listu x {4}…{5}, y {6}…{7}; souřadnice pohledu: výkres stav	✓ auxiliary view {0} (from view {1}, {2}, {3}) – on sheet x {4}…{5}, y {6}…{7}; view coordinates: drawing status
+✓ pomocný pohled {0} smazán	✓ auxiliary view {0} deleted
+✓ přerušení {0} smazáno	✓ break {0} deleted
+✓ přerušení {0} v pohledu {1} ({2} {3}…{4}): na listu {5} mm místo {6} mm, kóty přes přerušení drží skutečnou délku	✓ break {0} in view {1} ({2} {3}…{4}): {5} mm on sheet instead of {6} mm, dimensions across the break keep the true length
+✓ revize {0}: trojúhelníky se nekreslí	✓ revision {0}: triangles are not drawn
+✓ revize {0}: trojúhelníky u změněných kót se kreslí	✓ revision {0}: triangles at changed dimensions are drawn
+✓ smazána všechna přerušení ({0})	✓ all breaks deleted ({0})
+✓ smazány všechny částečné řezy ({0})	✓ all broken-out sections deleted ({0})
+✓ trojúhelník revize odebrán u: {0}	✓ revision triangle removed at: {0}
+✓ trojúhelník revize {0} u: {1}	✓ revision triangle {0} at: {1}
+✓ uložení na listu: {0}	✓ fits on the sheet: {0}
+✓ zóny listu vypnuty	✓ sheet zones off
+✓ zóny listu zapnuty (ISO 5457) – tabulka revizí má sloupec Zóna	✓ sheet zones on (ISO 5457) – the revision table has a Zone column
+✓ částečný řez {0} smazán	✓ broken-out section {0} deleted
+✓ částečný řez {0} v pohledu {1}: oblast {2} bodů{3}, hloubka {4} mm od přední strany	✓ broken-out section {0} in view {1}: region of {2} points{3}, depth {4} mm from the front
+✓ řez {0}–{0} smazán	✓ section {0}–{0} deleted
+✓ řez {0}–{0} {1} (pohled {2}, {3} bodů) – na listu x {4}…{5}, y {6}…{7}	✓ section {0}–{0} {1} (view {2}, {3} points) – on sheet x {4}…{5}, y {6}…{7}

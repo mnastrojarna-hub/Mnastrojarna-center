@@ -29,6 +29,8 @@ import { uid, type AsmComponent, type CadDoc, type ComponentSource, type MateRef
 import { MATERIALS, fmtNum } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
+import { KinMateButtons, KinMatePicker, kinPrompt } from "./asm-mates-kin";
+import { KIN_SPEC, isKinMode, kinHasLimits, kinHasValue } from "@/cad/mate-spec";
 import { CadIcon } from "./cad-icons";
 import { DirVecField } from "./dir-vec-field";
 import { Num, Vec } from "./props";
@@ -159,6 +161,7 @@ function MatesList({ doc, status, onCommit, onResolve, onSelect }: { doc: CadDoc
         mates.map((m) => {
           const st = status?.[m.id] ?? (m.suppressed ? "suppressed" : "missing");
           const valued = mateNeedsValue(m.type);
+          const kinValue = !valued && kinHasValue(m.type) ? KIN_SPEC[m.type as keyof typeof KIN_SPEC].params.find((p) => p.key === "value") : undefined;
           return (
             <div key={m.id} data-mate={m.id} data-mate-type={m.type} className={cn("group ml-3 rounded px-2 py-[3px] text-[12px]", m.suppressed && "opacity-45")} onClick={() => onSelect(m.a.compId)} title={tr(STATUS_TITLE[st])}>
               <div className="flex items-center gap-2">
@@ -184,6 +187,18 @@ function MatesList({ doc, status, onCommit, onResolve, onSelect }: { doc: CadDoc
                 // hodnota vazby: pole Num bez nadpisu (typ vazby je o řádek výš); změna se uloží a sestava se přepočítá
                 <div className="ml-4 mt-0.5 w-[150px] [&_label>span:first-child]:hidden" onClick={(e) => e.stopPropagation()} title={tr("Hodnotu vazby lze přepsat (číslo i výraz, např. 25/2) – Enter potvrdí a sestava se přepočítá")}>
                   <Num label={m.type === "angle" ? tr("Úhel") : tr("Vzdálenost")} value={m.value ?? 0} step={m.type === "angle" ? 5 : 1} suffix={m.type === "angle" ? "°" : "mm"} onChange={(v) => v !== (m.value ?? 0) && onCommit(patchMate(doc, m.id, { value: v }))} />
+                </div>
+              )}
+              {kinValue && (
+                // pokročilé vazby: převodový poměr, stoupání, posuv na otáčku – úprava přepočítá sestavu
+                <div className="ml-4 mt-0.5 w-[170px]" onClick={(e) => e.stopPropagation()} data-mate-value={m.id}>
+                  <Num label={tr(kinValue.label)} value={m.value ?? 0} step={kinValue.step} suffix={kinValue.suffix} onChange={(v) => v > 0 && v !== (m.value ?? 0) && onCommit(patchMate(doc, m.id, { value: v }))} />
+                </div>
+              )}
+              {kinHasLimits(m.type) && (
+                <div className="ml-4 mt-0.5 grid w-[200px] grid-cols-2 gap-1.5" onClick={(e) => e.stopPropagation()} data-mate-limits={m.id}>
+                  <Num label={tr("Min")} value={m.min ?? 0} suffix={m.type === "limitAngle" ? "°" : "mm"} onChange={(v) => v !== m.min && onCommit(patchMate(doc, m.id, { min: v }))} />
+                  <Num label={tr("Max")} value={m.max ?? 0} suffix={m.type === "limitAngle" ? "°" : "mm"} onChange={(v) => v !== m.max && onCommit(patchMate(doc, m.id, { max: v }))} />
                 </div>
               )}
             </div>
@@ -219,6 +234,7 @@ function SubTree({ comps, depth }: { comps: AsmComponent[]; depth: number }) {
 
 /** Výzva ve stavovém řádku pro rozpracovanou vazbu (nebo výběr směru pole komponenty z plochy). */
 export function matePrompt(m: PendingMate): string {
+  if (isKinMode(m.mode)) return kinPrompt(m);
   if (m.mode === "dir") return tr("Směr pole: klikněte na rovinnou plochu (normála) nebo válcovou plochu (osa) kterékoli komponenty · Esc zruší");
   if (m.b) return tr("Vazba: potvrďte hodnotu v panelu komponenty (Enter) · Esc zruší");
   if (!m.a) return tr("Vazba {0} vybrané (pohyblivé) komponenty · Esc zruší", m.mode === "concentric" ? tr("Souosost: klikněte na válcovou plochu") : tr("– klikněte na rovinnou plochu"));
@@ -228,7 +244,7 @@ export function matePrompt(m: PendingMate): string {
 /** Zvýraznění v modelu během zadávání vazby: už vybrané plochy + plocha, na kterou uživatel najel v seznamu ploch. */
 export function mateSelection(m: PendingMate | null, hover: SelItem | null): SelItem[] {
   const out: SelItem[] = [];
-  for (const r of [m?.a, m?.b]) if (r && r.face >= 0) out.push({ kind: "face", index: r.face, compId: r.leaf ?? r.compId });
+  for (const r of [m?.a, m?.b, m?.c, m?.d]) if (r && r.face >= 0 && r.ent !== "vertex") out.push(r.ent === "edge" ? { kind: "edge", index: r.face, compId: r.leaf ?? r.compId } : { kind: "face", index: r.face, compId: r.leaf ?? r.compId });
   if (hover) out.push(hover);
   return out;
 }
@@ -582,8 +598,8 @@ export function AsmProps({
   onMatePatch?: (p: Partial<PendingMate> | null) => void;
   /** plocha vybraná ze seznamu – stejné jako kliknutí na plochu v modelu (id listového dílu, index plochy) */
   onMateFace?: (leafId: string, face: number) => void;
-  /** potvrzení hodnoty Vzdálenosti / Úhlu po výběru obou ploch → vazba se vytvoří */
-  onMateConfirm?: (value: number) => void;
+  /** potvrzení hodnoty Vzdálenosti / Úhlu po výběru obou ploch → vazba se vytvoří (`patch` = doplnění rozpracované vazby, např. Zámek) */
+  onMateConfirm?: (value: number, patch?: Partial<PendingMate>) => void;
   /** zvýraznění plochy v modelu při najetí na řádek seznamu ploch */
   onFaceHover?: (it: SelItem | null) => void;
   onPattern?: (p: CompPattern) => void;
@@ -651,7 +667,10 @@ export function AsmProps({
             {tr("Ukotvit")}
           </button>
         </div>
-        {mate && activeMode && onMatePatch && onMateFace && onMateConfirm && <MatePicker key={activeMode} doc={doc} c={c} mate={mate} onPatch={onMatePatch} onPickFace={onMateFace} onConfirm={onMateConfirm} onHover={onFaceHover} />}
+        {/* pokročilé a mechanické vazby (Kolmo … Kardan) – průvodce v asm-mates-kin.tsx */}
+        <KinMateButtons active={activeMode} onMate={(t) => onMate(t)} />
+        {mate && activeMode && onMatePatch && onMateConfirm && isKinMode(activeMode) && <KinMatePicker key={activeMode} doc={doc} c={c} mate={mate} onPatch={onMatePatch} onConfirm={onMateConfirm} onHover={onFaceHover} />}
+        {mate && activeMode && onMatePatch && onMateFace && onMateConfirm && !isKinMode(activeMode) && <MatePicker key={activeMode} doc={doc} c={c} mate={mate} onPatch={onMatePatch} onPickFace={onMateFace} onConfirm={onMateConfirm} onHover={onFaceHover} />}
         <p className="mt-1.5 text-[11px] leading-relaxed text-[#6b7785]">
           {activeMode ? tr("Klikněte na plochu této komponenty a pak na plochu jiné komponenty. Vazba se uloží a přepočítá při každém pohybu.") : tr("Vyberte typ vazby, pak klikněte na plochu této komponenty a na plochu cílové komponenty.")}{" "}
           {activeMode

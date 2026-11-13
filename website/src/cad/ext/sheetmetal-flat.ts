@@ -10,6 +10,7 @@ import { cadLocale, tr } from "../i18n";
 import { cross, norm, planeBasis, toWorld } from "../defaults";
 import { arcPoints, circleFrom3, findLoops, pointInPolygon, type Loop, type Seg } from "../sketch";
 import type { CadDoc, Feature, SketchEntity, SketchPlane, Vec2, Vec3 } from "../types";
+import { flatForms, formTableLines, formsDxf, formsSvg, type FlatForm, type FormCtx } from "./sheetmetal-flat-forms";
 
 export type SheetParams = { t: number; r: number; k: number };
 export const DEFAULT_SHEET: SheetParams = { t: 2, r: 2, k: 0.44 };
@@ -48,7 +49,8 @@ export function baseFeatureIndex(doc: CadDoc, before = doc.features.length): num
 type Affine2 = { o: Vec2; x: Vec2; y: Vec2 };
 type Frame3 = { O: Vec3; X: Vec3; Y: Vec3; N: Vec3 };
 type Region = { a: Vec2; w: Vec2; min?: number; max?: number };
-type Panel = { id: string; frame: Frame3; toFlat: Affine2; regions: Region[] };
+/** `outline` = obrys panelu v rozvinu (pro křížový zlom) */
+type Panel = { id: string; frame: Frame3; toFlat: Affine2; regions: Region[]; outline?: Vec2[] };
 
 export type FlatBend = { n: number; feature: string; a: Vec2; b: Vec2; a2: Vec2; b2: Vec2; angle: number; radius: number; ba: number; dir: "up" | "down" };
 export type FlatLayout = {
@@ -60,10 +62,15 @@ export type FlatLayout = {
   basePlane: SketchPlane;
   baseDirection: "normal" | "reverse" | "symmetric";
   bbox: [Vec2, Vec2];
+  /** tvářecí nástroje a křížové zlomy (vrstva FORM – nerozvíjejí se) */
+  forms: FlatForm[];
 };
 export type EdgeGeom = { a: Vec3; b: Vec3 };
 /** Kdo umí určit hranu (featureIndex = index prvku ohybu, edgeIndex = index hrany v tělese před prvkem). */
 export type EdgeResolver = (featureIndex: number, edgeIndex: number) => Promise<EdgeGeom | null> | EdgeGeom | null;
+/** Rovina plochy tělesa před prvkem (počátek na ploše, vnější normála) – pro tvářecí nástroje a křížový zlom. */
+export type FaceGeom = { origin: Vec3; normal: Vec3 };
+export type FaceResolver = (featureIndex: number, faceIndex: number) => Promise<FaceGeom | null> | FaceGeom | null;
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
@@ -144,15 +151,15 @@ function lineEntity(entities: SketchEntity[]): [Vec2, Vec2] {
 
 // ---------------- výpočet rozvinu ----------------
 
-type Ctx = { doc: CadDoc; outer: Seg[]; holes: Seg[][]; bends: FlatBend[]; panels: Panel[]; warnings: string[]; t: number; tol: number };
+type Ctx = { doc: CadDoc; outer: Seg[]; holes: Seg[][]; bends: FlatBend[]; panels: Panel[]; warnings: string[]; t: number; tol: number; forms: FlatForm[] };
 
-function findPanel(ctx: Ctx, pts: Vec3[], within = false): { panel: Panel; onTop: boolean } | null {
+function findPanel(ctx: Ctx, pts: Vec3[], within = false, tolN = ctx.tol): { panel: Panel; onTop: boolean } | null {
   for (let i = ctx.panels.length - 1; i >= 0; i--) {
     const p = ctx.panels[i];
     const ls = pts.map((q) => local3(p.frame, q));
-    const top = ls.every((l) => Math.abs(l[2]) < ctx.tol);
-    const bottom = ls.every((l) => Math.abs(l[2] + ctx.t) < ctx.tol);
-    const inside = within && ls.every((l) => l[2] <= ctx.tol && l[2] >= -ctx.t - ctx.tol);
+    const top = ls.every((l) => Math.abs(l[2]) < tolN);
+    const bottom = ls.every((l) => Math.abs(l[2] + ctx.t) < tolN);
+    const inside = within && ls.every((l) => l[2] <= tolN && l[2] >= -ctx.t - tolN);
     if (!top && !bottom && !inside) continue;
     const ok = ls.every((l) => {
       const fp = flatOf(p.toFlat, [l[0], l[1]]);
@@ -186,11 +193,41 @@ function outwardOf(outer: Seg[], a: Vec2, b: Vec2): Vec2 {
   return pointInPolygon(probe, poly) ? [-perp[0], -perp[1]] : perp;
 }
 
+/** Mnohoúhelník bez bodů ležících na přímce (obrys panelu pro křížový zlom). */
+export function dropCollinear(p: Vec2[]): Vec2[] {
+  const out: Vec2[] = [];
+  for (let i = 0; i < p.length; i++) {
+    const a = p[(i - 1 + p.length) % p.length];
+    const b = p[i];
+    const c = p[(i + 1) % p.length];
+    const cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    if (Math.abs(cr) > 1e-9 * Math.max(1, d2(a, b) * d2(b, c)) && d2(a, b) > 1e-9) out.push(b);
+  }
+  return out;
+}
+/** Ořez mnohoúhelníku polorovinou: ponechá body s side·(w·(p − a) − k) ≥ 0. */
+function clipHalf(poly: Vec2[], a: Vec2, w: Vec2, k: number, side: 1 | -1): Vec2[] {
+  const f = (p: Vec2) => side * (w[0] * (p[0] - a[0]) + w[1] * (p[1] - a[1]) - k);
+  const out: Vec2[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    const fp = f(p);
+    const fq = f(q);
+    if (fp >= 0) out.push(p);
+    if ((fp >= 0) !== (fq >= 0)) {
+      const s = fp / (fp - fq);
+      out.push([p[0] + (q[0] - p[0]) * s, p[1] + (q[1] - p[1]) * s]);
+    }
+  }
+  return dropCollinear(out);
+}
+
 /**
  * Rozvin plechu z historie prvků (do indexu `upTo` výlučně). `resolve` dodá hranu (koncové body ve světě)
  * pro ohyb z hrany / lem – v jádře ze stavby tělesa, v UI z uložené geometrie.
  */
-export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.features.length): Promise<FlatLayout> {
+export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.features.length, resolveFace?: FaceResolver): Promise<FlatLayout> {
   const bi = baseFeatureIndex(doc, upTo);
   if (bi < 0) throw new Error(tr("Nejdřív vytvořte Základní plech (karta Plech)."));
   const base = doc.features[bi] as ExtF;
@@ -210,7 +247,27 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
     warnings: [],
     t,
     tol: 0.03,
-    panels: [{ id: base.id, frame: { O: add(pb.origin, mul(pb.n, topOffset)), X: pb.x, Y: pb.y, N: pb.n }, toFlat: { o: [0, 0], x: [1, 0], y: [0, 1] }, regions: [] }],
+    panels: [{ id: base.id, frame: { O: add(pb.origin, mul(pb.n, topOffset)), X: pb.x, Y: pb.y, N: pb.n }, toFlat: { o: [0, 0], x: [1, 0], y: [0, 1] }, regions: [], outline: dropCollinear(segsPolygon(outer)) }],
+    forms: [],
+  };
+  // tvářecí nástroje a křížový zlom (sheetmetal-flat-forms.ts): umístění na panelu → stopa ve vrstvě FORM
+  const fctx: FormCtx = {
+    t,
+    doc,
+    findPanel: (pts, within) => {
+      // plošky křížového zlomu leží až o několik desetin mm nad panelem – nenajde-li se panel přesně, zkusí se volněji
+      const hit = findPanel(ctx, pts, within) ?? findPanel(ctx, pts, within, 2);
+      if (!hit) return null;
+      const pn = hit.panel;
+      return { id: pn.id, N: pn.frame.N, flip: det2(pn.toFlat) < 0, outline: pn.outline, toFlat: (p: Vec3) => {
+        const l = local3(pn.frame, p);
+        return flatOf(pn.toFlat, [l[0], l[1]]);
+      } };
+    },
+    basePlane: { origin: ctx.panels[0].frame.O, normal: ctx.panels[0].frame.N },
+    resolveFace: resolveFace ?? (() => null),
+    warn: (w) => ctx.warnings.push(w),
+    push: (f) => ctx.forms.push(f),
   };
 
   for (let i = bi + 1; i < Math.min(upTo, doc.features.length); i++) {
@@ -295,6 +352,7 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
               { a: o2, w: u2f, min: 0, max: L },
               { a: o2, w: w2, min: 0, max: length },
             ],
+            outline: [o2, [o2[0] + u2f[0] * L, o2[1] + u2f[1] * L], [o2[0] + u2f[0] * L + w2[0] * length, o2[1] + u2f[1] * L + w2[1] * length], [o2[0] + w2[0] * length, o2[1] + w2[1] * length]],
           });
         }
         break;
@@ -337,8 +395,10 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
           frame: { O: O2, X: rotVec(panel.frame.X, uW, angle), Y: rotVec(panel.frame.Y, uW, angle), N: rotVec(panel.frame.N, uW, angle) },
           toFlat: panel.toFlat,
           regions: [...panel.regions, { a: A, w: w2, min: ba }],
+          outline: panel.outline ? clipHalf(panel.outline, A, w2, ba, 1) : undefined,
         };
         panel.regions = [...panel.regions, { a: A, w: w2, max: 0 }];
+        if (panel.outline) panel.outline = clipHalf(panel.outline, A, w2, 0, -1);
         ctx.panels.push(moving);
         break;
       }
@@ -395,13 +455,23 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
       case "sheet.rib":
         ctx.warnings.push(tr("{0}: prolis se v rozvinu nezobrazuje (tvářený prvek).", f.name));
         break;
+      case "sheet.louvre":
+      case "sheet.dimple":
+      case "sheet.bead":
+      case "sheet.lance":
+      case "sheet.bridge":
+      case "sheet.collar":
+      case "sheet.cardguide":
+      case "sheet.crossbreak":
+        await flatForms(fctx, f, i, p);
+        break;
       default:
         ctx.warnings.push(tr("{0}: neznámý plechový prvek – vynechán.", f.name));
     }
   }
-  const all = [...segsPolygon(ctx.outer), ...ctx.holes.flatMap(segsPolygon)];
+  const all = [...segsPolygon(ctx.outer), ...ctx.holes.flatMap(segsPolygon), ...ctx.forms.flatMap((x) => x.segs.length ? segsPolygon(x.segs) : [])];
   const bbox: [Vec2, Vec2] = all.length ? [[Math.min(...all.map((p) => p[0])), Math.min(...all.map((p) => p[1]))], [Math.max(...all.map((p) => p[0])), Math.max(...all.map((p) => p[1]))]] : [[0, 0], [0, 0]];
-  return { outer: ctx.outer, holes: ctx.holes, bends: ctx.bends, t, warnings: ctx.warnings, basePlane: sk.plane, baseDirection: dir, bbox };
+  return { outer: ctx.outer, holes: ctx.holes, bends: ctx.bends, t, warnings: ctx.warnings, basePlane: sk.plane, baseDirection: dir, bbox, forms: ctx.forms };
 }
 
 // ---------------- DXF / SVG / tabulka ----------------
@@ -418,6 +488,9 @@ function arcParams(s: Extract<Seg, { kind: "arc" }>): { c: Vec2; r: number; star
 }
 
 /** DXF R12 rozvinu: OBRYS (obrys + díry), OHYBY (osy ohybů, čerchovaně), OHYBY_ZONA (hranice ohybu, čárkovaně), TEXT. */
+/** Ne-ASCII znaky jako \U+XXXX (AutoCAD, LibreCAD, DraftSight) – texty vrstvy FORM. */
+export const dxfUni = (s: string) => s.replace(/[^\x20-\x7e]/g, (c) => `\\U+${c.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`);
+
 export function flatToDxf(l: FlatLayout, name = "Rozvin"): string {
   const o: string[] = [];
   const add = (...kv: (string | number)[]) => o.push(...kv.map(String));
@@ -429,8 +502,8 @@ export function flatToDxf(l: FlatLayout, name = "Rozvin"): string {
   add(0, "LTYPE", 2, "CENTER", 70, 0, 3, "Center ____ _ ____ _", 72, 65, 73, 4, 40, 50.8, 49, 31.75, 49, -6.35, 49, 6.35, 49, -6.35);
   add(0, "LTYPE", 2, "HIDDEN", 70, 0, 3, "Hidden __ __ __", 72, 65, 73, 2, 40, 9.525, 49, 6.35, 49, -3.175);
   add(0, "ENDTAB");
-  add(0, "TABLE", 2, "LAYER", 70, 4);
-  for (const [nm, col, lt] of [["OBRYS", 7, "CONTINUOUS"], ["OHYBY", 1, "CENTER"], ["OHYBY_ZONA", 8, "HIDDEN"], ["TEXT", 7, "CONTINUOUS"]] as const) add(0, "LAYER", 2, nm, 70, 0, 62, col, 6, lt);
+  add(0, "TABLE", 2, "LAYER", 70, 5);
+  for (const [nm, col, lt] of [["OBRYS", 7, "CONTINUOUS"], ["OHYBY", 1, "CENTER"], ["OHYBY_ZONA", 8, "HIDDEN"], ["TEXT", 7, "CONTINUOUS"], ["FORM", 3, "CONTINUOUS"]] as const) add(0, "LAYER", 2, nm, 70, 0, 62, col, 6, lt);
   add(0, "ENDTAB", 0, "ENDSEC", 0, "SECTION", 2, "ENTITIES");
   const seg = (s: Seg, layer: string) => {
     if (s.kind === "line") add(0, "LINE", 8, layer, 10, f(s.a[0]), 20, f(s.a[1]), 30, 0, 11, f(s.b[0]), 21, f(s.b[1]), 31, 0);
@@ -452,6 +525,8 @@ export function flatToDxf(l: FlatLayout, name = "Rozvin"): string {
     const mid: Vec2 = [(m[0] + m2[0]) / 2, (m[1] + m2[1]) / 2];
     text(mid[0] + 1, mid[1] + 1, Math.max(1.5, Math.min(3.5, l.t * 1.2)), tr("{0}: {1}° {2} R{3}", b.n, fmt(b.angle), b.dir === "up" ? "NAHORU" : "DOLU", fmt(b.radius)), "OHYBY");
   }
+  // tvářecí nástroje a křížové zlomy: stopa, středové značky a popisy ve vrstvě FORM
+  formsDxf(l.forms, seg, (x, y, hh, s) => add(0, "TEXT", 8, "FORM", 10, f(x), 20, f(y), 30, 0, 40, f(hh), 1, s), (a, b) => add(0, "LINE", 8, "FORM", 10, f(a[0]), 20, f(a[1]), 30, 0, 11, f(b[0]), 21, f(b[1]), 31, 0), l.t);
   // tabulka ohybů pod rozvinem
   const h = Math.max(2, Math.min(4, l.t * 1.5));
   let y = l.bbox[0][1] - 4 * h;
@@ -461,6 +536,10 @@ export function flatToDxf(l: FlatLayout, name = "Rozvin"): string {
     y -= 1.6 * h;
     text(x, y, h, tr("Ohyb {0}: {1}° {2}, R{3}, BA {4} mm", b.n, fmt(b.angle), b.dir === "up" ? "nahoru" : "dolu", fmt(b.radius), fmt(b.ba)));
   }
+  for (const line of formTableLines(l.forms)) {
+    y -= 1.6 * h;
+    add(0, "TEXT", 8, "FORM", 10, f(x), 20, f(y), 30, 0, 40, f(h), 1, dxfUni(line));
+  }
   add(0, "ENDSEC", 0, "EOF");
   return o.join("\n") + "\n";
 }
@@ -469,7 +548,8 @@ export function flatToSvg(l: FlatLayout, name = "Rozvin"): string {
   const [[x0, y0], [x1, y1]] = l.bbox;
   const M = 12;
   const W = x1 - x0 + 2 * M;
-  const H = y1 - y0 + 2 * M + 8 * (l.bends.length + 1);
+  const formLines = formTableLines(l.forms);
+  const H = y1 - y0 + 2 * M + 8 * (l.bends.length + 1) + 6 * formLines.length;
   const X = (x: number) => (x - x0 + M).toFixed(3);
   const Y = (y: number) => (y1 - y + M).toFixed(3);
   const path = (segs: Seg[]) => {
@@ -499,11 +579,16 @@ export function flatToSvg(l: FlatLayout, name = "Rozvin"): string {
     parts.push(`<line x1="${X(b.a2[0])}" y1="${Y(b.a2[1])}" x2="${X(b.b2[0])}" y2="${Y(b.b2[1])}" stroke="#777" stroke-width="0.2" stroke-dasharray="2 1"/>`);
     parts.push(`<text x="${X((m[0] + m2[0]) / 2)}" y="${Y((m[1] + m2[1]) / 2)}" font-size="3" fill="#E03930">${b.n}: ${fmtCs(b.angle)}° ${b.dir === "up" ? "▲" : "▼"} R${fmtCs(b.radius)}</text>`);
   }
+  parts.push(...formsSvg(l.forms, (x) => +X(x), (y) => +Y(y), esc));
   let ty = y1 - y0 + 2 * M + 2;
   parts.push(`<text x="${M}" y="${ty}" font-size="4" font-weight="700">${esc(name)} – rozvin · t = ${fmtCs(l.t)} mm</text>`);
   for (const b of l.bends) {
     ty += 6;
     parts.push(`<text x="${M}" y="${ty}" font-size="3.2">${tr("Ohyb {0}: {1}° {2}, R{3}, BA {4} mm", b.n, fmtCs(b.angle), b.dir === "up" ? tr("nahoru") : tr("dolů"), fmtCs(b.radius), fmtCs(b.ba))}</text>`);
+  }
+  for (const line of formLines) {
+    ty += 6;
+    parts.push(`<text x="${M}" y="${ty}" font-size="3.2" fill="#15803d">${esc(line)}</text>`);
   }
   parts.push("</svg>");
   return parts.join("");
@@ -514,6 +599,8 @@ export function bendTable(l: FlatLayout): string {
   const lines = [tr("Rozvin: {0} × {1} mm · tloušťka {2} mm · {3} ohybů", fmtCs(x1 - x0), fmtCs(y1 - y0), fmtCs(l.t), l.bends.length), ""];
   if (!l.bends.length) lines.push(tr("Žádné ohyby – díl je rovný plech."));
   for (const b of l.bends) lines.push(tr("Ohyb {0}: úhel {1}°, {2}, vnitřní R {3} mm, délka osy {4} mm, BA {5} mm", b.n, fmtCs(b.angle), b.dir === "up" ? tr("nahoru") : tr("dolů"), fmtCs(b.radius), fmtCs(d2(b.a, b.b)), fmtCs(b.ba)));
+  const fl = formTableLines(l.forms);
+  if (fl.length) lines.push("", ...fl);
   if (l.warnings.length) lines.push("", ...l.warnings.map((w) => "⚠ " + w));
   return lines.join("\n");
 }

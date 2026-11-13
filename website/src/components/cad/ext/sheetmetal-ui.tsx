@@ -6,9 +6,9 @@
  */
 import { tr } from "@/cad/i18n";
 import { useEffect } from "react";
-import { cad } from "@/cad/client";
+import { cad, type TopologyResult } from "@/cad/client";
 import { getExt, type ExtParam } from "@/cad/ext/registry";
-import { bendTable, flatLayout, flatToDxf, flatToSvg, type EdgeGeom, type EdgeResolver } from "@/cad/ext/sheetmetal-flat";
+import { bendTable, flatLayout, flatToDxf, flatToSvg, type EdgeGeom, type EdgeResolver, type FaceResolver } from "@/cad/ext/sheetmetal-flat";
 import type { CadDoc, Vec3 } from "@/cad/types";
 import { Num, Seg } from "../props";
 import { registerIcon } from "./icons";
@@ -104,16 +104,38 @@ registerExtUi("sheet.hem", { Form: FlangeForm });
 
 // ---------- akce: rozvin ----------
 
-/** Rozvin v UI: hrany ohybů bere z geometrie uložené formulářem (edgeGeom). */
+/**
+ * Rozvin v UI: hrany ohybů a plochy tvářecích nástrojů bere z geometrie uložené formulářem (edgeGeom, faceGeom). Chybí-li
+ * (prvek zadaný textem nebo JSON), dopočte je jádro z tělesa před prvkem (`cad.topology`) a pak obnoví model celého dílu.
+ */
 async function layoutFromDoc(doc: CadDoc) {
-  const resolve: EdgeResolver = (fi, ei) => {
+  const topo = new Map<number, Promise<TopologyResult | null>>();
+  const topoAt = (fi: number) => {
+    if (!topo.has(fi)) topo.set(fi, cad.topology({ ...doc, features: doc.features.slice(0, fi) }).catch(() => null));
+    return topo.get(fi)!;
+  };
+  const resolve: EdgeResolver = async (fi, ei) => {
     const f = doc.features[fi];
     if (!f || f.type !== "ext") return null;
     const edges = (f.data.edges as number[] | undefined) ?? [];
     const geom = (f.data.edgeGeom as (EdgeGeom | null)[] | undefined) ?? [];
-    return geom[edges.indexOf(ei)] ?? null;
+    const stored = geom[edges.indexOf(ei)];
+    if (stored) return stored;
+    const e = (await topoAt(fi))?.edges[ei];
+    if (!e?.center || !e.dir || !e.length || (e.curve && !/line/i.test(e.curve))) return null;
+    const h = e.length / 2;
+    return { a: [e.center[0] - e.dir[0] * h, e.center[1] - e.dir[1] * h, e.center[2] - e.dir[2] * h], b: [e.center[0] + e.dir[0] * h, e.center[1] + e.dir[1] * h, e.center[2] + e.dir[2] * h] };
   };
-  return flatLayout(doc, resolve);
+  const resolveFace: FaceResolver = async (fi, fx) => {
+    const fc = (await topoAt(fi))?.faces[fx];
+    return fc?.planar && fc.center && fc.normal ? { origin: fc.center, normal: fc.normal } : null;
+  };
+  try {
+    return await flatLayout(doc, resolve, doc.features.length, resolveFace);
+  } finally {
+    // jádro po dopočtu drží těleso zkrácené historie – vrátit model celého dílu (výběr ploch, měření)
+    if (topo.size) await cad.build(doc).catch(() => null);
+  }
 }
 
 const safe = (s: string) => (s || "rozvin").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w.-]+/g, "_").slice(0, 60);
@@ -123,7 +145,9 @@ async function exportFlat(api: ExtActionApi, kind: "dxf" | "svg") {
     const lay = await layoutFromDoc(api.doc);
     if (kind === "dxf") api.download(`${safe(api.doc.name)}_rozvin.dxf`, flatToDxf(lay, api.doc.name), "application/dxf");
     else api.download(`${safe(api.doc.name)}_rozvin.svg`, flatToSvg(lay, api.doc.name), "image/svg+xml");
-    api.flash(lay.warnings.length ? tr("Rozvin uložen ({0} ohybů). Upozornění: {1}", lay.bends.length, lay.warnings[0]) : tr("Rozvin uložen – {0} ohybů, {1} × {2} mm.", lay.bends.length, Math.round((lay.bbox[1][0] - lay.bbox[0][0]) * 10) / 10, Math.round((lay.bbox[1][1] - lay.bbox[0][1]) * 10) / 10));
+    const w = Math.round((lay.bbox[1][0] - lay.bbox[0][0]) * 10) / 10;
+    const h = Math.round((lay.bbox[1][1] - lay.bbox[0][1]) * 10) / 10;
+    api.flash(lay.warnings.length ? tr("Rozvin uložen ({0} ohybů). Upozornění: {1}", lay.bends.length, lay.warnings[0]) : lay.forms.length ? tr("Rozvin uložen – {0} ohybů, {1} tvářených prvků ve vrstvě FORM, {2} × {3} mm.", lay.bends.length, lay.forms.length, w, h) : tr("Rozvin uložen – {0} ohybů, {1} × {2} mm.", lay.bends.length, w, h));
   } catch (e) {
     api.flash((e as Error).message);
   }

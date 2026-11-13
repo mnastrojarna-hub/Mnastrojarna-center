@@ -124,6 +124,10 @@ export function featureIcon(f: Pick<Feature, "type"> & { ext?: string }): string
   if (f.type === "combine") return "layers";
   if (f.type === "splitBodies") return "split";
   if (f.type === "copyBody") return "copy";
+  // druhy 7. vlny (zaoblení se setbackem, eliptické, úkos s dělicí křivkou)
+  const k = f as { kind?: string; partingSketchId?: string };
+  if (f.type === "fillet" && (k.kind === "setback" || k.kind === "conic")) return k.kind === "setback" ? "filletSetback" : "filletConic";
+  if (f.type === "draft" && k.partingSketchId !== undefined) return "draftParting";
   return f.type;
 }
 export function featureTone(f: Pick<Feature, "type"> & { ext?: string }): string | undefined {

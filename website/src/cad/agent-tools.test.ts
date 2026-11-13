@@ -165,7 +165,7 @@ describe("akce rozšíření", () => {
     expect(apiActions().map((a) => a.id)).toEqual(expect.arrayContaining(["sheet.dxf", "sheet.svg", "sheet.table", "weld.cutList", "weld.weldTable", "adv.wallThickness", "sketch.dxf"]));
   });
   it("chyby: neznámá akce, prvek místo akce, „prvek <akce>“ odkazuje na akce", () => {
-    expect(() => resolveAction("blbost")).toThrow(/neznámá akce „blbost“ – akce: sheet.dxf/);
+    expect(() => resolveAction("blbost")).toThrow(/neznámá akce „blbost“ – akce: .*sheet.dxf/); // pořadí akcí určuje registr (první může být analýza ploch)
     expect(() => resolveAction("sheet.bend")).toThrow(/není akce, ale prvek – .*prvek sheet.bend/);
     expect(err("prvek sheet.dxf")).toMatch(/není prvek, ale akce .*akce sheet.dxf/);
     expect(err("prvek \"Tabulka ohybů\"")).toMatch(/akce sheet.table/);

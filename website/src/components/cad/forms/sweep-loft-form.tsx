@@ -125,7 +125,17 @@ function LoftForm({ f, set, b, sketches, mode }: FeatureFormProps<LoftF>) {
       </div>
       <div className="flex flex-wrap gap-4">
         <Check label={tr("Přímkové plochy (bez vyhlazení)")} value={f.ruled} onChange={(v) => set({ ruled: v })} />
-        <Check label={tr("Uzavřené (poslední profil se napojí na první)")} value={!!f.closed} onChange={(v) => set({ closed: v || undefined })} />
+      </div>
+      {/* uzavření: otevřené / uzavřené (šev přes první profil) / uzavřené hladce (periodická plocha C2 i ve švu – loft-smooth.ts) */}
+      <div data-loft-closure>
+        <Seg
+          label={tr("Uzavření")}
+          value={f.closed ? (f.smooth ? "smooth" : "closed") : "open"}
+          options={[{ v: "open", l: tr("Otevřené") }, { v: "closed", l: tr("Uzavřené") }, { v: "smooth", l: tr("Uzavřený hladce") }]}
+          onChange={(v) => set({ closed: v === "open" ? undefined : true, smooth: v === "smooth" ? true : undefined })}
+        />
+        {f.closed && !f.smooth && <p className="mt-1 text-[11px] text-ink-700/55">{tr("Uzavřené (poslední profil se napojí na první)")}</p>}
+        {f.closed && f.smooth && <p className="mt-1 text-[11px] text-ink-700/55">{tr("Plocha je periodická přes všechny profily – bez hrany ve švu (C2). Profily se prokládají hladce: ostré rohy profilů se zaoblí, odchylku ohlásí varování.")}</p>}
       </div>
       <Details summary={tr("Začátek a konec: šablonování do bodu, okrajové podmínky")} open={endsOpen}>
         {condBlock("start")}

@@ -43,8 +43,8 @@ export type SketchEntity = { construction?: boolean } & (
   | { id: string; type: "line"; a: Vec2; b: Vec2 }
   | { id: string; type: "point"; p: Vec2 }
   | { id: string; type: "ellipse"; cx: number; cy: number; rx: number; ry: number; angle: number }
-  /** hladká křivka (interpolační spline přes body) */
-  | { id: string; type: "spline"; points: Vec2[]; closed: boolean }
+  /** hladká křivka (interpolační spline přes body); `tangents[i]` = tečna v bodě i (°, null = volná), `weights[i]` = její velikost (1 = přirozená) – viz spline-tangent.ts */
+  | { id: string; type: "spline"; points: Vec2[]; closed: boolean; tangents?: (number | null)[]; weights?: (number | null)[] }
 );
 
 /** Odkaz na charakteristický bod/část entity skici: „a“, „b“, „c“ (konce/body), „center“, „p3“ (bod lomené čáry), „self“ (celá entita). */
@@ -129,8 +129,12 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       /** řada ISO 273 pro průchozí díru (informativní – průměr se dopočítá v UI) */
       fit?: HoleFit;
     }
-  /** Zaoblení: `kind` konstantní / asymetrické (r2) / proměnné (radii: poloměr podle indexu hrany) / plocha–plocha / plné; `tangentChain` = šířit po tečných hranách. */
-  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound"; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; edgeSigs?: PickSigs; faceSigs?: PickSigs; faceSigs2?: PickSigs; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
+  /**
+   * Zaoblení: `kind` konstantní / asymetrické (r2) / proměnné (radii: poloměr podle indexu hrany) / plocha–plocha / plné /
+   * setback (`setback` = vzdálenost od vrcholu, `setbacks` = jiná pro vrchol) / eliptické – kuželosečkové (D1 = radius, D2 = r2,
+   * `rho`; plocha pro D1 = `faceRefs`); `tangentChain` = šířit po tečných hranách.
+   */
+  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound" | "setback" | "conic"; setbacks?: { at: Ref; d: number }[]; rho?: number; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; edgeSigs?: PickSigs; faceSigs?: PickSigs; faceSigs2?: PickSigs; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
   /** Zkosení: stejné vzdálenosti / dvě vzdálenosti (d2 + referenční plocha) / vzdálenost + úhel / vrchol (3 vzdálenosti). */
   | { type: "chamfer"; distance: number; edges: number[] | "all"; kind?: "equal" | "twoDistances" | "distanceAngle" | "vertex"; d2?: number; d3?: number; angle?: number; faceRef?: Ref; vertices?: number[]; vertexRefs?: Ref[]; tangentChain?: boolean; edgeSigs?: PickSigs; vertexSigs?: PickSigs }
   /** Skořepina: `thicknesses` = jiná tloušťka pro vybrané plochy (index → mm), `outward` = zesílit ven. */
@@ -170,7 +174,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Tažení profilu po křivce (profil = uzavřená skica, dráha = skica s otevřenou/uzavřenou křivkou). */
   | { type: "sweep"; profileId: string; pathId: string; mode: BoolMode; frenet: boolean; guideId?: string; twist?: number; twistTurns?: number; thin?: Thin; circleRadius?: number; keepNormal?: boolean; transition?: "right" | "round" | "transformed"; scaleEnd?: number }
   /** Šablonování mezi 2+ skicami (profily v různých rovinách). */
-  | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode; guideIds?: string[]; centerlineId?: string; closed?: boolean; startCond?: "none" | "normal" | "direction"; endCond?: "none" | "normal" | "direction"; startDir?: Direction; endDir?: Direction; startLen?: number; endLen?: number; thin?: Thin; startPoint?: Ref; endPoint?: Ref }
+  /** `closed` + `smooth` = uzavřené hladce: periodická plocha přes všechny profily (C2 i ve švu) – feat/loft-smooth.ts */
+  | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode; guideIds?: string[]; centerlineId?: string; closed?: boolean; smooth?: boolean; startCond?: "none" | "normal" | "direction"; endCond?: "none" | "normal" | "direction"; startDir?: Direction; endDir?: Direction; startLen?: number; endLen?: number; thin?: Thin; startPoint?: Ref; endPoint?: Ref }
   /** Úkos vybraných ploch vůči neutrální rovině (`planeDef` = libovolná rovina; `pull` = směr tahu; `partingSketchId` = dělicí křivka). */
   | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number; planeDef?: PlaneDef; pull?: Direction; partingSketchId?: string; tangentChain?: boolean; step?: boolean; faceSigs?: PickSigs }
   /** Rozříznutí tělesa rovinou, ponechá se jedna strana (`planeDef` = libovolná rovina, `faceRef` = řez plochou). */
@@ -257,6 +262,8 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
+  /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
+  motion?: MotionStudy;
   /** metadata těles dílu (barva, skrytí) – název = klíč tělesa z historie */
   bodies?: BodyMeta[];
   /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */
@@ -377,7 +384,7 @@ export const uid = () => Math.random().toString(36).slice(2, 9);
  * Uživatelská poznámka/kóta ve výkrese. Souřadnice jsou v souřadnicích promítnutého pohledu (`view` = klíč pohledu,
  * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
  */
-export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string } & (
+export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string; /** revize, ve které se údaj změnil (trojúhelník s písmenem) */ rev?: string; /** kóta s polem tolerance ISO 286: jen značka / + úchylky / + mezní rozměry (jinak podle listu) */ tolShow?: "code" | "dev" | "limits" } & (
   | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean }
   /** průměr / poloměr kružnice nebo oblouku pohledu: střed `c` a poloměr `r` v souřadnicích pohledu, odkaz ve směru `ang` [°] o délce `offset` [mm listu] od kružnice */
   | { type: "dim"; kind: "diameter" | "radius"; c: Vec2; r: number; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
@@ -408,8 +415,26 @@ export type DrawingDoc = {
 
 // ---------------- vazby sestavy ----------------
 
-export type MateType = "mate" | "flush" | "concentric" | "distance" | "angle" | "parallel" | "fixed";
-/** Odkaz na plochu komponenty nejvyšší úrovně; `leaf` = cesta listu („a/b“) u podsestav, `face` = index plochy v dílu (−1 = doplní se automaticky podle `radius`). */
-export type MateRef = { compId: string; leaf?: string; face: number; radius?: number };
-/** Trvalá vazba sestavy – řeší se postupně při každé změně (viz cad/mates.ts). `a` = pohyblivá komponenta, `b` = cíl. */
-export type Mate = { id: string; type: MateType; a: MateRef; b: MateRef; value?: number; flip?: boolean; center?: boolean; suppressed?: boolean; name?: string };
+export type MateType = "mate" | "flush" | "concentric" | "distance" | "angle" | "parallel" | "fixed"
+  // pokročilé a mechanické vazby (cad/mates-kin.ts) – řeší je i globální řešič stupňů volnosti
+  | "perpendicular" | "tangent" | "coincident" | "symmetric" | "width" | "path" | "slot" | "hinge" | "lock" | "limitDistance" | "limitAngle"
+  | "gear" | "rack" | "screw" | "cam" | "universal";
+/**
+ * Odkaz na plochu komponenty nejvyšší úrovně; `leaf` = cesta listu („a/b“) u podsestav, `face` = index plochy v dílu (−1 = doplní se automaticky podle `radius`).
+ * `ent` = druh entity: bez hodnoty plocha, „edge“ = hrana (index hrany), „vertex“ = vrchol (index vrcholu).
+ */
+export type MateRef = { compId: string; leaf?: string; face: number; radius?: number; ent?: "edge" | "vertex" };
+/**
+ * Trvalá vazba sestavy – řeší se postupně při každé změně (viz cad/mates.ts). `a` = pohyblivá komponenta, `b` = cíl.
+ * `c`, `d` = další odkazy (Symetricky: rovina souměrnosti; Šířka: druhá plocha jazýčku / drážky; Drážka: druhý konec; Závěs: dosedací roviny).
+ * `value` = hodnota (Vzdálenost mm, Úhel °, Ozubení převodový poměr, Šroub stoupání mm, Hřeben dráha na otáčku mm, Drážka poloha mm);
+ * `min` / `max` = meze; `phase` = výchozí stav stupňů volnosti zachycený při prvním řešení (úhly °, posuvy mm); `rel` = poloha A vůči B (Zámek).
+ */
+export type Mate = {
+  id: string; type: MateType; a: MateRef; b: MateRef; value?: number; flip?: boolean; center?: boolean; suppressed?: boolean; name?: string;
+  c?: MateRef; d?: MateRef; min?: number; max?: number; phase?: number[]; rel?: Placement;
+};
+/** Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost). */
+export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost místo rozsahu: ot/min (rotační) / mm/s (lineární) */ speed?: number };
+/** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean };

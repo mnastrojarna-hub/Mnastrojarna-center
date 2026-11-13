@@ -313,10 +313,42 @@ function ShellForm({ f, doc, set, b, pickHint }: FeatureFormProps<ShellF>) {
 
 // ---------------- úkos ----------------
 
-function DraftForm({ f, doc, set, b, pickHint }: FeatureFormProps<DraftF>) {
+function DraftForm(p: FeatureFormProps<DraftF>) {
+  const { f, set, b } = p;
+  const parting = f.partingSketchId !== undefined;
   return (
     <>
       <Num label={tr("Úhel úkosu")} value={f.angle} suffix="°" step={0.5} bind={b("angle")} onChange={(v) => set({ angle: Math.max(-44, Math.min(44, v)) })} />
+      <Seg
+        label={tr("Neutrální prvek")}
+        value={parting ? "parting" : "plane"}
+        options={[{ v: "plane", l: tr("Neutrální rovina") }, { v: "parting", l: tr("Dělicí křivka") }]}
+        onChange={(v) => set(v === "parting" ? { partingSketchId: p.sketches[p.sketches.length - 1]?.id ?? "", pull: f.pull ?? { kind: "axis", axis: AXIS_PLANES.find((x) => x.v === f.plane)?.axis ?? "Z" } } : { partingSketchId: undefined, step: undefined })}
+      />
+      {parting ? <PartingDraftFields {...p} /> : <PlaneDraftFields {...p} />}
+    </>
+  );
+}
+
+/** Úkos s dělicí křivkou: skica, stupňovitý, směr tahu (stavba: src/cad/feat/draft-parting.ts). */
+function PartingDraftFields({ f, doc, set, pickHint, sketches }: FeatureFormProps<DraftF>) {
+  return (
+    <>
+      <SketchPick label={tr("Dělicí křivka (skica)")} value={f.partingSketchId ?? ""} sketches={sketches} onChange={(partingSketchId) => set({ partingSketchId })} />
+      <Check label={tr("Stupňovitý úkos (každý úsek od vlastní roviny, spojené stupni)")} value={!!f.step} onChange={(step) => set({ step: step || undefined })} />
+      <DirectionField label={tr("Směr tahu (otevírání formy)")} value={f.pull ?? { kind: "axis", axis: "Z" }} onChange={(pull) => set({ pull })} allowNormal={false} />
+      <Check label={tr("Rozšířit na tečně navazující plochy")} value={!!f.tangentChain} onChange={(tangentChain) => set({ tangentChain })} />
+      <PickInfo n={f.faces.length} what={tr("ploch ke zkosení")} hint={pickHint} onClear={() => set({ faces: [] })} list={{ doc, f, kind: "faces", value: f.faces, onChange: (faces) => set({ faces }) }} />
+      <Info>
+        {tr("Plochy se rozdělí dělicí křivkou; části nad ní se zkosí ve směru tahu, části pod ní proti němu – dělicí čára zůstane na místě a díl je v ní nejširší. Skica kolmá na tah = rovinná dělicí křivka (dělicí rovina pro obě strany, přesně). Skica rovnoběžná s tahem (např. v nárysu) = profil dělicí čáry promítnutý podél normály skici: přímé úseky přesně, oblouky a spline po rovinných úsecích (přibližně), svislé skoky = stupně. Stupňovitý úkos zkosí každý úsek od vlastní roviny kolmé na tah a sousední úseky spojí stupňovými plochami.")}
+      </Info>
+    </>
+  );
+}
+
+function PlaneDraftFields({ f, doc, set, b, pickHint }: FeatureFormProps<DraftF>) {
+  return (
+    <>
       <PlaneDefField label={tr("Neutrální rovina")} value={f.planeDef} allowNone noneLabel={f.pull ? tr("Kolmo na směr tahu středem tělesa") : tr("Základní rovina (níže)")} onChange={(planeDef) => set({ planeDef })} />
       {f.pull ? (
         <div className="space-y-1">
@@ -339,7 +371,7 @@ function DraftForm({ f, doc, set, b, pickHint }: FeatureFormProps<DraftF>) {
       <Check label={tr("Rozšířit na tečně navazující plochy")} value={!!f.tangentChain} onChange={(tangentChain) => set({ tangentChain })} />
       <PickInfo n={f.faces.length} what={tr("ploch ke zkosení")} hint={pickHint} onClear={() => set({ faces: [] })} list={{ doc, f, kind: "faces", value: f.faces, onChange: (faces) => set({ faces }) }} />
       <Info>
-        {tr("Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Dělicí křivka a stupňovitý úkos zatím nejsou k dispozici.")}
+        {tr("Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Úkos na obě strany od dělicí čáry a stupňovitý úkos: přepněte Neutrální prvek na Dělicí křivka.")}
       </Info>
     </>
   );

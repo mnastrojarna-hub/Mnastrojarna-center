@@ -20,6 +20,7 @@ import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { ShareCta } from "./share-cta";
+import { AnnFitRev, FitsSection, useViewTools, ViewToolsOverlay, ViewToolsSection } from "./drawing-views-panel";
 
 type Props = {
   doc: CadDoc;
@@ -447,6 +448,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   // ---------- náhled: zoom & posun ----------
   const canvas = useRef<HTMLDivElement>(null);
   const [view, setViewTf] = useState({ x: 0, y: 0, z: 2 });
+  // pomocné pohledy, řezy lomenou čarou, částečné řezy a přerušení (nástroje na listu – drawing-views-panel.tsx)
+  const vt = useViewTools({ res, opts, set, flash, zoom: view.z, onStart: () => (setAnnTool(null), setAnnPts([])) });
+  useEffect(() => {
+    if (annTool) vt.setTool(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [annTool]);
   const fitted = useRef<string | null>(null);
   const fit = useCallback(() => {
     const el = canvas.current;
@@ -498,6 +505,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       if (e.key === "Escape") setPrompt(null);
       return; // při otevřeném formuláři poznámky nepřepínat nástroje
     }
+    if (vt.tool && (e.key === "Escape" ? vt.cancel() : e.key === "Enter" && vt.finish())) return;
     if (e.key === "Escape") {
       if (dimBox) {
         // pole kóty zavřít, kóta zůstane s výchozími hodnotami
@@ -978,6 +986,15 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                         />
                       </>
                     )}
+                    <AnnFitRev
+                      a={a}
+                      res={res}
+                      revisions={meta.revisions ?? []}
+                      onChange={(next) => {
+                        setAnn((l) => l.map((x) => (x.id === a.id ? next : x)));
+                        markDirty();
+                      }}
+                    />
                     <button
                       type="button"
                       title={tr("Smazat")}
@@ -1086,6 +1103,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               </>
             )}
           </Section>
+
+          <ViewToolsSection vt={vt} opts={opts} set={set} />
 
           <Section title={tr("Zobrazení a kóty")}>
             <Check checked={opts.hidden} onChange={(v) => set("hidden", v)}>
@@ -1217,6 +1236,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               {tr("+ Přidat revizi")}
             </button>
           </Section>
+          <FitsSection opts={opts} set={set} meta={meta} setMeta={setM} />
           <p className="px-4 pb-5 text-[11px] leading-relaxed text-ink-700/45">
             {tr("DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).")}
           </p>
@@ -1229,8 +1249,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           data-views={viewsAttr}
           data-sheet-format={res ? `${res.sheet.name} ${res.scale}` : undefined}
           data-stacks={res?.stacks ? JSON.stringify(res.stacks) : undefined}
-          className={cn("relative min-w-0 flex-1 touch-none overflow-hidden", annTool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}
+          className={cn("relative min-w-0 flex-1 touch-none overflow-hidden", annTool || vt.tool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}
           onPointerDown={(e) => {
+            if (vt.tool && e.button === 0) {
+              e.preventDefault();
+              const q = toSheet(e);
+              if (q) vt.click(q);
+              return;
+            }
             if (annTool && e.button === 0) {
               e.preventDefault(); // nebrat fokus formuláři poznámky, který se při kliku otevře
               void onCanvasClick(e);
@@ -1242,6 +1268,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           onPointerMove={(e) => {
             const d = drag.current;
             if (d) setViewTf((v) => ({ ...v, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y }));
+            if (vt.tool) vt.move(toSheet(e));
             if (annTool === "dim") {
               const q = toSheet(e);
               const r = canvas.current?.getBoundingClientRect();
@@ -1256,7 +1283,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             setCursor(null);
           }}
           onPointerUp={() => (drag.current = null)}
-          onDoubleClick={annTool ? undefined : fit}
+          onDoubleClick={annTool || vt.tool ? undefined : fit}
         >
           <div className="absolute inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(circle,#fff 1px,transparent 1px)", backgroundSize: "22px 22px" }} />
           {res && (
@@ -1276,6 +1303,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               {annPts.length > 0 && hover && <polyline points={[...annPts, hover].map((p) => p.join(",")).join(" ")} fill="none" stroke="#E03930" strokeWidth={0.35 / Math.max(0.3, view.z / 3)} strokeDasharray="1.2 0.8" />}
             </svg>
           )}
+          {res && <ViewToolsOverlay vt={vt} res={res} tf={view} />}
           {res && lostGeom && (
             <svg data-dim-lost className="pointer-events-none absolute left-0 top-0 overflow-visible" width={res.sheet.w * view.z} height={res.sheet.h * view.z} style={{ transform: `translate(${view.x}px,${view.y}px)` }} viewBox={`0 0 ${res.sheet.w} ${res.sheet.h}`} fontFamily="Roboto, Arial, Helvetica, sans-serif">
               <GeomOverlay g={lostGeom} color="#d97706" width={Math.max(0.35, 1.5 / view.z)} />

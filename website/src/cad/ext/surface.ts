@@ -950,4 +950,5 @@ registerExt({
   },
 });
 
-export {};
+/** pomocné funkce pro plochy třídy A (surface-a.ts) */
+export { asBody, freeFaces, replaceFree, sew, withSurface };

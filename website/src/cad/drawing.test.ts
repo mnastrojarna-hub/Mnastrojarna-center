@@ -334,7 +334,7 @@ describe("kóty podle vybrané geometrie (kružnice Ø / R, hrana, úhel)", asyn
     expect(dimFromPicks(D, [arc], [30, 30], { ...modes, invert: true })).toMatchObject({ kind: "diameter" });
 
     const g = annotationGeometry(D, [withId({ ...dia, suffix: "H7" })]);
-    expect(g.texts.map((t) => t.s)).toEqual(["Ø12H7"]);
+    expect(g.texts.map((t) => t.s)).toEqual(["Ø12H7", "(+0,018/0)"]); // pole tolerance ISO 286 s úchylkami
     expect(g.polys.filter((p) => p.fill)).toHaveLength(1); // šipka na kružnici
     const leader = g.polys.find((p) => !p.fill)!;
     expect(Math.hypot(leader.pts[0][0] - 55, leader.pts[0][1] - 55)).toBeCloseTo(3, 6); // začíná na kružnici (r = 6 · 0,5)

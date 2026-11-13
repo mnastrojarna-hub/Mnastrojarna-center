@@ -16,7 +16,7 @@
  * - rozmístění: cad/drawing-dims-layout.ts (řady mimo obrys, texty bez překryvů; co se nevejde, se vynechá a nahlásí).
  */
 import type * as r from "replicad";
-import { camOf, makeDrawing, proj, type Cam, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt, type ViewKey, type ViewRotation } from "./drawing";
+import { camOf, makeDrawing, proj, viewExtent, type Cam, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt, type ViewKey, type ViewRotation } from "./drawing";
 import { DimLayout, type CallReq, type LinReq, type Side } from "./drawing-dims-layout";
 import { partGeom, type GAxis, type GCone, type GCyl, type PartGeom } from "./drawing-dims-geom";
 import { threadByName } from "./defaults";
@@ -35,6 +35,8 @@ export type SmartReport = {
   expected: number;
   /** kolik kót se nevešlo (málo místa kolem pohledů) */
   noRoom: number;
+  /** klíče kót a popisů, které se tentokrát nevešly – upravené (tolerance, revize) se při sloučení ponechají */
+  dropped?: string[];
 };
 export type SmartDims = { /** otisk modelu a rozvržení – shoda = není co přegenerovat */ gen: string; annotations: DrawingAnnotation[]; report: SmartReport };
 /** `rotation` = otočení hlavního pohledu (rady „zapněte pohled …“ podle otočených kamer) */
@@ -213,6 +215,7 @@ type Ctx = {
   /** odložené popisy děr a prvků: umístí se až po délkových kótách (pevné řady mají přednost, popis si najde jiný směr) */
   calls: { req: CallReq; what: string }[];
   noRoom: number;
+  dropped: string[];
   rot: ViewRotation;
   /** rotační díl: osa a čela (poloha příčných děr podél osy se kótuje od čela, ne od počátku modelu) */
   turn: { ax: GAxis; tMin: number; tMax: number; rMin: number; rMax: number } | null;
@@ -265,6 +268,7 @@ function lin(c: Ctx, v: PV, req: Omit<LinReq, "view">, what: string, alt?: Parti
   if (!quiet) {
     c.skipped.push(tr("{0}: nevešlo se čistě na list ({1})", what, tr(VIEW_NAME[v.key] ?? v.key)));
     c.noRoom++;
+    c.dropped.push(req.key);
   }
   return null;
 }
@@ -298,6 +302,7 @@ function call(c: Ctx, req: CallReq, what: string, quiet = false): boolean {
   if (quiet) return false;
   c.skipped.push(tr("{0}: popis se nevešel čistě na list ({1})", what, tr(VIEW_NAME[req.view] ?? req.view)));
   c.noRoom++;
+  c.dropped.push(req.key);
   return false;
 }
 const VIEW_NAME: Record<string, string> = { front: "přední", top: "horní", left: "levý", right: "pravý", back: "zadní", bottom: "spodní", section: "řez" };
@@ -338,9 +343,10 @@ export function turnedAxis(g: PartGeom): { ax: GAxis; R: number } | null {
 /** Celkový plán – vrátí požadavky už umístěné v rozvržení (`out.pads` = kolik místa kóty zabraly vedle pohledů). */
 export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "views" | "sheet" | "texts" | "polys" | "scaleValue">, opts: SmartOptions = {}, out?: { pads?: DrawingOptions["dimPads"] }): SmartDims {
   // jen pohledy hlavního dílu – pohledy dalších modelů na listu (`m:<id>`) zůstanou v rozvržení jako překážky
-  const views = d.views.filter((v): v is PV => !!v.cam && !v.key.startsWith("m:")).sort(byOrder);
+  // pomocné pohledy a řezy lomenou čarou (`aux:` / `cut:`) se kótují ručně
+  const views = d.views.filter((v): v is PV => !!v.cam && !v.key.startsWith("m:") && !/^(aux|cut):/.test(v.key)).sort(byOrder);
   const size = Math.max(1e-6, ...g.bbox[1].map((v, i) => v - g.bbox[0][i]));
-  const c: Ctx = { doc, g, views, lay: new DimLayout(d), style: opts.style ?? "chain", skipped: [], seen: new Set(), size, queue: [], calls: [], noRoom: 0, rot: opts.rotation ?? 0, turn: null };
+  const c: Ctx = { doc, g, views, lay: new DimLayout(d), style: opts.style ?? "chain", skipped: [], seen: new Set(), size, queue: [], calls: [], noRoom: 0, dropped: [], rot: opts.rotation ?? 0, turn: null };
   const turned = turnedAxis(g);
   const holeAxes: GAxis[] = [];
   if (turned) turnedDims(c, turned.ax, turned.R);
@@ -356,7 +362,7 @@ export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "
   const annotations = c.lay.placed.map((p) => ({ ...p.ann, id: uid() }) as DrawingAnnotation);
   const perView: Record<string, number> = {};
   for (const a of annotations) if (a.type !== "centerline") perView[a.view] = (perView[a.view] ?? 0) + 1;
-  return { gen: smartGenKey(doc, d.views, opts), annotations, report: { kind: turned ? "turned" : "prismatic", perView, skipped: c.skipped, expected: expectedDims(doc, g.bbox).length, noRoom: c.noRoom } };
+  return { gen: smartGenKey(doc, d.views, opts), annotations, report: { kind: turned ? "turned" : "prismatic", perView, skipped: c.skipped, expected: expectedDims(doc, g.bbox).length, noRoom: c.noRoom, dropped: c.dropped } };
 }
 
 /**
@@ -516,6 +522,7 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
     if (!fv || !call(c, { key: req.key, view: fv.key, tip: P(fv, ax.p), lines, ring: { c: P(fv, ax.p), r: s.r } }, lines[0], true)) {
       c.skipped.push(tr("{0}: nevešlo se čistě na list ({1})", what, tr(VIEW_NAME[sv.key] ?? sv.key)));
       c.noRoom++;
+      c.dropped.push(req.key);
     }
   }
   // zápichy a průměry mezi většími osazeními: popis s odkazem na dno
@@ -833,10 +840,8 @@ type Axial = { axis: 0 | 1; faces: { at: number; r: number }[] };
  */
 function positionDims(c: Ctx, v: PV, pts: Vec2[], center: Vec2 | null, axial: Axial | null = null) {
   if (!pts.length) return;
-  const vx0 = v.x0;
-  const vx1 = v.x0 + v.w;
-  const vy0 = v.y0;
-  const vy1 = v.y0 + v.h;
+  // skutečný rozsah (přerušený pohled je na listu kratší, souřadnice kót zůstávají skutečné)
+  const { x0: vx0, x1: vx1, y0: vy0, y1: vy1 } = viewExtent(v);
   for (const axis of [0, 1] as const) {
     const dir: "h" | "v" = axis === 0 ? "h" : "v";
     const lo = axis === 0 ? vx0 : vy1; // základní hrana: levá / spodní (y dolů → největší y)
@@ -955,10 +960,7 @@ function prismaticDims(c: Ctx) {
       const isV = Math.abs(Math.abs(dot(upOf(v.cam), A)) - 1) < 1e-6;
       if (!isH && !isV) continue;
       const dir: "h" | "v" = isH ? "h" : "v";
-      const x0 = v.x0;
-      const x1 = v.x0 + v.w;
-      const y0 = v.y0;
-      const y1 = v.y0 + v.h;
+      const { x0, x1, y0, y1 } = viewExtent(v);
       const sides: Side[] = dir === "h" ? ["bottom", "top"] : ["left", "right"];
       const alt: Partial<Record<Side, { a: Vec2; b: Vec2 }>> =
         dir === "h" ? { bottom: { a: [x0, y1], b: [x1, y1] }, top: { a: [x0, y0], b: [x1, y0] } } : { left: { a: [x0, y1], b: [x0, y0] }, right: { a: [x1, y1], b: [x1, y0] } };

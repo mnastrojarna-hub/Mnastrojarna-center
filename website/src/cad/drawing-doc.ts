@@ -5,6 +5,7 @@
  * Přesná projekce (HLR) šroubovicových ploch v jádře trvá minuty – to byl důvod „zaseknutého“ výkresu i exportu PDF.
  */
 import { threadByName } from "./defaults";
+import { tr } from "./i18n";
 import type { CadDoc, Feature } from "./types";
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
@@ -50,4 +51,11 @@ export function threadsOfDoc(doc: CadDoc): { r: number; label: string }[] {
   }
   // katalogové označení (prvek Závit, závitová díra) má přednost před označením odvozeným z geometrie šroubovice
   return out.sort((a, b) => Number(!!a.derived) - Number(!!b.derived)).map(({ r, label }) => ({ r, label }));
+}
+
+/** Poznámky výkresu k plechu: křížový zlom (úhlopříčky panelu se na výkrese kreslí jako hrany modelu, popis do poznámky). */
+export function formNotesOfDoc(doc: CadDoc): string[] {
+  return doc.features
+    .filter((f): f is Extract<Feature, { type: "ext" }> => f.type === "ext" && f.ext === "sheet.crossbreak" && !f.suppressed)
+    .map((f) => tr("KŘÍŽOVÝ ZLOM {0}° {1} ({2})", fmt(typeof f.data?.angle === "number" ? f.data.angle : 1.5), f.data?.direction === "down" ? tr("dolů") : tr("nahoru"), f.name));
 }

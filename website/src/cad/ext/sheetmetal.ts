@@ -515,7 +515,13 @@ registerExt({
       if (!e || e.geomType !== "LINE") return null;
       return { a: vt(e.startPoint), b: vt(e.endPoint) };
     };
-    const lay = await flatLayout(ctx.doc, resolve, ctx.index);
+    const resolveFace = async (fi: number, fx: number) => {
+      if (!cache.has(fi)) cache.set(fi, (await buildShape(ctx.doc, fi - 1)).body);
+      const f = cache.get(fi)?.faces[fx];
+      if (!f || f.geomType !== "PLANE") return null;
+      return { origin: vt(f.center), normal: norm(vt(f.normalAt(f.center))) };
+    };
+    const lay = await flatLayout(ctx.doc, resolve, ctx.index, resolveFace);
     const toPen = (segs: typeof lay.outer) => {
       let pen = r.draw(segs[0].a);
       for (const s of segs) pen = s.kind === "line" ? pen.lineTo(s.b) : pen.threePointsArcTo(s.b, s.m);

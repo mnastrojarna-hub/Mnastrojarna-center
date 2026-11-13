@@ -1,0 +1,152 @@
+# 7. vlna – plech: tvářecí nástroje (žaluzie, prolis, žebro, výstřih, můstek, lem díry, vodítko) a křížový zlom
+ (automaticky)	 (automatisch)
+ a přidá bod umístění	 und fügt einen Platzierungspunkt hinzu
+, ostrý	, scharfkantig
+[[x, y], …] v rovině plochy nebo [[x, y, z], …]; klik na plochu přidá bod	[[x, y], …] in der Flächenebene oder [[x, y, z], …]; Klick auf die Fläche fügt einen Punkt hinzu
+{0} neleží celý na rovné ploše plechu (přesahuje okraj, otvor, ohyb nebo jiný nástroj) – posuňte bod nebo zmenšete nástroj.	{0} liegt nicht vollständig auf einer ebenen Blechfläche (überragt Rand, Loch, Biegung oder ein anderes Werkzeug) – Punkt verschieben oder Werkzeug verkleinern.
+{0} v bodě {1}	{0} an Punkt {1}
+{0}: bez skici dráhy – v rozvinu vynechán.	{0}: keine Pfadskizze – in der Abwicklung ausgelassen.
+{0}: bod [{1}] neleží na rovné ploše plechu – v rozvinu vynechán.	{0}: Punkt [{1}] liegt nicht auf einer ebenen Blechfläche – in der Abwicklung ausgelassen.
+{0}: dráha žebra neleží na rovné ploše plechu – v rozvinu vynechána.	{0}: der Sickenpfad liegt nicht auf einer ebenen Blechfläche – in der Abwicklung ausgelassen.
+{0}: dráhu zvolte ve formuláři (skica s úsečkami / oblouky), klik na plochu plechu vybere plochu · Enter = OK, Esc = Storno	{0}: Pfad im Formular wählen (Skizze mit Linien / Bögen), Klick auf eine Blechfläche wählt die Fläche · Enter = OK, Esc = Abbrechen
+{0}: klikněte na rovinnou plochu plechu – každý klik přidá bod umístění (bodů {1}) · body lze zadat i číselně ve formuláři · Enter = OK, Esc = Storno	{0}: auf eine ebene Blechfläche klicken – jeder Klick fügt einen Platzierungspunkt hinzu ({1} Punkte) · Punkte auch numerisch im Formular · Enter = OK, Esc = Abbrechen
+{0}: KŘÍŽOVÝ ZLOM {1}, {2} ({3})	{0}: KREUZBRUCH {1}, {2} ({3})
+{0}: nástroje v bodech {1} a {2} se překrývají – zvětšete rozteč.	{0}: die Werkzeuge an den Punkten {1} und {2} überlappen sich – Abstand vergrößern.
+{0}: panel křížového zlomu se v rozvinu nenašel – vynechán.	{0}: das Kreuzbruch-Feld wurde in der Abwicklung nicht gefunden – ausgelassen.
+{0}: pod plochou není plech tloušťky {1} mm (je tam silnější materiál) – nástroj se umisťuje na plech.	{0}: unter der Fläche ist kein Blech der Dicke {1} mm (dickeres Material) – das Werkzeug wird auf Blech platziert.
+{0}: polohu plochy se nepodařilo určit – v rozvinu vynechán (otevřete prvek ve formuláři, uloží polohu plochy).	{0}: die Lage der Fläche konnte nicht bestimmt werden – in der Abwicklung ausgelassen (Element im Formular öffnen, es speichert die Flächenlage).
+{0}: rozměry nástroje jsou pro tloušťku plechu {1} mm příliš malé (zaoblení se nevejdou ani s ostrými rohy).	{0}: die Werkzeugmaße sind für {1} mm Blech zu klein (die Radien passen auch mit scharfen Ecken nicht).
+{0}: vnitřní poloměr {1} mm se do nástroje nevejde – největší možný je {2} mm (nebo zadejte 0 = automaticky).	{0}: der Innenradius {1} mm passt nicht in das Werkzeug – größtmöglich sind {2} mm (oder 0 = automatisch).
+{0}: zadejte bod umístění (klik na plochu plechu nebo souřadnice).	{0}: Platzierungspunkt angeben (Klick auf eine Blechfläche oder Koordinaten).
+0 = automaticky (poloměr plechu, zmenšený, aby se vešel)	0 = automatisch (Blechradius, verkleinert, damit er passt)
+Bod umístění musí mít dvě nebo tři čísla (x, y [, z]).	Ein Platzierungspunkt braucht zwei oder drei Zahlen (x, y [, z]).
+Body umístění	Platzierungspunkte
+Body umístění ({0})	Platzierungspunkte ({0})
+Body umístění zadejte jako [[x, y], [x, y]] nebo [[x, y, z], …].	Platzierungspunkte als [[x, y], [x, y]] oder [[x, y, z], …] angeben.
+čísla ploch začínají 1 (F1)	Flächennummern beginnen bei 1 (F1)
+DOLŮ	UNTEN
+Dolů (do plochy)	Unten (in die Fläche)
+Dolů (prohnout)	Unten (einwölben)
+dráha {0}	Pfad {0}
+horní plocha základu	Oberseite des Grundblechs
+jazýček prostřižený ze tří stran a vytlačený s náběhem	an drei Seiten freigeschnittene, mit Rampe ausgestellte Lasche
+Klik na plochu plechu v modelu přidá bod. Dvě čísla = souřadnice v rovině plochy (u vodorovné plochy x, y), tři = bod v prostoru (promítne se na plochu).	Klick auf eine Blechfläche im Modell fügt einen Punkt hinzu. Zwei Zahlen = Koordinaten in der Flächenebene (bei waagerechter Fläche x, y), drei = Raumpunkt (wird auf die Fläche projiziert).
+Klik na rovinnou plochu plechu ji vybere{0}; bez výběru = horní plocha základního plechu.	Klick auf eine ebene Blechfläche wählt sie aus{0}; ohne Auswahl = Oberseite des Grundblechs.
+Klik na rovný panel plechu (plocha s rovnými hranami); bez výběru = horní plocha základního plechu.	Auf ein ebenes Blechfeld klicken (Fläche mit geraden Kanten); ohne Auswahl = Oberseite des Grundblechs.
+kolem normály plochy od osy X (u ploch kolmých na X od osy Y)	um die Flächennormale ab der X-Achse (bei Flächen senkrecht zu X ab der Y-Achse)
+kruhový prolis (důlek) – průměr, hloubka, úhel stěny	runder Napf – Durchmesser, Tiefe, Wandwinkel
+křížový zlom	Kreuzbruch
+Křížový zlom	Kreuzbruch
+KŘÍŽOVÝ ZLOM {0} {1}	KREUZBRUCH {0} {1}
+křížový zlom {0}° {1} · {2}	Kreuzbruch {0}° {1} · {2}
+KŘÍŽOVÝ ZLOM {0}° {1} ({2})	KREUZBRUCH {0}° {1} ({2})
+Křížový zlom: klikněte na rovný panel plechu (bez výběru = horní plocha základního plechu) · Enter = OK, Esc = Storno	Kreuzbruch: auf ein ebenes Blechfeld klicken (ohne Auswahl = Oberseite des Grundblechs) · Enter = OK, Esc = Abbrechen
+Křížový zlom: panel musí mít rovné hrany (mnohoúhelník) – plocha má zaoblený nebo zakřivený obrys.	Kreuzbruch: das Feld braucht gerade Kanten (Vieleck) – die Fläche hat eine verrundete oder gekrümmte Kontur.
+Křížový zlom: plocha nemá platný obrys.	Kreuzbruch: die Fläche hat keine gültige Kontur.
+Křížový zlom: protilehlá strana panelu nemá stejný obrys (panel není rovný plech tloušťky {0} mm).	Kreuzbruch: die Gegenseite des Feldes hat eine andere Kontur (das Feld ist kein ebenes Blech der Dicke {0} mm).
+Křížový zlom: úhel musí být 0–10° (obvykle 1–2°).	Kreuzbruch: der Winkel muss 0–10° betragen (meist 1–2°).
+Lem díry (límec)	Durchzug (Kragen)
+lem díry Ø{0} mm, výška límce {1} mm	Durchzug Ø{0} mm, Kragenhöhe {1} mm
+Lem díry: průměr díry a výška límce musí být kladné.	Durchzug: Lochdurchmesser und Kragenhöhe müssen positiv sein.
+Mezera pro desku	Spalt für die Platine
+Můstek	Brücke
+můstek {0} × {1} mm, výška {2} mm, náběh {3}°	Brücke {0} × {1} mm, Höhe {2} mm, Rampe {3}°
+Můstek: délka {0} mm je pro výšku {1} mm a úhel {2}° krátká (rovná část vychází záporná).	Brücke: die Länge {0} mm ist für Höhe {1} mm und Winkel {2}° zu kurz (der gerade Teil wäre negativ).
+Můstek: délka, šířka a výška musí být kladné.	Brücke: Länge, Breite und Höhe müssen positiv sein.
+můstek: pás prostřižený po stranách a vytlačený s náběhy na obou koncích	Brücke: seitlich freigeschnittener Streifen, an beiden Enden mit Rampen ausgestellt
+Na plechu chybí horní rovinná plocha – vyberte plochu, na kterou se má nástroj umístit.	Das Blech hat keine ebene Oberseite – Fläche wählen, auf die das Werkzeug kommt.
+NAHORU	OBEN
+Nahoru (od plochy)	Oben (von der Fläche weg)
+Nahoru (vyklenout)	Oben (auswölben)
+natočení {0}°	Drehung {0}°
+od ohybu po otevřený konec (ve směru natočení)	von der Biegung zum offenen Ende (in Drehrichtung)
+od plochy plechu	ab der Blechfläche
+od roviny plechu; 90° = svislá stěna	zur Blechebene; 90° = senkrechte Wand
+Otevřená strana	Offene Seite
+Panel	Feld
+Panel (rovinná plocha)	Feld (ebene Fläche)
+panel se po úhlopříčkách mírně vyklene (skutečný zlom); ve výkrese hrany + poznámka KŘÍŽOVÝ ZLOM, v rozvinu tenké čáry ve vrstvě FORM	das Feld wölbt sich entlang der Diagonalen leicht aus (echter Bruch); in der Zeichnung Kanten + Hinweis KREUZBRUCH, in der Abwicklung dünne Linien im Layer FORM
+Panel se po úhlopříčkách vyklene o kratší polovinu × tan(úhel). Ve výkrese jsou úhlopříčky hranami modelu s poznámkou KŘÍŽOVÝ ZLOM, v rozvinu tenké čáry ve vrstvě FORM.	Das Feld wölbt sich entlang der Diagonalen um die kürzere Hälfte × tan(Winkel) aus. In der Zeichnung sind die Diagonalen Modellkanten mit dem Hinweis KREUZBRUCH, in der Abwicklung dünne Linien im Layer FORM.
+plech křížový zlom [F3] [úhel 1,5] [nahoru|dolů]	blech kreuzbruch [F3] [winkel 1,5] [oben|unten]
+plech lem díry PRŮMĚR VÝŠKA v x y [dolů] [plocha F3]	blech durchzug DURCHMESSER HÖHE bei x y [unten] [fläche F3]
+plech můstek DÉLKA ŠÍŘKA VÝŠKA [úhel 45] v x y [natočení 0] [dolů]	blech brücke LÄNGE BREITE HÖHE [winkel 45] bei x y [drehung 0] [unten]
+plech prolis PRŮMĚR HLOUBKA [úhel 60] v x y [ostrý] [dolů] [plocha F3]	blech napf DURCHMESSER TIEFE [winkel 60] bei x y [scharf] [unten] [fläche F3]
+Plech t = {0} mm · vnitřní poloměr R = {1} mm{2} · {3}	Blech t = {0} mm · Innenradius R = {1} mm{2} · {3}
+plech vodítko DÉLKA ŠÍŘKA mezera S v x y [natočení 90]	blech kartenführung LÄNGE BREITE spalt S bei x y [drehung 90]
+plech výstřih DÉLKA ŠÍŘKA VÝŠKA [úhel 45] v x y [natočení 0] [dolů]	blech lasche LÄNGE BREITE HÖHE [winkel 45] bei x y [drehung 0] [unten]
+plech žaluzie DÉLKA ŠÍŘKA VÝŠKA v x y [v x y …] [natočení 90] [vlevo|vpravo] [dolů] [plocha F3]	blech kieme LÄNGE BREITE HÖHE bei x y [bei x y …] [drehung 90] [links|rechts] [unten] [fläche F3]
+plech žebro ŠÍŘKA VÝŠKA [úhel 60] skica "Dráha" [dolů] [plocha F3]	blech sicke BREITE HÖHE [winkel 60] skizze "Pfad" [unten] [fläche F3]
+plech: {0} nemá body umístění – {1}	blech: {0} hat keine Platzierungspunkte – {1}
+plech: bod má dvě nebo tři souřadnice (v x y nebo v x y z) – „{0}“	blech: ein Punkt hat zwei oder drei Koordinaten (bei x y oder bei x y z) – „{0}“
+plech: modul tvářecích nástrojů není načten	blech: das Umformwerkzeug-Modul ist nicht geladen
+plech: neznámé slovo „{0}“ – {1}	blech: unbekanntes Wort „{0}“ – {1}
+plech: neznámý nástroj „{0}“ – plech žaluzie | prolis | žebro | výstřih | můstek | lem díry | vodítko | křížový zlom (EN louvre | dimple | bead | lance | bridge | collar | card guide | cross break)	blech: unbekanntes Werkzeug „{0}“ – blech kieme | napf | sicke | lasche | brücke | durchzug | kartenführung | kreuzbruch (EN louvre | dimple | bead | lance | bridge | collar | card guide | cross break)
+plech: příliš mnoho čísel – {0}	blech: zu viele Zahlen – {0}
+plech: text „{0}“ nečekán – název skici patří za slovo skica, název prvku za název	blech: unerwarteter Text „{0}“ – ein Skizzenname gehört hinter skizze, ein Elementname hinter name
+plech: za „{0}“ chybí číslo	blech: nach „{0}“ fehlt eine Zahl
+plech: za „{0}“ chybí název	blech: nach „{0}“ fehlt ein Name
+plech: za „{0}“ chybí název skici v uvozovkách nebo $last	blech: nach „{0}“ fehlt ein Skizzenname in Anführungszeichen oder $last
+plech: za „plocha“ zadejte F číslo (plocha F3) nebo pravidlo (plocha +Y, plocha největší)	blech: nach „fläche“ eine F-Nummer (fläche F3) oder eine Regel (fläche +Y, fläche größte) angeben
+plech: zadejte bod umístění „v x y“ – {0}	blech: Platzierungspunkt „bei x y“ angeben – {0}
+Plocha {0} v tělese neexistuje – vyberte plochu plechu znovu.	Fläche {0} existiert im Körper nicht – Blechfläche erneut wählen.
+plocha F{0}	Fläche F{0}
+Plocha plechu	Blechfläche
+plocha s rovnými hranami; prázdné = horní plocha základního plechu	Fläche mit geraden Kanten; leer = Oberseite des Grundblechs
+Plochu {0} se nepodařilo načíst.	Fläche {0} konnte nicht gelesen werden.
+Prolis (důlek)	Napf
+prolis Ø{0} hl. {1} mm, stěna {2}°{3}	Napf Ø{0} Tiefe {1} mm, Wand {2}°{3}
+Prolis: průměr {0} mm je pro hloubku {1} mm a úhel stěny {2}° malý – zvětšete průměr nebo úhel stěny.	Napf: der Durchmesser {0} mm ist für Tiefe {1} mm und Wandwinkel {2}° zu klein – Durchmesser oder Wandwinkel vergrößern.
+Prolis: průměr a hloubka musí být kladné.	Napf: Durchmesser und Tiefe müssen positiv sein.
+protažený otvor s límcem (pro závit nebo trubku)	Durchzug mit Kragen (für ein Gewinde oder ein Rohr)
+předděr ≈ Ø{0} mm (orientačně)	Vorloch ≈ Ø{0} mm (Richtwert)
+předděr ≈ Ø{0} mm (orientačně) – vysoký límec, hrozí trhliny (d0/d < 0,45)	Vorloch ≈ Ø{0} mm (Richtwert) – hoher Kragen, Rissgefahr (d0/d < 0,45)
+rovinná plocha, ze které se tvaruje; prázdné = horní plocha základního plechu	ebene Fläche, aus der umgeformt wird; leer = Oberseite des Grundblechs
+Skica s dráhou	Pfadskizze
+Skica s dráhou (úsečky, oblouky)	Pfadskizze (Linien, Bögen)
+skicu s dráhou žebra	die Skizze mit dem Sickenpfad
+sklon plošek u delších stran; obvykle 1–2°	Neigung der Teilflächen an den längeren Seiten; meist 1–2°
+Smazat bod	Punkt löschen
+Směr tvarování	Umformrichtung
+stopa {0} × {1} mm	Grundfläche {0} × {1} mm
+stopa Ø{0} mm	Grundfläche Ø{0} mm
+šířka stopy {0} mm	Breite der Grundfläche {0} mm
+tloušťka desky + vůle	Platinendicke + Spiel
+Tvarování (nerozvinuto, vrstva FORM):	Umformungen (nicht abgewickelt, Layer FORM):
+Tvářecí nástroj i křížový zlom se umisťují na rovinnou plochu plechu (plocha {0} není rovinná).	Umformwerkzeuge und Kreuzbrüche werden auf eine ebene Blechfläche gesetzt (Fläche {0} ist nicht eben).
+tvářecí nástroj plechu v jednom nebo více bodech plochy (bez plochy horní plocha základu): skořepina tloušťky plechu nahoru / dolů, prostřih skutečně otevřený; v rozvinu stopa ve vrstvě FORM	Blech-Umformwerkzeug an einem oder mehreren Punkten einer Fläche (ohne Fläche = Oberseite des Grundblechs): Schale in Blechdicke nach oben / unten, Freischnitte wirklich offen; in der Abwicklung die Grundfläche im Layer FORM
+u plochy plechu	an der Blechfläche
+Úhel náběhu	Rampenwinkel
+Úhel stěny	Wandwinkel
+Úhel zlomu	Bruchwinkel
+v rovině plochy	in der Flächenebene
+větrací žaluzie: prostřih podél jedné strany a vytlačená stříška	Lüftungskieme: Schnitt entlang einer Seite und ausgestellte Haube
+vnitřní průměr límce	Innendurchmesser des Kragens
+Vodítko desky	Kartenführung
+vodítko desky {0} × {1} mm, mezera {2} mm	Kartenführung {0} × {1} mm, Spalt {2} mm
+vodítko desky plošných spojů: můstek s mezerou pro hranu desky	Leiterplatten-Kartenführung: Brücke mit Spalt für die Platinenkante
+vylisované žebro podél dráhy ve skice (úsečky, oblouky) – skořepina tloušťky plechu	geprägte Sicke entlang eines Skizzenpfads (Linien, Bögen) – Schale in Blechdicke
+Výstřih (jazýček)	Lasche (Ausklinkung)
+výstřih {0} × {1} mm, výška {2} mm, náběh {3}°	Lasche {0} × {1} mm, Höhe {2} mm, Rampe {3}°
+Výstřih: délka {0} mm je pro výšku {1} mm a úhel {2}° krátká.	Lasche: die Länge {0} mm ist für Höhe {1} mm und Winkel {2}° zu kurz.
+Výstřih: délka, šířka a výška musí být kladné.	Lasche: Länge, Breite und Höhe müssen positiv sein.
+Výška límce	Kragenhöhe
+Výška otvoru	Öffnungshöhe
+vyztužení rovného panelu mírným zlomem po úhlopříčkách (1–2°)	Versteifung eines ebenen Feldes durch einen leichten Bruch entlang der Diagonalen (1–2°)
+Zadejte body jako „x y; x y“ nebo „x y z; …“ (mm).	Punkte als „x y; x y“ oder „x y z; …“ (mm) eingeben.
+Zaoblené rohy	Verrundete Ecken
+Žaluzie	Kieme
+žaluzie {0} × {1} × {2} mm, otevřená {3}	Kieme {0} × {1} × {2} mm, offen {3}
+Žaluzie: délka, šířka a výška musí být kladné.	Kieme: Länge, Breite und Höhe müssen positiv sein.
+žebro (prolis) podél dráhy ve skice – úsečky, lomené čáry, oblouky, kružnice; zaoblené konce, pokosy v rozích	Sicke entlang eines Skizzenpfads – Linien, Polylinien, Bögen, Kreise; gerundete Enden, Gehrungen in den Ecken
+Žebro podél dráhy	Sicke entlang Pfad
+žebro š. {0} v. {1} mm, stěna {2}°	Sicke B. {0} H. {1} mm, Wand {2}°
+Žebro: dráha může obsahovat úsečky, lomené čáry, oblouky a kružnice (spline a elipsu nahraďte oblouky).	Sicke: der Pfad darf Linien, Polylinien, Bögen und Kreise enthalten (Splines und Ellipsen durch Bögen ersetzen).
+Žebro: dráha se v rohu otáčí o víc než 150° – roh rozdělte nebo zaoblete.	Sicke: der Pfad knickt an einer Ecke um mehr als 150° – Ecke teilen oder verrunden.
+Žebro: oblouk dráhy musí na sousední úseky navazovat tečně.	Sicke: ein Bogen des Pfads muss tangential an die Nachbarsegmente anschließen.
+Žebro: poloměr oblouku dráhy {0} mm je menší než polovina šířky žebra s okrajem ({1} mm).	Sicke: der Bogenradius des Pfads {0} mm ist kleiner als die halbe Sickenbreite mit Rand ({1} mm).
+Žebro: skica dráhy neobsahuje úsečku ani oblouk.	Sicke: die Pfadskizze enthält keine Linie und keinen Bogen.
+Žebro: šířka {0} mm je pro výšku {1} mm a úhel stěny {2}° malá.	Sicke: die Breite {0} mm ist für Höhe {1} mm und Wandwinkel {2}° zu klein.
+Žebro: šířka a výška musí být kladné.	Sicke: Breite und Höhe müssen positiv sein.
+Rozvin uložen – {0} ohybů, {1} tvářených prvků ve vrstvě FORM, {2} × {3} mm.	Abwicklung gespeichert – {0} Biegungen, {1} Umformelemente im Layer FORM, {2} × {3} mm.
+#!dynamic
+Tvarování	Umformen

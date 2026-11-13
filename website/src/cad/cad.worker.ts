@@ -8,11 +8,12 @@ import { drawingDoc } from "./drawing-doc";
 import { drawingModelShapes } from "./drawing-models";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { makeSmartDrawing } from "./drawing-dims";
-import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOfDoc } from "./asm-kernel";
+import { cachedBody, findCylFace, interference, mateEdgeInfo, mateFaceInfo, mateFaceMesh, mateVertexInfo, partEntry, shapeOfDoc } from "./asm-kernel";
 import { compareTransferables, compareWithReference, type CompareOptions, type ReferenceFile } from "./compare";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
 import { measureQuery, type MeasureQuery } from "./measure";
+import { surfQuery, type SurfQuery } from "./surf-query";
 import { refInfo, resolvePlaneDef } from "./ref-resolve";
 import { stampPicks } from "./pick-sigs";
 import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
@@ -20,6 +21,7 @@ import type { PlaneDef, Ref } from "./refs";
 import type { CadDoc, ComponentSource, ExportFormat, Feature, MeshData } from "./types";
 import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark, setPerfSink } from "./perf-log";
+import { formNotesOfDoc } from "./drawing-doc";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 
@@ -52,6 +54,7 @@ type Req =
   | { id: number; op: "interference"; doc: CadDoc }
   | { id: number; op: "compare"; doc: CadDoc; file: ReferenceFile; opts?: CompareOptions }
   | { id: number; op: "mateFace"; key: string; index: number }
+  | { id: number; op: "mateEnt"; key: string; index: number; ent: "edge" | "vertex" | "mesh" }
   | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
@@ -61,7 +64,9 @@ type Req =
   | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef }
   | { id: number; op: "datumGfx"; doc: CadDoc }
   | { id: number; op: "pickSigs"; doc: CadDoc; feature: Feature }
-  | { id: number; op: "stepSplit"; bytes: Uint8Array; fileName: string };
+  | { id: number; op: "stepSplit"; bytes: Uint8Array; fileName: string }
+  /** plochy třídy A: návaznost hran, hřebeny křivosti, řídicí body (surf-query.ts); `doc` = postavit nejdřív tento díl */
+  | { id: number; op: "surfA"; q: SurfQuery; doc?: CadDoc };
 
 /** Kontext řešení odkazů nad posledním postaveným tělesem a aktuálním dokumentem. */
 function refCtx(doc: CadDoc) {
@@ -264,6 +269,15 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         }
         break;
       }
+      case "surfA": {
+        if (m.doc) {
+          const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
+          body?.delete?.();
+          body = res.body;
+        }
+        ctx.postMessage({ id: m.id, ok: true, result: surfQuery(body, m.q) });
+        break;
+      }
       case "interference":
         ctx.postMessage({ id: m.id, ok: true, result: await interference(m.doc) });
         break;
@@ -281,6 +295,10 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
       }
       case "mateFace":
         ctx.postMessage({ id: m.id, ok: true, result: mateFaceInfo(m.key, m.index) });
+        break;
+      case "mateEnt":
+        // hrana / vrchol / jemná síť plochy pro pokročilé vazby sestavy (Dráha, Shodně, Vačka)
+        ctx.postMessage({ id: m.id, ok: true, result: m.ent === "edge" ? mateEdgeInfo(m.key, m.index) : m.ent === "vertex" ? mateVertexInfo(m.key, m.index) : mateFaceMesh(m.key, m.index) });
         break;
       case "cylFace":
         ctx.postMessage({ id: m.id, ok: true, result: findCylFace(m.key, m.radius) });
@@ -309,7 +327,9 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         if (missingBlobs(dd).length) drawCache = null; // bez dat importu (dorazí s dalším požadavkem) nezapamatovat
         // Chytré kóty: list bez zapečených kót (s místem navíc) + plán kót podle prvků jako upravitelné poznámky (cad/drawing-dims.ts)
         const smart = m.opts?.dimensions === "smart" && dd.kind !== "assembly";
-        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(body, m.doc, m.meta, m.opts, extra) : makeDrawing(body, m.meta, m.opts, extra) });
+        // poznámky k plechu (křížový zlom) do patičky – z dokumentu, pokud je volající nedodal
+        const meta: DrawingMeta = m.meta.formNotes ? m.meta : { ...m.meta, formNotes: formNotesOfDoc(m.doc) };
+        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(body, m.doc, meta, m.opts, extra) : makeDrawing(body, meta, m.opts, extra) });
         break;
       }
     }
