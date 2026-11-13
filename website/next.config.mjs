@@ -59,6 +59,12 @@ const nextConfig = {
       config.resolve.fallback = { ...config.resolve.fallback, fs: false, path: false, crypto: false, module: false, url: false, worker_threads: false, perf_hooks: false };
     }
     config.experiments = { ...config.experiments, asyncWebAssembly: true };
+    // acad-ts (DWG/DXF) hledá typy DXF podle jména třídy (constructor.name). Minifikace produkčního buildu třídy
+    // přejmenuje („h is not a DXF subclass“) – proto předpřipravený balík knihovny, který jména drží (esbuild keepNames).
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@node-projects/acad-ts$": fileURLToPath(new URL("./node_modules/@node-projects/acad-ts/dist/index-min.js", import.meta.url)),
+    };
     return config;
   },
   ...(staticExport ? {} : {
