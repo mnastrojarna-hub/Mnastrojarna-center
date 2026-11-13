@@ -331,9 +331,10 @@ export function ExtentField({ label, value, onChange, kinds, defaultDistance = 2
   );
 }
 
-export function DirectionField({ label = tr("Směr"), value, onChange, allowNormal = true }: { label?: string; value: Direction | undefined; onChange: (d: Direction | undefined) => void; allowNormal?: boolean }) {
+/** Směr. `kinds` omezí nabídku druhů (např. bez „pod úhlem“ tam, kde není rovina skici). */
+export function DirectionField({ label = tr("Směr"), value, onChange, allowNormal = true, kinds }: { label?: string; value: Direction | undefined; onChange: (d: Direction | undefined) => void; allowNormal?: boolean; kinds?: Direction["kind"][] }) {
   const v: Direction = value ?? { kind: "normal" };
-  const list = allowNormal ? DIRECTION_KINDS : DIRECTION_KINDS.filter((k) => k.v !== "normal");
+  const list = DIRECTION_KINDS.filter((k) => (allowNormal || k.v !== "normal") && (!kinds || k.v === "normal" || kinds.includes(k.v)));
   const change = (kind: Direction["kind"]) => {
     switch (kind) {
       case "normal":
@@ -447,7 +448,8 @@ export function ThinField({ value, onChange }: { value: Thin | undefined; onChan
   );
 }
 
-export function AxisField({ value, onChange, sketch }: { value: AxisDef | undefined; onChange: (a: AxisDef | undefined) => void; sketch: Feature | undefined }) {
+/** Osa rotace. `kinds` omezí nabídku druhů (např. bez os skici, když prvek skicu nemá). */
+export function AxisField({ value, onChange, sketch, label = tr("Osa rotace"), kinds }: { value: AxisDef | undefined; onChange: (a: AxisDef | undefined) => void; sketch: Feature | undefined; label?: string; kinds?: AxisDef["kind"][] }) {
   const v: AxisDef = value ?? { kind: "sketchY" };
   const lines = sketch && sketch.type === "sketch" ? sketch.entities.filter((e) => e.type === "line") : [];
   const change = (kind: AxisDef["kind"]) => {
@@ -477,9 +479,9 @@ export function AxisField({ value, onChange, sketch }: { value: AxisDef | undefi
   return (
     <div className="space-y-2 rounded-lg border border-ink-700/10 bg-steel-50/60 p-2">
       <label className="block">
-        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Osa rotace")}</span>
+        <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{label}</span>
         <select className={selectCls} value={v.kind} onChange={(e) => change(e.target.value as AxisDef["kind"])}>
-          {AXIS_KINDS.map((k) => (
+          {AXIS_KINDS.filter((k) => !kinds || kinds.includes(k.v)).map((k) => (
             <option key={k.v} value={k.v}>
               {k.l}
             </option>

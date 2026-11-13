@@ -108,9 +108,9 @@ describe("rozbor kót: všechny druhy, hodnoty, referenční", () => {
     ["úhel e1 e2 45", "angle e1 e2 45", "Winkel e1 e2 45", "angle"],
     ["délka oblouku e5 30", "arcLength e5 30", "Bogenlänge e5 30", "arcLength"],
   ];
-  it("každý druh ve třech jazycích (kóta / dim / dimension / bemaßung / maß)", () => {
+  it("každý druh ve třech jazycích (kóta / dim / bemaßung / maß; „dimension“ je kótování výkresu)", () => {
     for (const [cs, en, de, type] of cases) {
-      for (const [cmd, body] of [["kóta", cs], ["dim", en], ["dimension", en], ["bemaßung", de], ["maß", de]] as const) {
+      for (const [cmd, body] of [["kóta", cs], ["dim", en], ["dims", en], ["bemaßung", de], ["maß", de]] as const) {
         const p = parseAgentText(`${cmd} ${body}`);
         expect(p.errors, `${cmd} ${body}`).toEqual([]);
         expect(p.ops[0], `${cmd} ${body}`).toMatchObject({ k: "dims", items: [{ type, driving: true }] });
@@ -145,7 +145,7 @@ describe("rozbor kót: všechny druhy, hodnoty, referenční", () => {
     expect(AGENT_COMMANDS.some((c) => c.cmd.startsWith("skica plocha") && /sketch face/.test(c.en) && /skizze fläche/.test(c.de))).toBe(true);
     expect(err("nesmysl")).toMatch(/příkazy: .*vazba, kóta/);
     setLang("en");
-    expect(err("nonsense")).toMatch(/commands: .*sketch face, sketch plane, constraint, dim, dimension/);
+    expect(err("nonsense")).toMatch(/commands: .*sketch face, sketch plane, constraint, dim/);
     setLang("de");
     expect(err("unsinn")).toMatch(/skizze fläche, skizze ebene, bedingung, bemaßung, maß/);
   });
@@ -211,7 +211,7 @@ constraint coincident e1.b e2.a; coincident e2.b e3.a; coincident e3.b e4.a; coi
 constraint horizontal e1; horizontal e3; vertical e2; vertical e4
 constraint coincident e1.a origin
 dim length e1 80
-dimension length e2 50`);
+dim length e2 50`);
     expect(en.log[6]).toBe("8: ✓ constraints in sketch “Sketch 1”: fixed e1.a 0 0 → Under-defined (2 degrees of freedom)");
     expect(en.log[8]).toBe("10: ✓ dimensions in sketch “Sketch 1”: length e2 50 → Fully defined");
     near(ent(en.sk, "e2").b as number[], [80, 50]);

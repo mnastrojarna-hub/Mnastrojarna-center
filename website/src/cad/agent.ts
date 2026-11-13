@@ -15,6 +15,7 @@ import { threadByName, threadLabel } from "./defaults";
 import { allExt } from "./ext/registry";
 import { parseDimension, parseDrawing, type DrawingCmd } from "./agent-drawing";
 import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type SketchOp, type SketchTarget } from "./agent-sketch";
+import { toAxisDef, toDirection } from "./ext/place";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
 
 export const AGENT_API_VERSION = 1;
@@ -418,7 +419,8 @@ function setAt(obj: Record<string, unknown>, path: string, value: unknown) {
 /** rozdělí `klíč=hodnota klíč="text s mezerami" klíč=[1, 2, 3]` na dvojice */
 function keyValues(text: string): [string, string][] {
   const out: [string, string][] = [];
-  const re = /([^\s=]+)=("[^"]*"|„[^“]*“|\[[^\]]*\]|\{[^}]*\}|\S*)/g;
+  // JSON hodnota smí mít vnořené objekty (směr / rovina odkazem: {"kind":"edge","ref":{"kind":"edge","index":3}}) – do 4 úrovní
+  const re = /([^\s=]+)=("[^"]*"|„[^“]*“|\[[^\]]*\]|\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}|\S*)/g;
   let m: RegExpExecArray | null;
   let last = 0;
   while ((m = re.exec(text))) {
@@ -473,6 +475,11 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
         const opt = prm.options.find((x) => fold(x.v) === fold(v as string) || fold(x.l) === fold(v as string));
         if (!opt) throw new Error(tr("prvek {0}: parametr „{1}“ má hodnoty {2}", ext.ext, key, prm.options.map((x) => x.v).join(" | ")));
         v = opt.v;
+      } else if (prm?.kind === "direction" || prm?.kind === "axis") {
+        // směr / osa: X | Y | Z | -Z | vektor 1;0;1 | JSON (osa i x | y = osa skici); uloží se nový tvar
+        const d = prm.kind === "direction" ? toDirection(v) : toAxisDef(v);
+        if (!d) throw new Error(tr("prvek {0}: parametr „{1}“ je {2} – X | Y | Z | -Z | vektor 1;0;1 | JSON", ext.ext, key, prm.kind === "direction" ? tr("směr") : tr("osa")));
+        v = d;
       } else if (prm?.kind === "sketches" && !Array.isArray(v)) v = [v];
       else if (prm?.kind === "mode" && typeof v === "string") v = canon(v) === "cut" ? "cut" : canon(v) === "intersect" ? "intersect" : canon(v) === "newbody" ? "new" : "add";
       setAt(data, key, v);
@@ -1292,7 +1299,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "úsečka x1 y1 x2 y2 · čára x1 y1 x2 y2 [r N] x3 y3 … [uzavřít] · oblouk x1 y1 xm ym x2 y2 · spline x1 y1 x2 y2 … [uzavřít] · bod x y · elipsa rx ry", en: "line, polyline, arc, spline, point, ellipse", de: "linie, polylinie, bogen, spline, punkt, ellipse", desc: tr("další entity; „r N“ za bodem čáry zaoblí tento roh; oblouk = začátek, bod na oblouku, konec; předpona „pomocná“ = konstrukční") },
   { cmd: "skica plocha F3|horní|+X [odsazení N] [obráceně]: … · skica rovina <název pomocné roviny> [odsazení N]: …", en: "sketch face, sketch plane", de: "skizze fläche, skizze ebene", desc: tr("skica na rovinné ploše modelu – číslem (F1, F2… jako popisky pro výběr / window.mncad.hints()) nebo pravidlem jako u skořepiny (horní, +X…) – nebo na pomocné rovině podle názvu; rovina je asociativní – přepočítá se se změnou modelu, protokol vypíše její počátek a osy") },
   { cmd: "vazba <druh> <odkaz> [<odkaz> …]; <druh> …", en: "constraint", de: "bedingung", desc: tr("vazba ve skice: vodorovně, svisle, shodně, rovnoběžně, kolmo, tečně, stejně, pevně, soustředně, středem, na křivce, symetricky, kolineárně; odkaz = e3 (celá entita; id entit ukazuje stav), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod), e3.s0 (strana obdélníku) nebo počátek; po řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno") },
-  { cmd: "kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; <druh> …", en: "dim, dimension", de: "bemaßung, maß", desc: tr("kóta ve skice: délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku; hodnota i s desetinnou čárkou, Ø20 / R10; řídicí kóta změní geometrii, „referenční“ jen měří") },
+  { cmd: "kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; <druh> …", en: "dim", de: "bemaßung, maß", desc: tr("kóta ve skice: délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku; hodnota i s desetinnou čárkou, Ø20 / R10; řídicí kóta změní geometrii, „referenční“ jen měří") },
   { cmd: "vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]", en: "extrude", de: "extrudieren", desc: tr("vysune poslední skicu") },
   { cmd: "rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]", en: "revolve", de: "rotieren", desc: tr("orotuje poslední skicu (výchozí osa Y skici, 360°); „odebrat“ = vysoustružit z tělesa") },
   { cmd: "díra D [hloubka H|skrz [obousměrně]|k tělesu] v x y [z] [v x2 y2 z2 …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", de: "bohrung", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit") },

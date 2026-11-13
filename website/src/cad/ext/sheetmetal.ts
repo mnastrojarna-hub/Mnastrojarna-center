@@ -6,7 +6,7 @@
  * spojené s tělesem. Rozvin se počítá analyticky (sheetmetal-flat.ts) s BA = π/180·α·(R + K·t).
  * replicad/build.ts se načítají líně, aby modul nešel do hlavního balíčku UI.
  */
-import { extPoint } from "./place";
+import { extDirection, extPoint } from "./place";
 import { tr } from "../i18n";
 import type * as R from "replicad";
 import { planeBasis, toWorld } from "../defaults";
@@ -401,24 +401,34 @@ registerExt({
   group: "Plech",
   order: 3,
   hint: tr("čtvercový nebo kruhový výřez v rohu mezi ohyby"),
-  make: (doc) => ({ point: [0, 0, 0], kind: "round", size: 2 * sheetParamsAt(doc, doc.features.length).t, axis: "Z" }),
+  make: (doc) => ({ point: [0, 0, 0], kind: "round", size: 2 * sheetParamsAt(doc, doc.features.length).t, axis: { kind: "axis", axis: "Z" } }),
   params: [
     { key: "pointRef", label: tr("Střed úlevy odkazem"), kind: "point", hint: tr("vrchol, střed hrany, bod skici… – má přednost před souřadnicemi níže") },
     { key: "point", label: tr("Střed úlevy"), kind: "vec3" },
     { key: "kind", label: tr("Tvar"), kind: "enum", options: [{ v: "round", l: tr("Kruhová") }, { v: "rect", l: tr("Čtvercová") }] },
     { key: "size", label: tr("Velikost (Ø / strana)"), kind: "number", min: 0.1 },
-    { key: "axis", label: tr("Osa výřezu"), kind: "enum", options: [{ v: "X", l: "X" }, { v: "Y", l: "Y" }, { v: "Z", l: "Z" }] },
+    { key: "axis", label: tr("Osa výřezu"), kind: "direction", hint: tr("X / Y / Z, vektor čísly, nebo odkazem: normála plochy plechu, hrana") },
   ],
   build: async (d, ctx) => {
     if (!ctx.body) throw new Error(tr("Nejdřív vytvořte Základní plech."));
     const r = await rep();
     const pt = extPoint(d, ctx, "point");
     const size = num(d.size, 4);
-    const axis = d.axis === "X" ? [1, 0, 0] : d.axis === "Y" ? [0, 1, 0] : [0, 0, 1];
+    // osa: dřívější „X“ / „Y“ / „Z“, nebo směr vektorem / odkazem (normála plochy, hrana)
+    const axis = extDirection(d, ctx, "axis");
     const L = bboxDiag(ctx.body) * 2;
     const start = sub(pt, mul(axis as Vec3, L / 2));
+    // +X / +Y / +Z = původní výpočet (krabice v osách); obecný směr = čtvercový výřez natočený do osy
+    const alongAxis = axis.filter((c) => c === 0).length === 2 && axis.includes(1);
     let tool: Shape;
-    if (d.kind === "rect") {
+    if (d.kind === "rect" && !alongAxis) {
+      const h = size / 2;
+      let box = r.makeBox([-h, -h, -L / 2], [h, h, L / 2]) as Shape;
+      const c = dot([0, 0, 1], axis);
+      if (c < -0.999999) box = box.rotate(180, [0, 0, 0], [1, 0, 0]) as Shape;
+      else if (c < 0.999999) box = box.rotate((Math.acos(c) * 180) / Math.PI, [0, 0, 0], norm(cross([0, 0, 1], axis))) as Shape;
+      tool = box.translate(pt) as Shape;
+    } else if (d.kind === "rect") {
       const h = size / 2;
       tool = r.makeBox([pt[0] - h, pt[1] - h, pt[2] - h], [pt[0] + h, pt[1] + h, pt[2] + h]) as Shape;
       const ext = axis.map((v) => v * L) as Vec3;

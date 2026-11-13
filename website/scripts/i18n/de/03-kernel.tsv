@@ -588,7 +588,6 @@ Odsazení	Versatz
 Odsazení nesmí být nulové.	Der Versatz darf nicht null sein.
 Opačný směr	Richtung umkehren
 Osa	Achse
-Osa rotace (ve skice)	Drehachse (in der Skizze)
 Oříznout rovinou	Mit Ebene trimmen
 Oříznout skicou	Mit Skizze trimmen
 Plochu se nepodařilo zesílit – zkuste menší tloušťku nebo nejdřív plochy sešijte.	Die Fläche konnte nicht verdickt werden – versuchen Sie eine kleinere Dicke oder nähen Sie die Flächen zuerst.
@@ -638,7 +637,6 @@ Skica „{0}“ neobsahuje souvislou křivku ani uzavřený profil.	Die Skizze �
 Stoupání	Steigung
 Strana	Seite
 Střed začátku	Startmittelpunkt
-Svislá Y	Vertikal Y
 Symetricky na obě strany	Symmetrisch nach beiden Seiten
 Tažení plochy	Flächenaustragung
 Tažení po šroubovici	Austragung entlang Helix
@@ -653,7 +651,6 @@ Vnitřek profilu	Innenseite des Profils
 Vnitřní (v díře)	Innen (in Bohrung)
 Vnějšek	Außenseite
 Vnější (na válci)	Außen (auf Zylinder)
-Vodorovná X	Horizontal X
 Vyberte alespoň dvě hrany tvořící uzavřenou smyčku.	Wählen Sie mindestens zwei Kanten, die eine geschlossene Schleife bilden.
 Vyberte cílovou plochu.	Wählen Sie die Zielfläche.
 Vyberte plochu k prodloužení.	Wählen Sie die zu verlängernde Fläche.
@@ -680,7 +677,6 @@ křivka skici (i otevřená) vysunutá do plochy	Skizzenkurve (auch offen) zu ei
 křivky skici promítnuté po normále skici na vybranou plochu	Skizzenkurven entlang der Skizzennormalen auf die gewählte Fläche projiziert
 nic = všechny volné plochy	nichts = alle freien Flächen
 odřízne část volných ploch na jedné straně základní roviny	schneidet den Teil der freien Flächen auf einer Seite einer Grundebene ab
-otevřený profil rotovaný kolem osy skici	offenes Profil um eine Skizzenachse gedreht
 otevřený profil tažený po dráze (druhá skica)	offenes Profil entlang eines Pfads (zweite Skizze) ausgetragen
 plocha přes 2 a více křivek (v různých rovinách)	Fläche durch 2 oder mehr Kurven (in verschiedenen Ebenen)
 poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	Radius = die Oberfläche, an der das Gewinde beginnt: Zylinder oder Bohrung (Kern); die Tiefe geht ins Material

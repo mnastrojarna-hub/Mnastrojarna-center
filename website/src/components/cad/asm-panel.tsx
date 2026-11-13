@@ -30,6 +30,7 @@ import { MATERIALS, fmtNum } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
 import { CadIcon } from "./cad-icons";
+import { DirVecField } from "./dir-vec-field";
 import { Num, Vec } from "./props";
 import type { RMenuEntry } from "./ribbon";
 import type { SelItem } from "./selection";
@@ -609,7 +610,6 @@ export function AsmProps({
       {label}
     </button>
   );
-  const dirIs = (a: "X" | "Y" | "Z") => pat.kind === "linear" && Math.abs(Math.abs(snapDir(pat.direction)[a === "X" ? 0 : a === "Y" ? 1 : 2]) - 1) < 1e-6;
   return (
     <div className="space-y-4">
       <TextProp key={`${c.id}:name:${c.name}`} label={tr("Název")} value={c.name} required onCommit={(v) => onChange({ name: v })} />
@@ -685,40 +685,26 @@ export function AsmProps({
                 <Num label={tr("Počet")} value={pat.count} step={1} min={1} suffix="" onChange={(v) => setPat({ ...pat, count: Math.round(v) })} />
                 <Num label={tr("Rozteč")} value={pat.spacing} onChange={(v) => setPat({ ...pat, spacing: v })} />
               </div>
+              {/* stejné pole směru jako u formařských nástrojů: osa X / Y / Z, obrácení, vektor čísly; odkaz = plocha komponenty kliknutá v modelu
+                  (obecné odkazy na hrany / dva body řeší jádro jen v dílu – v sestavě se plocha převezme jako vektor) */}
               <div data-pattern-direction>
-                <Vec label={tr("Směr")} value={pat.direction} onChange={(v: Vec3) => setPat({ ...pat, direction: v })} />
-              </div>
-              {/* směr bez psaní vektoru: globální osa, obrácení, nebo normála / osa plochy kliknuté v modelu */}
-              <div className="grid grid-cols-4 gap-1.5">
-                {(["X", "Y", "Z"] as const).map((a) => (
-                  <button key={a} type="button" data-pattern-dir={a} title={tr("Směr podél globální osy {0}", a)} onClick={() => setPat({ ...pat, direction: AXIS_DIR[a] })} className={cn("rounded border py-1 text-[11.5px]", dirIs(a) ? "border-brand bg-brand/10" : "border-[#cfd6de] hover:bg-[#f3f6f9]")}>
-                    {a}
+                <DirVecField label={tr("Směr")} value={pat.direction} refs={false} attr="data-pattern-dir" onChange={(v) => setPat({ ...pat, direction: v })}>
+                  <button type="button" data-pattern-dir="face" onClick={() => onMate("dir")} className={cn("w-full rounded border py-1.5 text-[12px]", dirPicking ? "border-brand bg-brand/10 text-brand" : "border-[#cfd6de] hover:bg-[#f3f6f9]")}>
+                    {dirPicking ? tr("Klikněte na plochu v modelu…") : tr("Směr z plochy v modelu…")}
                   </button>
-                ))}
-                <button type="button" data-pattern-dir="flip" title={tr("Obrátit směr")} onClick={() => setPat({ ...pat, direction: pat.direction.map((v) => -v || 0) as Vec3 })} className="rounded border border-[#cfd6de] py-1 text-[11.5px] hover:bg-[#f3f6f9]">
-                  ±
-                </button>
+                  <p className="text-[10.5px] leading-snug text-[#8a95a3]">{tr("Rovinná plocha dá směr své normály, válcová směr své osy (plocha kterékoli komponenty).")}</p>
+                </DirVecField>
               </div>
-              <button type="button" data-pattern-dir="face" onClick={() => onMate("dir")} className={cn("w-full rounded border py-1.5 text-[12px]", dirPicking ? "border-brand bg-brand/10 text-brand" : "border-[#cfd6de] hover:bg-[#f3f6f9]")}>
-                {dirPicking ? tr("Klikněte na plochu v modelu…") : tr("Směr z plochy v modelu…")}
-              </button>
-              <p className="text-[10.5px] leading-snug text-[#8a95a3]">{tr("Rovinná plocha dá směr své normály, válcová směr své osy (plocha kterékoli komponenty).")}</p>
             </div>
           ) : (
             <div className="space-y-2">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <Num label={tr("Počet")} value={pat.count} step={1} min={1} suffix="" onChange={(v) => setPat({ ...pat, count: Math.round(v) })} />
                 <Num label={tr("Úhel")} value={pat.angle} suffix="°" onChange={(v) => setPat({ ...pat, angle: v })} />
-                <div>
-                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Osa")}</p>
-                  <div className="flex rounded-md bg-[#eef2f6] p-0.5">
-                    {(["X", "Y", "Z"] as const).map((a) => (
-                      <button key={a} type="button" onClick={() => setPat({ ...pat, axis: a })} className={cn("flex-1 rounded py-0.5 text-[11.5px]", pat.axis === a ? "bg-white shadow-sm" : "text-[#5b6776]")}>
-                        {a}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              </div>
+              {/* osa kruhového pole: globální X / Y / Z nebo libovolný směr vektorem (stejné pole jako směr lineárního pole) */}
+              <div data-pattern-axis>
+                <DirVecField label={tr("Osa")} value={Array.isArray(pat.axis) ? pat.axis : AXIS_DIR[pat.axis]} refs={false} attr="data-pattern-axis-dir" onChange={(v) => setPat({ ...pat, axis: v })} />
               </div>
               <Vec label={tr("Střed osy")} value={pat.center} onChange={(v: Vec3) => setPat({ ...pat, center: v })} />
             </div>

@@ -1135,7 +1135,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
           const def = getExt(f.ext);
           if (!def) throw new Error(tr("Neznámý prvek rozšíření „{0}“ – modul není načten.", f.ext));
           if (!def.build) break;
-          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools, bodies: new Map<string, Shape>([...(body ? [[activeName, body] as [string, Shape]] : []), ...others]), activeBody: activeName, resolvePlane: (pd) => resolvePlaneDef(rctx(ctxOf()), pd), resolvePoint: (ref) => pointOf(rctx(ctxOf()), ref, tr("bod prvku")) });
+          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools, bodies: new Map<string, Shape>([...(body ? [[activeName, body] as [string, Shape]] : []), ...others]), activeBody: activeName, resolvePlane: (pd) => resolvePlaneDef(rctx(ctxOf()), pd), resolvePoint: (ref) => pointOf(rctx(ctxOf()), ref, tr("bod prvku")), resolveDirection: (dd, base) => resolveDirection(rctx(ctxOf()), dd, base ?? { normal: [0, 0, 1] }), resolveAxis: (ad, sid) => resolveAxis(rctx(ctxOf()), ad, sid ? (sketches.get(sid) ?? null) : null) });
           if (out !== null && out !== undefined) next = out; // null = prvek bez geometrie (těleso zůstává)
           break;
         }

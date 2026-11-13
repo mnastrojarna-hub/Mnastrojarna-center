@@ -3,14 +3,20 @@
 import { tr } from "@/cad/i18n";
 import { useState } from "react";
 import { DRAFT_COLORS, DRAFT_LABELS, SHRINKAGE, defaultCooling, type CoolingParams, type DraftClass, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
+import type { Direction } from "@/cad/refs";
 import type { Vec3 } from "@/cad/types";
 import { fmtNum } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
+import { DirVecField, unitVec } from "./dir-vec-field";
 import { Num } from "./props";
 import { Btn, FloatPanel, Row, Segmented, Toggle } from "./ui";
 
-export type DraftSetup = { on: boolean; pull: Vec3; minDeg: number };
+/**
+ * Směr vyhození (= směr otevírání formy): `pull` je vždy jednotkový vektor; `pullDef` = odkaz (normála plochy / hrana /
+ * dva body), ze kterého se `pull` znovu vyřeší po změně modelu, `pullFlip` = odkaz obráceně. Platí i pro vyhazovače a chlazení.
+ */
+export type DraftSetup = { on: boolean; pull: Vec3; minDeg: number; pullDef?: Direction; pullFlip?: boolean };
 /** analýza ploch: žádná / zebra / křivost / tloušťka stěn */
 export type SurfaceSetup = { mode: "none" | "zebra" | "curvature" | "thickness"; limit: number; info?: string };
 
@@ -53,8 +59,21 @@ export function MoldPanel({
   const [cool, setCool] = useState<CoolingParams | null>(bbox ? defaultCooling(bbox) : null);
   const pct = custom ?? SHRINKAGE.find((s) => s.id === shrinkId)?.pct ?? 1;
   const total = draftResult ? draftResult.areas.reduce((a, b) => a + b, 0) || 1 : 1;
-  const axisOf = (p: Vec3) => (p[0] ? "X" : p[1] ? "Y" : "Z") as "X" | "Y" | "Z";
-  const sign = (p: Vec3) => (p[0] + p[1] + p[2] < 0 ? -1 : 1);
+  /** směr otevírání formy – stejné pole na kartách Úkosy, Vyhazovače a Chlazení (typovaný vektor nebo odkaz na model) */
+  const pullField = (label: string, showMap: boolean) => (
+    <DirVecField
+      label={label}
+      value={draft.pull}
+      def={draft.pullDef}
+      flip={draft.pullFlip}
+      attr="data-pull-dir"
+      onChange={(v, def, flip) => {
+        // nulový vektor rozpracovaného zadání do analýzy nepouštět (necháme poslední platný směr)
+        const u = unitVec(v);
+        setDraft({ ...draft, on: showMap ? true : draft.on, pull: u ?? draft.pull, pullDef: def, pullFlip: flip });
+      }}
+    />
+  );
 
   return (
     <FloatPanel title={tr("Formařské nástroje")} icon="layers" tone="create" onClose={onClose} width={300} initial={{ x: 12, y: 12 }}>
@@ -73,16 +92,8 @@ export function MoldPanel({
       {tab === "draft" && (
         <div className="mt-3 space-y-2">
           <Toggle label={tr("Barevná mapa úkosů")} checked={draft.on} onChange={(on) => setDraft({ ...draft, on })} />
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Směr vyhození")}</p>
-              <Segmented size="sm" value={axisOf(draft.pull)} options={[{ v: "X", l: "X" }, { v: "Y", l: "Y" }, { v: "Z", l: "Z" }]} onChange={(a) => setDraft({ ...draft, on: true, pull: [a === "X" ? sign(draft.pull) : 0, a === "Y" ? sign(draft.pull) : 0, a === "Z" ? sign(draft.pull) : 0] as Vec3 })} />
-            </div>
-            <Num label={tr("Min. úkos")} value={draft.minDeg} step={0.5} min={0} suffix="°" onChange={(v) => setDraft({ ...draft, on: true, minDeg: v })} />
-          </div>
-          <Btn onClick={() => setDraft({ ...draft, on: true, pull: draft.pull.map((v) => -v) as Vec3 })} className="w-full">
-            {tr("Obrátit směr")}
-          </Btn>
+          <div data-mold-pull>{pullField(tr("Směr vyhození"), true)}</div>
+          <Num label={tr("Min. úkos")} value={draft.minDeg} step={0.5} min={0} suffix="°" onChange={(v) => setDraft({ ...draft, on: true, minDeg: v })} />
           {draftResult && (
             <div className="space-y-1 pt-1">
               {([0, 1, 2, 3] as DraftClass[]).map((k) => (
@@ -159,7 +170,8 @@ export function MoldPanel({
 
       {tab === "eject" && (
         <div className="mt-3 space-y-2">
-          <p className="text-[11.5px] leading-relaxed text-[#6b7785]">{tr("Návrh pravidelného rozmístění vyhazovačů v půdorysu dílu. Na díl se přidají díry, do sestavy skutečné vyhazovače.")}</p>
+          <p className="text-[11.5px] leading-relaxed text-[#6b7785]">{tr("Návrh pravidelného rozmístění vyhazovačů v průmětu dílu kolmo na směr otevírání formy. Na díl se přidají díry, do sestavy skutečné vyhazovače.")}</p>
+          <div data-mold-eject-dir>{pullField(tr("Směr otevírání formy (= vyhození)"), false)}</div>
           <Row k={tr("Navrženo")} v={ejectors.length ? `${ejectors.length} × Ø${ejectors[0].d} mm` : "—"} />
           <div className="grid grid-cols-2 gap-2">
             <Btn disabled={!bbox} onClick={() => onEjectors(ejectors, "holes")}>
@@ -181,9 +193,10 @@ export function MoldPanel({
             <Num label={tr("Přesah")} value={cool.overhang} min={0} onChange={(v) => setCool({ ...cool, overhang: v })} />
           </div>
           <p className="text-[11.5px] text-[#6b7785]">{tr("Meandr rovnoběžných vrtů propojených příčnými vrty. Doporučená vzdálenost od dutiny 2–3 × Ø.")}</p>
+          <div data-mold-cool-dir>{pullField(tr("Směr otevírání formy – kanály leží kolmo na něj pod dutinou"), false)}</div>
           <div className="grid grid-cols-2 gap-2">
-            <Btn onClick={() => onCooling(cool, "part")}>{tr("Vrtat do dílu (negativ)")}</Btn>
-            <Btn onClick={() => onCooling(cool, "component")}>{tr("Vložit do sestavy")}</Btn>
+            <Btn onClick={() => onCooling({ ...cool, dir: draft.pull }, "part")}>{tr("Vrtat do dílu (negativ)")}</Btn>
+            <Btn onClick={() => onCooling({ ...cool, dir: draft.pull }, "component")}>{tr("Vložit do sestavy")}</Btn>
           </div>
         </div>
       )}

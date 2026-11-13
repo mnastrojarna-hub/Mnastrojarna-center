@@ -3,8 +3,10 @@
  * Čisté funkce nad sítí modelu (MeshData) – běží v UI i v testech, bez OCCT.
  */
 import { tr } from "./i18n";
-import type { CadDoc, Feature, MeshData, Vec3 } from "./types";
+import type { Axis, CadDoc, Feature, MeshData, Placement, Vec3 } from "./types";
 import { uid } from "./types";
+import type { Direction } from "./refs";
+import { eulerXYZ, rotationBetween } from "./assembly";
 
 // ---------------- smrštění ----------------
 
@@ -118,13 +120,76 @@ export function draftVertexColors(mesh: MeshData, res: DraftResult): Float32Arra
 
 // ---------------- vyhazovače ----------------
 
-export type EjectorSuggestion = { x: number; y: number; d: number };
+export type EjectorSuggestion = {
+  /** poloha v půdorysu (u, v v rámu formy; pro směr +Z = X, Y dílu) */
+  x: number;
+  y: number;
+  d: number;
+  /** bod na čele dílu, odkud se vrtá díra (konec dílu ve směru vyhození) – jen u obecného směru */
+  p?: Vec3;
+  /** směr vyhození (jednotkový) – jen u obecného směru; bez něj +Z */
+  dir?: Vec3;
+};
+
+// ---------------- rámec formy (směr otevírání) ----------------
+
+const dot3 = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross3 = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const unit3 = (a: Vec3): Vec3 => {
+  const l = Math.hypot(a[0], a[1], a[2]);
+  if (!(l > 1e-12)) throw new Error(tr("Směr otevírání formy je nulový – zadejte nenulový vektor."));
+  return [a[0] / l, a[1] / l, a[2] / l];
+};
+const clean = (v: Vec3): Vec3 => v.map((c) => Math.round(c * 1e6) / 1e6 || 0) as Vec3;
+/** je směr +Z (nebo nezadaný / nulový – rozpracované zadání)? – pak platí původní výpočty v osách dílu */
+export const isPlusZ = (d: Vec3 | undefined) => !d || !(Math.hypot(d[0], d[1], d[2]) > 1e-12) || (Math.abs(d[0]) < 1e-9 && Math.abs(d[1]) < 1e-9 && d[2] > 0);
+
+/**
+ * Rámec formy pro směr otevírání (vyhození) `dir`: w = směr, u, v kolmo. Pro +Z je u = X, v = Y (jako dřív).
+ */
+export function moldFrame(dir: Vec3 = [0, 0, 1]): { u: Vec3; v: Vec3; w: Vec3 } {
+  const w = unit3(dir);
+  const ref: Vec3 = Math.abs(w[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const d = dot3(ref, w);
+  const u = unit3([ref[0] - d * w[0], ref[1] - d * w[1], ref[2] - d * w[2]]);
+  return { u, v: cross3(w, u), w };
+}
+/** rozsah kvádru obálky v rámci formy (průměty 8 rohů) */
+function frameBox(bbox: [Vec3, Vec3], f: { u: Vec3; v: Vec3; w: Vec3 }) {
+  const [a, b] = bbox;
+  const lo = [Infinity, Infinity, Infinity];
+  const hi = [-Infinity, -Infinity, -Infinity];
+  for (const x of [a[0], b[0]])
+    for (const y of [a[1], b[1]])
+      for (const z of [a[2], b[2]]) {
+        const p: Vec3 = [x, y, z];
+        [f.u, f.v, f.w].forEach((ax, i) => {
+          const t = dot3(p, ax);
+          lo[i] = Math.min(lo[i], t);
+          hi[i] = Math.max(hi[i], t);
+        });
+      }
+  return { lo: lo as Vec3, hi: hi as Vec3 };
+}
+const fromFrame = (f: { u: Vec3; v: Vec3; w: Vec3 }, a: number, b: number, c: number): Vec3 => clean([0, 1, 2].map((i) => f.u[i] * a + f.v[i] * b + f.w[i] * c) as Vec3);
+/** osa X / Y / Z, nebo obecný směr (`dirDef` vektorem) – pro válce a díry */
+function axisOf(d: Vec3): { axis: Axis; dirDef?: Direction } {
+  for (const [k, a] of [[0, "X"], [1, "Y"], [2, "Z"]] as const) if (Math.abs(d[k] - 1) < 1e-9) return { axis: a };
+  return { axis: "Z", dirDef: { kind: "vector", v: clean(d) } };
+}
 
 /**
  * Návrh rozmístění vyhazovačů: pravidelná mřížka uvnitř půdorysu dílu (bbox v rovině XY),
  * s odstupem od okraje a roztečí podle velikosti. Vrací pozice v souřadnicích dílu.
+ * `dir` = směr vyhození (otevírání formy); obecný směr → mřížka v rovině kolmé na něj, u každého bod na čele dílu (`p`).
  */
-export function suggestEjectors(bbox: [Vec3, Vec3], opts: { margin?: number; maxSpacing?: number; diameter?: number } = {}): EjectorSuggestion[] {
+export function suggestEjectors(bbox: [Vec3, Vec3], opts: { margin?: number; maxSpacing?: number; diameter?: number; dir?: Vec3 } = {}): EjectorSuggestion[] {
+  if (!isPlusZ(opts.dir)) {
+    const f = moldFrame(opts.dir);
+    const fb = frameBox(bbox, f);
+    const grid = suggestEjectors([[fb.lo[0], fb.lo[1], fb.lo[2]], [fb.hi[0], fb.hi[1], fb.hi[2]]], { ...opts, dir: undefined });
+    return grid.map((e) => ({ ...e, p: fromFrame(f, e.x, e.y, fb.hi[2]), dir: clean(f.w) }));
+  }
   const [min, max] = bbox;
   const w = max[0] - min[0];
   const l = max[1] - min[1];
@@ -142,6 +207,34 @@ export function suggestEjectors(bbox: [Vec3, Vec3], opts: { margin?: number; max
   return out;
 }
 
+/** Díry pro vyhazovače do dílu: od čela dílu proti směru vyhození, skrz (pro +Z jako dřív: osa Z z horní plochy). */
+export function ejectorHoles(list: EjectorSuggestion[], topZ: number): Feature[] {
+  return list.map((e, i) => {
+    const ax = e.dir && !isPlusZ(e.dir) ? axisOf(e.dir) : { axis: "Z" as Axis };
+    return { id: uid(), name: tr("Vyhazovač {0}", i + 1), type: "hole", position: e.p ?? [e.x, e.y, topZ], ...ax, flip: false, diameter: e.d + 0.05, depth: 0, cbDiameter: 0, cbDepth: 0, kind: "simple" } as Feature;
+  });
+}
+
+/** Délka dříku vyhazovače: výška dílu ve směru vyhození + 100 mm, zaokrouhleno na 10 mm nahoru. */
+export function ejectorLength(bbox: [Vec3, Vec3], dir?: Vec3): number {
+  const h = isPlusZ(dir) ? bbox[1][2] - bbox[0][2] : (() => {
+    const fb = frameBox(bbox, moldFrame(dir));
+    return fb.hi[2] - fb.lo[2];
+  })();
+  return Math.ceil((h + 100) / 10) * 10;
+}
+
+/**
+ * Umístění vyhazovače (díl s osou +Z, hlava dole) do sestavy: hlava `gap` pod dílem proti směru vyhození, dřík ve směru vyhození.
+ * `bbox` = obálka dílu, `len` = délka dříku.
+ */
+export function ejectorPinPlacement(e: EjectorSuggestion, bbox: [Vec3, Vec3], len: number, gap = 5): Partial<Placement> {
+  if (!e.dir || isPlusZ(e.dir)) return { position: [e.x, e.y, bbox[0][2] - len - gap] };
+  const f = moldFrame(e.dir);
+  const fb = frameBox(bbox, f);
+  return { position: fromFrame(f, e.x, e.y, fb.lo[2] - len - gap), rotation: eulerXYZ(rotationBetween([0, 0, 1], f.w)) };
+}
+
 // ---------------- chladicí kanály ----------------
 
 export type CoolingParams = {
@@ -155,6 +248,8 @@ export type CoolingParams = {
   rows: number;
   /** přesah za okraj dutiny (napojení) */
   overhang: number;
+  /** směr otevírání formy (vyhození); kanály leží v rovině kolmé na něj pod dutinou. Výchozí +Z. */
+  dir?: Vec3;
 };
 
 export const defaultCooling = (bbox: [Vec3, Vec3]): CoolingParams => {
@@ -168,7 +263,14 @@ export const defaultCooling = (bbox: [Vec3, Vec3]): CoolingParams => {
  * negativ (mode "cut") do desky.
  */
 export function coolingCircuit(p: CoolingParams, name = tr("Chladicí okruh")): CadDoc {
-  const [min, max] = p.bbox;
+  // obecný směr otevírání: výpočet v rámci formy (u, v, w) a převod zpět; pro +Z platí původní osy X / Y / Z dílu
+  const plusZ = isPlusZ(p.dir);
+  const f = plusZ ? { u: [1, 0, 0] as Vec3, v: [0, 1, 0] as Vec3, w: [0, 0, 1] as Vec3 } : moldFrame(p.dir);
+  const fb = plusZ ? { lo: p.bbox[0], hi: p.bbox[1] } : frameBox(p.bbox, f);
+  const at = (a: number, b: number, c: number): Vec3 => (plusZ ? [a, b, c] : fromFrame(f, a, b, c));
+  const dirU = plusZ ? { axis: "X" as Axis } : axisOf(clean(f.u));
+  const dirV = plusZ ? { axis: "Y" as Axis } : axisOf(clean(f.v));
+  const [min, max] = [fb.lo, fb.hi];
   const z = min[2] - p.depth;
   const x0 = min[0] - p.overhang;
   const x1 = max[0] + p.overhang;
@@ -176,12 +278,12 @@ export function coolingCircuit(p: CoolingParams, name = tr("Chladicí okruh")): 
   const ys: number[] = [];
   for (let i = 0; i < p.rows; i++) ys.push(p.rows === 1 ? (min[1] + max[1]) / 2 : min[1] + ((max[1] - min[1]) * i) / (p.rows - 1));
   ys.forEach((y, i) => {
-    features.push({ id: uid(), name: tr("Kanál {0}", i + 1), type: "cylinder", radius: p.diameter / 2, height: x1 - x0, position: [x0, y, z], axis: "X", mode: i === 0 ? "new" : "add" });
+    features.push({ id: uid(), name: tr("Kanál {0}", i + 1), type: "cylinder", radius: p.diameter / 2, height: x1 - x0, position: at(x0, y, z), ...dirU, mode: i === 0 ? "new" : "add" });
   });
   // propojky střídavě na koncích (meandr)
   for (let i = 0; i + 1 < ys.length; i++) {
     const x = i % 2 === 0 ? x1 - p.diameter : x0 + p.diameter;
-    features.push({ id: uid(), name: `Propojka ${i + 1}`, type: "cylinder", radius: p.diameter / 2, height: ys[i + 1] - ys[i], position: [x, ys[i], z], axis: "Y", mode: "add" });
+    features.push({ id: uid(), name: `Propojka ${i + 1}`, type: "cylinder", radius: p.diameter / 2, height: ys[i + 1] - ys[i], position: at(x, ys[i], z), ...dirV, mode: "add" });
   }
   return { app: "mnastrojarna-cad", version: 2, name, material: "ocel", features, color: "#1c7ed6", props: { note: tr("Ø{0} mm, {1} větví", p.diameter, p.rows) } };
 }

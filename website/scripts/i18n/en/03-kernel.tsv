@@ -588,7 +588,6 @@ Odsazení	Offset
 Odsazení nesmí být nulové.	The offset must not be zero.
 Opačný směr	Reverse direction
 Osa	Axis
-Osa rotace (ve skice)	Axis of revolution (in the sketch)
 Oříznout rovinou	Trim with plane
 Oříznout skicou	Trim with sketch
 Plochu se nepodařilo zesílit – zkuste menší tloušťku nebo nejdřív plochy sešijte.	The surface could not be thickened – try a smaller thickness or sew the surfaces first.
@@ -638,7 +637,6 @@ Skica „{0}“ neobsahuje souvislou křivku ani uzavřený profil.	Sketch “{0
 Stoupání	Pitch
 Strana	Side
 Střed začátku	Start centre
-Svislá Y	Vertical Y
 Symetricky na obě strany	Symmetric to both sides
 Tažení plochy	Surface sweep
 Tažení po šroubovici	Helical sweep
@@ -653,7 +651,6 @@ Vnitřek profilu	Inside of the profile
 Vnitřní (v díře)	Internal (in a hole)
 Vnějšek	Outside
 Vnější (na válci)	External (on a cylinder)
-Vodorovná X	Horizontal X
 Vyberte alespoň dvě hrany tvořící uzavřenou smyčku.	Select at least two edges forming a closed loop.
 Vyberte cílovou plochu.	Select the target face.
 Vyberte plochu k prodloužení.	Select the face to extend.
@@ -680,7 +677,6 @@ křivka skici (i otevřená) vysunutá do plochy	a sketch curve (even open) extr
 křivky skici promítnuté po normále skici na vybranou plochu	sketch curves projected along the sketch normal onto the selected face
 nic = všechny volné plochy	none = all free faces
 odřízne část volných ploch na jedné straně základní roviny	cuts away the part of the free faces on one side of a base plane
-otevřený profil rotovaný kolem osy skici	an open profile revolved about a sketch axis
 otevřený profil tažený po dráze (druhá skica)	an open profile swept along a path (second sketch)
 plocha přes 2 a více křivek (v různých rovinách)	a surface through 2 or more curves (in different planes)
 poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	radius = the surface where the thread starts: the cylinder, or the hole (minor diameter); the depth goes into the material

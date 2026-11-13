@@ -37,15 +37,18 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `koule D [v x y z]` · `kužel D1 D2 H` · `trubka D d H` | další primitiva (průměry) |
 | `skica XY|XZ|YZ [odsazení N]: entita; entita…` | skica na základní rovině; entity i na dalších řádcích |
 | `skica počátek x y z normála nx ny nz [osax ux uy uz]: …` | skica na obecné rovině (viz „Souřadnice skici ve 3D“) |
+| `skica plocha F3|horní|+X [odsazení N] [obráceně]: …` · `skica rovina "Rovina 1" [odsazení N]: …` | skica na rovinné ploše modelu (číslem nebo pravidlem) nebo na pomocné rovině – viz „Vazby a kóty ve skice textem“ |
 | `obdélník W H [v x y]` / `obdélník W H roh x y` | obdélník středem (výchozí počátek) nebo rohem |
 | `kružnice D [v x y]` / `kružnice poloměr r` | kružnice |
 | `mnohoúhelník N D [v x y]` · `drážka L W [úhel a]` · `úsečka x1 y1 x2 y2` · `bod x y` · `elipsa rx ry` | další entity; předpona `pomocná` = konstrukční |
 | `čára x1 y1 x2 y2 [r N] x3 y3 … [uzavřít]` | lomená čára; `r N` za bodem zaoblí tento roh poloměrem N (vzniknou úsečky a tečné oblouky) |
 | `oblouk x1 y1 xm ym x2 y2` | oblouk třemi body: začátek, bod na oblouku, konec |
 | `spline x1 y1 x2 y2 x3 y3 … [uzavřít]` | hladká křivka přes zadané body |
+| `vazba <druh> <odkaz> [<odkaz> …]; <druh> …` | vazba ve skice (vodorovně, kolmo, tečně, shodně…); odkazy na entity `e1`, `e1.a`, `počátek` |
+| `kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; …` | kóta ve skice (délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku) |
 | `vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]` | vysune poslední skicu |
 | `rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]` | orotuje poslední skicu (výchozí osa Y skici, 360°); `odebrat` = vysoustružit profil z tělesa |
-| `díra D [hloubka H|skrz [obousměrně]] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; `skrz` vrtá **od zadaného bodu jen ve směru vrtání** (materiál nad bodem zůstane), `obousměrně` na obě strany; `závit M6` vrtá jádro |
+| `díra D [hloubka H|skrz [obousměrně]|k tělesu] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8 [hloubka-závitu T]]` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; `skrz` vrtá **od zadaného bodu jen ve směru vrtání** (materiál nad bodem zůstane), `obousměrně` na obě strany; `k tělesu` (EN `to body`, DE `bis Körper`) vrtá po první stěnu stávajícího tělesa – projde první stěnou ve směru vrtání a dál nepokračuje (např. jen horní stěnou dutého dílu), jako ukončení „K tělesu“ u vysunutí; `závit M6` vrtá jádro, `hloubka` = hloubka vrtání, `hloubka-závitu` = užitečná délka závitu (výkres pak ukáže „M8 ↧10“ + „Ø6,8 ↧14“) |
 | `díra D … směr vx vy vz` · `díra D … sklon úhel [směr +X]` | šikmá díra: `směr` = směr vrtání vektorem; `sklon` = odklon od osy díry (výchozí k +X u osy Z) |
 | `díra D skrz v x1 y1 z1 v x2 y2 z2 …` | více děr jedním příkazem (každá poloha třemi souřadnicemi) |
 | `zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z|-Z|+X|-X|+Y|-Y] [poloměr N] [delší N] [kratší N]` | pravidla lze kombinovat: `hrany horní kruhové` |
@@ -59,6 +62,10 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `normálie <označení> [v x y z]` | díl z knihovny (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta |
 | `vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit]` | sestava: vloží díl z otevřené záložky jako komponentu |
 | `výkres` | otevře výkres otevřeného dokumentu v záložce |
+| `výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]` | volby prvního listu výkresu (založí ho, chybí-li) a otevře výkres |
+| `kótovat [chytře|celkově|nic] [řetězově|od základny]` | Chytré kóty podle prvků modelu (viz „Výkres a kóty“) – nahradí jen vygenerované kóty |
+| `výkres tolerance <kóta> <tolerance>` · `výkres poznámka "…"` · `výkres nepředepsané ISO 2768-mK` · `výkres hrany ISO 13715 …` · `výkres drsnost Ra 3,2` | tolerance ke kótě podle popisku (`Ø40 h6`, `25 ±0,1`, `M8 6H`); údaje u razítka |
+| `výkres stav` | textový stav výkresu: list, měřítko, pohledy, všechny kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo (také `window.mncad.drawingStatus()`) |
 | `smazat poslední` · `stav` · `zobraz iso|přední|horní…` · `kolize` | správa; kolize = kontrola průniků komponent sestavy |
 
 Booleovský režim: první tvarový prvek vytvoří těleso, další se **přidávají**; `odebrat` odečte, `průnik` ponechá
@@ -91,6 +98,109 @@ Bod skici `(u; v)` leží ve 3D v bodě `počátek + u·X_skici + v·Y_skici`, k
 - U obecné roviny se bez `osax` zvolí X skici kolmo na normálu co nejblíž ose X modelu (u normály ±X ose Y). V JSON je
   to `"plane": { "kind": "custom", "origin": [x,y,z], "normal": [nx,ny,nz], "xDir": [ux,uy,uz] }`.
 
+### Vazby a kóty ve skice textem
+
+Entity zadané textem dostanou ve skice krátká id **e1, e2, e3…** v pořadí vzniku (protokol je u každého řádku vypíše,
+např. `✓ 4 entity do skici „Skica 1“ (e1–e4)`; `stav` je u skici vypíše i se souřadnicemi – u skic do 40 entit).
+Na ně odkazují vazby a kóty:
+
+- `e3` = celá entita (úsečka, kružnice, oblouk, obdélník…); u kružnice / oblouku na místě bodu = její střed.
+- Body: `e3.a` / `e3.b` = začátek / konec úsečky, u oblouku `a` začátek, `b` bod na oblouku, `c` konec;
+  `e3.střed` (`center`) = střed kružnice, oblouku, obdélníku, drážky, u úsečky její polovina; `e3.začátek` / `e3.konec`;
+  `e3.p0`, `e3.p1`… = body lomené čáry / spline (od nuly); `e3.c0`…`c3` = rohy obdélníku (c0 vlevo dole, proti směru
+  hodin); `e3.e0` / `e3.e1` = středy konců drážky; `počátek` (`origin`, `O`) = počátek skice.
+- Strany: `e3.s0`…`s3` = strany obdélníku (s0 dole, s1 vpravo, s2 nahoře, s3 vlevo), `e3.g0`… = úseky lomené čáry.
+
+| Vazba (`vazba …`) | Odkazy |
+| --- | --- |
+| `vodorovně` / `svisle` | úsečka, nebo dva body |
+| `shodně` (`totožně`) | dva body; `shodně e1.a počátek` = bod pevně v počátku |
+| `rovnoběžně` · `kolmo` · `kolineárně` | dvě úsečky |
+| `tečně` | úsečka a kružnice / oblouk, nebo dvě kružnice / oblouky |
+| `stejně` | dvě úsečky (délka), nebo dvě kružnice / oblouky (poloměr) |
+| `pevně` | bod (`pevně e1.a` = na místě, `pevně e1.a 10 20` = na souřadnice), nebo celá entita |
+| `soustředně` | dvě kružnice / oblouky, nebo kružnice a bod (i `počátek`) |
+| `středem` | bod a úsečka (bod v polovině úsečky) |
+| `na křivce` | bod a úsečka / kružnice / oblouk |
+| `symetricky` | dva body a osa (úsečka) |
+
+| Kóta (`kóta …`) | Odkazy a hodnota |
+| --- | --- |
+| `délka` | úsečka nebo strana (`e2.s0`), délka v mm |
+| `vzdálenost` | dva body, bod a úsečka, nebo dvě rovnoběžné úsečky |
+| `vodorovně` / `svisle` | dva body (i `počátek`), nebo úsečka (= její konce); vzdálenost v X / Y |
+| `poloměr` / `průměr` | kružnice nebo oblouk (u drážky poloměr = půl šířky); hodnota i `R10` / `Ø20` |
+| `úhel` | dvě úsečky, 0–180° |
+| `délka oblouku` | oblouk |
+
+- Anglicky `constraint horizontal e1`, `dim length e1 50`; německy `bedingung waagerecht e1`, `bemaßung länge e1 50`
+  (druhy: horizontal/waagerecht, vertical/senkrecht, coincident/deckungsgleich, parallel, perpendicular/rechtwinklig,
+  tangent/tangential, equal/gleich, fixed/fest, concentric/konzentrisch, midpoint/mittelpunkt, onCurve/aufKurve,
+  symmetric/symmetrisch, collinear/kollinear; length/Länge, distance/Abstand, radius, diameter/Durchmesser, angle/Winkel,
+  arcLength/Bogenlänge). Více vazeb nebo kót na jednom řádku oddělte středníkem.
+- Kóta je **řídicí** (změní geometrii); `referenční` (`reference`, `Referenz`) jen měří a hodnotu lze vynechat.
+- Po každém řádku `vazba` / `kóta` (a na konci bloku skici, přibyly-li entity) se skica **vyřeší** a protokol napíše
+  stav jako skicář: `Plně určeno`, `Nedourčeno (N st. volnosti)` nebo ⚠ `Přeurčeno – konflikt / nadbytečné vazby` s výčtem
+  vazeb v rozporu. Nenajde-li řešič řešení, geometrie zůstane a vazby i kóty zůstanou uložené (opravíte je ve skicáři –
+  klik na značku vazby nebo kótu, Delete – nebo v JSON: pole `constraints` a `dims` skici).
+- Chybný odkaz skončí chybou s očekávaným zápisem na řádku, kde je (`✗ řádek 7: vazba kolmo: „e5“ je kružnice / oblouk,
+  čeká se úsečka – zápis: vazba kolmo e1 e2 (dvě úsečky)`); takový řádek nic nepřidá.
+- Vazba `tečně` mezi úsečkou a obloukem, které už sdílejí koncový bod (`shodně`), se vyhodnotí jako nadbytečná – drážku
+  kreslete entitou `drážka`, zaoblený roh `čára … r N`, případně tečnost vynechte.
+
+**Skica na ploše modelu nebo na pomocné rovině:** `skica plocha F6: …` – číslo plochy jako popisky pro výběr
+(`window.mncad.hints()`, Ctrl+Shift+L; F1 = první plocha), nebo pravidlem jako u skořepiny: `skica plocha horní`,
+`skica plocha +X`, `skica plocha spodní` (pravidlo musí vybrat právě jednu rovinnou plochu, jinak chyba vypíše rovinné
+plochy s normálami a středy). `odsazení N` posune rovinu po normále, `obráceně` otočí normálu. `skica rovina "Rovina 1"
+[odsazení N]` = pomocná rovina (prvek datum) podle názvu. Rovina je **asociativní** (při změně modelu se přepočítá; plocha
+má otisk, takže ji najde i po změně číslování). Počátek skici na ploše je ve **středu plochy**, normála míří ven z tělesa;
+protokol vypíše počátek, normálu a osu X skici (`✓ Skica 2 na ploše F6 (horni) – rovina: počátek [40; 25; 20], normála +Z,
+osa X skici …`), `vysunout` jde po normále (ven), `vysunout 5 odebrat obráceně` řeže do tělesa.
+
+```
+# 1) obdélník ze čtyř úseček, plně určený, 80 × 50 od počátku → objem 40 cm³
+skica XY
+úsečka 0 0 60 0
+úsečka 60 0 60 40
+úsečka 60 40 0 40
+úsečka 0 40 0 0
+vazba shodně e1.b e2.a; shodně e2.b e3.a; shodně e3.b e4.a; shodně e4.b e1.a
+vazba vodorovně e1; vodorovně e3; svisle e2; svisle e4
+vazba shodně e1.a počátek
+kóta délka e1 80; délka e2 50
+vysunout 10
+```
+
+```
+# 2) drážka: střed v počátku, vodorovně, rozteč středů 30, šířka 12 (celková délka 42)
+skica XY
+drážka 40 10 v 10 3
+vazba shodně e1.střed počátek; vodorovně e1.e0 e1.e1
+kóta vzdálenost e1.e0 e1.e1 30; poloměr e1 6
+```
+
+```
+# 3) kružnice Ø20 tečná k úsečce délky 50, střed 25 mm od začátku úsečky
+skica XY
+úsečka 0 0 50 0
+kružnice 20 v 25 12
+vazba vodorovně e1; pevně e1.a
+vazba tečně e1 e2
+kóta délka e1 50; průměr e2 Ø20; vodorovně e1.a e2.střed 25
+```
+
+```
+# 4) kvádr, čep Ø12 × 8 uprostřed horní plochy a kapsa 30 × 10 hloubky 2 uprostřed boku +X
+kvádr 80 50 20
+skica plocha horní: kružnice 12
+vazba soustředně e1 počátek
+vysunout 8
+skica plocha +X: obdélník 30 10
+vazba shodně e1.střed počátek; vodorovně e1.s0
+kóta délka e1.s0 30; délka e1.s1 10
+vysunout 2 odebrat obráceně
+```
+
 ### Více těles v dílu
 
 Díl má vždy jedno **aktivní těleso**, se kterým pracují prvky, a libovolný počet dalších těles (výchozí názvy
@@ -114,6 +224,14 @@ spring…) i prvek rozšíření (`prvek sheet.bend …`, `prvek "Zkrut" …` �
 - Skici a prvky se zadávají názvem (`profileId="Skica 1"`) nebo `$last`; plochy a hrany čísly (`faces=1;4;5`) nebo
   pravidlem (`faces=boční`, `edges=horní;kruhové`).
 - Neznámý klíč nebo typ skončí chybou s výčtem platných – tak lze parametry zjistit.
+- Směr a osa u rozšíření (`surf.helix` / `surf.helixSweep` `axis`, `sheet.relief` `axis`, `surf.extrude` `dir`,
+  `surf.revolve` `axis`): `axis=X`, `axis=-Z`, vektor `axis=1;0;1`, nebo JSON odkaz
+  (`axis={"kind":"edge","ref":{"kind":"edge","index":3}}` = podél hrany 4 / osy válce, `{"kind":"faceNormal","ref":{"kind":"face","index":5}}`
+  = normála plochy 6). U `surf.revolve` je `axis=x` / `axis=y` osa skici, `axis=X|Y|Z` globální osa, JSON `AxisDef`
+  (`{"kind":"cylFace","ref":{"kind":"face","index":2}}`). Starší zápis `"axis": "Z"` v JSON platí dál.
+- Prvky `adv.varFillet`, `adv.fullRound`, `adv.chamfer2`, `adv.curvePattern`, `adv.fillPattern` a `adv.holesAtPoints` jsou
+  starší duplicity – na pásu karet už nejsou, staré dokumenty i `prvek …` je dál postaví. Pro nové díly použijte
+  vestavěné `zaoblit` (druh R1 → R2 / plný), `srazit` (D1 × D2 / D × úhel), `pole` (po křivce / výplň / podle skici) a `díra`.
 
 ```
 skica XY: obdélník 20 20
@@ -181,6 +299,11 @@ Dokument je JSON objekt:
   `{ "kind": "sketchPt", "sketchId": "…", "entityId": "…", "k": "center" }`, odvozené body (`derived`: mid, between,
   offset, project, intersect, percent). Indexy ploch/hran získáte z textového stavu (`stav`) nebo zkouškou –
   pro agenty je jednodušší použít textové příkazy s pravidly (`hrany svislé`, `otevřít +Z`).
+- Výběr hran/ploch indexy (`edges`, `faces`, `faces2`, `vertices`, u rozšíření `data.faces` / `data.edges`) může nést
+  **otisky** `edgeSigs` / `faceSigs` / `faceSigs2` / `vertexSigs` (u rozšíření `data.facesSigs` …): mapa „index → otisk
+  { t: typ, c: střed, s: délka / plocha }“ entity tělesa před prvkem. Program je doplní sám při výběru v modelu, ze seznamu
+  i pravidlem v textovém příkazu; při stavbě se podle nich indexy znovu najdou, když úprava dřívějšího prvku hrany/plochy
+  přečísluje (nenalezená entita = ⚠ a použije se původní index). V ručně psaném JSON je lze vynechat.
 - Sestava: `"kind": "assembly"`, `"components": [ { "name": "Díl", "source": { "kind": "part", "doc": { …dokument dílu… } },
   "placement": { "position": [0,0,0], "rotation": [0,0,0] } } ]`, vazby `"mates"`.
 
@@ -211,12 +334,125 @@ pixely v 3D okně:
 - Výkres **nedoplňuje žádné výrobní požadavky sám**: nepředepsané tolerance (např. ISO 2768-mK) a opracování hran
   (např. srazit 0,5×45°) se na list dostanou jen vyplněním polí v razítku (každé zvlášť, lze smazat). Výchozí text je
   jen „Rozměry v mm“.
-- Závitové díry (`díra 5 závit M6 hloubka 12`) se na výkrese kótují jako `M6 hl. 12` (s počtem), ne jako Ø jádra.
-- Automatické kóty („Auto + Ø“) jsou pomocný základ. Tlačítko **Kontrola kót** ve výkresu porovná kóty na listu
-  s historií prvků a vypíše, co chybí (Ø, závity, drážky, zaoblení…); tolerance (H8, ±0,1) se píší u kóty do pole
-  „přípona“.
+- Závitové díry (`díra 5 závit M6 hloubka 12`) se na výkrese kótují popisem `M6 ↧12` (s počtem), ne jako Ø jádra.
+- Nové výkresy mají **Chytré kóty** (kótování podle prvků, viz další kapitola). Tlačítko **Kontrola kót** ve výkresu
+  porovná kóty na listu s historií prvků a vypíše, co chybí; totéž je v `výkres stav`. Tolerance (H8, ±0,1) se píší
+  příkazem `výkres tolerance` nebo u kóty do pole „přípona“.
 - Ukládání a export se standardně ptají na místo a název (systémový dialog – pro agenta „blokující“). V Nastavení →
   Soubory lze zapnout **přímé stažení pod výchozím názvem**; pro skripty je nejjednodušší `window.mncad.exportFile()`.
+
+## Výkres a kóty – postup a pravidla pro AI
+
+Výkres se kótuje **podle prvků modelu** (Chytré kóty), ne podle každé promítnuté čáry. Každý funkční rozměr je na listu
+právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jeden popis se značkami. Agent kóty **nepíše ručně**
+– nechá je vygenerovat příkazem `kótovat`, zkontroluje je příkazem `výkres stav` a doplní jen tolerance.
+
+### Postup (vždy v tomto pořadí)
+
+1. **Model** textovými příkazy, `stav` → Geometrie: platná, žádné ✗ / ⚠. Díry dělejte příkazem `díra` (ne vysunutím
+   kružnic) – jen tak výkres zná závit, hloubku, zahloubení a počet děr.
+2. **List a pohledy:** `výkres A3 na šířku pohledy přední,horní,iso`. Pohledy volte podle dílu:
+   rotační díl s osou X → `přední,levý` (osa vodorovně, čelní pohled pro díry v čele); díry shora → `horní`;
+   díry zespodu → `spodní`; vnitřní tvary (vrtání, osazení uvnitř) → `řez XZ odsazení 0` (řez osou).
+3. **Kóty:** `kótovat` (= chytře, řetězově) nebo `kótovat od základny`. Protokol vypíše počet kót podle pohledů
+   a co se nevešlo.
+4. **Kontrola:** `výkres stav` – musí platit „Duplicity: žádné“ a „Kontrola kót: všech … je na listu“. Řádek
+   „Vynecháno“ říká proč (např. „zapněte pohled spodní“, „zapněte řez osou“, „nevešlo se“ → `výkres A2` nebo jiné
+   měřítko) – opravte a spusťte `kótovat` znovu.
+5. **Tolerance** jen na funkční rozměry: `výkres tolerance Ø30 h6`, `výkres tolerance 50 ±0,05`,
+   `výkres tolerance M20 6g`, `výkres tolerance Ø50 H7` (kóta se najde podle popisku; nejednoznačná → chyba se seznamem).
+6. **Razítko:** `výkres nepředepsané ISO 2768-mK`, `výkres hrany ISO 13715 -0,3`, `výkres drsnost Ra 3,2`,
+   `výkres poznámka "…"`.
+7. `výkres stav` naposledy, pak export (výkres → PDF / DXF / DWG / SVG).
+
+### Pravidla Chytrých kót (ČSN EN ISO 129-1) – kontrolní seznam
+
+- Každý funkční rozměr **jednou** – žádná kóta dvakrát (ani v jiném pohledu), **žádný uzavřený řetězec**: řetěz délek
+  + celková délka → nejdelší článek je pomocná kóta v závorce „(50)“.
+- Prvek se kótuje v pohledu, kde je vidět ve skutečném tvaru; **nikdy na skryté (čárkované) hraně** – vnitřní tvary v řezu.
+- **Rotační díl** (osa vodorovně): průměry osazení naskládané na straně (nejmenší nejblíž dílu, rozestup 7 mm), délky
+  osazení **řetězově na jedné čáře**, celková délka ve vnější řadě (`kótovat od základny` = všechny délky od jednoho čela);
+  zápich šířkou (v řetězu) a Ø popisem; sražení „1,5×45°“ a zaoblení „R1“ jednou s počtem „2×“; vnější závit
+  „M20×1,5“ místo Ø a zvlášť délka závitu.
+- **Hranolový díl:** celkové rozměry délka × šířka × výška jednou; polohy děr od základních hran (levá / spodní) v pohledu,
+  kde jsou díry kružnicemi; souměrně rozmístěné díry roztečí od osy souměrnosti; kruhové pole roztečnou kružnicí „Ø120“
+  na osové kružnici + „rovnoměrně“ (nebo úhel).
+- **Díry – jeden popis s odkazem na skupinu stejných děr** (z parametrů příkazu `díra` a počtu z pole):
+  `4× Ø8,5 skrz` · `4× Ø8,5 ↧12` · `4× M8 ↧10` + `Ø6,8 ↧14` (hloubka závitu / hloubka vrtání) ·
+  `6× Ø11 skrz` + `⌴ Ø18 ↧11` (válcové zahloubení) · `4× Ø6,6 skrz` + `⌵ Ø12,4 × 90°` (kuželové zahloubení).
+  Značky: ↧ hloubka, ⌴ válcové zahloubení, ⌵ kuželové zahloubení, Ø průměr – na listu i v PDF / DXF / DWG se kreslí čarami.
+- Rozmístění: kóty mimo obrys v řadách rovnoběžných s hranami (1. řada 8 mm, další po 7 mm), kratší blíž dílu,
+  texty vodorovně nebo zdola nahoru (čitelné zdola / zprava), odkazy popisů pod 45°, žádný text přes jiný text nebo obrys.
+  Co se čistě nevejde, se **vynechá a nahlásí** (`výkres stav` → Vynecháno) – nikdy se nekreslí přes sebe.
+- Počet kót odpovídá počtu rozměrů („očekávaných rozměrů N“ v protokolu `kótovat`) – výrazně víc kót = chyba.
+
+### Čemu se vyhnout (anti-vzory)
+
+- **Nepište kóty jako JSON se souřadnicemi** (`drawings[].annotations`), když to umí `kótovat` – ruční kóty se nehlídají.
+- Nekótujte rozměr dvakrát (jednou v předním a znovu v horním pohledu, Ø jako průměr i jako délku).
+- Nekótujte skryté hrany; nekótujte každou promítnutou čáru; žádné kóty „do všech směrů“ a šikmo (kromě skutečně šikmých ploch).
+- Žádný uzavřený řetězec (všechny články + celková délka bez závorky).
+- Nemíchejte řetěz a kóty od základny u téhož prvku; závit nekótujte jako Ø jádra.
+- Díry nemodelujte vysunutím kružnic, když jde o díru (výkres pak nezná závit, hloubku ani počet).
+
+### Příklad A – hřídel s osazením, závitem, sražením, zápichem a zaoblením
+
+```
+nový díl Hřídel
+skica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,5 33 15 83 15 83 20 98 20 98 12,5 140 12,5 140 0 uzavřít
+rotovat osa X
+zaoblit 1 hrany kruhové poloměr 12,5
+srazit 1,5 hrany -X kruhové
+závit M20×1,5 délka 25 v 0 0 0 osa X
+výkres A3 na šířku pohledy přední,levý,iso
+kótovat
+výkres tolerance Ø30 h6
+výkres nepředepsané ISO 2768-mK
+výkres stav
+```
+
+Hotový výkres ukazuje (přední pohled, osa vodorovně): průměry `M20×1,5`, `Ø30` (vlevo), `Ø40`, `Ø25` (vpravo),
+zápich `Ø17` popisem; řetěz délek `30` · `3` · `(50)` · `15` · `42`, celková délka `140`, délka závitu `25`;
+`1,5×45°`, `2× R1`. Celkem 14 kót, žádná duplicita, Kontrola kót bez chybějících.
+
+### Příklad B – příruba s roztečnou kružnicí zahloubených děr a středovým otvorem
+
+```
+nový díl Příruba
+válec 160 20
+díra 50 skrz v 0 0 20
+díra 11 skrz v 60 0 20 zahloubení 18 11
+pole kruhové 6
+srazit 1 hrany kruhové poloměr 80
+výkres A3 na šířku pohledy přední,horní,iso
+kótovat
+výkres tolerance Ø50 H7
+výkres stav
+```
+
+Hotový výkres: přední pohled `Ø160`, tloušťka `20`, `2× 1×45°`; horní pohled `Ø50 skrz` (s tolerancí `Ø50H7 skrz`),
+roztečná kružnice `Ø120` (čerchovaná osová kružnice), popis děr `6× Ø11 skrz rovnoměrně` + `⌴ Ø18 ↧11`.
+
+### Příklad C – deska se slepými závitovými dírami, průchozími dírami a kapsou
+
+```
+nový díl Deska
+kvádr 120 80 20
+skica XY odsazení 20: obdélník 50 30 v 60 40 zaoblení-rohů 5
+vysunout 8 odebrat obráceně
+díra 6,8 závit M8 hloubka 14 hloubka-závitu 10 v 15 15
+pole 2 rozteč 90 směr X 2 rozteč 50 směr Y
+díra 8,5 skrz v 60 10
+pole 2 rozteč 60 směr Y
+výkres A3 na šířku pohledy přední,horní,iso
+kótovat
+výkres tolerance 90 ±0,05
+výkres stav
+```
+
+Hotový výkres (horní pohled = půdorys s dírami): `4× M8 ↧10` + `Ø6,8 ↧14`, `2× Ø8,5 skrz`; rozteče od os souměrnosti
+`90` a `50` (závitové díry), `60` (průchozí díry); kapsa `50` × `30`, hloubka `↧8`, `4× R5` (kapsa je uprostřed – bez
+polohových kót); celkové `120` × `80`; v předním pohledu tloušťka `20`.
 
 ## Stav prvku: ✓ / ⚠ / ✗ – co znamená
 
@@ -286,7 +522,7 @@ export type SketchPlane =
   | { kind: "custom"; origin: Vec3; normal: Vec3; xDir: Vec3; label?: string };
 
 import { tr } from "./i18n";
-import type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
+import type { AxisDef, Direction, Extent, PlaneDef, Ref, Sig, StartFrom, Thin } from "./refs";
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
 
 /** Ukončení díry. */
@@ -298,7 +534,9 @@ export type HoleEnd =
   /** dno v úrovni bodu (vrchol, střed hrany, bod skici…) měřeno podél osy díry */
   | { kind: "toVertex"; ref: Ref }
   /** dno ve vzdálenosti `d` před plochou (totéž co „k ploše“ s odsazením – stejný zápis jako u vysunutí) */
-  | { kind: "offsetFromFace"; ref: Ref; d: number };
+  | { kind: "offsetFromFace"; ref: Ref; d: number }
+  /** k tělesu: po první stěnu stávajícího tělesa ve směru vrtání (jako ukončení „k tělesu“ u vysunutí) */
+  | { kind: "toBody" };
 /** Řada průchozích děr ISO 273 (jemná / střední / hrubá). */
 export type HoleFit = "fine" | "medium" | "coarse";
 
@@ -400,11 +638,11 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       fit?: HoleFit;
     }
   /** Zaoblení: `kind` konstantní / asymetrické (r2) / proměnné (radii: poloměr podle indexu hrany) / plocha–plocha / plné; `tangentChain` = šířit po tečných hranách. */
-  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound"; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
+  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound"; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; edgeSigs?: PickSigs; faceSigs?: PickSigs; faceSigs2?: PickSigs; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
   /** Zkosení: stejné vzdálenosti / dvě vzdálenosti (d2 + referenční plocha) / vzdálenost + úhel / vrchol (3 vzdálenosti). */
-  | { type: "chamfer"; distance: number; edges: number[] | "all"; kind?: "equal" | "twoDistances" | "distanceAngle" | "vertex"; d2?: number; d3?: number; angle?: number; faceRef?: Ref; vertices?: number[]; vertexRefs?: Ref[]; tangentChain?: boolean }
+  | { type: "chamfer"; distance: number; edges: number[] | "all"; kind?: "equal" | "twoDistances" | "distanceAngle" | "vertex"; d2?: number; d3?: number; angle?: number; faceRef?: Ref; vertices?: number[]; vertexRefs?: Ref[]; tangentChain?: boolean; edgeSigs?: PickSigs; vertexSigs?: PickSigs }
   /** Skořepina: `thicknesses` = jiná tloušťka pro vybrané plochy (index → mm), `outward` = zesílit ven. */
-  | { type: "shell"; thickness: number; faces: number[]; thicknesses?: Record<string, number>; outward?: boolean }
+  | { type: "shell"; thickness: number; faces: number[]; thicknesses?: Record<string, number>; outward?: boolean; faceSigs?: PickSigs }
   | {
       type: "pattern";
       featureId: string;
@@ -442,7 +680,7 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Šablonování mezi 2+ skicami (profily v různých rovinách). */
   | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode; guideIds?: string[]; centerlineId?: string; closed?: boolean; startCond?: "none" | "normal" | "direction"; endCond?: "none" | "normal" | "direction"; startDir?: Direction; endDir?: Direction; startLen?: number; endLen?: number; thin?: Thin; startPoint?: Ref; endPoint?: Ref }
   /** Úkos vybraných ploch vůči neutrální rovině (`planeDef` = libovolná rovina; `pull` = směr tahu; `partingSketchId` = dělicí křivka). */
-  | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number; planeDef?: PlaneDef; pull?: Direction; partingSketchId?: string; tangentChain?: boolean; step?: boolean }
+  | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number; planeDef?: PlaneDef; pull?: Direction; partingSketchId?: string; tangentChain?: boolean; step?: boolean; faceSigs?: PickSigs }
   /** Rozříznutí tělesa rovinou, ponechá se jedna strana (`planeDef` = libovolná rovina, `faceRef` = řez plochou). */
   | { type: "split"; plane: PlaneName; offset: number; keep: "positive" | "negative"; planeDef?: PlaneDef; faceRef?: Ref }
   /** Přesun / otočení / měřítko tělesa. */
@@ -452,17 +690,17 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Text – vystouplý (add) nebo gravírovaný (cut) do tělesa. */
   | { type: "text"; text: string; height: number; depth: number; plane: SketchPlane; position: Vec2; angle: number; mode: "add" | "cut"; positionRef?: Ref; planeDef?: PlaneDef }
   /** Přímé úpravy: posunout (vytáhnout/zatlačit) vybrané plochy o vzdálenost podél normály (`extent` = k vrcholu / k ploše / odsazeně od plochy). */
-  | { type: "pushPull"; faces: number[]; distance: number; extent?: Extent }
+  | { type: "pushPull"; faces: number[]; distance: number; extent?: Extent; faceSigs?: PickSigs }
   /** Přímé úpravy: odstranit plochy (např. zaoblení, díry) a zacelit těleso. */
-  | { type: "deleteFace"; faces: number[] }
+  | { type: "deleteFace"; faces: number[]; faceSigs?: PickSigs }
   /** Přímé úpravy: odsadit plochy (offset) – kladně ven, záporně dovnitř. */
-  | { type: "offsetFace"; faces: number[]; distance: number }
+  | { type: "offsetFace"; faces: number[]; distance: number; faceSigs?: PickSigs }
   /** Žebro z otevřené skici (čára) s tloušťkou, dotažené k tělesu. */
   | { type: "rib"; sketchId: string; thickness: number; direction: "normal" | "inPlane"; flip: boolean }
   /** Šroubovice / pružina (tažení kruhového průřezu po šroubovici). */
   | { type: "spring"; radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis; mode: BoolMode; positionRef?: Ref; dirDef?: Direction }
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
-  | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode }
+  | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode; faceSigs?: PickSigs }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
   /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“) */
   | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; positionRef?: Ref; dirDef?: Direction }
@@ -516,6 +754,36 @@ export type CadDoc = {
   bodies?: BodyMeta[];
   /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */
   activeBody?: string | null;
+  /** podklady skic (obrázek / stránka PDF pod geometrií): id skici → podklad; mimo prvky, aby neměnily klíč mezipaměti stavby */
+  underlays?: Record<string, SketchUnderlay>;
+};
+
+/**
+ * Podklad skici: obrázek nebo stránka PDF zobrazená pod geometrií (obkreslování, převod čar PDF na entity).
+ * Poloha: střed obrázku `x, y` [mm ve skice], měřítko `mmPerPx` (velikost pixelu bitmapy v mm – nastavuje kalibrace
+ * dvěma body) a natočení `angle` [°, kladně proti směru hodin]. Matematika: cad/sketch-underlay.ts.
+ */
+export type SketchUnderlay = {
+  id: string;
+  /** obrázek jako data URL (PNG / JPEG; velké bitmapy se při vložení zmenší) */
+  src: string;
+  /** rozměr bitmapy [px] */
+  w: number;
+  h: number;
+  /** název zdrojového souboru */
+  name?: string;
+  x: number;
+  y: number;
+  mmPerPx: number;
+  angle: number;
+  /** krytí 0–1 */
+  opacity: number;
+  hidden?: boolean;
+  /** stránka PDF, ze které podklad vznikl (od 1), a počet stran dokumentu */
+  page?: number;
+  pages?: number;
+  /** stránka PDF: pixelů bitmapy na 1 bod PDF (1/72″) – převod vektorových čar stránky do skici */
+  pxPerPt?: number;
 };
 
 export type Sig = { t: string; c: Vec3; s: number };

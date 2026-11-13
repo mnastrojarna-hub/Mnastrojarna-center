@@ -11,11 +11,11 @@ import { mateFromPending, measureMateIn, releaseComponent, solveMates, type Face
 import { bodiesAt, isNewBodyMode, nextBodyName } from "@/cad/bodies";
 import { makeFromText } from "@/cad/library";
 import { cad, isCancelled } from "@/cad/client";
-import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
+import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, ejectorHoles, ejectorLength, ejectorPinPlacement, suggestEjectors, suggestPartingZ, type CoolingParams, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
 import { isUnlocked, notifyVault, persistMode, restoreSession, VAULT_EVENT, vaultGet, vaultSet, wipeStoredDocuments } from "@/cad/vault";
 import { DEFAULT_SKETCH_SHORTCUTS, keyCombo, loadSettings, pushRecent, readRecentDoc, saveSettings, shortcutOf, storeRecentDoc, type Settings } from "@/cad/settings";
 import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
-import { allExt, extByTab, getExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
+import { extByTab, getExt, visibleExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
@@ -2253,7 +2253,7 @@ export function CadApp() {
       // zkratky prvků rozšíření (Shift+F příruba plechu, Shift+W svar…) – stejná akce jako tlačítko na pásu karet
       if (e.shiftKey && e.key.length === 1) {
         const want = `SHIFT+${e.key.toUpperCase()}`;
-        const def = allExt().find((d) => d.kbd && d.kbd.replace(/\s+/g, "").toUpperCase() === want);
+        const def = visibleExt().find((d) => d.kbd && d.kbd.replace(/\s+/g, "").toUpperCase() === want);
         if (def) {
           e.preventDefault();
           return addExt(def);
@@ -2426,19 +2426,19 @@ export function CadApp() {
     return { colors: null, info: undefined };
   }, [result, isAsm, surface.mode, surface.limit]);
   const vertexColors = useMemo(() => analysis.colors ?? (draftResult && result?.mesh ? draftVertexColors(result.mesh, draftResult) : null), [analysis.colors, draftResult, result]);
-  const ejectors = useMemo<EjectorSuggestion[]>(() => (m ? suggestEjectors(m.bbox) : []), [m]);
+  const ejectors = useMemo<EjectorSuggestion[]>(() => (m ? suggestEjectors(m.bbox, { dir: draftSetup.pull }) : []), [m, draftSetup.pull]);
   const addEjectors = (list: EjectorSuggestion[], mode: "holes" | "pins") => {
     if (!m) return;
     if (mode === "holes") {
-      const fs: Feature[] = list.map((e, i) => ({ id: uid(), name: tr("Vyhazovač {0}", i + 1), type: "hole", position: [e.x, e.y, m.bbox[1][2]], axis: "Z", flip: false, diameter: e.d + 0.05, depth: 0, cbDiameter: 0, cbDepth: 0, kind: "simple" }));
+      const fs = ejectorHoles(list, m.bbox[1][2]); // proti směru vyhození (směr otevírání formy z panelu)
       commit({ ...doc, features: [...doc.features, ...fs] });
       flash(tr("{0} děr pro vyhazovače přidáno do historie.", fs.length));
     } else {
       const a = emptyAssembly(tr("Sestava – {0}", doc.name));
-      const len = Math.ceil((m.bbox[1][2] - m.bbox[0][2] + 100) / 10) * 10;
+      const len = ejectorLength(m.bbox, draftSetup.pull);
       a.components = [
         partComponent(doc, {}, { group: "Díly", fixed: true, color: doc.color ?? "#b9c2cc" }),
-        ...list.map((e) => partComponent(ejectorPin(e.d, len), { position: [e.x, e.y, m.bbox[0][2] - len - 5] }, { group: "Vyhazování", color: "#e03930" })),
+        ...list.map((e) => partComponent(ejectorPin(e.d, len), ejectorPinPlacement(e, m.bbox, len), { group: "Vyhazování", color: "#e03930" })),
       ];
       openDocInTab(a);
       setMoldTools(false);
@@ -3875,7 +3875,7 @@ function helpText(shortcuts: Record<string, string> | null | undefined): string 
   const sketch = Object.keys(DEFAULT_SKETCH_SHORTCUTS)
     .map((id) => `${k(id)} ${tr(SHORTCUT_LABELS[id] ?? id).toLowerCase()}`)
     .join(" · ");
-  const ext = allExt()
+  const ext = visibleExt()
     .filter((d) => d.kbd)
     .map((d) => `${d.kbd} ${d.label.toLowerCase()}`)
     .join(" · ");

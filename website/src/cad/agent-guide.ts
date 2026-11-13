@@ -229,6 +229,14 @@ spring…) i prvek rozšíření (\`prvek sheet.bend …\`, \`prvek "Zkrut" …\
 - Skici a prvky se zadávají názvem (\`profileId="Skica 1"\`) nebo \`$last\`; plochy a hrany čísly (\`faces=1;4;5\`) nebo
   pravidlem (\`faces=boční\`, \`edges=horní;kruhové\`).
 - Neznámý klíč nebo typ skončí chybou s výčtem platných – tak lze parametry zjistit.
+- Směr a osa u rozšíření (\`surf.helix\` / \`surf.helixSweep\` \`axis\`, \`sheet.relief\` \`axis\`, \`surf.extrude\` \`dir\`,
+  \`surf.revolve\` \`axis\`): \`axis=X\`, \`axis=-Z\`, vektor \`axis=1;0;1\`, nebo JSON odkaz
+  (\`axis={"kind":"edge","ref":{"kind":"edge","index":3}}\` = podél hrany 4 / osy válce, \`{"kind":"faceNormal","ref":{"kind":"face","index":5}}\`
+  = normála plochy 6). U \`surf.revolve\` je \`axis=x\` / \`axis=y\` osa skici, \`axis=X|Y|Z\` globální osa, JSON \`AxisDef\`
+  (\`{"kind":"cylFace","ref":{"kind":"face","index":2}}\`). Starší zápis \`"axis": "Z"\` v JSON platí dál.
+- Prvky \`adv.varFillet\`, \`adv.fullRound\`, \`adv.chamfer2\`, \`adv.curvePattern\`, \`adv.fillPattern\` a \`adv.holesAtPoints\` jsou
+  starší duplicity – na pásu karet už nejsou, staré dokumenty i \`prvek …\` je dál postaví. Pro nové díly použijte
+  vestavěné \`zaoblit\` (druh R1 → R2 / plný), \`srazit\` (D1 × D2 / D × úhel), \`pole\` (po křivce / výplň / podle skici) a \`díra\`.
 
 \`\`\`
 skica XY: obdélník 20 20

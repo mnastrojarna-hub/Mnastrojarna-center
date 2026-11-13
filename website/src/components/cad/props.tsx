@@ -7,6 +7,7 @@ import { tr } from "@/cad/i18n";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ALL_THREADS, FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
 import { getExt, type ExtParam } from "@/cad/ext/registry";
+import { ExtDirectionParam, ExtAxisParam, LegacyHint } from "./ext-params";
 import { getExtUi } from "./ext/registry";
 import { evalExpr, exprRefs, isExpression } from "@/cad/params";
 import type { Axis, BoolMode, CadDoc, Feature, HoleKind, PlaneName, SketchEntity, Vec2, Vec3 } from "@/cad/types";
@@ -918,11 +919,17 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
   if (!def) return <p className="text-[12px] text-brand-600">{tr("Modul prvku „")}{f.ext}{tr("“ není načten.")}</p>;
   if (ui?.Form) {
     const Form = ui.Form;
-    return <Form f={f} doc={doc} onChange={patch} />;
+    return (
+      <>
+        {def.legacy && <LegacyHint text={def.legacy} />}
+        <Form f={f} doc={doc} onChange={patch} />
+      </>
+    );
   }
   if (!def.params?.length) return <p className="text-[12px] text-ink-700/55">{def.hint ?? tr("Prvek nemá parametry.")}</p>;
   return (
     <>
+      {def.legacy && <LegacyHint text={def.legacy} />}
       {def.params.map((p: ExtParam) => {
         const v = data[p.key];
         switch (p.kind) {
@@ -1036,6 +1043,12 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
                 )}
               </div>
             );
+          case "direction":
+            // směr jako u vysunutí / pole (osa, vektor čísly, hrana, normála plochy…); starší „X“ / [x,y,z] se zobrazí převedené
+            return <ExtDirectionParam key={p.key} p={p} value={v} onChange={(d) => patch({ [p.key]: d })} />;
+          case "axis":
+            // osa jako u rotace (osy skici, čára skici, hrana, válcová plocha, dva body, globální osa…); starší „x“ / „y“ převedené
+            return <ExtAxisParam key={p.key} p={p} value={v} sketch={p.sketchKey ? sketches.find((sk) => sk.id === data[p.sketchKey!]) : undefined} onChange={(a) => patch({ [p.key]: a })} />;
           case "faces":
           case "edges": {
             // stejný výběr jako u základních prvků: klik v modelu, seznam / pravidlo, aktuální výběr, popis vybraných

@@ -596,9 +596,10 @@ export function moldBase(p: MoldBaseParams = defaultMoldBase, name = tr("Rám fo
 
 // ---------------- pole a zrcadlení komponent ----------------
 
-export type CompPattern = { kind: "linear"; count: number; spacing: number; direction: Vec3 } | { kind: "circular"; count: number; angle: number; axis: "X" | "Y" | "Z"; center: Vec3 };
+/** Pole komponenty; osa kruhového pole je globální X / Y / Z nebo libovolný směr zadaný vektorem. */
+export type CompPattern = { kind: "linear"; count: number; spacing: number; direction: Vec3 } | { kind: "circular"; count: number; angle: number; axis: "X" | "Y" | "Z" | Vec3; center: Vec3 };
 
-const axisVec = (a: "X" | "Y" | "Z"): Vec3 => (a === "X" ? [1, 0, 0] : a === "Y" ? [0, 1, 0] : [0, 0, 1]);
+const axisVec = (a: "X" | "Y" | "Z" | Vec3): Vec3 => (Array.isArray(a) ? a : a === "X" ? [1, 0, 0] : a === "Y" ? [0, 1, 0] : [0, 0, 1]);
 
 /** Rotační matice kolem osy o úhel (°). */
 export function axisRotation(axis: Vec3, deg: number): Mat3 {
@@ -617,6 +618,7 @@ export function patternComponent(doc: CadDoc, compId: string, p: CompPattern): C
   const c = comps[i];
   if (!c) throw new Error(tr("Komponenta nenalezena."));
   const n = Math.max(1, Math.round(p.count));
+  if (p.kind === "circular" && !(Math.hypot(...axisVec(p.axis)) > 1e-12)) throw new Error(tr("Osa kruhového pole je nulový vektor – zadejte směr osy."));
   const copies: AsmComponent[] = [];
   for (let k = 1; k < n; k++) {
     let placement: Placement;

@@ -52,7 +52,7 @@ const pt = (p: Vec2) => `[${fmt(p[0])}; ${fmt(p[1])}]`;
 export const ORIGIN_ID = "O";
 
 const CON_CMD = ["vazba", "vazby", "constraint", "constraints", "bedingung", "bedingungen"];
-const DIM_CMD = ["kota", "koty", "dim", "dims", "dimension", "dimensions", "bemaßung", "bemassung", "maß", "mass"];
+const DIM_CMD = ["kota", "koty", "dim", "dims", "bemaßung", "bemassung", "maß", "mass"]; // „dimension“ = kótování výkresu (kótovat)
 const ORIGIN_WORDS = ["pocatek", "origin", "ursprung", "o"];
 const REF_WORDS = ["referencni", "referencne", "reference", "ref", "referenz", "driven"];
 const DRIVE_WORDS = ["ridici", "driving", "steuernd"];

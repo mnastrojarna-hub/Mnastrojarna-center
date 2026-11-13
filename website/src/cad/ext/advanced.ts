@@ -107,6 +107,7 @@ function finish(mk: OC, what: string): Shape {
 
 registerExt({
   ext: "adv.varFillet",
+  legacy: tr("Totéž umí vestavěné Zaoblení, druh R1 → R2."),
   label: tr("Proměnné zaoblení"),
   icon: "adv-varfillet",
   tone: "feature",
@@ -143,6 +144,7 @@ registerExt({
 
 registerExt({
   ext: "adv.fullRound",
+  legacy: tr("Totéž umí vestavěné Zaoblení, druh Plný."),
   label: tr("Plné zaoblení"),
   icon: "adv-fullround",
   tone: "feature",
@@ -232,6 +234,7 @@ registerExt({
 
 registerExt({
   ext: "adv.chamfer2",
+  legacy: tr("Totéž umí vestavěné Sražení, druh D1 × D2 nebo D × úhel."),
   label: tr("Sražení D1×D2 / D×úhel"),
   icon: "adv-chamfer2",
   tone: "feature",
@@ -321,6 +324,7 @@ registerExt({
 
 registerExt({
   ext: "adv.curvePattern",
+  legacy: tr("Totéž umí vestavěné Pole, druh Po křivce."),
   label: tr("Pole podél křivky"),
   icon: "adv-curvepattern",
   tone: "pattern",
@@ -371,6 +375,7 @@ registerExt({
 
 registerExt({
   ext: "adv.fillPattern",
+  legacy: tr("Totéž umí vestavěné Pole, druh Výplň."),
   label: tr("Výplňové pole"),
   icon: "adv-fillpattern",
   tone: "pattern",
@@ -807,6 +812,7 @@ registerExt({
 
 registerExt({
   ext: "adv.holesAtPoints",
+  legacy: tr("Totéž umí vestavěná Díra (Polohy děr, více naráz) nebo Pole, druh Podle skici."),
   label: tr("Díry v bodech"),
   icon: "adv-holes",
   tone: "cut",
