@@ -325,7 +325,7 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
         T("circle", "circle"),
         T("arc", "arc", tr("začátek, konec, bod na oblouku")),
         T("polyline", "polyline", tr("Enter/dvojklik ukončí")),
-        T("centerline", "centerline", tr("pomocná osa")),
+        T("centerline", "centerline", tr("konstrukční čára – osa rotace nebo zrcadlení")),
         T("point", "point"),
         T("rectCenter", "rectCenter"),
         T("circle3", "circle3"),
@@ -363,7 +363,7 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
       ],
     },
     {
-      label: tr("Vazby"),
+      label: tr("Vazby skici"),
       big: 0,
       items: (["horizontal", "vertical", "coincident", "parallel", "perpendicular", "tangent", "equal", "concentric", "midpoint", "pointOnCurve", "symmetric", "collinear", "fixed"] as ConType[]).map(K),
     },
@@ -383,7 +383,7 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
   ];
   // pořadí jako v desktopových CADech: kreslení → vazby a kóty → úpravy → nástroje; uchopení (přepínače) až na konci
   const by = (l: string) => groups.find((g) => g.label === l)!;
-  return [by(tr("Kreslení")), by(tr("Vazby")), by(tr("Kóty")), by(tr("Úpravy")), by(tr("Nástroje")), ...snapGroup];
+  return [by(tr("Kreslení")), by(tr("Vazby skici")), by(tr("Kóty")), by(tr("Úpravy")), by(tr("Nástroje")), ...snapGroup];
 }
 
 // ======================= geometrie pomocí =======================
@@ -2528,7 +2528,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
       const applicable = (Object.keys(CON_INFO) as ConType[]).filter((t) => Array.isArray(matchConstraint(t, pk)));
       if (applicable.length) {
-        entries.push({ divider: true, label: tr("Vazby") });
+        entries.push({ divider: true, label: tr("Vazby skici") });
         for (const t of applicable) entries.push({ id: `c-${t}`, label: CON_INFO[t].label, icon: CON_INFO[t].icon, tone: "pattern", onClick: () => { const m = matchConstraint(t, pk); if (Array.isArray(m)) applyConstraint(t, m); } });
       }
     } else {

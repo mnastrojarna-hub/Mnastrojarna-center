@@ -20,6 +20,7 @@ import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { ShareCta } from "./share-cta";
+import { TipBox, microTipsEnabled, type TipSpec } from "./micro-tip";
 import { AnnFitRev, FitsSection, useViewTools, ViewToolsOverlay, ViewToolsSection } from "./drawing-views-panel";
 
 type Props = {
@@ -756,6 +757,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   })();
 
   const scaleValue = opts.scale === "auto" ? "auto" : String(opts.scale);
+  // mikronávody u tlačítek (Nastavení → Mikronávody u ikon); bez nich nativní title
+  const tipsOn = microTipsEnabled();
+  const WHY_RES = tr("Výkres se ještě počítá – počkejte na pohledy.");
 
   return (
     <div data-drawing-workspace className="fixed inset-x-0 bottom-0 top-[76px] z-30 flex flex-col bg-[#4b5058] text-[12.5px] text-ink-700 sm:top-10">
@@ -774,13 +778,15 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           </span>
         )}
         <div className="flex-1" />
-        <Btn primary onClick={exportPdf} disabled={!res}>
+        <Btn primary onClick={exportPdf} disabled={!res} tip={{ id: "pdf", label: tr("Export PDF"), why: WHY_RES }}>
           PDF
         </Btn>
         <span className="inline-flex items-stretch overflow-hidden rounded-md border border-ink-700/15 bg-white">
-          <button type="button" onClick={exportDwg} disabled={!res} title={tr("DWG {0} – přímo do AutoCADu, ZWCADu, BricsCADu", DWG_VERSIONS.find((v) => v.id === dwgVer)?.hint ?? "")} className="px-3 py-1.5 text-[12.5px] font-medium hover:bg-steel-100 disabled:opacity-40">
-            DWG
-          </button>
+          <TipBox tip={dwTip({ id: "dwg", label: tr("Export DWG"), why: WHY_RES }, tr("DWG {0} – přímo do AutoCADu, ZWCADu, BricsCADu", DWG_VERSIONS.find((v) => v.id === dwgVer)?.hint ?? ""), !res)} className="flex">
+            <button type="button" onClick={exportDwg} disabled={!res} title={tipsOn ? undefined : tr("DWG {0} – přímo do AutoCADu, ZWCADu, BricsCADu", DWG_VERSIONS.find((v) => v.id === dwgVer)?.hint ?? "")} className="px-3 py-1.5 text-[12.5px] font-medium hover:bg-steel-100 disabled:pointer-events-none disabled:opacity-40">
+              DWG
+            </button>
+          </TipBox>
           <select
             value={dwgVer}
             onChange={(e) => {
@@ -803,31 +809,37 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             ))}
           </select>
         </span>
-        <Btn onClick={() => exportText("dxf")} disabled={!res} title={tr("DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD")}>
+        <Btn onClick={() => exportText("dxf")} disabled={!res} title={tr("DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD")} tip={{ id: "dxf", label: tr("Export DXF"), why: WHY_RES }}>
           DXF
         </Btn>
-        <Btn onClick={() => exportText("svg")} disabled={!res}>
+        <Btn onClick={() => exportText("svg")} disabled={!res} tip={{ id: "svg", label: tr("Export SVG"), why: WHY_RES }}>
           SVG
         </Btn>
-        {bom?.length ? <Btn onClick={() => exportText("csv")}>{tr("Kusovník CSV")}</Btn> : null}
-        <Btn onClick={() => out && printSvg(out.svg, out.sheet.w, out.sheet.h)} disabled={!res}>
+        {bom?.length ? (
+          <Btn onClick={() => exportText("csv")} tip={{ id: "bomCsv", label: tr("Kusovník CSV") }}>
+            {tr("Kusovník CSV")}
+          </Btn>
+        ) : null}
+        <Btn onClick={() => out && printSvg(out.svg, out.sheet.w, out.sheet.h)} disabled={!res} tip={{ id: "print", label: tr("Tisk"), why: WHY_RES }}>
           {tr("Tisk")}
         </Btn>
         {onShare && (
           <>
             <div className="mx-1 h-6 w-px bg-ink-700/10" />
-            <ShareCta
-              compact
-              onClick={() => {
-                if (dirty.current) persistNow(); // rozpracované razítko / poznámky do dokumentu ještě před vytvořením odkazu
-                onShare?.();
-              }}
-              title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres")}
-            />
+            <TipBox tip={dwTip({ id: "share", label: tr("Sdílet odkazem") }, tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres"))} className="flex shrink-0">
+              <ShareCta
+                compact
+                onClick={() => {
+                  if (dirty.current) persistNow(); // rozpracované razítko / poznámky do dokumentu ještě před vytvořením odkazu
+                  onShare?.();
+                }}
+                title={tipsOn ? "" : tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres")}
+              />
+            </TipBox>
           </>
         )}
         <div className="mx-1 h-6 w-px bg-ink-700/10" />
-        <Btn onClick={close} title={tr("Zpět do 3D (Esc)")}>
+        <Btn onClick={close} title={tr("Zpět do 3D (Esc)")} tip={{ id: "close", label: tr("Zavřít"), kbd: "Esc" }}>
           {tr("Zavřít")}
         </Btn>
       </header>
@@ -862,9 +874,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             )}
           </div>
         ))}
-        <button type="button" onClick={addSheet} disabled={!onDrawingsChange} className="mb-0.5 rounded px-2 py-0.5 text-[12px] text-ink-700/60 hover:bg-white/60 hover:text-brand disabled:opacity-40" title={tr("Přidat list")}>
-          {tr("+ List")}
-        </button>
+        <TipBox tip={dwTip({ id: "sheetAdd", label: tr("Přidat list"), why: tr("Výkres bez dokumentu výkresu nemá další listy.") }, undefined, !onDrawingsChange)} className="mb-0.5 shrink-0">
+          <button type="button" onClick={addSheet} disabled={!onDrawingsChange} className="rounded px-2 py-0.5 text-[12px] text-ink-700/60 hover:bg-white/60 hover:text-brand disabled:pointer-events-none disabled:opacity-40" title={tipsOn ? undefined : tr("Přidat list")}>
+            {tr("+ List")}
+          </button>
+        </TipBox>
         <span className="ml-auto pb-1 text-[11px] text-ink-700/45">
           {tr("List")}{" "}{sheetIdx + 1}/{Math.max(1, sheets.length)}
         </span>
@@ -876,18 +890,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           <Section title={tr("Kóty a poznámky")}>
             <div className="grid grid-cols-3 gap-1">
               {ANN_TOOLS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  title={`${t.hint} (${t.kbd})`}
-                  onClick={() => {
-                    setAnnTool((cur) => (cur === t.id ? null : t.id));
-                    setAnnPts([]);
-                  }}
-                  className={cn("rounded-md border px-1 py-1.5 text-[11.5px] leading-tight", annTool === t.id ? "border-brand bg-brand/10 font-semibold text-brand" : "border-ink-700/15 hover:bg-steel-100")}
-                >
-                  {t.label}
-                </button>
+                <TipBox key={t.id} tip={dwTip({ id: `ann-${t.id}`, label: t.label, kbd: t.kbd }, t.hint)} className="flex">
+                  <button
+                    type="button"
+                    title={tipsOn ? undefined : `${t.hint} (${t.kbd})`}
+                    onClick={() => {
+                      setAnnTool((cur) => (cur === t.id ? null : t.id));
+                      setAnnPts([]);
+                    }}
+                    className={cn("w-full rounded-md border px-1 py-1.5 text-[11.5px] leading-tight", annTool === t.id ? "border-brand bg-brand/10 font-semibold text-brand" : "border-ink-700/15 hover:bg-steel-100")}
+                  >
+                    {t.label}
+                  </button>
+                </TipBox>
               ))}
             </div>
             {annTool === "dim" && (
@@ -1342,12 +1357,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
 
           {/* zoom */}
           <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-lg bg-white/95 p-1 shadow-lg" onPointerDown={(e) => e.stopPropagation()}>
-            <ZoomBtn onClick={() => setViewTf((v) => zoomAt(v, 1 / 1.25, canvas.current))}>−</ZoomBtn>
+            <ZoomBtn tip={dwTip({ id: "zoomOut", label: tr("Oddálit") })} onClick={() => setViewTf((v) => zoomAt(v, 1 / 1.25, canvas.current))}>−</ZoomBtn>
             <span className="w-12 text-center font-mono text-[11px] text-ink-700/70">{Math.round((view.z / 3.78) * 100)} %</span>
-            <ZoomBtn onClick={() => setViewTf((v) => zoomAt(v, 1.25, canvas.current))}>+</ZoomBtn>
-            <button type="button" className="rounded-md px-2 py-1 text-[11.5px] font-medium hover:bg-steel-100" onClick={fit} title={tr("Přizpůsobit (F)")}>
-              {tr("Celý list")}
-            </button>
+            <ZoomBtn tip={dwTip({ id: "zoomIn", label: tr("Přiblížit") })} onClick={() => setViewTf((v) => zoomAt(v, 1.25, canvas.current))}>+</ZoomBtn>
+            <TipBox tip={dwTip({ id: "fitSheet", label: tr("Celý list"), kbd: "F" }, tr("Přizpůsobit (F)"))} className="flex">
+              <button type="button" className="rounded-md px-2 py-1 text-[11.5px] font-medium hover:bg-steel-100" onClick={fit} title={tipsOn ? undefined : tr("Přizpůsobit (F)")}>
+                {tr("Celý list")}
+              </button>
+            </TipBox>
           </div>
 
           {/* stavový řádek */}
@@ -1473,11 +1490,11 @@ function AnnPrompt({ kind, x, y, onDone, onCancel }: { kind: AnnTool; x: number;
       {kind === "note" && field("text", tr("Text poznámky"), tr("např. Ostré hrany srazit 0,5×45°"))}
       {kind === "text" && (
         <>
-          {field("text", "Text", tr("např. Kalit 58 ± 2 HRC"))}
+          {field("text", tr("Text"), tr("např. Kalit 58 ± 2 HRC"))}
           {field("size", tr("Výška písma [mm]"))}
         </>
       )}
-      {kind === "roughness" && field("ra", "Drsnost", tr("Ra 3,2 / Rz 25"))}
+      {kind === "roughness" && field("ra", tr("Drsnost"), tr("Ra 3,2 / Rz 25"))}
       {kind === "gdt" && (
         <>
           <label className="block">
@@ -1491,7 +1508,7 @@ function AnnPrompt({ kind, x, y, onDone, onCancel }: { kind: AnnTool; x: number;
             </select>
           </label>
           <div className="grid grid-cols-2 gap-2">
-            {field("value", "Tolerance", "0,05")}
+            {field("value", tr("Tolerance"), "0,05")}
             {field("datum", tr("Základna"), "A")}
           </div>
         </>
@@ -1680,27 +1697,41 @@ function NumInput({ value, onChange, suffix }: { value: number; onChange: (v: nu
   );
 }
 
-function Btn({ children, onClick, primary, disabled, title }: { children: React.ReactNode; onClick: () => void; primary?: boolean; disabled?: boolean; title?: string }) {
-  return (
+/** Mikronávod tlačítka pracovní plochy výkresu (kontext „drawing-ws“, klíč návodu „drawing-ws/<id>“). */
+type DwTip = { id: string; label: string; kbd?: string; why?: string };
+const dwTip = (t: DwTip, hint?: string, disabled?: boolean): TipSpec => ({ ...t, ctx: "drawing-ws", hint, disabled });
+
+function Btn({ children, onClick, primary, disabled, title, tip }: { children: React.ReactNode; onClick: () => void; primary?: boolean; disabled?: boolean; title?: string; tip?: DwTip }) {
+  const on = !!tip && microTipsEnabled();
+  const b = (
     <button
       type="button"
-      title={title}
+      title={on ? undefined : title}
       disabled={disabled}
       onClick={onClick}
       className={cn(
         "shrink-0 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition disabled:opacity-40",
+        on && "disabled:pointer-events-none",
         primary ? "bg-brand text-white hover:bg-brand-600" : "border border-ink-700/12 bg-white text-ink-700 hover:bg-steel-100",
       )}
     >
       {children}
     </button>
   );
+  if (!tip) return b;
+  return (
+    <TipBox tip={dwTip(tip, title, disabled)} className="flex shrink-0">
+      {b}
+    </TipBox>
+  );
 }
 
-function ZoomBtn({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+function ZoomBtn({ children, onClick, tip }: { children: React.ReactNode; onClick: () => void; tip: TipSpec }) {
   return (
-    <button type="button" onClick={onClick} className="grid h-7 w-7 place-items-center rounded-md text-[15px] font-semibold hover:bg-steel-100">
-      {children}
-    </button>
+    <TipBox tip={tip} className="flex">
+      <button type="button" onClick={onClick} aria-label={tip.label} title={microTipsEnabled() ? undefined : tip.label} className="grid h-7 w-7 place-items-center rounded-md text-[15px] font-semibold hover:bg-steel-100">
+        {children}
+      </button>
+    </TipBox>
   );
 }

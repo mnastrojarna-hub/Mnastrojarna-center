@@ -1,0 +1,33 @@
+# Vlna 10 – mikronávody u ikon pásu karet (micro-tip.tsx, důvody neaktivních tlačítek, nastavení)
+Kdy použít	Wann verwenden
+Vyberte	Auswählen
+Postup	Vorgehen
+Příkaz	Befehl
+Tip	Tipp
+Mikronávody u ikon	Kurzanleitungen an Symbolen
+Po najetí myší (na dotyku dlouhým stiskem) ukáže u ikony pásu karet krátký návod: co dělá, kdy ji použít, co vybrat a jak postupovat	Beim Überfahren mit der Maus (auf Touch durch langes Drücken) zeigt ein Menüband-Symbol eine kurze Anleitung: was es tut, wann man es verwendet, was auszuwählen ist und wie man vorgeht
+Jen v dílu, ne v sestavě.	Nur im Bauteil, nicht in der Baugruppe.
+Jen v sestavě.	Nur in der Baugruppe.
+Nejdřív vytvořte nebo vložte těleso – model je zatím prázdný.	Erst einen Körper erstellen oder einfügen – das Modell ist noch leer.
+Nejdřív vyberte komponentu (ve stromu sestavy nebo v modelu).	Erst eine Komponente auswählen (im Baugruppenbaum oder im Modell).
+Nejdřív vyberte plochu (filtr výběru Plocha).	Erst eine Fläche auswählen (Auswahlfilter Fläche).
+Vybraná komponenta není podsestava.	Die ausgewählte Komponente ist keine Unterbaugruppe.
+Sestava zatím nemá komponenty.	Die Baugruppe hat noch keine Komponenten.
+Export PDF	PDF exportieren
+Export DWG	DWG exportieren
+Export DXF	DXF exportieren
+Export SVG	SVG exportieren
+Výkres se ještě počítá – počkejte na pohledy.	Die Zeichnung wird noch berechnet – warten Sie auf die Ansichten.
+Výkres bez dokumentu výkresu nemá další listy.	Eine Zeichnung ohne Zeichnungsdokument hat keine weiteren Blätter.
+# opravy popisků a nápověd podle kontroly obsahu mikronávodů
+vizualizace	Visualisierung
+Stran	Seiten
+Vazby skici	Beziehungen
+konstrukční čára – osa rotace nebo zrcadlení	Konstruktionslinie – Achse für Rotation oder Spiegelung
+délka do Tabulky svarů; 0 = neuvedena (délka i objem 0)	Länge für die Schweißtabelle; 0 = nicht angegeben (Länge und Volumen 0)
+pomocná 3D křivka (pružina, závit) – těleso po šroubovici vytvoří Tažení po šroubovici	Hilfs-3D-Kurve (Feder, Gewinde) – einen Körper entlang der Wendel erzeugt Austragung entlang Helix
+průsečnice tělesa/ploch s rovinou (pomocná 3D křivka; do skici ji převede Promítnout hrany)	Schnittkurve von Körper/Flächen mit einer Ebene (Hilfs-3D-Kurve; Kanten projizieren übernimmt sie in eine Skizze)
+odřízne část volných ploch na jedné straně roviny	schneidet den Teil der freien Flächen auf einer Seite einer Ebene ab
+rozřízne solid rovinou – obě části zůstanou, nebo jen jedna	teilt den Volumenkörper mit einer Ebene – beide Teile bleiben, oder nur einer
+zaoblený výstupek podél úsečky ve skice (zjednodušeně, v rozvinu chybí – tvářené žebro je Žebro podél dráhy)	gerundete Erhebung entlang einer Skizzenlinie (vereinfacht, fehlt in der Abwicklung – eine geformte Sicke ist Sicke entlang Pfad)
+Podložka kořene	Badsicherung

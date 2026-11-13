@@ -90,7 +90,7 @@ Volná délka	Free length
 Vrchol / bod	Vertex / point
 Vymazat = počátek	Clear = origin
 Vymazat = zpět na čísla	Clear = back to numbers
-Vystoupit	Leave
+Vystoupit	Raise
 Vzdálenost se spočítá ze středu každé vybrané plochy po cílovou rovinu podél normály plochy (každá plocha zvlášť).	The distance is computed from the centre of each selected face to the target plane along the face normal (each face separately).
 Válcová / kuželová plocha	Cylindrical / conical face
 Z bodu	From point

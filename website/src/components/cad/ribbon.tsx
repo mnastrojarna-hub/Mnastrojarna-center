@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
+import { MicroTipLayer, hideTip, nativeTitle, useMicroTip, type TipSpec } from "./micro-tip";
 
 export type RItem = {
   id: string;
@@ -16,6 +17,8 @@ export type RItem = {
   disabled?: boolean;
   kbd?: string;
   hint?: string;
+  /** proč je tlačítko neaktivní – ukáže se v mikronávodu (jen u neaktivního tlačítka) */
+  why?: string;
   /** rozbalovací nabídka */
   menu?: RMenuEntry[];
 };
@@ -23,14 +26,19 @@ export type RMenuEntry = RItem | { divider: true; label?: string };
 /** Skupina pásu: první `big` položek jsou velká tlačítka, zbytek malá ve sloupcích po třech. */
 export type RGroup = { label: string; big?: number; items: RItem[] };
 
+/** Údaje mikronávodu tlačítka (src/cad/help/tips.ts) v daném kontextu. */
+const tipSpec = (it: RItem, ctx?: string, place?: TipSpec["place"]): TipSpec => ({ id: it.id, ctx, label: it.label, kbd: it.kbd, hint: it.hint, disabled: it.disabled, why: it.why, place });
+
 /**
  * Pás karet (ribbon) – velká a malá tlačítka, rozbalovací nabídky, popisky skupin.
  *
  * Když se pás do šířky okna nevejde (karta Skica při 1430 px), zhušťuje se sám: nejdřív malá tlačítka bez pevné šířky,
  * potom malá tlačítka jen s ikonou (popisek zůstává v bublině). Teprve když nestačí ani to, objeví se po stranách šipky
  * pro posun (místo vodorovného posuvníku, který skupiny ořezával); posouvat lze i kolečkem myši.
+ *
+ * `ctx` = karta pásu (create, sketch, asm…) – kontext mikronávodů u tlačítek (viz micro-tip.tsx).
  */
-export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.ReactNode }) {
+export function Ribbon({ groups, right, ctx }: { groups: RGroup[]; right?: React.ReactNode; ctx?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   /** hustota: 0 = plná, 1 = malá tlačítka bez pevné šířky, 2 = malá tlačítka jen ikonou */
   const [level, setLevel] = useState<0 | 1 | 2>(0);
@@ -43,8 +51,9 @@ export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.Reac
     const rightMore = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
     setEdge((e) => (e.left === left && e.right === rightMore ? e : { left, right: rightMore }));
   };
-  // jiná karta / jiné skupiny → znovu od plné hustoty
+  // jiná karta / jiné skupiny → znovu od plné hustoty (a bublina mikronávodu pryč)
   useLayoutEffect(() => setLevel(0), [key]);
+  useEffect(() => hideTip(), [key, ctx]);
   // po každém vykreslení: nevejde-li se obsah, zhustit (nejvýš na úroveň 2) – ještě před vykreslením na obrazovku
   useLayoutEffect(() => {
     const el = ref.current;
@@ -87,12 +96,12 @@ export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.Reac
             <div key={g.label} data-ribbon-group={g.label} className="flex shrink-0 flex-col border-r border-[#d5dbe2] px-1.5 pt-1.5 last:border-r-0">
               <div className="flex flex-1 items-start gap-0.5">
                 {big.map((it) => (
-                  <BigBtn key={it.id} it={it} />
+                  <BigBtn key={it.id} it={it} ctx={ctx} />
                 ))}
                 {cols.map((c, i) => (
                   <div key={i} className="flex flex-col gap-px">
                     {c.map((it) => (
-                      <SmallBtn key={it.id} it={it} level={level} />
+                      <SmallBtn key={it.id} it={it} level={level} ctx={ctx} />
                     ))}
                   </div>
                 ))}
@@ -115,6 +124,7 @@ export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.Reac
           ›
         </button>
       )}
+      <MicroTipLayer />
     </div>
   );
 }
@@ -136,21 +146,21 @@ function useMenu() {
   return { open, setOpen, ref };
 }
 
-function tip(it: RItem) {
-  return [it.label, it.kbd ? `(${it.kbd})` : "", it.hint ? `– ${it.hint}` : ""].filter(Boolean).join(" ");
-}
+const tip = nativeTitle;
 
-function BigBtn({ it }: { it: RItem }) {
+function BigBtn({ it, ctx }: { it: RItem; ctx?: string }) {
   const m = useMenu();
+  const t = useMicroTip(tipSpec(it, ctx));
   return (
-    <div ref={m.ref} className="relative">
+    <div ref={m.ref} className="relative [-webkit-touch-callout:none]" {...t.wrap}>
       <button
         type="button"
         disabled={it.disabled}
-        title={tip(it)}
+        title={t.on ? undefined : tip(it)}
+        aria-keyshortcuts={it.kbd || undefined}
         onClick={() => (it.menu ? m.setOpen(!m.open) : it.onClick?.())}
         className={cn(
-          "flex h-[70px] w-[72px] flex-col items-center justify-start gap-1 rounded-md px-1 pt-1.5 text-[12.5px] font-medium leading-[1.15] text-[#26303b] transition disabled:opacity-35",
+          "flex h-[70px] w-[72px] flex-col items-center justify-start gap-1 rounded-md px-1 pt-1.5 text-[12.5px] font-medium leading-[1.15] text-[#26303b] transition disabled:pointer-events-none disabled:opacity-35",
           it.active ? "bg-[#fde3e1] ring-1 ring-brand/40" : "hover:bg-[#e3e9f0]",
         )}
       >
@@ -160,22 +170,24 @@ function BigBtn({ it }: { it: RItem }) {
           {it.menu && <span className="ml-0.5 inline-block text-[8px] text-[#6b7785]">▼</span>}
         </span>
       </button>
-      {it.menu && m.open && <Dropdown entries={it.menu} close={() => m.setOpen(false)} anchor={m.ref.current} />}
+      {it.menu && m.open && <Dropdown entries={it.menu} close={() => m.setOpen(false)} anchor={m.ref.current} tipCtx={`menu:${it.id}`} />}
     </div>
   );
 }
 
-function SmallBtn({ it, level = 0 }: { it: RItem; level?: 0 | 1 | 2 }) {
+function SmallBtn({ it, level = 0, ctx }: { it: RItem; level?: 0 | 1 | 2; ctx?: string }) {
   const m = useMenu();
+  const t = useMicroTip(tipSpec(it, ctx));
   return (
-    <div ref={m.ref} className="relative">
+    <div ref={m.ref} className="relative [-webkit-touch-callout:none]" {...t.wrap}>
       <button
         type="button"
         disabled={it.disabled}
-        title={tip(it)}
+        title={t.on ? undefined : tip(it)}
+        aria-keyshortcuts={it.kbd || undefined}
         onClick={() => (it.menu ? m.setOpen(!m.open) : it.onClick?.())}
         className={cn(
-          "flex h-[23px] w-full items-center gap-1.5 whitespace-nowrap rounded px-1.5 text-left text-[12.5px] text-[#26303b] transition disabled:opacity-35",
+          "flex h-[23px] w-full items-center gap-1.5 whitespace-nowrap rounded px-1.5 text-left text-[12.5px] text-[#26303b] transition disabled:pointer-events-none disabled:opacity-35",
           level === 0 ? "min-w-[110px]" : "min-w-0",
           it.active ? "bg-[#fde3e1] ring-1 ring-brand/40" : "hover:bg-[#e3e9f0]",
         )}
@@ -186,33 +198,23 @@ function SmallBtn({ it, level = 0 }: { it: RItem; level?: 0 | 1 | 2 }) {
         <span className={level === 2 ? "sr-only" : "flex-1"}>{it.label}</span>
         {it.menu && <span className="text-[8px] text-[#6b7785]">▼</span>}
       </button>
-      {it.menu && m.open && <Dropdown entries={it.menu} close={() => m.setOpen(false)} anchor={m.ref.current} />}
+      {it.menu && m.open && <Dropdown entries={it.menu} close={() => m.setOpen(false)} anchor={m.ref.current} tipCtx={`menu:${it.id}`} />}
     </div>
   );
 }
 
-export function Dropdown({ entries, close, className, anchor }: { entries: RMenuEntry[]; close: () => void; className?: string; anchor?: HTMLElement | null }) {
+/**
+ * Rozbalovací nabídka. `tipCtx` (např. „menu:color“ u nabídky tlačítka pásu) zapne u položek mikronávody;
+ * bez něj (kontextové nabídky) mají položky jen nativní `title` s krátkou nápovědou jako dřív.
+ */
+export function Dropdown({ entries, close, className, anchor, tipCtx }: { entries: RMenuEntry[]; close: () => void; className?: string; anchor?: HTMLElement | null; tipCtx?: string }) {
   const list = entries.map((e, i) =>
     "divider" in e ? (
       <div key={i} className="my-1 border-t border-[#e6eaef]">
         {e.label && <p className="px-3 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#6b7785]">{e.label}</p>}
       </div>
     ) : (
-      <button
-        key={e.id}
-        type="button"
-        disabled={e.disabled}
-        title={e.hint}
-        onClick={() => {
-          close();
-          e.onClick?.();
-        }}
-        className={cn("flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] text-[#26303b] hover:bg-[#eaf0f6] disabled:opacity-40", e.active && "font-semibold text-brand")}
-      >
-        <CadIcon name={e.icon} tone={e.tone} className="h-4 w-4 shrink-0" />
-        <span className="flex-1">{e.label}</span>
-        {e.kbd && <span className="font-mono text-[10px] text-[#8a95a3]">{e.kbd}</span>}
-      </button>
+      <MenuEntry key={e.id} e={e} close={close} tipCtx={tipCtx} />
     ),
   );
   if (!anchor) {
@@ -222,6 +224,33 @@ export function Dropdown({ entries, close, className, anchor }: { entries: RMenu
     <Floating anchor={anchor} close={close}>
       {list}
     </Floating>
+  );
+}
+
+/** Položka rozbalovací nabídky (s mikronávodem vedle nabídky, je-li zadán kontext). */
+function MenuEntry({ e, close, tipCtx }: { e: RItem; close: () => void; tipCtx?: string }) {
+  const t = useMicroTip(tipSpec(e, tipCtx, "side"), !!tipCtx);
+  const btn = (
+    <button
+      type="button"
+      disabled={e.disabled}
+      title={t.on ? undefined : e.hint}
+      onClick={() => {
+        close();
+        e.onClick?.();
+      }}
+      className={cn("flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] text-[#26303b] hover:bg-[#eaf0f6] disabled:opacity-40", t.on && "disabled:pointer-events-none", e.active && "font-semibold text-brand")}
+    >
+      <CadIcon name={e.icon} tone={e.tone} className="h-4 w-4 shrink-0" />
+      <span className="flex-1">{e.label}</span>
+      {e.kbd && <span className="font-mono text-[10px] text-[#8a95a3]">{e.kbd}</span>}
+    </button>
+  );
+  if (!t.on) return btn;
+  return (
+    <div className="[-webkit-touch-callout:none]" {...t.wrap}>
+      {btn}
+    </div>
   );
 }
 
@@ -334,6 +363,28 @@ export function ContextMenu({ x, y, entries, close }: { x: number; y: number; en
   );
 }
 
+/** Tlačítko rychlé lišty u výběru (mikronávod v kontextu „quick“). */
+function HudBtn({ it, onClose }: { it: RItem; onClose: () => void }) {
+  const t = useMicroTip(tipSpec(it, "quick"));
+  return (
+    <div className="[-webkit-touch-callout:none]" {...t.wrap}>
+      <button
+        type="button"
+        title={t.on ? undefined : tip(it)}
+        aria-label={it.label}
+        onClick={() => {
+          onClose();
+          it.onClick?.();
+        }}
+        className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-[#26303b] hover:bg-[#e3e9f0]"
+      >
+        <CadIcon name={it.icon} tone={it.tone} className="h-5 w-5" />
+        <span className="hidden sm:inline">{it.label}</span>
+      </button>
+    </div>
+  );
+}
+
 /** Kontextová mini lišta u kurzoru (jako v ZW3D/SolidWorks): nejčastější příkazy pro vybranou entitu na jeden klik. */
 export function HudBar({ x, y, entries, onMore, onClose, max = 4 }: { x: number; y: number; entries: RMenuEntry[]; onMore: () => void; onClose: () => void; max?: number }) {
   const items = entries.filter((e): e is RItem => !("divider" in e) && !e.disabled).slice(0, max);
@@ -358,19 +409,7 @@ export function HudBar({ x, y, entries, onMore, onClose, max = 4 }: { x: number;
       onPointerDown={(e) => e.stopPropagation()}
     >
       {items.map((it) => (
-        <button
-          key={it.id}
-          type="button"
-          title={tip(it)}
-          onClick={() => {
-            onClose();
-            it.onClick?.();
-          }}
-          className="flex h-8 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-[#26303b] hover:bg-[#e3e9f0]"
-        >
-          <CadIcon name={it.icon} tone={it.tone} className="h-5 w-5" />
-          <span className="hidden sm:inline">{it.label}</span>
-        </button>
+        <HudBtn key={it.id} it={it} onClose={onClose} />
       ))}
       <button type="button" title={tr("Další příkazy (pravé tlačítko)")} onClick={onMore} className="h-8 rounded-md px-2 text-[14px] leading-none text-[#6b7785] hover:bg-[#e3e9f0]">
         ⋯

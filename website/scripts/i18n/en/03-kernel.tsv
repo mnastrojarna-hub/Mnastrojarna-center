@@ -539,7 +539,6 @@ skicu výřezu	the cut-out sketch
 tloušťka, poloměr ohybu a K-faktor pro další prvky	thickness, bend radius and K-factor for the following features
 uzavřená skica na ploše plechu → otvor skrz	a closed sketch on the sheet face → through cut
 uzavřená skica → deska o tloušťce plechu	a closed sketch → plate of the sheet thickness
-vylisované žebro podél úsečky ve skice (zjednodušeně: zaoblený výstupek)	a pressed rib along a sketch line (simplified: a rounded bump)
 zahnutý okraj 180° – uzavřený nebo otevřený	a 180° folded edge – closed or open
 Úhel ohybu	Bend angle
 Úhel ohybu musí být 1–180°.	The bend angle must be 1–180°.
@@ -555,7 +554,6 @@ zahnutý okraj 180° – uzavřený nebo otevřený	a 180° folded edge – clos
 # ext/surface
 + (po normále)	+ (along the normal)
 + strana	+ side
-3D křivka pro tažení (pružiny, závity, spirálové drážky)	3D curve for sweeps (springs, threads, helical grooves)
 Cílové plochy	Target faces
 Délka musí být kladná.	The length must be positive.
 Délka prodloužení	Extension length
@@ -676,7 +674,6 @@ kopie plochy odsazená po normále (bez výběru = všechny volné plochy)	a cop
 křivka skici (i otevřená) vysunutá do plochy	a sketch curve (even open) extruded into a surface
 křivky skici promítnuté po normále skici na vybranou plochu	sketch curves projected along the sketch normal onto the selected face
 nic = všechny volné plochy	none = all free faces
-odřízne část volných ploch na jedné straně základní roviny	cuts away the part of the free faces on one side of a base plane
 otevřený profil tažený po dráze (druhá skica)	an open profile swept along a path (second sketch)
 plocha přes 2 a více křivek (v různých rovinách)	a surface through 2 or more curves (in different planes)
 poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	radius = the surface where the thread starts: the cylinder, or the hole (minor diameter); the depth goes into the material
@@ -684,10 +681,8 @@ poloměr válce / díry	radius of the cylinder / hole
 pro profil Kruh	for the Circle profile
 pro profil Závit 60°	for the Thread 60° profile
 profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka	a profile (circle, 60° thread or sketch) swept along a helix – thread, spring, helical groove
-průsečnice tělesa/ploch se základní rovinou (3D křivka pro další tažení)	the intersection of the body/surfaces with a base plane (3D curve for further sweeps)
 rovinná plocha se zvětší o danou délku po obvodu; zakřivená v parametrech plochy	a planar surface is enlarged by the given length along its perimeter; a curved one in the surface parameters
 rovinná plocha tělesa se posune po normále a sousední plochy se dotáhnou	a planar face of the body is moved along its normal and the neighbouring faces are extended
-rozřízne solid základní rovinou – obě části zůstanou, nebo jen jedna	splits the solid with a base plane – both parts remain, or only one
 skicu s křivkou	the sketch with the curve
 skicu s profilem	the sketch with the profile
 skicu s uzavřeným profilem	the sketch with the closed profile
@@ -749,7 +744,6 @@ Vpravo nahoře	Top right
 
 # ext/weld
 + (kladná)	+ (positive)
-0 = po celé délce	0 = along the whole length
 Deska	Plate
 Dvě vnitřní plochy rohu	Two inner faces of the corner
 Délka svaru	Weld length
@@ -772,7 +766,7 @@ Není co ořezat – nejdřív vytvořte profily.	Nothing to trim – create pro
 Není těleso – nejdřív vytvořte profily.	There is no body – create profiles first.
 Obrys plochy nelze zmenšit o zadané hodnoty – zvolte menší zmenšení/zaoblení.	The face outline cannot be reduced by the given values – choose a smaller reduction/rounding.
 Odstup děr od okraje	Hole distance from the edge
-Ořezat rovinou	Trim with plane
+Ořezat rovinou	Cut with plane
 Plocha {0} v tělese neexistuje – vyberte ji znovu.	Face {0} does not exist in the body – select it again.
 Plochy styčníku jsou rovnoběžné – vyberte dvě plochy svírající úhel.	The gusset faces are parallel – select two faces that form an angle.
 Plochá	Flat

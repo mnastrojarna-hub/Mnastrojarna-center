@@ -161,6 +161,7 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
               </div>
               <h3 className="mb-1 mt-5 text-[13px] font-semibold">{tr("Chování")}</h3>
               <Toggle label={tr("Potvrzovat mazání prvků a komponent")} checked={draft.confirmDelete} onChange={(v) => set("confirmDelete", v)} />
+              <Toggle label={tr("Mikronávody u ikon")} hint={tr("Po najetí myší (na dotyku dlouhým stiskem) ukáže u ikony pásu karet krátký návod: co dělá, kdy ji použít, co vybrat a jak postupovat")} checked={draft.microTips} onChange={(v) => set("microTips", v)} />
               <Toggle label={tr("Po dokončení skici rovnou nabídnout vysunutí")} hint={tr("Styl Inventor/ZW3D – zrychluje tvorbu prvních těles")} checked={draft.autoExtrude} onChange={(v) => set("autoExtrude", v)} />
               <Toggle label={tr("Úvodní obrazovka při spuštění")} hint={tr("Nedávné soubory, šablony a ukázky")} checked={draft.startScreen} onChange={(v) => set("startScreen", v)} />
               <Field label={tr("Výchozí materiál nového dílu")}>

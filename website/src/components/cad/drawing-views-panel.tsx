@@ -15,6 +15,7 @@ import { dimValue } from "@/cad/drawing-marks";
 import { nextViewLetter, viewNameOf } from "@/cad/drawing-views-agent";
 import { uid, type DrawingAnnotation, type Vec2 } from "@/cad/types";
 import { cn } from "@/lib/cn";
+import { TipBox, microTipsEnabled } from "./micro-tip";
 
 export type ViewTool = "aux" | "stepped" | "aligned" | "bo" | "break";
 const TOOLS: { id: ViewTool; label: () => string; hint: () => string }[] = [
@@ -220,9 +221,12 @@ export function ViewToolsSection({ vt, opts, set }: { vt: ViewTools; opts: Drawi
       <h3 className="text-[10.5px] font-semibold uppercase tracking-[0.16em] text-ink-700/45">{tr("Pomocné pohledy a řezy")}</h3>
       <div className="grid grid-cols-2 gap-1">
         {TOOLS.map((t) => (
-          <button key={t.id} type="button" data-view-tool={t.id} title={t.hint()} onClick={() => vt.setTool(vt.tool === t.id ? null : t.id)} className={cn("rounded-md border px-1 py-1.5 text-[11.5px] leading-tight", vt.tool === t.id ? "border-brand bg-brand/10 font-semibold text-brand" : "border-ink-700/15 hover:bg-steel-100")}>
-            {t.label()}
-          </button>
+          // mikronávod: klíč „drawing-ws/vt-<id>“ (src/cad/help/tips)
+          <TipBox key={t.id} tip={{ id: `vt-${t.id}`, ctx: "drawing-ws", label: t.label(), hint: t.hint() }} className="flex">
+            <button type="button" data-view-tool={t.id} title={microTipsEnabled() ? undefined : t.hint()} onClick={() => vt.setTool(vt.tool === t.id ? null : t.id)} className={cn("w-full rounded-md border px-1 py-1.5 text-[11.5px] leading-tight", vt.tool === t.id ? "border-brand bg-brand/10 font-semibold text-brand" : "border-ink-700/15 hover:bg-steel-100")}>
+              {t.label()}
+            </button>
+          </TipBox>
         ))}
       </div>
       {vt.tool && (

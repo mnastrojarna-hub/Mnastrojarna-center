@@ -485,7 +485,7 @@ registerExt({
     { key: "radius", label: tr("Poloměr dna R (U, J)"), kind: "number", min: 0, step: 0.5 },
     { key: "cap", label: tr("Převýšení housenky"), kind: "number", min: 0, step: 0.5 },
     { key: "root", label: tr("Převýšení kořene"), kind: "number", min: 0, step: 0.5 },
-    { key: "backing", label: tr("Podložka"), kind: "bool" },
+    { key: "backing", label: tr("Podložka kořene"), kind: "bool" },
     { key: "t", label: tr("Tloušťka t (0 = z modelu)"), kind: "number", min: 0 },
     { key: "flip", label: tr("Obrátit stranu svaru"), kind: "bool" },
     { key: "field", label: tr("Montážní svar"), kind: "bool" },
@@ -569,7 +569,7 @@ registerExt({
   params: [
     { key: "kind", label: tr("Typ svaru"), kind: "enum", options: SYMBOL_TYPES },
     { key: "size", label: tr("Velikost a / s"), kind: "number", min: 0, step: 0.5 },
-    { key: "length", label: tr("Délka svaru"), kind: "number", min: 0, hint: tr("0 = po celé délce") },
+    { key: "length", label: tr("Délka svaru"), kind: "number", min: 0, hint: tr("délka do Tabulky svarů; 0 = neuvedena (délka i objem 0)") },
     { key: "pitch", label: tr("Rozteč (přerušovaný)"), kind: "number", min: 0 },
     { key: "allAround", label: tr("Svar po obvodu"), kind: "bool" },
     { key: "field", label: tr("Montážní svar"), kind: "bool" },

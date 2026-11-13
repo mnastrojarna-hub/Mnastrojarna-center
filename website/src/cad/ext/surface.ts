@@ -492,7 +492,7 @@ registerExt({
   tab: TAB,
   group: "Úpravy ploch",
   order: 12,
-  hint: tr("odřízne část volných ploch na jedné straně základní roviny"),
+  hint: tr("odřízne část volných ploch na jedné straně roviny"),
   make: () => ({ plane: "XY", offset: 0, keep: "positive" }),
   params: [
     { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
@@ -643,7 +643,7 @@ registerExt({
   tab: TAB,
   group: "Těleso ↔ plocha",
   order: 22,
-  hint: tr("rozřízne solid základní rovinou – obě části zůstanou, nebo jen jedna"),
+  hint: tr("rozřízne solid rovinou – obě části zůstanou, nebo jen jedna"),
   make: () => ({ plane: "XY", offset: 0, keep: "both" }),
   params: [
     { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
@@ -730,7 +730,7 @@ registerExt({
   tab: TAB,
   group: "Křivky",
   order: 30,
-  hint: tr("průsečnice tělesa/ploch se základní rovinou (3D křivka pro další tažení)"),
+  hint: tr("průsečnice tělesa/ploch s rovinou (pomocná 3D křivka; do skici ji převede Promítnout hrany)"),
   make: () => ({ plane: "XY", offset: 0 }),
   params: [
     { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
@@ -807,7 +807,7 @@ registerExt({
   tab: TAB,
   group: "Křivky",
   order: 32,
-  hint: tr("3D křivka pro tažení (pružiny, závity, spirálové drážky)"),
+  hint: tr("pomocná 3D křivka (pružina, závit) – těleso po šroubovici vytvoří Tažení po šroubovici"),
   make: () => ({ radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: { kind: "axis", axis: "Z" }, lefthand: false }),
   params: [
     { key: "radius", label: tr("Poloměr"), kind: "number", min: 0.01 },

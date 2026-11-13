@@ -539,7 +539,6 @@ skicu výřezu	die Ausschnittskizze
 tloušťka, poloměr ohybu a K-faktor pro další prvky	Dicke, Biegeradius und K-Faktor für die folgenden Features
 uzavřená skica na ploše plechu → otvor skrz	geschlossene Skizze auf der Blechfläche → Durchbruch
 uzavřená skica → deska o tloušťce plechu	geschlossene Skizze → Platte in Blechdicke
-vylisované žebro podél úsečky ve skice (zjednodušeně: zaoblený výstupek)	eingeprägte Rippe entlang einer Skizzenlinie (vereinfacht: gerundete Erhebung)
 zahnutý okraj 180° – uzavřený nebo otevřený	um 180° umgelegter Rand – geschlossen oder offen
 Úhel ohybu	Biegewinkel
 Úhel ohybu musí být 1–180°.	Der Biegewinkel muss 1–180° betragen.
@@ -555,7 +554,6 @@ zahnutý okraj 180° – uzavřený nebo otevřený	um 180° umgelegter Rand –
 # ext/surface
 + (po normále)	+ (entlang der Normalen)
 + strana	+ Seite
-3D křivka pro tažení (pružiny, závity, spirálové drážky)	3D-Kurve für Austragungen (Federn, Gewinde, Spiralnuten)
 Cílové plochy	Zielflächen
 Délka musí být kladná.	Die Länge muss positiv sein.
 Délka prodloužení	Verlängerungslänge
@@ -676,7 +674,6 @@ kopie plochy odsazená po normále (bez výběru = všechny volné plochy)	Kopie
 křivka skici (i otevřená) vysunutá do plochy	Skizzenkurve (auch offen) zu einer Fläche extrudiert
 křivky skici promítnuté po normále skici na vybranou plochu	Skizzenkurven entlang der Skizzennormalen auf die gewählte Fläche projiziert
 nic = všechny volné plochy	nichts = alle freien Flächen
-odřízne část volných ploch na jedné straně základní roviny	schneidet den Teil der freien Flächen auf einer Seite einer Grundebene ab
 otevřený profil tažený po dráze (druhá skica)	offenes Profil entlang eines Pfads (zweite Skizze) ausgetragen
 plocha přes 2 a více křivek (v různých rovinách)	Fläche durch 2 oder mehr Kurven (in verschiedenen Ebenen)
 poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	Radius = die Oberfläche, an der das Gewinde beginnt: Zylinder oder Bohrung (Kern); die Tiefe geht ins Material
@@ -684,10 +681,8 @@ poloměr válce / díry	Radius des Zylinders / der Bohrung
 pro profil Kruh	für das Profil Kreis
 pro profil Závit 60°	für das Profil Gewinde 60°
 profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka	Profil (Kreis, Gewinde 60° oder Skizze) entlang einer Helix ausgetragen – Gewinde, Feder, Spiralnut
-průsečnice tělesa/ploch se základní rovinou (3D křivka pro další tažení)	Schnittkurve von Körper/Flächen mit einer Grundebene (3D-Kurve für weitere Austragungen)
 rovinná plocha se zvětší o danou délku po obvodu; zakřivená v parametrech plochy	eine ebene Fläche wird um die angegebene Länge entlang des Umfangs vergrößert; eine gekrümmte in den Flächenparametern
 rovinná plocha tělesa se posune po normále a sousední plochy se dotáhnou	eine ebene Körperfläche wird entlang der Normalen verschoben und die Nachbarflächen werden nachgezogen
-rozřízne solid základní rovinou – obě části zůstanou, nebo jen jedna	teilt den Volumenkörper mit einer Grundebene – beide Teile bleiben, oder nur einer
 skicu s křivkou	die Skizze mit der Kurve
 skicu s profilem	die Skizze mit dem Profil
 skicu s uzavřeným profilem	die Skizze mit dem geschlossenen Profil
@@ -749,7 +744,6 @@ Vpravo nahoře	Rechts oben
 
 # ext/weld
 + (kladná)	+ (positiv)
-0 = po celé délce	0 = über die ganze Länge
 Deska	Platte
 Dvě vnitřní plochy rohu	Zwei Innenflächen der Ecke
 Délka svaru	Nahtlänge
@@ -772,7 +766,7 @@ Není co ořezat – nejdřív vytvořte profily.	Nichts zu trimmen – erstelle
 Není těleso – nejdřív vytvořte profily.	Kein Körper – erstellen Sie zuerst Profile.
 Obrys plochy nelze zmenšit o zadané hodnoty – zvolte menší zmenšení/zaoblení.	Die Flächenkontur kann nicht um die angegebenen Werte verkleinert werden – wählen Sie eine kleinere Verkleinerung/Rundung.
 Odstup děr od okraje	Randabstand der Bohrungen
-Ořezat rovinou	Mit Ebene trimmen
+Ořezat rovinou	Mit Ebene abschneiden
 Plocha {0} v tělese neexistuje – vyberte ji znovu.	Fläche {0} existiert im Körper nicht – wählen Sie sie erneut.
 Plochy styčníku jsou rovnoběžné – vyberte dvě plochy svírající úhel.	Die Knotenblechflächen sind parallel – wählen Sie zwei Flächen, die einen Winkel bilden.
 Plochá	Flach
