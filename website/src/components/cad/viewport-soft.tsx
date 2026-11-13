@@ -8,8 +8,9 @@
 import { cadLocale, tr } from "@/cad/i18n";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { sectionPlane } from "@/cad/section-plane";
-import { VIEW_ANGLES, basisOf, fitCamera, hexToRgb, orbitAngles, screenToWorld, softBounds, softRender, type RGB, type SoftAngles, type SoftItem, type SoftViewName } from "@/cad/soft-render";
-import type { MeshData, Vec3 } from "@/cad/types";
+import { fitSoftCam, newSoftCam, softCamOnModel, type SoftCam } from "@/cad/soft-cam";
+import { basisOf, hexToRgb, orbitAngles, screenToWorld, softBounds, softRender, type RGB, type SoftItem, type SoftViewName } from "@/cad/soft-render";
+import type { MeshData } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { setSoftView, softView, type SoftViewHandle } from "./soft-bridge";
 import type { AsmView, DisplayMode, Section } from "./viewport";
@@ -65,14 +66,12 @@ export function sceneItems(sc: SoftScene): SoftItem[] {
 export const SOFT_BTN = "rounded border border-[#cfd6de] bg-white/95 px-2 py-1 text-[11.5px] font-medium text-[#26303b] shadow-sm hover:bg-[#f3f6f9]";
 const SOFT_BTN_ON = "rounded border border-[#1f2933] bg-[#1f2933] px-2 py-1 text-[11.5px] font-medium text-white shadow-sm";
 
-type Cam = { angles: SoftAngles; center: Vec3; /** CSS pixelů na milimetr */ scale: number; view: SoftViewName | "free"; fitted: boolean; radius: number };
-
 export function SoftViewport({ scene, toolbarExtra }: { scene: SoftScene; toolbarExtra?: React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const triad = useRef<SVGSVGElement>(null);
   const info = useRef<HTMLSpanElement>(null);
-  const cam = useRef<Cam>({ angles: VIEW_ANGLES.iso, center: [0, 0, 0], scale: 1, view: "iso", fitted: false, radius: 1 });
+  const cam = useRef<SoftCam>(newSoftCam());
   const buf = useRef<{ image: ImageData | null; depth: Float32Array | null }>({ image: null, depth: null });
   const raf = useRef(0);
   /** při tažení se u velkých modelů kreslí v polovičním rozlišení, po uvolnění znovu naplno */
@@ -153,21 +152,12 @@ export function SoftViewport({ scene, toolbarExtra }: { scene: SoftScene; toolba
     if (!raf.current) raf.current = requestAnimationFrame(draw);
   }, [draw]);
 
-  /** vejde model do plátna; s `v` zároveň nastaví pojmenovaný pohled */
+  /** vejde model do plátna; s `v` zároveň nastaví pojmenovaný pohled (prázdná scéna: přizpůsobí se až model) */
   const fit = useCallback(
     (v?: SoftViewName) => {
       const el = box.current;
-      const c = cam.current;
-      if (v) {
-        c.angles = VIEW_ANGLES[v];
-        c.view = v;
-        setViewName(v);
-      }
-      if (el && el.clientWidth && el.clientHeight) {
-        const f = fitCamera(itemsRef.current, basisOf(c.angles), el.clientWidth, el.clientHeight, FILL);
-        c.center = f.center;
-        c.scale = f.scale;
-      }
+      if (v) setViewName(v);
+      fitSoftCam(cam.current, itemsRef.current, el?.clientWidth ?? 0, el?.clientHeight ?? 0, FILL, v);
       schedule();
     },
     [schedule],
@@ -194,20 +184,11 @@ export function SoftViewport({ scene, toolbarExtra }: { scene: SoftScene; toolba
     [schedule],
   );
 
-  // model: první zobrazení a výrazná změna velikosti → izometrie na celé plátno (stejně jako 3D okno); jinak se pohled drží
+  // model: první zobrazení, výrazná změna velikosti nebo přesun → celé plátno (stejně jako 3D okno); jinak se pohled drží
   useEffect(() => {
-    const b = softBounds(items);
-    const c = cam.current;
-    if (b) {
-      const changed = Math.abs(b.radius - c.radius) / c.radius > 0.6;
-      c.radius = b.radius;
-      if (!c.fitted || changed) {
-        c.fitted = true;
-        fit("iso");
-        return;
-      }
-    }
-    schedule();
+    const v = softCamOnModel(cam.current, softBounds(items));
+    if (v) fit(v);
+    else schedule();
   }, [items, fit, schedule]);
   const secKey = scene.section ? JSON.stringify(sectionPlane(scene.section)) : "";
   useEffect(schedule, [scene.display, secKey, schedule]);

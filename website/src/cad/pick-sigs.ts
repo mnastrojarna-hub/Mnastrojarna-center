@@ -2,21 +2,28 @@
  * Otisky výběru indexy (zaoblení, sražení, skořepina, úkos, přímé úpravy, prvky rozšíření) nad skutečným tělesem – běží ve workeru
  * (stavba, razítkování výběru z UI) i v Node (testy). Zápis v dokumentu popisuje `pick-fields.ts`.
  *
- * Při stavbě (`resolvePicks`, strict): index s otiskem se ověří – sedí-li otisk na uloženém indexu, platí index; jinak se entita najde
- * podle otisku (typ + střed + velikost, stejná pravidla a tolerance jako `entityIndex` / `findBySig` v ref-resolve.ts). Nenajde-li se,
- * použije se původní index s varováním ⚠; je-li index mimo rozsah tělesa, prvek skončí srozumitelnou chybou. Index bez otisku = beze změny.
- * Pro UI (`stampPicks`): stejné znovunalezení bez chyb + nové otisky pro indexy, které je ještě nemají (výběr klikem, ze seznamu, pravidlem).
+ * Při stavbě (`resolvePicks`, strict): index s otiskem se ověří – sedí-li otisk na uloženém indexu, platí index. Jinak:
+ *  - topologie se nezměnila (stejný počet entit jako při razítkování, `Sig.n`) a na indexu je entita stejného typu = parametrická
+ *    změna rozměru → platí index bez varování (otisk se obnoví při příštím razítkování),
+ *  - jinak se entita najde podle otisku (`findSig` v ref-resolve.ts: typ, střed, velikost do 2 %, poloměr) – přečíslování,
+ *  - nenajde-li se: starší otisk bez `n` a entita stejného typu na indexu = index (jako před zavedením otisků); jinak původní
+ *    index s varováním ⚠; je-li index mimo rozsah tělesa, prvek skončí srozumitelnou chybou. Index bez otisku = beze změny.
+ * Pro UI (`stampPicks`): stejné znovunalezení bez chyb + aktuální otisky pro nalezené indexy a indexy, které otisk ještě nemají.
  */
 import { tr } from "./i18n";
 import * as r from "replicad";
 import { vertexPositions } from "./inspect";
-import { sigMatch, tolOf, V } from "./ref-resolve";
+import { edgeSig, faceSig, findSig, sigMatch, tolOf } from "./ref-resolve";
 import { pickFieldsOf, pickIndices, pickSigs, rekey, getPath, withPath, type PickField, type PickKind, type SigMap } from "./pick-fields";
 import type { Sig } from "./refs";
-import type { Feature, Vec3 } from "./types";
+import type { Feature } from "./types";
 
 type Shape = r.Shape3D;
-const vt = (v: { x: number; y: number; z: number }): Vec3 => [v.x, v.y, v.z];
+type OcBox = { IsVoid(): boolean; CornerMin(): OcPnt; CornerMax(): OcPnt; delete(): void };
+type OcPnt = { X(): number; Y(): number; Z(): number; delete(): void };
+
+/** Jak se index s otiskem vyřešil: na místě, přečíslovaný, na místě po změně rozměru (otisk zastaral), nenalezený. */
+export type PickHow = "same" | "moved" | "resized" | "lost";
 
 /**
  * Otisky entit jednoho druhu nad tělesem: seznam ploch / hran / vrcholů se z jádra načte jednou a otisky se počítají líně – výsledek je
@@ -47,13 +54,8 @@ export class SigTable {
       if (this.kind === "vertex") {
         const v = this.verts!;
         s = { t: "V", c: [v[i * 3], v[i * 3 + 1], v[i * 3 + 2]], s: 0 };
-      } else if (this.kind === "face") {
-        const f = this.list![i] as r.Face;
-        s = { t: f.geomType as string, c: vt(f.center), s: r.measureArea(f) };
-      } else {
-        const e = this.list![i] as r.Edge;
-        s = { t: e.geomType as string, c: vt(e.pointAt(0.5)), s: e.length };
-      }
+      } else if (this.kind === "face") s = faceSig(this.list![i] as r.Face);
+      else s = edgeSig(this.list![i] as r.Edge);
     } catch {
       s = null;
     }
@@ -65,33 +67,63 @@ export class SigTable {
     if (this.tolCache === null) this.tolCache = tolOf(this.body);
     return this.tolCache;
   }
-  /** entita podle otisku – stejné pravidlo jako `findBySig` (nejbližší střed stejného typu, velikost v toleranci); -1 = nenalezeno */
-  find(sig: Sig): number {
-    const tol = this.tol * 50;
-    let best = -1;
-    let bestD = Infinity;
-    for (let i = 0; i < this.count; i++) {
-      const s = this.at(i);
-      if (!s || s.t !== sig.t) continue;
-      const d = V.len(V.sub(s.c, sig.c)) + (Math.abs(s.s - sig.s) / Math.max(1, Math.abs(sig.s))) * tol;
-      if (d < bestD) {
-        bestD = d;
-        best = i;
+  /**
+   * Levné předběžné vyřazení plochy při hledání podle otisku (bez měření plochy a těžiště, které je u B-spline ploch drahé):
+   * jiný typ plochy, nebo hledaný střed leží dál než 50 × tol od obalového kvádru plochy (těžiště plochy leží vždy uvnitř
+   * jejího kvádru, `BRepBndLib.Add` dává kvádr spíš větší). Hrana jiného typu se vyřadí bez měření; vrcholy se měří levně.
+   */
+  private maybe(i: number, sig: Sig, far: number): boolean {
+    if (this.kind === "vertex" || this.cache[i] !== undefined) return true;
+    if (this.kind === "edge") {
+      try {
+        return ((this.list![i] as r.Edge).geomType as string) === sig.t;
+      } catch {
+        return true;
       }
     }
-    return bestD <= tol ? best : -1;
+    const f = this.list![i] as r.Face;
+    let box: OcBox | null = null;
+    try {
+      if ((f.geomType as string) !== sig.t) return false;
+      const oc = r.getOC() as unknown as { Bnd_Box: new () => OcBox; BRepBndLib: { Add(s: unknown, b: OcBox, useTri: boolean): void } };
+      box = new oc.Bnd_Box();
+      oc.BRepBndLib.Add(f.wrapped, box, true);
+      if (box.IsVoid()) return true;
+      const a = box.CornerMin();
+      const b = box.CornerMax();
+      const lo = [a.X(), a.Y(), a.Z()];
+      const hi = [b.X(), b.Y(), b.Z()];
+      a.delete();
+      b.delete();
+      const d = Math.hypot(...[0, 1, 2].map((k) => Math.max(lo[k] - sig.c[k], 0, sig.c[k] - hi[k])));
+      return d <= far;
+    } catch {
+      return true; // nelze rozhodnout levně – změřit
+    } finally {
+      box?.delete();
+    }
   }
-  /** index s otiskem → aktuální index (jako `entityIndex`): „same“ = sedí na místě, „moved“ = nalezen jinde, „lost“ = nenalezen */
-  resolve(index: number, sig: Sig): { index: number; how: "same" | "moved" | "lost" } {
+  /** entita podle otisku – stejné pravidlo jako `findBySig` (`findSig` v ref-resolve.ts); -1 = nenalezeno / nejednoznačné */
+  find(sig: Sig): number {
+    const tol = this.tol;
+    return findSig(this.count, (i) => (this.maybe(i, sig, tol * 50) ? this.at(i) : null), sig, tol);
+  }
+  /** index s otiskem → aktuální index (viz hlavička souboru) */
+  resolve(index: number, sig: Sig): { index: number; how: PickHow } {
     const cur = this.at(index);
     if (cur && sigMatch(cur, sig, this.tol * 10)) return { index, how: "same" };
+    const sameType = !!cur && cur.t === sig.t;
+    // stejný počet entit jako při razítkování a stejný typ na indexu: změnil se rozměr, ne topologie – index platí
+    if (sameType && sig.n === this.count) return { index, how: "resized" };
     const j = this.find(sig);
     if (j >= 0) return { index: j, how: j === index ? "same" : "moved" };
+    // starší otisk bez počtu entit: entita stejného typu na indexu platí (jako před zavedením otisků)
+    if (sameType && sig.n === undefined) return { index, how: "resized" };
     return { index, how: "lost" };
   }
 }
 
-/** Otisky entit tělesa podle indexů (pro razítkování výběru; null = index v tělese není). */
+/** Otisky entit tělesa podle indexů (null = index v tělese není). */
 export function sigsOf(body: Shape, kind: PickKind, indices: number[]): (Sig | null)[] {
   const t = new SigTable(body, kind);
   return indices.map((i) => t.at(i));
@@ -181,6 +213,7 @@ export function resolvePicks(f: Feature, body: Shape | null): PickResolution {
 /**
  * Razítkování výběru (UI, textové příkazy): indexy s otiskem znovu najde (u přečíslovaných entit přepíše index – zvýraznění a další
  * klikání pak sedí na skutečné entity), indexům bez otisku otisk doplní z tělesa před prvkem a vynechá otisky odebraných indexů.
+ * Nalezeným entitám (i po změně rozměru) se otisk obnoví na aktuální stav tělesa včetně počtu entit `n`, takže otisk sleduje model.
  * Otisk entity, která se nenašla, zůstává původní (varování ve stromu zmizí, až ji uživatel vybere znovu). Bez chyb – neplatný index
  * zůstane, jak je. Vrací `changed` = prvek se liší od vstupu.
  */
@@ -204,7 +237,8 @@ export function stampPicks(f: Feature, body: Shape): { feature: Feature; changed
       }
       // nalezené na místě: ponechat uložený otisk, je-li shodný (žádná zbytečná změna dokumentu); jinak aktuální otisk entity
       if (!table) tables.set(fd.kind, (table = new SigTable(body, fd.kind)));
-      const cur = table.at(j);
+      const at = table.at(j);
+      const cur: Sig | null = at && { ...at, n: table.count };
       if (old && cur && from === j && sameSig(old, cur)) next[String(j)] = old;
       else if (cur) next[String(j)] = cur;
       else if (old) next[String(j)] = old;
@@ -224,4 +258,4 @@ export function stampPicks(f: Feature, body: Shape): { feature: Feature; changed
   return { feature: changed ? out : f, changed, warnings };
 }
 
-const sameSig = (a: Sig, b: Sig) => a.t === b.t && a.s === b.s && a.c[0] === b.c[0] && a.c[1] === b.c[1] && a.c[2] === b.c[2];
+const sameSig = (a: Sig, b: Sig) => a.t === b.t && a.s === b.s && a.c[0] === b.c[0] && a.c[1] === b.c[1] && a.c[2] === b.c[2] && a.r === b.r && a.n === b.n;

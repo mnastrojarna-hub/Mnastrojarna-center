@@ -82,7 +82,8 @@ export function pickIndices(f: Feature, fd: PickField): number[] | null {
 export function isSig(s: unknown): s is Sig {
   if (!s || typeof s !== "object") return false;
   const o = s as Record<string, unknown>;
-  return typeof o.t === "string" && Array.isArray(o.c) && o.c.length === 3 && o.c.every((x) => typeof x === "number" && Number.isFinite(x)) && typeof o.s === "number" && Number.isFinite(o.s);
+  const optNum = (v: unknown) => v === undefined || (typeof v === "number" && Number.isFinite(v));
+  return typeof o.t === "string" && Array.isArray(o.c) && o.c.length === 3 && o.c.every((x) => typeof x === "number" && Number.isFinite(x)) && typeof o.s === "number" && Number.isFinite(o.s) && optNum(o.r) && optNum(o.n);
 }
 
 /** platné otisky pole výběru (neplatné položky ručně upraveného JSON se ignorují) */

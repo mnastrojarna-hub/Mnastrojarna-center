@@ -14,17 +14,13 @@ import type { CadDoc, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { Vec } from "./props";
 import { DirectionField, RefPickContext } from "./ref-field";
+import { unitVec } from "./unit-vec";
 
 const AX: Record<"X" | "Y" | "Z", Vec3> = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
 /** druhy odkazu, které dávají směr nezávisle na rovině skici */
 export const REF_DIR_KINDS: Direction["kind"][] = ["faceNormal", "edge", "twoPoints"];
 
-/** jednotkový vektor (null = nulový / neplatný); bez „−0“ v polích formuláře */
-export function unitVec(v: Vec3): Vec3 | null {
-  const l = Math.hypot(v[0], v[1], v[2]);
-  if (!(l > 1e-12) || !v.every(Number.isFinite)) return null;
-  return v.map((c) => Math.round((c / l) * 1e9) / 1e9 || 0) as Vec3;
-}
+export { unitVec };
 const neg = (v: Vec3): Vec3 => v.map((c) => -c || 0) as Vec3;
 const same = (a: Vec3, b: Vec3) => a.every((c, i) => Math.abs(c - b[i]) < 1e-9);
 

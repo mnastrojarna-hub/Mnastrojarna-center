@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { b64ToBytes, blobId, blobOf, blobRefsIn, bytesToB64, dataBytes, docDataBytes, embedBlobs, internBlobs, isBlobRef, MissingBlob, missingBlobs, putBlob, type SavedDoc } from "./blobs";
+import { b64ToBytes, blobId, blobOf, blobRefsIn, bytesToB64, dataBytes, docDataBytes, embedBlobs, internBlobs, isBlobRef, MissingBlob, missingBlobFiles, missingBlobs, putBlob, type SavedDoc } from "./blobs";
 import { fatalKernelText, isFatalKernelError, isOutOfMemory } from "./kernel-errors";
 import type { CadDoc } from "./types";
 
@@ -68,6 +68,31 @@ describe("úložiště dat importů podle otisku", () => {
     expect(Object.keys(embedBlobs(d).underlays ?? {})).toEqual(["s1"]);
     expect(Object.keys(embedBlobs(d, { inline: true }).underlays ?? {})).toEqual(["s1"]);
     expect(embedBlobs({ ...d, features: [] }).underlays).toBeUndefined();
+  });
+
+  it("modely vložené do výkresu (.mncad této verze s mapou blobs): otevření, uložení i kontrola chybějících dat je zahrnují", () => {
+    const raw = bytes(30_000, 11);
+    // vložený model = .mncad uložený touto verzí (data v mapě blobs), převedený při vložení na odkazy
+    const model = internBlobs(JSON.parse(JSON.stringify(embedBlobs(internBlobs(part(bytesToB64(raw)))))) as CadDoc);
+    const ref = (model.features[0] as { data: string }).data;
+    expect(isBlobRef(ref)).toBe(true);
+    expect(blobOf(ref)).toEqual(raw);
+    const host: CadDoc = { ...part("x"), features: [], drawings: [{ id: "d", name: "List 1", meta: {}, annotations: [], options: { models: [{ id: "m", name: "Model", source: { kind: "doc", doc: model }, view: "front", scale: "auto" }] } }] };
+    expect(docDataBytes(host)).toBe(raw.length);
+    expect(missingBlobs(host)).toEqual([]);
+    // uložení: data vloženého modelu v mapě blobs
+    const saved = embedBlobs(host) as SavedDoc;
+    expect(Object.keys(saved.blobs ?? {})).toEqual([ref.slice(7)]);
+    // starší soubor s base64 přímo ve vloženém modelu → odkaz
+    const legacy = embedBlobs(host, { inline: true });
+    const inl = ((legacy.drawings![0].options.models as { source: { doc: CadDoc } }[])[0].source.doc.features[0] as { data: string }).data;
+    expect(b64ToBytes(inl)).toEqual(raw);
+    const back = internBlobs(JSON.parse(JSON.stringify(legacy)));
+    expect(((back.drawings![0].options.models as { source: { doc: CadDoc } }[])[0].source.doc.features[0] as { data: string }).data).toBe(ref);
+    // chybějící data modelu ve výkresu se hlásí názvem souboru
+    const lost: CadDoc = { ...host, drawings: [{ ...host.drawings![0], options: { models: [{ id: "m", name: "M", source: { kind: "doc", doc: part("mnblob:00000000feedbeefzz") }, view: "front", scale: "auto" }] } }] };
+    expect(missingBlobs(lost)).toEqual(["mnblob:00000000feedbeefzz"]);
+    expect(missingBlobFiles(lost)).toEqual(["a.step"]);
   });
   it("chybějící data: seznam a srozumitelná chyba", () => {
     const d = part("mnblob:00000000deadbeefzz");

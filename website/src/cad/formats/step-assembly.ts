@@ -10,14 +10,17 @@ import { tr } from "../i18n";
 import { eulerXYZ } from "../assembly";
 import type { AsmComponent, CadDoc, Vec3 } from "../types";
 import { uid } from "../types";
-import { closure, extractProduct, hasGeometry, indexStep, stepTree, type StepIndex, type StepTree } from "./step-tree";
+import { closure, closureWithin, extractProduct, hasGeometry, indexStep, stepTree, type StepIndex, type StepTree } from "./step-tree";
 
-/** Díl vyříznutý ze sestavy. */
-export type SplitPart = { pd: number; name: string; color?: string; bytes: Uint8Array };
+/**
+ * Díl vyříznutý ze sestavy. `own` = vlastní tělesa sestavy / podsestavy `pd` (výrobek s dětmi, který má i svou geometrii –
+ * typicky kořenová komponenta Fusion 360 s tělesy vedle výskytů komponent); vkládá se do ní jako komponenta v počátku.
+ */
+export type SplitPart = { pd: number; name: string; color?: string; bytes: Uint8Array; own?: boolean };
 /** Uzel stromu výrobku (sestava): výskyty dětí s maticí umístění. */
 export type SplitNode = { pd: number; name: string; children: { pd: number; matrix: number[]; name: string }[] };
 export type StepSplit = {
-  /** kořenové výrobky */
+  /** kořenové výrobky (sestavy; samostatné díly mimo strom sestavy jsou mezi `parts` a kořenem jsou také) */
   roots: number[];
   /** podsestavy (výrobky s dětmi) */
   nodes: SplitNode[];
@@ -50,23 +53,37 @@ export function splitStepAssembly(bytes: Uint8Array, onProgress?: (done: number,
   const parts: SplitPart[] = [];
   const nodes: SplitNode[] = [];
   const empty: string[] = [];
+  const loose = new Set(tree.loose);
   const leaves = [...tree.products.values()].filter((p) => !p.children.length);
+  // reprezentace výrobků a MAPPED_ITEM: hranice vlastní geometrie sestavy (dál už jsou tělesa dětí)
+  const reps = new Map<number, number>();
+  for (const p of tree.products.values()) if (p.rep > 0) reps.set(p.rep, p.pd);
+  const mapped = ix.byType.get("MAPPED_ITEM") ?? [];
   let k = 0;
   for (const p of tree.products.values()) {
     if (p.children.length) {
       nodes.push({ pd: p.pd, name: p.name, children: p.children.map((c) => ({ pd: c.pd, matrix: c.matrix, name: c.name })) });
+      if (!p.geomRoots.length) continue;
+      const stop = new Set(mapped);
+      for (const [rep, pd] of reps) if (pd !== p.pd) stop.add(rep);
+      const own = closureWithin(ix, p.geomRoots, stop);
+      if (!hasGeometry(ix, own.ids)) continue;
+      // vlastní tělesa sestavy, ale jejich soubor nejde oddělit od umístění dětí → přesné čtení celého souboru (žádné ztracené těleso)
+      if (own.stopped) return null;
+      parts.push({ pd: p.pd, name: p.name, color: p.color, bytes: extractProduct(ix, p, own.ids), own: true });
       continue;
     }
     const ids = closure(ix, p.geomRoots);
     if (!p.geomRoots.length || !hasGeometry(ix, ids)) {
-      empty.push(p.name);
+      if (!loose.has(p.pd)) empty.push(p.name); // výrobek mimo strom bez geometrie (dokument, výkres) se nehlásí
       continue;
     }
     parts.push({ pd: p.pd, name: p.name, color: p.color, bytes: extractProduct(ix, p, ids) });
     onProgress?.(++k, leaves.length);
   }
   if (!parts.length) return null;
-  return { roots: tree.roots, nodes, parts, leafInstances: tree.leafInstances, empty, ms: { index: t1 - t0, tree: t2 - t1, extract: Date.now() - t2 }, incomplete: !ix.complete };
+  const extraRoots = tree.loose.filter((pd) => parts.some((x) => x.pd === pd));
+  return { roots: [...tree.roots, ...extraRoots], nodes, parts, leafInstances: tree.leafInstances + extraRoots.length, empty, ms: { index: t1 - t0, tree: t2 - t1, extract: Date.now() - t2 }, incomplete: !ix.complete };
 }
 
 const PALETTE = ["#b9c2cc", "#9fb4c8", "#c9a46a", "#8fa98f", "#c48f8f", "#a79bc4", "#d6d9dd", "#7f8a96"];
@@ -86,7 +103,17 @@ export function placementOfMatrix(m: number[]): { position: Vec3; rotation: Vec3
 export function assemblyDocFromSplit(split: StepSplit, fileName: string, refOf: (pd: number) => string): CadDoc {
   const base = fileName.replace(/\.[^.]+$/, "");
   const nodes = new Map(split.nodes.map((n) => [n.pd, n]));
-  const parts = new Map(split.parts.map((p, i) => [p.pd, { ...p, i }]));
+  const parts = new Map(split.parts.filter((p) => !p.own).map((p, i) => [p.pd, { ...p, i }]));
+  const own = new Map(split.parts.filter((p) => p.own).map((p) => [p.pd, p]));
+  const fileComp = (leaf: SplitPart & { i?: number }, placement: { position: Vec3; rotation: Vec3 }, name = leaf.name): AsmComponent => ({
+    id: uid(),
+    name,
+    source: { kind: "file", fileName: `${leaf.name}.step`, format: "step", data: refOf(leaf.pd) },
+    placement,
+    group: "Díly",
+    color: leaf.color ?? PALETTE[(leaf.i ?? 0) % PALETTE.length],
+  });
+  const ORIGIN = () => ({ position: [0, 0, 0] as Vec3, rotation: [0, 0, 0] as Vec3 });
   const memo = new Map<number, CadDoc | null>();
   const docOf = (pd: number, depth: number): CadDoc | null => {
     if (memo.has(pd)) return memo.get(pd)!;
@@ -94,18 +121,14 @@ export function assemblyDocFromSplit(split: StepSplit, fileName: string, refOf: 
     if (!n || depth > 14) return null;
     memo.set(pd, null); // ochrana proti cyklu
     const components: AsmComponent[] = [];
+    // vlastní tělesa sestavy (vedle výskytů dětí) – v počátku sestavy
+    const o = own.get(pd);
+    if (o) components.push(fileComp(o, ORIGIN(), tr("{0} – vlastní tělesa", o.name)));
     for (const ch of n.children) {
       const placement = placementOfMatrix(ch.matrix);
       const leaf = parts.get(ch.pd);
       if (leaf) {
-        components.push({
-          id: uid(),
-          name: leaf.name,
-          source: { kind: "file", fileName: `${leaf.name}.step`, format: "step", data: refOf(leaf.pd) },
-          placement,
-          group: "Díly",
-          color: leaf.color ?? PALETTE[leaf.i % PALETTE.length],
-        });
+        components.push(fileComp(leaf, placement));
         continue;
       }
       const sub = docOf(ch.pd, depth + 1);
@@ -115,17 +138,19 @@ export function assemblyDocFromSplit(split: StepSplit, fileName: string, refOf: 
     memo.set(pd, d);
     return d;
   };
-  const roots = split.roots.map((r) => docOf(r, 0)).filter((d): d is CadDoc => !!d && !!d.components?.length);
-  if (roots.length === 1) return { ...roots[0], name: roots[0].name || base };
-  return {
-    app: "mnastrojarna-cad",
-    version: 2,
-    name: base,
-    material: "ocel",
-    features: [],
-    kind: "assembly",
-    components: roots.map((d) => ({ id: uid(), name: d.name, source: { kind: "asm" as const, doc: d }, placement: { position: [0, 0, 0] as Vec3, rotation: [0, 0, 0] as Vec3 }, group: "Podsestavy" })),
-  };
+  // kořeny: sestavy a samostatné díly mimo strom (v počátku, jako je načte čtení celého souboru)
+  const top: AsmComponent[] = [];
+  for (const r of split.roots) {
+    const leaf = parts.get(r);
+    if (leaf) {
+      top.push(fileComp(leaf, ORIGIN()));
+      continue;
+    }
+    const d = docOf(r, 0);
+    if (d && d.components?.length) top.push({ id: uid(), name: d.name, source: { kind: "asm" as const, doc: d }, placement: ORIGIN(), group: "Podsestavy" });
+  }
+  if (top.length === 1 && top[0].source.kind === "asm") return { ...top[0].source.doc, name: top[0].source.doc.name || base };
+  return { app: "mnastrojarna-cad", version: 2, name: base, material: "ocel", features: [], kind: "assembly", components: top };
 }
 
 /** počet listových komponent (výskytů dílů) v dokumentu sestavy */

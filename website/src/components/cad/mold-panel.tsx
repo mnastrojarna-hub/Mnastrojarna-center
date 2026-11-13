@@ -3,20 +3,17 @@
 import { tr } from "@/cad/i18n";
 import { useState } from "react";
 import { DRAFT_COLORS, DRAFT_LABELS, SHRINKAGE, defaultCooling, type CoolingParams, type DraftClass, type DraftResult, type EjectorSuggestion } from "@/cad/mold";
-import type { Direction } from "@/cad/refs";
 import type { Vec3 } from "@/cad/types";
 import { fmtNum } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
-import { DirVecField, unitVec } from "./dir-vec-field";
+import { DirVecField } from "./dir-vec-field";
+import { pullChange, pullShown, type DraftSetup } from "./mold-pull";
 import { Num } from "./props";
 import { Btn, FloatPanel, Row, Segmented, Toggle } from "./ui";
 
-/**
- * Směr vyhození (= směr otevírání formy): `pull` je vždy jednotkový vektor; `pullDef` = odkaz (normála plochy / hrana /
- * dva body), ze kterého se `pull` znovu vyřeší po změně modelu, `pullFlip` = odkaz obráceně. Platí i pro vyhazovače a chlazení.
- */
-export type DraftSetup = { on: boolean; pull: Vec3; minDeg: number; pullDef?: Direction; pullFlip?: boolean };
+/** Směr vyhození (= směr otevírání formy) – viz `mold-pull.ts` (`pull` jednotkový, `pullRaw` zadání v poli, `pullDef` odkaz). */
+export type { DraftSetup };
 /** analýza ploch: žádná / zebra / křivost / tloušťka stěn */
 export type SurfaceSetup = { mode: "none" | "zebra" | "curvature" | "thickness"; limit: number; info?: string };
 
@@ -63,15 +60,11 @@ export function MoldPanel({
   const pullField = (label: string, showMap: boolean) => (
     <DirVecField
       label={label}
-      value={draft.pull}
+      value={pullShown(draft)}
       def={draft.pullDef}
       flip={draft.pullFlip}
       attr="data-pull-dir"
-      onChange={(v, def, flip) => {
-        // nulový vektor rozpracovaného zadání do analýzy nepouštět (necháme poslední platný směr)
-        const u = unitVec(v);
-        setDraft({ ...draft, on: showMap ? true : draft.on, pull: u ?? draft.pull, pullDef: def, pullFlip: flip });
-      }}
+      onChange={(v, def, flip) => setDraft(pullChange(draft, v, def, flip, showMap))}
     />
   );
 

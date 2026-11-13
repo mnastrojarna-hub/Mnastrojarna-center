@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { axisSection, facePlane, faceSection, formatVector, isGeneralSection, parseVector, projectionRange, sectionDistance, sectionKey, sectionNormal, sectionOrigin, sectionPlane, sectionPoint, toVectorSection, unitVec, vectorSection, type PlaneMesh, type SectionState } from "./section-plane";
+import { axisSection, facePlane, faceSection, formatPos, formatVector, isGeneralSection, parseFaceNo, parseVector, projectionRange, sectionDistance, sectionKey, sectionNormal, sectionOrigin, sectionPlane, sectionPoint, toVectorSection, unitVec, vectorSection, type PlaneMesh, type SectionState } from "./section-plane";
 import type { Vec3 } from "./types";
 
 /** Kvádr 40 × 30 × 20 (plochy: 0 spodní, 1 horní, 2 přední −Y, 3 zadní +Y, 4 levá −X, 5 pravá +X) a válcová plocha 6. */
@@ -264,3 +264,34 @@ describe("rovina řezu – rozsah modelu a zadání vektorem", () => {
 });
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
+
+describe("rovina řezu – opravy po kontrole nasazení", () => {
+  it("řez sestavy daleko od počátku začíná uprostřed modelu (komponenty po umístění)", () => {
+    const m = sample();
+    const at = (x: number, y: number) => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, 0, 1];
+    // dvě kostky 40 × 30 × 20 v Y 5000..5030 (bez čtvrtválce: jen plochy 0–5)
+    const box: PlaneMesh = { vertices: m.vertices.slice(0, 6 * 4 * 3) };
+    const s = axisSection("Y", [{ ...box, matrix: at(0, 5000) }, { ...box, matrix: at(80, 5000) }]);
+    expect(s).toEqual({ axis: "Y", offset: 5015, flip: false });
+    expect(sectionPlane(s)).toEqual({ normal: [0, 1, 0], constant: -5015 });
+    // záporné Y: rovina uprostřed, ne v 0 (dřív by zmizel celý model)
+    expect(axisSection("Y", [{ ...box, matrix: at(0, -100) }]).offset).toBe(-85);
+  });
+
+  it("rozsah polohy se vypíše bez „-0“", () => {
+    expect(formatPos(-1e-7)).toBe("0");
+    expect(formatPos(-0.004)).toBe("0");
+    expect(formatPos(0)).toBe("0");
+    expect(formatPos(60)).toBe("60");
+    expect(formatPos(-12.5)).toMatch(/^-12[.,]5$/);
+    expect(formatPos(1 / 3)).toMatch(/^0[.,]33$/);
+  });
+
+  it("číslo plochy: 3, F3 i f3 jako popisky ploch; jiný zápis → NaN", () => {
+    expect(parseFaceNo("3")).toBe(3);
+    expect(parseFaceNo("F3")).toBe(3);
+    expect(parseFaceNo(" f12 ")).toBe(12);
+    expect(parseFaceNo("F 7")).toBe(7);
+    for (const bad of ["", "F", "x3", "3a", "-2", "F-1", "plocha 3"]) expect(parseFaceNo(bad)).toBeNaN();
+  });
+});

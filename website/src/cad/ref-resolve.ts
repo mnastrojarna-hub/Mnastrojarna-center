@@ -50,17 +50,55 @@ const vt = (v: { x: number; y: number; z: number }): Vec3 => [v.x, v.y, v.z];
 
 // ---------------- otisky entit ----------------
 
+type OcRadius = { Radius(): number; delete?(): void };
+/** poloměr z geometrie jádra (válec / koule / kružnice); undefined = nelze určit */
+function radiusOf(read: () => OcRadius): number | undefined {
+  try {
+    const g = read();
+    const rad = g.Radius();
+    g.delete?.();
+    return Number.isFinite(rad) ? rad : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Otisk plochy (stejný výpočet pro `sigOf` i tabulku otisků v pick-sigs.ts). Válcová a kulová plocha nese i poloměr. */
+export function faceSig(f: r.Face): Sig {
+  const t = f.geomType as string;
+  const sig: Sig = { t, c: vt(f.center), s: r.measureArea(f) };
+  if (t === "CYLINDRE" || t === "SPHERE") {
+    const surf = f.surface;
+    const w = surf.wrapped as unknown as { Cylinder(): OcRadius; Sphere(): OcRadius };
+    const rad = radiusOf(() => (t === "CYLINDRE" ? w.Cylinder() : w.Sphere()));
+    surf.delete();
+    if (rad !== undefined) sig.r = rad;
+  }
+  return sig;
+}
+
+/** Otisk hrany; kružnice / oblouk nese i poloměr. */
+export function edgeSig(e: r.Edge): Sig {
+  const t = e.geomType as string;
+  const sig: Sig = { t, c: vt(e.pointAt(0.5)), s: e.length };
+  if (t === "CIRCLE") {
+    const curve = e.curve;
+    const rad = radiusOf(() => (curve.wrapped as unknown as { Circle(): OcRadius }).Circle());
+    curve.delete();
+    if (rad !== undefined) sig.r = rad;
+  }
+  return sig;
+}
+
 export function sigOf(body: Shape, kind: "face" | "edge" | "vertex", index: number): Sig | null {
   try {
     if (kind === "face") {
       const f = body.faces[index];
-      if (!f) return null;
-      return { t: f.geomType as string, c: vt(f.center), s: r.measureArea(f) };
+      return f ? faceSig(f) : null;
     }
     if (kind === "edge") {
       const e = body.edges[index];
-      if (!e) return null;
-      return { t: e.geomType as string, c: vt(e.pointAt(0.5)), s: e.length };
+      return e ? edgeSig(e) : null;
     }
     const v = vertexPositions(body);
     if (index * 3 + 2 >= v.length) return null;
@@ -79,22 +117,51 @@ export function tolOf(body: Shape) {
   return Math.max(1e-3, Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 1e-4);
 }
 
-/** Najde entitu podle otisku (nejbližší střed stejného typu, velikost v toleranci); -1 = nenalezeno. */
-export function findBySig(body: Shape, kind: "face" | "edge" | "vertex", sig: Sig): number {
-  const n = kind === "face" ? body.faces.length : kind === "edge" ? body.edges.length : vertexPositions(body).length / 3;
+/** největší rozdíl velikosti (plocha / délka), při kterém je entita ještě kandidátem hledání podle otisku – stejně jako `sigMatch` */
+const SIZE_REL = 0.02;
+
+/**
+ * Skóre kandidáta při hledání podle otisku (menší = lepší); null = není kandidát. `tol` = tolerance tělesa (`tolOf`).
+ * Kandidát má stejný typ, střed do 50 × tol, velikost do 2 % (souosé plochy mají stejný střed – velikost bez meze by po změně
+ * průměru vybrala jinou z nich) a – mají-li oba otisky poloměr – stejný poloměr (do 10 × tol).
+ */
+export function sigScore(s: Sig, sig: Sig, tol: number): number | null {
+  if (s.t !== sig.t) return null;
+  const far = tol * 50;
+  const dc = V.len(V.sub(s.c, sig.c));
+  if (!(dc <= far)) return null;
+  const ds = Math.abs(s.s - sig.s);
+  if (!(ds <= Math.max((tol * 10) ** 2, Math.abs(sig.s) * SIZE_REL))) return null;
+  if (s.r !== undefined && sig.r !== undefined && !(Math.abs(s.r - sig.r) <= tol * 10)) return null;
+  return dc + (ds / Math.max(1, Math.abs(sig.s))) * far;
+}
+
+/**
+ * Hledání podle otisku mezi `n` entitami (`at(i)` = otisk entity, null = přeskočit): nejlepší kandidát podle `sigScore`.
+ * Dva kandidáti prakticky stejně dobří (rozdíl skóre do `tol`) = nejednoznačné → -1 (raději původní index než záměna).
+ */
+export function findSig(n: number, at: (i: number) => Sig | null, sig: Sig, tol: number): number {
   let best = -1;
   let bestD = Infinity;
-  const tol = tolOf(body) * 50;
+  let second = Infinity;
   for (let i = 0; i < n; i++) {
-    const s = sigOf(body, kind, i);
-    if (!s || s.t !== sig.t) continue;
-    const d = V.len(V.sub(s.c, sig.c)) + Math.abs(s.s - sig.s) / Math.max(1, Math.abs(sig.s)) * tol;
+    const s = at(i);
+    if (!s) continue;
+    const d = sigScore(s, sig, tol);
+    if (d === null) continue;
     if (d < bestD) {
+      second = bestD;
       bestD = d;
       best = i;
-    }
+    } else if (d < second) second = d;
   }
-  return bestD <= tol ? best : -1;
+  return best >= 0 && second - bestD > tol ? best : -1;
+}
+
+/** Najde entitu podle otisku (stejný typ, nejbližší střed, velikost a poloměr v toleranci – `sigScore`); -1 = nenalezeno. */
+export function findBySig(body: Shape, kind: "face" | "edge" | "vertex", sig: Sig): number {
+  const n = kind === "face" ? body.faces.length : kind === "edge" ? body.edges.length : vertexPositions(body).length / 3;
+  return findSig(n, (i) => sigOf(body, kind, i), sig, tolOf(body));
 }
 
 /** Index entity: ověří otisk a v případě posunu indexů entitu znovu najde. */

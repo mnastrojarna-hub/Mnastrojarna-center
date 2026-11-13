@@ -99,12 +99,18 @@ describe("zaoblení s otiskem přežije přečíslování hran", () => {
   }, 120_000);
 
   it("nenalezená entita: varování ⚠ a původní index; index mimo rozsah = srozumitelná chyba", async () => {
-    const far = { t: "LINE", c: [500, 500, 500] as Vec3, s: 30 };
+    // otisk orazítkovaný na kvádru (12 hran); po díře má těleso 15 hran – topologie se změnila a otisk se nenajde
+    const far = { t: "LINE", c: [500, 500, 500] as Vec3, s: 30, n: 12 };
     const lost = await buildDoc(doc(box, hole, fillet({ edgeSigs: { "4": far } })));
     const s = statusOf(lost, "f");
     expect(s.ok).toBe(true);
     expect(s.warning).toMatch(/Hrana 5 se po změně modelu nenašla podle otisku – použit původní index/);
     expect(lost.metrics!.volume).toBeCloseTo(V_BOX - V_HOLE - vFillet(5, 80), 2);
+    // starší otisk bez počtu entit a na indexu hrana stejného typu: index platí bez varování (jako před zavedením otisků)
+    const legacyFar = { t: far.t, c: far.c, s: far.s };
+    const old = await buildDoc(doc(box, hole, fillet({ edgeSigs: { "4": legacyFar } })));
+    expect(statusOf(old, "f").warning).toBeUndefined();
+    expect(old.metrics!.volume).toBeCloseTo(V_BOX - V_HOLE - vFillet(5, 80), 2);
     const gone = await buildDoc(doc(box, hole, fillet({ edges: [40], edgeSigs: { "40": far } })));
     const g = statusOf(gone, "f");
     expect(g.ok).toBe(false);
@@ -175,7 +181,7 @@ describe("razítkování výběru (UI) a pomocné funkce", () => {
     const b1 = await bodyOf(box);
     const b2 = await bodyOf(box, hole);
     const s4 = sigOf(b1, "edge", 4)!;
-    const far = { t: "LINE", c: [500, 500, 500] as Vec3, s: 30 };
+    const far = { t: "LINE", c: [500, 500, 500] as Vec3, s: 30, n: 12 };
     // hrana 4 s otiskem z kvádru (po díře je to hrana 5), hrana 2 bez otisku, hrana 7 s neexistujícím otiskem, mrtvý otisk hrany 9
     const f = fillet({ edges: [4, 2, 7], edgeSigs: { "4": s4, "7": far, "9": far } });
     const res = stampPicks(f, b2);
@@ -183,8 +189,9 @@ describe("razítkování výběru (UI) a pomocné funkce", () => {
     const out = res.feature as FilletF;
     expect(out.edges).toEqual([5, 2, 7]);
     expect(Object.keys(out.edgeSigs!).sort()).toEqual(["2", "5", "7"]);
-    expect(out.edgeSigs!["5"]).toEqual(sigOf(b2, "edge", 5));
-    expect(out.edgeSigs!["2"]).toEqual(sigOf(b2, "edge", 2));
+    // nové otisky nesou počet hran tělesa (15), podle kterého se pozná změna rozměru bez změny topologie
+    expect(out.edgeSigs!["5"]).toEqual({ ...sigOf(b2, "edge", 5), n: 15 });
+    expect(out.edgeSigs!["2"]).toEqual({ ...sigOf(b2, "edge", 2), n: 15 });
     expect(out.edgeSigs!["7"]).toEqual(far);
     expect(res.warnings.join(" ")).toMatch(/Hrana 8 se po změně modelu nenašla/);
     // podruhé už není co měnit (žádné zbytečné zápisy do dokumentu)

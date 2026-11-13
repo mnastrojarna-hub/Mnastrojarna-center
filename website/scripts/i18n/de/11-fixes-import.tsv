@@ -1,0 +1,6 @@
+# Korrekturen nach Prüfung: Importdaten im verschlüsselten Speicher, eigene Körper von STEP-Baugruppen
+{0} – vlastní tělesa	{0} – eigene Körper
+Data importovaných souborů chybí	Daten importierter Dateien fehlen
+Data souboru {0} se do úložiště prohlížeče nevešla – po obnovení stránky ho otevřete znovu (nebo uložte projekt .mncad).	Die Daten von {0} passten nicht in den Browserspeicher – öffnen Sie die Datei nach dem Neuladen der Seite erneut (oder speichern Sie das Projekt als .mncad).
+Dokument odkazuje na importované soubory, jejichž data nejsou v paměti ani v úložišti prohlížeče: {0}. Tyto prvky se nepostaví – otevřete soubory znovu (nebo uložený projekt .mncad).	Das Dokument verweist auf importierte Dateien, deren Daten weder im Speicher noch im Browserspeicher vorhanden sind: {0}. Diese Elemente werden nicht aufgebaut – öffnen Sie die Dateien erneut (oder das gespeicherte .mncad-Projekt).
+Uloženo: {0} – BEZ dat souborů {1} (nejsou v paměti). Otevřete je znovu a uložte projekt ještě jednou.	Gespeichert: {0} – OHNE die Daten von {1} (nicht im Speicher). Öffnen Sie diese Dateien erneut und speichern Sie das Projekt noch einmal.

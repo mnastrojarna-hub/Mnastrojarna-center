@@ -1,0 +1,6 @@
+# Opravy po kontrole: data importů v šifrovaném úložišti, vlastní tělesa sestav STEP
+{0} – vlastní tělesa	{0} – own bodies
+Data importovaných souborů chybí	Imported file data is missing
+Data souboru {0} se do úložiště prohlížeče nevešla – po obnovení stránky ho otevřete znovu (nebo uložte projekt .mncad).	The data of {0} did not fit into the browser storage – after reloading the page, open the file again (or save the project as .mncad).
+Dokument odkazuje na importované soubory, jejichž data nejsou v paměti ani v úložišti prohlížeče: {0}. Tyto prvky se nepostaví – otevřete soubory znovu (nebo uložený projekt .mncad).	The document refers to imported files whose data is neither in memory nor in the browser storage: {0}. These features will not be built – open the files again (or the saved .mncad project).
+Uloženo: {0} – BEZ dat souborů {1} (nejsou v paměti). Otevřete je znovu a uložte projekt ještě jednou.	Saved: {0} – WITHOUT the data of {1} (not in memory). Open those files again and save the project once more.

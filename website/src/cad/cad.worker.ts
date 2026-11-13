@@ -17,7 +17,7 @@ import { stampPicks } from "./pick-sigs";
 import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
 import type { PlaneDef, Ref } from "./refs";
 import type { CadDoc, ComponentSource, ExportFormat, Feature, MeshData } from "./types";
-import { blobId, putBlobAs } from "./blobs";
+import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark, setPerfSink } from "./perf-log";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
@@ -282,9 +282,11 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
           drawCache?.body.delete?.();
           drawCache = { key, body: b };
         }
+        const body = drawCache.body;
+        if (missingBlobs(dd).length) drawCache = null; // bez dat importu (dorazí s dalším požadavkem) nezapamatovat
         // Chytré kóty: list bez zapečených kót (s místem navíc) + plán kót podle prvků jako upravitelné poznámky (cad/drawing-dims.ts)
         const smart = m.opts?.dimensions === "smart" && dd.kind !== "assembly";
-        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(drawCache.body, m.doc, m.meta, m.opts, extra) : makeDrawing(drawCache.body, m.meta, m.opts, extra) });
+        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(body, m.doc, m.meta, m.opts, extra) : makeDrawing(body, m.meta, m.opts, extra) });
         break;
       }
     }

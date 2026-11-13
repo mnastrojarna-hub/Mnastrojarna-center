@@ -311,9 +311,11 @@ Dokument je JSON objekt:
   pro agenty je jednodušší použít textové příkazy s pravidly (\`hrany svislé\`, \`otevřít +Z\`).
 - Výběr hran/ploch indexy (\`edges\`, \`faces\`, \`faces2\`, \`vertices\`, u rozšíření \`data.faces\` / \`data.edges\`) může nést
   **otisky** \`edgeSigs\` / \`faceSigs\` / \`faceSigs2\` / \`vertexSigs\` (u rozšíření \`data.facesSigs\` …): mapa „index → otisk
-  { t: typ, c: střed, s: délka / plocha }“ entity tělesa před prvkem. Program je doplní sám při výběru v modelu, ze seznamu
-  i pravidlem v textovém příkazu; při stavbě se podle nich indexy znovu najdou, když úprava dřívějšího prvku hrany/plochy
-  přečísluje (nenalezená entita = ⚠ a použije se původní index). V ručně psaném JSON je lze vynechat.
+  { t: typ, c: střed, s: délka / plocha, r: poloměr válce / koule / kružnice, n: počet hran / ploch / vrcholů tělesa }“ entity
+  tělesa před prvkem. Program je doplní sám při výběru v modelu, ze seznamu i pravidlem v textovém příkazu; při stavbě se
+  podle nich indexy znovu najdou, když úprava dřívějšího prvku hrany/plochy přečísluje. Změna rozměru bez změny topologie
+  (stejné \`n\`) ponechá index bez varování; ⚠ s původním indexem jen tehdy, když se topologie změnila a entita podle otisku
+  nenašla. V ručně psaném JSON je lze vynechat.
 - Sestava: \`"kind": "assembly"\`, \`"components": [ { "name": "Díl", "source": { "kind": "part", "doc": { …dokument dílu… } },
   "placement": { "position": [0,0,0], "rotation": [0,0,0] } } ]\`, vazby \`"mates"\`.
 

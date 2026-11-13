@@ -29,6 +29,11 @@ const legacy = [
   ["/de/anfrage", "/de/kontakt"],
 ];
 
+/** Přejmenované složky: přesměruje se celý obsah (soubor po souboru), např. obrázky zakázky bez roku v adrese. */
+const legacyDirs = [
+  ["/img/zakazky/upinaci-pripravek-2015", "/img/zakazky/upinaci-pripravek-s-celistmi"],
+];
+
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -58,7 +63,10 @@ const nextConfig = {
   },
   ...(staticExport ? {} : {
   async redirects() {
-    return legacy.map(([source, destination]) => ({ source, destination, permanent: true }));
+    return [
+      ...legacy.map(([source, destination]) => ({ source, destination, permanent: true })),
+      ...legacyDirs.map(([from, to]) => ({ source: `${from}/:file*`, destination: `${to}/:file*`, permanent: true })),
+    ];
   },
   async headers() {
     return [
@@ -69,5 +77,5 @@ const nextConfig = {
   }),
 };
 
-export { legacy, securityHeaders };
+export { legacy, legacyDirs, securityHeaders };
 export default nextConfig;

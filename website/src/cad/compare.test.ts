@@ -458,3 +458,18 @@ describe("porovnání s referencí – malé díly, formáty a chybové stavy", 
     expect(mapMeshTolerance(630, 0.1, 0.05)).toBeCloseTo(0.05, 9);
   });
 });
+
+describe("reference s více než 1000 plochami (zrychlená cesta shapeResult pro velká tělesa)", () => {
+  it("shodný hranol s 1100 obloukovými stranami: nulový rozdíl objemů, bez varování o nepřesné booleovské operaci, platnost zkontrolována", () => {
+    const model = r.drawPolysides(50, 1100, -0.02).sketchOnPlane("XY").extrude(20) as Shape;
+    const ref = model.clone() as Shape;
+    const exact = r.measureVolume(model);
+    const c = compareShapes(model, ref, { map: false });
+    expect(c.reference.faces).toBeGreaterThan(1000);
+    expect(c.reference.volume).toBeCloseTo(exact, 6);
+    expect(Math.abs(c.volumeDiff)).toBeLessThan(1e-6 * exact);
+    expect(c.reference.area).toBeCloseTo(c.model.area, 6);
+    expect(c.reference.valid).toBe(true);
+    expect(c.warnings.join(" ")).not.toMatch(/nepřesná|nesedí/);
+  }, 240_000);
+});

@@ -5,20 +5,28 @@
  * nebo rovina zadaná normálou „nx; ny; nz“; poloha posuvníkem i číslem (mm, lze i výrazem), otočení strany.
  * Stav řezu drží aplikace (`section` / `onChange`), matematika roviny je v `@/cad/section-plane`.
  */
-import { cadLocale, tr } from "@/cad/i18n";
+import { tr } from "@/cad/i18n";
 import { useEffect, useMemo, useState } from "react";
-import { axisSection, facePlane, faceSection, formatVector, isGeneralSection, parseVector, projectionRange, sectionNormal, sectionOrigin, sectionPlane, toVectorSection, unitVec, vectorSection, type PlaneMesh, type SectionAxis, type SectionState } from "@/cad/section-plane";
+import { axisSection, facePlane, faceSection, formatPos, formatVector, isGeneralSection, parseFaceNo, parseVector, projectionRange, sectionNormal, sectionOrigin, sectionPlane, toVectorSection, unitVec, vectorSection, type PlaneMesh, type SectionAxis, type SectionState } from "@/cad/section-plane";
 import type { MeshData, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { Num } from "./props";
 import type { SelItem } from "./selection";
+import { useSoftViewActive } from "./soft-bridge";
 import { Row } from "./ui";
 import type { AsmView } from "./viewport";
 
 type Mode = SectionAxis | "face" | "vector";
 type FaceSel = Extract<SelItem, { kind: "face" }>;
 
-const fmt = (v: number) => (Math.round(v * 100) / 100).toLocaleString(cadLocale(), { maximumFractionDigits: 2 });
+/** Sítě modelu pro rozsah a rovinu řezu: komponenty sestavy (po umístění), jinak síť dílu. */
+export function sectionItems(mesh: MeshData | null, assembly?: AsmView[]): PlaneMesh[] {
+  if (assembly) return assembly.map((c) => ({ vertices: c.mesh.vertices, triangles: c.mesh.triangles, faceGroups: c.mesh.faceGroups, matrix: c.matrix }));
+  return mesh ? [mesh] : [];
+}
+
+/** Řez po zapnutí (klávesa X, pás karet): rovina kolmá na Y uprostřed modelu – dílu i sestavy. */
+export const defaultSection = (mesh: MeshData | null, assembly?: AsmView[]): SectionState => axisSection("Y", sectionItems(mesh, assembly));
 
 export function SectionControls({
   section,
@@ -36,7 +44,9 @@ export function SectionControls({
   /** aktuální výběr ve 3D okně – rovinná plocha z něj určí rovinu řezu */
   selection?: SelItem[];
 }) {
-  const items = useMemo<PlaneMesh[]>(() => (assembly ? assembly.map((c) => ({ vertices: c.mesh.vertices, triangles: c.mesh.triangles, faceGroups: c.mesh.faceGroups, matrix: c.matrix })) : mesh ? [mesh] : []), [mesh, assembly]);
+  const items = useMemo(() => sectionItems(mesh, assembly), [mesh, assembly]);
+  /** náhled bez WebGL: plochy nejde vybrat kliknutím */
+  const soft = useSoftViewActive();
   const general = isGeneralSection(section);
   const mode: Mode = !general ? section.axis : section.source?.kind === "face" ? "face" : "vector";
   /** záložka „Plocha“ je otevřená, ale rovina ještě není určená (čeká se na výběr rovinné plochy) */
@@ -85,7 +95,7 @@ export function SectionControls({
     onChange(axisSection(m, items, general ? false : section.flip));
   };
   const applyFaceNumber = () => {
-    const n = Math.round(Number(faceNo.replace(",", ".")));
+    const n = parseFaceNo(faceNo);
     if (!mesh || !Number.isFinite(n) || n < 1 || n > faceCount) return setFaceErr(tr("Zadejte číslo plochy 1–{0}.", faceCount));
     const plane = facePlane(mesh, n - 1);
     if (!plane) return setFaceErr(tr("Plocha {0} není rovinná – řez lze vést jen rovinnou plochou.", n));
@@ -142,7 +152,13 @@ export function SectionControls({
         <div className="mb-2 space-y-1.5">
           {waitFace ? (
             <p data-section-wait className={hint}>
-              {picked && !picked.plane ? tr("Vybraná plocha není rovinná. Vyberte rovinnou plochu tělesa – rovina řezu se na ni položí.") : tr("Vyberte rovinnou plochu tělesa (kliknutím ve 3D okně) – rovina řezu se na ni položí.")}
+              {picked && !picked.plane
+                ? tr("Vybraná plocha není rovinná. Vyberte rovinnou plochu tělesa – rovina řezu se na ni položí.")
+                : soft && assembly
+                  ? tr("V náhledu bez WebGL nejde plochu sestavy vybrat kliknutím. Rovinu zadejte na záložce Vektor (normála) nebo X / Y / Z.")
+                  : soft
+                    ? tr("V náhledu bez WebGL nejde plochu vybrat kliknutím. Zadejte číslo rovinné plochy (např. F3) – rovina řezu se na ni položí.")
+                    : tr("Vyberte rovinnou plochu tělesa (kliknutím ve 3D okně) – rovina řezu se na ni položí.")}
             </p>
           ) : (
             <p className={hint}>{tr("Rovina leží na ploše {0}. Poloha je posun od plochy: záporně do materiálu, kladně ven.", (section.source?.kind === "face" ? section.source.index : 0) + 1)}</p>
@@ -211,7 +227,7 @@ export function SectionControls({
         />
       )}
       <div className="mt-1">
-        <Num label={tr("Poloha")} value={section.offset} onChange={(v) => onChange({ ...section, offset: v })} step={1} hint={range ? tr("model {0} až {1}", fmt(range[0]), fmt(range[1])) : undefined} />
+        <Num label={tr("Poloha")} value={section.offset} onChange={(v) => onChange({ ...section, offset: v })} step={1} hint={range ? tr("model {0} až {1}", formatPos(range[0]), formatPos(range[1])) : undefined} />
       </div>
       {mode === "face" && !waitFace && (
         <div className="mt-1.5">

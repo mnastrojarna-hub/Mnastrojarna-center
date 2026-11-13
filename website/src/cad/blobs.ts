@@ -95,8 +95,19 @@ export function dataBytes(data: string, fileName = ""): Uint8Array {
 
 // ---------------- procházení dokumentu ----------------
 
-type DataHolder = { data: string };
-/** všechna místa s daty importu v dokumentu (prvky importu, komponenty ze souboru, vnořené díly a podsestavy) */
+type DataHolder = { data: string; fileName?: string };
+type ModelLike = { source?: { kind?: string; doc?: CadDoc } };
+/** dokumenty vložené do výkresů (Další modely na listu → ze souboru .mncad) – i jejich importy patří k dokumentu */
+function drawingModelDocs(doc: CadDoc): CadDoc[] {
+  const out: CadDoc[] = [];
+  for (const dr of doc.drawings ?? []) {
+    const models = (dr?.options as { models?: unknown } | undefined)?.models;
+    if (!Array.isArray(models)) continue;
+    for (const m of models as ModelLike[]) if (m?.source?.kind === "doc" && m.source.doc && typeof m.source.doc === "object") out.push(m.source.doc);
+  }
+  return out;
+}
+/** všechna místa s daty importu v dokumentu (prvky importu, komponenty ze souboru, vnořené díly a podsestavy, modely ve výkresech) */
 function holders(doc: CadDoc, out: DataHolder[] = [], depth = 0): DataHolder[] {
   if (depth > 20) return out;
   for (const f of doc.features ?? []) if (f.type === "import") out.push(f as Extract<Feature, { type: "import" }>);
@@ -105,8 +116,17 @@ function holders(doc: CadDoc, out: DataHolder[] = [], depth = 0): DataHolder[] {
     if (s.kind === "file") out.push(s);
     else holders(s.doc, out, depth + 1);
   }
+  for (const d of drawingModelDocs(doc)) holders(d, out, depth + 1);
   return out;
 }
+
+/** odkazy na data importů v dokumentu (každý jednou) s názvem souboru */
+export function docBlobEntries(doc: CadDoc): { ref: string; fileName: string }[] {
+  const out = new Map<string, string>();
+  for (const h of holders(doc)) if (isBlobRef(h.data) && !out.has(h.data)) out.set(h.data, h.fileName || blobIdOf(h.data));
+  return [...out].map(([ref, fileName]) => ({ ref, fileName }));
+}
+export const docBlobRefs = (doc: CadDoc): string[] => docBlobEntries(doc).map((e) => e.ref);
 
 /** Odkazy na data v libovolné hodnotě (zpráva pro jádro) – bez kopírování, jen průchod objekty. */
 export function blobRefsIn(v: unknown, out = new Set<string>(), depth = 0): Set<string> {
@@ -155,8 +175,24 @@ const mapDoc = (doc: CadDoc, fn: (data: string) => string, depth = 0): CadDoc =>
     changed = true;
     return { ...c, source: { ...s, doc: sub } };
   });
+  // dokumenty vložené do výkresů (Další modely na listu)
+  const drawings = doc.drawings?.map((dr) => {
+    const models = (dr?.options as { models?: unknown } | undefined)?.models;
+    if (!Array.isArray(models)) return dr;
+    let mch = false;
+    const next = (models as ModelLike[]).map((m) => {
+      if (m?.source?.kind !== "doc" || !m.source.doc || typeof m.source.doc !== "object") return m;
+      const sub = mapDoc(m.source.doc, fn, depth + 1);
+      if (sub === m.source.doc) return m;
+      mch = true;
+      return { ...m, source: { ...m.source, doc: sub } };
+    });
+    if (!mch) return dr;
+    changed = true;
+    return { ...dr, options: { ...dr.options, models: next } };
+  });
   if (!changed) return doc;
-  return components ? { ...doc, features, components } : { ...doc, features };
+  return { ...doc, features, ...(components ? { components } : {}), ...(drawings ? { drawings } : {}) };
 };
 
 /**
@@ -223,6 +259,13 @@ export function missingBlobs(doc: CadDoc): string[] {
   return holders(doc)
     .map((h) => h.data)
     .filter((d) => isBlobRef(d) && !hasBlob(d));
+}
+
+/** Názvy souborů, jejichž data v paměti chybí (pro srozumitelné hlášení). */
+export function missingBlobFiles(doc: CadDoc): string[] {
+  const out = new Set<string>();
+  for (const h of holders(doc)) if (isBlobRef(h.data) && !hasBlob(h.data)) out.add(h.fileName || blobIdOf(h.data));
+  return [...out];
 }
 
 /** Celková velikost dat importů v dokumentu (bajty). */

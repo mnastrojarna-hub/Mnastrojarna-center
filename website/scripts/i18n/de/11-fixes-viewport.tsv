@@ -1,0 +1,3 @@
+# Opravy po kontrole nasazení: náhled bez WebGL a řez (vlna 4, viewport)
+V náhledu bez WebGL nejde plochu sestavy vybrat kliknutím. Rovinu zadejte na záložce Vektor (normála) nebo X / Y / Z.	In der Vorschau ohne WebGL lassen sich Flächen einer Baugruppe nicht per Klick auswählen. Geben Sie die Ebene auf der Registerkarte Vektor (Normale) oder X / Y / Z ein.
+V náhledu bez WebGL nejde plochu vybrat kliknutím. Zadejte číslo rovinné plochy (např. F3) – rovina řezu se na ni položí.	In der Vorschau ohne WebGL lassen sich Flächen nicht per Klick auswählen. Geben Sie die Nummer einer ebenen Fläche ein (z. B. F3) – die Schnittebene wird darauf gelegt.

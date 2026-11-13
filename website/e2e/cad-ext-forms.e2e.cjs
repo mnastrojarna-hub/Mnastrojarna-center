@@ -171,6 +171,22 @@ const coreReady = (page) => page.waitForFunction(() => document.body.innerText.i
   ok(await p.locator('[data-mold-eject-dir] [data-dir-field]').isVisible(), 'karta Vyhazovače: směr otevírání formy stejným polem');
   await p.getByRole('button', { name: 'Chlazení', exact: true }).click(); await p.waitForTimeout(400);
   ok(await p.locator('[data-mold-cool-dir] [data-dir-field]').isVisible(), 'karta Chlazení: směr otevírání formy stejným polem');
+  // obecný vektor zadaný po složkách (2; 1; 0 od Z): pole ukazuje zadání a díry vyhazovačů mají směr (0,894; 0,447; 0)
+  await p.getByRole('button', { name: 'Vyhazovače', exact: true }).click(); await p.waitForTimeout(400);
+  const ej = p.locator('[data-mold-eject-dir]');
+  const toVector = ej.getByRole('button', { name: 'Zadat čísly (vektor)' });
+  if (await toVector.isVisible().catch(() => false)) { await toVector.click(); await p.waitForTimeout(300); }
+  await ej.locator('[data-pull-dir="Z"]').click(); await p.waitForTimeout(500);
+  const ein = ej.locator('input');
+  for (const [i, v] of [[0, '2'], [1, '1'], [2, '0']]) { await ein.nth(i).fill(v); await ein.nth(i).press('Enter'); await p.waitForTimeout(600); }
+  const shown = [await ein.nth(0).inputValue(), await ein.nth(1).inputValue(), await ein.nth(2).inputValue()].map((x) => parseFloat(x.replace(',', '.')));
+  ok(shown[0] === 2 && shown[1] === 1 && shown[2] === 0, 'vektor 2; 1; 0 zadaný po složkách zůstane v poli, jak byl zadán: ' + shown.join('; '));
+  const nHoles = (await doc()).features.length;
+  await p.getByRole('button', { name: 'Díry do dílu' }).click(); await p.waitForTimeout(800); await idle();
+  const holes = (await doc()).features.slice(nHoles).filter((f) => f.type === 'hole');
+  const hv = holes[0] && holes[0].dirDef && holes[0].dirDef.v;
+  const want = [2 / Math.sqrt(5), 1 / Math.sqrt(5), 0];
+  ok(holes.length > 0 && !!hv && hv.every((c, k) => Math.abs(c - want[k]) < 1e-4), `díry vyhazovačů ve směru (0,894; 0,447; 0): ${holes.length} děr, směr ${JSON.stringify(hv)}`);
 
   ok(errs.length === 0, 'žádná chyba stránky' + (errs.length ? ': ' + errs.join(' | ') : ''));
   await b.close();

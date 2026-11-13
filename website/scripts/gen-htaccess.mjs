@@ -2,7 +2,7 @@
 // Spouští se po `STATIC_EXPORT=1 next build` (npm run build:ftp).
 // Přesměrování a bezpečnostní hlavičky bere z next.config.mjs, aby byly na Vercelu i na FTP stejné.
 import { writeFileSync, existsSync } from "node:fs";
-import { legacy, securityHeaders } from "../next.config.mjs";
+import { legacy, legacyDirs, securityHeaders } from "../next.config.mjs";
 
 if (!existsSync("out")) {
   console.error("[htaccess] složka out/ neexistuje — nejdřív spusť STATIC_EXPORT=1 next build");
@@ -13,6 +13,8 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const rules = legacy
   .map(([from, to]) => `RewriteRule ^${esc(from.replace(/^\//, ""))}/?$ ${to === "/" ? "/" : to + (to.includes(".") ? "" : "/")} [R=301,L,NC]`)
   .join("\n");
+// přejmenované složky: celý obsah (obrázky…) na stejné jméno souboru v nové složce
+const dirRules = legacyDirs.map(([from, to]) => `RewriteRule ^${esc(from.replace(/^\//, ""))}/(.+)$ ${to}/$1 [R=301,L,NC]`).join("\n");
 
 const headers = securityHeaders
   .filter((h) => h.key !== "Strict-Transport-Security")
@@ -53,6 +55,7 @@ ErrorDocument 404 /404/index.html
 
   # Staré adresy původního webu → nové stránky
 ${rules}
+${dirRules}
 
   # Chybějící lomítko na konci (statický export používá složka/index.html)
   RewriteCond %{REQUEST_FILENAME} !-f
@@ -83,4 +86,4 @@ ${headers}
 `;
 
 writeFileSync("out/.htaccess", htaccess);
-console.log(`[htaccess] out/.htaccess zapsán (${legacy.length} přesměrování)`);
+console.log(`[htaccess] out/.htaccess zapsán (${legacy.length + legacyDirs.length} přesměrování)`);
