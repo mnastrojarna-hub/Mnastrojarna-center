@@ -12,6 +12,7 @@ import { cad, isCancelled } from "@/cad/client";
 import type { CompareOptions, CompareResult, ReferenceFile } from "@/cad/compare";
 import { alignText, compareReportCsv, compareReportText, regionHint, regionList, sideText, surfacesText, type NumberedRegion } from "@/cad/compare-report";
 import { prepareImport } from "@/cad/formats/import";
+import { dataBytes } from "@/cad/blobs";
 import { cadLocale, getLang, tr } from "@/cad/i18n";
 import { distanceColors, distanceStats, MAP_GREEN, MAP_ORANGE, MAP_RED, MAP_YELLOW, type AlignMode } from "@/cad/mesh-distance";
 import type { CadDoc, MeshData, Vec3 } from "@/cad/types";
@@ -33,13 +34,6 @@ const ROTS = [0, 90, 180, 270];
 const css = (c: [number, number, number]) => `rgb(${Math.round(c[0] * 255)} ${Math.round(c[1] * 255)} ${Math.round(c[2] * 255)})`;
 const geoKeyOf = (d: CadDoc) => JSON.stringify([d.features, d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null, d.activeBody ?? null]);
 const showNum = (v: number) => (getLang() === "en" ? String(v) : String(v).replace(".", ","));
-
-function fromB64(b64: string): Uint8Array {
-  const s = atob(b64);
-  const u = new Uint8Array(s.length);
-  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
-  return u;
-}
 
 /** číslo podle jazyka rozhraní */
 const nf = (v: number, digits = 2) => (Number.isFinite(v) ? (Math.abs(v) < 0.5 * 10 ** -digits ? 0 : v).toLocaleString(cadLocale(), { minimumFractionDigits: digits, maximumFractionDigits: digits }) : "–");
@@ -174,12 +168,14 @@ export function CompareDialog({ doc, vp, onView, onClose }: { doc: CadDoc; vp: R
   const onFile = async (f: File) => {
     setLoadErr(null);
     setErr(null);
-    const r = await prepareImport(f);
+    // reference = vždy jedno těleso: velkou sestavu STEP nerozkládat na komponenty (splitter vrací null)
+    const r = await prepareImport(f, async () => null);
     if (r.kind !== "body") {
       setLoadErr(r.kind === "unsupported" ? r.message : tr("{0}: soubor obsahuje jen 2D výkres – jako referenci použijte 3D model (STEP).", f.name));
       return;
     }
-    const file: ReferenceFile = { data: fromB64(r.data), format: r.format, fileName: f.name };
+    // import vrací odkaz do úložiště dat (mnblob:), starší cesta base64 – dataBytes umí obojí
+    const file: ReferenceFile = { data: dataBytes(r.data, f.name), format: r.format, fileName: f.name };
     setRef({ file, note: r.note, size: f.size });
     setRes(null);
     setSel(null);
