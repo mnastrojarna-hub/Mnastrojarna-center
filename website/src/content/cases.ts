@@ -195,11 +195,11 @@ export const CASES: CaseStudy[] = [
     },
   },
   {
-    slug: { cs: "upinaci-pripravek-2015", en: "clamping-fixture-2015", de: "spannvorrichtung-2015" },
+    slug: { cs: "upinaci-pripravek-s-celistmi", en: "clamping-fixture-with-jaws", de: "spannvorrichtung-mit-wechselbacken" },
     year: 2015,
     kind: "fixture",
     services: ["nastrojarstvi"],
-    photos: ph("upinaci-pripravek-2015", [V]),
+    photos: ph("upinaci-pripravek-s-celistmi", [V]),
     text: {
       cs: { title: "Upínací přípravek s výměnnými čelistmi", summary: "Upínací přípravek z kalené oceli s výměnnými čelistmi a bočními dorazy." },
       en: { title: "Clamping fixture with interchangeable jaws", summary: "A clamping fixture made of hardened steel with interchangeable jaws and side stops." },
