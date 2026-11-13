@@ -20,6 +20,7 @@ import type { MateStatus } from "./mates";
 import type { DrawingExportFormat, DrawingExportOptions, DrawingExportResult } from "./drawing-export";
 import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type SketchOp, type SketchTarget } from "./agent-sketch";
 import { parseMeasure, type MeasureApiResult, type MeasureCmd } from "./agent-measure";
+import { parseSheetLine, sheetSummary, SHEET_COMMANDS } from "./agent-sheet";
 import { paramStatusLines, parseEditLine, type EditOp } from "./agent-edit";
 import { toAxisDef, toDirection } from "./ext/place";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
@@ -459,7 +460,7 @@ function setAt(obj: Record<string, unknown>, path: string, value: unknown) {
 function keyValues(text: string): [string, string][] {
   const out: [string, string][] = [];
   // JSON hodnota smí mít vnořené objekty (směr / rovina odkazem: {"kind":"edge","ref":{"kind":"edge","index":3}}) – do 4 úrovní
-  const re = /([^\s=]+)=("[^"]*"|„[^“]*“|\[[^\]]*\]|\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}|\S*)/g;
+  const re = /([^\s=]+)=("[^"]*"|„[^“]*“|\[(?:[^[\]]|\[[^[\]]*\])*\]|\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}|\S*)/g;
   let m: RegExpExecArray | null;
   let last = 0;
   while ((m = re.exec(text))) {
@@ -602,6 +603,12 @@ export function parseAgentText(text: string): AgentProgram {
       const cmd = canon(headTokens[0] ?? "");
       const isEntity = ENTITY.has(cmd) || (cmd === "construction" && ENTITY.has(canon(headTokens[1] ?? "")));
       if (cmd === "sketch" || (cmd !== "constraint" && cmd !== "dim" && !isEntity)) endBlock();
+      // plech: tvářecí nástroje a křížový zlom (agent-sheet.ts) – null = jiný příkaz
+      const sheetOp = parseSheetLine(line, no, (l) => `${l} ${(counts[`ext:${l}`] = (counts[`ext:${l}`] ?? 0) + 1)}`);
+      if (sheetOp) {
+        ops.push(sheetOp);
+        return;
+      }
       if (cmd === "sketch") {
         // id doplní založená skica; nepovede-li se řádek přečíst, entity bloku ohlásí, že skica nevznikla (nepřidají se do jiné skici)
         const blk: NonNullable<typeof block> & { sketch: SketchTarget } = (block = { sketch: { id: "", line: no } });
@@ -1329,7 +1336,7 @@ export function featureSummary(f: Feature, doc?: CadDoc): string {
     case "combine":
       return tr("{0} „{1}“ {2} „{3}“{4}", f.op === "cut" ? tr("odebrat od") : f.op === "intersect" ? tr("průnik") : tr("sjednotit"), f.target || tr("aktivní"), f.op === "cut" ? "−" : f.op === "intersect" ? "∩" : "+", f.tool, f.keepTool ? tr(", nástroj ponechán") : "");
     default:
-      return "";
+      return sheetSummary(f);
   }
 }
 /** Stav sestavy pro textový stav (počítá aplikace z načtených komponent). */
@@ -1415,6 +1422,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "zrcadlit XY|XZ|YZ [odsazení N]", en: "mirror", de: "spiegeln", desc: tr("zrcadlení tělesa") },
   { cmd: "text \"ABC\" výška H hloubka D v x y [z] [gravírovat]", en: "text", de: "text", desc: tr("nápis vystouplý / gravírovaný") },
   { cmd: "těleso N · rozdělit XY|XZ|YZ [odsazení N] [jako Název] · kopie [těleso N] [posun dx dy dz] [jako Název] · sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]", en: "body, splitbodies, copybody, combine", de: "körper, teilen, kopieren, kombinieren", desc: tr("více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným") },
+  ...SHEET_COMMANDS,
   { cmd: "prvek <typ|rozšíření> klíč=hodnota …", en: "feature", de: "element", desc: tr("kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId=\"Skica 1\" pathId=$last · prvek draft angle=3 faces=boční · prvek \"Ohyb plechu\" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem") },
   { cmd: "normálie <označení> [v x y z]", en: "library", de: "normteil", desc: tr("díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta") },
   { cmd: "vložit \"název záložky\" [v x y z] [otočení rx ry rz] [ukotvit]", en: "insert", de: "einfügen", desc: tr("sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)") },

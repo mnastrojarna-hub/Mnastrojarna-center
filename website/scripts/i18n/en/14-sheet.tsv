@@ -1,0 +1,152 @@
+# 7. vlna – plech: tvářecí nástroje (žaluzie, prolis, žebro, výstřih, můstek, lem díry, vodítko) a křížový zlom
+ (automaticky)	 (automatic)
+ a přidá bod umístění	 and adds a placement point
+, ostrý	, sharp
+[[x, y], …] v rovině plochy nebo [[x, y, z], …]; klik na plochu přidá bod	[[x, y], …] in the face plane or [[x, y, z], …]; clicking the face adds a point
+{0} neleží celý na rovné ploše plechu (přesahuje okraj, otvor, ohyb nebo jiný nástroj) – posuňte bod nebo zmenšete nástroj.	{0} does not lie fully on a flat sheet face (it overlaps an edge, hole, bend or another tool) – move the point or make the tool smaller.
+{0} v bodě {1}	{0} at point {1}
+{0}: bez skici dráhy – v rozvinu vynechán.	{0}: no path sketch – omitted from the flat pattern.
+{0}: bod [{1}] neleží na rovné ploše plechu – v rozvinu vynechán.	{0}: point [{1}] is not on a flat sheet face – omitted from the flat pattern.
+{0}: dráha žebra neleží na rovné ploše plechu – v rozvinu vynechána.	{0}: the bead path is not on a flat sheet face – omitted from the flat pattern.
+{0}: dráhu zvolte ve formuláři (skica s úsečkami / oblouky), klik na plochu plechu vybere plochu · Enter = OK, Esc = Storno	{0}: choose the path in the form (sketch with lines / arcs), clicking a sheet face selects the face · Enter = OK, Esc = Cancel
+{0}: klikněte na rovinnou plochu plechu – každý klik přidá bod umístění (bodů {1}) · body lze zadat i číselně ve formuláři · Enter = OK, Esc = Storno	{0}: click a flat sheet face – every click adds a placement point ({1} points) · points can also be typed in the form · Enter = OK, Esc = Cancel
+{0}: KŘÍŽOVÝ ZLOM {1}, {2} ({3})	{0}: CROSS BREAK {1}, {2} ({3})
+{0}: nástroje v bodech {1} a {2} se překrývají – zvětšete rozteč.	{0}: the tools at points {1} and {2} overlap – increase the spacing.
+{0}: panel křížového zlomu se v rozvinu nenašel – vynechán.	{0}: the cross break panel was not found in the flat pattern – omitted.
+{0}: pod plochou není plech tloušťky {1} mm (je tam silnější materiál) – nástroj se umisťuje na plech.	{0}: there is no {1} mm sheet under the face (the material is thicker) – the tool must be placed on sheet metal.
+{0}: polohu plochy se nepodařilo určit – v rozvinu vynechán (otevřete prvek ve formuláři, uloží polohu plochy).	{0}: the face position could not be determined – omitted from the flat pattern (open the feature in the form to store the face position).
+{0}: rozměry nástroje jsou pro tloušťku plechu {1} mm příliš malé (zaoblení se nevejdou ani s ostrými rohy).	{0}: the tool dimensions are too small for a {1} mm sheet (the radii do not fit even with sharp corners).
+{0}: vnitřní poloměr {1} mm se do nástroje nevejde – největší možný je {2} mm (nebo zadejte 0 = automaticky).	{0}: the inner radius {1} mm does not fit the tool – the largest possible is {2} mm (or enter 0 = automatic).
+{0}: zadejte bod umístění (klik na plochu plechu nebo souřadnice).	{0}: enter a placement point (click a sheet face or type coordinates).
+0 = automaticky (poloměr plechu, zmenšený, aby se vešel)	0 = automatic (sheet radius, reduced to fit)
+Bod umístění musí mít dvě nebo tři čísla (x, y [, z]).	A placement point needs two or three numbers (x, y [, z]).
+Body umístění	Placement points
+Body umístění ({0})	Placement points ({0})
+Body umístění zadejte jako [[x, y], [x, y]] nebo [[x, y, z], …].	Enter placement points as [[x, y], [x, y]] or [[x, y, z], …].
+čísla ploch začínají 1 (F1)	face numbers start at 1 (F1)
+DOLŮ	DOWN
+Dolů (do plochy)	Down (into the face)
+Dolů (prohnout)	Down (sag)
+dráha {0}	path {0}
+horní plocha základu	top face of the base
+jazýček prostřižený ze tří stran a vytlačený s náběhem	tab lanced on three sides and offset with a ramp
+Klik na plochu plechu v modelu přidá bod. Dvě čísla = souřadnice v rovině plochy (u vodorovné plochy x, y), tři = bod v prostoru (promítne se na plochu).	Clicking a sheet face in the model adds a point. Two numbers = coordinates in the face plane (x, y on a horizontal face), three = a point in space (projected onto the face).
+Klik na rovinnou plochu plechu ji vybere{0}; bez výběru = horní plocha základního plechu.	Clicking a flat sheet face selects it{0}; nothing selected = top face of the base sheet.
+Klik na rovný panel plechu (plocha s rovnými hranami); bez výběru = horní plocha základního plechu.	Click a flat sheet panel (face with straight edges); nothing selected = top face of the base sheet.
+kolem normály plochy od osy X (u ploch kolmých na X od osy Y)	about the face normal from the X axis (from the Y axis on faces normal to X)
+kruhový prolis (důlek) – průměr, hloubka, úhel stěny	round dimple – diameter, depth, wall angle
+křížový zlom	cross break
+Křížový zlom	Cross break
+KŘÍŽOVÝ ZLOM {0} {1}	CROSS BREAK {0} {1}
+křížový zlom {0}° {1} · {2}	cross break {0}° {1} · {2}
+KŘÍŽOVÝ ZLOM {0}° {1} ({2})	CROSS BREAK {0}° {1} ({2})
+Křížový zlom: klikněte na rovný panel plechu (bez výběru = horní plocha základního plechu) · Enter = OK, Esc = Storno	Cross break: click a flat sheet panel (nothing selected = top face of the base sheet) · Enter = OK, Esc = Cancel
+Křížový zlom: panel musí mít rovné hrany (mnohoúhelník) – plocha má zaoblený nebo zakřivený obrys.	Cross break: the panel must have straight edges (polygon) – the face has a rounded or curved outline.
+Křížový zlom: plocha nemá platný obrys.	Cross break: the face has no valid outline.
+Křížový zlom: protilehlá strana panelu nemá stejný obrys (panel není rovný plech tloušťky {0} mm).	Cross break: the opposite side of the panel has a different outline (the panel is not a flat {0} mm sheet).
+Křížový zlom: úhel musí být 0–10° (obvykle 1–2°).	Cross break: the angle must be 0–10° (usually 1–2°).
+Lem díry (límec)	Extruded hole (collar)
+lem díry Ø{0} mm, výška límce {1} mm	extruded hole Ø{0} mm, collar height {1} mm
+Lem díry: průměr díry a výška límce musí být kladné.	Extruded hole: hole diameter and collar height must be positive.
+Mezera pro desku	Card gap
+Můstek	Bridge lance
+můstek {0} × {1} mm, výška {2} mm, náběh {3}°	bridge lance {0} × {1} mm, height {2} mm, ramp {3}°
+Můstek: délka {0} mm je pro výšku {1} mm a úhel {2}° krátká (rovná část vychází záporná).	Bridge lance: the length {0} mm is too short for height {1} mm and angle {2}° (the flat part would be negative).
+Můstek: délka, šířka a výška musí být kladné.	Bridge lance: length, width and height must be positive.
+můstek: pás prostřižený po stranách a vytlačený s náběhy na obou koncích	bridge lance: a strip lanced along its sides and offset with ramps at both ends
+Na plechu chybí horní rovinná plocha – vyberte plochu, na kterou se má nástroj umístit.	The sheet has no flat top face – select the face to place the tool on.
+NAHORU	UP
+Nahoru (od plochy)	Up (away from the face)
+Nahoru (vyklenout)	Up (bulge)
+natočení {0}°	rotation {0}°
+od ohybu po otevřený konec (ve směru natočení)	from the bend to the open end (in the rotation direction)
+od plochy plechu	from the sheet face
+od roviny plechu; 90° = svislá stěna	from the sheet plane; 90° = vertical wall
+Otevřená strana	Open side
+Panel	Panel
+Panel (rovinná plocha)	Panel (flat face)
+panel se po úhlopříčkách mírně vyklene (skutečný zlom); ve výkrese hrany + poznámka KŘÍŽOVÝ ZLOM, v rozvinu tenké čáry ve vrstvě FORM	the panel bulges slightly along its diagonals (a real break); in the drawing edges + note CROSS BREAK, in the flat pattern thin lines on layer FORM
+Panel se po úhlopříčkách vyklene o kratší polovinu × tan(úhel). Ve výkrese jsou úhlopříčky hranami modelu s poznámkou KŘÍŽOVÝ ZLOM, v rozvinu tenké čáry ve vrstvě FORM.	The panel bulges along its diagonals by the shorter half × tan(angle). In the drawing the diagonals are model edges with the note CROSS BREAK, in the flat pattern thin lines on layer FORM.
+plech křížový zlom [F3] [úhel 1,5] [nahoru|dolů]	sheet cross break [F3] [angle 1.5] [up|down]
+plech lem díry PRŮMĚR VÝŠKA v x y [dolů] [plocha F3]	sheet collar DIAMETER HEIGHT at x y [down] [face F3]
+plech můstek DÉLKA ŠÍŘKA VÝŠKA [úhel 45] v x y [natočení 0] [dolů]	sheet bridge LENGTH WIDTH HEIGHT [angle 45] at x y [rotation 0] [down]
+plech prolis PRŮMĚR HLOUBKA [úhel 60] v x y [ostrý] [dolů] [plocha F3]	sheet dimple DIAMETER DEPTH [angle 60] at x y [sharp] [down] [face F3]
+Plech t = {0} mm · vnitřní poloměr R = {1} mm{2} · {3}	Sheet t = {0} mm · inner radius R = {1} mm{2} · {3}
+plech vodítko DÉLKA ŠÍŘKA mezera S v x y [natočení 90]	sheet card guide LENGTH WIDTH slot S at x y [rotation 90]
+plech výstřih DÉLKA ŠÍŘKA VÝŠKA [úhel 45] v x y [natočení 0] [dolů]	sheet lance LENGTH WIDTH HEIGHT [angle 45] at x y [rotation 0] [down]
+plech žaluzie DÉLKA ŠÍŘKA VÝŠKA v x y [v x y …] [natočení 90] [vlevo|vpravo] [dolů] [plocha F3]	sheet louvre LENGTH WIDTH HEIGHT at x y [at x y …] [rotation 90] [left|right] [down] [face F3]
+plech žebro ŠÍŘKA VÝŠKA [úhel 60] skica "Dráha" [dolů] [plocha F3]	sheet bead WIDTH HEIGHT [angle 60] sketch "Path" [down] [face F3]
+plech: {0} nemá body umístění – {1}	sheet: {0} has no placement points – {1}
+plech: bod má dvě nebo tři souřadnice (v x y nebo v x y z) – „{0}“	sheet: a point has two or three coordinates (at x y or at x y z) – "{0}"
+plech: modul tvářecích nástrojů není načten	sheet: the forming tool module is not loaded
+plech: neznámé slovo „{0}“ – {1}	sheet: unknown word "{0}" – {1}
+plech: neznámý nástroj „{0}“ – plech žaluzie | prolis | žebro | výstřih | můstek | lem díry | vodítko | křížový zlom (EN louvre | dimple | bead | lance | bridge | collar | card guide | cross break)	sheet: unknown tool "{0}" – sheet louvre | dimple | bead | lance | bridge | collar | card guide | cross break (CS žaluzie | prolis | žebro | výstřih | můstek | lem díry | vodítko | křížový zlom)
+plech: příliš mnoho čísel – {0}	sheet: too many numbers – {0}
+plech: text „{0}“ nečekán – název skici patří za slovo skica, název prvku za název	sheet: unexpected text "{0}" – a sketch name goes after the word sketch, a feature name after name
+plech: za „{0}“ chybí číslo	sheet: a number is missing after "{0}"
+plech: za „{0}“ chybí název	sheet: a name is missing after "{0}"
+plech: za „{0}“ chybí název skici v uvozovkách nebo $last	sheet: a sketch name in quotes or $last is missing after "{0}"
+plech: za „plocha“ zadejte F číslo (plocha F3) nebo pravidlo (plocha +Y, plocha největší)	sheet: after "face" give an F number (face F3) or a rule (face +Y, face largest)
+plech: zadejte bod umístění „v x y“ – {0}	sheet: give a placement point "at x y" – {0}
+Plocha {0} v tělese neexistuje – vyberte plochu plechu znovu.	Face {0} does not exist in the body – select the sheet face again.
+plocha F{0}	face F{0}
+Plocha plechu	Sheet face
+plocha s rovnými hranami; prázdné = horní plocha základního plechu	face with straight edges; empty = top face of the base sheet
+Plochu {0} se nepodařilo načíst.	Face {0} could not be read.
+Prolis (důlek)	Dimple
+prolis Ø{0} hl. {1} mm, stěna {2}°{3}	dimple Ø{0} depth {1} mm, wall {2}°{3}
+Prolis: průměr {0} mm je pro hloubku {1} mm a úhel stěny {2}° malý – zvětšete průměr nebo úhel stěny.	Dimple: the diameter {0} mm is too small for depth {1} mm and wall angle {2}° – increase the diameter or the wall angle.
+Prolis: průměr a hloubka musí být kladné.	Dimple: diameter and depth must be positive.
+protažený otvor s límcem (pro závit nebo trubku)	extruded hole with a collar (for a thread or a tube)
+předděr ≈ Ø{0} mm (orientačně)	pre-hole ≈ Ø{0} mm (approximate)
+předděr ≈ Ø{0} mm (orientačně) – vysoký límec, hrozí trhliny (d0/d < 0,45)	pre-hole ≈ Ø{0} mm (approximate) – tall collar, risk of cracks (d0/d < 0.45)
+rovinná plocha, ze které se tvaruje; prázdné = horní plocha základního plechu	flat face the tool forms from; empty = top face of the base sheet
+Skica s dráhou	Path sketch
+Skica s dráhou (úsečky, oblouky)	Path sketch (lines, arcs)
+skicu s dráhou žebra	the bead path sketch
+sklon plošek u delších stran; obvykle 1–2°	slope of the facets at the longer sides; usually 1–2°
+Smazat bod	Delete point
+Směr tvarování	Forming direction
+stopa {0} × {1} mm	footprint {0} × {1} mm
+stopa Ø{0} mm	footprint Ø{0} mm
+šířka stopy {0} mm	footprint width {0} mm
+tloušťka desky + vůle	card thickness + clearance
+Tvarování (nerozvinuto, vrstva FORM):	Forming (not unfolded, layer FORM):
+Tvářecí nástroj i křížový zlom se umisťují na rovinnou plochu plechu (plocha {0} není rovinná).	Forming tools and cross breaks are placed on a flat sheet face (face {0} is not flat).
+tvářecí nástroj plechu v jednom nebo více bodech plochy (bez plochy horní plocha základu): skořepina tloušťky plechu nahoru / dolů, prostřih skutečně otevřený; v rozvinu stopa ve vrstvě FORM	sheet metal forming tool at one or more points of a face (no face = top of the base): a shell of sheet thickness up / down, lanced cuts really open; in the flat pattern the footprint on layer FORM
+u plochy plechu	at the sheet face
+Úhel náběhu	Ramp angle
+Úhel stěny	Wall angle
+Úhel zlomu	Break angle
+v rovině plochy	in the face plane
+větrací žaluzie: prostřih podél jedné strany a vytlačená stříška	ventilation louvre: a cut along one side and a raised hood
+vnitřní průměr límce	inner diameter of the collar
+Vodítko desky	Card guide
+vodítko desky {0} × {1} mm, mezera {2} mm	card guide {0} × {1} mm, gap {2} mm
+vodítko desky plošných spojů: můstek s mezerou pro hranu desky	PCB card guide: a bridge with a gap for the card edge
+vylisované žebro podél dráhy ve skice (úsečky, oblouky) – skořepina tloušťky plechu	pressed bead along a sketch path (lines, arcs) – a shell of sheet thickness
+Výstřih (jazýček)	Lance (tab)
+výstřih {0} × {1} mm, výška {2} mm, náběh {3}°	lance {0} × {1} mm, height {2} mm, ramp {3}°
+Výstřih: délka {0} mm je pro výšku {1} mm a úhel {2}° krátká.	Lance: the length {0} mm is too short for height {1} mm and angle {2}°.
+Výstřih: délka, šířka a výška musí být kladné.	Lance: length, width and height must be positive.
+Výška límce	Collar height
+Výška otvoru	Opening height
+vyztužení rovného panelu mírným zlomem po úhlopříčkách (1–2°)	stiffening a flat panel with a slight break along the diagonals (1–2°)
+Zadejte body jako „x y; x y“ nebo „x y z; …“ (mm).	Enter points as "x y; x y" or "x y z; …" (mm).
+Zaoblené rohy	Rounded corners
+Žaluzie	Louvre
+žaluzie {0} × {1} × {2} mm, otevřená {3}	louvre {0} × {1} × {2} mm, open {3}
+Žaluzie: délka, šířka a výška musí být kladné.	Louvre: length, width and height must be positive.
+žebro (prolis) podél dráhy ve skice – úsečky, lomené čáry, oblouky, kružnice; zaoblené konce, pokosy v rozích	bead along a sketch path – lines, polylines, arcs, circles; rounded ends, mitred corners
+Žebro podél dráhy	Bead along path
+žebro š. {0} v. {1} mm, stěna {2}°	bead w. {0} h. {1} mm, wall {2}°
+Žebro: dráha může obsahovat úsečky, lomené čáry, oblouky a kružnice (spline a elipsu nahraďte oblouky).	Bead: the path may contain lines, polylines, arcs and circles (replace splines and ellipses with arcs).
+Žebro: dráha se v rohu otáčí o víc než 150° – roh rozdělte nebo zaoblete.	Bead: the path turns by more than 150° at a corner – split or round the corner.
+Žebro: oblouk dráhy musí na sousední úseky navazovat tečně.	Bead: a path arc must join its neighbouring segments tangentially.
+Žebro: poloměr oblouku dráhy {0} mm je menší než polovina šířky žebra s okrajem ({1} mm).	Bead: the path arc radius {0} mm is smaller than half the bead width including its margin ({1} mm).
+Žebro: skica dráhy neobsahuje úsečku ani oblouk.	Bead: the path sketch contains no line or arc.
+Žebro: šířka {0} mm je pro výšku {1} mm a úhel stěny {2}° malá.	Bead: the width {0} mm is too small for height {1} mm and wall angle {2}°.
+Žebro: šířka a výška musí být kladné.	Bead: width and height must be positive.
+Rozvin uložen – {0} ohybů, {1} tvářených prvků ve vrstvě FORM, {2} × {3} mm.	Flat pattern saved – {0} bends, {1} formed features on layer FORM, {2} × {3} mm.
+#!dynamic
+Tvarování	Forming

@@ -21,6 +21,7 @@ import type { PlaneDef, Ref } from "./refs";
 import type { CadDoc, ComponentSource, ExportFormat, Feature, MeshData } from "./types";
 import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark, setPerfSink } from "./perf-log";
+import { formNotesOfDoc } from "./drawing-doc";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 
@@ -326,7 +327,9 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         if (missingBlobs(dd).length) drawCache = null; // bez dat importu (dorazí s dalším požadavkem) nezapamatovat
         // Chytré kóty: list bez zapečených kót (s místem navíc) + plán kót podle prvků jako upravitelné poznámky (cad/drawing-dims.ts)
         const smart = m.opts?.dimensions === "smart" && dd.kind !== "assembly";
-        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(body, m.doc, m.meta, m.opts, extra) : makeDrawing(body, m.meta, m.opts, extra) });
+        // poznámky k plechu (křížový zlom) do patičky – z dokumentu, pokud je volající nedodal
+        const meta: DrawingMeta = m.meta.formNotes ? m.meta : { ...m.meta, formNotes: formNotesOfDoc(m.doc) };
+        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(body, m.doc, meta, m.opts, extra) : makeDrawing(body, meta, m.opts, extra) });
         break;
       }
     }

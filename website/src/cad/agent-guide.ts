@@ -601,6 +601,55 @@ vrací \`window.mncad.progress()\` a \`window.mncad.cancel()\`. Zrušený běh k
 v protokolu u delších prvků čas (\`✓ Pole 1 (pattern) · 7,9 s\`) a celkový čas. Jádro si pamatuje stav po prvcích:
 další příkaz přidaný na konec historie přepočítá jen nový prvek.
 
+### Plech – tvářecí nástroje a křížový zlom (\`plech …\`, EN \`sheet …\`, DE \`blech …\`)
+
+Tvářecí nástroj se umisťuje na **rovinnou plochu plechu** (bez \`plocha …\` = horní plocha základního plechu; za
+křížovým zlomem ploška, na které leží první bod) do jednoho nebo více bodů. Tvarovaná oblast je **skořepina tloušťky
+plechu** (vnitřní poloměr R, vnější R + t; \`poloměr 0\` = automaticky poloměr plechu, zmenšený, aby se vešel) vytlačená
+\`nahoru\` (od plochy, výchozí) nebo \`dolů\`. Kde nástroj materiál prostřihne (žaluzie, výstřih, můstek, vodítko, lem
+díry), je plech skutečně otevřený (štěrbina 0,1·t, min. 0,1 mm). Body \`v x y\` jsou souřadnice v rovině plochy (u
+vodorovné plochy x, y; u plochy kolmé na Y x, z; kolmé na X y, z), \`v x y z\` = bod v prostoru promítnutý na plochu;
+více bodů \`v 0 0 v 30 0\` nebo \`v 0 0; 30 0\`. Natočení (\`natočení 90\`) je kolem normály plochy od osy X (u ploch
+kolmých na X od osy Y). Nástroj musí ležet celý na rovné ploše (ne přes okraj, otvor, ohyb ani jiný nástroj) – jinak ✗
+s důvodem. Rozvin tvářené nástroje **nerozvíjí** (jako SolidWorks): \`akce sheet.dxf\` / \`sheet.svg\` je kreslí ve vrstvě
+**FORM** (obrys tvarované oblasti, štěrbiny, středová značka, popis T1, T2…; u lemu díry orientační předděr) a \`akce
+tabulka ohybů\` je vypíše v oddílu „Tvarování“.
+
+| Nástroj (CS / EN / DE) | Čísla za názvem | Klíčová slova |
+|---|---|---|
+| \`žaluzie\` / \`louvre\` / \`kieme\` | délka šířka výška | \`vlevo\` / \`vpravo\` = otevřená strana (vlevo od osy natočení) |
+| \`prolis\` / \`dimple\` / \`napf\` | průměr hloubka [úhel stěny] | \`úhel 60\` (od roviny plechu, 90 = svisle), \`ostrý\` |
+| \`žebro\` / \`bead\` / \`sicke\` | šířka výška [úhel stěny] | \`skica "Dráha"\` (úsečky, lomené čáry, oblouky, kružnice; bez = poslední skica) |
+| \`výstřih\` / \`lance\` / \`lasche\` | délka šířka výška [úhel náběhu] | otevřený konec ve směru +X natočení |
+| \`můstek\` / \`bridge\` / \`brücke\` | délka šířka výška [úhel náběhu] | boky prostřižené, konce spojené |
+| \`lem díry\` / \`collar\` / \`durchzug\` | průměr díry výška límce | límec od plochy plechu |
+| \`vodítko\` / \`card guide\` / \`kartenführung\` | délka šířka mezera [úhel] | \`mezera 1,6\` = mezera pro desku pod můstkem |
+| \`křížový zlom\` / \`cross break\` / \`kreuzbruch\` | [úhel] | \`F3\` panel, \`úhel 1,5\`, \`nahoru\` / \`dolů\` |
+
+\`\`\`
+nový díl Kryt
+skica XY: obdélník 120 80
+prvek sheet.base sketchId=$last t=1,5 r=1
+plech tvarování žaluzie 40 8 4 v -30 0 v 0 0 v 30 0 natočení 90   # tři žaluzie, délka podél Y, otevřené k −X
+plech prolis 12 2 v 45 -15 v 45 15                               # dva prolisy Ø12 hloubky 2
+plech lem díry 8 3 v -45 -25 dolů                                # protažený otvor s límcem dolů
+skica XY odsazení 1,5: úsečka -50 30 50 30
+plech žebro 6 2 skica $last                                      # žebro podél úsečky na horní ploše
+plech křížový zlom úhel 1,5                                      # horní plocha základu, vyklenutí nahoru
+stav
+akce sheet.dxf
+\`\`\`
+
+- Zlom a nástroje: křížový zlom zadaný **po** nástrojích je obejde (nástroje zůstanou v rovině panelu); nástroje zadané
+  **po** zlomu se položí na plošku zlomu, na které leží bod.
+- \`stav\` vypíše u nástroje např. \`žaluzie 40 × 8 × 4 mm, otevřená vlevo · nahoru · horní plocha základu · 3 b.: [-30; 0] …\`.
+- Obecný příkaz: \`prvek sheet.louvre points=[[0,0],[30,0]] length=40 width=8 height=4 rotation=90 open=right\`,
+  \`prvek sheet.dimple points=10;20 diameter=12 height=2 wallAngle=45 rounded=ne\`, \`prvek sheet.bead sketchId=$last width=6\`,
+  \`prvek sheet.crossbreak face=3 angle=2 direction=down\` (\`face\` = index plochy od 0, F3 = 2), úpravy \`upravit "Žaluzie 1" points=[[0,0]]\`.
+- Výkres: úhlopříčky křížového zlomu jsou hrany modelu (kreslí se v pohledech), poznámka \`KŘÍŽOVÝ ZLOM 1,5° nahoru\` se doplní
+  do patičky nad razítkem. Ohraňování a tváření nástroji pro výrobu (lis, nástroj) zůstává na technologovi – model je
+  geometricky přesná skořepina, tenčení materiálu se nemodeluje.
+
 ### Příklad – příruba DN50 (6 řádků)
 
 \`\`\`

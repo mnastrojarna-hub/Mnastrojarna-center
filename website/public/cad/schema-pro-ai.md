@@ -56,6 +56,9 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `díra D skrz v x1 y1 z1 v x2 y2 z2 …` | více děr jedním příkazem (každá poloha třemi souřadnicemi) |
 | `zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z|-Z|+X|-X|+Y|-Y] [poloměr N] [delší N] [kratší N]` | pravidla lze kombinovat: `hrany horní kruhové` |
 | `srazit C [hrany …]` | sražení hran, stejná pravidla |
+| `zaoblit R hrany <pravidlo> setback S [vrchol V3 S2]` | zaoblení se setbackem: ve vrcholu se 3+ zaoblenými hranami skončí zaoblení S od vrcholu a roh uzavře hladká záplata (G1) – viz „Zaoblení se setbackem, eliptické zaoblení a úkos s dělicí křivkou“ |
+| `zaoblit eliptické D1 D2 hrany <pravidlo> [rho 0,5]` | eliptické / kuželosečkové zaoblení: D1 na první (horní) ploše, D2 na druhé |
+| `úkos A plochy <pravidlo|F1 F2…> [dělicí "Skica 2"] [stupňovitý] [směr +Z]` · `úkos A plochy boční [rovina XY] [odsazení N]` | úkos ploch; s dělicí křivkou na obě strany od dělicí čáry, `stupňovitý` = každý úsek od vlastní roviny |
 | `skořepina T [otevřít +Z|horní|boční|největší]` | vydlabání; otevřené plochy pravidlem |
 | `pole N rozteč P [směr X|Y|Z] [N2 rozteč P2 směr Y]` · `pole kruhové N [úhel 360] [osa Z] [v cx cy cz]` | pole posledního prvku |
 | `zrcadlit XY|XZ|YZ [odsazení N]` | zrcadlení tělesa |
@@ -65,6 +68,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `normálie <označení> [v x y z]` | díl z knihovny (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta |
 | `vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit]` | sestava: vloží díl z otevřené záložky jako komponentu |
 | `sestava` · `sestava plochy "Čep" [rovinné|válcové]` · `sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]` · `sestava vazby` · `sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
+| `sestava vazba ozubení|šroub|hřeben|vačka|kardan|kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez … "A" <F|E|V> "B" <F|E|V> [poměr|stoupání|min|max]` · `pohyb motor rotační "Klika" 0..360 krok 5 [kolize]` · `pohyb stav|krok N|přehrát|export csv` | pokročilé a mechanické vazby (23 druhů) a pohybová studie (viz „Pokročilé a mechanické vazby, pohybová studie“) |
 | `sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …]` · `sestava odebrat|duplikovat|izolovat "X"` · `sestava zobrazit vše` | vlastnosti komponenty jako v panelu |
 | `sestava pole "X" N rozteč P [směr Y]` · `sestava pole "X" kruhové N [osa Z] [v cx cy cz]` · `sestava zrcadlit "X" YZ` · `sestava šroub "Deska" Ø9 [matice] [bez podložky]` | pole, zrcadlení, šroubový spoj do díry |
 | `sestava podsestava "A" "B" [jako "…"]` · `sestava rozpustit "P"` · `sestava upravit "X"` … `sestava hotovo` · `sestava otevřít "X"` | podsestavy, úprava dílu v kontextu sestavy |
@@ -77,6 +81,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `měřit F3|E5|V2 [F7|E9|V8|x y z]` · `měřit těleso|díry|válce` · `měřit plocha|hrany <pravidlo>` | měření pro kontrolu modelu (viz „Měření“); také `window.mncad.measure()` |
 | `výkres list 2` · `výkres list nový "Detail"` · `výkres list přejmenovat 2 "…"` · `výkres list smazat 2` · `výkres stav [list N|vše]` | listy výkresu – další příkazy výkresu pracují s vybraným listem (viz „Výkres textem: listy, značky, kóty, export“) |
 | `výkres razítko číslo="MN-1" kreslil="AI" …` · `výkres revize B "popis"` · `výkres otočení 90` · `výkres řez XZ poloviční` · `výkres kusovník ano` · `výkres balónky ne` · `kótovat základní` | razítko, revize a další volby listu |
+| `výkres pohled pomocný přední hrana x1 y1 x2 y2` · `výkres řez zalomený|natočený|částečný …` · `výkres přerušení přední x od 50 do 250` · `výkres uložení Ø40 H7` · `výkres revize značka B na Ø40` · `výkres zóny ano` | pomocný pohled, řezy lomenou čarou, částečný řez, přerušený pohled, uložení ISO 286 s Tabulkou uložení, trojúhelníky revizí a zóny (viz „Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize“) |
 | `výkres značka drsnost Ra 1,6 na Ø40` · `výkres kóta vodorovně pohled přední x1 y1 x2 y2` · `výkres upravit a3 odsazení=8` · `výkres smazat a3` · `výkres detail přední v x y poloměr r` · `výkres model "Hřídel"` | značky, ruční kóty, úpravy, detaily a další modely – vše, co jde ve výkrese myší; export `window.mncad.exportDrawing("pdf")` |
 | `smazat poslední` · `stav` · `zobraz iso|přední|horní…` · `kolize` | správa; kolize = kontrola průniků komponent sestavy |
 | `upravit` · `potlačit` / `zapnout` · `smazat <prvek>` · `přejmenovat` · `přesunout` · `duplikovat` · `zpět` / `znovu` · `proměnná` · `konfigurace` · `skica "Skica 1"` · `entita` · `kóta k1` · `odsadit` · `promítnout hrany` | úpravy hotového modelu a skici na místě – viz „Úpravy existujícího modelu“ |
@@ -293,6 +298,55 @@ prvek adv.twist sketch=$last height=30 angle=45
 prvek chamfer distance=1 edges=horní;rovné
 ```
 
+### Zaoblení se setbackem, eliptické zaoblení a úkos s dělicí křivkou
+
+Tři tvary pro formy a lité / obráběné díly (EN `fillet … setback`, `fillet elliptical`, `draft … parting … stepped`;
+DE `verrunden … rückversatz`, `verrunden elliptisch`, `schräge … trennlinie … gestuft`). V JSON / `prvek` jsou to běžné
+prvky `fillet` (pole `kind`) a `draft` (pole `partingSketchId`, `step`).
+
+- **Setback** – `zaoblit 3 hrany <pravidlo> setback 5`: ve vrcholu, kde se stýkají aspoň tři vybrané hrany (roh kvádru),
+  zaoblení skončí 5 mm od vrcholu podél každé hrany a roh uzavře hladká N-stranná záplata tečná (G1) k zaoblením i
+  k plochám rohu. Setback musí být ≥ poloměr (= poloměr ≈ běžný kulový roh; větší = plošší, rozlehlejší roh). Jiná hodnota
+  pro jeden vrchol: `vrchol V3 8` (číslo vrcholu jako popisek pro výběr) nebo `vrchol x y z 8`. JSON:
+  `{"type":"fillet","kind":"setback","radius":3,"setback":5,"setbacks":[{"at":{"kind":"vertex","index":2},"d":8}],"edges":[…]}`.
+  Přesně pro rohy z rovinných ploch a přímých hran; jiné rohy dostanou běžný roh a prvek hlásí ⚠.
+- **Eliptické / kuželosečkové** – `zaoblit eliptické 4 2 hrany horní`: průřez je oblouk elipsy tečný k oběma plochám,
+  D1 = 4 mm se odměří na **první** ploše (s normálou nejvíc nahoru: +Z, pak +Y, +X – u horní hrany kvádru tedy na
+  horní ploše), D2 = 2 mm na druhé. `rho 0,5` = kuželosečka (parabola; < 0,5 plošší, > 0,5 ostřejší). JSON:
+  `{"type":"fillet","kind":"conic","radius":4,"r2":2,"rho":0.5,"faceRefs":[{"kind":"face","index":3}],"edges":[…]}`
+  (`faceRefs` = plocha pro D1). Přímá hrana mezi rovinami a kruhová hrana se stálým průřezem (rovina ⟂ osa, souosý
+  válec) jsou přesné – odebraný průřez rovné hrany = D1·D2·(1 − π/4); jiné hrany jsou proložené šablonováním (⚠).
+  Vnitřní (konkávní) hrana materiál přidá.
+- **Úkos s dělicí křivkou** – `úkos 3 plochy boční dělicí "Skica 2"`: části vybraných ploch nad dělicí křivkou se zkosí ve
+  směru tahu (`směr +Z`, výchozí normála roviny XY), části pod ní proti němu – díl je v dělicí čáře nejširší a obě poloviny
+  formy jdou vyjmout. Skica **kolmá na tah** (`skica XY odsazení 10: …`) = rovinná dělicí křivka, její rovina je neutrální
+  rovinou obou stran (přesně). Skica **rovnoběžná s tahem** (`skica XZ: čára 0 10 30 10 30 20 60 20`) = profil dělicí čáry
+  promítnutý podél normály skici přes celý díl; křivka musí postupovat jedním směrem, konce se samy prodlouží za díl
+  (ve směru krajního úseku). `čára` se 3+ body se ve skice uzavírá – uzavírací úsek se u dělicí čáry vynechá.
+  Přímé úseky drží dělicí čáru přesně, oblouky / spline se rozdělí na rovinné úseky (⚠ přibližně), svislé skoky jsou stupně.
+- **Stupňovitý úkos** – `… dělicí "Skica 2" stupňovitý`: každý úsek dělicí čáry se zkosí od vlastní roviny kolmé na tah
+  (výška úseku, u šikmého jeho střed) a sousední úseky spojí stupňové plochy – klasický stupňovitý úkos formy.
+
+```
+nový díl Forma
+kvádr 60 40 30
+skica XZ: čára 0 10 30 10 30 20 60 20
+úkos 3 plochy boční dělicí "Skica 1" stupňovitý
+stav
+```
+
+```
+nový díl Kryt
+kvádr 60 40 20
+zaoblit 3 setback 6                  # všechny hrany, 8 rohů uzavře záplata
+nový díl Lišta
+kvádr 60 40 20
+zaoblit eliptické 4 2 hrany horní    # 4 mm po horní ploše, 2 mm dolů po boku
+```
+
+Stav (`stav`) u prvků vypíše např. `R3, setback 6, hrany vše`, `eliptické D1 4 × D2 2, hrany 1`,
+`3°, ploch 4, dělicí křivka „Skica 1“, stupňovitý`; přibližné výsledky mají ⚠ s vysvětlením.
+
 ### Úpravy existujícího modelu – upravit, potlačit, smazat, přesunout, zpět / znovu, proměnné, konfigurace
 
 Hotový díl se upravuje **na místě** (stejná záložka, historie Zpět funguje) – není potřeba `getDocument()` → ruční úprava
@@ -407,12 +461,189 @@ kolize
 kusovník
 ```
 
+### Pokročilé a mechanické vazby, pohybová studie – `sestava vazba …`, `pohyb …`
+
+Vedle 7 základních vazeb (kontakt, zarovnat, souosost, vzdálenost, úhel, rovnoběžně, ukotvit) je 16 dalších – celkem 23 druhů.
+Entita komponenty: `F12` = plocha, `E5` = hrana, `V3` = vrchol (čísla z `sestava plochy` / `měřit`), u dílu v podsestavě
+`F3@Díl`; nebo pravidlo `+Z|-X|horní|spodní|největší|nejmenší|rovinná|válcová|koule|kružnice|úsečka|Ø8|R4`.
+
+| Druh (CS / EN / DE) | Entity A → B | Volby |
+|---|---|---|
+| `kolmo` / perpendicular / senkrecht | rovina / osa → rovina / osa | – |
+| `tečně` / tangent / tangential | rovina, válec, koule → rovina, válec, koule | `obráceně` = vnitřní dotyk |
+| `shodně` / coincident / koinzident | vrchol, střed koule / kružnice, osa, rovina → totéž | – |
+| `symetricky` / symmetric / symmetrisch | plocha → protější plocha, `rovina "C" F3` (rovina souměrnosti) | `obráceně` |
+| `šířka` / width / breite | 2 plochy jazýčku (nebo čep) → 2 stěny drážky: `"A" F1 F2 "B" F5 F6` | – |
+| `dráha` / path / pfad | vrchol / střed → hrana (úsečka, kružnice, křivka) | – |
+| `drážka` / slot / langloch | čep (válec) → 2 válcové konce drážky: `"Čep" Ø8 "Deska" F7 F8` | `poloha N` (mm od 1. konce) |
+| `závěs` / hinge / scharnier | válec [+ dosedací rovina] → válec [+ rovina] | bez rovin drží osovou polohu |
+| `zámek` / lock / sperren | jen komponenty `"A" "B"` | – |
+| `mez vzdálenosti` / limit distance / abstandsgrenze | rovina / bod → rovina | `min N max N`, `od N do M`, `N..M` |
+| `mez úhlu` / limit angle / winkelgrenze | rovina / osa → rovina / osa | `min N max N` [°] |
+| `ozubení` / gear / zahnrad | osa kola A → osa kola B | `poměr N` (otáčky A : B) nebo `zuby zA zB`; `vnitřní` = stejný smysl |
+| `hřeben` / rack / zahnstange | osa pastorku → rovina zubů / hrana hřebenu | `dráha N` (mm na otáčku) nebo `modul m zuby z` (= π·m·z) |
+| `šroub` / screw / schraube | válec → válec (souosost + stoupání) | `stoupání P`; `levý` = levý závit |
+| `vačka` / cam / nocken | zdvihátko (rovina, váleček, koule, vrchol) → plocha vačky | síť plochy s odchylkou 0,002 mm |
+| `kardan` / universal / kardangelenk | vstupní hřídel → výstupní hřídel | tan θ2 = tan θ1 / cos β, nula = poloha při vytvoření |
+
+Bez entity se u Ozubení / Šroubu / Kardanu vezme osa z vazby Závěs / Souosost komponenty (jinak největší válec), bez hodnoty
+poměr poloměrů os, hrubé stoupání ISO podle průměru, u Hřebenu 2π·r pastorku. Mechanické vazby si při prvním řešení zapamatují
+výchozí natočení / posuv (`phase`) a dál drží vztah přírůstků. Hodnotu a meze lze měnit: `sestava vazba 3 poměr 2`,
+`sestava vazba 4 min 0 max 25`. Řešič: sekvenční průchod (původní vazby přesně jako dřív) + globální Levenberg–Marquardt přes
+polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
+
+**Pohybová studie** (`pohyb`, EN `motion`, DE `bewegung`): motor na vazbě, kroky, výpočet poloh všech komponent v každém kroku.
+
+- `pohyb motor rotační "Klika" 0..360 krok 5 [kolize] [stopa "Ojnice" bod 60 0 0]` – rotační motor na vazbě Závěs / Souosost /
+  Šroub komponenty (vztaženo k protějšku vazby, ukotvený má přednost; motor na komponentě B vazby obrátí znaménko). `krok 5` =
+  73 kroků po 5°, `kroky N` = počet, `čas T` = délka [s], `ot/min 60` místo rozsahu = rychlost.
+- `pohyb motor lineární vazba 3 10..40` – lineární motor: Vzdálenost (absolutní hodnota mezery), Drážka / Dráha / Souosost / Šroub
+  (posuv od výchozí polohy, mm); `rychlost 5` = mm/s.
+- `pohyb` / `pohyb stav` – definice a souhrn (rozsah pohybu komponent, první kolize, nesplněné vazby); `pohyb krok 12` – polohy
+  v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
+  `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
+  `pohyb kroky 48 čas 2 kolize vyp`, `pohyb motor smazat 1`, `pohyb smazat`.
+- API: `await window.mncad.motion('motor rotační "Klika" 0..360 krok 5')` (text = volitelný příkaz `pohyb …` předem) vrátí
+  `{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }`.
+- Studie se ukládá do sestavy (`motion` v JSON) a v `stav` je řádek „Pohybová studie: …“.
+
+```
+nová sestava Klikový mechanismus
+vložit "Rám" ukotvit
+vložit "Klika"
+vložit "Ojnice"
+vložit "Píst"
+sestava vazba závěs "Klika" Ø10 -Z "Rám" Ø10 +Z
+sestava vazba souosost "Ojnice" F3 "Klika" Ø6
+sestava vazba souosost "Ojnice" F4 "Píst" Ø6
+sestava vazba zarovnat "Píst" +Y "Rám" F5
+sestava vazba kontakt "Píst" -Z "Rám" +Z
+pohyb motor rotační "Klika" 0..360 krok 5 kolize stopa "Ojnice" bod 30 0 0
+pohyb krok 18
+pohyb export csv
+```
+
+```
+sestava vazba závěs "Kolo1" Ø10 "Rám" F1
+sestava vazba závěs "Kolo2" Ø10 "Rám" F2
+sestava vazba ozubení "Kolo1" "Kolo2" zuby 20 40
+sestava vazba šroub "Matice" "Šroub" stoupání 1,5
+sestava vazba vačka "Zdvihátko" -Y "Vačka" F3
+pohyb motor rotační "Kolo1" 0..720 kroky 144
+```
+
+### Spline s tečnami, hladké uzavřené šablonování a plochy třídy A
+
+**Spline s tečnami** (v řádku skici): úhel tečny ve stupních od osy X skici, váha = velikost tečny (1 = přirozená,
+větší = křivka se u bodu déle drží směru). Body se číslují od `p0`; tečna jde zadat u kteréhokoli bodu, „vyp“ ji zruší.
+Křivka je přesně ta, kterou postaví jádro (interpolace s tečnými podmínkami) – ve skicáři je u bodu úchyt tečny
+(kroužek, tažením se mění úhel i váha) a panel s úhly a vahami u vybraného splinu.
+
+```
+skica XZ: spline 0 0 50 20 100 0 tečna-začátek 30 tečna-konec -30
+spline 0 0 40 30 80 0 120 20 tečna p1 0 váha p1 1,5        # tečna ve vnitřním bodě p1
+entita e1 tečna-konec=-45 váha-konec=2 tečna-p1=vyp        # úprava existujícího splinu (skica "Skica 1")
+```
+EN: `tangent-start 30`, `tangent-end -30`, `tangent p1 0`, `weight-start 1.5`, `weight p1 2`; DE: `tangente-anfang`,
+`tangente-ende`, `tangente p1`, `gewicht-anfang`, `gewicht p1`. Ve stavu: `e1 spline 3 b. … tečny p0 30°, p2 −30°`.
+
+**Hladké uzavřené šablonování** (Uzavřený hladce): profily tvoří uzavřenou smyčku a plocha je periodická přes všechny
+profily – bez hrany ve švu (C2). Profily se prokládají hladce, ostré rohy profilů se zaoblí (odchylku ohlásí ⚠).
+
+```
+prvek loft sketchIds=["Skica 1","Skica 2","Skica 3","Skica 4"] closed=ano smooth=ano
+```
+
+**Plochy třídy A** (karta Plochy, skupina „Plochy třídy A“). Hrany a plochy se zadávají čísly `E3` / `F3` jako
+popisky pro výběr (`window.mncad.hints()`). Plochy se přidají jako volné plochy (sešít = jedna skořepina s okolím).
+
+| Příkaz | Význam |
+| --- | --- |
+| `výplň E3 E4 E5 [G0|G1|G2] [sešít]` | N-stranná výplň otvoru, návaznost na plochy, kterým hrany patří (výchozí G1) |
+| `přechod E3 E7 [G1|G2] [G1|G2] [napětí 1 1,5] [obrátit] [sešít]` | přechodová plocha mezi dvěma hranami ploch; napětí = délka tečny (1 = přirozená); „obrátit“ = opačný směr 2. hrany |
+| `prodloužit plochu E5 [E6 …] 10 [G1|G2]` | plocha pokračuje přes hranu: G1 tečně (rovně), G2 i s křivostí; sešije se s původní plochou |
+| `plocha F3 cv` | seznam řídicích bodů (CV) B-spline plochy: `[u v] (x; y; z)` |
+| `plocha F3 cv [síť 4 4] 2 3 posun 0 0 1,5` | posun CV [u=2, v=3] o vektor; „síť“ = přesné zjemnění (stupeň 3, vložení uzlů) |
+| `plocha F3 cv řada u 2 posun 0 0 1` | posun celé řady CV (u nebo v, od 1); více posunů lze psát za sebou v jednom řádku |
+| `analýza návaznosti [E3 E5 …] [zobrazit]` | G0 mezera (mm), G1 úhel normál (°), G2 rozdíl křivostí napříč hranou (1/mm) a třída; bez hran všechny |
+| `analýza hřebenu [E3 …] [měřítko 50] [zobrazit]` | hřebeny křivosti hran: křivost min/max, nejmenší poloměr; „zobrazit“ = hřebeny v 3D okně |
+
+EN: `fill`, `blend … tension`, `extend surface`, `face F3 cv 2 3 move 0 0 1.5`, `face F3 cv row u 2 move …`,
+`grid 4 4`, `analyze continuity`, `analyze comb … scale 50 show`; DE: `füllen`, `übergang … spannung`,
+`verlängern fläche`, `fläche F3 cv 2 3 verschieben …`, `reihe`, `netz`, `analyse stetigkeit`, `analyse kamm`.
+Obecně: `prvek surf.fill edges=2;3;4 continuity=G2`, `prvek surf.blend edges=2;6 contA=G2 tensionA=1,2`,
+`prvek surf.extendEdge edges=4 length=10 continuity=G1`, `prvek surf.cv faces=2 gridU=4 gridV=4 moves=[{"i":2,"j":3,"d":[0,0,1.5]}]`
+(v obecném příkazu `prvek` a v JSON jsou hrany / plochy indexy od 0 – E3 = 2, F3 = 2; řídicí body [i j] jsou od 1).
+
+Třídy návaznosti: **G2** = mezera ≤ 0,01 mm, úhel ≤ 0,1° a rozdíl křivostí ≤ 5 % (min. 0,0001 1/mm), **G1** = tečně,
+**G0** = jen dotyk (ostrá hrana), **mezera**, **volná hrana** (bez sousední plochy). Nesešité plochy se párují podle
+polohy hran (`nesešité` v protokolu). Ukázka protokolu:
+
+```
+✓ návaznost 2 hran: G2 2 · G1 0 · G0 0 · mezera 0 · volné 0
+  E9 (F1|F3, nesešité): G2 · mezera 0 mm · úhel 0,002° · Δk 0,00004 1/mm (k 0,02 / 0,02)
+```
+
+Co je přesné a co přibližné: výplň je operátor jádra (dosažená tečnost se ověří, nad 0,1° ⚠); přechod a prodloužení
+jsou Hermitovy pásy proložené B-spline – návaznost je přesná ve vzorkovacích bodech (33 podél hrany) a mezi nimi se
+ověřuje analýzou; CV úprava je přesná u B-spline ploch, jiné plochy se převedou prokladem (rovina přesně) a ořezaná
+plocha se vrátí v celém rozsahu parametrů (⚠).
+
 ### Průběh a zrušení výpočtu
 
 Během delšího výpočtu ukazuje program u spodního okraje „Počítám prvek k/n: název · čas“ s tlačítkem **Zrušit**; totéž
 vrací `window.mncad.progress()` a `window.mncad.cancel()`. Zrušený běh konzole dokument nezmění. Po výpočtu je
 v protokolu u delších prvků čas (`✓ Pole 1 (pattern) · 7,9 s`) a celkový čas. Jádro si pamatuje stav po prvcích:
 další příkaz přidaný na konec historie přepočítá jen nový prvek.
+
+### Plech – tvářecí nástroje a křížový zlom (`plech …`, EN `sheet …`, DE `blech …`)
+
+Tvářecí nástroj se umisťuje na **rovinnou plochu plechu** (bez `plocha …` = horní plocha základního plechu; za
+křížovým zlomem ploška, na které leží první bod) do jednoho nebo více bodů. Tvarovaná oblast je **skořepina tloušťky
+plechu** (vnitřní poloměr R, vnější R + t; `poloměr 0` = automaticky poloměr plechu, zmenšený, aby se vešel) vytlačená
+`nahoru` (od plochy, výchozí) nebo `dolů`. Kde nástroj materiál prostřihne (žaluzie, výstřih, můstek, vodítko, lem
+díry), je plech skutečně otevřený (štěrbina 0,1·t, min. 0,1 mm). Body `v x y` jsou souřadnice v rovině plochy (u
+vodorovné plochy x, y; u plochy kolmé na Y x, z; kolmé na X y, z), `v x y z` = bod v prostoru promítnutý na plochu;
+více bodů `v 0 0 v 30 0` nebo `v 0 0; 30 0`. Natočení (`natočení 90`) je kolem normály plochy od osy X (u ploch
+kolmých na X od osy Y). Nástroj musí ležet celý na rovné ploše (ne přes okraj, otvor, ohyb ani jiný nástroj) – jinak ✗
+s důvodem. Rozvin tvářené nástroje **nerozvíjí** (jako SolidWorks): `akce sheet.dxf` / `sheet.svg` je kreslí ve vrstvě
+**FORM** (obrys tvarované oblasti, štěrbiny, středová značka, popis T1, T2…; u lemu díry orientační předděr) a `akce
+tabulka ohybů` je vypíše v oddílu „Tvarování“.
+
+| Nástroj (CS / EN / DE) | Čísla za názvem | Klíčová slova |
+|---|---|---|
+| `žaluzie` / `louvre` / `kieme` | délka šířka výška | `vlevo` / `vpravo` = otevřená strana (vlevo od osy natočení) |
+| `prolis` / `dimple` / `napf` | průměr hloubka [úhel stěny] | `úhel 60` (od roviny plechu, 90 = svisle), `ostrý` |
+| `žebro` / `bead` / `sicke` | šířka výška [úhel stěny] | `skica "Dráha"` (úsečky, lomené čáry, oblouky, kružnice; bez = poslední skica) |
+| `výstřih` / `lance` / `lasche` | délka šířka výška [úhel náběhu] | otevřený konec ve směru +X natočení |
+| `můstek` / `bridge` / `brücke` | délka šířka výška [úhel náběhu] | boky prostřižené, konce spojené |
+| `lem díry` / `collar` / `durchzug` | průměr díry výška límce | límec od plochy plechu |
+| `vodítko` / `card guide` / `kartenführung` | délka šířka mezera [úhel] | `mezera 1,6` = mezera pro desku pod můstkem |
+| `křížový zlom` / `cross break` / `kreuzbruch` | [úhel] | `F3` panel, `úhel 1,5`, `nahoru` / `dolů` |
+
+```
+nový díl Kryt
+skica XY: obdélník 120 80
+prvek sheet.base sketchId=$last t=1,5 r=1
+plech tvarování žaluzie 40 8 4 v -30 0 v 0 0 v 30 0 natočení 90   # tři žaluzie, délka podél Y, otevřené k −X
+plech prolis 12 2 v 45 -15 v 45 15                               # dva prolisy Ø12 hloubky 2
+plech lem díry 8 3 v -45 -25 dolů                                # protažený otvor s límcem dolů
+skica XY odsazení 1,5: úsečka -50 30 50 30
+plech žebro 6 2 skica $last                                      # žebro podél úsečky na horní ploše
+plech křížový zlom úhel 1,5                                      # horní plocha základu, vyklenutí nahoru
+stav
+akce sheet.dxf
+```
+
+- Zlom a nástroje: křížový zlom zadaný **po** nástrojích je obejde (nástroje zůstanou v rovině panelu); nástroje zadané
+  **po** zlomu se položí na plošku zlomu, na které leží bod.
+- `stav` vypíše u nástroje např. `žaluzie 40 × 8 × 4 mm, otevřená vlevo · nahoru · horní plocha základu · 3 b.: [-30; 0] …`.
+- Obecný příkaz: `prvek sheet.louvre points=[[0,0],[30,0]] length=40 width=8 height=4 rotation=90 open=right`,
+  `prvek sheet.dimple points=10;20 diameter=12 height=2 wallAngle=45 rounded=ne`, `prvek sheet.bead sketchId=$last width=6`,
+  `prvek sheet.crossbreak face=3 angle=2 direction=down` (`face` = index plochy od 0, F3 = 2), úpravy `upravit "Žaluzie 1" points=[[0,0]]`.
+- Výkres: úhlopříčky křížového zlomu jsou hrany modelu (kreslí se v pohledech), poznámka `KŘÍŽOVÝ ZLOM 1,5° nahoru` se doplní
+  do patičky nad razítkem. Ohraňování a tváření nástroji pro výrobu (lis, nástroj) zůstává na technologovi – model je
+  geometricky přesná skořepina, tenčení materiálu se nemodeluje.
 
 ### Příklad – příruba DN50 (6 řádků)
 
@@ -761,6 +992,55 @@ výkres stav vše
 
 Pak `window.mncad.exportDrawing("pdf", { sheet: 1 })` a `exportDrawing("png", { sheet: 2 })` pro kontrolu očima.
 
+### Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize
+
+Body se zadávají jako u ostatních příkazů výkresu v **mm modelu v rovině pohledu** (y nahoru – rozsahy pohledů ukáže
+`výkres stav`), umístění na listu v mm listu od levého dolního rohu. Nové pohledy dostanou písmeno (B, C… – A patří
+řezu A–A) a značky na ně míří jako na ostatní pohledy: `pohled B v x y` (pomocný), `řez B v x y` (řez lomenou čarou).
+
+| Příkaz | Význam |
+| --- | --- |
+| `výkres pohled pomocný přední hrana 40 50 100 15,36` | **pomocný pohled** (POHLED B, metoda šipky ISO 128-30) kolmo na šikmou plochu, která je v rodičovském pohledu vidět jako hrana – plocha ve skutečném tvaru; bod hrany se přichytí k hraně pohledu |
+| `… hrana … podél` · `… otočit` · `… umístit 330 120` | pohled podél hrany · z opačné strany · střed pohledu na zadané místo listu (jinak zarovnaně s rodičem: ISO E po šipce, A proti ní) |
+| `výkres pohled pomocný plocha F7` · `výkres pohled pomocný směr 0,5 0 0,87` | směr podle rovinné plochy (číslo F z `měřit`) nebo vektoru k pozorovateli; rodič se vybere sám (pohled, ve kterém je plocha vidět z boku) |
+| `výkres řez zalomený horní body -70 -10 -20 -10 -20 10 70 10` | **zalomený řez** (ŘEZ B–B): rovnoběžné úseky spojené skoky; skoky se v řezu nekreslí, šrafy jen v rovinách úseků |
+| `výkres řez natočený horní body 60 0 0 0 -30 52` | **natočený řez**: konec hlavního ramena, vrchol (osa otočení), konec šikmého ramena – šikmé rameno se otočí do roviny hlavního (příruby, rozteče děr) |
+| `… otočit` · `výkres řez smazat B` | pohled na řez z druhé strany (šipky obráceně) · smazání |
+| `výkres řez částečný přední body -25 5 25 5 25 45 -25 45 hloubka 30 křivka` | **částečný řez**: v oblasti pohledu se odebere materiál do hloubky od přední strany, řezná plocha se šrafuje, hranice tenkou čarou od ruky (`křivka` = hladká) · `výkres řez částečný smazat 1|vše` |
+| `výkres přerušení přední x od 50 do 250 [mezera 8] [vlnovka]` | **přerušený pohled**: střední část se vynechá, části se přisunou (i v pohledech ve stejné promítací čáře), čáry přerušení cikcak / vlnovka; kóty přes přerušení i `výkres stav` drží **skutečnou délku** · `výkres přerušení smazat 1|vše` |
+| `výkres uložení Ø40 H7` · `výkres uložení Ø12 skrz H7` · `výkres uložení Ø25 H7/k6` | pole tolerance **ISO 286** ke kótě nebo popisu díry (kontrola, že pole pro rozměr existuje); u kóty se zobrazí úchylky `(+0,025/0)` – `výkres tolerance Ø40 H7` funguje stejně (bez kontroly) |
+| `… zobrazení odchylky|mezní|značka` · `výkres uložení zobrazení mezní` | úchylky, mezní rozměry `(40,025/40,000)` nebo jen značka – u jedné kóty / na celém listu |
+| `výkres uložení tabulka ano` | **Tabulka uložení** na volném místě listu: kóta, pole, horní a dolní úchylka, max. a min. rozměr |
+| `výkres uložení dotaz 40 H7/g6` | jen dotaz: úchylky díry a hřídele, vůle / přesah a druh uložení (s vůlí, přechodné, s přesahem) |
+| `výkres revize značka B na Ø40, 25` · `výkres revize značka smazat na Ø40` · `výkres revize B značky ne` | **trojúhelník revize** u změněných kót (revize musí být v tabulce: `výkres revize B "…"`); kreslení trojúhelníků lze vypnout pro jednu revizi |
+| `výkres zóny ano` | zóny listu ISO 5457 (písmena a čísla na okraji rámu) – tabulka revizí dostane sloupec **Zóna** s polohou trojúhelníků |
+
+`výkres stav` vypíše řádky „Pomocné pohledy“, „Řezy lomenou čarou“, „Částečné řezy“, „Přerušení“ (zkrácení na listu
+proti skutečné délce), „Uložení ISO 286“ (každá kóta s polem tolerance, úchylky a mezní rozměry) a „Zóny listu ·
+trojúhelníky revizí“. Všechno se exportuje do PDF, DXF, DWG, SVG i PNG (`window.mncad.exportDrawing`).
+
+### Příklad E – zalomený řez, uložení, revize se zónou
+
+```
+nový díl Deska se třemi dírami
+kvádr 120 60 20 střed
+díra 10 skrz v -40 -10 20
+díra 12 skrz v 0 10 20
+díra 8 skrz v 40 -10 20
+výkres A3 na šířku pohledy přední,horní
+kótovat
+výkres řez zalomený horní body -70 -10 -20 -10 -20 10 20 10 20 -10 70 -10
+výkres uložení Ø12 skrz H7
+výkres uložení tabulka ano
+výkres revize B "Díra Ø12 H7"
+výkres revize značka B na Ø12
+výkres zóny ano
+výkres stav
+```
+
+Řez B–B prochází všemi třemi dírami (šrafy jen v řezných plochách, mezery Ø10, Ø12 a Ø8); popis díry má úchylky
+`(+0,018/0)` a je v Tabulce uložení; u popisu je trojúhelník revize B a v tabulce revizí jeho zóna.
+
 ## Model nebo výkres podle předlohy – kontrola 1:1 (povinné)
 
 Když podle předlohy (výkres PDF, obrázek, ruční skica, 3D model zákazníka) stavíte model nebo překreslujete výkres,
@@ -920,8 +1200,8 @@ export type SketchEntity = { construction?: boolean } & (
   | { id: string; type: "line"; a: Vec2; b: Vec2 }
   | { id: string; type: "point"; p: Vec2 }
   | { id: string; type: "ellipse"; cx: number; cy: number; rx: number; ry: number; angle: number }
-  /** hladká křivka (interpolační spline přes body) */
-  | { id: string; type: "spline"; points: Vec2[]; closed: boolean }
+  /** hladká křivka (interpolační spline přes body); `tangents[i]` = tečna v bodě i (°, null = volná), `weights[i]` = její velikost (1 = přirozená) – viz spline-tangent.ts */
+  | { id: string; type: "spline"; points: Vec2[]; closed: boolean; tangents?: (number | null)[]; weights?: (number | null)[] }
 );
 
 /** Odkaz na charakteristický bod/část entity skici: „a“, „b“, „c“ (konce/body), „center“, „p3“ (bod lomené čáry), „self“ (celá entita). */
@@ -1006,8 +1286,12 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       /** řada ISO 273 pro průchozí díru (informativní – průměr se dopočítá v UI) */
       fit?: HoleFit;
     }
-  /** Zaoblení: `kind` konstantní / asymetrické (r2) / proměnné (radii: poloměr podle indexu hrany) / plocha–plocha / plné; `tangentChain` = šířit po tečných hranách. */
-  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound"; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; edgeSigs?: PickSigs; faceSigs?: PickSigs; faceSigs2?: PickSigs; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
+  /**
+   * Zaoblení: `kind` konstantní / asymetrické (r2) / proměnné (radii: poloměr podle indexu hrany) / plocha–plocha / plné /
+   * setback (`setback` = vzdálenost od vrcholu, `setbacks` = jiná pro vrchol) / eliptické – kuželosečkové (D1 = radius, D2 = r2,
+   * `rho`; plocha pro D1 = `faceRefs`); `tangentChain` = šířit po tečných hranách.
+   */
+  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound" | "setback" | "conic"; setbacks?: { at: Ref; d: number }[]; rho?: number; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; edgeSigs?: PickSigs; faceSigs?: PickSigs; faceSigs2?: PickSigs; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
   /** Zkosení: stejné vzdálenosti / dvě vzdálenosti (d2 + referenční plocha) / vzdálenost + úhel / vrchol (3 vzdálenosti). */
   | { type: "chamfer"; distance: number; edges: number[] | "all"; kind?: "equal" | "twoDistances" | "distanceAngle" | "vertex"; d2?: number; d3?: number; angle?: number; faceRef?: Ref; vertices?: number[]; vertexRefs?: Ref[]; tangentChain?: boolean; edgeSigs?: PickSigs; vertexSigs?: PickSigs }
   /** Skořepina: `thicknesses` = jiná tloušťka pro vybrané plochy (index → mm), `outward` = zesílit ven. */
@@ -1047,7 +1331,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Tažení profilu po křivce (profil = uzavřená skica, dráha = skica s otevřenou/uzavřenou křivkou). */
   | { type: "sweep"; profileId: string; pathId: string; mode: BoolMode; frenet: boolean; guideId?: string; twist?: number; twistTurns?: number; thin?: Thin; circleRadius?: number; keepNormal?: boolean; transition?: "right" | "round" | "transformed"; scaleEnd?: number }
   /** Šablonování mezi 2+ skicami (profily v různých rovinách). */
-  | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode; guideIds?: string[]; centerlineId?: string; closed?: boolean; startCond?: "none" | "normal" | "direction"; endCond?: "none" | "normal" | "direction"; startDir?: Direction; endDir?: Direction; startLen?: number; endLen?: number; thin?: Thin; startPoint?: Ref; endPoint?: Ref }
+  /** `closed` + `smooth` = uzavřené hladce: periodická plocha přes všechny profily (C2 i ve švu) – feat/loft-smooth.ts */
+  | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode; guideIds?: string[]; centerlineId?: string; closed?: boolean; smooth?: boolean; startCond?: "none" | "normal" | "direction"; endCond?: "none" | "normal" | "direction"; startDir?: Direction; endDir?: Direction; startLen?: number; endLen?: number; thin?: Thin; startPoint?: Ref; endPoint?: Ref }
   /** Úkos vybraných ploch vůči neutrální rovině (`planeDef` = libovolná rovina; `pull` = směr tahu; `partingSketchId` = dělicí křivka). */
   | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number; planeDef?: PlaneDef; pull?: Direction; partingSketchId?: string; tangentChain?: boolean; step?: boolean; faceSigs?: PickSigs }
   /** Rozříznutí tělesa rovinou, ponechá se jedna strana (`planeDef` = libovolná rovina, `faceRef` = řez plochou). */
@@ -1119,6 +1404,8 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
+  /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
+  motion?: MotionStudy;
   /** metadata těles dílu (barva, skrytí) – název = klíč tělesa z historie */
   bodies?: BodyMeta[];
   /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */

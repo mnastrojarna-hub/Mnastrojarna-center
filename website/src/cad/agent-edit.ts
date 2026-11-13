@@ -98,7 +98,7 @@ export function parseValue(raw: string): unknown {
 /** `klíč=hodnota klíč="text s mezerami" klíč=[1, 2] klíč={"a":{"b":1}}` → dvojice (JSON do 4 úrovní vnoření) */
 export function keyValues(text: string): [string, string][] {
   const out: [string, string][] = [];
-  const re = /([^\s=]+)=("[^"]*"|„[^“]*“|\[[^\]]*\]|\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}|\S*)/g;
+  const re = /([^\s=]+)=("[^"]*"|„[^“]*“|\[(?:[^[\]]|\[[^[\]]*\])*\]|\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}|\S*)/g;
   let m: RegExpExecArray | null;
   let last = 0;
   while ((m = re.exec(text))) {

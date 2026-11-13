@@ -44,6 +44,8 @@ export type DrawingMeta = {
   edges?: string;
   /** závitové díry: poloměr jádrového vrtání → popis (např. „M6 hl. 12“) – místo Ø jádra se kótuje označení závitu */
   threads?: { r: number; label: string }[];
+  /** poznámky k plechu (křížový zlom) – v patičce nad razítkem */
+  formNotes?: string[];
   /** kusovník (sestava) – vykreslí se nad razítkem dle ISO 7573 */
   bom?: BomItem[];
   /** komponenty sestavy pro pozice (balónky) – světový obalový kvádr každé komponenty */
@@ -2526,7 +2528,7 @@ function titleBlock(W: number, H: number, sheet: SheetName, scale: number, proje
   // poznámka nad razítkem a list
   const ny = y - bomHeight(meta.bom) - extraAbove;
   // výrobní požadavky (tolerance, hrany) jen když je uživatel zadal – nic se nedoplňuje automaticky
-  T(x, ny - 5.5, [tr("Rozměry v mm"), meta.tolerance?.trim() ? tr("Nepředepsané tolerance {0}", meta.tolerance.trim()) : "", meta.edges?.trim() ? tr("Hrany: {0}", meta.edges.trim()) : ""].filter(Boolean).join(" · "), 2.5);
+  T(x, ny - 5.5, [tr("Rozměry v mm"), meta.tolerance?.trim() ? tr("Nepředepsané tolerance {0}", meta.tolerance.trim()) : "", meta.edges?.trim() ? tr("Hrany: {0}", meta.edges.trim()) : "", ...(meta.formNotes ?? [])].filter(Boolean).join(" · "), 2.5);
   // poznámka k modelu jen na vyžádání (razítko → „Poznámka v patičce“) – nic nenaznačuje úplnost dokumentace automaticky
   T(x, ny - 1.8, [meta.note?.trim() ?? "", tr("List {0}/{1}", meta.sheetIndex ?? 1, meta.sheetCount ?? 1)].filter(Boolean).join(" · "), 2.5);
 }

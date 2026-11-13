@@ -3,7 +3,7 @@
  * Modul UI (soubor v `components/cad/ext/`) je importován z `components/cad/ext/index.tsx`.
  */
 import type { ComponentType } from "react";
-import type { BuildResult, CadDoc, Feature } from "@/cad/types";
+import type { BuildResult, CadDoc, Feature, Vec3 } from "@/cad/types";
 import type { SelItem } from "../selection";
 import "@/cad/ext/index";
 
@@ -27,7 +27,17 @@ export type ExtActionApi = {
   exportModel: (format: string) => Promise<void>;
 };
 
-export type ExtUi = { Form?: ComponentType<ExtFormProps>; action?: (api: ExtActionApi) => void | Promise<void> };
+export type ExtUi = {
+  Form?: ComponentType<ExtFormProps>;
+  action?: (api: ExtActionApi) => void | Promise<void>;
+  /**
+   * klik na plochu modelu při úpravě prvku (s bodem dopadu) – místo prostého přepnutí indexu plochy: vrací změnu dat prvku,
+   * text = hlášení (např. „vyberte rovinnou plochu“), null = nic
+   */
+  onFacePick?: (a: { f: Extract<Feature, { type: "ext" }>; index: number; point: Vec3 }) => Promise<Record<string, unknown> | string | null> | Record<string, unknown> | string | null;
+  /** výzva v řádku příkazů při úpravě prvku */
+  prompt?: (f: Extract<Feature, { type: "ext" }>) => string;
+};
 
 const ui = new Map<string, ExtUi>();
 export function registerExtUi(ext: string, def: ExtUi) {

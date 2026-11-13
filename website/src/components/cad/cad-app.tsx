@@ -2301,6 +2301,14 @@ export function CadApp() {
   const onPickFace = async (i: number, point?: [number, number, number]) => {
     if (refPick) return void deliverRef({ kind: "face", index: i, point }, refPick);
     if (planePick) return sketchOnFace(i);
+    // prvek rozšíření s vlastním klikem na plochu (tvářecí nástroje plechu: plocha + bod umístění)
+    const facePick = active?.type === "ext" && point ? getExtUi(active.ext)?.onFacePick : undefined;
+    if (facePick && active?.type === "ext" && point) {
+      const patch = await facePick({ f: active, index: i, point });
+      if (typeof patch === "string") flash(patch);
+      else if (patch) updateFeature(active.id, { data: { ...active.data, ...patch } } as Partial<Feature>);
+      return;
+    }
     if (toggleExtPick(i, "faces")) return;
     if (active && FACE_PICK.has(active.type)) {
       const cur = ((active as { faces?: number[] }).faces ?? []);
@@ -4188,6 +4196,8 @@ function featurePrompt(f: Feature): string {
   const picked = (n: number, what: "faces" | "edges") =>
     what === "faces" ? tr("{0}: klikáním vyberte plochy v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno", featureLabel(f), n) : tr("{0}: klikáním vyberte hrany v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno", featureLabel(f), n);
   if (f.type === "ext") {
+    const own = getExtUi(f.ext)?.prompt?.(f);
+    if (own) return own;
     const pick = getExt(f.ext)?.pick;
     if (pick) return picked(Array.isArray((f.data ?? {})[pick.key]) ? ((f.data ?? {})[pick.key] as unknown[]).length : 0, pick.kind);
   }
