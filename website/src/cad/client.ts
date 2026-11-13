@@ -10,9 +10,18 @@ import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
 import type { DatumDisplay } from "./feat/refs-more";
 import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
 import type { BodyInfo, BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo, Feature, Vec3 } from "./types";
+import { blobIdOf, blobOf, blobRefsIn, putBlobAs } from "./blobs";
+import { perfMark, perfPush, type PerfEntry } from "./perf-log";
+import { fatalKernelText } from "./kernel-errors";
+import type { SplitPart, StepSplit } from "./formats/step-assembly";
 
 let worker: Worker | null = null;
 let seq = 0;
+/** data importů (otisky), která už má běžící jádro – posílají se jen jednou; nové jádro začíná s prázdnou sadou */
+let sent = new Set<string>();
+/** pořadí instance jádra (po pádu / zrušení se spouští nové) */
+let generation = 0;
+const restartListeners = new Set<(reason: string) => void>();
 const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; op: string; at: number }>();
 
 /**
@@ -21,7 +30,7 @@ const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Err
  */
 export type CadProgress = Omit<BuildProgress, "phase"> & { phase: BuildProgress["phase"] | "start"; op: string; startedAt: number; featureAt: number };
 /** operace, které mohou trvat dlouho – ukazuje se u nich průběh a jdou zrušit */
-const LONG_OPS = new Set(["build", "topology", "export", "drawing", "interference", "asmParts", "compare"]);
+const LONG_OPS = new Set(["build", "topology", "export", "drawing", "interference", "asmParts", "compare", "stepSplit"]);
 const progressListeners = new Set<(p: CadProgress | null) => void>();
 let lastProgress: CadProgress | null = null;
 const emitProgress = (p: CadProgress | null) => {
@@ -38,12 +47,30 @@ export class CadCancelled extends Error {
 }
 export const isCancelled = (e: unknown): e is CadCancelled => e instanceof CadCancelled;
 
+/** Pád jádra (WASM): ukončit, všechny čekající požadavky odmítnout srozumitelnou chybou, příště spustit nové jádro. */
+function crashed(raw: string) {
+  const text = fatalKernelText(raw);
+  const waiting = [...pending.values()];
+  pending.clear();
+  worker?.terminate();
+  worker = null;
+  emitProgress(null);
+  perfMark("kernel.crash", 0, { error: raw.slice(0, 160) });
+  for (const p of waiting) p.reject(new Error(text));
+  for (const l of restartListeners) l(text);
+}
+
 function w() {
   if (!worker) {
     worker = new Worker(new URL("./cad.worker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; result?: unknown; error?: string; progress?: BuildProgress }>) => {
+    sent = new Set();
+    generation++;
+    worker.onmessage = (e: MessageEvent<{ id: number; ok?: boolean; result?: unknown; error?: string; progress?: BuildProgress; perf?: PerfEntry; fatal?: boolean; at?: number }>) => {
+      if (e.data.perf) return perfPush(e.data.perf);
+      if (e.data.fatal) return crashed(e.data.error || "");
       const p = pending.get(e.data.id);
       if (!p) return;
+      if (e.data.at && !e.data.progress) perfMark("ui.fromKernel", Date.now() - e.data.at, { op: p.op });
       if (e.data.progress) {
         emitProgress({ ...e.data.progress, op: p.op, startedAt: p.at, featureAt: Date.now() });
         return;
@@ -58,6 +85,8 @@ function w() {
       else p.reject(new Error(e.data.error || tr("Chyba CAD jádra.")));
     };
     worker.onerror = (e) => {
+      // nezachycená chyba ve workeru: před prvním načtením = jádro se nenačetlo, později = pád (jádro se spustí znovu)
+      if (generation > 1 || pending.size > 1 || [...pending.values()].some((p) => p.op !== "init" && p.op !== "lang")) return crashed(e.message || "worker error");
       for (const p of pending.values()) p.reject(new Error(tr("CAD jádro se nepodařilo načíst: ") + (e.message || "")));
       pending.clear();
       emitProgress(null);
@@ -70,13 +99,33 @@ function w() {
   return worker;
 }
 
+/** začátek načítání dílů sestavy po dávkách – průběh ukazuje celkový čas, ne čas dávky */
+let seriesAt = 0;
+
 function call<T>(msg: Record<string, unknown>): Promise<T> {
   const id = ++seq;
   return new Promise<T>((resolve, reject) => {
     const op = String(msg.op);
-    const at = Date.now();
+    if (op === "asmParts" && !msg.offset) seriesAt = Date.now();
+    const at = op === "asmParts" && msg.offset ? seriesAt || Date.now() : Date.now();
     pending.set(id, { resolve: resolve as (v: unknown) => void, reject, op, at });
-    w().postMessage({ id, ...msg });
+    const wk = w();
+    // data importů, která jádro ještě nemá (odkazy mnblob: v dokumentu) – jen poprvé, další stavby posílají jen odkaz
+    let blobs: Record<string, Uint8Array> | undefined;
+    let bytes = 0;
+    for (const ref of blobRefsIn(msg)) {
+      const bid = blobIdOf(ref);
+      if (sent.has(bid)) continue;
+      const b = blobOf(ref);
+      if (!b) continue; // chybějící data ohlásí jádro srozumitelnou chybou
+      (blobs ??= {})[bid] = b;
+      bytes += b.length;
+      sent.add(bid);
+    }
+    const tp = performance.now();
+    wk.postMessage(blobs ? { id, ...msg, blobs } : { id, ...msg });
+    const dt = performance.now() - tp;
+    if (bytes || dt > 20) perfMark("ui.postMessage", dt, { op, mb: +(bytes / 1048576).toFixed(2) });
     if (LONG_OPS.has(op) && !lastProgress) emitProgress({ op, phase: "start", index: -1, total: 0, startedAt: at, featureAt: at });
   });
 }
@@ -125,7 +174,28 @@ export const cad = {
   /** pomocné osy / body / souřadné systémy k vykreslení */
   datumGfx: (doc: CadDoc) => call<{ id: string; gfx: DatumDisplay }[]>({ op: "datumGfx", doc }),
   exportFile: (doc: CadDoc, format: ExportFormat) => call<ArrayBuffer>({ op: "export", doc, format }),
-  asmParts: (parts: { key: string; source: ComponentSource }[]) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts }),
+  /** díly sestavy; `offset`/`total` = pořadí dávky v celém načítání (pro průběh „díl k z n“) */
+  asmParts: (parts: { key: string; source: ComponentSource }[], offset = 0, total = parts.length) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts, offset, total }),
+  /**
+   * Sestava STEP → díly (každý svůj STEP). `null` = soubor není sestava. Data dílů zůstávají v jádře a ukládají se i v UI
+   * (pro uložení .mncad a nové jádro po pádu).
+   */
+  stepSplit: async (bytes: Uint8Array, fileName: string): Promise<(Omit<StepSplit, "parts"> & { parts: (SplitPart & { id: string })[] }) | null> => {
+    w();
+    const gen = generation;
+    const res = await call<(Omit<StepSplit, "parts"> & { parts: (SplitPart & { id: string })[] }) | null>({ op: "stepSplit", bytes, fileName });
+    if (res)
+      for (const p of res.parts) {
+        putBlobAs(p.id, p.bytes);
+        if (gen === generation) sent.add(p.id);
+      }
+    return res;
+  },
+  /** odběr pádů jádra (po pádu se spustí nové) – UI zobrazí zprávu a přestaví model */
+  onRestart: (fn: (reason: string) => void) => {
+    restartListeners.add(fn);
+    return () => void restartListeners.delete(fn);
+  },
   asmFace: (key: string, index: number) => call<FaceInfo | null>({ op: "asmFace", key, index }),
   interference: (doc: CadDoc) => call<Interference[]>({ op: "interference", doc }),
   /** porovnání dílu s referenčním modelem (STEP / BREP / STL): objemy, rozdílová tělesa, mapa odchylek – viz compare.ts */

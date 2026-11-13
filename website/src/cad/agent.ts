@@ -1360,6 +1360,8 @@ export type MncadApi = {
   clickHint: (id: string, additive?: boolean) => boolean;
   /** export bez dialogu: STEP, STL, BREP, OBJ, GLB, 3MF, WRL nebo projekt .mncad – vrátí název, MIME, velikost a base64 */
   exportFile: (format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad") => Promise<{ name: string; mime: string; bytes: number; base64: string }>;
+  /** změřené kroky otevření / výpočtu / zobrazení (čtení souboru, jádro, síť, WebGL…) s pamětí – diagnostika velkých souborů */
+  perf?: () => { stage: string; ms: number; at: number; info?: Record<string, number | string> }[];
 };
 declare global {
   interface Window {

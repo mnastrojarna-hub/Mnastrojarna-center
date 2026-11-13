@@ -152,7 +152,6 @@ Horní	Top
 Hotovo	Done
 Hranu ani bod nelze smazat samostatně – vyberte plochu (Odstranit plochu) nebo prvek v historii.	An edge or a point cannot be deleted on its own – select a face (Delete face) or a feature in the history.
 Hustota	Density
-Importovaný soubor nelze upravovat historií – lze jen umístit.	An imported file cannot be edited by the history – it can only be positioned.
 Izolovat (skrýt ostatní)	Isolate (hide others)
 Izometrie	Isometric
 Jen poprvé – poté se načítá z mezipaměti.	Only the first time – afterwards it loads from the cache.
@@ -191,7 +190,6 @@ Max. bod	Max. point
 Mazání	Delete
 Min. bod	Min. point
 Mnástrojárna	Mnástrojárna
-Model importován – můžete na něj navázat dalšími prvky.	Model imported – you can continue with further features.
 Modrošedý přechod	Blue-grey gradient
 Modrá	Blue
 Mosaz	Brass
@@ -368,7 +366,6 @@ Soubor	File
 Soubor není platný projekt Mnástrojárna CAD.	The file is not a valid Mnástrojárna CAD project.
 Soubor se nepodařilo načíst.	The file could not be loaded.
 Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.	The file is no longer in the browser's memory – open it from the .mncad file.
-Soubor vložen jako komponenta sestavy.	File inserted as an assembly component.
 Souosost potřebuje válcovou nebo kuželovou plochu (díra, čep, šroub).	Concentric needs a cylindrical or conical face (hole, pin, screw).
 Souř. systém	Coord. system
 Souřadnice {0}	Coordinates {0}

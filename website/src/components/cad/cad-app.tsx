@@ -17,6 +17,9 @@ import { DEFAULT_SKETCH_SHORTCUTS, keyCombo, loadSettings, pushRecent, readRecen
 import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
 import { extByTab, getExt, visibleExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
+import { embedBlobs, internBlobs } from "@/cad/blobs";
+import { perfEntries } from "@/cad/perf-log";
+import { asmImportOutcome, fileComponentAsPart, importStartText, loadAsmParts, partImportOutcome, subassemblyComponent, type PendingImport } from "./import-watch";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
@@ -337,7 +340,8 @@ export function CadApp() {
     setTimeout(() => vp.current?.setView("iso"), 400);
   };
   /** otevře dokument: do prázdné aktivní záložky, jinak do nové záložky */
-  const openDocInTab = (d: CadDoc, opts: { docId?: string } = {}): string => {
+  const openDocInTab = (d0: CadDoc, opts: { docId?: string } = {}): string => {
+    const d = internBlobs(d0); // velká data importů (base64) → odkazy do úložiště (blobs.ts)
     const kind: DocTab["kind"] = d.kind === "assembly" ? "assembly" : "part";
     const curTabs = docTabsRef.current;
     const curId = tabIdRef.current;
@@ -889,6 +893,7 @@ export function CadApp() {
         return sk.current?.hintList() ?? vp.current?.hintList() ?? [];
       },
       clickHint: (id, additive) => sk.current?.clickHint(id, additive) ?? vp.current?.clickHint(id, additive) ?? false,
+      perf: () => perfEntries(),
       exportFile: async (format) => {
         const d = histRef.current.present;
         const toB64 = (u8: Uint8Array) => {
@@ -897,7 +902,7 @@ export function CadApp() {
           return btoa(b);
         };
         if (format === "mncad") {
-          const u8 = new TextEncoder().encode(JSON.stringify(d, null, 1));
+          const u8 = new TextEncoder().encode(JSON.stringify(embedBlobs(d), null, 1));
           return { name: `${safeName(d.name)}.mncad`, mime: "application/json", bytes: u8.length, base64: toB64(u8) };
         }
         const meta = EXPORTS.find((e) => e.f === format);
@@ -960,6 +965,29 @@ export function CadApp() {
   const builtKey = useRef<string | null>(null);
   /** model není přepočítaný (výpočet zrušen a nebylo co vrátit) – stavový řádek nabídne nový výpočet */
   const [stale, setStale] = useState(false);
+  /** otevírá se soubor: úspěch / chyba se ohlásí až po výpočtu (import-watch.ts) */
+  const pendingImport = useRef<PendingImport | null>(null);
+  const settleImportRef = useRef<(d: CadDoc | null, res: BuildResult | null, e: unknown) => void>(() => undefined);
+  settleImportRef.current = (d, res, e) => {
+    const p = pendingImport.current;
+    if (!p || p.docId !== docId.current || (d && (p.featureId ? !d.features.some((f) => f.id === p.featureId) : d.name !== p.name))) return;
+    if (p.kind === "asm" && !e) return;
+    pendingImport.current = null;
+    if (e) return isCancelled(e) ? flash(tr("Otevírání souboru {0} zrušeno.", p.name)) : setNotice({ title: tr("Soubor {0} se nepodařilo otevřít", p.name), body: (e as Error).message });
+    const out = partImportOutcome(res!, p);
+    if (!out.ok) return setNotice({ title: out.title, body: out.body });
+    flash(out.text);
+    vp.current?.setView("iso");
+  };
+  // pád jádra (nedostatek paměti WASM…): jádro běží znovu, model se nepřepočítává sám (mohl by spadnout znovu)
+  useEffect(
+    () =>
+      cad.onRestart((t) => {
+        setNotice({ title: tr("Jádro CAD bylo spuštěno znovu"), body: t });
+        setStale(true);
+      }),
+    [],
+  );
   const runBuild = useCallback(async (d: CadDoc) => {
     if (inflight.current) {
       queued.current = d;
@@ -972,7 +1000,9 @@ export function CadApp() {
       setResult(res);
       setStale(false);
       builtKey.current = geoKey(d);
+      settleImportRef.current(d, res, null);
     } catch (e) {
+      settleImportRef.current(d, null, e);
       if (isCancelled(e)) {
         queued.current = null;
         // Zrušit = vrátit dokument do stavu před výpočtem: čeká-li na výpočet jen poslední změna, vrátí se zpět (Ctrl+Y ji obnoví);
@@ -1061,20 +1091,29 @@ export function CadApp() {
     const need = new Map<string, AsmComponent["source"]>();
     for (const l of leaves) if (!asmCache.current.has(l.key)) need.set(l.key, l.comp.source);
     if (!need.size) return;
-    let alive = true;
     setAsmLoading((n) => n + 1);
-    cad
-      .asmParts([...need.entries()].map(([key, source]) => ({ key, source })))
-      .then((res) => {
-        for (const r of res) asmCache.current.set(r.key, r.result);
-        if (alive) setAsmVer((v) => v + 1);
+    // po dávkách: obraz se objeví po první dávce a přibývá (velké sestavy STEP)
+    loadAsmParts(need, (res) => {
+      for (const r of res) asmCache.current.set(r.key, r.result);
+      setAsmVer((v) => v + 1);
+    })
+      .catch((e) => {
+        flash((e as Error).message);
+        settleImportRef.current(null, null, e);
       })
-      .catch((e) => flash((e as Error).message))
       .finally(() => setAsmLoading((n) => n - 1));
-    return () => {
-      alive = false;
-    };
   }, [leaves, core, isAsm]);
+  // otevřená sestava: všechny díly načtené → ohlásit výsledek (úspěch / díly, které se nenačetly)
+  useEffect(() => {
+    const p = pendingImport.current;
+    if (!p || p.kind !== "asm" || p.docId !== docId.current || !isAsm || !leaves.length) return;
+    if (!leaves.every((l) => asmCache.current.has(l.key))) return;
+    pendingImport.current = null;
+    const out = asmImportOutcome(leaves.map((l) => asmCache.current.get(l.key)), p);
+    if (out.ok) flash(out.text);
+    else setNotice({ title: out.title, body: out.body });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asmVer, leaves]);
 
   const asmViews = useMemo<AsmView[]>(() => {
     if (!isAsm) return [];
@@ -1141,7 +1180,7 @@ export function CadApp() {
     insertComponent(partComponent(d, { position: b && (doc.components?.length ?? 0) > 0 ? [Math.round(b.center[0] + b.radius * 1.2), 0, 0] : [0, 0, 0] }, { group, number: d.props?.number, color: d.color ?? "#b9c2cc" }));
   };
   const editPartInContext = (c: AsmComponent) => {
-    if (c.source.kind === "file") return flash(tr("Importovaný soubor nelze upravovat historií – lze jen umístit."));
+    if (c.source.kind === "file") return void openDocInTab(fileComponentAsPart(c)!); // přesné těleso v nové záložce
     setAsmStack((st) => [...st, { asm: doc, key: sourceKey(c.source) }]);
     commit(c.source.kind === "asm" ? { ...c.source.doc, kind: "assembly" } : { ...c.source.doc, kind: "part" });
     setAsmSel(null);
@@ -1162,6 +1201,7 @@ export function CadApp() {
   };
   const compMenu = (c: AsmComponent): RMenuEntry[] => [
     { id: "edit", label: tr("Upravit díl (v kontextu)"), icon: "edit", disabled: c.source.kind !== "part", onClick: () => editPartInContext(c) },
+    ...(c.source.kind === "file" ? [{ id: "openPart", label: tr("Otevřít jako díl (přesné těleso k modelování)"), icon: "edit" as const, onClick: () => openDocInTab(fileComponentAsPart(c)!) }] : []),
     { id: "hide", label: c.hidden ? tr("Zobrazit") : tr("Skrýt"), icon: "eye", onClick: () => setComp(c.id, { hidden: !c.hidden }) },
     { id: "iso", label: tr("Izolovat (skrýt ostatní)"), icon: "eye", onClick: () => commit({ ...doc, components: (doc.components ?? []).map((x) => ({ ...x, hidden: x.id !== c.id })) }) },
     { id: "all", label: tr("Zobrazit vše"), icon: "eye", onClick: () => commit({ ...doc, components: (doc.components ?? []).map((x) => ({ ...x, hidden: false })) }) },
@@ -1744,12 +1784,19 @@ export function CadApp() {
       volume += v;
       mass += asmPartInfo(l.comp).massKg ?? 0;
     }
+    // obálka z listových dílů (i uvnitř podsestav – řádky kusovníku podsestav nemají id komponent nejvyšší úrovně)
     let bbox: [Vec3, Vec3] | undefined;
-    for (const it of balloonItems ?? []) {
-      if (!bbox) bbox = [[...it.bbox[0]] as Vec3, [...it.bbox[1]] as Vec3];
-      else for (let k = 0; k < 3; k++) {
-        bbox[0][k] = Math.min(bbox[0][k], it.bbox[0][k]);
-        bbox[1][k] = Math.max(bbox[1][k], it.bbox[1][k]);
+    for (const l of vis) {
+      const m = asmCache.current.get(l.key)?.metrics?.bbox;
+      if (!m) continue;
+      const pl = matrixToPlacement(l.matrix);
+      for (const x of [m[0][0], m[1][0]]) for (const y of [m[0][1], m[1][1]]) for (const z of [m[0][2], m[1][2]]) {
+        const w = transformPoint(pl, [x, y, z]);
+        if (!bbox) bbox = [[...w] as Vec3, [...w] as Vec3];
+        else for (let k = 0; k < 3; k++) {
+          bbox[0][k] = Math.min(bbox[0][k], w[k]);
+          bbox[1][k] = Math.max(bbox[1][k], w[k]);
+        }
       }
     }
     return {
@@ -2030,7 +2077,7 @@ export function CadApp() {
   const saveProjectAs = async () => {
     const t = await pickSaveTarget(`${safeName(doc.name)}.mncad`, "application/json");
     if (!t) return;
-    await writeSaved(t, JSON.stringify(doc, null, 1), "application/json");
+    await writeSaved(t, JSON.stringify(embedBlobs(doc), null, 1), "application/json");
     projectTarget.current = t.handle ? t : null;
     dirty.current = false;
     flash(tr("Uloženo: {0}", t.name));
@@ -2039,7 +2086,7 @@ export function CadApp() {
     const t = projectTarget.current;
     if (t?.handle) {
       try {
-        await writeSaved(t, JSON.stringify(doc, null, 1), "application/json");
+        await writeSaved(t, JSON.stringify(embedBlobs(doc), null, 1), "application/json");
         dirty.current = false;
         flash(tr("Uloženo: {0}", t.name));
         return;
@@ -2067,7 +2114,7 @@ export function CadApp() {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext === "mncad" || ext === "json") {
       try {
-        const d = JSON.parse(await file.text()) as CadDoc;
+        const d = internBlobs(JSON.parse(await file.text()) as CadDoc); // data importů → úložiště (odkazy mnblob:)
         if (d.app !== "mnastrojarna-cad") throw new Error();
         if (isAsm && d.kind !== "assembly" && !drawAfterImport.current) {
           insertPart(d, tr("Díly"));
@@ -2075,7 +2122,8 @@ export function CadApp() {
           return;
         }
         openDocInTab(d);
-        flash(tr("Otevřeno: {0}", d.name));
+        flash(file.size > 2 * 1048576 ? importStartText(d.name, file.size) : tr("Otevřeno: {0}", d.name));
+        if (file.size > 2 * 1048576) pendingImport.current = { docId: docId.current, name: d.name, t0: Date.now(), kind: d.kind === "assembly" ? "asm" : "part", bytes: file.size };
         if (drawAfterImport.current) {
           drawAfterImport.current = false;
           setTimeout(() => openDrawingTabRef.current(), 1500);
@@ -2088,17 +2136,29 @@ export function CadApp() {
     flash(tr("Načítám {0}…", file.name));
     try {
       const res = await prepareImport(file);
-      if (res.kind === "unsupported") return setNotice({ title: tr("Formát .{0} nelze otevřít přímo", ext), body: res.message });
+      if (res.kind === "unsupported") return setNotice({ title: res.title ?? tr("Formát .{0} nelze otevřít přímo", ext), body: res.message });
+      if (res.kind === "assembly") {
+        // velká sestava STEP: sestava komponent (díly se čtou zvlášť a postupně); v otevřené sestavě jako podsestava
+        if (isAsm && !drawAfterImport.current) insertComponent(subassemblyComponent(res.doc));
+        else openDocInTab(res.doc);
+        pendingImport.current = { docId: docId.current, name: file.name, t0: Date.now(), kind: "asm", bytes: file.size };
+        flash(res.note);
+        track("cad_import", { format: "step-asm" });
+        return;
+      }
       const base = doc.features.length || doc.components?.length ? emptyDoc(file.name.replace(/\.[^.]+$/, "")) : { ...doc, name: doc.name === "Nový díl" ? file.name.replace(/\.[^.]+$/, "") : doc.name };
       if (res.kind === "body" && isAsm && !drawAfterImport.current) {
         insertComponent({ id: uid(), name: res.fileName.replace(/\.[^.]+$/, ""), source: { kind: "file", fileName: res.fileName, format: res.format, data: res.data }, placement: { position: [0, 0, 0], rotation: [0, 0, 0] }, group: "Díly", color: "#9fb4c8" });
-        flash(tr("Soubor vložen jako komponenta sestavy."));
+        pendingImport.current = { docId: docId.current, name: file.name, t0: Date.now(), kind: "asm", bytes: file.size };
+        flash(importStartText(file.name, file.size));
         return;
       }
       if (res.kind === "body") {
         const f: Feature = { id: uid(), name: `Import ${res.fileName}`, type: "import", fileName: res.fileName, format: res.format, data: res.data };
         openDocInTab({ ...base, kind: "part", features: [...base.features, f] }); // každý model ve vlastní záložce
-        flash(res.note ?? tr("Model importován – můžete na něj navázat dalšími prvky."));
+        // úspěch se ohlásí až po výpočtu a zobrazení (settleImport); do té doby průběh s časem a Zrušit
+        pendingImport.current = { docId: docId.current, name: file.name, t0: Date.now(), kind: "part", featureId: f.id, bytes: file.size };
+        flash(res.note ? `${res.note} ${importStartText(file.name, file.size)}` : importStartText(file.name, file.size));
         if (drawAfterImport.current) {
           drawAfterImport.current = false;
           setTimeout(() => openDrawingTabRef.current(), 1800);

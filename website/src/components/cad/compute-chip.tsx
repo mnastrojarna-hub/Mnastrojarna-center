@@ -13,6 +13,8 @@ const SHOW_AFTER_MS = 800;
 export function progressLabel(p: CadProgress): string {
   if (p.op === "compare" && p.phase === "feature" && p.type === undefined && p.id === undefined) return tr("Porovnání {0}/{1}: {2}", p.index + 1, p.total, p.name ?? "");
   if (p.op === "compare" && p.phase === "start") return tr("Porovnávám s referenčním modelem…");
+  if (p.op === "stepSplit") return p.phase === "feature" ? tr("Čtu strukturu sestavy STEP – díl {0}/{1}", p.index + 1, p.total) : tr("Čtu strukturu sestavy STEP…");
+  if (p.op === "asmParts" && p.phase === "feature") return tr("Načítám díl {0}/{1}: {2}", p.index + 1, p.total, p.name ?? "");
   if (p.phase === "feature") return tr("Počítám prvek {0}/{1}: {2}", p.index + 1, p.total, p.name ?? "");
   if (p.phase === "mesh") return tr("Počítám síť modelu…");
   if (p.op === "drawing") return tr("Počítám pohledy výkresu…");
@@ -37,7 +39,7 @@ export function ComputeChip({ onCancel }: { onCancel: () => void }) {
   if (!p) return null;
   const total = now - p.startedAt;
   if (total < SHOW_AFTER_MS) return null;
-  const feat = now - p.featureAt;
+  const feat = Math.max(0, now - p.featureAt);
   return (
     <div
       role="status"

@@ -19,6 +19,7 @@
  *                /cad#r=<cesta>.<klíč>     úložiště, klíč náhodný
  *                /cad#r=<cesta>.<klíč>.p<sůl>   úložiště + heslo
  */
+import { embedBlobs } from "./blobs";
 import { cadLocale, tr } from "./i18n";
 import type { CadDoc } from "./types";
 
@@ -126,7 +127,8 @@ function baseUrl(base?: string) {
 /** Sestaví odkaz. Vyhodí chybu s česky formulovaným důvodem (příliš velký dokument, úložiště nedostupné…). */
 export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<ShareResult> {
   const exp = o.days ? Date.now() + o.days * 86_400_000 : null;
-  const payload: SharePayload = { v: 1, exp, from: o.from?.trim() || undefined, view: o.view, doc };
+  // data importů (odkazy mnblob: platí jen v této kartě) se do odkazu vloží jako base64
+  const payload: SharePayload = { v: 1, exp, from: o.from?.trim() || undefined, view: o.view, doc: embedBlobs(doc) };
   const json = enc.encode(JSON.stringify(payload));
   const packed = (await deflate(json)) ?? json;
   const compressed = packed !== json;

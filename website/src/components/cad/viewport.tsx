@@ -3,6 +3,7 @@
 import { tr } from "@/cad/i18n";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { probeWebGL, type RenderFailure } from "@/cad/diagnostics";
+import { perfMark } from "@/cad/perf-log";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
@@ -165,6 +166,11 @@ const faceOfFrom = (m: MeshData) => {
   for (let i = 0; i < m.faceGroups.length; i += 3) for (let t = m.faceGroups[i] / 3; t < (m.faceGroups[i] + m.faceGroups[i + 1]) / 3; t++) faceOf[t] = m.faceGroups[i + 2];
   return faceOf;
 };
+/** nová síť čeká na první vykreslení (měření nahrání do WebGL – perf-log) */
+let uploadMark: { t0: number; tris: number; kind: string } | null = null;
+/** posunul se model mimo dosavadní pohled (nový model jinde, stejně velký)? → přizpůsobit pohled */
+const movedAway = (c: THREE.Vector3, r: number, prevC: THREE.Vector3, prevR: number) => c.distanceTo(prevC) > Math.max(r, prevR) * 0.5;
+
 function geoInfo(m: MeshData): GeoInfo {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(m.vertices, 3));
@@ -346,6 +352,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     }
     const onLost = (ev: Event) => {
       ev.preventDefault();
+      perfMark("ui.webgl.lost", 0);
       propsRef.current.onRenderError?.({ error: new Error(tr("WebGL kontext byl ztracen")), probe, lost: true });
     };
     renderer.domElement.addEventListener("webglcontextlost", onLost);
@@ -434,7 +441,12 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         if (s) {
           if (s.camera === s.orthoCam && key.parent !== orthoCam) orthoCam.add(key);
           if (s.camera === s.persp && key.parent !== persp) persp.add(key);
+          const tRender = uploadMark ? performance.now() : 0;
           renderer.render(scene, s.camera);
+          if (uploadMark) {
+            perfMark("ui.three.firstRender", performance.now() - uploadMark.t0, { renderMs: Math.round(performance.now() - tRender), triangles: uploadMark.tris, kind: uploadMark.kind });
+            uploadMark = null;
+          }
           syncCube(s.camera);
           syncLabels(s.camera);
         }
@@ -1147,6 +1159,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         s.partGeo?.geo.dispose();
         s.partGeo?.edges.dispose();
         s.partGeo = geoInfo(m);
+        uploadMark = { t0: performance.now(), tris: m.triangles.length / 3, kind: "part" };
       }
       const gi = s.partGeo;
       const colors = [...new Set(Object.values(props.faceColors ?? {}))];
@@ -1185,7 +1198,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.edges = edges;
 
       const bs = gi.geo.boundingSphere!;
-      const changed = Math.abs(bs.radius - s.radius) / s.radius > 0.6;
+      const changed = Math.abs(bs.radius - s.radius) / s.radius > 0.6 || movedAway(bs.center, bs.radius, s.center, s.radius);
       s.radius = bs.radius || 100;
       s.center.copy(bs.center);
       if (firstFit.current || changed) {
@@ -1398,6 +1411,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         }
         g = geoInfo(c.mesh);
         s.asmGeo.set(c.key, g);
+        uploadMark = { t0: uploadMark?.t0 ?? performance.now(), tris: (uploadMark?.tris ?? 0) + c.mesh.triangles.length / 3, kind: "asm" };
       }
       const mtx = new THREE.Matrix4().fromArray(c.matrix);
       const col = new THREE.Color(c.clash ? "#ff3b30" : c.color);
@@ -1435,7 +1449,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         box.expandByPoint(sp.center.clone().addScalar(-sp.radius));
       }
       const sp = box.getBoundingSphere(new THREE.Sphere());
-      const changed = Math.abs(sp.radius - s.radius) / s.radius > 0.6;
+      const changed = Math.abs(sp.radius - s.radius) / s.radius > 0.6 || movedAway(sp.center, sp.radius * 0.8, s.center, s.radius);
       s.radius = sp.radius * 0.8 || 100;
       s.center.copy(sp.center);
       if (firstFit.current || changed) {
@@ -1488,6 +1502,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     s.persp.near = dist / 500;
     s.persp.far = dist * 50;
     s.persp.updateProjectionMatrix();
+    perfMark("ui.fit", 0, { radius: Math.round(s.radius), x: Math.round(s.center.x), y: Math.round(s.center.y), z: Math.round(s.center.z) });
     s.orthoCam.position.copy(s.persp.position);
     s.orthoCam.zoom = 1;
     s.controls.target.copy(s.center);
