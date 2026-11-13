@@ -145,7 +145,7 @@ const evalErr = (p, fn, arg) => p.evaluate(fn, arg).then(() => '', (e) => String
     r = await p.evaluate((s) => window.mncad.importFile({ name: 'kvadr80.step', base64: s }), step.base64);
     ok(/✓ model kvadr80\.step vložen do sestavy jako komponenta · Sestava kvadr80\.step zobrazena/.test(r) && /Komponenty: kvadr80/.test(r), 'importFile STEP v otevřené sestavě → komponenta, stav sestavy');
     r = await p.evaluate((t) => window.mncad.importFile({ name: 'deska.mncad', text: t }), deska);
-    ok(/✓ díl „Deska“ vložen do sestavy jako komponenta/.test(r) && /Komponenty: kvadr80, Deska/.test(r), 'importFile .mncad v sestavě → díl jako komponenta');
+    ok(/✓ díl „Deska“ vložen do sestavy jako komponenta/.test(r) && /Komponenty: kvadr80\b[^\n]*\bDeska\b/.test(r), 'importFile .mncad v sestavě → díl jako komponenta');
     const sel2 = await p.evaluate(() => { const n = window.mncad.select(['comp:kvadr80', 'Deska:F2']); return { n, s: window.mncad.selection() }; });
     ok(sel2.n === 2 && sel2.s.map((x) => x.id).join(',') === 'comp:kvadr80,Deska:F2', 'sestava: select(comp:…, Komponenta:F2) a selection() hned po něm (' + sel2.s.map((x) => x.id).join(',') + ')');
     const s7 = await p.evaluate(() => window.mncad.screenshot({ width: 500, explode: 1 }));
