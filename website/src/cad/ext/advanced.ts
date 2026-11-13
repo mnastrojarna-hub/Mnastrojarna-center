@@ -4,6 +4,7 @@
  * měřítko v bodě, díry v bodech skici, booleovská operace s dřívějším nástrojem, kontrola a sjednocení geometrie.
  * Běží ve web workeru i v Node (testy). Vše se registruje přes `registerExt`.
  */
+import { extPlane, extPoint, hasPlaneDef } from "./place";
 import { tr } from "../i18n";
 import * as r from "replicad";
 import { planeOf, sketchDrawing, sketchPathWire } from "../build";
@@ -106,6 +107,7 @@ function finish(mk: OC, what: string): Shape {
 
 registerExt({
   ext: "adv.varFillet",
+  legacy: tr("Totéž umí vestavěné Zaoblení, druh R1 → R2."),
   label: tr("Proměnné zaoblení"),
   icon: "adv-varfillet",
   tone: "feature",
@@ -142,6 +144,7 @@ registerExt({
 
 registerExt({
   ext: "adv.fullRound",
+  legacy: tr("Totéž umí vestavěné Zaoblení, druh Plný."),
   label: tr("Plné zaoblení"),
   icon: "adv-fullround",
   tone: "feature",
@@ -231,6 +234,7 @@ registerExt({
 
 registerExt({
   ext: "adv.chamfer2",
+  legacy: tr("Totéž umí vestavěné Sražení, druh D1 × D2 nebo D × úhel."),
   label: tr("Sražení D1×D2 / D×úhel"),
   icon: "adv-chamfer2",
   tone: "feature",
@@ -295,6 +299,7 @@ registerExt({
   make: () => ({ features: [], all: false, plane: "YZ", offset: 0 }),
   params: [
     { key: "all", label: tr("Všechny dosavadní prvky"), kind: "bool" },
+    { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Rovina zrcadlení"), kind: "enum", options: PLANE_OPTS },
     { key: "offset", label: tr("Odsazení roviny"), kind: "number", step: 1 },
   ],
@@ -308,7 +313,7 @@ registerExt({
     let acc = body;
     for (const id of list) {
       const t = needTool(ctx, id);
-      const m = t.tool.clone().mirror(plane, origin) as Shape;
+      const m = (hasPlaneDef(d) ? t.tool.clone().mirror(extPlane(d, ctx)) : t.tool.clone().mirror(plane, origin)) as Shape;
       acc = applyMode(acc, m, t.mode === "new" ? "add" : t.mode);
     }
     return acc;
@@ -319,6 +324,7 @@ registerExt({
 
 registerExt({
   ext: "adv.curvePattern",
+  legacy: tr("Totéž umí vestavěné Pole, druh Po křivce."),
   label: tr("Pole podél křivky"),
   icon: "adv-curvepattern",
   tone: "pattern",
@@ -369,6 +375,7 @@ registerExt({
 
 registerExt({
   ext: "adv.fillPattern",
+  legacy: tr("Totéž umí vestavěné Pole, druh Výplň."),
   label: tr("Výplňové pole"),
   icon: "adv-fillpattern",
   tone: "pattern",
@@ -652,6 +659,7 @@ registerExt({
   make: () => ({ angle: 2, plane: "XY", offset: 0, flip: false }),
   params: [
     { key: "angle", label: tr("Úhel úkosu"), kind: "number", unit: "°", min: 0.1, max: 45, step: 0.5 },
+    { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Dělicí rovina"), kind: "enum", options: PLANE_OPTS },
     { key: "offset", label: tr("Odsazení roviny"), kind: "number", step: 1 },
     { key: "flip", label: tr("Obrátit smysl úkosu"), kind: "bool" },
@@ -663,7 +671,8 @@ registerExt({
     const plane = (["XY", "XZ", "YZ"].includes(str(d, "plane")) ? str(d, "plane") : "XY") as PlaneName;
     const off = num(d, "offset");
     const flip = bool(d, "flip");
-    const pl = axisPlane(plane, off);
+    const byRef = hasPlaneDef(d);
+    const pl = byRef ? extPlane(d, ctx) : axisPlane(plane, off);
     const n = V(pl.zDir);
     const res = body.clone().split(pl);
     const halves = [res.positive, res.negative] as (Shape | null | undefined)[];
@@ -672,7 +681,7 @@ registerExt({
     const drafted = solids.map((half) => {
       const cz = half.boundingBox.center as Vec3;
       const above = dot(sub(cz, V(pl.origin)), n) >= 0;
-      const pull = axisPlane(plane, off, above === flip);
+      const pull = byRef ? extPlane(d, ctx, { flip: above === flip }) : axisPlane(plane, off, above === flip);
       const sides = half.faces.filter((f) => Math.abs(dot(norm(V(f.normalAt(f.center))), n)) < 0.3);
       if (!sides.length) return half;
       try {
@@ -787,13 +796,14 @@ registerExt({
   params: [
     { key: "factor", label: tr("Měřítko"), kind: "number", unit: "×", min: 0.001, step: 0.01 },
     { key: "useCenter", label: tr("Kolem těžiště obálky"), kind: "bool" },
+    { key: "centerRef", label: tr("Bod měřítka odkazem"), kind: "point", hint: tr("vrchol, střed hrany, bod skici… – má přednost před souřadnicemi níže") },
     { key: "center", label: tr("Bod měřítka"), kind: "vec3", hint: tr("použije se, není-li zaškrtnuto Kolem těžiště") },
   ],
   build: (d, ctx) => {
     const body = needBody(ctx, tr("Měřítko"));
     const k = num(d, "factor", 1);
     if (!(k > 0)) throw new Error(tr("Měřítko musí být kladné."));
-    const c = bool(d, "useCenter", true) ? (body.boundingBox.center as Vec3) : vec3(d, "center");
+    const c = bool(d, "useCenter", true) ? (body.boundingBox.center as Vec3) : extPoint(d, ctx, "center");
     return body.clone().scale(k, c) as Shape;
   },
 });
@@ -802,6 +812,7 @@ registerExt({
 
 registerExt({
   ext: "adv.holesAtPoints",
+  legacy: tr("Totéž umí vestavěná Díra (Polohy děr, více naráz) nebo Pole, druh Podle skici."),
   label: tr("Díry v bodech"),
   icon: "adv-holes",
   tone: "cut",

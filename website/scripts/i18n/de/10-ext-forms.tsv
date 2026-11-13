@@ -1,0 +1,29 @@
+# Směr a osa u prvků rozšíření (parametry direction / axis), sjednocené zadání směru (formařské nástroje, pole komponent), starší duplicitní prvky
+Návrh pravidelného rozmístění vyhazovačů v průmětu dílu kolmo na směr otevírání formy. Na díl se přidají díry, do sestavy skutečné vyhazovače.	Vorschlag einer regelmäßigen Anordnung der Auswerferstifte in der Projektion des Teils senkrecht zur Öffnungsrichtung der Form. Am Teil werden Bohrungen erzeugt, in der Baugruppe echte Auswerferstifte.
+Nulový směr – zadejte nenulový vektor.	Nullrichtung – geben Sie einen Vektor ungleich null ein.
+osa	Achse
+Osa kruhového pole je nulový vektor – zadejte směr osy.	Die Achse des Kreismusters ist ein Nullvektor – geben Sie die Achsrichtung ein.
+Osu odkazem nelze vyřešit – jádro neposkytlo odkazy.	Die Achsreferenz kann nicht aufgelöst werden – der Kern hat keine Referenzen bereitgestellt.
+otevřený profil rotovaný kolem osy (osa skici, čára skici, hrana, válcová plocha, dva body…)	offenes Profil um eine Achse gedreht (Skizzenachse, Skizzenlinie, Kante, Zylinderfläche, zwei Punkte…)
+prvek {0}: parametr „{1}“ je {2} – X | Y | Z | -Z | vektor 1;0;1 | JSON	Feature {0}: Parameter „{1}“ ist {2} – X | Y | Z | -Z | Vektor 1;0;1 | JSON
+Směr nelze určit.	Die Richtung kann nicht bestimmt werden.
+Směr odkazem	Richtung per Referenz
+Směr odkazem nelze vyřešit – jádro neposkytlo odkazy.	Die Richtungsreferenz kann nicht aufgelöst werden – der Kern hat keine Referenzen bereitgestellt.
+Směr otevírání formy – kanály leží kolmo na něj pod dutinou	Öffnungsrichtung der Form – die Kanäle liegen senkrecht dazu unter der Kavität
+Směr otevírání formy (= vyhození)	Öffnungsrichtung der Form (= Entformung)
+Směr otevírání formy je nulový – zadejte nenulový vektor.	Die Öffnungsrichtung der Form ist null – geben Sie einen Vektor ungleich null ein.
+Směr vysunutí	Extrusionsrichtung
+Směr: {0}{1}	Richtung: {0}{1}
+Starší prvek.	Älteres Feature.
+Totéž umí vestavěná Díra (Polohy děr, více naráz) nebo Pole, druh Podle skici.	Dasselbe kann die eingebaute Bohrung (Bohrungspositionen, mehrere auf einmal) oder das Muster, Art Nach Skizze.
+Totéž umí vestavěné Pole, druh Po křivce.	Dasselbe kann das eingebaute Muster, Art Entlang Kurve.
+Totéž umí vestavěné Pole, druh Výplň.	Dasselbe kann das eingebaute Muster, Art Füllung.
+Totéž umí vestavěné Sražení, druh D1 × D2 nebo D × úhel.	Dasselbe kann die eingebaute Fase, Art D1 × D2 oder D × Winkel.
+Totéž umí vestavěné Zaoblení, druh Plný.	Dasselbe kann die eingebaute Verrundung, Art Vollrundung.
+Totéž umí vestavěné Zaoblení, druh R1 → R2.	Dasselbe kann die eingebaute Verrundung, Art R1 → R2.
+Vektor	Vektor
+Klikněte do pole odkazu a vyberte geometrii v modelu.	Klicken Sie in das Referenzfeld und wählen Sie die Geometrie im Modell.
+výchozí kolmo na rovinu skici; jinak osa, vektor, hrana nebo normála plochy	Standard senkrecht zur Skizzenebene; sonst Achse, Vektor, Kante oder Flächennormale
+X / Y / Z, vektor čísly, nebo odkazem: normála plochy plechu, hrana	X / Y / Z, Vektor als Zahlen oder per Referenz: Normale der Blechfläche, Kante
+X / Y / Z, vektor čísly, nebo odkazem: osa válcové plochy, hrana, normála plochy	X / Y / Z, Vektor als Zahlen oder per Referenz: Achse einer Zylinderfläche, Kante, Flächennormale
+Zadat odkazem (normála plochy, hrana, dva body)…	Per Referenz angeben (Flächennormale, Kante, zwei Punkte)…

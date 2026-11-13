@@ -30,7 +30,6 @@ export function CasesView({ locale }: { locale: Locale }) {
               href: href(locale, "case", c.slug.cs),
               title: c.text[locale].title,
               summary: c.text[locale].summary,
-              year: c.year,
               kind: c.kind,
               photo: c.photos[0].src,
               photos: c.photos.length,
@@ -92,8 +91,8 @@ export function CaseView({ locale, c }: { locale: Locale; c: CaseStudy }) {
           </div>
           <dl className="mt-10 grid gap-px overflow-hidden rounded-2xl border border-ink-700/10 bg-ink-700/10 sm:grid-cols-3">
             <div className="bg-white p-5">
-              <dt className="font-mono text-[10px] uppercase tracking-widest text-ink-700/45">{p.kinds[c.kind]}</dt>
-              <dd className="mt-1 text-[15px] font-medium text-ink-700">{c.year ? `${p.year} ${c.year}` : "—"}</dd>
+              <dt className="font-mono text-[10px] uppercase tracking-widest text-ink-700/45">{p.kind}</dt>
+              <dd className="mt-1 text-[15px] font-medium text-ink-700">{p.kinds[c.kind]}</dd>
             </div>
             <div className="bg-white p-5 sm:col-span-2">
               <dt className="font-mono text-[10px] uppercase tracking-widest text-ink-700/45">{p.tech}</dt>
@@ -164,7 +163,6 @@ export function CaseView({ locale, c }: { locale: Locale; c: CaseStudy }) {
           inLanguage: locale,
           image: c.photos.map((x) => `${SITE.url}${x.src}`),
           creator: { "@type": "Organization", name: SITE.name, url: SITE.url },
-          ...(c.year ? { dateCreated: String(c.year) } : {}),
         }}
       />
     </>

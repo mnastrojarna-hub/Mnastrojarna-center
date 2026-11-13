@@ -4,7 +4,7 @@ import { cadLocale, tr } from "@/cad/i18n";
 import { useState } from "react";
 import { featureIcon, featureTone } from "@/cad/defaults";
 import { resolveDoc } from "@/cad/params";
-import { uid, type CadDoc, type Config, type Feature, type FeatureStatus, type Variable } from "@/cad/types";
+import { uid, type BodyInfo, type CadDoc, type Config, type Feature, type FeatureStatus, type Variable } from "@/cad/types";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
@@ -40,6 +40,9 @@ export const FEATURE_TONE: Record<string, Tone> = {
   thicken: "feature",
   rib: "create",
   spring: "create",
+  combine: "pattern",
+  splitBodies: "cut",
+  copyBody: "pattern",
 };
 
 type Tab = "history" | "vars" | "configs";
@@ -52,8 +55,13 @@ export function Manager({
   onSelect,
   onCommit,
   onContext,
+  bodies,
+  onActivateBody,
 }: {
   doc: CadDoc;
+  /** tělesa dílu z poslední stavby (víc než jedno → seznam těles s volbou aktivního) */
+  bodies?: BodyInfo[];
+  onActivateBody?: (name: string) => void;
   status: FeatureStatus[] | undefined;
   activeId: string | null;
   sketchId: string | null;
@@ -132,6 +140,27 @@ export function Manager({
                 {l}
               </div>
             ))}
+            {bodies && bodies.length > 1 && (
+              <div data-bodies className="my-1 border-y border-dashed border-[#cdd5de] py-1">
+                <div className="px-2 py-[2px] text-[10.5px] font-semibold uppercase tracking-wide text-[#8a95a3]">{tr("Tělesa ({0})", bodies.length)}</div>
+                {bodies.map((b) => (
+                  <button
+                    key={b.name}
+                    type="button"
+                    data-body={b.name}
+                    aria-pressed={b.active}
+                    title={b.active ? tr("Aktivní těleso – pracují s ním nové prvky") : tr("Kliknutím se těleso stane aktivním – nové prvky budou pracovat s ním")}
+                    onClick={() => !b.active && onActivateBody?.(b.name)}
+                    className={cn("flex w-full items-center gap-2 px-2 py-[3px] text-left text-[12px]", b.active ? "font-semibold text-[#1f2933]" : "text-[#4a5664] hover:bg-[#eef2f6]")}
+                  >
+                    <CadIcon name="cube" tone={b.active ? "create" : "ref"} className="h-3.5 w-3.5" />
+                    <span className="truncate">{b.name}</span>
+                    {b.active && <span className="rounded bg-[#e6f4ea] px-1 text-[10px] font-medium text-[#1e7a3c]">{tr("aktivní")}</span>}
+                    <span className="ml-auto font-mono text-[10.5px] font-normal text-[#8a95a3]">{(b.volume / 1000).toLocaleString(cadLocale(), { maximumFractionDigits: 2 })} cm³</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {doc.features.length === 0 && <p className="m-2 rounded border border-dashed border-[#cdd5de] p-3 text-[11.5px] leading-relaxed text-[#6b7785]">{tr("Historie je prázdná. Začněte skicou (karta Tvorba → Skica) nebo vložte primitivum.")}</p>}
             {doc.features.map((f) => {
               const st = status?.find((s) => s.id === f.id);
@@ -281,6 +310,13 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
                     const name = e.target.value.trim().replace(/[^\p{L}\p{N}_]/gu, "_");
                     if (name && name !== v.name) set(vars.map((x, k) => (k === i ? { ...x, name } : x)));
                   }}
+                  onKeyDown={(e) => {
+                    // Enter potvrdí (jako u výrazu), Esc vrátí původní název
+                    const el = e.target as HTMLInputElement;
+                    if (e.key === "Escape") el.value = v.name;
+                    if (e.key === "Enter" || e.key === "Escape") el.blur();
+                  }}
+                  aria-label={tr("Název proměnné")}
                   className="w-full rounded border border-transparent px-1 py-0.5 font-mono hover:border-[#cfd6de] focus:border-brand focus:outline-none"
                 />
               </td>
@@ -289,7 +325,12 @@ function Variables({ doc, values, errors, onCommit }: { doc: CadDoc; values: Rec
                   defaultValue={v.expr}
                   key={v.expr}
                   onBlur={(e) => e.target.value !== v.expr && set(vars.map((x, k) => (k === i ? { ...x, expr: e.target.value } : x)))}
-                  onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+                  onKeyDown={(e) => {
+                    const el = e.target as HTMLInputElement;
+                    if (e.key === "Escape") el.value = v.expr;
+                    if (e.key === "Enter" || e.key === "Escape") el.blur();
+                  }}
+                  aria-label={tr("Výraz proměnné")}
                   className="w-full rounded border border-transparent px-1 py-0.5 font-mono hover:border-[#cfd6de] focus:border-brand focus:outline-none"
                 />
               </td>

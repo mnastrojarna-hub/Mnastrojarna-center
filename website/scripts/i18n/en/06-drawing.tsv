@@ -1,0 +1,29 @@
+# EN – výkres: kóty podle vybrané geometrie (kružnice Ø / R, hrana, úhel), pole u kurzoru, příznaky kót, přejmenování listu
+# drawing-workspace
+Délka odkazu od kružnice [mm]	Leader length from the circle [mm]
+Druh délkové kóty (2 body, hrana)	Linear dimension type (2 points, edge)
+Druhá hrana: úhel {0}° / {1}°	Second edge: angle {0}° / {1}°
+Druhá hrana: vzdálenost {0}	Second edge: distance {0}
+Dvě hrany vybrány – klikněte na místo kóty (úhel se bere v sektoru, kde je kurzor).	Two edges selected – click where to place the dimension (the angle is taken in the sector under the cursor).
+Enter potvrdí · Esc ponechá výchozí · později lze upravit v seznamu	Enter confirms · Esc keeps the defaults · can be edited later in the list
+Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil) – kreslí se podle uložených údajů. Zkontrolujte ji nebo ji vložte znovu.	The edge or circle this dimension refers to is no longer in the view (the model has changed) – it is drawn from the stored data. Check it or insert it again.
+Hrana vybrána – klikněte na místo kóty délky, nebo na druhou hranu (úhel, u rovnoběžných vzdálenost).	Edge selected – click where to place the length dimension, or click a second edge (angle; distance for parallel edges).
+Hrana: délka {0}	Edge: length {0}
+Klikněte na kružnici nebo oblouk (Ø / R), na hranu (délka; druhá hrana = úhel) nebo na dva body. Shift = průměr ↔ poloměr.	Click a circle or arc (Ø / R), an edge (length; second edge = angle) or two points. Shift = diameter ↔ radius.
+Klikněte na místo kóty {0}	Click where to place dimension {0}
+Kóta kružnice / oblouku: Auto = kružnice průměrem Ø, oblouk poloměrem R; Shift při kliknutí volbu obrátí	Circle / arc dimension: Auto = circle by diameter Ø, arc by radius R; Shift while clicking inverts the choice
+Kóty a poznámky bez geometrie: {0} (⚠ v seznamu)	Dimensions and notes without geometry: {0} (⚠ in the list)
+kružnice → Ø / R, hrana → délka, 2 hrany → úhel	circle → Ø / R, edge → length, 2 edges → angle
+Kružnice vybrána – klikněte na místo kóty (Shift = průměr ↔ poloměr).	Circle selected – click where to place the dimension (Shift = diameter ↔ radius).
+Kružnice: {0} · Shift = {1}	Circle: {0} · Shift = {1}
+Ø průměr	Ø diameter
+Oblouk: {0} · Shift = {1}	Arc: {0} · Shift = {1}
+Odsazení kótovací čáry [mm]	Dimension line offset [mm]
+Odsazení kóty	Dimension offset
+Pohled kóty není na listu – kóta se nekreslí.	The view of this dimension is not on the sheet – the dimension is not drawn.
+Pohled, ke kterému se poznámka váže, není na listu.	The view this note refers to is not on the sheet.
+Poloměr kótovacího oblouku [mm]	Dimension arc radius [mm]
+R poloměr	R radius
+Tolerance / přípona	Tolerance / suffix
+Vodor.	Horiz.
+opakovat	repeat

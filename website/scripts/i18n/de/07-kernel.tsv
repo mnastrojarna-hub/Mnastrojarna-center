@@ -1,0 +1,118 @@
+# Jádro: více těles, díra skrz, průběh a zrušení výpočtu, obecné textové příkazy (report 604200.001)
+ · těles {0}	 · Körper {0}
+ (aktivní)	 (aktiv)
+ skrz oběma směry	 durchgehend in beide Richtungen
+✗ Výpočet zrušen – dokument zůstal beze změny.	✗ Berechnung abgebrochen – das Dokument bleibt unverändert.
+celkem {0} s	gesamt {0} s
+Cílové a nástrojové těleso musí být dvě různá tělesa.	Zielkörper und Werkzeugkörper müssen zwei verschiedene Körper sein.
+čas tohoto kroku · celkový čas výpočtu	Zeit dieses Schritts · gesamte Rechenzeit
+Díra „skrz“ vrtá od zadaného bodu jen ve směru vrtání – materiál nad bodem (např. protější příruba) zůstane.	Eine Durchgangsbohrung bohrt vom angegebenen Punkt nur in Bohrrichtung – Material über dem Punkt (z. B. der gegenüberliegende Flansch) bleibt erhalten.
+Díra prochází celým tělesem na obě strany od zadaného bodu.	Die Bohrung geht vom angegebenen Punkt in beide Richtungen durch den ganzen Körper.
+Není co rozdělit – nejdřív vytvořte těleso.	Nichts zu teilen – erstellen Sie zuerst einen Körper.
+Počítám díly sestavy…	Baugruppenteile werden berechnet…
+Počítám kolize…	Kollisionen werden berechnet…
+Počítám model…	Modell wird berechnet…
+Počítám pohledy výkresu…	Zeichnungsansichten werden berechnet…
+Počítám prvek {0}/{1}: {2}	Element {0}/{1} wird berechnet: {2}
+Počítám síť modelu…	Modellnetz wird berechnet…
+Připravuji export…	Export wird vorbereitet…
+Rovina těleso nerozdělí – musí jím procházet (změňte rovinu nebo posunutí).	Die Ebene teilt den Körper nicht – sie muss durch ihn hindurchgehen (Ebene oder Versatz ändern).
+Skrz oběma směry (celé těleso)	Durchgehend in beide Richtungen (ganzer Körper)
+Tělesa: {0}	Körper: {0}
+Těleso „{0}“ už v dílu je – zvolte jiný název.	Der Körper „{0}“ ist im Teil bereits vorhanden – wählen Sie einen anderen Namen.
+Těleso „{0}“ v dílu není – zvolte existující těleso, nebo operaci „Nové těleso“.	Der Körper „{0}“ ist im Teil nicht vorhanden – wählen Sie einen vorhandenen Körper oder die Operation „Neuer Körper“.
+Těleso „{0}“ v dílu není (tělesa: {1}).	Der Körper „{0}“ ist im Teil nicht vorhanden (Körper: {1}).
+Ukončí výpočet a vrátí dokument do stavu před ním	Bricht die Berechnung ab und setzt das Dokument auf den Stand davor zurück
+Vyberte nástrojové těleso.	Wählen Sie den Werkzeugkörper.
+Výpočet byl zrušen – kliknutím se model přepočítá	Die Berechnung wurde abgebrochen – Klick berechnet das Modell neu
+Výpočet modelu: {0} s	Modellberechnung: {0} s
+Výpočet zrušen – model není přepočítaný. Upravte nebo potlačte náročný prvek, nebo spusťte výpočet znovu kliknutím na stav jádra.	Berechnung abgebrochen – das Modell ist nicht neu berechnet. Bearbeiten oder unterdrücken Sie das aufwendige Element oder starten Sie die Berechnung per Klick auf den Kernstatus erneut.
+Výpočet zrušen – poslední změna je vrácena (Ctrl+Y ji obnoví).	Berechnung abgebrochen – die letzte Änderung wurde zurückgenommen (Strg+Y stellt sie wieder her).
+Výpočet zrušen · přepočítat	Berechnung abgebrochen · neu berechnen
+Výpočet zrušen.	Berechnung abgebrochen.
+
+# Více těles v rozhraní, nové textové příkazy (oblouk, spline, zaoblení rohu, šikmá díra, tělesa, prvek, normálie, vložit, výkres)
+ (ukotvená)	 (fixiert)
+— vyberte těleso —	— Körper wählen —
+, nástroj ponechán	, Werkzeug behalten
+„{0}“ není ve tvaru klíč=hodnota	„{0}“ hat nicht die Form Schlüssel=Wert
+„{0}“ v historii není – k dispozici: {1}	„{0}“ ist nicht im Verlauf – verfügbar: {1}
+(aktivní)	(aktiv)
+(další volný název)	(nächster freier Name)
+→ {0} ({1}) – {2} {3} podle pravidla „{4}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} {3} nach Regel „{4}“ – Ergebnis nach der Berechnung unten
+✓ další prvky pracují s tělesem „{0}“	✓ folgende Elemente arbeiten am Körper „{0}“
+✓ komponenta „{0}“ vložena do sestavy{1}	✓ Komponente „{0}“ in die Baugruppe eingefügt{1}
+✓ normálie „{0}“ – nová záložka	✓ Normteil „{0}“ – neuer Tab
+✓ normálie „{0}“ vložena do sestavy jako komponenta	✓ Normteil „{0}“ als Komponente in die Baugruppe eingefügt
+✓ výkres dokumentu se otevře v záložce	✓ die Zeichnung des Dokuments wird in einem Tab geöffnet
+aktivní	aktiv
+aktivní ({0})	aktiv ({0})
+Aktivní těleso – pracují s ním nové prvky	Aktiver Körper – neue Elemente arbeiten an ihm
+bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit	ohne z = beginnt an der Körperoberfläche an dieser Stelle (laut Netz) und bohrt nach unten; „durch“ bohrt vom Punkt nur in Bohrrichtung, „beidseits“ in beide Richtungen; schräge Bohrung: „richtung“ = Bohrrichtung, „neigung“ = Abweichung von der Achse; mehrere Positionen = mehrere Bohrungen; Gewinde auch mit Feinsteigung (M18×1,5) – wie beim Befehl gewinde
+Cílové těleso	Zielkörper
+Cílové těleso (výsledek)	Zielkörper (Ergebnis)
+čára: neznámé slovo „{0}“ – body po dvojicích, „r N“ za bodem zaoblí roh, „uzavřít“ spojí konec se začátkem	polylinie: unbekanntes Wort „{0}“ – Punkte paarweise, „r N“ nach einem Punkt verrundet diese Ecke, „schließen“ verbindet Ende und Anfang
+další entity; „r N“ za bodem čáry zaoblí tento roh; oblouk = začátek, bod na oblouku, konec; předpona „pomocná“ = konstrukční	weitere Elemente; „r N“ nach einem Polylinienpunkt verrundet diese Ecke; Bogen = Anfang, Punkt auf dem Bogen, Ende; Präfix „hilfs“ = Konstruktionsgeometrie
+další těleso jako posunutá kopie	weiterer Körper als verschobene Kopie
+díl „{0}“ není mezi otevřenými záložkami – otevřené díly: {1}	Teil „{0}“ ist nicht unter den geöffneten Tabs – geöffnete Teile: {1}
+Díl má zatím jedno těleso. Druhé vznikne operací „Nové těleso“ u vysunutí či primitiva, rozdělením (Rozdělit na tělesa) nebo kopií (Kopie tělesa).	Das Teil hat bisher einen Körper. Ein zweiter entsteht durch die Operation „Neuer Körper“ bei Extrusion oder Grundkörper, durch Teilen (In Körper teilen) oder durch Kopieren (Körper kopieren).
+díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta	Bibliotheksteil nach Text (M8x30, Lager 6204, Passfeder 8x7x40): im Teil ein neuer Tab, in der Baugruppe eine Komponente
+hodnotu „{0}“ nelze přečíst jako JSON	der Wert „{0}“ lässt sich nicht als JSON lesen
+hran	Kanten
+Kliknutím se těleso stane aktivním – nové prvky budou pracovat s ním	Klick macht den Körper aktiv – neue Elemente arbeiten dann an ihm
+Kopie je samostatné těleso dílu – dá se dál upravovat, nebo sloučit s jiným tělesem (Sloučit tělesa).	Die Kopie ist ein eigener Körper des Teils – sie kann weiter bearbeitet oder mit einem anderen Körper kombiniert werden (Körper kombinieren).
+kopie tělesa {0}, posun [{1}]	Kopie des Körpers {0}, Verschiebung [{1}]
+Kopírované těleso	Zu kopierender Körper
+krajní bod otevřené čáry zaoblit nelze (bod {0})	der Endpunkt einer offenen Polylinie kann nicht verrundet werden (Punkt {0})
+kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId="Skica 1" pathId=$last · prvek draft angle=3 faces=boční · prvek "Ohyb plechu" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem	jeder Elementtyp und jedes Erweiterungselement ohne JSON: element sweep profileId="Skizze 1" pathId=$last · element draft angle=3 faces=seitlich · element sheet.bend angle=90; Werte: Zahl, ja/nein, Liste a;b;c, Text in Anführungszeichen; Skizzen und Elemente per Name oder $last; Flächen und Kanten per Nummer oder Regel
+naposledy aktivní ({0})	zuletzt aktiv ({0})
+Nástrojové těleso	Werkzeugkörper
+Název kopie	Name der Kopie
+Název nového tělesa	Name des neuen Körpers
+Název nového tělesa (záporná strana roviny)	Name des neuen Körpers (negative Seite der Ebene)
+neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, oblouk, spline, bod, elipsa	unbekanntes Skizzenelement „{0}“ – rechteck, kreis, vieleck, langloch, linie, polylinie, bogen, spline, punkt, ellipse
+neznámý příkaz „{0}“ – příkazy: {1}	unbekannter Befehl „{0}“ – Befehle: {1}
+neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}	unbekannter Elementtyp „{0}“ – Typen: {1}; Erweiterungen: {2}
+normálie potřebuje označení: normálie M8x30 · normálie ložisko 6204 · normálie pero 8x7x40	normteil braucht eine Bezeichnung: normteil M8x30 · normteil Lager 6204 · normteil Passfeder 8x7x40
+normálii „{0}“ knihovna nezná – zkuste např. M8x30, ložisko 6204, pero 8x7x40	die Bibliothek kennt das Normteil „{0}“ nicht – versuchen Sie z. B. M8x30, Lager 6204, Passfeder 8x7x40
+nová skica na základní nebo obecné rovině (osa X skici se bez zadání zvolí kolmo na normálu); entity i na dalších řádcích	neue Skizze auf einer Grund- oder allgemeinen Ebene (ohne Angabe wird die X-Achse der Skizze senkrecht zur Normale gewählt); Elemente auch in folgenden Zeilen
+oblouk potřebuje tři body (začátek, bod na oblouku, konec): oblouk x1 y1 xm ym x2 y2	bogen braucht drei Punkte (Anfang, Punkt auf dem Bogen, Ende): bogen x1 y1 xm ym x2 y2
+odebrat od	abziehen von
+orotuje poslední skicu (výchozí osa Y skici, 360°); „odebrat“ = vysoustružit z tělesa	rotiert die letzte Skizze (Standard: Y-Achse der Skizze, 360°); „abziehen“ = aus dem Körper ausdrehen
+otevře výkres otevřeného dokumentu v záložce	öffnet die Zeichnung des geöffneten Dokuments in einem Tab
+ploch	Flächen
+Ponechat nástrojové těleso	Werkzeugkörper behalten
+Posunutí kopie	Verschiebung der Kopie
+pravidlem lze v jednom prvku vybrat jen jednu skupinu ploch nebo hran – ostatní zadejte čísly	pro Element lässt sich nur eine Gruppe von Flächen oder Kanten per Regel wählen – die übrigen per Nummer angeben
+prvek {0}: neznámý parametr „{1}“ – parametry: {2}	Element {0}: unbekannter Parameter „{1}“ – Parameter: {2}
+prvek {0}: parametr „{1}“ má hodnoty {2}	Element {0}: Parameter „{1}“ hat die Werte {2}
+prvek potřebuje typ: prvek <typ> klíč=hodnota … (typy: {0})	element braucht einen Typ: element <Typ> Schlüssel=Wert … (Typen: {0})
+prvek se nepodařilo vytvořit	das Element konnte nicht erstellt werden
+roh v bodě {0} je přímý – není co zaoblit	die Ecke im Punkt {0} ist gerade – nichts zu verrunden
+rovina {0}{1} → nové těleso {2}	Ebene {0}{1} → neuer Körper {2}
+Rovina rozdělí těleso „{0}“ na dvě: strana ve směru normály zůstane tímto tělesem, opačná strana je nové těleso. Další prvky pracují s tělesem, které vyberete v poli Těleso nebo ve správci.	Die Ebene teilt den Körper „{0}“ in zwei: die Seite in Normalenrichtung bleibt dieser Körper, die Gegenseite ist ein neuer Körper. Folgende Elemente arbeiten an dem Körper, den Sie im Feld Körper oder im Manager wählen.
+rovina rozdělí těleso na dvě samostatná tělesa	eine Ebene teilt den Körper in zwei eigenständige Körper
+Rozdělit na tělesa	In Körper teilen
+sestava: vloží díl z otevřené záložky jako komponentu (vazby se zadávají v panelu sestavy nebo v JSON dokumentu)	Baugruppe: fügt ein Teil aus einem geöffneten Tab als Komponente ein (Verknüpfungen werden im Baugruppenpanel oder im JSON-Dokument angegeben)
+sjednotit	vereinigen
+Sjednotit	Vereinigen
+sjednotit, odebrat nebo průnik dvou těles	zwei Körper vereinigen, abziehen oder schneiden
+skica v obecné rovině potřebuje normálu třemi čísly: skica počátek x y z normála nx ny nz [osax ux uy uz]	eine Skizze auf einer allgemeinen Ebene braucht die Normale als drei Zahlen: skizze ursprung x y z normale nx ny nz [xrichtung ux uy uz]
+sloučit potřebuje dvě tělesa: sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat] – např. sloučit 1 2 odebrat	kombinieren braucht zwei Körper: kombinieren <Ziel> <Werkzeug> [abziehen|schnittmenge] [behalten] – z. B. kombinieren 1 2 abziehen
+Sloučit tělesa	Körper kombinieren
+směr nesmí být nulový vektor	die Richtung darf kein Nullvektor sein
+spline potřebuje aspoň dva body po dvojicích: spline x1 y1 x2 y2 x3 y3 … [uzavřít]	spline braucht mindestens zwei Punkte paarweise: spline x1 y1 x2 y2 x3 y3 … [schließen]
+Tělesa	Körper
+Tělesa ({0})	Körper ({0})
+těleso „{0}“ v dílu není – tělesa: {1}	Körper „{0}“ ist im Teil nicht vorhanden – Körper: {1}
+těleso potřebuje název nebo číslo: těleso 2 (= „Těleso 2“) – další prvky pak pracují s ním	körper braucht einen Namen oder eine Nummer: körper 2 (= „Těleso 2“) – folgende Elemente arbeiten dann an ihm
+Těleso, na kterém prvek pracuje	Körper, an dem das Element arbeitet
+tři body oblouku leží v přímce – použijte úsečku	die drei Bogenpunkte liegen auf einer Geraden – verwenden Sie eine Linie
+více děr jedním příkazem potřebuje u každé polohy tři souřadnice: díra 8 skrz v x1 y1 z1 v x2 y2 z2	mehrere Bohrungen in einem Befehl brauchen für jede Position drei Koordinaten: bohrung 8 durch bei x1 y1 z1 bei x2 y2 z2
+více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným	mehrere Körper im Teil: „körper 2“ schaltet folgende Elemente auf Těleso 2; teilen = zwei Körper durch eine Ebene; kopieren = weiterer Körper; kombinieren = zwei Körper vereinigen / abziehen / schneiden. Bei Elementen: „… separat [körper Name]“ legt einen neuen Körper an, „… körper 2“ arbeitet am gewählten
+vložit potřebuje název otevřené záložky s dílem: vložit "Hřídel" v 0 0 10 [otočení 0 90 0] [ukotvit]	einfügen braucht den Namen eines geöffneten Tabs mit einem Teil: einfügen "Welle" bei 0 0 10 [drehung 0 90 0] [fixieren]
+vložit: otevřený dokument není sestava – nejdřív „nová sestava“	einfügen: das geöffnete Dokument ist keine Baugruppe – zuerst „neu baugruppe“
+Výsledek zůstane v cílovém tělese; nástrojové těleso zanikne, pokud ho neponecháte.	Das Ergebnis bleibt im Zielkörper; der Werkzeugkörper entfällt, wenn Sie ihn nicht behalten.
+zaoblení rohu potřebuje aspoň tři body čáry	eine Eckenverrundung braucht mindestens drei Polylinienpunkte
+zaoblení rohu se píše za bod: čára 0 0 50 0 r 5 50 30 … (r 5 zaoblí roh v bodě 50 0)	eine Eckenverrundung steht nach dem Punkt: polylinie 0 0 50 0 r 5 50 30 … (r 5 verrundet die Ecke im Punkt 50 0)
+zaoblení se nevejde na úsek mezi body {0} a {1} (délka {2}) – zmenšete poloměr	die Verrundung passt nicht auf den Abschnitt zwischen den Punkten {0} und {1} (Länge {2}) – Radius verkleinern

@@ -607,7 +607,7 @@ export const de: Dict = {
       lead: "Fotos direkt aus unserer Werkstatt – keine Symbolbilder. Einige Projekte unterliegen einer Geheimhaltung; Details besprechen wir gern persönlich.",
       all: "Alle",
       kinds: { fixture: "Vorrichtungen", part: "Teile", assembly: "Anlagen" },
-      year: "Jahr",
+      kind: "Projektart",
       tech: "Technologie",
       photos: "Fotos",
       brief: "Aufgabe",

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { AGENT_COMMANDS, docStatusText, FEATURE_TYPES, normalizeFeatures, parseAgentText, parseEntity, selectEdges, selectFaces, topAt, type Bbox } from "./agent";
+import { AGENT_COMMANDS, docStatusText, FEATURE_TYPES, featureSummary, normalizeFeatures, parseAgentText, parseEntity, selectEdges, selectFaces, topAt, type Bbox } from "./agent";
 import { emptyDoc, type CadDoc, type Feature } from "./types";
 
 const feat = (p: ReturnType<typeof parseAgentText>, i: number) => {
@@ -119,6 +119,21 @@ válec 20 30`);
   });
 });
 
+describe("díra skrz: jen ve směru vrtání, „obousměrně“ na obě strany", () => {
+  it("díra 6 skrz v 35 0 20 → jednosměrná; obousměrně / both / beidseitig → bothWays; souhrn to uvádí", () => {
+    const one = parseAgentText("díra 6 skrz v 35 0 20").ops[0] as { feature: Feature };
+    expect(one.feature).toMatchObject({ type: "hole", diameter: 6, depth: 0, position: [35, 0, 20] });
+    expect((one.feature as { bothWays?: boolean }).bothWays).toBeUndefined();
+    for (const text of ["díra 6 skrz obousměrně v 35 0 20", "hole 6 through both at 35 0 20", "bohrung 6 durch beidseitig bei 35 0 20"]) {
+      const p = parseAgentText(text);
+      expect(p.errors, text).toEqual([]);
+      expect((p.ops[0] as { feature: Feature }).feature, text).toMatchObject({ type: "hole", depth: 0, bothWays: true, position: [35, 0, 20] });
+    }
+    expect(featureSummary(one.feature)).toBe("Ø6 skrz v [35; 0; 20], osa Z");
+    expect(featureSummary({ ...one.feature, bothWays: true } as Feature)).toBe("Ø6 skrz oběma směry v [35; 0; 20], osa Z");
+  });
+});
+
 describe("JSON vstup", () => {
   it("celý dokument .mncad → op doc; pole prvků → op features s doplněnými id, názvy a výchozími poli", () => {
     const doc = { app: "mnastrojarna-cad", version: 2, name: "Deska", material: "ocel", features: [{ type: "box", size: [10, 20, 5] }] };
@@ -142,6 +157,38 @@ describe("JSON vstup", () => {
     expect(errors[0]).toMatch(/neznámý typ „warp“/);
     expect(errors[1]).toMatch(/není objekt/);
     expect(parseAgentText("{nope").errors[0].message).toMatch(/JSON nelze přečíst/);
+  });
+  it("JSON na prvním řádku + textové příkazy na dalších se zpracují po řádcích (dřív se celý vstup četl jako jeden JSON a selhal)", () => {
+    const p = parseAgentText(`{"type":"sketch","name":"S","plane":{"kind":"base","name":"XY","offset":0},"entities":[{"type":"circle","id":"c","cx":0,"cy":0,"r":10}]}
+vysunout 5
+stav`);
+    expect(p.errors).toEqual([]);
+    expect(p.ops.map((o) => o.k)).toEqual(["features", "feature", "status"]);
+    expect(p.ops.map((o) => o.line)).toEqual([1, 2, 3]);
+    expect((p.ops[0] as { features: Feature[] }).features[0]).toMatchObject({ type: "sketch", name: "S" });
+    expect((p.ops[1] as { feature: Feature }).feature).toMatchObject({ type: "extrude", distance: 5 });
+    // pole na prvním řádku, komentář a další JSON uprostřed
+    const q = parseAgentText(`[{"type":"box","size":[10,10,10]}]
+# komentář
+díra 4 skrz v 5 5 10
+{"type":"fillet","radius":1}`);
+    expect(q.errors).toEqual([]);
+    expect(q.ops.map((o) => o.k)).toEqual(["features", "feature", "features"]);
+    // rozbitý JSON na prvním řádku: chyba jen u řádku 1, ostatní řádky se zpracují
+    const bad = parseAgentText(`{"type":"box","size":[10,10,10}
+kvádr 10 20 30`);
+    expect(bad.errors).toHaveLength(1);
+    expect(bad.errors[0]).toMatchObject({ line: 1 });
+    expect(bad.errors[0].message).toMatch(/JSON nelze přečíst/);
+    expect(bad.ops.map((o) => o.k)).toEqual(["feature"]);
+    // rozepsaný víceřádkový JSON jde dál jako celek
+    const multi = parseAgentText(`[
+  { "type": "box", "size": [10, 20, 5] },
+  { "type": "fillet", "radius": 1 }
+]`);
+    expect(multi.errors).toEqual([]);
+    expect((multi.ops[0] as { features: Feature[] }).features).toHaveLength(2);
+    expect(parseAgentText(`{\n  "type": "box",\n  "size": [1, 2\n}`).errors[0].message).toMatch(/JSON nelze přečíst/);
   });
   it("FEATURE_TYPES odpovídá typům v types.ts", () => {
     const src = readFileSync(new URL("./types.ts", import.meta.url), "utf8");
@@ -195,8 +242,9 @@ describe("stav dokumentu jako text", () => {
       { id: "x1", name: "Vysunutí 1", type: "extrude", sketchId: "s1", distance: 20, symmetric: false, reverse: false, mode: "new" },
       { id: "h1", name: "Díra 1", type: "hole", position: [30, 25, 20], axis: "Z", flip: false, diameter: 18, depth: 0, cbDiameter: 0, cbDepth: 0 },
     ] };
-    const t = docStatusText(doc, { status: [{ id: "s1", ok: true }, { id: "x1", ok: true }, { id: "h1", ok: false, error: "Díra je mimo těleso." }], mesh: null, metrics: { volume: 97456, area: 1, bbox: [[-50, -25, 0], [50, 25, 20]], faces: 8, edges: 18 }, bodies: [{ name: "Těleso 1", faces: [], edges: [], volume: 1, area: 1, createdBy: "x1" }], ms: 3 });
-    expect(t).toContain("Dokument: „Deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ✗) · těles 1");
+    const t = docStatusText(doc, { status: [{ id: "s1", ok: true }, { id: "x1", ok: true }, { id: "h1", ok: false, error: "Díra je mimo těleso." }], mesh: null, metrics: { volume: 97456, area: 1, bbox: [[-50, -25, 0], [50, 25, 20]], faces: 8, edges: 18 }, bodies: [{ name: "Těleso 1", active: true, faceStart: 0, faceCount: 6, edgeStart: 0, edgeCount: 12, volume: 90000 }, { name: "Těleso 2", active: false, faceStart: 6, faceCount: 2, edgeStart: 12, edgeCount: 6, volume: 7456 }], ms: 3 });
+    expect(t).toContain("Dokument: „Deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ✗) · těles 2");
+    expect(t).toContain("Tělesa: Těleso 1 (aktivní) 90 cm³ · Těleso 2 7,46 cm³");
     expect(t).toContain("Rozměry: 100 × 50 × 20 mm");
     expect(t).toContain("objem 97,46 cm³ · ploch 8 · hran 18");
     expect(t).toContain("1. Skica 1 [sketch, id s1] ✓ – rovina XY, 1 entit: obdélník 100×50");

@@ -1,6 +1,10 @@
 /**
  * ARCHIV ZAKÁZEK — skutečné fotografie z dílny (převzaté ze stávající galerie webu).
- * Popisy vycházejí výhradně z toho, co je na fotografiích vidět. Rok = datum pořízení fotografie (pokud je známo).
+ * Popisy vycházejí výhradně z toho, co je na fotografiích vidět. `year` = rok pořízení fotografie (pokud je známo) – jen interní
+ * údaj, web ho nezobrazuje (staré roky u fotek nepůsobí dobře).
+ *
+ * NOVÁ ZAKÁZKA: fotky (JPG, delší strana 1200 px) do `public/img/zakazky/<slug>/1.jpg, 2.jpg…`, záznam na ZAČÁTEK pole `CASES`
+ * (první se ukazují nejvýš), rozměry fotek v `ph(...)` (Q = 4:3, W = 16:9, V = 5:3) a texty ve všech třech jazycích.
  *
  * DOPLNIT OD FIRMY (u každé zakázky, nepovinné): `brief` (zadání / problém zákazníka),
  * `solution` (jak jsme to vyřešili), `result` (výsledek), obor / klient (se souhlasem), technologie.
@@ -191,11 +195,11 @@ export const CASES: CaseStudy[] = [
     },
   },
   {
-    slug: { cs: "upinaci-pripravek-2015", en: "clamping-fixture-2015", de: "spannvorrichtung-2015" },
+    slug: { cs: "upinaci-pripravek-s-celistmi", en: "clamping-fixture-with-jaws", de: "spannvorrichtung-mit-wechselbacken" },
     year: 2015,
     kind: "fixture",
     services: ["nastrojarstvi"],
-    photos: ph("upinaci-pripravek-2015", [V]),
+    photos: ph("upinaci-pripravek-s-celistmi", [V]),
     text: {
       cs: { title: "Upínací přípravek s výměnnými čelistmi", summary: "Upínací přípravek z kalené oceli s výměnnými čelistmi a bočními dorazy." },
       en: { title: "Clamping fixture with interchangeable jaws", summary: "A clamping fixture made of hardened steel with interchangeable jaws and side stops." },

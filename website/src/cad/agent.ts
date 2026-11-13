@@ -12,7 +12,11 @@
 import { getLang, tr } from "./i18n";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { threadByName, threadLabel } from "./defaults";
-import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec3 } from "./types";
+import { allExt } from "./ext/registry";
+import { parseDimension, parseDrawing, type DrawingCmd } from "./agent-drawing";
+import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type SketchOp, type SketchTarget } from "./agent-sketch";
+import { toAxisDef, toDirection } from "./ext/place";
+import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
 
 export const AGENT_API_VERSION = 1;
 
@@ -26,6 +30,23 @@ export const FEATURE_LABEL: Record<string, string> = {
 };
 
 /* ───────────────────────── operace ───────────────────────── */
+/** příkazy z tabulky příkazů v jazyce rozhraní – pro hlášku o neznámém příkazu (stejný seznam jako v nápovědě) */
+function commandWords(): string[] {
+  const lang = getLang();
+  const out: string[] = [];
+  const add = (w?: string) => {
+    if (w && w !== "JSON" && !out.includes(w)) out.push(w);
+  };
+  for (const c of AGENT_COMMANDS) {
+    if (lang !== "cs") {
+      for (const w of (lang === "en" ? c.en : c.de).split(/, | \/ /)) add(w.trim());
+      continue;
+    }
+    for (const part of c.cmd.split(/ · | \/ |, /)) add(part.trim().match(/^(nov[ýá] (díl|sestava)|smazat poslední|pole kruhové|[^\s[<|{(,]+)/)?.[0]);
+  }
+  return out;
+}
+
 export type Rule = string[];
 export type AgentOp =
   | { k: "doc"; doc: CadDoc; line: number }
@@ -34,10 +55,24 @@ export type AgentOp =
   | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string }; line: number }
   /** prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text) */
   | { k: "feature"; feature: Feature; line: number; fillTop?: boolean }
-  /** entity do poslední skici */
-  | { k: "entities"; entities: SketchEntity[]; line: number }
-  /** prvek, jehož hrany/plochy vybere aplikace podle pravidla (zaoblení, sražení, skořepina) */
-  | { k: "select"; feature: Feature; rule: Rule; line: number }
+  /** entity, vazby a kóty do skici bloku (skica z tohoto vstupu, jinak poslední skica); skica na ploše / pomocné rovině – agent-sketch.ts */
+  | SketchOp
+  | SketchOnOp
+  /**
+   * prvek, jehož hrany/plochy vybere aplikace podle pravidla (zaoblení, sražení, skořepina); `into` = obecný prvek:
+   * cesta v prvku, kam se indexy uloží (např. „data.faces“), a druh entit
+   */
+  | { k: "select"; feature: Feature; rule: Rule; line: number; into?: { path: string; kind: "faces" | "edges" } }
+  /** další prvky pracují s tímto tělesem dílu (více těles) */
+  | { k: "body"; name: string; line: number }
+  /** normálie z knihovny podle textu („M8x30“, „ložisko 6204“): v dílu nová záložka, v sestavě komponenta */
+  | { k: "library"; query: string; at?: Vec3; line: number }
+  /** sestava: vloží komponentu z otevřené záložky (díl podle názvu) */
+  | { k: "insert"; tab: string; at: Vec3; rotation: Vec3; fixed: boolean; line: number }
+  /** otevře výkres otevřeného dokumentu */
+  | { k: "drawing"; line: number }
+  /** výkres: volby listu, Chytré kóty, tolerance, údaje u razítka, stav (cad/agent-drawing.ts, provedení cad/drawing-agent.ts) */
+  | { k: "drawingCmd"; cmd: DrawingCmd; line: number }
   | { k: "pop"; line: number }
   | { k: "view"; view: string; line: number }
   | { k: "status"; line: number }
@@ -103,6 +138,7 @@ syn("view", "zobraz", "pohled", "zobrazit");
 syn("center", "střed", "stred", "centered", "vystředit");
 syn("at", "v", "na", "poloha", "position", "pos");
 syn("through", "skrz", "průchozí", "pruchozi", "throughall");
+syn("bothways", "obousměrně", "obousmerne", "oboustranně", "oboustranne", "both", "bidirectional");
 syn("depth", "hloubka", "hloubku", "deep");
 syn("symmetric", "symetricky", "symetrický", "symetricke", "oboustranně", "midplane");
 syn("reverse", "obráceně", "obracene", "opačně", "opacne", "flip", "otočit");
@@ -178,6 +214,7 @@ syn("clash", "kollision", "kollisionen", "durchdringung");
 syn("center", "mitte", "zentriert", "zentrieren");
 syn("at", "bei", "an");
 syn("through", "durch", "durchgehend", "durchgangs");
+syn("bothways", "beidseits", "beiderseits", "beidrichtung"); // „beidseitig“ = symmetric (u díry znamená totéž)
 syn("depth", "tiefe", "tief");
 syn("symmetric", "symmetrisch", "beidseitig", "mittig");
 syn("reverse", "umkehren", "umgekehrt", "entgegen", "gegenrichtung");
@@ -215,6 +252,31 @@ syn("linear", "reihe", "raster", "gitter");
 syn("circular", "kreisförmig", "kreismuster", "rundum");
 syn("internal", "innen", "innengewinde");
 syn("modeled", "modellieren", "modelliert");
+// ── skica: oblouk, spline; díra: sklon; tělesa; obecný prvek; knihovna; sestava ──
+syn("arc", "oblouk", "bogen", "kreisbogen");
+syn("spline", "křivka", "krivka", "kurve");
+syn("tilt", "sklon", "naklonit", "neigung", "geneigt");
+syn("origin", "počátek", "pocatek", "ursprung");
+syn("normal", "normála", "normala", "normale");
+syn("xdir", "osax", "směrx", "smerx", "xrichtung");
+syn("splitbodies", "rozdělit", "rozdelit", "teilen", "aufteilen");
+syn("copybody", "kopie", "kopírovat", "kopirovat", "copy", "kopieren");
+syn("combine", "spojit", "kombinovat", "kombinieren");
+syn("body", "těleso", "teleso", "tělesa", "telesa", "bodies", "körper", "koerper");
+syn("as", "jako", "als");
+syn("feature", "prvek", "element");
+syn("library", "normálie", "normalie", "knihovna", "normteil", "normteile", "bibliothek");
+syn("insert", "vložit", "vlozit", "einfügen", "einfuegen");
+syn("fixed", "ukotvit", "ukotvená", "ukotvena", "fixieren", "fest");
+syn("rotation", "otočení", "otoceni", "natočení", "natoceni", "drehung");
+syn("drawing", "výkres", "vykres", "zeichnung");
+syn("dimension", "kótovat", "kotovat", "okótovat", "okotovat", "bemaßen", "bemassen", "dimensionieren");
+syn("threaddepth", "hloubka-závitu", "hloubka-zavitu", "thread-depth", "gewindetiefe");
+// ── skica: vazby, kóty, rovina na ploše / pomocné rovině (agent-sketch.ts) ──
+syn("constraint", "vazba", "vazby", "constraints", "bedingung", "bedingungen");
+syn("dim", "kóta", "kota", "kóty", "koty", "dims", "bemaßung", "bemassung", "maß", "mass");
+syn("face", "plocha", "fläche", "flaeche");
+syn("plane", "rovina", "ebene", "datum", "bezugsebene", "hilfsebene");
 const canon = (t: string) => SYN[fold(t)] ?? fold(t);
 /** anglické a německé názvy tříd materiálu → id (hustota); jiné texty jdou do razítka jako označení */
 const MATERIAL_ALIASES: Record<string, string> = Object.fromEntries(
@@ -238,9 +300,9 @@ const VIEWS: Record<string, string> = { iso: "iso", izo: "iso", izometrie: "iso"
 
 /** volby za příkazem: `{klíč: čísla | slova}` + příznaky */
 type Opts = { flags: Set<string>; nums: Record<string, number[]>; words: Record<string, string[]>; free: number[]; strings: string[] };
-const FLAGS = new Set(["center", "through", "symmetric", "reverse", "cut", "add", "intersect", "newbody", "engrave", "construction", "closed", "keep", "linear", "circular", "internal", "modeled"]);
-const NUM_OPTS = new Set(["at", "depth", "angle", "draft", "offset", "spacing", "count", "counterbore", "countersink", "height", "radius", "diameter", "sides", "rect-r", "length", "width", "longer", "shorter", "corner"]);
-const WORD_OPTS = new Set(["axis", "direction", "thread", "edges", "open", "name", "material", "color"]);
+const FLAGS = new Set(["fixed", "center", "through", "bothways", "symmetric", "reverse", "cut", "add", "intersect", "newbody", "engrave", "construction", "closed", "keep", "linear", "circular", "internal", "modeled"]);
+const NUM_OPTS = new Set(["threaddepth", "tilt", "origin", "normal", "xdir", "rotation", "at", "depth", "angle", "draft", "offset", "spacing", "count", "counterbore", "countersink", "height", "radius", "diameter", "sides", "rect-r", "length", "width", "longer", "shorter", "corner"]);
+const WORD_OPTS = new Set(["axis", "direction", "thread", "edges", "open", "name", "material", "color", "body", "as"]);
 function parseOpts(tokens: string[]): Opts {
   const o: Opts = { flags: new Set(), nums: {}, words: {}, free: [], strings: [] };
   let i = 0;
@@ -277,6 +339,28 @@ function parseOpts(tokens: string[]): Opts {
   }
   return o;
 }
+/** `skica plocha F3 [odsazení N] [obráceně]` · `skica rovina <název pomocné roviny> [odsazení N]` (null = jiná rovina) */
+function sketchOnSpec(tk: string[], o: Opts): Pick<SketchOnOp, "on" | "offset" | "flip"> | null {
+  const i = tk.findIndex((t) => canon(t) === "face" || canon(t) === "plane");
+  if (i < 0) return null;
+  const rest: string[] = [];
+  for (const t of tk.slice(i + 1)) {
+    const c = canon(t);
+    if (NUM_OPTS.has(c) || FLAGS.has(c) || WORD_OPTS.has(c)) break;
+    rest.push(t);
+  }
+  const placed = { offset: o.nums.offset?.[0] ?? 0, flip: o.flags.has("reverse") };
+  if (canon(tk[i]) === "face") {
+    // číslo F jako popisky pro výběr (F1 = první plocha), nebo pravidlo jako u skořepiny: horní, spodní, +X, boční -Y…
+    const m = /^f?(\d+)$/i.exec(rest[0] ?? "");
+    if (m && rest.length === 1 && Number(m[1]) >= 1) return { on: { face: Number(m[1]) }, ...placed };
+    if (!rest.length || /^f?\d+$/i.test(rest[0])) throw new Error(tr("skica na ploše potřebuje číslo plochy nebo pravidlo: skica plocha F3 | horní | +X [odsazení 5] [obráceně] – čísla ploch F1, F2… ukazují popisky pro výběr (Ctrl+Shift+L, window.mncad.hints())"));
+    return { on: { faceRule: rest.map(fold) }, ...placed };
+  }
+  const name = rest.join(" ").trim();
+  if (!name) throw new Error(tr("skica na pomocné rovině potřebuje její název: skica rovina \"Rovina 1\" [odsazení 5]"));
+  return PLANES[fold(name)] ? null : { on: { datum: name }, ...placed }; // „skica rovina XY“ = základní rovina
+}
 const axisOf = (o: Opts, dflt: Axis = "Z"): Axis => AXES[fold(o.words.axis?.[0] ?? "")] ?? dflt;
 const modeOf = (o: Opts): "new" | "add" | "cut" | "intersect" => (o.flags.has("cut") ? "cut" : o.flags.has("intersect") ? "intersect" : o.flags.has("newbody") ? "new" : "add");
 const posOf = (o: Opts): Vec3 | null => {
@@ -292,16 +376,151 @@ const dirOf = (words: string[] | undefined, nums?: number[]): Vec3 | null => {
   return null;
 };
 
+/** název tělesa z tokenů: samotné číslo = „Těleso N“ (výchozí názvy), jinak text tak, jak je */
+const bodyName = (tokens: string[] | undefined): string => {
+  const t = (tokens ?? []).join(" ").trim();
+  return /^\d+$/.test(t) ? `Těleso ${t}` : t;
+};
+const unit = (v: Vec3): Vec3 => {
+  const l = Math.hypot(v[0], v[1], v[2]);
+  if (!(l > 1e-12)) throw new Error(tr("směr nesmí být nulový vektor"));
+  return [v[0] / l, v[1] / l, v[2] / l];
+};
+const cross3 = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
+
+/** hodnota za `klíč=` v obecném příkazu „prvek“: číslo, ano/ne, seznam `a;b;c`, JSON `[…]` / `{…}`, jinak text */
+function parseValue(raw: string): unknown {
+  const t = raw.trim();
+  if (/^[[{]/.test(t)) {
+    try {
+      return JSON.parse(t);
+    } catch {
+      throw new Error(tr("hodnotu „{0}“ nelze přečíst jako JSON", t));
+    }
+  }
+  const f = fold(t);
+  if (["ano", "true", "yes", "ja", "on"].includes(f)) return true;
+  if (["ne", "false", "no", "nein", "off"].includes(f)) return false;
+  if (t.includes(";")) return t.split(";").map((x) => parseValue(x));
+  if (isNum(t)) return num(t);
+  return t;
+}
+/** nastaví hodnotu na cestě `a.b.0` (vytvoří chybějící objekty) */
+function setAt(obj: Record<string, unknown>, path: string, value: unknown) {
+  const keys = path.split(".");
+  let o: Record<string, unknown> = obj;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (typeof o[keys[i]] !== "object" || o[keys[i]] === null) o[keys[i]] = /^\d+$/.test(keys[i + 1]) ? [] : {};
+    o = o[keys[i]] as Record<string, unknown>;
+  }
+  o[keys[keys.length - 1]] = value;
+}
+/** rozdělí `klíč=hodnota klíč="text s mezerami" klíč=[1, 2, 3]` na dvojice */
+function keyValues(text: string): [string, string][] {
+  const out: [string, string][] = [];
+  // JSON hodnota smí mít vnořené objekty (směr / rovina odkazem: {"kind":"edge","ref":{"kind":"edge","index":3}}) – do 4 úrovní
+  const re = /([^\s=]+)=("[^"]*"|„[^“]*“|\[[^\]]*\]|\{(?:[^{}]|\{(?:[^{}]|\{(?:[^{}]|\{[^{}]*\})*\})*\})*\}|\S*)/g;
+  let m: RegExpExecArray | null;
+  let last = 0;
+  while ((m = re.exec(text))) {
+    const gap = text.slice(last, m.index).trim();
+    if (gap) throw new Error(tr("„{0}“ není ve tvaru klíč=hodnota", gap));
+    out.push([m[1], m[2].replace(/^["„]|["“]$/g, "")]);
+    last = re.lastIndex;
+  }
+  const rest = text.slice(last).trim();
+  if (rest) throw new Error(tr("„{0}“ není ve tvaru klíč=hodnota", rest));
+  return out;
+}
+
+/**
+ * Obecný příkaz `prvek <typ> klíč=hodnota …` – přístup ke všem typům prvků i prvkům rozšíření bez JSON.
+ * Typ = název typu (sweep, loft, draft…), id rozšíření (sheet.bend) nebo jeho popisek („Ohyb plechu“).
+ * Klíče: názvy polí prvku (u rozšíření klíč nebo popisek parametru); skici a prvky lze zadat názvem nebo `$last`;
+ * plochy / hrany čísly `1;2;5` nebo pravidlem (`plochy=horní`, `hrany=svislé;kruhové`).
+ */
+function parseGenericFeature(rest: string, named: (type: Feature["type"], name?: string) => string, no: number): AgentOp {
+  const m = /^\s*("([^"]*)"|„([^“]*)“|(\S+))\s*(.*)$/.exec(rest);
+  if (!m) throw new Error(tr("prvek potřebuje typ: prvek <typ> klíč=hodnota … (typy: {0})", FEATURE_TYPES.join(", ")));
+  const word = m[2] ?? m[3] ?? m[4];
+  const pairs = keyValues(m[5] ?? "");
+  const fw = fold(word);
+  const base = FEATURE_TYPES.find((t) => fold(t) === fw) ?? (Object.entries(FEATURE_LABEL).find(([, l]) => fold(l) === fw)?.[0] as (typeof FEATURE_TYPES)[number] | undefined);
+  const ext = base ? undefined : allExt().find((d) => fold(d.ext) === fw || fold(d.label) === fw);
+  if (!base && !ext) throw new Error(tr("neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}", word, FEATURE_TYPES.join(", "), allExt().map((d) => d.ext).join(", ")));
+  const nameAt = pairs.findIndex(([k]) => ["name", "nazev"].includes(fold(k)));
+  const name = nameAt >= 0 ? pairs.splice(nameAt, 1)[0][1] : undefined;
+  let into: { path: string; kind: "faces" | "edges" } | undefined;
+  let rule: Rule = [];
+  const pick = (path: string, kind: "faces" | "edges", v: unknown): unknown => {
+    const list = Array.isArray(v) ? v : [v];
+    if (list.every((x) => typeof x === "number")) return list;
+    if (into) throw new Error(tr("pravidlem lze v jednom prvku vybrat jen jednu skupinu ploch nebo hran – ostatní zadejte čísly"));
+    into = { path, kind };
+    rule = list.map((x) => fold(String(x)));
+    return [];
+  };
+  if (ext) {
+    const data: Record<string, unknown> = { ...ext.make({ ...emptyDoc(""), features: [] }) };
+    const params = ext.params ?? [];
+    for (const [k, raw] of pairs) {
+      const fk = fold(k);
+      const prm = params.find((x) => fold(x.key) === fk || fold(x.label) === fk);
+      const key = prm?.key ?? (k in data || k.includes(".") ? k : undefined);
+      if (!key) throw new Error(tr("prvek {0}: neznámý parametr „{1}“ – parametry: {2}", ext.ext, k, [...new Set([...params.map((x) => x.key), ...Object.keys(data)])].join(", ")));
+      let v = parseValue(raw);
+      if (prm?.kind === "faces" || prm?.kind === "edges") v = pick(`data.${key}`, prm.kind, v);
+      else if (prm?.kind === "enum" && typeof v === "string") {
+        const opt = prm.options.find((x) => fold(x.v) === fold(v as string) || fold(x.l) === fold(v as string));
+        if (!opt) throw new Error(tr("prvek {0}: parametr „{1}“ má hodnoty {2}", ext.ext, key, prm.options.map((x) => x.v).join(" | ")));
+        v = opt.v;
+      } else if (prm?.kind === "direction" || prm?.kind === "axis") {
+        // směr / osa: X | Y | Z | -Z | vektor 1;0;1 | JSON (osa i x | y = osa skici); uloží se nový tvar
+        const d = prm.kind === "direction" ? toDirection(v) : toAxisDef(v);
+        if (!d) throw new Error(tr("prvek {0}: parametr „{1}“ je {2} – X | Y | Z | -Z | vektor 1;0;1 | JSON", ext.ext, key, prm.kind === "direction" ? tr("směr") : tr("osa")));
+        v = d;
+      } else if (prm?.kind === "sketches" && !Array.isArray(v)) v = [v];
+      else if (prm?.kind === "mode" && typeof v === "string") v = canon(v) === "cut" ? "cut" : canon(v) === "intersect" ? "intersect" : canon(v) === "newbody" ? "new" : "add";
+      setAt(data, key, v);
+    }
+    const n = name ?? `${ext.label}`;
+    const feature = { id: uid(), name: n, type: "ext", ext: ext.ext, data } as unknown as Feature;
+    return into ? { k: "select", feature, rule, line: no, into } : { k: "feature", feature, line: no };
+  }
+  const obj: Record<string, unknown> = { type: base, ...(name ? { name } : {}) };
+  for (const [k, raw] of pairs) {
+    let v = parseValue(raw);
+    if ((k === "faces" || k === "edges") && v !== "all") v = pick(k, k, v);
+    if (k === "mode" && typeof v === "string") v = canon(v) === "cut" ? "cut" : canon(v) === "intersect" ? "intersect" : canon(v) === "newbody" ? "new" : "add";
+    setAt(obj, k, v);
+  }
+  const { features, errors } = normalizeFeatures([obj]);
+  if (errors.length || !features.length) throw new Error(errors[0] ?? tr("prvek se nepodařilo vytvořit"));
+  const feature = features[0];
+  if (!name) feature.name = named(feature.type);
+  return into ? { k: "select", feature, rule, line: no, into } : { k: "feature", feature, line: no };
+}
+
 /* ───────────────────────── parser ───────────────────────── */
 export function parseAgentText(text: string): AgentProgram {
   const trimmed = text.trim();
   if (!trimmed) return { ops: [], errors: [{ line: 0, text: "", message: tr("Prázdný vstup.") }] };
-  if (/^[[{]/.test(trimmed)) return parseJson(trimmed);
+  // Celý vstup je JSON jen tehdy, když jde jako celek přečíst (dokument, pole prvků, víceřádkový prvek). JSON na PRVNÍM řádku,
+  // za kterým následují textové příkazy (`{"type":"sketch",…}` + `vysunout 5`), se zpracuje po řádcích jako každý jiný řádek.
+  // Rozepsaný (víceřádkový) JSON s chybou se dál hlásí jako nečitelný JSON – první řádek pak nekončí závorkou.
+  if (/^[[{]/.test(trimmed) && (isJson(trimmed) || !/[}\]]$/.test(trimmed.split(/\r?\n/)[0].trim()))) return parseJson(trimmed);
   const ops: AgentOp[] = [];
   const errors: AgentError[] = [];
   const counts: Record<string, number> = {}; // čítače názvů podle typu prvku
   const lines = trimmed.split(/\r?\n/);
   const named = (type: Feature["type"], name?: string) => name ?? `${tr(FEATURE_LABEL[type] ?? type)} ${(counts[type] = (counts[type] ?? 0) + 1)}`;
+  /** blok skici (řádek skica + entity, vazby, kóty): jeho řádky patří ke skice bloku; skončí-li blok entitami, skica se pak vyřeší (`end`) */
+  let block: { sketch?: SketchTarget; last?: Extract<AgentOp, { k: "entities" }> } | null = null;
+  const endBlock = () => {
+    if (block?.last) block.last.end = true;
+    block = null;
+  };
   lines.forEach((raw, idx) => {
     const line = raw.replace(/\s+(#|\/\/).*$/, "").trim();
     if (!line || line.startsWith("#") || line.startsWith("//")) return;
@@ -309,6 +528,7 @@ export function parseAgentText(text: string): AgentProgram {
     try {
       // JSON na jednom řádku (jeden prvek, pole prvků) lze míchat s textovými příkazy – např. prvek rozšíření bez textového příkazu
       if (/^[[{]/.test(line)) {
+        endBlock();
         const sub = parseJson(line);
         for (const op of sub.ops) ops.push({ ...op, line: no });
         for (const e of sub.errors) errors.push({ line: no, text: line.slice(0, 80), message: e.message });
@@ -318,35 +538,73 @@ export function parseAgentText(text: string): AgentProgram {
       const colon = line.indexOf(":");
       const headTokens = tokenize(colon >= 0 ? line.slice(0, colon) : line);
       const cmd = canon(headTokens[0] ?? "");
+      const isEntity = ENTITY.has(cmd) || (cmd === "construction" && ENTITY.has(canon(headTokens[1] ?? "")));
+      if (cmd === "sketch" || (cmd !== "constraint" && cmd !== "dim" && !isEntity)) endBlock();
       if (cmd === "sketch") {
+        // id doplní založená skica; nepovede-li se řádek přečíst, entity bloku ohlásí, že skica nevznikla (nepřidají se do jiné skici)
+        const blk: NonNullable<typeof block> & { sketch: SketchTarget } = (block = { sketch: { id: "", line: no } });
         const o = parseOpts(headTokens.slice(1));
+        const on = sketchOnSpec(headTokens.slice(1), o);
         const planeWord = o.strings.map(fold).find((w) => PLANES[w]);
         const plane: PlaneName = planeWord ? PLANES[planeWord] : "XY";
         const f: Feature = { id: uid(), name: named("sketch", o.words.name?.join(" ")), type: "sketch", plane: { kind: "base", name: plane, offset: o.nums.offset?.[0] ?? 0 }, entities: [] };
-        ops.push({ k: "feature", feature: f, line: no });
+        // obecná rovina: `skica počátek x y z normála nx ny nz [osax ux uy uz]` – osa X skici se bez zadání zvolí kolmo na normálu
+        if (o.nums.normal?.length) {
+          if (o.nums.normal.length < 3) throw new Error(tr("skica v obecné rovině potřebuje normálu třemi čísly: skica počátek x y z normála nx ny nz [osax ux uy uz]"));
+          const n = unit([o.nums.normal[0], o.nums.normal[1], o.nums.normal[2]]);
+          const og = o.nums.origin ?? [];
+          const xr = o.nums.xdir && o.nums.xdir.length >= 3 ? ([o.nums.xdir[0], o.nums.xdir[1], o.nums.xdir[2]] as Vec3) : Math.abs(n[0]) < 0.9 ? ([1, 0, 0] as Vec3) : ([0, 1, 0] as Vec3);
+          const d = xr[0] * n[0] + xr[1] * n[1] + xr[2] * n[2];
+          const x = unit([xr[0] - d * n[0], xr[1] - d * n[1], xr[2] - d * n[2]]);
+          f.plane = { kind: "custom", origin: [og[0] ?? 0, og[1] ?? 0, og[2] ?? 0], normal: n.map(r6) as Vec3, xDir: x.map(r6) as Vec3 };
+        }
+        blk.sketch.id = f.id;
+        ops.push(on ? { k: "sketchOn", feature: f, ...on, line: no } : { k: "feature", feature: f, line: no });
         if (colon >= 0) {
           const ents = line
             .slice(colon + 1)
             .split(";")
             .map((s) => s.trim())
             .filter(Boolean)
-            .map((s) => parseEntity(tokenize(s)));
-          ops.push({ k: "entities", entities: ents, line: no });
+            .flatMap((s) => parseEntities(tokenize(s)));
+          const op: Extract<AgentOp, { k: "entities" }> = { k: "entities", entities: ents, line: no, sketch: blk.sketch };
+          ops.push(op);
+          blk.last = op;
         }
         return;
       }
-      if (ENTITY.has(cmd) || (cmd === "construction" && ENTITY.has(canon(headTokens[1] ?? "")))) {
+      if (isEntity) {
+        const blk = (block ??= {});
         const ents = line
           .split(";")
           .map((s) => s.trim())
           .filter(Boolean)
-          .map((s) => parseEntity(tokenize(s)));
-        ops.push({ k: "entities", entities: ents, line: no });
+          .flatMap((s) => parseEntities(tokenize(s)));
+        const op: Extract<AgentOp, { k: "entities" }> = { k: "entities", entities: ents, line: no, ...(blk.sketch ? { sketch: blk.sketch } : {}) };
+        ops.push(op);
+        blk.last = op;
+        return;
+      }
+      // vazby a kóty ve skice bloku (jinak v poslední skice): `vazba kolmo e1 e2; …`, `kóta délka e1 50; …` – po řádku se skica vyřeší
+      if (cmd === "constraint" || cmd === "dim") {
+        const blk = (block ??= {});
+        const rest = line.replace(/^\s*\S+/, "");
+        const target = blk.sketch ? { sketch: blk.sketch } : {};
+        ops.push(cmd === "constraint" ? { k: "constraints", items: parseConstraints(rest), line: no, ...target } : { k: "dims", items: parseDims(rest), line: no, ...target });
+        blk.last = undefined;
+        return;
+      }
+      if (cmd === "feature") {
+        ops.push(parseGenericFeature(line.replace(/^\s*\S+/, ""), named, no));
         return;
       }
       const tokens = tokenize(line).slice(1);
       const o = parseOpts(tokens);
       const nm = o.words.name?.join(" ");
+      // `… těleso 2` za prvkem = cílové těleso prvku; s „nové“ je to název nově založeného tělesa
+      const targetBody = cmd !== "body" && cmd !== "copybody" && cmd !== "combine" && cmd !== "add" && o.words.body?.length ? bodyName(o.words.body) : "";
+      const before = ops.length;
+      try {
       switch (cmd) {
         case "new": {
           const what = canon(tokens[0] ?? "part");
@@ -420,9 +678,35 @@ export function parseAgentText(text: string): AgentProgram {
           if (!(d > 0)) throw new Error(tr("díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]"));
           const at = o.nums.at ?? [];
           const axis = axisOf(o);
+          // více děr jedním příkazem: `v x1 y1 z1 v x2 y2 z2 …` (trojice souřadnic)
+          const many = at.length >= 6 && at.length % 3 === 0;
+          if (at.length > 3 && !many) throw new Error(tr("více děr jedním příkazem potřebuje u každé polohy tři souřadnice: díra 8 skrz v x1 y1 z1 v x2 y2 z2"));
           const fillTop = at.length < 3;
           const position: Vec3 = [at[0] ?? 0, at[1] ?? 0, at[2] ?? 0];
-          const f: Feature = { id: uid(), name: named("hole", nm), type: "hole", position, axis, flip: o.flags.has("reverse"), diameter: d, depth: o.flags.has("through") ? 0 : (o.nums.depth?.[0] ?? 0), cbDiameter: o.nums.counterbore?.[0] ?? 0, cbDepth: o.nums.counterbore?.[1] ?? 0 };
+          // „k tělesu“ (EN „to body“, DE „bis Körper“) = po první stěnu stávajícího tělesa ve směru vrtání (jako u vysunutí)
+          const toBody = hasPhrase(tokens, TO_BODY);
+          const f: Feature = { id: uid(), name: named("hole", nm), type: "hole", position, axis, flip: o.flags.has("reverse"), diameter: d, depth: o.flags.has("through") || toBody ? 0 : (o.nums.depth?.[0] ?? 0), cbDiameter: o.nums.counterbore?.[0] ?? 0, cbDepth: o.nums.counterbore?.[1] ?? 0 };
+          if (toBody) f.end = { kind: "toBody" };
+          // „skrz“ vrtá od zadaného bodu jen ve směru vrtání; „obousměrně“ = skrz celé těleso na obě strany od bodu
+          else if (o.flags.has("bothways") || o.flags.has("symmetric")) f.bothWays = true;
+          if (many) {
+            f.points = [];
+            for (let j = 0; j < at.length; j += 3) f.points.push({ kind: "xyz", p: [at[j], at[j + 1], at[j + 2]] });
+          }
+          // šikmá díra: `směr vx vy vz` = směr vrtání; `sklon úhel [směr +X]` = odklon od osy díry (výchozí k další ose: Z→X, X→Y, Y→Z)
+          const dv = dirOf(o.words.direction);
+          const tiltDeg = o.nums.tilt?.[0];
+          if (tiltDeg !== undefined) {
+            const ax: Vec3 = axis === "X" ? [1, 0, 0] : axis === "Y" ? [0, 1, 0] : [0, 0, 1];
+            const toward = unit(dv ?? (axis === "X" ? [0, 1, 0] : axis === "Y" ? [0, 0, 1] : [1, 0, 0]));
+            const a = (tiltDeg * Math.PI) / 180;
+            const down = o.flags.has("reverse") ? 1 : -1; // výchozí vrtání proti ose (shora dolů)
+            f.dirDef = { kind: "vector", v: [0, 1, 2].map((i) => r6(down * ax[i] * Math.cos(a) + toward[i] * Math.sin(a))) as Vec3 };
+            f.flip = true;
+          } else if (dv) {
+            f.dirDef = { kind: "vector", v: unit(dv).map(r6) as Vec3 };
+            f.flip = !o.flags.has("reverse");
+          }
           if (o.nums.counterbore?.length) f.kind = "counterbore";
           if (o.nums.countersink?.length) {
             f.kind = "countersink";
@@ -435,6 +719,7 @@ export function parseAgentText(text: string): AgentProgram {
             f.kind = "tapped";
             f.thread = t.name;
             f.diameter = t.tap;
+            if (o.nums.threaddepth?.[0]) f.threadDepth = o.nums.threaddepth[0];
           }
           ops.push({ k: "feature", feature: f, line: no, fillTop });
           return;
@@ -518,6 +803,68 @@ export function parseAgentText(text: string): AgentProgram {
           ops.push({ k: "feature", feature: { id: uid(), name: named("text", nm), type: "text", text: str, height: o.nums.height?.[0] ?? o.free[0] ?? 10, depth: o.nums.depth?.[0] ?? o.free[1] ?? 1, plane: { kind: "base", name: planeWord ? PLANES[planeWord] : "XY", offset: at[2] ?? 0 }, position: [at[0] ?? 0, at[1] ?? 0], angle: o.nums.angle?.[0] ?? 0, mode: o.flags.has("engrave") || o.flags.has("cut") ? "cut" : "add" }, line: no, fillTop: at.length < 3 });
           return;
         }
+        case "body": {
+          const name = bodyName(tokens.filter((t) => canon(t) !== "body"));
+          if (!name) throw new Error(tr("těleso potřebuje název nebo číslo: těleso 2 (= „Těleso 2“) – další prvky pak pracují s ním"));
+          ops.push({ k: "body", name, line: no });
+          return;
+        }
+        case "splitbodies": {
+          // rozdělit [tělesa] XY|XZ|YZ [odsazení N] [těleso Zdroj] [jako Název]
+          const planeWord = o.strings.map(fold).find((w) => PLANES[w]);
+          const f: Feature = { id: uid(), name: named("splitBodies", nm), type: "splitBodies", plane: planeWord ? PLANES[planeWord] : "XY", offset: o.nums.offset?.[0] ?? o.free[0] ?? 0 };
+          if (o.words.as?.length) f.nameB = bodyName(o.words.as);
+          ops.push({ k: "feature", feature: f, line: no });
+          return;
+        }
+        case "copybody": {
+          // kopie [těleso Zdroj] [posun dx dy dz] [jako Název]
+          const t = o.nums.offset ?? o.nums.at ?? [];
+          const f: Feature = { id: uid(), name: named("copyBody", nm), type: "copyBody", source: o.words.body?.length ? bodyName(o.words.body) : "", translate: [t[0] ?? 0, t[1] ?? 0, t[2] ?? 0] };
+          if (o.words.as?.length) f.newName = bodyName(o.words.as);
+          ops.push({ k: "feature", feature: f, line: no });
+          return;
+        }
+        case "add":
+        case "combine": {
+          // sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat] – tělesa číslem (2 = „Těleso 2“) nebo názvem v uvozovkách
+          const names: string[] = [];
+          const flags = new Set<string>();
+          for (const t of tokens) {
+            const c = canon(t);
+            if (c === "body") continue;
+            if (c === "cut" || c === "intersect" || c === "add" || c === "keep") flags.add(c);
+            else names.push(bodyName([t]));
+          }
+          if (names.length !== 2) throw new Error(tr("sloučit potřebuje dvě tělesa: sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat] – např. sloučit 1 2 odebrat"));
+          ops.push({ k: "feature", feature: { id: uid(), name: named("combine", nm), type: "combine", target: names[0], tool: names[1], op: flags.has("cut") ? "cut" : flags.has("intersect") ? "intersect" : "add", keepTool: flags.has("keep") }, line: no });
+          return;
+        }
+        case "library": {
+          // normálie M8x30 [v x y z] – text za příkazem jde do hledání knihovny
+          const i = tokens.findIndex((t) => canon(t) === "at");
+          const query = (i >= 0 ? tokens.slice(0, i) : tokens).join(" ").trim();
+          if (!query) throw new Error(tr("normálie potřebuje označení: normálie M8x30 · normálie ložisko 6204 · normálie pero 8x7x40"));
+          const p = posOf(o);
+          ops.push({ k: "library", query, ...(p ? { at: p } : {}), line: no });
+          return;
+        }
+        case "insert": {
+          // sestava: vložit "Název záložky" [v x y z] [otočení rx ry rz] [ukotvit]
+          const name = o.strings.join(" ").trim();
+          if (!name) throw new Error(tr("vložit potřebuje název otevřené záložky s dílem: vložit \"Hřídel\" v 0 0 10 [otočení 0 90 0] [ukotvit]"));
+          const rt = o.nums.rotation ?? [];
+          ops.push({ k: "insert", tab: name, at: posOf(o) ?? [0, 0, 0], rotation: [rt[0] ?? 0, rt[1] ?? 0, rt[2] ?? 0], fixed: o.flags.has("fixed"), line: no });
+          return;
+        }
+        case "drawing": {
+          const cmd = parseDrawing(tokens);
+          ops.push(cmd ? { k: "drawingCmd", cmd, line: no } : { k: "drawing", line: no });
+          return;
+        }
+        case "dimension":
+          ops.push({ k: "drawingCmd", cmd: parseDimension(tokens), line: no });
+          return;
         case "undo":
           ops.push({ k: "pop", line: no });
           return;
@@ -534,14 +881,27 @@ export function parseAgentText(text: string): AgentProgram {
           return;
         }
         default:
-          throw new Error(tr("neznámý příkaz „{0}“ – příkazy: nový díl, kvádr, válec, koule, kužel, trubka, skica, obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, vysunout, rotovat, díra, zaoblit, srazit, skořepina, pole, zrcadlit, text, smazat poslední, stav, zobraz; nebo vložte JSON", headTokens[0]));
+          throw new Error(tr("neznámý příkaz „{0}“ – příkazy: {1}", headTokens[0], commandWords().join(", ")));
+      }
+      } finally {
+        // „nové“ bez názvu = nové těleso s dalším volným názvem (doplní aplikace); u prvního tělesa dílu se nic nemění
+        const body = targetBody || (o.flags.has("newbody") ? "$new" : "");
+        if (body) for (const op of ops.slice(before)) if ((op.k === "feature" || op.k === "select") && !op.feature.body) op.feature.body = body;
       }
     } catch (e) {
       errors.push({ line: no, text: line, message: (e as Error).message });
     }
   });
+  endBlock();
   return { ops, errors };
 }
+
+/** víceslovná volba ukončení díry „k tělesu“ (slova se jinak čtou jednotlivě – „body“ / „Körper“ je volba tělesa) */
+const TO_BODY = [["k", "telesu"], ["ke", "telesu"], ["to", "body"], ["tobody"], ["bis", "korper"], ["bis", "koerper"], ["bis", "zum", "korper"], ["bis", "zum", "koerper"]];
+const hasPhrase = (tokens: string[], phrases: string[][]) => {
+  const w = tokens.map(fold);
+  return phrases.some((p) => w.some((_, i) => p.every((x, k) => w[i + k] === x)));
+};
 
 const numRule = (o: Opts): string[] => {
   const r: string[] = [];
@@ -551,7 +911,89 @@ const numRule = (o: Opts): string[] => {
   return r;
 };
 
-const ENTITY = new Set(["rect", "circle", "polygon", "slot", "line", "polyline", "point", "ellipse"]);
+const ENTITY = new Set(["rect", "circle", "polygon", "slot", "line", "polyline", "point", "ellipse", "arc", "spline"]);
+
+/**
+ * Entity skici z jednoho zápisu. Většinou jedna; lomená čára se zaoblenými rohy (`čára 0 0 50 0 r 5 50 30 0 30 uzavřít` –
+ * „r N“ za bodem zaoblí tento roh) se rozloží na úsečky a oblouky.
+ */
+export function parseEntities(tokens: string[]): SketchEntity[] {
+  let construction = false;
+  let tk = tokens;
+  if (canon(tk[0] ?? "") === "construction") {
+    construction = true;
+    tk = tk.slice(1);
+  }
+  if (canon(tk[0] ?? "") !== "polyline" || !tk.some((t) => canon(t) === "radius" || canon(t) === "fillet")) return [parseEntity(tokens)];
+  const pts: Vec2[] = [];
+  const radii: number[] = [];
+  let closed = false;
+  const nums: number[] = [];
+  const flush = () => {
+    if (nums.length % 2) throw new Error(tr("čára potřebuje body po dvojicích: čára x1 y1 x2 y2 x3 y3 … [uzavřít]"));
+    for (let i = 0; i < nums.length; i += 2) {
+      pts.push([nums[i], nums[i + 1]]);
+      radii.push(0);
+    }
+    nums.length = 0;
+  };
+  for (let i = 1; i < tk.length; i++) {
+    const c = canon(tk[i]);
+    if (c === "radius" || c === "fillet") {
+      flush();
+      const v = tk[i + 1];
+      if (!pts.length || v === undefined || !isNum(v) || !(num(v) > 0)) throw new Error(tr("zaoblení rohu se píše za bod: čára 0 0 50 0 r 5 50 30 … (r 5 zaoblí roh v bodě 50 0)"));
+      radii[pts.length - 1] = num(v);
+      i++;
+    } else if (c === "closed") closed = true;
+    else if (isNum(tk[i])) nums.push(num(tk[i]));
+    else throw new Error(tr("čára: neznámé slovo „{0}“ – body po dvojicích, „r N“ za bodem zaoblí roh, „uzavřít“ spojí konec se začátkem", tk[i]));
+  }
+  flush();
+  if (pts.length >= 3 && !closed && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-9) {
+    pts.pop();
+    radii.pop();
+    closed = true;
+  }
+  if (pts.length < 3) throw new Error(tr("zaoblení rohu potřebuje aspoň tři body čáry"));
+  const n = pts.length;
+  const base = () => ({ id: uid(), ...(construction ? { construction: true } : {}) });
+  // tečné body a střed oblouku pro každý zaoblený roh
+  const cut: ({ a: Vec2; m: Vec2; b: Vec2; t: number } | null)[] = pts.map((p, i) => {
+    const rad = radii[i];
+    if (!rad) return null;
+    if (!closed && (i === 0 || i === n - 1)) throw new Error(tr("krajní bod otevřené čáry zaoblit nelze (bod {0})", i + 1));
+    const prev = pts[(i - 1 + n) % n];
+    const next = pts[(i + 1) % n];
+    const u1: Vec2 = [prev[0] - p[0], prev[1] - p[1]];
+    const u2: Vec2 = [next[0] - p[0], next[1] - p[1]];
+    const l1 = Math.hypot(u1[0], u1[1]);
+    const l2 = Math.hypot(u2[0], u2[1]);
+    const cos = (u1[0] * u2[0] + u1[1] * u2[1]) / (l1 * l2);
+    const ang = Math.acos(Math.max(-1, Math.min(1, cos)));
+    if (!(ang > 1e-6 && ang < Math.PI - 1e-6)) throw new Error(tr("roh v bodě {0} je přímý – není co zaoblit", i + 1));
+    const t = rad / Math.tan(ang / 2);
+    const a: Vec2 = [p[0] + (u1[0] / l1) * t, p[1] + (u1[1] / l1) * t];
+    const b: Vec2 = [p[0] + (u2[0] / l2) * t, p[1] + (u2[1] / l2) * t];
+    const bis: Vec2 = [u1[0] / l1 + u2[0] / l2, u1[1] / l1 + u2[1] / l2];
+    const bl = Math.hypot(bis[0], bis[1]);
+    const dist = rad / Math.sin(ang / 2) - rad; // vzdálenost vrcholu od středu oblouku na ose úhlu
+    return { a, b, m: [p[0] + (bis[0] / bl) * dist, p[1] + (bis[1] / bl) * dist], t };
+  });
+  const out: SketchEntity[] = [];
+  const segs = closed ? n : n - 1;
+  for (let i = 0; i < segs; i++) {
+    const j = (i + 1) % n;
+    const len = Math.hypot(pts[j][0] - pts[i][0], pts[j][1] - pts[i][1]);
+    if ((cut[i]?.t ?? 0) + (cut[j]?.t ?? 0) > len + 1e-9) throw new Error(tr("zaoblení se nevejde na úsek mezi body {0} a {1} (délka {2}) – zmenšete poloměr", i + 1, j + 1, r6(len)));
+    const from = cut[i]?.b ?? pts[i];
+    const to = cut[j]?.a ?? pts[j];
+    if (Math.hypot(to[0] - from[0], to[1] - from[1]) > 1e-9) out.push({ ...base(), type: "line", a: [r6(from[0]), r6(from[1])], b: [r6(to[0]), r6(to[1])] });
+    const c = cut[j];
+    if (c && (closed || j < n - 1)) out.push({ ...base(), type: "arc", a: [r6(c.a[0]), r6(c.a[1])], b: [r6(c.m[0]), r6(c.m[1])], c: [r6(c.b[0]), r6(c.b[1])] });
+  }
+  return out;
+}
 /** entita skici z tokenů: `kružnice 165 [v 10 20]`, `obdélník 60 40 [střed] [v x y] [r 3]`, `čára x1 y1 x2 y2 … [uzavřít]` */
 export function parseEntity(tokens: string[]): SketchEntity {
   let construction = false;
@@ -601,6 +1043,19 @@ export function parseEntity(tokens: string[]): SketchEntity {
       for (let i = 0; i < o.free.length; i += 2) points.push([o.free[i], o.free[i + 1]]);
       return { ...base, type: "polyline", points, closed: o.flags.has("closed") || points.length >= 3 };
     }
+    case "arc": {
+      // oblouk třemi body: začátek, bod na oblouku, konec
+      if (o.free.length !== 6) throw new Error(tr("oblouk potřebuje tři body (začátek, bod na oblouku, konec): oblouk x1 y1 xm ym x2 y2"));
+      const [x1, y1, xm, ym, x2, y2] = o.free;
+      if (Math.abs((xm - x1) * (y2 - y1) - (ym - y1) * (x2 - x1)) < 1e-9) throw new Error(tr("tři body oblouku leží v přímce – použijte úsečku"));
+      return { ...base, type: "arc", a: [x1, y1], b: [xm, ym], c: [x2, y2] };
+    }
+    case "spline": {
+      if (o.free.length < 4 || o.free.length % 2) throw new Error(tr("spline potřebuje aspoň dva body po dvojicích: spline x1 y1 x2 y2 x3 y3 … [uzavřít]"));
+      const points: [number, number][] = [];
+      for (let i = 0; i < o.free.length; i += 2) points.push([o.free[i], o.free[i + 1]]);
+      return { ...base, type: "spline", points, closed: o.flags.has("closed") };
+    }
     case "point":
       return { ...base, type: "point", p: [o.free[0] ?? cx, o.free[1] ?? cy] };
     case "ellipse": {
@@ -609,11 +1064,20 @@ export function parseEntity(tokens: string[]): SketchEntity {
       return { ...base, type: "ellipse", cx, cy, rx, ry, angle: o.nums.angle?.[0] ?? 0 };
     }
     default:
-      throw new Error(tr("neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, bod, elipsa", tokens[0]));
+      throw new Error(tr("neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, oblouk, spline, bod, elipsa", tokens[0]));
   }
 }
 
 /* ───────────────────────── JSON ───────────────────────── */
+function isJson(text: string): boolean {
+  try {
+    JSON.parse(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function parseJson(text: string): AgentProgram {
   let v: unknown;
   try {
@@ -745,7 +1209,7 @@ export function featureSummary(f: Feature): string {
     case "tube":
       return tr("Ø{0}/Ø{1} × {2} mm, {3}", fmt(f.outer), fmt(f.inner), fmt(f.height), f.mode);
     case "hole":
-      return tr("{0}{1}{2} v [{3}], osa {4}", f.kind === "tapped" && f.thread ? tr("{0}{1} (jádro Ø{2})", threadLabel(f.thread), f.depth > 0 ? tr(" hl. {0}", fmt(f.depth)) : tr(" skrz"), fmt(f.diameter, 2)) : `Ø${fmt(f.diameter, 2)}${f.depth > 0 ? tr(" hloubka {0}", fmt(f.depth)) : tr(" skrz")}`, f.cbDiameter > 0 ? tr(" zahl. Ø{0}×{1}", fmt(f.cbDiameter), fmt(f.cbDepth)) : "", f.csDiameter ? tr(" kuž. Ø{0}", fmt(f.csDiameter)) : "", f.position.map((v) => fmt(v)).join("; "), f.axis);
+      return tr("{0}{1}{2} v [{3}], osa {4}", f.kind === "tapped" && f.thread ? tr("{0}{1} (jádro Ø{2})", threadLabel(f.thread), f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hl. {0}", fmt(f.depth)) : tr(" skrz"), fmt(f.diameter, 2)) : `Ø${fmt(f.diameter, 2)}${f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hloubka {0}", fmt(f.depth)) : f.bothWays ? tr(" skrz oběma směry") : tr(" skrz")}`, f.cbDiameter > 0 ? tr(" zahl. Ø{0}×{1}", fmt(f.cbDiameter), fmt(f.cbDepth)) : "", f.csDiameter ? tr(" kuž. Ø{0}", fmt(f.csDiameter)) : "", f.position.map((v) => fmt(v)).join("; "), f.axis);
     case "fillet":
       return tr("R{0}, hrany {1}", fmt(f.radius, 2), f.edges === "all" ? tr("vše") : f.edges.length);
     case "chamfer":
@@ -760,6 +1224,12 @@ export function featureSummary(f: Feature): string {
       return tr("„{0}“ {1} mm, {2}", f.text, fmt(f.height), f.mode);
     case "import":
       return `${f.fileName} (${f.format})`;
+    case "splitBodies":
+      return tr("rovina {0}{1} → nové těleso {2}", f.plane, f.offset ? ` +${fmt(f.offset)}` : "", f.nameB ? `„${f.nameB}“` : tr("(další volný název)"));
+    case "copyBody":
+      return tr("kopie tělesa {0}, posun [{1}]", f.source ? `„${f.source}“` : tr("(aktivní)"), f.translate.map((v) => fmt(v)).join("; "));
+    case "combine":
+      return tr("{0} „{1}“ {2} „{3}“{4}", f.op === "cut" ? tr("odebrat od") : f.op === "intersect" ? tr("průnik") : tr("sjednotit"), f.target || tr("aktivní"), f.op === "cut" ? "−" : f.op === "intersect" ? "∩" : "+", f.tool, f.keepTool ? tr(", nástroj ponechán") : "");
     default:
       return "";
   }
@@ -783,7 +1253,8 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
   const lines: string[] = [];
   const matClass = MATERIALS.find((x) => x.id === doc.material);
   const matText = doc.materialName?.trim() ? tr("{0} (hustota podle: {1})", doc.materialName.trim(), matClass?.label ?? doc.material) : (matClass ? `${matClass.label} (${matClass.density} g/cm³)` : doc.material || "–");
-  lines.push(tr("Dokument: „{0}“ · {1} · materiál {2} · prvků {3} ({4} ✓{5}, {6} ✗){7}", doc.name, doc.kind === "assembly" ? tr("sestava") : tr("díl"), matText, doc.features.length, okCount - warnCount, warnCount ? `, ${warnCount} ⚠` : "", doc.features.length - okCount, res?.bodies?.length ? ` · těles ${res.bodies.length}` : ""));
+  lines.push(tr("Dokument: „{0}“ · {1} · materiál {2} · prvků {3} ({4} ✓{5}, {6} ✗){7}", doc.name, doc.kind === "assembly" ? tr("sestava") : tr("díl"), matText, doc.features.length, okCount - warnCount, warnCount ? `, ${warnCount} ⚠` : "", doc.features.length - okCount, res?.bodies && res.bodies.length > 1 ? tr(" · těles {0}", res.bodies.length) : ""));
+  if (res?.bodies && res.bodies.length > 1) lines.push(tr("Tělesa: {0}", res.bodies.map((b) => `${b.name}${b.active ? tr(" (aktivní)") : ""} ${fmt(b.volume / 1000, 2)} cm³`).join(" · ")));
   if (res?.metrics) {
     const [a, b] = res.metrics.bbox;
     lines.push(tr("Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem {9} cm³ · ploch {10} · hran {11}", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2]), fmt(a[0]), fmt(b[0]), fmt(a[1]), fmt(b[1]), fmt(a[2]), fmt(b[2]), fmt(res.metrics.volume / 1000, 2), res.metrics.faces, res.metrics.edges));
@@ -803,6 +1274,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
     doc.features.forEach((f, i) => {
       const s = st.get(f.id);
       lines.push(tr(" {0}. {1} [{2}, id {3}] {4}{5} – {6}", i + 1, f.name, f.type, f.id, s?.ok === false ? "✗ " + (s.error ?? tr("chyba")) : s?.warning ? "⚠ " + s.warning : "✓", f.suppressed ? " (potlačen)" : "", featureSummary(f)));
+      if (f.type === "sketch") lines.push(...sketchStatusLines(f)); // entity s id (e1, e2…) pro vazby a kóty textem, stav určenosti
     });
   }
   if (res?.paramErrors?.length) lines.push(tr("Chyby proměnných: {0}", res.paramErrors.join("; ")));
@@ -811,33 +1283,45 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
 }
 
 /** Seznam příkazů (pro nápovědu v konzoli a paletu). */
-export const AGENT_COMMANDS: { cmd: string; en: string; desc: string }[] = [
-  { cmd: "nový díl [název] / nová sestava [název]", en: "new part / new assembly", desc: tr("nový dokument v nové záložce") },
-  { cmd: "název …, materiál …, barva #hex", en: "name, material, color", desc: tr("materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)") },
-  { cmd: "kvádr X Y Z [střed] [v x y z] [odebrat]", en: "box", desc: tr("kvádr; výchozí roh v počátku, „střed“ = vystředit") },
-  { cmd: "válec D H [osa Z] [v x y z] [odebrat]", en: "cylinder", desc: tr("válec průměr × výška") },
-  { cmd: "koule D [v x y z]", en: "sphere", desc: tr("koule průměr") },
-  { cmd: "kužel D1 D2 H [osa Z]", en: "cone", desc: tr("kužel / komolý kužel") },
-  { cmd: "trubka D d H [osa Z]", en: "tube", desc: tr("trubka vnější / vnitřní průměr × výška") },
-  { cmd: "skica XY|XZ|YZ [odsazení N]: entita; entita…", en: "sketch", desc: tr("nová skica; entity i na dalších řádcích") },
-  { cmd: "obdélník W H [v x y] | roh x y [zaoblení-rohů r]", en: "rect", desc: tr("obdélník se středem (výchozí počátek) nebo rohem") },
-  { cmd: "kružnice D [v x y]", en: "circle", desc: tr("kružnice průměrem (poloměr r: „poloměr 10“)") },
-  { cmd: "mnohoúhelník N D [v x y]", en: "polygon", desc: tr("pravidelný N-úhelník (D = opsaná kružnice)") },
-  { cmd: "drážka L W [v x y] [úhel a]", en: "slot", desc: tr("drážka") },
-  { cmd: "úsečka x1 y1 x2 y2 · čára x1 y1 x2 y2 … [uzavřít] · bod x y · elipsa rx ry", en: "line, polyline, point, ellipse", desc: tr("další entity; předpona „pomocná“ = konstrukční") },
-  { cmd: "vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]", en: "extrude", desc: tr("vysune poslední skicu") },
-  { cmd: "rotovat [úhel] [osa X|Y|Z]", en: "revolve", desc: tr("orotuje poslední skicu (výchozí osa Y skici, 360°)") },
-  { cmd: "díra D [hloubka H|skrz] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; závit i s jemným stoupáním (M18×1,5) – jádro se dopočítá") },
-  { cmd: "závit M18×1,5 délka L [v x y z] [osa Z] [vnitřní] [modelovat]", en: "thread", desc: tr("závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii") },
-  { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z… ] [poloměr N] [delší N]", en: "fillet", desc: tr("pravidla lze kombinovat (horní kruhové)") },
-  { cmd: "srazit C [hrany …]", en: "chamfer", desc: tr("sražení hran") },
-  { cmd: "skořepina T [otevřít +Z|horní|boční…]", en: "shell", desc: tr("vydlabání, otevřené plochy pravidlem") },
-  { cmd: "pole N rozteč P [směr X] [N2 rozteč P2 směr Y] · pole kruhové N [úhel 360] [osa Z] [v cx cy cz]", en: "pattern", desc: tr("pole posledního prvku") },
-  { cmd: "zrcadlit XY|XZ|YZ [odsazení N]", en: "mirror", desc: tr("zrcadlení tělesa") },
-  { cmd: "text \"ABC\" výška H hloubka D v x y [z] [gravírovat]", en: "text", desc: tr("nápis vystouplý / gravírovaný") },
-  { cmd: "smazat poslední · stav · zobraz iso|přední|horní…", en: "undo, status, view", desc: tr("správa") },
-  { cmd: "kolize", en: "clash", desc: tr("sestava: kontrola průniků komponent; výsledek zůstane v protokolu i ve stavu (řádek „Kolize:“)") },
-  { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", desc: tr("celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy") },
+export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string }[] = [
+  { cmd: "nový díl [název] / nová sestava [název]", en: "new part / new assembly", de: "neu teil / neu baugruppe", desc: tr("nový dokument v nové záložce") },
+  { cmd: "název …, materiál …, barva #hex", en: "name, material, color", de: "name, werkstoff, farbe", desc: tr("materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)") },
+  { cmd: "kvádr X Y Z [střed] [v x y z] [odebrat]", en: "box", de: "quader", desc: tr("kvádr; výchozí roh v počátku, „střed“ = vystředit") },
+  { cmd: "válec D H [osa Z] [v x y z] [odebrat]", en: "cylinder", de: "zylinder", desc: tr("válec průměr × výška") },
+  { cmd: "koule D [v x y z]", en: "sphere", de: "kugel", desc: tr("koule průměr") },
+  { cmd: "kužel D1 D2 H [osa Z]", en: "cone", de: "kegel", desc: tr("kužel / komolý kužel") },
+  { cmd: "trubka D d H [osa Z]", en: "tube", de: "rohr", desc: tr("trubka vnější / vnitřní průměr × výška") },
+  { cmd: "skica XY|XZ|YZ [odsazení N]: entita; entita… · skica počátek x y z normála nx ny nz [osax ux uy uz]: …", en: "sketch", de: "skizze", desc: tr("nová skica na základní nebo obecné rovině (osa X skici se bez zadání zvolí kolmo na normálu); entity i na dalších řádcích") },
+  { cmd: "obdélník W H [v x y] | roh x y [zaoblení-rohů r]", en: "rect", de: "rechteck", desc: tr("obdélník se středem (výchozí počátek) nebo rohem") },
+  { cmd: "kružnice D [v x y]", en: "circle", de: "kreis", desc: tr("kružnice průměrem (poloměr r: „poloměr 10“)") },
+  { cmd: "mnohoúhelník N D [v x y]", en: "polygon", de: "vieleck", desc: tr("pravidelný N-úhelník (D = opsaná kružnice)") },
+  { cmd: "drážka L W [v x y] [úhel a]", en: "slot", de: "langloch", desc: tr("drážka") },
+  { cmd: "úsečka x1 y1 x2 y2 · čára x1 y1 x2 y2 [r N] x3 y3 … [uzavřít] · oblouk x1 y1 xm ym x2 y2 · spline x1 y1 x2 y2 … [uzavřít] · bod x y · elipsa rx ry", en: "line, polyline, arc, spline, point, ellipse", de: "linie, polylinie, bogen, spline, punkt, ellipse", desc: tr("další entity; „r N“ za bodem čáry zaoblí tento roh; oblouk = začátek, bod na oblouku, konec; předpona „pomocná“ = konstrukční") },
+  { cmd: "skica plocha F3|horní|+X [odsazení N] [obráceně]: … · skica rovina <název pomocné roviny> [odsazení N]: …", en: "sketch face, sketch plane", de: "skizze fläche, skizze ebene", desc: tr("skica na rovinné ploše modelu – číslem (F1, F2… jako popisky pro výběr / window.mncad.hints()) nebo pravidlem jako u skořepiny (horní, +X…) – nebo na pomocné rovině podle názvu; rovina je asociativní – přepočítá se se změnou modelu, protokol vypíše její počátek a osy") },
+  { cmd: "vazba <druh> <odkaz> [<odkaz> …]; <druh> …", en: "constraint", de: "bedingung", desc: tr("vazba ve skice: vodorovně, svisle, shodně, rovnoběžně, kolmo, tečně, stejně, pevně, soustředně, středem, na křivce, symetricky, kolineárně; odkaz = e3 (celá entita; id entit ukazuje stav), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod), e3.s0 (strana obdélníku) nebo počátek; po řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno") },
+  { cmd: "kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; <druh> …", en: "dim", de: "bemaßung, maß", desc: tr("kóta ve skice: délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku; hodnota i s desetinnou čárkou, Ø20 / R10; řídicí kóta změní geometrii, „referenční“ jen měří") },
+  { cmd: "vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]", en: "extrude", de: "extrudieren", desc: tr("vysune poslední skicu") },
+  { cmd: "rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]", en: "revolve", de: "rotieren", desc: tr("orotuje poslední skicu (výchozí osa Y skici, 360°); „odebrat“ = vysoustružit z tělesa") },
+  { cmd: "díra D [hloubka H|skrz [obousměrně]|k tělesu] v x y [z] [v x2 y2 z2 …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", de: "bohrung", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit") },
+  { cmd: "závit M18×1,5 délka L [v x y z] [osa Z] [vnitřní] [modelovat]", en: "thread", de: "gewinde", desc: tr("závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii") },
+  { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z… ] [poloměr N] [delší N]", en: "fillet", de: "verrunden", desc: tr("pravidla lze kombinovat (horní kruhové)") },
+  { cmd: "srazit C [hrany …]", en: "chamfer", de: "fase", desc: tr("sražení hran") },
+  { cmd: "skořepina T [otevřít +Z|horní|boční…]", en: "shell", de: "schale", desc: tr("vydlabání, otevřené plochy pravidlem") },
+  { cmd: "pole N rozteč P [směr X] [N2 rozteč P2 směr Y] · pole kruhové N [úhel 360] [osa Z] [v cx cy cz]", en: "pattern", de: "muster", desc: tr("pole posledního prvku") },
+  { cmd: "zrcadlit XY|XZ|YZ [odsazení N]", en: "mirror", de: "spiegeln", desc: tr("zrcadlení tělesa") },
+  { cmd: "text \"ABC\" výška H hloubka D v x y [z] [gravírovat]", en: "text", de: "text", desc: tr("nápis vystouplý / gravírovaný") },
+  { cmd: "těleso N · rozdělit XY|XZ|YZ [odsazení N] [jako Název] · kopie [těleso N] [posun dx dy dz] [jako Název] · sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]", en: "body, splitbodies, copybody, combine", de: "körper, teilen, kopieren, kombinieren", desc: tr("více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným") },
+  { cmd: "prvek <typ|rozšíření> klíč=hodnota …", en: "feature", de: "element", desc: tr("kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId=\"Skica 1\" pathId=$last · prvek draft angle=3 faces=boční · prvek \"Ohyb plechu\" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem") },
+  { cmd: "normálie <označení> [v x y z]", en: "library", de: "normteil", desc: tr("díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta") },
+  { cmd: "vložit \"název záložky\" [v x y z] [otočení rx ry rz] [ukotvit]", en: "insert", de: "einfügen", desc: tr("sestava: vloží díl z otevřené záložky jako komponentu (vazby se zadávají v panelu sestavy nebo v JSON dokumentu)") },
+  { cmd: "výkres", en: "drawing", de: "zeichnung", desc: tr("otevře výkres otevřeného dokumentu v záložce") },
+  { cmd: "výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]", en: "drawing A3 landscape scale 1:2 views front,top,iso section XZ offset 0 hidden no axes yes holetable no projection E", de: "zeichnung A3 quer maßstab 1:2 ansichten vorne,oben,iso schnitt XZ versatz 0 verdeckt nein achsen ja bohrungstabelle nein projektion E", desc: tr("volby listu výkresu (první list v dokumentu) a otevření výkresu; nové výkresy mají Chytré kóty") },
+  { cmd: "kótovat [chytře|celkově|nic] [řetězově|od základny]", en: "dimension smart chain / dimension smart baseline / dimension overall / dimension none", de: "bemaßen intelligent kette / bemaßen intelligent basis / bemaßen gesamt / bemaßen keine", desc: tr("(pře)generuje Chytré kóty podle prvků modelu – nahradí jen vygenerované, vlastní kóty zůstanou; vypíše počet kót podle pohledů a co se nevešlo") },
+  { cmd: "výkres tolerance <kóta> <tolerance> · výkres poznámka \"…\" · výkres nepředepsané ISO 2768-mK · výkres hrany ISO 13715 … · výkres drsnost Ra 3,2", en: "drawing tolerance Ø40 h6, drawing note, drawing general ISO 2768-mK, drawing edges ISO 13715, drawing roughness Ra 3.2", de: "zeichnung toleranz Ø40 h6, zeichnung notiz, zeichnung allgemein ISO 2768-mK, zeichnung kanten ISO 13715, zeichnung rauheit Ra 3,2", desc: tr("tolerance ke kótě podle popisku (Ø40 h6, 25 ±0,1, M8 6H); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka") },
+  { cmd: "výkres stav", en: "drawing status", de: "zeichnung status", desc: tr("textový stav výkresu pro agenta: list, měřítko, pohledy, všechny kóty s pohledem, duplicity, chybějící rozměry (Kontrola kót), co se nevešlo; také window.mncad.drawingStatus()") },
+  { cmd: "smazat poslední · stav · zobraz iso|přední|horní…", en: "undo, status, view", de: "rückgängig, status, ansicht", desc: tr("správa") },
+  { cmd: "kolize", en: "clash", de: "kollision", desc: tr("sestava: kontrola průniků komponent; výsledek zůstane v protokolu i ve stavu (řádek „Kolize:“)") },
+  { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", de: "JSON", desc: tr("celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy") },
 ];
 
 /** JavaScript API v prohlížeči (`window.mncad`) – pro automatizaci a agenty, kteří umí spustit skript. */
@@ -859,10 +1343,19 @@ export type MncadApi = {
   setDocument: (doc: CadDoc | string) => Promise<string>;
   /** textový stav dokumentu (rozměry, prvky, chyby) */
   status: () => Promise<string>;
+  /** textový stav výkresu (list, měřítko, pohledy, kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo) – jako „výkres stav“ */
+  drawingStatus: () => Promise<string>;
   /** otevře konzoli Textové příkazy */
   openConsole: () => void;
-  /** popisky entit v 3D okně (F1 plocha, E2 hrana, V3 vrchol): zapne/vypne a vrátí seznam se souřadnicemi na obrazovce (vůči 3D oknu) */
-  hints: (on?: boolean) => { id: string; kind: "face" | "edge" | "vertex"; index: number; x: number; y: number; title: string }[];
+  /** průběh běžícího výpočtu jádra (prvek index+1 z total, uplynulý čas) – null, když nic dlouhého neběží */
+  progress: () => { label: string; op: string; phase: "feature" | "mesh" | "start"; index: number; total: number; name?: string; seconds: number } | null;
+  /** zruší běžící výpočet (jako tlačítko Zrušit); vrací false, když nic neběželo */
+  cancel: () => boolean;
+  /**
+   * popisky entit v 3D okně (F1 plocha, E2 hrana, V3 vrchol): zapne/vypne a vrátí seznam se souřadnicemi na obrazovce (vůči 3D oknu);
+   * při otevřené skice vrací štítky bodů skici (O = počátek, P1… = body entit; kind "origin" / "point") se souřadnicemi vůči plátnu skici
+   */
+  hints: (on?: boolean) => { id: string; kind: "face" | "edge" | "vertex" | "origin" | "point"; index: number; x: number; y: number; title: string }[];
   /** klikne na entitu podle popisku stejnou cestou jako myš (additive = přidat k výběru) */
   clickHint: (id: string, additive?: boolean) => boolean;
   /** export bez dialogu: STEP, STL, BREP, OBJ, GLB, 3MF, WRL nebo projekt .mncad – vrátí název, MIME, velikost a base64 */

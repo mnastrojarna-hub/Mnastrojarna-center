@@ -3,6 +3,10 @@ import { fileURLToPath } from "node:url";
 
 /** @type {import('next').NextConfig} */
 const legacy = [
+  // zakázka přejmenovaná bez roku v adrese
+  ["/zakazky/upinaci-pripravek-2015", "/zakazky/upinaci-pripravek-s-celistmi"],
+  ["/en/projects/clamping-fixture-2015", "/en/projects/clamping-fixture-with-jaws"],
+  ["/de/projekte/spannvorrichtung-2015", "/de/projekte/spannvorrichtung-mit-wechselbacken"],
   ["/cz", "/"],
   ["/cz/o-nas/o-nas", "/o-nas"],
   ["/cz/o-nas/certifikaty", "/kvalita"],

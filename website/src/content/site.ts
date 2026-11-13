@@ -113,7 +113,7 @@ export const GALLERY: { src: string; w: number; h: number }[] = [
   ["tvarove-slozita-skrin/1", 1200, 900],
   ["pripravky-s-pneumatikou/2", 1200, 900],
   ["desky-skorepiny-a-mereni/2", 1200, 900],
-  ["upinaci-pripravek-2015/1", 1200, 720],
+  ["upinaci-pripravek-s-celistmi/1", 1200, 720],
   ["paletove-upinaci-pripravky/6", 1200, 900],
   ["dily-podle-vykresu/2", 1200, 720],
 ].map(([p, w, h]) => ({ src: `/img/zakazky/${p}.jpg`, w: w as number, h: h as number }));

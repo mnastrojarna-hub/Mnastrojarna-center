@@ -4,7 +4,7 @@ import { CAD_LANGS, getLang, langMeta, tr } from "@/cad/i18n";
 import { disableEncrypted, enableEncrypted, isUnlocked, lock, notifyVault, persistMode, unlock, VAULT_EVENT, wipeStoredDocuments } from "@/cad/vault";
 import { useEffect, useState as useLocalState } from "react";
 import { useRef, useState } from "react";
-import { DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, exportSettings, importSettings, keyCombo, type Settings } from "@/cad/settings";
+import { DEFAULT_SETTINGS, SHORTCUT_GROUPS, exportSettings, importSettings, keyCombo, shortcutOf, type Settings } from "@/cad/settings";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName } from "./cad-icons";
@@ -35,7 +35,33 @@ export const SHORTCUT_LABELS: Record<string, string> = {
   "file.open": "Otevřít / import",
   "edit.undo": "Zpět",
   "edit.redo": "Znovu",
+  // skica (skupina „Skica“ – platí jen při otevřené skice)
+  "sketch.select": "Výběr",
+  "sketch.line": "Úsečka",
+  "sketch.polyline": "Lomená čára",
+  "sketch.centerline": "Osa",
+  "sketch.rect": "Obdélník",
+  "sketch.circle": "Kružnice",
+  "sketch.arc": "Oblouk 3 body",
+  "sketch.ellipse": "Elipsa",
+  "sketch.spline": "Spline",
+  "sketch.point": "Bod",
+  "sketch.polygon": "Mnohoúhelník",
+  "sketch.slot": "Drážka",
+  "sketch.trim": "Oříznout",
+  "sketch.offset": "Odsadit",
+  "sketch.dimension": "Kóta",
+  "sketch.measure": "Měřit",
+  "sketch.horizontal": "Vazba vodorovně (vybrané entity)",
+  "sketch.fit": "Zobrazit vše",
+  "sketch.grid": "Přichytit k mřížce",
 };
+
+/** Nadpis a vysvětlení skupiny zkratek (kontextu kláves) v Nastavení → Klávesové zkratky. */
+const shortcutGroupText = (id: (typeof SHORTCUT_GROUPS)[number]["id"]): { title: string; hint: string } =>
+  id === "sketch"
+    ? { title: tr("Skica"), hint: tr("Platí při otevřené skice – stejnou klávesu lze použít zároveň ve 3D.") }
+    : { title: tr("3D model"), hint: tr("Platí v prostoru dílu a sestavy.") };
 
 export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { settings: Settings; onChange: (s: Settings) => void; onClose: () => void; backgrounds: Record<string, { label: string }> }) {
   const [tab, setTab] = useState<Tab>("general");
@@ -266,34 +292,42 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
           {tab === "keys" && (
             <>
               <p className="mb-2 text-[12px] text-[#6b7785]">{tr("Klikněte na zkratku a stiskněte novou kombinaci. Esc zruší záznam.")}</p>
-              <div className="divide-y divide-[#edf1f5] rounded border border-[#e3e8ee]">
-                {Object.keys(DEFAULT_SHORTCUTS).map((id) => (
-                  <div key={id} className="flex items-center gap-3 px-3 py-1.5 text-[12.5px]">
-                    <span className="flex-1">{tr(SHORTCUT_LABELS[id] ?? id)}</span>
-                    <button
-                      type="button"
-                      onClick={() => setRecording(id)}
-                      onKeyDown={(e) => {
-                        if (recording !== id) return;
-                        e.preventDefault();
-                        if (e.key === "Escape") return setRecording(null);
-                        if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
-                        set("shortcuts", { ...draft.shortcuts, [id]: keyCombo(e.nativeEvent) });
-                        setRecording(null);
-                      }}
-                      onBlur={() => recording === id && setRecording(null)}
-                      className={cn("min-w-[90px] rounded border px-2 py-0.5 text-right", recording === id ? "border-brand bg-brand/5 text-brand" : "border-transparent hover:border-[#cfd6de]")}
-                    >
-                      {recording === id ? tr("stiskněte…") : <Kbd k={draft.shortcuts[id] ?? DEFAULT_SHORTCUTS[id]} />}
-                    </button>
-                    {draft.shortcuts[id] !== DEFAULT_SHORTCUTS[id] && (
-                      <button type="button" title={tr("Výchozí")} onClick={() => set("shortcuts", { ...draft.shortcuts, [id]: DEFAULT_SHORTCUTS[id] })} className="text-[#8a95a3] hover:text-brand">
-                        <CadIcon name="undo" className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+              {/* každá skupina = jeden kontext kláves: stejná klávesa smí být jednou ve 3D a jednou ve skice */}
+              {SHORTCUT_GROUPS.map((g) => (
+                <section key={g.id} data-shortcut-group={g.id} className="mb-4 last:mb-0">
+                  <h3 className="mb-0.5 text-[13px] font-semibold">{shortcutGroupText(g.id).title}</h3>
+                  <p className="mb-1.5 text-[11px] text-[#6b7785]">{shortcutGroupText(g.id).hint}</p>
+                  <div className="divide-y divide-[#edf1f5] rounded border border-[#e3e8ee]">
+                    {Object.keys(g.defaults).map((id) => (
+                      <div key={id} data-shortcut={id} className="flex items-center gap-3 px-3 py-1.5 text-[12.5px]">
+                        <span className="flex-1">{tr(SHORTCUT_LABELS[id] ?? id)}</span>
+                        <button
+                          type="button"
+                          onClick={() => setRecording(id)}
+                          onKeyDown={(e) => {
+                            if (recording !== id) return;
+                            e.preventDefault();
+                            e.stopPropagation(); // zaznamenávaná klávesa nesmí zároveň spustit příkaz v aplikaci (ani Esc zavřít okno)
+                            if (e.key === "Escape") return setRecording(null);
+                            if (["Control", "Shift", "Alt", "Meta"].includes(e.key)) return;
+                            set("shortcuts", { ...draft.shortcuts, [id]: keyCombo(e.nativeEvent) });
+                            setRecording(null);
+                          }}
+                          onBlur={() => recording === id && setRecording(null)}
+                          className={cn("min-w-[90px] rounded border px-2 py-0.5 text-right", recording === id ? "border-brand bg-brand/5 text-brand" : "border-transparent hover:border-[#cfd6de]")}
+                        >
+                          {recording === id ? tr("stiskněte…") : <Kbd k={shortcutOf(draft.shortcuts, id)} />}
+                        </button>
+                        {shortcutOf(draft.shortcuts, id) !== g.defaults[id] && (
+                          <button type="button" title={tr("Výchozí")} onClick={() => set("shortcuts", { ...draft.shortcuts, [id]: g.defaults[id] })} className="text-[#8a95a3] hover:text-brand">
+                            <CadIcon name="undo" className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </section>
+              ))}
             </>
           )}
         </div>

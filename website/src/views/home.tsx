@@ -29,7 +29,7 @@ export function HomeView({ locale }: { locale: Locale }) {
   const h = t.home;
   const env = t.pages.machinery.envelope;
   const clients = REFERENCES.filter((r) => r.kind === "client" && r.logo);
-  const caseCode = (i: number, y?: number) => `№ ${String(i + 1).padStart(2, "0")}${y ? ` · ${y}` : ""}`;
+  const caseCode = (i: number) => `№ ${String(i + 1).padStart(2, "0")}`;
 
   return (
     <>
@@ -133,7 +133,7 @@ export function HomeView({ locale }: { locale: Locale }) {
                     <Image src={p.src} alt={tx.title} fill sizes="(min-width:768px) 30vw, 78vw" className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-[1.07]" />
                     <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/55 to-transparent" />
                     <span className="absolute left-5 top-5 rounded-full bg-white/90 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-700 backdrop-blur">
-                      {caseCode(i, c.year)}
+                      {caseCode(i)}
                     </span>
                     <span className="absolute right-5 top-5 rounded-full bg-black/40 px-3 py-1 font-mono text-[10px] text-white backdrop-blur">
                       {c.photos.length} {t.pages.cases.photos}

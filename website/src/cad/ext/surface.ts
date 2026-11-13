@@ -8,6 +8,8 @@
  * `makeCompound([těleso, plocha…])`. Operace „Sešít / Uzavřít / Zesílit“ pracují s volnými plochami (ty, které
  * nejsou součástí žádného solidu). Běží ve workeru i v Node (testy) – žádné DOM API.
  */
+import { extAxis, extDirection, extPlane, extPoint, hasPlaneDef, toAxisDef } from "./place";
+import { subShapes } from "../fastbox";
 import { tr } from "../i18n";
 import * as r from "replicad";
 import { planeOf, sketchDrawing, sketchPathWire } from "../build";
@@ -73,7 +75,7 @@ function closedFaces(sk: SketchF): r.AnyShape {
 /** Skořepina (nebo jediná plocha) z libovolného tvaru – pro OCCT operace, které chtějí Shell/Face. */
 function shellOrFace(shape: r.AnyShape): r.AnyShape {
   if (shape instanceof r.Shell || shape instanceof r.Face) return shape;
-  const shells = [...r.iterTopo(shape.wrapped, "shell" as never)].map((s) => r.cast(s as never));
+  const shells = subShapes(shape, "SHELL").map((s) => r.cast(s as never));
   if (shells.length === 1) return shells[0];
   if (shells.length > 1) throw new Error(tr("Plochy netvoří jednu souvislou skořepinu – nejdřív je sešijte (Sešít plochy) nebo zvětšete toleranci."));
   const faces = shape.faces;
@@ -159,21 +161,14 @@ function bboxDiag(s: Shape | null) {
 }
 
 /** Velký kvádr na jedné straně základní roviny (side = +1 ponechá kladnou stranu → kvádr leží na záporné). */
-function sideBox(plane: PlaneName, offset: number, removeSide: 1 | -1, D: number): r.Solid {
-  const pl = r.makePlane(plane, offset);
+function sideBox(pl: r.Plane, removeSide: 1 | -1, D: number): r.Solid {
+  // hranol nad velkým čtvercem v rovině (rovina může být obecná – plocha modelu, tři body…)
   const n = norm(vec(pl.zDir));
-  const a = vec(pl.toWorldCoords([-D, -D]));
-  const b = vec(pl.toWorldCoords([D, D]));
-  const c = addV(a, scaleV(n, removeSide * D));
-  const pts = [a, b, c, addV(b, scaleV(n, removeSide * D))];
-  const lo: Vec3 = [Math.min(...pts.map((p) => p[0])), Math.min(...pts.map((p) => p[1])), Math.min(...pts.map((p) => p[2]))];
-  const hi: Vec3 = [Math.max(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[1])), Math.max(...pts.map((p) => p[2]))];
-  return r.makeBox(lo, hi);
+  return r.basicFaceExtrusion(planeFace(pl, D), new r.Vector(scaleV(n, removeSide * D)));
 }
 
 /** Velká čtvercová plocha v základní rovině. */
-function planeFace(plane: PlaneName, offset: number, D: number): r.Face {
-  const pl = r.makePlane(plane, offset);
+function planeFace(pl: r.Plane, D: number): r.Face {
   const P = (x: number, y: number) => vec(pl.toWorldCoords([x, y]));
   const w = r.assembleWire([r.makeLine(P(-D, -D), P(D, -D)), r.makeLine(P(D, -D), P(D, D)), r.makeLine(P(D, D), P(-D, D)), r.makeLine(P(-D, D), P(-D, -D))]);
   return r.makeFace(w);
@@ -257,12 +252,6 @@ const PLANES = [
   { v: "XZ", l: "XZ" },
   { v: "YZ", l: "YZ" },
 ];
-const AXES = [
-  { v: "X", l: "X" },
-  { v: "Y", l: "Y" },
-  { v: "Z", l: "Z" },
-];
-const axisDir = (a: string): Vec3 => (a === "X" ? [1, 0, 0] : a === "Y" ? [0, 1, 0] : [0, 0, 1]);
 const TAB = "surface" as const;
 
 // ---------------- Plochy ----------------
@@ -281,6 +270,7 @@ registerExt({
   params: [
     { key: "sketchId", label: tr("Skica (křivka)"), kind: "sketch" },
     { key: "distance", label: tr("Vzdálenost"), kind: "number", min: 0.01 },
+    { key: "dir", label: tr("Směr vysunutí"), kind: "direction", allowNormal: true, hint: tr("výchozí kolmo na rovinu skici; jinak osa, vektor, hrana nebo normála plochy") },
     { key: "symmetric", label: tr("Symetricky na obě strany"), kind: "bool" },
     { key: "reverse", label: tr("Opačný směr"), kind: "bool" },
   ],
@@ -289,7 +279,8 @@ registerExt({
     const dist = num(d.distance);
     if (!(dist > 0)) throw new Error(tr("Vzdálenost musí být kladná."));
     const pl = planeOf(sk.plane);
-    const n = norm(vec(pl.zDir));
+    // směr: kolmo na skicu (výchozí, jako dřív), nebo zadaný osou / vektorem / odkazem
+    const n = extDirection(d, ctx, "dir", { base: { normal: norm(vec(pl.zDir)), xDir: vec(pl.xDir) } });
     const len = (d.reverse ? -1 : 1) * dist;
     const shells: r.AnyShape[] = [];
     for (const w of sketchWires(sk)) {
@@ -312,18 +303,22 @@ registerExt({
   group: "Plochy",
   big: true,
   order: 2,
-  hint: tr("otevřený profil rotovaný kolem osy skici"),
-  make: (doc) => ({ sketchId: lastSketch(doc), angle: 360, axis: "y" }),
+  hint: tr("otevřený profil rotovaný kolem osy (osa skici, čára skici, hrana, válcová plocha, dva body…)"),
+  make: (doc) => ({ sketchId: lastSketch(doc), angle: 360, axis: { kind: "sketchY" } }),
   params: [
     { key: "sketchId", label: tr("Skica (profil)"), kind: "sketch" },
     { key: "angle", label: tr("Úhel"), kind: "number", unit: "°", min: 0.1, max: 360 },
-    { key: "axis", label: tr("Osa rotace (ve skice)"), kind: "enum", options: [{ v: "x", l: tr("Vodorovná X") }, { v: "y", l: tr("Svislá Y") }] },
+    { key: "axis", label: tr("Osa rotace"), kind: "axis", sketchKey: "sketchId" },
   ],
   build: (d, ctx) => {
     const sk = needSketch(ctx, d.sketchId, tr("skicu s profilem"));
     const pl = planeOf(sk.plane);
-    const dir = norm(vec(str(d.axis, "y") === "x" ? pl.xDir : pl.yDir));
-    const origin = vec(pl.origin);
+    // osa: osy skici (dřívější „x“ / „y“) beze změny výpočtu, jinak čára skici / hrana / válcová plocha / dva body / globální osa…
+    const ad = toAxisDef(d.axis) ?? { kind: "sketchY" };
+    const fromSketch = ad.kind === "sketchX" || ad.kind === "sketchY";
+    const ax = fromSketch ? { origin: vec(pl.origin), dir: norm(vec(ad.kind === "sketchX" ? pl.xDir : pl.yDir)) } : extAxis(d, ctx, "axis", { sketchKey: "sketchId" });
+    const dir = ax.dir;
+    const origin = ax.origin;
     const parts = sketchWires(sk).map((w) => revolveWire(w, origin, dir, num(d.angle, 360)));
     return withSurface(ctx, parts.length > 1 ? sew(parts) : parts[0]);
   },
@@ -500,6 +495,7 @@ registerExt({
   hint: tr("odřízne část volných ploch na jedné straně základní roviny"),
   make: () => ({ plane: "XY", offset: 0, keep: "positive" }),
   params: [
+    { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Rovina"), kind: "enum", options: PLANES },
     { key: "offset", label: tr("Odsazení roviny"), kind: "number" },
     { key: "keep", label: tr("Ponechat stranu"), kind: "enum", options: [{ v: "positive", l: tr("+ (po normále)") }, { v: "negative", l: "−" }] },
@@ -508,7 +504,7 @@ registerExt({
     const free = freeFaces(ctx.body);
     if (!free.length) throw new Error(tr("Není co oříznout – vytvořte nejdřív plochu."));
     const D = bboxDiag(ctx.body) * 4;
-    const box = sideBox(str(d.plane, "XY") as PlaneName, num(d.offset), str(d.keep, "positive") === "positive" ? -1 : 1, D);
+    const box = sideBox(extPlane(d, ctx), str(d.keep, "positive") === "positive" ? -1 : 1, D);
     const cut = surfaceBody(free).cut(box);
     if (!shellFaces(cut).length) throw new Error(tr("Rovina plochu neprotíná na zvolené straně nic nezůstalo – otočte stranu."));
     return replaceFree(ctx, [cut]);
@@ -650,6 +646,7 @@ registerExt({
   hint: tr("rozřízne solid základní rovinou – obě části zůstanou, nebo jen jedna"),
   make: () => ({ plane: "XY", offset: 0, keep: "both" }),
   params: [
+    { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Rovina"), kind: "enum", options: PLANES },
     { key: "offset", label: tr("Odsazení"), kind: "number" },
     { key: "keep", label: tr("Ponechat"), kind: "enum", options: [{ v: "both", l: tr("Obě části") }, { v: "positive", l: tr("+ strana") }, { v: "negative", l: tr("− strana") }] },
@@ -658,7 +655,7 @@ registerExt({
     const solids = ctx.body ? solidsOf(ctx.body) : [];
     if (!solids.length) throw new Error(tr("Rozdělit lze jen těleso (solid)."));
     const base = fuseAll(solids as Shape[]);
-    const res = base.split(str(d.plane, "XY") as PlaneName, num(d.offset));
+    const res = hasPlaneDef(d) ? base.split(extPlane(d, ctx)) : base.split(str(d.plane, "XY") as PlaneName, num(d.offset));
     const keep = str(d.keep, "both");
     const parts = (keep === "both" ? [res.positive, res.negative] : keep === "positive" ? [res.positive] : [res.negative]).filter((p): p is r.Solid | r.Compound => !!p);
     if (!parts.length) throw new Error(tr("Rovina těleso neprotíná."));
@@ -736,13 +733,14 @@ registerExt({
   hint: tr("průsečnice tělesa/ploch se základní rovinou (3D křivka pro další tažení)"),
   make: () => ({ plane: "XY", offset: 0 }),
   params: [
+    { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Rovina"), kind: "enum", options: PLANES },
     { key: "offset", label: tr("Odsazení"), kind: "number" },
   ],
   build: (d, ctx) => {
     if (!ctx.body) throw new Error(tr("Nejdřív vytvořte těleso nebo plochu."));
     const D = bboxDiag(ctx.body) * 2;
-    const face = planeFace(str(d.plane, "XY") as PlaneName, num(d.offset), D);
+    const face = planeFace(extPlane(d, ctx), D);
     const o = oc();
     const s = new o.BRepAlgoAPI_Section(ctx.body.wrapped, face.wrapped, true);
     let curves: r.AnyShape;
@@ -810,13 +808,14 @@ registerExt({
   group: "Křivky",
   order: 32,
   hint: tr("3D křivka pro tažení (pružiny, závity, spirálové drážky)"),
-  make: () => ({ radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: "Z", lefthand: false }),
+  make: () => ({ radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: { kind: "axis", axis: "Z" }, lefthand: false }),
   params: [
     { key: "radius", label: tr("Poloměr"), kind: "number", min: 0.01 },
     { key: "pitch", label: tr("Stoupání"), kind: "number", min: 0.01 },
     { key: "turns", label: tr("Počet závitů"), kind: "number", min: 0.05, step: 0.5, unit: "" },
+    { key: "positionRef", label: tr("Střed začátku odkazem"), kind: "point", hint: tr("vrchol, střed hrany, bod skici… – má přednost před souřadnicemi níže") },
     { key: "position", label: tr("Střed začátku"), kind: "vec3" },
-    { key: "axis", label: tr("Osa"), kind: "enum", options: AXES },
+    { key: "axis", label: tr("Osa"), kind: "direction", hint: tr("X / Y / Z, vektor čísly, nebo odkazem: osa válcové plochy, hrana, normála plochy") },
     { key: "lefthand", label: tr("Levotočivá"), kind: "bool" },
   ],
   build: (d, ctx) => {
@@ -824,7 +823,7 @@ registerExt({
     const p = num(d.pitch);
     const t = num(d.turns);
     if (!(R > 0 && p > 0 && t > 0)) throw new Error(tr("Poloměr, stoupání i počet závitů musí být kladné."));
-    const helix = r.makeHelix(p, p * t, R, vec3(d.position), axisDir(str(d.axis, "Z")), !!d.lefthand);
+    const helix = r.makeHelix(p, p * t, R, extPoint(d, ctx, "position"), extDirection(d, ctx, "axis"), !!d.lefthand);
     return withSurface(ctx, helix);
   },
 });
@@ -838,7 +837,7 @@ registerExt({
   group: "Křivky",
   order: 33,
   hint: tr("profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka"),
-  make: (doc) => ({ profile: "circle", wire: 2, depth: 1.2, side: "external", leadIn: 0, sketchId: lastSketch(doc), radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: "Z", lefthand: false, mode: "add" }),
+  make: (doc) => ({ profile: "circle", wire: 2, depth: 1.2, side: "external", leadIn: 0, sketchId: lastSketch(doc), radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: { kind: "axis", axis: "Z" }, lefthand: false, mode: "add" }),
   params: [
     { key: "profile", label: tr("Profil"), kind: "enum", options: [{ v: "circle", l: tr("Kruh (drát)") }, { v: "thread60", l: tr("Závit 60°") }, { v: "sketch", l: tr("Skica") }] },
     { key: "wire", label: tr("Průměr drátu"), kind: "number", min: 0.01, hint: tr("pro profil Kruh") },
@@ -849,8 +848,9 @@ registerExt({
     { key: "radius", label: tr("Poloměr šroubovice"), kind: "number", min: 0.01, hint: tr("poloměr válce / díry") },
     { key: "pitch", label: tr("Stoupání"), kind: "number", min: 0.01 },
     { key: "turns", label: tr("Počet závitů"), kind: "number", min: 0.05, step: 0.5, unit: "" },
+    { key: "positionRef", label: tr("Střed začátku odkazem"), kind: "point", hint: tr("vrchol, střed hrany, bod skici… – má přednost před souřadnicemi níže") },
     { key: "position", label: tr("Střed začátku"), kind: "vec3" },
-    { key: "axis", label: tr("Osa"), kind: "enum", options: AXES },
+    { key: "axis", label: tr("Osa"), kind: "direction", hint: tr("X / Y / Z, vektor čísly, nebo odkazem: osa válcové plochy, hrana, normála plochy") },
     { key: "lefthand", label: tr("Levotočivá"), kind: "bool" },
     { key: "mode", label: tr("Operace"), kind: "mode" },
   ],
@@ -860,8 +860,8 @@ registerExt({
     const t = num(d.turns);
     if (!(R > 0 && p > 0 && t > 0)) throw new Error(tr("Poloměr, stoupání i počet závitů musí být kladné."));
     if (t > 200) throw new Error(tr("Nejvýš 200 závitů."));
-    const center = vec3(d.position);
-    const dir = axisDir(str(d.axis, "Z"));
+    const center = extPoint(d, ctx, "position");
+    const dir = extDirection(d, ctx, "axis");
     const lefthand = !!d.lefthand;
     const profile = str(d.profile, "circle");
     const mode = str(d.mode, "add") as BoolMode;

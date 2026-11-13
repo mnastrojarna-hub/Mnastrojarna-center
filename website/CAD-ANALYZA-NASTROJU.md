@@ -400,3 +400,29 @@ Chování vykonání (`cad-app.tsx:408–600`): příkazy se připojují k otev�
 17. **Formuláře přímých úprav nemají „Použít aktuální výběr“** – výběr se použije jen při spuštění příkazu (`cad-app.tsx:1333–1348`); je-li prvek už otevřený, musí se klikat znovu. Doplnit do `PickInfo` (`props.tsx:857`) tlačítko „+ výběr“ jako v `RefListField` (`ref-field.tsx:738`).
 18. **Dotyk ve skicáři:** `sketcher.tsx` nemá dlouhý stisk pro kontextovou nabídku (jen `button === 2`, `:1815`) ani pinch-zoom; pan jen prostředním/pravým tlačítkem (`:1711`). Na mobilu je skica prakticky neovladatelná bez myši – dokumentace (`cad-docs.ts:590`) to u skici nepřiznává. Štítky P/O ve skice nejsou dostupné přes `window.mncad.hints()` (`viewport.tsx:1481` vrací jen 3D).
 19. **Drobnosti:** u pole „Opakovaný prvek“ se ve vestavěné větvi (`props.tsx:670`, fallback bez registrace formuláře) nabízí jen lineární/kruhové, zatímco registrovaný `PatternForm` všech 5 – mrtvý kód, ale při výpadku registru by zmátl; `Text` ve vestavěné větvi (`props.tsx:647`) nemá `planeDef`/`positionRef`, registrovaný formulář ano – stejný případ. `AsmProps` název/číslo/skupina potvrzuje až na blur (bez Enter) (`asm-panel.tsx:223–232`). `Variables` neumí název potvrdit Enterem bez blur (`manager.tsx:278`). Šablonování ploch (`surface.ts:382`) má skici jako zaškrtávací seznam bez možnosti změnit pořadí, na rozdíl od objemového šablonování.
+
+## 5. Stav po opravách (13. 11. 2026)
+
+Opravy proběhly ve větvi `claude/cnc-sales-os-ai-cbR2f` (PR #82). Oprava k tvrzení v oddílu 3: stavba více těles (`combine`, `splitBodies`, `copyBody`) v jádře tehdy **nefungovala** – existovaly jen typy a popisky; jádro, tlačítka i formuláře vznikly až touto opravou.
+
+| # | Nedostatek | Stav | Co je hotové |
+| --- | --- | --- | --- |
+| 1 | Textové příkazy jen pro zlomek nástrojů | hotovo | obecný příkaz `prvek <typ> klíč=hodnota` pro všechny prvky a 59 rozšíření, výběr hran/ploch pravidlem i u rozšíření, `normálie`, `vložit`, `těleso`/`rozdělit`/`kopie`/`sloučit`, `výkres`, `kótovat`, vazby a kóty skici; vazby sestav textem zatím jen JSON |
+| 2 | Více těles bez GUI | hotovo | skupina Tělesa v pásu, formuláře Rozdělit / Kopie / Sloučit, režim Nové těleso, seznam těles ve správci |
+| 3 | Indexy hran/ploch bez otisku | hotovo | otisky u zaoblení, sražení, skořepiny, úkosu, přímých úprav a rozšíření; znovunalezení po změně historie, ⚠ když se entita nenajde |
+| 4 | Chudší zadání u rozšíření | hotovo | druhy parametrů rovina, bod, směr a osa (odkazem nebo číslem); druh „rozsah“ (k ploše / skrz) zatím nepřidán |
+| 5 | `window.prompt` | hotovo | vlastní dotaz na hodnotu (výrazy, proměnné, mobil) |
+| 6 | Vazby a kóty skici jen JSON | hotovo | `vazba …`, `kóta …`, id entit e1, e2…, `skica plocha F3`, `skica rovina "…"`, řešení skice a stav určenosti v protokolu |
+| 7 | Nejednotné zadání směru | hotovo | sdílené pole směru u rozšíření, úkosů formy, vyhazovačů, chlazení a pole komponent; Rozříznout s plochou, Zrcadlit vybrané prvky; 6 duplicitních rozšíření skryto z pásu a palety (staré dokumenty fungují) |
+| 8 | Vazby sestav jen klikem | hotovo | výběr komponenty a plochy ze seznamu, úprava hodnoty, vazba Pevně |
+| 9 | Výkres: kóta jen 2 body | hotovo | kóty podle geometrie (Ø, R, délka hrany, úhel) a nově Chytré kóty podle prvků modelu (řetězové kóty, popisy děr ↧ ⌴ ⌵, závity) |
+| 10 | Zkratky bez obsluhy | hotovo | Shift+F a Shift+W fungují |
+| 11 | Dokumentace vs. kód u zkratek | hotovo | nápověda generovaná ze skutečných zkratek, B/N/S berou předvýběr, zkratky skici v Nastavení |
+| 12 | Chybějící výzvy | hotovo | výzva podle druhu výběru u všech prvků |
+| 13 | Díra: body a více děr | hotovo | více poloh jedním příkazem, šikmá díra (`směr`, `sklon`), řada ISO 273 |
+| 14 | Řez jen posuvníkem | dokončuje se | číselná poloha, rovina z plochy a obecná normála – sloučí se s náhledem bez WebGL |
+| 15 | Normálie textem | hotovo | `normálie M8x30 [v x y z]` |
+| 16 | Ukončení díry | hotovo | k vrcholu, odsazeně od plochy, k tělesu |
+| 17 | „Použít aktuální výběr“ | hotovo | tlačítko + výběr a výběr ze seznamu v každém formuláři s hranami/plochami |
+| 18 | Dotyk ve skicáři | hotovo | dlouhý stisk = nabídka, pinch-zoom, posun dvěma prsty, štítky bodů skici pro `window.mncad.hints()` |
+| 19 | Drobnosti | hotovo | mrtvé větve formulářů odstraněny, Enter u sestavy a proměnných, pořadí skic u šablonování ploch |

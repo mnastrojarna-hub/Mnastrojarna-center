@@ -1,0 +1,142 @@
+# Porovnání s referenčním modelem (compare.ts, compare-report.ts, compare-dialog.tsx)
+ – bez přesunu	 – not moved
+, otočení X {0}° Y {1}° Z {2}°	, rotation X {0}° Y {1}° Z {2}°
+, posun {0} / {1} / {2} mm	, offset {0} / {1} / {2} mm
+… a dalších {0} oblastí ({1}), celkem {2} cm³	… and {0} more regions ({1}), total {2} cm³
+{0} ({1} těles)	{0} ({1} bodies)
+{0} × {1} × {2} mm · střed {3}	{0} × {1} × {2} mm · centre {3}
+{0}: soubor obsahuje jen 2D výkres – jako referenci použijte 3D model (STEP).	{0}: the file contains only a 2D drawing – use a 3D model (STEP) as the reference.
+{0}. {1}: {2} cm³ · rozměr {3} × {4} × {5} mm · střed [{6}; {7}; {8}] · {9} · {10}	{0}. {1}: {2} cm³ · size {3} × {4} × {5} mm · centre [{6}; {7}; {8}] · {9} · {10}
+anuloid R{0}/r{1}	torus R{0}/r{1}
+automaticky (24 poloh po 90°)	automatic (24 positions in 90° steps)
+Barevná mapa odchylek	Deviation colour map
+booleovské operace – u složité reference trvají déle	Boolean operations – take longer with a complex reference
+Červená od mm	Red from mm
+dalších {0} oblastí	{0} more regions
+Formát {0} nelze použít jako referenci – použijte STEP, BREP nebo síťový model.	Format {0} cannot be used as a reference – use STEP, BREP or a mesh model.
+chyba geometrického jádra	geometry kernel error
+chybějící materiál (reference − model)	missing material (reference − model)
+chybí v modelu	missing in model
+Chybí v modelu (ref. − model)	Missing in model (ref. − model)
+Jak je	As is
+jak je v souboru	as in the file
+Jiný soubor…	Other file…
+Kliknutím zvýraznit a přiblížit, dalším kliknutím zpět na celý model	Click to highlight and zoom; click again to return to the whole model
+Kontrola rozdílů nesedí o {0} mm³ (objem navíc − objem chybí se má rovnat rozdílu objemů) – booleovská operace je na tomto páru nepřesná.	The difference check is off by {0} mm³ (extra volume − missing volume should equal the volume difference) – the Boolean operation is inaccurate for this pair.
+koule Ø{0}	sphere Ø{0}
+kužel	cone
+Mapa odchylek na modelu	Deviation map on the model
+Mapa odchylek: největší +{0} mm (vně reference) / {1} mm (uvnitř), v toleranci {2} % plochy, přesnost ±{3} mm	Deviation map: largest +{0} mm (outside the reference) / {1} mm (inside), {2} % of the area within tolerance, accuracy ±{3} mm
+Mapu odchylek se nepodařilo spočítat: {0}	The deviation map could not be computed: {0}
+Materiál chybí v modelu (reference − model) [cm³]	Material missing in model (reference − model) [cm³]
+Materiál chybí v modelu (reference − model): {0} cm³	Material missing in model (reference − model): {0} cm³
+materiál navíc (model − reference)	extra material (model − reference)
+Materiál navíc v modelu (model − reference) [cm³]	Extra material in model (model − reference) [cm³]
+Materiál navíc v modelu (model − reference): {0} cm³	Extra material in model (model − reference): {0} cm³
+Model	Model
+model má navíc díru / vybrání Ø{0} (nebo mu chybí čep)	model has an extra hole / recess Ø{0} (or lacks a pin)
+model má navíc drážku / zápich R{0}	model has an extra groove / undercut R{0}
+Model není objemové těleso – porovnání objemů nelze provést.	The model is not a solid – volumes cannot be compared.
+Model se od porovnání změnil – mapa je skrytá. Porovnejte znovu.	The model has changed since the comparison – the map is hidden. Compare again.
+Model: {0}	Model: {0}
+Modely se liší o více než polovinu objemu – reference je nejspíš jinak umístěná. Zkuste jiné zarovnání.	The models differ by more than half of the volume – the reference is probably positioned differently. Try another alignment.
+načítám referenční model	loading the reference model
+navíc v modelu	extra in model
+Navíc v modelu (model − ref.)	Extra in model (model − ref.)
+Největší odchylka + / −	Largest deviation + / −
+Největší odchylka uvnitř reference [mm]	Largest deviation inside the reference [mm]
+Největší odchylka vně reference [mm]	Largest deviation outside the reference [mm]
+nespočítáno	not computed
+Numerický šum ({0} těles)	Numerical noise ({0} bodies)
+Numerický šum [cm³]	Numerical noise [cm³]
+Numerický šum: {0} drobných těles, {1} cm³	Numerical noise: {0} tiny bodies, {1} cm³
+Obalové kvádry modelu a reference se nepřekrývají – zkontrolujte zarovnání reference.	The bounding boxes of the model and the reference do not overlap – check the reference alignment.
+obecná plocha	general surface
+Objem [cm³]	Volume [cm³]
+Objem modelu	Model volume
+Objem modelu [cm³]	Model volume [cm³]
+Objem modelu: {0} cm³	Model volume: {0} cm³
+Objem reference	Reference volume
+Objem reference [cm³]	Reference volume [cm³]
+Objem reference: {0} cm³	Reference volume: {0} cm³
+Oblast {0}: {1}	Region {0}: {1}
+odchylky od modelu zákazníka (STEP): objemy, chybějící prvky, barevná mapa	deviations from the customer's model (STEP): volumes, missing features, colour map
+Otočení kolem {0}	Rotation about {0}
+Plná červená od odchylky (mm)	Full red from deviation (mm)
+Plocha v toleranci [%]	Area within tolerance [%]
+Porovnání {0}/{1}: {2}	Comparison {0}/{1}: {2}
+Porovnání bylo zrušeno.	The comparison was cancelled.
+Porovnání s referenčním modelem	Comparison with the reference model
+POROVNÁNÍ S REFERENČNÍM MODELEM	COMPARISON WITH THE REFERENCE MODEL
+Porovnat	Compare
+Porovnat s referencí	Compare with reference
+Porovnat s referenčním modelem	Compare with reference model
+Porovnat znovu	Compare again
+Porovnávám s referenčním modelem…	Comparing with the reference model…
+Porovnávám…	Comparing…
+Posun {0} (mm)	Offset {0} (mm)
+Posun mm	Offset mm
+Průběh a tlačítko Zrušit jsou dole uprostřed.	Progress and the Cancel button are at the bottom centre.
+Přesnost mapy (±{0} mm) je horší než zadaná tolerance – u takto velkého dílu jemnější síť nejde.	The map accuracy (±{0} mm) is worse than the given tolerance – a finer mesh is not possible for a part this large.
+Přesnost mapy ±{0} mm (dána sítí reference a modelu).	Map accuracy ±{0} mm (given by the meshes of the reference and the model).
+Přesnost mapy odchylek [mm]	Deviation map accuracy [mm]
+Reference má {0} ploch (síťový model) – rozdílová tělesa se nepočítala, protože by výpočet trval velmi dlouho. Objemy a mapa odchylek platí.	The reference has {0} faces (mesh model) – difference bodies were not computed because it would take very long. Volumes and the deviation map are valid.
+Reference má výrazně jinou velikost než model ({0}×) – zkontrolujte jednotky souboru.	The reference has a very different size than the model ({0}×) – check the file units.
+Reference průhledně	Reference transparent
+reference v poloze ze souboru	reference in the position from the file
+Reference: {0} ({1})	Reference: {0} ({1})
+Referenční model není podle kontroly jádra platné těleso – rozdíly mohou být nepřesné.	According to the kernel check, the reference model is not a valid solid – differences may be inaccurate.
+Referenční model neobsahuje 3D těleso.	The reference model contains no 3D body.
+Referenční model neobsahuje objemové těleso (jen plochy) – objemy ani rozdíly nelze spočítat.	The reference model contains no solid (only surfaces) – neither volumes nor differences can be computed.
+Referenční model se nepodařilo zasíťovat.	The reference model could not be meshed.
+Referenční soubor STEP se nepodařilo načíst.	The reference STEP file could not be loaded.
+rovina	plane
+Rozdíl „model − reference“ se nepodařilo spočítat: {0}	The difference “model − reference” could not be computed: {0}
+Rozdíl „reference − model“ se nepodařilo spočítat: {0}	The difference “reference − model” could not be computed: {0}
+Rozdíl (model − reference)	Difference (model − reference)
+Rozdíl objemů (model − reference): {0} cm³	Volume difference (model − reference): {0} cm³
+Rozdíl objemů model − reference [cm³]	Volume difference model − reference [cm³]
+Rozdílová tělesa (seznam oblastí)	Difference bodies (list of regions)
+Rozdílová tělesa se nepočítala.	Difference bodies were not computed.
+Rozdílové oblasti ({0})	Difference regions ({0})
+Rozdílové oblasti ({0}):	Difference regions ({0}):
+Rozdílové oblasti se nepočítaly	Difference regions were not computed
+Rozměr X [mm]	Size X [mm]
+Rozměr Y [mm]	Size Y [mm]
+Rozměr Z [mm]	Size Z [mm]
+Síť pro mapu dosáhla limitu počtu trojúhelníků – uprostřed velkých rovinných ploch mohou body chybět.	The map mesh reached the triangle limit – points may be missing in the middle of large planar faces.
+síť pro mapu odchylek	mesh for the deviation map
+Síťová reference: přesnost je omezená sítí souboru.	Mesh reference: accuracy is limited by the file's mesh.
+STEP, BREP, IGES nebo síť (STL, OBJ…)	STEP, BREP, IGES or a mesh (STL, OBJ…)
+Střed obalového kvádru	Bounding box centre
+střed obalového kvádru reference na střed kvádru modelu	centre of the reference bounding box onto the centre of the model box
+Střed X [mm]	Centre X [mm]
+Střed Y [mm]	Centre Y [mm]
+Střed Z [mm]	Centre Z [mm]
+Středy	Centres
+středy obalových kvádrů	bounding box centres
+Tolerance (mm)	Tolerance (mm)
+Tolerance [mm]	Tolerance [mm]
+Tolerance mm	Tolerance mm
+Tolerance: {0} mm	Tolerance: {0} mm
+Umístění reference	Reference position
+Upozornění	Warning
+Upozornění: {0}	Warning: {0}
+v automatickém režimu se otočení hledá samo	in automatic mode the rotation is found automatically
+v modelu chybí díra / vybrání Ø{0}	model lacks a hole / recess Ø{0}
+v modelu chybí drážka / zápich R{0}	model lacks a groove / undercut R{0}
+v modelu chybí materiál (výstupek)	model lacks material (a boss)
+v modelu chybí vybrání (materiál navíc)	model lacks a recess (extra material)
+V toleranci ±{0} mm	Within tolerance ±{0} mm
+válec Ø{0}	cylinder Ø{0}
+Vybrat referenci…	Choose reference…
+výpočet {0} s	computed in {0} s
+Význam	Meaning
+vzdálenosti od reference	distances to the reference
+zarovnání reference	aligning the reference
+Zarovnání: {0}	Alignment: {0}
+Zelená = odchylka v toleranci, žlutá → červená = odchylka od povrchu reference.	Green = deviation within tolerance, yellow → red = deviation from the reference surface.
+zkusí polohu ze souboru a 24 otočení po 90° se středy na sobě a vybere nejlépe sedící	tries the position from the file and 24 rotations in 90° steps with matching centres and picks the best fit
+Zvýraznění jen u největších oblastí – použijte souřadnice.	Highlighting only for the largest regions – use the coordinates.
+Žádné rozdílové oblasti nad prahem šumu.	No difference regions above the noise threshold.
+Žádné rozdíly nad prahem šumu – modely se shodují.	No differences above the noise threshold – the models match.

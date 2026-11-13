@@ -23,36 +23,98 @@ export type RMenuEntry = RItem | { divider: true; label?: string };
 /** Skupina pásu: první `big` položek jsou velká tlačítka, zbytek malá ve sloupcích po třech. */
 export type RGroup = { label: string; big?: number; items: RItem[] };
 
-/** Pás karet (ribbon) – velká a malá tlačítka, rozbalovací nabídky, popisky skupin. */
+/**
+ * Pás karet (ribbon) – velká a malá tlačítka, rozbalovací nabídky, popisky skupin.
+ *
+ * Když se pás do šířky okna nevejde (karta Skica při 1430 px), zhušťuje se sám: nejdřív malá tlačítka bez pevné šířky,
+ * potom malá tlačítka jen s ikonou (popisek zůstává v bublině). Teprve když nestačí ani to, objeví se po stranách šipky
+ * pro posun (místo vodorovného posuvníku, který skupiny ořezával); posouvat lze i kolečkem myši.
+ */
 export function Ribbon({ groups, right }: { groups: RGroup[]; right?: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  /** hustota: 0 = plná, 1 = malá tlačítka bez pevné šířky, 2 = malá tlačítka jen ikonou */
+  const [level, setLevel] = useState<0 | 1 | 2>(0);
+  const [edge, setEdge] = useState({ left: false, right: false });
+  const key = groups.map((g) => `${g.label}:${g.items.length}`).join("|");
+  const measureEdges = () => {
+    const el = ref.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const rightMore = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdge((e) => (e.left === left && e.right === rightMore ? e : { left, right: rightMore }));
+  };
+  // jiná karta / jiné skupiny → znovu od plné hustoty
+  useLayoutEffect(() => setLevel(0), [key]);
+  // po každém vykreslení: nevejde-li se obsah, zhustit (nejvýš na úroveň 2) – ještě před vykreslením na obrazovku
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (el.scrollWidth > el.clientWidth + 1 && level < 2) setLevel((level + 1) as 1 | 2);
+    else measureEdges();
+  });
+  // změna šířky okna → přeměřit od plné hustoty
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let w = el.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (Math.abs(el.clientWidth - w) < 2) return;
+      w = el.clientWidth;
+      setLevel(0);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const scrollBy = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * Math.max(160, ref.current.clientWidth * 0.6), behavior: "smooth" });
   return (
-    <div className="flex h-[108px] shrink-0 items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain border-b border-[#d5dbe2] bg-gradient-to-b from-[#fbfcfd] to-[#eef2f6] px-1 [scrollbar-width:thin] [touch-action:pan-x]">
-      {groups.map((g) => {
-        const big = g.items.slice(0, g.big ?? g.items.length);
-        const small = g.items.slice(g.big ?? g.items.length);
-        const cols: RItem[][] = [];
-        for (let i = 0; i < small.length; i += 3) cols.push(small.slice(i, i + 3));
-        return (
-          <div key={g.label} data-ribbon-group={g.label} className="flex shrink-0 flex-col border-r border-[#d5dbe2] px-1.5 pt-1.5 last:border-r-0">
-            <div className="flex flex-1 items-start gap-0.5">
-              {big.map((it) => (
-                <BigBtn key={it.id} it={it} />
-              ))}
-              {cols.map((c, i) => (
-                <div key={i} className="flex flex-col gap-px">
-                  {c.map((it) => (
-                    <SmallBtn key={it.id} it={it} />
-                  ))}
-                </div>
-              ))}
+    <div className="relative shrink-0" data-ribbon data-ribbon-density={level}>
+      <div
+        ref={ref}
+        onScroll={measureEdges}
+        onWheel={(e) => {
+          // kolečko myši posouvá pás vodorovně (svislý posun pás nemá)
+          const el = ref.current;
+          if (el && el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) el.scrollLeft += e.deltaY;
+        }}
+        className="flex h-[108px] items-stretch overflow-x-auto overflow-y-hidden overscroll-x-contain border-b border-[#d5dbe2] bg-gradient-to-b from-[#fbfcfd] to-[#eef2f6] px-1 [scrollbar-width:none] [touch-action:pan-x] [&::-webkit-scrollbar]:hidden"
+      >
+        {groups.map((g) => {
+          const big = g.items.slice(0, g.big ?? g.items.length);
+          const small = g.items.slice(g.big ?? g.items.length);
+          const cols: RItem[][] = [];
+          for (let i = 0; i < small.length; i += 3) cols.push(small.slice(i, i + 3));
+          return (
+            <div key={g.label} data-ribbon-group={g.label} className="flex shrink-0 flex-col border-r border-[#d5dbe2] px-1.5 pt-1.5 last:border-r-0">
+              <div className="flex flex-1 items-start gap-0.5">
+                {big.map((it) => (
+                  <BigBtn key={it.id} it={it} />
+                ))}
+                {cols.map((c, i) => (
+                  <div key={i} className="flex flex-col gap-px">
+                    {c.map((it) => (
+                      <SmallBtn key={it.id} it={it} level={level} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+              {/* název skupiny (Skica, Tvar, Vazby, Kóty…) – čitelný, ne jen šedá drobná poznámka */}
+              <p className="mt-0.5 whitespace-nowrap border-t border-[#d5dbe2]/80 pb-1 pt-1 text-center text-[12px] font-semibold tracking-wide text-[#3f4a57]">{g.label}</p>
             </div>
-            {/* název skupiny (Skica, Tvar, Vazby, Kóty…) – čitelný, ne jen šedá drobná poznámka */}
-            <p className="mt-0.5 border-t border-[#d5dbe2]/80 pb-1 pt-1 text-center text-[12px] font-semibold tracking-wide text-[#3f4a57]">{g.label}</p>
-          </div>
-        );
-      })}
-      <div className="flex-1" />
-      {right}
+          );
+        })}
+        <div className="flex-1" />
+        {right}
+      </div>
+      {edge.left && (
+        <button type="button" data-ribbon-scroll="left" aria-label={tr("Posunout pás karet doleva")} title={tr("Posunout pás karet doleva")} onClick={() => scrollBy(-1)} className="absolute inset-y-0 left-0 z-10 flex w-6 items-center justify-center border-r border-[#d5dbe2] bg-gradient-to-r from-[#eef2f6] to-[#eef2f6]/85 text-[#3f4a57] hover:text-brand">
+          ‹
+        </button>
+      )}
+      {edge.right && (
+        <button type="button" data-ribbon-scroll="right" aria-label={tr("Posunout pás karet doprava")} title={tr("Posunout pás karet doprava")} onClick={() => scrollBy(1)} className="absolute inset-y-0 right-0 z-10 flex w-6 items-center justify-center border-l border-[#d5dbe2] bg-gradient-to-l from-[#eef2f6] to-[#eef2f6]/85 text-[#3f4a57] hover:text-brand">
+          ›
+        </button>
+      )}
     </div>
   );
 }
@@ -103,7 +165,7 @@ function BigBtn({ it }: { it: RItem }) {
   );
 }
 
-function SmallBtn({ it }: { it: RItem }) {
+function SmallBtn({ it, level = 0 }: { it: RItem; level?: 0 | 1 | 2 }) {
   const m = useMenu();
   return (
     <div ref={m.ref} className="relative">
@@ -113,12 +175,15 @@ function SmallBtn({ it }: { it: RItem }) {
         title={tip(it)}
         onClick={() => (it.menu ? m.setOpen(!m.open) : it.onClick?.())}
         className={cn(
-          "flex h-[23px] w-full min-w-[110px] items-center gap-1.5 whitespace-nowrap rounded px-1.5 text-left text-[12.5px] text-[#26303b] transition disabled:opacity-35",
+          "flex h-[23px] w-full items-center gap-1.5 whitespace-nowrap rounded px-1.5 text-left text-[12.5px] text-[#26303b] transition disabled:opacity-35",
+          level === 0 ? "min-w-[110px]" : "min-w-0",
           it.active ? "bg-[#fde3e1] ring-1 ring-brand/40" : "hover:bg-[#e3e9f0]",
         )}
+        aria-label={it.label}
       >
         <CadIcon name={it.icon} tone={it.tone} className="h-4 w-4 shrink-0" />
-        <span className="flex-1">{it.label}</span>
+        {/* při nejvyšší hustotě zůstává jen ikona; název je v bublině a pro čtečky obrazovky */}
+        <span className={level === 2 ? "sr-only" : "flex-1"}>{it.label}</span>
         {it.menu && <span className="text-[8px] text-[#6b7785]">▼</span>}
       </button>
       {it.menu && m.open && <Dropdown entries={it.menu} close={() => m.setOpen(false)} anchor={m.ref.current} />}

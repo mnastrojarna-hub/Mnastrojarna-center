@@ -1,0 +1,49 @@
+# Sestava: panel vazeb (výběr ploch ze seznamu, potvrzení hodnoty po výběru, vazba Ukotvit), úprava vazby v seznamu, směr pole komponenty
+
+# výzvy stavového řádku a hlášky
+Směr pole: klikněte na rovinnou plochu (normála) nebo válcovou plochu (osa) kterékoli komponenty · Esc zruší	Musterrichtung: klicken Sie auf eine ebene Fläche (Normale) oder eine Zylinderfläche (Achse) einer beliebigen Komponente · Esc bricht ab
+Vazba: potvrďte hodnotu v panelu komponenty (Enter) · Esc zruší	Verknüpfung: bestätigen Sie den Wert im Komponentenpanel (Enter) · Esc bricht ab
+Směr lze převzít jen z rovinné nebo válcové plochy.	Die Richtung kann nur von einer ebenen oder zylindrischen Fläche übernommen werden.
+
+# seznam ploch komponenty
+Načítám plochy komponenty…	Flächen der Komponente werden geladen…
+Komponenta nemá žádnou rovinnou plochu.	Die Komponente hat keine ebene Fläche.
+Komponenta nemá žádnou válcovou ani kuželovou plochu.	Die Komponente hat keine zylindrische oder kegelförmige Fläche.
+Hledat plochu	Fläche suchen
+Hledat plochu (např. +Z, Ø8, 120)…	Fläche suchen (z. B. +Z, Ø8, 120)…
+{0} z {1} ploch	{0} von {1} Flächen
+ · upřesněte hledáním	 · grenzen Sie die Suche ein
+ · načteno prvních {0} ploch dílu, další vyberte kliknutím v modelu	 · die ersten {0} Flächen des Teils sind geladen, weitere wählen Sie per Klick im Modell
+normála {0}	Normale {0}
+osa {0}	Achse {0}
+střed osy {0}	Achsmitte {0}
+délka {0} mm	Länge {0} mm
+Změnit	Ändern
+
+# panel rozpracované vazby
+1 · Plocha této komponenty	1 · Fläche dieser Komponente
+2 · Cílová komponenta a její plocha	2 · Zielkomponente und ihre Fläche
+3 · Vzdálenost ploch	3 · Abstand der Flächen
+3 · Úhel mezi plochami	3 · Winkel zwischen den Flächen
+Cílová komponenta	Zielkomponente
+V sestavě není žádná další komponenta – vazba potřebuje dvě.	Die Baugruppe enthält keine weitere Komponente – eine Verknüpfung braucht zwei.
+naměřeno	gemessen
+Předvyplněna je aktuálně naměřená hodnota – s ní komponenty zůstanou, kde jsou. Přepište ji a potvrďte (Enter).	Vorbelegt ist der aktuell gemessene Wert – damit bleiben die Komponenten, wo sie sind. Überschreiben Sie ihn und bestätigen Sie (Enter).
+Vytvořit vazbu	Verknüpfung erstellen
+Plochy lze místo klikání vybrat ze seznamů výše; hodnotu potvrdíte až po výběru obou ploch.	Statt zu klicken, können die Flächen aus den Listen oben gewählt werden; den Wert bestätigen Sie erst nach der Wahl beider Flächen.
+Plochy lze místo klikání vybrat ze seznamů výše.	Statt zu klicken, können die Flächen aus den Listen oben gewählt werden.
+Plochy lze vybrat i ze seznamu v tomto panelu; hotovou vazbu upravíte v seznamu Vazby pod stromem komponent.	Flächen lassen sich auch aus einer Liste in diesem Panel wählen; eine fertige Verknüpfung bearbeiten Sie in der Liste Verknüpfungen unter dem Komponentenbaum.
+
+# vazba Ukotvit
+Ukotví komponentu na místě: vazba Ukotvit se zapíše do seznamu vazeb, ostatní vazby pak hýbou druhou komponentou	Fixiert die Komponente an ihrem Platz: die Verknüpfung Fixieren wird in die Verknüpfungsliste eingetragen, andere Verknüpfungen bewegen dann die jeweils andere Komponente
+Komponenta má vazbu Ukotvit – kliknutím ji odeberete a komponentu uvolníte (totéž smazáním vazby v seznamu vazeb)	Die Komponente hat die Verknüpfung Fixieren – per Klick entfernen Sie sie und lösen die Komponente (ebenso durch Löschen der Verknüpfung in der Verknüpfungsliste)
+
+# seznam vazeb pod stromem komponent
+{0} konflikt	{0} im Konflikt
+Hodnotu vazby lze přepsat (číslo i výraz, např. 25/2) – Enter potvrdí a sestava se přepočítá	Der Wert der Verknüpfung kann überschrieben werden (Zahl oder Ausdruck, z. B. 25/2) – Enter bestätigt und die Baugruppe wird neu berechnet
+
+# směr pole komponenty
+Směr podél globální osy {0}	Richtung entlang der globalen {0}-Achse
+Směr z plochy v modelu…	Richtung von einer Fläche im Modell…
+Klikněte na plochu v modelu…	Klicken Sie auf eine Fläche im Modell…
+Rovinná plocha dá směr své normály, válcová směr své osy (plocha kterékoli komponenty).	Eine ebene Fläche liefert die Richtung ihrer Normale, eine zylindrische die Richtung ihrer Achse (Fläche einer beliebigen Komponente).

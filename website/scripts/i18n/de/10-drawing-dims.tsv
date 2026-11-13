@@ -1,0 +1,99 @@
+# DE – Chytré kóty výkresu (cad/drawing-dims*.ts), textové příkazy výkresu (agent-drawing.ts, drawing-agent.ts), výkresové prostředí
+  (* = vlastní kóta uživatele)	  (* = eigenes Maß des Benutzers)
+ · vynecháno {0}	 · ausgelassen {0}
+ (zatím neuložený – výchozí volby)	 (noch nicht gespeichert – Standardoptionen)
+! vynecháno: {0}	! ausgelassen: {0}
+(pře)generuje Chytré kóty podle prvků modelu – nahradí jen vygenerované, vlastní kóty zůstanou; vypíše počet kót podle pohledů a co se nevešlo	(Neu-)Erzeugen der intelligenten Bemaßung aus den Modell-Features – ersetzt nur erzeugte Maße, eigene Maße bleiben; meldet Maße je Ansicht und was nicht passte
+{0}: čekám ano / ne	{0}: erwartet ja / nein
+{0}: díra je v pohledu vidět jen skrytě – zapněte pohled {1}	{0}: die Bohrung ist in der Ansicht nur verdeckt – Ansicht {1} einschalten
+{0}: díra v geometrii nenalezena	{0}: Bohrung in der Geometrie nicht gefunden
+{0}: chybí pohled ve směru osy díry – zapněte pohled {1}	{0}: keine Ansicht in Richtung der Bohrungsachse – Ansicht {1} einschalten
+{0}: natočený obrys kótujte ručně	{0}: gedrehte Kontur manuell bemaßen
+{0}: nevešlo se čistě na list ({1})	{0}: passte nicht sauber auf das Blatt ({1})
+{0}: oblouk zaoblení v pohledu nenalezen	{0}: Rundungsbogen in der Ansicht nicht gefunden
+{0}: popis se nevešel čistě na list ({1})	{0}: die Beschriftung passte nicht sauber auf das Blatt ({1})
+{0}: sražení v pohledu nenalezeno	{0}: Fase in der Ansicht nicht gefunden
+✓ hrany: {0}	✓ Kanten: {0}
+✓ Chytré kóty ({0}): {1} kót a popisů – {2} · očekávaných rozměrů {3}	✓ Intelligente Bemaßung ({0}): {1} Maße und Beschriftungen – {2} · erwartete Größen {3}
+✓ kóty: jen celkové rozměry (odstraněno vygenerovaných: {0})	✓ Maße: nur Gesamtmaße (erzeugte entfernt: {0})
+✓ kóty: žádné automatické (odstraněno vygenerovaných: {0})	✓ Maße: keine automatischen (erzeugte entfernt: {0})
+✓ nepředepsané tolerance {0}	✓ Allgemeintoleranzen {0}
+✓ nový list výkresu „{0}“ (Chytré kóty)	✓ neues Zeichnungsblatt „{0}“ (intelligente Bemaßung)
+✓ obecná drsnost {0} (poznámka u razítka)	✓ allgemeine Rauheit {0} (Hinweis am Schriftfeld)
+✓ poznámka: {0}	✓ Hinweis: {0}
+✓ tolerance {0} → {1} ({2})	✓ Toleranz {0} → {1} ({2})
+✓ výkres: {0}	✓ Zeichnung: {0}
+Auto + Ø (zapečené)	Auto + Ø (fest eingebrannt)
+bez automatických kót	keine automatischen Maße
+bez os	ohne Mittellinien
+bez řezu	ohne Schnitt
+bez skrytých hran	ohne verdeckte Kanten
+bez tabulky děr	ohne Bohrungstabelle
+beze změny voleb	Optionen unverändert
+celkový rozměr {0}: žádný pohled ho neukazuje v pravé délce	Gesamtmaß {0}: keine Ansicht zeigt es in wahrer Länge
+délka závitu {0}	Gewindelänge {0}
+Duplicity ({0}): {1}	Doppelte Maße ({0}): {1}
+Duplicity: žádné	Doppelte Maße: keine
+formát A4|A3|A2|A1|A0|auto	format A4|A3|A2|A1|A0|auto
+formát automaticky	Format automatisch
+formát listu: A4, A3, A2, A1, A0 nebo auto	Blattformat: A4, A3, A2, A1, A0 oder auto
+Chytré kóty	Intelligente Bemaßung
+Chytré kóty ({0})	Intelligente Bemaßung ({0})
+Chytré kóty jsou pro díly – u sestavy použijte „kótovat celkově“ a pozice	Intelligente Bemaßung ist für Teile – bei Baugruppen „bemaßen gesamt“ und Positionen verwenden
+Chytré kóty přegenerovány: {0}{1}	Intelligente Bemaßung neu erzeugt: {0}{1}
+jádro nevrátilo Chytré kóty	der Kern lieferte keine intelligente Bemaßung
+jen celkové (zapečené)	nur Gesamtmaße (fest eingebrannt)
+Kontrola kót: chybí {0} z {1}: {2}	Maßprüfung: {0} von {1} fehlen: {2}
+Kontrola kót: všech {0} očekávaných rozměrů je na listu	Maßprüfung: alle {0} erwarteten Größen sind auf dem Blatt
+kóta „{0}“ na výkrese není – kóty: {1}	Maß „{0}“ ist nicht auf der Zeichnung – Maße: {1}
+kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji (např. celým popiskem)	Maß „{0}“ ist nicht eindeutig ({1}×: {2}) – genauer angeben (z. B. ganze Beschriftung)
+kótovat [chytře|celkově|nic] [řetězově|od základny] – neznámé slovo „{0}“	bemaßen [intelligent|gesamt|keine] [kette|basis] – unbekanntes Wort „{0}“
+Kóty a popisy ({0}, z toho vygenerovaných {1}):	Maße und Beschriftungen ({0}, davon erzeugt {1}):
+kuželové plochy ({0}): úhel a průměry kuželů kótujte ručně	Kegelflächen ({0}): Kegelwinkel und -durchmesser manuell bemaßen
+měřítko {0}	Maßstab {0}
+měřítko 1:2|2:1|1:1|auto	maßstab 1:2|2:1|1:1|auto
+měřítko: 1:2, 2:1, 1:1 nebo auto	Maßstab: 1:2, 2:1, 1:1 oder auto
+na šířku	quer
+na výšku	hoch
+Nahradí jen vygenerované kóty – vlastní kóty a poznámky zůstanou	Ersetzt nur erzeugte Maße – eigene Maße und Hinweise bleiben
+Nepředepsaná drsnost {0}	Allgemeine Oberflächenrauheit {0}
+neznámá volba výkresu „{0}“ – volby: A4…A0, na šířku / na výšku, {1}; podpříkazy: tolerance, poznámka, nepředepsané, hrany, drsnost, stav	unbekannte Zeichnungsoption „{0}“ – Optionen: A4…A0, quer / hoch, {1}; Unterbefehle: toleranz, notiz, allgemein, kanten, rauheit, status
+neznámý pohled „{0}“ – přední, horní, levý, pravý, zadní, spodní, iso	unbekannte Ansicht „{0}“ – vorne, oben, links, rechts, hinten, unten, iso
+od základny	Bezugsbemaßung
+osy	Mittellinien
+osy ano|ne	achsen ja|nein
+pohledy {0}	Ansichten {0}
+pohledy přední,horní,levý,pravý,zadní,spodní,iso	ansichten vorne,oben,links,rechts,hinten,unten,iso
+pohledy: vyjmenujte je čárkou, např. pohledy přední,horní,iso	Ansichten: mit Komma aufzählen, z. B. ansichten vorne,oben,iso
+poloha díry	Bohrungsposition
+Popis	Beschriftung
+Poznámky a značky: {0}	Hinweise und Symbole: {0}
+promítání E|A	projektion E|A
+promítání ISO {0}	Projektion ISO {0}
+promítání: E (evropské) nebo A (americké)	Projektion: E (europäisch) oder A (amerikanisch)
+Přegenerovat kóty	Maße neu erzeugen
+rotační díl: chybí pohled, ve kterém je osa v rovině průmětu (zapněte přední nebo boční pohled)	Drehteil: keine Ansicht mit der Achse in der Projektionsebene (Vorder- oder Seitenansicht einschalten)
+rovnoměrně	gleichmäßig verteilt
+řetězově	Kettenbemaßung
+řez {0} odsazení {1}	Schnitt {0} Versatz {1}
+řez XZ|YZ|XY [odsazení N] | řez ne	schnitt XZ|YZ|XY [versatz N] | schnitt nein
+řez: odsazení musí být číslo	Schnitt: der Versatz muss eine Zahl sein
+řez: rovina XZ, YZ nebo XY (řez XZ odsazení 0), nebo „řez ne“	Schnitt: Ebene XZ, YZ oder XY (schnitt XZ versatz 0) oder „schnitt nein“
+skryté ano|ne	verdeckt ja|nein
+skryté hrany	verdeckte Kanten
+skrz	durch
+tabulka děr	Bohrungstabelle
+tabulka děr ano|ne	bohrungstabelle ja|nein
+textový stav výkresu pro agenta: list, měřítko, pohledy, všechny kóty s pohledem, duplicity, chybějící rozměry (Kontrola kót), co se nevešlo; také window.mncad.drawingStatus()	Zeichnungsstatus als Text für Agenten: Blatt, Maßstab, Ansichten, jedes Maß mit Ansicht, doppelte Maße, fehlende Größen (Maßprüfung), was nicht passte; auch window.mncad.drawingStatus()
+tolerance ke kótě podle popisku (Ø40 h6, 25 ±0,1, M8 6H); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka	Toleranz an einem Maß nach Beschriftung (Ø40 h6, 25 ±0,1, M8 6H); Hinweis, Allgemeintoleranzen, Kanten und allgemeine Rauheit am Schriftfeld
+U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}	Am Schriftfeld: Allgemeintoleranzen {0} · Kanten {1} · Hinweis {2}
+Varování výkresu: {0}	Zeichnungswarnungen: {0}
+vnitřní {0}: v pohledech jen skrytě – zapněte řez osou (výkres řez …)	innen {0}: in den Ansichten nur verdeckt – Schnitt durch die Achse einschalten (zeichnung schnitt …)
+volby listu výkresu (první list v dokumentu) a otevření výkresu; nové výkresy mají Chytré kóty	Blattoptionen der Zeichnung (erstes Blatt im Dokument) und Öffnen der Zeichnung; neue Zeichnungen nutzen die intelligente Bemaßung
+Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}	Zeichnung „{0}“{1}: Blatt {2} {3} · Maßstab {4} · Ansichten: {5} · Maße: {6}
+výkres {0} potřebuje text, např. {1}	zeichnung {0} braucht einen Text, z. B. {1}
+výkres tolerance <kóta> <tolerance> – např. výkres tolerance Ø40 h6 · výkres tolerance 25 ±0,1 · výkres tolerance M8 6H	zeichnung toleranz <Maß> <Toleranz> – z. B. zeichnung toleranz Ø40 h6 · zeichnung toleranz 25 ±0,1 · zeichnung toleranz M8 6H
+Výkres: model je prázdný – nejdřív vymodelujte díl	Zeichnung: das Modell ist leer – zuerst ein Teil modellieren
+Vynecháno (nevešlo se nebo nejde okótovat automaticky): {0}	Ausgelassen (passte nicht oder nicht automatisch bemaßbar): {0}
+Chytré kóty se nepodařilo vytvořit: {0}	Intelligente Bemaßung konnte nicht erstellt werden: {0}
+osa souměrnosti	Symmetrieachse

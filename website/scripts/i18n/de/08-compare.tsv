@@ -1,0 +1,142 @@
+# Porovnání s referenčním modelem (compare.ts, compare-report.ts, compare-dialog.tsx)
+ – bez přesunu	 – nicht verschoben
+, otočení X {0}° Y {1}° Z {2}°	, Drehung X {0}° Y {1}° Z {2}°
+, posun {0} / {1} / {2} mm	, Verschiebung {0} / {1} / {2} mm
+… a dalších {0} oblastí ({1}), celkem {2} cm³	… und {0} weitere Bereiche ({1}), gesamt {2} cm³
+{0} ({1} těles)	{0} ({1} Körper)
+{0} × {1} × {2} mm · střed {3}	{0} × {1} × {2} mm · Mitte {3}
+{0}: soubor obsahuje jen 2D výkres – jako referenci použijte 3D model (STEP).	{0}: Die Datei enthält nur eine 2D-Zeichnung – verwenden Sie ein 3D-Modell (STEP) als Referenz.
+{0}. {1}: {2} cm³ · rozměr {3} × {4} × {5} mm · střed [{6}; {7}; {8}] · {9} · {10}	{0}. {1}: {2} cm³ · Größe {3} × {4} × {5} mm · Mitte [{6}; {7}; {8}] · {9} · {10}
+anuloid R{0}/r{1}	Torus R{0}/r{1}
+automaticky (24 poloh po 90°)	automatisch (24 Lagen in 90°-Schritten)
+Barevná mapa odchylek	Farbige Abweichungskarte
+booleovské operace – u složité reference trvají déle	Boolesche Operationen – dauern bei komplexer Referenz länger
+Červená od mm	Rot ab mm
+dalších {0} oblastí	{0} weitere Bereiche
+Formát {0} nelze použít jako referenci – použijte STEP, BREP nebo síťový model.	Das Format {0} kann nicht als Referenz verwendet werden – verwenden Sie STEP, BREP oder ein Netzmodell.
+chyba geometrického jádra	Fehler des Geometriekerns
+chybějící materiál (reference − model)	fehlendes Material (Referenz − Modell)
+chybí v modelu	fehlt im Modell
+Chybí v modelu (ref. − model)	Fehlt im Modell (Ref. − Modell)
+Jak je	Wie vorhanden
+jak je v souboru	wie in der Datei
+Jiný soubor…	Andere Datei…
+Kliknutím zvýraznit a přiblížit, dalším kliknutím zpět na celý model	Klicken zum Hervorheben und Zoomen, erneut klicken für das ganze Modell
+Kontrola rozdílů nesedí o {0} mm³ (objem navíc − objem chybí se má rovnat rozdílu objemů) – booleovská operace je na tomto páru nepřesná.	Die Differenzprüfung weicht um {0} mm³ ab (Volumen zu viel − Volumen fehlend soll der Volumendifferenz entsprechen) – die Boolesche Operation ist bei diesem Paar ungenau.
+koule Ø{0}	Kugel Ø{0}
+kužel	Kegel
+Mapa odchylek na modelu	Abweichungskarte auf dem Modell
+Mapa odchylek: největší +{0} mm (vně reference) / {1} mm (uvnitř), v toleranci {2} % plochy, přesnost ±{3} mm	Abweichungskarte: größte +{0} mm (außerhalb der Referenz) / {1} mm (innerhalb), {2} % der Fläche in Toleranz, Genauigkeit ±{3} mm
+Mapu odchylek se nepodařilo spočítat: {0}	Die Abweichungskarte konnte nicht berechnet werden: {0}
+Materiál chybí v modelu (reference − model) [cm³]	Material fehlt im Modell (Referenz − Modell) [cm³]
+Materiál chybí v modelu (reference − model): {0} cm³	Material fehlt im Modell (Referenz − Modell): {0} cm³
+materiál navíc (model − reference)	zusätzliches Material (Modell − Referenz)
+Materiál navíc v modelu (model − reference) [cm³]	Zusätzliches Material im Modell (Modell − Referenz) [cm³]
+Materiál navíc v modelu (model − reference): {0} cm³	Zusätzliches Material im Modell (Modell − Referenz): {0} cm³
+Model	Modell
+model má navíc díru / vybrání Ø{0} (nebo mu chybí čep)	Modell hat eine zusätzliche Bohrung / Aussparung Ø{0} (oder ihm fehlt ein Zapfen)
+model má navíc drážku / zápich R{0}	Modell hat eine zusätzliche Nut / einen Einstich R{0}
+Model není objemové těleso – porovnání objemů nelze provést.	Das Modell ist kein Volumenkörper – Volumen können nicht verglichen werden.
+Model se od porovnání změnil – mapa je skrytá. Porovnejte znovu.	Das Modell hat sich seit dem Vergleich geändert – die Karte ist ausgeblendet. Erneut vergleichen.
+Model: {0}	Modell: {0}
+Modely se liší o více než polovinu objemu – reference je nejspíš jinak umístěná. Zkuste jiné zarovnání.	Die Modelle unterscheiden sich um mehr als die Hälfte des Volumens – die Referenz liegt vermutlich anders. Versuchen Sie eine andere Ausrichtung.
+načítám referenční model	Referenzmodell wird geladen
+navíc v modelu	zusätzlich im Modell
+Navíc v modelu (model − ref.)	Zusätzlich im Modell (Modell − Ref.)
+Největší odchylka + / −	Größte Abweichung + / −
+Největší odchylka uvnitř reference [mm]	Größte Abweichung innerhalb der Referenz [mm]
+Největší odchylka vně reference [mm]	Größte Abweichung außerhalb der Referenz [mm]
+nespočítáno	nicht berechnet
+Numerický šum ({0} těles)	Numerisches Rauschen ({0} Körper)
+Numerický šum [cm³]	Numerisches Rauschen [cm³]
+Numerický šum: {0} drobných těles, {1} cm³	Numerisches Rauschen: {0} winzige Körper, {1} cm³
+Obalové kvádry modelu a reference se nepřekrývají – zkontrolujte zarovnání reference.	Die Hüllquader von Modell und Referenz überlappen sich nicht – prüfen Sie die Ausrichtung der Referenz.
+obecná plocha	allgemeine Fläche
+Objem [cm³]	Volumen [cm³]
+Objem modelu	Modellvolumen
+Objem modelu [cm³]	Modellvolumen [cm³]
+Objem modelu: {0} cm³	Modellvolumen: {0} cm³
+Objem reference	Referenzvolumen
+Objem reference [cm³]	Referenzvolumen [cm³]
+Objem reference: {0} cm³	Referenzvolumen: {0} cm³
+Oblast {0}: {1}	Bereich {0}: {1}
+odchylky od modelu zákazníka (STEP): objemy, chybějící prvky, barevná mapa	Abweichungen vom Kundenmodell (STEP): Volumen, fehlende Features, Farbkarte
+Otočení kolem {0}	Drehung um {0}
+Plná červená od odchylky (mm)	Volles Rot ab Abweichung (mm)
+Plocha v toleranci [%]	Fläche in Toleranz [%]
+Porovnání {0}/{1}: {2}	Vergleich {0}/{1}: {2}
+Porovnání bylo zrušeno.	Der Vergleich wurde abgebrochen.
+Porovnání s referenčním modelem	Vergleich mit dem Referenzmodell
+POROVNÁNÍ S REFERENČNÍM MODELEM	VERGLEICH MIT DEM REFERENZMODELL
+Porovnat	Vergleichen
+Porovnat s referencí	Mit Referenz vergleichen
+Porovnat s referenčním modelem	Mit Referenzmodell vergleichen
+Porovnat znovu	Erneut vergleichen
+Porovnávám s referenčním modelem…	Vergleiche mit dem Referenzmodell…
+Porovnávám…	Vergleiche…
+Posun {0} (mm)	Verschiebung {0} (mm)
+Posun mm	Verschiebung mm
+Průběh a tlačítko Zrušit jsou dole uprostřed.	Fortschritt und die Schaltfläche Abbrechen befinden sich unten in der Mitte.
+Přesnost mapy (±{0} mm) je horší než zadaná tolerance – u takto velkého dílu jemnější síť nejde.	Die Genauigkeit der Karte (±{0} mm) ist schlechter als die angegebene Toleranz – ein feineres Netz ist bei einem so großen Teil nicht möglich.
+Přesnost mapy ±{0} mm (dána sítí reference a modelu).	Genauigkeit der Karte ±{0} mm (bestimmt durch die Netze von Referenz und Modell).
+Přesnost mapy odchylek [mm]	Genauigkeit der Abweichungskarte [mm]
+Reference má {0} ploch (síťový model) – rozdílová tělesa se nepočítala, protože by výpočet trval velmi dlouho. Objemy a mapa odchylek platí.	Die Referenz hat {0} Flächen (Netzmodell) – Differenzkörper wurden nicht berechnet, da dies sehr lange dauern würde. Volumen und Abweichungskarte gelten.
+Reference má výrazně jinou velikost než model ({0}×) – zkontrolujte jednotky souboru.	Die Referenz hat eine deutlich andere Größe als das Modell ({0}×) – prüfen Sie die Einheiten der Datei.
+Reference průhledně	Referenz transparent
+reference v poloze ze souboru	Referenz in der Lage aus der Datei
+Reference: {0} ({1})	Referenz: {0} ({1})
+Referenční model není podle kontroly jádra platné těleso – rozdíly mohou být nepřesné.	Laut Kernprüfung ist das Referenzmodell kein gültiger Körper – Differenzen können ungenau sein.
+Referenční model neobsahuje 3D těleso.	Das Referenzmodell enthält keinen 3D-Körper.
+Referenční model neobsahuje objemové těleso (jen plochy) – objemy ani rozdíly nelze spočítat.	Das Referenzmodell enthält keinen Volumenkörper (nur Flächen) – weder Volumen noch Differenzen können berechnet werden.
+Referenční model se nepodařilo zasíťovat.	Das Referenzmodell konnte nicht vernetzt werden.
+Referenční soubor STEP se nepodařilo načíst.	Die STEP-Referenzdatei konnte nicht geladen werden.
+rovina	Ebene
+Rozdíl „model − reference“ se nepodařilo spočítat: {0}	Die Differenz „Modell − Referenz“ konnte nicht berechnet werden: {0}
+Rozdíl „reference − model“ se nepodařilo spočítat: {0}	Die Differenz „Referenz − Modell“ konnte nicht berechnet werden: {0}
+Rozdíl (model − reference)	Differenz (Modell − Referenz)
+Rozdíl objemů (model − reference): {0} cm³	Volumendifferenz (Modell − Referenz): {0} cm³
+Rozdíl objemů model − reference [cm³]	Volumendifferenz Modell − Referenz [cm³]
+Rozdílová tělesa (seznam oblastí)	Differenzkörper (Liste der Bereiche)
+Rozdílová tělesa se nepočítala.	Differenzkörper wurden nicht berechnet.
+Rozdílové oblasti ({0})	Differenzbereiche ({0})
+Rozdílové oblasti ({0}):	Differenzbereiche ({0}):
+Rozdílové oblasti se nepočítaly	Differenzbereiche wurden nicht berechnet
+Rozměr X [mm]	Größe X [mm]
+Rozměr Y [mm]	Größe Y [mm]
+Rozměr Z [mm]	Größe Z [mm]
+Síť pro mapu dosáhla limitu počtu trojúhelníků – uprostřed velkých rovinných ploch mohou body chybět.	Das Netz für die Karte hat das Dreieckslimit erreicht – in der Mitte großer ebener Flächen können Punkte fehlen.
+síť pro mapu odchylek	Netz für die Abweichungskarte
+Síťová reference: přesnost je omezená sítí souboru.	Netzreferenz: die Genauigkeit ist durch das Netz der Datei begrenzt.
+STEP, BREP, IGES nebo síť (STL, OBJ…)	STEP, BREP, IGES oder ein Netz (STL, OBJ…)
+Střed obalového kvádru	Mitte des Hüllquaders
+střed obalového kvádru reference na střed kvádru modelu	Mitte des Referenz-Hüllquaders auf die Mitte des Modellquaders
+Střed X [mm]	Mitte X [mm]
+Střed Y [mm]	Mitte Y [mm]
+Střed Z [mm]	Mitte Z [mm]
+Středy	Mitten
+středy obalových kvádrů	Mitten der Hüllquader
+Tolerance (mm)	Toleranz (mm)
+Tolerance [mm]	Toleranz [mm]
+Tolerance mm	Toleranz mm
+Tolerance: {0} mm	Toleranz: {0} mm
+Umístění reference	Lage der Referenz
+Upozornění	Hinweis
+Upozornění: {0}	Hinweis: {0}
+v automatickém režimu se otočení hledá samo	im automatischen Modus wird die Drehung selbst gesucht
+v modelu chybí díra / vybrání Ø{0}	im Modell fehlt eine Bohrung / Aussparung Ø{0}
+v modelu chybí drážka / zápich R{0}	im Modell fehlt eine Nut / ein Einstich R{0}
+v modelu chybí materiál (výstupek)	im Modell fehlt Material (ein Vorsprung)
+v modelu chybí vybrání (materiál navíc)	im Modell fehlt eine Aussparung (zusätzliches Material)
+V toleranci ±{0} mm	In Toleranz ±{0} mm
+válec Ø{0}	Zylinder Ø{0}
+Vybrat referenci…	Referenz wählen…
+výpočet {0} s	Berechnung {0} s
+Význam	Bedeutung
+vzdálenosti od reference	Abstände zur Referenz
+zarovnání reference	Ausrichtung der Referenz
+Zarovnání: {0}	Ausrichtung: {0}
+Zelená = odchylka v toleranci, žlutá → červená = odchylka od povrchu reference.	Grün = Abweichung in Toleranz, Gelb → Rot = Abweichung von der Referenzoberfläche.
+zkusí polohu ze souboru a 24 otočení po 90° se středy na sobě a vybere nejlépe sedící	probiert die Lage aus der Datei und 24 Drehungen in 90°-Schritten mit deckungsgleichen Mitten und wählt die beste Passung
+Zvýraznění jen u největších oblastí – použijte souřadnice.	Hervorhebung nur bei den größten Bereichen – verwenden Sie die Koordinaten.
+Žádné rozdílové oblasti nad prahem šumu.	Keine Differenzbereiche über der Rauschschwelle.
+Žádné rozdíly nad prahem šumu – modely se shodují.	Keine Differenzen über der Rauschschwelle – die Modelle stimmen überein.

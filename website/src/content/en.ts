@@ -607,7 +607,7 @@ export const en: Dict = {
       lead: "Photos straight from our workshop – no illustrative images. Some projects are under NDA; we are happy to share details in person.",
       all: "All",
       kinds: { fixture: "Fixtures", part: "Parts", assembly: "Devices" },
-      year: "Year",
+      kind: "Project type",
       tech: "Technology",
       photos: "photos",
       brief: "Brief",

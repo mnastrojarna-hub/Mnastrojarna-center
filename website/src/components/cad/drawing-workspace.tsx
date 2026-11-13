@@ -7,10 +7,13 @@
 import { cadLocale, tr } from "@/cad/i18n";
 import { saveFile } from "@/lib/save-file";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
-import { bomToCsv, defaultDrawingOptions, GDT_LABEL, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type RevisionItem, type SheetName, type ViewKey } from "@/cad/drawing";
+import { angleGeom, annotationGeometry, annotationStatus, annToSheet, bomToCsv, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { threadsOfDoc } from "@/cad/drawing-doc";
 import { dimCheck } from "@/cad/dim-check";
+import { mergeSmart, NEW_DRAWING_OPTIONS } from "@/cad/drawing-agent";
+import type { SmartDims } from "@/cad/drawing-dims";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -39,8 +42,10 @@ type Props = {
 
 type AnnTool = "dim" | "note" | "roughness" | "gdt" | "datum" | "text" | "detail";
 type DimKind = "auto" | "aligned" | "horizontal" | "vertical";
+/** kóta kružnice / oblouku: auto = kružnice průměrem, oblouk poloměrem */
+type CircKind = "auto" | "diameter" | "radius";
 const ANN_TOOLS: { id: AnnTool; label: string; kbd: string; hint: string }[] = [
-  { id: "dim", label: tr("Kóta"), kbd: "D", hint: tr("2 body + umístění kótovací čáry") },
+  { id: "dim", label: tr("Kóta"), kbd: "D", hint: `${tr("kružnice → Ø / R, hrana → délka, 2 hrany → úhel")} · ${tr("2 body + umístění kótovací čáry")}` },
   { id: "note", label: tr("Poznámka"), kbd: "N", hint: tr("odkazová čára + text") },
   { id: "roughness", label: tr("Drsnost"), kbd: "R", hint: tr("značka ISO 1302 na povrch") },
   { id: "gdt", label: tr("Geom. tolerance"), kbd: "G", hint: tr("rámeček ISO 1101 s odkazem") },
@@ -50,9 +55,29 @@ const ANN_TOOLS: { id: AnnTool; label: string; kbd: string; hint: string }[] = [
 ];
 /** nástroje, které se po jednom vložení vypnou (kóty a detaily zůstávají aktivní pro sérii) */
 const ONE_SHOT = new Set<DrawingAnnotation["type"]>(["text", "note", "roughness", "gdt", "datum"]);
-const ANN_LABEL: Record<DrawingAnnotation["type"], string> = { dim: tr("Kóta"), note: tr("Poznámka"), roughness: tr("Drsnost"), gdt: tr("Tolerance"), datum: tr("Základna"), text: tr("Text") };
+const ANN_LABEL: Record<DrawingAnnotation["type"], string> = { dim: tr("Kóta"), note: tr("Poznámka"), roughness: tr("Drsnost"), gdt: tr("Tolerance"), datum: tr("Základna"), text: tr("Text"), callout: tr("Popis"), centerline: tr("Osa") };
 
-const OPTS_KEY = "mn-cad-drawing-opts-v1";
+/** naposledy použité volby listu (pro nový výkres); v2 = skryté hrany už nejsou výchozí – z v1 se nepřebírají */
+const OPTS_KEY = "mn-cad-drawing-opts-v2";
+const OPTS_KEY_V1 = "mn-cad-drawing-opts-v1";
+
+// ---------- kóty: čísla a odsazení ----------
+const fmtN = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale());
+const parseNum = (t: string): number | null => {
+  const x = t.trim().replace(",", ".");
+  if (!x) return null;
+  const n = Number(x);
+  return Number.isFinite(n) ? n : null;
+};
+const fmtOffset = (n: number) => (Math.round(n * 10) / 10).toLocaleString(cadLocale(), { useGrouping: false });
+/** odsazení kóty, jak se zadává: délková = vzdálenost kótovací čáry od geometrie, Ø / R = délka odkazu od kružnice, úhel = poloměr oblouku [mm listu] */
+const shownOffset = (a: DimAnn) => (isRadialDim(a) || a.kind === "angle" ? a.offset : Math.abs(a.offset));
+const withOffset = (a: DimAnn, n: number): DimAnn => ({ ...a, offset: isRadialDim(a) ? n : a.kind === "angle" ? Math.max(1, Math.abs(n)) : (a.offset < 0 ? -1 : 1) * n });
+const offsetLabel = (a: DimAnn) => (isRadialDim(a) ? tr("Délka odkazu od kružnice [mm]") : a.kind === "angle" ? tr("Poloměr kótovacího oblouku [mm]") : tr("Odsazení kótovací čáry [mm]"));
+const dimSymbol = (a: DimAnn) => (a.kind === "horizontal" ? "↔" : a.kind === "vertical" ? "↕" : a.kind === "diameter" ? "Ø" : a.kind === "radius" ? "R" : a.kind === "angle" ? "∠" : "⤢");
+/** vybraná / nabízená geometrie kóty v mm listu (pro zvýraznění) */
+type SheetPick = { kind: "point"; p: Vec2 } | { kind: "line"; a: Vec2; b: Vec2 } | { kind: "circle"; c: Vec2; r: number };
+const samePick = (a: DimPick, b: DimPick) => a.kind === "line" && b.kind === "line" && ((a.a === b.a && a.b === b.b) || (Math.hypot(a.a[0] - b.a[0], a.a[1] - b.a[1]) < 1e-6 && Math.hypot(a.b[0] - b.b[0], a.b[1] - b.b[1]) < 1e-6));
 
 function download(name: string, data: BlobPart | (() => Promise<BlobPart> | BlobPart), type: string) {
   void saveFile(name, data, type).catch((e) => console.warn("Uložení se nezdařilo:", e));
@@ -78,18 +103,22 @@ function printSvg(svg: string, w: number, h: number) {
 function loadOpts(): DrawingOptions {
   try {
     const raw = localStorage.getItem(OPTS_KEY);
-    if (raw) {
-      const o = JSON.parse(raw) as Partial<DrawingOptions>;
-      return { ...defaultDrawingOptions, ...o, views: { ...defaultDrawingOptions.views, ...(o.views ?? {}) }, section: null };
+    const old = raw ? null : localStorage.getItem(OPTS_KEY_V1);
+    if (raw || old) {
+      const o = JSON.parse((raw ?? old)!) as Partial<DrawingOptions>;
+      // v1 ukládala i dřívější výchozí „skryté hrany zapnuté“ – nový výkres je má vypnuté
+      if (old) delete o.hidden;
+      // řez, otočení a další modely patří ke konkrétnímu modelu – nový výkres začíná bez nich
+      return { ...defaultDrawingOptions, ...o, views: { ...defaultDrawingOptions.views, ...(o.views ?? {}) }, section: null, rotation: 0, models: [], dimensions: NEW_DRAWING_OPTIONS.dimensions, smartGen: undefined, smartOff: undefined };
     }
   } catch {
     /* nedostupné úložiště */
   }
-  return defaultDrawingOptions;
+  return NEW_DRAWING_OPTIONS;
 }
 
 export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
-  const [opts, setOpts] = useState<DrawingOptions>(defaultDrawingOptions);
+  const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
   const [meta, setMeta] = useState<DrawingMeta>(() => ({
     name: doc.name,
     material: materialLabel,
@@ -131,10 +160,26 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const [annPts, setAnnPts] = useState<Vec2[]>([]);
   const [hover, setHover] = useState<Vec2 | null>(null);
   const [prompt, setPrompt] = useState<null | { id: string; kind: AnnTool; x: number; y: number; done: (v: Record<string, string>) => void }>(null);
+  // ---------- nástroj Kóta: výběr geometrie (bod / hrana / kružnice), kurzor a pole u kurzoru po vložení ----------
+  const [circKind, setCircKind] = useState<CircKind>("auto");
+  /** vybraná geometrie rozpracované kóty; `inv` = kružnice vybraná se Shiftem (průměr ↔ poloměr) */
+  const [dimSel, setDimSel] = useState<(DimSel & { inv?: boolean })[]>([]);
+  /** kurzor nad listem: poloha v mm listu, v px náhledu a stav klávesy Shift */
+  const [cursor, setCursor] = useState<{ q: Vec2; x: number; y: number; shift: boolean } | null>(null);
+  /** pole u kurzoru po vložení kóty (tolerance / přípona, odsazení); `orig` = kóta tak, jak byla vložena (Esc ji vrátí) */
+  const [dimBox, setDimBox] = useState<null | { id: string; x: number; y: number; suffix: string; offset: string; orig: DimAnn }>(null);
+  /** přejmenování listu přímo na záložce (ref = platný stav i pro ztrátu fokusu, která přijde až po Enter / Esc) */
+  const [rename, setRename] = useState<null | { i: number; v: string }>(null);
+  const renameRef = useRef<null | { i: number; v: string }>(null);
+  const editRename = (r: null | { i: number; v: string }) => {
+    renameRef.current = r;
+    setRename(r);
+  };
   const dirty = useRef(false);
 
-  // načtení listu (při otevření a při přepnutí listu)
-  useEffect(() => {
+  // načtení listu (při otevření a při přepnutí listu; po změně listu zvenku – textové příkazy „výkres …“, „kótovat“)
+  const wrote = useRef(JSON.stringify(drawings ?? null));
+  const loadSheet = () => {
     const sv = sheets[sheetIdx];
     dirty.current = false;
     if (sv?.options) setOpts({ ...defaultDrawingOptions, ...(sv.options as Partial<DrawingOptions>), views: { ...defaultDrawingOptions.views, ...((sv.options as Partial<DrawingOptions>).views ?? {}) } });
@@ -144,8 +189,28 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     setSheetName(sv?.name ?? tr("List {0}", sheetIdx + 1));
     setAnnTool(null);
     setAnnPts([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sheetIdx]);
+    setDimSel([]);
+    setDimBox(null);
+  };
+  const loadRef = useRef(loadSheet);
+  loadRef.current = loadSheet;
+  useEffect(() => loadRef.current(), [sheetIdx]);
+  useEffect(() => {
+    const now = JSON.stringify(drawings ?? null);
+    if (now === wrote.current) return;
+    wrote.current = now;
+    loadRef.current();
+  }, [drawings]);
+  // rozpracovaný výběr kóty patří jen nástroji Kóta
+  useEffect(() => {
+    if (annTool === "dim") return;
+    setDimSel([]);
+    setCursor(null);
+  }, [annTool]);
+  // pole u kurzoru patří existující kótě (po smazání kóty v seznamu zmizí)
+  useEffect(() => {
+    if (dimBox && !ann.some((a) => a.id === dimBox.id)) setDimBox(null);
+  }, [ann, dimBox]);
   /** aktuální stav listu jako DrawingDoc */
   const sheetDoc = (): DrawingDoc => {
     const { bom: _b, massKg: _m, material: _mat, components: _c, sheetIndex: _si, sheetCount: _sc, ...metaRest } = meta;
@@ -162,13 +227,16 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = sheetDoc();
     dirty.current = false;
+    wrote.current = JSON.stringify(next);
     onDrawingsChange(next);
   };
   const persistRef = useRef(persistNow);
   persistRef.current = persistNow;
   /** zavření výkresu: rozpracované změny (formát, razítko, kóty) se uloží hned – i když ještě běží odložené uložení nebo přepočet */
   const close = useCallback(() => {
-    if (dirty.current) persistRef.current();
+    // uložení se musí do dokumentu propsat dřív, než aplikace záložku výkresu zavře – zavření bere stav dokumentu
+    // z posledního vykreslení a čekající změnu by přepsalo (ztratil by se např. formát změněný těsně před Esc)
+    if (dirty.current) flushSync(() => persistRef.current());
     onClose();
   }, [onClose]);
   useEffect(() => () => {
@@ -187,8 +255,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const cur = sheets.length ? [...sheets] : [];
     cur[sheetIdx] = sheetDoc();
     const n = cur.length + 1;
-    cur.push({ id: uid(), name: tr("List {0}", n), options: { ...defaultDrawingOptions, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] });
+    cur.push({ id: uid(), name: tr("List {0}", n), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] });
     dirty.current = false;
+    wrote.current = JSON.stringify(cur);
     onDrawingsChange(cur);
     setSheetIdx(n - 1);
   };
@@ -196,6 +265,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (!onDrawingsChange || sheets.length <= 1) return;
     const cur = sheets.filter((_, k) => k !== i);
     dirty.current = false;
+    wrote.current = JSON.stringify(cur);
     onDrawingsChange(cur);
     setSheetIdx(Math.max(0, Math.min(i, cur.length - 1)));
   };
@@ -204,9 +274,26 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (dirty.current) persistNow();
     setSheetIdx(i);
   };
+  /** konec přejmenování listu na záložce: Enter / opuštění pole potvrdí (prázdný název se nepřijme), Esc zruší */
+  const commitRename = (apply: boolean) => {
+    const r = renameRef.current;
+    if (!r) return; // už ukončeno (Enter / Esc následované ztrátou fokusu při zániku pole)
+    editRename(null);
+    const n = r.v.trim();
+    if (!apply || !n) return;
+    if (r.i === sheetIdx) {
+      if (n === sheetName) return;
+      setSheetName(n);
+      markDirty();
+    } else {
+      const next = sheets.map((x, k) => (k === r.i ? { ...x, name: n } : x));
+      wrote.current = JSON.stringify(next);
+      onDrawingsChange?.(next);
+    }
+  };
   useEffect(() => {
     try {
-      localStorage.setItem(OPTS_KEY, JSON.stringify({ ...opts, section: undefined }));
+      localStorage.setItem(OPTS_KEY, JSON.stringify({ ...opts, section: undefined, rotation: undefined, models: undefined }));
     } catch {
       /* nedostupné úložiště */
     }
@@ -256,8 +343,43 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     return Math.round(((bbox[0][k] + bbox[1][k]) / 2) * 100) / 100;
   };
 
+  // Chytré kóty: vygenerované poznámky (auto) se po výpočtu sloučí s vlastními (cad/drawing-agent.ts)
+  const smart = (res as (DrawingResult & { smart?: SmartDims }) | null)?.smart;
+  useEffect(() => {
+    if (!res) return;
+    if (opts.dimensions === "smart" && smart) {
+      const m = mergeSmart(ann, opts, smart);
+      if (!m) return;
+      setAnn(m.annotations);
+      setOpts((o) => ({ ...o, smartGen: m.gen }));
+      markDirty();
+    } else if (opts.dimensions !== "smart" && ann.some((a) => a.auto)) {
+      setAnn((l) => l.filter((a) => !a.auto));
+      setOpts((o) => ({ ...o, smartGen: undefined, smartOff: undefined }));
+      markDirty();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [res]);
+  const regenSmart = () => {
+    if (!smart) return;
+    const m = mergeSmart(ann, opts, smart, true)!;
+    setAnn(m.annotations);
+    setOpts((o) => ({ ...o, smartGen: m.gen, smartOff: [] }));
+    markDirty();
+    flash(tr("Chytré kóty přegenerovány: {0}{1}", smart.annotations.filter((a) => a.type !== "centerline").length, smart.report.skipped.length ? tr(" · vynecháno {0}", smart.report.skipped.length) : ""));
+  };
   // výsledek včetně uživatelských kót a poznámek
   const out = useMemo(() => (res ? withAnnotations(res, ann) : null), [res, ann]);
+  /** stav kót a poznámek vůči aktuální geometrii (ztracená hrana / kružnice, pohled mimo list) */
+  const annState = useMemo(() => (res ? annotationStatus(res, ann) : {}), [res, ann]);
+  const flagged = ann.filter((a) => (annState[a.id] ?? "ok") !== "ok").length;
+  /** kóty, jejichž hrana / kružnice v pohledu není – na obrazovce se zvýrazní oranžově (do exportu se zvýraznění nepromítá) */
+  const lostGeom = useMemo(() => {
+    const lost = ann.filter((a) => annState[a.id] === "lost");
+    return res && lost.length ? annotationGeometry(res, lost) : null;
+  }, [res, ann, annState]);
+  /** umístění pohledů na listu (pro automatizované testy a agenty: přepočet mm modelu → list) */
+  const viewsAttr = useMemo(() => (res ? JSON.stringify(res.views.map((v) => ({ key: v.key, px: v.px, py: v.py, s: v.s, x0: v.x0, y0: v.y0, w: v.w, h: v.h }))) : undefined), [res]);
 
   // ---------- export ----------
   const base = safeName(meta.name || doc.name);
@@ -333,36 +455,47 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   }, []);
   const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest?.("input,textarea,select")) return;
-      if (prompt) {
-        if (e.key === "Escape") setPrompt(null);
-        return; // při otevřeném formuláři poznámky nepřepínat nástroje
+  // Klávesy: posluchač se registruje jednou a aktuální stav čte přes ref. Kdyby se při každé změně stavu registroval znovu,
+  // ztratil by se stisk klávesy, během jehož zpracování se výkres překreslí (překreslení vyvolá posluchač kláves aplikace,
+  // který běží před ním) – typicky druhý Esc hned po zavření pole kóty nebo formuláře poznámky.
+  const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
+  onKeyRef.current = (e: KeyboardEvent) => {
+    if ((e.target as HTMLElement)?.closest?.("input,textarea,select")) return;
+    if (prompt) {
+      if (e.key === "Escape") setPrompt(null);
+      return; // při otevřeném formuláři poznámky nepřepínat nástroje
+    }
+    if (e.key === "Escape") {
+      if (dimBox) {
+        // pole kóty zavřít, kóta zůstane s výchozími hodnotami
+        setAnn((l) => l.map((x) => (x.id === dimBox.id ? dimBox.orig : x)));
+        return setDimBox(null);
       }
-      if (e.key === "Escape") {
-        if (annTool) {
-          setAnnTool(null);
-          setAnnPts([]);
-          return;
-        }
-        return close();
-      }
-      const k = e.key.toLowerCase();
-      if (k === "f") fit();
-      const t = ANN_TOOLS.find((x) => x.kbd.toLowerCase() === k);
-      if (t && !e.ctrlKey && !e.metaKey) {
-        setAnnTool((cur) => (cur === t.id ? null : t.id));
+      if (dimSel.length) return setDimSel([]); // rozpracovaný výběr kóty zrušit, nástroj zůstává
+      if (annTool) {
+        setAnnTool(null);
         setAnnPts([]);
+        return;
       }
-      if ((e.key === "Delete" || e.key === "Backspace") && ann.length && !annTool) {
-        setAnn((a) => a.slice(0, -1));
-        markDirty();
-      }
-    };
+      return close();
+    }
+    const k = e.key.toLowerCase();
+    if (k === "f") fit();
+    const t = ANN_TOOLS.find((x) => x.kbd.toLowerCase() === k);
+    if (t && !e.ctrlKey && !e.metaKey) {
+      setAnnTool((cur) => (cur === t.id ? null : t.id));
+      setAnnPts([]);
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && ann.length && !annTool) {
+      setAnn((a) => a.slice(0, -1));
+      markDirty();
+    }
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => onKeyRef.current(e);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [close, fit, annTool, prompt, ann.length]);
+  }, []);
 
   // ---------- umisťování kót a poznámek ----------
   const toSheet = (e: { clientX: number; clientY: number }): Vec2 | null => {
@@ -406,30 +539,79 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     return "ABCDEFGHJKLMNPRSTUVWXYZ".split("").find((c) => !used.has(c)) ?? "A";
   };
   const ask = (kind: AnnTool, e: { clientX: number; clientY: number }) => new Promise<Record<string, string> | null>((resolve) => setPrompt({ id: uid(), kind, x: e.clientX, y: e.clientY, done: (v) => { setPrompt(null); resolve(v); } }));
+
+  // ---------- nástroj Kóta: co je pod kurzorem ----------
+  /** pohled s rozpoznanou geometrií, ve kterém leží bod listu (s okrajem dosahu výběru) */
+  const entViewAt = (q: Vec2, m: number): PlacedView | null => res?.views.find((v) => v.ents?.length && q[0] >= v.px - m && q[0] <= v.px + v.w * v.s + m && q[1] >= v.py - m && q[1] <= v.py + v.h * v.s + m) ?? null;
+  /**
+   * Co by se kliknutím vybralo: v pohledu hrana, kružnice / oblouk nebo bod (konec hrany, střed kružnice), jinak volný bod pohledu;
+   * mimo pohledy (izometrie, detail) vrchol geometrie jako dosud. `want`: jen body (druhý bod kóty) / jen hrany (druhá hrana úhlu).
+   * `hit` = pod kurzorem opravdu leží geometrie (ne volný bod).
+   */
+  const dimTarget = (q: Vec2, want: "any" | "point" | "line", inView?: string): { sel: DimSel; hit: boolean } | null => {
+    if (!res) return null;
+    const tol = 10 / view.z;
+    const v = entViewAt(q, tol);
+    if (v && (!inView || v.key === inView)) {
+      const pick = pickViewEnt(v.ents ?? [], sheetToAnn(v, q), tol / v.s, want);
+      if (pick) return { sel: { view: v.key, pick }, hit: true };
+      return want === "line" ? null : { sel: { view: v.key, pick: { kind: "point", p: sheetToAnn(v, q) } }, hit: false };
+    }
+    if (want === "line") return null;
+    const p = snap(q);
+    const loc = localize([p]);
+    return { sel: { view: loc.view, pick: { kind: "point", p: loc.pts[0] } }, hit: p !== q };
+  };
+  const dimModes = (shift: boolean) => ({ linear: dimKind, circle: circKind, invert: shift || !!dimSel[0]?.inv });
+  /** co se stane v místě kurzoru: další výběr (`next`), nebo vložení kóty (`place`) */
+  const dimStep = (q: Vec2, shift: boolean): { next?: { sel: DimSel; hit: boolean }; place?: NewDim | null } => {
+    const first = dimSel[0];
+    if (!first) return { next: dimTarget(q, "any") ?? undefined };
+    if (first.pick.kind === "point" && dimSel.length === 1) return { next: dimTarget(q, "point") ?? undefined };
+    if (first.pick.kind === "line" && dimSel.length === 1) {
+      const t = dimTarget(q, "line", first.view);
+      if (t && !samePick(t.sel.pick, first.pick)) return { next: t };
+    }
+    return { place: res ? dimFromPicks(res, dimSel, q, dimModes(shift)) : null };
+  };
+  const onDimClick = (e: React.PointerEvent, raw: Vec2) => {
+    setDimBox(null); // rozepsané pole předchozí kóty: hodnoty už jsou zapsané
+    const st = dimStep(raw, e.shiftKey);
+    if (st.next) return setDimSel([...dimSel, st.next.sel.pick.kind === "circle" && e.shiftKey ? { ...st.next.sel, inv: true } : st.next.sel]);
+    if (!st.place) {
+      if (dimSel.length > 1) flash(tr("Tuto kombinaci nelze okótovat."));
+      return setDimSel([]);
+    }
+    const a = { ...st.place, id: uid() } as DimAnn;
+    addAnn(a);
+    setDimSel([]);
+    setDimBox({ id: a.id, x: e.clientX, y: e.clientY, suffix: "", offset: fmtOffset(shownOffset(a)), orig: a });
+  };
+  /** zápis hodnot z pole u kurzoru do kóty (průběžně při psaní); prázdné / neplatné odsazení = původní */
+  const editDimBox = (patch: { suffix?: string; offset?: string }) => {
+    if (!dimBox) return;
+    const box = { ...dimBox, ...patch };
+    setDimBox(box);
+    const n = parseNum(box.offset);
+    const base = n == null || box.offset === fmtOffset(shownOffset(box.orig)) ? box.orig : withOffset(box.orig, n);
+    const next: DimAnn = { ...base, suffix: box.suffix.trim() ? box.suffix : undefined };
+    setAnn((l) => l.map((x) => (x.id === box.id ? next : x)));
+    markDirty();
+  };
+  const cancelDimBox = () => {
+    if (!dimBox) return;
+    setAnn((l) => l.map((x) => (x.id === dimBox.id ? dimBox.orig : x)));
+    setDimBox(null);
+  };
+
   const onCanvasClick = async (e: React.PointerEvent) => {
     if (!annTool || !res) return;
     const raw = toSheet(e);
     if (!raw) return;
+    if (annTool === "dim") return onDimClick(e, raw);
     const q = snap(raw);
     const pts = [...annPts, q];
     switch (annTool) {
-      case "dim": {
-        if (pts.length < 3) return setAnnPts(pts);
-        const [A, B, C] = pts;
-        const dx = B[0] - A[0];
-        const dy = B[1] - A[1];
-        let kind: Exclude<DimKind, "auto"> = dimKind === "auto" ? (Math.abs(dx) > 3 * Math.abs(dy) ? "horizontal" : Math.abs(dy) > 3 * Math.abs(dx) ? "vertical" : "aligned") : dimKind;
-        if (Math.hypot(dx, dy) < 1e-6) kind = "horizontal";
-        let offset: number;
-        if (kind === "horizontal") offset = C[1] - A[1];
-        else if (kind === "vertical") offset = C[0] - A[0];
-        else {
-          const l = Math.hypot(dx, dy) || 1;
-          offset = (-(dy / l)) * (C[0] - A[0]) + (dx / l) * (C[1] - A[1]);
-        }
-        const loc = localize([A, B]);
-        return addAnn({ id: uid(), view: loc.view, type: "dim", a: loc.pts[0], b: loc.pts[1], kind, offset });
-      }
       case "note": {
         if (pts.length < 2) return setAnnPts(pts);
         const v = await ask("note", e);
@@ -480,6 +662,57 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       }
     }
   };
+
+  /** nápověda nástroje Kóta podle toho, co je vybráno */
+  const dimHint = () => {
+    const k = dimSel[0]?.pick.kind;
+    if (!k) return tr("Klikněte na kružnici nebo oblouk (Ø / R), na hranu (délka; druhá hrana = úhel) nebo na dva body. Shift = průměr ↔ poloměr.");
+    if (k === "circle") return tr("Kružnice vybrána – klikněte na místo kóty (Shift = průměr ↔ poloměr).");
+    if (k === "line") return dimSel.length === 1 ? tr("Hrana vybrána – klikněte na místo kóty délky, nebo na druhou hranu (úhel, u rovnoběžných vzdálenost).") : tr("Dvě hrany vybrány – klikněte na místo kóty (úhel se bere v sektoru, kde je kurzor).");
+    return tr("Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno {0}/3.", dimSel.length);
+  };
+
+  // ---------- nástroj Kóta: zvýraznění pod kurzorem a náhled kóty ----------
+  const pickSheet = (sel: DimSel): SheetPick => {
+    const S = (q: Vec2) => annToSheet(res?.views ?? [], sel.view, q);
+    const k = sel.pick;
+    if (k.kind === "point") return { kind: "point", p: S(k.p) };
+    if (k.kind === "line") return { kind: "line", a: S(k.a), b: S(k.b) };
+    return { kind: "circle", c: S(k.c), r: k.r * (res?.views.find((v) => v.key === sel.view)?.s ?? 1) };
+  };
+  const dimHover = (() => {
+    if (annTool !== "dim" || !cursor || !res) return null;
+    const st = dimStep(cursor.q, cursor.shift);
+    const first = dimSel[0];
+    let label = "";
+    if (st.next?.hit) {
+      const k = st.next.sel.pick;
+      if (k.kind === "circle") {
+        const base = circKind === "auto" ? (k.full ? "diameter" : "radius") : circKind;
+        const dia = (base === "diameter") !== cursor.shift;
+        const [main, alt] = dia ? [`Ø${fmtN(2 * k.r)}`, `R${fmtN(k.r)}`] : [`R${fmtN(k.r)}`, `Ø${fmtN(2 * k.r)}`];
+        label = k.full ? tr("Kružnice: {0} · Shift = {1}", main, alt) : tr("Oblouk: {0} · Shift = {1}", main, alt);
+      } else if (k.kind === "line") {
+        const len = Math.hypot(k.b[0] - k.a[0], k.b[1] - k.a[1]);
+        if (first?.pick.kind === "line") {
+          const g = angleGeom(first.pick.a, first.pick.b, k.a, k.b, 0);
+          if (g) label = tr("Druhá hrana: úhel {0}° / {1}°", fmtN(g.angle), fmtN(180 - g.angle));
+          else {
+            const f = first.pick;
+            const l = Math.hypot(f.b[0] - f.a[0], f.b[1] - f.a[1]) || 1;
+            label = tr("Druhá hrana: vzdálenost {0}", fmtN(Math.abs(((k.a[0] - f.a[0]) * (f.b[1] - f.a[1]) - (k.a[1] - f.a[1]) * (f.b[0] - f.a[0])) / l)));
+          }
+        } else label = tr("Hrana: délka {0}", fmtN(len));
+      } else label = tr("Bod");
+    }
+    const preview = st.place ? annotationGeometry(res, [{ ...st.place, id: "preview" } as DimAnn]) : null;
+    if (preview) label = preview.texts[0]?.s ? tr("Klikněte na místo kóty {0}", preview.texts[0].s) : "";
+    const target = st.next?.hit ? pickSheet(st.next.sel) : null;
+    // první bod vybrán → pomocná čára k druhému bodu
+    const from = first?.pick.kind === "point" && dimSel.length === 1 ? annToSheet(res.views, first.view, first.pick.p) : null;
+    const rubber: [Vec2, Vec2] | null = from ? [from, target?.kind === "point" ? target.p : cursor.q] : null;
+    return { target, preview, label, rubber };
+  })();
 
   const scaleValue = opts.scale === "auto" ? "auto" : String(opts.scale);
 
@@ -561,22 +794,26 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       <div className="flex h-8 shrink-0 items-end gap-1 overflow-x-auto overflow-y-hidden border-b border-black/10 bg-[#dfe5eb] px-3 [scrollbar-width:none] [touch-action:pan-x]">
         {(sheets.length ? sheets : [{ id: "main", name: sheetName }]).map((sh, i) => (
           <div key={sh.id} className={cn("group flex items-center gap-1 rounded-t-md border-x border-t px-3 py-1 text-[12px]", i === sheetIdx ? "relative top-px border-black/10 bg-white font-semibold" : "border-transparent text-ink-700/60 hover:bg-white/60")}>
-            <button
-              type="button"
-              onClick={() => switchSheet(i)}
-              onDoubleClick={() => {
-                const n = window.prompt(tr("Název listu"), i === sheetIdx ? sheetName : sh.name);
-                if (n?.trim()) {
-                  if (i === sheetIdx) {
-                    setSheetName(n.trim());
-                    markDirty();
-                  } else onDrawingsChange?.(sheets.map((x, k) => (k === i ? { ...x, name: n.trim() } : x)));
-                }
-              }}
-              title={tr("Dvojklik = přejmenovat")}
-            >
-              {i === sheetIdx ? sheetName : sh.name}
-            </button>
+            {rename?.i === i ? (
+              <input
+                data-sheet-rename
+                autoFocus
+                aria-label={tr("Název listu")}
+                value={rename.v}
+                onChange={(e) => editRename({ i, v: e.target.value })}
+                onFocus={(e) => e.target.select()}
+                onBlur={() => commitRename(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitRename(true);
+                  if (e.key === "Escape") commitRename(false);
+                }}
+                className="w-28 rounded border border-brand bg-white px-1 py-0 text-[12px] font-normal outline-none ring-2 ring-brand/15"
+              />
+            ) : (
+              <button type="button" onClick={() => switchSheet(i)} onDoubleClick={() => editRename({ i, v: i === sheetIdx ? sheetName : sh.name })} title={tr("Dvojklik = přejmenovat")}>
+                {i === sheetIdx ? sheetName : sh.name}
+              </button>
+            )}
             {sheets.length > 1 && (
               <button type="button" title={tr("Odstranit list")} onClick={() => removeSheet(i)} className="hidden text-ink-700/40 hover:text-brand group-hover:inline">
                 ×
@@ -613,13 +850,25 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               ))}
             </div>
             {annTool === "dim" && (
-              <div className="mt-2 flex rounded-md bg-steel-100 p-0.5">
-                {(["auto", "aligned", "horizontal", "vertical"] as DimKind[]).map((k) => (
-                  <button key={k} type="button" onClick={() => setDimKind(k)} className={cn("flex-1 rounded px-1 py-0.5 text-[11px]", dimKind === k ? "bg-white shadow-sm" : "text-ink-700/60")}>
-                    {k === "auto" ? tr("Auto") : k === "aligned" ? tr("Šikmá") : k === "horizontal" ? "Vodor." : tr("Svislá")}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="mt-2 flex rounded-md bg-steel-100 p-0.5" title={tr("Druh délkové kóty (2 body, hrana)")}>
+                  {(["auto", "aligned", "horizontal", "vertical"] as DimKind[]).map((k) => (
+                    <button key={k} type="button" onClick={() => setDimKind(k)} className={cn("flex-1 rounded px-1 py-0.5 text-[11px]", dimKind === k ? "bg-white shadow-sm" : "text-ink-700/60")}>
+                      {k === "auto" ? tr("Auto") : k === "aligned" ? tr("Šikmá") : k === "horizontal" ? tr("Vodor.") : tr("Svislá")}
+                    </button>
+                  ))}
+                </div>
+                <div data-circ-kind className="mt-1 flex items-center gap-1.5">
+                  <span className="shrink-0 text-[11px] text-ink-700/55">{tr("Kružnice")}</span>
+                  <div className="flex flex-1 rounded-md bg-steel-100 p-0.5" title={tr("Kóta kružnice / oblouku: Auto = kružnice průměrem Ø, oblouk poloměrem R; Shift při kliknutí volbu obrátí")}>
+                    {(["auto", "diameter", "radius"] as CircKind[]).map((k) => (
+                      <button key={k} type="button" onClick={() => setCircKind(k)} className={cn("flex-1 rounded px-1 py-0.5 text-[11px]", circKind === k ? "bg-white shadow-sm" : "text-ink-700/60")}>
+                        {k === "auto" ? tr("Auto") : k === "diameter" ? tr("Ø průměr") : tr("R poloměr")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
             {annTool && (
               <div data-active-tool className="mt-2 flex items-center justify-between gap-2 rounded-md border border-brand/30 bg-brand/5 px-2 py-1 text-[11px]">
@@ -627,12 +876,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   <strong className="text-brand">{tr("Aktivní nástroj:")}{" "}{ANN_TOOLS.find((t) => t.id === annTool)?.label ?? annTool}</strong> {tr("· Esc ukončí")}
                 </span>
                 <label className="flex shrink-0 items-center gap-1 text-ink-700/70" title={tr("Po vložení zůstat v nástroji (jinak se po jednom vložení vypne)")}>
-                  <input type="checkbox" checked={repeatTool} onChange={(e) => setRepeatTool(e.target.checked)} /> opakovat
+                  <input type="checkbox" checked={repeatTool} onChange={(e) => setRepeatTool(e.target.checked)} /> {tr("opakovat")}
                 </label>
               </div>
             )}
             <p className="mt-2 text-[11px] leading-snug text-ink-700/55">
-              {annTool ? (annTool === "detail" ? tr("Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu ({0}/3).", annPts.length) : annTool === "dim" ? tr("Klikněte na 2 body geometrie (přichytávání k vrcholům) a pak na místo kótovací čáry. Vybráno {0}/3.", annPts.length) : annTool === "note" || annTool === "gdt" ? tr("1. klik = kam šipka ukazuje, 2. klik = umístění. ({0}/2)", annPts.length) : tr("Klikněte na místo ve výkresu.")) : tr("Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu.")}
+              {annTool ? (annTool === "detail" ? tr("Detail: 1. klik = střed, 2. klik = poloměr, 3. klik = umístění na listu ({0}/3).", annPts.length) : annTool === "dim" ? dimHint() : annTool === "note" || annTool === "gdt" ? tr("1. klik = kam šipka ukazuje, 2. klik = umístění. ({0}/2)", annPts.length) : tr("Klikněte na místo ve výkresu.")) : tr("Kóty a poznámky jsou asociativní – drží se geometrie pohledu i po změně modelu. Ukládají se do dokumentu.")}
             </p>
             <div className="mt-2">
               <button type="button" onClick={() => setCheckOpen((v) => !v)} className="w-full rounded-md border border-ink-700/15 px-2 py-1 text-[11.5px] hover:bg-steel-100">
@@ -666,26 +915,42 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 {ann.map((a, i) => (
                   <li key={a.id} className="flex items-center gap-2 rounded px-1.5 py-0.5 text-[11.5px] hover:bg-steel-100">
                     <span className="w-16 shrink-0 text-ink-700/50">{tr(ANN_LABEL[a.type])}</span>
-                    <span className="min-w-0 flex-1 truncate">{a.type === "dim" ? `${a.kind === "horizontal" ? "↔" : a.kind === "vertical" ? "↕" : "⤢"} ${a.view}` : a.type === "note" || a.type === "text" ? a.text : a.type === "roughness" ? a.ra : a.type === "gdt" ? `${GDT_LABEL[a.symbol]} ${a.value}${a.datum ? " " + a.datum : ""}` : a.label}</span>
+                    <span className="min-w-0 flex-1 truncate">{a.type === "dim" ? `${dimSymbol(a)} ${a.view}` : a.type === "note" || a.type === "text" ? a.text : a.type === "roughness" ? a.ra : a.type === "gdt" ? `${GDT_LABEL[a.symbol]} ${a.value}${a.datum ? " " + a.datum : ""}` : a.type === "callout" ? a.lines.join(" · ") : a.type === "centerline" ? tr("osa souměrnosti") : a.label}</span>
+                    {(annState[a.id] ?? "ok") !== "ok" && (
+                      <span data-ann-flag={annState[a.id]} className="shrink-0 cursor-help text-amber-600" title={annState[a.id] === "noView" ? (a.type === "dim" ? tr("Pohled kóty není na listu – kóta se nekreslí.") : tr("Pohled, ke kterému se poznámka váže, není na listu.")) : tr("Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil) – kreslí se podle uložených údajů. Zkontrolujte ji nebo ji vložte znovu.")}>
+                        ⚠
+                      </span>
+                    )}
                     {a.type === "dim" && (
-                      <input
-                        value={a.suffix ?? ""}
-                        placeholder={tr("H8 / ±0,1")}
-                        title={tr("Tolerance nebo přípona kóty (zobrazí se za hodnotou)")}
-                        aria-label={tr("Přípona kóty")}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setAnn((l) => l.map((x) => (x.id === a.id && x.type === "dim" ? { ...x, suffix: v } : x)));
-                          markDirty();
-                        }}
-                        className="w-16 shrink-0 rounded border border-ink-700/15 px-1 py-0.5 font-mono text-[10.5px]"
-                      />
+                      <>
+                        <input
+                          value={a.suffix ?? ""}
+                          placeholder={tr("H8 / ±0,1")}
+                          title={tr("Tolerance nebo přípona kóty (zobrazí se za hodnotou)")}
+                          aria-label={tr("Přípona kóty")}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setAnn((l) => l.map((x) => (x.id === a.id && x.type === "dim" ? { ...x, suffix: v } : x)));
+                            markDirty();
+                          }}
+                          className="w-14 shrink-0 rounded border border-ink-700/15 px-1 py-0.5 font-mono text-[10.5px]"
+                        />
+                        <OffsetInput
+                          value={shownOffset(a)}
+                          title={offsetLabel(a)}
+                          onCommit={(n) => {
+                            setAnn((l) => l.map((x) => (x.id === a.id && x.type === "dim" ? withOffset(x, n) : x)));
+                            markDirty();
+                          }}
+                        />
+                      </>
                     )}
                     <button
                       type="button"
                       title={tr("Smazat")}
                       onClick={() => {
                         setAnn((l) => l.filter((_, k) => k !== i));
+                        if (a.auto) setOpts((o) => ({ ...o, smartOff: [...(o.smartOff ?? []), a.auto!] }));
                         markDirty();
                       }}
                       className="text-ink-700/40 hover:text-brand"
@@ -701,6 +966,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 type="button"
                 onClick={() => {
                   setAnn([]);
+                  if (ann.some((a) => a.auto)) setOpts((o) => ({ ...o, smartOff: ann.flatMap((a) => (a.auto ? [a.auto] : [])) }));
                   markDirty();
                 }}
                 className="mt-1 text-[11px] text-ink-700/50 hover:text-brand"
@@ -744,6 +1010,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 </Check>
               ))}
             </div>
+            <Row label={tr("Otočení hlavního pohledu")}>
+              <Seg
+                value={String(opts.rotation ?? 0) as `${ViewRotation}`}
+                onChange={(v) => set("rotation", Number(v) as ViewRotation)}
+                options={(["0", "90", "180", "270"] as const).map((v) => ({ v, l: `${v}°` }))}
+              />
+            </Row>
+            <p className="-mt-1 text-[10.5px] leading-snug text-ink-700/50">{tr("Otočí hlavní pohled po směru hodin a s ním celé promítání – soustružený díl tak může ležet osou vodorovně.")}</p>
           </Section>
 
           <Section title={tr("Řez A–A")}>
@@ -757,16 +1031,25 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <>
                 <Seg
                   value={opts.section.plane}
-                  onChange={(p) => set("section", { plane: p, offset: centerOf(p) })}
+                  onChange={(p) => set("section", { plane: p, offset: centerOf(p), kind: opts.section!.kind })}
                   options={[
                     { v: "XZ", l: tr("XZ (čelní)") },
                     { v: "YZ", l: tr("YZ (boční)") },
                     { v: "XY", l: tr("XY (vodor.)") },
                   ]}
                 />
+                <Seg
+                  value={opts.section.kind ?? "full"}
+                  onChange={(k) => set("section", { ...opts.section!, kind: k })}
+                  options={[
+                    { v: "full", l: tr("Celý řez") },
+                    { v: "half", l: tr("Poloviční řez") },
+                  ]}
+                />
                 <Row label={tr("Poloha roviny")}>
                   <NumInput value={opts.section.offset} onChange={(n) => set("section", { ...opts.section!, offset: n })} suffix="mm" />
                 </Row>
+                {opts.section.kind === "half" && <p className="text-[10.5px] leading-snug text-ink-700/50">{tr("Polovina pohled, polovina řez – dělí je osa souměrnosti (u soustružených dílů osa rotace).")}</p>}
               </>
             )}
           </Section>
@@ -779,8 +1062,16 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               {tr("Osy děr a válců")}
             </Check>
             <Row label={tr("Kóty")}>
-              <Seg value={opts.dimensions} onChange={(v) => set("dimensions", v)} options={[{ v: "none", l: tr("Žádné") }, { v: "overall", l: tr("Celkové") }, { v: "auto", l: tr("Auto + Ø") }]} />
+              <Seg value={opts.dimensions} onChange={(v) => set("dimensions", v)} options={[{ v: "smart", l: tr("Chytré kóty") }, { v: "none", l: tr("Žádné") }, { v: "overall", l: tr("Celkové") }, { v: "auto", l: tr("Auto + Ø") }]} />
             </Row>
+            {opts.dimensions === "smart" && (
+              <div data-smart-dims className="-mt-0.5 mb-1.5 flex items-center gap-1.5">
+                <Seg value={opts.dimStyle ?? "chain"} onChange={(v) => set("dimStyle", v)} options={[{ v: "chain", l: tr("řetězově") }, { v: "baseline", l: tr("od základny") }]} />
+                <button type="button" onClick={regenSmart} disabled={!smart} title={tr("Nahradí jen vygenerované kóty – vlastní kóty a poznámky zůstanou")} className="shrink-0 rounded-md border border-ink-700/15 px-2 py-1 text-[11px] hover:bg-steel-100 disabled:opacity-40">
+                  {tr("Přegenerovat kóty")}
+                </button>
+              </div>
+            )}
             <p className="-mt-1 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">{tr("Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.")}</p>
             {bom?.length ? (
               <Check checked={showBom} onChange={setShowBom}>
@@ -820,6 +1111,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               </div>
             ))}
           </Section>
+
+          <ModelsSection doc={doc} models={opts.models ?? []} onChange={(m) => set("models", m)} flash={flash} />
 
           <Section title={tr("Razítko")}>
             <Row label={tr("Název")}>
@@ -900,6 +1193,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         <main
           ref={canvas}
           data-sheet
+          data-views={viewsAttr}
+          data-sheet-format={res ? `${res.sheet.name} ${res.scale}` : undefined}
+          data-stacks={res?.stacks ? JSON.stringify(res.stacks) : undefined}
           className={cn("relative min-w-0 flex-1 touch-none overflow-hidden", annTool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}
           onPointerDown={(e) => {
             if (annTool && e.button === 0) {
@@ -913,12 +1209,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           onPointerMove={(e) => {
             const d = drag.current;
             if (d) setViewTf((v) => ({ ...v, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y }));
-            if (annTool) {
+            if (annTool === "dim") {
+              const q = toSheet(e);
+              const r = canvas.current?.getBoundingClientRect();
+              setCursor(q && r ? { q, x: e.clientX - r.left, y: e.clientY - r.top, shift: e.shiftKey } : null);
+            } else if (annTool) {
               const q = toSheet(e);
               setHover(q ? snap(q) : null);
             }
           }}
-          onPointerLeave={() => setHover(null)}
+          onPointerLeave={() => {
+            setHover(null);
+            setCursor(null);
+          }}
           onPointerUp={() => (drag.current = null)}
           onDoubleClick={annTool ? undefined : fit}
         >
@@ -931,7 +1234,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             />
           )}
           {/* překryv: rozpracovaná kóta/poznámka a přichycený bod */}
-          {res && annTool && (
+          {res && annTool && annTool !== "dim" && (
             <svg className="pointer-events-none absolute left-0 top-0 overflow-visible" width={res.sheet.w * view.z} height={res.sheet.h * view.z} style={{ transform: `translate(${view.x}px,${view.y}px)` }} viewBox={`0 0 ${res.sheet.w} ${res.sheet.h}`}>
               {annPts.map((p, i) => (
                 <circle key={i} cx={p[0]} cy={p[1]} r={1.6 / Math.max(0.3, view.z / 3)} fill="#E03930" />
@@ -939,6 +1242,31 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               {hover && <circle cx={hover[0]} cy={hover[1]} r={1.4 / Math.max(0.3, view.z / 3)} fill="none" stroke="#f59e0b" strokeWidth={0.5 / Math.max(0.3, view.z / 3)} />}
               {annPts.length > 0 && hover && <polyline points={[...annPts, hover].map((p) => p.join(",")).join(" ")} fill="none" stroke="#E03930" strokeWidth={0.35 / Math.max(0.3, view.z / 3)} strokeDasharray="1.2 0.8" />}
             </svg>
+          )}
+          {res && lostGeom && (
+            <svg data-dim-lost className="pointer-events-none absolute left-0 top-0 overflow-visible" width={res.sheet.w * view.z} height={res.sheet.h * view.z} style={{ transform: `translate(${view.x}px,${view.y}px)` }} viewBox={`0 0 ${res.sheet.w} ${res.sheet.h}`} fontFamily="Roboto, Arial, Helvetica, sans-serif">
+              <GeomOverlay g={lostGeom} color="#d97706" width={Math.max(0.35, 1.5 / view.z)} />
+            </svg>
+          )}
+          {/* nástroj Kóta: vybraná geometrie (červeně), co by se vybralo pod kurzorem (oranžově) a náhled kóty */}
+          {res && annTool === "dim" && (
+            <svg data-dim-overlay className="pointer-events-none absolute left-0 top-0 overflow-visible" width={res.sheet.w * view.z} height={res.sheet.h * view.z} style={{ transform: `translate(${view.x}px,${view.y}px)` }} viewBox={`0 0 ${res.sheet.w} ${res.sheet.h}`} fontFamily="Roboto, Arial, Helvetica, sans-serif">
+              {dimSel.map((x, i) => (
+                <PickMark key={i} pick={pickSheet(x)} color="#E03930" px={1 / view.z} />
+              ))}
+              {dimHover?.target && <PickMark pick={dimHover.target} color="#f59e0b" px={1 / view.z} hover />}
+              {dimHover?.rubber && <polyline points={dimHover.rubber.map((q) => q.join(",")).join(" ")} fill="none" stroke="#E03930" strokeWidth={1 / view.z} strokeDasharray={`${4 / view.z} ${3 / view.z}`} />}
+              {dimHover?.preview && (
+                <g data-dim-preview opacity={0.85}>
+                  <GeomOverlay g={dimHover.preview} color="#E03930" width={Math.max(LAYER_STYLE.dim.w, 1 / view.z)} />
+                </g>
+              )}
+            </svg>
+          )}
+          {annTool === "dim" && cursor && dimHover?.label && (
+            <div data-dim-hover className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-[11.5px] text-white shadow-lg" style={{ left: cursor.x + 16, top: cursor.y + 18 }}>
+              {dimHover.label}
+            </div>
           )}
           {!res && !error && (
             <div className="absolute inset-0 grid place-items-center text-white/80">
@@ -969,12 +1297,96 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 {w}
               </span>
             ))}
+            {flagged > 0 && (
+              <span data-ann-flagged className="rounded-full bg-amber-100 px-3 py-1 text-amber-900">
+                {tr("Kóty a poznámky bez geometrie: {0} (⚠ v seznamu)", flagged)}
+              </span>
+            )}
           </div>
         </main>
       </div>
       {prompt && <AnnPrompt key={prompt.id} kind={prompt.kind} x={prompt.x} y={prompt.y} onDone={prompt.done} onCancel={() => prompt.done({})} />}
+      {dimBox &&
+        (() => {
+          const cur = ann.find((x): x is DimAnn => x.id === dimBox.id && x.type === "dim");
+          if (!cur || !res) return null;
+          return <DimBox key={dimBox.id} x={dimBox.x} y={dimBox.y} title={annotationGeometry(res, [cur]).texts[0]?.s ?? ""} suffix={dimBox.suffix} offset={dimBox.offset} offsetLabel={offsetLabel(cur)} onChange={editDimBox} onOk={() => setDimBox(null)} onCancel={cancelDimBox} />;
+        })()}
     </div>
   );
+}
+
+/** Geometrie kót (čáry, šipky, texty v mm listu) jednou barvou – náhled vkládané kóty a zvýraznění kót bez geometrie. */
+function GeomOverlay({ g, color, width }: { g: ReturnType<typeof annotationGeometry>; color: string; width: number }) {
+  return (
+    <>
+      {g.polys.map((pl, i) => (pl.fill ? <polygon key={`p${i}`} points={pl.pts.map((q) => q.join(",")).join(" ")} fill={color} /> : <polyline key={`p${i}`} points={pl.pts.map((q) => q.join(",")).join(" ")} fill="none" stroke={color} strokeWidth={width} />))}
+      {g.texts.map((t, i) => (
+        <text key={`t${i}`} x={t.x} y={t.y} fontSize={t.size} textAnchor={t.anchor ?? "start"} transform={t.rotate ? `rotate(${t.rotate} ${t.x} ${t.y})` : undefined} fill={color}>
+          {t.s}
+        </text>
+      ))}
+    </>
+  );
+}
+
+/** Zvýraznění vybrané / nabízené geometrie kóty v souřadnicích listu (`px` = 1 px náhledu v mm listu). */
+function PickMark({ pick, color, px, hover }: { pick: SheetPick; color: string; px: number; hover?: boolean }) {
+  const w = (hover ? 3 : 2.2) * px;
+  if (pick.kind === "line") return <line data-pick="line" x1={pick.a[0]} y1={pick.a[1]} x2={pick.b[0]} y2={pick.b[1]} stroke={color} strokeWidth={w} strokeLinecap="round" opacity={0.85} />;
+  if (pick.kind === "circle") return <circle data-pick="circle" cx={pick.c[0]} cy={pick.c[1]} r={pick.r} fill="none" stroke={color} strokeWidth={w} opacity={0.85} />;
+  return <circle data-pick="point" cx={pick.p[0]} cy={pick.p[1]} r={(hover ? 5 : 3.5) * px} fill={hover ? "none" : color} stroke={color} strokeWidth={1.5 * px} />;
+}
+
+/** Malé pole u kurzoru po vložení kóty: tolerance / přípona a odsazení. Hodnoty se propisují do kóty hned; Enter potvrdí, Esc vrátí výchozí. */
+function DimBox({ x, y, title, suffix, offset, offsetLabel, onChange, onOk, onCancel }: { x: number; y: number; title: string; suffix: string; offset: string; offsetLabel: string; onChange: (p: { suffix?: string; offset?: string }) => void; onOk: () => void; onCancel: () => void }) {
+  const first = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+    const t = setTimeout(() => first.current?.focus(), 60); // po případném přesunu fokusu výchozí akcí kliknutí
+    return () => clearTimeout(t);
+  }, []);
+  const left = Math.max(8, Math.min(x + 14, window.innerWidth - 250));
+  const top = Math.max(8, Math.min(y + 14, window.innerHeight - 190));
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      onOk();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      onCancel();
+    }
+  };
+  const cap = "mb-0.5 block text-[10.5px] font-semibold uppercase tracking-wider text-ink-700/50";
+  return (
+    <div data-dim-box className="fixed z-[60] w-60 space-y-1.5 rounded-lg border border-ink-700/15 bg-white p-2.5 shadow-2xl" style={{ left, top }} onPointerDown={(e) => e.stopPropagation()}>
+      <p data-dim-box-title className="truncate font-mono text-[13px] font-semibold text-brand">
+        {title}
+      </p>
+      <label className="block">
+        <span className={cap}>{tr("Tolerance / přípona")}</span>
+        <input ref={first} data-dim-suffix autoFocus value={suffix} placeholder={tr("H8 / ±0,1")} onChange={(e) => onChange({ suffix: e.target.value })} onKeyDown={onKey} className={inputCls} />
+      </label>
+      <label className="block">
+        <span className={cap}>{offsetLabel}</span>
+        <input data-dim-offset value={offset} inputMode="decimal" onChange={(e) => onChange({ offset: e.target.value })} onKeyDown={onKey} className={cn(inputCls, "font-mono")} />
+      </label>
+      <p className="text-[10.5px] leading-snug text-ink-700/50">{tr("Enter potvrdí · Esc ponechá výchozí · později lze upravit v seznamu")}</p>
+    </div>
+  );
+}
+
+/** Odsazení kóty v seznamu (potvrzení Enterem nebo opuštěním pole). */
+function OffsetInput({ value, title, onCommit }: { value: number; title: string; onCommit: (n: number) => void }) {
+  const shown = fmtOffset(value);
+  const [t, setT] = useState(shown);
+  useEffect(() => setT(shown), [shown]);
+  const commit = () => {
+    const n = parseNum(t);
+    if (n != null && t !== shown) onCommit(n);
+    else setT(shown);
+  };
+  return <input data-dim-list-offset value={t} inputMode="decimal" title={title} aria-label={tr("Odsazení kóty")} onChange={(e) => setT(e.target.value)} onBlur={commit} onKeyDown={(e) => e.key === "Enter" && commit()} className="w-10 shrink-0 rounded border border-ink-700/15 px-1 py-0.5 text-right font-mono text-[10.5px]" />;
 }
 
 /** Malý formulář u kurzoru pro text poznámky / drsnost / geometrickou toleranci. */
@@ -1038,6 +1450,104 @@ function zoomAt(v: { x: number; y: number; z: number }, k: number, el: HTMLDivEl
   const cy = (el?.clientHeight ?? 0) / 2;
   const z = Math.min(40, Math.max(0.3, v.z * k));
   return { z, x: cx - ((cx - v.x) * z) / v.z, y: cy - ((cy - v.y) * z) / v.z };
+}
+
+// ---------- další modely na listu ----------
+
+const MODEL_VIEWS: (ViewKey | "iso")[] = ["front", "top", "left", "right", "back", "bottom", "iso"];
+
+/**
+ * Pohledy dalších modelů na listu: komponenty sestavy (podle id – sledují změny dílu) a dokumenty vložené ze souboru
+ * (kopie uložená v definici výkresu). Každý model má vlastní pohled a měřítko s popiskem pod pohledem.
+ */
+function ModelsSection({ doc, models, onChange, flash }: { doc: CadDoc; models: ModelView[]; onChange: (m: ModelView[]) => void; flash: (m: string) => void }) {
+  const comps = doc.kind === "assembly" ? (doc.components ?? []) : [];
+  const [pick, setPick] = useState("");
+  const file = useRef<HTMLInputElement>(null);
+  const upd = (id: string, patch: Partial<ModelView>) => onChange(models.map((m) => (m.id === id ? { ...m, ...patch } : m)));
+  const add = (m: Omit<ModelView, "id" | "view" | "scale">) => onChange([...models, { id: uid(), view: "front", scale: "auto", ...m }]);
+  const addComp = () => {
+    const c = comps.find((x) => x.id === (pick || comps[0]?.id));
+    if (c) add({ name: c.name, source: { kind: "component", compId: c.id } });
+  };
+  const addFile = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      const d = JSON.parse(await f.text()) as CadDoc;
+      if (d.app !== "mnastrojarna-cad" || !Array.isArray(d.features)) throw new Error();
+      // do výkresu se ukládá jen geometrie dokumentu (jeho vlastní výkresy ne)
+      const { drawings: _d, ...rest } = d;
+      void _d;
+      add({ name: d.name || f.name, source: { kind: "doc", doc: rest } });
+      flash(tr("Model {0} přidán na list.", d.name || f.name));
+    } catch {
+      flash(tr("Soubor není platný projekt Mnástrojárna CAD."));
+    }
+  };
+  const sel = "min-w-0 flex-1 rounded border border-ink-700/15 bg-white px-1 py-0.5 text-[11.5px]";
+  return (
+    <Section title={tr("Další modely na listu")}>
+      {models.map((m) => (
+        <div key={m.id} data-model-row={m.id} className="space-y-1 rounded-md bg-steel-100/60 px-2 py-1.5 text-[12px]">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate font-medium" title={m.name}>
+              {m.name}
+            </span>
+            <span className="shrink-0 text-[10.5px] text-ink-700/45">{m.source.kind === "component" ? tr("komponenta") : tr("ze souboru")}</span>
+            <button type="button" title={tr("Odebrat model z listu")} onClick={() => onChange(models.filter((x) => x.id !== m.id))} className="text-ink-700/40 hover:text-brand">
+              ×
+            </button>
+          </div>
+          <div className="flex gap-1">
+            <select className={sel} aria-label={tr("Pohled modelu")} value={m.view} onChange={(e) => upd(m.id, { view: e.target.value as ModelView["view"] })}>
+              {MODEL_VIEWS.map((k) => (
+                <option key={k} value={k}>
+                  {tr(VIEW_LABEL[k])}
+                </option>
+              ))}
+            </select>
+            <select className={sel} aria-label={tr("Měřítko modelu")} value={String(m.scale)} onChange={(e) => upd(m.id, { scale: e.target.value === "auto" ? "auto" : Number(e.target.value) })}>
+              <option value="auto">{tr("Automaticky")}</option>
+              {STANDARD_SCALES.map((x) => (
+                <option key={x} value={String(x)}>
+                  {scaleLabel(x)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      ))}
+      {comps.length > 0 && (
+        <div className="flex items-center gap-1">
+          <select className={sel} aria-label={tr("Komponenta sestavy")} value={pick || comps[0].id} onChange={(e) => setPick(e.target.value)}>
+            {comps.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <Btn onClick={addComp} title={tr("Přidat pohled komponenty na list")}>
+            {tr("Přidat")}
+          </Btn>
+        </div>
+      )}
+      <Btn onClick={() => file.current?.click()} title={tr("Kopie dokumentu se uloží do výkresu")}>
+        {tr("Vložit model ze souboru (.mncad)…")}
+      </Btn>
+      <input
+        ref={file}
+        type="file"
+        accept=".mncad,.json"
+        className="hidden"
+        data-model-file
+        onChange={(e) => {
+          void addFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <p className="text-[10.5px] leading-snug text-ink-700/50">{tr("Pohled komponenty sestavy nebo jiného dílu ze souboru na tomtéž listu – každý ve vlastním měřítku uvedeném pod pohledem.")}</p>
+    </Section>
+  );
 }
 
 // ---------- drobné ovládací prvky ----------

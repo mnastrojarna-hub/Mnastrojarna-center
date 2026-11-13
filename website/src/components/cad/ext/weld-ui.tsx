@@ -170,7 +170,7 @@ function BeadForm({ f, onChange }: ExtFormProps) {
         <span className="font-medium">{tr("Hrany koutu:")}</span> {b.edges.length ? tr("{0} vybráno ({1} mm)", b.edges.length, Math.round(b.edgeLens.reduce((s, x) => s + x, 0))) : tr("klikněte na hranu vnitřního rohu v modelu")}
         {b.edges.length > 0 && (
           <button type="button" className="ml-2 text-brand hover:underline" onClick={() => onChange({ edges: [], edgeLens: [] })}>
-            vymazat
+            {tr("vymazat")}
           </button>
         )}
       </div>

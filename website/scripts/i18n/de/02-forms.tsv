@@ -292,7 +292,6 @@ Měřítko dutiny	Kavitätsmaßstab
 Navrhnout dělicí rovinu	Trennebene vorschlagen
 Navrženo	Vorgeschlagen
 Nejdřív vytvořte nebo otevřete těleso.	Erzeugen oder öffnen Sie zuerst einen Körper.
-Návrh pravidelného rozmístění vyhazovačů v půdorysu dílu. Na díl se přidají díry, do sestavy skutečné vyhazovače.	Vorschlag einer regelmäßigen Auswerferanordnung in der Draufsicht des Teils. Dem Teil werden Bohrungen, der Baugruppe echte Auswerfer hinzugefügt.
 Obrátit směr	Richtung umkehren
 Podkosy na {0} % povrchu – díl nelze vyhodit bez posuvných čelistí.	Hinterschnitte auf {0} % der Oberfläche – das Teil lässt sich ohne Schieber nicht entformen.
 Použít smrštění	Schwindung anwenden
@@ -348,17 +347,14 @@ Jen vnější obrys (ignorovat otvory profilu)	Nur Außenkontur (Profillöcher i
 Klikáním v modelu přidáváte / odebíráte.	Durch Klicken im Modell fügen Sie hinzu / entfernen Sie.
 Kolmo na skicu	Senkrecht zur Skizze
 Konec	Ende
-Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese. Doporučeno pro výrobní dokumentaci.	Kosmetisches Gewinde: die Geometrie ändert sich nicht, das Gewinde erscheint in der Zeichnung. Empfohlen für Fertigungsunterlagen.
 Kuž. zahl.	Kegelsenkung
 Modul prvku „	Feature-Modul „
 Měřítko konce	Maßstab am Ende
-Natáčet profil podle křivky (Frenet)	Profil mit der Kurve drehen (Frenet)
 Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).	Unbekannte Bezeichnung – M2 bis M48, optional mit Steigung (M18×1,5).
 Obrátit stranu	Seite umkehren
 Odstraní díry, čepy, kuželová zahloubení a válcová zaoblení (obnoví ostrou hranu). Vhodné pro úpravy importovaných modelů.	Entfernt Bohrungen, Zapfen, Kegelsenkungen und zylindrische Verrundungen (stellt die scharfe Kante wieder her). Geeignet zur Bearbeitung importierter Modelle.
 Opsaný průměr	Umkreisdurchmesser
 Osa díry	Bohrungsachse
-Osa otočení (přes počátek)	Drehachse (durch den Ursprung)
 Označení závitu (text)	Gewindebezeichnung (Text)
 Označení závitu díry	Gewindebezeichnung der Bohrung
 Parametr je navázaný na proměnné – kliknutím vazbu zrušíte	Der Parameter ist an Variablen gebunden – Klick hebt die Bindung auf
@@ -370,9 +366,7 @@ Ponechat originál (sloučit)	Original behalten (vereinigen)
 Posunutí roviny	Ebenenversatz
 Počet stran	Seitenzahl
 Počátek a normála níže se dopočítají z definice při každé změně modelu.	Ursprung und Normale unten werden bei jeder Modelländerung aus der Definition neu berechnet.
-Pořadí: měřítko → otočení → posunutí, vše vůči počátku souřadnic.	Reihenfolge: Skalierung → Drehung → Verschiebung, alles bezogen auf den Koordinatenursprung.
 Pro šroub (průchozí díra ISO 273)	Für Schraube (Durchgangsloch ISO 273)
-Profil by měl ležet v rovině kolmé na začátek dráhy. Dráha může obsahovat úsečky, oblouky a lomené čáry – musí být souvislá.	Das Profil sollte in einer Ebene senkrecht zum Pfadanfang liegen. Der Pfad kann Linien, Bögen und Polylinien enthalten – er muss zusammenhängend sein.
 Prvek nemá parametry.	Das Feature hat keine Parameter.
 Průnik	Schnittmenge
 Rovina se přepočítá při každé změně modelu (např. posune-li se plocha, na které skica leží).	Die Ebene wird bei jeder Modelländerung neu berechnet (z. B. wenn sich die Fläche verschiebt, auf der die Skizze liegt).
@@ -382,10 +376,8 @@ Ručně (počátek a normála níže)	Manuell (Ursprung und Normale unten)
 Stranu +{0}	Seite +{0}
 Stranu −{0}	Seite −{0}
 Střední	Mittel
-Tento typ pole (po křivce / podle skici / výplňové) připravuje modul polí.	Diese Musterart (entlang Kurve / nach Skizze / Füllung) bereitet das Mustermodul vor.
 Tip: klikněte na plochu modelu – bod a osa se doplní automaticky. Více děr: „Přidat body klikem“ (vrcholy, středy kružnic, body skici přes pravé tlačítko).	Tipp: Klicken Sie auf eine Modellfläche – Punkt und Achse werden automatisch ergänzt. Mehrere Bohrungen: „Punkte per Klick hinzufügen“ (Eckpunkte, Kreismittelpunkte, Skizzenpunkte über die rechte Taste).
 Typ díry	Bohrungstyp
-Typ pole	Musterart
 Ukončení (směr 1)	Endbedingung (Richtung 1)
 Ukončení (směr 2)	Endbedingung (Richtung 2)
 Uzavřená	Geschlossen
@@ -403,10 +395,8 @@ YZ ⟂ X	YZ ⟂ X
 Začátek, směr, tenká stěna, úkos, kroucení…	Anfang, Richtung, dünne Wand, Schräge, Verdrehung…
 Zrušit výběr	Auswahl aufheben
 Závit (hrubé i jemné stoupání)	Gewinde (Regel- und Feingewinde)
-Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk.	Das Gewinde wird als Rillen modelliert (vereinfacht, ohne Steigung) – geeignet für Visualisierung und 3D-Druck.
 mm, závit	mm, Gewinde
 se uvede ve výkrese.	erscheint in der Zeichnung.
-vyberte v modelu ({0})	im Modell wählen ({0})
 vybráno.	ausgewählt.
 · střed	· Mitte
 · vrták Ø	· Bohrer Ø
@@ -419,7 +409,6 @@ vybráno.	ausgewählt.
 Žebro se protáhne od čáry až k tělesu. Stranu, kde narazí na materiál, najde automaticky.	Die Rippe wird von der Linie bis zum Körper gezogen. Die Seite, auf der sie auf Material trifft, findet sie automatisch.
 — vlastní průměr —	— eigener Durchmesser —
 — vyberte prvek —	— Feature wählen —
-— vyberte —	— wählen —
 “ není načten.	“ ist nicht geladen.
 # ref-field
 + Přidat {0} klikem	+ {0} per Klick hinzufügen

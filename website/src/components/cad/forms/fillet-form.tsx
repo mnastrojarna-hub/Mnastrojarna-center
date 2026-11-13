@@ -32,11 +32,11 @@ const CHAMFER_KINDS: { v: ChamferKind; l: string }[] = [
 const without = (o: Record<string, number> | undefined, k: string) => (o ? Object.fromEntries(Object.entries(o).filter(([key]) => key !== k)) : o);
 
 /** Hrany: vybrané klikem / všechny (+ počet vybraných). */
-function EdgesPick({ f, set, pickHint, allLabel = tr("Všechny") }: { f: FilletF | ChamferF; set: FeatureFormProps["set"]; pickHint?: string; allLabel?: string }) {
+function EdgesPick({ f, doc, set, pickHint, allLabel = tr("Všechny") }: { f: FilletF | ChamferF; doc: FeatureFormProps["doc"]; set: FeatureFormProps["set"]; pickHint?: string; allLabel?: string }) {
   return (
     <>
       <Seg label={tr("Hrany")} value={f.edges === "all" ? "all" : "pick"} options={[{ v: "pick", l: tr("Vybrané") }, { v: "all", l: allLabel }]} onChange={(v) => set({ edges: v === "all" ? "all" : [] })} />
-      {f.edges !== "all" && <PickInfo n={f.edges.length} what="hran" hint={pickHint} onClear={() => set({ edges: [] })} />}
+      {f.edges !== "all" && <PickInfo n={f.edges.length} what={tr("hran")} hint={pickHint} onClear={() => set({ edges: [] })} list={{ doc, f, kind: "edges", value: f.edges, onChange: (edges) => set({ edges }) }} />}
     </>
   );
 }
@@ -45,7 +45,7 @@ function TangentChain({ f, set }: { f: FilletF | ChamferF; set: FeatureFormProps
   return <Check label={tr("Šířit výběr po tečně navazujících hranách")} value={!!f.tangentChain} onChange={(v) => set({ tangentChain: v })} />;
 }
 
-function FilletForm({ f, set, b, pickHint }: FeatureFormProps<FilletF>) {
+function FilletForm({ f, doc, set, b, pickHint }: FeatureFormProps<FilletF>) {
   const kind: FilletKind = f.kind ?? "constant";
   const edgeIdx = f.edges === "all" ? [] : f.edges;
   const radiusField = (label = tr("Poloměr")) => <Num label={label} value={f.radius} min={0.01} step={0.5} bind={b("radius")} onChange={(v) => set({ radius: v })} />;
@@ -55,7 +55,7 @@ function FilletForm({ f, set, b, pickHint }: FeatureFormProps<FilletF>) {
       {kind === "constant" && (
         <>
           {radiusField()}
-          <EdgesPick f={f} set={set} pickHint={pickHint} />
+          <EdgesPick f={f} doc={doc} set={set} pickHint={pickHint} />
           <TangentChain f={f} set={set} />
         </>
       )}
@@ -68,7 +68,7 @@ function FilletForm({ f, set, b, pickHint }: FeatureFormProps<FilletF>) {
           <button type="button" className="text-[12px] text-brand underline" onClick={() => set({ radius: f.r2 ?? f.radius, r2: f.radius })}>
             {tr("Prohodit R1 ↔ R2")}
           </button>
-          <EdgesPick f={f} set={set} pickHint={pickHint} />
+          <EdgesPick f={f} doc={doc} set={set} pickHint={pickHint} />
           <TangentChain f={f} set={set} />
           <Info>
             {tr("Poloměr se mění lineárně od začátku hrany (R1) k jejímu konci (R2). Začátek hrany určuje model – běží-li přechod obráceně, hodnoty prohoďte. Eliptické (asymetrické) zaoblení s různou vzdáleností na každé ploše jádro OCCT neumí.")}
@@ -78,7 +78,7 @@ function FilletForm({ f, set, b, pickHint }: FeatureFormProps<FilletF>) {
       {kind === "variable" && (
         <>
           {radiusField(tr("Výchozí poloměr"))}
-          <EdgesPick f={f} set={set} pickHint={pickHint} />
+          <EdgesPick f={f} doc={doc} set={set} pickHint={pickHint} />
           {f.edges === "all" ? (
             <Info>{tr("Pro tabulku poloměrů vyberte hrany klikem v modelu – u volby „Všechny“ platí výchozí poloměr.")}</Info>
           ) : (
@@ -133,7 +133,7 @@ function FilletForm({ f, set, b, pickHint }: FeatureFormProps<FilletF>) {
   );
 }
 
-function ChamferForm({ f, set, b, pickHint }: FeatureFormProps<ChamferF>) {
+function ChamferForm({ f, doc, set, b, pickHint }: FeatureFormProps<ChamferF>) {
   const kind: ChamferKind = f.kind ?? "equal";
   const withFace = kind === "twoDistances" || kind === "distanceAngle";
   const d1 = (label: string) => <Num label={label} value={f.distance} min={0.01} step={0.5} bind={b("distance")} onChange={(v) => set({ distance: v })} />;
@@ -143,7 +143,7 @@ function ChamferForm({ f, set, b, pickHint }: FeatureFormProps<ChamferF>) {
       {kind === "equal" && (
         <>
           {d1(tr("Velikost sražení"))}
-          <EdgesPick f={f} set={set} pickHint={pickHint} />
+          <EdgesPick f={f} doc={doc} set={set} pickHint={pickHint} />
           <TangentChain f={f} set={set} />
         </>
       )}
@@ -162,7 +162,7 @@ function ChamferForm({ f, set, b, pickHint }: FeatureFormProps<ChamferF>) {
       {withFace && (
         <>
           <RefField label={tr("Referenční plocha")} value={f.faceRef} want="face" hint={tr("plocha, na které se měří první vzdálenost")} onChange={(faceRef) => set({ faceRef })} />
-          <EdgesPick f={f} set={set} pickHint={pickHint} allLabel={tr("Všechny hrany plochy")} />
+          <EdgesPick f={f} doc={doc} set={set} pickHint={pickHint} allLabel={tr("Všechny hrany plochy")} />
           <TangentChain f={f} set={set} />
           <Info>
             {kind === "twoDistances"

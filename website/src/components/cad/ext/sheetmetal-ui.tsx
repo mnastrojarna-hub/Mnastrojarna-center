@@ -86,7 +86,7 @@ function FlangeForm({ f, onChange }: ExtFormProps) {
                 <span className="font-medium">{p.label}:</span> {edges.length ? tr("{0} vybráno", edges.length) : tr("klikněte na rovnou hranu plechu v modelu")}
                 {edges.length > 0 && (
                   <button type="button" className="ml-2 text-brand hover:underline" onClick={() => onChange({ edges: [], edgeGeom: [] })}>
-                    vymazat
+                    {tr("vymazat")}
                   </button>
                 )}
                 {p.hint && <p className="mt-1 text-[11px] text-ink-700/45">{p.hint}</p>}

@@ -18,9 +18,7 @@ R{0}, hrany {1}	R{0}, edges {1}
 Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)	Assembly: component bodies are built separately (see the bill of materials for volume and mass)
 Sestava: {0} komponent ({1} dílů po rozložení podsestav){2}{3}{4}	Assembly: {0} components ({1} parts after expanding sub-assemblies){2}{3}{4}
 Text	Text
-bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; závit i s jemným stoupáním (M18×1,5) – jádro se dopočítá	without z = starts on the body surface at that point (from the mesh) and drills downwards; the thread may have a fine pitch (M18×1,5) – the minor diameter is computed
 celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy	a whole .mncad document, an array of features or a single feature – gives access to all 36 feature types; one feature per line can be mixed with text commands
-další entity; předpona „pomocná“ = konstrukční	more entities; the prefix “construction” = construction geometry
 drážka	slot
 drážka potřebuje délku a šířku: drážka 40 10 [v x y] [úhel 0]	slot needs a length and a width: slot 40 10 [at x y] [angle 0]
 díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]	hole needs a diameter: hole 8.5 [depth 20 | through] at X Y [Z]
@@ -37,17 +35,13 @@ kvádr; výchozí roh v počátku, „střed“ = vystředit	box; corner at the 
 lineární {0}× po {1}{2}	linear {0}× every {1}{2}
 materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)	material = density class (steel, stainless, aluminium, brass, copper, plastic, titanium, cast iron, bronze) or any designation for the title block (ČSN 11 423, 1.0503)
 mnohoúhelník potřebuje počet stran a průměr opsané kružnice: mnohoúhelník 6 30 [v x y]	polygon needs the number of sides and the circumscribed diameter: polygon 6 30 [at x y]
-neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, bod, elipsa	unknown sketch entity “{0}” – rect, circle, polygon, slot, line, polyline, point, ellipse
 neznámé pravidlo pro hrany „{0}“ – vše, horní, spodní, +Z/-Z/+X/-X/+Y/-Y, svislé, vodorovné, kruhové, rovné, poloměr N, delší N, kratší N	unknown edge rule “{0}” – all, top, bottom, +Z/-Z/+X/-X/+Y/-Y, vertical, horizontal, circular, straight, radius N, longer N, shorter N
 neznámé pravidlo pro plochy „{0}“ – +Z/-Z/+X/-X/+Y/-Y, horní, spodní, boční, válcové, rovinné, největší	unknown face rule “{0}” – +Z/-Z/+X/-X/+Y/-Y, top, bottom, side, cylindrical, planar, largest
-neznámý příkaz „{0}“ – příkazy: nový díl, kvádr, válec, koule, kužel, trubka, skica, obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, vysunout, rotovat, díra, zaoblit, srazit, skořepina, pole, zrcadlit, text, smazat poslední, stav, zobraz; nebo vložte JSON	unknown command “{0}” – commands: new part, box, cylinder, sphere, cone, tube, sketch, rect, circle, polygon, slot, line, polyline, extrude, revolve, hole, fillet, chamfer, shell, pattern, mirror, text, undo, status, view; or paste JSON
 neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)	unknown thread “{0}” – M2 to M48, coarse or fine pitch (M18×1,5)
-nová skica; entity i na dalších řádcích	new sketch; entities may follow on the next lines
 nový dokument v nové záložce	new document in a new tab
 nápis vystouplý / gravírovaný	raised / engraved lettering
 obdélník potřebuje šířku a výšku: obdélník 60 40 [v x y] (střed) nebo roh x y	rectangle needs a width and a height: rect 60 40 [at x y] (centre) or corner x y
 obdélník se středem (výchozí počátek) nebo rohem	rectangle by centre (origin by default) or by corner
-orotuje poslední skicu (výchozí osa Y skici, 360°)	revolves the last sketch (sketch Y axis by default, 360°)
 pohled: iso, přední, zadní, horní, spodní, levý, pravý	view: iso, front, back, top, bottom, left, right
 pole kruhové potřebuje počet: pole kruhové 6 [úhel 360] [osa Z]	circular pattern needs a count: pattern circular 6 [angle 360] [axis Z]
 pole posledního prvku	pattern of the last feature
@@ -594,7 +588,6 @@ Odsazení	Offset
 Odsazení nesmí být nulové.	The offset must not be zero.
 Opačný směr	Reverse direction
 Osa	Axis
-Osa rotace (ve skice)	Axis of revolution (in the sketch)
 Oříznout rovinou	Trim with plane
 Oříznout skicou	Trim with sketch
 Plochu se nepodařilo zesílit – zkuste menší tloušťku nebo nejdřív plochy sešijte.	The surface could not be thickened – try a smaller thickness or sew the surfaces first.
@@ -644,7 +637,6 @@ Skica „{0}“ neobsahuje souvislou křivku ani uzavřený profil.	Sketch “{0
 Stoupání	Pitch
 Strana	Side
 Střed začátku	Start centre
-Svislá Y	Vertical Y
 Symetricky na obě strany	Symmetric to both sides
 Tažení plochy	Surface sweep
 Tažení po šroubovici	Helical sweep
@@ -659,7 +651,6 @@ Vnitřek profilu	Inside of the profile
 Vnitřní (v díře)	Internal (in a hole)
 Vnějšek	Outside
 Vnější (na válci)	External (on a cylinder)
-Vodorovná X	Horizontal X
 Vyberte alespoň dvě hrany tvořící uzavřenou smyčku.	Select at least two edges forming a closed loop.
 Vyberte cílovou plochu.	Select the target face.
 Vyberte plochu k prodloužení.	Select the face to extend.
@@ -686,7 +677,6 @@ křivka skici (i otevřená) vysunutá do plochy	a sketch curve (even open) extr
 křivky skici promítnuté po normále skici na vybranou plochu	sketch curves projected along the sketch normal onto the selected face
 nic = všechny volné plochy	none = all free faces
 odřízne část volných ploch na jedné straně základní roviny	cuts away the part of the free faces on one side of a base plane
-otevřený profil rotovaný kolem osy skici	an open profile revolved about a sketch axis
 otevřený profil tažený po dráze (druhá skica)	an open profile swept along a path (second sketch)
 plocha přes 2 a více křivek (v různých rovinách)	a surface through 2 or more curves (in different planes)
 poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	radius = the surface where the thread starts: the cylinder, or the hole (minor diameter); the depth goes into the material

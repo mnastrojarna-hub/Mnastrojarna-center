@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
 
-type Item = { href: string; title: string; summary: string; year?: number; kind: string; photo: string; photos: number };
+type Item = { href: string; title: string; summary: string; kind: string; photo: string; photos: number };
 
 /** Archiv zakázek s filtrem podle typu. */
 export function CasesGrid({ items, kinds, all, photosLabel, openLabel }: { items: Item[]; kinds: Record<string, string>; all: string; photosLabel: string; openLabel: string }) {
@@ -32,7 +32,6 @@ export function CasesGrid({ items, kinds, all, photosLabel, openLabel }: { items
               <Image src={c.photo} alt={c.title} fill sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 100vw" className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-[1.06]" />
               <span className="absolute left-5 top-5 rounded-full bg-white/90 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-ink-700 backdrop-blur">
                 {kinds[c.kind]}
-                {c.year ? ` · ${c.year}` : ""}
               </span>
               <span className="absolute bottom-5 right-5 rounded-full bg-black/40 px-3 py-1 font-mono text-[10px] text-white backdrop-blur">
                 {c.photos} {photosLabel}

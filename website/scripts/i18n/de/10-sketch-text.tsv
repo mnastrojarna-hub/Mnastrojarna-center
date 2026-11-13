@@ -1,0 +1,110 @@
+# Vazby, kóty a roviny skici textem (agent-sketch.ts): vazba …, kóta …, skica plocha F3 …, skica rovina …, id entit e1, e2…
+vodorovně	waagerecht
+svisle	senkrecht
+shodně	deckungsgleich
+rovnoběžně	parallel
+kolmo	rechtwinklig
+tečně	tangential
+stejně	gleich
+pevně	fest
+soustředně	konzentrisch
+středem	Mittelpunkt
+na křivce	aufKurve
+symetricky	symmetrisch
+kolineárně	kollinear
+délka	Länge
+vzdálenost	Abstand
+poloměr	Radius
+průměr	Durchmesser
+úhel	Winkel
+délka oblouku	Bogenlänge
+referenční	Referenz
+počátek	Ursprung
+vazba {0}	Bedingung {0}
+kóta {0}	Bemaßung {0}
+vazba vodorovně e1 (úsečka) · vazba vodorovně e1.a e2.b (dva body)	bedingung waagerecht e1 (Linie) · bedingung waagerecht e1.a e2.b (zwei Punkte)
+vazba svisle e1 (úsečka) · vazba svisle e1.a e2.b (dva body)	bedingung senkrecht e1 (Linie) · bedingung senkrecht e1.a e2.b (zwei Punkte)
+vazba shodně e1.b e2.a (dva body; počátek = počátek skici)	bedingung deckungsgleich e1.b e2.a (zwei Punkte; ursprung = Skizzenursprung)
+vazba rovnoběžně e1 e3 (dvě úsečky)	bedingung parallel e1 e3 (zwei Linien)
+vazba kolmo e1 e2 (dvě úsečky)	bedingung rechtwinklig e1 e2 (zwei Linien)
+vazba tečně e1 e5 (úsečka a kružnice / oblouk, nebo dvě kružnice / oblouky)	bedingung tangential e1 e5 (Linie und Kreis / Bogen oder zwei Kreise / Bögen)
+vazba stejně e1 e3 (dvě úsečky, nebo dvě kružnice / oblouky)	bedingung gleich e1 e3 (zwei Linien oder zwei Kreise / Bögen)
+vazba pevně e1.a [x y] (bod, volitelně na souřadnice) · vazba pevně e1 (celá entita)	bedingung fest e1.a [x y] (Punkt, optional auf Koordinaten) · bedingung fest e1 (ganzes Element)
+vazba soustředně e5 e6 (dvě kružnice / oblouky, nebo kružnice a bod)	bedingung konzentrisch e5 e6 (zwei Kreise / Bögen oder Kreis und Punkt)
+vazba středem e5.střed e1 (bod a úsečka)	bedingung mittelpunkt e5.mitte e1 (Punkt und Linie)
+vazba na křivce e1.b e5 (bod a úsečka / kružnice / oblouk)	bedingung aufKurve e1.b e5 (Punkt und Linie / Kreis / Bogen)
+vazba symetricky e1.a e2.b e3 (dva body a osa = úsečka)	bedingung symmetrisch e1.a e2.b e3 (zwei Punkte und Achse = Linie)
+vazba kolineárně e1 e4 (dvě úsečky)	bedingung kollinear e1 e4 (zwei Linien)
+kóta délka e1 50 (úsečka nebo strana: e2.s0 obdélníku, e3.g1 lomené čáry)	bemaßung länge e1 50 (Linie oder Seite: e2.s0 eines Rechtecks, e3.g1 einer Polylinie)
+kóta vzdálenost e1.a e3.b 40 (dva body, bod a úsečka, nebo dvě rovnoběžné úsečky)	bemaßung abstand e1.a e3.b 40 (zwei Punkte, Punkt und Linie oder zwei parallele Linien)
+kóta vodorovně e1.a e2.b 30 (dva body; úsečka = její konce; počátek = počátek skici)	bemaßung waagerecht e1.a e2.b 30 (zwei Punkte; Linie = ihre Enden; ursprung = Skizzenursprung)
+kóta svisle počátek e1.a 20 (dva body; úsečka = její konce)	bemaßung senkrecht ursprung e1.a 20 (zwei Punkte; Linie = ihre Enden)
+kóta poloměr e5 R10 (kružnice nebo oblouk)	bemaßung radius e5 R10 (Kreis oder Bogen)
+kóta průměr e5 Ø20 (kružnice nebo oblouk)	bemaßung durchmesser e5 Ø20 (Kreis oder Bogen)
+kóta úhel e1 e2 45 (dvě úsečky, 0–180°)	bemaßung winkel e1 e2 45 (zwei Linien, 0–180°)
+kóta délka oblouku e5 30 (oblouk)	bemaßung bogenlänge e5 30 (Bogen)
+„{0}“ není odkaz na entitu skici – e3 (celá entita), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod) nebo počátek	„{0}“ ist kein Verweis auf ein Skizzenelement – e3 (ganzes Element), e3.a / e3.b / e3.c / e3.mitte / e3.p0 (Punkt) oder ursprung
+vazba potřebuje druh a odkazy: vazba kolmo e1 e2 – druhy: {0}	bedingung braucht Art und Referenzen: bedingung rechtwinklig e1 e2 – Arten: {0}
+neznámý druh vazby „{0}“ – druhy: {1}	unbekannte Bedingungsart „{0}“ – Arten: {1}
+vazba {0}: špatný počet odkazů ({1}) – zápis: {2}	Bedingung {0}: falsche Anzahl von Referenzen ({1}) – Schreibweise: {2}
+vazba {0}: čísla „{1}“ navíc – zápis: {2}	Bedingung {0}: überzählige Zahlen „{1}“ – Schreibweise: {2}
+kóta potřebuje druh, odkaz a hodnotu: kóta délka e1 50 – druhy: {0}	bemaßung braucht Art, Referenz und Wert: bemaßung länge e1 50 – Arten: {0}
+neznámý druh kóty „{0}“ – druhy: {1}	unbekannte Bemaßungsart „{0}“ – Arten: {1}
+kóta {0}: jen jedna hodnota (zadáno {1}) – zápis: {2}	Bemaßung {0}: nur ein Wert (angegeben {1}) – Schreibweise: {2}
+kóta {0}: špatný počet odkazů ({1}) – zápis: {2}	Bemaßung {0}: falsche Anzahl von Referenzen ({1}) – Schreibweise: {2}
+kóta {0} potřebuje hodnotu (nebo „referenční“) – zápis: {1}	Bemaßung {0} braucht einen Wert (oder „Referenz“) – Schreibweise: {1}
+kóta úhel: hodnota musí být mezi 0° a 180° (zadáno {0})	Bemaßung Winkel: der Wert muss zwischen 0° und 180° liegen (angegeben {0})
+kóta {0}: hodnota nesmí být záporná (zadáno {1}) – stranu určuje pořadí bodů	Bemaßung {0}: der Wert darf nicht negativ sein (angegeben {1}) – die Seite ergibt sich aus der Reihenfolge der Punkte
+kóta {0}: hodnota musí být kladná (zadáno {1})	Bemaßung {0}: der Wert muss positiv sein (angegeben {1})
+entita	Element
+entit	Elemente
+kružnice	Kreis
+oblouk	Bogen
+obdélník	Rechteck
+mnohoúhelník	Vieleck
+lomená čára	Polylinie
+spline	Spline
+spline {0} b.	Spline {0} Pkt.
+přes	über
+ (pomocná)	 (Hilfsgeometrie)
+ nebo 	 oder 
+entita „{0}“ ve skice „{1}“ není – entity: {2}	Element „{0}“ gibt es in Skizze „{1}“ nicht – Elemente: {2}
+entita {0} ({1}) nemá bod ani stranu „{2}“ – lze: {3}	Element {0} ({1}) hat keinen Punkt und keine Seite „{2}“ – möglich: {3}
+{0}: „{1}“ je {2}, čeká se {3} – zápis: {4}	{0}: „{1}“ ist {2}, erwartet: {3} – Schreibweise: {4}
+{0}: oba odkazy jsou počátek – zápis: {1}	{0}: beide Referenzen sind der Ursprung – Schreibweise: {1}
+{0}: aspoň jeden odkaz musí být kružnice nebo oblouk – zápis: {1}	{0}: mindestens eine Referenz muss ein Kreis oder Bogen sein – Schreibweise: {1}
+{0}: obě entity musí být stejného druhu (dvě úsečky, nebo dvě kružnice / oblouky) – zápis: {1}	{0}: beide Elemente müssen gleicher Art sein (zwei Linien oder zwei Kreise / Bögen) – Schreibweise: {1}
+{0}: počátek je pevný sám o sobě – zápis: {1}	{0}: der Ursprung ist von sich aus fest – Schreibweise: {1}
+{0}: souřadnice lze zadat jen u bodu (e1.a 10 20) – zápis: {1}	{0}: Koordinaten nur bei einem Punkt (e1.a 10 20) – Schreibweise: {1}
+{0}: chybí {1} – zápis: {2}	{0}: es fehlt {1} – Schreibweise: {2}
+{0}: chybí osa (úsečka) – zápis: {1}	{0}: die Achse (Linie) fehlt – Schreibweise: {1}
+{0}: vzdálenost dvou úseček jen u rovnoběžných – jinak kóta úhel nebo vzdálenost bodů	{0}: Abstand zweier Linien nur bei parallelen – sonst Winkelbemaßung oder Punktabstand
+{0}: „{1}“ není oblouk – zápis: {2}	{0}: „{1}“ ist kein Bogen – Schreibweise: {2}
+{0}: tuto kombinaci nelze okótovat – zápis: {1}	{0}: diese Kombination lässt sich nicht bemaßen – Schreibweise: {1}
+ · řešič nenašel řešení (odchylka {0}), geometrie zůstala beze změny; vazby a kóty zůstaly uložené – opravte nebo smažte tu, která je v rozporu	 · der Löser fand keine Lösung (Abweichung {0}), die Geometrie bleibt unverändert; Bedingungen und Bemaßungen bleiben gespeichert – die widersprüchliche korrigieren oder löschen
+skica z řádku {0} nevznikla – entity, vazby a kóty nemají kam (opravte řádek {0})	die Skizze aus Zeile {0} wurde nicht angelegt – Elemente, Bedingungen und Bemaßungen haben kein Ziel (Zeile {0} korrigieren)
+skica „{0}“: {1}	Skizze „{0}“: {1}
+vazby ve skice „{0}“: {1}	Bedingungen in Skizze „{0}“: {1}
+kóty ve skice „{0}“: {1}	Bemaßungen in Skizze „{0}“: {1}
+entity: {0}	Elemente: {0}
+entit {0} – jednotlivě s id se vypisují jen skici do {1} entit	{0} Elemente – einzeln mit ID werden nur Skizzen bis {1} Elemente aufgeführt
+vazby {0}, kóty {1}{2}	Bedingungen {0}, Bemaßungen {1}{2}
+– rovinné plochy: {0}	– ebene Flächen: {0}
+skica na ploše: dokument nemá těleso – nejdřív vytvořte tvar (kvádr, vysunutí…)	Skizze auf Fläche: das Dokument hat keinen Körper – erst eine Form anlegen (Quader, Extrusion…)
+plocha F{0} v tělese není – těleso má {1} ploch (F1 až F{1}){2}	Fläche F{0} gibt es nicht – der Körper hat {1} Flächen (F1 bis F{1}){2}
+plocha F{0} není rovinná – skicu lze založit jen na rovinné ploše{1}	Fläche F{0} ist nicht eben – eine Skizze lässt sich nur auf einer ebenen Fläche anlegen{1}
+plochu F{0} nelze použít: {1}	Fläche F{0} kann nicht verwendet werden: {1}
+na ploše F{0}	auf Fläche F{0}
+pomocná rovina „{0}“ v dílu není – pomocné roviny: {1}	Hilfsebene „{0}“ gibt es im Teil nicht – Hilfsebenen: {1}
+žádné (vytvoří ji např. prvek datum)	keine (z. B. mit dem Element datum anlegen)
+na pomocné rovině „{0}“	auf Hilfsebene „{0}“
+rovinu skice {0} se nepodařilo určit: {1}	die Skizzenebene {0} konnte nicht bestimmt werden: {1}
+neznámá chyba	unbekannter Fehler
+počátek {0}, normála {1}, osa X skici {2}	Ursprung {0}, Normale {1}, X-Achse der Skizze {2}
+✓ {0} {1} – rovina: {2}	✓ {0} {1} – Ebene: {2}
+skica na ploše potřebuje číslo plochy nebo pravidlo: skica plocha F3 | horní | +X [odsazení 5] [obráceně] – čísla ploch F1, F2… ukazují popisky pro výběr (Ctrl+Shift+L, window.mncad.hints())	Skizze auf Fläche braucht eine Flächennummer oder eine Regel: skizze fläche F3 | oben | +X [versatz 5] [umkehren] – Flächennummern F1, F2… zeigen die Auswahl-Beschriftungen (Strg+Umschalt+L, window.mncad.hints())
+pravidlu „{0}“ odpovídá {1} rovinných ploch – zadejte ho jednoznačně (horní, spodní, +X, -Y…) nebo plochu číslem (F3){2}	der Regel „{0}“ entsprechen {1} ebene Flächen – eindeutig angeben (oben, unten, +X, -Y…) oder die Flächennummer (F3){2}
+skica na pomocné rovině potřebuje její název: skica rovina "Rovina 1" [odsazení 5]	Skizze auf Hilfsebene braucht ihren Namen: skizze ebene "Ebene 1" [versatz 5]
+skica na rovinné ploše modelu – číslem (F1, F2… jako popisky pro výběr / window.mncad.hints()) nebo pravidlem jako u skořepiny (horní, +X…) – nebo na pomocné rovině podle názvu; rovina je asociativní – přepočítá se se změnou modelu, protokol vypíše její počátek a osy	Skizze auf einer ebenen Fläche des Modells – per Nummer (F1, F2… wie die Auswahl-Beschriftungen / window.mncad.hints()) oder per Regel wie bei der Schale (oben, +X…) – oder auf einer Hilfsebene nach Namen; die Ebene ist assoziativ – sie wird bei Modelländerungen neu berechnet, das Protokoll nennt Ursprung und Achsen
+vazba ve skice: vodorovně, svisle, shodně, rovnoběžně, kolmo, tečně, stejně, pevně, soustředně, středem, na křivce, symetricky, kolineárně; odkaz = e3 (celá entita; id entit ukazuje stav), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod), e3.s0 (strana obdélníku) nebo počátek; po řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno	Skizzenbedingung: waagerecht, senkrecht, deckungsgleich, parallel, rechtwinklig, tangential, gleich, fest, konzentrisch, mittelpunkt, aufKurve, symmetrisch, kollinear; Referenz = e3 (ganzes Element; IDs zeigt der Status), e3.a / e3.b / e3.c / e3.mitte / e3.p0 (Punkt), e3.s0 (Rechteckseite) oder ursprung; nach der Zeile wird die Skizze gelöst und das Protokoll meldet Vollständig bestimmt / Unterbestimmt (N Freiheitsgrade) / Überbestimmt
+kóta ve skice: délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku; hodnota i s desetinnou čárkou, Ø20 / R10; řídicí kóta změní geometrii, „referenční“ jen měří	Skizzenbemaßung: länge, abstand, waagerecht, senkrecht, radius, durchmesser, winkel, bogenlänge; Wert auch mit Dezimalkomma, Ø20 / R10; eine steuernde Bemaßung ändert die Geometrie, „Referenz“ misst nur

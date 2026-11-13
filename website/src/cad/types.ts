@@ -14,11 +14,21 @@ export type SketchPlane =
   | { kind: "custom"; origin: Vec3; normal: Vec3; xDir: Vec3; label?: string };
 
 import { tr } from "./i18n";
-import type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
+import type { AxisDef, Direction, Extent, PlaneDef, Ref, Sig, StartFrom, Thin } from "./refs";
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
 
 /** Ukončení díry. */
-export type HoleEnd = { kind: "blind" } | { kind: "throughAll" } | { kind: "toNext" } | { kind: "toFace"; ref: Ref; offset?: number };
+export type HoleEnd =
+  | { kind: "blind" }
+  | { kind: "throughAll" }
+  | { kind: "toNext" }
+  | { kind: "toFace"; ref: Ref; offset?: number }
+  /** dno v úrovni bodu (vrchol, střed hrany, bod skici…) měřeno podél osy díry */
+  | { kind: "toVertex"; ref: Ref }
+  /** dno ve vzdálenosti `d` před plochou (totéž co „k ploše“ s odsazením – stejný zápis jako u vysunutí) */
+  | { kind: "offsetFromFace"; ref: Ref; d: number }
+  /** k tělesu: po první stěnu stávajícího tělesa ve směru vrtání (jako ukončení „k tělesu“ u vysunutí) */
+  | { kind: "toBody" };
 /** Řada průchozích děr ISO 273 (jemná / střední / hrubá). */
 export type HoleFit = "fine" | "medium" | "coarse";
 
@@ -96,6 +106,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       flip: boolean;
       diameter: number;
       depth: number; // 0 = skrz
+      /** díra „skrz“ vrtá od zadaného bodu jen ve směru vrtání; `bothWays` = oběma směry (skrz celé těleso) */
+      bothWays?: boolean;
       cbDiameter: number; // 0 = bez zahloubení
       cbDepth: number;
       /** výchozí "simple" (nebo "counterbore", pokud cbDiameter > 0) */
@@ -118,11 +130,11 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       fit?: HoleFit;
     }
   /** Zaoblení: `kind` konstantní / asymetrické (r2) / proměnné (radii: poloměr podle indexu hrany) / plocha–plocha / plné; `tangentChain` = šířit po tečných hranách. */
-  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound"; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
+  | { type: "fillet"; radius: number; edges: number[] | "all"; kind?: "constant" | "asymmetric" | "variable" | "faceFace" | "fullRound"; r2?: number; radii?: Record<string, number>; radii2?: Record<string, number>; faces?: number[]; faces2?: number[]; edgeSigs?: PickSigs; faceSigs?: PickSigs; faceSigs2?: PickSigs; faceRefs?: Ref[]; faceRefs2?: Ref[]; faceRefsMid?: Ref[]; tangentChain?: boolean; setback?: number }
   /** Zkosení: stejné vzdálenosti / dvě vzdálenosti (d2 + referenční plocha) / vzdálenost + úhel / vrchol (3 vzdálenosti). */
-  | { type: "chamfer"; distance: number; edges: number[] | "all"; kind?: "equal" | "twoDistances" | "distanceAngle" | "vertex"; d2?: number; d3?: number; angle?: number; faceRef?: Ref; vertices?: number[]; vertexRefs?: Ref[]; tangentChain?: boolean }
+  | { type: "chamfer"; distance: number; edges: number[] | "all"; kind?: "equal" | "twoDistances" | "distanceAngle" | "vertex"; d2?: number; d3?: number; angle?: number; faceRef?: Ref; vertices?: number[]; vertexRefs?: Ref[]; tangentChain?: boolean; edgeSigs?: PickSigs; vertexSigs?: PickSigs }
   /** Skořepina: `thicknesses` = jiná tloušťka pro vybrané plochy (index → mm), `outward` = zesílit ven. */
-  | { type: "shell"; thickness: number; faces: number[]; thicknesses?: Record<string, number>; outward?: boolean }
+  | { type: "shell"; thickness: number; faces: number[]; thicknesses?: Record<string, number>; outward?: boolean; faceSigs?: PickSigs }
   | {
       type: "pattern";
       featureId: string;
@@ -160,7 +172,7 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Šablonování mezi 2+ skicami (profily v různých rovinách). */
   | { type: "loft"; sketchIds: string[]; ruled: boolean; mode: BoolMode; guideIds?: string[]; centerlineId?: string; closed?: boolean; startCond?: "none" | "normal" | "direction"; endCond?: "none" | "normal" | "direction"; startDir?: Direction; endDir?: Direction; startLen?: number; endLen?: number; thin?: Thin; startPoint?: Ref; endPoint?: Ref }
   /** Úkos vybraných ploch vůči neutrální rovině (`planeDef` = libovolná rovina; `pull` = směr tahu; `partingSketchId` = dělicí křivka). */
-  | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number; planeDef?: PlaneDef; pull?: Direction; partingSketchId?: string; tangentChain?: boolean; step?: boolean }
+  | { type: "draft"; angle: number; faces: number[]; plane: PlaneName; offset: number; planeDef?: PlaneDef; pull?: Direction; partingSketchId?: string; tangentChain?: boolean; step?: boolean; faceSigs?: PickSigs }
   /** Rozříznutí tělesa rovinou, ponechá se jedna strana (`planeDef` = libovolná rovina, `faceRef` = řez plochou). */
   | { type: "split"; plane: PlaneName; offset: number; keep: "positive" | "negative"; planeDef?: PlaneDef; faceRef?: Ref }
   /** Přesun / otočení / měřítko tělesa. */
@@ -170,17 +182,17 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Text – vystouplý (add) nebo gravírovaný (cut) do tělesa. */
   | { type: "text"; text: string; height: number; depth: number; plane: SketchPlane; position: Vec2; angle: number; mode: "add" | "cut"; positionRef?: Ref; planeDef?: PlaneDef }
   /** Přímé úpravy: posunout (vytáhnout/zatlačit) vybrané plochy o vzdálenost podél normály (`extent` = k vrcholu / k ploše / odsazeně od plochy). */
-  | { type: "pushPull"; faces: number[]; distance: number; extent?: Extent }
+  | { type: "pushPull"; faces: number[]; distance: number; extent?: Extent; faceSigs?: PickSigs }
   /** Přímé úpravy: odstranit plochy (např. zaoblení, díry) a zacelit těleso. */
-  | { type: "deleteFace"; faces: number[] }
+  | { type: "deleteFace"; faces: number[]; faceSigs?: PickSigs }
   /** Přímé úpravy: odsadit plochy (offset) – kladně ven, záporně dovnitř. */
-  | { type: "offsetFace"; faces: number[]; distance: number }
+  | { type: "offsetFace"; faces: number[]; distance: number; faceSigs?: PickSigs }
   /** Žebro z otevřené skici (čára) s tloušťkou, dotažené k tělesu. */
   | { type: "rib"; sketchId: string; thickness: number; direction: "normal" | "inPlane"; flip: boolean }
   /** Šroubovice / pružina (tažení kruhového průřezu po šroubovici). */
   | { type: "spring"; radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis; mode: BoolMode; positionRef?: Ref; dirDef?: Direction }
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
-  | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode }
+  | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode; faceSigs?: PickSigs }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
   /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“) */
   | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; positionRef?: Ref; dirDef?: Direction }
@@ -201,6 +213,13 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
 );
 
 export type FeatureType = Feature["type"];
+
+/**
+ * Otisky výběru indexy: index (řetězec, jak je v poli indexů) → otisk entity tělesa před prvkem v okamžiku výběru. Volitelné u
+ * zaoblení (`edgeSigs`, `faceSigs`, `faceSigs2`), sražení (`edgeSigs`, `vertexSigs`), skořepiny, úkosu a přímých úprav (`faceSigs`);
+ * u rozšíření `data[klíč + "Sigs"]`. Při stavbě se podle nich indexy znovu najdou (pick-fields.ts, pick-sigs.ts).
+ */
+export type PickSigs = Record<string, Sig>;
 
 /** Proměnná (rovnice) – výraz může odkazovat na jiné proměnné: „L = 2*d + 10“. */
 export type Variable = { name: string; expr: string; note?: string };
@@ -242,12 +261,42 @@ export type CadDoc = {
   bodies?: BodyMeta[];
   /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */
   activeBody?: string | null;
+  /** podklady skic (obrázek / stránka PDF pod geometrií): id skici → podklad; mimo prvky, aby neměnily klíč mezipaměti stavby */
+  underlays?: Record<string, SketchUnderlay>;
+};
+
+/**
+ * Podklad skici: obrázek nebo stránka PDF zobrazená pod geometrií (obkreslování, převod čar PDF na entity).
+ * Poloha: střed obrázku `x, y` [mm ve skice], měřítko `mmPerPx` (velikost pixelu bitmapy v mm – nastavuje kalibrace
+ * dvěma body) a natočení `angle` [°, kladně proti směru hodin]. Matematika: cad/sketch-underlay.ts.
+ */
+export type SketchUnderlay = {
+  id: string;
+  /** obrázek jako data URL (PNG / JPEG; velké bitmapy se při vložení zmenší) */
+  src: string;
+  /** rozměr bitmapy [px] */
+  w: number;
+  h: number;
+  /** název zdrojového souboru */
+  name?: string;
+  x: number;
+  y: number;
+  mmPerPx: number;
+  angle: number;
+  /** krytí 0–1 */
+  opacity: number;
+  hidden?: boolean;
+  /** stránka PDF, ze které podklad vznikl (od 1), a počet stran dokumentu */
+  page?: number;
+  pages?: number;
+  /** stránka PDF: pixelů bitmapy na 1 bod PDF (1/72″) – převod vektorových čar stránky do skici */
+  pxPerPt?: number;
 };
 
 export type BodyMeta = { name: string; color?: string; hidden?: boolean };
 
 /** Těleso ve výsledku stavby: indexy ploch/hran jsou globální (v pořadí těles ve složeném výsledku). */
-export type BodyInfo = { name: string; faces: number[]; edges: number[]; volume: number; area: number; createdBy: string; hidden?: boolean };
+export type BodyInfo = { name: string; active: boolean; faceStart: number; faceCount: number; edgeStart: number; edgeCount: number; volume: number };
 
 /** Umístění komponenty: posun (mm) a natočení kolem os X, Y, Z (°, v tomto pořadí). */
 export type Placement = { position: Vec3; rotation: Vec3 };
@@ -277,7 +326,8 @@ export type AsmComponent = {
  * Stav prvku po stavbě: `ok` = prvek se zpracoval; `warning` = zpracoval se, ale výsledek si zaslouží pozornost
  * (operace těleso nezměnila, geometrie po opravě stále není platná…) – v UI ⚠, v protokolu „⚠“.
  */
-export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string };
+/** `ms` = doba výpočtu prvku (jen prvky, které se skutečně počítaly) */
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number };
 
 export type MeshData = {
   vertices: Float32Array;
@@ -327,13 +377,21 @@ export const uid = () => Math.random().toString(36).slice(2, 9);
  * Uživatelská poznámka/kóta ve výkrese. Souřadnice jsou v souřadnicích promítnutého pohledu (`view` = klíč pohledu,
  * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
  */
-export type DrawingAnnotation = { id: string; view: string } & (
-  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string }
+export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string } & (
+  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean }
+  /** průměr / poloměr kružnice nebo oblouku pohledu: střed `c` a poloměr `r` v souřadnicích pohledu, odkaz ve směru `ang` [°] o délce `offset` [mm listu] od kružnice */
+  | { type: "dim"; kind: "diameter" | "radius"; c: Vec2; r: number; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
+  /** úhel dvou hran pohledu (a–b, a2–b2): oblouk o poloměru `offset` [mm listu] v sektoru, kam míří směr `ang` [°] */
+  | { type: "dim"; kind: "angle"; a: Vec2; b: Vec2; a2: Vec2; b2: Vec2; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
   | { type: "note"; at: Vec2; leader?: Vec2; text: string }
   | { type: "roughness"; at: Vec2; ra: string; leader?: Vec2 }
   | { type: "gdt"; at: Vec2; symbol: GdtSymbol; value: string; datum?: string; leader?: Vec2 }
   | { type: "datum"; at: Vec2; label: string }
   | { type: "text"; at: Vec2; text: string; size: number }
+  /** popis s odkazovou čarou (díry, sražení, zaoblení, roztečná kružnice): šipka v `tip`, koleno v `at`, řádky textu (↧ ⌴ ⌵ se kreslí jako značky); `circle` = osová kružnice; `tol` = tolerance za prvním označením */
+  | { type: "callout"; tip: Vec2; at: Vec2; lines: string[]; circle?: { c: Vec2; r: number }; tol?: string }
+  /** osa souměrnosti (čerchovaná čára) – souměrné kótování roztečí od ní */
+  | { type: "centerline"; a: Vec2; b: Vec2 }
 );
 
 export type GdtSymbol = "straight" | "flat" | "circ" | "cyl" | "prof" | "par" | "perp" | "angle" | "pos" | "conc" | "sym" | "runout";

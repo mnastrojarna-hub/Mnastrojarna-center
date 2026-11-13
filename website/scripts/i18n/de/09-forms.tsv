@@ -1,0 +1,70 @@
+# Výběr ze seznamu a pravidlem, vlastní dotaz na hodnotu, rovina / bod odkazem u rozšíření, zkratky a nápověda, pás karet
+{0} izometrie · {1} přední · {2} horní · {3} pravý · {4} zadní · {5} spodní · {6} levý	{0} Isometrie · {1} vorne · {2} oben · {3} rechts · {4} hinten · {5} unten · {6} links
+{0} přizpůsobit · {1} pravoúhlá / perspektiva · {2} měření · {3} řez	{0} einpassen · {1} orthogonal / Perspektive · {2} Messen · {3} Schnitt
+{0} vysunutí · {1} díra · {2} zaoblení · {3} sražení (vybrané hrany se použijí rovnou) · {4} nová skica (na vybrané ploše, jinak nabídne roviny)	{0} Extrusion · {1} Bohrung · {2} Verrundung · {3} Fase (gewählte Kanten werden direkt verwendet) · {4} neue Skizze (auf der gewählten Fläche, sonst Ebenenauswahl)
+{0}: klikáním vyberte hrany v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno	{0}: Kanten im Modell anklicken ({1} gewählt) · oder „Aus Liste / per Regel…“ im Formular · Enter = OK, Esc = Abbrechen
+{0}: klikáním vyberte plochy v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno	{0}: Flächen im Modell anklicken ({1} gewählt) · oder „Aus Liste / per Regel…“ im Formular · Enter = OK, Esc = Abbrechen
+• SolidWorks: prostřední = otáčení, Ctrl+prostřední = posun	• SolidWorks: mittlere Taste = Drehen, Strg+mittlere = Verschieben
+• Touchpad: levé = otáčení, pravé = posun	• Touchpad: links = Drehen, rechts = Verschieben
+• ZW3D: pravé tlačítko táhnout = otáčení, prostřední = posun, kolečko = zoom k kurzoru, pravý klik = nabídka	• ZW3D: mit rechter Taste ziehen = Drehen, mittlere = Verschieben, Rad = Zoom zum Cursor, Rechtsklick = Menü
++ aktuální výběr ({0})	+ aktuelle Auswahl ({0})
+Bod měřítka odkazem	Skalierpunkt per Referenz
+bod prvku	Punkt des Elements
+Celé těleso	Ganzer Körper
+cílový bod díry	Zielpunkt der Bohrung
+Cílový bod neleží ve směru vrtání (zkuste obrátit směr).	Der Zielpunkt liegt nicht in Bohrrichtung (Richtung umkehren).
+Ctrl+K paleta příkazů · Ctrl+L knihovna normálií · Ctrl+, nastavení · Ctrl+Shift+K textové příkazy · Ctrl+Shift+L popisky entit	Strg+K Befehlspalette · Strg+L Normteilbibliothek · Strg+, Einstellungen · Strg+Umschalt+K Textbefehle · Strg+Umschalt+L Elementbeschriftungen
+Ctrl+Z / Ctrl+Y zpět / znovu · Ctrl+S uložit · Ctrl+O otevřít	Strg+Z / Strg+Y rückgängig / wiederholen · Strg+S speichern · Strg+O öffnen
+Díry se vrtají v {0} zadaných polohách. Pole „Bod na povrchu“ se při tom nepoužívá – objeví se znovu, když polohy odeberete.	Die Bohrungen entstehen an den {0} angegebenen Positionen. Das Feld „Punkt auf der Oberfläche“ wird dabei nicht verwendet – es erscheint wieder, wenn Sie die Positionen entfernen.
+Dotyk ve skice: dlouhý stisk = kontextová nabídka, dva prsty = posun a zoom.	Touch in der Skizze: langes Drücken = Kontextmenü, zwei Finger = Verschieben und Zoom.
+Enter = OK · Esc = Storno · Delete = smazat prvek · G = posun komponenty v sestavě · R = přepnout posun / otočení u gizma	Enter = OK · Esc = Abbrechen · Entf = Element löschen · G = Komponente in der Baugruppe verschieben · R = Verschieben / Drehen am Gizmo umschalten
+Hledat (číslo, typ, souřadnice)…	Suchen (Nummer, Typ, Koordinaten)…
+jen vybrané	nur gewählte
+Klávesy ve 3D (lze změnit v Nastavení → Klávesové zkratky):	Tasten in 3D (änderbar unter Einstellungen → Tastenkürzel):
+kružnice R{0}	Kreis R{0}
+Lze zadat i výraz (25/2) nebo proměnnou dílu. Enter potvrdí, Esc zruší.	Auch ein Ausdruck (25/2) oder eine Teilvariable ist möglich. Enter bestätigt, Esc bricht ab.
+Myš (lze přepnout na kartě Zobrazení → Ovládání myši):	Maus (umschaltbar auf der Registerkarte Ansicht → Maussteuerung):
+Načítám plochy a hrany z jádra…	Flächen und Kanten werden aus dem Kern geladen…
+Napište pravidlo, např. „horní kruhové“, „svislé“ nebo „+Z“.	Regel eingeben, z. B. „oben rund“, „senkrecht“ oder „+Z“.
+např. horní · boční · válcové · +Z · největší	z. B. oben · seitlich · zylindrisch · +Z · grösste
+např. horní kruhové · svislé · rovné · poloměr 5	z. B. oben rund · senkrecht · gerade · radius 5
+Nic neodpovídá.	Keine Treffer.
+Odebrat z výběru	Aus der Auswahl entfernen
+Parametry: do pole lze psát výrazy (25/2) nebo vazby na proměnné (=d1*2).	Parameter: Felder akzeptieren Ausdrücke (25/2) oder Verknüpfungen mit Variablen (=d1*2).
+plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže	Modellfläche, drei Punkte, Hilfsebene… – hat Vorrang vor der Grundebene unten
+Pole: počet, rozteč a směr zadejte ve formuláři – směr podél hrany nebo osy válce vyberete tlačítkem Vybrat v poli směru · Enter = OK, Esc = Storno	Muster: Anzahl, Abstand und Richtung im Formular angeben – eine Richtung entlang einer Kante oder Zylinderachse wählen Sie mit der Schaltfläche Wählen im Richtungsfeld · Enter = OK, Esc = Abbrechen
+Popis vybraných	Auswahl beschreiben
+Posunout pás karet doleva	Menüband nach links schieben
+Posunout pás karet doprava	Menüband nach rechts schieben
+Pravidlo (jako v textových příkazech)	Regel (wie in Textbefehlen)
+Pravidlu „{0}“ neodpovídá nic.	Der Regel „{0}“ entspricht nichts.
+Prvky ke zrcadlení	Zu spiegelnde Elemente
+Prvky rozšíření: {0}	Erweiterungselemente: {0}
+Přidá plochy / hrany vybrané v modelu před otevřením formuláře	Fügt die vor dem Öffnen des Formulars im Modell gewählten Flächen / Kanten hinzu
+Přidat k výběru	Zur Auswahl hinzufügen
+Rovina odkazem	Ebene per Referenz
+Skica (lze změnit v Nastavení → Klávesové zkratky, skupina Skica):	Skizze (änderbar unter Einstellungen → Tastenkürzel, Gruppe Skizze):
+Skrýt popis	Beschreibung ausblenden
+směr {0}	Richtung {0}
+Střed úlevy odkazem	Mittelpunkt der Freisparung per Referenz
+Střed začátku odkazem	Startmittelpunkt per Referenz
+V historii zatím není prvek s nástrojovým tělesem (vysunutí, díra, primitivum…).	Im Verlauf gibt es noch kein Element mit Werkzeugkörper (Extrusion, Bohrung, Grundkörper…).
+v tělese před prvkem není – odeberte ji	ist im Körper vor dem Element nicht vorhanden – entfernen
+vrchol, střed hrany, bod skici… – má přednost před souřadnicemi níže	Eckpunkt, Kantenmitte, Skizzenpunkt… – hat Vorrang vor den Koordinaten unten
+Vybrané prvky	Gewählte Elemente
+Vybráno {0} z {1} · zobrazeno {2}	{0} von {1} gewählt · {2} angezeigt
+Vybrat hrany ze seznamu	Kanten aus Liste wählen
+Vybrat plochy ze seznamu	Flächen aus Liste wählen
+Vybrat pravidlem	Per Regel wählen
+Vybrat zobrazené	Angezeigte wählen
+vymazat	löschen
+Zadejte číslo nebo výraz (např. 12,5 nebo 25/2){0}	Zahl oder Ausdruck eingeben (z. B. 12,5 oder 25/2){0}
+Ze seznamu / pravidlem…	Aus Liste / per Regel…
+Zobrazeno prvních 400 – upřesněte hledání nebo použijte pravidlo.	Die ersten 400 werden angezeigt – Suche verfeinern oder Regel verwenden.
+Zrcadlení: rovinu zvolte ve formuláři – základní rovinu, nebo plochu modelu tlačítkem Vybrat v poli Rovina zrcadlení · Enter = OK, Esc = Storno	Spiegeln: Ebene im Formular wählen – eine Grundebene oder eine Modellfläche mit der Schaltfläche Wählen im Feld Spiegelebene · Enter = OK, Esc = Abbrechen
+Zrcadlený prvek „{0}“ nemá nástrojové těleso – zrcadlit lze vysunutí, rotace, primitiva, díry, tažení a text.	Das gespiegelte Element „{0}“ hat keinen Werkzeugkörper – spiegeln lassen sich Extrusionen, Rotationen, Grundkörper, Bohrungen, Austragungen und Text.
+Zrušit odkaz (použít souřadnice)	Referenz entfernen (Koordinaten verwenden)
++ přidat skicu…	+ Skizze hinzufügen…
+Název proměnné	Variablenname
+Přidat skicu	Skizze hinzufügen
+Výraz proměnné	Variablenausdruck

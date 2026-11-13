@@ -7,6 +7,7 @@ next-env.d.ts
 .env*.local
 .vercel
 public/vendor/occt-*
+public/vendor/pdfjs-*
 
 # CAD i18n – pracovní soubory sestavení slovníků
 .i18n-missing-*.txt

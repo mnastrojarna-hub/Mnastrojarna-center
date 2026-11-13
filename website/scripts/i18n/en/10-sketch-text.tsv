@@ -1,0 +1,110 @@
+# Vazby, kóty a roviny skici textem (agent-sketch.ts): vazba …, kóta …, skica plocha F3 …, skica rovina …, id entit e1, e2…
+vodorovně	horizontal
+svisle	vertical
+shodně	coincident
+rovnoběžně	parallel
+kolmo	perpendicular
+tečně	tangent
+stejně	equal
+pevně	fixed
+soustředně	concentric
+středem	midpoint
+na křivce	onCurve
+symetricky	symmetric
+kolineárně	collinear
+délka	length
+vzdálenost	distance
+poloměr	radius
+průměr	diameter
+úhel	angle
+délka oblouku	arcLength
+referenční	reference
+počátek	origin
+vazba {0}	constraint {0}
+kóta {0}	dim {0}
+vazba vodorovně e1 (úsečka) · vazba vodorovně e1.a e2.b (dva body)	constraint horizontal e1 (line) · constraint horizontal e1.a e2.b (two points)
+vazba svisle e1 (úsečka) · vazba svisle e1.a e2.b (dva body)	constraint vertical e1 (line) · constraint vertical e1.a e2.b (two points)
+vazba shodně e1.b e2.a (dva body; počátek = počátek skici)	constraint coincident e1.b e2.a (two points; origin = sketch origin)
+vazba rovnoběžně e1 e3 (dvě úsečky)	constraint parallel e1 e3 (two lines)
+vazba kolmo e1 e2 (dvě úsečky)	constraint perpendicular e1 e2 (two lines)
+vazba tečně e1 e5 (úsečka a kružnice / oblouk, nebo dvě kružnice / oblouky)	constraint tangent e1 e5 (line and circle / arc, or two circles / arcs)
+vazba stejně e1 e3 (dvě úsečky, nebo dvě kružnice / oblouky)	constraint equal e1 e3 (two lines, or two circles / arcs)
+vazba pevně e1.a [x y] (bod, volitelně na souřadnice) · vazba pevně e1 (celá entita)	constraint fixed e1.a [x y] (point, optionally at coordinates) · constraint fixed e1 (whole entity)
+vazba soustředně e5 e6 (dvě kružnice / oblouky, nebo kružnice a bod)	constraint concentric e5 e6 (two circles / arcs, or a circle and a point)
+vazba středem e5.střed e1 (bod a úsečka)	constraint midpoint e5.center e1 (point and line)
+vazba na křivce e1.b e5 (bod a úsečka / kružnice / oblouk)	constraint onCurve e1.b e5 (point and line / circle / arc)
+vazba symetricky e1.a e2.b e3 (dva body a osa = úsečka)	constraint symmetric e1.a e2.b e3 (two points and an axis = line)
+vazba kolineárně e1 e4 (dvě úsečky)	constraint collinear e1 e4 (two lines)
+kóta délka e1 50 (úsečka nebo strana: e2.s0 obdélníku, e3.g1 lomené čáry)	dim length e1 50 (line or side: e2.s0 of a rectangle, e3.g1 of a polyline)
+kóta vzdálenost e1.a e3.b 40 (dva body, bod a úsečka, nebo dvě rovnoběžné úsečky)	dim distance e1.a e3.b 40 (two points, a point and a line, or two parallel lines)
+kóta vodorovně e1.a e2.b 30 (dva body; úsečka = její konce; počátek = počátek skici)	dim horizontal e1.a e2.b 30 (two points; a line = its ends; origin = sketch origin)
+kóta svisle počátek e1.a 20 (dva body; úsečka = její konce)	dim vertical origin e1.a 20 (two points; a line = its ends)
+kóta poloměr e5 R10 (kružnice nebo oblouk)	dim radius e5 R10 (circle or arc)
+kóta průměr e5 Ø20 (kružnice nebo oblouk)	dim diameter e5 Ø20 (circle or arc)
+kóta úhel e1 e2 45 (dvě úsečky, 0–180°)	dim angle e1 e2 45 (two lines, 0–180°)
+kóta délka oblouku e5 30 (oblouk)	dim arcLength e5 30 (arc)
+„{0}“ není odkaz na entitu skici – e3 (celá entita), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod) nebo počátek	“{0}” is not a reference to a sketch entity – e3 (whole entity), e3.a / e3.b / e3.c / e3.center / e3.p0 (point) or origin
+vazba potřebuje druh a odkazy: vazba kolmo e1 e2 – druhy: {0}	constraint needs a kind and references: constraint perpendicular e1 e2 – kinds: {0}
+neznámý druh vazby „{0}“ – druhy: {1}	unknown constraint kind “{0}” – kinds: {1}
+vazba {0}: špatný počet odkazů ({1}) – zápis: {2}	constraint {0}: wrong number of references ({1}) – usage: {2}
+vazba {0}: čísla „{1}“ navíc – zápis: {2}	constraint {0}: extra numbers “{1}” – usage: {2}
+kóta potřebuje druh, odkaz a hodnotu: kóta délka e1 50 – druhy: {0}	dim needs a kind, a reference and a value: dim length e1 50 – kinds: {0}
+neznámý druh kóty „{0}“ – druhy: {1}	unknown dimension kind “{0}” – kinds: {1}
+kóta {0}: jen jedna hodnota (zadáno {1}) – zápis: {2}	dim {0}: only one value (given {1}) – usage: {2}
+kóta {0}: špatný počet odkazů ({1}) – zápis: {2}	dim {0}: wrong number of references ({1}) – usage: {2}
+kóta {0} potřebuje hodnotu (nebo „referenční“) – zápis: {1}	dim {0} needs a value (or “reference”) – usage: {1}
+kóta úhel: hodnota musí být mezi 0° a 180° (zadáno {0})	dim angle: the value must be between 0° and 180° (given {0})
+kóta {0}: hodnota nesmí být záporná (zadáno {1}) – stranu určuje pořadí bodů	dim {0}: the value must not be negative (given {1}) – the side follows from the order of the points
+kóta {0}: hodnota musí být kladná (zadáno {1})	dim {0}: the value must be positive (given {1})
+entita	entity
+entit	entities
+kružnice	circle
+oblouk	arc
+obdélník	rectangle
+mnohoúhelník	polygon
+lomená čára	polyline
+spline	spline
+spline {0} b.	spline {0} pts
+přes	via
+ (pomocná)	 (construction)
+ nebo 	 or 
+entita „{0}“ ve skice „{1}“ není – entity: {2}	entity “{0}” is not in sketch “{1}” – entities: {2}
+entita {0} ({1}) nemá bod ani stranu „{2}“ – lze: {3}	entity {0} ({1}) has no point or side “{2}” – possible: {3}
+{0}: „{1}“ je {2}, čeká se {3} – zápis: {4}	{0}: “{1}” is a {2}, expected: {3} – usage: {4}
+{0}: oba odkazy jsou počátek – zápis: {1}	{0}: both references are the origin – usage: {1}
+{0}: aspoň jeden odkaz musí být kružnice nebo oblouk – zápis: {1}	{0}: at least one reference must be a circle or an arc – usage: {1}
+{0}: obě entity musí být stejného druhu (dvě úsečky, nebo dvě kružnice / oblouky) – zápis: {1}	{0}: both entities must be of the same kind (two lines, or two circles / arcs) – usage: {1}
+{0}: počátek je pevný sám o sobě – zápis: {1}	{0}: the origin is fixed by itself – usage: {1}
+{0}: souřadnice lze zadat jen u bodu (e1.a 10 20) – zápis: {1}	{0}: coordinates can only be given for a point (e1.a 10 20) – usage: {1}
+{0}: chybí {1} – zápis: {2}	{0}: missing {1} – usage: {2}
+{0}: chybí osa (úsečka) – zápis: {1}	{0}: the axis (line) is missing – usage: {1}
+{0}: vzdálenost dvou úseček jen u rovnoběžných – jinak kóta úhel nebo vzdálenost bodů	{0}: a distance between two lines only for parallel lines – otherwise an angle dimension or a distance between points
+{0}: „{1}“ není oblouk – zápis: {2}	{0}: “{1}” is not an arc – usage: {2}
+{0}: tuto kombinaci nelze okótovat – zápis: {1}	{0}: this combination cannot be dimensioned – usage: {1}
+ · řešič nenašel řešení (odchylka {0}), geometrie zůstala beze změny; vazby a kóty zůstaly uložené – opravte nebo smažte tu, která je v rozporu	 · the solver found no solution (deviation {0}), the geometry is unchanged; constraints and dimensions remain stored – fix or delete the conflicting one
+skica z řádku {0} nevznikla – entity, vazby a kóty nemají kam (opravte řádek {0})	the sketch from line {0} was not created – entities, constraints and dimensions have nowhere to go (fix line {0})
+skica „{0}“: {1}	sketch “{0}”: {1}
+vazby ve skice „{0}“: {1}	constraints in sketch “{0}”: {1}
+kóty ve skice „{0}“: {1}	dimensions in sketch “{0}”: {1}
+entity: {0}	entities: {0}
+entit {0} – jednotlivě s id se vypisují jen skici do {1} entit	{0} entities – entities with ids are listed only for sketches with up to {1} entities
+vazby {0}, kóty {1}{2}	constraints {0}, dimensions {1}{2}
+– rovinné plochy: {0}	– planar faces: {0}
+skica na ploše: dokument nemá těleso – nejdřív vytvořte tvar (kvádr, vysunutí…)	sketch on face: the document has no body – create a shape first (box, extrude…)
+plocha F{0} v tělese není – těleso má {1} ploch (F1 až F{1}){2}	face F{0} does not exist – the body has {1} faces (F1 to F{1}){2}
+plocha F{0} není rovinná – skicu lze založit jen na rovinné ploše{1}	face F{0} is not planar – a sketch can only be placed on a planar face{1}
+plochu F{0} nelze použít: {1}	face F{0} cannot be used: {1}
+na ploše F{0}	on face F{0}
+pomocná rovina „{0}“ v dílu není – pomocné roviny: {1}	datum plane “{0}” is not in the part – datum planes: {1}
+žádné (vytvoří ji např. prvek datum)	none (create one e.g. with the datum feature)
+na pomocné rovině „{0}“	on datum plane “{0}”
+rovinu skice {0} se nepodařilo určit: {1}	the sketch plane {0} could not be determined: {1}
+neznámá chyba	unknown error
+počátek {0}, normála {1}, osa X skici {2}	origin {0}, normal {1}, sketch X axis {2}
+✓ {0} {1} – rovina: {2}	✓ {0} {1} – plane: {2}
+skica na ploše potřebuje číslo plochy nebo pravidlo: skica plocha F3 | horní | +X [odsazení 5] [obráceně] – čísla ploch F1, F2… ukazují popisky pro výběr (Ctrl+Shift+L, window.mncad.hints())	sketch on face needs a face number or a rule: sketch face F3 | top | +X [offset 5] [reverse] – face numbers F1, F2… are shown by the selection labels (Ctrl+Shift+L, window.mncad.hints())
+pravidlu „{0}“ odpovídá {1} rovinných ploch – zadejte ho jednoznačně (horní, spodní, +X, -Y…) nebo plochu číslem (F3){2}	{1} planar faces match the rule “{0}” – make it unambiguous (top, bottom, +X, -Y…) or give the face number (F3){2}
+skica na pomocné rovině potřebuje její název: skica rovina "Rovina 1" [odsazení 5]	sketch on a datum plane needs its name: sketch plane "Plane 1" [offset 5]
+skica na rovinné ploše modelu – číslem (F1, F2… jako popisky pro výběr / window.mncad.hints()) nebo pravidlem jako u skořepiny (horní, +X…) – nebo na pomocné rovině podle názvu; rovina je asociativní – přepočítá se se změnou modelu, protokol vypíše její počátek a osy	sketch on a planar face of the model – by number (F1, F2… as the selection labels / window.mncad.hints()) or by a rule as for shell (top, +X…) – or on a datum plane by name; the plane is associative – it is recomputed when the model changes, the log prints its origin and axes
+vazba ve skice: vodorovně, svisle, shodně, rovnoběžně, kolmo, tečně, stejně, pevně, soustředně, středem, na křivce, symetricky, kolineárně; odkaz = e3 (celá entita; id entit ukazuje stav), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod), e3.s0 (strana obdélníku) nebo počátek; po řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno	sketch constraint: horizontal, vertical, coincident, parallel, perpendicular, tangent, equal, fixed, concentric, midpoint, onCurve, symmetric, collinear; reference = e3 (whole entity; entity ids are shown by status), e3.a / e3.b / e3.c / e3.center / e3.p0 (point), e3.s0 (side of a rectangle) or origin; after the line the sketch is solved and the log says Fully defined / Under-defined (N degrees of freedom) / Over-defined
+kóta ve skice: délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku; hodnota i s desetinnou čárkou, Ø20 / R10; řídicí kóta změní geometrii, „referenční“ jen měří	sketch dimension: length, distance, horizontal, vertical, radius, diameter, angle, arcLength; value with decimal point or comma, Ø20 / R10; a driving dimension changes the geometry, “reference” only measures

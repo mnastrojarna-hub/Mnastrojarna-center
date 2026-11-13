@@ -1,0 +1,23 @@
+# Výkres: rozvržení listu, otočení hlavního pohledu, poloviční řez, další modely na listu
+Celý řez	Full section
+Další modely na listu	Other models on the sheet
+komponenta	component
+Komponenta sestavy	Assembly component
+Kopie dokumentu se uloží do výkresu	A copy of the document is stored in the drawing
+Měřítko modelu	Model scale
+Model {0} nemá v pohledu žádnou geometrii.	Model {0} has no geometry in this view.
+Model {0} přidán na list.	Model {0} added to the sheet.
+Model {0} se nepodařilo načíst.	Model {0} could not be loaded.
+Model {0} se nepodařilo promítnout.	Model {0} could not be projected.
+Odebrat model z listu	Remove the model from the sheet
+Otočení hlavního pohledu	Main view rotation
+Otočí hlavní pohled po směru hodin a s ním celé promítání – soustružený díl tak může ležet osou vodorovně.	Rotates the main view clockwise and the whole projection with it – a turned part can lie with its axis horizontal.
+Pohled komponenty sestavy nebo jiného dílu ze souboru na tomtéž listu – každý ve vlastním měřítku uvedeném pod pohledem.	A view of an assembly component or of another part from a file on the same sheet – each at its own scale shown below the view.
+Pohled modelu	Model view
+Pohled modelu {0} se na list nevejde – zvolte větší formát nebo menší měřítko.	The view of model {0} does not fit on the sheet – choose a larger format or a smaller scale.
+Poloviční řez	Half section
+Polovina pohled, polovina řez – dělí je osa souměrnosti (u soustružených dílů osa rotace).	Half view, half section – divided by the axis of symmetry (the rotation axis for turned parts).
+Přidat pohled komponenty na list	Add a view of the component to the sheet
+Řez se na list nevejde – zvolte větší formát nebo menší měřítko.	The section does not fit on the sheet – choose a larger format or a smaller scale.
+Vložit model ze souboru (.mncad)…	Insert a model from a file (.mncad)…
+ze souboru	from file

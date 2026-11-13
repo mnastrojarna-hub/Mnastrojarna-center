@@ -1,0 +1,29 @@
+# DE – výkres: kóty podle vybrané geometrie (kružnice Ø / R, hrana, úhel), pole u kurzoru, příznaky kót, přejmenování listu
+# drawing-workspace
+Délka odkazu od kružnice [mm]	Länge der Hinweislinie ab dem Kreis [mm]
+Druh délkové kóty (2 body, hrana)	Art des Längenmaßes (2 Punkte, Kante)
+Druhá hrana: úhel {0}° / {1}°	Zweite Kante: Winkel {0}° / {1}°
+Druhá hrana: vzdálenost {0}	Zweite Kante: Abstand {0}
+Dvě hrany vybrány – klikněte na místo kóty (úhel se bere v sektoru, kde je kurzor).	Zwei Kanten ausgewählt – klicken Sie auf die Position des Maßes (der Winkel wird in dem Sektor genommen, in dem der Cursor steht).
+Enter potvrdí · Esc ponechá výchozí · později lze upravit v seznamu	Enter bestätigt · Esc behält die Vorgaben · später in der Liste änderbar
+Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil) – kreslí se podle uložených údajů. Zkontrolujte ji nebo ji vložte znovu.	Die Kante oder der Kreis, auf die sich das Maß bezieht, ist in der Ansicht nicht mehr vorhanden (das Modell wurde geändert) – es wird nach den gespeicherten Daten gezeichnet. Prüfen Sie es oder fügen Sie es neu ein.
+Hrana vybrána – klikněte na místo kóty délky, nebo na druhou hranu (úhel, u rovnoběžných vzdálenost).	Kante ausgewählt – klicken Sie auf die Position des Längenmaßes oder auf eine zweite Kante (Winkel, bei parallelen Kanten Abstand).
+Hrana: délka {0}	Kante: Länge {0}
+Klikněte na kružnici nebo oblouk (Ø / R), na hranu (délka; druhá hrana = úhel) nebo na dva body. Shift = průměr ↔ poloměr.	Klicken Sie auf einen Kreis oder Bogen (Ø / R), auf eine Kante (Länge; zweite Kante = Winkel) oder auf zwei Punkte. Umschalt = Durchmesser ↔ Radius.
+Klikněte na místo kóty {0}	Klicken Sie auf die Position des Maßes {0}
+Kóta kružnice / oblouku: Auto = kružnice průměrem Ø, oblouk poloměrem R; Shift při kliknutí volbu obrátí	Maß für Kreis / Bogen: Auto = Kreis mit Durchmesser Ø, Bogen mit Radius R; Umschalt beim Klicken kehrt die Wahl um
+Kóty a poznámky bez geometrie: {0} (⚠ v seznamu)	Maße und Anmerkungen ohne Geometrie: {0} (⚠ in der Liste)
+kružnice → Ø / R, hrana → délka, 2 hrany → úhel	Kreis → Ø / R, Kante → Länge, 2 Kanten → Winkel
+Kružnice vybrána – klikněte na místo kóty (Shift = průměr ↔ poloměr).	Kreis ausgewählt – klicken Sie auf die Position des Maßes (Umschalt = Durchmesser ↔ Radius).
+Kružnice: {0} · Shift = {1}	Kreis: {0} · Umschalt = {1}
+Ø průměr	Ø Durchmesser
+Oblouk: {0} · Shift = {1}	Bogen: {0} · Umschalt = {1}
+Odsazení kótovací čáry [mm]	Abstand der Maßlinie [mm]
+Odsazení kóty	Maßabstand
+Pohled kóty není na listu – kóta se nekreslí.	Die Ansicht dieses Maßes ist nicht auf dem Blatt – das Maß wird nicht gezeichnet.
+Pohled, ke kterému se poznámka váže, není na listu.	Die Ansicht, auf die sich die Anmerkung bezieht, ist nicht auf dem Blatt.
+Poloměr kótovacího oblouku [mm]	Radius des Maßbogens [mm]
+R poloměr	R Radius
+Tolerance / přípona	Toleranz / Suffix
+Vodor.	Horiz.
+opakovat	wiederholen

@@ -1,0 +1,80 @@
+# EN – skica z klávesnice a podklad skici (P1-6, P2-9)
+# Skica zadaná z klávesnice: seznam souřadnic ze schránky (Ctrl+V) a dialog „Body ze seznamu“
+ Opakované body vynechány: {0}.	 Repeated points skipped: {0}.
+ Seznam má víc než {0} bodů, proto vznikla lomená čára místo jednotlivých úseček.	 The list has more than {0} points, so a polyline was created instead of separate lines.
+Body ze seznamu souřadnic	Points from a coordinate list
+Body ze seznamu…	Points from list…
+Čísla po dvojicích X Y, na řádcích nebo za sebou; oddělovač mezera, středník nebo tabulátor, desetinná čárka i tečka. Body se ukotví vazbou „Pevně“.	Numbers in X Y pairs, one per line or in a row; separated by space, semicolon or tab, decimal comma or point. The points are anchored with a “Fixed” constraint.
+lomená čára	polyline
+Prohlížeč čtení schránky nedovoluje – vložte text do pole klávesami Ctrl+V.	The browser does not allow reading the clipboard – paste the text into the field with Ctrl+V.
+Přečten jediný bod – čára potřebuje aspoň dva.	Only one point read – a line needs at least two.
+Přečteno bodů: {0}	Points read: {0}
+řetěz úseček	chain of lines
+Seznam souřadnic je prázdný – čekají se čísla po dvojicích X Y.	The coordinate list is empty – numbers in X Y pairs are expected.
+Seznam souřadnic je příliš dlouhý – nejvýše {0} bodů.	The coordinate list is too long – at most {0} points.
+Seznam souřadnic má lichý počet čísel ({0}) – čísla musí jít po dvojicích X Y.	The coordinate list has an odd count of numbers ({0}) – numbers must come in X Y pairs.
+souřadnice X Y ze schránky nebo psané → lomená čára, spline, úsečky	X Y coordinates from the clipboard or typed → polyline, spline, lines
+spline	spline
+Ve schránce je jediný bod – čára potřebuje aspoň dva (čísla po dvojicích X Y).	The clipboard holds a single point – a line needs at least two (numbers in X Y pairs).
+Vložený text není seznam souřadnic – „{0}“ není číslo (čekají se čísla po dvojicích X Y).	The pasted text is not a coordinate list – “{0}” is not a number (numbers in X Y pairs are expected).
+Vložit do skici	Insert into sketch
+Vložte nebo napište souřadnice.	Paste or type the coordinates.
+Ze schránky	From clipboard
+Ze schránky přečteno bodů: {0} → {1} bez ukotvení (bodů je víc než {2}).	Points read from the clipboard: {0} → {1} without anchoring (more than {2} points).
+Ze schránky přečteno bodů: {0} → {1}, body ukotveny vazbou „Pevně“.	Points read from the clipboard: {0} → {1}, points anchored with a “Fixed” constraint.
+Ze schránky přečteno bodů: {0} → {1}, ukotvení celé křivky jednou vazbou „Pevně“.	Points read from the clipboard: {0} → {1}, the whole curve anchored with one “Fixed” constraint.
+Ze schránky vložen 1 bod [{0}; {1}] – ukotven vazbou „Pevně“.	1 point [{0}; {1}] pasted from the clipboard – anchored with a “Fixed” constraint.
+
+# Podklad skici: obrázek / stránka PDF pod geometrií, kalibrace, posun, natočení, převod čar PDF na entity
+ · měřítko {0}	 · scale {0}
+ · strana {0} z {1}	 · page {0} of {1}
+ Stránka má {0} čar – vloženo {1} nejdelších.	 The page has {0} lines – the {1} longest were inserted.
+Čtečku PDF se nepodařilo načíst.	The PDF reader could not be loaded.
+Druhý bod kalibrace musí ležet jinde než první.	The second calibration point must differ from the first one.
+jako pomocnou geometrii	as construction geometry
+Kalibrace podkladu: druhý bod	Underlay calibration: second point
+Kalibrace podkladu: první bod	Underlay calibration: first point
+Kalibrovat měřítko	Calibrate scale
+Klikněte na druhý bod podkladu (Esc zruší).	Click the second point on the underlay (Esc cancels).
+Klikněte na dva body podkladu se známou vzdáleností a zadejte ji	Click two points on the underlay with a known distance and enter it
+Klikněte na první bod podkladu se známou vzdáleností (Esc zruší).	Click the first point on the underlay with a known distance (Esc cancels).
+Krytí podkladu	Underlay opacity
+Na stránce nejsou čáry delší než 0,02 mm.	The page has no lines longer than 0.02 mm.
+Načítám „{0}“…	Loading “{0}”…
+Načítám stranu {0}…	Loading page {0}…
+Natočení podkladu kolem jeho středu (kladně proti směru hodin)	Underlay rotation about its centre (positive counter-clockwise)
+obrázek	image
+Obrázek (PNG, JPG) nebo stránka PDF pod geometrií skici – k obkreslení, s kalibrací měřítka; čáry vektorového PDF lze převést na entity. Velké obrázky se zmenší na nejvýše {0} px.	An image (PNG, JPG) or a PDF page under the sketch geometry – for tracing, with scale calibration; the lines of a vector PDF can be converted to entities. Large images are reduced to at most {0} px.
+Obrázek je prázdný.	The image is empty.
+obrázek nebo stránka PDF pod skicou: obkreslení, kalibrace měřítka, převod čar PDF na entity	image or PDF page under the sketch: tracing, scale calibration, converting PDF lines to entities
+Obrázek se nepodařilo načíst (poškozený soubor nebo nepodporovaný formát).	The image could not be loaded (damaged file or unsupported format).
+Odebrat podklad	Remove underlay
+PDF je chráněné heslem – podklad z něj nelze vložit.	The PDF is password-protected – it cannot be used as an underlay.
+PDF lze načíst jen v prohlížeči.	A PDF can only be loaded in the browser.
+PDF se nepodařilo přečíst (poškozený soubor?).	The PDF could not be read (damaged file?).
+Podklad může být obrázek PNG nebo JPG, nebo soubor PDF – „{0}“ není ani jedno.	An underlay can be a PNG or JPG image or a PDF file – “{0}” is neither.
+Podklad skici	Sketch underlay
+Podklad vložen ({0} × {1} px). Skutečné měřítko nastavíte kalibrací dvěma body.	Underlay inserted ({0} × {1} px). Set the real scale by calibrating with two points.
+Podklad zkalibrován: {0} mm mezi body, šířka podkladu {1} mm.	Underlay calibrated: {0} mm between the points, underlay width {1} mm.
+Podklad: strana {0} z {1} ve skutečné velikosti 1:1 ({2} × {3} mm). Jiné měřítko nastavíte kalibrací dvěma body.	Underlay: page {0} of {1} at real size 1:1 ({2} × {3} mm). Set a different scale by calibrating with two points.
+Podklad…	Underlay…
+Posunout	Move
+Prohlížeč neumí kreslit do plátna (canvas) – podklad nelze vložit.	The browser cannot draw to a canvas – the underlay cannot be inserted.
+Převádím čáry PDF na entity…	Converting PDF lines to entities…
+Převést čáry na entity skici	Convert lines to sketch entities
+Skutečná vzdálenost	Real distance
+Stránka	Page
+Stránka PDF nemá vektorové čáry (je to sken nebo obrázek?) – podklad lze jen obkreslit.	The PDF page has no vector lines (is it a scan or an image?) – the underlay can only be traced.
+Šířka podkladu – mění měřítko kolem středu	Underlay width – changes the scale about the centre
+Táhněte podklad myší	Drag the underlay with the mouse
+Táhněte podklad myší; Esc nebo „Posunout“ režim ukončí.	Drag the underlay with the mouse; Esc or “Move” ends the mode.
+Úsečky, oblouky a křivky stránky PDF se vloží jako entity skici v aktuálním měřítku a poloze podkladu	Lines, arcs and curves of the PDF page are inserted as sketch entities at the current scale and position of the underlay
+Vložit obrázek / PDF…	Insert image / PDF…
+Vyberte soubor PDF, ze kterého podklad vznikl.	Select the PDF file the underlay was made from.
+Vyberte znovu soubor PDF podkladu „{0}“ – dokument obsahuje jen obrázek stránky.	Select the underlay PDF file “{0}” again – the document only contains an image of the page.
+Vybrané PDF nemá stránku {0} – neodpovídá podkladu.	The selected PDF has no page {0} – it does not match the underlay.
+Vybrané PDF neodpovídá podkladu (stránka {0} má jiný rozměr).	The selected PDF does not match the underlay (page {0} has a different size).
+Vyměnit…	Replace…
+Vzdálenost musí být kladné číslo.	The distance must be a positive number.
+Z PDF vloženo entit: {0} (úsečky a lomené čáry {1}, oblouky a kružnice {2}, křivky {3}).	Entities inserted from the PDF: {0} (lines and polylines {1}, arcs and circles {2}, curves {3}).
+Zavřít panel (podklad zůstane)	Close the panel (the underlay stays)

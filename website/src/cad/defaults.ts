@@ -121,6 +121,9 @@ export function featureLabel(f: Pick<Feature, "type"> & { ext?: string }): strin
 /** Ikona prvku pro strom a formulář. */
 export function featureIcon(f: Pick<Feature, "type"> & { ext?: string }): string {
   if (f.type === "ext") return getExt((f as { ext: string }).ext)?.icon ?? "cube";
+  if (f.type === "combine") return "layers";
+  if (f.type === "splitBodies") return "split";
+  if (f.type === "copyBody") return "copy";
   return f.type;
 }
 export function featureTone(f: Pick<Feature, "type"> & { ext?: string }): string | undefined {

@@ -12,7 +12,8 @@
  */
 import { tr } from "../i18n";
 import type * as r from "replicad";
-import type { BoolMode, CadDoc, Feature } from "../types";
+import type { AxisDef, Direction, PlaneDef, Ref } from "../refs";
+import type { BoolMode, CadDoc, Feature, Vec3 } from "../types";
 
 export type Shape = r.Shape3D;
 export type SketchF = Extract<Feature, { type: "sketch" }>;
@@ -34,6 +35,14 @@ export type ExtBuildCtx = {
   bodies?: Map<string, Shape>;
   /** název aktivního (cílového) tělesa */
   activeBody?: string | null;
+  /** vyřeší rovinu zadanou odkazem nad tělesem před prvkem (parametr druhu „plane“) */
+  resolvePlane?: (def: PlaneDef) => { origin: Vec3; normal: Vec3; xDir: Vec3 };
+  /** vyřeší bod zadaný odkazem nad tělesem před prvkem (parametr druhu „point“) */
+  resolvePoint?: (ref: Ref) => Vec3;
+  /** vyřeší směr (hrana, normála plochy, dva body…) na jednotkový vektor (parametr druhu „direction“); `base` = normála pro druh „normal“ */
+  resolveDirection?: (d: Direction, base?: { normal: Vec3; xDir?: Vec3 }) => Vec3;
+  /** vyřeší osu (hrana, válcová plocha, dva body, osy skici…) na počátek a jednotkový směr (parametr druhu „axis“) */
+  resolveAxis?: (def: AxisDef, sketchId?: string) => { origin: Vec3; dir: Vec3 };
 };
 
 /** Parametr pro automatický formulář. */
@@ -51,7 +60,22 @@ export type ExtParam =
   | { key: string; label: string; kind: "feature"; hint?: string }
   /** plochy/hrany vybrané v modelu (uloží number[]); UI přepne výběr */
   | { key: string; label: string; kind: "faces" | "edges"; hint?: string }
-  | { key: string; label: string; kind: "mode" };
+  | { key: string; label: string; kind: "mode" }
+  /** rovina zadaná odkazem (plocha, tři body, pomocná rovina…): ukládá `PlaneDef`; prázdné = základní rovina a odsazení prvku */
+  | { key: string; label: string; kind: "plane"; hint?: string }
+  /** bod zadaný odkazem (vrchol, střed hrany, bod skici…): ukládá `Ref`; prázdné = souřadnice prvku */
+  | { key: string; label: string; kind: "point"; hint?: string }
+  /**
+   * směr (osa X / Y / Z, vektor čísly, podél hrany / osy válce, normála plochy, dva body…): ukládá `Direction`.
+   * Starší dokumenty mají na stejném klíči „X“ / „Y“ / „Z“ nebo vektor [x, y, z] – stavba i formulář je převedou (`toDirection`).
+   * `allowNormal` = nabídnout „kolmo na rovinu skici“ (prázdná hodnota); jinak je výchozí `fallback`.
+   */
+  | { key: string; label: string; kind: "direction"; allowNormal?: boolean; normalLabel?: string; hint?: string }
+  /**
+   * osa (počátek + směr: hrana, válcová plocha, dva body, globální osa, pomocná osa, osy skici `sketchKey`…): ukládá `AxisDef`.
+   * Starší hodnoty „x“ / „y“ (osa skici) a „X“ / „Y“ / „Z“ (globální osa) se převedou (`toAxisDef`).
+   */
+  | { key: string; label: string; kind: "axis"; sketchKey?: string; hint?: string };
 
 export type ExtTab = "create" | "surface" | "sheet" | "weld" | "tools" | "asm" | "drawing";
 
@@ -87,6 +111,12 @@ export type ExtDef = {
   action?: boolean;
   /** jen pro sestavy / jen pro díly (výchozí: díly) */
   scope?: "part" | "assembly" | "both";
+  /**
+   * Starší prvek, který jen opakuje vestavěný prvek s chudším zadáním: na pásu karet, v paletě příkazů ani mezi zkratkami
+   * se nenabízí, ale zůstává zaregistrovaný (staré dokumenty a obecný příkaz `prvek <id> …` dál fungují). Text = jednořádková
+   * nápověda ve formuláři, kde najít vestavěnou náhradu.
+   */
+  legacy?: string;
 };
 
 const defs = new Map<string, ExtDef>();
@@ -98,7 +128,9 @@ export function registerExt(def: ExtDef) {
 }
 export const getExt = (ext: string) => defs.get(ext);
 export const allExt = () => [...defs.values()];
-export const extByTab = (tab: ExtTab) => allExt().filter((d) => d.tab === tab).sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
+/** prvky nabízené v UI (pás karet, paleta, zkratky, nápověda) – bez starších duplicit (`legacy`) */
+export const visibleExt = () => allExt().filter((d) => !d.legacy);
+export const extByTab = (tab: ExtTab) => visibleExt().filter((d) => d.tab === tab).sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 
 /** Prvek rozšíření v dokumentu. */
 export type ExtFeature = Extract<Feature, { type: "ext" }>;

@@ -327,7 +327,7 @@ registerFeatureForm("transform", ({ f, doc, set, b }) => {
 // ---------------- Vytáhnout / Zatlačit ----------------
 
 const PP_KINDS: Extent["kind"][] = ["blind", "toVertex", "toFace", "offsetFromFace"];
-registerFeatureForm("pushPull", ({ f, set, b, pickHint }) => {
+registerFeatureForm("pushPull", ({ f, doc, set, b, pickHint }) => {
   const e: Extent = f.extent ?? { kind: "blind", d: f.distance };
   const change = (kind: Extent["kind"]) => {
     if (kind === "blind") return set({ extent: undefined });
@@ -354,7 +354,7 @@ registerFeatureForm("pushPull", ({ f, set, b, pickHint }) => {
           <Num label={e.kind === "toFace" ? tr("Odsazení od plochy (0 = až k ploše)") : tr("Odsazení")} value={e.kind === "toFace" ? (e.offset ?? 0) : e.d} step={0.5} onChange={(v) => set({ extent: e.kind === "toFace" ? { ...e, offset: v } : { ...e, d: v } })} />
         </>
       )}
-      <PickInfo n={f.faces.length} what={tr("rovinných ploch")} hint={pickHint} onClear={() => set({ faces: [] })} />
+      <PickInfo n={f.faces.length} what={tr("rovinných ploch")} hint={pickHint} onClear={() => set({ faces: [] })} list={{ doc, f, kind: "faces", value: f.faces, onChange: (faces) => set({ faces }) }} />
       <Info>{e.kind === "blind" ? tr("Přímá úprava: plocha se posune po své normále. Kladná hodnota přidá materiál, záporná odebere.") : tr("Vzdálenost se spočítá ze středu každé vybrané plochy po cílovou rovinu podél normály plochy (každá plocha zvlášť).")}</Info>
     </>
   );

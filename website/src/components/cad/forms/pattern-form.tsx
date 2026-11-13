@@ -264,7 +264,7 @@ function PatternForm({ f, doc, set, b, sketches, toolFeatures }: FeatureFormProp
 
 // ---------------- skořepina ----------------
 
-function ShellForm({ f, set, b, pickHint }: FeatureFormProps<ShellF>) {
+function ShellForm({ f, doc, set, b, pickHint }: FeatureFormProps<ShellF>) {
   const th = f.thicknesses ?? {};
   const keys = Object.keys(th)
     .map(Number)
@@ -280,7 +280,7 @@ function ShellForm({ f, set, b, pickHint }: FeatureFormProps<ShellF>) {
     <>
       <Num label={tr("Tloušťka stěny")} value={f.thickness} min={0.01} step={0.5} bind={b("thickness")} onChange={(v) => set({ thickness: v })} />
       <Check label={tr("Zesílit ven (stěna přiroste vně původního povrchu)")} value={!!f.outward} onChange={(outward) => set({ outward })} />
-      <PickInfo n={f.faces.length} what={tr("otevřených ploch")} hint={pickHint} onClear={() => set({ faces: [] })} />
+      <PickInfo n={f.faces.length} what={tr("otevřených ploch")} hint={pickHint} onClear={() => set({ faces: [] })} list={{ doc, f, kind: "faces", value: f.faces, onChange: (faces) => set({ faces }) }} />
       <Details summary={tr("Jiná tloušťka vybraných stěn{0}", keys.length ? ` (${keys.length})` : "")} open={keys.length > 0}>
         {keys.length > 0 && (
           <div className="space-y-1.5">
@@ -313,7 +313,7 @@ function ShellForm({ f, set, b, pickHint }: FeatureFormProps<ShellF>) {
 
 // ---------------- úkos ----------------
 
-function DraftForm({ f, set, b, pickHint }: FeatureFormProps<DraftF>) {
+function DraftForm({ f, doc, set, b, pickHint }: FeatureFormProps<DraftF>) {
   return (
     <>
       <Num label={tr("Úhel úkosu")} value={f.angle} suffix="°" step={0.5} bind={b("angle")} onChange={(v) => set({ angle: Math.max(-44, Math.min(44, v)) })} />
@@ -337,7 +337,7 @@ function DraftForm({ f, set, b, pickHint }: FeatureFormProps<DraftF>) {
         </>
       )}
       <Check label={tr("Rozšířit na tečně navazující plochy")} value={!!f.tangentChain} onChange={(tangentChain) => set({ tangentChain })} />
-      <PickInfo n={f.faces.length} what={tr("ploch ke zkosení")} hint={pickHint} onClear={() => set({ faces: [] })} />
+      <PickInfo n={f.faces.length} what={tr("ploch ke zkosení")} hint={pickHint} onClear={() => set({ faces: [] })} list={{ doc, f, kind: "faces", value: f.faces, onChange: (faces) => set({ faces }) }} />
       <Info>
         {tr("Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Dělicí křivka a stupňovitý úkos zatím nejsou k dispozici.")}
       </Info>

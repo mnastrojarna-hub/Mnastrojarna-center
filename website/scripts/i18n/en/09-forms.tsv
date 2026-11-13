@@ -1,0 +1,70 @@
+# Výběr ze seznamu a pravidlem, vlastní dotaz na hodnotu, rovina / bod odkazem u rozšíření, zkratky a nápověda, pás karet
+{0} izometrie · {1} přední · {2} horní · {3} pravý · {4} zadní · {5} spodní · {6} levý	{0} isometric · {1} front · {2} top · {3} right · {4} back · {5} bottom · {6} left
+{0} přizpůsobit · {1} pravoúhlá / perspektiva · {2} měření · {3} řez	{0} fit · {1} orthographic / perspective · {2} measure · {3} section
+{0} vysunutí · {1} díra · {2} zaoblení · {3} sražení (vybrané hrany se použijí rovnou) · {4} nová skica (na vybrané ploše, jinak nabídne roviny)	{0} extrude · {1} hole · {2} fillet · {3} chamfer (selected edges are used right away) · {4} new sketch (on the selected face, otherwise offers planes)
+{0}: klikáním vyberte hrany v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno	{0}: click edges in the model to select them ({1} selected) · or “From list / by rule…” in the form · Enter = OK, Esc = Cancel
+{0}: klikáním vyberte plochy v modelu (vybráno {1}) · nebo „Ze seznamu / pravidlem…“ ve formuláři · Enter = OK, Esc = Storno	{0}: click faces in the model to select them ({1} selected) · or “From list / by rule…” in the form · Enter = OK, Esc = Cancel
+• SolidWorks: prostřední = otáčení, Ctrl+prostřední = posun	• SolidWorks: middle button = rotate, Ctrl+middle = pan
+• Touchpad: levé = otáčení, pravé = posun	• Touchpad: left = rotate, right = pan
+• ZW3D: pravé tlačítko táhnout = otáčení, prostřední = posun, kolečko = zoom k kurzoru, pravý klik = nabídka	• ZW3D: drag with the right button = rotate, middle = pan, wheel = zoom to cursor, right click = menu
++ aktuální výběr ({0})	+ current selection ({0})
+Bod měřítka odkazem	Scale point by reference
+bod prvku	feature point
+Celé těleso	Whole body
+cílový bod díry	target point of the hole
+Cílový bod neleží ve směru vrtání (zkuste obrátit směr).	The target point does not lie in the drilling direction (try reversing the direction).
+Ctrl+K paleta příkazů · Ctrl+L knihovna normálií · Ctrl+, nastavení · Ctrl+Shift+K textové příkazy · Ctrl+Shift+L popisky entit	Ctrl+K command palette · Ctrl+L standard parts library · Ctrl+, settings · Ctrl+Shift+K text commands · Ctrl+Shift+L entity labels
+Ctrl+Z / Ctrl+Y zpět / znovu · Ctrl+S uložit · Ctrl+O otevřít	Ctrl+Z / Ctrl+Y undo / redo · Ctrl+S save · Ctrl+O open
+Díry se vrtají v {0} zadaných polohách. Pole „Bod na povrchu“ se při tom nepoužívá – objeví se znovu, když polohy odeberete.	Holes are drilled at the {0} given positions. The field “Point on surface” is not used then – it reappears when you remove the positions.
+Dotyk ve skice: dlouhý stisk = kontextová nabídka, dva prsty = posun a zoom.	Touch in the sketch: long press = context menu, two fingers = pan and zoom.
+Enter = OK · Esc = Storno · Delete = smazat prvek · G = posun komponenty v sestavě · R = přepnout posun / otočení u gizma	Enter = OK · Esc = Cancel · Delete = delete feature · G = move component in an assembly · R = switch move / rotate on the gizmo
+Hledat (číslo, typ, souřadnice)…	Search (number, type, coordinates)…
+jen vybrané	selected only
+Klávesy ve 3D (lze změnit v Nastavení → Klávesové zkratky):	Keys in 3D (can be changed in Settings → Keyboard shortcuts):
+kružnice R{0}	circle R{0}
+Lze zadat i výraz (25/2) nebo proměnnou dílu. Enter potvrdí, Esc zruší.	An expression (25/2) or a part variable can be entered too. Enter confirms, Esc cancels.
+Myš (lze přepnout na kartě Zobrazení → Ovládání myši):	Mouse (can be switched on the View tab → Mouse control):
+Načítám plochy a hrany z jádra…	Loading faces and edges from the kernel…
+Napište pravidlo, např. „horní kruhové“, „svislé“ nebo „+Z“.	Type a rule, e.g. “top circular”, “vertical” or “+Z”.
+např. horní · boční · válcové · +Z · největší	e.g. top · side · cylindrical · +Z · largest
+např. horní kruhové · svislé · rovné · poloměr 5	e.g. top circular · vertical · straight · radius 5
+Nic neodpovídá.	Nothing matches.
+Odebrat z výběru	Remove from selection
+Parametry: do pole lze psát výrazy (25/2) nebo vazby na proměnné (=d1*2).	Parameters: fields accept expressions (25/2) or links to variables (=d1*2).
+plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže	model face, three points, datum plane… – takes precedence over the base plane below
+Pole: počet, rozteč a směr zadejte ve formuláři – směr podél hrany nebo osy válce vyberete tlačítkem Vybrat v poli směru · Enter = OK, Esc = Storno	Pattern: enter count, spacing and direction in the form – pick a direction along an edge or cylinder axis with the Select button in the direction field · Enter = OK, Esc = Cancel
+Popis vybraných	Describe selected
+Posunout pás karet doleva	Scroll the ribbon left
+Posunout pás karet doprava	Scroll the ribbon right
+Pravidlo (jako v textových příkazech)	Rule (as in text commands)
+Pravidlu „{0}“ neodpovídá nic.	Nothing matches the rule “{0}”.
+Prvky ke zrcadlení	Features to mirror
+Prvky rozšíření: {0}	Extension features: {0}
+Přidá plochy / hrany vybrané v modelu před otevřením formuláře	Adds the faces / edges selected in the model before the form was opened
+Přidat k výběru	Add to selection
+Rovina odkazem	Plane by reference
+Skica (lze změnit v Nastavení → Klávesové zkratky, skupina Skica):	Sketch (can be changed in Settings → Keyboard shortcuts, group Sketch):
+Skrýt popis	Hide description
+směr {0}	direction {0}
+Střed úlevy odkazem	Relief centre by reference
+Střed začátku odkazem	Start centre by reference
+V historii zatím není prvek s nástrojovým tělesem (vysunutí, díra, primitivum…).	There is no feature with a tool body in the history yet (extrusion, hole, primitive…).
+v tělese před prvkem není – odeberte ji	is not in the body before the feature – remove it
+vrchol, střed hrany, bod skici… – má přednost před souřadnicemi níže	vertex, edge midpoint, sketch point… – takes precedence over the coordinates below
+Vybrané prvky	Selected features
+Vybráno {0} z {1} · zobrazeno {2}	Selected {0} of {1} · shown {2}
+Vybrat hrany ze seznamu	Select edges from a list
+Vybrat plochy ze seznamu	Select faces from a list
+Vybrat pravidlem	Select by rule
+Vybrat zobrazené	Select shown
+vymazat	clear
+Zadejte číslo nebo výraz (např. 12,5 nebo 25/2){0}	Enter a number or an expression (e.g. 12.5 or 25/2){0}
+Ze seznamu / pravidlem…	From list / by rule…
+Zobrazeno prvních 400 – upřesněte hledání nebo použijte pravidlo.	The first 400 are shown – refine the search or use a rule.
+Zrcadlení: rovinu zvolte ve formuláři – základní rovinu, nebo plochu modelu tlačítkem Vybrat v poli Rovina zrcadlení · Enter = OK, Esc = Storno	Mirror: choose the plane in the form – a base plane, or a model face with the Select button in the Mirror plane field · Enter = OK, Esc = Cancel
+Zrcadlený prvek „{0}“ nemá nástrojové těleso – zrcadlit lze vysunutí, rotace, primitiva, díry, tažení a text.	The mirrored feature “{0}” has no tool body – extrusions, revolves, primitives, holes, sweeps and text can be mirrored.
+Zrušit odkaz (použít souřadnice)	Clear the reference (use coordinates)
++ přidat skicu…	+ add sketch…
+Název proměnné	Variable name
+Přidat skicu	Add sketch
+Výraz proměnné	Variable expression

@@ -576,7 +576,7 @@ export const cs = {
       lead: "Fotografie přímo z naší dílny, žádné ilustrační obrázky. Část zakázek je pod NDA – podrobnosti vám rádi řekneme osobně.",
       all: "Vše",
       kinds: { fixture: "Přípravky", part: "Díly", assembly: "Zařízení" },
-      year: "Rok",
+      kind: "Druh zakázky",
       tech: "Technologie",
       photos: "fotografií",
       brief: "Zadání",

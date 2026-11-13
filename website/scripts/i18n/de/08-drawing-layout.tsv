@@ -1,0 +1,23 @@
+# Výkres: rozvržení listu, otočení hlavního pohledu, poloviční řez, další modely na listu
+Celý řez	Vollschnitt
+Další modely na listu	Weitere Modelle auf dem Blatt
+komponenta	Komponente
+Komponenta sestavy	Baugruppenkomponente
+Kopie dokumentu se uloží do výkresu	Eine Kopie des Dokuments wird in der Zeichnung gespeichert
+Měřítko modelu	Modellmaßstab
+Model {0} nemá v pohledu žádnou geometrii.	Modell {0} hat in dieser Ansicht keine Geometrie.
+Model {0} přidán na list.	Modell {0} zum Blatt hinzugefügt.
+Model {0} se nepodařilo načíst.	Modell {0} konnte nicht geladen werden.
+Model {0} se nepodařilo promítnout.	Modell {0} konnte nicht projiziert werden.
+Odebrat model z listu	Modell vom Blatt entfernen
+Otočení hlavního pohledu	Drehung der Hauptansicht
+Otočí hlavní pohled po směru hodin a s ním celé promítání – soustružený díl tak může ležet osou vodorovně.	Dreht die Hauptansicht im Uhrzeigersinn und mit ihr die gesamte Projektion – ein Drehteil kann so mit waagerechter Achse liegen.
+Pohled komponenty sestavy nebo jiného dílu ze souboru na tomtéž listu – každý ve vlastním měřítku uvedeném pod pohledem.	Ansicht einer Baugruppenkomponente oder eines anderen Teils aus einer Datei auf demselben Blatt – jeweils im eigenen Maßstab, der unter der Ansicht angegeben ist.
+Pohled modelu	Modellansicht
+Pohled modelu {0} se na list nevejde – zvolte větší formát nebo menší měřítko.	Die Ansicht von Modell {0} passt nicht auf das Blatt – wählen Sie ein größeres Format oder einen kleineren Maßstab.
+Poloviční řez	Halbschnitt
+Polovina pohled, polovina řez – dělí je osa souměrnosti (u soustružených dílů osa rotace).	Halb Ansicht, halb Schnitt – getrennt durch die Symmetrieachse (bei Drehteilen die Rotationsachse).
+Přidat pohled komponenty na list	Ansicht der Komponente zum Blatt hinzufügen
+Řez se na list nevejde – zvolte větší formát nebo menší měřítko.	Der Schnitt passt nicht auf das Blatt – wählen Sie ein größeres Format oder einen kleineren Maßstab.
+Vložit model ze souboru (.mncad)…	Modell aus Datei einfügen (.mncad)…
+ze souboru	aus Datei

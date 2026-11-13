@@ -18,9 +18,7 @@ R{0}, hrany {1}	R{0}, Kanten {1}
 Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)	Baugruppe: die Körper der Komponenten werden getrennt aufgebaut (Volumen und Masse siehe Stückliste)
 Sestava: {0} komponent ({1} dílů po rozložení podsestav){2}{3}{4}	Baugruppe: {0} Komponenten ({1} Teile nach Auflösung der Unterbaugruppen){2}{3}{4}
 Text	Text
-bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; závit i s jemným stoupáním (M18×1,5) – jádro se dopočítá	ohne z = beginnt an der Körperoberfläche an dieser Stelle (laut Netz) und bohrt nach unten; Gewinde auch mit Feingewinde (M18×1,5) – der Kerndurchmesser wird berechnet
 celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy	ein ganzes .mncad-Dokument, ein Array von Features oder ein einzelnes Feature – Zugriff auf alle 36 Feature-Typen; ein Feature pro Zeile lässt sich mit Textbefehlen mischen
-další entity; předpona „pomocná“ = konstrukční	weitere Elemente; Präfix „hilfs“ = Konstruktionsgeometrie
 drážka	Langloch
 drážka potřebuje délku a šířku: drážka 40 10 [v x y] [úhel 0]	Langloch braucht Länge und Breite: langloch 40 10 [bei x y] [winkel 0]
 díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]	Bohrung braucht einen Durchmesser: bohrung 8,5 [tiefe 20 | durch] bei X Y [Z]
@@ -37,17 +35,13 @@ kvádr; výchozí roh v počátku, „střed“ = vystředit	Quader; Ecke standa
 lineární {0}× po {1}{2}	linear {0}× alle {1}{2}
 materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)	Material = Dichteklasse (stahl, edelstahl, aluminium, messing, kupfer, kunststoff, titan, gusseisen, bronze) oder eine beliebige Bezeichnung für das Schriftfeld (ČSN 11 423, 1.0503)
 mnohoúhelník potřebuje počet stran a průměr opsané kružnice: mnohoúhelník 6 30 [v x y]	Polygon braucht die Seitenzahl und den Umkreisdurchmesser: vieleck 6 30 [bei x y]
-neznámá entita skici „{0}“ – obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, bod, elipsa	unbekanntes Skizzenelement „{0}“ – rechteck, kreis, vieleck, langloch, linie, polylinie, punkt, ellipse
 neznámé pravidlo pro hrany „{0}“ – vše, horní, spodní, +Z/-Z/+X/-X/+Y/-Y, svislé, vodorovné, kruhové, rovné, poloměr N, delší N, kratší N	unbekannte Kantenregel „{0}“ – alle, oben, unten, +Z/-Z/+X/-X/+Y/-Y, senkrecht, waagerecht, rund, gerade, radius N, länger N, kürzer N
 neznámé pravidlo pro plochy „{0}“ – +Z/-Z/+X/-X/+Y/-Y, horní, spodní, boční, válcové, rovinné, největší	unbekannte Flächenregel „{0}“ – +Z/-Z/+X/-X/+Y/-Y, oben, unten, seitlich, zylindrisch, eben, grösste
-neznámý příkaz „{0}“ – příkazy: nový díl, kvádr, válec, koule, kužel, trubka, skica, obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, vysunout, rotovat, díra, zaoblit, srazit, skořepina, pole, zrcadlit, text, smazat poslední, stav, zobraz; nebo vložte JSON	unbekannter Befehl „{0}“ – Befehle: neu teil, quader, zylinder, kugel, kegel, rohr, skizze, rechteck, kreis, vieleck, langloch, linie, polylinie, extrudieren, drehen, bohrung, verrunden, fase, schale, muster, spiegeln, text, rückgängig, status, ansicht; oder JSON einfügen
 neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)	unbekanntes Gewinde „{0}“ – M2 bis M48, Regel- oder Feingewinde (M18×1,5)
-nová skica; entity i na dalších řádcích	neue Skizze; Elemente auch in den folgenden Zeilen
 nový dokument v nové záložce	neues Dokument in einer neuen Registerkarte
 nápis vystouplý / gravírovaný	erhabene / gravierte Beschriftung
 obdélník potřebuje šířku a výšku: obdélník 60 40 [v x y] (střed) nebo roh x y	Rechteck braucht Breite und Höhe: rechteck 60 40 [bei x y] (Mitte) oder ecke x y
 obdélník se středem (výchozí počátek) nebo rohem	Rechteck über Mittelpunkt (standardmäßig Ursprung) oder Ecke
-orotuje poslední skicu (výchozí osa Y skici, 360°)	dreht die letzte Skizze (standardmäßig Skizzen-Y-Achse, 360°)
 pohled: iso, přední, zadní, horní, spodní, levý, pravý	Ansicht: iso, vorne, hinten, oben, unten, links, rechts
 pole kruhové potřebuje počet: pole kruhové 6 [úhel 360] [osa Z]	Kreismuster braucht eine Anzahl: muster kreisförmig 6 [winkel 360] [achse Z]
 pole posledního prvku	Muster des letzten Features
@@ -594,7 +588,6 @@ Odsazení	Versatz
 Odsazení nesmí být nulové.	Der Versatz darf nicht null sein.
 Opačný směr	Richtung umkehren
 Osa	Achse
-Osa rotace (ve skice)	Drehachse (in der Skizze)
 Oříznout rovinou	Mit Ebene trimmen
 Oříznout skicou	Mit Skizze trimmen
 Plochu se nepodařilo zesílit – zkuste menší tloušťku nebo nejdřív plochy sešijte.	Die Fläche konnte nicht verdickt werden – versuchen Sie eine kleinere Dicke oder nähen Sie die Flächen zuerst.
@@ -644,7 +637,6 @@ Skica „{0}“ neobsahuje souvislou křivku ani uzavřený profil.	Die Skizze �
 Stoupání	Steigung
 Strana	Seite
 Střed začátku	Startmittelpunkt
-Svislá Y	Vertikal Y
 Symetricky na obě strany	Symmetrisch nach beiden Seiten
 Tažení plochy	Flächenaustragung
 Tažení po šroubovici	Austragung entlang Helix
@@ -659,7 +651,6 @@ Vnitřek profilu	Innenseite des Profils
 Vnitřní (v díře)	Innen (in Bohrung)
 Vnějšek	Außenseite
 Vnější (na válci)	Außen (auf Zylinder)
-Vodorovná X	Horizontal X
 Vyberte alespoň dvě hrany tvořící uzavřenou smyčku.	Wählen Sie mindestens zwei Kanten, die eine geschlossene Schleife bilden.
 Vyberte cílovou plochu.	Wählen Sie die Zielfläche.
 Vyberte plochu k prodloužení.	Wählen Sie die zu verlängernde Fläche.
@@ -686,7 +677,6 @@ křivka skici (i otevřená) vysunutá do plochy	Skizzenkurve (auch offen) zu ei
 křivky skici promítnuté po normále skici na vybranou plochu	Skizzenkurven entlang der Skizzennormalen auf die gewählte Fläche projiziert
 nic = všechny volné plochy	nichts = alle freien Flächen
 odřízne část volných ploch na jedné straně základní roviny	schneidet den Teil der freien Flächen auf einer Seite einer Grundebene ab
-otevřený profil rotovaný kolem osy skici	offenes Profil um eine Skizzenachse gedreht
 otevřený profil tažený po dráze (druhá skica)	offenes Profil entlang eines Pfads (zweite Skizze) ausgetragen
 plocha přes 2 a více křivek (v různých rovinách)	Fläche durch 2 oder mehr Kurven (in verschiedenen Ebenen)
 poloměr = povrch, kde závit začíná: válec, nebo díra (jádro); hloubka jde do materiálu	Radius = die Oberfläche, an der das Gewinde beginnt: Zylinder oder Bohrung (Kern); die Tiefe geht ins Material

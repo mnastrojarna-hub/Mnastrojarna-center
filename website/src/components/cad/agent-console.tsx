@@ -141,19 +141,18 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
           </div>
           {note && <p className="mt-1 text-[12px] text-brand">{note}</p>}
           {help && (
-            <div className="mt-3 max-h-64 overflow-y-auto rounded border border-[#e3e8ee] bg-[#f7f9fb] p-2">
-              <table className="w-full text-[11.5px]">
-                <tbody>
-                  {AGENT_COMMANDS.map((c) => (
-                    <tr key={c.cmd} className="border-b border-[#edf1f5] align-top last:border-0">
-                      <td className="py-1 pr-2 font-mono text-[11px] text-[#1f2933]">{c.cmd}</td>
-                      <td className="py-1 text-[#4a5664]">
-                        {c.desc} <span className="text-[#8a95a3]">({c.en})</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-3 max-h-64 overflow-y-auto rounded border border-[#e3e8ee] bg-[#f7f9fb] p-2" data-agent-commands>
+              {/* příkaz na vlastním řádku, popis pod ním – ve dvou sloupcích zbývalo na popis místo na jedno slovo */}
+              <ul className="space-y-1.5 text-[11.5px]">
+                {AGENT_COMMANDS.map((c) => (
+                  <li key={c.cmd} className="border-b border-[#edf1f5] pb-1.5 last:border-0 last:pb-0">
+                    <code className="block whitespace-pre-wrap break-words font-mono text-[11px] text-[#1f2933]">{c.cmd}</code>
+                    <span className="block leading-snug text-[#4a5664]">
+                      {c.desc} <span className="text-[#8a95a3]">({c.en} · {c.de})</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

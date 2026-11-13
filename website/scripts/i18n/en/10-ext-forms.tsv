@@ -1,0 +1,29 @@
+# Směr a osa u prvků rozšíření (parametry direction / axis), sjednocené zadání směru (formařské nástroje, pole komponent), starší duplicitní prvky
+Návrh pravidelného rozmístění vyhazovačů v průmětu dílu kolmo na směr otevírání formy. Na díl se přidají díry, do sestavy skutečné vyhazovače.	A proposal for a regular layout of ejector pins in the part's projection perpendicular to the mould opening direction. Holes are added to the part, real ejector pins to the assembly.
+Nulový směr – zadejte nenulový vektor.	Zero direction – enter a non-zero vector.
+osa	axis
+Osa kruhového pole je nulový vektor – zadejte směr osy.	The axis of the circular pattern is a zero vector – enter the axis direction.
+Osu odkazem nelze vyřešit – jádro neposkytlo odkazy.	The axis reference cannot be resolved – the kernel provided no references.
+otevřený profil rotovaný kolem osy (osa skici, čára skici, hrana, válcová plocha, dva body…)	an open profile revolved about an axis (sketch axis, sketch line, edge, cylindrical face, two points…)
+prvek {0}: parametr „{1}“ je {2} – X | Y | Z | -Z | vektor 1;0;1 | JSON	feature {0}: parameter “{1}” is {2} – X | Y | Z | -Z | vector 1;0;1 | JSON
+Směr nelze určit.	The direction cannot be determined.
+Směr odkazem	Direction by reference
+Směr odkazem nelze vyřešit – jádro neposkytlo odkazy.	The direction reference cannot be resolved – the kernel provided no references.
+Směr otevírání formy – kanály leží kolmo na něj pod dutinou	Mould opening direction – the channels lie perpendicular to it below the cavity
+Směr otevírání formy (= vyhození)	Mould opening direction (= ejection)
+Směr otevírání formy je nulový – zadejte nenulový vektor.	The mould opening direction is zero – enter a non-zero vector.
+Směr vysunutí	Extrusion direction
+Směr: {0}{1}	Direction: {0}{1}
+Starší prvek.	Legacy feature.
+Totéž umí vestavěná Díra (Polohy děr, více naráz) nebo Pole, druh Podle skici.	The built-in Hole (Hole positions, several at once) or Pattern, type By sketch, does the same.
+Totéž umí vestavěné Pole, druh Po křivce.	The built-in Pattern, type Along a curve, does the same.
+Totéž umí vestavěné Pole, druh Výplň.	The built-in Pattern, type Fill, does the same.
+Totéž umí vestavěné Sražení, druh D1 × D2 nebo D × úhel.	The built-in Chamfer, type D1 × D2 or D × angle, does the same.
+Totéž umí vestavěné Zaoblení, druh Plný.	The built-in Fillet, type Full round, does the same.
+Totéž umí vestavěné Zaoblení, druh R1 → R2.	The built-in Fillet, type R1 → R2, does the same.
+Vektor	Vector
+Klikněte do pole odkazu a vyberte geometrii v modelu.	Click the reference field and select the geometry in the model.
+výchozí kolmo na rovinu skici; jinak osa, vektor, hrana nebo normála plochy	default perpendicular to the sketch plane; otherwise an axis, vector, edge or face normal
+X / Y / Z, vektor čísly, nebo odkazem: normála plochy plechu, hrana	X / Y / Z, a numeric vector, or by reference: sheet face normal, edge
+X / Y / Z, vektor čísly, nebo odkazem: osa válcové plochy, hrana, normála plochy	X / Y / Z, a numeric vector, or by reference: cylindrical face axis, edge, face normal
+Zadat odkazem (normála plochy, hrana, dva body)…	Enter by reference (face normal, edge, two points)…
