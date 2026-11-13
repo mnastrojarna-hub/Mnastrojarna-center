@@ -1,0 +1,36 @@
+# 3D okno: náhled bez WebGL (softwarové vykreslení) a řez číslem / obecnou rovinou (P1-8, analýza nástrojů bod 14)
+ – model se proto kreslí softwarově. Tažením otáčíte, kolečkem přibližujete, Shift + tažení posouvá. Výběr ploch a hran kliknutím zde nefunguje: použijte seznamy ve formulářích prvků a textové příkazy. Příčinu a postup nápravy ukáže tlačítko „Proč nevidím 3D?“.	 – das Modell wird deshalb per Software gezeichnet. Ziehen dreht, das Mausrad zoomt, Umschalt + Ziehen verschiebt. Die Auswahl von Flächen und Kanten per Klick funktioniert hier nicht: Verwenden Sie die Listen in den Formularen der Elemente und Textbefehle. Ursache und Abhilfe zeigt die Schaltfläche „Warum sehe ich kein 3D?“.
+Číslo plochy	Flächennummer
+model {0} až {1}	Modell {0} bis {1}
+Model je zatím prázdný – po vytvoření tělesa se tu zobrazí jeho náhled.	Das Modell ist noch leer – sobald ein Körper erstellt ist, erscheint hier seine Vorschau.
+Náhled modelu bez WebGL	Modellvorschau ohne WebGL
+nebo č.	oder Nr.
+Normála míří do odříznuté části. Poloha je vzdálenost roviny od počátku souřadnic ve směru normály.	Die Normale zeigt in den weggeschnittenen Teil. Die Position ist der Abstand der Ebene vom Ursprung in Richtung der Normale.
+Normála míří do zachované části. Poloha je vzdálenost roviny od počátku souřadnic ve směru normály.	Die Normale zeigt in den erhaltenen Teil. Die Position ist der Abstand der Ebene vom Ursprung in Richtung der Normale.
+Normála nesmí být nulový vektor.	Die Normale darf kein Nullvektor sein.
+Normála roviny řezu	Normale der Schnittebene
+Obecná rovina zadaná normálou nx; ny; nz	Allgemeine Ebene, gegeben durch die Normale nx; ny; nz
+Oddálit	Verkleinern
+Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Model se místo 3D okna zobrazuje jako zjednodušený náhled: pohledy, přizpůsobení, přiblížení, otáčení i řez fungují, výběr ploch a hran kliknutím ne – použijte seznamy ve formulářích prvků a textové příkazy.	Die übrigen Programmteile funktionieren weiter: Menüs, Hilfe, Einstellungen, Öffnen und Speichern von Dateien, 2D-Skizze und Zeichnungen. Statt des 3D-Fensters wird das Modell als vereinfachte Vorschau angezeigt: Ansichten, Einpassen, Zoom, Drehen und Schnittansicht funktionieren, die Auswahl von Flächen und Kanten per Klick nicht – verwenden Sie die Listen in den Formularen der Elemente und Textbefehle.
+Plocha {0} není rovinná – řez lze vést jen rovinnou plochou.	Fläche {0} ist nicht eben – ein Schnitt kann nur durch eine ebene Fläche gelegt werden.
+Poloha roviny řezu	Position der Schnittebene
+Použít	Übernehmen
+Použít vybranou plochu	Gewählte Fläche verwenden
+Proč nevidím 3D?	Warum sehe ich kein 3D?
+Přiblížit	Vergrößern
+Rovina kolmá na osu {0}	Ebene senkrecht zur {0}-Achse
+Rovina leží na ploše {0}. Poloha je posun od plochy: záporně do materiálu, kladně ven.	Die Ebene liegt auf Fläche {0}. Die Position ist der Versatz von der Fläche: negativ ins Material, positiv nach außen.
+Rovina řezu	Schnittebene
+Rovina vybrané rovinné plochy tělesa	Ebene der gewählten ebenen Fläche des Körpers
+Složky normály musí být čísla.	Die Komponenten der Normale müssen Zahlen sein.
+Softwarový náhled · {0} trojúhelníků · {1} ms	Software-Vorschau · {0} Dreiecke · {1} ms
+Těleso je skryté.	Der Körper ist ausgeblendet.
+Vejít celý model do okna (F)	Ganzes Modell ins Fenster einpassen (F)
+Vektor	Vektor
+Vyberte rovinnou plochu tělesa (kliknutím ve 3D okně) – rovina řezu se na ni položí.	Wählen Sie eine ebene Fläche des Körpers (per Klick im 3D-Fenster) – die Schnittebene wird darauf gelegt.
+Vybraná plocha není rovinná.	Die gewählte Fläche ist nicht eben.
+Vybraná plocha není rovinná. Vyberte rovinnou plochu tělesa – rovina řezu se na ni položí.	Die gewählte Fläche ist nicht eben. Wählen Sie eine ebene Fläche des Körpers – die Schnittebene wird darauf gelegt.
+Zadejte číslo plochy 1–{0}.	Geben Sie eine Flächennummer 1–{0} ein.
+Zadejte tři složky normály oddělené středníkem, např. 1; 0; 1.	Geben Sie die drei Komponenten der Normale durch Semikolon getrennt ein, z. B. 1; 0; 1.
+Zjednodušený náhled bez WebGL.	Vereinfachte Vorschau ohne WebGL.
+Zpět k náhledu	Zurück zur Vorschau

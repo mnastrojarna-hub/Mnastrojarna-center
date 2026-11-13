@@ -8,9 +8,11 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { toWorld } from "@/cad/defaults";
+import { sectionKey, sectionPlane, type SectionState } from "@/cad/section-plane";
 import { entityPath } from "@/cad/sketch";
 import type { Feature, MeshData, Vec3 } from "@/cad/types";
 import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
+import { softView, useSoftViewActive } from "./soft-bridge";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -23,7 +25,8 @@ export type DisplayMode = "shadedEdges" | "shaded" | "wireframe" | "hiddenLine" 
 export type SurfaceAnalysis = "none" | "zebra";
 /** Schéma myši: ZW3D (pravé otáčí, prostřední posouvá), SolidWorks (prostřední otáčí, Ctrl+prostřední posouvá), jednoduché (levé otáčí). */
 export type MouseScheme = "zw3d" | "solidworks" | "simple";
-export type Section = { axis: "X" | "Y" | "Z"; offset: number; flip: boolean } | null;
+/** Řez: osová rovina (X / Y / Z + poloha) nebo obecná rovina (normála + bod + posun) – viz `@/cad/section-plane`. */
+export type Section = SectionState | null;
 export type Datum = { id: string; name: string; origin: Vec3; normal: Vec3; xDir: Vec3; size: number };
 /** Pomocná osa / bod / souřadný systém k vykreslení (vyřešené jádrem). */
 export type DatumGfx = { kind: "axis"; origin: Vec3; dir: Vec3; length: number } | { kind: "point"; p: Vec3 } | { kind: "csys"; origin: Vec3; x: Vec3; y: Vec3; z: Vec3; size: number };
@@ -193,6 +196,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   const S = useRef<St | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  /** bez WebGL kreslí model softwarový náhled (viewport-soft.tsx) a přebírá pohledy, přizpůsobení i snímek */
+  const softOn = useSoftViewActive();
 
   // ---------- popisky entit (F1 / E2 / V3) ----------
   const [hintList, setHintList] = useState<Hint[]>([]);
@@ -1111,10 +1116,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     if (!s) return;
     const sec = propsRef.current.section;
     if (sec) {
-      // ponechá se strana, kam míří normála (výchozí: strana odvrácená od izometrické kamery → řez je vidět)
-      const sign = (sec.axis === "Y" ? 1 : -1) * (sec.flip ? -1 : 1);
-      const n = new THREE.Vector3(sec.axis === "X" ? 1 : 0, sec.axis === "Y" ? 1 : 0, sec.axis === "Z" ? 1 : 0).multiplyScalar(sign);
-      s.clip.set(n, -sign * sec.offset);
+      // ponechá se strana, kam míří normála; osová i obecná rovina (z plochy, z vektoru) se počítá v section-plane.ts
+      const pl = sectionPlane(sec);
+      s.clip.set(new THREE.Vector3(...pl.normal), pl.constant);
     }
   }
 
@@ -1198,7 +1202,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   useEffect(() => {
     applyClip();
     S.current?.render();
-  }, [props.section?.axis, props.section?.offset, props.section?.flip]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sectionKey(props.section)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const s = S.current;
@@ -1466,6 +1470,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   }, [gizmoKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function fitTo(v: ViewName) {
+    if (softView.current) return softView.current.setView(v);
     const s = S.current;
     if (!s) return;
     const dirs: Record<ViewName, [number, number, number]> = {
@@ -1494,6 +1499,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   useImperativeHandle(ref, () => ({
     setView: fitTo,
     fit: () => {
+      if (softView.current) return softView.current.fit();
       const s = S.current;
       if (!s) return;
       const dir = s.camera.position.clone().sub(s.controls.target).normalize();
@@ -1508,6 +1514,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.render();
     },
     snapshot: () => {
+      if (softView.current) return softView.current.snapshot();
       const s = S.current;
       if (!s) return null;
       s.renderer.render(s.scene, s.camera);
@@ -1527,6 +1534,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       return true;
     },
     bounds: () => {
+      if (softView.current) return softView.current.bounds();
       const s = S.current;
       return { center: s ? [s.center.x, s.center.y, s.center.z] : [0, 0, 0], radius: s?.radius ?? 100 };
     },
@@ -1566,7 +1574,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   };
 
   return (
-    <div className="absolute inset-0">
+    <div className={softOn ? "invisible absolute inset-0" : "absolute inset-0"}>
       <div ref={host} className="absolute inset-0" />
       {/* popisky kót měření */}
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 overflow-hidden">

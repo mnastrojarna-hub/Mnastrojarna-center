@@ -60,6 +60,7 @@ import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool, type SketcherHandle } from "./sketcher";
 import { applySketchPatch } from "@/cad/sketch-underlay";
+import { SectionControls } from "./section-panel";
 import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
@@ -2877,7 +2878,6 @@ export function CadApp() {
   );
 
   const measureGfx: MeasureGfx | null = measure && measureRes ? measureRes.gfx : null;
-  const bb = m ? m.bbox : null;
 
   const buildCommands = (): Command[] => {
     const out: Command[] = [];
@@ -3242,6 +3242,7 @@ export function CadApp() {
               <ViewportFallback
                 failure={glError}
                 core={core}
+                scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: doc.faceColors, display: prefs.display, section, hidden: bodyHidden, dark: bg.dark }}
                 onRetry={() => {
                   setGlError(null);
                   setGlKey((k) => k + 1);
@@ -3323,28 +3324,7 @@ export function CadApp() {
             {/* Řez */}
             {section && !sketch && (
               <FloatPanel title={tr("Řez modelem")} icon="section" onClose={() => setSection(null)} pos={measure ? "left-3 top-[300px]" : "left-3 top-3"}>
-                <div className="mb-2 flex gap-1">
-                  {(["X", "Y", "Z"] as const).map((a) => (
-                    <button key={a} type="button" onClick={() => setSection({ ...section, axis: a, offset: bb ? Math.round(((bb[0]["XYZ".indexOf(a)] + bb[1]["XYZ".indexOf(a)]) / 2) * 100) / 100 : 0 })} className={cn("flex-1 rounded py-1 text-[12px] font-semibold", section.axis === a ? "bg-[#1f2933] text-white" : "bg-[#eef2f6] hover:bg-[#e3e9f0]")}>
-                      {a}
-                    </button>
-                  ))}
-                </div>
-                {bb && (
-                  <input
-                    type="range"
-                    min={bb[0]["XYZ".indexOf(section.axis)] - 0.01}
-                    max={bb[1]["XYZ".indexOf(section.axis)] + 0.01}
-                    step={0.01}
-                    value={section.offset}
-                    onChange={(e) => setSection({ ...section, offset: Number(e.target.value) })}
-                    className="w-full accent-[#E03930]"
-                  />
-                )}
-                <Row k={tr("Poloha")} v={`${fmtNum(section.offset, 2)} mm`} />
-                <button type="button" onClick={() => setSection({ ...section, flip: !section.flip })} className="mt-2 w-full rounded border border-[#cfd6de] py-1 text-[12px] hover:bg-[#f3f6f9]">
-                  {tr("Otočit stranu")}
-                </button>
+                <SectionControls section={section} onChange={setSection} mesh={result?.mesh ?? null} assembly={isAsm ? asmViews : undefined} selection={selection} />
               </FloatPanel>
             )}
 
