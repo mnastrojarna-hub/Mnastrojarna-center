@@ -10,10 +10,11 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
-import { angleGeom, annotationGeometry, annotationStatus, annToSheet, bomToCsv, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
+import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { threadsOfDoc } from "@/cad/drawing-doc";
 import { dimCheck } from "@/cad/dim-check";
-import { mergeSmart, NEW_DRAWING_OPTIONS } from "@/cad/drawing-agent";
+import { activeSheet, mergeSmart, NEW_DRAWING_OPTIONS } from "@/cad/drawing-agent";
+import { drawingFile, safeName, type DrawingExportFormat } from "@/cad/drawing-export";
 import type { SmartDims } from "@/cad/drawing-dims";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
@@ -85,8 +86,6 @@ function download(name: string, data: BlobPart | (() => Promise<BlobPart> | Blob
   void saveFile(name, data, type).catch((e) => console.warn("Uložení se nezdařilo:", e));
 }
 
-const safeName = (s: string) => (s || "vykres").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w.-]+/g, "_").slice(0, 60);
-
 function printSvg(svg: string, w: number, h: number) {
   const iframe = document.createElement("iframe");
   iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
@@ -131,7 +130,6 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     date: new Date().toLocaleDateString(cadLocale()),
     tolerance: "", // výrobní požadavky (tolerance, hrany) se nedoplňují automaticky – uvedou se jen zadané
   }));
-  const [showBom, setShowBom] = useState(!!bom?.length);
   /** závity: kružnice válce / jádra se kótuje označením („M6 hl. 12“, „M18×1,5 dl. 18“) – modelované šroubovice se na výkrese nekreslí (ISO 6410) */
   const threads = useMemo(() => threadsOfDoc(doc), [doc.features]);
   const [repeatTool, setRepeatTool] = useState(false);
@@ -153,8 +151,15 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   // ---------- uživatelské kóty a poznámky (uložené v dokumentu) ----------
   // ---------- listy (každý list = DrawingDoc v doc.drawings) ----------
   const sheets = useMemo(() => drawings ?? [], [drawings]);
-  const [sheetIdx, setSheetIdx] = useState(0);
+  // aktivní list sdílí výkres s textovými příkazy („výkres list 2“ → výkres se otevře / přepne na list 2)
+  const [sheetIdx, setSheetIdxRaw] = useState(() => Math.max(0, sheets.findIndex((s) => s.id === activeSheet.get())));
+  const setSheetIdx = (i: number, id = sheets[i]?.id) => {
+    setSheetIdxRaw(i);
+    activeSheet.set(id ?? null, false);
+  };
   const saved = sheets[sheetIdx];
+  /** kusovník nad razítkem (sestava) – volba listu (výchozí zobrazit) */
+  const showBom = opts.bomTable ?? !!bom?.length;
   const [sheetName, setSheetName] = useState(saved?.name ?? tr("List 1"));
   const [ann, setAnn] = useState<DrawingAnnotation[]>(() => saved?.annotations ?? []);
   const [annTool, setAnnTool] = useState<AnnTool | null>(null);
@@ -201,8 +206,28 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const now = JSON.stringify(drawings ?? null);
     if (now === wrote.current) return;
     wrote.current = now;
+    // list zvolený textovým příkazem (výkres list N / nový list) nebo smazaný list → přepnout (načte efekt listu)
+    const want = sheets.findIndex((x) => x.id === activeSheet.get());
+    const i = want >= 0 ? want : Math.min(sheetIdx, Math.max(0, sheets.length - 1));
+    if (i !== sheetIdx) {
+      dirty.current = false;
+      setSheetIdxRaw(i);
+      return;
+    }
     loadRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawings]);
+  // přepnutí listu textovým příkazem bez změny dokumentu (výkres list 2): přepnout, jakmile list v dokumentu je
+  const [wantSheet, setWantSheet] = useState<string | null>(null);
+  useEffect(() => activeSheet.subscribe(setWantSheet), []);
+  useEffect(() => {
+    if (!wantSheet) return;
+    const i = sheets.findIndex((x) => x.id === wantSheet);
+    if (i < 0) return;
+    setWantSheet(null);
+    if (i !== sheetIdx) switchSheet(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantSheet, sheets]);
   // rozpracovaný výběr kóty patří jen nástroji Kóta
   useEffect(() => {
     if (annTool === "dim") return;
@@ -261,7 +286,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     dirty.current = false;
     wrote.current = JSON.stringify(cur);
     onDrawingsChange(cur);
-    setSheetIdx(n - 1);
+    setSheetIdx(n - 1, cur[n - 1].id);
   };
   const removeSheet = (i: number) => {
     if (!onDrawingsChange || sheets.length <= 1) return;
@@ -269,7 +294,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     dirty.current = false;
     wrote.current = JSON.stringify(cur);
     onDrawingsChange(cur);
-    setSheetIdx(Math.max(0, Math.min(i, cur.length - 1)));
+    const k = Math.max(0, Math.min(i, cur.length - 1));
+    setSheetIdx(k, cur[k]?.id);
   };
   const switchSheet = (i: number) => {
     if (i === sheetIdx) return;
@@ -385,13 +411,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
 
   // ---------- export ----------
   const base = safeName(meta.name || doc.name);
+  /** soubor výkresu (stejný výpočet jako window.mncad.exportDrawing – cad/drawing-export.ts) */
+  const fileOf = (f: DrawingExportFormat) => drawingFile(out!, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
   const exportPdf = async () => {
     if (!out) return;
     try {
       const saved = await saveFile(`${base}_vykres.pdf`, async () => {
         flash(tr("Generuji PDF…"));
-        const { drawingToPdf } = await import("@/cad/pdf");
-        return drawingToPdf({ ...out, title: meta.name });
+        return new Blob([(await fileOf("pdf")).data as BlobPart], { type: "application/pdf" });
       }, "application/pdf");
       if (saved) flash(tr("PDF uloženo: {0}", saved.name));
     } catch (e) {
@@ -404,13 +431,17 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     try {
       const saved = await saveFile(`${base}_vykres.dwg`, async () => {
         flash(tr("Generuji DWG ({0})…", dwgVer));
-        const { drawingToDwg } = await import("@/cad/formats/dwg");
-        return drawingToDwg(out, { version: dwgVer });
+        return new Blob([(await fileOf("dwg")).data as BlobPart], { type: "application/acad" });
       }, "application/acad");
       if (saved) flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name));
     } catch (e) {
       flash((e as Error).message || tr("DWG se nepodařilo vytvořit."));
     }
+  };
+  /** DXF / SVG / kusovník CSV (textové soubory) */
+  const exportText = (f: DrawingExportFormat) => {
+    if (!out && f !== "csv") return;
+    void fileOf(f).then((x) => download(x.name, new Blob([x.data as BlobPart], { type: x.mime }), x.mime)).catch((e) => flash((e as Error).message));
   };
 
   // ---------- náhled: zoom & posun ----------
@@ -764,13 +795,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             ))}
           </select>
         </span>
-        <Btn onClick={() => out && download(`${base}_vykres.dxf`, out.dxf, "application/dxf")} disabled={!res} title={tr("DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD")}>
+        <Btn onClick={() => exportText("dxf")} disabled={!res} title={tr("DXF (AutoCAD R12) – otevře AutoCAD, ZWCAD, DraftSight, LibreCAD")}>
           DXF
         </Btn>
-        <Btn onClick={() => out && download(`${base}_vykres.svg`, out.svg, "image/svg+xml")} disabled={!res}>
+        <Btn onClick={() => exportText("svg")} disabled={!res}>
           SVG
         </Btn>
-        {bom?.length ? <Btn onClick={() => download(`${base}_kusovnik.csv`, bomToCsv(bom), "text/csv;charset=utf-8")}>{tr("Kusovník CSV")}</Btn> : null}
+        {bom?.length ? <Btn onClick={() => exportText("csv")}>{tr("Kusovník CSV")}</Btn> : null}
         <Btn onClick={() => out && printSvg(out.svg, out.sheet.w, out.sheet.h)} disabled={!res}>
           {tr("Tisk")}
         </Btn>
@@ -1076,7 +1107,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             )}
             <p className="-mt-1 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">{tr("Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.")}</p>
             {bom?.length ? (
-              <Check checked={showBom} onChange={setShowBom}>
+              <Check checked={showBom} onChange={(v) => set("bomTable", v)}>
                 {tr("Kusovník nad razítkem (")}{bom.length} {tr("pol.)")}
               </Check>
             ) : null}

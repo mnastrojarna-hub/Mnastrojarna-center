@@ -1,0 +1,182 @@
+# Výkres textem pro agenty: listy, razítko, revize, značky, ruční kóty, úpravy, detaily, modely, export (vlna 6, drawing)
+  detail {0} (z pohledu {1}, střed {2}, r {3}, {4}){5}	  detail {0} (from view {1}, center {2}, r {3}, {4}){5}
+  {0}{1}: x {2}…{3}, y {4}…{5} mm · {6} · na listu x {7}…{8}, y {9}…{10}	  {0}{1}: x {2}…{3}, y {4}…{5} mm · {6} · on sheet x {7}…{8}, y {9}…{10}
+ (celý)	 (full)
+ (list {0}/{1})	 (sheet {0}/{1})
+ (odsazení {0})	 (offset {0})
+ (poloviční)	 (half)
+ (posun {0} {1})	 (shift {0} {1})
+ (text: v x y v mm listu)	 (text: at x y in sheet mm)
+ · list {0}	 · sheet {0}
+ · na listu x {0}…{1}, y {2}…{3}	 · on sheet x {0}…{1}, y {2}…{3}
+ · není na listu	 · not on the sheet
+! kóta přesahuje rámeček listu – zmenšete odsazení: výkres upravit {0} odsazení=…	! the dimension extends beyond the sheet frame – reduce the offset: drawing edit {0} offset=…
+! popisek se překrývá s „{0}“ – posuňte ho: výkres upravit {1} posun="dx dy" (mm listu)	! the label overlaps “{0}” – move it: drawing edit {1} shift="dx dy" (sheet mm)
+! přesahuje rámeček listu	! extends beyond the sheet frame
+! text kóty se překrývá s „{0}“ – změňte odsazení: výkres upravit {1} odsazení=…	! the dimension text overlaps “{0}” – change the offset: drawing edit {1} offset=…
+! text se překrývá s „{0}“	! the text overlaps “{0}”
+! značka přesahuje rámeček listu – posuňte ji: výkres upravit {0} posun="dx dy"	! the mark extends beyond the sheet frame – move it: drawing edit {0} shift="dx dy"
+auto	auto
+balónky	balloons
+balónky ano|ne	balloons yes|no
+bez balónků	no balloons
+bez kusovníku	no parts list
+bod geometrie	geometry point
+bod {0} je mimo pohled {1} (x {2}…{3}, y {4}…{5} mm) – rozsahy ukáže výkres stav	point {0} is outside the {1} view (x {2}…{3}, y {4}…{5} mm) – drawing status shows the ranges
+bod {0} leží mimo kruh detailu {1} (střed {2}, r {3})	point {0} lies outside the circle of detail {1} (center {2}, r {3})
+celý	full
+chybí pohled – přední, horní, levý, pravý, zadní, spodní, iso, řez, detail A nebo "název modelu"	view missing – front, top, left, right, back, bottom, iso, section, detail A or "model name"
+Další modely: {0}	Additional models: {0}
+další volby listu: otočení hlavního pohledu, poloviční řez, kusovník nad razítkem, pozice komponent; kóty „Auto + Ø“ zapečené do pohledů	more sheet options: main view rotation, half section, parts list above the title block, component balloons; “Auto + Ø” dimensions baked into the views
+detail se vytváří z pohledu, ne z jiného detailu	a detail is created from a view, not from another detail
+detail {0}	detail {0}
+detail {0} na listu není – detaily: {1}	detail {0} is not on the sheet – details: {1}
+detail: měřítko je číslo, např. 2:1	detail: the scale is a number, e.g. 2:1
+detail: nečekané „{0}“ – {1}	detail: unexpected “{0}” – {1}
+detail: zadejte poloměr kruhu detailu – poloměr r (mm modelu)	detail: give the radius of the detail circle – radius r (model mm)
+detail: zadejte písmeno detailu, např. pohled detail A v 2 3	detail: give the detail letter, e.g. view detail A at 2 3
+detail: zadejte střed – v x y (mm modelu v rovině pohledu)	detail: give the center – at x y (model mm in the view plane)
+detailní pohled (střed v mm modelu, umístění středu v mm listu) a další modely na listu (komponenta sestavy nebo otevřená záložka)	detail view (center in model mm, placement of its center in sheet mm) and additional models on the sheet (assembly component or open tab)
+Dokument zatím nemá výkres – export prvního listu: bez „sheet“ nebo sheet 1.	The document has no drawing yet – to export the first sheet omit “sheet” or use sheet 1.
+drsnost: zadejte hodnotu, např. výkres značka drsnost Ra 1,6 na Ø40	roughness: give a value, e.g. drawing mark roughness Ra 1.6 on Ø40
+geometrická tolerance: charakteristika {0} – neznámé „{1}“	geometric tolerance: characteristic {0} – unknown “{1}”
+geometrická tolerance: za charakteristikou zadejte hodnotu, např. tolerance kolmost 0,02 A na Ø40	geometric tolerance: give a value after the characteristic, e.g. gdt perpendicularity 0.02 A on Ø40
+geometrická tolerance: základna je písmeno (A, B, A-B) – „{0}“	geometric tolerance: the datum is a letter (A, B, A-B) – “{0}”
+hrana	edge
+Id (výkres upravit / smazat / značka na <id>): {0}	Ids (drawing edit / delete / mark on <id>): {0}
+izometrie nemá souřadnice pro značky a kóty – použijte pravoúhlý pohled ({0}) nebo místo na listu	the isometric view has no coordinates for marks and dimensions – use an orthographic view ({0}) or a place on the sheet
+kusovník	parts list
+kusovník ano|ne	bom yes|no
+Kusovník CSV je jen u sestavy s komponentami – díl kusovník nemá.	The parts list CSV exists only for an assembly with components – a part has no parts list.
+kusovník nad razítkem	parts list above the title block
+kóta svisle: body mají stejné y – svislá vzdálenost je nulová	vertical dimension: the points have the same y – the vertical distance is zero
+kóta vodorovně: body mají stejné x – vodorovná vzdálenost je nulová	horizontal dimension: the points have the same x – the horizontal distance is zero
+kóta {0} ({1}, {2})	dimension {0} ({1}, {2})
+kóta {0}: zadejte střed kružnice – střed x y (mm modelu v rovině pohledu)	{0} dimension: give the circle center – center x y (model mm in the view plane)
+kóta úhel: hrana má nulovou délku	angle dimension: an edge has zero length
+kóta úhel: hrany jsou rovnoběžné – pro jejich vzdálenost použijte kótu šikmo / vodorovně / svisle	angle dimension: the edges are parallel – for their distance use an aligned / horizontal / vertical dimension
+kóta úhel: zadejte dvě hrany osmi čísly – x1 y1 x2 y2 x3 y3 x4 y4 (mm modelu v rovině pohledu)	angle dimension: give two edges with eight numbers – x1 y1 x2 y2 x3 y3 x4 y4 (model mm in the view plane)
+kóta šikmo: body splývají	aligned dimension: the points coincide
+kóta: nečekané „{0}“ – {1}	dimension: unexpected “{0}” – {1}
+kóta: odsazení musí být číslo	dimension: the offset must be a number
+kóta: zadejte dva body čtyřmi čísly – x1 y1 x2 y2 (mm modelu v rovině pohledu)	dimension: give two points with four numbers – x1 y1 x2 y2 (model mm in the view plane)
+kótovat [chytře|celkově|základní|nic] [řetězově|od základny] – neznámé slovo „{0}“	dimension [smart|overall|basic|none] [chain|baseline] – unknown word “{0}”
+Kóty a poznámky bez geometrie: {0}	Dimensions and notes without geometry: {0}
+kóty se zadávají v pohledu, ne v detailu – použijte pohled, ze kterého je detail	dimensions are placed in a view, not in a detail – use the view the detail comes from
+list {0}	sheet {0}
+list {0} neexistuje – {1}; nový list: výkres list nový "název"	sheet {0} does not exist – {1}; new sheet: drawing sheet new "name"
+list „{0}“ už existuje – {1}	sheet “{0}” already exists – {1}
+Listy ({0}): {1}	Sheets ({0}): {1}
+listy výkresu: další příkazy výkresu pracují s vybraným listem a výkres se otevře na něm; „výkres list A3“ dál znamená formát	drawing sheets: further drawing commands work with the selected sheet and the drawing opens on it; “drawing sheet A3” still means the format
+Listy: zatím žádný (první vznikne příkazem výkresu)	Sheets: none yet (the first one is created by a drawing command)
+model „{0}“ na listu není – modely: {1}	model “{0}” is not on the sheet – models: {1}
+Neznámá verze DWG „{0}“ – {1}	Unknown DWG version “{0}” – {1}
+neznámá volba výkresu „{0}“ – volby: A4…A0, na šířku / na výšku, {1}; podpříkazy: tolerance, poznámka, nepředepsané, hrany, drsnost, list, razítko, revize, značka, kóta, upravit, smazat, detail, model, stav	unknown drawing option “{0}” – options: A4…A0, landscape / portrait, {1}; subcommands: tolerance, note, general, edges, roughness, sheet, titleblock, revision, mark, dim, edit, delete, detail, model, status
+Neznámý formát výkresu „{0}“ – pdf, dxf, dwg, svg, csv, png.	Unknown drawing format “{0}” – pdf, dxf, dwg, svg, csv, png.
+název listu nesmí být prázdný	the sheet name must not be empty
+otočení 0|90|180|270	rotation 0|90|180|270
+otočení hlavního pohledu: 0, 90, 180 nebo 270 (°)	main view rotation: 0, 90, 180 or 270 (°)
+otočení {0}°	rotation {0}°
+PNG výkresu jde vytvořit jen v prohlížeči.	The drawing PNG can only be created in the browser.
+PNG výkresu se nepodařilo vytvořit.	The drawing PNG could not be created.
+pohled „{0}“ na listu není – pohledy: {1}	view “{0}” is not on the sheet – views: {1}
+poloviční	half
+posun	shift
+pozice komponent (balónky)	component positions (balloons)
+poznámka potřebuje text: výkres značka poznámka "Kalit 58 HRC" na Ø40	a note needs a text: drawing mark note "Harden 58 HRC" on Ø40
+Prohlížeč nepodporuje kreslení do canvasu.	The browser does not support drawing into a canvas.
+přichyceno ke geometrii	snapped to geometry
+razítko listu (číslo, kreslil a revize i do vlastností dokumentu, materiál do označení materiálu) a tabulka revizí	sheet title block (number, author and revision also into the document properties, material into the material designation) and the revision table
+Razítko: název {0} · číslo {1} · kreslil {2} · revize {3} · datum {4} · materiál {5}	Title block: name {0} · number {1} · drawn by {2} · revision {3} · date {4} · material {5}
+Revize ({0}): {1}	Revisions ({0}): {1}
+revize {0} v tabulce není – revize: {1}	revision {0} is not in the table – revisions: {1}
+Revize: žádné	Revisions: none
+ruční kóta (nástroj Kóta): body v mm modelu v rovině pohledu, přichytí se ke koncům hran a kružnicím; konce jedné hrany = kóta hrany	manual dimension (Dimension tool): points in model mm in the view plane, snapped to edge ends and circles; both ends of one edge = edge dimension
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, {0} × {1}):	Coordinates (for “view … at x y” and dimensions: model mm in the view plane, y up; sheet: mm from the lower left corner, {0} × {1}):
+stav vybraného nebo všech listů: přehled listů, souřadnice pohledů pro značky a kóty, id kót a značek (a1…), razítko a revize; také window.mncad.drawingStatus({ sheet }) a export bez dialogu window.mncad.exportDrawing("pdf"|"dxf"|"dwg"|"svg"|"csv"|"png")	status of the selected or all sheets: sheet overview, view coordinates for marks and dimensions, ids of dimensions and marks (a1…), title block and revisions; also window.mncad.drawingStatus({ sheet }) and export without a dialog window.mncad.exportDrawing("pdf"|"dxf"|"dwg"|"svg"|"csv"|"png")
+střed	center
+střed detailu	detail center
+střed detailu {0} je mimo pohled {1} – rozsahy ukáže výkres stav	detail center {0} is outside the {1} view – drawing status shows the ranges
+text se umisťuje na list: výkres značka text "…" v x y (mm listu od levého dolního rohu)	text is placed on the sheet: drawing mark text "…" at x y (sheet mm from the lower left corner)
+text: výkres značka text "Kalit 58 HRC" v 20 30 [výška 5] (mm listu od levého dolního rohu)	text: drawing mark text "Harden 58 HRC" at 20 30 [height 5] (sheet mm from the lower left corner)
+umístit	place
+v bodě {0} je více kružnic (R {1}) – zadejte r	there are several circles at {0} (R {1}) – give r
+v pohledu {0} není kružnice se středem {1}{2} – kružnice: {3}	the {0} view has no circle with center {1}{2} – circles: {3}
+volby listu výkresu (aktivní list – výkres list N; jinak první) a otevření výkresu; nové výkresy mají Chytré kóty	drawing sheet options (active sheet – drawing sheet N; otherwise the first) and opening the drawing; new drawings use Smart dimensions
+Volby: {0}	Options: {0}
+volné body	free points
+volný bod	free point
+výkres detail <pohled> v x y poloměr r [měřítko 2:1] [umístit x y] · výkres detail <písmeno> měřítko 4:1 | umístit x y · výkres detail smazat <písmeno>	drawing detail <view> at x y radius r [scale 2:1] [place x y] · drawing detail <letter> scale 4:1 | place x y · drawing detail delete <letter>
+výkres kóta vodorovně|svisle|šikmo pohled <p> x1 y1 x2 y2 · kóta průměr|poloměr pohled <p> střed x y [r R] [úhel 45] · kóta úhel pohled <p> x1 y1 x2 y2 x3 y3 x4 y4 – [odsazení 10] [text "…"]	drawing dim horizontal|vertical|aligned view <v> x1 y1 x2 y2 · dim diameter|radius view <v> center x y [r R] [angle 45] · dim angle view <v> x1 y1 x2 y2 x3 y3 x4 y4 – [offset 10] [text "…"]
+výkres list <číslo|"název"> · výkres list nový ["název"] · výkres list přejmenovat [<číslo>] "název" · výkres list smazat <číslo|"název">	drawing sheet <number|"name"> · drawing sheet new ["name"] · drawing sheet rename [<number>] "name" · drawing sheet delete <number|"name">
+výkres model "<komponenta|záložka>" [pohled horní] [měřítko 1:2|auto] · výkres model smazat "<název>"	drawing model "<component|tab>" [view top] [scale 1:2|auto] · drawing model delete "<name>"
+výkres má jen jeden list – ten smazat nelze	the drawing has only one sheet – it cannot be deleted
+výkres razítko název="…" číslo="…" kreslil="…" revize="…" datum="…" materiál="…" [nepředepsané="…" hrany="…" poznámka="…"] – neznámé „{0}“	drawing titleblock name="…" number="…" author="…" revision="…" date="…" material="…" [general="…" edges="…" note="…"] – unknown “{0}”
+výkres revize <znak> "popis změny" [datum 13.11.2026] [kreslil "…"] · výkres revize smazat <znak>	drawing revision <mark> "change description" [date 2026-11-13] [author "…"] · drawing revision delete <mark>
+výkres smazat <id|popisek> [další id…] · výkres smazat vlastní · výkres smazat vše	drawing delete <id|label> [more ids…] · drawing delete custom · drawing delete all
+výkres stav [list <číslo|"název">|vše]	drawing status [sheet <number|"name">|all]
+výkres upravit <id|popisek> odsazení=8 text="…" přípona="…" [hodnota=… základna=… výška=… posun="dx dy"]	drawing edit <id|label> offset=8 text="…" suffix="…" [value=… datum=… height=… shift="dx dy"]
+výkres upravit: neznámé „{0}=“ – {1}	drawing edit: unknown “{0}=” – {1}
+výkres upravit: posun="dx dy" (mm listu, y nahoru), např. posun="5 -3"	drawing edit: shift="dx dy" (sheet mm, y up), e.g. shift="5 -3"
+výkres upravit: {0} musí být číslo	drawing edit: {0} must be a number
+výkres značka poznámka "text" | drsnost Ra 1,6 | tolerance kolmost 0,02 A | základna A | text "…" v x y [výška 5] – cíl: na <kóta> | pohled <přední…> v x y; [posun dx dy]	drawing mark note "text" | roughness Ra 1.6 | gdt perpendicularity 0.02 A | datum A | text "…" at x y [height 5] – target: on <dimension> | view <front…> at x y; [shift dx dy]
+značka se váže na kótu nebo popis	a mark attaches to a dimension or a callout
+značka: chybí cíl – na <kóta> (např. na Ø40, na a3) nebo pohled přední v x y{0}	mark: target missing – on <dimension> (e.g. on Ø40, on a3) or view front at x y{0}
+značka: nečekané „{0}“ za bodem	mark: unexpected “{0}” after the point
+značka: za pohledem zadejte bod – pohled přední v x y (mm modelu v rovině pohledu)	mark: give a point after the view – view front at x y (model mm in the view plane)
+značka: za „na“ zadejte kótu – popisek (Ø40, 25, M8) nebo id (a3) z výkres stav	mark: after “on” give a dimension – a label (Ø40, 25, M8) or an id (a3) from drawing status
+značky jako nástroje výkresu: cíl „na <kóta>“ (popisek nebo id a3) nebo „pohled přední v x y“ (mm modelu v rovině pohledu, přichytí se ke geometrii); text v mm listu od levého dolního rohu	marks like the drawing tools: target “on <dimension>” (label or id a3) or “view front at x y” (model mm in the view plane, snapped to geometry); text in sheet mm from the lower left corner
+základna: písmeno A, B, C… – „{0}“	datum: a letter A, B, C… – “{0}”
+{0} na listu není – id jsou a1…a{1} (výkres stav)	{0} is not on the sheet – ids are a1…a{1} (drawing status)
+{0} nelze u {1} upravit – lze: {2}	{0} cannot be edited on a {1} – possible: {2}
+{0} není kóta ani popis – značka se váže na kótu	{0} is neither a dimension nor a callout – a mark attaches to a dimension
+{0}: čekám dvě čísla (x y), např. {0} 10 5	{0}: two numbers expected (x y), e.g. {0} 10 5
+úprava a mazání kót a značek podle id z výkres stav (a1, a2…) nebo popisku; smazané vygenerované kóty se při přegenerování nevrátí	edit and delete dimensions and marks by the id from drawing status (a1, a2…) or by label; deleted generated dimensions do not come back on regeneration
+řez {0} {1}	section {0} {1}
+„{0}“ na listu není – {1}	“{0}” is not on the sheet – {1}
+„{0}“ není jednoznačné ({1}×: {2}) – zadejte id	“{0}” is ambiguous ({1}×: {2}) – give the id
+„{0}“ není komponenta sestavy ani otevřená záložka – k dispozici: {1}	“{0}” is neither an assembly component nor an open tab – available: {1}
+⚠ detail {0} uložen, ale na listu není: {1}	⚠ detail {0} saved but it is not on the sheet: {1}
+⚠ model „{0}“ uložen, ale na listu není: {1}	⚠ model “{0}” saved but it is not on the sheet: {1}
+✓ detail {0} (pohled {1}, střed {2}, r {3}, {4}) – na listu x {5}…{6}, y {7}…{8}	✓ detail {0} (view {1}, center {2}, r {3}, {4}) – on sheet x {5}…{6}, y {7}…{8}
+✓ detail {0} smazán	✓ detail {0} deleted
+✓ kóta {0} ({1}) · {2}	✓ dimension {0} ({1}) · {2}
+✓ kóty: Auto + Ø – základní kóty zapečené do pohledů (odstraněno vygenerovaných: {0})	✓ dimensions: Auto + Ø – basic dimensions baked into the views (generated ones removed: {0})
+✓ list {0} – další příkazy výkresu pracují s ním	✓ sheet {0} – further drawing commands work with it
+✓ list {0} „{1}“ smazán – aktivní list {2}	✓ sheet {0} “{1}” deleted – active sheet {2}
+✓ list {0}: „{1}“ → „{2}“	✓ sheet {0}: “{1}” → “{2}”
+✓ model „{0}“ na listu: pohled {1}, měřítko {2}	✓ model “{0}” on the sheet: view {1}, scale {2}
+✓ model „{0}“ odebrán z listu	✓ model “{0}” removed from the sheet
+✓ není co smazat	✓ nothing to delete
+✓ nový list {0} (Chytré kóty) – další příkazy výkresu pracují s ním	✓ new sheet {0} (Smart dimensions) – further drawing commands work with it
+✓ razítko: {0}	✓ title block: {0}
+✓ revize {0} smazána	✓ revision {0} deleted
+✓ revize {0} {1} „{2}“ – v razítku revize {0}	✓ revision {0} {1} “{2}” – title block revision {0}
+✓ smazáno {0}: {1} – id dalších poznámek se posunula (výkres stav)	✓ deleted {0}: {1} – ids of the following annotations have shifted (drawing status)
+✓ upraveno {0}: {1} → {2}{3}	✓ edited {0}: {1} → {2}{3}
+✓ značka {0} · {1}	✓ mark {0} · {1}
+#!dynamic
+# názvy druhů značek, kót a polí (tr(MAPA[x]) v cad/drawing-marks.ts a cad/drawing-agent.ts)
+poznámka	note
+drsnost	roughness
+geometrická tolerance	geometric tolerance
+základna	datum
+text	text
+šikmo	aligned
+kóty	dimension
+popisu	callout
+poznámky	note
+textu	text
+drsnosti	roughness
+geometrické tolerance	geometric tolerance
+základny	datum
+odsazení	offset
+přípona	suffix
+hodnota	value
+výška	height
+číslo	number
+kreslil	drawn by
+revize	revision
+datum	date
+materiál	material
+nepředepsané	general tolerances

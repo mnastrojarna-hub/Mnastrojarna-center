@@ -21,7 +21,9 @@ do 3D okna (výběr hran a ploch pravidlem).
    (tažení, šablonování, úkos, plochy, plech, sestavy…).
 3. **JavaScript API \`window.mncad\`** (pro Playwright, Selenium, rozšíření prohlížeče, Claude in Chrome…):
    \`await window.mncad.run(text)\` provede příkazy / JSON a vrátí protokol; \`window.mncad.getDocument()\` vrátí
-   dokument; \`await window.mncad.setDocument(docOrJson)\` ho nahradí; \`await window.mncad.status()\` vrátí stav
+   dokument; \`await window.mncad.setDocument(docOrJson)\` ho otevře v nové záložce (\`{ inPlace: true }\` = nahradí otevřený
+   dokument jako jeden krok historie); \`await window.mncad.undo(n)\` / \`redo(n)\` / \`history()\` = historie Zpět / Znovu;
+   \`await window.mncad.status()\` vrátí stav
    jako text; \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
    \`window.mncad.openConsole()\` otevře konzoli; \`await window.mncad.exportFile("step")\` (step, stl, brep, obj, glb,
    3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor;
@@ -67,13 +69,25 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`prvek <typ|rozšíření> klíč=hodnota …\` | kterýkoli typ prvku i prvek rozšíření bez JSON (viz níže) |
 | \`normálie <označení> [v x y z]\` | díl z knihovny (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta |
 | \`vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit]\` | sestava: vloží díl z otevřené záložky jako komponentu |
+| \`sestava\` · \`sestava plochy "Čep" [rovinné|válcové]\` · \`sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]\` · \`sestava vazby\` · \`sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat\` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
+| \`sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …]\` · \`sestava odebrat|duplikovat|izolovat "X"\` · \`sestava zobrazit vše\` | vlastnosti komponenty jako v panelu |
+| \`sestava pole "X" N rozteč P [směr Y]\` · \`sestava pole "X" kruhové N [osa Z] [v cx cy cz]\` · \`sestava zrcadlit "X" YZ\` · \`sestava šroub "Deska" Ø9 [matice] [bez podložky]\` | pole, zrcadlení, šroubový spoj do díry |
+| \`sestava podsestava "A" "B" [jako "…"]\` · \`sestava rozpustit "P"\` · \`sestava upravit "X"\` … \`sestava hotovo\` · \`sestava otevřít "X"\` | podsestavy, úprava dílu v kontextu sestavy |
+| \`kusovník [strukturovaně] [csv]\` · \`rám formy [šířka délka] [dutina X Y H] …\` · \`záložky\` · \`záložka "název"|N\` · \`zavřít záložku\` | kusovník do protokolu, rám vstřikovací formy, záložky dokumentů |
 | \`výkres\` | otevře výkres otevřeného dokumentu v záložce |
-| \`výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]\` | volby prvního listu výkresu (založí ho, chybí-li) a otevře výkres |
+| \`výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]\` | volby aktivního listu výkresu (\`výkres list N\`; bez něj první list – založí ho, chybí-li) a otevře výkres |
 | \`kótovat [chytře|celkově|nic] [řetězově|od základny]\` | Chytré kóty podle prvků modelu (viz „Výkres a kóty“) – nahradí jen vygenerované kóty |
 | \`výkres tolerance <kóta> <tolerance>\` · \`výkres poznámka "…"\` · \`výkres nepředepsané ISO 2768-mK\` · \`výkres hrany ISO 13715 …\` · \`výkres drsnost Ra 3,2\` | tolerance ke kótě podle popisku (\`Ø40 h6\`, \`25 ±0,1\`, \`M8 6H\`); údaje u razítka |
 | \`výkres stav\` | textový stav výkresu: list, měřítko, pohledy, všechny kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo (také \`window.mncad.drawingStatus()\`) |
 | \`měřit F3|E5|V2 [F7|E9|V8|x y z]\` · \`měřit těleso|díry|válce\` · \`měřit plocha|hrany <pravidlo>\` | měření pro kontrolu modelu (viz „Měření“); také \`window.mncad.measure()\` |
+| \`výkres list 2\` · \`výkres list nový "Detail"\` · \`výkres list přejmenovat 2 "…"\` · \`výkres list smazat 2\` · \`výkres stav [list N|vše]\` | listy výkresu – další příkazy výkresu pracují s vybraným listem (viz „Výkres textem: listy, značky, kóty, export“) |
+| \`výkres razítko číslo="MN-1" kreslil="AI" …\` · \`výkres revize B "popis"\` · \`výkres otočení 90\` · \`výkres řez XZ poloviční\` · \`výkres kusovník ano\` · \`výkres balónky ne\` · \`kótovat základní\` | razítko, revize a další volby listu |
+| \`výkres značka drsnost Ra 1,6 na Ø40\` · \`výkres kóta vodorovně pohled přední x1 y1 x2 y2\` · \`výkres upravit a3 odsazení=8\` · \`výkres smazat a3\` · \`výkres detail přední v x y poloměr r\` · \`výkres model "Hřídel"\` | značky, ruční kóty, úpravy, detaily a další modely – vše, co jde ve výkrese myší; export \`window.mncad.exportDrawing("pdf")\` |
 | \`smazat poslední\` · \`stav\` · \`zobraz iso|přední|horní…\` · \`kolize\` | správa; kolize = kontrola průniků komponent sestavy |
+| \`upravit\` · \`potlačit\` / \`zapnout\` · \`smazat <prvek>\` · \`přejmenovat\` · \`přesunout\` · \`duplikovat\` · \`zpět\` / \`znovu\` · \`proměnná\` · \`konfigurace\` · \`skica "Skica 1"\` · \`entita\` · \`kóta k1\` · \`odsadit\` · \`promítnout hrany\` | úpravy hotového modelu a skici na místě – viz „Úpravy existujícího modelu“ |
+| \`zobraz stínovaný|hrany|drátový|skryté|průhledný|přizpůsobit\` · \`řez X|Y|Z [poloha] [obráceně]\` · \`řez vyp\` | styl 3D okna a řez modelem (viz „Soubory, obraz, výstupy a analýzy“) |
+| \`barva plochy F3 [F5 …]|<pravidlo> #rrggbb|výchozí\` · \`akce <id|popisek>\` | barva ploch; akce rozšíření bez prvku (rozvin DXF / SVG, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn, skica DXF) |
+| \`analýza úkosů|tloušťky|křivosti|zebra|vyp\` · \`dělicí rovina\` · \`vyhazovače …\` · \`chlazení …\` · \`smrštění 0,5\` | formařské nástroje a analýzy jako text |
 
 Booleovský režim: první tvarový prvek vytvoří těleso, další se **přidávají**; \`odebrat\` odečte, \`průnik\` ponechá
 průnik, \`nové\` založí další samostatné těleso. Pravidla hran/ploch se vyhodnocují na aktuálním tělese (před
@@ -284,6 +298,120 @@ prvek adv.twist sketch=$last height=30 angle=45
 prvek chamfer distance=1 edges=horní;rovné
 \`\`\`
 
+### Úpravy existujícího modelu – upravit, potlačit, smazat, přesunout, zpět / znovu, proměnné, konfigurace
+
+Hotový díl se upravuje **na místě** (stejná záložka, historie Zpět funguje) – není potřeba \`getDocument()\` → ruční úprava
+JSON → \`setDocument()\`. Prvek se zadává názvem v uvozovkách (\`"Díra 1"\`), id ze stavu, \`$last\` (poslední prvek) nebo
+\`@3\` (3. prvek historie); více prvků za sebou mezerou nebo středníkem. Slova fungují česky, anglicky i německy.
+
+| Příkaz | Význam |
+| --- | --- |
+| \`upravit <prvek> klíč=hodnota …\` (EN \`edit\`, DE \`bearbeiten\`; \`změnit\` / \`modify\` / \`ändern\`) | změní parametry prvku; klíče = pole prvku jako u \`prvek\` (\`diameter\`, \`size.0\`, \`extent={"kind":"toNext"}\`, \`sketchId="Skica 2"\`, \`mode=odebrat\`, \`název="…"\`), u rozšíření klíč nebo popisek parametru (\`úhel=90\`); bez klíčů vypíše parametry prvku |
+| \`upravit <prvek> {JSON záplata}\` | sloučí JSON do prvku (\`null\` pole odstraní) – \`upravit "Pole 1" {"count": 6, "skip": [2]}\` |
+| \`upravit <prvek> plochy / hrany\` | \`edges=1;4\` (indexy jako u \`prvek\`), \`edges=E3;E7\` (popisky pro výběr), \`edges=vše\`, nebo pravidlem \`edges=horní;kruhové\` – pravidlo se vyhodnotí na tělese **před** prvkem a otisky výběru se spočtou znovu |
+| \`upravit <prvek> klíč==výraz\` | vazba parametru na proměnné (jako „=d*2“ v poli formuláře): \`upravit "Vysunutí 1" distance==h*2\`; číslo (\`distance=20\`) vazbu zruší |
+| \`potlačit <prvek> […]\` · \`zapnout <prvek> […]\` (EN \`suppress\` / \`unsuppress\`, DE \`unterdrücken\` / \`aktivieren\`) | potlačený prvek se nestaví |
+| \`smazat <prvek> […]\` (EN \`delete\` / \`remove\`, DE \`löschen\` / \`entfernen\`) | smaže konkrétní prvky; protokol vypíše prvky, které na ně odkazovaly (\`⚠ na smazané odkazují: Pole 1 (featureId)\`), a po výpočtu jejich ✗; \`smazat\` / \`smazat poslední\` = poslední prvek |
+| \`přejmenovat <prvek> na <název>\` (EN \`rename … to …\`, DE \`umbenennen … zu|in …\`) | nový název prvku |
+| \`přesunout <prvek> před|za <prvek>\` · \`… nahoru|dolů [N]\` · \`… na začátek|konec\` (EN \`move … before|after|up|down\`, DE \`verschieben … vor|nach|hoch|runter\`) | pořadí v historii; skica a jiné použité prvky musí zůstat **před** prvky, které je používají – jinak \`✗ … „Vysunutí 1“ používá „Skica 1“ (sketchId)\` a nic se nezmění |
+| \`duplikovat <prvek> [jako "Název"]\` (EN \`duplicate … as\`, DE \`duplizieren … als\`) | kopie hned za originálem |
+| \`zpět [N]\` · \`znovu [N]\` (EN \`undo\` / \`redo\`, DE \`rückgängig\` / \`wiederherstellen\`) | **kroky historie** dokumentu jako Ctrl+Z / Ctrl+Y; jeden běh \`run\` (jeden vstup konzole) = jeden krok. Pozor: dříve \`zpět\` mazalo poslední prvek – to je teď \`smazat poslední\` |
+| \`proměnná d = 20 [poznámka "…"]\` · \`proměnná h = d*1,5\` · \`proměnná smazat d\` · \`proměnné\` (EN \`variable|var\`, \`variables\`; DE \`variable\`, \`variablen\`) | proměnné dílu; chybný výraz (neznámá proměnná, cyklus) se nezapíše; \`proměnné\` vypíše hodnoty, chyby a vazby parametrů |
+| \`konfigurace "Krátká" t=10 [potlačit "Díra 1";"Pole 1"]\` · \`konfigurace aktivní "Krátká"|žádná\` · \`konfigurace smazat "Krátká"\` · \`konfigurace\` (EN \`config … suppress\`, \`config active\`, \`config delete\`; DE \`konfiguration … unterdrücken\`, \`konfiguration aktiv\`, \`konfiguration löschen\`; také \`varianta\`) | stavy dílu (varianty): hodnoty proměnných a potlačené prvky; založení konfiguraci neaktivuje |
+
+\`stav\` vypíše navíc řádky \`Vazby parametrů: Vysunutí 1.distance = h*2 (= 40)\` a \`Konfigurace: Krátká (aktivní), Dlouhá\`.
+Protokol úpravy: \`✓ Díra 1: diameter 8,5 → 10, depth 0 → 12\` a po výpočtu ✓ / ⚠ / ✗ upraveného prvku i prvků, které na
+něm závisejí. Neznámý klíč skončí chybou s výčtem parametrů prvku (\`„diametr“ není parametr prvku „Díra 1“ (hole) – parametry: …\`).
+
+**Úprava existující skici.** \`skica "Skica 1"\` (EN \`sketch "…"\`, DE \`skizze "…"\`; bez roviny, jen název v uvozovkách) znovu
+otevře hotovou skicu jako cíl dalších řádků – entity, \`vazba\`, \`kóta\` i níže uvedené úpravy jdou do ní (i na jednom řádku:
+\`skica "Skica 1": kružnice 10 v 0 0\`). Bez bloku jdou úpravy do skici otevřené ve skicáři, jinak do poslední skici.
+\`stav\` u skici vypíše vazby a kóty s čísly: \`vazby: v1 kolmo e1 e2 · v2 vodorovně e1\`, \`kóty: k1 délka e1 = 60 · k2 průměr e3 = 20 referenční\`.
+
+| Příkaz ve skice | Význam |
+| --- | --- |
+| \`entita e3 klíč=hodnota …\` (EN \`entity\`, DE \`objekt\`) | souřadnice a rozměry entity: \`entita e3 cx=10 cy=5 r=4\`, \`entita e3 průměr=20\`, \`entita e3 střed=10;5\`, \`entita e1 a=0;0 b=60;0\`, \`entita e2 w=40 h=20 úhel=15\`, \`entita e4 p2=10;5\` (bod lomené čáry), \`entita e2 pomocná=ano\`; po řádku se skica vyřeší (vazby mohou entitu vrátit – protokol vypíše výsledek) |
+| \`smazat e3 [e4 …]\` · \`smazat v1\` · \`smazat k2\` | smaže entity (i s jejich vazbami a kótami), vazby a kóty podle čísla; čísla se pak přečíslují (\`stav\`) – mažte více položek jedním řádkem |
+| \`kóta k1 65\` · \`kóta k1 referenční\` · \`kóta k1 řídicí\` (EN \`dim k1 65\`, \`reference\` / \`driving\`; DE \`bemaßung k1 …\`, \`referenz\` / \`steuernd\`) | nová hodnota kóty (změní geometrii), přepnutí řídicí ↔ referenční; kóta, která by skicu přeurčila, se nezmění (✗ s důvodem) |
+| \`odsadit e1 [e2 …] 5 [ven|dovnitř|vlevo|vpravo] [řetězec]\` (EN \`offset … out|in|left|right chain\`, DE \`versetzen … außen|innen kette\`) | odsazená kopie entity; \`řetězec\` = celý navazující řetězec úseček a oblouků (u uzavřeného obrysu \`ven\` = větší obrys); nové entity dostanou další id |
+| \`promítnout hrany E3;E7\` · \`promítnout hrany vše\` · \`promítnout hrany\` [\`pomocné\`] (EN \`project edges … construction\`, DE \`projizieren kanten … hilfs\`) | průmět hran tělesa před skicou do roviny skici (E čísla jako popisky pro výběr); bez čísel jen hrany ležící v rovině skici |
+
+Oříznutí, prodloužení, rozdělení, zaoblení / sražení rohu, přesun, otočení, zrcadlení, měřítko a pole entit nemají vlastní
+příkaz: výsledek zapište příkazy \`entita\` (nové souřadnice), \`smazat e…\` a novými entitami (\`úsečka\`, \`oblouk\` + \`vazba tečně\`).
+
+\`\`\`
+# příruba z příkladu níže: větší díry, výška přes proměnnou, varianta bez děr, oprava a návrat
+upravit "Díra 1" diameter=20
+proměnná t = 18
+upravit "Vysunutí 1" distance==t
+konfigurace "Bez děr" t=12 potlačit "Díra 1";"Pole 1"
+konfigurace aktivní "Bez děr"
+přejmenovat "Díra 1" na "Díra šroubu"
+skica "Skica 1"
+entita e1 průměr=170
+stav
+\`\`\`
+
+**API:** \`await window.mncad.undo(n?)\` / \`await window.mncad.redo(n?)\` (vrátí protokol + stav), \`window.mncad.history()\` →
+\`{ undo, redo }\` (počet kroků), \`await window.mncad.setDocument(doc, { inPlace: true })\` nahradí dokument **aktivní záložky**
+jako jeden krok historie (bez \`inPlace\` se dokument otevře v nové záložce) – univerzální únik pro změny bez vlastního příkazu.
+
+### Sestava textem – plochy, vazby, komponenty, kusovník, záložky
+
+Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky \`assembly …\`, německy \`baugruppe …\`):
+
+1. Díly jako záložky (\`nový díl Deska\` …), pak \`nová sestava\` a \`vložit "Deska" ukotvit\`, \`vložit "Čep" v 100 0 0\`.
+2. \`sestava plochy "Čep" [rovinné|válcové]\` vypíše plochy komponenty v **souřadnicích sestavy**: \`F3 · rovinná · normála −Z ·
+   střed [40; 30; 10] · 122,5 mm²\`, \`F2 · válcová Ø10 · osa Z · střed osy […] · délka 30 mm\` (u dílu v podsestavě \`Díl › F3\`,
+   odkaz \`F3@Díl\`). Číslo F je stejné jako u popisků pro výběr (F1 = první plocha dílu).
+3. \`sestava vazba <druh> "A" <plocha A> "B" <plocha B> [hodnota N] [obráceně] [název "…"]\` – druh \`kontakt\`, \`zarovnat\`,
+   \`vystředit\` (kontakt + středy, také \`kontakt … střed\`), \`souosost\` (válcové plochy), \`vzdálenost\`, \`úhel\`, \`rovnoběžně\`;
+   \`sestava vazba ukotvit "A"\`. Plocha = \`F12\` nebo pravidlo: \`+Z|-X|…\`, \`horní|spodní\` (= ±Z) – rovinná plocha s touto
+   normálou (u souososti osa v tomto směru), více ploch → krajní ve směru; \`největší|nejmenší\`; \`válcová|rovinná\`; \`Ø8\` / \`R4\`.
+   Pohybuje se komponenta A (je-li ukotvená, pak B). Vzdálenost / Úhel bez hodnoty = naměřená (komponenty zůstanou).
+   Protokol napíše stav vazby (ok / konflikt) a novou polohu: \`✓ vazba Souosost „Čep“ F2 → „Deska“ F7: ok · „Čep“ poloha [40; 30; 0]\`.
+4. \`sestava vazby\` – očíslovaný výpis (druh, komponenty a plochy, hodnota, stav); \`sestava vazba 3 hodnota=8\`,
+   \`… obráceně\`, \`… potlačit\`, \`… zapnout\`, \`… smazat\` (číslo nebo název vazby). Po každé změně se vazby přepočítají.
+5. \`sestava\` (bez podpříkazu) vypíše komponenty \`#1 Deska · díl · poloha [0; 0; 0] · ukotvená ⚓\`; komponentu lze zadat
+   názvem nebo pořadím \`#2\`. \`stav\` u sestavy obsahuje řádky \`Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; -20]\` a
+   \`Vazby: 2 (2 ok)\`.
+6. \`sestava komponenta "Čep" v x y z | posun dx dy dz | otočení rx ry rz | pootočit X 90 | ukotvit | uvolnit | skrýt | zobrazit |
+   barva #hex | název "…" | číslo "…" | skupina "…" | materiál ocel\` (třída hustoty, jiný text = označení do kusovníku);
+   po přesunu se vazby přepočítají (přesunutá komponenta drží). \`sestava odebrat "X"\` (i s jejími vazbami),
+   \`sestava duplikovat "X" [posun 50 0 0]\`, \`sestava izolovat "X"\`, \`sestava zobrazit vše\`.
+7. \`sestava pole "X" 4 rozteč 25 [směr Y|dx dy dz]\`, \`sestava pole "X" kruhové 6 [úhel 360] [osa Z] [v cx cy cz]\` (kopie
+   „X (2)“…), \`sestava zrcadlit "X" YZ [odsazení N]\`, \`sestava šroub "Deska" Ø9|F8 [matice] [bez podložky] [obráceně]\` –
+   šroub ISO 4762 podle průměru díry, délka podle tloušťky, hlava nahoře (\`obráceně\` = dole), vazba Souosost.
+8. \`sestava podsestava "A" "B" [jako "Vedení"]\` (vazby se převedou), \`sestava rozpustit "Vedení"\`;
+   \`sestava upravit "Čep"\` → další řádky pracují s dílem (\`díra 3 skrz v 0 0\`…) → \`sestava hotovo\` vrátí díl do sestavy
+   (změna platí pro všechny stejné komponenty); \`sestava otevřít "Čep"\` = kopie v nové záložce.
+9. \`kusovník [strukturovaně] [csv]\` – tabulka \`Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks\`; \`kolize\` = průniky.
+10. \`rám formy 296 346 [deska-a 56] [deska-b 56] [upínací 27] [opěrná 36] [rozpěrky 96] [šířka-rozpěrek 56] [vyhazovací 22]
+    [kotevní 17] [sloupky 24] [dutina 140 180 30 | bez dutiny] [materiál 1.2311]\` – rám formy v nové záložce.
+11. \`záložky\` (výpis), \`záložka "Čep"\` / \`záložka 2\` (další řádky pracují s ní), \`zavřít záložku ["…"]\`.
+
+API: \`await window.mncad.bom({ structured })\` → \`{ rows: [{ pos, name, number, qty, material, massKg, level }], text, csv }\`;
+\`window.mncad.tabs()\` → \`[{ id, title, kind: "part"|"assembly"|"drawing", active }]\`; \`window.mncad.activateTab("Čep" | 2)\`
+a \`window.mncad.closeTab(["Čep" | 2])\` vrátí \`true\` / \`false\` (přepnutí se projeví po vykreslení – pak \`getDocument()\`).
+
+\`\`\`
+nový díl Deska
+kvádr 80 60 10
+díra 10,5 skrz v 40 30
+díra 9 skrz v 20 15
+nový díl Čep
+válec 10 30
+válec 16 5 v 0 0 30
+nová sestava Čep v desce
+vložit "Deska" ukotvit
+vložit "Čep" v 100 0 0
+sestava vazba souosost "Čep" Ø10 "Deska" Ø10,5
+sestava vazba kontakt "Čep" -Z největší "Deska" horní
+sestava šroub "Deska" Ø9 matice
+kolize
+kusovník
+\`\`\`
+
 ### Průběh a zrušení výpočtu
 
 Během delšího výpočtu ukazuje program u spodního okraje „Počítám prvek k/n: název · čas“ s tlačítkem **Zrušit**; totéž
@@ -332,7 +460,8 @@ Dokument je JSON objekt:
 
 - \`id\` a \`name\` prvků lze vynechat (doplní se); \`sketchId\` / \`featureId\` může být \`"$last"\` (poslední skica /
   prvek) nebo id dřívějšího prvku. Pole \`[ {…}, {…} ]\` nebo jeden objekt \`{ "type": … }\` se **připojí** k otevřenému
-  dokumentu; objekt s \`"app": "mnastrojarna-cad"\` otevře **nový** dokument.
+  dokumentu; objekt s \`"app": "mnastrojarna-cad"\` otevře **nový** dokument (\`setDocument(doc, { inPlace: true })\` nahradí
+  otevřený dokument jedním krokem historie).
 - Materiál: \`ocel\`, \`nerez\`, \`hlinik\`, \`mosaz\`, \`med\`, \`plast\`, \`titan\`, \`litina\`, \`bronz\` (viz nabídka
   Materiál v programu).
 - Typy prvků (\`type\`): sketch, extrude, revolve, box, cylinder, sphere, cone, tube, hole, fillet, chamfer, shell,
@@ -353,6 +482,75 @@ Dokument je JSON objekt:
   nenašla. V ručně psaném JSON je lze vynechat.
 - Sestava: \`"kind": "assembly"\`, \`"components": [ { "name": "Díl", "source": { "kind": "part", "doc": { …dokument dílu… } },
   "placement": { "position": [0,0,0], "rotation": [0,0,0] } } ]\`, vazby \`"mates"\`.
+
+## Soubory, obraz, výstupy a analýzy – API pro agenty
+
+Vše z tohoto oddílu funguje bez dialogů a bez klikání; textové příkazy píší do protokolu jeden řádek ✓ / ✗ s výsledkem.
+
+**Soubory.** \`await window.mncad.importFile({ name: "dil.step", base64 })\` (nebo \`{ name, text }\` u DXF / .mncad, nebo
+objekt \`File\`) otevře soubor **stejnou cestou jako Otevřít / přetažení** – STEP (i sestavy), IGES, BREP, STL, OBJ, 3MF,
+glTF/GLB, PLY, OFF, DXF, .mncad. Volba \`{ as: "auto" | "tab" | "component" | "sketch" }\`: auto = jako Otevřít (v otevřené
+sestavě se díl vloží jako komponenta), tab = samostatný dokument v záložce (prázdnou záložku použije, jinak otevře novou),
+component = do otevřené sestavy (Sestava ▸ Vložit díl),
+sketch = DXF do otevřené skici, jinak jako nová skica v otevřeném dílu (Skica ▸ Import DXF). Slib se splní až po
+dokončení importu a výpočtu a vrátí protokol + stav dokumentu; chyba (nepodporovaný formát, prázdný soubor) = výjimka
+s důvodem. Export skici do DXF: \`await window.mncad.exportFile("dxf", { sketch: "Skica 1" })\` (výchozí otevřená, jinak
+poslední skica).
+
+**Obraz.** \`await window.mncad.screenshot({ view: "iso", display: "shadedEdges", width: 1200, hints: true })\` vrátí
+\`{ mime: "image/png", width, height, base64 }\` – snímek 3D okna; při otevřené skice snímek skicáře (\`target: "3d"\`
+vynutí 3D okno). Volby: \`view\` iso | front | top | right | back | bottom | left | current, \`display\` shadedEdges |
+shaded | wireframe | hiddenLine | xray, \`fit\`, \`hints\` (popisky F1 / E2 / V3 do obrázku), \`section: { axis: "X", offset:
+25, flip: true }\` (\`null\` = bez řezu), \`explode\` (sestava 0–3), \`background\` white | current. Dočasný pohled, styl
+i řez se po snímku vrátí. Funguje i bez WebGL (zjednodušený náhled). Trvale textem:
+
+\`\`\`
+zobraz drátový            # stínovaný | hrany | skryté | průhledný (EN view wireframe, DE ansicht drahtmodell)
+zobraz přizpůsobit        # EN view fit, DE ansicht einpassen
+řez X 25 obráceně         # rovina kolmá na X v 25 mm; bez polohy = střed modelu (EN section x 25 flip, DE schnitt x 25 umkehren)
+řez vyp                   # EN section off, DE schnitt aus
+barva plochy F3 F5 #e03930   # nebo pravidlem: barva plochy horní modrá · barva plochy válcové výchozí
+\`\`\`
+
+**Výběr.** \`window.mncad.select(["F3", "E2"])\` vybere entity stejně jako klik (bez trefování, bez ohledu na filtr a na
+limit popisků), v sestavě \`"comp:Čep"\` nebo \`"Čep:F3"\`, prvek historie \`"feature:Díra 1"\`; \`{ additive: true }\` přidá
+k výběru. \`window.mncad.selection()\` vrátí výběr (\`{ id: "F3", kind: "face", index: 2 }\` – id jako popisky a příkaz
+\`měřit\`), \`window.mncad.clearSelection()\` ho zruší (Esc).
+
+**Výstupy.** \`await window.mncad.action("sheet.dxf")\` spustí akci rozšíření (tlačítko bez prvku v historii) a vrátí
+\`{ log, files: [{ name, mime, bytes, base64 }] }\` – Rozvin → DXF / SVG, Tabulka ohybů, Kusovník řezů (+ CSV), Tabulka
+svarů, Tloušťka stěn, \`sketch.dxf\`. Textem \`akce tabulka ohybů\` (EN \`action bend table\`, DE \`aktion biegetabelle\`)
+– text okna jde do protokolu. \`prvek sheet.dxf\` skončí chybou s odkazem na \`akce\`.
+\`await window.mncad.share({ days: 10, password, from, view: "model" | "drawing", mode: "link" | "store" })\` vytvoří
+sdílený odkaz (jako tlačítko Sdílet odkazem) a vrátí \`{ url, mode, bytes, exp, message }\`.
+\`await window.mncad.compare({ name: "zakaznik.step", base64 }, { tolerance: 0.1, align: "auto", show: true })\` porovná
+díl s referenčním modelem a vrátí \`{ ok, text, csv, regions: [{ n, side: "extra" | "missing", volume, center, hint }] }\`;
+\`show\` zobrazí barevnou mapu odchylek (pro \`screenshot\`), \`ok\` = žádná rozdílová oblast a odchylky v toleranci.
+
+**Nastavení.** \`window.mncad.settings()\` vrátí nastavení, \`window.mncad.setSettings({ askWhereToSave: false })\` změní jen
+klíče, které mění chování a výstup: askWhereToSave, meshQuality, units, decimals, angleDecimals, defaultMaterial, author,
+sheet, projection, tolerance, confirmDelete, autoExtrude, autoConstraints, snapGrid, gridStep, display, ortho, showGrid,
+bg (neznámý klíč nebo hodnota = chyba). Zkratky, jazyk a úložiště API nemění.
+
+**Formařské nástroje a analýzy textem** (díl; směr vyhození \`směr +Z | -X | vx vy vz\`, výchozí +Z):
+
+\`\`\`
+analýza úkosů směr +Z min 1 zobrazit
+# ✓ Úkosy (směr vyhození +Z, min. 1°): Dostatečný 82,1 % · Malý 6,0 % · Svislá stěna 9,8 % · Podkos 2,1 % – nelze vyhodit bez posuvných čelistí
+analýza tloušťky limit 2  # nejtenčí stěna a místo [x; y; z], průměr, % vzorků pod limitem
+analýza křivosti          # min / max 1/mm a nejmenší poloměr
+analýza zebra · analýza vyp   # „zobrazit“ zapne barevnou mapu v 3D okně (pro screenshot), „analýza vyp“ ji vypne
+dělicí rovina             # Z s největším obvodem průřezu; nastaví řez v této výšce
+vyhazovače Ø 6 rozteč 60 díry      # polohy; „díry“ = díry do dílu, „sestava“ = nová sestava s vyhazovači
+chlazení Ø8 hloubka 15 větve 4 přesah 10 díl   # „díl“ = vrty do dílu, „sestava“ = díl + chladicí okruh
+smrštění 0,5              # nebo materiálem: smrštění ABS – měřítko dutiny formy jako prvek Přesun
+\`\`\`
+
+EN: \`analyze draft direction +Z min 1 show\`, \`analyze thickness limit 2\`, \`analyze curvature\`, \`analyze off\`,
+\`parting plane\`, \`ejectors d 6 spacing 60 holes|assembly\`, \`cooling d8 depth 15 rows 4 overhang 10 part|assembly\`,
+\`shrinkage 0.5\`. DE: \`analyse formschräge richtung +Z min 1 anzeigen\`, \`analyse wandstärke grenze 2\`, \`analyse krümmung\`,
+\`analyse aus\`, \`trennebene\`, \`auswerfer ø 6 teilung 60 bohrungen|baugruppe\`, \`kühlung ø8 tiefe 15 reihen 4 überstand 10
+teil|baugruppe\`, \`schwindung 0,5\`.
 
 ## Modelování myší jako člověk (pro agenty s ovládáním prohlížeče)
 
@@ -505,6 +703,69 @@ Hotový výkres (horní pohled = půdorys s dírami): \`4× M8 ↧10\` + \`Ø6,8
 \`90\` a \`50\` (závitové díry), \`60\` (průchozí díry); kapsa \`50\` × \`30\`, hloubka \`↧8\`, \`4× R5\` (kapsa je uprostřed – bez
 polohových kót); celkové \`120\` × \`80\`; v předním pohledu tloušťka \`20\`.
 
+### Výkres textem: listy, značky, kóty, export
+
+Vše, co jde ve výkresovém prostředí myší, jde i textem (anglicky \`drawing …\`, německy \`zeichnung …\`). Příkazy
+výkresu pracují s **aktivním listem**: \`výkres list 2\` / \`výkres list "Detail"\` ho přepne (a výkres se otevře na
+něm), \`výkres list nový "Detail"\` založí nový list a přepne na něj; \`výkres list A3\` dál znamená formát listu.
+U více listů protokol u každého ✓ připíše, se kterým listem příkaz pracoval. Popisek značky se sám umístí na první
+volné místo u cíle; když se nová kóta nebo značka přesto překrývá s jiným textem nebo přesahuje rámeček listu, protokol
+to ohlásí řádkem \`!\` s radou (\`výkres upravit a7 odsazení=…\`, \`posun="dx dy"\`).
+
+**Souřadnice.** \`výkres stav\` vypíše řádek „Souřadnice“: pro každý pohled rozsah v **mm modelu v rovině pohledu**
+(y nahoru; přední = X, Z · horní = X, Y · levý = −Y, Z) a jeho polohu na listu, např.
+\`přední (x = X, y = Z): x −50…50, y 0…20 mm · 1:1 · na listu x 40…140, y 237…257\`. V těchto souřadnicích se zadávají
+body značek a ruční kóty (\`pohled přední v 10 20\`); bod se přichytí ke konci hrany, hraně nebo kružnici jako myš.
+Místo na listu (text, umístění detailu) je v **mm listu od levého dolního rohu** (jako v DXF). Řádek „Id“ dává krátká
+id kót a značek (\`a1 100 (přední) · a2 Ø40 (horní) · …\`) pro \`výkres upravit / smazat\` a \`značka … na a2\`; po smazání se
+id dalších poznámek posunou – po změně si stav vypište znovu.
+
+| Příkaz | Význam |
+| --- | --- |
+| \`výkres razítko název="…" číslo="MN-1" kreslil="AI" revize=A datum="13.11.2026" materiál="ČSN 11 523"\` | razítko listu (+ \`nepředepsané=\`, \`hrany=\`, \`poznámka=\`); číslo, kreslil a revize se uloží i do dokumentu |
+| \`výkres revize B "Přidána díra Ø8" [datum …] [kreslil …]\` · \`výkres revize smazat B\` | tabulka revizí; poslední revize se zapíše do razítka |
+| \`výkres otočení 0|90|180|270\` · \`výkres řez XZ odsazení 0 poloviční|celý\` · \`výkres kusovník ano|ne\` · \`výkres balónky ano|ne\` | otočení hlavního pohledu, poloviční řez, kusovník nad razítkem a pozice komponent (sestava) |
+| \`kótovat základní\` | kóty „Auto + Ø“ zapečené do pohledů (jen pomocný základ – místo Chytrých kót) |
+| \`výkres značka poznámka "Kalit 58 HRC" na Ø40\` | poznámka s odkazovou čarou na kótu (popisek nebo id) |
+| \`výkres značka drsnost Ra 1,6 na Ø40\` · \`… drsnost Ra 0,8 pohled přední v 0 20\` | značka drsnosti na kótu nebo na povrch (bod pohledu) |
+| \`výkres značka tolerance kolmost 0,02 A na Ø40\` | rámeček ISO 1101: přímost, rovinnost, kruhovitost, válcovitost, profil, rovnoběžnost, kolmost, sklon, poloha, souosost, souměrnost, házení (+ hodnota, základna) |
+| \`výkres značka základna A pohled horní v -50 0\` | základna (bez písmene další volné) |
+| \`výkres značka text "Kalit 58 ± 2 HRC" v 20 30 [výška 5]\` | volný text na listu (mm listu) |
+| \`… posun dx dy\` | posun popisku značky od cíle [mm listu] |
+| \`výkres kóta vodorovně|svisle|šikmo pohled přední x1 y1 x2 y2 [odsazení 10] [text "…"]\` | ruční kóta dvou bodů; konce jedné hrany = kóta hrany (sleduje změny modelu); kladné odsazení = ven z pohledu |
+| \`výkres kóta průměr|poloměr pohled horní střed x y [r R] [úhel 45]\` · \`výkres kóta úhel pohled přední x1 y1 x2 y2 x3 y3 x4 y4\` | kóta kružnice (dohledá se podle středu a poloměru) a úhlu dvou hran (mezi směry 1→2 a 3→4) |
+| \`výkres upravit a3 odsazení=8 přípona="H7" text="(20)"\` · \`výkres upravit a5 posun="5 -3"\` | úprava kóty / značky (také \`hodnota=\`, \`základna=\`, \`výška=\`; \`posun\` přesune popisek značky v mm listu); cíl id nebo popisek |
+| \`výkres smazat a3 a5\` · \`výkres smazat "Ra 1,6"\` · \`výkres smazat vlastní\` · \`výkres smazat vše\` | smazání; smazané vygenerované kóty se při přegenerování nevrátí |
+| \`výkres detail přední v 45 10 poloměr 5 [měřítko 4:1] [umístit 330 200]\` · \`výkres detail A měřítko 5:1\` · \`výkres detail smazat A\` | detailní pohled (střed v mm modelu, umístění středu v mm listu) |
+| \`výkres model "Hřídel" [pohled horní] [měřítko 1:2]\` · \`výkres model smazat "Hřídel"\` | další model na listu: komponenta sestavy nebo otevřená záložka |
+| \`výkres stav list 2\` · \`výkres stav vše\` | stav zvoleného / všech listů (přehled listů, souřadnice, id, razítko, revize) |
+
+**Export bez dialogu** (JavaScript API): \`await window.mncad.exportDrawing("pdf" | "dxf" | "dwg" | "svg" | "csv" | "png",
+{ sheet: 2, dwgVersion: "R2018", width: 2000 })\` vrátí \`{ name, mime, bytes, base64, width?, height?, warnings? }\` –
+stejný výpočet jako tlačítka ve výkresu (DWG R2000–R2018, DXF R12, kusovník CSV jen u sestavy). **PNG** je náhled listu
+(rastr, výchozí šířka 2000 px) – agent si tak výkres prohlédne. \`await window.mncad.drawingStatus({ sheet: "all" })\` = \`výkres stav vše\`.
+
+### Příklad D – druhý list, značky, razítko a export
+
+\`\`\`
+nový díl Příruba
+válec 100 20
+díra 40 skrz v 0 0 20
+výkres A3 na šířku pohledy přední,horní,iso
+kótovat
+výkres značka drsnost Ra 1,6 na Ø40
+výkres značka tolerance kolmost 0,02 A na Ø40
+výkres značka základna A pohled přední v 0 0
+výkres razítko číslo="MN-2026-001" kreslil="AI" materiál="ČSN 11 523"
+výkres revize A "první vydání"
+výkres list nový "Detail"
+výkres pohledy přední měřítko 2:1
+výkres detail přední v 45 10 poloměr 5 měřítko 5:1
+výkres stav vše
+\`\`\`
+
+Pak \`window.mncad.exportDrawing("pdf", { sheet: 1 })\` a \`exportDrawing("png", { sheet: 2 })\` pro kontrolu očima.
+
 ## Model nebo výkres podle předlohy – kontrola 1:1 (povinné)
 
 Když podle předlohy (výkres PDF, obrázek, ruční skica, 3D model zákazníka) stavíte model nebo překreslujete výkres,
@@ -597,8 +858,9 @@ Výkres:
 1. Otevřete https://www.mnastrojarna.cz/cad, zavřete úvodní obrazovku (Pokračovat v práci / Esc).
 2. Nápověda → Textové příkazy (Ctrl+Shift+K). Vložte příkazy, Provést.
 3. Přečtěte protokol: řádky ✗ mají důvod (např. „žádná hrana neodpovídá pravidlu“, „Hloubka díry musí být
-   kladná“). Opravte a spusťte znovu jen opravené řádky – příkazy se **připojují** k dokumentu; \`smazat poslední\`
-   vrátí poslední prvek.
+   kladná“). Opravte a spusťte znovu jen opravené řádky – příkazy se **připojují** k dokumentu; chybný prvek opravíte
+   \`upravit "Díra 1" diameter=10\`, \`smazat "Díra 1"\` ho smaže, \`smazat poslední\` smaže poslední prvek a \`zpět\` vrátí
+   celý poslední běh (krok historie).
 4. \`stav\` vrátí rozměry (X/Y/Z rozsah), objem, řádek Geometrie (platná / neplatná / bez tělesa), počet ploch a hran
    a seznam prvků se stavem ✓ / ⚠ / ✗ – podle toho ověřte, že model odpovídá výkresu (např. 165 × 165 × 48 mm).
    Jednotlivé rozměry, díry a polohy ověříte příkazem \`měřit\` (oddíl „Měření“).
@@ -615,6 +877,7 @@ fungují i s čtečkou stránky. Konzole má textové pole s popiskem „Textov�
 
 - Pravidla hran/ploch pracují s polohou vůči obálce tělesa (horní = nejvyšší Z apod.) a s typem křivky; u složitých
   tvarů raději zadejte geometrii tak, aby pravidla byla jednoznačná, nebo použijte JSON s indexy.
-- Konzole nepřistupuje k souborům na disku (bezpečnost prohlížeče) – import STEP udělá člověk přetažením souboru.
+- Konzole nepřistupuje k souborům na disku (bezpečnost prohlížeče) – soubor předá skript přes \`window.mncad.importFile()\`
+  (obsah jako base64 / text), nebo ho člověk přetáhne do okna.
 - Dokumentace pro lidi: https://www.mnastrojarna.cz/cad/dokumentace (PDF: /cad/mnastrojarna-cad-prirucka.pdf).
 `;

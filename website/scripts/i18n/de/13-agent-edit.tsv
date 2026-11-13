@@ -1,0 +1,152 @@
+# Úpravy existujícího modelu a skici textem (agent-edit.ts): upravit, potlačit / zapnout, smazat <prvek>, přejmenovat, přesunout, duplikovat,
+# zpět / znovu (historie), proměnná, konfigurace, skica "Skica 1", entita, smazat e3 / v1 / k1, kóta k1, odsadit, promítnout hrany, setDocument inPlace
+  aktivní: žádná (výchozí hodnoty proměnných)	  aktiv: keine (Standardwerte der Variablen)
+  čísla vazeb a kót se přečíslovala – aktuální vypíše stav	  Nummern der Bedingungen und Bemaßungen wurden neu vergeben – Status zeigt die aktuellen
+ (pomocné)	 (Hilfsgeometrie)
+– víc kroků v historii není	– keine weiteren Schritte im Verlauf
+, uzavřený	, geschlossen
+„{0}“ čeká {1} čísel oddělených středníkem (dosud {2}), zadáno „{3}“	„{0}“ erwartet {1} Zahlen getrennt durch Semikolon (bisher {2}), angegeben „{3}“
+„{0}“ čeká ano / ne	„{0}“ erwartet ja / nein
+„{0}“ čeká ano / ne (dosud {1}), zadáno „{2}“	„{0}“ erwartet ja / nein (bisher {1}), angegeben „{2}“
+„{0}“ čeká bod x;y (např. {0}=10;5)	„{0}“ erwartet einen Punkt x;y (z. B. {0}=10;5)
+„{0}“ čeká body x1;y1;x2;y2;… (aspoň dva)	„{0}“ erwartet Punkte x1;y1;x2;y2;… (mindestens zwei)
+„{0}“ čeká číslo	„{0}“ erwartet eine Zahl
+„{0}“ čeká číslo (dosud {1}), zadáno „{2}“	„{0}“ erwartet eine Zahl (bisher {1}), angegeben „{2}“
+„{0}“ čeká kladné číslo	„{0}“ erwartet eine positive Zahl
+„{0}“ nelze měnit	„{0}“ kann nicht geändert werden
+„{0}“ není parametr prvku „{1}“ ({2}) – parametry: {3}	„{0}“ ist kein Parameter des Features „{1}“ ({2}) – Parameter: {3}
+„{0}“ před prvkem „{1}“ není – {2}: {3}	„{0}“ liegt nicht vor dem Feature „{1}“ – {2}: {3}
+(bylo {0} → {1})	(bisher {0} → {1})
+(s entitami i vazby {0} a kóty {1})	(mit den Elementen auch {0} Bedingungen und {1} Bemaßungen)
+(zbývá zpět {0}, znovu {1})	(verbleibend: rückgängig {0}, wiederherstellen {1})
+{0} (kopie)	{0} (Kopie)
+{0} {1} → {2} ({3} podle pravidla „{4}“)	{0} {1} → {2} ({3} nach Regel „{4}“)
+{0} = {1} (= {2}) – vazba na proměnné	{0} = {1} (= {2}) – an Variablen gebunden
+{0} ve skice „{1}“ není – {2}	{0} gibt es in Skizze „{1}“ nicht – {2}
+{0}: {1} – proměnné: {2}	{0}: {1} – Variablen: {2}
+⚠ „{0}“ je potlačený – změna se projeví po: zapnout "{0}"	⚠ „{0}“ ist unterdrückt – die Änderung wirkt erst nach: aktivieren "{0}"
+⚠ {0} zůstává potlačeno aktivní konfigurací „{1}“ – změníte: konfigurace "{1}" potlačit …	⚠ {0} bleibt durch die aktive Konfiguration „{1}“ unterdrückt – ändern mit: konfiguration "{1}" unterdrücken …
+⚠ aktivní konfigurace „{0}“ přepisuje {1} = {2} – výraz platí bez ní (konfigurace aktivní žádná)	⚠ die aktive Konfiguration „{0}“ überschreibt {1} = {2} – der Ausdruck gilt ohne sie (konfiguration aktiv keine)
+⚠ na {0} odkazují: {1} – teď skončí chybou proměnných; upravte je (proměnná …, upravit … klíč=číslo)	⚠ auf {0} verweisen: {1} – sie enden jetzt mit einem Variablenfehler; korrigieren (variable …, bearbeiten … schlüssel=zahl)
+⚠ na smazané odkazují: {0} – po výpočtu nejspíš ✗; smažte je také, nebo je upravte (upravit …)	⚠ auf die gelöschten verweisen: {0} – nach der Berechnung wohl ✗; ebenfalls löschen oder bearbeiten (bearbeiten …)
+⚠ název „{0}“ má i jiný prvek – odkaz názvem vybere ten poslední; použijte jiný název nebo @pořadí	⚠ auch ein anderes Feature heißt „{0}“ – ein Verweis per Name wählt das letzte; anderen Namen oder @Position verwenden
+✓ „{0}“ přesunut {1}(pozice {2} → {3})	✓ „{0}“ verschoben {1}(Position {2} → {3})
+✓ „{0}“ už je na pozici {1}	✓ „{0}“ ist bereits an Position {1}
+✓ {0} duplikován jako „{1}“ (pozice {2})	✓ {0} dupliziert als „{1}“ (Position {2})
+✓ aktivní konfigurace „{0}“: {1}	✓ aktive Konfiguration „{0}“: {1}
+✓ aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací)	✓ aktive Konfiguration: keine (Standardwerte der Variablen, keine Unterdrückung durch Konfiguration)
+✓ do skici „{0}“ promítnuto ({1}): {2} úseček {3}{4}	✓ in Skizze „{0}“ projiziert ({1}): {2} Linien {3}{4}
+✓ dokument „{0}“ ({1} prvků) nahradil otevřený dokument – jeden krok historie (zpět ho vrátí)	✓ Dokument „{0}“ ({1} Features) hat das geöffnete Dokument ersetzt – ein Verlaufsschritt (rückgängig stellt es wieder her)
+✓ konfigurace „{0}“ smazána	✓ Konfiguration „{0}“ gelöscht
+✓ potlačeno: {0}	✓ unterdrückt: {0}
+✓ proměnná {0} smazána	✓ Variable {0} gelöscht
+✓ přejmenováno: {0} → {1}	✓ umbenannt: {0} → {1}
+✓ skica „{0}“ je cílem dalších řádků (entity, vazby, kóty, entita, smazat e…, kóta k…) – {1}	✓ Skizze „{0}“ ist das Ziel der nächsten Zeilen (Elemente, Bedingungen, Bemaßungen, objekt, löschen e…, bemaßung k…) – {1}
+✓ smazáno: {0}	✓ gelöscht: {0}
+✓ už potlačeno: {0}	✓ bereits unterdrückt: {0}
+✓ už zapnuto: {0}	✓ bereits aktiv: {0}
+✓ ve skice „{0}“ odsazeno o {1} mm {2}: {3} → nové entity {4}	✓ in Skizze „{0}“ um {1} mm {2} versetzt: {3} → neue Elemente {4}
+✓ zapnuto: {0}	✓ aktiviert: {0}
+✓ ze skici „{0}“ smazáno: {1}{2}{3}	✓ aus Skizze „{0}“ gelöscht: {1}{2}{3}
+✓ znovu {0} krok(ů)	✓ {0} Schritt(e) wiederhergestellt
+✓ zpět o {0} krok(ů)	✓ {0} Schritt(e) rückgängig
+aktivujete: konfigurace aktivní "{0}"	aktivieren mit: konfiguration aktiv "{0}"
+beze změn proti výchozímu stavu	keine Änderungen gegenüber dem Standard
+dovnitř	nach innen
+duplikovat potřebuje prvek: duplikovat "Díra 1" [jako "Díra 2"]	duplizieren braucht ein Feature: duplizieren "Bohrung 1" [als "Bohrung 2"]
+entit {0} (upravíte: skica "{1}" + entita e3 …)	{0} Elemente (bearbeiten mit: skizze "{1}" + objekt e3 …)
+entita {0} ({1}) nemá „{2}“ – lze: {3}	Element {0} ({1}) hat kein „{2}“ – möglich: {3}
+entita {0} má body p0–p{1}	Element {0} hat die Punkte p0–p{1}
+entita {0} ve skice „{1}“: {2} = {3}{4}	Element {0} in Skizze „{1}“: {2} = {3}{4}
+entita potřebuje id a klíč=hodnota: entita e3 cx=10 cy=5 r=4 · entita e1 a=0;0 b=60;0 · entita e2 pomocná=ano	objekt braucht eine ID und schlüssel=wert: objekt e3 cx=10 cy=5 r=4 · objekt e1 a=0;0 b=60;0 · objekt e2 hilfs=ja
+entitu {0} nelze odsadit o {1} mm (rozměr by zanikl)	Element {0} kann nicht um {1} mm versetzt werden (ein Maß würde verschwinden)
+entity: {0}; vazby: {1}; kóty: {2}	Elemente: {0}; Bedingungen: {1}; Bemaßungen: {2}
+hrana {0} v tělese před skicou není – hran je {1} (E1 až E{1})	Kante {0} gibt es im Körper vor der Skizze nicht – Kanten: {1} (E1 bis E{1})
+hrany v rovině skici	Kanten in der Skizzenebene
+id, typ a druh rozšíření prvku nelze měnit – smažte prvek a vytvořte nový	ID, Typ und Erweiterungsart eines Features können nicht geändert werden – Feature löschen und neu anlegen
+JSON záplata musí být objekt: upravit "Díra 1" {"diameter": 10}	der JSON-Patch muss ein Objekt sein: bearbeiten "Bohrung 1" {"diameter": 10}
+JSON záplatu nelze přečíst: {0}	JSON-Patch nicht lesbar: {0}
+konfigurace „{0}“ není – konfigurace: {1}	Konfiguration „{0}“ gibt es nicht – Konfigurationen: {1}
+konfigurace „{0}“ upravena: {1}	Konfiguration „{0}“ geändert: {1}
+konfigurace „{0}“ založena: {1}	Konfiguration „{0}“ angelegt: {1}
+konfigurace "<název>" [proměnná=hodnota …] [potlačit <prvek>;<prvek>] · konfigurace aktivní "<název>"|žádná · konfigurace smazat "<název>" · konfigurace (výpis)	konfiguration "<Name>" [variable=wert …] [unterdrücken <Feature>;<Feature>] · konfiguration aktiv "<Name>"|keine · konfiguration löschen "<Name>" · konfiguration (Liste)
+Konfigurace ({0}): {1}	Konfigurationen ({0}): {1}
+konfigurace: „{0}“ není ve tvaru proměnná=hodnota – {1}	konfiguration: „{0}“ hat nicht die Form variable=wert – {1}
+Konfigurace: {0}	Konfigurationen: {0}
+konfigurace: {0}={1}: {2}	konfiguration: {0}={1}: {2}
+konfigurace: proměnná „{0}“ není – proměnné: {1} (založíte: proměnná {0} = …)	konfiguration: Variable „{0}“ gibt es nicht – Variablen: {1} (anlegen: variable {0} = …)
+Konfigurace: žádné – založíte: konfigurace "Krátká" t=10 [potlačit "Díra 1"]	Konfigurationen: keine – anlegen: konfiguration "Kurz" t=10 [unterdrücken "Bohrung 1"]
+kopie prvku hned za originálem	Kopie des Features direkt nach dem Original
+kóta {0} ({1}) nezměněna – {2}	Bemaßung {0} ({1}) nicht geändert – {2}
+kóta {0} ve skice „{1}“ není – {2}	Bemaßung {0} gibt es in Skizze „{1}“ nicht – {2}
+kóta {0} ve skice „{1}“: {2} → {3}	Bemaßung {0} in Skizze „{1}“: {2} → {3}
+kóta {0}: referenční kóta jen měří – hodnotu nelze zadat zároveň s „referenční“	bemaßung {0}: eine Referenzbemaßung misst nur – ein Wert kann nicht zusammen mit „referenz“ angegeben werden
+kóta k1 65 (nová hodnota) · kóta k1 referenční · kóta k1 řídicí – čísla kót k1, k2… vypíše stav skici	bemaßung k1 65 (neuer Wert) · bemaßung k1 referenz · bemaßung k1 steuernd – die Nummern k1, k2… zeigt der Skizzenstatus
+kóty: {0}	Bemaßungen: {0}
+kroky historie dokumentu jako Ctrl+Z / Ctrl+Y (jeden běh příkazů = jeden krok); také window.mncad.undo(n) / redo(n) / history()	Schritte im Dokumentverlauf wie Strg+Z / Strg+Y (ein Befehlslauf = ein Schritt); auch window.mncad.undo(n) / redo(n) / history()
+název nesmí být prázdný	der Name darf nicht leer sein
+neplatný název proměnné „{0}“ – písmena, číslice, podtržítko; nesmí začínat číslicí	ungültiger Variablenname „{0}“ – Buchstaben, Ziffern, Unterstrich; darf nicht mit einer Ziffer beginnen
+odsadit e1 [e2 …] <vzdálenost> [ven|dovnitř|vlevo|vpravo] [řetězec]	versetzen e1 [e2 …] <Abstand> [außen|innen|links|rechts] [kette]
+odsazení entity nebo navazujícího řetězce úseček a oblouků; průmět hran modelu (tělesa před skicou) do roviny skici – E čísla jako popisky pro výběr	Versatz eines Elements oder einer zusammenhängenden Kette aus Linien und Bögen; Projektion von Modellkanten (Körper vor der Skizze) in die Skizzenebene – E-Nummern wie die Auswahlbeschriftungen
+Parametry „{0}“ ({1}): {2}	Parameter von „{0}“ ({1}): {2}
+počet kroků musí být aspoň 1	die Anzahl der Schritte muss mindestens 1 sein
+počet stran mnohoúhelníku je celé číslo aspoň 3	die Seitenzahl des Vielecks ist eine ganze Zahl von mindestens 3
+pomocná	Hilfsgeometrie
+potlačeno: {0}	unterdrückt: {0}
+potlačí / zapne prvky historie (potlačený prvek se nestaví)	unterdrückt / aktiviert Features im Verlauf (ein unterdrücktes Feature wird nicht berechnet)
+potlačit potřebuje prvek: potlačit "Díra 1" ["Pole 1" …]	unterdrücken braucht ein Feature: unterdrücken "Bohrung 1" ["Muster 1" …]
+proměnná „{0}“ není – proměnné: {1}	Variable „{0}“ gibt es nicht – Variablen: {1}
+proměnná {0} = {1} → {2}	Variable {0} = {1} → {2}
+proměnná {0} = {1}: {2} – proměnné: {3}	Variable {0} = {1}: {2} – Variablen: {3}
+proměnná <název> = <výraz> [poznámka "…"] · proměnná smazat <název> · proměnné (výpis)	variable <Name> = <Ausdruck> [notiz "…"] · variable löschen <Name> · variablen (Liste)
+Proměnné ({0}): {1}	Variablen ({0}): {1}
+proměnné dílu (rovnice): přidat / změnit výraz, smazat, výpis s hodnotami a chybami; parametr na ni navážete: upravit "Vysunutí 1" distance==h*2	Variablen des Teils (Gleichungen): Ausdruck anlegen / ändern, löschen, Liste mit Werten und Fehlern; Parameter daran binden: bearbeiten "Extrusion 1" distance==h*2
+Proměnné: žádné – založíte: proměnná d = 20	Variablen: keine – anlegen: variable d = 20
+promítnout hrany E3;E7 | vše | rovina [pomocné] – E čísla jako popisky pro výběr (hrany tělesa před skicou)	projizieren kanten E3;E7 | alle | ebene [hilfs] – E-Nummern wie die Auswahlbeschriftungen (Kanten des Körpers vor der Skizze)
+promítnutí hran potřebuje jádro (v konzoli programu)	das Projizieren von Kanten braucht den Kernel (in der Programmkonsole)
+průmět hran do skici „{0}“ je prázdný (hrany kolmé na rovinu skici)	die Projektion der Kanten in Skizze „{0}“ ist leer (Kanten senkrecht zur Skizzenebene)
+prvek nelze přesunout vůči sobě samému	ein Feature kann nicht relativ zu sich selbst verschoben werden
+prvky	Features
+před „{0}“	vor „{0}“
+před prvkem „{0}“ není těleso – plochy a hrany zadejte čísly	vor dem Feature „{0}“ gibt es keinen Körper – Flächen und Kanten per Nummer angeben
+před skicou „{0}“ není těleso – není co promítnout	vor der Skizze „{0}“ gibt es keinen Körper – nichts zu projizieren
+přejmenovat potřebuje prvek a nový název: přejmenovat "Díra 1" na "Díra M8"	umbenennen braucht ein Feature und einen neuen Namen: umbenennen "Bohrung 1" zu "Bohrung M8"
+přejmenuje prvek historie	benennt ein Feature im Verlauf um
+přesunout „{0}“ na pozici {1} nelze: „{2}“ používá „{3}“ ({4}) – použitý prvek musí zůstat v historii před prvkem, který ho používá	„{0}“ kann nicht an Position {1} verschoben werden: „{2}“ verwendet „{3}“ ({4}) – ein verwendetes Feature muss im Verlauf vor dem Feature bleiben, das es verwendet
+přesunout potřebuje prvek a místo: přesunout "Díra 1" před|za "Vysunutí 2" · přesunout "Díra 1" nahoru|dolů [N] · přesunout "Díra 1" na začátek|konec	verschieben braucht ein Feature und eine Stelle: verschieben "Bohrung 1" vor|nach "Extrusion 2" · verschieben "Bohrung 1" hoch|runter [N] · verschieben "Bohrung 1" an anfang|ende
+referenční kóta se stala řídicí	die Referenzbemaßung wurde steuernd
+řešič nenašel řešení – hodnota nejde s dosavadními vazbami splnit	der Löser fand keine Lösung – der Wert ist mit den bisherigen Bedingungen nicht erfüllbar
+řetězec {0} ({1} úseků{2})	Kette {0} ({1} Segmente{2})
+řetězec {0} nelze odsadit o {1} mm (oblouk by zanikl)	Kette {0} kann nicht um {1} mm versetzt werden (ein Bogen würde verschwinden)
+řetězec začíná úsečkou nebo obloukem – {0} je {1}	eine Kette beginnt mit einer Linie oder einem Bogen – {0} ist {1}
+skica „{0}“ v dokumentu není – skici: {1}	Skizze „{0}“ gibt es im Dokument nicht – Skizzen: {1}
+skici	Skizzen
+skicu by přeurčila (v rozporu s vazbami a kótami, nebo nadbytečná)	sie würde die Skizze überbestimmen (Widerspruch zu Bedingungen und Bemaßungen oder redundant)
+smaže konkrétní prvky; protokol vypíše prvky, které na ně odkazovaly (po výpočtu jejich ✗); „smazat“ bez prvku = poslední prvek	löscht bestimmte Features; das Protokoll nennt Features, die darauf verwiesen (nach der Berechnung ihr ✗); „löschen“ ohne Feature = letztes Feature
+stavy dílu (varianty): hodnoty proměnných a potlačené prvky; založí / přepíše, aktivuje, smaže, vypíše	Konfigurationen des Teils (Varianten): Variablenwerte und unterdrückte Features; anlegen / überschreiben, aktivieren, löschen, auflisten
+střed	Mitte
+u uzavřeného tvaru zadejte stranu ven / dovnitř	bei einer geschlossenen Form die Seite außen / innen angeben
+úprava skici: souřadnice / rozměry / pomocná entity (cx, cy, r, průměr, a=x;y, b=…, w, h, úhel, pomocná=ano), smazání entit (i s jejich vazbami a kótami), vazeb v1… a kót k1… (čísla vypíše stav), hodnota kóty a řídicí ↔ referenční; po řádku se skica vyřeší	Skizze bearbeiten: Koordinaten / Maße / Hilfsgeometrie eines Elements (cx, cy, r, durchmesser, a=x;y, b=…, w, h, winkel, hilfs=ja), Elemente löschen (mit ihren Bedingungen und Bemaßungen), Bedingungen v1… und Bemaßungen k1… (Nummern zeigt der Status), Bemaßungswert und steuernd ↔ Referenz; nach der Zeile wird die Skizze gelöst
+upravit potřebuje prvek a změny: upravit "Díra 1" diameter=10 depth=12 · upravit $last edges=svislé · upravit "Pole 1" {"count": 6}	bearbeiten braucht ein Feature und Änderungen: bearbeiten "Bohrung 1" diameter=10 depth=12 · bearbeiten $last edges=senkrecht · bearbeiten "Muster 1" {"count": 6}
+vazba {0} = {1} zrušena	Bindung {0} = {1} aufgehoben
+vazbu na proměnné lze zadat jen u číselného parametru – „{0}“ je {1}	eine Variablenbindung ist nur bei einem Zahlenparameter möglich – „{0}“ ist {1}
+Vazby parametrů: {0}	Parameterbindungen: {0}
+vazby: {0}	Bedingungen: {0}
+ven	nach außen
+vlevo	nach links
+vpravo	nach rechts
+vrcholy zadejte čísly (V3 nebo indexy) – pravidlo umí jen plochy a hrany	Ecken per Nummer angeben (V3 oder Indizes) – Regeln gibt es nur für Flächen und Kanten
+všechny hrany	alle Kanten
+výběr pravidlem potřebuje jádro (v konzoli programu)	die Auswahl per Regel braucht den Kernel (in der Programmkonsole)
+výraz „{0}“ neobsahuje proměnnou – číslo zadejte bez „=“ ({1}={0})	der Ausdruck „{0}“ enthält keine Variable – Zahl ohne „=“ angeben ({1}={0})
+zapnout potřebuje prvek: zapnout "Díra 1" ["Pole 1" …]	aktivieren braucht ein Feature: aktivieren "Bohrung 1" ["Muster 1" …]
+změní parametry existujícího prvku na místě (prvek = název v uvozovkách, id, $last nebo @3 = 3. prvek historie); klíče jako u příkazu prvek, u rozšíření i popisek; plochy / hrany čísly, E7 / F3 nebo pravidlem nad tělesem před prvkem; „==výraz“ naváže parametr na proměnné, číslo vazbu zruší; bez klíčů vypíše parametry	ändert die Parameter eines vorhandenen Features direkt (Feature = Name in Anführungszeichen, ID, $last oder @3 = 3. Feature im Verlauf); Schlüssel wie beim Befehl element, bei Erweiterungen auch die Beschriftung; Flächen / Kanten per Nummer, E7 / F3 oder per Regel am Körper vor dem Feature; „==Ausdruck“ bindet den Parameter an Variablen, eine Zahl hebt die Bindung auf; ohne Schlüssel listet es die Parameter
+změní pořadí v historii; skica (použitý prvek) musí zůstat před prvky, které ji používají – jinak ✗ s důvodem	ändert die Reihenfolge im Verlauf; eine Skizze (verwendetes Feature) muss vor den Features bleiben, die sie verwenden – sonst ✗ mit Grund
+znovu [N] – N = počet kroků historie (výchozí 1)	wiederherstellen [N] – N = Anzahl der Verlaufsschritte (Standard 1)
+znovu otevře existující skicu jako cíl dalších řádků (entity, vazby, kóty, entita, smazat e3, kóta k1)	öffnet eine vorhandene Skizze erneut als Ziel der nächsten Zeilen (Elemente, Bedingungen, Bemaßungen, objekt, löschen e3, bemaßung k1)
+znovu: není co obnovit (žádný vrácený krok)	wiederherstellen: nichts wiederherzustellen (kein rückgängig gemachter Schritt)
+zpět [N] – N = počet kroků historie (výchozí 1); poslední prvek smaže „smazat poslední“	rückgängig [N] – N = Anzahl der Verlaufsschritte (Standard 1); „löschen letzte“ löscht das letzte Feature
+zpět / znovu provádí aplikace (historie dokumentu)	rückgängig / wiederherstellen erledigt die Anwendung (Dokumentverlauf)
+zpět: historie je prázdná – není co vrátit	rückgängig: der Verlauf ist leer – nichts rückgängig zu machen
+žádná hrana modelu neleží v rovině skici „{0}“ – zadejte hrany čísly (promítnout hrany E3;E7) nebo vše	keine Modellkante liegt in der Ebene der Skizze „{0}“ – Kanten per Nummer (projizieren kanten E3;E7) oder alle angeben
+žádné (založíte: proměnná d = 20)	keine (anlegen: variable d = 20)

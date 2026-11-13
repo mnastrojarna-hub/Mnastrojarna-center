@@ -6,6 +6,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { AGENT_COMMANDS, docStatusText, parseAgentText, selectFaces } from "./agent";
 import { applySketchOp, parseConstraints, parseDims, sketchOnPlane, sketchStatusLines, withTextIds, type SketchKernel, type SketchOnOp } from "./agent-sketch";
+import { applyEdit, type EditKernel } from "./agent-edit";
 import { setLang } from "./i18n";
 import { emptyDoc, type CadDoc, type Feature, type SketchEntity, type SketchPlane } from "./types";
 
@@ -466,5 +467,133 @@ describe("opravy po kontrole: název skici, otevřená skica, přeurčující va
       "4: ✗ vazba kolmo e1 e2 ve skice „Skica 1“ nepřidána – nadbytečná: tutéž geometrii už určují dosavadní vazby a kóty",
     ]);
     expect(m.sk.constraints?.map((c) => c.type)).toEqual(["horizontal", "vertical"]);
+  });
+});
+
+/* ───────────── úpravy existující skici (agent-edit.ts): skica "Skica 1", entita, smazat e/v/k, kóta k1, odsadit, promítnout ───────────── */
+/** Provede program včetně úprav (op „edit“) nad dokumentem stejně jako smyčka operací v cad-app.tsx; jádro jen náhradou. */
+async function runEdit(text: string, doc: CadDoc = emptyDoc("Test"), kernel?: EditKernel) {
+  const p = parseAgentText(text);
+  const log: string[] = p.errors.map((e) => `✗ řádek ${e.line}: ${e.message}`);
+  for (const op of p.ops) {
+    try {
+      if (op.k === "feature") doc.features.push(op.feature);
+      else if (op.k === "entities" || op.k === "constraints" || op.k === "dims") log.push(...applySketchOp(doc.features, op).map((x) => `${op.line}: ${x}`));
+      else if (op.k === "edit") {
+        const r = await applyEdit(doc, op.cmd, { kernel }, op.sketch);
+        doc = r.doc;
+        log.push(...r.log.map((x) => `${op.line}: ${x}`));
+      } else throw new Error(`neočekávaná operace ${op.k}`);
+    } catch (e) {
+      log.push(`✗ řádek ${op.line}: ${(e as Error).message}`);
+    }
+  }
+  return { doc, log, text: log.join("\n"), sk: (name: string) => doc.features.find((f) => f.name === name) as SketchF };
+}
+
+describe("úprava existující skici textem", () => {
+  it("skica \"Skica 1\" znovu otevře skicu jako cíl bloku (ne poslední skica); i s entitami za dvojtečkou", async () => {
+    const r = await runEdit('skica XY: kružnice 10\nskica XZ: obdélník 20 10\nskica "Skica 1"\nkružnice 20 v 30 0\nvazba soustředně e1 počátek\nskica "skica 1": bod 5 5');
+    expect(r.sk("Skica 1").entities.map((e) => `${e.id}:${e.type}`)).toEqual(["e1:circle", "e2:circle", "e3:point"]);
+    expect(r.sk("Skica 2").entities.map((e) => e.id)).toEqual(["e1"]);
+    expect(r.sk("Skica 1").constraints).toHaveLength(1);
+    expect(r.log).toContain("3: ✓ skica „Skica 1“ je cílem dalších řádků (entity, vazby, kóty, entita, smazat e…, kóta k…) – entity: e1; vazby: —; kóty: —");
+    expect(r.log).toContain("4: ✓ 1 entita do skici „Skica 1“ (e2)");
+    // název, který není skicou: chyba s výčtem skic; další řádky bloku nikam nepřidají
+    const bad = await runEdit('skica XY: kružnice 10\nskica "Neni"\nkružnice 5');
+    expect(bad.log).toEqual(["1: ✓ 1 entita do skici „Skica 1“ (e1)", "✗ řádek 2: skica „Neni“ v dokumentu není – skici: Skica 1", "✗ řádek 3: skica z řádku 2 nevznikla – entity, vazby a kóty nemají kam (opravte řádek 2)"]);
+    // „skica XY“ a „skica "XY"“ dál zakládají novou skicu
+    expect(parseAgentText('skica "XY": kružnice 5').ops[0]).toMatchObject({ k: "feature", feature: { type: "sketch" } });
+  });
+  it("entita e3 klíč=hodnota: souřadnice, průměr, střed, body, pomocná; chyba s výčtem klíčů", async () => {
+    let r = await runEdit("skica XY\nkružnice 10\núsečka 0 0 60 0\nentita e1 cx=10 cy=5 r=4\nentita e2 b=50;10 pomocná=ano\nobjekt e1 průměr=30\nentity e1 střed=-5;2");
+    const sk = r.sk("Skica 1");
+    expect(ent(sk, "e1")).toMatchObject({ cx: -5, cy: 2, r: 15 });
+    expect(ent(sk, "e2")).toMatchObject({ a: [0, 0], b: [50, 10], construction: true });
+    expect(r.log[2]).toBe("4: ✓ entita e1 ve skice „Skica 1“: cx 0 → 10, cy 0 → 5, r 5 → 4 = e1 kružnice Ø8 [10; 5]");
+    expect(r.log[3]).toBe("5: ✓ entita e2 ve skice „Skica 1“: b [60; 0] → [50; 10], pomocná ne → ano = e2 úsečka [0; 0]→[50; 10] (pomocná)");
+    r = await runEdit("entita e1 w=5", r.doc);
+    expect(r.log[0]).toBe("✗ řádek 1: entita e1 (circle) nemá „w“ – lze: cx, cy, r, pomocná, průměr, střed");
+    r = await runEdit("entita e9 r=5", r.doc);
+    expect(r.log[0]).toBe("✗ řádek 1: entita „e9“ ve skice „Skica 1“ není – entity: e1, e2");
+    expect(err("entita e1")).toMatch(/^entita potřebuje id a klíč=hodnota/);
+  });
+  it("stav skici vypíše vazby a kóty s čísly (v1, k1); kóta k1 65 změní geometrii, referenční ↔ řídicí", async () => {
+    let r = await runEdit(RECT);
+    const lines = sketchStatusLines(r.sk("Skica 1"));
+    expect(lines[2]).toBe("    vazby: v1 shodně e1.b e2.a · v2 shodně e2.b e3.a · v3 shodně e3.b e4.a · v4 shodně e4.b e1.a · v5 vodorovně e1 · v6 vodorovně e3 · v7 svisle e2 · v8 svisle e4 · v9 pevně e1.a 0 0");
+    expect(lines[3]).toBe("    kóty: k1 délka e1 = 80 · k2 délka e2 = 50");
+    r = await runEdit("kóta k1 65", r.doc);
+    expect(r.log[0]).toBe("1: ✓ kóta k1 ve skice „Skica 1“: délka e1 80 → délka e1 65 → Plně určeno");
+    near(ent(r.sk("Skica 1"), "e1").b as number[], [65, 0]);
+    r = await runEdit("kóta k2 referenční", r.doc);
+    expect(r.log[0]).toBe("1: ✓ kóta k2 ve skice „Skica 1“: délka e2 50 → délka e2 50 referenční → Nedourčeno (1 st. volnosti)");
+    expect(sketchStatusLines(r.sk("Skica 1"))[3]).toBe("    kóty: k1 délka e1 = 65 · k2 délka e2 = 50 referenční");
+    r = await runEdit("dim k2 driving", r.doc);
+    expect(r.sk("Skica 1").dims?.[1].driving).toBe(true);
+    r = await runEdit("kóta k2 Ø40", r.doc);
+    near(ent(r.sk("Skica 1"), "e3").a as number[], [65, 40]);
+    // chyby: kóta, která není; záporná hodnota; referenční s hodnotou
+    expect((await runEdit("kóta k7 10", r.doc)).log[0]).toMatch(/^✗ řádek 1: kóta k7 ve skice „Skica 1“ není – entity: e1, e2, e3, e4; vazby: v1–v9; kóty: k1–k2$/);
+    expect((await runEdit("kóta k1 -5", r.doc)).log[0]).toBe("✗ řádek 1: kóta k1: hodnota musí být kladná (zadáno -5)");
+    expect(err("kóta k1 5 referenční")).toMatch(/referenční kóta jen měří/);
+  });
+  it("smazat e3 / v1 / k2 ve skice: entita i s vazbami a kótami, přečíslování, skica se vyřeší", async () => {
+    let r = await runEdit(RECT + "\nsmazat k2");
+    expect(r.sk("Skica 1").dims?.map((d) => d.value)).toEqual([80]);
+    expect(r.log[r.log.length - 2]).toBe("11: ✓ ze skici „Skica 1“ smazáno: k2 délka e2 50 → Nedourčeno (1 st. volnosti)");
+    expect(r.log[r.log.length - 1]).toMatch(/čísla vazeb a kót se přečíslovala/);
+    r = await runEdit("smazat v9 v5", r.doc);
+    expect(r.sk("Skica 1").constraints?.map((c) => c.type)).toEqual(["coincident", "coincident", "coincident", "coincident", "horizontal", "vertical", "vertical"]);
+    r = await runEdit("delete e4", r.doc);
+    const sk = r.sk("Skica 1");
+    expect(sk.entities.map((e) => e.id)).toEqual(["e1", "e2", "e3"]);
+    expect(sk.constraints?.every((c) => c.refs.every((x) => x.e !== "e4"))).toBe(true);
+    expect(r.log[0]).toMatch(/^1: ✓ ze skici „Skica 1“ smazáno: e4 úsečka \[0; 50\]→\[0; 0\] \(s entitami i vazby 3 a kóty 0\) → Nedourčeno/);
+    expect((await runEdit("smazat e9", r.doc)).log[0]).toBe("✗ řádek 1: e9 ve skice „Skica 1“ není – entity: e1, e2, e3; vazby: v1–v4; kóty: k1");
+  });
+  it("smazat <prvek> vs. položka skici: e3 ve skice, „Skica 1“ jako prvek", async () => {
+    const r = await runEdit("skica XY: kružnice 10; kružnice 20\nsmazat e1\nsmazat \"Skica 1\"");
+    expect(r.log[1]).toMatch(/^2: ✓ ze skici „Skica 1“ smazáno: e1 kružnice Ø10/);
+    expect(r.log[2]).toBe("3: ✓ smazáno: Skica 1");
+    expect(r.doc.features).toEqual([]);
+  });
+  it("odsadit: entita ven / dovnitř / vlevo, uzavřený řetězec ven (proti i po směru hodin)", async () => {
+    let r = await runEdit("skica XY\nkružnice 20\núsečka 0 0 10 0\nodsadit e1 5\nodsadit e1 2 dovnitř\nodsadit e2 3 vlevo\noffset e2 3 right");
+    let sk = r.sk("Skica 1");
+    expect(sk.entities.map((e) => (e.type === "circle" ? `${e.id}:r${e.r}` : e.type === "line" ? `${e.id}:${e.a}>${e.b}` : e.id))).toEqual(["e1:r10", "e2:0,0>10,0", "e3:r15", "e4:r8", "e5:0,3>10,3", "e6:0,-3>10,-3"]);
+    expect(r.log[2]).toBe("4: ✓ ve skice „Skica 1“ odsazeno o 5 mm ven: e1 → nové entity e3");
+    // čtverec proti směru hodin i po směru hodin: „ven“ = větší obrys
+    for (const pts of ["0 0 10 0 10 10 0 10", "0 0 0 10 10 10 10 0"]) {
+      const [a, b, c, d] = [0, 2, 4, 6].map((k) => pts.split(" ").slice(k, k + 2).join(" "));
+      r = await runEdit(`skica XY\núsečka ${a} ${b}\núsečka ${b} ${c}\núsečka ${c} ${d}\núsečka ${d} ${a}\nodsadit e1 2 ven řetězec`);
+      sk = r.sk("Skica 1");
+      const xs = sk.entities.slice(4).flatMap((e) => (e.type === "line" ? [e.a[0], e.b[0]] : []));
+      expect([Math.min(...xs), Math.max(...xs)], pts).toEqual([-2, 12]);
+      expect(r.log[4]).toMatch(/odsazeno o 2 mm ven: řetězec e1\+e2\+e3\+e4 \(4 úseků, uzavřený\) → nové entity e5, e6, e7, e8$/);
+    }
+    expect(err("odsadit e1")).toMatch(/^odsadit e1 \[e2 …\] <vzdálenost>/);
+    expect((await runEdit("odsadit e9 2", r.doc)).log[0]).toMatch(/^✗ řádek 1: entita „e9“ ve skice „Skica 1“ není/);
+  });
+  it("promítnout hrany: čísly E, v rovině skici, vše jako pomocné; chybějící hrana", async () => {
+    // čtverec 10 × 10 v z = 0 (hrany E1–E4) a svislá hrana E5 z [0;0;0] do [0;0;10]
+    const pts = [[0, 0, 0, 10, 0, 0], [10, 0, 0, 10, 10, 0], [10, 10, 0, 0, 10, 0], [0, 10, 0, 0, 0, 0], [0, 0, 0, 0, 0, 10], [0, 10, 5, 10, 10, 5]];
+    const lines = pts.flat();
+    const edgeGroups = pts.flatMap((_, i) => [i * 2, 2, i]);
+    const seen: string[][] = [];
+    const kernel: EditKernel = { build: async (d) => (seen.push(d.features.map((f) => f.name)), { mesh: { lines, edgeGroups } }) };
+    const doc: CadDoc = { ...emptyDoc("T"), features: [{ id: "b", name: "Kvádr 1", type: "box", size: [10, 10, 10], position: [0, 0, 0], centered: false, mode: "new" } as Feature] };
+    let r = await runEdit("skica XY: bod 50 50\npromítnout hrany E1;E2", doc, kernel);
+    expect(seen[0]).toEqual(["Kvádr 1"]); // těleso PŘED skicou
+    expect(r.sk("Skica 1").entities.slice(1).map((e) => (e.type === "line" ? `${e.a}>${e.b}` : e.type))).toEqual(["0,0>10,0", "10,0>10,10"]);
+    expect(r.log[1]).toBe("2: ✓ do skici „Skica 1“ promítnuto (E1, E2): 2 úseček e2, e3");
+    r = await runEdit("promítnout hrany", r.doc, kernel);
+    expect(r.sk("Skica 1").entities).toHaveLength(7); // jen 4 hrany v rovině XY (z = 0)
+    r = await runEdit("project edges all construction", r.doc, kernel);
+    const added = r.sk("Skica 1").entities.slice(7);
+    expect(added.every((e) => e.construction)).toBe(true);
+    expect(added.length).toBeGreaterThanOrEqual(4);
+    expect((await runEdit("promítnout hrany E9", r.doc, kernel)).log[0]).toBe("✗ řádek 1: hrana E9 v tělese před skicou není – hran je 6 (E1 až E6)");
+    expect(parseAgentText("projizieren kanten E3;E7 hilfs").ops[0]).toMatchObject({ k: "edit", cmd: { kind: "project", edges: [2, 6], construction: true } });
   });
 });

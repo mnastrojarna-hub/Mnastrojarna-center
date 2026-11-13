@@ -93,7 +93,6 @@ rovina {0}{1} → nové těleso {2}	plane {0}{1} → new body {2}
 Rovina rozdělí těleso „{0}“ na dvě: strana ve směru normály zůstane tímto tělesem, opačná strana je nové těleso. Další prvky pracují s tělesem, které vyberete v poli Těleso nebo ve správci.	The plane splits body “{0}” in two: the side in the direction of the normal stays this body, the opposite side is a new body. Following features work on the body you choose in the Body field or in the manager.
 rovina rozdělí těleso na dvě samostatná tělesa	a plane splits the body into two separate bodies
 Rozdělit na tělesa	Split into bodies
-sestava: vloží díl z otevřené záložky jako komponentu (vazby se zadávají v panelu sestavy nebo v JSON dokumentu)	assembly: inserts a part from an open tab as a component (mates are entered in the assembly panel or in the JSON document)
 sjednotit	unite
 Sjednotit	Unite
 sjednotit, odebrat nebo průnik dvou těles	unite, subtract or intersect two bodies

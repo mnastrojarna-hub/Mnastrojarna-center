@@ -1,0 +1,175 @@
+# Rozhraní pro AI agenty – soubory, obraz, výstupy a analýzy (agent-api.ts, agent-api-host.ts)
+ – ⚠ poloha je mimo model, řez nic neukáže	 – ⚠ die Lage liegt außerhalb des Modells, der Schnitt zeigt nichts
+ – barevná mapa zapnuta (analýza vyp ji vypne)	 – Farbkarte eingeschaltet (analyse aus schaltet sie aus)
+ – nová záložka	 – neuer Reiter
+ (jen rovinné plochy)	 (nur ebene Flächen)
+ (model {0} {1}…{2} mm)	 (Modell {0} {1}…{2} mm)
+ (nejmenší poloměr ≈ {0} mm)	 (kleinster Radius ≈ {0} mm)
+, obráceně	, umgekehrt
+„{0}“ není akce, ale prvek – přidejte ho příkazem: prvek {1} klíč=hodnota …	„{0}“ ist keine Aktion, sondern ein Element – fügen Sie es so ein: element {1} schlüssel=wert …
+„{0}“ není prvek, ale akce (bez prvku v historii) – spusťte ji příkazem: akce {1}	„{0}“ ist kein Element, sondern eine Aktion (ohne Element im Verlauf) – starten Sie sie mit: aktion {1}
+„{0}“: v dílu se komponenta nepíše – jen F3, E2, V5	„{0}“: im Bauteil wird keine Komponente angegeben – nur F3, E2, V5
+(bod na čele dílu x; y; z)	(Punkt auf der Bauteilstirn x; y; z)
+(X; Y v půdorysu)	(X; Y in der Draufsicht)
+{0} – nedokončeno do {1} s	{0} – nicht innerhalb von {1} s abgeschlossen
+{0}: 2D výkres DXF nelze vložit jako komponentu – použijte as: "sketch"	{0}: eine 2D-DXF-Zeichnung kann nicht als Komponente eingefügt werden – verwenden Sie as: "sketch"
+{0}: 3D model nelze vložit do skici	{0}: ein 3D-Modell kann nicht in eine Skizze eingefügt werden
+{0}: díl nemá těleso – nejdřív vytvořte tvar	{0}: das Bauteil hat keinen Körper – erstellen Sie zuerst eine Form
+{0}: do skici lze vložit jen 2D výkres DXF	{0}: in eine Skizze kann nur eine 2D-DXF-Zeichnung eingefügt werden
+{0}: neznámé slovo „{1}“ – {2}	{0}: unbekanntes Wort „{1}“ – {2}
+{0}: otevřený dokument je sestava – formařské nástroje a analýzy pracují s dílem	{0}: das geöffnete Dokument ist eine Baugruppe – Formenbau-Werkzeuge und Analysen arbeiten mit einem Bauteil
+{0}: skica patří do dílu – otevřený dokument je sestava	{0}: eine Skizze gehört in ein Bauteil – das geöffnete Dokument ist eine Baugruppe
+{0}: směr se píše +X, -X, +Y, -Y, +Z, -Z nebo třemi čísly (směr 0 0 1) – {1}	{0}: die Richtung wird +X, -X, +Y, -Y, +Z, -Z oder mit drei Zahlen geschrieben (richtung 0 0 1) – {1}
+{0}: soubor není platný projekt Mnástrojárna CAD (JSON).	{0}: die Datei ist kein gültiges Mnástrojárna-CAD-Projekt (JSON).
+{0}: vložit jako komponentu lze jen do otevřené sestavy – nejdřív „nová sestava“ (otevřený dokument je díl)	{0}: als Komponente kann nur in eine geöffnete Baugruppe eingefügt werden – zuerst „neu baugruppe“ (das geöffnete Dokument ist ein Bauteil)
+{0}: za „{1}“ chybí číslo – {2}	{0}: nach „{1}“ fehlt eine Zahl – {2}
+{0}: za průměrem chybí číslo – {1}	{0}: nach dem Durchmesser fehlt eine Zahl – {1}
+{0}{1} v tělese není – {2}1 až {3}{4}	{0}{1} ist nicht im Körper – {2}1 bis {3}{4}
+→ {0} děr pro vyhazovače přidáno do historie (Vyhazovač 1…) – výsledek po výpočtu níže	→ {0} Auswerferbohrungen in den Verlauf eingefügt (Auswerfer 1…) – Ergebnis nach der Berechnung unten
+→ {0}{1}: měřítko {2} kolem počátku – výsledek po výpočtu níže	→ {0}{1}: Maßstab {2} um den Ursprung – Ergebnis nach der Berechnung unten
+→ chladicí kanály vyvrtány do dílu ({0} prvků Kanál / Propojka) – výsledek po výpočtu níže	→ Kühlkanäle in das Bauteil gebohrt ({0} Elemente Kanal / Verbindung) – Ergebnis nach der Berechnung unten
+✓ {0} „{1}“ vložen do sestavy jako komponenta	✓ {0} „{1}“ als Komponente in die Baugruppe eingefügt
+✓ akce {0}	✓ Aktion {0}
+✓ barevné analýzy vypnuty	✓ Farbanalysen ausgeschaltet
+✓ barva ploch {0} – výchozí (barva tělesa)	✓ Farbe der Flächen {0} – Standard (Körperfarbe)
+✓ barva ploch {0} = {1} ({2} ploch)	✓ Farbe der Flächen {0} = {1} ({2} Flächen)
+✓ DXF {0}: {1} entit vloženo do otevřené skice „{2}“	✓ DXF {0}: {1} Elemente in die geöffnete Skizze „{2}“ eingefügt
+✓ DXF {0}: nová skica „{1}“ ({2} entit, rovina XY){3}	✓ DXF {0}: neue Skizze „{1}“ ({2} Elemente, Ebene XY){3}
+✓ model {0} otevřen (prvek Import)	✓ Modell {0} geöffnet (Element Import)
+✓ model {0} vložen do sestavy jako komponenta	✓ Modell {0} als Komponente in die Baugruppe eingefügt
+✓ otevřeno: „{0}“ ({1})	✓ geöffnet: „{0}“ ({1})
+✓ pohled přizpůsoben modelu	✓ Ansicht an das Modell angepasst
+✓ řez kolmo na {0} v {1} mm{2}{3}	✓ Schnitt senkrecht zu {0} bei {1} mm{2}{3}
+✓ řez obecnou rovinou s normálou {0} v {1} mm{2}	✓ Schnitt mit allgemeiner Ebene, Normale {0}, bei {1} mm{2}
+✓ řez vypnut	✓ Schnitt ausgeschaltet
+✓ sestava „{0}“: díl + {1} vyhazovačů Ø{2} × {3} mm – nová záložka	✓ Baugruppe „{0}“: Bauteil + {1} Auswerfer Ø{2} × {3} mm – neuer Reiter
+✓ sestava „{0}“: díl + chladicí okruh – nová záložka	✓ Baugruppe „{0}“: Bauteil + Kühlkreis – neuer Reiter
+✓ sestava {0} otevřena ({1} komponent)	✓ Baugruppe {0} geöffnet ({1} Komponenten)
+✓ sestava {0} vložena jako podsestava	✓ Baugruppe {0} als Unterbaugruppe eingefügt
+✓ styl zobrazení: {0}	✓ Darstellungsstil: {0}
+✓ zebra pruhy zapnuty (návaznost ploch) – analýza vyp je vypne	✓ Zebrastreifen eingeschaltet (Flächenübergänge) – analyse aus schaltet sie aus
+akce „{0}“ nemá v této verzi provedení	Aktion „{0}“ ist in dieser Version nicht umgesetzt
+akce „{0}“ nic nevytvořila: {1}	Aktion „{0}“ hat nichts erzeugt: {1}
+akce rozšíření bez prvku v historii: akce sheet.dxf (Rozvin → DXF), sheet.svg, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn, skica dxf; text okna jde do protokolu, soubory vrací window.mncad.action()	Erweiterungsaktionen ohne Element im Verlauf: aktion sheet.dxf (Abwicklung → DXF), sheet.svg, biegetabelle, zuschnittliste, schweißtabelle, wandstärke, skizze dxf; der Fenstertext geht ins Protokoll, Dateien liefert window.mncad.action()
+Akce: {0}	Aktionen: {0}
+analýza	analyse
+analýza {0} nemá další volby – {1}	analyse {0} hat keine weiteren Optionen – {1}
+analýza tloušťky: limit musí být kladný (mm)	analyse wandstärke: die Grenze muss positiv sein (mm)
+analýza úkosů [směr +Z|vx vy vz] [min 1] [zobrazit] · analýza tloušťky [limit 2] [zobrazit] · analýza křivosti [zobrazit] · analýza zebra · analýza vyp	analyse formschräge [richtung +Z|vx vy vz] [min 1] [anzeigen] · analyse wandstärke [grenze 2] [anzeigen] · analyse krümmung [anzeigen] · analyse zebra · analyse aus
+analýza úkosů: číslo „{0}“ bez významu – minimální úkos se píše „min 1“	analyse formschräge: Zahl „{0}“ ohne Bedeutung – die Mindestschräge wird „min 1“ geschrieben
+analýza úkosů: minimální úkos musí být 0 až 45°	analyse formschräge: die Mindestschräge muss 0 bis 45° sein
+analýza: neznámý druh „{0}“ – {1}	analyse: unbekannte Art „{0}“ – {1}
+analýza: otevřený dokument je sestava – formařské nástroje a analýzy pracují s dílem	analyse: das geöffnete Dokument ist eine Baugruppe – Formenbau-Werkzeuge und Analysen arbeiten mit einem Bauteil
+barva ploch číslem (F1… jako popisky pro výběr) nebo pravidlem jako u skořepiny (horní, +X, válcové…); výchozí = barva tělesa	Flächenfarbe per Nummer (F1… wie die Auswahlbeschriftungen) oder per Regel wie bei Schale (oben, +X, zylindrisch…); standard = Körperfarbe
+barva plochy F3 [F5 …] | <pravidlo: horní, +X, válcové…> #rrggbb | červená | výchozí	farbe fläche F3 [F5 …] | <Regel: oben, +X, zylindrisch…> #rrggbb | rot | standard
+barva plochy potřebuje barvu (#rrggbb, název nebo „výchozí“): {0}	farbe fläche braucht eine Farbe (#rrggbb, Name oder „standard“): {0}
+barva plochy potřebuje čísla ploch nebo pravidlo: {0}	farbe fläche braucht Flächennummern oder eine Regel: {0}
+barva plochy: buď čísla ploch, nebo pravidlo – „{0}“	farbe fläche: entweder Flächennummern oder eine Regel – „{0}“
+barva plochy: díl nemá těleso	farbe fläche: das Bauteil hat keinen Körper
+barva plochy: otevřený dokument je sestava – barvu ploch lze měnit v dílu	farbe fläche: das geöffnete Dokument ist eine Baugruppe – Flächenfarben werden im Bauteil geändert
+bez hlášky	ohne Meldung
+bez podkosů – svislé stěny a malé úkosy doplňte úkosem (prvek úkos)	keine Hinterschnitte – senkrechte Wände und kleine Schrägen mit Formschräge versehen (Element Schräge)
+bez podkosů, úkosy dostatečné	keine Hinterschnitte, Schrägen ausreichend
+CAD ještě není připravený	CAD ist noch nicht bereit
+comp:… vybírá komponentu sestavy – otevřený dokument je díl	comp:… wählt eine Baugruppenkomponente – das geöffnete Dokument ist ein Bauteil
+compare potřebuje referenci {0}	compare braucht eine Referenz {0}
+compare: align je none | center | auto	compare: align ist none | center | auto
+compare: booleans je auto | always | never	compare: booleans ist auto | always | never
+compare: tolerance musí být kladná (mm)	compare: tolerance muss positiv sein (mm)
+čísla ploch začínají F1 – „{0}“	Flächennummern beginnen mit F1 – „{0}“
+čísla ploch, hran a vrcholů začínají 1 (F1, E1, V1) – „{0}“	Flächen-, Kanten- und Eckennummern beginnen mit 1 (F1, E1, V1) – „{0}“
+dělicí rovina	trennebene
+dělicí rovina [směr +Z]	trennebene [richtung +Z]
+Dělicí rovina kolmo na {0}: {1} mm podél směru (největší obvod průřezu {2} mm) – řez zobrazen	Trennebene senkrecht zu {0}: {1} mm entlang der Richtung (größter Querschnittsumfang {2} mm) – Schnitt angezeigt
+dělicí rovina: číslo bez významu – {0}	trennebene: Zahl ohne Bedeutung – {0}
+Dělicí rovina: Z = {0} mm (největší obvod průřezu {1} mm) – řez zobrazen	Trennebene: Z = {0} mm (größter Querschnittsumfang {1} mm) – Schnitt angezeigt
+Dělicí rovinu se nepodařilo navrhnout (těleso nemá ve směru {0} žádnou výšku).	Die Trennebene konnte nicht vorgeschlagen werden (der Körper hat in Richtung {0} keine Höhe).
+dokument nemá žádnou skicu k exportu DXF	das Dokument hat keine Skizze für den DXF-Export
+Dostatečný {0} % · Malý {1} % · Svislá stěna {2} % · Podkos {3} %	Ausreichend {0} % · Klein {1} % · Senkrechte Wand {2} % · Hinterschnitt {3} %
+Export skici „{0}“ ({1} entit) do DXF	Export der Skizze „{0}“ ({1} Elemente) als DXF
+formařské analýzy jako text: podíly úkosů a podkosy, nejtenčí stěna a místo, křivost; „zobrazit“ = barevná mapa v 3D okně (pro screenshot)	Formenbau-Analysen als Text: Anteile der Schrägen und Hinterschnitte, dünnste Wand und ihre Lage, Krümmung; „anzeigen“ = Farbkarte im 3D-Fenster (für screenshot)
+formařské nástroje: návrh dělicí roviny (nastaví řez), polohy vyhazovačů (díry do dílu / sestava s vyhazovači), chladicí okruh (vrty do dílu / sestava), smrštění jako měřítko	Formenbau-Werkzeuge: Vorschlag der Trennebene (setzt den Schnitt), Auswerferpositionen (Bohrungen ins Bauteil / Baugruppe mit Auswerfern), Kühlkreis (Bohrungen ins Bauteil / Baugruppe), Schwindung als Maßstab
+Chladicí okruh: {0} větví Ø{1} mm, hloubka osy {2} mm pod dutinou, přesah {3} mm, směr {4} – {5} vrtů, celková délka {6} mm	Kühlkreis: {0} Reihen Ø{1} mm, Achstiefe {2} mm unter der Kavität, Überstand {3} mm, Richtung {4} – {5} Bohrungen, Gesamtlänge {6} mm
+chlazení	kühlung
+chlazení [Ø8] [hloubka 15] [větve 4] [přesah 10] [směr +Z] [díl|sestava]	kühlung [ø8] [tiefe 15] [reihen 4] [überstand 10] [richtung +Z] [teil|baugruppe]
+chlazení: buď díl, nebo sestava	kühlung: entweder teil oder baugruppe
+chlazení: číslo „{0}“ bez významu – {1}	kühlung: Zahl „{0}“ ohne Bedeutung – {1}
+chlazení: hloubka musí být kladná	kühlung: die Tiefe muss positiv sein
+chlazení: počet větví musí být celé číslo 1 až 50	kühlung: die Anzahl der Reihen muss eine ganze Zahl von 1 bis 50 sein
+chlazení: průměr musí být kladný	kühlung: der Durchmesser muss positiv sein
+chlazení: přesah nesmí být záporný	kühlung: der Überstand darf nicht negativ sein
+importFile potřebuje {0}, {1} nebo File	importFile braucht {0}, {1} oder File
+importFile: chybí obsah souboru – {0} nebo {1}	importFile: der Dateiinhalt fehlt – {0} oder {1}
+importFile: volba as je auto | tab | component | sketch	importFile: die Option as ist auto | tab | component | sketch
+komponenta „{0}“ se ještě načítá	Komponente „{0}“ wird noch geladen
+komponenta „{0}“ v sestavě není – komponenty: {1}	Komponente „{0}“ ist nicht in der Baugruppe – Komponenten: {1}
+Křivost: min {0} · max {1} 1/mm{2}	Krümmung: min {0} · max {1} 1/mm{2}
+Načítání sestavy {0}	Laden der Baugruppe {0}
+Nastavení „{0}“ je text – zadáno {1}	Einstellung „{0}“ ist Text – angegeben {1}
+Nastavení „{0}“ je true / false – zadáno {1}	Einstellung „{0}“ ist true / false – angegeben {1}
+Nastavení „{0}“ má hodnoty {1} – zadáno {2}	Einstellung „{0}“ hat die Werte {1} – angegeben {2}
+Nastavení „{0}“ nelze měnit přes API – povolené klíče: {1}	Einstellung „{0}“ kann über die API nicht geändert werden – erlaubte Schlüssel: {1}
+Nastavení „defaultMaterial“ má hodnoty {0} – zadáno {1}	Einstellung „defaultMaterial“ hat die Werte {0} – angegeben {1}
+Nastavení „gridStep“ je krok mřížky skici v mm (0 = automaticky) – zadáno {0}	Einstellung „gridStep“ ist das Skizzenraster in mm (0 = automatisch) – angegeben {0}
+nelze vyhodit bez posuvných čelistí	ohne Schieber nicht entformbar
+neznámá akce „{0}“ – akce: {1}	unbekannte Aktion „{0}“ – Aktionen: {1}
+neznámé id výběru „{0}“ – F3, E2, V5, těleso, comp:Název, feature:Název, v sestavě Komponenta:F3	unbekannte Auswahl-ID „{0}“ – F3, E2, V5, körper, comp:Name, feature:Name, in einer Baugruppe Komponente:F3
+plocha F{0} v tělese není – plochy F1 až F{1} (popisky pro výběr / window.mncad.hints())	Fläche F{0} ist nicht im Körper – Flächen F1 bis F{1} (Auswahlbeschriftungen / window.mncad.hints())
+porovnání s referencí pracuje s dílem – otevřený dokument je sestava	der Vergleich mit einer Referenz arbeitet mit einem Bauteil – das geöffnete Dokument ist eine Baugruppe
+porovnání: díl nemá těleso	Vergleich: das Bauteil hat keinen Körper
+Prázdný dokument nelze sdílet – nejdřív vytvořte nebo otevřete díl.	Ein leeres Dokument kann nicht geteilt werden – erstellen oder öffnen Sie zuerst ein Bauteil.
+prvek „{0}“ v historii není – prvky: {1}	Element „{0}“ ist nicht im Verlauf – Elemente: {1}
+řez má jednu polohu – {0}	ein Schnitt hat eine Lage – {0}
+řez modelem rovinou kolmou na osu v poloze (mm, bez polohy střed modelu); obráceně = druhá strana; protokol vypíše rozsah modelu v ose	Modellschnitt mit einer Ebene senkrecht zur Achse an einer Lage (mm, ohne Lage die Modellmitte); umkehren = die andere Seite; das Protokoll nennt den Modellbereich entlang der Achse
+řez potřebuje osu, na kterou je rovina kolmá: {0}	schnitt braucht die Achse, zu der die Ebene senkrecht ist: {0}
+řez vyp nemá další volby – {0}	schnitt aus hat keine weiteren Optionen – {0}
+řez X|Y|Z [poloha] [obráceně] · řez vyp	schnitt X|Y|Z [versatz] [umkehren] · schnitt aus
+řez: díl nemá těleso	schnitt: das Bauteil hat keinen Körper
+řez: neznámé slovo „{0}“ – {1}	schnitt: unbekanntes Wort „{0}“ – {1}
+řez: v okně není žádný model	schnitt: im Fenster ist kein Modell
+screenshot potřebuje objekt voleb, např. {0}	screenshot braucht ein Optionsobjekt, z. B. {0}
+screenshot: {0} musí být 16 až 4096 px	screenshot: {0} muss 16 bis 4096 px sein
+screenshot: 3D okno nemá co vyfotit (žádný model nebo okno ještě není připravené)	screenshot: das 3D-Fenster hat nichts aufzunehmen (kein Modell oder das Fenster ist noch nicht bereit)
+screenshot: 3D okno není připravené	screenshot: das 3D-Fenster ist nicht bereit
+screenshot: background je white | current	screenshot: background ist white | current
+screenshot: display je {0}	screenshot: display ist {0}
+screenshot: explode je 0 až 3 (rozložení sestavy)	screenshot: explode ist 0 bis 3 (Explosion der Baugruppe)
+screenshot: není otevřená skica (target: "sketch")	screenshot: keine Skizze geöffnet (target: "sketch")
+screenshot: neznámá volba „{0}“ – volby: {1}	screenshot: unbekannte Option „{0}“ – Optionen: {1}
+screenshot: section je {0}	screenshot: section ist {0}
+screenshot: skicář není zobrazený	screenshot: der Skizzierer wird nicht angezeigt
+screenshot: target je auto | 3d | sketch	screenshot: target ist auto | 3d | sketch
+screenshot: view je {0}	screenshot: view ist {0}
+select potřebuje pole id, např. {0}	select braucht ein Array von IDs, z. B. {0}
+setSettings potřebuje objekt, např. {0}	setSettings braucht ein Objekt, z. B. {0}
+share: days je počet dní (např. 10) nebo null = bez omezení	share: days ist eine Anzahl Tage (z. B. 10) oder null = unbegrenzt
+share: mode je link | store	share: mode ist link | store
+share: view je model | drawing	share: view ist model | drawing
+skica „{0}“ je prázdná	Skizze „{0}“ ist leer
+skica „{0}“ v dokumentu není – skici: {1}	Skizze „{0}“ ist nicht im Dokument – Skizzen: {1}
+smrštění 0,5 (%) · smrštění ABS|PP|PA6…	schwindung 0,5 (%) · schwindung ABS|PP|PA6…
+smrštění se zadává v procentech (typicky 0,3 až 2,5): {0}	die Schwindung wird in Prozent angegeben (typisch 0,3 bis 2,5): {0}
+smrštění: díl nemá těleso – nejdřív vytvořte tvar	schwindung: das Bauteil hat keinen Körper – erstellen Sie zuerst eine Form
+smrštění: otevřený dokument je sestava – smrštění se přidává do dílu	schwindung: das geöffnete Dokument ist eine Baugruppe – die Schwindung wird einem Bauteil hinzugefügt
+smrštění: zadejte procenta nebo materiál ({0}) – {1}	schwindung: geben Sie Prozent oder ein Material an ({0}) – {1}
+snímek se nepodařilo načíst jako obrázek	die Aufnahme konnte nicht als Bild geladen werden
+snímek: prohlížeč nedovolil kreslit do plátna	Aufnahme: der Browser hat das Zeichnen in die Leinwand nicht erlaubt
+soubor {0} ({1} B, {2}) – data vrací window.mncad.action()	Datei {0} ({1} B, {2}) – die Daten liefert window.mncad.action()
+styl 3D okna (trvale, jako Zobrazení ▸ styl) a přizpůsobení pohledu; snímek pro agenta: window.mncad.screenshot()	Stil des 3D-Fensters (dauerhaft, wie Ansicht ▸ Stil) und Einpassen; Bild für den Agenten: window.mncad.screenshot()
+těleso	körper
+Tloušťka stěn: nejtenčí {0} mm{1} · průměr {2} mm · pod limitem {3} mm: {4} % vzorků	Wandstärke: dünnste {0} mm{1} · Mittel {2} mm · unter der Grenze {3} mm: {4} % der Proben
+Tloušťku stěn se nepodařilo změřit (otevřená síť nebo plochy bez tělesa).	Die Wandstärke konnte nicht gemessen werden (offenes Netz oder Flächen ohne Körper).
+Úkosy (směr vyhození {0}, min. {1}°): {2} – {3}	Formschrägen (Entformungsrichtung {0}, min. {1}°): {2} – {3}
+v sestavě pište komponentu: Komponenta:F3 (nebo comp:Název)	in einer Baugruppe die Komponente angeben: Komponente:F3 (oder comp:Name)
+výběr: díl nemá těleso	Auswahl: das Bauteil hat keinen Körper
+vyhazovače	auswerfer
+vyhazovače [Ø 6] [rozteč 60] [směr +Z] [díry|sestava]	auswerfer [ø 6] [teilung 60] [richtung +Z] [bohrungen|baugruppe]
+Vyhazovače: {0}× Ø{1} ve směru {2} – polohy {3}: {4}	Auswerfer: {0}× Ø{1} in Richtung {2} – Lagen {3}: {4}
+vyhazovače: buď díry, nebo sestava	auswerfer: entweder bohrungen oder baugruppe
+vyhazovače: číslo „{0}“ bez významu – {1}	auswerfer: Zahl „{0}“ ohne Bedeutung – {1}
+vyhazovače: průměr musí být kladný	auswerfer: der Durchmesser muss positiv sein
+vyhazovače: rozteč musí být kladná	auswerfer: die Teilung muss positiv sein
+Vyhazovače: žádný návrh (těleso je příliš malé).	Auswerfer: kein Vorschlag (der Körper ist zu klein).
+zobraz iso|přední|zadní|horní|spodní|levý|pravý · zobraz stínovaný|hrany|drátový|skryté|průhledný · zobraz přizpůsobit	ansicht iso|vorne|hinten|oben|unten|links|rechts · ansicht schattiert|kanten|drahtmodell|verdeckt|röntgen · ansicht einpassen
+zobraz: neznámé slovo „{0}“ – {1}	ansicht: unbekanntes Wort „{0}“ – {1}
+zobraz: neznámý pohled ani styl „{0}“ – {1}	ansicht: unbekannte Ansicht oder Stil „{0}“ – {1}

@@ -332,12 +332,19 @@ export function SoftViewport({ scene, toolbarExtra }: { scene: SoftScene; toolba
         const b = softBounds(itemsRef.current);
         return b ? { center: b.center, radius: b.radius } : { center: [0, 0, 0], radius: 100 };
       },
+      camera: () => ({ ...cam.current, angles: { ...cam.current.angles } }),
+      setCamera: (c) => {
+        if (!c || typeof c !== "object") return;
+        cam.current = { ...(c as SoftCam) };
+        setViewName(cam.current.view);
+        schedule();
+      },
     };
     setSoftView(handle);
     return () => {
       if (softView.current === handle) setSoftView(null);
     };
-  }, [fit, draw]);
+  }, [fit, draw, schedule]);
 
   const views: { v: SoftViewName; label: string }[] = [
     { v: "iso", label: tr("Izometrie") },

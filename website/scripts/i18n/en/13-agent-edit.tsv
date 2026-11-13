@@ -1,0 +1,152 @@
+# Úpravy existujícího modelu a skici textem (agent-edit.ts): upravit, potlačit / zapnout, smazat <prvek>, přejmenovat, přesunout, duplikovat,
+# zpět / znovu (historie), proměnná, konfigurace, skica "Skica 1", entita, smazat e3 / v1 / k1, kóta k1, odsadit, promítnout hrany, setDocument inPlace
+  aktivní: žádná (výchozí hodnoty proměnných)	  active: none (default variable values)
+  čísla vazeb a kót se přečíslovala – aktuální vypíše stav	  constraint and dimension numbers were renumbered – status lists the current ones
+ (pomocné)	 (construction)
+– víc kroků v historii není	– no more steps in the history
+, uzavřený	, closed
+„{0}“ čeká {1} čísel oddělených středníkem (dosud {2}), zadáno „{3}“	“{0}” expects {1} numbers separated by semicolons (currently {2}), given “{3}”
+„{0}“ čeká ano / ne	“{0}” expects yes / no
+„{0}“ čeká ano / ne (dosud {1}), zadáno „{2}“	“{0}” expects yes / no (currently {1}), given “{2}”
+„{0}“ čeká bod x;y (např. {0}=10;5)	“{0}” expects a point x;y (e.g. {0}=10;5)
+„{0}“ čeká body x1;y1;x2;y2;… (aspoň dva)	“{0}” expects points x1;y1;x2;y2;… (at least two)
+„{0}“ čeká číslo	“{0}” expects a number
+„{0}“ čeká číslo (dosud {1}), zadáno „{2}“	“{0}” expects a number (currently {1}), given “{2}”
+„{0}“ čeká kladné číslo	“{0}” expects a positive number
+„{0}“ nelze měnit	“{0}” cannot be changed
+„{0}“ není parametr prvku „{1}“ ({2}) – parametry: {3}	“{0}” is not a parameter of feature “{1}” ({2}) – parameters: {3}
+„{0}“ před prvkem „{1}“ není – {2}: {3}	“{0}” is not before feature “{1}” – {2}: {3}
+(bylo {0} → {1})	(was {0} → {1})
+(s entitami i vazby {0} a kóty {1})	(with the entities also {0} constraints and {1} dimensions)
+(zbývá zpět {0}, znovu {1})	(left: undo {0}, redo {1})
+{0} (kopie)	{0} (copy)
+{0} {1} → {2} ({3} podle pravidla „{4}“)	{0} {1} → {2} ({3} by rule “{4}”)
+{0} = {1} (= {2}) – vazba na proměnné	{0} = {1} (= {2}) – bound to variables
+{0} ve skice „{1}“ není – {2}	{0} is not in sketch “{1}” – {2}
+{0}: {1} – proměnné: {2}	{0}: {1} – variables: {2}
+⚠ „{0}“ je potlačený – změna se projeví po: zapnout "{0}"	⚠ “{0}” is suppressed – the change takes effect after: unsuppress "{0}"
+⚠ {0} zůstává potlačeno aktivní konfigurací „{1}“ – změníte: konfigurace "{1}" potlačit …	⚠ {0} stays suppressed by the active configuration “{1}” – change it with: config "{1}" suppress …
+⚠ aktivní konfigurace „{0}“ přepisuje {1} = {2} – výraz platí bez ní (konfigurace aktivní žádná)	⚠ the active configuration “{0}” overrides {1} = {2} – the expression applies without it (config active none)
+⚠ na {0} odkazují: {1} – teď skončí chybou proměnných; upravte je (proměnná …, upravit … klíč=číslo)	⚠ {1} refer to {0} – they now end with a variable error; fix them (variable …, edit … key=number)
+⚠ na smazané odkazují: {0} – po výpočtu nejspíš ✗; smažte je také, nebo je upravte (upravit …)	⚠ referring to the deleted: {0} – probably ✗ after the rebuild; delete them too or edit them (edit …)
+⚠ název „{0}“ má i jiný prvek – odkaz názvem vybere ten poslední; použijte jiný název nebo @pořadí	⚠ another feature is also named “{0}” – a reference by name picks the last one; use another name or @position
+✓ „{0}“ přesunut {1}(pozice {2} → {3})	✓ “{0}” moved {1}(position {2} → {3})
+✓ „{0}“ už je na pozici {1}	✓ “{0}” is already at position {1}
+✓ {0} duplikován jako „{1}“ (pozice {2})	✓ {0} duplicated as “{1}” (position {2})
+✓ aktivní konfigurace „{0}“: {1}	✓ active configuration “{0}”: {1}
+✓ aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací)	✓ active configuration: none (default variable values, nothing suppressed by a configuration)
+✓ do skici „{0}“ promítnuto ({1}): {2} úseček {3}{4}	✓ projected into sketch “{0}” ({1}): {2} lines {3}{4}
+✓ dokument „{0}“ ({1} prvků) nahradil otevřený dokument – jeden krok historie (zpět ho vrátí)	✓ document “{0}” ({1} features) replaced the open document – one history step (undo reverts it)
+✓ konfigurace „{0}“ smazána	✓ configuration “{0}” deleted
+✓ potlačeno: {0}	✓ suppressed: {0}
+✓ proměnná {0} smazána	✓ variable {0} deleted
+✓ přejmenováno: {0} → {1}	✓ renamed: {0} → {1}
+✓ skica „{0}“ je cílem dalších řádků (entity, vazby, kóty, entita, smazat e…, kóta k…) – {1}	✓ sketch “{0}” is the target of the next lines (entities, constraints, dimensions, entity, delete e…, dim k…) – {1}
+✓ smazáno: {0}	✓ deleted: {0}
+✓ už potlačeno: {0}	✓ already suppressed: {0}
+✓ už zapnuto: {0}	✓ already enabled: {0}
+✓ ve skice „{0}“ odsazeno o {1} mm {2}: {3} → nové entity {4}	✓ in sketch “{0}” offset by {1} mm {2}: {3} → new entities {4}
+✓ zapnuto: {0}	✓ enabled: {0}
+✓ ze skici „{0}“ smazáno: {1}{2}{3}	✓ deleted from sketch “{0}”: {1}{2}{3}
+✓ znovu {0} krok(ů)	✓ redo {0} step(s)
+✓ zpět o {0} krok(ů)	✓ undo {0} step(s)
+aktivujete: konfigurace aktivní "{0}"	activate with: config active "{0}"
+beze změn proti výchozímu stavu	no changes from the default
+dovnitř	inward
+duplikovat potřebuje prvek: duplikovat "Díra 1" [jako "Díra 2"]	duplicate needs a feature: duplicate "Hole 1" [as "Hole 2"]
+entit {0} (upravíte: skica "{1}" + entita e3 …)	{0} entities (edit with: sketch "{1}" + entity e3 …)
+entita {0} ({1}) nemá „{2}“ – lze: {3}	entity {0} ({1}) has no “{2}” – possible: {3}
+entita {0} má body p0–p{1}	entity {0} has points p0–p{1}
+entita {0} ve skice „{1}“: {2} = {3}{4}	entity {0} in sketch “{1}”: {2} = {3}{4}
+entita potřebuje id a klíč=hodnota: entita e3 cx=10 cy=5 r=4 · entita e1 a=0;0 b=60;0 · entita e2 pomocná=ano	entity needs an id and key=value: entity e3 cx=10 cy=5 r=4 · entity e1 a=0;0 b=60;0 · entity e2 construction=yes
+entitu {0} nelze odsadit o {1} mm (rozměr by zanikl)	entity {0} cannot be offset by {1} mm (a dimension would vanish)
+entity: {0}; vazby: {1}; kóty: {2}	entities: {0}; constraints: {1}; dimensions: {2}
+hrana {0} v tělese před skicou není – hran je {1} (E1 až E{1})	edge {0} is not in the body before the sketch – it has {1} edges (E1 to E{1})
+hrany v rovině skici	edges in the sketch plane
+id, typ a druh rozšíření prvku nelze měnit – smažte prvek a vytvořte nový	the id, type and extension kind of a feature cannot be changed – delete the feature and create a new one
+JSON záplata musí být objekt: upravit "Díra 1" {"diameter": 10}	the JSON patch must be an object: edit "Hole 1" {"diameter": 10}
+JSON záplatu nelze přečíst: {0}	cannot read the JSON patch: {0}
+konfigurace „{0}“ není – konfigurace: {1}	configuration “{0}” does not exist – configurations: {1}
+konfigurace „{0}“ upravena: {1}	configuration “{0}” updated: {1}
+konfigurace „{0}“ založena: {1}	configuration “{0}” created: {1}
+konfigurace "<název>" [proměnná=hodnota …] [potlačit <prvek>;<prvek>] · konfigurace aktivní "<název>"|žádná · konfigurace smazat "<název>" · konfigurace (výpis)	config "<name>" [variable=value …] [suppress <feature>;<feature>] · config active "<name>"|none · config delete "<name>" · config (list)
+Konfigurace ({0}): {1}	Configurations ({0}): {1}
+konfigurace: „{0}“ není ve tvaru proměnná=hodnota – {1}	config: “{0}” is not in the form variable=value – {1}
+Konfigurace: {0}	Configurations: {0}
+konfigurace: {0}={1}: {2}	config: {0}={1}: {2}
+konfigurace: proměnná „{0}“ není – proměnné: {1} (založíte: proměnná {0} = …)	config: variable “{0}” does not exist – variables: {1} (create it: variable {0} = …)
+Konfigurace: žádné – založíte: konfigurace "Krátká" t=10 [potlačit "Díra 1"]	Configurations: none – create one: config "Short" t=10 [suppress "Hole 1"]
+kopie prvku hned za originálem	copy of the feature right after the original
+kóta {0} ({1}) nezměněna – {2}	dimension {0} ({1}) not changed – {2}
+kóta {0} ve skice „{1}“ není – {2}	dimension {0} is not in sketch “{1}” – {2}
+kóta {0} ve skice „{1}“: {2} → {3}	dimension {0} in sketch “{1}”: {2} → {3}
+kóta {0}: referenční kóta jen měří – hodnotu nelze zadat zároveň s „referenční“	dim {0}: a reference dimension only measures – a value cannot be given together with “reference”
+kóta k1 65 (nová hodnota) · kóta k1 referenční · kóta k1 řídicí – čísla kót k1, k2… vypíše stav skici	dim k1 65 (new value) · dim k1 reference · dim k1 driving – the dimension numbers k1, k2… are listed by the sketch status
+kóty: {0}	dimensions: {0}
+kroky historie dokumentu jako Ctrl+Z / Ctrl+Y (jeden běh příkazů = jeden krok); také window.mncad.undo(n) / redo(n) / history()	document history steps like Ctrl+Z / Ctrl+Y (one command run = one step); also window.mncad.undo(n) / redo(n) / history()
+název nesmí být prázdný	the name must not be empty
+neplatný název proměnné „{0}“ – písmena, číslice, podtržítko; nesmí začínat číslicí	invalid variable name “{0}” – letters, digits, underscore; must not start with a digit
+odsadit e1 [e2 …] <vzdálenost> [ven|dovnitř|vlevo|vpravo] [řetězec]	offset e1 [e2 …] <distance> [out|in|left|right] [chain]
+odsazení entity nebo navazujícího řetězce úseček a oblouků; průmět hran modelu (tělesa před skicou) do roviny skici – E čísla jako popisky pro výběr	offset of an entity or of a connected chain of lines and arcs; projection of model edges (body before the sketch) into the sketch plane – E numbers as the selection labels
+Parametry „{0}“ ({1}): {2}	Parameters of “{0}” ({1}): {2}
+počet kroků musí být aspoň 1	the number of steps must be at least 1
+počet stran mnohoúhelníku je celé číslo aspoň 3	the number of polygon sides is a whole number of at least 3
+pomocná	construction
+potlačeno: {0}	suppressed: {0}
+potlačí / zapne prvky historie (potlačený prvek se nestaví)	suppresses / enables history features (a suppressed feature is not built)
+potlačit potřebuje prvek: potlačit "Díra 1" ["Pole 1" …]	suppress needs a feature: suppress "Hole 1" ["Pattern 1" …]
+proměnná „{0}“ není – proměnné: {1}	variable “{0}” does not exist – variables: {1}
+proměnná {0} = {1} → {2}	variable {0} = {1} → {2}
+proměnná {0} = {1}: {2} – proměnné: {3}	variable {0} = {1}: {2} – variables: {3}
+proměnná <název> = <výraz> [poznámka "…"] · proměnná smazat <název> · proměnné (výpis)	variable <name> = <expression> [note "…"] · variable delete <name> · variables (list)
+Proměnné ({0}): {1}	Variables ({0}): {1}
+proměnné dílu (rovnice): přidat / změnit výraz, smazat, výpis s hodnotami a chybami; parametr na ni navážete: upravit "Vysunutí 1" distance==h*2	part variables (equations): add / change the expression, delete, list with values and errors; bind a parameter to one: edit "Extrude 1" distance==h*2
+Proměnné: žádné – založíte: proměnná d = 20	Variables: none – create one: variable d = 20
+promítnout hrany E3;E7 | vše | rovina [pomocné] – E čísla jako popisky pro výběr (hrany tělesa před skicou)	project edges E3;E7 | all | plane [construction] – E numbers as the selection labels (edges of the body before the sketch)
+promítnutí hran potřebuje jádro (v konzoli programu)	projecting edges needs the kernel (in the program console)
+průmět hran do skici „{0}“ je prázdný (hrany kolmé na rovinu skici)	the projection of edges into sketch “{0}” is empty (edges perpendicular to the sketch plane)
+prvek nelze přesunout vůči sobě samému	a feature cannot be moved relative to itself
+prvky	features
+před „{0}“	before “{0}”
+před prvkem „{0}“ není těleso – plochy a hrany zadejte čísly	there is no body before feature “{0}” – give faces and edges by number
+před skicou „{0}“ není těleso – není co promítnout	there is no body before sketch “{0}” – nothing to project
+přejmenovat potřebuje prvek a nový název: přejmenovat "Díra 1" na "Díra M8"	rename needs a feature and a new name: rename "Hole 1" to "M8 hole"
+přejmenuje prvek historie	renames a history feature
+přesunout „{0}“ na pozici {1} nelze: „{2}“ používá „{3}“ ({4}) – použitý prvek musí zůstat v historii před prvkem, který ho používá	cannot move “{0}” to position {1}: “{2}” uses “{3}” ({4}) – a used feature must stay in the history before the feature that uses it
+přesunout potřebuje prvek a místo: přesunout "Díra 1" před|za "Vysunutí 2" · přesunout "Díra 1" nahoru|dolů [N] · přesunout "Díra 1" na začátek|konec	move needs a feature and a place: move "Hole 1" before|after "Extrude 2" · move "Hole 1" up|down [N] · move "Hole 1" to start|end
+referenční kóta se stala řídicí	the reference dimension became driving
+řešič nenašel řešení – hodnota nejde s dosavadními vazbami splnit	the solver found no solution – the value cannot be met with the existing constraints
+řetězec {0} ({1} úseků{2})	chain {0} ({1} segments{2})
+řetězec {0} nelze odsadit o {1} mm (oblouk by zanikl)	chain {0} cannot be offset by {1} mm (an arc would vanish)
+řetězec začíná úsečkou nebo obloukem – {0} je {1}	a chain starts with a line or an arc – {0} is {1}
+skica „{0}“ v dokumentu není – skici: {1}	sketch “{0}” is not in the document – sketches: {1}
+skici	sketches
+skicu by přeurčila (v rozporu s vazbami a kótami, nebo nadbytečná)	it would over-define the sketch (in conflict with the constraints and dimensions, or redundant)
+smaže konkrétní prvky; protokol vypíše prvky, které na ně odkazovaly (po výpočtu jejich ✗); „smazat“ bez prvku = poslední prvek	deletes specific features; the log lists features that referred to them (their ✗ after the rebuild); “delete” without a feature = the last feature
+stavy dílu (varianty): hodnoty proměnných a potlačené prvky; založí / přepíše, aktivuje, smaže, vypíše	part configurations (variants): variable values and suppressed features; create / overwrite, activate, delete, list
+střed	center
+u uzavřeného tvaru zadejte stranu ven / dovnitř	for a closed shape give the side out / in
+úprava skici: souřadnice / rozměry / pomocná entity (cx, cy, r, průměr, a=x;y, b=…, w, h, úhel, pomocná=ano), smazání entit (i s jejich vazbami a kótami), vazeb v1… a kót k1… (čísla vypíše stav), hodnota kóty a řídicí ↔ referenční; po řádku se skica vyřeší	sketch editing: coordinates / sizes / construction flag of an entity (cx, cy, r, diameter, a=x;y, b=…, w, h, angle, construction=yes), deleting entities (with their constraints and dimensions), constraints v1… and dimensions k1… (numbers listed by status), dimension value and driving ↔ reference; the sketch is solved after the line
+upravit potřebuje prvek a změny: upravit "Díra 1" diameter=10 depth=12 · upravit $last edges=svislé · upravit "Pole 1" {"count": 6}	edit needs a feature and changes: edit "Hole 1" diameter=10 depth=12 · edit $last edges=vertical · edit "Pattern 1" {"count": 6}
+vazba {0} = {1} zrušena	binding {0} = {1} removed
+vazbu na proměnné lze zadat jen u číselného parametru – „{0}“ je {1}	a variable binding is possible only for a numeric parameter – “{0}” is {1}
+Vazby parametrů: {0}	Parameter bindings: {0}
+vazby: {0}	constraints: {0}
+ven	outward
+vlevo	to the left
+vpravo	to the right
+vrcholy zadejte čísly (V3 nebo indexy) – pravidlo umí jen plochy a hrany	give vertices by number (V3 or indices) – rules work only for faces and edges
+všechny hrany	all edges
+výběr pravidlem potřebuje jádro (v konzoli programu)	selection by rule needs the kernel (in the program console)
+výraz „{0}“ neobsahuje proměnnou – číslo zadejte bez „=“ ({1}={0})	the expression “{0}” contains no variable – give a number without “=” ({1}={0})
+zapnout potřebuje prvek: zapnout "Díra 1" ["Pole 1" …]	unsuppress needs a feature: unsuppress "Hole 1" ["Pattern 1" …]
+změní parametry existujícího prvku na místě (prvek = název v uvozovkách, id, $last nebo @3 = 3. prvek historie); klíče jako u příkazu prvek, u rozšíření i popisek; plochy / hrany čísly, E7 / F3 nebo pravidlem nad tělesem před prvkem; „==výraz“ naváže parametr na proměnné, číslo vazbu zruší; bez klíčů vypíše parametry	changes the parameters of an existing feature in place (feature = name in quotes, id, $last or @3 = 3rd history feature); keys as with the feature command, for extensions also the label; faces / edges by number, E7 / F3 or by rule on the body before the feature; “==expression” binds the parameter to variables, a number removes the binding; without keys it lists the parameters
+změní pořadí v historii; skica (použitý prvek) musí zůstat před prvky, které ji používají – jinak ✗ s důvodem	changes the order in the history; a sketch (used feature) must stay before the features that use it – otherwise ✗ with the reason
+znovu [N] – N = počet kroků historie (výchozí 1)	redo [N] – N = number of history steps (default 1)
+znovu otevře existující skicu jako cíl dalších řádků (entity, vazby, kóty, entita, smazat e3, kóta k1)	reopens an existing sketch as the target of the next lines (entities, constraints, dimensions, entity, delete e3, dim k1)
+znovu: není co obnovit (žádný vrácený krok)	redo: nothing to restore (no undone step)
+zpět [N] – N = počet kroků historie (výchozí 1); poslední prvek smaže „smazat poslední“	undo [N] – N = number of history steps (default 1); “delete last” deletes the last feature
+zpět / znovu provádí aplikace (historie dokumentu)	undo / redo is done by the application (document history)
+zpět: historie je prázdná – není co vrátit	undo: the history is empty – nothing to undo
+žádná hrana modelu neleží v rovině skici „{0}“ – zadejte hrany čísly (promítnout hrany E3;E7) nebo vše	no model edge lies in the plane of sketch “{0}” – give edges by number (project edges E3;E7) or all
+žádné (založíte: proměnná d = 20)	none (create one: variable d = 20)

@@ -13,6 +13,9 @@ export type SoftViewHandle = {
   /** snímek náhledu jako data URL (PNG) */
   snapshot: () => string | null;
   bounds: () => { center: Vec3; radius: number };
+  /** stav kamery a jeho obnovení (snímek pro agenta vrátí dočasný pohled zpět) */
+  camera?: () => unknown;
+  setCamera?: (c: unknown) => void;
 };
 
 /** Aktivní softwarový náhled hlavního 3D okna; null = kreslí WebGL. */

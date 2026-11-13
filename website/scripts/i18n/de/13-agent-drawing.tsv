@@ -1,0 +1,182 @@
+# Výkres textem pro agenty: listy, razítko, revize, značky, ruční kóty, úpravy, detaily, modely, export (vlna 6, drawing)
+  detail {0} (z pohledu {1}, střed {2}, r {3}, {4}){5}	  Einzelheit {0} (aus Ansicht {1}, Mitte {2}, r {3}, {4}){5}
+  {0}{1}: x {2}…{3}, y {4}…{5} mm · {6} · na listu x {7}…{8}, y {9}…{10}	  {0}{1}: x {2}…{3}, y {4}…{5} mm · {6} · auf dem Blatt x {7}…{8}, y {9}…{10}
+ (celý)	 (voll)
+ (list {0}/{1})	 (Blatt {0}/{1})
+ (odsazení {0})	 (Versatz {0})
+ (poloviční)	 (Halbschnitt)
+ (posun {0} {1})	 (Verschiebung {0} {1})
+ (text: v x y v mm listu)	 (Text: bei x y in Blatt-mm)
+ · list {0}	 · Blatt {0}
+ · na listu x {0}…{1}, y {2}…{3}	 · auf dem Blatt x {0}…{1}, y {2}…{3}
+ · není na listu	 · nicht auf dem Blatt
+! kóta přesahuje rámeček listu – zmenšete odsazení: výkres upravit {0} odsazení=…	! das Maß ragt über den Blattrahmen – Versatz verkleinern: zeichnung bearbeiten {0} versatz=…
+! popisek se překrývá s „{0}“ – posuňte ho: výkres upravit {1} posun="dx dy" (mm listu)	! die Beschriftung überdeckt „{0}“ – verschieben: zeichnung bearbeiten {1} verschiebung="dx dy" (Blatt-mm)
+! přesahuje rámeček listu	! ragt über den Blattrahmen
+! text kóty se překrývá s „{0}“ – změňte odsazení: výkres upravit {1} odsazení=…	! der Maßtext überdeckt „{0}“ – Versatz ändern: zeichnung bearbeiten {1} versatz=…
+! text se překrývá s „{0}“	! der Text überdeckt „{0}“
+! značka přesahuje rámeček listu – posuňte ji: výkres upravit {0} posun="dx dy"	! das Symbol ragt über den Blattrahmen – verschieben: zeichnung bearbeiten {0} verschiebung="dx dy"
+auto	auto
+balónky	Positionsnummern
+balónky ano|ne	positionsnummern ja|nein
+bez balónků	ohne Positionsnummern
+bez kusovníku	ohne Stückliste
+bod geometrie	Geometriepunkt
+bod {0} je mimo pohled {1} (x {2}…{3}, y {4}…{5} mm) – rozsahy ukáže výkres stav	Punkt {0} liegt außerhalb der Ansicht {1} (x {2}…{3}, y {4}…{5} mm) – die Bereiche zeigt zeichnung status
+bod {0} leží mimo kruh detailu {1} (střed {2}, r {3})	Punkt {0} liegt außerhalb des Kreises der Einzelheit {1} (Mitte {2}, r {3})
+celý	voll
+chybí pohled – přední, horní, levý, pravý, zadní, spodní, iso, řez, detail A nebo "název modelu"	Ansicht fehlt – vorne, oben, links, rechts, hinten, unten, iso, schnitt, einzelheit A oder "Modellname"
+Další modely: {0}	Weitere Modelle: {0}
+další volby listu: otočení hlavního pohledu, poloviční řez, kusovník nad razítkem, pozice komponent; kóty „Auto + Ø“ zapečené do pohledů	weitere Blattoptionen: Drehung der Hauptansicht, Halbschnitt, Stückliste über dem Schriftfeld, Positionsnummern; Maße „Auto + Ø“ fest in den Ansichten
+detail se vytváří z pohledu, ne z jiného detailu	eine Einzelheit entsteht aus einer Ansicht, nicht aus einer anderen Einzelheit
+detail {0}	Einzelheit {0}
+detail {0} na listu není – detaily: {1}	Einzelheit {0} ist nicht auf dem Blatt – Einzelheiten: {1}
+detail: měřítko je číslo, např. 2:1	Einzelheit: der Maßstab ist eine Zahl, z. B. 2:1
+detail: nečekané „{0}“ – {1}	Einzelheit: unerwartetes „{0}“ – {1}
+detail: zadejte poloměr kruhu detailu – poloměr r (mm modelu)	Einzelheit: Radius des Kreises angeben – radius r (Modell-mm)
+detail: zadejte písmeno detailu, např. pohled detail A v 2 3	Einzelheit: Buchstaben angeben, z. B. ansicht einzelheit A bei 2 3
+detail: zadejte střed – v x y (mm modelu v rovině pohledu)	Einzelheit: Mitte angeben – bei x y (Modell-mm in der Ansichtsebene)
+detailní pohled (střed v mm modelu, umístění středu v mm listu) a další modely na listu (komponenta sestavy nebo otevřená záložka)	Einzelheit (Mitte in Modell-mm, Platzierung der Mitte in Blatt-mm) und weitere Modelle auf dem Blatt (Baugruppenkomponente oder offener Tab)
+Dokument zatím nemá výkres – export prvního listu: bez „sheet“ nebo sheet 1.	Das Dokument hat noch keine Zeichnung – Export des ersten Blatts: ohne „sheet“ oder sheet 1.
+drsnost: zadejte hodnotu, např. výkres značka drsnost Ra 1,6 na Ø40	Rauheit: Wert angeben, z. B. zeichnung symbol rauheit Ra 1,6 an Ø40
+geometrická tolerance: charakteristika {0} – neznámé „{1}“	Form- und Lagetoleranz: Eigenschaft {0} – unbekannt „{1}“
+geometrická tolerance: za charakteristikou zadejte hodnotu, např. tolerance kolmost 0,02 A na Ø40	Form- und Lagetoleranz: nach der Eigenschaft den Wert angeben, z. B. form rechtwinkligkeit 0,02 A an Ø40
+geometrická tolerance: základna je písmeno (A, B, A-B) – „{0}“	Form- und Lagetoleranz: der Bezug ist ein Buchstabe (A, B, A-B) – „{0}“
+hrana	Kante
+Id (výkres upravit / smazat / značka na <id>): {0}	Ids (zeichnung bearbeiten / löschen / symbol an <id>): {0}
+izometrie nemá souřadnice pro značky a kóty – použijte pravoúhlý pohled ({0}) nebo místo na listu	die Isometrie hat keine Koordinaten für Symbole und Maße – verwenden Sie eine Normalansicht ({0}) oder eine Stelle auf dem Blatt
+kusovník	Stückliste
+kusovník ano|ne	stückliste ja|nein
+Kusovník CSV je jen u sestavy s komponentami – díl kusovník nemá.	Die Stückliste als CSV gibt es nur bei einer Baugruppe mit Komponenten – ein Teil hat keine Stückliste.
+kusovník nad razítkem	Stückliste über dem Schriftfeld
+kóta svisle: body mají stejné y – svislá vzdálenost je nulová	senkrechtes Maß: die Punkte haben dasselbe y – der senkrechte Abstand ist null
+kóta vodorovně: body mají stejné x – vodorovná vzdálenost je nulová	waagerechtes Maß: die Punkte haben dasselbe x – der waagerechte Abstand ist null
+kóta {0} ({1}, {2})	Maß {0} ({1}, {2})
+kóta {0}: zadejte střed kružnice – střed x y (mm modelu v rovině pohledu)	Maß {0}: Kreismitte angeben – mitte x y (Modell-mm in der Ansichtsebene)
+kóta úhel: hrana má nulovou délku	Winkelmaß: eine Kante hat die Länge null
+kóta úhel: hrany jsou rovnoběžné – pro jejich vzdálenost použijte kótu šikmo / vodorovně / svisle	Winkelmaß: die Kanten sind parallel – für ihren Abstand ein schräges / waagerechtes / senkrechtes Maß verwenden
+kóta úhel: zadejte dvě hrany osmi čísly – x1 y1 x2 y2 x3 y3 x4 y4 (mm modelu v rovině pohledu)	Winkelmaß: zwei Kanten mit acht Zahlen angeben – x1 y1 x2 y2 x3 y3 x4 y4 (Modell-mm in der Ansichtsebene)
+kóta šikmo: body splývají	schräges Maß: die Punkte fallen zusammen
+kóta: nečekané „{0}“ – {1}	Maß: unerwartetes „{0}“ – {1}
+kóta: odsazení musí být číslo	Maß: der Versatz muss eine Zahl sein
+kóta: zadejte dva body čtyřmi čísly – x1 y1 x2 y2 (mm modelu v rovině pohledu)	Maß: zwei Punkte mit vier Zahlen angeben – x1 y1 x2 y2 (Modell-mm in der Ansichtsebene)
+kótovat [chytře|celkově|základní|nic] [řetězově|od základny] – neznámé slovo „{0}“	bemaßen [intelligent|gesamt|einfach|keine] [kette|basis] – unbekanntes Wort „{0}“
+Kóty a poznámky bez geometrie: {0}	Maße und Anmerkungen ohne Geometrie: {0}
+kóty se zadávají v pohledu, ne v detailu – použijte pohled, ze kterého je detail	Maße werden in einer Ansicht angegeben, nicht in einer Einzelheit – verwenden Sie die Ansicht, aus der die Einzelheit stammt
+list {0}	Blatt {0}
+list {0} neexistuje – {1}; nový list: výkres list nový "název"	Blatt {0} existiert nicht – {1}; neues Blatt: zeichnung blatt neu "Name"
+list „{0}“ už existuje – {1}	Blatt „{0}“ existiert bereits – {1}
+Listy ({0}): {1}	Blätter ({0}): {1}
+listy výkresu: další příkazy výkresu pracují s vybraným listem a výkres se otevře na něm; „výkres list A3“ dál znamená formát	Zeichnungsblätter: weitere Zeichnungsbefehle arbeiten mit dem gewählten Blatt und die Zeichnung öffnet sich darauf; „zeichnung blatt A3“ bedeutet weiterhin das Format
+Listy: zatím žádný (první vznikne příkazem výkresu)	Blätter: noch keines (das erste entsteht durch einen Zeichnungsbefehl)
+model „{0}“ na listu není – modely: {1}	Modell „{0}“ ist nicht auf dem Blatt – Modelle: {1}
+Neznámá verze DWG „{0}“ – {1}	Unbekannte DWG-Version „{0}“ – {1}
+neznámá volba výkresu „{0}“ – volby: A4…A0, na šířku / na výšku, {1}; podpříkazy: tolerance, poznámka, nepředepsané, hrany, drsnost, list, razítko, revize, značka, kóta, upravit, smazat, detail, model, stav	unbekannte Zeichnungsoption „{0}“ – Optionen: A4…A0, quer / hoch, {1}; Unterbefehle: toleranz, notiz, allgemein, kanten, rauheit, blatt, schriftfeld, änderung, symbol, maß, bearbeiten, löschen, einzelheit, modell, status
+Neznámý formát výkresu „{0}“ – pdf, dxf, dwg, svg, csv, png.	Unbekanntes Zeichnungsformat „{0}“ – pdf, dxf, dwg, svg, csv, png.
+název listu nesmí být prázdný	der Blattname darf nicht leer sein
+otočení 0|90|180|270	drehung 0|90|180|270
+otočení hlavního pohledu: 0, 90, 180 nebo 270 (°)	Drehung der Hauptansicht: 0, 90, 180 oder 270 (°)
+otočení {0}°	Drehung {0}°
+PNG výkresu jde vytvořit jen v prohlížeči.	Das PNG der Zeichnung lässt sich nur im Browser erstellen.
+PNG výkresu se nepodařilo vytvořit.	Das PNG der Zeichnung konnte nicht erstellt werden.
+pohled „{0}“ na listu není – pohledy: {1}	Ansicht „{0}“ ist nicht auf dem Blatt – Ansichten: {1}
+poloviční	halb
+posun	verschiebung
+pozice komponent (balónky)	Positionsnummern der Komponenten
+poznámka potřebuje text: výkres značka poznámka "Kalit 58 HRC" na Ø40	ein Hinweis braucht einen Text: zeichnung symbol hinweis "Härten 58 HRC" an Ø40
+Prohlížeč nepodporuje kreslení do canvasu.	Der Browser unterstützt das Zeichnen in ein Canvas nicht.
+přichyceno ke geometrii	an Geometrie gefangen
+razítko listu (číslo, kreslil a revize i do vlastností dokumentu, materiál do označení materiálu) a tabulka revizí	Schriftfeld des Blatts (Nummer, Ersteller und Index auch in die Dokumenteigenschaften, Werkstoff in die Werkstoffbezeichnung) und Änderungstabelle
+Razítko: název {0} · číslo {1} · kreslil {2} · revize {3} · datum {4} · materiál {5}	Schriftfeld: Benennung {0} · Nummer {1} · Ersteller {2} · Index {3} · Datum {4} · Werkstoff {5}
+Revize ({0}): {1}	Änderungen ({0}): {1}
+revize {0} v tabulce není – revize: {1}	Änderung {0} ist nicht in der Tabelle – Änderungen: {1}
+Revize: žádné	Änderungen: keine
+ruční kóta (nástroj Kóta): body v mm modelu v rovině pohledu, přichytí se ke koncům hran a kružnicím; konce jedné hrany = kóta hrany	manuelles Maß (Werkzeug Maß): Punkte in Modell-mm in der Ansichtsebene, gefangen an Kantenenden und Kreisen; beide Enden einer Kante = Kantenmaß
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, {0} × {1}):	Koordinaten (für „ansicht … bei x y“ und Maße: Modell-mm in der Ansichtsebene, y nach oben; Blatt: mm von der linken unteren Ecke, {0} × {1}):
+stav vybraného nebo všech listů: přehled listů, souřadnice pohledů pro značky a kóty, id kót a značek (a1…), razítko a revize; také window.mncad.drawingStatus({ sheet }) a export bez dialogu window.mncad.exportDrawing("pdf"|"dxf"|"dwg"|"svg"|"csv"|"png")	Status des gewählten oder aller Blätter: Blattübersicht, Ansichtskoordinaten für Symbole und Maße, Ids der Maße und Symbole (a1…), Schriftfeld und Änderungen; auch window.mncad.drawingStatus({ sheet }) und Export ohne Dialog window.mncad.exportDrawing("pdf"|"dxf"|"dwg"|"svg"|"csv"|"png")
+střed	Mitte
+střed detailu	Mitte der Einzelheit
+střed detailu {0} je mimo pohled {1} – rozsahy ukáže výkres stav	Mitte der Einzelheit {0} liegt außerhalb der Ansicht {1} – die Bereiche zeigt zeichnung status
+text se umisťuje na list: výkres značka text "…" v x y (mm listu od levého dolního rohu)	Text wird auf dem Blatt platziert: zeichnung symbol text "…" bei x y (Blatt-mm von der linken unteren Ecke)
+text: výkres značka text "Kalit 58 HRC" v 20 30 [výška 5] (mm listu od levého dolního rohu)	Text: zeichnung symbol text "Härten 58 HRC" bei 20 30 [höhe 5] (Blatt-mm von der linken unteren Ecke)
+umístit	platzieren
+v bodě {0} je více kružnic (R {1}) – zadejte r	an {0} liegen mehrere Kreise (R {1}) – r angeben
+v pohledu {0} není kružnice se středem {1}{2} – kružnice: {3}	in der Ansicht {0} gibt es keinen Kreis mit Mitte {1}{2} – Kreise: {3}
+volby listu výkresu (aktivní list – výkres list N; jinak první) a otevření výkresu; nové výkresy mají Chytré kóty	Blattoptionen der Zeichnung (aktives Blatt – zeichnung blatt N; sonst das erste) und Öffnen der Zeichnung; neue Zeichnungen nutzen die intelligente Bemaßung
+Volby: {0}	Optionen: {0}
+volné body	freie Punkte
+volný bod	freier Punkt
+výkres detail <pohled> v x y poloměr r [měřítko 2:1] [umístit x y] · výkres detail <písmeno> měřítko 4:1 | umístit x y · výkres detail smazat <písmeno>	zeichnung einzelheit <ansicht> bei x y radius r [maßstab 2:1] [platzieren x y] · zeichnung einzelheit <buchstabe> maßstab 4:1 | platzieren x y · zeichnung einzelheit löschen <buchstabe>
+výkres kóta vodorovně|svisle|šikmo pohled <p> x1 y1 x2 y2 · kóta průměr|poloměr pohled <p> střed x y [r R] [úhel 45] · kóta úhel pohled <p> x1 y1 x2 y2 x3 y3 x4 y4 – [odsazení 10] [text "…"]	zeichnung maß waagerecht|senkrecht|schräg ansicht <a> x1 y1 x2 y2 · maß durchmesser|radius ansicht <a> mitte x y [r R] [winkel 45] · maß winkel ansicht <a> x1 y1 x2 y2 x3 y3 x4 y4 – [versatz 10] [text "…"]
+výkres list <číslo|"název"> · výkres list nový ["název"] · výkres list přejmenovat [<číslo>] "název" · výkres list smazat <číslo|"název">	zeichnung blatt <nummer|"name"> · zeichnung blatt neu ["name"] · zeichnung blatt umbenennen [<nummer>] "name" · zeichnung blatt löschen <nummer|"name">
+výkres model "<komponenta|záložka>" [pohled horní] [měřítko 1:2|auto] · výkres model smazat "<název>"	zeichnung modell "<komponente|tab>" [ansicht oben] [maßstab 1:2|auto] · zeichnung modell löschen "<name>"
+výkres má jen jeden list – ten smazat nelze	die Zeichnung hat nur ein Blatt – es kann nicht gelöscht werden
+výkres razítko název="…" číslo="…" kreslil="…" revize="…" datum="…" materiál="…" [nepředepsané="…" hrany="…" poznámka="…"] – neznámé „{0}“	zeichnung schriftfeld benennung="…" nummer="…" ersteller="…" revision="…" datum="…" werkstoff="…" [allgemeintoleranz="…" kanten="…" hinweis="…"] – unbekannt „{0}“
+výkres revize <znak> "popis změny" [datum 13.11.2026] [kreslil "…"] · výkres revize smazat <znak>	zeichnung änderung <zeichen> "Änderungsbeschreibung" [datum 13.11.2026] [ersteller "…"] · zeichnung änderung löschen <zeichen>
+výkres smazat <id|popisek> [další id…] · výkres smazat vlastní · výkres smazat vše	zeichnung löschen <id|beschriftung> [weitere Ids…] · zeichnung löschen eigene · zeichnung löschen alle
+výkres stav [list <číslo|"název">|vše]	zeichnung status [blatt <nummer|"name">|alle]
+výkres upravit <id|popisek> odsazení=8 text="…" přípona="…" [hodnota=… základna=… výška=… posun="dx dy"]	zeichnung bearbeiten <id|beschriftung> versatz=8 text="…" suffix="…" [wert=… bezug=… höhe=… verschiebung="dx dy"]
+výkres upravit: neznámé „{0}=“ – {1}	zeichnung bearbeiten: unbekannt „{0}=“ – {1}
+výkres upravit: posun="dx dy" (mm listu, y nahoru), např. posun="5 -3"	zeichnung bearbeiten: verschiebung="dx dy" (Blatt-mm, y nach oben), z. B. verschiebung="5 -3"
+výkres upravit: {0} musí být číslo	zeichnung bearbeiten: {0} muss eine Zahl sein
+výkres značka poznámka "text" | drsnost Ra 1,6 | tolerance kolmost 0,02 A | základna A | text "…" v x y [výška 5] – cíl: na <kóta> | pohled <přední…> v x y; [posun dx dy]	zeichnung symbol hinweis "Text" | rauheit Ra 1,6 | form rechtwinkligkeit 0,02 A | bezug A | text "…" bei x y [höhe 5] – Ziel: an <maß> | ansicht <vorne…> bei x y; [verschiebung dx dy]
+značka se váže na kótu nebo popis	ein Symbol bezieht sich auf ein Maß oder eine Beschriftung
+značka: chybí cíl – na <kóta> (např. na Ø40, na a3) nebo pohled přední v x y{0}	Symbol: Ziel fehlt – an <maß> (z. B. an Ø40, an a3) oder ansicht vorne bei x y{0}
+značka: nečekané „{0}“ za bodem	Symbol: unerwartetes „{0}“ nach dem Punkt
+značka: za pohledem zadejte bod – pohled přední v x y (mm modelu v rovině pohledu)	Symbol: nach der Ansicht einen Punkt angeben – ansicht vorne bei x y (Modell-mm in der Ansichtsebene)
+značka: za „na“ zadejte kótu – popisek (Ø40, 25, M8) nebo id (a3) z výkres stav	Symbol: nach „an“ ein Maß angeben – Beschriftung (Ø40, 25, M8) oder Id (a3) aus zeichnung status
+značky jako nástroje výkresu: cíl „na <kóta>“ (popisek nebo id a3) nebo „pohled přední v x y“ (mm modelu v rovině pohledu, přichytí se ke geometrii); text v mm listu od levého dolního rohu	Symbole wie die Zeichenwerkzeuge: Ziel „an <maß>“ (Beschriftung oder Id a3) oder „ansicht vorne bei x y“ (Modell-mm in der Ansichtsebene, an Geometrie gefangen); Text in Blatt-mm von der linken unteren Ecke
+základna: písmeno A, B, C… – „{0}“	Bezug: Buchstabe A, B, C… – „{0}“
+{0} na listu není – id jsou a1…a{1} (výkres stav)	{0} ist nicht auf dem Blatt – Ids sind a1…a{1} (zeichnung status)
+{0} nelze u {1} upravit – lze: {2}	{0} lässt sich bei {1} nicht bearbeiten – möglich: {2}
+{0} není kóta ani popis – značka se váže na kótu	{0} ist weder ein Maß noch eine Beschriftung – ein Symbol bezieht sich auf ein Maß
+{0}: čekám dvě čísla (x y), např. {0} 10 5	{0}: zwei Zahlen erwartet (x y), z. B. {0} 10 5
+úprava a mazání kót a značek podle id z výkres stav (a1, a2…) nebo popisku; smazané vygenerované kóty se při přegenerování nevrátí	Maße und Symbole bearbeiten und löschen per Id aus zeichnung status (a1, a2…) oder Beschriftung; gelöschte generierte Maße kehren beim Neugenerieren nicht zurück
+řez {0} {1}	Schnitt {0} {1}
+„{0}“ na listu není – {1}	„{0}“ ist nicht auf dem Blatt – {1}
+„{0}“ není jednoznačné ({1}×: {2}) – zadejte id	„{0}“ ist nicht eindeutig ({1}×: {2}) – geben Sie die Id an
+„{0}“ není komponenta sestavy ani otevřená záložka – k dispozici: {1}	„{0}“ ist weder eine Baugruppenkomponente noch ein offener Tab – verfügbar: {1}
+⚠ detail {0} uložen, ale na listu není: {1}	⚠ Einzelheit {0} gespeichert, aber nicht auf dem Blatt: {1}
+⚠ model „{0}“ uložen, ale na listu není: {1}	⚠ Modell „{0}“ gespeichert, aber nicht auf dem Blatt: {1}
+✓ detail {0} (pohled {1}, střed {2}, r {3}, {4}) – na listu x {5}…{6}, y {7}…{8}	✓ Einzelheit {0} (Ansicht {1}, Mitte {2}, r {3}, {4}) – auf dem Blatt x {5}…{6}, y {7}…{8}
+✓ detail {0} smazán	✓ Einzelheit {0} gelöscht
+✓ kóta {0} ({1}) · {2}	✓ Maß {0} ({1}) · {2}
+✓ kóty: Auto + Ø – základní kóty zapečené do pohledů (odstraněno vygenerovaných: {0})	✓ Maße: Auto + Ø – einfache Maße fest in den Ansichten (entfernte generierte: {0})
+✓ list {0} – další příkazy výkresu pracují s ním	✓ Blatt {0} – weitere Zeichnungsbefehle arbeiten damit
+✓ list {0} „{1}“ smazán – aktivní list {2}	✓ Blatt {0} „{1}“ gelöscht – aktives Blatt {2}
+✓ list {0}: „{1}“ → „{2}“	✓ Blatt {0}: „{1}“ → „{2}“
+✓ model „{0}“ na listu: pohled {1}, měřítko {2}	✓ Modell „{0}“ auf dem Blatt: Ansicht {1}, Maßstab {2}
+✓ model „{0}“ odebrán z listu	✓ Modell „{0}“ vom Blatt entfernt
+✓ není co smazat	✓ nichts zu löschen
+✓ nový list {0} (Chytré kóty) – další příkazy výkresu pracují s ním	✓ neues Blatt {0} (intelligente Bemaßung) – weitere Zeichnungsbefehle arbeiten damit
+✓ razítko: {0}	✓ Schriftfeld: {0}
+✓ revize {0} smazána	✓ Änderung {0} gelöscht
+✓ revize {0} {1} „{2}“ – v razítku revize {0}	✓ Änderung {0} {1} „{2}“ – im Schriftfeld Index {0}
+✓ smazáno {0}: {1} – id dalších poznámek se posunula (výkres stav)	✓ gelöscht {0}: {1} – Ids der folgenden Anmerkungen haben sich verschoben (zeichnung status)
+✓ upraveno {0}: {1} → {2}{3}	✓ bearbeitet {0}: {1} → {2}{3}
+✓ značka {0} · {1}	✓ Symbol {0} · {1}
+#!dynamic
+# názvy druhů značek, kót a polí (tr(MAPA[x]) v cad/drawing-marks.ts a cad/drawing-agent.ts)
+poznámka	Hinweis
+drsnost	Rauheit
+geometrická tolerance	Form- und Lagetoleranz
+základna	Bezug
+text	Text
+šikmo	schräg
+kóty	Maß
+popisu	Beschriftung
+poznámky	Hinweis
+textu	Text
+drsnosti	Rauheit
+geometrické tolerance	Form- und Lagetoleranz
+základny	Bezug
+odsazení	Versatz
+přípona	Suffix
+hodnota	Wert
+výška	Höhe
+číslo	Nummer
+kreslil	Ersteller
+revize	Index
+datum	Datum
+materiál	Werkstoff
+nepředepsané	Allgemeintoleranzen

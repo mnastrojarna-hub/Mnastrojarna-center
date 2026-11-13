@@ -4,6 +4,7 @@ import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { Interference } from "@/cad/asm-kernel";
 import { apply3, boltStack, bomCsv, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
@@ -26,7 +27,11 @@ import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
 import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, topAt, type AsmStatus, type EdgeLite, type FaceLite } from "@/cad/agent";
 import { applySketchOp, sketchOnPlane } from "@/cad/agent-sketch";
+import { applyEdit, freeName, histStep, historyText } from "@/cad/agent-edit";
+import { resolveTab, type TabInfo } from "@/cad/agent-asm";
+import type { AsmEnv, PartFaces } from "@/cad/asm-agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
+import type { DrawingExtras } from "@/cad/drawing-agent";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
 import { copyText } from "@/lib/clipboard";
@@ -42,6 +47,7 @@ import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
 import { ShareCta } from "./share-cta";
 import { CommandPalette, type Command } from "./command-palette";
 import { getExtUi, type ExtActionApi } from "./ext";
+import { extendMncad, runApiCmd, type ApiHost } from "./agent-api-host";
 import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { CompareDialog, type CompareView } from "./compare-dialog";
@@ -66,7 +72,7 @@ import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool, type SketcherHandle } from "./sketcher";
 import { applySketchPatch, pruneUnderlays } from "@/cad/sketch-underlay";
-import { SectionControls, defaultSection } from "./section-panel";
+import { SectionControls, defaultSection, sectionItems } from "./section-panel";
 import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
@@ -427,11 +433,53 @@ export function CadApp() {
   };
   const openSharedRef = useRef(openShared);
   openSharedRef.current = openShared;
+  // ---------- sestava textem (cad/asm-agent.ts): jádro, záložky a úprava v kontextu pro příkazy „sestava …“, „kusovník“, „záložka …“ ----------
+  const asmFaceLists = useRef(new Map<string, PartFaces>());
+  const mateStatusRef = useRef(mateStatus);
+  mateStatusRef.current = mateStatus;
+  const asmStackRef = useRef(asmStack);
+  asmStackRef.current = asmStack;
+  /** počká, až se změna stavu (záložky, dokument) promítne do refs po vykreslení */
+  const settleUi = async (ok: () => boolean) => {
+    for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 25));
+  };
+  const tabList = (): TabInfo[] => (docTabsRef.current.length ? snapshotTabs(docTabsRef.current) : fallbackTabs()).map((t) => ({ id: t.id, title: t.title, kind: t.kind, active: t.id === tabIdRef.current }));
+  const asmEnv = (stack?: { asm: CadDoc; key: string }[]): AsmEnv => ({
+    parts: async (list) => {
+      const need = list.filter((p) => !asmCache.current.has(p.key));
+      if (need.length) {
+        for (const r of await cad.asmParts(need)) asmCache.current.set(r.key, r.result);
+        setAsmVer((v) => v + 1);
+      }
+      return list.map((p) => ({ key: p.key, result: asmCache.current.get(p.key) ?? null }));
+    },
+    mateFace: (key, i) => cad.mateFace(key, i),
+    cylFace: (key, r) => cad.cylFace(key, r),
+    isCone: (key, i) => cad.inspect({ kind: "comp", key, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }, { kind: "face", index: i }).then((e) => e.surface === "CONE", () => false),
+    geo: mateGeo.current,
+    faceLists: asmFaceLists.current,
+    stack,
+    tabs: {
+      list: tabList,
+      activate: async (id) => {
+        activateTab(id);
+        await settleUi(() => tabIdRef.current === id);
+        return histRef.current.present;
+      },
+      close: async (id) => {
+        closeTab(id);
+        await settleUi(() => tabIdRef.current !== id && !docTabsRef.current.some((t) => t.id === id));
+        return histRef.current.present;
+      },
+    },
+  });
+  const asmEnvRef = useRef(asmEnv);
+  asmEnvRef.current = asmEnv;
   /**
    * Textové rozhraní (AI agenti, automatizace): provede příkazy / JSON nad otevřeným dokumentem a vrátí protokol
    * + textový stav. Prvky s pravidlem (zaoblit hrany svislé…) se vyhodnotí nad aktuálním tělesem přes jádro.
    */
-  const runAgentText = async (text: string): Promise<string> => {
+  const runAgentText = async (text: string, opts: { inPlace?: boolean } = {}): Promise<string> => {
     const prog = parseAgentText(text);
     // Protokol v pořadí řádků vstupu: chyby čtení (řádek 8) nepředbíhají výsledky dřívějších řádků; výsledky stavby a stav až na konci.
     const entries: { line: number; text: string }[] = prog.errors.map((e) => ({ line: e.line, text: tr("✗ řádek {0}: {1}{2}", e.line, e.message, e.text ? ` ← „${e.text}“` : "") }));
@@ -471,8 +519,9 @@ export function CadApp() {
       if (!hit) throw new Error(tr("„{0}“ v historii není – k dispozici: {1}", v, d.features.filter((x) => what === "feature" || x.type === "sketch").map((x) => x.name).join(", ") || "—"));
       return hit.id;
     };
-    const prepare = (f0: Feature): Feature => {
+    const prepare = (f0: Feature, keepName = false): Feature => {
       const f = { ...f0 } as Feature;
+      if (!keepName) f.name = freeName(d.features, f); // „Skica 1“ z dřívějšího běhu už v dílu je → „Skica 2“ (odkazy názvem jednoznačné)
       // odkazy názvem (obecný příkaz „prvek“): skici a prvky podle názvu nebo `$last`
       const rec = f as unknown as Record<string, unknown>;
       for (const k of ["sketchId", "profileId", "pathId", "guideId"]) if (k in rec && rec[k] !== "$last") rec[k] = refId(rec[k], "sketch");
@@ -531,10 +580,10 @@ export function CadApp() {
             const din = internBlobs(op.doc); // data importů z mapy `blobs` (.mncad této verze) do úložiště ještě před ověřovací stavbou
             const incoming = din.features;
             d = { ...din, features: [] };
-            openNew = true;
+            openNew = !opts.inPlace; // setDocument(doc, { inPlace: true }) = nahradit dokument aktivní záložky jedním krokem historie
             changed = true;
-            for (const raw of incoming) d.features.push(prepare(raw)); // $last, režim, duplicitní id – prvek po prvku
-            log.push(tr("✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce", d.name, d.features.length));
+            for (const raw of incoming) d.features.push(prepare(raw, true)); // $last, režim, duplicitní id – prvek po prvku
+            log.push(opts.inPlace ? tr("✓ dokument „{0}“ ({1} prvků) nahradil otevřený dokument – jeden krok historie (zpět ho vrátí)", d.name, d.features.length) : tr("✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce", d.name, d.features.length));
             break;
           }
           case "new":
@@ -653,7 +702,7 @@ export function CadApp() {
           case "drawingCmd": {
             // výkres: volby listu, Chytré kóty, tolerance, stav (cad/drawing-agent.ts – výkres se počítá v jádře)
             const { applyDrawingCmd } = await import("@/cad/drawing-agent");
-            const r = await applyDrawingCmd(d, op.cmd, (doc, meta, o) => cad.drawing(doc, meta, o));
+            const r = await applyDrawingCmd(d, op.cmd, (doc, meta, o) => cad.drawing(doc, meta, o), { extras: () => drawEnvRef.current, tabs: () => [...[...madeDocs.values()].map((x) => ({ title: x.name, doc: x })), ...docTabsRef.current.filter((t) => t.kind !== "drawing").map((t) => ({ title: t.title, doc: t.hist.present }))] });
             d = r.doc;
             changed = changed || r.changed;
             openDrawingAfter = openDrawingAfter || r.open;
@@ -699,6 +748,94 @@ export function CadApp() {
             log.push(res.length ? tr("⚠ kolize: {0} – {1}", res.length, res.map((x) => `${name(x.a)} × ${name(x.b)} (${fmtNum(x.volume, 1)} mm³)`).join("; ")) : tr("✓ kolize: žádné ({0} komponent)", comps));
             break;
           }
+          case "edit": {
+            // úpravy existujícího modelu a skici, proměnné, konfigurace (agent-edit.ts); zpět / znovu = skutečná historie dokumentu
+            if (op.cmd.kind === "undo" || op.cmd.kind === "redo") {
+              const { kind: dir, n } = op.cmd;
+              flush(); // dosavadní změny tohoto běhu = jeden krok historie
+              openNew = false;
+              let moved = 0;
+              flushSync(() =>
+                setHist((h) => {
+                  const step = histStep(h, dir, n);
+                  moved = step.moved;
+                  return step.hist;
+                }),
+              );
+              d = JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc;
+              added.length = 0;
+              log.push(historyText(dir, n, moved, histRef.current));
+              break;
+            }
+            const r = await applyEdit(d, op.cmd, { kernel: { topology: cad.topology, selectFaces, selectEdges, stamp: stampFeature, build: cad.build }, openSketchId: openNew || added.some((f) => f.type === "sketch") ? null : sketchId }, op.sketch);
+            d = r.doc;
+            changed = changed || r.changed;
+            for (const id of r.removed) if (added.some((f) => f.id === id)) added.splice(added.findIndex((f) => f.id === id), 1);
+            for (const f of d.features) if (r.touched.includes(f.id) && !added.some((x) => x.id === f.id)) added.push(f);
+            log.push(...r.log);
+            break;
+          }
+          case "asm": {
+            // sestava textem: vazby, komponenty, pole, šroub, podsestavy, úprava v kontextu, kusovník, rám formy, záložky
+            const { applyAsmCmd } = await import("@/cad/asm-agent");
+            if (changed && (op.cmd.k === "tab" || op.cmd.k === "closeTab" || (op.cmd.k === "edit" && openNew))) {
+              // rozpracovaný dokument nejdřív do jeho záložky – přepnutí záložky čte stav aplikace; úprava v kontextu nové sestavy
+              // potřebuje, aby sestava už měla záložku (díl se pak otevře v ní a „sestava hotovo“ ji vrátí)
+              const want = d;
+              const fresh = openNew;
+              if (d.kind !== "assembly") madeDocs.set(d.name.toLowerCase(), d);
+              const id = fresh ? openDocInTab(d) : (commit(d), tabIdRef.current);
+              changed = false;
+              openNew = false; // dokument už má svou záložku (je aktivní) – další změny do ní
+              await settleUi(() => tabIdRef.current === id && (fresh ? histRef.current.present.name === want.name && docTabsRef.current.some((t) => t.id === id) : histRef.current.present === want));
+            }
+            const stack = [...asmStackRef.current];
+            const r = await applyAsmCmd(d, op.cmd, asmEnvRef.current(stack));
+            if (r.newTab) {
+              flush();
+              currentBody = null;
+              d = r.doc;
+              openNew = true;
+              changed = true;
+            } else if (r.switched) {
+              d = JSON.parse(JSON.stringify(r.doc)) as CadDoc;
+              openNew = false;
+              changed = false;
+              currentBody = null;
+            } else {
+              d = r.doc;
+              changed = changed || r.changed;
+            }
+            if (r.mateStatus) {
+              mateStatusRef.current = r.mateStatus;
+              setMateStatus(r.mateStatus);
+            }
+            if (r.stackChanged) {
+              asmStackRef.current = stack;
+              setAsmStack(stack);
+              setAsmSel(null);
+              setTab(d.kind === "assembly" ? "asm" : "create");
+            }
+            log.push(...r.log);
+            break;
+          }
+          case "api": {
+            // řez, styl zobrazení, barva ploch, akce rozšíření, analýzy a formařské nástroje (agent-api-host.ts)
+            const r = await runApiCmd(op.cmd, d, apiHostRef.current!);
+            if (r.open) {
+              flush();
+              currentBody = null;
+              d = r.open;
+              openNew = true;
+              changed = true;
+            } else if (r.doc) {
+              d = r.doc;
+              changed = true;
+            }
+            added.push(...(r.added ?? []));
+            log.push(...r.log);
+            break;
+          }
           case "pop": {
             const f = d.features.pop();
             changed = changed || !!f;
@@ -716,7 +853,7 @@ export function CadApp() {
             // „stav“ na konci vstupu vypíše až závěrečný stav (jednou); uprostřed vstupu stav v tom okamžiku
             if (op === lastOp) break;
             const r = await build();
-            log.push(docStatusText(d, r, openNew ? undefined : asmStatusRef.current()));
+            log.push(docStatusText(d, r, openNew ? undefined : asmStatusRef.current(d)));
             break;
           }
         }
@@ -753,7 +890,7 @@ export function CadApp() {
       const total = Date.now() - tBuild;
       if (total >= 2000) tail.push(tr("Výpočet modelu: {0} s", fmtNum(total / 1000, 1)));
     } else if (added.length) tail.push(tr("✗ stavba selhala – prvky {0} nebyly ověřeny", added.map((f) => f.name).join(", ")));
-    tail.push("", docStatusText(d, res, openNew ? undefined : asmStatusRef.current()));
+    tail.push("", docStatusText(d, res, openNew ? undefined : asmStatusRef.current(d)));
     return [...ordered(), ...tail].join("\n");
     } catch (e) {
       if (!isCancelled(e)) throw e;
@@ -768,6 +905,48 @@ export function CadApp() {
   const runAgentRef = useRef(runAgentText);
   runAgentRef.current = runAgentText;
   const agentStatus = async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current());
+  // automatizační API pro agenty (agent-api-host.ts): přístup ke stavu aplikace – obnovuje se při každém vykreslení
+  const apiHostRef = useRef<ApiHost | null>(null);
+  apiHostRef.current = {
+    doc: () => histRef.current.present,
+    result: () => (isAsm ? null : result),
+    vp: () => vp.current,
+    sketch: () => sketch ?? null,
+    openSketch: (id) => {
+      setSketchId(id);
+      setTool("select");
+      setTab("sketch");
+    },
+    prefs: () => prefs,
+    applySettings: (n) => applySettings(n),
+    setDisplay: (m, persist) => (persist ? setPref("display", m) : setPrefs((p) => ({ ...p, display: m }))),
+    bgCss: () => bg.css,
+    section: () => section,
+    setSection,
+    sectionItems: () => sectionItems(result?.mesh ?? null, isAsm ? asmViews : undefined),
+    explode: () => explode,
+    setExplode,
+    hintsOn: () => hintsOn,
+    setHints: setHintsOn,
+    selection: () => selection,
+    setSelection,
+    inspect: (it) => (it ? void runInspect(it) : setInspect(null)),
+    setAsmSel,
+    leafResult: (id) => asmCache.current.get(leaves.find((l) => l.id === id)?.key ?? ""),
+    setDraft: setDraftSetup,
+    setSurface,
+    setPartingZ,
+    setCmpView,
+    commit,
+    openDocInTab: (d) => openDocInTab(d),
+    insertComponent: (c) => insertComponent(c),
+    insertPart: (d, g) => insertPart(d, g),
+    docId: () => docId.current,
+    setPending: (p) => void (pendingImport.current = p),
+    asmParts: () => (isAsm && leaves.every((l) => asmCache.current.has(l.key)) ? leaves.map((l) => asmCache.current.get(l.key)) : null),
+    status: agentStatus,
+    exportModel: (f) => exportModel(f as ExportFormat),
+  };
   /** diagnostika prostředí pro podporu (bez dat dokumentu) do schránky */
   const copyDiagnostics = async () => {
     const ok = await copyText(collectDiagnostics({ error: glError?.error ?? null, probe: glError?.probe ?? probeWebGL(), core, lost: glError?.lost }));
@@ -882,7 +1061,7 @@ export function CadApp() {
     }
     track("cad_open");
     // JavaScript API pro automatizaci a AI agenty (Playwright, rozšíření prohlížeče…)
-    window.mncad = {
+    window.mncad = extendMncad({
       version: AGENT_API_VERSION,
       lang: getLang(),
       missing: () => missingKeys(),
@@ -890,10 +1069,41 @@ export function CadApp() {
       commands: () => AGENT_COMMANDS.map((c) => c.cmd),
       run: (text) => runAgentRef.current(text),
       getDocument: () => JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc,
-      setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
+      setDocument: (doc, o) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc), o?.inPlace ? { inPlace: true } : undefined),
+      undo: (n) => runAgentRef.current(`zpět ${Math.max(1, Math.floor(Number(n) || 1))}`),
+      redo: (n) => runAgentRef.current(`znovu ${Math.max(1, Math.floor(Number(n) || 1))}`),
+      history: () => ({ undo: histRef.current.past.length, redo: histRef.current.future.length }),
       status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current()),
-      drawingStatus: async () => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, o) => cad.drawing(doc, meta, o))).text,
+      drawingStatus: async (o) => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, op) => cad.drawing(doc, meta, op), { sheet: o?.sheet, extras: drawEnvRef.current })).text,
+      exportDrawing: async (format, o) => (await import("@/cad/drawing-export")).exportDrawing(histRef.current.present, format, o ?? {}, (doc, meta, op) => cad.drawing(doc, meta, op), drawEnvRef.current),
       measure: (a, b) => measureApi(histRef.current.present, a, b),
+      bom: async (opts) => {
+        const d = histRef.current.present;
+        if (d.kind !== "assembly") throw new Error(tr("kusovník: otevřený dokument „{0}“ není sestava", d.name));
+        const r = await (await import("@/cad/asm-agent")).bomData(d, asmEnvRef.current(), !!opts?.structured);
+        return { rows: r.rows.map(({ pos, name, number, qty, material, massKg, level }) => ({ pos, name, number, qty, material, massKg, level })), text: r.text, csv: r.csv };
+      },
+      tabs: () => asmEnvRef.current().tabs!.list(),
+      activateTab: (t) => {
+        try {
+          const hit = resolveTab(asmEnvRef.current().tabs!.list(), t);
+          if (!hit.active) void asmEnvRef.current().tabs!.activate(hit.id);
+          return true;
+        } catch {
+          return false;
+        }
+      },
+      closeTab: (t) => {
+        try {
+          const list = asmEnvRef.current().tabs!.list();
+          const hit = t === undefined ? list.find((x) => x.active) : resolveTab(list, t);
+          if (!hit) return false;
+          void asmEnvRef.current().tabs!.close(hit.id);
+          return true;
+        } catch {
+          return false;
+        }
+      },
       openConsole: () => setAgentOpen(true),
       progress: () => {
         const p = cad.progress();
@@ -924,10 +1134,10 @@ export function CadApp() {
         }
         const meta = EXPORTS.find((e) => e.f === format);
         if (!meta) throw new Error(tr("Neznámý formát „{0}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.", format));
-        const buf = await cad.exportFile(d, format);
+        const buf = await cad.exportFile(d, meta.f);
         return { name: `${safeName(d.name)}.${meta.ext}`, mime: meta.mime, bytes: buf.byteLength, base64: toB64(new Uint8Array(buf)) };
       },
-    };
+    }, () => apiHostRef.current);
     return () => {
       window.removeEventListener(VAULT_EVENT, onVault);
       delete window.mncad;
@@ -1794,10 +2004,11 @@ export function CadApp() {
   };
   const compName = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
   /** stav sestavy pro textový stav (agenti): počty, obálka, objem, hmotnost, poslední kontrola kolizí */
-  const asmStatusRef = useRef<() => AsmStatus | undefined>(() => undefined);
-  asmStatusRef.current = () => {
-    if (!isAsm) return undefined;
-    const vis = leaves.filter((l) => !l.hidden);
+  const asmStatusRef = useRef<(dd?: CadDoc) => AsmStatus | undefined>(() => undefined);
+  asmStatusRef.current = (dd = doc) => {
+    // `dd` = dokument rozpracovaný textovými příkazy (stav aplikace se propíše až po jejich dokončení)
+    if (dd.kind !== "assembly") return undefined;
+    const vis = (dd === doc ? leaves : flattenLeaves(dd)).filter((l) => !l.hidden);
     let volume = 0;
     let mass = 0;
     let known = vis.length > 0;
@@ -1826,12 +2037,13 @@ export function CadApp() {
       }
     }
     return {
-      components: (doc.components ?? []).length,
+      components: (dd.components ?? []).length,
       parts: vis.length,
       bbox,
       volume: known ? volume : undefined,
       massKg: known ? mass : undefined,
       clash: clashes ? { count: clashes.length, pairs: clashes.map((x) => `${compName(x.a)} × ${compName(x.b)} (${fmtNum(x.volume, 1)} mm³)`), at: clashInfo?.at ?? "" } : null,
+      mates: mateStatusRef.current,
     };
   };
 
@@ -2428,6 +2640,9 @@ export function CadApp() {
   );
 
   const mat = MATERIALS.find((m) => m.id === doc.material) ?? MATERIALS[0];
+  /** výkres pro textové příkazy a window.mncad.exportDrawing: hmotnost, kusovník a pozice jako ve výkresovém prostředí */
+  const drawEnvRef = useRef<DrawingExtras>({});
+  drawEnvRef.current = isAsm ? { massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0), bom: bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })), balloons: balloonItems } : { massKg: result?.metrics ? massKg(result.metrics.volume, mat.density) : undefined };
   const m = result?.metrics;
   const errors = result?.status.filter((s) => !s.ok) ?? [];
   const warnings = result?.status.filter((s) => s.ok && s.warning) ?? [];

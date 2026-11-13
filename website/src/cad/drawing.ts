@@ -101,6 +101,8 @@ export type DrawingOptions = {
   dimPads?: Record<string, Partial<Record<"l" | "t" | "r" | "b", number>>>;
   /** pozice komponent (balónky) – jen sestavy s meta.components */
   balloons?: boolean;
+  /** kusovník nad razítkem (sestava; bez hodnoty = zobrazit, když je kusovník) – kusovník sám přichází v meta.bom */
+  bomTable?: boolean;
   /** tabulka děr (souřadnice a průměry děr v půdorysu) */
   holeTable?: boolean;
   /** detailní pohledy */
