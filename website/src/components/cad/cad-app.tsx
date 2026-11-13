@@ -17,6 +17,7 @@ import { applyShrinkage, coolingCircuit, draftAnalysis, draftVertexColors, eject
 import { isUnlocked, notifyVault, persistMode, restoreSession, VAULT_EVENT, vaultGet, vaultSet, wipeStoredDocuments } from "@/cad/vault";
 import { DEFAULT_SKETCH_SHORTCUTS, keyCombo, loadSettings, pushRecent, readRecentDoc, saveSettings, shortcutOf, storeRecentDoc, type Settings } from "@/cad/settings";
 import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
+import { presetFor, shapePresetItems } from "./shape-presets";
 import { extByTab, getExt, visibleExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
 import { embedBlobs, internBlobs, missingBlobFiles } from "@/cad/blobs";
@@ -53,6 +54,9 @@ import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { CompareDialog, type CompareView } from "./compare-dialog";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
+import { cvGizmoProps, useSurfState } from "./surf-overlay";
+import { runSurfCmd } from "./surf-a-host";
+import { SurfAnalysisPanel } from "./ext/surface-a-ui";
 import { SettingsDialog, SHORTCUT_LABELS } from "./settings-dialog";
 import { AgentConsole } from "./agent-console";
 import { ShareDialog } from "./share-dialog";
@@ -232,6 +236,9 @@ export function CadApp() {
   const [moldTools, setMoldTools] = useState(false);
   const [draftSetup, setDraftSetup] = useState<DraftSetup>({ on: false, pull: [0, 0, 1], minDeg: 1 });
   const [surface, setSurface] = useState<SurfaceSetup>({ mode: "none", limit: 1 });
+  // plochy třídy A: panel analýzy, překryv v 3D okně a gizmo řídicího bodu (surf-overlay.ts)
+  const surfSt = useSurfState();
+  const cvG = cvGizmoProps(surfSt);
   const [partingZ, setPartingZ] = useState<{ z: number; perimeter: number } | null>(null);
   const docId = useRef(uid());
   const lastThumb = useRef(0);
@@ -535,6 +542,7 @@ export function CadApp() {
       for (const k of ["sketchId", "profileId", "pathId", "guideId"]) if (k in rec && rec[k] !== "$last") rec[k] = refId(rec[k], "sketch");
       for (const k of ["sketchIds", "profileIds", "guideIds"]) if (Array.isArray(rec[k])) rec[k] = (rec[k] as unknown[]).map((v) => refId(v, "sketch"));
       if ("featureId" in rec && rec.featureId !== "$last") rec.featureId = refId(rec.featureId, "feature");
+      if (typeof rec.partingSketchId === "string" && rec.partingSketchId) rec.partingSketchId = refId(rec.partingSketchId, "sketch"); // úkos s dělicí křivkou (název / $last)
       if (Array.isArray(rec.featureIds)) rec.featureIds = (rec.featureIds as unknown[]).map((v) => refId(v, "feature"));
       if (f.type === "ext") {
         const data = { ...(f.data ?? {}) } as Record<string, unknown>;
@@ -861,6 +869,10 @@ export function CadApp() {
             break;
           case "measure":
             log.push(...(await measureLog(d, op.cmd)));
+            break;
+          case "surf":
+            // plochy: analýza návaznosti hran, hřebeny křivosti, seznam CV (surf-a-host.ts)
+            log.push(...(await runSurfCmd(op.cmd, d)));
             break;
           case "status": {
             // „stav“ na konci vstupu vypíše až závěrečný stav (jednou); uprostřed vstupu stav v tom okamžiku
@@ -1842,6 +1854,15 @@ export function CadApp() {
     beginEdit(f.id, doc);
     setSelection([]);
   };
+  /** zaoblení / úkos s předvoleným druhem (setback, eliptické, dělicí křivka) – hrany / plochy z aktuálního výběru */
+  const addPreset = (type: "fillet" | "draft", preset: Partial<Feature>) => {
+    if (isAsm) return flash(tr("Zaoblení se dělá v dílu – otevřete ho (Upravit díl)."));
+    const f = newFeature(doc, type, { ...(type === "fillet" ? { edges: selEdges } : { faces: selFaces }), ...presetFor(doc, preset) } as Partial<Feature>);
+    commit({ ...doc, features: [...doc.features, f] });
+    beginEdit(f.id, doc);
+    setSelection([]);
+    track("cad_feature", { type });
+  };
   const setFaceColor = (faces: number[], color: string | null) => {
     const fc = { ...(doc.faceColors ?? {}) };
     for (const i of faces) {
@@ -2819,6 +2840,7 @@ export function CadApp() {
           { id: "chamfer", label: tr("Srazit"), icon: "chamfer", tone: "feature", onClick: () => (selEdges.length ? addWithEdges("chamfer") : addFeature("chamfer")) },
           { id: "draft", label: tr("Úkos"), icon: "draft", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("draft") : addFeature("draft")) },
           { id: "shell", label: tr("Skořepina"), icon: "shell", tone: "feature", onClick: () => (selFaces.length ? addWithFaces("shell") : addFeature("shell")) },
+          ...shapePresetItems({ add: addPreset }),
         ],
       },
       {
@@ -3539,8 +3561,9 @@ export function CadApp() {
                   faceColors={doc.faceColors}
                   bodyHidden={bodyHidden}
                   bodyOpacity={bodyOpacity}
-                  gizmo={gizmo}
-                  onGizmo={onGizmo}
+                  gizmo={cvG?.gizmo ?? gizmo}
+                  onGizmo={cvG?.onGizmo ?? onGizmo}
+                  surfOverlay={surfSt.overlay}
                   onContext={vpContext}
                   onCursor={setCursor}
                   display={prefs.display}
@@ -3705,6 +3728,7 @@ export function CadApp() {
                 }}
               />
             )}
+            {surfSt.panel && !isAsm && <SurfAnalysisPanel doc={doc} selEdges={selEdges} surfaceMode={surface.mode} onSurface={(mode) => setSurface((x) => ({ ...x, mode }))} />}
             {compareOpen && !isAsm && <CompareDialog doc={buildDocView} vp={vp} onView={setCmpView} onClose={() => setCompareOpen(false)} />}
             {motionOpen && isAsm && (
               <MotionPanel doc={doc} env={() => asmEnvRef.current()} onDoc={commit} onClose={() => setMotionOpen(false)} snapshot={() => vp.current?.snapshot() ?? null} canvas={() => document.querySelector<HTMLCanvasElement>("main canvas")} flash={flash} />

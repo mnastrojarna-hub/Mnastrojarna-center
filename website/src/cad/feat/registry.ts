@@ -17,6 +17,8 @@ export type FeatCtx = {
   tools: Map<string, { tool: Shape; mode: BoolMode }>;
   index: number;
   doc: CadDoc;
+  /** upozornění k prvku (⚠ ve stromu a v protokolu) – výsledek je použitelný, ale přibližný / částečný */
+  warn?: (message: string) => void;
 };
 
 export type FeatBuilder<T extends Feature = Feature> = (f: T, ctx: FeatCtx) => Shape | null | Promise<Shape | null>;

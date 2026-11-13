@@ -61,6 +61,9 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`díra D skrz v x1 y1 z1 v x2 y2 z2 …\` | více děr jedním příkazem (každá poloha třemi souřadnicemi) |
 | \`zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z|-Z|+X|-X|+Y|-Y] [poloměr N] [delší N] [kratší N]\` | pravidla lze kombinovat: \`hrany horní kruhové\` |
 | \`srazit C [hrany …]\` | sražení hran, stejná pravidla |
+| \`zaoblit R hrany <pravidlo> setback S [vrchol V3 S2]\` | zaoblení se setbackem: ve vrcholu se 3+ zaoblenými hranami skončí zaoblení S od vrcholu a roh uzavře hladká záplata (G1) – viz „Zaoblení se setbackem, eliptické zaoblení a úkos s dělicí křivkou“ |
+| \`zaoblit eliptické D1 D2 hrany <pravidlo> [rho 0,5]\` | eliptické / kuželosečkové zaoblení: D1 na první (horní) ploše, D2 na druhé |
+| \`úkos A plochy <pravidlo|F1 F2…> [dělicí "Skica 2"] [stupňovitý] [směr +Z]\` · \`úkos A plochy boční [rovina XY] [odsazení N]\` | úkos ploch; s dělicí křivkou na obě strany od dělicí čáry, \`stupňovitý\` = každý úsek od vlastní roviny |
 | \`skořepina T [otevřít +Z|horní|boční|největší]\` | vydlabání; otevřené plochy pravidlem |
 | \`pole N rozteč P [směr X|Y|Z] [N2 rozteč P2 směr Y]\` · \`pole kruhové N [úhel 360] [osa Z] [v cx cy cz]\` | pole posledního prvku |
 | \`zrcadlit XY|XZ|YZ [odsazení N]\` | zrcadlení tělesa |
@@ -300,6 +303,55 @@ prvek adv.twist sketch=$last height=30 angle=45
 prvek chamfer distance=1 edges=horní;rovné
 \`\`\`
 
+### Zaoblení se setbackem, eliptické zaoblení a úkos s dělicí křivkou
+
+Tři tvary pro formy a lité / obráběné díly (EN \`fillet … setback\`, \`fillet elliptical\`, \`draft … parting … stepped\`;
+DE \`verrunden … rückversatz\`, \`verrunden elliptisch\`, \`schräge … trennlinie … gestuft\`). V JSON / \`prvek\` jsou to běžné
+prvky \`fillet\` (pole \`kind\`) a \`draft\` (pole \`partingSketchId\`, \`step\`).
+
+- **Setback** – \`zaoblit 3 hrany <pravidlo> setback 5\`: ve vrcholu, kde se stýkají aspoň tři vybrané hrany (roh kvádru),
+  zaoblení skončí 5 mm od vrcholu podél každé hrany a roh uzavře hladká N-stranná záplata tečná (G1) k zaoblením i
+  k plochám rohu. Setback musí být ≥ poloměr (= poloměr ≈ běžný kulový roh; větší = plošší, rozlehlejší roh). Jiná hodnota
+  pro jeden vrchol: \`vrchol V3 8\` (číslo vrcholu jako popisek pro výběr) nebo \`vrchol x y z 8\`. JSON:
+  \`{"type":"fillet","kind":"setback","radius":3,"setback":5,"setbacks":[{"at":{"kind":"vertex","index":2},"d":8}],"edges":[…]}\`.
+  Přesně pro rohy z rovinných ploch a přímých hran; jiné rohy dostanou běžný roh a prvek hlásí ⚠.
+- **Eliptické / kuželosečkové** – \`zaoblit eliptické 4 2 hrany horní\`: průřez je oblouk elipsy tečný k oběma plochám,
+  D1 = 4 mm se odměří na **první** ploše (s normálou nejvíc nahoru: +Z, pak +Y, +X – u horní hrany kvádru tedy na
+  horní ploše), D2 = 2 mm na druhé. \`rho 0,5\` = kuželosečka (parabola; < 0,5 plošší, > 0,5 ostřejší). JSON:
+  \`{"type":"fillet","kind":"conic","radius":4,"r2":2,"rho":0.5,"faceRefs":[{"kind":"face","index":3}],"edges":[…]}\`
+  (\`faceRefs\` = plocha pro D1). Přímá hrana mezi rovinami a kruhová hrana se stálým průřezem (rovina ⟂ osa, souosý
+  válec) jsou přesné – odebraný průřez rovné hrany = D1·D2·(1 − π/4); jiné hrany jsou proložené šablonováním (⚠).
+  Vnitřní (konkávní) hrana materiál přidá.
+- **Úkos s dělicí křivkou** – \`úkos 3 plochy boční dělicí "Skica 2"\`: části vybraných ploch nad dělicí křivkou se zkosí ve
+  směru tahu (\`směr +Z\`, výchozí normála roviny XY), části pod ní proti němu – díl je v dělicí čáře nejširší a obě poloviny
+  formy jdou vyjmout. Skica **kolmá na tah** (\`skica XY odsazení 10: …\`) = rovinná dělicí křivka, její rovina je neutrální
+  rovinou obou stran (přesně). Skica **rovnoběžná s tahem** (\`skica XZ: čára 0 10 30 10 30 20 60 20\`) = profil dělicí čáry
+  promítnutý podél normály skici přes celý díl; křivka musí postupovat jedním směrem, konce se samy prodlouží za díl
+  (ve směru krajního úseku). \`čára\` se 3+ body se ve skice uzavírá – uzavírací úsek se u dělicí čáry vynechá.
+  Přímé úseky drží dělicí čáru přesně, oblouky / spline se rozdělí na rovinné úseky (⚠ přibližně), svislé skoky jsou stupně.
+- **Stupňovitý úkos** – \`… dělicí "Skica 2" stupňovitý\`: každý úsek dělicí čáry se zkosí od vlastní roviny kolmé na tah
+  (výška úseku, u šikmého jeho střed) a sousední úseky spojí stupňové plochy – klasický stupňovitý úkos formy.
+
+\`\`\`
+nový díl Forma
+kvádr 60 40 30
+skica XZ: čára 0 10 30 10 30 20 60 20
+úkos 3 plochy boční dělicí "Skica 1" stupňovitý
+stav
+\`\`\`
+
+\`\`\`
+nový díl Kryt
+kvádr 60 40 20
+zaoblit 3 setback 6                  # všechny hrany, 8 rohů uzavře záplata
+nový díl Lišta
+kvádr 60 40 20
+zaoblit eliptické 4 2 hrany horní    # 4 mm po horní ploše, 2 mm dolů po boku
+\`\`\`
+
+Stav (\`stav\`) u prvků vypíše např. \`R3, setback 6, hrany vše\`, \`eliptické D1 4 × D2 2, hrany 1\`,
+\`3°, ploch 4, dělicí křivka „Skica 1“, stupňovitý\`; přibližné výsledky mají ⚠ s vysvětlením.
+
 ### Úpravy existujícího modelu – upravit, potlačit, smazat, přesunout, zpět / znovu, proměnné, konfigurace
 
 Hotový díl se upravuje **na místě** (stejná záložka, historie Zpět funguje) – není potřeba \`getDocument()\` → ruční úprava
@@ -484,6 +536,63 @@ sestava vazba šroub "Matice" "Šroub" stoupání 1,5
 sestava vazba vačka "Zdvihátko" -Y "Vačka" F3
 pohyb motor rotační "Kolo1" 0..720 kroky 144
 \`\`\`
+
+### Spline s tečnami, hladké uzavřené šablonování a plochy třídy A
+
+**Spline s tečnami** (v řádku skici): úhel tečny ve stupních od osy X skici, váha = velikost tečny (1 = přirozená,
+větší = křivka se u bodu déle drží směru). Body se číslují od \`p0\`; tečna jde zadat u kteréhokoli bodu, „vyp“ ji zruší.
+Křivka je přesně ta, kterou postaví jádro (interpolace s tečnými podmínkami) – ve skicáři je u bodu úchyt tečny
+(kroužek, tažením se mění úhel i váha) a panel s úhly a vahami u vybraného splinu.
+
+\`\`\`
+skica XZ: spline 0 0 50 20 100 0 tečna-začátek 30 tečna-konec -30
+spline 0 0 40 30 80 0 120 20 tečna p1 0 váha p1 1,5        # tečna ve vnitřním bodě p1
+entita e1 tečna-konec=-45 váha-konec=2 tečna-p1=vyp        # úprava existujícího splinu (skica "Skica 1")
+\`\`\`
+EN: \`tangent-start 30\`, \`tangent-end -30\`, \`tangent p1 0\`, \`weight-start 1.5\`, \`weight p1 2\`; DE: \`tangente-anfang\`,
+\`tangente-ende\`, \`tangente p1\`, \`gewicht-anfang\`, \`gewicht p1\`. Ve stavu: \`e1 spline 3 b. … tečny p0 30°, p2 −30°\`.
+
+**Hladké uzavřené šablonování** (Uzavřený hladce): profily tvoří uzavřenou smyčku a plocha je periodická přes všechny
+profily – bez hrany ve švu (C2). Profily se prokládají hladce, ostré rohy profilů se zaoblí (odchylku ohlásí ⚠).
+
+\`\`\`
+prvek loft sketchIds=["Skica 1","Skica 2","Skica 3","Skica 4"] closed=ano smooth=ano
+\`\`\`
+
+**Plochy třídy A** (karta Plochy, skupina „Plochy třídy A“). Hrany a plochy se zadávají čísly \`E3\` / \`F3\` jako
+popisky pro výběr (\`window.mncad.hints()\`). Plochy se přidají jako volné plochy (sešít = jedna skořepina s okolím).
+
+| Příkaz | Význam |
+| --- | --- |
+| \`výplň E3 E4 E5 [G0\|G1\|G2] [sešít]\` | N-stranná výplň otvoru, návaznost na plochy, kterým hrany patří (výchozí G1) |
+| \`přechod E3 E7 [G1\|G2] [G1\|G2] [napětí 1 1,5] [obrátit] [sešít]\` | přechodová plocha mezi dvěma hranami ploch; napětí = délka tečny (1 = přirozená); „obrátit“ = opačný směr 2. hrany |
+| \`prodloužit plochu E5 [E6 …] 10 [G1\|G2]\` | plocha pokračuje přes hranu: G1 tečně (rovně), G2 i s křivostí; sešije se s původní plochou |
+| \`plocha F3 cv\` | seznam řídicích bodů (CV) B-spline plochy: \`[u v] (x; y; z)\` |
+| \`plocha F3 cv [síť 4 4] 2 3 posun 0 0 1,5\` | posun CV [u=2, v=3] o vektor; „síť“ = přesné zjemnění (stupeň 3, vložení uzlů) |
+| \`plocha F3 cv řada u 2 posun 0 0 1\` | posun celé řady CV (u nebo v, od 1); více posunů lze psát za sebou v jednom řádku |
+| \`analýza návaznosti [E3 E5 …] [zobrazit]\` | G0 mezera (mm), G1 úhel normál (°), G2 rozdíl křivostí napříč hranou (1/mm) a třída; bez hran všechny |
+| \`analýza hřebenu [E3 …] [měřítko 50] [zobrazit]\` | hřebeny křivosti hran: křivost min/max, nejmenší poloměr; „zobrazit“ = hřebeny v 3D okně |
+
+EN: \`fill\`, \`blend … tension\`, \`extend surface\`, \`face F3 cv 2 3 move 0 0 1.5\`, \`face F3 cv row u 2 move …\`,
+\`grid 4 4\`, \`analyze continuity\`, \`analyze comb … scale 50 show\`; DE: \`füllen\`, \`übergang … spannung\`,
+\`verlängern fläche\`, \`fläche F3 cv 2 3 verschieben …\`, \`reihe\`, \`netz\`, \`analyse stetigkeit\`, \`analyse kamm\`.
+Obecně: \`prvek surf.fill edges=2;3;4 continuity=G2\`, \`prvek surf.blend edges=2;6 contA=G2 tensionA=1,2\`,
+\`prvek surf.extendEdge edges=4 length=10 continuity=G1\`, \`prvek surf.cv faces=2 gridU=4 gridV=4 moves=[{"i":2,"j":3,"d":[0,0,1.5]}]\`
+(v obecném příkazu \`prvek\` a v JSON jsou hrany / plochy indexy od 0 – E3 = 2, F3 = 2; řídicí body [i j] jsou od 1).
+
+Třídy návaznosti: **G2** = mezera ≤ 0,01 mm, úhel ≤ 0,1° a rozdíl křivostí ≤ 5 % (min. 0,0001 1/mm), **G1** = tečně,
+**G0** = jen dotyk (ostrá hrana), **mezera**, **volná hrana** (bez sousední plochy). Nesešité plochy se párují podle
+polohy hran (\`nesešité\` v protokolu). Ukázka protokolu:
+
+\`\`\`
+✓ návaznost 2 hran: G2 2 · G1 0 · G0 0 · mezera 0 · volné 0
+  E9 (F1|F3, nesešité): G2 · mezera 0 mm · úhel 0,002° · Δk 0,00004 1/mm (k 0,02 / 0,02)
+\`\`\`
+
+Co je přesné a co přibližné: výplň je operátor jádra (dosažená tečnost se ověří, nad 0,1° ⚠); přechod a prodloužení
+jsou Hermitovy pásy proložené B-spline – návaznost je přesná ve vzorkovacích bodech (33 podél hrany) a mezi nimi se
+ověřuje analýzou; CV úprava je přesná u B-spline ploch, jiné plochy se převedou prokladem (rovina přesně) a ořezaná
+plocha se vrátí v celém rozsahu parametrů (⚠).
 
 ### Průběh a zrušení výpočtu
 

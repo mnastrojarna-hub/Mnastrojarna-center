@@ -13,6 +13,8 @@ import { sectionKey, sectionPlane, type SectionState } from "@/cad/section-plane
 import { entityPath } from "@/cad/sketch";
 import type { Feature, MeshData, Vec3 } from "@/cad/types";
 import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
+import { drawSurfOverlay } from "./viewport-surf-overlay";
+import type { SurfOverlay } from "./surf-overlay";
 import { softView, useSoftViewActive } from "./soft-bridge";
 
 /**
@@ -113,6 +115,8 @@ type Props = {
   bodyColor?: string;
   mouse?: MouseScheme;
   showGrid?: boolean;
+  /** plochy třídy A: hrany obarvené podle návaznosti, hřebeny křivosti, řídicí body CV (surf-overlay.ts) */
+  surfOverlay?: SurfOverlay | null;
 };
 
 const HOVER = new THREE.Color(0xf59e0b);
@@ -1342,6 +1346,14 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     }
     s.render();
   }, [props.measure]);
+
+  // ---------- analýza ploch: návaznost hran, hřebeny křivosti, řídicí body ----------
+  useEffect(() => {
+    const s = S.current;
+    if (!s) return;
+    drawSurfOverlay(s.scene, props.surfOverlay ?? null, s.radius);
+    s.render();
+  }, [props.surfOverlay]);
 
   // ---------- průhledná pomocná tělesa (porovnání s referencí) ----------
   useEffect(() => {

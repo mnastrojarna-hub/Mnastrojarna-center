@@ -3,6 +3,7 @@
  * Import tohoto souboru (build.ts, UI) zajistí registraci. Přidáváš-li modul, přidej řádek sem.
  */
 import "./surface";
+import "./surface-a";
 import "./sheetmetal";
 import "./advanced";
 import "./weld";

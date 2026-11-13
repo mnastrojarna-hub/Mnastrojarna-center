@@ -22,6 +22,9 @@ import { resolveDoc } from "./params";
 import { entityIndex, planeDefToSketchPlane, pointOf, resolveAxis, resolveDirection, resolvePlaneDef, resolveRef, V, type ResolveCtx } from "./ref-resolve";
 import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
 import { findLoops, nestLoops, shapeSegs, splinePoints, type Loop, type Seg } from "./sketch";
+import { hasTangents } from "./spline-tangent";
+import { sketchSplineEdge } from "./spline-occ";
+import { takeFeatureNotes } from "./feature-notes";
 import type { Axis, BodyInfo, BoolMode, BuildResult, CadDoc, FaceInfo, Feature, FeatureStatus, MeshData, PlaneName, SketchPlane, Vec2, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -226,6 +229,7 @@ export function sketchPathWire(sk: SketchF): r.Wire {
   const others = sk.entities.filter((e) => !e.construction && e.type !== "point" && e.type !== "spline");
   if (splines.length === 1 && !others.length) {
     const e = splines[0] as Extract<typeof splines[number], { type: "spline" }>;
+    if (hasTangents(e)) return r.assembleWire([sketchSplineEdge(e, plane)]); // tečny → přesná interpolace (GeomAPI_Interpolate)
     const pts = splinePoints(e.points, e.closed, 8).map(W);
     if (e.closed) pts.push(pts[0]);
     const edge = r.makeBSplineApproximation(pts, { tolerance: 1e-3, degMin: 3, degMax: 3 });
@@ -833,6 +837,8 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
       if (!chk.valid) warning = (warning ? warning + " " : "") + tr("Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.");
     }
     bodySig = sig;
+    const notes = takeFeatureNotes(); // přiblížení / nedosažená návaznost ohlášené stavitelem (feature-notes.ts)
+    if (notes.length) warning = [warning, ...notes].filter(Boolean).join(" ");
     status.push(warning ? { id: f.id, ok: true, warning } : { id: f.id, ok: true });
     return next;
   };
@@ -925,6 +931,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     let startedNew: { name: string } | null = null;
     const tFeature = Date.now();
     const nStatus = status.length;
+    takeFeatureNotes(); // hlášky předchozího (např. neúspěšného) prvku zahodit
     opts.onProgress?.({ index: i, total: doc.features.length, id: f.id, name: f.name, type: f.type, phase: "feature" });
     try {
       if (f.body && f.body !== activeName) {
@@ -942,7 +949,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
       let next: Shape | null = body;
       const custom = f.type !== "sketch" && f.type !== "datum" && f.type !== "ext" ? getFeatureBuilder(f.type) : undefined;
       if (custom) {
-        const out = await custom(f, { body, sketches, features, tools, index: i, doc });
+        const out = await custom(f, { body, sketches, features, tools, index: i, doc, warn: (m) => pickWarn.push(m) });
         if (out !== null && out !== undefined) next = out;
         body = finish(f, next);
         continue;

@@ -22,6 +22,7 @@ import { evalExpr, exprRefs, getPath as numAt, resolveVariables, VAR_NAME } from
 import { pickFieldsOf } from "./pick-fields";
 import { measureDim } from "./sketch-solver";
 import { offsetEntity } from "./sketch-ops";
+import { isSplineTangentKey, patchSplineTangentKey } from "./agent-surfaces";
 import { chainOf, offsetChain, projectModelLines, type ChainSeg } from "./sketch-tools";
 import { uid, type CadDoc, type Config, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type Vec2, type Vec3 } from "./types";
 
@@ -634,10 +635,12 @@ export async function applyEdit(doc0: CadDoc, cmd: EditCmd, ctx: EditCtx = {}, s
 /* ───────────────────────── upravit ───────────────────────── */
 /** volitelná pole prvků (`pole?:` v typu Feature, types.ts) – klíč, který prvek zatím nemá, je platný jen z tohoto seznamu (hlídá test) */
 export const OPTIONAL_KEYS = new Set(
-  "angle angle2 axisDef body bothWays centerRef centerlineId circleRadius closed constraints count2 csAngle csDiameter d2 d3 dims dir dirDef dirDef2 direction2 draftAngle edgeSigs end endCond endDir endLen endPoint endScale equalSpacing extent extent2 faceRef faceRefs faceRefs2 faceRefsMid faceSigs faceSigs2 faces faces2 featureIds fit from geometryOnly guideId guideIds internal keepNormal kind nameB newName outerOnly outward partingSketchId planeDef points positionRef pull r2 radial radii radii2 rotateAxisDef scaleEnd setback size skip spacing spacing2 spacingMode stagger startCond startDir startLen startPoint step suppressed symmetric tangentChain thicknesses thin thread threadDepth tipAngle transition translateRef twist twistTurns vertexRefs vertexSigs vertices".split(
+  "angle angle2 axisDef body bothWays centerRef centerlineId circleRadius closed constraints count2 csAngle csDiameter d2 d3 dims dir dirDef dirDef2 direction2 draftAngle edgeSigs end endCond endDir endLen endPoint endScale equalSpacing extent extent2 faceRef faceRefs faceRefs2 faceRefsMid faceSigs faceSigs2 faces faces2 featureIds fit from geometryOnly guideId guideIds internal keepNormal kind nameB newName outerOnly outward partingSketchId planeDef points positionRef pull r2 radial radii radii2 rotateAxisDef scaleEnd setback size skip smooth spacing spacing2 spacingMode stagger startCond startDir startLen startPoint step suppressed symmetric tangentChain thicknesses thin thread threadDepth tipAngle transition translateRef twist twistTurns vertexRefs vertexSigs vertices".split(
     " ",
   ),
 );
+// tvary 7. vlny (agent-shapes.ts): kuželosečka eliptického zaoblení, setback pro jednotlivé vrcholy
+for (const k of ["rho", "setbacks"]) OPTIONAL_KEYS.add(k);
 const SKETCH_KEYS = new Set(["sketchId", "profileId", "pathId", "guideId", "partingSketchId", "centerlineId"]);
 const SKETCH_LISTS = new Set(["sketchIds", "profileIds", "guideIds"]);
 const MODE_WORDS: [string, Set<string>][] = [
@@ -1200,6 +1203,12 @@ function patchEntity(e: SketchEntity, pairs: [string, string][]): { e: SketchEnt
       changes.push(`${a} ${show(pts[k])} → ${show(vec2(v, key0))}`);
       pts[k] = vec2(v, key0);
       n.points = pts;
+    } else if (n.type === "spline" && isSplineTangentKey(key0)) {
+      const pt = patchSplineTangentKey(n as Extract<SketchEntity, { type: "spline" }>, key0, v)!; // tečny splinu: tečna-začátek=30, tečna-p1=vyp, váha-konec=2
+      changes.push(pt.change);
+      Object.assign(n, { tangents: pt.e.tangents, weights: pt.e.weights });
+      if (!pt.e.tangents) delete n.tangents;
+      if (!pt.e.weights) delete n.weights;
     } else if (keys.includes(a)) {
       const old = n[a];
       if (Array.isArray(old)) set(a, vec2(v, key0));

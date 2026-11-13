@@ -1,0 +1,162 @@
+# 7. vlna – plochy (surfaces): spline s tečnami, hladké uzavřené šablonování, plochy třídy A, analýza návaznosti
+  … a dalších {0} hran (vypsány jen hrany s horší než G2 návazností)	… und {0} weitere Kanten (nur Kanten schlechter als G2 aufgeführt)
+  … vypsáno prvních 200 z {0} bodů	… die ersten 200 von {0} Punkten aufgeführt
+  E{0} (F{1}): volná hrana – bez sousední plochy	E{0} (F{1}): freie Kante – keine Nachbarfläche
+  E{0} (F{1}|F{2}{3}): {4} · mezera {5} mm · úhel {6}° · Δk {7} 1/mm (k {8} / {9})	E{0} (F{1}|F{2}{3}): {4} · Spalt {5} mm · Winkel {6}° · Δk {7} 1/mm (k {8} / {9})
+  E{0}: křivost {1} až {2} 1/mm{3}	E{0}: Krümmung {1} bis {2} 1/mm{3}
+  posun: plocha F{0} cv u v posun dx dy dz · řada: plocha F{0} cv řada u|v k posun dx dy dz	verschieben: fläche F{0} cv u v verschieben dx dy dz · Reihe: fläche F{0} cv reihe u|v k verschieben dx dy dz
+ – periodická	 – periodisch
+ – plocha není B-spline, síť je proložení (přibližně)	 – die Fläche ist kein B-Spline, das Netz ist eine Annäherung (näherungsweise)
+ (nejmenší poloměr {0} mm)	 (kleinster Radius {0} mm)
+ (přímá)	 (gerade)
+, nesešité	, nicht vernäht
+„{0}“ čeká úhel ve stupních nebo „vyp“	„{0}“ erwartet einen Winkel in Grad oder „aus“
+(hrany obarveny v 3D okně: zelená G2, žlutá G1, oranžová G0, červená mezera, fialová volná)	(Kanten in der 3D-Ansicht eingefärbt: grün G2, gelb G1, orange G0, rot Spalt, violett frei)
+(zobrazeny v 3D okně)	(in der 3D-Ansicht angezeigt)
+{0} × {1} řídicích bodů, stupeň {2} × {3}	{0} × {1} Kontrollpunkte, Grad {2} × {3}
+✓ F{0}: B-spline {1} × {2} řídicích bodů (stupeň {3} × {4}){5}{6}	✓ F{0}: B-Spline {1} × {2} Kontrollpunkte (Grad {3} × {4}){5}{6}
+✓ hřebeny křivosti {0} hran{1}	✓ Krümmungskämme von {0} Kanten{1}
+✓ hřebeny křivosti: žádná zakřivená hrana	✓ Krümmungskämme: keine gekrümmte Kante
+✓ návaznost {0} hran: G2 {1} · G1 {2} · G0 {3} · mezera {4} · volné {5}	✓ Stetigkeit von {0} Kanten: G2 {1} · G1 {2} · G0 {3} · Spalt {4} · frei {5}
+0 = automaticky	0 = automatisch
+1 = přirozené; větší = plocha se déle drží směru plochy	1 = natürlich; größer = die Fläche hält die Richtung der Fläche länger
+analýza hřebenu [E3 …] [měřítko 50] [zobrazit]	analyse kamm [E3 …] [maßstab 50] [anzeigen]
+analýza návaznosti [E3 E5 …] [zobrazit] – bez hran všechny hrany modelu	analyse stetigkeit [E3 E5 …] [anzeigen] – ohne Kanten alle Kanten des Modells
+B-spline plochu se nepodařilo sestavit (nekonzistentní póly a uzly).	Die B-Spline-Fläche konnte nicht aufgebaut werden (inkonsistente Pole und Knoten).
+Bez mapy	Keine Karte
+Bod hrany se nepodařilo promítnout na plochu.	Der Kantenpunkt konnte nicht auf die Fläche projiziert werden.
+CV: ořez plochy se nezachová – upravená plocha má celý rozsah parametrů (otvory a obrys znovu ořízněte).	CV: der Beschnitt der Fläche bleibt nicht erhalten – die bearbeitete Fläche hat den vollen Parameterbereich (Löcher und Kontur neu beschneiden).
+CV: plocha nebyla B-spline – převedla se prokladem sítí bodů (přibližně).	CV: die Fläche war kein B-Spline – sie wurde durch ein Punktnetz angenähert (näherungsweise).
+Číslo řady	Reihennummer
+Délka prodloužení musí být kladná.	Die Verlängerungslänge muss positiv sein.
+Dvě hrany (1. a 2. strana)	Zwei Kanten (Seite 1 und Seite 2)
+G0 – jen dotyk	G0 – nur Berührung
+G0 mezera, G1 úhel a G2 rozdíl křivostí napříč vybranými hranami (barvy hran), hřebeny křivosti, zebra a mapa křivosti	G0-Spalt, G1-Winkel und G2-Krümmungsdifferenz über die gewählten Kanten (Kantenfarben), Krümmungskämme, Zebra und Krümmungskarte
+G1 – tečně	G1 – tangential
+G2 – křivostně	G2 – krümmungsstetig
+hladká plocha vyplní uzavřenou smyčku hran (otvor) s návazností G0 / G1 / G2 na sousední plochy (BRepOffsetAPI_MakeFilling)	eine glatte Fläche füllt eine geschlossene Kantenschleife (Loch) mit G0 / G1 / G2-Stetigkeit zu den Nachbarflächen (BRepOffsetAPI_MakeFilling)
+Hrana E{0} nepatří žádné ploše.	Kante E{0} gehört zu keiner Fläche.
+Hrana E{0} v modelu není (model má E1–E{1}).	Kante E{0} ist nicht im Modell (das Modell hat E1–E{1}).
+Hrana E{0} v modelu není.	Kante E{0} ist nicht im Modell.
+hrany otvoru – v libovolném pořadí	Kanten des Lochs – in beliebiger Reihenfolge
+Hrany volných ploch	Kanten freier Flächen
+Hřebeny vybraných hran	Kämme der gewählten Kanten
+Hřebeny zakřivených hran	Kämme gekrümmter Kanten
+chybí posun: {0}	Verschiebung fehlt: {0}
+Interpolace křivky se nezdařila – body se nesmí opakovat.	Kurveninterpolation fehlgeschlagen – Punkte dürfen sich nicht wiederholen.
+Mapa křivosti	Krümmungskarte
+měřítko hřebenu musí být kladné: {0}	der Kamm-Maßstab muss positiv sein: {0}
+mezera	Spalt
+Model nemá žádné plochy ani hrany.	Das Modell hat keine Flächen oder Kanten.
+Napětí musí být kladné.	Die Spannung muss positiv sein.
+napětí přechodu musí být kladné: {0}	die Übergangsspannung muss positiv sein: {0}
+Napětí strany 1	Spannung Seite 1
+Napětí strany 2	Spannung Seite 2
+Návaznost	Stetigkeit
+Návaznost a křivost hran	Kantenstetigkeit und Krümmung
+Návaznost na sousední plochy	Stetigkeit zu Nachbarflächen
+návaznost ploch napříč hranami: G0 mezera (mm), G1 úhel normál (°), G2 rozdíl křivostí (1/mm) a třída G0/G1/G2; hřebeny křivosti hran; „zobrazit“ obarví hrany / ukáže hřebeny v 3D okně	Flächenstetigkeit über Kanten: G0-Spalt (mm), G1-Normalenwinkel (°), G2-Krümmungsdifferenz (1/mm) und Klasse G0/G1/G2; Krümmungskämme von Kanten; „anzeigen“ färbt die Kanten / zeigt die Kämme in der 3D-Ansicht
+Návaznost strany 1	Stetigkeit Seite 1
+Návaznost strany 2	Stetigkeit Seite 2
+Návaznost vybraných ({0})	Stetigkeit der gewählten ({0})
+Nejvýš 40 × 40 řídicích bodů.	Höchstens 40 × 40 Kontrollpunkte.
+Obrátit směr druhé hrany (zkroucení)	Richtung der zweiten Kante umkehren (Verdrehung)
+Ořezaná plocha (otvory, neobdélníkový obrys) se po úpravě vrátí v celém rozsahu parametrů. Plochy, které nejsou B-spline, se převedou prokladem sítí (rovina přesně).	Eine beschnittene Fläche (Löcher, nicht rechteckige Kontur) erhält nach der Bearbeitung ihren vollen Parameterbereich. Flächen, die keine B-Splines sind, werden durch ein Netz angenähert (Ebenen exakt).
+Otevřené	Offen
+Plocha F{0} v modelu není (model má F1–F{1}).	Fläche F{0} ist nicht im Modell (das Modell hat F1–F{1}).
+plocha F3 cv · plocha F3 cv [síť 4 4] 2 3 posun 0 0 1,5 · plocha F3 cv řada u 2 posun 0 0 1	fläche F3 cv · fläche F3 cv [netz 4 4] 2 3 verschieben 0 0 1,5 · fläche F3 cv reihe u 2 verschieben 0 0 1
+Plocha je periodická přes všechny profily – bez hrany ve švu (C2). Profily se prokládají hladce: ostré rohy profilů se zaoblí, odchylku ohlásí varování.	Die Fläche ist periodisch über alle Profile – keine Kante an der Naht (C2). Profile werden glatt angenähert: scharfe Profilecken werden verrundet, die Abweichung meldet eine Warnung.
+Plocha má řídicí body 1–{0} × 1–{1} – bod [{2}, {3}] neexistuje.	Die Fläche hat Kontrollpunkte 1–{0} × 1–{1} – Punkt [{2}, {3}] existiert nicht.
+plocha mezi dvěma hranami ploch s tečnou (G1) nebo křivostní (G2) návazností a nastavitelným napětím	Fläche zwischen zwei Flächenkanten mit tangentialer (G1) oder krümmungsstetiger (G2) Stetigkeit und einstellbarer Spannung
+plocha není B-spline – síť je proložení (přibližně)	die Fläche ist kein B-Spline – das Netz ist eine Annäherung (näherungsweise)
+plocha pokračuje přes vybrané hrany o danou délku: G1 = tečně (rovně), G2 = pokračuje křivost	die Fläche setzt sich über die gewählten Kanten um die angegebene Länge fort: G1 = tangential (gerade), G2 = Krümmung läuft weiter
+plocha: {0}	Fläche: {0}
+Plochu tohoto typu nelze převést na B-spline (řídicí body).	Eine Fläche dieses Typs lässt sich nicht in einen B-Spline umwandeln (Kontrollpunkte).
+plochy třídy A: N-stranná výplň otvoru s návazností na sousední plochy, přechodová plocha mezi dvěma hranami (napětí 1 = přirozené), prodloužení plochy přes hranu (G1 tečně, G2 s křivostí)	Class-A-Flächen: N-seitige Füllung eines Lochs mit Stetigkeit zu den Nachbarflächen, Übergangsfläche zwischen zwei Kanten (Spannung 1 = natürlich), Verlängerung einer Fläche über eine Kante (G1 tangential, G2 mit Krümmung)
+Počítám…	Berechne…
+Posun bodu	Punktverschiebung
+posun čeho? Zadejte bod (2 3) nebo řadu (řada u 2) před slovem posun: {0}	was verschieben? Punkt (2 3) oder Reihe (reihe u 2) vor dem Wort verschieben angeben: {0}
+posun potřebuje vektor třemi čísly: posun 0 0 1,5	verschieben braucht einen Vektor aus drei Zahlen: verschieben 0 0 1,5
+Posun řady	Reihenverschiebung
+Posun řady CV	CV-Reihe verschieben
+posun řídicích bodů (CV) nebo celých řad B-spline plochy; síť lze přesně zjemnit (stupeň 3, vložení uzlů)	Kontrollpunkte (CV) oder ganze Reihen einer B-Spline-Fläche verschieben; das Netz lässt sich exakt verfeinern (Grad 3, Knoteneinfügung)
+prodloužení je G1 (tečně) nebo G2 (křivostně)	Verlängerung ist G1 (tangential) oder G2 (krümmungsstetig)
+prodloužení potřebuje hrany a kladnou délku: {0}	Verlängerung braucht Kanten und eine positive Länge: {0}
+Prodloužit lze jen volnou plochu (ne stěnu tělesa) – hrana E{0}.	Nur eine freie Fläche (keine Körperfläche) lässt sich verlängern – Kante E{0}.
+prodloužit plochu E5 [E6 …] 10 [G1|G2]	verlängern fläche E5 [E6 …] 10 [G1|G2]
+Prodloužit přes hranu (G1/G2)	Über Kante verlängern (G1/G2)
+Profil má nulovou délku.	Das Profil hat die Länge null.
+první vybraná hrana = strana 1, druhá = strana 2	erste gewählte Kante = Seite 1, zweite = Seite 2
+přechod E3 E7 [G1|G2] [G1|G2] [napětí 1 [1,5]] [obrátit] [sešít]	übergang E3 E7 [G1|G2] [G1|G2] [spannung 1 [1,5]] [umkehren] [nähen]
+přechod je G1 nebo G2 (G0 = jen dotyk – použijte výplň nebo šablonování)	ein Übergang ist G1 oder G2 (G0 = nur Berührung – Füllung oder Loft verwenden)
+Přechod potřebuje dvě různé hrany.	Ein Übergang braucht zwei verschiedene Kanten.
+přechod potřebuje právě dvě hrany: {0}	ein Übergang braucht genau zwei Kanten: {0}
+Přechodová plocha (G1/G2)	Übergangsfläche (G1/G2)
+řada	Reihe
+řada CV: řada u 2 | řada v 3 (čísla řad od 1)	CV-Reihe: reihe u 2 | reihe v 3 (Reihen ab 1 nummeriert)
+Řada u {0} neexistuje (plocha má řady u 1–{1}).	Reihe u {0} existiert nicht (die Fläche hat Reihen u 1–{1}).
+Řada v {0} neexistuje (plocha má řady v 1–{1}).	Reihe v {0} existiert nicht (die Fläche hat Reihen v 1–{1}).
+Řady pólů plochy nemají stejnou strukturu.	Die Polreihen der Fläche haben nicht dieselbe Struktur.
+Řezy plochy nemají stejnou strukturu – zkuste jiný počet bodů.	Die Flächenschnitte haben nicht dieselbe Struktur – andere Punktzahl versuchen.
+řídicí bod se zadává dvěma celými čísly od 1 (u v): 2 3	ein Kontrollpunkt wird mit zwei ganzen Zahlen ab 1 angegeben (u v): 2 3
+řídicí body (CV) B-spline plochy: seznam, posun bodu [u v] nebo celé řady o vektor; síť = přesné zjemnění (stupeň 3)	Kontrollpunkte (CV) einer B-Spline-Fläche: Liste, Punkt [u v] oder ganze Reihe um einen Vektor verschieben; netz = exakte Verfeinerung (Grad 3)
+Řídicí body lze upravit jen u volné plochy (karta Plochy), ne u stěny tělesa.	Kontrollpunkte lassen sich nur an einer freien Fläche (Registerkarte Flächen) bearbeiten, nicht an einer Körperfläche.
+Řídicí body plochy (CV)	Kontrollpunkte der Fläche (CV)
+řídicí body: {0}	Kontrollpunkte: {0}
+řídicí body: zadejte plochu číslem F…: {0}	Kontrollpunkte: Fläche mit ihrer Nummer F… angeben: {0}
+Sešít s okolními plochami	Mit umliegenden Flächen vernähen
+síť CV = dva počty 2 až 40: síť 4 4	CV-Netz = zwei Anzahlen 2 bis 40: netz 4 4
+Síť CV ve směru u (0 = původní)	CV-Netz in u-Richtung (0 = ursprünglich)
+Síť CV ve směru v (0 = původní)	CV-Netz in v-Richtung (0 = ursprünglich)
+Síť řídicích bodů (u × v, 0 = původní)	Kontrollpunktnetz (u × v, 0 = ursprünglich)
+Skrýt barvy a hřebeny	Farben und Kämme ausblenden
+Směr řady	Reihenrichtung
+Spline – tečny v bodech	Spline – Tangenten in Punkten
+spline má body p0–p{0} – tečna u p{1} není možná	der Spline hat die Punkte p0–p{0} – eine Tangente bei p{1} ist nicht möglich
+Spline potřebuje aspoň dva body.	Ein Spline braucht mindestens zwei Punkte.
+Spline se nepodařilo proložit body – body se nesmí opakovat.	Der Spline konnte nicht durch die Punkte gelegt werden – Punkte dürfen sich nicht wiederholen.
+Táhnout bod v 3D okně (gizmo)	Punkt in der 3D-Ansicht ziehen (Gizmo)
+Tečna	Tangente
+tečna p{0} {1} → {2}°	Tangente p{0} {1} → {2}°
+tečna p{0} {1} → volná	Tangente p{0} {1} → frei
+tečna se píše: tečna-začátek 30 · tečna-konec -30 · tečna p1 45 · váha-začátek 1,5 · váha p1 2 (úhel ve stupních od osy X skici; „vyp“ tečnu zruší)	eine Tangente wird so geschrieben: tangente-anfang 30 · tangente-ende -30 · tangente p1 45 · gewicht-anfang 1,5 · gewicht p1 2 (Winkel in Grad von der Skizzen-X-Achse; „aus“ entfernt die Tangente)
+Tečna v bodě p{0}	Tangente im Punkt p{0}
+tečny	Tangenten
+Třída	Klasse
+Úhel °	Winkel °
+Úhel od osy X skici (°), váha 1 = přirozená velikost. Tečnu lze i táhnout za kroužek u bodu.	Winkel von der Skizzen-X-Achse (°), Gewicht 1 = natürliche Größe. Die Tangente lässt sich auch am Kreis beim Punkt ziehen.
+Úhel tečny v bodě p{0}	Tangentenwinkel im Punkt p{0}
+Uzavřené	Geschlossen
+Uzavřené hladce: plocha prochází profily s odchylkou až {0} mm (profily se prokládají hladce – ostré rohy se zaoblí).	Geschlossen glatt: die Fläche läuft mit einer Abweichung bis {0} mm durch die Profile (Profile werden glatt angenähert – scharfe Ecken werden verrundet).
+Uzavřené hladké šablonování	Glatter geschlossener Loft
+Uzavřené hladké šablonování nevytvořilo objem – profily se nejspíš kříží.	Der glatte geschlossene Loft hat kein Volumen erzeugt – die Profile kreuzen sich vermutlich.
+Uzavřené hladké šablonování potřebuje uzavřené profily.	Der glatte geschlossene Loft braucht geschlossene Profile.
+Uzavření	Schließen
+Uzavřený hladce	Geschlossen glatt
+Váha	Gewicht
+váha tečny musí být kladná (1 = přirozená)	das Tangentengewicht muss positiv sein (1 = natürlich)
+váha tečny p{0} {1} → {2}	Tangentengewicht p{0} {1} → {2}
+Váha tečny v bodě p{0}	Tangentengewicht im Punkt p{0}
+váha u p{0}: nejdřív zadejte tečnu (tečna p{0} úhel)	Gewicht bei p{0}: zuerst die Tangente angeben (tangente p{0} Winkel)
+volná	frei
+volná hrana	freie Kante
+volná plocha (karta Plochy) – klik v modelu	freie Fläche (Registerkarte Flächen) – Klick im Modell
+Vyberte hranu volné plochy, přes kterou se má plocha prodloužit.	Kante einer freien Fläche wählen, über die die Fläche verlängert werden soll.
+Vyberte hrany tvořící uzavřenou smyčku (otvor v ploše).	Kanten wählen, die eine geschlossene Schleife bilden (ein Loch in der Fläche).
+Vyberte hrany v modelu (nebo nic = všechny). G0 = mezera ≤ 0,01 mm, G1 = úhel normál ≤ 0,1°, G2 = rozdíl křivostí ≤ 5 %.	Kanten im Modell wählen (oder keine = alle). G0 = Spalt ≤ 0,01 mm, G1 = Normalenwinkel ≤ 0,1°, G2 = Krümmungsdifferenz ≤ 5 %.
+Vyberte plochu (F…), jejíž řídicí body se mají posunout.	Fläche (F…) wählen, deren Kontrollpunkte verschoben werden sollen.
+Vyberte právě dvě hrany (každou na jiné ploše).	Genau zwei Kanten wählen (jede auf einer anderen Fläche).
+výplň E3 E4 E5 [G0|G1|G2] [sešít]	füllen E3 E4 E5 [G0|G1|G2] [nähen]
+Výplň N-stran (G0/G1/G2)	N-seitige Füllung (G0/G1/G2)
+výplň potřebuje hrany otvoru: {0}	Füllung braucht die Kanten des Lochs: {0}
+Výplň se nepodařilo vytvořit – hrany musí tvořit jednu uzavřenou smyčku (otvor).	Die Füllung konnte nicht erzeugt werden – die Kanten müssen eine einzige geschlossene Schleife (Loch) bilden.
+Výplň: {0} z {1} hran nemá sousední plochu – u nich je jen G0.	Füllung: {0} von {1} Kanten haben keine Nachbarfläche – dort nur G0.
+Výplň: dosažená tečnost {0}° (cíl < 0,1°) – zkuste méně hran nebo G0.	Füllung: erreichte Tangentialität {0}° (Ziel < 0,1°) – weniger Kanten oder G0 versuchen.
+Z plochy se nepodařilo vytvořit stěnu.	Aus der Fläche ließ sich keine Seitenfläche erzeugen.
+Zebra	Zebra
+zjemnění je přesné (stupeň 3, vložení uzlů)	die Verfeinerung ist exakt (Grad 3, Knoteneinfügung)
+Zrušit všechny tečny	Alle Tangenten entfernen
+Žádná zakřivená hrana.	Keine gekrümmte Kante.
+#!dynamic – skupiny pásu karet (tr(label) za běhu)
+Plochy třídy A	Class-A-Flächen
+Analýza ploch	Flächenanalyse

@@ -15,7 +15,6 @@ Odebrat hranu	Kante entfernen
 Plný	Vollrundung
 Plocha–plocha	Fläche–Fläche
 Poloměr = polovina vzdálenosti rovnoběžných bočních ploch; prostřední plocha se nahradí válcem tečným k oběma. Prostřední plochu lze vynechat, je-li mezi bočními plochami jediná. Obdélníková prostřední plocha kolmá na boční se zaoblí přesně, jiná přibližně.	Radius = halber Abstand der parallelen Seitenflächen; die Mittelfläche wird durch einen zu beiden tangentialen Zylinder ersetzt. Die Mittelfläche kann entfallen, wenn zwischen den Seitenflächen nur eine liegt. Eine rechteckige, zu den Seiten senkrechte Mittelfläche wird exakt verrundet, andere näherungsweise.
-Poloměr se mění lineárně od začátku hrany (R1) k jejímu konci (R2). Začátek hrany určuje model – běží-li přechod obráceně, hodnoty prohoďte. Eliptické (asymetrické) zaoblení s různou vzdáleností na každé ploše jádro OCCT neumí.	Der Radius ändert sich linear vom Kantenanfang (R1) zum Kantenende (R2). Den Kantenanfang bestimmt das Modell – läuft der Übergang verkehrt, vertauschen Sie die Werte. Elliptische (asymmetrische) Verrundungen mit unterschiedlichem Abstand je Fläche unterstützt der OCCT-Kern nicht.
 Poloměry hran	Kantenradien
 Pro tabulku poloměrů vyberte hrany klikem v modelu – u volby „Všechny“ platí výchozí poloměr.	Für die Radientabelle wählen Sie Kanten per Klick im Modell – bei „Alle“ gilt der Standardradius.
 Prohodit R1 ↔ R2	R1 ↔ R2 tauschen
@@ -141,7 +140,6 @@ Neutrální rovina	Neutrale Ebene
 Okraj od obrysu	Rand zur Kontur
 Opakované prvky	Wiederholte Features
 Pevné (jen posun)	Fest (nur Verschiebung)
-Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Dělicí křivka a stupňovitý úkos zatím nejsou k dispozici.	Die Flächen werden um den Winkel um ihre Schnittlinie mit der neutralen Ebene geneigt; die Entformungsrichtung bestimmt, zu welcher Seite sich die Schräge öffnet (bei vorgegebener Ebene dreht sie nur deren Orientierung). Ohne Ebene und Richtung gilt die Grundebene. Trennkurve und gestufte Schräge sind noch nicht verfügbar.
 Po křivce	Entlang Kurve
 Podle skici	Nach Skizze
 Podle tečny křivky	Nach Kurventangente

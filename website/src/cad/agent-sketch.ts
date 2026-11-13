@@ -9,6 +9,7 @@
  *
  * Čisté funkce bez prohlížeče (testovatelné v Node); `cad-app.tsx` volá jen `applySketchOp` a `sketchOnPlane`.
  */
+import { tangentSummary } from "./spline-tangent";
 import type { FaceLite } from "./agent";
 import { getLang, tr } from "./i18n";
 import type { Ref, Sig } from "./refs";
@@ -616,7 +617,7 @@ export function entityText(e: SketchEntity): string {
       case "polyline":
         return `${tr("čára {0} b.", e.points.length)} ${e.points.map(pt).join("→")}${e.closed ? "↺" : ""}`;
       case "spline":
-        return `${tr("spline {0} b.", e.points.length)} ${e.points.map(pt).join("→")}${e.closed ? "↺" : ""}`;
+        return `${tr("spline {0} b.", e.points.length)} ${e.points.map(pt).join("→")}${e.closed ? "↺" : ""}${tangentSummary(e) ? ` ${tr("tečny")} ${tangentSummary(e, fmt)}` : ""}`;
       case "point":
         return `${tr("bod")} ${pt(e.p)}`;
       case "ellipse":

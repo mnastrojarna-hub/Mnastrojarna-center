@@ -1,0 +1,102 @@
+# Tvary 7. vlny: zaoblení se setbackem, eliptické / kuželosečkové zaoblení, úkos s dělicí křivkou, stupňovitý úkos
+# (feat/fillet-shapes.ts, feat/draft-parting.ts, agent-shapes.ts, forms/fillet-form.tsx, forms/pattern-form.tsx, shape-presets.tsx)
+ (+{0} vrcholů vlastní)	 (+{0} vertices own)
+, dělicí křivka „{0}“{1}	, parting curve “{0}”{1}
+, kuželosečka rho {0}	, conic rho {0}
+, neutrální rovina {0}	, neutral plane {0}
+, stupňovitý	, stepped
+{0}°, ploch {1}	{0}°, {1} faces
+D1 (první plocha)	D1 (first face)
+D2 (druhá plocha)	D2 (second face)
+Dělicí čára má {0} úseků – každý se zkosí kolem své roviny; mezi nerovnoběžnými úseky vzniknou drobné přechodové stupně.	The parting line has {0} segments – each is drafted about its own plane; small transition steps appear between non-parallel segments.
+Dělicí křivka	Parting curve
+Dělicí křivka (skica)	Parting curve (sketch)
+Dělicí křivka je rovinná (skica kolmá na tah) – stupňovitý úkos je zde totožný s úkosem kolem dělicí roviny.	The parting curve is planar (sketch perpendicular to the pull) – a step draft is identical to a draft about the parting plane here.
+Dělicí křivka je zakřivená – úkos se počítá po {0} rovinných úsecích (přibližně, mezi úseky drobné stupně).	The parting curve is curved – the draft is computed in {0} planar segments (approximate, small steps between segments).
+Dělicí křivka leží mimo těleso.	The parting curve lies outside the body.
+Dělicí křivka musí být jedna souvislá čára (skica „{0}“ má mezery nebo větve).	The parting curve must be one continuous line (sketch “{0}” has gaps or branches).
+Dělicí křivka musí mít aspoň dva body.	The parting curve needs at least two points.
+Dělicí křivka se ve směru kolmém na tah vrací – každému místu smí odpovídat jediná výška (svislé skoky jsou dovoleny).	The parting curve turns back across the pull direction – each position may have only one height (vertical jumps are allowed).
+Dělicí plocha těleso nerozdělila – zkontrolujte polohu skici dělicí křivky.	The parting surface did not split the body – check the position of the parting curve sketch.
+dvě vzdálenosti D1 × D2, elipsa nebo kuželosečka (rho)	two distances D1 × D2, ellipse or conic (rho)
+Eliptické / kuželosečkové	Elliptical / conic
+eliptické / kuželosečkové zaoblení: D1 na horní (první) ploše, D2 na druhé; rho = kuželosečka (0,5 parabola)	elliptical / conic fillet: D1 on the upper (first) face, D2 on the second; rho = conic (0.5 parabola)
+eliptické D1 {0} × D2 {1}{2}, hrany {3}	elliptical D1 {0} × D2 {1}{2}, edges {3}
+Eliptické zaoblení	Elliptical fillet
+Eliptické zaoblení D1 {0} × D2 {1} nelze provést – vzdálenosti jsou pro vybrané hrany příliš velké nebo se zaoblení kříží.	Elliptical fillet D1 {0} × D2 {1} cannot be created – the distances are too large for the selected edges or the fillets intersect.
+Eliptické zaoblení hrany {0} se nepodařilo vytvořit (šablonování průřezů selhalo).	The elliptical fillet of edge {0} could not be created (lofting the sections failed).
+eliptické zaoblení potřebuje vzdálenosti: zaoblit eliptické D1 D2 hrany <pravidlo> [rho 0,5]	an elliptical fillet needs distances: fillet elliptical D1 D2 edges <rule> [rho 0.5]
+Eliptické zaoblení: {0} z {1} hran není přímka mezi rovinnými plochami ani kruhová hrana se stálým průřezem – průřez je tam proložen šablonováním (přibližně).	Elliptical fillet: {0} of {1} edges are neither a straight line between planar faces nor a circular edge with a constant section – the section is lofted there (approximate).
+Hrana {0} je zčásti vypuklá a zčásti vnitřní – eliptické zaoblení ji neumí; rozdělte ji nebo použijte konstantní zaoblení.	Edge {0} is partly convex and partly concave – the elliptical fillet cannot handle it; split it or use a constant fillet.
+Hrana {0} nesousedí právě se dvěma plochami – eliptické zaoblení na ní nelze vytvořit.	Edge {0} does not border exactly two faces – an elliptical fillet cannot be created on it.
+Kuželosečka (rho)	Conic (rho)
+Neutrální prvek	Neutral element
+obě strany od dělicí čáry, i stupňovitý	both sides from the parting line, also stepped
+Obě vzdálenosti eliptického zaoblení (D1 i D2) musí být kladné.	Both distances of the elliptical fillet (D1 and D2) must be positive.
+Odebrat vrchol	Remove vertex
+odkazem	by reference
+Parametr kuželosečky rho musí být mezi 0 a 1 (0,5 = parabola, menší = elipsa, větší = hyperbola).	The conic parameter rho must be between 0 and 1 (0.5 = parabola, less = ellipse, more = hyperbola).
+Plocha pro D1 (volitelně)	Face for D1 (optional)
+Plochu nelze zkosit kolem dělicí křivky – plocha je kolmá na směr tahu nebo ji jádro neumí naklopit.	The face cannot be drafted about the parting curve – it is perpendicular to the pull direction or the kernel cannot tilt it.
+Plochy se naklopí o úhel kolem průsečnice s neutrální rovinou; směr tahu určuje, na kterou stranu se úkos otevírá (u zadané roviny jen otočí její orientaci). Bez roviny i směru platí základní rovina. Úkos na obě strany od dělicí čáry a stupňovitý úkos: přepněte Neutrální prvek na Dělicí křivka.	The faces are tilted by the angle about their intersection with the neutral plane; the pull direction decides which way the draft opens (with a given plane it only flips its orientation). Without plane and direction the base plane applies. Draft to both sides of a parting line and step draft: switch Neutral element to Parting curve.
+Plochy se rozdělí dělicí křivkou; části nad ní se zkosí ve směru tahu, části pod ní proti němu – dělicí čára zůstane na místě a díl je v ní nejširší. Skica kolmá na tah = rovinná dělicí křivka (dělicí rovina pro obě strany, přesně). Skica rovnoběžná s tahem (např. v nárysu) = profil dělicí čáry promítnutý podél normály skici: přímé úseky přesně, oblouky a spline po rovinných úsecích (přibližně), svislé skoky = stupně. Stupňovitý úkos zkosí každý úsek od vlastní roviny kolmé na tah a sousední úseky spojí stupňovými plochami.	The faces are split by the parting curve; the parts above it are drafted in the pull direction, the parts below against it – the parting line stays in place and the part is widest there. Sketch perpendicular to the pull = planar parting curve (parting plane for both sides, exact). Sketch parallel to the pull (e.g. in the front view) = parting-line profile projected along the sketch normal: straight segments exact, arcs and splines in planar segments (approximate), vertical jumps = steps. A step draft drafts each segment from its own plane perpendicular to the pull and joins neighbouring segments with step faces.
+Poloměr se mění lineárně od začátku hrany (R1) k jejímu konci (R2). Začátek hrany určuje model – běží-li přechod obráceně, hodnoty prohoďte. Různou vzdálenost na každé ploše (eliptický průřez) má druh „Eliptické / kuželosečkové“.	The radius changes linearly from the start of the edge (R1) to its end (R2). The model decides where the edge starts – if the transition runs the other way, swap the values. A different distance on each face (elliptical section) is the “Elliptical / conic” type.
+Prohodit D1 ↔ D2	Swap D1 ↔ D2
+Průřez je oblouk elipsy (nebo kuželosečky s parametrem rho) tečný k oběma plochám: D1 se odměří na první ploše, D2 na druhé. První plocha = plocha z pole výše, jinak plocha s normálou nejvíc nahoru (+Z, pak +Y, +X). Přímá hrana mezi rovinnými plochami a kruhová hrana se stálým průřezem (rovina ⟂ osa, souosý válec/kužel) jsou přesné; jiné hrany se proloží šablonováním průřezů (přibližně, ⚠). Vnitřní hrany materiál přidají.	The section is an arc of an ellipse (or a conic with parameter rho) tangent to both faces: D1 is measured on the first face, D2 on the second. First face = the face from the field above, otherwise the face whose normal points most upwards (+Z, then +Y, +X). A straight edge between planar faces and a circular edge with a constant section (plane ⟂ axis, coaxial cylinder/cone) are exact; other edges are lofted through sections (approximate, ⚠). Concave edges add material.
+Přidat vrchol s jiným setbackem	Add a vertex with a different setback
+R{0}, setback {1}{2}, hrany {3}	R{0}, setback {1}{2}, edges {3}
+Rho (0,5 = parabola, menší = plošší, větší = ostřejší)	Rho (0.5 = parabola, less = flatter, more = sharper)
+rho kuželosečky musí být mezi 0 a 1 (0,5 = parabola)	the conic rho must be between 0 and 1 (0.5 = parabola)
+roh tří a více hran uzavře hladká záplata	a smooth patch closes a corner of three or more edges
+Rovina dělicí křivky těleso neprotíná – celé těleso se zkosí na jednu stranu.	The parting-curve plane does not cross the body – the whole body is drafted to one side.
+Rovina skici dělicí křivky musí být kolmá na směr tahu (rovinná dělicí křivka), nebo s ním rovnoběžná (profil dělicí čáry, např. skica v nárysu). Odchylka je {0}°.	The parting-curve sketch plane must be perpendicular to the pull direction (planar parting curve) or parallel to it (parting-line profile, e.g. a sketch in the front view). The deviation is {0}°.
+Rozdělení tělesa dělicí plochou se nepodařilo (booleovská operace jádra selhala).	Splitting the body by the parting surface failed (kernel boolean operation failed).
+Setback	Setback
+Setback (od vrcholu podél hran)	Setback (from the vertex along the edges)
+Setback {0} mm je delší než hrana u vrcholu [{1}] ({2} mm).	Setback {0} mm is longer than an edge at vertex [{1}] ({2} mm).
+Setback {0} mm je pro poloměr R{1} příliš malý – zvolte setback alespoň rovný poloměru.	Setback {0} mm is too small for radius R{1} – choose a setback at least equal to the radius.
+Setback {0} mm: ve vrcholu se nepodařilo najít konce všech zaoblení – setback je nejspíš delší než hrana nebo se zaoblení jinde kříží.	Setback {0} mm: the ends of all fillets could not be found at the vertex – the setback is probably longer than an edge or the fillets intersect elsewhere.
+setback musí být kladný: zaoblit 3 hrany <pravidlo> setback 5	the setback must be positive: fillet 3 edges <rule> setback 5
+Setback musí být kladný.	The setback must be positive.
+Setback nelze použít ({0}) – tyto rohy mají výchozí zaoblení vrcholu.	Setback cannot be applied ({0}) – these corners keep the default vertex blend.
+setback pro vrchol musí být kladný	the setback for a vertex must be positive
+setback pro vrchol: vrchol V3 8 (číslo vrcholu a setback) nebo vrchol x y z 8	setback for a vertex: vertex V3 8 (vertex number and setback) or vertex x y z 8
+Setback u vrcholu musí být kladný.	The setback at a vertex must be positive.
+Setback: hraniční plochu rohu se nepodařilo vytvořit.	Setback: the corner boundary face could not be created.
+Setback: mezi vybranými hranami není vrchol, ve kterém by se stýkaly aspoň 3 hrany – použito běžné zaoblení.	Setback: no vertex where at least 3 of the selected edges meet – a regular fillet was used.
+Setback: odříznutí rohu se nepodařilo (booleovská operace jádra selhala).	Setback: cutting off the corner failed (kernel boolean operation failed).
+Setback: roh není tvořen rovinnými plochami mezi zaoblenými hranami (plocha rohu má {0} konců zaoblení místo 2).	Setback: the corner is not formed by planar faces between the filleted edges (a corner face has {0} fillet ends instead of 2).
+Setback: roviny rohu jsou rovnoběžné – roh nelze uzavřít.	Setback: the corner planes are parallel – the corner cannot be closed.
+Setback: z ploch rohu se nepodařilo uzavřít těleso.	Setback: the corner faces could not be closed into a solid.
+Setback: záplata rohu navazuje s odchylkou tečen {0}° (G1 přibližně).	Setback: the corner patch joins with a tangent deviation of {0}° (G1 approximately).
+Setback: záplata rohu nenavazuje na okolní plochy ({0} volných hran) – zkuste jiný setback.	Setback: the corner patch does not connect to the surrounding faces ({0} free edges) – try another setback.
+Setback: záplatu rohu (N-stranná plocha G1) se nepodařilo spočítat.	Setback: the corner patch (N-sided G1 surface) could not be computed.
+Skica dělicí křivky „{0}“ neobsahuje žádnou křivku.	The parting-curve sketch “{0}” contains no curve.
+směr tahu: +Z | -Z | +X … nebo tři čísla (směr 0 0 1)	pull direction: +Z | -Z | +X … or three numbers (direction 0 0 1)
+Stupňovitý úkos (každý úsek od vlastní roviny, spojené stupni)	Step draft (each segment from its own plane, joined by steps)
+stupňovitý úkos potřebuje dělicí křivku: úkos 3 plochy boční dělicí "Skica 2" stupňovitý	a step draft needs a parting curve: draft 3 faces side parting "Sketch 2" stepped
+Stupňovitý úkos: {0} šikmých úseků – neutrální rovina kolmá na tah prochází středem úseku.	Step draft: {0} slanted segments – the neutral plane perpendicular to the pull passes through the segment midpoint.
+Svislé úseky dělicí křivky ({0}) nelze použít jako neutrální – plochy po obou stranách spojí stupňové plochy.	Vertical segments of the parting curve ({0}) cannot be neutral – step faces join the faces on both sides.
+Úkos kolem dělicí křivky nevrátil těleso.	The draft about the parting curve did not return a solid.
+Úkos kolem dělicí křivky se nepodařilo dopočítat (sousední plochy nelze znovu protnout) – zmenšete úhel nebo upravte výběr ploch.	The draft about the parting curve could not be completed (neighbouring faces cannot be re-intersected) – reduce the angle or adjust the face selection.
+Úkos není k dispozici.	Draft is not available.
+úkos ploch; s dělicí křivkou se části nad ní a pod ní zkosí od ní na obě strany, stupňovitý = každý úsek od vlastní roviny	face draft; with a parting curve the parts above and below it are drafted away from it to both sides, stepped = each segment from its own plane
+úkos potřebuje plochy: úkos 3 plochy boční | +X -X | F3 F5 … [dělicí "Skica 2"]	a draft needs faces: draft 3 faces side | +X -X | F3 F5 … [parting "Sketch 2"]
+úkos potřebuje úhel a plochy: úkos 3 plochy boční [dělicí "Skica 2"] [stupňovitý] [směr +Z]	a draft needs an angle and faces: draft 3 faces side [parting "Sketch 2"] [stepped] [direction +Z]
+Úkos s dělicí křivkou	Parting-line draft
+úkos všech ploch nedává smysl – vyberte boční plochy: úkos 3 plochy boční	drafting all faces makes no sense – select the side faces: draft 3 faces side
+úkos: rovina XY | XZ | YZ (neutrální rovina), „{0}“ není základní rovina	draft: plane XY | XZ | YZ (neutral plane), “{0}” is not a base plane
+Úsek dělicí křivky je příliš strmý (víc než 60° od kolmice na tah) – zkosit kolem něj nelze; použijte stupňovitý úkos nebo svislý skok.	A parting-curve segment is too steep (more than 60° from perpendicular to the pull) – no draft about it is possible; use a step draft or a vertical jump.
+Ve vrcholu, kde se stýkají aspoň tři vybrané hrany, zaoblení skončí ve vzdálenosti setback od vrcholu a roh uzavře hladká N-stranná záplata, tečná (G1) k zaoblením i k plochám rohu. Setback musí být alespoň rovný poloměru (stejná hodnota ≈ běžný kulový roh). Přesně pro rohy z rovinných ploch a přímých hran; jiné rohy dostanou běžné zaoblení vrcholu a prvek zobrazí ⚠.	At a vertex where at least three selected edges meet, the fillets stop at the setback distance from the vertex and a smooth N-sided patch closes the corner, tangent (G1) to the fillets and to the corner faces. The setback must be at least the radius (equal value ≈ the usual spherical corner). Exact for corners of planar faces and straight edges; other corners get the regular vertex blend and the feature shows ⚠.
+vrchol [{0}]: plochy rohu nejsou rovinné	vertex [{0}]: the corner faces are not planar
+vrchol {0}: hrany nejsou přímé	vertex {0}: the edges are not straight
+vrchol {0}: nejsou vybrány všechny jeho hrany	vertex {0}: not all of its edges are selected
+Vyberte plochy, které se mají zkosit (obvykle boční plochy, přes které vede dělicí křivka).	Select the faces to draft (usually the side faces crossed by the parting curve).
+Vyberte skicu dělicí křivky (skica musí být v historii před úkosem).	Select the parting-curve sketch (it must be in the history before the draft).
+výchozí = poloměr	default = radius
+Zaoblení není k dispozici.	Fillet is not available.
+Zaoblení se setbackem	Setback fillet
+zaoblení se setbackem potřebuje poloměr: zaoblit R hrany <pravidlo> setback S	a setback fillet needs a radius: fillet R edges <rule> setback S
+zaoblení se setbackem: zaoblení skončí S od vrcholu se 3+ hranami, roh uzavře hladká záplata G1 (výchozí S = R)	setback fillet: the fillets stop S from a vertex with 3+ edges, a smooth G1 patch closes the corner (default S = R)
+Zkosené části tělesa se nepodařilo sloučit (booleovská operace jádra selhala) – zmenšete úhel.	The drafted parts of the body could not be merged (kernel boolean operation failed) – reduce the angle.
+Setback {0} mm: oblast rohu zasahuje do jiné části tělesa – zvolte menší setback.	Setback {0} mm: the corner region reaches another part of the body – choose a smaller setback.

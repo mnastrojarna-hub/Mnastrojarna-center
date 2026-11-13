@@ -1,4 +1,5 @@
 "use client";
+import type { SurfQuery, SurfQueryResult } from "./surf-query";
 import { getLang, tr, type CadLang } from "./i18n";
 import type { BuildProgress } from "./build";
 import type { EdgeLite, FaceLite } from "./agent";
@@ -210,4 +211,6 @@ export const cad = {
   /** měření pro příkaz „měřit“ / window.mncad.measure (measure.ts): `doc` = díl, který se postaví a změří; `sources` = díly komponent sestavy */
   measure: (q: MeasureQuery, o: { doc?: CadDoc; density?: number; sources?: { key: string; source: ComponentSource }[] } = {}) => call<MeasureReport>({ op: "measure", q, ...o }),
   drawing: (doc: CadDoc, meta: DrawingMeta, opts?: Partial<DrawingOptions>) => call<DrawingResult & { smart?: SmartDims }>({ op: "drawing", doc, meta, opts }),
+  /** plochy třídy A: návaznost hran, hřebeny křivosti, řídicí body plochy (surf-query.ts); `doc` = postavit nejdřív tento díl */
+  surfA: (q: SurfQuery, doc?: CadDoc) => call<SurfQueryResult>({ op: "surfA", q, doc }),
 };

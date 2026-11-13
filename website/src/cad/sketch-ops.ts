@@ -4,6 +4,7 @@
  */
 import { arcGeom, circleFrom3, keyPoints, prims, shapeSegs, type Prim } from "./sketch";
 import { uid, type SketchEntity, type Vec2 } from "./types";
+import { mapTangents } from "./spline-tangent";
 
 const TAU = Math.PI * 2;
 const EPS = 1e-9;
@@ -144,8 +145,9 @@ export function transformEntity(e: SketchEntity, T: Xf, newId = false): SketchEn
     case "arc":
       return { ...e, id, a: P(e.a), b: P(e.b), c: P(e.c) };
     case "polyline":
-    case "spline":
       return { ...e, id, points: e.points.map(P) };
+    case "spline":
+      return { ...e, id, points: e.points.map(P), ...mapTangents(e, T.ang) };
     case "point":
       return { ...e, id, p: P(e.p) };
     case "circle": {

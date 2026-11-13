@@ -13,6 +13,7 @@ import { compareTransferables, compareWithReference, type CompareOptions, type R
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
 import { measureQuery, type MeasureQuery } from "./measure";
+import { surfQuery, type SurfQuery } from "./surf-query";
 import { refInfo, resolvePlaneDef } from "./ref-resolve";
 import { stampPicks } from "./pick-sigs";
 import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
@@ -62,7 +63,9 @@ type Req =
   | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef }
   | { id: number; op: "datumGfx"; doc: CadDoc }
   | { id: number; op: "pickSigs"; doc: CadDoc; feature: Feature }
-  | { id: number; op: "stepSplit"; bytes: Uint8Array; fileName: string };
+  | { id: number; op: "stepSplit"; bytes: Uint8Array; fileName: string }
+  /** plochy třídy A: návaznost hran, hřebeny křivosti, řídicí body (surf-query.ts); `doc` = postavit nejdřív tento díl */
+  | { id: number; op: "surfA"; q: SurfQuery; doc?: CadDoc };
 
 /** Kontext řešení odkazů nad posledním postaveným tělesem a aktuálním dokumentem. */
 function refCtx(doc: CadDoc) {
@@ -263,6 +266,15 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         } finally {
           for (const s of made) s.delete?.();
         }
+        break;
+      }
+      case "surfA": {
+        if (m.doc) {
+          const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
+          body?.delete?.();
+          body = res.body;
+        }
+        ctx.postMessage({ id: m.id, ok: true, result: surfQuery(body, m.q) });
         break;
       }
       case "interference":

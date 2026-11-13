@@ -1,0 +1,162 @@
+# 7. vlna – plochy (surfaces): spline s tečnami, hladké uzavřené šablonování, plochy třídy A, analýza návaznosti
+  … a dalších {0} hran (vypsány jen hrany s horší než G2 návazností)	… and {0} more edges (only edges worse than G2 are listed)
+  … vypsáno prvních 200 z {0} bodů	… first 200 of {0} points listed
+  E{0} (F{1}): volná hrana – bez sousední plochy	E{0} (F{1}): free edge – no neighbouring face
+  E{0} (F{1}|F{2}{3}): {4} · mezera {5} mm · úhel {6}° · Δk {7} 1/mm (k {8} / {9})	E{0} (F{1}|F{2}{3}): {4} · gap {5} mm · angle {6}° · Δk {7} 1/mm (k {8} / {9})
+  E{0}: křivost {1} až {2} 1/mm{3}	E{0}: curvature {1} to {2} 1/mm{3}
+  posun: plocha F{0} cv u v posun dx dy dz · řada: plocha F{0} cv řada u|v k posun dx dy dz	move: face F{0} cv u v move dx dy dz · row: face F{0} cv row u|v k move dx dy dz
+ – periodická	 – periodic
+ – plocha není B-spline, síť je proložení (přibližně)	 – the face is not a B-spline, the grid is a fit (approximate)
+ (nejmenší poloměr {0} mm)	 (smallest radius {0} mm)
+ (přímá)	 (straight)
+, nesešité	, not sewn
+„{0}“ čeká úhel ve stupních nebo „vyp“	„{0}“ expects an angle in degrees or „off“
+(hrany obarveny v 3D okně: zelená G2, žlutá G1, oranžová G0, červená mezera, fialová volná)	(edges coloured in the 3D view: green G2, yellow G1, orange G0, red gap, purple free)
+(zobrazeny v 3D okně)	(shown in the 3D view)
+{0} × {1} řídicích bodů, stupeň {2} × {3}	{0} × {1} control points, degree {2} × {3}
+✓ F{0}: B-spline {1} × {2} řídicích bodů (stupeň {3} × {4}){5}{6}	✓ F{0}: B-spline {1} × {2} control points (degree {3} × {4}){5}{6}
+✓ hřebeny křivosti {0} hran{1}	✓ curvature combs of {0} edges{1}
+✓ hřebeny křivosti: žádná zakřivená hrana	✓ curvature combs: no curved edge
+✓ návaznost {0} hran: G2 {1} · G1 {2} · G0 {3} · mezera {4} · volné {5}	✓ continuity of {0} edges: G2 {1} · G1 {2} · G0 {3} · gap {4} · free {5}
+0 = automaticky	0 = automatic
+1 = přirozené; větší = plocha se déle drží směru plochy	1 = natural; larger = the surface keeps the direction of the face longer
+analýza hřebenu [E3 …] [měřítko 50] [zobrazit]	analyze comb [E3 …] [scale 50] [show]
+analýza návaznosti [E3 E5 …] [zobrazit] – bez hran všechny hrany modelu	analyze continuity [E3 E5 …] [show] – without edges all edges of the model
+B-spline plochu se nepodařilo sestavit (nekonzistentní póly a uzly).	The B-spline surface could not be assembled (inconsistent poles and knots).
+Bez mapy	No map
+Bod hrany se nepodařilo promítnout na plochu.	The edge point could not be projected onto the face.
+CV: ořez plochy se nezachová – upravená plocha má celý rozsah parametrů (otvory a obrys znovu ořízněte).	CV: the trim of the face is not kept – the edited face has the full parameter range (trim holes and outline again).
+CV: plocha nebyla B-spline – převedla se prokladem sítí bodů (přibližně).	CV: the face was not a B-spline – it was converted by fitting a grid of points (approximate).
+Číslo řady	Row number
+Délka prodloužení musí být kladná.	The extension length must be positive.
+Dvě hrany (1. a 2. strana)	Two edges (side 1 and side 2)
+G0 – jen dotyk	G0 – contact only
+G0 mezera, G1 úhel a G2 rozdíl křivostí napříč vybranými hranami (barvy hran), hřebeny křivosti, zebra a mapa křivosti	G0 gap, G1 angle and G2 curvature difference across the selected edges (edge colours), curvature combs, zebra and curvature map
+G1 – tečně	G1 – tangent
+G2 – křivostně	G2 – curvature
+hladká plocha vyplní uzavřenou smyčku hran (otvor) s návazností G0 / G1 / G2 na sousední plochy (BRepOffsetAPI_MakeFilling)	a smooth surface fills a closed loop of edges (hole) with G0 / G1 / G2 continuity to the neighbouring faces (BRepOffsetAPI_MakeFilling)
+Hrana E{0} nepatří žádné ploše.	Edge E{0} does not belong to any face.
+Hrana E{0} v modelu není (model má E1–E{1}).	Edge E{0} is not in the model (the model has E1–E{1}).
+Hrana E{0} v modelu není.	Edge E{0} is not in the model.
+hrany otvoru – v libovolném pořadí	edges of the hole – in any order
+Hrany volných ploch	Edges of free faces
+Hřebeny vybraných hran	Combs of selected edges
+Hřebeny zakřivených hran	Combs of curved edges
+chybí posun: {0}	move missing: {0}
+Interpolace křivky se nezdařila – body se nesmí opakovat.	Curve interpolation failed – points must not repeat.
+Mapa křivosti	Curvature map
+měřítko hřebenu musí být kladné: {0}	comb scale must be positive: {0}
+mezera	gap
+Model nemá žádné plochy ani hrany.	The model has no faces or edges.
+Napětí musí být kladné.	Tension must be positive.
+napětí přechodu musí být kladné: {0}	blend tension must be positive: {0}
+Napětí strany 1	Tension of side 1
+Napětí strany 2	Tension of side 2
+Návaznost	Continuity
+Návaznost a křivost hran	Edge continuity and curvature
+Návaznost na sousední plochy	Continuity to neighbouring faces
+návaznost ploch napříč hranami: G0 mezera (mm), G1 úhel normál (°), G2 rozdíl křivostí (1/mm) a třída G0/G1/G2; hřebeny křivosti hran; „zobrazit“ obarví hrany / ukáže hřebeny v 3D okně	surface continuity across edges: G0 gap (mm), G1 normal angle (°), G2 curvature difference (1/mm) and class G0/G1/G2; curvature combs of edges; „show“ colours the edges / shows the combs in the 3D view
+Návaznost strany 1	Continuity of side 1
+Návaznost strany 2	Continuity of side 2
+Návaznost vybraných ({0})	Continuity of selected ({0})
+Nejvýš 40 × 40 řídicích bodů.	At most 40 × 40 control points.
+Obrátit směr druhé hrany (zkroucení)	Reverse the direction of the second edge (twist)
+Ořezaná plocha (otvory, neobdélníkový obrys) se po úpravě vrátí v celém rozsahu parametrů. Plochy, které nejsou B-spline, se převedou prokladem sítí (rovina přesně).	A trimmed face (holes, non-rectangular outline) comes back with its full parameter range after the edit. Faces that are not B-splines are converted by fitting a grid (planes exactly).
+Otevřené	Open
+Plocha F{0} v modelu není (model má F1–F{1}).	Face F{0} is not in the model (the model has F1–F{1}).
+plocha F3 cv · plocha F3 cv [síť 4 4] 2 3 posun 0 0 1,5 · plocha F3 cv řada u 2 posun 0 0 1	face F3 cv · face F3 cv [grid 4 4] 2 3 move 0 0 1.5 · face F3 cv row u 2 move 0 0 1
+Plocha je periodická přes všechny profily – bez hrany ve švu (C2). Profily se prokládají hladce: ostré rohy profilů se zaoblí, odchylku ohlásí varování.	The surface is periodic through all profiles – no edge at the seam (C2). Profiles are fitted smoothly: sharp profile corners get rounded, a warning reports the deviation.
+Plocha má řídicí body 1–{0} × 1–{1} – bod [{2}, {3}] neexistuje.	The face has control points 1–{0} × 1–{1} – point [{2}, {3}] does not exist.
+plocha mezi dvěma hranami ploch s tečnou (G1) nebo křivostní (G2) návazností a nastavitelným napětím	surface between two edges of faces with tangent (G1) or curvature (G2) continuity and adjustable tension
+plocha není B-spline – síť je proložení (přibližně)	the face is not a B-spline – the grid is a fit (approximate)
+plocha pokračuje přes vybrané hrany o danou délku: G1 = tečně (rovně), G2 = pokračuje křivost	the face continues across the selected edges by the given length: G1 = tangent (straight), G2 = curvature continues
+plocha: {0}	face: {0}
+Plochu tohoto typu nelze převést na B-spline (řídicí body).	A face of this type cannot be converted to a B-spline (control points).
+plochy třídy A: N-stranná výplň otvoru s návazností na sousední plochy, přechodová plocha mezi dvěma hranami (napětí 1 = přirozené), prodloužení plochy přes hranu (G1 tečně, G2 s křivostí)	class-A surfaces: N-sided fill of a hole with continuity to the neighbouring faces, blend surface between two edges (tension 1 = natural), extension of a face across an edge (G1 tangent, G2 with curvature)
+Počítám…	Computing…
+Posun bodu	Point move
+posun čeho? Zadejte bod (2 3) nebo řadu (řada u 2) před slovem posun: {0}	move what? Give a point (2 3) or a row (row u 2) before the word move: {0}
+posun potřebuje vektor třemi čísly: posun 0 0 1,5	move needs a vector of three numbers: move 0 0 1.5
+Posun řady	Row move
+Posun řady CV	Move a CV row
+posun řídicích bodů (CV) nebo celých řad B-spline plochy; síť lze přesně zjemnit (stupeň 3, vložení uzlů)	move control points (CV) or whole rows of a B-spline face; the grid can be refined exactly (degree 3, knot insertion)
+prodloužení je G1 (tečně) nebo G2 (křivostně)	extension is G1 (tangent) or G2 (curvature)
+prodloužení potřebuje hrany a kladnou délku: {0}	extension needs edges and a positive length: {0}
+Prodloužit lze jen volnou plochu (ne stěnu tělesa) – hrana E{0}.	Only a free face (not a face of a solid) can be extended – edge E{0}.
+prodloužit plochu E5 [E6 …] 10 [G1|G2]	extend surface E5 [E6 …] 10 [G1|G2]
+Prodloužit přes hranu (G1/G2)	Extend across edge (G1/G2)
+Profil má nulovou délku.	The profile has zero length.
+první vybraná hrana = strana 1, druhá = strana 2	first selected edge = side 1, second = side 2
+přechod E3 E7 [G1|G2] [G1|G2] [napětí 1 [1,5]] [obrátit] [sešít]	blend E3 E7 [G1|G2] [G1|G2] [tension 1 [1.5]] [flip] [sew]
+přechod je G1 nebo G2 (G0 = jen dotyk – použijte výplň nebo šablonování)	a blend is G1 or G2 (G0 = contact only – use fill or loft)
+Přechod potřebuje dvě různé hrany.	A blend needs two different edges.
+přechod potřebuje právě dvě hrany: {0}	a blend needs exactly two edges: {0}
+Přechodová plocha (G1/G2)	Blend surface (G1/G2)
+řada	row
+řada CV: řada u 2 | řada v 3 (čísla řad od 1)	CV row: row u 2 | row v 3 (rows numbered from 1)
+Řada u {0} neexistuje (plocha má řady u 1–{1}).	Row u {0} does not exist (the face has rows u 1–{1}).
+Řada v {0} neexistuje (plocha má řady v 1–{1}).	Row v {0} does not exist (the face has rows v 1–{1}).
+Řady pólů plochy nemají stejnou strukturu.	The pole rows of the surface do not have the same structure.
+Řezy plochy nemají stejnou strukturu – zkuste jiný počet bodů.	The surface sections do not have the same structure – try a different number of points.
+řídicí bod se zadává dvěma celými čísly od 1 (u v): 2 3	a control point is given by two whole numbers from 1 (u v): 2 3
+řídicí body (CV) B-spline plochy: seznam, posun bodu [u v] nebo celé řady o vektor; síť = přesné zjemnění (stupeň 3)	control points (CV) of a B-spline face: list, move a point [u v] or a whole row by a vector; grid = exact refinement (degree 3)
+Řídicí body lze upravit jen u volné plochy (karta Plochy), ne u stěny tělesa.	Control points can be edited only on a free face (Surfaces tab), not on a face of a solid.
+Řídicí body plochy (CV)	Face control points (CV)
+řídicí body: {0}	control points: {0}
+řídicí body: zadejte plochu číslem F…: {0}	control points: give the face by its number F…: {0}
+Sešít s okolními plochami	Sew with surrounding faces
+síť CV = dva počty 2 až 40: síť 4 4	CV grid = two counts 2 to 40: grid 4 4
+Síť CV ve směru u (0 = původní)	CV grid in u direction (0 = original)
+Síť CV ve směru v (0 = původní)	CV grid in v direction (0 = original)
+Síť řídicích bodů (u × v, 0 = původní)	Control point grid (u × v, 0 = original)
+Skrýt barvy a hřebeny	Hide colours and combs
+Směr řady	Row direction
+Spline – tečny v bodech	Spline – tangents at points
+spline má body p0–p{0} – tečna u p{1} není možná	the spline has points p0–p{0} – a tangent at p{1} is not possible
+Spline potřebuje aspoň dva body.	A spline needs at least two points.
+Spline se nepodařilo proložit body – body se nesmí opakovat.	The spline could not be fitted through the points – points must not repeat.
+Táhnout bod v 3D okně (gizmo)	Drag the point in the 3D view (gizmo)
+Tečna	Tangent
+tečna p{0} {1} → {2}°	tangent p{0} {1} → {2}°
+tečna p{0} {1} → volná	tangent p{0} {1} → free
+tečna se píše: tečna-začátek 30 · tečna-konec -30 · tečna p1 45 · váha-začátek 1,5 · váha p1 2 (úhel ve stupních od osy X skici; „vyp“ tečnu zruší)	a tangent is written: tangent-start 30 · tangent-end -30 · tangent p1 45 · weight-start 1.5 · weight p1 2 (angle in degrees from the sketch X axis; „off“ removes the tangent)
+Tečna v bodě p{0}	Tangent at point p{0}
+tečny	tangents
+Třída	Class
+Úhel °	Angle °
+Úhel od osy X skici (°), váha 1 = přirozená velikost. Tečnu lze i táhnout za kroužek u bodu.	Angle from the sketch X axis (°), weight 1 = natural magnitude. The tangent can also be dragged by the circle at the point.
+Úhel tečny v bodě p{0}	Tangent angle at point p{0}
+Uzavřené	Closed
+Uzavřené hladce: plocha prochází profily s odchylkou až {0} mm (profily se prokládají hladce – ostré rohy se zaoblí).	Closed smooth: the surface passes through the profiles with a deviation of up to {0} mm (profiles are fitted smoothly – sharp corners get rounded).
+Uzavřené hladké šablonování	Closed smooth loft
+Uzavřené hladké šablonování nevytvořilo objem – profily se nejspíš kříží.	The closed smooth loft did not create a volume – the profiles probably cross.
+Uzavřené hladké šablonování potřebuje uzavřené profily.	The closed smooth loft needs closed profiles.
+Uzavření	Closure
+Uzavřený hladce	Closed smooth
+Váha	Weight
+váha tečny musí být kladná (1 = přirozená)	the tangent weight must be positive (1 = natural)
+váha tečny p{0} {1} → {2}	tangent weight p{0} {1} → {2}
+Váha tečny v bodě p{0}	Tangent weight at point p{0}
+váha u p{0}: nejdřív zadejte tečnu (tečna p{0} úhel)	weight at p{0}: give the tangent first (tangent p{0} angle)
+volná	free
+volná hrana	free edge
+volná plocha (karta Plochy) – klik v modelu	free face (Surfaces tab) – click in the model
+Vyberte hranu volné plochy, přes kterou se má plocha prodloužit.	Select an edge of a free face across which the face is to be extended.
+Vyberte hrany tvořící uzavřenou smyčku (otvor v ploše).	Select edges forming a closed loop (a hole in the surface).
+Vyberte hrany v modelu (nebo nic = všechny). G0 = mezera ≤ 0,01 mm, G1 = úhel normál ≤ 0,1°, G2 = rozdíl křivostí ≤ 5 %.	Select edges in the model (or none = all). G0 = gap ≤ 0.01 mm, G1 = normal angle ≤ 0.1°, G2 = curvature difference ≤ 5 %.
+Vyberte plochu (F…), jejíž řídicí body se mají posunout.	Select the face (F…) whose control points are to be moved.
+Vyberte právě dvě hrany (každou na jiné ploše).	Select exactly two edges (each on a different face).
+výplň E3 E4 E5 [G0|G1|G2] [sešít]	fill E3 E4 E5 [G0|G1|G2] [sew]
+Výplň N-stran (G0/G1/G2)	N-sided fill (G0/G1/G2)
+výplň potřebuje hrany otvoru: {0}	fill needs the edges of the hole: {0}
+Výplň se nepodařilo vytvořit – hrany musí tvořit jednu uzavřenou smyčku (otvor).	The fill could not be created – the edges must form a single closed loop (hole).
+Výplň: {0} z {1} hran nemá sousední plochu – u nich je jen G0.	Fill: {0} of {1} edges have no neighbouring face – only G0 there.
+Výplň: dosažená tečnost {0}° (cíl < 0,1°) – zkuste méně hran nebo G0.	Fill: achieved tangency {0}° (target < 0.1°) – try fewer edges or G0.
+Z plochy se nepodařilo vytvořit stěnu.	The surface could not be turned into a face.
+Zebra	Zebra
+zjemnění je přesné (stupeň 3, vložení uzlů)	the refinement is exact (degree 3, knot insertion)
+Zrušit všechny tečny	Remove all tangents
+Žádná zakřivená hrana.	No curved edge.
+#!dynamic – skupiny pásu karet (tr(label) za běhu)
+Plochy třídy A	Class-A surfaces
+Analýza ploch	Surface analysis
