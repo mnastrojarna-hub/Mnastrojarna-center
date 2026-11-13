@@ -1101,7 +1101,7 @@ export function bomText(rows: BomRow[], docName: string, structured: boolean): s
 }
 
 /** Otevřená záložka dokumentu (výpis `záložky`, `window.mncad.tabs()`). */
-export type TabInfo = { id: string; title: string; kind: "part" | "assembly" | "drawing"; active: boolean };
+export type TabInfo = { id: string; title: string; kind: "part" | "assembly" | "drawing" | "draft"; active: boolean };
 
 /** Záložka podle pořadí (1 = první), id nebo názvu (bez ohledu na velikost písmen a diakritiku); chyba vyjmenuje záložky. */
 export function resolveTab(list: TabInfo[], target: string | number): TabInfo {

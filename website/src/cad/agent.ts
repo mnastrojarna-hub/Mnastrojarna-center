@@ -28,6 +28,9 @@ import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, 
 import { parseApiCommand, type ApiOp, type MncadApiExt } from "./agent-api";
 import { parseShapesLine, shapesSummary } from "./agent-shapes";
 import { applySplineTangents, parseSurfaceLine, splitSplineTangents, type SurfCmd } from "./agent-surfaces";
+import { draftDocStatusText, draftLine, draftUndoLine } from "./draft/prefix";
+import type { DraftApiResult } from "./draft/agent";
+import type { DraftStatus } from "./draft/status";
 
 export const AGENT_API_VERSION = 1;
 
@@ -98,7 +101,9 @@ export type AgentOp =
   /** sestava textem (plochy, vazby, komponenty, pole, šroub, podsestavy, kusovník, rám formy, záložky) – cad/agent-asm.ts, provedení cad/asm-agent.ts */
   | { k: "asm"; cmd: AsmCmd; line: number }
   /** plochy: analýza návaznosti hran, hřebeny křivosti, seznam řídicích bodů (agent-surfaces.ts, provedení surf-a-host.ts) */
-  | { k: "surf"; cmd: SurfCmd; line: number };
+  | { k: "surf"; cmd: SurfCmd; line: number }
+  /** 2D výkres: řádek za předponou `2d` (cad/draft/agent.ts) */
+  | { k: "draft"; text: string; line: number };
 export type AgentError = { line: number; text: string; message: string };
 export type AgentProgram = { ops: AgentOp[]; errors: AgentError[] };
 
@@ -575,6 +580,17 @@ export function parseAgentText(text: string): AgentProgram {
         const sub = parseJson(line);
         for (const op of sub.ops) ops.push({ ...op, line: no });
         for (const e of sub.errors) errors.push({ line: no, text: line.slice(0, 80), message: e.message });
+        return;
+      }
+      // 2D výkres: `2d čára 0,0 100,0` (en `draft …`, de `zeichnen …`) – celý řádek patří 2D výkresu (cad/draft); `2d zpět` = historie
+      const dl = draftLine(line);
+      if (dl !== null) {
+        endBlock();
+        const undo = draftUndoLine(dl);
+        const prev = ops[ops.length - 1];
+        if (undo) for (const op of parseAgentText(undo).ops) ops.push({ ...op, line: no });
+        else if (prev?.k === "draft" && !/^(nový|novy|nová|nova|new|neu)(\s|$)/i.test(dl)) prev.text += `\n${dl}`; // navazující 2D řádky = jeden běh (rychlost)
+        else ops.push({ k: "draft", text: dl, line: no });
         return;
       }
       // úpravy existujícího modelu a skici (agent-edit.ts): upravit, potlačit / zapnout, smazat <prvek>, přejmenovat, přesunout,
@@ -1361,6 +1377,7 @@ export type AsmStatus = {
 
 /** Textový stav dokumentu – zpětná vazba pro agenta bez obrázku. */
 export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus): string {
+  if (doc.kind === "draft") return draftDocStatusText(doc);
   const st = new Map((res?.status ?? []).map((s) => [s.id, s]));
   const okCount = doc.features.filter((f) => st.get(f.id)?.ok !== false).length;
   const warnCount = doc.features.filter((f) => st.get(f.id)?.ok !== false && st.get(f.id)?.warning).length;
@@ -1490,6 +1507,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "kusovník [strukturovaně] [csv]", en: "bom", de: "stückliste", desc: tr("kusovník otevřené sestavy jako tabulka do protokolu (poz., název, číslo / norma, ks, materiál, hmotnost); strukturovaně = podsestavy s díly; také window.mncad.bom()") },
   { cmd: "rám formy [šířka délka] [deska-a N] [deska-b N] [upínací N] [opěrná N] [rozpěrky N] [šířka-rozpěrek N] [vyhazovací N] [kotevní N] [sloupky Ø] [dutina X Y H | bez dutiny] [materiál …]", en: "moldbase", de: "formaufbau", desc: tr("rám vstřikovací formy jako průvodce (výchozí 296 × 346 mm) – nová záložka se sestavou desek, vedení, šroubů a vyhazovačů") },
   { cmd: "záložky · záložka \"název\"|N · zavřít záložku [\"název\"|N]", en: "tabs, tab, close tab", de: "registerkarten, registerkarte, registerkarte schließen", desc: tr("otevřené dokumenty: výpis, přepnutí (další příkazy pracují s vybranou záložkou), zavření; také window.mncad.tabs(), activateTab(), closeTab()") },
+  { cmd: "2d <příkaz 2D výkresu> · 2d nový [název] [mm] · 2d čára 0,0 100,0 @0,50 · 2d hladina nová OSY barva 1 · 2d stav", en: "2d, draft", de: "2d, zeichnen", desc: tr("2D výkres (jako AutoCAD): kreslení, hladiny, typy čar, vlastnosti, výběr, dotazy, export DXF / DWG – stejné příkazy jako příkazový řádek 2D výkresu; také window.mncad.draft()") },
   { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", de: "JSON", desc: tr("celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy") },
 ];
 
@@ -1538,7 +1556,7 @@ export type MncadApi = MncadApiExt & {
   /** kusovník otevřené sestavy (plochý / strukturovaný) – řádky, textová tabulka a CSV (jako „kusovník“ a Export CSV) */
   bom: (opts?: { structured?: boolean }) => Promise<{ rows: { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; level?: number }[]; text: string; csv: string }>;
   /** otevřené záložky dokumentů (pořadí jako v titulní liště) */
-  tabs: () => { id: string; title: string; kind: "part" | "assembly" | "drawing"; active: boolean }[];
+  tabs: () => { id: string; title: string; kind: "part" | "assembly" | "drawing" | "draft"; active: boolean }[];
   /** přepne záložku podle názvu, id nebo pořadí (1 = první); false = taková záložka není */
   activateTab: (nameOrId: string | number) => boolean;
   /** zavře záložku (bez argumentu aktivní); false = taková záložka není */
@@ -1558,6 +1576,13 @@ export type MncadApi = MncadApiExt & {
   clickHint: (id: string, additive?: boolean) => boolean;
   /** export bez dialogu: STEP, STL, BREP, OBJ, GLB, 3MF, WRL, projekt .mncad nebo skica DXF (`sketch` = název skici, výchozí otevřená / poslední) – vrátí název, MIME, velikost a base64 */
   exportFile: (format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad" | "dxf", opts?: { sketch?: string }) => Promise<{ name: string; mime: string; bytes: number; base64: string; /** .mncad bez dat některých importů (nejsou v paměti) */ warning?: string }>;
+  /**
+   * 2D výkres: provede 2D příkazy (řádky / „;“, předpona `2d` se doplní) nad otevřeným 2D výkresem (`nový …` založí nový)
+   * a vrátí protokol, strukturované výsledky příkazů (vytvořené / změněné / smazané id, data dotazů, soubor exportu) a stav výkresu
+   */
+  draft?: (text: string) => Promise<DraftApiResult>;
+  /** otevře DXF / DWG (base64 nebo text) jako nový 2D výkres v nové záložce */
+  draftImport?: (file: { name: string; base64?: string; text?: string }) => Promise<{ ok: boolean; note: string; status: DraftStatus }>;
   /** změřené kroky otevření / výpočtu / zobrazení (čtení souboru, jádro, síť, WebGL…) s pamětí – diagnostika velkých souborů */
   perf?: () => { stage: string; ms: number; at: number; info?: Record<string, number | string> }[];
 };

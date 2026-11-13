@@ -754,6 +754,63 @@ srazit 0,5 hrany horní
 stav
 ```
 
+## 2D výkres (2D CAD jako AutoCAD) – `2d …`, `window.mncad.draft()`
+
+Samostatný druh dokumentu **2D výkres** (`kind: "draft"`, model v `doc.draft`): modelový prostor v jednotkách
+výkresu (výchozí mm), hladiny, typy čar, tloušťky, barvy ACI / pravé, ByLayer / ByBlock, uchopení, příkazový řádek.
+Každý řádek začíná `2d` (EN také `draft`, DE také `zeichnen`); za předponou je **stejný příkaz jako na příkazovém
+řádku 2D výkresu** (CZ / EN / DE název nebo zkratka AutoCADu: L, C, A, PL, REC, POL, EL, SPL, XL, PO, DT, E, LA, LT…).
+Více příkazů na řádku odděluje `;`. Zadání výzev jdou za sebou, konec řádku = Enter. Každý příkaz je atomický
+(chyba = nic se nezapíše, další řádky pokračují) a každý běh je jeden krok historie (`2d zpět` / `2d znovu`).
+
+**Body:** `x,y` · `@dx,dy` (relativně k poslednímu bodu) · `@d<úhel` · `d<úhel` (polárně od počátku) · `#x,y` · `@`
+· samotné číslo = vzdálenost ve směru předchozího úseku · desetinná **tečka** (čárka odděluje x a y) · výrazy `100/3`.
+**Přesné body entit** (uchopení textem): `e3.start` `e3.end` `e3.mid` `e3.cen` `e3.q1`–`q4` `e3.v2` (vrchol křivky)
+`e3.ins` · průsečík `x(e1,e2)` / `x(e1,e2,2)` / `x(e1,e2,x,y)` · `per(e3)` pata kolmice z předchozího bodu · `tan(e3[,k])`
+bod dotyku tečny · `nea(e3,x,y)` nejbližší bod. Id entit (`e12`) vrací protokol (`✓ Úsečka: e1, e2`) i `2d stav`.
+
+| Příkaz (cs · en) | Zápis |
+|---|---|
+| nový · new | `2d nový Deska [mm / cm / m / in]` – nová záložka s 2D výkresem |
+| čára · line (L) | `2d čára 0,0 100,0 @0,50 @-100,0 uzavřít` (`zpět` vrátí úsek) |
+| křivka · pline (PL) | `2d křivka 0,0 100,0 oblouk 100,50 úsečka 0,50 uzavřít` · `šířka 2 2` · `oblouk druhý x,y x,y` |
+| kružnice · circle (C) | `2d kružnice 50,25 20` · `… průměr 40` · `3b p1 p2 p3` · `2b p1 p2` · `ttp e1@x,y e2@x,y r` |
+| oblouk · arc (A) | `2d oblouk p1 p2 p3` · `p1 střed c p2` · `p1 střed c úhel 90` · `p1 konec p2 poloměr r` · `střed c p1 p2` |
+| obdélník · rectang (REC) | `2d obdélník 0,0 @100,50` · `zaoblení 5 …` · `zkosení 5 5 …` · `natočení 30 …` · `x,y rozměry 100 50` |
+| mnohoúhelník · polygon (POL) | `2d mnohoúhelník 6 0,0 vepsaný 20` · `opsaný` · `hrana p1 p2` |
+| elipsa · ellipse (EL) | `2d elipsa -50,0 50,0 20` · `střed c p b` · `oblouk střed c p b 0 180` |
+| spline (SPL) | `2d spline 0,0 10,10 20,0 30,10 [uzavřít]` · `spline metoda řídicí …` · `stupeň 2` |
+| přímka · xline (XL), polopřímka · ray | `2d přímka 0,0 1,1` · `vodorovně p` · `svisle p` · `úhel 30 p` · `osa v a b` · `odsazení 10 e3 x,y` |
+| bod · point (PO) | `2d bod 1,1 2,2` (vzhled `2d proměnná pdmode 3`) |
+| text (DT) | `2d text 10,10 5 0 "Obsah"` (bod, výška, úhel, text) · `text zarovnání mc x,y 5 0 "…"` |
+| hladina · layer (LA) | `2d hladina nová OSY barva 1 typčáry CENTER tloušťka 0.25 [popis "…"]` · `aktuální OSY` · `vytvořit X` (+aktuální) · `OSY vypnout` (zapnout, zmrazit, rozmrazit, zamknout, odemknout, netisk, tisk) · `* rozmrazit` · `přejmenovat A B` · `smazat OSY přesunout-na 0` |
+| typčáry · linetype | `2d typčáry načíst CENTER2 HIDDENX2` · `načíst vše` · `aktuální DASHED` · měřítko `2d měřítkočar 0.5` |
+| vlastnosti · properties | `2d vlastnosti e3 e5 hladina OSY barva 5 typčáry DASHED tloušťka 0.5 měřítkočáry 2` (bez id = výběr; `barva ByLayer` vrátí výchozí) |
+| nastavit · set | geometrie jako panel vlastností: `2d nastavit e3 r 25 c 10,10` · `nastavit e7 s "Nový text" h 5` · `nastavit e2 length=120` |
+| vyber · select | `2d vyber hladina OSY typ circle` · `okno x,y x,y` · `křížení x,y x,y` · `vše` · `poslední` · `předchozí` · `výběr odebrat e3` · `nic` |
+| smazat · erase (E) | `2d smazat e3 e5` · `smazat hladina OSY` · `smazat` (výběr) |
+| dotazy | `2d vzdálenost p1 p2` · `plocha p1 p2 p3 …` / `plocha objekt e3` · `souřadnice x(e1,e2)` · `výpis e3` · `stav` · `rozsah` |
+| proměnná · setvar | `2d proměnná cecolor 1` · `celtype` `celweight` `clayer` `ltscale` `textsize` `pdmode` `luprec` `insunits` `mirrtext` … · `jednotky mm přesnost 3` |
+| zoom | `2d zoom rozsah` · `zoom okno x,y x,y` · `zoom střed x,y výška` |
+| export / import | `2d export dxf` · `export dwg verze R2013` (soubor v `results[].data.file`) · import: `window.mncad.draftImport({ name, base64 })` nebo `{ name, text }` |
+| nápověda · help | `2d nápověda` (všechny příkazy s popisem) · `2d nápověda kružnice` |
+
+**API:** `await window.mncad.draft("čára 0,0 100,0; kružnice 50,0 20")` (předpona `2d` se doplní) vrací
+`{ ok, log, results: [{ cmd, input, ok, error?, log, created, changed, deleted, data? }], status, doc }`;
+`status` = jednotky, rozsah, počty entit podle druhu, hladiny (barva, typ, tloušťka, stav, počet entit), výběr.
+Dotazy vrací čísla v `data` (`distance`, `angle`, `dx`, `dy`, `area`, `perimeter`, `point`, `entities`…).
+Poloha pohledu pro klikání myší: atribut `data-view` prvku `[data-draft-canvas]` (`x = (X − cx)·scale + w/2`,
+`y = h/2 − (Y − cy)·scale` v pixelech plátna).
+
+Příklad – deska 100 × 50 s osami a dírou:
+```
+2d nový Deska
+2d hladina nová OBRYS barva 7 tloušťka 0.5; hladina nová OSY barva 1 typčáry CENTER tloušťka 0.25
+2d hladina aktuální OBRYS; obdélník 0,0 @100,50; kružnice 50,25 průměr 20
+2d hladina aktuální OSY; čára 45,25 55,25; čára 50,20 50,30
+2d stav
+```
+
 ## JSON (formát .mncad) – přístup ke všemu
 
 Dokument je JSON objekt:
@@ -1262,6 +1319,7 @@ export type SketchPlane =
 
 import { tr } from "./i18n";
 import type { AxisDef, Direction, Extent, PlaneDef, Ref, Sig, StartFrom, Thin } from "./refs";
+import type { DraftModel } from "./draft/model";
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
 
 /** Ukončení díry. */
@@ -1484,8 +1542,10 @@ export type CadDoc = {
   activeConfig?: string | null;
   /** popisové údaje (razítko výkresu) */
   props?: { number?: string; author?: string; revision?: string; note?: string };
-  /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent */
-  kind?: "part" | "assembly";
+  /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent; „draft“ = 2D výkres (model v `draft`) */
+  kind?: "part" | "assembly" | "draft";
+  /** 2D výkres (hladiny, typy čar, entity, bloky, rozvržení) – cad/draft/model.ts */
+  draft?: DraftModel;
   /** komponenty sestavy */
   components?: AsmComponent[];
   /** barvy jednotlivých ploch výsledného tělesa (index plochy → #rrggbb) */
