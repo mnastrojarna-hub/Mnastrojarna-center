@@ -1,7 +1,7 @@
 // Vygeneruje out/.htaccess pro statický export na Apache hostingu (Hosting90 / Webglobe).
 // Spouští se po `STATIC_EXPORT=1 next build` (npm run build:ftp).
 // Přesměrování a bezpečnostní hlavičky bere z next.config.mjs, aby byly na Vercelu i na FTP stejné.
-import { writeFileSync, existsSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { legacy, legacyDirs, securityHeaders } from "../next.config.mjs";
 
 if (!existsSync("out")) {
@@ -53,6 +53,9 @@ ErrorDocument 404 /404/index.html
   RewriteCond %{HTTP_HOST} ^mnastrojarna\\.cz$ [NC]
   RewriteRule ^(.*)$ http://www.mnastrojarna.cz/$1 [R=301,L]
 
+  # Úložiště sdílených odkazů CADu (PHP, out/cad/share/index.php) – nikdy nepřepisovat ani nepřesměrovávat
+  RewriteRule ^cad/share/ - [L]
+
   # Staré adresy původního webu → nové stránky
 ${rules}
 ${dirRules}
@@ -87,3 +90,12 @@ ${headers}
 
 writeFileSync("out/.htaccess", htaccess);
 console.log(`[htaccess] out/.htaccess zapsán (${legacy.length + legacyDirs.length} přesměrování)`);
+
+// Úložiště krátkých sdílených odkazů CADu: PHP skript + jeho .htaccess / .user.ini (statický export kopíruje public/,
+// pro jistotu se soubory doplní, kdyby chyběly – např. tečkové soubory).
+const SHARE = ["index.php", ".htaccess", ".user.ini"];
+mkdirSync("out/cad/share", { recursive: true });
+for (const f of SHARE) if (!existsSync(`out/cad/share/${f}`) && existsSync(`public/cad/share/${f}`)) copyFileSync(`public/cad/share/${f}`, `out/cad/share/${f}`);
+const missing = SHARE.filter((f) => !existsSync(`out/cad/share/${f}`));
+if (missing.length) console.warn(`[htaccess] POZOR: v out/cad/share chybí ${missing.join(", ")} – krátké sdílené odkazy CADu nebudou fungovat`);
+else console.log("[htaccess] out/cad/share/ (index.php, .htaccess, .user.ini) – úložiště krátkých sdílených odkazů CADu; po nahrání ověřte https://www.mnastrojarna.cz/cad/share/?ping");

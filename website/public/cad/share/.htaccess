@@ -1,0 +1,10 @@
+# Mnástrojárna CAD – úložiště krátkých sdílených odkazů (index.php). Nahrává se s webem (out/cad/share/).
+# Jen skript index.php, žádný výpis složky, žádné přepisování adres. Data si skript ukládá mimo web (o úroveň výš
+# než kořen webu, složka cad-share-data), a nejde-li to, do složky data/ vedle sebe – tu sám chrání vlastním
+# .htaccess (Require all denied / Deny from all) a prázdným index.html.
+# Záměrně jen direktivy, které používá i kořenový .htaccess (jinak by hosting mohl vracet chybu 500).
+DirectoryIndex index.php
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine Off
+</IfModule>

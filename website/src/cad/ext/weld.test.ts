@@ -150,10 +150,16 @@ describe("svařence (OCCT)", () => {
     const E = b0.body!.edges[edge];
     const L = Math.abs(E.endPoint.z - E.startPoint.z); // rovná část vnitřní plochy = 40 − 2·(2t) = 28 (zaoblené rohy jäklu)
     expect(L).toBeCloseTo(28, 3);
-    const w = await buildDoc({ ...base, features: [...base.features, ext(base, "weld.bead", { edges: [edge], a: 4 })] });
+    // starší zadání: a = rameno z (a×a), housenka sloučená s tělesem
+    const w = await buildDoc({ ...base, features: [...base.features, ext(base, "weld.bead", { edges: [edge], a: 4, measure: "z", separate: false })] });
     expect(w.status.every((s) => s.ok), w.status.map((s) => s.error).join()).toBe(true);
     expect(w.metrics!.volume - b0.metrics!.volume).toBeCloseTo((16 / 2) * L, 0);
-    const wi = await buildDoc({ ...base, features: [...base.features, ext(base, "weld.bead", { edges: [edge], a: 4, intermittent: true, segLen: 10, pitch: 20 })] });
+    // nové výchozí: a = účinná tloušťka (z = a·√2) → průřez a², svarový kov jako těleso „Svar 1“
+    const wa = await buildDoc({ ...base, features: [...base.features, ext(base, "weld.bead", { edges: [edge], a: 4 })] });
+    expect(wa.status.every((s) => s.ok), wa.status.map((s) => s.error).join()).toBe(true);
+    expect(wa.metrics!.volume - b0.metrics!.volume).toBeCloseTo(16 * L, 0);
+    expect(wa.bodies?.map((b) => b.name)).toContain("Svar 1");
+    const wi = await buildDoc({ ...base, features: [...base.features, ext(base, "weld.bead", { edges: [edge], a: 4, measure: "z", intermittent: true, segLen: 10, pitch: 20 })] });
     expect(wi.status.every((s) => s.ok)).toBe(true);
     expect(wi.metrics!.volume - b0.metrics!.volume).toBeCloseTo((16 / 2) * weldLength(L, { edges: [], a: 4, intermittent: true, segLen: 10, pitch: 20, edgeLens: [] }), 0);
     // vnější (konvexní) hrana → chyba
@@ -164,7 +170,7 @@ describe("svařence (OCCT)", () => {
       expect(bad.status.at(-1)!.error).toMatch(/vnitřní/);
     }
     // tabulka svarů z dat (délky hran z UI)
-    const bf = ext(base, "weld.bead", { edges: [edge], a: 4, edgeLens: [40] }); // délky hran ukládá formulář v UI
+    const bf = ext(base, "weld.bead", { edges: [edge], a: 4, measure: "z", edgeLens: [40] }); // starší prvek: délky hran z formuláře v UI
     const sym = ext(base, "weld.symbol", { kind: "V", size: 6, length: 120 });
     const rows = weldTable({ ...base, features: [...base.features, bf, sym] });
     expect(rows).toHaveLength(2);

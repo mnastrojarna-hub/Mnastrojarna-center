@@ -11,6 +11,7 @@
  * Stejná pravidla uplatňuje jádro (`build.ts`); tady jsou bez geometrie – pro nabídky ve formulářích a textové příkazy.
  */
 import type { CadDoc, Feature } from "./types";
+import { weldBodyNames } from "./ext/weld-bodies";
 
 /** název prvního tělesa dílu */
 export const DEFAULT_BODY = "Těleso 1";
@@ -48,6 +49,7 @@ export function bodiesAt(doc: Pick<CadDoc, "features">, index = doc.features.len
     if (makesGeometry) started = true;
     if (f.type === "splitBodies") names.push(f.nameB?.trim() || nextBodyName(names));
     else if (f.type === "copyBody") names.push(f.newName?.trim() || nextBodyName(names));
+    else if (f.type === "ext") names.push(...weldBodyNames(doc.features, i, names)); // svarový kov (a podložka) = vlastní tělesa
     else if (f.type === "combine") {
       const target = f.target?.trim() || active;
       const tool = f.tool?.trim();

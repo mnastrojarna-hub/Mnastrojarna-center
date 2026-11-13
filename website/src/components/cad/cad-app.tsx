@@ -36,6 +36,7 @@ import { AGENT_GUIDE } from "@/cad/agent-guide";
 import type { DrawingExtras } from "@/cad/drawing-agent";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
+import { docHasContent, docTabKind, emptyDraftDoc, isDraftDoc, normalizeDraftDoc } from "@/cad/draft/doc";
 import { copyText } from "@/lib/clipboard";
 import { CAD_LINKS } from "@/content/cad-links";
 import { SALES } from "@/content/site";
@@ -48,7 +49,8 @@ import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
 import { ShareCta } from "./share-cta";
 import { CommandPalette, type Command } from "./command-palette";
-import { getExtUi, type ExtActionApi } from "./ext";
+import { extPickOf, getExtUi, type ExtActionApi } from "./ext";
+import { weldFaceColors } from "@/cad/ext/weld-colors";
 import { extendMncad, runApiCmd, type ApiHost } from "./agent-api-host";
 import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
@@ -85,11 +87,12 @@ import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
 const DrawingWorkspace = dynamic(() => import("./drawing-workspace").then((m) => m.DrawingWorkspace), { ssr: false });
+const DraftWorkspace = dynamic(() => import("./draft/draft-workspace").then((m) => m.DraftWorkspace), { ssr: false });
 
 const STORE = "mn-cad-doc-v1";
 type Hist = { past: CadDoc[]; present: CadDoc; future: CadDoc[] };
 /** Záložka dokumentu (díl / sestava / výkres). Výkresová záložka sdílí dokument zdrojové záložky (`srcTabId`). */
-type DocTab = { id: string; kind: "part" | "assembly" | "drawing"; title: string; hist: Hist; docId: string; srcTabId?: string };
+type DocTab = { id: string; kind: "part" | "assembly" | "drawing" | "draft"; title: string; hist: Hist; docId: string; srcTabId?: string };
 const TABS_KEY = "mn-cad-tabs-v1";
 type Tab = "create" | "sketch" | "surface" | "sheet" | "weld" | "asm" | "tools" | "view" | "drawing" | "data";
 type AddType = Exclude<FeatureType, "sketch" | "import" | "pattern" | "ext">;
@@ -280,7 +283,7 @@ export function CadApp() {
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => {
       const d = histRef.current.present;
-      if (persistMode() === "none" && dirty.current && (d.features.length || d.components?.length)) {
+      if (persistMode() === "none" && dirty.current && docHasContent(d)) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -322,14 +325,14 @@ export function CadApp() {
   /** jediná záložka pro aktuální dokument (před obnovou / bez záznamů) */
   const fallbackTabs = (): DocTab[] => {
     const h = histRef.current;
-    return [{ id: tabIdRef.current, kind: h.present.kind === "assembly" ? "assembly" : "part", title: h.present.name, hist: h, docId: docId.current }];
+    return [{ id: tabIdRef.current, kind: docTabKind(h.present), title: h.present.name, hist: h, docId: docId.current }];
   };
   /** záznamy záložek s uloženou aktuální historií aktivního dokumentu */
   const snapshotTabs = (list: DocTab[]): DocTab[] => {
     const base = list.length ? list : fallbackTabs(); // před první změnou záložek není žádný záznam – aktivní dokument nesmí zmizet
     const h = histRef.current;
     const eid = docEntryId(base, tabIdRef.current);
-    return base.map((t) => (t.id === eid ? { ...t, hist: h, docId: docId.current, title: h.present.name, kind: h.present.kind === "assembly" ? "assembly" : t.kind === "drawing" ? "drawing" : "part" } : t));
+    return base.map((t) => (t.id === eid ? { ...t, hist: h, docId: docId.current, title: h.present.name, kind: h.present.kind === "assembly" ? "assembly" : t.kind === "drawing" ? "drawing" : docTabKind(h.present) } : t));
   };
   const resetUiForDoc = () => {
     setActiveId(null);
@@ -365,13 +368,13 @@ export function CadApp() {
   };
   /** otevře dokument: do prázdné aktivní záložky, jinak do nové záložky */
   const openDocInTab = (d0: CadDoc, opts: { docId?: string } = {}): string => {
-    const d = internBlobs(d0); // velká data importů (base64) → odkazy do úložiště (blobs.ts)
-    const kind: DocTab["kind"] = d.kind === "assembly" ? "assembly" : "part";
+    const d = normalizeDraftDoc(internBlobs(d0)); // velká data importů (base64) → odkazy do úložiště (blobs.ts); 2D výkres doplněný
+    const kind: DocTab["kind"] = docTabKind(d);
     const curTabs = docTabsRef.current;
     const curId = tabIdRef.current;
     const curDoc = histRef.current.present;
     const cur = curTabs.find((t) => t.id === curId);
-    const reuse = !curDoc.features.length && !curDoc.components?.length && cur?.kind !== "drawing";
+    const reuse = !docHasContent(curDoc) && cur?.kind !== "drawing";
     let openedId = curId;
     if (reuse) {
       docId.current = opts.docId ?? uid();
@@ -435,6 +438,8 @@ export function CadApp() {
   };
   const openDrawingTabRef = useRef(openDrawingTab);
   openDrawingTabRef.current = openDrawingTab;
+  const openDocInTabRef = useRef(openDocInTab);
+  openDocInTabRef.current = openDocInTab;
   /** dokument ze sdíleného odkazu (snímek): nová záložka + informační pruh; nic se neukládá */
   const openShared = (p: SharePayload) => {
     const id = openDocInTab(p.doc);
@@ -874,6 +879,22 @@ export function CadApp() {
             // plochy: analýza návaznosti hran, hřebeny křivosti, seznam CV (surf-a-host.ts)
             log.push(...(await runSurfCmd(op.cmd, d)));
             break;
+          case "draft": {
+            // 2D výkres (cad/draft/agent.ts): `2d nový` = nová záložka, ostatní příkazy nad otevřeným 2D výkresem
+            const r = await (await import("@/cad/draft/agent")).applyDraftText(d, op.text);
+            if (r.newDoc) {
+              flush();
+              currentBody = null;
+              d = r.newDoc;
+              openNew = true;
+              changed = true;
+            } else if (r.changed) {
+              d = r.doc;
+              changed = true;
+            }
+            log.push(...r.log);
+            break;
+          }
           case "status": {
             // „stav“ na konci vstupu vypíše až závěrečný stav (jednou); uprostřed vstupu stav v tom okamžiku
             if (op === lastOp) break;
@@ -890,7 +911,7 @@ export function CadApp() {
     // Ověřovací stavba PŘED zápisem do dokumentu: zrušený výpočet tak dokument vůbec nezmění. Aplikace pak tentýž dokument
     // staví znovu už z mezipaměti jádra (bez výpočtu).
     const tBuild = Date.now();
-    const res = await build().catch((e) => {
+    const res = d.kind === "draft" ? null : await build().catch((e) => { // 2D výkres se v jádře nestaví
       if (isCancelled(e)) throw e;
       return null;
     });
@@ -1029,7 +1050,7 @@ export function CadApp() {
             } else {
               const json = await readRecentDoc(t.docId);
               // prázdné záložky se neukládají – obnoví se jako prázdný díl / sestava se stejným názvem
-              const pd = json ? internBlobs(JSON.parse(json) as CadDoc) : t.kind === "assembly" ? emptyAssembly(t.title) : emptyDoc(t.title);
+              const pd = json ? internBlobs(JSON.parse(json) as CadDoc) : t.kind === "assembly" ? emptyAssembly(t.title) : t.kind === "draft" ? emptyDraftDoc(t.title) : emptyDoc(t.title);
               for (const n of await loadDocBlobs(pd).catch(() => [])) lost.add(n);
               list.push({ ...t, hist: { past: [], present: pd, future: [] } });
             }
@@ -1102,6 +1123,8 @@ export function CadApp() {
       drawingStatus: async (o) => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, op) => cad.drawing(doc, meta, op), { sheet: o?.sheet, extras: drawEnvRef.current })).text,
       exportDrawing: async (format, o) => (await import("@/cad/drawing-export")).exportDrawing(histRef.current.present, format, o ?? {}, (doc, meta, op) => cad.drawing(doc, meta, op), drawEnvRef.current),
       measure: (a, b) => measureApi(histRef.current.present, a, b),
+      draft: async (text) => (await import("@/cad/draft/agent")).draftApi(text, (t) => runAgentRef.current(t), () => histRef.current.present),
+      draftImport: async (file) => (await import("@/cad/draft/agent")).draftImportApi(file, (d) => void openDocInTabRef.current(d)),
       motion: async (cmd) => {
         if (cmd?.trim()) {
           const before = JSON.stringify(histRef.current.present.motion ?? null);
@@ -1204,9 +1227,9 @@ export function CadApp() {
         void vaultSet(STORE, json);
         const strip: DocTab[] = docTabs.length ? docTabs : fallbackTabs();
         void vaultSet(TABS_KEY, JSON.stringify({ active: tabId, tabs: strip.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(strip, tabId) ? docId.current : did, srcTabId })) }));
-        if (doc.features.length || doc.components?.length) {
+        if (docHasContent(doc)) {
           void storeRecentDoc(docId.current, json);
-          const entry = { id: docId.current, name: doc.name, kind: (doc.kind === "assembly" ? "assembly" : "part") as "assembly" | "part", at: Date.now(), features: doc.kind === "assembly" ? (doc.components?.length ?? 0) : doc.features.length };
+          const entry = { id: docId.current, name: doc.name, kind: docTabKind(doc), at: Date.now(), features: doc.kind === "assembly" ? (doc.components?.length ?? 0) : doc.kind === "draft" ? (doc.draft?.entities.length ?? 0) : doc.features.length };
           const limit = loadSettings().recentLimit;
           // náhled nejvýš jednou za 10 s (snímek 3D okna zmenšený na 160×120)
           if (Date.now() - lastThumb.current > 10_000 && vp.current) {
@@ -2266,16 +2289,16 @@ export function CadApp() {
           : active && FACE_PICK.has(active.type)
             ? "faces"
             : active?.type === "ext"
-              ? getExt(active.ext)?.pick?.kind === "faces"
+              ? extPickOf(active)?.kind === "faces"
                 ? "faces"
-                : getExt(active.ext)?.pick?.kind === "edges"
+                : extPickOf(active)?.kind === "edges"
                   ? "edges"
                   : "select"
               : "select";
 
   const toggleExtPick = (i: number, kind: "faces" | "edges") => {
     if (active?.type !== "ext") return false;
-    const pk = getExt(active.ext)?.pick;
+    const pk = extPickOf(active);
     if (!pk || pk.kind !== kind) return false;
     const cur = (active.data[pk.key] as number[] | undefined) ?? [];
     updateFeature(active.id, { data: { ...active.data, [pk.key]: cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i] } } as Partial<Feature>);
@@ -2283,7 +2306,7 @@ export function CadApp() {
   };
   const extPicked = (kind: "faces" | "edges"): number[] => {
     if (active?.type !== "ext") return [];
-    const pk = getExt(active.ext)?.pick;
+    const pk = extPickOf(active);
     return pk && pk.kind === kind ? ((active.data[pk.key] as number[] | undefined) ?? []) : [];
   };
   const onPickEdge = (i: number) => {
@@ -2395,13 +2418,14 @@ export function CadApp() {
   const freshNameRef = useRef(freshName);
   freshNameRef.current = freshName;
   const newDoc = () => openDocInTab(emptyDoc(freshName(tr("Nový díl"))));
+  const newDraft = () => openDocInTab(emptyDraftDoc(freshName(tr("Nový 2D výkres"))));
   const openFile = async (file: File) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
     if (ext === "mncad" || ext === "json") {
       try {
         const d = internBlobs(JSON.parse(await file.text()) as CadDoc); // data importů → úložiště (odkazy mnblob:)
         if (d.app !== "mnastrojarna-cad") throw new Error();
-        if (isAsm && d.kind !== "assembly" && !drawAfterImport.current) {
+        if (isAsm && d.kind !== "assembly" && d.kind !== "draft" && !drawAfterImport.current) {
           insertPart(d, tr("Díly"));
           flash(tr("Díl {0} vložen do sestavy.", d.name));
           return;
@@ -3276,7 +3300,7 @@ export function CadApp() {
           }}
         >
           <button type="button" className="flex min-w-0 items-center gap-1.5" onClick={() => activateTab(t.id)} title={t.id === tabId ? tr("Aktivní dokument – název lze přepsat") : tr("Přepnout na: {0}", t.title)}>
-            <CadIcon name={t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube"} className="h-3.5 w-3.5 shrink-0 text-brand" />
+            <CadIcon name={t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : t.kind === "draft" ? "polyline" : "cube"} className="h-3.5 w-3.5 shrink-0 text-brand" />
             {t.id === tabId && t.kind !== "drawing" ? (
               <input
                 value={doc.name}
@@ -3362,7 +3386,7 @@ export function CadApp() {
           <ShareCta
             compact
             onClick={() => setShareOpen(true)}
-            disabled={!doc.features.length && !doc.components?.length}
+            disabled={!docHasContent(doc)}
             title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči")}
           />
           <div className="relative">
@@ -3440,7 +3464,7 @@ export function CadApp() {
                   close={() => setTabMenu(false)}
                   entries={[
                     { divider: true, label: tr("Otevřené dokumenty") },
-                    ...tabStrip.map((t) => ({ id: t.id, label: t.id === tabId ? doc.name : t.title, icon: (t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : "cube") as CadIconName, active: t.id === tabId, onClick: () => activateTab(t.id) })),
+                    ...tabStrip.map((t) => ({ id: t.id, label: t.id === tabId ? doc.name : t.title, icon: (t.kind === "assembly" ? "layers" : t.kind === "drawing" ? "drawing" : t.kind === "draft" ? "polyline" : "cube") as CadIconName, active: t.id === tabId, onClick: () => activateTab(t.id) })),
                     { divider: true },
                     { id: "new", label: tr("Nový díl v nové záložce"), icon: "new", tone: "create", onClick: newDoc },
                     { id: "close", label: tr("Zavřít: {0}", tabStrip.find((t) => t.id === tabId)?.title ?? doc.name), icon: "x", onClick: () => closeTab(tabId) },
@@ -3467,10 +3491,11 @@ export function CadApp() {
                   className="z-50 w-[300px]"
                   entries={[
                     { id: "new", label: tr("Nový díl"), icon: "new", tone: "file", onClick: newDoc },
+                    { id: "new2d", label: tr("Nový 2D výkres"), icon: "polyline", tone: "file", hint: tr("2D CAD jako AutoCAD: hladiny, typy čar, příkazový řádek, DXF / DWG"), onClick: newDraft },
                     { id: "open", label: tr("Otevřít / importovat…"), icon: "open", tone: "file", kbd: "Ctrl+O", onClick: () => fileInput.current?.click() },
                     { id: "save", label: tr("Uložit projekt (.mncad)"), icon: "save", tone: "file", kbd: "Ctrl+S", onClick: () => void saveProject() },
                     { id: "saveAs", label: tr("Uložit jako…"), icon: "save", tone: "file", onClick: () => void saveProjectAs() },
-                    { id: "share", label: tr("Sdílet odkazem…"), icon: "share", tone: "file", disabled: !doc.features.length && !doc.components?.length, hint: tr("WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní"), onClick: () => setShareOpen(true) },
+                    { id: "share", label: tr("Sdílet odkazem…"), icon: "share", tone: "file", disabled: !docHasContent(doc), hint: tr("WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní"), onClick: () => setShareOpen(true) },
                     { divider: true, label: tr("Export 3D") },
                     ...exportEntries,
                     { divider: true, label: tr("Výkres") },
@@ -3566,7 +3591,7 @@ export function CadApp() {
                   onPick={onPick}
                   measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
                   vertices={result?.vertices ?? null}
-                  faceColors={doc.faceColors}
+                  faceColors={weldFaceColors(doc, result?.bodies, doc.faceColors)}
                   bodyHidden={bodyHidden}
                   bodyOpacity={bodyOpacity}
                   gizmo={cvG?.gizmo ?? gizmo}
@@ -3592,7 +3617,7 @@ export function CadApp() {
                 hidden={!!sketch}
                 failure={glError}
                 core={core}
-                scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: doc.faceColors, display: prefs.display, section, hidden: bodyHidden, dark: bg.dark }}
+                scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: weldFaceColors(doc, result?.bodies, doc.faceColors), display: prefs.display, section, hidden: bodyHidden, dark: bg.dark }}
                 onRetry={() => {
                   setGlError(null);
                   setGlKey((k) => k + 1);
@@ -4127,6 +4152,7 @@ export function CadApp() {
               { id: "part", label: tr("Nový díl"), desc: tr("Prázdný díl: skica → vysunutí → prvky. Parametrická historie."), icon: "cube", tone: "create", run: () => { setStartOpen(false); newDoc(); } },
               { id: "asm", label: tr("Nová sestava"), desc: tr("Prázdná sestava: komponenty, vazby, podsestavy, kusovník."), icon: "layers", tone: "create", run: () => { setStartOpen(false); newAssembly(false); } },
               { id: "drawing", label: tr("Nový výkres"), desc: tr("Otevřete díl nebo sestavu (.mncad, STEP…) a rovnou vznikne výkres s pohledy a razítkem."), icon: "drawing", tone: "file", run: () => { setStartOpen(false); drawAfterImport.current = true; fileInput.current?.click(); } },
+              { id: "draft", label: tr("Nový 2D výkres"), desc: tr("2D CAD jako AutoCAD: hladiny, typy čar, příkazový řádek, uchopení, DXF / DWG – myší i textem."), icon: "polyline", tone: "file", run: () => { setStartOpen(false); newDraft(); } },
             ]}
             secondary={[
               { id: "open", label: tr("Otevřít / importovat"), desc: tr("STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad"), icon: "open", tone: "file", kbd: "Ctrl+O", run: () => { setStartOpen(false); fileInput.current?.click(); } },
@@ -4162,6 +4188,9 @@ export function CadApp() {
           </Modal>
         )}
 
+        {isDraftDoc(doc) && !drawingOpen && (
+          <DraftWorkspace key={doc.draft.id} doc={doc} onCommit={commit} onUndo={undo} onRedo={redo} canUndo={hist.past.length > 0} canRedo={hist.future.length > 0} onOpenDoc={(d) => void openDocInTab(d)} onSave={() => void saveProject()} onShare={() => setShareOpen(true)} onFlash={flash} />
+        )}
         {drawingOpen && (isAsm || result?.metrics) && (
           <DrawingWorkspace
             doc={doc}
@@ -4198,7 +4227,7 @@ function featurePrompt(f: Feature): string {
   if (f.type === "ext") {
     const own = getExtUi(f.ext)?.prompt?.(f);
     if (own) return own;
-    const pick = getExt(f.ext)?.pick;
+    const pick = extPickOf(f);
     if (pick) return picked(Array.isArray((f.data ?? {})[pick.key]) ? ((f.data ?? {})[pick.key] as unknown[]).length : 0, pick.kind);
   }
   if (f.type === "pushPull" || f.type === "offsetFace" || f.type === "deleteFace" || f.type === "thicken") return picked(f.faces.length, "faces");

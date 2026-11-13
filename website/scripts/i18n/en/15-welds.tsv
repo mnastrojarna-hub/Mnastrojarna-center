@@ -1,0 +1,204 @@
+# 8. vlna – svary: tupé svary s úpravou ISO 9692-1, koutové (a/z, oboustranné, kolem), děrové, bodové, svarový kov, tabulka svarů, značky ISO 2553, příkaz svar
+Poz. | Prvek | Typ | Velikost | Délka | Ks | Průřez | Objem | Svarový kov | Přídavný materiál | Metoda	Pos. | Feature | Type | Size | Length | Pcs | Cross-section | Volume | Weld metal | Filler metal | Process
+ (rohový spoj)	 (corner joint)
+ (T spoj)	 (T-joint)
+(bez výsledku – přestavte model)	(no result – rebuild the model)
+{0}× rozteč {1}	{0}× pitch {1}
+* odhad z parametrů prvku (bez geometrie)	* estimate from feature parameters (no geometry)
+0 = podle metody	0 = by process
+0 = podle metody (135: 0,9)	0 = by process (135: 0.9)
+0 = z modelu	0 = from the model
+½V – jednostranný úkos (HV)	½V – single bevel (HV)
+½Y – úkos s velkým otupením (HY)	½Y – single bevel with broad root face (HY)
+½Y svar	½Y weld
+111 – obalená elektroda (MMA)	111 – covered electrode (MMA)
+121 – pod tavidlem (SAW)	121 – submerged arc (SAW)
+131 – MIG	131 – MIG
+135 – MAG	135 – MAG
+136 – MAG plněnou elektrodou	136 – MAG flux-cored wire
+138 – MAG kovovým práškem	138 – MAG metal-cored wire
+141 – TIG	141 – TIG
+21 – bodové odporové	21 – resistance spot
+2J – oboustranný J	2J – double-J
+2J svar	double-J weld
+2U – oboustranný U	2U – double-U
+2U svar	double-U weld
+a – účinná tloušťka	a – throat thickness
+a = z/√2 = {0} mm (kout 90°), průřez z²/2 = {1} mm²	a = z/√2 = {0} mm (90° corner), cross-section z²/2 = {1} mm²
+Aktivní těleso vrací prvek výsledkem stavby.	The active body is returned as the feature's build result.
+bez přídavného materiálu	no filler metal
+Bod hrany / plochy musí mít tři souřadnice x y z.	An edge / face point needs three coordinates x y z.
+Bod v poloze {0} mm leží mimo vybranou plochu – zmenšete rozteč nebo počet.	The spot at {0} mm lies outside the selected face – reduce the pitch or count.
+bodový {0}×{1}	spot {0}×{1}
+bodový Ø{0}	spot Ø{0}
+Bodový svar	Spot weld
+Celkem: {0} svarů · délka {1} mm · objem {2} cm³ · svarový kov {3} kg · přídavný materiál ≈ {4} kg	Total: {0} welds · length {1} mm · volume {2} cm³ · weld metal {3} kg · filler metal ≈ {4} kg
+Čelo dílu (plocha)	Part end face (face)
+Čelo připravovaného dílu, které se dotýká druhého dílu (konec plechu, spodní čelo stojiny).	End face of the prepared part touching the other part (plate end, bottom face of a web).
+Čelo spoje (plocha)	Joint face (face)
+Čelo spoje má nulový rozměr.	The joint face has zero size.
+Čelo spoje musí být rovinná plocha (čelo plechu nebo profilu).	The joint face must be planar (end of a plate or profile).
+Čelo spoje nemá rovnou hranu – tupý svar s úpravou lze zatím vést jen po rovné spáře.	The joint face has no straight edge – a prepared butt weld can so far only follow a straight joint.
+Délka žlábku l (0 = kruhový otvor)	Slot length l (0 = round hole)
+delší strany plochy	the longer side of the face
+děrový {0}×	plug {0}×
+děrový / bodový svar se zadává plochou horního plechu: … plocha F3 (nebo plocha horní)	a plug / spot weld is given by the upper plate face: … face F3 (or face top)
+Děrový / žlábkový	Plug / slot
+děrový / žlábkový svar: otvory v horním plechu (tloušťka z modelu) vyplněné svarem; bodový: značky bodů Ø d (bez přídavného materiálu); řada po delší (kratší) straně plochy, vystředěná	plug / slot weld: holes in the upper plate (thickness from the model) filled with weld metal; spot: spot markers Ø d (no filler); centred row along the longer (shorter) side of the face
+děrový Ø{0}	plug Ø{0}
+Děrový svar	Plug weld
+Druhou stranu stěny u hrany {0} se nepodařilo najít – vyberte obě hrany ručně.	The other side of the wall at edge {0} was not found – select both edges manually.
+Horní plocha horního plechu	Top face of the upper plate
+Housenka je prázdná – zkontrolujte délku úseku a rozteč.	The bead is empty – check the segment length and pitch.
+Housenka je rovnoramenný trojúhelník z × z v koutu (rovné hrany i oblouky); kolem = celá uzavřená smyčka koutu s vyplněnými rohy. Délka, průřez, hmotnost svarového kovu a přídavný materiál jsou ve stavu prvku a v Tabulce svarů.	The bead is an isosceles z × z triangle in the corner (straight edges and arcs); all around = the whole closed corner loop with filled corners. Length, cross-section, weld metal mass and filler metal are in the feature status and the weld table.
+Housenku lze vést po rovné hraně nebo oblouku (hrana {0}).	A bead can follow a straight edge or an arc (edge {0}).
+Hrana {0} patří svaru – vyberte hranu spojovaného dílu.	Edge {0} belongs to a weld – select an edge of a joined part.
+Hrana čela na straně svaru (strana šipky), nebo vnitřní kout sloučeného T / rohového spoje.	Edge of the end face on the weld side (arrow side), or the inner corner of a merged T / corner joint.
+Hrana není vnitřní (konkávní) a nedotýká se jiného dílu – housenka se dělá do koutu mezi dvěma plochami nebo dvěma díly.	The edge is not concave and does not touch another part – a bead goes into a corner between two faces or two parts.
+Hrana spáry / kout	Joint edge / corner
+Hrana spoje (šipka na výkrese)	Joint edge (arrow on the drawing)
+Hustota svarového kovu {0} g/cm³; přídavný materiál = hmotnost / účinnost navaření (135 MAG: 0,9).	Weld metal density {0} g/cm³; filler metal = mass / deposition efficiency (135 MAG: 0.9).
+chyba stavby: {0}	build error: {0}
+I – bez úpravy (mezera)	I – square (gap)
+i na druhé straně stěny	also on the other side of the wall
+ISO 2553 – ruční značka (bez geometrie); s hranou ukáže šipkou na výkrese, jinak v seznamu značek	ISO 2553 – manual symbol (no geometry); with an edge it points with an arrow on the drawing, otherwise it is listed
+J – jednostranný J	J – single-J
+J svar	J weld
+Jádro nepodporuje samostatná tělesa svarů.	The kernel does not support separate weld bodies.
+jen s mezerou	only with a gap
+K – oboustranný úkos	K – double bevel
+K hraně {0} nepřiléhá druhý díl – vyberte hranu čela, které se dotýká druhého dílu (nebo čelo samotné).	No other part adjoins edge {0} – select an edge of the end face touching the other part (or the face itself).
+K svar	K weld
+Klikněte na vnitřní hranu koutu, nebo na spodní hranu dílu stojícího na jiném dílu.	Click the inner corner edge, or the bottom edge of a part standing on another part.
+kolem	all around
+Kolem	All around
+Kolem hrany {0} není uzavřený kout (svar kolem potřebuje uzavřenou smyčku, např. profil postavený na desce).	There is no closed corner around edge {0} (an all-around weld needs a closed loop, e.g. a profile standing on a plate).
+koutový {0}{1}	fillet {0}{1}
+koutový přerušovaný {0}×{1} ({2})	intermittent fillet {0}×{1} ({2})
+Koutový svar	Fillet weld
+koutový svar a (účinná tloušťka, z = a·√2; „z7“ = rameno) do koutu dvou ploch nebo dvou dílů; oboustranně = i druhá strana stěny, kolem = celá smyčka (profil na desce, i oblouky); svarový kov = těleso „Svar k“	fillet weld a (throat thickness, z = a·√2; “z7” = leg) into the corner of two faces or two parts; both sides = also the other side of the wall, all around = the whole loop (profile on a plate, arcs too); weld metal = body “Svar k”
+koutový svar a (z = a·√2) do koutu dvou ploch nebo dvou dílů; oboustranný, kolem, přerušovaný	fillet weld a (z = a·√2) into the corner of two faces or two parts; both sides, all around, intermittent
+koutový svar potřebuje velikost: svar koutový a5 hrany …	a fillet weld needs a size: weld fillet a5 edges …
+koutový svar se zadává hranami koutu: … hrany E7;E9 (nebo pravidlem)	a fillet weld is given by corner edges: … edges E7;E9 (or a rule)
+kratší strany plochy	the shorter side of the face
+Metoda (ISO 4063)	Process (ISO 4063)
+mezera {0}	gap {0}
+mezera {0} 	gap {0} 
+Mezera b	Gap b
+Mezera v modelu {0} mm je větší než zadaná {1} mm – počítá se se skutečnou.	The gap in the model ({0} mm) is larger than the given {1} mm – the actual gap is used.
+Mezera, otupení i převýšení musí být nezáporné.	Gap, root face and reinforcement must not be negative.
+montážní	field
+nebo hrana spáry	or joint edge
+Není těleso – nejdřív vytvořte plechy přeplátovaného spoje.	No body – first create the plates of the lap joint.
+Není těleso – nejdřív vytvořte plechy.	No body – first create the plates.
+Není těleso – nejdřív vytvořte spojované díly.	No body – first create the parts to be joined.
+neznámá úprava „{0}“	unknown preparation “{0}”
+Neznámá úprava svarových ploch „{0}“ – {1}.	Unknown joint preparation “{0}” – {1}.
+neznámý druh svaru „{0}“ – koutový, tupý (V, Y, X, U, 2U, ½V, ½Y, K, J, 2J, I), děrový, žlábkový, bodový, tabulka	unknown weld type “{0}” – fillet, butt (V, Y, X, U, 2U, ½V, ½Y, K, J, 2J, I), plug, slot, spot, table
+objem {0} cm³	volume {0} cm³
+Objem svarového kovu z geometrie ({0} mm³) se liší od průřezu × délky ({1} mm³).	The weld metal volume from the geometry ({0} mm³) differs from cross-section × length ({1} mm³).
+Objem svarového kovu z geometrie ({0} mm³) se liší od výpočtu ({1} mm³).	The weld metal volume from the geometry ({0} mm³) differs from the calculation ({1} mm³).
+Oblouk hrany se nepodařilo určit.	The arc of the edge could not be determined.
+oboustranně	both sides
+oboustranný	both sides
+Oboustranný	Both sides
+Obrátit stranu svaru	Flip the weld side
+otupení {0}	root face {0}
+otupení {0} 	root face {0} 
+Otupení {0} mm musí být menší než tloušťka {1} mm.	Root face {0} mm must be smaller than the thickness {1} mm.
+Otupení c	Root face c
+Otvor v poloze {0} mm leží mimo vybranou plochu – zmenšete rozteč nebo počet.	The hole at {0} mm lies outside the selected face – reduce the pitch or count.
+otvory Ø d (žlábky l × d) v horním plechu vyplněné svarem – přeplátovaný spoj	holes Ø d (slots l × d) in the upper plate filled with weld metal – lap joint
+Plocha {0} patří svaru – vyberte plochu spojovaného dílu.	Face {0} belongs to a weld – select a face of a joined part.
+Plocha horního plechu	Face of the upper plate
+Plocha patří svaru – vyberte plochu plechu.	The face belongs to a weld – select a plate face.
+po celé uzavřené smyčce koutu	along the whole closed corner loop
+Počet bodů	Number of spots
+podložka	backing
+Podložka se modeluje jen u tupého spoje.	A backing strip is modelled only for a butt joint.
+Poloměr dna R	Root radius R
+Poloměr dna R (U, J)	Root radius R (U, J)
+Pozice;Prvek;Typ;Velikost;Délka [mm];Ks;Průřez [mm²];Objem [cm³];Svarový kov [kg];Přídavný materiál [kg];Metoda	Position;Feature;Type;Size;Length [mm];Pcs;Cross-section [mm²];Volume [cm³];Weld metal [kg];Filler metal [kg];Process
+Průměr / šířka otvoru d	Hole diameter / width d
+Průměr / šířka otvoru musí být kladná.	The hole diameter / width must be positive.
+Průměr bodu d	Spot diameter d
+Průměr bodu musí být kladný.	The spot diameter must be positive.
+průřez {0} mm²	cross-section {0} mm²
+Prvek {0} není načten.	Feature {0} is not loaded.
+přerušovaný {0}/{1}	intermittent {0}/{1}
+Převýšení (kruhový otvor)	Reinforcement (round hole)
+Převýšení housenky	Cap reinforcement
+Převýšení kořene	Root reinforcement
+přídavný materiál ≈ {0} kg ({1}, η {2})	filler metal ≈ {0} kg ({1}, η {2})
+Rameno z	Leg length z
+Rozteč e	Pitch e
+Řada podél	Row along
+sloučit	merge
+Spoj vybírám v modelu jako	Pick the joint in the model as
+Svar I potřebuje mezeru větší než 0.	A square (I) weld needs a gap greater than 0.
+svar potřebuje druh: svar koutový a5 hrany … | svar tupý V 60 … | svar děrový Ø12 … | svar bodový Ø6 … | svar tabulka	weld needs a type: weld fillet a5 edges … | weld butt V 60 … | weld plug Ø12 … | weld spot Ø6 … | weld table
+svar: bod hrany / plochy má tři souřadnice: hrana u x y z [; x y z]	weld: an edge / face point has three coordinates: edge at x y z [; x y z]
+svar: chybí hrany – … hrany E7;E9, pravidlo (svislé, horní…) nebo hrana u x y z	weld: edges are missing – … edges E7;E9, a rule (vertical, top…) or edge at x y z
+svar: chybí plocha – … plocha F3, pravidlo (horní, +Z…) nebo plocha u x y z	weld: the face is missing – … face F3, a rule (top, +Z…) or face at x y z
+svar: metoda je číslo ISO 4063 (111, 131, 135, 136, 141, 21)	weld: the process is an ISO 4063 number (111, 131, 135, 136, 141, 21)
+svar: neznámé slovo „{0}“	weld: unknown word “{0}”
+svar: za „{0}“ chybí číslo	weld: a number is missing after “{0}”
+svar: zadejte buď čísla (E7;E9), nebo pravidlo – ne obojí	weld: give either numbers (E7;E9) or a rule – not both
+svarový kov {0} kg	weld metal {0} kg
+Svarový kov jako těleso	Weld metal as a body
+Svarový kov jako těleso „Svar k“	Weld metal as body “Svar k”
+Svarový kov se nepodařilo vytvořit.	The weld metal could not be created.
+Svary:	Welds:
+Šikmý T / rohový spoj (úhel stěn ≠ 90°) zatím jen koutovým svarem.	An oblique T / corner joint (wall angle ≠ 90°) is so far possible only with a fillet weld.
+tabulka svarů: délka, průřez, objem, hmotnost svarového kovu a přídavný materiál každého svaru se součty	weld table: length, cross-section, volume, weld metal mass and filler metal of every weld with totals
+těleso „{0}“	body “{0}”
+Tloušťka horního plechu (0 = z modelu)	Upper plate thickness (0 = from the model)
+Tloušťka svařovaného dílu musí být kladná.	The thickness of the welded part must be positive.
+Tloušťka t	Thickness t
+Tloušťka t (0 = z modelu)	Thickness t (0 = from the model)
+Tloušťku horního plechu se nepodařilo změřit – zadejte ji (t).	The upper plate thickness could not be measured – enter it (t).
+Tloušťku stěny se nepodařilo změřit – zadejte ji (t).	The wall thickness could not be measured – enter it (t).
+tupý {0}	butt {0}
+tupý {0}{1}	butt {0}{1}
+Tupý svar	Butt weld
+Tupý svar {0}	Butt weld {0}
+tupý svar s úpravou ISO 9692-1 pro tupý, T i rohový spoj: plocha = čelo připravovaného dílu u druhého dílu, hrana = hrana čela na straně svaru nebo vnitřní kout sloučeného tělesa; úprava se vyřízne do dílů, svarový kov (+ převýšení) = těleso „Svar k“	butt weld with ISO 9692-1 preparation for butt, T and corner joints: face = end face of the prepared part at the other part, edge = edge of that face on the weld side or the inner corner of a merged body; the preparation is cut into the parts, weld metal (+ reinforcement) = body “Svar k”
+Tupý svar s úpravou lze zatím vést jen po rovné hraně.	A prepared butt weld can so far only follow a straight edge.
+U – jednostranný U	U – single-U
+U bodu [{0}] není žádná hrana (nejbližší je dál než 1 mm).	There is no edge at point [{0}] (the nearest is more than 1 mm away).
+U bodu [{0}] není žádná plocha (nejbližší je dál než 1 mm).	There is no face at point [{0}] (the nearest is more than 1 mm away).
+Účinná tloušťka a	Throat thickness a
+Účinnost navaření	Deposition efficiency
+Úhel rozevření α	Groove angle α
+Úhel úkosu β	Bevel angle β
+Úhel úpravy musí být v rozsahu 0–{0}°.	The preparation angle must be between 0 and {0}°.
+Úhel α / β	Angle α / β
+Úprava (ISO 9692-1)	Preparation (ISO 9692-1)
+Úprava {0} je pro tupý spoj dvou dílů – u vnitřního koutu použijte ½V, ½Y, K, J nebo 2J, nebo vyberte čelo dílu.	Preparation {0} is for a butt joint of two parts – for an inner corner use ½V, ½Y, K, J or 2J, or select the end face of a part.
+Úprava {0} potřebuje poloměr dna R > 0.	Preparation {0} needs a root radius R > 0.
+úprava I, V, Y, X, U, ½V, K, J (ISO 9692-1) vyříznutá do dílů + svarový kov jako těleso; tupý, T i rohový spoj	I, V, Y, X, U, ½V, K, J preparation (ISO 9692-1) cut into the parts + weld metal as a body; butt, T and corner joints
+Úprava se vyřízne do spojovaných dílů (souměrné V, Y, X, U, 2U do obou, ½V, ½Y, K, J, 2J jen do vybraného), svarový kov s převýšením je těleso „Svar k“, podložka „Podložka k“. Náhled kreslí průřez pro zadanou tloušťku (0 = 10 mm, skutečná se změří v modelu).	The preparation is cut into the joined parts (symmetric V, Y, X, U, 2U into both, ½V, ½Y, K, J, 2J only into the selected one); the weld metal with reinforcement is body “Svar k”, the backing strip “Podložka k”. The preview draws the cross-section for the given thickness (0 = 10 mm, the actual one is measured in the model).
+Úpravu svarových ploch se nepodařilo vyříznout do tělesa „{0}“ – zkontrolujte rozměry úpravy.	The joint preparation could not be cut into body “{0}” – check the preparation dimensions.
+V – jednostranný V	V – single-V
+V, Y, X: celkový úhel rozevření α; ½V, K, U, J: úhel úkosu / boku β	V, Y, X: total groove angle α; ½V, K, U, J: bevel / flank angle β
+Ve směru čela spoje do {0} mm není druhý díl – úprava se udělá jen na vybraném dílu.	There is no other part within {0} mm in front of the joint face – the preparation is made only on the selected part.
+Velikost je	Size is
+Velikost svaru	Weld size
+vlastní těleso „Svar k“ (jinak se sloučí s dílem)	own body “Svar k” (otherwise merged with the part)
+Vyberte čelo spoje (plochu) nebo hranu spáry na straně svaru.	Select the joint face or the joint edge on the weld side.
+Vyberte horní plochu horního plechu.	Select the top face of the upper plate.
+Vyberte rovinnou plochu horního plechu.	Select a planar face of the upper plate.
+X – oboustranný V	X – double-V
+X svar (2V)	X weld (double V)
+Y – V s velkým otupením	Y – single-V with broad root face
+Y svar	Y weld
+z – rameno	z – leg length
+z = a·√2 = {0} mm (kout 90°), průřez a² = {1} mm²	z = a·√2 = {0} mm (90° corner), cross-section a² = {1} mm²
+značka u hrany {0}	symbol at edge {0}
+značky bodových svarů Ø d s roztečí e na ploše přeplátování (bez přídavného materiálu)	spot weld markers Ø d with pitch e on the lap face (no filler metal)
+Žádné svary (přidejte Svarovou housenku, Tupý svar, Děrový / Bodový svar nebo Značku svaru).	No welds (add a weld bead, butt weld, plug / spot weld or weld symbol).
+žlábkový {0}× l {1}	slot {0}× l {1}
+žlábkový {0}×{1}	slot {0}×{1}
+Žlábkový svar	Slot weld
+žlábkový svar potřebuje délku žlábku: svar žlábkový 30×10 … nebo délka 30 Ø10	a slot weld needs a slot length: weld slot 30x10 … or length 30 Ø10
+Průřez svarového kovu ≈ {0} mm² (t = {1} mm) · {2} kg/m	Weld metal cross-section ≈ {0} mm² (t = {1} mm) · {2} kg/m

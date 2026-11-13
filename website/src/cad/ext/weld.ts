@@ -31,6 +31,8 @@ import {
   type Section,
 } from "./weld-layout";
 import type { Feature, Vec2, Vec3 } from "../types";
+import { buildBead, buildGroove, buildPlug, buildSpot, symbolAnchor } from "./weld-kernel";
+import { PREPS, PROCESSES } from "./weld-calc";
 
 type Rep = typeof R;
 let repP: Promise<Rep> | null = null;
@@ -424,7 +426,9 @@ registerExt({
   },
 });
 
-// ---------------- Svarová housenka ----------------
+// ---------------- Svarová housenka (koutový svar) ----------------
+
+const PROCESS_OPTIONS = PROCESSES.map((p) => ({ v: p.v, l: p.l }));
 
 registerExt({
   ext: "weld.bead",
@@ -435,56 +439,117 @@ registerExt({
   group: "Svary",
   order: 0,
   big: true,
-  hint: tr("koutový svar a×a podél vnitřní hrany (vyberte hrany)"),
+  hint: tr("koutový svar a (z = a·√2) do koutu dvou ploch nebo dvou dílů; oboustranný, kolem, přerušovaný"),
   pick: { kind: "edges", key: "edges" },
   rollback: true,
-  make: (_doc, extra) => ({ edges: (extra?.edges as number[]) ?? [], a: 4, intermittent: false, segLen: 50, pitch: 100, edgeLens: [] }),
+  make: (_doc, extra) => ({ edges: (extra?.edges as number[]) ?? [], edgeAt: [], a: 4, measure: "a", intermittent: false, segLen: 50, pitch: 100, both: false, allAround: false, separate: true, field: false, process: "135", edgeLens: [] }),
   params: [
     { key: "edges", label: tr("Hrany koutu"), kind: "edges" },
-    { key: "a", label: tr("Velikost svaru a"), kind: "number", min: 0.5, step: 0.5 },
+    { key: "a", label: tr("Velikost svaru"), kind: "number", min: 0.5, step: 0.5 },
+    { key: "measure", label: tr("Velikost je"), kind: "enum", options: [{ v: "a", l: tr("a – účinná tloušťka") }, { v: "z", l: tr("z – rameno") }] },
+    { key: "both", label: tr("Oboustranný"), kind: "bool", hint: tr("i na druhé straně stěny") },
+    { key: "allAround", label: tr("Kolem"), kind: "bool", hint: tr("po celé uzavřené smyčce koutu") },
     { key: "intermittent", label: tr("Přerušovaný svar"), kind: "bool" },
     { key: "segLen", label: tr("Délka úseku"), kind: "number", min: 1 },
     { key: "pitch", label: tr("Rozteč úseků"), kind: "number", min: 1 },
+    { key: "separate", label: tr("Svarový kov jako těleso"), kind: "bool", hint: tr("vlastní těleso „Svar k“ (jinak se sloučí s dílem)") },
+    { key: "field", label: tr("Montážní svar"), kind: "bool" },
+    { key: "process", label: tr("Metoda (ISO 4063)"), kind: "enum", options: PROCESS_OPTIONS },
+    { key: "eff", label: tr("Účinnost navaření"), kind: "number", min: 0, max: 1, step: 0.05, hint: tr("0 = podle metody (135: 0,9)") },
   ],
-  build: async (data, ctx) => {
-    const r = await rep();
-    if (!ctx.body) throw new Error(tr("Není těleso – nejdřív vytvořte profily."));
-    const b = beadData(data);
-    if (!b.edges.length) throw new Error(tr("Vyberte hranu vnitřního rohu v modelu."));
-    if (!(b.a > 0)) throw new Error(tr("Velikost svaru musí být kladná."));
-    const beads: Shape[] = [];
-    for (const idx of b.edges) {
-      const edge = ctx.body.edges[idx];
-      if (!edge) throw new Error(tr("Hrana {0} v tělese neexistuje – vyberte ji znovu.", idx + 1));
-      if (edge.geomType !== "LINE") throw new Error(tr("Housenku lze zatím vést jen po rovné hraně."));
-      const E = vt(edge.startPoint);
-      const F = vt(edge.endPoint);
-      const L = len(sub(F, E));
-      const e = norm(sub(F, E));
-      const mid = add(E, mul(e, L / 2));
-      const adj = ctx.body.faces.filter((f) => f.edges.some((x) => x.isSame(edge)));
-      if (adj.length !== 2) throw new Error(tr("Hrana musí ležet mezi dvěma plochami tělesa."));
-      const dirs = adj.map((f) => {
-        const n = norm(vt(f.normalAt(mid)));
-        let tdir = norm(cross(e, n));
-        if (dot(tdir, sub(vt(f.center), mid)) < 0) tdir = mul(tdir, -1);
-        return { n, t: tdir };
-      });
-      const [A, B] = dirs;
-      if (dot(A.t, B.n) <= 1e-6 || dot(B.t, A.n) <= 1e-6) throw new Error(tr("Hrana není vnitřní (konkávní) – housenka se dělá jen do vnitřního rohu mezi dvěma plochami."));
-      const yDir = cross(e, A.t);
-      const p2: Vec2 = [b.a * dot(B.t, A.t), b.a * dot(B.t, yDir)];
-      const drawing = polyDrawing(r, [[0, 0], [b.a, 0], p2]);
-      const spans: [number, number][] = [];
-      if (b.intermittent && b.pitch > 0) for (let s = 0; s < L - 1e-6; s += b.pitch) spans.push([s, Math.min(b.segLen, L - s)]);
-      else spans.push([0, L]);
-      for (const [s, l] of spans) {
-        const plane = new r.Plane(add(E, mul(e, s)), A.t, e);
-        beads.push(drawing.sketchOnPlane(plane).extrude(l) as Shape);
-      }
-    }
-    return ctx.body.fuse(fuseAll(beads)) as Shape;
-  },
+  build: (data, ctx) => buildBead(data, ctx, beadData(data)),
+});
+
+// ---------------- Tupý svar s úpravou ----------------
+
+registerExt({
+  ext: "weld.groove",
+  label: tr("Tupý svar"),
+  icon: "weld-groove",
+  tone: "feature",
+  tab: "weld",
+  group: "Svary",
+  order: 1,
+  big: true,
+  hint: tr("úprava I, V, Y, X, U, ½V, K, J (ISO 9692-1) vyříznutá do dílů + svarový kov jako těleso; tupý, T i rohový spoj"),
+  pick: { kind: "faces", key: "faces" },
+  rollback: true,
+  make: (_doc, extra) => ({ faces: (extra?.faces as number[]) ?? [], edges: (extra?.edges as number[]) ?? [], faceAt: [], edgeAt: [], prep: "V", cap: 1.5, root: 0, backing: false, flip: false, t: 0, field: false, process: "135" }),
+  params: [
+    { key: "faces", label: tr("Čelo spoje (plocha)"), kind: "faces" },
+    { key: "edges", label: tr("nebo hrana spáry"), kind: "edges" },
+    { key: "prep", label: tr("Úprava (ISO 9692-1)"), kind: "enum", options: PREPS.map((p) => ({ v: p.v, l: p.l })) },
+    { key: "angle", label: tr("Úhel α / β"), kind: "number", unit: "°", min: 0, max: 150, hint: tr("V, Y, X: celkový úhel rozevření α; ½V, K, U, J: úhel úkosu / boku β") },
+    { key: "rootFace", label: tr("Otupení c"), kind: "number", min: 0, step: 0.5 },
+    { key: "gap", label: tr("Mezera b"), kind: "number", min: 0, step: 0.5 },
+    { key: "radius", label: tr("Poloměr dna R (U, J)"), kind: "number", min: 0, step: 0.5 },
+    { key: "cap", label: tr("Převýšení housenky"), kind: "number", min: 0, step: 0.5 },
+    { key: "root", label: tr("Převýšení kořene"), kind: "number", min: 0, step: 0.5 },
+    { key: "backing", label: tr("Podložka"), kind: "bool" },
+    { key: "t", label: tr("Tloušťka t (0 = z modelu)"), kind: "number", min: 0 },
+    { key: "flip", label: tr("Obrátit stranu svaru"), kind: "bool" },
+    { key: "field", label: tr("Montážní svar"), kind: "bool" },
+    { key: "process", label: tr("Metoda (ISO 4063)"), kind: "enum", options: PROCESS_OPTIONS },
+    { key: "eff", label: tr("Účinnost navaření"), kind: "number", min: 0, max: 1, step: 0.05, hint: tr("0 = podle metody (135: 0,9)") },
+  ],
+  build: (data, ctx) => buildGroove(data, ctx),
+});
+
+// ---------------- Děrový / žlábkový svar ----------------
+
+registerExt({
+  ext: "weld.plug",
+  label: tr("Děrový svar"),
+  icon: "weld-plug",
+  tone: "feature",
+  tab: "weld",
+  group: "Svary",
+  order: 2,
+  hint: tr("otvory Ø d (žlábky l × d) v horním plechu vyplněné svarem – přeplátovaný spoj"),
+  pick: { kind: "faces", key: "faces" },
+  rollback: true,
+  make: (_doc, extra) => ({ faces: (extra?.faces as number[]) ?? [], faceAt: [], d: 12, slot: 0, n: 2, pitch: 60, axis: "long", shift: 0, t: 0, cap: 0, field: false, process: "135" }),
+  params: [
+    { key: "faces", label: tr("Horní plocha horního plechu"), kind: "faces" },
+    { key: "d", label: tr("Průměr / šířka otvoru d"), kind: "number", min: 1 },
+    { key: "slot", label: tr("Délka žlábku l (0 = kruhový otvor)"), kind: "number", min: 0 },
+    { key: "n", label: tr("Počet"), kind: "number", min: 1, step: 1, unit: "ks" },
+    { key: "pitch", label: tr("Rozteč e"), kind: "number", min: 1 },
+    { key: "axis", label: tr("Řada podél"), kind: "enum", options: [{ v: "long", l: tr("delší strany plochy") }, { v: "short", l: tr("kratší strany plochy") }] },
+    { key: "shift", label: tr("Posun řady"), kind: "number" },
+    { key: "t", label: tr("Tloušťka horního plechu (0 = z modelu)"), kind: "number", min: 0 },
+    { key: "cap", label: tr("Převýšení (kruhový otvor)"), kind: "number", min: 0, step: 0.5 },
+    { key: "field", label: tr("Montážní svar"), kind: "bool" },
+    { key: "process", label: tr("Metoda (ISO 4063)"), kind: "enum", options: PROCESS_OPTIONS },
+  ],
+  build: (data, ctx) => buildPlug(data, ctx),
+});
+
+// ---------------- Bodový svar ----------------
+
+registerExt({
+  ext: "weld.spot",
+  label: tr("Bodový svar"),
+  icon: "weld-spot",
+  tone: "feature",
+  tab: "weld",
+  group: "Svary",
+  order: 3,
+  hint: tr("značky bodových svarů Ø d s roztečí e na ploše přeplátování (bez přídavného materiálu)"),
+  pick: { kind: "faces", key: "faces" },
+  rollback: true,
+  make: (_doc, extra) => ({ faces: (extra?.faces as number[]) ?? [], faceAt: [], d: 6, n: 5, pitch: 40, axis: "long", shift: 0, field: false, process: "21" }),
+  params: [
+    { key: "faces", label: tr("Plocha horního plechu"), kind: "faces" },
+    { key: "d", label: tr("Průměr bodu d"), kind: "number", min: 1 },
+    { key: "n", label: tr("Počet bodů"), kind: "number", min: 1, step: 1, unit: "ks" },
+    { key: "pitch", label: tr("Rozteč e"), kind: "number", min: 1 },
+    { key: "axis", label: tr("Řada podél"), kind: "enum", options: [{ v: "long", l: tr("delší strany plochy") }, { v: "short", l: tr("kratší strany plochy") }] },
+    { key: "shift", label: tr("Posun řady"), kind: "number" },
+    { key: "field", label: tr("Montážní svar"), kind: "bool" },
+    { key: "process", label: tr("Metoda (ISO 4063)"), kind: "enum", options: PROCESS_OPTIONS },
+  ],
+  build: (data, ctx) => buildSpot(data, ctx),
 });
 
 // ---------------- Značka svaru ----------------
@@ -496,9 +561,11 @@ registerExt({
   tone: "ref",
   tab: "weld",
   group: "Svary",
-  order: 1,
-  hint: tr("ISO 2553 – uloží se k dílu, zobrazí se v tabulce svarů a na výkresu"),
-  make: () => ({ kind: "fillet", size: 4, length: 0, pitch: 0, allAround: false, field: false, otherSide: false, note: "" }),
+  order: 4,
+  hint: tr("ISO 2553 – ruční značka (bez geometrie); s hranou ukáže šipkou na výkrese, jinak v seznamu značek"),
+  pick: { kind: "edges", key: "edges" },
+  rollback: true,
+  make: (_doc, extra) => ({ kind: "fillet", size: 4, length: 0, pitch: 0, allAround: false, field: false, otherSide: false, both: false, process: "", note: "", edges: (extra?.edges as number[]) ?? [] }),
   params: [
     { key: "kind", label: tr("Typ svaru"), kind: "enum", options: SYMBOL_TYPES },
     { key: "size", label: tr("Velikost a / s"), kind: "number", min: 0, step: 0.5 },
@@ -507,9 +574,15 @@ registerExt({
     { key: "allAround", label: tr("Svar po obvodu"), kind: "bool" },
     { key: "field", label: tr("Montážní svar"), kind: "bool" },
     { key: "otherSide", label: tr("Svar na druhé straně"), kind: "bool" },
-    { key: "note", label: tr("Poznámka (metoda, ISO 4063)"), kind: "text" },
+    { key: "both", label: tr("Oboustranný"), kind: "bool" },
+    { key: "process", label: tr("Metoda (ISO 4063)"), kind: "text" },
+    { key: "note", label: tr("Poznámka"), kind: "text" },
+    { key: "edges", label: tr("Hrana spoje (šipka na výkrese)"), kind: "edges" },
   ],
-  build: (_d, ctx) => ctx.body,
+  build: async (d, ctx) => {
+    await symbolAnchor(d, ctx);
+    return ctx.body;
+  },
 });
 
 // ---------------- Výstupy (akce v UI) ----------------

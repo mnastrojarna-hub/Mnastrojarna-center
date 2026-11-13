@@ -1,0 +1,464 @@
+# Vlna 9 / fáze A – 2D CAD: jádro (model, hladiny, typy čar, příkazový řádek, uchopení, text 2d, GUI)
+ – {0} entit přesunuto na {1}	 – {0} Objekte nach {1} verschoben
+ – aktuální	 – aktuell
+ – smazáno i {0} entit	 – auch {0} Objekte gelöscht
+{0} ({1}) nemá bod „{2}“	{0} ({1}) hat keinen Punkt „{2}“
+{0} (zadání „{1}“)	{0} (Eingabe „{1}“)
+{0} a {1} mají {2} průsečíků – pořadí {3} neexistuje	{0} und {1} haben {2} Schnittpunkte – Nummer {3} gibt es nicht
+{0} a {1} se neprotínají	{0} und {1} schneiden sich nicht
+{0} musí být kladné	{0} muss positiv sein
+{0} nemá koncové body	{0} hat keine Endpunkte
+{0} nemá křivku	{0} hat keine Kurve
+{0} nemá kvadrant {1}	{0} hat keinen Quadranten {1}
+{0} nemá plochu ani délku	{0} hat weder Fläche noch Länge
+{0} nemá vrchol {1} (vrcholů {2})	{0} hat keinen Scheitelpunkt {1} ({2} Scheitelpunkte)
+{0} není uzavřená – délka = {1}	{0} ist nicht geschlossen – Länge = {1}
+{0}: očekávám číslo, ne „{1}“	{0}: Zahl erwartet, nicht „{1}“
+{0}: očekávám kladné číslo, ne „{1}“	{0}: positive Zahl erwartet, nicht „{1}“
+{0}: očekávám souřadnice x,y, ne „{1}“	{0}: Koordinaten x,y erwartet, nicht „{1}“
+@ = poslední bod – zatím nebyl zadán žádný bod	@ = letzter Punkt – es wurde noch kein Punkt eingegeben
+@ = relativně k poslednímu bodu – zatím nebyl zadán žádný bod	@ = relativ zum letzten Punkt – es wurde noch kein Punkt eingegeben
+*Zrušeno*	*Abbruch*
+⚠ aktuální hladina je vypnutá – nové entity nebudou vidět	⚠ die aktuelle Ebene ist ausgeschaltet – neue Objekte sind nicht sichtbar
+⚠ na zamčené hladině (beze změny): {0}	⚠ auf gesperrter Ebene (unverändert): {0}
+⚠ na zamčené hladině (nesmazáno): {0}	⚠ auf gesperrter Ebene (nicht gelöscht): {0}
+✓ aktuální hladina: {0}	✓ aktuelle Ebene: {0}
+✓ aktuální typ čáry: {0}	✓ aktueller Linientyp: {0}
+✓ hladina {0} → {1}	✓ Ebene {0} → {1}
+✓ hladina {0} smazána{1}	✓ Ebene {0} gelöscht{1}
+✓ hladina {0}{1}	✓ Ebene {0}{1}
+✓ jednotky {0}, přesnost {1}, úhly {2}	✓ Einheiten {0}, Genauigkeit {1}, Winkel {2}
+✓ načteno: {0}	✓ geladen: {0}
+✓ nový 2D výkres „{0}“ ({1}) – nová záložka	✓ neue 2D-Zeichnung „{0}“ ({1}) – neue Registerkarte
+✓ pohled se upraví	✓ die Ansicht wird angepasst
+✓ smazáno entit: {0}	✓ gelöschte Objekte: {0}
+✓ tloušťky čar se nezobrazují	✓ Linienstärken werden nicht angezeigt
+✓ tloušťky čar se zobrazují	✓ Linienstärken werden angezeigt
+✓ typ čáry {0} smazán	✓ Linientyp {0} gelöscht
+✓ upraveno: {0}	✓ geändert: {0}
+✓ vybráno: {0}{1}	✓ gewählt: {0}{1}
+✓ změněno entit: {0}	✓ geänderte Objekte: {0}
+✗ neznámý příkaz „{0}“	✗ unbekannter Befehl „{0}“
+✗ neznámý příkaz „{0}“ – nápověda: napište „nápověda“	✗ unbekannter Befehl „{0}“ – geben Sie „hilfe“ ein
+2D CAD jako AutoCAD: hladiny, typy čar, příkazový řádek, DXF / DWG	2D-CAD wie AutoCAD: Ebenen, Linientypen, Befehlszeile, DXF / DWG
+2D CAD jako AutoCAD: hladiny, typy čar, příkazový řádek, uchopení, DXF / DWG – myší i textem.	2D-CAD wie AutoCAD: Ebenen, Linientypen, Befehlszeile, Objektfang, DXF / DWG – mit der Maus und per Text.
+2D výkres	2D-Zeichnung
+2D výkres – napište příkaz (čára, kružnice, hladina…, zkratky L, C, PL…) nebo vyberte nástroj na pásu karet.	2D-Zeichnung – geben Sie einen Befehl ein (linie, kreis, ebene…, Kürzel L, C, PL…) oder wählen Sie ein Werkzeug in der Multifunktionsleiste.
+2D výkres (jako AutoCAD): kreslení, hladiny, typy čar, vlastnosti, výběr, dotazy, export DXF / DWG – stejné příkazy jako příkazový řádek 2D výkresu; také window.mncad.draft()	2D-Zeichnung (wie AutoCAD): Zeichnen, Ebenen, Linientypen, Eigenschaften, Auswahl, Abfragen, DXF-/DWG-Export – dieselben Befehle wie die 2D-Befehlszeile; auch window.mncad.draft()
+2D výkres{0} · jednotky {1} · přesnost {2} · LTSCALE {3} · prostor {4}	2D-Zeichnung{0} · Einheiten {1} · Genauigkeit {2} · LTFAKTOR {3} · Bereich {4}
+3 body	3 Punkte
+Aktuální hladina	Aktuelle Ebene
+aktuální hladinu „{0}“ nelze smazat – nejdřív nastavte jinou aktuální	die aktuelle Ebene „{0}“ kann nicht gelöscht werden – setzen Sie zuerst eine andere Ebene aktuell
+aktuální hladinu „{0}“ nelze zmrazit – nejdřív nastavte jinou aktuální	die aktuelle Ebene „{0}“ kann nicht gefroren werden – setzen Sie zuerst eine andere Ebene aktuell
+Aktuální podle objektu	Ebene des Objekts aktuell
+Aktuální: {0}	Aktuell: {0}
+azurová	cyan
+barva hladiny musí být ACI 1–255 nebo #rrggbb	die Ebenenfarbe muss ACI 1–255 oder #rrggbb sein
+bez jednotek	ohne Einheiten
+bílá	weiß
+Bloky	Blöcke
+bod je totožný s předchozím – přeskočen	der Punkt ist mit dem vorherigen identisch – übersprungen
+Bod proložení	Anpassungspunkt
+Bod vložení	Einfügepunkt
+bod x,y [x,y …]	punkt x,y [x,y …]
+body (uzly) – vzhled podle PDMODE / PDSIZE (2d proměnná pdmode 3)	Punkte (Knoten) – Darstellung nach PDMODE / PDSIZE (2d variable pdmode 3)
+body leží v přímce – kružnice nevznikla	die Punkte liegen auf einer Geraden – kein Kreis erstellt
+body leží v přímce – oblouk nevznikl	die Punkte liegen auf einer Geraden – kein Bogen erstellt
+Body proložení	Anpassungspunkte
+body průměru jsou totožné	die Durchmesserpunkte sind identisch
+cílová hladina „{0}“ neexistuje	Zielebene „{0}“ existiert nicht
+čára x,y x,y [@dx,dy | @d<úhel | délka] … [uzavřít]	linie x,y x,y [@dx,dy | @d<winkel | länge] … [schließen]
+červená	rot
+číslo musí být v rozsahu {0}–{1}	die Zahl muss im Bereich {0}–{1} liegen
+Delta X, Y	Delta X, Y
+DleBloku	VonBlock
+DleHladiny	VonLayer
+Dotazy	Abfragen
+dva rohy, rozměry, zaoblení, zkosení	zwei Ecken, Abmessungen, Abrundung, Fase
+elipsa osou (dva koncové body + poloosa) nebo středem; Oblouk = eliptický oblouk (počáteční a koncový úhel od první osy, nebo parametr)	Ellipse über Achse (zwei Endpunkte + Halbachse) oder über Mittelpunkt; Bogen = Ellipsenbogen (Start- und Endwinkel von der ersten Achse oder Parameter)
+elipsa p1 p2 b | elipsa střed c p b | elipsa oblouk střed c p b 0 180 | elipsa p1 p2 natočení 60	ellipse p1 p2 b | ellipse mittelpunkt c p b | ellipse bogen mittelpunkt c p b 0 180 | ellipse p1 p2 drehung 60
+Eliptický oblouk	Ellipsenbogen
+Entit: {0}{1}	Objekte: {0}{1}
+entita {0} ({1}) tu nejde použít	Objekt {0} ({1}) ist hier nicht verwendbar
+entita {0} je na zamčené hladině „{1}“	Objekt {0} liegt auf der gesperrten Ebene „{1}“
+entita {0} neexistuje	Objekt {0} existiert nicht
+entitu nelze takto transformovat	das Objekt kann so nicht transformiert werden
+Export DWG	DWG exportieren
+Export DXF	DXF exportieren
+export dxf | export dwg verze R2013 | export dxf název "Deska"	exportieren dxf | exportieren dwg version R2013 | exportieren dxf name "Platte"
+export výkresu do DXF nebo DWG (verze R2000–R2018); soubor se stáhne (v API je v results[].data.file)	Export der Zeichnung nach DXF oder DWG (Versionen R2000–R2018); die Datei wird heruntergeladen (in der API in results[].data.file)
+export: dxf nebo dwg	export: dxf oder dwg
+globální měřítko typů čar (LTSCALE) – délky čárek a mezer se násobí	globaler Linientypfaktor (LTFAKTOR) – Strich- und Lückenlängen werden multipliziert
+hladina	Ebene
+Hladina	Ebene
+hladina „{0}“ neexistuje	Ebene „{0}“ existiert nicht
+hladina „{0}“ neexistuje – hladiny: {1}	Ebene „{0}“ existiert nicht – Ebenen: {1}
+hladina „{0}“ obsahuje {1} entit – přesuňte je („přesunout-na 0“) nebo smažte spolu s hladinou („i-s-entitami“)	Ebene „{0}“ enthält {1} Objekte – verschieben Sie sie („verschieben-nach 0“) oder löschen Sie sie mit der Ebene („mitobjekten“)
+hladina „{0}“ už existuje	Ebene „{0}“ existiert bereits
+hladina nemůže mít typ čáry {0}	eine Ebene kann nicht den Linientyp {0} haben
+hladina nová OSY barva 1 typčáry CENTER tloušťka 0.25 | hladina aktuální OSY | hladina OSY vypnout | hladina přejmenovat OSY Osy | hladina smazat OSY přesunout-na 0	ebene neu ACHSEN farbe 1 linientyp CENTER linienstärke 0.25 | ebene aktuell ACHSEN | ebene ACHSEN aus | ebene umbenennen ACHSEN Achsen | ebene löschen ACHSEN verschieben-nach 0
+Hladina{0}	Ebene{0}
+hladinaobjektu e3	ebeneaktobj e3
+hladinu „{0}“ nelze přejmenovat	Ebene „{0}“ kann nicht umbenannt werden
+hladinu „{0}“ nelze smazat	Ebene „{0}“ kann nicht gelöscht werden
+Hladiny	Ebenen
+Hladiny ({0}), aktuální: {1}	Ebenen ({0}), aktuell: {1}
+hladiny: nová / vytvořit (+ aktuální) / aktuální / smazat [přesunout-na X | i-s-entitami] / přejmenovat / vlastnosti (barva, typčáry, tloušťka, zapnout, vypnout, zmrazit, rozmrazit, zamknout, odemknout, tisk, netisk, popis); * = všechny hladiny; bez argumentu = seznam (v GUI správce hladin)	Ebenen: neu / erstellen (+ aktuell) / aktuell / löschen [verschieben-nach X | mitobjekten] / umbenennen / Eigenschaften (farbe, linientyp, linienstärke, ein, aus, frieren, tauen, sperren, entsperren, plotten, nichtplotten, beschreibung); * = alle Ebenen; ohne Argument = Liste (in der GUI Ebenen-Manager)
+hlavní poloosa musí být delší než vedlejší ({0})	die Hauptachse muss länger als die Nebenachse sein ({0})
+hodnota musí být alespoň {0}	der Wert muss mindestens {0} sein
+chybí hodnota vlastnosti {0}	Wert der Eigenschaft {0} fehlt
+chybí název hladiny	Ebenenname fehlt
+chybí název typu čáry	Linientypname fehlt
+chybí zadání – {0}	Eingabe fehlt – {0}
+import (GUI) | import "vykres.dxf" <base64>	importieren (GUI) | importieren "zeichnung.dxf" <base64>
+import: zadejte název a obsah souboru v base64, nebo použijte window.mncad.draftImport	import: Dateiname und Inhalt in Base64 angeben oder window.mncad.draftImport verwenden
+jedna entita z úseků a oblouků (Oblouk = tečný oblouk, Druhý = oblouk třemi body, Úsečka = zpět na úseky), šířka, uzavření	ein Objekt aus Segmenten und Bögen (Bogen = tangentialer Bogen, Zweiter = Bogen durch drei Punkte, Linie = zurück zu Segmenten), Breite, schließen
+jednořádkový text	einzeiliger Text
+jednořádkový text: bod, výška, natočení, obsah (v uvozovkách); Zarovnání (Střed, Vpravo, Uprostřed, TL…BR, Zarovnat, Přizpůsobit), Styl	einzeiliger Text: Punkt, Höhe, Drehung, Inhalt (in Anführungszeichen); Ausrichten (Zentrum, Rechts, Mitte, OL…UR, Ausrichten, Einpassen), Stil
+Jednotky	Einheiten
+jednotky {0}, přesnost {1}, úhly {2}	Einheiten {0}, Genauigkeit {1}, Winkel {2}
+jednotky mm přesnost 3 úhly 1	einheiten mm genauigkeit 3 winkel 1
+jednotky výkresu (INSUNITS: mm, cm, m, in, ft…) a přesnost délek / úhlů; geometrie se nepřepočítává	Zeichnungseinheiten (INSUNITS: mm, cm, m, in, ft…) und Genauigkeit von Längen / Winkeln; die Geometrie wird nicht umgerechnet
+jednotky: mm, cm, m, in, ft, km, um, unitless	Einheiten: mm, cm, m, in, ft, km, um, unitless
+jednotky: mm|cm|m|in|ft… přesnost N úhly N	einheiten: mm|cm|m|in|ft… genauigkeit N winkel N
+k {0} vedou {1} tečny – pořadí {2} neexistuje	zu {0} führen {1} Tangenten – Nummer {2} gibt es nicht
+kolmo: chybí výchozí bod (zadejte nejdřív první bod)	lotrecht: Ausgangspunkt fehlt (zuerst den ersten Punkt eingeben)
+Koncový parametr	Endparameter
+Koncový úhel	Endwinkel
+Konstantní šířka	Konstante Breite
+Kreslit	Zeichnen
+KROK	FANG
+kružnice s poloměrem {0} tečná k oběma objektům neexistuje	es gibt keinen Kreis mit Radius {0}, der beide Objekte berührt
+kružnice x,y r | kružnice x,y průměr d | kružnice 3b p1 p2 p3 | kružnice 2b p1 p2 | kružnice ttp e1 e2 r	kreis x,y r | kreis x,y durchmesser d | kreis 3p p1 p2 p3 | kreis 2p p1 p2 | kreis ttr e1 e2 r
+kružnice: střed a poloměr / průměr, třemi body (3B), dvěma body průměru (2B), tečná ke dvěma objektům s poloměrem (TTP)	Kreis: Mittelpunkt und Radius / Durchmesser, drei Punkte (3P), zwei Durchmesserpunkte (2P), tangential zu zwei Objekten mit Radius (TTR)
+Křivka	Polylinie
+křivka potřebuje alespoň dva body	eine Polylinie braucht mindestens zwei Punkte
+křivka x,y x,y [oblouk x,y [druhý x,y x,y] | úsečka x,y | šířka w0 w1] … [uzavřít]	plinie x,y x,y [bogen x,y [zweiter x,y x,y] | linie x,y | breite w0 w1] … [schließen]
+měřítko	Maßstab
+Měřítko čar (LTSCALE {0})	Linientypfaktor (LTFAKTOR {0})
+měřítko čáry	Linientypfaktor
+Měřítko typu čáry	Linientypfaktor
+měřítkočar 0.5	ltfaktor 0.5
+Metoda	Methode
+mnohoúhelník 6 x,y vepsaný 20 | mnohoúhelník 6 x,y opsaný x,y | mnohoúhelník 5 hrana p1 p2	vieleck 6 x,y umkreis 20 | vieleck 6 x,y inkreis x,y | vieleck 5 kante p1 p2
+Mnohoúhelník je	Das Vieleck ist
+modrá	blau
+MŘÍŽKA	RASTER
+Načíst typ čáry	Linientyp laden
+Načíst z knihovny	Aus Bibliothek laden
+Načteno {0} entit, {1} hladin.	{0} Objekte, {1} Ebenen geladen.
+Načteno {0} entit, {1} hladin. Zatím nepřevedeno: {2}.	{0} Objekte, {1} Ebenen geladen. Noch nicht übernommen: {2}.
+nadbytečné zadání „{0}“ – příkaz {1} skončil dřív	überzählige Eingabe „{0}“ – Befehl {1} wurde schon beendet
+napište příkaz (čára, kružnice, L, C…) nebo x,y	Befehl eingeben (linie, kreis, L, C…) oder x,y
+nápověda | nápověda kružnice	hilfe | hilfe kreis
+nastaví aktuální hladinu podle vybrané entity	setzt die Ebene des gewählten Objekts aktuell
+nastaví výběr: e3 e5, vše, poslední (naposledy vytvořené), předchozí, okno x,y x,y, křížení x,y x,y, hladina X, typ line, barva 1, odebrat …, přidat …, nic	setzt die Auswahl: e3 e5, alles, letzte (zuletzt erstellt), vorher, fenster x,y x,y, kreuzen x,y x,y, ebene X, art line, farbe 1, entfernen …, hinzu …, nichts
+Nastavit aktuální	Aktuell setzen
+Nastavit aktuální (dvojklik na název)	Aktuell setzen (Doppelklick auf den Namen)
+nastavit e3 r 25 c 10,10 | nastavit e7 s "Nový text" h 5 | nastavit e2 length=120	setzen e3 r 25 c 10,10 | setzen e7 s "Neuer Text" h 5 | setzen e2 length=120
+Nástroje této karty doplní další balík	Die Werkzeuge dieser Registerkarte ergänzt ein weiteres Paket
+natočení musí být 0°–89,4°	die Drehung muss 0°–89,4° betragen
+název hladiny je delší než 255 znaků	der Ebenenname ist länger als 255 Zeichen
+název hladiny nesmí být prázdný	der Ebenenname darf nicht leer sein
+název hladiny nesmí obsahovat znaky < > / \ " : ; ? * | = `	der Ebenenname darf die Zeichen < > / \ " : ; ? * | = ` nicht enthalten
+Nejbližší	Nächster
+nejbližší: nea(e3,x,y)	nächster: nea(e3,x,y)
+Nejdřív vyberte objekt – {0}	Wählen Sie zuerst ein Objekt – {0}
+nekonečná konstrukční přímka	unendliche Konstruktionslinie
+nekonečné konstrukční přímky: bodem a průchozími body, vodorovně, svisle, pod úhlem, osa úhlu, odsazením od úsečky	unendliche Konstruktionslinien: Punkt und Durchgangspunkte, horizontal, vertikal, unter einem Winkel, Winkelhalbierende, Abstand zu einer Linie
+není co vrátit	nichts rückgängig zu machen
+neplatná barva „{0}“ – číslo ACI 1–255, název (červená…), #rrggbb, r,g,b, ByLayer, ByBlock	ungültige Farbe „{0}“ – ACI-Nummer 1–255, Name (rot…), #rrggbb, r,g,b, VonLayer, VonBlock
+neplatné souřadnice „{0}“ – x,y s desetinnou tečkou (čárka odděluje x a y)	ungültige Koordinaten „{0}“ – x,y mit Dezimalpunkt (das Komma trennt x und y)
+neplatné souřadnice „{0}“ – x,y s desetinnou tečkou, např. 12.5,40	ungültige Koordinaten „{0}“ – x,y mit Dezimalpunkt, z. B. 12.5,40
+neplatný bod „{0}“ – x,y, @dx,dy, @d<úhel nebo e3.end	ungültiger Punkt „{0}“ – x,y, @dx,dy, @d<winkel oder e3.end
+neplatný polární zápis „{0}“ – vzdálenost<úhel, např. @50<30	ungültige Polareingabe „{0}“ – Abstand<Winkel, z. B. @50<30
+netiskne	wird nicht geplottet
+Netisknout	Nicht plotten
+neznámá proměnná „{0}“ – {1}	unbekannte Variable „{0}“ – {1}
+neznámá vlastnost „{0}“ – hladina, barva, typčáry, tloušťka, měřítkočáry, průhlednost	unbekannte Eigenschaft „{0}“ – ebene, farbe, linientyp, linienstärke, ltfaktor, transparenz
+neznámá vlastnost „{0}“ – možné: {1}	unbekannte Eigenschaft „{0}“ – möglich: {1}
+neznámá vlastnost hladiny „{0}“ – barva, typčáry, tloušťka, zapnout, vypnout, zmrazit, rozmrazit, zamknout, odemknout, tisk, netisk, popis	unbekannte Ebeneneigenschaft „{0}“ – farbe, linientyp, linienstärke, ein, aus, frieren, tauen, sperren, entsperren, plotten, nichtplotten, beschreibung
+neznámá volba „{0}“ – možnosti: {1}	unbekannte Option „{0}“ – Optionen: {1}
+neznámý bod entity „{0}“ – start, end, mid, cen, q1–q4, v1…, ins	unbekannter Objektpunkt „{0}“ – start, end, mid, cen, q1–q4, v1…, ins
+neznámý druh entity {0}	unbekannte Objektart {0}
+neznámý příkaz „{0}“	unbekannter Befehl „{0}“
+neznámý příkaz „{0}“ – seznam: 2d nápověda	unbekannter Befehl „{0}“ – Liste: 2d hilfe
+nic není vybráno – zadejte e3 e5 / vše nebo nejdřív „2d vyber …“	nichts ist gewählt – geben Sie e3 e5 / alles an oder zuerst „2d wählen …“
+nic nevybráno	nichts gewählt
+nic nevzniklo	nichts erstellt
+Nová	Neu
+Nový 2D výkres	Neue 2D-Zeichnung
+obdélník jako uzavřená křivka: dva rohy nebo rozměry, zaoblení / zkosení rohů, šířka čáry, natočení	Rechteck als geschlossene Polylinie: zwei Ecken oder Abmessungen, abgerundete / gefaste Ecken, Linienbreite, Drehung
+obdélník x,y @šířka,výška | obdélník zaoblení r x,y x,y | obdélník x,y rozměry 100 50 | obdélník natočení 30 x,y x,y	rechteck x,y @breite,höhe | rechteck abrunden r x,y x,y | rechteck x,y abmessungen 100 50 | rechteck drehung 30 x,y x,y
+oblouk p1 p2 p3 | oblouk p1 střed c p2 | oblouk p1 střed c úhel 90 | oblouk p1 konec p2 poloměr r | oblouk střed c p1 p2	bogen p1 p2 p3 | bogen p1 mittelpunkt c p2 | bogen p1 mittelpunkt c winkel 90 | bogen p1 endpunkt p2 radius r | bogen mittelpunkt c p1 p2
+oblouk: třemi body; počátek-střed-konec / úhel / tětiva; počátek-konec-úhel / směr / poloměr; střed-počátek-konec / úhel (proti směru hodin)	Bogen: drei Punkte; Start-Mittelpunkt-Ende / Winkel / Sehne; Start-Ende-Winkel / Richtung / Radius; Mittelpunkt-Start-Ende / Winkel (gegen den Uhrzeigersinn)
+Obsah	Inhalt
+očekávám celé číslo, ne „{0}“	ganze Zahl erwartet, nicht „{0}“
+očekávám úhel ve stupních nebo bod, ne „{0}“	Winkel in Grad oder Punkt erwartet, nicht „{0}“
+očekávám vzdálenost nebo bod, ne „{0}“	Abstand oder Punkt erwartet, nicht „{0}“
+Odemknout vše	Alle entsperren
+Opakovat {0}	{0} wiederholen
+osa elipsy má nulovou délku	die Ellipsenachse hat die Länge null
+Osa, konec	Achse, Endpunkt
+otevře DXF / DWG jako nový 2D výkres v nové záložce (v GUI výběr souboru; textem: import "název.dxf" base64)	öffnet DXF / DWG als neue 2D-Zeichnung in einer neuen Registerkarte (in der GUI Dateiauswahl; per Text: importieren "name.dxf" base64)
+otevřený dokument „{0}“ není 2D výkres – nejdřív „2d nový“ nebo přepněte na záložku s 2D výkresem	das geöffnete Dokument „{0}“ ist keine 2D-Zeichnung – zuerst „2d neu“ oder zur Registerkarte mit einer 2D-Zeichnung wechseln
+Otevřít DXF / DWG jako 2D výkres	DXF / DWG als 2D-Zeichnung öffnen
+Panel vlastností a hladin	Eigenschaften- und Ebenenfenster
+PDMODE: 0, 2, 3, 32, 34, 35 …	PDMODE: 0, 2, 3, 32, 34, 35 …
+Plocha = {0}, obvod = {1}	Fläche = {0}, Umfang = {1}
+plocha 0,0 100,0 100,50 0,50 | plocha objekt e3	fläche 0,0 100,0 100,50 0,50 | fläche objekt e3
+plocha a obvod: body mnohoúhelníku (Enter uzavře), nebo Objekt (kružnice, uzavřená křivka, elipsa, spline)	Fläche und Umfang: Polygonpunkte (Enter schließt) oder Objekt (Kreis, geschlossene Polylinie, Ellipse, Spline)
+Počáteční parametr	Startparameter
+Počáteční úhel	Startwinkel
+počátek a konec oblouku jsou totožné	Start und Ende des Bogens sind identisch
+počátek oblouku leží ve středu	der Bogenstart liegt im Mittelpunkt
+Počátek, střed, konec	Start, Mittelpunkt, Ende
+pohled: rozsah (vše), okno x,y x,y, střed x,y výška, měřítko k	Ansicht: Grenzen (alles), Fenster x,y x,y, Mitte x,y Höhe, Faktor k
+POLÁRNÍ {0}°	POLAR {0}°
+Polární přírůstek	Polarer Winkelschritt
+poloměr {0} je menší než polovina tětivy {1}	Radius {0} ist kleiner als die halbe Sehne {1}
+Polopřímka	Strahl
+polopřímka p q [q2 …]	strahl p q [q2 …]
+polopřímky z počátečního bodu přes průchozí body	Strahlen vom Startpunkt durch Durchgangspunkte
+Polovina	Mittelpunkt
+Poměr os	Achsenverhältnis
+Popis hladiny {0}	Beschreibung der Ebene {0}
+Potvrdit (Enter)	Bestätigen (Enter)
+Poznámky	Beschriften
+Pravá barva	Echtfarbe
+pravidelný mnohoúhelník (3–1024 stran): střed a poloměr vepsaný / opsaný, nebo hranou; číslem = spodní hrana vodorovně, bodem = natočení k bodu	regelmäßiges Vieleck (3–1024 Seiten): Mittelpunkt und Umkreis- / Inkreisradius oder über Kante; Zahl = untere Kante horizontal, Punkt = zum Punkt gedreht
+Prodloužení	Verlängerung
+Proložením bodů	Durch Anpassungspunkte
+proměnná cecolor 1 | proměnná pdmode 3 | proměnná luprec 2 | proměnná (výpis všech)	variable cecolor 1 | variable pdmode 3 | variable luprec 2 | variable (alle auflisten)
+proměnné výkresu (jako AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT; bez hodnoty = výpis	Zeichnungsvariablen (wie AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT; ohne Wert = Liste
+průhlednost 0–90 %	Transparenz 0–90 %
+průsečík: x(e1,e2) nebo x(e1,e2,k) nebo x(e1,e2,x,y)	Schnittpunkt: x(e1,e2) oder x(e1,e2,k) oder x(e1,e2,x,y)
+přejmenovat: hladina přejmenovat STARÝ NOVÝ	umbenennen: ebene umbenennen ALT NEU
+přesnost 0–8	Genauigkeit 0–8
+Přesnost délek	Längengenauigkeit
+příkaz {0} nejde spustit	Befehl {0} kann nicht gestartet werden
+příkaz přerušen – výkres se mezitím změnil	Befehl abgebrochen – die Zeichnung hat sich inzwischen geändert
+Příkaz:	Befehl:
+Příkazový řádek	Befehlszeile
+Přímka	Konstruktionslinie
+přímka p q [q2 …] | přímka vodorovně p … | přímka svisle p … | přímka úhel 30 p … | přímka osa v a b | přímka odsazení 10 e3 x,y	klinie p q [q2 …] | klinie hor p … | klinie ver p … | klinie winkel 30 p … | klinie halbieren v a b | klinie abstand 10 e3 x,y
+Připravuje se	In Vorbereitung
+purpurová	magenta
+Režimy uchopení	Objektfangmodi
+Rozbalit historii příkazového řádku (F2)	Befehlszeilenverlauf aufklappen (F2)
+Rozmrazit	Tauen
+rozsah	Grenzen
+rozsah kresby (nejmenší a největší souřadnice, šířka × výška)	Zeichnungsgrenzen (kleinste und größte Koordinaten, Breite × Höhe)
+Rozsah: {0} – {1} ({2} × {3})	Grenzen: {0} – {1} ({2} × {3})
+Rozsah: prázdný výkres	Grenzen: leere Zeichnung
+Rozvržení	Layout
+různé	verschieden
+Řídicí bod	Kontrollpunkt
+Řídicí body	Kontrollpunkte
+Řídicími body	Durch Kontrollpunkte
+samotné číslo („{0}“) je vzdálenost od předchozího bodu – tady zadejte bod x,y	eine Zahl allein („{0}“) ist ein Abstand vom vorherigen Punkt – geben Sie hier einen Punkt x,y ein
+Sdílet	Teilen
+seznam příkazů 2D výkresu (nebo nápověda k jednomu)	Liste der 2D-Zeichnungsbefehle (oder Hilfe zu einem)
+sklon musí být v rozsahu −85° až 85°	der Neigungswinkel muss zwischen −85° und 85° liegen
+Smazat ({0})	Löschen ({0})
+smazat e3 e5 | smazat hladina OSY | smazat okno 0,0 100,100 | smazat vše	löschen e3 e5 | löschen ebene ACHSEN | löschen fenster 0,0 100,100 | löschen alles
+Smaže hladinu; entity se přesunou na aktuální hladinu	Löscht die Ebene; ihre Objekte werden auf die aktuelle Ebene verschoben
+smaže vybrané entity (výběr: e3 e5, vše, okno, křížení, hladina, typ…; zamčené hladiny se přeskočí)	löscht die gewählten Objekte (Auswahl: e3 e5, alles, fenster, kreuzen, ebene, art…; gesperrte Ebenen werden übersprungen)
+Soubor {0} se nepodařilo přečíst: {1}	Die Datei {0} konnte nicht gelesen werden: {1}
+souřadnice bodu (i odkazu na entitu, např. e3.cen, x(e1,e2))	Punktkoordinaten (auch eines Objektverweises, z. B. e3.cen, x(e1,e2))
+souřadnice e3.cen	koordinaten e3.cen
+spline potřebuje alespoň dva body	ein Spline braucht mindestens zwei Punkte
+spline proložením bodů (kubická, délka tětiv) nebo řídicími body (Metoda Řídicí, stupeň 1–10); Uzavřít = uzavřená	Spline durch Anpassungspunkte (kubisch, Sehnenlänge) oder durch Kontrollpunkte (Methode SKP, Grad 1–10); Schließen = geschlossen
+spline x,y x,y x,y … [uzavřít] | spline metoda řídicí x,y x,y x,y x,y | spline stupeň 2 x,y …	spline x,y x,y x,y … [schließen] | spline methode skp x,y x,y x,y x,y | spline grad 2 x,y …
+Správce hladin	Ebenen-Manager
+Správce hladin…	Ebenen-Manager…
+stav	Status
+stav výkresu: jednotky, rozsah, počty entit podle druhu, hladiny (barva, typ, tloušťka, stav, počet entit), výběr	Zeichnungsstatus: Einheiten, Grenzen, Objektanzahl nach Art, Ebenen (Farbe, Linientyp, Stärke, Zustand, Objektanzahl), Auswahl
+Střed, počátek, konec	Mittelpunkt, Start, Ende
+Střed, poloměr	Mittelpunkt, Radius
+Stupeň	Grad
+SVĚTLÉ	HELL
+svislé zarovnání: baseline, bottom, middle, top	vertikale Ausrichtung: baseline, bottom, middle, top
+šířka nesmí být záporná	die Breite darf nicht negativ sein
+Šířkový faktor	Breitenfaktor
+Tečná, tečná, poloměr	Tangente, Tangente, Radius
+tečně: chybí výchozí bod (zadejte nejdřív první bod)	tangential: Ausgangspunkt fehlt (zuerst den ersten Punkt eingeben)
+tětiva {0} je delší než průměr {1}	die Sehne {0} ist länger als der Durchmesser {1}
+text x,y výška úhel "obsah" | text zarovnání mc x,y 5 0 "obsah" | text styl Standard x,y 5 0 "obsah"	dtext x,y höhe winkel "inhalt" | dtext ausrichten mz x,y 5 0 "inhalt" | dtext stil Standard x,y 5 0 "inhalt"
+Text: 2d vlastnosti {0} barva 1 · 2d nastavit {1} …	Text: 2d eigenschaften {0} farbe 1 · 2d setzen {1} …
+textový styl „{0}“ ve výkresu není	Textstil „{0}“ ist nicht in der Zeichnung
+textový styl „{0}“ ve výkresu není – styly: {1}	Textstil „{0}“ ist nicht in der Zeichnung – Stile: {1}
+Tisknout	Plotten
+tloušťka čáry hladiny: 0–2,11 mm nebo Default	Linienstärke der Ebene: 0–2,11 mm oder Default
+tloušťka čáry: 0–2,11 mm, ByLayer, ByBlock nebo Default – ne „{0}“	Linienstärke: 0–2,11 mm, VonLayer, VonBlock oder Default – nicht „{0}“
+TLOUŠŤKY	LST
+tloušťky zap | tloušťky vyp	lstärke ein | lstärke aus
+TMAVÉ	DUNKEL
+Tmavé / světlé pozadí	Dunkler / heller Hintergrund
+typ Continuous nelze smazat	der Linientyp Continuous kann nicht gelöscht werden
+Typ čáry	Linientyp
+typ čáry „{0}“ není ve výkresu ani v knihovně – typy: {1}	Linientyp „{0}“ ist weder in der Zeichnung noch in der Bibliothek – Typen: {1}
+typ čáry „{0}“ v knihovně není – knihovna: {1}	Linientyp „{0}“ ist nicht in der Bibliothek – Bibliothek: {1}
+typ čáry „{0}“ ve výkresu není	Linientyp „{0}“ ist nicht in der Zeichnung
+typ čáry {0} se používá – nelze smazat	Linientyp {0} wird verwendet – Löschen nicht möglich
+typčáry načíst CENTER2 HIDDENX2 | typčáry načíst vše | typčáry aktuální DASHED | typčáry smazat DOT | typčáry seznam	linientyp laden CENTER2 HIDDENX2 | linientyp laden alles | linientyp aktuell DASHED | linientyp löschen DOT | linientyp liste
+typčáry: načíst | aktuální | smazat | seznam	linientyp: laden | aktuell | löschen | liste
+Typy čar	Linientypen
+typy čar: načíst z knihovny (BORDER, CENTER, DASHDOT, DASHED, DIVIDE, DOT, HIDDEN, PHANTOM + varianty 2 a X2; vše), aktuální typ nových entit, smazat nepoužitý, seznam	Linientypen: aus der Bibliothek laden (BORDER, CENTER, DASHDOT, DASHED, DIVIDE, DOT, HIDDEN, PHANTOM + Varianten 2 und X2; alles), aktueller Linientyp neuer Objekte, unbenutzte löschen, Liste
+úhel bodem potřebuje výchozí bod – zadejte úhel ve stupních	ein Winkel per Punkt braucht einen Ausgangspunkt – geben Sie den Winkel in Grad ein
+úhel oblouku musí být mezi 0° a 360°	der Bogenwinkel muss zwischen 0° und 360° liegen
+UCHOP	OFANG
+Uložit .mncad	.mncad speichern
+úsečky na sebe navazující · Uzavřít, Zpět	verbundene Linien · Schließen, Zurück
+úsečky na sebe navazující (každý úsek je samostatná entita); Uzavřít spojí s prvním bodem, Zpět vrátí poslední úsek	verbundene Linien (jedes Segment ist ein eigenes Objekt); Schließen verbindet mit dem ersten Punkt, Zurück entfernt das letzte Segment
+úsek {0} neexistuje	Segment {0} existiert nicht
+úseky a oblouky jedné entity, šířka	Segmente und Bögen eines Objekts, Breite
+Uzel	Knoten
+vedlejší poloosa nesmí být delší než hlavní ({0})	die Nebenachse darf nicht länger als die Hauptachse sein ({0})
+vlastnosti e3 e5 hladina OSY barva 1 typčáry DASHED tloušťka 0.5 | vlastnosti barva ByLayer (vybrané)	eigenschaften e3 e5 ebene ACHSEN farbe 1 linientyp DASHED linienstärke 0.5 | eigenschaften farbe VonLayer (gewählte)
+vrchol {0} neexistuje (vrcholů {1})	Scheitelpunkt {0} existiert nicht ({1} Scheitelpunkte)
+Vše ({0})	Alle ({0})
+výběr {0}: zadejte dva rohy x,y x,y	Auswahl {0}: zwei Ecken x,y x,y angeben
+vyber hladina OSY typ circle | vyber okno 0,0 100,50 | vyber výběr odebrat e3 | vyber nic	wählen ebene ACHSEN art circle | wählen fenster 0,0 100,50 | wählen auswahl entfernen e3 | wählen nichts
+výběr podle barvy: neplatná barva „{0}“	Auswahl nach Farbe: ungültige Farbe „{0}“
+výběr podle druhu: neznámý druh „{0}“ – druhy: {1}	Auswahl nach Art: unbekannte Art „{0}“ – Arten: {1}
+výběr podle hladiny: hladina „{0}“ neexistuje – hladiny: {1}	Auswahl nach Ebene: Ebene „{0}“ existiert nicht – Ebenen: {1}
+výběr se zadává slovy výběru	eine Auswahl wird mit Auswahlwörtern eingegeben
+Výběr: {0} ({1})	Auswahl: {0} ({1})
+Vyberte druhý objekt pro tečnu	Zweites Objekt für die Tangente wählen
+Vyberte objekt	Objekt wählen
+Vyberte objekt, jehož hladina bude aktuální	Objekt wählen, dessen Ebene aktuell wird
+Vyberte objekty	Objekte wählen
+Vyberte první objekt pro tečnu	Erstes Objekt für die Tangente wählen
+Vyberte úsečku nebo přímku	Linie oder Konstruktionslinie wählen
+vybráno {0}	gewählt {0}
+Vydutí	Wölbung
+výkres je prázdný	die Zeichnung ist leer
+vyp	aus
+Výpis	Liste
+výpis e3 e5 | výpis vše	liste e3 e5 | liste alles
+výpis entit: druh, id, hladina, barva, typ čáry, tloušťka a geometrie (délka, plocha, body…)	Objektliste: Art, ID, Ebene, Farbe, Linientyp, Linienstärke und Geometrie (Länge, Fläche, Punkte…)
+Vypnout	Ausschalten
+vypnout hladinu	Ebene ausschalten
+Vypnout hladinu objektu	Ebene des Objekts ausschalten
+vypnutá	ausgeschaltet
+Výstup	Ausgabe
+Výška textu	Texthöhe
+Vzdálenost = {0}, úhel v XY = {1}, delta X = {2}, delta Y = {3}	Abstand = {0}, Winkel in XY = {1}, Delta X = {2}, Delta Y = {3}
+vzdálenost 0,0 e3.end	abstand 0,0 e3.end
+vzdálenost bodem potřebuje výchozí bod – zadejte číslo	ein Abstand per Punkt braucht einen Ausgangspunkt – geben Sie eine Zahl ein
+vzdálenost dvou bodů, úhel v rovině XY, delta X a Y	Abstand zweier Punkte, Winkel in der XY-Ebene, Delta X und Y
+z bodu nelze spustit kolmici na {0}	vom Punkt gibt es kein Lot auf {0}
+z bodu nevede tečna k {0}	vom Punkt führt keine Tangente zu {0}
+Zadejte bod	Punkt angeben
+Zadejte bod průchodu	Durchgangspunkt angeben
+Zadejte bod přímky	Punkt der Linie angeben
+Zadejte bod zarovnání textu	Ausrichtungspunkt des Textes angeben
+Zadejte celkový úhel oblouku	Eingeschlossenen Winkel des Bogens angeben
+Zadejte další bod	Nächsten Punkt angeben
+Zadejte další roh (Enter = konec)	Nächste Ecke angeben (Enter = Ende)
+Zadejte délku druhé poloosy	Länge der anderen Halbachse angeben
+Zadejte délku obdélníku	Länge des Rechtecks angeben
+Zadejte délku tětivy (záporná = větší oblouk)	Sehnenlänge angeben (negativ = größerer Bogen)
+Zadejte druhou vzdálenost zkosení	Zweiten Fasenabstand angeben
+zadejte druhý bod	zweiten Punkt angeben
+Zadejte druhý bod	Zweiten Punkt angeben
+Zadejte druhý bod na kružnici	Zweiten Punkt auf dem Kreis angeben
+Zadejte druhý bod oblouku	Zweiten Punkt des Bogens angeben
+Zadejte druhý koncový bod hrany	Zweiten Endpunkt der Kante angeben
+Zadejte druhý koncový bod osy	Zweiten Endpunkt der Achse angeben
+Zadejte druhý koncový bod průměru	Zweiten Endpunkt des Durchmessers angeben
+Zadejte druhý koncový bod účaří textu	Zweiten Endpunkt der Textgrundlinie angeben
+Zadejte druhý roh	Andere Ecke angeben
+zadejte entitu (e3) nebo vyberte entity	Objekt angeben (e3) oder Objekte wählen
+zadejte entitu (id, např. e3 nebo e3@x,y), ne „{0}“	Objekt angeben (ID, z. B. e3 oder e3@x,y), nicht „{0}“
+zadejte hodnotu: {0}	Wert eingeben: {0}
+Zadejte koncovou pološířku	Endhalbbreite angeben
+Zadejte koncovou šířku	Endbreite angeben
+Zadejte koncový bod oblouku	Endpunkt des Bogens angeben
+Zadejte koncový bod osy	Endpunkt der Achse angeben
+Zadejte koncový bod osy elipsy	Achsenendpunkt der Ellipse angeben
+Zadejte koncový bod osy eliptického oblouku	Achsenendpunkt des Ellipsenbogens angeben
+Zadejte koncový bod úhlu	Winkelendpunkt angeben
+Zadejte koncový parametr	Endparameter angeben
+Zadejte koncový úhel	Endwinkel angeben
+Zadejte natočení kolem hlavní osy	Drehung um die Hauptachse angeben
+Zadejte název textového stylu	Textstilnamen eingeben
+Zadejte počáteční bod	Startpunkt angeben
+Zadejte počáteční bod oblouku	Startpunkt des Bogens angeben
+Zadejte počáteční bod textu	Startpunkt des Textes angeben
+Zadejte počáteční bod úhlu	Winkelstartpunkt angeben
+Zadejte počáteční parametr	Startparameter angeben
+Zadejte počáteční pološířku	Starthalbbreite angeben
+Zadejte počáteční šířku	Startbreite angeben
+Zadejte počáteční úhel	Startwinkel angeben
+Zadejte počet stran	Anzahl der Seiten eingeben
+Zadejte poloměr kružnice	Kreisradius angeben
+Zadejte poloměr oblouku (záporný = větší oblouk)	Bogenradius angeben (negativ = größerer Bogen)
+Zadejte poloměr opsané kružnice	Radius des Umkreises angeben
+Zadejte poloměr vepsané kružnice	Radius des Inkreises angeben
+Zadejte poloměr zaoblení rohů	Abrundungsradius der Ecken angeben
+Zadejte průměr kružnice	Kreisdurchmesser angeben
+Zadejte první bod	Ersten Punkt angeben
+Zadejte první bod na kružnici	Ersten Punkt auf dem Kreis angeben
+Zadejte první bod proložení	Ersten Anpassungspunkt angeben
+Zadejte první koncový bod hrany	Ersten Endpunkt der Kante angeben
+Zadejte první koncový bod průměru	Ersten Endpunkt des Durchmessers angeben
+Zadejte první roh	Erste Ecke angeben
+Zadejte první řídicí bod	Ersten Kontrollpunkt angeben
+Zadejte první vzdálenost zkosení	Ersten Fasenabstand angeben
+Zadejte směr druhého rohu (Enter = vpravo nahoru)	Richtung der zweiten Ecke angeben (Enter = rechts oben)
+Zadejte směr tečny v počátečním bodě	Tangentenrichtung am Startpunkt angeben
+Zadejte stranu odsazení	Abstandsseite angeben
+Zadejte střed elipsy	Mittelpunkt der Ellipse angeben
+Zadejte střed kružnice	Kreismittelpunkt angeben
+Zadejte střed mnohoúhelníku	Mittelpunkt des Vielecks angeben
+Zadejte střed oblouku	Bogenmittelpunkt angeben
+Zadejte stupeň splajnu	Grad des Splines eingeben
+Zadejte šířku čáry obdélníku	Linienbreite des Rechtecks angeben
+Zadejte šířku obdélníku	Breite des Rechtecks angeben
+Zadejte text	Text eingeben
+Zadejte třetí bod na kružnici	Dritten Punkt auf dem Kreis angeben
+Zadejte úhel natočení	Drehwinkel angeben
+Zadejte úhel natočení textu	Drehwinkel des Textes angeben
+Zadejte úhel přímky	Winkel der Linie angeben
+Zadejte vrchol úhlu	Scheitelpunkt des Winkels angeben
+Zadejte výšku textu	Texthöhe angeben
+Zadejte vzdálenost odsazení	Abstand angeben
+zam	ges
+Zam	Ges
+zamčená	gesperrt
+Zamčená	Gesperrt
+Zamknout	Sperren
+zamknout hladinu	Ebene sperren
+Zamknout hladinu objektu	Ebene des Objekts sperren
+Zap	Ein
+Zapnout a rozmrazit vše	Alle einschalten und tauen
+zapnutá	eingeschaltet
+Zapnutá	Eingeschaltet
+Zarovnání svisle	Vertikale Ausrichtung
+Zarovnání vodorovně	Horizontale Ausrichtung
+zarovnání: left, center, right, middle, aligned, fit	Ausrichtung: left, center, right, middle, aligned, fit
+Zdánlivý průsečík	Angenommener Schnittpunkt
+zelená	grün
+změní geometrii entity jako panel vlastností: klíč hodnota nebo klíč=hodnota (úsečka a b length angle; kružnice c r d area; oblouk c r a0 a1; křivka closed width v1… b1…; elipsa c a b rot t0 t1; text s p h rot style halign valign wf oblique; bod p; přímka p angle)	ändert die Objektgeometrie wie das Eigenschaftenfenster: Schlüssel Wert oder Schlüssel=Wert (Linie a b length angle; Kreis c r d area; Bogen c r a0 a1; Polylinie closed width v1… b1…; Ellipse c a b rot t0 t1; Text s p h rot style halign valign wf oblique; Punkt p; Konstruktionslinie p angle)
+změní vlastnosti entit (výběr na začátku: e3 e5 / vše / poslední / výběr; jinak aktuální výběr): hladina, barva, typčáry, tloušťka, měřítkočáry, průhlednost; bez vlastností = výpis	ändert Objekteigenschaften (Auswahl zuerst: e3 e5 / alles / letzte / auswahl; sonst die aktuelle Auswahl): ebene, farbe, linientyp, linienstärke, ltfaktor, transparenz; ohne Eigenschaften = Liste
+zmr	gfr
+Zmr	Gfr
+zmrazená	gefroren
+Zmrazená	Gefroren
+zmrazená hladina „{0}“ nemůže být aktuální	die gefrorene Ebene „{0}“ kann nicht aktuell sein
+Zmrazit	Frieren
+zmrazit hladinu	Ebene frieren
+Zmrazit hladinu objektu	Ebene des Objekts frieren
+zobrazení tlouštěk čar zapnout / vypnout (bez argumentu přepne)	Anzeige der Linienstärken ein / aus (ohne Argument umschalten)
+Zobrazit tloušťky	Linienstärken anzeigen
+Zoom – rozsah	Zoom – Grenzen
+Zoom – rozsah (poklepání prostředním tlačítkem)	Zoom – Grenzen (Doppelklick mit der mittleren Taste)
+zoom okno x,y x,y	zoom fenster x,y x,y
+zoom rozsah | okno x,y x,y | střed x,y výška | měřítko k	zoom grenzen | fenster x,y x,y | mitte x,y höhe | faktor k
+zoom rozsah | zoom okno 0,0 100,100 | zoom střed 50,50 200	zoom grenzen | zoom fenster 0,0 100,100 | zoom mitte 50,50 200
+zoom střed x,y výška	zoom mitte x,y höhe
+Zrušit (Esc)	Abbrechen (Esc)
+Žádný výběr – vlastnosti nových entit	Keine Auswahl – Eigenschaften neuer Objekte
+žlutá	gelb

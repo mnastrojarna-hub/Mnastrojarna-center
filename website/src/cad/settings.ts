@@ -242,7 +242,7 @@ export const fromMm = (mm: number, units: Settings["units"]) => (units === "inch
 
 // ---------------- nedávné soubory (jen v šifrovaném úložišti – viz vault.ts) ----------------
 
-export type RecentDoc = { id: string; name: string; kind: "part" | "assembly"; at: number; features: number; thumb?: string };
+export type RecentDoc = { id: string; name: string; kind: "part" | "assembly" | "draft"; at: number; features: number; thumb?: string };
 const RECENT = "mn-cad-recent-v1";
 
 export async function loadRecent(): Promise<RecentDoc[]> {

@@ -169,12 +169,12 @@ export function StartScreen({
                 <button type="button" onClick={() => onOpenRecent(r)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                   <span className="grid h-10 w-12 shrink-0 place-items-center overflow-hidden rounded bg-[#f3f6f9]">
                     {/* eslint-disable-next-line @next/next/no-img-element -- data URL náhledu z canvasu */}
-                    {r.thumb ? <img src={r.thumb} alt="" className="h-full w-full object-cover" /> : <CadIcon name={r.kind === "assembly" ? "layers" : "cube"} tone="create" className="h-5 w-5" />}
+                    {r.thumb ? <img src={r.thumb} alt="" className="h-full w-full object-cover" /> : <CadIcon name={r.kind === "assembly" ? "layers" : r.kind === "draft" ? "polyline" : "cube"} tone="create" className="h-5 w-5" />}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-medium">{r.name}</span>
                     <span className="block text-[11px] text-[#8a95a3]">
-                      {r.kind === "assembly" ? tr("Sestava") : tr("Díl")} · {r.features} {r.kind === "assembly" ? "komp." : tr("prvků")} · {new Date(r.at).toLocaleString(cadLocale(), { dateStyle: "short", timeStyle: "short" })}
+                      {r.kind === "assembly" ? tr("Sestava") : r.kind === "draft" ? tr("2D výkres") : tr("Díl")} · {r.features} {r.kind === "assembly" ? "komp." : r.kind === "draft" ? tr("entit") : tr("prvků")} · {new Date(r.at).toLocaleString(cadLocale(), { dateStyle: "short", timeStyle: "short" })}
                     </span>
                   </span>
                 </button>

@@ -710,9 +710,7 @@ Rozvin uložen – {0} ohybů, {1} × {2} mm.	Abwicklung gespeichert – {0} Bie
 klikněte na rovnou hranu plechu v modelu	klicken Sie auf eine gerade Blechkante im Modell
 {0} vybráno	{0} ausgewählt
 Hloubka Y	Tiefe Y
-Hrany koutu:	Kehlnahtkanten:
 Jako samostatná tělesa (nespojovat)	Als separate Körper (nicht verbinden)
-Koutový svar a×a se vymodeluje jako trojúhelníkový hranol podél hrany; objem svarového kovu ≈ a²/2 × délka (Tabulka svarů).	Eine Kehlnaht a×a wird als Dreiecksprisma entlang der Kante modelliert; Schweißgutvolumen ≈ a²/2 × Länge (Schweißnahttabelle).
 Kusovník řezů uložen jako CSV (Excel).	Zuschnittliste als CSV gespeichert (Excel).
 Mezera	Spalt
 Natočení	Drehung
@@ -729,6 +727,4 @@ Skica s úsečkami (osy profilů)	Skizze mit Linien (Profilachsen)
 Spodní a horní obdélník + 4 sloupky tupě mezi nimi. Vnější rozměry rámu odpovídají zadání.	Unteres und oberes Rechteck + 4 Pfosten stumpf dazwischen. Die Außenmaße des Rahmens entsprechen der Eingabe.
 Výška Z	Höhe Z
 Zarovnání k ose	Ausrichtung zur Achse
-klikněte na hranu vnitřního rohu v modelu	klicken Sie auf eine Innenecken-Kante im Modell
-{0} vybráno ({1} mm)	{0} ausgewählt ({1} mm)
 — vyberte skicu —	— Skizze wählen —

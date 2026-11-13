@@ -223,9 +223,7 @@ Plochá {0}×{1}	Flach {0}×{1}
 Čtyřhran {0}	Vierkant {0}
 Poz.  Profil                 Ks   Délka [mm]  Řez A  Řez B  kg/ks	Pos.  Profil                 Stk  Länge [mm]  Schn. A Schn. B kg/Stk
 Pozice;Profil;Ks;Délka [mm];Řez A [°];Řez B [°];Hmotnost 1 ks [kg];Hmotnost celkem [kg];Prvek	Pos.;Profil;Stk;Länge [mm];Schnitt A [°];Schnitt B [°];Masse je Stk [kg];Gesamtmasse [kg];Feature
-Prvek                  Typ                           a/s   Délka [mm]  Objem [cm³]  kg	Feature                Typ                           a/s   Länge [mm]  Volumen [cm³] kg
 koutový	Kehlnaht
-koutový přerušovaný {0} ({1})	Kehlnaht unterbrochen {0} ({1})
  (po obvodu)	 (rundum)
  (montážní)	 (Baustelle)
 Rozvin: {0} × {1} mm · tloušťka {2} mm · {3} ohybů	Abwicklung: {0} × {1} mm · Dicke {2} mm · {3} Biegungen
@@ -235,7 +233,6 @@ dolů	nach unten
 # sdílení a soubory
  · chráněno heslem	 · passwortgeschützt
  (příjemci se otevře rovnou výkres)	 (der Empfänger sieht direkt die Zeichnung)
- Pro velké modely (STEP) lze zapnout šifrované úložiště (viz dokumentace).	 Für große Modelle (STEP) lässt sich der verschlüsselte Speicher aktivieren (siehe Dokumentation).
 v šifrovaném úložišti	im verschlüsselten Speicher
 Připravuji odkaz…	Link wird vorbereitet…
 výkres	Zeichnung

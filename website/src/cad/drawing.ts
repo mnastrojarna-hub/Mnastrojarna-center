@@ -10,6 +10,7 @@ import * as r from "replicad";
 import type { CadDoc, PlaneName, Vec2, Vec3 } from "./types";
 import { auxView, brkInView, breakDir, breakLines, brokenOut, clipBreaks, compress1, compressQ, cutSection, decompress1, decompressQ, normBrks, pickParent, type AuxViewOpt, type Brk, type BrokenOutOpt, type CutSectionOpt, type ExtraViewData, type ViewBreakOpt } from "./drawing-views";
 import { fitOfSuffix, fitRows, fitSuffix, type FitShow } from "./drawing-fits";
+import { weldSymbolsOnSheet, type WeldMark } from "./drawing-welds";
 
 // ---------------------------------------------------------------- typy
 
@@ -55,6 +56,8 @@ export type DrawingMeta = {
   /** číslo listu / počet listů (razítko „List i/n“) */
   sheetIndex?: number;
   sheetCount?: number;
+  /** značky svarů ISO 2553 z 3D svarů dílu (drawing-welds.ts – `weldMarksOf`) */
+  welds?: WeldMark[];
 };
 
 export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3] };
@@ -131,6 +134,8 @@ export type DrawingOptions = {
   zones?: boolean;
   /** (vnitřní) měřítko pro mezeru přerušení při automatickém měřítku – z prvního průchodu; 0 = odhad */
   breakScale?: number;
+  /** značky svarů z 3D svarů (meta.welds); false = nekreslit */
+  weldSymbols?: boolean;
 };
 
 export const defaultDrawingOptions: DrawingOptions = {
@@ -1750,6 +1755,18 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     if (mainView) balloonsFor(meta.components, mainView, polys, texts, balloons, { top: M + 3, bottom: SH - M - TBH - 3, left: M_LEFT + 3, right: SW - M - 3 });
   }
 
+  // značky svarů ISO 2553 z 3D svarů (drawing-welds.ts)
+  if (meta.welds?.length && opts.weldSymbols !== false) {
+    const wv = ortho.filter((p) => p.key in VIEW_LABEL && p.key !== "iso").map((p) => ({ key: p.key, d: p.cam.d, rect: [p.px, p.py, p.w * p.s, p.h * p.s] as [number, number, number, number], at: (q: Vec3) => at(p, q) }));
+    const busy = [...placed.values()].map((p) => ({ x: p.px, y: p.py, w: p.w * p.s, h: p.h * p.s })).concat(isoRect ? [isoRect] : [], [{ x: SW - M - TB.w, y: SH - M - TBH, w: TB.w, h: TBH }]);
+    for (const t of texts) {
+      const [x0, y0, x1, y1] = textBox(t);
+      busy.push({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+    }
+    for (const pl of polys) if (pl.layer === "dim" && pl.pts.length > 1) busy.push(rectOfPts(pl.pts, 0.5));
+    weldSymbolsOnSheet(meta.welds, wv, polys, texts, { left: M_LEFT + 3, right: SW - M - 3, top: M + 3, bottom: SH - M - 3 }, busy);
+  }
+
   // rám, centrovací značky, zóny, razítko
   frame(SW, SH, polys);
   const zones = opts.zones ? zoneGrid(SW, SH, polys, texts) : undefined;
@@ -2099,6 +2116,14 @@ function centerLines(p: Placed, circles: Circle[], polys: Poly[]) {
 /** odhad šířky znaku vůči výšce písma (Roboto; číslice ≈ 0,56) – s rezervou */
 const CHAR_W = 0.6;
 /** Obdélník, který na listu zabírá text (osově rovnoběžný obal i pro otočený text): [x0, y0, x1, y1]. */
+/** obalový obdélník bodů (+ okraj) */
+function rectOfPts(pts: Vec2[], pad = 0): { x: number; y: number; w: number; h: number } {
+  const xs = pts.map((q) => q[0]);
+  const ys = pts.map((q) => q[1]);
+  const x = Math.min(...xs) - pad;
+  const y = Math.min(...ys) - pad;
+  return { x, y, w: Math.max(...xs) + pad - x, h: Math.max(...ys) + pad - y };
+}
 export function textBox(t: DText): [number, number, number, number] {
   const w = t.s.length * t.size * CHAR_W;
   const x0 = t.anchor === "middle" ? -w / 2 : t.anchor === "end" ? -w : 0;

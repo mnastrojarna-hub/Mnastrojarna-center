@@ -1,12 +1,13 @@
 // E2E: sdílení odkazem – tlačítko Sdílet, dialog (platnost, heslo, WhatsApp / e-mail / kopírovat), otevření odkazu
 // v jiném prohlížeči (snímek + pruh „Sdílený dokument“, nic se neukládá, přežije F5), heslo, výkres, neplatný odkaz, mobil.
-// Spuštění (produkční server na :3100): node e2e/cad-share.e2e.cjs <složka pro výstupy>
+// Spuštění (server na E2E_BASE, výchozí :3100): node e2e/cad-share.e2e.cjs <složka pro výstupy>
+// Režim „v odkazu“ (#s=): server bez úložiště /cad/share/ (next dev / next start); krátké odkazy testuje cad-w8-share.e2e.cjs.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const S = (process.argv[2] || '/tmp/e2e').replace(/\/?$/, '/');
 fs.mkdirSync(S, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
-const CAD = 'http://localhost:3100/cad';
+const CAD = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, '') + '/cad';
 const coreReady = (page) => page.waitForFunction(() => document.body.innerText.includes('OCCT') && !document.body.innerText.includes('Načítám jádro'), null, { timeout: 120000 });
 const ready = async (page) => {
   const c = page.getByText('Pokračovat v práci');
@@ -15,7 +16,7 @@ const ready = async (page) => {
   await page.waitForTimeout(800);
 };
 const linkValue = async (dlg, page, notEqual) => {
-  await page.waitForFunction((prev) => { const t = document.querySelector('textarea[aria-label="Sdílený odkaz"]'); return !!t && t.value.startsWith('http') && t.value !== prev; }, notEqual ?? null, { timeout: 20000 });
+  await page.waitForFunction((prev) => { const t = document.querySelector('[aria-label="Sdílený odkaz"]'); return !!t && t.value.startsWith('http') && t.value !== prev; }, notEqual ?? null, { timeout: 20000 });
   return dlg.getByLabel('Sdílený odkaz').inputValue();
 };
 

@@ -15,6 +15,7 @@ export type SketchPlane =
 
 import { tr } from "./i18n";
 import type { AxisDef, Direction, Extent, PlaneDef, Ref, Sig, StartFrom, Thin } from "./refs";
+import type { DraftModel } from "./draft/model";
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
 
 /** Ukončení díry. */
@@ -252,8 +253,10 @@ export type CadDoc = {
   activeConfig?: string | null;
   /** popisové údaje (razítko výkresu) */
   props?: { number?: string; author?: string; revision?: string; note?: string };
-  /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent */
-  kind?: "part" | "assembly";
+  /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent; „draft“ = 2D výkres (model v `draft`) */
+  kind?: "part" | "assembly" | "draft";
+  /** 2D výkres (hladiny, typy čar, entity, bloky, rozvržení) – cad/draft/model.ts */
+  draft?: DraftModel;
   /** komponenty sestavy */
   components?: AsmComponent[];
   /** barvy jednotlivých ploch výsledného tělesa (index plochy → #rrggbb) */
@@ -334,7 +337,7 @@ export type AsmComponent = {
  * (operace těleso nezměnila, geometrie po opravě stále není platná…) – v UI ⚠, v protokolu „⚠“.
  */
 /** `ms` = doba výpočtu prvku (jen prvky, které se skutečně počítaly) */
-export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number };
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown> };
 
 export type MeshData = {
   vertices: Float32Array;

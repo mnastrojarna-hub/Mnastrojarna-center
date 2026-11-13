@@ -727,7 +727,6 @@ Profil;Ks;Délka celkem [m];Hmotnost [kg]	Profile;Qty;Total length [m];Mass [kg]
 Rozměr	Size
 Rozměry rámu jsou menší než dvojnásobek profilu.	The frame dimensions are smaller than twice the profile size.
 Střed	Centre
-Svarový kov celkem: {0} kg	Total weld metal: {0} kg
 Tloušťka stěny	Wall thickness
 Tloušťka stěny jäklu je příliš velká.	The hollow-section wall thickness is too large.
 Tloušťka stěny trubky je příliš velká.	The tube wall thickness is too large.
@@ -747,7 +746,6 @@ Vpravo nahoře	Top right
 Úsečka profilu má nulovou délku.	The profile line has zero length.
 Čtyřhranná tyč	Square bar
 Žádné konstrukční profily (přidejte prvek Konstrukční profil nebo Rám z profilů).	No structural profiles (add a Structural profile or a Profile frame feature).
-Žádné svary (přidejte Svarovou housenku nebo Značku svaru).	No welds (add a Weld bead or a Weld symbol).
 
 # ext/weld
 + (kladná)	+ (positive)
@@ -760,12 +758,9 @@ Díra je větší než deska.	The hole is larger than the plate.
 Díry v řadě (X)	Holes per row (X)
 Díry ve sloupci (Y)	Holes per column (Y)
 Hloubka rámu (Y)	Frame depth (Y)
-Housenku lze zatím vést jen po rovné hraně.	A bead can only follow a straight edge for now.
 Hrana musí ležet mezi dvěma plochami tělesa.	The edge must lie between two faces of the body.
-Hrana není vnitřní (konkávní) – housenka se dělá jen do vnitřního rohu mezi dvěma plochami.	The edge is not internal (concave) – a bead is only made in the inner corner between two faces.
 Hrana {0} v tělese neexistuje – vyberte ji znovu.	Edge {0} does not exist in the body – select it again.
 Hrany koutu	Corner edges
-ISO 2553 – uloží se k dílu, zobrazí se v tabulce svarů a na výkresu	ISO 2553 – saved with the part, shown in the weld table and on the drawing
 Jako samostatná tělesa	As separate bodies
 Konstrukční profil	Structural profile
 Kusovník řezů	Cut list
@@ -782,7 +777,6 @@ Plocha {0} v tělese neexistuje – vyberte ji znovu.	Face {0} does not exist in
 Plochy styčníku jsou rovnoběžné – vyberte dvě plochy svírající úhel.	The gusset faces are parallel – select two faces that form an angle.
 Plochá	Flat
 Pokos	Mitre
-Poznámka (metoda, ISO 4063)	Note (process, ISO 4063)
 Prodloužit konec	Extend end
 Prodloužit začátek	Extend start
 Profil má po zkrácení nulovou délku.	The profile has zero length after shortening.
@@ -816,7 +810,6 @@ Tupý	Butt
 Typ svaru	Weld type
 Velikost (UPN/IPE/HEB)	Size (UPN/IPE/HEB)
 Velikost a / s	Size a / s
-Velikost svaru a	Weld size a
 Velikost svaru musí být kladná.	The weld size must be positive.
 Vyberte hranu vnitřního rohu v modelu.	Select an inner corner edge in the model.
 Vyberte přesně dvě rovinné plochy, které svírají roh.	Select exactly two planar faces that form a corner.
@@ -835,7 +828,6 @@ Značka svaru	Weld symbol
 destička na otevřený konec profilu (vyberte čelní plochy)	a plate on the open end of a profile (select the end faces)
 délky a úhly řezů profilů, hmotnosti, CSV	profile cut lengths and angles, masses, CSV
 délky svarů a svarový kov	weld lengths and weld metal
-koutový svar a×a podél vnitřní hrany (vyberte hrany)	a fillet weld a×a along an inner edge (select the edges)
 kvádrový rám: dva obdélníky (pokos) + 4 sloupky	a box frame: two rectangles (mitred) + 4 posts
 obdélníková deska (patka, příložka) s volitelným polem děr	a rectangular plate (base plate, splice plate) with an optional hole pattern
 odřízne vše na jedné straně roviny (zkrácení profilů)	cuts away everything on one side of the plane (shortening profiles)
