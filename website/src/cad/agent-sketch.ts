@@ -501,7 +501,7 @@ export function solveSketchFeature(sk: SketchF): { feature: SketchF; ok: boolean
 }
 
 /** skica bloku (založená tímto vstupem), jinak skica otevřená ve skicáři (`openId`), jinak poslední skica dokumentu */
-function targetSketch(features: Feature[], target?: SketchTarget, openId?: string | null): number {
+export function targetSketch(features: Feature[], target?: SketchTarget, openId?: string | null): number {
   if (target) {
     const i = features.findIndex((f) => f.id === target.id && f.type === "sketch");
     if (i < 0) throw new Error(tr("skica z řádku {0} nevznikla – entity, vazby a kóty nemají kam (opravte řádek {0})", target.line));
@@ -636,6 +636,12 @@ export function sketchStatusLines(f: SketchF, indent = "    "): string[] {
   const nc = f.constraints?.length ?? 0;
   const nd = f.dims?.length ?? 0;
   if (nc || nd) out.push(indent + tr("vazby {0}, kóty {1}{2}", nc, nd, n <= STATUS_MAX_ENTITIES ? ` · ${dofText(analyzeSketch(f.entities, f.constraints ?? [], f.dims ?? []))}` : ""));
+  // vazby a kóty s čísly v1, k1 (pořadí ve skice) – pro „smazat v1“, „kóta k1 65“, „kóta k1 referenční“ (agent-edit.ts)
+  if (n <= STATUS_MAX_ENTITIES) {
+    const ents = new Map(f.entities.map((e) => [e.id, e]));
+    if (nc && nc <= STATUS_MAX_ENTITIES) out.push(indent + tr("vazby: {0}", (f.constraints ?? []).map((c, i) => `v${i + 1} ${describeConstraint(c, ents)}`).join(" · ")));
+    if (nd && nd <= STATUS_MAX_ENTITIES) out.push(indent + tr("kóty: {0}", (f.dims ?? []).map((d, i) => `k${i + 1} ${describeDim({ ...d, driving: true }, ents).replace(/ (\S+)$/, " = $1")}${d.driving ? "" : " " + tr("referenční")}`).join(" · ")));
+  }
   return out;
 }
 

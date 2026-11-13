@@ -58,7 +58,7 @@ stav`;
   log = await run(BUG1);
   ok(vol(log).join(' / ') === '314,16 / 313,59', 'BUG1: 314,16 cm³ před dírou, 313,59 cm³ po díře skrz od z = 20 dolů (' + vol(log).join(' / ') + ')');
   ok((log.match(/^Dokument:/gm) || []).length === 2, '„stav“ uprostřed vstupu + závěrečný stav = dva výpisy (ne tři)');
-  log = await run('zpět\ndíra 6 skrz obousměrně v 35 0 20');
+  log = await run('smazat poslední\ndíra 6 skrz obousměrně v 35 0 20'); // „zpět“ = krok historie; poslední prvek smaže „smazat poslední“
   ok(vol(log).pop() === '313,03', 'díra skrz obousměrně: obě příruby (313,03 cm³; ' + vol(log).join(' / ') + ')');
   ok(/skrz oběma směry/.test(log), 'stav uvádí „skrz oběma směry“');
 

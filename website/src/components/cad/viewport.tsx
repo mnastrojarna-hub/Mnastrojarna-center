@@ -64,6 +64,9 @@ export type ViewportHandle = {
   bounds: () => { center: Vec3; radius: number };
   /** přiblíží pohled na kouli (střed, poloměr) při zachování směru pohledu */
   focus: (center: Vec3, radius: number) => void;
+  /** stav kamery a jeho obnovení – snímek pro agenta (window.mncad.screenshot) vrátí dočasný pohled zpět */
+  camera?: () => unknown;
+  setCamera?: (c: unknown) => void;
 };
 
 type Props = {
@@ -1534,6 +1537,26 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       if (!s) return null;
       s.renderer.render(s.scene, s.camera);
       return s.renderer.domElement.toDataURL("image/png");
+    },
+    camera: () => {
+      if (softView.current) return softView.current.camera?.() ?? null;
+      const s = S.current;
+      return s ? { p: s.persp.position.toArray(), n: [s.persp.near, s.persp.far], o: s.orthoCam.position.toArray(), z: s.orthoCam.zoom, t: s.controls.target.toArray() } : null;
+    },
+    setCamera: (c: unknown) => {
+      if (softView.current) return softView.current.setCamera?.(c);
+      const s = S.current;
+      const v = c as { p: [number, number, number]; n: [number, number]; o: [number, number, number]; z: number; t: [number, number, number] } | null;
+      if (!s || !v?.p) return;
+      s.persp.position.fromArray(v.p);
+      [s.persp.near, s.persp.far] = v.n;
+      s.persp.updateProjectionMatrix();
+      s.orthoCam.position.fromArray(v.o);
+      s.orthoCam.zoom = v.z;
+      s.controls.target.fromArray(v.t);
+      updateOrthoFrustum();
+      s.controls.update();
+      s.render();
     },
     /** popisky entit na obrazovce (souřadnice vůči 3D oknu) – pro automatizaci */
     hintList: () => hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),

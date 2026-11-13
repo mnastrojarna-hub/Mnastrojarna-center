@@ -45,6 +45,8 @@ const SoftHandle = forwardRef<ViewportHandle>(function SoftHandle(_, ref) {
       fit: () => softView.current?.fit(),
       snapshot: () => softView.current?.snapshot() ?? null,
       bounds: () => softView.current?.bounds() ?? { center: [0, 0, 0], radius: 100 },
+      camera: () => softView.current?.camera?.() ?? null,
+      setCamera: (c) => softView.current?.setCamera?.(c),
       // přiblížení na oblast (porovnání s referencí) – softwarový náhled ukáže celý model
       focus: () => softView.current?.fit(),
     }),

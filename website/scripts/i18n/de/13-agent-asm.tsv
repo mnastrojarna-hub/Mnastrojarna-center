@@ -1,0 +1,207 @@
+# Sestava textem pro AI agenty: plochy, vazby, komponenty, pole, šroub, podsestavy, kusovník, rám formy, záložky (balík asm)
+  plochy vazeb přečíslovány podle geometrie: {0}	  Flächen der Verknüpfungen nach Geometrie neu nummeriert: {0}
+  pohnuto: {0}	  bewegt: {0}
+  vazby pohnuly: {0}	  von Verknüpfungen bewegt: {0}
+ – vypsány {0}	 – aufgeführt: {0}
+ … (celkem {0})	 … (insgesamt {0})
+ … a dalších {0} (sestava)	 … und {0} weitere (baugruppe)
+ … dalších {0} – upřesněte: sestava plochy "{1}" rovinné|válcové	 … {0} weitere – eingrenzen: baugruppe flächen "{1}" eben|zylindrisch
+ · aktivní	 · aktiv
+ · objem dílu {0} cm³	 · Teilvolumen {0} cm³
+ · ukotvená	 · fixiert
+ · vazby {0}	 · Verknüpfungen {0}
+ · vazby uvnitř: {0}	 · Verknüpfungen innen: {0}
+ · vazby, které nešlo převést (odebrány): {0}	 · nicht übertragbare Verknüpfungen (entfernt): {0}
+ (a jejich vazby: {0})	 (und ihre Verknüpfungen: {0})
+ (bez dílů, které se nepostavily)	 (ohne Teile, die nicht aufgebaut wurden)
+ (načteno prvních {0} ploch dílu)	 (erste {0} Flächen des Teils geladen)
+ (podsestava)	 (Unterbaugruppe)
+ (prázdná – vložit "díl" · normálie M8x30 · rám formy)	 (leer – einfügen "Teil" · normteil M8x30 · formaufbau)
+ (skrytá)	 (ausgeblendet)
+ (vybrána {0})	 (gewählt {0})
+ (změna platí pro všechny stejné komponenty: {0})	 (die Änderung gilt für alle gleichen Komponenten: {0})
+ (žádná plocha, kterou by vazby uměly použít)	 (keine Fläche, die Verknüpfungen verwenden können)
+ (žádné – sestava vazba kontakt|souosost … "A" <plocha> "B" <plocha>)	 (keine – baugruppe verknüpfung kontakt|konzentrisch … "A" <Fläche> "B" <Fläche>)
+ + matice	 + Mutter
+ + podložka	 + Scheibe
+„{0}“ je importovaný soubor – otevřete ho jako díl: sestava otevřít "{0}" (přesné těleso v nové záložce)	„{0}“ ist eine importierte Datei – als Teil öffnen: baugruppe öffnen "{0}" (exakter Körper in neuer Registerkarte)
+„{0}“ je v sestavě {1}× – zadejte pořadí: {2}	„{0}“ ist {1}× in der Baugruppe – Position angeben: {2}
+„{0}“ není podsestava – rozpustit lze jen podsestavu	„{0}“ ist keine Unterbaugruppe – nur eine Unterbaugruppe kann aufgelöst werden
+„střed“ (ztotožnit středy ploch) jde jen u vazby Kontakt	„mitte“ (Flächenmitten zusammenlegen) geht nur bei der Verknüpfung Kontakt
+{0} (stav se přepočítá)	{0} (Status wird neu berechnet)
+{0} šroub „{1}“ ({2}) do díry {3} komponenty „{4}“ (Ø{5}, délka díry {6} mm){7}{8} · vazba Souosost: {9} · {10}{11}	{0} Schraube „{1}“ ({2}) in Bohrung {3} der Komponente „{4}“ (Ø{5}, Bohrungslänge {6} mm){7}{8} · Verknüpfung Konzentrisch: {9} · {10}{11}
+{0} vazba {1}: {2}{3} · {4}	{0} Verknüpfung {1}: {2}{3} · {4}
+{0} z {1} vyhovujících	{0} von {1} passenden
+{0}: čekám číslo{1}	{0}: Zahl erwartet{1}
+{0}: chybí hodnota	{0}: Wert fehlt
+{0}: X | Y | Z | -X … nebo vektor dx dy dz	{0}: X | Y | Z | -X … oder Vektor dx dy dz
+{0}„{1}“: vazba potřebuje rovinnou plochu, ne válcovou	{0}„{1}“: die Verknüpfung braucht eine ebene Fläche, keine zylindrische
+{0}„{1}“: vazba potřebuje válcovou plochu, ne rovinnou	{0}„{1}“: die Verknüpfung braucht eine zylindrische Fläche, keine ebene
+{0}chybí plocha komponenty „{1}“ – zadejte F-číslo (sestava plochy "{1}") nebo pravidlo (+Z, horní, největší, válcová Ø8); {2}	{0}Fläche der Komponente „{1}“ fehlt – F-Nummer (baugruppe flächen "{1}") oder Regel angeben (+Z, oben, größte, zylindrisch Ø8); {2}
+{0}komponenta „{1}“ nemá plochu {2}, kterou by vazba uměla použít – {3}	{0}Komponente „{1}“ hat keine Fläche {2}, die die Verknüpfung verwenden kann – {3}
+{0}komponenta „{1}“: žádná {2} plocha neodpovídá „{3}“ – {4}	{0}Komponente „{1}“: keine {2} Fläche passt zu „{3}“ – {4}
+{0}plocha {1} je ve více dílech podsestavy „{2}“ – upřesněte díl: {3}	{0}Fläche {1} gibt es in mehreren Teilen der Unterbaugruppe „{2}“ – Teil angeben: {3}
+{0}plocha {1} komponenty „{2}“ je {3} – vazba potřebuje {4} plochu; {5}	{0}Fläche {1} der Komponente „{2}“ ist {3} – die Verknüpfung braucht eine {4} Fläche; {5}
+⚠ díl se nepostavil (bez ploch): {0}	⚠ Teil wurde nicht aufgebaut (keine Flächen): {0}
+⚠ plochu vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ Fläche der Verknüpfung konnte nicht aus dem Kern geladen werden – baugruppe verknüpfungen berechnet sie nach dem Aufbau der Teile neu
+⚠ plochy vazeb, které po úpravě dílu nejde najít: {0} – sestava vazby	⚠ Flächen von Verknüpfungen, die nach der Teiländerung nicht gefunden werden: {0} – baugruppe verknüpfungen
+⚠ v sestavě je konflikt vazeb – sestava vazby	⚠ in der Baugruppe gibt es einen Verknüpfungskonflikt – baugruppe verknüpfungen
+⚠ vazbu nelze splnit spolu s ostatními – sestava vazby (výpis), sestava vazba {0} potlačit|smazat|obráceně	⚠ die Verknüpfung ist mit den anderen nicht erfüllbar – baugruppe verknüpfungen (Liste), baugruppe verknüpfung {0} unterdrücken|löschen|umkehren
+✓ „{0}“ už má vazbu Ukotvit – beze změny	✓ „{0}“ hat bereits eine Verknüpfung Fixiert – unverändert
+✓ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}	✓ „{0}“ in Baugruppe „{1}“ zurückgegeben (übernommen von Komponenten: {2}){3}{4}
+✓ izolováno: zobrazena jen „{0}“ (ostatní skryté – sestava zobrazit vše)	✓ isoliert: nur „{0}“ sichtbar (andere ausgeblendet – baugruppe alle einblenden)
+✓ komponenta „{0}“ otevřena jako díl v nové záložce (přesné těleso k modelování)	✓ Komponente „{0}“ als Teil in neuer Registerkarte geöffnet (exakter Körper zum Modellieren)
+✓ komponenta „{0}“ otevřena v nové záložce jako kopie – změny se do sestavy nepropíší (úprava v sestavě: sestava upravit "{0}")	✓ Komponente „{0}“ als Kopie in neuer Registerkarte geöffnet – Änderungen gehen nicht in die Baugruppe (Bearbeiten im Kontext: baugruppe bearbeiten "{0}")
+✓ komponenta „{0}“: {1}	✓ Komponente „{0}“: {1}
+✓ kopie „{0}“ → #{1} {2}	✓ Kopie von „{0}“ → #{1} {2}
+✓ odebráno ze sestavy: {0}{1} · zbývá komponent: {2}	✓ aus der Baugruppe entfernt: {0}{1} · verbleibende Komponenten: {2}
+✓ podsestava „{0}“ rozpuštěna – o úroveň výš: {1}{2}	✓ Unterbaugruppe „{0}“ aufgelöst – eine Ebene höher: {1}{2}
+✓ podsestava „{0}“: {1}{2}{3}	✓ Unterbaugruppe „{0}“: {1}{2}{3}
+✓ pole „{0}“: {1} ks ({2}) – kopie {3}	✓ Muster „{0}“: {1} Stk. ({2}) – Kopien {3}
+✓ rám formy „{0}“ – nová záložka: komponent {1}, {2}×{3} mm, výška {4} mm (se středicím kroužkem), dutina {5}, materiál {6}	✓ Formaufbau „{0}“ – neue Registerkarte: Komponenten {1}, {2}×{3} mm, Höhe {4} mm (mit Zentrierring), Nest {5}, Werkstoff {6}
+✓ úprava {0} „{1}“ v kontextu sestavy „{2}“{3} – další příkazy pracují s ním; návrat: sestava hotovo	✓ Bearbeitung {0} „{1}“ im Kontext der Baugruppe „{2}“{3} – weitere Befehle arbeiten damit; zurück: baugruppe fertig
+✓ vazba {0} ({1}): {2}{3}	✓ Verknüpfung {0} ({1}): {2}{3}
+✓ vazba Ukotvit „{0}“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou	✓ Verknüpfung Fixiert „{0}“ – die Komponente ist fixiert, andere Verknüpfungen bewegen die andere Komponente
+✓ záložka „{0}“ ({1}) je aktivní – další příkazy pracují s ní	✓ Registerkarte „{0}“ ({1}) ist aktiv – weitere Befehle arbeiten damit
+✓ záložka „{0}“ už je aktivní	✓ Registerkarte „{0}“ ist bereits aktiv
+✓ záložka „{0}“ zavřena – aktivní je „{1}“	✓ Registerkarte „{0}“ geschlossen – aktiv ist „{1}“
+✓ zobrazeny všechny komponenty ({0})	✓ alle Komponenten eingeblendet ({0})
+✓ zrcadlení „{0}“ podle {1}{2} → „{3}“ {4} (zrcadlí se poloha a natočení, geometrie dílu se nezrcadlí)	✓ Spiegelung von „{0}“ an {1}{2} → „{3}“ {4} (Lage und Drehung werden gespiegelt, die Teilgeometrie nicht)
+✗ prvek dílu {0}: {1}	✗ Element des Teils {0}: {1}
+barva {0}	Farbe {0}
+barva: čekám #rrggbb (např. #e03930), ne „{0}“	Farbe: #rrggbb erwartet (z. B. #e03930), nicht „{0}“
+CSV (oddělovač ;):	CSV (Trennzeichen ;):
+číslo	Nummer
+číslo „{0}“	Nummer „{0}“
+číslo plochy začíná F1	Flächennummern beginnen bei F1
+dílu	des Teils
+díra: 	Bohrung: 
+dutina	Nest
+hodnota	Wert
+hodnota {0}	Wert {0}
+hodnotu má jen vazba Vzdálenost a Úhel	nur die Verknüpfungen Abstand und Winkel haben einen Wert
+chybí název komponenty: sestava duplikovat "Čep" [posun 50 0 0]	Komponentenname fehlt: baugruppe duplizieren "Stift" [versatz 50 0 0]
+chybí název komponenty: sestava izolovat "Čep"	Komponentenname fehlt: baugruppe isolieren "Stift"
+chybí název komponenty: sestava komponenta "Čep" [v x y z] [otočení rx ry rz] [ukotvit|uvolnit] …	Komponentenname fehlt: baugruppe komponente "Stift" [bei x y z] [drehung rx ry rz] [fixieren|lösen] …
+chybí název komponenty: sestava odebrat "Čep" ["Čep (2)" …]	Komponentenname fehlt: baugruppe entfernen "Stift" ["Stift (2)" …]
+chybí název komponenty: sestava otevřít "Čep"	Komponentenname fehlt: baugruppe öffnen "Stift"
+chybí název komponenty: sestava plochy "Čep" [rovinné|válcové]	Komponentenname fehlt: baugruppe flächen "Stift" [eben|zylindrisch]
+chybí název komponenty: sestava podsestava "A" "B" [jako "Podsestava 1"]	Komponentenname fehlt: baugruppe unterbaugruppe "A" "B" [als "Unterbaugruppe 1"]
+chybí název komponenty: sestava pole "Čep" 4 rozteč 25 [směr X] · sestava pole "Čep" kruhové 6 [úhel 360] [osa Z] [v cx cy cz]	Komponentenname fehlt: baugruppe muster "Stift" 4 abstand 25 [richtung X] · baugruppe muster "Stift" kreisförmig 6 [winkel 360] [achse Z] [bei cx cy cz]
+chybí název komponenty: sestava rozpustit "Podsestava 1"	Komponentenname fehlt: baugruppe auflösen "Unterbaugruppe 1"
+chybí název komponenty: sestava skrýt|zobrazit|ukotvit|uvolnit "Čep"	Komponentenname fehlt: baugruppe ausblenden|einblenden|fixieren|lösen "Stift"
+chybí název komponenty: sestava šroub "Deska" F12|Ø9 [matice] [bez podložky] [obráceně]	Komponentenname fehlt: baugruppe schraube "Platte" F12|Ø9 [mutter] [ohne scheibe] [umkehren]
+chybí název komponenty: sestava upravit "Čep" … sestava hotovo	Komponentenname fehlt: baugruppe bearbeiten "Stift" … baugruppe fertig
+chybí název komponenty: sestava zrcadlit "Čep" XY|XZ|YZ [odsazení N]	Komponentenname fehlt: baugruppe spiegeln "Stift" XY|XZ|YZ [versatz N]
+chybí plocha	Fläche fehlt
+komponenta „{0}“ v sestavě není – komponenty: {1}	Komponente „{0}“ ist nicht in der Baugruppe – Komponenten: {1}
+komponenta {0} v sestavě není – komponenty: {1}	Komponente {0} ist nicht in der Baugruppe – Komponenten: {1}
+konflikt	Konflikt
+kruhové, úhel {0}°, osa {1}, střed {2}	kreisförmig, Winkel {0}°, Achse {1}, Mitte {2}
+Kusovník „{0}“ ({1}): položek {2}, kusů {3}, hmotnost Σ {4} kg{5}	Stückliste „{0}“ ({1}): Positionen {2}, Stück {3}, Masse Σ {4} kg{5}
+kusovník otevřené sestavy jako tabulka do protokolu (poz., název, číslo / norma, ks, materiál, hmotnost); strukturovaně = podsestavy s díly; také window.mncad.bom()	Stückliste der offenen Baugruppe als Tabelle im Protokoll (Pos., Name, Nummer / Norm, Stk., Werkstoff, Masse); strukturiert = Unterbaugruppen mit Teilen; auch window.mncad.bom()
+kusovník: neznámá volba „{0}“ – kusovník [strukturovaně] [csv]	stückliste: unbekannte Option „{0}“ – stückliste [strukturiert] [csv]
+kusovník: otevřený dokument „{0}“ není sestava	stückliste: das offene Dokument „{0}“ ist keine Baugruppe
+lineární, rozteč {0} mm, směr {1}	linear, Abstand {0} mm, Richtung {1}
+materiál	Werkstoff
+materiál {0}	Werkstoff {0}
+materiál importované komponenty: jen třída hustoty – {0}	Werkstoff einer importierten Komponente: nur Dichteklasse – {0}
+materiál podsestavy nelze nastavit – nastavte ho jejím dílům (sestava upravit "{0}")	Werkstoff einer Unterbaugruppe kann nicht gesetzt werden – an ihren Teilen setzen (baugruppe bearbeiten "{0}")
+natočení {0}	Drehung {0}
+název „{0}“	Name „{0}“
+název komponenty nesmí být prázdný	der Komponentenname darf nicht leer sein
+název podsestavy	Name der Unterbaugruppe
+nečekané „{0}“ za názvem komponenty – další volby zadejte příkazem sestava komponenta	unerwartetes „{0}“ nach dem Komponentennamen – weitere Optionen mit baugruppe komponente
+není aktivní záložka	keine aktive Registerkarte
+nepřepočteno	nicht neu berechnet
+neznámý podpříkaz sestavy „{0}“ – podpříkazy: {1} (bez podpříkazu vypíše komponenty)	unbekannter Baugruppen-Unterbefehl „{0}“ – Unterbefehle: {1} (ohne Unterbefehl werden die Komponenten aufgeführt)
+obráceně	umgekehrt
+odsazení	Versatz
+otevřené dokumenty: výpis, přepnutí (další příkazy pracují s vybranou záložkou), zavření; také window.mncad.tabs(), activateTab(), closeTab()	offene Dokumente: Liste, Wechsel (weitere Befehle arbeiten mit der gewählten Registerkarte), Schließen; auch window.mncad.tabs(), activateTab(), closeTab()
+otevřený dokument „{0}“ není sestava – nejdřív „nová sestava“, „záložka "…"“ nebo „sestava hotovo“ (při úpravě dílu v kontextu)	das offene Dokument „{0}“ ist keine Baugruppe – zuerst „neu baugruppe“, „registerkarte "…"“ oder „baugruppe fertig“ (beim Bearbeiten eines Teils im Kontext)
+otočení	Drehung
+plocha {0} není válcová plocha díry	Fläche {0} ist keine zylindrische Bohrungsfläche
+plochý	flach
+Plochy komponenty „{0}“ (souřadnice sestavy, {1}) – rovinné: {2}, válcové/kuželové: {3}{4}	Flächen der Komponente „{0}“ (Baugruppenkoordinaten, {1}) – eben: {2}, zylindrisch/kegelig: {3}{4}
+plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít	flächen, verknüpfung, verknüpfungen, komponente, entfernen, duplizieren, isolieren, ausblenden, einblenden, fixieren, lösen, muster, spiegeln, schraube, unterbaugruppe, auflösen, bearbeiten, fertig, öffnen
+plochy: {0}	Flächen: {0}
+počet	Anzahl
+podsestava ({0} ks)	Unterbaugruppe ({0} Stk.)
+podsestavy	der Unterbaugruppe
+podsestavy (vazby se převedou), úprava dílu v kontextu sestavy – příkazy mezi upravit a hotovo pracují s dílem a změna se propíše do všech stejných komponent; otevřít = kopie v nové záložce	Unterbaugruppen (Verknüpfungen werden übertragen), Bearbeiten eines Teils im Baugruppenkontext – Befehle zwischen bearbeiten und fertig arbeiten mit dem Teil, die Änderung gilt für alle gleichen Komponenten; öffnen = Kopie in neuer Registerkarte
+pole komponenty (kopie „X (2)“…) a zrcadlení polohy a natočení komponenty	Komponentenmuster (Kopien „X (2)“…) und Spiegeln von Lage und Drehung einer Komponente
+poloha	Lage
+poloha {0}	Lage {0}
+poloha beze změny	Lage unverändert
+pootočit	verdrehen
+pootočit: osa X | Y | Z a úhel, např. pootočit X 90	verdrehen: Achse X | Y | Z und Winkel, z. B. verdrehen X 90
+posun	Versatz
+potlačena	unterdrückt
+použitelná	verwendbare
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks	Pos. | Name | Nummer / Norm | Stk. | Werkstoff | kg/Stk.
+původní orientace	ursprüngliche Ausrichtung
+rám formy: {0} musí být alespoň {1} mm	formaufbau: {0} muss mindestens {1} mm sein
+rám formy: dutina {0}×{1}×{2} se nevejde do desky A {3}×{4}×{5}	formaufbau: Nest {0}×{1}×{2} passt nicht in Platte A {3}×{4}×{5}
+rám formy: dutina potřebuje tři kladné rozměry X Y H	formaufbau: das Nest braucht drei positive Maße X Y H
+rám formy: neznámá volba „{0}“ – rám formy <šířka> <délka> [deska-a N] [deska-b N] [upínací N] [opěrná N] [rozpěrky N] [šířka-rozpěrek N] [vyhazovací N] [kotevní N] [sloupky Ø] [dutina X Y H | bez dutiny] [materiál …]	formaufbau: unbekannte Option „{0}“ – formaufbau <Breite> <Länge> [a-platte N] [b-platte N] [aufspann N] [stütz N] [leiste N] [leistenbreite N] [auswerfer N] [halte N] [säule D] [nest X Y H | ohne nest] [werkstoff …]
+rám formy: neznámý materiál „{0}“ – materiály: {1}	formaufbau: unbekannter Werkstoff „{0}“ – Werkstoffe: {1}
+rám formy: rozpěrky ({0} mm) jsou na šířku {1} mm příliš široké – vyhazovací paket se mezi ně nevejde	formaufbau: die Leisten ({0} mm) sind für {1} mm Breite zu breit – das Auswerferpaket passt nicht dazwischen
+rám formy: šířka a délka musí být alespoň 100 mm	formaufbau: Breite und Länge müssen mindestens 100 mm sein
+rám formy: zadejte šířku i délku (dvě čísla), např. rám formy 296 346	formaufbau: Breite und Länge angeben (zwei Zahlen), z. B. formaufbau 296 346
+rám vstřikovací formy jako průvodce (výchozí 296 × 346 mm) – nová záložka se sestavou desek, vedení, šroubů a vyhazovačů	Spritzgießformaufbau wie im Assistenten (Standard 296 × 346 mm) – neue Registerkarte mit Baugruppe aus Platten, Führungen, Schrauben und Auswerfern
+rovinné	eben
+rovinné plochy: {0}	ebene Flächen: {0}
+Sestava „{0}“: komponent {1} · vazby {2}	Baugruppe „{0}“: Komponenten {1} · Verknüpfungen {2}
+sestava duplikovat: neznámá volba „{0}“ – posun dx dy dz	baugruppe duplizieren: unbekannte Option „{0}“ – versatz dx dy dz
+sestava hotovo: žádná rozpracovaná úprava dílu v kontextu – začněte příkazem sestava upravit "…"	baugruppe fertig: keine laufende Bearbeitung im Kontext – beginnen mit baugruppe bearbeiten "…"
+sestava komponenta: neznámá volba „{0}“ – volby: {1}	baugruppe komponente: unbekannte Option „{0}“ – Optionen: {1}
+sestava plochy: neznámá volba „{0}“ – rovinné | válcové	baugruppe flächen: unbekannte Option „{0}“ – eben | zylindrisch
+sestava pole: lineární pole potřebuje rozteč: sestava pole "X" {0} rozteč 25 [směr X]	baugruppe muster: ein lineares Muster braucht einen Abstand: baugruppe muster "X" {0} abstand 25 [richtung X]
+sestava pole: neznámá volba „{0}“ – pole "X" N rozteč P [směr X|dx dy dz] · pole "X" kruhové N [úhel 360] [osa Z|dx dy dz] [v cx cy cz]	baugruppe muster: unbekannte Option „{0}“ – muster "X" N abstand P [richtung X|dx dy dz] · muster "X" kreisförmig N [winkel 360] [achse Z|dx dy dz] [bei cx cy cz]
+sestava pole: počet kusů musí být celé číslo alespoň 2 (včetně originálu)	baugruppe muster: die Anzahl muss eine ganze Zahl ab 2 sein (einschließlich Original)
+sestava šroub: neznámá volba „{0}“ – plocha díry (F12 | Ø9), matice, bez podložky, obráceně	baugruppe schraube: unbekannte Option „{0}“ – Bohrungsfläche (F12 | Ø9), mutter, ohne scheibe, umkehren
+sestava vazba kontakt|zarovnat|vystředit|souosost|vzdálenost|úhel|rovnoběžně "A" <plocha A> "B" <plocha B> [hodnota N] [obráceně] [název "…"] · sestava vazba ukotvit "A" · sestava vazba <č.|"název"> hodnota=N|obráceně|potlačit|zapnout|smazat	baugruppe verknüpfung kontakt|bündig|zentrieren|konzentrisch|abstand|winkel|parallel "A" <Fläche A> "B" <Fläche B> [wert N] [umkehren] [name "…"] · baugruppe verknüpfung fixiert "A" · baugruppe verknüpfung <Nr.|"Name"> wert=N|umkehren|unterdrücken|aktivieren|löschen
+sestava zrcadlit: neznámá volba „{0}“ – XY | XZ | YZ, odsazení N	baugruppe spiegeln: unbekannte Option „{0}“ – XY | XZ | YZ, versatz N
+sestava: výpis komponent (poloha, natočení, ukotvení, viditelnost, vazby); plochy komponenty pro vazby – F-číslo, druh, normála / osa a Ø, střed v souřadnicích sestavy, plocha / délka	Baugruppe: Komponentenliste (Lage, Drehung, fixiert, Sichtbarkeit, Verknüpfungen); Flächen einer Komponente für Verknüpfungen – F-Nummer, Art, Normale / Achse und Ø, Mitte in Baugruppenkoordinaten, Fläche / Länge
+skrytá	ausgeblendet
+skupina	Gruppe
+skupina „{0}“	Gruppe „{0}“
+skupina {0}	Gruppe {0}
+smazána	gelöscht
+strukturovaný	strukturiert
+střed osy	Achsmitte
+šroubový spoj do válcové plochy díry (F12 nebo Ø9): šroub ISO 4762 podle průměru díry, délka podle sevřené tloušťky, podložka (výchozí) a matice, vazba Souosost; hlava nahoře, „obráceně“ = na druhém konci díry	Schraubverbindung in die zylindrische Bohrungsfläche (F12 oder Ø9): Schraube ISO 4762 nach Bohrungsdurchmesser, Länge nach Klemmdicke, Scheibe (Standard) und Mutter, Verknüpfung Konzentrisch; Kopf oben, „umkehren“ = am anderen Bohrungsende
+trvalá vazba jako v panelu sestavy: plocha = F12 (sestava plochy) nebo pravidlo +Z|-X|horní|spodní|největší|nejmenší|válcová|rovinná|Ø8|R4; bez hodnoty se u Vzdálenosti / Úhlu vezme naměřená; po vazbě se sestava přepočítá a protokol napíše stav vazby a novou polohu komponenty	dauerhafte Verknüpfung wie im Baugruppen-Panel: Fläche = F12 (baugruppe flächen) oder Regel +Z|-X|oben|unten|größte|kleinste|zylindrisch|eben|Ø8|R4; ohne Wert nehmen Abstand / Winkel den gemessenen; danach wird die Baugruppe neu berechnet und das Protokoll zeigt Status und neue Lage der Komponente
+ukotvená	fixiert
+ukotvená ⚓	fixiert ⚓
+úprava v kontextu je dostupná jen v aplikaci	Bearbeiten im Kontext ist nur in der Anwendung verfügbar
+uvolněná	gelöst
+v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …	bei x y z, drehung rx ry rz, versatz dx dy dz, verdrehen X 90, fixieren, lösen, ausblenden, einblenden, farbe #hex, name "…", nummer "…", gruppe "…", werkstoff …
+válcové	zylindrisch
+válcové plochy: {0}	zylindrische Flächen: {0}
+vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	Verknüpfung „{0}“ ist {1}× in der Baugruppe – Nummer angeben: {2}
+vazba „{0}“ v sestavě není – vazby: {1}	Verknüpfung „{0}“ ist nicht in der Baugruppe – Verknüpfungen: {1}
+vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…"	Verknüpfung „{0}“: was tun? wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…"
+vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	Verknüpfung „{0}“: unbekannte Änderung „{1}“ – wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…" (neue Verknüpfung mit der Art beginnen: kontakt, bündig, zentrieren, konzentrisch, abstand, winkel, parallel, fixiert)
+vazba {0} ({1}) nemá hodnotu – hodnotu má jen Vzdálenost a Úhel	Verknüpfung {0} ({1}) hat keinen Wert – nur Abstand und Winkel haben einen
+vazba {0} v sestavě není – vazby: {1}	Verknüpfung {0} ist nicht in der Baugruppe – Verknüpfungen: {1}
+vazba {0}: chybí cílová komponenta B – {1}	Verknüpfung {0}: Zielkomponente B fehlt – {1}
+vazba {0}: chybí komponenta A – {1}	Verknüpfung {0}: Komponente A fehlt – {1}
+vazba potřebuje dvě různé komponenty – „{0}“ je A i B	eine Verknüpfung braucht zwei verschiedene Komponenten – „{0}“ ist A und B
+vazba Ukotvit má jen jednu komponentu: sestava vazba ukotvit "A"	die Verknüpfung Fixiert hat nur eine Komponente: baugruppe verknüpfung fixiert "A"
+vazba: {0}	Verknüpfung: {0}
+vazba: neznámá volba „{0}“ (plochu zadejte hned za názvem komponenty: F12, +Z, horní, největší, válcová Ø8) – {1}	Verknüpfung: unbekannte Option „{0}“ (Fläche direkt nach dem Komponentennamen angeben: F12, +Z, oben, größte, zylindrisch Ø8) – {1}
+vazbu Ukotvit nelze otočit	die Verknüpfung Fixiert kann nicht umgekehrt werden
+Vazby sestavy „{0}“: {1}	Verknüpfungen der Baugruppe „{0}“: {1}
+Vazby: {0}	Verknüpfungen: {0}
+vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název nebo pořadí #3; po přesunu se vazby přepočítají	Komponenteneigenschaften wie im Panel (Lage, Drehung, fixiert, Sichtbarkeit, Beschreibung, Stücklisten-Werkstoff); Komponente = Name oder Position #3; nach dem Verschieben werden Verknüpfungen neu berechnet
+výpis vazeb (číslo, druh, komponenty a plochy, hodnota, stav ok / konflikt) a úprava vazby podle čísla nebo názvu; po změně se vazby přepočítají	Liste der Verknüpfungen (Nummer, Art, Komponenten und Flächen, Wert, Status ok / Konflikt) und Ändern per Nummer oder Name; danach werden Verknüpfungen neu berechnet
+záložka „{0}“ je otevřená {1}× – zadejte číslo: {2}	Registerkarte „{0}“ ist {1}× offen – Nummer angeben: {2}
+záložka „{0}“ není otevřená – záložky: {1}	Registerkarte „{0}“ ist nicht offen – Registerkarten: {1}
+záložka {0} není – záložky: {1}	Registerkarte {0} gibt es nicht – Registerkarten: {1}
+Záložky ({0}):	Registerkarten ({0}):
+záložky jsou dostupné jen v aplikaci	Registerkarten sind nur in der Anwendung verfügbar
+zapnuta	aktiviert
+zavřít: zavřít záložku ["název"|N] – bez názvu zavře aktivní záložku	schließen: registerkarte schließen ["Name"|N] – ohne Namen wird die aktive geschlossen
+zobrazená	eingeblendet
+sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)	Baugruppe: fügt ein Teil aus einer geöffneten Registerkarte als Komponente ein (Verknüpfungen per Text: baugruppe verknüpfung …, siehe unten)

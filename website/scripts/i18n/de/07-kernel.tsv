@@ -93,7 +93,6 @@ rovina {0}{1} → nové těleso {2}	Ebene {0}{1} → neuer Körper {2}
 Rovina rozdělí těleso „{0}“ na dvě: strana ve směru normály zůstane tímto tělesem, opačná strana je nové těleso. Další prvky pracují s tělesem, které vyberete v poli Těleso nebo ve správci.	Die Ebene teilt den Körper „{0}“ in zwei: die Seite in Normalenrichtung bleibt dieser Körper, die Gegenseite ist ein neuer Körper. Folgende Elemente arbeiten an dem Körper, den Sie im Feld Körper oder im Manager wählen.
 rovina rozdělí těleso na dvě samostatná tělesa	eine Ebene teilt den Körper in zwei eigenständige Körper
 Rozdělit na tělesa	In Körper teilen
-sestava: vloží díl z otevřené záložky jako komponentu (vazby se zadávají v panelu sestavy nebo v JSON dokumentu)	Baugruppe: fügt ein Teil aus einem geöffneten Tab als Komponente ein (Verknüpfungen werden im Baugruppenpanel oder im JSON-Dokument angegeben)
 sjednotit	vereinigen
 Sjednotit	Vereinigen
 sjednotit, odebrat nebo průnik dvou těles	zwei Körper vereinigen, abziehen oder schneiden

@@ -1,0 +1,207 @@
+# Sestava textem pro AI agenty: plochy, vazby, komponenty, pole, šroub, podsestavy, kusovník, rám formy, záložky (balík asm)
+  plochy vazeb přečíslovány podle geometrie: {0}	  mate faces renumbered by geometry: {0}
+  pohnuto: {0}	  moved: {0}
+  vazby pohnuly: {0}	  mates moved: {0}
+ – vypsány {0}	 – listed: {0}
+ … (celkem {0})	 … ({0} in total)
+ … a dalších {0} (sestava)	 … and {0} more (assembly)
+ … dalších {0} – upřesněte: sestava plochy "{1}" rovinné|válcové	 … {0} more – narrow down: assembly faces "{1}" planar|cylindrical
+ · aktivní	 · active
+ · objem dílu {0} cm³	 · part volume {0} cm³
+ · ukotvená	 · fixed
+ · vazby {0}	 · mates {0}
+ · vazby uvnitř: {0}	 · mates inside: {0}
+ · vazby, které nešlo převést (odebrány): {0}	 · mates that could not be converted (removed): {0}
+ (a jejich vazby: {0})	 (and their mates: {0})
+ (bez dílů, které se nepostavily)	 (without parts that failed to build)
+ (načteno prvních {0} ploch dílu)	 (first {0} faces of the part loaded)
+ (podsestava)	 (sub-assembly)
+ (prázdná – vložit "díl" · normálie M8x30 · rám formy)	 (empty – insert "part" · library M8x30 · moldbase)
+ (skrytá)	 (hidden)
+ (vybrána {0})	 (picked {0})
+ (změna platí pro všechny stejné komponenty: {0})	 (the change applies to all identical components: {0})
+ (žádná plocha, kterou by vazby uměly použít)	 (no face that mates can use)
+ (žádné – sestava vazba kontakt|souosost … "A" <plocha> "B" <plocha>)	 (none – assembly mate contact|concentric … "A" <face> "B" <face>)
+ + matice	 + nut
+ + podložka	 + washer
+„{0}“ je importovaný soubor – otevřete ho jako díl: sestava otevřít "{0}" (přesné těleso v nové záložce)	„{0}“ is an imported file – open it as a part: assembly open "{0}" (exact solid in a new tab)
+„{0}“ je v sestavě {1}× – zadejte pořadí: {2}	„{0}“ is in the assembly {1}× – give the position: {2}
+„{0}“ není podsestava – rozpustit lze jen podsestavu	„{0}“ is not a sub-assembly – only a sub-assembly can be dissolved
+„střed“ (ztotožnit středy ploch) jde jen u vazby Kontakt	„center“ (coincident face centres) only works with the Contact mate
+{0} (stav se přepočítá)	{0} (status will be recomputed)
+{0} šroub „{1}“ ({2}) do díry {3} komponenty „{4}“ (Ø{5}, délka díry {6} mm){7}{8} · vazba Souosost: {9} · {10}{11}	{0} screw „{1}“ ({2}) into hole {3} of component „{4}“ (Ø{5}, hole length {6} mm){7}{8} · Concentric mate: {9} · {10}{11}
+{0} vazba {1}: {2}{3} · {4}	{0} mate {1}: {2}{3} · {4}
+{0} z {1} vyhovujících	{0} of {1} matching
+{0}: čekám číslo{1}	{0}: number expected{1}
+{0}: chybí hodnota	{0}: value missing
+{0}: X | Y | Z | -X … nebo vektor dx dy dz	{0}: X | Y | Z | -X … or vector dx dy dz
+{0}„{1}“: vazba potřebuje rovinnou plochu, ne válcovou	{0}„{1}“: the mate needs a planar face, not a cylindrical one
+{0}„{1}“: vazba potřebuje válcovou plochu, ne rovinnou	{0}„{1}“: the mate needs a cylindrical face, not a planar one
+{0}chybí plocha komponenty „{1}“ – zadejte F-číslo (sestava plochy "{1}") nebo pravidlo (+Z, horní, největší, válcová Ø8); {2}	{0}face of component „{1}“ missing – give an F number (assembly faces "{1}") or a rule (+Z, top, largest, cylindrical Ø8); {2}
+{0}komponenta „{1}“ nemá plochu {2}, kterou by vazba uměla použít – {3}	{0}component „{1}“ has no face {2} that the mate can use – {3}
+{0}komponenta „{1}“: žádná {2} plocha neodpovídá „{3}“ – {4}	{0}component „{1}“: no {2} face matches „{3}“ – {4}
+{0}plocha {1} je ve více dílech podsestavy „{2}“ – upřesněte díl: {3}	{0}face {1} exists in several parts of sub-assembly „{2}“ – specify the part: {3}
+{0}plocha {1} komponenty „{2}“ je {3} – vazba potřebuje {4} plochu; {5}	{0}face {1} of component „{2}“ is {3} – the mate needs a {4} face; {5}
+⚠ díl se nepostavil (bez ploch): {0}	⚠ part failed to build (no faces): {0}
+⚠ plochu vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ the mate face could not be loaded from the kernel – assembly mates recomputes the mate once the parts are built
+⚠ plochy vazeb, které po úpravě dílu nejde najít: {0} – sestava vazby	⚠ mate faces that cannot be found after editing the part: {0} – assembly mates
+⚠ v sestavě je konflikt vazeb – sestava vazby	⚠ the assembly has conflicting mates – assembly mates
+⚠ vazbu nelze splnit spolu s ostatními – sestava vazby (výpis), sestava vazba {0} potlačit|smazat|obráceně	⚠ the mate cannot be satisfied together with the others – assembly mates (list), assembly mate {0} suppress|delete|flip
+✓ „{0}“ už má vazbu Ukotvit – beze změny	✓ „{0}“ already has a Fix mate – unchanged
+✓ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}	✓ „{0}“ returned to assembly „{1}“ (components updated: {2}){3}{4}
+✓ izolováno: zobrazena jen „{0}“ (ostatní skryté – sestava zobrazit vše)	✓ isolated: only „{0}“ shown (others hidden – assembly show all)
+✓ komponenta „{0}“ otevřena jako díl v nové záložce (přesné těleso k modelování)	✓ component „{0}“ opened as a part in a new tab (exact solid for modelling)
+✓ komponenta „{0}“ otevřena v nové záložce jako kopie – změny se do sestavy nepropíší (úprava v sestavě: sestava upravit "{0}")	✓ component „{0}“ opened in a new tab as a copy – changes are not written back to the assembly (in-context edit: assembly edit "{0}")
+✓ komponenta „{0}“: {1}	✓ component „{0}“: {1}
+✓ kopie „{0}“ → #{1} {2}	✓ copy of „{0}“ → #{1} {2}
+✓ odebráno ze sestavy: {0}{1} · zbývá komponent: {2}	✓ removed from the assembly: {0}{1} · components left: {2}
+✓ podsestava „{0}“ rozpuštěna – o úroveň výš: {1}{2}	✓ sub-assembly „{0}“ dissolved – one level up: {1}{2}
+✓ podsestava „{0}“: {1}{2}{3}	✓ sub-assembly „{0}“: {1}{2}{3}
+✓ pole „{0}“: {1} ks ({2}) – kopie {3}	✓ pattern „{0}“: {1} pcs ({2}) – copies {3}
+✓ rám formy „{0}“ – nová záložka: komponent {1}, {2}×{3} mm, výška {4} mm (se středicím kroužkem), dutina {5}, materiál {6}	✓ mould base „{0}“ – new tab: components {1}, {2}×{3} mm, height {4} mm (with locating ring), cavity {5}, material {6}
+✓ úprava {0} „{1}“ v kontextu sestavy „{2}“{3} – další příkazy pracují s ním; návrat: sestava hotovo	✓ editing {0} „{1}“ in the context of assembly „{2}“{3} – the following commands work on it; back: assembly done
+✓ vazba {0} ({1}): {2}{3}	✓ mate {0} ({1}): {2}{3}
+✓ vazba Ukotvit „{0}“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou	✓ Fix mate „{0}“ – the component is fixed, other mates move the other component
+✓ záložka „{0}“ ({1}) je aktivní – další příkazy pracují s ní	✓ tab „{0}“ ({1}) is active – the following commands work on it
+✓ záložka „{0}“ už je aktivní	✓ tab „{0}“ is already active
+✓ záložka „{0}“ zavřena – aktivní je „{1}“	✓ tab „{0}“ closed – „{1}“ is active
+✓ zobrazeny všechny komponenty ({0})	✓ all components shown ({0})
+✓ zrcadlení „{0}“ podle {1}{2} → „{3}“ {4} (zrcadlí se poloha a natočení, geometrie dílu se nezrcadlí)	✓ mirror of „{0}“ about {1}{2} → „{3}“ {4} (position and orientation are mirrored, the part geometry is not)
+✗ prvek dílu {0}: {1}	✗ part feature {0}: {1}
+barva {0}	colour {0}
+barva: čekám #rrggbb (např. #e03930), ne „{0}“	colour: #rrggbb expected (e.g. #e03930), not „{0}“
+CSV (oddělovač ;):	CSV (separator ;):
+číslo	number
+číslo „{0}“	number „{0}“
+číslo plochy začíná F1	face numbers start at F1
+dílu	of part
+díra: 	hole: 
+dutina	cavity
+hodnota	value
+hodnota {0}	value {0}
+hodnotu má jen vazba Vzdálenost a Úhel	only the Distance and Angle mates have a value
+chybí název komponenty: sestava duplikovat "Čep" [posun 50 0 0]	component name missing: assembly duplicate "Pin" [offset 50 0 0]
+chybí název komponenty: sestava izolovat "Čep"	component name missing: assembly isolate "Pin"
+chybí název komponenty: sestava komponenta "Čep" [v x y z] [otočení rx ry rz] [ukotvit|uvolnit] …	component name missing: assembly component "Pin" [at x y z] [rotation rx ry rz] [fixed|release] …
+chybí název komponenty: sestava odebrat "Čep" ["Čep (2)" …]	component name missing: assembly remove "Pin" ["Pin (2)" …]
+chybí název komponenty: sestava otevřít "Čep"	component name missing: assembly open "Pin"
+chybí název komponenty: sestava plochy "Čep" [rovinné|válcové]	component name missing: assembly faces "Pin" [planar|cylindrical]
+chybí název komponenty: sestava podsestava "A" "B" [jako "Podsestava 1"]	component name missing: assembly subassembly "A" "B" [as "Sub-assembly 1"]
+chybí název komponenty: sestava pole "Čep" 4 rozteč 25 [směr X] · sestava pole "Čep" kruhové 6 [úhel 360] [osa Z] [v cx cy cz]	component name missing: assembly pattern "Pin" 4 spacing 25 [direction X] · assembly pattern "Pin" circular 6 [angle 360] [axis Z] [at cx cy cz]
+chybí název komponenty: sestava rozpustit "Podsestava 1"	component name missing: assembly dissolve "Sub-assembly 1"
+chybí název komponenty: sestava skrýt|zobrazit|ukotvit|uvolnit "Čep"	component name missing: assembly hide|show|fix|release "Pin"
+chybí název komponenty: sestava šroub "Deska" F12|Ø9 [matice] [bez podložky] [obráceně]	component name missing: assembly bolt "Plate" F12|Ø9 [nut] [no washer] [flip]
+chybí název komponenty: sestava upravit "Čep" … sestava hotovo	component name missing: assembly edit "Pin" … assembly done
+chybí název komponenty: sestava zrcadlit "Čep" XY|XZ|YZ [odsazení N]	component name missing: assembly mirror "Pin" XY|XZ|YZ [offset N]
+chybí plocha	face missing
+komponenta „{0}“ v sestavě není – komponenty: {1}	component „{0}“ is not in the assembly – components: {1}
+komponenta {0} v sestavě není – komponenty: {1}	component {0} is not in the assembly – components: {1}
+konflikt	conflict
+kruhové, úhel {0}°, osa {1}, střed {2}	circular, angle {0}°, axis {1}, centre {2}
+Kusovník „{0}“ ({1}): položek {2}, kusů {3}, hmotnost Σ {4} kg{5}	BOM „{0}“ ({1}): items {2}, pieces {3}, mass Σ {4} kg{5}
+kusovník otevřené sestavy jako tabulka do protokolu (poz., název, číslo / norma, ks, materiál, hmotnost); strukturovaně = podsestavy s díly; také window.mncad.bom()	BOM of the open assembly as a table in the log (item, name, number / standard, qty, material, mass); structured = sub-assemblies with their parts; also window.mncad.bom()
+kusovník: neznámá volba „{0}“ – kusovník [strukturovaně] [csv]	bom: unknown option „{0}“ – bom [structured] [csv]
+kusovník: otevřený dokument „{0}“ není sestava	bom: the open document „{0}“ is not an assembly
+lineární, rozteč {0} mm, směr {1}	linear, spacing {0} mm, direction {1}
+materiál	material
+materiál {0}	material {0}
+materiál importované komponenty: jen třída hustoty – {0}	material of an imported component: density class only – {0}
+materiál podsestavy nelze nastavit – nastavte ho jejím dílům (sestava upravit "{0}")	the material of a sub-assembly cannot be set – set it on its parts (assembly edit "{0}")
+natočení {0}	rotation {0}
+název „{0}“	name „{0}“
+název komponenty nesmí být prázdný	the component name must not be empty
+název podsestavy	sub-assembly name
+nečekané „{0}“ za názvem komponenty – další volby zadejte příkazem sestava komponenta	unexpected „{0}“ after the component name – use assembly component for further options
+není aktivní záložka	there is no active tab
+nepřepočteno	not recomputed
+neznámý podpříkaz sestavy „{0}“ – podpříkazy: {1} (bez podpříkazu vypíše komponenty)	unknown assembly subcommand „{0}“ – subcommands: {1} (without a subcommand it lists the components)
+obráceně	flipped
+odsazení	offset
+otevřené dokumenty: výpis, přepnutí (další příkazy pracují s vybranou záložkou), zavření; také window.mncad.tabs(), activateTab(), closeTab()	open documents: list, switch (the following commands work on the selected tab), close; also window.mncad.tabs(), activateTab(), closeTab()
+otevřený dokument „{0}“ není sestava – nejdřív „nová sestava“, „záložka "…"“ nebo „sestava hotovo“ (při úpravě dílu v kontextu)	the open document „{0}“ is not an assembly – first „new assembly“, „tab "…"“ or „assembly done“ (when editing a part in context)
+otočení	rotation
+plocha {0} není válcová plocha díry	face {0} is not the cylindrical face of a hole
+plochý	flat
+Plochy komponenty „{0}“ (souřadnice sestavy, {1}) – rovinné: {2}, válcové/kuželové: {3}{4}	Faces of component „{0}“ (assembly coordinates, {1}) – planar: {2}, cylindrical/conical: {3}{4}
+plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít	faces, mate, mates, component, remove, duplicate, isolate, hide, show, fix, release, pattern, mirror, bolt, subassembly, dissolve, edit, done, open
+plochy: {0}	faces: {0}
+počet	count
+podsestava ({0} ks)	sub-assembly ({0} pcs)
+podsestavy	of sub-assembly
+podsestavy (vazby se převedou), úprava dílu v kontextu sestavy – příkazy mezi upravit a hotovo pracují s dílem a změna se propíše do všech stejných komponent; otevřít = kopie v nové záložce	sub-assemblies (mates are converted), editing a part in the assembly context – commands between edit and done work on the part and the change goes to all identical components; open = copy in a new tab
+pole komponenty (kopie „X (2)“…) a zrcadlení polohy a natočení komponenty	component pattern (copies „X (2)“…) and mirroring of a component's position and rotation
+poloha	position
+poloha {0}	position {0}
+poloha beze změny	position unchanged
+pootočit	turn
+pootočit: osa X | Y | Z a úhel, např. pootočit X 90	turn: axis X | Y | Z and angle, e.g. turn X 90
+posun	offset
+potlačena	suppressed
+použitelná	usable
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks	Item | Name | Number / standard | Qty | Material | kg/pc
+původní orientace	original orientation
+rám formy: {0} musí být alespoň {1} mm	moldbase: {0} must be at least {1} mm
+rám formy: dutina {0}×{1}×{2} se nevejde do desky A {3}×{4}×{5}	moldbase: cavity {0}×{1}×{2} does not fit into plate A {3}×{4}×{5}
+rám formy: dutina potřebuje tři kladné rozměry X Y H	moldbase: the cavity needs three positive dimensions X Y H
+rám formy: neznámá volba „{0}“ – rám formy <šířka> <délka> [deska-a N] [deska-b N] [upínací N] [opěrná N] [rozpěrky N] [šířka-rozpěrek N] [vyhazovací N] [kotevní N] [sloupky Ø] [dutina X Y H | bez dutiny] [materiál …]	moldbase: unknown option „{0}“ – moldbase <width> <length> [aplate N] [bplate N] [clamp N] [support N] [spacer N] [spacerwidth N] [ejector N] [retainer N] [pillar D] [cavity X Y H | no cavity] [material …]
+rám formy: neznámý materiál „{0}“ – materiály: {1}	moldbase: unknown material „{0}“ – materials: {1}
+rám formy: rozpěrky ({0} mm) jsou na šířku {1} mm příliš široké – vyhazovací paket se mezi ně nevejde	moldbase: the spacers ({0} mm) are too wide for a width of {1} mm – the ejector package does not fit between them
+rám formy: šířka a délka musí být alespoň 100 mm	moldbase: width and length must be at least 100 mm
+rám formy: zadejte šířku i délku (dvě čísla), např. rám formy 296 346	moldbase: give both width and length (two numbers), e.g. moldbase 296 346
+rám vstřikovací formy jako průvodce (výchozí 296 × 346 mm) – nová záložka se sestavou desek, vedení, šroubů a vyhazovačů	injection mould base like the wizard (default 296 × 346 mm) – new tab with an assembly of plates, guides, screws and ejectors
+rovinné	planar
+rovinné plochy: {0}	planar faces: {0}
+Sestava „{0}“: komponent {1} · vazby {2}	Assembly „{0}“: components {1} · mates {2}
+sestava duplikovat: neznámá volba „{0}“ – posun dx dy dz	assembly duplicate: unknown option „{0}“ – offset dx dy dz
+sestava hotovo: žádná rozpracovaná úprava dílu v kontextu – začněte příkazem sestava upravit "…"	assembly done: no in-context part edit in progress – start with assembly edit "…"
+sestava komponenta: neznámá volba „{0}“ – volby: {1}	assembly component: unknown option „{0}“ – options: {1}
+sestava plochy: neznámá volba „{0}“ – rovinné | válcové	assembly faces: unknown option „{0}“ – planar | cylindrical
+sestava pole: lineární pole potřebuje rozteč: sestava pole "X" {0} rozteč 25 [směr X]	assembly pattern: a linear pattern needs a spacing: assembly pattern "X" {0} spacing 25 [direction X]
+sestava pole: neznámá volba „{0}“ – pole "X" N rozteč P [směr X|dx dy dz] · pole "X" kruhové N [úhel 360] [osa Z|dx dy dz] [v cx cy cz]	assembly pattern: unknown option „{0}“ – pattern "X" N spacing P [direction X|dx dy dz] · pattern "X" circular N [angle 360] [axis Z|dx dy dz] [at cx cy cz]
+sestava pole: počet kusů musí být celé číslo alespoň 2 (včetně originálu)	assembly pattern: the count must be a whole number of at least 2 (including the original)
+sestava šroub: neznámá volba „{0}“ – plocha díry (F12 | Ø9), matice, bez podložky, obráceně	assembly bolt: unknown option „{0}“ – hole face (F12 | Ø9), nut, no washer, flip
+sestava vazba kontakt|zarovnat|vystředit|souosost|vzdálenost|úhel|rovnoběžně "A" <plocha A> "B" <plocha B> [hodnota N] [obráceně] [název "…"] · sestava vazba ukotvit "A" · sestava vazba <č.|"název"> hodnota=N|obráceně|potlačit|zapnout|smazat	assembly mate contact|flush|center|concentric|distance|angle|parallel "A" <face A> "B" <face B> [value N] [flip] [name "…"] · assembly mate fixed "A" · assembly mate <no.|"name"> value=N|flip|suppress|unsuppress|delete
+sestava zrcadlit: neznámá volba „{0}“ – XY | XZ | YZ, odsazení N	assembly mirror: unknown option „{0}“ – XY | XZ | YZ, offset N
+sestava: výpis komponent (poloha, natočení, ukotvení, viditelnost, vazby); plochy komponenty pro vazby – F-číslo, druh, normála / osa a Ø, střed v souřadnicích sestavy, plocha / délka	assembly: component list (position, rotation, fixed, visibility, mates); faces of a component for mates – F number, type, normal / axis and Ø, centre in assembly coordinates, area / length
+skrytá	hidden
+skupina	group
+skupina „{0}“	group „{0}“
+skupina {0}	group {0}
+smazána	deleted
+strukturovaný	structured
+střed osy	axis centre
+šroubový spoj do válcové plochy díry (F12 nebo Ø9): šroub ISO 4762 podle průměru díry, délka podle sevřené tloušťky, podložka (výchozí) a matice, vazba Souosost; hlava nahoře, „obráceně“ = na druhém konci díry	bolted joint into the cylindrical face of a hole (F12 or Ø9): ISO 4762 screw by hole diameter, length by clamped thickness, washer (default) and nut, Concentric mate; head on top, „flip“ = at the other end of the hole
+trvalá vazba jako v panelu sestavy: plocha = F12 (sestava plochy) nebo pravidlo +Z|-X|horní|spodní|největší|nejmenší|válcová|rovinná|Ø8|R4; bez hodnoty se u Vzdálenosti / Úhlu vezme naměřená; po vazbě se sestava přepočítá a protokol napíše stav vazby a novou polohu komponenty	persistent mate as in the assembly panel: face = F12 (assembly faces) or a rule +Z|-X|top|bottom|largest|smallest|cylindrical|planar|Ø8|R4; without a value Distance / Angle take the measured one; after the mate the assembly is recomputed and the log shows the mate status and the new component position
+ukotvená	fixed
+ukotvená ⚓	fixed ⚓
+úprava v kontextu je dostupná jen v aplikaci	editing in context is only available in the application
+uvolněná	released
+v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …	at x y z, rotation rx ry rz, move dx dy dz, turn X 90, fixed, release, hide, show, color #hex, name "…", number "…", group "…", material …
+válcové	cylindrical
+válcové plochy: {0}	cylindrical faces: {0}
+vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	mate „{0}“ is in the assembly {1}× – give its number: {2}
+vazba „{0}“ v sestavě není – vazby: {1}	mate „{0}“ is not in the assembly – mates: {1}
+vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…"	mate „{0}“: what to do? value=N | flip | suppress | unsuppress | delete | name "…"
+vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	mate „{0}“: unknown change „{1}“ – value=N | flip | suppress | unsuppress | delete | name "…" (start a new mate with its type: contact, flush, center, concentric, distance, angle, parallel, fixed)
+vazba {0} ({1}) nemá hodnotu – hodnotu má jen Vzdálenost a Úhel	mate {0} ({1}) has no value – only Distance and Angle have one
+vazba {0} v sestavě není – vazby: {1}	mate {0} is not in the assembly – mates: {1}
+vazba {0}: chybí cílová komponenta B – {1}	mate {0}: target component B missing – {1}
+vazba {0}: chybí komponenta A – {1}	mate {0}: component A missing – {1}
+vazba potřebuje dvě různé komponenty – „{0}“ je A i B	a mate needs two different components – „{0}“ is both A and B
+vazba Ukotvit má jen jednu komponentu: sestava vazba ukotvit "A"	the Fix mate has only one component: assembly mate fixed "A"
+vazba: {0}	mate: {0}
+vazba: neznámá volba „{0}“ (plochu zadejte hned za názvem komponenty: F12, +Z, horní, největší, válcová Ø8) – {1}	mate: unknown option „{0}“ (give the face right after the component name: F12, +Z, top, largest, cylindrical Ø8) – {1}
+vazbu Ukotvit nelze otočit	the Fix mate cannot be flipped
+Vazby sestavy „{0}“: {1}	Mates of assembly „{0}“: {1}
+Vazby: {0}	Mates: {0}
+vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název nebo pořadí #3; po přesunu se vazby přepočítají	component properties as in the panel (position, rotation, fixed, visibility, description, BOM material); component = name or position #3; mates are recomputed after a move
+výpis vazeb (číslo, druh, komponenty a plochy, hodnota, stav ok / konflikt) a úprava vazby podle čísla nebo názvu; po změně se vazby přepočítají	list of mates (number, type, components and faces, value, status ok / conflict) and editing a mate by number or name; mates are recomputed after a change
+záložka „{0}“ je otevřená {1}× – zadejte číslo: {2}	tab „{0}“ is open {1}× – give its number: {2}
+záložka „{0}“ není otevřená – záložky: {1}	tab „{0}“ is not open – tabs: {1}
+záložka {0} není – záložky: {1}	there is no tab {0} – tabs: {1}
+Záložky ({0}):	Tabs ({0}):
+záložky jsou dostupné jen v aplikaci	tabs are only available in the application
+zapnuta	enabled
+zavřít: zavřít záložku ["název"|N] – bez názvu zavře aktivní záložku	close: close tab ["name"|N] – without a name it closes the active tab
+zobrazená	shown
+sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)	assembly: inserts a part from an open tab as a component (mates by text: assembly mate …, see below)

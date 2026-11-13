@@ -68,9 +68,10 @@ export function curvatureColors(mesh: MeshData, range?: number): { colors: Float
 
 /**
  * Odhad tloušťky stěny ze sítě: pro vzorek vrcholů vyšle paprsek proti normále a najde nejbližší protější trojúhelník.
- * Vrací minimální a průměrnou tloušťku a barvy vrcholů (červená = pod limitem).
+ * Vrací minimální a průměrnou tloušťku, místo nejtenčí stěny (vrchol sítě, ze kterého paprsek vyšel) a barvy vrcholů
+ * (červená = pod limitem).
  */
-export function wallThickness(mesh: MeshData, limit = 1, samples = 4000): { min: number; avg: number; colors: Float32Array; below: number } {
+export function wallThickness(mesh: MeshData, limit = 1, samples = 4000): { min: number; avg: number; colors: Float32Array; below: number; at: [number, number, number] | null } {
   const v = mesh.vertices;
   const n = mesh.normals;
   const tri = mesh.triangles;
@@ -108,13 +109,17 @@ export function wallThickness(mesh: MeshData, limit = 1, samples = 4000): { min:
     if (Number.isFinite(best)) thick[i] = best;
   }
   let min = Infinity;
+  let minAt = -1;
   let sum = 0;
   let k = 0;
   let below = 0;
   for (let i = 0; i < count; i++) {
     const x = thick[i];
     if (Number.isNaN(x)) continue;
-    if (x < min) min = x;
+    if (x < min) {
+      min = x;
+      minAt = i;
+    }
     sum += x;
     k++;
     if (x < limit) below++;
@@ -139,5 +144,5 @@ export function wallThickness(mesh: MeshData, limit = 1, samples = 4000): { min:
     colors[i * 3 + 1] = t < 0.5 ? t * 2 : 1;
     colors[i * 3 + 2] = 0.15;
   }
-  return { min: Number.isFinite(min) ? min : 0, avg: k ? sum / k : 0, colors, below: k ? below / k : 0 };
+  return { min: Number.isFinite(min) ? min : 0, avg: k ? sum / k : 0, colors, below: k ? below / k : 0, at: minAt >= 0 ? [v[minAt * 3], v[minAt * 3 + 1], v[minAt * 3 + 2]] : null };
 }

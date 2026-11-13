@@ -38,8 +38,12 @@ status`);
     expect(feat(p, 8)).toMatchObject({ type: "extrude", distance: 20, symmetric: true, mode: "cut" });
     expect(p.ops[9]).toMatchObject({ k: "select", rule: ["top", "circular"], feature: { type: "chamfer", distance: 1 } });
     expect(p.ops[10]).toMatchObject({ k: "select", rule: ["+z"], feature: { type: "shell", thickness: 2 } });
-    expect(p.ops.slice(11).map((o) => o.k)).toEqual(["view", "pop", "status"]);
+    // „undo“ = krok historie dokumentu (jako Ctrl+Z), ne smazání posledního prvku – to je „delete last“
+    expect(p.ops.slice(11).map((o) => o.k)).toEqual(["view", "edit", "status"]);
     expect(p.ops[11]).toMatchObject({ k: "view", view: "front" });
+    expect(p.ops[12]).toMatchObject({ k: "edit", cmd: { kind: "undo", n: 1 } });
+    expect(parseAgentText("delete last").ops).toMatchObject([{ k: "pop" }]);
+    expect(parseAgentText("redo 2\nedit \"Hole 1\" diameter=10").ops).toMatchObject([{ k: "edit", cmd: { kind: "redo", n: 2 } }, { k: "edit", cmd: { kind: "edit", target: "Hole 1", pairs: [["diameter", "10"]] } }]);
   });
 });
 
@@ -74,7 +78,11 @@ gewinde M18×1,5 länge 20 bei 0 0 10 achse Z innen modellieren`);
     expect(p.ops[10]).toMatchObject({ k: "select", rule: ["+z"], feature: { type: "shell", thickness: 2 } });
     expect(feat(p, 11)).toMatchObject({ type: "pattern", kind: "circular", count: 6, angle: 360, axis: "Z" });
     expect(p.ops[12]).toMatchObject({ k: "view", view: "front" });
-    expect(p.ops.slice(13, 15).map((o) => o.k)).toEqual(["pop", "status"]);
+    // „rückgängig“ = krok historie (Strg+Z); letzten Schritt löschen = „löschen letzte“
+    expect(p.ops.slice(13, 15).map((o) => o.k)).toEqual(["edit", "status"]);
+    expect(p.ops[13]).toMatchObject({ k: "edit", cmd: { kind: "undo", n: 1 } });
+    expect(parseAgentText("löschen letzte").ops).toMatchObject([{ k: "pop" }]);
+    expect(parseAgentText("wiederherstellen\nbearbeiten \"Bohrung 1\" diameter=10\nunterdrücken \"Bohrung 1\"").ops).toMatchObject([{ k: "edit", cmd: { kind: "redo", n: 1 } }, { k: "edit", cmd: { kind: "edit" } }, { k: "edit", cmd: { kind: "suppress", on: true } }]);
     expect(feat(p, 15)).toMatchObject({ type: "thread", designation: "M18×1,5", length: 20, position: [0, 0, 10], axis: "Z", internal: true, modeled: true });
   });
 

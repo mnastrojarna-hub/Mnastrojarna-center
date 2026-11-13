@@ -47,7 +47,6 @@ Kontrola kót: chybí {0} z {1}: {2}	Dimension check: {0} of {1} missing: {2}
 Kontrola kót: všech {0} očekávaných rozměrů je na listu	Dimension check: all {0} expected sizes are on the sheet
 kóta „{0}“ na výkrese není – kóty: {1}	dimension “{0}” is not on the drawing – dimensions: {1}
 kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji (např. celým popiskem)	dimension “{0}” is ambiguous ({1}×: {2}) – be more specific (e.g. the full label)
-kótovat [chytře|celkově|nic] [řetězově|od základny] – neznámé slovo „{0}“	dimension [smart|overall|none] [chain|baseline] – unknown word “{0}”
 Kóty a popisy ({0}, z toho vygenerovaných {1}):	Dimensions and callouts ({0}, generated {1}):
 kuželové plochy ({0}): úhel a průměry kuželů kótujte ručně	conical faces ({0}): dimension cone angles and diameters manually
 měřítko {0}	scale {0}
@@ -57,7 +56,6 @@ na šířku	landscape
 na výšku	portrait
 Nahradí jen vygenerované kóty – vlastní kóty a poznámky zůstanou	Replaces only generated dimensions – your own dimensions and notes stay
 Nepředepsaná drsnost {0}	General surface roughness {0}
-neznámá volba výkresu „{0}“ – volby: A4…A0, na šířku / na výšku, {1}; podpříkazy: tolerance, poznámka, nepředepsané, hrany, drsnost, stav	unknown drawing option “{0}” – options: A4…A0, landscape / portrait, {1}; subcommands: tolerance, note, general, edges, roughness, status
 neznámý pohled „{0}“ – přední, horní, levý, pravý, zadní, spodní, iso	unknown view “{0}” – front, top, left, right, back, bottom, iso
 od základny	baseline
 osy	centre lines
@@ -84,12 +82,10 @@ skryté hrany	hidden edges
 skrz	thru
 tabulka děr	hole table
 tabulka děr ano|ne	holetable yes|no
-textový stav výkresu pro agenta: list, měřítko, pohledy, všechny kóty s pohledem, duplicity, chybějící rozměry (Kontrola kót), co se nevešlo; také window.mncad.drawingStatus()	drawing status as text for agents: sheet, scale, views, every dimension with its view, duplicates, missing sizes (dimension check), what did not fit; also window.mncad.drawingStatus()
 tolerance ke kótě podle popisku (Ø40 h6, 25 ±0,1, M8 6H); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka	tolerance on a dimension by its label (Ø40 h6, 25 ±0.1, M8 6H); note, general tolerances, edges and general roughness at the title block
 U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}	At the title block: general tolerances {0} · edges {1} · note {2}
 Varování výkresu: {0}	Drawing warnings: {0}
 vnitřní {0}: v pohledech jen skrytě – zapněte řez osou (výkres řez …)	internal {0}: only hidden in the views – turn on a section through the axis (drawing section …)
-volby listu výkresu (první list v dokumentu) a otevření výkresu; nové výkresy mají Chytré kóty	drawing sheet options (first sheet in the document) and opening the drawing; new drawings use Smart dimensions
 Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}	Drawing “{0}”{1}: sheet {2} {3} · scale {4} · views: {5} · dimensions: {6}
 výkres {0} potřebuje text, např. {1}	drawing {0} needs a text, e.g. {1}
 výkres tolerance <kóta> <tolerance> – např. výkres tolerance Ø40 h6 · výkres tolerance 25 ±0,1 · výkres tolerance M8 6H	drawing tolerance <dimension> <tolerance> – e.g. drawing tolerance Ø40 h6 · drawing tolerance 25 ±0.1 · drawing tolerance M8 6H

@@ -47,7 +47,6 @@ Kontrola kót: chybí {0} z {1}: {2}	Maßprüfung: {0} von {1} fehlen: {2}
 Kontrola kót: všech {0} očekávaných rozměrů je na listu	Maßprüfung: alle {0} erwarteten Größen sind auf dem Blatt
 kóta „{0}“ na výkrese není – kóty: {1}	Maß „{0}“ ist nicht auf der Zeichnung – Maße: {1}
 kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji (např. celým popiskem)	Maß „{0}“ ist nicht eindeutig ({1}×: {2}) – genauer angeben (z. B. ganze Beschriftung)
-kótovat [chytře|celkově|nic] [řetězově|od základny] – neznámé slovo „{0}“	bemaßen [intelligent|gesamt|keine] [kette|basis] – unbekanntes Wort „{0}“
 Kóty a popisy ({0}, z toho vygenerovaných {1}):	Maße und Beschriftungen ({0}, davon erzeugt {1}):
 kuželové plochy ({0}): úhel a průměry kuželů kótujte ručně	Kegelflächen ({0}): Kegelwinkel und -durchmesser manuell bemaßen
 měřítko {0}	Maßstab {0}
@@ -57,7 +56,6 @@ na šířku	quer
 na výšku	hoch
 Nahradí jen vygenerované kóty – vlastní kóty a poznámky zůstanou	Ersetzt nur erzeugte Maße – eigene Maße und Hinweise bleiben
 Nepředepsaná drsnost {0}	Allgemeine Oberflächenrauheit {0}
-neznámá volba výkresu „{0}“ – volby: A4…A0, na šířku / na výšku, {1}; podpříkazy: tolerance, poznámka, nepředepsané, hrany, drsnost, stav	unbekannte Zeichnungsoption „{0}“ – Optionen: A4…A0, quer / hoch, {1}; Unterbefehle: toleranz, notiz, allgemein, kanten, rauheit, status
 neznámý pohled „{0}“ – přední, horní, levý, pravý, zadní, spodní, iso	unbekannte Ansicht „{0}“ – vorne, oben, links, rechts, hinten, unten, iso
 od základny	Bezugsbemaßung
 osy	Mittellinien
@@ -84,12 +82,10 @@ skryté hrany	verdeckte Kanten
 skrz	durch
 tabulka děr	Bohrungstabelle
 tabulka děr ano|ne	bohrungstabelle ja|nein
-textový stav výkresu pro agenta: list, měřítko, pohledy, všechny kóty s pohledem, duplicity, chybějící rozměry (Kontrola kót), co se nevešlo; také window.mncad.drawingStatus()	Zeichnungsstatus als Text für Agenten: Blatt, Maßstab, Ansichten, jedes Maß mit Ansicht, doppelte Maße, fehlende Größen (Maßprüfung), was nicht passte; auch window.mncad.drawingStatus()
 tolerance ke kótě podle popisku (Ø40 h6, 25 ±0,1, M8 6H); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka	Toleranz an einem Maß nach Beschriftung (Ø40 h6, 25 ±0,1, M8 6H); Hinweis, Allgemeintoleranzen, Kanten und allgemeine Rauheit am Schriftfeld
 U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}	Am Schriftfeld: Allgemeintoleranzen {0} · Kanten {1} · Hinweis {2}
 Varování výkresu: {0}	Zeichnungswarnungen: {0}
 vnitřní {0}: v pohledech jen skrytě – zapněte řez osou (výkres řez …)	innen {0}: in den Ansichten nur verdeckt – Schnitt durch die Achse einschalten (zeichnung schnitt …)
-volby listu výkresu (první list v dokumentu) a otevření výkresu; nové výkresy mají Chytré kóty	Blattoptionen der Zeichnung (erstes Blatt im Dokument) und Öffnen der Zeichnung; neue Zeichnungen nutzen die intelligente Bemaßung
 Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}	Zeichnung „{0}“{1}: Blatt {2} {3} · Maßstab {4} · Ansichten: {5} · Maße: {6}
 výkres {0} potřebuje text, např. {1}	zeichnung {0} braucht einen Text, z. B. {1}
 výkres tolerance <kóta> <tolerance> – např. výkres tolerance Ø40 h6 · výkres tolerance 25 ±0,1 · výkres tolerance M8 6H	zeichnung toleranz <Maß> <Toleranz> – z. B. zeichnung toleranz Ø40 h6 · zeichnung toleranz 25 ±0,1 · zeichnung toleranz M8 6H
