@@ -1,6 +1,10 @@
 /**
  * ARCHIV ZAKÁZEK — skutečné fotografie z dílny (převzaté ze stávající galerie webu).
- * Popisy vycházejí výhradně z toho, co je na fotografiích vidět. Rok = datum pořízení fotografie (pokud je známo).
+ * Popisy vycházejí výhradně z toho, co je na fotografiích vidět. `year` = rok pořízení fotografie (pokud je známo) – jen interní
+ * údaj, web ho nezobrazuje (staré roky u fotek nepůsobí dobře).
+ *
+ * NOVÁ ZAKÁZKA: fotky (JPG, delší strana 1200 px) do `public/img/zakazky/<slug>/1.jpg, 2.jpg…`, záznam na ZAČÁTEK pole `CASES`
+ * (první se ukazují nejvýš), rozměry fotek v `ph(...)` (Q = 4:3, W = 16:9, V = 5:3) a texty ve všech třech jazycích.
  *
  * DOPLNIT OD FIRMY (u každé zakázky, nepovinné): `brief` (zadání / problém zákazníka),
  * `solution` (jak jsme to vyřešili), `result` (výsledek), obor / klient (se souhlasem), technologie.

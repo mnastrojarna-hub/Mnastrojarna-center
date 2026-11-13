@@ -19,9 +19,9 @@ function Field({ label, value, set, unit = "mm" }: { label: string; value: numbe
           inputMode="decimal"
           value={value || ""}
           onChange={(e) => set(Math.max(0, Number(e.target.value)))}
-          className="w-full min-w-0 bg-transparent px-3 py-2.5 font-mono text-[15px] text-ink-700 outline-none"
+          className="w-full min-w-0 bg-transparent py-2.5 pl-3 pr-1 font-mono text-[16px] text-ink-700 outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
-        <span className="pr-3 font-mono text-[12px] text-ink-700/40">{unit}</span>
+        <span className="shrink-0 pr-3 font-mono text-[12px] text-ink-700/40">{unit}</span>
       </span>
     </label>
   );
@@ -42,7 +42,7 @@ export function FitChecker({ t, names, email, subject, bodyTpl }: { t: T; names:
 
   return (
     <div className="grid overflow-hidden rounded-3xl border border-ink-700/10 bg-white shadow-[0_40px_80px_-50px_rgba(39,36,37,.4)] lg:grid-cols-5">
-      <div className="space-y-6 p-8 md:p-10 lg:col-span-3">
+      <div className="space-y-6 p-5 sm:p-8 md:p-10 lg:col-span-3">
         <div>
           <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{t.fitShape}</p>
           <div className="flex flex-wrap gap-2">
@@ -60,13 +60,13 @@ export function FitChecker({ t, names, email, subject, bodyTpl }: { t: T; names:
           </div>
         </div>
         {shape === "rot" ? (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <Field label={t.fitDiameter} value={d} set={setD} />
             <Field label={t.fitLength} value={len} set={setLen} />
             <Field label={t.fitWeight} value={kg} set={setKg} unit="kg" />
           </div>
         ) : (
-          <div className={cn("grid gap-3", shape === "edm" ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4")}>
+          <div className={cn("grid gap-3", shape === "edm" ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4")}>
             <Field label={t.fitX} value={x} set={setX} />
             <Field label={t.fitY} value={y} set={setY} />
             <Field label={t.fitZ} value={z} set={setZ} />
@@ -75,7 +75,7 @@ export function FitChecker({ t, names, email, subject, bodyTpl }: { t: T; names:
         )}
         <p className="font-mono text-[11px] uppercase tracking-widest text-ink-700/40">{t.fitNote}</p>
       </div>
-      <div className="relative bg-steel-100 p-8 md:p-10 lg:col-span-2">
+      <div className="relative bg-steel-100 p-5 sm:p-8 md:p-10 lg:col-span-2">
         <div className="bg-grid-light absolute inset-0 opacity-70" />
         <div className="relative">
           <p className="text-[15px] font-semibold text-ink-700">{n ? t.fitResultOk.replace("{n}", String(n)) : t.fitResultNone}</p>
