@@ -61,7 +61,7 @@ const has = (bin) => { try { execFileSync('which', [bin]); return true; } catch 
   await p.locator('[data-drawing-workspace] header').getByRole('button', { name: 'Zavřít', exact: true }).click(); await p.waitForTimeout(400);
 
   // ── 2. sdílení s heslem u příjemce + skutečné vypršení (posunutý čas) ──
-  await p.getByRole('button', { name: 'Sdílet', exact: true }).click();
+  await p.getByRole('button', { name: 'Sdílet odkazem', exact: true }).click();
   const dlg = p.locator('div.fixed.z-\\[70\\]');
   await p.waitForFunction(() => { const t = document.querySelector('textarea[aria-label="Sdílený odkaz"]'); return !!t && t.value.startsWith('http'); }, null, { timeout: 20000 });
   await dlg.getByRole('button', { name: '1 den', exact: true }).click();
@@ -95,7 +95,7 @@ const has = (bin) => { try { execFileSync('which', [bin]); return true; } catch 
     return window.mncad.run(JSON.stringify({ app: 'mnastrojarna-cad', version: 2, name: 'Velký import', material: 'ocel', features: [{ type: 'box', size: [10, 10, 10] }, { type: 'import', fileName: 'velky.step', format: 'step', data: btoa(s) }] }));
   });
   ok(/dokument „Velký import“/.test(big), 'velký dokument (300 kB importu) otevřen v nové záložce');
-  await p.getByRole('button', { name: 'Sdílet', exact: true }).click();
+  await p.getByRole('button', { name: 'Sdílet odkazem', exact: true }).click();
   await p.waitForFunction(() => /příliš velký/.test(document.querySelector('div.fixed.z-\\[70\\]')?.textContent || ''), null, { timeout: 30000 });
   ok(/příliš velký.*\.mncad/.test(await dlg.innerText()), 'příliš velký model: dialog vysvětlí, že se do odkazu nevejde, a poradí soubor / úložiště');
   await dlg.getByRole('button', { name: 'Zavřít', exact: true }).last().click();

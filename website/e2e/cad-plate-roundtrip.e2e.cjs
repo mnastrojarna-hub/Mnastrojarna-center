@@ -104,7 +104,7 @@ stav`;
   await p.screenshot({ path: S + 'plate-drawing.png' });
 
   // ── 3. sdílet z výkresu → otevřít jinde ──
-  await p.locator('[data-drawing-workspace] header').getByRole('button', { name: 'Sdílet', exact: true }).click();
+  await p.locator('[data-drawing-workspace] header').getByRole('button', { name: 'Sdílet odkazem', exact: true }).click();
   const dlg = p.locator('div.fixed.z-\\[70\\]');
   await p.waitForFunction(() => { const t = document.querySelector('textarea[aria-label="Sdílený odkaz"]'); return !!t && t.value.startsWith('http'); }, null, { timeout: 20000 });
   const url = await dlg.getByLabel('Sdílený odkaz').inputValue();

@@ -28,7 +28,7 @@ const linkValue = async (dlg, page, notEqual) => {
   await p.goto(CAD, { waitUntil: 'networkidle', timeout: 180000 }); await ready(p);
 
   // ── odesílatel ──
-  const shareBtn = p.getByRole('button', { name: 'Sdílet', exact: true });
+  const shareBtn = p.getByRole('button', { name: 'Sdílet odkazem', exact: true });
   ok(await shareBtn.isDisabled(), 'prázdný dokument: Sdílet je neaktivní');
   await p.getByRole('button', { name: 'Soubor', exact: true }).click();
   await p.getByRole('button', { name: /Příruba DN50/ }).click(); await p.waitForTimeout(3000);
@@ -95,7 +95,7 @@ const linkValue = async (dlg, page, notEqual) => {
   await p.getByRole('button', { name: 'Soubor', exact: true }).click();
   await p.getByRole('button', { name: /Výkres PDF/ }).click(); await p.waitForTimeout(2500);
   ok(/Výkres/.test(await p.locator('[role=tab][aria-selected="true"]').innerText()), 'odesílatel: aktivní výkresová záložka');
-  await p.locator('[data-drawing-workspace]').getByRole('button', { name: 'Sdílet', exact: true }).click();
+  await p.locator('[data-drawing-workspace]').getByRole('button', { name: 'Sdílet odkazem', exact: true }).click();
   const urlDrw = await linkValue(dlg, p);
   ok(/příjemci se otevře rovnou výkres/.test(await dlg.innerText()), 'dialog: sdílí se včetně výkresu');
   await dlg.getByRole('button', { name: 'Zavřít', exact: true }).last().click();
@@ -115,7 +115,7 @@ const linkValue = async (dlg, page, notEqual) => {
   const m = await b.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await m.goto(url, { waitUntil: 'networkidle', timeout: 180000 });
   await m.locator('[role=status]').first().waitFor({ timeout: 120000 }); await m.waitForTimeout(2500); // stav jádra je na mobilu skrytý
-  await m.getByRole('button', { name: 'Sdílet', exact: true }).click();
+  await m.getByRole('button', { name: 'Sdílet odkazem', exact: true }).click();
   const mdlg = m.locator('div.fixed.z-\\[70\\]');
   await linkValue(mdlg, m);
   ok(await mdlg.getByRole('button', { name: 'Kopírovat odkaz' }).isVisible(), 'mobil: dialog sdílení s tlačítky');

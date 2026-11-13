@@ -57,7 +57,7 @@ const CAD = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, '')
   await fb.getByRole('button', { name: 'Zkusit znovu' }).click(); await p.waitForTimeout(1200);
   ok(await p.locator('[data-viewport-fallback]').isVisible(), 'Zkusit znovu bez WebGL: opět chybová obrazovka, bez pádu');
   // sdílení, nastavení a výkres fungují
-  await p.getByRole('button', { name: 'Sdílet', exact: true }).click();
+  await p.getByRole('button', { name: 'Sdílet odkazem', exact: true }).click();
   await p.waitForFunction(() => { const t = document.querySelector('textarea[aria-label="Sdílený odkaz"]'); return !!t && t.value.startsWith('http'); }, null, { timeout: 20000 });
   ok(true, 'sdílení odkazem funguje bez 3D okna');
   await p.getByRole('button', { name: 'Zavřít', exact: true }).last().click(); await p.waitForTimeout(300);

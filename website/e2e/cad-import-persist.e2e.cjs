@@ -99,7 +99,8 @@ const NOT_IN_MEMORY = /nejsou v paměti/;
     await p.getByPlaceholder(/Hledat příkaz/).fill('Úvodní obrazovka');
     await p.locator('button[data-i]', { hasText: 'Úvodní obrazovka' }).first().click();
     const rec = p.locator('li button', { hasText: 'rounded-cube' }).first();
-    const recOk = await rec.isVisible({ timeout: 15000 }).catch(() => false);
+    // isVisible nečeká – úvodní obrazovka se vykreslí až po chvíli (pod zátěží i několik sekund)
+    const recOk = await rec.waitFor({ state: 'visible', timeout: 30000 }).then(() => true).catch(() => false);
     if (!recOk) await p.screenshot({ path: S + 'import-persist-recent.png' });
     ok(recOk, `rounded-cube je v nedávných souborech (${recOk ? '' : (await p.evaluate(() => document.body.innerText)).slice(0, 300).replace(/\n/g, ' | ')})`);
     if (recOk) {
@@ -142,7 +143,8 @@ const NOT_IN_MEMORY = /nejsou v paměti/;
     await idle(p2);
     await p2.waitForTimeout(2000);
     const ds = await p2.evaluate(() => window.mncad.drawingStatus());
-    ok(/pohledy:[^\n]*m:/.test(ds) && !/se nepodařilo načíst/.test(ds), `výkres: pohled vloženého modelu na listu bez varování (${(ds.match(/pohledy:[^\n]*/) || [''])[0]})`);
+    // stav výkresu uvádí vložený model jménem (dřív interním klíčem m:…)
+    ok(/pohledy:[^\n]*(m:|rounded-cube)/.test(ds) && !/se nepodařilo načíst/.test(ds), `výkres: pohled vloženého modelu na listu bez varování (${(ds.match(/pohledy:[^\n]*/) || [''])[0]})`);
     await p2.screenshot({ path: S + 'import-persist-drawing.png' });
     const d2 = await p2.evaluate(() => window.mncad.getDocument());
     const m = (d2.drawings || []).flatMap((x) => (x.options && x.options.models) || [])[0];
