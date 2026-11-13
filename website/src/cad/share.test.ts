@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { emptyDoc, type CadDoc } from "./types";
-import { b64u, createShareLink, LINK_MAX_CHARS, openShareLink, parseShareHash, shareMessage, unb64u } from "./share";
+import { b64u, createShareLink, LINK_MAX_CHARS, openShareLink, parseShareHash, resetShareProbe, shareMessage, unb64u } from "./share";
 
 const sample = (): CadDoc => ({
   ...emptyDoc("Příruba DN50"),
@@ -22,6 +22,7 @@ const hashOf = (url: string) => url.slice(url.indexOf("#"));
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  resetShareProbe();
   delete process.env.NEXT_PUBLIC_CAD_SHARE_URL;
   delete process.env.NEXT_PUBLIC_CAD_SHARE_KEY;
 });
@@ -157,10 +158,14 @@ describe("sdílení přes úložiště (Supabase Storage, šifrováno – klíč
     expect(o.ok && o.payload.doc.features.length).toBe(3);
   });
 
-  it("malý dokument zůstává v odkazu i s nastaveným úložištěm; vynucené úložiště funguje; heslo chrání i úložiště", async () => {
+  it("i malý dokument jde do úložiště (krátký odkaz); vynucený odkaz bez serveru; heslo chrání i úložiště", async () => {
     const { fetchSpy } = setup();
     const r1 = await createShareLink(sample(), { days: 10, base: BASE });
-    expect(r1.mode).toBe("link");
+    expect(r1.mode).toBe("store");
+    expect(r1.url.length).toBeLessThan(140);
+    fetchSpy.mockClear();
+    const r0 = await createShareLink(sample(), { days: 10, base: BASE, mode: "link" });
+    expect(r0.mode).toBe("link");
     expect(fetchSpy).not.toHaveBeenCalled();
     const r2 = await createShareLink(sample(), { days: 7, base: BASE, mode: "store", password: "heslo" });
     expect(r2.mode).toBe("store");

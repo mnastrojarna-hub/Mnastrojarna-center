@@ -1,0 +1,22 @@
+# 8. Welle – kurzer Freigabelink (verschlüsselter Speicher auf der eigenen Website /cad/share/)
+{0} znaků	{0} Zeichen
+Bez omezení platnosti nemůže být dokument v úložišti – celý je proto v odkazu. Pro krátký odkaz zvolte platnost 1–90 dní.	Ohne Ablaufdatum kann das Dokument nicht im Speicher liegen – es steht daher vollständig im Link. Für einen kurzen Link eine Gültigkeit von 1–90 Tagen wählen.
+Celý dokument je proto v odkazu (dlouhý odkaz).	Das ganze Dokument steht daher im Link (langer Link).
+krátký odkaz (automaticky)	kurzer Link (automatisch)
+Krátký odkaz není k dispozici: úložiště sdílení na serveru ({0}) neodpovídá.	Kein kurzer Link verfügbar: der Freigabespeicher auf dem Server ({0}) antwortet nicht.
+krátký odkaz: dokument se v prohlížeči zašifruje (AES-GCM) a na server jde jen šifrovaný; klíč je jen v odkazu za „#“, kterou prohlížeč na server nikdy neposílá. Po vypršení platnosti se soubor ze serveru smaže.	kurzer Link: das Dokument wird im Browser verschlüsselt (AES-GCM), auf den Server gelangen nur verschlüsselte Daten; der Schlüssel steht nur im Teil des Links nach „#“, den der Browser nie an den Server sendet. Nach Ablauf wird die Datei vom Server gelöscht.
+Model je pro sdílení odkazem příliš velký: {0} po kompresi a zašifrování, limit úložiště je {1}. Uložte .mncad nebo STEP a pošlete soubor (např. přes úschovnu).	Das Modell ist zum Teilen per Link zu groß: {0} nach Komprimierung und Verschlüsselung, das Speicherlimit beträgt {1}. Speichern Sie eine .mncad- oder STEP-Datei und senden Sie die Datei (z. B. über einen Filetransfer-Dienst).
+Odkaz byl zneplatněn – změňte volby pro nový.	Der Link wurde ungültig gemacht – ändern Sie die Optionen für einen neuen.
+Odkaz zneplatněn – šifrovaný dokument byl ze serveru smazán.	Link ungültig gemacht – das verschlüsselte Dokument wurde vom Server gelöscht.
+share: mode je link | store | self	share: mode ist link | store | self
+Smaže šifrovaný dokument ze serveru – odkaz přestane fungovat i těm, kdo ho už mají	Löscht das verschlüsselte Dokument vom Server – der Link funktioniert dann auch für alle nicht mehr, die ihn schon haben
+Šifruji a nahrávám… {0} %	Verschlüssele und lade hoch… {0} %
+Úložiště sdílení dočasně odmítá další nahrávání z této adresy (limit za hodinu).	Der Freigabespeicher lehnt weitere Uploads von dieser Adresse vorübergehend ab (Stundenlimit).
+Úložiště sdílení na serveru ({0}) neodpovídá.	Der Freigabespeicher auf dem Server ({0}) antwortet nicht.
+Úložiště sdílení na serveru je plné.	Der Freigabespeicher auf dem Server ist voll.
+Úložiště sdílení není dostupné (síť).	Der Freigabespeicher ist nicht erreichbar (Netzwerk).
+Úložiště sdílení odmítlo nahrání ({0}).	Der Freigabespeicher hat den Upload abgelehnt ({0}).
+Úložiště sdílení vrátilo neplatnou odpověď.	Der Freigabespeicher hat eine ungültige Antwort geliefert.
+V úložišti musí mít odkaz omezenou platnost (max. {0} dní).	Im Speicher muss der Link eine begrenzte Gültigkeit haben (max. {0} Tage).
+Zneplatnění se nezdařilo (síť) – zkuste to znovu.	Ungültig machen fehlgeschlagen (Netzwerk) – bitte erneut versuchen.
+Zneplatnit odkaz	Link ungültig machen

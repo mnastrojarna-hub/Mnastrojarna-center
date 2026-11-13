@@ -545,8 +545,6 @@ Jazyk rozhraní	Sprache der Oberfläche
 Jazyk	Sprache
 přepnutí znovu načte aplikaci; rozpracovaná práce zůstane uložená	Umschalten lädt die Anwendung neu; der Arbeitsstand bleibt gespeichert
 # share-dialog
- Velké modely (importovaný STEP) do odkazu nevejdou – pošlete soubor .mncad nebo STEP.	 Große Modelle (importiertes STEP) passen nicht in einen Link – senden Sie die .mncad- oder STEP-Datei.
- Velké modely jdou do úložiště zašifrované (AES-256); klíč je jen v odkazu a soubor se po vypršení platnosti smaže.	 Große Modelle gehen verschlüsselt (AES-256) in den Speicher; der Schlüssel steht nur im Link und die Datei wird nach Ablauf gelöscht.
 ): WhatsApp, e-mail, Teams a Slack ho přenesou, SMS ne. U e-mailu raději „Kopírovat odkaz“ a vložit do zprávy.	): WhatsApp, E-Mail, Teams und Slack übertragen ihn, SMS nicht. Bei E-Mail besser „Link kopieren“ und in die Nachricht einfügen.
 . Příjemce odkaz otevře v prohlížeči bez instalace a registrace – může model prohlížet, otáčet, měřit, řezat, prohlédnout výkresy a uložit si kopii. Jde o	. Der Empfänger öffnet den Link im Browser ohne Installation und Registrierung – er kann das Modell ansehen, drehen, messen, schneiden, die Zeichnungen durchsehen und eine Kopie speichern. Es handelt sich um eine
 1 den	1 Tag

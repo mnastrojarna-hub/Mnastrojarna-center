@@ -15,3 +15,15 @@ export function takeFeatureNotes(): string[] {
   notes = [];
   return out;
 }
+
+/** Výsledek právě stavěného prvku (8. vlna, svary): text do stavu (✓ … ve stromu, `stav`) a strojově čitelná data (`status.data`). */
+let info: { text: string; data?: Record<string, unknown> } | null = null;
+export function noteFeatureInfo(text: string, data?: Record<string, unknown>) {
+  info = { text, ...(data ? { data } : {}) };
+}
+/** vybrat (a vyprázdnit) výsledek právě stavěného prvku */
+export function takeFeatureInfo(): { text: string; data?: Record<string, unknown> } | null {
+  const out = info;
+  info = null;
+  return out;
+}

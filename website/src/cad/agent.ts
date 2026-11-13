@@ -21,6 +21,7 @@ import type { DrawingExportFormat, DrawingExportOptions, DrawingExportResult } f
 import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type SketchOp, type SketchTarget } from "./agent-sketch";
 import { parseMeasure, type MeasureApiResult, type MeasureCmd } from "./agent-measure";
 import { parseSheetLine, sheetSummary, SHEET_COMMANDS } from "./agent-sheet";
+import { parseWeldLine, weldSummary, WELD_COMMANDS } from "./agent-welds";
 import { paramStatusLines, parseEditLine, type EditOp } from "./agent-edit";
 import { toAxisDef, toDirection } from "./ext/place";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
@@ -607,6 +608,12 @@ export function parseAgentText(text: string): AgentProgram {
       const sheetOp = parseSheetLine(line, no, (l) => `${l} ${(counts[`ext:${l}`] = (counts[`ext:${l}`] ?? 0) + 1)}`);
       if (sheetOp) {
         ops.push(sheetOp);
+        return;
+      }
+      // svary (agent-welds.ts): svar koutový / tupý V… / děrový / bodový / tabulka – null = jiný příkaz
+      const weldOp = parseWeldLine(line, no, (l) => `${l} ${(counts[`ext:${l}`] = (counts[`ext:${l}`] ?? 0) + 1)}`);
+      if (weldOp) {
+        ops.push(weldOp);
         return;
       }
       if (cmd === "sketch") {
@@ -1336,7 +1343,7 @@ export function featureSummary(f: Feature, doc?: CadDoc): string {
     case "combine":
       return tr("{0} „{1}“ {2} „{3}“{4}", f.op === "cut" ? tr("odebrat od") : f.op === "intersect" ? tr("průnik") : tr("sjednotit"), f.target || tr("aktivní"), f.op === "cut" ? "−" : f.op === "intersect" ? "∩" : "+", f.tool, f.keepTool ? tr(", nástroj ponechán") : "");
     default:
-      return sheetSummary(f);
+      return sheetSummary(f) || weldSummary(f);
   }
 }
 /** Stav sestavy pro textový stav (počítá aplikace z načtených komponent). */
@@ -1381,6 +1388,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
     doc.features.forEach((f, i) => {
       const s = st.get(f.id);
       lines.push(tr(" {0}. {1} [{2}, id {3}] {4}{5} – {6}", i + 1, f.name, f.type, f.id, s?.ok === false ? "✗ " + (s.error ?? tr("chyba")) : s?.warning ? "⚠ " + s.warning : "✓", f.suppressed ? " (potlačen)" : "", featureSummary(f, doc)));
+      if (s?.ok !== false && s?.info) lines.push(`    → ${s.info}`); // výsledek prvku (svarový kov…)
       if (f.type === "sketch") lines.push(...sketchStatusLines(f)); // entity s id (e1, e2…) pro vazby a kóty textem, stav určenosti
     });
   }
@@ -1423,6 +1431,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "text \"ABC\" výška H hloubka D v x y [z] [gravírovat]", en: "text", de: "text", desc: tr("nápis vystouplý / gravírovaný") },
   { cmd: "těleso N · rozdělit XY|XZ|YZ [odsazení N] [jako Název] · kopie [těleso N] [posun dx dy dz] [jako Název] · sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]", en: "body, splitbodies, copybody, combine", de: "körper, teilen, kopieren, kombinieren", desc: tr("více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným") },
   ...SHEET_COMMANDS,
+  ...WELD_COMMANDS,
   { cmd: "prvek <typ|rozšíření> klíč=hodnota …", en: "feature", de: "element", desc: tr("kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId=\"Skica 1\" pathId=$last · prvek draft angle=3 faces=boční · prvek \"Ohyb plechu\" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem") },
   { cmd: "normálie <označení> [v x y z]", en: "library", de: "normteil", desc: tr("díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta") },
   { cmd: "vložit \"název záložky\" [v x y z] [otočení rx ry rz] [ukotvit]", en: "insert", de: "einfügen", desc: tr("sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)") },

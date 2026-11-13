@@ -143,7 +143,6 @@ screenshot: view je {0}	screenshot: view ist {0}
 select potřebuje pole id, např. {0}	select braucht ein Array von IDs, z. B. {0}
 setSettings potřebuje objekt, např. {0}	setSettings braucht ein Objekt, z. B. {0}
 share: days je počet dní (např. 10) nebo null = bez omezení	share: days ist eine Anzahl Tage (z. B. 10) oder null = unbegrenzt
-share: mode je link | store	share: mode ist link | store
 share: view je model | drawing	share: view ist model | drawing
 skica „{0}“ je prázdná	Skizze „{0}“ ist leer
 skica „{0}“ v dokumentu není – skici: {1}	Skizze „{0}“ ist nicht im Dokument – Skizzen: {1}

@@ -710,9 +710,7 @@ Rozvin uložen – {0} ohybů, {1} × {2} mm.	Flat pattern saved – {0} bends, 
 klikněte na rovnou hranu plechu v modelu	click a straight sheet edge in the model
 {0} vybráno	{0} selected
 Hloubka Y	Depth Y
-Hrany koutu:	Fillet weld edges:
 Jako samostatná tělesa (nespojovat)	As separate bodies (do not join)
-Koutový svar a×a se vymodeluje jako trojúhelníkový hranol podél hrany; objem svarového kovu ≈ a²/2 × délka (Tabulka svarů).	A fillet weld a×a is modelled as a triangular prism along the edge; weld metal volume ≈ a²/2 × length (Weld table).
 Kusovník řezů uložen jako CSV (Excel).	Cut list saved as CSV (Excel).
 Mezera	Gap
 Natočení	Rotation
@@ -729,6 +727,4 @@ Skica s úsečkami (osy profilů)	Sketch with lines (profile axes)
 Spodní a horní obdélník + 4 sloupky tupě mezi nimi. Vnější rozměry rámu odpovídají zadání.	Bottom and top rectangle + 4 posts butt-jointed between them. The outer frame dimensions match the input.
 Výška Z	Height Z
 Zarovnání k ose	Alignment to the axis
-klikněte na hranu vnitřního rohu v modelu	click an inner corner edge in the model
-{0} vybráno ({1} mm)	{0} selected ({1} mm)
 — vyberte skicu —	— select a sketch —

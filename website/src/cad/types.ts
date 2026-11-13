@@ -334,7 +334,7 @@ export type AsmComponent = {
  * (operace těleso nezměnila, geometrie po opravě stále není platná…) – v UI ⚠, v protokolu „⚠“.
  */
 /** `ms` = doba výpočtu prvku (jen prvky, které se skutečně počítaly) */
-export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number };
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown> };
 
 export type MeshData = {
   vertices: Float32Array;

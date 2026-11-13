@@ -6,7 +6,6 @@
 import { cadLocale, tr } from "../i18n";
 import { toWorld } from "../defaults";
 import { HEB, IPE, UPN, type IProfile } from "../library/tables";
-import type { DText, Poly } from "../drawing";
 import type { CadDoc, Feature, SketchEntity, Vec2, Vec3 } from "../types";
 
 export const STEEL_DENSITY = 7.85e-6; // kg/mm³
@@ -531,119 +530,7 @@ export function cutListCsv(doc: CadDoc): string {
   return "﻿" + out.join("\r\n") + "\r\n";
 }
 
-// ---------------- svary ----------------
+// ---------------- svary (weld-table.ts, weld-symbol.ts) ----------------
 
-export type BeadData = { edges: number[]; a: number; intermittent: boolean; segLen: number; pitch: number; edgeLens: number[] };
-export function beadData(data: Record<string, unknown>): BeadData {
-  const n = (k: string, d: number) => (typeof data[k] === "number" && Number.isFinite(data[k] as number) ? (data[k] as number) : d);
-  return { edges: Array.isArray(data.edges) ? (data.edges as number[]) : [], a: n("a", 4), intermittent: !!data.intermittent, segLen: n("segLen", 50), pitch: n("pitch", 100), edgeLens: Array.isArray(data.edgeLens) ? (data.edgeLens as number[]) : [] };
-}
-
-/** Délka svaru na hraně délky L: souvislý = L, přerušovaný = součet úseků. */
-export function weldLength(L: number, b: BeadData) {
-  if (!b.intermittent || b.pitch <= 0) return L;
-  let total = 0;
-  for (let s = 0; s < L - 1e-9; s += b.pitch) total += Math.min(b.segLen, L - s);
-  return total;
-}
-
-export type WeldRow = { feature: string; type: string; a: number; length: number; volume: number; mass: number };
-
-export function weldTable(doc: CadDoc): WeldRow[] {
-  const rows: WeldRow[] = [];
-  for (const f of doc.features) {
-    if (f.type !== "ext" || f.suppressed) continue;
-    if (f.ext === "weld.bead") {
-      const b = beadData(f.data);
-      const length = b.edgeLens.reduce((s, L) => s + weldLength(L, b), 0);
-      const volume = ((b.a * b.a) / 2) * length;
-      rows.push({ feature: f.name, type: b.intermittent ? tr("koutový přerušovaný {0} ({1})", fmt(b.segLen), fmt(b.pitch)) : tr("koutový"), a: b.a, length, volume, mass: volume * STEEL_DENSITY });
-    } else if (f.ext === "weld.symbol") {
-      const s = symbolData(f.data);
-      rows.push({ feature: f.name, type: `${SYMBOL_TYPES.find((t) => t.v === s.kind)?.l ?? s.kind}${s.allAround ? tr(" (po obvodu)") : ""}${s.field ? tr(" (montážní)") : ""}`, a: s.size, length: s.length, volume: s.kind === "fillet" ? ((s.size * s.size) / 2) * s.length : 0, mass: s.kind === "fillet" ? ((s.size * s.size) / 2) * s.length * STEEL_DENSITY : 0 });
-    }
-  }
-  return rows;
-}
-
-export function weldTableText(doc: CadDoc): string {
-  const rows = weldTable(doc);
-  if (!rows.length) return tr("Žádné svary (přidejte Svarovou housenku nebo Značku svaru).");
-  const lines = [tr("Prvek                  Typ                           a/s   Délka [mm]  Objem [cm³]  kg")];
-  for (const r of rows) lines.push(`${r.feature.padEnd(22)} ${r.type.padEnd(29)} ${fmt(r.a).padStart(4)}  ${fmt(r.length).padStart(10)}  ${fmt(r.volume / 1000).padStart(11)}  ${fmt(r.mass)}`);
-  lines.push(tr("Svarový kov celkem: {0} kg", fmt(rows.reduce((s, r) => s + r.mass, 0))));
-  return lines.join("\n");
-}
-
-// ---------------- značka svaru (ISO 2553) ----------------
-
-export type SymbolKind = "fillet" | "V" | "halfV" | "U" | "I" | "square" | "spot";
-export const SYMBOL_TYPES: { v: SymbolKind; l: string }[] = [
-  { v: "fillet", l: tr("Koutový") },
-  { v: "V", l: tr("V svar") },
-  { v: "halfV", l: tr("½V svar") },
-  { v: "U", l: tr("U svar") },
-  { v: "I", l: tr("I svar") },
-  { v: "square", l: tr("Lemový") },
-  { v: "spot", l: tr("Bodový") },
-];
-export type SymbolData = { kind: SymbolKind; size: number; length: number; pitch: number; allAround: boolean; field: boolean; otherSide: boolean; note: string };
-export function symbolData(data: Record<string, unknown>): SymbolData {
-  const n = (k: string, d: number) => (typeof data[k] === "number" && Number.isFinite(data[k] as number) ? (data[k] as number) : d);
-  const kind = SYMBOL_TYPES.some((t) => t.v === data.kind) ? (data.kind as SymbolKind) : "fillet";
-  return { kind, size: n("size", 4), length: n("length", 0), pitch: n("pitch", 0), allAround: !!data.allAround, field: !!data.field, otherSide: !!data.otherSide, note: String(data.note ?? "") };
-}
-
-/** Geometrie značky svaru pro výkres (mm listu): `at` = začátek odkazové (referenční) čáry, `leader` = hrot šipky. */
-export function weldSymbolGeometry(sym: SymbolData, at: Vec2, leader: Vec2): { polys: Poly[]; texts: DText[] } {
-  const polys: Poly[] = [];
-  const texts: DText[] = [];
-  const L = 28;
-  const [x, y] = at;
-  const line = (pts: Vec2[]) => polys.push({ layer: "dim", pts });
-  // referenční čára + identifikační (čárkovaná) pro druhou stranu
-  line([[x, y], [x + L, y]]);
-  polys.push({ layer: "hidden", pts: sym.otherSide ? [[x, y + 2.2], [x + L, y + 2.2]] : [[x, y - 2.2], [x + L, y - 2.2]] });
-  // šipka
-  line([[x, y], leader]);
-  const dx = leader[0] - x;
-  const dy = leader[1] - y;
-  const l = Math.hypot(dx, dy) || 1;
-  const ux = dx / l;
-  const uy = dy / l;
-  polys.push({ layer: "dim", fill: true, pts: [leader, [leader[0] - ux * 3 - uy * 0.9, leader[1] - uy * 3 + ux * 0.9], [leader[0] - ux * 3 + uy * 0.9, leader[1] - uy * 3 - ux * 0.9], leader] });
-  // značka nad (strana šipky) nebo pod čarou
-  const side = sym.otherSide ? 1 : -1; // SVG y dolů: nad čarou = −
-  const cx = x + 12;
-  const h = 3.6;
-  const g = (pts: Vec2[]) => line(pts.map(([px, py]) => [cx + px, y + side * py] as Vec2));
-  switch (sym.kind) {
-    case "fillet": g([[0, 0], [0, h], [h, 0], [0, 0]]); break;
-    case "V": g([[-h / 2, h], [0, 0], [h / 2, h]]); break;
-    case "halfV": g([[0, h], [0, 0], [h, h]]); break;
-    case "U": g([[-h / 2, h], [-h / 2, h / 2], [-h / 4, 0], [h / 4, 0], [h / 2, h / 2], [h / 2, h]]); break;
-    case "I": g([[-1.2, 0], [-1.2, h]]); g([[1.2, 0], [1.2, h]]); break;
-    case "square": g([[-h / 2, h], [-h / 2, 0], [h / 2, 0], [h / 2, h]]); break;
-    case "spot": {
-      const pts: Vec2[] = [];
-      for (let i = 0; i <= 16; i++) pts.push([Math.cos((i / 16) * Math.PI * 2) * 1.8, h / 2 + Math.sin((i / 16) * Math.PI * 2) * 1.8]);
-      g(pts);
-      break;
-    }
-  }
-  // rozměr vlevo, délka vpravo
-  const ty = y + side * (h / 2) + 1.2;
-  if (sym.size > 0) texts.push({ x: cx - 1.5, y: ty, s: `${sym.kind === "fillet" ? "a" : "s"}${fmt(sym.size)}`, size: 3.2, anchor: "end", layer: "dim" });
-  if (sym.length > 0) texts.push({ x: cx + h + 1.5, y: ty, s: sym.pitch > 0 ? `${fmt(sym.length)} (${fmt(sym.pitch)})` : fmt(sym.length), size: 3.2, layer: "dim" });
-  if (sym.allAround) {
-    const pts: Vec2[] = [];
-    for (let i = 0; i <= 16; i++) pts.push([x + Math.cos((i / 16) * Math.PI * 2) * 1.6, y + Math.sin((i / 16) * Math.PI * 2) * 1.6]);
-    line(pts);
-  }
-  if (sym.field) {
-    line([[x, y], [x, y - 7]]);
-    polys.push({ layer: "dim", fill: true, pts: [[x, y - 7], [x + 4, y - 5.5], [x, y - 4], [x, y - 7]] });
-  }
-  if (sym.note) texts.push({ x: x + L + 2, y: y + 1.1, s: sym.note, size: 3, layer: "text" });
-  return { polys, texts };
-}
+export { beadData, weldLength, weldTable, weldTableText, weldTableCsv, type BeadData, type WeldRow } from "./weld-table";
+export { SYMBOL_TYPES, symbolData, weldSymbolGeometry, type SymbolData, type SymbolKind } from "./weld-symbol";

@@ -1,0 +1,204 @@
+# 8. vlna – svary: tupé svary s úpravou ISO 9692-1, koutové (a/z, oboustranné, kolem), děrové, bodové, svarový kov, tabulka svarů, značky ISO 2553, příkaz svar
+Poz. | Prvek | Typ | Velikost | Délka | Ks | Průřez | Objem | Svarový kov | Přídavný materiál | Metoda	Pos. | Element | Art | Größe | Länge | Stk | Querschnitt | Volumen | Schweißgut | Zusatzwerkstoff | Verfahren
+ (rohový spoj)	 (Eckstoß)
+ (T spoj)	 (T-Stoß)
+(bez výsledku – přestavte model)	(kein Ergebnis – Modell neu berechnen)
+{0}× rozteč {1}	{0}× Teilung {1}
+* odhad z parametrů prvku (bez geometrie)	* Schätzung aus den Elementparametern (ohne Geometrie)
+0 = podle metody	0 = nach Verfahren
+0 = podle metody (135: 0,9)	0 = nach Verfahren (135: 0,9)
+0 = z modelu	0 = aus dem Modell
+½V – jednostranný úkos (HV)	½V – HV-Naht (einseitige Fase)
+½Y – úkos s velkým otupením (HY)	½Y – HY-Naht (Fase mit Steg)
+½Y svar	HY-Naht
+111 – obalená elektroda (MMA)	111 – Lichtbogenhandschweißen (E-Hand)
+121 – pod tavidlem (SAW)	121 – Unterpulverschweißen (UP)
+131 – MIG	131 – MIG
+135 – MAG	135 – MAG
+136 – MAG plněnou elektrodou	136 – MAG mit Fülldrahtelektrode
+138 – MAG kovovým práškem	138 – MAG mit Metallpulverfülldraht
+141 – TIG	141 – WIG
+21 – bodové odporové	21 – Widerstandspunktschweißen
+2J – oboustranný J	2J – Doppel-J-Naht
+2J svar	Doppel-J-Naht
+2U – oboustranný U	2U – Doppel-U-Naht
+2U svar	Doppel-U-Naht
+a – účinná tloušťka	a – Nahtdicke
+a = z/√2 = {0} mm (kout 90°), průřez z²/2 = {1} mm²	a = z/√2 = {0} mm (90°-Ecke), Querschnitt z²/2 = {1} mm²
+Aktivní těleso vrací prvek výsledkem stavby.	Der aktive Körper wird als Ergebnis des Elements zurückgegeben.
+bez přídavného materiálu	ohne Zusatzwerkstoff
+Bod hrany / plochy musí mít tři souřadnice x y z.	Ein Kanten- / Flächenpunkt braucht drei Koordinaten x y z.
+Bod v poloze {0} mm leží mimo vybranou plochu – zmenšete rozteč nebo počet.	Der Punkt bei {0} mm liegt außerhalb der gewählten Fläche – Teilung oder Anzahl verkleinern.
+bodový {0}×{1}	Punkt {0}×{1}
+bodový Ø{0}	Punkt Ø{0}
+Bodový svar	Punktschweißung
+Celkem: {0} svarů · délka {1} mm · objem {2} cm³ · svarový kov {3} kg · přídavný materiál ≈ {4} kg	Gesamt: {0} Nähte · Länge {1} mm · Volumen {2} cm³ · Schweißgut {3} kg · Zusatzwerkstoff ≈ {4} kg
+Čelo dílu (plocha)	Stirnfläche des Teils (Fläche)
+Čelo připravovaného dílu, které se dotýká druhého dílu (konec plechu, spodní čelo stojiny).	Stirnfläche des vorbereiteten Teils, die das andere Teil berührt (Blechende, Unterseite des Stegs).
+Čelo spoje (plocha)	Fugenfläche (Fläche)
+Čelo spoje má nulový rozměr.	Die Fugenfläche hat die Größe null.
+Čelo spoje musí být rovinná plocha (čelo plechu nebo profilu).	Die Fugenfläche muss eben sein (Stirnseite eines Blechs oder Profils).
+Čelo spoje nemá rovnou hranu – tupý svar s úpravou lze zatím vést jen po rovné spáře.	Die Fugenfläche hat keine gerade Kante – eine vorbereitete Stumpfnaht ist vorerst nur an einer geraden Fuge möglich.
+Délka žlábku l (0 = kruhový otvor)	Schlitzlänge l (0 = rundes Loch)
+delší strany plochy	der längeren Flächenseite
+děrový {0}×	Lochnaht {0}×
+děrový / bodový svar se zadává plochou horního plechu: … plocha F3 (nebo plocha horní)	Loch- / Punktnaht wird über die Fläche des oberen Blechs angegeben: … fläche F3 (oder fläche oben)
+Děrový / žlábkový	Loch- / Schlitznaht
+děrový / žlábkový svar: otvory v horním plechu (tloušťka z modelu) vyplněné svarem; bodový: značky bodů Ø d (bez přídavného materiálu); řada po delší (kratší) straně plochy, vystředěná	Loch- / Schlitznaht: Löcher im oberen Blech (Dicke aus dem Modell) mit Schweißgut gefüllt; Punkt: Punktmarken Ø d (ohne Zusatzwerkstoff); zentrierte Reihe entlang der längeren (kürzeren) Flächenseite
+děrový Ø{0}	Lochnaht Ø{0}
+Děrový svar	Lochnaht
+Druhou stranu stěny u hrany {0} se nepodařilo najít – vyberte obě hrany ručně.	Die andere Wandseite an Kante {0} wurde nicht gefunden – beide Kanten manuell wählen.
+Horní plocha horního plechu	Oberseite des oberen Blechs
+Housenka je prázdná – zkontrolujte délku úseku a rozteč.	Die Naht ist leer – Abschnittslänge und Teilung prüfen.
+Housenka je rovnoramenný trojúhelník z × z v koutu (rovné hrany i oblouky); kolem = celá uzavřená smyčka koutu s vyplněnými rohy. Délka, průřez, hmotnost svarového kovu a přídavný materiál jsou ve stavu prvku a v Tabulce svarů.	Die Naht ist ein gleichschenkliges Dreieck z × z in der Ecke (gerade Kanten und Bögen); ringsum = die ganze geschlossene Eckschleife mit gefüllten Ecken. Länge, Querschnitt, Schweißgutmasse und Zusatzwerkstoff stehen im Elementstatus und in der Schweißnahttabelle.
+Housenku lze vést po rovné hraně nebo oblouku (hrana {0}).	Eine Naht kann einer geraden Kante oder einem Bogen folgen (Kante {0}).
+Hrana {0} patří svaru – vyberte hranu spojovaného dílu.	Kante {0} gehört zu einer Naht – eine Kante eines gefügten Teils wählen.
+Hrana čela na straně svaru (strana šipky), nebo vnitřní kout sloučeného T / rohového spoje.	Kante der Stirnfläche auf der Nahtseite (Pfeilseite) oder die innere Ecke eines vereinigten T- / Eckstoßes.
+Hrana není vnitřní (konkávní) a nedotýká se jiného dílu – housenka se dělá do koutu mezi dvěma plochami nebo dvěma díly.	Die Kante ist nicht konkav und berührt kein anderes Teil – eine Naht liegt in einer Ecke zwischen zwei Flächen oder zwei Teilen.
+Hrana spáry / kout	Fugenkante / Ecke
+Hrana spoje (šipka na výkrese)	Fugenkante (Pfeil in der Zeichnung)
+Hustota svarového kovu {0} g/cm³; přídavný materiál = hmotnost / účinnost navaření (135 MAG: 0,9).	Dichte des Schweißguts {0} g/cm³; Zusatzwerkstoff = Masse / Ausbringung (135 MAG: 0,9).
+chyba stavby: {0}	Berechnungsfehler: {0}
+I – bez úpravy (mezera)	I – I-Naht (Spalt)
+i na druhé straně stěny	auch auf der anderen Wandseite
+ISO 2553 – ruční značka (bez geometrie); s hranou ukáže šipkou na výkrese, jinak v seznamu značek	ISO 2553 – manuelles Symbol (ohne Geometrie); mit Kante zeigt es per Pfeil in der Zeichnung, sonst in der Symbolliste
+J – jednostranný J	J – J-Naht
+J svar	J-Naht
+Jádro nepodporuje samostatná tělesa svarů.	Der Kern unterstützt keine separaten Nahtkörper.
+jen s mezerou	nur mit Spalt
+K – oboustranný úkos	K – K-Naht (Doppel-HV)
+K hraně {0} nepřiléhá druhý díl – vyberte hranu čela, které se dotýká druhého dílu (nebo čelo samotné).	An Kante {0} liegt kein anderes Teil an – eine Kante der Stirnfläche wählen, die das andere Teil berührt (oder die Fläche selbst).
+K svar	K-Naht
+Klikněte na vnitřní hranu koutu, nebo na spodní hranu dílu stojícího na jiném dílu.	Auf die innere Eckkante klicken oder auf die Unterkante eines Teils, das auf einem anderen Teil steht.
+kolem	ringsum
+Kolem	Ringsum
+Kolem hrany {0} není uzavřený kout (svar kolem potřebuje uzavřenou smyčku, např. profil postavený na desce).	Um Kante {0} gibt es keine geschlossene Ecke (eine Ringsumnaht braucht eine geschlossene Schleife, z. B. ein Profil auf einer Platte).
+koutový {0}{1}	Kehlnaht {0}{1}
+koutový přerušovaný {0}×{1} ({2})	unterbrochene Kehlnaht {0}×{1} ({2})
+Koutový svar	Kehlnaht
+koutový svar a (účinná tloušťka, z = a·√2; „z7“ = rameno) do koutu dvou ploch nebo dvou dílů; oboustranně = i druhá strana stěny, kolem = celá smyčka (profil na desce, i oblouky); svarový kov = těleso „Svar k“	Kehlnaht a (Nahtdicke, z = a·√2; „z7“ = Schenkel) in die Ecke zweier Flächen oder Teile; beidseitig = auch die andere Wandseite, ringsum = die ganze Schleife (Profil auf Platte, auch Bögen); Schweißgut = Körper „Svar k“
+koutový svar a (z = a·√2) do koutu dvou ploch nebo dvou dílů; oboustranný, kolem, přerušovaný	Kehlnaht a (z = a·√2) in die Ecke zweier Flächen oder Teile; beidseitig, ringsum, unterbrochen
+koutový svar potřebuje velikost: svar koutový a5 hrany …	eine Kehlnaht braucht eine Größe: naht kehlnaht a5 kanten …
+koutový svar se zadává hranami koutu: … hrany E7;E9 (nebo pravidlem)	eine Kehlnaht wird über Eckkanten angegeben: … kanten E7;E9 (oder eine Regel)
+kratší strany plochy	der kürzeren Flächenseite
+Metoda (ISO 4063)	Verfahren (ISO 4063)
+mezera {0}	Spalt {0}
+mezera {0} 	Spalt {0} 
+Mezera b	Spalt b
+Mezera v modelu {0} mm je větší než zadaná {1} mm – počítá se se skutečnou.	Der Spalt im Modell ({0} mm) ist größer als die angegebenen {1} mm – es wird mit dem tatsächlichen gerechnet.
+Mezera, otupení i převýšení musí být nezáporné.	Spalt, Steg und Überhöhung dürfen nicht negativ sein.
+montážní	Baustelle
+nebo hrana spáry	oder Fugenkante
+Není těleso – nejdřív vytvořte plechy přeplátovaného spoje.	Kein Körper – zuerst die Bleche des Überlappstoßes erzeugen.
+Není těleso – nejdřív vytvořte plechy.	Kein Körper – zuerst die Bleche erzeugen.
+Není těleso – nejdřív vytvořte spojované díly.	Kein Körper – zuerst die zu fügenden Teile erzeugen.
+neznámá úprava „{0}“	unbekannte Fugenvorbereitung „{0}“
+Neznámá úprava svarových ploch „{0}“ – {1}.	Unbekannte Fugenvorbereitung „{0}“ – {1}.
+neznámý druh svaru „{0}“ – koutový, tupý (V, Y, X, U, 2U, ½V, ½Y, K, J, 2J, I), děrový, žlábkový, bodový, tabulka	unbekannte Nahtart „{0}“ – kehlnaht, stumpf (V, Y, X, U, 2U, ½V, ½Y, K, J, 2J, I), lochnaht, schlitznaht, punkt, tabelle
+objem {0} cm³	Volumen {0} cm³
+Objem svarového kovu z geometrie ({0} mm³) se liší od průřezu × délky ({1} mm³).	Das Schweißgutvolumen aus der Geometrie ({0} mm³) weicht von Querschnitt × Länge ({1} mm³) ab.
+Objem svarového kovu z geometrie ({0} mm³) se liší od výpočtu ({1} mm³).	Das Schweißgutvolumen aus der Geometrie ({0} mm³) weicht von der Berechnung ({1} mm³) ab.
+Oblouk hrany se nepodařilo určit.	Der Bogen der Kante konnte nicht bestimmt werden.
+oboustranně	beidseitig
+oboustranný	beidseitig
+Oboustranný	Beidseitig
+Obrátit stranu svaru	Nahtseite umkehren
+otupení {0}	Steg {0}
+otupení {0} 	Steg {0} 
+Otupení {0} mm musí být menší než tloušťka {1} mm.	Steg {0} mm muss kleiner als die Dicke {1} mm sein.
+Otupení c	Steg c
+Otvor v poloze {0} mm leží mimo vybranou plochu – zmenšete rozteč nebo počet.	Das Loch bei {0} mm liegt außerhalb der gewählten Fläche – Teilung oder Anzahl verkleinern.
+otvory Ø d (žlábky l × d) v horním plechu vyplněné svarem – přeplátovaný spoj	Löcher Ø d (Schlitze l × d) im oberen Blech mit Schweißgut gefüllt – Überlappstoß
+Plocha {0} patří svaru – vyberte plochu spojovaného dílu.	Fläche {0} gehört zu einer Naht – eine Fläche eines gefügten Teils wählen.
+Plocha horního plechu	Fläche des oberen Blechs
+Plocha patří svaru – vyberte plochu plechu.	Die Fläche gehört zu einer Naht – eine Blechfläche wählen.
+po celé uzavřené smyčce koutu	entlang der ganzen geschlossenen Eckschleife
+Počet bodů	Anzahl Punkte
+podložka	Badsicherung
+Podložka se modeluje jen u tupého spoje.	Eine Badsicherung wird nur beim Stumpfstoß modelliert.
+Poloměr dna R	Fugenradius R
+Poloměr dna R (U, J)	Fugenradius R (U, J)
+Pozice;Prvek;Typ;Velikost;Délka [mm];Ks;Průřez [mm²];Objem [cm³];Svarový kov [kg];Přídavný materiál [kg];Metoda	Position;Element;Art;Größe;Länge [mm];Stk;Querschnitt [mm²];Volumen [cm³];Schweißgut [kg];Zusatzwerkstoff [kg];Verfahren
+Průměr / šířka otvoru d	Lochdurchmesser / -breite d
+Průměr / šířka otvoru musí být kladná.	Lochdurchmesser / -breite muss positiv sein.
+Průměr bodu d	Punktdurchmesser d
+Průměr bodu musí být kladný.	Der Punktdurchmesser muss positiv sein.
+průřez {0} mm²	Querschnitt {0} mm²
+Prvek {0} není načten.	Element {0} ist nicht geladen.
+přerušovaný {0}/{1}	unterbrochen {0}/{1}
+Převýšení (kruhový otvor)	Überhöhung (rundes Loch)
+Převýšení housenky	Nahtüberhöhung
+Převýšení kořene	Wurzelüberhöhung
+přídavný materiál ≈ {0} kg ({1}, η {2})	Zusatzwerkstoff ≈ {0} kg ({1}, η {2})
+Rameno z	Schenkellänge z
+Rozteč e	Teilung e
+Řada podél	Reihe entlang
+sloučit	vereinigen
+Spoj vybírám v modelu jako	Stoß im Modell wählen als
+Svar I potřebuje mezeru větší než 0.	Eine I-Naht braucht einen Spalt größer als 0.
+svar potřebuje druh: svar koutový a5 hrany … | svar tupý V 60 … | svar děrový Ø12 … | svar bodový Ø6 … | svar tabulka	naht braucht eine Art: naht kehlnaht a5 kanten … | naht stumpf V 60 … | naht lochnaht Ø12 … | naht punkt Ø6 … | naht tabelle
+svar: bod hrany / plochy má tři souřadnice: hrana u x y z [; x y z]	naht: ein Kanten- / Flächenpunkt hat drei Koordinaten: kante bei x y z [; x y z]
+svar: chybí hrany – … hrany E7;E9, pravidlo (svislé, horní…) nebo hrana u x y z	naht: Kanten fehlen – … kanten E7;E9, eine Regel (senkrecht, oben…) oder kante bei x y z
+svar: chybí plocha – … plocha F3, pravidlo (horní, +Z…) nebo plocha u x y z	naht: Fläche fehlt – … fläche F3, eine Regel (oben, +Z…) oder fläche bei x y z
+svar: metoda je číslo ISO 4063 (111, 131, 135, 136, 141, 21)	naht: das Verfahren ist eine ISO-4063-Nummer (111, 131, 135, 136, 141, 21)
+svar: neznámé slovo „{0}“	naht: unbekanntes Wort „{0}“
+svar: za „{0}“ chybí číslo	naht: nach „{0}“ fehlt eine Zahl
+svar: zadejte buď čísla (E7;E9), nebo pravidlo – ne obojí	naht: entweder Nummern (E7;E9) oder eine Regel angeben – nicht beides
+svarový kov {0} kg	Schweißgut {0} kg
+Svarový kov jako těleso	Schweißgut als Körper
+Svarový kov jako těleso „Svar k“	Schweißgut als Körper „Svar k“
+Svarový kov se nepodařilo vytvořit.	Das Schweißgut konnte nicht erzeugt werden.
+Svary:	Schweißnähte:
+Šikmý T / rohový spoj (úhel stěn ≠ 90°) zatím jen koutovým svarem.	Ein schräger T- / Eckstoß (Wandwinkel ≠ 90°) ist vorerst nur mit einer Kehlnaht möglich.
+tabulka svarů: délka, průřez, objem, hmotnost svarového kovu a přídavný materiál každého svaru se součty	Schweißnahttabelle: Länge, Querschnitt, Volumen, Schweißgutmasse und Zusatzwerkstoff jeder Naht mit Summen
+těleso „{0}“	Körper „{0}“
+Tloušťka horního plechu (0 = z modelu)	Dicke des oberen Blechs (0 = aus dem Modell)
+Tloušťka svařovaného dílu musí být kladná.	Die Dicke des geschweißten Teils muss positiv sein.
+Tloušťka t	Dicke t
+Tloušťka t (0 = z modelu)	Dicke t (0 = aus dem Modell)
+Tloušťku horního plechu se nepodařilo změřit – zadejte ji (t).	Die Dicke des oberen Blechs konnte nicht gemessen werden – bitte angeben (t).
+Tloušťku stěny se nepodařilo změřit – zadejte ji (t).	Die Wanddicke konnte nicht gemessen werden – bitte angeben (t).
+tupý {0}	Stumpfnaht {0}
+tupý {0}{1}	Stumpfnaht {0}{1}
+Tupý svar	Stumpfnaht
+Tupý svar {0}	Stumpfnaht {0}
+tupý svar s úpravou ISO 9692-1 pro tupý, T i rohový spoj: plocha = čelo připravovaného dílu u druhého dílu, hrana = hrana čela na straně svaru nebo vnitřní kout sloučeného tělesa; úprava se vyřízne do dílů, svarový kov (+ převýšení) = těleso „Svar k“	Stumpfnaht mit Fugenvorbereitung nach ISO 9692-1 für Stumpf-, T- und Eckstoß: Fläche = Stirnfläche des vorbereiteten Teils am anderen Teil, Kante = deren Kante auf der Nahtseite oder die innere Ecke eines vereinigten Körpers; die Vorbereitung wird in die Teile geschnitten, Schweißgut (+ Überhöhung) = Körper „Svar k“
+Tupý svar s úpravou lze zatím vést jen po rovné hraně.	Eine vorbereitete Stumpfnaht ist vorerst nur an einer geraden Kante möglich.
+U – jednostranný U	U – U-Naht
+U bodu [{0}] není žádná hrana (nejbližší je dál než 1 mm).	Am Punkt [{0}] liegt keine Kante (die nächste ist weiter als 1 mm).
+U bodu [{0}] není žádná plocha (nejbližší je dál než 1 mm).	Am Punkt [{0}] liegt keine Fläche (die nächste ist weiter als 1 mm).
+Účinná tloušťka a	Nahtdicke a
+Účinnost navaření	Ausbringung
+Úhel rozevření α	Öffnungswinkel α
+Úhel úkosu β	Flankenwinkel β
+Úhel úpravy musí být v rozsahu 0–{0}°.	Der Fugenwinkel muss zwischen 0 und {0}° liegen.
+Úhel α / β	Winkel α / β
+Úprava (ISO 9692-1)	Fugenvorbereitung (ISO 9692-1)
+Úprava {0} je pro tupý spoj dvou dílů – u vnitřního koutu použijte ½V, ½Y, K, J nebo 2J, nebo vyberte čelo dílu.	Die Vorbereitung {0} ist für den Stumpfstoß zweier Teile – für eine innere Ecke ½V, ½Y, K, J oder 2J verwenden oder die Stirnfläche eines Teils wählen.
+Úprava {0} potřebuje poloměr dna R > 0.	Die Vorbereitung {0} braucht einen Fugenradius R > 0.
+úprava I, V, Y, X, U, ½V, K, J (ISO 9692-1) vyříznutá do dílů + svarový kov jako těleso; tupý, T i rohový spoj	Fugenvorbereitung I, V, Y, X, U, ½V, K, J (ISO 9692-1) in die Teile geschnitten + Schweißgut als Körper; Stumpf-, T- und Eckstoß
+Úprava se vyřízne do spojovaných dílů (souměrné V, Y, X, U, 2U do obou, ½V, ½Y, K, J, 2J jen do vybraného), svarový kov s převýšením je těleso „Svar k“, podložka „Podložka k“. Náhled kreslí průřez pro zadanou tloušťku (0 = 10 mm, skutečná se změří v modelu).	Die Vorbereitung wird in die gefügten Teile geschnitten (symmetrische V, Y, X, U, 2U in beide, ½V, ½Y, K, J, 2J nur in das gewählte); das Schweißgut mit Überhöhung ist der Körper „Svar k“, die Badsicherung „Podložka k“. Die Vorschau zeigt den Querschnitt für die angegebene Dicke (0 = 10 mm, die tatsächliche wird im Modell gemessen).
+Úpravu svarových ploch se nepodařilo vyříznout do tělesa „{0}“ – zkontrolujte rozměry úpravy.	Die Fugenvorbereitung konnte nicht in den Körper „{0}“ geschnitten werden – Maße der Vorbereitung prüfen.
+V – jednostranný V	V – V-Naht
+V, Y, X: celkový úhel rozevření α; ½V, K, U, J: úhel úkosu / boku β	V, Y, X: gesamter Öffnungswinkel α; ½V, K, U, J: Flankenwinkel β
+Ve směru čela spoje do {0} mm není druhý díl – úprava se udělá jen na vybraném dílu.	Vor der Fugenfläche liegt bis {0} mm kein anderes Teil – die Vorbereitung erfolgt nur am gewählten Teil.
+Velikost je	Größe ist
+Velikost svaru	Nahtgröße
+vlastní těleso „Svar k“ (jinak se sloučí s dílem)	eigener Körper „Svar k“ (sonst mit dem Teil vereinigt)
+Vyberte čelo spoje (plochu) nebo hranu spáry na straně svaru.	Fugenfläche oder Fugenkante auf der Nahtseite wählen.
+Vyberte horní plochu horního plechu.	Oberseite des oberen Blechs wählen.
+Vyberte rovinnou plochu horního plechu.	Eine ebene Fläche des oberen Blechs wählen.
+X – oboustranný V	X – X-Naht (Doppel-V)
+X svar (2V)	X-Naht (Doppel-V)
+Y – V s velkým otupením	Y – Y-Naht (V mit Steg)
+Y svar	Y-Naht
+z – rameno	z – Schenkellänge
+z = a·√2 = {0} mm (kout 90°), průřez a² = {1} mm²	z = a·√2 = {0} mm (90°-Ecke), Querschnitt a² = {1} mm²
+značka u hrany {0}	Symbol an Kante {0}
+značky bodových svarů Ø d s roztečí e na ploše přeplátování (bez přídavného materiálu)	Punktschweißmarken Ø d mit Teilung e auf der Überlappfläche (ohne Zusatzwerkstoff)
+Žádné svary (přidejte Svarovou housenku, Tupý svar, Děrový / Bodový svar nebo Značku svaru).	Keine Schweißnähte (Schweißraupe, Stumpfnaht, Loch- / Punktnaht oder Nahtsymbol hinzufügen).
+žlábkový {0}× l {1}	Schlitznaht {0}× l {1}
+žlábkový {0}×{1}	Schlitznaht {0}×{1}
+Žlábkový svar	Schlitznaht
+žlábkový svar potřebuje délku žlábku: svar žlábkový 30×10 … nebo délka 30 Ø10	eine Schlitznaht braucht eine Schlitzlänge: naht schlitznaht 30x10 … oder länge 30 Ø10
+Průřez svarového kovu ≈ {0} mm² (t = {1} mm) · {2} kg/m	Schweißgutquerschnitt ≈ {0} mm² (t = {1} mm) · {2} kg/m

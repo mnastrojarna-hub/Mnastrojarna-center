@@ -631,10 +631,10 @@ async function share(host: ApiHost, o: ShareApiOptions = {}) {
   const doc = host.doc();
   if (emptyDocLike(doc)) throw new Error(tr("Prázdný dokument nelze sdílet – nejdřív vytvořte nebo otevřete díl."));
   if (o.view !== undefined && o.view !== "model" && o.view !== "drawing") throw new Error(tr("share: view je model | drawing"));
-  if (o.mode !== undefined && o.mode !== "link" && o.mode !== "store") throw new Error(tr("share: mode je link | store"));
+  if (o.mode !== undefined && o.mode !== "link" && o.mode !== "store" && o.mode !== "self") throw new Error(tr("share: mode je link | store | self"));
   if (o.days !== undefined && o.days !== null && !(typeof o.days === "number" && o.days > 0)) throw new Error(tr("share: days je počet dní (např. 10) nebo null = bez omezení"));
   const r = await createShareLink(doc, { days: o.days === undefined ? SHARE_DEFAULT_DAYS : o.days, password: o.password || undefined, from: o.from || undefined, view: o.view ?? "model", mode: o.mode });
-  return { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, message: shareMessage(doc.name, r) };
+  return { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, message: shareMessage(doc.name, r), chars: r.url.length, ...(r.note ? { note: r.note } : {}) };
 }
 
 /* ───────────────────────── výběr ───────────────────────── */

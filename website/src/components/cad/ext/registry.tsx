@@ -5,7 +5,7 @@
 import type { ComponentType } from "react";
 import type { BuildResult, CadDoc, Feature, Vec3 } from "@/cad/types";
 import type { SelItem } from "../selection";
-import "@/cad/ext/index";
+import { getExt } from "@/cad/ext/index";
 
 export type ExtFormProps = {
   f: Extract<Feature, { type: "ext" }>;
@@ -37,6 +37,8 @@ export type ExtUi = {
   onFacePick?: (a: { f: Extract<Feature, { type: "ext" }>; index: number; point: Vec3 }) => Promise<Record<string, unknown> | string | null> | Record<string, unknown> | string | null;
   /** výzva v řádku příkazů při úpravě prvku */
   prompt?: (f: Extract<Feature, { type: "ext" }>) => string;
+  /** co se při úpravě vybírá v modelu, závisí-li to na datech prvku (tupý svar: plocha čela / hrana spáry); jinak `pick` z registru jádra */
+  pick?: (f: Extract<Feature, { type: "ext" }>) => { kind: "faces" | "edges"; key: string } | undefined;
 };
 
 const ui = new Map<string, ExtUi>();
@@ -44,3 +46,5 @@ export function registerExtUi(ext: string, def: ExtUi) {
   ui.set(ext, { ...(ui.get(ext) ?? {}), ...def });
 }
 export const getExtUi = (ext: string) => ui.get(ext);
+/** výběr v modelu při úpravě prvku rozšíření (podle dat prvku, jinak podle registru jádra) */
+export const extPickOf = (f: Extract<Feature, { type: "ext" }>) => ui.get(f.ext)?.pick?.(f) ?? getExt(f.ext)?.pick;

@@ -727,7 +727,6 @@ Profil;Ks;Délka celkem [m];Hmotnost [kg]	Profil;Stk;Gesamtlänge [m];Masse [kg]
 Rozměr	Abmessung
 Rozměry rámu jsou menší než dvojnásobek profilu.	Die Rahmenmaße sind kleiner als das Doppelte des Profils.
 Střed	Mitte
-Svarový kov celkem: {0} kg	Schweißgut gesamt: {0} kg
 Tloušťka stěny	Wanddicke
 Tloušťka stěny jäklu je příliš velká.	Die Wanddicke des Hohlprofils ist zu groß.
 Tloušťka stěny trubky je příliš velká.	Die Wanddicke des Rohrs ist zu groß.
@@ -747,7 +746,6 @@ Vpravo nahoře	Rechts oben
 Úsečka profilu má nulovou délku.	Die Profillinie hat die Länge null.
 Čtyřhranná tyč	Vierkantstahl
 Žádné konstrukční profily (přidejte prvek Konstrukční profil nebo Rám z profilů).	Keine Konstruktionsprofile (fügen Sie das Feature Konstruktionsprofil oder Profilrahmen hinzu).
-Žádné svary (přidejte Svarovou housenku nebo Značku svaru).	Keine Schweißnähte (fügen Sie eine Schweißraupe oder ein Schweißsymbol hinzu).
 
 # ext/weld
 + (kladná)	+ (positiv)
@@ -760,12 +758,9 @@ Díra je větší než deska.	Die Bohrung ist größer als die Platte.
 Díry v řadě (X)	Bohrungen je Reihe (X)
 Díry ve sloupci (Y)	Bohrungen je Spalte (Y)
 Hloubka rámu (Y)	Rahmentiefe (Y)
-Housenku lze zatím vést jen po rovné hraně.	Eine Raupe kann vorerst nur entlang einer geraden Kante geführt werden.
 Hrana musí ležet mezi dvěma plochami tělesa.	Die Kante muss zwischen zwei Flächen des Körpers liegen.
-Hrana není vnitřní (konkávní) – housenka se dělá jen do vnitřního rohu mezi dvěma plochami.	Die Kante ist nicht innen (konkav) – eine Raupe wird nur in die Innenecke zwischen zwei Flächen gelegt.
 Hrana {0} v tělese neexistuje – vyberte ji znovu.	Kante {0} existiert im Körper nicht – wählen Sie sie erneut.
 Hrany koutu	Kehlkanten
-ISO 2553 – uloží se k dílu, zobrazí se v tabulce svarů a na výkresu	ISO 2553 – wird beim Teil gespeichert, in der Schweißtabelle und auf der Zeichnung angezeigt
 Jako samostatná tělesa	Als getrennte Körper
 Konstrukční profil	Konstruktionsprofil
 Kusovník řezů	Zuschnittliste
@@ -782,7 +777,6 @@ Plocha {0} v tělese neexistuje – vyberte ji znovu.	Fläche {0} existiert im K
 Plochy styčníku jsou rovnoběžné – vyberte dvě plochy svírající úhel.	Die Knotenblechflächen sind parallel – wählen Sie zwei Flächen, die einen Winkel bilden.
 Plochá	Flach
 Pokos	Gehrung
-Poznámka (metoda, ISO 4063)	Anmerkung (Verfahren, ISO 4063)
 Prodloužit konec	Ende verlängern
 Prodloužit začátek	Anfang verlängern
 Profil má po zkrácení nulovou délku.	Das Profil hat nach dem Kürzen die Länge null.
@@ -816,7 +810,6 @@ Tupý	Stumpf
 Typ svaru	Nahtart
 Velikost (UPN/IPE/HEB)	Größe (UPN/IPE/HEB)
 Velikost a / s	Größe a / s
-Velikost svaru a	Nahtdicke a
 Velikost svaru musí být kladná.	Die Nahtdicke muss positiv sein.
 Vyberte hranu vnitřního rohu v modelu.	Wählen Sie eine Innenkante im Modell.
 Vyberte přesně dvě rovinné plochy, které svírají roh.	Wählen Sie genau zwei ebene Flächen, die eine Ecke bilden.
@@ -835,7 +828,6 @@ Značka svaru	Schweißsymbol
 destička na otevřený konec profilu (vyberte čelní plochy)	Platte auf dem offenen Profilende (wählen Sie die Stirnflächen)
 délky a úhly řezů profilů, hmotnosti, CSV	Zuschnittlängen und -winkel der Profile, Massen, CSV
 délky svarů a svarový kov	Nahtlängen und Schweißgut
-koutový svar a×a podél vnitřní hrany (vyberte hrany)	Kehlnaht a×a entlang einer Innenkante (wählen Sie die Kanten)
 kvádrový rám: dva obdélníky (pokos) + 4 sloupky	Quaderrahmen: zwei Rechtecke (Gehrung) + 4 Pfosten
 obdélníková deska (patka, příložka) s volitelným polem děr	rechteckige Platte (Fußplatte, Lasche) mit optionalem Bohrungsmuster
 odřízne vše na jedné straně roviny (zkrácení profilů)	schneidet alles auf einer Seite der Ebene ab (Kürzen von Profilen)

@@ -22,6 +22,7 @@ import type { CadDoc, ComponentSource, ExportFormat, Feature, MeshData } from ".
 import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark, setPerfSink } from "./perf-log";
 import { formNotesOfDoc } from "./drawing-doc";
+import { hasWelds, weldMarksOf } from "./drawing-welds";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 
@@ -328,7 +329,9 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         // Chytré kóty: list bez zapečených kót (s místem navíc) + plán kót podle prvků jako upravitelné poznámky (cad/drawing-dims.ts)
         const smart = m.opts?.dimensions === "smart" && dd.kind !== "assembly";
         // poznámky k plechu (křížový zlom) do patičky – z dokumentu, pokud je volající nedodal
-        const meta: DrawingMeta = m.meta.formNotes ? m.meta : { ...m.meta, formNotes: formNotesOfDoc(m.doc) };
+        let meta: DrawingMeta = m.meta.formNotes ? m.meta : { ...m.meta, formNotes: formNotesOfDoc(m.doc) };
+        // značky svarů ISO 2553 z 3D svarů (stav prvků po stavbě – mezipaměť stavby) – drawing-welds.ts
+        if (!meta.welds && hasWelds(dd)) meta = { ...meta, welds: weldMarksOf(dd, (await buildShape(dd)).status) };
         ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(body, m.doc, meta, m.opts, extra) : makeDrawing(body, meta, m.opts, extra) });
         break;
       }

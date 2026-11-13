@@ -24,7 +24,7 @@ import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
 import { findLoops, nestLoops, shapeSegs, splinePoints, type Loop, type Seg } from "./sketch";
 import { hasTangents } from "./spline-tangent";
 import { sketchSplineEdge } from "./spline-occ";
-import { takeFeatureNotes } from "./feature-notes";
+import { takeFeatureInfo, takeFeatureNotes } from "./feature-notes";
 import type { Axis, BodyInfo, BoolMode, BuildResult, CadDoc, FaceInfo, Feature, FeatureStatus, MeshData, PlaneName, SketchPlane, Vec2, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -807,8 +807,10 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
   const ctxOf = (): Ctx => ({ sketches, body, features });
   /** Dokončení prvku: kontrola, že se operace projevila a že výsledek je platné objemové těleso → ✓ / ⚠ / ✗. */
   const finish = (f: Feature, next: Shape | null): Shape | null => {
+    const info = takeFeatureInfo(); // výsledek prvku (svarový kov) do stavu
+    const extra = info ? { info: info.text, ...(info.data ? { data: info.data } : {}) } : {};
     if (next === body || !next) {
-      status.push({ id: f.id, ok: true });
+      status.push({ id: f.id, ok: true, ...extra });
       return next;
     }
     // velký import do prázdného dílu: podpis (objem) a kontrola platnosti by trvaly desítky sekund – podpis se nevytvoří
@@ -839,7 +841,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     bodySig = sig;
     const notes = takeFeatureNotes(); // přiblížení / nedosažená návaznost ohlášené stavitelem (feature-notes.ts)
     if (notes.length) warning = [warning, ...notes].filter(Boolean).join(" ");
-    status.push(warning ? { id: f.id, ok: true, warning } : { id: f.id, ok: true });
+    status.push(warning ? { id: f.id, ok: true, warning, ...extra } : { id: f.id, ok: true, ...extra });
     return next;
   };
 
@@ -932,6 +934,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     const tFeature = Date.now();
     const nStatus = status.length;
     takeFeatureNotes(); // hlášky předchozího (např. neúspěšného) prvku zahodit
+    takeFeatureInfo();
     opts.onProgress?.({ index: i, total: doc.features.length, id: f.id, name: f.name, type: f.type, phase: "feature" });
     try {
       if (f.body && f.body !== activeName) {
@@ -1153,7 +1156,11 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
           const def = getExt(f.ext);
           if (!def) throw new Error(tr("Neznámý prvek rozšíření „{0}“ – modul není načten.", f.ext));
           if (!def.build) break;
-          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools, bodies: new Map<string, Shape>([...(body ? [[activeName, body] as [string, Shape]] : []), ...others]), activeBody: activeName, resolvePlane: (pd) => resolvePlaneDef(rctx(ctxOf()), pd), resolvePoint: (ref) => pointOf(rctx(ctxOf()), ref, tr("bod prvku")), resolveDirection: (dd, base) => resolveDirection(rctx(ctxOf()), dd, base ?? { normal: [0, 0, 1] }), resolveAxis: (ad, sid) => resolveAxis(rctx(ctxOf()), ad, sid ? (sketches.get(sid) ?? null) : null) });
+          const putBody = (name: string, shape: Shape) => {
+            if (name === activeName) throw new Error(tr("Aktivní těleso vrací prvek výsledkem stavby."));
+            others.set(name, shape); // svarový kov (weld-kernel.ts): nové těleso / úprava dalšího tělesa
+          };
+          const out = await def.build(f.data ?? {}, { body, sketches, doc, index: i, featureId: f.id, tools, bodies: new Map<string, Shape>([...(body ? [[activeName, body] as [string, Shape]] : []), ...others]), activeBody: activeName, resolvePlane: (pd) => resolvePlaneDef(rctx(ctxOf()), pd), resolvePoint: (ref) => pointOf(rctx(ctxOf()), ref, tr("bod prvku")), resolveDirection: (dd, base) => resolveDirection(rctx(ctxOf()), dd, base ?? { normal: [0, 0, 1] }), resolveAxis: (ad, sid) => resolveAxis(rctx(ctxOf()), ad, sid ? (sketches.get(sid) ?? null) : null), putBody });
           if (out !== null && out !== undefined) next = out; // null = prvek bez geometrie (těleso zůstává)
           break;
         }

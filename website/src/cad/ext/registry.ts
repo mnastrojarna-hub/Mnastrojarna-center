@@ -43,6 +43,8 @@ export type ExtBuildCtx = {
   resolveDirection?: (d: Direction, base?: { normal: Vec3; xDir?: Vec3 }) => Vec3;
   /** vyřeší osu (hrana, válcová plocha, dva body, osy skici…) na počátek a jednotkový směr (parametr druhu „axis“) */
   resolveAxis?: (def: AxisDef, sketchId?: string) => { origin: Vec3; dir: Vec3 };
+  /** nahradí jiné (neaktivní) těleso dílu, nebo založí nové s tímto názvem (svarový kov) – aktivní těleso vrací `build` */
+  putBody?: (name: string, shape: Shape) => void;
 };
 
 /** Parametr pro automatický formulář. */

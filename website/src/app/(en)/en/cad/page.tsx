@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 };
 
 export default function CadPage() {
-  // Shared link (#s=… / #r=…): the part after # is stashed in sessionStorage and removed from the address at once (NDA documents).
-  const shareScript = "try{var h=location.hash;if(/^#[sr]=/.test(h)){sessionStorage.setItem('mn-cad-share',h);history.replaceState(null,'',location.pathname+location.search)}}catch(e){}";
+  // Shared link (#q=… / #s=… / #r=…): the part after # is stashed in sessionStorage and removed from the address at once (NDA documents).
+  const shareScript = "try{var h=location.hash;if(/^#[sqr]=/.test(h)){sessionStorage.setItem('mn-cad-share',h);history.replaceState(null,'',location.pathname+location.search)}}catch(e){}";
   return (
     <>
       <script dangerouslySetInnerHTML={{ __html: shareScript }} />

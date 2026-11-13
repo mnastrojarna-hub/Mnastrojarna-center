@@ -1,0 +1,22 @@
+# 8. vlna – krátký sdílený odkaz (šifrované úložiště na vlastním webu /cad/share/)
+{0} znaků	{0} characters
+Bez omezení platnosti nemůže být dokument v úložišti – celý je proto v odkazu. Pro krátký odkaz zvolte platnost 1–90 dní.	Without an expiry the document cannot be kept in the storage – the whole document is therefore in the link. For a short link choose a validity of 1–90 days.
+Celý dokument je proto v odkazu (dlouhý odkaz).	The whole document is therefore in the link (long link).
+krátký odkaz (automaticky)	short link (automatic)
+Krátký odkaz není k dispozici: úložiště sdílení na serveru ({0}) neodpovídá.	No short link available: the sharing storage on the server ({0}) does not respond.
+krátký odkaz: dokument se v prohlížeči zašifruje (AES-GCM) a na server jde jen šifrovaný; klíč je jen v odkazu za „#“, kterou prohlížeč na server nikdy neposílá. Po vypršení platnosti se soubor ze serveru smaže.	short link: the document is encrypted in the browser (AES-GCM) and only the encrypted data goes to the server; the key is only in the part of the link after “#”, which the browser never sends to the server. When the link expires, the file is deleted from the server.
+Model je pro sdílení odkazem příliš velký: {0} po kompresi a zašifrování, limit úložiště je {1}. Uložte .mncad nebo STEP a pošlete soubor (např. přes úschovnu).	The model is too large to share by link: {0} after compression and encryption, the storage limit is {1}. Save a .mncad or STEP file and send the file (e.g. via a file transfer service).
+Odkaz byl zneplatněn – změňte volby pro nový.	The link has been revoked – change the options to create a new one.
+Odkaz zneplatněn – šifrovaný dokument byl ze serveru smazán.	Link revoked – the encrypted document was deleted from the server.
+share: mode je link | store | self	share: mode is link | store | self
+Smaže šifrovaný dokument ze serveru – odkaz přestane fungovat i těm, kdo ho už mají	Deletes the encrypted document from the server – the link stops working even for people who already have it
+Šifruji a nahrávám… {0} %	Encrypting and uploading… {0} %
+Úložiště sdílení dočasně odmítá další nahrávání z této adresy (limit za hodinu).	The sharing storage temporarily refuses further uploads from this address (hourly limit).
+Úložiště sdílení na serveru ({0}) neodpovídá.	The sharing storage on the server ({0}) does not respond.
+Úložiště sdílení na serveru je plné.	The sharing storage on the server is full.
+Úložiště sdílení není dostupné (síť).	The sharing storage is unavailable (network).
+Úložiště sdílení odmítlo nahrání ({0}).	The sharing storage rejected the upload ({0}).
+Úložiště sdílení vrátilo neplatnou odpověď.	The sharing storage returned an invalid response.
+V úložišti musí mít odkaz omezenou platnost (max. {0} dní).	A link in the storage must have a limited validity (max. {0} days).
+Zneplatnění se nezdařilo (síť) – zkuste to znovu.	Revoking failed (network) – please try again.
+Zneplatnit odkaz	Revoke link

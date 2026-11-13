@@ -48,7 +48,8 @@ import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
 import { ShareCta } from "./share-cta";
 import { CommandPalette, type Command } from "./command-palette";
-import { getExtUi, type ExtActionApi } from "./ext";
+import { extPickOf, getExtUi, type ExtActionApi } from "./ext";
+import { weldFaceColors } from "@/cad/ext/weld-colors";
 import { extendMncad, runApiCmd, type ApiHost } from "./agent-api-host";
 import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
@@ -2266,16 +2267,16 @@ export function CadApp() {
           : active && FACE_PICK.has(active.type)
             ? "faces"
             : active?.type === "ext"
-              ? getExt(active.ext)?.pick?.kind === "faces"
+              ? extPickOf(active)?.kind === "faces"
                 ? "faces"
-                : getExt(active.ext)?.pick?.kind === "edges"
+                : extPickOf(active)?.kind === "edges"
                   ? "edges"
                   : "select"
               : "select";
 
   const toggleExtPick = (i: number, kind: "faces" | "edges") => {
     if (active?.type !== "ext") return false;
-    const pk = getExt(active.ext)?.pick;
+    const pk = extPickOf(active);
     if (!pk || pk.kind !== kind) return false;
     const cur = (active.data[pk.key] as number[] | undefined) ?? [];
     updateFeature(active.id, { data: { ...active.data, [pk.key]: cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i] } } as Partial<Feature>);
@@ -2283,7 +2284,7 @@ export function CadApp() {
   };
   const extPicked = (kind: "faces" | "edges"): number[] => {
     if (active?.type !== "ext") return [];
-    const pk = getExt(active.ext)?.pick;
+    const pk = extPickOf(active);
     return pk && pk.kind === kind ? ((active.data[pk.key] as number[] | undefined) ?? []) : [];
   };
   const onPickEdge = (i: number) => {
@@ -3566,7 +3567,7 @@ export function CadApp() {
                   onPick={onPick}
                   measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
                   vertices={result?.vertices ?? null}
-                  faceColors={doc.faceColors}
+                  faceColors={weldFaceColors(doc, result?.bodies, doc.faceColors)}
                   bodyHidden={bodyHidden}
                   bodyOpacity={bodyOpacity}
                   gizmo={cvG?.gizmo ?? gizmo}
@@ -3592,7 +3593,7 @@ export function CadApp() {
                 hidden={!!sketch}
                 failure={glError}
                 core={core}
-                scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: doc.faceColors, display: prefs.display, section, hidden: bodyHidden, dark: bg.dark }}
+                scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: weldFaceColors(doc, result?.bodies, doc.faceColors), display: prefs.display, section, hidden: bodyHidden, dark: bg.dark }}
                 onRetry={() => {
                   setGlError(null);
                   setGlKey((k) => k + 1);
@@ -4198,7 +4199,7 @@ function featurePrompt(f: Feature): string {
   if (f.type === "ext") {
     const own = getExtUi(f.ext)?.prompt?.(f);
     if (own) return own;
-    const pick = getExt(f.ext)?.pick;
+    const pick = extPickOf(f);
     if (pick) return picked(Array.isArray((f.data ?? {})[pick.key]) ? ((f.data ?? {})[pick.key] as unknown[]).length : 0, pick.kind);
   }
   if (f.type === "pushPull" || f.type === "offsetFace" || f.type === "deleteFace" || f.type === "thicken") return picked(f.faces.length, "faces");

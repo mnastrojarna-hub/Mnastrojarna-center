@@ -650,6 +650,90 @@ akce sheet.dxf
   do patičky nad razítkem. Ohraňování a tváření nástroji pro výrobu (lis, nástroj) zůstává na technologovi – model je
   geometricky přesná skořepina, tenčení materiálu se nemodeluje.
 
+### Svary – koutové, tupé s úpravou, děrové, bodové (\`svar …\`, EN \`weld …\`, DE \`schweißnaht …\` / \`naht …\`)
+
+Svary jsou prvky karty Svařence. Každý svar vytvoří **svarový kov jako samostatné těleso** „Svar 1“, „Svar 2“… (obarvené
+jako svar; u housenky volba \`sloučit\` = připojit k dílu jako dřív) a do stavu prvku zapíše výsledek: délku, průřez, objem,
+**hmotnost svarového kovu** (hustota materiálu dílu, jinak 7,85 g/cm³) a **odhad přídavného materiálu** = hmotnost / účinnost
+navaření (135 MAG / 131 MIG 0,9; 111 obalená elektroda 0,6; 136 0,85; 141 TIG 0,98; 121 0,99; \`účinnost 0,8\` přepíše).
+\`stav\` vypíše výsledek pod prvkem (\`→ tupý V s10 · délka 200 mm · průřez 74,56 mm² · … · svarový kov 0,117 kg …\`),
+\`svar tabulka\` (= \`akce tabulka svarů\`) vypíše tabulku všech svarů se součty. Kusovník řezů svary nemění.
+
+**Spoj se zadává** (indexy = popisky F1 / E1 zobrazeného modelu přes všechna tělesa, aktivní těleso první –
+\`window.mncad.hints()\`; nebo pravidlem jako u zaoblení na aktivním tělese; nebo **bodem** \`hrana u x y z\` / \`plocha u x y z\`
+= nejbližší hrana / plocha do 1 mm – nejspolehlivější pro agenty):
+- tupý svar – **plocha** = čelo připravovaného dílu, které se dotýká druhého dílu (konec plechu u druhého plechu, spodní čelo
+  stojiny na pásnici); **hrana** = hrana tohoto čela na straně svaru (strana šipky; spodní hrana = svar zespodu), nebo
+  **vnitřní kout** sloučeného tělesa (T / rohový spoj, připravuje se svislá stěna, \`obráceně\` = druhá stěna; tloušťka stěny
+  se změří, \`t 10\` ji zadá). Mezera v modelu se pozná (do 15 mm); větší než zadaná se použije skutečná. Druh spoje (tupý /
+  T / rohový) se pozná z polohy druhého dílu.
+- koutový svar – hrana koutu: vnitřní hrana sloučeného tělesa, nebo hrana dílu, který stojí na jiném tělese (spodní hrana
+  stojiny); \`oboustranně\` = i kout na druhé straně stěny, \`kolem\` = celá uzavřená smyčka (profil / trubka na desce, rovné
+  hrany i oblouky, rohy se vyplní).
+- děrový, žlábkový a bodový svar – horní plocha horního plechu přeplátování; řada \`počet\` × \`rozteč\` vystředěná podél delší
+  (\`kratší\`) strany plochy, \`posun N\`.
+
+| Úprava ISO 9692-1 | Slovo | Výchozí (úhel / otupení c / mezera b / R) | Průřez drážky (bez převýšení) |
+|---|---|---|---|
+| I | \`I\` | – / 0 / 2 | b·t |
+| V | \`V\` | α 60° / 1 / 2 | b·t + (t−c)²·tg(α/2) |
+| Y (V s velkým otupením) | \`Y\` | α 60° / 3 / 1 | jako V |
+| X (oboustranný V) | \`X\`, \`2V\` | α 60° / 2 / 2 | b·t + 2·h²·tg(α/2), h = (t−c)/2 |
+| U / 2U | \`U\`, \`2U\` | β 10° / 2 / 0 / R 6 | b·t + 2·U(t−c) / b·t + 4·U(h) |
+| ½V (HV) / ½Y (HY) | \`½V\`, \`1/2V\`, \`HV\` / \`½Y\`, \`HY\` | β 45° / 1 (3) / 2 (1) | b·t + (t−c)²·tg β / 2 |
+| K (oboustranný ½V) | \`K\` | β 45° / 2 / 2 | b·t + h²·tg β |
+| J / 2J | \`J\`, \`2J\` | β 10° / 2 / 0 / R 6 | b·t + U(t−c) / b·t + 2·U(h) |
+
+U(H) = R²/2·(π/2 − β − sin β cos β) + R cos β·H′ + H′² tg β / 2, H′ = H − R(1 − sin β). Úhel za úpravou (\`V 60\`, \`½V 45\`)
+je u V / Y / X celkový úhel rozevření α, u ostatních úhel úkosu / boku β. Převýšení housenky \`převýšení 1,5\` (výchozí 1,5 mm,
+přesah 1 mm přes hrany úkosu; u X / K / 2U / 2J na obou stranách), převýšení kořene \`kořen 1\` (jen s mezerou),
+\`podložka\` = těleso „Podložka k“ 25 × 5 mm pod kořenem (jen tupý spoj). Souměrné úpravy (I, V, Y, X, U, 2U) se vyříznou do
+obou dílů, jednostranné (½V, ½Y, K, J, 2J) jen do vybraného dílu.
+
+\`\`\`
+nový díl Tupý spoj
+kvádr 100 200 10 v -100 0 0                       # deska A (Těleso 1)
+kvádr 100 200 10 v 2 0 0 nové                     # deska B (Těleso 2), mezera 2 mm
+těleso 1
+svar tupý V 60 otupení 1 mezera 2 plocha +X       # čelo desky A u desky B → V do obou desek, Svar 1
+svar tabulka
+\`\`\`
+
+\`\`\`
+nový díl T spoj
+kvádr 200 100 12 v -100 0 0                       # pásnice
+kvádr 10 100 80 v -5 0 12                         # stojina (sloučí se)
+svar koutový a5 hrana u 5 50 12 oboustranně metoda 135   # a5 z obou stran stojiny = 2 × 25 mm² × 100 mm
+svar ½V 45 otupení 1 mezera 0 hrana u -5 50 12 převýšení 1   # nebo úkos do stojiny (vnitřní kout)
+stav
+\`\`\`
+
+\`\`\`
+svar koutový z7 hrany E12;E14 přerušovaný 50/100           # rameno 7 (a ≈ 4,95), úseky 50 po 100
+svar koutový a4 hrana u 20 0 10 kolem                       # kolem profilu na desce
+svar X 60 otupení 2 mezera 2 plocha F7                     # oboustranný V, housenka z obou stran
+svar U R6 úhel 10 otupení 2 plocha F7
+svar děrový Ø12 počet 3 rozteč 50 plocha u 150 50 18
+svar žlábkový 30×10 počet 2 rozteč 60 plocha F9
+svar bodový Ø6 rozteč 40 počet 5 plocha F9 metoda 21
+\`\`\`
+
+- EN: \`weld fillet a5 edges E7;E9 both sides all around intermittent 50/100 field process 135\`, \`weld butt V 60 root face 1
+  gap 2 edge E7 backing\`, \`weld HV 45 face F3\`, \`weld plug Ø12 count 2 pitch 60 face F3\`, \`weld spot Ø6 pitch 40 face F3\`,
+  \`weld table\`. DE: \`schweißnaht kehlnaht a5 kanten E7 beidseitig ringsum unterbrochen 50/100 baustelle\`, \`naht stumpf V 60
+  steg 1 spalt 2 kante E7 badsicherung\`, \`naht lochnaht Ø12 …\`, \`naht punkt Ø6 teilung 40 …\`, \`naht tabelle\`.
+- Obecný příkaz: \`prvek weld.groove prep=K faces=2 angle=45 rootFace=2 gap=2 cap=1 process=135\`, \`prvek weld.groove
+  prep=HV edgeAt=[[5,50,12]]\`, \`prvek weld.bead edges=6;8 a=5 measure=a both=ano\`, \`prvek weld.plug faces=8 d=12 n=3
+  pitch=50\`, \`prvek weld.spot faceAt=[[100,50,18]] d=6 n=5 pitch=40\` (indexy od 0: F3 = 2). Klíče tupého svaru: \`prep\`,
+  \`angle\`, \`rootFace\`, \`gap\`, \`radius\`, \`cap\`, \`root\`, \`backing\`, \`t\`, \`flip\`, \`field\`, \`process\`, \`eff\`.
+- Výkres: z každého svaru se automaticky nakreslí **značka ISO 2553** (šipka ke spoji v pohledu podél spoje, referenční
+  čára s čárkovanou identifikační čarou, značka druhu, velikost a / z / s / Ø, délka × počet (rozteč), oboustranný,
+  kolem, montážní, \`M\` podložka, metoda ve vidličce) – v SVG, DXF, DWG i PDF. Ruční „Značka svaru“ s hranou se umístí
+  stejně, bez hrany se vypíše do seznamu „Svary:“ vlevo dole.
+- Omezení: tupý svar s úpravou jen po **rovné** spáře (čelo musí mít rovnou hranu), šikmý T spoj (≠ 90°) jen koutovým
+  svarem; koutová housenka po rovných hranách a obloucích (ne po obecné křivce); bodové svary jsou značky (tenké
+  terčíky Ø d na ploše, bez hmotnosti), čočka svaru uvnitř plechů se nemodeluje.
+
 ### Příklad – příruba DN50 (6 řádků)
 
 \`\`\`
@@ -752,8 +836,14 @@ k výběru. \`window.mncad.selection()\` vrátí výběr (\`{ id: "F3", kind: "f
 \`{ log, files: [{ name, mime, bytes, base64 }] }\` – Rozvin → DXF / SVG, Tabulka ohybů, Kusovník řezů (+ CSV), Tabulka
 svarů, Tloušťka stěn, \`sketch.dxf\`. Textem \`akce tabulka ohybů\` (EN \`action bend table\`, DE \`aktion biegetabelle\`)
 – text okna jde do protokolu. \`prvek sheet.dxf\` skončí chybou s odkazem na \`akce\`.
-\`await window.mncad.share({ days: 10, password, from, view: "model" | "drawing", mode: "link" | "store" })\` vytvoří
-sdílený odkaz (jako tlačítko Sdílet odkazem) a vrátí \`{ url, mode, bytes, exp, message }\`.
+\`await window.mncad.share({ days: 10, password, from, view: "model" | "drawing", mode: "link" | "store" | "self" })\`
+vytvoří sdílený odkaz (jako tlačítko Sdílet odkazem) a vrátí \`{ url, mode, bytes, exp, message, chars, note? }\`.
+Výchozí je **krátký odkaz na jeden řádek** (~70 znaků, např. \`https://www.mnastrojarna.cz/cad#q=Ab3kZ9xQ2m.0f8Kx…\`,
+\`mode: "self"\`): dokument se v prohlížeči zašifruje (AES-GCM, klíč 128 bitů jen v odkazu za #) a nahraje do úložiště
+na webu (\`/cad/share/\`; s heslem PBKDF2 – odkaz zůstává stejně krátký); platnost 1–90 dní, po ní se smaže.
+\`mode: "store"\` = Supabase (je-li nastavené), \`"link"\` = celý dokument v odkazu (dlouhý, bez serveru). Když úložiště
+neodpovídá nebo je \`days: null\`, vrátí se \`mode: "link"\` a \`note\` říká proč. Velké modely (importovaný STEP) do
+25 MB po kompresi; nad limit = výjimka s velikostí a limitem. Odkaz (i \`#q=\`, \`#s=\`, \`#r=\`) otevřete \`page.goto(url)\`.
 \`await window.mncad.compare({ name: "zakaznik.step", base64 }, { tolerance: 0.1, align: "auto", show: true })\` porovná
 díl s referenčním modelem a vrátí \`{ ok, text, csv, regions: [{ n, side: "extra" | "missing", volume, center, hint }] }\`;
 \`show\` zobrazí barevnou mapu odchylek (pro \`screenshot\`), \`ok\` = žádná rozdílová oblast a odchylky v toleranci.
