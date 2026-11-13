@@ -1,0 +1,26 @@
+# Velké soubory: otevření sestav STEP, průběh, chyby jádra (agent w3-bigasm)
+{0} dílů se nepodařilo načíst: {1}	{0} parts could not be loaded: {1}
+Bez geometrie (vynecháno): {0}.	Without geometry (skipped): {0}.
+Čtu strukturu sestavy STEP – díl {0}/{1}	Reading the STEP assembly structure – part {0}/{1}
+Čtu strukturu sestavy STEP…	Reading the STEP assembly structure…
+Data souboru {0} nejsou v paměti (dokument obnovený bez souboru) – otevřete soubor znovu.	The data of file {0} is not in memory (document restored without the file) – open the file again.
+Jádro CAD bylo spuštěno znovu	The CAD kernel was restarted
+Jádro CAD spadlo ({0}) a bylo spuštěno znovu. Zkuste operaci zopakovat; pokud se pád opakuje, model je pravděpodobně poškozený nebo příliš velký.	The CAD kernel crashed ({0}) and was restarted. Try the operation again; if the crash repeats, the model is probably damaged or too large.
+Jádro soubor přečetlo, ale nevzniklo žádné těleso ani plocha (prázdný soubor, jen křivky nebo body). Zkontrolujte export ve zdrojovém programu (STEP AP214, tělesa).	The kernel read the file, but no solid or face was created (empty file, only curves or points). Check the export in the source program (STEP AP214, solids).
+Jádru CAD došla paměť – model je pro prohlížeč příliš velký. Jádro bylo spuštěno znovu. Velkou sestavu STEP otevřete jako sestavu (díly se čtou zvlášť), zavřete ostatní záložky nebo skryjte část komponent.	The CAD kernel ran out of memory – the model is too large for the browser. The kernel was restarted. Open a large STEP assembly as an assembly (parts are read separately), close other tabs or hide some components.
+Model {0} zobrazen za {1} s ({2} trojúhelníků) – můžete na něj navázat dalšími prvky.	Model {0} displayed in {1} s ({2} triangles) – you can continue with further features.
+Načítám {0} ({1} MB) – model se počítá, průběh a Zrušit jsou dole.	Loading {0} ({1} MB) – the model is being computed, progress and Cancel are at the bottom.
+Načítám díl {0}/{1}: {2}	Loading part {0}/{1}: {2}
+Otevírání souboru {0} zrušeno.	Opening of file {0} cancelled.
+Otevřít jako díl (přesné těleso k modelování)	Open as part (exact solid for modelling)
+Sestava {0} zobrazena za {1} s: {2} komponent, {3} trojúhelníků.	Assembly {0} displayed in {1} s: {2} components, {3} triangles.
+Sestava STEP {0}: {1} různých dílů, {2} výskytů – otevřena jako sestava, díly se načítají postupně.	STEP assembly {0}: {1} distinct parts, {2} occurrences – opened as an assembly, parts are loaded progressively.
+Sestavu {0} se nepodařilo zobrazit	Assembly {0} could not be displayed
+Soubor {0} je neúplný – chybí konec souboru STEP (END-ISO-10303-21). Nejspíš se nestáhl nebo neuložil celý; uložte / exportujte ho znovu.	File {0} is incomplete – the end of the STEP file (END-ISO-10303-21) is missing. It was probably not downloaded or saved completely; save / export it again.
+Soubor {0} neobsahuje 3D těleso.	File {0} does not contain a 3D solid.
+Soubor {0} neobsahuje nic k zobrazení	File {0} contains nothing to display
+Soubor {0} neobsahuje žádné plochy ani tělesa – není co zobrazit.	File {0} contains no faces or solids – there is nothing to display.
+Soubor {0} neobsahuje žádný výrobek s geometrií (STEP bez tvaru).	File {0} contains no product with geometry (STEP without shape).
+Soubor {0} se nepodařilo otevřít	File {0} could not be opened
+Soubor {0} se nepodařilo přečíst jako STEP (stav čtení: {1}) – soubor je poškozený nebo není ve formátu STEP AP203/AP214/AP242.	File {0} could not be read as STEP (read status: {1}) – the file is damaged or not in STEP AP203/AP214/AP242 format.
+Žádný díl sestavy neobsahuje geometrii.	No part of the assembly contains geometry.

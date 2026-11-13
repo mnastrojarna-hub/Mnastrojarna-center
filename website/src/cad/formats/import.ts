@@ -3,14 +3,23 @@
  * DXF na entity skici a u nativních formátů jiných CAD programů poradí, jak vyexportovat STEP.
  */
 import { cadLocale, tr } from "../i18n";
-import type { KernelImportFormat, SketchEntity } from "../types";
+import { blobIdOf, BLOB_PREFIX, putBlob } from "../blobs";
+import { perfMark } from "../perf-log";
+import type { CadDoc, KernelImportFormat, SketchEntity } from "../types";
 import { parseDXF } from "./dxf";
-import { bytesToB64, parse3MF, parseGLTF, parseOBJ, parseOFF, parsePLY, parseSTL, triangleCount, writeBinarySTL, type TriMesh } from "./mesh-io";
+import { parse3MF, parseGLTF, parseOBJ, parseOFF, parsePLY, parseSTL, triangleCount, writeBinarySTL, type TriMesh } from "./mesh-io";
+import { ASSEMBLY_MIN_BYTES, assemblyDocFromSplit, leafCount, type StepSplit } from "./step-assembly";
+import { stepHasAssembly, stepHasHeader, stepIsComplete, truncatedStepText } from "./step-check";
 
+/**
+ * `body.data` = odkaz `mnblob:` na bajty souboru v úložišti (blobs.ts) – dokument nenese 60 MB base64.
+ * `assembly` = velká sestava STEP rozdělená na díly (lehký režim): dokument sestavy s komponentami ze souborů.
+ */
 export type ImportResult =
   | { kind: "body"; format: KernelImportFormat; data: string; fileName: string; note?: string }
+  | { kind: "assembly"; doc: CadDoc; fileName: string; note: string }
   | { kind: "sketch"; name: string; entities: SketchEntity[]; note?: string }
-  | { kind: "unsupported"; message: string };
+  | { kind: "unsupported"; message: string; title?: string };
 
 /** Hodnota atributu accept pro <input type="file">. */
 export const IMPORT_EXTENSIONS = [
@@ -73,11 +82,39 @@ function meshBody(m: TriMesh, fileName: string, extra?: string): ImportResult {
   const notes = [tr("Síťový model ({0} trojúhelníků) – vloženo jako těleso z plošek.", n.toLocaleString(cadLocale()))];
   if (n > BIG_MESH) notes.push(tr("Model je velký, přestavba může trvat déle."));
   if (extra) notes.push(extra);
-  return { kind: "body", format: "stl", data: bytesToB64(writeBinarySTL(m)), fileName, note: notes.join(" ") };
+  return { kind: "body", format: "stl", data: putBlob(writeBinarySTL(m)), fileName, note: notes.join(" ") };
+}
+
+/** rozdělení sestavy STEP (v jádře); v testech lze nahradit */
+export type StepSplitter = (bytes: Uint8Array, fileName: string) => Promise<(Omit<StepSplit, "parts"> & { parts: (StepSplit["parts"][number] & { id?: string })[] }) | null>;
+const defaultSplitter: StepSplitter = async (bytes, fileName) => (await import("../client")).cad.stepSplit(bytes, fileName);
+
+/**
+ * STEP: kontrola hlavičky a úplnosti; velká sestava (strom výrobku, ≥ 1 MB) se rozdělí na díly a otevře jako sestava,
+ * jinak (jeden díl, malá sestava) jako prvek Import v dílu – jako dřív.
+ */
+async function prepareStep(buf: Uint8Array, fileName: string, splitter: StepSplitter): Promise<ImportResult> {
+  if (!stepHasHeader(buf)) throw new Error(tr("Soubor nevypadá jako STEP (chybí hlavička ISO-10303-21)."));
+  if (!stepIsComplete(buf)) return { kind: "unsupported", message: truncatedStepText(fileName), title: tr("Soubor {0} se nepodařilo otevřít", fileName) };
+  if (buf.length >= ASSEMBLY_MIN_BYTES && stepHasAssembly(buf)) {
+    const split = await splitter(buf, fileName);
+    if (split) {
+      const ids = new Map(split.parts.map((p) => [p.pd, p.id ? BLOB_PREFIX + p.id : putBlob(p.bytes)]));
+      const doc = assemblyDocFromSplit({ ...split, parts: split.parts }, fileName, (pd) => ids.get(pd)!);
+      const n = leafCount(doc);
+      const notes = [tr("Sestava STEP {0}: {1} různých dílů, {2} výskytů – otevřena jako sestava, díly se načítají postupně.", fileName, split.parts.length, n)];
+      if (split.empty.length) notes.push(tr("Bez geometrie (vynecháno): {0}.", split.empty.slice(0, 6).join(", ") + (split.empty.length > 6 ? "…" : "")));
+      return { kind: "assembly", doc, fileName, note: notes.join(" ") };
+    }
+  }
+  const t = performance.now();
+  const ref = putBlob(buf);
+  perfMark("ui.hash", performance.now() - t, { mb: +(buf.length / 1048576).toFixed(2), id: blobIdOf(ref) });
+  return { kind: "body", format: "step", data: ref, fileName };
 }
 
 /** Rozpozná formát podle přípony i obsahu a připraví data pro jádro / skicu. */
-export async function prepareImport(file: File): Promise<ImportResult> {
+export async function prepareImport(file: File, splitter: StepSplitter = defaultSplitter): Promise<ImportResult> {
   const ext = extOf(file.name);
   const base = file.name.replace(/\.[^.]+$/, "");
   try {
@@ -88,17 +125,18 @@ export async function prepareImport(file: File): Promise<ImportResult> {
         message: tr("{0}: nativní formát programu {1} je uzavřený a v prohlížeči ho bez licencovaného převodníku nepřečte žádný CAD. {2} Pak otevřete soubor STEP zde.", file.name, n.app, n.how),
       };
     }
+    const tr0 = performance.now();
     const buf = new Uint8Array(await file.arrayBuffer());
+    perfMark("ui.file.read", performance.now() - tr0, { mb: +(buf.length / 1048576).toFixed(2) });
     const head = new TextDecoder().decode(buf.subarray(0, 256));
     switch (ext) {
       case "step":
       case "stp":
-        if (!/ISO-10303-21/.test(head)) throw new Error(tr("Soubor nevypadá jako STEP (chybí hlavička ISO-10303-21)."));
-        return { kind: "body", format: "step", data: bytesToB64(buf), fileName: file.name };
+        return await prepareStep(buf, file.name, splitter);
       case "brep":
       case "brp":
         if (!/DBRep_DrawableShape|CASCADE Topology/.test(head)) throw new Error(tr("Soubor nevypadá jako BREP OpenCascade."));
-        return { kind: "body", format: "brep", data: bytesToB64(buf), fileName: file.name };
+        return { kind: "body", format: "brep", data: putBlob(buf), fileName: file.name };
       case "igs":
       case "iges": {
         const { igesToMesh } = await import("./occt");

@@ -152,7 +152,6 @@ Horní	Oben
 Hotovo	Fertig
 Hranu ani bod nelze smazat samostatně – vyberte plochu (Odstranit plochu) nebo prvek v historii.	Eine Kante oder ein Punkt kann nicht einzeln gelöscht werden – wählen Sie eine Fläche (Fläche entfernen) oder ein Feature in der Historie.
 Hustota	Dichte
-Importovaný soubor nelze upravovat historií – lze jen umístit.	Eine importierte Datei kann nicht über die Historie bearbeitet werden – sie kann nur positioniert werden.
 Izolovat (skrýt ostatní)	Isolieren (andere ausblenden)
 Izometrie	Isometrie
 Jen poprvé – poté se načítá z mezipaměti.	Nur beim ersten Mal – danach wird aus dem Cache geladen.
@@ -191,7 +190,6 @@ Max. bod	Max. Punkt
 Mazání	Löschen
 Min. bod	Min. Punkt
 Mnástrojárna	Mnástrojárna
-Model importován – můžete na něj navázat dalšími prvky.	Modell importiert – Sie können mit weiteren Features fortfahren.
 Modrošedý přechod	Blaugrauer Verlauf
 Modrá	Blau
 Mosaz	Messing
@@ -368,7 +366,6 @@ Soubor	Datei
 Soubor není platný projekt Mnástrojárna CAD.	Die Datei ist kein gültiges Mnástrojárna-CAD-Projekt.
 Soubor se nepodařilo načíst.	Die Datei konnte nicht geladen werden.
 Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad.	Die Datei ist nicht mehr im Browserspeicher – öffnen Sie sie aus der .mncad-Datei.
-Soubor vložen jako komponenta sestavy.	Datei als Baugruppenkomponente eingefügt.
 Souosost potřebuje válcovou nebo kuželovou plochu (díra, čep, šroub).	Koaxial braucht eine Zylinder- oder Kegelfläche (Bohrung, Stift, Schraube).
 Souř. systém	Koord.-System
 Souřadnice {0}	Koordinaten {0}

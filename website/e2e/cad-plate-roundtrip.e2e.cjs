@@ -56,7 +56,9 @@ stav`;
   let txt = await drawingText(p);
   ok(!/2768/.test(txt) && !/0,5×45/.test(txt) && /Rozměry v mm/.test(txt), 'výkres bez zadání neuvádí ISO 2768 ani sražení hran, jen „Rozměry v mm“');
   ok(/ČSN 11 423/.test(txt), 'razítko: materiál ČSN 11 423');
-  ok(/M6 hl\. 8/.test(txt) && !/Ø5\b/.test(txt), 'výkres: závit kótován jako „M6 hl. 8“, ne Ø5 (kóty: ' + (await dimTexts(p)) + ')');
+  // Chytré kóty: popis díry „2× M6 ↧8“ (značka hloubky je kreslená čarou, číslo hloubky je samostatný text); dřívější „M6 hl. 8“ také platí
+  const threadOk = (t) => /M6 hl\. 8/.test(t) || /\d+× M6\b/.test(t);
+  ok(threadOk(txt) && !/Ø5\b/.test(txt), 'výkres: závit kótován označením M6 (2× M6 ↧8), ne Ø5 (kóty: ' + (await dimTexts(p)) + ')');
   const aside = p.locator('[data-drawing-workspace] aside').first();
   await aside.getByPlaceholder('např. ISO 2768-mK').fill('ISO 2768-mK');
   await waitDrawing(p); await p.waitForTimeout(700); txt = await drawingText(p);
@@ -78,7 +80,8 @@ stav`;
   // kontrola kót
   await aside.getByRole('button', { name: /Kontrola kót/ }).click(); await p.waitForTimeout(300);
   const chk = await p.locator('[data-dim-check]').innerText();
-  ok(/Chybí \d+ z \d+/.test(chk) && /14 \(šířka drážky\)/.test(chk), 'Kontrola kót: vypíše chybějící kóty (např. šířka drážky 14)\n' + chk.split('\n').slice(0, 4).join(' | '));
+  // s Chytrými kótami je šířka drážky 14 zakótovaná – kontrola buď nic nepostrádá, nebo vypíše jiné chybějící kóty
+  ok(/Všech \d+ očekávaných kót je na listu/.test(chk) || (/Chybí \d+ z \d+/.test(chk) && !/14 \(šířka drážky\)/.test(chk)), 'Kontrola kót: šířka drážky 14 je zakótovaná\n' + chk.split('\n').slice(0, 4).join(' | '));
   ok(!/Ø50/.test(chk.split('Odvozeno')[0]) || true, 'kontrola kót: průměry z automatických kót jsou přítomné');
   // nástroj Text: jednorázový + viditelně aktivní
   await aside.getByRole('button', { name: 'Text', exact: true }).click(); await p.waitForTimeout(200);
@@ -115,7 +118,7 @@ stav`;
   const rt = await drawingText(r);
   ok(/ČSN 11 423/.test(rt), 'příjemce: razítko materiál ČSN 11 423 (zachováno)');
   ok(/Hrany: srazit 0,5×45°/.test(rt) && !/2768/.test(rt), 'příjemce: opracování hran zachováno, tolerance (smazaná) nepřibyla' + (/Hrany: srazit 0,5×45°/.test(rt) ? '' : ' ← ' + rt.split('\n').filter((l) => /Rozměry v mm|Hrany|ČSN/.test(l)).join(' | ')));
-  ok(/Kalit 58/.test(rt) && /M6 hl\. 8/.test(rt), 'příjemce: text a závitová anotace zachovány' + (/Kalit 58/.test(rt) ? '' : ' (text chybí)') + (/M6 hl\. 8/.test(rt) ? '' : ' (M6 chybí)'));
+  ok(/Kalit 58/.test(rt) && threadOk(rt), 'příjemce: text a závitová anotace zachovány' + (/Kalit 58/.test(rt) ? '' : ' (text chybí)') + (threadOk(rt) ? '' : ' (M6 chybí)'));
   const st2 = await r.evaluate(() => window.mncad.status());
   ok(Math.abs(volumeOf(st2) - vol0) < 0.01 && /materiál ČSN 11 423/.test(st2), `příjemce: shodný objem ${volumeOf(st2)} cm³ a materiál`);
   await r.screenshot({ path: S + 'plate-recipient.png' });

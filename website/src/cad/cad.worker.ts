@@ -17,6 +17,10 @@ import { stampPicks } from "./pick-sigs";
 import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
 import type { PlaneDef, Ref } from "./refs";
 import type { CadDoc, ComponentSource, ExportFormat, Feature, MeshData } from "./types";
+import { blobId, putBlobAs } from "./blobs";
+import { perfMark, setPerfSink } from "./perf-log";
+import { splitStepAssembly } from "./formats/step-assembly";
+import { isFatalKernelError } from "./kernel-errors";
 
 let ready: Promise<void> | null = null;
 let body: r.Shape3D | null = null;
@@ -54,7 +58,8 @@ type Req =
   | { id: number; op: "refInfo"; doc: CadDoc; ref: Ref }
   | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef }
   | { id: number; op: "datumGfx"; doc: CadDoc }
-  | { id: number; op: "pickSigs"; doc: CadDoc; feature: Feature };
+  | { id: number; op: "pickSigs"; doc: CadDoc; feature: Feature }
+  | { id: number; op: "stepSplit"; bytes: Uint8Array; fileName: string };
 
 /** Kontext řešení odkazů nad posledním postaveným tělesem a aktuálním dokumentem. */
 function refCtx(doc: CadDoc) {
@@ -63,12 +68,18 @@ function refCtx(doc: CadDoc) {
 }
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
+setPerfSink((e) => ctx.postMessage({ perf: e }));
+/** jádro po pádu WASM (nedostatek paměti, abort) – každý další požadavek se odmítne, UI spustí nové jádro */
+let fatal: string | null = null;
 
 /** průběh stavby do UI: právě počítaný prvek (zpráva bez `ok` – odpověď na požadavek přijde až po dokončení) */
 const progressTo = (id: number) => (p: BuildProgress) => ctx.postMessage({ id, progress: p });
 
-ctx.onmessage = async (e: MessageEvent<Req>) => {
+ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array> }>) => {
   const m = e.data;
+  // data importovaných souborů posílá UI jen poprvé (odkazy mnblob: v dokumentu)
+  if (m.blobs) for (const [k, v] of Object.entries(m.blobs)) putBlobAs(k, v);
+  if (fatal) return ctx.postMessage({ id: m.id, ok: false, error: fatal, fatal: true });
   try {
     await init();
     switch (m.op) {
@@ -93,7 +104,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
           }
         }
         const t = plain.mesh ? [plain.mesh.vertices.buffer, plain.mesh.normals.buffer, plain.mesh.triangles.buffer, plain.mesh.faceGroups.buffer, plain.mesh.lines.buffer, plain.mesh.edgeGroups.buffer] : [];
-        ctx.postMessage({ id: m.id, ok: true, result: plain }, t as Transferable[]);
+        ctx.postMessage({ id: m.id, ok: true, result: plain, at: Date.now() }, t as Transferable[]);
         break;
       }
       case "face":
@@ -133,11 +144,35 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         }
         break;
       }
+      case "stepSplit": {
+        // sestava STEP → díly (každý svůj malý STEP); data dílů si jádro ponechá (UI je už nemusí posílat zpět)
+        const t0 = Date.now();
+        const split = splitStepAssembly(m.bytes, (done, total) => ctx.postMessage({ id: m.id, progress: { phase: "feature", index: done - 1, total, name: m.fileName } }));
+        if (!split) {
+          ctx.postMessage({ id: m.id, ok: true, result: null });
+          break;
+        }
+        perfMark("kernel.step.split", Date.now() - t0, { index: split.ms.index, tree: split.ms.tree, extract: split.ms.extract, parts: split.parts.length, instances: split.leafInstances });
+        const t: Transferable[] = [];
+        const parts = split.parts.map((p) => {
+          const id = blobId(p.bytes);
+          putBlobAs(id, p.bytes);
+          const copy = p.bytes.slice();
+          t.push(copy.buffer);
+          return { ...p, id, bytes: copy };
+        });
+        ctx.postMessage({ id: m.id, ok: true, result: { ...split, parts } }, t);
+        break;
+      }
       case "asmParts": {
         const out = [];
         const t: Transferable[] = [];
-        for (const p of m.parts) {
+        const req = m as typeof m & { offset?: number; total?: number };
+        for (const [i, p] of m.parts.entries()) {
+          ctx.postMessage({ id: m.id, progress: { phase: "feature", index: (req.offset ?? 0) + i, total: req.total ?? m.parts.length, name: p.source.kind === "file" ? p.source.fileName : p.source.doc.name } });
+          const tp = Date.now();
           const e = await partEntry(p.key, p.source);
+          if (Date.now() - tp > 50) perfMark("kernel.part", Date.now() - tp, { name: p.source.kind === "file" ? p.source.fileName : p.source.doc.name, triangles: (e.result.mesh?.triangles.length ?? 0) / 3 });
           if (!e.result.vertices && e.body) {
             try {
               e.result.vertices = vertexPositions(e.body);
@@ -149,7 +184,7 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
           if (res.mesh) t.push(res.mesh.vertices.buffer, res.mesh.normals.buffer, res.mesh.triangles.buffer, res.mesh.faceGroups.buffer, res.mesh.lines.buffer, res.mesh.edgeGroups.buffer);
           out.push({ key: p.key, result: res });
         }
-        ctx.postMessage({ id: m.id, ok: true, result: out }, t);
+        ctx.postMessage({ id: m.id, ok: true, result: out, at: Date.now() }, t);
         break;
       }
       case "asmFace": {
@@ -254,6 +289,11 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       }
     }
   } catch (err) {
+    // pád WASM (nedostatek paměti, abort, přístup mimo paměť): jádro je nepoužitelné – UI ho ukončí a spustí nové
+    if (isFatalKernelError(err)) {
+      fatal = err instanceof Error ? err.message : String(err);
+      return ctx.postMessage({ id: m.id, ok: false, error: fatal, fatal: true });
+    }
     ctx.postMessage({ id: m.id, ok: false, error: err instanceof Error ? err.message : tr("Chyba CAD jádra.") });
   }
 };

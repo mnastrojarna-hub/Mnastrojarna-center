@@ -36,7 +36,8 @@ export async function partEntry(key: string, s: ComponentSource, depth = 0): Pro
     return hit;
   }
   // podsestava = složené těleso z jejích komponent (jedna tuhá síť)
-  const res = s.kind === "asm" ? shapeResult(await assemblyShape(s.doc, depth + 1)) : await buildDoc(sourceDoc(s));
+  // importované soubory = lehké komponenty (hrubší síť, objem ze sítě) – díly velkých sestav STEP se tak zobrazí rychle
+  const res = s.kind === "asm" ? shapeResult(await assemblyShape(s.doc, depth + 1)) : await buildDoc(sourceDoc(s), { light: s.kind === "file" });
   const { body, ...result } = res;
   const e: Entry = { body, result, used: ++tick };
   cache.set(key, e);

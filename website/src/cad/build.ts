@@ -13,7 +13,9 @@ import { getExt } from "./ext/index";
 import "./feat/index";
 import { getFeatureBuilder } from "./feat/registry";
 import { resolvePicks } from "./pick-sigs";
-import { importBody } from "./formats/kernel-import";
+import { countFaces, importBody, wasmMB } from "./formats/kernel-import";
+import { perfMark } from "./perf-log";
+import { BIG_FACES, meshMetrics, meshParams, quickDiag } from "./mesh-budget";
 import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
 import { entityIndex, planeDefToSketchPlane, pointOf, resolveAxis, resolveDirection, resolvePlaneDef, resolveRef, V, type ResolveCtx } from "./ref-resolve";
@@ -802,6 +804,12 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
       status.push({ id: f.id, ok: true });
       return next;
     }
+    // velký import do prázdného dílu: podpis (objem) a kontrola platnosti by trvaly desítky sekund – podpis se nevytvoří
+    if (f.type === "import" && !body && countFaces(next.wrapped, BIG_FACES + 1) > BIG_FACES) {
+      bodySig = null;
+      status.push({ id: f.id, ok: true });
+      return next;
+    }
     const sig = signatureOf(next);
     let warning: string | undefined;
     if (body && expectsChange(f) && sameSignature(bodySig, sig)) {
@@ -1216,30 +1224,33 @@ const copyMeshData = (m: MeshData): MeshData => ({ vertices: m.vertices.slice(),
 /** kopie výsledku: pole sítě se do UI předávají přenosem (původní pole tím zanikají) a těleso si jádro po další stavbě uvolní */
 const copyDocResult = (x: DocResult): DocResult => ({ ...x, mesh: x.mesh ? copyMeshData(x.mesh) : null, vertices: x.vertices?.slice(), status: x.status.map((s) => ({ ...s })), body: x.body ? (x.body.clone() as Shape) : null });
 
-export async function buildDoc(doc: CadDoc, opts: { tolerance?: number; onProgress?: BuildProgressFn } = {}): Promise<DocResult> {
+/** `opts.light`: lehká komponenta sestavy (díl velké sestavy STEP) – hrubší síť, objem a plocha ze sítě, bez kontroly platnosti */
+export async function buildDoc(doc: CadDoc, opts: { tolerance?: number; onProgress?: BuildProgressFn; light?: boolean } = {}): Promise<DocResult> {
   const t0 = Date.now();
-  const key = JSON.stringify([doc.features, doc.variables ?? null, doc.bindings ?? null, doc.configs ?? null, doc.activeConfig ?? null, doc.material, doc.kind ?? "part", doc.activeBody ?? null, opts.tolerance ?? null]);
+  const key = JSON.stringify([doc.features, doc.variables ?? null, doc.bindings ?? null, doc.configs ?? null, doc.activeConfig ?? null, doc.material, doc.kind ?? "part", doc.activeBody ?? null, opts.tolerance ?? null, opts.light ?? null]);
   if (lastDocResult?.key === key) return { ...copyDocResult(lastDocResult.res), ms: Date.now() - t0 };
   const { body, status, paramErrors, resolved, bodies } = await buildShape(doc, Infinity, { preferActive: true, onProgress: opts.onProgress });
   opts.onProgress?.({ index: doc.features.length, total: doc.features.length, phase: "mesh" });
-  const res: DocResult = { ...shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance }), resolved, bodies: bodyInfos(bodies) };
+  const sr = shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance, light: opts.light });
+  const res: DocResult = { ...sr, resolved, bodies: bodyInfos(bodies, bodies.length === 1 ? sr.metrics?.volume : undefined) };
   lastDocResult = { key, res: copyDocResult(res) };
   return res;
 }
 
 /** Přehled těles dílu: rozsahy globálních indexů ploch a hran ve složeném tvaru (aktivní těleso je první) a objem. */
-export function bodyInfos(bodies: NamedBody[]): BodyInfo[] {
+export function bodyInfos(bodies: NamedBody[], knownVolume?: number): BodyInfo[] {
   let fs = 0;
   let es = 0;
   return bodies.map((b, i) => {
     const faceCount = b.shape.faces.length;
     const edgeCount = b.shape.edges.length;
-    let volume = 0;
-    try {
-      volume = r.measureVolume(b.shape);
-    } catch {
-      /* otevřené těleso */
-    }
+    let volume = knownVolume ?? 0;
+    if (knownVolume === undefined)
+      try {
+        volume = r.measureVolume(b.shape);
+      } catch {
+        /* otevřené těleso */
+      }
     const info: BodyInfo = { name: b.name, active: i === 0, faceStart: fs, faceCount, edgeStart: es, edgeCount, volume };
     fs += faceCount;
     es += edgeCount;
@@ -1280,14 +1291,22 @@ export function meshArrays(body: Shape, tolerance: number, angular: number) {
 }
 
 /** Síť, hrany, vrcholy a metriky libovolného tělesa (i složeného – např. podsestavy). */
-export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; paramErrors?: string[]; t0?: number; tolerance?: number } = {}): BuildResult & { body: Shape | null } {
+export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; paramErrors?: string[]; t0?: number; tolerance?: number; light?: boolean } = {}): BuildResult & { body: Shape | null } {
   const t0 = o.t0 ?? Date.now();
   const status = o.status ?? [];
   const paramErrors = o.paramErrors ?? [];
   const opts = { tolerance: o.tolerance };
   if (!body) return { status, paramErrors, mesh: null, metrics: null, ms: Date.now() - t0, body: null };
-  const tol = opts.tolerance ?? meshTolerance(bboxDiag(body));
-  const m = meshArrays(body, tol, MESH_ANGULAR);
+  // velká tělesa (import 46 MB: přesný kvádr 104 s, objem + plocha 20 s) a lehké komponenty: rychlý kvádr, adaptivní síť, metriky ze sítě
+  const nFaces = countFaces(body.wrapped, BIG_FACES + 1);
+  const big = !!o.light || nFaces > BIG_FACES;
+  let tm = Date.now();
+  const mp = big ? meshParams(quickDiag(body), o.light ? 0 : countFaces(body.wrapped), o.light) : { tolerance: meshTolerance(bboxDiag(body)), angular: MESH_ANGULAR };
+  const tol = opts.tolerance ?? mp.tolerance;
+  if (big) perfMark("kernel.bounds", Date.now() - tm, { light: o.light ? 1 : 0 });
+  tm = Date.now();
+  const m = meshArrays(body, tol, mp.angular);
+  if (big) perfMark("kernel.mesh", Date.now() - tm, { triangles: m.triangles.length / 3, tolerance: +tol.toFixed(3), wasmMB: wasmMB() });
   const faces = body.faces;
   const edges = body.edges;
   const faceIndex = new Map(faces.map((f, i) => [f.hashCode, i]));
@@ -1299,18 +1318,26 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
   for (let i = 2; i < edgeGroups.length; i += 3) edgeGroups[i] = edgeIndex.get(edgeGroups[i]) ?? -1;
   let volume = 0;
   let area = 0;
-  try {
-    volume = r.measureVolume(body);
-    area = r.measureArea(body);
-  } catch {
-    /* otevřené těleso */
+  let bb: [Vec3, Vec3];
+  if (big) {
+    const mm = meshMetrics(m.vertices, m.triangles);
+    volume = mm.volume;
+    area = mm.area;
+    bb = mm.bbox;
+  } else {
+    try {
+      volume = r.measureVolume(body);
+      area = r.measureArea(body);
+    } catch {
+      /* otevřené těleso */
+    }
+    bb = body.boundingBox.bounds as [Vec3, Vec3];
   }
-  const bb = body.boundingBox.bounds as [Vec3, Vec3];
   // platnost a počet těles – u velmi složitých tvarů (sestavy) se kontrola platnosti vynechá (drahá)
   let valid: boolean | undefined;
   let solids: number | undefined;
   try {
-    const chk = faces.length <= 2000 ? checkShape(body) : null;
+    const chk = !big && faces.length <= 2000 ? checkShape(body) : null;
     if (chk) {
       valid = chk.valid;
       solids = chk.solids;

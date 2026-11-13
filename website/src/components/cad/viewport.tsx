@@ -3,14 +3,17 @@
 import { tr } from "@/cad/i18n";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { probeWebGL, type RenderFailure } from "@/cad/diagnostics";
+import { perfMark } from "@/cad/perf-log";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { toWorld } from "@/cad/defaults";
+import { sectionKey, sectionPlane, type SectionState } from "@/cad/section-plane";
 import { entityPath } from "@/cad/sketch";
 import type { Feature, MeshData, Vec3 } from "@/cad/types";
 import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
+import { softView, useSoftViewActive } from "./soft-bridge";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -23,7 +26,8 @@ export type DisplayMode = "shadedEdges" | "shaded" | "wireframe" | "hiddenLine" 
 export type SurfaceAnalysis = "none" | "zebra";
 /** Schéma myši: ZW3D (pravé otáčí, prostřední posouvá), SolidWorks (prostřední otáčí, Ctrl+prostřední posouvá), jednoduché (levé otáčí). */
 export type MouseScheme = "zw3d" | "solidworks" | "simple";
-export type Section = { axis: "X" | "Y" | "Z"; offset: number; flip: boolean } | null;
+/** Řez: osová rovina (X / Y / Z + poloha) nebo obecná rovina (normála + bod + posun) – viz `@/cad/section-plane`. */
+export type Section = SectionState | null;
 export type Datum = { id: string; name: string; origin: Vec3; normal: Vec3; xDir: Vec3; size: number };
 /** Pomocná osa / bod / souřadný systém k vykreslení (vyřešené jádrem). */
 export type DatumGfx = { kind: "axis"; origin: Vec3; dir: Vec3; length: number } | { kind: "point"; p: Vec3 } | { kind: "csys"; origin: Vec3; x: Vec3; y: Vec3; z: Vec3; size: number };
@@ -162,6 +166,11 @@ const faceOfFrom = (m: MeshData) => {
   for (let i = 0; i < m.faceGroups.length; i += 3) for (let t = m.faceGroups[i] / 3; t < (m.faceGroups[i] + m.faceGroups[i + 1]) / 3; t++) faceOf[t] = m.faceGroups[i + 2];
   return faceOf;
 };
+/** nová síť čeká na první vykreslení (měření nahrání do WebGL – perf-log) */
+let uploadMark: { t0: number; tris: number; kind: string } | null = null;
+/** posunul se model mimo dosavadní pohled (nový model jinde, stejně velký)? → přizpůsobit pohled */
+const movedAway = (c: THREE.Vector3, r: number, prevC: THREE.Vector3, prevR: number) => c.distanceTo(prevC) > Math.max(r, prevR) * 0.5;
+
 function geoInfo(m: MeshData): GeoInfo {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(m.vertices, 3));
@@ -193,6 +202,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   const S = useRef<St | null>(null);
   const propsRef = useRef(props);
   propsRef.current = props;
+  /** bez WebGL kreslí model softwarový náhled (viewport-soft.tsx) a přebírá pohledy, přizpůsobení i snímek */
+  const softOn = useSoftViewActive();
 
   // ---------- popisky entit (F1 / E2 / V3) ----------
   const [hintList, setHintList] = useState<Hint[]>([]);
@@ -341,6 +352,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     }
     const onLost = (ev: Event) => {
       ev.preventDefault();
+      perfMark("ui.webgl.lost", 0);
       propsRef.current.onRenderError?.({ error: new Error(tr("WebGL kontext byl ztracen")), probe, lost: true });
     };
     renderer.domElement.addEventListener("webglcontextlost", onLost);
@@ -429,7 +441,12 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         if (s) {
           if (s.camera === s.orthoCam && key.parent !== orthoCam) orthoCam.add(key);
           if (s.camera === s.persp && key.parent !== persp) persp.add(key);
+          const tRender = uploadMark ? performance.now() : 0;
           renderer.render(scene, s.camera);
+          if (uploadMark) {
+            perfMark("ui.three.firstRender", performance.now() - uploadMark.t0, { renderMs: Math.round(performance.now() - tRender), triangles: uploadMark.tris, kind: uploadMark.kind });
+            uploadMark = null;
+          }
           syncCube(s.camera);
           syncLabels(s.camera);
         }
@@ -1111,10 +1128,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     if (!s) return;
     const sec = propsRef.current.section;
     if (sec) {
-      // ponechá se strana, kam míří normála (výchozí: strana odvrácená od izometrické kamery → řez je vidět)
-      const sign = (sec.axis === "Y" ? 1 : -1) * (sec.flip ? -1 : 1);
-      const n = new THREE.Vector3(sec.axis === "X" ? 1 : 0, sec.axis === "Y" ? 1 : 0, sec.axis === "Z" ? 1 : 0).multiplyScalar(sign);
-      s.clip.set(n, -sign * sec.offset);
+      // ponechá se strana, kam míří normála; osová i obecná rovina (z plochy, z vektoru) se počítá v section-plane.ts
+      const pl = sectionPlane(sec);
+      s.clip.set(new THREE.Vector3(...pl.normal), pl.constant);
     }
   }
 
@@ -1143,6 +1159,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         s.partGeo?.geo.dispose();
         s.partGeo?.edges.dispose();
         s.partGeo = geoInfo(m);
+        uploadMark = { t0: performance.now(), tris: m.triangles.length / 3, kind: "part" };
       }
       const gi = s.partGeo;
       const colors = [...new Set(Object.values(props.faceColors ?? {}))];
@@ -1181,7 +1198,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.edges = edges;
 
       const bs = gi.geo.boundingSphere!;
-      const changed = Math.abs(bs.radius - s.radius) / s.radius > 0.6;
+      const changed = Math.abs(bs.radius - s.radius) / s.radius > 0.6 || movedAway(bs.center, bs.radius, s.center, s.radius);
       s.radius = bs.radius || 100;
       s.center.copy(bs.center);
       if (firstFit.current || changed) {
@@ -1198,7 +1215,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   useEffect(() => {
     applyClip();
     S.current?.render();
-  }, [props.section?.axis, props.section?.offset, props.section?.flip]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sectionKey(props.section)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const s = S.current;
@@ -1394,6 +1411,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         }
         g = geoInfo(c.mesh);
         s.asmGeo.set(c.key, g);
+        uploadMark = { t0: uploadMark?.t0 ?? performance.now(), tris: (uploadMark?.tris ?? 0) + c.mesh.triangles.length / 3, kind: "asm" };
       }
       const mtx = new THREE.Matrix4().fromArray(c.matrix);
       const col = new THREE.Color(c.clash ? "#ff3b30" : c.color);
@@ -1431,7 +1449,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         box.expandByPoint(sp.center.clone().addScalar(-sp.radius));
       }
       const sp = box.getBoundingSphere(new THREE.Sphere());
-      const changed = Math.abs(sp.radius - s.radius) / s.radius > 0.6;
+      const changed = Math.abs(sp.radius - s.radius) / s.radius > 0.6 || movedAway(sp.center, sp.radius * 0.8, s.center, s.radius);
       s.radius = sp.radius * 0.8 || 100;
       s.center.copy(sp.center);
       if (firstFit.current || changed) {
@@ -1466,6 +1484,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   }, [gizmoKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function fitTo(v: ViewName) {
+    if (softView.current) return softView.current.setView(v);
     const s = S.current;
     if (!s) return;
     const dirs: Record<ViewName, [number, number, number]> = {
@@ -1483,6 +1502,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     s.persp.near = dist / 500;
     s.persp.far = dist * 50;
     s.persp.updateProjectionMatrix();
+    perfMark("ui.fit", 0, { radius: Math.round(s.radius), x: Math.round(s.center.x), y: Math.round(s.center.y), z: Math.round(s.center.z) });
     s.orthoCam.position.copy(s.persp.position);
     s.orthoCam.zoom = 1;
     s.controls.target.copy(s.center);
@@ -1494,6 +1514,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   useImperativeHandle(ref, () => ({
     setView: fitTo,
     fit: () => {
+      if (softView.current) return softView.current.fit();
       const s = S.current;
       if (!s) return;
       const dir = s.camera.position.clone().sub(s.controls.target).normalize();
@@ -1508,6 +1529,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.render();
     },
     snapshot: () => {
+      if (softView.current) return softView.current.snapshot();
       const s = S.current;
       if (!s) return null;
       s.renderer.render(s.scene, s.camera);
@@ -1527,6 +1549,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       return true;
     },
     bounds: () => {
+      if (softView.current) return softView.current.bounds();
       const s = S.current;
       return { center: s ? [s.center.x, s.center.y, s.center.z] : [0, 0, 0], radius: s?.radius ?? 100 };
     },
@@ -1566,7 +1589,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   };
 
   return (
-    <div className="absolute inset-0">
+    <div className={softOn ? "invisible absolute inset-0" : "absolute inset-0"}>
       <div ref={host} className="absolute inset-0" />
       {/* popisky kót měření */}
       <div ref={labelsRef} className="pointer-events-none absolute inset-0 overflow-hidden">

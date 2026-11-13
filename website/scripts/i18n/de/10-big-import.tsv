@@ -1,0 +1,26 @@
+# Große Dateien: Öffnen von STEP-Baugruppen, Fortschritt, Kernfehler (Agent w3-bigasm)
+{0} dílů se nepodařilo načíst: {1}	{0} Teile konnten nicht geladen werden: {1}
+Bez geometrie (vynecháno): {0}.	Ohne Geometrie (übersprungen): {0}.
+Čtu strukturu sestavy STEP – díl {0}/{1}	Lese die Struktur der STEP-Baugruppe – Teil {0}/{1}
+Čtu strukturu sestavy STEP…	Lese die Struktur der STEP-Baugruppe…
+Data souboru {0} nejsou v paměti (dokument obnovený bez souboru) – otevřete soubor znovu.	Die Daten der Datei {0} sind nicht im Speicher (Dokument ohne Datei wiederhergestellt) – öffnen Sie die Datei erneut.
+Jádro CAD bylo spuštěno znovu	Der CAD-Kern wurde neu gestartet
+Jádro CAD spadlo ({0}) a bylo spuštěno znovu. Zkuste operaci zopakovat; pokud se pád opakuje, model je pravděpodobně poškozený nebo příliš velký.	Der CAD-Kern ist abgestürzt ({0}) und wurde neu gestartet. Wiederholen Sie den Vorgang; tritt der Absturz erneut auf, ist das Modell wahrscheinlich beschädigt oder zu groß.
+Jádro soubor přečetlo, ale nevzniklo žádné těleso ani plocha (prázdný soubor, jen křivky nebo body). Zkontrolujte export ve zdrojovém programu (STEP AP214, tělesa).	Der Kern hat die Datei gelesen, aber es entstand kein Körper und keine Fläche (leere Datei, nur Kurven oder Punkte). Prüfen Sie den Export im Quellprogramm (STEP AP214, Volumenkörper).
+Jádru CAD došla paměť – model je pro prohlížeč příliš velký. Jádro bylo spuštěno znovu. Velkou sestavu STEP otevřete jako sestavu (díly se čtou zvlášť), zavřete ostatní záložky nebo skryjte část komponent.	Dem CAD-Kern ist der Speicher ausgegangen – das Modell ist für den Browser zu groß. Der Kern wurde neu gestartet. Öffnen Sie eine große STEP-Baugruppe als Baugruppe (Teile werden einzeln gelesen), schließen Sie andere Registerkarten oder blenden Sie einen Teil der Komponenten aus.
+Model {0} zobrazen za {1} s ({2} trojúhelníků) – můžete na něj navázat dalšími prvky.	Modell {0} in {1} s angezeigt ({2} Dreiecke) – Sie können mit weiteren Elementen fortfahren.
+Načítám {0} ({1} MB) – model se počítá, průběh a Zrušit jsou dole.	Lade {0} ({1} MB) – das Modell wird berechnet, Fortschritt und Abbrechen finden Sie unten.
+Načítám díl {0}/{1}: {2}	Lade Teil {0}/{1}: {2}
+Otevírání souboru {0} zrušeno.	Öffnen der Datei {0} abgebrochen.
+Otevřít jako díl (přesné těleso k modelování)	Als Teil öffnen (exakter Körper zum Modellieren)
+Sestava {0} zobrazena za {1} s: {2} komponent, {3} trojúhelníků.	Baugruppe {0} in {1} s angezeigt: {2} Komponenten, {3} Dreiecke.
+Sestava STEP {0}: {1} různých dílů, {2} výskytů – otevřena jako sestava, díly se načítají postupně.	STEP-Baugruppe {0}: {1} verschiedene Teile, {2} Vorkommen – als Baugruppe geöffnet, Teile werden schrittweise geladen.
+Sestavu {0} se nepodařilo zobrazit	Die Baugruppe {0} konnte nicht angezeigt werden
+Soubor {0} je neúplný – chybí konec souboru STEP (END-ISO-10303-21). Nejspíš se nestáhl nebo neuložil celý; uložte / exportujte ho znovu.	Die Datei {0} ist unvollständig – das Ende der STEP-Datei (END-ISO-10303-21) fehlt. Sie wurde wahrscheinlich nicht vollständig heruntergeladen oder gespeichert; speichern / exportieren Sie sie erneut.
+Soubor {0} neobsahuje 3D těleso.	Die Datei {0} enthält keinen 3D-Körper.
+Soubor {0} neobsahuje nic k zobrazení	Die Datei {0} enthält nichts Anzeigbares
+Soubor {0} neobsahuje žádné plochy ani tělesa – není co zobrazit.	Die Datei {0} enthält keine Flächen oder Körper – es gibt nichts anzuzeigen.
+Soubor {0} neobsahuje žádný výrobek s geometrií (STEP bez tvaru).	Die Datei {0} enthält kein Produkt mit Geometrie (STEP ohne Form).
+Soubor {0} se nepodařilo otevřít	Die Datei {0} konnte nicht geöffnet werden
+Soubor {0} se nepodařilo přečíst jako STEP (stav čtení: {1}) – soubor je poškozený nebo není ve formátu STEP AP203/AP214/AP242.	Die Datei {0} konnte nicht als STEP gelesen werden (Lesestatus: {1}) – die Datei ist beschädigt oder nicht im Format STEP AP203/AP214/AP242.
+Žádný díl sestavy neobsahuje geometrii.	Kein Teil der Baugruppe enthält Geometrie.

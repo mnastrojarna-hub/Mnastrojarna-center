@@ -420,7 +420,7 @@ Opravy proběhly ve větvi `claude/cnc-sales-os-ai-cbR2f` (PR #82). Oprava k tvr
 | 11 | Dokumentace vs. kód u zkratek | hotovo | nápověda generovaná ze skutečných zkratek, B/N/S berou předvýběr, zkratky skici v Nastavení |
 | 12 | Chybějící výzvy | hotovo | výzva podle druhu výběru u všech prvků |
 | 13 | Díra: body a více děr | hotovo | více poloh jedním příkazem, šikmá díra (`směr`, `sklon`), řada ISO 273 |
-| 14 | Řez jen posuvníkem | dokončuje se | číselná poloha, rovina z plochy a obecná normála – sloučí se s náhledem bez WebGL |
+| 14 | Řez jen posuvníkem | hotovo | poloha číslem i výrazem v souladu s posuvníkem, rovina z vybrané plochy, obecná normála, otočit stranu; řez funguje i v náhledu bez WebGL |
 | 15 | Normálie textem | hotovo | `normálie M8x30 [v x y z]` |
 | 16 | Ukončení díry | hotovo | k vrcholu, odsazeně od plochy, k tělesu |
 | 17 | „Použít aktuální výběr“ | hotovo | tlačítko + výběr a výběr ze seznamu v každém formuláři s hranami/plochami |
