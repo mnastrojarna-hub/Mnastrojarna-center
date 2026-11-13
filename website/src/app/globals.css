@@ -659,3 +659,30 @@ html.has-cursor .cursor-ring {
     text-decoration: none;
   }
 }
+
+/* CAD: výrazné tlačítko „Sdílet odkazem“ (components/cad/share-cta.tsx) */
+@keyframes share-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(224, 57, 48, 0.7), 0 6px 18px -6px rgba(224, 57, 48, 0.9); }
+  70% { box-shadow: 0 0 0 12px rgba(224, 57, 48, 0), 0 6px 18px -6px rgba(224, 57, 48, 0.9); }
+  100% { box-shadow: 0 0 0 0 rgba(224, 57, 48, 0), 0 6px 18px -6px rgba(224, 57, 48, 0.9); }
+}
+@keyframes share-shine {
+  0% { transform: translateX(0) skewX(-20deg); }
+  55%, 100% { transform: translateX(400%) skewX(-20deg); }
+}
+@keyframes share-wiggle {
+  0%, 84%, 100% { transform: rotate(0) scale(1); }
+  87% { transform: rotate(-16deg) scale(1.2); }
+  90% { transform: rotate(14deg) scale(1.2); }
+  93% { transform: rotate(-8deg) scale(1.1); }
+  96% { transform: rotate(4deg) scale(1.05); }
+}
+.share-cta:not(:disabled) { animation: share-pulse 1.8s cubic-bezier(0.66, 0, 0, 1) infinite; }
+.share-cta:not(:disabled) .share-cta-shine { animation: share-shine 2.8s ease-in-out infinite; }
+.share-cta:not(:disabled) .share-cta-icon { animation: share-wiggle 4.5s ease-in-out infinite; }
+.share-cta:disabled .share-cta-shine { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .share-cta:not(:disabled),
+  .share-cta:not(:disabled) .share-cta-shine,
+  .share-cta:not(:disabled) .share-cta-icon { animation: none; }
+}

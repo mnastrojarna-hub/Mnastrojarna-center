@@ -1,0 +1,4 @@
+# EN – opravy Chytrých kót po kontrole (vrtání v řezu, pomocná kóta, rada pohledu)
+{0}: hloubka vrtání není v řezu vidět – kótujte ji ručně	{0}: the bore depth is not visible in the section – dimension it manually
+kóta „{0}“ je pomocná (v závorce) – pomocná kóta se netoleruje (ISO 129-1); tolerujte jiný článek řetězu: {1}	dimension “{0}” is an auxiliary dimension (in parentheses) – auxiliary dimensions are not toleranced (ISO 129-1); tolerance another link of the chain: {1}
+vnitřní {0}: v pohledech jen skrytě – zapněte pohled {1} nebo řez osou (výkres řez …)	internal {0}: only hidden in the views – turn on the {1} view or a section through the axis (drawing section …)

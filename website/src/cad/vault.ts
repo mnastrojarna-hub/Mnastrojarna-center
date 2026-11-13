@@ -21,6 +21,8 @@ const SESSION_KEY = "mn-cad-vault-key";
 /** klíče, pod kterými se ukládají dokumenty (vše se při vypnutí / vymazání odstraní) */
 export const DOC_KEYS = ["mn-cad-doc-v1", "mn-cad-tabs-v1", "mn-cad-recent-v1", "mn-cad-prefs-v1"];
 export const DOC_PREFIX = "mn-cad-doc-";
+/** IndexedDB s daty importů (STEP, STL…) dokumentů – zašifrované stejným klíčem (viz vault-blobs.ts) */
+export const BLOB_DB = "mn-cad-vault-blobs-v1";
 
 let key: CryptoKey | null = null;
 
@@ -28,7 +30,13 @@ const ls = () => (typeof localStorage === "undefined" ? null : localStorage);
 const ss = () => (typeof sessionStorage === "undefined" ? null : sessionStorage);
 const enc = new TextEncoder();
 const dec = new TextDecoder();
-const b64 = (a: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(a)));
+/** base64 po blocích – `String.fromCharCode(...pole)` nad ~120 kB přeteče zásobník (velký dokument by se tiše neuložil) */
+const b64 = (a: ArrayBuffer | Uint8Array) => {
+  const u = new Uint8Array(a);
+  let s = "";
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000));
+  return btoa(s);
+};
 const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 export function persistMode(): PersistMode {
@@ -37,11 +45,31 @@ export function persistMode(): PersistMode {
 export function isUnlocked() {
   return !!key;
 }
-/** Smaže z prohlížeče všechny uložené dokumenty (i z dřívějších verzí programu). Nastavení zůstává. */
+let generation = 0;
+/** počítadlo vymazání úložiště – data importů zapsaná dřív už v IndexedDB nejsou (vault-blobs.ts) */
+export const vaultGeneration = () => generation;
+/** Smaže z prohlížeče všechny uložené dokumenty (i z dřívějších verzí programu) včetně dat importů. Nastavení zůstává. */
 export function wipeStoredDocuments() {
+  generation++;
+  try {
+    if (typeof indexedDB !== "undefined") indexedDB.deleteDatabase(BLOB_DB);
+  } catch {
+    /* IndexedDB nedostupné */
+  }
   const l = ls();
   if (!l) return;
   for (const k of Object.keys(l)) if (k.startsWith(DOC_PREFIX) || DOC_KEYS.includes(k)) l.removeItem(k);
+}
+/** klíče uložených dokumentů (rozpracovaný dokument a nedávné soubory) */
+export function storedDocKeys(): string[] {
+  const l = ls();
+  if (!l) return [];
+  const out: string[] = [];
+  for (let i = 0; i < l.length; i++) {
+    const k = l.key(i);
+    if (k && k.startsWith(DOC_PREFIX)) out.push(k);
+  }
+  return out;
 }
 
 async function deriveKey(pass: string, salt: Uint8Array): Promise<CryptoKey> {
@@ -145,6 +173,25 @@ export async function vaultGet(k: string): Promise<string | null> {
   if (!v) return null;
   try {
     return await decryptText(key, v);
+  } catch {
+    return null;
+  }
+}
+/** Zašifruje bajty klíčem úložiště (iv 12 B + šifrový text); null = úložiště vypnuté nebo zamčené. */
+export async function vaultSeal(bytes: Uint8Array): Promise<Uint8Array | null> {
+  if (persistMode() !== "encrypted" || !key) return null;
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes as BufferSource));
+  const out = new Uint8Array(12 + ct.length);
+  out.set(iv, 0);
+  out.set(ct, 12);
+  return out;
+}
+/** Dešifruje bajty z `vaultSeal`; null = zamčeno, jiný klíč nebo poškozená data. */
+export async function vaultUnseal(sealed: Uint8Array): Promise<Uint8Array | null> {
+  if (persistMode() !== "encrypted" || !key || sealed.length < 13) return null;
+  try {
+    return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: sealed.subarray(0, 12) as BufferSource }, key, sealed.subarray(12) as BufferSource));
   } catch {
     return null;
   }

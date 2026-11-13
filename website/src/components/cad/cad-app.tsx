@@ -17,8 +17,9 @@ import { DEFAULT_SKETCH_SHORTCUTS, keyCombo, loadSettings, pushRecent, readRecen
 import { EXAMPLES, FEATURE_LABEL, featureIcon, featureLabel, featureTone, newExtFeature, newFeature, nextName, planeLabel } from "@/cad/defaults";
 import { extByTab, getExt, visibleExt, type ExtDef, type ExtTab } from "@/cad/ext/registry";
 import { IMPORT_ACCEPT, prepareImport } from "@/cad/formats/import";
-import { embedBlobs, internBlobs } from "@/cad/blobs";
-import { perfEntries } from "@/cad/perf-log";
+import { embedBlobs, internBlobs, missingBlobFiles } from "@/cad/blobs";
+import { gcVaultBlobs, loadDocBlobs, lostImportsText, persistDocBlobs } from "@/cad/vault-blobs";
+import { perfEntries, perfMark } from "@/cad/perf-log";
 import { asmImportOutcome, fileComponentAsPart, importStartText, loadAsmParts, partImportOutcome, subassemblyComponent, type PendingImport } from "./import-watch";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
@@ -38,6 +39,7 @@ import { saveFile } from "@/lib/save-file";
 import { track } from "../analytics";
 import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
+import { ShareCta } from "./share-cta";
 import { CommandPalette, type Command } from "./command-palette";
 import { getExtUi, type ExtActionApi } from "./ext";
 import { LibraryDialog } from "./library-dialog";
@@ -52,6 +54,7 @@ import { StartScreen } from "./start-screen";
 import { stampFeature, usePickSigs } from "./use-pick-sigs";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
+import { measureApi, measureLog } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
 import { AskHost, askNumber } from "./ask-dialog";
 import { ComputeChip, progressLabel } from "./compute-chip";
@@ -62,8 +65,8 @@ import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Wa
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool, type SketcherHandle } from "./sketcher";
-import { applySketchPatch } from "@/cad/sketch-underlay";
-import { SectionControls } from "./section-panel";
+import { applySketchPatch, pruneUnderlays } from "@/cad/sketch-underlay";
+import { SectionControls, defaultSection } from "./section-panel";
 import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
@@ -220,6 +223,8 @@ export function CadApp() {
   const [partingZ, setPartingZ] = useState<{ z: number; perimeter: number } | null>(null);
   const docId = useRef(uid());
   const lastThumb = useRef(0);
+  /** soubory, jejichž data se nevešla do úložiště prohlížeče (hlásí se jednou) */
+  const blobWarned = useRef(new Set<string>());
   const parentAsm = asmStack.length ? asmStack[asmStack.length - 1] : null;
   const setParentAsm = (v: null) => setAsmStack(v === null ? [] : []);
   const vp = useRef<ViewportHandle>(null);
@@ -523,8 +528,9 @@ export function CadApp() {
         switch (op.k) {
           case "doc": {
             flush();
-            const incoming = op.doc.features;
-            d = { ...op.doc, features: [] };
+            const din = internBlobs(op.doc); // data importů z mapy `blobs` (.mncad této verze) do úložiště ještě před ověřovací stavbou
+            const incoming = din.features;
+            d = { ...din, features: [] };
             openNew = true;
             changed = true;
             for (const raw of incoming) d.features.push(prepare(raw)); // $last, režim, duplicitní id – prvek po prvku
@@ -591,8 +597,9 @@ export function CadApp() {
           case "entities":
           case "constraints":
           case "dims":
-            // entity (id e1, e2…), vazby a kóty do skici bloku; po vazbách / kótách a na konci bloku se skica vyřeší (agent-sketch.ts)
-            log.push(...applySketchOp(d.features, op));
+            // entity (id e1, e2…), vazby a kóty do skici bloku, jinak do skici otevřené ve skicáři (nezaložil-li tento vstup
+            // vlastní skicu), jinak do poslední; po vazbách / kótách a na konci bloku se skica vyřeší (agent-sketch.ts)
+            log.push(...applySketchOp(d.features, op, openNew || added.some((f) => f.type === "sketch") ? null : sketchId));
             changed = true;
             break;
           case "sketchOn": {
@@ -702,6 +709,9 @@ export function CadApp() {
             vp.current?.setView(op.view as ViewName);
             log.push(tr("✓ pohled {0}", op.view));
             break;
+          case "measure":
+            log.push(...(await measureLog(d, op.cmd)));
+            break;
           case "status": {
             // „stav“ na konci vstupu vypíše až závěrečný stav (jednou); uprostřed vstupu stav v tom okamžiku
             if (op === lastOp) break;
@@ -797,8 +807,10 @@ export function CadApp() {
       }
       if (!isUnlocked() && !(await restoreSession())) return; // zamčeno – odemkne se z úvodní obrazovky / nastavení
       const raw = await vaultGet(STORE);
-      const d = raw ? (JSON.parse(raw) as CadDoc) : null;
+      const d = raw ? internBlobs(JSON.parse(raw) as CadDoc) : null;
       const present = d?.app === "mnastrojarna-cad" && Array.isArray(d.features) ? d : emptyDoc();
+      // data importů (STEP, STL…) jsou v úložišti zvlášť (vault-blobs.ts) – doplnit je dřív, než se dokument postaví
+      const lost = new Set(await loadDocBlobs(present).catch(() => []));
       setHist({ past: [], present, future: [] });
       // obnova záložek z minulé návštěvy (dokumenty jsou uložené v nedávných souborech)
       try {
@@ -813,7 +825,8 @@ export function CadApp() {
             } else {
               const json = await readRecentDoc(t.docId);
               // prázdné záložky se neukládají – obnoví se jako prázdný díl / sestava se stejným názvem
-              const pd = json ? (JSON.parse(json) as CadDoc) : t.kind === "assembly" ? emptyAssembly(t.title) : emptyDoc(t.title);
+              const pd = json ? internBlobs(JSON.parse(json) as CadDoc) : t.kind === "assembly" ? emptyAssembly(t.title) : emptyDoc(t.title);
+              for (const n of await loadDocBlobs(pd).catch(() => [])) lost.add(n);
               list.push({ ...t, hist: { past: [], present: pd, future: [] } });
             }
             void isActive;
@@ -830,6 +843,8 @@ export function CadApp() {
       } catch {
         /* bez obnovy záložek */
       }
+      if (lost.size) setNotice({ title: tr("Data importovaných souborů chybí"), body: lostImportsText([...lost]) });
+      setTimeout(() => void gcVaultBlobs().catch(() => 0), 8000); // úklid dat, na která už nic neodkazuje
     };
     restore()
       .catch(() => setHist({ past: [], present: emptyDoc(), future: [] }))
@@ -878,6 +893,7 @@ export function CadApp() {
       setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
       status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current()),
       drawingStatus: async () => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, o) => cad.drawing(doc, meta, o))).text,
+      measure: (a, b) => measureApi(histRef.current.present, a, b),
       openConsole: () => setAgentOpen(true),
       progress: () => {
         const p = cad.progress();
@@ -902,8 +918,9 @@ export function CadApp() {
           return btoa(b);
         };
         if (format === "mncad") {
+          const lost = missingBlobFiles(d);
           const u8 = new TextEncoder().encode(JSON.stringify(embedBlobs(d), null, 1));
-          return { name: `${safeName(d.name)}.mncad`, mime: "application/json", bytes: u8.length, base64: toB64(u8) };
+          return { name: `${safeName(d.name)}.mncad`, mime: "application/json", bytes: u8.length, base64: toB64(u8), ...(lost.length ? { warning: lostImportsText(lost) } : {}) };
         }
         const meta = EXPORTS.find((e) => e.f === format);
         if (!meta) throw new Error(tr("Neznámý formát „{0}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.", format));
@@ -922,7 +939,16 @@ export function CadApp() {
       try {
         // ochrana dokumentace: bez zapnutého šifrovaného úložiště se do prohlížeče nic nezapisuje
         if (persistMode() !== "encrypted" || !isUnlocked()) return;
-        const json = JSON.stringify(doc);
+        const t0 = performance.now();
+        const json = JSON.stringify(pruneUnderlays(doc)); // bez podkladů smazaných skic
+        const jsonMs = performance.now() - t0;
+        // dokument drží jen odkazy mnblob: – data importů se uloží zvlášť, každý soubor jen poprvé (vault-blobs.ts)
+        void persistDocBlobs(doc).then((r) => {
+          perfMark("ui.autosave", jsonMs + r.ms, { kb: Math.round(json.length / 1024), written: r.written, mb: +(r.bytes / 1048576).toFixed(2) });
+          const fresh = r.failed.filter((n) => !blobWarned.current.has(n));
+          fresh.forEach((n) => blobWarned.current.add(n));
+          if (fresh.length) flash(tr("Data souboru {0} se do úložiště prohlížeče nevešla – po obnovení stránky ho otevřete znovu (nebo uložte projekt .mncad).", fresh.join(", ")));
+        });
         void vaultSet(STORE, json);
         const strip: DocTab[] = docTabs.length ? docTabs : fallbackTabs();
         void vaultSet(TABS_KEY, JSON.stringify({ active: tabId, tabs: strip.map(({ id, kind, title, docId: did, srcTabId }) => ({ id, kind, title: id === tabId ? doc.name : title, docId: id === docEntryId(strip, tabId) ? docId.current : did, srcTabId })) }));
@@ -2074,13 +2100,18 @@ export function CadApp() {
   };
   /** cíl posledního uložení projektu (Ctrl+S pak ukládá bez dotazu; „Uložit jako…“ se zeptá znovu) */
   const projectTarget = useRef<SavedFile | null>(null);
+  /** hlášení po uložení – soubor bez dat některého importu (data nejsou v paměti) se ohlásí, ne tiše uloží */
+  const savedText = (name: string) => {
+    const lost = missingBlobFiles(doc);
+    return lost.length ? tr("Uloženo: {0} – BEZ dat souborů {1} (nejsou v paměti). Otevřete je znovu a uložte projekt ještě jednou.", name, lost.join(", ")) : tr("Uloženo: {0}", name);
+  };
   const saveProjectAs = async () => {
     const t = await pickSaveTarget(`${safeName(doc.name)}.mncad`, "application/json");
     if (!t) return;
     await writeSaved(t, JSON.stringify(embedBlobs(doc), null, 1), "application/json");
     projectTarget.current = t.handle ? t : null;
     dirty.current = false;
-    flash(tr("Uloženo: {0}", t.name));
+    flash(savedText(t.name));
   };
   const saveProject = async () => {
     const t = projectTarget.current;
@@ -2088,7 +2119,7 @@ export function CadApp() {
       try {
         await writeSaved(t, JSON.stringify(embedBlobs(doc), null, 1), "application/json");
         dirty.current = false;
-        flash(tr("Uloženo: {0}", t.name));
+        flash(savedText(t.name));
         return;
       } catch {
         projectTarget.current = null; // soubor už není dostupný → zeptat se znovu
@@ -2174,7 +2205,8 @@ export function CadApp() {
       }
       track("cad_import", { format: ext ?? "" });
     } catch (e) {
-      flash((e as Error).message || tr("Soubor se nepodařilo načíst."));
+      if (isCancelled(e)) flash(tr("Otevírání souboru {0} zrušeno.", file.name)); // Zrušit při čtení struktury sestavy STEP
+      else flash((e as Error).message || tr("Soubor se nepodařilo načíst."));
     }
   };
   // přetažení souborů do okna: každý se otevře ve vlastní záložce (bez výchozího chování prohlížeče = nové okno)
@@ -2227,9 +2259,7 @@ export function CadApp() {
   };
   const toggleSection = () => {
     if (section) return setSection(null);
-    const m = result?.metrics;
-    const c = m ? (m.bbox[0][1] + m.bbox[1][1]) / 2 : 0;
-    setSection({ axis: "Y", offset: Math.round(c * 100) / 100, flip: false });
+    setSection(defaultSection(result?.mesh ?? null, isAsm ? asmViews : undefined)); // střed modelu – i sestavy
   };
   const view = (v: ViewName) => vp.current?.setView(v);
 
@@ -2390,10 +2420,11 @@ export function CadApp() {
   const setSketchPatch = useCallback(
     (patch: SketchPatch, record = true) => {
       if (!sketchId) return;
-      const next = applySketchPatch(doc, sketchId, patch); // podklad skici jde do doc.underlays, ne do prvku
-      (record ? commit : live)(next);
+      // podklad skici jde do doc.underlays, ne do prvku; funkčně nad aktuálním dokumentem a jen dokud v něm skica je –
+      // zpožděný zápis (načtení podkladu) po zavření skici / přepnutí záložky nepřepíše jiný dokument
+      (record ? commitWith : liveWith)((d) => (d.features.some((f) => f.id === sketchId) ? applySketchPatch(d, sketchId, patch) : d));
     },
-    [doc, sketchId, commit, live],
+    [sketchId, commitWith, liveWith],
   );
 
   const mat = MATERIALS.find((m) => m.id === doc.material) ?? MATERIALS[0];
@@ -3066,17 +3097,12 @@ export function CadApp() {
           </span>
           <QBtn icon="measure" title={tr("Paleta příkazů (Ctrl+K)")} onClick={() => setPaletteOpen(true)} />
           <QBtn icon="settings" title={tr("Nastavení (Ctrl+,)")} onClick={() => setSettingsOpen(true)} />
-          <button
-            type="button"
+          <ShareCta
+            compact
             onClick={() => setShareOpen(true)}
             disabled={!doc.features.length && !doc.components?.length}
             title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči")}
-            aria-label={tr("Sdílet")}
-            className="flex h-7 items-center gap-1 rounded px-1.5 text-[12px] font-medium text-white/85 hover:bg-white/10 disabled:opacity-40"
-          >
-            <CadIcon name="share" className="h-4 w-4" />
-            <span className="hidden md:inline">{tr("Sdílet")}</span>
-          </button>
+          />
           <div className="relative">
             <button
               type="button"
@@ -3298,8 +3324,9 @@ export function CadApp() {
                 />
               </ViewportBoundary>
             </div>
-            {glError && !sketch && (
+            {glError && (
               <ViewportFallback
+                hidden={!!sketch}
                 failure={glError}
                 core={core}
                 scene={{ mesh: result?.mesh ?? null, assembly: isAsm ? asmViews : undefined, color: doc.color, faceColors: doc.faceColors, display: prefs.display, section, hidden: bodyHidden, dark: bg.dark }}
@@ -3845,12 +3872,14 @@ export function CadApp() {
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
             onOpenRecent={(r) => {
-              void readRecentDoc(r.id).then((json) => {
+              void readRecentDoc(r.id).then(async (json) => {
                 if (!json) return flash(tr("Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad."));
                 try {
-                  const d = JSON.parse(json) as CadDoc;
+                  const d = internBlobs(JSON.parse(json) as CadDoc);
+                  const lost = await loadDocBlobs(d).catch(() => []); // data importů z úložiště (vault-blobs.ts)
                   setStartOpen(false);
                   openDocInTab(d, { docId: r.id });
+                  if (lost.length) setNotice({ title: tr("Data importovaných souborů chybí"), body: lostImportsText(lost) });
                 } catch {
                   flash(tr("Soubor se nepodařilo načíst."));
                 }

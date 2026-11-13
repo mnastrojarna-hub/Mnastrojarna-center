@@ -20,6 +20,7 @@
 import * as r from "replicad";
 import { tr } from "./i18n";
 import { deepCopy, meshArrays, shapeResult } from "./build";
+import { checkShape } from "./check";
 import { MESH_ANGULAR, meshTolerance } from "./fastbool";
 import { importBREP, importSTLBody } from "./formats/kernel-import";
 import {
@@ -504,7 +505,24 @@ export function compareShapes(model: Shape, ref0: Shape, opts: CompareOptions = 
     const tRef = Date.now();
     const rr = shapeResult(ref);
     if (!rr.metrics || !rr.mesh) throw new Error(tr("Referenční model se nepodařilo zasíťovat."));
+    // shapeResult u velkých těles (> BIG_FACES ploch) bere objem a obálku z hrubší sítě a vynechá kontrolu platnosti –
+    // pro porovnání musí být reference změřená stejně přesně jako model (jinak falešný rozdíl objemů)
     const refInfo = { volume: rr.metrics.volume, area: rr.metrics.area, bbox: rr.metrics.bbox, faces: rr.metrics.faces, solids: rr.metrics.solids ?? 0, valid: rr.metrics.valid, format: info.format ?? "step", fileName: info.fileName ?? "" };
+    try {
+      refInfo.volume = r.measureVolume(ref);
+      refInfo.area = r.measureArea(ref);
+      refInfo.bbox = boundsOf(ref);
+    } catch {
+      /* otevřené těleso – zůstanou hodnoty ze sítě */
+    }
+    if (refInfo.valid === undefined && refInfo.faces <= 2000)
+      try {
+        const chk = checkShape(ref);
+        refInfo.valid = chk.valid;
+        refInfo.solids = chk.solids;
+      } catch {
+        /* bez kontroly */
+      }
     const ghost: TriMeshData | null = opts.ghost === false ? null : { vertices: rr.mesh.vertices, normals: rr.mesh.normals, triangles: rr.mesh.triangles };
     const msRef = Date.now() - tRef;
     if (refInfo.valid === false) warnings.push(tr("Referenční model není podle kontroly jádra platné těleso – rozdíly mohou být nepřesné."));

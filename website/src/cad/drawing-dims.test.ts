@@ -10,7 +10,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
 import { AGENT_GUIDE } from "./agent-guide";
-import { annToSheet, withAnnotations, type DrawingResult } from "./drawing";
+import { annToSheet, makeDrawing, withAnnotations, type DrawingResult } from "./drawing";
+import { buildDoc } from "./build";
+import { drawingDoc } from "./drawing-doc";
 import { holeCallout, linMeaning } from "./drawing-dims";
 import { annotationBoxes } from "./drawing-dims-layout";
 import { annLabel, dimDuplicates, drawingStatus, mergeSmart } from "./drawing-agent";
@@ -254,6 +256,34 @@ describe("oběžné kolo 604200.001 B (rotační díl se 16 dírami)", async () 
     expect(L).toContain("110");
     expect(d.smart.annotations.find((a) => a.type === "callout" && a.lines[0].startsWith("16×"))?.view).toBe("bottom");
   });
+  it("výchozí pohledy: místo pro kóty nezvětší formát (A2 1:2 jako bez kót); pevný A2 1:2 bez falešného varování; Ø416 na listu", async () => {
+    const body = (await buildDoc(drawingDoc(doc))).body!;
+    const meta = { name: "Kolo", material: "" };
+    // dřív jednotné místo kolem všech pohledů posunulo list na A1, i když se pohledy s kótami na A2 vejdou
+    for (const dimRoom of [10, 24]) {
+      const plain = makeDrawing(body, meta, { dimensions: "none", dimRoom, dimRoomMin: 0 });
+      expect(`${plain.sheet.name} ${plain.scale}`).toBe("A2 1:2");
+      expect(plain.warnings).toEqual([]);
+    }
+    const a2 = await smartDrawing(doc, { sheet: "A2", scale: 0.5 });
+    expect(a2.drawing.warnings).toEqual([]); // dřív „Pohledy se v měřítku 1:2 nevejdou na list A2“
+    expect(labels(a2.drawing, a2.smart.annotations)).toContain("Ø416");
+    const auto = await smartDrawing(doc, {});
+    expect(`${auto.drawing.sheet.name} ${auto.drawing.scale}`).toBe("A2 1:2");
+    expect(auto.drawing.warnings).toEqual([]);
+    expect(labels(auto.drawing, auto.smart.annotations)).toContain("Ø416");
+    expect(labels(auto.drawing, auto.smart.annotations)).toContain("Ø338,4");
+    // kóty a popisy uvnitř rámu a mimo razítko
+    const { w: W, h: H } = auto.drawing.sheet;
+    const tb: Box = { x0: W - 10 - 180, y0: H - 10 - 38, x1: W - 10, y1: H - 10 };
+    for (const b of annotationBoxes(auto.drawing, auto.smart.annotations).flatMap((x) => x.boxes)) {
+      expect(b.x0 >= 20 && b.y0 >= 10 && b.x1 <= W - 10 && b.y1 <= H - 10, JSON.stringify(b)).toBe(true);
+      expect(boxesOverlap(b, tb), JSON.stringify(b)).toBe(false);
+    }
+    expect(auto.smart.report.skipped.filter((s) => s.startsWith("Ø416"))).toEqual([]);
+    expect(dimDuplicates(auto.drawing.views, auto.smart.annotations)).toEqual([]);
+    expect(overlaps(auto.drawing, auto.smart.annotations)).toEqual([]);
+  }, 300_000);
   it("bez duplicit a překryvů; počet kót nepřesáhne počet očekávaných rozměrů", () => {
     expect(d.smart.report.kind).toBe("turned");
     expect(dimDuplicates(d.drawing.views, d.smart.annotations)).toEqual([]);

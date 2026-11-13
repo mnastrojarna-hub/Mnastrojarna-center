@@ -15,6 +15,7 @@ import { getFeatureBuilder } from "./feat/registry";
 import { resolvePicks } from "./pick-sigs";
 import { countFaces, importBody, wasmMB } from "./formats/kernel-import";
 import { perfMark } from "./perf-log";
+import { missingBlobs } from "./blobs";
 import { BIG_FACES, meshMetrics, meshParams, quickDiag } from "./mesh-budget";
 import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
@@ -774,6 +775,8 @@ const docKeyOf = (d: CadDoc) => JSON.stringify([d.variables ?? null, d.bindings 
  */
 export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { preferActive?: boolean; onProgress?: BuildProgressFn; noCache?: boolean } = {}): Promise<{ body: Shape | null; status: FeatureStatus[]; paramErrors: string[]; resolved: Resolved; bodies: NamedBody[] }> {
   const { doc, errors: paramErrors } = resolveDoc(input);
+  // chybějící data importu (dorazí s dalším požadavkem) – selhaný import se nesmí zapamatovat pro tentýž dokument
+  if (missingBlobs(input).length) opts = { ...opts, noCache: true };
   const sketches = new Map<string, SketchF>();
   const tools = new Map<string, ToolEntry>();
   const status: FeatureStatus[] = [];
@@ -1233,7 +1236,7 @@ export async function buildDoc(doc: CadDoc, opts: { tolerance?: number; onProgre
   opts.onProgress?.({ index: doc.features.length, total: doc.features.length, phase: "mesh" });
   const sr = shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance, light: opts.light });
   const res: DocResult = { ...sr, resolved, bodies: bodyInfos(bodies, bodies.length === 1 ? sr.metrics?.volume : undefined) };
-  lastDocResult = { key, res: copyDocResult(res) };
+  if (!missingBlobs(doc).length) lastDocResult = { key, res: copyDocResult(res) };
   return res;
 }
 

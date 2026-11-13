@@ -15,6 +15,7 @@ import { threadByName, threadLabel } from "./defaults";
 import { allExt } from "./ext/registry";
 import { parseDimension, parseDrawing, type DrawingCmd } from "./agent-drawing";
 import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type SketchOp, type SketchTarget } from "./agent-sketch";
+import { parseMeasure, type MeasureApiResult, type MeasureCmd } from "./agent-measure";
 import { toAxisDef, toDirection } from "./ext/place";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
 
@@ -76,6 +77,8 @@ export type AgentOp =
   | { k: "pop"; line: number }
   | { k: "view"; view: string; line: number }
   | { k: "status"; line: number }
+  /** měření (agent-measure.ts): údaje o F/E/V, vzdálenost a úhel dvou entit, těleso, díry, válce – výsledek do protokolu */
+  | { k: "measure"; cmd: MeasureCmd; line: number }
   /** sestava: kontrola kolizí komponent, výsledek do protokolu */
   | { k: "clash"; line: number };
 export type AgentError = { line: number; text: string; message: string };
@@ -277,6 +280,7 @@ syn("constraint", "vazba", "vazby", "constraints", "bedingung", "bedingungen");
 syn("dim", "kóta", "kota", "kóty", "koty", "dims", "bemaßung", "bemassung", "maß", "mass");
 syn("face", "plocha", "fläche", "flaeche");
 syn("plane", "rovina", "ebene", "datum", "bezugsebene", "hilfsebene");
+syn("measure", "měřit", "merit", "změřit", "zmerit", "measurement", "messen", "vermessen", "ausmessen");
 const canon = (t: string) => SYN[fold(t)] ?? fold(t);
 /** anglické a německé názvy tříd materiálu → id (hustota); jiné texty jdou do razítka jako označení */
 const MATERIAL_ALIASES: Record<string, string> = Object.fromEntries(
@@ -341,7 +345,18 @@ function parseOpts(tokens: string[]): Opts {
 }
 /** `skica plocha F3 [odsazení N] [obráceně]` · `skica rovina <název pomocné roviny> [odsazení N]` (null = jiná rovina) */
 function sketchOnSpec(tk: string[], o: Opts): Pick<SketchOnOp, "on" | "offset" | "flip"> | null {
-  const i = tk.findIndex((t) => canon(t) === "face" || canon(t) === "plane");
+  // slova za volbou (název „Horní plocha“, materiál…) nejsou umístění skici – přeskočí se jako v parseOpts
+  const isKey = (t: string) => NUM_OPTS.has(canon(t)) || WORD_OPTS.has(canon(t)) || FLAGS.has(canon(t));
+  let i = -1;
+  for (let j = 0; j < tk.length && i < 0; j++) {
+    const c = canon(tk[j]);
+    if (c === "face" || c === "plane") i = j;
+    else if (c === "axis" || c === "direction" || c === "thread") {
+      // jedno slovo, nebo směr třemi čísly
+      if (j + 1 < tk.length && isNum(tk[j + 1])) for (let n = 0; n < 3 && j + 1 < tk.length && isNum(tk[j + 1]); n++) j++;
+      else if (j + 1 < tk.length && !isKey(tk[j + 1])) j++;
+    } else if (WORD_OPTS.has(c)) while (j + 1 < tk.length && !isKey(tk[j + 1])) j++;
+  }
   if (i < 0) return null;
   const rest: string[] = [];
   for (const t of tk.slice(i + 1)) {
@@ -871,6 +886,9 @@ export function parseAgentText(text: string): AgentProgram {
         case "status":
           ops.push({ k: "status", line: no });
           return;
+        case "measure":
+          ops.push({ k: "measure", cmd: parseMeasure(tokens), line: no });
+          return;
         case "clash":
           ops.push({ k: "clash", line: no });
           return;
@@ -1319,6 +1337,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "kótovat [chytře|celkově|nic] [řetězově|od základny]", en: "dimension smart chain / dimension smart baseline / dimension overall / dimension none", de: "bemaßen intelligent kette / bemaßen intelligent basis / bemaßen gesamt / bemaßen keine", desc: tr("(pře)generuje Chytré kóty podle prvků modelu – nahradí jen vygenerované, vlastní kóty zůstanou; vypíše počet kót podle pohledů a co se nevešlo") },
   { cmd: "výkres tolerance <kóta> <tolerance> · výkres poznámka \"…\" · výkres nepředepsané ISO 2768-mK · výkres hrany ISO 13715 … · výkres drsnost Ra 3,2", en: "drawing tolerance Ø40 h6, drawing note, drawing general ISO 2768-mK, drawing edges ISO 13715, drawing roughness Ra 3.2", de: "zeichnung toleranz Ø40 h6, zeichnung notiz, zeichnung allgemein ISO 2768-mK, zeichnung kanten ISO 13715, zeichnung rauheit Ra 3,2", desc: tr("tolerance ke kótě podle popisku (Ø40 h6, 25 ±0,1, M8 6H); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka") },
   { cmd: "výkres stav", en: "drawing status", de: "zeichnung status", desc: tr("textový stav výkresu pro agenta: list, měřítko, pohledy, všechny kóty s pohledem, duplicity, chybějící rozměry (Kontrola kót), co se nevešlo; také window.mncad.drawingStatus()") },
+  { cmd: "měřit F3|E5|V2 [F7|E9|V8|x y z] · měřit těleso · měřit díry · měřit válce · měřit plocha|hrany <pravidlo>", en: "measure", de: "messen", desc: tr("měření pro kontrolu modelu: údaje o ploše / hraně / vrcholu (čísla jako popisky pro výběr), vzdálenost, úhel a rovnoběžnost dvou entit, rozteč os děr, těleso (obálka, objem, hmotnost, těžiště), seznam děr (Ø, hloubka, osa, střed, po průměrech) a vnějších válců; v sestavě Komponenta:F3; také window.mncad.measure()") },
   { cmd: "smazat poslední · stav · zobraz iso|přední|horní…", en: "undo, status, view", de: "rückgängig, status, ansicht", desc: tr("správa") },
   { cmd: "kolize", en: "clash", de: "kollision", desc: tr("sestava: kontrola průniků komponent; výsledek zůstane v protokolu i ve stavu (řádek „Kolize:“)") },
   { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", de: "JSON", desc: tr("celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy") },
@@ -1345,6 +1364,11 @@ export type MncadApi = {
   status: () => Promise<string>;
   /** textový stav výkresu (list, měřítko, pohledy, kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo) – jako „výkres stav“ */
   drawingStatus: () => Promise<string>;
+  /**
+   * měření jako příkaz „měřit“: a / b = "F3", "E5", "V2", [x, y, z], "těleso", "díry", "válce", "plocha horní", "Hřídel:F3";
+   * vrátí řádky protokolu, hlavní čísla (distance, angle, radius, diameter, area, length, volume, points) a celý výsledek (report)
+   */
+  measure: (a: string | number[], b?: string | number[]) => Promise<MeasureApiResult>;
   /** otevře konzoli Textové příkazy */
   openConsole: () => void;
   /** průběh běžícího výpočtu jádra (prvek index+1 z total, uplynulý čas) – null, když nic dlouhého neběží */
@@ -1359,7 +1383,7 @@ export type MncadApi = {
   /** klikne na entitu podle popisku stejnou cestou jako myš (additive = přidat k výběru) */
   clickHint: (id: string, additive?: boolean) => boolean;
   /** export bez dialogu: STEP, STL, BREP, OBJ, GLB, 3MF, WRL nebo projekt .mncad – vrátí název, MIME, velikost a base64 */
-  exportFile: (format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad") => Promise<{ name: string; mime: string; bytes: number; base64: string }>;
+  exportFile: (format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad") => Promise<{ name: string; mime: string; bytes: number; base64: string; /** .mncad bez dat některých importů (nejsou v paměti) */ warning?: string }>;
   /** změřené kroky otevření / výpočtu / zobrazení (čtení souboru, jádro, síť, WebGL…) s pamětí – diagnostika velkých souborů */
   perf?: () => { stage: string; ms: number; at: number; info?: Record<string, number | string> }[];
 };

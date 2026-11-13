@@ -12,12 +12,13 @@ import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOf
 import { compareTransferables, compareWithReference, type CompareOptions, type ReferenceFile } from "./compare";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
+import { measureQuery, type MeasureQuery } from "./measure";
 import { refInfo, resolvePlaneDef } from "./ref-resolve";
 import { stampPicks } from "./pick-sigs";
 import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
 import type { PlaneDef, Ref } from "./refs";
 import type { CadDoc, ComponentSource, ExportFormat, Feature, MeshData } from "./types";
-import { blobId, putBlobAs } from "./blobs";
+import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark, setPerfSink } from "./perf-log";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
@@ -54,6 +55,7 @@ type Req =
   | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
+  | { id: number; op: "measure"; q: MeasureQuery; doc?: CadDoc; density?: number; sources?: { key: string; source: ComponentSource }[] }
   | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> }
   | { id: number; op: "refInfo"; doc: CadDoc; ref: Ref }
   | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef }
@@ -241,6 +243,27 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         ctx.postMessage({ id: m.id, ok: true, result: res });
         break;
       }
+      case "measure": {
+        // příkaz „měřit“ / window.mncad.measure: díl se postaví (z mezipaměti) a změří atomicky – čísla F/E/V jako popisky pro výběr
+        if (m.doc) {
+          const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
+          body?.delete?.();
+          body = res.body;
+        }
+        for (const s of m.sources ?? []) if (!cachedBody(s.key)) await partEntry(s.key, s.source);
+        const made: r.Shape3D[] = [];
+        const get = (src: ShapeSrc) => {
+          const s = shapeFor(src, body, cachedBody);
+          if (s && src.kind === "comp") made.push(s);
+          return s;
+        };
+        try {
+          ctx.postMessage({ id: m.id, ok: true, result: measureQuery(get, m.q, m.density) });
+        } finally {
+          for (const s of made) s.delete?.();
+        }
+        break;
+      }
       case "interference":
         ctx.postMessage({ id: m.id, ok: true, result: await interference(m.doc) });
         break;
@@ -282,9 +305,11 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
           drawCache?.body.delete?.();
           drawCache = { key, body: b };
         }
+        const body = drawCache.body;
+        if (missingBlobs(dd).length) drawCache = null; // bez dat importu (dorazí s dalším požadavkem) nezapamatovat
         // Chytré kóty: list bez zapečených kót (s místem navíc) + plán kót podle prvků jako upravitelné poznámky (cad/drawing-dims.ts)
         const smart = m.opts?.dimensions === "smart" && dd.kind !== "assembly";
-        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(drawCache.body, m.doc, m.meta, m.opts, extra) : makeDrawing(drawCache.body, m.meta, m.opts, extra) });
+        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(body, m.doc, m.meta, m.opts, extra) : makeDrawing(body, m.meta, m.opts, extra) });
         break;
       }
     }

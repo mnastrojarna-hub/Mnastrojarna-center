@@ -523,6 +523,9 @@ export type StepTree = {
   leafProducts: number;
   /** sestava je popsaná přes MAPPED_ITEM (umístění v geometrii) – strom se tím nepřečte */
   mappedItems: number;
+  /** samostatné výrobky mimo strom sestavy (nejsou v žádném NEXT_ASSEMBLY_USAGE_OCCURRENCE) s reprezentací tvaru –
+   * OpenCascade je při čtení celého souboru načte jako další kořen v počátku */
+  loose: number[];
 };
 
 function colorOfStyled(ix: StepIndex, styled: number): string | undefined {
@@ -652,6 +655,12 @@ export function stepTree(ix: StepIndex): StepTree | null {
   }
   const roots = [...products.keys()].filter((pd) => !isChild.has(pd) && products.get(pd)!.children.length);
   if (!roots.length) return null;
+  const loose: number[] = [];
+  for (const pd of [...list("PRODUCT_DEFINITION"), ...list("PRODUCT_DEFINITION_WITH_ASSOCIATED_DOCUMENTS")]) {
+    if (products.has(pd) || !repOfPds.has(pdsOf.get(pd) ?? -1)) continue;
+    product(pd);
+    loose.push(pd);
+  }
   // barvy dílů: STYLED_ITEM → prvek geometrie (těleso) → reprezentace dílu
   const colorOfItem = new Map<number, string>();
   for (const id of [...list("STYLED_ITEM"), ...list("OVER_RIDING_STYLED_ITEM")]) {
@@ -675,7 +684,7 @@ export function stepTree(ix: StepIndex): StepTree | null {
     for (const c of p.children) walk(c.pd, depth + 1);
   };
   for (const r of roots) walk(r, 0);
-  for (const pd of leaves) {
+  for (const pd of [...leaves, ...loose]) {
     const p = products.get(pd)!;
     if (!colorOfItem.size) break;
     // položky reprezentací geometrie dílu (MANIFOLD_SOLID_BREP…)
@@ -691,7 +700,7 @@ export function stepTree(ix: StepIndex): StepTree | null {
       }
     }
   }
-  return { products, roots, leafInstances, leafProducts: leaves.size, mappedItems };
+  return { products, roots, leafInstances, leafProducts: leaves.size, mappedItems, loose };
 }
 
 // ---------------- vyříznutí dílu do samostatného souboru ----------------
@@ -721,6 +730,36 @@ export function closure(ix: StepIndex, roots: number[]): number[] {
     for (const r of buf) if (r <= ix.maxId && mark[r] !== gen) stack.push(r);
   }
   return out.sort((a, b) => a - b);
+}
+
+/**
+ * Uzávěr odkazů, který nevstupuje do entit `stop` (reprezentace jiných výrobků, MAPPED_ITEM). `stopped` = některá taková
+ * entita byla odkazována – uzávěr pak sám o sobě není úplný soubor (vlastní geometrie sestavy smíchaná s umístěním dětí).
+ */
+export function closureWithin(ix: StepIndex, roots: number[], stop: Set<number>): { ids: number[]; stopped: boolean } {
+  if (!mark || mark.length < ix.maxId + 1) {
+    mark = new Int32Array(ix.maxId + 1);
+    markGen = 0;
+  }
+  const gen = ++markGen;
+  const out: number[] = [];
+  let stopped = false;
+  const stack = roots.filter((r) => hasEntity(ix, r));
+  const buf: number[] = [];
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (mark[id] === gen || !hasEntity(ix, id)) continue;
+    mark[id] = gen;
+    if (stop.has(id)) {
+      stopped = true;
+      continue;
+    }
+    out.push(id);
+    buf.length = 0;
+    refsOf(ix, id, buf);
+    for (const r of buf) if (r <= ix.maxId && mark[r] !== gen) stack.push(r);
+  }
+  return { ids: out.sort((a, b) => a - b), stopped };
 }
 
 const enc = new TextEncoder();

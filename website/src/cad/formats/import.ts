@@ -170,6 +170,9 @@ export async function prepareImport(file: File, splitter: StepSplitter = default
         return { kind: "unsupported", message: tr("Formát .{0} není podporovaný. Otevřete STEP, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF nebo DXF.", ext || "?") };
     }
   } catch (e) {
-    return { kind: "unsupported", message: `${file.name}: ${e instanceof Error ? e.message : tr("soubor se nepodařilo načíst.")}` };
+    // zrušení uživatelem (Zrušit při čtení struktury sestavy STEP v jádře) není chyba formátu – ohlásí ho volající
+    if (e instanceof Error && e.name === "CadCancelled") throw e;
+    // chyba čtení / pád jádra: soubor se nepodařilo otevřít (ne „formát nelze otevřít přímo“)
+    return { kind: "unsupported", message: `${file.name}: ${e instanceof Error ? e.message : tr("soubor se nepodařilo načíst.")}`, title: tr("Soubor {0} se nepodařilo otevřít", file.name) };
   }
 }

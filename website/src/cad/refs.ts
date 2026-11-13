@@ -6,8 +6,13 @@
 import { tr } from "./i18n";
 import type { Axis, PlaneName, Vec3 } from "./types";
 
-/** Otisk topologické entity – podle něj se odkaz znovu najde, když se po úpravě historie posunou indexy. */
-export type Sig = { t: string; c: Vec3; s: number };
+/**
+ * Otisk topologické entity – podle něj se odkaz znovu najde, když se po úpravě historie posunou indexy.
+ * `t` typ plochy/křivky, `c` střed, `s` velikost (plocha / délka), `r` poloměr válcové / kulové plochy a kružnice (rozliší
+ * souosé plochy se stejným středem), `n` počet entit téhož druhu v tělese při razítkování výběru (jen otisky výběru,
+ * pick-sigs.ts: stejný počet = topologie se nezměnila). Starší otisky `r` ani `n` nemají.
+ */
+export type Sig = { t: string; c: Vec3; s: number; r?: number; n?: number };
 
 /** Místo na hraně: začátek, konec, střed délky, střed kružnice/oblouku, nebo parametr 0–1. */
 export type EdgeAt = "start" | "end" | "mid" | "center" | { t: number };

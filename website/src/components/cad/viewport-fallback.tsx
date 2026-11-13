@@ -3,6 +3,7 @@
 import { langMeta, tr } from "@/cad/i18n";
 import { Component, forwardRef, isValidElement, useImperativeHandle, useState, type ReactNode, type Ref } from "react";
 import { explainRenderFailure, type RenderFailure } from "@/cad/diagnostics";
+import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
 import { softView } from "./soft-bridge";
 import type { ViewportHandle } from "./viewport";
@@ -57,20 +58,21 @@ const SoftHandle = forwardRef<ViewportHandle>(function SoftHandle(_, ref) {
  * Se scénou (`scene`) zobrazí model softwarově vykresleným náhledem (pohledy, přizpůsobení, přiblížení, otáčení –
  * bez výběru kliknutím) a příčinu s postupem nápravy schová pod tlačítko „Proč nevidím 3D?“.
  * Bez scény zobrazí rovnou chybovou obrazovku: česky příčina, postup, Zkusit znovu, Zkopírovat diagnostiku, nápověda.
+ * `hidden` (např. během skici) náhled jen skryje – pohled, přiblížení i zavřené upozornění zůstanou zachované.
  */
-export function ViewportFallback({ failure, core, onRetry, onCopy, scene }: { failure: RenderFailure; core: string; onRetry: () => void; onCopy: () => void; scene?: SoftScene }) {
+export function ViewportFallback({ failure, core, onRetry, onCopy, scene, hidden }: { failure: RenderFailure; core: string; onRetry: () => void; onCopy: () => void; scene?: SoftScene; hidden?: boolean }) {
   const [why, setWhy] = useState(false);
   const [note, setNote] = useState(true);
   if (!scene) {
     return (
-      <div role="alert" data-viewport-fallback className="absolute inset-0 z-20 overflow-y-auto bg-[#eef1f5]/95 p-4 sm:p-8">
+      <div role="alert" data-viewport-fallback className={cn("absolute inset-0 z-20 overflow-y-auto bg-[#eef1f5]/95 p-4 sm:p-8", hidden && "invisible")}>
         <HelpCard failure={failure} core={core} onRetry={onRetry} onCopy={onCopy} />
       </div>
     );
   }
   const title = explainRenderFailure(failure).title;
   return (
-    <div data-viewport-fallback="soft" className="absolute inset-0">
+    <div data-viewport-fallback="soft" className={cn("absolute inset-0", hidden && "invisible")} aria-hidden={hidden || undefined}>
       <SoftViewport
         scene={scene}
         toolbarExtra={
@@ -79,8 +81,9 @@ export function ViewportFallback({ failure, core, onRetry, onCopy, scene }: { fa
           </button>
         }
       />
+      {/* na širokém okně dole vedle sloupce plovoucích panelů (Řez, Měření… vlevo nahoře), aby je nezakrývaly */}
       {note && (
-        <div role="status" data-soft-note className="absolute bottom-10 left-[92px] right-3 z-10 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 py-2 pl-3 pr-7 text-[11.5px] leading-relaxed text-[#26303b] shadow lg:bottom-auto lg:left-3 lg:right-auto lg:top-3 lg:w-[276px]">
+        <div role="status" data-soft-note className="absolute bottom-10 left-[92px] right-3 z-10 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 py-2 pl-3 pr-7 text-[11.5px] leading-relaxed text-[#26303b] shadow lg:bottom-14 lg:left-[292px] lg:right-auto lg:w-[420px]">
           <strong className="font-semibold">{tr("Zjednodušený náhled bez WebGL.")}</strong> {title}
           {tr(" – model se proto kreslí softwarově. Tažením otáčíte, kolečkem přibližujete, Shift + tažení posouvá. Výběr ploch a hran kliknutím zde nefunguje: použijte seznamy ve formulářích prvků a textové příkazy. Příčinu a postup nápravy ukáže tlačítko „Proč nevidím 3D?“.")}
           <button type="button" onClick={() => setNote(false)} aria-label={tr("Skrýt")} className="absolute right-1 top-1 rounded p-0.5 text-[#6b7785] hover:bg-white">

@@ -54,6 +54,11 @@ export interface PartTopology {
   faces: FaceInfo[];
   /** Okrajové hrany (síť není uzavřená → objem / hmotnost jen orientačně). */
   boundaryEdges?: number;
+  /**
+   * Velká sestava: křivky a plochy výskytu se přepočítají z prototypu dílu až při prvním použití
+   * (curves / faces jsou do té doby prázdné) — viz step-assembly.ts → hydrateTopology.
+   */
+  lazy?: { proto: number; matrix: number[] };
 }
 
 export interface TopologyInput {

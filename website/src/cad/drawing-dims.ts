@@ -16,7 +16,7 @@
  * - rozmístění: cad/drawing-dims-layout.ts (řady mimo obrys, texty bez překryvů; co se nevejde, se vynechá a nahlásí).
  */
 import type * as r from "replicad";
-import { makeDrawing, proj, type Cam, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt } from "./drawing";
+import { camOf, makeDrawing, proj, type Cam, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt, type ViewKey, type ViewRotation } from "./drawing";
 import { DimLayout, type CallReq, type LinReq, type Side } from "./drawing-dims-layout";
 import { partGeom, type GAxis, type GCone, type GCyl, type PartGeom } from "./drawing-dims-geom";
 import { threadByName } from "./defaults";
@@ -37,7 +37,8 @@ export type SmartReport = {
   noRoom: number;
 };
 export type SmartDims = { /** otisk modelu a rozvržení – shoda = není co přegenerovat */ gen: string; annotations: DrawingAnnotation[]; report: SmartReport };
-export type SmartOptions = { style?: "chain" | "baseline" };
+/** `rotation` = otočení hlavního pohledu (rady „zapněte pohled …“ podle otočených kamer) */
+export type SmartOptions = { style?: "chain" | "baseline"; rotation?: ViewRotation };
 
 type PV = PlacedView & { cam: Cam };
 type HoleF = Extract<Feature, { type: "hole" }>;
@@ -209,18 +210,38 @@ type Ctx = {
   size: number;
   /** odložené délkové kóty (polohy a rozměry prvků): umístí se najednou od nejkratší (kratší blíž obrysu) */
   queue: { v: PV; req: Omit<LinReq, "view">; what: string; alt?: Partial<Record<Side, { a: Vec2; b: Vec2 }>> }[];
+  /** odložené popisy děr a prvků: umístí se až po délkových kótách (pevné řady mají přednost, popis si najde jiný směr) */
+  calls: { req: CallReq; what: string }[];
   noRoom: number;
+  rot: ViewRotation;
+  /** rotační díl: osa a čela (poloha příčných děr podél osy se kótuje od čela, ne od počátku modelu) */
+  turn: { ax: GAxis; tMin: number; tMax: number; rMin: number; rMax: number } | null;
 };
 
 const P = (v: PV, p: Vec3): Vec2 => proj(v.cam, p);
 const viewAlong = (c: Ctx, dir: Vec3) => c.views.filter((v) => Math.abs(dot(v.cam.d, dir)) > 0.999);
 const viewSide = (c: Ctx, dir: Vec3) => c.views.filter((v) => v.key !== "section" && Math.abs(dot(v.cam.d, dir)) < 1e-3);
 const VIEW_ORDER = ["front", "top", "left", "right", "bottom", "back", "section"];
+const VIEW_KEYS: ViewKey[] = ["front", "back", "left", "right", "top", "bottom"];
+/** pohledy, které na listu nejsou a díval by se jimi pozorovatel ve směru `dir` (podle otočených kamer) – rada „zapněte pohled …“ */
+const missingViewsAlong = (c: Ctx, dir: Vec3) =>
+  VIEW_KEYS.filter((k) => !c.views.some((v) => v.key === k) && Math.abs(Math.abs(dot(camOf(k, c.rot).d, dir)) - 1) < 1e-6).map((k) => tr(VIEW_NAME[k]));
 const byOrder = (a: PV, b: PV) => VIEW_ORDER.indexOf(a.key) - VIEW_ORDER.indexOf(b.key);
 
 /** viditelná (ne skrytá) kružnice / oblouk pohledu se středem c a poloměrem r */
 function visibleArc(v: PV, c: Vec2, rad: number, tol = 0.02): boolean {
   return (v.ents ?? []).some((e) => e.t === "arc" && !e.hidden && Math.abs(e.r - rad) <= tol + 1e-4 * rad && Math.hypot(e.c[0] - c[0], e.c[1] - c[1]) <= tol + 1e-4 * rad);
+}
+/** bod leží na viditelné úsečce pohledu (vynášecí čára musí začínat na nakreslené hraně) */
+function onVisibleLine(v: PV, p: Vec2, tol = 0.02): boolean {
+  return (v.ents ?? []).some((e) => {
+    if (e.t !== "line" || e.hidden) return false;
+    const dx = e.b[0] - e.a[0];
+    const dy = e.b[1] - e.a[1];
+    const l2 = dx * dx + dy * dy;
+    const u = l2 > 0 ? Math.max(0, Math.min(1, ((p[0] - e.a[0]) * dx + (p[1] - e.a[1]) * dy) / l2)) : 0;
+    return Math.hypot(e.a[0] + u * dx - p[0], e.a[1] + u * dy - p[1]) <= tol;
+  });
 }
 function hiddenArc(v: PV, c: Vec2, rad: number, tol = 0.02): boolean {
   return (v.ents ?? []).some((e) => e.t === "arc" && e.hidden && Math.abs(e.r - rad) <= tol && Math.hypot(e.c[0] - c[0], e.c[1] - c[1]) <= tol);
@@ -232,9 +253,10 @@ function lin(c: Ctx, v: PV, req: Omit<LinReq, "view">, what: string, alt?: Parti
   if (span < 1e-3) return "dup";
   const m = linMeaning(v.cam, req.dir, req.a, req.b, req.prefix ?? req.text ?? "");
   if (c.seen.has(m)) return "dup";
-  for (const side of req.sides) {
+  for (const [i, side] of req.sides.entries()) {
     const ab = alt?.[side] ?? { a: req.a, b: req.b };
-    const res = c.lay.placeLin({ ...req, ...ab, view: v.key, sides: [side] });
+    // nejnižší řada platí jen pro zamýšlenou (první) stranu – na druhé straně se řady počítají od obrysu (obsazené přeskočí placeLin)
+    const res = c.lay.placeLin({ ...req, ...ab, view: v.key, sides: [side], minRow: i === 0 ? req.minRow : 0 });
     if (res) {
       c.seen.add(m);
       return res;
@@ -259,6 +281,13 @@ function flushLin(c: Ctx) {
   const list = c.queue.splice(0).sort((a, b) => span(a) - span(b));
   for (const q of list) lin(c, q.v, q.req, q.what, q.alt);
 }
+/** popis do fronty – umístí ho `flushCalls` po délkových kótách */
+function callQ(c: Ctx, req: CallReq, what: string) {
+  c.calls.push({ req, what });
+}
+function flushCalls(c: Ctx) {
+  for (const q of c.calls.splice(0)) call(c, q.req, q.what);
+}
 function call(c: Ctx, req: CallReq, what: string, quiet = false): boolean {
   const m = `C:${req.lines.join("|")}`;
   if (c.seen.has(m)) return true;
@@ -271,8 +300,6 @@ function call(c: Ctx, req: CallReq, what: string, quiet = false): boolean {
   c.noRoom++;
   return false;
 }
-/** směr pohledu k pozorovateli (stejně jako kamery v cad/drawing.ts) – jen pro radu, který pohled zapnout */
-const CAM_D: Record<"front" | "back" | "left" | "right" | "top" | "bottom", Vec3> = { front: [0, -1, 0], back: [0, 1, 0], left: [-1, 0, 0], right: [1, 0, 0], top: [0, 0, 1], bottom: [0, 0, -1] };
 const VIEW_NAME: Record<string, string> = { front: "přední", top: "horní", left: "levý", right: "pravý", back: "zadní", bottom: "spodní", section: "řez" };
 
 /** Hlavní osa rotačního dílu (většina ploch souosá, obálka kolmo na osu kruhová) nebo null. */
@@ -308,11 +335,12 @@ export function turnedAxis(g: PartGeom): { ax: GAxis; R: number } | null {
   return best ? { ax: best.ax, R: best.R } : null;
 }
 
-/** Celkový plán – vrátí požadavky už umístěné v rozvržení. */
-export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "views" | "sheet" | "texts" | "polys" | "scaleValue">, opts: SmartOptions = {}): SmartDims {
-  const views = d.views.filter((v): v is PV => !!v.cam).sort(byOrder);
+/** Celkový plán – vrátí požadavky už umístěné v rozvržení (`out.pads` = kolik místa kóty zabraly vedle pohledů). */
+export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "views" | "sheet" | "texts" | "polys" | "scaleValue">, opts: SmartOptions = {}, out?: { pads?: DrawingOptions["dimPads"] }): SmartDims {
+  // jen pohledy hlavního dílu – pohledy dalších modelů na listu (`m:<id>`) zůstanou v rozvržení jako překážky
+  const views = d.views.filter((v): v is PV => !!v.cam && !v.key.startsWith("m:")).sort(byOrder);
   const size = Math.max(1e-6, ...g.bbox[1].map((v, i) => v - g.bbox[0][i]));
-  const c: Ctx = { doc, g, views, lay: new DimLayout(d), style: opts.style ?? "chain", skipped: [], seen: new Set(), size, queue: [], noRoom: 0 };
+  const c: Ctx = { doc, g, views, lay: new DimLayout(d), style: opts.style ?? "chain", skipped: [], seen: new Set(), size, queue: [], calls: [], noRoom: 0, rot: opts.rotation ?? 0, turn: null };
   const turned = turnedAxis(g);
   const holeAxes: GAxis[] = [];
   if (turned) turnedDims(c, turned.ax, turned.R);
@@ -321,8 +349,10 @@ export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "
   if (!turned) extrudeDims(c);
   // polohy a rozměry prvků najednou – kratší blíž obrysu, delší vně (vynášecí čáry se nekříží s kótovacími)
   flushLin(c);
+  flushCalls(c);
   if (!turned) prismaticDims(c);
   // výsledek: poznámky s id a klíčem `auto`
+  if (out) out.pads = c.lay.overhang();
   const annotations = c.lay.placed.map((p) => ({ ...p.ann, id: uid() }) as DrawingAnnotation);
   const perView: Record<string, number> = {};
   for (const a of annotations) if (a.type !== "centerline") perView[a.view] = (perView[a.view] ?? 0) + 1;
@@ -330,26 +360,44 @@ export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "
 }
 
 /**
- * Pro jádro (worker): list bez zapečených kót s místem pro kóty + plán Chytrých kót. Když se kóty nevejdou,
- * zkusí list s větším místem kolem pohledů (menší měřítko / větší formát) a ponechá lepší výsledek.
+ * Pro jádro (worker): list bez zapečených kót s místem pro kóty + plán Chytrých kót. List a měřítko se volí jako bez kót
+ * a místo mezi pohledy a kolem nich se dá podle toho, kolik se vejde. Když se kóty nevejdou, zkusí list s plným místem
+ * kolem pohledů (větší formát / menší měřítko) a pak znovu s místem jen tam, kde kóty skutečně jsou; ponechá lepší výsledek.
  */
 export function makeSmartDrawing(shape: r.Shape3D, doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions> = {}, extra: Record<string, r.Shape3D> = {}): DrawingResult & { smart: SmartDims } {
   const g = partGeom(shape);
-  let best: { d: DrawingResult; smart: SmartDims; score: number } | null = null;
-  for (const room of opts.dimRoom != null ? [opts.dimRoom] : [10, 24]) {
-    const d = makeDrawing(shape, meta, { ...opts, dimensions: "none", dimRoom: room }, extra);
-    let smart: SmartDims;
+  const so: SmartOptions = { style: opts.dimStyle, rotation: opts.rotation };
+  type Res = { d: DrawingResult; smart: SmartDims; pads?: DrawingOptions["dimPads"] };
+  const run = (room: Partial<DrawingOptions>): Res => {
+    const d = makeDrawing(shape, meta, { ...opts, dimensions: "none", ...room }, extra);
+    const out: { pads?: DrawingOptions["dimPads"] } = {};
     try {
-      smart = planSmartDims(g, doc, d, { style: opts.dimStyle });
+      return { d, smart: planSmartDims(g, doc, d, so, out), pads: out.pads };
     } catch (e) {
       // chyba plánovače nesmí shodit výkres – list bez kót a hlášení ve stavu výkresu
-      smart = { gen: smartGenKey(doc, d.views, { style: opts.dimStyle }), annotations: [], report: { kind: "prismatic", perView: {}, skipped: [tr("Chytré kóty se nepodařilo vytvořit: {0}", e instanceof Error ? e.message : String(e))], expected: 0, noRoom: 0 } };
+      return { d, smart: { gen: smartGenKey(doc, d.views, so), annotations: [], report: { kind: "prismatic", perView: {}, skipped: [tr("Chytré kóty se nepodařilo vytvořit: {0}", e instanceof Error ? e.message : String(e))], expected: 0, noRoom: 0 } } };
     }
-    const score = smart.report.noRoom * 10 + d.warnings.length * 100;
-    if (!best || score < best.score) best = { d, smart, score };
-    if (!smart.report.noRoom) break;
+  };
+  // lepší výsledek: bez varování, méně nevešlých kót, menší formát, větší měřítko; při shodě dřívější pokus
+  const rank = (x: Res) => [x.d.warnings.length, x.smart.report.noRoom, x.d.sheet.w * x.d.sheet.h, -x.d.scaleValue];
+  let best: Res | null = null;
+  const consider = (x: Res): Res => {
+    const a = rank(x);
+    const b = best ? rank(best) : null;
+    const i = b ? a.findIndex((v, k) => Math.abs(v - b[k]) > 1e-9) : -1;
+    if (!b || (i >= 0 && a[i] < b[i])) best = x;
+    return x;
+  };
+  const done = () => ({ ...best!.d, smart: best!.smart });
+  if (opts.dimRoom != null) {
+    consider(run({ dimRoom: opts.dimRoom, dimRoomMin: 0 }));
+    return done();
   }
-  return { ...best!.d, smart: best!.smart };
+  for (const room of [10, 24]) if (!consider(run({ dimRoom: room, dimRoomMin: 0 })).smart.report.noRoom) return done();
+  const wide = consider(run({ dimRoom: 24, dimRoomMin: undefined }));
+  // místo jen tam, kde kóty v předchozím pokusu skutečně jsou (okraj bez kót se smí zmenšit) – často se vejdou na menší formát
+  if (wide.pads) consider(run({ dimRoom: 0, dimRoomMin: -6, dimPads: wide.pads }));
+  return done();
 }
 
 // ---------------------------------------------------------------- rotační díl
@@ -360,6 +408,23 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
   const g = c.g;
   const tol = 1e-4 * c.size + 1e-4;
   const co = (x: GAxis) => sameAxis(ax, x, tol);
+  // obrys: vnější válce a kužely souosé s osou
+  const cyls = g.cyls.filter((x) => x.ext && co(x));
+  const cones = g.cones.filter((x) => x.ext && co(x));
+  const segs: Seg1[] = [];
+  for (const x of cyls) {
+    const hit = segs.find((s) => s.cyl && Math.abs(s.r - x.r) < 1e-3 && s.t0 <= x.t1 + 1e-3 && x.t0 <= s.t1 + 1e-3);
+    if (hit) {
+      hit.t0 = Math.min(hit.t0, x.t0);
+      hit.t1 = Math.max(hit.t1, x.t1);
+    } else segs.push({ t0: x.t0, t1: x.t1, r: x.r, cyl: x });
+  }
+  for (const x of cones) segs.push({ t0: x.t0, t1: x.t1, r: Math.max(x.r0, x.r1), cone: x });
+  const allT = [...cyls.flatMap((x) => [x.t0, x.t1]), ...cones.flatMap((x) => [x.t0, x.t1]), ...g.planes.filter((p) => Math.abs(Math.abs(dot(p.n, ax.dir)) - 1) < 1e-4).map((p) => onAxis(ax, p.c).t)];
+  const tMin = Math.min(...allT);
+  const tMax = Math.max(...allT);
+  const radiusAt = (t: number) => Math.max(0, ...segs.filter((s) => s.t0 - 1e-3 <= t && t <= s.t1 + 1e-3).map((s) => (s.cone ? coneR(s.cone, t) : s.r)));
+  c.turn = { ax, tMin, tMax, rMin: radiusAt(tMin), rMax: radiusAt(tMax) };
   const sv = viewSide(c, ax.dir)[0];
   if (!sv) {
     c.skipped.push(tr("rotační díl: chybí pohled, ve kterém je osa v rovině průmětu (zapněte přední nebo boční pohled)"));
@@ -381,23 +446,6 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
   const diaDir: "h" | "v" = horiz ? "v" : "h";
   const lenDir: "h" | "v" = horiz ? "h" : "v";
   const lenSides: Side[] = horiz ? ["bottom", "top"] : ["right", "left"];
-
-  // obrys: vnější válce a kužely souosé s osou
-  const cyls = g.cyls.filter((x) => x.ext && co(x));
-  const cones = g.cones.filter((x) => x.ext && co(x));
-  const segs: Seg1[] = [];
-  for (const x of cyls) {
-    const hit = segs.find((s) => s.cyl && Math.abs(s.r - x.r) < 1e-3 && s.t0 <= x.t1 + 1e-3 && x.t0 <= s.t1 + 1e-3);
-    if (hit) {
-      hit.t0 = Math.min(hit.t0, x.t0);
-      hit.t1 = Math.max(hit.t1, x.t1);
-    } else segs.push({ t0: x.t0, t1: x.t1, r: x.r, cyl: x });
-  }
-  for (const x of cones) segs.push({ t0: x.t0, t1: x.t1, r: Math.max(x.r0, x.r1), cone: x });
-  const allT = [...cyls.flatMap((x) => [x.t0, x.t1]), ...cones.flatMap((x) => [x.t0, x.t1]), ...g.planes.filter((p) => Math.abs(Math.abs(dot(p.n, ax.dir)) - 1) < 1e-4).map((p) => onAxis(ax, p.c).t)];
-  const tMin = Math.min(...allT);
-  const tMax = Math.max(...allT);
-  const radiusAt = (t: number) => Math.max(0, ...segs.filter((s) => s.t0 - 1e-3 <= t && t <= s.t1 + 1e-3).map((s) => (s.cone ? coneR(s.cone, t) : s.r)));
 
   // závity (vnější) na této ose
   const threads = c.doc.features.filter((f): f is Extract<Feature, { type: "thread" }> => f.type === "thread" && !f.suppressed && !f.internal && Math.abs(Math.abs(dot(AXV[f.axis] ?? [0, 0, 1], ax.dir)) - 1) < 1e-6 && onAxis(ax, f.position).rad < 1e-3);
@@ -432,35 +480,49 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
     }
     return { prefix: "Ø", what: `Ø${fmtDim(2 * s.r)}` };
   };
+  // klíč kóty podle významu (průměr, u závitu označení; stejný průměr vícekrát = pořadí podél osy), ne podle pořadí v seznamu:
+  // úpravy kót (tolerance) a smazané kóty se po změně modelu vážou ke kótě téhož významu
+  const diaKey = new Map<Seg1, string>();
+  for (const s of cylSegs) {
+    const lab = diaLabel(s);
+    const base = `dia:${lab.thread ? lab.what : r3(2 * s.r)}`;
+    let k = base;
+    for (let n = 2; [...diaKey.values()].includes(k); n++) k = `${base}#${n}`;
+    diaKey.set(s, k);
+  }
+  const overflow: { s: Seg1; what: string; thread: boolean; req: Omit<LinReq, "view"> }[] = [];
   for (const key of ["lo", "hi"] as const) {
     const list = stacks[key].sort((a, b) => a.s.r - b.s.r);
     const side = key === "lo" ? loSide : hiSide;
     const other = key === "lo" ? hiSide : loSide;
     let row = 0;
-    for (const { s, i } of list) {
+    for (const { s } of list) {
       // konec válce, ze kterého vede vynášecí čára na tuto stranu
       const tEnd = (key === "lo") === sgn > 0 ? s.t0 : s.t1;
       const tEnd2 = tEnd === s.t0 ? s.t1 : s.t0;
       const lab = diaLabel(s);
-      const req = { key: `dia:${i}`, dir: diaDir, a: Q(tEnd, -s.r), b: Q(tEnd, s.r), sides: [side, other], prefix: lab.prefix, ...(lab.suffix ? { suffix: lab.suffix } : {}), minRow: row };
-      const res = lin(c, sv, req, lab.what, { [other]: { a: Q(tEnd2, -s.r), b: Q(tEnd2, s.r) } }, true);
-      if (res && res !== "dup" && res.side === side) row = res.row + 1;
-      // nevešlo se do řady: průměr na kružnici v čelním pohledu (popis s odkazem), jinak hlášení
-      if (!res) {
-        const fv = viewAlong(c, ax.dir).find((v) => visibleArc(v, P(v, ax.p), s.r));
-        const lines = [lab.thread ? lab.what : `Ø${fmtDim(2 * s.r)}`];
-        if (!fv || !call(c, { key: `dia:${i}`, view: fv.key, tip: P(fv, ax.p), lines, ring: { c: P(fv, ax.p), r: s.r } }, lines[0], true)) {
-          c.skipped.push(tr("{0}: nevešlo se čistě na list ({1})", lab.what, tr(VIEW_NAME[sv.key] ?? sv.key)));
-          c.noRoom++;
-        }
-      }
+      const req = { key: diaKey.get(s)!, dir: diaDir, a: Q(tEnd, -s.r), b: Q(tEnd, s.r), sides: [side], prefix: lab.prefix, ...(lab.suffix ? { suffix: lab.suffix } : {}), minRow: row };
+      const res = lin(c, sv, req, lab.what, undefined, true);
+      if (res && res !== "dup") row = res.row + 1;
+      // na svou stranu se nevešlo: zkusí se druhá strana, až když jsou na ní její vlastní průměry (vně nich)
+      if (!res) overflow.push({ s, what: lab.what, thread: !!lab.thread, req: { ...req, a: Q(tEnd2, -s.r), b: Q(tEnd2, s.r), sides: [other], minRow: 0 } });
+    }
+  }
+  for (const { s, what, thread, req } of overflow.sort((a, b) => a.s.r - b.s.r)) {
+    if (lin(c, sv, req, what, undefined, true)) continue;
+    // ani tam: průměr na kružnici v čelním pohledu (popis s odkazem), jinak hlášení
+    const fv = viewAlong(c, ax.dir).find((v) => visibleArc(v, P(v, ax.p), s.r));
+    const lines = [thread ? what : `Ø${fmtDim(2 * s.r)}`];
+    if (!fv || !call(c, { key: req.key, view: fv.key, tip: P(fv, ax.p), lines, ring: { c: P(fv, ax.p), r: s.r } }, lines[0], true)) {
+      c.skipped.push(tr("{0}: nevešlo se čistě na list ({1})", what, tr(VIEW_NAME[sv.key] ?? sv.key)));
+      c.noRoom++;
     }
   }
   // zápichy a průměry mezi většími osazeními: popis s odkazem na dno
-  for (const { s, i } of interior) {
+  for (const { s } of interior) {
     const lab = diaLabel(s);
     const tm = (s.t0 + s.t1) / 2;
-    call(c, { key: `dia:${i}`, view: sv.key, tip: Q(tm, -s.r), lines: [lab.what], prefer: horiz ? [0, -1] : [1, 0] }, lab.what);
+    call(c, { key: diaKey.get(s)!, view: sv.key, tip: Q(tm, -s.r), lines: [lab.what], prefer: horiz ? [0, -1] : [1, 0] }, lab.what);
     c.seen.add(linMeaning(sv.cam, diaDir, Q(tm, -s.r), Q(tm, s.r), lab.prefix));
   }
 
@@ -498,12 +560,12 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
   const L = Math.abs(tMax - tMin);
   if (ts.length > 2) {
     if (c.style === "baseline") {
-      ts.slice(1).forEach((t, i) => placeLen(ts[0], t, `len:b${i}`, fmtDim(Math.abs(t - ts[0])), { minRow: i }));
+      ts.slice(1).forEach((t, i) => placeLen(ts[0], t, `len:b:${spanKey(ts[0], t)}`, fmtDim(Math.abs(t - ts[0])), { minRow: i }));
     } else {
       // řetěz bez uzavření: nejdelší článek jako pomocná kóta v závorce
       const links = ts.slice(1).map((t, i) => ({ t0: ts[i], t1: t, i, l: Math.abs(t - ts[i]) }));
       const refLink = links.reduce((m, x) => (x.l > m.l ? x : m), links[0]);
-      for (const k of links) placeLen(k.t0, k.t1, `len:c${k.i}`, fmtDim(k.l), k === refLink ? { prefix: "(", suffix: ")" } : {});
+      for (const k of links) placeLen(k.t0, k.t1, `len:c:${spanKey(k.t0, k.t1)}`, fmtDim(k.l), k === refLink ? { prefix: "(", suffix: ")" } : {});
       c.seen.add(`ref:${r3(refLink.t0)}:${r3(refLink.t1)}`);
     }
   }
@@ -596,16 +658,34 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
         const q = P(sec, A(t));
         return hz ? [q[0], q[1] + sv2] : [q[0] + sv2, q[1]];
       };
-      const sides: Side[] = hz ? ["right", "left"] : ["bottom", "top"];
-      const tEnd = Math.abs(b.t1 - tMax) < Math.abs(b.t0 - tMin) ? b.t1 : b.t0;
-      const res = lin(c, sec, { key: `bore:${k}`, dir: hz ? "v" : "h", a: QS(tEnd, -b.r), b: QS(tEnd, b.r), sides, prefix: "Ø" }, `Ø${fmtDim(2 * b.r)}`);
-      if (res && !through) lin(c, sec, { key: `bore:${k}:d`, dir: hz ? "h" : "v", a: QS(b.t0, -b.r), b: QS(b.t1, -b.r), sides: hz ? ["top", "bottom"] : ["left", "right"] }, fmtDim(depth));
+      // vynášecí čáry od čela, kde díra ústí, na straně kótovací čáry – ne od vzdáleného konce přes celou délku dílu
+      // (v polovičním řezu by taková čára v nevyříznuté polovině vypadala jako hrana díry)
+      const open = [b.t0, b.t1].filter((t) => Math.abs(t - tMin) < 1e-3 || Math.abs(t - tMax) < 1e-3);
+      const ends = open.length ? open : [Math.abs(b.t1 - tMax) < Math.abs(b.t0 - tMin) ? b.t1 : b.t0];
+      const at = (t: number) => P(sec, A(t))[hz ? 0 : 1];
+      const hiEnd = ends.reduce((m, t) => (at(t) > at(m) ? t : m));
+      const loEnd = ends.reduce((m, t) => (at(t) < at(m) ? t : m));
+      const hiS: Side = hz ? "right" : "bottom";
+      const loS: Side = hz ? "left" : "top";
+      const sides: Side[] = at(hiEnd) >= (at(tMin) + at(tMax)) / 2 ? [hiS, loS] : [loS, hiS];
+      const pts: Partial<Record<Side, { a: Vec2; b: Vec2 }>> = { [hiS]: { a: QS(hiEnd, -b.r), b: QS(hiEnd, b.r) }, [loS]: { a: QS(loEnd, -b.r), b: QS(loEnd, b.r) } };
+      const res = lin(c, sec, { key: `bore:${k}`, dir: hz ? "v" : "h", ...pts[sides[0]]!, sides, prefix: "Ø" }, `Ø${fmtDim(2 * b.r)}`, pts);
+      // hloubka: vynášecí čáry jen od hran, které jsou v řezu vidět (v polovičním řezu není dno díry v nevyříznuté polovině)
+      if (res && !through) {
+        const sr = [-b.r, b.r].find((q) => onVisibleLine(sec, QS(b.t0, q)) && onVisibleLine(sec, QS(b.t1, q)));
+        const dSides: Side[] = (sr ?? -1) < 0 ? (hz ? ["top", "bottom"] : ["left", "right"]) : hz ? ["bottom", "top"] : ["right", "left"];
+        if (sr != null) lin(c, sec, { key: `bore:${k}:d`, dir: hz ? "h" : "v", a: QS(b.t0, sr), b: QS(b.t1, sr), sides: dSides }, fmtDim(depth));
+        else c.skipped.push(tr("{0}: hloubka vrtání není v řezu vidět – kótujte ji ručně", lines[0]));
+      }
       continue;
     }
-    c.skipped.push(tr("vnitřní {0}: v pohledech jen skrytě – zapněte řez osou (výkres řez …)", lines[0]));
+    const endViews = missingViewsAlong(c, ax.dir);
+    c.skipped.push(endViews.length ? tr("vnitřní {0}: v pohledech jen skrytě – zapněte pohled {1} nebo řez osou (výkres řez …)", lines[0], endViews.join(" / ")) : tr("vnitřní {0}: v pohledech jen skrytě – zapněte řez osou (výkres řez …)", lines[0]));
   }
 }
 
+/** interval podél osy jako část klíče kóty (nezávislý na pořadí článků) */
+const spanKey = (a: number, b: number) => `${r3(Math.min(a, b))}:${r3(Math.max(a, b))}`;
 const coneR = (x: GCone, t: number) => (Math.abs(x.t1 - x.t0) < 1e-9 ? Math.max(x.r0, x.r1) : x.r0 + ((x.r1 - x.r0) * (t - x.t0)) / (x.t1 - x.t0));
 const holeR = (f: HoleF) => (f.kind === "tapped" && f.thread ? (threadByName(f.thread)?.tap ?? f.diameter) / 2 : f.diameter / 2);
 const uniq = (xs: number[]) => xs.filter((x, i) => xs.findIndex((y) => Math.abs(y - x) < 1e-3) === i);
@@ -670,6 +750,15 @@ function holeDims(c: Ctx, mainAx: GAxis | null, out: GAxis[], positions: boolean
   if (!groups.size) return;
   // polohy děr – po skupinách (stejná rozteč se pozná jen uvnitř skupiny), duplicity hlídá význam kóty
   const center = (v: PV) => (positions ? null : mainAx ? P(v, mainAx.p) : null);
+  // rotační díl: osa je datum jen radiálně, podél osy se poloha kótuje od čela (ne od bodu osy v počátku modelu)
+  const axialOf = (v: PV): Axial | null => {
+    const t = c.turn;
+    if (positions || !t) return null;
+    const k: 0 | 1 | null = Math.abs(Math.abs(dot(v.cam.x, t.ax.dir)) - 1) < 1e-6 ? 0 : Math.abs(Math.abs(dot(upOf(v.cam), t.ax.dir)) - 1) < 1e-6 ? 1 : null;
+    if (k === null) return null;
+    const at = (tt: number) => P(v, add(t.ax.p, mul(t.ax.dir, tt)))[k];
+    return { axis: k, faces: [{ at: at(t.tMin), r: t.rMin }, { at: at(t.tMax), r: t.rMax }] };
+  };
   for (const grp of groups.values()) {
     const n = grp.inst.length;
     const label = grp.lines.map((l, i) => (i === 0 && n > 1 ? `${n}× ${l}` : l));
@@ -686,7 +775,7 @@ function holeDims(c: Ctx, mainAx: GAxis | null, out: GAxis[], positions: boolean
     }
     if (!fv) {
       // pohledy ve směru osy díry, které na listu nejsou
-      const want = (["front", "back", "left", "right", "top", "bottom"] as const).filter((k) => !c.views.some((v) => v.key === k) && Math.abs(Math.abs(dot(CAM_D[k], grp.dir)) - 1) < 1e-6).map((k) => tr(VIEW_NAME[k]));
+      const want = missingViewsAlong(c, grp.dir);
       c.skipped.push(hiddenOnly ? tr("{0}: díra je v pohledu vidět jen skrytě – zapněte pohled {1}", label[0], want.join(" / ") || "—") : tr("{0}: chybí pohled ve směru osy díry – zapněte pohled {1}", label[0], want.join(" / ") || "—"));
       continue;
     }
@@ -715,11 +804,11 @@ function holeDims(c: Ctx, mainAx: GAxis | null, out: GAxis[], positions: boolean
           const minGap = Math.min(...gaps);
           pcdLines.push(`${fmtDim((minGap * 180) / Math.PI)}°`);
         }
-        call(c, { key: pcdKey, view: fv.key, tip: circ.c, lines: pcdLines, circle: { c: circ.c, r: circ.r }, ring: { c: circ.c, r: circ.r } }, pcdLines[0]);
+        callQ(c, { key: pcdKey, view: fv.key, tip: circ.c, lines: pcdLines, circle: { c: circ.c, r: circ.r }, ring: { c: circ.c, r: circ.r } }, pcdLines[0]);
       }
-      if (!mainCenter || Math.hypot(mainCenter[0] - circ.c[0], mainCenter[1] - circ.c[1]) > 1e-3) positionDims(c, fv, [circ.c], center(fv));
-    } else positionDims(c, fv, pts2, center(fv));
-    call(c, { key: `hole:${grp.f.id}`, view: fv.key, tip: rings[0].c, lines: callLines, rings }, callLines[0]);
+      if (!mainCenter || Math.hypot(mainCenter[0] - circ.c[0], mainCenter[1] - circ.c[1]) > 1e-3) positionDims(c, fv, [circ.c], center(fv), axialOf(fv));
+    } else positionDims(c, fv, pts2, center(fv), axialOf(fv));
+    callQ(c, { key: `hole:${grp.f.id}`, view: fv.key, tip: rings[0].c, lines: callLines, rings }, callLines[0]);
   }
 }
 
@@ -734,11 +823,15 @@ function circleThrough(pts: Vec2[]): { c: Vec2; r: number } | null {
   return { c: [cx, cy], r: rm };
 }
 
+/** rotační díl v pohledu: osa obrazu (0 = x, 1 = y) podél osy dílu a čela (souřadnice v pohledu, poloměr obrysu u čela) */
+type Axial = { axis: 0 | 1; faces: { at: number; r: number }[] };
+
 /**
  * Kóty poloh bodů v pohledu: souměrné rozmístění → rozteče dvojic od osy souměrnosti (nejmenší nejblíž),
- * jinak od základní hrany (levá / spodní hrana obrysu) od základny nebo řetězově. `center` = střed rotačního dílu (datum).
+ * jinak od základní hrany (levá / spodní hrana obrysu) od základny nebo řetězově. `center` = střed rotačního dílu (datum
+ * radiálně); `axial` = podél osy rotačního dílu se poloha kótuje od bližšího čela.
  */
-function positionDims(c: Ctx, v: PV, pts: Vec2[], center: Vec2 | null) {
+function positionDims(c: Ctx, v: PV, pts: Vec2[], center: Vec2 | null, axial: Axial | null = null) {
   if (!pts.length) return;
   const vx0 = v.x0;
   const vx1 = v.x0 + v.w;
@@ -753,6 +846,31 @@ function positionDims(c: Ctx, v: PV, pts: Vec2[], center: Vec2 | null) {
     const ptAt = (val: number) => pts.find((p) => Math.abs(p[axis] - val) < 1e-3)!;
     const symmetric = vals.every((x) => vals.some((y) => Math.abs(x + y - 2 * mid) < 1e-3));
     const what = tr("poloha díry");
+    if (center && axial?.axis === axis) {
+      // od čela bližšího dírám: první od čela, další řetězově (nebo od čela); stejné rozteče jednou kótou „n× rozteč“
+      const dist = (f: Axial["faces"][number]) => Math.min(...vals.map((x) => Math.abs(x - f.at)));
+      const face = axial.faces.reduce((m, f) => (dist(f) < dist(m) - 1e-9 ? f : m));
+      const order = [...vals].filter((x) => Math.abs(x - face.at) > 1e-3).sort((a, b) => Math.abs(a - face.at) - Math.abs(b - face.at));
+      const oc = center[1 - axis];
+      const facePt = (side: Side): Vec2 => (axis === 0 ? [face.at, side === "top" ? oc - face.r : oc + face.r] : [side === "right" ? oc + face.r : oc - face.r, face.at]);
+      const fromFace = (x: number) => {
+        const b = ptAt(x);
+        const alt = { [sideList[0]]: { a: facePt(sideList[0]), b }, [sideList[1]]: { a: facePt(sideList[1]), b } } as Partial<Record<Side, { a: Vec2; b: Vec2 }>>;
+        linQ(c, v, { key: `pos:${v.key}:${axis}:f${r3(face.at)}:${r3(x)}`, dir, a: facePt(sideList[0]), b, sides: sideList }, what, alt);
+      };
+      const steps = order.slice(1).map((x, i) => Math.abs(x - order[i]));
+      if (order.length >= 3 && steps.every((g) => Math.abs(g - steps[0]) < 1e-3)) {
+        fromFace(order[0]);
+        const total = Math.abs(order[order.length - 1] - order[0]);
+        linQ(c, v, { key: `pos:${v.key}:${axis}:p${r3(order[0])}`, dir, a: ptAt(order[0]), b: ptAt(order[1]), sides: sideList, prefix: `${steps.length}× `, suffix: ` (=${fmtDim(total)})` }, what);
+        continue;
+      }
+      order.forEach((x, i) => {
+        if (c.style === "baseline" || i === 0) fromFace(x);
+        else linQ(c, v, { key: `pos:${v.key}:${axis}:${r3(x)}`, dir, a: ptAt(order[i - 1]), b: ptAt(x), sides: sideList }, what);
+      });
+      continue;
+    }
     // osa souměrnosti (u hranolového dílu se kreslí – souměrné kótování se o ni opírá)
     const symAxis = () => {
       const k = `sym:${v.key}:${axis}:${r3(mid)}`;
@@ -831,6 +949,7 @@ function prismaticDims(c: Ctx) {
     const L = hi[k] - lo[k];
     if (!(L > 1e-6)) continue;
     let ok = false;
+    let shown: PV | null = null;
     for (const v of order) {
       const isH = Math.abs(Math.abs(dot(v.cam.x, A)) - 1) < 1e-6;
       const isV = Math.abs(Math.abs(dot(upOf(v.cam), A)) - 1) < 1e-6;
@@ -845,13 +964,18 @@ function prismaticDims(c: Ctx) {
         dir === "h" ? { bottom: { a: [x0, y1], b: [x1, y1] }, top: { a: [x0, y0], b: [x1, y0] } } : { left: { a: [x0, y1], b: [x0, y0] }, right: { a: [x1, y1], b: [x1, y0] } };
       const used = c.lay.placed.filter((p) => p.ann.view === v.key && p.side && sides.includes(p.side));
       const minRow = used.length ? Math.max(...used.map((p) => (p.row ?? 0) + 1)) : 0;
-      const res = lin(c, v, { key: `ov:${"xyz"[k]}`, dir, ...alt[sides[0]]!, sides, minRow }, fmtDim(L), alt);
+      shown ??= v;
+      // tiše: nevejde-li se v tomto pohledu, zkusí se další; hlásí se jen, když se nevešel nikde
+      const res = lin(c, v, { key: `ov:${"xyz"[k]}`, dir, ...alt[sides[0]]!, sides, minRow }, fmtDim(L), alt, true);
       if (res) {
         ok = true;
         break;
       }
     }
-    if (!ok) c.skipped.push(tr("celkový rozměr {0}: žádný pohled ho neukazuje v pravé délce", fmtDim(L)));
+    if (!ok && shown) {
+      c.skipped.push(tr("{0}: nevešlo se čistě na list ({1})", fmtDim(L), tr(VIEW_NAME[shown.key] ?? shown.key)));
+      c.noRoom++;
+    } else if (!ok) c.skipped.push(tr("celkový rozměr {0}: žádný pohled ho neukazuje v pravé délce", fmtDim(L)));
   }
   // zaoblení a sražení hran (prvky Zaoblení / Sražení)
   edgeFeatureDims(c);
@@ -876,7 +1000,7 @@ function extrudeDims(c: Ctx) {
       if (e.type === "circle") {
         const cc = P(v, sketchPoint(sk.plane, e.cx, e.cy));
         const lines = [`Ø${fmtDim(2 * e.r)}${depthTxt}`];
-        call(c, { key: `ext:${f.id}:${e.id}`, view: v.key, tip: cc, lines, ring: { c: cc, r: e.r } }, lines[0]);
+        callQ(c, { key: `ext:${f.id}:${e.id}`, view: v.key, tip: cc, lines, ring: { c: cc, r: e.r } }, lines[0]);
         positionDims(c, v, [cc], null);
       } else if (e.type === "rect" || e.type === "slot") {
         const wdt = e.type === "rect" ? e.w : e.length;
@@ -898,11 +1022,11 @@ function extrudeDims(c: Ctx) {
         linQ(c, v, { key: `ext:${f.id}:${e.id}:w`, dir: "h", a: [x0, y0], b: [x1, y0], sides: ["top", "bottom"] }, what, { bottom: { a: [x0, y1], b: [x1, y1] } });
         linQ(c, v, { key: `ext:${f.id}:${e.id}:h`, dir: "v", a: [x1, y1], b: [x1, y0], sides: ["right", "left"] }, what, { left: { a: [x0, y1], b: [x0, y0] } });
         positionDims(c, v, [[x0, y1], [x1, y0]], null);
-        if (depthTxt) call(c, { key: `ext:${f.id}:${e.id}:d`, view: v.key, tip: [(x0 + x1) / 2, y0], lines: [depthTxt.trim()], prefer: [0.7, -0.7] }, `${f.name} ${depthTxt.trim()}`);
+        if (depthTxt) callQ(c, { key: `ext:${f.id}:${e.id}:d`, view: v.key, tip: [(x0 + x1) / 2, y0], lines: [depthTxt.trim()], prefer: [0.7, -0.7] }, `${f.name} ${depthTxt.trim()}`);
         if (e.type === "rect" && e.r > 0) {
           const arc = findArc(v, [x1 - e.r, y0 + e.r], e.r);
           const lines = [`4× R${fmtDim(e.r)}`];
-          if (arc) call(c, { key: `ext:${f.id}:${e.id}:r`, view: v.key, tip: arc.mid, lines, prefer: arc.out }, lines[0]);
+          if (arc) callQ(c, { key: `ext:${f.id}:${e.id}:r`, view: v.key, tip: arc.mid, lines, prefer: arc.out }, lines[0]);
         }
       }
     }

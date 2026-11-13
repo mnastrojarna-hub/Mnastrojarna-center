@@ -3,12 +3,13 @@
 import * as React from "react";
 import {
   AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
-  ListTree, Loader2, Maximize2, Move3d, MousePointer2, PaintBucket, Palette, Printer, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
+  Download, ListTree, Loader2, Maximize2, Move3d, MousePointer2, PaintBucket, Palette, Printer, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
   Undo2, Weight, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { printDocument } from "@/components/print/print-action";
 import type { ModelNode } from "@/lib/viewer3d/types";
-import type { LoadStage } from "@/lib/viewer3d/worker-protocol";
+import type { LoadProgress, LoadStage } from "@/lib/viewer3d/worker-protocol";
+import { fmtMb, isOutOfMemory } from "@/lib/viewer3d/tessellation";
 import { fmtMm, type Measurement } from "@/lib/viewer3d/measure";
 import { fmtKg, massKg, stockFor, type StockMode, type StockResult } from "@/lib/viewer3d/stock";
 import {
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
 import {
   COLOR_PALETTE, ViewerEngine, pickFilters, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
 } from "./engine";
-import { loadModel } from "./load-model";
+import { ModelLoadError, loadModel } from "./load-model";
 
 export interface ModelViewerProps {
   /** Obsah souboru (předá se do workeru — volající ho už nesmí potřebovat). */
@@ -29,11 +30,14 @@ export interface ModelViewerProps {
   /** Popisek formátu do stavového řádku (např. „STEP (AP214)"). */
   formatLabel?: string;
   className?: string;
+  /** Stažení originálu (nabídne se, když model nejde zobrazit). */
+  download?: { href: string; filename: string } | null;
 }
 
 const STAGE_TEXT: Record<LoadStage, string> = {
   download: "Stahuji soubor…",
   engine: "Spouštím CAD jádro (OpenCascade)…",
+  split: "Rozebírám sestavu na díly…",
   parse: "Čtu geometrii modelu…",
   topology: "Připravuji hrany a body pro měření…",
   render: "Vykresluji…",
@@ -105,10 +109,20 @@ function useEngineEvents(): { bump: (k: ChangeKind) => void; subscribeSnap: (fn:
 }
 
 /** Prohlížeč 3D modelu (STEP, IGES, STL, 3D PDF…) s ovládáním jako ZW3D. */
-export function ModelViewer({ bytes, format, name, formatLabel, className }: ModelViewerProps) {
+export function ModelViewer({ bytes, format, name, formatLabel, className, download }: ModelViewerProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
   const engineRef = React.useRef<ViewerEngine | null>(null);
   const [stage, setStage] = React.useState<LoadStage | "ready">("download");
+  const [prog, setProg] = React.useState<LoadProgress | null>(null);
+  const sizeBytes = React.useRef(bytes.byteLength).current;
+  const startedAt = React.useRef(Date.now());
+  const [, setTick] = React.useState(0);
+  // u dlouhého načítání ukazovat uplynulý čas (je vidět, že se pracuje)
+  React.useEffect(() => {
+    if (stage === "ready") return;
+    const t = window.setInterval(() => setTick((x) => x + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [stage]);
   const [error, setError] = React.useState<string | null>(null);
   const [warnings, setWarnings] = React.useState<string[]>([]);
   const [modelFormat, setModelFormat] = React.useState<string>(formatLabel ?? "");
@@ -157,11 +171,25 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
     engineRef.current = engine;
     const ac = new AbortController();
     setStage("parse");
-    loadModel({ format, bytes, name } as Parameters<typeof loadModel>[0], (s) => setStage(s), ac.signal)
-      .then((res) => {
+    startedAt.current = Date.now();
+    loadModel({ format, bytes, name } as Parameters<typeof loadModel>[0], (p) => {
+      setStage(p.stage);
+      setProg(p);
+    }, ac.signal)
+      .then(async (res) => {
         if (ac.signal.aborted) return;
         setStage("render");
-        engine.load(res.model, res.topology, res.zUp);
+        // velký model: nejdřív ukázat „Vykresluji…", nahrání do grafiky chvíli trvá
+        if (res.model.parts.length > 200) await new Promise((r) => setTimeout(r, 30));
+        if (ac.signal.aborted) return;
+        try {
+          const tLoad = Date.now();
+          engine.load(res.model, res.topology, res.zUp);
+          hostRef.current?.parentElement?.setAttribute("data-load-stats", JSON.stringify({ ...res.timings, render: Date.now() - tLoad, total: Date.now() - startedAt.current }));
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          throw new Error(isOutOfMemory(msg) ? `Model je pro grafiku prohlížeče příliš velký (${fmtMb(sizeBytes)}) — nestačí paměť. Stáhni ho a otevři v CADu.` : `Model se nepodařilo vykreslit (${msg}).`);
+        }
         setWarnings(res.model.warnings ?? []);
         setModelFormat((f) => f || res.model.format);
         if (res.model.parts.length > 1 && window.matchMedia("(min-width: 1024px)").matches) setPanel("tree");
@@ -169,7 +197,10 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
       })
       .catch((e: unknown) => {
         if (ac.signal.aborted) return;
-        setError(e instanceof Error ? e.message : String(e));
+        let msg = e instanceof Error ? e.message : String(e);
+        // zaseknutý / spadlý worker → velikost a rada
+        if (e instanceof ModelLoadError && e.kind !== "import") msg += ` Velikost souboru ${fmtMb(sizeBytes)} — stáhni ho a otevři v CADu.`;
+        setError(msg);
       });
     return () => {
       ac.abort();
@@ -239,19 +270,25 @@ export function ModelViewer({ bytes, format, name, formatLabel, className }: Mod
 
       {/* načítání / chyba */}
       {!error && stage !== "ready" && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center">
-          <div className="flex items-center gap-3 rounded-xl border bg-card/95 px-4 py-3 text-sm shadow-lg">
-            <Loader2 className="h-5 w-5 animate-spin text-primary" />
-            <span>{STAGE_TEXT[stage]}</span>
-          </div>
-        </div>
+        <LoadingCard stage={stage} prog={prog} elapsedMs={Date.now() - startedAt.current} sizeBytes={sizeBytes} />
       )}
       {error && (
         <div className="absolute inset-0 z-20 flex items-center justify-center p-4">
-          <div className="max-w-md rounded-xl border bg-card p-5 text-center shadow-lg" role="alert">
+          <div className="max-w-md rounded-xl border bg-card p-5 text-center shadow-lg" role="alert" data-testid="viewer3d-error">
             <AlertTriangle className="mx-auto h-8 w-8 text-amber-500" />
             <p className="mt-2 font-semibold">3D model se nepodařilo zobrazit</p>
             <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+            {download && (
+              <a
+                href={download.href}
+                download={download.filename}
+                data-no-viewer=""
+                className="mt-3 inline-flex h-10 items-center gap-2 rounded-lg bg-foreground px-4 text-sm font-medium text-background"
+                data-testid="viewer3d-error-download"
+              >
+                <Download className="h-4 w-4" /> Stáhnout {download.filename}
+              </a>
+            )}
           </div>
         </div>
       )}
@@ -1289,6 +1326,43 @@ function PartCard({ engine, selection, materials, onMass }: { engine: ViewerEngi
         <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat</button>
         <button type="button" onClick={() => engine.isolate(selection)} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Focus className="h-3.5 w-3.5" /> Izolovat</button>
         <button type="button" onClick={() => engine.fit(true)} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Maximize2 className="h-3.5 w-3.5" /> Přiblížit</button>
+      </div>
+    </div>
+  );
+}
+
+const fmtElapsed = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
+
+/** Průběh načítání: krok, u velké sestavy díly „120 / 850" s ukazatelem, uplynulý čas. */
+function LoadingCard({ stage, prog, elapsedMs, sizeBytes }: { stage: LoadStage; prog: LoadProgress | null; elapsedMs: number; sizeBytes: number }) {
+  const parts = stage === "parse" && prog?.total ? prog : null;
+  const pct = parts ? Math.min(100, Math.round(((parts.done ?? 0) / parts.total!) * 100)) : null;
+  const big = sizeBytes >= 20 * 1024 * 1024;
+  return (
+    <div className="absolute inset-0 z-20 flex items-center justify-center p-4">
+      <div className="flex min-w-[16rem] max-w-sm flex-col gap-2 rounded-xl border bg-card/95 px-4 py-3 text-sm shadow-lg" role="status" data-testid="viewer3d-loading">
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-5 w-5 shrink-0 animate-spin text-primary" />
+          <span data-testid="viewer3d-stage">
+            {parts ? (
+              <>
+                Čtu geometrii — díl <span className="tabular-nums">{(parts.done ?? 0).toLocaleString("cs-CZ")} / {parts.total!.toLocaleString("cs-CZ")}</span>
+              </>
+            ) : (
+              STAGE_TEXT[stage]
+            )}
+          </span>
+          {elapsedMs >= 3000 && <span className="ml-auto pl-2 text-xs tabular-nums text-muted-foreground">{fmtElapsed(elapsedMs)}</span>}
+        </div>
+        {pct !== null && (
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" data-testid="viewer3d-progress">
+            <div className="h-full bg-primary transition-[width]" style={{ width: `${pct}%` }} />
+          </div>
+        )}
+        {big && <p className="text-xs text-muted-foreground">Velký model ({fmtMb(sizeBytes)}) — načtení může trvat i několik minut.</p>}
       </div>
     </div>
   );

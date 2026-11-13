@@ -82,8 +82,11 @@ const SETTINGS_KEY = 'mn-cad-settings-v2';
   await p.evaluate(() => window.mncad.run('nový díl Dotyk'));
   await p.waitForTimeout(500);
   await p.keyboard.press('s');
+  // bez vybrané plochy nabídne klávesa S roviny skici (nabídka u kurzoru) – vybere se rovina XY
+  const menuXY = p.getByRole('button', { name: /Rovina XY/ }).first();
+  if (await menuXY.isVisible({ timeout: 3000 }).catch(() => false)) await menuXY.click();
   const opened = await p.waitForSelector('[data-sketch-canvas]', { timeout: 8000 }).then(() => true, () => false);
-  ok(opened, '3D: klávesa S (sketch.new) založila skicu a otevřela skicář');
+  ok(opened, '3D: klávesa S (sketch.new) založila skicu (rovina z nabídky) a otevřela skicář');
   if (!opened) { await p.screenshot({ path: S + 'touch-fail-open.png' }); await b.close(); return; }
   await p.waitForTimeout(500);
   ok((await tool()) === 'line', `nová skica začíná nástrojem Úsečka (${await tool()})`);
@@ -343,6 +346,8 @@ const SETTINGS_KEY = 'mn-cad-settings-v2';
   await p.reload({ waitUntil: 'networkidle', timeout: 240000 }); await start(p);
   await p.evaluate(() => window.mncad.run('nový díl Staré nastavení')); await p.waitForTimeout(500);
   await p.keyboard.press('s');
+  const menuXY2 = p.getByRole('button', { name: /Rovina XY/ }).first();
+  if (await menuXY2.isVisible({ timeout: 3000 }).catch(() => false)) await menuXY2.click();
   await p.waitForSelector('[data-sketch-canvas]', { timeout: 8000 }).catch(() => {});
   await p.waitForTimeout(400);
   await p.keyboard.press('r'); await p.waitForTimeout(100);

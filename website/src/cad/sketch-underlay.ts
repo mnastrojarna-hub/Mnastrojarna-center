@@ -8,6 +8,7 @@
  *
  * Souřadnice: pixel podkladu má počátek v levém horním rohu bitmapy a osu Y dolů; skica je v mm s osou Y nahoru.
  */
+import { cadLocale } from "./i18n";
 import { uid, type CadDoc, type Feature, type SketchUnderlay, type Vec2 } from "./types";
 
 /** delší strana uložené bitmapy nejvýš tolik px – větší obrázek se zmenší, stránka PDF se na tuto velikost vykreslí */
@@ -218,4 +219,43 @@ export function applySketchPatch(doc: CadDoc, sketchId: string, patch: SketchDoc
   if (Object.keys(next).length) out.underlays = next;
   else delete out.underlays;
   return out;
+}
+
+/**
+ * Dokument bez podkladů skic, které v něm už nejsou (smazaná skica). Podklad leží mimo prvek skici, takže po smazání
+ * skici zůstal v `doc.underlays` – skrytý obrázek (až stovky kB) by se ukládal, sdílel odkazem a exportoval. Volá se
+ * při uložení a sdílení (`embedBlobs`) a při automatickém uložení; v historii (Zpět) podklad zůstává. Nic-li se
+ * nemění, vrací tentýž objekt.
+ */
+export function pruneUnderlays(doc: CadDoc): CadDoc {
+  const all = doc.underlays;
+  if (!all) return doc;
+  const ids = new Set(doc.features.filter((f) => f.type === "sketch").map((f) => f.id));
+  const keys = Object.keys(all);
+  if (keys.every((k) => ids.has(k))) return doc;
+  const next: Record<string, SketchUnderlay> = {};
+  for (const k of keys) if (ids.has(k)) next[k] = all[k];
+  const out: CadDoc = { ...doc };
+  if (Object.keys(next).length) out.underlays = next;
+  else delete out.underlays;
+  return out;
+}
+
+/** Číslo do editačního pole podkladu: bez oddělovače tisíců („1.500“ v němčině by se po úpravě přečetlo jako 1,5). */
+export const fieldNum = (v: number, d = 3, locale = cadLocale()): string => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(locale, { useGrouping: false, maximumFractionDigits: d });
+
+/**
+ * Číslo z editačního pole bez ohledu na jazyk: mezery (i pevné) se vypustí; desetinná čárka i tečka platí. Jsou-li
+ * v textu obě, desetinný je poslední z nich a druhý znak odděluje tisíce („1.234,5“ i „1,234.5“ = 1234,5); opakovaný
+ * týž znak odděluje tisíce („1.600.000“). Chyba = NaN.
+ */
+export function parseFieldNum(text: string): number {
+  let t = text.replace(/\s/g, "");
+  if (!t) return NaN;
+  const dot = t.lastIndexOf(".");
+  const comma = t.lastIndexOf(",");
+  if (dot >= 0 && comma >= 0) t = dot > comma ? t.replace(/,/g, "") : t.replace(/\./g, "").replace(",", ".");
+  else if ((t.match(/[.,]/g) ?? []).length > 1) t = t.replace(/[.,]/g, "");
+  else t = t.replace(",", ".");
+  return /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t) ? Number(t) : NaN;
 }

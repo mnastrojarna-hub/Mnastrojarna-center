@@ -8,6 +8,7 @@
 import * as r from "replicad";
 import { sourceKey } from "./assembly";
 import { partEntry, shapeOfDoc } from "./asm-kernel";
+import { missingBlobs } from "./blobs";
 import { drawingDoc } from "./drawing-doc";
 import type { ModelView } from "./drawing";
 import type { CadDoc } from "./types";
@@ -21,6 +22,7 @@ export const docGeometryKey = (d: CadDoc) => JSON.stringify({ f: d.features, v: 
 
 function docShape(doc: CadDoc, used: Set<string>): Promise<r.Shape3D | null> {
   const dd = drawingDoc(doc);
+  if (missingBlobs(dd).length) return shapeOfDoc(dd).catch(() => null); // bez dat importu nic nezapamatovat
   const key = docGeometryKey(dd);
   used.add(key);
   let p = docShapes.get(key);

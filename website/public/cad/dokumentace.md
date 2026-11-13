@@ -832,6 +832,8 @@ nový díl Příruba DN50 · skica XY: kružnice 165 · vysunout 18 · trubka 88
 - vazba kolmo e1 e2, vazba shodně e1.a počátek, kóta délka e1 80, kóta průměr e2 Ø20 (řídicí; referenční jen měří). Po každém řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno.
 - skica plocha F6: … (číslo jako u popisků Ctrl+Shift+L, nebo horní, +X), odsazení N, obráceně; skica rovina "Rovina 1": … na pomocné rovině.
 - Výkres: výkres A3 …, kótovat, výkres tolerance Ø40 h6, výkres stav / window.mncad.drawingStatus(). Návod pro AI obsahuje pravidla kótování a tři vzorové příklady (hřídel, příruba, deska).
+- Měření textem: měřit F3 (plocha: typ, obsah, normála nebo osa, Ø, díra / vnější válec), měřit E5 (délka hrany), měřit F3 F7 (vzdálenost, úhel, u rovnoběžných ploch vzdálenost rovin, u děr rozteč os), měřit V1 x y z (bod k bodu), měřit těleso (obálka, objem, hmotnost, těžiště), měřit díry (všechny díry podle Ø: poloha, skrz / hloubka, směr), měřit válce (vnější průměry s délkou), měřit plocha horní (pravidlem). V sestavě měřit Hřídel:F3 Deska:F1. Pro skripty window.mncad.measure("F3", "F7") vrací čísla. Měření dokument nemění.
+- Podle předlohy vždy kontrola 1:1: návod pro AI ukládá agentům před modelováním vypsat všechny kóty předlohy, chybějící kótu nevymýšlet, ale zeptat se (odhadnout z měřítka, nebo ji někdo doplní), a na konci porovnat model a výkres s předlohou kótu po kótě a plochu po ploše a odhady vypsat v závěrečné zprávě.
 
 ## 22. Omezení a poctivé srovnání s desktopovými CADy
 

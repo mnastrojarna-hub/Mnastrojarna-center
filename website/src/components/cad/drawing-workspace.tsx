@@ -9,6 +9,7 @@ import { saveFile } from "@/lib/save-file";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
+import { internBlobs } from "@/cad/blobs";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, bomToCsv, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { threadsOfDoc } from "@/cad/drawing-doc";
 import { dimCheck } from "@/cad/dim-check";
@@ -17,6 +18,7 @@ import type { SmartDims } from "@/cad/drawing-dims";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
+import { ShareCta } from "./share-cta";
 
 type Props = {
   doc: CadDoc;
@@ -775,14 +777,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         {onShare && (
           <>
             <div className="mx-1 h-6 w-px bg-ink-700/10" />
-            <Btn
+            <ShareCta
+              compact
               onClick={() => {
                 if (dirty.current) persistNow(); // rozpracované razítko / poznámky do dokumentu ještě před vytvořením odkazu
                 onShare?.();
               }}
-              title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres")}>
-              {tr("Sdílet")}
-            </Btn>
+              title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemci se otevře rovnou výkres")}
+            />
           </>
         )}
         <div className="mx-1 h-6 w-px bg-ink-700/10" />
@@ -1473,7 +1475,8 @@ function ModelsSection({ doc, models, onChange, flash }: { doc: CadDoc; models: 
   const addFile = async (f: File | undefined) => {
     if (!f) return;
     try {
-      const d = JSON.parse(await f.text()) as CadDoc;
+      // .mncad této verze má data importů v mapě `blobs` – do úložiště (odkazy mnblob:), jinak by model nešel postavit
+      const d = internBlobs(JSON.parse(await f.text()) as CadDoc);
       if (d.app !== "mnastrojarna-cad" || !Array.isArray(d.features)) throw new Error();
       // do výkresu se ukládá jen geometrie dokumentu (jeho vlastní výkresy ne)
       const { drawings: _d, ...rest } = d;

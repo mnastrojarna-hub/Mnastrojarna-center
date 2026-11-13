@@ -5,7 +5,7 @@
  * Úmluva: `offset` se měří ve směru normály (u osové roviny je to přímo souřadnice na ose). Výsledná rovina
  * zachovává poloprostor `normal·p + constant ≥ 0` (shodně s THREE.Plane).
  */
-import { tr } from "./i18n";
+import { cadLocale, tr } from "./i18n";
 import { evalExpr } from "./params";
 import type { Vec3 } from "./types";
 
@@ -226,6 +226,17 @@ const round4 = (v: number) => Math.round(v * 1e4) / 1e4;
 /** Zápis vektoru „nx; ny; nz“ (nejvýš 4 desetinná místa). */
 export function formatVector(v: Vec3): string {
   return v.map((c) => String(round4(clean(c)))).join("; ");
+}
+
+/** Poloha v mm k zobrazení: nejvýš 2 desetinná místa, bez „-0“ (vrchol sítě v y = −1e-7 se zaokrouhlí na 0). */
+export function formatPos(v: number): string {
+  return (round2(v) || 0).toLocaleString(cadLocale(), { maximumFractionDigits: 2 });
+}
+
+/** Číslo plochy zapsané jako „3“, „F3“ i „f3“ (stejně jako popisky ploch a `skica plocha F3`); jinak NaN. */
+export function parseFaceNo(text: string): number {
+  const m = text.trim().match(/^F?\s*(\d+)$/i);
+  return m ? Number(m[1]) : NaN;
 }
 
 /**

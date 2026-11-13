@@ -6,6 +6,7 @@ import { tr } from "./i18n";
 import * as r from "replicad";
 import { flattenAssembly, MAX_DEPTH, sourceKey } from "./assembly";
 import { buildDoc, buildShape, shapeResult } from "./build";
+import { missingBlobs } from "./blobs";
 import type { BuildResult, CadDoc, ComponentSource, Placement, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -40,6 +41,8 @@ export async function partEntry(key: string, s: ComponentSource, depth = 0): Pro
   const res = s.kind === "asm" ? shapeResult(await assemblyShape(s.doc, depth + 1)) : await buildDoc(sourceDoc(s), { light: s.kind === "file" });
   const { body, ...result } = res;
   const e: Entry = { body, result, used: ++tick };
+  // bez dat importu (dorazí s dalším požadavkem) se selhaný díl nezapamatuje
+  if (missingBlobs(s.kind === "asm" ? s.doc : sourceDoc(s)).length) return e;
   cache.set(key, e);
   trim();
   return e;

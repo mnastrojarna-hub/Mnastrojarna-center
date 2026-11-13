@@ -283,14 +283,25 @@ maß Länge e2 50,5`);
     expect(rect.w).toBeCloseTo(50, 4);
     expect(r.sk.constraints?.map((c) => c.refs.map((x) => `${x.e}.${x.k}`).join(" "))).toEqual(["e3.p e4.c", "e3.p e2.g0", "e4.center e1.s2"]);
   });
-  it("konflikt: řešič nenajde řešení → ⚠, geometrie beze změny, vazby a kóty zůstanou", () => {
+  it("konflikt: kóta v rozporu se nepřidá (✗), geometrie i dosavadní kóty beze změny", () => {
     const r = run("skica XY\núsečka 0 0 10 0\nkóta délka e1 10\nkóta délka e1 20");
-    expect(r.log[2]).toMatch(/^4: ⚠ kóty ve skice „Skica 1“: délka e1 20 → Přeurčeno – konflikt \(1\): kóta délka e1 20 · řešič nenašel řešení \(odchylka 5\), geometrie zůstala beze změny/);
-    expect(r.sk.dims).toHaveLength(2);
+    expect(r.log[2]).toMatch(/^4: ✗ kóta délka e1 20 ve skice „Skica 1“ nepřidána – v rozporu s dosavadními vazbami a kótami$/);
+    expect(r.sk.dims).toHaveLength(1);
     near(ent(r.sk, "e1").b as number[], [10, 0]);
-    // nadbytečná (ale splnitelná) vazba = přeurčeno, ⚠
+    // referenční (měřící) kóta skicu nepřeurčí – přidá se
+    const ref = run("kóta délka e1 referenční", r.doc);
+    expect(ref.log[0]).toMatch(/^1: ✓ kóty ve skice „Skica 1“: délka e1 10 referenční/);
+    expect(ref.sk.dims).toHaveLength(2);
+    // nadbytečná (ale splnitelná) vazba se také nepřidá – skica nezůstane přeurčená
     const red = run("skica XY\núsečka 0 0 10 0\nvazba vodorovně e1; vodorovně e1");
-    expect(red.log[1]).toMatch(/⚠ vazby ve skice .* → Přeurčeno – nadbytečné vazby \(1\): vodorovně e1$/);
+    expect(red.log[1]).toMatch(/^3: ✓ vazby ve skice „Skica 1“: vodorovně e1 → Nedourčeno/);
+    expect(red.log[2]).toMatch(/^3: ✗ vazba vodorovně e1 ve skice „Skica 1“ nepřidána – nadbytečná/);
+    expect(red.sk.constraints).toHaveLength(1);
+    // skica přeurčená už předem (JSON, starší verze): nová nezávislá vazba se přidá, stav ⚠ zůstane
+    const pre = run("skica XY\núsečka 0 0 10 0\núsečka 0 0 0 10");
+    pre.sk.constraints = [{ id: "h1", type: "horizontal", refs: [{ e: "e1", k: "self" }] }, { id: "h2", type: "horizontal", refs: [{ e: "e1", k: "self" }] }];
+    const again = run("vazba svisle e2", pre.doc);
+    expect(again.log[0]).toMatch(/^1: ⚠ vazby ve skice „Skica 1“: svisle e2 → Přeurčeno – nadbytečné vazby \(1\): vodorovně e1$/);
   });
   it("konec bloku skici: skica s vazbami se po dalších entitách vyřeší a ohlásí stav, bez vazeb mlčí", () => {
     const p = parseAgentText("skica XY\núsečka 0 0 10 0\nvazba vodorovně e1\núsečka 0 0 0 10\nvysunout 5");
@@ -407,5 +418,53 @@ describe("skica na ploše modelu a na pomocné rovině", () => {
     expect((await sketchOnPlane(b.feature, b, doc, kernel().k)).feature.planeDef).toEqual({ kind: "datum", featureId: "d1" });
     const c = sketchOn("skica rovina Nic").op;
     await expect(sketchOnPlane(c.feature, c, doc, kernel().k)).rejects.toThrow(/^pomocná rovina „Nic“ v dílu není – pomocné roviny: Rovina 1$/);
+  });
+});
+
+describe("opravy po kontrole: název skici, otevřená skica, přeurčující vazby", () => {
+  it("„plocha“ / „rovina“ v názvu skici není umístění na plochu / pomocnou rovinu", () => {
+    const a = parseAgentText("skica XY název Plocha 3: kružnice 5 v 10 10");
+    expect(a.errors).toEqual([]);
+    expect(a.ops[0]).toMatchObject({ k: "feature", feature: { name: "Plocha 3", plane: { kind: "base", name: "XY" } } });
+    const b = parseAgentText("skica XY název Horní plocha: obdélník 20 10");
+    expect(b.errors).toEqual([]);
+    expect(b.ops[0]).toMatchObject({ k: "feature", feature: { name: "Horní plocha" } });
+    expect(parseAgentText("sketch XZ name Top face plane").ops[0]).toMatchObject({ k: "feature", feature: { name: "Top face plane", plane: { name: "XZ" } } });
+    // umístění před názvem dál platí
+    expect(parseAgentText("skica plocha F3 název Horní plocha").ops[0]).toMatchObject({ k: "sketchOn", on: { face: 3 }, feature: { name: "Horní plocha" } });
+    expect(parseAgentText('skica rovina "Rovina 1" název Rovina víka').ops[0]).toMatchObject({ k: "sketchOn", on: { datum: "Rovina 1" }, feature: { name: "Rovina víka" } });
+  });
+  it("vazby a kóty bez bloku skici jdou do skici otevřené ve skicáři (ne do poslední)", () => {
+    const { doc } = run("skica XY: úsečka 0 0 40 7\nskica XZ: úsečka 0 0 40 9");
+    const [s1, s2] = doc.features as SketchF[];
+    const op = parseAgentText("vazba vodorovně e1").ops[0] as Parameters<typeof applySketchOp>[1];
+    const log = applySketchOp(doc.features, op, s1.id);
+    expect(log[0]).toMatch(/^✓ vazby ve skice „Skica 1“: vodorovně e1/);
+    expect((doc.features[0] as SketchF).constraints?.map((c) => c.type)).toEqual(["horizontal"]);
+    expect((doc.features[1] as SketchF).constraints ?? []).toEqual([]);
+    expect(ent(doc.features[1] as SketchF, "e1").b).toEqual([40, 9]);
+    // blok skici (skica z tohoto vstupu) má přednost; neexistující otevřená skica = poslední skica
+    const blk = parseAgentText("skica XY: úsečka 0 0 10 3\nvazba vodorovně e1").ops;
+    doc.features.push((blk[0] as { feature: Feature }).feature);
+    for (const o of blk.slice(1)) applySketchOp(doc.features, o as Parameters<typeof applySketchOp>[1], s1.id);
+    expect((doc.features[2] as SketchF).constraints?.map((c) => c.type)).toEqual(["horizontal"]);
+    expect((doc.features[0] as SketchF).constraints).toHaveLength(1);
+    applySketchOp(doc.features, parseAgentText("kóta délka e1 30").ops[0] as Parameters<typeof applySketchOp>[1], "nic");
+    expect((doc.features[2] as SketchF).dims?.map((d) => d.value)).toEqual([30]);
+    expect(s2.dims ?? []).toEqual([]);
+  });
+  it("vazba nebo kóta, která by skicu přeurčila, se nepřidá (✗), ostatní z řádku ano", () => {
+    const r = run("skica XY\núsečka 0 0 10 0\nvazba pevně e1.a 0 0\nkóta vodorovně počátek e1.a 10");
+    expect(r.log[r.log.length - 1]).toMatch(/^4: ✗ kóta vodorovně počátek e1\.a 10 ve skice „Skica 1“ nepřidána – v rozporu s dosavadními vazbami a kótami/);
+    expect(r.sk.dims ?? []).toEqual([]);
+    // pomocný bod počátku pro odmítnutou kótu nezůstane
+    expect(r.sk.entities.map((e) => e.id)).toEqual(["e1"]);
+    const m = run("skica XY\núsečka 0 0 10 0\núsečka 0 0 0 10\nvazba vodorovně e1; svisle e2; vodorovně e1; kolmo e1 e2");
+    expect(m.log.slice(-3)).toEqual([
+      "4: ✓ vazby ve skice „Skica 1“: vodorovně e1, svisle e2 → Nedourčeno (6 st. volnosti)",
+      "4: ✗ vazba vodorovně e1 ve skice „Skica 1“ nepřidána – nadbytečná: tutéž geometrii už určují dosavadní vazby a kóty",
+      "4: ✗ vazba kolmo e1 e2 ve skice „Skica 1“ nepřidána – nadbytečná: tutéž geometrii už určují dosavadní vazby a kóty",
+    ]);
+    expect(m.sk.constraints?.map((c) => c.type)).toEqual(["horizontal", "vertical"]);
   });
 });
