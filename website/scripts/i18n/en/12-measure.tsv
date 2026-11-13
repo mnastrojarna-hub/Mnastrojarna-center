@@ -1,0 +1,70 @@
+# Měření pro AI agenty: příkaz měřit / measure / messen, window.mncad.measure (agent-measure.ts, measure.ts)
+ – díra	 – hole
+ – vnější válec	 – outer cylinder
+„{0}:“ – komponentu lze uvést jen v sestavě; v dílu stačí F3, E5, V2	“{0}:” – a component can only be given in an assembly; in a part just use F3, E5, V2
+{0}: obálka {1} × {2} × {3} mm (X {4}…{5}, Y {6}…{7}, Z {8}…{9}) · objem {10} mm³ ({11} cm³) · povrch {12} mm² · hmotnost {13} kg ({14} g/cm³) · těžiště {15} · ploch {16} · hran {17} · vrcholů {18}{19}	{0}: bounding box {1} × {2} × {3} mm (X {4}…{5}, Y {6}…{7}, Z {8}…{9}) · volume {10} mm³ ({11} cm³) · surface {12} mm² · mass {13} kg ({14} g/cm³) · centre of mass {15} · faces {16} · edges {17} · vertices {18}{19}
+{0}: povrch {1} mm²	{0}: surface {1} mm²
+{0}: vrchol {1}	{0}: vertex {1}
+B-spline křivka	B-spline curve
+B-spline plocha	B-spline surface
+Bézierova plocha	Bézier surface
+bod {0}	point {0}
+bod osy {0}	axis point {0}
+bod potřebuje tři souřadnice: měřit V1 10 20 5 (nebo měřit V1 bod 10 20 5)	a point needs three coordinates: measure V1 10 20 5 (or measure V1 point 10 20 5)
+čísla ploch, hran a vrcholů začínají 1 (F1, E1, V1) – „{0}“	face, edge and vertex numbers start at 1 (F1, E1, V1) – “{0}”
+délka {0}	length {0}
+díra Ø{0}	hole Ø{0}
+Díry: {0} – {1}	Holes: {0} – {1}
+Díry: žádné válcové díry	Holes: no cylindrical holes
+hrana E{0} v tělese není – těleso má {1} hran (E1 až E{1})	edge E{0} is not in the body – the body has {1} edges (E1 to E{1})
+Hrany podle pravidla „{0}“: {1}	Edges by rule “{0}”: {1}
+kolmé	perpendicular
+komponenta „{0}“ v sestavě není – komponenty: {1}	component “{0}” is not in the assembly – components: {1}
+kulová plocha	spherical face
+měření pro kontrolu modelu: údaje o ploše / hraně / vrcholu (čísla jako popisky pro výběr), vzdálenost, úhel a rovnoběžnost dvou entit, rozteč os děr, těleso (obálka, objem, hmotnost, těžiště), seznam děr (Ø, hloubka, osa, střed, po průměrech) a vnějších válců; v sestavě Komponenta:F3; také window.mncad.measure()	measuring to check the model: face / edge / vertex data (numbers as the selection labels), distance, angle and parallelism of two entities, hole axis pitch, body (bounding box, volume, mass, centre of mass), list of holes (Ø, depth, axis, centre, grouped by diameter) and outer cylinders; in an assembly Component:F3; also window.mncad.measure()
+měřit díry nemá další volby – vypíše všechny díry tělesa: {0}	measure holes takes no further options – it lists all holes of the body: {0}
+měřit F3 | E5 | V2 · měřit F3 F7 (dvě entity) · měřit V1 x y z · měřit těleso · měřit díry · měřit válce · měřit plocha <pravidlo> · měřit hrany <pravidlo> · v sestavě Komponenta:F3	measure F3 | E5 | V2 · measure F3 F7 (two entities) · measure V1 x y z · measure body · measure holes · measure cylinders · measure faces <rule> · measure edges <rule> · in an assembly Component:F3
+měřit hrany potřebuje pravidlo: měřit hrany kruhové | svislé | horní | poloměr 4 | delší 20	measure edges needs a rule: measure edges circular | vertical | top | radius 4 | longer 20
+měřit plocha potřebuje číslo nebo pravidlo: měřit plocha F3 | horní | +X | válcové | největší	measure faces needs a number or a rule: measure face F3 | top | +X | cylindrical | largest
+měřit porovná nejvýš dvě entity (zadáno {0}) – např. měřit F3 F7	measure compares at most two entities ({0} given) – e.g. measure F3 F7
+měřit potřebuje aspoň jednu entitu modelu (F3, E5, V2, těleso) – vzdálenost dvou bodů spočítejte přímo	measure needs at least one model entity (F3, E5, V2, body) – compute the distance of two points directly
+měřit potřebuje, co měřit: {0}	measure needs something to measure: {0}
+měřit válce nemá další volby – vypíše všechny vnější válce tělesa: {0}	measure cylinders takes no further options – it lists all outer cylinders of the body: {0}
+měřit: neznámá entita „{0}“ – {1}	measure: unknown entity “{0}” – {1}
+nejbližší body {0} a {1}	nearest points {0} and {1}
+oblouk {0}°	arc {0}°
+oblouk R{0}	arc R{0}
+obvod {0}°	circumference {0}°
+odsazená plocha	offset surface
+plocha	face
+plocha {0} mm²	area {0} mm²
+plocha F{0} v tělese není – těleso má {1} ploch (F1 až F{1})	face F{0} is not in the body – the body has {1} faces (F1 to F{1})
+Plochy podle pravidla „{0}“: {1}	Faces by rule “{0}”: {1}
+rotační plocha	surface of revolution
+rovnoběžné	parallel
+skrz, délka {0}	through, length {0}
+slepá, hloubka {0}	blind, depth {0}
+směr vrtání {0}	drilling direction {0}
+střed koule {0}	sphere centre {0}
+těleso	body
+těleso komponenty není načtené – otevřete sestavu a zopakujte měření	the component body is not loaded – open the assembly and measure again
+těžiště plochy {0}	face centroid {0}
+toroidní plocha	toroidal face
+úhel {0}°	angle {0}°
+úhel k rovině {0}°	angle to plane {0}°
+úhel normál {0}°	angle between normals {0}°
+úsek osy {0} → {1} (délka {2})	axis segment {0} → {1} (length {2})
+v sestavě uveďte komponentu: měřit Hřídel:F3 Deska:F1 – komponenty: {0}	in an assembly give the component: measure Shaft:F3 Plate:F1 – components: {0}
+Válce: {0} – {1}	Cylinders: {0} – {1}
+Válce: žádné vnější válcové plochy	Cylinders: no outer cylindrical faces
+vrchol V{0} v tělese není – těleso má {1} vrcholů (V1 až V{1})	vertex V{0} is not in the body – the body has {1} vertices (V1 to V{1})
+vrcholový úhel {0}°	apex angle {0}°
+vstup {0}	entry {0}
+výběr pravidlem měří jen v dílu – v sestavě zadejte entity číslem: měřit Hřídel:F3 Deska:F1	selection by rule measures only in a part – in an assembly give entities by number: measure Shaft:F3 Plate:F1
+vysunutá plocha	extrusion surface
+vzdálenost –	distance –
+vzdálenost {0}	distance {0}
+vzdálenost od roviny {0}	distance from plane {0}
+vzdálenost os {0}	axis distance {0}
+vzdálenost rovin {0}	distance between planes {0}
+vzdálenost středů {0}	centre distance {0}

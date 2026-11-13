@@ -1,0 +1,70 @@
+# Měření pro AI agenty: příkaz měřit / measure / messen, window.mncad.measure (agent-measure.ts, measure.ts)
+ – díra	 – Bohrung
+ – vnější válec	 – Außenzylinder
+„{0}:“ – komponentu lze uvést jen v sestavě; v dílu stačí F3, E5, V2	„{0}:“ – eine Komponente kann nur in einer Baugruppe angegeben werden; im Teil genügt F3, E5, V2
+{0}: obálka {1} × {2} × {3} mm (X {4}…{5}, Y {6}…{7}, Z {8}…{9}) · objem {10} mm³ ({11} cm³) · povrch {12} mm² · hmotnost {13} kg ({14} g/cm³) · těžiště {15} · ploch {16} · hran {17} · vrcholů {18}{19}	{0}: Hüllquader {1} × {2} × {3} mm (X {4}…{5}, Y {6}…{7}, Z {8}…{9}) · Volumen {10} mm³ ({11} cm³) · Oberfläche {12} mm² · Masse {13} kg ({14} g/cm³) · Schwerpunkt {15} · Flächen {16} · Kanten {17} · Ecken {18}{19}
+{0}: povrch {1} mm²	{0}: Oberfläche {1} mm²
+{0}: vrchol {1}	{0}: Ecke {1}
+B-spline křivka	B-Spline-Kurve
+B-spline plocha	B-Spline-Fläche
+Bézierova plocha	Bézier-Fläche
+bod {0}	Punkt {0}
+bod osy {0}	Achspunkt {0}
+bod potřebuje tři souřadnice: měřit V1 10 20 5 (nebo měřit V1 bod 10 20 5)	ein Punkt braucht drei Koordinaten: messen V1 10 20 5 (oder messen V1 punkt 10 20 5)
+čísla ploch, hran a vrcholů začínají 1 (F1, E1, V1) – „{0}“	Flächen-, Kanten- und Eckennummern beginnen mit 1 (F1, E1, V1) – „{0}“
+délka {0}	Länge {0}
+díra Ø{0}	Bohrung Ø{0}
+Díry: {0} – {1}	Bohrungen: {0} – {1}
+Díry: žádné válcové díry	Bohrungen: keine zylindrischen Bohrungen
+hrana E{0} v tělese není – těleso má {1} hran (E1 až E{1})	Kante E{0} ist nicht im Körper – der Körper hat {1} Kanten (E1 bis E{1})
+Hrany podle pravidla „{0}“: {1}	Kanten nach Regel „{0}“: {1}
+kolmé	senkrecht
+komponenta „{0}“ v sestavě není – komponenty: {1}	Komponente „{0}“ ist nicht in der Baugruppe – Komponenten: {1}
+kulová plocha	Kugelfläche
+měření pro kontrolu modelu: údaje o ploše / hraně / vrcholu (čísla jako popisky pro výběr), vzdálenost, úhel a rovnoběžnost dvou entit, rozteč os děr, těleso (obálka, objem, hmotnost, těžiště), seznam děr (Ø, hloubka, osa, střed, po průměrech) a vnějších válců; v sestavě Komponenta:F3; také window.mncad.measure()	Messen zur Modellkontrolle: Daten zu Fläche / Kante / Ecke (Nummern wie die Auswahlbeschriftungen), Abstand, Winkel und Parallelität zweier Elemente, Achsabstand von Bohrungen, Körper (Hüllquader, Volumen, Masse, Schwerpunkt), Liste der Bohrungen (Ø, Tiefe, Achse, Mitte, nach Durchmesser gruppiert) und Außenzylinder; in der Baugruppe Komponente:F3; auch window.mncad.measure()
+měřit díry nemá další volby – vypíše všechny díry tělesa: {0}	messen bohrungen hat keine weiteren Optionen – es listet alle Bohrungen des Körpers: {0}
+měřit F3 | E5 | V2 · měřit F3 F7 (dvě entity) · měřit V1 x y z · měřit těleso · měřit díry · měřit válce · měřit plocha <pravidlo> · měřit hrany <pravidlo> · v sestavě Komponenta:F3	messen F3 | E5 | V2 · messen F3 F7 (zwei Elemente) · messen V1 x y z · messen körper · messen bohrungen · messen zylinder · messen fläche <Regel> · messen kanten <Regel> · in der Baugruppe Komponente:F3
+měřit hrany potřebuje pravidlo: měřit hrany kruhové | svislé | horní | poloměr 4 | delší 20	messen kanten braucht eine Regel: messen kanten kreisförmig | senkrecht | oben | radius 4 | länger 20
+měřit plocha potřebuje číslo nebo pravidlo: měřit plocha F3 | horní | +X | válcové | největší	messen fläche braucht eine Nummer oder Regel: messen fläche F3 | oben | +X | zylindrisch | größte
+měřit porovná nejvýš dvě entity (zadáno {0}) – např. měřit F3 F7	messen vergleicht höchstens zwei Elemente ({0} angegeben) – z. B. messen F3 F7
+měřit potřebuje aspoň jednu entitu modelu (F3, E5, V2, těleso) – vzdálenost dvou bodů spočítejte přímo	messen braucht mindestens ein Modellelement (F3, E5, V2, körper) – den Abstand zweier Punkte direkt berechnen
+měřit potřebuje, co měřit: {0}	messen braucht etwas zum Messen: {0}
+měřit válce nemá další volby – vypíše všechny vnější válce tělesa: {0}	messen zylinder hat keine weiteren Optionen – es listet alle Außenzylinder des Körpers: {0}
+měřit: neznámá entita „{0}“ – {1}	messen: unbekanntes Element „{0}“ – {1}
+nejbližší body {0} a {1}	nächste Punkte {0} und {1}
+oblouk {0}°	Bogen {0}°
+oblouk R{0}	Bogen R{0}
+obvod {0}°	Umfang {0}°
+odsazená plocha	Offsetfläche
+plocha	Fläche
+plocha {0} mm²	Fläche {0} mm²
+plocha F{0} v tělese není – těleso má {1} ploch (F1 až F{1})	Fläche F{0} ist nicht im Körper – der Körper hat {1} Flächen (F1 bis F{1})
+Plochy podle pravidla „{0}“: {1}	Flächen nach Regel „{0}“: {1}
+rotační plocha	Rotationsfläche
+rovnoběžné	parallel
+skrz, délka {0}	durchgehend, Länge {0}
+slepá, hloubka {0}	Sackloch, Tiefe {0}
+směr vrtání {0}	Bohrrichtung {0}
+střed koule {0}	Kugelmitte {0}
+těleso	körper
+těleso komponenty není načtené – otevřete sestavu a zopakujte měření	der Körper der Komponente ist nicht geladen – Baugruppe öffnen und erneut messen
+těžiště plochy {0}	Flächenschwerpunkt {0}
+toroidní plocha	Torusfläche
+úhel {0}°	Winkel {0}°
+úhel k rovině {0}°	Winkel zur Ebene {0}°
+úhel normál {0}°	Winkel der Normalen {0}°
+úsek osy {0} → {1} (délka {2})	Achsabschnitt {0} → {1} (Länge {2})
+v sestavě uveďte komponentu: měřit Hřídel:F3 Deska:F1 – komponenty: {0}	in der Baugruppe die Komponente angeben: messen Welle:F3 Platte:F1 – Komponenten: {0}
+Válce: {0} – {1}	Zylinder: {0} – {1}
+Válce: žádné vnější válcové plochy	Zylinder: keine zylindrischen Außenflächen
+vrchol V{0} v tělese není – těleso má {1} vrcholů (V1 až V{1})	Ecke V{0} ist nicht im Körper – der Körper hat {1} Ecken (V1 bis V{1})
+vrcholový úhel {0}°	Öffnungswinkel {0}°
+vstup {0}	Eintritt {0}
+výběr pravidlem měří jen v dílu – v sestavě zadejte entity číslem: měřit Hřídel:F3 Deska:F1	Auswahl per Regel misst nur im Teil – in der Baugruppe Elemente per Nummer angeben: messen Welle:F3 Platte:F1
+vysunutá plocha	Extrusionsfläche
+vzdálenost –	Abstand –
+vzdálenost {0}	Abstand {0}
+vzdálenost od roviny {0}	Abstand zur Ebene {0}
+vzdálenost os {0}	Achsabstand {0}
+vzdálenost rovin {0}	Abstand der Ebenen {0}
+vzdálenost středů {0}	Mittenabstand {0}

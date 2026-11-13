@@ -25,6 +25,7 @@ do 3D okna (výběr hran a ploch pravidlem).
    jako text; \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
    \`window.mncad.openConsole()\` otevře konzoli; \`await window.mncad.exportFile("step")\` (step, stl, brep, obj, glb,
    3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor;
+   \`await window.mncad.measure("F3", "F7")\` změří jako příkaz \`měřit\` a vrátí řádky + čísla (viz „Měření“);
    \`window.mncad.progress()\` vrátí průběh běžícího výpočtu (\`{ label, index, total, name, seconds }\` nebo \`null\`) a
    \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem).
 
@@ -71,6 +72,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`kótovat [chytře|celkově|nic] [řetězově|od základny]\` | Chytré kóty podle prvků modelu (viz „Výkres a kóty“) – nahradí jen vygenerované kóty |
 | \`výkres tolerance <kóta> <tolerance>\` · \`výkres poznámka "…"\` · \`výkres nepředepsané ISO 2768-mK\` · \`výkres hrany ISO 13715 …\` · \`výkres drsnost Ra 3,2\` | tolerance ke kótě podle popisku (\`Ø40 h6\`, \`25 ±0,1\`, \`M8 6H\`); údaje u razítka |
 | \`výkres stav\` | textový stav výkresu: list, měřítko, pohledy, všechny kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo (také \`window.mncad.drawingStatus()\`) |
+| \`měřit F3|E5|V2 [F7|E9|V8|x y z]\` · \`měřit těleso|díry|válce\` · \`měřit plocha|hrany <pravidlo>\` | měření pro kontrolu modelu (viz „Měření“); také \`window.mncad.measure()\` |
 | \`smazat poslední\` · \`stav\` · \`zobraz iso|přední|horní…\` · \`kolize\` | správa; kolize = kontrola průniků komponent sestavy |
 
 Booleovský režim: první tvarový prvek vytvoří těleso, další se **přidávají**; \`odebrat\` odečte, \`průnik\` ponechá
@@ -209,6 +211,39 @@ skica plocha +X: obdélník 30 10
 vazba shodně e1.střed počátek; vodorovně e1.s0
 kóta délka e1.s0 30; délka e1.s1 10
 vysunout 2 odebrat obráceně
+\`\`\`
+
+### Měření – \`měřit\` (EN \`measure\`, DE \`messen\`)
+
+Měří hotový model (stav po předchozích řádcích vstupu); výsledek je **jeden řádek protokolu na měření**, délky v mm
+(nejvýš 3 desetinná místa, desetinná čárka jako ve \`stav\`), úhly ve stupních. Plochy, hrany a vrcholy se číslují jako
+popisky pro výběr (\`F1\` = první plocha, \`E2\`, \`V3\` – \`window.mncad.hints()\`, Ctrl+Shift+L); neexistující číslo vrátí
+chybu s platným rozsahem („těleso má 10 ploch (F1 až F10)“).
+
+| Zápis | Výsledek |
+| --- | --- |
+| \`měřit F3\` | typ plochy, plocha mm², normála (rovina) nebo Ø / R, osa a úsek osy s délkou (válec – „díra“ / „vnější válec“), vrcholový úhel (kužel), těžiště plochy |
+| \`měřit E5\` · \`měřit V2\` | hrana: typ, délka, začátek a konec, směr (úsečka) nebo Ø, střed, osa, úhel oblouku (kružnice); vrchol: souřadnice |
+| \`měřit F3 F7\` · \`měřit E2 E9\` · \`měřit F3 E5\` · \`měřit V1 V8\` | nejmenší vzdálenost, ΔX/ΔY/ΔZ, nejbližší body; dvě roviny: úhel normál, „rovnoběžné“ + **vzdálenost rovin** / „kolmé“; dvě díry, válce nebo kružnice: **vzdálenost os** (rozteč), úhel os, vzdálenost středů |
+| \`měřit V1 x y z\` · \`měřit F3 bod x y z\` | vzdálenost entity od bodu |
+| \`měřit těleso\` | obálka (X/Y/Z od…do), objem, povrch, hmotnost podle materiálu, těžiště, počet ploch / hran / vrcholů |
+| \`měřit díry\` | všechny válcové díry po skupinách průměru: Ø, vstup (střed na povrchu), skrz + délka / slepá + hloubka, osa / směr vrtání, čísla ploch |
+| \`měřit válce\` | vnější válce (osazení, čepy): Ø, délka, osa, od…do |
+| \`měřit plocha horní\` · \`měřit hrany kruhové poloměr 4\` | všechny plochy / hrany podle pravidla jako u \`skořepina\` / \`zaoblit\`, každá na řádku |
+| \`měřit Hřídel:F3 Deska:F1\` · \`měřit Deska:díry\` | v sestavě: komponenta podle názvu (s mezerou v uvozovkách: \`"Víko A":F2\`), světové souřadnice; pravidla jen v dílu |
+
+\`await window.mncad.measure("F3", "F7")\` (také \`measure("V1", [0, 0, 50])\`, \`measure("díry")\`, \`measure("Hřídel:F3")\`)
+vrátí \`{ ok, kind, lines, distance, angle, radius, diameter, area, length, volume, points, report }\` – \`lines\` jsou řádky
+protokolu, \`report\` celý výsledek s čísly (u děr \`report.holes[]\` s \`diameter\`, \`entry\`, \`through\`, \`depth\`, \`axis\`);
+při chybě \`{ ok: false, error }\`. Příklad:
+
+\`\`\`
+kvádr 100 60 20
+díra 8 skrz v 20 30 20
+díra 6 hloubka 10 v 50 52 20
+měřit díry          # Díry: 2 – Ø 6 mm × 1, Ø 8 mm × 1 · D1 Ø 6 mm: vstup [50; 52; 20] · slepá, hloubka 10 mm · směr vrtání −Z …
+měřit těleso        # Těleso: obálka 100 × 60 × 20 mm …
+měřit plocha horní  # F… rovinná plocha · normála +Z …
 \`\`\`
 
 ### Více těles v dílu
@@ -502,9 +537,15 @@ Model:
 - \`stav\` → rozměry X / Y / Z, objem, počet ploch a seznam prvků s parametry. Porovnejte celkové rozměry (a hmotnost nebo
   objem, uvádí-li je předloha).
 - **Kóta po kótě:** ke každému řádku soupisu najděte prvek v modelu a porovnejte hodnotu **přesně** – odchylka ani
-  v setinách není „skoro dobře“.
+  v setinách není „skoro dobře“. Hodnotu **změřte** na hotovém modelu, ne jen v parametrech prvku: tloušťka / délka
+  osazení \`měřit F3 F7\` (řádek „rovnoběžné · vzdálenost rovin“), průměr \`měřit F5\` nebo \`měřit válce\`, úhel
+  \`měřit F2 F6\`, rozteč dvou děr \`měřit F8 F9\` („vzdálenost os“), poloha díry od boční plochy \`měřit F8 F1\` (válcová
+  plocha díry × rovina: „vzdálenost od roviny“ se měří od osy díry).
+- **Díry:** \`měřit díry\` – počet v každé skupině Ø, průměr, skrz / slepá s hloubkou a **střed vstupu** každé díry
+  porovnejte s tabulkou děr nebo kótami polohy předlohy (souřadnice od počátku modelu = od základny kótování).
 - **Plocha po ploše:** počet děr, osazení a drážek musí sedět; s popisky \`F1\` / \`E2\` (\`window.mncad.hints()\`) ověřte
-  polohu a stranu (díra na správné straně, drážka na správném osazení, závit na správném konci).
+  polohu a stranu (díra na správné straně, drážka na správném osazení, závit na správném konci); \`měřit plocha horní\`
+  a podobná pravidla vypíšou čísla a polohy ploch bez obrázku.
 - Je-li k dispozici 3D model zákazníka (STEP), použijte Nástroje → **Porovnat s referencí**: rozdíl objemů a seznam
   rozdílových oblastí musí být prázdný (jen numerický šum).
 
@@ -560,6 +601,7 @@ Výkres:
    vrátí poslední prvek.
 4. \`stav\` vrátí rozměry (X/Y/Z rozsah), objem, řádek Geometrie (platná / neplatná / bez tělesa), počet ploch a hran
    a seznam prvků se stavem ✓ / ⚠ / ✗ – podle toho ověřte, že model odpovídá výkresu (např. 165 × 165 × 48 mm).
+   Jednotlivé rozměry, díry a polohy ověříte příkazem \`měřit\` (oddíl „Měření“).
    Pracujete-li podle předlohy, na konci vždy proveďte **kontrolu 1:1** (oddíl „Model nebo výkres podle předlohy“).
    U sestavy přibude řádek Sestava (komponenty, obálka, objem, hmotnost) a Kolize (\`kolize\` spustí kontrolu).
 5. Výstupy: Soubor → Export 3D (STEP, STL…), Výkres → PDF/DXF/DWG, Sdílet odkazem (odkaz pro lidi), Uložit

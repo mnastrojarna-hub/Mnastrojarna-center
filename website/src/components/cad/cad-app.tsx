@@ -54,6 +54,7 @@ import { StartScreen } from "./start-screen";
 import { stampFeature, usePickSigs } from "./use-pick-sigs";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
+import { measureApi, measureLog } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
 import { AskHost, askNumber } from "./ask-dialog";
 import { ComputeChip, progressLabel } from "./compute-chip";
@@ -708,6 +709,9 @@ export function CadApp() {
             vp.current?.setView(op.view as ViewName);
             log.push(tr("✓ pohled {0}", op.view));
             break;
+          case "measure":
+            log.push(...(await measureLog(d, op.cmd)));
+            break;
           case "status": {
             // „stav“ na konci vstupu vypíše až závěrečný stav (jednou); uprostřed vstupu stav v tom okamžiku
             if (op === lastOp) break;
@@ -889,6 +893,7 @@ export function CadApp() {
       setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
       status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current()),
       drawingStatus: async () => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, o) => cad.drawing(doc, meta, o))).text,
+      measure: (a, b) => measureApi(histRef.current.present, a, b),
       openConsole: () => setAgentOpen(true),
       progress: () => {
         const p = cad.progress();

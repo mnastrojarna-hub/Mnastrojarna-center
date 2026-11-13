@@ -12,6 +12,7 @@ import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOf
 import { compareTransferables, compareWithReference, type CompareOptions, type ReferenceFile } from "./compare";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
+import { measureQuery, type MeasureQuery } from "./measure";
 import { refInfo, resolvePlaneDef } from "./ref-resolve";
 import { stampPicks } from "./pick-sigs";
 import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
@@ -54,6 +55,7 @@ type Req =
   | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
+  | { id: number; op: "measure"; q: MeasureQuery; doc?: CadDoc; density?: number; sources?: { key: string; source: ComponentSource }[] }
   | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> }
   | { id: number; op: "refInfo"; doc: CadDoc; ref: Ref }
   | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef }
@@ -239,6 +241,27 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         if (m.a.src.kind === "comp") sa.delete?.();
         if (sb && m.b?.src.kind === "comp") sb.delete?.();
         ctx.postMessage({ id: m.id, ok: true, result: res });
+        break;
+      }
+      case "measure": {
+        // příkaz „měřit“ / window.mncad.measure: díl se postaví (z mezipaměti) a změří atomicky – čísla F/E/V jako popisky pro výběr
+        if (m.doc) {
+          const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
+          body?.delete?.();
+          body = res.body;
+        }
+        for (const s of m.sources ?? []) if (!cachedBody(s.key)) await partEntry(s.key, s.source);
+        const made: r.Shape3D[] = [];
+        const get = (src: ShapeSrc) => {
+          const s = shapeFor(src, body, cachedBody);
+          if (s && src.kind === "comp") made.push(s);
+          return s;
+        };
+        try {
+          ctx.postMessage({ id: m.id, ok: true, result: measureQuery(get, m.q, m.density) });
+        } finally {
+          for (const s of made) s.delete?.();
+        }
         break;
       }
       case "interference":
