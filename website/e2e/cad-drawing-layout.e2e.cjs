@@ -73,8 +73,14 @@ const PIN = {
   ok(Number.isFinite(firstMs), `výkres otevřen (${await status()})`);
   ok((await check('Skryté hrany').isChecked()) === false, 'nový výkres: skryté hrany vypnuté');
   ok((await p.locator('[data-sheet] > div svg [stroke-dasharray="3 1.5"]').count()) === 0, 'na listu nejsou čárkované skryté hrany');
-  ok((await format()) === 'A2 1:2', `bez řezu: list ${await format()}`);
+  // nový výkres má Chytré kóty (podle prvků modelu, víc místa kolem pohledů) – jen se ověří, že se texty nepřekrývají
   let cl = await dimClashes();
+  ok(cl.out.length === 0, `Chytré kóty (výchozí): list ${await format()}, ${cl.n} textů kót, překryvy: ${cl.out.join(', ') || 'žádné'}`);
+  // rozvržení listu a řada průměrů se ověřují v režimu „Auto + Ø“
+  await segBtn('Auto \\+ Ø').click();
+  await settled();
+  ok((await format()) === 'A2 1:2', `bez řezu: list ${await format()}`);
+  cl = await dimClashes();
   ok(cl.n >= 15 && cl.out.length === 0, `bez řezu: ${cl.n} textů kót, překryvy: ${cl.out.join(', ') || 'žádné'}`);
 
   // ── 2. řez: formát listu zůstane, průměry v řadě u řezu ──
