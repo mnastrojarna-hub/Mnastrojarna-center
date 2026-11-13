@@ -12,6 +12,7 @@ import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces,
 import { getExt } from "./ext/index";
 import "./feat/index";
 import { getFeatureBuilder } from "./feat/registry";
+import { resolvePicks } from "./pick-sigs";
 import { importBody } from "./formats/kernel-import";
 import { threadByName } from "./defaults";
 import { resolveDoc } from "./params";
@@ -447,7 +448,8 @@ function holeTools(f: HoleF, ctx: Ctx, strict = false): Shape {
       if (!(t > 1e-6)) throw new Error(tr("Cílová plocha neleží ve směru vrtání (zkuste obrátit směr)."));
       return holeToolAt(f, body, at, dir, { through: false, depth: t, flat: true }, strict);
     }
-    if (!body) throw new Error(tr("Ukončení „k dalšímu“ potřebuje těleso."));
+    // k dalšímu / k tělesu (jako u vysunutí): díra projde první stěnou tělesa ve směru vrtání a skončí za ní
+    if (!body) throw new Error(end.kind === "toBody" ? tr("Ukončení „k tělesu“ potřebuje těleso.") : tr("Ukončení „k dalšímu“ potřebuje těleso."));
     const T = holeToolAt(f, body, at, dir, { through: true, depth: 0, flat: false }, strict);
     const inside = T.intersect(body);
     return nearestSolid(inside, at, dir).solid;
@@ -887,8 +889,22 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     }
   };
 
+  /**
+   * Otisky výběru hran/ploch (pick-sigs.ts): indexy prvku se znovu najdou v tělese, se kterým bude prvek pracovat (úprava dřívějšího
+   * prvku je mohla přečíslovat). Chyba (entita zmizela a index je mimo rozsah) se ohlásí až jako chyba prvku.
+   */
+  const picksFor = (raw: Feature): { feature: Feature; warnings: string[]; error?: unknown } => {
+    if (raw.suppressed) return { feature: raw, warnings: [] };
+    const target = raw.body && raw.body !== activeName ? (others.get(raw.body) ?? null) : body;
+    try {
+      return resolvePicks(raw, target);
+    } catch (error) {
+      return { feature: raw, warnings: [], error };
+    }
+  };
+
   for (let i = start; i < doc.features.length && i <= untilIndex; i++) {
-    const f = doc.features[i];
+    const { feature: f, warnings: pickWarn, error: pickErr } = picksFor(doc.features[i]);
     if (f.suppressed) {
       status.push({ id: f.id, ok: true });
       if (f.type === "sketch") sketches.set(f.id, f);
@@ -911,6 +927,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
           activeName = f.body;
         } else throw new Error(tr("Těleso „{0}“ v dílu není – zvolte existující těleso, nebo operaci „Nové těleso“.", f.body));
       }
+      if (pickErr) throw pickErr;
       let next: Shape | null = body;
       const custom = f.type !== "sketch" && f.type !== "datum" && f.type !== "ext" ? getFeatureBuilder(f.type) : undefined;
       if (custom) {
@@ -1163,6 +1180,8 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     } finally {
       const dt = Date.now() - tFeature;
       if (status.length > nStatus && f.type !== "sketch" && dt >= 1) status[status.length - 1].ms = dt;
+      const st = status.length > nStatus ? status[status.length - 1] : null;
+      if (st?.ok && pickWarn.length) st.warning = [...pickWarn, st.warning].filter(Boolean).join(" ");
       if (dt >= CHECKPOINT_MIN_MS || i === count - 1) checkpoint(i + 1, dt);
     }
   }
@@ -1232,7 +1251,7 @@ export function bodyInfos(bodies: NamedBody[]): BodyInfo[] {
  * Síť ploch a hran tělesa rovnou jako typovaná pole. replicad (`shape.mesh()`) převádí data z paměti jádra na obyčejná pole
  * čísel prvek po prvku (u 240 tisíc trojúhelníků 1,5 s); tady se paměť jen zkopíruje.
  */
-function meshArrays(body: Shape, tolerance: number, angular: number) {
+export function meshArrays(body: Shape, tolerance: number, angular: number) {
   const oc = r.getOC() as unknown as {
     wasmMemory: { buffer: ArrayBuffer };
     ReplicadMeshExtractor: { extract(s: unknown, t: number, a: number, x: boolean): Record<string, () => number> & { delete(): void } };

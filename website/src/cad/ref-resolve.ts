@@ -70,11 +70,11 @@ export function sigOf(body: Shape, kind: "face" | "edge" | "vertex", index: numb
   }
 }
 
-function sigMatch(a: Sig, b: Sig, tol: number) {
+export function sigMatch(a: Sig, b: Sig, tol: number) {
   return a.t === b.t && V.len(V.sub(a.c, b.c)) <= tol && Math.abs(a.s - b.s) <= Math.max(tol * tol, Math.abs(b.s) * 0.02);
 }
 
-function tolOf(body: Shape) {
+export function tolOf(body: Shape) {
   const [[x0, y0, z0], [x1, y1, z1]] = body.boundingBox.bounds as [Vec3, Vec3];
   return Math.max(1e-3, Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 1e-4);
 }

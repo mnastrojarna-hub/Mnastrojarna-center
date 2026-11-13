@@ -187,14 +187,16 @@ export function presentDims(texts: { s: string; layer?: string }[]): { kind: Dim
   const out: { kind: DimKind; value: number; text: string }[] = [];
   for (const t of texts) {
     if (t.layer && t.layer !== "dim") continue;
-    const raw = t.s.replace(/^\s*\d+\s*[×x]\s*/i, "").trim();
+    // pomocná kóta v závorce „(50)“, značky zahloubení „⌴ Ø14“ / „⌵ Ø16,5“, počet „4× “ (s mezerou – „1×45°“ je sražení)
+    const raw = t.s.replace(/^\s*\((.*)\)\s*$/, "$1").replace(/^\s*\d+\s*[×x]\s+/i, "").replace(/^\s*[⌴⌵]\s*/, "").trim();
     let m: RegExpExecArray | null;
-    if ((m = /^M\s*(\d+(?:[.,]\d+)?)/i.exec(raw))) out.push({ kind: "thread", value: num(m[1]), text: t.s });
+    if ((m = /^(\d+(?:[.,]\d+)?)\s*[×x]\s*\d+(?:[.,]\d+)?°/.exec(raw))) out.push({ kind: "lin", value: num(m[1]), text: t.s });
+    else if ((m = /^M\s*(\d+(?:[.,]\d+)?)/i.exec(raw))) out.push({ kind: "thread", value: num(m[1]), text: t.s });
     else if ((m = /^[Øø⌀]\s*(\d+(?:[.,]\d+)?)/.exec(raw))) out.push({ kind: "dia", value: num(m[1]), text: t.s });
     else if ((m = /^R\s*(\d+(?:[.,]\d+)?)/.exec(raw))) out.push({ kind: "rad", value: num(m[1]), text: t.s });
     else if ((m = /^(\d+(?:[.,]\d+)?)/.exec(raw))) out.push({ kind: "lin", value: num(m[1]), text: t.s });
     // další čísla v textu (např. „hl. 12“) jako lineární
-    for (const h of raw.matchAll(/hl\.\s*(\d+(?:[.,]\d+)?)/g)) out.push({ kind: "lin", value: num(h[1]), text: t.s });
+    for (const h of raw.matchAll(/(?:hl\.|↧)\s*(\d+(?:[.,]\d+)?)/g)) out.push({ kind: "lin", value: num(h[1]), text: t.s });
   }
   return out;
 }
@@ -203,5 +205,7 @@ export function presentDims(texts: { s: string; layer?: string }[]): { kind: Dim
 export function dimCheck(doc: CadDoc, bbox: [Vec3, Vec3] | null, texts: { s: string; layer?: string }[]): DimCheckItem[] {
   const have = presentDims(texts);
   const tol = (v: number) => Math.max(0.01, Math.abs(v) * 1e-4);
-  return expectedDims(doc, bbox).map((e) => ({ ...e, present: have.some((h) => h.kind === e.kind && Math.abs(h.value - e.value) <= tol(e.value)) }));
+  // celkový rozměr rotačního dílu = jeho největší Ø; průměr se závitem nese označení závitu (M20 místo Ø20)
+  const same = (e: DimExpect, h: { kind: DimKind; value: number }) => h.kind === e.kind || (e.kind === "lin" && h.kind === "dia" && e.source === tr("celkové rozměry")) || (e.kind === "dia" && h.kind === "thread");
+  return expectedDims(doc, bbox).map((e) => ({ ...e, present: have.some((h) => same(e, h) && Math.abs(h.value - e.value) <= tol(e.value)) }));
 }

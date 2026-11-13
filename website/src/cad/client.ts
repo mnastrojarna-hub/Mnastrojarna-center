@@ -3,11 +3,13 @@ import { getLang, tr, type CadLang } from "./i18n";
 import type { BuildProgress } from "./build";
 import type { EdgeLite, FaceLite } from "./agent";
 import type { DrawingMeta, DrawingOptions, DrawingResult } from "./drawing";
+import type { SmartDims } from "./drawing-dims";
 import type { Interference, MateFaceInfo } from "./asm-kernel";
+import type { CompareOptions, CompareResult, ReferenceFile } from "./compare";
 import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
 import type { DatumDisplay } from "./feat/refs-more";
 import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
-import type { BodyInfo, BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo, Vec3 } from "./types";
+import type { BodyInfo, BuildResult, CadDoc, ComponentSource, ExportFormat, FaceInfo, Feature, Vec3 } from "./types";
 
 let worker: Worker | null = null;
 let seq = 0;
@@ -19,7 +21,7 @@ const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Err
  */
 export type CadProgress = Omit<BuildProgress, "phase"> & { phase: BuildProgress["phase"] | "start"; op: string; startedAt: number; featureAt: number };
 /** operace, které mohou trvat dlouho – ukazuje se u nich průběh a jdou zrušit */
-const LONG_OPS = new Set(["build", "topology", "export", "drawing", "interference", "asmParts"]);
+const LONG_OPS = new Set(["build", "topology", "export", "drawing", "interference", "asmParts", "compare"]);
 const progressListeners = new Set<(p: CadProgress | null) => void>();
 let lastProgress: CadProgress | null = null;
 const emitProgress = (p: CadProgress | null) => {
@@ -117,6 +119,8 @@ export const cad = {
   face: (index: number) => call<FaceInfo | null>({ op: "face", index }),
   /** geometrie + otisk odkazu nad aktuálním tělesem (pro formuláře a náhledy) */
   refInfo: (doc: CadDoc, ref: Ref) => call<{ geo: Geo | null; sig: Sig | null; error?: string }>({ op: "refInfo", doc, ref }),
+  /** otisky výběru hran/ploch prvku nad tělesem před ním (`doc` oříznutý před prvek) – viz pick-sigs.ts `stampPicks` */
+  pickSigs: (doc: CadDoc, feature: Feature) => call<{ feature: Feature; changed: boolean; warnings: string[] } | null>({ op: "pickSigs", doc, feature }),
   planeDef: (doc: CadDoc, def: PlaneDef) => call<{ plane: ResolvedPlane | null; error?: string }>({ op: "planeDef", doc, def }),
   /** pomocné osy / body / souřadné systémy k vykreslení */
   datumGfx: (doc: CadDoc) => call<{ id: string; gfx: DatumDisplay }[]>({ op: "datumGfx", doc }),
@@ -124,9 +128,11 @@ export const cad = {
   asmParts: (parts: { key: string; source: ComponentSource }[]) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts }),
   asmFace: (key: string, index: number) => call<FaceInfo | null>({ op: "asmFace", key, index }),
   interference: (doc: CadDoc) => call<Interference[]>({ op: "interference", doc }),
+  /** porovnání dílu s referenčním modelem (STEP / BREP / STL): objemy, rozdílová tělesa, mapa odchylek – viz compare.ts */
+  compare: (doc: CadDoc, file: ReferenceFile, opts?: CompareOptions) => call<CompareResult>({ op: "compare", doc, file, opts }),
   mateFace: (key: string, index: number) => call<MateFaceInfo | null>({ op: "mateFace", key, index }),
   cylFace: (key: string, radius: number) => call<number>({ op: "cylFace", key, radius }),
   inspect: (src: ShapeSrc, ref: EntRef, density?: number) => call<EntityInfo>({ op: "inspect", src, ref, density }),
   measureEnt: (a: { src: ShapeSrc; ref: EntRef }, b: { src: ShapeSrc; ref: EntRef } | null) => call<MeasureResult>({ op: "measureEnt", a, b }),
-  drawing: (doc: CadDoc, meta: DrawingMeta, opts?: Partial<DrawingOptions>) => call<DrawingResult>({ op: "drawing", doc, meta, opts }),
+  drawing: (doc: CadDoc, meta: DrawingMeta, opts?: Partial<DrawingOptions>) => call<DrawingResult & { smart?: SmartDims }>({ op: "drawing", doc, meta, opts }),
 };

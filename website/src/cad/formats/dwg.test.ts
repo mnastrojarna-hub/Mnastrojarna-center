@@ -123,7 +123,7 @@ describe("DWG export – skutečný výkres z modelu (OCCT)", () => {
   it("deska s dírami: zapíše se a načte zpět se všemi entitami", async () => {
     let s = r.makeBox([-40, -25, 0], [40, 25, 20]) as r.Shape3D;
     s = s.cut(r.makeCylinder(10, 40, [0, 0, -10], [0, 0, 1]));
-    const d = makeDrawing(s, { name: "Deska", material: "Ocel S235", massKg: 0.5, number: "MN-001" });
+    const d = makeDrawing(s, { name: "Deska", material: "Ocel S235", massKg: 0.5, number: "MN-001" }, { hidden: true }); // skryté hrany (vrstva SKRYTE) – u nového výkresu jsou vypnuté
     const expected = d.polys.filter((p) => p.pts.length >= 2 || (p.fill && p.pts.length >= 3)).length + d.texts.length;
     for (const v of ["R2018", "R2000"] as DwgVersion[]) {
       const buf = await drawingToDwg(d, { version: v });

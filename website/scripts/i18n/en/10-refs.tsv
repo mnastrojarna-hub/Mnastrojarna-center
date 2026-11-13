@@ -1,0 +1,12 @@
+# Otisky výběru hran/ploch (pick-sigs.ts) a ukončení díry „k tělesu“ (vlna 3, refs)
+ k tělesu	 up to body
+Hrana {0} se po změně modelu nenašla podle otisku – použit původní index.	Edge {0} was not found by its signature after the model changed – the original index is used.
+Hrana {0} se po změně modelu nenašla podle otisku a těleso ji už nemá (hran: {1}) – vyberte ji znovu.	Edge {0} was not found by its signature after the model changed and the body no longer has it ({1} edges) – select it again.
+Hrany {0} se po změně modelu nenašly podle otisku – použity původní indexy.	Edges {0} were not found by their signatures after the model changed – the original indices are used.
+Plocha {0} se po změně modelu nenašla podle otisku – použit původní index.	Face {0} was not found by its signature after the model changed – the original index is used.
+Plocha {0} se po změně modelu nenašla podle otisku a těleso ji už nemá (ploch: {1}) – vyberte ji znovu.	Face {0} was not found by its signature after the model changed and the body no longer has it ({1} faces) – select it again.
+Plochy {0} se po změně modelu nenašly podle otisku – použity původní indexy.	Faces {0} were not found by their signatures after the model changed – the original indices are used.
+Ukončení „k tělesu“ potřebuje těleso.	The “up to body” end condition needs a body.
+Vrchol {0} se po změně modelu nenašel podle otisku – použit původní index.	Vertex {0} was not found by its signature after the model changed – the original index is used.
+Vrchol {0} se po změně modelu nenašel podle otisku a těleso ho už nemá (vrcholů: {1}) – vyberte ho znovu.	Vertex {0} was not found by its signature after the model changed and the body no longer has it ({1} vertices) – select it again.
+Vrcholy {0} se po změně modelu nenašly podle otisku – použity původní indexy.	Vertices {0} were not found by their signatures after the model changed – the original indices are used.

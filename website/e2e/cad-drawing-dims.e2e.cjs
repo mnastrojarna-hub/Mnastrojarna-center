@@ -59,6 +59,10 @@ const near = (a, b, e = 0.06) => Math.abs(a - b) <= e;
   const log = await run('nový díl Kóty\nkvádr 100 60 20\ndíra 12 skrz v 30 30\nsrazit 10 hrany svislé\nstav');
   ok(!/^✗/m.test(log) && /Geometrie: platná/.test(log), 'díl pro výkres vytvořen (deska s dírou Ø12 a sraženími)');
   await openDrawing();
+  // nové výkresy mají Chytré kóty (vygenerované poznámky) – tento test ověřuje vlastní kóty uživatele v dřívějším režimu „Auto + Ø“
+  await p.locator('[data-drawing-workspace] aside').getByRole('button', { name: 'Auto + Ø', exact: true }).click();
+  await p.waitForFunction(() => !document.querySelector('[data-drawing-workspace] aside ul li'), null, { timeout: 60000 }).catch(() => {});
+  await p.waitForTimeout(1500);
   T = await topMap();
 
   // ── 1. přejmenování listu přímo na záložce (žádný window.prompt) ──

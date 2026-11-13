@@ -55,11 +55,14 @@ import {
   type AutoRef,
   type DrawOpts,
 } from "@/cad/sketch-tools";
-import { LongPress, TOUCH_SLOP_PX, TouchTracker, clickSlop, movedBeyond, pinchView } from "@/cad/sketch-touch";
-import { uid, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchRef, type Vec2 } from "@/cad/types";
+import { LINE_CHAIN_MAX, PASTE_FIX_LIMIT, PASTE_MAX_POINTS, anchorPoints, entitiesFromPoints, fitView, fixedPoint, parseCoordList, pointVisible, pruneRedundant, typedAnchor, type ChainKind, type CoordList } from "@/cad/sketch-kbd";
+import { LongPress, TOUCH_SLOP_PX, TouchTracker, canvasToMm, clickSlop, movedBeyond, pinchView } from "@/cad/sketch-touch";
+import { calibrateUnderlay, moveUnderlay, replaceBitmap, underlayCorners, underlayWidth } from "@/cad/sketch-underlay";
+import { uid, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchRef, type SketchUnderlay, type Vec2 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName } from "./cad-icons";
 import { ContextMenu, type RGroup, type RItem, type RMenuEntry } from "./ribbon";
+import { UNDERLAY_ACCEPT, UnderlayImage, UnderlayPanel, imageUnderlay, isImageFile, isPdfFile, pdfEntitiesSummary, pdfOf, pdfPageEntities, pdfUnderlay, rememberPdf, type UnderlayMode } from "./sketch-underlay";
 
 // ======================= typy a nastavení =======================
 
@@ -105,7 +108,8 @@ export type SketchTool =
   | `con-${ConType}`;
 
 type SketchF = Extract<Feature, { type: "sketch" }>;
-export type SketchPatch = { entities?: SketchEntity[]; constraints?: SketchConstraint[]; dims?: SketchDim[] };
+/** Změna skici: entity, vazby, kóty; `underlay` = podklad skici (uloží se mimo prvek – `doc.underlays`, null = odebrat). */
+export type SketchPatch = { entities?: SketchEntity[]; constraints?: SketchConstraint[]; dims?: SketchDim[]; underlay?: SketchUnderlay | null };
 
 type Props = {
   sketch: SketchF;
@@ -123,6 +127,8 @@ type Props = {
   hints?: boolean;
   /** ovládání skicáře zvenku (automatizace – `window.mncad.hints()` / `clickHint()`) */
   ref?: Ref<SketcherHandle>;
+  /** podklad skici (obrázek / stránka PDF pod geometrií) – z `doc.underlays[id skici]`; změny jdou přes `onChange({ underlay })` */
+  underlay?: SketchUnderlay | null;
 };
 
 /** Štítek bodu skici pro automatizaci: `x, y` = px vůči plátnu skici (levý horní roh), `index` = číslo za P (O = 0). */
@@ -367,6 +373,8 @@ export function sketchRibbon(p: { tool: SketchTool; setTool: (t: SketchTool) => 
         { id: "grid", label: tr("Přichytit k mřížce"), icon: "grid", tone: "view", kbd: sketchKey("sketch.grid"), active: p.snapGrid, onClick: () => p.setSnapGrid(!p.snapGrid) },
         { id: "dxf", label: tr("Export skici DXF"), icon: "export", tone: "file", onClick: p.onExportDxf },
         { id: "imp", label: tr("Import DXF…"), icon: "open", tone: "file", onClick: p.onImportDxf },
+        { id: "coords", label: tr("Body ze seznamu…"), icon: "table", tone: "file", kbd: "Ctrl+V", hint: tr("souřadnice X Y ze schránky nebo psané → lomená čára, spline, úsečky"), onClick: () => sendSketchCommand("coords") },
+        { id: "underlay", label: tr("Podklad…"), icon: "layers", tone: "file", hint: tr("obrázek nebo stránka PDF pod skicou: obkreslení, kalibrace měřítka, převod čar PDF na entity"), onClick: () => sendSketchCommand("underlay") },
       ],
     },
   ];
@@ -552,6 +560,27 @@ function pickOfEntity(e: SketchEntity, q: Vec2): Pick {
   return { kind: "entity", ref };
 }
 
+/** Proč se seznam souřadnic (ze schránky, z dialogu) nepodařilo přečíst – text pro uživatele. */
+function coordListError(r: Extract<CoordList, { ok: false }>): string {
+  switch (r.reason) {
+    case "odd":
+      return tr("Seznam souřadnic má lichý počet čísel ({0}) – čísla musí jít po dvojicích X Y.", r.numbers);
+    case "many":
+      return tr("Seznam souřadnic je příliš dlouhý – nejvýše {0} bodů.", PASTE_MAX_POINTS);
+    case "text":
+      return tr("Vložený text není seznam souřadnic – „{0}“ není číslo (čekají se čísla po dvojicích X Y).", r.token ?? "?");
+    default:
+      return tr("Seznam souřadnic je prázdný – čekají se čísla po dvojicích X Y.");
+  }
+}
+
+// ---- příkazy z pásu karet pro otevřený skicář (pás je bez vlastního stavu a o skicáři neví) ----
+type SketchCommand = "coords" | "underlay";
+const commandListeners = new Set<(c: SketchCommand) => void>();
+function sendSketchCommand(c: SketchCommand) {
+  commandListeners.forEach((l) => l(c));
+}
+
 // ======================= vrstva entit (memo – nevykresluje se při pohybu myši) =======================
 
 /** Barva podle stavu určenosti (jako SolidWorks): nedourčená modře, plně určená černě, přeurčená/konflikt červeně. */
@@ -597,7 +626,8 @@ type DragS =
   | { kind: "move"; ids: string[]; from: Vec2; orig: SketchEntity[] }
   | { kind: "box"; from: Vec2; to: Vec2 }
   | { kind: "dimLabel"; id: string; from: Vec2; orig: Vec2 }
-  | { kind: "trimPath"; path: Vec2[] };
+  | { kind: "trimPath"; path: Vec2[] }
+  | { kind: "underlay"; from: Vec2; orig: SketchUnderlay };
 
 type DynState = { texts: string[]; locked: boolean[]; active: number };
 const emptyDyn: DynState = { texts: [], locked: [], active: 0 };
@@ -609,7 +639,7 @@ type Snap = { p: Vec2; kind: SnapKind | "free"; ref?: SketchRef; hv?: "h" | "v" 
  * Profesionální 2D skicář: uchopování (OSNAP), vazby s numerickým řešičem, řídicí kóty,
  * editační nástroje, kontextové menu. Souřadnice v mm, osa Y nahoru.
  */
-export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish, modelLines, hints, ref }: Props) {
+export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, snapGrid, setSnapGrid, onFinish, modelLines, hints, ref, underlay = null }: Props) {
   const entities = sketch.entities;
   const constraints = useMemo(() => sketch.constraints ?? [], [sketch.constraints]);
   const dims = useMemo(() => sketch.dims ?? [], [sketch.dims]);
@@ -621,6 +651,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const [snapState, setSnapState] = useState<Snap | null>(null);
   const [pts, setPts] = useState<Vec2[]>([]);
   const [ptRefs, setPtRefs] = useState<(SketchRef | undefined)[]>([]);
+  /** které rozpracované body byly zadány souřadnicemi z klávesnice / ze schránky → ukotví se vazbou „Pevně“ */
+  const [ptFix, setPtFix] = useState<boolean[]>([]);
   const [picks, setPicks] = useState<Pick[]>([]);
   const [sel, setSel] = useState<Set<string>>(() => new Set(selected ? [selected] : []));
   const [selAnn, setSelAnn] = useState<string | null>(null);
@@ -636,6 +668,25 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const [opts, setOpts] = useState<DrawOpts>(defaultOpts);
   const [dyn, setDyn] = useState<DynState>(emptyDyn);
   const [trimPreview, setTrimPreview] = useState<Vec2[] | null>(null);
+  /** dialog „Body ze seznamu souřadnic“ (pás karet → Nástroje): text a druh křivky */
+  const [coordDlg, setCoordDlg] = useState<{ text: string; kind: ChainKind } | null>(null);
+  // ---- podklad skici (obrázek / stránka PDF pod geometrií; uložen v doc.underlays, matematika: cad/sketch-underlay.ts) ----
+  const [ulOpen, setUlOpen] = useState(false);
+  /** režim úprav podkladu: kalibrace měřítka dvěma body / posun tažením */
+  const [ulMode, setUlMode] = useState<UnderlayMode>(null);
+  /** naklikané body kalibrace [mm] */
+  const [calib, setCalib] = useState<Vec2[]>([]);
+  /** náhled podkladu během tažení / posuvníku krytí (do dokumentu se zapíše až po puštění – jeden krok historie) */
+  const [ulDraft, setUlDraft] = useState<SketchUnderlay | null>(null);
+  const [ulBusy, setUlBusy] = useState<string | null>(null);
+  const [ulErr, setUlErr] = useState<string | null>(null);
+  /** převod čar PDF jako pomocná geometrie */
+  const [ulCons, setUlCons] = useState(false);
+  const ulFile = useRef<HTMLInputElement>(null);
+  /** k čemu je výběr souboru: nový podklad, nebo znovu vybrané PDF podkladu pro převod čar / změnu stránky */
+  const ulFileFor = useRef<{ kind: "new" } | { kind: "pdf"; then: "convert" | number }>({ kind: "new" });
+  /** podklad, jak je právě vidět (náhled při tažení má přednost) */
+  const shownUl = ulDraft && underlay && ulDraft.id === underlay.id ? ulDraft : underlay;
   const drag = useRef<DragS | null>(null);
   const downAt = useRef<[number, number, number] | null>(null);
   const fitted = useRef(false);
@@ -643,6 +694,10 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   /** poslední poloha kurzoru (mm) a poslední zadaný bod – pro Enter bez pohybu myši a relativní zadání „@“ */
   const lastRaw = useRef<Vec2 | null>(null);
   const lastPt = useRef<Vec2 | null>(null);
+  /** byl poslední zadaný bod ukotven (zadán souřadnicemi)? – relativní zadání „@“ od pevného bodu je také pevné */
+  const lastPtFixed = useRef(false);
+  /** poslední poloha ukazatele v okně (px) – po automatické změně pohledu se z ní přepočítá kurzor v mm */
+  const lastClient = useRef<[number, number] | null>(null);
   /** klíče hodnot zadaných číslem v předchozích krocích téže entity (např. poloměr oblouku středem) – pro kóty při kreslení */
   const typedKeys = useRef<Set<string>>(new Set());
   // ---- dotyk (matematika gest: cad/sketch-touch.ts) ----
@@ -741,26 +796,62 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   // úvodní zaměření
   const fit = useCallback(() => {
     const all = [...paths.values()].flatMap((p) => p.pts);
+    if (underlay && !underlay.hidden) all.push(...underlayCorners(underlay));
     if (!all.length) return setView({ cx: 0, cy: 0, scale: Math.min(size.w, size.h) / 160 });
     const xs = all.map((p) => p[0]);
     const ys = all.map((p) => p[1]);
     const w = Math.max(...xs) - Math.min(...xs) || 50;
     const h = Math.max(...ys) - Math.min(...ys) || 50;
     setView({ cx: (Math.max(...xs) + Math.min(...xs)) / 2, cy: (Math.max(...ys) + Math.min(...ys)) / 2, scale: Math.min(size.w / (w * 1.5), size.h / (h * 1.5)) });
-  }, [paths, size]);
+  }, [paths, size, underlay]);
   useEffect(() => {
     if (fitted.current || !size.w || size.w === 800) return;
     fitted.current = true;
     fit();
   }, [size, fit]);
+  /**
+   * Pohled „zobrazit vše“ při zadávání z klávesnice: geometrie skici + rozpracované / právě zadané body `extra`.
+   * Rozpracované zadání se nemění (body, hodnoty u kurzoru). Kurzor zůstává na místě na obrazovce, proto se jeho
+   * poloha v mm přepočítá do nového pohledu.
+   */
+  const showAll = (extra: Vec2[]) => {
+    const v = fitView([...[...paths.values()].flatMap((q) => q.pts), ...extra], size);
+    if (!v) return;
+    setView(v);
+    const lc = lastClient.current;
+    const el = svgRef.current;
+    if (lc && el && cursor) {
+      const r = el.getBoundingClientRect();
+      const raw = R4(canvasToMm(v, size, [lc[0] - r.left, lc[1] - r.top]));
+      lastRaw.current = raw;
+      setCursor(raw);
+      setSnapState({ p: raw, kind: "free" });
+    }
+  };
+  /** Bod zadaný souřadnicemi (z klávesnice, ze schránky) leží mimo viditelnou část plátna → zobrazit vše. */
+  const revealTyped = (points: Vec2[], extra: Vec2[] = []) => {
+    if (points.some((q) => !pointVisible(view, size, q))) showAll([...extra, ...points]);
+  };
+  /** zahodit rozpracované body nástroje */
+  const clearPts = () => {
+    setPts([]);
+    setPtRefs([]);
+    setPtFix([]);
+  };
 
   // změna nástroje: reset rozpracovaných kroků; nástroje s výběrem se provedou hned
   useEffect(() => {
     setPts([]);
     setPtRefs([]);
+    setPtFix([]);
     setPicks([]);
     setPhase(0);
     setAsk(null);
+    // kreslicí nástroj ukončí úpravu podkladu (kalibrace / posun běží s nástrojem Výběr)
+    if (tool !== "select") {
+      setUlMode(null);
+      setCalib([]);
+    }
     typedKeys.current.clear();
     if (tool !== "measure") setMeasureRes(null);
     if (tool.startsWith("con-") && sel.size) applyConstraintToSelection(tool.slice(4) as ConType);
@@ -894,6 +985,14 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   );
 
   const addEntities = (es: SketchEntity[], extraCons: SketchConstraint[] = [], extraDims: SketchDim[] = []) => {
+    // body zadané souřadnicemi se kotví vazbou „Pevně“: co by tím bylo nadbytečné (vodorovně mezi dvěma pevnými body,
+    // druhé ukotvení bodu napojeného totožností na pevný bod, kóta délky mezi pevnými body), se nepřidá – jinak by skica
+    // hlásila „Přeurčeno“. Ukotvení celé entity (promítnuté hrany, dlouhý seznam ze schránky) se nekontroluje.
+    if (extraCons.some((c) => c.type === "fixed" && c.refs[0]?.k !== "self")) {
+      const kept = pruneRedundant([...entities, ...es], constraints, dims, extraCons, extraDims);
+      extraCons = kept.constraints;
+      extraDims = kept.dims;
+    }
     commitEdit([...entities, ...es], [...constraints, ...extraCons], [...dims, ...extraDims]);
     setDyn(emptyDyn);
     // řetězové nástroje nevybírají (panel by se otevíral při každém segmentu)
@@ -1140,7 +1239,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const firstInput = spec[0] && dynT(spec[0].key).trim() ? parseInput(dynT(spec[0].key)) : null;
   const pairWH: [number, number] | null = firstInput && (firstInput.kind === "abs" || firstInput.kind === "rel") && (tool === "rect" || tool === "rectCenter") && pts.length >= 1 ? [Math.abs(firstInput.v[0]), Math.abs(firstInput.v[1])] : null;
 
-  type Resolved = { p: Vec2; kinds: AutoKind[]; ref?: string; typed: boolean; snap: Snap };
+  /** `fixed` = bod je úplně určen zadanými souřadnicemi (x;y, @dx;dy od pevného bodu…) → ukotví se vazbou „Pevně“ */
+  type Resolved = { p: Vec2; kinds: AutoKind[]; ref?: string; typed: boolean; fixed: boolean; snap: Snap };
   /** Výsledný bod kliknutí/náhledu: uchopení → zadané hodnoty u kurzoru → odvozené vazby (H/V, rovnoběžně, kolmo, tečně). */
   const resolvePoint = (s0: Snap): Resolved => {
     const n = pts.length;
@@ -1148,6 +1248,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const c0 = pts[0];
     let p = s0.p;
     let typed = false;
+    let fixed = false;
     const ci = firstInput;
     const keys = new Set(spec.map((f) => f.key));
     if (ci && ci.kind !== "num" && !pairWH && (keys.has("x") || keys.has("len") || keys.has("w"))) {
@@ -1156,12 +1257,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (q) {
         p = q;
         typed = true;
+        // relativní zadání je pevné, jen když je pevný bod, ke kterému se vztahuje (bez předchozího bodu = počátek skici)
+        fixed = typedAnchor({ input: ci, prevFixed: n ? !!ptFix[n - 1] : lastPt.current ? lastPtFixed.current : true });
       }
     } else if (dynTyped) {
       typed = true;
       const dir = (c: Vec2) => (dist(p, c) > 1e-9 ? unitv(sub(p, c)) : ([1, 0] as Vec2));
-      if (keys.has("x") || keys.has("y")) p = [dynNum("x") ?? p[0], dynNum("y") ?? p[1]];
-      else if (keys.has("len") && from) p = polarPoint(from, p, dynNum("len"), dynNum("ang"));
+      if (keys.has("x") || keys.has("y")) {
+        p = [dynNum("x") ?? p[0], dynNum("y") ?? p[1]];
+        fixed = typedAnchor({ input: null, xTyped: dynNum("x") != null, yTyped: dynNum("y") != null });
+      } else if (keys.has("len") && from) p = polarPoint(from, p, dynNum("len"), dynNum("ang"));
       else if ((tool === "rect" || tool === "rectCenter") && c0) {
         const k = tool === "rect" ? 1 : 0.5;
         const w = pairWH?.[0] ?? dynNum("w");
@@ -1228,7 +1333,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       } else if (Math.abs(p[1] - from[1]) < 1e-9) kinds = ["horizontal"];
       else if (Math.abs(p[0] - from[0]) < 1e-9) kinds = ["vertical"];
     }
-    return { p: R4(p), kinds, ref, typed, snap: { ...snap, p: R4(p) } };
+    return { p: R4(p), kinds, ref, typed, fixed, snap: { ...snap, p: R4(p) } };
   };
 
   /** Potvrzení zadaných hodnot klávesou Enter (bod se dopočítá z hodnot a poslední polohy kurzoru). */
@@ -1255,13 +1360,19 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     return [];
   };
 
-  const toolClick = (raw: Vec2, ev: React.PointerEvent) => {
+  /** `given` = bod daný přímo souřadnicemi (jeden bod vložený ze schránky) – chová se jako zadání „x;y“ z klávesnice */
+  const toolClick = (raw: Vec2, ev: React.PointerEvent, given?: Vec2) => {
     const from = pts.length ? pts[pts.length - 1] : null;
-    const rp = resolvePoint(computeSnap(raw, { from }));
+    const rp: Resolved = given ? { p: R4(given), kinds: [], typed: true, fixed: true, snap: { p: R4(given), kind: "free" } } : resolvePoint(computeSnap(raw, { from }));
     const s = rp.snap;
     const p = rp.p;
     const next = [...pts, p];
     const nextRefs = [...ptRefs, s.ref];
+    const nextFix = [...pts.map((_, i) => !!ptFix[i]), rp.fixed];
+    // bod zadaný číselně mimo viditelnou část plátna → zobrazit vše (rozpracované zadání pokračuje)
+    if (rp.typed) revealTyped([p], pts);
+    /** ukotvení („Pevně“) klíčového bodu nové entity v místě i-tého kliknutí, byl-li bod zadán souřadnicemi */
+    const fix = (id: string, key: string, idx: number): SketchConstraint[] => (nextFix[idx] ? [fixedPoint(id, key, next[idx])] : []);
     const autoFor = (id: string, key: string, idx: number): SketchConstraint[] => {
       const snapAt = idx === next.length - 1 ? s : null;
       if (snapAt) return lastAuto(snapAt, id, key);
@@ -1321,14 +1432,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       addEntities(es, cons, dms);
       typedKeys.current.clear();
       lastPt.current = p;
-      setPts([]);
-      setPtRefs([]);
+      lastPtFixed.current = rp.fixed;
+      clearPts();
     };
     const step = () => {
       for (const f of spec) if (hasNum(f.key)) typedKeys.current.add(f.key);
       setPts(next);
       setPtRefs(nextRefs);
+      setPtFix(nextFix);
       lastPt.current = p;
+      lastPtFixed.current = rp.fixed;
     };
     switch (tool) {
       case "line":
@@ -1339,29 +1452,32 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         const id = uid();
         const cons: SketchConstraint[] = [...autoFor(id, "a", next.length - 2), ...autoFor(id, "b", next.length - 1)];
         if (snaps.auto) cons.push(...autoConstraints(id, rp, refKind));
+        cons.push(...fix(id, "a", next.length - 2), ...fix(id, "b", next.length - 1));
         const line: SketchEntity = { id, type: "line", a, b: p, construction: tool === "centerline" || undefined };
         addEntities([line], cons, dimsFor(line));
         lastPt.current = p;
+        lastPtFixed.current = rp.fixed;
         if (tool === "centerline" || (pts.length > 1 && dist(p, pts[0]) < 1e-6)) {
-          setPts([]);
-          setPtRefs([]);
+          clearPts();
           return;
         }
-        setPts([...pts, p]);
+        setPts(next);
         setPtRefs([...ptRefs.slice(0, -1), ptRefs[ptRefs.length - 1], { e: id, k: "b" }]);
+        setPtFix(nextFix);
         return;
       }
       case "polyline":
       case "spline": {
-        if (pts.length >= 2 && dist(p, pts[0]) < tolMm()) return finishPoly(true);
+        if (pts.length >= 2 && dist(p, pts[0]) < (rp.typed ? 1e-6 : tolMm())) return finishPoly(true);
         step();
-        if (ev.detail >= 2) finishPoly(false, next);
+        if (ev.detail >= 2) finishPoly(false, next, nextFix);
         return;
       }
       case "point": {
         const id = uid();
-        addEntities([{ id, type: "point", p }], lastAuto(s, id, "p"));
+        addEntities([{ id, type: "point", p }], [...lastAuto(s, id, "p"), ...fix(id, "p", next.length - 1)]);
         lastPt.current = p;
+        lastPtFixed.current = rp.fixed;
         return;
       }
       case "rect":
@@ -1373,21 +1489,21 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           tool === "rect"
             ? { id: uid(), type: "rect", cx: r4((a[0] + p[0]) / 2), cy: r4((a[1] + p[1]) / 2), w: r4(Math.abs(p[0] - a[0])), h: r4(Math.abs(p[1] - a[1])), r: 0, angle: 0 }
             : { id: uid(), type: "rect", cx: a[0], cy: a[1], w: r4(Math.abs(p[0] - a[0]) * 2), h: r4(Math.abs(p[1] - a[1]) * 2), r: 0, angle: 0 };
-        const cons = tool === "rectCenter" ? coinc(e.id, "center", 0) : [...coinc(e.id, cornerKey(e, a), 0), ...coinc(e.id, cornerKey(e, p), 1)];
+        const cons = tool === "rectCenter" ? [...coinc(e.id, "center", 0), ...fix(e.id, "center", 0)] : [...coinc(e.id, cornerKey(e, a), 0), ...coinc(e.id, cornerKey(e, p), 1), ...fix(e.id, cornerKey(e, a), 0), ...fix(e.id, cornerKey(e, p), 1)];
         return finish([e], cons, dimsFor(e));
       }
       case "rect3": {
         if (next.length < 3) return step();
         const e = rectFrom3(next[0], next[1], p);
         if (!e) return note(tr("Body obdélníku leží na přímce."));
-        return finish([e], [...coinc(e.id, cornerKey(e, next[0]), 0), ...coinc(e.id, cornerKey(e, next[1]), 1)], dimsFor(e));
+        return finish([e], [...coinc(e.id, cornerKey(e, next[0]), 0), ...coinc(e.id, cornerKey(e, next[1]), 1), ...fix(e.id, cornerKey(e, next[0]), 0), ...fix(e.id, cornerKey(e, next[1]), 1)], dimsFor(e));
       }
       case "circle": {
         if (next.length < 2) return step();
         if (dist(next[0], p) < 1e-6) return;
         const id = uid();
         const e: SketchEntity = { id, type: "circle", cx: next[0][0], cy: next[0][1], r: r4(dist(next[0], p)) };
-        return finish([e], [...coinc(id, "center", 0), ...onCurve(id, 1)], dimsFor(e));
+        return finish([e], [...coinc(id, "center", 0), ...onCurve(id, 1), ...fix(id, "center", 0)], dimsFor(e));
       }
       case "circle2": {
         if (next.length < 2) return step();
@@ -1407,13 +1523,13 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         if (!circleFrom3(next[0], p, next[1])) return;
         const id = uid();
         const e: SketchEntity = { id, type: "arc", a: next[0], b: p, c: next[1] };
-        return finish([e], [...coinc(id, "a", 0), ...coinc(id, "c", 1)], dimsFor(e));
+        return finish([e], [...coinc(id, "a", 0), ...coinc(id, "c", 1), ...fix(id, "a", 0), ...fix(id, "c", 1)], dimsFor(e));
       }
       case "arcCenter": {
         if (next.length < 3) return step();
         const arc = arcFromCenter(next[0], next[1], p);
         if (!arc) return;
-        return finish([arc], [...coinc(arc.id, "center", 0), ...coinc(arc.id, "a", 1)], dimsFor(arc));
+        return finish([arc], [...coinc(arc.id, "center", 0), ...coinc(arc.id, "a", 1), ...fix(arc.id, "center", 0), ...fix(arc.id, "a", 1)], dimsFor(arc));
       }
       case "arcTangent": {
         if (!pts.length) {
@@ -1428,7 +1544,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           cons.push({ id: uid(), type: "tangent", refs: [{ e: ptRefs[0].e, k: "self" }, { e: arc.id, k: "self" }] });
         }
         const srcType = ptRefs[0] ? emap.get(ptRefs[0].e)?.type : undefined;
-        return finish([arc], srcType === "line" || srcType === "arc" ? cons : cons.slice(0, 1), dimsFor(arc));
+        return finish([arc], [...(srcType === "line" || srcType === "arc" ? cons : cons.slice(0, 1)), ...fix(arc.id, "c", 1)], dimsFor(arc));
       }
       case "ellipse": {
         if (next.length < 3) return step();
@@ -1439,7 +1555,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         const ry = Math.abs(-(p[0] - c[0]) * Math.sin(t) + (p[1] - c[1]) * Math.cos(t));
         if (rx < 1e-6 || ry < 1e-6) return;
         const id = uid();
-        return finish([{ id, type: "ellipse", cx: c[0], cy: c[1], rx: r4(rx), ry: r4(ry), angle: r4(ang) }], coinc(id, "center", 0));
+        return finish([{ id, type: "ellipse", cx: c[0], cy: c[1], rx: r4(rx), ry: r4(ry), angle: r4(ang) }], [...coinc(id, "center", 0), ...fix(id, "center", 0)]);
       }
       case "polygon": {
         if (next.length < 2) return step();
@@ -1447,7 +1563,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         if (sides !== opts.sides) setOpt("sides", sides);
         const e = polygonFrom(next[0], p, sides, opts.circumscribed);
         if (!e) return;
-        return finish([e], coinc(e.id, "center", 0), dimsFor(e));
+        return finish([e], [...coinc(e.id, "center", 0), ...fix(e.id, "center", 0)], dimsFor(e));
       }
       case "slot": {
         if (next.length < 3) return step();
@@ -1456,7 +1572,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         if (len < 1e-6) return;
         const w = Math.abs(sideDist(p, a, b)) * 2 || 10;
         const id = uid();
-        return finish([{ id, type: "slot", cx: r4((a[0] + b[0]) / 2), cy: r4((a[1] + b[1]) / 2), length: r4(len + w), width: r4(w), angle: r4(angDeg(a, b)) }], [...coinc(id, "e0", 0), ...coinc(id, "e1", 1)]);
+        return finish([{ id, type: "slot", cx: r4((a[0] + b[0]) / 2), cy: r4((a[1] + b[1]) / 2), length: r4(len + w), width: r4(w), angle: r4(angDeg(a, b)) }], [...coinc(id, "e0", 0), ...coinc(id, "e1", 1), ...fix(id, "e0", 0), ...fix(id, "e1", 1)]);
       }
       case "slotArc": {
         if (next.length < 4) return step();
@@ -1470,14 +1586,255 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     }
   };
 
-  const finishPoly = (closed: boolean, list = pts) => {
+  /** Dokončí lomenou čáru / spline z rozpracovaných bodů; body zadané souřadnicemi (`flags`) se ukotví vazbou „Pevně“. */
+  const finishPoly = (closed: boolean, list = pts, flags = ptFix) => {
     if (list.length >= 2) {
       const id = uid();
-      const e: SketchEntity = tool === "spline" ? { id, type: "spline", points: list, closed } : { id, type: "polyline", points: list, closed: closed && list.length >= 3 };
-      addEntities([e]);
+      const e: Extract<SketchEntity, { type: "polyline" | "spline" }> = tool === "spline" ? { id, type: "spline", points: list, closed } : { id, type: "polyline", points: list, closed: closed && list.length >= 3 };
+      addEntities([e], anchorPoints(e, list.map((_, i) => !!flags[i])).constraints);
     }
-    setPts([]);
-    setPtRefs([]);
+    clearPts();
+  };
+
+  // ---------- seznam souřadnic ze schránky (Ctrl+V, dialog „Body ze seznamu“) ----------
+  /**
+   * Vloží seznam souřadnic (čísla po dvojicích X Y) jako křivku. Při aktivním nástroji Úsečka / Lomená čára / Spline
+   * vznikne řetěz úseček / lomená čára / spline (rozpracovaný řetěz vloženými body pokračuje), jinak – nebo podle
+   * `as` z dialogu – lomená čára. Body se kotví vazbou „Pevně“ stejně jako při zadání souřadnic z klávesnice.
+   * Vrací true, když se něco vložilo; jinak ohlásí důvod (lichý počet čísel, text místo čísla…).
+   */
+  const pasteCoords = (text: string, as?: ChainKind): boolean => {
+    const r = parseCoordList(text);
+    if (!r.ok) {
+      note(coordListError(r));
+      return false;
+    }
+    const active: ChainKind | null = tool === "line" || tool === "polyline" || tool === "spline" ? tool : null;
+    let kind: ChainKind = as ?? active ?? "polyline";
+    // rozpracovaný řetěz téhož nástroje pokračuje vloženými body (úsečky: od posledního bodu řetězu)
+    const cont = !as && !!active && pts.length > 0;
+    const head = cont ? (kind === "line" ? [pts[pts.length - 1]] : pts) : [];
+    const headFix = cont ? (kind === "line" ? [!!ptFix[pts.length - 1]] : pts.map((_, i) => !!ptFix[i])) : [];
+    const startRef = cont && kind === "line" && snaps.auto ? ptRefs[pts.length - 1] : undefined;
+    let points = r.points;
+    if (head.length && dist(head[head.length - 1], points[0]) < 1e-9) points = points.slice(1);
+    const all = [...head, ...points];
+    if (all.length < 2) {
+      // jediný bod: při kreslení řetězu je to další bod (jako „x;y“ z klávesnice); samotný čáru nevytvoří
+      if (active && !as && points.length === 1) {
+        toolClick(points[0], { detail: 1, shiftKey: false } as React.PointerEvent, points[0]);
+        note(tr("Ze schránky vložen 1 bod [{0}; {1}] – ukotven vazbou „Pevně“.", fmt(points[0][0], 4), fmt(points[0][1], 4)));
+        return true;
+      }
+      note(tr("Ve schránce je jediný bod – čára potřebuje aspoň dva (čísla po dvojicích X Y)."));
+      return false;
+    }
+    let extra = r.merged ? tr(" Opakované body vynechány: {0}.", r.merged) : "";
+    if (kind === "line" && all.length > LINE_CHAIN_MAX) {
+      kind = "polyline";
+      extra += tr(" Seznam má víc než {0} bodů, proto vznikla lomená čára místo jednotlivých úseček.", LINE_CHAIN_MAX);
+    }
+    const res = entitiesFromPoints(kind, all, { fixed: [...headFix, ...points.map(() => true)], coincident: snaps.auto, startRef });
+    addEntities(res.entities, res.constraints);
+    clearPts();
+    lastPt.current = all[all.length - 1];
+    lastPtFixed.current = res.anchor !== "none";
+    revealTyped(all);
+    const what = kind === "line" ? tr("řetěz úseček") : kind === "spline" ? tr("spline") : tr("lomená čára");
+    note(
+      (res.anchor === "points"
+        ? tr("Ze schránky přečteno bodů: {0} → {1}, body ukotveny vazbou „Pevně“.", r.points.length, what)
+        : res.anchor === "entity"
+          ? tr("Ze schránky přečteno bodů: {0} → {1}, ukotvení celé křivky jednou vazbou „Pevně“.", r.points.length, what)
+          : tr("Ze schránky přečteno bodů: {0} → {1} bez ukotvení (bodů je víc než {2}).", r.points.length, what, PASTE_FIX_LIMIT)) + extra,
+    );
+    return true;
+  };
+  // Ctrl+V na plátně skici (mimo textová pole): seznam souřadnic → křivka
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if ((e.target as HTMLElement | null)?.closest?.("input,textarea,select,[contenteditable='true']")) return;
+      if (ask || coordDlg) return;
+      const text = e.clipboardData?.getData("text/plain") ?? "";
+      if (!text.trim()) {
+        // obrázek (snímek obrazovky) nebo PDF ve schránce → podklad skici
+        const file = [...(e.clipboardData?.files ?? [])].find((f) => isImageFile(f) || isPdfFile(f));
+        if (file) {
+          e.preventDefault();
+          importUnderlay(file);
+        }
+        return;
+      }
+      e.preventDefault();
+      pasteCoords(text);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  });
+  // příkazy z pásu karet (pás o otevřeném skicáři neví) – vždy se volá aktuální verze obsluhy
+  const onCommand = (c: SketchCommand) => {
+    if (c === "coords") setCoordDlg({ text: "", kind: tool === "line" || tool === "spline" ? tool : "polyline" });
+    if (c === "underlay") {
+      setUlOpen(true);
+      // bez podkladu rovnou výběr souboru (jedno kliknutí méně)
+      if (!underlay && !ulBusy) {
+        ulFileFor.current = { kind: "new" };
+        ulFile.current?.click();
+      }
+    }
+  };
+  const onCommandRef = useRef(onCommand);
+  onCommandRef.current = onCommand;
+  useEffect(() => {
+    const l = (c: SketchCommand) => onCommandRef.current(c);
+    commandListeners.add(l);
+    return () => {
+      commandListeners.delete(l);
+    };
+  }, []);
+
+  // ---------- podklad skici ----------
+  // asynchronní načítání podkladu volá vždy aktuální obsluhu (jinak by zapsalo dokument z doby před načítáním)
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const addEntitiesRef = useRef(addEntities);
+  addEntitiesRef.current = addEntities;
+  /** Zapíše podklad do dokumentu (jeden krok historie); null = odebrat. */
+  const setUl = (u: SketchUnderlay | null) => {
+    setUlDraft(null);
+    onChangeRef.current({ underlay: u }, true);
+    if (!u) {
+      setUlMode(null);
+      setCalib([]);
+    }
+  };
+  // podklad zmizel (Zpět, odebrání) → konec úprav
+  useEffect(() => {
+    if (!underlay) {
+      setUlMode(null);
+      setCalib([]);
+      setUlDraft(null);
+    }
+  }, [underlay]);
+  const setUlModeSafe = (m: UnderlayMode) => {
+    setCalib([]);
+    setUlDraft(null);
+    if (m) {
+      if (tool !== "select") setTool("select");
+      if (underlay?.hidden) setUl({ ...underlay, hidden: undefined });
+    }
+    setUlMode(m);
+  };
+  const ulRun = async (msg: string, job: () => Promise<void>) => {
+    setUlBusy(msg);
+    setUlErr(null);
+    try {
+      await job();
+    } catch (e) {
+      setUlErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUlBusy(null);
+    }
+  };
+  /** Nový podklad ze souboru: obrázek PNG / JPG, nebo první stránka PDF ve skutečné velikosti. Nahradí dosavadní podklad. */
+  const importUnderlay = (file: File) => {
+    setUlOpen(true);
+    if (!isPdfFile(file) && !isImageFile(file)) {
+      setUlErr(tr("Podklad může být obrázek PNG nebo JPG, nebo soubor PDF – „{0}“ není ani jedno.", file.name));
+      return;
+    }
+    const center: Vec2 = [r4(view.cx), r4(view.cy)];
+    const fitMm: [number, number] = [size.w / view.scale, size.h / view.scale];
+    void ulRun(tr("Načítám „{0}“…", file.name), async () => {
+      let u: SketchUnderlay;
+      if (isPdfFile(file)) {
+        const data = new Uint8Array(await file.arrayBuffer());
+        u = await pdfUnderlay(data, 1, file.name, center);
+        rememberPdf(u.id, data);
+      } else u = await imageUnderlay(file, { center, fit: fitMm });
+      setUlMode(null);
+      setCalib([]);
+      setUl(u);
+      showAll(underlayCorners(u));
+      note(
+        u.page
+          ? tr("Podklad: strana {0} z {1} ve skutečné velikosti 1:1 ({2} × {3} mm). Jiné měřítko nastavíte kalibrací dvěma body.", u.page, u.pages ?? 1, fmt(underlayWidth(u)), fmt(u.h * u.mmPerPx))
+          : tr("Podklad vložen ({0} × {1} px). Skutečné měřítko nastavíte kalibrací dvěma body.", u.w, u.h),
+      );
+    });
+  };
+  /** Převod vektorových čar stránky PDF na entity skici (v měřítku, poloze a natočení podkladu). */
+  const convertPdf = (data: Uint8Array) => {
+    const u = underlay;
+    if (!u) return;
+    void ulRun(tr("Převádím čáry PDF na entity…"), async () => {
+      const r = await pdfPageEntities(data, u, { construction: ulCons });
+      rememberPdf(u.id, data);
+      if (!r.entities.length) throw new Error(r.paths ? tr("Na stránce nejsou čáry delší než 0,02 mm.") : tr("Stránka PDF nemá vektorové čáry (je to sken nebo obrázek?) – podklad lze jen obkreslit."));
+      addEntitiesRef.current(r.entities);
+      setSelection([]); // stovky vložených entit se nevybírají (panel vlastností by ukázal jen poslední)
+      note(pdfEntitiesSummary(r));
+    });
+  };
+  /** Jiná stránka téhož PDF: poloha, natočení a kalibrace podkladu zůstávají. */
+  const setPdfPage = (page: number, data: Uint8Array) => {
+    const u = underlay;
+    if (!u) return;
+    void ulRun(tr("Načítám stranu {0}…", page), async () => {
+      const n = await pdfUnderlay(data, page, u.name, [u.x, u.y]);
+      rememberPdf(u.id, data);
+      setUl(replaceBitmap(u, n));
+    });
+  };
+  /** Původní PDF podkladu; když v této relaci není (dokument otevřený znovu), požádá o jeho výběr a akci provede potom. */
+  const withPdf = (then: "convert" | number) => {
+    if (!underlay) return;
+    const data = pdfOf(underlay.id);
+    if (data) return then === "convert" ? convertPdf(data) : setPdfPage(then, data);
+    ulFileFor.current = { kind: "pdf", then };
+    setUlErr(null);
+    note(tr("Vyberte znovu soubor PDF podkladu „{0}“ – dokument obsahuje jen obrázek stránky.", underlay.name ?? "PDF"));
+    ulFile.current?.click();
+  };
+  const onUlFile = (file: File | undefined) => {
+    const why = ulFileFor.current;
+    ulFileFor.current = { kind: "new" };
+    if (!file) return;
+    if (why.kind === "new" || !underlay) return importUnderlay(file);
+    if (!isPdfFile(file)) {
+      setUlErr(tr("Vyberte soubor PDF, ze kterého podklad vznikl."));
+      return;
+    }
+    void file.arrayBuffer().then((b) => (why.then === "convert" ? convertPdf(new Uint8Array(b)) : setPdfPage(why.then, new Uint8Array(b))));
+  };
+  /** Bod kalibrace: uchopí se jen koncové body, středy, průsečíky a počátek (zarovnání a mřížka by klik posunuly). */
+  const calibPoint = (raw: Vec2): Snap | null => {
+    const s = computeSnap(raw);
+    return s.kind !== "free" && s.kind !== "grid" && s.kind !== "near" ? s : null;
+  };
+  const calibClick = (raw: Vec2) => {
+    const u = underlay;
+    if (!u) return;
+    const p = calibPoint(raw)?.p ?? R4(raw);
+    if (calib.length !== 1) return setCalib([p]);
+    const a = calib[0];
+    if (dist(a, p) * view.scale < 3) return note(tr("Druhý bod kalibrace musí ležet jinde než první."));
+    setCalib([a, p]);
+    setAsk({
+      key: "calib",
+      label: tr("Skutečná vzdálenost"),
+      value: r4(dist(a, p)),
+      suffix: "mm",
+      at: p,
+      onOk: (v) => {
+        const n = calibrateUnderlay(u, a, p, v);
+        if (!n) return note(tr("Vzdálenost musí být kladné číslo."));
+        setUl(n);
+        setCalib([]);
+        setUlMode(null);
+        note(tr("Podklad zkalibrován: {0} mm mezi body, šířka podkladu {1} mm.", fmt(v), fmt(underlayWidth(n))));
+      },
+    });
   };
 
   // ---------- editační nástroje: kliknutí ----------
@@ -1852,6 +2209,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       drag.current = { kind: "pan", from: [ev.clientX, ev.clientY], view };
       return;
     }
+    if (ulMode && underlay && ev.button === 0) {
+      // úprava podkladu: posun tažením; body kalibrace se klikají (vyřídí je uvolnění tlačítka)
+      if (ulMode === "move") drag.current = { kind: "underlay", from: raw, orig: underlay };
+      return;
+    }
     if (tool === "trim" && ev.button === 0) {
       // výkonný ořez: tažení přes víc úseků (klik bez pohybu = běžný ořez)
       drag.current = { kind: "trimPath", path: [raw] };
@@ -1905,6 +2267,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     longPress.current.move(ev.pointerId, [ev.clientX, ev.clientY]);
     const raw = toMm(ev.clientX, ev.clientY);
     lastRaw.current = raw;
+    lastClient.current = [ev.clientX, ev.clientY];
     const d = drag.current;
     if (d && !dragArmed.current) {
       // prst / pero: tažení začne až po překročení mrtvé zóny (klepnutí ani dlouhý stisk s ničím nepohnou)
@@ -1918,6 +2281,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     }
     if (d?.kind === "box") {
       drag.current = { ...d, to: raw };
+      setCursor(raw);
+      return;
+    }
+    if (d?.kind === "underlay") {
+      setUlDraft(moveUnderlay(d.orig, sub(raw, d.from)));
       setCursor(raw);
       return;
     }
@@ -1946,6 +2314,15 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       const moved = new Map(d.orig.map((e) => [e.id, transformEntity(e, xfMove(delta))]));
       const w = Object.fromEntries(d.ids.map((i) => [i, 1]));
       commitEdit(entities.map((e) => moved.get(e.id) ?? e), constraints, dims, false, w, true);
+      return;
+    }
+    // úprava podkladu: kalibrace uchopuje koncové body / středy / průsečíky, posun jen ukazuje kurzor
+    if (ulMode) {
+      const s = ulMode === "calib" ? calibPoint(raw) : null;
+      setSnapState(s);
+      setCursor(s?.p ?? raw);
+      setHover(null);
+      setHoverAnn(null);
       return;
     }
     // bez tažení: uchopení + zvýraznění
@@ -2012,6 +2389,15 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       onChange({ dims }, true);
       return;
     }
+    if (d?.kind === "underlay") {
+      setUlDraft(null);
+      if (!clicked) setUl(moveUnderlay(d.orig, sub(toMm(ev.clientX, ev.clientY), d.from)));
+      return;
+    }
+    if (ulMode === "calib" && clicked && dn && dn[2] === 0) {
+      calibClick(toMm(ev.clientX, ev.clientY));
+      return;
+    }
     if (!clicked || !dn || dn[2] !== 0 || tool === "select") return;
     const raw = toMm(ev.clientX, ev.clientY);
     if (tool === "project") return;
@@ -2060,8 +2446,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     if (tool !== "select" && (pts.length || picks.length)) {
       // pravé tlačítko ukončí rozpracovaný krok (jako v ZW3D)
       if (tool === "polyline" || tool === "spline") finishPoly(false);
-      setPts([]);
-      setPtRefs([]);
+      clearPts();
       setPicks([]);
       return;
     }
@@ -2137,6 +2522,12 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest?.("input,textarea,select")) return;
       if (ask) return;
+      if (e.key === "Escape" && ulMode) {
+        setUlMode(null);
+        setCalib([]);
+        setUlDraft(null);
+        return;
+      }
       // číselné zadání u kurzoru: psaní hodnot, Tab = další pole (zámek), Enter = potvrdit, Esc = smazat
       if (spec.length && !(e.ctrlKey || e.metaKey || e.altKey)) {
         const cur = dyn.texts[dyn.active] ?? "";
@@ -2180,8 +2571,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
       if (e.key === "Escape") {
         if (pts.length || picks.length) {
-          setPts([]);
-          setPtRefs([]);
+          clearPts();
           setPicks([]);
         } else if (tool !== "select") setTool("select");
         else {
@@ -2340,8 +2730,10 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   }
   annHits.current = hits;
 
-  // výsledný bod kurzoru po zadání hodnot a odvození vazeb (náhled musí odpovídat kliknutí)
-  const resolved = cursor && snapState && tool !== "select" ? resolvePoint(snapState) : null;
+  // výsledný bod kurzoru po zadání hodnot a odvození vazeb (náhled musí odpovídat kliknutí); při zadávání jen
+  // z klávesnice (kurzor mimo plátno) se bod počítá z psaných hodnot a poslední známé polohy – náhled je vidět i tak
+  const typedSnap: Snap | null = !cursor && dynTyped && tool !== "select" ? { p: lastRaw.current ?? pts[pts.length - 1] ?? [0, 0], kind: "free" } : null;
+  const resolved = tool === "select" ? null : cursor && snapState ? resolvePoint(snapState) : typedSnap ? resolvePoint(typedSnap) : null;
   const cursorPt = resolved?.p ?? cursor;
 
   /** živá hodnota pole zadání (z polohy kurzoru), dokud uživatel nic nenapsal */
@@ -2407,8 +2799,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   // náhled nástroje
   const preview = (() => {
     const c = cursorPt;
-    if (!c) return null;
     const stroke = { fill: "none", stroke: "#2563eb", strokeWidth: 1.5, strokeDasharray: "5 4" } as const;
+    // lomená čára / spline: křivka zadanými body je vidět průběžně – i bez kurzoru na plátně (body psané z klávesnice);
+    // s kurzorem nebo rozepsanou souřadnicí pokračuje až k tomuto bodu
+    if ((tool === "polyline" || tool === "spline") && pts.length) {
+      const seq = c && dist(c, pts[pts.length - 1]) > 1e-9 ? [...pts, c] : pts;
+      if (seq.length < 2) return null;
+      const path = tool === "spline" ? entityPath({ id: "_", type: "spline", points: seq, closed: false }).pts : seq;
+      return <polyline data-sketch-preview={tool} points={path.map(P).join(" ")} {...stroke} />;
+    }
+    if (!c) return null;
     const label = (p: Vec2, s: string) => {
       const [x, y] = toPx(p);
       return (
@@ -2482,10 +2882,6 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
             {label(c, tr("{0} mm · {1}°", fmt(dist(last, c)), fmt(((angDeg(last, c) % 360) + 360) % 360)))}
           </g>
         );
-      case "polyline":
-        return <polyline points={[...pts, c].map(P).join(" ")} {...stroke} />;
-      case "spline":
-        return <polyline points={entityPath({ id: "_", type: "spline", points: [...pts, c], closed: false }).pts.map(P).join(" ")} {...stroke} />;
       case "rect":
       case "rectCenter": {
         const a = pts[0];
@@ -2585,9 +2981,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   });
 
   const box = drag.current?.kind === "box" ? drag.current : null;
-  const snapGlyph = snapState && cursor && tool !== "select" && snapState.kind !== "free" ? snapState : null;
+  const snapGlyph = snapState && cursor && (tool !== "select" || ulMode === "calib") && snapState.kind !== "free" ? snapState : null;
 
-  const prompt = promptFor(tool, pts.length, picks.length, phase, sel.size);
+  const prompt = ulMode === "calib" ? (calib.length === 1 ? tr("Kalibrace podkladu: druhý bod") : tr("Kalibrace podkladu: první bod")) : ulMode === "move" ? tr("Táhněte podklad myší") : promptFor(tool, pts.length, picks.length, phase, sel.size);
   const dofText =
     status.status === "over"
       ? status.conflicts.length
@@ -2608,7 +3004,7 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         data-sketch-canvas
         data-tool={tool}
         className="h-full w-full"
-        style={{ cursor: tool === "select" ? (hover || hoverAnn ? "pointer" : "default") : "crosshair", background: "#fbfcfd", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
+        style={{ cursor: ulMode === "move" ? "move" : ulMode === "calib" ? "crosshair" : tool === "select" ? (hover || hoverAnn ? "pointer" : "default") : "crosshair", background: "#fbfcfd", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -2620,6 +3016,16 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         onWheel={onWheel}
         onDoubleClick={onDoubleClick}
       >
+        {/* podklad (obrázek / stránka PDF) pod mřížkou a geometrií */}
+        {shownUl && !shownUl.hidden && (
+          <>
+            <g transform={T}>
+              <UnderlayImage u={shownUl} />
+            </g>
+            {/* okraj podkladu (bílá stránka PDF na světlém plátně jinak splyne) */}
+            <polygon points={underlayCorners(shownUl).map(P).join(" ")} fill="none" stroke="#c3ccd6" strokeWidth={1} pointerEvents="none" />
+          </>
+        )}
         {gridLines}
         <line x1={o[0]} x2={o[0] + 60} y1={o[1]} y2={o[1]} stroke="#E03930" strokeWidth={1.5} />
         <line x1={o[0]} x2={o[0]} y1={o[1]} y2={o[1] - 60} stroke="#16a34a" strokeWidth={1.5} />
@@ -2659,6 +3065,29 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
           return pp ? <polyline key={"pk" + i} points={pp.pts.map(P).join(" ")} fill="none" stroke="#9333ea" strokeWidth={3} opacity={0.6} /> : null;
         })}
         {preview}
+        {/* úprava podkladu: obrys při posunu, body a vzdálenost při kalibraci */}
+        {ulMode === "move" && shownUl && <polygon data-ul-outline points={underlayCorners(shownUl).map(P).join(" ")} fill="rgba(37,99,235,.05)" stroke="#2563eb" strokeWidth={1.2} strokeDasharray="6 4" pointerEvents="none" />}
+        {ulMode === "calib" &&
+          calib.length > 0 &&
+          (() => {
+            const a = calib[0];
+            const b = calib[1] ?? cursorPt;
+            const [ax, ay] = toPx(a);
+            return (
+              <g data-ul-calib-marks pointerEvents="none">
+                {b && <line x1={ax} y1={ay} x2={toPx(b)[0]} y2={toPx(b)[1]} stroke="#E03930" strokeWidth={1.4} strokeDasharray="5 3" />}
+                {[a, ...calib.slice(1)].map((q, i) => {
+                  const [x, y] = toPx(q);
+                  return <path key={i} d={`M${x - 7},${y}H${x + 7}M${x},${y - 7}V${y + 7}`} stroke="#E03930" strokeWidth={1.6} />;
+                })}
+                {b && (
+                  <text x={(ax + toPx(b)[0]) / 2 + 6} y={(ay + toPx(b)[1]) / 2 - 6} fontSize={11} fill="#b91c1c" fontFamily="ui-monospace,monospace">
+                    {fmt(dist(a, b))} mm
+                  </text>
+                )}
+              </g>
+            );
+          })()}
         {snapState?.guides?.map(([a, b], i) => <line key={"g" + i} x1={toPx(a)[0]} y1={toPx(a)[1]} x2={toPx(b)[0]} y2={toPx(b)[1]} stroke="#0e7490" strokeDasharray="3 4" strokeWidth={1} />)}
         {snapGlyph && <SnapGlyph at={toPx(snapGlyph.p)} kind={snapGlyph.kind as SnapKind} />}
         {/* náhled odvozených vazeb u kurzoru (žluté ikony jako v SolidWorks) */}
@@ -2779,8 +3208,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       {spec.length > 0 && (cursorPt || dynTyped) && tool !== "select" && (() => {
         const base = cursorPt ?? lastRaw.current ?? pts[pts.length - 1] ?? [0, 0];
         const [px, py] = toPx(base);
+        // pole zůstává na plátně, i když psaná souřadnice leží mimo viditelnou část (jinak by zadání zmizelo z očí)
         return (
-          <div className="pointer-events-none absolute z-10 flex items-center gap-1 rounded-md border border-[#2563eb]/60 bg-white/95 px-1.5 py-1 font-mono text-[11px] shadow-md" style={{ left: Math.max(4, px + 18), top: Math.max(4, py + 24) }}>
+          <div data-sketch-dyn className="pointer-events-none absolute z-10 flex items-center gap-1 rounded-md border border-[#2563eb]/60 bg-white/95 px-1.5 py-1 font-mono text-[11px] shadow-md" style={{ left: Math.max(4, Math.min(px + 18, size.w - 270)), top: Math.max(4, Math.min(py + 24, size.h - 64)) }}>
             {spec.map((f, i) => {
               const t = dyn.texts[i] ?? "";
               const act = i === dyn.active;
@@ -2857,7 +3287,121 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         {prompt && <span className="rounded bg-[#2563eb] px-2.5 py-0.5 font-sans text-[11.5px] text-white shadow">{prompt}</span>}
       </div>
 
+      {/* podklad skici */}
+      <input
+        ref={ulFile}
+        data-sketch-underlay-file
+        type="file"
+        accept={UNDERLAY_ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          onUlFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      {ulOpen && tool !== "project" && !(tool === "measure" && measureRes) && (
+        <UnderlayPanel
+          u={shownUl}
+          busy={ulBusy}
+          error={ulErr}
+          mode={ulMode}
+          calibN={calib.length}
+          construction={ulCons}
+          setConstruction={setUlCons}
+          commit={setUl}
+          draft={setUlDraft}
+          pick={() => {
+            ulFileFor.current = { kind: "new" };
+            ulFile.current?.click();
+          }}
+          setMode={setUlModeSafe}
+          setPage={(n) => withPdf(n)}
+          convert={() => withPdf("convert")}
+          close={() => {
+            setUlOpen(false);
+            setUlMode(null);
+            setCalib([]);
+            setUlErr(null);
+          }}
+        />
+      )}
+
+      {/* body ze seznamu souřadnic */}
+      {coordDlg && (
+        <CoordDialog
+          init={coordDlg}
+          close={() => setCoordDlg(null)}
+          insert={(text, kind) => {
+            if (pasteCoords(text, kind)) setCoordDlg(null);
+          }}
+        />
+      )}
+
       {ctx && <ContextMenu x={ctx.x} y={ctx.y} entries={ctx.entries} close={() => setCtx(null)} />}
+    </div>
+  );
+}
+
+/** Dialog „Body ze seznamu souřadnic“: text (psaný nebo vložený ze schránky) → lomená čára / spline / řetěz úseček. */
+function CoordDialog({ init, close, insert }: { init: { text: string; kind: ChainKind }; close: () => void; insert: (text: string, kind: ChainKind) => void }) {
+  const [text, setText] = useState(init.text);
+  const [kind, setKind] = useState<ChainKind>(init.kind);
+  const [clip, setClip] = useState<string | null>(null);
+  const r = text.trim() ? parseCoordList(text) : null;
+  const ok = !!r && r.ok && r.points.length >= 2;
+  const fromClipboard = () => {
+    const read = navigator.clipboard?.readText?.();
+    if (!read) return setClip(tr("Prohlížeč čtení schránky nedovoluje – vložte text do pole klávesami Ctrl+V."));
+    read.then(
+      (t) => {
+        setText(t);
+        setClip(null);
+      },
+      () => setClip(tr("Prohlížeč čtení schránky nedovoluje – vložte text do pole klávesami Ctrl+V.")),
+    );
+  };
+  const KINDS: [ChainKind, string][] = [["polyline", tr("Lomená čára")], ["spline", tr("Spline")], ["line", tr("Úsečky")]];
+  return (
+    <div data-sketch-coords className="absolute left-1/2 top-16 z-30 w-[340px] max-w-[calc(100%-24px)] -translate-x-1/2 rounded-md border border-[#cfd6de] bg-white p-3 text-[12px] shadow-xl" onPointerDown={(e) => e.stopPropagation()}>
+      <p className="mb-1 flex items-center gap-1.5 font-semibold">
+        <CadIcon name="table" tone="tool" className="h-4 w-4" />
+        {tr("Body ze seznamu souřadnic")}
+      </p>
+      <p className="mb-1.5 text-[#6b7785]">{tr("Čísla po dvojicích X Y, na řádcích nebo za sebou; oddělovač mezera, středník nebo tabulátor, desetinná čárka i tečka. Body se ukotví vazbou „Pevně“.")}</p>
+      <textarea
+        autoFocus
+        rows={7}
+        value={text}
+        placeholder={"0 0\n10 5\n20;0\n30,5 8"}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Escape") close();
+          if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && ok) insert(text, kind);
+        }}
+        className="w-full rounded border border-[#cfd6de] p-1.5 font-mono text-[12px] outline-none focus:border-[#2563eb]"
+      />
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+        {KINDS.map(([k, label]) => (
+          <label key={k} className="flex cursor-pointer items-center gap-1.5">
+            <input type="radio" name="coordKind" checked={kind === k} onChange={() => setKind(k)} /> {label}
+          </label>
+        ))}
+      </div>
+      <p data-sketch-coords-status className={cn("mt-1.5 min-h-[16px]", (r && !r.ok) || clip ? "text-red-600" : "text-[#6b7785]")}>
+        {clip ?? (!r ? tr("Vložte nebo napište souřadnice.") : !r.ok ? coordListError(r) : r.points.length >= 2 ? tr("Přečteno bodů: {0}", r.points.length) : tr("Přečten jediný bod – čára potřebuje aspoň dva."))}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" disabled={!ok} onClick={() => insert(text, kind)} title="Ctrl+Enter" className="rounded bg-[#2563eb] px-2.5 py-1 text-[11.5px] font-semibold text-white disabled:opacity-40">
+          {tr("Vložit do skici")}
+        </button>
+        <button type="button" onClick={fromClipboard} className="rounded border border-[#cfd6de] px-2.5 py-1 text-[11.5px]">
+          {tr("Ze schránky")}
+        </button>
+        <button type="button" onClick={close} className="rounded border border-[#cfd6de] px-2.5 py-1 text-[11.5px]">
+          {tr("Zrušit")}
+        </button>
+      </div>
     </div>
   );
 }

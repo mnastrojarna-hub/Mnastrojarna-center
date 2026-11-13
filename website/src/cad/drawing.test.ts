@@ -27,7 +27,7 @@ const meta = { name: "Deska", material: "Ocel S235", massKg: 0.5, number: "MN-00
 
 describe("výkres", () => {
   it("3 pohledy + izometrie, razítko, osy a průměry", () => {
-    const d = makeDrawing(plate(), meta);
+    const d = makeDrawing(plate(), meta, { hidden: true });
     expect(d.sheet.name).toBe("A4");
     expect(d.sheet.w).toBe(297);
     expect(d.svg).toContain("Mnástrojárna");
@@ -467,4 +467,291 @@ describe("kóty podle vybrané geometrie (kružnice Ø / R, hrana, úhel)", asyn
     const pdf = await drawingToPdf(out, { regular: font("Roboto-Regular.ttf"), bold: font("Roboto-Bold.ttf") });
     expect(pdf.size).toBeGreaterThan(base.size);
   }, 60_000);
+});
+
+// ---------------------------------------------------------------- rozvržení výkresu soustruženého dílu (oběžné kolo 604200.001, model B)
+
+describe("rozvržení výkresu: oběžné kolo B (řez, otočení, poloviční řez, skryté hrany, více modelů, výkon)", async () => {
+  const { buildShape } = await import("./build");
+  await import("./ext/index");
+  await import("./feat/index");
+  const { convexHull, pickViewEnt, dimFromPicks, annotationGeometry, projectionStats, textBox, modelViewKey } = await import("./drawing");
+  type Res = ReturnType<typeof makeDrawing>;
+  type V2 = [number, number];
+  const fixture = (name: string) => JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures", name), "utf8"));
+  const metaB = { name: "Oběžné kolo B", material: "ocel", number: "604200.001" };
+  let B: r.Shape3D;
+  beforeAll(async () => {
+    B = (await buildShape(fixture("impeller-B.mncad.json"))).body!;
+  }, 120_000);
+
+  type Box = [number, number, number, number];
+  const boxHit = (a: Box, b: Box) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+  /** úsečka zasahuje do obdélníku (Liang–Barsky) */
+  const segHit = (p: V2, q: V2, b: Box) => {
+    let t0 = 0;
+    let t1 = 1;
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    for (const [pp, qq] of [[-dx, p[0] - b[0]], [dx, b[2] - p[0]], [-dy, p[1] - b[1]], [dy, b[3] - p[1]]]) {
+      if (pp === 0) {
+        if (qq < 0) return false;
+        continue;
+      }
+      const t = qq / pp;
+      if (pp < 0) t0 = Math.max(t0, t);
+      else t1 = Math.min(t1, t);
+      if (t0 > t1) return false;
+    }
+    return true;
+  };
+  const inHull = (h: V2[], q: V2) => h.length > 2 && h.every((a, i) => {
+    const b = h[(i + 1) % h.length];
+    return (b[0] - a[0]) * (q[1] - a[1]) - (b[1] - a[1]) * (q[0] - a[0]) >= -1e-9;
+  });
+  /**
+   * Čitelnost automatických kót: texty kót se nepřekrývají navzájem ani s jinými texty, neleží na žádné čáře listu
+   * (obrysy, šrafy, osy, kótovací a vynášecí čáry, rám) a neleží uvnitř obrysu žádného pohledu.
+   */
+  const readability = (d: Res): string[] => {
+    const out: string[] = [];
+    const dims = d.texts.filter((t) => t.layer === "dim");
+    const boxes = dims.map((t) => textBox(t) as Box);
+    for (let i = 0; i < dims.length; i++) {
+      for (let j = i + 1; j < dims.length; j++) if (boxHit(boxes[i], boxes[j])) out.push(`text ${dims[i].s} × ${dims[j].s}`);
+      for (const o of d.texts) if (o.layer !== "dim" && boxHit(boxes[i], textBox(o) as Box)) out.push(`text ${dims[i].s} × ${o.s}`);
+      for (const pl of d.polys) {
+        if (pl.fill) continue;
+        for (let k = 1; k < pl.pts.length; k++)
+          if (segHit(pl.pts[k - 1] as V2, pl.pts[k] as V2, boxes[i])) {
+            out.push(`čára ${pl.layer} × ${dims[i].s}`);
+            break;
+          }
+      }
+      for (const v of d.views) {
+        const pts: V2[] = [];
+        for (const e of v.ents ?? []) {
+          if (e.t === "line") pts.push(e.a as V2, e.b as V2);
+          else for (let k = 0; k <= 16; k++) pts.push([e.c[0] + e.r * Math.cos(e.a0 + (e.da * k) / 16), e.c[1] + e.r * Math.sin(e.a0 + (e.da * k) / 16)]);
+        }
+        const hull = convexHull(pts.map((q) => [v.px + (q[0] - v.x0) * v.s, v.py + (q[1] - v.y0) * v.s] as V2)) as V2[];
+        const b = boxes[i];
+        if ([[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]], [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]].some((q) => inHull(hull, q as V2))) out.push(`pohled ${v.key} × ${dims[i].s}`);
+      }
+      const [W, H] = [d.sheet.w, d.sheet.h];
+      if (boxes[i][0] < 20 || boxes[i][1] < 10 || boxes[i][2] > W - 10 || boxes[i][3] > H - 10) out.push(`mimo rám ${dims[i].s}`);
+    }
+    return out;
+  };
+  const view = (d: Res, k: string) => d.views.find((v) => v.key === k)!;
+  const diameters = (d: Res) => d.texts.filter((t) => t.layer === "dim" && /^Ø/.test(t.s)).map((t) => t.s);
+  const save = (name: string, d: Res) => {
+    fs.mkdirSync("/tmp/claude-0/wc", { recursive: true });
+    fs.writeFileSync(`/tmp/claude-0/wc/${name}.svg`, d.svg);
+  };
+
+  it("výkon: projekce modelu B od nuly, s řezem, se skrytými hranami a otočená (mezipaměť projekcí)", () => {
+    const times: Record<string, number> = {};
+    const time = (label: string, sh: r.Shape3D, o: Parameters<typeof makeDrawing>[2]) => {
+      const h0 = projectionStats.hlr;
+      const t = performance.now();
+      const d = makeDrawing(sh, metaB, o);
+      times[label] = Math.round(performance.now() - t);
+      return { d, hlr: projectionStats.hlr - h0 };
+    };
+    // 1) uživatelův případ: nový model, výkres rovnou s řezem (skryté hrany vypnuté = nové výchozí)
+    const s1 = B.clone() as r.Shape3D;
+    const first = time("řez od nuly", s1, { section: { plane: "XZ", offset: 0 } });
+    expect(first.d.warnings).toEqual([]);
+    expect(first.hlr).toBe(5); // čelní, půdorys, bokorys, izometrie + projekce odříznutého tělesa (řez)
+    // 2) změny voleb nad týmž modelem už projekci nespouští
+    const hid = time("+ skryté hrany", s1, { section: { plane: "XZ", offset: 0 }, hidden: true });
+    expect(hid.hlr).toBe(0);
+    expect(hid.d.polys.some((p) => p.layer === "hidden")).toBe(true);
+    const off = time("bez řezu", s1, {});
+    expect(off.hlr).toBe(0);
+    const half = time("poloviční řez", s1, { section: { plane: "XZ", offset: 0, kind: "half" } });
+    expect(half.hlr).toBe(1); // jen projekce tělesa bez čtvrtiny
+    // otočení o 90°: hlavní pohled a řez jsou otočením hotových projekcí, nový směr má jen bokorys (pohled zdola)
+    const rot = time("otočení 90° s řezem", s1, { rotation: 90, section: { plane: "XZ", offset: 0 } });
+    expect(rot.hlr).toBeLessThanOrEqual(1);
+    // 3) tentýž model od nuly bez řezu a se skrytými hranami (pro srovnání se stavem před úpravou)
+    const s2 = B.clone() as r.Shape3D;
+    time("bez řezu od nuly", s2, {});
+    time("+ řez", s2, { section: { plane: "XZ", offset: 0 } });
+    console.log("výkres modelu B [ms]:", JSON.stringify(times));
+    // cíl zadání: projekce modelu B s řezem do 10 s (sdílený stroj – v testu s rezervou)
+    expect(times["řez od nuly"]).toBeLessThan(20_000);
+    expect(times["+ skryté hrany"] + times["bez řezu"]).toBeLessThan(5_000);
+  }, 180_000);
+
+  it("řez nemění formát listu: model B zůstane na A2 1:2, řez se položí do volného místa listu", () => {
+    const plain = makeDrawing(B, metaB);
+    const sec = makeDrawing(B, metaB, { section: { plane: "XZ", offset: 0 } });
+    save("B-rez", sec);
+    expect([plain.sheet.name, plain.scale]).toEqual(["A2", "1:2"]);
+    expect([sec.sheet.name, sec.scale]).toEqual(["A2", "1:2"]);
+    expect(sec.warnings).toEqual([]);
+    // řez je na listu, uvnitř rámu, mimo razítko a nepřekrývá jiný pohled
+    const rect = (v: Res["views"][number]) => ({ x: v.px, y: v.py, w: v.w * v.s, h: v.h * v.s });
+    const s = rect(view(sec, "section"));
+    expect(s.x).toBeGreaterThanOrEqual(20);
+    expect(s.y).toBeGreaterThanOrEqual(10);
+    expect(s.x + s.w).toBeLessThanOrEqual(sec.sheet.w - 10);
+    expect(s.y + s.h).toBeLessThanOrEqual(sec.sheet.h - 10);
+    for (const v of sec.views.filter((x) => x.key !== "section")) {
+      const o = rect(v);
+      expect(s.x < o.x + o.w && o.x < s.x + s.w && s.y < o.y + o.h && o.y < s.y + s.h, `řez × ${v.key}`).toBe(false);
+    }
+    // zadaný list a měřítko: řez se vejde → beze změny a bez varování
+    const fixed = makeDrawing(B, metaB, { sheet: "A2", scale: 0.5, section: { plane: "XZ", offset: 0 } });
+    expect([fixed.sheet.name, fixed.scale, fixed.warnings]).toEqual(["A2", "1:2", []]);
+    // deska: řez na tomtéž listu ve stejném měřítku
+    const p0 = makeDrawing(plate(), meta);
+    const p1 = makeDrawing(plate(), meta, { section: { plane: "XZ", offset: 0 } });
+    expect([p1.sheet.name, p1.scale]).toEqual([p0.sheet.name, p0.scale]);
+  }, 120_000);
+
+  it("když se pohledy s řezem opravdu nevejdou: zadaný list → varování, automatický list → větší formát nebo menší měřítko", () => {
+    const tight = makeDrawing(B, metaB, { sheet: "A3", scale: 0.5, section: { plane: "XZ", offset: 0 } });
+    expect(tight.warnings.join(" ")).toMatch(/nevejdou/);
+    const auto = makeDrawing(B, metaB, { scale: 1, section: { plane: "XZ", offset: 0 } });
+    expect(["A1", "A0"]).toContain(auto.sheet.name);
+    expect(auto.scale).toBe("1:1");
+  }, 120_000);
+
+  it("automatické kóty průměrů: v řezu, v řadě na jedné straně, texty se nepřekrývají a neleží na čarách ani v pohledech", () => {
+    const sec = makeDrawing(B, metaB, { section: { plane: "XZ", offset: 0 } });
+    expect(sec.stacks).toEqual([{ view: "section", side: "b", count: 14 }]);
+    expect(diameters(sec)).toEqual(["Ø42", "Ø45", "Ø49", "Ø90", "Ø100", "Ø102", "Ø120", "Ø236", "Ø257,6", "Ø272", "Ø338,4", "Ø365,4", "Ø416", "Ø430"]);
+    expect(readability(sec)).toEqual([]);
+    // řada roste od obrysu: menší průměr blíž pohledu, rozteč stejná
+    const ys = sec.texts.filter((t) => t.layer === "dim" && /^Ø\d/.test(t.s) && t.s !== "16× Ø13").map((t) => t.y);
+    const sv = view(sec, "section");
+    expect(Math.min(...ys)).toBeGreaterThan(sv.py + sv.h * sv.s);
+    for (let i = 1; i < ys.length; i++) expect(ys[i] - ys[i - 1]).toBeCloseTo(6.5, 6);
+    // bez řezu: řada pod bokorysem (průměry jsou vidět jako délky), také čitelná
+    const plain = makeDrawing(B, metaB);
+    expect(plain.stacks?.[0].count).toBe(14);
+    expect(readability(plain)).toEqual([]);
+    // poloviční řez a otočený pohled
+    for (const o of [{ section: { plane: "XZ" as const, offset: 0, kind: "half" as const } }, { rotation: 90 as const, section: { plane: "XZ" as const, offset: 0 } }]) {
+      const d = makeDrawing(B, metaB, o);
+      expect(d.stacks?.[0]).toMatchObject({ view: "section", count: 14 });
+      expect(readability(d), JSON.stringify(o)).toEqual([]);
+    }
+    // deska (bez soustružené osy): odkazy „n× Ø“ také čitelné
+    expect(readability(makeDrawing(plate(), meta, { section: { plane: "XZ", offset: 0 } }))).toEqual([]);
+  }, 120_000);
+
+  it("otočení hlavního pohledu o 90° / 180° / 270°: obraz otočený, kóty z geometrie fungují", () => {
+    const d0 = makeDrawing(B, metaB);
+    const d90 = makeDrawing(B, metaB, { rotation: 90 });
+    save("B-otoceni-90", d90);
+    const f0 = view(d0, "front");
+    const f90 = view(d90, "front");
+    // osa dílu leží vodorovně: šířka a výška čelního pohledu se vymění
+    expect(f90.w).toBeCloseTo(f0.h, 6);
+    expect(f90.h).toBeCloseTo(f0.w, 6);
+    // půdorys je průmětem otočeného hlavního pohledu (bokorys dílu), pohled zleva je čelní pohled na kružnice
+    expect(view(d90, "top").h).toBeCloseTo(f0.w, 6);
+    expect(view(d90, "left").ents!.some((e) => e.t === "arc" && Math.abs(e.r - 6.5) < 1e-3)).toBe(true);
+    // výběr hrany v otočeném pohledu: čelo příruby Ø430 je svislá hrana délky 430
+    const flange = f90.ents!.find((e) => e.t === "line" && !e.hidden && Math.abs(Math.abs(e.b[1] - e.a[1]) - 430) < 1e-3 && Math.abs(e.b[0] - e.a[0]) < 1e-6);
+    expect(flange).toBeDefined();
+    const fl = flange as Extract<typeof flange, { t: "line" }>;
+    const mid: V2 = [(fl.a[0] + fl.b[0]) / 2, (fl.a[1] + fl.b[1]) / 2 + 37];
+    const pick = pickViewEnt(f90.ents!, mid, 0.5)!;
+    expect(pick).toMatchObject({ kind: "line" });
+    const at: V2 = [f90.px - 20, f90.py + 40];
+    const dim = dimFromPicks(d90, [{ view: "front", pick }], at, { linear: "auto", circle: "auto" })!;
+    expect(dim).toMatchObject({ kind: "vertical", edge: true });
+    expect(annotationGeometry(d90, [{ ...dim, id: "x" } as never]).texts[0].s).toBe("430");
+    // díra Ø13 v pohledu na čelo
+    const lv = view(d90, "left");
+    const hole = lv.ents!.find((e) => e.t === "arc" && Math.abs(e.r - 6.5) < 1e-3) as Extract<NonNullable<typeof lv.ents>[number], { t: "arc" }>;
+    const hp = pickViewEnt(lv.ents!, [hole.c[0] + 6.5, hole.c[1]], 0.3)!;
+    expect(hp).toMatchObject({ kind: "circle", full: true });
+    const hd = dimFromPicks(d90, [{ view: "left", pick: hp }], [lv.px + 10, lv.py + 10], { linear: "auto", circle: "auto" })!;
+    expect(annotationGeometry(d90, [{ ...hd, id: "h" } as never]).texts[0].s).toBe("Ø13");
+    // 180° a 270°: obraz zrcadlově podle středu / otočený opačně, rozměry sedí
+    for (const rot of [180, 270] as const) {
+      const d = makeDrawing(B, metaB, { rotation: rot });
+      const f = view(d, "front");
+      expect(rot === 180 ? [f.w, f.h] : [f.h, f.w]).toEqual([expect.closeTo(f0.w, 6), expect.closeTo(f0.h, 6)]);
+      expect(d.warnings).toEqual([]);
+    }
+    // deska: 90° otočí čelní pohled 80 × 20 na 20 × 80
+    const p = makeDrawing(plate(), meta, { rotation: 90 });
+    expect(view(p, "front").w).toBeCloseTo(20, 6);
+    expect(view(p, "front").h).toBeCloseTo(80, 6);
+    expect(p.texts.some((t) => t.s === "4× Ø6")).toBe(true);
+  }, 120_000);
+
+  it("poloviční řez: polovina pohled / polovina řez podél osy, šrafy jen v řezané polovině, osa souměrnosti", () => {
+    const d = makeDrawing(B, metaB, { section: { plane: "XZ", offset: 0, kind: "half" } });
+    save("B-polovicni-rez", d);
+    expect(d.warnings).toEqual([]);
+    expect(d.texts.some((t) => t.s === "A–A")).toBe(true);
+    const s = view(d, "section");
+    const axisX = s.px + (0 - s.x0) * s.s; // osa dílu (x = 0) na listu
+    const hatchPts = d.polys.filter((p) => p.layer === "hatch").flatMap((p) => p.pts);
+    expect(hatchPts.length).toBeGreaterThan(20);
+    for (const q of hatchPts) expect(q[0]).toBeGreaterThan(axisX - 1e-6);
+    // osa souměrnosti (čerchovaná) přes celou výšku řezu
+    expect(d.polys.some((p) => p.layer === "center" && Math.abs(p.pts[0][0] - axisX) < 1e-6 && Math.abs(p.pts[1][0] - axisX) < 1e-6 && Math.abs(p.pts[1][1] - p.pts[0][1]) > s.h * s.s)).toBe(true);
+    // celý řez šrafuje obě poloviny
+    const full = makeDrawing(B, metaB, { section: { plane: "XZ", offset: 0 } });
+    const fs2 = view(full, "section");
+    const fAxis = fs2.px + (0 - fs2.x0) * fs2.s;
+    expect(full.polys.filter((p) => p.layer === "hatch").flatMap((p) => p.pts).some((q) => q[0] < fAxis - 5)).toBe(true);
+    // deska (bez osy soustružení): poloviční řez podle středu obalu; dosavadní řezy XZ / YZ / XY dál fungují
+    const ph = makeDrawing(plate(), meta, { section: { plane: "YZ", offset: 0, kind: "half" } });
+    expect(ph.warnings).toEqual([]);
+    expect(ph.polys.filter((p) => p.layer === "hatch").length).toBeGreaterThan(3);
+    for (const plane of ["XZ", "YZ", "XY"] as const) {
+      const x = makeDrawing(plate(), meta, { section: { plane, offset: plane === "XY" ? 10 : 0 } });
+      expect(x.warnings, plane).toEqual([]);
+      expect(x.polys.filter((p) => p.layer === "hatch").length, plane).toBeGreaterThan(5);
+    }
+  }, 120_000);
+
+  it("skryté hrany jsou u nového výkresu vypnuté; zapnuté se kreslí čárkovaně", () => {
+    expect(defaultDrawingOptions.hidden).toBe(false);
+    expect(makeDrawing(plate(), meta).polys.some((p) => p.layer === "hidden")).toBe(false);
+    expect(makeDrawing(plate(), meta, { hidden: true }).polys.some((p) => p.layer === "hidden")).toBe(true);
+  });
+
+  it("více modelů na jednom listu: vlastní měřítko s popiskem, kóty a výběr geometrie v pohledu dalšího modelu", () => {
+    const pin = r.makeCylinder(15, 60, [0, 0, 0], [0, 0, 1]) as r.Shape3D;
+    const models = [
+      { id: "m1", name: "Čep", source: { kind: "doc" as const, doc: { app: "mnastrojarna-cad", version: 2, name: "Čep", material: "ocel", features: [] } as never }, view: "front" as const, scale: 1 },
+      { id: "m2", name: "Deska", source: { kind: "component" as const, compId: "c1" }, view: "top" as const, scale: "auto" as const },
+    ];
+    const d = makeDrawing(B, metaB, { models }, { m1: pin, m2: plate() });
+    save("B-vice-modelu", d);
+    expect(d.warnings).toEqual([]);
+    expect(d.models?.map((m) => [m.id, m.key, m.scale])).toEqual([["m1", modelViewKey("m1"), "1:1"], ["m2", modelViewKey("m2"), "1:2"]]);
+    expect(d.texts.some((t) => t.s === "Čep (1:1)")).toBe(true);
+    expect(d.texts.some((t) => t.s === "Deska (1:2)")).toBe(true);
+    const pv = view(d, "m:m1");
+    expect(pv.s).toBe(1);
+    expect(pv.w).toBeCloseTo(30, 6);
+    // pohledy se nepřekrývají a jsou uvnitř rámu
+    const rects = d.views.map((v) => ({ k: v.key, x: v.px, y: v.py, w: v.w * v.s, h: v.h * v.s }));
+    for (const a of rects) {
+      expect(a.x >= 20 && a.y >= 10 && a.x + a.w <= d.sheet.w - 10 && a.y + a.h <= d.sheet.h - 10, a.k).toBe(true);
+      for (const b of rects) if (a !== b) expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h, `${a.k} × ${b.k}`).toBe(false);
+    }
+    expect(readability(d)).toEqual([]);
+    // kóta z geometrie v pohledu dalšího modelu (délka čepu 60)
+    const edge = pv.ents!.find((e) => e.t === "line" && Math.abs(Math.abs(e.b[1] - e.a[1]) - 60) < 1e-6)!;
+    const pick = pickViewEnt(pv.ents!, [(edge as { a: V2 }).a[0], -30], 0.3)!;
+    const dm = dimFromPicks(d, [{ view: "m:m1", pick }], [pv.px - 15, pv.py + 30], { linear: "auto", circle: "auto" })!;
+    expect(annotationGeometry(d, [{ ...dm, id: "z" } as never]).texts[0].s).toBe("60");
+    // chybějící těleso dalšího modelu → varování, výkres hlavního modelu zůstane
+    const miss = makeDrawing(plate(), meta, { models: [models[0]] });
+    expect(miss.warnings.join(" ")).toMatch(/Čep/);
+    expect(miss.models).toBeUndefined();
+  }, 120_000);
 });

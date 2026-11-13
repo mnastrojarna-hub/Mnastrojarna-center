@@ -3,16 +3,20 @@
 import { setLang, tr, type CadLang } from "./i18n";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
-import { buildDoc, faceInfo, type BuildProgress } from "./build";
+import { buildDoc, buildShape, faceInfo, type BuildProgress } from "./build";
 import { drawingDoc } from "./drawing-doc";
+import { drawingModelShapes } from "./drawing-models";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
+import { makeSmartDrawing } from "./drawing-dims";
 import { cachedBody, findCylFace, interference, mateFaceInfo, partEntry, shapeOfDoc } from "./asm-kernel";
+import { compareTransferables, compareWithReference, type CompareOptions, type ReferenceFile } from "./compare";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
 import { refInfo, resolvePlaneDef } from "./ref-resolve";
+import { stampPicks } from "./pick-sigs";
 import { datumDisplay, type DatumDisplay } from "./feat/refs-more";
 import type { PlaneDef, Ref } from "./refs";
-import type { CadDoc, ComponentSource, ExportFormat, MeshData } from "./types";
+import type { CadDoc, ComponentSource, ExportFormat, Feature, MeshData } from "./types";
 
 let ready: Promise<void> | null = null;
 let body: r.Shape3D | null = null;
@@ -41,6 +45,7 @@ type Req =
   | { id: number; op: "asmFace"; key: string; index: number }
   | { id: number; op: "lang"; lang: CadLang }
   | { id: number; op: "interference"; doc: CadDoc }
+  | { id: number; op: "compare"; doc: CadDoc; file: ReferenceFile; opts?: CompareOptions }
   | { id: number; op: "mateFace"; key: string; index: number }
   | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
@@ -48,7 +53,8 @@ type Req =
   | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> }
   | { id: number; op: "refInfo"; doc: CadDoc; ref: Ref }
   | { id: number; op: "planeDef"; doc: CadDoc; def: PlaneDef }
-  | { id: number; op: "datumGfx"; doc: CadDoc };
+  | { id: number; op: "datumGfx"; doc: CadDoc }
+  | { id: number; op: "pickSigs"; doc: CadDoc; feature: Feature };
 
 /** Kontext řešení odkazů nad posledním postaveným tělesem a aktuálním dokumentem. */
 function refCtx(doc: CadDoc) {
@@ -110,6 +116,13 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
           }
         }
         ctx.postMessage({ id: m.id, ok: true, result: out });
+        break;
+      }
+      case "pickSigs": {
+        // výběr hran/ploch prvku nad tělesem PŘED prvkem (`doc` je oříznutý před prvek): znovunalezení podle otisků + otisky nových indexů
+        const { bodies } = await buildShape(m.doc, Infinity, { preferActive: true });
+        const b = bodies[0]?.shape;
+        ctx.postMessage({ id: m.id, ok: true, result: b ? stampPicks(m.feature, b) : null });
         break;
       }
       case "planeDef": {
@@ -196,6 +209,18 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
       case "interference":
         ctx.postMessage({ id: m.id, ok: true, result: await interference(m.doc) });
         break;
+      case "compare": {
+        // porovnání s referenčním modelem: těleso dokumentu (z mezipaměti stavby) proti souboru STEP / BREP / STL
+        const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
+        if (!res.body) throw new Error(tr("Model je prázdný."));
+        try {
+          const out = await compareWithReference(res.body, m.file, m.opts, (s) => ctx.postMessage({ id: m.id, progress: { index: s.index, total: s.total, name: s.name, phase: "feature" } }));
+          ctx.postMessage({ id: m.id, ok: true, result: out }, compareTransferables(out));
+        } finally {
+          res.body.delete?.();
+        }
+        break;
+      }
       case "mateFace":
         ctx.postMessage({ id: m.id, ok: true, result: mateFaceInfo(m.key, m.index) });
         break;
@@ -214,13 +239,17 @@ ctx.onmessage = async (e: MessageEvent<Req>) => {
         // závity se kreslí zjednodušeně (kružnice + označení) – modelované šroubovice se pro výkres potlačí (jejich přesná projekce trvá minuty)
         const dd = drawingDoc(m.doc);
         const key = JSON.stringify({ f: dd.features, v: dd.variables, c: dd.configs, a: dd.activeConfig, b: dd.bodies, k: dd.kind, comp: dd.components, mates: dd.mates });
+        // další modely na listu (komponenty sestavy, vložené dokumenty) – vlastní tělesa z mezipaměti
+        const extra = await drawingModelShapes(m.doc, m.opts?.models);
         if (drawCache?.key !== key) {
           const b = await shapeOfDoc(dd);
           if (!b) throw new Error(tr("Model je prázdný."));
           drawCache?.body.delete?.();
           drawCache = { key, body: b };
         }
-        ctx.postMessage({ id: m.id, ok: true, result: makeDrawing(drawCache.body, m.meta, m.opts) });
+        // Chytré kóty: list bez zapečených kót (s místem navíc) + plán kót podle prvků jako upravitelné poznámky (cad/drawing-dims.ts)
+        const smart = m.opts?.dimensions === "smart" && dd.kind !== "assembly";
+        ctx.postMessage({ id: m.id, ok: true, result: smart ? makeSmartDrawing(drawCache.body, m.doc, m.meta, m.opts, extra) : makeDrawing(drawCache.body, m.meta, m.opts, extra) });
         break;
       }
     }

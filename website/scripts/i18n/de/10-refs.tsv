@@ -1,0 +1,12 @@
+# Otisky výběru hran/ploch (pick-sigs.ts) a ukončení díry „k tělesu“ (vlna 3, refs)
+ k tělesu	 bis Körper
+Hrana {0} se po změně modelu nenašla podle otisku – použit původní index.	Kante {0} wurde nach der Modelländerung nicht über ihren Fingerabdruck gefunden – der ursprüngliche Index wird verwendet.
+Hrana {0} se po změně modelu nenašla podle otisku a těleso ji už nemá (hran: {1}) – vyberte ji znovu.	Kante {0} wurde nach der Modelländerung nicht über ihren Fingerabdruck gefunden und der Körper hat sie nicht mehr ({1} Kanten) – wählen Sie sie erneut aus.
+Hrany {0} se po změně modelu nenašly podle otisku – použity původní indexy.	Kanten {0} wurden nach der Modelländerung nicht über ihre Fingerabdrücke gefunden – die ursprünglichen Indizes werden verwendet.
+Plocha {0} se po změně modelu nenašla podle otisku – použit původní index.	Fläche {0} wurde nach der Modelländerung nicht über ihren Fingerabdruck gefunden – der ursprüngliche Index wird verwendet.
+Plocha {0} se po změně modelu nenašla podle otisku a těleso ji už nemá (ploch: {1}) – vyberte ji znovu.	Fläche {0} wurde nach der Modelländerung nicht über ihren Fingerabdruck gefunden und der Körper hat sie nicht mehr ({1} Flächen) – wählen Sie sie erneut aus.
+Plochy {0} se po změně modelu nenašly podle otisku – použity původní indexy.	Flächen {0} wurden nach der Modelländerung nicht über ihre Fingerabdrücke gefunden – die ursprünglichen Indizes werden verwendet.
+Ukončení „k tělesu“ potřebuje těleso.	Die Endbedingung „bis Körper“ benötigt einen Körper.
+Vrchol {0} se po změně modelu nenašel podle otisku – použit původní index.	Eckpunkt {0} wurde nach der Modelländerung nicht über seinen Fingerabdruck gefunden – der ursprüngliche Index wird verwendet.
+Vrchol {0} se po změně modelu nenašel podle otisku a těleso ho už nemá (vrcholů: {1}) – vyberte ho znovu.	Eckpunkt {0} wurde nach der Modelländerung nicht über seinen Fingerabdruck gefunden und der Körper hat ihn nicht mehr ({1} Eckpunkte) – wählen Sie ihn erneut aus.
+Vrcholy {0} se po změně modelu nenašly podle otisku – použity původní indexy.	Eckpunkte {0} wurden nach der Modelländerung nicht über ihre Fingerabdrücke gefunden – die ursprünglichen Indizes werden verwendet.

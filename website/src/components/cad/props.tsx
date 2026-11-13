@@ -624,6 +624,7 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
     if (e.kind === "toVertex") return set({ end: { kind: "toVertex", ref: e.ref } });
     if (e.kind === "offsetFromFace") return set({ end: { kind: "offsetFromFace", ref: e.ref, d: e.d } });
     if (e.kind === "toNext") return set({ end: { kind: "toNext" } });
+    if (e.kind === "toBody") return set({ end: { kind: "toBody" } });
   };
   return (
     <>
@@ -675,7 +676,7 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
           )}
         </>
       )}
-      <ExtentField label={tr("Ukončení")} value={endExt} kinds={["blind", "throughAll", "toNext", "toFace", "toVertex", "offsetFromFace"]} defaultDistance={f.depth || 10} onChange={setEnd} />
+      <ExtentField label={tr("Ukončení")} value={endExt} kinds={["blind", "throughAll", "toNext", "toFace", "toVertex", "offsetFromFace", "toBody"]} defaultDistance={f.depth || 10} onChange={setEnd} />
       {end.kind === "blind" && <Num label={tr("Úhel špičky vrtáku")} value={f.tipAngle ?? 118} min={60} suffix="°" bind={b("tipAngle")} onChange={(v) => set({ tipAngle: Math.min(170, v) })} />}
       {!f.points?.length && <Vec label={tr("Bod na povrchu")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />}
       <RefListField label={tr("Polohy děr (více naráz)")} value={f.points ?? []} onChange={(points) => set({ points: points.length ? points : undefined })} />

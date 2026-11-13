@@ -1,0 +1,80 @@
+# DE – skica z klávesnice a podklad skici (P1-6, P2-9)
+# Skica zadaná z klávesnice: seznam souřadnic ze schránky (Ctrl+V) a dialog „Body ze seznamu“
+ Opakované body vynechány: {0}.	 Wiederholte Punkte ausgelassen: {0}.
+ Seznam má víc než {0} bodů, proto vznikla lomená čára místo jednotlivých úseček.	 Die Liste hat mehr als {0} Punkte, daher wurde eine Polylinie statt einzelner Linien erzeugt.
+Body ze seznamu souřadnic	Punkte aus Koordinatenliste
+Body ze seznamu…	Punkte aus Liste…
+Čísla po dvojicích X Y, na řádcích nebo za sebou; oddělovač mezera, středník nebo tabulátor, desetinná čárka i tečka. Body se ukotví vazbou „Pevně“.	Zahlen in X-Y-Paaren, zeilenweise oder hintereinander; Trennzeichen Leerzeichen, Semikolon oder Tabulator, Dezimalkomma oder -punkt. Die Punkte werden mit der Bedingung „Fixiert“ verankert.
+lomená čára	Polylinie
+Prohlížeč čtení schránky nedovoluje – vložte text do pole klávesami Ctrl+V.	Der Browser erlaubt kein Lesen der Zwischenablage – fügen Sie den Text mit Strg+V in das Feld ein.
+Přečten jediný bod – čára potřebuje aspoň dva.	Nur ein Punkt gelesen – eine Linie braucht mindestens zwei.
+Přečteno bodů: {0}	Gelesene Punkte: {0}
+řetěz úseček	Linienzug
+Seznam souřadnic je prázdný – čekají se čísla po dvojicích X Y.	Die Koordinatenliste ist leer – erwartet werden Zahlen in X-Y-Paaren.
+Seznam souřadnic je příliš dlouhý – nejvýše {0} bodů.	Die Koordinatenliste ist zu lang – höchstens {0} Punkte.
+Seznam souřadnic má lichý počet čísel ({0}) – čísla musí jít po dvojicích X Y.	Die Koordinatenliste hat eine ungerade Anzahl von Zahlen ({0}) – die Zahlen müssen X-Y-Paare bilden.
+souřadnice X Y ze schránky nebo psané → lomená čára, spline, úsečky	X-Y-Koordinaten aus der Zwischenablage oder getippt → Polylinie, Spline, Linien
+spline	Spline
+Ve schránce je jediný bod – čára potřebuje aspoň dva (čísla po dvojicích X Y).	In der Zwischenablage ist nur ein Punkt – eine Linie braucht mindestens zwei (Zahlen in X-Y-Paaren).
+Vložený text není seznam souřadnic – „{0}“ není číslo (čekají se čísla po dvojicích X Y).	Der eingefügte Text ist keine Koordinatenliste – „{0}“ ist keine Zahl (erwartet werden Zahlen in X-Y-Paaren).
+Vložit do skici	In Skizze einfügen
+Vložte nebo napište souřadnice.	Koordinaten einfügen oder eingeben.
+Ze schránky	Aus Zwischenablage
+Ze schránky přečteno bodů: {0} → {1} bez ukotvení (bodů je víc než {2}).	Aus der Zwischenablage gelesene Punkte: {0} → {1} ohne Verankerung (mehr als {2} Punkte).
+Ze schránky přečteno bodů: {0} → {1}, body ukotveny vazbou „Pevně“.	Aus der Zwischenablage gelesene Punkte: {0} → {1}, Punkte mit „Fixiert“ verankert.
+Ze schránky přečteno bodů: {0} → {1}, ukotvení celé křivky jednou vazbou „Pevně“.	Aus der Zwischenablage gelesene Punkte: {0} → {1}, die ganze Kurve mit einer Bedingung „Fixiert“ verankert.
+Ze schránky vložen 1 bod [{0}; {1}] – ukotven vazbou „Pevně“.	1 Punkt [{0}; {1}] aus der Zwischenablage eingefügt – mit „Fixiert“ verankert.
+
+# Podklad skici: obrázek / stránka PDF pod geometrií, kalibrace, posun, natočení, převod čar PDF na entity
+ · měřítko {0}	 · Maßstab {0}
+ · strana {0} z {1}	 · Seite {0} von {1}
+ Stránka má {0} čar – vloženo {1} nejdelších.	 Die Seite hat {0} Linien – die {1} längsten wurden eingefügt.
+Čtečku PDF se nepodařilo načíst.	Der PDF-Leser konnte nicht geladen werden.
+Druhý bod kalibrace musí ležet jinde než první.	Der zweite Kalibrierpunkt muss woanders liegen als der erste.
+jako pomocnou geometrii	als Hilfsgeometrie
+Kalibrace podkladu: druhý bod	Unterlage kalibrieren: zweiter Punkt
+Kalibrace podkladu: první bod	Unterlage kalibrieren: erster Punkt
+Kalibrovat měřítko	Maßstab kalibrieren
+Klikněte na druhý bod podkladu (Esc zruší).	Klicken Sie auf den zweiten Punkt der Unterlage (Esc bricht ab).
+Klikněte na dva body podkladu se známou vzdáleností a zadejte ji	Klicken Sie auf zwei Punkte der Unterlage mit bekanntem Abstand und geben Sie ihn ein
+Klikněte na první bod podkladu se známou vzdáleností (Esc zruší).	Klicken Sie auf den ersten Punkt der Unterlage mit bekanntem Abstand (Esc bricht ab).
+Krytí podkladu	Deckkraft der Unterlage
+Na stránce nejsou čáry delší než 0,02 mm.	Die Seite hat keine Linien länger als 0,02 mm.
+Načítám „{0}“…	Lade „{0}“…
+Načítám stranu {0}…	Lade Seite {0}…
+Natočení podkladu kolem jeho středu (kladně proti směru hodin)	Drehung der Unterlage um ihre Mitte (positiv gegen den Uhrzeigersinn)
+obrázek	Bild
+Obrázek (PNG, JPG) nebo stránka PDF pod geometrií skici – k obkreslení, s kalibrací měřítka; čáry vektorového PDF lze převést na entity. Velké obrázky se zmenší na nejvýše {0} px.	Ein Bild (PNG, JPG) oder eine PDF-Seite unter der Skizzengeometrie – zum Nachzeichnen, mit Maßstabskalibrierung; die Linien eines Vektor-PDF lassen sich in Elemente umwandeln. Große Bilder werden auf höchstens {0} px verkleinert.
+Obrázek je prázdný.	Das Bild ist leer.
+obrázek nebo stránka PDF pod skicou: obkreslení, kalibrace měřítka, převod čar PDF na entity	Bild oder PDF-Seite unter der Skizze: Nachzeichnen, Maßstabskalibrierung, PDF-Linien in Elemente umwandeln
+Obrázek se nepodařilo načíst (poškozený soubor nebo nepodporovaný formát).	Das Bild konnte nicht geladen werden (beschädigte Datei oder nicht unterstütztes Format).
+Odebrat podklad	Unterlage entfernen
+PDF je chráněné heslem – podklad z něj nelze vložit.	Das PDF ist passwortgeschützt – es kann nicht als Unterlage verwendet werden.
+PDF lze načíst jen v prohlížeči.	Ein PDF kann nur im Browser geladen werden.
+PDF se nepodařilo přečíst (poškozený soubor?).	Das PDF konnte nicht gelesen werden (beschädigte Datei?).
+Podklad může být obrázek PNG nebo JPG, nebo soubor PDF – „{0}“ není ani jedno.	Eine Unterlage kann ein PNG- oder JPG-Bild oder eine PDF-Datei sein – „{0}“ ist keines davon.
+Podklad skici	Skizzenunterlage
+Podklad vložen ({0} × {1} px). Skutečné měřítko nastavíte kalibrací dvěma body.	Unterlage eingefügt ({0} × {1} px). Den echten Maßstab stellen Sie per Kalibrierung mit zwei Punkten ein.
+Podklad zkalibrován: {0} mm mezi body, šířka podkladu {1} mm.	Unterlage kalibriert: {0} mm zwischen den Punkten, Breite der Unterlage {1} mm.
+Podklad: strana {0} z {1} ve skutečné velikosti 1:1 ({2} × {3} mm). Jiné měřítko nastavíte kalibrací dvěma body.	Unterlage: Seite {0} von {1} in Originalgröße 1:1 ({2} × {3} mm). Einen anderen Maßstab stellen Sie per Kalibrierung mit zwei Punkten ein.
+Podklad…	Unterlage…
+Posunout	Verschieben
+Prohlížeč neumí kreslit do plátna (canvas) – podklad nelze vložit.	Der Browser kann nicht auf eine Zeichenfläche (Canvas) zeichnen – die Unterlage kann nicht eingefügt werden.
+Převádím čáry PDF na entity…	Wandle PDF-Linien in Elemente um…
+Převést čáry na entity skici	Linien in Skizzenelemente umwandeln
+Skutečná vzdálenost	Echter Abstand
+Stránka	Seite
+Stránka PDF nemá vektorové čáry (je to sken nebo obrázek?) – podklad lze jen obkreslit.	Die PDF-Seite hat keine Vektorlinien (ein Scan oder Bild?) – die Unterlage lässt sich nur nachzeichnen.
+Šířka podkladu – mění měřítko kolem středu	Breite der Unterlage – ändert den Maßstab um die Mitte
+Táhněte podklad myší	Ziehen Sie die Unterlage mit der Maus
+Táhněte podklad myší; Esc nebo „Posunout“ režim ukončí.	Ziehen Sie die Unterlage mit der Maus; Esc oder „Verschieben“ beendet den Modus.
+Úsečky, oblouky a křivky stránky PDF se vloží jako entity skici v aktuálním měřítku a poloze podkladu	Linien, Bögen und Kurven der PDF-Seite werden als Skizzenelemente im aktuellen Maßstab und in der aktuellen Lage der Unterlage eingefügt
+Vložit obrázek / PDF…	Bild / PDF einfügen…
+Vyberte soubor PDF, ze kterého podklad vznikl.	Wählen Sie die PDF-Datei, aus der die Unterlage entstand.
+Vyberte znovu soubor PDF podkladu „{0}“ – dokument obsahuje jen obrázek stránky.	Wählen Sie die PDF-Datei der Unterlage „{0}“ erneut – das Dokument enthält nur ein Bild der Seite.
+Vybrané PDF nemá stránku {0} – neodpovídá podkladu.	Das gewählte PDF hat keine Seite {0} – es passt nicht zur Unterlage.
+Vybrané PDF neodpovídá podkladu (stránka {0} má jiný rozměr).	Das gewählte PDF passt nicht zur Unterlage (Seite {0} hat eine andere Größe).
+Vyměnit…	Ersetzen…
+Vzdálenost musí být kladné číslo.	Der Abstand muss eine positive Zahl sein.
+Z PDF vloženo entit: {0} (úsečky a lomené čáry {1}, oblouky a kružnice {2}, křivky {3}).	Aus dem PDF eingefügte Elemente: {0} (Linien und Polylinien {1}, Bögen und Kreise {2}, Kurven {3}).
+Zavřít panel (podklad zůstane)	Panel schließen (die Unterlage bleibt)

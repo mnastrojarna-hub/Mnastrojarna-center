@@ -21,6 +21,7 @@ import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
 import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, topAt, type AsmStatus, type EdgeLite, type FaceLite } from "@/cad/agent";
+import { applySketchOp, sketchOnPlane } from "@/cad/agent-sketch";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
 import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
@@ -38,12 +39,14 @@ import { CommandPalette, type Command } from "./command-palette";
 import { getExtUi, type ExtActionApi } from "./ext";
 import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
+import { CompareDialog, type CompareView } from "./compare-dialog";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { SettingsDialog, SHORTCUT_LABELS } from "./settings-dialog";
 import { AgentConsole } from "./agent-console";
 import { ShareDialog } from "./share-dialog";
 import { Btn, Modal as UiModal } from "./ui";
 import { StartScreen } from "./start-screen";
+import { stampFeature, usePickSigs } from "./use-pick-sigs";
 import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect";
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4 } from "./asm-flatten";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
@@ -56,6 +59,7 @@ import { RefPickContext, selToRef, useRefPickEscape, type RefPickTarget, type Wa
 import type { Ref } from "@/cad/refs";
 import { ContextMenu, Dropdown, HudBar, Ribbon, type RGroup, type RMenuEntry } from "./ribbon";
 import { Sketcher, setSketchSnap, sketchRibbon, useSketchSnaps, type SketchPatch, type SketchTool, type SketcherHandle } from "./sketcher";
+import { applySketchPatch } from "@/cad/sketch-underlay";
 import { ViewportBoundary, ViewportFallback } from "./viewport-fallback";
 import { Viewport, type AsmView, type Datum, type DatumGfx, type Gizmo, type DisplayMode, type MouseScheme, type PickMode, type Section, type ViewName, type ViewportHandle } from "./viewport";
 
@@ -155,6 +159,8 @@ export function CadApp() {
   const [bodyOpacity, setBodyOpacity] = useState(1);
   const [bomFlat, setBomFlat] = useState(true);
   const [massOpen, setMassOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [cmpView, setCmpView] = useState<CompareView | null>(null);
   const [drawingOpen, setDrawingOpen] = useState(false);
   /** úvodní obrazovka „Nový výkres“: po načtení souboru rovnou otevřít výkres */
   const drawAfterImport = useRef(false);
@@ -424,6 +430,7 @@ export function CadApp() {
     let d: CadDoc = JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc;
     let openNew = false;
     let changed = false;
+    let openDrawingAfter = false;
     /** prvky přidané tímto během – jejich výsledek (✓ / ⚠ / ✗) se vypíše až po stavbě, ne při přidání */
     const added: Feature[] = [];
     const SOLID = new Set(["extrude", "revolve", "box", "cylinder", "sphere", "cone", "tube", "import", "sweep", "loft", "spring", "thicken", "text", "ext"]);
@@ -576,12 +583,20 @@ export function CadApp() {
             log.push(tr("→ {0} ({1}) přidán – výsledek po výpočtu níže", f.name, f.type));
             break;
           }
-          case "entities": {
-            const sk = lastSketch();
-            if (!sk || sk.type !== "sketch") throw new Error(tr("není žádná skica – nejdřív „skica XY: …“"));
-            sk.entities.push(...op.entities);
+          case "entities":
+          case "constraints":
+          case "dims":
+            // entity (id e1, e2…), vazby a kóty do skici bloku; po vazbách / kótách a na konci bloku se skica vyřeší (agent-sketch.ts)
+            log.push(...applySketchOp(d.features, op));
             changed = true;
-            log.push(tr("✓ {0} {1} do skici „{2}“", op.entities.length, op.entities.length === 1 ? "entita" : op.entities.length < 5 ? "entity" : "entit", sk.name));
+            break;
+          case "sketchOn": {
+            // skica na ploše (F číslo) / pomocné rovině: otisk plochy a vyřešená rovina z jádra jako při výběru myší
+            const r = await sketchOnPlane(prepare(op.feature), op, d, { ...cad, selectFaces });
+            d.features.push(r.feature);
+            added.push(r.feature);
+            changed = true;
+            log.push(r.log);
             break;
           }
           case "body": {
@@ -623,6 +638,16 @@ export function CadApp() {
             setTimeout(() => openDrawingTabRef.current(), 400);
             log.push(tr("✓ výkres dokumentu se otevře v záložce"));
             break;
+          case "drawingCmd": {
+            // výkres: volby listu, Chytré kóty, tolerance, stav (cad/drawing-agent.ts – výkres se počítá v jádře)
+            const { applyDrawingCmd } = await import("@/cad/drawing-agent");
+            const r = await applyDrawingCmd(d, op.cmd, (doc, meta, o) => cad.drawing(doc, meta, o));
+            d = r.doc;
+            changed = changed || r.changed;
+            openDrawingAfter = openDrawingAfter || r.open;
+            log.push(...r.log);
+            break;
+          }
           case "select": {
             const f = prepare(op.feature);
             const t = await topology(f.body);
@@ -646,8 +671,9 @@ export function CadApp() {
               f.faces = idx;
               log.push(tr("→ {0} (shell) – otevřeno ploch: {1} – výsledek po výpočtu níže", f.name, idx.length));
             } else throw new Error(tr("pravidlo výběru podporují zaoblení, sražení a skořepina"));
-            d.features.push(f);
-            added.push(f);
+            const stamped = await stampFeature(f.body ? { ...d, activeBody: f.body } : d, f); // otisky vybraných entit (přežijí přečíslování)
+            d.features.push(stamped);
+            added.push(stamped);
             changed = true;
             break;
           }
@@ -697,6 +723,7 @@ export function CadApp() {
       setStartOpen(false);
       track("cad_agent_run");
     }
+    if (openDrawingAfter) setTimeout(() => openDrawingTabRef.current(), 400);
     if (res) {
       // výsledek až po výpočtu: ✓ = platné těleso a operace se projevila, ⚠ = zpracováno s výhradou, ✗ = selhalo; u delších prvků čas výpočtu
       const st = new Map(res.status.map((s) => [s.id, s]));
@@ -845,6 +872,7 @@ export function CadApp() {
       getDocument: () => JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc,
       setDocument: (doc) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc)),
       status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current()),
+      drawingStatus: async () => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, o) => cad.drawing(doc, meta, o))).text,
       openConsole: () => setAgentOpen(true),
       progress: () => {
         const p = cad.progress();
@@ -915,6 +943,7 @@ export function CadApp() {
   const active = doc.features.find((f) => f.id === activeId) ?? null;
   const activeIndex = active ? doc.features.indexOf(active) : -1;
   const rollback = !!active && (PICK_TYPES.has(active.type) || (active.type === "ext" && !!getExt(active.ext)?.rollback));
+  usePickSigs(doc, activeId, liveWith); // otisky vybraných hran/ploch upravovaného prvku (přežijí přečíslování po změně historie)
   const buildDocView = useMemo<CadDoc>(() => {
     if (sketchId) {
       const i = doc.features.findIndex((f) => f.id === sketchId);
@@ -2300,7 +2329,7 @@ export function CadApp() {
   const setSketchPatch = useCallback(
     (patch: SketchPatch, record = true) => {
       if (!sketchId) return;
-      const next = { ...doc, features: doc.features.map((f) => (f.id === sketchId ? ({ ...f, ...patch } as Feature) : f)) };
+      const next = applySketchPatch(doc, sketchId, patch); // podklad skici jde do doc.underlays, ne do prvku
       (record ? commit : live)(next);
     },
     [doc, sketchId, commit, live],
@@ -2614,6 +2643,7 @@ export function CadApp() {
           },
           { id: "mass", label: tr("Hmotnost"), icon: "mass", tone: "tool", disabled: !hasBody, onClick: () => setMassOpen(true), hint: tr("objem, plocha, hmotnost") },
           { id: "section", label: tr("Řez"), icon: "section", tone: "tool", kbd: "X", active: !!section, disabled: !hasBody, onClick: toggleSection },
+          { id: "compare", label: tr("Porovnat s referencí"), icon: "xray", tone: "tool", active: compareOpen, disabled: isAsm || !hasBody, onClick: () => setCompareOpen((v) => !v), hint: tr("odchylky od modelu zákazníka (STEP): objemy, chybějící prvky, barevná mapa") },
         ],
       },
       {
@@ -3173,7 +3203,7 @@ export function CadApp() {
                   ref={vp}
                   onRenderError={setGlError}
                   hints={hintsOn}
-                  mesh={result?.mesh ?? null}
+                  mesh={cmpView?.mesh ?? result?.mesh ?? null}
                   sketches={sketchesForView}
                   datums={datums}
                   datumGfx={datumGfx}
@@ -3200,7 +3230,8 @@ export function CadApp() {
                   section={section}
                   bodyColor={doc.color}
                   mouse={prefs.mouse}
-                  vertexColors={vertexColors}
+                  vertexColors={cmpView?.colors ?? vertexColors}
+                  ghosts={cmpView?.ghosts}
                   surface={surface.mode === "zebra" ? "zebra" : "none"}
                   showGrid={showGrid}
                   assembly={isAsm ? asmViews : undefined}
@@ -3220,7 +3251,7 @@ export function CadApp() {
             )}
             {sketch && (
               <>
-                <Sketcher ref={sk} key={sketch.id} hints={hintsOn} sketch={sketch} onChange={setSketchPatch} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} setSnapGrid={setSnapGrid} onFinish={finishSketch} modelLines={result?.mesh?.lines ?? null} />
+                <Sketcher ref={sk} key={sketch.id} underlay={doc.underlays?.[sketch.id]} hints={hintsOn} sketch={sketch} onChange={setSketchPatch} selected={sketchSel} onSelect={setSketchSel} tool={tool} setTool={setTool} snapGrid={snapGrid} setSnapGrid={setSnapGrid} onFinish={finishSketch} modelLines={result?.mesh?.lines ?? null} />
                 <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded bg-[#2563eb] px-3 py-1 font-mono text-[11px] uppercase tracking-widest text-white shadow-lg">{tr("Skica ·")}{" "}{planeLabel(sketch.plane)}</div>
               </>
             )}
@@ -3375,6 +3406,7 @@ export function CadApp() {
                 }}
               />
             )}
+            {compareOpen && !isAsm && <CompareDialog doc={buildDocView} vp={vp} onView={setCmpView} onClose={() => setCompareOpen(false)} />}
             {isAsm && explode > 0 && (
               <FloatPanel title={tr("Rozložený pohled")} icon="transform" onClose={() => setExplode(0)}>
                 <input type="range" min={0} max={3} step={0.05} value={explode} onChange={(e) => setExplode(Number(e.target.value))} className="w-full accent-[#E03930]" />

@@ -43,6 +43,8 @@ export type AsmView = {
   clash?: boolean;
   opacity?: number;
 };
+/** Průhledné pomocné těleso jen k zobrazení (referenční model, rozdílová oblast při porovnání) – nejde vybrat; `xray` = kreslí se i skrz model. */
+export type Ghost = { key: string; vertices: Float32Array; normals?: Float32Array | null; triangles: Uint32Array; color: string; opacity: number; xray?: boolean };
 /** Gizmo pro přesun/otočení (TransformControls). `matrix` = výchozí poloha úchopu (po sloupcích). */
 export type Gizmo = { id: string; matrix: number[]; mode: "translate" | "rotate"; targets: string[] } | null;
 
@@ -56,6 +58,8 @@ export type ViewportHandle = {
   fit: () => void;
   snapshot: () => string | null;
   bounds: () => { center: Vec3; radius: number };
+  /** přiblíží pohled na kouli (střed, poloměr) při zachování směru pohledu */
+  focus: (center: Vec3, radius: number) => void;
 };
 
 type Props = {
@@ -87,6 +91,8 @@ type Props = {
   faceColors?: Record<number, string>;
   /** barvy vrcholů (RGB po trojicích, délka = vertices.length) – např. analýza úkosů; přebije barvy ploch */
   vertexColors?: Float32Array | null;
+  /** průhledná pomocná tělesa (porovnání s referenčním modelem) */
+  ghosts?: Ghost[] | null;
   /** zebra pruhy pro kontrolu hladkosti/návaznosti ploch */
   surface?: SurfaceAnalysis;
   bodyOpacity?: number;
@@ -1317,6 +1323,36 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     s.render();
   }, [props.measure]);
 
+  // ---------- průhledná pomocná tělesa (porovnání s referencí) ----------
+  useEffect(() => {
+    const s = S.current;
+    if (!s) return;
+    let grp = s.scene.getObjectByName("ghosts") as THREE.Group | undefined;
+    if (!grp) {
+      if (!props.ghosts?.length) return;
+      grp = new THREE.Group();
+      grp.name = "ghosts";
+      s.scene.add(grp);
+    }
+    for (const o of [...grp.children] as THREE.Mesh[]) {
+      grp.remove(o);
+      o.geometry.dispose();
+      (o.material as THREE.Material).dispose();
+    }
+    for (const g of props.ghosts ?? []) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(g.vertices, 3));
+      geo.setIndex(new THREE.BufferAttribute(g.triangles, 1));
+      if (g.normals && g.normals.length === g.vertices.length) geo.setAttribute("normal", new THREE.BufferAttribute(g.normals, 3));
+      else geo.computeVertexNormals();
+      const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: g.color, transparent: true, opacity: g.opacity, depthWrite: false, depthTest: !g.xray, side: THREE.DoubleSide, metalness: 0, roughness: 0.75 }));
+      mesh.renderOrder = g.xray ? 20 : 5;
+      mesh.userData.ghost = g.key;
+      grp.add(mesh);
+    }
+    s.render();
+  }, [props.ghosts]);
+
   useEffect(paint, [props.selectedEdges, props.selectedFaces, props.pickMode]); // eslint-disable-line react-hooks/exhaustive-deps
   const selKeyStr = (props.selection ?? []).map((x) => JSON.stringify(x)).join("|");
   useEffect(drawHilite, [selKeyStr, props.assembly]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1493,6 +1529,24 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     bounds: () => {
       const s = S.current;
       return { center: s ? [s.center.x, s.center.y, s.center.z] : [0, 0, 0], radius: s?.radius ?? 100 };
+    },
+    focus: (center: Vec3, radius: number) => {
+      const s = S.current;
+      if (!s) return;
+      const c = new THREE.Vector3(...center);
+      const dir = s.camera.position.clone().sub(s.controls.target).normalize();
+      const dist = (Math.max(radius, s.radius / 100) / Math.sin((s.persp.fov * Math.PI) / 360)) * 1.12;
+      s.persp.position.copy(c).addScaledVector(dir, dist);
+      s.persp.near = dist / 500;
+      s.persp.far = Math.max(dist * 50, s.radius * 100);
+      s.persp.updateProjectionMatrix();
+      s.orthoCam.position.copy(s.persp.position);
+      s.orthoCam.zoom = 1;
+      s.orthoCam.updateProjectionMatrix();
+      s.controls.target.copy(c);
+      updateOrthoFrustum();
+      s.controls.update();
+      s.render();
     },
   }));
 

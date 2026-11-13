@@ -11,6 +11,8 @@ const SHOW_AFTER_MS = 800;
 
 /** popis běžící operace pro ukazatel i automatizaci */
 export function progressLabel(p: CadProgress): string {
+  if (p.op === "compare" && p.phase === "feature" && p.type === undefined && p.id === undefined) return tr("Porovnání {0}/{1}: {2}", p.index + 1, p.total, p.name ?? "");
+  if (p.op === "compare" && p.phase === "start") return tr("Porovnávám s referenčním modelem…");
   if (p.phase === "feature") return tr("Počítám prvek {0}/{1}: {2}", p.index + 1, p.total, p.name ?? "");
   if (p.phase === "mesh") return tr("Počítám síť modelu…");
   if (p.op === "drawing") return tr("Počítám pohledy výkresu…");
