@@ -7,8 +7,9 @@
 //     výkresů a + Výkres; Ctrl+Z hned po + Výkres vrátí jen nový výkres.
 //  16 Skica › Import DXF… přidá entity do OTEVŘENÉ skice (dialog: jednotky, posun, hladiny), Ctrl+Z vrátí; žádná nová záložka;
 //     Esc zavře dialog prvním stiskem.
-//  17 Export výkresu s více listy: volba Listy k exportu (výchozí všechny), PDF vícestránkové, DXF ZIP, Tisk všech listů;
-//     text `výkres export pdf vše` a window.mncad.exportDrawing("pdf", { sheet: "all" }); název souboru s názvem výkresu.
+//  17 Export výkresu s více listy: volba Listy k exportu (výchozí všechny), PDF vícestránkové, DXF ZIP, Tisk všech listů
+//     (v automatizaci = PDF všech listů ke stažení, bez dialogu tisku); text `výkres export pdf vše` (protokol výstupů
+//     konzole) a window.mncad.exportDrawing("pdf", { sheet: "all" }); název souboru s názvem výkresu.
 // Spuštění: E2E_BASE=http://localhost:3402 node e2e/cad-w13-docs.e2e.cjs <složka> [soubor.dxf]   (ONLY=13,13b,14,15,15a,16,17)
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -255,11 +256,15 @@ const zipNames = (buf) => { const out = []; for (let i = 0; i + 46 < buf.length;
       f = await dl;
       buf = fs.readFileSync(await f.path());
       ok(f.suggestedFilename() === 'Hridel_Vykres_2_vykres_dxf_listy.zip' && zipNames(buf).join() === 'Hridel_Vykres_2_list1_List_1.dxf,Hridel_Vykres_2_list2_List_2.dxf', `17: DXF všech listů → ${f.suggestedFilename()} ${JSON.stringify(zipNames(buf))}`);
-      // tisk: jedna stránka na list (tisk prohlížeče se v testu zachytí)
-      await p.evaluate(() => { window.__printed = null; new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => { if (n.tagName === 'IFRAME') n.contentWindow.print = () => { window.__printed = n.contentDocument.body.getAttribute('data-print-pages'); }; }))).observe(document.body, { childList: true }); });
+      // tisk: Playwright = automatizace (navigator.webdriver, lib/automation.ts) → Tisk neotevře dialog tisku (skrytý rámec
+      // s print()), ale stáhne PDF všech listů aktivního výkresu (jedna stránka na list) – stejný soubor jako tlačítko PDF
+      await p.evaluate(() => { window.__frames = 0; new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => { if (n.nodeName === 'IFRAME') window.__frames++; }))).observe(document.body, { childList: true }); });
+      dl = p.waitForEvent('download', { timeout: 120000 });
       await p.getByRole('button', { name: 'Tisk', exact: true }).click();
-      await p.waitForFunction(() => window.__printed, null, { timeout: 120000 }).catch(() => {});
-      ok((await p.evaluate(() => window.__printed)) === '2', '17: Tisk všech listů → stránek ' + (await p.evaluate(() => window.__printed)));
+      f = await dl.catch(() => null);
+      buf = f ? fs.readFileSync(await f.path()) : Buffer.alloc(0);
+      const frames = await p.evaluate(() => window.__frames);
+      ok(f && f.suggestedFilename() === 'Hridel_Vykres_2_vykres.pdf' && pdfPages(buf) === 2 && frames === 0, `17: Tisk všech listů (automatizace) → PDF ${f && f.suggestedFilename()}, stran ${pdfPages(buf)}, tiskových rámců ${frames}`);
       await p.selectOption('[data-export-sheets]', 'active'); await p.waitForTimeout(300);
       dl = p.waitForEvent('download', { timeout: 120000 });
       await p.getByRole('button', { name: 'DXF', exact: true }).click();
@@ -269,10 +274,13 @@ const zipNames = (buf) => { const out = []; for (let i = 0; i + 46 < buf.length;
       // API a text
       const api = await p.evaluate(async () => { const r = await window.mncad.exportDrawing('pdf', { sheet: 'all' }); return { name: r.name, sheets: r.sheets, pages: (atob(r.base64).match(/\/Type \/Page\b(?!s)/g) || []).length }; });
       ok(api.sheets === 2 && api.pages === 2, '17: exportDrawing("pdf", { sheet: "all" }) ' + JSON.stringify(api));
+      // text: výstupní příkazy konzole (cad/agent-out.ts, agent-out-host.ts) – všechny listy jedním souborem jako v GUI,
+      // protokol „✓ výkres PDF, listů 2: <soubor> · <velikost> · výkres PDF – staženo (bez dialogu)“
       dl = p.waitForEvent('download', { timeout: 120000 });
       const log = await run(p, 'výkres export pdf vše');
       f = await dl.catch(() => null);
-      ok(/✓ výkres export PDF: Hridel_Vykres_2_vykres\.pdf \(\d+ kB, listů 2\)/.test(log) && f && f.suggestedFilename() === 'Hridel_Vykres_2_vykres.pdf', '17: text výkres export pdf vše → ' + ((log.match(/✓ výkres export[^\n]*/) || [''])[0]) + ' · stažení ' + (f && f.suggestedFilename()));
+      const txtPages = f ? pdfPages(fs.readFileSync(await f.path())) : 0;
+      ok(/✓ výkres PDF, listů 2: Hridel_Vykres_2_vykres\.pdf · [\d\s,.]+ (B|kB|MB) · výkres PDF – staženo \(bez dialogu\)/.test(log) && f && f.suggestedFilename() === 'Hridel_Vykres_2_vykres.pdf' && txtPages === 2, '17: text výkres export pdf vše → ' + ((log.match(/✓ výkres[^\n]*/) || [''])[0]) + ' · stažení ' + (f && f.suggestedFilename()) + `, stran ${txtPages}`);
       // jiný výkres téhož dílu = jiný soubor (nepřepíše export Výkresu 2)
       await p.selectOption('[data-drawing-select]', ''); await p.waitForTimeout(4000);
       dl = p.waitForEvent('download', { timeout: 120000 });

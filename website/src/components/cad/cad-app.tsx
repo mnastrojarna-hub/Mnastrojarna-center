@@ -3,7 +3,7 @@
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { Interference } from "@/cad/asm-kernel";
 import { apply3, boltStack, bomCsv, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
@@ -2688,7 +2688,20 @@ export function CadApp() {
   const view = (v: ViewName) => vp.current?.setView(v);
 
   // ---------- klávesy ----------
+  // Posluchač je na okně jeden stálý (zaregistrovaný při připojení) a aktuální obsluhu čte přes ref – jako výkres
+  // (drawing-workspace.tsx) a Modal (ui.tsx). Dřív se odregistroval a znovu zaregistroval po každém vykreslení: když
+  // stejnou klávesu dřív obsloužil posluchač podřízené komponenty (Esc v kontextové nabídce = setCtx(null)), aplikace se
+  // ještě během téže klávesy překreslila, její posluchač se odebral a ten nový už prohlížeč pro tuto událost nevolá – Esc
+  // pak jen zavřel nabídku a výběr ve stromu zůstal (další klik na řádek ho zrušil). V produkčním buildu je nabídka
+  // před aplikací vždy (efekty potomků běží dřív); ve vývojovém režimu StrictMode efekty nabídky zopakuje a pořadí obrátí.
+  const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => onKeyRef.current(e);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  // obsluha s aktuálním stavem: v layout efektu, tj. hned při zápisu vykreslení – platí i pro překreslení během téže klávesy
+  useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (askBusy()) return; // otevřený dotaz na stránce (potvrzení…) blokuje zkratky jako systémové okno – druhé Delete nepoloží druhý dotaz
       const field = (e.target as HTMLElement)?.closest?.("input,textarea,select") as HTMLElement | null;
@@ -2798,8 +2811,7 @@ export function CadApp() {
       if (k === "g" && isAsm && asmSel) (gizmoOn ? setGizmoOn(null) : startCompGizmo(asmSel)); // stejná kontrola ukotvení jako tlačítko
       if (k === "r" && gizmoOn) setGizmoOn({ ...gizmoOn, mode: gizmoOn.mode === "translate" ? "rotate" : "translate" });
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    onKeyRef.current = onKey;
   });
 
   const sketch = doc.features.find((f) => f.id === sketchId) as Extract<Feature, { type: "sketch" }> | undefined;
