@@ -21,6 +21,21 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 19:45 | Dokumentace 2. kolo hotová a nanesena na větev (vlna 15, převodník, vlna 17; `S/w18/docs2.patch`). Do PR půjde spolu s opravami e2e po doběhnutí průchodu a ověření na novém buildu. Agent dokumentace zjistil 2 mezery → úkol E6 a E7. |
 | 14. 11. 19:55 | NOVÝ požadavek majitele: výběr myší oknem (více prvků naráz) ve 3D i 2D → vlna 20 (kapitola 7b). Spuštěn workflow `wf_533a7c7c-a4a` (balíky `3d` a `2d` souběžně, každý implementace → kontrola → opravy), základ `210a1e8`, zadání `S/w20/brief.md`. Průchod e2e: 35/49, dosud jen zastaralá očekávání (`cad-big-step` – vkládání do sestavy přes vstup Vložit – opraveno). |
 | 14. 11. 19:49 | **Sloučeno PR #98** (`12e7108`): dokumentace 2. kolo + oprava 6 zastaralých e2e + návod „Příklad F“. Úplný průchod 49 e2e sad hotov: žádná chyba v CADu; po opravě všech 6 sad zelených, `cad-w9-core` 2× zelený (závod výběru ve 2D se neopakuje – follow-up uzavřen, pravděpodobně vyřešeno čekáním na usazení UI z vlny 15). Běží workflow: B akceptace (`w14-b6`), B integrace (`w14-int2`), kola (`w19:core`), výběr oknem (`w20-3d`, `w20-2d`). |
+| 14. 11. 19:58 | **POZASTAVENO na přání majitele** (šetří se limit; majitel teď sám nasadí `main` a testuje). Zastaveny všechny 4 workflow a jejich procesy. Statický export `npm run build:ftp` na `main` (`12e7108`) ověřen: prošel. Postup obnovení viz kapitola 0a. |
+
+## 0a. Obnovení po pozastavení (14. 11. 19:58)
+
+Stav zastavené práce (nic není ztraceno – rozpracované soubory zůstaly ve worktree a jsou zálohované ve scratchpadu):
+
+| Úkol | Workflow | Kde to stojí | Obnovení |
+| --- | --- | --- | --- |
+| B – fáze B, akceptace | `wf_0a444c37-b25` | `w14-b6` commit `7a77f53` (brána hotovosti hotová); stála kontrola `verify:acceptance` | `Workflow({ scriptPath: ".../cad-wave14-phase-b-wf_0a444c37-b25.js", resumeFromRunId: "wf_0a444c37-b25" })` – hotoví agenti se vrátí z mezipaměti, znovu poběží jen kontrola a opravy |
+| B – převzetí na main | `wf_d020a109-e6f` | `w14-int2`: patch nanesen, konflikty bez značek, NEcommitnuto, testy neproběhly; záloha `S/w14/int2/wip-snapshot.patch` (proti `4ceb0e7`) | obnov `resumeFromRunId: "wf_d020a109-e6f"`; agent integrace začne znovu – řekni mu (do zadání `S/w14/int2/brief.md` přidej odstavec), že worktree už existuje a rozpracovaný stav je v něm / v záloze |
+| F – kola | `wf_a5f62aa9-09a` | návrh `S/w19/NAVRH.md` hotový; `w19-core` jen začátek (9 souborů), záloha `S/w19/core-wip-snapshot.patch` | `resumeFromRunId: "wf_a5f62aa9-09a"` (návrh z mezipaměti) |
+| G – výběr oknem | `wf_533a7c7c-a4a` | `w20-3d`, `w20-2d`: hotový jen rozbor dnešních chyb (`S/w20/repro-3d-base.txt`, `S/w20/2d-repro-notes.txt`) | `resumeFromRunId: "wf_533a7c7c-a4a"` |
+
+Před obnovením: zkontroluj paměť a disk (pravidlo 7), spouštěj nejvýš 2 workflow naráz (stroj má 4 CPU) – pořadí B → G → F.
+Hlášení majitele z jeho testování nasazené verze má přednost: každou chybu nejdřív zopakuj, pak oprav (malá vlna s testem).
 
 ## 0. Pevná pravidla (platí pořád)
 
