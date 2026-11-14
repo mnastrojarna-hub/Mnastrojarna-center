@@ -283,7 +283,6 @@ WebGL je dostupné ({0}), ale 3D vykreslování se nepodařilo spustit: {1}. Mů
 
 # jádro
 Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.	The feature did not change the body (volume and face count stayed the same) – the tool does not overlap the body, lies outside it, or the kernel operation failed. Check the position and dimensions.
-Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.	The result has invalid geometry (self-intersecting or non-orientable faces) – STEP export may fail. Change the parameters: the profile must not be tangent to the body surface, the path must not self-intersect.
 Cyklická závislost: {0}	Cyclic dependency: {0}
 Neplatný název proměnné (písmena, číslice, podtržítko; nesmí začínat číslicí).	Invalid variable name (letters, digits, underscore; must not start with a digit).
 Proměnná je definovaná vícekrát.	The variable is defined more than once.

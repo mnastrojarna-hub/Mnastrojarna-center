@@ -7,7 +7,8 @@ import * as r from "replicad";
 import { DEFAULT_BODY, isNewBodyMode, nextBodyName } from "./bodies";
 import "./fastbox";
 import { MESH_ANGULAR, meshTolerance } from "./fastbool";
-import { checkShape, describeCheck, sameSignature, signatureOf, tryFixShape, type ShapeSignature } from "./check";
+import { checkShape, describeCheck, sameSignature, signatureOf, type ShapeSignature } from "./check";
+import { carryHealth, flagInvalidBody, invalidSince, verifyResult } from "./shape-health";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
 import { getExt } from "./ext/index";
 import "./feat/index";
@@ -805,12 +806,12 @@ export function clearBuildCache() {
 /** vstupy na úrovni dokumentu, které mohou ovlivnit geometrii prvků */
 const docKeyOf = (d: CadDoc) => JSON.stringify([d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null, d.material, d.kind ?? "part"]);
 /** Tělesa po jednotlivých prvcích z mezipaměti stavby celého dokumentu (jen ke čtení; filtr výběru Prvek – face-owner.ts). */
-export function cachedSteps(input: CadDoc): { n: number; shapes: Shape[] }[] {
+export function cachedSteps(input: CadDoc): { n: number; shapes: Shape[]; status: FeatureStatus[] }[] {
   const { doc } = resolveDoc(input);
   const docKey = docKeyOf(doc);
   const keys = doc.features.map((f) => JSON.stringify(f));
   const c = chains.find((x) => x.docKey === docKey && x.keys.length === keys.length && x.keys.every((k, i) => k === keys[i]));
-  return (c?.points ?? []).map((p) => ({ n: p.n, shapes: [p.body, ...p.others.map(([, s]) => s)].filter((s): s is Shape => !!s) }));
+  return (c?.points ?? []).map((p) => ({ n: p.n, shapes: [p.body, ...p.others.map(([, s]) => s)].filter((s): s is Shape => !!s), status: p.status }));
 }
 
 /**
@@ -859,7 +860,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
       status.push({ id: f.id, ok: true });
       return next;
     }
-    const sig = signatureOf(next);
+    let sig = signatureOf(next);
     let warning: string | undefined;
     if (body && expectsChange(f) && sameSignature(bodySig, sig)) {
       if (f.type === "shell") throw new Error(tr("Skořepinu se nepodařilo vytvořit – jádro vrátilo těleso beze změny. Otevřete jen rovinné plochy (zaoblené plochy jádro otevřít neumí); u zaoblených hran musí být tloušťka stěny menší než poloměr zaoblení, nebo zaoblete až po skořepině."));
@@ -867,17 +868,16 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     }
     // platnost výsledku: jen u prvků, které mění těleso (jinak by se kontrola opakovala zbytečně); velká tělesa se kontrolují až na konci
     if (expectsChange(f) && sig && sig.faces <= 400) {
-      let chk = checkShape(next);
-      if (body && bodySig && !chk.solids && bodySig.faces > 0) throw new Error(tr("Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).", describeCheck(chk)));
-      if (!chk.valid) {
-        const fixed = tryFixShape(next);
-        if (fixed) {
-          next = fixed;
-          chk = checkShape(next);
-        }
+      // síť jako pro zobrazení + kontrola; výsledek s příznakem vady: operace znovu s tolerancí, pak oprava tělesa (shape-health.ts)
+      const v = verifyResult(next, f, body && bodySig ? [bodySig.volume, sig.volume] : undefined, invalidSince(body));
+      if (body && bodySig && !v.check.solids && bodySig.faces > 0) throw new Error(tr("Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).", describeCheck(v.check)));
+      if (v.shape !== next) {
+        next = v.shape;
+        sig = signatureOf(next) ?? sig;
+        warning = undefined; // opravená operace se projevila
       }
-      if (!chk.valid) warning = (warning ? warning + " " : "") + tr("Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.");
-    }
+      if (v.warning && !(v.noEffect && warning)) warning = (warning ? warning + " " : "") + v.warning;
+    } else carryHealth(body, next); // bez kontroly: těleso neplatné už před prvkem takové zůstává
     bodySig = sig;
     const notes = takeFeatureNotes(); // přiblížení / nedosažená návaznost ohlášené stavitelem (feature-notes.ts)
     notes.push(profileNote(f, sketches, false)); // vada profilu skici (křížení, mezera, překryv…) – profile-check.ts
@@ -908,9 +908,9 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     mine = { docKey, keys, points: best ? best.points.filter((p) => p.n <= bestLen) : [], used: ++chainClock };
     if (cp) {
       start = cp.n;
-      body = cp.body ? (cp.body.clone() as Shape) : null;
+      body = cp.body ? carryHealth(cp.body, cp.body.clone() as Shape) : null;
       bodySig = cp.bodySig;
-      for (const [k, v] of cp.others) others.set(k, v.clone() as Shape);
+      for (const [k, v] of cp.others) others.set(k, carryHealth(v, v.clone() as Shape));
       activeName = cp.activeName;
       for (const [k, v] of cp.sketches) sketches.set(k, v);
       for (const [k, v] of cp.tools) tools.set(k, { tool: v.tool.clone() as Shape, mode: v.mode });
@@ -931,9 +931,9 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     mine.points.push({
       n,
       ms,
-      body: body ? (body.clone() as Shape) : null,
+      body: body ? carryHealth(body, body.clone() as Shape) : null,
       bodySig,
-      others: [...others].map(([k, v]) => [k, v.clone() as Shape]),
+      others: [...others].map(([k, v]) => [k, carryHealth(v, v.clone() as Shape)]),
       activeName,
       sketches: [...sketches],
       tools: [...tools].map(([k, v]) => [k, { tool: v.tool.clone() as Shape, mode: v.mode }]),
@@ -1292,6 +1292,8 @@ export async function buildDoc(doc: CadDoc, opts: { tolerance?: number; onProgre
   const { body, status, paramErrors, resolved, bodies } = await buildShape(doc, Infinity, { preferActive: true, onProgress: opts.onProgress });
   opts.onProgress?.({ index: doc.features.length, total: doc.features.length, phase: "mesh" });
   const sr = shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance, light: opts.light });
+  // neplatné těleso, které žádný prvek nehlásí (velká tělesa se po prvcích nekontrolují) → varování prvku, u kterého vada vznikla
+  if (sr.metrics?.valid === false) flagInvalidBody(doc.features, status, cachedSteps(doc));
   const res: DocResult = { ...sr, resolved, bodies: bodyInfos(bodies, bodies.length === 1 ? sr.metrics?.volume : undefined) };
   if (!missingBlobs(doc).length) lastDocResult = { key, res: copyDocResult(res) };
   return res;

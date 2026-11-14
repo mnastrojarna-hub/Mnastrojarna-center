@@ -283,7 +283,6 @@ WebGL je dostupné ({0}), ale 3D vykreslování se nepodařilo spustit: {1}. Mů
 
 # jádro
 Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.	Das Feature hat den Körper nicht verändert (Volumen und Flächenzahl blieben gleich) – das Werkzeug überlappt den Körper nicht, liegt außerhalb, oder die Kernoperation ist fehlgeschlagen. Prüfen Sie Position und Maße.
-Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat. Změňte parametry: profil nesmí být tečný k povrchu tělesa, dráha se nesmí protínat.	Das Ergebnis hat eine ungültige Geometrie (selbstschneidende oder nicht orientierbare Flächen) – der STEP-Export kann fehlschlagen. Ändern Sie die Parameter: das Profil darf nicht tangential zur Körperoberfläche sein, der Pfad darf sich nicht selbst schneiden.
 Cyklická závislost: {0}	Zyklische Abhängigkeit: {0}
 Neplatný název proměnné (písmena, číslice, podtržítko; nesmí začínat číslicí).	Ungültiger Variablenname (Buchstaben, Ziffern, Unterstrich; darf nicht mit einer Ziffer beginnen).
 Proměnná je definovaná vícekrát.	Die Variable ist mehrfach definiert.

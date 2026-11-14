@@ -37,19 +37,106 @@ function atLeastFaces(oc: OC, wrapped: unknown, n: number): boolean {
 export const meshTolerance = (diag: number) => Math.max(0.01, (diag || 100) / 2000);
 export const MESH_ANGULAR = 0.2;
 
+/** s jakou jemností už těleso síť má (tvary se po vzniku nemění) – opakovaný průchod všemi plochami se pak vynechá */
+const meshedAt = new WeakMap<object, number>();
+/** Zasíťuje těleso stejně jako zobrazení (jen plochy, které síť ještě nemají). */
+export function meshShape(shape: Shape) {
+  const oc: OC = r.getOC();
+  const tolerance = meshTolerance(sizeOf(shape));
+  if (meshedAt.get(shape) === tolerance) return;
+  const m = new oc.BRepMesh_IncrementalMesh(shape.wrapped, tolerance, false, MESH_ANGULAR, false);
+  m.delete();
+  meshedAt.set(shape, tolerance);
+}
+/**
+ * Má každá plocha tělesa síť a každá hrana lomenou čáru? Po průchodu sítě to neplatí jen u vadných ploch (sebeprotínající
+ * obrys) – zobrazení je pak zkusí zasíťovat znovu jinou cestou a teprve po tomto druhém průchodu je stav tělesa konečný.
+ */
+export function meshComplete(shape: Shape): boolean {
+  const oc: OC = r.getOC();
+  try {
+    return !!oc.BRepTools.Triangulation(shape.wrapped, 1e9, false);
+  } catch {
+    return true;
+  }
+}
+/** Další průchod sítě týmž nastavením (to, co s tělesem udělá zobrazení): doplní plochy, které v prvním průchodu síť nedostaly. */
+export function remeshShape(shape: Shape) {
+  const oc: OC = r.getOC();
+  const m = new oc.BRepMesh_IncrementalMesh(shape.wrapped, meshTolerance(sizeOf(shape)), false, MESH_ANGULAR, false);
+  m.delete();
+}
+
 /** Zasíťuje těleso (jen plochy, které síť ještě nemají) – kvůli těsným obálkám ploch v booleovské operaci. */
 export function premesh(shape: Shape) {
   const oc: OC = r.getOC();
   try {
     if (!atLeastFaces(oc, shape.wrapped, PREMESH_MIN_FACES)) return;
-    const m = new oc.BRepMesh_IncrementalMesh(shape.wrapped, meshTolerance(sizeOf(shape)), false, MESH_ANGULAR, false);
-    m.delete();
+    meshShape(shape);
   } catch {
     /* síť je jen urychlení – operace proběhne i bez ní */
   }
 }
 
-function run(kind: "Cut" | "Fuse" | "Common", a: Shape, b: Shape | Shape[], { optimisation = "none", simplify = true }: BoolOpts = {}): Shape {
+/**
+ * Tolerance modelu (mm) pro OPAKOVANOU booleovskou operaci: 1e-7 × úhlopříčka, nejméně 1e-5 a nejvýš 1e-4 mm. Jádro samo
+ * počítá přesně (1e-7 mm) a tak běží každá operace napoprvé – stejně jako dřív. Tolerance se použije, až když přesný výsledek
+ * nese příznak vady (shape-health.ts): souřadnice zadané na 5–6 desetinných míst a směrové vektory rovin na 6 míst se od
+ * „stejné“ plochy tělesa liší o 1e-5 mm i víc a u tečných a souběžných ploch z toho vznikají zbytky, vrcholy s tolerancí
+ * tisíckrát větší nebo se operace neprovede vůbec (střižnice se zadním odlehčením: klín tečný ke kuželu).
+ *
+ * Proč ne tolerance u každé operace: plochy bližší než tolerance jádro spojí, i když totožné být nemají. Dvě díry, které se
+ * překrývají o 1e-5 mm, se protínají ve dvou přímkách 0,014 mm od sebe – s tolerancí z nich je jedna hrana s tolerancí
+ * vrcholu 0,007 mm, neplatné těleso a síť, která se počítá minuty. Kanál, který prorazí plochu o 1e-5 mm, se uzavře (chybí
+ * 2,4 mm³ a export STEP dá dvě tělesa). Ramena zkrutné pružiny se s tolerancí nespojí se závity.
+ */
+export const baseFuzzy = (size: number) => Math.min(1e-4, Math.max(1e-5, (size || 100) * 1e-7));
+const exact = () => 0;
+let tolerance: (size: number) => number = exact;
+/**
+ * Pravidlo tolerance PRVNÍHO pokusu každé operace (mm); výchozí je 0 = přesné jádro. Jen pro měření a testy (např. `baseFuzzy`
+ * = tolerance u každé operace); `null` vrátí výchozí. Vrací předchozí pravidlo.
+ */
+export function setBooleanTolerance(rule: ((size: number) => number) | null): (size: number) => number {
+  const before = tolerance;
+  tolerance = rule ?? exact;
+  return before;
+}
+
+/** druh booleovské operace */
+export type BoolKind = "Cut" | "Fuse" | "Common";
+/**
+ * Kontrola výsledku každé operace (shape-health.ts): dostane výsledek (`null`, když přesná operace skončila chybou jádra)
+ * a operaci (druh, původní těleso, nástroje a funkci, která ji zopakuje s tolerancí v mm) a vrátí těleso, které se použije
+ * (`null` = náhrada za neúspěšnou operaci není, chyba platí). Bez registrace se výsledek bere tak, jak je.
+ */
+type BooleanGuard = (out: Shape | null, op: { kind: BoolKind; a: Shape; tools: Shape[]; redo: (fuzzy: number) => Shape }) => Shape | null;
+let guard: BooleanGuard | null = null;
+export function setBooleanGuard(g: BooleanGuard | null): BooleanGuard | null {
+  const before = guard;
+  guard = g;
+  return before;
+}
+
+function run(kind: BoolKind, a: Shape, b: Shape | Shape[], opts?: BoolOpts): Shape {
+  const op = { kind, a, tools: Array.isArray(b) ? b : [b], redo: (fuzzy: number) => runOnce(kind, a, b, opts, fuzzy) };
+  let out: Shape;
+  try {
+    out = runOnce(kind, a, b, opts, tolerance(sizeOf(a)));
+  } catch (e) {
+    const rescued = guard ? guard(null, op) : null;
+    if (!rescued) throw e;
+    return rescued;
+  }
+  return (guard ? guard(out, op) : null) ?? out;
+}
+
+/** Jedna operace bez kontroly výsledku (ověřovací průnik tělesa s nástroji v shape-health.ts); `fuzzy` = tolerance v mm, 0 = přesně. */
+export function booleanOnce(kind: BoolKind, a: Shape, tools: Shape[], fuzzy = 0): Shape {
+  return runOnce(kind, a, tools, { simplify: false }, fuzzy);
+}
+
+function runOnce(kind: BoolKind, a: Shape, b: Shape | Shape[], { optimisation = "none", simplify = true }: BoolOpts = {}, fuzzy = 0): Shape {
   const oc: OC = r.getOC();
   const list = Array.isArray(b) ? b : [b];
   premesh(a);
@@ -66,6 +153,8 @@ function run(kind: "Cut" | "Fuse" | "Common", a: Shape, b: Shape | Shape[], { op
       if (optimisation === "commonFace") builder.SetGlue(oc.BOPAlgo_GlueEnum.BOPAlgo_GlueShift);
       if (optimisation === "sameFace") builder.SetGlue(oc.BOPAlgo_GlueEnum.BOPAlgo_GlueFull);
     }
+    // tolerance jen u opakované operace: plochy a hrany bližší než tato hodnota se berou jako totožné
+    if (fuzzy > 0) builder.SetFuzzyValue(fuzzy);
     builder.Build();
     if (simplify) builder.SimplifyResult(true, true, 0.001);
     const out = r.cast(builder.Shape()) as unknown as Shape;
