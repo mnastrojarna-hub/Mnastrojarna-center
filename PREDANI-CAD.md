@@ -14,6 +14,12 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 18:13 | NOVÝ požadavek majitele: kola „vyplním tabulku a mám díl, extra snadno“ → vlna 19 (kapitola 7a). Spuštěn workflow `wf_a5f62aa9-09a` (návrh → jádro → průvodce + text), základ `3bb04d9`. |
 | 14. 11. 18:17 | Workflow `wf_1fd5cfa9-922` DOKONČEN: střižnice (geom) hotová vč. oprav 8 nálezů kontroly – commit `5b303bc` ve worktree `w17-geom`, patch `S/w17/geom.patch` (základ `bf91b0b`, 10 souborů). Výsledek agenta: 27/27 dílů platných, Σ 5241,7333 cm³, střižnice 450,46 cm³. Úkol C1 hotov, zbývá C2–C4. |
 | 14. 11. 18:30 | **Úkol A HOTOV**: vlna 15 sloučena do `main` (PR #96, `23c34b0`); e2e 18 sad bez nových selhání; worktree `w15-*` smazány. Začíná úkol C2 (střižnice) – patch `S/w17/geom.patch` jde na `main` nanést čistě. |
+| 14. 11. 18:52 | **Úkol C HOTOV**: střižnice sloučena do `main` (PR #97, `aa4300e`). Celý strom `src/cad` 2621 testů prošel (1 selhání `node-shims` po vlně 15 opraveno), skutečný nástroj 27/27 platných, Σ 5241,734 cm³. Dvě e2e sady měly po vlně 15 zastaralá očekávání (`cad-plate-roundtrip`, `cad-fixes`) – opraveno. BĚŽÍ úplný průchod zbylých e2e sad (`S/e2e-sweep.log`, končí `done`) – selhání roztřiď: zastaralé očekávání po vlně 15 / 17 (uprav test), zátěž (pusť znovu samostatně), skutečná chyba (oprav). |
+| 14. 11. 19:12 | Průchod e2e 19/49: zastaralá očekávání po vlně 15 opravena v `cad-agent-drawing` (dva „Příklad D“ v návodu → nový je „Příklad F“), `cad-bodies` (seznam příkazů obsahuje `nápověda`), `cad-verify` (tolerance razítka výběrem ISO 2768). Po doběhnutí průchodu: přestavět build (návod je v balíku) a tyto tři sady + všechna další selhání pustit znovu. Workflow: fáze B `w14:acceptance` běží, kola `w19:core` běží. |
+| 14. 11. 19:20 | Úkol D1 částečně rozjet dřív (nezávisí na B): agent dokumentace dopisuje vlnu 15, převodník a vlnu 17 do `cad-docs.ts` ve worktree `w18-docs2`, výstup `S/w18/docs2.patch` (zdroje `S/w18/docs-round2-sources.md`). Místa o fázi A nechává beze změny – přepíšou se až po B. |
+| 14. 11. 19:30 | Úkol B2 rozjet souběžně s akceptací: zkušební nanesení `bint.patch` na dnešní větev = 15 souborů s konflikty (největší `cad-app.tsx` – stará smyčka 378 řádků vs. volání enginu). Spuštěn workflow `wf_d020a109-e6f` (integrace → nezávislá kontrola ztracených změn → opravy), worktree `w14-int2` ze `4ceb0e7`, zadání `S/w14/int2/brief.md`, výstup `S/w14/int2/int2.patch` + `audit.md`. Až doběhne i akceptace (`w14-b6`), přenes její rozdíl `git -C .claude/worktrees/w14-b6 diff 7b86184 HEAD` na `w14-int2` (nebo do hlavní větve po int2). |
+| 14. 11. 19:45 | Dokumentace 2. kolo hotová a nanesena na větev (vlna 15, převodník, vlna 17; `S/w18/docs2.patch`). Do PR půjde spolu s opravami e2e po doběhnutí průchodu a ověření na novém buildu. Agent dokumentace zjistil 2 mezery → úkol E6 a E7. |
+| 14. 11. 19:55 | NOVÝ požadavek majitele: výběr myší oknem (více prvků naráz) ve 3D i 2D → vlna 20 (kapitola 7b). Spuštěn workflow `wf_533a7c7c-a4a` (balíky `3d` a `2d` souběžně, každý implementace → kontrola → opravy), základ `210a1e8`, zadání `S/w20/brief.md`. Průchod e2e: 35/49, dosud jen zastaralá očekávání (`cad-big-step` – vkládání do sestavy přes vstup Vložit – opraveno). |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -39,7 +45,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 
 | Co | Kde |
 | --- | --- |
-| `main` | `23c34b0` (PR #96: vlna 15; předtím PR #95 převodník a dokumentace) |
+| `main` | `aa4300e` (PR #97 střižnice; PR #96 vlna 15; PR #95 převodník a dokumentace) |
 | pracovní větev | `claude/cnc-sales-os-ai-cbR2f` = `main` + rozdělaný úkol (viz Průběžný stav) |
 | scratchpad `S` | `/tmp/claude-0/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/scratchpad` |
 | worktree agentů | `/home/user/Mnastrojarna-center/.claude/worktrees/<název>` |
@@ -74,8 +80,12 @@ postupuj podle kapitoly 9.
     (`merge_method: "merge"`), `git pull -q origin main`, `git push`.
 11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`.
 
+Poučení z vlny 15: před sloučením VŽDY pusť i `src/cad/cli/*.test.ts` (hlídá, že jádro pro příkazovou řádku zná každou
+operaci klienta) a e2e sady, které sahají na změněné GUI / texty, i když nejsou v patchi (`grep -l "<starý text>" e2e/`).
+
 Známé nestabilní testy (nejsou chybou vlny, při selhání pusť znovu samostatně):
 - `e2e/cad-asm-mates`: 1 FAIL „najetí na řádek seznamu zvýrazní plochu“ (WebGL hover) – selhává i na `main`.
+- `e2e/cad-impeller`: „Zrušit během přepočtu … do 2 s“ při zátěži stroje (samostatně prochází).
 - `e2e/cad-cli`: 2 časové kontroly hlídacího psa při zátěži stroje.
 - `e2e/cad-w15-asm`: při zátěži občas vyprší 300 s u výkresu sestavy.
 - `e2e/cad-w9-core` řádek 128 (výběr v 2D, 1 ze 4 běhů) – viz `S/followups.md`.
@@ -119,7 +129,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
 - [ ] B1. Počkej na oznámení o dokončení workflow. Kdyby workflow neběželo (restart), obnov ho:
       `Workflow({ scriptPath: "<cesta ke skriptu výše>", resumeFromRunId: "wf_0a444c37-b25" })` – hotoví agenti se vrátí
       z mezipaměti. Zprávu integrace najdeš v deníku (`journal.jsonl`, záznam `result` se štítkem `w14:integrate`).
-- [ ] B2. Aplikuj `S/w14/bint.patch` na aktuální `main` (po úkolu A). Čekej konflikty v `src/components/cad/cad-app.tsx`,
+- [ ] B2. (BĚŽÍ jako workflow `wf_d020a109-e6f`, viz Průběžný stav) Aplikuj `S/w14/bint.patch` na aktuální `main` (po úkolu A). Čekej konflikty v `src/components/cad/cad-app.tsx`,
       `src/cad/agent.ts`, `src/cad/agent-out.ts`, `src/components/cad/agent-out-host.ts`, `agent-api-host.ts`,
       `agent-guide.ts`, `scripts/cad-harness/*`, `e2e/cad-cli.e2e.cjs`. Zásada: **smyčka operací žije v enginu**
       (`src/cad/engine/ops/*`), `cad-app.tsx` ji jen volá. Co mezitím přibylo do staré smyčky v `cad-app.tsx`, přenes
@@ -170,16 +180,18 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 (opravy nálezů kontroly). Zadání: `S/w17/brief.md`, „Package geom“.
 
 - [x] C1. (hotovo 14. 11. 18:17) Počkej na dokončení (případně obnov `resumeFromRunId: "wf_1fd5cfa9-922"`), přečti zprávu `fix:geom` v deníku.
-- [ ] C2. Aplikuj `S/w17/geom.patch` na `main` (po úkolu B; když B ještě běží, klidně před ním – patch sahá hlavně do
+- [x] C2. Aplikuj `S/w17/geom.patch` na `main` (po úkolu B; když B ještě běží, klidně před ním – patch sahá hlavně do
       `src/cad/build.ts` a jádra). Kontroly podle kapitoly 2 + `e2e/cad-w17-geom` + sady `cad cad-agent cad-w12-parts
       cad-impeller` (regrese objemů).
-- [ ] C3. Lokálně ověř na skutečném dokumentu (test se bez souboru přeskočí): 27 z 27 dílů platných, Σ 5241,734 cm³
+- [x] C3. Lokálně ověř na skutečném dokumentu (test se bez souboru přeskočí): 27 z 27 dílů platných, Σ 5241,734 cm³
       ± 0,01, díl střižnice 450,460 cm³ ± 0,001, čas stavby dílu se nezhoršil (dnes 6,0 s). Neplatnost se musí hlásit
       u PRVNÍHO prvku, který ji způsobí.
-- [ ] C4. PR „CAD: platná geometrie řezů na natočené rovině a včasné hlášení neplatnosti“ → sloučit. Smaž `w17-geom`.
+- [x] C4. PR „CAD: platná geometrie řezů na natočené rovině a včasné hlášení neplatnosti“ → sloučit. Smaž `w17-geom`.
 
 ## 6. Úkol D – dokumentace a příručka po sloučení B a C
 
+- [x] D0. (naneseno 19:45, PR spolu s opravami e2e) Převzít `S/w18/docs2.patch` (vlna 15, převodník, vlna 17 – agent dokumentace, worktree `w18-docs2`) podle
+      kapitoly 2 (stačí tsc, lint, `docs:text`), commit, PR, sloučit.
 - [ ] D1. `website/src/content/cad-docs.ts`: přepiš místa o fázi A (hledej „fáze A“, „host.app-only“; v
       `src/views/cad-docs-intl.tsx` „phase A“ / „Phase A“) podle toho, co CLI po fázi B skutečně umí (ověř spuštěním).
       Doplň: vlna 15 (odstavec je v deníku `wf_5f997da2-2d8`, `w15:integrate`, pole `docs_cs`), převodník `export skript`,
@@ -207,6 +219,15 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
   - tichý (stručný) protokol i v konzoli prohlížeče,
   - vícedokumentové běhy: ✓ jen u dokumentů, které se skutečně postavily (dřív se stavěl jen poslední),
   - B1 / B2 z hlášení (prázdná sestava se počítá jako prázdná záložka; závod evidence záložek).
+- [ ] E6. Převodník dokument → skript nepřenáší nic z vlny 15 kromě třídy ISO 2768 a NEHLÁSÍ to: šablona a další pole
+      razítka (logo, zákazník, polotovar…), tabulka nepředepsaných tolerancí podle desetinných míst, funkční rozměry
+      (`kótovat chytře funkční …`), režim poloh děr (`kótovat … díry tabulka|souřadnicově`), přezdívky komponent
+      (`vložit … jako`), pružiny (`sestava pružina …`). Doplň vyhrazené příkazy do `src/cad/doc-script.ts` (a do
+      ověření řádku), jinak aspoň poznámku ℹ; test tam a zpět pro každý bod (`doc-script.roundtrip.test.ts`). Po úkolu B
+      (patch B na doc-script nesahá, ale ověř).
+- [ ] E7. `stav` ve stejném běhu `window.mncad.run`, který sestavu teprve založil, nevypíše přesnou obálku („tělesa
+      komponent se stavějí zvlášť“); samostatné `stav` ji vypíše. Po úkolu B ověř v enginu (asynchronní stav sestavy)
+      a oprav, aby obálka byla i v témže běhu (nebo to jasně řekni v protokolu).
 - [ ] E4. Hostovaný koncový bod (HTTP služba pro agenty bez Node) je rozhodnutí majitele – nenasazuj, jen se v závěrečné
       zprávě zeptej, zda ho chce (je to jediná povolená otázka).
 - [ ] E5. Smaž zbylé worktree (`w18-docs`), tento soubor a odkaz v `CLAUDE.md`. Závěrečná zpráva majiteli.
@@ -250,6 +271,27 @@ patche jsou proti poslednímu commitu `w19-core`. Každý balík: implementace �
       textem v CLI (`mncad run`), až bude sloučen úkol B.
 - [ ] F4. Dokumentace (nová podkapitola v kapitole Prvky / Knihovna + FAQ „Jak udělám ozubené kolo?“), PR, sloučení,
       smazat worktree `w19-*`.
+
+## 7b. Úkol G – vlna 20: výběr oknem (tažením obdélníku) ve 3D, ve skice, ve 2D výkresu a ve výkresu dílu
+
+Zadání majitele: „Mnástrojárna CAD 3D a 2D neumí vybrat jednoduše myší oknem, tedy více prvků naráz.“
+Očekávání (jako AutoCAD / SolidWorks): tažení levým tlačítkem = obdélník; zleva doprava = okno (jen celé uvnitř),
+zprava doleva = křížení (i dotčené); bez klávesy nahradí výběr, Ctrl/Shift přidá, Ctrl+Shift/Alt ubere; Esc zruší;
+ve 3D jen viditelné (volba „i skryté“), podle filtru výběru; funguje i ve výběrech formulářů (hrany zaoblení),
+v měření, v sestavě (komponenty), bez WebGL; ve skice (mazání, vazby na vícenásobném výběru), ve 2D výkresu
+(i uvnitř příkazů „Vyberte objekty“) a ve výkresu dílu (kóty, poznámky). Pro agenty `window.mncad.selectBox(...)`.
+Úplné zadání `S/w20/brief.md`.
+
+Workflow `wf_533a7c7c-a4a` (skript `…/workflows/scripts/cad-wave20-box-select-wf_533a7c7c-a4a.js`): balíky `3d`
+(worktree `w20-3d`, patch `S/w20/3d.patch`) a `2d` (`w20-2d`, `S/w20/2d.patch`), oba proti `210a1e8`.
+
+- [ ] G1. Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
+- [ ] G2. Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
+      – malé kusy; je-li B už sloučen, nanes na nový `main`).
+- [ ] G3. Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
+      plochy vybere jen viditelné plochy; křížení vybere i dotčené; Ctrl přidá; zaoblení – hrany oknem; sestava –
+      komponenty oknem; skica – smazat více entit; 2D – MOVE s výběrem oknem; výkres dílu – smazat více kót.
+- [ ] G4. Dokumentace (kapitola 3 Obrazovka, 5 Skica, 14 2D CAD, 13 Výkresy + mikronávody), PR, sloučení, smazat `w20-*`.
 
 ## 8. Co říct majiteli o nasazení (po každém sloučení)
 

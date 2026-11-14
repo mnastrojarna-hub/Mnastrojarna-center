@@ -19,11 +19,12 @@
 - Referenční systém zadání: 14 voleb bodu, 8 směrů, 12 definic rovin, 10 os, pomocná rovina / osa / bod / souřadný systém
 - Plochy (19 příkazů), plech s rozvinem DXF (12), svařence a rámy z profilů (13) se svary koutovými, tupými podle ISO 9692-1, děrovými a bodovými a značkami ISO 2553
 - Sestavy: komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled, průvodce rámem vstřikovací formy
-- Výkresy: pohledy, řez, detail, kóty, drsnosti, geometrické tolerance, tabulka děr, kusovník; export PDF, DXF, DWG R2000–R2018, SVG
+- Výkresy: pohledy, řez, detail, chytré kóty s funkčními rozměry, drsnosti, geometrické tolerance, tabulka děr a souřadnicové kóty, kusovník, razítko ve třech šablonách s nepředepsanými tolerancemi ISO 2768; export PDF, DXF, DWG R2000–R2018, SVG
+- Kontrola modelu podle výkresu zákazníka: předloha DWG / DXF / PDF, výtah kót a děr, porovnání pohledů s pokrytím v %, kontrola kót
 - 2D CAD (2D výkres): příkazový řádek se zkratkami AutoCADu, hladiny, typy čar, uchopení, kóty a kótovací styly, šrafy, bloky s atributy, rozvržení s výřezy v měřítku, tisk PDF; editor DWG R2000–R2018 a DXF R12–R2018
 - Knihovna 103 rodin normálií ve 13 skupinách zadávaných textem
 - Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF, DWG; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML, DXF, DWG
 - Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
 - Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání, mikronávody u každé ikony (česky, anglicky, německy)
 - Sdílení krátkým odkazem mnastrojarna.cz/s#KÓD: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams, SMS), platnost 1–90 dní, volitelné heslo, zneplatnění; dokument se šifruje v prohlížeči, na serveru je jen šifrovaný obsah
-- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba, výstupy bez dialogů, příkazová řádka mncad bez prohlížeče pro stavbu a převod hotových dokumentů
+- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba, výstupy bez dialogů, převod dokumentu na textový skript, příkazová řádka mncad bez prohlížeče pro stavbu a převod hotových dokumentů

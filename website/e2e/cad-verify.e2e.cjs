@@ -31,7 +31,10 @@ const has = (bin) => { try { execFileSync('which', [bin]); return true; } catch 
   await p.getByRole('button', { name: /Výkres PDF/ }).click();
   await p.waitForFunction(() => /Rozměry v mm/.test(document.querySelector('[data-sheet]')?.textContent || ''), null, { timeout: 120000 }); await p.waitForTimeout(800);
   const aside = p.locator('[data-drawing-workspace] aside').first();
-  await aside.getByPlaceholder('např. ISO 2768-mK').fill('ISO 2768-mK');
+  // nepředepsané tolerance se od vlny 15 volí třídou ISO 2768 (výběr režimu + třídy), ne volným textem
+  await aside.locator('[data-title-tol-mode]').selectOption('iso2768');
+  await aside.locator('[data-title-tol-lin]').selectOption('m');
+  await aside.locator('[data-title-tol-geo]').selectOption('K');
   await p.waitForFunction(() => /2768/.test(document.querySelector('[data-sheet]')?.textContent || ''), null, { timeout: 60000 });
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 120000 }), p.locator('[data-drawing-workspace] header').getByRole('button', { name: 'PDF', exact: true }).click()]);
   const pdfPath = S + 'deska.pdf';

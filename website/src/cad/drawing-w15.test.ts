@@ -356,10 +356,10 @@ describe("souřadnicová kóta: kreslení a hodnota", () => {
   });
 });
 
-describe("návod pro AI – příklad D", () => {
+describe("návod pro AI – příklad F", () => {
   it("funkční rozměry, tolerance na funkční kótu a kontrola tolerancí jako v návodu", async () => {
     const { AGENT_GUIDE } = await import("./agent-guide");
-    const i = AGENT_GUIDE.indexOf("### Příklad D");
+    const i = AGENT_GUIDE.indexOf("### Příklad F");
     expect(i).toBeGreaterThan(0);
     const a = AGENT_GUIDE.indexOf("```", i) + 3;
     const text = AGENT_GUIDE.slice(a, AGENT_GUIDE.indexOf("```", a)).trim();

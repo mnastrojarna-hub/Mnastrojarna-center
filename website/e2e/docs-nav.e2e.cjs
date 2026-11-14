@@ -2,6 +2,7 @@
 // stránce, patička, stránka dokumentace, úvodní obrazovka CADu a nabídka Nápověda v horní liště CADu.
 // Spuštění (produkční server na :3100): node e2e/docs-nav.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
+const BASE = process.env.E2E_BASE || 'http://localhost:3100';
 const fs = require('fs');
 const S = (process.argv[2] || '/tmp/e2e').replace(/\/?$/, '/');
 fs.mkdirSync(S, { recursive: true });
@@ -11,7 +12,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   // desktop 1280 (xl – nejužší, kde je vidět plné menu)
   for (const w of [1280, 1536]) {
     const p = await b.newPage({ viewport: { width: w, height: 800 } });
-    await p.goto('http://localhost:3100/', { waitUntil: 'networkidle', timeout: 120000 });
+    await p.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 120000 });
     const nav = p.locator('header nav').first();
     const grp = nav.getByRole('group');
     ok(await grp.isVisible(), `${w}: skupina Online CAD + Návod + PDF viditelná`);
@@ -37,14 +38,14 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
       await p.locator('footer').scrollIntoViewIfNeeded(); await p.waitForTimeout(600);
       ok(await p.locator('footer').getByRole('link', { name: 'Příručka CAD (PDF)' }).isVisible(), 'patička: Příručka CAD (PDF)');
       // dokumentace: aktivní stav v menu
-      await p.goto('http://localhost:3100/cad/dokumentace', { waitUntil: 'networkidle', timeout: 120000 });
+      await p.goto(BASE + '/cad/dokumentace', { waitUntil: 'networkidle', timeout: 120000 });
       ok(/Stáhnout příručku PDF/.test(await p.locator('main').innerText()), 'dokumentace: tlačítko Stáhnout příručku PDF');
     }
     await p.close();
   }
   // mobil – otevřené menu
   const m = await b.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await m.goto('http://localhost:3100/', { waitUntil: 'networkidle', timeout: 120000 });
+  await m.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 120000 });
   await m.getByRole('button', { name: 'Otevřít menu' }).click(); await m.waitForTimeout(900);
   const mnav = m.getByRole('navigation', { name: 'Mobilní navigace' });
   ok(await mnav.getByRole('link', { name: /Dokumentace a návod k obsluze/ }).isVisible(), 'mobil: menu má Dokumentace a návod');
@@ -54,7 +55,7 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
   // CAD – horní lišta Nápověda + úvodní obrazovka
   const c = await b.newPage({ viewport: { width: 1400, height: 850 } });
   const errs = []; c.on('pageerror', (e) => errs.push(e.message));
-  await c.goto('http://localhost:3100/cad', { waitUntil: 'networkidle', timeout: 180000 });
+  await c.goto(BASE + '/cad', { waitUntil: 'networkidle', timeout: 180000 });
   await c.waitForTimeout(1500);
   const start = c.locator('div.fixed.z-\\[65\\]');
   ok(await start.getByRole('link', { name: /Návod a dokumentace/ }).isVisible(), 'start: odkaz Návod a dokumentace v hlavičce');
