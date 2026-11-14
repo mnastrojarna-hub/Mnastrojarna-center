@@ -16,6 +16,7 @@ import { blobIdOf, blobOf, blobRefsIn, putBlobAs } from "./blobs";
 import { perfMark, perfPush, type PerfEntry } from "./perf-log";
 import { fatalKernelText } from "./kernel-errors";
 import type { SplitPart, StepSplit } from "./formats/step-assembly";
+import type { KernelShapeStats } from "./export-verify";
 
 let worker: Worker | null = null;
 let seq = 0;
@@ -32,7 +33,7 @@ const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Err
  */
 export type CadProgress = Omit<BuildProgress, "phase"> & { phase: BuildProgress["phase"] | "start"; op: string; startedAt: number; featureAt: number };
 /** operace, které mohou trvat dlouho – ukazuje se u nich průběh a jdou zrušit */
-const LONG_OPS = new Set(["build", "topology", "measure", "export", "drawing", "interference", "asmParts", "compare", "stepSplit"]);
+const LONG_OPS = new Set(["build", "topology", "measure", "export", "exportStats", "drawing", "interference", "asmParts", "compare", "stepSplit"]);
 const progressListeners = new Set<(p: CadProgress | null) => void>();
 let lastProgress: CadProgress | null = null;
 const emitProgress = (p: CadProgress | null) => {
@@ -176,6 +177,8 @@ export const cad = {
   /** pomocné osy / body / souřadné systémy k vykreslení */
   datumGfx: (doc: CadDoc) => call<{ id: string; gfx: DatumDisplay }[]>({ op: "datumGfx", doc }),
   exportFile: (doc: CadDoc, format: ExportFormat) => call<ArrayBuffer>({ op: "export", doc, format }),
+  /** exportovaný STEP / BREP znovu načtený jádrem a model: tělesa, objem, obálka (bez sítě – export-verify.ts) */
+  exportStats: (doc: CadDoc, bytes: Uint8Array, format: "step" | "brep") => call<{ model: KernelShapeStats; file: KernelShapeStats }>({ op: "exportStats", doc, bytes, format }),
   /** díly sestavy; `offset`/`total` = pořadí dávky v celém načítání (pro průběh „díl k z n“) */
   asmParts: (parts: { key: string; source: ComponentSource }[], offset = 0, total = parts.length) => call<{ key: string; result: BuildResult }[]>({ op: "asmParts", parts, offset, total }),
   /**

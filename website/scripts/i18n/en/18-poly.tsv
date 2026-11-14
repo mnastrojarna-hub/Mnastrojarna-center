@@ -1,0 +1,44 @@
+# 11. vlna – lomená čára z textu (uzavřít / otevřená, rozhodnutí podle celé skici) a kontrola profilu skici (profile-check.ts)
+… a dalších {0}	… and {0} more
+(další viz stav)	(more in the status)
+(průsečíky nekontrolovány – víc než {0} úseků)	(intersections not checked – more than {0} segments)
+{0} a {1} jsou duplicitní (stejná geometrie) – jednu smažte	{0} and {1} are duplicates (same geometry) – delete one
+{0} a {1} se překrývají v úseku {2}–{3}	{0} and {1} overlap between {2}–{3}
+{0} byla uzavřena automaticky a její uzavírací úsek kříží {1} v {2} – napište „otevřená“ nebo napojte konce	{0} was closed automatically and its closing segment crosses {1} at {2} – write “open” or join the ends
+{0} kříží {1} v {2}	{0} crosses {1} at {2}
+{0} kříží sama sebe v {1}	{0} crosses itself at {1}
+{0} se dotýká {1} v {2} – napojení musí být konec na konec	{0} touches {1} at {2} – joints must be end to end
+{0} uzavřené obrysy	{0} closed contours
+{0} uzavřený obrys	{0} closed contour
+{0} uzavřených obrysů	{0} closed contours
+čára nemůže být zároveň „uzavřít“ a „otevřená“ – nechte jen jedno slovo	a polyline cannot be both “close” and “open” – keep only one word
+ℹ čára {0} je otevřená – její konce navazují na {1}	ℹ polyline {0} is open – its ends join {1}
+ℹ čára {0} otevřena – na její konce nově navazuje {1} (uzavřená byla jen automaticky)	ℹ polyline {0} opened – {1} now joins its ends (it was only closed automatically)
+ℹ čára {0} uzavřena – konce nebyly napojené; „otevřená“ ji nechá otevřenou	ℹ polyline {0} closed – its ends were not joined; “open” keeps it open
+ℹ čára se zaoblenými rohy je otevřená – její konec {0} navazuje na další entitu	ℹ the polyline with rounded corners is open – its end {0} joins another entity
+ℹ čára se zaoblenými rohy uzavřena úsečkou {0} – konce nebyly napojené; „otevřená“ ji nechá otevřenou	ℹ the polyline with rounded corners closed by line {0} – its ends were not joined; “open” keeps it open
+ℹ odebráno vazeb {0} a kót {1}, které odkazovaly na uzavírací úsek otevřené čáry	ℹ removed {0} constraints and {1} dimensions that referred to the closing segment of the opened polyline
+ℹ uzavírací úsečka {0} čáry se zaoblenými rohy odebrána – na konec {1} nově navazuje {2}	ℹ closing line {0} of the polyline with rounded corners removed – {2} now joins the end {1}
+mezera {0} mm mezi {1} {2} a {3} {4}	gap of {0} mm between {1} {2} and {3} {4}
+mezera {0} mm mezi konci {1} ({2} a {3})	gap of {0} mm between the ends of {1} ({2} and {3})
+otevřená	open
+otevřený konec {0} v {1}	open end of {0} at {1}
+Profil skici „{0}“: {1}.	Profile of sketch “{0}”: {1}.
+Profil skici „{0}“: žádný uzavřený obrys.	Profile of sketch “{0}”: no closed contour.
+profil: {0} · ⚠ problémů {1}:	profile: {0} · ⚠ {1} problems:
+profil: {0} ✓	profile: {0} ✓
+profil: žádný uzavřený obrys	profile: no closed contour
+profil: žádný uzavřený obrys – otevřená křivka {0} (konce {1} a {2}); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku	profile: no closed contour – open curve {0} (ends {1} and {2}); close it to extrude, as a path or parting line it is fine
+uzavřená	closed
+uzavřená automaticky	closed automatically
+v bodě {0} se stýká {1} konců ({2}) – obrys je nejednoznačný	{1} ends meet at {0} ({2}) – the contour is ambiguous
+žádný uzavřený obrys	no closed contour
+ (uzavírá čáru se zaoblenými rohy – automaticky)	 (closes the polyline with rounded corners – automatically)
+uzavření lomené čáry (i se zaoblenými rohy): „uzavřít“ / „otevřená“ platí vždy, první bod = poslední → uzavřená; jinak rozhodne skica – tvoří-li čára s dalšími entitami uzavřený obrys (oba konce propojené přes jiné entity), je otevřená, jinak se uzavře a protokol to ohlásí (ne, kdyby ji uzavírací úsek křížil); vznikne-li obrys později, čára se otevře; jako dráha (tažení, žebro, dělicí čára, pole podél křivky) se automatické uzavření nepoužije	closing a polyline (also with rounded corners): “close” / “open” always win, first point = last → closed; otherwise the sketch decides – if the polyline forms a closed contour with other entities (both ends connected through other entities) it is open, otherwise it is closed and the log says so (not when the closing segment would cross it); if a contour forms later, the polyline opens; as a path (sweep, rib, parting line, pattern along a curve) automatic closing is not used
+ℹ čára {0} je otevřená – uzavírací úsek by ji křížil nebo překrýval v {1} (neplatný obrys); „uzavřít“ ji uzavře	ℹ polyline {0} is open – the closing segment would cross or overlap it at {1} (invalid contour); “close” closes it
+ℹ čára {0} uzavřena – navazuje na {1}, ale uzavřený obrys s nimi netvoří; „otevřená“ ji nechá otevřenou	ℹ polyline {0} closed – it joins {1}, but does not form a closed contour with them; “open” keeps it open
+ℹ čára se zaoblenými rohy je otevřená – uzavírací úsečka by ji křížila nebo překrývala v {0} (neplatný obrys); „uzavřít“ ji uzavře	ℹ the polyline with rounded corners is open – the closing line would cross or overlap it at {0} (invalid contour); “close” closes it
+ℹ čára se zaoblenými rohy uzavřena úsečkou {0} – navazuje na {1}, ale uzavřený obrys s nimi netvoří; „otevřená“ ji nechá otevřenou	ℹ the polyline with rounded corners closed by line {0} – it joins {1}, but does not form a closed contour with them; “open” keeps it open
+otevřený konec {0} v {1} leží na obrysu {2} – {0} do žádného obrysu nepatří	open end of {0} at {1} lies on contour {2} – {0} belongs to no contour
+; {0} je uzavřená čára – má-li být částí obrysu s {1}, napište u ní „otevřená“	; {0} is a closed polyline – if it should be part of a contour with {1}, write “open” for it
+{0} byla uzavřena automaticky a její uzavírací úsek kříží samu čáru v {1} – jako profil neplatná; napište „otevřená“ (dráha, dělicí čára) nebo napojte konce	{0} was closed automatically and its closing segment crosses the polyline itself at {1} – invalid as a profile; write “open” (path, parting line) or join the ends

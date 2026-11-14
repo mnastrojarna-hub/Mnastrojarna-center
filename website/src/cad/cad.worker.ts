@@ -25,6 +25,7 @@ import { formNotesOfDoc } from "./drawing-doc";
 import { hasWelds, weldMarksOf } from "./drawing-welds";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
+import { exportStats } from "./export-verify";
 
 let ready: Promise<void> | null = null;
 let body: r.Shape3D | null = null;
@@ -49,6 +50,8 @@ type Req =
   | { id: number; op: "topology"; doc: CadDoc }
   | { id: number; op: "face"; index: number }
   | { id: number; op: "export"; format: ExportFormat; doc: CadDoc }
+  /** kontrola exportu z konzole: soubor znovu načíst a změřit proti modelu (export-verify.ts) */
+  | { id: number; op: "exportStats"; doc: CadDoc; bytes: Uint8Array; format: "step" | "brep" }
   | { id: number; op: "asmParts"; parts: { key: string; source: ComponentSource }[] }
   | { id: number; op: "asmFace"; key: string; index: number }
   | { id: number; op: "lang"; lang: CadLang }
@@ -311,6 +314,9 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         ctx.postMessage({ id: m.id, ok: true, result: buf }, [buf]);
         break;
       }
+      case "exportStats":
+        ctx.postMessage({ id: m.id, ok: true, result: await exportStats(m.doc, m.bytes, m.format) });
+        break;
       case "drawing": {
         // těleso se přestaví jen při změně geometrie (razítko, název, materiál, poznámky těleso nemění – ty jsou rychlé)
         // závity se kreslí zjednodušeně (kružnice + označení) – modelované šroubovice se pro výkres potlačí (jejich přesná projekce trvá minuty)

@@ -1,5 +1,4 @@
 # 3D okno: náhled bez WebGL (softwarové vykreslení) a řez číslem / obecnou rovinou (P1-8, analýza nástrojů bod 14)
- – model se proto kreslí softwarově. Tažením otáčíte, kolečkem přibližujete, Shift + tažení posouvá. Výběr ploch a hran kliknutím zde nefunguje: použijte seznamy ve formulářích prvků a textové příkazy. Příčinu a postup nápravy ukáže tlačítko „Proč nevidím 3D?“.	 – das Modell wird deshalb per Software gezeichnet. Ziehen dreht, das Mausrad zoomt, Umschalt + Ziehen verschiebt. Die Auswahl von Flächen und Kanten per Klick funktioniert hier nicht: Verwenden Sie die Listen in den Formularen der Elemente und Textbefehle. Ursache und Abhilfe zeigt die Schaltfläche „Warum sehe ich kein 3D?“.
 Číslo plochy	Flächennummer
 model {0} až {1}	Modell {0} bis {1}
 Model je zatím prázdný – po vytvoření tělesa se tu zobrazí jeho náhled.	Das Modell ist noch leer – sobald ein Körper erstellt ist, erscheint hier seine Vorschau.
@@ -11,7 +10,6 @@ Normála nesmí být nulový vektor.	Die Normale darf kein Nullvektor sein.
 Normála roviny řezu	Normale der Schnittebene
 Obecná rovina zadaná normálou nx; ny; nz	Allgemeine Ebene, gegeben durch die Normale nx; ny; nz
 Oddálit	Verkleinern
-Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Model se místo 3D okna zobrazuje jako zjednodušený náhled: pohledy, přizpůsobení, přiblížení, otáčení i řez fungují, výběr ploch a hran kliknutím ne – použijte seznamy ve formulářích prvků a textové příkazy.	Die übrigen Programmteile funktionieren weiter: Menüs, Hilfe, Einstellungen, Öffnen und Speichern von Dateien, 2D-Skizze und Zeichnungen. Statt des 3D-Fensters wird das Modell als vereinfachte Vorschau angezeigt: Ansichten, Einpassen, Zoom, Drehen und Schnittansicht funktionieren, die Auswahl von Flächen und Kanten per Klick nicht – verwenden Sie die Listen in den Formularen der Elemente und Textbefehle.
 Plocha {0} není rovinná – řez lze vést jen rovinnou plochou.	Fläche {0} ist nicht eben – ein Schnitt kann nur durch eine ebene Fläche gelegt werden.
 Poloha roviny řezu	Position der Schnittebene
 Použít	Übernehmen

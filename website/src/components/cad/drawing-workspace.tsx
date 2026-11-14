@@ -6,6 +6,7 @@
  */
 import { cadLocale, tr } from "@/cad/i18n";
 import { saveFile } from "@/lib/save-file";
+import { isAutomation } from "@/lib/automation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
@@ -820,7 +821,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             {tr("Kusovník CSV")}
           </Btn>
         ) : null}
-        <Btn onClick={() => out && printSvg(out.svg, out.sheet.w, out.sheet.h)} disabled={!res} tip={{ id: "print", label: tr("Tisk"), why: WHY_RES }}>
+        {/* automatizace / AI agent: systémový dialog tisku by ji zablokoval → stejný list jako PDF bez dialogu */}
+        <Btn onClick={() => out && (isAutomation() ? void exportPdf() : printSvg(out.svg, out.sheet.w, out.sheet.h))} disabled={!res} tip={{ id: "print", label: tr("Tisk"), why: WHY_RES }}>
           {tr("Tisk")}
         </Btn>
         {onShare && (

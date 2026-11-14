@@ -10,6 +10,7 @@
  */
 import { tr } from "../i18n";
 import type { Seg } from "../sketch";
+import { pathEntities } from "../poly-close";
 import { toWorld } from "../defaults";
 import type { Feature, Vec2, Vec3 } from "../types";
 
@@ -583,7 +584,7 @@ export function sketchChains(sk: Extract<Feature, { type: "sketch" }>, toFace: (
     if (!ccw && angle >= 0) angle -= 2 * Math.PI;
     return { kind: "arc", a: a3, m: m3, b: b3, c, r, ccw, angle: Math.abs(angle) };
   };
-  for (const e of sk.entities) {
+  for (const e of pathEntities(sk.entities)) {
     if (e.construction) continue;
     if (e.type === "line") raw.push({ kind: "line", a: w(e.a), b: w(e.b) });
     else if (e.type === "polyline") {

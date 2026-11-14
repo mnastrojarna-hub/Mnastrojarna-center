@@ -1,5 +1,4 @@
 # 3D okno: náhled bez WebGL (softwarové vykreslení) a řez číslem / obecnou rovinou (P1-8, analýza nástrojů bod 14)
- – model se proto kreslí softwarově. Tažením otáčíte, kolečkem přibližujete, Shift + tažení posouvá. Výběr ploch a hran kliknutím zde nefunguje: použijte seznamy ve formulářích prvků a textové příkazy. Příčinu a postup nápravy ukáže tlačítko „Proč nevidím 3D?“.	 – the model is therefore drawn in software. Drag to rotate, use the wheel to zoom, Shift + drag to pan. Selecting faces and edges by clicking does not work here: use the lists in the feature forms and text commands. The “Why can’t I see 3D?” button shows the cause and how to fix it.
 Číslo plochy	Face number
 model {0} až {1}	model {0} to {1}
 Model je zatím prázdný – po vytvoření tělesa se tu zobrazí jeho náhled.	The model is empty so far – once a body is created, its preview appears here.
@@ -11,7 +10,6 @@ Normála nesmí být nulový vektor.	The normal must not be a zero vector.
 Normála roviny řezu	Section plane normal
 Obecná rovina zadaná normálou nx; ny; nz	General plane given by its normal nx; ny; nz
 Oddálit	Zoom out
-Ostatní části programu fungují dál: nabídky, nápověda, nastavení, otevření a uložení souborů, 2D skica i výkresy. Model se místo 3D okna zobrazuje jako zjednodušený náhled: pohledy, přizpůsobení, přiblížení, otáčení i řez fungují, výběr ploch a hran kliknutím ne – použijte seznamy ve formulářích prvků a textové příkazy.	The rest of the program keeps working: menus, help, settings, opening and saving files, the 2D sketch and drawings. Instead of the 3D window the model is shown as a simplified preview: views, fit, zoom, rotation and the section view work, selecting faces and edges by clicking does not – use the lists in the feature forms and text commands.
 Plocha {0} není rovinná – řez lze vést jen rovinnou plochou.	Face {0} is not planar – a section can only follow a planar face.
 Poloha roviny řezu	Section plane position
 Použít	Apply

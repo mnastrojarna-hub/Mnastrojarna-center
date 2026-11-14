@@ -1,0 +1,75 @@
+# 11. vlna – výstupy z konzole bez dialogů (uložit, export, výkres export, skica export, sdílet, odkaz), dialogy na stránce místo prompt/confirm
+  (schránka není dostupná – adresu zkopírujte z protokolu)	  (clipboard not available – copy the address from the log)
+  (zkopírováno do schránky)	  (copied to clipboard)
+  ✓ kontrola: projekt jde znovu otevřít – „{0}“, {1} {2}	  ✓ check: the project opens again – “{0}”, {1} {2}
+{0} – „{1}“ ({2}), platí do: {3}, {4}, {5} {6}	{0} – “{1}” ({2}), valid until: {3}, {4}, {5} {6}
+{0}, {1} entit	{0}, {1} entities
+⚠ dokument zatím nemá výkres – exportuje se výchozí list (pro vlastní list nejdřív „výkres A3 …“ a „kótovat“)	⚠ the document has no drawing yet – the default sheet is exported (for your own sheet first “drawing A3 …” and “dimension”)
+⚠ kontrola {0}: soubor se od modelu liší – {1}; zkontrolujte prvky s ⚠ / ✗ (stav) a export zopakujte	⚠ {0} check: the file differs from the model – {1}; check features with ⚠ / ✗ (status) and repeat the export
+✓ {0}: {1} · {2} · {3} – staženo (bez dialogu)	✓ {0}: {1} · {2} · {3} – downloaded (no dialog)
+✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu	✓ {0} check: file re-read by the kernel – {1}volume {2} (difference {3} %), bounding box {4} mm (deviation {5} mm) → faithful copy of the model
+✓ poslední sdílený odkaz	✓ last shared link
+✓ sdílený odkaz vytvořen	✓ shared link created
+✗ kontrola {0}: soubor se nepodařilo znovu načíst – {1}	✗ {0} check: the file could not be read again – {1}
+3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) → „věrná kopie modelu“; „bez kontroly“ ji vynechá	the 3D model is downloaded without a dialog; for STEP and BREP a check: the file is re-read by the kernel and compared with the model (bodies, volume, bounding box) → “faithful copy of the model”; “no check” skips it
+3MF (síť)	3MF (mesh)
+export {0}	export {0}
+export {0}: výkres se exportuje příkazem „výkres export {0}“ (nejdřív „výkres A3 …“)	export {0}: a drawing is exported with “drawing export {0}” (first “drawing A3 …”)
+export dxf: výkres → „výkres export dxf“, skica → „skica export dxf“	export dxf: drawing → “drawing export dxf”, sketch → “sketch export dxf”
+export MNCAD	export MNCAD
+export potřebuje formát: {0}	export needs a format: {0}
+export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]	export step|stl|brep|obj|glb|3mf|wrl|mncad [name] [no check]
+export: model je prázdný – nejdřív vymodelujte díl	export: the model is empty – model a part first
+export: neznámý formát „{0}“ – {1}	export: unknown format “{0}” – {1}
+glTF binární (síť)	glTF binary (mesh)
+jádro v souboru nenašlo těleso	the kernel found no body in the file
+komponent	components
+kusovník CSV	BOM CSV
+list výkresu jako soubor bez dialogu (bez listu aktivní, „vše“ = každý list zvlášť); výkres nejdřív „výkres A3 …“ a „kótovat“	drawing sheet as a file without a dialog (without a sheet the active one, “all” = each sheet separately); first “drawing A3 …” and “dimension”
+model	model
+náhled listu PNG	sheet preview PNG
+obálka {0} mm (model {1} mm, odchylka {2} mm)	bounding box {0} mm (model {1} mm, deviation {2} mm)
+objem {0} (model {1}, rozdíl {2} %)	volume {0} (model {1}, difference {2} %)
+odkaz nemá další volby – vypíše poslední sdílený odkaz; nový vytvoří „sdílet“	link has no options – it prints the last shared link; “share” creates a new one
+projekt .mncad se stáhne rovnou (bez dialogu „Uložit jako“); protokol napíše název souboru, velikost a počet prvků; také window.mncad.save(název)	the .mncad project is downloaded directly (no “Save as” dialog); the log shows the file name, size and number of features; also window.mncad.save(name)
+projekt Mnástrojárna CAD (.mncad)	Mnástrojárna CAD project (.mncad)
+s heslem	with password
+sdílený odkaz (jako tlačítko Sdílet odkazem): ADRESA SE VYPÍŠE DO PROTOKOLU (a zkopíruje do schránky, když to prohlížeč dovolí); výchozí platnost 10 dní; „odkaz“ vypíše poslední odkaz znovu	shared link (like the Share link button): THE ADDRESS IS PRINTED IN THE LOG (and copied to the clipboard when the browser allows it); default validity 10 days; “link” prints the last link again
+sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]	share [model|drawing] [days N|unlimited] [password X] [from "Name"]
+sdílet výkres: dokument zatím nemá výkres – nejdřív „výkres A3 …“, nebo sdílejte model	share drawing: the document has no drawing yet – first “drawing A3 …”, or share the model
+sdílet: neznámé slovo „{0}“ – {1}	share: unknown word “{0}” – {1}
+sdílet: platnost je 1 až 3650 dní, nebo „bez omezení“ – {0}	share: validity is 1 to 3650 days, or “unlimited” – {0}
+sdílet: za „{0}“ chybí heslo – {1}	share: password missing after “{0}” – {1}
+sdílet: za „{0}“ chybí jméno odesílatele – {1}	share: sender name missing after “{0}” – {1}
+skica „{0}“	sketch “{0}”
+skica DXF	sketch DXF
+skica export dxf ["Skica 1"] [jako název]	sketch export dxf ["Sketch 1"] [as name]
+skica jako DXF bez dialogu (bez názvu otevřená, jinak poslední skica)	sketch as DXF without a dialog (without a name the open sketch, otherwise the last one)
+skica se exportuje jen do DXF: {0}	a sketch is exported only to DXF: {0}
+STEP {0} stažen – e-mail se v automatizaci neotevírá (dotaz prohlížeče na poštovní program), pošlete ho na {1}.	STEP {0} downloaded – no e-mail is opened under automation (the browser would ask for a mail program), send it to {1}.
+STL (síť)	STL (mesh)
+těles {0} (model {1})	bodies {0} (model {1})
+těles: {0}, 	bodies: {0}, 
+uloženo	saved
+uložit [název] – projekt .mncad se stáhne bez dialogu	save [name] – the .mncad project is downloaded without a dialog
+Uložit jako – název souboru:	Save as – file name:
+v odkazu	in the link
+v úložišti	in storage
+VRML (síť)	VRML (mesh)
+výkres {0}	drawing {0}
+výkres {0}, list {1}	drawing {0}, sheet {1}
+výkres DWG	drawing DWG
+výkres DXF	drawing DXF
+výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]	drawing export pdf|dxf|dwg|svg|csv|png [sheet N|all] [name]
+výkres export potřebuje formát: {0}	drawing export needs a format: {0}
+výkres export: listy se číslují celými čísly od 1 – „{0}“	drawing export: sheets are numbered with whole numbers from 1 – “{0}”
+výkres export: neznámý formát „{0}“ – {1}	drawing export: unknown format “{0}” – {1}
+výkres export: za „{0}“ chybí číslo nebo název listu – {1}	drawing export: sheet number or name missing after “{0}” – {1}
+výkres PDF	drawing PDF
+výkres SVG	drawing SVG
+Wavefront OBJ (síť)	Wavefront OBJ (mesh)
+Zadejte název souboru.	Enter a file name.
+zatím žádný sdílený odkaz – vytvořte ho příkazem „sdílet“	no shared link yet – create one with “share”
+  – kontrola {0} vynechána („bez kontroly“)	  – {0} check skipped (“no check”)
+ (model od minulé kontroly beze změny)	 (model unchanged since the last check)
+soubor neobsahuje žádný tvar	the file contains no shape

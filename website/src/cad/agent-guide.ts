@@ -27,6 +27,8 @@ do 3D okna (výběr hran a ploch pravidlem).
    jako text; \`window.mncad.guide()\` vrátí tento návod; \`window.mncad.commands()\` seznam příkazů;
    \`window.mncad.openConsole()\` otevře konzoli; \`await window.mncad.exportFile("step")\` (step, stl, brep, obj, glb,
    3mf, wrl, mncad) vrátí \`{ name, mime, bytes, base64 }\` **bez dialogu** – pro agenty a skripty, které potřebují soubor;
+   \`await window.mncad.save("název")\` stáhne projekt .mncad bez dialogu (jako příkaz \`uložit\`) a vrátí
+   \`{ name, mime, bytes, format, log }\`;
    \`await window.mncad.measure("F3", "F7")\` změří jako příkaz \`měřit\` a vrátí řádky + čísla (viz „Měření“);
    \`window.mncad.progress()\` vrátí průběh běžícího výpočtu (\`{ label, index, total, name, seconds }\` nebo \`null\`) a
    \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem).
@@ -57,7 +59,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`obdélník W H [v x y]\` / \`obdélník W H roh x y\` | obdélník středem (výchozí počátek) nebo rohem |
 | \`kružnice D [v x y]\` / \`kružnice poloměr r\` | kružnice |
 | \`mnohoúhelník N D [v x y]\` · \`drážka L W [úhel a]\` · \`úsečka x1 y1 x2 y2\` · \`bod x y\` · \`elipsa rx ry\` | další entity; předpona \`pomocná\` = konstrukční |
-| \`čára x1 y1 x2 y2 [r N] x3 y3 … [uzavřít]\` | lomená čára; \`r N\` za bodem zaoblí tento roh poloměrem N (vzniknou úsečky a tečné oblouky) |
+| \`čára x1 y1 x2 y2 [r N] x3 y3 … [uzavřít|otevřená]\` | lomená čára; \`r N\` za bodem zaoblí tento roh poloměrem N (vzniknou úsečky a tečné oblouky); kdy se uzavře – viz „Profil ze skici textem – uzavřené obrysy“ |
 | \`oblouk x1 y1 xm ym x2 y2\` | oblouk třemi body: začátek, bod na oblouku, konec |
 | \`spline x1 y1 x2 y2 x3 y3 … [uzavřít]\` | hladká křivka přes zadané body |
 | \`vazba <druh> <odkaz> [<odkaz> …]; <druh> …\` | vazba ve skice (vodorovně, kolmo, tečně, shodně…); odkazy na entity \`e1\`, \`e1.a\`, \`počátek\` |
@@ -99,6 +101,8 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`výkres pohled pomocný přední hrana x1 y1 x2 y2\` · \`výkres řez zalomený|natočený|částečný …\` · \`výkres přerušení přední x od 50 do 250\` · \`výkres uložení Ø40 H7\` · \`výkres revize značka B na Ø40\` · \`výkres zóny ano\` | pomocný pohled, řezy lomenou čarou, částečný řez, přerušený pohled, uložení ISO 286 s Tabulkou uložení, trojúhelníky revizí a zóny (viz „Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize“) |
 | \`výkres značka drsnost Ra 1,6 na Ø40\` · \`výkres kóta vodorovně pohled přední x1 y1 x2 y2\` · \`výkres upravit a3 odsazení=8\` · \`výkres smazat a3\` · \`výkres detail přední v x y poloměr r\` · \`výkres model "Hřídel"\` | značky, ruční kóty, úpravy, detaily a další modely – vše, co jde ve výkrese myší; export \`window.mncad.exportDrawing("pdf")\` |
 | \`smazat poslední\` · \`stav\` · \`zobraz iso|přední|horní…\` · \`kolize\` | správa; kolize = kontrola průniků komponent sestavy |
+| \`uložit [název]\` · \`export step|stl|brep|obj|glb|3mf|wrl|mncad [název]\` · \`výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]\` · \`skica export dxf ["Skica 1"]\` | výstupy **bez dialogu** – soubor se rovnou stáhne, protokol napíše název, velikost a formát; u STEP / BREP kontrolu „věrná kopie modelu“ (viz „Výstupy z konzole bez dialogů“) |
+| \`sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]\` · \`odkaz\` | sdílený odkaz – adresa se vypíše do protokolu na řádek \`URL: …\`; \`odkaz\` ji vypíše znovu |
 | \`upravit\` · \`potlačit\` / \`zapnout\` · \`smazat <prvek>\` · \`přejmenovat\` · \`přesunout\` · \`duplikovat\` · \`zpět\` / \`znovu\` · \`proměnná\` · \`konfigurace\` · \`skica "Skica 1"\` · \`entita\` · \`kóta k1\` · \`odsadit\` · \`promítnout hrany\` | úpravy hotového modelu a skici na místě – viz „Úpravy existujícího modelu“ |
 | \`zobraz stínovaný|hrany|drátový|skryté|průhledný|přizpůsobit\` · \`řez X|Y|Z [poloha] [obráceně]\` · \`řez vyp\` | styl 3D okna a řez modelem (viz „Soubory, obraz, výstupy a analýzy“) |
 | \`barva plochy F3 [F5 …]|<pravidlo> #rrggbb|výchozí\` · \`akce <id|popisek>\` | barva ploch; akce rozšíření bez prvku (rozvin DXF / SVG, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn, skica DXF) |
@@ -134,6 +138,61 @@ Bod skici \`(u; v)\` leží ve 3D v bodě \`počátek + u·X_skici + v·Y_skici\
   \`směr …\` / \`sklon …\` (viz „Šikmé vysunutí, úkos dovnitř / ven a břit“).
 - U obecné roviny se bez \`osax\` zvolí X skici kolmo na normálu co nejblíž ose X modelu (u normály ±X ose Y). V JSON je
   to \`"plane": { "kind": "custom", "origin": [x,y,z], "normal": [nx,ny,nz], "xDir": [ux,uy,uz] }\`.
+
+### Profil ze skici textem – uzavřené obrysy
+
+Vysunout, rotovat nebo táhnout jde jen **uzavřený obrys**: řetěz entit, kde každý konec navazuje přesně na konec další
+entity (úsečka, oblouk, spline, lomená čára), nebo uzavřený tvar (obdélník, kružnice, mnohoúhelník, drážka, elipsa,
+uzavřená čára). Kdy je \`čára\` (lomená čára, i se zaoblenými rohy \`r N\`) uzavřená:
+
+1. \`uzavřít\` (EN \`close\`, DE \`schließen\`) a \`otevřená\` (EN \`open\`, DE \`offen\`) platí **vždy** (slovo smí stát kdekoli).
+2. První bod = poslední bod → uzavřená (opakovaný bod se vynechá).
+3. Jinak rozhodne **celá skica**: tvoří-li čára s dalšími entitami **uzavřený obrys** (oba její konce propojuje řetěz
+   jiných entit – úseček, oblouků, splinů, čar; konce do 0,05 mm), je **otevřená** – je částí obrysu složeného z více
+   entit. Jinak se uzavře (samostatný obrys, jako dřív) a protokol napíše
+   \`ℹ čára e3 uzavřena – konce nebyly napojené; „otevřená“ ji nechá otevřenou\` (navazuje-li jen jedním koncem, třeba
+   lopatky z jednoho středu: \`… uzavřena – navazuje na e2, ale uzavřený obrys s nimi netvoří …\`). Čára, kterou by
+   uzavírací úsek křížil nebo překrýval (neplatný obrys), zůstane otevřená (\`ℹ čára e1 je otevřená – uzavírací úsek by ji
+   křížil nebo překrýval v [30; 15] …\`). Vznikne-li obrys až **pozdějším řádkem** nebo úpravou \`entita …\`, čára se
+   otevře (\`ℹ čára e1 otevřena – na její konce nově navazuje e3\`) – obrys tedy smíte psát po řádcích v libovolném
+   pořadí. Pomocné entity (\`pomocná …\`) rozhodují jen mezi sebou.
+4. Jako **dráha** (tažení – dráha i vodicí křivka, žebro, plechové žebro, pole podél křivky, dělicí čára úkosu) se
+   automatické uzavření **nepoužije**: osamocená \`čára 0 0 0 50 r 10 50 50\` je tam otevřená křivka (L se zaobleným
+   rohem); uzavřenou dráhu napište s \`uzavřít\`.
+
+Stav skici (\`stav\`) u každé čáry vypíše \`otevřená\` / \`↺ uzavřená\` / \`↺ uzavřená automaticky\` a řádek **profil:** –
+\`profil: 1 uzavřený obrys (e1–e3) ✓\`, nebo \`profil: … · ⚠ problémů N:\` a pod ním každý problém zvlášť s id entit a
+souřadnicemi: \`otevřený konec e5 v [10; 20]\`, \`mezera 0,02 mm mezi e1 [20; 10] a e2 [20,02; 10]\`, \`e2 kříží e7 v [x; y]\`,
+\`e3 kříží sama sebe v [x; y]\`, \`e5 se dotýká e2 v [x; y]\` (konec uprostřed jiné entity), \`e1 a e5 se překrývají v úseku …\`,
+\`e1 a e5 jsou duplicitní\`, \`v bodě [x; y] se stýká 3 konců\` (větvení), \`e1 byla uzavřena automaticky a její uzavírací
+úsek kříží e2\`, \`otevřený konec e2 v [20; 10] leží na obrysu e1 – e2 do žádného obrysu nepatří; e1 je uzavřená čára –
+má-li být částí obrysu s e2, napište u ní „otevřená“\` (entita visí na obrysu, ale profil ji nepoužije). Selže-li
+vysunutí / rotace / tažení, chyba prvku (✗) obsahuje tytéž důvody (\`Profil skici „Skica 1“: otevřený konec e1 v [0; 40];
+…\`); projde-li prvek s vadným profilem (křížení, překryv, mezera, entita s koncem na obrysu, která do něj nepatří…),
+dostane ⚠ se stejným popisem – **✓ bez ⚠ znamená, že profil použil všechny křivky skici**. Opravte souřadnice
+(\`entita e4 a=0;40\`), uzavření (\`entita e1 uzavřená=ne\`), smažte duplicitu (\`smazat e5\`) nebo doplňte chybějící entitu.
+U velkých skic se počítá nejvýš 500 problémů (\`problémů 500+\`) a průsečíky se nehledají nad 4000 úseků.
+
+Profil z úseček, oblouků a lomených čar (po řádcích; obě čáry zůstanou otevřené, vznikne jeden obrys, 13,21 cm³):
+
+\`\`\`
+nový díl Úhelník
+skica XY
+čára 0 0 80 0 80 10 20 10
+oblouk 20 10 12,928932 12,928932 10 20
+čára 10 20 10 60 0 60 0 0
+vysunout 10
+stav
+\`\`\`
+
+Osamocená čára jako samostatný obrys (uzavře se automaticky; jistější je napsat \`uzavřít\`):
+
+\`\`\`
+nový díl Trojúhelník
+skica XY: čára 0 0 60 0 60 40
+vysunout 5
+stav
+\`\`\`
 
 ### Vazby a kóty ve skice textem
 
@@ -428,7 +487,7 @@ pružina 22 stoupání 4 závity 5 drát 2 na střed plochy F15 nové těleso "P
 - \`srazit D úhel A plocha F3 [hrany …]\` · \`srazit D1 D2 plocha F3 [hrany …]\` – vzdálenost + úhel, nebo dvě vzdálenosti; D / D1 se
   měří na referenční ploše F3 (bez \`hrany\` = všechny hrany té plochy).
 - \`zaoblit 2 hrany E3 E7\` · \`srazit 1 hrany E5\` · \`skořepina 2 otevřít F3 F5\` · \`úkos 3 plochy F2 F4\` – hrany a plochy **čísly**
-  (popisky pro výběr) místo pravidla; čísla a slova pravidla nelze míchat.
+  (popisky pro výběr) místo pravidla; s dalšími slovy pravidla se čísla zužují (\`hrany E2,E9,E10 svislé\` = jen svislé z nich).
 - Co dál jde jen přes \`prvek\` / \`upravit\` (proměnný poloměr zaoblení, přeskočené instance pole, tenká stěna, ukončení druhého
   směru…), ukáže \`prvek nápověda\` (přehled) a \`prvek nápověda <typ>\` (pole s „jen prvek / upravit / JSON“).
 
@@ -496,7 +555,8 @@ prvky \`fillet\` (pole \`kind\`) a \`draft\` (pole \`partingSketchId\`, \`step\`
   formy jdou vyjmout. Skica **kolmá na tah** (\`skica XY odsazení 10: …\`) = rovinná dělicí křivka, její rovina je neutrální
   rovinou obou stran (přesně). Skica **rovnoběžná s tahem** (\`skica XZ: čára 0 10 30 10 30 20 60 20\`) = profil dělicí čáry
   promítnutý podél normály skici přes celý díl; křivka musí postupovat jedním směrem, konce se samy prodlouží za díl
-  (ve směru krajního úseku). \`čára\` se 3+ body se ve skice uzavírá – uzavírací úsek se u dělicí čáry vynechá.
+  (ve směru krajního úseku). Automatické uzavření osamocené \`čáry\` (i se zaoblenými rohy \`r N\`) se u dělicí čáry
+  nepoužije a uzavírací úsek výslovně uzavřené čáry se vynechá – dělicí čára je vždy otevřená křivka.
   Přímé úseky drží dělicí čáru přesně, oblouky / spline se rozdělí na rovinné úseky (⚠ přibližně), svislé skoky jsou stupně.
 - **Stupňovitý úkos** – \`… dělicí "Skica 2" stupňovitý\`: každý úsek dělicí čáry se zkosí od vlastní roviny kolmé na tah
   (výška úseku, u šikmého jeho střed) a sousední úseky spojí stupňové plochy – klasický stupňovitý úkos formy.
@@ -788,7 +848,7 @@ tabulka ohybů\` je vypíše v oddílu „Tvarování“.
 |---|---|---|
 | \`žaluzie\` / \`louvre\` / \`kieme\` | délka šířka výška | \`vlevo\` / \`vpravo\` = otevřená strana (vlevo od osy natočení) |
 | \`prolis\` / \`dimple\` / \`napf\` | průměr hloubka [úhel stěny] | \`úhel 60\` (od roviny plechu, 90 = svisle), \`ostrý\` |
-| \`žebro\` / \`bead\` / \`sicke\` | šířka výška [úhel stěny] | \`skica "Dráha"\` (úsečky, lomené čáry, oblouky, kružnice; bez = poslední skica) |
+| \`žebro\` / \`bead\` / \`sicke\` | šířka výška [úhel stěny] | \`skica "Dráha"\` (úsečky, lomené čáry, oblouky, kružnice; bez = poslední skica; automaticky uzavřená čára je tu otevřená, uzavřenou dráhu napište s \`uzavřít\`) |
 | \`výstřih\` / \`lance\` / \`lasche\` | délka šířka výška [úhel náběhu] | otevřený konec ve směru +X natočení |
 | \`můstek\` / \`bridge\` / \`brücke\` | délka šířka výška [úhel náběhu] | boky prostřižené, konce spojené |
 | \`lem díry\` / \`collar\` / \`durchzug\` | průměr díry výška límce | límec od plochy plechu |
@@ -1042,6 +1102,71 @@ Dokument je JSON objekt:
 - Sestava: \`"kind": "assembly"\`, \`"components": [ { "name": "Díl", "source": { "kind": "part", "doc": { …dokument dílu… } },
   "placement": { "position": [0,0,0], "rotation": [0,0,0] } } ]\`, vazby \`"mates"\`.
 
+## Výstupy z konzole bez dialogů – uložit, export, výkres, sdílet
+
+Agent, který umí jen psát do konzole (nebo volat \`window.mncad.run\`) a klikat, dokončí celou práci **uvnitř CADu** –
+uložení, export, výkres i sdílený odkaz. Výstupní příkazy nikdy neotevřou systémový dialog („Uložit jako“, dotaz na
+název): soubor se rovnou stáhne do složky Stažené pod výchozím nebo zadaným názvem a protokol napíše **název souboru,
+velikost a formát**. Příkazy lze psát za modelovací řádky v témže vstupu – pracují s dokumentem v tom stavu, v jakém
+je na jejich řádku.
+
+| Příkaz (EN · DE) | Co udělá |
+| --- | --- |
+| \`uložit [název]\` (\`save\` · \`speichern\`) | projekt .mncad (bez názvu podle dílu: \`Konzola.mncad\`); kontrola, že soubor jde znovu otevřít (počet prvků) |
+| \`export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]\` (\`export\` · \`exportieren\`) | 3D model; u **STEP a BREP kontrola**: stažený soubor se znovu načte jádrem a porovná s modelem – počet těles, objem (rozdíl v %) a obálka (odchylka v mm); bez sítě, opakovaný export nezměněného modelu ji nepočítá znovu; \`bez kontroly\` (\`no check\` · \`ohne prüfung\`) ji vynechá |
+| \`výkres export pdf|dxf|dwg|svg|csv|png [list N|N|vše] [název]\` (\`drawing export\` · \`zeichnung export\`) | list výkresu (bez listu aktivní; \`list 2\` i holé \`2\` = list 2, jen celá čísla od 1; \`vše\` = každý list zvlášť, \`…_list2.pdf\`; číselný název souboru: \`jako 2\`); výkres nejdřív \`výkres A3 …\` a \`kótovat\` |
+| \`skica export dxf ["Skica 1"] [jako název]\` (\`sketch export dxf\` · \`skizze export dxf\`) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
+| \`sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]\` (\`share\` · \`freigeben\` – německé \`teilen\` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v protokolu na řádku \`URL: …\`** a zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
+| \`odkaz\` (\`link\`) | vypíše poslední sdílený odkaz znovu |
+
+\`\`\`
+uložit
+# ✓ uloženo: Konzola.mncad · 1,9 kB · projekt Mnástrojárna CAD (.mncad) – staženo (bez dialogu)
+#   ✓ kontrola: projekt jde znovu otevřít – „Konzola“, 5 prvků
+export step
+# ✓ export STEP: Konzola.step · 41 kB · STEP AP214 – staženo (bez dialogu)
+#   ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 46 701 mm³ (rozdíl 0,0000 %), obálka 80,00 × 50,00 × 12,00 mm (odchylka 0,0000 mm) → věrná kopie modelu
+výkres A3 na šířku pohledy přední,horní,iso
+kótovat
+výkres export pdf
+# ✓ výkres PDF: Konzola_vykres.pdf · 83 kB · výkres PDF – staženo (bez dialogu)
+sdílet
+# ✓ sdílený odkaz vytvořen – „Konzola“ (model), platí do: 23. 11. 2026, bez hesla, 1,3 kB v odkazu
+# URL: https://www.mnastrojarna.cz/cad#s=1d.…
+#   (zkopírováno do schránky)
+\`\`\`
+
+- Kontrola STEP / BREP: \`✓ … věrná kopie modelu\` = soubor obsahuje totéž těleso (objem do 0,1 %, obálka do 0,01 mm).
+  \`⚠ kontrola STEP: soubor se od modelu liší – …\` napíše, co nesedí (tělesa, objem, obálka) – opravte prvky s ⚠ / ✗
+  (\`stav\`) a export zopakujte. \`✗ kontrola …: soubor se nepodařilo znovu načíst\` = soubor je poškozený nebo prázdný.
+- Chybný zápis skončí řádkem ✗ se správným zápisem (\`export pdf\` → „výkres se exportuje příkazem výkres export pdf“).
+- Prohlížeč se může po několika staženích za sebou zeptat „Stáhnout více souborů?“ – to je lišta prohlížeče, ne dialog
+  CADu; povolte ji jednou pro tuto stránku.
+
+### Prohlížeč ovládaný automatizací – žádná systémová okna
+
+Když prohlížeč ovládá automatizace (\`navigator.webdriver === true\` – Playwright, Selenium, Puppeteer, WebDriver BiDi)
+nebo má adresa příznak **\`?agent=1\`** (např. \`https://www.mnastrojarna.cz/cad?agent=1\` pro rozšíření prohlížeče,
+které webdriver nenastavuje), CAD neotevře žádné systémové okno, na kterém by automatizace uvízla:
+
+- **Tlačítka** Uložit projekt, Uložit jako, Ctrl+S, Soubor ▸ export 3D, export výkresu (PDF / DXF / DWG…), CSV porovnání
+  stahují rovnou pod výchozím názvem (bez dialogu „Uložit jako“). Člověk bez automatizace dialog dál dostane; trvale ho
+  vypne Nastavení → Soubory (\`window.mncad.setSettings({ askWhereToSave: false })\`).
+- **Dotazy a potvrzení** jsou dialogy na stránce (nikdy \`window.prompt\` / \`confirm\` / \`alert\`): překrytí
+  \`[data-ask="number|text|confirm"]\`, nadpis \`[data-ask-title]\`, text \`[data-ask-body]\`, pole \`[data-ask-input]\`,
+  chyba \`[data-ask-error]\`, tlačítka \`[data-ask-ok]\` a \`[data-ask-cancel]\`. Fokus je po otevření v poli (u potvrzení
+  na OK) – **Enter = OK, Esc = zrušit**. Např. Delete s vybraným tělesem → potvrzení „Smazat celé těleso…“.
+  Enter / Esc platí pro dotaz, i když fokus do něj ještě nepřešel; dokud je dotaz otevřený, klávesové zkratky CADu
+  (Delete, Ctrl+S…) se neprovedou – jako u systémového okna.
+- Zavření karty s neuloženou prací se v automatizaci **neptá** (žádný dotaz beforeunload).
+- **Tisk** ve výkresovém prostředí v automatizaci neotevře dialog tisku, ale stáhne stejný list jako PDF.
+- Příznak \`?agent=1\` si karta pamatuje i po přechodu na jinou adresu (přepnutí jazyka \`/cad\` → \`/en/cad\`); vypne ho
+  \`?agent=0\`.
+- Zbývají jen tlačítka, která otevírají okno systému nebo jiného programu – v automatizaci je **nepoužívejte**: výběr
+  souboru u Otevřít (soubor předejte \`window.mncad.importFile({ name, base64 })\`), v dialogu sdílení „Sdílet…“
+  (systémová nabídka sdílení) a „E-mail“ (otevře poštovní program, prohlížeč se na něj ptá) – místo nich příkaz
+  \`sdílet\` a adresa z řádku \`URL: …\`.
+
 ## Soubory, obraz, výstupy a analýzy – API pro agenty
 
 Vše z tohoto oddílu funguje bez dialogů a bez klikání; textové příkazy píší do protokolu jeden řádek ✓ / ✗ s výsledkem.
@@ -1074,7 +1199,16 @@ barva plochy F3 F5 #e03930   # nebo pravidlem: barva plochy horní modrá · bar
 **Výběr.** \`window.mncad.select(["F3", "E2"])\` vybere entity stejně jako klik (bez trefování, bez ohledu na filtr a na
 limit popisků), v sestavě \`"comp:Čep"\` nebo \`"Čep:F3"\`, prvek historie \`"feature:Díra 1"\`; \`{ additive: true }\` přidá
 k výběru. \`window.mncad.selection()\` vrátí výběr (\`{ id: "F3", kind: "face", index: 2 }\` – id jako popisky a příkaz
-\`měřit\`), \`window.mncad.clearSelection()\` ho zruší (Esc).
+\`měřit\`), \`window.mncad.clearSelection()\` ho zruší (Esc). Textem v konzoli: \`vyber F3 E2\` (jako klik; id lze
+oddělit i \`;\` nebo \`,\`), \`vyber F4 přidat\` (jako Ctrl + klik), \`vyber Čep:F3\` / \`vyber comp:Čep\` v sestavě,
+\`vyber nic\` (zruší), samotné \`vyber\` výběr vypíše (EN \`select F3 E2 / select F4 add / select none\`, DE
+\`auswählen …\`). Je-li v sestavě víc stejně pojmenovaných komponent (dvakrát vložený díl), id je pořadí komponenty:
+\`#2:F3\`, \`comp:#2\` (vrací je i \`selection()\` po kliknutí, platí i pro \`měřit\`); samotný víceznačný název
+skončí chybou s výčtem. Výběr převezmou **tlačítka** Zaoblit / Sražení / Skica na pásu karet a „+ aktuální výběr“
+v otevřeném formuláři prvku – **textové příkazy výběr nečtou**: \`zaoblit 3\` bez \`hrany\` zaoblí všechny hrany
+(je-li vybraná hrana, protokol na to upozorní řádkem „! … zpracují se všechny hrany …“).
+Vybrané entity v nich zadejte čísly: \`zaoblit 3 hrany E2;E5\`, \`srazit 1 hrany E2\`, \`skořepina 2 otevřít F3\`,
+\`skica plocha F3: …\` (čísla lze kombinovat s pravidlem: \`hrany E2;E5;E9 svislé\`).
 
 **Výstupy.** \`await window.mncad.action("sheet.dxf")\` spustí akci rozšíření (tlačítko bez prvku v historii) a vrátí
 \`{ log, files: [{ name, mime, bytes, base64 }] }\` – Rozvin → DXF / SVG, Tabulka ohybů, Kusovník řezů (+ CSV), Tabulka
@@ -1135,6 +1269,25 @@ pixely v 3D okně:
    pole s popisky, \`Enter\` = OK, \`Esc\` = Storno. Stavový řádek dole říká, co je vybráno a co příkaz očekává.
 4. Po každém kroku lze stav ověřit textem (\`stav\` v konzoli nebo \`window.mncad.status()\`) – není nutné číst
    obrázek.
+5. **Prohlížeč bez WebGL** (headless Chrome bez grafiky, vypnutá akcelerace): místo 3D okna se kreslí **softwarový
+   náhled** (\`[data-viewport-fallback="soft"]\`, plátno \`[data-soft-canvas]\`, horní lišta hlásí „3D okno: nedostupné“).
+   Výběr v něm funguje stejně jako ve 3D okně: **klik** vybere plochu (nejbližší ke kameře), hranu (do ~6 px, jen
+   viditelnou) nebo vrchol (do ~7 px), **Ctrl / Shift + klik** přidá či odebere, platí filtr výběru (stavový řádek),
+   kliknuté hrany a plochy berou formuláře prvků (Zaoblit, Skořepina, „+ aktuální výběr“), skica na ploše, měření,
+   řez rovinou plochy i vazby sestav (plocha komponenty). Najetí entitu zvýrazní oranžově, vybraná je červená, po
+   kliknutí se objeví rychlá lišta příkazů. Popisky (\`window.mncad.hints(true)\`) mají v náhledu celočíselné souřadnice
+   (vůči plátnu \`[data-soft-canvas]\`) a leží jen tam, kde klik – i o 1 px vedle (zaokrouhlení) – vybere právě jejich entitu
+   a kam klik opravdu dopadne na plátno (ne pod upozorněním náhledu, panelem vlastností vybrané entity ani lištou);
+   entity bez takového místa (zakryté, příliš malé) popisek nemají. \`clickHint\` funguje. Náhled je pravoúhlý (bez
+   perspektivy), otáčí se tažením, posouvá Shift + tažením, pohledy jsou tlačítka nahoře (\`[data-soft-view="top"]\`).
+   Bez myši: \`vyber F3 E2\` nebo \`window.mncad.select(["F3", "E2"])\`.
+   **Plné 3D v automatizovaném Chromu:** WebGL vypne přepínač \`--disable-software-rasterizer\` (a \`--disable-webgl\`,
+   \`--disable-3d-apis\`) – ten nepoužívejte a přidejte \`--enable-unsafe-swiftshader\` (Playwright:
+   \`chromium.launch({ args: ["--enable-unsafe-swiftshader"] })\`, případně \`--use-angle=swiftshader\`); WebGL pak
+   běží softwarově přes SwiftShader. Ověřeno s Playwright Chromium 153 (headless): bez přepínačů i s nimi WebGL 2 přes
+   SwiftShader; s \`--disable-software-rasterizer\` WebGL chybí i s \`--enable-unsafe-swiftshader\`. Novější Chrome bez
+   GPU vyžaduje pro SwiftShader právě \`--enable-unsafe-swiftshader\`. Zda 3D běží:
+   \`!!document.createElement("canvas").getContext("webgl2")\`.
 
 ## Materiál, výkres a export – co je dobré vědět
 
@@ -1149,8 +1302,10 @@ pixely v 3D okně:
 - Nové výkresy mají **Chytré kóty** (kótování podle prvků, viz další kapitola). Tlačítko **Kontrola kót** ve výkresu
   porovná kóty na listu s historií prvků a vypíše, co chybí; totéž je v \`výkres stav\`. Tolerance (H8, ±0,1) se píší
   příkazem \`výkres tolerance\` nebo u kóty do pole „přípona“.
-- Ukládání a export se standardně ptají na místo a název (systémový dialog – pro agenta „blokující“). V Nastavení →
-  Soubory lze zapnout **přímé stažení pod výchozím názvem**; pro skripty je nejjednodušší \`window.mncad.exportFile()\`.
+- Ukládání a export z **konzole** (\`uložit\`, \`export step\`, \`výkres export pdf\`, \`sdílet\`) se nikdy neptají – soubor se
+  rovnou stáhne. Tlačítka se člověka ptají na místo a název (systémový dialog), v prohlížeči ovládaném automatizací
+  (\`navigator.webdriver\`, \`?agent=1\`) stahují rovnou; trvale to zapne Nastavení → Soubory (přímé stažení). Pro skripty
+  vrací \`window.mncad.exportFile()\` soubor jako base64.
 
 ## Výkres a kóty – postup a pravidla pro AI
 
@@ -1482,8 +1637,9 @@ Výkres:
    Jednotlivé rozměry, díry a polohy ověříte příkazem \`měřit\` (oddíl „Měření“).
    Pracujete-li podle předlohy, na konci vždy proveďte **kontrolu 1:1** (oddíl „Model nebo výkres podle předlohy“).
    U sestavy přibude řádek Sestava (komponenty, obálka, objem, hmotnost) a Kolize (\`kolize\` spustí kontrolu).
-5. Výstupy: Soubor → Export 3D (STEP, STL…), Výkres → PDF/DXF/DWG, Sdílet odkazem (odkaz pro lidi), Uložit
-   projekt (.mncad). Tyto akce otevírají systémový dialog uložení – to je jediné místo, kde je potřeba klik.
+5. Výstupy přímo z konzole, bez dialogů a bez klikání: \`uložit\`, \`export step\` (s kontrolou „věrná kopie modelu“),
+   \`výkres export pdf\`, \`sdílet\` (adresa na řádku \`URL: …\`) – viz „Výstupy z konzole bez dialogů“. Stejná místa
+   v nabídce Soubor (Export 3D, Výkres → PDF/DXF/DWG, Sdílet odkazem, Uložit projekt) v automatizaci také stahují rovnou.
 
 Historie prvků v levém panelu, formuláře, nabídky i pás karet mají textové popisky (title/aria-label), takže
 fungují i s čtečkou stránky. Konzole má textové pole s popiskem „Textové příkazy nebo JSON“ a výstup s popiskem

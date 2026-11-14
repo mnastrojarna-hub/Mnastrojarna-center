@@ -825,7 +825,7 @@ export function EntityProps({ e, onChange }: { e: SketchEntity; onChange: (n: Sk
               <Vec key={i} label={tr("Bod {0}", i + 1)} value={pt} onChange={(v: Vec2) => set({ points: e.points.map((q, k) => (k === i ? v : q)) } as Partial<SketchEntity>)} />
             ))}
           </div>
-          <Check label={tr("Uzavřená")} value={e.closed} onChange={(v) => set({ closed: v } as Partial<SketchEntity>)} />
+          <Check label={tr("Uzavřená")} value={e.closed} onChange={(v) => set({ closed: v, autoClose: undefined } as Partial<SketchEntity>)} />
         </>
       )}
       {e.type === "arc" && (

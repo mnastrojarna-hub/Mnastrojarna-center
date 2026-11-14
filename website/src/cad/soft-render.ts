@@ -129,7 +129,7 @@ export function hexToRgb(hex: string | null | undefined, fallback: RGB = [185, 1
 }
 
 /** Lineární část a posun matice umístění (po sloupcích); bez matice jednotková. */
-function affine(m: ArrayLike<number> | null | undefined): number[] {
+export function affine(m: ArrayLike<number> | null | undefined): number[] {
   if (!m || m.length < 16) return [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
   // [m00 m01 m02 | m10 m11 m12 | m20 m21 m22 | tx ty tz], mRC = řádek R, sloupec C
   return [m[0], m[4], m[8], m[1], m[5], m[9], m[2], m[6], m[10], m[12], m[13], m[14]];

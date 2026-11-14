@@ -52,7 +52,7 @@ import { ShareCta } from "./share-cta";
 import { CommandPalette, type Command } from "./command-palette";
 import { extPickOf, getExtUi, type ExtActionApi } from "./ext";
 import { weldFaceColors } from "@/cad/ext/weld-colors";
-import { extendMncad, runApiCmd, type ApiHost } from "./agent-api-host";
+import { extendMncad, runApiCmd, textSelectionNote, type ApiHost } from "./agent-api-host";
 import { LibraryDialog } from "./library-dialog";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { CompareDialog, type CompareView } from "./compare-dialog";
@@ -73,7 +73,9 @@ import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, typ
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
 import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
-import { AskHost, askNumber } from "./ask-dialog";
+import { AskHost, askBusy, askConfirm, askNumber } from "./ask-dialog";
+import { runOutCmd } from "./agent-out-host";
+import { isAutomation } from "@/lib/automation";
 import { ComputeChip, progressLabel } from "./compute-chip";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { FEATURE_TONE, Manager } from "./manager";
@@ -277,6 +279,8 @@ export function CadApp() {
   // ---------- historie ----------
   /** neuložené změny (v režimu „neukládat“ varuje prohlížeč před zavřením karty) */
   const dirty = useRef(false);
+  /** obsah naposled uloženého dokumentu (příkaz „uložit“ ukládá kopii běhu – shoda obsahu = nic neuloženého) */
+  const savedJson = useRef<string | null>(null);
   const commit = useCallback((next: CadDoc) => {
     dirty.current = true;
     setHist((h) => ({ past: [...h.past.slice(-80), h.present], present: next, future: [] }));
@@ -284,7 +288,8 @@ export function CadApp() {
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => {
       const d = histRef.current.present;
-      if (persistMode() === "none" && dirty.current && docHasContent(d)) {
+      if (isAutomation()) return; // automatizace / AI agent: žádný systémový dotaz při zavření karty (uvízla by na něm)
+      if (persistMode() === "none" && dirty.current && docHasContent(d) && JSON.stringify(d) !== savedJson.current) {
         e.preventDefault();
         e.returnValue = "";
       }
@@ -665,6 +670,8 @@ export function CadApp() {
             changed = true;
             log.push(tr("→ {0} ({1}) přidán – výsledek po výpočtu níže", f.name, f.type));
             if (op.note) log.push(`  ${op.note}`); // např. vrták závitové díry zadaný ručně (agent-hole.ts)
+            const selNote = textSelectionNote(f, apiHostRef.current); // zaoblit 3 při vybraných hranách: všechny hrany, ne výběr
+            if (selNote) log.push(selNote);
             break;
           }
           case "entities":
@@ -868,6 +875,10 @@ export function CadApp() {
             log.push(...r.log);
             break;
           }
+          case "out":
+            // uložit, export, výkres export, skica export, sdílet, odkaz – stažení bez dialogu (agent-out-host.ts)
+            log.push(...(await runOutCmd(op.cmd, d, apiHostRef.current!)));
+            break;
           case "pop": {
             const f = d.features.pop();
             changed = changed || !!f;
@@ -998,6 +1009,11 @@ export function CadApp() {
     asmParts: () => (isAsm && leaves.every((l) => asmCache.current.has(l.key)) ? leaves.map((l) => asmCache.current.get(l.key)) : null),
     status: agentStatus,
     exportModel: (f) => exportModel(f as ExportFormat),
+    drawEnv: () => drawEnvRef.current,
+    markSaved: (d) => {
+      savedJson.current = JSON.stringify(d);
+      if (d === histRef.current.present) dirty.current = false;
+    },
   };
   /** diagnostika prostředí pro podporu (bez dat dokumentu) do schránky */
   const copyDiagnostics = async () => {
@@ -2222,21 +2238,23 @@ export function CadApp() {
     setTab("create");
   };
   const removeFeature = (id: string) => {
-    commit({ ...doc, features: doc.features.filter((f) => f.id !== id) });
+    commitWith((d) => ({ ...d, features: d.features.filter((f) => f.id !== id) }));
     if (activeId === id) setActiveId(null);
     if (sketchId === id) setSketchId(null);
   };
   /** Smazat (Delete / tlačítko Smazat): upravovaný prvek, vybrané prvky, komponenty sestavy, plochy (Odstranit plochu), celé těleso. */
-  const deleteSelection = () => {
-    const ask = (msg: string) => !prefs.confirmDelete || window.confirm(msg);
+  const deleteSelection = async () => {
+    // potvrzení dialogem na stránce (ne window.confirm – automatizace by na něm uvízla)
+    const ask = async (msg: string) => !prefs.confirmDelete || (await askConfirm(msg, { danger: true }));
     if (active) {
-      if (!ask(tr("Smazat prvek „{0}“?", active.name))) return;
+      if (!(await ask(tr("Smazat prvek „{0}“?", active.name)))) return;
       return removeFeature(active.id);
     }
     const feats = selection.flatMap((x) => (x.kind === "feature" ? [x.featureId] : []));
     if (feats.length) {
-      if (!ask(tr("Smazat {0} prvků z historie?", feats.length))) return;
-      commit({ ...doc, features: doc.features.filter((f) => !feats.includes(f.id)) });
+      if (!(await ask(tr("Smazat {0} prvků z historie?", feats.length)))) return;
+      // po potvrzení nad AKTUÁLNÍM dokumentem – co přibylo, zatímco byl dotaz otevřený (konzole, API), zůstane
+      commitWith((d) => ({ ...d, features: d.features.filter((f) => !feats.includes(f.id)) }));
       setSelection([]);
       return;
     }
@@ -2245,16 +2263,17 @@ export function CadApp() {
       for (const x of selection) if (x.kind === "component" || x.kind === "body") { const top = (x.topId ?? x.compId)?.split("/")[0]; if (top) ids.add(top); }
       if (asmSel) ids.add(asmSel);
       if (!ids.size) return flash(tr("Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu)."));
-      if (!ask(tr("Odebrat {0} komponent ze sestavy?", ids.size))) return;
-      commit({ ...doc, components: (doc.components ?? []).filter((c) => !ids.has(c.id)) });
+      if (!(await ask(tr("Odebrat {0} komponent ze sestavy?", ids.size)))) return;
+      commitWith((d) => ({ ...d, components: (d.components ?? []).filter((c) => !ids.has(c.id)) }));
       setAsmSel(null);
       setSelection([]);
       return;
     }
     if (selection.some((x) => x.kind === "face")) return addWithFaces("deleteFace");
     if (selection.some((x) => x.kind === "body")) {
-      if (!window.confirm(tr("Smazat celé těleso, tj. všechny prvky v historii dílu?"))) return;
-      commit({ ...doc, features: [] });
+      const all = new Set(doc.features.map((f) => f.id)); // prvky, jejichž smazání uživatel potvrzuje
+      if (!(await askConfirm(tr("Smazat celé těleso, tj. všechny prvky v historii dílu?"), { danger: true }))) return;
+      commitWith((d) => ({ ...d, features: d.features.filter((f) => !all.has(f.id)) }));
       setSelection([]);
       return;
     }
@@ -2528,6 +2547,7 @@ export function CadApp() {
       const file = `${safeName(doc.name)}.step`;
       download(file, () => buf, "application/step");
       track("cad_to_rfq");
+      if (isAutomation()) return flash(tr("STEP {0} stažen – e-mail se v automatizaci neotevírá (dotaz prohlížeče na poštovní program), pošlete ho na {1}.", file, SALES.email));
       const body = tr("Dobrý den,\n\nposílám model z Mnástrojárna CAD – soubor {0} jsem si stáhl do počítače a přikládám ho.\n\nMnožství:\nMateriál:\nTermín:\n\nS pozdravem\n", file);
       setTimeout(() => {
         window.location.href = `mailto:${SALES.email}?subject=${encodeURIComponent(`Poptávka z webu – ${doc.name}`)}&body=${encodeURIComponent(body)}`;
@@ -2554,6 +2574,7 @@ export function CadApp() {
   // ---------- klávesy ----------
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (askBusy()) return; // otevřený dotaz na stránce (potvrzení…) blokuje zkratky jako systémové okno – druhé Delete nepoloží druhý dotaz
       const field = (e.target as HTMLElement)?.closest?.("input,textarea,select") as HTMLElement | null;
       if (field) {
         if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr

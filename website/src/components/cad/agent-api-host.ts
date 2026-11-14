@@ -2,7 +2,7 @@
  * Automatizační rozhraní pro AI agenty – provedení se stavem aplikace (prohlížeč):
  *  - textové příkazy z agent-api.ts (řez, styl zobrazení, barva ploch, akce rozšíření, analýzy, formařské nástroje),
  *  - metody `window.mncad`: importFile, screenshot, compare, share, settings / setSettings, selection / select /
- *    clearSelection, action a export skici DXF (`exportFile("dxf")`).
+ *    clearSelection, action, export skici DXF (`exportFile("dxf")`) a save (projekt .mncad bez dialogu, agent-out-host.ts).
  * Aplikace (cad-app.tsx) předá přístup ke svému stavu objektem `ApiHost` (obnovuje se při každém vykreslení).
  */
 import type { Dispatch, SetStateAction } from "react";
@@ -54,7 +54,11 @@ import { uid, type AsmComponent, type BuildResult, type CadDoc, type Feature, ty
 import { getExtUi, type ExtActionApi } from "./ext";
 import { asmImportOutcome, partImportOutcome, subassemblyComponent, type PendingImport } from "./import-watch";
 import { flattenLeaves } from "./asm-flatten";
+import { compRef, leafByRef } from "./leaf-ref";
 import type { DraftSetup, SurfaceSetup } from "./mold-panel";
+import { rememberLink, saveProjectFile } from "./agent-out-host";
+import type { MncadOutApi } from "@/cad/agent-out";
+import type { DrawingExtras } from "@/cad/drawing-agent";
 import type { CompareView } from "./compare-dialog";
 import type { SelItem } from "./selection";
 import type { DisplayMode, Section, ViewName, ViewportHandle } from "./viewport";
@@ -105,6 +109,10 @@ export type ApiHost = {
   /** textový stav dokumentu (jako window.mncad.status) */
   status: () => Promise<string>;
   exportModel: (format: string) => Promise<void>;
+  /** hmotnost, kusovník a balónky pro razítko výkresu (výstupy z konzole – agent-out-host.ts) */
+  drawEnv?: () => DrawingExtras;
+  /** projekt uložen (neuložené změny = žádné) */
+  markSaved?: (d: CadDoc) => void;
 };
 
 /* ───────────────────────── pomocné ───────────────────────── */
@@ -223,6 +231,26 @@ export async function runApiCmd(cmd: ApiCmd, d: CadDoc, host: ApiHost): Promise<
     case "fit":
       host.vp()?.fit();
       return { log: [tr("✓ pohled přizpůsoben modelu")] };
+    case "select": {
+      // výběr textem (jako klik): indexy se ověří proti dokumentu tohoto běhu (díl se mohl právě změnit)
+      const res = isPartDoc(d) ? await cad.build(d).catch(() => null) : null;
+      select(host, cmd.ids, { additive: cmd.additive }, res);
+      const list = selectionOf(host);
+      const ids = list.map((x) => x.id);
+      // textové příkazy výběr nečtou (zaoblit 3 = všechny hrany) – návod, jak vybrané entity zadat čísly
+      const edges = list.filter((x) => x.kind === "edge" && !x.compId).map((x) => x.id);
+      const faces = list.filter((x) => x.kind === "face" && !x.compId).map((x) => x.id);
+      const ex = [...(edges.length ? [tr("zaoblit {0} hrany {1}", 2, edges.join(";"))] : []), ...(faces.length ? [tr("skica plocha {0}", faces[0])] : [])];
+      return { log: [tr("✓ výběr: {0} ({1}) – převezmou ho tlačítka Zaoblit / Sražení / Skica na pásu karet a „+ aktuální výběr“ ve formulářích; textové příkazy výběr nečtou{2}", ids.join(", "), ids.length, ex.length ? tr(" – textem: {0}", ex.join(" · ")) : "")] };
+    }
+    case "selectClear":
+      setSel(host, []);
+      host.inspect(null);
+      return { log: [tr("✓ výběr zrušen")] };
+    case "selectShow": {
+      const list = selectionOf(host).map((x) => (x.title && x.kind === "vertex" ? `${x.id} ${x.title}` : x.id));
+      return { log: [list.length ? tr("Výběr: {0}", list.join(", ")) : tr("Výběr je prázdný – klik do modelu, vyber F3 E2 nebo window.mncad.select([…])")] };
+    }
     case "faceColor": {
       if (!isPartDoc(d)) throw new Error(tr("barva plochy: otevřený dokument je sestava – barvu ploch lze měnit v dílu"));
       const t = await cad.topology(d);
@@ -634,6 +662,7 @@ async function share(host: ApiHost, o: ShareApiOptions = {}) {
   if (o.mode !== undefined && o.mode !== "link" && o.mode !== "store" && o.mode !== "self") throw new Error(tr("share: mode je link | store | self"));
   if (o.days !== undefined && o.days !== null && !(typeof o.days === "number" && o.days > 0)) throw new Error(tr("share: days je počet dní (např. 10) nebo null = bez omezení"));
   const r = await createShareLink(doc, { days: o.days === undefined ? SHARE_DEFAULT_DAYS : o.days, password: o.password || undefined, from: o.from || undefined, view: o.view ?? "model", mode: o.mode });
+  rememberLink({ url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, name: doc.name, view: o.view ?? "model", password: r.password }); // příkaz „odkaz“
   return { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, message: shareMessage(doc.name, r), chars: r.url.length, ...(r.note ? { note: r.note } : {}) };
 }
 
@@ -656,30 +685,28 @@ function selectionOf(host: ApiHost): SelectionEntry[] {
   const doc = host.doc();
   const leaves = !isPartDoc(doc) ? flattenLeaves(doc) : [];
   const compName = (id?: string) => (id ? (leaves.find((l) => l.id === id)?.comp.name ?? doc.components?.find((c) => c.id === id)?.name ?? id) : "");
+  // id komponenty, které `select` přečte zpět na tutéž instanci (u stejně pojmenovaných #2 – leaf-ref.ts)
+  const ref = (id?: string) => (id ? compRef(doc, leaves, id) : "");
   return currentSel(host).map((s): SelectionEntry => {
     if (s.kind === "feature") {
       const f = doc.features.find((x) => x.id === s.featureId);
       return { id: `feature:${f?.name ?? s.featureId}`, kind: "feature", title: f ? `${f.name} (${f.type})` : undefined };
     }
-    if (s.kind === "component") return { id: `comp:${compName(s.compId)}`, kind: "component", compId: s.compId, title: compName(s.compId) };
-    const pre = s.compId ? `${compName(s.compId)}:` : "";
+    if (s.kind === "component") return { id: `comp:${ref(s.compId)}`, kind: "component", compId: s.compId, title: compName(s.compId) };
+    const pre = s.compId ? `${ref(s.compId)}:` : "";
     if (s.kind === "body") return { id: `${pre}${tr("těleso")}`, kind: "body", ...(s.compId ? { compId: s.compId } : {}) };
     const L = s.kind === "face" ? "F" : s.kind === "edge" ? "E" : "V";
     return { id: `${pre}${L}${s.index + 1}`, kind: s.kind, index: s.index, ...(s.compId ? { compId: s.compId } : {}), title: s.kind === "vertex" ? `[${s.point.map((v) => Math.round(v * 1000) / 1000).join("; ")}]` : undefined };
   });
 }
 
-function select(host: ApiHost, ids: string[], o: { additive?: boolean } = {}): number {
+function select(host: ApiHost, ids: string[], o: { additive?: boolean } = {}, partResult?: BuildResult | null): number {
   if (!Array.isArray(ids)) throw new Error(tr("select potřebuje pole id, např. {0}", '["F3", "E2"]'));
   const doc = host.doc();
   const asm = !isPartDoc(doc);
   const leaves = asm ? flattenLeaves(doc) : [];
-  const leafBy = (name: string) => {
-    const n = name.trim().toLowerCase();
-    const hit = leaves.find((l) => l.comp.name.toLowerCase() === n) ?? leaves.find((l) => l.path.join("/").toLowerCase() === n);
-    if (!hit) throw new Error(tr("komponenta „{0}“ v sestavě není – komponenty: {1}", name, leaves.map((l) => l.comp.name).join(", ") || "—"));
-    return hit;
-  };
+  // název, cesta nebo pořadí #2; víceznačný název je chyba (ne tiše první instance) – leaf-ref.ts
+  const leafBy = (name: string) => leafByRef(doc, leaves, name);
   const items: SelItem[] = ids.map((raw) => {
     const s = parseSelectionId(raw);
     if (s.kind === "feature") {
@@ -689,12 +716,16 @@ function select(host: ApiHost, ids: string[], o: { additive?: boolean } = {}): n
     }
     if (s.kind === "component") {
       if (!asm) throw new Error(tr("comp:… vybírá komponentu sestavy – otevřený dokument je díl"));
-      const top = (doc.components ?? []).find((c) => c.name.toLowerCase() === s.name.trim().toLowerCase());
+      const comps = doc.components ?? [];
+      const nth = /^#(\d+)$/.exec(s.name.trim());
+      const named = nth ? [comps[Number(nth[1]) - 1]].filter(Boolean) : comps.filter((c) => c.name.toLowerCase() === s.name.trim().toLowerCase());
+      if (named.length > 1) throw new Error(tr("„{0}“ je v sestavě {1}× – zadejte pořadí: {2}", s.name, named.length, named.map((c) => `comp:#${comps.indexOf(c) + 1}`).join(", ")));
+      const top = named[0];
       if (top) return { kind: "component", compId: top.id, topId: top.id };
       const l = leafBy(s.name);
       return { kind: "component", compId: l.id, topId: l.topId };
     }
-    let res: BuildResult | null | undefined = host.result();
+    let res: BuildResult | null | undefined = partResult ?? host.result();
     let compId: string | undefined;
     let topId: string | undefined;
     let matrix: ArrayLike<number> | null = null;
@@ -730,12 +761,25 @@ function select(host: ApiHost, ids: string[], o: { additive?: boolean } = {}): n
   return next.length;
 }
 
+/**
+ * Textové zaoblení / sražení bez `hrany` zpracuje všechny hrany – výběr (klik, `vyber`) textové příkazy nečtou. Je-li
+ * vybraná nějaká hrana, protokol to řekne a ukáže zápis jen pro vybrané hrany (žádná tichá změna geometrie).
+ */
+export function textSelectionNote(f: Feature, host: ApiHost | null): string | null {
+  if (!host || (f.type !== "fillet" && f.type !== "chamfer") || f.edges !== "all") return null;
+  if (f.type === "fillet" && f.kind && f.kind !== "constant") return null;
+  const edges = selectionOf(host).filter((x) => x.kind === "edge" && !x.compId).map((x) => x.id);
+  if (!edges.length) return null;
+  const how = f.type === "fillet" ? tr("zaoblit {0} hrany {1}", f.radius, edges.join(";")) : tr("srazit {0} hrany {1}", f.distance, edges.join(";"));
+  return tr("! {0}: zpracují se všechny hrany – vybrané hrany ({1}) textové příkazy nečtou; jen vybrané: {2}", f.name, edges.join(", "), how);
+}
+
 /* ───────────────────────── window.mncad ───────────────────────── */
 /**
  * Doplní `window.mncad` o metody tohoto modulu a export skici DXF (`exportFile("dxf", { sketch })`).
  * `getHost` vrací aktuální přístup ke stavu aplikace (obnovuje se při každém vykreslení).
  */
-export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt>, getHost: () => ApiHost | null): MncadApi {
+export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof MncadOutApi>, getHost: () => ApiHost | null): MncadApi {
   const host = () => {
     const h = getHost();
     if (!h) throw new Error(tr("CAD ještě není připravený"));
@@ -771,6 +815,10 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt>, getHost: ()
     action: async (id) => {
       const r = await runAction(host(), id);
       return { log: r.log, files: r.files };
+    },
+    save: (name) => {
+      const h = host();
+      return saveProjectFile(h.doc(), name, h);
     },
   };
 }

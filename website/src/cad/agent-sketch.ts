@@ -14,6 +14,8 @@ import type { FaceLite } from "./agent";
 import { getLang, tr } from "./i18n";
 import type { Ref, Sig } from "./refs";
 import { keyPoints } from "./sketch";
+import { addWithAutoClose } from "./poly-close";
+import { profileStatusLines } from "./profile-check";
 import { analyzeSketch, measureDim, paramsOf, refCircle, refLine, refPoint, solveSketch, type SketchAnalysis } from "./sketch-solver";
 import { uid, type BuildResult, type CadDoc, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchPlane, type SketchRef, type Vec2, type Vec3 } from "./types";
 
@@ -525,10 +527,11 @@ export function applySketchOp(features: Feature[], op: SketchOp, openSketchId?: 
   const i = targetSketch(features, op.sketch, openSketchId);
   const sk = features[i] as SketchF;
   if (op.k === "entities") {
-    const ents = withTextIds(sk.entities, op.entities);
-    let next: SketchF = { ...sk, entities: [...sk.entities, ...ents] };
+    const m = addWithAutoClose(sk, withTextIds(sk.entities, op.entities)); // uzavření lomených čar podle celé skici (poly-close.ts)
+    const ents = m.added;
+    let next: SketchF = { ...sk, ...m.patch };
     const n = ents.length;
-    const out = [`${tr("✓ {0} {1} do skici „{2}“", n, n === 1 ? tr("entita") : n < 5 ? tr("entity") : tr("entit"), sk.name)}${n ? ` (${idList(ents.map((e) => e.id))})` : ""}`];
+    const out = [`${tr("✓ {0} {1} do skici „{2}“", n, n === 1 ? tr("entita") : n < 5 ? tr("entity") : tr("entit"), sk.name)}${n ? ` (${idList(ents.map((e) => e.id))})` : ""}`, ...m.notes];
     if (op.end && (next.constraints?.length || next.dims?.length)) {
       const r = solveSketchFeature(next);
       next = r.feature;
@@ -615,7 +618,7 @@ export function entityText(e: SketchEntity): string {
       case "slot":
         return `${tr("drážka {0}×{1}", fmt(e.length), fmt(e.width))} ${pt(c)}${e.angle ? ` ∠${fmt(e.angle)}°` : ""}`;
       case "polyline":
-        return `${tr("čára {0} b.", e.points.length)} ${e.points.map(pt).join("→")}${e.closed ? "↺" : ""}`;
+        return `${tr("čára {0} b.", e.points.length)} ${e.points.map(pt).join("→")} ${e.closed ? `↺ ${e.autoClose ? tr("uzavřená automaticky") : tr("uzavřená")}` : tr("otevřená")}`;
       case "spline":
         return `${tr("spline {0} b.", e.points.length)} ${e.points.map(pt).join("→")}${e.closed ? "↺" : ""}${tangentSummary(e) ? ` ${tr("tečny")} ${tangentSummary(e, fmt)}` : ""}`;
       case "point":
@@ -624,7 +627,7 @@ export function entityText(e: SketchEntity): string {
         return `${tr("elipsa")} ${fmt(e.rx)}×${fmt(e.ry)} ${pt(c)}`;
     }
   })();
-  return `${e.id} ${body}${e.construction ? tr(" (pomocná)") : ""}`;
+  return `${e.id} ${body}${e.construction ? tr(" (pomocná)") : ""}${e.type === "line" && e.autoClose ? tr(" (uzavírá čáru se zaoblenými rohy – automaticky)") : ""}`;
 }
 /** nejvíc entit, které textový stav vypíše jednotlivě (s id) – u větších skic jen počet */
 export const STATUS_MAX_ENTITIES = 40;
@@ -643,6 +646,7 @@ export function sketchStatusLines(f: SketchF, indent = "    "): string[] {
     if (nc && nc <= STATUS_MAX_ENTITIES) out.push(indent + tr("vazby: {0}", (f.constraints ?? []).map((c, i) => `v${i + 1} ${describeConstraint(c, ents)}`).join(" · ")));
     if (nd && nd <= STATUS_MAX_ENTITIES) out.push(indent + tr("kóty: {0}", (f.dims ?? []).map((d, i) => `k${i + 1} ${describeDim({ ...d, driving: true }, ents).replace(/ (\S+)$/, " = $1")}${d.driving ? "" : " " + tr("referenční")}`).join(" · ")));
   }
+  out.push(...profileStatusLines(f.entities, indent)); // obrysy a proč profil není platný (profile-check.ts)
   return out;
 }
 

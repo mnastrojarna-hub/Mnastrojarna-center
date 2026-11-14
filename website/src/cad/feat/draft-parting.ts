@@ -19,6 +19,7 @@ import * as r from "replicad";
 import { axisPlane, planeOf } from "../build";
 import { resolveDirection, V, type ResolveCtx } from "../ref-resolve";
 import { arcPoints, shapeSegs, splinePoints } from "../sketch";
+import { pathEntities } from "../poly-close";
 import type { Feature, Vec2, Vec3 } from "../types";
 import { tangentFaces } from "./pattern";
 import { getFeatureBuilder, registerFeatureBuilder, type FeatCtx } from "./registry";
@@ -42,10 +43,11 @@ export const PARTING_ARC_SEGMENTS = 8;
 export function partingPolyline(sk: SketchF): { pts: Vec2[]; curved: boolean } {
   type Piece = { pts: Vec2[]; curved: boolean };
   const pieces: Piece[] = [];
-  for (const e of sk.entities) {
+  // automaticky uzavřené čáry z textu jako otevřené, bez uzavíracích úseček (poly-close.ts)
+  for (const e of pathEntities(sk.entities)) {
     if (e.construction) continue;
     if (e.type === "line") pieces.push({ pts: [e.a, e.b], curved: false });
-    // uzavřená lomená čára (text „čára …“ se 3+ body se uzavírá sám) – uzavírací úsek se pro dělicí čáru vynechá
+    // uzavřená lomená čára – uzavírací úsek se pro dělicí čáru vynechá
     else if (e.type === "polyline") pieces.push({ pts: e.points, curved: false });
     else if (e.type === "arc") pieces.push({ pts: arcPoints(e.a, e.b, e.c, PARTING_ARC_SEGMENTS), curved: true });
     else if (e.type === "spline") pieces.push({ pts: splinePoints(e.points, e.closed, 4), curved: true });

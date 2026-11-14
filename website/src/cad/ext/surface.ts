@@ -51,7 +51,7 @@ function needSketch(ctx: ExtBuildCtx, id: unknown, role: string): SketchF {
 /** Křivky skici jako dráty: jedna souvislá (otevřená i uzavřená) křivka, jinak uzavřené profily. */
 function sketchWires(sk: SketchF): r.Wire[] {
   try {
-    return [sketchPathWire(sk)];
+    return [sketchPathWire(sk, false)]; // profil plochy – automaticky uzavřená čára zůstane uzavřená
   } catch {
     const d = sketchDrawing(sk);
     if (!d) throw new Error(tr("Skica „{0}“ neobsahuje souvislou křivku ani uzavřený profil.", sk.name));

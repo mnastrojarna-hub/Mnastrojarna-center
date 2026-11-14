@@ -1,0 +1,44 @@
+# 11. vlna – lomená čára z textu (uzavřít / otevřená, rozhodnutí podle celé skici) a kontrola profilu skici (profile-check.ts)
+… a dalších {0}	… und {0} weitere
+(další viz stav)	(weitere im Status)
+(průsečíky nekontrolovány – víc než {0} úseků)	(Schnittpunkte nicht geprüft – mehr als {0} Segmente)
+{0} a {1} jsou duplicitní (stejná geometrie) – jednu smažte	{0} und {1} sind doppelt (gleiche Geometrie) – eines löschen
+{0} a {1} se překrývají v úseku {2}–{3}	{0} und {1} überlappen im Abschnitt {2}–{3}
+{0} byla uzavřena automaticky a její uzavírací úsek kříží {1} v {2} – napište „otevřená“ nebo napojte konce	{0} wurde automatisch geschlossen und ihr Schließsegment kreuzt {1} bei {2} – „offen“ schreiben oder die Enden verbinden
+{0} kříží {1} v {2}	{0} kreuzt {1} bei {2}
+{0} kříží sama sebe v {1}	{0} kreuzt sich selbst bei {1}
+{0} se dotýká {1} v {2} – napojení musí být konec na konec	{0} berührt {1} bei {2} – Verbindungen müssen Ende an Ende sein
+{0} uzavřené obrysy	{0} geschlossene Konturen
+{0} uzavřený obrys	{0} geschlossene Kontur
+{0} uzavřených obrysů	{0} geschlossene Konturen
+čára nemůže být zároveň „uzavřít“ a „otevřená“ – nechte jen jedno slovo	eine Polylinie kann nicht zugleich „schließen“ und „offen“ sein – nur ein Wort angeben
+ℹ čára {0} je otevřená – její konce navazují na {1}	ℹ Polylinie {0} ist offen – ihre Enden schließen an {1} an
+ℹ čára {0} otevřena – na její konce nově navazuje {1} (uzavřená byla jen automaticky)	ℹ Polylinie {0} geöffnet – an ihre Enden schließt jetzt {1} an (sie war nur automatisch geschlossen)
+ℹ čára {0} uzavřena – konce nebyly napojené; „otevřená“ ji nechá otevřenou	ℹ Polylinie {0} geschlossen – die Enden waren nicht verbunden; „offen“ lässt sie offen
+ℹ čára se zaoblenými rohy je otevřená – její konec {0} navazuje na další entitu	ℹ die Polylinie mit verrundeten Ecken ist offen – ihr Ende {0} schließt an ein weiteres Element an
+ℹ čára se zaoblenými rohy uzavřena úsečkou {0} – konce nebyly napojené; „otevřená“ ji nechá otevřenou	ℹ die Polylinie mit verrundeten Ecken mit Linie {0} geschlossen – die Enden waren nicht verbunden; „offen“ lässt sie offen
+ℹ odebráno vazeb {0} a kót {1}, které odkazovaly na uzavírací úsek otevřené čáry	ℹ {0} Bedingungen und {1} Bemaßungen entfernt, die auf das Schließsegment der geöffneten Polylinie verwiesen
+ℹ uzavírací úsečka {0} čáry se zaoblenými rohy odebrána – na konec {1} nově navazuje {2}	ℹ Schließlinie {0} der Polylinie mit verrundeten Ecken entfernt – an das Ende {1} schließt jetzt {2} an
+mezera {0} mm mezi {1} {2} a {3} {4}	Lücke {0} mm zwischen {1} {2} und {3} {4}
+mezera {0} mm mezi konci {1} ({2} a {3})	Lücke {0} mm zwischen den Enden von {1} ({2} und {3})
+otevřená	offen
+otevřený konec {0} v {1}	offenes Ende von {0} bei {1}
+Profil skici „{0}“: {1}.	Profil der Skizze „{0}“: {1}.
+Profil skici „{0}“: žádný uzavřený obrys.	Profil der Skizze „{0}“: keine geschlossene Kontur.
+profil: {0} · ⚠ problémů {1}:	Profil: {0} · ⚠ {1} Probleme:
+profil: {0} ✓	Profil: {0} ✓
+profil: žádný uzavřený obrys	Profil: keine geschlossene Kontur
+profil: žádný uzavřený obrys – otevřená křivka {0} (konce {1} a {2}); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku	Profil: keine geschlossene Kontur – offene Kurve {0} (Enden {1} und {2}); zum Extrudieren schließen, als Pfad oder Trennlinie ist sie in Ordnung
+uzavřená	geschlossen
+uzavřená automaticky	automatisch geschlossen
+v bodě {0} se stýká {1} konců ({2}) – obrys je nejednoznačný	bei {0} treffen {1} Enden zusammen ({2}) – die Kontur ist mehrdeutig
+žádný uzavřený obrys	keine geschlossene Kontur
+ (uzavírá čáru se zaoblenými rohy – automaticky)	 (schließt die Polylinie mit verrundeten Ecken – automatisch)
+uzavření lomené čáry (i se zaoblenými rohy): „uzavřít“ / „otevřená“ platí vždy, první bod = poslední → uzavřená; jinak rozhodne skica – tvoří-li čára s dalšími entitami uzavřený obrys (oba konce propojené přes jiné entity), je otevřená, jinak se uzavře a protokol to ohlásí (ne, kdyby ji uzavírací úsek křížil); vznikne-li obrys později, čára se otevře; jako dráha (tažení, žebro, dělicí čára, pole podél křivky) se automatické uzavření nepoužije	Schließen einer Polylinie (auch mit verrundeten Ecken): „schließen“ / „offen“ gelten immer, erster Punkt = letzter → geschlossen; sonst entscheidet die Skizze – bildet die Polylinie mit anderen Elementen eine geschlossene Kontur (beide Enden über andere Elemente verbunden), ist sie offen, sonst wird sie geschlossen und das Protokoll meldet es (nicht, wenn das Schließsegment sie kreuzen würde); entsteht die Kontur später, öffnet sie sich; als Pfad (Sweep, Rippe, Trennlinie, Muster entlang einer Kurve) wird das automatische Schließen nicht verwendet
+ℹ čára {0} je otevřená – uzavírací úsek by ji křížil nebo překrýval v {1} (neplatný obrys); „uzavřít“ ji uzavře	ℹ Polylinie {0} ist offen – das Schließsegment würde sie bei {1} kreuzen oder überlappen (ungültige Kontur); „schließen“ schließt sie
+ℹ čára {0} uzavřena – navazuje na {1}, ale uzavřený obrys s nimi netvoří; „otevřená“ ji nechá otevřenou	ℹ Polylinie {0} geschlossen – sie schließt an {1} an, bildet mit ihnen aber keine geschlossene Kontur; „offen“ lässt sie offen
+ℹ čára se zaoblenými rohy je otevřená – uzavírací úsečka by ji křížila nebo překrývala v {0} (neplatný obrys); „uzavřít“ ji uzavře	ℹ die Polylinie mit verrundeten Ecken ist offen – die Schließlinie würde sie bei {0} kreuzen oder überlappen (ungültige Kontur); „schließen“ schließt sie
+ℹ čára se zaoblenými rohy uzavřena úsečkou {0} – navazuje na {1}, ale uzavřený obrys s nimi netvoří; „otevřená“ ji nechá otevřenou	ℹ die Polylinie mit verrundeten Ecken mit Linie {0} geschlossen – sie schließt an {1} an, bildet mit ihnen aber keine geschlossene Kontur; „offen“ lässt sie offen
+otevřený konec {0} v {1} leží na obrysu {2} – {0} do žádného obrysu nepatří	offenes Ende von {0} bei {1} liegt auf der Kontur {2} – {0} gehört zu keiner Kontur
+; {0} je uzavřená čára – má-li být částí obrysu s {1}, napište u ní „otevřená“	; {0} ist eine geschlossene Polylinie – soll sie mit {1} Teil einer Kontur sein, bei ihr „offen“ schreiben
+{0} byla uzavřena automaticky a její uzavírací úsek kříží samu čáru v {1} – jako profil neplatná; napište „otevřená“ (dráha, dělicí čára) nebo napojte konce	{0} wurde automatisch geschlossen und ihr Schließsegment kreuzt die Polylinie selbst bei {1} – als Profil ungültig; „offen“ schreiben (Pfad, Trennlinie) oder die Enden verbinden

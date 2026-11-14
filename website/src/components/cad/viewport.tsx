@@ -15,7 +15,7 @@ import type { Feature, MeshData, Vec3 } from "@/cad/types";
 import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { drawSurfOverlay } from "./viewport-surf-overlay";
 import type { SurfOverlay } from "./surf-overlay";
-import { softView, useSoftViewActive } from "./soft-bridge";
+import { softView, usePublishPickProps, useSoftViewActive } from "./soft-bridge";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -118,6 +118,7 @@ type Props = {
   /** plochy třídy A: hrany obarvené podle návaznosti, hřebeny křivosti, řídicí body CV (surf-overlay.ts) */
   surfOverlay?: SurfOverlay | null;
 };
+export type ViewportProps = Props;
 
 const HOVER = new THREE.Color(0xf59e0b);
 const SEL = new THREE.Color(0xe03930);
@@ -211,6 +212,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   propsRef.current = props;
   /** bez WebGL kreslí model softwarový náhled (viewport-soft.tsx) a přebírá pohledy, přizpůsobení i snímek */
   const softOn = useSoftViewActive();
+  // … i výběr kliknutím: dostane tytéž vlastnosti (režim, filtr, výběr, události výběru)
+  usePublishPickProps(props);
 
   // ---------- popisky entit (F1 / E2 / V3) ----------
   const [hintList, setHintList] = useState<Hint[]>([]);
@@ -1571,9 +1574,10 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.render();
     },
     /** popisky entit na obrazovce (souřadnice vůči 3D oknu) – pro automatizaci */
-    hintList: () => hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
+    hintList: () => softView.current?.hintList?.() ?? hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
     /** „klikne“ na popisek (syntetické pointer události na plátně – stejná cesta jako myš) */
     clickHint: (id: string, additive = false) => {
+      if (softView.current?.clickHint) return softView.current.clickHint(id, additive);
       const hh = hintsRef.current.find((x) => x.id.toUpperCase() === id.trim().toUpperCase());
       const s = S.current;
       if (!hh || !s) return false;

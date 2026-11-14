@@ -33,8 +33,11 @@ export type HoleEnd =
 /** Řada průchozích děr ISO 273 (jemná / střední / hrubá). */
 export type HoleFit = "fine" | "medium" | "coarse";
 
-/** Entita skici. `construction` = pomocná geometrie (nevytváří profil). */
-export type SketchEntity = { construction?: boolean } & (
+/**
+ * Entita skici. `construction` = pomocná geometrie (nevytváří profil). `autoClose` = uzavření rozhodl text, ne autor: lomená čára
+ * s volnými konci uzavřená automaticky / uzavírací úsečka zaoblené čáry – otevře se, naváže-li na konce další entita (poly-close.ts).
+ */
+export type SketchEntity = { construction?: boolean; autoClose?: boolean } & (
   | { id: string; type: "rect"; cx: number; cy: number; w: number; h: number; r: number; angle: number }
   | { id: string; type: "circle"; cx: number; cy: number; r: number }
   | { id: string; type: "polygon"; cx: number; cy: number; r: number; sides: number; angle: number }

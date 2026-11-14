@@ -1,0 +1,75 @@
+# 11. vlna – výstupy z konzole bez dialogů (uložit, export, výkres export, skica export, sdílet, odkaz), dialogy na stránce místo prompt/confirm
+  (schránka není dostupná – adresu zkopírujte z protokolu)	  (Zwischenablage nicht verfügbar – Adresse aus dem Protokoll kopieren)
+  (zkopírováno do schránky)	  (in die Zwischenablage kopiert)
+  ✓ kontrola: projekt jde znovu otevřít – „{0}“, {1} {2}	  ✓ Prüfung: Projekt lässt sich wieder öffnen – „{0}“, {1} {2}
+{0} – „{1}“ ({2}), platí do: {3}, {4}, {5} {6}	{0} – „{1}“ ({2}), gültig bis: {3}, {4}, {5} {6}
+{0}, {1} entit	{0}, {1} Elemente
+⚠ dokument zatím nemá výkres – exportuje se výchozí list (pro vlastní list nejdřív „výkres A3 …“ a „kótovat“)	⚠ das Dokument hat noch keine Zeichnung – das Standardblatt wird exportiert (für ein eigenes Blatt zuerst „zeichnung A3 …“ und „bemaßen“)
+⚠ kontrola {0}: soubor se od modelu liší – {1}; zkontrolujte prvky s ⚠ / ✗ (stav) a export zopakujte	⚠ {0}-Prüfung: die Datei weicht vom Modell ab – {1}; Elemente mit ⚠ / ✗ prüfen (status) und Export wiederholen
+✓ {0}: {1} · {2} · {3} – staženo (bez dialogu)	✓ {0}: {1} · {2} · {3} – heruntergeladen (ohne Dialog)
+✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu	✓ {0}-Prüfung: Datei vom Kern neu eingelesen – {1}Volumen {2} (Differenz {3} %), Hüllquader {4} mm (Abweichung {5} mm) → originalgetreue Kopie des Modells
+✓ poslední sdílený odkaz	✓ letzter Freigabelink
+✓ sdílený odkaz vytvořen	✓ Freigabelink erstellt
+✗ kontrola {0}: soubor se nepodařilo znovu načíst – {1}	✗ {0}-Prüfung: die Datei konnte nicht erneut gelesen werden – {1}
+3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) → „věrná kopie modelu“; „bez kontroly“ ji vynechá	das 3D-Modell wird ohne Dialog heruntergeladen; bei STEP und BREP Prüfung: die Datei wird vom Kern neu eingelesen und mit dem Modell verglichen (Körper, Volumen, Hüllquader) → „originalgetreue Kopie des Modells“; „ohne prüfung“ lässt sie aus
+3MF (síť)	3MF (Netz)
+export {0}	Export {0}
+export {0}: výkres se exportuje příkazem „výkres export {0}“ (nejdřív „výkres A3 …“)	export {0}: eine Zeichnung wird mit „zeichnung export {0}“ exportiert (zuerst „zeichnung A3 …“)
+export dxf: výkres → „výkres export dxf“, skica → „skica export dxf“	export dxf: Zeichnung → „zeichnung export dxf“, Skizze → „skizze export dxf“
+export MNCAD	Export MNCAD
+export potřebuje formát: {0}	export braucht ein Format: {0}
+export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]	exportieren step|stl|brep|obj|glb|3mf|wrl|mncad [Name] [ohne prüfung]
+export: model je prázdný – nejdřív vymodelujte díl	export: das Modell ist leer – zuerst ein Teil modellieren
+export: neznámý formát „{0}“ – {1}	export: unbekanntes Format „{0}“ – {1}
+glTF binární (síť)	glTF binär (Netz)
+jádro v souboru nenašlo těleso	der Kern hat in der Datei keinen Körper gefunden
+komponent	Komponenten
+kusovník CSV	Stückliste CSV
+list výkresu jako soubor bez dialogu (bez listu aktivní, „vše“ = každý list zvlášť); výkres nejdřív „výkres A3 …“ a „kótovat“	Zeichnungsblatt als Datei ohne Dialog (ohne Blatt das aktive, „alle“ = jedes Blatt einzeln); zuerst „zeichnung A3 …“ und „bemaßen“
+model	Modell
+náhled listu PNG	Blattvorschau PNG
+obálka {0} mm (model {1} mm, odchylka {2} mm)	Hüllquader {0} mm (Modell {1} mm, Abweichung {2} mm)
+objem {0} (model {1}, rozdíl {2} %)	Volumen {0} (Modell {1}, Differenz {2} %)
+odkaz nemá další volby – vypíše poslední sdílený odkaz; nový vytvoří „sdílet“	link hat keine Optionen – gibt den letzten Freigabelink aus; „freigeben“ erstellt einen neuen
+projekt .mncad se stáhne rovnou (bez dialogu „Uložit jako“); protokol napíše název souboru, velikost a počet prvků; také window.mncad.save(název)	das .mncad-Projekt wird direkt heruntergeladen (ohne Dialog „Speichern unter“); das Protokoll nennt Dateiname, Größe und Anzahl der Elemente; auch window.mncad.save(Name)
+projekt Mnástrojárna CAD (.mncad)	Mnástrojárna-CAD-Projekt (.mncad)
+s heslem	mit Passwort
+sdílený odkaz (jako tlačítko Sdílet odkazem): ADRESA SE VYPÍŠE DO PROTOKOLU (a zkopíruje do schránky, když to prohlížeč dovolí); výchozí platnost 10 dní; „odkaz“ vypíše poslední odkaz znovu	Freigabelink (wie die Schaltfläche Per Link teilen): DIE ADRESSE WIRD INS PROTOKOLL GESCHRIEBEN (und in die Zwischenablage kopiert, wenn der Browser es erlaubt); Standardgültigkeit 10 Tage; „link“ gibt den letzten Link erneut aus
+sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]	freigeben [modell|zeichnung] [tage N|unbegrenzt] [passwort X] [von "Name"]
+sdílet výkres: dokument zatím nemá výkres – nejdřív „výkres A3 …“, nebo sdílejte model	freigeben zeichnung: das Dokument hat noch keine Zeichnung – zuerst „zeichnung A3 …“, oder das Modell freigeben
+sdílet: neznámé slovo „{0}“ – {1}	freigeben: unbekanntes Wort „{0}“ – {1}
+sdílet: platnost je 1 až 3650 dní, nebo „bez omezení“ – {0}	freigeben: Gültigkeit 1 bis 3650 Tage, oder „unbegrenzt“ – {0}
+sdílet: za „{0}“ chybí heslo – {1}	freigeben: nach „{0}“ fehlt das Passwort – {1}
+sdílet: za „{0}“ chybí jméno odesílatele – {1}	freigeben: nach „{0}“ fehlt der Absendername – {1}
+skica „{0}“	Skizze „{0}“
+skica DXF	Skizze DXF
+skica export dxf ["Skica 1"] [jako název]	skizze export dxf ["Skizze 1"] [als Name]
+skica jako DXF bez dialogu (bez názvu otevřená, jinak poslední skica)	Skizze als DXF ohne Dialog (ohne Namen die geöffnete, sonst die letzte Skizze)
+skica se exportuje jen do DXF: {0}	eine Skizze wird nur nach DXF exportiert: {0}
+STEP {0} stažen – e-mail se v automatizaci neotevírá (dotaz prohlížeče na poštovní program), pošlete ho na {1}.	STEP {0} heruntergeladen – unter Automatisierung wird keine E-Mail geöffnet (der Browser würde nach einem Mailprogramm fragen), senden Sie sie an {1}.
+STL (síť)	STL (Netz)
+těles {0} (model {1})	Körper {0} (Modell {1})
+těles: {0}, 	Körper: {0}, 
+uloženo	gespeichert
+uložit [název] – projekt .mncad se stáhne bez dialogu	speichern [Name] – das .mncad-Projekt wird ohne Dialog heruntergeladen
+Uložit jako – název souboru:	Speichern unter – Dateiname:
+v odkazu	im Link
+v úložišti	im Speicher
+VRML (síť)	VRML (Netz)
+výkres {0}	Zeichnung {0}
+výkres {0}, list {1}	Zeichnung {0}, Blatt {1}
+výkres DWG	Zeichnung DWG
+výkres DXF	Zeichnung DXF
+výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]	zeichnung export pdf|dxf|dwg|svg|csv|png [blatt N|alle] [Name]
+výkres export potřebuje formát: {0}	zeichnung export braucht ein Format: {0}
+výkres export: listy se číslují celými čísly od 1 – „{0}“	zeichnung export: Blätter werden mit ganzen Zahlen ab 1 nummeriert – „{0}“
+výkres export: neznámý formát „{0}“ – {1}	zeichnung export: unbekanntes Format „{0}“ – {1}
+výkres export: za „{0}“ chybí číslo nebo název listu – {1}	zeichnung export: nach „{0}“ fehlt Blattnummer oder -name – {1}
+výkres PDF	Zeichnung PDF
+výkres SVG	Zeichnung SVG
+Wavefront OBJ (síť)	Wavefront OBJ (Netz)
+Zadejte název souboru.	Dateinamen eingeben.
+zatím žádný sdílený odkaz – vytvořte ho příkazem „sdílet“	noch kein Freigabelink – mit „freigeben“ erstellen
+  – kontrola {0} vynechána („bez kontroly“)	  – {0}-Prüfung ausgelassen („ohne prüfung“)
+ (model od minulé kontroly beze změny)	 (Modell seit der letzten Prüfung unverändert)
+soubor neobsahuje žádný tvar	die Datei enthält keine Form
