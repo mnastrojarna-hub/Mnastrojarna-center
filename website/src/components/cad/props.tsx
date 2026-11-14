@@ -16,6 +16,8 @@ import type { Extent, HoleEnd } from "@/cad/types";
 import { AxisField, DirectionField, ExtentField, PlaneDefField, RefField, RefListField, RefPickContext, StartField, ThinField } from "./ref-field";
 import "./forms/index";
 import { getFeatureForm } from "./forms/registry";
+import { HoleBottomField, TapDrillField, threadPatch } from "./forms/hole-fields";
+import { ExtrudeDraftFields, ExtrudeHeightCheck } from "./extrude-fields";
 
 // ---------- parametry (proměnné / rovnice) ----------
 
@@ -445,9 +447,10 @@ export function FeatureProps({
                 <Details summary={tr("Začátek, směr, tenká stěna, úkos, kroucení…")} open={!!(f.from || f.dir || f.thin || f.draftAngle || f.twist || f.endScale || f.outerOnly)}>
                   <StartField value={f.from} onChange={(from) => set({ from })} />
                   <DirectionField value={f.dir} onChange={(dir) => set({ dir })} />
+                  <ExtrudeHeightCheck f={f} set={set} />
                   <ThinField value={f.thin} onChange={(thin) => set({ thin })} />
-                  <div className="grid grid-cols-3 gap-2">
-                    <Num label={tr("Úkos")} value={f.draftAngle ?? 0} suffix="°" hint={tr("0 = bez úkosu")} bind={b("draftAngle")} onChange={(v) => set({ draftAngle: Math.max(-44, Math.min(44, v)) })} />
+                  <ExtrudeDraftFields f={f} set={set} bind={b} />
+                  <div className="grid grid-cols-2 gap-2">
                     <Num label={tr("Kroucení")} value={f.twist ?? 0} suffix="°" bind={b("twist")} onChange={(v) => set({ twist: v })} />
                     <Num label={tr("Měřítko konce")} value={f.endScale ?? 1} suffix="×" min={0.01} step={0.1} bind={b("endScale")} onChange={(v) => set({ endScale: v })} />
                   </div>
@@ -633,7 +636,7 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
       {kind === "tapped" ? (
         <>
           <Field label={tr("Závit (hrubé i jemné stoupání)")}>
-            <select className={selectCls} value={thread && ALL_THREADS.some((x) => x.name === thread.name) ? thread.name : "custom"} onChange={(e) => e.target.value !== "custom" && set({ thread: e.target.value, diameter: threadByName(e.target.value)?.tap ?? f.diameter })}>
+            <select className={selectCls} value={thread && ALL_THREADS.some((x) => x.name === thread.name) ? thread.name : "custom"} onChange={(e) => e.target.value !== "custom" && set(threadPatch(f, e.target.value))}>
               {!(thread && ALL_THREADS.some((x) => x.name === thread.name)) && <option value="custom">{thread ? tr("{0} (vlastní stoupání)", thread.name) : tr("— vyberte nebo zadejte níže —")}</option>}
               {ALL_THREADS.map((t) => (
                 <option key={t.name} value={t.name}>
@@ -643,11 +646,11 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
             </select>
           </Field>
           <Field label={tr("Označení závitu (text)")}>
-            <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-brand" aria-label={tr("Označení závitu díry")} value={f.thread ?? ""} placeholder={tr("např. M18×1,5")} onChange={(e) => { const t = threadByName(e.target.value); set(t ? { thread: e.target.value, diameter: t.tap } : { thread: e.target.value }); }} />
+            <input className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 font-mono text-[13px] outline-none focus:border-brand" aria-label={tr("Označení závitu díry")} value={f.thread ?? ""} placeholder={tr("např. M18×1,5")} onChange={(e) => set(threadPatch(f, e.target.value))} />
             {!thread && (f.thread ?? "").trim() && <span className="mt-1 block text-[11px] text-brand-600">{tr("Neznámé označení – M2 až M48, volitelně se stoupáním (M18×1,5).")}</span>}
           </Field>
           <Num label={tr("Hloubka závitu")} value={f.threadDepth ?? 0} min={0} hint={tr("0 = celá")} bind={b("threadDepth")} onChange={(v) => set({ threadDepth: v })} />
-          {thread && <Info>{tr("Vrtá se jádrový průměr Ø")}{fmtMm(thread.tap)} {tr("mm, závit")}{" "}{thread.name} {tr("se uvede ve výkrese.")}</Info>}
+          {thread && <TapDrillField f={f} t={thread} set={set} b={b} />}
         </>
       ) : (
         <>
@@ -678,7 +681,7 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
         </>
       )}
       <ExtentField label={tr("Ukončení")} value={endExt} kinds={["blind", "throughAll", "toNext", "toFace", "toVertex", "offsetFromFace", "toBody"]} defaultDistance={f.depth || 10} onChange={setEnd} />
-      {end.kind === "blind" && <Num label={tr("Úhel špičky vrtáku")} value={f.tipAngle ?? 118} min={60} suffix="°" bind={b("tipAngle")} onChange={(v) => set({ tipAngle: Math.min(170, v) })} />}
+      {end.kind === "blind" && <HoleBottomField f={f} set={set} b={b} />}
       {!f.points?.length && <Vec label={tr("Bod na povrchu")} value={f.position} bind={b("position")} onChange={(v) => set({ position: v })} />}
       <RefListField label={tr("Polohy děr (více naráz)")} value={f.points ?? []} onChange={(points) => set({ points: points.length ? points : undefined })} />
       {!!f.points?.length && <Info>{tr("Díry se vrtají v {0} zadaných polohách. Pole „Bod na povrchu“ se při tom nepoužívá – objeví se znovu, když polohy odeberete.", f.points.length)}</Info>}

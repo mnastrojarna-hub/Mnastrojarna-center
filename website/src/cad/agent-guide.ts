@@ -31,6 +31,12 @@ do 3D okna (výběr hran a ploch pravidlem).
    \`window.mncad.progress()\` vrátí průběh běžícího výpočtu (\`{ label, index, total, name, seconds }\` nebo \`null\`) a
    \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem).
 
+**Když textový příkaz něco neumí, \`prvek nápověda <typ>\` ukáže všechna pole pro \`prvek <typ> …\`** (EN \`feature help\`,
+DE \`element hilfe\`; typ i slovem příkazu – \`nápověda díra\`, \`nápověda kužel\`, u rozšíření id: \`prvek nápověda sheet.bend\`):
+název, druh hodnoty a ukázka zápisu, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem
+(„jen prvek / upravit / JSON“ = vlastní zápis nemá). \`prvek nápověda\` bez typu vypíše přehled všech typů a polí, která jdou
+zadat jen přes \`prvek\` / \`upravit\`.
+
 Všechny rozměry jsou v **milimetrech**, úhly ve stupních, desetinná čárka i tečka jsou povolené, „Ø“ před číslem
 se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu kvádru (bez „střed“) nebo ve středu válce.
 
@@ -40,9 +46,11 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | --- | --- |
 | \`nový díl [název]\` / \`nová sestava [název]\` | nový dokument v nové záložce |
 | \`název …\`, \`materiál …\`, \`barva #hex\` | popis dokumentu |
-| \`kvádr X Y Z [střed] [v x y z] [odebrat]\` | kvádr; roh v počátku, „střed“ = vystředit |
-| \`válec D H [osa X|Y|Z] [v x y z] [odebrat]\` | válec průměr × výška, osa Z |
-| \`koule D [v x y z]\` · \`kužel D1 D2 H\` · \`trubka D d H\` | další primitiva (průměry) |
+| \`kvádr X Y Z [střed] [v x y z] [osa …] [odebrat|průnik|nové]\` | kvádr; roh v poloze, „střed“ = poloha je střed kvádru; \`osa\` natočí osu Z kvádru |
+| \`válec D H [v x y z] [osa X|Y|Z|-Z|x y z|hrana E3|plocha F2|"Osa 1"] [odebrat|průnik|nové]\` | válec průměr × výška; poloha = střed podstavy, roste ve směru osy |
+| \`koule D [v x y z]\` · \`kužel D1 D2 H [v …] [osa …]\` · \`trubka D d H [v …] [osa …]\` – vše i \`[odebrat|průnik|nové]\` | další primitiva (průměry; u kužele D2 = 0 → špička) |
+| \`pružina D stoupání P závity N|délka L drát d [v …] [osa …]\` | šroubovitá pružina (D = střední průměr) |
+| \`… na V3 | na střed hrany E2 | na střed kružnice E5 | na střed plochy F3 | na bod "Bod 1" | na mezi V1 V5\` · \`… osa hrana E3 | osa plocha F2 | osa body V1 V5 [obráceně]\` | poloha a osa **odkazem** u všech primitiv i u \`závit\` – viz „Primitiva – poloha a osa odkazem“ |
 | \`skica XY|XZ|YZ [odsazení N]: entita; entita…\` | skica na základní rovině; entity i na dalších řádcích |
 | \`skica počátek x y z normála nx ny nz [osax ux uy uz]: …\` | skica na obecné rovině (viz „Souřadnice skici ve 3D“) |
 | \`skica plocha F3|horní|+X [odsazení N] [obráceně]: …\` · \`skica rovina "Rovina 1" [odsazení N]: …\` | skica na rovinné ploše modelu (číslem nebo pravidlem) nebo na pomocné rovině – viz „Vazby a kóty ve skice textem“ |
@@ -54,9 +62,11 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`spline x1 y1 x2 y2 x3 y3 … [uzavřít]\` | hladká křivka přes zadané body |
 | \`vazba <druh> <odkaz> [<odkaz> …]; <druh> …\` | vazba ve skice (vodorovně, kolmo, tečně, shodně…); odkazy na entity \`e1\`, \`e1.a\`, \`počátek\` |
 | \`kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; …\` | kóta ve skice (délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku) |
-| \`vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]\` | vysune poslední skicu |
+| \`vysunout H|výška H [směr x y z|směr +X|směr hrana E3|směr osa "Osa 1"|směr plocha F2|směr body V1 V2] [sklon a [k +X|k x y z]] [symetricky] [skrz|k tělesu|k dalšímu|k ploše F3 [odsazení N]|k rovině "Rovina 1"|k vrcholu V3] [odebrat|přidat|průnik|nové] [obráceně] [úkos a [dovnitř|ven] [břit N] [ostré rohy|zaoblené rohy]]\` | vysune poslední skicu; šikmo (\`sklon 25 k +X\` = propad), úkos dovnitř / ven s břitem (střižnice) – viz „Šikmé vysunutí, úkos dovnitř / ven a břit“ |
 | \`rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]\` | orotuje poslední skicu (výchozí osa Y skici, 360°); \`odebrat\` = vysoustružit profil z tělesa |
-| \`díra D [hloubka H|skrz [obousměrně]|k tělesu] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8 [hloubka-závitu T]]\` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; \`skrz\` vrtá **od zadaného bodu jen ve směru vrtání** (materiál nad bodem zůstane), \`obousměrně\` na obě strany; \`k tělesu\` (EN \`to body\`, DE \`bis Körper\`) vrtá po první stěnu stávajícího tělesa – projde první stěnou ve směru vrtání a dál nepokračuje (např. jen horní stěnou dutého dílu), jako ukončení „K tělesu“ u vysunutí; \`závit M6\` vrtá jádro, \`hloubka\` = hloubka vrtání, \`hloubka-závitu\` = užitečná délka závitu (výkres pak ukáže „M8 ↧10“ + „Ø6,8 ↧14“) |
+| \`díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8 [hloubka-závitu T] [jádro | vrták [N]]]\` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; \`skrz\` vrtá **od zadaného bodu jen ve směru vrtání** (materiál nad bodem zůstane), \`obousměrně\` na obě strany; \`k tělesu\` (EN \`to body\`, DE \`bis Körper\`) vrtá po první stěnu stávajícího tělesa – projde první stěnou ve směru vrtání a dál nepokračuje (např. jen horní stěnou dutého dílu), jako ukončení „K tělesu“ u vysunutí; \`závit M6\` vrtá tabulkový vrták (viz další řádek), \`hloubka\` = hloubka vrtání, \`hloubka-závitu\` = užitečná délka závitu (výkres pak ukáže „M8 ↧10“ + „Ø6,8 ↧14“) |
+| \`díra závit M8 hloubka 20 v x y\` · \`díra 6,647 závit M8 …\` · \`díra závit M8 … jádro\` · \`díra závit M8 … vrták 6,7\` | **průměr vrtáku závitové díry**: bez průměru = tabulkový vrták (M8 → Ø6,8, jemný M18×1,5 → Ø16,5); **zadaný průměr má přednost** (protokol: „vrták Ø6,647 zadán ručně (tabulkový 6,8)“); jmenovitý průměr (\`díra 8 závit M8\`) i nesmyslně malé zástupné číslo (pod D1 − P, např. \`díra 5 závit M18×1,5\` ze starších zápisů) = tabulkový vrták s poznámkou v protokolu; \`jádro\` (EN \`core\`/\`minor\`, DE \`Kern\`) = malý průměr vnitřního závitu D1 = D − 1,082532·P podle ISO 965-1 (M8 → 6,647, M12 → 10,106, M18×1,5 → 16,376); \`vrták\` (EN \`drill\`, DE \`Bohrer\`) = tabulkový, \`vrták 6,7\` = vlastní; vrták větší než závit = chyba. Označení \`M8\` lze psát i bez slova \`závit\`. Výkres u jiného než tabulkového vrtáku uvede i řádek vrtáku („M8 ↧20“ + „Ø6,647 ↧20“), stav ukáže „(vrták = jádro D1 Ø6,647)“. V JSON je to pole \`tapDrill\`: \`"table"\` (nebo chybí) / \`"minor"\` / \`"custom"\` + \`diameter\` – v JSON bez \`tapDrill: "custom"\` se \`diameter\` závitové díry nepoužije (stavba to ohlásí ⚠). \`upravit "Díra 1" diameter=6,647\` a \`prvek hole … kind=tapped thread=M8 diameter=6,647\` platí jako text (zadaný průměr má přednost, \`tapDrill\` se doplní); \`tapDrill=\` přijme jen \`table\` / \`minor\` / \`custom\` (i \`tabulkový\` / \`jádro\` / \`vlastní\`); změna závitu (\`thread=M10\`, formulář) ponechá vlastní vrták, jen když se k novému závitu hodí (D1 − P až pod D), jinak vrtá tabulkový s poznámkou. Volby díry pište **před** \`název\` – vše za \`název\` až do další volby je název (\`… název M8\` je díra pojmenovaná M8, ne závit) |
+| \`díra D hloubka H dno ploché\` · \`díra D hloubka H hrot 120\` | **dno slepé díry**: výchozí kužel hrotu vrtáku 118°; \`hrot N\` (EN \`tip\`, DE \`Spitze\`) = jiný vrcholový úhel 60–170°; \`dno ploché\` / \`ploché dno\` (EN \`flat bottom\`, DE \`flacher Grund\`) = rovné dno bez kužele (sedlo pružiny, frézované dno; v JSON \`tipAngle: 180\`); také \`ploché\`, \`s plochým dnem\`, \`bez hrotu\`, \`dno=ploché\`, \`dno kužel 120\` (EN \`flat\`, \`without tip\`, DE \`ohne Spitze\`); slovo podobné volbě dna, kterému CAD nerozumí, je chyba řádku. Hloubka H je vždy hloubka válcové části (u plochého dna celá hloubka). Platí i pro závitovou a zahloubenou díru; u díry skrz / k tělesu je to chyba; úhel mimo 60–170° je chyba i v \`upravit\` / \`prvek\` (v JSON jádro úhel ořízne a ohlásí ⚠, stav i výkres ukazují použitý úhel). \`měřit díry\` vypíše „dno ploché“ (i se souosou dírou ze dna) nebo „hrot 118° (ke špičce …)“, výkres u plochého dna připíše „(ploché dno)“ |
 | \`díra D … směr vx vy vz\` · \`díra D … sklon úhel [směr +X]\` | šikmá díra: \`směr\` = směr vrtání vektorem; \`sklon\` = odklon od osy díry (výchozí k +X u osy Z) |
 | \`díra D skrz v x1 y1 z1 v x2 y2 z2 …\` | více děr jedním příkazem (každá poloha třemi souřadnicemi) |
 | \`zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z|-Z|+X|-X|+Y|-Y] [poloměr N] [delší N] [kratší N]\` | pravidla lze kombinovat: \`hrany horní kruhové\` |
@@ -120,7 +130,8 @@ Bod skici \`(u; v)\` leží ve 3D v bodě \`počátek + u·X_skici + v·Y_skici\
 - \`rotovat\` otáčí kolem osy **Y skici** procházející počátkem skici (\`osa X\` = kolem osy X skici). U skici v rovině
   XZ je tedy osou rotace osa **Z** modelu a souřadnice \`u\` profilu je poloměr – tak se kreslí soustružené díly
   (profil \`skica XZ: čára r1 z1 r2 z2 … uzavřít\`, pak \`rotovat\`).
-- \`vysunout H\` jde ve směru normály (u roviny XZ směrem −Y), \`obráceně\` opačně, \`symetricky\` na obě strany.
+- \`vysunout H\` jde ve směru normály (u roviny XZ směrem −Y), \`obráceně\` opačně, \`symetricky\` na obě strany; šikmo
+  \`směr …\` / \`sklon …\` (viz „Šikmé vysunutí, úkos dovnitř / ven a břit“).
 - U obecné roviny se bez \`osax\` zvolí X skici kolmo na normálu co nejblíž ose X modelu (u normály ±X ose Y). V JSON je
   to \`"plane": { "kind": "custom", "origin": [x,y,z], "normal": [nx,ny,nz], "xDir": [ux,uy,uz] }\`.
 
@@ -232,6 +243,100 @@ kóta délka e1.s0 30; délka e1.s1 10
 vysunout 2 odebrat obráceně
 \`\`\`
 
+### Šikmé vysunutí, úkos dovnitř / ven a břit – \`vysunout …\`
+
+EN \`extrude 20 tilt 25 toward +X\`, \`extrude through cut reverse draft 2 out land 3\`; DE \`extrudieren 20 neigung 25 nach +X\`,
+\`extrudieren durch abziehen umkehren schräge 2 außen steg 3\`. Neznámé slovo za \`vysunout\` je chyba (nic se tiše nevynechá) –
+také volba jiného příkazu (\`úhel 25\` → použijte \`sklon 25\`, \`odsazení 5\` bez \`k ploše\`, \`v x y\`, \`poloměr\`…), přebytečné číslo
+(\`vysunout 20 30\`) a délka zadaná dvakrát (\`vysunout 20 výška 15\`).
+
+**Směr** (výchozí = normála skici). Odkaz se píše **vždy za slovo \`směr\`** – samotné \`hrana E3\`, \`osa "Osa 1"\`, \`plocha F2\`
+nebo \`body V1 V5\` je chyba s nápovědou (jinak by je obecný rozbor vzal jako hrany zaoblení, název tělesa…):
+
+| Zápis | Směr |
+| --- | --- |
+| \`směr 1 0 1\` · \`směr +X\` · \`směr -Y\` | vektor / osa modelu (EN \`direction\`, DE \`richtung\`) |
+| \`směr hrana E3\` (také \`podél hrany E3\`, \`směr E3\`) | podél přímé hrany nebo osy válcové plochy E3 (EN \`edge\`, DE \`kante\`) |
+| \`směr plocha F2\` (také \`směr F2\`) | normála plochy F2 (EN \`face\`, DE \`fläche\`) |
+| \`směr osa "Osa 1"\` | podél pomocné osy podle názvu (EN \`axis "Axis 1"\`, DE \`achse "Achse 1"\`); \`směr osa Z\` = osa modelu |
+| \`směr body V1 V5\` | od vrcholu V1 k V5 (EN \`points\`, DE \`punkte\`) |
+| \`sklon 25 [k +X | k 1 1 0]\` | **propad**: normála skici skloněná o 25° směrem k zadanému směru (globální, promítne se do roviny skici; bez \`k\` = k ose X skici, u skici XY tedy totéž jako \`k +X\` i s \`obráceně\`). EN \`tilt 25 toward +X\`, DE \`neigung 25 nach +X\`; \`sklon 25 směr +X\` znamená totéž (jako u díry) |
+
+- **Délka**: číslo za \`vysunout\` (i \`hloubka H\`) se měří **podél směru** (jako v desktopových CADech); \`výška H\` (EN \`height\`,
+  DE \`höhe\`) = **kolmo na rovinu skici** – délka podél směru je pak H / cos(sklon). Objem šikmého hranolu = plocha profilu ×
+  výška kolmo. Ve formuláři je to zaškrtávátko „Vzdálenost kolmo na skicu (výška)“ (zobrazí se u šikmého směru).
+- \`obráceně\` u \`sklon …\` (s \`k\` i bez) vysune na druhou stranu skici a stranu sklonu zachová (konec je posunutý k +X);
+  u ostatních směrů obrátí celý směr. \`symetricky\` = na obě strany podél směru; s úkosem zůstane obrys skici v rovině
+  skici a obě poloviny se od ní zužují (\`ven\`: rozšiřují), každá s vlastním břitem – \`vysunout 20 symetricky úkos 5\` na
+  čtverci 20 = 2 × komolý jehlan výšky 10 (7 320,5 mm³). (Starší JSON bez \`draftCorners\` se staví jako dřív – úkos od
+  spodního konce.)
+- Ukončení platí i šikmo: \`skrz\`, \`k tělesu\` (po první stěnu), \`k dalšímu\`, \`k ploše F3 [odsazení N]\` (rovinná plocha
+  přesně řezem), \`k rovině "Rovina 1"\` (pomocná rovina podle názvu), \`k vrcholu V3\` (konec v rovině bodu rovnoběžné se
+  skicou; u šikmého směru to text uloží jako \`"normalHeight": true\` – starší JSON bez pole končí v průmětu bodu do směru). EN \`to body | to next | to face F3 [offset N] | to plane "…" | to vertex V3\`, DE \`bis körper | bis nächste |
+  bis fläche F3 [versatz N] | bis ebene "…" | bis punkt V3\`. Směr ve stavu: \`20 mm, cut, směr sklon 25° k +X, výška kolmo na skicu\`.
+- Směr nesmí ležet v rovině skici (\`✗ Směr vysunutí nesmí ležet v rovině skici.\`).
+
+**Úkos** \`úkos a [dovnitř|ven]\` (EN \`draft a [in|out]\`, DE \`schräge a [innen|außen]\`), |a| < 45°:
+
+| Zápis | Vnější obrys profilu | Otvory v profilu (vnitřní smyčky) | Přidání (výstupek) | Odebrání (otvor / kapsa) |
+| --- | --- | --- | --- | --- |
+| \`úkos 2\` = \`úkos 2 dovnitř\` (+) | se od roviny skici **zužuje** | se rozšiřují | stěny se naklánějí do materiálu (úkos výstupku formy) | otvor se do hloubky **zužuje** |
+| \`úkos -2\` = \`úkos 2 ven\` (−) | se **rozšiřuje** | se zužují | těleso se od skici rozšiřuje | otvor se do hloubky **rozšiřuje** – odlehčení (vůle) střižnice |
+
+- Slovo \`dovnitř\` / \`ven\` určí znaménko bez ohledu na zapsané (\`úkos -2 dovnitř\` = +2). Otvory v profilu se odsazují
+  opačně než vnější obrys, aby všechny stěny měly stejný sklon vůči materiálu (u desky s otvorem a úkosem dovnitř se deska
+  zužuje a otvor rozšiřuje).
+- \`břit N\` (EN \`land N\`, DE \`steg N\`) = prvních N mm (kolmo od roviny skici) je rovných, teprve potom začne úkos. Odsazení obrysu
+  ve výšce h = max(0, h − N) · tan(a). Břit musí být kratší než výška vysunutí.
+- Rohy: nový úkos má **ostré rohy** (rovinné stěny, průsečík odsazených stran – jako v desktopových CADech, objem = komolý
+  jehlan; smyčka z úseček se staví z rovinných ploch, takže \`měřit F11\` ukáže normálu a \`měřit F11 F8\` úhel, na stěnu jde
+  položit \`skica plocha F11\` a STEP nese roviny); \`zaoblené rohy\` (EN \`round corners\`, DE \`runde ecken\`) zaoblí rohy, od kterých se obrys vzdaluje, poloměrem rovným
+  odsazení (= starší chování; v JSON bez pole \`draftCorners\`). Oblouky a kružnice v profilu se odsazují vždy soustředně.
+- Úkos funguje i u šikmého směru: obrys se odsadí v rovině skici o výška · tan(a) a posune podél směru (objem jako u kolmého).
+  Úkos nelze kombinovat s tenkou stěnou ani s ukončením k zakřivené ploše (chyba – použijte rovinnou plochu, pomocnou rovinu
+  nebo \`k dalšímu\`).
+- Úkos s ukončením odkazem: \`k ploše F3 [odsazení N]\` / \`k rovině "…"\` rovnoběžnou se skicou = přesně slepé vysunutí do té
+  výšky (odsazení obrysu se počítá ze skutečné hloubky), u šikmé roviny nástroj končí kousek za ní a rovina ho ořízne;
+  \`k dalšímu\` / \`k tělesu\` najde hloubku rovný nástroj a úkos se počítá od roviny skici po nalezenou stěnu; \`skrz\`
+  končí kousek za tělesem (aspoň za břitem – deska tenčí než břit má rovný otvor). Míří-li nástroj od tělesa (zapomenuté
+  \`obráceně\`), je to chyba „nástroj míří od tělesa (zkuste … obráceně)“. Chyba „Úkos … je pro tento profil příliš velký“
+  uvádí skutečnou výšku od roviny skici, ve které by obrys zanikl.
+- JSON / \`prvek extrude\`: \`"draftAngle": -2\` (+ dovnitř, − ven), \`"draftLand": 3\`, \`"draftCorners": "sharp" | "round"\`,
+  \`"dir": { "kind": "angle", "deg": 25, "toward": [1, 0, 0] }\` (bez \`k\`: \`"keepSide": true\` – \`obráceně\` zachová stranu
+  sklonu; starší JSON bez \`toward\` i \`keepSide\` obrátí celý směr), \`"normalHeight": true\`. \`upravit "Vysunutí 1"
+  draftCorners=ostré|zaoblené|sharp|round\`, \`draftLand=3\`, \`normalHeight=ano\` – jiné hodnoty jsou chyba. Ve formuláři Vysunutí → „Začátek,
+  směr, tenká stěna, úkos…“: Úkos (°) + přepínač Dovnitř / Ven, Břit (rovná část), Ostré rohy; směr „Pod úhlem od normály“ +
+  „Směrem k“. Do pole Úkos lze napsat i záporné číslo (= Ven, přepínač se přepne).
+
+#### Příklad – Střižnice – otvor s břitem a odlehčením 2°
+
+Otvor střižnice má od střižné (horní) plochy rovný **břit** 3 mm a pod ním **odlehčení 2°**, aby výstřižek volně propadl.
+Skica leží na střižné ploše, řez jde dolů (\`obráceně\`) skrz desku, \`ven\` = otvor se do hloubky rozšiřuje:
+
+\`\`\`
+nový díl Střižnice
+kvádr 120 80 25 název Deska
+skica XY odsazení 25: obdélník 40 20 v 60 40
+vysunout skrz odebrat obráceně úkos 2 ven břit 3
+stav
+\`\`\`
+
+Odebraný objem = 40 · 20 · 3 (břit) + komolý jehlan 40 × 20 → (40 + 2·22·tan 2°) × (20 + 2·22·tan 2°) na výšce 22 mm
+= 2 400 + 18 631,4 = 21 031,4 mm³ (deska 240 000 → objem 218 968,6 mm³); \`stav\` vypíše \`skrz vše, cut, úkos 2° ven (obrys se rozšiřuje), břit 3 mm, ostré rohy\`.
+Kruhový otvor: \`kružnice 20 v 60 40\` místo obdélníku (válec Ø20 × 3 + komolý kužel). Na ploše modelu: \`skica plocha horní:
+obdélník 40 20\` a týž řádek \`vysunout skrz odebrat obráceně úkos 2 ven břit 3\`.
+
+#### Příklad – propad pod 25°
+
+\`\`\`
+kvádr 80 60 20
+skica XY odsazení 20: obdélník 20 10 v 30 30
+vysunout skrz odebrat obráceně sklon 25 k +X
+\`\`\`
+
+Otvor 20 × 10 projde deskou šikmo (stěny rovnoběžné se směrem, dolní ústí posunuté o 20 · tan 25° = 9,3 mm k +X), odebraný
+objem = 20 · 10 · 20 = 4 000 mm³. Se zúžením / rozšířením stačí přidat \`úkos 1 ven\`.
+
 ### Měření – \`měřit\` (EN \`measure\`, DE \`messen\`)
 
 Měří hotový model (stav po předchozích řádcích vstupu); výsledek je **jeden řádek protokolu na měření**, délky v mm
@@ -253,7 +358,8 @@ chybu s platným rozsahem („těleso má 10 ploch (F1 až F10)“).
 
 \`await window.mncad.measure("F3", "F7")\` (také \`measure("V1", [0, 0, 50])\`, \`measure("díry")\`, \`measure("Hřídel:F3")\`)
 vrátí \`{ ok, kind, lines, distance, angle, radius, diameter, area, length, volume, points, report }\` – \`lines\` jsou řádky
-protokolu, \`report\` celý výsledek s čísly (u děr \`report.holes[]\` s \`diameter\`, \`entry\`, \`through\`, \`depth\`, \`axis\`);
+protokolu, \`report\` celý výsledek s čísly (u děr \`report.holes[]\` s \`diameter\`, \`entry\`, \`through\`, \`depth\`, \`axis\`, u slepé díry \`bottom\` = \`"flat"\` | \`"cone"\`,
+u kužele \`tipAngle\` (vrcholový úhel °) a \`tipDepth\` (hloubka ke špičce, mm; chybí u kužele propíchnutého souosou dírou));
 při chybě \`{ ok: false, error }\`. Příklad:
 
 \`\`\`
@@ -264,6 +370,67 @@ měřit díry          # Díry: 2 – Ø 6 mm × 1, Ø 8 mm × 1 · D1 Ø 6 mm: 
 měřit těleso        # Těleso: obálka 100 × 60 × 20 mm …
 měřit plocha horní  # F… rovinná plocha · normála +Z …
 \`\`\`
+
+### Primitiva – poloha a osa odkazem, pružina
+
+Kvádr, válec, koule, kužel, trubka, pružina i závit mají **stejné volby jako formulář**: polohu, osu, operaci a těleso.
+
+- **Poloha** čísly \`v x y z\`, nebo **odkazem** (asociativně – počítá se na tělese před prvkem, čísla jako popisky pro výběr):
+  \`na V3\` (vrchol), \`na střed hrany E2\`, \`na střed kružnice E5\` (střed kruhové hrany – ústí díry, čep), \`na střed plochy F3\`
+  (u válcové plochy bod na její ose), \`na začátek|konec hrany E2\`, \`na bod "Bod 1"\` (pomocný bod názvem), \`na mezi V1 V5\`
+  (střed mezi dvěma body), \`na počátek\`. EN \`at V3\`, \`at mid edge E2\`, \`at center circle E5\`, \`at center face F3\`, \`at point "P1"\`;
+  DE \`bei V3\`, \`bei mitte kante E2\`, \`bei mittelpunkt kreis E5\`, \`bei mitte fläche F3\`, \`bei punkt "P1"\`.
+- **Osa** (\`osa\` = \`směr\`): \`osa X|Y|Z\`, \`osa -Z\`, vektor \`osa 0 0,5 -0,866\` (právě tři čísla), \`osa hrana E3\` (přímá hrana;
+  u kruhové hrany osa kružnice jejím středem), \`osa plocha F2\` (normála rovinné plochy, osa válcové), \`osa "Osa 1"\` (pomocná osa
+  názvem), \`osa body V1 V5\` (od V1 k V5; EN \`axis points V1 V5\`, DE \`achse punkte V1 V5\`);
+  \`obráceně\` otočí osu X|Y|Z, vektor i dva body. Válec, kužel, trubka a pružina rostou od polohy **ve směru osy**. Koule osu nemá.
+  Smysl osy z hrany / válcové plochy určuje geometrie (nelze ho otočit slovem \`obráceně\`) – kde záleží na smyslu (kužel, závit do
+  díry), použijte \`osa -Z\`, vektor nebo \`osa body V1 V5\`.
+- **Kvádr s osou**: rozměr Z kvádru jde po ose; natočení je nejkratší otočení osy +Z do osy kolem polohy (rohu, se \`střed\` středu
+  kvádru). Pro \`kvádr X Y Z\` s rohem v počátku: \`osa -Z\` (180° kolem X) → X 0…X, Y −Y…0, Z −Z…0 · \`osa X\` → X 0…Z, Y 0…Y, Z −X…0 ·
+  \`osa -X\` → X −Z…0, Y 0…Y, Z 0…X · \`osa Y\` → X 0…X, Y 0…Z, Z −Y…0 · \`osa -Y\` → X 0…X, Y −Z…0, Z 0…Y. Kapsu shora proto
+  zadejte bez osy rohem dna (\`kvádr 20 10 5 v 40 30 15 odebrat\` v desce výšky 20) nebo středem (\`kvádr 20 10 10 střed v 50 35 20 odebrat\`).
+- **Kvádr a „střed“**: \`střed\` bez \`v\` / \`na\` před sebou = vystředit; odkaz hned za ním je poloha středu:
+  \`kvádr 10 10 10 střed F1\` = střed kvádru ve středu plochy F1, \`… střed V3\` = střed ve vrcholu V3 (totéž co \`střed na V3\`);
+  \`kvádr 10 10 10 na střed plochy F1\` = **roh** ve středu plochy.
+- **Operace**: \`přidat\` (výchozí) | \`odebrat\` | \`průnik\` | \`nové [těleso "Název"]\` – jen jedna (dvě různé = chyba);
+  \`těleso "Název"\` = cílové těleso prvku. U \`nové\` se odkazy polohy a osy (\`na střed plochy F8\`, \`osa hrana E3\`) počítají na
+  tělese, ze kterého se nové zakládá (pružina do sedla jako samostatné těleso).
+- Neznámé nebo nepatřičné slovo je **chyba** (dřív se tiše ignorovalo – \`kužel … směr 1 0 1\` pak stál svisle).
+- \`stav\` vypíše polohu i osu na tisíciny: \`Ø12→Ø0 × 6 mm, cut, podstava střed kružnice E5, osa [0; 0; -1]\`.
+- **Výkres**: \`válec D H … odebrat\` je pro Chytré kóty díra – popis \`Ø6,8 ↧16\` nebo \`Ø10 skrz\` (hloubka z geometrie), \`kužel … odebrat\`
+  v ústí takové díry přidá \`⌵ Ø12 × 90°\` a vnitřní \`závit\` souosý s dírou z ní udělá závitovou díru \`M8 ↧12\` + \`Ø6,8 ↧16\` (vrták jiný
+  než tabulkový, který se k závitu hodí – jádro D1 Ø6,647, zadaný Ø6,7 –, se vypíše skutečným průměrem; průměr, který k závitu
+  nepatří, dá hlášení „závit v popisu doplňte ručně“). Vnější závit odkazem i po libovolné ose dostane popis \`M20\` a délku.
+  Kosmetický závit s chybným odkazem je chyba prvku (✗), ne tichý úspěch.
+
+\`\`\`
+kvádr 100 100 60 v -50 -50 0
+kužel 20 0 25 v 0 0 70 osa 0 0,5 -0,866 odebrat     # kuželové sedlo pro šikmý hrot: osa skloněná 30° od -Z k +Y, podstava nad deskou
+válec 10 150 v -50 0 -40 osa 1 0 1 odebrat          # válcový otvor podél vektoru 1 0 1 (šikmý průchod deskou)
+kvádr 20 20 20 střed v 25 -25 60 odebrat            # kvádr vystředěný v bodě: kapsa 20 × 20 × 10 v horní ploše
+válec 6,8 16 v 30 30 60 osa -Z odebrat              # díra vrtáku M8 hl. 16 shora; horní kružnice díry = E17 (měřit hrany kruhové)
+kužel 12 0 6 na střed kružnice E17 osa -Z odebrat   # zahloubení 90° v ústí díry; Ø12 v horní ploše je pak E17
+závit M8 délka 12 na střed kružnice E17 osa -Z vnitřní  # kosmetický vnitřní závit; výkres: „M8 ↧12“ + „Ø6,8 ↧16“
+válec 25 15 v -30 -30 60 osa -Z odebrat             # sedlo pružiny Ø25 hl. 15; dno sedla = F15 (měřit plochy rovinné)
+pružina 22 stoupání 4 závity 5 drát 2 na střed plochy F15 nové těleso "Pružina"   # pružina v sedle jako samostatné těleso
+\`\`\`
+
+### Odkazy u rotace, pole, zrcadlení a sražení; hrany a plochy čísly
+
+- \`rotovat [úhel] osa hrana E3 | osa plocha F7 | osa "Osa 1" | osa body V1 V5 [symetricky]\` – osa rotace modelem (osa válcové
+  plochy, pomocná osa…); \`osa X|Y|Z\` = globální osa jako dřív.
+- \`pole N rozteč P směr hrana E3 | směr body V1 V5 | směr osa "Osa 1" [N2 rozteč P2 směr …]\` – směr řady odkazem;
+  \`pole kruhové N [úhel A] osa hrana E3 | osa plocha F7 | osa "Osa 1"\` – osa kruhového pole odkazem (např. osa náboje): kruhová
+  hrana = osa kružnice jejím středem, plocha jen válcová / kuželová (rovinná plocha osu nemá – chyba; střed kruhové rovinné plochy
+  zadejte její kruhovou hranou).
+- \`zrcadlit plocha F3 [odsazení N]\` · \`zrcadlit rovina "Rovina 1" [odsazení N]\` – rovina zrcadlení plochou / pomocnou rovinou.
+- \`srazit D úhel A plocha F3 [hrany …]\` · \`srazit D1 D2 plocha F3 [hrany …]\` – vzdálenost + úhel, nebo dvě vzdálenosti; D / D1 se
+  měří na referenční ploše F3 (bez \`hrany\` = všechny hrany té plochy).
+- \`zaoblit 2 hrany E3 E7\` · \`srazit 1 hrany E5\` · \`skořepina 2 otevřít F3 F5\` · \`úkos 3 plochy F2 F4\` – hrany a plochy **čísly**
+  (popisky pro výběr) místo pravidla; čísla a slova pravidla nelze míchat.
+- Co dál jde jen přes \`prvek\` / \`upravit\` (proměnný poloměr zaoblení, přeskočené instance pole, tenká stěna, ukončení druhého
+  směru…), ukáže \`prvek nápověda\` (přehled) a \`prvek nápověda <typ>\` (pole s „jen prvek / upravit / JSON“).
 
 ### Více těles v dílu
 
@@ -287,7 +454,9 @@ spring…) i prvek rozšíření (\`prvek sheet.bend …\`, \`prvek "Zkrut" …\
 - Hodnoty: číslo (\`12,5\`), \`ano\` / \`ne\`, seznam \`10;0;5\`, text v uvozovkách, JSON (\`planeDef={"kind":"base","name":"XY","offset":12}\`).
 - Skici a prvky se zadávají názvem (\`profileId="Skica 1"\`) nebo \`$last\`; plochy a hrany čísly (\`faces=1;4;5\`) nebo
   pravidlem (\`faces=boční\`, \`edges=horní;kruhové\`).
-- Neznámý klíč nebo typ skončí chybou s výčtem platných – tak lze parametry zjistit.
+- Neznámý klíč nebo typ skončí chybou s výčtem platných. **Všechna pole typu** vypíše \`prvek nápověda <typ>\` (název, druh
+  hodnoty s ukázkou, jednotka, povolené hodnoty, výchozí / povinné, význam, textový zápis) – zdrojem je tabulka svázaná
+  s TypeScript typy, takže je vždy úplná; u rozšíření \`prvek nápověda sheet.bend\` vypíše jeho parametry a výchozí hodnoty.
 - Směr a osa u rozšíření (\`surf.helix\` / \`surf.helixSweep\` \`axis\`, \`sheet.relief\` \`axis\`, \`surf.extrude\` \`dir\`,
   \`surf.revolve\` \`axis\`): \`axis=X\`, \`axis=-Z\`, vektor \`axis=1;0;1\`, nebo JSON odkaz
   (\`axis={"kind":"edge","ref":{"kind":"edge","index":3}}\` = podél hrany 4 / osy válce, \`{"kind":"faceNormal","ref":{"kind":"face","index":5}}\`
@@ -746,6 +915,24 @@ pole kruhové 4
 srazit 1,5
 \`\`\`
 
+### Příklad – sedlo pružiny (ploché dno) a závit s vrtákem z výkresu
+
+\`\`\`
+kvádr 80 50 30 název Kostka
+# sedlo pružiny Ø12,5 hloubky 15 s rovným dnem, pod ním průchozí Ø6,6 pro vedení
+díra 12,5 hloubka 15 dno ploché v 20 25
+díra 6,6 skrz v 20 25 15
+# závit M8 s vrtákem podle výkresu (jádro 6,647) – zadaný průměr má přednost před tabulkovým 6,8
+díra 6,647 závit M8 hloubka 20 hloubka-závitu 16 v 60 25
+# totéž bez opisování čísla: díra závit M8 hloubka 20 hloubka-závitu 16 jádro v 60 25
+měřit díry
+stav
+\`\`\`
+
+\`měřit díry\` ukáže u sedla „slepá, hloubka 15 mm · směr vrtání −Z · dno ploché“, u závitu „Ø 6,647 mm … hrot 118°
+(ke špičce 21,997 mm)“; stav
+„M8 hl. 20 (vrták Ø6,647 zadán ručně)“; výkres „Ø12,5 ↧15 (ploché dno)“ a „M8 ↧16“ + „Ø6,647 ↧20“.
+
 ### Příklad – deska s drážkou a zahloubenými dírami
 
 \`\`\`
@@ -957,7 +1144,8 @@ pixely v 3D okně:
 - Výkres **nedoplňuje žádné výrobní požadavky sám**: nepředepsané tolerance (např. ISO 2768-mK) a opracování hran
   (např. srazit 0,5×45°) se na list dostanou jen vyplněním polí v razítku (každé zvlášť, lze smazat). Výchozí text je
   jen „Rozměry v mm“.
-- Závitové díry (\`díra 5 závit M6 hloubka 12\`) se na výkrese kótují popisem \`M6 ↧12\` (s počtem), ne jako Ø jádra.
+- Závitové díry (\`díra závit M6 hloubka 12\`) se na výkrese kótují popisem \`M6 ↧12\` (s počtem), ne jako Ø jádra; vrták
+  jiný než tabulkový (\`jádro\`, zadaný průměr) má vlastní řádek \`Ø6,647 ↧12\`, ploché dno poznámku \`(ploché dno)\`.
 - Nové výkresy mají **Chytré kóty** (kótování podle prvků, viz další kapitola). Tlačítko **Kontrola kót** ve výkresu
   porovná kóty na listu s historií prvků a vypíše, co chybí; totéž je v \`výkres stav\`. Tolerance (H8, ±0,1) se píší
   příkazem \`výkres tolerance\` nebo u kóty do pole „přípona“.
@@ -1268,7 +1456,8 @@ Výkres:
 - Katalogový závit: \`závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]\` – hrubé i jemné stoupání
   (M18×1,5, M10×1,25; jiné stoupání se dopočítá). Bez \`modelovat\` je kosmetický: geometrie se nemění, na výkrese
   se kružnice válce (nebo jádra díry u \`vnitřní\`) kótuje označením. S \`modelovat\` vzniknou zjednodušené drážky.
-- Díra se závitem: \`díra 5 závit M18×1,5 hloubka 20 v x y\` – jádro (Ø16,5) se dopočítá z označení.
+- Díra se závitem: \`díra závit M18×1,5 hloubka 20 v x y\` – vrták (Ø16,5) se dopočítá z označení; zadaný průměr
+  (\`díra 16,4 závit M18×1,5 …\`) má přednost, \`jádro\` = D1 podle ISO 965-1 (16,376).
 - Skutečná šroubovice (Plochy → Tažení po šroubovici, JSON \`{"type":"ext","ext":"surf.helixSweep","data":{…}}\`):
   \`profile: "thread60"\`, \`side: "internal"\` pro závit **v díře** (poloměr = poloměr díry / jádra, hloubka jde
   do stěny) nebo \`"external"\` pro závit **na válci** (poloměr = poloměr válce), \`pitch\`, \`turns\`, \`mode: "cut"\`,

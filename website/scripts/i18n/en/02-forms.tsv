@@ -384,7 +384,6 @@ Ve směru normály	Along the normal
 Vedlejší poloosa	Minor semi-axis
 Vrtaná	Drilled
 Vrtat v kladném směru osy	Drill in the positive axis direction
-Vrtá se jádrový průměr Ø	The core diameter Ø is drilled
 Válc. zahl.	Counterbore
 Všechny	All
 XY ⟂ Z	XY ⟂ Z
@@ -393,8 +392,6 @@ YZ ⟂ X	YZ ⟂ X
 Začátek, směr, tenká stěna, úkos, kroucení…	Start, direction, thin wall, draft, twist…
 Zrušit výběr	Clear selection
 Závit (hrubé i jemné stoupání)	Thread (coarse and fine pitch)
-mm, závit	mm, thread
-se uvede ve výkrese.	appears in the drawing.
 vybráno.	selected.
 · střed	· centre
 · vrták Ø	· drill Ø

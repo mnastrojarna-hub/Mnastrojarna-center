@@ -389,6 +389,7 @@ export function resolveDirection(ctx: ResolveCtx, d: Direction | undefined, base
       return V.norm(d.v);
     case "angle": {
       const n = V.norm(base.normal);
+      if (d.toward) return tiltToward(n, d.toward, d.deg);
       const x = base.xDir ? V.norm(base.xDir) : V.perp(n);
       const y = V.cross(n, x); // osa Y skici
       return V.rotate(n, y, d.deg);
@@ -399,6 +400,14 @@ export function resolveDirection(ctx: ResolveCtx, d: Direction | undefined, base
       return g.dir;
     }
   }
+}
+
+/** normála `n` skloněná o `deg` směrem k `toward` promítnutému do roviny kolmé na `n` (šikmé vysunutí „sklon 25 k +X“) */
+export function tiltToward(n: Vec3, toward: Vec3, deg: number): Vec3 {
+  const t = V.sub(toward, V.mul(n, V.dot(toward, n)));
+  if (V.len(t) < 1e-9 * Math.max(1, V.len(toward))) throw new Error(tr("Směr sklonu leží na normále skici – zadejte směr v rovině skici (např. k +X)."));
+  const a = (deg * Math.PI) / 180;
+  return V.norm(V.add(V.mul(n, Math.cos(a)), V.mul(V.norm(t), Math.sin(a))));
 }
 
 // ---------------- osa ----------------
@@ -421,8 +430,13 @@ export function resolveAxis(ctx: ResolveCtx, def: AxisDef | undefined, sk: Sketc
     }
     case "edge":
     case "cylFace": {
-      const g = resolveRef(ctx, (def as { ref: Ref }).ref);
+      const ref = (def as { ref: Ref }).ref;
+      const g = resolveRef(ctx, ref);
       if (!g.dir || !g.point) throw new Error(tr("Vyberte přímou hranu nebo válcovou plochu."));
+      // rovinná plocha osu nemá (normála v těžišti posune pole bez varování) – osa válce / kužele, nebo kruhová hrana
+      if (kind === "cylFace" && ref.kind === "face" && g.kindLabel !== tr("válcová plocha") && g.kindLabel !== tr("kuželová plocha")) throw new Error(tr("Plocha F{0} není válcová ani kuželová – osu má jen válcová / kuželová plocha; střed kruhové rovinné plochy zadejte její kruhovou hranou (osa hrana E…).", ref.index + 1));
+      // kruhová hrana bez určeného bodu: osa kružnice (střed), ne bod na obvodu
+      if (ref.kind === "edge" && ref.at === undefined && g.plane && g.radius !== undefined) return { origin: g.plane.origin, dir: g.dir };
       return { origin: g.point, dir: g.dir };
     }
     case "twoPoints": {

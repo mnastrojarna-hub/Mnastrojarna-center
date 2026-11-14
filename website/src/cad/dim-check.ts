@@ -6,6 +6,8 @@
  */
 import { tr } from "./i18n";
 import { threadByName, threadLabel } from "./defaults";
+import { holeDrillD } from "./hole-spec";
+import { placementOf } from "./placements";
 import type { CadDoc, Feature, Vec3 } from "./types";
 
 type Vec2Like = readonly [number, number];
@@ -33,6 +35,16 @@ function countOf(doc: CadDoc, id: string): number {
   return n;
 }
 
+/** Válec (i odkazem – placements.ts) pokrývá po své ose celou obálku dílu? */
+function throughBox(f: Extract<Feature, { type: "cylinder" }>, bbox: [Vec3, Vec3]): boolean {
+  const pl = placementOf(f);
+  if (!pl) return false;
+  const d = pl.dir;
+  const ts = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => [0, 1, 2].reduce((s, i) => s + d[i] * bbox[(k >> i) & 1][i], 0));
+  const t0 = d[0] * pl.position[0] + d[1] * pl.position[1] + d[2] * pl.position[2];
+  return t0 <= Math.min(...ts) + 1e-6 && t0 + f.height >= Math.max(...ts) - 1e-6;
+}
+
 /** Očekávané kóty z historie prvků. */
 export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[] {
   const out: DimExpect[] = [];
@@ -55,6 +67,8 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
         if (f.kind === "tapped" && f.thread) {
           const t = threadByName(f.thread);
           push(out, "thread", t?.d ?? parseFloat(f.thread.replace(/^m/i, "")), `${cnt}${threadLabel(f.thread)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}`, src);
+          // vrták jiný než tabulkový (jádro D1, zadaný průměr) patří na výkres – výroba ho jinak nepozná
+          if (f.tapDrill === "minor" || f.tapDrill === "custom") push(out, "dia", holeDrillD(f), tr("Ø{0} (vrták závitu {1})", String(Math.round(holeDrillD(f) * 1000) / 1000).replace(".", ","), threadLabel(f.thread)), src);
         } else push(out, "dia", f.diameter, `${cnt}Ø${fmt(f.diameter)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"}`, src);
         if (f.depth > 0) push(out, "lin", f.depth, tr("{0} (hloubka díry)", fmt(f.depth)), src);
         if (f.cbDiameter > 0) {
@@ -66,7 +80,8 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
       }
       case "cylinder":
         push(out, "dia", 2 * f.radius, `Ø${fmt(2 * f.radius)}`, src);
-        push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
+        // odebraný válec skrz celý díl (díra „skrz“): délka nástroje není rozměr součásti
+        if (!(f.mode === "cut" && bbox && throughBox(f, bbox))) push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
         break;
       case "tube":
         push(out, "dia", f.outer, `Ø${fmt(f.outer)}`, src);
@@ -79,7 +94,8 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
       case "cone":
         push(out, "dia", 2 * f.radius1, `Ø${fmt(2 * f.radius1)}`, src);
         if (f.radius2 > 0) push(out, "dia", 2 * f.radius2, `Ø${fmt(2 * f.radius2)}`, src);
-        push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
+        // odebraný kužel se špičkou (zahloubení, sedlo hrotu) se kótuje průměrem × úhlem, výška z nich plyne
+        if (!(f.mode === "cut" && (f.radius1 === 0 || f.radius2 === 0))) push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
         break;
       case "box":
         for (const v of f.size) push(out, "lin", v, `${fmt(v)}`, src);

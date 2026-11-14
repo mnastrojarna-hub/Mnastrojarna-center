@@ -87,7 +87,7 @@ export default {
     select: "Skizze mit geschlossenem Profil (letzte vorgewählt; andere im Feld Profil (Skizze)).",
     steps: ["Im Feld Profil (Skizze) das Profil prüfen.", "Endbedingung (Richtung 1): Blind, Durch alles, Bis Fläche… und Länge.", "Operation: Hinzufügen / Entfernen / Schnittmenge, mit OK bestätigen."],
     cmd: "extrudieren 10",
-    note: "Ohne Skizze geht es nicht. Offene Kontur nur mit der Option Dünne Wand.",
+    note: "Auch schräg (Richtung, Winkel zur Normalen) und Formschräge Innen / Außen mit gerader Schneidkante – Freiwinkel der Schneidplatte.",
   },
   revolve: {
     what: "Dreht ein Skizzenprofil um eine Achse – Drehteile wie Welle, Flansch, Bolzen.",
@@ -163,7 +163,7 @@ export default {
     select: "Bei offenem Formular die Fläche anklicken, in die gebohrt wird (setzt Punkt und Achse).",
     steps: ["Bohrungstyp: Gebohrt, Zylindersenkung, Kegelsenkung oder Gewinde; Durchmesser.", "Fläche anklicken (Punkt auf der Oberfläche) oder Bohrungspositionen ausfüllen.", "Endbedingung (Tiefe, durch) einstellen und mit OK bestätigen."],
     cmd: "bohrung 8,5 durch bei 20 30",
-    note: "Für Schraube (Durchgangsloch ISO 273) berechnet den Durchmesser aus der Schraube.",
+    note: "Gewinde: Tabellenbohrer (M8 → 6,8), Kerndurchmesser oder eigener Bohrer; Sackloch auch mit flachem Grund.",
   },
   thread: {
     what: "Fügt ein metrisches ISO-Gewinde an einem Zylinder oder in einer Bohrung hinzu – kosmetisch oder modelliert.",

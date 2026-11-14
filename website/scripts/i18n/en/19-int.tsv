@@ -1,0 +1,19 @@
+# vlna 12 – integrace (tabulka polí prvků: vysunutí a díra po sloučení balíků extr / hole / prim)
+(bez volby) | jádro | vrták N | díra 6,647 závit M8	(no option) | core | drill N | hole 6.647 thread M8
+břit – rovná část kolmo od roviny skici před začátkem úkosu	land – straight part normal to the sketch plane before the draft starts
+břit N	land N
+délka se měří kolmo na rovinu skici (výška), ne podél šikmého směru	the length is measured normal to the sketch plane (height), not along the oblique direction
+díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8 [jádro | vrták [N]]]	hole D [depth H [flat bottom | tip 118]|through [both]|to body] at x y [z] [axis Z] [direction vx vy vz | tilt angle] [cbore D2 H2] [csink D2] [thread M8 [core | drill [N]]]
+hrot N | dno ploché	tip N | flat bottom
+ostré rohy | zaoblené rohy	sharp corners | round corners
+průměr (u závitové díry skutečný vrták – viz tapDrill)	diameter (for a tapped hole the actual drill – see tapDrill)
+rohy úkosu: ostré (rovinné stěny) / zaoblené (vzdalující se rohy se zaoblí)	draft corners: sharp (planar walls) / round (receding corners are rounded)
+skrz | k tělesu | k dalšímu | k ploše F3 [odsazení N] | k rovině "Rovina 1" | k vrcholu V3	through | to body | to next | to face F3 [offset N] | to plane "Plane 1" | to vertex V3
+směr vysunutí (výchozí normála skici); sklon = {"kind":"angle","deg":25,"toward":[1,0,0]}	extrusion direction (default sketch normal); tilt = {"kind":"angle","deg":25,"toward":[1,0,0]}
+směr x y z | směr +X | směr hrana E3 | směr osa "Osa 1" | směr plocha F2 | směr body V1 V2 | sklon a [k +X]	direction x y z | direction +X | direction edge E3 | direction axis "Axis 1" | direction face F2 | direction points V1 V2 | tilt a [toward +X]
+úhel špičky vrtáku slepé díry 60–170° (výchozí 118), 180 = ploché dno; jiná hodnota: text / prvek / upravit = chyba, starší JSON = varování a oříznutí	drill point angle of a blind hole 60–170° (default 118), 180 = flat bottom; other values: text / feature / edit = error, older JSON = warning and clamping
+úkos a [dovnitř|ven]	draft a [in|out]
+úkos stěn: + = dovnitř (vnější obrys se od skici zužuje, otvory profilu rozšiřují), − = ven	wall draft: + = inward (the outer outline narrows away from the sketch, profile holes widen), − = outward
+vysunout H|výška H [směr …] [sklon a [k +X]] [symetricky] [skrz|k tělesu|k dalšímu|k ploše F3|k rovině "Rovina 1"|k vrcholu V3] [odebrat|přidat|průnik|nové] [obráceně] [úkos a [dovnitř|ven] [břit N] [ostré rohy|zaoblené rohy]]	extrude H|height H [direction …] [tilt a [toward +X]] [symmetric] [through|to body|to next|to face F3|to plane "Plane 1"|to vertex V3] [cut|add|intersect|newbody] [reverse] [draft a [in|out] [land N] [sharp corners|round corners]]
+vrták závitové díry: table = z tabulky (M8 → 6,8), minor = jádro D1 podle ISO 965-1 (M8 → 6,647), custom = vrtá se diameter	tapped hole drill: table = from the thread table (M8 → 6.8), minor = minor diameter D1 per ISO 965-1 (M8 → 6.647), custom = the diameter is drilled
+prvek {0}: neznámý klíč „{1}“ – pole: {2} (popis: prvek nápověda {0})	feature {0}: unknown key “{1}” – fields: {2} (description: feature help {0})

@@ -83,6 +83,10 @@ export type MeasureCyl = {
   through?: boolean;
   /** slepá díra: hloubka válcové části */
   depth?: number;
+  /** slepá díra: tvar dna – ploché, nebo kužel hrotu vrtáku (`tipAngle` = vrcholový úhel, `tipDepth` = hloubka ke špičce) */
+  bottom?: "flat" | "cone";
+  tipAngle?: number;
+  tipDepth?: number;
 };
 export type MeasureReport =
   | { kind: "entity"; entity: MeasureEnt }
@@ -378,6 +382,60 @@ function cylGroups(shape: Shape): Group[] {
 const MIN_SPAN = 181;
 const byPos = (a: MeasureCyl, b: MeasureCyl) => a.diameter - b.diameter || (a.entry ?? a.from)[0] - (b.entry ?? b.from)[0] || (a.entry ?? a.from)[1] - (b.entry ?? b.from)[1] || (a.entry ?? a.from)[2] - (b.entry ?? b.from)[2];
 
+/**
+ * Dno slepé díry na uzavřeném konci `end` (směr `out` = dál od vstupu, `u` = kolmý jednotkový směr):
+ * - ploché, když je hned za koncem materiál na ose, nebo když vnitřní okraj dna (poloměr, kde začíná materiál) je v obou
+ *   hloubkách stejný – rovné dno se souosou menší dírou (sedlo pružiny s průchozí dírou libovolného průměru);
+ * - kužel hrotu vrtáku, když se okraj s hloubkou lineárně zužuje: vrcholový úhel 2·atan(sklon), špička na ose se zpřesní
+ *   půlením (nezávisle na tloušťce materiálu pod dnem); kužel propíchnutý souosou dírou dá jen úhel.
+ * (gp_Cone v jádře OCCT pro web není dostupný – tvar se zjišťuje body uvnitř / vně tělesa.)
+ */
+export function holeBottom(test: (p: Vec3) => boolean, end: Vec3, out: Vec3, u: Vec3, rad: number): Pick<MeasureCyl, "bottom" | "tipAngle" | "tipDepth"> {
+  const at = (t: number, k = 0) => add(add(end, mul(out, t)), mul(u, k * rad));
+  const eps = Math.max(0.02 * rad, 0.01);
+  if (test(at(eps))) return { bottom: "flat" };
+  /** vnitřní okraj dna v hloubce s (násobek r): uvnitř díra, vně materiál; null = v hloubce s u stěny materiál není */
+  const edge = (s: number): number | null => {
+    if (!test(at(s, 0.995))) return null;
+    let lo = 0;
+    let hi = 0.995;
+    for (let i = 0; i < 20; i++) {
+      const m = (lo + hi) / 2;
+      if (test(at(s, m))) hi = m;
+      else lo = m;
+    }
+    return (lo + hi) / 2;
+  };
+  const s2 = eps + 0.04 * rad;
+  const k1 = edge(eps);
+  const k2 = k1 === null ? null : edge(s2);
+  if (k1 === null || k2 === null) return {};
+  // tan polovičního vrcholového úhlu; svislá stěna souosé díry ≈ 0 (vrták 60° má 0,577, 170° má 11,4). Okraj těsně u stěny
+  // se skoro nulovým sklonem je zaoblené (kulové) dno, ne ploché; sklon pod 0,5 nemá žádný vrták (60° = 0,577) → tvar neznámý
+  const slope = ((k1 - k2) * rad) / (s2 - eps);
+  if (slope < 0.1) return k1 < 0.98 ? { bottom: "flat" } : {};
+  if (slope < 0.5) return {};
+  const deg = (h: number) => Math.round(((2 * Math.atan(rad / h) * 180) / Math.PI) * 1000) / 1000;
+  const hEst = eps + (k1 * rad) / slope; // hloubka špičky podle sklonu
+  const hi0 = [1.002, 1.01, 1.03, 1.1].map((x) => hEst * x).find((t) => test(at(t)));
+  if (hi0 === undefined) {
+    // propíchnutý kužel (souosá díra ze dna): úhel jen ze sklonu, když je okraj lineární i v půlce
+    const km = edge((eps + s2) / 2);
+    return km !== null && Math.abs(km - (k1 + k2) / 2) < 0.01 * Math.max(k1 - k2, 1e-3) + 1e-4 ? { bottom: "cone", tipAngle: deg(rad / slope) } : {};
+  }
+  let lo = s2;
+  let hi = hi0;
+  for (let i = 0; i < 40 && hi - lo > 1e-7 * Math.max(1, rad); i++) {
+    const mid = (lo + hi) / 2;
+    if (test(at(mid))) hi = mid;
+    else lo = mid;
+  }
+  const h = (lo + hi) / 2;
+  // lineární kužel: v polovině hloubky hrotu je stěna v polovině poloměru
+  if (test(at(h / 2, 0.45)) || !test(at(h / 2, 0.55))) return {};
+  return { bottom: "cone", tipAngle: deg(h), tipDepth: q6(h) };
+}
+
 /** Díry (vnitřní válcové plochy) nebo vnější válce (osazení, čepy) tělesa. */
 export function measureCylinders(shape: Shape, holes: boolean): MeasureCyl[] {
   const groups = cylGroups(shape).filter((g) => (holes ? g.inner >= g.outer : g.outer > g.inner) && g.span >= MIN_SPAN);
@@ -391,7 +449,8 @@ export function measureCylinders(shape: Shape, holes: boolean): MeasureCyl[] {
         // konec díry je uzavřený (dno, hrot vrtáku, osazení), když je kousek za ním (podél osy) u stěny díry materiál
         const u = unit(cross(g.d, Math.abs(g.d[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]));
         const step = Math.max(0.15 * g.r, 0.05);
-        const closed = (end: Vec3, out: Vec3) => [u, mul(u, -1)].some((s) => inside.test(add(add(end, mul(out, step)), mul(s, 0.9 * g.r))));
+        // 0,97 r: strmý hrot vrtáku (60–67°) je v kroku 0,15 r ještě za 0,9 r – bez druhého bodu by slepá díra vyšla jako skrz
+        const closed = (end: Vec3, out: Vec3) => [u, mul(u, -1)].some((s) => [0.9, 0.97].some((k) => inside.test(add(add(end, mul(out, step)), mul(s, k * g.r)))));
         const c0 = closed(from, mul(g.d, -1));
         const c1 = closed(to, g.d);
         c.through = !c0 && !c1;
@@ -399,6 +458,9 @@ export function measureCylinders(shape: Shape, holes: boolean): MeasureCyl[] {
         c.entry = qv(entryAtTo ? to : from);
         c.drill = qv(entryAtTo ? mul(g.d, -1) : g.d);
         if (!c.through) c.depth = c.length;
+        // tvar dna jen u díry uzavřené na jednom konci
+        if (!c.through && c0 !== c1) Object.assign(c, holeBottom(inside.test, entryAtTo ? from : to, entryAtTo ? mul(g.d, -1) : g.d, u, g.r));
+        if (c.tipDepth !== undefined) c.tipDepth = q6(c.length + c.tipDepth);
       }
       return c;
     });

@@ -20,9 +20,11 @@ import { toAxisDef, toDirection } from "./ext/place";
 import { getLang, tr } from "./i18n";
 import { evalExpr, exprRefs, getPath as numAt, resolveVariables, VAR_NAME } from "./params";
 import { pickFieldsOf } from "./pick-fields";
+import { EXTRUDE_EDIT_FIELDS, extrudeFieldValue } from "./agent-extr";
 import { measureDim } from "./sketch-solver";
 import { offsetEntity } from "./sketch-ops";
 import { isSplineTangentKey, patchSplineTangentKey } from "./agent-surfaces";
+import { changedHoleKeys, holeFieldRules } from "./agent-hole";
 import { chainOf, offsetChain, projectModelLines, type ChainSeg } from "./sketch-tools";
 import { uid, type CadDoc, type Config, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type Vec2, type Vec3 } from "./types";
 
@@ -641,6 +643,10 @@ export const OPTIONAL_KEYS = new Set(
 );
 // tvary 7. vlny (agent-shapes.ts): kuželosečka eliptického zaoblení, setback pro jednotlivé vrcholy
 for (const k of ["rho", "setbacks"]) OPTIONAL_KEYS.add(k);
+// díra 12. vlny (agent-hole.ts): vrták závitové díry – upravit "Díra 1" tapDrill=minor
+OPTIONAL_KEYS.add("tapDrill");
+// vlna 12 (agent-extr.ts): břit a rohy úkosu vysunutí, výška kolmo na skicu u šikmého směru
+for (const k of ["draftLand", "draftCorners", "normalHeight"]) OPTIONAL_KEYS.add(k);
 const SKETCH_KEYS = new Set(["sketchId", "profileId", "pathId", "guideId", "partingSketchId", "centerlineId"]);
 const SKETCH_LISTS = new Set(["sketchIds", "profileIds", "guideIds"]);
 const MODE_WORDS: [string, Set<string>][] = [
@@ -813,6 +819,7 @@ async function editFeature(res: EditResult, cmd: Extract<EditCmd, { kind: "edit"
     else if (pathStr === "featureId") v = refTo(v, false);
     else if (pathStr === "featureIds") v = (Array.isArray(v) ? v : [v]).map((x) => refTo(x, false));
     else if (pathStr === "mode") v = modeOf(v);
+    else if (EXTRUDE_EDIT_FIELDS.has(pathStr)) v = extrudeFieldValue(pathStr, v, key0); // rohy / břit úkosu, výška kolmo (agent-extr.ts)
     // typ hodnoty musí sedět s dosavadní (číslo za číslo, vektor za vektor)
     if (!rules.some((r) => r.path.join(".") === pathStr)) {
       if (typeof old === "number" && typeof v !== "number") throw new Error(tr("„{0}“ čeká číslo (dosud {1}), zadáno „{2}“", key0, show(old), raw));
@@ -844,6 +851,8 @@ async function editFeature(res: EditResult, cmd: Extract<EditCmd, { kind: "edit"
       changes.push(tr("{0} {1} → {2} ({3} podle pravidla „{4}“)", r.path.join("."), show(old), show(idx), idx.length, r.rule.join(" ")));
     }
   }
+  // díra: vrták závitové díry a dno podle stejných pravidel jako text a formulář (agent-hole.ts)
+  if (f.type === "hole" && f0.type === "hole") changes.push(...holeFieldRules(f, changedHoleKeys(f0, f)));
   let out = f;
   if (picked.size && ctx.kernel?.stamp) out = await ctx.kernel.stamp(before(doc, i, f), f); // otisky vybraných entit (přežijí přečíslování)
   doc.features[i] = out;

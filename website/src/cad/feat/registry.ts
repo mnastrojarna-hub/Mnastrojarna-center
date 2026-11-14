@@ -19,6 +19,8 @@ export type FeatCtx = {
   doc: CadDoc;
   /** upozornění k prvku (⚠ ve stromu a v protokolu) – výsledek je použitelný, ale přibližný / částečný */
   warn?: (message: string) => void;
+  /** prvek zakládá nové těleso (`body` je prázdné): těleso před prvkem, na kterém se řeší odkazy polohy a osy */
+  refBody?: Shape | null;
 };
 
 export type FeatBuilder<T extends Feature = Feature> = (f: T, ctx: FeatCtx) => Shape | null | Promise<Shape | null>;

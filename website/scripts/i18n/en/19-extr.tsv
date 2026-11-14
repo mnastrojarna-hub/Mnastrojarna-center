@@ -1,0 +1,82 @@
+# vlna 12 – šikmé vysunutí, úkos dovnitř / ven, břit (agent-extr.ts, extrude-draft.ts, extrude-fields.tsx)
+„dovnitř“ / „ven“ patří k úkosu: vysunout 20 úkos 2 ven	“in” / “out” belong to the draft: extrude 20 draft 2 out
+„k +X“ určuje směr sklonu – patří za sklon: vysunout 20 sklon 25 k +X	“toward +X” sets the tilt direction – it belongs after tilt: extrude 20 tilt 25 toward +X
+{0}: směr sklonu se píše +X, -Y … nebo třemi čísly (k 1 1 0)	{0}: write the tilt direction as +X, -Y … or as three numbers (toward 1 1 0)
+2. směr {0}	2nd direction {0}
+Břit ({0} mm) musí být kratší než výška vysunutí ({1} mm).	The land ({0} mm) must be shorter than the extrusion height ({1} mm).
+Břit (rovná část)	Land (straight part)
+břit {0} mm	land {0} mm
+břit a ostré / zaoblené rohy patří k úkosu: vysunout skrz odebrat úkos 2 ven břit 3	land and sharp / round corners belong to the draft: extrude through cut draft 2 out land 3
+břit potřebuje délku rovné části v mm: břit 3	land needs the length of the straight part in mm: land 3
+Dovnitř: vnější obrys se od roviny skici zužuje, otvory v profilu se rozšiřují (u odebrání se otvor do hloubky zužuje).	In: the outer outline narrows away from the sketch plane, holes in the profile widen (for a cut the opening narrows with depth).
+k dalšímu	to next
+k ploše {0}	to face {0}
+k ploše potřebuje číslo plochy: k ploše F3 [odsazení 2]	to face needs a face number: to face F3 [offset 2]
+k tělesu	to body
+k vrcholu {0}	to vertex {0}
+k vrcholu potřebuje číslo vrcholu: k vrcholu V3	to vertex needs a vertex number: to vertex V3
+kolmo od roviny skici, pak začne úkos	normal to the sketch plane, then the draft starts
+neznámý směr „{0}“ – směr x y z | +X | hrana E3 | osa "Osa 1" | plocha F2 | body V1 V2	unknown direction “{0}” – direction x y z | +X | edge E3 | axis "Axis 1" | face F2 | points V1 V2
+normála plochy {0}	normal of face {0}
+normála skici	sketch normal
+odsazeně {0} mm od plochy {1}	offset {0} mm from face {1}
+odsazení potřebuje číslo: k ploše F3 odsazení 2	offset needs a number: to face F3 offset 2
+ose X skici	sketch X axis
+ostré rohy	sharp corners
+Ostré rohy (jinak zaoblené)	Sharp corners (otherwise rounded)
+Ostré rohy úkosu se u tohoto profilu nepodařilo vytvořit – rohy jsou zaoblené.	Sharp draft corners could not be created for this profile – the corners are rounded.
+podél hrany {0}	along edge {0}
+podél osy {0}	along axis {0}
+sklon {0}° (k ose X skici)	tilt {0}° (toward the sketch X axis)
+sklon {0}° k {1}	tilt {0}° toward {1}
+sklon musí být menší než 89° (zadáno {0}°)	tilt must be less than 89° (given {0}°)
+Sklon od normály	Tilt from normal
+sklon potřebuje úhel od normály skici: sklon 25 [k +X]	tilt needs an angle from the sketch normal: tilt 25 [toward +X]
+sklon: směr naklonění zadejte jednou (k +X nebo směr +X)	tilt: give the tilt direction once (toward +X or direction +X)
+sklon: směr naklonění zadejte vektorem nebo osou (k +X, k 1 1 0)	tilt: give the tilt direction as a vector or an axis (toward +X, toward 1 1 0)
+směr body potřebuje dva vrcholy: směr body V1 V5	direction points needs two vertices: direction points V1 V5
+směr hrana potřebuje číslo hrany: směr hrana E3	direction edge needs an edge number: direction edge E3
+směr osa potřebuje osu: směr osa "Osa 1" | X | E3	direction axis needs an axis: direction axis "Axis 1" | X | E3
+směr plocha potřebuje číslo plochy: směr plocha F2 (normála plochy)	direction face needs a face number: direction face F2 (face normal)
+směr potřebuje hodnotu: směr x y z | +X | hrana E3 | osa "Osa 1" | plocha F2 | body V1 V2	direction needs a value: direction x y z | +X | edge E3 | axis "Axis 1" | face F2 | points V1 V2
+Směr sklonu leží na normále skici – zadejte směr v rovině skici (např. k +X).	The tilt direction lies on the sketch normal – give a direction in the sketch plane (e.g. toward +X).
+směr vektorem potřebuje tři čísla: směr 1 0 1	a direction vector needs three numbers: direction 1 0 1
+Směrem k	Toward
+tečna {0}	tangent {0}
+Úhel {0}° k {1}	Angle {0}° toward {1}
+ukončení k ploše / rovině / vrcholu potřebuje odkaz: k ploše F3 | k rovině "Rovina 1" | k vrcholu V3	end to face / plane / vertex needs a reference: to face F3 | to plane "Plane 1" | to vertex V3
+úkos {0}° dovnitř (obrys se zužuje)	draft {0}° in (outline narrows)
+úkos {0}° ven (obrys se rozšiřuje)	draft {0}° out (outline widens)
+úkos nemůže být zároveň dovnitř i ven	the draft cannot be both in and out
+Úkos obrysu	Outline draft
+úkos potřebuje úhel: úkos 2 [dovnitř|ven]	draft needs an angle: draft 2 [in|out]
+úkos vysunutí musí být menší než 45° (zadáno {0}°)	the extrusion draft must be less than 45° (given {0}°)
+vektor {0}	vector {0}
+Ven: vnější obrys se od roviny skici rozšiřuje, otvory v profilu se zužují – u odebrání se otvor do hloubky rozšiřuje (odlehčení střižnice za břitem).	Out: the outer outline widens away from the sketch plane, holes in the profile narrow – for a cut the opening widens with depth (die relief behind the land).
+vysune poslední skicu; H = délka podél směru, „výška H“ = kolmo na skicu; „sklon 25 k +X“ = šikmý hranol (propad); úkos + / dovnitř = obrys se od skici zužuje, − / ven = rozšiřuje (u odebrání otvor do hloubky – odlehčení střižnice), břit N = rovná část před úkosem	extrudes the last sketch; H = length along the direction, “height H” = normal to the sketch; “tilt 25 toward +X” = oblique prism (drop-through); draft + / in = the outline narrows away from the sketch, − / out = widens (for a cut the opening widens with depth – die relief), land N = straight part before the draft
+vysunout potřebuje výšku: {0}	extrude needs a height: {0}
+vysunout: „skrz“ a ukončení „k …“ nelze kombinovat	extrude: “through” and an end “to …” cannot be combined
+vysunout: neznámé slovo „{0}“ – zápis: {1}	extrude: unknown word “{0}” – syntax: {1}
+vysunout: směr je zadaný dvakrát	extrude: the direction is given twice
+vysunout: ukončení je zadané dvakrát	extrude: the end is given twice
+výška kolmo na skicu	height normal to the sketch
+Vzdálenost kolmo na skicu (výška), ne podél směru	Distance normal to the sketch (height), not along the direction
+zaoblené rohy	round corners
+Úkos {0}° je pro tento profil příliš velký – obrys by se ve výšce {1} mm od roviny skici odsadil o {2} mm a zanikl. Zmenšete úhel nebo výšku.	A {0}° draft is too large for this profile – at a height of {1} mm from the sketch plane the outline would be offset by {2} mm and vanish. Reduce the angle or the height.
+vysunout H|výška H [směr x y z|směr +X|směr hrana E3|směr osa "Osa 1"|směr plocha F2|směr body V1 V2] [sklon a [k +X|k x y z]] [symetricky] [skrz|k tělesu|k dalšímu|k ploše F3 [odsazení N]|k rovině "Rovina 1"|k vrcholu V3] [odebrat|přidat|průnik|nové] [obráceně] [úkos a [dovnitř|ven] [břit N] [ostré rohy|zaoblené rohy]]	extrude H|height H [direction x y z|direction +X|direction edge E3|direction axis "Axis 1"|direction face F2|direction points V1 V2] [tilt a [toward +X|toward x y z]] [symmetric] [through|to body|to next|to face F3 [offset N]|to plane "Plane 1"|to vertex V3] [cut|add|intersect|newbody] [reverse] [draft a [in|out] [land N] [sharp corners|round corners]]
+„{0}“ čeká ano / ne, zadáno „{1}“	“{0}” expects yes / no, given “{1}”
+„{0}“ čeká délku břitu v mm (0 = bez břitu), zadáno „{1}“	“{0}” expects the land length in mm (0 = no land), given “{1}”
+„{0}“: rohy úkosu jsou sharp (ostré) | round (zaoblené), zadáno „{1}“	“{0}”: draft corners are sharp | round, given “{1}”
+k rovině {0}	to plane {0}
+odsazení patří k ukončení: k ploše F3 odsazení 2	offset belongs to the end: to face F3 offset 2
+směr podél hrany: směr hrana E3	direction along an edge: direction edge E3
+směr podél osy: směr osa "Osa 1" | směr osa Z	direction along an axis: direction axis "Axis 1" | direction axis Z
+směr x y z | směr +X | směr hrana E3	direction x y z | direction +X | direction edge E3
+šikmé vysunutí: sklon 25 [k +X] nebo směr x y z	oblique extrusion: tilt 25 [toward +X] or direction x y z
+Úkos nelze kombinovat s ukončením k zakřivené ploše – použijte rovinnou plochu, pomocnou rovinu nebo „k dalšímu“.	A draft cannot be combined with an end at a curved face – use a planar face, a datum plane or “to next”.
+Ve směru vysunutí za rovinou skici není těleso – nástroj míří od tělesa (zkuste Opačný směr / „obráceně“).	There is no body beyond the sketch plane in the extrusion direction – the tool points away from the body (try Reverse direction / “reverse”).
+vysunout: „{0}“ – směr odkazem se píše za slovo směr: směr {0} (ukončení: k ploše F3, k vrcholu V3)	extrude: “{0}” – a direction by reference is written after the word direction: direction {0} (end: to face F3, to vertex V3)
+vysunout: „{0}“ má jen jednu hodnotu (zadáno {1})	extrude: “{0}” takes one value only (given {1})
+vysunout: délka je zadaná dvakrát ({0}) – číslo / hloubka = podél směru, výška = kolmo na skicu	extrude: the length is given twice ({0}) – number / depth = along the direction, height = normal to the sketch
+vysunout: přebytečné číslo „{0}“ – délka se zadává jednou: {1}	extrude: extra number “{0}” – the length is given once: {1}
+vysunout: volba „{0}“ sem nepatří{1} – zápis: {2}	extrude: option “{0}” does not belong here{1} – syntax: {2}

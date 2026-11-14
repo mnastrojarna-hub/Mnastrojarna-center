@@ -5,6 +5,7 @@
  * Přesná projekce (HLR) šroubovicových ploch v jádře trvá minuty – to byl důvod „zaseknutého“ výkresu i exportu PDF.
  */
 import { threadByName } from "./defaults";
+import { holeDrillD } from "./hole-spec";
 import { tr } from "./i18n";
 import type { CadDoc, Feature } from "./types";
 
@@ -34,7 +35,7 @@ export function threadsOfDoc(doc: CadDoc): { r: number; label: string }[] {
       if (t) out.push({ r: (f.internal ? t.tap : t.d) / 2, label: `${t.name}${f.length > 0 ? ` dl. ${fmt(f.length)}` : ""}` });
     } else if (f.type === "hole" && f.kind === "tapped" && f.thread) {
       const t = threadByName(f.thread);
-      if (t) out.push({ r: t.tap / 2, label: `${t.name}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}` });
+      if (t) out.push({ r: holeDrillD(f) / 2, label: `${t.name}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}` }); // vrták podle volby (hole-spec.ts)
     } else if (f.type === "ext" && f.ext === "surf.helixSweep" && f.data?.profile === "thread60") {
       const d = f.data;
       const R = typeof d.radius === "number" ? d.radius : 0;

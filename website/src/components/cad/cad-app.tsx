@@ -32,6 +32,7 @@ import { applySketchOp, sketchOnPlane } from "@/cad/agent-sketch";
 import { applyEdit, freeName, histStep, historyText } from "@/cad/agent-edit";
 import { resolveTab, type TabInfo } from "@/cad/agent-asm";
 import type { AsmEnv, PartFaces } from "@/cad/asm-agent";
+import { resolveDatumNames } from "@/cad/agent-prim";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
 import type { DrawingExtras } from "@/cad/drawing-agent";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
@@ -558,6 +559,7 @@ export function CadApp() {
         }
         (f as { data: Record<string, unknown> }).data = data;
       }
+      resolveDatumNames(f, d.features, !keepName); // pomocná rovina / osa / bod názvem („na bod "Bod 1"“, „směr osa "Osa 1"“, „k rovině "Rovina 1"“) → id (agent-prim.ts); celý dokument bez chyby
       // více těles: „nové“ = nové těleso s dalším volným názvem; „těleso N“ = cílové těleso dalších prvků
       if (f.body === "$new") f.body = hasSolid() ? nextBodyName(bodiesAt(d).names) : undefined;
       if (f.body) {
@@ -662,6 +664,7 @@ export function CadApp() {
             added.push(f);
             changed = true;
             log.push(tr("→ {0} ({1}) přidán – výsledek po výpočtu níže", f.name, f.type));
+            if (op.note) log.push(`  ${op.note}`); // např. vrták závitové díry zadaný ručně (agent-hole.ts)
             break;
           }
           case "entities":
@@ -759,6 +762,9 @@ export function CadApp() {
             changed = true;
             break;
           }
+          case "info":
+            log.push(...op.lines); // nápověda polí prvku (agent-help.ts)
+            break;
           case "clash": {
             if (d.kind !== "assembly") throw new Error(tr("kolize: otevřený dokument není sestava"));
             const res = await cad.interference(d);
