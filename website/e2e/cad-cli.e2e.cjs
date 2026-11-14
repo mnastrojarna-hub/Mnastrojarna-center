@@ -18,6 +18,8 @@ const crypto = require('crypto');
 
 const WEB = path.resolve(__dirname, '..');
 const WORK = path.resolve(process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), 'mncad-e2e-')));
+// opakovaný běh ve stejné složce: zbytky výstupů minulého běhu by změnily názvy souborů („Deska 1 (2).step“) – uklidit vlastní podsložky
+if (fs.existsSync(WORK)) for (const n of fs.readdirSync(WORK)) if (/^(o\d+|o-.+|iso|in)$/.test(n)) fs.rmSync(path.join(WORK, n), { recursive: true, force: true });
 const NODE = process.env.MNCAD_NODE || process.execPath;
 fs.mkdirSync(WORK, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
