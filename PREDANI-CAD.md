@@ -3,6 +3,14 @@
 Tento soubor je **závazný plán pro pokračování**. Pracuj přesně podle něj, krok po kroku, v uvedeném pořadí.
 Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude vše hotové, soubor smaž a odstraň odkaz v `CLAUDE.md`.
 
+## Průběžný stav (aktualizuj po každém kroku: čas, co je hotové, co právě běží)
+
+| Čas | Stav |
+| --- | --- |
+| 14. 11. 18:05 | Vlna 15 na větvi (`29b31a5`), plán pushnut (`277a6bd`). Produkční build vlny 15 prošel (`S/build-w15.log`, `exit=0`). |
+| 14. 11. 18:06 | BĚŽÍ na pozadí: opakované testy (`S/vitest-w15c.log`, čekej na řádek `exit=`) a e2e 18 sad na portu 3199 (`S/e2e-w15.log`, končí řádkem `done`; server `next start -p 3199` běží – po e2e ho zastav a smaž `.next`). |
+| 14. 11. 18:06 | BĚŽÍ workflow: `wf_0a444c37-b25` (fáze B – integrace hotová, `S/w14/bint.patch`; následuje akceptace) a `wf_1fd5cfa9-922` (`fix:geom`). |
+
 ## 0. Pevná pravidla (platí pořád)
 
 1. Režim práce podle `CLAUDE.md`: autonomně, bez dotazů na dílčí rozhodnutí, po každé etapě kontroly, commit a push na
@@ -80,7 +88,7 @@ První běh testů: 467 z 470; 3 selhání způsobila změna znaménka odsazení
 - `src/cad/drawing-w15.test.ts`: test „mimo těleso“ používá −80, nový test staršího zápisu.
 
 Zbývá:
-- [ ] A1. Přečti výsledek opakovaných testů `S/vitest-w15c.log` (poslední řádek `exit=0`?) a buildu `S/build-w15.log`.
+- [ ] A1. (build hotov, testy běží) Přečti výsledek opakovaných testů `S/vitest-w15c.log` (poslední řádek `exit=0`?) a buildu `S/build-w15.log`.
       Nejsou-li, pusť znovu: testy `src/cad/doc-script.test.ts doc-script.roundtrip.test.ts doc-script.review.test.ts
       drawing-w15.test.ts drawing-w15-int.test.ts i18n/i18n.test.ts` a pak celou sadu z patche
       (`git show --name-only 29b31a5 | grep "\.test\.ts$"`). Všechno musí projít.
