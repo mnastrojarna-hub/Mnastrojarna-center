@@ -16,6 +16,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 18:30 | **Úkol A HOTOV**: vlna 15 sloučena do `main` (PR #96, `23c34b0`); e2e 18 sad bez nových selhání; worktree `w15-*` smazány. Začíná úkol C2 (střižnice) – patch `S/w17/geom.patch` jde na `main` nanést čistě. |
 | 14. 11. 18:52 | **Úkol C HOTOV**: střižnice sloučena do `main` (PR #97, `aa4300e`). Celý strom `src/cad` 2621 testů prošel (1 selhání `node-shims` po vlně 15 opraveno), skutečný nástroj 27/27 platných, Σ 5241,734 cm³. Dvě e2e sady měly po vlně 15 zastaralá očekávání (`cad-plate-roundtrip`, `cad-fixes`) – opraveno. BĚŽÍ úplný průchod zbylých e2e sad (`S/e2e-sweep.log`, končí `done`) – selhání roztřiď: zastaralé očekávání po vlně 15 / 17 (uprav test), zátěž (pusť znovu samostatně), skutečná chyba (oprav). |
 | 14. 11. 19:12 | Průchod e2e 19/49: zastaralá očekávání po vlně 15 opravena v `cad-agent-drawing` (dva „Příklad D“ v návodu → nový je „Příklad F“), `cad-bodies` (seznam příkazů obsahuje `nápověda`), `cad-verify` (tolerance razítka výběrem ISO 2768). Po doběhnutí průchodu: přestavět build (návod je v balíku) a tyto tři sady + všechna další selhání pustit znovu. Workflow: fáze B `w14:acceptance` běží, kola `w19:core` běží. |
+| 14. 11. 19:20 | Úkol D1 částečně rozjet dřív (nezávisí na B): agent dokumentace dopisuje vlnu 15, převodník a vlnu 17 do `cad-docs.ts` ve worktree `w18-docs2`, výstup `S/w18/docs2.patch` (zdroje `S/w18/docs-round2-sources.md`). Místa o fázi A nechává beze změny – přepíšou se až po B. |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -186,6 +187,8 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 
 ## 6. Úkol D – dokumentace a příručka po sloučení B a C
 
+- [ ] D0. Převzít `S/w18/docs2.patch` (vlna 15, převodník, vlna 17 – agent dokumentace, worktree `w18-docs2`) podle
+      kapitoly 2 (stačí tsc, lint, `docs:text`), commit, PR, sloučit.
 - [ ] D1. `website/src/content/cad-docs.ts`: přepiš místa o fázi A (hledej „fáze A“, „host.app-only“; v
       `src/views/cad-docs-intl.tsx` „phase A“ / „Phase A“) podle toho, co CLI po fázi B skutečně umí (ověř spuštěním).
       Doplň: vlna 15 (odstavec je v deníku `wf_5f997da2-2d8`, `w15:integrate`, pole `docs_cs`), převodník `export skript`,
