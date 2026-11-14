@@ -8,6 +8,11 @@ next-env.d.ts
 .vercel
 public/vendor/occt-*
 public/vendor/pdfjs-*
+# CLI mncad – verzované svazky generuje scripts/cad-cli-build.mjs (prebuild)
+public/cad/cli/*/
+public/cad/cli/.build-*
+public/cad/cli/latest.json
+public/cad/cli/README.txt
 
 # CAD i18n – pracovní soubory sestavení slovníků
 .i18n-missing-*.txt

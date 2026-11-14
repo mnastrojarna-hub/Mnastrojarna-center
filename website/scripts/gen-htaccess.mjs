@@ -31,6 +31,8 @@ AddDefaultCharset utf-8
   AddType application/manifest+json .webmanifest
   AddType application/wasm .wasm
   AddType font/woff2 .woff2
+  AddType application/javascript .mjs
+  AddType application/gzip .tgz
   AddType text/x-component .txt
 </IfModule>
 # .txt je text/x-component kvůli RSC datům Next.js; soubory pro roboty a AI musí být text/plain
@@ -99,3 +101,32 @@ for (const f of SHARE) if (!existsSync(`out/cad/share/${f}`) && existsSync(`publ
 const missing = SHARE.filter((f) => !existsSync(`out/cad/share/${f}`));
 if (missing.length) console.warn(`[htaccess] POZOR: v out/cad/share chybí ${missing.join(", ")} – krátké sdílené odkazy CADu nebudou fungovat`);
 else console.log("[htaccess] out/cad/share/ (index.php, .htaccess, .user.ini) – úložiště krátkých sdílených odkazů CADu; po nahrání ověřte https://www.mnastrojarna.cz/cad/share/?ping");
+
+// CLI mncad (scripts/cad-cli-build.mjs, prebuild): verzované složky cad/cli/<verze>/ jsou neměnné (rok v mezipaměti),
+// ukazatel latest.json a README.txt se nesmí ukládat do mezipaměti; .txt jako text/plain (ne RSC text/x-component).
+if (existsSync("out/cad/cli")) {
+  writeFileSync(
+    "out/cad/cli/.htaccess",
+    `# Vygenerováno scripts/gen-htaccess.mjs — CLI mncad (verzované svazky cad/cli/<verze>/)
+<IfModule mod_mime.c>
+  AddType application/javascript .mjs
+  AddType application/gzip .tgz
+  AddType application/wasm .wasm
+  AddType application/json .json
+  AddType text/plain .txt
+</IfModule>
+<Files "SHA256SUMS">
+  ForceType text/plain
+</Files>
+<IfModule mod_headers.c>
+  <FilesMatch "\\.(mjs|tgz|wasm|ttf)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^(latest\\.json|README\\.txt)$">
+    Header set Cache-Control "no-cache, max-age=0, must-revalidate"
+  </FilesMatch>
+</IfModule>
+`,
+  );
+  console.log("[htaccess] out/cad/cli/.htaccess zapsán (MIME .mjs/.tgz, bez mezipaměti latest.json a README.txt)");
+} else console.warn("[htaccess] POZOR: out/cad/cli chybí – CLI mncad se nepublikuje (npm run cad:cli)");

@@ -13,10 +13,14 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "postinstall": "node scripts/vendor-occt.mjs && node scripts/vendor-pdfjs.mjs",
-    "prebuild": "node scripts/vendor-occt.mjs && node scripts/vendor-pdfjs.mjs",
+    "prebuild": "node scripts/vendor-occt.mjs && node scripts/vendor-pdfjs.mjs && node scripts/cad-cli-build.mjs",
+    "cad:cli": "node scripts/cad-cli-build.mjs",
+    "cad:cli:e2e": "node e2e/cad-cli.e2e.cjs",
+    "mncad": "node scripts/cad-cli-build.mjs --if-stale --run",
     "docs:assets": "node scripts/cad-docs-assets.mjs",
     "docs:text": "node --experimental-strip-types scripts/cad-docs-text.mjs",
     "docs:pdf": "node scripts/cad-docs-pdf.mjs",
+    "prebuild:ftp": "node scripts/cad-cli-build.mjs",
     "build:ftp": "STATIC_EXPORT=1 next build && node scripts/gen-htaccess.mjs"
   },
   "dependencies": {
@@ -43,6 +47,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.5.28",
     "postcss": "^8.5.32",
+    "rolldown": "^1.2.16",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"

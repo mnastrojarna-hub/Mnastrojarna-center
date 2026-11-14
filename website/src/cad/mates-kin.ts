@@ -607,92 +607,252 @@ function gauss(A: Float64Array, b: Float64Array, n: number): Float64Array | null
   return x;
 }
 
+/* ───────────────────────── tuhé skupiny (Zámek, Ukotvit) ───────────────────────── */
+
+/** Složení poloh: P ∘ Q (Q v souřadnicích P). */
+export const composePose = (P: Pose, Q: Pose): Pose => ({ R: mul3(P.R, Q.R), p: add(apply3(P.R, Q.p), P.p) });
+/** Inverzní poloha. */
+export const invertPose = (P: Pose): Pose => {
+  const Rt = transpose(P.R);
+  return { R: Rt, p: scale(apply3(Rt, P.p), -1) };
+};
+
+/**
+ * Tuhé skupiny komponent spojených vazbami Zámek (union-find přes kostru vazeb). Kořen skupiny je ukotvená komponenta, jinak první
+ * komponenta skupiny v pořadí `order`; každý člen má polohu v souřadnicích kořene (složení `rel` zámků po kostře). Skupina s ukotvenou
+ * komponentou je celá pevná (Zámek k ukotvenému dílu = Ukotvit). Zámky mimo kostru (uzavřené smyčky) zůstávají jako vazby řešiče –
+ * nesouhlasí-li, ohlásí se jako konflikt.
+ */
+export type RigidGroups = {
+  /** kořen → členové (bez kořene) s polohou v souřadnicích kořene */
+  members: Map<string, { id: string; rel: Pose }[]>;
+  /** komponenta → kořen její skupiny (jen komponenty ve skupinách) */
+  rootOf: Map<string, string>;
+  /** kořeny pevných skupin */
+  fixedRoots: Set<string>;
+  /** vazby Zámek použité jako kostra (zbytek je z definice nulový, řešič je nepotřebuje) */
+  tree: Set<string>;
+};
+
+export function rigidGroups(mates: Mate[], order: string[], isFixed: (id: string) => boolean): RigidGroups {
+  const known = new Set(order);
+  const adj = new Map<string, { m: Mate; other: string }[]>();
+  for (const m of mates) {
+    if (m.type !== "lock" || m.suppressed || !m.rel) continue;
+    const a = m.a.compId;
+    const b = m.b.compId;
+    if (a === b || !known.has(a) || !known.has(b)) continue;
+    if (!adj.has(a)) adj.set(a, []);
+    if (!adj.has(b)) adj.set(b, []);
+    adj.get(a)!.push({ m, other: b });
+    adj.get(b)!.push({ m, other: a });
+  }
+  const out: RigidGroups = { members: new Map(), rootOf: new Map(), fixedRoots: new Set(), tree: new Set() };
+  const seen = new Set<string>();
+  for (const start of order) {
+    if (seen.has(start) || !adj.has(start)) continue;
+    // souvislá skupina (pořadí podle `order` – deterministické)
+    const comp: string[] = [];
+    const stack = [start];
+    seen.add(start);
+    while (stack.length) {
+      const id = stack.pop()!;
+      comp.push(id);
+      for (const e of adj.get(id) ?? []) if (!seen.has(e.other)) {
+        seen.add(e.other);
+        stack.push(e.other);
+      }
+    }
+    comp.sort((x, y) => order.indexOf(x) - order.indexOf(y));
+    // kořeny: všechny ukotvené (ty se nikdy nepřepočítají), jinak první komponenta; kostra = BFS ze všech kořenů naráz
+    const fixed = comp.filter(isFixed);
+    const roots = fixed.length ? fixed : [comp[0]];
+    const relOf = new Map<string, { root: string; rel: Pose }>();
+    const I: Pose = { R: [1, 0, 0, 0, 1, 0, 0, 0, 1], p: [0, 0, 0] };
+    for (const r0 of roots) relOf.set(r0, { root: r0, rel: I });
+    const queue = [...roots];
+    while (queue.length) {
+      const id = queue.shift()!;
+      const cur = relOf.get(id)!;
+      for (const e of adj.get(id)!) {
+        if (relOf.has(e.other)) continue;
+        // zámek: rel = poloha A v souřadnicích B
+        const lock = poseOf(e.m.rel!);
+        const rel = e.m.a.compId === e.other ? composePose(cur.rel, lock) : composePose(cur.rel, invertPose(lock));
+        relOf.set(e.other, { root: cur.root, rel });
+        out.tree.add(e.m.id);
+        queue.push(e.other);
+      }
+    }
+    for (const id of comp) {
+      const { root, rel } = relOf.get(id)!;
+      out.rootOf.set(id, root);
+      if (id === root) {
+        if (!out.members.has(root)) out.members.set(root, []);
+        if (fixed.length) out.fixedRoots.add(root);
+        continue;
+      }
+      if (!out.members.has(root)) out.members.set(root, []);
+      out.members.get(root)!.push({ id, rel });
+    }
+  }
+  return out;
+}
+
+/** Polohy členů tuhých skupin podle kořenů (po změně kořene; u pevných skupin jednou na začátku). */
+export function syncGroups(poses: Map<string, Pose>, groups: RigidGroups, roots?: Iterable<string>): void {
+  for (const root of roots ?? groups.members.keys()) {
+    const P = poses.get(root);
+    const list = groups.members.get(root);
+    if (!P || !list) continue;
+    for (const m of list) poses.set(m.id, composePose(P, m.rel));
+  }
+}
+
 /**
  * Najde polohy komponent `vars`, při kterých jsou zbytky `resid()` nulové (nejmenší čtverce), z výchozích poloh v `poses`
  * (mapa se upraví na výsledek). Proměnné komponenty: natočení kolem jejího pivotu (×L) a posuv. Vrací součet čtverců zbytků.
+ * `groups` = tuhé skupiny: proměnná je kořen, členové se po každé změně odvodí (jedna poloha na skupinu).
+ *
+ * Nedourčené stupně volnosti mají zůstat, kde jsou (nejmenší změna): k ceně se přidá μ·|x|² (x = změna od výchozí polohy), takže
+ * u nesplnitelné vazby řešič nehledá kompromis „v nekonečnu“ (sloupek ujetý o stovky metrů a nepatrně nakloněný – nález P7).
+ * Je-li výsledek splnitelný, doladí se bez μ (přesné řešení); jinak zůstane omezený kompromis.
  */
-export function solvePoses(poses: Map<string, Pose>, vars: SolveVar[], resid: () => number[], opts: { maxIter?: number; tol?: number } = {}): { cost: number; iter: number } {
+export function solvePoses(poses: Map<string, Pose>, vars: SolveVar[], resid: () => number[], opts: { maxIter?: number; tol?: number; groups?: RigidGroups; reg?: number } = {}): { cost: number; iter: number } {
   const n = vars.length * 6;
   const base = vars.map((v) => poses.get(v.id)!);
   const cost = (r: number[]) => r.reduce((s, v) => s + v * v, 0);
-  if (!n) return { cost: cost(resid()), iter: 0 };
-  const x = new Float64Array(n);
+  const groups = opts.groups;
   const apply = (xv: Float64Array) => {
     vars.forEach((v, i) => {
       const P = base[i];
       const E = expRot([xv[i * 6] / L, xv[i * 6 + 1] / L, xv[i * 6 + 2] / L]);
       poses.set(v.id, { R: mul3(E, P.R), p: add(add(apply3(E, sub(P.p, v.pivot)), v.pivot), [xv[i * 6 + 3], xv[i * 6 + 4], xv[i * 6 + 5]]) });
     });
+    if (groups) syncGroups(poses, groups, vars.map((v) => v.id));
   };
+  if (!n) return { cost: cost(resid()), iter: 0 };
+  const x = new Float64Array(n);
   const evalAt = (xv: Float64Array) => {
     apply(xv);
     return resid();
   };
-  let r = evalAt(x);
-  let c = cost(r);
   const tol = opts.tol ?? 1e-20;
-  let lambda = 1e-3;
-  let iter = 0;
+  const maxIter = opts.maxIter ?? 60;
   const h = 1e-6;
-  for (; iter < (opts.maxIter ?? 60) && c > tol; iter++) {
-    const m = r.length;
-    const J = new Float64Array(m * n);
-    for (let j = 0; j < n; j++) {
-      const xj = x[j];
-      x[j] = xj + h;
-      const rj = evalAt(x);
-      x[j] = xj;
-      for (let i = 0; i < m; i++) J[i * n + j] = ((rj[i] ?? 0) - r[i]) / h;
-    }
-    const JtJ = new Float64Array(n * n);
-    const Jtr = new Float64Array(n);
-    for (let i = 0; i < m; i++) {
-      const ri = r[i];
+  const sq = (v: Float64Array) => v.reduce((s, a) => s + a * a, 0);
+  let r = evalAt(x);
+  let iter = 0;
+  /**
+   * Levenberg–Marquardt na ceně |r|² + μ·|x|². `strict` (doladění bez μ): přijme jen krok, který cenu aspoň čtyřikrát sníží
+   * (Gaussův–Newtonův krok u splnitelné soustavy) – jinak skončí a výsledek fáze s μ zůstane.
+   */
+  const lm = (mu: number, budget: number, strict: boolean) => {
+    let c = cost(r) + mu * sq(x);
+    let lambda = 1e-3;
+    // šum numerické derivace: zaokrouhlení zbytků a souřadnic (řád S·ε) dělené krokem h. Sloupce Jacobiho matice pod touto mezí
+    // jsou nulové směry (posuv sloupku podél osy, natočení kolem vlastní osy) – Marquardtův krok λ·(1 + 0) by šum zesílil
+    const scaleOf = () => Math.max(1e3, ...base.map((P) => Math.max(Math.abs(P.p[0]), Math.abs(P.p[1]), Math.abs(P.p[2]))), ...r.map(Math.abs));
+    for (let k = 0; k < budget && cost(r) > tol; k++, iter++) {
+      const m = r.length;
+      const J = new Float64Array(m * n);
+      for (let j = 0; j < n; j++) {
+        const xj = x[j];
+        x[j] = xj + h;
+        const rj = evalAt(x);
+        x[j] = xj;
+        for (let i = 0; i < m; i++) J[i * n + j] = ((rj[i] ?? 0) - r[i]) / h;
+      }
+      apply(x);
+      const noise = (64 * Number.EPSILON * scaleOf()) / h;
+      for (let j = 0; j < n; j++) {
+        let mx = 0;
+        for (let i = 0; i < m; i++) mx = Math.max(mx, Math.abs(J[i * n + j]));
+        if (mx < noise) for (let i = 0; i < m; i++) J[i * n + j] = 0;
+      }
+      const JtJ = new Float64Array(n * n);
+      const Jtr = new Float64Array(n);
+      for (let i = 0; i < m; i++) {
+        const ri = r[i];
+        for (let a = 0; a < n; a++) {
+          const ja = J[i * n + a];
+          if (!ja) continue;
+          Jtr[a] -= ja * ri;
+          for (let b = a; b < n; b++) JtJ[a * n + b] += ja * J[i * n + b];
+        }
+      }
       for (let a = 0; a < n; a++) {
-        const ja = J[i * n + a];
-        if (!ja) continue;
-        Jtr[a] -= ja * ri;
-        for (let b = a; b < n; b++) JtJ[a * n + b] += ja * J[i * n + b];
+        for (let b = 0; b < a; b++) JtJ[a * n + b] = JtJ[b * n + a];
+        // člen μ·|x|²: Jacobiho matice √μ·I, zbytek √μ·x
+        JtJ[a * n + a] += mu;
+        Jtr[a] -= mu * x[a];
       }
-    }
-    for (let a = 0; a < n; a++) for (let b = 0; b < a; b++) JtJ[a * n + b] = JtJ[b * n + a];
-    let improved = false;
-    for (let tries = 0; tries < 12; tries++) {
-      const A = JtJ.slice();
-      for (let a = 0; a < n; a++) A[a * n + a] += lambda * (1 + JtJ[a * n + a]);
-      const dx = gauss(A, Jtr, n);
-      if (!dx) {
-        lambda *= 10;
-        continue;
+      let improved = false;
+      for (let tries = 0; tries < 12; tries++) {
+        const A = JtJ.slice();
+        for (let a = 0; a < n; a++) A[a * n + a] += lambda * (1 + JtJ[a * n + a]);
+        const dx = gauss(A, Jtr, n);
+        if (!dx) {
+          lambda *= 10;
+          continue;
+        }
+        const xn = x.slice();
+        for (let a = 0; a < n; a++) xn[a] += dx[a];
+        const rn = evalAt(xn);
+        const cn = cost(rn) + mu * sq(xn);
+        if (strict ? cn <= 0.25 * c : cn < c) {
+          x.set(xn);
+          r = rn;
+          const small = dx.reduce((s, v) => Math.max(s, Math.abs(v)), 0) < 1e-13;
+          // zlepšení na úrovni zaokrouhlení = minimum → konec, ne další kroky šumem
+          const flat = c - cn <= 1e-12 * c;
+          c = cn;
+          lambda = Math.max(lambda / 4, 1e-12);
+          improved = true;
+          if (small || flat) k = budget;
+          break;
+        }
+        if (strict) break;
+        lambda *= 6;
       }
-      const xn = x.slice();
-      for (let a = 0; a < n; a++) xn[a] += dx[a];
-      const rn = evalAt(xn);
-      const cn = cost(rn);
-      if (cn < c) {
-        x.set(xn);
-        r = rn;
-        const small = dx.reduce((s, v) => Math.max(s, Math.abs(v)), 0) < 1e-13;
-        c = cn;
-        lambda = Math.max(lambda / 4, 1e-12);
-        improved = true;
-        if (small) iter = 1e9;
+      if (!improved) {
+        apply(x);
         break;
       }
-      lambda *= 6;
     }
-    if (!improved) break;
+    apply(x);
+  };
+  const mu = opts.reg ?? 1e-6;
+  lm(mu, maxIter, false);
+  // doladění bez μ: jen když je soustava splnitelná – přesné řešení bez posunu vlivem μ. Splnitelná = zbytek pod mezí konfliktu (1e-3)
+  // nebo zbytek vysvětlitelný samotným μ: v minimu |r|² + μ|x|² je Jᵀr = −μx, tedy |r| ≈ μ·|x| (posuv o 1 500 mm v jednom kroku
+  // pohybu zůstane bez doladění o 1,5e-3 mm kratší = falešný konflikt). V druhém případě smí doladění polohu změnit jen řádově o tento
+  // posun – nesplnitelná soustava tak ani u velkého kroku neujede ke kompromisu „v nekonečnu“.
+  const c0 = cost(r);
+  const bias = mu * x.reduce((s, a) => Math.max(s, Math.abs(a)), 0);
+  if (mu > 0 && c0 > tol && (c0 < 1e-6 || c0 < (100 * bias) ** 2)) {
+    const keep = x.slice();
+    const rKeep = r;
+    lm(0, Math.max(8, Math.ceil(maxIter / 4)), true);
+    const moved = x.reduce((s, a, i) => Math.max(s, Math.abs(a - keep[i])), 0);
+    if (!(cost(r) <= c0) || (c0 >= 1e-6 && moved > 1e3 * bias)) {
+      x.set(keep);
+      r = rKeep;
+      apply(x);
+    }
   }
-  apply(x);
-  return { cost: c, iter };
+  return { cost: cost(r), iter };
 }
 
-/** Pivot komponenty: střed počátků geometrií jejích vazeb (natočení kolem něj méně posouvá geometrii). */
-export function pivotOf(compId: string, mates: Mate[], ctx: KinCtx): Vec3 {
+/**
+ * Pivot komponenty: střed počátků geometrií jejích vazeb (natočení kolem něj méně posouvá geometrii). U tuhé skupiny `ids` = všichni
+ * členové (pivot z vazeb celé skupiny), `compId` = kořen.
+ */
+export function pivotOf(compId: string, mates: Mate[], ctx: KinCtx, ids?: Set<string>): Vec3 {
   const pts: Vec3[] = [];
   for (const m of mates)
     for (const ref of [m.a, m.b, m.c, m.d]) {
-      if (!ref || ref.compId !== compId) continue;
+      if (!ref || (ids ? !ids.has(ref.compId) : ref.compId !== compId)) continue;
       const g = wgeo(ctx, ref);
       if (g) pts.push(g.origin);
     }

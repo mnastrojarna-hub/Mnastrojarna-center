@@ -1,0 +1,78 @@
+# Vlna 14 A1 – protokol běhu, kódy hlášek, porty enginu (src/cad/engine/*)
+záložka „{0}“ neexistuje – otevřené: {1}	Registerkarte „{0}“ existiert nicht – geöffnet: {1}
+soubor relace není platný JSON	die Sitzungsdatei ist kein gültiges JSON
+neznámý formát relace (očekáváno v: 1 a seznam záložek)	unbekanntes Sitzungsformat (erwartet v: 1 und eine Liste der Registerkarten)
+záložka {0} v relaci není dokument	Registerkarte {0} der Sitzung ist kein Dokument
+záložka {0} v relaci nemá název dokumentu (text)	Registerkarte {0} der Sitzung hat keinen Dokumentnamen (Text)
+záložka {0} v relaci má neplatný seznam „{1}“	Registerkarte {0} der Sitzung hat eine ungültige Liste „{1}“
+data importů v relaci nejsou mapa id → base64	die Importdaten der Sitzung sind keine Zuordnung ID → Base64
+data importu „{0}“ v relaci nejsou platné base64	die Importdaten „{0}“ der Sitzung sind kein gültiges Base64
+název souboru „{0}“ míří mimo výstupní složku	Dateiname „{0}“ zeigt aus dem Ausgabeordner heraus
+soubor „{0}“ není k dispozici – dostupné: {1}	Datei „{0}“ ist nicht verfügbar – verfügbar: {1}
+operace „{0}“ už má obsluhu – každý druh operace má jednoho vlastníka	Operation „{0}“ hat bereits einen Handler – jede Operationsart hat genau einen Eigentümer
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key), v kódu jako literál tr("…") nejsou
+časový limit {0} s vypršel	Zeitlimit von {0} s überschritten
+překročen limit paměti {0} MB	Speicherlimit von {0} MB überschritten
+výpočet spadl: {0}	die Berechnung ist abgestürzt: {0}
+běh přerušen	Lauf unterbrochen
+výpočet zrušen – dokument zůstal beze změny	Berechnung abgebrochen – das Dokument blieb unverändert
+příkaz funguje jen v aplikaci v prohlížeči: {0}	der Befehl funktioniert nur in der Browser-App: {0}
+písma pro PDF a text modelu nejsou k dispozici	Schriften für PDF und Modelltext sind nicht verfügbar
+bez 3D okna nemá příkaz účinek: {0}	ohne 3D-Ansicht hat der Befehl keine Wirkung: {0}
+historie zpět/znovu se v relaci neukládá	der Rückgängig/Wiederholen-Verlauf wird in der Sitzung nicht gespeichert
+soubor „{0}“ už existuje – uloženo jako „{1}“	Datei „{0}“ existiert bereits – gespeichert als „{1}“
+úložiště odkazů odmítlo zápis: {0}	der Link-Speicher hat das Hochladen abgelehnt: {0}
+krátký odkaz se nepodařil – použit dlouhý odkaz	der Kurzlink ist fehlgeschlagen – ein langer Link wird verwendet
+odkaz není komprimovaný (prostředí neumí deflate-raw)	der Link ist nicht komprimiert (die Umgebung kann kein deflate-raw)
+chyba zápisu: {0}	Syntaxfehler: {0}
+neznámý příkaz „{0}“	unbekannter Befehl „{0}“
+nevyužitá slova: {0}	nicht verwendete Wörter: {0}
+chybějící souřadnice doplněna nulou: {0}	fehlende Koordinate auf null gesetzt: {0}
+neznámá osa „{0}“	unbekannte Achse „{0}“
+odporující si volby – použito „{0}“, zahozeno „{1}“	widersprüchliche Optionen – verwendet „{0}“, verworfen „{1}“
+příkaz selhal: {0}	Befehl fehlgeschlagen: {0}
+stavba selhala: {0}	Aufbau fehlgeschlagen: {0}
+prvek „{0}“ se nepostavil: {1}	Feature „{0}“ wurde nicht aufgebaut: {1}
+prvek „{0}“: {1}	Feature „{0}“: {1}
+objem a hmotnost jsou přibližné (ze sítě)	Volumen und Masse sind Näherungswerte (aus dem Netz)
+objem se nepodařilo změřit – uvedena 0	das Volumen konnte nicht gemessen werden – 0 angegeben
+hodnota {0} upravena na {1} ({2})	Wert {0} auf {1} angepasst ({2})
+přidání bez tělesa – vytvořeno nové těleso	Hinzufügen ohne Körper – ein neuer Körper wurde erzeugt
+duplicitní id prvku „{0}“ nahrazeno novým	doppelte Feature-ID „{0}“ durch eine neue ersetzt
+název „{0}“ je obsazený – použit „{1}“	Name „{0}“ ist vergeben – „{1}“ verwendet
+výchozí název očíslován: „{0}“	Standardname nummeriert: „{0}“
+prázdná záložka „{0}“ nahrazena dokumentem „{1}“	leere Registerkarte „{0}“ durch Dokument „{1}“ ersetzt
+přepnutí záložky nedoběhlo do {0} s	der Registerkartenwechsel wurde nicht innerhalb von {0} s abgeschlossen
+díra bez hloubky – vrtá se skrz	Bohrung ohne Tiefe – wird durchgebohrt
+zahloubení a kuželové zahloubení zároveň – použito {0}	Senkung und Kegelsenkung gleichzeitig – {0} verwendet
+zahloubení Ø{0} je menší než závit {1}	Senkung Ø{0} ist kleiner als Gewinde {1}
+díra neleží na povrchu – umístěna na obálku tělesa	die Bohrung liegt nicht auf der Oberfläche – auf die Hüllbox des Körpers gesetzt
+zadaný průměr {0} nahrazen průměrem vrtáku {1} pro závit {2}	angegebener Durchmesser {0} durch Kernlochdurchmesser {1} für Gewinde {2} ersetzt
+plocha podle pravidla nenalezena – použita nejkrajnější	keine Fläche passt zur Regel – die äußerste wird verwendet
+více vyhovujících ploch – použita první	mehrere passende Flächen – die erste wird verwendet
+název instance „{0}“ se zatím neukládá	Instanzname „{0}“ wird noch nicht gespeichert
+komponenta je kopie dílu – pozdější změny dílu se nepromítnou	die Komponente ist eine Kopie des Teils – spätere Änderungen am Teil werden nicht übernommen
+podsestavy hlubší než {0} úrovní se vynechají	Unterbaugruppen tiefer als {0} Ebenen werden ausgelassen
+díl „{0}“ má víc než {1} ploch – načteno jen prvních {1}	Teil „{0}“ hat mehr als {1} Flächen – nur die ersten {1} wurden geladen
+jádro se restartovalo – mezipaměti sestavy vyprázdněny	der Kernel wurde neu gestartet – Baugruppen-Caches geleert
+plocha F{0} dílu „{1}“ není k dispozici	Fläche F{0} des Teils „{1}“ ist nicht verfügbar
+instance „{0}“ už v sestavě je	Instanz „{0}“ ist bereits in der Baugruppe
+kolize „{0}“ × „{1}“ ({2} mm³)	Kollision „{0}“ × „{1}“ ({2} mm³)
+šroub v závitu „{0}“ × „{1}“	Schraube im Gewinde „{0}“ × „{1}“
+prstenec pod hlavou šroubu „{0}“ × „{1}“	Ring unter dem Schraubenkopf „{0}“ × „{1}“
+kolizi „{0}“ × „{1}“ nelze vyhodnotit	Kollision „{0}“ × „{1}“ kann nicht ausgewertet werden
+skryté komponenty se nekontrolují ({0})	ausgeblendete Komponenten werden nicht geprüft ({0})
+pohyb porušuje vazbu „{0}“ v kroku {1}	die Bewegung verletzt die Verknüpfung „{0}“ in Schritt {1}
+vypsáno {0} z {1}	{0} von {1} aufgeführt
+prvek díry „{0}“ nemá v geometrii díru	Bohrungs-Feature „{0}“ hat keine Bohrung in der Geometrie
+model se od reference liší: {0}	das Modell weicht von der Referenz ab: {0}
+materiál „{0}“ zadán jen označením – hustota {1} g/cm³ ({2})	Werkstoff „{0}“ nur per Bezeichnung angegeben – Dichte {1} g/cm³ ({2})
+materiál „{0}“ zařazen jako {1}	Werkstoff „{0}“ eingeordnet als {1}
+list {0}: {1}	Blatt {0}: {1}
+rovina řezu neprotíná těleso: {0}	die Schnittebene schneidet den Körper nicht: {0}
+překryv na listu {0}: {1}	Überlappung auf Blatt {0}: {1}
+kóta {0} nemá toleranci	Maß {0} hat keine Toleranz
+předloha se liší: {0}	die Vorlage weicht ab: {0}
+chyba: {0}	Fehler: {0}
+varování: {0}	Warnung: {0}
+poznámka: {0}	Hinweis: {0}
