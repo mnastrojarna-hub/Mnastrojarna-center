@@ -115,9 +115,22 @@ export async function export3d(d: CadDoc, format: Export3dFormat, name: string |
 async function exportDrawingFiles(d: CadDoc, cmd: Extract<OutCmd, { kind: "drawing" }>, host: OutHost): Promise<string[]> {
   if (isEmpty(d)) throw new Error(tr("Výkres: model je prázdný – nejdřív vymodelujte díl"));
   const { exportDrawing } = await import("@/cad/drawing-export");
-  const sheets: (number | string | undefined)[] = cmd.sheet === "all" ? (d.drawings?.length ? d.drawings.map((_, i) => i + 1) : [undefined]) : [cmd.sheet];
   const log: string[] = [];
   if (!d.drawings?.length) log.push(tr("⚠ dokument zatím nemá výkres – exportuje se výchozí list (pro vlastní list nejdřív „výkres A3 …“ a „kótovat“)"));
+  // všechny listy aktivního výkresu jedním souborem jako v GUI (PDF vícestránkové, DXF / DWG / SVG / PNG v ZIPu) – drawing-export.ts
+  if (cmd.sheet === "all" && d.drawings?.length) {
+    const r = await exportDrawing(d, cmd.format, { sheet: "all" }, (doc, meta, o) => cad.drawing(doc, meta, o), host.drawEnv?.());
+    const ext = r.files ? ["zip"] : FORMAT_EXT[cmd.format];
+    const base = cmd.name ? cmd.name.replace(new RegExp(`\\.(${[...FORMAT_EXT[cmd.format], "zip"].join("|")})$`, "i"), "") : r.name.replace(/\.[^.]+$/, "");
+    const file = outFileName(base, "vykres", ext);
+    const bytes = fromBase64(r.base64);
+    await download(file, bytes, r.mime);
+    const n = r.sheets ?? r.files?.length ?? 1;
+    log.push(fileLogLine(tr("výkres {0}, listů {1}", cmd.format.toUpperCase(), n), file, bytes.length, formatLabel(cmd.format) + (r.files ? ` · ZIP: ${r.files.join(", ")}` : "")));
+    for (const w of r.warnings ?? []) log.push(`  ⚠ ${w}`);
+    return log;
+  }
+  const sheets: (number | string | undefined)[] = cmd.sheet === "all" ? [undefined] : [cmd.sheet];
   for (const sheet of sheets) {
     const r = await exportDrawing(d, cmd.format, sheet === undefined ? {} : { sheet }, (doc, meta, o) => cad.drawing(doc, meta, o), host.drawEnv?.());
     const ext = FORMAT_EXT[cmd.format];

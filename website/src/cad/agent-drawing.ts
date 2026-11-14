@@ -20,6 +20,8 @@ import type { GdtSymbol, PlaneName, Vec2 } from "./types";
 export type ViewRef = string;
 /** Odkaz na list: číslo (od 1) nebo název. */
 export type SheetRef = number | string;
+/** formáty `výkres export …` (shodné s DrawingExportFormat v drawing-export.ts) */
+export type DrawingFileFormat = "pdf" | "dxf" | "dwg" | "svg" | "csv" | "png";
 /** Značka výkresu (nástroje Poznámka, Drsnost, Geom. tolerance, Základna, Text). */
 export type MarkSpec =
   | { type: "note"; text: string }
@@ -58,6 +60,14 @@ export type DrawingCmd =
   | { k: "sheet"; op: "new"; name?: string; then?: DrawingCmd }
   | { k: "sheet"; op: "rename"; ref?: SheetRef; name: string }
   | { k: "sheet"; op: "delete"; ref: SheetRef }
+  /** výkresy dílu (více výkresů – cad/drawing-sets.ts): přehled, nový, přepnout, přejmenovat, smazat */
+  | { k: "drawings"; op: "list" }
+  | { k: "drawings"; op: "new"; name?: string }
+  | { k: "drawings"; op: "select"; ref: SheetRef }
+  | { k: "drawings"; op: "rename"; ref?: SheetRef; name: string }
+  | { k: "drawings"; op: "delete"; ref: SheetRef }
+  /** export do souboru: aktivní list, list N nebo všechny listy aktivního výkresu (PDF vícestránkové, jinak ZIP) */
+  | { k: "export"; format: DrawingFileFormat; sheet?: SheetRef | "all"; dwgVersion?: string }
   /** razítko (prázdné = vypsat) */
   | { k: "title"; fields: Partial<Record<TitleField, string>> }
   /** tabulka revizí */
@@ -368,6 +378,10 @@ const NEW_W = W("novy", "nova", "nove", "new", "neu", "neues", "pridat", "add");
 const RENAME_W = W("prejmenovat", "rename", "umbenennen", "nazev");
 const DEL_W = W("smazat", "odstranit", "delete", "remove", "loschen", "loeschen", "entfernen");
 const ALL_W = W("vse", "vsechny", "all", "alle");
+const DRAWINGS_W = W("vykresy", "drawings", "zeichnungen");
+const NEW_DRAWING_W = W("novy", "new", "neu", "neue");
+const EXPORT_W = W("export", "exportovat", "exportieren");
+const FORMAT_W = W("pdf", "dxf", "dwg", "svg", "csv", "png");
 const CUSTOM_W = W("vlastni", "custom", "eigene", "benutzer");
 const ON_W = W("na", "on", "an", "auf");
 const VIEW_W = W("pohled", "view", "ansicht");
@@ -409,7 +423,7 @@ export const GDT_WORDS: Record<string, GdtSymbol> = {
 };
 const DIM_W: Record<string, ManualDim["kind"]> = {
   vodorovne: "horizontal", vodorovna: "horizontal", horizontal: "horizontal", waagerecht: "horizontal", waagrecht: "horizontal",
-  svisle: "vertical", svisla: "vertical", vertical: "vertical", senkrecht: "vertical",
+  svisle: "vertical", svisla: "vertical", vertical: "vertical", senkrecht: "vertical", vertikal: "vertical", lotrecht: "vertical", // DE protokol píše „vertikal“
   sikmo: "aligned", sikma: "aligned", aligned: "aligned", schrag: "aligned", parallel: "aligned",
   prumer: "diameter", diameter: "diameter", durchmesser: "diameter",
   polomer: "radius", radius: "radius",
@@ -476,6 +490,10 @@ function parseDrawingMore(rt: RawTok[]): DrawingCmd | null {
   if (!head || head.q || head.key) return null;
   const sub = SUBS_MORE[fold(head.s)];
   const rest = rt.slice(1);
+  // více výkresů dílu a export (w13): výkres nový ["název"] · výkres výkresy … · výkres export pdf [vše|list N]
+  if (isKw(head, NEW_DRAWING_W)) return { k: "drawings", op: "new", ...(rest[0] ? { name: rest.map((t) => t.s).join(" ") } : {}) };
+  if (isKw(head, DRAWINGS_W)) return parseDrawings(rest);
+  if (isKw(head, EXPORT_W)) return parseExport(rest);
   switch (sub) {
     case "sheets":
       return { k: "sheet", op: "list" };
@@ -530,6 +548,42 @@ function parseSheet(rt: RawTok[]): DrawingCmd {
   if (t0.key) throw new Error(usage);
   const then = thenSet(rt.slice(1));
   return { k: "sheet", op: "select", ref: sheetRef(t0), ...(then ? { then } : {}) };
+}
+
+function parseDrawings(rt: RawTok[]): DrawingCmd {
+  const usage = tr("výkres výkresy · výkres nový [\"název\"] · výkres výkresy <číslo|\"název\"> · výkres výkresy přejmenovat [<číslo>] \"název\" · výkres výkresy smazat <číslo|\"název\">");
+  if (!rt.length) return { k: "drawings", op: "list" };
+  const t0 = rt[0];
+  if (isKw(t0, NEW_W)) return { k: "drawings", op: "new", ...(rt[1] ? { name: rt.slice(1).map((t) => t.s).join(" ") } : {}) };
+  if (isKw(t0, RENAME_W)) {
+    const args = rt.slice(1);
+    if (!args.length) throw new Error(usage);
+    if (args.length === 1) return { k: "drawings", op: "rename", name: args[0].s };
+    return { k: "drawings", op: "rename", ref: sheetRef(args[0]), name: args.slice(1).map((t) => t.s).join(" ") };
+  }
+  if (isKw(t0, DEL_W)) {
+    if (!rt[1]) throw new Error(usage);
+    return { k: "drawings", op: "delete", ref: sheetRef(rt[1]) };
+  }
+  if (t0.key || rt.length > 1) throw new Error(usage);
+  return { k: "drawings", op: "select", ref: sheetRef(t0) };
+}
+
+/** `výkres export pdf|dxf|dwg|svg|csv|png [vše|list <číslo|"název">|<číslo>] [R2018]` */
+function parseExport(rt: RawTok[]): DrawingCmd {
+  const usage = tr("výkres export pdf|dxf|dwg|svg|csv|png [vše|list <číslo|\"název\">] [verze DWG R2000…R2018]");
+  const f = rt[0];
+  if (!f || !isKw(f, FORMAT_W)) throw new Error(usage);
+  const cmd: Extract<DrawingCmd, { k: "export" }> = { k: "export", format: fold(f.s) as DrawingFileFormat };
+  for (let i = 1; i < rt.length; i++) {
+    const t = rt[i];
+    if (isKw(t, ALL_W)) cmd.sheet = "all";
+    else if (isKw(t, SHEET_W) && rt[i + 1]) cmd.sheet = isKw(rt[i + 1], ALL_W) ? "all" : sheetRef(rt[++i]);
+    else if (!t.q && /^r20\d\d$/i.test(t.s)) cmd.dwgVersion = t.s.toUpperCase();
+    else if (!t.q && /^\d+$/.test(t.s)) cmd.sheet = Number(t.s);
+    else throw new Error(usage + tr(" – neznámé „{0}“", t.s));
+  }
+  return cmd;
 }
 
 /** `výkres stav [list N|vše]` */

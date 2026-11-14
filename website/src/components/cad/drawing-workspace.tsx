@@ -15,7 +15,8 @@ import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDra
 import { threadsOfDoc } from "@/cad/drawing-doc";
 import { dimCheck } from "@/cad/dim-check";
 import { activeSheet, mergeSmart, NEW_DRAWING_OPTIONS } from "@/cad/drawing-agent";
-import { drawingFile, safeName, type DrawingExportFormat } from "@/cad/drawing-export";
+import { drawingBase, drawingFile, drawingFileSheets, drawingSheetsOut, type DrawingExportFormat } from "@/cad/drawing-export";
+import { drawingKey, drawingSets, inDrawing, nextDrawingName } from "@/cad/drawing-sets";
 import type { SmartDims } from "@/cad/drawing-dims";
 import { DWG_VERSIONS, type DwgVersion } from "@/cad/formats/dwg-versions";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type GdtSymbol, type PlaneName, type Vec2, type Vec3 } from "@/cad/types";
@@ -42,6 +43,8 @@ type Props = {
   /** výkresy uložené v dokumentu (volby, razítko, kóty a poznámky) */
   drawings?: DrawingDoc[];
   onDrawingsChange?: (d: DrawingDoc[]) => void;
+  /** zápis výkresů jako krok historie (založení výkresu – Ctrl+Z ho vrátí); bez zadání onDrawingsChange */
+  onDrawingsCommit?: (d: DrawingDoc[]) => void;
   /** komponenty sestavy pro pozice (balónky): světové obalové kvádry */
   balloons?: BalloonItem[];
 };
@@ -104,6 +107,28 @@ function printSvg(svg: string, w: number, h: number) {
   }, 300);
 }
 
+/** Tisk více listů: každý list jedna stránka ve svém formátu (pojmenované stránky CSS @page). */
+function printSheets(pages: { svg: string; w: number; h: number }[]) {
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0";
+  document.body.appendChild(iframe);
+  const d = iframe.contentDocument!;
+  const sizes = [...new Set(pages.map((p) => `${p.w}x${p.h}`))];
+  const css = sizes.map((k, i) => `@page s${i}{size:${k.split("x")[0]}mm ${k.split("x")[1]}mm;margin:0}`).join("");
+  const body = pages.map((p) => `<div class="pg" style="page:s${sizes.indexOf(`${p.w}x${p.h}`)};width:${p.w}mm;height:${p.h}mm">${p.svg}</div>`).join("");
+  d.open();
+  d.write(`<!doctype html><html><head><title>${tr("Výkres")}</title><style>${css}html,body{margin:0}.pg{break-after:page;overflow:hidden}.pg:last-child{break-after:auto}.pg svg{width:100%;height:100%;display:block}</style></head><body data-print-pages="${pages.length}">${body}</body></html>`);
+  d.close();
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => iframe.remove(), 1500);
+  }, 300);
+}
+
+/** Volby prvního listu dílu bez výkresu: zapamatované volby posledního výkresu (i pro tlačítko Nový výkres v aplikaci). */
+export const firstSheetOptions = (): DrawingOptions => loadOpts();
+
 function loadOpts(): DrawingOptions {
   try {
     const raw = localStorage.getItem(OPTS_KEY);
@@ -121,7 +146,7 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, balloons }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons }: Props) {
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
   const [meta, setMeta] = useState<DrawingMeta>(() => ({
     name: doc.name,
@@ -153,7 +178,36 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const seq = useRef(0);
   // ---------- uživatelské kóty a poznámky (uložené v dokumentu) ----------
   // ---------- listy (každý list = DrawingDoc v doc.drawings) ----------
-  const sheets = useMemo(() => drawings ?? [], [drawings]);
+  // více výkresů dílu (cad/drawing-sets.ts): pracovní plocha ukazuje listy jednoho výkresu (`group` = jeho klíč)
+  const all = useMemo(() => drawings ?? [], [drawings]);
+  const [group, setGroup] = useState(() => {
+    const a = all.find((s) => s.id === activeSheet.get()) ?? all[0];
+    return a ? drawingKey(a) : "";
+  });
+  const sets = useMemo(() => drawingSets({ drawings: all } as CadDoc), [all]);
+  const sheets = useMemo(() => all.filter((s) => drawingKey(s) === group), [all, group]);
+  /** listy aktivního výkresu → celý seznam doc.drawings (ostatní výkresy beze změny, pořadí výkresů zachováno) */
+  const withGroup = (next: DrawingDoc[], base: DrawingDoc[] = all, key = group): DrawingDoc[] => {
+    const tagged = next.map((x) => inDrawing(x, key));
+    const out: DrawingDoc[] = [];
+    let placed = false;
+    for (const x of base) {
+      if (drawingKey(x) !== key) out.push(x);
+      else if (!placed) {
+        out.push(...tagged);
+        placed = true;
+      }
+    }
+    if (!placed) out.push(...tagged);
+    return out;
+  };
+  /** zápis listů aktivního výkresu do dokumentu */
+  const emit = (next: DrawingDoc[]) => {
+    const out = withGroup(next);
+    wrote.current = JSON.stringify(out);
+    onDrawingsChange?.(out);
+    return out;
+  };
   // aktivní list sdílí výkres s textovými příkazy („výkres list 2“ → výkres se otevře / přepne na list 2)
   const [sheetIdx, setSheetIdxRaw] = useState(() => Math.max(0, sheets.findIndex((s) => s.id === activeSheet.get())));
   const setSheetIdx = (i: number, id = sheets[i]?.id) => {
@@ -193,7 +247,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const sv = sheets[sheetIdx];
     dirty.current = false;
     if (sv?.options) setOpts({ ...defaultDrawingOptions, ...(sv.options as Partial<DrawingOptions>), views: { ...defaultDrawingOptions.views, ...((sv.options as Partial<DrawingOptions>).views ?? {}) } });
-    else setOpts(loadOpts());
+    else {
+      const o = loadOpts();
+      setOpts(o);
+      // dokument bez výkresu: první list se uloží hned – výkres existuje, jakmile je otevřený (Otevřít výkres ▼, další
+      // Nový výkres = „Výkres 2“), i když se na něm nic nezmění (sestava bez Chytrých kót)
+      if (!all.length && onDrawingsChange) emit([{ ...sheetDoc(), options: o as unknown as Record<string, unknown> }]);
+    }
     if (sv?.meta) setMeta((m) => ({ ...m, ...(sv.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
     setAnn(sv?.annotations ?? []);
     setSheetName(sv?.name ?? tr("List {0}", sheetIdx + 1));
@@ -204,11 +264,20 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   };
   const loadRef = useRef(loadSheet);
   loadRef.current = loadSheet;
-  useEffect(() => loadRef.current(), [sheetIdx]);
+  useEffect(() => loadRef.current(), [sheetIdx, group]);
   useEffect(() => {
     const now = JSON.stringify(drawings ?? null);
     if (now === wrote.current) return;
     wrote.current = now;
+    // list jiného výkresu (výkres nový / výkres výkresy 2) nebo smazaný výkres → přepnout výkres
+    const act = all.find((x) => x.id === activeSheet.get());
+    const key = act ? drawingKey(act) : sets.some((x) => x.key === group) ? group : (sets[0]?.key ?? "");
+    if (key !== group) {
+      dirty.current = false;
+      setGroup(key);
+      setSheetIdxRaw(Math.max(0, all.filter((x) => drawingKey(x) === key).findIndex((x) => x.id === act?.id)));
+      return;
+    }
     // list zvolený textovým příkazem (výkres list N / nový list) nebo smazaný list → přepnout (načte efekt listu)
     const want = sheets.findIndex((x) => x.id === activeSheet.get());
     const i = want >= 0 ? want : Math.min(sheetIdx, Math.max(0, sheets.length - 1));
@@ -226,7 +295,15 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   useEffect(() => {
     if (!wantSheet) return;
     const i = sheets.findIndex((x) => x.id === wantSheet);
-    if (i < 0) return;
+    if (i < 0) {
+      // list jiného výkresu (Otevřít výkres ▼, výkres výkresy 2): přepnout výkres, jakmile list v dokumentu je
+      const o = all.find((x) => x.id === wantSheet);
+      if (o) {
+        setWantSheet(null);
+        switchDrawing(drawingKey(o), o.id);
+      }
+      return;
+    }
     setWantSheet(null);
     if (i !== sheetIdx) switchSheet(i);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -250,15 +327,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     void _c;
     void _si;
     void _sc;
-    return { id: saved?.id ?? uid(), name: sheetName, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann };
+    return inDrawing({ id: saved?.id ?? uid(), name: sheetName, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann }, group);
   };
   const persistNow = () => {
     if (!onDrawingsChange) return;
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = sheetDoc();
     dirty.current = false;
-    wrote.current = JSON.stringify(next);
-    onDrawingsChange(next);
+    return emit(next);
   };
   const persistRef = useRef(persistNow);
   persistRef.current = persistNow;
@@ -287,16 +363,41 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const n = cur.length + 1;
     cur.push({ id: uid(), name: tr("List {0}", n), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] });
     dirty.current = false;
-    wrote.current = JSON.stringify(cur);
-    onDrawingsChange(cur);
+    emit(cur);
     setSheetIdx(n - 1, cur[n - 1].id);
+  };
+  /** přepnutí výkresu dílu (rozpracovaný list se nejdřív uloží) */
+  const switchDrawing = (key: string, sheetId?: string) => {
+    if (key === group && !sheetId) return;
+    const base = dirty.current ? persistNow() ?? all : all;
+    const list = base.filter((x) => drawingKey(x) === key);
+    const i = Math.max(0, sheetId ? list.findIndex((x) => x.id === sheetId) : 0);
+    dirty.current = false;
+    setGroup(key);
+    setSheetIdxRaw(i);
+    activeSheet.set(list[i]?.id ?? null, false);
+  };
+  /** další výkres dílu („Výkres 2“…) s jedním listem – jako tlačítko Nový výkres na kartě Výkres */
+  const addDrawing = () => {
+    if (!onDrawingsChange) return;
+    // rozpracovaný list se uloží zvlášť (bez kroku historie); založení výkresu je jeden krok – Ctrl+Z vrátí jen nový výkres
+    const base = persistNow() ?? all;
+    const name = nextDrawingName({ drawings: base } as CadDoc);
+    const first: DrawingDoc = inDrawing({ id: uid(), name: tr("List {0}", 1), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] }, name);
+    const out = [...base, first];
+    dirty.current = false;
+    wrote.current = JSON.stringify(out);
+    (onDrawingsCommit ?? onDrawingsChange)(out);
+    setGroup(name);
+    setSheetIdxRaw(0);
+    activeSheet.set(first.id, false);
+    flash(tr("Nový výkres „{0}“", name));
   };
   const removeSheet = (i: number) => {
     if (!onDrawingsChange || sheets.length <= 1) return;
     const cur = sheets.filter((_, k) => k !== i);
     dirty.current = false;
-    wrote.current = JSON.stringify(cur);
-    onDrawingsChange(cur);
+    emit(cur);
     const k = Math.max(0, Math.min(i, cur.length - 1));
     setSheetIdx(k, cur[k]?.id);
   };
@@ -317,9 +418,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       setSheetName(n);
       markDirty();
     } else {
-      const next = sheets.map((x, k) => (k === r.i ? { ...x, name: n } : x));
-      wrote.current = JSON.stringify(next);
-      onDrawingsChange?.(next);
+      emit(sheets.map((x, k) => (k === r.i ? { ...x, name: n } : x)));
     }
   };
   useEffect(() => {
@@ -413,14 +512,46 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const viewsAttr = useMemo(() => (res ? JSON.stringify(res.views.map((v) => ({ key: v.key, px: v.px, py: v.py, s: v.s, x0: v.x0, y0: v.y0, w: v.w, h: v.h }))) : undefined), [res]);
 
   // ---------- export ----------
-  const base = safeName(meta.name || doc.name);
-  /** soubor výkresu (stejný výpočet jako window.mncad.exportDrawing – cad/drawing-export.ts) */
-  const fileOf = (f: DrawingExportFormat) => drawingFile(out!, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
+  const base = drawingBase(meta.name || doc.name, { drawings: all }, group); // u víc výkresů s názvem výkresu (soubory se nepřepíší)
+  /** export všech listů výkresu (výchozí, má-li výkres víc listů) nebo jen aktivního listu; volba se pamatuje */
+  const [allSheets, setAllSheets] = useState(() => {
+    try {
+      return localStorage.getItem("mn-cad-drawing-export-range") !== "active";
+    } catch {
+      return true;
+    }
+  });
+  const exportAll = allSheets && sheets.length > 1;
+  /**
+   * soubor výkresu (stejný výpočet jako window.mncad.exportDrawing – cad/drawing-export.ts); všechny listy = rozpracovaný list
+   * se uloží a listy výkresu se spočítají v jádře (PDF vícestránkové, DXF / DWG / SVG ZIP s jedním souborem na list)
+   */
+  const fileOf = async (f: DrawingExportFormat) => {
+    if (!exportAll || f === "csv") return drawingFile(out!, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
+    const outs = await allSheetsOut();
+    return drawingFileSheets(outs, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
+  };
+  /** hotové listy aktivního výkresu (aktivní list s rozpracovanými změnami) */
+  const allSheetsOut = async () => {
+    const list = persistNow() ?? withGroup(sheets.map((x, k) => (k === sheetIdx ? sheetDoc() : x)));
+    activeSheet.set(sheetDoc().id, false);
+    return drawingSheetsOut({ ...doc, drawings: list }, "all", (d, m, o) => cad.drawing(d, m, o), { massKg, bom: showBom ? bom : undefined, balloons });
+  };
+  const sheetsLabel = exportAll ? tr(" – všechny listy ({0})", sheets.length) : "";
+  const printAll = async () => {
+    if (!exportAll) return out && printSvg(out.svg, out.sheet.w, out.sheet.h);
+    try {
+      flash(tr("Připravuji tisk (listů: {0})…", sheets.length));
+      printSheets((await allSheetsOut()).map((x) => ({ svg: x.out.svg, w: x.out.sheet.w, h: x.out.sheet.h })));
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
   const exportPdf = async () => {
     if (!out) return;
     try {
       const saved = await saveFile(`${base}_vykres.pdf`, async () => {
-        flash(tr("Generuji PDF…"));
+        flash(exportAll ? tr("Generuji PDF (listů: {0})…", sheets.length) : tr("Generuji PDF…"));
         return new Blob([(await fileOf("pdf")).data as BlobPart], { type: "application/pdf" });
       }, "application/pdf");
       if (saved) flash(tr("PDF uloženo: {0}", saved.name));
@@ -432,10 +563,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const exportDwg = async () => {
     if (!out) return;
     try {
-      const saved = await saveFile(`${base}_vykres.dwg`, async () => {
+      const saved = await saveFile(exportAll ? `${base}_vykres_dwg_listy.zip` : `${base}_vykres.dwg`, async () => {
         flash(tr("Generuji DWG ({0})…", dwgVer));
-        return new Blob([(await fileOf("dwg")).data as BlobPart], { type: "application/acad" });
-      }, "application/acad");
+        const f = await fileOf("dwg");
+        return new Blob([f.data as BlobPart], { type: f.mime });
+      }, exportAll ? "application/zip" : "application/acad");
       if (saved) flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name));
     } catch (e) {
       flash((e as Error).message || tr("DWG se nepodařilo vytvořit."));
@@ -779,7 +911,30 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           </span>
         )}
         <div className="flex-1" />
-        <Btn primary onClick={exportPdf} disabled={!res} tip={{ id: "pdf", label: tr("Export PDF"), why: WHY_RES }}>
+        {sheets.length > 1 && (
+          <TipBox tip={dwTip({ id: "exportSheets", label: tr("Listy k exportu") }, tr("PDF, DWG, DXF, SVG a Tisk: všechny listy výkresu, nebo jen aktivní list"))} className="flex shrink-0">
+            <select
+              data-export-sheets
+              value={allSheets ? "all" : "active"}
+              onChange={(e) => {
+                const v = e.target.value === "all";
+                setAllSheets(v);
+                try {
+                  localStorage.setItem("mn-cad-drawing-export-range", v ? "all" : "active");
+                } catch {
+                  /* nedostupné úložiště */
+                }
+              }}
+              aria-label={tr("Listy k exportu")}
+              title={tipsOn ? undefined : tr("Listy k exportu")}
+              className="rounded-md border border-ink-700/15 bg-steel-100 px-1.5 py-1.5 text-[11.5px] text-ink-700/80 outline-none"
+            >
+              <option value="all">{tr("Všechny listy ({0})", sheets.length)}</option>
+              <option value="active">{tr("Aktivní list")}</option>
+            </select>
+          </TipBox>
+        )}
+        <Btn primary onClick={exportPdf} disabled={!res} title={tr("PDF{0}", sheetsLabel)} tip={{ id: "pdf", label: tr("Export PDF") + sheetsLabel, why: WHY_RES }}>
           PDF
         </Btn>
         <span className="inline-flex items-stretch overflow-hidden rounded-md border border-ink-700/15 bg-white">
@@ -821,8 +976,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             {tr("Kusovník CSV")}
           </Btn>
         ) : null}
-        {/* automatizace / AI agent: systémový dialog tisku by ji zablokoval → stejný list jako PDF bez dialogu */}
-        <Btn onClick={() => out && (isAutomation() ? void exportPdf() : printSvg(out.svg, out.sheet.w, out.sheet.h))} disabled={!res} tip={{ id: "print", label: tr("Tisk"), why: WHY_RES }}>
+        {/* automatizace / AI agent: systémový dialog tisku by ji zablokoval → stejné listy jako PDF bez dialogu */}
+        <Btn onClick={() => (isAutomation() ? void exportPdf() : void printAll())} disabled={!res} tip={{ id: "print", label: tr("Tisk") + sheetsLabel, why: WHY_RES }}>
           {tr("Tisk")}
         </Btn>
         {onShare && (
@@ -847,6 +1002,17 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       </header>
       {/* listy výkresu */}
       <div className="flex h-8 shrink-0 items-end gap-1 overflow-x-auto overflow-y-hidden border-b border-black/10 bg-[#dfe5eb] px-3 [scrollbar-width:none] [touch-action:pan-x]">
+        {sets.length > 1 && (
+          <TipBox tip={dwTip({ id: "drawingSel", label: tr("Výkres dílu") }, tr("přepnutí mezi výkresy tohoto dílu / sestavy"))} className="mb-0.5 mr-1 flex shrink-0">
+            <select data-drawing-select value={group} onChange={(e) => switchDrawing(e.target.value)} aria-label={tr("Výkres dílu")} title={tipsOn ? undefined : tr("Výkres dílu")} className="rounded border border-black/10 bg-white px-1.5 py-0.5 text-[12px] font-semibold text-ink-700 outline-none">
+              {sets.map((d) => (
+                <option key={d.key} value={d.key}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </TipBox>
+        )}
         {(sheets.length ? sheets : [{ id: "main", name: sheetName }]).map((sh, i) => (
           <div key={sh.id} className={cn("group flex items-center gap-1 rounded-t-md border-x border-t px-3 py-1 text-[12px]", i === sheetIdx ? "relative top-px border-black/10 bg-white font-semibold" : "border-transparent text-ink-700/60 hover:bg-white/60")}>
             {rename?.i === i ? (
@@ -879,6 +1045,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         <TipBox tip={dwTip({ id: "sheetAdd", label: tr("Přidat list"), why: tr("Výkres bez dokumentu výkresu nemá další listy.") }, undefined, !onDrawingsChange)} className="mb-0.5 shrink-0">
           <button type="button" onClick={addSheet} disabled={!onDrawingsChange} className="rounded px-2 py-0.5 text-[12px] text-ink-700/60 hover:bg-white/60 hover:text-brand disabled:pointer-events-none disabled:opacity-40" title={tipsOn ? undefined : tr("Přidat list")}>
             {tr("+ List")}
+          </button>
+        </TipBox>
+        <TipBox tip={dwTip({ id: "drawingAdd", label: tr("Nový výkres"), why: tr("Výkres bez dokumentu výkresu nemá další listy.") }, tr("další výkres tohoto dílu se samostatnými listy („Výkres 2“…)"), !onDrawingsChange)} className="mb-0.5 shrink-0">
+          <button type="button" data-drawing-add onClick={addDrawing} disabled={!onDrawingsChange} className="rounded px-2 py-0.5 text-[12px] text-ink-700/60 hover:bg-white/60 hover:text-brand disabled:pointer-events-none disabled:opacity-40" title={tipsOn ? undefined : tr("Nový výkres")}>
+            {tr("+ Výkres")}
           </button>
         </TipBox>
         <span className="ml-auto pb-1 text-[11px] text-ink-700/45">

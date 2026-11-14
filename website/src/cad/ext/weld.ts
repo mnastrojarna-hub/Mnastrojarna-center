@@ -139,6 +139,7 @@ registerExt({
   order: 0,
   kbd: "Shift+W",
   hint: tr("profily (jäkl, trubka, L, U, IPE…) podél úseček skici, rohy pokos/tupý"),
+  toolBody: (data) => !memberData(data).separate, // samostatná tělesa nástroj neukládají (viz build)
   make: (doc) => {
     const last = [...doc.features].reverse().find((f) => f.type === "sketch");
     return { sketchId: last?.id ?? "", family: "shs", w: 40, h: 40, t: 3, d: 33.7, size: "100", align: "center", angle: 0, corner: "mitre", gap: 0, extStart: 0, extEnd: 0, separate: false, mode: "add" };

@@ -63,10 +63,11 @@ const AT_WORDS = ["v", "na", "at", "bei", "an"];
 
 const CON_WORDS: Record<ConType, string[]> = {
   horizontal: ["vodorovne", "vodorovna", "vodorovny", "horizontalne", "horizontal", "waagerecht", "waagrecht"],
-  vertical: ["svisle", "svisla", "svisly", "vertikalne", "vertical", "senkrecht", "vertikal"],
+  // DE: „senkrecht“ je v CADu kolmost (tlačítko „Senkrecht“ = Kolmo) – svisle je „vertikal“ / „lotrecht“
+  vertical: ["svisle", "svisla", "svisly", "vertikalne", "vertical", "vertikal", "lotrecht"],
   coincident: ["shodne", "shoda", "totozne", "totoznost", "coincident", "deckungsgleich", "koinzident"],
   parallel: ["rovnobezne", "rovnobezna", "rovnobezny", "parallel", "parallele"],
-  perpendicular: ["kolmo", "kolma", "kolmy", "perpendicular", "rechtwinklig"],
+  perpendicular: ["kolmo", "kolma", "kolmy", "perpendicular", "senkrecht", "rechtwinklig"],
   tangent: ["tecne", "tecna", "tecny", "tangent", "tangential", "tangentially"],
   equal: ["stejne", "stejna", "stejny", "stejna velikost", "equal", "gleich", "gleiche"],
   fixed: ["pevne", "pevna", "pevny", "fixed", "fix", "fest", "fixiert"],
@@ -80,7 +81,7 @@ const DIM_WORDS: Record<DimType, string[]> = {
   length: ["delka", "length", "lange", "laenge", "len"],
   distance: ["vzdalenost", "distance", "abstand", "dist"],
   horizontal: ["vodorovne", "vodorovna", "horizontal", "waagerecht", "waagrecht", "dx"],
-  vertical: ["svisle", "svisla", "vertical", "senkrecht", "vertikal", "dy"],
+  vertical: ["svisle", "svisla", "vertical", "vertikal", "senkrecht", "lotrecht", "dy"], // u kót „senkrecht“ dál = svislá kóta (kolmá kóta neexistuje)
   radius: ["polomer", "radius", "halbmesser"],
   diameter: ["prumer", "diameter", "durchmesser"],
   angle: ["uhel", "angle", "winkel"],
@@ -159,6 +160,9 @@ export function parseConstraints(text: string): ConstraintSpec[] {
     const rest = tk.slice(m.used).filter((t) => !AT_WORDS.includes(fold(t)));
     const nums = rest.filter(isNumTok).map(numOf);
     const refs = rest.filter((t) => !isNumTok(t)).map(parseRef);
+    // „senkrecht“ znamenalo do 13. vlny svisle: jedna úsečka nebo dva body (e1.a e2.b) svědčí o starém skriptu → jasná rada
+    if (m.kind === "perpendicular" && fold(tk[0]) === "senkrecht" && (refs.length === 1 || (refs.length === 2 && refs.every((x) => "origin" in x || (!!x.k && !/^[sg]\d+$/i.test(x.k))))))
+      throw new Error(tr("vazba „senkrecht“ = kolmo (dvě úsečky: senkrecht e1 e2); pro svislou úsečku nebo dva body nad sebou napište „vertikal“ ({0})", tk.slice(m.used).join(" ")));
     if (!CON_ARITY[m.kind].includes(refs.length)) throw new Error(tr("vazba {0}: špatný počet odkazů ({1}) – zápis: {2}", conWord(m.kind), refs.length, conUsage(m.kind)));
     const spec: ConstraintSpec = { type: m.kind, refs };
     if (nums.length) {

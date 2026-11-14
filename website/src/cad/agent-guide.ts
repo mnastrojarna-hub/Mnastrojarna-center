@@ -97,6 +97,8 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | \`výkres stav\` | textový stav výkresu: list, měřítko, pohledy, všechny kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo (také \`window.mncad.drawingStatus()\`) |
 | \`měřit F3|E5|V2 [F7|E9|V8|x y z]\` · \`měřit těleso|díry|válce\` · \`měřit plocha|hrany <pravidlo>\` | měření pro kontrolu modelu (viz „Měření“); také \`window.mncad.measure()\` |
 | \`výkres list 2\` · \`výkres list nový "Detail"\` · \`výkres list přejmenovat 2 "…"\` · \`výkres list smazat 2\` · \`výkres stav [list N|vše]\` | listy výkresu – další příkazy výkresu pracují s vybraným listem (viz „Výkres textem: listy, značky, kóty, export“) |
+| \`výkres nový ["Montážní"]\` · \`výkres výkresy\` · \`výkres výkresy 2\` · \`výkres výkresy přejmenovat 2 "…"\` · \`výkres výkresy smazat 2\` | další výkres téhož dílu (Výkres 2…) s vlastními listy; čísla listů, razítko „List 1/2“ a \`vše\` platí uvnitř aktivního výkresu |
+| \`výkres export pdf|dxf|dwg|svg|csv|png [vše|list N] [R2018]\` | soubor výkresu (v aplikaci se uloží / stáhne); \`vše\` = všechny listy aktivního výkresu: PDF vícestránkové, DXF / DWG / SVG / PNG jako ZIP s jedním souborem na list |
 | \`výkres razítko číslo="MN-1" kreslil="AI" …\` · \`výkres revize B "popis"\` · \`výkres otočení 90\` · \`výkres řez XZ poloviční\` · \`výkres kusovník ano\` · \`výkres balónky ne\` · \`kótovat základní\` | razítko, revize a další volby listu |
 | \`výkres pohled pomocný přední hrana x1 y1 x2 y2\` · \`výkres řez zalomený|natočený|částečný …\` · \`výkres přerušení přední x od 50 do 250\` · \`výkres uložení Ø40 H7\` · \`výkres revize značka B na Ø40\` · \`výkres zóny ano\` | pomocný pohled, řezy lomenou čarou, částečný řez, přerušený pohled, uložení ISO 286 s Tabulkou uložení, trojúhelníky revizí a zóny (viz „Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize“) |
 | \`výkres značka drsnost Ra 1,6 na Ø40\` · \`výkres kóta vodorovně pohled přední x1 y1 x2 y2\` · \`výkres upravit a3 odsazení=8\` · \`výkres smazat a3\` · \`výkres detail přední v x y poloměr r\` · \`výkres model "Hřídel"\` | značky, ruční kóty, úpravy, detaily a další modely – vše, co jde ve výkrese myší; export \`window.mncad.exportDrawing("pdf")\` |
@@ -230,10 +232,15 @@ Na ně odkazují vazby a kóty:
 | \`délka oblouku\` | oblouk |
 
 - Anglicky \`constraint horizontal e1\`, \`dim length e1 50\`; německy \`bedingung waagerecht e1\`, \`bemaßung länge e1 50\`
-  (druhy: horizontal/waagerecht, vertical/senkrecht, coincident/deckungsgleich, parallel, perpendicular/rechtwinklig,
+  (druhy: horizontal/waagerecht, vertical/vertikal, coincident/deckungsgleich, parallel, perpendicular/senkrecht (i rechtwinklig),
   tangent/tangential, equal/gleich, fixed/fest, concentric/konzentrisch, midpoint/mittelpunkt, onCurve/aufKurve,
   symmetric/symmetrisch, collinear/kollinear; length/Länge, distance/Abstand, radius, diameter/Durchmesser, angle/Winkel,
   arcLength/Bogenlänge). Více vazeb nebo kót na jednom řádku oddělte středníkem.
+- Německy je \`senkrecht\` **kolmo** (jako tlačítko „Senkrecht“): \`bedingung senkrecht e1 e2\`; svisle je \`vertikal\`
+  (\`bedingung vertikal e2\`, \`bedingung vertikal e1.a e2.b\`). Starší skript s \`senkrecht e1\` (jedna úsečka) nebo
+  \`senkrecht e1.a e2.b\` (dva body) skončí na řádku ✗ s radou napsat \`vertikal\` – nic se nezamění potichu. U kót
+  \`bemaßung senkrecht …\` dál znamená svislou kótu (kolmá kóta neexistuje), protokol píše \`vertikal\`; totéž ve výkresu
+  (\`zeichnung maß vertikal|senkrecht ansicht vorne …\`).
 - Kóta je **řídicí** (změní geometrii); \`referenční\` (\`reference\`, \`Referenz\`) jen měří a hodnotu lze vynechat.
 - Po každém řádku \`vazba\` / \`kóta\` (a na konci bloku skici, přibyly-li entity) se skica **vyřeší** a protokol napíše
   stav jako skicář: \`Plně určeno\`, \`Nedourčeno (N st. volnosti)\` nebo ⚠ \`Přeurčeno – konflikt / nadbytečné vazby\` s výčtem
@@ -521,6 +528,18 @@ spring…) i prvek rozšíření (\`prvek sheet.bend …\`, \`prvek "Zkrut" …\
   (\`axis={"kind":"edge","ref":{"kind":"edge","index":3}}\` = podél hrany 4 / osy válce, \`{"kind":"faceNormal","ref":{"kind":"face","index":5}}\`
   = normála plochy 6). U \`surf.revolve\` je \`axis=x\` / \`axis=y\` osa skici, \`axis=X|Y|Z\` globální osa, JSON \`AxisDef\`
   (\`{"kind":"cylFace","ref":{"kind":"face","index":2}}\`). Starší zápis \`"axis": "Z"\` v JSON platí dál.
+- Operace rozšíření \`mode=add|cut|intersect\`: \`surf.close\` a \`surf.thicken\` mají výchozí \`add\` (s tělesem v dílu se sloučí);
+  starší JSON s \`"mode": "new"\` dál tělesa nahradí (formulář ukáže volbu „Nahradit tělesa“). \`adv.dome mode=intersect\` plochu
+  vyklene dovnitř (vrchol v rovině plochy, okraj o \`height\` níž). \`adv.check strict=ne\` kontroluje jen topologii.
+- \`prvek sheet.hem edges=… kind=teardrop radius=1 closeAngle=30\` = lem Kapka (ohyb 180° + úhel, rameno šikmo k plechu,
+  délka ramene se dopočítá); \`sheet.flange relief=rect|obround reliefWidth=… reliefDepth=…\` platí pro obě polohy materiálu,
+  \`reliefDepth=0\` = tloušťka plechu. \`surf.offset faces=… keepOriginal=ne\` vybrané volné plochy nahradí odsazenými.
+- \`adv.mirrorFeatures features="Zkrut"\` (název, id nebo \`$last\`; více prvků \`features=["Zkrut","Díra 1"]\`) zrcadlí i prvky
+  rozšíření s nástrojovým tělesem (\`adv.twist\`, \`adv.dome\`, \`adv.textOnCyl\`, \`adv.lipGroove\`, \`adv.holesAtPoints\`,
+  \`surf.helixSweep\`, \`weld.member\` bez \`separate\`); rovina \`plane=XY|XZ|YZ offset=…\` nebo odkazem \`planeDef={…}\` (má
+  přednost). \`all=ano\` = všechny dřívější prvky s nástrojem KROMĚ toho, který těleso založil (zrcadlený základ by zaplnil
+  dřívější kapsy a díry); celé těleso zrcadlí vestavěné \`zrcadlit\`. \`adv.dome\` s \`radius=0\` bere poloměr k vnějšímu obrysu
+  plochy (díry se nepočítají); kopule celá nad dírou / mimo plochu skončí chybou. \`sheet.unfold\` hlásí ⚠, co rozvin vynechal.
 - Prvky \`adv.varFillet\`, \`adv.fullRound\`, \`adv.chamfer2\`, \`adv.curvePattern\`, \`adv.fillPattern\` a \`adv.holesAtPoints\` jsou
   starší duplicity – na pásu karet už nejsou, staré dokumenty i \`prvek …\` je dál postaví. Pro nové díly použijte
   vestavěné \`zaoblit\` (druh R1 → R2 / plný), \`srazit\` (D1 × D2 / D × úhel), \`pole\` (po křivce / výplň / podle skici) a \`díra\`.
@@ -1463,6 +1482,8 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 
 **Export bez dialogu** (JavaScript API): \`await window.mncad.exportDrawing("pdf" | "dxf" | "dwg" | "svg" | "csv" | "png",
 { sheet: 2, dwgVersion: "R2018", width: 2000 })\` vrátí \`{ name, mime, bytes, base64, width?, height?, warnings? }\` –
+\`{ sheet: "all" }\` = všechny listy aktivního výkresu (PDF jedna stránka na list, ostatní formáty ZIP, výsledek navíc
+\`sheets\` a \`files\`; DXF R12 rozvržení nezná a DWG se zapisuje do modelového prostoru, proto soubor na list) –
 stejný výpočet jako tlačítka ve výkresu (DWG R2000–R2018, DXF R12, kusovník CSV jen u sestavy). **PNG** je náhled listu
 (rastr, výchozí šířka 2000 px) – agent si tak výkres prohlédne. \`await window.mncad.drawingStatus({ sheet: "all" })\` = \`výkres stav vše\`.
 
@@ -1485,7 +1506,9 @@ výkres detail přední v 45 10 poloměr 5 měřítko 5:1
 výkres stav vše
 \`\`\`
 
-Pak \`window.mncad.exportDrawing("pdf", { sheet: 1 })\` a \`exportDrawing("png", { sheet: 2 })\` pro kontrolu očima.
+Pak \`window.mncad.exportDrawing("pdf", { sheet: "all" })\` (oba listy v jednom PDF) a \`exportDrawing("png", { sheet: 2 })\` pro
+kontrolu očima; totéž textem \`výkres export pdf vše\`. Druhý výkres téhož dílu (např. montážní) založí \`výkres nový "Montážní"\` –
+má vlastní listy a \`výkres výkresy 1\` vrátí práci na první výkres.
 
 ### Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize
 

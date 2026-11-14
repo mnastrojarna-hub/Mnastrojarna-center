@@ -48,11 +48,11 @@ describe("rozbor vazeb: všechny druhy česky, anglicky a německy", () => {
   const cases: [string, string, string, string, number][] = [
     // [česky, anglicky, německy, typ, počet odkazů]
     ["vodorovně e1", "horizontal e1", "waagerecht e1", "horizontal", 1],
-    ["svisle e1.a e2.b", "vertical e1.a e2.b", "senkrecht e1.a e2.b", "vertical", 2],
+    ["svisle e1.a e2.b", "vertical e1.a e2.b", "vertikal e1.a e2.b", "vertical", 2], // DE „senkrecht“ = kolmo (13. vlna)
     ["shodně e1.b e2.a", "coincident e1.b e2.a", "deckungsgleich e1.b e2.a", "coincident", 2],
     ["totožně e1.b e2.a", "coincident e1.b e2.a", "koinzident e1.b e2.a", "coincident", 2],
     ["rovnoběžně e1 e3", "parallel e1 e3", "parallel e1 e3", "parallel", 2],
-    ["kolmo e1 e2", "perpendicular e1 e2", "rechtwinklig e1 e2", "perpendicular", 2],
+    ["kolmo e1 e2", "perpendicular e1 e2", "senkrecht e1 e2", "perpendicular", 2],
     ["tečně e1 e5", "tangent e1 e5", "tangential e1 e5", "tangent", 2],
     ["stejně e1 e3", "equal e1 e3", "gleich e1 e3", "equal", 2],
     ["pevně e1.a", "fixed e1.a", "fest e1.a", "fixed", 1],
@@ -103,7 +103,7 @@ describe("rozbor kót: všechny druhy, hodnoty, referenční", () => {
     ["délka e1 50", "length e1 50", "Länge e1 50", "length"],
     ["vzdálenost e1.a e3.b 40", "distance e1.a e3.b 40", "Abstand e1.a e3.b 40", "distance"],
     ["vodorovně e1.a e2.b 30", "horizontal e1.a e2.b 30", "waagerecht e1.a e2.b 30", "horizontal"],
-    ["svisle počátek e1.a 20", "vertical origin e1.a 20", "senkrecht ursprung e1.a 20", "vertical"],
+    ["svisle počátek e1.a 20", "vertical origin e1.a 20", "vertikal ursprung e1.a 20", "vertical"],
     ["poloměr e5 10", "radius e5 10", "Radius e5 10", "radius"],
     ["průměr e5 20", "diameter e5 20", "Durchmesser e5 20", "diameter"],
     ["úhel e1 e2 45", "angle e1 e2 45", "Winkel e1 e2 45", "angle"],
@@ -223,13 +223,15 @@ linie 60 0 60 40
 linie 60 40 0 40
 linie 0 40 0 0
 bedingung deckungsgleich e1.b e2.a; deckungsgleich e2.b e3.a; deckungsgleich e3.b e4.a; deckungsgleich e4.b e1.a
-bedingung waagerecht e1; waagerecht e3; senkrecht e2; senkrecht e4
+bedingung waagerecht e1; waagerecht e3; vertikal e2; vertikal e4
 bedingung deckungsgleich e1.a ursprung
 bemaßung länge e1 80
 maß Länge e2 50,5`);
     expect(de.log[8]).toBe("10: ✓ Bemaßungen in Skizze „Skizze 1“: Länge e2 50,5 → Vollständig bestimmt");
     near(ent(de.sk, "e2").b as number[], [80, 50.5]);
-    expect(run("skizze XY\nlinie 0 0 10 0\nbedingung rechtwinklig e1").text).toMatch(/Bedingung rechtwinklig: falsche Anzahl von Referenzen \(1\) – Schreibweise: bedingung rechtwinklig e1 e2 \(zwei Linien\)/);
+    expect(run("skizze XY\nlinie 0 0 10 0\nbedingung rechtwinklig e1").text).toMatch(/Bedingung senkrecht: falsche Anzahl von Referenzen \(1\) – Schreibweise: bedingung senkrecht e1 e2 \(zwei Linien\)/);
+    // starý skript se „senkrecht“ ve smyslu svisle: jasná rada (řádek ✗), ne tichá záměna za kolmost
+    expect(run("skizze XY\nlinie 0 0 0 10\nbedingung senkrecht e1").text).toMatch(/„senkrecht“ = rechtwinklig zueinander.*„vertikal“ schreiben \(e1\)/);
   });
   it("řídicí kóta délka změní úsečku; referenční kóta jen měří", () => {
     const free = run("skica XY\núsečka 0 0 30 0\nkóta délka e1 45");

@@ -63,11 +63,15 @@ export function FloatPanel({
 
 /** Modální dialog. */
 export function Modal({ title, icon, tone = "tool", onClose, children, width = "max-w-lg", footer }: { title: string; icon: CadIconName; tone?: Tone; onClose: () => void; children: React.ReactNode; width?: string; footer?: React.ReactNode }) {
+  // jeden stálý posluchač: s onClose v závislostech by se při překreslení během téže klávesy (jiný posluchač Esc
+  // změní stav) odregistroval dřív, než přijde na řadu, a dialog by zavřel až druhý Esc
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [onClose]);
+  }, []);
   return (
     <div className="fixed inset-0 z-[70] grid place-items-center bg-[#0b1220]/40 p-4" onClick={onClose}>
       <div className={cn("flex max-h-[88vh] w-full flex-col rounded-lg border border-[#cfd6de] bg-white shadow-2xl", width)} onClick={(e) => e.stopPropagation()}>

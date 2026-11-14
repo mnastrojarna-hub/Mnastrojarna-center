@@ -23,9 +23,9 @@ export default {
   "adv.mirrorFeatures": {
     what: "Mirrors chosen earlier features (extrusions, holes…) about a plane – not the whole body.",
     when: "Symmetric part where only some features are mirrored: ribs, pockets or holes from one side.",
-    steps: ["In Features to mirror tick the features, or All previous features.", "Choose Mirror plane XY / XZ / YZ and Plane offset [mm].", "Confirm OK – each feature keeps its own Add / Remove operation."],
+    steps: ["Tick Features to mirror, or All previous features (without the base body).", "Plane by reference (face, three points…), or Mirror plane XY / XZ / YZ and offset.", "Confirm OK – each feature keeps its own Add / Remove operation."],
     cmd: "feature adv.mirrorFeatures all=yes plane=YZ",
-    note: "The list offers only features with a body – no sketches, planes or extension features.",
+    note: "Offers features with a body and extensions with a tool (twist, dome…), no sketches. The built-in Mirror mirrors the whole body.",
   },
   "adv.scaleAbout": {
     what: "Enlarges or shrinks the whole body by the given scale about a point.",
@@ -55,9 +55,9 @@ export default {
     what: "Creates an elliptical dome in the centre of a planar face – with Remove a dimple.",
     when: "Domed lid, lens, spherical pocket or dimple in a flat face.",
     select: "One planar face (filter Face) – or click it in the form.",
-    steps: ["Select a planar face and click Dome.", "Enter Dome height and Base radius (0 = inscribed in the face).", "Operation: Add = dome, Remove = dimple; confirm OK."],
+    steps: ["Select a planar face and click Dome.", "Enter Dome height and Base radius (0 = inscribed in the face).", "Operation: Add = dome, Remove = dimple, Intersect = crowning; OK."],
     cmd: "feature adv.dome faces=top height=8",
-    note: "The dome is always centred on the face; Intersect behaves like Add.",
+    note: "Centred on the face, radius 0 = to the nearest outer edge (holes do not count). Intersect crowns the face into the body.",
   },
   "adv.textOnCyl": {
     what: "Engraves or raises lettering on a cylindrical face – shaft, bush, ring.",
@@ -123,7 +123,7 @@ export default {
     select: "Faces (filter Face); with no selection all free faces are offset.",
     steps: ["Select faces (or none) and click Offset surface.", "Enter the Offset (negative = opposite direction).", "Optionally untick Keep the original surface, confirm OK."],
     cmd: "feature surf.offset distance=5",
-    note: "The original disappears only without a selection (all free faces); selected faces always stay.",
+    note: "Without Keep the original surface the selected free faces are replaced; a face of a body stays, with a warning.",
   },
   "surf.extend": {
     what: "Enlarges a surface: a planar one by a length around its whole boundary, a curved one in its parameters.",
@@ -167,14 +167,14 @@ export default {
     when: "The surface model is finished and closed – convert it to a solid for holes, fillets, drawings.",
     steps: ["Click Close into solid.", "If there are gaps, increase the Sewing tolerance.", "Choose the Operation and confirm OK."],
     cmd: "feature surf.close tolerance=0.01",
-    note: "If the part already has a body, click Add under Operation – the default state replaces it.",
+    note: "The default Add merges the result with the body in the part. An older feature set to Replace solids replaces them.",
   },
   "surf.thicken": {
     what: "Turns the free faces into a solid body of the given thickness.",
     when: "Part modelled with surfaces: cover, blade, shell made of plastic or sheet.",
     steps: ["Click Thicken surface and enter the Thickness.", "Side: Along the normal / Against the normal.", "Choose the Operation and confirm OK."],
     cmd: "feature surf.thicken thickness=2",
-    note: "Thickens all free faces; with a body in the part click Add under Operation.",
+    note: "Thickens all free faces; the default Add merges the result with the body in the part.",
   },
   "surf.split": {
     what: "Cuts the body with a plane – keeps both parts or only one side.",
@@ -313,14 +313,14 @@ export default {
     when: "Box edges, angle bracket, holder, strap – the most common bend.",
     select: "Straight outline edges of the sheet (filter Edge) – or click them in the form.",
     steps: ["Select the edge and click Edge flange.", "Enter Flange length, Bend angle and Inner radius (0 = from the sheet).", "Choose Material position, optionally Bend to the opposite side; OK."],
-    note: "The Bend relief is applied only with Material inside and a Relief depth greater than 0.",
+    note: "The Bend relief cuts notches at both ends of the edge in both material positions; Relief depth 0 = sheet thickness.",
   },
   "sheet.hem": {
     what: "Folds the sheet edge by 180° – an open or closed hem.",
     when: "Safe edge without a sharp rim, edge stiffening, joint of two sheets.",
     select: "Straight outline edges of the sheet (filter Edge) – or click them in the form.",
-    steps: ["Select the edge and click Hem.", "Enter Hem length and Hem type: Open / Closed.", "For an open hem the Inner radius, optionally Fold to the opposite side; OK."],
-    note: "The Teardrop type is currently built the same as an open hem.",
+    steps: ["Select the edge and click Hem.", "Enter Hem length and Hem type: Open / Closed / Teardrop.", "Inner radius (open, teardrop), for a teardrop the Closing angle; OK."],
+    note: "Teardrop = a bend of 180° + Closing angle; the leg returns at an angle to the sheet and its length is computed.",
   },
   "sheet.bend": {
     what: "A line in a sketch splits the sheet and bends one side by the given angle.",
@@ -337,7 +337,7 @@ export default {
     when: "Checking the blank, sizes for laser cutting, basis for a flat pattern drawing.",
     steps: ["Click Flatten – the feature is added to the end of the history.", "Suppress the Flatten feature to get the bent shape back."],
     cmd: "feature sheet.unfold",
-    note: "Features outside the Sheet metal tab (e.g. Hole) are skipped in the flat pattern – make openings with Cut-out.",
+    note: "Features outside the Sheet metal tab (e.g. Hole) and bend reliefs are skipped in the flat pattern with a warning. Make openings with Cut-out.",
   },
   "sheet.dxf": {
     what: "Saves the flat pattern as DXF: outline, openings, bend lines and the bend table.",
@@ -531,7 +531,7 @@ export default {
     when: "After a STEP import, after complex Boolean operations, before export or filleting.",
     steps: ["Click Geometry check – the feature is added to the end of the history.", "An error appears at the feature in the history with face and edge numbers; no error means the body is valid."],
     cmd: "feature adv.check",
-    note: "Does not change the body. Try to repair a faulty body with Merge faces or by editing the features.",
+    note: "Does not change the body. Without Also check face geometry only the topology (faster). Repair: Merge faces.",
   },
   "adv.simplify": {
     what: "Merges neighbouring faces and edges that lie on the same geometry into one.",

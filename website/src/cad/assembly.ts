@@ -2,6 +2,7 @@
  * Sestavy: umístění komponent, kusovník (BOM), rozložený pohled, zarovnání ploch a generátory
  * normálií a rámu vstřikovací formy. Čisté funkce – běží v prohlížeči i v testech.
  */
+import { groupKey, groupLabel } from "./asm-groups";
 import { tr } from "./i18n";
 import { emptyDoc, uid, type AsmComponent, type CadDoc, type ComponentSource, type Feature, type Placement, type Vec3 } from "./types";
 
@@ -138,11 +139,12 @@ export function sourceKey(s: ComponentSource, depth = 0): string {
 export type BomRow = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; group?: string; ids: string[]; level?: number; assembly?: boolean };
 
 const GROUP_ORDER = ["Podsestavy", "Desky", "Tvarové díly", "Vedení", "Vyhazování", "Normálie"];
-const byGroup = (a: BomRow, b: BomRow) => {
-  const ga = GROUP_ORDER.indexOf(a.group ?? "");
-  const gb = GROUP_ORDER.indexOf(b.group ?? "");
-  return (ga < 0 ? 99 : ga) - (gb < 0 ? 99 : gb);
+/** pořadí skupiny v kusovníku – skupina uložená přeloženě (starší dokument, ruční zápis) má stejné pořadí jako česká */
+const groupRank = (g?: string) => {
+  const i = g ? GROUP_ORDER.indexOf(groupKey(g)) : -1;
+  return i < 0 ? 99 : i;
 };
+const byGroup = (a: BomRow, b: BomRow) => groupRank(a.group) - groupRank(b.group);
 
 /** Hmotnost a materiál komponenty; u podsestavy součet hmotností dílů. */
 function compInfo(c: AsmComponent, info: (c: AsmComponent) => { material?: string; massKg?: number }, depth = 0): { material?: string; massKg?: number } {
@@ -308,7 +310,7 @@ export function bomCsv(rows: BomRow[]): string {
   };
   const head = [tr("Pozice"), tr("Název"), tr("Číslo výkresu / norma"), tr("Ks"), tr("Materiál"), tr("Hmotnost 1 ks [kg]"), tr("Hmotnost celkem [kg]"), tr("Skupina")];
   const lines = rows.map((r) =>
-    [r.pos, r.name, r.number, r.qty, r.material, r.massKg != null ? r.massKg.toFixed(3).replace(".", ",") : "", r.massKg != null ? (r.massKg * r.qty).toFixed(3).replace(".", ",") : "", r.group].map(esc).join(";"),
+    [r.pos, r.name, r.number, r.qty, r.material, r.massKg != null ? r.massKg.toFixed(3).replace(".", ",") : "", r.massKg != null ? (r.massKg * r.qty).toFixed(3).replace(".", ",") : "", r.group ? groupLabel(r.group) : ""].map(esc).join(";"),
   );
   return "﻿" + [head.join(";"), ...lines].join("\r\n") + "\r\n";
 }

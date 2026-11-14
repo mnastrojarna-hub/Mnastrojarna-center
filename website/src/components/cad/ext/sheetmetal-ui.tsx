@@ -8,7 +8,8 @@ import { tr } from "@/cad/i18n";
 import { useEffect } from "react";
 import { cad, type TopologyResult } from "@/cad/client";
 import { getExt, type ExtParam } from "@/cad/ext/registry";
-import { bendTable, flatLayout, flatToDxf, flatToSvg, type EdgeGeom, type EdgeResolver, type FaceResolver } from "@/cad/ext/sheetmetal-flat";
+import { flangeFieldState } from "@/cad/ext/sheetmetal";
+import { bendTable, flangeNumber, flatLayout, flatToDxf, flatToSvg, sheetParamsAt, type EdgeGeom, type EdgeResolver, type FaceResolver } from "@/cad/ext/sheetmetal-flat";
 import type { CadDoc, Vec3 } from "@/cad/types";
 import { Num, Seg } from "../props";
 import { registerIcon } from "./icons";
@@ -36,9 +37,11 @@ const parseVec = (s: string | undefined): Vec3 | null => {
 };
 
 /** Formulář: parametry z registru + uložení koncových bodů vybraných hran (pro rozvin počítaný v UI). */
-function FlangeForm({ f, onChange }: ExtFormProps) {
+function FlangeForm({ f, doc, onChange }: ExtFormProps) {
   const def = getExt(f.ext);
   const data = f.data ?? {};
+  const idx = doc.features.findIndex((x) => x.id === f.id);
+  const sheet = sheetParamsAt(doc, idx >= 0 ? idx : doc.features.length);
   const edges = (data.edges as number[] | undefined) ?? [];
   const geom = (data.edgeGeom as (EdgeGeom | null)[] | undefined) ?? [];
   const key = edges.join(",");
@@ -68,9 +71,15 @@ function FlangeForm({ f, onChange }: ExtFormProps) {
     <>
       {def.params.map((p: ExtParam) => {
         const v = data[p.key];
+        // pole, které se při ostatních hodnotách neuplatní (úleva bez druhu, úhel kapky u jiného lemu…), je zašedlé s vysvětlením
+        const st = flangeFieldState(f.ext, p.key, data, sheet);
         switch (p.kind) {
           case "number":
-            return <Num key={p.key} label={p.label} value={typeof v === "number" ? v : 0} step={p.step ?? 1} min={p.min} suffix={p.unit ?? "mm"} hint={p.hint} bind={`${f.id}:data.${p.key}`} onChange={(n) => onChange({ [p.key]: p.max != null ? Math.min(p.max, n) : n })} />;
+            return (
+              <fieldset key={p.key} disabled={!!st.off} data-field={p.key} data-off={st.off ? "1" : undefined} className={st.off ? "opacity-50" : undefined}>
+                <Num label={p.label} value={flangeNumber(f.ext, p.key, data, sheet)} step={p.step ?? 1} min={p.min} suffix={p.unit ?? "mm"} hint={st.note ?? p.hint} bind={`${f.id}:data.${p.key}`} onChange={(n) => onChange({ [p.key]: p.max != null ? Math.min(p.max, n) : n })} />
+              </fieldset>
+            );
           case "bool":
             return (
               <label key={p.key} className="flex items-center gap-2 text-[13px]">

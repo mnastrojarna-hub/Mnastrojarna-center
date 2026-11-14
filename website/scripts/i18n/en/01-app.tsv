@@ -249,8 +249,6 @@ Otevřít / Import	Open / Import
 Otevřít / importovat	Open / import
 Otevřít / importovat (Ctrl+O)	Open / import (Ctrl+O)
 Otevřít / importovat…	Open / import…
-Otevřít podsestavu	Open sub-assembly
-Otevřít vybranou	Open selected
 Otočení (15°)	Rotation (15°)
 Otočení kolem obecné osy nelze uložit – otáčejte po jednom oblouku.	A rotation about a general axis cannot be stored – rotate one arc at a time.
 Otočit stranu	Flip side
@@ -288,7 +286,6 @@ Pravý	Right
 Primitiva	Primitives
 Program	Program
 Proměnné	Variables
-Proměnné najdete v levém panelu – záložka Proměnné.	Variables are in the left panel – Variables tab.
 Provést příkaz: {0}	Run command: {0}
 Pružina	Spring
 Prázdná sestava: komponenty, vazby, podsestavy, kusovník.	Empty assembly: components, mates, sub-assemblies, BOM.
@@ -372,7 +369,6 @@ Spodní	Bottom
 Správce historie	History manager
 Srazit	Chamfer
 Srazit hranu	Chamfer edge
-Stavy (konfigurace) najdete v levém panelu – záložka Stavy.	Configurations are in the left panel – Configurations tab.
 Stavy dílu	Part configurations
 Stavím komponenty…	Building components…
 Stavím rám formy…	Building the mould base…
@@ -425,7 +421,6 @@ Vodicí sloupek	Guide pillar
 Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše	Free text for the drawing title block, e.g. ČSN 11 423 or 1.0503 – the density comes from the material class above
 Vyberte dvě rovinné plochy.	Select two planar faces.
 Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu).	Select the component to remove (click in the 3D view or in the tree).
-Vyberte komponenty (filtr Komponenta, Ctrl+klik).	Select components (Component filter, Ctrl+click).
 Vyberte plochu (filtr Plocha) a zopakujte příkaz.	Select a face (Face filter) and repeat the command.
 Vyberte plochu.	Select a face.
 Vyberte rovinnou plochu.	Select a planar face.
@@ -435,7 +430,6 @@ Vyhazovač	Ejector pin
 Vyhazování	Ejection
 Vysunout	Extrude
 Vytvořit podsestavu z vybraných ({0})	Create sub-assembly from selected ({0})
-Vytvořit z vybraných (Ctrl+klik)	Create from selected (Ctrl+click)
 Vytáhnout / Zatlačit	Push / Pull
 Vzhled	Appearance
 Výchozí barva	Default colour

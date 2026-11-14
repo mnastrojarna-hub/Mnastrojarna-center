@@ -8,6 +8,7 @@ import type { SmartDims } from "./drawing-dims";
 import type { Interference, MateFaceInfo } from "./asm-kernel";
 import type { CompareOptions, CompareResult, ReferenceFile } from "./compare";
 import type { EntRef, EntityInfo, MeasureResult, ShapeSrc } from "./inspect";
+import type { FaceOwner } from "./face-owner";
 import type { MeasureQuery, MeasureReport } from "./measure";
 import type { DatumDisplay } from "./feat/refs-more";
 import type { Geo, PlaneDef, Ref, ResolvedPlane, Sig } from "./refs";
@@ -210,6 +211,8 @@ export const cad = {
   mateEnt: (key: string, index: number, ent: "edge" | "vertex" | "mesh") => call<MateFaceInfo | null>({ op: "mateEnt", key, index, ent }),
   cylFace: (key: string, radius: number) => call<number>({ op: "cylFace", key, radius }),
   inspect: (src: ShapeSrc, ref: EntRef, density?: number) => call<EntityInfo>({ op: "inspect", src, ref, density }),
+  /** filtr výběru Prvek: prvek historie, který vytvořil plochu `index` dílu, a všechny jeho plochy */
+  faceOwner: (doc: CadDoc, index: number, point?: Vec3) => call<FaceOwner | null>({ op: "faceOwner", doc, index, point }),
   measureEnt: (a: { src: ShapeSrc; ref: EntRef }, b: { src: ShapeSrc; ref: EntRef } | null) => call<MeasureResult>({ op: "measureEnt", a, b }),
   /** měření pro příkaz „měřit“ / window.mncad.measure (measure.ts): `doc` = díl, který se postaví a změří; `sources` = díly komponent sestavy */
   measure: (q: MeasureQuery, o: { doc?: CadDoc; density?: number; sources?: { key: string; source: ComponentSource }[] } = {}) => call<MeasureReport>({ op: "measure", q, ...o }),

@@ -4,11 +4,24 @@ import type { MicroTip } from "../tips";
 export default {
   // ── Drawing (tab) ──
   drw: {
-    what: "Opens the drawing of the part or assembly in a new tab – views, sections, dimensions, title block, export PDF / DXF / DWG.",
-    when: "Production drawing for the shop floor, a subcontractor or an inquiry; basis for a quote.",
-    steps: ["Click New drawing – a drawing tab opens with Smart dimensions.", "On the left set Sheet, Views, Section A–A and Title block; add dimensions with the tools.", "Export PDF / DWG / DXF; Close returns to the 3D model."],
-    cmd: "drawing",
-    note: "If the document already has a drawing, the saved one opens (sheets, dimensions, title block) – no second one is made.",
+    what: "Creates a new drawing of the part or assembly in the drawing tab – views, sections, dimensions, title block, export.",
+    when: "Production drawing for the shop or a subcontractor; another drawing of the same part (assembly, blank).",
+    steps: ["Click New drawing – the first drawing, or another one (Drawing 2…) with its own sheets.", "On the left set Sheet, Views, Section A–A and Title block; add dimensions with the tools.", "Export PDF / DWG / DXF; Close returns to the 3D model."],
+    cmd: "drawing new",
+    note: "A saved drawing opens with Open drawing ▼; the drop-down in the sheet bar also switches drawings.",
+  },
+  drwOpen: {
+    what: "Opens a saved drawing of the part or assembly – the menu lists all drawings with their sheet count.",
+    when: "Back to a drawing in progress, fixing dimensions or the title block, a new export.",
+    steps: ["Click Open drawing ▼.", "Choose a drawing – it opens on its first sheet."],
+    cmd: "drawing drawings 1",
+    note: "Inactive until the document has a drawing (New drawing).",
+  },
+  "menu:drwOpen/*": {
+    what: "Opens this drawing of the part on its first sheet.",
+    when: "Switching between drawings of the same part (production, assembly…).",
+    steps: ["Click the drawing name."],
+    cmd: "drawing drawings 2",
   },
 
   // ── Sketch › Draw ──
@@ -370,10 +383,10 @@ export default {
     note: "Saves only the 2D sketch entities; export a drawing with views from the drawing.",
   },
   imp: {
-    what: "Loads a DXF file as a new sketch on the XY plane in a new part tab.",
+    what: "Adds the lines, circles, arcs and curves of a DXF file to the open sketch.",
     when: "Taking over a 2D outline from AutoCAD or a customer for extrusion.",
-    steps: ["Click Import DXF… and choose a .dxf file.", "In the new sketch check the outline and add constraints and dimensions."],
-    note: "Nothing is added to the open sketch; insert an image or PDF via Underlay….",
+    steps: ["Click Import DXF… and choose a .dxf file.", "Choose the units, origin offset and layers.", "Confirm Import – a message says how many entities were added."],
+    note: "Ctrl+Z undoes the whole import. To open a DXF as a new part use Data › Open; an image or PDF goes in via Underlay….",
   },
   coords: {
     what: "Inserts a curve from a list of X Y coordinates – polyline, spline or chain of lines.",
@@ -454,29 +467,31 @@ export default {
 
   // ── Drawing workspace: export and toolbar ──
   "drawing-ws/pdf": {
-    what: "Saves the displayed drawing sheet as a PDF in the sheet format.",
+    what: "Saves the drawing as PDF – one page per sheet in its own format; or only the active sheet.",
     when: "Drawing for printing, for e-mailing a customer or for the shop floor.",
     steps: ["Wait until the views have been computed.", "Click PDF – the file <name>_vykres.pdf is saved."],
-    note: "Saves only the displayed sheet – switch to further sheets and export them separately.",
+    cmd: "drawing export pdf all",
+    note: "If the drawing has more sheets, all are saved as a multi-page PDF (Sheets to export on the left).",
   },
   "drawing-ws/dwg": {
-    what: "Saves the displayed sheet as DWG in the chosen AutoCAD version (2000 to 2018+).",
+    what: "Saves the sheet as DWG in the chosen AutoCAD version (2000 to 2018+); more sheets = ZIP with one DWG per sheet.",
     when: "Handing the drawing over to AutoCAD, ZWCAD or BricsCAD for further editing.",
     steps: ["In the drop-down next to the button choose the DWG version (default AutoCAD 2018+).", "Click DWG – the file is saved."],
-    note: "For old software choose a lower version; characters outside ASCII are written as codes there.",
+    note: "For old software choose a lower version. Sheets are written as separate files, not as layouts.",
   },
   "drawing-ws/dxf": {
-    what: "Saves the displayed sheet as DXF (AutoCAD R12) – readable by almost every CAD.",
+    what: "Saves the sheet as DXF (AutoCAD R12) – almost every CAD reads it; more sheets = ZIP with one DXF per sheet.",
     when: "Exchange with another CAD, input for CAM or laser, older software.",
-    steps: ["Click DXF – the file <name>_vykres.dxf is saved."],
+    steps: ["Click DXF – <name>_vykres.dxf is saved, with more sheets <name>_vykres_dxf_listy.zip."],
+    note: "DXF R12 has no layouts, hence one file per sheet.",
   },
   "drawing-ws/svg": {
-    what: "Saves the displayed sheet as an SVG vector image.",
+    what: "Saves the sheet as an SVG vector image; more sheets = ZIP with one SVG per sheet.",
     when: "Drawing for the web, documentation or a presentation without loss of sharpness.",
-    steps: ["Click SVG – the file <name>_vykres.svg is saved."],
+    steps: ["Click SVG – <name>_vykres.svg is saved, with more sheets a ZIP."],
   },
   "drawing-ws/print": {
-    what: "Prints the displayed sheet through the browser's print dialog in the sheet format.",
+    what: "Prints the drawing through the browser's print dialog – all sheets (one page each) or only the active one.",
     when: "Quick print on the shop printer; the dialog also offers Save as PDF.",
     steps: ["Click Print.", "In the browser dialog choose the printer and 100 % scale, confirm."],
     note: "The paper size in the printer should match the sheet (A4, A3…).",
@@ -491,7 +506,7 @@ export default {
     what: "Closes the drawing tab and returns to the 3D model; drawing changes stay in the document.",
     when: "The drawing is finished, or the model needs changing.",
     steps: ["Click Close (or Esc when no tool is active)."],
-    note: "New drawing on the Drawing tab reopens it – with the saved sheets and dimensions.",
+    note: "Open drawing ▼ on the Drawing tab reopens it – with the saved sheets and dimensions (New drawing creates another drawing).",
   },
   "drawing-ws/sheetAdd": {
     what: "Adds a new sheet with default views; the title block data is taken from the current sheet.",
@@ -499,6 +514,27 @@ export default {
     steps: ["Click + Sheet – the new sheet opens.", "Double-click the sheet tab to rename it."],
     cmd: "drawing sheet new",
     note: "Remove a sheet with the cross on its tab (only when the drawing has more sheets).",
+  },
+  "drawing-ws/exportSheets": {
+    what: "Chooses what PDF, DWG, DXF, SVG and Print save: all sheets of the drawing or only the active sheet.",
+    when: "The whole drawing set at once, or quickly just one sheet.",
+    steps: ["Choose All sheets (default) or Active sheet.", "Click PDF, DWG, DXF, SVG or Print."],
+    cmd: "drawing export dxf all",
+    note: "Shown only for a drawing with more sheets; the choice is remembered.",
+  },
+  "drawing-ws/drawingSel": {
+    what: "Switches to another drawing of this part or assembly; each drawing has its own sheets.",
+    when: "A part with several drawings – production, assembly, blank drawing.",
+    steps: ["Open the list on the left of the sheet bar.", "Choose a drawing – its first sheet opens."],
+    cmd: "drawing drawings 2",
+    note: "Exports carry the drawing name (<name>_Drawing_2_vykres.pdf) – files of different drawings do not overwrite each other.",
+  },
+  "drawing-ws/drawingAdd": {
+    what: "Creates another drawing of this part (Drawing 2…) with one sheet and switches to it.",
+    when: "A second drawing of the same part – assembly, blank, variant for another supplier.",
+    steps: ["Click + Drawing.", "Switch between drawings with the drop-down on the left of the sheet bar."],
+    cmd: "drawing new",
+    note: "Delete a drawing: drawing drawings delete 2, or Ctrl+Z right after creating it (+ Drawing, or New drawing on the Drawing tab).",
   },
 
   // ── Drawing workspace: dimensions and notes ──

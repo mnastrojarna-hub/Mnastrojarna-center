@@ -815,6 +815,7 @@ async function editFeature(res: EditResult, cmd: Extract<EditCmd, { kind: "edit"
       else if (prm.kind === "sketch") v = refTo(v, true);
       else if (prm.kind === "feature") v = refTo(v, false);
       else if (prm.kind === "sketches") v = (Array.isArray(v) ? v : [v]).map((x) => refTo(x, true));
+      else if (prm.kind === "features") v = (Array.isArray(v) ? v : [v]).map((x) => refTo(x, false));
     } else if (path.length === 1 && SKETCH_KEYS.has(path[0])) v = refTo(v, true);
     else if (path.length === 1 && SKETCH_LISTS.has(path[0])) v = (Array.isArray(v) ? v : [v]).map((x) => refTo(x, true));
     else if (pathStr === "featureId") v = refTo(v, false);

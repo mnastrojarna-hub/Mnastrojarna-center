@@ -352,7 +352,6 @@ Text na válci	Text auf Zylinder
 Tloušťka stěn	Wandstärke
 Tolerance tečnosti	Tangententoleranz
 Těleso má nulový objem.	Der Körper hat kein Volumen.
-Těleso není platné: {0}{1}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.	Der Körper ist ungültig: {0}{1}. Versuchen Sie „Flächen zusammenführen“ oder ändern Sie die vorherigen Features.
 Vrtat v kladném směru normály	In positiver Normalenrichtung bohren
 Vyberte dřívější prvek s tělesem (vysunutí, díra, primitivum…).	Wählen Sie ein früheres Feature mit Körper (Extrusion, Bohrung, Grundkörper…).
 Vyberte plochu v modelu.	Wählen Sie eine Fläche im Modell.
@@ -381,7 +380,6 @@ Znovu použít nástroj	Werkzeug wiederverwenden
 Zrcadlení prvků	Features spiegeln
 Zrcadlit prvky	Features spiegeln
 body, středy kružnic	Punkte, Kreismittelpunkte
-eliptická kopule (nebo důlek) na rovinné ploše	elliptische Kuppel (oder Mulde) auf einer ebenen Fläche
 jen pro D × úhel	nur für D × Winkel
 jen pro D1 × D2	nur für D1 × D2
 kopie prvku rozmístěné po dráze ze skici	Instanzen eines Features entlang eines Skizzenpfads
@@ -505,7 +503,6 @@ Uzavřený	Geschlossen
 Velikost (Ø / strana)	Größe (Ø / Seite)
 Vlevo od čáry	Links der Linie
 Vnitřní poloměr	Innenradius
-Vnitřní poloměr (otevřený)	Innenradius (offen)
 Vnitřní poloměr ohybu	Innerer Biegeradius
 Vpravo od čáry	Rechts der Linie
 Vyberte hranu plechu, ze které se má ohyb vytvořit.	Wählen Sie die Blechkante, von der die Biegung ausgehen soll.
@@ -527,7 +524,6 @@ skicu výřezu	die Ausschnittskizze
 tloušťka, poloměr ohybu a K-faktor pro další prvky	Dicke, Biegeradius und K-Faktor für die folgenden Features
 uzavřená skica na ploše plechu → otvor skrz	geschlossene Skizze auf der Blechfläche → Durchbruch
 uzavřená skica → deska o tloušťce plechu	geschlossene Skizze → Platte in Blechdicke
-zahnutý okraj 180° – uzavřený nebo otevřený	um 180° umgelegter Rand – geschlossen oder offen
 Úhel ohybu	Biegewinkel
 Úhel ohybu musí být 1–180°.	Der Biegewinkel muss 1–180° betragen.
 Úleva ohybu	Biegefreistich

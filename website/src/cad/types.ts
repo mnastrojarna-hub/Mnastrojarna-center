@@ -423,6 +423,8 @@ export type DrawingDoc = {
   /** razítko: číslo, autor, revize… */
   meta: Record<string, unknown>;
   annotations: DrawingAnnotation[];
+  /** název výkresu, ke kterému list patří (více výkresů jednoho dílu); chybí = první výkres (cad/drawing-sets.ts) */
+  drawing?: string;
 };
 
 // ---------------- vazby sestavy ----------------

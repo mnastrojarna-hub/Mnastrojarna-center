@@ -249,8 +249,6 @@ Otevřít / Import	Öffnen / Import
 Otevřít / importovat	Öffnen / importieren
 Otevřít / importovat (Ctrl+O)	Öffnen / importieren (Strg+O)
 Otevřít / importovat…	Öffnen / importieren…
-Otevřít podsestavu	Unterbaugruppe öffnen
-Otevřít vybranou	Ausgewählte öffnen
 Otočení (15°)	Drehung (15°)
 Otočení kolem obecné osy nelze uložit – otáčejte po jednom oblouku.	Eine Drehung um eine beliebige Achse kann nicht gespeichert werden – drehen Sie jeweils um einen Bogen.
 Otočit stranu	Seite umdrehen
@@ -288,7 +286,6 @@ Pravý	Rechts
 Primitiva	Grundkörper
 Program	Programm
 Proměnné	Variablen
-Proměnné najdete v levém panelu – záložka Proměnné.	Die Variablen finden Sie im linken Bereich – Registerkarte Variablen.
 Provést příkaz: {0}	Befehl ausführen: {0}
 Pružina	Feder
 Prázdná sestava: komponenty, vazby, podsestavy, kusovník.	Leere Baugruppe: Komponenten, Verknüpfungen, Unterbaugruppen, Stückliste.
@@ -372,7 +369,6 @@ Spodní	Unten
 Správce historie	Historien-Manager
 Srazit	Fasen
 Srazit hranu	Kante fasen
-Stavy (konfigurace) najdete v levém panelu – záložka Stavy.	Konfigurationen finden Sie im linken Bereich – Registerkarte Konfigurationen.
 Stavy dílu	Teilkonfigurationen
 Stavím komponenty…	Komponenten werden aufgebaut…
 Stavím rám formy…	Formaufbau wird aufgebaut…
@@ -425,7 +421,6 @@ Vodicí sloupek	Führungssäule
 Volný text do razítka výkresu, např. ČSN 11 423 nebo 1.0503 – hustota se bere z třídy materiálu výše	Freitext für das Schriftfeld der Zeichnung, z. B. ČSN 11 423 oder 1.0503 – die Dichte stammt aus der Werkstoffklasse oben
 Vyberte dvě rovinné plochy.	Wählen Sie zwei ebene Flächen.
 Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu).	Wählen Sie die zu entfernende Komponente (Klick in der 3D-Ansicht oder im Baum).
-Vyberte komponenty (filtr Komponenta, Ctrl+klik).	Wählen Sie Komponenten (Filter Komponente, Strg+Klick).
 Vyberte plochu (filtr Plocha) a zopakujte příkaz.	Wählen Sie eine Fläche (Filter Fläche) und wiederholen Sie den Befehl.
 Vyberte plochu.	Wählen Sie eine Fläche.
 Vyberte rovinnou plochu.	Wählen Sie eine ebene Fläche.
@@ -435,7 +430,6 @@ Vyhazovač	Auswerfer
 Vyhazování	Auswerfen
 Vysunout	Extrudieren
 Vytvořit podsestavu z vybraných ({0})	Unterbaugruppe aus Auswahl erzeugen ({0})
-Vytvořit z vybraných (Ctrl+klik)	Aus Auswahl erzeugen (Strg+Klick)
 Vytáhnout / Zatlačit	Ziehen / Drücken
 Vzhled	Darstellung
 Výchozí barva	Standardfarbe

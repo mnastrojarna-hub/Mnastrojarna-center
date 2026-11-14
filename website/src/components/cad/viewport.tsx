@@ -760,7 +760,8 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         case "subasm":
           return h && isAsm() ? { kind: "component", compId: h.object.userData.topId ?? h.object.userData.id, topId: h.object.userData.topId, point: pt } : h ? { kind: "body", point: pt } : null;
         case "feature":
-          return h ? { kind: "body", point: pt, ...ids(h.object) } : null;
+          // plocha pod kurzorem – který prvek ji vytvořil, dohledá aplikace (cad.faceOwner); v sestavě jako Těleso
+          return h && faceIdx >= 0 && !isAsm() ? { kind: "face", index: faceIdx, point: pt, ...ids(h.object) } : h ? { kind: "body", point: pt, ...ids(h.object) } : null;
         default: {
           const v = pickVertex(e, h);
           if (v) return v;

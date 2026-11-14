@@ -794,6 +794,14 @@ export function clearBuildCache() {
 }
 /** vstupy na úrovni dokumentu, které mohou ovlivnit geometrii prvků */
 const docKeyOf = (d: CadDoc) => JSON.stringify([d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null, d.material, d.kind ?? "part"]);
+/** Tělesa po jednotlivých prvcích z mezipaměti stavby celého dokumentu (jen ke čtení; filtr výběru Prvek – face-owner.ts). */
+export function cachedSteps(input: CadDoc): { n: number; shapes: Shape[] }[] {
+  const { doc } = resolveDoc(input);
+  const docKey = docKeyOf(doc);
+  const keys = doc.features.map((f) => JSON.stringify(f));
+  const c = chains.find((x) => x.docKey === docKey && x.keys.length === keys.length && x.keys.every((k, i) => k === keys[i]));
+  return (c?.points ?? []).map((p) => ({ n: p.n, shapes: [p.body, ...p.others.map(([, s]) => s)].filter((s): s is Shape => !!s) }));
+}
 
 /**
  * `opts.preferActive`: po stavbě přepne aktivní těleso na `doc.activeBody` (jen pro zobrazení v editoru dílu – aktivní těleso je

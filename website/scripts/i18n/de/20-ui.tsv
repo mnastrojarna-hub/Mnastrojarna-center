@@ -1,0 +1,21 @@
+# Vlna 13 – balík ui: Nástroje / Zobrazení / Data / rychlá lišta (hmotnost sestavy, filtr Prvek, barva komponent, skryté těleso, import do sestavy)
+ (přibližně – stav po prvku není v mezipaměti)	 (ungefähr – der Zustand nach dem Feature ist nicht zwischengespeichert)
+{0} (skryté nezapočteny: {1})	{0} (ausgeblendete nicht gezählt: {1})
+Barva {0}: obarveno komponent {1} (Ctrl+Z vrátí)	Farbe {0}: {1} Komponenten gefärbt (Strg+Z macht rückgängig)
+Barva komponent	Komponentenfarbe
+Hmotnostní vlastnosti sestavy – {0}	Masseeigenschaften der Baugruppe – {0}
+Import do sestavy	In Baugruppe importieren
+Komponenta je ukotvená – polohu a natočení změníte po uvolnění (Ukotvená dole).	Die Komponente ist fixiert – Lage und Drehung ändern Sie nach dem Lösen (Fixiert unten).
+Materiál dílu se mění v dílu (Upravit díl), u importovaného modelu v panelu komponenty. Těžiště je v souřadnicích sestavy.	Den Werkstoff eines Teils ändert man im Teil (Teil bearbeiten), bei einem importierten Modell im Komponentenbereich. Der Schwerpunkt ist in Baugruppenkoordinaten.
+Měřím díly sestavy… {0} / {1}	Messe Teile der Baugruppe… {0} / {1}
+Nezměřeno (není v součtu): {0}	Nicht gemessen (nicht in der Summe): {0}
+Povrch dílů (součet)	Oberfläche der Teile (Summe)
+Proměnné má díl, sestava ne – otevřete díl (jeho záložku nebo Upravit díl v kontextu).	Variablen hat ein Teil, keine Baugruppe – öffnen Sie das Teil (seinen Tab oder Teil bearbeiten im Kontext).
+Prvek „{0}“ – ploch: {1}{2} · klik ve stromu otevře úpravu, Delete ho smaže	Feature „{0}“ – Flächen: {1}{2} · Klick im Baum öffnet die Bearbeitung, Entf löscht es
+Prvek této plochy se nepodařilo určit – vyberte ho ve stromu historie vlevo.	Das Feature dieser Fläche ließ sich nicht bestimmen – wählen Sie es im Historienbaum links.
+Sestava nemá žádný viditelný díl.	Die Baugruppe hat kein sichtbares Teil.
+Stavy (konfigurace) má díl, sestava ne – otevřete díl (jeho záložku nebo Upravit díl v kontextu).	Konfigurationen hat ein Teil, keine Baugruppe – öffnen Sie das Teil (seinen Tab oder Teil bearbeiten im Kontext).
+Těleso je skryté	Körper ist ausgeblendet
+Těžiště X ; Y ; Z	Schwerpunkt X ; Y ; Z
+v nové záložce – STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad	in einem neuen Tab – STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad
+Vlastnosti: klikněte na plochu, hranu, bod, těleso nebo komponentu – údaje se ukážou vpravo dole.	Eigenschaften: Fläche, Kante, Punkt, Körper oder Komponente anklicken – die Daten erscheinen unten rechts.

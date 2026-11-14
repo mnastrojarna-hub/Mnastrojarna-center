@@ -7,12 +7,13 @@
  * replicad/build.ts se načítají líně, aby modul nešel do hlavního balíčku UI.
  */
 import { extDirection, extPoint } from "./place";
-import { tr } from "../i18n";
+import { cadLocale, tr } from "../i18n";
 import type * as R from "replicad";
 import { planeBasis, toWorld } from "../defaults";
+import { noteFeatureWarning } from "../feature-notes";
 import type { CadDoc, Feature, Vec2, Vec3 } from "../types";
 import { registerExt, type ExtBuildCtx, type Shape } from "./registry";
-import { baseFeatureIndex, bendAllowance, bendRadius, flatLayout, sheetParamsAt, type EdgeGeom } from "./sheetmetal-flat";
+import { baseFeatureIndex, bendAllowance, bendRadius, flangeGeometry, flatLayout, sheetParamsAt, type EdgeGeom } from "./sheetmetal-flat";
 
 type Rep = typeof R;
 let repP: Promise<Rep> | null = null;
@@ -184,8 +185,46 @@ const FLANGE_PARAMS = [
   { key: "position", label: tr("Poloha materiálu"), kind: "enum" as const, options: [{ v: "bendOutside", l: tr("Ohyb vně") }, { v: "materialInside", l: tr("Materiál uvnitř") }] },
   { key: "relief", label: tr("Úleva ohybu"), kind: "enum" as const, options: [{ v: "none", l: tr("Žádná") }, { v: "rect", l: tr("Obdélník") }, { v: "obround", l: tr("Oválná") }] },
   { key: "reliefWidth", label: tr("Šířka úlevy"), kind: "number" as const, min: 0.1 },
-  { key: "reliefDepth", label: tr("Hloubka úlevy"), kind: "number" as const, min: 0 },
+  { key: "reliefDepth", label: tr("Hloubka úlevy"), kind: "number" as const, min: 0, hint: tr("za začátek ohybu; 0 = tloušťka plechu") },
 ];
+
+/**
+ * Úleva ohybu z dat prvku: šířka (výchozí t) a hloubka za začátek ohybu (0 = automaticky tloušťka plechu); null = bez úlevy.
+ * Platí pro obě polohy materiálu (Ohyb vně i Materiál uvnitř); lem úlevu nemá.
+ */
+export function flangeRelief(d: Record<string, unknown>, t: number): { rw: number; rd: number } | null {
+  if (!d.relief || d.relief === "none") return null;
+  const rw = num(d.reliefWidth, t);
+  const rd = num(d.reliefDepth, 0);
+  if (!(rw > 0)) throw new Error(tr("Šířka úlevy musí být kladná."));
+  if (rd < 0) throw new Error(tr("Hloubka úlevy nesmí být záporná (0 = tloušťka plechu)."));
+  return { rw, rd: rd > 0 ? rd : t };
+}
+
+/**
+ * Stav polí formuláře Ohyb z hrany / Lem podle ostatních hodnot (vlastní formulář `FlangeForm`): `off` = pole se neuplatní
+ * (zobrazí se zašedlé) a `note` vysvětlí proč nebo co se dopočítá.
+ */
+export function flangeFieldState(ext: string, key: string, d: Record<string, unknown>, p: { t: number; r: number; k: number }): { off?: boolean; note?: string } {
+  if (ext === "sheet.flange") {
+    if ((key === "reliefWidth" || key === "reliefDepth") && (!d.relief || d.relief === "none")) return { off: true, note: tr("nejdřív zvolte Úleva ohybu") };
+    if (key === "reliefDepth") return { note: tr("za začátek ohybu; 0 = tloušťka plechu ({0} mm)", fmtMm(p.t)) };
+    return {};
+  }
+  if (ext !== "sheet.hem") return {};
+  const kind = d.kind ?? "open";
+  if (key === "closeAngle" && kind !== "teardrop") return { off: true, note: tr("jen pro lem Kapka") };
+  if (key === "radius" && kind === "closed") return { off: true, note: tr("uzavřený lem má poloměr 0,1·t") };
+  if (key === "length" && kind === "teardrop") {
+    try {
+      return { off: true, note: tr("kapka: rameno se dotáhne k plechu – {0} mm", fmtMm(flangeGeometry(d, p, true).length)) };
+    } catch (e) {
+      return { off: true, note: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  return {};
+}
+const fmtMm = (v: number) => (Math.round(v * 100) / 100).toLocaleString(cadLocale());
 
 /** Společná stavba ohybu z hrany / lemu. */
 async function buildFlange(d: Record<string, unknown>, ctx: ExtBuildCtx, hem: boolean): Promise<Shape> {
@@ -195,11 +234,9 @@ async function buildFlange(d: Record<string, unknown>, ctx: ExtBuildCtx, hem: bo
   const t = p.t;
   const edges = (d.edges as number[] | undefined) ?? [];
   if (!edges.length) throw new Error(tr("Vyberte hranu plechu, ze které se má ohyb vytvořit."));
-  const angle = hem ? 180 : num(d.angle, 90);
-  if (!(angle > 0 && angle <= 180)) throw new Error(tr("Úhel ohybu musí být 1–180°."));
-  const length = num(d.length, hem ? 10 : 20);
-  if (!(length > 0)) throw new Error(tr("Délka příruby musí být kladná."));
-  const R = hem ? (d.kind === "closed" ? Math.max(0.05, 0.1 * t) : bendRadius(d, p)) : bendRadius(d, p);
+  const { angle, R, length } = flangeGeometry(d, p, hem);
+  if (!(angle > 0 && angle <= (hem ? 270 : 180))) throw new Error(tr("Úhel ohybu musí být 1–180°."));
+  if (!(length > 0) && !(hem && d.kind === "teardrop")) throw new Error(tr("Délka příruby musí být kladná."));
   let body: Shape = ctx.body;
   const infos = [];
   for (const ei of edges) infos.push(await sheetEdge(ctx.body, ei));
@@ -212,32 +249,33 @@ async function buildFlange(d: Record<string, unknown>, ctx: ExtBuildCtx, hem: bo
     const inside = d.position === "materialInside";
     const shift = inside ? R + t : 0;
     const fl = await bendSolid(sub(originIn, mul(w, shift)), w, nEff, u, e.len, angle, R, t, length, 0);
+    // řezné obdélníky v rovině (u, −nEff) nad vnitřní plochou: y ∈ [0, t + 1] pokryje celou tloušťku plechu s přesahem 0,5 mm
+    const slabPlane = (at: number) => new r.Plane(add(add(originIn, mul(nEff, 0.5)), mul(u, at)), u, w);
     if (inside) {
       // odebrat pruh základního plechu, kam se ohyb posunul
-      const plane = new r.Plane(add(originIn, mul(nEff, 0.5)), u, w);
       const cutter = r
         .drawRectangle(e.len + 1, t + 1)
-        .translate(e.len / 2, 0)
-        .sketchOnPlane(plane)
+        .translate(e.len / 2, (t + 1) / 2)
+        .sketchOnPlane(slabPlane(0))
         .extrude(-shift) as Shape;
       body = body.cut(cutter) as Shape;
-      const rw = num(d.reliefWidth, t);
-      const rd = num(d.reliefDepth, 0);
-      if (d.relief && d.relief !== "none" && rw > 0 && rd > 0) {
-        for (const s of [0, e.len - rw]) {
-          const rp = new r.Plane(add(add(originIn, mul(nEff, 0.5)), mul(u, s)), u, w);
-          let rc = r
-            .drawRectangle(rw, t + 1)
-            .translate(rw / 2, 0)
-            .sketchOnPlane(rp)
-            .extrude(-(shift + rd)) as Shape;
-          if (d.relief === "obround") {
-            const cp = new r.Plane(add(add(originIn, mul(nEff, 0.5)), add(mul(u, s + rw / 2), mul(w, -(shift + rd)))), u, nEff);
-            const cyl = r.drawCircle(rw / 2).sketchOnPlane(cp).extrude(-(t + 1)) as Shape;
-            rc = rc.fuse(cyl) as Shape;
-          }
-          body = body.cut(rc) as Shape;
+    }
+    // úleva ohybu (obě polohy materiálu): zářez do základního plechu na obou koncích hrany, hloubka za začátek ohybu
+    const relief = flangeRelief(d, t);
+    if (relief) {
+      const { rw, rd } = relief;
+      for (const s of [0, e.len - rw]) {
+        let rc = r
+          .drawRectangle(rw, t + 1)
+          .translate(rw / 2, (t + 1) / 2)
+          .sketchOnPlane(slabPlane(s))
+          .extrude(-(shift + rd)) as Shape;
+        if (d.relief === "obround") {
+          const cp = new r.Plane(add(add(originIn, mul(nEff, 0.5)), add(mul(u, s + rw / 2), mul(w, -(shift + rd)))), u, nEff);
+          const cyl = r.drawCircle(rw / 2).sketchOnPlane(cp).extrude(-(t + 1)) as Shape;
+          rc = rc.fuse(cyl) as Shape;
         }
+        body = body.cut(rc) as Shape;
       }
     }
     body = body.fuse(fl) as Shape;
@@ -271,15 +309,16 @@ registerExt({
   tab: "sheet",
   group: "Ohyby",
   order: 1,
-  hint: tr("zahnutý okraj 180° – uzavřený nebo otevřený"),
+  hint: tr("zahnutý okraj – otevřený, uzavřený nebo kapka"),
   pick: { kind: "edges", key: "edges" },
   rollback: true,
-  make: (_doc, extra) => ({ edges: (extra?.edges as number[]) ?? [], length: 8, kind: "open", radius: 0, flip: false, position: "bendOutside" }),
+  make: (_doc, extra) => ({ edges: (extra?.edges as number[]) ?? [], length: 8, kind: "open", radius: 0, closeAngle: 30, flip: false, position: "bendOutside" }),
   params: [
     { key: "edges", label: tr("Hrany lemu"), kind: "edges" },
     { key: "length", label: tr("Délka lemu"), kind: "number", min: 0.1 },
     { key: "kind", label: tr("Typ lemu"), kind: "enum", options: [{ v: "open", l: tr("Otevřený") }, { v: "closed", l: tr("Uzavřený") }, { v: "teardrop", l: tr("Kapka") }] },
-    { key: "radius", label: tr("Vnitřní poloměr (otevřený)"), kind: "number", min: 0, step: 0.5, hint: tr("0 = dle parametrů plechu") },
+    { key: "radius", label: tr("Vnitřní poloměr (otevřený, kapka)"), kind: "number", min: 0, step: 0.5, hint: tr("0 = dle parametrů plechu") },
+    { key: "closeAngle", label: tr("Úhel uzavření (kapka)"), kind: "number", unit: "°", min: 5, max: 90, step: 5, hint: tr("ohyb 180° + tento úhel; rameno se vrací šikmo k plechu") },
     { key: "flip", label: tr("Zahnout na opačnou stranu"), kind: "bool" },
   ],
   build: (d, ctx) => buildFlange(d, ctx, true),
@@ -522,6 +561,9 @@ registerExt({
       return { origin: vt(f.center), normal: norm(vt(f.normalAt(f.center))) };
     };
     const lay = await flatLayout(ctx.doc, resolve, ctx.index, resolveFace);
+    // co rozvin vynechal (úleva ohybu, prolisy, neplechové prvky…), ohlásí varování u prvku – ne tichý ✓ (hlásí se až po
+    // vnořených stavbách výše, které hlášky průběžně vybírají)
+    for (const w of lay.warnings) noteFeatureWarning(w);
     const toPen = (segs: typeof lay.outer) => {
       let pen = r.draw(segs[0].a);
       for (const s of segs) pen = s.kind === "line" ? pen.lineTo(s.b) : pen.threePointsArcTo(s.b, s.m);

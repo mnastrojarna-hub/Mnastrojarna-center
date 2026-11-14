@@ -60,9 +60,15 @@ export type ExtParam =
   | { key: string; label: string; kind: "sketches"; hint?: string }
   /** výběr dřívějšího prvku (uloží id) – např. pro pole */
   | { key: string; label: string; kind: "feature"; hint?: string }
+  /** výběr více dřívějších prvků (uloží id[]; text i JSON smí prvek zadat názvem nebo `$last` – převede se na id) */
+  | { key: string; label: string; kind: "features"; hint?: string }
   /** plochy/hrany vybrané v modelu (uloží number[]); UI přepne výběr */
   | { key: string; label: string; kind: "faces" | "edges"; hint?: string }
-  | { key: string; label: string; kind: "mode" }
+  /**
+   * operace Přidat / Odebrat / Průnik. `newLabel` = vlastní význam uložené hodnoty „new“ u starších dokumentů (např. „Nahradit
+   * tělesa“): formulář ji pak ukáže jako čtvrtou volbu, aby odpovídal stavbě; bez `newLabel` se „new“ zobrazí jako Přidat.
+   */
+  | { key: string; label: string; kind: "mode"; newLabel?: string }
   /** rovina zadaná odkazem (plocha, tři body, pomocná rovina…): ukládá `PlaneDef`; prázdné = základní rovina a odsazení prvku */
   | { key: string; label: string; kind: "plane"; hint?: string }
   /** bod zadaný odkazem (vrchol, střed hrany, bod skici…): ukládá `Ref`; prázdné = souřadnice prvku */
@@ -119,6 +125,12 @@ export type ExtDef = {
    * nápověda ve formuláři, kde najít vestavěnou náhradu.
    */
   legacy?: string;
+  /**
+   * Prvek ukládá své nástrojové těleso (`ctx.tools.set(featureId, …)`): lze ho vybrat v Zrcadlit prvky, Znovu použít nástroj
+   * a v poli prvků. Formuláře nabízejí jen prvky rozšíření s tímto příznakem. Funkce = podle dat prvku (profil jako samostatná
+   * tělesa nástroj neukládá) – ptejte se přes `hasExtTool(f)`.
+   */
+  toolBody?: boolean | ((data: Record<string, unknown>) => boolean);
 };
 
 const defs = new Map<string, ExtDef>();
@@ -133,6 +145,19 @@ export const allExt = () => [...defs.values()];
 /** prvky nabízené v UI (pás karet, paleta, zkratky, nápověda) – bez starších duplicit (`legacy`) */
 export const visibleExt = () => allExt().filter((d) => !d.legacy);
 export const extByTab = (tab: ExtTab) => visibleExt().filter((d) => d.tab === tab).sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
+
+/** Uloží prvek nástrojové těleso (`toolBody`), které jde zrcadlit, opakovat v poli nebo znovu použít? Jen prvky rozšíření. */
+export function hasExtTool(f: Feature): boolean {
+  if (f.type !== "ext") return false;
+  const tb = defs.get(f.ext)?.toolBody;
+  return typeof tb === "function" ? tb(f.data ?? {}) : !!tb;
+}
+
+/** Zaregistruje nástrojové těleso prvku (pro Zrcadlit prvky / Pole / Znovu použít nástroj) a vrátí ho beze změny. */
+export function setExtTool(ctx: ExtBuildCtx, tool: Shape, mode: BoolMode): Shape {
+  ctx.tools.set(ctx.featureId, { tool: tool.clone() as Shape, mode });
+  return tool;
+}
 
 /** Prvek rozšíření v dokumentu. */
 export type ExtFeature = Extract<Feature, { type: "ext" }>;

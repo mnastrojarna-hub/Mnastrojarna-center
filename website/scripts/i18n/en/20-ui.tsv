@@ -1,0 +1,21 @@
+# Vlna 13 – balík ui: Nástroje / Zobrazení / Data / rychlá lišta (hmotnost sestavy, filtr Prvek, barva komponent, skryté těleso, import do sestavy)
+ (přibližně – stav po prvku není v mezipaměti)	 (approximate – the state after the feature is not cached)
+{0} (skryté nezapočteny: {1})	{0} (hidden not counted: {1})
+Barva {0}: obarveno komponent {1} (Ctrl+Z vrátí)	Colour {0}: {1} components coloured (Ctrl+Z undoes)
+Barva komponent	Component colour
+Hmotnostní vlastnosti sestavy – {0}	Assembly mass properties – {0}
+Import do sestavy	Import into assembly
+Komponenta je ukotvená – polohu a natočení změníte po uvolnění (Ukotvená dole).	The component is fixed – change its position and rotation after releasing it (Fixed below).
+Materiál dílu se mění v dílu (Upravit díl), u importovaného modelu v panelu komponenty. Těžiště je v souřadnicích sestavy.	A part's material is changed in the part (Edit part), for an imported model in the component panel. The centre of gravity is in assembly coordinates.
+Měřím díly sestavy… {0} / {1}	Measuring assembly parts… {0} / {1}
+Nezměřeno (není v součtu): {0}	Not measured (not in the total): {0}
+Povrch dílů (součet)	Surface of parts (sum)
+Proměnné má díl, sestava ne – otevřete díl (jeho záložku nebo Upravit díl v kontextu).	Variables belong to a part, not to an assembly – open the part (its tab or Edit part in context).
+Prvek „{0}“ – ploch: {1}{2} · klik ve stromu otevře úpravu, Delete ho smaže	Feature “{0}” – faces: {1}{2} · a click in the tree opens it for editing, Delete removes it
+Prvek této plochy se nepodařilo určit – vyberte ho ve stromu historie vlevo.	The feature of this face could not be determined – select it in the history tree on the left.
+Sestava nemá žádný viditelný díl.	The assembly has no visible part.
+Stavy (konfigurace) má díl, sestava ne – otevřete díl (jeho záložku nebo Upravit díl v kontextu).	Configurations belong to a part, not to an assembly – open the part (its tab or Edit part in context).
+Těleso je skryté	Body is hidden
+Těžiště X ; Y ; Z	Centre of gravity X ; Y ; Z
+v nové záložce – STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad	in a new tab – STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, DXF, .mncad
+Vlastnosti: klikněte na plochu, hranu, bod, těleso nebo komponentu – údaje se ukážou vpravo dole.	Properties: click a face, edge, point, body or component – the data appear at the bottom right.

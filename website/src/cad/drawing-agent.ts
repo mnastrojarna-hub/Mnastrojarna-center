@@ -17,6 +17,8 @@ import { applyViewsCmd, viewsStatusLines } from "./drawing-views-agent";
 import { cadLocale, tr } from "./i18n";
 import { MATERIALS } from "../lib/mesh-metrics";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec3 } from "./types";
+import { drawingKey, drawingSets, drawingsLine, inDrawing, nextDrawingName, resolveDrawing, setSheets, sheetCount, sheetPos } from "./drawing-sets";
+import type { DrawingExportResult } from "./drawing-export";
 
 export { annLabel, dimValue, findDims } from "./drawing-marks";
 
@@ -57,18 +59,25 @@ export function activeSheetIndex(doc: CadDoc): number {
   const i = doc.drawings?.findIndex((s) => s.id === activeId) ?? -1;
   return i >= 0 ? i : 0;
 }
-/** popis listu „2 „Detail““ */
-const sheetName = (doc: CadDoc, i: number) => `${i + 1} „${doc.drawings?.[i]?.name ?? tr("List {0}", i + 1)}“`;
-/** Přehled listů: „Listy (2): 1 „List 1“ A3 · 2 „Detail“ auto (aktivní)“. */
+/** popis listu „2 „Detail““ (číslo listu v jeho výkresu) */
+const sheetName = (doc: CadDoc, i: number) => `${sheetPos(doc, i).pos + 1} „${doc.drawings?.[i]?.name ?? tr("List {0}", i + 1)}“`;
+/**
+ * Přehled listů aktivního výkresu: „Listy (2): 1 „List 1“ A3 · 2 „Detail“ auto (aktivní)“; u více výkresů s názvem výkresu
+ * a přehledem výkresů (cad/drawing-sets.ts).
+ */
 export function sheetsLine(doc: CadDoc, active = activeSheetIndex(doc)): string {
   const list = doc.drawings ?? [];
   if (!list.length) return tr("Listy: zatím žádný (první vznikne příkazem výkresu)");
-  return tr("Listy ({0}): {1}", list.length, list.map((s, i) => `${sheetName(doc, i)} ${String((s.options as Partial<DrawingOptions>).sheet ?? "auto")}${i === active ? tr(" (aktivní)") : ""}`).join(" · "));
+  const set = setSheets(doc, active);
+  const line = tr("Listy ({0}): {1}", set.length, set.map((i) => `${sheetName(doc, i)} ${String((list[i].options as Partial<DrawingOptions>).sheet ?? "auto")}${i === active ? tr(" (aktivní)") : ""}`).join(" · "));
+  const sets = drawingSets(doc);
+  return sets.length > 1 ? `${drawingsLine(doc, active)}\n${tr("Výkres „{0}“ – {1}", sets.find((x) => x.sheets.includes(active))?.name ?? "", line)}` : line;
 }
-/** List podle čísla (od 1) nebo názvu – chyba se seznamem listů. */
+/** List aktivního výkresu podle čísla (od 1) nebo názvu → index v doc.drawings – chyba se seznamem listů. */
 export function resolveSheet(doc: CadDoc, ref: SheetRef): number {
   const list = doc.drawings ?? [];
-  const i = typeof ref === "number" ? ref - 1 : list.findIndex((s) => s.name.toLowerCase() === ref.trim().toLowerCase());
+  const set = list.length ? setSheets(doc, activeSheetIndex(doc)) : [];
+  const i = typeof ref === "number" ? (set[ref - 1] ?? -1) : (set.find((k) => list[k].name.toLowerCase() === ref.trim().toLowerCase()) ?? -1);
   if (i >= 0 && i < list.length) return i;
   throw new Error(tr("list {0} neexistuje – {1}; nový list: výkres list nový \"název\"", typeof ref === "number" ? ref : `„${ref}“`, sheetsLine(doc)));
 }
@@ -85,6 +94,18 @@ export function newSheet(doc: CadDoc, n = 1): DrawingDoc {
     meta: { name: doc.name, number: doc.props?.number ?? "", author: doc.props?.author ?? "", revision: doc.props?.revision ?? "", tolerance: "" },
     annotations: [],
   };
+}
+
+/**
+ * Další výkres dílu (tlačítko Nový výkres, `výkres nový`): sada listů s názvem „Výkres N“ (nebo `name`) a s listem 1 –
+ * vrací dokument, id nového listu (otevře se na něm) a název. Díl bez výkresu dostane první výkres.
+ */
+export function addDrawing(doc: CadDoc, name?: string): { doc: CadDoc; sheetId: string; name: string } {
+  const has = !!doc.drawings?.length;
+  const n = name?.trim() || (has ? nextDrawingName(doc) : tr("Výkres 1"));
+  if (drawingSets(doc).some((x) => x.name.toLowerCase() === n.toLowerCase())) throw new Error(tr("výkres „{0}“ už existuje – {1}", n, drawingsLine(doc)));
+  const s = inDrawing(newSheet(doc, 1), !has && n === tr("Výkres 1") ? "" : n);
+  return { doc: { ...doc, drawings: [...(doc.drawings ?? []), s] }, sheetId: s.id, name: n };
 }
 
 /** Volby listu (doplněné o výchozí). */
@@ -109,8 +130,8 @@ export function sheetMeta(doc: CadDoc, s: DrawingDoc, idx = 0, extras?: DrawingE
     material: materialLabel(doc),
     date: m.date || new Date().toLocaleDateString(cadLocale()),
     threads: threadsOfDoc(doc),
-    sheetIndex: idx + 1,
-    sheetCount: Math.max(1, doc.drawings?.length ?? 1),
+    // číslo listu v jeho výkresu (razítko „List 1/2“); list mimo dokument (ještě neuložený první list) = idx
+    ...(doc.drawings?.[idx] ? { sheetIndex: sheetPos(doc, idx).pos + 1, sheetCount: sheetPos(doc, idx).count } : { sheetIndex: idx + 1, sheetCount: Math.max(1, doc.drawings?.length ?? 1) }),
     ...(extras?.massKg !== undefined ? { massKg: extras.massKg } : {}),
     ...(extras?.bom?.length && o.bomTable !== false ? { bom: extras.bom } : {}),
     ...(extras?.balloons?.length ? { components: extras.balloons } : {}),
@@ -193,7 +214,8 @@ export function dimDuplicates(views: PlacedView[], anns: DrawingAnnotation[]): D
 
 // ---------------------------------------------------------------- provedení příkazů
 
-export type DrawingCmdResult = { doc: CadDoc; log: string[]; changed: boolean; open: boolean };
+/** `file` = soubor z `výkres export …` (aplikace ho uloží / stáhne) */
+export type DrawingCmdResult = { doc: CadDoc; log: string[]; changed: boolean; open: boolean; file?: DrawingExportResult };
 
 const TITLE_KEY: Record<TitleField, string> = { name: "název", number: "číslo", author: "kreslil", revision: "revize", date: "datum", material: "materiál", tolerance: "nepředepsané", edges: "hrany", note: "poznámka" };
 const today = () => new Date().toLocaleDateString(cadLocale());
@@ -235,7 +257,7 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
   };
   const done = (r: Omit<DrawingCmdResult, "doc" | "log">): DrawingCmdResult => {
     // u více listů se k výsledku připíše list, se kterým příkaz pracoval
-    if (doc.drawings!.length > 1 && cmd.k !== "sheet" && cmd.k !== "status") {
+    if (setSheets(doc, idx).length > 1 && cmd.k !== "sheet" && cmd.k !== "status") {
       const k = log.findIndex((l) => l.startsWith("✓"));
       if (k >= 0) log[k] += tr(" · list {0}", sheetName(doc, idx));
     }
@@ -350,12 +372,14 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
           break;
         }
         case "new": {
+          // nový list patří do výkresu aktivního listu
           const cur = sheet().meta as Partial<DrawingMeta>;
-          const n = list.length + 1;
+          const set = setSheets(doc, idx);
+          const n = set.length + 1;
           const s = newSheet(doc, n);
           const name = cmd.name?.trim() || s.name;
-          if (list.some((x) => x.name.toLowerCase() === name.toLowerCase())) throw new Error(tr("list „{0}“ už existuje – {1}", name, sheetsLine(doc, idx)));
-          list.push({ ...s, name, meta: { name: cur.name ?? doc.name, number: cur.number ?? "", author: cur.author ?? "", revision: cur.revision ?? "", date: cur.date ?? "", tolerance: cur.tolerance ?? "" } });
+          if (set.some((k) => list[k].name.toLowerCase() === name.toLowerCase())) throw new Error(tr("list „{0}“ už existuje – {1}", name, sheetsLine(doc, idx)));
+          list.push(inDrawing({ ...s, name, meta: { name: cur.name ?? doc.name, number: cur.number ?? "", author: cur.author ?? "", revision: cur.revision ?? "", date: cur.date ?? "", tolerance: cur.tolerance ?? "" } }, drawingKey(sheet())));
           idx = list.length - 1;
           activeSheet.set(sheet().id);
           log.push(tr("✓ nový list {0} (Chytré kóty) – další příkazy výkresu pracují s ním", sheetName(doc, idx)));
@@ -367,17 +391,19 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
           if (!name) throw new Error(tr("název listu nesmí být prázdný"));
           const old = list[i].name;
           list[i] = { ...list[i], name };
-          log.push(tr("✓ list {0}: „{1}“ → „{2}“", i + 1, old, name));
+          log.push(tr("✓ list {0}: „{1}“ → „{2}“", sheetPos(doc, i).pos + 1, old, name));
           return { doc, log, changed: true, open: false };
         }
         case "delete": {
           const i = resolveSheet(doc, cmd.ref);
-          if (list.length <= 1) throw new Error(tr("výkres má jen jeden list – ten smazat nelze"));
+          const set = setSheets(doc, i);
+          if (set.length <= 1) throw new Error(tr("výkres má jen jeden list – ten smazat nelze"));
+          const at = set.indexOf(i);
+          const keep = list[idx === i ? set[at + 1] ?? set[at - 1] : idx];
           const [gone] = list.splice(i, 1);
-          if (i === idx || idx >= list.length) idx = Math.max(0, Math.min(i, list.length - 1));
-          else if (i < idx) idx--;
+          idx = Math.max(0, list.indexOf(keep));
           activeSheet.set(sheet().id);
-          log.push(tr("✓ list {0} „{1}“ smazán – aktivní list {2}", i + 1, gone.name, sheetName(doc, idx)));
+          log.push(tr("✓ list {0} „{1}“ smazán – aktivní list {2}", at + 1, gone.name, sheetName(doc, idx)));
           return { doc, log, changed: true, open: false };
         }
       }
@@ -386,6 +412,62 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
         return { doc: r.doc, log: [...log, ...r.log], changed: true, open: true };
       }
       return { doc, log, changed: true, open: true };
+    }
+    case "drawings": {
+      // více výkresů dílu (cad/drawing-sets.ts): listy nesou název výkresu, příkazy pracují s výkresem aktivního listu
+      const list = doc.drawings!;
+      const sets = () => drawingSets(doc);
+      switch (cmd.op) {
+        case "list":
+          // u více výkresů začíná přehled listů přehledem výkresů – nevypisovat ho dvakrát
+          log.push(...(sets().length > 1 ? [] : [drawingsLine(doc, idx)]), sheetsLine(doc, idx));
+          return { doc, log, changed: created, open: false };
+        case "new": {
+          // díl bez výkresu: první výkres vznikl právě teď (created) – jen dostane název; jinak další výkres s listem 1
+          const name = cmd.name?.trim() || (created ? tr("Výkres 1") : nextDrawingName(doc));
+          if (created) list[0] = inDrawing(list[0], name === tr("Výkres 1") ? "" : name);
+          else list.push(addDrawing(doc, name).doc.drawings!.at(-1)!);
+          idx = created ? 0 : list.length - 1;
+          activeSheet.set(sheet().id);
+          log.push(tr("✓ nový výkres „{0}“ – list 1 „{1}“ (Chytré kóty); další příkazy výkresu pracují s ním · výkresů {2}", name, sheet().name, sets().length));
+          return { doc, log, changed: true, open: true };
+        }
+        case "select": {
+          const set = resolveDrawing(doc, cmd.ref);
+          idx = set.sheets[0];
+          activeSheet.set(sheet().id);
+          log.push(tr("✓ výkres „{0}“ ({1}) – další příkazy výkresu pracují s ním", set.name, sheetCount(set.sheets.length)));
+          return { doc, log, changed: created, open: true };
+        }
+        case "rename": {
+          const set = cmd.ref === undefined ? sets().find((x) => x.sheets.includes(idx))! : resolveDrawing(doc, cmd.ref);
+          const name = cmd.name.trim();
+          if (!name) throw new Error(tr("název výkresu nesmí být prázdný"));
+          if (sets().some((x) => x !== set && x.name.toLowerCase() === name.toLowerCase())) throw new Error(tr("výkres „{0}“ už existuje – {1}", name, drawingsLine(doc, idx)));
+          for (const i of set.sheets) list[i] = inDrawing(list[i], name);
+          log.push(tr("✓ výkres „{0}“ → „{1}“", set.name, name));
+          return { doc, log, changed: true, open: false };
+        }
+        case "delete": {
+          const set = resolveDrawing(doc, cmd.ref);
+          if (sets().length <= 1) throw new Error(tr("dokument má jen jeden výkres – ten smazat nelze (smažte jeho listy nebo kóty)"));
+          const keep = set.sheets.includes(idx) ? null : list[idx];
+          doc.drawings = list.filter((_, i) => !set.sheets.includes(i));
+          idx = keep ? doc.drawings.indexOf(keep) : 0;
+          activeSheet.set(sheet().id);
+          log.push(tr("✓ výkres „{0}“ smazán ({1}) – aktivní výkres „{2}“", set.name, sheetCount(set.sheets.length), sets().find((x) => x.sheets.includes(idx))?.name ?? ""));
+          return { doc, log, changed: true, open: false };
+        }
+      }
+      break;
+    }
+    case "export": {
+      // soubor výkresu jako window.mncad.exportDrawing – aplikace ho uloží (stáhne); bez listu = list se nezakládá
+      const { exportDrawing } = await import("./drawing-export");
+      const r = await exportDrawing(doc0, cmd.format, { sheet: cmd.sheet, ...(cmd.dwgVersion ? { dwgVersion: cmd.dwgVersion as never } : {}) }, compute, extras);
+      log.push(tr("✓ výkres export {0}: {1} ({2} kB{3})", cmd.format.toUpperCase(), r.name, Math.max(1, Math.round(r.bytes / 1024)), r.sheets && r.sheets > 1 ? tr(", listů {0}", r.sheets) : ""));
+      for (const w of r.warnings ?? []) log.push(tr("! {0}", w));
+      return { doc: doc0, log, changed: false, open: false, file: r };
     }
     case "title": {
       const f = cmd.fields;
@@ -580,7 +662,8 @@ export async function drawingStatus(doc0: CadDoc, compute: DrawingCompute, opts:
   if (!doc0.features.length && !doc0.components?.length) return { text: tr("Výkres: model je prázdný – nejdřív vymodelujte díl") };
   const has = !!doc0.drawings?.length;
   const doc: CadDoc = has ? { ...doc0, drawings: [...doc0.drawings!] } : { ...doc0, drawings: [newSheet(doc0)] };
-  const which = opts.sheet === "all" ? doc.drawings!.map((_, i) => i) : [opts.sheet === undefined ? activeSheetIndex(doc) : resolveSheet(doc, opts.sheet)];
+  // „vše“ = všechny listy aktivního výkresu (cad/drawing-sets.ts)
+  const which = opts.sheet === "all" ? setSheets(doc, activeSheetIndex(doc)) : [opts.sheet === undefined ? activeSheetIndex(doc) : resolveSheet(doc, opts.sheet)];
   let changed = false;
   const blocks: string[] = [];
   for (const i of which) {
@@ -607,10 +690,10 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
     }
   }
   const views = res.views;
-  const n = doc.drawings!.length;
+  const { pos, count: n } = sheetPos(doc, idx);
   const L: string[] = [];
   const mode = o.dimensions === "smart" ? tr("Chytré kóty ({0})", o.dimStyle === "baseline" ? tr("od základny") : tr("řetězově")) : o.dimensions === "auto" ? tr("Auto + Ø (zapečené)") : o.dimensions === "overall" ? tr("jen celkové (zapečené)") : tr("bez automatických kót");
-  const where = has ? (n > 1 ? tr(" (list {0}/{1})", idx + 1, n) : "") : tr(" (zatím neuložený – výchozí volby)");
+  const where = has ? (n > 1 ? tr(" (list {0}/{1})", pos + 1, n) : "") : tr(" (zatím neuložený – výchozí volby)");
   L.push(tr("Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}", s.name, where, res.sheet.name, o.orientation === "portrait" ? tr("na výšku") : tr("na šířku"), res.scale, [...views.map((v) => VIEW_NAME(v.key, o)), ...(o.views.iso ? [VIEW_NAME("iso")] : [])].join(", ") || "—", mode));
   if (first) L.push(sheetsLine(doc, activeSheetIndex(doc)));
   const extra = [o.rotation ? tr("otočení {0}°", o.rotation) : "", o.section ? tr("řez {0} {1}", o.section.plane, o.section.kind === "half" ? tr("poloviční") : tr("celý")) : "", o.bomTable === false ? tr("bez kusovníku") : "", o.balloons === false ? tr("bez balónků") : ""].filter(Boolean);

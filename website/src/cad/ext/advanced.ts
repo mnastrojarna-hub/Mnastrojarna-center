@@ -9,8 +9,8 @@ import { tr } from "../i18n";
 import * as r from "replicad";
 import { planeOf, sketchDrawing, sketchPathWire } from "../build";
 import { findLoops, loopPolygon, nestLoops, pointInPolygon } from "../sketch";
-import type { BoolMode, CadDoc, PlaneName, Vec2, Vec3 } from "../types";
-import { registerExt, type ExtBuildCtx, type Shape, type SketchF } from "./registry";
+import type { BoolMode, CadDoc, Feature, PlaneName, Vec2, Vec3 } from "../types";
+import { hasExtTool, registerExt, setExtTool, type ExtBuildCtx, type Shape, type SketchF } from "./registry";
 
 type OC = any; // eslint-disable-line
 const oc = (): OC => r.getOC() as OC;
@@ -287,6 +287,53 @@ registerExt({
 
 // ---------------- 5. zrcadlení prvků ----------------
 
+/**
+ * Prvky, které formulář Zrcadlit prvky nabízí: dřívější prvky kromě skic a rovin – u rozšíření jen ty, které ukládají
+ * nástrojové těleso (`toolBody`: zkrut, kopule, text na válci, lem/drážka, díry v bodech, tažení po šroubovici, profil…).
+ */
+export function mirrorCandidates(doc: Pick<CadDoc, "features">, featureId: string): Feature[] {
+  const idx = doc.features.findIndex((x) => x.id === featureId);
+  return doc.features.slice(0, idx < 0 ? doc.features.length : idx).filter((x) => x.type !== "sketch" && x.type !== "datum" && (x.type !== "ext" || hasExtTool(x)));
+}
+
+/** prvky bez geometrie – těleso nezakládají */
+const NO_GEOMETRY = new Set<Feature["type"]>(["sketch", "datum", "datumAxis", "datumPoint", "csys"]);
+
+/**
+ * „Všechny dosavadní prvky“: nástrojová tělesa dřívějších prvků v pořadí historie BEZ prvků, které těleso zakládají (operace
+ * „new“ = základní / nové těleso, nebo první prvek s geometrií). Zrcadlený základ by se sloučil přes dřívější kapsy a díry
+ * a potichu je zaplnil; celé těleso zrcadlí vestavěné Zrcadlení.
+ */
+export function mirrorAllIds(ctx: Pick<ExtBuildCtx, "doc" | "index" | "tools">): string[] {
+  const out: string[] = [];
+  let geometry = false;
+  for (const f of ctx.doc.features.slice(0, ctx.index)) {
+    if (f.suppressed || NO_GEOMETRY.has(f.type)) continue;
+    const t = ctx.tools.get(f.id);
+    if (t && t.mode !== "new" && geometry) out.push(f.id);
+    geometry = true;
+  }
+  return out;
+}
+
+/**
+ * Výslovně vybrané prvky: id, název (bez ohledu na velikost písmen) nebo `$last`; jedna hodnota i seznam (text, JSON, starší
+ * klíč `feature`). Neznámý název = chyba s nabídkou prvků s tělesem.
+ */
+function mirrorPickedIds(d: Record<string, unknown>, ctx: ExtBuildCtx): string[] {
+  const one = (v: unknown) => (typeof v === "string" && v ? [v] : []);
+  const raw = [...(Array.isArray(d.features) ? d.features : one(d.features)), ...one(d.feature)].map(String);
+  const before = ctx.doc.features.slice(0, ctx.index);
+  const withTool = before.filter((f) => ctx.tools.has(f.id));
+  const low = (x: string) => x.normalize("NFC").trim().toLowerCase();
+  return raw.map((v) => {
+    if (ctx.tools.has(v) || before.some((f) => f.id === v)) return v;
+    const hit = v === "$last" ? withTool[withTool.length - 1] : [...before].reverse().find((f) => low(f.name) === low(v));
+    if (!hit) throw new Error(tr("Prvek „{0}“ v historii před zrcadlením není – prvky s tělesem: {1}", v, withTool.map((f) => f.name).join(", ") || "—"));
+    return hit.id;
+  });
+}
+
 registerExt({
   ext: "adv.mirrorFeatures",
   label: tr("Zrcadlit prvky"),
@@ -299,6 +346,7 @@ registerExt({
   make: () => ({ features: [], all: false, plane: "YZ", offset: 0 }),
   params: [
     { key: "all", label: tr("Všechny dosavadní prvky"), kind: "bool" },
+    { key: "features", label: tr("Prvky k zrcadlení"), kind: "features" },
     { key: "planeDef", label: tr("Rovina odkazem"), kind: "plane", hint: tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže") },
     { key: "plane", label: tr("Rovina zrcadlení"), kind: "enum", options: PLANE_OPTS },
     { key: "offset", label: tr("Odsazení roviny"), kind: "number", step: 1 },
@@ -308,11 +356,13 @@ registerExt({
     const plane = (["XY", "XZ", "YZ"].includes(str(d, "plane")) ? str(d, "plane") : "YZ") as PlaneName;
     const off = num(d, "offset");
     const origin: Vec3 = plane === "YZ" ? [off, 0, 0] : plane === "XZ" ? [0, off, 0] : [0, 0, off];
-    const list = bool(d, "all") ? [...ctx.tools.keys()] : (Array.isArray(d.features) ? (d.features as string[]) : []).concat(typeof d.feature === "string" && d.feature ? [d.feature] : []);
-    if (!list.length) throw new Error(tr("Vyberte prvky, které se mají zrcadlit (nebo zaškrtněte Všechny)."));
+    const all = bool(d, "all");
+    const list = all ? mirrorAllIds(ctx) : mirrorPickedIds(d, ctx);
+    if (!list.length) throw new Error(all ? tr("Kromě základního tělesa tu nejsou žádné prvky k zrcadlení – celé těleso zrcadlí vestavěné Zrcadlení.") : tr("Vyberte prvky, které se mají zrcadlit (nebo zaškrtněte Všechny)."));
     let acc = body;
     for (const id of list) {
-      const t = needTool(ctx, id);
+      const t = ctx.tools.get(id);
+      if (!t) throw new Error(tr("Zrcadlený prvek „{0}“ nemá nástrojové těleso – zrcadlit lze vysunutí, rotace, primitiva, díry, tažení a text.", ctx.doc.features.find((x) => x.id === id)?.name ?? id));
       const m = (hasPlaneDef(d) ? t.tool.clone().mirror(extPlane(d, ctx)) : t.tool.clone().mirror(plane, origin)) as Shape;
       acc = applyMode(acc, m, t.mode === "new" ? "add" : t.mode);
     }
@@ -462,6 +512,7 @@ registerExt({
   group: "Pokročilé tvary",
   big: true,
   hint: tr("vysunutí profilu s otáčením kolem osy (šroubovitá drážka, vrták…)"),
+  toolBody: true,
   make: (doc) => ({ sketch: [...doc.features].reverse().find((f) => f.type === "sketch")?.id ?? "", height: 40, angle: 90, mode: "add" }),
   params: [
     { key: "sketch", label: tr("Profil (skica)"), kind: "sketch" },
@@ -477,7 +528,9 @@ registerExt({
     const dr = sketchDrawing(sk);
     if (!dr) throw new Error(tr("Skica neobsahuje uzavřený profil."));
     const s = dr.sketchOnPlane(planeOf(sk.plane)).extrude(h, { twistAngle: ang }) as Shape;
-    return applyMode(ctx.body, s, modeOf(d, ctx.body ? "add" : "new"));
+    const mode = modeOf(d, ctx.body ? "add" : "new");
+    setExtTool(ctx, s, mode === "new" ? "add" : mode);
+    return applyMode(ctx.body, s, mode);
   },
 });
 
@@ -490,7 +543,8 @@ registerExt({
   tone: "create",
   tab: "create",
   group: "Pokročilé tvary",
-  hint: tr("eliptická kopule (nebo důlek) na rovinné ploše"),
+  hint: tr("eliptická kopule (nebo důlek) na rovinné ploše; Průnik plochu vyklene dovnitř tělesa"),
+  toolBody: true,
   pick: { kind: "faces", key: "faces" },
   rollback: true,
   make: (_doc, extra) => ({ faces: extra?.faces ?? [], height: 10, radius: 0, mode: "add" }),
@@ -510,21 +564,40 @@ registerExt({
     const n = norm(V(face.normalAt(face.center)));
     let R = num(d, "radius");
     if (!(R > 0)) {
-      // vepsaný poloměr: nejmenší vzdálenost středu k hranám plochy
-      R = Math.min(...face.edges.map((e) => Math.min(len(sub(c, V(e.startPoint))), len(sub(c, V(e.endPoint))), len(sub(c, V(e.pointAt(0.5)))))));
+      // vepsaný poloměr: nejmenší vzdálenost středu k hranám VNĚJŠÍHO obrysu plochy (díra uprostřed by dala kopuli jen nad dírou)
+      const outer = (face.clone() as r.Face).outerWire(); // pozor: outerWire() v replicadu plochu maže – proto klon
+      R = Math.min(...outer.edges.map((e) => Math.min(len(sub(c, V(e.startPoint))), len(sub(c, V(e.endPoint))), len(sub(c, V(e.pointAt(0.5)))))));
       if (!(R > 0.01)) throw new Error(tr("Nepodařilo se určit poloměr – zadejte ho ručně."));
     }
+    // základna kopule musí ležet aspoň zčásti na materiálu plochy (ne celá nad dírou / mimo obrys) – jinak by Přidat vytvořil
+    // volné těleso a Průnik potichu odebral celou vrstvu plochy
+    const e = Math.min(h, R) * 0.05;
+    const slab = r.basicFaceExtrusion(face, new r.Vector(mul(n, -e))) as Shape;
+    const disc = r.makeCylinder(R, e, add(c, n, -e), n) as Shape;
+    if (!(r.measureVolume(slab.intersect(disc)) > 1e-3 * Math.PI * R * R * e))
+      throw new Error(tr("Základna kopule (R {0} mm ve středu plochy) leží celá mimo materiál plochy – nad dírou nebo mimo obrys. Zvětšete poloměr.", Math.round(R * 100) / 100));
     const mode = modeOf(d, "add");
-    const dir = mode === "cut" ? mul(n, -1) : n;
-    const wires: r.Wire[] = [];
-    const N = 10;
-    for (let k = 0; k < N; k++) {
-      const z = (h * k) / N;
-      const rk = R * Math.sqrt(Math.max(0, 1 - (z / h) ** 2));
-      wires.push(r.assembleWire([r.makeCircle(Math.max(rk, 1e-3), add(c, dir, z), dir)]));
+    /** eliptická kopule: základna (kruh R) ve středu `at`, vrchol ve výšce h ve směru `dir` */
+    const capAt = (at: Vec3, dir: Vec3) => {
+      const wires: r.Wire[] = [];
+      const N = 10;
+      for (let k = 0; k < N; k++) {
+        const z = (h * k) / N;
+        const rk = R * Math.sqrt(Math.max(0, 1 - (z / h) ** 2));
+        wires.push(r.assembleWire([r.makeCircle(Math.max(rk, 1e-3), add(at, dir, z), dir)]));
+      }
+      return r.loft(wires, { endPoint: add(at, dir, h) }) as Shape;
+    };
+    if (mode === "intersect") {
+      // Průnik = vyklenutí plochy: těleso se ponechá jen pod kopulí s vrcholem v rovině plochy a základnou o h níž; materiál
+      // nad kopulí v obrysu vybrané plochy (do hloubky h) se odebere – mimo obrys plochy zůstane těleso beze změny
+      const prism = r.basicFaceExtrusion(face, new r.Vector(mul(n, -h))) as Shape;
+      const removed = prism.cut(capAt(add(c, n, -h), n));
+      setExtTool(ctx, removed, "cut");
+      return body.cut(removed);
     }
-    const apex = add(c, dir, h);
-    const cap = r.loft(wires, { endPoint: apex }) as Shape;
+    const cap = capAt(c, mode === "cut" ? mul(n, -1) : n);
+    setExtTool(ctx, cap, mode === "cut" ? "cut" : "add");
     return mode === "cut" ? body.cut(cap) : body.fuse(cap);
   },
 });
@@ -575,6 +648,7 @@ registerExt({
   tab: "create",
   group: "Pokročilé tvary",
   hint: tr("vystouplý nebo gravírovaný nápis na válcové ploše (radiální promítnutí)"),
+  toolBody: true,
   pick: { kind: "faces", key: "faces" },
   rollback: true,
   make: (_doc, extra) => ({ faces: extra?.faces ?? [], text: "MNÁSTROJÁRNA", size: 6, depth: 0.6, along: "around", angle: 0, shift: 0, mode: "cut" }),
@@ -639,9 +713,11 @@ registerExt({
     const cylOf = (rad: number) => r.makeCylinder(rad, bigLen, add(loc, dir, axial - bigLen / 2), dir) as Shape;
     if (cut) {
       const tool = ext.cut(cylOf(Math.max(1e-3, R - depth)));
+      setExtTool(ctx, tool, "cut");
       return body.cut(tool);
     }
     const tool = ext.intersect(cylOf(R + depth));
+    setExtTool(ctx, tool, "add");
     return body.fuse(tool);
   },
 });
@@ -706,6 +782,7 @@ registerExt({
   tab: "create",
   group: "Pokročilé tvary",
   hint: tr("vystouplý lem nebo drážka podél obrysu rovinné plochy (dosedání tvárníku a tvárnice)"),
+  toolBody: true,
   pick: { kind: "faces", key: "faces" },
   rollback: true,
   make: (_doc, extra) => ({ faces: extra?.faces ?? [], kind: "lip", width: 3, depth: 2, inset: 0 }),
@@ -778,6 +855,7 @@ registerExt({
     const ring = outerD.cut(innerD);
     const groove = str(d, "kind", "lip") === "groove";
     const tool = ring.sketchOnPlane(plane).extrude(groove ? -depth : depth) as Shape;
+    setExtTool(ctx, tool, groove ? "cut" : "add");
     return groove ? body.cut(tool) : body.fuse(tool);
   },
 });
@@ -820,6 +898,7 @@ registerExt({
   group: "Pokročilé tvary",
   big: true,
   hint: tr("stejná díra v každém bodě (nebo středu kružnice) vybrané skici"),
+  toolBody: true,
   make: (doc) => ({ sketch: [...doc.features].reverse().find((f) => f.type === "sketch")?.id ?? "", diameter: 6.6, depth: 0, cbDiameter: 11, cbDepth: 0, flip: false }),
   params: [
     { key: "sketch", label: tr("Skica s body"), kind: "sketch", hint: tr("body, středy kružnic") },
@@ -888,10 +967,14 @@ registerExt({
 
 // ---------------- 16./17. kontrola a sjednocení geometrie ----------------
 
-/** Zkontroluje platnost tělesa (BRepCheck_Analyzer). Vrací seznam nálezů (prázdný = v pořádku). */
-export function checkShape(body: Shape): string[] {
+/**
+ * Zkontroluje platnost tělesa (BRepCheck_Analyzer). Vrací seznam nálezů (prázdný = v pořádku).
+ * `geometry` = i geometrické kontroly (křivky hran na plochách, SameParameter, protínající se a samy sebe protínající obrysy
+ * ploch); false = jen topologie (uzavřenost skořepin, orientace, návaznost hran a vrcholů) – rychlejší.
+ */
+export function checkShape(body: Shape, geometry = true): string[] {
   const o = oc();
-  const an = new o.BRepCheck_Analyzer(body.wrapped, true);
+  const an = new o.BRepCheck_Analyzer(body.wrapped, geometry);
   try {
     if (an.IsValid()) return [];
     const bad: string[] = [];
@@ -917,11 +1000,12 @@ registerExt({
   big: true,
   hint: tr("ověří platnost tělesa (OpenCascade BRepCheck); chyby se zobrazí u prvku"),
   make: () => ({ strict: true }),
-  params: [{ key: "strict", label: tr("Kontrolovat i geometrii ploch"), kind: "bool" }],
-  build: (_d, ctx) => {
+  params: [{ key: "strict", label: tr("Kontrolovat i geometrii ploch"), kind: "bool", hint: tr("vypnuto = jen topologie (uzavřenost, orientace, návaznost) – rychlejší") }],
+  build: (d, ctx) => {
     const body = needBody(ctx, tr("Kontrola geometrie"));
-    const bad = checkShape(body);
-    if (bad.length) throw new Error(tr("Těleso není platné: {0}{1}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.", bad.slice(0, 6).join(", "), bad.length > 6 ? "…" : ""));
+    const geometry = d.strict !== false; // starší dokumenty bez klíče = s geometrií (jako dřív)
+    const bad = checkShape(body, geometry);
+    if (bad.length) throw new Error(tr("Těleso není platné ({0}): {1}{2}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.", geometry ? tr("topologie i geometrie") : tr("jen topologie"), bad.slice(0, 6).join(", "), bad.length > 6 ? "…" : ""));
     if (!(r.measureVolume(body) > 0)) throw new Error(tr("Těleso má nulový objem."));
     return body; // beze změny (null by těleso odstranilo)
   },

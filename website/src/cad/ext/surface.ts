@@ -14,8 +14,9 @@ import { tr } from "../i18n";
 import * as r from "replicad";
 import { planeOf, sketchDrawing, sketchPathWire } from "../build";
 import { pushPull } from "../direct";
+import { noteFeatureWarning } from "../feature-notes";
 import type { BoolMode, CadDoc, PlaneName, Vec3 } from "../types";
-import { registerExt, type ExtBuildCtx, type Shape, type SketchF } from "./registry";
+import { registerExt, setExtTool, type ExtBuildCtx, type Shape, type SketchF } from "./registry";
 
 type OC = any;
 const oc = (): OC => r.getOC() as OC;
@@ -423,8 +424,15 @@ registerExt({
       }
     });
     const res = offs.length > 1 ? sew(offs) : offs[0];
-    if (d.keepOriginal !== false || sel.length) return withSurface(ctx, res);
-    return replaceFree(ctx, [res]);
+    if (d.keepOriginal !== false) return withSurface(ctx, res);
+    if (!sel.length) return replaceFree(ctx, [res]); // bez výběru: všechny volné plochy nahradí odsazené
+    // vybrané plochy bez zachování: volné plochy se nahradí odsazenými, ostatní volné zůstanou; plocha tělesa (solidu)
+    // zůstat musí – bez ní by těleso přestalo být uzavřené (ohlásí se varováním, ne potichu)
+    const free = freeFaces(ctx.body);
+    const isFree = (f: r.Face) => free.some((x) => x.isSame(f));
+    const inSolid = faces.filter((f) => !isFree(f)).length;
+    if (inSolid) noteFeatureWarning(tr("Původní plochy tělesa ({0}) zůstávají – plochu solidu odstranit nelze; nahrazují se jen volné plochy.", inSolid));
+    return replaceFree(ctx, [...free.filter((x) => !faces.some((f) => f.isSame(x))), res]);
   },
 });
 
@@ -570,10 +578,11 @@ registerExt({
   big: true,
   order: 20,
   hint: tr("uzavřené volné plochy → solid (lze sloučit/odebrat s existujícím tělesem)"),
-  make: () => ({ mode: "new", tolerance: 0.01 }),
+  // výchozí Přidat (jako formulář): bez tělesa v dílu je totéž co dřívější „new“, s tělesem se výsledek sloučí místo náhrady
+  make: () => ({ mode: "add", tolerance: 0.01 }),
   params: [
     { key: "tolerance", label: tr("Tolerance sešití"), kind: "number", min: 0.0001, step: 0.01 },
-    { key: "mode", label: tr("Operace"), kind: "mode" },
+    { key: "mode", label: tr("Operace"), kind: "mode", newLabel: tr("Nahradit tělesa") },
   ],
   build: (d, ctx) => {
     const free = freeFaces(ctx.body);
@@ -592,7 +601,7 @@ registerExt({
       throw new Error(tr("Plochy neuzavírají objem – zkontrolujte, že na sebe navazují (Sešít plochy)."));
     }
     if (!r.isShape3D(solid) || !(Math.abs(r.measureVolume(solid)) > 1e-6)) throw new Error(tr("Plochy neuzavírají objem – chybí některá stěna nebo jsou mezery."));
-    return applySolid(ctx, fixSolid(solid), str(d.mode, "new") as BoolMode, true);
+    return applySolid(ctx, fixSolid(solid), str(d.mode, "add") as BoolMode, true);
   },
 });
 
@@ -606,11 +615,11 @@ registerExt({
   big: true,
   order: 21,
   hint: tr("z volných ploch vznikne solid dané tloušťky"),
-  make: () => ({ thickness: 2, side: "normal", mode: "new" }),
+  make: () => ({ thickness: 2, side: "normal", mode: "add" }),
   params: [
     { key: "thickness", label: tr("Tloušťka"), kind: "number", min: 0.01, step: 0.5 },
     { key: "side", label: tr("Strana"), kind: "enum", options: [{ v: "normal", l: tr("Po normále") }, { v: "reverse", l: tr("Proti normále") }] },
-    { key: "mode", label: tr("Operace"), kind: "mode" },
+    { key: "mode", label: tr("Operace"), kind: "mode", newLabel: tr("Nahradit tělesa") },
   ],
   build: (d, ctx) => {
     const free = freeFaces(ctx.body);
@@ -631,7 +640,7 @@ registerExt({
       mk.delete();
     }
     if (!r.isShape3D(solid) || !(Math.abs(r.measureVolume(solid)) > 1e-6)) throw new Error(tr("Zesílení nevytvořilo objem – zkuste menší tloušťku."));
-    return applySolid(ctx, fixSolid(solid), str(d.mode, "new") as BoolMode, true);
+    return applySolid(ctx, fixSolid(solid), str(d.mode, "add") as BoolMode, true);
   },
 });
 
@@ -837,6 +846,7 @@ registerExt({
   group: "Křivky",
   order: 33,
   hint: tr("profil (kruh, závit 60° nebo skica) tažený po šroubovici – závit, pružina, spirálová drážka"),
+  toolBody: true,
   make: (doc) => ({ profile: "circle", wire: 2, depth: 1.2, side: "external", leadIn: 0, sketchId: lastSketch(doc), radius: 10, pitch: 5, turns: 4, position: [0, 0, 0], axis: { kind: "axis", axis: "Z" }, lefthand: false, mode: "add" }),
   params: [
     { key: "profile", label: tr("Profil"), kind: "enum", options: [{ v: "circle", l: tr("Kruh (drát)") }, { v: "thread60", l: tr("Závit 60°") }, { v: "sketch", l: tr("Skica") }] },
@@ -915,6 +925,7 @@ registerExt({
       return solid;
     };
     const groove = sweep(full, wireFor(full));
+    setExtTool(ctx, groove, mode === "new" ? "add" : mode); // zrcadlení / pole prvků (bez výbrusu náběhu)
     if (leadIn <= 0) return applySolid(ctx, groove, mode);
     // Náběh jako u závitového kalibru: drážka je od začátku plná, ale HŘBET prvního závitu je vybroušený – od začátku
     // šroubovice (hřbet odstraněn až na dno drážky) se během `leadIn` otáček plynule zvedá do plného profilu.

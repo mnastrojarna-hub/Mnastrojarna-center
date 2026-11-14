@@ -12,12 +12,12 @@ export default {
     note: "Najetím na hranu se nabídnou koncové body, střed hrany a střed kružnice.",
   },
   inspect: {
-    what: "Zapíná a vypíná panel s údaji o vybrané entitě: typ, délka, Ø, plocha, normála, souřadnice.",
+    what: "Ukáže panel s údaji o vybrané entitě: typ, délka, Ø, plocha, normála, souřadnice, u komponenty poloha.",
     when: "Rychlé zjištění Ø díry, délky hrany, normály plochy nebo polohy komponenty.",
-    select: "Jednu entitu kliknutím v modelu (plochu, hranu, bod, těleso nebo komponentu).",
-    steps: ["Klikněte na entitu – vpravo dole se ukáže panel s jejími údaji.", "Tlačítkem Vlastnosti panel vypnete, dalším klikem znovu zapnete."],
+    select: "Jednu entitu kliknutím v modelu (plochu, hranu, bod, těleso nebo komponentu), v sestavě i komponentu ve stromu.",
+    steps: ["Vyberte entitu a klikněte na Vlastnosti – vpravo dole se ukáže panel s údaji.", "Zvýrazněné = panel u každého výběru (model i strom sestavy); klik při otevřeném ho skryje."],
     cmd: "měřit F3",
-    note: "Panel je zapnutý od začátku – první klik na tlačítko ho vypne.",
+    note: "Zapnuté je od spuštění programu; skrytí platí do jeho zavření (nebo do dalšího kliku).",
   },
   filter: {
     what: "Určí, co kliknutí v 3D okně vybere: vše, plochu, hranu, bod, těleso, v sestavě komponentu.",
@@ -31,10 +31,10 @@ export default {
     steps: ["Zvolte Vše a klikněte na entitu v modelu."],
   },
   "menu:filter/feature": {
-    what: "Filtr Prvek: kliknutí v 3D okně vybere celé těleso, stejně jako Těleso / tvar.",
-    when: "Prvky historie (díra, vysunutí…) se vybírají ve stromu historie vlevo.",
-    steps: ["Zvolte Prvek.", "Prvek otevřete kliknutím ve stromu historie vlevo."],
-    note: "Kliknutím do modelu se jednotlivý prvek nevybere.",
+    what: "Klik na plochu vybere prvek historie, který ji vytvořil (díru, kapsu, zaoblení…), a zvýrazní všechny jeho plochy.",
+    when: "Najít prvek dílu kliknutím do modelu – pak ho upravit nebo smazat.",
+    steps: ["Zvolte Prvek a klikněte na plochu – prvek se zvýrazní v modelu i ve stromu historie.", "Klik na zvýrazněný řádek ve stromu otevře úpravu; Delete prvek smaže."],
+    note: "Ctrl+klik přidá další prvek. Jen v dílu; Přesunout / otočit na konci historie vlastní všechny plochy.",
   },
   "menu:filter/face": {
     what: "Kliknutí vybere jen plochy modelu.",
@@ -69,11 +69,11 @@ export default {
     note: "Jen v sestavě; díl mimo podsestavu se vybere sám.",
   },
   mass: {
-    what: "Ukáže hmotnost, objem, povrch, rozměry obálky a počet ploch a hran dílu.",
-    when: "Hmotnost do nabídky nebo kusovníku, kontrola objemu, volba materiálu.",
-    steps: ["Klikněte na Hmotnost.", "V poli Materiál zvolte materiál (hustota), případně Označení materiálu (razítko).", "Odečtěte Hmotnost, Objem, Povrch a Rozměry (X × Y × Z)."],
+    what: "Ukáže hmotnost, objem, povrch a rozměry dílu; v sestavě součet dílů podle jejich materiálů a těžiště.",
+    when: "Hmotnost do nabídky nebo kusovníku, kontrola objemu, volba materiálu, těžiště sestavy.",
+    steps: ["Klikněte na Hmotnost.", "Díl: v poli Materiál zvolte materiál (hustota), případně Označení materiálu (razítko).", "Sestava: odečtěte Hmotnost, Těžiště X ; Y ; Z a hmotnosti dílů v tabulce."],
     cmd: "měřit těleso",
-    note: "V sestavě se okno neotevře – hmotnost sestavy je ve štítku dole a v Kusovníku.",
+    note: "V sestavě se skryté komponenty nepočítají; materiál dílu změníte v dílu (Upravit díl).",
   },
   section: {
     what: "Rozřízne zobrazení modelu rovinou – jen pohled, geometrie se nemění.",
@@ -91,18 +91,18 @@ export default {
 
   // ── Nástroje › Parametrizace, Formy ──
   vars: {
-    what: "Ukáže, kde jsou proměnné dílu – pojmenované rozměry, na které se odkazují pole formulářů.",
+    what: "Přepne levý panel na záložku Proměnné – pojmenované rozměry, na které se odkazují pole formulářů.",
     when: "Parametrický díl: změna jednoho rozměru (d, t, L) přepočítá celý model.",
-    steps: ["Klikněte na Proměnné a v levém panelu otevřete záložku Proměnné.", "+ Přidat proměnnou: vyplňte Název a Výraz (např. d*2).", "V poli prvku napište =d nebo výraz (např. =d/2+3)."],
+    steps: ["Klikněte na Proměnné – levý panel ukáže záložku Proměnné.", "+ Přidat proměnnou: vyplňte Název a Výraz (např. d*2).", "V poli prvku napište =d nebo výraz (např. =d/2+3)."],
     cmd: "proměnná d = 20",
-    note: "Tlačítko záložku samo nepřepne, jen ukáže hlášku. Sestava záložku Proměnné nemá.",
+    note: "Jen v dílu – v sestavě je tlačítko neaktivní (sestava proměnné nemá).",
   },
   cfg: {
-    what: "Ukáže, kde jsou stavy dílu (konfigurace) – varianty s jinými hodnotami proměnných a potlačenými prvky.",
+    what: "Přepne levý panel na záložku Stavy – varianty dílu s jinými hodnotami proměnných a potlačenými prvky.",
     when: "Jeden díl ve více provedeních: M8 / M10, s děrami a bez, různé délky.",
-    steps: ["Klikněte na Stavy dílu a v levém panelu otevřete záložku Stavy.", "+ Nový stav z aktuálních hodnot, rozbalte ho a upravte hodnoty a Potlačené prvky.", "Přepínačem u stavu ho aktivujte; Výchozí vrátí původní hodnoty."],
+    steps: ["Klikněte na Stavy dílu – levý panel ukáže záložku Stavy.", "+ Nový stav z aktuálních hodnot, rozbalte ho a upravte hodnoty a Potlačené prvky.", "Přepínačem u stavu ho aktivujte; Výchozí vrátí původní hodnoty."],
     cmd: 'konfigurace "Krátká" t=10',
-    note: "Stavy mění proměnné – nejdřív je založte. Sestava záložku Stavy nemá.",
+    note: "Jen v dílu (v sestavě je tlačítko neaktivní). Stavy mění proměnné – nejdřív je založte.",
   },
   moldtools: {
     what: "Otevře panel pro konstrukci formy: úkosy a podkosy, analýza ploch, smrštění, vyhazovače, chlazení.",
@@ -215,21 +215,21 @@ export default {
     what: "Zapne nebo vypne mřížku a osy souřadnic v 3D okně.",
     when: "Orientace v prostoru, kontrola polohy dílu vůči počátku.",
     steps: ["Klikněte na Mřížka a osy; dalším klikem je skryjete."],
-    note: "Platí jen do zavření programu – po spuštění je mřížka vypnutá.",
+    note: "Volba se uloží do Nastavení (Zobrazení › Mřížka a osy) a platí i po dalším spuštění.",
   },
 
   // ── Zobrazení › Vzhled ──
   color: {
-    what: "Nastaví barvu tělesa dílu – ocel, hliník, mosaz, litina nebo signální barvy.",
-    when: "Odlišení dílů na obrazovce a ve snímcích; barva se uloží s dílem.",
-    steps: ["Otevřete nabídku Barva tělesa.", "Klikněte na barvu – těleso se hned přebarví (Ctrl+Z vrátí)."],
+    what: "Nastaví barvu tělesa dílu, v sestavě barvu vybraných komponent (bez výběru všech).",
+    when: "Odlišení dílů na obrazovce a ve snímcích; barva se uloží s dílem nebo se sestavou.",
+    steps: ["V sestavě nejdřív vyberte komponenty (strom nebo model), jinak se obarví všechny.", "Otevřete nabídku Barva tělesa / Barva komponent a klikněte na barvu (Ctrl+Z vrátí)."],
     cmd: "barva #b9c2cc",
-    note: "Barva nemění materiál ani hmotnost. V sestavě má barvu každá komponenta (panel komponenty).",
+    note: "Barva nemění materiál ani hmotnost. Barva podsestavy se propíše i do jejích dílů.",
   },
   "menu:color/*": {
-    what: "Obarví těleso dílu touto barvou.",
+    what: "Obarví touto barvou těleso dílu, v sestavě vybrané komponenty (bez výběru všechny).",
     when: "Rychlé odlišení dílu nebo materiálu na obrazovce.",
-    steps: ["Klikněte na barvu – změna se uloží do dílu, Ctrl+Z ji vrátí."],
+    steps: ["Klikněte na barvu – změna se uloží, Ctrl+Z ji vrátí."],
     cmd: "barva #b9c2cc",
     note: "Jen vzhled – materiál pro hmotnost se volí zvlášť (Hmotnost, levý panel).",
   },
@@ -287,10 +287,17 @@ export default {
 
   // ── Data › Soubor ──
   open: {
-    what: "Otevře projekt .mncad nebo importuje STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY či DXF.",
+    what: "Otevře projekt .mncad nebo model STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY či DXF v nové záložce.",
     when: "Model od zákazníka, rozpracovaný projekt, výkres DXF jako podklad skici.",
-    steps: ["Klikněte na Otevřít / Import a vyberte jeden nebo více souborů.", "Každý model se otevře ve vlastní záložce; DXF se načte jako skica."],
-    note: "V sestavě se díl nebo model vloží jako komponenta. Soubory lze i přetáhnout do okna.",
+    steps: ["Klikněte na Otevřít / Import (v sestavě Otevřít) a vyberte soubor.", "Model se otevře ve vlastní záložce; DXF se načte jako skica."],
+    note: "Do sestavy soubor vloží Import do sestavy nebo Vložit díl / model; přetažení do okna sestavy ho vloží také.",
+  },
+  importAsm: {
+    what: "Vloží do otevřené sestavy díl .mncad nebo model STEP, IGES, STL… ze souboru jako komponentu.",
+    when: "Skládání sestavy z hotových dílů a nakupovaných modelů bez přepnutí na kartu Sestava.",
+    steps: ["Klikněte na Import do sestavy a vyberte soubor.", "Komponentu umístěte gizmem (Přesunout / otočit) nebo vazbami."],
+    cmd: 'vložit "Deska" v 100 0 0',
+    note: "Totéž jako Vložit díl / model na kartě Sestava; soubor sestavy .mncad se otevře v nové záložce.",
   },
   save: {
     what: "Uloží celý projekt (.mncad) včetně historie prvků, skic a dat importů.",
@@ -373,7 +380,7 @@ export default {
     when: "Rychlý návrh rámu formy kolem tvarové vložky.",
     steps: ["Zadejte Šířka X, Délka Y, tloušťky desek a Ø vodicích sloupků.", "Volitelně Dutina v desce A a Materiál desek.", "Klikněte na Vytvořit rám formy."],
     cmd: "rám formy 246 296",
-    note: "Rám nahradí obsah aktuální záložky (Ctrl+Z vrátí) – nejdřív otevřete prázdnou.",
+    note: "Rám se otevře v nové záložce (jako příkaz rám formy); rozpracovaný dokument zůstane beze změny.",
   },
   ex: {
     what: "Otevře ukázkový díl v nové záložce – příruba, hřídel, úhelník, madlo, čep, přechodový kus.",
@@ -452,7 +459,7 @@ export default {
     what: "Ukazuje souřadnice X ; Y ; Z kliknutého vrcholu přímo na tlačítku.",
     when: "Rychlé odečtení polohy rohu pro díru, skicu nebo kótu.",
     select: "Vrchol (filtr Vše nebo Bod) – lišta se ukáže po kliknutí na něj.",
-    steps: ["Klikněte na vrchol a odečtěte souřadnice na tlačítku.", "Klik na tlačítko obnoví údaje v panelu Vlastnosti."],
+    steps: ["Klikněte na vrchol a odečtěte souřadnice na tlačítku.", "Klik na tlačítko otevře panel Vlastnosti (i skrytý) s údaji o vrcholu."],
     cmd: "měřit V2",
     note: "Hodnoty na tlačítku jsou zaokrouhlené na 2 desetinná místa.",
   },
@@ -469,7 +476,7 @@ export default {
     when: "Pohled na skici, pomocné roviny a osy schované v tělese.",
     select: "Těleso (filtr Těleso / tvar).",
     steps: ["Klikněte na těleso a v liště zvolte Skrýt těleso."],
-    note: "Skryté těleso nejde kliknout, takže ho touto lištou znovu nezobrazíte.",
+    note: "Znovu ho ukáže pruh Těleso je skryté nahoře, oko u názvu dílu ve stromu nebo pravé tlačítko na prázdném místě.",
   },
   "quick/tr": {
     what: "Přepne těleso na poloprůhledné a zpět na neprůhledné – jen zobrazení.",
@@ -569,7 +576,7 @@ export default {
     select: "Komponentu ve stromu sestavy nebo v modelu.",
     steps: ["Vyberte komponentu a klikněte na Přesunout / otočit.", "Táhněte šipky (krok 1 mm) nebo oblouky (15°); R přepne posun/otočení.", "Klikněte na Hotovo."],
     cmd: 'sestava komponenta "Čep" posun 10 0 0',
-    note: "Ukotvenou komponentu je třeba nejdřív uvolnit.",
+    note: "Ukotvenou komponentu je třeba nejdřív uvolnit – gizmo, klávesa G ani pole Poloha ji nepřesunou.",
   },
   "asm/delete": {
     what: "Odebere vybrané komponenty ze sestavy.",
@@ -580,18 +587,18 @@ export default {
     note: "Ctrl+Z odebrání vrátí; potvrzování vypnete v Nastavení › Obecné.",
   },
   sub: {
-    what: "Seskupí komponenty do podsestavy, rozpustí ji nebo ji otevře k úpravě.",
+    what: "Seskupí komponenty do podsestavy, rozpustí ji, upraví ji v kontextu nebo otevře její kopii v nové záložce.",
     when: "Uzel, který se pohybuje nebo opakuje jako celek – vedení, vyhazovací paket.",
-    steps: ["Otevřete nabídku Podsestava.", "Zvolte Vytvořit z vybraných, Rozpustit vybranou nebo Otevřít vybranou."],
+    steps: ["Otevřete nabídku Podsestava.", "Zvolte Vytvořit z vybraných, Rozpustit, Upravit v kontextu nebo Otevřít v nové záložce."],
     cmd: 'sestava podsestava "A" "B" jako "Vedení"',
   },
   "menu:sub/mk": {
-    what: "Z komponent vybraných v modelu vytvoří novou podsestavu (Podsestava 1, 2…).",
+    what: "Z vybraných komponent vytvoří novou podsestavu (Podsestava 1, 2…); počet je v názvu položky.",
     when: "Seskupení dílů uzlu, aby se přesouvaly jako celek.",
-    select: "Komponenty kliknutím v modelu (filtr Komponenta, Ctrl+klik).",
-    steps: ["Ctrl+klikem vyberte komponenty ve 3D okně.", "Zvolte Vytvořit z vybraných (Ctrl+klik)."],
+    select: "Komponenty ve stromu sestavy nebo v modelu; Ctrl+klik přidá další (strom i 3D okno).",
+    steps: ["Klikněte na první komponentu, Ctrl+klikem přidejte další.", "Zvolte Vytvořit z vybraných."],
     cmd: 'sestava podsestava "A" "B"',
-    note: "Počítá se jen výběr ve 3D okně – komponenta vybraná jen ve stromu ne.",
+    note: "Bez výběru je položka neaktivní. Počítá se výběr ve stromu i ve 3D okně.",
   },
   "menu:sub/dis": {
     what: "Rozpustí vybranou podsestavu – její komponenty se vrátí přímo do sestavy.",
@@ -601,10 +608,18 @@ export default {
     cmd: 'sestava rozpustit "Vedení"',
   },
   "menu:sub/open": {
-    what: "Otevře vybranou podsestavu k úpravě v téže záložce (pruh Úprava podsestavy).",
+    what: "Otevře kopii vybrané podsestavy jako samostatnou sestavu v nové záložce.",
+    when: "Výkres nebo kusovník podsestavy, uložení podsestavy jako vlastního souboru .mncad.",
+    select: "Podsestavu (filtr Podsestava nebo ve stromu).",
+    steps: ["Vyberte podsestavu.", "Zvolte Otevřít v nové záložce (kopie)."],
+    cmd: 'sestava otevřít "Vedení"',
+    note: "Je to kopie – změny v nové záložce se do sestavy nepropíší. Úprava v sestavě: Upravit v kontextu.",
+  },
+  "menu:sub/edit": {
+    what: "Upraví vybranou podsestavu přímo v sestavě (pruh Úprava podsestavy) – změny se do sestavy vrátí.",
     when: "Přidání, posun nebo vazby dílů uvnitř podsestavy.",
     select: "Podsestavu (filtr Podsestava nebo ve stromu).",
-    steps: ["Vyberte podsestavu a zvolte Otevřít vybranou.", "Upravte komponenty a klikněte na ← Zpět do sestavy."],
+    steps: ["Vyberte podsestavu a zvolte Upravit v kontextu.", "Upravte komponenty a klikněte na ← Zpět do sestavy."],
     cmd: 'sestava upravit "Vedení"',
   },
 
@@ -614,6 +629,6 @@ export default {
     when: "Návrh dvoudeskové formy kolem tvarové vložky.",
     steps: ["Zadejte Šířka X, Délka Y, tloušťky desek a Ø vodicích sloupků.", "Volitelně Dutina v desce A a Materiál desek.", "Klikněte na Vytvořit rám formy."],
     cmd: "rám formy 246 296",
-    note: "Rám nahradí obsah aktuální záložky (Ctrl+Z vrátí) – vložky přidejte až potom.",
+    note: "Rám se otevře v nové záložce; vložky do něj přidejte až potom (Vložit díl / model).",
   },
 } satisfies Record<string, MicroTip>;

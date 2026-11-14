@@ -2,6 +2,7 @@
 
 import { tr } from "@/cad/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { groupComponents, groupKey, groupLabel } from "@/cad/asm-groups";
 import { defaultMoldBase, type BomRow, type CompPattern, type MoldBaseParams } from "@/cad/assembly";
 import { cad } from "@/cad/client";
 import {
@@ -49,24 +50,24 @@ export function AsmTree({
   menuFor,
   mateStatus,
   onResolve,
+  picked,
 }: {
   doc: CadDoc;
   selected: string | null;
-  onSelect: (id: string | null) => void;
+  /** výběr ve stromu; `add` = Ctrl / ⌘ / Shift + klik (přidat k výběru / ubrat z něj) */
+  onSelect: (id: string | null, add?: boolean) => void;
   onCommit: (d: CadDoc) => void;
   onContext: (x: number, y: number, entries: RMenuEntry[]) => void;
   menuFor: (c: AsmComponent) => RMenuEntry[];
+  /** další vybrané komponenty (Ctrl+klik ve stromu nebo v modelu) – zvýraznění řádků */
+  picked?: readonly string[];
   /** stav trvalých vazeb (z řešiče) */
   mateStatus?: Record<string, MateStatus>;
   /** přepočítat vazby */
   onResolve?: () => void;
 }) {
   const comps = doc.components ?? [];
-  const groups = new Map<string, AsmComponent[]>();
-  for (const c of comps) {
-    const g = c.group || "Díly";
-    groups.set(g, [...(groups.get(g) ?? []), c]);
-  }
+  const groups = groupComponents(comps); // „Normálie“ i „Standard parts“ = jedna skupina (asm-groups.ts)
   const [closed, setClosed] = useState<Record<string, boolean>>({});
   const setComp = (id: string, patch: Partial<AsmComponent>) => onCommit({ ...doc, components: comps.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
   return (
@@ -77,24 +78,27 @@ export function AsmTree({
         <span className="ml-auto font-mono text-[10.5px] font-normal text-[#8a95a3]">{comps.length} ks</span>
       </div>
       {comps.length === 0 && <p className="m-3 rounded border border-dashed border-[#cdd5de] p-3 text-[11.5px] leading-relaxed text-[#6b7785]">{tr("Sestava je prázdná. Na kartě Sestava vložte díl, normálii nebo vygenerujte rám formy.")}</p>}
-      {[...groups.entries()].map(([g, list]) => (
-        <div key={tr(g)} className="ml-3 border-l border-dashed border-[#cdd5de] pl-1">
+      {groups.map(({ key: g, label, items: list }) => (
+        <div key={g} className="ml-3 border-l border-dashed border-[#cdd5de] pl-1">
           <button type="button" onClick={() => setClosed((c) => ({ ...c, [g]: !c[g] }))} className="flex w-full items-center gap-1.5 px-1.5 py-[3px] text-left text-[11.5px] font-semibold text-[#4a5664]">
             <CadIcon name={closed[g] ? "chevronRight" : "chevronDown"} className="h-3 w-3" />
-            {tr(g)}
+            {label}
             <span className="ml-auto pr-2 font-mono text-[10px] font-normal text-[#8a95a3]">{list.length}</span>
           </button>
           {!closed[g] &&
             list.map((c) => (
               <div key={c.id}>
               <div
-                onClick={() => onSelect(c.id === selected ? null : c.id)}
+                onClick={(e) => {
+                  const add = e.ctrlKey || e.metaKey || e.shiftKey;
+                  onSelect(c.id === selected && !add ? null : c.id, add);
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   onSelect(c.id);
                   onContext(e.clientX, e.clientY, menuFor(c));
                 }}
-                className={cn("group ml-3 flex cursor-default items-center gap-2 rounded px-2 py-[3px]", c.id === selected ? "bg-[#dbe7f5]" : "hover:bg-[#edf2f7]", c.hidden && "opacity-45")}
+                className={cn("group ml-3 flex cursor-default items-center gap-2 rounded px-2 py-[3px]", c.id === selected || picked?.includes(c.id) ? "bg-[#dbe7f5]" : "hover:bg-[#edf2f7]", c.hidden && "opacity-45")}
               >
                 {c.source.kind === "asm" ? (
                   <button
@@ -631,8 +635,11 @@ export function AsmProps({
       <TextProp key={`${c.id}:name:${c.name}`} label={tr("Název")} value={c.name} required onCommit={(v) => onChange({ name: v })} />
       <div className="grid grid-cols-2 gap-2">
         <TextProp key={`${c.id}:number:${c.number ?? ""}`} label={tr("Číslo / norma")} value={c.number ?? ""} onCommit={(v) => onChange({ number: v || undefined })} />
-        <TextProp key={`${c.id}:group:${c.group ?? ""}`} label={tr("Skupina")} value={c.group ?? ""} onCommit={(v) => onChange({ group: v || undefined })} />
+        <TextProp key={`${c.id}:group:${c.group ?? ""}`} label={tr("Skupina")} value={c.group ? groupLabel(c.group) : ""} onCommit={(v) => onChange({ group: v.trim() ? groupKey(v) : undefined })} />
       </div>
+      {/* ukotvená komponenta (příznak nebo vazba Ukotvit) se nepřesouvá – jako gizmo a klávesa G; poloha jde změnit po uvolnění */}
+      <fieldset disabled={!!c.fixed || fixedByMate} data-placement-locked={!!c.fixed || fixedByMate || undefined} className="space-y-4 disabled:opacity-55">
+      {(!!c.fixed || fixedByMate) && <p className="rounded bg-[#eef2f6] px-2 py-1 text-[11px] text-[#5b6776]">{tr("Komponenta je ukotvená – polohu a natočení změníte po uvolnění (Ukotvená dole).")}</p>}
       <Vec label={tr("Poloha [mm]")} value={c.placement.position} onChange={(v: Vec3) => onChange({ placement: { ...c.placement, position: v } })} />
       <Vec label={tr("Natočení X / Y / Z [°]")} value={c.placement.rotation} onChange={(v: Vec3) => onChange({ placement: { ...c.placement, rotation: v } })} />
       <div className="grid grid-cols-3 gap-1.5">
@@ -647,6 +654,7 @@ export function AsmProps({
           </button>
         ))}
       </div>
+      </fieldset>
       <div>
         <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Vazby (trvalé – uloží se do sestavy)")}</p>
         <div className="grid grid-cols-3 gap-1.5">

@@ -1,0 +1,29 @@
+# 13. vlna, balík ext: chyby chování prvků rozšíření (Uzavřít do tělesa / Zesílit, Kontrola geometrie, lem Kapka, Kopule Průnik, Zrcadlit prvky, Odsazená plocha, úleva ohybu, DE senkrecht)
+eliptická kopule (nebo důlek) na rovinné ploše; Průnik plochu vyklene dovnitř tělesa	elliptische Kuppel (oder Mulde) auf einer ebenen Fläche; Schnittmenge wölbt die Fläche in den Körper
+Hloubka úlevy nesmí být záporná (0 = tloušťka plechu).	Die Freistichtiefe darf nicht negativ sein (0 = Blechdicke).
+jen pro lem Kapka	nur für den Falz Tropfen
+jen topologie	nur Topologie
+kapka: rameno se dotáhne k plechu – {0} mm	Tropfen: der Schenkel reicht bis zum Blech – {0} mm
+Nahradit tělesa	Körper ersetzen
+nejdřív zvolte Úleva ohybu	zuerst Biegefreistich wählen
+ohyb 180° + tento úhel; rameno se vrací šikmo k plechu	Biegung 180° + dieser Winkel; der Schenkel läuft schräg zum Blech zurück
+Původní plochy tělesa ({0}) zůstávají – plochu solidu odstranit nelze; nahrazují se jen volné plochy.	Die ursprünglichen Körperflächen ({0}) bleiben – eine Fläche eines Volumenkörpers lässt sich nicht entfernen; nur freie Flächen werden ersetzt.
+Šířka úlevy musí být kladná.	Die Freistichbreite muss positiv sein.
+Těleso není platné ({0}): {1}{2}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.	Der Körper ist ungültig ({0}): {1}{2}. Versuchen Sie „Flächen zusammenführen“ oder ändern Sie die vorherigen Features.
+topologie i geometrie	Topologie und Geometrie
+Úhel uzavření (kapka)	Schließwinkel (Tropfen)
+Úhel uzavření kapky musí být 5–90° (zadáno {0}°).	Der Schließwinkel des Tropfens muss 5–90° betragen (angegeben {0}°).
+uzavřený lem má poloměr 0,1·t	ein geschlossener Falz hat den Radius 0,1·t
+vazba „senkrecht“ = kolmo (dvě úsečky: senkrecht e1 e2); pro svislou úsečku nebo dva body nad sebou napište „vertikal“ ({0})	Bedingung „senkrecht“ = rechtwinklig zueinander (zwei Linien: senkrecht e1 e2); für eine vertikale Linie oder zwei Punkte übereinander „vertikal“ schreiben ({0})
+Vnitřní poloměr (otevřený, kapka)	Innenradius (offen, Tropfen)
+vypnuto = jen topologie (uzavřenost, orientace, návaznost) – rychlejší	aus = nur Topologie (Geschlossenheit, Orientierung, Zusammenhang) – schneller
+za začátek ohybu; 0 = tloušťka plechu	über den Biegebeginn hinaus; 0 = Blechdicke
+za začátek ohybu; 0 = tloušťka plechu ({0} mm)	über den Biegebeginn hinaus; 0 = Blechdicke ({0} mm)
+zahnutý okraj – otevřený, uzavřený nebo kapka	umgelegter Rand – offen, geschlossen oder Tropfen
+{0}: úleva ohybu se v rozvinu nekreslí – zářezy doplňte ručně.	{0}: der Biegefreistich wird in der Abwicklung nicht gezeichnet – Einschnitte bitte manuell ergänzen.
+Kromě základního tělesa tu nejsou žádné prvky k zrcadlení – celé těleso zrcadlí vestavěné Zrcadlení.	Außer dem Basiskörper gibt es keine Features zum Spiegeln – den ganzen Körper spiegelt das eingebaute Spiegeln.
+Prvek „{0}“ v historii před zrcadlením není – prvky s tělesem: {1}	Feature „{0}“ steht nicht vor dem Spiegeln in der Historie – Features mit Körper: {1}
+Základna kopule (R {0} mm ve středu plochy) leží celá mimo materiál plochy – nad dírou nebo mimo obrys. Zvětšete poloměr.	Die Kuppelbasis (R {0} mm in der Flächenmitte) liegt ganz außerhalb des Flächenmaterials – über einer Bohrung oder außerhalb der Kontur. Radius vergrößern.
+#!dynamic
+# popisek nástroje skici (TOOL_LABEL v sketcher.tsx, překládá se tr(TOOL_LABEL[t])) – vlastní klíč, „Měřítko“ je měřítko výkresu
+Změnit měřítko	Skalieren

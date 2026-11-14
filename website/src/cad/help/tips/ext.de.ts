@@ -23,9 +23,9 @@ export default {
   "adv.mirrorFeatures": {
     what: "Spiegelt gewählte frühere Features (Extrusionen, Bohrungen…) an einer Ebene – nicht den ganzen Körper.",
     when: "Symmetrisches Teil, bei dem nur einiges gespiegelt wird: Rippen, Taschen oder Bohrungen einer Seite.",
-    steps: ["In Zu spiegelnde Features die Features ankreuzen, oder Alle bisherigen Features.", "Spiegelebene XY / XZ / YZ und Ebenenversatz [mm] wählen.", "Mit OK bestätigen – jedes Feature behält seine Operation Hinzufügen / Entfernen."],
+    steps: ["Zu spiegelnde Features ankreuzen, oder Alle bisherigen Features (ohne den Basiskörper).", "Ebene per Referenz (Fläche, drei Punkte…) oder Spiegelebene XY / XZ / YZ und Versatz.", "Mit OK bestätigen – jedes Feature behält seine Operation Hinzufügen / Entfernen."],
     cmd: "element adv.mirrorFeatures all=ja plane=YZ",
-    note: "Die Liste bietet nur Features mit Körper – keine Skizzen, Ebenen oder Erweiterungs-Features.",
+    note: "Bietet Features mit Körper und Erweiterungen mit Werkzeug (Verdrehung, Kuppel…), keine Skizzen. Den ganzen Körper spiegelt das eingebaute Spiegeln.",
   },
   "adv.scaleAbout": {
     what: "Vergrößert oder verkleinert den ganzen Körper im angegebenen Maßstab um einen Punkt.",
@@ -55,9 +55,9 @@ export default {
     what: "Erzeugt eine elliptische Kuppel in der Mitte einer ebenen Fläche – mit Entfernen eine Mulde.",
     when: "Gewölbter Deckel, Linse, kugelige Tasche oder Mulde in einer ebenen Fläche.",
     select: "Eine ebene Fläche (Filter Fläche) – oder im Formular anklicken.",
-    steps: ["Ebene Fläche wählen und auf Kuppel klicken.", "Kuppelhöhe und Grundradius eingeben (0 = in die Fläche eingeschrieben).", "Operation: Hinzufügen = Kuppel, Entfernen = Mulde; mit OK bestätigen."],
+    steps: ["Ebene Fläche wählen und auf Kuppel klicken.", "Kuppelhöhe und Grundradius eingeben (0 = in die Fläche eingeschrieben).", "Hinzufügen = Kuppel, Entfernen = Mulde, Schnittmenge = Wölbung; OK."],
     cmd: "element adv.dome faces=oben height=8",
-    note: "Die Kuppel sitzt immer in der Flächenmitte; Schnittmenge wirkt wie Hinzufügen.",
+    note: "Die Kuppel sitzt in der Flächenmitte, Radius 0 = bis zur nächsten Außenkante (Bohrungen zählen nicht). Schnittmenge wölbt die Fläche nach innen.",
   },
   "adv.textOnCyl": {
     what: "Graviert oder erhebt eine Beschriftung auf einer Zylinderfläche – Welle, Buchse, Ring.",
@@ -123,7 +123,7 @@ export default {
     select: "Flächen (Filter Fläche); ohne Auswahl werden alle freien Flächen versetzt.",
     steps: ["Flächen wählen (oder keine) und auf Versetzte Fläche klicken.", "Versatz eingeben (negativ = Gegenrichtung).", "Ggf. Ursprüngliche Fläche behalten abwählen, mit OK bestätigen."],
     cmd: "element surf.offset distance=5",
-    note: "Das Original verschwindet nur ohne Auswahl (alle freien Flächen); gewählte Flächen bleiben immer.",
+    note: "Ohne Ursprüngliche Fläche behalten werden gewählte freie Flächen ersetzt; eine Körperfläche bleibt, mit Warnung.",
   },
   "surf.extend": {
     what: "Vergrößert eine Fläche: eine ebene um eine Länge am ganzen Rand, eine gekrümmte in ihren Parametern.",
@@ -167,14 +167,14 @@ export default {
     when: "Das Flächenmodell ist fertig und geschlossen – Umwandlung in einen Körper für Bohrungen, Verrundungen, Zeichnung.",
     steps: ["Auf Zu Körper schließen klicken.", "Bei Lücken die Nähtoleranz erhöhen.", "Operation wählen und mit OK bestätigen."],
     cmd: "element surf.close tolerance=0,01",
-    note: "Hat das Teil schon einen Körper, unter Operation auf Hinzufügen klicken – der Ausgangszustand ersetzt ihn.",
+    note: "Das voreingestellte Hinzufügen vereinigt das Ergebnis mit dem Körper. Ein älteres Feature mit Körper ersetzen ersetzt ihn.",
   },
   "surf.thicken": {
     what: "Macht aus den freien Flächen einen Volumenkörper der angegebenen Dicke.",
     when: "Mit Flächen modelliertes Teil: Haube, Schaufel, Schale aus Kunststoff oder Blech.",
     steps: ["Auf Fläche verdicken klicken und Dicke eingeben.", "Seite: Entlang der Normalen / Gegen die Normale.", "Operation wählen und mit OK bestätigen."],
     cmd: "element surf.thicken thickness=2",
-    note: "Verdickt alle freien Flächen; mit einem Körper im Teil unter Operation auf Hinzufügen klicken.",
+    note: "Verdickt alle freien Flächen; das voreingestellte Hinzufügen vereinigt das Ergebnis mit dem Körper im Teil.",
   },
   "surf.split": {
     what: "Schneidet den Körper mit einer Ebene – behält beide Teile oder nur eine Seite.",
@@ -313,14 +313,14 @@ export default {
     when: "Kastenränder, Winkel, Halter, Lasche – die häufigste Biegung.",
     select: "Gerade Konturkanten des Blechs (Filter Kante) – oder im Formular anklicken.",
     steps: ["Kante wählen und auf Kantenlasche klicken.", "Laschenlänge, Biegewinkel und Innenradius eingeben (0 = aus dem Blech).", "Materiallage wählen, ggf. Zur Gegenseite biegen; OK."],
-    note: "Der Biegefreistich wirkt nur mit Material innen und einer Freistichtiefe größer als 0.",
+    note: "Der Biegefreistich schneidet an beiden Kantenenden ein, in beiden Materiallagen; Freistichtiefe 0 = Blechdicke.",
   },
   "sheet.hem": {
     what: "Faltet die Blechkante um 180° – offener oder geschlossener Falz.",
     when: "Sichere Kante ohne scharfen Rand, Randversteifung, Verbindung zweier Bleche.",
     select: "Gerade Konturkanten des Blechs (Filter Kante) – oder im Formular anklicken.",
-    steps: ["Kante wählen und auf Falz klicken.", "Falzlänge und Falztyp eingeben: Offen / Geschlossen.", "Beim offenen Falz Innenradius, ggf. Zur Gegenseite falzen; OK."],
-    note: "Der Typ Tropfen wird derzeit wie ein offener Falz gebaut.",
+    steps: ["Kante wählen und auf Falz klicken.", "Falzlänge und Falztyp eingeben: Offen / Geschlossen / Tropfen.", "Innenradius (offen, Tropfen), beim Tropfen den Schließwinkel; OK."],
+    note: "Tropfen = Biegung 180° + Schließwinkel; der Schenkel läuft schräg zum Blech zurück, seine Länge wird berechnet.",
   },
   "sheet.bend": {
     what: "Eine Linie in der Skizze teilt das Blech und biegt eine Seite um den angegebenen Winkel.",
@@ -337,7 +337,7 @@ export default {
     when: "Zuschnitt prüfen, Maße für den Laser, Grundlage für die Zeichnung der Abwicklung.",
     steps: ["Auf Abwickeln klicken – das Feature kommt ans Ende der Historie.", "Die gebogene Form kehrt zurück, wenn das Feature Abwickeln unterdrückt wird."],
     cmd: "element sheet.unfold",
-    note: "Features außerhalb der Registerkarte Blech (z. B. Bohrung) fehlen in der Abwicklung – Öffnungen mit Ausschnitt machen.",
+    note: "Features außerhalb der Registerkarte Blech (z. B. Bohrung) und Biegefreistiche fehlen in der Abwicklung, mit Warnung. Öffnungen mit Ausschnitt machen.",
   },
   "sheet.dxf": {
     what: "Speichert die Abwicklung als DXF: Kontur, Öffnungen, Biegelinien und Biegetabelle.",
@@ -531,7 +531,7 @@ export default {
     when: "Nach STEP-Import, nach komplexen booleschen Operationen, vor Export oder Verrundung.",
     steps: ["Auf Geometrieprüfung klicken – das Feature kommt ans Ende der Historie.", "Ein Fehler erscheint am Feature in der Historie mit Flächen- und Kantennummern; ohne Fehler ist der Körper gültig."],
     cmd: "element adv.check",
-    note: "Ändert den Körper nicht. Einen fehlerhaften Körper mit Flächen zusammenführen oder durch Bearbeiten der Features reparieren.",
+    note: "Ändert den Körper nicht. Ohne Auch die Flächengeometrie prüfen nur Topologie (schneller). Reparatur: Flächen zusammenführen.",
   },
   "adv.simplify": {
     what: "Führt benachbarte Flächen und Kanten, die auf derselben Geometrie liegen, zu einer zusammen.",

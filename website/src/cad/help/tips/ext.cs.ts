@@ -23,9 +23,9 @@ export default {
   "adv.mirrorFeatures": {
     what: "Zrcadlí vybrané dřívější prvky (vysunutí, díry…) podle roviny – ne celé těleso.",
     when: "Symetrický díl, kde se má zrcadlit jen část: žebra, kapsy nebo díry z jedné strany.",
-    steps: ["V seznamu Prvky k zrcadlení zaškrtněte prvky, nebo Všechny dosavadní prvky.", "Zvolte Rovina zrcadlení XY / XZ / YZ a Odsazení roviny [mm].", "Potvrďte OK – každý prvek si ponechá svou operaci Přidat / Odebrat."],
+    steps: ["Zaškrtněte Prvky k zrcadlení, nebo Všechny dosavadní prvky (bez základního tělesa).", "Rovina odkazem (plocha, tři body…), nebo Rovina zrcadlení XY / XZ / YZ a Odsazení.", "Potvrďte OK – každý prvek si ponechá svou operaci Přidat / Odebrat."],
     cmd: "prvek adv.mirrorFeatures all=ano plane=YZ",
-    note: "Seznam nabízí jen prvky s tělesem – bez skic, rovin a prvků rozšíření.",
+    note: "Nabízí prvky s tělesem i rozšíření s nástrojem (zkrut, kopule…), ne skici. Celé těleso zrcadlí vestavěné Zrcadlení.",
   },
   "adv.scaleAbout": {
     what: "Zvětší nebo zmenší celé těleso v zadaném měřítku kolem bodu.",
@@ -55,9 +55,9 @@ export default {
     what: "Vytvoří eliptickou kopuli ve středu rovinné plochy – s Odebrat důlek.",
     when: "Vypouklé víko, čočka, kulovitá kapsa nebo důlek v rovné ploše.",
     select: "Jednu rovinnou plochu (filtr Plocha) – nebo ji klikněte ve formuláři.",
-    steps: ["Vyberte rovinnou plochu a klikněte na Kopule.", "Zadejte Výška kopule a Poloměr základny (0 = vepsaný do plochy).", "Operace: Přidat = kopule, Odebrat = důlek; potvrďte OK."],
+    steps: ["Vyberte rovinnou plochu a klikněte na Kopule.", "Zadejte Výška kopule a Poloměr základny (0 = vepsaný do plochy).", "Operace: Přidat = kopule, Odebrat = důlek, Průnik = vyklenutí; OK."],
     cmd: "prvek adv.dome faces=horní height=8",
-    note: "Střed kopule je vždy ve středu plochy; Průnik se chová jako Přidat.",
+    note: "Střed je ve středu plochy, poloměr 0 = k vnější hraně (díry se nepočítají). Průnik vyklene plochu dovnitř tělesa.",
   },
   "adv.textOnCyl": {
     what: "Vygravíruje nebo vytáhne nápis na válcové ploše – hřídel, pouzdro, kroužek.",
@@ -123,7 +123,7 @@ export default {
     select: "Plochy (filtr Plocha); bez výběru se odsadí všechny volné plochy.",
     steps: ["Vyberte plochy (nebo nic) a klikněte na Odsazená plocha.", "Zadejte Odsazení (záporné = opačným směrem).", "Případně odškrtněte Zachovat původní plochu, potvrďte OK."],
     cmd: "prvek surf.offset distance=5",
-    note: "Původní plocha zmizí jen bez výběru (všechny volné plochy); vybrané plochy zůstávají vždy.",
+    note: "Bez Zachovat původní plochu se vybrané volné plochy nahradí odsazenými; plocha tělesa zůstane s varováním.",
   },
   "surf.extend": {
     what: "Zvětší plochu: rovinnou o délku po celém obvodu, zakřivenou v jejích parametrech.",
@@ -167,14 +167,14 @@ export default {
     when: "Plošný model je hotový a uzavřený – převod na solid pro díry, zaoblení, výkres.",
     steps: ["Klikněte na Uzavřít do tělesa.", "Při mezerách zvětšete Tolerance sešití.", "Zvolte Operace a potvrďte OK."],
     cmd: "prvek surf.close tolerance=0,01",
-    note: "Je-li v dílu už těleso, klikněte v Operace na Přidat – výchozí stav ho nahradí.",
+    note: "Výchozí Přidat sloučí výsledek s tělesem v dílu. Starší prvek s volbou Nahradit tělesa dosavadní tělesa nahradí.",
   },
   "surf.thicken": {
     what: "Z volných ploch udělá plné těleso zadané tloušťky.",
     when: "Díl modelovaný plochami: kryt, lopatka, skořepina z plastu nebo plechu.",
     steps: ["Klikněte na Zesílit plochu a zadejte Tloušťka.", "Strana: Po normále / Proti normále.", "Zvolte Operace a potvrďte OK."],
     cmd: "prvek surf.thicken thickness=2",
-    note: "Zesílí všechny volné plochy; s tělesem v dílu klikněte v Operace na Přidat.",
+    note: "Zesílí všechny volné plochy; výchozí Přidat výsledek sloučí s tělesem v dílu.",
   },
   "surf.split": {
     what: "Rozřízne těleso rovinou – ponechá obě části, nebo jen jednu stranu.",
@@ -313,14 +313,14 @@ export default {
     when: "Okraje krabice, úhelník, držák, příložka – nejčastější ohyb.",
     select: "Rovné hrany obrysu plechu (filtr Hrana) – nebo je klikněte ve formuláři.",
     steps: ["Vyberte hranu a klikněte na Ohyb z hrany.", "Zadejte Délka příruby, Úhel ohybu a Vnitřní poloměr (0 = dle plechu).", "Zvolte Poloha materiálu, případně Ohnout na opačnou stranu; OK."],
-    note: "Úleva ohybu se uplatní jen s volbou Materiál uvnitř a Hloubka úlevy větší než 0.",
+    note: "Úleva ohybu vyřízne zářezy na obou koncích hrany v obou polohách materiálu; Hloubka úlevy 0 = tloušťka plechu.",
   },
   "sheet.hem": {
-    what: "Zahne okraj plechu o 180° – otevřený nebo uzavřený lem.",
+    what: "Zahne okraj plechu – otevřený nebo uzavřený lem, nebo kapka.",
     when: "Bezpečný okraj bez ostré hrany, vyztužení okraje, spoj dvou plechů.",
     select: "Rovné hrany obrysu plechu (filtr Hrana) – nebo je klikněte ve formuláři.",
-    steps: ["Vyberte hranu a klikněte na Lem.", "Zadejte Délka lemu a Typ lemu: Otevřený / Uzavřený.", "U otevřeného Vnitřní poloměr, případně Zahnout na opačnou stranu; OK."],
-    note: "Typ Kapka se zatím staví stejně jako otevřený lem.",
+    steps: ["Vyberte hranu a klikněte na Lem.", "Zadejte Délka lemu a Typ lemu: Otevřený / Uzavřený / Kapka.", "Vnitřní poloměr (otevřený, kapka), u kapky Úhel uzavření; OK."],
+    note: "Kapka = ohyb 180° + Úhel uzavření, rameno se vrací šikmo k plechu a jeho délka se dopočítá.",
   },
   "sheet.bend": {
     what: "Úsečka ve skice rozdělí plech a jednu stranu ohne o zadaný úhel.",
@@ -337,7 +337,7 @@ export default {
     when: "Kontrola přířezu, rozměry pro laser, podklad pro výkres rozvinu.",
     steps: ["Klikněte na Rozvinout – prvek se přidá na konec historie.", "Ohnutý tvar vrátíte potlačením prvku Rozvinout."],
     cmd: "prvek sheet.unfold",
-    note: "Prvky mimo kartu Plech (např. Díra) se v rozvinu vynechají – otvory dělejte Výřezem.",
+    note: "Prvky mimo kartu Plech (např. Díra) a úlevy ohybu rozvin vynechá a ohlásí to varováním. Otvory dělejte Výřezem.",
   },
   "sheet.dxf": {
     what: "Uloží rozvin do DXF: obrys, otvory, čáry ohybů a tabulku ohybů.",
@@ -531,7 +531,7 @@ export default {
     when: "Po importu STEP, po složitých booleovských operacích, před exportem nebo zaoblením.",
     steps: ["Klikněte na Kontrola geometrie – prvek se přidá na konec historie.", "Chyba se ukáže u prvku v historii s čísly ploch a hran; bez chyby je těleso v pořádku."],
     cmd: "prvek adv.check",
-    note: "Těleso nemění. Vadné těleso zkuste opravit Sjednotit plochy nebo úpravou prvků.",
+    note: "Těleso nemění. Bez Kontrolovat i geometrii ploch jen topologie (rychlejší). Opravy: Sjednotit plochy.",
   },
   "adv.simplify": {
     what: "Sloučí sousední plochy a hrany, které leží na stejné geometrii, do jedné.",
