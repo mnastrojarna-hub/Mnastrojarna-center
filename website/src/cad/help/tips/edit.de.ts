@@ -12,12 +12,12 @@ export default {
     note: "Beim Überfahren einer Kante werden Endpunkte, Kantenmitte und Kreismittelpunkt angeboten.",
   },
   inspect: {
-    what: "Schaltet den Bereich mit Daten zum gewählten Objekt ein und aus: Typ, Länge, Ø, Fläche, Normale, Koordinaten.",
+    what: "Zeigt einen Bereich mit Daten zum gewählten Objekt: Typ, Länge, Ø, Fläche, Normale, Koordinaten, Lage der Komponente.",
     when: "Schnell Bohrungs-Ø, Kantenlänge, Flächennormale oder Lage einer Komponente ablesen.",
-    select: "Ein Objekt im Modell anklicken (Fläche, Kante, Punkt, Körper oder Komponente).",
-    steps: ["Objekt anklicken – unten rechts erscheint ein Bereich mit seinen Daten.", "Die Schaltfläche Eigenschaften blendet ihn aus, ein weiterer Klick wieder ein."],
+    select: "Ein Objekt im Modell anklicken (Fläche, Kante, Punkt, Körper oder Komponente), in der Baugruppe auch eine Komponente im Baum.",
+    steps: ["Objekt wählen und auf Eigenschaften klicken – unten rechts erscheint ein Bereich mit seinen Daten.", "Hervorgehoben = Bereich bei jeder Auswahl (Modell oder Baugruppenbaum); Klick bei offenem Bereich blendet ihn aus."],
     cmd: "messen F3",
-    note: "Der Bereich ist von Anfang an eingeschaltet – der erste Klick auf die Schaltfläche schaltet ihn aus.",
+    note: "Ab Programmstart eingeschaltet; das Ausblenden gilt bis zum Schließen (oder bis zum nächsten Klick).",
   },
   filter: {
     what: "Legt fest, was ein Klick im 3D-Fenster wählt: alles, Fläche, Kante, Punkt, Körper, in der Baugruppe Komponente.",
@@ -31,10 +31,10 @@ export default {
     steps: ["Alle wählen und ein Objekt im Modell anklicken."],
   },
   "menu:filter/feature": {
-    what: "Filter Feature: ein Klick im 3D-Fenster wählt den ganzen Körper, genau wie Körper / Form.",
-    when: "Features der Historie (Bohrung, Extrusion…) wählt man im Historienbaum links.",
-    steps: ["Feature wählen.", "Ein Feature durch Klick im Historienbaum links öffnen."],
-    note: "Ein Klick ins Modell wählt kein einzelnes Feature.",
+    what: "Ein Klick auf eine Fläche wählt das Feature der Historie, das sie erzeugt hat (Bohrung, Tasche, Verrundung…), und hebt alle seine Flächen hervor.",
+    when: "Ein Feature des Teils per Klick ins Modell finden – dann bearbeiten oder löschen.",
+    steps: ["Feature wählen und auf eine Fläche klicken – das Feature wird im Modell und im Historienbaum hervorgehoben.", "Klick auf die hervorgehobene Zeile im Baum öffnet die Bearbeitung; Entf löscht das Feature."],
+    note: "Strg+Klick fügt ein weiteres Feature hinzu. Nur im Teil; Verschieben / drehen am Ende der Historie besitzt alle Flächen.",
   },
   "menu:filter/face": {
     what: "Ein Klick wählt nur Flächen des Modells.",
@@ -69,11 +69,11 @@ export default {
     note: "Nur in der Baugruppe; ein Teil außerhalb einer Unterbaugruppe wird allein gewählt.",
   },
   mass: {
-    what: "Zeigt Masse, Volumen, Oberfläche, Hüllquader sowie Anzahl der Flächen und Kanten des Teils.",
-    when: "Masse für Angebot oder Stückliste, Volumen prüfen, Werkstoff wählen.",
-    steps: ["Auf Masse klicken.", "Im Feld Werkstoff den Werkstoff (Dichte) wählen, ggf. Werkstoffbezeichnung (Schriftfeld).", "Masse, Volumen, Oberfläche und Abmessungen (X × Y × Z) ablesen."],
+    what: "Zeigt Masse, Volumen, Oberfläche und Abmessungen des Teils; in der Baugruppe die Summe der Teile nach Werkstoff und den Schwerpunkt.",
+    when: "Masse für Angebot oder Stückliste, Volumen prüfen, Werkstoff wählen, Schwerpunkt der Baugruppe.",
+    steps: ["Auf Masse klicken.", "Teil: im Feld Werkstoff den Werkstoff (Dichte) wählen, ggf. Werkstoffbezeichnung (Schriftfeld).", "Baugruppe: Masse, Schwerpunkt X ; Y ; Z und die Teilmassen in der Tabelle ablesen."],
     cmd: "messen körper",
-    note: "In der Baugruppe öffnet sich das Fenster nicht – die Baugruppenmasse steht im Infochip unten und in der Stückliste.",
+    note: "Ausgeblendete Komponenten zählen in der Baugruppe nicht; den Werkstoff ändert man im Teil (Teil bearbeiten).",
   },
   section: {
     what: "Schneidet die Modellanzeige mit einer Ebene – nur Ansicht, die Geometrie ändert sich nicht.",
@@ -91,18 +91,18 @@ export default {
 
   // ── Werkzeuge › Parametrisierung, Formen ──
   vars: {
-    what: "Zeigt, wo die Variablen des Teils sind – benannte Maße, auf die sich Formularfelder beziehen.",
+    what: "Schaltet den linken Bereich auf die Registerkarte Variablen – benannte Maße, auf die sich Formularfelder beziehen.",
     when: "Parametrisches Teil: Ändern eines Maßes (d, t, L) berechnet das ganze Modell neu.",
-    steps: ["Auf Variablen klicken und im linken Bereich die Registerkarte Variablen öffnen.", "+ Variable hinzufügen: Namen und Ausdruck (z. B. d*2) eintragen.", "Im Feld eines Features =d oder einen Ausdruck schreiben (z. B. =d/2+3)."],
+    steps: ["Auf Variablen klicken – der linke Bereich zeigt die Registerkarte Variablen.", "+ Variable hinzufügen: Namen und Ausdruck (z. B. d*2) eintragen.", "Im Feld eines Features =d oder einen Ausdruck schreiben (z. B. =d/2+3)."],
     cmd: "variable d = 20",
-    note: "Die Schaltfläche wechselt die Registerkarte nicht selbst, sie zeigt nur eine Meldung. Die Baugruppe hat keine Variablen.",
+    note: "Nur im Teil – in der Baugruppe ist die Schaltfläche inaktiv (die Baugruppe hat keine Variablen).",
   },
   cfg: {
-    what: "Zeigt, wo die Teilkonfigurationen sind – Varianten mit anderen Variablenwerten und unterdrückten Features.",
+    what: "Schaltet den linken Bereich auf die Registerkarte Konfigurationen – Teilvarianten mit anderen Variablenwerten und unterdrückten Features.",
     when: "Ein Teil in mehreren Ausführungen: M8 / M10, mit und ohne Bohrungen, verschiedene Längen.",
-    steps: ["Auf Teilkonfigurationen klicken und links die Registerkarte Konfigurationen öffnen.", "+ Neue Konfiguration aus aktuellen Werten, aufklappen, Werte und Unterdrückte Features ändern.", "Mit dem Optionsfeld aktivieren; Standard stellt die ursprünglichen Werte her."],
+    steps: ["Auf Teilkonfigurationen klicken – der linke Bereich zeigt die Registerkarte Konfigurationen.", "+ Neue Konfiguration aus aktuellen Werten, aufklappen, Werte und Unterdrückte Features ändern.", "Mit dem Optionsfeld aktivieren; Standard stellt die ursprünglichen Werte her."],
     cmd: 'konfiguration "Kurz" t=10',
-    note: "Konfigurationen ändern Variablen – diese zuerst anlegen. Die Baugruppe hat keine Konfigurationen.",
+    note: "Nur im Teil (in der Baugruppe inaktiv). Konfigurationen ändern Variablen – diese zuerst anlegen.",
   },
   moldtools: {
     what: "Öffnet den Bereich für den Formenbau: Entformungsschrägen und Hinterschnitte, Flächenanalyse, Schwindung, Auswerfer, Kühlung.",
@@ -215,21 +215,21 @@ export default {
     what: "Blendet Raster und Koordinatenachsen im 3D-Fenster ein oder aus.",
     when: "Orientierung im Raum, Lage des Teils zum Ursprung prüfen.",
     steps: ["Auf Raster und Achsen klicken; ein weiterer Klick blendet sie aus."],
-    note: "Gilt nur bis zum Schließen des Programms – nach dem Start ist das Raster aus.",
+    note: "Die Wahl wird in den Einstellungen gespeichert (Anzeige › Raster und Achsen) und gilt auch nach dem nächsten Start.",
   },
 
   // ── Ansicht › Darstellung ──
   color: {
-    what: "Setzt die Körperfarbe des Teils – Stahl, Aluminium, Messing, Gusseisen oder Signalfarben.",
-    when: "Teile am Bildschirm und auf Bildern unterscheiden; die Farbe wird mit dem Teil gespeichert.",
-    steps: ["Menü Körperfarbe öffnen.", "Farbe anklicken – der Körper wird sofort umgefärbt (Strg+Z macht rückgängig)."],
+    what: "Setzt die Körperfarbe des Teils, in der Baugruppe die Farbe der gewählten Komponenten (ohne Auswahl aller).",
+    when: "Teile am Bildschirm und auf Bildern unterscheiden; die Farbe wird mit Teil oder Baugruppe gespeichert.",
+    steps: ["In der Baugruppe zuerst Komponenten wählen (Baum oder Modell), sonst werden alle gefärbt.", "Menü Körperfarbe / Komponentenfarbe öffnen und Farbe anklicken (Strg+Z macht rückgängig)."],
     cmd: "farbe #b9c2cc",
-    note: "Die Farbe ändert weder Werkstoff noch Masse. In der Baugruppe hat jede Komponente ihre Farbe (Komponentenbereich).",
+    note: "Die Farbe ändert weder Werkstoff noch Masse. Die Farbe einer Unterbaugruppe geht auch auf ihre Teile über.",
   },
   "menu:color/*": {
-    what: "Färbt den Körper des Teils in dieser Farbe.",
+    what: "Färbt den Körper des Teils, in der Baugruppe die gewählten Komponenten (ohne Auswahl alle), in dieser Farbe.",
     when: "Teil oder Werkstoff am Bildschirm schnell unterscheiden.",
-    steps: ["Farbe anklicken – die Änderung wird im Teil gespeichert, Strg+Z macht sie rückgängig."],
+    steps: ["Farbe anklicken – die Änderung wird gespeichert, Strg+Z macht sie rückgängig."],
     cmd: "farbe #b9c2cc",
     note: "Nur Aussehen – der Werkstoff für die Masse wird getrennt gewählt (Masse, linker Bereich).",
   },
@@ -287,10 +287,17 @@ export default {
 
   // ── Daten › Datei ──
   open: {
-    what: "Öffnet ein .mncad-Projekt oder importiert STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY oder DXF.",
+    what: "Öffnet ein .mncad-Projekt oder ein Modell STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY oder DXF in einem neuen Tab.",
     when: "Modell vom Kunden, laufendes Projekt, DXF-Zeichnung als Skizzenunterlage.",
-    steps: ["Auf Öffnen / Import klicken und eine oder mehrere Dateien wählen.", "Jedes Modell öffnet sich in einem eigenen Tab; DXF wird als Skizze geladen."],
-    note: "In der Baugruppe wird ein Teil oder Modell als Komponente eingefügt. Dateien lassen sich auch ins Fenster ziehen.",
+    steps: ["Auf Öffnen / Import (in der Baugruppe Öffnen) klicken und eine Datei wählen.", "Das Modell öffnet sich in einem eigenen Tab; DXF wird als Skizze geladen."],
+    note: "In die Baugruppe fügen In Baugruppe importieren oder Teil / Modell einfügen ein; Ziehen ins Baugruppenfenster auch.",
+  },
+  importAsm: {
+    what: "Fügt ein .mncad-Teil oder ein Modell STEP, IGES, STL… aus einer Datei als Komponente in die offene Baugruppe ein.",
+    when: "Baugruppe aus fertigen Teilen und Kaufteilen aufbauen, ohne zur Registerkarte Baugruppe zu wechseln.",
+    steps: ["Auf In Baugruppe importieren klicken und eine Datei wählen.", "Komponente mit dem Gizmo (Verschieben / drehen) oder mit Verknüpfungen platzieren."],
+    cmd: 'einfügen "Platte" bei 100 0 0',
+    note: "Wie Teil / Modell einfügen auf der Registerkarte Baugruppe; eine .mncad-Baugruppe öffnet sich in einem neuen Tab.",
   },
   save: {
     what: "Speichert das ganze Projekt (.mncad) mit Feature-Historie, Skizzen und Importdaten.",
@@ -373,7 +380,7 @@ export default {
     when: "Schneller Entwurf eines Formaufbaus um einen Formeinsatz.",
     steps: ["Breite X, Länge Y, Plattendicken und Ø Führungssäulen eingeben.", "Optional Kavität in Platte A und Plattenwerkstoff.", "Auf Formaufbau erzeugen klicken."],
     cmd: "formaufbau 246 296",
-    note: "Der Formaufbau ersetzt den Inhalt des aktuellen Tabs (Strg+Z macht rückgängig) – zuerst einen leeren öffnen.",
+    note: "Der Formaufbau öffnet sich in einem neuen Tab (wie der Befehl formaufbau); das laufende Dokument bleibt unverändert.",
   },
   ex: {
     what: "Öffnet ein Beispielteil in einem neuen Tab – Flansch, Welle, Winkel, Griff, Bolzen, Übergangsstück.",
@@ -452,7 +459,7 @@ export default {
     what: "Zeigt die Koordinaten X ; Y ; Z des angeklickten Eckpunkts direkt auf der Schaltfläche.",
     when: "Schnelles Ablesen der Lage einer Ecke für Bohrung, Skizze oder Maß.",
     select: "Einen Eckpunkt (Filter Alle oder Punkt) – die Leiste erscheint nach Klick darauf.",
-    steps: ["Eckpunkt anklicken und die Koordinaten auf der Schaltfläche ablesen.", "Klick auf die Schaltfläche aktualisiert die Daten im Bereich Eigenschaften."],
+    steps: ["Eckpunkt anklicken und die Koordinaten auf der Schaltfläche ablesen.", "Klick auf die Schaltfläche öffnet den Bereich Eigenschaften (auch einen ausgeblendeten) mit den Punktdaten."],
     cmd: "messen V2",
     note: "Die Werte auf der Schaltfläche sind auf 2 Dezimalstellen gerundet.",
   },
@@ -469,7 +476,7 @@ export default {
     when: "Blick auf Skizzen, Hilfsebenen und Achsen, die im Körper verborgen sind.",
     select: "Den Körper (Filter Körper / Form).",
     steps: ["Körper anklicken und in der Leiste Körper ausblenden wählen."],
-    note: "Ein ausgeblendeter Körper lässt sich nicht anklicken, diese Leiste blendet ihn also nicht wieder ein.",
+    note: "Wieder einblenden: Leiste Körper ist ausgeblendet oben, Auge neben dem Teilnamen im Baum oder Rechtsklick auf leere Stelle.",
   },
   "quick/tr": {
     what: "Schaltet den Körper halbtransparent und zurück auf undurchsichtig – nur Anzeige.",
@@ -569,7 +576,7 @@ export default {
     select: "Eine Komponente im Baugruppenbaum oder im Modell.",
     steps: ["Komponente wählen und auf Verschieben / drehen klicken.", "Pfeile (Schritt 1 mm) oder Bögen (15°) ziehen; R schaltet um.", "Auf Fertig klicken."],
     cmd: 'baugruppe komponente "Stift" verschieben 10 0 0',
-    note: "Eine fixierte Komponente muss zuerst gelöst werden.",
+    note: "Eine fixierte Komponente muss zuerst gelöst werden – Gizmo, Taste G und Feld Lage verschieben sie nicht.",
   },
   "asm/delete": {
     what: "Entfernt die gewählten Komponenten aus der Baugruppe.",
@@ -580,18 +587,18 @@ export default {
     note: "Strg+Z macht das Entfernen rückgängig; die Rückfrage schalten Sie unter Einstellungen › Allgemein ab.",
   },
   sub: {
-    what: "Fasst Komponenten zu einer Unterbaugruppe zusammen, löst sie auf oder öffnet sie zum Bearbeiten.",
+    what: "Fasst Komponenten zu einer Unterbaugruppe zusammen, löst sie auf, bearbeitet sie im Kontext oder öffnet eine Kopie.",
     when: "Eine Einheit, die sich als Ganzes bewegt oder wiederholt – Führung, Auswerferpaket.",
-    steps: ["Menü Unterbaugruppe öffnen.", "Aus Auswahl erzeugen, Ausgewählte auflösen oder Ausgewählte öffnen wählen."],
+    steps: ["Menü Unterbaugruppe öffnen.", "Aus Auswahl erzeugen, Auflösen, Im Kontext bearbeiten oder In neuem Tab öffnen wählen."],
     cmd: 'baugruppe unterbaugruppe "A" "B" als "Führung"',
   },
   "menu:sub/mk": {
-    what: "Erzeugt aus den im Modell gewählten Komponenten eine neue Unterbaugruppe (Unterbaugruppe 1, 2…).",
+    what: "Erzeugt aus den gewählten Komponenten eine neue Unterbaugruppe (Unterbaugruppe 1, 2…); die Anzahl steht im Eintrag.",
     when: "Teile einer Einheit gruppieren, damit sie sich als Ganzes bewegen.",
-    select: "Komponenten per Klick im Modell (Filter Komponente, Strg+Klick).",
-    steps: ["Komponenten im 3D-Fenster mit Strg+Klick wählen.", "Aus Auswahl erzeugen (Strg+Klick) wählen."],
+    select: "Komponenten im Baugruppenbaum oder im Modell; Strg+Klick fügt weitere hinzu (Baum und 3D-Fenster).",
+    steps: ["Erste Komponente anklicken, weitere mit Strg+Klick hinzufügen.", "Aus Auswahl erzeugen wählen."],
     cmd: 'baugruppe unterbaugruppe "A" "B"',
-    note: "Es zählt nur die Auswahl im 3D-Fenster – eine nur im Baum gewählte Komponente nicht.",
+    note: "Ohne Auswahl ist der Eintrag inaktiv. Es zählt die Auswahl im Baum und im 3D-Fenster.",
   },
   "menu:sub/dis": {
     what: "Löst die gewählte Unterbaugruppe auf – ihre Komponenten kehren direkt in die Baugruppe zurück.",
@@ -601,10 +608,18 @@ export default {
     cmd: 'baugruppe auflösen "Führung"',
   },
   "menu:sub/open": {
-    what: "Öffnet die gewählte Unterbaugruppe zum Bearbeiten im selben Tab (Leiste Unterbaugruppe wird bearbeitet).",
+    what: "Öffnet eine Kopie der gewählten Unterbaugruppe als eigenständige Baugruppe in einem neuen Tab.",
+    when: "Zeichnung oder Stückliste der Unterbaugruppe, Speichern als eigene .mncad-Datei.",
+    select: "Eine Unterbaugruppe (Filter Unterbaugruppe oder im Baum).",
+    steps: ["Unterbaugruppe wählen.", "In neuem Tab öffnen (Kopie) wählen."],
+    cmd: 'baugruppe öffnen "Führung"',
+    note: "Es ist eine Kopie – Änderungen im neuen Tab gehen nicht in die Baugruppe zurück. Dort bearbeiten: Im Kontext bearbeiten.",
+  },
+  "menu:sub/edit": {
+    what: "Bearbeitet die gewählte Unterbaugruppe direkt in der Baugruppe (Leiste Unterbaugruppe wird bearbeitet).",
     when: "Teile innerhalb einer Unterbaugruppe hinzufügen, verschieben oder verknüpfen.",
     select: "Eine Unterbaugruppe (Filter Unterbaugruppe oder im Baum).",
-    steps: ["Unterbaugruppe wählen und Ausgewählte öffnen wählen.", "Komponenten bearbeiten und auf ← Zurück zur Baugruppe klicken."],
+    steps: ["Unterbaugruppe wählen und Im Kontext bearbeiten wählen.", "Komponenten bearbeiten und auf ← Zurück zur Baugruppe klicken."],
     cmd: 'baugruppe bearbeiten "Führung"',
   },
 
@@ -614,6 +629,6 @@ export default {
     when: "Entwurf einer Zweiplattenform um einen Formeinsatz.",
     steps: ["Breite X, Länge Y, Plattendicken und Ø Führungssäulen eingeben.", "Optional Kavität in Platte A und Plattenwerkstoff.", "Auf Formaufbau erzeugen klicken."],
     cmd: "formaufbau 246 296",
-    note: "Der Formaufbau ersetzt den Inhalt des aktuellen Tabs (Strg+Z macht rückgängig) – Einsätze danach hinzufügen.",
+    note: "Der Formaufbau öffnet sich in einem neuen Tab; Einsätze danach hinzufügen (Teil / Modell einfügen).",
   },
 } satisfies Record<string, MicroTip>;

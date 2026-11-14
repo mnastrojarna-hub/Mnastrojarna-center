@@ -66,6 +66,37 @@ export function makeSubassembly(doc: CadDoc, ids: string[], name = "Podsestava")
   return { ...doc, components: rest };
 }
 
+/** položka výběru (selection.ts SelItem) → id komponenty nejvyšší úrovně („“ = prvek dílu) */
+type SelLike = { kind: string; compId?: string; topId?: string };
+const selTop = (x: SelLike) => (x.kind === "feature" ? "" : ((x.topId ?? x.compId) ?? "").split("/")[0]);
+
+/**
+ * Komponenty nejvyšší úrovně pro „Vytvořit podsestavu z vybraných“: výběr ve 3D okně (komponenta, těleso, plocha… –
+ * vždy jeho komponenta nejvyšší úrovně) a komponenta vybraná ve stromu (`treeSel`), bez duplicit a jen existující.
+ * `why` = důvod, proč příkaz nejde (pro neaktivní položku nabídky).
+ */
+export function subassemblyPick(doc: CadDoc, sel: readonly SelLike[], treeSel: string | null): { ids: string[]; why?: string } {
+  const comps = doc.components ?? [];
+  const tops = sel.map(selTop);
+  const ids = [...new Set([...tops, ...(treeSel ? [treeSel] : [])])].filter((id) => comps.some((c) => c.id === id));
+  if (!comps.length) return { ids, why: tr("Sestava zatím nemá komponenty.") };
+  if (!ids.length) return { ids, why: tr("Vyberte komponenty ve stromu nebo v modelu (Ctrl+klik přidá další).") };
+  return { ids };
+}
+
+/**
+ * Komponenta vybraná ve stromu (`asmSel`) po kliku v modelu: klik nebo přidání = komponenta kliknuté položky;
+ * Ctrl/Shift+klik, který položku z výběru ubral = poslední zbylá komponenta (nic nezbylo = null) – odebraná komponenta
+ * nesmí zůstat ve stromu vybraná, jinak by ji subassemblyPick vzal zpět. undefined = beze změny.
+ */
+export function treeSelAfterPick(prev: readonly SelLike[], next: readonly SelLike[], it: SelLike): string | null | undefined {
+  if (next.length < prev.length) {
+    const rest = next.map(selTop).filter(Boolean);
+    return rest.length ? rest[rest.length - 1] : null;
+  }
+  return selTop(it) || undefined;
+}
+
 /** Rozpustí podsestavu: její komponenty se přesunou o úroveň výš se složeným umístěním. */
 export function dissolveSubassembly(doc: CadDoc, id: string): CadDoc {
   const comps = doc.components ?? [];

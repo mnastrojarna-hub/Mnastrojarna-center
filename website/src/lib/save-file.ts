@@ -2,10 +2,15 @@
  * Uložení souboru do počítače s dotazem na místo a název.
  *  – Chrome / Edge / Opera: systémový dialog „Uložit jako“ (File System Access API); dialog se otevře PŘED výpočtem dat,
  *    aby platilo uživatelské gesto i u delšího exportu (STEP, PDF).
- *  – Firefox / Safari: dotaz na název souboru a stažení do složky Stažené (prohlížeč umí nabídnout i vlastní umístění,
- *    je-li zapnuto „Vždy se zeptat, kam soubory ukládat“).
+ *  – Firefox / Safari: dotaz na název souboru (dialog na stránce, ne `window.prompt`) a stažení do složky Stažené
+ *    (prohlížeč umí nabídnout i vlastní umístění, je-li zapnuto „Vždy se zeptat, kam soubory ukládat“).
+ *  – Automatizace / AI agent (`navigator.webdriver`, `?agent=1`) a Nastavení → Soubory „bez dotazu“: přímé stažení pod
+ *    výchozím názvem – žádné systémové okno, na kterém by automatizace uvízla.
  * Vrací true při uložení, false při zrušení uživatelem.
  */
+import { askFileName } from "@/components/cad/ask-dialog";
+import { isAutomation } from "./automation";
+
 
 type PickerWindow = Window & {
   showSaveFilePicker?: (o: { suggestedName?: string; types?: { description?: string; accept: Record<string, string[]> }[]; excludeAcceptAllOption?: boolean }) => Promise<FileSystemFileHandle>;
@@ -41,11 +46,12 @@ let direct = false;
 export function setDirectDownload(v: boolean) {
   direct = v;
 }
-export const isDirectDownload = () => direct;
+/** stahuje se bez dotazu? (nastavení, nebo prohlížeč ovládá automatizace / AI agent) */
+export const isDirectDownload = () => direct || isAutomation();
 
 /** Otevře dialog (nebo dotaz na název) a vrátí cíl; `null` = zrušeno. */
 export async function pickSaveTarget(suggested: string, mime: string): Promise<SavedFile | null> {
-  if (direct) return { name: suggested, handle: null };
+  if (isDirectDownload()) return { name: suggested, handle: null };
   const w = window as PickerWindow;
   const ext = extOf(suggested);
   const cleanMime = (mime.split(";")[0] || "application/octet-stream").trim();
@@ -61,7 +67,7 @@ export async function pickSaveTarget(suggested: string, mime: string): Promise<S
       /* SecurityError (vypršelo gesto) nebo jiná chyba → záložní cesta níže */
     }
   }
-  const typed = window.prompt("Uložit jako – název souboru:", suggested);
+  const typed = await askFileName(suggested); // dialog na stránce, ne window.prompt (automatizace by na něm uvízla)
   if (typed === null) return null;
   let name = typed.trim() || suggested;
   if (ext && !extOf(name)) name += ext;

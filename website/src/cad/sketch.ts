@@ -197,6 +197,42 @@ export function findLoops(entities: SketchEntity[]): { loops: Loop[]; openCount:
   const used = new Array(open.length).fill(false);
   const tol = 1e-3;
   const reverse = (s: Seg): Seg => (s.kind === "line" ? { kind: "line", a: s.b, b: s.a } : { kind: "arc", a: s.b, m: s.m, b: s.a });
+  // konce segmentů v mřížce s buňkou tol: navazující segment se hledá jen v okolních buňkách (dřív průchod všemi segmenty
+  // pro každý krok – skica z tisíců úseček z DXF trvala sekundy). Vybere se týž segment jako dřív: nejnižší nepoužitý index
+  // (buňka drží indexy vzestupně, použité na začátku se přeskočí posunem `head` – i tisíce konců v jednom bodě jsou rychlé).
+  const cellOf = (v: number) => Math.floor(v / tol);
+  const grid = new Map<string, { idx: number[]; head: number }>();
+  const put = (p: Vec2, j: number) => {
+    const k = `${cellOf(p[0])},${cellOf(p[1])}`;
+    const b = grid.get(k);
+    if (!b) grid.set(k, { idx: [j], head: 0 });
+    else if (b.idx[b.idx.length - 1] !== j) b.idx.push(j);
+  };
+  open.forEach((o, j) => {
+    put(o.seg.a, j);
+    put(o.seg.b, j);
+  });
+  const nextAt = (end: Vec2): number => {
+    const cx = cellOf(end[0]);
+    const cy = cellOf(end[1]);
+    let best = -1;
+    for (let dx = -1; dx <= 1; dx++)
+      for (let dy = -1; dy <= 1; dy++) {
+        const b = grid.get(`${cx + dx},${cy + dy}`);
+        if (!b) continue;
+        while (b.head < b.idx.length && used[b.idx[b.head]]) b.head++;
+        for (let t = b.head; t < b.idx.length; t++) {
+          const j = b.idx[t];
+          if (best >= 0 && j >= best) break;
+          if (used[j]) continue;
+          if (near(open[j].seg.a, end, tol) || near(open[j].seg.b, end, tol)) {
+            best = j;
+            break;
+          }
+        }
+      }
+    return best;
+  };
   for (let i = 0; i < open.length; i++) {
     if (used[i]) continue;
     const chain: Seg[] = [open[i].seg];
@@ -206,17 +242,13 @@ export function findLoops(entities: SketchEntity[]): { loops: Loop[]; openCount:
     while (progressed && !near(chain[0].a, chain[chain.length - 1].b, tol)) {
       progressed = false;
       const end = chain[chain.length - 1].b;
-      for (let j = 0; j < open.length; j++) {
-        if (used[j]) continue;
-        const s = open[j].seg;
-        if (near(s.a, end, tol)) chain.push(s);
-        else if (near(s.b, end, tol)) chain.push(reverse(s));
-        else continue;
-        used[j] = true;
-        ids.push(open[j].id);
-        progressed = true;
-        break;
-      }
+      const j = nextAt(end);
+      if (j < 0) continue;
+      const s = open[j].seg;
+      chain.push(near(s.a, end, tol) ? s : reverse(s));
+      used[j] = true;
+      ids.push(open[j].id);
+      progressed = true;
     }
     if (chain.length >= 2 && near(chain[0].a, chain[chain.length - 1].b, tol)) {
       // přesné uzavření

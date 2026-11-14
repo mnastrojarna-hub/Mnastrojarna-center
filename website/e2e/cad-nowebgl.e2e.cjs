@@ -82,7 +82,7 @@ const setPos = async (p, text) => {
     ok(await p.locator('[data-soft-canvas]').isVisible(), 'A: plátno náhledu je vidět');
     ok(/3D okno: nedostupné/.test(await p.locator('header').first().innerText()), 'A: stav v horní liště: 3D okno nedostupné');
     const note = await p.locator('[data-soft-note]').innerText();
-    ok(/náhled bez WebGL/.test(note) && /Výběr ploch a hran kliknutím zde nefunguje/.test(note) && /seznamy/.test(note) && /textové příkazy/.test(note), 'A: upozornění – zjednodušený náhled, výběr jen ze seznamů a textovými příkazy');
+    ok(/náhled bez WebGL/.test(note) && /Klik vybere plochu, hranu nebo vrchol/.test(note) && /vyber F3 E2/.test(note) && /window\.mncad\.select/.test(note), 'A: upozornění – zjednodušený náhled, výběr kliknutím, textem „vyber“ a window.mncad.select');
 
     // prázdný díl → prázdné plátno; po textovém příkazu se model objeví
     await run(p, 'nový díl Náhled');

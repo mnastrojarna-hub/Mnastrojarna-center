@@ -46,6 +46,8 @@ export const FEATURE_TONE: Record<string, Tone> = {
 };
 
 type Tab = "history" | "vars" | "configs";
+/** záložka správce dílu (Historie / Proměnné / Stavy) – řízená zvenku tlačítky Nástroje › Proměnné a Stavy dílu */
+export type ManagerTab = Tab;
 
 export function Manager({
   doc,
@@ -57,8 +59,21 @@ export function Manager({
   onContext,
   bodies,
   onActivateBody,
+  tab: tabProp,
+  onTab,
+  selectedIds,
+  bodyHidden,
+  onToggleBody,
 }: {
   doc: CadDoc;
+  /** řízená záložka (bez ní si ji správce drží sám) */
+  tab?: Tab;
+  onTab?: (t: Tab) => void;
+  /** prvky vybrané v modelu (filtr výběru Prvek) – zvýrazní se ve stromu, úpravu otevře klik */
+  selectedIds?: string[];
+  /** skryté těleso dílu – ikona oka u názvu dílu ho znovu zobrazí */
+  bodyHidden?: boolean;
+  onToggleBody?: () => void;
   /** tělesa dílu z poslední stavby (víc než jedno → seznam těles s volbou aktivního) */
   bodies?: BodyInfo[];
   onActivateBody?: (name: string) => void;
@@ -69,7 +84,12 @@ export function Manager({
   onCommit: (d: CadDoc) => void;
   onContext: (x: number, y: number, entries: RMenuEntry[]) => void;
 }) {
-  const [tab, setTab] = useState<Tab>("history");
+  const [tabLocal, setTabLocal] = useState<Tab>("history");
+  const tab = tabProp ?? tabLocal;
+  const setTab = (t: Tab) => {
+    setTabLocal(t);
+    onTab?.(t);
+  };
   const [renaming, setRenaming] = useState<string | null>(null);
   const resolved = resolveDoc(doc);
   const suppressedByConfig = new Set(doc.configs?.find((c) => c.id === doc.activeConfig)?.suppressed ?? []);
@@ -125,9 +145,21 @@ export function Manager({
 
       {tab === "history" && (
         <div className="min-h-0 flex-1 overflow-y-auto py-1">
-          <div className="flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-[#1f2933]">
-            <CadIcon name="cube" tone="create" className="h-4 w-4" />
-            <span className="truncate">{doc.name}</span>
+          <div className="group flex items-center gap-2 px-3 py-1.5 text-[12px] font-semibold text-[#1f2933]">
+            <CadIcon name="cube" tone="create" className={cn("h-4 w-4", bodyHidden && "opacity-40")} />
+            <span className={cn("truncate", bodyHidden && "opacity-50")}>{doc.name}</span>
+            {onToggleBody && (
+              <button
+                type="button"
+                data-body-eye={bodyHidden ? "hidden" : "shown"}
+                title={bodyHidden ? tr("Zobrazit těleso") : tr("Skrýt těleso")}
+                aria-label={bodyHidden ? tr("Zobrazit těleso") : tr("Skrýt těleso")}
+                onClick={onToggleBody}
+                className={cn("ml-auto rounded p-0.5 font-normal hover:bg-[#e3e9f0]", bodyHidden ? "block text-brand" : "hidden text-[#6b7785] group-hover:block")}
+              >
+                <CadIcon name="eye" className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           <div className="ml-5 border-l border-dashed border-[#cdd5de] pl-1">
             {[
@@ -165,11 +197,14 @@ export function Manager({
             {doc.features.map((f) => {
               const st = status?.find((s) => s.id === f.id);
               const isActive = f.id === activeId || f.id === sketchId;
+              const picked = !isActive && !!selectedIds?.includes(f.id);
               const off = f.suppressed || suppressedByConfig.has(f.id);
               return (
                 <div key={f.id}>
                   <div
-                    className={cn("group flex cursor-default items-center gap-2 rounded px-2 py-[3px] text-[12.5px]", isActive ? "bg-[#dbe7f5] text-[#0b1f33]" : "text-[#26303b] hover:bg-[#edf2f7]", off && "opacity-45")}
+                    data-feature-row={f.id}
+                    data-picked={picked || undefined}
+                    className={cn("group flex cursor-default items-center gap-2 rounded px-2 py-[3px] text-[12.5px]", isActive ? "bg-[#dbe7f5] text-[#0b1f33]" : picked ? "bg-[#eaf2fb] text-[#0b1f33] ring-1 ring-inset ring-[#8fb3dc]" : "text-[#26303b] hover:bg-[#edf2f7]", off && "opacity-45")}
                     onClick={() => onSelect(f)}
                     onDoubleClick={() => setRenaming(f.id)}
                     onContextMenu={(e) => {

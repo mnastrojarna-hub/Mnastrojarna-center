@@ -6,7 +6,7 @@ import { bodiesAt, isNewBodyMode, nextBodyName } from "@/cad/bodies";
 import { tr } from "@/cad/i18n";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ALL_THREADS, FEATURE_LABEL, METRIC_THREADS, planeLabel, threadByName } from "@/cad/defaults";
-import { getExt, type ExtParam } from "@/cad/ext/registry";
+import { getExt, hasExtTool, type ExtParam } from "@/cad/ext/registry";
 import { ExtDirectionParam, ExtAxisParam, LegacyHint } from "./ext-params";
 import { getExtUi } from "./ext/registry";
 import { evalExpr, exprRefs, isExpression } from "@/cad/params";
@@ -306,7 +306,7 @@ export function FeatureProps({
   const idx = doc.features.findIndex((x) => x.id === f.id);
   const before = idx >= 0 ? doc.features.slice(0, idx) : doc.features;
   const sketches = before.filter((x) => x.type === "sketch");
-  const toolFeatures = before.filter((x) => TOOL_TYPES.includes(x.type) && x.id !== f.id);
+  const toolFeatures = before.filter((x) => (TOOL_TYPES.includes(x.type) || hasExtTool(x)) && x.id !== f.id); // + rozšíření s nástrojovým tělesem
   // ── více těles: stav těles před tímto prvkem (názvy, aktivní) ──
   const bs = bodiesAt(doc, idx >= 0 ? idx : doc.features.length);
   /** prvek zakládá nové těleso (operace „Nové těleso“ s dosud neexistujícím názvem) */
@@ -825,7 +825,7 @@ export function EntityProps({ e, onChange }: { e: SketchEntity; onChange: (n: Sk
               <Vec key={i} label={tr("Bod {0}", i + 1)} value={pt} onChange={(v: Vec2) => set({ points: e.points.map((q, k) => (k === i ? v : q)) } as Partial<SketchEntity>)} />
             ))}
           </div>
-          <Check label={tr("Uzavřená")} value={e.closed} onChange={(v) => set({ closed: v } as Partial<SketchEntity>)} />
+          <Check label={tr("Uzavřená")} value={e.closed} onChange={(v) => set({ closed: v, autoClose: undefined } as Partial<SketchEntity>)} />
         </>
       )}
       {e.type === "arc" && (
@@ -948,8 +948,11 @@ function ExtForm({ f, doc, set, sketches, toolFeatures }: { f: Extract<Feature, 
             );
           case "enum":
             return <Seg key={p.key} label={p.label} value={String(v ?? p.options[0]?.v ?? "")} options={p.options} onChange={(x) => patch({ [p.key]: x })} />;
-          case "mode":
-            return <Seg key={p.key} label={tr("Operace")} value={String(v === "new" ? "add" : (v ?? "add"))} options={MODES as unknown as { v: string; l: string }[]} onChange={(x) => patch({ [p.key]: x })} />;
+          case "mode": {
+            // uložené „new“ ukáže formulář tak, jak se staví: s vlastním významem (newLabel) jako čtvrtou volbu, jinak jako Přidat
+            const legacyNew = v === "new" && p.newLabel ? [{ v: "new", l: p.newLabel }] : [];
+            return <Seg key={p.key} label={tr("Operace")} value={String(v === "new" && !legacyNew.length ? "add" : (v ?? "add"))} options={[...(MODES as unknown as { v: string; l: string }[]), ...legacyNew]} onChange={(x) => patch({ [p.key]: x })} />;
+          }
           case "text":
             return (
               <Field key={p.key} label={p.label}>

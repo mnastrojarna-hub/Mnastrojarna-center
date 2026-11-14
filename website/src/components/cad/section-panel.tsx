@@ -45,7 +45,7 @@ export function SectionControls({
   selection?: SelItem[];
 }) {
   const items = useMemo(() => sectionItems(mesh, assembly), [mesh, assembly]);
-  /** náhled bez WebGL: plochy nejde vybrat kliknutím */
+  /** náhled bez WebGL: rada „klik v náhledu nebo číslo plochy“ */
   const soft = useSoftViewActive();
   const general = isGeneralSection(section);
   const mode: Mode = !general ? section.axis : section.source?.kind === "face" ? "face" : "vector";
@@ -155,9 +155,12 @@ export function SectionControls({
               {picked && !picked.plane
                 ? tr("Vybraná plocha není rovinná. Vyberte rovinnou plochu tělesa – rovina řezu se na ni položí.")
                 : soft && assembly
-                  ? tr("V náhledu bez WebGL nejde plochu sestavy vybrat kliknutím. Rovinu zadejte na záložce Vektor (normála) nebo X / Y / Z.")
+                  ? // v sestavě vybírá klik výchozím filtrem celou komponentu – plochu až s filtrem Plocha
+                    (selection ?? []).some((x) => x.kind === "component")
+                    ? tr("Vybrána je celá komponenta. Ve stavovém řádku přepněte filtr výběru na Plocha a klikněte v náhledu na rovinnou plochu komponenty – rovina řezu se na ni položí.")
+                    : tr("Ve stavovém řádku přepněte filtr výběru na Plocha a klikněte v náhledu na rovinnou plochu komponenty – rovina řezu se na ni položí. Obecnou rovinu zadáte na záložce Vektor (normála).")
                   : soft
-                    ? tr("V náhledu bez WebGL nejde plochu vybrat kliknutím. Zadejte číslo rovinné plochy (např. F3) – rovina řezu se na ni položí.")
+                    ? tr("Klikněte v náhledu na rovinnou plochu tělesa nebo zadejte její číslo (např. F3) – rovina řezu se na ni položí.")
                     : tr("Vyberte rovinnou plochu tělesa (kliknutím ve 3D okně) – rovina řezu se na ni položí.")}
             </p>
           ) : (

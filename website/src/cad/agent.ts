@@ -36,7 +36,9 @@ import { extrudeFromText, extrudeOptTokens, extrudeSummary } from "./agent-extr"
 import { parsePrimLine, primSummary } from "./agent-prim";
 import { parseFeatureHelp } from "./agent-help";
 import { COMMON_FIELDS, fieldsOf } from "./feature-fields";
-import { gapSummary, parseGapLine, ruleNumbers } from "./agent-gaps";
+import { gapSummary, parseGapLine } from "./agent-gaps";
+import { OUT_COMMANDS, parseOutLine, type MncadOutApi, type OutOp } from "./agent-out";
+import { polylineClose, takeCloseWords } from "./poly-close";
 
 export const AGENT_API_VERSION = 1;
 
@@ -73,6 +75,8 @@ export type AgentOp =
   | { k: "features"; features: Feature[]; line: number }
   /** řez, styl zobrazení, barva plochy, akce rozšíření, analýzy a formařské nástroje (agent-api.ts, provedení agent-api-host.ts) */
   | ApiOp
+  /** výstupy: uložit, export, výkres export, skica export, sdílet, odkaz (agent-out.ts, provedení agent-out-host.ts) */
+  | OutOp
   | { k: "new"; name: string; assembly: boolean; line: number }
   | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string }; line: number }
   /** prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text); `note` = poznámka do protokolu */
@@ -535,7 +539,7 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
         const d = prm.kind === "direction" ? toDirection(v) : toAxisDef(v);
         if (!d) throw new Error(tr("prvek {0}: parametr „{1}“ je {2} – X | Y | Z | -Z | vektor 1;0;1 | JSON", ext.ext, key, prm.kind === "direction" ? tr("směr") : tr("osa")));
         v = d;
-      } else if (prm?.kind === "sketches" && !Array.isArray(v)) v = [v];
+      } else if ((prm?.kind === "sketches" || prm?.kind === "features") && !Array.isArray(v)) v = [v];
       else if (prm?.kind === "mode" && typeof v === "string") v = canon(v) === "cut" ? "cut" : canon(v) === "intersect" ? "intersect" : canon(v) === "newbody" ? "new" : "add";
       setAt(data, key, v);
     }
@@ -610,6 +614,13 @@ export function parseAgentText(text: string): AgentProgram {
         if (undo) for (const op of parseAgentText(undo).ops) ops.push({ ...op, line: no });
         else if (prev?.k === "draft" && !/^(nový|novy|nová|nova|new|neu)(\s|$)/i.test(dl)) prev.text += `\n${dl}`; // navazující 2D řádky = jeden běh (rychlost)
         else ops.push({ k: "draft", text: dl, line: no });
+        return;
+      }
+      // výstupy bez dialogu: uložit, export step…, výkres export pdf…, skica export dxf, sdílet, odkaz (agent-out.ts) – null = jiný příkaz
+      const out = parseOutLine(tokenize(line));
+      if (out) {
+        endBlock();
+        ops.push({ k: "out", cmd: out, line: no });
         return;
       }
       // úpravy existujícího modelu a skici (agent-edit.ts): upravit, potlačit / zapnout, smazat <prvek>, přejmenovat, přesunout,
@@ -1053,9 +1064,11 @@ export function parseEntities(tokens: string[]): SketchEntity[] {
     tk = tk.slice(1);
   }
   if (canon(tk[0] ?? "") !== "polyline" || !tk.some((t) => canon(t) === "radius" || canon(t) === "fillet")) return [parseEntity(tokens)];
+  const pc = takeCloseWords(tk); // uzavřít / otevřená – stejná pravidla jako u čáry bez zaoblení (poly-close.ts)
+  tk = pc.rest;
   const pts: Vec2[] = [];
   const radii: number[] = [];
-  let closed = false;
+  let closed = pc.close === "closed";
   const nums: number[] = [];
   const flush = () => {
     if (nums.length % 2) throw new Error(tr("čára potřebuje body po dvojicích: čára x1 y1 x2 y2 x3 y3 … [uzavřít]"));
@@ -1073,12 +1086,11 @@ export function parseEntities(tokens: string[]): SketchEntity[] {
       if (!pts.length || v === undefined || !isNum(v) || !(num(v) > 0)) throw new Error(tr("zaoblení rohu se píše za bod: čára 0 0 50 0 r 5 50 30 … (r 5 zaoblí roh v bodě 50 0)"));
       radii[pts.length - 1] = num(v);
       i++;
-    } else if (c === "closed") closed = true;
-    else if (isNum(tk[i])) nums.push(num(tk[i]));
+    } else if (isNum(tk[i])) nums.push(num(tk[i]));
     else throw new Error(tr("čára: neznámé slovo „{0}“ – body po dvojicích, „r N“ za bodem zaoblí roh, „uzavřít“ spojí konec se začátkem", tk[i]));
   }
   flush();
-  if (pts.length >= 3 && !closed && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-9) {
+  if (pts.length >= 3 && !closed && pc.close !== "open" && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-9) {
     pts.pop();
     radii.pop();
     closed = true;
@@ -1120,6 +1132,8 @@ export function parseEntities(tokens: string[]): SketchEntity[] {
     const c = cut[j];
     if (c && (closed || j < n - 1)) out.push({ ...base(), type: "arc", a: [r6(c.a[0]), r6(c.a[1])], b: [r6(c.m[0]), r6(c.m[1])], c: [r6(c.b[0]), r6(c.b[1])] });
   }
+  // bez „uzavřít“ / „otevřená“: o uzavření rozhodne celá skica – prozatím uzavírací úsečka se značkou (resolveAutoClose)
+  if (!closed && !pc.close) out.push({ ...base(), type: "line", a: pts[n - 1], b: pts[0], autoClose: true });
   return out;
 }
 /** entita skici z tokenů: `kružnice 165 [v 10 20]`, `obdélník 60 40 [střed] [v x y] [r 3]`, `čára x1 y1 x2 y2 … [uzavřít]` */
@@ -1131,7 +1145,8 @@ export function parseEntity(tokens: string[]): SketchEntity {
   }
   const t = canon(tokens[0] ?? "");
   const tg = t === "spline" ? splitSplineTangents(tokens.slice(1)) : null; // tečny splinu (agent-surfaces.ts)
-  const o = parseOpts(tg ? tg.rest : tokens.slice(1));
+  const pc = t === "polyline" ? takeCloseWords(tokens.slice(1)) : null; // uzavřít / otevřená (poly-close.ts)
+  const o = parseOpts(tg ? tg.rest : pc ? pc.rest : tokens.slice(1));
   const at = o.nums.at ?? [];
   const cx = at[0] ?? 0;
   const cy = at[1] ?? 0;
@@ -1170,7 +1185,7 @@ export function parseEntity(tokens: string[]): SketchEntity {
       if (o.free.length < 4 || o.free.length % 2) throw new Error(tr("čára potřebuje body po dvojicích: čára x1 y1 x2 y2 x3 y3 … [uzavřít]"));
       const points: [number, number][] = [];
       for (let i = 0; i < o.free.length; i += 2) points.push([o.free[i], o.free[i + 1]]);
-      return { ...base, type: "polyline", points, closed: o.flags.has("closed") || points.length >= 3 };
+      return { ...base, type: "polyline", ...polylineClose(points, pc?.close ?? null) };
     }
     case "arc": {
       // oblouk třemi body: začátek, bod na oblouku, konec
@@ -1288,13 +1303,31 @@ const sideWord = (w: string): { ax: 0 | 1 | 2; max: boolean } | null => {
   const m: Record<string, { ax: 0 | 1 | 2; max: boolean }> = { "+x": { ax: 0, max: true }, "-x": { ax: 0, max: false }, "+y": { ax: 1, max: true }, "-y": { ax: 1, max: false }, "+z": { ax: 2, max: true }, "-z": { ax: 2, max: false }, horni: { ax: 2, max: true }, top: { ax: 2, max: true }, spodni: { ax: 2, max: false }, bottom: { ax: 2, max: false }, dole: { ax: 2, max: false }, nahore: { ax: 2, max: true }, oben: { ax: 2, max: true }, unten: { ax: 2, max: false }, upper: { ax: 2, max: true }, lower: { ax: 2, max: false } };
   return m[w] ?? null;
 };
-export function selectEdges(rule: Rule, edges: EdgeLite[], bbox: Bbox): number[] {
-  const byNum = ruleNumbers(rule, "e"); // hrany čísly E3 E7 (jako popisky pro výběr) místo pravidla – agent-gaps.ts
-  if (byNum) return byNum.map((i) => (edges.some((e) => e.index === i) ? i : fail(tr("hrana E{0} v tělese není (hran {1})", i + 1, edges.length))));
-  const tol = tolOf(bbox);
-  let list = edges;
+/** čísla entit v pravidle (E2;E5 / F3,F4 – jako popisky pro výběr a `vyber`) */
+const NUMBERED = { e: /^e\d+(?:[;,]e\d+)*$/, f: /^f\d+(?:[;,]f\d+)*$/ };
+/** Entity zadané čísly (sjednocení všech slov s čísly; ostatní slova pravidla je dál zužují); null = žádná čísla. */
+function numberedRule(rule: Rule, letter: "e" | "f", have: number[]): Set<number> | null {
+  const out = new Set<number>();
   for (const w0 of rule) {
     const w = fold(w0);
+    if (!NUMBERED[letter].test(w)) continue;
+    for (const part of w.split(/[;,]/)) {
+      const i = Number(part.slice(1)) - 1;
+      const L = letter.toUpperCase();
+      if (i < 0) throw new Error(tr("čísla ploch, hran a vrcholů začínají 1 (F1, E1, V1) – „{0}“", w0));
+      if (!have.includes(i)) throw new Error(tr("{0}{1} v tělese není – {2}1 až {3}{4}", L, i + 1, L, L, have.length));
+      out.add(i);
+    }
+  }
+  return out.size ? out : null;
+}
+export function selectEdges(rule: Rule, edges: EdgeLite[], bbox: Bbox): number[] {
+  const tol = tolOf(bbox);
+  let list = edges;
+  const picked = numberedRule(rule, "e", edges.map((e) => e.index));
+  for (const w0 of rule) {
+    const w = fold(w0);
+    if (NUMBERED.e.test(w)) continue;
     const side = sideWord(w);
     if (side) list = list.filter((e) => e.center && near(e.center[side.ax], bbox[side.max ? 1 : 0][side.ax], tol));
     else if (["svisle", "vertical", "svisla", "senkrecht", "vertikal"].includes(w)) list = list.filter((e) => !!e.dir && unitDot(e.dir, [0, 0, 1]) > 0.999);
@@ -1305,17 +1338,17 @@ export function selectEdges(rule: Rule, edges: EdgeLite[], bbox: Bbox): number[]
     else if (w.startsWith("len>")) list = list.filter((e) => (e.length ?? 0) > num(w.slice(4)));
     else if (w.startsWith("len<")) list = list.filter((e) => (e.length ?? Infinity) < num(w.slice(4)));
     else if (["vse", "all", "vsechny", "alle", "alles"].includes(w)) list = edges;
-    else throw new Error(tr("neznámé pravidlo pro hrany „{0}“ – vše, horní, spodní, +Z/-Z/+X/-X/+Y/-Y, svislé, vodorovné, kruhové, rovné, poloměr N, delší N, kratší N", w0));
+    else throw new Error(tr("neznámé pravidlo pro hrany „{0}“ – vše, horní, spodní, +Z/-Z/+X/-X/+Y/-Y, svislé, vodorovné, kruhové, rovné, poloměr N, delší N, kratší N, čísla E2;E5", w0));
   }
-  return list.map((e) => e.index);
+  return (picked ? list.filter((e) => picked.has(e.index)) : list).map((e) => e.index);
 }
 export function selectFaces(rule: Rule, faces: FaceLite[], bbox: Bbox): number[] {
-  const byNum = ruleNumbers(rule, "f"); // plochy čísly F3 F5 místo pravidla – agent-gaps.ts
-  if (byNum) return byNum.map((i) => (faces.some((f) => f.index === i) ? i : fail(tr("plocha F{0} v tělese není (ploch {1})", i + 1, faces.length))));
   const tol = tolOf(bbox);
   let list = faces;
+  const picked = numberedRule(rule, "f", faces.map((f) => f.index));
   for (const w0 of rule) {
     const w = fold(w0);
+    if (NUMBERED.f.test(w)) continue;
     const side = sideWord(w);
     if (side) {
       const n: Vec3 = [0, 0, 0];
@@ -1327,9 +1360,9 @@ export function selectFaces(rule: Rule, faces: FaceLite[], bbox: Bbox): number[]
     else if (["bocni", "side", "sides", "seitlich", "seite", "seiten"].includes(w)) list = list.filter((f) => f.planar && f.normal && unitDot(f.normal, [0, 0, 1]) < 0.001);
     else if (["nejvetsi", "largest", "max", "biggest", "grosste", "groesste", "maximal"].includes(w)) list = [...list].sort((a, b) => (b.area ?? 0) - (a.area ?? 0)).slice(0, 1);
     else if (["vse", "all", "vsechny", "alle", "alles"].includes(w)) list = faces;
-    else throw new Error(tr("neznámé pravidlo pro plochy „{0}“ – +Z/-Z/+X/-X/+Y/-Y, horní, spodní, boční, válcové, rovinné, největší", w0));
+    else throw new Error(tr("neznámé pravidlo pro plochy „{0}“ – +Z/-Z/+X/-X/+Y/-Y, horní, spodní, boční, válcové, rovinné, největší, čísla F3;F5", w0));
   }
-  return list.map((f) => f.index);
+  return (picked ? list.filter((f) => picked.has(f.index)) : list).map((f) => f.index);
 }
 
 /* ───────────────────────── stav dokumentu jako text ───────────────────────── */
@@ -1443,6 +1476,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "mnohoúhelník N D [v x y]", en: "polygon", de: "vieleck", desc: tr("pravidelný N-úhelník (D = opsaná kružnice)") },
   { cmd: "drážka L W [v x y] [úhel a]", en: "slot", de: "langloch", desc: tr("drážka") },
   { cmd: "úsečka x1 y1 x2 y2 · čára x1 y1 x2 y2 [r N] x3 y3 … [uzavřít] · oblouk x1 y1 xm ym x2 y2 · spline x1 y1 x2 y2 … [uzavřít] · bod x y · elipsa rx ry", en: "line, polyline, arc, spline, point, ellipse", de: "linie, polylinie, bogen, spline, punkt, ellipse", desc: tr("další entity; „r N“ za bodem čáry zaoblí tento roh; oblouk = začátek, bod na oblouku, konec; předpona „pomocná“ = konstrukční") },
+  { cmd: "čára x1 y1 x2 y2 x3 y3 … [uzavřít|otevřená]", en: "polyline … [close|open]", de: "polylinie … [schließen|offen]", desc: tr("uzavření lomené čáry (i se zaoblenými rohy): „uzavřít“ / „otevřená“ platí vždy, první bod = poslední → uzavřená; jinak rozhodne skica – tvoří-li čára s dalšími entitami uzavřený obrys (oba konce propojené přes jiné entity), je otevřená, jinak se uzavře a protokol to ohlásí (ne, kdyby ji uzavírací úsek křížil); vznikne-li obrys později, čára se otevře; jako dráha (tažení, žebro, dělicí čára, pole podél křivky) se automatické uzavření nepoužije") },
   { cmd: "skica plocha F3|horní|+X [odsazení N] [obráceně]: … · skica rovina <název pomocné roviny> [odsazení N]: …", en: "sketch face, sketch plane", de: "skizze fläche, skizze ebene", desc: tr("skica na rovinné ploše modelu – číslem (F1, F2… jako popisky pro výběr / window.mncad.hints()) nebo pravidlem jako u skořepiny (horní, +X…) – nebo na pomocné rovině podle názvu; rovina je asociativní – přepočítá se se změnou modelu, protokol vypíše její počátek a osy") },
   { cmd: "vazba <druh> <odkaz> [<odkaz> …]; <druh> …", en: "constraint", de: "bedingung", desc: tr("vazba ve skice: vodorovně, svisle, shodně, rovnoběžně, kolmo, tečně, stejně, pevně, soustředně, středem, na křivce, symetricky, kolineárně; odkaz = e3 (celá entita; id entit ukazuje stav), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod), e3.s0 (strana obdélníku) nebo počátek; po řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno") },
   { cmd: "kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; <druh> …", en: "dim", de: "bemaßung, maß", desc: tr("kóta ve skice: délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku; hodnota i s desetinnou čárkou, Ø20 / R10; řídicí kóta změní geometrii, „referenční“ jen měří") },
@@ -1456,12 +1490,12 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x2 y2 z2 …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8 [hloubka-závitu T] [jádro | vrták [N]]]", en: "hole", de: "bohrung", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit") },
   { cmd: "díra závit M8 hloubka 20 [jádro | vrták | vrták 6,7] · díra 6,647 závit M8 … · díra 10 hloubka 12 dno ploché · díra … hrot 120", en: "hole", de: "bohrung", desc: tr("závitová díra: bez průměru = tabulkový vrták (M8 → 6,8, M18×1,5 → 16,5); zadaný průměr má přednost (protokol: vrták zadán ručně); jmenovitý průměr (díra 8 závit M8) = tabulkový vrták s poznámkou; „jádro“ (EN core, DE Kern) = malý průměr D1 podle ISO 965-1 (M8 → 6,647); „vrták N“ (EN drill N, DE Bohrer N) = vlastní vrták. Dno slepé díry: „dno ploché“ (EN flat bottom, DE flacher Grund) – sedlo pružiny, frézované dno – nebo „hrot 118|120|90“ (EN tip, DE Spitze; 60–170°, „hrot 180“ = ploché; také „ploché“, „bez hrotu“, „dno kužel 120“); platí i pro závitovou a zahloubenou díru; volby díry pište před „název“") },
   { cmd: "závit M18×1,5 délka L [v x y z] [osa Z] [vnitřní] [modelovat]", en: "thread", de: "gewinde", desc: tr("závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii") },
-  { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z… ] [poloměr N] [delší N]", en: "fillet", de: "verrunden", desc: tr("pravidla lze kombinovat (horní kruhové)") },
+  { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z…|E2;E5] [poloměr N] [delší N]", en: "fillet", de: "verrunden", desc: tr("pravidla lze kombinovat (horní kruhové)") },
   { cmd: "zaoblit R hrany <pravidlo> setback S [vrchol V3 S2 | vrchol x y z S2]", en: "fillet R edges … setback S [vertex V3 S2]", de: "verrunden R kanten … rückversatz S [ecke V3 S2]", desc: tr("zaoblení se setbackem: zaoblení skončí S od vrcholu se 3+ hranami, roh uzavře hladká záplata G1 (výchozí S = R)") },
   { cmd: "zaoblit eliptické D1 D2 hrany <pravidlo> [rho 0,5]", en: "fillet elliptical D1 D2 edges … [rho 0.5]", de: "verrunden elliptisch D1 D2 kanten … [rho 0,5]", desc: tr("eliptické / kuželosečkové zaoblení: D1 na horní (první) ploše, D2 na druhé; rho = kuželosečka (0,5 parabola)") },
   { cmd: "úkos A plochy <pravidlo|F1 F2…> [dělicí \"Skica\"] [stupňovitý] [směr +Z] [rovina XY odsazení N]", en: "draft A faces … [parting \"Sketch\"] [stepped] [direction +Z]", de: "schräge A flächen … [trennlinie \"Skizze\"] [gestuft] [richtung +Z]", desc: tr("úkos ploch; s dělicí křivkou se části nad ní a pod ní zkosí od ní na obě strany, stupňovitý = každý úsek od vlastní roviny") },
-  { cmd: "srazit C [hrany …]", en: "chamfer", de: "fase", desc: tr("sražení hran") },
-  { cmd: "skořepina T [otevřít +Z|horní|boční…]", en: "shell", de: "schale", desc: tr("vydlabání, otevřené plochy pravidlem") },
+  { cmd: "srazit C [hrany …|E2;E5]", en: "chamfer", de: "fase", desc: tr("sražení hran") },
+  { cmd: "skořepina T [otevřít +Z|horní|boční…|F3;F5]", en: "shell", de: "schale", desc: tr("vydlabání, otevřené plochy pravidlem") },
   { cmd: "pole N rozteč P [směr X] [N2 rozteč P2 směr Y] · pole kruhové N [úhel 360] [osa Z] [v cx cy cz]", en: "pattern", de: "muster", desc: tr("pole posledního prvku") },
   { cmd: "zrcadlit XY|XZ|YZ [odsazení N]", en: "mirror", de: "spiegeln", desc: tr("zrcadlení tělesa") },
   { cmd: "text \"ABC\" výška H hloubka D v x y [z] [gravírovat]", en: "text", de: "text", desc: tr("nápis vystouplý / gravírovaný") },
@@ -1489,6 +1523,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "výkres přerušení <pohled> x|y od a do b [mezera 8] [vlnovka|cikcak] · výkres přerušení smazat [N|vše]", en: "drawing break front x from 50 to 250 gap 8 wave / drawing break delete all", de: "zeichnung unterbrechung vorne x von 50 bis 250 lücke 8 welle / zeichnung unterbrechung löschen alle", desc: tr("přerušený pohled: dlouhý díl se zkrátí (i v pohledech ve stejné promítací čáře), kóty přes přerušení drží skutečnou délku") },
   { cmd: "výkres uložení <kóta> H7 [zobrazení odchylky|mezní|značka] · výkres uložení tabulka ano|ne · výkres uložení zobrazení … · výkres uložení dotaz 40 H7/g6", en: "drawing fit Ø40 H7 / drawing fit table yes / drawing fit show limits / drawing fit query 40 H7/g6", de: "zeichnung passung Ø40 H7 / zeichnung passung tabelle ja / zeichnung passung anzeige grenzmaße / zeichnung passung abfrage 40 H7/g6", desc: tr("tolerance uložení ISO 286 (díry A…ZC, hřídele a…zc, IT1…IT18 do 500 mm): úchylky „(+0,025/0)“ nebo mezní rozměry u kóty, Tabulka uložení na listu, dotaz na vůli / přesah") },
   { cmd: "výkres revize značka <znak> na <kóta>[, <kóta>…] · výkres revize značka smazat na <kóta> · výkres revize <znak> značky ano|ne · výkres zóny ano|ne", en: "drawing revision mark B on Ø40 / drawing revision mark delete on Ø40 / drawing revision B marks no / drawing zones yes", de: "zeichnung änderung zeichen B auf Ø40 / zeichnung änderung zeichen löschen auf Ø40 / zeichnung änderung B dreiecke nein / zeichnung zonen ja", desc: tr("trojúhelník revize u změněné kóty (volitelně pro každou revizi), zóny listu ISO 5457 a sloupec Zóna v tabulce revizí") },
+  { cmd: "výkres nový [\"název\"] · výkres výkresy [N|přejmenovat|smazat] · výkres export pdf|dxf|dwg|svg|csv|png [vše|list N]", en: "drawing new / drawing drawings 2 / drawing export pdf all", de: "zeichnung neu / zeichnung zeichnungen 2 / zeichnung export pdf alle", desc: tr("další výkres téhož dílu s vlastními listy (Výkres 2…), přepnutí a správa výkresů; export do souboru – vše = všechny listy aktivního výkresu (PDF vícestránkové, jinak ZIP), také window.mncad.exportDrawing(\"pdf\", { sheet: \"all\" })") },
   { cmd: "výkres stav [list N|vše]", en: "drawing status sheet 2 / drawing status all", de: "zeichnung status blatt 2 / zeichnung status alle", desc: tr("stav vybraného nebo všech listů: přehled listů, souřadnice pohledů pro značky a kóty, id kót a značek (a1…), razítko a revize; také window.mncad.drawingStatus({ sheet }) a export bez dialogu window.mncad.exportDrawing(\"pdf\"|\"dxf\"|\"dwg\"|\"svg\"|\"csv\"|\"png\")") },
   { cmd: "měřit F3|E5|V2 [F7|E9|V8|x y z] · měřit těleso · měřit díry · měřit válce · měřit plocha|hrany <pravidlo>", en: "measure", de: "messen", desc: tr("měření pro kontrolu modelu: údaje o ploše / hraně / vrcholu (čísla jako popisky pro výběr), vzdálenost, úhel a rovnoběžnost dvou entit, rozteč os děr, těleso (obálka, objem, hmotnost, těžiště), seznam děr (Ø, hloubka, osa, střed, po průměrech) a vnějších válců; v sestavě Komponenta:F3; také window.mncad.measure()") },
   { cmd: "smazat poslední · stav · zobraz iso|přední|horní…", en: "delete last, status, view", de: "löschen letzte, status, ansicht", desc: tr("správa") },
@@ -1506,6 +1541,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "entita e3 klíč=hodnota … · smazat e3 [v1 k2 …] · kóta k1 65 | referenční | řídicí", en: "entity, delete e3, dim k1", de: "objekt, löschen e3, bemaßung k1", desc: tr("úprava skici: souřadnice / rozměry / pomocná entity (cx, cy, r, průměr, a=x;y, b=…, w, h, úhel, pomocná=ano), smazání entit (i s jejich vazbami a kótami), vazeb v1… a kót k1… (čísla vypíše stav), hodnota kóty a řídicí ↔ referenční; po řádku se skica vyřeší") },
   { cmd: "odsadit e1 [e2 …] <vzdálenost> [ven|dovnitř|vlevo|vpravo] [řetězec] · promítnout hrany E3;E7|vše|rovina [pomocné]", en: "offset … out|in chain, project edges … construction", de: "versetzen … außen|innen kette, projizieren kanten … hilfs", desc: tr("odsazení entity nebo navazujícího řetězce úseček a oblouků; průmět hran modelu (tělesa před skicou) do roviny skici – E čísla jako popisky pro výběr") },
   { cmd: "zobraz stínovaný|hrany|drátový|skryté|průhledný|přizpůsobit", en: "view shaded / view edges / view wireframe / view hidden / view xray / view fit", de: "ansicht schattiert / ansicht kanten / ansicht drahtmodell / ansicht verdeckt / ansicht röntgen / ansicht einpassen", desc: tr("styl 3D okna (trvale, jako Zobrazení ▸ styl) a přizpůsobení pohledu; snímek pro agenta: window.mncad.screenshot()") },
+  { cmd: "vyber F3 E2 V5 [přidat] · vyber Čep:F3|#2:F3|comp:Čep · vyber nic · vyber", en: "select F3 E2 / select F4 add / select none", de: "auswählen F3 E2 / auswählen F4 hinzufügen / auswählen nichts", desc: tr("výběr entit textem stejně jako klik do modelu (i v náhledu bez WebGL): čísla jako popisky pro výběr a měřit; přidat = Ctrl + klik; nic = Esc; bez id vypíše výběr; v sestavě se stejnými komponentami #2:F3. Výběr převezmou tlačítka Zaoblit / Sražení / Skica na pásu karet a „+ aktuální výběr“ ve formulářích – textové příkazy ne: zaoblit 3 bez hran zaoblí všechny hrany, vybrané zadejte čísly (zaoblit 3 hrany E2;E5, skica plocha F3); také window.mncad.select()") },
   { cmd: "řez X|Y|Z [poloha] [obráceně] · řez vyp", en: "section x 25 flip / section off", de: "schnitt x 25 umkehren / schnitt aus", desc: tr("řez modelem rovinou kolmou na osu v poloze (mm, bez polohy střed modelu); obráceně = druhá strana; protokol vypíše rozsah modelu v ose") },
   { cmd: "barva plochy F3 [F5 …]|<pravidlo> #rrggbb|výchozí", en: "color face F3 #e03930 / color face top default", de: "farbe fläche F3 #e03930 / farbe fläche oben standard", desc: tr("barva ploch číslem (F1… jako popisky pro výběr) nebo pravidlem jako u skořepiny (horní, +X, válcové…); výchozí = barva tělesa") },
   { cmd: "akce <id|popisek>", en: "action", de: "aktion", desc: tr("akce rozšíření bez prvku v historii: akce sheet.dxf (Rozvin → DXF), sheet.svg, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn, skica dxf; text okna jde do protokolu, soubory vrací window.mncad.action()") },
@@ -1529,11 +1565,12 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "rám formy [šířka délka] [deska-a N] [deska-b N] [upínací N] [opěrná N] [rozpěrky N] [šířka-rozpěrek N] [vyhazovací N] [kotevní N] [sloupky Ø] [dutina X Y H | bez dutiny] [materiál …]", en: "moldbase", de: "formaufbau", desc: tr("rám vstřikovací formy jako průvodce (výchozí 296 × 346 mm) – nová záložka se sestavou desek, vedení, šroubů a vyhazovačů") },
   { cmd: "záložky · záložka \"název\"|N · zavřít záložku [\"název\"|N]", en: "tabs, tab, close tab", de: "registerkarten, registerkarte, registerkarte schließen", desc: tr("otevřené dokumenty: výpis, přepnutí (další příkazy pracují s vybranou záložkou), zavření; také window.mncad.tabs(), activateTab(), closeTab()") },
   { cmd: "2d <příkaz 2D výkresu> · 2d nový [název] [mm] · 2d čára 0,0 100,0 @0,50 · 2d hladina nová OSY barva 1 · 2d stav", en: "2d, draft", de: "2d, zeichnen", desc: tr("2D výkres (jako AutoCAD): kreslení, hladiny, typy čar, vlastnosti, výběr, dotazy, export DXF / DWG – stejné příkazy jako příkazový řádek 2D výkresu; také window.mncad.draft()") },
+  ...OUT_COMMANDS,
   { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", de: "JSON", desc: tr("celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy") },
 ];
 
 /** JavaScript API v prohlížeči (`window.mncad`) – pro automatizaci a agenty, kteří umí spustit skript. */
-export type MncadApi = MncadApiExt & {
+export type MncadApi = MncadApiExt & MncadOutApi & {
   version: number;
   /** jazyk rozhraní (cs / en / de) – podle adresy /cad, /en/cad, /de/cad */
   lang: "cs" | "en" | "de";

@@ -36,17 +36,39 @@ const DASH: Record<string, number[]> = {
 const PT_PER_MM = 72 / 25.4;
 
 export async function drawingToPdf(d: Pick<DrawingResult, "sheet" | "polys" | "texts"> & { title?: string }, fonts?: PdfFonts): Promise<Blob> {
+  return drawingsToPdf([d], d.title, fonts);
+}
+
+type PdfPage = Pick<DrawingResult, "sheet" | "polys" | "texts">;
+type JsPdf = InstanceType<typeof import("jspdf").jsPDF>;
+
+/** Vícestránkové PDF – každý list výkresu jedna stránka ve svém formátu a orientaci (export „Všechny listy“). */
+export async function drawingsToPdf(pages: PdfPage[], title?: string, fonts?: PdfFonts): Promise<Blob> {
+  if (!pages.length) throw new Error(tr("Výkres nemá žádný list."));
   const { jsPDF } = await import("jspdf");
   const f = fonts ?? (await loadFonts());
-  const { w, h } = d.sheet;
-  const pdf = new jsPDF({ orientation: w >= h ? "landscape" : "portrait", unit: "mm", format: [Math.min(w, h), Math.max(w, h)], compress: true });
-  pdf.setProperties({ title: d.title ?? tr("Výkres"), creator: "Mnástrojárna CAD", author: "Mnástrojárna s.r.o." });
+  const fmt = (p: PdfPage) => ({ o: (p.sheet.w >= p.sheet.h ? "landscape" : "portrait") as "landscape" | "portrait", f: [Math.min(p.sheet.w, p.sheet.h), Math.max(p.sheet.w, p.sheet.h)] });
+  const first = fmt(pages[0]);
+  const pdf = new jsPDF({ orientation: first.o, unit: "mm", format: first.f, compress: true });
+  pdf.setProperties({ title: title ?? tr("Výkres"), creator: "Mnástrojárna CAD", author: "Mnástrojárna s.r.o." });
   pdf.addFileToVFS("Roboto-Regular.ttf", toBase64(f.regular));
   pdf.addFont("Roboto-Regular.ttf", "Roboto", "normal");
   if (f.bold) {
     pdf.addFileToVFS("Roboto-Bold.ttf", toBase64(f.bold));
     pdf.addFont("Roboto-Bold.ttf", "Roboto", "bold");
   }
+  pages.forEach((d, i) => {
+    if (i) {
+      const x = fmt(d);
+      pdf.addPage(x.f, x.o);
+    }
+    drawPage(pdf, d, f);
+  });
+  return new Blob([pdf.output("arraybuffer")], { type: "application/pdf" });
+}
+
+/** Jedna stránka: čáry a plošky po vrstvách (ISO 128), texty Roboto. */
+function drawPage(pdf: JsPdf, d: PdfPage, f: PdfFonts) {
   pdf.setFont("Roboto", "normal");
   pdf.setLineCap("round");
   pdf.setLineJoin("round");
@@ -84,5 +106,4 @@ export async function drawingToPdf(d: Pick<DrawingResult, "sheet" | "polys" | "t
     const y = t.y + shift * Math.sin(rot);
     pdf.text(t.s, x, y, { angle: -(t.rotate ?? 0), baseline: "alphabetic" });
   }
-  return new Blob([pdf.output("arraybuffer")], { type: "application/pdf" });
 }

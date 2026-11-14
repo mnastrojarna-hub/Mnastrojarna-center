@@ -1,0 +1,29 @@
+# 13. vlna, balík ext: chyby chování prvků rozšíření (Uzavřít do tělesa / Zesílit, Kontrola geometrie, lem Kapka, Kopule Průnik, Zrcadlit prvky, Odsazená plocha, úleva ohybu, DE senkrecht)
+eliptická kopule (nebo důlek) na rovinné ploše; Průnik plochu vyklene dovnitř tělesa	elliptical dome (or dimple) on a planar face; Intersect crowns the face into the body
+Hloubka úlevy nesmí být záporná (0 = tloušťka plechu).	The relief depth must not be negative (0 = sheet thickness).
+jen pro lem Kapka	only for the Teardrop hem
+jen topologie	topology only
+kapka: rameno se dotáhne k plechu – {0} mm	teardrop: the leg runs down to the sheet – {0} mm
+Nahradit tělesa	Replace solids
+nejdřív zvolte Úleva ohybu	choose a Bend relief first
+ohyb 180° + tento úhel; rameno se vrací šikmo k plechu	bend of 180° + this angle; the leg returns at an angle towards the sheet
+Původní plochy tělesa ({0}) zůstávají – plochu solidu odstranit nelze; nahrazují se jen volné plochy.	The original faces of the body ({0}) remain – a face of a solid cannot be removed; only free faces are replaced.
+Šířka úlevy musí být kladná.	The relief width must be positive.
+Těleso není platné ({0}): {1}{2}. Zkuste „Sjednotit plochy“ nebo upravte předchozí prvky.	The body is not valid ({0}): {1}{2}. Try “Merge faces” or edit the previous features.
+topologie i geometrie	topology and geometry
+Úhel uzavření (kapka)	Closing angle (teardrop)
+Úhel uzavření kapky musí být 5–90° (zadáno {0}°).	The teardrop closing angle must be 5–90° (given {0}°).
+uzavřený lem má poloměr 0,1·t	a closed hem has a radius of 0.1·t
+vazba „senkrecht“ = kolmo (dvě úsečky: senkrecht e1 e2); pro svislou úsečku nebo dva body nad sebou napište „vertikal“ ({0})	constraint “senkrecht” = perpendicular (two lines: senkrecht e1 e2); for a vertical line or two points above each other write “vertical” ({0})
+Vnitřní poloměr (otevřený, kapka)	Inner radius (open, teardrop)
+vypnuto = jen topologie (uzavřenost, orientace, návaznost) – rychlejší	off = topology only (closure, orientation, connectivity) – faster
+za začátek ohybu; 0 = tloušťka plechu	beyond the start of the bend; 0 = sheet thickness
+za začátek ohybu; 0 = tloušťka plechu ({0} mm)	beyond the start of the bend; 0 = sheet thickness ({0} mm)
+zahnutý okraj – otevřený, uzavřený nebo kapka	a folded edge – open, closed or teardrop
+{0}: úleva ohybu se v rozvinu nekreslí – zářezy doplňte ručně.	{0}: the bend relief is not drawn in the flat pattern – add the notches manually.
+Kromě základního tělesa tu nejsou žádné prvky k zrcadlení – celé těleso zrcadlí vestavěné Zrcadlení.	Apart from the base body there are no features to mirror – the built-in Mirror mirrors the whole body.
+Prvek „{0}“ v historii před zrcadlením není – prvky s tělesem: {1}	Feature “{0}” is not in the history before the mirror – features with a body: {1}
+Základna kopule (R {0} mm ve středu plochy) leží celá mimo materiál plochy – nad dírou nebo mimo obrys. Zvětšete poloměr.	The dome base (R {0} mm at the face centre) lies entirely off the face material – over a hole or outside the outline. Increase the radius.
+#!dynamic
+# popisek nástroje skici (TOOL_LABEL v sketcher.tsx, překládá se tr(TOOL_LABEL[t])) – vlastní klíč, „Měřítko“ je měřítko výkresu
+Změnit měřítko	Scale

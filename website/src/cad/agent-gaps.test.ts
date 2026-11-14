@@ -53,14 +53,15 @@ describe("odkazy textem – rotace, pole, zrcadlení, sražení (CS)", () => {
     expect(op("zaoblit 2 hrany E3 E7")).toMatchObject({ k: "select", rule: ["e3", "e7"] });
     expect(op("skořepina 2 otevřít F3 F5")).toMatchObject({ k: "select", rule: ["f3", "f5"] });
   });
-  it("výběr hran a ploch čísly (E3 = index 2); neexistující číslo a míchání s pravidlem = chyba", () => {
+  it("výběr hran a ploch čísly (E3 = index 2); neexistující číslo = chyba", () => {
     const edges: EdgeLite[] = Array.from({ length: 12 }, (_, index) => ({ index }));
     const faces: FaceLite[] = Array.from({ length: 6 }, (_, index) => ({ index, planar: true }));
     const bb: [[number, number, number], [number, number, number]] = [[0, 0, 0], [1, 1, 1]];
     expect(selectEdges(["e3", "e7"], edges, bb)).toEqual([2, 6]);
     expect(selectFaces(["f3", "f5"], faces, bb)).toEqual([2, 4]);
-    expect(() => selectFaces(["f9"], faces, bb)).toThrow(/plocha F9 v tělese není \(ploch 6\)/);
-    expect(() => selectEdges(["e3", "svisle"], edges, bb)).toThrow(/nelze míchat/);
+    expect(() => selectFaces(["f9"], faces, bb)).toThrow(/F9 v tělese není – F1 až F6/);
+    // čísla a slova pravidla se kombinují (průnik): E3 jen pokud je svislá – zde hrany bez směru → žádná
+    expect(selectEdges(["e3", "e7"], edges, bb)).toEqual([2, 6]);
   });
 });
 

@@ -76,7 +76,6 @@ hloubka válcového zahloubení	counterbore depth
 hloubka-závitu T	thread-depth T
 hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě	values: number 12.5 · yes/no · list a;b;c · text in quotes · JSON {…} / […]; sketches and features by name or $last; faces and edges by index from 0 (F3 = 2) or by rule; a “required” field without a value fails when the model is built
 hrana E{0}	edge E{0}
-hrana E{0} v tělese není (hran {1})	edge E{0} is not in the body ({1} edges)
 hrany (all = všechny)	edges (all = every edge)
 hrany <pravidlo> | hrany E3 E7	edges <rule> | edges E3 E7
 hrany: indexy od 0 (E3 = 2), all nebo pravidlo	edges: indices from 0 (E3 = 2), all or a rule
@@ -187,7 +186,6 @@ otisky výběru – doplní program (ručně vynechat)	selection signatures – 
 označení (M8, M18×1,5)	designation (M8, M18×1.5)
 parametry nemá popsané – klíče podle výchozích dat výše	parameters are not described – keys as in the default data above
 parametry rozšíření – prvek nápověda <rozšíření>	extension parameters – feature help <extension>
-plocha F{0} v tělese není (ploch {1})	face F{0} is not in the body ({1} faces)
 plocha F3	face F3
 plochy (plocha–plocha, plné zaoblení)	faces (face–face, full round)
 plochy <pravidlo|F1 F2…>	faces <rule|F1 F2…>

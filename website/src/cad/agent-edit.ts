@@ -13,6 +13,7 @@
  * Čisté funkce bez prohlížeče (testovatelné v Node); co potřebuje jádro (topologie pro pravidla, otisky výběru, hrany modelu),
  * dostanou jako rozhraní `EditKernel`. Slova příkazů platí česky, anglicky i německy bez ohledu na jazyk rozhraní.
  */
+import { addWithAutoClose } from "./poly-close";
 import type { EdgeLite, FaceLite } from "./agent";
 import { describeConstraint, describeDim, entityText, solveSketchFeature, targetSketch, withTextIds, type SketchTarget } from "./agent-sketch";
 import { getExt, type ExtParam } from "./ext/registry";
@@ -814,6 +815,7 @@ async function editFeature(res: EditResult, cmd: Extract<EditCmd, { kind: "edit"
       else if (prm.kind === "sketch") v = refTo(v, true);
       else if (prm.kind === "feature") v = refTo(v, false);
       else if (prm.kind === "sketches") v = (Array.isArray(v) ? v : [v]).map((x) => refTo(x, true));
+      else if (prm.kind === "features") v = (Array.isArray(v) ? v : [v]).map((x) => refTo(x, false));
     } else if (path.length === 1 && SKETCH_KEYS.has(path[0])) v = refTo(v, true);
     else if (path.length === 1 && SKETCH_LISTS.has(path[0])) v = (Array.isArray(v) ? v : [v]).map((x) => refTo(x, true));
     else if (pathStr === "featureId") v = refTo(v, false);
@@ -1177,7 +1179,8 @@ const pos = (v: unknown, key: string): number => {
 function patchEntity(e: SketchEntity, pairs: [string, string][]): { e: SketchEntity; changes: string[] } {
   const n = clone(e) as SketchEntity & Record<string, unknown>;
   const changes: string[] = [];
-  const keys = Object.keys(e).filter((k) => k !== "id" && k !== "type");
+  const keys = Object.keys(e).filter((k) => k !== "id" && k !== "type" && k !== "autoClose");
+  if (pairs.some(([k]) => (ENT_ALIAS[fold(k)] ?? k) === "closed")) delete n.autoClose; // uzavření teď určil autor (poly-close.ts)
   for (const [key0, raw] of pairs) {
     const v = parseValue(raw);
     const a = ENT_ALIAS[fold(key0)] ?? key0;
@@ -1282,9 +1285,12 @@ async function sketchEdit(res: EditResult, cmd: Extract<EditCmd, { kind: "entity
     const e = sk.entities.find((x) => x.id === cmd.id) ?? sk.entities.find((x) => x.id.toLowerCase() === cmd.id.toLowerCase());
     if (!e) throw new Error(tr("entita „{0}“ ve skice „{1}“ není – entity: {2}", cmd.id, sk.name, sk.entities.map((x) => x.id).join(", ") || "—"));
     const p = patchEntity(e, cmd.pairs);
-    const r = solved({ ...sk, entities: sk.entities.map((x) => (x === e ? p.e : x)) });
+    const m = addWithAutoClose({ ...sk, entities: sk.entities.map((x) => (x === e ? p.e : x)) }, []); // úprava může uzavřít obrys – automaticky uzavřené čáry znovu posoudit (poly-close.ts)
+    const r = solved({ ...sk, ...m.patch });
     const after = r.feature.entities.find((x) => x.id === e.id)!;
-    return finish(r.feature, `${r.ok ? "✓" : "⚠"} ${tr("entita {0} ve skice „{1}“: {2} = {3}{4}", e.id, sk.name, p.changes.join(", "), entityText(after), r.text)}`);
+    const out = finish(r.feature, `${r.ok ? "✓" : "⚠"} ${tr("entita {0} ve skice „{1}“: {2} = {3}{4}", e.id, sk.name, p.changes.join(", "), entityText(after), r.text)}`);
+    out.log.push(...m.notes);
+    return out;
   }
   if (cmd.kind === "dimEdit") {
     const n = Number(cmd.id.slice(1));

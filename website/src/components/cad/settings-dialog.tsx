@@ -10,6 +10,7 @@ import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName } from "./cad-icons";
 import type { DisplayMode, MouseScheme } from "./viewport";
 import { Btn, Field, Kbd, Modal, Segmented, Toggle, inputCls, selectCls } from "./ui";
+import { askConfirm, askNotice } from "./ask-dialog";
 
 type Tab = "general" | "display" | "mouse" | "sketch" | "drawing" | "files" | "keys";
 
@@ -107,7 +108,7 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
               try {
                 setDraft(importSettings(await f.text()));
               } catch (err) {
-                alert((err as Error).message);
+                void askNotice((err as Error).message); // dialog na stránce (ne alert – automatizace by na něm uvízla)
               }
               e.target.value = "";
             }}
@@ -143,7 +144,7 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
                     } catch {
                       /* bez úložiště */
                     }
-                    if (v !== getLang()) window.location.assign(langMeta(v).path);
+                    if (v !== getLang()) window.location.assign(langMeta(v).path + window.location.search); // ?agent=1 zůstane
                   }}
                 />
               </Field>
@@ -371,8 +372,8 @@ function StorageSettings() {
     setMsg(tr("Šifrované úložiště je zapnuté a odemčené. Heslo si zapamatujte – bez něj data nelze obnovit."));
     notifyVault();
   };
-  const disable = () => {
-    if (!window.confirm(tr("Vypnout úložiště a smazat všechny dokumenty uložené v tomto prohlížeči?"))) return;
+  const disable = async () => {
+    if (!(await askConfirm(tr("Vypnout úložiště a smazat všechny dokumenty uložené v tomto prohlížeči?"), { danger: true }))) return;
     disableEncrypted();
     setMsg(tr("Úložiště vypnuto, uložené dokumenty smazány."));
     notifyVault();
@@ -384,8 +385,8 @@ function StorageSettings() {
       notifyVault();
     } else setMsg(tr("Nesprávné heslo."));
   };
-  const wipe = () => {
-    if (!window.confirm(tr("Smazat všechny dokumenty uložené v tomto prohlížeči? Nastavení zůstane."))) return;
+  const wipe = async () => {
+    if (!(await askConfirm(tr("Smazat všechny dokumenty uložené v tomto prohlížeči? Nastavení zůstane."), { danger: true }))) return;
     wipeStoredDocuments();
     setMsg(tr("Uložené dokumenty byly smazány."));
     notifyVault();

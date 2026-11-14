@@ -3,6 +3,7 @@
  * pravidlem a díry „v x y“ na povrchu) → těleso → výkres → plán kót. Jen pro testy (nepoužívá ho aplikace).
  */
 import { parseAgentText, selectEdges, selectFaces, topAt, type EdgeLite, type FaceLite } from "./agent";
+import { applySketchOp } from "./agent-sketch";
 import { buildDoc } from "./build";
 import { drawingDoc, threadsOfDoc } from "./drawing-doc";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
@@ -37,7 +38,7 @@ export async function runText(text: string): Promise<{ doc: CadDoc; log: string[
   for (const op of prog.ops) {
     if (op.k === "new") d = emptyDoc(op.name);
     else if (op.k === "meta") d = { ...d, ...op.patch };
-    else if (op.k === "entities") lastSketch()!.entities.push(...op.entities);
+    else if (op.k === "entities") applySketchOp(d.features, op); // jako konzole: id e1…, uzavření lomených čar podle celé skici
     else if (op.k === "feature") {
       const f = prepare(op.feature);
       if (op.fillTop && f.type === "hole") {

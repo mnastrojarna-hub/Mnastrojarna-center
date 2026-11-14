@@ -27,6 +27,8 @@ import { hasTangents } from "./spline-tangent";
 import { sketchSplineEdge } from "./spline-occ";
 import { noteFeatureWarning, takeFeatureInfo, takeFeatureNotes } from "./feature-notes";
 import { draftedExtrusion, planeReach, throughLength, tiltCos, wireBounds } from "./extrude-draft";
+import { profileNote } from "./profile-check";
+import { pathEntities } from "./poly-close";
 import type { Axis, BodyInfo, BoolMode, BuildResult, CadDoc, FaceInfo, Feature, FeatureStatus, MeshData, PlaneName, SketchPlane, Vec2, Vec3 } from "./types";
 
 type Shape = r.Shape3D;
@@ -219,16 +221,20 @@ export function sketchWires(sk: SketchF, plane: r.Plane = planeOf(sk.plane)): { 
   });
 }
 
-/** Otevřená i uzavřená křivka skici (úsečky, oblouky, lomené čáry, tvary) jako jeden drát – dráha tažení. */
-export function sketchPathWire(sk: SketchF): r.Wire {
+/**
+ * Otevřená i uzavřená křivka skici (úsečky, oblouky, lomené čáry, tvary) jako jeden drát – dráha tažení. Jako dráha
+ * (`asPath`) bez automatického uzavření lomených čar z textu (poly-close.ts pathEntities).
+ */
+export function sketchPathWire(sk: SketchF, asPath = true): r.Wire {
+  const ents = asPath ? pathEntities(sk.entities) : sk.entities;
   const plane = planeOf(sk.plane);
   const W = (p: Vec2): Vec3 => vec(plane.toWorldCoords(p));
   const segs: Seg[] = [];
   const closedEdges: r.Edge[] = [];
   // Hladká křivka (spline) jako dráha = jedna B-spline hrana. Řetězec oblouků (jak se spline kreslí v profilu) má v navázání
   // oblouků skoky křivosti, po kterých tažení vytvoří sebeprotínající plochy a booleovská operace selže.
-  const splines = sk.entities.filter((e) => e.type === "spline" && !e.construction && e.points.length >= 2);
-  const others = sk.entities.filter((e) => !e.construction && e.type !== "point" && e.type !== "spline");
+  const splines = ents.filter((e) => e.type === "spline" && !e.construction && e.points.length >= 2);
+  const others = ents.filter((e) => !e.construction && e.type !== "point" && e.type !== "spline");
   if (splines.length === 1 && !others.length) {
     const e = splines[0] as Extract<typeof splines[number], { type: "spline" }>;
     if (hasTangents(e)) return r.assembleWire([sketchSplineEdge(e, plane)]); // tečny → přesná interpolace (GeomAPI_Interpolate)
@@ -237,7 +243,7 @@ export function sketchPathWire(sk: SketchF): r.Wire {
     const edge = r.makeBSplineApproximation(pts, { tolerance: 1e-3, degMin: 3, degMax: 3 });
     return r.assembleWire([edge]);
   }
-  for (const e of sk.entities) {
+  for (const e of ents) {
     if (e.type === "line") {
       if (!e.construction) segs.push({ kind: "line", a: e.a, b: e.b });
     } else if (e.type === "arc") segs.push({ kind: "arc", a: e.a, m: e.b, b: e.c });
@@ -264,7 +270,7 @@ export function sketchPathWire(sk: SketchF): r.Wire {
 /** Otevřená (nebo uzavřená) křivka skici jako seřazené 2D segmenty – pro žebro. */
 export function sketchChain(sk: SketchF): Seg[] {
   const segs: Seg[] = [];
-  for (const e of sk.entities) {
+  for (const e of pathEntities(sk.entities)) {
     if (e.construction) continue;
     if (e.type === "line") segs.push({ kind: "line", a: e.a, b: e.b });
     else if (e.type === "arc") segs.push({ kind: "arc", a: e.a, m: e.b, b: e.c });
@@ -788,6 +794,14 @@ export function clearBuildCache() {
 }
 /** vstupy na úrovni dokumentu, které mohou ovlivnit geometrii prvků */
 const docKeyOf = (d: CadDoc) => JSON.stringify([d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null, d.material, d.kind ?? "part"]);
+/** Tělesa po jednotlivých prvcích z mezipaměti stavby celého dokumentu (jen ke čtení; filtr výběru Prvek – face-owner.ts). */
+export function cachedSteps(input: CadDoc): { n: number; shapes: Shape[] }[] {
+  const { doc } = resolveDoc(input);
+  const docKey = docKeyOf(doc);
+  const keys = doc.features.map((f) => JSON.stringify(f));
+  const c = chains.find((x) => x.docKey === docKey && x.keys.length === keys.length && x.keys.every((k, i) => k === keys[i]));
+  return (c?.points ?? []).map((p) => ({ n: p.n, shapes: [p.body, ...p.others.map(([, s]) => s)].filter((s): s is Shape => !!s) }));
+}
 
 /**
  * `opts.preferActive`: po stavbě přepne aktivní těleso na `doc.activeBody` (jen pro zobrazení v editoru dílu – aktivní těleso je
@@ -856,7 +870,8 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     }
     bodySig = sig;
     const notes = takeFeatureNotes(); // přiblížení / nedosažená návaznost ohlášené stavitelem (feature-notes.ts)
-    if (notes.length) warning = [warning, ...notes].filter(Boolean).join(" ");
+    notes.push(profileNote(f, sketches, false)); // vada profilu skici (křížení, mezera, překryv…) – profile-check.ts
+    if (notes.some(Boolean)) warning = [warning, ...notes].filter(Boolean).join(" ");
     status.push(warning ? { id: f.id, ok: true, warning, ...extra } : { id: f.id, ok: true, ...extra });
     return next;
   };
@@ -1209,7 +1224,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
       }
       body = finish(f, next);
     } catch (e) {
-      status.push({ id: f.id, ok: false, error: humanError(e) });
+      status.push({ id: f.id, ok: false, error: [humanError(e), profileNote(f, sketches, true)].filter(Boolean).join(" ") });
       if (startedNew && !body) {
         // nové těleso nevzniklo – vrátit se k původnímu aktivnímu
         const prev = others.get(startedNew.name);

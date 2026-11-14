@@ -12,12 +12,12 @@ export default {
     note: "Hovering over an edge offers its end points, midpoint and circle centre.",
   },
   inspect: {
-    what: "Turns the panel with data on the selected entity on and off: type, length, Ø, area, normal, coordinates.",
+    what: "Shows a panel with data on the selected entity: type, length, Ø, area, normal, coordinates, component position.",
     when: "Quickly reading a hole Ø, edge length, face normal or component position.",
-    select: "One entity clicked in the model (face, edge, point, body or component).",
-    steps: ["Click an entity – a panel with its data appears at the bottom right.", "The Properties button turns the panel off; another click turns it back on."],
+    select: "One entity clicked in the model (face, edge, point, body or component); in an assembly also a component in the tree.",
+    steps: ["Select an entity and click Properties – a panel with its data appears at the bottom right.", "Highlighted = the panel shows for every selection (model or assembly tree); a click while it is open hides it."],
     cmd: "measure F3",
-    note: "The panel is on from the start – the first click on the button turns it off.",
+    note: "It is on from program start; hiding it lasts until the program is closed (or the next click).",
   },
   filter: {
     what: "Sets what a click in the 3D window selects: anything, face, edge, point, body, in an assembly a component.",
@@ -31,10 +31,10 @@ export default {
     steps: ["Choose All and click an entity in the model."],
   },
   "menu:filter/feature": {
-    what: "Feature filter: a click in the 3D window selects the whole body, just like Body / shape.",
-    when: "History features (hole, extrude…) are selected in the history tree on the left.",
-    steps: ["Choose Feature.", "Open a feature by clicking it in the history tree on the left."],
-    note: "Clicking in the model does not select an individual feature.",
+    what: "A click on a face selects the history feature that created it (hole, pocket, fillet…) and highlights all its faces.",
+    when: "Finding a part feature by clicking the model – then editing or deleting it.",
+    steps: ["Choose Feature and click a face – the feature is highlighted in the model and in the history tree.", "Clicking the highlighted row in the tree opens it for editing; Delete removes the feature."],
+    note: "Ctrl+click adds another feature. Part only; a Move / rotate at the end of the history owns all faces.",
   },
   "menu:filter/face": {
     what: "A click selects faces of the model only.",
@@ -69,11 +69,11 @@ export default {
     note: "Assembly only; a part outside a sub-assembly is selected on its own.",
   },
   mass: {
-    what: "Shows mass, volume, surface area, bounding box and the number of faces and edges of the part.",
-    when: "Mass for a quote or BOM, checking the volume, choosing the material.",
-    steps: ["Click Mass.", "In the Material field choose the material (density), optionally the Material designation (title block).", "Read Mass, Volume, Surface and Dimensions (X × Y × Z)."],
+    what: "Shows mass, volume, surface area and size of the part; in an assembly the sum of the parts by their materials and the centre of gravity.",
+    when: "Mass for a quote or BOM, checking the volume, choosing the material, centre of gravity of an assembly.",
+    steps: ["Click Mass.", "Part: in the Material field choose the material (density), optionally the Material designation (title block).", "Assembly: read Mass, Centre of gravity X ; Y ; Z and the part masses in the table."],
     cmd: "measure body",
-    note: "In an assembly the window does not open – the assembly mass is in the chip at the bottom and in the BOM.",
+    note: "Hidden components are not counted in an assembly; change a part's material in the part (Edit part).",
   },
   section: {
     what: "Cuts the model display with a plane – view only, the geometry does not change.",
@@ -91,18 +91,18 @@ export default {
 
   // ── Tools › Parametrisation, Moulds ──
   vars: {
-    what: "Shows where the part variables are – named dimensions that form fields can refer to.",
+    what: "Switches the left panel to the Variables tab – named dimensions that form fields can refer to.",
     when: "Parametric part: changing one dimension (d, t, L) recomputes the whole model.",
-    steps: ["Click Variables and open the Variables tab in the left panel.", "+ Add variable: fill in the name and Expression (e.g. d*2).", "In a feature field type =d or an expression (e.g. =d/2+3)."],
+    steps: ["Click Variables – the left panel shows the Variables tab.", "+ Add variable: fill in the name and Expression (e.g. d*2).", "In a feature field type =d or an expression (e.g. =d/2+3)."],
     cmd: "variable d = 20",
-    note: "The button does not switch the tab itself, it only shows a message. An assembly has no Variables tab.",
+    note: "Part only – in an assembly the button is disabled (an assembly has no variables).",
   },
   cfg: {
-    what: "Shows where the part configurations are – variants with other variable values and suppressed features.",
+    what: "Switches the left panel to the Configurations tab – part variants with other variable values and suppressed features.",
     when: "One part in several versions: M8 / M10, with and without holes, different lengths.",
-    steps: ["Click Part configurations and open the Configurations tab in the left panel.", "+ New configuration from current values, expand it, edit values and Suppressed features.", "Activate a configuration with its radio button; Default restores the original values."],
+    steps: ["Click Part configurations – the left panel shows the Configurations tab.", "+ New configuration from current values, expand it, edit values and Suppressed features.", "Activate a configuration with its radio button; Default restores the original values."],
     cmd: 'config "Short" t=10',
-    note: "Configurations change variables – create those first. An assembly has no Configurations tab.",
+    note: "Part only (disabled in an assembly). Configurations change variables – create those first.",
   },
   moldtools: {
     what: "Opens the mould design panel: drafts and undercuts, face analysis, shrinkage, ejector pins, cooling.",
@@ -215,21 +215,21 @@ export default {
     what: "Shows or hides the grid and coordinate axes in the 3D window.",
     when: "Orientation in space, checking the part position relative to the origin.",
     steps: ["Click Grid and axes; another click hides them."],
-    note: "Valid only until the program is closed – after start-up the grid is off.",
+    note: "The choice is saved in Settings (Display › Grid and axes) and also applies after the next start.",
   },
 
   // ── View › Appearance ──
   color: {
-    what: "Sets the body colour of the part – steel, aluminium, brass, cast iron or signal colours.",
-    when: "Telling parts apart on screen and in pictures; the colour is saved with the part.",
-    steps: ["Open the Body colour menu.", "Click a colour – the body is recoloured at once (Ctrl+Z undoes)."],
+    what: "Sets the body colour of the part; in an assembly the colour of the selected components (all if none is selected).",
+    when: "Telling parts apart on screen and in pictures; the colour is saved with the part or the assembly.",
+    steps: ["In an assembly select components first (tree or model), otherwise all are coloured.", "Open the Body colour / Component colour menu and click a colour (Ctrl+Z undoes)."],
     cmd: "color #b9c2cc",
-    note: "The colour changes neither material nor mass. In an assembly each component has its own colour (component panel).",
+    note: "The colour changes neither material nor mass. A sub-assembly colour is passed on to its parts.",
   },
   "menu:color/*": {
-    what: "Colours the body of the part with this colour.",
+    what: "Colours the part body, in an assembly the selected components (all if none is selected), with this colour.",
     when: "Quickly telling a part or material apart on screen.",
-    steps: ["Click the colour – the change is saved in the part, Ctrl+Z undoes it."],
+    steps: ["Click the colour – the change is saved, Ctrl+Z undoes it."],
     cmd: "color #b9c2cc",
     note: "Appearance only – the material for the mass is chosen separately (Mass, left panel).",
   },
@@ -287,10 +287,17 @@ export default {
 
   // ── Data › File ──
   open: {
-    what: "Opens a .mncad project or imports STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY or DXF.",
+    what: "Opens a .mncad project or a STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY or DXF model in a new tab.",
     when: "A model from a customer, a project in progress, a DXF drawing as a sketch underlay.",
-    steps: ["Click Open / Import and choose one or more files.", "Each model opens in its own tab; a DXF is loaded as a sketch."],
-    note: "In an assembly a part or model is inserted as a component. Files can also be dragged into the window.",
+    steps: ["Click Open / Import (Open in an assembly) and choose a file.", "The model opens in its own tab; a DXF is loaded as a sketch."],
+    note: "Import into assembly or Insert part / model puts a file into the assembly; dropping it on an assembly window does too.",
+  },
+  importAsm: {
+    what: "Inserts a .mncad part or a STEP, IGES, STL… model from a file into the open assembly as a component.",
+    when: "Building an assembly from finished parts and purchased models without switching to the Assembly tab.",
+    steps: ["Click Import into assembly and choose a file.", "Place the component with the gizmo (Move / rotate) or with mates."],
+    cmd: 'insert "Plate" at 100 0 0',
+    note: "Same as Insert part / model on the Assembly tab; a .mncad assembly file opens in a new tab.",
   },
   save: {
     what: "Saves the whole project (.mncad) including the feature history, sketches and import data.",
@@ -373,7 +380,7 @@ export default {
     when: "Quickly designing a mould base around a cavity insert.",
     steps: ["Enter Width X, Length Y, plate thicknesses and Ø guide pillars.", "Optionally Cavity in plate A and Plate material.", "Click Create mould base."],
     cmd: "moldbase 246 296",
-    note: "The base replaces the content of the current tab (Ctrl+Z undoes) – open an empty one first.",
+    note: "The base opens in a new tab (like the moldbase command); the document in progress stays unchanged.",
   },
   ex: {
     what: "Opens a sample part in a new tab – flange, shaft, bracket, handle, pin, transition piece.",
@@ -452,7 +459,7 @@ export default {
     what: "Shows the X ; Y ; Z coordinates of the clicked vertex right on the button.",
     when: "Quickly reading a corner position for a hole, sketch or dimension.",
     select: "A vertex (filter All or Point) – the bar appears after clicking it.",
-    steps: ["Click the vertex and read the coordinates on the button.", "Clicking the button refreshes the data in the Properties panel."],
+    steps: ["Click the vertex and read the coordinates on the button.", "Clicking the button opens the Properties panel (even a hidden one) with the vertex data."],
     cmd: "measure V2",
     note: "The values on the button are rounded to 2 decimal places.",
   },
@@ -469,7 +476,7 @@ export default {
     when: "Looking at sketches, datum planes and axes hidden inside the body.",
     select: "The body (filter Body / shape).",
     steps: ["Click the body and choose Hide body in the bar."],
-    note: "A hidden body cannot be clicked, so this bar cannot show it again.",
+    note: "Show it again with the Body is hidden strip at the top, the eye next to the part name in the tree or a right-click on empty space.",
   },
   "quick/tr": {
     what: "Switches the body to semi-transparent and back to opaque – display only.",
@@ -569,7 +576,7 @@ export default {
     select: "A component in the assembly tree or in the model.",
     steps: ["Select the component and click Move / rotate.", "Drag the arrows (1 mm steps) or arcs (15°); R toggles move/rotate.", "Click Done."],
     cmd: 'assembly component "Pin" move 10 0 0',
-    note: "A fixed component has to be released first.",
+    note: "A fixed component has to be released first – neither the gizmo, the G key nor the Position field moves it.",
   },
   "asm/delete": {
     what: "Removes the selected components from the assembly.",
@@ -580,18 +587,18 @@ export default {
     note: "Ctrl+Z undoes the removal; the confirmation is switched off in Settings › General.",
   },
   sub: {
-    what: "Groups components into a sub-assembly, dissolves it or opens it for editing.",
+    what: "Groups components into a sub-assembly, dissolves it, edits it in context or opens a copy of it in a new tab.",
     when: "A unit that moves or repeats as a whole – guiding, ejector set.",
-    steps: ["Open the Sub-assembly menu.", "Choose Create from selected, Dissolve selected or Open selected."],
+    steps: ["Open the Sub-assembly menu.", "Choose Create from selected, Dissolve selected, Edit in context or Open in a new tab."],
     cmd: 'assembly subassembly "A" "B" as "Guide"',
   },
   "menu:sub/mk": {
-    what: "Creates a new sub-assembly (Sub-assembly 1, 2…) from the components selected in the model.",
+    what: "Creates a new sub-assembly (Sub-assembly 1, 2…) from the selected components; the count is in the item label.",
     when: "Grouping the parts of a unit so they move as a whole.",
-    select: "Components clicked in the model (filter Component, Ctrl+click).",
-    steps: ["Ctrl+click the components in the 3D window.", "Choose Create from selected (Ctrl+click)."],
+    select: "Components in the assembly tree or in the model; Ctrl+click adds more (tree and 3D window).",
+    steps: ["Click the first component, Ctrl+click to add more.", "Choose Create from selected."],
     cmd: 'assembly subassembly "A" "B"',
-    note: "Only the selection in the 3D window counts – a component selected only in the tree does not.",
+    note: "Without a selection the item is inactive. The selection in the tree and in the 3D window both count.",
   },
   "menu:sub/dis": {
     what: "Dissolves the selected sub-assembly – its components go back directly into the assembly.",
@@ -601,10 +608,18 @@ export default {
     cmd: 'assembly dissolve "Guide"',
   },
   "menu:sub/open": {
-    what: "Opens the selected sub-assembly for editing in the same tab (Editing sub-assembly bar).",
+    what: "Opens a copy of the selected sub-assembly as a stand-alone assembly in a new tab.",
+    when: "Drawing or BOM of the sub-assembly, saving the sub-assembly as its own .mncad file.",
+    select: "A sub-assembly (filter Sub-assembly or in the tree).",
+    steps: ["Select the sub-assembly.", "Choose Open in a new tab (copy)."],
+    cmd: 'assembly open "Guide"',
+    note: "It is a copy – changes in the new tab do not flow back into the assembly. To edit in the assembly: Edit in context.",
+  },
+  "menu:sub/edit": {
+    what: "Edits the selected sub-assembly right in the assembly (Editing sub-assembly bar) – changes go back into it.",
     when: "Adding, moving or mating parts inside a sub-assembly.",
     select: "A sub-assembly (filter Sub-assembly or in the tree).",
-    steps: ["Select the sub-assembly and choose Open selected.", "Edit the components and click ← Back to assembly."],
+    steps: ["Select the sub-assembly and choose Edit in context.", "Edit the components and click ← Back to assembly."],
     cmd: 'assembly edit "Guide"',
   },
 
@@ -614,6 +629,6 @@ export default {
     when: "Designing a two-plate mould around a cavity insert.",
     steps: ["Enter Width X, Length Y, plate thicknesses and Ø guide pillars.", "Optionally Cavity in plate A and Plate material.", "Click Create mould base."],
     cmd: "moldbase 246 296",
-    note: "The base replaces the content of the current tab (Ctrl+Z undoes) – add inserts afterwards.",
+    note: "The base opens in a new tab; add inserts to it afterwards (Insert part / model).",
   },
 } satisfies Record<string, MicroTip>;

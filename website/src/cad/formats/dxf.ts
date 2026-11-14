@@ -34,18 +34,26 @@ function all(e: Ent, code: number): number[] {
   return e.g.filter((x) => x.code === code).map((x) => Number(x.value));
 }
 
-export type DxfResult = { entities: SketchEntity[]; skipped: Record<string, number>; unitScale: number };
+/**
+ * `layers[i]` = hladina entity `entities[i]` (skupina 8, výchozí „0“); `units` = kód $INSUNITS (0 = bez jednotek / chybí)
+ * – podle něj import do skici rozhodne, zda nabídnout volbu jednotek.
+ */
+export type DxfResult = { entities: SketchEntity[]; skipped: Record<string, number>; unitScale: number; layers: string[]; units: number };
 
 export function parseDXF(text: string): DxfResult {
   if (/^AC10\d\d/.test(text.slice(0, 6))) throw new Error(tr("Soubor je binární DWG, ne DXF."));
   if (text.startsWith("AutoCAD Binary DXF")) throw new Error(tr("Binární DXF není podporované – uložte DXF jako ASCII."));
   const P = pairs(text);
   let scale = 1;
+  let units = 0;
   // hlavička
   for (let i = 0; i < P.length; i++) {
     if (P[i].code === 9 && P[i].value === "$INSUNITS") {
       const v = P[i + 1];
-      if (v && v.code === 70) scale = UNITS[Number(v.value)] ?? 1;
+      if (v && v.code === 70) {
+        units = Number(v.value) || 0;
+        scale = UNITS[units] ?? 1;
+      }
     }
   }
   // sekce ENTITIES
@@ -102,9 +110,11 @@ export function parseDXF(text: string): DxfResult {
     }
   };
 
+  const layers: string[] = [];
   for (let k = 0; k < ents.length; k++) {
     const e = ents[k];
     const flip = ocsFlip(e);
+    const layer = e.g.find((x) => x.code === 8)?.value || "0";
     switch (e.type) {
       case "LINE":
         out.push({ id: uid(), type: "line", a: pt(num(e, 10), num(e, 20)), b: pt(num(e, 11), num(e, 21)) });
@@ -201,8 +211,9 @@ export function parseDXF(text: string): DxfResult {
       default:
         skipped[e.type] = (skipped[e.type] ?? 0) + 1;
     }
+    while (layers.length < out.length) layers.push(layer); // hladina každé nové entity (LWPOLYLINE s oblouky = více entit)
   }
-  return { entities: out, skipped, unitScale: scale };
+  return { entities: out, skipped, unitScale: scale, layers, units };
 }
 
 /** Racionální B-spline (de Boor). */

@@ -1,0 +1,67 @@
+# Vlna 13 – balík docs: podsestavy (strom + 3D, kopie v nové záložce, úprava v kontextu), více výkresů dílu, export všech listů, import DXF do otevřené skice
+ – neznámé „{0}“	 – unbekannt „{0}“
+ – všechny listy ({0})	 – alle Blätter ({0})
+, listů {0}	, Blätter {0}
+{0} listů	{0} Blätter
+{0} listy	{0} Blätter
++ Výkres	+ Zeichnung
+✓ nový výkres „{0}“ – list 1 „{1}“ (Chytré kóty); další příkazy výkresu pracují s ním · výkresů {2}	✓ neue Zeichnung „{0}“ – Blatt 1 „{1}“ (Intelligente Bemaßung); weitere Zeichnungsbefehle wirken darauf · Zeichnungen {2}
+✓ výkres „{0}“ ({1}) – další příkazy výkresu pracují s ním	✓ Zeichnung „{0}“ ({1}) – weitere Zeichnungsbefehle wirken darauf
+✓ výkres „{0}“ → „{1}“	✓ Zeichnung „{0}“ → „{1}“
+✓ výkres „{0}“ smazán ({1}) – aktivní výkres „{2}“	✓ Zeichnung „{0}“ gelöscht ({1}) – aktive Zeichnung „{2}“
+✓ výkres export {0}: {1} ({2} kB{3})	✓ Zeichnungsexport {0}: {1} ({2} kB{3})
+1 list	1 Blatt
+Aktivní list	Aktives Blatt
+Ctrl+Z import vrátí.	Strg+Z macht den Import rückgängig.
+další výkres tohoto dílu se samostatnými listy („Výkres 2“…)	weitere Zeichnung dieses Teils mit eigenen Blättern („Zeichnung 2“…)
+Do skici přidáno entit: {0} z „{1}“ (hladiny: {2}){3}.	Zur Skizze hinzugefügt: {0} Elemente aus „{1}“ (Layer: {2}){3}.
+dokument má jen jeden výkres – ten smazat nelze (smažte jeho listy nebo kóty)	das Dokument hat nur eine Zeichnung – sie kann nicht gelöscht werden (Blätter oder Maße löschen)
+Dokument zatím nemá výkres – vytvořte ho tlačítkem Nový výkres.	Das Dokument hat noch keine Zeichnung – mit Neue Zeichnung anlegen.
+entit v souboru: {0}	Elemente in der Datei: {0}
+Entity se přidají k otevřené skice jedním krokem – Ctrl+Z vrátí celý import. DXF jako nový díl otevřete přes Data › Otevřít.	Die Elemente werden der geöffneten Skizze in einem Schritt hinzugefügt – Strg+Z macht den ganzen Import rückgängig. DXF als neues Teil: Daten › Öffnen.
+Generuji PDF (listů: {0})…	PDF wird erzeugt (Blätter: {0})…
+Import DXF do skici „{0}“	DXF in Skizze „{0}“ importieren
+Importovat (entit: {0})	Importieren (Elemente: {0})
+jednotky souboru: {0}	Einheiten der Datei: {0}
+Jednotky výkresu DXF	Einheiten der DXF-Zeichnung
+jinak zůstanou souřadnice ze souboru	sonst bleiben die Koordinaten der Datei
+Levý dolní roh do počátku skici	Linke untere Ecke in den Skizzenursprung
+Listy k exportu	Blätter für Export
+název výkresu nesmí být prázdný	der Zeichnungsname darf nicht leer sein
+Nový výkres „{0}“	Neue Zeichnung „{0}“
+Nový výkres „{0}“ – mezi výkresy dílu přepnete v liště listů výkresu.	Neue Zeichnung „{0}“ – zwischen den Zeichnungen des Teils wechseln Sie in der Blattleiste.
+Otevřít v nové záložce (kopie)	In neuem Tab öffnen (Kopie)
+Otevřít výkres	Zeichnung öffnen
+palce	Zoll
+PDF, DWG, DXF, SVG a Tisk: všechny listy výkresu, nebo jen aktivní list	PDF, DWG, DXF, SVG und Drucken: alle Blätter der Zeichnung oder nur das aktive Blatt
+PDF{0}	PDF{0}
+Podle souboru	Laut Datei
+Podsestava „{0}“ otevřena v nové záložce jako kopie – změny se do sestavy nepropíší (úprava v sestavě: Upravit v kontextu).	Unterbaugruppe „{0}“ als Kopie in neuem Tab geöffnet – Änderungen gehen nicht in die Baugruppe zurück (in der Baugruppe bearbeiten: Im Kontext bearbeiten).
+Posun X [mm]	Versatz X [mm]
+Posun Y [mm]	Versatz Y [mm]
+přepnutí mezi výkresy tohoto dílu / sestavy	Wechsel zwischen den Zeichnungen dieses Teils / dieser Baugruppe
+přeskočeno: {0}	übersprungen: {0}
+Přeskočeno: {0}.	Übersprungen: {0}.
+převod na mm skici	Umrechnung in Skizzen-mm
+Přidá se entit: {0}	Hinzuzufügende Elemente: {0}
+Připravuji tisk (listů: {0})…	Druck wird vorbereitet (Blätter: {0})…
+soubor jednotky neuvádí (bráno jako mm)	die Datei nennt keine Einheiten (als mm angenommen)
+Upravit podsestavu v kontextu	Unterbaugruppe im Kontext bearbeiten
+Upravit v kontextu	Im Kontext bearbeiten
+Všechny listy ({0})	Alle Blätter ({0})
+Vyberte komponenty ve stromu nebo v modelu (Ctrl+klik přidá další).	Komponenten im Baum oder im Modell wählen (Strg+Klick fügt weitere hinzu).
+Výkres „{0}“ – {1}	Zeichnung „{0}“ – {1}
+výkres „{0}“ už existuje – {1}	Zeichnung „{0}“ existiert bereits – {1}
+Výkres {0}	Zeichnung {0}
+výkres {0} neexistuje – {1}; nový výkres: výkres nový "název"	Zeichnung {0} existiert nicht – {1}; neue Zeichnung: zeichnung neu "Name"
+Výkres 1	Zeichnung 1
+Výkres dílu	Zeichnung des Teils
+výkres export pdf|dxf|dwg|svg|csv|png [vše|list <číslo|"název">] [verze DWG R2000…R2018]	zeichnung export pdf|dxf|dwg|svg|csv|png [alle|blatt <Nummer|"Name">] [DWG-Version R2000…R2018]
+Výkres nemá žádný list.	Die Zeichnung hat kein Blatt.
+výkres výkresy · výkres nový ["název"] · výkres výkresy <číslo|"název"> · výkres výkresy přejmenovat [<číslo>] "název" · výkres výkresy smazat <číslo|"název">	zeichnung zeichnungen · zeichnung neu ["Name"] · zeichnung zeichnungen <Nummer|"Name"> · zeichnung zeichnungen umbenennen [<Nummer>] "Name" · zeichnung zeichnungen löschen <Nummer|"Name">
+Výkresy ({0}): {1}	Zeichnungen ({0}): {1}
+Výkresy: zatím žádný (první vznikne příkazem výkresu)	Zeichnungen: noch keine (die erste entsteht mit einem Zeichnungsbefehl)
+Vytvořit z vybraných	Aus Auswahl erzeugen
+Vytvořit z vybraných ({0})	Aus Auswahl erzeugen ({0})
+další výkres téhož dílu s vlastními listy (Výkres 2…), přepnutí a správa výkresů; export do souboru – vše = všechny listy aktivního výkresu (PDF vícestránkové, jinak ZIP), také window.mncad.exportDrawing("pdf", { sheet: "all" })	weitere Zeichnung desselben Teils mit eigenen Blättern (Zeichnung 2…), Wechseln und Verwalten von Zeichnungen; Export in eine Datei – alle = alle Blätter der aktiven Zeichnung (mehrseitiges PDF, sonst ZIP), auch window.mncad.exportDrawing("pdf", { sheet: "all" })
+Uložit podsestavu (.mncad)	Unterbaugruppe speichern (.mncad)

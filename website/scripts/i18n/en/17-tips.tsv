@@ -31,3 +31,4 @@ odřízne část volných ploch na jedné straně roviny	cuts away the part of t
 rozřízne solid rovinou – obě části zůstanou, nebo jen jedna	splits the solid with a plane – both parts remain, or only one
 zaoblený výstupek podél úsečky ve skice (zjednodušeně, v rozvinu chybí – tvářené žebro je Žebro podél dráhy)	a rounded bump along a sketch line (simplified, missing in the flat pattern – a formed bead is Bead along path)
 Podložka kořene	Backing strip
+výkres {0}, listů {1}	drawing {0}, {1} sheets

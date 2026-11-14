@@ -14,6 +14,8 @@ import type { FaceLite } from "./agent";
 import { getLang, tr } from "./i18n";
 import type { Ref, Sig } from "./refs";
 import { keyPoints } from "./sketch";
+import { addWithAutoClose } from "./poly-close";
+import { profileStatusLines } from "./profile-check";
 import { analyzeSketch, measureDim, paramsOf, refCircle, refLine, refPoint, solveSketch, type SketchAnalysis } from "./sketch-solver";
 import { uid, type BuildResult, type CadDoc, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchPlane, type SketchRef, type Vec2, type Vec3 } from "./types";
 
@@ -61,10 +63,11 @@ const AT_WORDS = ["v", "na", "at", "bei", "an"];
 
 const CON_WORDS: Record<ConType, string[]> = {
   horizontal: ["vodorovne", "vodorovna", "vodorovny", "horizontalne", "horizontal", "waagerecht", "waagrecht"],
-  vertical: ["svisle", "svisla", "svisly", "vertikalne", "vertical", "senkrecht", "vertikal"],
+  // DE: „senkrecht“ je v CADu kolmost (tlačítko „Senkrecht“ = Kolmo) – svisle je „vertikal“ / „lotrecht“
+  vertical: ["svisle", "svisla", "svisly", "vertikalne", "vertical", "vertikal", "lotrecht"],
   coincident: ["shodne", "shoda", "totozne", "totoznost", "coincident", "deckungsgleich", "koinzident"],
   parallel: ["rovnobezne", "rovnobezna", "rovnobezny", "parallel", "parallele"],
-  perpendicular: ["kolmo", "kolma", "kolmy", "perpendicular", "rechtwinklig"],
+  perpendicular: ["kolmo", "kolma", "kolmy", "perpendicular", "senkrecht", "rechtwinklig"],
   tangent: ["tecne", "tecna", "tecny", "tangent", "tangential", "tangentially"],
   equal: ["stejne", "stejna", "stejny", "stejna velikost", "equal", "gleich", "gleiche"],
   fixed: ["pevne", "pevna", "pevny", "fixed", "fix", "fest", "fixiert"],
@@ -78,7 +81,7 @@ const DIM_WORDS: Record<DimType, string[]> = {
   length: ["delka", "length", "lange", "laenge", "len"],
   distance: ["vzdalenost", "distance", "abstand", "dist"],
   horizontal: ["vodorovne", "vodorovna", "horizontal", "waagerecht", "waagrecht", "dx"],
-  vertical: ["svisle", "svisla", "vertical", "senkrecht", "vertikal", "dy"],
+  vertical: ["svisle", "svisla", "vertical", "vertikal", "senkrecht", "lotrecht", "dy"], // u kót „senkrecht“ dál = svislá kóta (kolmá kóta neexistuje)
   radius: ["polomer", "radius", "halbmesser"],
   diameter: ["prumer", "diameter", "durchmesser"],
   angle: ["uhel", "angle", "winkel"],
@@ -157,6 +160,9 @@ export function parseConstraints(text: string): ConstraintSpec[] {
     const rest = tk.slice(m.used).filter((t) => !AT_WORDS.includes(fold(t)));
     const nums = rest.filter(isNumTok).map(numOf);
     const refs = rest.filter((t) => !isNumTok(t)).map(parseRef);
+    // „senkrecht“ znamenalo do 13. vlny svisle: jedna úsečka nebo dva body (e1.a e2.b) svědčí o starém skriptu → jasná rada
+    if (m.kind === "perpendicular" && fold(tk[0]) === "senkrecht" && (refs.length === 1 || (refs.length === 2 && refs.every((x) => "origin" in x || (!!x.k && !/^[sg]\d+$/i.test(x.k))))))
+      throw new Error(tr("vazba „senkrecht“ = kolmo (dvě úsečky: senkrecht e1 e2); pro svislou úsečku nebo dva body nad sebou napište „vertikal“ ({0})", tk.slice(m.used).join(" ")));
     if (!CON_ARITY[m.kind].includes(refs.length)) throw new Error(tr("vazba {0}: špatný počet odkazů ({1}) – zápis: {2}", conWord(m.kind), refs.length, conUsage(m.kind)));
     const spec: ConstraintSpec = { type: m.kind, refs };
     if (nums.length) {
@@ -525,10 +531,11 @@ export function applySketchOp(features: Feature[], op: SketchOp, openSketchId?: 
   const i = targetSketch(features, op.sketch, openSketchId);
   const sk = features[i] as SketchF;
   if (op.k === "entities") {
-    const ents = withTextIds(sk.entities, op.entities);
-    let next: SketchF = { ...sk, entities: [...sk.entities, ...ents] };
+    const m = addWithAutoClose(sk, withTextIds(sk.entities, op.entities)); // uzavření lomených čar podle celé skici (poly-close.ts)
+    const ents = m.added;
+    let next: SketchF = { ...sk, ...m.patch };
     const n = ents.length;
-    const out = [`${tr("✓ {0} {1} do skici „{2}“", n, n === 1 ? tr("entita") : n < 5 ? tr("entity") : tr("entit"), sk.name)}${n ? ` (${idList(ents.map((e) => e.id))})` : ""}`];
+    const out = [`${tr("✓ {0} {1} do skici „{2}“", n, n === 1 ? tr("entita") : n < 5 ? tr("entity") : tr("entit"), sk.name)}${n ? ` (${idList(ents.map((e) => e.id))})` : ""}`, ...m.notes];
     if (op.end && (next.constraints?.length || next.dims?.length)) {
       const r = solveSketchFeature(next);
       next = r.feature;
@@ -615,7 +622,7 @@ export function entityText(e: SketchEntity): string {
       case "slot":
         return `${tr("drážka {0}×{1}", fmt(e.length), fmt(e.width))} ${pt(c)}${e.angle ? ` ∠${fmt(e.angle)}°` : ""}`;
       case "polyline":
-        return `${tr("čára {0} b.", e.points.length)} ${e.points.map(pt).join("→")}${e.closed ? "↺" : ""}`;
+        return `${tr("čára {0} b.", e.points.length)} ${e.points.map(pt).join("→")} ${e.closed ? `↺ ${e.autoClose ? tr("uzavřená automaticky") : tr("uzavřená")}` : tr("otevřená")}`;
       case "spline":
         return `${tr("spline {0} b.", e.points.length)} ${e.points.map(pt).join("→")}${e.closed ? "↺" : ""}${tangentSummary(e) ? ` ${tr("tečny")} ${tangentSummary(e, fmt)}` : ""}`;
       case "point":
@@ -624,7 +631,7 @@ export function entityText(e: SketchEntity): string {
         return `${tr("elipsa")} ${fmt(e.rx)}×${fmt(e.ry)} ${pt(c)}`;
     }
   })();
-  return `${e.id} ${body}${e.construction ? tr(" (pomocná)") : ""}`;
+  return `${e.id} ${body}${e.construction ? tr(" (pomocná)") : ""}${e.type === "line" && e.autoClose ? tr(" (uzavírá čáru se zaoblenými rohy – automaticky)") : ""}`;
 }
 /** nejvíc entit, které textový stav vypíše jednotlivě (s id) – u větších skic jen počet */
 export const STATUS_MAX_ENTITIES = 40;
@@ -643,6 +650,7 @@ export function sketchStatusLines(f: SketchF, indent = "    "): string[] {
     if (nc && nc <= STATUS_MAX_ENTITIES) out.push(indent + tr("vazby: {0}", (f.constraints ?? []).map((c, i) => `v${i + 1} ${describeConstraint(c, ents)}`).join(" · ")));
     if (nd && nd <= STATUS_MAX_ENTITIES) out.push(indent + tr("kóty: {0}", (f.dims ?? []).map((d, i) => `k${i + 1} ${describeDim({ ...d, driving: true }, ents).replace(/ (\S+)$/, " = $1")}${d.driving ? "" : " " + tr("referenční")}`).join(" · ")));
   }
+  out.push(...profileStatusLines(f.entities, indent)); // obrysy a proč profil není platný (profile-check.ts)
   return out;
 }
 

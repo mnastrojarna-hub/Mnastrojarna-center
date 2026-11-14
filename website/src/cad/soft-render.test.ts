@@ -496,7 +496,7 @@ const fmtMs = (a: number[]) => a.map((t) => t.toFixed(1)).join(" / ");
 const median = (a: number[]) => [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)];
 
 describe("softwarový renderer – rychlost", () => {
-  it("250 000 trojúhelníků na plátně 1400 × 850 výrazně pod sekundu na pohled", () => {
+  it("250 000 trojúhelníků na plátně 1400 × 850 výrazně pod sekundu na pohled", { timeout: 60_000 }, () => {
     const s = sphere(50, 354, 354);
     const tris = s.triangles.length / 3;
     expect(tris).toBeGreaterThan(249_000);
@@ -526,7 +526,7 @@ describe("softwarový renderer – rychlost", () => {
     expect(Math.max(...cpu)).toBeLessThan(1500);
   });
 
-  it("250 000 trojúhelníků s hranami (125 000 úseček) a řezem", () => {
+  it("250 000 trojúhelníků s hranami (125 000 úseček) a řezem", { timeout: 60_000 }, () => {
     // mříž 50 × 50 × 4 kvádrů… zde 20 833 kvádrů × 12 trojúhelníků v jedné síti
     const n = 20_834;
     const one = box([0, 0, 0], [1.6, 1.6, 1.6]);

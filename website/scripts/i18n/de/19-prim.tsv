@@ -76,7 +76,6 @@ hloubka válcového zahloubení	Tiefe der Zylindersenkung
 hloubka-závitu T	gewindetiefe T
 hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě	Werte: Zahl 12,5 · ja/nein · Liste a;b;c · Text in Anführungszeichen · JSON {…} / […]; Skizzen und Elemente per Name oder $last; Flächen und Kanten per Index ab 0 (F3 = 2) oder per Regel; ein „Pflicht“-Feld ohne Wert führt beim Aufbau zu einem Fehler
 hrana E{0}	Kante E{0}
-hrana E{0} v tělese není (hran {1})	Kante E{0} gibt es im Körper nicht ({1} Kanten)
 hrany (all = všechny)	Kanten (all = alle)
 hrany <pravidlo> | hrany E3 E7	kanten <regel> | kanten E3 E7
 hrany: indexy od 0 (E3 = 2), all nebo pravidlo	Kanten: Indizes ab 0 (E3 = 2), all oder Regel
@@ -187,7 +186,6 @@ otisky výběru – doplní program (ručně vynechat)	Auswahlsignaturen – fü
 označení (M8, M18×1,5)	Bezeichnung (M8, M18×1,5)
 parametry nemá popsané – klíče podle výchozích dat výše	keine Parameterbeschreibung – Schlüssel wie in den Standarddaten oben
 parametry rozšíření – prvek nápověda <rozšíření>	Erweiterungsparameter – element hilfe <erweiterung>
-plocha F{0} v tělese není (ploch {1})	Fläche F{0} gibt es im Körper nicht ({1} Flächen)
 plocha F3	fläche F3
 plochy (plocha–plocha, plné zaoblení)	Flächen (Fläche–Fläche, Vollrundung)
 plochy <pravidlo|F1 F2…>	flächen <regel|F1 F2…>

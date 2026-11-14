@@ -23,6 +23,7 @@ import { SHRINKAGE, isPlusZ, moldFrame, suggestPartingZ, type CoolingParams, typ
 import type { SectionState } from "./section-plane";
 import type { Settings } from "./settings";
 import type { CadDoc, MeshData, Vec3 } from "./types";
+import { parseSelectCommand, type SelectCmd } from "./agent-select";
 
 /* ───────────────────────── příkazy ───────────────────────── */
 export type DisplayStyle = "shadedEdges" | "shaded" | "wireframe" | "hiddenLine" | "xray";
@@ -44,7 +45,9 @@ export type ApiCmd =
   | { kind: "parting"; dir: Vec3 }
   | { kind: "ejectors"; d?: number; spacing?: number; dir: Vec3; mode: "list" | "holes" | "assembly" }
   | { kind: "cooling"; d?: number; depth?: number; rows?: number; overhang?: number; dir: Vec3; mode: "list" | "part" | "assembly" }
-  | { kind: "shrinkage"; pct: number; label?: string };
+  | { kind: "shrinkage"; pct: number; label?: string }
+  /** výběr entit textem: vyber F3 E2 [přidat] · vyber nic · vyber (agent-select.ts) */
+  | SelectCmd;
 /** operace programu textových příkazů (agent.ts) – provede ji aplikace (agent-api-host.ts) */
 export type ApiOp = { k: "api"; cmd: ApiCmd; line: number };
 
@@ -229,6 +232,8 @@ export function parseApiCommand(tokens: string[]): ApiCmd | null {
   const rest = tokens.slice(1);
   const f1 = foldWord(rest[0] ?? "");
   if (!head) return null;
+  const pick = parseSelectCommand(tokens);
+  if (pick) return pick;
 
   // ── řez ──
   if (SECTION_HEADS.has(head)) {

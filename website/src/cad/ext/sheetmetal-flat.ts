@@ -39,6 +39,40 @@ export const bendRadius = (data: Record<string, unknown>, p: SheetParams) => {
   return r > 0 ? r : p.r;
 };
 
+/**
+ * Číselné hodnoty ohybu z hrany / lemu, se kterými počítá stavba, když v datech chybí (starší dokumenty: kapka bez úhlu
+ * uzavření, lem bez délky…). Formulář je ukáže stejně – jinak by pole ukázalo 0 a stavba počítala s jinou hodnotou.
+ */
+export function flangeDefaults(hem: boolean, p: SheetParams): Record<string, number> {
+  return hem ? { length: 10, radius: 0, closeAngle: 30 } : { length: 20, angle: 90, radius: 0, reliefWidth: p.t, reliefDepth: 0 };
+}
+/** Hodnota číselného pole formuláře ohybu / lemu: uložená, jinak ta, se kterou počítá stavba (`flangeDefaults`), jinak 0. */
+export function flangeNumber(ext: string, key: string, data: Record<string, unknown>, p: SheetParams): number {
+  const v = data[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : (flangeDefaults(ext === "sheet.hem", p)[key] ?? 0);
+}
+
+/**
+ * Ohyb z hrany / lem: úhel, vnitřní poloměr a délka rovné příruby (ramene). Jádro (sheetmetal.ts) i rozvin počítají stejně.
+ * Lem: otevřený = 180° s poloměrem, uzavřený = 180° s malým poloměrem (0,1·t), kapka = 180° + úhel uzavření s poloměrem a
+ * rameno, které se vrací šikmo k plechu a končí těsně nad ním (mezera max(0,01; 0,05·t) mm) – délka ramene se dopočítá.
+ */
+export function flangeGeometry(data: Record<string, unknown>, p: SheetParams, hem: boolean): { angle: number; R: number; length: number } {
+  const dflt = flangeDefaults(hem, p);
+  if (!hem) return { angle: num(data.angle, dflt.angle), R: bendRadius(data, p), length: num(data.length, dflt.length) };
+  if (data.kind === "teardrop") {
+    const R = bendRadius(data, p);
+    const phi = num(data.closeAngle, dflt.closeAngle);
+    if (!(phi >= 5 && phi <= 90)) throw new Error(tr("Úhel uzavření kapky musí být 5–90° (zadáno {0}°).", phi));
+    const a = (phi * Math.PI) / 180;
+    const gap = Math.max(0.01, 0.05 * p.t);
+    // vnitřní plocha ramene klesá od konce oblouku (výška R + R·cos φ nad plechem) se sklonem φ → k mezerě nad plechem
+    const length = Math.max(0, (R * (1 + Math.cos(a)) - gap) / Math.sin(a));
+    return { angle: 180 + phi, R, length };
+  }
+  return { angle: 180, R: data.kind === "closed" ? Math.max(0.05, 0.1 * p.t) : bendRadius(data, p), length: num(data.length, dflt.length) };
+}
+
 export function baseFeatureIndex(doc: CadDoc, before = doc.features.length): number {
   for (let i = 0; i < Math.min(before, doc.features.length); i++) if (!doc.features[i].suppressed && isSheet(doc.features[i], "sheet.base")) return i;
   return -1;
@@ -288,11 +322,10 @@ export async function flatLayout(doc: CadDoc, resolve: EdgeResolver, upTo = doc.
       case "sheet.hem": {
         const edges = (data.edges as number[] | undefined) ?? [];
         if (!edges.length) throw new Error(tr("{0}: není vybrána hrana.", f.name));
-        const hem = f.ext === "sheet.hem";
-        const angle = hem ? 180 : num(data.angle, 90);
-        const length = num(data.length, hem ? 10 : 20);
-        const R = hem ? (data.kind === "closed" ? Math.max(0.05, 0.1 * t) : bendRadius(data, p)) : bendRadius(data, p);
+        const { angle, R, length } = flangeGeometry(data, p, f.ext === "sheet.hem");
         const ba = bendAllowance(angle, R, t, p.k);
+        // zářezy úlevy ohybu jsou jen v 3D modelu – rozvin je nekreslí, aby to nebylo potichu, ohlásí se
+        if (f.ext === "sheet.flange" && data.relief && data.relief !== "none") ctx.warnings.push(tr("{0}: úleva ohybu se v rozvinu nekreslí – zářezy doplňte ručně.", f.name));
         for (const ei of edges) {
           const eg = await resolve(i, ei);
           if (!eg) throw new Error(tr("{0}: hranu ohybu se nepodařilo určit – otevřete prvek a vyberte hranu znovu.", f.name));

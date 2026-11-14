@@ -251,7 +251,7 @@ const TOOL_LABEL: Partial<Record<SketchTool, string>> = {
   move: "Přesunout",
   copy: "Kopírovat",
   rotate: "Otočit",
-  scale: "Měřítko",
+  scale: "Změnit měřítko", // vlastní klíč: „Měřítko“ je měřítko výkresu (DE Maßstab), nástroj skici je DE „Skalieren“
   patternLinear: "Lineární pole",
   patternCircular: "Kruhové pole",
   explode: "Rozložit",

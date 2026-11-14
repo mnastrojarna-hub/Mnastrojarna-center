@@ -1,0 +1,67 @@
+# Vlna 13 – balík docs: podsestavy (strom + 3D, kopie v nové záložce, úprava v kontextu), více výkresů dílu, export všech listů, import DXF do otevřené skice
+ – neznámé „{0}“	 – unknown “{0}”
+ – všechny listy ({0})	 – all sheets ({0})
+, listů {0}	, sheets {0}
+{0} listů	{0} sheets
+{0} listy	{0} sheets
++ Výkres	+ Drawing
+✓ nový výkres „{0}“ – list 1 „{1}“ (Chytré kóty); další příkazy výkresu pracují s ním · výkresů {2}	✓ new drawing “{0}” – sheet 1 “{1}” (Smart dimensions); further drawing commands work on it · drawings {2}
+✓ výkres „{0}“ ({1}) – další příkazy výkresu pracují s ním	✓ drawing “{0}” ({1}) – further drawing commands work on it
+✓ výkres „{0}“ → „{1}“	✓ drawing “{0}” → “{1}”
+✓ výkres „{0}“ smazán ({1}) – aktivní výkres „{2}“	✓ drawing “{0}” deleted ({1}) – active drawing “{2}”
+✓ výkres export {0}: {1} ({2} kB{3})	✓ drawing export {0}: {1} ({2} kB{3})
+1 list	1 sheet
+Aktivní list	Active sheet
+Ctrl+Z import vrátí.	Ctrl+Z undoes the import.
+další výkres tohoto dílu se samostatnými listy („Výkres 2“…)	another drawing of this part with its own sheets (“Drawing 2”…)
+Do skici přidáno entit: {0} z „{1}“ (hladiny: {2}){3}.	Added to the sketch: {0} entities from “{1}” (layers: {2}){3}.
+dokument má jen jeden výkres – ten smazat nelze (smažte jeho listy nebo kóty)	the document has only one drawing – it cannot be deleted (delete its sheets or dimensions)
+Dokument zatím nemá výkres – vytvořte ho tlačítkem Nový výkres.	The document has no drawing yet – create one with New drawing.
+entit v souboru: {0}	entities in file: {0}
+Entity se přidají k otevřené skice jedním krokem – Ctrl+Z vrátí celý import. DXF jako nový díl otevřete přes Data › Otevřít.	The entities are added to the open sketch in one step – Ctrl+Z undoes the whole import. To open a DXF as a new part use Data › Open.
+Generuji PDF (listů: {0})…	Generating PDF (sheets: {0})…
+Import DXF do skici „{0}“	Import DXF into sketch “{0}”
+Importovat (entit: {0})	Import (entities: {0})
+jednotky souboru: {0}	file units: {0}
+Jednotky výkresu DXF	DXF drawing units
+jinak zůstanou souřadnice ze souboru	otherwise the file coordinates are kept
+Levý dolní roh do počátku skici	Lower-left corner to the sketch origin
+Listy k exportu	Sheets to export
+název výkresu nesmí být prázdný	the drawing name must not be empty
+Nový výkres „{0}“	New drawing “{0}”
+Nový výkres „{0}“ – mezi výkresy dílu přepnete v liště listů výkresu.	New drawing “{0}” – switch between the part's drawings in the drawing's sheet bar.
+Otevřít v nové záložce (kopie)	Open in a new tab (copy)
+Otevřít výkres	Open drawing
+palce	inches
+PDF, DWG, DXF, SVG a Tisk: všechny listy výkresu, nebo jen aktivní list	PDF, DWG, DXF, SVG and Print: all sheets of the drawing or only the active sheet
+PDF{0}	PDF{0}
+Podle souboru	From file
+Podsestava „{0}“ otevřena v nové záložce jako kopie – změny se do sestavy nepropíší (úprava v sestavě: Upravit v kontextu).	Sub-assembly “{0}” opened in a new tab as a copy – changes do not flow back into the assembly (to edit in the assembly: Edit in context).
+Posun X [mm]	Offset X [mm]
+Posun Y [mm]	Offset Y [mm]
+přepnutí mezi výkresy tohoto dílu / sestavy	switch between the drawings of this part / assembly
+přeskočeno: {0}	skipped: {0}
+Přeskočeno: {0}.	Skipped: {0}.
+převod na mm skici	converted to sketch mm
+Přidá se entit: {0}	Entities to add: {0}
+Připravuji tisk (listů: {0})…	Preparing print (sheets: {0})…
+soubor jednotky neuvádí (bráno jako mm)	the file states no units (taken as mm)
+Upravit podsestavu v kontextu	Edit sub-assembly in context
+Upravit v kontextu	Edit in context
+Všechny listy ({0})	All sheets ({0})
+Vyberte komponenty ve stromu nebo v modelu (Ctrl+klik přidá další).	Select components in the tree or in the model (Ctrl+click adds more).
+Výkres „{0}“ – {1}	Drawing “{0}” – {1}
+výkres „{0}“ už existuje – {1}	drawing “{0}” already exists – {1}
+Výkres {0}	Drawing {0}
+výkres {0} neexistuje – {1}; nový výkres: výkres nový "název"	drawing {0} does not exist – {1}; new drawing: drawing new "name"
+Výkres 1	Drawing 1
+Výkres dílu	Drawing of the part
+výkres export pdf|dxf|dwg|svg|csv|png [vše|list <číslo|"název">] [verze DWG R2000…R2018]	drawing export pdf|dxf|dwg|svg|csv|png [all|sheet <number|"name">] [DWG version R2000…R2018]
+Výkres nemá žádný list.	The drawing has no sheet.
+výkres výkresy · výkres nový ["název"] · výkres výkresy <číslo|"název"> · výkres výkresy přejmenovat [<číslo>] "název" · výkres výkresy smazat <číslo|"název">	drawing drawings · drawing new ["name"] · drawing drawings <number|"name"> · drawing drawings rename [<number>] "name" · drawing drawings delete <number|"name">
+Výkresy ({0}): {1}	Drawings ({0}): {1}
+Výkresy: zatím žádný (první vznikne příkazem výkresu)	Drawings: none yet (the first one is created by a drawing command)
+Vytvořit z vybraných	Create from selected
+Vytvořit z vybraných ({0})	Create from selected ({0})
+další výkres téhož dílu s vlastními listy (Výkres 2…), přepnutí a správa výkresů; export do souboru – vše = všechny listy aktivního výkresu (PDF vícestránkové, jinak ZIP), také window.mncad.exportDrawing("pdf", { sheet: "all" })	another drawing of the same part with its own sheets (Drawing 2…), switching and managing drawings; export to a file – all = all sheets of the active drawing (multi-page PDF, otherwise ZIP), also window.mncad.exportDrawing("pdf", { sheet: "all" })
+Uložit podsestavu (.mncad)	Save sub-assembly (.mncad)

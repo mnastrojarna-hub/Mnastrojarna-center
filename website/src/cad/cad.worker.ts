@@ -3,7 +3,9 @@
 import { setLang, tr, type CadLang } from "./i18n";
 import * as r from "replicad";
 import opencascade from "replicad-opencascadejs";
-import { buildDoc, buildShape, faceInfo, type BuildProgress } from "./build";
+import { buildDoc, buildShape, cachedSteps, faceInfo, type BuildProgress } from "./build";
+import { faceOwner } from "./face-owner";
+import { resolveDoc } from "./params";
 import { drawingDoc } from "./drawing-doc";
 import { drawingModelShapes } from "./drawing-models";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
@@ -25,6 +27,7 @@ import { formNotesOfDoc } from "./drawing-doc";
 import { hasWelds, weldMarksOf } from "./drawing-welds";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
+import { exportStats } from "./export-verify";
 
 let ready: Promise<void> | null = null;
 let body: r.Shape3D | null = null;
@@ -49,6 +52,8 @@ type Req =
   | { id: number; op: "topology"; doc: CadDoc }
   | { id: number; op: "face"; index: number }
   | { id: number; op: "export"; format: ExportFormat; doc: CadDoc }
+  /** kontrola exportu z konzole: soubor znovu načíst a změřit proti modelu (export-verify.ts) */
+  | { id: number; op: "exportStats"; doc: CadDoc; bytes: Uint8Array; format: "step" | "brep" }
   | { id: number; op: "asmParts"; parts: { key: string; source: ComponentSource }[] }
   | { id: number; op: "asmFace"; key: string; index: number }
   | { id: number; op: "lang"; lang: CadLang }
@@ -58,6 +63,8 @@ type Req =
   | { id: number; op: "mateEnt"; key: string; index: number; ent: "edge" | "vertex" | "mesh" }
   | { id: number; op: "cylFace"; key: string; radius: number }
   | { id: number; op: "inspect"; src: ShapeSrc; ref: EntRef; density?: number }
+  /** filtr výběru Prvek: prvek, který vytvořil plochu dílu, a jeho plochy (face-owner.ts) */
+  | { id: number; op: "faceOwner"; doc: CadDoc; index: number; point?: [number, number, number] }
   | { id: number; op: "measureEnt"; a: { src: ShapeSrc; ref: EntRef }; b: { src: ShapeSrc; ref: EntRef } | null }
   | { id: number; op: "measure"; q: MeasureQuery; doc?: CadDoc; density?: number; sources?: { key: string; source: ComponentSource }[] }
   | { id: number; op: "drawing"; doc: CadDoc; meta: DrawingMeta; opts?: Partial<DrawingOptions> }
@@ -239,6 +246,19 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         ctx.postMessage({ id: m.id, ok: true, result: info });
         break;
       }
+      case "faceOwner": {
+        const res = await buildDoc(m.doc, { onProgress: progressTo(m.id) });
+        body?.delete?.();
+        body = res.body;
+        let steps = cachedSteps(m.doc);
+        if (!steps.length) {
+          // řetěz mezipaměti dokumentu mezitím vypadl (jiný dokument, výkres) – obnovit ho stavbou (navazuje na uložené stavy)
+          (await buildShape(m.doc, Infinity, { preferActive: true })).body?.delete?.();
+          steps = cachedSteps(m.doc);
+        }
+        ctx.postMessage({ id: m.id, ok: true, result: body ? faceOwner(body, m.index, m.point, steps, resolveDoc(m.doc).doc.features) : null });
+        break;
+      }
       case "measureEnt": {
         const sa = shapeFor(m.a.src, body, cachedBody);
         const sb = m.b ? shapeFor(m.b.src, body, cachedBody) : null;
@@ -311,6 +331,9 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
         ctx.postMessage({ id: m.id, ok: true, result: buf }, [buf]);
         break;
       }
+      case "exportStats":
+        ctx.postMessage({ id: m.id, ok: true, result: await exportStats(m.doc, m.bytes, m.format) });
+        break;
       case "drawing": {
         // těleso se přestaví jen při změně geometrie (razítko, název, materiál, poznámky těleso nemění – ty jsou rychlé)
         // závity se kreslí zjednodušeně (kružnice + označení) – modelované šroubovice se pro výkres potlačí (jejich přesná projekce trvá minuty)

@@ -4,11 +4,24 @@ import type { MicroTip } from "../tips";
 export default {
   // ── Zeichnung (Registerkarte) ──
   drw: {
-    what: "Öffnet die Zeichnung des Teils oder der Baugruppe in einer neuen Registerkarte – Ansichten, Schnitte, Maße, Schriftfeld, Export PDF / DXF / DWG.",
-    when: "Fertigungszeichnung für Werkstatt, Lohnfertiger oder Anfrage; Grundlage für ein Angebot.",
-    steps: ["Auf Neue Zeichnung klicken – eine Zeichnungsregisterkarte mit Intelligenter Bemaßung öffnet sich.", "Links Blatt, Ansichten, Schnitt A–A und Schriftfeld einstellen; Maße mit den Werkzeugen ergänzen.", "PDF / DWG / DXF exportieren; Schließen führt zurück zum 3D-Modell."],
-    cmd: "zeichnung",
-    note: "Hat das Dokument schon eine Zeichnung, öffnet sich die gespeicherte (Blätter, Maße, Schriftfeld) – keine zweite.",
+    what: "Legt eine neue Zeichnung des Teils oder der Baugruppe an – Ansichten, Schnitte, Maße, Schriftfeld, Export.",
+    when: "Fertigungszeichnung für Werkstatt oder Lohnfertiger; weitere Zeichnung desselben Teils (Montage, Rohteil).",
+    steps: ["Auf Neue Zeichnung klicken – erste Zeichnung oder eine weitere (Zeichnung 2…) mit eigenen Blättern.", "Links Blatt, Ansichten, Schnitt A–A und Schriftfeld einstellen; Maße ergänzen.", "PDF / DWG / DXF exportieren; Schließen führt zurück zum 3D-Modell."],
+    cmd: "zeichnung neu",
+    note: "Eine gespeicherte Zeichnung öffnet Zeichnung öffnen ▼; auch die Auswahl in der Blattleiste wechselt Zeichnungen.",
+  },
+  drwOpen: {
+    what: "Öffnet eine gespeicherte Zeichnung des Teils oder der Baugruppe – das Menü zeigt alle Zeichnungen mit Blattzahl.",
+    when: "Zurück zu einer Zeichnung in Arbeit, Maße oder Schriftfeld korrigieren, neuer Export.",
+    steps: ["Auf Zeichnung öffnen ▼ klicken.", "Zeichnung wählen – sie öffnet sich auf ihrem ersten Blatt."],
+    cmd: "zeichnung zeichnungen 1",
+    note: "Inaktiv, solange das Dokument keine Zeichnung hat (Neue Zeichnung).",
+  },
+  "menu:drwOpen/*": {
+    what: "Öffnet diese Zeichnung des Teils auf ihrem ersten Blatt.",
+    when: "Wechsel zwischen Zeichnungen desselben Teils (Fertigung, Montage…).",
+    steps: ["Auf den Namen der Zeichnung klicken."],
+    cmd: "zeichnung zeichnungen 2",
   },
 
   // ── Skizze › Zeichnen ──
@@ -370,10 +383,10 @@ export default {
     note: "Speichert nur die 2D-Skizzenelemente; eine Zeichnung mit Ansichten aus der Zeichnung exportieren.",
   },
   imp: {
-    what: "Lädt eine DXF-Datei als neue Skizze auf der Ebene XY in einer neuen Teil-Registerkarte.",
+    what: "Fügt Linien, Kreise, Bögen und Kurven einer DXF-Datei in die geöffnete Skizze ein.",
     when: "Übernahme einer 2D-Kontur aus AutoCAD oder vom Kunden zum Extrudieren.",
-    steps: ["Auf DXF importieren… klicken und eine .dxf-Datei wählen.", "In der neuen Skizze die Kontur prüfen und Beziehungen und Maße ergänzen."],
-    note: "In die geöffnete Skizze wird nichts eingefügt; Bild oder PDF über Unterlage… einlegen.",
+    steps: ["Auf DXF importieren… klicken und eine .dxf-Datei wählen.", "Einheiten, Ursprungsversatz und Layer wählen.", "Mit Importieren bestätigen – die Meldung nennt die Zahl neuer Elemente."],
+    note: "Strg+Z nimmt den ganzen Import zurück. DXF als neues Teil: Daten › Öffnen; Bild oder PDF über Unterlage….",
   },
   coords: {
     what: "Fügt eine Kurve aus einer Liste von X-Y-Koordinaten ein – Polylinie, Spline oder Linienkette.",
@@ -454,29 +467,31 @@ export default {
 
   // ── Zeichnungsarbeitsbereich: Export und Leiste ──
   "drawing-ws/pdf": {
-    what: "Speichert das angezeigte Zeichnungsblatt als PDF im Blattformat.",
+    what: "Speichert die Zeichnung als PDF – je Blatt eine Seite im eigenen Format; oder nur das aktive Blatt.",
     when: "Zeichnung zum Drucken, für die E-Mail an den Kunden oder für die Werkstatt.",
     steps: ["Warten, bis die Ansichten berechnet sind.", "Auf PDF klicken – die Datei <Name>_vykres.pdf wird gespeichert."],
-    note: "Speichert nur das angezeigte Blatt – weitere Blätter umschalten und einzeln exportieren.",
+    cmd: "zeichnung export pdf alle",
+    note: "Hat die Zeichnung mehrere Blätter, werden alle als mehrseitiges PDF gespeichert (Auswahl Blätter für Export).",
   },
   "drawing-ws/dwg": {
-    what: "Speichert das angezeigte Blatt als DWG in der gewählten AutoCAD-Version (2000 bis 2018+).",
+    what: "Speichert das Blatt als DWG in der gewählten AutoCAD-Version; mehrere Blätter = ZIP mit einer DWG je Blatt.",
     when: "Übergabe der Zeichnung an AutoCAD, ZWCAD oder BricsCAD zur weiteren Bearbeitung.",
     steps: ["In der Auswahlliste neben der Schaltfläche die DWG-Version wählen (Standard AutoCAD 2018+).", "Auf DWG klicken – die Datei wird gespeichert."],
-    note: "Für alte Software eine niedrigere Version wählen; Zeichen außerhalb ASCII werden dort als Codes geschrieben.",
+    note: "Für alte Software eine niedrigere Version wählen. Blätter werden als eigene Dateien geschrieben, nicht als Layouts.",
   },
   "drawing-ws/dxf": {
-    what: "Speichert das angezeigte Blatt als DXF (AutoCAD R12) – liest fast jedes CAD.",
+    what: "Speichert das Blatt als DXF (AutoCAD R12) – liest fast jedes CAD; mehrere Blätter = ZIP mit einer DXF je Blatt.",
     when: "Austausch mit einem anderen CAD, Vorlage für CAM oder Laser, ältere Software.",
-    steps: ["Auf DXF klicken – die Datei <Name>_vykres.dxf wird gespeichert."],
+    steps: ["Auf DXF klicken – <Name>_vykres.dxf, bei mehreren Blättern <Name>_vykres_dxf_listy.zip."],
+    note: "DXF R12 kennt keine Layouts, daher eine Datei je Blatt.",
   },
   "drawing-ws/svg": {
-    what: "Speichert das angezeigte Blatt als SVG-Vektorgrafik.",
+    what: "Speichert das Blatt als SVG-Vektorgrafik; mehrere Blätter = ZIP mit einer SVG je Blatt.",
     when: "Zeichnung für Web, Dokumentation oder Präsentation ohne Schärfeverlust.",
-    steps: ["Auf SVG klicken – die Datei <Name>_vykres.svg wird gespeichert."],
+    steps: ["Auf SVG klicken – <Name>_vykres.svg, bei mehreren Blättern ein ZIP."],
   },
   "drawing-ws/print": {
-    what: "Druckt das angezeigte Blatt über den Druckdialog des Browsers im Blattformat.",
+    what: "Druckt die Zeichnung über den Druckdialog des Browsers – alle Blätter (je Blatt eine Seite) oder nur das aktive.",
     when: "Schneller Druck auf dem Werkstattdrucker; der Dialog bietet auch Als PDF speichern.",
     steps: ["Auf Drucken klicken.", "Im Browserdialog Drucker und Skalierung 100 % wählen, bestätigen."],
     note: "Das Papierformat im Drucker sollte dem Blatt entsprechen (A4, A3…).",
@@ -491,7 +506,7 @@ export default {
     what: "Schließt die Zeichnungsregisterkarte und kehrt zum 3D-Modell zurück; Änderungen bleiben im Dokument.",
     when: "Die Zeichnung ist fertig oder das Modell muss geändert werden.",
     steps: ["Auf Schließen klicken (oder Esc, wenn kein Werkzeug aktiv ist)."],
-    note: "Neue Zeichnung auf der Registerkarte Zeichnung öffnet sie wieder – mit gespeicherten Blättern und Maßen.",
+    note: "Zeichnung öffnen ▼ auf der Registerkarte Zeichnung öffnet sie wieder – mit gespeicherten Blättern und Maßen (Neue Zeichnung legt eine weitere Zeichnung an).",
   },
   "drawing-ws/sheetAdd": {
     what: "Fügt ein neues Blatt mit Standardansichten hinzu; die Schriftfelddaten kommen vom aktuellen Blatt.",
@@ -499,6 +514,27 @@ export default {
     steps: ["Auf + Blatt klicken – das neue Blatt öffnet sich.", "Per Doppelklick auf den Blattreiter umbenennen."],
     cmd: "zeichnung blatt neu",
     note: "Ein Blatt mit dem Kreuz auf seinem Reiter entfernen (nur bei mehreren Blättern).",
+  },
+  "drawing-ws/exportSheets": {
+    what: "Wählt, was PDF, DWG, DXF, SVG und Drucken ausgeben: alle Blätter der Zeichnung oder nur das aktive Blatt.",
+    when: "Der ganze Zeichnungssatz auf einmal oder schnell nur ein Blatt.",
+    steps: ["Alle Blätter (Standard) oder Aktives Blatt wählen.", "Auf PDF, DWG, DXF, SVG oder Drucken klicken."],
+    cmd: "zeichnung export dxf alle",
+    note: "Nur bei einer Zeichnung mit mehreren Blättern sichtbar; die Wahl wird gespeichert.",
+  },
+  "drawing-ws/drawingSel": {
+    what: "Wechselt zu einer anderen Zeichnung dieses Teils oder dieser Baugruppe; jede Zeichnung hat eigene Blätter.",
+    when: "Ein Teil mit mehreren Zeichnungen – Fertigung, Montage, Rohteil.",
+    steps: ["Liste links in der Blattleiste öffnen.", "Zeichnung wählen – ihr erstes Blatt öffnet sich."],
+    cmd: "zeichnung zeichnungen 2",
+    note: "Exporte tragen den Zeichnungsnamen (<Name>_Zeichnung_2_vykres.pdf) – Dateien verschiedener Zeichnungen überschreiben sich nicht.",
+  },
+  "drawing-ws/drawingAdd": {
+    what: "Legt eine weitere Zeichnung dieses Teils an (Zeichnung 2…) mit einem Blatt und wechselt zu ihr.",
+    when: "Zweite Zeichnung desselben Teils – Montage, Rohteil, Variante für einen anderen Lieferanten.",
+    steps: ["Auf + Zeichnung klicken.", "Zwischen Zeichnungen mit der Auswahl links in der Blattleiste wechseln."],
+    cmd: "zeichnung neu",
+    note: "Zeichnung löschen: zeichnung zeichnungen löschen 2, oder Strg+Z direkt nach dem Anlegen (+ Zeichnung oder Neue Zeichnung auf der Registerkarte Zeichnung).",
   },
 
   // ── Zeichnungsarbeitsbereich: Maße und Anmerkungen ──

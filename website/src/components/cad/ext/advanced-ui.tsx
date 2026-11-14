@@ -1,6 +1,9 @@
 /** UI pokročilého modelování: ikony, vlastní formulář zrcadlení více prvků, akce „Tloušťka stěn“ (vzorkování sítě). */
 import { cadLocale, tr } from "@/cad/i18n";
+import { mirrorCandidates } from "@/cad/ext/advanced";
+import type { PlaneDef } from "@/cad/refs";
 import type { Feature, MeshData } from "@/cad/types";
+import { PlaneDefField } from "../ref-field";
 import { registerIcon } from "./icons";
 import { registerExtUi, type ExtFormProps } from "./registry";
 
@@ -26,9 +29,10 @@ registerIcon("adv-wall", <><path d="M4 5h16v14H4z" /><path d="M8 9h8v6H8z" /><pa
 
 // ---------- zrcadlení více prvků: vlastní formulář ----------
 function MirrorForm({ f, doc, onChange }: ExtFormProps) {
-  const idx = doc.features.findIndex((x) => x.id === f.id);
-  const before = doc.features.slice(0, idx).filter((x) => x.type !== "sketch" && x.type !== "datum" && x.type !== "ext");
+  // vestavěné prvky s tělesem i prvky rozšíření, které ukládají nástrojové těleso (zkrut, kopule, text na válci…)
+  const before = mirrorCandidates(doc, f.id);
   const sel = Array.isArray(f.data.features) ? (f.data.features as string[]) : [];
+  const planeDef = (f.data.planeDef as PlaneDef | null | undefined) ?? undefined;
   const all = !!f.data.all;
   const plane = String(f.data.plane ?? "YZ");
   const offset = Number(f.data.offset ?? 0);
@@ -54,6 +58,11 @@ function MirrorForm({ f, doc, onChange }: ExtFormProps) {
         </div>
       )}
       <div>
+        {/* rovina odkazem (plocha, tři body, pomocná rovina…) jako u ostatních prvků rozšíření – má přednost před základní */}
+        <PlaneDefField label={tr("Rovina odkazem")} value={planeDef} allowNone noneLabel={tr("Základní rovina (níže)")} onChange={(pd) => onChange({ planeDef: pd ?? null })} />
+        <p className="mt-1 text-[11px] text-ink-700/45">{tr("plocha modelu, tři body, pomocná rovina… – má přednost před základní rovinou níže")}</p>
+      </div>
+      <div className={planeDef ? "opacity-50" : undefined}>
         <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Rovina zrcadlení")}</p>
         <div className="flex rounded-lg bg-steel-100 p-0.5">
           {["XY", "XZ", "YZ"].map((p) => (

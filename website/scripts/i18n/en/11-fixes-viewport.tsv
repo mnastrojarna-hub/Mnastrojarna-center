@@ -1,3 +1,1 @@
 # Opravy po kontrole nasazení: náhled bez WebGL a řez (vlna 4, viewport)
-V náhledu bez WebGL nejde plochu sestavy vybrat kliknutím. Rovinu zadejte na záložce Vektor (normála) nebo X / Y / Z.	Faces of an assembly cannot be picked by clicking in the preview without WebGL. Enter the plane on the Vector tab (normal) or X / Y / Z.
-V náhledu bez WebGL nejde plochu vybrat kliknutím. Zadejte číslo rovinné plochy (např. F3) – rovina řezu se na ni položí.	Faces cannot be picked by clicking in the preview without WebGL. Enter the number of a planar face (e.g. F3) – the section plane will be placed on it.

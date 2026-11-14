@@ -12,6 +12,7 @@ import type { MeasureItem, MeasureQuery, MeasureReport } from "@/cad/measure";
 import type { CadDoc, ComponentSource } from "@/cad/types";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { flattenLeaves } from "./asm-flatten";
+import { leafByRef, leafRef } from "./leaf-ref";
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 const densityOf = (mat?: string) => MATERIALS.find((x) => x.id === mat)?.density ?? 7.85;
@@ -30,12 +31,11 @@ export async function runMeasure(d: CadDoc, cmd: MeasureCmd): Promise<MeasureRep
       return { src: { kind: "part" }, prefix: "" };
     }
     if (!comp) throw new Error(tr("v sestavě uveďte komponentu: měřit Hřídel:F3 Deska:F1 – komponenty: {0}", names()));
-    const q = fold(comp);
-    const leaf = leaves.find((l) => fold(l.comp.name) === q) ?? leaves.find((l) => fold(l.path.join("/")) === q);
-    if (!leaf) throw new Error(tr("komponenta „{0}“ v sestavě není – komponenty: {1}", comp, names()));
+    // název, cesta nebo pořadí #2 (stejně pojmenované komponenty) – shodně s výběrem (leaf-ref.ts)
+    const leaf = leafByRef(d, leaves, comp);
     sources.set(leaf.key, leaf.comp.source);
     density = densityOf(leaf.comp.source.kind === "part" ? leaf.comp.source.doc.material : (leaf.comp.material ?? "ocel"));
-    return { src: { kind: "comp", key: leaf.key, matrix: leaf.matrix }, prefix: `${leaf.comp.name}:` };
+    return { src: { kind: "comp", key: leaf.key, matrix: leaf.matrix }, prefix: `${leafRef(d, leaves, leaf)}:` };
   };
   let q: MeasureQuery;
   if (cmd.kind === "entities") {

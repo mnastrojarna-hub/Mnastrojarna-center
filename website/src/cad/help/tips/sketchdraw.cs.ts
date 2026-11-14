@@ -4,11 +4,24 @@ import type { MicroTip } from "../tips";
 export default {
   // ── Výkres (karta) ──
   drw: {
-    what: "Otevře výkres dílu nebo sestavy v nové záložce – pohledy, řezy, kóty, razítko, export PDF / DXF / DWG.",
-    when: "Výrobní výkres pro dílnu, kooperaci nebo poptávku; podklad k nabídce.",
-    steps: ["Klikněte na Nový výkres – otevře se záložka výkresu s Chytrými kótami.", "Vlevo nastavte List, Pohledy, Řez A–A a Razítko; kóty doplňte nástroji.", "Exportujte PDF / DWG / DXF; Zavřít vrátí do 3D modelu."],
-    cmd: "výkres",
-    note: "Má-li dokument už výkres, otevře se uložený (listy, kóty, razítko) – druhý nevznikne.",
+    what: "Založí nový výkres dílu nebo sestavy v záložce výkresu – pohledy, řezy, kóty, razítko, export PDF / DXF / DWG.",
+    when: "Výrobní výkres pro dílnu, kooperaci nebo poptávku; další výkres téhož dílu (montážní, polotovar).",
+    steps: ["Klikněte na Nový výkres – první výkres, nebo další (Výkres 2…) s vlastními listy.", "Vlevo nastavte List, Pohledy, Řez A–A a Razítko; kóty doplňte nástroji.", "Exportujte PDF / DWG / DXF; Zavřít vrátí do 3D modelu."],
+    cmd: "výkres nový",
+    note: "Uložený výkres otevře Otevřít výkres ▼; mezi výkresy přepíná i rozbalovač v liště listů výkresu.",
+  },
+  drwOpen: {
+    what: "Otevře uložený výkres dílu nebo sestavy – nabídka ukazuje všechny výkresy s počtem listů.",
+    when: "Návrat k rozpracovanému výkresu, oprava kót nebo razítka, nový export.",
+    steps: ["Klikněte na Otevřít výkres ▼.", "Zvolte výkres – otevře se na svém prvním listu."],
+    cmd: "výkres výkresy 1",
+    note: "Neaktivní, dokud dokument nemá výkres (Nový výkres).",
+  },
+  "menu:drwOpen/*": {
+    what: "Otevře tento výkres dílu na jeho prvním listu.",
+    when: "Přepnutí mezi výkresy téhož dílu (výrobní, montážní…).",
+    steps: ["Klikněte na název výkresu."],
+    cmd: "výkres výkresy 2",
   },
 
   // ── Skica › Kreslení ──
@@ -370,10 +383,10 @@ export default {
     note: "Ukládá jen 2D entity skici; výkres s pohledy exportujte z výkresu.",
   },
   imp: {
-    what: "Načte soubor DXF jako novou skicu na rovině XY v nové záložce dílu.",
+    what: "Přidá čáry, kružnice, oblouky a křivky ze souboru DXF do otevřené skice.",
     when: "Převzetí 2D obrysu z AutoCADu nebo od zákazníka pro vysunutí.",
-    steps: ["Klikněte na Import DXF… a vyberte soubor .dxf.", "V nové skice zkontrolujte obrys a doplňte vazby a kóty."],
-    note: "Do otevřené skice se nepřidává; obrázek nebo PDF vložte přes Podklad….",
+    steps: ["Klikněte na Import DXF… a vyberte soubor .dxf.", "Zvolte jednotky, posun počátku a hladiny.", "Potvrďte Importovat – hlášení řekne, kolik entit přibylo."],
+    note: "Ctrl+Z vrátí celý import. DXF jako nový díl otevřete přes Data › Otevřít; obrázek nebo PDF přes Podklad….",
   },
   coords: {
     what: "Vloží křivku ze seznamu souřadnic X Y – lomenou čáru, spline nebo řetěz úseček.",
@@ -454,29 +467,31 @@ export default {
 
   // ── Pracovní plocha výkresu: export a lišta ──
   "drawing-ws/pdf": {
-    what: "Uloží zobrazený list výkresu jako PDF ve formátu listu.",
+    what: "Uloží výkres jako PDF – každý list jedna stránka ve svém formátu; nebo jen aktivní list.",
     when: "Výkres k tisku, do e-mailu zákazníkovi nebo do dílny.",
     steps: ["Počkejte, až se dopočítají pohledy.", "Klikněte na PDF – uloží se soubor <název>_vykres.pdf."],
-    note: "Ukládá jen zobrazený list – další listy přepněte a exportujte zvlášť.",
+    cmd: "výkres export pdf vše",
+    note: "Má-li výkres víc listů, uloží se všechny jako vícestránkové PDF (volba Listy k exportu vlevo).",
   },
   "drawing-ws/dwg": {
-    what: "Uloží zobrazený list jako DWG ve zvolené verzi AutoCADu (2000 až 2018+).",
+    what: "Uloží list jako DWG ve zvolené verzi AutoCADu (2000 až 2018+); víc listů = ZIP s DWG na každý list.",
     when: "Předání výkresu do AutoCADu, ZWCADu nebo BricsCADu k další úpravě.",
     steps: ["V rozbalovači vedle tlačítka zvolte verzi DWG (výchozí AutoCAD 2018+).", "Klikněte na DWG – soubor se uloží."],
-    note: "Pro starý software volte nižší verzi; znaky mimo ASCII se tam zapíší kódem.",
+    note: "Pro starý software volte nižší verzi. Listy se nezapisují jako rozvržení, ale jako samostatné soubory.",
   },
   "drawing-ws/dxf": {
-    what: "Uloží zobrazený list jako DXF (AutoCAD R12) – přečte ho téměř každý CAD.",
+    what: "Uloží list jako DXF (AutoCAD R12) – přečte ho téměř každý CAD; víc listů = ZIP s DXF na každý list.",
     when: "Výměna s jiným CADem, podklad pro CAM nebo laser, starší software.",
-    steps: ["Klikněte na DXF – uloží se soubor <název>_vykres.dxf."],
+    steps: ["Klikněte na DXF – uloží se <název>_vykres.dxf, u více listů <název>_vykres_dxf_listy.zip."],
+    note: "DXF R12 nezná rozvržení, proto soubor na list.",
   },
   "drawing-ws/svg": {
-    what: "Uloží zobrazený list jako vektorový obrázek SVG.",
+    what: "Uloží list jako vektorový obrázek SVG; víc listů = ZIP se SVG na každý list.",
     when: "Výkres na web, do dokumentace nebo prezentace bez ztráty ostrosti.",
-    steps: ["Klikněte na SVG – uloží se soubor <název>_vykres.svg."],
+    steps: ["Klikněte na SVG – uloží se <název>_vykres.svg, u více listů ZIP."],
   },
   "drawing-ws/print": {
-    what: "Vytiskne zobrazený list přes tiskový dialog prohlížeče ve formátu listu.",
+    what: "Vytiskne výkres přes tiskový dialog prohlížeče – všechny listy (stránka na list) nebo jen aktivní.",
     when: "Rychlý tisk na dílenskou tiskárnu; v dialogu jde zvolit i Uložit jako PDF.",
     steps: ["Klikněte na Tisk.", "V dialogu prohlížeče zvolte tiskárnu a měřítko 100 %, potvrďte."],
     note: "Formát papíru v tiskárně má odpovídat listu (A4, A3…).",
@@ -491,7 +506,7 @@ export default {
     what: "Zavře záložku výkresu a vrátí se k 3D modelu; změny výkresu zůstanou v dokumentu.",
     when: "Výkres je hotový, nebo je potřeba upravit model.",
     steps: ["Klikněte na Zavřít (nebo Esc, když není aktivní žádný nástroj)."],
-    note: "Výkres znovu otevře Nový výkres na kartě Výkres – s uloženými listy a kótami.",
+    note: "Výkres znovu otevře Otevřít výkres ▼ na kartě Výkres – s uloženými listy a kótami (Nový výkres založí další výkres).",
   },
   "drawing-ws/sheetAdd": {
     what: "Přidá nový list s výchozími pohledy; údaje razítka převezme z aktuálního listu.",
@@ -499,6 +514,27 @@ export default {
     steps: ["Klikněte na + List – nový list se otevře.", "Dvojklikem na záložku listu ho přejmenujte."],
     cmd: "výkres list nový",
     note: "List odstraníte křížkem na jeho záložce (jen má-li výkres víc listů).",
+  },
+  "drawing-ws/exportSheets": {
+    what: "Volí, co uloží PDF, DWG, DXF, SVG a Tisk: všechny listy výkresu, nebo jen aktivní list.",
+    when: "Celá výkresová sada najednou, nebo rychle jen jeden list.",
+    steps: ["Zvolte Všechny listy (výchozí) nebo Aktivní list.", "Klikněte na PDF, DWG, DXF, SVG nebo Tisk."],
+    cmd: "výkres export dxf vše",
+    note: "Zobrazí se jen u výkresu s víc listy; volba se pamatuje.",
+  },
+  "drawing-ws/drawingSel": {
+    what: "Přepne na jiný výkres tohoto dílu nebo sestavy; každý výkres má vlastní listy.",
+    when: "Díl s víc výkresy – výrobní, montážní, výkres polotovaru.",
+    steps: ["Rozbalte seznam vlevo v liště listů.", "Zvolte výkres – otevře se jeho první list."],
+    cmd: "výkres výkresy 2",
+    note: "Exporty nesou název výkresu (<název>_Vykres_2_vykres.pdf) – soubory různých výkresů se nepřepíšou.",
+  },
+  "drawing-ws/drawingAdd": {
+    what: "Založí další výkres tohoto dílu (Výkres 2…) s jedním listem a přepne na něj.",
+    when: "Druhý výkres téhož dílu – montážní, polotovar, varianta pro jiného dodavatele.",
+    steps: ["Klikněte na + Výkres.", "Mezi výkresy přepínejte rozbalovačem vlevo v liště listů."],
+    cmd: "výkres nový",
+    note: "Smazání výkresu: výkres výkresy smazat 2, nebo Ctrl+Z hned po založení (+ Výkres i Nový výkres na kartě Výkres).",
   },
 
   // ── Pracovní plocha výkresu: kóty a poznámky ──
