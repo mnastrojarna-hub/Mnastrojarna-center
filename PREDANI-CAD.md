@@ -14,6 +14,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 18:13 | NOVÝ požadavek majitele: kola „vyplním tabulku a mám díl, extra snadno“ → vlna 19 (kapitola 7a). Spuštěn workflow `wf_a5f62aa9-09a` (návrh → jádro → průvodce + text), základ `3bb04d9`. |
 | 14. 11. 18:17 | Workflow `wf_1fd5cfa9-922` DOKONČEN: střižnice (geom) hotová vč. oprav 8 nálezů kontroly – commit `5b303bc` ve worktree `w17-geom`, patch `S/w17/geom.patch` (základ `bf91b0b`, 10 souborů). Výsledek agenta: 27/27 dílů platných, Σ 5241,7333 cm³, střižnice 450,46 cm³. Úkol C1 hotov, zbývá C2–C4. |
 | 14. 11. 18:30 | **Úkol A HOTOV**: vlna 15 sloučena do `main` (PR #96, `23c34b0`); e2e 18 sad bez nových selhání; worktree `w15-*` smazány. Začíná úkol C2 (střižnice) – patch `S/w17/geom.patch` jde na `main` nanést čistě. |
+| 14. 11. 19:05 | **Úkol C HOTOV**: střižnice sloučena do `main` (PR #97, `aa4300e`). Celý strom `src/cad` 2621 testů prošel (1 selhání `node-shims` po vlně 15 opraveno), skutečný nástroj 27/27 platných, Σ 5241,734 cm³. Dvě e2e sady měly po vlně 15 zastaralá očekávání (`cad-plate-roundtrip`, `cad-fixes`) – opraveno. BĚŽÍ úplný průchod zbylých e2e sad (`S/e2e-sweep.log`, končí `done`) – selhání roztřiď: zastaralé očekávání po vlně 15 / 17 (uprav test), zátěž (pusť znovu samostatně), skutečná chyba (oprav). |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -39,7 +40,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 
 | Co | Kde |
 | --- | --- |
-| `main` | `23c34b0` (PR #96: vlna 15; předtím PR #95 převodník a dokumentace) |
+| `main` | `aa4300e` (PR #97 střižnice; PR #96 vlna 15; PR #95 převodník a dokumentace) |
 | pracovní větev | `claude/cnc-sales-os-ai-cbR2f` = `main` + rozdělaný úkol (viz Průběžný stav) |
 | scratchpad `S` | `/tmp/claude-0/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/scratchpad` |
 | worktree agentů | `/home/user/Mnastrojarna-center/.claude/worktrees/<název>` |
@@ -74,8 +75,12 @@ postupuj podle kapitoly 9.
     (`merge_method: "merge"`), `git pull -q origin main`, `git push`.
 11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`.
 
+Poučení z vlny 15: před sloučením VŽDY pusť i `src/cad/cli/*.test.ts` (hlídá, že jádro pro příkazovou řádku zná každou
+operaci klienta) a e2e sady, které sahají na změněné GUI / texty, i když nejsou v patchi (`grep -l "<starý text>" e2e/`).
+
 Známé nestabilní testy (nejsou chybou vlny, při selhání pusť znovu samostatně):
 - `e2e/cad-asm-mates`: 1 FAIL „najetí na řádek seznamu zvýrazní plochu“ (WebGL hover) – selhává i na `main`.
+- `e2e/cad-impeller`: „Zrušit během přepočtu … do 2 s“ při zátěži stroje (samostatně prochází).
 - `e2e/cad-cli`: 2 časové kontroly hlídacího psa při zátěži stroje.
 - `e2e/cad-w15-asm`: při zátěži občas vyprší 300 s u výkresu sestavy.
 - `e2e/cad-w9-core` řádek 128 (výběr v 2D, 1 ze 4 běhů) – viz `S/followups.md`.
@@ -170,13 +175,13 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 (opravy nálezů kontroly). Zadání: `S/w17/brief.md`, „Package geom“.
 
 - [x] C1. (hotovo 14. 11. 18:17) Počkej na dokončení (případně obnov `resumeFromRunId: "wf_1fd5cfa9-922"`), přečti zprávu `fix:geom` v deníku.
-- [ ] C2. Aplikuj `S/w17/geom.patch` na `main` (po úkolu B; když B ještě běží, klidně před ním – patch sahá hlavně do
+- [x] C2. Aplikuj `S/w17/geom.patch` na `main` (po úkolu B; když B ještě běží, klidně před ním – patch sahá hlavně do
       `src/cad/build.ts` a jádra). Kontroly podle kapitoly 2 + `e2e/cad-w17-geom` + sady `cad cad-agent cad-w12-parts
       cad-impeller` (regrese objemů).
-- [ ] C3. Lokálně ověř na skutečném dokumentu (test se bez souboru přeskočí): 27 z 27 dílů platných, Σ 5241,734 cm³
+- [x] C3. Lokálně ověř na skutečném dokumentu (test se bez souboru přeskočí): 27 z 27 dílů platných, Σ 5241,734 cm³
       ± 0,01, díl střižnice 450,460 cm³ ± 0,001, čas stavby dílu se nezhoršil (dnes 6,0 s). Neplatnost se musí hlásit
       u PRVNÍHO prvku, který ji způsobí.
-- [ ] C4. PR „CAD: platná geometrie řezů na natočené rovině a včasné hlášení neplatnosti“ → sloučit. Smaž `w17-geom`.
+- [x] C4. PR „CAD: platná geometrie řezů na natočené rovině a včasné hlášení neplatnosti“ → sloučit. Smaž `w17-geom`.
 
 ## 6. Úkol D – dokumentace a příručka po sloučení B a C
 
