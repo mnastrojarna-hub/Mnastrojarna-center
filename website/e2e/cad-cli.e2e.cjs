@@ -252,9 +252,10 @@ const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/pro
     r = await cli(['run', path.join(IN, 'empty.txt'), '--open', path.join(IN, 'plate.mncad'), '--out', path.join(WORK, 'o9'), '--formats', 'none', '--share', '--share-store', `http://127.0.0.1:${port}/cad/share/`, '--json']);
     j = json(r);
     ps.kill();
-    ok(r.code === 0 && j?.share?.mode === 'self' && /#q=/.test(j.share.url) && fs.readdirSync(path.join(WORK, 'cad-share-data')).some((f) => f.endsWith('.bin')), `--share proti php -S (index.php) → krátký odkaz mode=self ${j?.share?.url}`);
-    // odkaz ukazuje na web úložiště (prohlížeč čte #q= z <origin>/cad/share/), ne na www.mnastrojarna.cz (nález 12)
-    ok(j?.share?.url?.startsWith(`http://127.0.0.1:${port}/cad#q=`), `odkaz mode=self míří na web úložiště: ${j?.share?.url?.slice(0, 40)}…`);
+    ok(r.code === 0 && j?.share?.mode === 'self' && /#[1-9A-HJ-NP-Za-km-z]{10}$/.test(j.share.url) && fs.readdirSync(path.join(WORK, 'cad-share-data')).some((f) => f.endsWith('.bin')), `--share proti php -S (index.php) → nejkratší odkaz mode=self ${j?.share?.url}`);
+    // odkaz ukazuje na web úložiště (prohlížeč čte obsah z <origin>/cad/share/), ne na www.mnastrojarna.cz (nález 12);
+    // tvar <web>/s#<KÓD> – /s na webu přesměruje na /cad (next.config.mjs / .htaccess)
+    ok(new RegExp(`^http://127\\.0\\.0\\.1:${port}/s#[1-9A-HJ-NP-Za-km-z]{10}$`).test(j?.share?.url || ''), `odkaz mode=self míří na web úložiště: ${j?.share?.url}`);
   } else console.log('# php chybí – sdílení do vlastního úložiště přeskočeno');
 
   // ── hlídač: časový limit uprostřed dlouhého volání OCCT ──

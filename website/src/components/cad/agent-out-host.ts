@@ -10,7 +10,7 @@ import { cad } from "@/cad/client";
 import { cadLocale, tr } from "@/cad/i18n";
 import { embedBlobs, missingBlobFiles } from "@/cad/blobs";
 import { lostImportsText } from "@/cad/vault-blobs";
-import { createShareLink, SHARE_DEFAULT_DAYS, type ShareMode, type ShareView } from "@/cad/share";
+import { createShareLink, groupShareCode, SHARE_DEFAULT_DAYS, type ShareMode, type ShareView } from "@/cad/share";
 import { sketchToDxf } from "@/cad/sketch";
 import { checkFailed, exportCheck, fileLogLine, fmtBytes, formatLabel, FORMAT_EXT, outFileName, type ExportCheck, type Export3dFormat, type OutCmd, type OutFileInfo } from "@/cad/agent-out";
 import type { DrawingExtras } from "@/cad/drawing-agent";
@@ -166,7 +166,7 @@ function exportSketchDxf(d: CadDoc, cmd: Extract<OutCmd, { kind: "sketch" }>, ho
 }
 
 /* ───────────────────────── sdílení ───────────────────────── */
-export type LastLink = { url: string; mode: ShareMode; bytes: number; exp: number | null; name: string; view: ShareView; password: boolean };
+export type LastLink = { url: string; mode: ShareMode; bytes: number; exp: number | null; name: string; view: ShareView; password: boolean; /** kód krátkého odkazu (část za #) */ code?: string };
 let lastLink: LastLink | null = null;
 /** poslední sdílený odkaz (příkaz „odkaz“); zapisuje i window.mncad.share() */
 export const rememberLink = (l: LastLink) => void (lastLink = l);
@@ -179,8 +179,9 @@ async function linkLines(l: LastLink, head: string): Promise<string[]> {
   const exp = l.exp ? new Date(l.exp).toLocaleDateString(cadLocale(), { day: "numeric", month: "numeric", year: "numeric" }) : tr("bez omezení");
   const copied = await withTimeout(copyText(l.url), 1500, false);
   return [
-    tr("{0} – „{1}“ ({2}), platí do: {3}, {4}, {5} {6}", head, l.name, l.view === "drawing" ? tr("výkres") : tr("model"), exp, l.password ? tr("s heslem") : tr("bez hesla"), fmtBytes(l.bytes), l.mode === "store" ? tr("v úložišti") : tr("v odkazu")),
+    tr("{0} – „{1}“ ({2}), platí do: {3}, {4}, {5} {6}", head, l.name, l.view === "drawing" ? tr("výkres") : tr("model"), exp, l.password ? tr("s heslem") : tr("bez hesla"), fmtBytes(l.bytes), l.mode === "link" ? tr("v odkazu") : tr("v úložišti")),
     `URL: ${l.url}`,
+    ...(l.code ? [tr("  kód k přečtení nebo opsání: {0} ({1} znaků odkazu)", groupShareCode(l.code), l.url.length)] : []),
     copied ? tr("  (zkopírováno do schránky)") : tr("  (schránka není dostupná – adresu zkopírujte z protokolu)"),
   ];
 }
@@ -190,7 +191,7 @@ async function shareDoc(d: CadDoc, cmd: Extract<OutCmd, { kind: "share" }>): Pro
   const view: ShareView = cmd.view ?? "model";
   if (view === "drawing" && !d.drawings?.length) throw new Error(tr("sdílet výkres: dokument zatím nemá výkres – nejdřív „výkres A3 …“, nebo sdílejte model"));
   const r = await createShareLink(d, { days: cmd.days === undefined ? SHARE_DEFAULT_DAYS : cmd.days, password: cmd.password || undefined, from: cmd.from || undefined, view, mode: cmd.mode });
-  const l: LastLink = { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, name: d.name, view, password: r.password };
+  const l: LastLink = { url: r.url, mode: r.mode, bytes: r.bytes, exp: r.exp, name: d.name, view, password: r.password, ...(r.code ? { code: r.code } : {}) };
   rememberLink(l);
   return linkLines(l, tr("✓ sdílený odkaz vytvořen"));
 }

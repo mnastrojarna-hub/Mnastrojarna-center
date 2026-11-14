@@ -38,7 +38,8 @@ import { AGENT_GUIDE } from "@/cad/agent-guide";
 import type { DrawingExtras } from "@/cad/drawing-agent";
 import { drawingSets, sheetCount } from "@/cad/drawing-sets";
 import { collectDiagnostics, probeWebGL, type RenderFailure } from "@/cad/diagnostics";
-import { openErrorText, openShareLink, parseShareHash, type ParsedShare, type SharePayload } from "@/cad/share";
+import { openErrorText, openShareLink, parseShareInput, shareCodeProblem, shareHttpsUrl, shareInputHash, type OpenResult, type ParsedShare, type SharePayload } from "@/cad/share";
+import { clearShareStash, readShareEntry, stashShare, type ShareEntry } from "@/cad/share-entry";
 import { docHasContent, docTabKind, emptyDraftDoc, isDraftDoc, normalizeDraftDoc } from "@/cad/draft/doc";
 import { copyText } from "@/lib/clipboard";
 import { CAD_LINKS } from "@/content/cad-links";
@@ -64,6 +65,7 @@ import { runSurfCmd } from "./surf-a-host";
 import { SurfAnalysisPanel } from "./ext/surface-a-ui";
 import { SettingsDialog, SHORTCUT_LABELS } from "./settings-dialog";
 import { AgentConsole } from "./agent-console";
+import { ShareCodeDialog } from "./share-code-dialog";
 import { ShareDialog } from "./share-dialog";
 import { Btn, Modal as UiModal } from "./ui";
 import { StartScreen } from "./start-screen";
@@ -219,6 +221,8 @@ export function CadApp() {
   const [shared, setShared] = useState<{ tabId: string; from?: string; exp: number | null } | null>(null);
   /** sdílený odkaz chráněný heslem – dotaz na heslo */
   const [sharePass, setSharePass] = useState<{ parsed: ParsedShare; value: string; error?: string; busy?: boolean } | null>(null);
+  /** dialog „Otevřít sdílený dokument“ (zadání kódu): příchod přes …/s bez kódu, překlep v kódu, nabídka Soubor */
+  const [shareAsk, setShareAsk] = useState<{ value: string; error?: string } | null>(null);
   const [ctx, setCtx] = useState<{ x: number; y: number; entries: RMenuEntry[] } | null>(null);
   const [cursor, setCursor] = useState<Vec3 | null>(null);
   // sestavy
@@ -498,6 +502,55 @@ export function CadApp() {
   };
   const openSharedRef = useRef(openShared);
   openSharedRef.current = openShared;
+  /**
+   * Otevře rozpoznaný sdílený odkaz: stažení a dešifrování (u odkazu s kódem navíc pomalé odvození klíče, ~0,3–1 s).
+   * Vrátí null (otevřeno, nebo se ptá na heslo), jinak důvod a text chyby. `stash` = část za # k odložení (F5 pak
+   * dokument otevře znovu). Odložený odkaz zůstává jen po úspěchu a při výpadku úložiště – překlep v kódu ani
+   * vypršelý odkaz se na kartu „nepřilepí“.
+   */
+  const openParsedShare = async (parsed: ParsedShare, stash: string | null): Promise<{ reason: Extract<OpenResult, { ok: false }>["reason"]; text: string } | null> => {
+    if (parsed.kind !== "link") flash(tr("Otevírám sdílený dokument…"));
+    const r = await openShareLink(parsed);
+    if (r.ok || r.reason === "password") {
+      if (stash) stashShare(stash);
+      setShareAsk(null);
+      if (r.ok) openSharedRef.current(r.payload);
+      else {
+        setStartOpen(false);
+        setSharePass({ parsed, value: "" });
+      }
+      return null;
+    }
+    // stránka na http:// (prohlížeč tam nemá šifrování): přejít na https i s odkazem
+    const https = r.reason === "insecure" ? shareHttpsUrl(stash ?? "") : null;
+    if (https) {
+      location.replace(https);
+      return null;
+    }
+    if (r.reason !== "network") clearShareStash();
+    return { reason: r.reason, text: openErrorText(r.reason, r.exp, parsed.kind) };
+  };
+  /** sdílený odkaz z adresy (načtení stránky, odkaz vložený do adresy otevřeného CADu) nebo žádost o zadání kódu */
+  const openShareEntry = (entry: ShareEntry) => {
+    if (!entry) return;
+    if (entry.kind === "ask") return setShareAsk({ value: entry.value, error: entry.error });
+    const { parsed } = entry;
+    void openParsedShare(parsed, entry.hash).then((fail) => {
+      if (!fail) return;
+      // kód, který v úložišti není, bývá překlep (velikost písmen): rovnou pole s kódem k opravě
+      if (parsed.kind === "code" && fail.reason === "notfound") setShareAsk({ value: parsed.code, error: fail.text });
+      else setNotice({ title: tr("Sdílený odkaz nelze otevřít"), body: fail.text });
+    });
+  };
+  const openShareEntryRef = useRef(openShareEntry);
+  openShareEntryRef.current = openShareEntry;
+  /** ručně zadaný kód nebo odkaz (úvodní obrazovka, dialog „Otevřít sdílený dokument“): null = otevřeno, jinak text chyby */
+  const openShareInput = async (text: string): Promise<string | null> => {
+    const parsed = parseShareInput(text);
+    if (!parsed) return shareCodeProblem(text);
+    const fail = await openParsedShare(parsed, shareInputHash(text));
+    return fail ? fail.text : null;
+  };
   // ---------- sestava textem (cad/asm-agent.ts): jádro, záložky a úprava v kontextu pro příkazy „sestava …“, „kusovník“, „záložka …“ ----------
   const asmFaceLists = useRef(new Map<string, PartFaces>());
   const mateStatusRef = useRef(mateStatus);
@@ -1136,27 +1189,19 @@ export function CadApp() {
       if (lost.size) setNotice({ title: tr("Data importovaných souborů chybí"), body: lostImportsText([...lost]) });
       setTimeout(() => void gcVaultBlobs().catch(() => 0), 8000); // úklid dat, na která už nic neodkazuje
     };
+    // sdílený odkaz (#KÓD / #q=… / #s=… / #r=…): část za # odložil skript stránky do sessionStorage a z adresy ji odstranil
+    // (app/(cs)/cad/page.tsx) – dokument pod NDA nesmí zůstat v historii prohlížeče ani jít do měření návštěvnosti;
+    // …/s bez kódu (?kod=1) nebo kód s překlepem → dialog pro zadání kódu (cad/share-entry.ts)
+    const shareEntry = readShareEntry(true);
     restore()
       .catch(() => setHist({ past: [], present: emptyDoc(), future: [] }))
       .finally(() => {
         loaded.current = true;
-        // sdílený odkaz (#s=… / #r=…): část za # odložil skript stránky do sessionStorage a z adresy ji odstranil
-        // (app/(cs)/cad/page.tsx) – dokument pod NDA nesmí zůstat v historii prohlížeče ani jít do měření návštěvnosti
-        let hash = "";
-        try {
-          hash = sessionStorage.getItem("mn-cad-share") || location.hash;
-        } catch {
-          hash = location.hash;
-        }
-        const parsed = parseShareHash(hash);
-        if (!parsed) return;
-        if (location.hash) history.replaceState(null, "", location.pathname + location.search);
-        void openShareLink(parsed).then((r) => {
-          if (r.ok) openSharedRef.current(r.payload);
-          else if (r.reason === "password") setSharePass({ parsed, value: "" });
-          else setNotice({ title: tr("Sdílený odkaz nelze otevřít"), body: openErrorText(r.reason, r.exp) });
-        });
+        openShareEntryRef.current(shareEntry);
       });
+    // odkaz vložený do adresy už otevřené stránky (…/cad#KÓD): otevřít stejně jako při načtení
+    const onHash = () => openShareEntryRef.current(readShareEntry(false));
+    window.addEventListener("hashchange", onHash);
     // odemčení / vypnutí úložiště z úvodní obrazovky nebo nastavení
     const onVault = () => {
       if (persistMode() === "none") return;
@@ -1165,7 +1210,8 @@ export function CadApp() {
     window.addEventListener(VAULT_EVENT, onVault);
     loaded.current = true;
     try {
-      if (loadSettings().startScreen && !sessionStorage.getItem("mn-cad-started")) setStartOpen(true);
+      // (sdílený odkaz otevírá rovnou dokument – úvodní obrazovka by zakryla hlášení „Otevírám sdílený dokument…“ i dialog pro kód)
+      if (loadSettings().startScreen && !sessionStorage.getItem("mn-cad-started") && !shareEntry) setStartOpen(true);
       sessionStorage.setItem("mn-cad-started", "1");
     } catch {
       /* ignore */
@@ -1270,6 +1316,7 @@ export function CadApp() {
     }, () => apiHostRef.current);
     return () => {
       window.removeEventListener(VAULT_EVENT, onVault);
+      window.removeEventListener("hashchange", onHash);
       delete window.mncad;
     };
   }, []);
@@ -3464,6 +3511,7 @@ export function CadApp() {
       { id: "p.docs", label: tr("Dokumentace a návod k obsluze (web)"), group: "Program", icon: "info", run: () => window.open(langMeta().docs, "_blank", "noopener") },
       { id: "p.pdf", label: tr("Příručka PDF – stáhnout"), group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
       { id: "p.share", label: tr("Sdílet odkazem (WhatsApp, e-mail, Teams…)"), group: "Program", icon: "share", run: () => setShareOpen(true) },
+      { id: "p.sharecode", label: tr("Otevřít sdílený dokument – zadat kód nebo odkaz"), group: "Program", icon: "share", run: () => setShareAsk({ value: "" }) },
       { id: "p.agent", label: tr("Textové příkazy – pro AI agenty a automatizaci"), group: "Program", icon: "palette", kbd: "Ctrl+Shift+K", run: () => setAgentOpen(true) },
       { id: "p.hints", label: tr("Popisky pro výběr myší (F1 / E2 / V3) – {0}", hintsOn ? "vypnout" : "zapnout"), group: "Program", icon: "filterSel", kbd: "Ctrl+Shift+L", run: () => setHintsOn((v) => !v) },
       { id: "p.rfq", label: tr("Poptat výrobu (STEP + e-mail)"), group: "Program", icon: "export", run: toRfq },
@@ -3697,6 +3745,7 @@ export function CadApp() {
                     { id: "save", label: tr("Uložit projekt (.mncad)"), icon: "save", tone: "file", kbd: "Ctrl+S", onClick: () => void saveProject() },
                     { id: "saveAs", label: tr("Uložit jako…"), icon: "save", tone: "file", onClick: () => void saveProjectAs() },
                     { id: "share", label: tr("Sdílet odkazem…"), icon: "share", tone: "file", disabled: !docHasContent(doc), hint: tr("WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní"), onClick: () => setShareOpen(true) },
+                    { id: "sharecode", label: tr("Otevřít sdílený dokument…"), icon: "share", tone: "file", hint: tr("Zadejte kód (10 znaků) nebo vložte odkaz, který vám někdo poslal"), onClick: () => setShareAsk({ value: "" }) },
                     { divider: true, label: tr("Export 3D") },
                     ...exportEntries,
                     { divider: true, label: tr("Výkres") },
@@ -4310,6 +4359,7 @@ export function CadApp() {
         <AskHost />
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
         {shareOpen && <ShareDialog doc={doc} view={drawingOpen ? "drawing" : "model"} onClose={() => setShareOpen(false)} onFlash={flash} />}
+        {shareAsk && <ShareCodeDialog key={`${shareAsk.value}|${shareAsk.error ?? ""}`} initial={shareAsk.value} error={shareAsk.error} onOpen={openShareInput} onClose={() => setShareAsk(null)} />}
         {agentOpen && <AgentConsole onClose={() => setAgentOpen(false)} run={(t) => runAgentRef.current(t)} getDocJson={() => JSON.stringify(histRef.current.present, null, 1)} status={agentStatus} />}
         {sharePass && (
           <UiModal
@@ -4369,6 +4419,7 @@ export function CadApp() {
               { id: "agent", label: tr("Textové příkazy (AI)"), desc: tr("Díl zadaný textem nebo JSON – pro AI agenty, automatizaci i rychlé modelování."), icon: "palette", tone: "tool", kbd: "Ctrl+Shift+K", run: () => { setStartOpen(false); setAgentOpen(true); } },
             ]}
             examples={EXAMPLES.map((ex) => ({ id: ex.id, label: ex.label, run: () => { setStartOpen(false); loadExample(ex.make); } }))}
+            onOpenShare={openShareInput}
             onOpenRecent={(r) => {
               void readRecentDoc(r.id).then(async (json) => {
                 if (!json) return flash(tr("Soubor už není v paměti prohlížeče – otevřete ho ze souboru .mncad."));

@@ -1,13 +1,16 @@
 // E2E: krátký sdílený odkaz přes vlastní úložiště na webu (/cad/share/, PHP).
 // Vedle Next serveru běží skutečné PHP (`php -S` se skriptem public/cad/share/index.php); požadavky prohlížeče na /cad/share/
-// se přesměrují na něj (page.route → fetch, jako reverzní proxy). Ověří: odkaz na jeden řádek < 120 znaků (#q=<id>.<klíč>),
-// otevření v jiném prohlížeči se stejným modelem (objem), heslo (odkaz stejně krátký), smazání nepoužitého odkazu při změně
+// se přesměrují na něj (page.route → fetch, jako reverzní proxy). Ověří: nejkratší odkaz <web>/s#<KÓD 10 znaků base58>
+// (na produkci https://mnastrojarna.cz/s#… = 36 znaků; id v úložišti i klíč se odvozují z kódu, v odkazu nejsou),
+// otevření v jiném prohlížeči přes přesměrování /s → /cad (část za # zůstane) se stejným modelem (objem), heslo (odkaz
+// stejně krátký, samotný kód neotevře), smazání nepoužitého odkazu při změně
 // voleb, zneplatnění, vypršení, velký model (importovaný STEP, nahrání po částech), nad limit = srozumitelná chyba,
 // bez úložiště = dlouhý odkaz s vysvětlením, window.mncad.share() → mode "self", mobil.
 // Spuštění: E2E_BASE=http://localhost:3341 node e2e/cad-w8-share.e2e.cjs <složka pro snímky>
-//   (výchozí server http://localhost:3341; potřebuje příkaz php ≥ 7.4)
+//   (výchozí server http://localhost:3341 – next start nebo next dev, kvůli přesměrování /s → /cad; potřebuje příkaz php ≥ 7.4)
 const { chromium } = require('playwright');
 const { spawn, execFileSync } = require('child_process');
+const crypto = require('crypto');
 const fs = require('fs');
 const net = require('net');
 const os = require('os');
@@ -59,7 +62,26 @@ const forward = (php) => async (route) => {
   }
 };
 const blobsOn = (php) => (fs.existsSync(php.data) ? fs.readdirSync(php.data).filter((f) => f.endsWith('.bin')).map((f) => f.slice(0, -4)) : []);
-const idOf = (url) => /#q=([0-9A-Za-z]+)\./.exec(url)?.[1];
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+const CODE = '[1-9A-HJ-NP-Za-km-z]{10}';
+/** nejkratší odkaz tohoto serveru: <BASE>/s#<KÓD> (BASE + 13 znaků; na produkci https://mnastrojarna.cz/s#… = 36) */
+const SHORT_RE = new RegExp('^' + BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '/s#' + CODE + '$');
+const isShort = (url) => SHORT_RE.test(url) && url.length === BASE.length + 13;
+const codeOf = (url) => new RegExp('#(' + CODE + ')$').exec(url)?.[1];
+/** id v úložišti = nezávislý výpočet z kódu (PBKDF2-HMAC-SHA-256, sůl mncad-share-v2, 1 200 000 iterací, 32 B → HKDF „mncad-share-v2 id“ 16 B mod 58^11) */
+const idCache = new Map();
+const idOf = (url) => {
+  const code = codeOf(url);
+  if (!code) return undefined;
+  if (!idCache.has(code)) {
+    const prk = crypto.pbkdf2Sync(code, 'mncad-share-v2', 1200000, 32, 'sha256');
+    let n = BigInt('0x' + Buffer.from(crypto.hkdfSync('sha256', prk, Buffer.alloc(0), 'mncad-share-v2 id', 16)).toString('hex')) % (58n ** 11n);
+    let id = '';
+    for (let i = 0; i < 11; i++) { id = B58[Number(n % 58n)] + id; n /= 58n; }
+    idCache.set(code, id);
+  }
+  return idCache.get(code);
+};
 
 function bigStep(mb) {
   const file = path.join(process.env.E2E_BIG_DIR || os.tmpdir(), `mn-big-${mb}.step`);
@@ -126,16 +148,22 @@ let browser = null;
   let dlg = await openShare(p);
   const url1 = await linkValue(p);
   const field = p.locator('[aria-label="Sdílený odkaz"]');
-  ok(/#q=[0-9A-Za-z]{10}\.[A-Za-z0-9_-]{22}$/.test(url1) && url1.startsWith(CAD + '#q='), `krátký odkaz: ${url1}`);
-  ok(url1.length < 120 && !/\s/.test(url1), `odkaz na jeden řádek, ${url1.length} znaků (< 120)`);
+  ok(isShort(url1), `nejkratší odkaz: ${url1}`);
+  const prodLen = 'https://mnastrojarna.cz/s#'.length + codeOf(url1).length;
+  ok(url1.length === BASE.length + 13 && prodLen === 36 && !/\s/.test(url1), `odkaz na jeden řádek, ${url1.length} znaků (adresa serveru + 13); na produkci https://mnastrojarna.cz/s#… = ${prodLen} znaků`);
+  const codeEl = dlg.locator('[data-share-code]');
+  const grouped = codeOf(url1).replace(/(.{4})(?=.)/g, '$1 ');
+  ok((await codeEl.getAttribute('data-share-code')) === codeOf(url1) && (await codeEl.innerText()).includes(grouped) && (await codeEl.innerText()).includes(BASE.replace(/^https?:\/\//, '') + '/s'), `dialog: kód po skupinách k přečtení („${grouped}“) a kam ho zadat`);
   ok((await field.getAttribute('data-share-short')) === '1' && (await field.getAttribute('data-share-mode')) === 'self', 'dialog: krátký odkaz na výrazném jednořádkovém poli, režim self');
   const fits = await field.evaluate((e) => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1);
   ok(fits, 'odkaz je v poli vidět celý');
   const t1 = await dlg.innerText();
   ok(new RegExp(`${url1.length} znaků`).test(t1) && /zašifrováno v úložišti do/.test(t1) && /Platí do/.test(t1), 'dialog ukazuje délku odkazu, šifrování a platnost');
-  ok(blobsOn(php).includes(idOf(url1)), 'na serveru je šifrovaný obsah s id z odkazu');
+  ok(blobsOn(php).includes(idOf(url1)) && !url1.includes(idOf(url1)), `na serveru je šifrovaný obsah pod id odvozeným z kódu (${idOf(url1)}); id v odkazu není`);
   const raw = fs.readFileSync(path.join(php.data, idOf(url1) + '.bin'));
-  ok(raw.subarray(0, 3).toString() === 'MNQ' && !raw.includes(Buffer.from('Příruba')) && !raw.includes(Buffer.from('mnastrojarna-cad')), 'na serveru jen šifrovaná data (žádný název ani JSON)');
+  ok(raw.subarray(0, 3).toString() === 'MNQ' && raw[3] === 2 && !raw.includes(Buffer.from('Příruba')) && !raw.includes(Buffer.from('mnastrojarna-cad')), 'na serveru jen šifrovaná data (žádný název ani JSON)');
+  const onDisk = fs.readdirSync(php.data).map((f) => { try { return f + '\n' + fs.readFileSync(path.join(php.data, f)).toString('latin1'); } catch { return f; } }).join('\n');
+  ok(!onDisk.includes(codeOf(url1)), 'kód z odkazu na serveru není (ani v názvech souborů, ani v metadatech)');
   await p.screenshot({ path: S + 'w8-share-dialog.png' });
 
   // změna platnosti bez zkopírování → nový odkaz, starý (nepoužitý) se ze serveru smaže
@@ -152,7 +180,7 @@ let browser = null;
   // heslo
   await dlg.getByLabel('Heslo k odkazu').fill('tajne');
   const urlPw = await linkValue(p, url2);
-  ok(/#q=/.test(urlPw) && urlPw.length === url2.length, `odkaz s heslem stejně krátký (${urlPw.length} znaků)`);
+  ok(isShort(urlPw) && urlPw.length === url2.length, `odkaz s heslem stejně krátký (${urlPw.length} znaků)`);
   ok(/chráněno heslem/.test(await dlg.innerText()), 'dialog: chráněno heslem');
   await dlg.getByRole('button', { name: 'Kopírovat odkaz' }).click(); await p.waitForTimeout(400);
   await closeDlg(p);
@@ -163,15 +191,19 @@ let browser = null;
   await ctx2.route(isShare, forward(php));
   const r = await ctx2.newPage();
   const errs2 = []; r.on('pageerror', (e) => errs2.push(e.message));
+  const hops = [];
+  r.on('response', (res) => { if (res.request().isNavigationRequest() && res.status() >= 300 && res.status() < 400) hops.push(`${res.status()} ${new URL(res.url()).pathname} → ${res.headers().location}`); });
   await r.goto(url2, { waitUntil: 'networkidle', timeout: 240000 });
-  ok(!r.url().includes('#'), 'část za # je z adresy hned odstraněna');
+  ok(hops.length === 1 && /^30[18] \/s → \/cad\?kod=1$/.test(hops[0]), `odkaz /s#KÓD: server přesměruje na /cad?kod=1 (${hops.join(' | ')})`);
+  ok(r.url() === CAD, `po přesměrování je příjemce na /cad; část za # i parametr kod jsou z adresy hned odstraněny (${r.url()})`);
+  ok((await r.evaluate(() => sessionStorage.getItem('mn-cad-share'))) === '#' + codeOf(url2), 'část za # přežila přesměrování (kód odložen do sessionStorage)');
   await coreReady(r); await r.waitForTimeout(4000);
   ok(/Sdílený dokument/.test(await r.locator('[role=status]').first().innerText().catch(() => '')), 'příjemce vidí pruh „Sdílený dokument“');
   ok(/Díra 1/.test(await r.locator('aside').first().innerText()), 'příjemce má díl s historií prvků');
   const vol2 = await volumeOf(r);
   ok(vol2 === vol, `příjemce: stejný model (objem ${vol2} = ${vol} cm³)`);
   await r.screenshot({ path: S + 'w8-share-recipient.png' });
-  await r.reload({ waitUntil: 'networkidle' }); await coreReady(r); await r.waitForTimeout(3500);
+  await r.reload({ waitUntil: 'networkidle', timeout: 240000 }); await coreReady(r); await r.waitForTimeout(3500);
   ok(/Díra 1/.test(await r.locator('aside').first().innerText()), 'po F5 sdílený díl zůstává');
   await r.close();
 
@@ -197,12 +229,16 @@ let browser = null;
   await closeDlg(p);
   const r3 = await ctx2.newPage();
   await r3.goto(url3, { waitUntil: 'networkidle', timeout: 240000 });
-  ok(/nelze otevřít/.test(await notice(r3)) && /už v úložišti není/.test(await r3.locator('body').innerText()), 'zneplatněný odkaz: srozumitelné hlášení');
+  ok(/nelze otevřít/.test(await notice(r3)) && /Odesílatel tento sdílený odkaz zneplatnil/.test(await r3.locator('body').innerText()), 'zneplatněný odkaz: hlášení „Odesílatel tento sdílený odkaz zneplatnil“');
+  ok((await r3.evaluate(() => sessionStorage.getItem('mn-cad-share'))) === null, 'zneplatněný odkaz se na kartu nepřilepí (po F5 se znovu nezkouší)');
   await r3.close();
+  // revize: zneplatněný odkaz nejde oživit – id zůstává na serveru obsazené (náhrobek), pod stejný kód nic nahrát nejde
+  const replant = await fetch(`${php.origin}/cad/share/?days=90&total=5&id=${idOf(url3)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: Buffer.from('PODVR') });
+  ok(replant.status === 409 && !blobsOn(php).includes(idOf(url3)), `zneplatněný odkaz nejde oživit: nahrání pod jeho id → ${replant.status} id_taken`);
 
   // ── API pro agenty + vypršení ──
   const api = await p.evaluate(() => window.mncad.share({ days: 1 }));
-  ok(api.mode === 'self' && api.chars === api.url.length && api.url.length < 120 && /#q=/.test(api.url) && api.message.includes(api.url), `window.mncad.share() → mode "self", ${api.chars} znaků`);
+  ok(api.mode === 'self' && api.chars === api.url.length && isShort(api.url) && api.code === codeOf(api.url) && api.message.includes(api.url), `window.mncad.share() → mode "self", ${api.chars} znaků, code ${api.code}`);
   const meta = path.join(php.data, idOf(api.url) + '.json');
   fs.writeFileSync(meta, JSON.stringify({ ...JSON.parse(fs.readFileSync(meta, 'utf8')), exp: Math.floor(Date.now() / 1000) - 60 }));
   const r4 = await ctx2.newPage();
@@ -211,7 +247,11 @@ let browser = null;
   ok(/Platnost sdíleného odkazu vypršela/.test(t4), 'vypršelý odkaz (server 410): hlášení o vypršení');
   if (!/vypršela/.test(t4)) { await r4.screenshot({ path: S + 'w8-share-expired-fail.png' }); console.log(t4.slice(0, 600)); }
   ok(!fs.existsSync(meta), 'vypršelý obsah server smazal');
+  await r4.reload({ waitUntil: 'networkidle', timeout: 240000 }); await coreReady(r4); await r4.waitForTimeout(2500);
+  ok(!/nelze otevřít/.test(await r4.locator('body').innerText()) && (await r4.evaluate(() => sessionStorage.getItem('mn-cad-share'))) === null, 'vypršelý odkaz se na kartu nepřilepí: po F5 běžný CAD bez hlášení');
   await r4.close();
+  const replantExp = await fetch(`${php.origin}/cad/share/?days=90&total=5&id=${idOf(api.url)}`, { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: Buffer.from('PODVR') });
+  ok(replantExp.status === 409, `vypršelý odkaz nejde oživit: nahrání pod jeho id → ${replantExp.status} id_taken`);
 
   // ── velký model: importovaný STEP (mnblob), nahrání po částech ──
   const stepFile = bigStep(3);
@@ -225,7 +265,7 @@ let browser = null;
   dlg = await openShare(p);
   const urlBig = await linkValue(p);
   p.off('request', onReq);
-  ok(/#q=/.test(urlBig) && urlBig.length < 120, `velký model: krátký odkaz (${urlBig.length} znaků)`);
+  ok(isShort(urlBig), `velký model: stejně krátký odkaz (${urlBig.length} znaků)`);
   const bigBytes = fs.statSync(path.join(php.data, idOf(urlBig) + '.bin')).size;
   ok(posts.length >= 2 && posts.every((n) => n <= 262144), `nahráno po částech: ${posts.length} × ≤ 256 kB, celkem ${(bigBytes / 1048576).toFixed(2)} MB (STEP ${(fs.statSync(stepFile).size / 1048576).toFixed(1)} MB)`);
   await dlg.getByRole('button', { name: 'Kopírovat odkaz' }).click(); await p.waitForTimeout(300);
@@ -291,7 +331,7 @@ let browser = null;
   const urlM = await linkValue(m);
   const over = await m.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
   const fitsM = await m.locator('[aria-label="Sdílený odkaz"]').evaluate((e) => e.scrollWidth <= e.clientWidth + 1 && e.scrollHeight <= e.clientHeight + 1);
-  ok(/#q=/.test(urlM) && !over && fitsM, 'mobil: krátký odkaz celý vidět (zalomený), dialog nepřetéká');
+  ok(isShort(urlM) && !over && fitsM, 'mobil: krátký odkaz celý vidět, dialog nepřetéká');
   await m.screenshot({ path: S + 'w8-share-mobile.png' });
 
   ok(errs.length === 0 && errs2.length === 0, 'bez JS chyb ' + [...errs, ...errs2].join(' | '));

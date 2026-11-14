@@ -654,8 +654,11 @@ export type CompareApiResult = {
   regions: { n: number; side: "extra" | "missing"; volume: number; center: [number, number, number]; hint: string }[];
 };
 export type ShareApiOptions = { days?: number | null; password?: string; from?: string; view?: "model" | "drawing"; mode?: "link" | "store" | "self" };
-/** výsledek share(): self = krátký odkaz z úložiště na webu (/cad/share/), store = Supabase, link = celý dokument v odkazu (`note` = proč) */
-export type ShareApiResult = { url: string; mode: "link" | "store" | "self"; bytes: number; exp: number | null; message: string; chars: number; note?: string };
+/**
+ * výsledek share(): self = krátký odkaz z úložiště na webu (/cad/share/; `code` = desetimístný kód za #, odkaz ≈ 36 znaků),
+ * store = Supabase, link = celý dokument v odkazu (`note` = proč)
+ */
+export type ShareApiResult = { url: string; mode: "link" | "store" | "self"; bytes: number; exp: number | null; message: string; chars: number; code?: string; note?: string };
 export type SelectionEntry = { id: string; kind: "face" | "edge" | "vertex" | "body" | "component" | "feature"; index?: number; compId?: string; title?: string };
 /** Metody `window.mncad` z tohoto modulu (provedení: components/cad/agent-api-host.ts). */
 export type MncadApiExt = {

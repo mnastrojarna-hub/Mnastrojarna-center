@@ -1269,8 +1269,9 @@ kótovat
 výkres export pdf
 # ✓ výkres PDF: Konzola_vykres.pdf · 83 kB · výkres PDF – staženo (bez dialogu)
 sdílet
-# ✓ sdílený odkaz vytvořen – „Konzola“ (model), platí do: 23. 11. 2026, bez hesla, 1,3 kB v odkazu
-# URL: https://www.mnastrojarna.cz/cad#s=1d.…
+# ✓ sdílený odkaz vytvořen – „Konzola“ (model), platí do: 23. 11. 2026, bez hesla, 1,3 kB v úložišti
+# URL: https://mnastrojarna.cz/s#Ab3kZ9xQ2m
+#   kód k přečtení nebo opsání: Ab3k Z9xQ 2m (36 znaků odkazu)
 #   (zkopírováno do schránky)
 ```
 
@@ -1354,13 +1355,24 @@ Vybrané entity v nich zadejte čísly: `zaoblit 3 hrany E2;E5`, `srazit 1 hrany
 svarů, Tloušťka stěn, `sketch.dxf`. Textem `akce tabulka ohybů` (EN `action bend table`, DE `aktion biegetabelle`)
 – text okna jde do protokolu. `prvek sheet.dxf` skončí chybou s odkazem na `akce`.
 `await window.mncad.share({ days: 10, password, from, view: "model" | "drawing", mode: "link" | "store" | "self" })`
-vytvoří sdílený odkaz (jako tlačítko Sdílet odkazem) a vrátí `{ url, mode, bytes, exp, message, chars, note? }`.
-Výchozí je **krátký odkaz na jeden řádek** (~70 znaků, např. `https://www.mnastrojarna.cz/cad#q=Ab3kZ9xQ2m.0f8Kx…`,
-`mode: "self"`): dokument se v prohlížeči zašifruje (AES-GCM, klíč 128 bitů jen v odkazu za #) a nahraje do úložiště
-na webu (`/cad/share/`; s heslem PBKDF2 – odkaz zůstává stejně krátký); platnost 1–90 dní, po ní se smaže.
-`mode: "store"` = Supabase (je-li nastavené), `"link"` = celý dokument v odkazu (dlouhý, bez serveru). Když úložiště
-neodpovídá nebo je `days: null`, vrátí se `mode: "link"` a `note` říká proč. Velké modely (importovaný STEP) do
-25 MB po kompresi; nad limit = výjimka s velikostí a limitem. Odkaz (i `#q=`, `#s=`, `#r=`) otevřete `page.goto(url)`.
+vytvoří sdílený odkaz (jako tlačítko Sdílet odkazem) a vrátí `{ url, mode, bytes, exp, message, chars, code?, note? }`.
+Výchozí je **nejkratší odkaz** `https://mnastrojarna.cz/s#Ab3kZ9xQ2m` (`mode: "self"`, `chars` 36; `/en/s`, `/de/s`
+pro další jazyky): za `#` je jen desetimístný kód (`code`; base58 bez 0 O I l – dá se přečíst nahlas nebo opsat).
+Dokument se v prohlížeči zašifruje (AES-256-GCM) a nahraje do úložiště na webu (`/cad/share/`); id v úložišti i klíč se
+z kódu odvodí pomalým výpočtem (PBKDF2, 1 200 000 iterací, ~0,3–1 s), kód se na server nikdy neposílá. S heslem se klíč
+odvodí z kódu + hesla – odkaz zůstává stejně krátký a samotný kód dokument neotevře. Platnost 1–90 dní, po ní se obsah
+smaže. Odkaz, který přestal platit (vypršel, odesílatel ho zneplatnil), už pod stejným kódem nikdy neožije – ani s jiným
+obsahem. Sdílení potřebuje stránku na `https://` (na `http://` prohlížeč šifrování nedovolí; stránka se sdíleným
+odkazem na https přejde sama). `mode: "store"` = Supabase (je-li nastavené), `"link"` = celý dokument v odkazu
+(dlouhý, bez serveru). Když úložiště neodpovídá nebo je `days: null`, vrátí se `mode: "link"` a `note` říká proč.
+Velké modely (importovaný STEP) do 25 MB po kompresi; nad limit = výjimka s velikostí a limitem. **Tvary odkazu** (všechny
+otevřete `page.goto(url)`): `/s#<KÓD>` nebo `/cad#<KÓD>` (kód; `/s` jen přesměruje na `/cad?kod=1` a parametr
+z adresy hned zmizí), starší `/cad#q=<id>.<klíč>` (úložiště, klíč v odkazu – otevírá se dál), `/cad#s=1d.…` (dokument
+v odkazu), `/cad#r=…` (Supabase). Znaky přilepené za odkaz (tečka, závorka, uvozovky…) nevadí. Kód lze zadat i ručně:
+`…/s` bez kódu otevře dialog „Otevřít sdílený dokument“ (i nabídka Soubor → Otevřít sdílený dokument… a pole na úvodní
+obrazovce); přijme kód i po skupinách (`Ab3k Z9xQ 2m`) nebo celý odkaz či zprávu s odkazem. Kód jde také dopsat za adresu
+otevřeného CADu (`…/cad#Ab3kZ9xQ2m`). Chybný kód (jiná délka, znak 0 / O / I / l, jiná velikost písmen) dostane
+vysvětlení a pole k opravě.
 `await window.mncad.compare({ name: "zakaznik.step", base64 }, { tolerance: 0.1, align: "auto", show: true })` porovná
 díl s referenčním modelem a vrátí `{ ok, text, csv, regions: [{ n, side: "extra" | "missing", volume, center, hint }] }`;
 `show` zobrazí barevnou mapu odchylek (pro `screenshot`), `ok` = žádná rozdílová oblast a odchylky v toleranci.
