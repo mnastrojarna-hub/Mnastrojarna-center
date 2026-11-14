@@ -77,7 +77,9 @@ postupuj podle kapitoly 9.
 
 ## 2. Jednotný postup převzetí patche (každá vlna stejně)
 
-1. `cd /home/user/Mnastrojarna-center && git status --short` (čisto) `&& git pull -q origin main`.
+1. `cd /home/user/Mnastrojarna-center && git status --short` (čisto) `&& git pull -q origin main && git pull -q --no-rebase origin claude/cnc-sales-os-ai-cbR2f`.
+   Pozor: do této větve slučuje i JINÉ sezení (aplikace CNC Sales OS v kořeni `src/`, např. PR #99 – kontakty, prohlížeč
+   výkresů). Před každým push si větev stáhni; jejich změny nech být a v PR do `main` je zmiň jedním řádkem.
 2. `git apply -3 --index <patch>`; konflikty vyřeš ručně – zásada: **ponechat obě strany** (importy, větve `switch`,
    členy union typů – hlídej středníky). Stejná funkce dvakrát = sjednotit na jednu implementaci.
 3. Kontrola NDA nad patchem (nesmí nic vypsat kromě obecných slov jako „stopka“, „zdvih“):
