@@ -20,6 +20,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 19:30 | Úkol B2 rozjet souběžně s akceptací: zkušební nanesení `bint.patch` na dnešní větev = 15 souborů s konflikty (největší `cad-app.tsx` – stará smyčka 378 řádků vs. volání enginu). Spuštěn workflow `wf_d020a109-e6f` (integrace → nezávislá kontrola ztracených změn → opravy), worktree `w14-int2` ze `4ceb0e7`, zadání `S/w14/int2/brief.md`, výstup `S/w14/int2/int2.patch` + `audit.md`. Až doběhne i akceptace (`w14-b6`), přenes její rozdíl `git -C .claude/worktrees/w14-b6 diff 7b86184 HEAD` na `w14-int2` (nebo do hlavní větve po int2). |
 | 14. 11. 19:45 | Dokumentace 2. kolo hotová a nanesena na větev (vlna 15, převodník, vlna 17; `S/w18/docs2.patch`). Do PR půjde spolu s opravami e2e po doběhnutí průchodu a ověření na novém buildu. Agent dokumentace zjistil 2 mezery → úkol E6 a E7. |
 | 14. 11. 19:55 | NOVÝ požadavek majitele: výběr myší oknem (více prvků naráz) ve 3D i 2D → vlna 20 (kapitola 7b). Spuštěn workflow `wf_533a7c7c-a4a` (balíky `3d` a `2d` souběžně, každý implementace → kontrola → opravy), základ `210a1e8`, zadání `S/w20/brief.md`. Průchod e2e: 35/49, dosud jen zastaralá očekávání (`cad-big-step` – vkládání do sestavy přes vstup Vložit – opraveno). |
+| 14. 11. 20:25 | **Sloučeno PR #98** (`12e7108`): dokumentace 2. kolo + oprava 6 zastaralých e2e + návod „Příklad F“. Úplný průchod 49 e2e sad hotov: žádná chyba v CADu; po opravě všech 6 sad zelených, `cad-w9-core` 2× zelený (závod výběru ve 2D se neopakuje – follow-up uzavřen, pravděpodobně vyřešeno čekáním na usazení UI z vlny 15). Běží workflow: B akceptace (`w14-b6`), B integrace (`w14-int2`), kola (`w19:core`), výběr oknem (`w20-3d`, `w20-2d`). |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -45,7 +46,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 
 | Co | Kde |
 | --- | --- |
-| `main` | `aa4300e` (PR #97 střižnice; PR #96 vlna 15; PR #95 převodník a dokumentace) |
+| `main` | `12e7108` (PR #98 dokumentace 2. kolo + e2e; PR #97 střižnice; PR #96 vlna 15; PR #95 převodník) |
 | pracovní větev | `claude/cnc-sales-os-ai-cbR2f` = `main` + rozdělaný úkol (viz Průběžný stav) |
 | scratchpad `S` | `/tmp/claude-0/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/scratchpad` |
 | worktree agentů | `/home/user/Mnastrojarna-center/.claude/worktrees/<název>` |
@@ -88,7 +89,6 @@ Známé nestabilní testy (nejsou chybou vlny, při selhání pusť znovu samost
 - `e2e/cad-impeller`: „Zrušit během přepočtu … do 2 s“ při zátěži stroje (samostatně prochází).
 - `e2e/cad-cli`: 2 časové kontroly hlídacího psa při zátěži stroje.
 - `e2e/cad-w15-asm`: při zátěži občas vyprší 300 s u výkresu sestavy.
-- `e2e/cad-w9-core` řádek 128 (výběr v 2D, 1 ze 4 běhů) – viz `S/followups.md`.
 - `src/cad/soft-render.test.ts`, `share-self.test.ts`, `drawing.test.ts` „výkon“ – citlivé na zátěž.
 
 ## 3. Úkol A – dokončit a sloučit vlnu 15 (test 959: díry, výkres, sestava, razítko, předloha)
