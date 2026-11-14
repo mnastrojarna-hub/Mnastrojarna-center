@@ -1,0 +1,50 @@
+# 12. vlna – díra: vrták závitové díry (tabulkový / zadaný / jádro D1), ploché dno a hrot vrtáku
+ · dno ploché	 · flat bottom
+ · hrot {0}°	 · tip {0}°
+díra: „dno ploché“ / „hrot“ platí jen pro slepou díru s hloubkou: díra 10 hloubka 12 dno ploché	hole: “flat bottom” / “tip” only apply to a blind hole with a depth: hole 10 depth 12 flat bottom
+díra: „jádro“ a „vrták“ platí jen pro závitovou díru: díra závit M8 hloubka 20 jádro	hole: “core” and “drill” only apply to a tapped hole: hole thread M8 depth 20 core
+díra: „jádro“ a „vrták“ si odporují – zadejte jen jedno	hole: “core” and “drill” contradict each other – give only one
+díra: dno je zadané dvakrát různě („{0}“) – použijte buď „dno ploché“, nebo „hrot 118“	hole: the bottom is given twice differently (“{0}”) – use either “flat bottom” or “tip 118”
+díra: průměr {0} a „jádro“ (D1 závitu {1} = {2}) si odporují – zadejte jen jedno	hole: diameter {0} and “core” (D1 of thread {1} = {2}) contradict each other – give only one
+díra: průměr {0} a „vrták {1}“ si odporují – zadejte jen jedno	hole: diameter {0} and “drill {1}” contradict each other – give only one
+díra: průměr {0} a „vrták“ (tabulkový {1} pro {2}) si odporují – zadejte jen jedno	hole: diameter {0} and “drill” (table {1} for {2}) contradict each other – give only one
+díra: průměr vrtáku musí být kladný: vrták 6,7	hole: the drill diameter must be positive: drill 6.7
+díra: úhel hrotu {0}° – zadejte 60 až 170° (vrták 118°, 120°, 90°…) nebo 180 = ploché dno	hole: tip angle {0}° – enter 60 to 170° (drill 118°, 120°, 90°…) or 180 = flat bottom
+díra: vrták Ø{0} musí být menší než závit {1} (Ø{2}) – průchozí díra pro šroub je díra bez závitu (např. díra 9 skrz)	hole: drill Ø{0} must be smaller than thread {1} (Ø{2}) – a clearance hole for a screw is a hole without a thread (e.g. hole 9 through)
+díra: za slovem „{0}“ čekám „ploché“ nebo „hrot N“ (dno ploché | hrot 118)	hole: after “{0}” I expect “flat” or “tip N” (flat bottom | tip 118)
+Dno díry	Hole bottom
+dno ploché	flat bottom
+hrot {0}° (ke špičce {1})	tip {0}° (to the point {1})
+Jádro D1 Ø{0}	Minor D1 Ø{0}
+jádro D1 podle ISO 965-1 (D − 1,0825·P)	minor diameter D1 per ISO 965-1 (D − 1.0825·P)
+Kužel vrtáku	Drill point
+Ø{0} (vrták závitu {1})	Ø{0} (tap drill {1})
+Ø{0} je jmenovitý průměr závitu {1} – vrtá se tabulkový vrták Ø{2} (jádro D1 Ø{3}: volba „jádro“, jiný vrták: „vrták 6,7“ nebo průměr za slovem díra)	Ø{0} is the nominal diameter of thread {1} – the table tap drill Ø{2} is drilled (minor D1 Ø{3}: option “core”, another drill: “drill 6.7” or the diameter after the word hole)
+Ploché	Flat
+ploché dno	flat bottom
+Průměr vrtáku	Drill diameter
+Tabulkový Ø{0}	Table Ø{0}
+tabulkový vrták	table tap drill
+Vlastní	Custom
+Vrtá se Ø{0} mm – {1}; závit {2} se uvede ve výkrese.	Drilled Ø{0} mm – {1}; thread {2} appears in the drawing.
+vrták = jádro D1 Ø{0}	drill = minor D1 Ø{0}
+Vrták musí být menší než závit {0} (Ø{1}).	The drill must be smaller than thread {0} (Ø{1}).
+vrták Ø{0}	drill Ø{0}
+vrták Ø{0} = jádro D1 závitu {1} podle ISO 965-1 (tabulkový vrták {2})	drill Ø{0} = minor D1 of thread {1} per ISO 965-1 (table tap drill {2})
+vrták Ø{0} zadán ručně	drill Ø{0} entered manually
+vrták Ø{0} zadán ručně (tabulkový {1})	drill Ø{0} entered manually (table {1})
+Vrták pro závit	Tap drill
+Vrták závitové díry Ø{0} musí být menší než závit {1} (Ø{2}).	The tap drill Ø{0} must be smaller than thread {1} (Ø{2}).
+zadaný průměr	entered diameter
+závitová díra: bez průměru = tabulkový vrták (M8 → 6,8, M18×1,5 → 16,5); zadaný průměr má přednost (protokol: vrták zadán ručně); jmenovitý průměr (díra 8 závit M8) = tabulkový vrták s poznámkou; „jádro“ (EN core, DE Kern) = malý průměr D1 podle ISO 965-1 (M8 → 6,647); „vrták N“ (EN drill N, DE Bohrer N) = vlastní vrták. Dno slepé díry: „dno ploché“ (EN flat bottom, DE flacher Grund) – sedlo pružiny, frézované dno – nebo „hrot 118|120|90“ (EN tip, DE Spitze; 60–170°, „hrot 180“ = ploché; také „ploché“, „bez hrotu“, „dno kužel 120“); platí i pro závitovou a zahloubenou díru; volby díry pište před „název“	tapped hole: without a diameter = table tap drill (M8 → 6.8, M18×1.5 → 16.5); an entered diameter takes precedence (log: drill entered manually); the nominal diameter (hole 8 thread M8) = table tap drill with a note; “core” (CZ jádro, DE Kern) = minor diameter D1 per ISO 965-1 (M8 → 6.647); “drill N” (CZ vrták N, DE Bohrer N) = custom drill. Blind-hole bottom: “flat bottom” (CZ dno ploché, DE flacher Grund) – spring seat, milled bottom – or “tip 118|120|90” (CZ hrot, DE Spitze; 60–170°, “tip 180” = flat; also “flat”, “without tip”, “bottom cone 120”); also applies to tapped and counterbored holes; write the hole options before “name”
+Ø{0} je pro závit {1} příliš malý (pod jádrem D1 {2} o víc než stoupání) – vrtá se tabulkový vrták Ø{3}; jiný vrták: „vrták 6,7“	Ø{0} is too small for thread {1} (more than one pitch below the minor diameter D1 {2}) – the table tap drill Ø{3} is drilled; another drill: “drill 6.7”
+# 12. vlna – oprava po kontrole: název díry, upravit / prvek, tichá oříznutí, měření dna
+díra: nerozumím slovu „{0}“ – volby dna a vrtáku: dno ploché | hrot 118 | dno kužel | jádro | vrták [6,7]; název pište za slovo „název“	hole: I do not understand the word “{0}” – bottom and drill options: flat bottom | tip 118 | bottom cone | core | drill [6.7]; write a name after the word “name”
+tapDrill „{0}“ – zadejte table (tabulkový vrták), minor (jádro D1) nebo custom (vrtá se diameter)	tapDrill “{0}” – enter table (table tap drill), minor (minor diameter D1) or custom (diameter is drilled)
+vlastní vrták Ø{0} se k závitu {1} nehodí (vhodný je Ø{2} až pod Ø{3}) – vrtá se tabulkový vrták Ø{4}	the custom drill Ø{0} does not suit thread {1} (suitable is Ø{2} up to below Ø{3}) – the table tap drill Ø{4} is drilled
+tapDrill custom potřebuje průměr vrtáku: diameter=6,647	tapDrill custom needs a drill diameter: diameter=6.647
+Průměr Ø{0} se u závitové díry {1} nepoužije – vrtá se tabulkový vrták Ø{2}; zadaný vrták: tapDrill custom (upravit … tapDrill=custom, formulář Vrták pro závit – Vlastní).	The diameter Ø{0} is not used for the tapped hole {1} – the table tap drill Ø{2} is drilled; for the given drill: tapDrill custom (edit … tapDrill=custom, form Tap drill – Custom).
+Úhel hrotu {0}° je mimo 60–170° – použito {1}.	The tip angle {0}° is outside 60–170° – {1} used.
+hrot {0}°	tip {0}°
+{0} (tabulkový {1})	{0} (table {1})
+Prvek {0} (díra): chybí poloha – position=x;y;z (nebo points)	Feature {0} (hole): position missing – position=x;y;z (or points)

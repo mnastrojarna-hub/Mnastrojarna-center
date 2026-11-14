@@ -87,7 +87,7 @@ export default {
     select: "Skicu s uzavřeným profilem (předvolí se poslední; jinou zvolíte v poli Profil (skica)).",
     steps: ["V poli Profil (skica) zkontrolujte profil.", "Ukončení (směr 1): Na vzdálenost, Skrz vše, K ploše… a délka.", "Operace: Přidat / Odebrat / Průnik, potvrďte OK."],
     cmd: "vysunout 10",
-    note: "Bez skici nejde. Otevřený obrys vysunete jen s volbou Tenká stěna.",
+    note: "Umí i šikmo (Směr, Pod úhlem od normály) a úkos Dovnitř / Ven s břitem – odlehčení střižnice.",
   },
   revolve: {
     what: "Orotuje profil skici kolem osy – rotační díly jako hřídel, příruba, čep.",
@@ -163,7 +163,7 @@ export default {
     select: "Po otevření formuláře klikněte na plochu, kam se má vrtat (nastaví Bod na povrchu i osu).",
     steps: ["Typ díry: Vrtaná, Válc. zahl., Kuž. zahl. nebo Závit; zadejte Průměr.", "Klikněte na plochu (Bod na povrchu) nebo vyplňte Polohy děr.", "Nastavte Ukončení (hloubka, skrz) a potvrďte OK."],
     cmd: "díra 8,5 skrz v 20 30",
-    note: "Volba Pro šroub (průchozí díra ISO 273) dopočítá průměr podle šroubu.",
+    note: "Závit: vrták z tabulky (M8 → 6,8), volba jádro nebo vlastní průměr; slepá díra i s plochým dnem.",
   },
   thread: {
     what: "Přidá metrický závit ISO na válec nebo do díry – kosmetický, nebo vymodelovaný.",

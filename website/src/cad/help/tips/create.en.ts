@@ -87,7 +87,7 @@ export default {
     select: "A sketch with a closed profile (the last one is preset; change it in Profile (sketch)).",
     steps: ["Check the profile in Profile (sketch).", "End condition (direction 1): Blind, Through all, Up to face… and length.", "Operation: Add / Remove / Intersect, confirm OK."],
     cmd: "extrude 10",
-    note: "Needs a sketch. An open outline extrudes only with the Thin wall option.",
+    note: "Also oblique (Direction, Angle from normal) and draft In / Out with a land – die clearance relief.",
   },
   revolve: {
     what: "Revolves a sketch profile about an axis – turned parts such as shafts, flanges, pins.",
@@ -163,7 +163,7 @@ export default {
     select: "With the form open click the face to drill into (sets Point on the surface and the axis).",
     steps: ["Hole type: Drilled, Counterbore, Countersink or Thread; enter the Diameter.", "Click the face (Point on the surface) or fill in Hole positions.", "Set the End condition (depth, through) and confirm OK."],
     cmd: "hole 8.5 through at 20 30",
-    note: "For a screw (clearance hole ISO 273) works out the diameter from the screw.",
+    note: "Thread: table drill (M8 → 6.8), minor diameter or a custom drill; blind holes also with a flat bottom.",
   },
   thread: {
     what: "Adds an ISO metric thread on a cylinder or in a hole – cosmetic or modelled.",

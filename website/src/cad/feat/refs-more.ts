@@ -16,11 +16,13 @@ import { axisVec, csysBasis, entityIndex, planeDefToSketchPlane, planeOfRef, poi
 import { planeDefLabel, type AxisDef, type Direction, type Extent, type Ref } from "../refs";
 import type { Axis, BoolMode, Feature, SketchPlane, Vec2, Vec3 } from "../types";
 import { registerFeatureBuilder, type FeatCtx } from "./registry";
+import { recordPlacement } from "../placements";
 
 type Shape = r.Shape3D;
 type F<T extends Feature["type"]> = Extract<Feature, { type: T }>;
 
-const rc = (ctx: FeatCtx): ResolveCtx => ({ body: ctx.body, sketches: ctx.sketches, features: ctx.features });
+/** odkazy se řeší na tělese před prvkem; u „nového tělesa“ na tom, ze kterého se nové zakládá (`refBody`) */
+const rc = (ctx: FeatCtx): ResolveCtx => ({ body: ctx.body ?? ctx.refBody ?? null, sketches: ctx.sketches, features: ctx.features });
 const vt = (v: { x: number; y: number; z: number }): Vec3 => [v.x, v.y, v.z];
 
 // ---------------- společné pomocné funkce ----------------
@@ -96,9 +98,20 @@ toolBuilder("box", (f, ctx) => {
   return f.dirDef ? alignZ(box, resolveDirection(rc(ctx), f.dirDef, { normal: [0, 0, 1] }), at) : box;
 });
 
+/** Poloha a osa prvku (odkaz vyřešený na tělese) – zapíše se pro výkres a kontrolu kót (placements.ts). */
+function placed(f: { id: string; position: Vec3; positionRef?: Ref; axis: Axis; dirDef?: Direction }, ctx: FeatCtx, what: string): { at: Vec3; dir: Vec3 } {
+  const byRef = !!f.positionRef || !!f.dirDef; // čísla + osa X / Y / Z výkres spočítá sám (placements.ts)
+  recordPlacement(f.id, null);
+  const at = placeOf(f, ctx, what);
+  const dir = dirDefOf(f, ctx);
+  if (byRef) recordPlacement(f.id, { position: at, dir });
+  return { at, dir };
+}
+
 toolBuilder("cylinder", (f, ctx) => {
   if (!(f.radius > 0 && f.height > 0)) throw new Error(tr("Rozměry musí být kladné."));
-  return r.makeCylinder(f.radius, f.height, placeOf(f, ctx, tr("polohu podstavy")), dirDefOf(f, ctx)) as Shape;
+  const p = placed(f, ctx, tr("polohu podstavy"));
+  return r.makeCylinder(f.radius, f.height, p.at, p.dir) as Shape;
 });
 
 toolBuilder("sphere", (f, ctx) => {
@@ -109,31 +122,35 @@ toolBuilder("sphere", (f, ctx) => {
 toolBuilder("cone", (f, ctx) => {
   if (!(f.height > 0) || f.radius1 < 0 || f.radius2 < 0 || f.radius1 + f.radius2 <= 0) throw new Error(tr("Neplatné rozměry kuželu."));
   const s = revolvedZ([[0, 0], [Math.max(f.radius1, 1e-4), 0], [Math.max(f.radius2, 1e-4), f.height], [0, f.height]]);
-  return alignZ(s, dirDefOf(f, ctx)).translate(placeOf(f, ctx, tr("polohu podstavy")));
+  const p = placed(f, ctx, tr("polohu podstavy"));
+  return alignZ(s, p.dir).translate(p.at);
 });
 
 toolBuilder("tube", (f, ctx) => {
   if (!(f.outer > f.inner && f.inner >= 0 && f.height > 0)) throw new Error(tr("Vnější průměr musí být větší než vnitřní."));
   let t = r.makeCylinder(f.outer / 2, f.height) as Shape;
   if (f.inner > 0) t = t.cut(r.makeCylinder(f.inner / 2, f.height));
-  return alignZ(t, dirDefOf(f, ctx)).translate(placeOf(f, ctx, tr("polohu podstavy")));
+  const p = placed(f, ctx, tr("polohu podstavy"));
+  return alignZ(t, p.dir).translate(p.at);
 });
 
 // ---------------- pružina, závit, text ----------------
 
 toolBuilder("spring", (f, ctx) => {
-  const at = placeOf(f, ctx);
-  if (!f.dirDef) return springSolid({ ...f, position: at });
-  return alignZ(springSolid({ ...f, position: [0, 0, 0], axis: "Z" }), dirDefOf(f, ctx)).translate(at);
+  const p = placed(f, ctx, "polohu");
+  if (!f.dirDef) return springSolid({ ...f, position: p.at });
+  return alignZ(springSolid({ ...f, position: [0, 0, 0], axis: "Z" }), p.dir).translate(p.at);
 });
 
 toolBuilder("thread", (f, ctx) => {
   if (!ctx.body) throw new Error(tr("Závit potřebuje těleso (válcovou plochu nebo díru)."));
+  // poloha a osa se řeší i u kosmetického závitu: chybný odkaz = chyba prvku (dřív ✓), výkres kreslí závit tam, kde skutečně je
+  const p = placed(f, ctx, tr("začátek závitu"));
   if (!f.modeled) return null; // kosmetický závit – jen ve výkrese
   const t = threadByName(f.designation);
   if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.designation, tr(THREAD_HINT)));
   if (!(f.length > 0)) throw new Error(tr("Délka závitu musí být kladná."));
-  return alignZ(revolvedZ(threadProfile(t, f.length, f.internal)), dirDefOf(f, ctx)).translate(placeOf(f, ctx, tr("začátek závitu")));
+  return alignZ(revolvedZ(threadProfile(t, f.length, f.internal)), p.dir).translate(p.at);
 });
 
 const FONT_FAMILY = "MnRoboto";

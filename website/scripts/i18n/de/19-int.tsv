@@ -1,0 +1,19 @@
+# vlna 12 – integrace (tabulka polí prvků: vysunutí a díra po sloučení balíků extr / hole / prim)
+(bez volby) | jádro | vrták N | díra 6,647 závit M8	(ohne Option) | Kern | Bohrer N | bohrung 6,647 gewinde M8
+břit – rovná část kolmo od roviny skici před začátkem úkosu	Steg – gerader Teil senkrecht zur Skizzenebene vor Beginn der Schräge
+břit N	steg N
+délka se měří kolmo na rovinu skici (výška), ne podél šikmého směru	die Länge wird senkrecht zur Skizzenebene gemessen (Höhe), nicht entlang der schrägen Richtung
+díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8 [jádro | vrták [N]]]	bohrung D [tiefe H [flacher Grund | Spitze 118]|durch [beidseits]|bis körper] bei x y [z] [achse Z] [richtung vx vy vz | neigung winkel] [senkung D2 H2] [kegelsenkung D2] [gewinde M8 [Kern | Bohrer [N]]]
+hrot N | dno ploché	Spitze N | flacher Grund
+ostré rohy | zaoblené rohy	scharfe ecken | runde ecken
+průměr (u závitové díry skutečný vrták – viz tapDrill)	Durchmesser (bei Gewindebohrung der tatsächliche Bohrer – siehe tapDrill)
+rohy úkosu: ostré (rovinné stěny) / zaoblené (vzdalující se rohy se zaoblí)	Ecken der Schräge: scharf (ebene Wände) / rund (zurückweichende Ecken werden verrundet)
+skrz | k tělesu | k dalšímu | k ploše F3 [odsazení N] | k rovině "Rovina 1" | k vrcholu V3	durch | bis körper | bis nächste | bis fläche F3 [versatz N] | bis ebene "Ebene 1" | bis punkt V3
+směr vysunutí (výchozí normála skici); sklon = {"kind":"angle","deg":25,"toward":[1,0,0]}	Extrusionsrichtung (standardmäßig Skizzennormale); Neigung = {"kind":"angle","deg":25,"toward":[1,0,0]}
+směr x y z | směr +X | směr hrana E3 | směr osa "Osa 1" | směr plocha F2 | směr body V1 V2 | sklon a [k +X]	richtung x y z | richtung +X | richtung kante E3 | richtung achse "Achse 1" | richtung fläche F2 | richtung punkte V1 V2 | neigung a [nach +X]
+úhel špičky vrtáku slepé díry 60–170° (výchozí 118), 180 = ploché dno; jiná hodnota: text / prvek / upravit = chyba, starší JSON = varování a oříznutí	Spitzenwinkel des Bohrers bei Sacklöchern 60–170° (Standard 118), 180 = flacher Grund; andere Werte: Text / element / bearbeiten = Fehler, älteres JSON = Warnung und Begrenzung
+úkos a [dovnitř|ven]	schräge a [innen|außen]
+úkos stěn: + = dovnitř (vnější obrys se od skici zužuje, otvory profilu rozšiřují), − = ven	Wandschräge: + = innen (Außenkontur verjüngt sich von der Skizze weg, Profilöffnungen weiten sich), − = außen
+vysunout H|výška H [směr …] [sklon a [k +X]] [symetricky] [skrz|k tělesu|k dalšímu|k ploše F3|k rovině "Rovina 1"|k vrcholu V3] [odebrat|přidat|průnik|nové] [obráceně] [úkos a [dovnitř|ven] [břit N] [ostré rohy|zaoblené rohy]]	extrudieren H|höhe H [richtung …] [neigung a [nach +X]] [symmetrisch] [durch|bis körper|bis nächste|bis fläche F3|bis ebene "Ebene 1"|bis punkt V3] [abziehen|hinzufügen|schnittmenge|neukörper] [umkehren] [schräge a [innen|außen] [steg N] [scharfe ecken|runde ecken]]
+vrták závitové díry: table = z tabulky (M8 → 6,8), minor = jádro D1 podle ISO 965-1 (M8 → 6,647), custom = vrtá se diameter	Bohrer der Gewindebohrung: table = aus der Gewindetabelle (M8 → 6,8), minor = Kerndurchmesser D1 nach ISO 965-1 (M8 → 6,647), custom = es wird diameter gebohrt
+prvek {0}: neznámý klíč „{1}“ – pole: {2} (popis: prvek nápověda {0})	element {0}: unbekannter Schlüssel „{1}“ – Felder: {2} (Beschreibung: element hilfe {0})

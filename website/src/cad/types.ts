@@ -90,8 +90,12 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
    * Vysunutí. Ukončení `extent` (slepé / skrz vše / k dalšímu / k vrcholu / k ploše / odsazeně / k tělesu / střední rovina),
    * nezávislý druhý směr `extent2`, začátek `from`, směr `dir`, tenká stěna `thin`, kroucení `twist` (°), změna měřítka na konci
    * `endScale` (ZW3D smrštit/rozšířit), `outerOnly` = ignorovat otvory profilu. Starší pole `distance/symmetric` platí, když `extent` chybí.
+   * Úkos `draftAngle`: + = dovnitř (vnější obrys se od roviny skici zužuje, otvory profilu rozšiřují), − = ven; `draftLand` = rovná část
+   * (břit, mm kolmo od roviny skici) před začátkem úkosu; `draftCorners: "sharp"` = ostré rohy (jinak se vzdalující rohy zaoblí);
+   * s `draftCorners` (nový úkos) se `symmetric` úkos odsazuje od roviny skici na obě strany, bez něj jako ve starších dokumentech.
+   * `normalHeight` = vzdálenost se měří kolmo na rovinu skici (výška), ne podél šikmého směru `dir` (extrude-draft.ts).
    */
-  | { type: "extrude"; sketchId: string; distance: number; symmetric: boolean; reverse: boolean; mode: BoolMode; draftAngle?: number; extent?: Extent; extent2?: Extent; from?: StartFrom; dir?: Direction; thin?: Thin; twist?: number; endScale?: number; outerOnly?: boolean }
+  | { type: "extrude"; sketchId: string; distance: number; symmetric: boolean; reverse: boolean; mode: BoolMode; draftAngle?: number; extent?: Extent; extent2?: Extent; from?: StartFrom; dir?: Direction; thin?: Thin; twist?: number; endScale?: number; outerOnly?: boolean; draftLand?: number; draftCorners?: "sharp" | "round"; normalHeight?: boolean }
   /** Rotace. Osa `axisDef` (8 způsobů; starší `axis` = osa skici), druhý směr `angle2`, `symmetric` (střední rovina), tenká stěna. */
   | { type: "revolve"; sketchId: string; angle: number; axis: "x" | "y"; mode: BoolMode; axisDef?: AxisDef; angle2?: number; symmetric?: boolean; thin?: Thin }
   /** Primitiva: `positionRef` = poloha odkazem (má přednost před `position`), `dirDef` = osa libovolným směrem (má přednost před `axis`). */
@@ -116,8 +120,10 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       /** kuželové zahloubení: průměr a vrcholový úhel (90°) */
       csDiameter?: number;
       csAngle?: number;
-      /** závit, např. "M8" (u kind = "tapped" se vrtá jádrový průměr) */
+      /** závit, např. "M8" (u kind = "tapped" se vrtá průměr podle `tapDrill`) */
       thread?: string;
+      /** vrták závitové díry: chybí / "table" = z tabulky závitů (M8 → 6,8), "minor" = jádro D1 podle ISO 965-1 (6,647), "custom" = `diameter` */
+      tapDrill?: "table" | "minor" | "custom";
       threadDepth?: number;
       /** ukončení (chybí-li: depth > 0 = slepá, jinak skrz) */
       end?: HoleEnd;
@@ -125,7 +131,7 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       points?: Ref[];
       /** osa díry libovolným směrem (chybí-li, platí `axis`) */
       dirDef?: Direction;
-      /** úhel špičky vrtáku (°), výchozí 118 */
+      /** úhel špičky vrtáku (°) u slepé díry, výchozí 118; 180 = ploché dno (hole-spec.ts) */
       tipAngle?: number;
       /** řada ISO 273 pro průchozí díru (informativní – průměr se dopočítá v UI) */
       fit?: HoleFit;

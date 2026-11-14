@@ -331,6 +331,10 @@ export function ExtentField({ label, value, onChange, kinds, defaultDistance = 2
   );
 }
 
+/** směr sklonu u „Pod úhlem od normály“: globální osa (promítne se do roviny skici); jiný vektor z textu se jen zobrazí */
+const TOWARD: Record<string, Vec3> = { "+X": [1, 0, 0], "−X": [-1, 0, 0], "+Y": [0, 1, 0], "−Y": [0, -1, 0], "+Z": [0, 0, 1], "−Z": [0, 0, -1] };
+const towardKey = (t: Vec3 | undefined) => (!t ? "" : (Object.keys(TOWARD).find((k) => TOWARD[k].every((c, i) => Math.abs(c - t[i]) < 1e-9)) ?? "vec"));
+
 /** Směr. `kinds` omezí nabídku druhů (např. bez „pod úhlem“ tam, kde není rovina skici). */
 export function DirectionField({ label = tr("Směr"), value, onChange, allowNormal = true, kinds }: { label?: string; value: Direction | undefined; onChange: (d: Direction | undefined) => void; allowNormal?: boolean; kinds?: Direction["kind"][] }) {
   const v: Direction = value ?? { kind: "normal" };
@@ -344,7 +348,7 @@ export function DirectionField({ label = tr("Směr"), value, onChange, allowNorm
       case "vector":
         return onChange({ kind, v: [0, 0, 1] });
       case "angle":
-        return onChange({ kind, deg: 15 });
+        return onChange({ kind, deg: 15, keepSide: true }); // „Opačný směr“ zrcadlí přes rovinu skici jako text „sklon … obráceně“
       case "twoPoints":
         return onChange({ kind, a: { kind: "vertex", index: -1 }, b: { kind: "vertex", index: -1 } });
       case "faceNormal":
@@ -381,7 +385,23 @@ export function DirectionField({ label = tr("Směr"), value, onChange, allowNorm
           ))}
         </div>
       )}
-      {v.kind === "angle" && <NumIn label={tr("Úhel od normály (kolem osy Y skici)")} suffix="°" value={v.deg} onChange={(deg) => onChange({ kind: "angle", deg })} />}
+      {v.kind === "angle" && (
+        <div className="grid grid-cols-2 gap-1" data-dir-tilt>
+          <NumIn label={v.toward ? tr("Sklon od normály") : tr("Úhel od normály (kolem osy Y skici)")} suffix="°" value={v.deg} onChange={(deg) => onChange({ ...v, deg })} />
+          <label className="block">
+            <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{tr("Směrem k")}</span>
+            <select data-dir-toward className={selectCls} value={towardKey(v.toward)} onChange={(e) => onChange({ kind: "angle", deg: v.deg, ...(TOWARD[e.target.value] ? { toward: TOWARD[e.target.value] } : { keepSide: true }) })}>
+              <option value="">{tr("ose X skici")}</option>
+              {Object.keys(TOWARD).map((k) => (
+                <option key={k} value={k}>
+                  {k}
+                </option>
+              ))}
+              {towardKey(v.toward) === "vec" && <option value="vec">{tr("vektor {0}", (v.toward ?? []).map((c) => Math.round(c * 1000) / 1000).join("; "))}</option>}
+            </select>
+          </label>
+        </div>
+      )}
       {v.kind === "twoPoints" && (
         <>
           <RefField label={tr("Od bodu")} value={v.a} want="point" onChange={(a) => onChange({ ...v, a })} />

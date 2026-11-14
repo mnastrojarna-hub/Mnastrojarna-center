@@ -63,7 +63,12 @@ export type Direction =
   | { kind: "twoPoints"; a: Ref; b: Ref }
   | { kind: "faceNormal"; ref: Ref }
   | { kind: "vector"; v: Vec3 }
-  | { kind: "angle"; deg: number } // natočení od normály v rovině skici (kolem osy Y skici)
+  /**
+   * sklon `deg` od normály skici směrem k `toward` (globální vektor promítnutý do roviny skici; chybí-li = osa X skici, tj. kolem osy Y
+   * skici). „Obráceně“ u vysunutí zrcadlí směr přes rovinu skici (strana sklonu zůstane), je-li `toward` nebo `keepSide` (text, nový
+   * formulář); starší dokumenty bez nich obrátí celý směr.
+   */
+  | { kind: "angle"; deg: number; toward?: Vec3; keepSide?: boolean }
   | { kind: "tangent"; ref: Ref }; // tečna hrany v bodě
 
 /** Začátek vysunutí (SolidWorks „From“). */
@@ -244,7 +249,7 @@ export function directionLabel(d: Direction | undefined): string {
   if (!d || d.kind === "normal") return tr("Normála");
   if (d.kind === "axis") return tr("Osa {0}", d.axis);
   if (d.kind === "vector") return tr("Vektor {0}", fmtVec(d.v));
-  if (d.kind === "angle") return tr("Úhel {0}°", fmt(d.deg));
+  if (d.kind === "angle") return d.toward ? tr("Úhel {0}° k {1}", fmt(d.deg), fmtVec(d.toward)) : tr("Úhel {0}°", fmt(d.deg));
   if (d.kind === "twoPoints") return `${refLabel(d.a)} → ${refLabel(d.b)}`;
   return `${DIRECTION_KINDS.find((x) => x.v === d.kind)?.l}: ${refLabel(d.ref)}`;
 }

@@ -225,6 +225,9 @@ function cylLine(c: MeasureCyl, id: string, hole: boolean): string {
     parts.push(tr("vstup {0}", vec(c.entry ?? c.to)));
     parts.push(c.through ? tr("skrz, délka {0}", mm(c.length)) : tr("slepá, hloubka {0}", mm(c.depth ?? c.length)));
     parts.push(c.through ? tr("osa {0}", dirText(c.axis)) : tr("směr vrtání {0}", dirText(c.drill)));
+    // dno slepé díry: ploché / hrot vrtáku s úhlem a hloubkou ke špičce
+    if (c.bottom === "flat") parts.push(tr("dno ploché"));
+    else if (c.bottom === "cone" && c.tipAngle !== undefined) parts.push(c.tipDepth !== undefined ? tr("hrot {0}° (ke špičce {1})", mfmt(c.tipAngle, 1), mm(c.tipDepth)) : tr("hrot {0}°", mfmt(c.tipAngle, 1)));
   } else {
     parts.push(tr("délka {0}", mm(c.length)));
     parts.push(tr("osa {0}", dirText(c.axis)));

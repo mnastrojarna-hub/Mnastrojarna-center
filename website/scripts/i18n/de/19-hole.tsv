@@ -1,0 +1,50 @@
+# 12. vlna – díra: vrták závitové díry (tabulkový / zadaný / jádro D1), ploché dno a hrot vrtáku
+ · dno ploché	 · flacher Grund
+ · hrot {0}°	 · Spitze {0}°
+díra: „dno ploché“ / „hrot“ platí jen pro slepou díru s hloubkou: díra 10 hloubka 12 dno ploché	Bohrung: „flacher Grund“ / „Spitze“ gelten nur für ein Sackloch mit Tiefe: bohrung 10 tiefe 12 flacher grund
+díra: „jádro“ a „vrták“ platí jen pro závitovou díru: díra závit M8 hloubka 20 jádro	Bohrung: „Kern“ und „Bohrer“ gelten nur für eine Gewindebohrung: bohrung gewinde M8 tiefe 20 kern
+díra: „jádro“ a „vrták“ si odporují – zadejte jen jedno	Bohrung: „Kern“ und „Bohrer“ widersprechen sich – nur eines angeben
+díra: dno je zadané dvakrát různě („{0}“) – použijte buď „dno ploché“, nebo „hrot 118“	Bohrung: der Grund ist zweimal unterschiedlich angegeben („{0}“) – entweder „flacher Grund“ oder „Spitze 118“ verwenden
+díra: průměr {0} a „jádro“ (D1 závitu {1} = {2}) si odporují – zadejte jen jedno	Bohrung: Durchmesser {0} und „Kern“ (D1 des Gewindes {1} = {2}) widersprechen sich – nur eines angeben
+díra: průměr {0} a „vrták {1}“ si odporují – zadejte jen jedno	Bohrung: Durchmesser {0} und „Bohrer {1}“ widersprechen sich – nur eines angeben
+díra: průměr {0} a „vrták“ (tabulkový {1} pro {2}) si odporují – zadejte jen jedno	Bohrung: Durchmesser {0} und „Bohrer“ (Tabelle {1} für {2}) widersprechen sich – nur eines angeben
+díra: průměr vrtáku musí být kladný: vrták 6,7	Bohrung: der Bohrerdurchmesser muss positiv sein: bohrer 6,7
+díra: úhel hrotu {0}° – zadejte 60 až 170° (vrták 118°, 120°, 90°…) nebo 180 = ploché dno	Bohrung: Spitzenwinkel {0}° – 60 bis 170° angeben (Bohrer 118°, 120°, 90°…) oder 180 = flacher Grund
+díra: vrták Ø{0} musí být menší než závit {1} (Ø{2}) – průchozí díra pro šroub je díra bez závitu (např. díra 9 skrz)	Bohrung: Bohrer Ø{0} muss kleiner als das Gewinde {1} (Ø{2}) sein – ein Durchgangsloch für eine Schraube ist eine Bohrung ohne Gewinde (z. B. bohrung 9 durch)
+díra: za slovem „{0}“ čekám „ploché“ nebo „hrot N“ (dno ploché | hrot 118)	Bohrung: nach „{0}“ wird „flach“ oder „Spitze N“ erwartet (flacher Grund | Spitze 118)
+Dno díry	Bohrungsgrund
+dno ploché	flacher Grund
+hrot {0}° (ke špičce {1})	Spitze {0}° (bis zur Spitze {1})
+Jádro D1 Ø{0}	Kern D1 Ø{0}
+jádro D1 podle ISO 965-1 (D − 1,0825·P)	Kerndurchmesser D1 nach ISO 965-1 (D − 1,0825·P)
+Kužel vrtáku	Bohrerspitze
+Ø{0} (vrták závitu {1})	Ø{0} (Kernlochbohrer {1})
+Ø{0} je jmenovitý průměr závitu {1} – vrtá se tabulkový vrták Ø{2} (jádro D1 Ø{3}: volba „jádro“, jiný vrták: „vrták 6,7“ nebo průměr za slovem díra)	Ø{0} ist der Nenndurchmesser des Gewindes {1} – gebohrt wird der Tabellen-Kernlochbohrer Ø{2} (Kern D1 Ø{3}: Option „Kern“, anderer Bohrer: „Bohrer 6,7“ oder Durchmesser nach dem Wort Bohrung)
+Ploché	Flach
+ploché dno	flacher Grund
+Průměr vrtáku	Bohrerdurchmesser
+Tabulkový Ø{0}	Tabelle Ø{0}
+tabulkový vrták	Tabellen-Kernlochbohrer
+Vlastní	Eigener
+Vrtá se Ø{0} mm – {1}; závit {2} se uvede ve výkrese.	Gebohrt wird Ø{0} mm – {1}; Gewinde {2} erscheint in der Zeichnung.
+vrták = jádro D1 Ø{0}	Bohrer = Kern D1 Ø{0}
+Vrták musí být menší než závit {0} (Ø{1}).	Der Bohrer muss kleiner als das Gewinde {0} (Ø{1}) sein.
+vrták Ø{0}	Bohrer Ø{0}
+vrták Ø{0} = jádro D1 závitu {1} podle ISO 965-1 (tabulkový vrták {2})	Bohrer Ø{0} = Kern D1 des Gewindes {1} nach ISO 965-1 (Tabellen-Kernlochbohrer {2})
+vrták Ø{0} zadán ručně	Bohrer Ø{0} manuell angegeben
+vrták Ø{0} zadán ručně (tabulkový {1})	Bohrer Ø{0} manuell angegeben (Tabelle {1})
+Vrták pro závit	Kernlochbohrer
+Vrták závitové díry Ø{0} musí být menší než závit {1} (Ø{2}).	Der Kernlochbohrer Ø{0} muss kleiner als das Gewinde {1} (Ø{2}) sein.
+zadaný průměr	angegebener Durchmesser
+závitová díra: bez průměru = tabulkový vrták (M8 → 6,8, M18×1,5 → 16,5); zadaný průměr má přednost (protokol: vrták zadán ručně); jmenovitý průměr (díra 8 závit M8) = tabulkový vrták s poznámkou; „jádro“ (EN core, DE Kern) = malý průměr D1 podle ISO 965-1 (M8 → 6,647); „vrták N“ (EN drill N, DE Bohrer N) = vlastní vrták. Dno slepé díry: „dno ploché“ (EN flat bottom, DE flacher Grund) – sedlo pružiny, frézované dno – nebo „hrot 118|120|90“ (EN tip, DE Spitze; 60–170°, „hrot 180“ = ploché; také „ploché“, „bez hrotu“, „dno kužel 120“); platí i pro závitovou a zahloubenou díru; volby díry pište před „název“	Gewindebohrung: ohne Durchmesser = Tabellen-Kernlochbohrer (M8 → 6,8, M18×1,5 → 16,5); ein angegebener Durchmesser hat Vorrang (Protokoll: Bohrer manuell angegeben); der Nenndurchmesser (bohrung 8 gewinde M8) = Tabellen-Kernlochbohrer mit Hinweis; „Kern“ (CZ jádro, EN core) = Kerndurchmesser D1 nach ISO 965-1 (M8 → 6,647); „Bohrer N“ (CZ vrták N, EN drill N) = eigener Bohrer. Sacklochgrund: „flacher Grund“ (CZ dno ploché, EN flat bottom) – Federsitz, gefräster Grund – oder „Spitze 118|120|90“ (CZ hrot, EN tip; 60–170°, „Spitze 180“ = flach; auch „flach“, „ohne Spitze“, „Grund Kegel 120“); gilt auch für Gewinde- und Senkbohrungen; die Bohrungsoptionen vor „name“ schreiben
+Ø{0} je pro závit {1} příliš malý (pod jádrem D1 {2} o víc než stoupání) – vrtá se tabulkový vrták Ø{3}; jiný vrták: „vrták 6,7“	Ø{0} ist für das Gewinde {1} zu klein (mehr als eine Steigung unter dem Kerndurchmesser D1 {2}) – gebohrt wird der Tabellen-Kernlochbohrer Ø{3}; anderer Bohrer: „Bohrer 6,7“
+# 12. vlna – oprava po kontrole: název díry, upravit / prvek, tichá oříznutí, měření dna
+díra: nerozumím slovu „{0}“ – volby dna a vrtáku: dno ploché | hrot 118 | dno kužel | jádro | vrták [6,7]; název pište za slovo „název“	Bohrung: das Wort „{0}“ verstehe ich nicht – Grund- und Bohreroptionen: flacher Grund | Spitze 118 | Grund Kegel | Kern | Bohrer [6,7]; einen Namen hinter das Wort „name“ schreiben
+tapDrill „{0}“ – zadejte table (tabulkový vrták), minor (jádro D1) nebo custom (vrtá se diameter)	tapDrill „{0}“ – table (Tabellen-Kernlochbohrer), minor (Kerndurchmesser D1) oder custom (diameter wird gebohrt) eingeben
+vlastní vrták Ø{0} se k závitu {1} nehodí (vhodný je Ø{2} až pod Ø{3}) – vrtá se tabulkový vrták Ø{4}	der eigene Bohrer Ø{0} passt nicht zum Gewinde {1} (geeignet ist Ø{2} bis unter Ø{3}) – der Tabellen-Kernlochbohrer Ø{4} wird gebohrt
+tapDrill custom potřebuje průměr vrtáku: diameter=6,647	tapDrill custom braucht einen Bohrerdurchmesser: diameter=6,647
+Průměr Ø{0} se u závitové díry {1} nepoužije – vrtá se tabulkový vrták Ø{2}; zadaný vrták: tapDrill custom (upravit … tapDrill=custom, formulář Vrták pro závit – Vlastní).	Der Durchmesser Ø{0} wird bei der Gewindebohrung {1} nicht verwendet – der Tabellen-Kernlochbohrer Ø{2} wird gebohrt; für den angegebenen Bohrer: tapDrill custom (ändern … tapDrill=custom, Formular Kernlochbohrer – Eigener).
+Úhel hrotu {0}° je mimo 60–170° – použito {1}.	Der Spitzenwinkel {0}° liegt außerhalb 60–170° – {1} verwendet.
+hrot {0}°	Spitze {0}°
+{0} (tabulkový {1})	{0} (Tabelle {1})
+Prvek {0} (díra): chybí poloha – position=x;y;z (nebo points)	Element {0} (Bohrung): Position fehlt – position=x;y;z (oder points)

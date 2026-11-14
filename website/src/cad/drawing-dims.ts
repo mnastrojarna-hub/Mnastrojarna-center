@@ -20,7 +20,10 @@ import { camOf, makeDrawing, proj, viewExtent, type Cam, type DrawingMeta, type 
 import { DimLayout, type CallReq, type LinReq, type Side } from "./drawing-dims-layout";
 import { partGeom, type GAxis, type GCone, type GCyl, type PartGeom } from "./drawing-dims-geom";
 import { threadByName } from "./defaults";
+import { holeDrillD, holeTip } from "./hole-spec";
 import { expectedDims } from "./dim-check";
+import { primHoles } from "./drawing-prim";
+import { placementOf } from "./placements";
 import { cadLocale, tr } from "./i18n";
 import { uid, type CadDoc, type DrawingAnnotation, type Feature, type SketchPlane, type Vec2, type Vec3 } from "./types";
 
@@ -57,6 +60,8 @@ const unit = (a: Vec3): Vec3 => mul(a, 1 / (len(a) || 1));
 const r3 = (n: number) => (Math.round(n * 1000) / 1000 || 0).toFixed(3);
 /** číslo do popisu (desetinná čárka podle jazyka, bez oddělovače tisíců) */
 export const fmtDim = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale(), { useGrouping: false });
+/** průměr vrtáku na tisíciny (jádro závitu D1 = 6,647) */
+const fmtDrill = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString(cadLocale(), { useGrouping: false, maximumFractionDigits: 3 });
 const upOf = (c: Cam) => cross(c.d, c.x);
 const AXV: Record<string, Vec3> = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
 
@@ -157,8 +162,12 @@ function rotateAbout(p: Vec3, c: Vec3, ax: Vec3, a: number): Vec3 {
 /** směr osy díry (jednotkový, bez ohledu na smysl vrtání) */
 const holeDir = (f: HoleF): Vec3 => unit(f.dirDef?.kind === "vector" ? f.dirDef.v : AXV[f.axis] ?? [0, 0, 1]);
 
-/** Řádky popisu díry z parametrů prvku: „4× M8 ↧16“ + „Ø6,8 ↧20“, „4× Ø9 skrz“ + „⌴ Ø15 ↧9“, „⌵ Ø16,5 × 90°“. */
-export function holeCallout(f: Pick<HoleF, "kind" | "diameter" | "depth" | "cbDiameter" | "cbDepth" | "csDiameter" | "csAngle" | "thread" | "threadDepth" | "end" | "tipAngle">, count: number, measuredDepth?: number): string[] {
+/**
+ * Řádky popisu díry z parametrů prvku: „4× M8 ↧16“ + „Ø6,8 ↧20“, „4× Ø9 skrz“ + „⌴ Ø15 ↧9“, „⌵ Ø16,5 × 90°“.
+ * Závitová díra s vrtákem jiným než tabulkovým (jádro D1, zadaný průměr) nese i řádek vrtáku („M8 ↧20“ + „Ø6,647 ↧20“);
+ * slepá díra s jiným hrotem než 118° má úhel v závorce, ploché dno poznámku „(ploché dno)“ (hloubka = celá hloubka).
+ */
+export function holeCallout(f: Pick<HoleF, "kind" | "diameter" | "depth" | "cbDiameter" | "cbDepth" | "csDiameter" | "csAngle" | "thread" | "threadDepth" | "end" | "tipAngle" | "tapDrill">, count: number, measuredDepth?: number): string[] {
   const n = count > 1 ? `${count}× ` : "";
   const kind = f.kind ?? (f.cbDiameter > f.diameter && f.cbDepth > 0 ? "counterbore" : "simple");
   const through = (f.end ? f.end.kind === "throughAll" || f.end.kind === "toNext" : !(f.depth > 0)) && f.end?.kind !== "toNext";
@@ -166,19 +175,27 @@ export function holeCallout(f: Pick<HoleF, "kind" | "diameter" | "depth" | "cbDi
   const deep = (d: number) => (d > 0 ? ` ↧${fmtDim(d)}` : "");
   const skrz = ` ${tr("skrz")}`;
   const lines: string[] = [];
+  // dno slepé díry (jen ukončení „hloubka“ – k ploše / k bodu je dno ploché vždy)
+  const blindEnd = !through && (!f.end || f.end.kind === "blind");
+  const tip = holeTip(f); // úhel jako v jádře (mimo 60–170° oříznutý), null = ploché dno
+  const bottom = !blindEnd ? "" : tip === null ? ` (${tr("ploché dno")})` : Math.abs(tip - 118) > 0.01 ? ` (${fmtDim(tip)}°)` : "";
   if (kind === "tapped" && f.thread) {
     const t = threadByName(f.thread);
     const name = t?.name ?? f.thread;
     const td = f.threadDepth && f.threadDepth > 0 ? f.threadDepth : 0;
-    if (through) lines.push(`${n}${name}${skrz}`);
-    else if (td > 0 && td < depth - 1e-6) lines.push(`${n}${name}${deep(td)}`, `Ø${fmtDim(t?.tap ?? f.diameter)}${deep(depth)}`);
-    else lines.push(`${n}${name}${deep(depth)}`);
+    // vrták na výkres: průměr na tisíciny (jádro D1 6,647), jiný než tabulkový se uvádí vždy
+    const drill = `Ø${fmtDrill(holeDrillD({ ...f, kind }))}`;
+    const special = f.tapDrill === "minor" || f.tapDrill === "custom";
+    if (through) lines.push(`${n}${name}${skrz}`, ...(special ? [`${drill}${skrz}`] : []));
+    else if (td > 0 && td < depth - 1e-6) lines.push(`${n}${name}${deep(td)}`, `${drill}${deep(depth)}${bottom}`);
+    else if (special) lines.push(`${n}${name}${deep(depth)}`, `${drill}${deep(depth)}${bottom}`);
+    else lines.push(`${n}${name}${deep(depth)}${bottom}`);
     return lines;
   }
   lines.push(`${n}Ø${fmtDim(f.diameter)}${through ? skrz : deep(depth)}`);
   if (kind === "counterbore" && f.cbDiameter > 0) lines.push(`⌴ Ø${fmtDim(f.cbDiameter)}${deep(f.cbDepth)}`);
   if (kind === "countersink" && (f.csDiameter ?? 0) > 0) lines.push(`⌵ Ø${fmtDim(f.csDiameter!)} × ${fmtDim(f.csAngle ?? 90)}°`);
-  if (!through && f.tipAngle && Math.abs(f.tipAngle - 118) > 0.01) lines[0] += ` (${fmtDim(f.tipAngle)}°)`;
+  lines[0] += bottom;
   return lines;
 }
 
@@ -454,7 +471,9 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
   const lenSides: Side[] = horiz ? ["bottom", "top"] : ["right", "left"];
 
   // závity (vnější) na této ose
-  const threads = c.doc.features.filter((f): f is Extract<Feature, { type: "thread" }> => f.type === "thread" && !f.suppressed && !f.internal && Math.abs(Math.abs(dot(AXV[f.axis] ?? [0, 0, 1], ax.dir)) - 1) < 1e-6 && onAxis(ax, f.position).rad < 1e-3);
+  // poloha a osa i odkazem / libovolným směrem (placements.ts – vyřešené stavbou)
+  const thrPl = (f: Extract<Feature, { type: "thread" }>) => placementOf(f) ?? { position: f.position, dir: AXV[f.axis] ?? [0, 0, 1] };
+  const threads = c.doc.features.filter((f): f is Extract<Feature, { type: "thread" }> => f.type === "thread" && !f.suppressed && !f.internal && Math.abs(Math.abs(dot(thrPl(f).dir, ax.dir)) - 1) < 1e-6 && onAxis(ax, thrPl(f).position).rad < 1e-3);
 
   // --- průměry: válce seřazené podél osy, přístupné z konce (všechno za nimi je menší) → naskládat na tu stranu
   const cylSegs = segs.filter((s) => s.cyl).sort((a, b) => a.t0 - b.t0);
@@ -580,8 +599,8 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
 
   // délka závitu (pokud není totožná s článkem)
   for (const th of threads) {
-    const st = onAxis(ax, th.position).t;
-    const dirSign = Math.sign(dot(AXV[th.axis] ?? [0, 0, 1], ax.dir)) || 1;
+    const st = onAxis(ax, thrPl(th).position).t;
+    const dirSign = Math.sign(dot(thrPl(th).dir, ax.dir)) || 1;
     const t0 = st;
     const t1 = st + dirSign * th.length;
     const same = ts.some((a, i) => ts.some((b, j) => j > i && Math.abs(Math.min(a, b) - Math.min(t0, t1)) < 1e-3 && Math.abs(Math.max(a, b) - Math.max(t0, t1)) < 1e-3));
@@ -694,7 +713,7 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
 /** interval podél osy jako část klíče kóty (nezávislý na pořadí článků) */
 const spanKey = (a: number, b: number) => `${r3(Math.min(a, b))}:${r3(Math.max(a, b))}`;
 const coneR = (x: GCone, t: number) => (Math.abs(x.t1 - x.t0) < 1e-9 ? Math.max(x.r0, x.r1) : x.r0 + ((x.r1 - x.r0) * (t - x.t0)) / (x.t1 - x.t0));
-const holeR = (f: HoleF) => (f.kind === "tapped" && f.thread ? (threadByName(f.thread)?.tap ?? f.diameter) / 2 : f.diameter / 2);
+const holeR = (f: HoleF) => holeDrillD(f) / 2; // u závitové díry vrták podle volby (tabulkový / jádro D1 / zadaný)
 const uniq = (xs: number[]) => xs.filter((x, i) => xs.findIndex((y) => Math.abs(y - x) < 1e-3) === i);
 
 /** oblouk pohledu poloměru r se středem blízko c (zaoblení) → jeho střední bod a směr ven */
@@ -723,7 +742,10 @@ type HoleGroup = { /** řádky popisu pro jednu díru (počet se doplní) */ lin
 function holeDims(c: Ctx, mainAx: GAxis | null, out: GAxis[], positions: boolean) {
   const g = c.g;
   const tol = 1e-4 * c.size + 1e-3;
-  const holes = c.doc.features.filter((f): f is HoleF => f.type === "hole" && !f.suppressed);
+  // + díry z odebraných válců a vnitřní závity (drawing-prim.ts)
+  const prim = primHoles(c.doc, g, c.doc.features.filter((f): f is HoleF => f.type === "hole" && !f.suppressed), tol);
+  const holes = prim.holes;
+  c.skipped.push(...prim.notes);
   const groups = new Map<string, HoleGroup>();
   const claimed = new Set<GCyl>();
   for (const f of holes) {

@@ -27,10 +27,16 @@ import { toAxisDef, toDirection } from "./ext/place";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
 import { parseApiCommand, type ApiOp, type MncadApiExt } from "./agent-api";
 import { parseShapesLine, shapesSummary } from "./agent-shapes";
+import { holeBottomText, holeDrillText, holeFieldRules, holeTextExtras, holeThreadDrill } from "./agent-hole";
 import { applySplineTangents, parseSurfaceLine, splitSplineTangents, type SurfCmd } from "./agent-surfaces";
 import { draftDocStatusText, draftLine, draftUndoLine } from "./draft/prefix";
 import type { DraftApiResult } from "./draft/agent";
 import type { DraftStatus } from "./draft/status";
+import { extrudeFromText, extrudeOptTokens, extrudeSummary } from "./agent-extr";
+import { parsePrimLine, primSummary } from "./agent-prim";
+import { parseFeatureHelp } from "./agent-help";
+import { COMMON_FIELDS, fieldsOf } from "./feature-fields";
+import { gapSummary, parseGapLine, ruleNumbers } from "./agent-gaps";
 
 export const AGENT_API_VERSION = 1;
 
@@ -69,8 +75,8 @@ export type AgentOp =
   | ApiOp
   | { k: "new"; name: string; assembly: boolean; line: number }
   | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string }; line: number }
-  /** prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text) */
-  | { k: "feature"; feature: Feature; line: number; fillTop?: boolean }
+  /** prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text); `note` = poznámka do protokolu */
+  | { k: "feature"; feature: Feature; line: number; fillTop?: boolean; note?: string }
   /** entity, vazby a kóty do skici bloku (skica z tohoto vstupu, jinak poslední skica); skica na ploše / pomocné rovině – agent-sketch.ts */
   | SketchOp
   | SketchOnOp
@@ -103,7 +109,9 @@ export type AgentOp =
   /** plochy: analýza návaznosti hran, hřebeny křivosti, seznam řídicích bodů (agent-surfaces.ts, provedení surf-a-host.ts) */
   | { k: "surf"; cmd: SurfCmd; line: number }
   /** 2D výkres: řádek za předponou `2d` (cad/draft/agent.ts) */
-  | { k: "draft"; text: string; line: number };
+  | { k: "draft"; text: string; line: number }
+  /** jen text do protokolu (nápověda polí prvku – agent-help.ts) */
+  | { k: "info"; lines: string[]; line: number };
 export type AgentError = { line: number; text: string; message: string };
 export type AgentProgram = { ops: AgentOp[]; errors: AgentError[] };
 
@@ -536,6 +544,14 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
     return into ? { k: "select", feature, rule, line: no, into } : { k: "feature", feature, line: no };
   }
   const obj: Record<string, unknown> = { type: base, ...(name ? { name } : {}) };
+  // klíč mimo pole typu (tabulka feature-fields.ts svázaná s types.ts) = chyba, ne tiché pole navíc; velikost písmen se opraví
+  const keys = [...COMMON_FIELDS, ...fieldsOf(base!).map(([k]) => k)];
+  for (const pr of pairs) {
+    const [top, ...sub] = pr[0].split(".");
+    const key = keys.find((x) => x === top) ?? keys.find((x) => x.toLowerCase() === top.toLowerCase());
+    if (!key) throw new Error(tr("prvek {0}: neznámý klíč „{1}“ – pole: {2} (popis: prvek nápověda {0})", base!, top, keys.filter((x) => x !== "type" && x !== "id").join(", ")));
+    pr[0] = [key, ...sub].join(".");
+  }
   for (const [k, raw] of pairs) {
     let v = parseValue(raw);
     if ((k === "faces" || k === "edges") && v !== "all") v = pick(k, k, v);
@@ -546,7 +562,10 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
   if (errors.length || !features.length) throw new Error(errors[0] ?? tr("prvek se nepodařilo vytvořit"));
   const feature = features[0];
   if (!name) feature.name = named(feature.type);
-  return into ? { k: "select", feature, rule, line: no, into } : { k: "feature", feature, line: no };
+  // díra: vrták závitové díry a dno jako text `díra` (zadaný diameter má přednost, tapDrill / tipAngle ověřené) – agent-hole.ts
+  const has = (k: string) => pairs.some(([x]) => x.split(".")[0] === k);
+  const note = feature.type === "hole" ? holeFieldRules(feature, { diameter: has("diameter"), thread: has("thread"), tapDrill: has("tapDrill"), tipAngle: has("tipAngle") }).join(" ") : "";
+  return into ? { k: "select", feature, rule, line: no, into } : { k: "feature", feature, line: no, ...(note ? { note } : {}) };
 }
 
 /* ───────────────────────── parser ───────────────────────── */
@@ -686,6 +705,12 @@ export function parseAgentText(text: string): AgentProgram {
         blk.last = undefined;
         return;
       }
+      // nápověda polí: prvek nápověda <typ> · nápověda <typ> · help · hilfe (agent-help.ts)
+      const help = parseFeatureHelp(cmd, line.replace(/^\s*\S+/, ""), { types: FEATURE_TYPES, labels: FEATURE_LABEL, canon, defaults: featureDefaults });
+      if (help) {
+        ops.push({ k: "info", lines: help, line: no });
+        return;
+      }
       if (cmd === "feature") {
         ops.push(parseGenericFeature(line.replace(/^\s*\S+/, ""), named, no));
         return;
@@ -703,16 +728,28 @@ export function parseAgentText(text: string): AgentProgram {
         return;
       }
       const tokens = tokenize(line).slice(1);
-      const o = parseOpts(tokens);
+      // díra: dno ploché, hrot N, jádro / vrták [N], M8 (agent-hole.ts); hodnota názvu / materiálu… zůstane obecnému parseru
+      const hx = cmd === "hole" ? holeTextExtras(tokens, (t) => (WORD_OPTS.has(canon(t)) && !["axis", "direction", "thread"].includes(canon(t)) ? "words" : FLAGS.has(canon(t)) || NUM_OPTS.has(canon(t)) || WORD_OPTS.has(canon(t)) ? "key" : null)) : null;
+      const o = parseOpts(hx ? hx.rest : cmd === "extrude" ? extrudeOptTokens(tokens) : tokens); // vysunout: bez „směr body V1 V5“ / „k tělesu“ (agent-extr.ts)
       const nm = o.words.name?.join(" ");
       // `… těleso 2` za prvkem = cílové těleso prvku; s „nové“ je to název nově založeného tělesa
       const targetBody = cmd !== "body" && cmd !== "copybody" && cmd !== "combine" && cmd !== "add" && o.words.body?.length ? bodyName(o.words.body) : "";
       const before = ops.length;
+      let ownBody = false; // primitiva a odkazy (agent-prim / agent-gaps) čtou těleso samy – CS „osa body V1 V5“ ≠ EN „body“ = těleso
       try {
       // tvary 7. vlny: zaoblit … setback / eliptické, úkos … [dělicí "Skica"] [stupňovitý] (agent-shapes.ts); null = běžný zápis
       const shp = parseShapesLine(cmd, tokens, (t, given) => named(t, given ?? nm), no);
       if (shp) {
         ops.push(shp);
+        return;
+      }
+      // primitiva (kvádr, válec, koule, kužel, trubka, pružina, závit): poloha odkazem, osa směrem, operace (agent-prim.ts);
+      // osa / směr / rovina odkazem u rotace, pole, zrcadlení a sražení s úhlem (agent-gaps.ts) – null = běžný zápis níže
+      const po = { parse: parseOpts, canon, isKey: (t: string) => FLAGS.has(canon(t)) || NUM_OPTS.has(canon(t)) || WORD_OPTS.has(canon(t)) };
+      const prim = parsePrimLine(cmd, tokens, po, (t, given) => named(t, given ?? nm), no) ?? parseGapLine(cmd, tokens, po, (t) => named(t, nm), no);
+      if (prim) {
+        ops.push(prim);
+        ownBody = true;
         return;
       }
       switch (cmd) {
@@ -735,44 +772,9 @@ export function parseAgentText(text: string): AgentProgram {
         case "color":
           ops.push({ k: "meta", patch: { color: tokens[0] }, line: no });
           return;
-        case "box": {
-          const [x, y, z] = o.free;
-          if (!(x > 0 && y > 0 && z > 0)) throw new Error(tr("kvádr potřebuje tři kladné rozměry: kvádr X Y Z"));
-          ops.push({ k: "feature", feature: { id: uid(), name: named("box", nm), type: "box", size: [x, y, z], position: posOf(o) ?? [0, 0, 0], centered: o.flags.has("center"), mode: modeOf(o) }, line: no });
-          return;
-        }
-        case "cylinder": {
-          const [d, h] = o.free;
-          if (!(d > 0 && h > 0)) throw new Error(tr("válec potřebuje průměr a výšku: válec D H"));
-          ops.push({ k: "feature", feature: { id: uid(), name: named("cylinder", nm), type: "cylinder", radius: d / 2, height: h, position: posOf(o) ?? [0, 0, 0], axis: axisOf(o), mode: modeOf(o) }, line: no });
-          return;
-        }
-        case "sphere": {
-          const [d] = o.free;
-          if (!(d > 0)) throw new Error(tr("koule potřebuje průměr: koule D"));
-          ops.push({ k: "feature", feature: { id: uid(), name: named("sphere", nm), type: "sphere", radius: d / 2, position: posOf(o) ?? [0, 0, 0], mode: modeOf(o) }, line: no });
-          return;
-        }
-        case "cone": {
-          const [d1, d2, h] = o.free;
-          if (!(d1 > 0 && d2 >= 0 && h > 0)) throw new Error(tr("kužel potřebuje dolní průměr, horní průměr a výšku: kužel D1 D2 H"));
-          ops.push({ k: "feature", feature: { id: uid(), name: named("cone", nm), type: "cone", radius1: d1 / 2, radius2: d2 / 2, height: h, position: posOf(o) ?? [0, 0, 0], axis: axisOf(o), mode: modeOf(o) }, line: no });
-          return;
-        }
-        case "tube": {
-          const [D, d, h] = o.free;
-          if (!(D > 0 && d >= 0 && D > d && h > 0)) throw new Error(tr("trubka potřebuje vnější průměr, vnitřní průměr a výšku: trubka D d H"));
-          ops.push({ k: "feature", feature: { id: uid(), name: named("tube", nm), type: "tube", outer: D, inner: d, height: h, position: posOf(o) ?? [0, 0, 0], axis: axisOf(o), mode: modeOf(o) }, line: no });
-          return;
-        }
         case "extrude": {
-          const d = o.free[0] ?? o.nums.height?.[0] ?? o.nums.depth?.[0];
-          const through = o.flags.has("through");
-          if (!through && !(d > 0)) throw new Error(tr("vysunout potřebuje výšku: vysunout 20 [symetricky] [odebrat] [skrz]"));
-          const f: Feature = { id: uid(), name: named("extrude", nm), type: "extrude", sketchId: "$last", distance: through ? 1 : d, symmetric: o.flags.has("symmetric"), reverse: o.flags.has("reverse"), mode: o.flags.has("cut") || o.flags.has("intersect") || o.flags.has("newbody") || o.flags.has("add") ? modeOf(o) : "$auto" as unknown as "add" };
-          if (through) f.extent = { kind: "throughAll" };
-          if (o.nums.draft?.[0]) f.draftAngle = o.nums.draft[0];
-          ops.push({ k: "feature", feature: f, line: no });
+          // šikmý směr / sklon, výška kolmo, úkos dovnitř / ven s břitem, ukončení k tělesu / ploše… (agent-extr.ts)
+          ops.push({ k: "feature", feature: extrudeFromText(tokens, parseOpts, () => ({ id: uid(), name: named("extrude", nm) })), line: no });
           return;
         }
         case "revolve": {
@@ -784,8 +786,12 @@ export function parseAgentText(text: string): AgentProgram {
           return;
         }
         case "hole": {
-          const d = o.free[0] ?? o.nums.diameter?.[0];
-          if (!(d > 0)) throw new Error(tr("díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]"));
+          // závitová díra nepotřebuje průměr (tabulkový vrták); zadaný průměr má přednost – holeThreadDrill (agent-hole.ts)
+          const thr = o.words.thread?.[0] ?? hx?.thread;
+          if (!thr && (hx?.drill || hx?.drillD)) throw new Error(tr("díra: „jádro“ a „vrták“ platí jen pro závitovou díru: díra závit M8 hloubka 20 jádro"));
+          const dIn = o.free[0] ?? o.nums.diameter?.[0];
+          if (!((dIn ?? 0) > 0) && !(thr && dIn === undefined)) throw new Error(tr("díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]"));
+          const d = dIn ?? 0;
           const at = o.nums.at ?? [];
           const axis = axisOf(o);
           // více děr jedním příkazem: `v x1 y1 z1 v x2 y2 z2 …` (trojice souřadnic)
@@ -823,15 +829,24 @@ export function parseAgentText(text: string): AgentProgram {
             f.csDiameter = o.nums.countersink[0];
             f.csAngle = o.nums.countersink[1] ?? 90;
           }
-          if (o.words.thread?.[0]) {
-            const t = threadByName(o.words.thread[0]);
-            if (!t) throw new Error(tr("neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)", o.words.thread[0]));
+          let note: string | undefined;
+          if (thr) {
+            const t = threadByName(thr);
+            if (!t) throw new Error(tr("neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)", thr));
             f.kind = "tapped";
             f.thread = t.name;
-            f.diameter = t.tap;
+            const td = holeThreadDrill(dIn, t, hx ?? {});
+            f.diameter = td.diameter;
+            if (td.tapDrill) f.tapDrill = td.tapDrill;
+            note = td.note;
             if (o.nums.threaddepth?.[0]) f.threadDepth = o.nums.threaddepth[0];
           }
-          ops.push({ k: "feature", feature: f, line: no, fillTop });
+          // dno slepé díry: hrot vrtáku (tipAngle) nebo ploché (180)
+          if (hx?.tip !== undefined) {
+            if (f.end || !(f.depth > 0)) throw new Error(tr("díra: „dno ploché“ / „hrot“ platí jen pro slepou díru s hloubkou: díra 10 hloubka 12 dno ploché"));
+            f.tipAngle = hx.tip;
+          }
+          ops.push({ k: "feature", feature: f, line: no, fillTop, ...(note ? { note } : {}) });
           return;
         }
         case "fillet":
@@ -842,18 +857,6 @@ export function parseAgentText(text: string): AgentProgram {
           const feature: Feature = cmd === "fillet" ? { id: uid(), name: named("fillet", nm), type: "fillet", radius: v, edges: "all" } : { id: uid(), name: named("chamfer", nm), type: "chamfer", distance: v, edges: "all" };
           if (!rule.length || rule.includes("vse") || rule.includes("all")) ops.push({ k: "feature", feature, line: no });
           else ops.push({ k: "select", feature, rule, line: no });
-          return;
-        }
-        case "thread": {
-          // závit M18×1,5 délka 20 [v x y z] [osa Z] [vnitřní] [modelovat]
-          const des = (o.strings.find((w) => /^m\d/i.test(w)) ?? o.words.thread?.[0] ?? "").replace(/,/g, ".");
-          const t = threadByName(des);
-          if (!t) throw new Error(tr("závit potřebuje označení M2 až M48 (hrubé nebo jemné stoupání, např. M18×1,5): závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]{0}", des ? ` – „${des}“ není metrický závit` : ""));
-          const L = o.nums.length?.[0] ?? o.free[0];
-          if (!(L > 0)) throw new Error(tr("závit potřebuje délku: závit M18×1,5 délka 20"));
-          const f: Feature = { id: uid(), name: named("thread", nm), type: "thread", designation: t.name, position: posOf(o) ?? [0, 0, 0], axis: axisOf(o), length: L, modeled: o.flags.has("modeled") };
-          if (o.flags.has("internal")) f.internal = true;
-          ops.push({ k: "feature", feature: f, line: no });
           return;
         }
         case "shell": {
@@ -1010,7 +1013,7 @@ export function parseAgentText(text: string): AgentProgram {
       }
       } finally {
         // „nové“ bez názvu = nové těleso s dalším volným názvem (doplní aplikace); u prvního tělesa dílu se nic nemění
-        const body = targetBody || (o.flags.has("newbody") ? "$new" : "");
+        const body = ownBody ? "" : targetBody || (o.flags.has("newbody") ? "$new" : "");
         if (body) for (const op of ops.slice(before)) if ((op.k === "feature" || op.k === "select") && !op.feature.body) op.feature.body = body;
       }
     } catch (e) {
@@ -1222,6 +1225,14 @@ function parseJson(text: string): AgentProgram {
   return { ops: features.length ? [{ k: "features", features, line: 1 }] : [], errors: errors.map((m) => ({ line: 1, text: "", message: m })) };
 }
 
+/** Výchozí hodnoty polí, které doplní `prvek <typ>` (normalizeFeatures); díra nemá výchozí polohu (povinné pole) – nápověda polí. */
+export function featureDefaults(type: string): Record<string, unknown> | null {
+  const f = normalizeFeatures([{ type, ...(type === "hole" ? { position: [0, 0, 0] } : {}) }]).features[0] as unknown as Record<string, unknown> | undefined;
+  if (!f) return null;
+  if (type === "hole") delete f.position;
+  return f;
+}
+
 /** Doplní id/název, ověří typ a základní povinná pole; vrací chyby pro neznámé/nevalidní prvky. */
 export function normalizeFeatures(input: unknown[]): { features: Feature[]; errors: string[] } {
   const features: Feature[] = [];
@@ -1253,8 +1264,10 @@ export function normalizeFeatures(input: unknown[]): { features: Feature[]; erro
       sketch: { plane: { kind: "base", name: "XY", offset: 0 }, entities: [] },
       text: { angle: 0, mode: "add", position: [0, 0], depth: 1, height: 10, plane: { kind: "base", name: "XY", offset: 0 } },
       pattern: { kind: "linear" },
+      datum: { origin: [0, 0, 0], normal: [0, 0, 1], xDir: [1, 0, 0], size: 100 }, // jen planeDef (prvek datum planeDef=…) – rovinu doplní stavba
     };
     for (const [k, v] of Object.entries(dflt[type] ?? {})) if (f[k] === undefined) f[k] = v;
+    if (type === "hole" && !Array.isArray(f.position) && !(Array.isArray(f.points) && f.points.length)) return void errors.push(tr("Prvek {0} (díra): chybí poloha – position=x;y;z (nebo points)", i + 1));
     if (type === "sketch" && Array.isArray(f.entities)) f.entities = (f.entities as Record<string, unknown>[]).map((e, j) => ({ ...e, id: typeof e.id === "string" && e.id ? e.id : `e${i + 1}_${j + 1}` }));
     features.push(f as unknown as Feature);
   });
@@ -1266,6 +1279,9 @@ export type EdgeLite = { index: number; curve?: string; dir?: Vec3; center?: Vec
 export type FaceLite = { index: number; planar: boolean; normal?: Vec3; center?: Vec3; area?: number; surface?: string };
 export type Bbox = [Vec3, Vec3];
 const near = (a: number, b: number, tol: number) => Math.abs(a - b) <= tol;
+const fail = (msg: string): never => {
+  throw new Error(msg);
+};
 const tolOf = (b: Bbox) => Math.max(0.01, 1e-3 * Math.hypot(b[1][0] - b[0][0], b[1][1] - b[0][1], b[1][2] - b[0][2]));
 const unitDot = (a: Vec3 | undefined, b: Vec3) => (a ? Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) || 1) : 0);
 const sideWord = (w: string): { ax: 0 | 1 | 2; max: boolean } | null => {
@@ -1273,6 +1289,8 @@ const sideWord = (w: string): { ax: 0 | 1 | 2; max: boolean } | null => {
   return m[w] ?? null;
 };
 export function selectEdges(rule: Rule, edges: EdgeLite[], bbox: Bbox): number[] {
+  const byNum = ruleNumbers(rule, "e"); // hrany čísly E3 E7 (jako popisky pro výběr) místo pravidla – agent-gaps.ts
+  if (byNum) return byNum.map((i) => (edges.some((e) => e.index === i) ? i : fail(tr("hrana E{0} v tělese není (hran {1})", i + 1, edges.length))));
   const tol = tolOf(bbox);
   let list = edges;
   for (const w0 of rule) {
@@ -1292,6 +1310,8 @@ export function selectEdges(rule: Rule, edges: EdgeLite[], bbox: Bbox): number[]
   return list.map((e) => e.index);
 }
 export function selectFaces(rule: Rule, faces: FaceLite[], bbox: Bbox): number[] {
+  const byNum = ruleNumbers(rule, "f"); // plochy čísly F3 F5 místo pravidla – agent-gaps.ts
+  if (byNum) return byNum.map((i) => (faces.some((f) => f.index === i) ? i : fail(tr("plocha F{0} v tělese není (ploch {1})", i + 1, faces.length))));
   const tol = tolOf(bbox);
   let list = faces;
   for (const w0 of rule) {
@@ -1317,27 +1337,18 @@ const fmt = (n: number, d = 1) => (Number.isFinite(n) ? n.toFixed(d).replace(/\.
 export function featureSummary(f: Feature, doc?: CadDoc): string {
   const shp = shapesSummary(f, (id) => doc?.features.find((x) => x.id === id)?.name ?? id);
   if (shp) return shp;
+  const nameOf = (id: string) => doc?.features.find((x) => x.id === id)?.name ?? id;
+  const prim = primSummary(f, fmt, nameOf) ?? gapSummary(f, fmt, nameOf); // poloha a osa primitiv, odkazy u rotace / pole / zrcadlení / sražení
+  if (prim) return prim;
   switch (f.type) {
     case "sketch":
       return tr("rovina {0}, {1} entit", f.plane.kind === "base" ? f.plane.name + (f.plane.offset ? ` +${fmt(f.plane.offset)}` : "") : f.plane.label ?? tr("vlastní"), f.entities.length) + (f.entities.length ? ": " + f.entities.map((e) => e.type === "circle" ? tr("kružnice Ø{0}", fmt(2 * e.r)) : e.type === "rect" ? tr("obdélník {0}×{1}", fmt(e.w), fmt(e.h)) : e.type === "polygon" ? tr("{0}-úhelník", e.sides) : e.type === "slot" ? tr("drážka {0}×{1}", fmt(e.length), fmt(e.width)) : e.type === "polyline" ? tr("čára {0} b.", e.points.length) : e.type).slice(0, 6).join(", ") : "");
     case "extrude":
-      return `${f.extent?.kind === "throughAll" ? tr("skrz vše") : fmt(f.distance) + " mm"}${f.symmetric ? tr(", symetricky") : ""}, ${f.mode}`;
+      return extrudeSummary(f, fmt, (id) => doc?.features.find((x) => x.id === id)?.name ?? id);
     case "revolve":
       return `${fmt(f.angle)}°, ${f.mode}`;
-    case "box":
-      return tr("{0} mm{1}, {2}", f.size.map((v) => fmt(v)).join(" × "), f.centered ? tr(" (střed)") : "", f.mode);
-    case "cylinder":
-      return tr("Ø{0} × {1} mm, osa {2}, {3}", fmt(2 * f.radius), fmt(f.height), f.axis, f.mode);
-    case "sphere":
-      return tr("Ø{0} mm, {1}", fmt(2 * f.radius), f.mode);
-    case "thread":
-      return tr("{0} délka {1} mm, {2}, {3}, začátek [{4}], osa {5}", threadLabel(f.designation), fmt(f.length), f.internal ? tr("vnitřní (v díře)") : tr("vnější (na válci)"), f.modeled ? tr("modelované drážky") : tr("kosmetický (jen výkres)"), f.position.map((v) => fmt(v)).join("; "), f.axis);
-    case "cone":
-      return tr("Ø{0}→Ø{1} × {2} mm, {3}", fmt(2 * f.radius1), fmt(2 * f.radius2), fmt(f.height), f.mode);
-    case "tube":
-      return tr("Ø{0}/Ø{1} × {2} mm, {3}", fmt(f.outer), fmt(f.inner), fmt(f.height), f.mode);
     case "hole":
-      return tr("{0}{1}{2} v [{3}], osa {4}", f.kind === "tapped" && f.thread ? tr("{0}{1} (jádro Ø{2})", threadLabel(f.thread), f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hl. {0}", fmt(f.depth)) : tr(" skrz"), fmt(f.diameter, 2)) : `Ø${fmt(f.diameter, 2)}${f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hloubka {0}", fmt(f.depth)) : f.bothWays ? tr(" skrz oběma směry") : tr(" skrz")}`, f.cbDiameter > 0 ? tr(" zahl. Ø{0}×{1}", fmt(f.cbDiameter), fmt(f.cbDepth)) : "", f.csDiameter ? tr(" kuž. Ø{0}", fmt(f.csDiameter)) : "", f.position.map((v) => fmt(v)).join("; "), f.axis);
+      return tr("{0}{1}{2} v [{3}], osa {4}", (f.kind === "tapped" && f.thread ? tr("{0}{1} ({2})", threadLabel(f.thread), f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hl. {0}", fmt(f.depth)) : tr(" skrz"), holeDrillText(f)) : `Ø${fmt(f.diameter, 2)}${f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hloubka {0}", fmt(f.depth)) : f.bothWays ? tr(" skrz oběma směry") : tr(" skrz")}`) + holeBottomText(f), f.cbDiameter > 0 ? tr(" zahl. Ø{0}×{1}", fmt(f.cbDiameter), fmt(f.cbDepth)) : "", f.csDiameter ? tr(" kuž. Ø{0}", fmt(f.csDiameter)) : "", f.position.map((v) => fmt(v)).join("; "), f.axis);
     case "fillet":
       return tr("R{0}, hrany {1}", fmt(f.radius, 2), f.edges === "all" ? tr("vše") : f.edges.length);
     case "chamfer":
@@ -1419,11 +1430,13 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
 export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string }[] = [
   { cmd: "nový díl [název] / nová sestava [název]", en: "new part / new assembly", de: "neu teil / neu baugruppe", desc: tr("nový dokument v nové záložce") },
   { cmd: "název …, materiál …, barva #hex", en: "name, material, color", de: "name, werkstoff, farbe", desc: tr("materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)") },
-  { cmd: "kvádr X Y Z [střed] [v x y z] [odebrat]", en: "box", de: "quader", desc: tr("kvádr; výchozí roh v počátku, „střed“ = vystředit") },
-  { cmd: "válec D H [osa Z] [v x y z] [odebrat]", en: "cylinder", de: "zylinder", desc: tr("válec průměr × výška") },
-  { cmd: "koule D [v x y z]", en: "sphere", de: "kugel", desc: tr("koule průměr") },
-  { cmd: "kužel D1 D2 H [osa Z]", en: "cone", de: "kegel", desc: tr("kužel / komolý kužel") },
-  { cmd: "trubka D d H [osa Z]", en: "tube", de: "rohr", desc: tr("trubka vnější / vnitřní průměr × výška") },
+  { cmd: "kvádr X Y Z [střed] [v x y z | na …] [osa …] [přidat|odebrat|průnik|nové] [těleso \"Název\"]", en: "box", de: "quader", desc: tr("kvádr; výchozí roh v poloze (počátek); „střed“ = poloha je střed kvádru („střed F1“ / „střed V3“ = střed v odkazu, „na střed plochy F1“ = roh); „osa“ = rozměr Z po ose, nejkratší otočení kolem polohy (osa -Z: Y a Z záporně; osa X: X 0…Z, Z −X…0; osa Y: Y 0…Z, Z −Y…0)") },
+  { cmd: "válec D H [v x y z | na …] [osa …] [obráceně] [přidat|odebrat|průnik|nové]", en: "cylinder", de: "zylinder", desc: tr("válec průměr × výška; poloha = střed podstavy, válec roste ve směru osy (výchozí +Z); „odebrat“ = válcový otvor po libovolné ose (na výkrese popis díry Ø ↧ hloubka / skrz)") },
+  { cmd: "koule D [v x y z | na …] [přidat|odebrat|průnik|nové]", en: "sphere", de: "kugel", desc: tr("koule průměr; poloha = střed koule") },
+  { cmd: "kužel D1 D2 H [v x y z | na …] [osa …] [obráceně] [přidat|odebrat|průnik|nové]", en: "cone", de: "kegel", desc: tr("kužel / komolý kužel: D1 = průměr podstavy v poloze, D2 = průměr ve výšce H po ose (0 = špička); „odebrat“ = kuželový otvor, zahloubení, sedlo hrotu (v ústí díry na výkrese ⌵ Ø × úhel)") },
+  { cmd: "trubka D d H [v x y z | na …] [osa …] [obráceně] [přidat|odebrat|průnik|nové]", en: "tube", de: "rohr", desc: tr("trubka vnější / vnitřní průměr × délka; poloha = střed podstavy") },
+  { cmd: "pružina D stoupání P závity N|délka L drát d [v x y z | na …] [osa …] [obráceně] [přidat|odebrat|průnik|nové]", en: "spring", de: "feder", desc: tr("šroubovitá pružina: D = střední průměr (osa drátu), stoupání a počet závitů nebo volná délka, průměr drátu; poloha = začátek osy; EN spring D pitch P turns N wire d, DE feder D steigung P windungen N draht d") },
+  { cmd: "kvádr|válec|koule|kužel|trubka|pružina|závit … [v x y z | na V3 | na střed hrany E2 | na střed kružnice E5 | na střed plochy F3 | na začátek|konec hrany E2 | na bod \"Bod 1\" | na mezi V1 V5 | na počátek] [osa X|Y|Z|-Z | osa 1 0 1 | osa hrana E3 | osa plocha F2 | osa \"Osa 1\" | osa body V1 V5] [obráceně]", en: "box, cylinder, sphere, cone, tube, spring, thread", de: "quader, zylinder, kugel, kegel, rohr, feder, gewinde", desc: tr("poloha a osa primitiv jako ve formuláři: poloha čísly nebo odkazem na vrchol / hranu / kružnici / plochu (F, E, V jako popisky pro výběr) / pomocný bod; osa X|Y|Z, vektor, podél hrany nebo osy kružnice, normála plochy nebo osa válcové plochy, pomocná osa, dva body; „směr“ = „osa“; EN at V3 / at mid edge E2 / at center circle E5 / axis edge E3, DE bei V3 / bei mitte kante E2 / achse kante E3; odkaz je asociativní (počítá se na tělese před prvkem)") },
   { cmd: "skica XY|XZ|YZ [odsazení N]: entita; entita… · skica počátek x y z normála nx ny nz [osax ux uy uz]: …", en: "sketch", de: "skizze", desc: tr("nová skica na základní nebo obecné rovině (osa X skici se bez zadání zvolí kolmo na normálu); entity i na dalších řádcích") },
   { cmd: "obdélník W H [v x y] | roh x y [zaoblení-rohů r]", en: "rect", de: "rechteck", desc: tr("obdélník se středem (výchozí počátek) nebo rohem") },
   { cmd: "kružnice D [v x y]", en: "circle", de: "kreis", desc: tr("kružnice průměrem (poloměr r: „poloměr 10“)") },
@@ -1433,9 +1446,15 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "skica plocha F3|horní|+X [odsazení N] [obráceně]: … · skica rovina <název pomocné roviny> [odsazení N]: …", en: "sketch face, sketch plane", de: "skizze fläche, skizze ebene", desc: tr("skica na rovinné ploše modelu – číslem (F1, F2… jako popisky pro výběr / window.mncad.hints()) nebo pravidlem jako u skořepiny (horní, +X…) – nebo na pomocné rovině podle názvu; rovina je asociativní – přepočítá se se změnou modelu, protokol vypíše její počátek a osy") },
   { cmd: "vazba <druh> <odkaz> [<odkaz> …]; <druh> …", en: "constraint", de: "bedingung", desc: tr("vazba ve skice: vodorovně, svisle, shodně, rovnoběžně, kolmo, tečně, stejně, pevně, soustředně, středem, na křivce, symetricky, kolineárně; odkaz = e3 (celá entita; id entit ukazuje stav), e3.a / e3.b / e3.c / e3.střed / e3.p0 (bod), e3.s0 (strana obdélníku) nebo počátek; po řádku se skica vyřeší a protokol napíše Plně určeno / Nedourčeno (N st. volnosti) / Přeurčeno") },
   { cmd: "kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; <druh> …", en: "dim", de: "bemaßung, maß", desc: tr("kóta ve skice: délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku; hodnota i s desetinnou čárkou, Ø20 / R10; řídicí kóta změní geometrii, „referenční“ jen měří") },
-  { cmd: "vysunout H [symetricky] [skrz] [odebrat|přidat|průnik|nové] [obráceně] [úkos a]", en: "extrude", de: "extrudieren", desc: tr("vysune poslední skicu") },
+  {
+    cmd: "vysunout H|výška H [směr x y z|směr +X|směr hrana E3|směr osa \"Osa 1\"|směr plocha F2|směr body V1 V2] [sklon a [k +X|k x y z]] [symetricky] [skrz|k tělesu|k dalšímu|k ploše F3 [odsazení N]|k rovině \"Rovina 1\"|k vrcholu V3] [odebrat|přidat|průnik|nové] [obráceně] [úkos a [dovnitř|ven] [břit N] [ostré rohy|zaoblené rohy]]",
+    en: "extrude H|height H [direction x y z|direction +X|direction edge E3|direction axis \"Axis 1\"|direction face F2|direction points V1 V2] [tilt a [toward +X]] [symmetric] [through|to body|to next|to face F3 [offset N]|to plane \"Plane 1\"|to vertex V3] [cut|add|intersect|newbody] [reverse] [draft a [in|out] [land N] [sharp corners|round corners]]",
+    de: "extrudieren H|höhe H [richtung x y z|richtung +X|richtung kante E3|richtung achse \"Achse 1\"|richtung fläche F2|richtung punkte V1 V2] [neigung a [nach +X]] [symmetrisch] [durch|bis körper|bis nächste|bis fläche F3 [versatz N]|bis ebene \"Ebene 1\"|bis punkt V3] [abziehen|hinzufügen|schnittmenge|neukörper] [umkehren] [schräge a [innen|außen] [steg N] [scharfe ecken|runde ecken]]",
+    desc: tr("vysune poslední skicu; H = délka podél směru, „výška H“ = kolmo na skicu; „sklon 25 k +X“ = šikmý hranol (propad); úkos + / dovnitř = obrys se od skici zužuje, − / ven = rozšiřuje (u odebrání otvor do hloubky – odlehčení střižnice), břit N = rovná část před úkosem"),
+  },
   { cmd: "rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]", en: "revolve", de: "rotieren", desc: tr("orotuje poslední skicu (výchozí osa Y skici, 360°); „odebrat“ = vysoustružit z tělesa") },
-  { cmd: "díra D [hloubka H|skrz [obousměrně]|k tělesu] v x y [z] [v x2 y2 z2 …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8]", en: "hole", de: "bohrung", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit") },
+  { cmd: "díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x2 y2 z2 …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8 [hloubka-závitu T] [jádro | vrták [N]]]", en: "hole", de: "bohrung", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit") },
+  { cmd: "díra závit M8 hloubka 20 [jádro | vrták | vrták 6,7] · díra 6,647 závit M8 … · díra 10 hloubka 12 dno ploché · díra … hrot 120", en: "hole", de: "bohrung", desc: tr("závitová díra: bez průměru = tabulkový vrták (M8 → 6,8, M18×1,5 → 16,5); zadaný průměr má přednost (protokol: vrták zadán ručně); jmenovitý průměr (díra 8 závit M8) = tabulkový vrták s poznámkou; „jádro“ (EN core, DE Kern) = malý průměr D1 podle ISO 965-1 (M8 → 6,647); „vrták N“ (EN drill N, DE Bohrer N) = vlastní vrták. Dno slepé díry: „dno ploché“ (EN flat bottom, DE flacher Grund) – sedlo pružiny, frézované dno – nebo „hrot 118|120|90“ (EN tip, DE Spitze; 60–170°, „hrot 180“ = ploché; také „ploché“, „bez hrotu“, „dno kužel 120“); platí i pro závitovou a zahloubenou díru; volby díry pište před „název“") },
   { cmd: "závit M18×1,5 délka L [v x y z] [osa Z] [vnitřní] [modelovat]", en: "thread", de: "gewinde", desc: tr("závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii") },
   { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z… ] [poloměr N] [delší N]", en: "fillet", de: "verrunden", desc: tr("pravidla lze kombinovat (horní kruhové)") },
   { cmd: "zaoblit R hrany <pravidlo> setback S [vrchol V3 S2 | vrchol x y z S2]", en: "fillet R edges … setback S [vertex V3 S2]", de: "verrunden R kanten … rückversatz S [ecke V3 S2]", desc: tr("zaoblení se setbackem: zaoblení skončí S od vrcholu se 3+ hranami, roh uzavře hladká záplata G1 (výchozí S = R)") },
@@ -1450,6 +1469,8 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   ...SHEET_COMMANDS,
   ...WELD_COMMANDS,
   { cmd: "prvek <typ|rozšíření> klíč=hodnota …", en: "feature", de: "element", desc: tr("kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId=\"Skica 1\" pathId=$last · prvek draft angle=3 faces=boční · prvek \"Ohyb plechu\" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem") },
+  { cmd: "rotovat [úhel] osa hrana E3|plocha F7|\"Osa 1\"|body V1 V5 [symetricky] · pole N rozteč P směr hrana E3|body V1 V5 · pole kruhové N osa hrana E3|plocha F7|\"Osa 1\" · zrcadlit plocha F3|rovina \"Rovina 1\" [odsazení N] · srazit D úhel A plocha F3 [hrany …] · srazit D1 D2 plocha F3 · zaoblit R hrany E3 E7 · skořepina T otevřít F3 F5", en: "revolve, pattern, mirror, chamfer, fillet, shell", de: "rotieren, muster, spiegeln, fase, verrunden, schale", desc: tr("odkazy místo čísel: osa rotace a kruhového pole hranou, osou válcové plochy, pomocnou osou nebo dvěma body; směr řady pole hranou / dvěma body; rovina zrcadlení plochou nebo pomocnou rovinou; sražení vzdálenost + úhel nebo dvě vzdálenosti od referenční plochy; hrany a plochy čísly (E, F jako popisky pro výběr) místo pravidla") },
+  { cmd: "prvek nápověda <typ|rozšíření> · nápověda <typ> · prvek nápověda", en: "feature help, help", de: "element hilfe, hilfe", desc: tr("všechna pole typu prvku pro „prvek <typ> klíč=hodnota“ a „upravit“: název, druh hodnoty, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem (typ i slovem příkazu: díra, kužel, pružina; u rozšíření jeho parametry); bez typu = přehled typů a polí, která jdou zadat jen přes prvek") },
   { cmd: "normálie <označení> [v x y z]", en: "library", de: "normteil", desc: tr("díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta") },
   { cmd: "vložit \"název záložky\" [v x y z] [otočení rx ry rz] [ukotvit]", en: "insert", de: "einfügen", desc: tr("sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)") },
   { cmd: "výkres", en: "drawing", de: "zeichnung", desc: tr("otevře výkres otevřeného dokumentu v záložce") },

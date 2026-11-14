@@ -1,0 +1,461 @@
+# 12. vlna – primitiva textem (poloha / osa odkazem, pružina), prvek nápověda (feature-fields.ts, agent-help.ts), odkazy u rotace / pole / zrcadlení / sražení (agent-gaps.ts)
+ · jen prvek / upravit / JSON	 · feature / edit / JSON only
+ · text: {0}	 · text: {0}
+ [přidat|odebrat|průnik|nové] [těleso "Název"]	 [add|cut|intersect|newbody] [body "Name"]
+ • další klíče dat: {0}	 • other data keys: {0}
+, např. {0}={1}	, e.g. {0}={1}
+, osa Z kvádru {0}	, box Z axis {0}
+„{0} {1}“ není poloha – {2}	“{0} {1}” is not a position – {2}
+„obráceně“ jde jen s osou X|Y|Z, vektorem nebo dvěma body – směr hranou / plochou otočte zápisem osa body … nebo vektorem	“reverse” works only with an X|Y|Z axis, a vector or two points – reverse an edge / face direction by writing axis points … or a vector
+„skrz“ na obě strany od bodu	“through” to both sides of the point
+(poslední prvek)	(last feature)
+(poslední skica)	(last sketch)
+[v x y z | na V3 | na střed hrany E2 | na střed kružnice E5 | na střed plochy F3 | na začátek|konec hrany E2 | na bod "Bod 1" | na mezi V1 V5] [osa X|Y|Z|-Z | osa x y z | osa hrana E3 | osa plocha F2 | osa "Osa 1" | osa body V1 V2] [obráceně]	[at x y z | at V3 | at mid edge E2 | at center circle E5 | at center face F3 | at start|end edge E2 | at point "Point 1" | at between V1 V5] [axis X|Y|Z|-Z | axis x y z | axis edge E3 | axis face F2 | axis "Axis 1" | axis points V1 V2] [reverse]
+{0} ({1}) – parametry pro „prvek {1} klíč=hodnota“ (klíč nebo český popisek):	{0} ({1}) – parameters for “feature {1} key=value” (key or Czech label):
+{0} ({1}) – pole pro „prvek {1} klíč=hodnota“ i „upravit <prvek> klíč=hodnota“:	{0} ({1}) – fields for “feature {1} key=value” and “edit <feature> key=value”:
+{0} délka {1} mm, {2}, {3}, začátek {4}, osa {5}	{0} length {1} mm, {2}, {3}, start {4}, axis {5}
+{0} potřebuje číslo	{0} needs a number
+{0} potřebuje číslo hrany: na střed hrany E2 · na střed kružnice E5 · na začátek hrany E2	{0} needs an edge number: at mid edge E2 · at center circle E5 · at start edge E2
+{0}: příliš mnoho čísel ({1}) – {2}	{0}: too many numbers ({1}) – {2}
+{0}: volba „{1}“ sem nepatří – {2}	{0}: option “{1}” does not belong here – {2}
+2;5 · boční	2;5 · side
+2;5 · svislé	2;5 · vertical
+ano/ne	yes/no
+asociativní definice (plocha, 3 body, pod úhlem…)	associative definition (face, 3 points, at an angle…)
+asociativní definice roviny (plocha, pomocná rovina, 3 body…)	associative plane definition (face, datum plane, 3 points…)
+bez textového příkazu	no text command
+bod „{0}“	point “{0}”
+bod (vrchol, střed hrany, střed kružnice, odvozený bod…)	point (vertex, edge midpoint, circle center, derived point…)
+bod na ose	point on the axis
+bod potřebuje název pomocného bodu nebo souřadnice: na bod "Bod 1" · v x y z	point needs a datum point name or coordinates: at point "Point 1" · at x y z
+bod potřebuje tři souřadnice: na bod 10 20 5	point needs three coordinates: at point 10 20 5
+bod x;y	point x;y
+bod začátku díry (text bez z = na povrchu tělesa)	hole start point (text without z = on the body surface)
+booleovská operace: nové těleso / přidat / odebrat / průnik	Boolean operation: new body / add / cut / intersect
+celé číslo	integer
+celkový úhel	total angle
+cílové těleso	target body
+curve, sketch, fill	curve, sketch, fill
+čísla hran (E3 E7) nelze míchat s pravidlem – zadejte jen čísla, nebo jen pravidlo	edge numbers (E3 E7) cannot be mixed with a rule – give only numbers or only a rule
+čísla ploch (F3 F5) nelze míchat s pravidlem – zadejte jen čísla, nebo jen pravidlo	face numbers (F3 F5) cannot be mixed with a rule – give only numbers or only a rule
+definice osy (hrana, válec, 2 body, globální, průsečnice rovin…)	axis definition (edge, cylinder, 2 points, global, plane intersection…)
+dělicí "Skica"	parting "Sketch"
+dělicí křivka (skica)	parting curve (sketch)
+délka L	length L
+délka po ose	length along the axis
+délka vysunutí	extrusion length
+délka závitu	thread length
+délka zobrazení	display length
+díra D	hole D
+drát d	wire d
+druh díry	hole type
+druh pole	pattern type
+druh zaoblení	fillet type
+druh: stejné / dvě vzdálenosti / vzdálenost + úhel / vrchol	type: equal / two distances / distance + angle / vertex
+druhá sada ploch (plocha–plocha)	second face set (face–face)
+druhá vzdálenost	second distance
+druhé plochy odkazem	second faces by reference
+druhý poloměr (asymetrické) / D2 (eliptické)	second radius (asymmetric) / D2 (elliptical)
+druhý poloměr podle hrany	second radius per edge
+druhý směr (mřížka)	second direction (grid)
+druhý směr odkazem	second direction by reference
+držet normálu profilu	keep the profile normal
+eliptické D1 D2	elliptical D1 D2
+entity skici (obdélník, kružnice, čára, oblouk, spline…)	sketch entities (rectangle, circle, polyline, arc, spline…)
+entity za dvojtečkou: obdélník W H; kružnice D; čára …	entities after the colon: rect W H; circle D; polyline …
+formát	format
+Frenetův trojhran (profil se natáčí podle křivosti)	Frenet frame (profile turns with the curvature)
+geometrické vazby skici	geometric sketch constraints
+gravírovat	engrave
+hladce uzavřené (periodická plocha)	smoothly closed (periodic surface)
+hloubka (0 = skrz)	depth (0 = through)
+hloubka / výška reliéfu	depth / relief height
+hloubka D	depth D
+hloubka H | skrz	depth H | through
+hloubka válcového zahloubení	counterbore depth
+hloubka-závitu T	thread-depth T
+hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě	values: number 12.5 · yes/no · list a;b;c · text in quotes · JSON {…} / […]; sketches and features by name or $last; faces and edges by index from 0 (F3 = 2) or by rule; a “required” field without a value fails when the model is built
+hrana E{0}	edge E{0}
+hrana E{0} v tělese není (hran {1})	edge E{0} is not in the body ({1} edges)
+hrany (all = všechny)	edges (all = every edge)
+hrany <pravidlo> | hrany E3 E7	edges <rule> | edges E3 E7
+hrany: indexy od 0 (E3 = 2), all nebo pravidlo	edges: indices from 0 (E3 = 2), all or a rule
+id rozšíření (sheet.bend, surf.helix…)	extension id (sheet.bend, surf.helix…)
+jako Název	as Name
+jen geometrie (rychlejší, bez booleovské operace)	geometry only (faster, no Boolean operation)
+jen prvek: {0}	feature only: {0}
+jen vnější obrys (otvory profilu ignorovat)	outer contour only (ignore profile holes)
+jiná tloušťka pro plochu: index → mm	different thickness per face: index → mm
+JSON	JSON
+k tělesu	to body
+klíč=hodnota	key=value
+koncový bod (špička)	end point (tip)
+konec hrany E{0}	end edge E{0}
+kopie [těleso N] [posun dx dy dz] [jako Název]	copy [body N] [offset dx dy dz] [as Name]
+kóta <druh> e1 <hodnota>	dim <kind> e1 <value>
+kóty skici	sketch dimensions
+koule	sphere
+koule D	sphere D
+koule D [v x y z | na …] [odebrat|průnik|nové]	sphere D [at x y z | at …] [cut|intersect|newbody]
+koule D [v x y z | na …] [přidat|odebrat|průnik|nové]	sphere D [at x y z | at …] [add|cut|intersect|newbody]
+koule nemá osu – zadejte jen průměr a polohu: {0}	sphere has no axis – give only the diameter and position: {0}
+koule průměr; poloha = střed koule	sphere by diameter; position = sphere center
+kruhový průřez bez skici profilu (poloměr)	circular cross-section without a profile sketch (radius)
+kužel D1 D2 H	cone D1 D2 H
+kužel D1 D2 H [v x y z | na …] [osa …] [odebrat|průnik|nové]	cone D1 D2 H [at x y z | at …] [axis …] [cut|intersect|newbody]
+kuželosečka rho (0,5 = parabola)	conic rho (0.5 = parabola)
+kuželové D2	csink D2
+kuželové D2 A	csink D2 A
+kvádr	box
+kvádr X Y Z	box X Y Z
+kvádr X Y Z [střed]	box X Y Z [center]
+kvádr X Y Z [střed] [v x y z | na …] [osa …] [odebrat|průnik|nové]	box X Y Z [center] [at x y z | at …] [axis …] [cut|intersect|newbody]
+linear, circular, curve	linear, circular, curve
+mapa index → hodnota (JSON)	map index → value (JSON)
+měřítko (1 = beze změny)	scale (1 = unchanged)
+měřítko konce (1 = beze změny)	end scale (1 = unchanged)
+měřítko profilu na konci	profile scale at the end
+mezi {0}	between {0}
+mezi potřebuje dva body: na mezi V1 V5 · na mezi střed hrany E1 V7	between needs two points: at between V1 V5 · at between mid edge E1 V7
+modelované drážky (jinak kosmetický – jen výkres)	modelled grooves (otherwise cosmetic – drawing only)
+modelovat	modeled
+N2 rozteč P2	N2 spacing P2
+N2 rozteč P2 směr hrana E5	N2 spacing P2 direction edge E5
+na V3 | na střed hrany E2 | na střed kružnice E5 | na střed plochy F3 | na bod "Bod 1" | na mezi V1 V5	at V3 | at mid edge E2 | at center circle E5 | at center face F3 | at point "Point 1" | at between V1 V5
+nápis	text
+nápověda: neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}	help: unknown feature type “{0}” – types: {1}; extensions: {2}
+nástrojové těleso	tool body
+natáčet instance s rotací	rotate instances with the pattern
+natočení	rotation
+natočení po křivce	orientation along the curve
+název kopie	copy name
+název souboru	file name
+název tělesa na záporné straně	name of the body on the negative side
+nepovinné	optional
+neutrální rovina	neutral plane
+neutrální rovina definicí	neutral plane by definition
+normála	normal
+Ø{0} × {1} mm, {2}, podstava {3}, osa {4}	Ø{0} × {1} mm, {2}, base {3}, axis {4}
+Ø{0} mm, {1}, střed {2}	Ø{0} mm, {1}, center {2}
+Ø{0}, stoupání {1}, závitů {2}, drát Ø{3} (délka {4} mm), {5}, začátek {6}, osa {7}	Ø{0}, pitch {1}, turns {2}, wire Ø{3} (length {4} mm), {5}, start {6}, axis {7}
+Ø{0}/Ø{1} × {2} mm, {3}, podstava {4}, osa {5}	Ø{0}/Ø{1} × {2} mm, {3}, base {4}, axis {5}
+Ø{0}→Ø{1} × {2} mm, {3}, podstava {4}, osa {5}	Ø{0}→Ø{1} × {2} mm, {3}, base {4}, axis {5}
+obousměrně	both
+obsah souboru (base64) – raději window.mncad.importFile()	file content (base64) – better use window.mncad.importFile()
+odebrat|průnik	cut|intersect
+odkaz na bod (JSON Ref)	point reference (JSON Ref)
+odkazy místo čísel: osa rotace a kruhového pole hranou, osou válcové plochy, pomocnou osou nebo dvěma body; směr řady pole hranou / dvěma body; rovina zrcadlení plochou nebo pomocnou rovinou; sražení vzdálenost + úhel nebo dvě vzdálenosti od referenční plochy; hrany a plochy čísly (E, F jako popisky pro výběr) místo pravidla	references instead of numbers: revolve and circular pattern axis by an edge, the axis of a cylindrical face, a datum axis or two points; linear pattern direction by an edge / two points; mirror plane by a face or a datum plane; chamfer distance + angle or two distances from a reference face; edges and faces by number (E, F as the pick labels) instead of a rule
+odsazení (+ ven, − dovnitř)	offset (+ outward, − inward)
+odsazení N	offset N
+odsazení neutrální roviny	neutral plane offset
+odsazení roviny	plane offset
+odstraněné plochy	removed faces
+okraj výplně	fill margin
+opačná strana	opposite side
+opačný směr	opposite direction
+operace	operation
+osa -Z | osa 1 0 1 | osa hrana E3 | osa plocha F2 | osa "Osa 1" | osa body V1 V5	axis -Z | axis 1 0 1 | axis edge E3 | axis face F2 | axis "Axis 1" | axis points V1 V5
+osa „{0}“	axis “{0}”
+osa (globální X / Y / Z)	axis (global X / Y / Z)
+osa (JSON AxisDef)	axis (JSON AxisDef)
+osa / směr je zadaná dvakrát	axis / direction is given twice
+osa / směr potřebuje hodnotu: {0}	axis / direction needs a value: {0}
+osa díry libovolným směrem – má přednost před axis	hole axis in any direction – takes precedence over axis
+osa dvěma body: osa body V1 V5 (od prvního ke druhému)	axis by two points: axis points V1 V5 (from the first to the second)
+osa hrana E3 | osa plocha F7 | osa "Osa 1" | osa body V1 V5	axis edge E3 | axis face F7 | axis "Axis 1" | axis points V1 V5
+osa hrana potřebuje číslo hrany: osa hrana E3 (přímá hrana nebo kruhová – osa kružnice)	axis edge needs an edge number: axis edge E3 (a straight edge, or a circular one – its circle axis)
+osa libovolným směrem – má přednost před axis	axis in any direction – takes precedence over axis
+osa modelem (hrana, válcová plocha, 2 body, globální, pomocná osa…)	axis from the model (edge, cylindrical face, 2 points, global, datum axis…)
+osa odkazem (hrana, válec, pomocná osa…)	axis by reference (edge, cylinder, datum axis…)
+osa otočení	rotation axis
+osa otočení odkazem	rotation axis by reference
+osa plocha potřebuje číslo plochy: osa plocha F2 (normála rovinné plochy, osa válcové)	axis face needs a face number: axis face F2 (normal of a planar face, axis of a cylindrical one)
+osa potřebuje název pomocné osy: osa "Osa 1"	axis needs a datum axis name: axis "Axis 1"
+osa rotace potřebuje polohu – zadejte ji hranou (osa hrana E3), válcovou plochou (osa plocha F7), dvěma body (osa body V1 V5), pomocnou osou (osa "Osa 1") nebo globální osou X|Y|Z	the revolve axis needs a location – give it by an edge (axis edge E3), a cylindrical face (axis face F7), two points (axis points V1 V5), a datum axis (axis "Axis 1") or a global axis X|Y|Z
+osa skici (x = vodorovná, y = svislá)	sketch axis (x = horizontal, y = vertical)
+osa vektorem potřebuje tři čísla: osa 1 0 1	axis as a vector needs three numbers: axis 1 0 1
+osa x|y	axis x|y
+osa X|Y|Z	axis X|Y|Z
+osa X|Y|Z | osa hrana E3 | osa plocha F7 | osa "Osa 1" | osa body V1 V5	axis X|Y|Z | axis edge E3 | axis face F7 | axis "Axis 1" | axis points V1 V5
+osa X|Y|Z|-Z · osa 1 0 1 · osa hrana E3 · osa plocha F2 · osa "Osa 1" · osa body V1 V5	axis X|Y|Z|-Z · axis 1 0 1 · axis edge E3 · axis face F2 · axis "Axis 1" · axis points V1 V5
+osa Z kvádru libovolným směrem (otáčí se kolem polohy)	box Z axis in any direction (rotates about the position)
+osa: X | Y | Z | vektor 1;0;1 | JSON	axis: X | Y | Z | vector 1;0;1 | JSON
+otevřené (odebrané) plochy	open (removed) faces
+otevřít <pravidlo> | otevřít F3 F5	open <rule> | open F3 F5
+otisky (JSON)	signatures (JSON)
+otisky výběru – doplní program (ručně vynechat)	selection signatures – filled in by the program (omit when writing by hand)
+označení (M8, M18×1,5)	designation (M8, M18×1.5)
+parametry nemá popsané – klíče podle výchozích dat výše	parameters are not described – keys as in the default data above
+parametry rozšíření – prvek nápověda <rozšíření>	extension parameters – feature help <extension>
+plocha F{0} v tělese není (ploch {1})	face F{0} is not in the body ({1} faces)
+plocha F3	face F3
+plochy (plocha–plocha, plné zaoblení)	faces (face–face, full round)
+plochy <pravidlo|F1 F2…>	faces <rule|F1 F2…>
+plochy odkazem (plocha–plocha, eliptické D1)	faces by reference (face–face, elliptical D1)
+plochy: indexy od 0 (F3 = 2) nebo pravidlo	faces: indices from 0 (F3 = 2) or a rule
+počáteční bod (špička)	start point (tip)
+počátek (bod odkazem)	origin (point by reference)
+počátek roviny	plane origin
+počet instancí	number of instances
+počet otáček zkroucení	number of twist turns
+počet ve druhém směru	count in the second direction
+počet závitů	number of turns
+podmínka na konci	end condition
+podmínka na začátku	start condition
+pole … | pole kruhové …	pattern … | pattern circular …
+pole kind=circular	pattern kind=circular
+pole kind=curve	pattern kind=curve
+pole kind=fill	pattern kind=fill
+pole kind=linear	pattern kind=linear
+pole kruhové potřebuje počet: pole kruhové 6 [úhel 360] [osa Z] [v cx cy cz]	circular pattern needs a count: pattern circular 6 [angle 360] [axis Z] [at cx cy cz]
+pole N	pattern N
+pole N rozteč P [směr X|x y z|hrana E3|body V1 V5] [N2 rozteč P2 směr …] · pole kruhové N [úhel 360] [osa Z|hrana E3|plocha F7|"Osa 1"] [v cx cy cz]	pattern N spacing P [direction X|x y z|edge E3|points V1 V5] [N2 spacing P2 direction …] · pattern circular N [angle 360] [axis Z|edge E3|face F7|"Axis 1"] [at cx cy cz]
+poloha a osa primitiv jako ve formuláři: poloha čísly nebo odkazem na vrchol / hranu / kružnici / plochu (F, E, V jako popisky pro výběr) / pomocný bod; osa X|Y|Z, vektor, podél hrany nebo osy kružnice, normála plochy nebo osa válcové plochy, pomocná osa, dva body; „směr“ = „osa“; EN at V3 / at mid edge E2 / at center circle E5 / axis edge E3, DE bei V3 / bei mitte kante E2 / achse kante E3; odkaz je asociativní (počítá se na tělese před prvkem)	position and axis of primitives as in the form: position by numbers or by reference to a vertex / edge / circle / face (F, E, V as the pick labels) / datum point; axis X|Y|Z, vector, along an edge or circle axis, face normal or cylindrical face axis, datum axis, two points; “direction” = “axis”; e.g. at V3 / at mid edge E2 / at center circle E5 / axis edge E3; the reference is associative (resolved on the body before the feature)
+poloha je střed kvádru	the position is the box center
+poloha je zadaná dvakrát	position is given twice
+poloha je zadaná dvakrát (čísly i odkazem) – použijte jedno	position is given twice (by numbers and by reference) – use one
+poloha má tři souřadnice: v x y z	the position has three coordinates: at x y z
+poloha odkazem (vrchol, střed hrany, střed kružnice, střed plochy, pomocný bod…) – má přednost před position	position by reference (vertex, edge midpoint, circle center, face center, datum point…) – takes precedence over position
+poloměr (text zadává průměr D)	radius (the text command takes the diameter D)
+poloměr (u eliptického D1)	radius (D1 for elliptical)
+poloměr osy drátu (text zadává průměr D)	radius of the wire centre line (the text command takes the diameter D)
+poloměr podstavy (text zadává průměr D1)	base radius (the text command takes the diameter D1)
+poloměr ve výšce H (0 = špička)	radius at height H (0 = apex)
+pomocná osa „{0}“	datum axis “{0}”
+ponechaná strana	kept side
+ponechat	keep
+ponechat nástrojové těleso	keep the tool body
+ponechat originál	keep the original
+posun dx dy dz	offset dx dy dz
+posun kopie	copy offset
+posun podél normály (+ ven)	move along the normal (+ outward)
+posun z bodu do bodu {a: Ref, b: Ref}	move from point to point {a: Ref, b: Ref}
+povinné	required
+profily (2 a více skic)	profiles (2 or more sketches)
+proměnný poloměr: index hrany → R	variable radius: edge index → R
+průměr drátu	wire diameter
+průměr kuželového zahloubení	countersink diameter
+průměr válcového zahloubení (0 = bez)	counterbore diameter (0 = none)
+pružina	spring
+pružina D	spring D
+pružina D stoupání P (závity N | délka L) drát d	spring D pitch P (turns N | length L) wire d
+pružina D stoupání P závity N|délka L drát d [v x y z | na …] [osa …] [odebrat|průnik|nové]	spring D pitch P turns N|length L wire d [at x y z | at …] [axis …] [cut|intersect|newbody]
+pružina potřebuje průměr, stoupání, počet závitů (nebo délku) a průměr drátu: {0}	spring needs a diameter, pitch, number of turns (or length) and wire diameter: {0}
+pružina: zadejte buď počet závitů, nebo délku (délka = stoupání × závity)	spring: give either the number of turns or the length (length = pitch × turns)
+prvek (název, id, $last)	feature (name, id, $last)
+prvek <rozšíření>	feature <extension>
+prvek <rozšíření> klíč=hodnota … (pole rozšíření: prvek nápověda <rozšíření>)	feature <extension> key=value … (extension fields: feature help <extension>)
+prvek nápověda <typ> vypíše všechna pole typu pro „prvek <typ> klíč=hodnota“ (typ i slovem příkazu: díra, kužel, pružina; rozšíření id nebo popiskem). Přehled – textový příkaz · pole jen přes prvek / upravit / JSON:	feature help <type> lists every field of the type for “feature <type> key=value” (the type also by its command word: hole, cone, spring; an extension by id or label). Overview – text command · fields only via feature / edit / JSON:
+přechod v rozích dráhy	transition at path corners
+přeskočené instance	skipped instances
+přidat|odebrat|průnik|nové	add|cut|intersect|newbody
+příklad: {0}	example: {0}
+přímkové plochy mezi profily	ruled faces between profiles
+referenční plocha pro druhou vzdálenost / úhel	reference face for the second distance / angle
+rho 0,5	rho 0.5
+roh	corner
+roh kvádru (se „střed“ jeho střed)	box corner (with “center” its center)
+rotovat [úhel] [osa X|Y|Z | osa hrana E3 | osa plocha F7 | osa "Osa 1" | osa body V1 V5] [symetricky] [odebrat|přidat|průnik|nové]	revolve [angle] [axis X|Y|Z | axis edge E3 | axis face F7 | axis "Axis 1" | axis points V1 V5] [symmetric] [cut|add|intersect|newbody]
+rotovat úhel	revolve angle
+rovina (JSON PlaneDef)	plane (JSON PlaneDef)
+rovina definicí – má přednost	plane by definition – takes precedence
+rovina definicí (plocha, pomocná rovina, 3 body…) – má přednost	plane by definition (face, datum plane, 3 points…) – takes precedence
+rovina rozdělení	split plane
+rovina řezu	cutting plane
+rovina skici (JSON SketchPlane)	sketch plane (JSON SketchPlane)
+rovina skici (základní + odsazení, nebo obecná)	sketch plane (base + offset, or general)
+rovina textu	text plane
+rovina textu definicí	text plane by definition
+rovina XY|XZ|YZ	plane XY|XZ|YZ
+rovnoměrně v celém úhlu	evenly over the whole angle
+rozdělit XY|XZ|YZ	splitbodies XY|XZ|YZ
+rozdělit XY|XZ|YZ [odsazení N] [jako Název]	splitbodies XY|XZ|YZ [offset N] [as Name]
+rozměry X × Y × Z	dimensions X × Y × Z
+rozmístění výplně	fill layout
+rozšíření ({0}): prvek nápověda <id> – např. prvek nápověda sheet.bend	extensions ({0}): feature help <id> – e.g. feature help sheet.bend
+rozteč jako krok, nebo celková délka	spacing as a step or as the total length
+rozteč P	spacing P
+rozteč ve druhém směru	spacing in the second direction
+řada průchozích děr ISO 273 (informativní)	ISO 273 clearance hole series (informative)
+řez rovinou plochy	cut by the plane of a face
+setback – vzdálenost konce zaoblení od vrcholu	setback – distance of the fillet end from the vertex
+setback | eliptické	setback | elliptical
+setback pro jednotlivé vrcholy [{at: Ref, d}]	setback for individual vertices [{at: Ref, d}]
+setback S	setback S
+seznam indexů od 0	list of indices from 0
+seznam odkazů (JSON Ref[])	list of references (JSON Ref[])
+seznam prvků	list of features
+seznam skic	list of sketches
+skica (název, id nebo $last)	sketch (name, id or $last)
+skica (název, id, $last)	sketch (name, id, $last)
+skica křivky / bodů / obrysu	sketch of the curve / points / outline
+skica plocha F3 | skica rovina "Rovina 1"	sketch face F3 | sketch plane "Plane 1"
+skica s otevřenou čarou	sketch with an open line
+skica XY|XZ|YZ [odsazení N] · skica počátek … normála …	sketch XY|XZ|YZ [offset N] · sketch origin … normal …
+skica XY|XZ|YZ [odsazení N]: … · skica počátek x y z normála nx ny nz: … · skica plocha F3: … · skica rovina "Rovina 1": …	sketch XY|XZ|YZ [offset N]: … · sketch origin x y z normal nx ny nz: … · sketch face F3: … · sketch plane "Plane 1": …
+skořepina T	shell T
+skořepina T [otevřít <pravidlo>|F3 F5]	shell T [open <rule>|F3 F5]
+sloučit <cíl> <nástroj>	combine <target> <tool>
+sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]	combine <target> <tool> [cut|intersect] [keep]
+směr (JSON Direction)	direction (JSON Direction)
+směr +Z	direction +Z
+směr hrana E3 | směr body V1 V5 | směr osa "Osa 1"	direction edge E3 | direction points V1 V5 | direction axis "Axis 1"
+směr na konci	direction at the end
+směr na začátku	direction at the start
+směr odkazem (hrana, osa, 2 body) – má přednost před direction	direction by reference (edge, axis, 2 points) – takes precedence over direction
+směr osy X (ortogonalizuje se vůči Z)	X axis direction (orthogonalised against Z)
+směr osy X roviny	plane X axis direction
+směr osy Z	Z axis direction
+směr řady	row direction
+směr tahu (vyhození)	pull direction (ejection)
+směr vx vy vz | sklon úhel	direction vx vy vz | tilt angle
+směr X|x y z	direction X|x y z
+směr Y	direction Y
+směr: kolmo na skicu / v rovině skici	direction: normal to the sketch / in the sketch plane
+směr: X | Y | Z | -Z | vektor 1;0;1 | JSON	direction: X | Y | Z | -Z | vector 1;0;1 | JSON
+společná pole všech prvků: {0}	fields common to all features: {0}
+společná pole: name (název), suppressed (potlačit ano/ne), body (cílové těleso)	common fields: name (name), suppressed (suppress yes/no), body (target body)
+srazit C	chamfer C
+srazit C [hrany <pravidlo>|E3 E7] · srazit D úhel A plocha F3 [hrany …] · srazit D1 D2 plocha F3 [hrany …]	chamfer C [edges <rule>|E3 E7] · chamfer D angle A face F3 [edges …] · chamfer D1 D2 face F3 [edges …]
+srazit D úhel A plocha F3 | srazit D1 D2 plocha F3	chamfer D angle A face F3 | chamfer D1 D2 face F3
+srazit D1 D2 plocha F3	chamfer D1 D2 face F3
+sražení s úhlem potřebuje referenční plochu (na ní se měří vzdálenost): srazit 2 úhel 30 plocha F3 [hrany …]	a chamfer with an angle needs a reference face (the distance is measured on it): chamfer 2 angle 30 face F3 [edges …]
+stoupání P	pitch P
+střed hrany E{0}	mid edge E{0}
+střed kružnice E{0}	center circle E{0}
+střed otáčení / měřítka	center of rotation / scaling
+střed plochy F{0}	center face F{0}
+střed plochy potřebuje číslo plochy: na střed plochy F3	face center needs a face number: at center face F3
+střed podstavy	base center
+střed textu odkazem (promítne se do roviny)	text center by reference (projected into the plane)
+střed textu v rovině	text center in the plane
+střední plochy (plné zaoblení)	middle faces (full round)
+středová křivka	centre line curve
+střídavé řady (posun o půl kroku)	staggered rows (offset by half a step)
+stupňovitý	stepped
+stupňovitý úkos (každý úsek od vlastní roviny)	stepped draft (each segment from its own plane)
+symetricky (střední rovina)	symmetric (mid-plane)
+symetricky na obě strany	symmetric to both sides
+symetricky na obě strany od skici	symmetric to both sides of the sketch
+šířit po tečně navazujících hranách	propagate along tangent edges
+šířit po tečně navazujících plochách	propagate along tangent faces
+šroubovitá pružina: D = střední průměr (osa drátu), stoupání a počet závitů nebo volná délka, průměr drátu; poloha = začátek osy; EN spring D pitch P turns N wire d, DE feder D steigung P windungen N draht d	helical spring: D = mean diameter (wire centre line), pitch and number of turns or free length, wire diameter; position = start of the axis; spring D pitch P turns N wire d
+těleso (název)	body (name)
+těleso N	body N
+tenká stěna (JSON Thin)	thin wall (JSON Thin)
+tenká stěna {side: one|two|mid|in, t1, t2}	thin wall {side: one|two|mid|in, t1, t2}
+text "ABC"	text "ABC"
+text "ABC" výška H hloubka D v x y [z] [gravírovat]	text "ABC" height H depth D at x y [z] [engrave]
+text ✓	text ✓
+textový příkaz: {0}	text command: {0}
+tloušťka stěny	wall thickness
+tloušťka žebra	rib thickness
+trubka	tube
+trubka D d H	tube D d H
+trubka D d H [v x y z | na …] [osa …] [odebrat|průnik|nové]	tube D d H [at x y z | at …] [axis …] [cut|intersect|newbody]
+trubka vnější / vnitřní průměr × délka; poloha = střed podstavy	tube outer / inner diameter × length; position = base center
+třetí vzdálenost (vrchol)	third distance (vertex)
+úhel (vzdálenost + úhel)	angle (distance + angle)
+úhel 360	angle 360
+úhel a	angle a
+úhel A	angle A
+úhel druhým směrem	angle in the second direction
+úhel otočení	rotation angle
+úhel rotace (360 = celá otáčka)	revolve angle (360 = full turn)
+úhel rotace musí být 0–360°: rotovat 180 osa hrana E3	the revolve angle must be 0–360°: revolve 180 axis edge E3
+úhel úkosu	draft angle
+ukončení (JSON Extent)	end condition (JSON Extent)
+ukončení druhého směru	end condition of the second direction
+ukončení: blind, throughAll, toNext, toFace, toVertex, offsetFromFace, toBody	end condition: blind, throughAll, toNext, toFace, toVertex, offsetFromFace, toBody
+ukončení: k vrcholu, k ploše, odsazeně od plochy	end condition: to vertex, to face, offset from face
+ukončení: na vzdálenost, skrz vše, k dalšímu, k vrcholu, k ploše, odsazeně, k tělesu, střední rovina	end condition: blind, through all, to next, to vertex, to face, offset, to body, mid-plane
+úkos A	draft A
+úkos A plochy <pravidlo|F1 F2…> [dělicí "Skica"] [stupňovitý] [směr +Z] [rovina XY odsazení N]	draft A faces <rule|F1 F2…> [parting "Sketch"] [stepped] [direction +Z] [plane XY offset N]
+uzavřené (poslední profil zpět na první)	closed (last profile back to the first)
+užitečná délka závitu	usable thread length
+v x1 y1 z1 v x2 y2 z2 (souřadnice)	at x1 y1 z1 at x2 y2 z2 (coordinates)
+váha tečny na konci	tangent weight at the end
+váha tečny na začátku	tangent weight at the start
+válec	cylinder
+válec D H	cylinder D H
+válec D H [v x y z | na …] [osa …] [odebrat|průnik|nové]	cylinder D H [at x y z | at …] [axis …] [cut|intersect|newbody]
+vazba <druh> e1 e2	constraint <kind> e1 e2
+vektor x;y;z	vector x;y;z
+velikost zobrazení	display size
+více poloh (odkazy na body)	several positions (point references)
+více zdrojových prvků	several source features
+vlastní textový příkaz nemá – jen prvek {0} …, upravit nebo JSON	no text command of its own – only feature {0} …, edit or JSON
+vnější průměr	outer diameter
+vnitřní	internal
+vnitřní průměr (0 = plný válec)	inner diameter (0 = solid cylinder)
+vnitřní závit (v díře)	internal thread (in a hole)
+vodicí křivka	guide curve
+vodicí křivky	guide curves
+vrchol V3 S2	vertex V3 S2
+vrcholový úhel kuželového zahloubení (90)	countersink included angle (90)
+vrcholy (druh vertex) – indexy od 0	vertices (kind vertex) – indices from 0
+vrcholy odkazem	vertices by reference
+vrtat ve směru osy (výchozí proti ose – shora dolů)	drill along the axis (default against the axis – top down)
+vše textem	all by text
+všechna pole typu prvku pro „prvek <typ> klíč=hodnota“ a „upravit“: název, druh hodnoty, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem (typ i slovem příkazu: díra, kužel, pružina; u rozšíření jeho parametry); bez typu = přehled typů a polí, která jdou zadat jen přes prvek	every field of a feature type for “feature <type> key=value” and “edit”: name, value kind, unit, allowed values, default / required, meaning and the syntax of its own text command (the type also by its command word: hole, cone, spring; for an extension its parameters); without a type = overview of the types and of the fields that can only be set via feature
+výčet	enum
+výchozí {0}	default {0}
+vystouplý / gravírovaný	raised / engraved
+vysunout H	extrude H
+výška H	height H
+výška písma	text height
+výška po ose	height along the axis
+XY|XZ|YZ, z = odsazení	XY|XZ|YZ, z = offset
+začátek (JSON StartFrom)	start (JSON StartFrom)
+začátek hrany E{0}	start edge E{0}
+začátek osy	start of the axis
+začátek závitu na ose	thread start on the axis
+začátek: rovina skici, odsazení, od plochy, od vrcholu	start: sketch plane, offset, from face, from vertex
+zahloubení | kuželové | závit	cbore | csink | thread
+zahloubení D2 H2	cbore D2 H2
+základní rovina zrcadlení	base mirror plane
+zaoblit R	fillet R
+zaoblit R [hrany <pravidlo>] · zaoblit R hrany … setback S · zaoblit eliptické D1 D2 hrany …	fillet R [edges <rule>] · fillet R edges … setback S · fillet elliptical D1 D2 edges …
+závit (M8, M18×1,5)	thread (M8, M18×1.5)
+závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat]	thread M18×1.5 length L [at x y z | at …] [axis …] [internal] [modeled]
+závit M18×1,5 délka L [vnitřní] [modelovat]	thread M18×1.5 length L [internal] [modeled]
+závit M8	thread M8
+závit nemá operaci – kosmetický je jen ve výkrese, „modelovat“ vyřízne drážky: {0}	a thread has no operation – a cosmetic one is drawing only, “modeled” cuts the grooves: {0}
+závity N | délka L	turns N | length L
+zdrojové těleso (prázdné = aktivní)	source body (empty = active)
+zdrojový prvek (název, id nebo $last)	source feature (name, id or $last)
+zesílit ven (vnější rozměr roste)	thicken outward (the outer size grows)
+zkroucení po délce	twist along the length
+zkroucení po dráze	twist along the path
+zrcadlit jen vybrané prvky (jinak celé těleso)	mirror only the selected features (otherwise the whole body)
+zrcadlit plocha F3 | zrcadlit rovina "Rovina 1"	mirror face F3 | mirror plane "Plane 1"
+zrcadlit plocha potřebuje číslo rovinné plochy: zrcadlit plocha F3 [odsazení N]	mirror face needs a planar face number: mirror face F3 [offset N]
+zrcadlit XY|XZ|YZ	mirror XY|XZ|YZ
+zrcadlit XY|XZ|YZ [odsazení N] · zrcadlit plocha F3 [odsazení N] · zrcadlit rovina "Rovina 1" [odsazení N]	mirror XY|XZ|YZ [offset N] · mirror face F3 [offset N] · mirror plane "Plane 1" [offset N]
+ × {0}× po {1}, směr {2}	 × {0}× at {1}, direction {2}
+ symetricky	 symmetric
+, jen {0} prvků	, only {0} features
+{0} × {1} mm od plochy {2}, hrany {3}	{0} × {1} mm from face {2}, edges {3}
+{0} mm × {1}° od plochy {2}, hrany {3}	{0} mm × {1}° from face {2}, edges {3}
+{0}°{1}, {2}, osa {3}	{0}°{1}, {2}, axis {3}
+kruhové {0}× / {1}°, osa {2}	circular {0}× / {1}°, axis {2}
+lineární {0}× po {1}, směr {2}{3}	linear {0}× at {1}, direction {2}{3}
+osa {0} skici	sketch axis {0}
+osa plochy F{0}	axis of face F{0}
+osa x skici	sketch x axis
+osa y skici	sketch y axis
+pomocná rovina „{0}“{1}{2}	datum plane “{0}”{1}{2}
+rovina plochy F{0}{1}{2}	plane of face F{0}{1}{2}
+# oprava po kontrole (12. vlna)
+{0}: díra Ø{1} není vrták závitu {2} (Ø{3}) – závit v popisu díry doplňte ručně	{0}: hole Ø{1} is not the tap drill of thread {2} (Ø{3}) – add the thread to the hole callout manually
+{0}: díra vrtáku Ø{1} pro vnitřní závit v geometrii nenalezena – popis závitu chybí	{0}: tap drill hole Ø{1} for the internal thread not found in the geometry – thread callout missing
+{0}: operace „{1}“ a „{2}“ se vylučují – zadejte jen jednu: přidat | odebrat | průnik | nové	{0}: operations “{1}” and “{2}” exclude each other – give only one: add | cut | intersect | newbody
+{0}: poloha odkazem není vyřešená – popis díry chybí (přestavte model)	{0}: position by reference is not resolved – hole callout missing (rebuild the model)
+{0}: poloha odkazem není vyřešená – popis závitu chybí (přestavte model)	{0}: position by reference is not resolved – thread callout missing (rebuild the model)
+kužel / komolý kužel: D1 = průměr podstavy v poloze, D2 = průměr ve výšce H po ose (0 = špička); „odebrat“ = kuželový otvor, zahloubení, sedlo hrotu (v ústí díry na výkrese ⌵ Ø × úhel)	cone / frustum: D1 = base diameter at the position, D2 = diameter at height H along the axis (0 = apex); “cut” = conical hole, countersink, centre seat (at a hole mouth the drawing shows ⌵ Ø × angle)
+kvádr; výchozí roh v poloze (počátek); „střed“ = poloha je střed kvádru („střed F1“ / „střed V3“ = střed v odkazu, „na střed plochy F1“ = roh); „osa“ = rozměr Z po ose, nejkratší otočení kolem polohy (osa -Z: Y a Z záporně; osa X: X 0…Z, Z −X…0; osa Y: Y 0…Z, Z −Y…0)	box; by default the corner is at the position (origin); “center” = the position is the box center (“center F1” / “center V3” = center at the reference, “at center face F1” = corner); “axis” = the Z size runs along the axis, shortest rotation about the position (axis -Z: Y and Z negative; axis X: X 0…Z, Z −X…0; axis Y: Y 0…Z, Z −Y…0)
+odkaz na plochu (JSON Ref; F3 = index 2)	face reference (JSON Ref; F3 = index 2)
+osa vektorem má tři složky – číslo „{0}“ za „{1} {2}“ je navíc (rozměry pište hned za příkaz)	a vector axis has three components – the number “{0}” after “{1} {2}” is extra (write the sizes right after the command)
+Plocha F{0} není válcová ani kuželová – osu má jen válcová / kuželová plocha; střed kruhové rovinné plochy zadejte její kruhovou hranou (osa hrana E…).	Face F{0} is neither cylindrical nor conical – only a cylindrical / conical face has an axis; give the center of a circular planar face by its circular edge (axis edge E…).
+rotovat	revolve
+válec průměr × výška; poloha = střed podstavy, válec roste ve směru osy (výchozí +Z); „odebrat“ = válcový otvor po libovolné ose (na výkrese popis díry Ø ↧ hloubka / skrz)	cylinder diameter × height; position = base center, the cylinder grows along the axis (default +Z); “cut” = a cylindrical hole along any axis (the drawing shows a hole callout Ø ↧ depth / thru)

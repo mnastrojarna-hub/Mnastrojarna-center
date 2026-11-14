@@ -1,0 +1,461 @@
+# 12. vlna – primitiva textem (poloha / osa odkazem, pružina), prvek nápověda (feature-fields.ts, agent-help.ts), odkazy u rotace / pole / zrcadlení / sražení (agent-gaps.ts)
+ · jen prvek / upravit / JSON	 · nur element / bearbeiten / JSON
+ · text: {0}	 · Text: {0}
+ [přidat|odebrat|průnik|nové] [těleso "Název"]	 [hinzufügen|abziehen|schnittmenge|neukörper] [körper "Name"]
+ • další klíče dat: {0}	 • weitere Datenschlüssel: {0}
+, např. {0}={1}	, z. B. {0}={1}
+, osa Z kvádru {0}	, Z-Achse des Quaders {0}
+„{0} {1}“ není poloha – {2}	„{0} {1}“ ist keine Position – {2}
+„obráceně“ jde jen s osou X|Y|Z, vektorem nebo dvěma body – směr hranou / plochou otočte zápisem osa body … nebo vektorem	„umkehren“ geht nur mit Achse X|Y|Z, Vektor oder zwei Punkten – eine Richtung über Kante / Fläche drehen Sie mit achse punkte … oder einem Vektor um
+„skrz“ na obě strany od bodu	„durch“ zu beiden Seiten des Punkts
+(poslední prvek)	(letztes Element)
+(poslední skica)	(letzte Skizze)
+[v x y z | na V3 | na střed hrany E2 | na střed kružnice E5 | na střed plochy F3 | na začátek|konec hrany E2 | na bod "Bod 1" | na mezi V1 V5] [osa X|Y|Z|-Z | osa x y z | osa hrana E3 | osa plocha F2 | osa "Osa 1" | osa body V1 V2] [obráceně]	[bei x y z | bei V3 | bei mitte kante E2 | bei mittelpunkt kreis E5 | bei mitte fläche F3 | bei anfang|ende kante E2 | bei punkt "Punkt 1" | bei zwischen V1 V5] [achse X|Y|Z|-Z | achse x y z | achse kante E3 | achse fläche F2 | achse "Achse 1" | achse punkte V1 V2] [umkehren]
+{0} ({1}) – parametry pro „prvek {1} klíč=hodnota“ (klíč nebo český popisek):	{0} ({1}) – Parameter für „element {1} schlüssel=wert“ (Schlüssel oder tschechische Bezeichnung):
+{0} ({1}) – pole pro „prvek {1} klíč=hodnota“ i „upravit <prvek> klíč=hodnota“:	{0} ({1}) – Felder für „element {1} schlüssel=wert“ und „bearbeiten <element> schlüssel=wert“:
+{0} délka {1} mm, {2}, {3}, začátek {4}, osa {5}	{0} Länge {1} mm, {2}, {3}, Anfang {4}, Achse {5}
+{0} potřebuje číslo	{0} braucht eine Zahl
+{0} potřebuje číslo hrany: na střed hrany E2 · na střed kružnice E5 · na začátek hrany E2	{0} braucht eine Kantennummer: bei mitte kante E2 · bei mittelpunkt kreis E5 · bei anfang kante E2
+{0}: příliš mnoho čísel ({1}) – {2}	{0}: zu viele Zahlen ({1}) – {2}
+{0}: volba „{1}“ sem nepatří – {2}	{0}: Option „{1}“ gehört nicht hierher – {2}
+2;5 · boční	2;5 · seitlich
+2;5 · svislé	2;5 · senkrecht
+ano/ne	ja/nein
+asociativní definice (plocha, 3 body, pod úhlem…)	assoziative Definition (Fläche, 3 Punkte, unter Winkel…)
+asociativní definice roviny (plocha, pomocná rovina, 3 body…)	assoziative Ebenendefinition (Fläche, Hilfsebene, 3 Punkte…)
+bez textového příkazu	kein Textbefehl
+bod „{0}“	Punkt „{0}“
+bod (vrchol, střed hrany, střed kružnice, odvozený bod…)	Punkt (Eckpunkt, Kantenmitte, Kreismittelpunkt, abgeleiteter Punkt…)
+bod na ose	Punkt auf der Achse
+bod potřebuje název pomocného bodu nebo souřadnice: na bod "Bod 1" · v x y z	Punkt braucht den Namen eines Hilfspunkts oder Koordinaten: bei punkt "Punkt 1" · bei x y z
+bod potřebuje tři souřadnice: na bod 10 20 5	Punkt braucht drei Koordinaten: bei punkt 10 20 5
+bod x;y	Punkt x;y
+bod začátku díry (text bez z = na povrchu tělesa)	Startpunkt der Bohrung (Text ohne z = auf der Körperoberfläche)
+booleovská operace: nové těleso / přidat / odebrat / průnik	Boolesche Operation: neuer Körper / hinzufügen / abziehen / Schnittmenge
+celé číslo	Ganzzahl
+celkový úhel	Gesamtwinkel
+cílové těleso	Zielkörper
+curve, sketch, fill	curve, sketch, fill
+čísla hran (E3 E7) nelze míchat s pravidlem – zadejte jen čísla, nebo jen pravidlo	Kantennummern (E3 E7) lassen sich nicht mit einer Regel mischen – nur Nummern oder nur eine Regel angeben
+čísla ploch (F3 F5) nelze míchat s pravidlem – zadejte jen čísla, nebo jen pravidlo	Flächennummern (F3 F5) lassen sich nicht mit einer Regel mischen – nur Nummern oder nur eine Regel angeben
+definice osy (hrana, válec, 2 body, globální, průsečnice rovin…)	Achsdefinition (Kante, Zylinder, 2 Punkte, global, Schnittlinie von Ebenen…)
+dělicí "Skica"	trennlinie "Skizze"
+dělicí křivka (skica)	Trennkurve (Skizze)
+délka L	länge L
+délka po ose	Länge entlang der Achse
+délka vysunutí	Extrusionslänge
+délka závitu	Gewindelänge
+délka zobrazení	Anzeigelänge
+díra D	bohrung D
+drát d	draht d
+druh díry	Bohrungsart
+druh pole	Musterart
+druh zaoblení	Verrundungsart
+druh: stejné / dvě vzdálenosti / vzdálenost + úhel / vrchol	Art: gleich / zwei Abstände / Abstand + Winkel / Eckpunkt
+druhá sada ploch (plocha–plocha)	zweiter Flächensatz (Fläche–Fläche)
+druhá vzdálenost	zweiter Abstand
+druhé plochy odkazem	zweite Flächen per Referenz
+druhý poloměr (asymetrické) / D2 (eliptické)	zweiter Radius (asymmetrisch) / D2 (elliptisch)
+druhý poloměr podle hrany	zweiter Radius je Kante
+druhý směr (mřížka)	zweite Richtung (Raster)
+druhý směr odkazem	zweite Richtung per Referenz
+držet normálu profilu	Profilnormale beibehalten
+eliptické D1 D2	elliptisch D1 D2
+entity skici (obdélník, kružnice, čára, oblouk, spline…)	Skizzenelemente (Rechteck, Kreis, Linienzug, Bogen, Spline…)
+entity za dvojtečkou: obdélník W H; kružnice D; čára …	Elemente nach dem Doppelpunkt: rechteck W H; kreis D; linienzug …
+formát	Format
+Frenetův trojhran (profil se natáčí podle křivosti)	Frenet-Dreibein (Profil dreht sich mit der Krümmung)
+geometrické vazby skici	geometrische Skizzenbedingungen
+gravírovat	gravieren
+hladce uzavřené (periodická plocha)	glatt geschlossen (periodische Fläche)
+hloubka (0 = skrz)	Tiefe (0 = durch)
+hloubka / výška reliéfu	Tiefe / Reliefhöhe
+hloubka D	tiefe D
+hloubka H | skrz	tiefe H | durch
+hloubka válcového zahloubení	Tiefe der Zylindersenkung
+hloubka-závitu T	gewindetiefe T
+hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě	Werte: Zahl 12,5 · ja/nein · Liste a;b;c · Text in Anführungszeichen · JSON {…} / […]; Skizzen und Elemente per Name oder $last; Flächen und Kanten per Index ab 0 (F3 = 2) oder per Regel; ein „Pflicht“-Feld ohne Wert führt beim Aufbau zu einem Fehler
+hrana E{0}	Kante E{0}
+hrana E{0} v tělese není (hran {1})	Kante E{0} gibt es im Körper nicht ({1} Kanten)
+hrany (all = všechny)	Kanten (all = alle)
+hrany <pravidlo> | hrany E3 E7	kanten <regel> | kanten E3 E7
+hrany: indexy od 0 (E3 = 2), all nebo pravidlo	Kanten: Indizes ab 0 (E3 = 2), all oder Regel
+id rozšíření (sheet.bend, surf.helix…)	Erweiterungs-ID (sheet.bend, surf.helix…)
+jako Název	als Name
+jen geometrie (rychlejší, bez booleovské operace)	nur Geometrie (schneller, ohne Boolesche Operation)
+jen prvek: {0}	nur element: {0}
+jen vnější obrys (otvory profilu ignorovat)	nur Außenkontur (Profilöffnungen ignorieren)
+jiná tloušťka pro plochu: index → mm	andere Dicke je Fläche: Index → mm
+JSON	JSON
+k tělesu	bis körper
+klíč=hodnota	schlüssel=wert
+koncový bod (špička)	Endpunkt (Spitze)
+konec hrany E{0}	Ende Kante E{0}
+kopie [těleso N] [posun dx dy dz] [jako Název]	kopieren [körper N] [versatz dx dy dz] [als Name]
+kóta <druh> e1 <hodnota>	bemaßung <art> e1 <wert>
+kóty skici	Skizzenbemaßungen
+koule	Kugel
+koule D	kugel D
+koule D [v x y z | na …] [odebrat|průnik|nové]	kugel D [bei x y z | bei …] [abziehen|schnittmenge|neukörper]
+koule D [v x y z | na …] [přidat|odebrat|průnik|nové]	kugel D [bei x y z | bei …] [hinzufügen|abziehen|schnittmenge|neukörper]
+koule nemá osu – zadejte jen průměr a polohu: {0}	Kugel hat keine Achse – nur Durchmesser und Position angeben: {0}
+koule průměr; poloha = střed koule	Kugel nach Durchmesser; Position = Kugelmittelpunkt
+kruhový průřez bez skici profilu (poloměr)	kreisförmiger Querschnitt ohne Profilskizze (Radius)
+kužel D1 D2 H	kegel D1 D2 H
+kužel D1 D2 H [v x y z | na …] [osa …] [odebrat|průnik|nové]	kegel D1 D2 H [bei x y z | bei …] [achse …] [abziehen|schnittmenge|neukörper]
+kuželosečka rho (0,5 = parabola)	Kegelschnitt rho (0,5 = Parabel)
+kuželové D2	kegelsenkung D2
+kuželové D2 A	kegelsenkung D2 A
+kvádr	Quader
+kvádr X Y Z	quader X Y Z
+kvádr X Y Z [střed]	quader X Y Z [mitte]
+kvádr X Y Z [střed] [v x y z | na …] [osa …] [odebrat|průnik|nové]	quader X Y Z [mitte] [bei x y z | bei …] [achse …] [abziehen|schnittmenge|neukörper]
+linear, circular, curve	linear, circular, curve
+mapa index → hodnota (JSON)	Zuordnung Index → Wert (JSON)
+měřítko (1 = beze změny)	Maßstab (1 = unverändert)
+měřítko konce (1 = beze změny)	Endmaßstab (1 = unverändert)
+měřítko profilu na konci	Profilmaßstab am Ende
+mezi {0}	zwischen {0}
+mezi potřebuje dva body: na mezi V1 V5 · na mezi střed hrany E1 V7	zwischen braucht zwei Punkte: bei zwischen V1 V5 · bei zwischen mitte kante E1 V7
+modelované drážky (jinak kosmetický – jen výkres)	modellierte Rillen (sonst kosmetisch – nur Zeichnung)
+modelovat	modellieren
+N2 rozteč P2	N2 abstand P2
+N2 rozteč P2 směr hrana E5	N2 abstand P2 richtung kante E5
+na V3 | na střed hrany E2 | na střed kružnice E5 | na střed plochy F3 | na bod "Bod 1" | na mezi V1 V5	bei V3 | bei mitte kante E2 | bei mittelpunkt kreis E5 | bei mitte fläche F3 | bei punkt "Punkt 1" | bei zwischen V1 V5
+nápis	Beschriftung
+nápověda: neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}	Hilfe: unbekannter Elementtyp „{0}“ – Typen: {1}; Erweiterungen: {2}
+nástrojové těleso	Werkzeugkörper
+natáčet instance s rotací	Instanzen mitdrehen
+natočení	Drehung
+natočení po křivce	Ausrichtung entlang der Kurve
+název kopie	Name der Kopie
+název souboru	Dateiname
+název tělesa na záporné straně	Name des Körpers auf der negativen Seite
+nepovinné	optional
+neutrální rovina	neutrale Ebene
+neutrální rovina definicí	neutrale Ebene per Definition
+normála	Normale
+Ø{0} × {1} mm, {2}, podstava {3}, osa {4}	Ø{0} × {1} mm, {2}, Grundfläche {3}, Achse {4}
+Ø{0} mm, {1}, střed {2}	Ø{0} mm, {1}, Mitte {2}
+Ø{0}, stoupání {1}, závitů {2}, drát Ø{3} (délka {4} mm), {5}, začátek {6}, osa {7}	Ø{0}, Steigung {1}, Windungen {2}, Draht Ø{3} (Länge {4} mm), {5}, Anfang {6}, Achse {7}
+Ø{0}/Ø{1} × {2} mm, {3}, podstava {4}, osa {5}	Ø{0}/Ø{1} × {2} mm, {3}, Grundfläche {4}, Achse {5}
+Ø{0}→Ø{1} × {2} mm, {3}, podstava {4}, osa {5}	Ø{0}→Ø{1} × {2} mm, {3}, Grundfläche {4}, Achse {5}
+obousměrně	beidseits
+obsah souboru (base64) – raději window.mncad.importFile()	Dateiinhalt (base64) – besser window.mncad.importFile()
+odebrat|průnik	abziehen|schnittmenge
+odkaz na bod (JSON Ref)	Punktreferenz (JSON Ref)
+odkazy místo čísel: osa rotace a kruhového pole hranou, osou válcové plochy, pomocnou osou nebo dvěma body; směr řady pole hranou / dvěma body; rovina zrcadlení plochou nebo pomocnou rovinou; sražení vzdálenost + úhel nebo dvě vzdálenosti od referenční plochy; hrany a plochy čísly (E, F jako popisky pro výběr) místo pravidla	Referenzen statt Zahlen: Achse von Rotation und Kreismuster per Kante, Achse einer Zylinderfläche, Hilfsachse oder zwei Punkte; Richtung des linearen Musters per Kante / zwei Punkte; Spiegelebene per Fläche oder Hilfsebene; Fase Abstand + Winkel oder zwei Abstände von einer Bezugsfläche; Kanten und Flächen per Nummer (E, F wie die Auswahlbeschriftungen) statt einer Regel
+odsazení (+ ven, − dovnitř)	Versatz (+ nach außen, − nach innen)
+odsazení N	versatz N
+odsazení neutrální roviny	Versatz der neutralen Ebene
+odsazení roviny	Ebenenversatz
+odstraněné plochy	entfernte Flächen
+okraj výplně	Füllrand
+opačná strana	Gegenseite
+opačný směr	Gegenrichtung
+operace	Operation
+osa -Z | osa 1 0 1 | osa hrana E3 | osa plocha F2 | osa "Osa 1" | osa body V1 V5	achse -Z | achse 1 0 1 | achse kante E3 | achse fläche F2 | achse "Achse 1" | achse punkte V1 V5
+osa „{0}“	Achse „{0}“
+osa (globální X / Y / Z)	Achse (global X / Y / Z)
+osa (JSON AxisDef)	Achse (JSON AxisDef)
+osa / směr je zadaná dvakrát	Achse / Richtung ist doppelt angegeben
+osa / směr potřebuje hodnotu: {0}	Achse / Richtung braucht einen Wert: {0}
+osa díry libovolným směrem – má přednost před axis	Bohrungsachse in beliebiger Richtung – hat Vorrang vor axis
+osa dvěma body: osa body V1 V5 (od prvního ke druhému)	Achse durch zwei Punkte: achse punkte V1 V5 (vom ersten zum zweiten)
+osa hrana E3 | osa plocha F7 | osa "Osa 1" | osa body V1 V5	achse kante E3 | achse fläche F7 | achse "Achse 1" | achse punkte V1 V5
+osa hrana potřebuje číslo hrany: osa hrana E3 (přímá hrana nebo kruhová – osa kružnice)	achse kante braucht eine Kantennummer: achse kante E3 (gerade Kante oder Kreiskante – deren Kreisachse)
+osa libovolným směrem – má přednost před axis	Achse in beliebiger Richtung – hat Vorrang vor axis
+osa modelem (hrana, válcová plocha, 2 body, globální, pomocná osa…)	Achse aus dem Modell (Kante, Zylinderfläche, 2 Punkte, global, Hilfsachse…)
+osa odkazem (hrana, válec, pomocná osa…)	Achse per Referenz (Kante, Zylinder, Hilfsachse…)
+osa otočení	Drehachse
+osa otočení odkazem	Drehachse per Referenz
+osa plocha potřebuje číslo plochy: osa plocha F2 (normála rovinné plochy, osa válcové)	achse fläche braucht eine Flächennummer: achse fläche F2 (Normale einer ebenen Fläche, Achse einer Zylinderfläche)
+osa potřebuje název pomocné osy: osa "Osa 1"	Achse braucht den Namen einer Hilfsachse: achse "Achse 1"
+osa rotace potřebuje polohu – zadejte ji hranou (osa hrana E3), válcovou plochou (osa plocha F7), dvěma body (osa body V1 V5), pomocnou osou (osa "Osa 1") nebo globální osou X|Y|Z	die Rotationsachse braucht eine Lage – per Kante (achse kante E3), Zylinderfläche (achse fläche F7), zwei Punkte (achse punkte V1 V5), Hilfsachse (achse "Achse 1") oder globale Achse X|Y|Z
+osa skici (x = vodorovná, y = svislá)	Skizzenachse (x = waagerecht, y = senkrecht)
+osa vektorem potřebuje tři čísla: osa 1 0 1	Achse als Vektor braucht drei Zahlen: achse 1 0 1
+osa x|y	achse x|y
+osa X|Y|Z	achse X|Y|Z
+osa X|Y|Z | osa hrana E3 | osa plocha F7 | osa "Osa 1" | osa body V1 V5	achse X|Y|Z | achse kante E3 | achse fläche F7 | achse "Achse 1" | achse punkte V1 V5
+osa X|Y|Z|-Z · osa 1 0 1 · osa hrana E3 · osa plocha F2 · osa "Osa 1" · osa body V1 V5	achse X|Y|Z|-Z · achse 1 0 1 · achse kante E3 · achse fläche F2 · achse "Achse 1" · achse punkte V1 V5
+osa Z kvádru libovolným směrem (otáčí se kolem polohy)	Z-Achse des Quaders in beliebiger Richtung (Drehung um die Position)
+osa: X | Y | Z | vektor 1;0;1 | JSON	Achse: X | Y | Z | Vektor 1;0;1 | JSON
+otevřené (odebrané) plochy	offene (entfernte) Flächen
+otevřít <pravidlo> | otevřít F3 F5	öffnen <regel> | öffnen F3 F5
+otisky (JSON)	Signaturen (JSON)
+otisky výběru – doplní program (ručně vynechat)	Auswahlsignaturen – füllt das Programm aus (von Hand weglassen)
+označení (M8, M18×1,5)	Bezeichnung (M8, M18×1,5)
+parametry nemá popsané – klíče podle výchozích dat výše	keine Parameterbeschreibung – Schlüssel wie in den Standarddaten oben
+parametry rozšíření – prvek nápověda <rozšíření>	Erweiterungsparameter – element hilfe <erweiterung>
+plocha F{0} v tělese není (ploch {1})	Fläche F{0} gibt es im Körper nicht ({1} Flächen)
+plocha F3	fläche F3
+plochy (plocha–plocha, plné zaoblení)	Flächen (Fläche–Fläche, Vollrundung)
+plochy <pravidlo|F1 F2…>	flächen <regel|F1 F2…>
+plochy odkazem (plocha–plocha, eliptické D1)	Flächen per Referenz (Fläche–Fläche, elliptisch D1)
+plochy: indexy od 0 (F3 = 2) nebo pravidlo	Flächen: Indizes ab 0 (F3 = 2) oder Regel
+počáteční bod (špička)	Startpunkt (Spitze)
+počátek (bod odkazem)	Ursprung (Punkt per Referenz)
+počátek roviny	Ebenenursprung
+počet instancí	Anzahl der Instanzen
+počet otáček zkroucení	Anzahl der Verdrehungsumdrehungen
+počet ve druhém směru	Anzahl in der zweiten Richtung
+počet závitů	Anzahl der Windungen
+podmínka na konci	Endbedingung
+podmínka na začátku	Startbedingung
+pole … | pole kruhové …	muster … | muster kreisförmig …
+pole kind=circular	Muster kind=circular
+pole kind=curve	Muster kind=curve
+pole kind=fill	Muster kind=fill
+pole kind=linear	Muster kind=linear
+pole kruhové potřebuje počet: pole kruhové 6 [úhel 360] [osa Z] [v cx cy cz]	Kreismuster braucht eine Anzahl: muster kreisförmig 6 [winkel 360] [achse Z] [bei cx cy cz]
+pole N	muster N
+pole N rozteč P [směr X|x y z|hrana E3|body V1 V5] [N2 rozteč P2 směr …] · pole kruhové N [úhel 360] [osa Z|hrana E3|plocha F7|"Osa 1"] [v cx cy cz]	muster N abstand P [richtung X|x y z|kante E3|punkte V1 V5] [N2 abstand P2 richtung …] · muster kreisförmig N [winkel 360] [achse Z|kante E3|fläche F7|"Achse 1"] [bei cx cy cz]
+poloha a osa primitiv jako ve formuláři: poloha čísly nebo odkazem na vrchol / hranu / kružnici / plochu (F, E, V jako popisky pro výběr) / pomocný bod; osa X|Y|Z, vektor, podél hrany nebo osy kružnice, normála plochy nebo osa válcové plochy, pomocná osa, dva body; „směr“ = „osa“; EN at V3 / at mid edge E2 / at center circle E5 / axis edge E3, DE bei V3 / bei mitte kante E2 / achse kante E3; odkaz je asociativní (počítá se na tělese před prvkem)	Position und Achse der Grundkörper wie im Formular: Position per Zahlen oder per Referenz auf Eckpunkt / Kante / Kreis / Fläche (F, E, V wie die Auswahlbeschriftungen) / Hilfspunkt; Achse X|Y|Z, Vektor, entlang einer Kante oder Kreisachse, Flächennormale oder Achse einer Zylinderfläche, Hilfsachse, zwei Punkte; „richtung“ = „achse“; z. B. bei V3 / bei mitte kante E2 / bei mittelpunkt kreis E5 / achse kante E3; die Referenz ist assoziativ (wird am Körper vor dem Element aufgelöst)
+poloha je střed kvádru	Position ist die Quadermitte
+poloha je zadaná dvakrát	Position ist doppelt angegeben
+poloha je zadaná dvakrát (čísly i odkazem) – použijte jedno	Position ist doppelt angegeben (per Zahlen und per Referenz) – eines verwenden
+poloha má tři souřadnice: v x y z	Position hat drei Koordinaten: bei x y z
+poloha odkazem (vrchol, střed hrany, střed kružnice, střed plochy, pomocný bod…) – má přednost před position	Position per Referenz (Eckpunkt, Kantenmitte, Kreismittelpunkt, Flächenmitte, Hilfspunkt…) – hat Vorrang vor position
+poloměr (text zadává průměr D)	Radius (der Textbefehl nimmt den Durchmesser D)
+poloměr (u eliptického D1)	Radius (bei elliptisch D1)
+poloměr osy drátu (text zadává průměr D)	Radius der Drahtmittellinie (der Textbefehl nimmt den Durchmesser D)
+poloměr podstavy (text zadává průměr D1)	Grundradius (der Textbefehl nimmt den Durchmesser D1)
+poloměr ve výšce H (0 = špička)	Radius in Höhe H (0 = Spitze)
+pomocná osa „{0}“	Hilfsachse „{0}“
+ponechaná strana	beibehaltene Seite
+ponechat	behalten
+ponechat nástrojové těleso	Werkzeugkörper behalten
+ponechat originál	Original behalten
+posun dx dy dz	versatz dx dy dz
+posun kopie	Versatz der Kopie
+posun podél normály (+ ven)	Verschiebung entlang der Normalen (+ nach außen)
+posun z bodu do bodu {a: Ref, b: Ref}	Verschiebung von Punkt zu Punkt {a: Ref, b: Ref}
+povinné	Pflicht
+profily (2 a více skic)	Profile (2 oder mehr Skizzen)
+proměnný poloměr: index hrany → R	variabler Radius: Kantenindex → R
+průměr drátu	Drahtdurchmesser
+průměr kuželového zahloubení	Durchmesser der Kegelsenkung
+průměr válcového zahloubení (0 = bez)	Durchmesser der Zylindersenkung (0 = ohne)
+pružina	Feder
+pružina D	feder D
+pružina D stoupání P (závity N | délka L) drát d	feder D steigung P (windungen N | länge L) draht d
+pružina D stoupání P závity N|délka L drát d [v x y z | na …] [osa …] [odebrat|průnik|nové]	feder D steigung P windungen N|länge L draht d [bei x y z | bei …] [achse …] [abziehen|schnittmenge|neukörper]
+pružina potřebuje průměr, stoupání, počet závitů (nebo délku) a průměr drátu: {0}	Feder braucht Durchmesser, Steigung, Windungszahl (oder Länge) und Drahtdurchmesser: {0}
+pružina: zadejte buď počet závitů, nebo délku (délka = stoupání × závity)	Feder: entweder Windungszahl oder Länge angeben (Länge = Steigung × Windungen)
+prvek (název, id, $last)	Element (Name, ID, $last)
+prvek <rozšíření>	element <erweiterung>
+prvek <rozšíření> klíč=hodnota … (pole rozšíření: prvek nápověda <rozšíření>)	element <erweiterung> schlüssel=wert … (Felder der Erweiterung: element hilfe <erweiterung>)
+prvek nápověda <typ> vypíše všechna pole typu pro „prvek <typ> klíč=hodnota“ (typ i slovem příkazu: díra, kužel, pružina; rozšíření id nebo popiskem). Přehled – textový příkaz · pole jen přes prvek / upravit / JSON:	element hilfe <typ> listet alle Felder des Typs für „element <typ> schlüssel=wert“ (Typ auch per Befehlswort: bohrung, kegel, feder; Erweiterung per ID oder Bezeichnung). Übersicht – Textbefehl · Felder nur über element / bearbeiten / JSON:
+přechod v rozích dráhy	Übergang an Bahnecken
+přeskočené instance	übersprungene Instanzen
+přidat|odebrat|průnik|nové	hinzufügen|abziehen|schnittmenge|neukörper
+příklad: {0}	Beispiel: {0}
+přímkové plochy mezi profily	Regelflächen zwischen Profilen
+referenční plocha pro druhou vzdálenost / úhel	Bezugsfläche für den zweiten Abstand / Winkel
+rho 0,5	rho 0,5
+roh	Ecke
+roh kvádru (se „střed“ jeho střed)	Quaderecke (mit „mitte“ dessen Mitte)
+rotovat [úhel] [osa X|Y|Z | osa hrana E3 | osa plocha F7 | osa "Osa 1" | osa body V1 V5] [symetricky] [odebrat|přidat|průnik|nové]	rotieren [winkel] [achse X|Y|Z | achse kante E3 | achse fläche F7 | achse "Achse 1" | achse punkte V1 V5] [symmetrisch] [abziehen|hinzufügen|schnittmenge|neukörper]
+rotovat úhel	rotieren winkel
+rovina (JSON PlaneDef)	Ebene (JSON PlaneDef)
+rovina definicí – má přednost	Ebene per Definition – hat Vorrang
+rovina definicí (plocha, pomocná rovina, 3 body…) – má přednost	Ebene per Definition (Fläche, Hilfsebene, 3 Punkte…) – hat Vorrang
+rovina rozdělení	Teilungsebene
+rovina řezu	Schnittebene
+rovina skici (JSON SketchPlane)	Skizzenebene (JSON SketchPlane)
+rovina skici (základní + odsazení, nebo obecná)	Skizzenebene (Grundebene + Versatz oder allgemein)
+rovina textu	Textebene
+rovina textu definicí	Textebene per Definition
+rovina XY|XZ|YZ	ebene XY|XZ|YZ
+rovnoměrně v celém úhlu	gleichmäßig über den ganzen Winkel
+rozdělit XY|XZ|YZ	teilen XY|XZ|YZ
+rozdělit XY|XZ|YZ [odsazení N] [jako Název]	teilen XY|XZ|YZ [versatz N] [als Name]
+rozměry X × Y × Z	Abmessungen X × Y × Z
+rozmístění výplně	Füllanordnung
+rozšíření ({0}): prvek nápověda <id> – např. prvek nápověda sheet.bend	Erweiterungen ({0}): element hilfe <id> – z. B. element hilfe sheet.bend
+rozteč jako krok, nebo celková délka	Abstand als Schritt oder als Gesamtlänge
+rozteč P	abstand P
+rozteč ve druhém směru	Abstand in der zweiten Richtung
+řada průchozích děr ISO 273 (informativní)	Reihe der Durchgangsbohrungen ISO 273 (informativ)
+řez rovinou plochy	Schnitt mit der Ebene einer Fläche
+setback – vzdálenost konce zaoblení od vrcholu	Rückversatz – Abstand des Rundungsendes vom Eckpunkt
+setback | eliptické	rückversatz | elliptisch
+setback pro jednotlivé vrcholy [{at: Ref, d}]	Rückversatz für einzelne Eckpunkte [{at: Ref, d}]
+setback S	rückversatz S
+seznam indexů od 0	Liste von Indizes ab 0
+seznam odkazů (JSON Ref[])	Liste von Referenzen (JSON Ref[])
+seznam prvků	Liste von Elementen
+seznam skic	Liste von Skizzen
+skica (název, id nebo $last)	Skizze (Name, ID oder $last)
+skica (název, id, $last)	Skizze (Name, ID, $last)
+skica křivky / bodů / obrysu	Skizze der Kurve / Punkte / Kontur
+skica plocha F3 | skica rovina "Rovina 1"	skizze fläche F3 | skizze ebene "Ebene 1"
+skica s otevřenou čarou	Skizze mit offener Linie
+skica XY|XZ|YZ [odsazení N] · skica počátek … normála …	skizze XY|XZ|YZ [versatz N] · skizze ursprung … normale …
+skica XY|XZ|YZ [odsazení N]: … · skica počátek x y z normála nx ny nz: … · skica plocha F3: … · skica rovina "Rovina 1": …	skizze XY|XZ|YZ [versatz N]: … · skizze ursprung x y z normale nx ny nz: … · skizze fläche F3: … · skizze ebene "Ebene 1": …
+skořepina T	schale T
+skořepina T [otevřít <pravidlo>|F3 F5]	schale T [öffnen <regel>|F3 F5]
+sloučit <cíl> <nástroj>	kombinieren <ziel> <werkzeug>
+sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]	kombinieren <ziel> <werkzeug> [abziehen|schnittmenge] [behalten]
+směr (JSON Direction)	Richtung (JSON Direction)
+směr +Z	richtung +Z
+směr hrana E3 | směr body V1 V5 | směr osa "Osa 1"	richtung kante E3 | richtung punkte V1 V5 | richtung achse "Achse 1"
+směr na konci	Richtung am Ende
+směr na začátku	Richtung am Anfang
+směr odkazem (hrana, osa, 2 body) – má přednost před direction	Richtung per Referenz (Kante, Achse, 2 Punkte) – hat Vorrang vor direction
+směr osy X (ortogonalizuje se vůči Z)	Richtung der X-Achse (wird gegen Z orthogonalisiert)
+směr osy X roviny	Richtung der X-Achse der Ebene
+směr osy Z	Richtung der Z-Achse
+směr řady	Reihenrichtung
+směr tahu (vyhození)	Zugrichtung (Entformung)
+směr vx vy vz | sklon úhel	richtung vx vy vz | neigung winkel
+směr X|x y z	richtung X|x y z
+směr Y	richtung Y
+směr: kolmo na skicu / v rovině skici	Richtung: senkrecht zur Skizze / in der Skizzenebene
+směr: X | Y | Z | -Z | vektor 1;0;1 | JSON	Richtung: X | Y | Z | -Z | Vektor 1;0;1 | JSON
+společná pole všech prvků: {0}	gemeinsame Felder aller Elemente: {0}
+společná pole: name (název), suppressed (potlačit ano/ne), body (cílové těleso)	gemeinsame Felder: name (Name), suppressed (unterdrücken ja/nein), body (Zielkörper)
+srazit C	fase C
+srazit C [hrany <pravidlo>|E3 E7] · srazit D úhel A plocha F3 [hrany …] · srazit D1 D2 plocha F3 [hrany …]	fase C [kanten <regel>|E3 E7] · fase D winkel A fläche F3 [kanten …] · fase D1 D2 fläche F3 [kanten …]
+srazit D úhel A plocha F3 | srazit D1 D2 plocha F3	fase D winkel A fläche F3 | fase D1 D2 fläche F3
+srazit D1 D2 plocha F3	fase D1 D2 fläche F3
+sražení s úhlem potřebuje referenční plochu (na ní se měří vzdálenost): srazit 2 úhel 30 plocha F3 [hrany …]	eine Fase mit Winkel braucht eine Bezugsfläche (auf ihr wird der Abstand gemessen): fase 2 winkel 30 fläche F3 [kanten …]
+stoupání P	steigung P
+střed hrany E{0}	Mitte Kante E{0}
+střed kružnice E{0}	Mittelpunkt Kreis E{0}
+střed otáčení / měřítka	Dreh- / Skalierungszentrum
+střed plochy F{0}	Mitte Fläche F{0}
+střed plochy potřebuje číslo plochy: na střed plochy F3	Flächenmitte braucht eine Flächennummer: bei mitte fläche F3
+střed podstavy	Mitte der Grundfläche
+střed textu odkazem (promítne se do roviny)	Textmitte per Referenz (wird in die Ebene projiziert)
+střed textu v rovině	Textmitte in der Ebene
+střední plochy (plné zaoblení)	mittlere Flächen (Vollrundung)
+středová křivka	Mittellinienkurve
+střídavé řady (posun o půl kroku)	versetzte Reihen (um einen halben Schritt verschoben)
+stupňovitý	gestuft
+stupňovitý úkos (každý úsek od vlastní roviny)	gestufte Schräge (jeder Abschnitt von eigener Ebene)
+symetricky (střední rovina)	symmetrisch (Mittelebene)
+symetricky na obě strany	symmetrisch zu beiden Seiten
+symetricky na obě strany od skici	symmetrisch zu beiden Seiten der Skizze
+šířit po tečně navazujících hranách	entlang tangentialer Kanten fortsetzen
+šířit po tečně navazujících plochách	entlang tangentialer Flächen fortsetzen
+šroubovitá pružina: D = střední průměr (osa drátu), stoupání a počet závitů nebo volná délka, průměr drátu; poloha = začátek osy; EN spring D pitch P turns N wire d, DE feder D steigung P windungen N draht d	Schraubenfeder: D = mittlerer Durchmesser (Drahtmittellinie), Steigung und Windungszahl oder freie Länge, Drahtdurchmesser; Position = Anfang der Achse; feder D steigung P windungen N draht d
+těleso (název)	Körper (Name)
+těleso N	körper N
+tenká stěna (JSON Thin)	dünne Wand (JSON Thin)
+tenká stěna {side: one|two|mid|in, t1, t2}	dünne Wand {side: one|two|mid|in, t1, t2}
+text "ABC"	text "ABC"
+text "ABC" výška H hloubka D v x y [z] [gravírovat]	text "ABC" höhe H tiefe D bei x y [z] [gravieren]
+text ✓	Text ✓
+textový příkaz: {0}	Textbefehl: {0}
+tloušťka stěny	Wanddicke
+tloušťka žebra	Rippendicke
+trubka	Rohr
+trubka D d H	rohr D d H
+trubka D d H [v x y z | na …] [osa …] [odebrat|průnik|nové]	rohr D d H [bei x y z | bei …] [achse …] [abziehen|schnittmenge|neukörper]
+trubka vnější / vnitřní průměr × délka; poloha = střed podstavy	Rohr Außen- / Innendurchmesser × Länge; Position = Mitte der Grundfläche
+třetí vzdálenost (vrchol)	dritter Abstand (Eckpunkt)
+úhel (vzdálenost + úhel)	Winkel (Abstand + Winkel)
+úhel 360	winkel 360
+úhel a	winkel a
+úhel A	winkel A
+úhel druhým směrem	Winkel in der zweiten Richtung
+úhel otočení	Drehwinkel
+úhel rotace (360 = celá otáčka)	Rotationswinkel (360 = volle Umdrehung)
+úhel rotace musí být 0–360°: rotovat 180 osa hrana E3	der Rotationswinkel muss 0–360° betragen: rotieren 180 achse kante E3
+úhel úkosu	Schrägungswinkel
+ukončení (JSON Extent)	Abschluss (JSON Extent)
+ukončení druhého směru	Abschluss der zweiten Richtung
+ukončení: blind, throughAll, toNext, toFace, toVertex, offsetFromFace, toBody	Abschluss: blind, throughAll, toNext, toFace, toVertex, offsetFromFace, toBody
+ukončení: k vrcholu, k ploše, odsazeně od plochy	Abschluss: bis Eckpunkt, bis Fläche, versetzt von Fläche
+ukončení: na vzdálenost, skrz vše, k dalšímu, k vrcholu, k ploše, odsazeně, k tělesu, střední rovina	Abschluss: auf Abstand, durch alles, bis nächste, bis Eckpunkt, bis Fläche, versetzt, bis Körper, Mittelebene
+úkos A	schräge A
+úkos A plochy <pravidlo|F1 F2…> [dělicí "Skica"] [stupňovitý] [směr +Z] [rovina XY odsazení N]	schräge A flächen <regel|F1 F2…> [trennlinie "Skizze"] [gestuft] [richtung +Z] [ebene XY versatz N]
+uzavřené (poslední profil zpět na první)	geschlossen (letztes Profil zurück zum ersten)
+užitečná délka závitu	nutzbare Gewindelänge
+v x1 y1 z1 v x2 y2 z2 (souřadnice)	bei x1 y1 z1 bei x2 y2 z2 (Koordinaten)
+váha tečny na konci	Tangentengewicht am Ende
+váha tečny na začátku	Tangentengewicht am Anfang
+válec	Zylinder
+válec D H	zylinder D H
+válec D H [v x y z | na …] [osa …] [odebrat|průnik|nové]	zylinder D H [bei x y z | bei …] [achse …] [abziehen|schnittmenge|neukörper]
+vazba <druh> e1 e2	bedingung <art> e1 e2
+vektor x;y;z	Vektor x;y;z
+velikost zobrazení	Anzeigegröße
+více poloh (odkazy na body)	mehrere Positionen (Punktreferenzen)
+více zdrojových prvků	mehrere Quellelemente
+vlastní textový příkaz nemá – jen prvek {0} …, upravit nebo JSON	kein eigener Textbefehl – nur element {0} …, bearbeiten oder JSON
+vnější průměr	Außendurchmesser
+vnitřní	innen
+vnitřní průměr (0 = plný válec)	Innendurchmesser (0 = Vollzylinder)
+vnitřní závit (v díře)	Innengewinde (in einer Bohrung)
+vodicí křivka	Führungskurve
+vodicí křivky	Führungskurven
+vrchol V3 S2	ecke V3 S2
+vrcholový úhel kuželového zahloubení (90)	Spitzenwinkel der Kegelsenkung (90)
+vrcholy (druh vertex) – indexy od 0	Eckpunkte (Art vertex) – Indizes ab 0
+vrcholy odkazem	Eckpunkte per Referenz
+vrtat ve směru osy (výchozí proti ose – shora dolů)	in Achsrichtung bohren (standardmäßig gegen die Achse – von oben nach unten)
+vše textem	alles per Text
+všechna pole typu prvku pro „prvek <typ> klíč=hodnota“ a „upravit“: název, druh hodnoty, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem (typ i slovem příkazu: díra, kužel, pružina; u rozšíření jeho parametry); bez typu = přehled typů a polí, která jdou zadat jen přes prvek	alle Felder eines Elementtyps für „element <typ> schlüssel=wert“ und „bearbeiten“: Name, Werteart, Einheit, erlaubte Werte, Standard / Pflicht, Bedeutung und Schreibweise im eigenen Textbefehl (Typ auch per Befehlswort: bohrung, kegel, feder; bei Erweiterungen deren Parameter); ohne Typ = Übersicht der Typen und der Felder, die nur über element gehen
+výčet	Aufzählung
+výchozí {0}	Standard {0}
+vystouplý / gravírovaný	erhaben / graviert
+vysunout H	extrudieren H
+výška H	höhe H
+výška písma	Schrifthöhe
+výška po ose	Höhe entlang der Achse
+XY|XZ|YZ, z = odsazení	XY|XZ|YZ, z = Versatz
+začátek (JSON StartFrom)	Anfang (JSON StartFrom)
+začátek hrany E{0}	Anfang Kante E{0}
+začátek osy	Anfang der Achse
+začátek závitu na ose	Gewindeanfang auf der Achse
+začátek: rovina skici, odsazení, od plochy, od vrcholu	Anfang: Skizzenebene, Versatz, ab Fläche, ab Eckpunkt
+zahloubení | kuželové | závit	senkung | kegelsenkung | gewinde
+zahloubení D2 H2	senkung D2 H2
+základní rovina zrcadlení	Grundebene der Spiegelung
+zaoblit R	verrunden R
+zaoblit R [hrany <pravidlo>] · zaoblit R hrany … setback S · zaoblit eliptické D1 D2 hrany …	verrunden R [kanten <regel>] · verrunden R kanten … rückversatz S · verrunden elliptisch D1 D2 kanten …
+závit (M8, M18×1,5)	Gewinde (M8, M18×1,5)
+závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat]	gewinde M18×1,5 länge L [bei x y z | bei …] [achse …] [innen] [modellieren]
+závit M18×1,5 délka L [vnitřní] [modelovat]	gewinde M18×1,5 länge L [innen] [modellieren]
+závit M8	gewinde M8
+závit nemá operaci – kosmetický je jen ve výkrese, „modelovat“ vyřízne drážky: {0}	ein Gewinde hat keine Operation – kosmetisch nur in der Zeichnung, „modellieren“ schneidet die Rillen: {0}
+závity N | délka L	windungen N | länge L
+zdrojové těleso (prázdné = aktivní)	Quellkörper (leer = aktiv)
+zdrojový prvek (název, id nebo $last)	Quellelement (Name, ID oder $last)
+zesílit ven (vnější rozměr roste)	nach außen verstärken (Außenmaß wächst)
+zkroucení po délce	Verdrehung über die Länge
+zkroucení po dráze	Verdrehung entlang der Bahn
+zrcadlit jen vybrané prvky (jinak celé těleso)	nur ausgewählte Elemente spiegeln (sonst den ganzen Körper)
+zrcadlit plocha F3 | zrcadlit rovina "Rovina 1"	spiegeln fläche F3 | spiegeln ebene "Ebene 1"
+zrcadlit plocha potřebuje číslo rovinné plochy: zrcadlit plocha F3 [odsazení N]	spiegeln fläche braucht die Nummer einer ebenen Fläche: spiegeln fläche F3 [versatz N]
+zrcadlit XY|XZ|YZ	spiegeln XY|XZ|YZ
+zrcadlit XY|XZ|YZ [odsazení N] · zrcadlit plocha F3 [odsazení N] · zrcadlit rovina "Rovina 1" [odsazení N]	spiegeln XY|XZ|YZ [versatz N] · spiegeln fläche F3 [versatz N] · spiegeln ebene "Ebene 1" [versatz N]
+ × {0}× po {1}, směr {2}	 × {0}× im Abstand {1}, Richtung {2}
+ symetricky	 symmetrisch
+, jen {0} prvků	, nur {0} Elemente
+{0} × {1} mm od plochy {2}, hrany {3}	{0} × {1} mm von Fläche {2}, Kanten {3}
+{0} mm × {1}° od plochy {2}, hrany {3}	{0} mm × {1}° von Fläche {2}, Kanten {3}
+{0}°{1}, {2}, osa {3}	{0}°{1}, {2}, Achse {3}
+kruhové {0}× / {1}°, osa {2}	kreisförmig {0}× / {1}°, Achse {2}
+lineární {0}× po {1}, směr {2}{3}	linear {0}× im Abstand {1}, Richtung {2}{3}
+osa {0} skici	Skizzenachse {0}
+osa plochy F{0}	Achse der Fläche F{0}
+osa x skici	x-Achse der Skizze
+osa y skici	y-Achse der Skizze
+pomocná rovina „{0}“{1}{2}	Hilfsebene „{0}“{1}{2}
+rovina plochy F{0}{1}{2}	Ebene der Fläche F{0}{1}{2}
+# oprava po kontrole (12. vlna)
+{0}: díra Ø{1} není vrták závitu {2} (Ø{3}) – závit v popisu díry doplňte ručně	{0}: Bohrung Ø{1} ist nicht der Kernbohrer des Gewindes {2} (Ø{3}) – Gewinde in der Bohrungsangabe von Hand ergänzen
+{0}: díra vrtáku Ø{1} pro vnitřní závit v geometrii nenalezena – popis závitu chybí	{0}: Kernbohrung Ø{1} für das Innengewinde in der Geometrie nicht gefunden – Gewindeangabe fehlt
+{0}: operace „{1}“ a „{2}“ se vylučují – zadejte jen jednu: přidat | odebrat | průnik | nové	{0}: die Operationen „{1}“ und „{2}“ schließen sich aus – nur eine angeben: hinzufügen | abziehen | schnittmenge | neukörper
+{0}: poloha odkazem není vyřešená – popis díry chybí (přestavte model)	{0}: Position per Referenz ist nicht aufgelöst – Bohrungsangabe fehlt (Modell neu berechnen)
+{0}: poloha odkazem není vyřešená – popis závitu chybí (přestavte model)	{0}: Position per Referenz ist nicht aufgelöst – Gewindeangabe fehlt (Modell neu berechnen)
+kužel / komolý kužel: D1 = průměr podstavy v poloze, D2 = průměr ve výšce H po ose (0 = špička); „odebrat“ = kuželový otvor, zahloubení, sedlo hrotu (v ústí díry na výkrese ⌵ Ø × úhel)	Kegel / Kegelstumpf: D1 = Grunddurchmesser an der Position, D2 = Durchmesser in Höhe H entlang der Achse (0 = Spitze); „abziehen“ = Kegelbohrung, Senkung, Spitzensitz (an einer Bohrungsmündung zeigt die Zeichnung ⌵ Ø × Winkel)
+kvádr; výchozí roh v poloze (počátek); „střed“ = poloha je střed kvádru („střed F1“ / „střed V3“ = střed v odkazu, „na střed plochy F1“ = roh); „osa“ = rozměr Z po ose, nejkratší otočení kolem polohy (osa -Z: Y a Z záporně; osa X: X 0…Z, Z −X…0; osa Y: Y 0…Z, Z −Y…0)	Quader; standardmäßig liegt die Ecke an der Position (Ursprung); „mitte“ = Position ist die Quadermitte („mitte F1“ / „mitte V3“ = Mitte in der Referenz, „bei mitte fläche F1“ = Ecke); „achse“ = das Z-Maß läuft entlang der Achse, kürzeste Drehung um die Position (Achse -Z: Y und Z negativ; Achse X: X 0…Z, Z −X…0; Achse Y: Y 0…Z, Z −Y…0)
+odkaz na plochu (JSON Ref; F3 = index 2)	Flächenreferenz (JSON Ref; F3 = Index 2)
+osa vektorem má tři složky – číslo „{0}“ za „{1} {2}“ je navíc (rozměry pište hned za příkaz)	eine Vektorachse hat drei Komponenten – die Zahl „{0}“ nach „{1} {2}“ ist zu viel (Maße direkt nach dem Befehl schreiben)
+Plocha F{0} není válcová ani kuželová – osu má jen válcová / kuželová plocha; střed kruhové rovinné plochy zadejte její kruhovou hranou (osa hrana E…).	Fläche F{0} ist weder zylindrisch noch kegelig – nur eine Zylinder- / Kegelfläche hat eine Achse; die Mitte einer kreisförmigen ebenen Fläche über ihre Kreiskante angeben (achse kante E…).
+rotovat	rotieren
+válec průměr × výška; poloha = střed podstavy, válec roste ve směru osy (výchozí +Z); „odebrat“ = válcový otvor po libovolné ose (na výkrese popis díry Ø ↧ hloubka / skrz)	Zylinder Durchmesser × Höhe; Position = Mitte der Grundfläche, der Zylinder wächst entlang der Achse (Standard +Z); „abziehen“ = zylindrische Öffnung entlang beliebiger Achse (die Zeichnung zeigt eine Bohrungsangabe Ø ↧ Tiefe / durch)
