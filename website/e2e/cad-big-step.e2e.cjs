@@ -67,10 +67,11 @@ const fmtPerf = (list, from) => {
 };
 
 /** otevře soubor přes výběr souboru a čeká na první obraz a na dokončení; vrací časy */
-async function openAndWait(p, file, label, { expectAsm = true, limit = 300000 } = {}) {
+async function openAndWait(p, file, label, { expectAsm = true, limit = 300000, insert = false } = {}) {
   const t0 = Date.now();
   const px0 = await modelPixels(p);
-  await p.locator('input[type=file]').first().setInputFiles(file);
+  // Otevřít (Ctrl+O) otevírá vždy v nové záložce; do otevřené sestavy vkládá zvláštní vstup Vložit (data-insert-input)
+  await p.locator(insert ? 'input[data-insert-input]' : 'input[type=file]').first().setInputFiles(file);
   let first = null;
   let done = null;
   let doneText = '';
@@ -188,7 +189,7 @@ async function openAndWait(p, file, label, { expectAsm = true, limit = 300000 } 
   // ── 4. sestava v metrech = stejné rozměry v mm; v záložce sestavy jako podsestava ──
   await p.evaluate(() => window.mncad.run('nová sestava Linka'));
   await p.waitForTimeout(1200);
-  const r4 = await openAndWait(p, f10m, '12 MB v metrech v záložce sestavy', { limit: 180000 });
+  const r4 = await openAndWait(p, f10m, '12 MB v metrech v záložce sestavy', { limit: 180000, insert: true });
   ok(r4.first !== null && r4.first < 60000 && /zobrazena za/.test(r4.doneText), `sestava v metrech vložena do otevřené sestavy a zobrazena (první obraz ${r4.first} ms)`);
   const d4 = await p.evaluate(() => window.mncad.getDocument());
   ok(d4.name === 'Linka' && (d4.components || []).length === 1 && d4.components[0].source.kind === 'asm', 'v otevřené sestavě se soubor vloží jako podsestava');
