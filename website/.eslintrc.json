@@ -1,1 +1,39 @@
-{ "root": true, "extends": "next/core-web-vitals" }
+{
+  "root": true,
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["src/cad/engine/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "src/cad/cli/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+      "plugins": ["@typescript-eslint"],
+      "rules": {
+        "@typescript-eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react", "message": "engine/CLI runs without React (CAD-HEADLESS-NAVRH 2.2)" },
+              { "name": "react-dom", "message": "engine/CLI runs without React (CAD-HEADLESS-NAVRH 2.2)" },
+              { "name": "next", "message": "engine/CLI runs without Next.js (CAD-HEADLESS-NAVRH 2.2)" }
+            ],
+            "patterns": [
+              { "group": ["react/*", "react-dom/*", "next/*", "@next/*"], "message": "engine/CLI runs without React/Next.js (CAD-HEADLESS-NAVRH 2.2)" },
+              { "group": ["@/components", "@/components/*", "**/components", "**/components/**"], "message": "engine/CLI must not import UI components" },
+              { "group": ["**/lib/save-file", "**/lib/save-file.*"], "message": "engine/CLI writes files only through host.files (FileSink)" },
+              { "group": ["**/client", "**/client.*"], "allowTypeImports": true, "message": "kernel client only as `import type` (KernelApi); the kernel comes from host.kernel" }
+            ]
+          }
+        ],
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "ImportExpression[source.value=/(^|\\u002F)(client|save-file)(\\.[a-z]+)?$|^(react|react-dom|next)(\\u002F|$)|^@next\\u002F|(^|\\u002F)components(\\u002F|$)/]",
+            "message": "engine/CLI: no dynamic import() of React/Next.js, UI components, save-file or the kernel client (CAD-HEADLESS-NAVRH 2.2)"
+          },
+          {
+            "selector": "CallExpression[callee.name='require'][arguments.0.value=/(^|\\u002F)(client|save-file)(\\.[a-z]+)?$|^(react|react-dom|next)(\\u002F|$)|^@next\\u002F|(^|\\u002F)components(\\u002F|$)/]",
+            "message": "engine/CLI: no require() of React/Next.js, UI components, save-file or the kernel client (CAD-HEADLESS-NAVRH 2.2)"
+          }
+        ]
+      }
+    }
+  ]
+}

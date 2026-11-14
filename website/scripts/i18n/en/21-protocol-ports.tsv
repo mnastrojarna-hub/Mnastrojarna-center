@@ -1,0 +1,78 @@
+# Vlna 14 A1 – protokol běhu, kódy hlášek, porty enginu (src/cad/engine/*)
+záložka „{0}“ neexistuje – otevřené: {1}	tab “{0}” does not exist – open: {1}
+soubor relace není platný JSON	the session file is not valid JSON
+neznámý formát relace (očekáváno v: 1 a seznam záložek)	unknown session format (expected v: 1 and a list of tabs)
+záložka {0} v relaci není dokument	tab {0} in the session is not a document
+záložka {0} v relaci nemá název dokumentu (text)	tab {0} in the session has no document name (text)
+záložka {0} v relaci má neplatný seznam „{1}“	tab {0} in the session has an invalid list “{1}”
+data importů v relaci nejsou mapa id → base64	the import data of the session is not a map id → base64
+data importu „{0}“ v relaci nejsou platné base64	the import data “{0}” in the session is not valid base64
+název souboru „{0}“ míří mimo výstupní složku	file name “{0}” points outside the output folder
+soubor „{0}“ není k dispozici – dostupné: {1}	file “{0}” is not available – available: {1}
+operace „{0}“ už má obsluhu – každý druh operace má jednoho vlastníka	operation “{0}” already has a handler – each operation kind has one owner
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key), v kódu jako literál tr("…") nejsou
+časový limit {0} s vypršel	time limit of {0} s exceeded
+překročen limit paměti {0} MB	memory limit of {0} MB exceeded
+výpočet spadl: {0}	the computation crashed: {0}
+běh přerušen	run interrupted
+výpočet zrušen – dokument zůstal beze změny	computation cancelled – the document is unchanged
+příkaz funguje jen v aplikaci v prohlížeči: {0}	the command works only in the browser app: {0}
+písma pro PDF a text modelu nejsou k dispozici	fonts for PDF and model text are not available
+bez 3D okna nemá příkaz účinek: {0}	without a 3D view the command has no effect: {0}
+historie zpět/znovu se v relaci neukládá	undo/redo history is not stored in the session
+soubor „{0}“ už existuje – uloženo jako „{1}“	file “{0}” already exists – saved as “{1}”
+úložiště odkazů odmítlo zápis: {0}	the link store rejected the upload: {0}
+krátký odkaz se nepodařil – použit dlouhý odkaz	the short link failed – a long link is used
+odkaz není komprimovaný (prostředí neumí deflate-raw)	the link is not compressed (the environment lacks deflate-raw)
+chyba zápisu: {0}	syntax error: {0}
+neznámý příkaz „{0}“	unknown command “{0}”
+nevyužitá slova: {0}	unused words: {0}
+chybějící souřadnice doplněna nulou: {0}	missing coordinate set to zero: {0}
+neznámá osa „{0}“	unknown axis “{0}”
+odporující si volby – použito „{0}“, zahozeno „{1}“	conflicting options – used “{0}”, dropped “{1}”
+příkaz selhal: {0}	command failed: {0}
+stavba selhala: {0}	build failed: {0}
+prvek „{0}“ se nepostavil: {1}	feature “{0}” failed to build: {1}
+prvek „{0}“: {1}	feature “{0}”: {1}
+objem a hmotnost jsou přibližné (ze sítě)	volume and mass are approximate (from the mesh)
+objem se nepodařilo změřit – uvedena 0	the volume could not be measured – 0 reported
+hodnota {0} upravena na {1} ({2})	value {0} adjusted to {1} ({2})
+přidání bez tělesa – vytvořeno nové těleso	add without a body – a new body was created
+duplicitní id prvku „{0}“ nahrazeno novým	duplicate feature id “{0}” replaced with a new one
+název „{0}“ je obsazený – použit „{1}“	name “{0}” is taken – “{1}” used
+výchozí název očíslován: „{0}“	default name numbered: “{0}”
+prázdná záložka „{0}“ nahrazena dokumentem „{1}“	empty tab “{0}” replaced by document “{1}”
+přepnutí záložky nedoběhlo do {0} s	switching tabs did not finish within {0} s
+díra bez hloubky – vrtá se skrz	hole without depth – drilled through
+zahloubení a kuželové zahloubení zároveň – použito {0}	counterbore and countersink together – {0} used
+zahloubení Ø{0} je menší než závit {1}	counterbore Ø{0} is smaller than thread {1}
+díra neleží na povrchu – umístěna na obálku tělesa	the hole is not on the surface – placed on the body's bounding box
+zadaný průměr {0} nahrazen průměrem vrtáku {1} pro závit {2}	given diameter {0} replaced by tap drill diameter {1} for thread {2}
+plocha podle pravidla nenalezena – použita nejkrajnější	no face matches the rule – the outermost one is used
+více vyhovujících ploch – použita první	several matching faces – the first one is used
+název instance „{0}“ se zatím neukládá	instance name “{0}” is not stored yet
+komponenta je kopie dílu – pozdější změny dílu se nepromítnou	the component is a copy of the part – later changes to the part are not reflected
+podsestavy hlubší než {0} úrovní se vynechají	subassemblies deeper than {0} levels are skipped
+díl „{0}“ má víc než {1} ploch – načteno jen prvních {1}	part “{0}” has more than {1} faces – only the first {1} were loaded
+jádro se restartovalo – mezipaměti sestavy vyprázdněny	the kernel restarted – assembly caches cleared
+plocha F{0} dílu „{1}“ není k dispozici	face F{0} of part “{1}” is not available
+instance „{0}“ už v sestavě je	instance “{0}” is already in the assembly
+kolize „{0}“ × „{1}“ ({2} mm³)	collision “{0}” × “{1}” ({2} mm³)
+šroub v závitu „{0}“ × „{1}“	screw in thread “{0}” × “{1}”
+prstenec pod hlavou šroubu „{0}“ × „{1}“	ring under the screw head “{0}” × “{1}”
+kolizi „{0}“ × „{1}“ nelze vyhodnotit	collision “{0}” × “{1}” cannot be evaluated
+skryté komponenty se nekontrolují ({0})	hidden components are not checked ({0})
+pohyb porušuje vazbu „{0}“ v kroku {1}	the motion violates mate “{0}” in step {1}
+vypsáno {0} z {1}	{0} of {1} listed
+prvek díry „{0}“ nemá v geometrii díru	hole feature “{0}” has no hole in the geometry
+model se od reference liší: {0}	the model differs from the reference: {0}
+materiál „{0}“ zadán jen označením – hustota {1} g/cm³ ({2})	material “{0}” given only by designation – density {1} g/cm³ ({2})
+materiál „{0}“ zařazen jako {1}	material “{0}” classified as {1}
+list {0}: {1}	sheet {0}: {1}
+rovina řezu neprotíná těleso: {0}	the section plane does not cut the body: {0}
+překryv na listu {0}: {1}	overlap on sheet {0}: {1}
+kóta {0} nemá toleranci	dimension {0} has no tolerance
+předloha se liší: {0}	the reference drawing differs: {0}
+chyba: {0}	error: {0}
+varování: {0}	warning: {0}
+poznámka: {0}	note: {0}

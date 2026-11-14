@@ -1,0 +1,5 @@
+# Welle 14 A3 motion-clash – nicht erfüllte Verknüpfungen je Schritt der Bewegungsstudie (motion.ts)
+ … a další úseky s nesplněnými vazbami: {0}	 … und weitere Abschnitte mit nicht erfüllten Verknüpfungen: {0}
+motor {0}	Antrieb {0}
+# ⚠ motion.conflict – týž klíč a překlad jako registr kódů balíku A1 (engine/codes.ts, 21-protocol-ports.tsv)
+pohyb porušuje vazbu „{0}“ v kroku {1}	die Bewegung verletzt die Verknüpfung „{0}“ in Schritt {1}

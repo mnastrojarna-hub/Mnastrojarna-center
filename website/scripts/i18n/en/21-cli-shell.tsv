@@ -1,0 +1,84 @@
+# Vlna 14 A2 – CLI mncad a mncad serve (src/cad/cli/*)
+--allow-remote vyžaduje výslovný --token-file (token se negeneruje automaticky)	--allow-remote requires an explicit --token-file (no token is generated automatically)
+2D výkres nemá 3D model pro {0}	a 2D drawing has no 3D model for {0}
+adresa „{0}“ není místní (loopback) – naslouchat na síti jde jen s --allow-remote a --token-file	address “{0}” is not local (loopback) – listening on the network requires --allow-remote and --token-file
+chybí nebo neplatný token (Authorization: Bearer …)	missing or invalid token (Authorization: Bearer …)
+chybí skript – mncad run <skript.txt|-> (mncad help)	script missing – mncad run <script.txt|-> (mncad help)
+dokument „{0}“ (--doc) není otevřený – otevřené: {1}	document “{0}” (--doc) is not open – open: {1}
+export 2D výkresu do {0}	export of a 2D drawing to {0}
+export {0}	export {0}
+fronta je plná ({0} čekajících požadavků)	the queue is full ({0} waiting requests)
+hlavička Host „{0}“ není povolená (ochrana proti DNS rebinding)	Host header “{0}” is not allowed (DNS rebinding protection)
+jádro CAD není načtené (cad.worker)	the CAD kernel is not loaded (cad.worker)
+jádro CAD se nenačetlo: {0}	the CAD kernel failed to load: {0}
+jádro připraveno za {0} ms	kernel ready in {0} ms
+jádro připraveno za {0} ms (WASM {1} MB, RSS {2} MB)	kernel ready in {0} ms (WASM {1} MB, RSS {2} MB)
+Kódy ukončení: 0 bez chyb · 1 chyby ✗ · 2 přísný režim zastaven · 3 chyba použití nebo souboru · 4 pád výpočtu · 5 časový limit · 6 limit paměti · 130 přerušeno	Exit codes: 0 no errors · 1 errors ✗ · 2 strict mode stopped · 3 usage or file error · 4 computation crashed · 5 time limit · 6 memory limit · 130 interrupted
+metoda {0} není povolená	method {0} is not allowed
+MN CAD bez prohlížeče – textový skript dovnitř; chyby s čísly řádků, měření, soubory a odkaz ven.	MN CAD without a browser – a text script in; errors with line numbers, measurements, files and a link out.
+mncad help guide = celý návod pro AI agenty · mncad help commands = seznam textových příkazů	mncad help guide = the full guide for AI agents · mncad help commands = list of text commands
+mncad serve: naslouchá na {0} (token: {1}; Ctrl+C ukončí)	mncad serve: listening on {0} (token: {1}; Ctrl+C stops)
+mncad serve: server nelze spustit: {0}	mncad serve: cannot start the server: {0}
+mncad serve: vygenerován token do „{0}“ (práva 0600)	mncad serve: token generated in “{0}” (mode 0600)
+mncad: neočekávaná chyba: {0}	mncad: unexpected error: {0}
+mncad: relaci „{0}“ nelze přečíst: {1}	mncad: cannot read session “{0}”: {1}
+mncad: selftest selhal: {0}	mncad: selftest failed: {0}
+mncad: skript „{0}“ nelze přečíst: {1}	mncad: cannot read script “{0}”: {1}
+mncad: složka vstupů „{0}“ neexistuje	mncad: input folder “{0}” does not exist
+mncad: výstupní složku „{0}“ nelze použít: {1}	mncad: cannot use output folder “{0}”: {1}
+mncad: {0} se nepodařilo zapsat: {1}	mncad: could not write {0}: {1}
+model nemá těleso	the model has no solid
+nadbytečný argument „{0}“	unexpected argument “{0}”
+neznámá adresa {0}	unknown address {0}
+neznámá volba „{0}“ příkazu {1} – mncad help	unknown option “{0}” of command {1} – mncad help
+neznámé pole „{0}“	unknown field “{0}”
+neznámé téma nápovědy „{0}“ – guide, commands	unknown help topic “{0}” – guide, commands
+neznámý formát „{0}“ – {1}	unknown format “{0}” – {1}
+neznámý jazyk „{0}“ – cs, en, de	unknown language “{0}” – cs, en, de
+neznámý příkaz „{0}“ – run, serve, help, version, selftest	unknown command “{0}” – run, serve, help, version, selftest
+název vstupního souboru „{0}“ není přípustný	input file name “{0}” is not allowed
+operace jádra „{0}“ ve vlákně běhu zatím chybí	kernel operation “{0}” is not yet available in the run thread
+otevřeno „{0}“	opened “{0}”
+otevřít „{0}“ (zatím jen .mncad)	open “{0}” (only .mncad so far)
+pole „{0}“ musí být {1}	field “{0}” must be {1}
+Použití:	Usage:
+požadavky z prohlížeče (hlavička Origin) nejsou povolené	requests from a browser (Origin header) are not allowed
+Protokol: stručný (≤ 2 048 B, přebytek v protocol-full.txt), --json = jeden JSON objekt, --full = celý protokol.	Protocol: short (≤ 2,048 B, overflow in protocol-full.txt), --json = one JSON object, --full = the full protocol.
+písma se nečetla přes shim	the fonts were not read through the shim
+písmo „{0}“ není ve složce písem	font “{0}” is not in the fonts folder
+relace „{0}“ neexistuje	session “{0}” does not exist
+relaci nelze načíst: {0}	cannot load the session: {0}
+return: "paths" vyžaduje server spuštěný s --out	return: "paths" requires the server to be started with --out
+Sec-Fetch-Site „{0}“ není povolené	Sec-Fetch-Site “{0}” is not allowed
+soubor tokenu „{0}“ mohou číst i jiní uživatelé (práva {1}) – nastavte chmod 600	token file “{0}” is readable by other users (mode {1}) – run chmod 600
+soubor tokenu „{0}“ neexistuje	token file “{0}” does not exist
+soubor tokenu „{0}“ není soubor	token file “{0}” is not a file
+soubor „{0}“ je příliš velký ({1} MB, nejvýš {2} MB)	file “{0}” is too large ({1} MB, at most {2} MB)
+soubor „{0}“ není base64	file “{0}” is not base64
+token v „{0}“ je kratší než {1} znaků nebo obsahuje mezery	the token in “{0}” is shorter than {1} characters or contains spaces
+tělo je větší než {0} MB	the body is larger than {0} MB
+tělo musí být application/json, ne „{0}“	the body must be application/json, not “{0}”
+tělo musí být objekt JSON	the body must be a JSON object
+tělo není platný JSON: {0}	the body is not valid JSON: {0}
+volba „{0}“ je zadaná dvakrát	option “{0}” is given twice
+volba „{0}“ nemá hodnotu	option “{0}” takes no value
+volba „{0}“ potřebuje adresu http(s)://… nebo off	option “{0}” needs an http(s)://… address or off
+volba „{0}“ potřebuje celé číslo, ne „{1}“	option “{0}” needs an integer, not “{1}”
+volba „{0}“: neznámý pohled „{1}“ – model, drawing	option “{0}”: unknown view “{1}” – model, drawing
+volba „{0}“: {1} je mimo rozsah {2}–{3}	option “{0}”: {1} is outside the range {2}–{3}
+volbě „{0}“ chybí hodnota	option “{0}” is missing a value
+výstupní složku „{0}“ nelze použít: {1}	cannot use output folder “{0}”: {1}
+Výstupy: --out (výchozí ./mncad-out); --formats auto = STEP + .mncad hlavního dokumentu a PDF listů výkresu.	Outputs: --out (default ./mncad-out); --formats auto = STEP + .mncad of the main document and PDF of the drawing sheets.
+základ sdílení musí být http(s):// – „{0}“	the share base must be http(s):// – “{0}”
+{0} výkres	{0} drawing
+{0} výkres {1}	{0} drawing {1}
+„{0}“ není dokument MN CAD (chybí název nebo prvky)	“{0}” is not an MN CAD document (name or features missing)
+„{0}“ není kód hlášky (např. select.ambiguous)	“{0}” is not a message code (e.g. select.ambiguous)
+„{0}“ není platný JSON dokumentu: {1}	“{0}” is not valid document JSON: {1}
+„{0}“ není složka	“{0}” is not a folder
+neplatné kódování adresy „{0}“	invalid URL encoding “{0}”
+odkaz	link
+server se ukončuje	the server is shutting down
+výstupní složka „{0}“ míří mimo --out	the output folder “{0}” points outside --out
+#!dynamic – text kódu out.empty (src/cad/engine/codes.ts) se překládá za běhu tr(def.key)
+prázdný dokument – nezapsáno: {0}	empty document – not written: {0}

@@ -1,0 +1,5 @@
+# Vlna 14 A3 motion-clash – nesplněné vazby po krocích pohybové studie (motion.ts)
+ … a další úseky s nesplněnými vazbami: {0}	 … and more sections with unsatisfied mates: {0}
+motor {0}	motor {0}
+# ⚠ motion.conflict – týž klíč a překlad jako registr kódů balíku A1 (engine/codes.ts, 21-protocol-ports.tsv)
+pohyb porušuje vazbu „{0}“ v kroku {1}	the motion violates mate “{0}” in step {1}

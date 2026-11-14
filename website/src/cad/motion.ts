@@ -6,12 +6,37 @@
  * a stopa bodu komponenty. Výsledek = tabulka poloh a natočení po krocích (CSV).
  * Čisté funkce bez jádra (geometrii ploch dodá volající jako v řešiči vazeb).
  */
+import type { InterferenceStats } from "./asm-kernel";
 import { tr } from "./i18n";
 import { kinCluster, kinCtx, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
-import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, solvePoses, toWorld, wrap, type Pose } from "./mates-kin";
+import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, rigidGroups, solvePoses, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 export type MotionCollision = { a: string; b: string; volume: number };
+/** Výsledek kontroly kolizí v kroku; `stats` = počty přesných / znovupoužitých / odfiltrovaných dvojic z jádra (přírůstková kontrola). */
+export type MotionClashes = MotionCollision[] & { stats?: InterferenceStats };
+/** Časy výpočtu studie [ms] pro protokol (Σ slow=, JSON timing) a průběh. */
+export type MotionTiming = {
+  ms: number;
+  /** řešič vazeb (všechny kroky) */
+  solveMs: number;
+  /** kontrola kolizí (všechny kroky, včetně přenosu do jádra) */
+  collideMs: number;
+  /** nejpomalejší krok */
+  slowStep: { i: number; ms: number } | null;
+  /** neznámé řešiče (poloh na krok) a počet tuhých skupin ze zámků */
+  vars: number;
+  groups: number;
+  /** součet počtů kontroly kolizí přes kroky (přesné průniky, znovupoužité, odfiltrované obálkou, nevyhodnotitelné) */
+  clash?: InterferenceStats;
+};
+/**
+ * Nález studie pro protokol: ⚠ `motion.conflict` ve tvaru registru kódů (engine/codes.ts, balík A1): klíč
+ * „pohyb porušuje vazbu „{0}“ v kroku {1}“ s `args` = [vazba, krok nebo úsek kroků s časem, např. „27–40 (t = 1.35–2 s)“],
+ * `text` = tentýž text v aktuálním jazyce (`codeEntry("motion.conflict", { args })` dá totéž). Jeden záznam na vazbu a souvislý
+ * úsek kroků (`steps`, `t`), `step` = první krok; `mate` = id vazby („motor:…“ = motor nedosáhl hodnoty).
+ */
+export type MotionIssue = { code: "motion.conflict"; level: "warn"; step: number; steps: [number, number]; t: [number, number]; mate: string; args: [string, string]; text: string };
 export type MotionStep = {
   i: number;
   /** čas [s] */
@@ -38,6 +63,8 @@ export type MotionResult = {
   conflictSteps: number;
   /** vazby se doplněným výchozím stavem (uložit do dokumentu) */
   mates?: Mate[];
+  /** časy výpočtu (protokol, průběh) */
+  timing?: MotionTiming;
 };
 
 export const defaultStudy = (): MotionStudy => ({ motors: [], duration: 2, steps: 36 });
@@ -79,8 +106,10 @@ export async function runMotion(
   doc: CadDoc,
   geo: GeoProvider,
   study: MotionStudy,
-  opts: { collide?: (d: CadDoc) => Promise<MotionCollision[]>; onStep?: (k: number, n: number) => void; cancel?: () => boolean } = {},
+  opts: { collide?: (d: CadDoc) => Promise<MotionClashes>; onStep?: (k: number, n: number, info?: { ms: number; solveMs: number; collideMs: number }) => void; cancel?: () => boolean } = {},
 ): Promise<MotionResult> {
+  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const tStart = now();
   const comps = doc.components ?? [];
   const n = Math.max(1, Math.min(2000, Math.round(study.steps || 1)));
   const duration = study.duration > 0 ? study.duration : 1;
@@ -126,7 +155,19 @@ export async function runMotion(
     });
   const seeds = new Set(mates.flatMap((m) => [m.a, m.b, m.c, m.d].flatMap((r) => (r ? [r.compId] : []))));
   const cl = kinCluster(mates, seeds, isFixed);
-  const vars = cl.vars.map((id) => ({ id, pivot: pivotOf(id, cl.mates, ctx) }));
+  // tuhé skupiny ze zámků: jedna poloha na skupinu (kořen), členové se odvodí – méně neznámých a přesně neměnná vzájemná poloha
+  // (podmínka znovupoužití dvojic v přírůstkové kontrole kolizí); skupina zamčená k ukotvenému dílu je pevná
+  const groups = rigidGroups(mates, comps.map((c) => c.id), isFixed);
+  const inCluster = new Set(cl.vars);
+  syncGroups(poses, groups, [...groups.fixedRoots].filter((r) => groups.members.get(r)!.some((m) => inCluster.has(m.id))));
+  const roots = new Set<string>();
+  for (const id of cl.vars) {
+    const root = groups.rootOf.get(id) ?? id;
+    if (!groups.fixedRoots.has(root) && !isFixed(root)) roots.add(root);
+  }
+  const groupIds = (root: string) => new Set([root, ...(groups.members.get(root) ?? []).map((m) => m.id)]);
+  const vars = [...roots].map((id) => ({ id, pivot: pivotOf(id, cl.mates, ctx, groups.members.get(id)?.length ? groupIds(id) : undefined) }));
+  const timing: MotionTiming = { ms: 0, solveMs: 0, collideMs: 0, slowStep: null, vars: vars.length * 6, groups: [...groups.members.values()].filter((m) => m.length).length };
   const steps: MotionStep[] = [];
   let collision: MotionResult["collision"] = null;
   let conflictSteps = 0;
@@ -136,9 +177,13 @@ export async function runMotion(
     const t = (duration * k) / n;
     const vals = motors.map((x) => motorValue(x.mo, k, n, duration));
     motors.forEach((x, i) => (x.target = vals[i]));
+    const tStep = now();
     const ms = active();
-    const resid = () => [...ms.flatMap((m) => kinResidual(m, ctx) ?? []), ...driveRes()];
-    solvePoses(poses, vars, resid, { maxIter: 60 });
+    // zámky kostry skupin jsou splněné z definice – řešič je nevyhodnocuje (kontrola konfliktů níže ano)
+    const solved = ms.filter((m) => !groups.tree.has(m.id));
+    const resid = () => [...solved.flatMap((m) => kinResidual(m, ctx) ?? []), ...driveRes()];
+    solvePoses(poses, vars, resid, { maxIter: 60, groups });
+    timing.solveMs += now() - tStep;
     // záznam kroku: rozbalené úhly → stav pro další krok
     rec = new Map();
     const conflicts = ms.filter((m) => m.type !== "fixed" && resNorm(kinResidual(m, ctx)) > 1e-3).map((m) => m.id);
@@ -155,14 +200,25 @@ export async function runMotion(
     }
     const row: MotionStep = { i: k, t, motors: vals, place, conflicts };
     if (trace) row.trace = toWorld(poses.get(trace.compId)!, trace.point);
+    let collideMs = 0;
     if (study.collisions && opts.collide) {
+      const tc = now();
       const clashes = await opts.collide(poseDoc(doc, place));
-      row.clashes = clashes;
-      if (clashes.length && !collision) collision = { ...clashes[0], step: k, t };
+      collideMs = now() - tc;
+      timing.collideMs += collideMs;
+      if (clashes.stats) {
+        const a = (timing.clash ??= { pairs: 0, culled: 0, exact: 0, reused: 0, undetermined: 0 });
+        for (const k2 of ["pairs", "culled", "exact", "reused", "undetermined"] as const) a[k2] += clashes.stats[k2] ?? 0;
+      }
+      row.clashes = clashes.map((c) => ({ a: c.a, b: c.b, volume: c.volume }));
+      if (row.clashes.length && !collision) collision = { ...row.clashes[0], step: k, t };
     }
     steps.push(row);
-    opts.onStep?.(k, n);
+    const stepMs = now() - tStep;
+    if (!timing.slowStep || stepMs > timing.slowStep.ms) timing.slowStep = { i: k, ms: stepMs };
+    opts.onStep?.(k, n, { ms: stepMs, solveMs: stepMs - collideMs, collideMs });
   }
+  timing.ms = now() - tStart;
   return {
     steps,
     comps: comps.map((c) => ({ id: c.id, name: c.name })),
@@ -171,6 +227,7 @@ export async function runMotion(
     collisionsChecked: !!(study.collisions && opts.collide),
     conflictSteps,
     ...(s0.mates ? { mates: s0.mates } : {}),
+    timing,
   };
 }
 
@@ -234,5 +291,61 @@ export function motionSummary(res: MotionResult, doc: CadDoc): string[] {
     out.push(res.collision ? tr("⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)", res.collision.step, num(res.collision.t, 3), nm(res.collision.a), nm(res.collision.b), num(res.collision.volume, 3)) : tr("Kolize: žádné ve všech krocích"));
   }
   out.push(res.conflictSteps ? tr("⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)", res.conflictSteps) : tr("Vazby splněny ve všech krocích"));
+  const issues = motionIssues(res, doc);
+  for (const x of issues.slice(0, 4)) out.push(` ⚠ ${x.code} ${x.text}`);
+  if (issues.length > 4) out.push(tr(" … a další úseky s nesplněnými vazbami: {0}", issues.length - 4));
+  return out;
+}
+
+/** Popis vazby pro hlášení (uvnitř uvozovek klíče): „Mez vzdálenosti Stírací deska → Kotevní deska“; motor: „motor 1: Vzdálenost …“. */
+function mateLabel(id: string, res: MotionResult, doc: CadDoc): string {
+  const mates = res.mates ?? doc.mates ?? [];
+  const nm = (cid: string) => doc.components?.find((c) => c.id === cid)?.name ?? cid;
+  const label = (m: Mate) => `${m.name ?? tr(MATE_LABEL[m.type])} ${nm(m.a.compId)} → ${nm(m.b.compId)}`;
+  if (id.startsWith("motor:")) {
+    const k = res.motors.findIndex((m) => m.id === id.slice(6));
+    const m = mates.find((x) => x.id === res.motors[k]?.mate);
+    return tr("motor {0}", k + 1) + (m ? `: ${label(m)}` : "");
+  }
+  const m = mates.find((x) => x.id === id);
+  return m ? label(m) : id;
+}
+
+/**
+ * Nesplněné vazby po krocích pro protokol: ⚠ `motion.conflict` (viz `MotionIssue`) – jeden záznam na vazbu a souvislý úsek kroků,
+ * v pořadí prvního kroku a pak pořadí vazby v dokumentu (motory za vazbami). Nezávisí na id vazeb (náhodná `uid()`), takže stejný
+ * skript dá vždy stejný protokol. Prázdné, když jsou vazby splněné ve všech krocích.
+ */
+export function motionIssues(res: MotionResult, doc: CadDoc): MotionIssue[] {
+  const mates = res.mates ?? doc.mates ?? [];
+  const order = new Map<string, number>(mates.map((m, i) => [m.id, i]));
+  res.motors.forEach((m, i) => order.set(`motor:${m.id}`, mates.length + i));
+  const rank = (id: string) => order.get(id) ?? Number.MAX_SAFE_INTEGER;
+  const byRank = (a: string, b: string) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0);
+  const out: MotionIssue[] = [];
+  let open = new Map<string, MotionIssue>();
+  for (const s of res.steps) {
+    const next = new Map<string, MotionIssue>();
+    for (const id of [...new Set(s.conflicts)].sort(byRank)) {
+      const cur = open.get(id);
+      if (cur && cur.steps[1] === s.i - 1) {
+        cur.steps[1] = s.i;
+        cur.t[1] = s.t;
+        next.set(id, cur);
+        continue;
+      }
+      const x: MotionIssue = { code: "motion.conflict", level: "warn", step: s.i, steps: [s.i, s.i], t: [s.t, s.t], mate: id, args: ["", ""], text: "" };
+      out.push(x);
+      next.set(id, x);
+    }
+    open = next;
+  }
+  // čísla v argumentech s tečkou (gramatika protokolu, stejné ve všech jazycích); lokalizovaný je jen název druhu vazby a klíč
+  const sec = (v: number) => String(Math.round(v * 1000) / 1000 || 0);
+  for (const x of out) {
+    const when = x.steps[0] === x.steps[1] ? `${x.steps[0]} (t = ${sec(x.t[0])} s)` : `${x.steps[0]}–${x.steps[1]} (t = ${sec(x.t[0])}–${sec(x.t[1])} s)`;
+    x.args = [mateLabel(x.mate, res, doc), when];
+    x.text = tr("pohyb porušuje vazbu „{0}“ v kroku {1}", x.args[0], x.args[1]);
+  }
   return out;
 }

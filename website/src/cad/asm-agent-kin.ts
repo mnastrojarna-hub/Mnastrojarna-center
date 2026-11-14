@@ -13,7 +13,7 @@ import { ensureMateRefs, entKey } from "./mate-geo";
 import { KIN_SPEC, accepts, entKindOf, kinDefaults, kinHasValue, type EntKind, type SlotSpec } from "./mate-spec";
 import { MATE_LABEL, faceAreas, worldGeo, type FaceGeo, type KinMateType } from "./mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "./mates-kin";
-import { defaultStudy, motionCsv, motionSummary, motorProblem, motorText, poseDoc, runMotion, type MotionResult } from "./motion";
+import { defaultStudy, motionCsv, motionSummary, motorProblem, motorText, poseDoc, runMotion, type MotionClashes, type MotionResult } from "./motion";
 import { uid, type AsmComponent, type CadDoc, type Mate, type MateRef, type MotionMotor, type MotionStudy, type Vec3 } from "./types";
 
 /** Pokyn pro panel pohybové studie v aplikaci. */
@@ -218,7 +218,15 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
   await ensureBuilt(env, flat);
   const mates = await ensureMateRefs(d.mates ?? [], (ref) => byLeaf.get(ref.leaf ?? ref.compId)?.key ?? null, env.geo, { face: env.mateFace, ent: env.mateEnt, cylFace: env.cylFace });
   const doc = { ...d, mates };
-  const collide = env.interference ? async (x: CadDoc) => (await env.interference!(x)).map((c) => ({ a: c.a, b: c.b, volume: c.volume })) : undefined;
+  // kolize v kroku: jádro kontroluje přírůstkově (dvojice se stejnou vzájemnou polohou se nepočítají znovu); počty jdou do časů studie
+  const collide = env.interference
+    ? async (x: CadDoc) => {
+        const res = (await env.interference!(x)) as Awaited<ReturnType<NonNullable<AsmEnv["interference"]>>> & { stats?: MotionClashes["stats"] };
+        const out: MotionClashes = res.map((c) => ({ a: c.a, b: c.b, volume: c.volume }));
+        if (res.stats) out.stats = res.stats;
+        return out;
+      }
+    : undefined;
   const res = await runMotion(doc, geoProvider(doc, env), study, { collide, onStep: opts.onStep, cancel: opts.cancel });
   if (!opts.cancel?.()) last = { sig, res };
   return res;
