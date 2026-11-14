@@ -1,0 +1,59 @@
+# Vlna 17 doc2text – dokument → textový skript (src/cad/doc-script.ts, export skript, Data › Export › Textový skript)
+ – poznámek {0}: vypíše je příkaz „export skript“ v konzoli	 – {0} Hinweise: der Konsolenbefehl „export skript“ listet sie auf
+{0} prvků: {1} vlastním příkazem, {2} obecným příkazem „prvek“, {3} jako JSON	{0} Elemente: {1} mit eigenem Befehl, {2} mit dem allgemeinen Befehl „element“, {3} als JSON
+2D výkres se do skriptu zapisuje jako jeden řádek JSON (celý dokument) – příkazy „2d …“ zatím jeho hladiny, styly, bloky a rozvržení nepokrývají	eine 2D-Zeichnung wird als eine JSON-Zeile (das ganze Dokument) ins Skript geschrieben – die Befehle „2d …“ decken ihre Layer, Stile, Blöcke und Layouts noch nicht ab
+barvy a skrytí těles dílu „{0}“ se do skriptu nepřenášejí	Farben und Ausblendung der Körper des Teils „{0}“ werden nicht ins Skript übernommen
+barvy ploch dílu „{0}“ se do skriptu nepřenášejí	Flächenfarben des Teils „{0}“ werden nicht ins Skript übernommen
+další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu	die weitere Zeichnung „{0}“ konnte nicht geschrieben werden – das Blatt kommt zur ersten Zeichnung
+díl „{0}“ má stejný název jako jiný díl nebo sestava – ve skriptu se jmenuje „{1}“ (název dílu uvnitř komponenty se tím změní)	das Teil „{0}“ heißt wie ein anderes Teil oder die Baugruppe – im Skript heißt es „{1}“ (der Teilname in der Komponente ändert sich)
+dokument jako textové příkazy – k úpravě a novému spuštění v konzoli	das Dokument als Textbefehle – zum Bearbeiten und erneuten Ausführen in der Konsole
+dokument jako textový skript <název>.mncad.txt (díly, sestava s polohami a vazbami, pohyb, výkresy) – stejné příkazy jako konzole, k úpravě a novému spuštění; protokol napíše počet řádků, velikost a pokrytí (vlastní příkaz / prvek / JSON); také window.mncad.script()	das Dokument als Textskript <name>.mncad.txt (Teile, Baugruppe mit Lage und Verknüpfungen, Bewegung, Zeichnungen) – dieselben Befehle wie die Konsole, zum Bearbeiten und erneuten Ausführen; das Protokoll nennt Zeilenzahl, Größe und Abdeckung (eigener Befehl / element / JSON); auch window.mncad.script()
+export skript: dokument je prázdný – není co zapsat	export skript: das Dokument ist leer – nichts zu schreiben
+Export skriptu zrušen.	Skriptexport abgebrochen.
+komponenty z importovaného souboru a podsestavy se do skriptu nepřenášejí: {0} z {1} – vložte je ručně (Import do sestavy, sestava podsestava)	Komponenten aus importierten Dateien und Unterbaugruppen werden nicht ins Skript übernommen: {0} von {1} – von Hand einfügen (Import in Baugruppe, baugruppe unterbaugruppe)
+konfiguraci „{0}“ nejde zapsat na řádek skriptu	die Konfiguration „{0}“ lässt sich nicht in eine Skriptzeile schreiben
+list „{0}“ se nepodařilo zapsat jako nový list	das Blatt „{0}“ konnte nicht als neues Blatt geschrieben werden
+motor pohybové studie č. {0} odkazuje na vazbu, která ve skriptu není	Antrieb Nr. {0} der Bewegungsstudie verweist auf eine Verknüpfung, die nicht im Skript ist
+název dokumentu „{0}“ nejde zapsat na řádek skriptu – dokument je zapsán jako JSON	der Dokumentname „{0}“ lässt sich nicht in eine Skriptzeile schreiben – das Dokument steht als JSON im Skript
+název listu „{0}“ se nepodařilo zapsat	der Blattname „{0}“ konnte nicht geschrieben werden
+názvy některých prvků se po přečtení skriptu mohou lišit (stejné názvy v jednom dílu)	manche Elementnamen können nach dem Lesen des Skripts abweichen (gleiche Namen in einem Teil)
+orientaci vazeb Vzdálenost / Úhel („obráceně“) určuje aplikace měřením při vložení vazby – skript ji nezapisuje (komponenty stojí ve splněné poloze)	die Ausrichtung der Verknüpfungen Abstand / Winkel („umkehren“) misst die App beim Einfügen – das Skript schreibt sie nicht (die Komponenten stehen in der gelösten Lage)
+označení materiálu „{0}“ nejde zapsat příkazem materiál (čte se jako třída materiálu)	die Werkstoffbezeichnung „{0}“ lässt sich nicht mit dem Befehl werkstoff schreiben (wird als Werkstoffklasse gelesen)
+podklady skic (obrázky / PDF) dílu „{0}“ se do skriptu nepřenášejí	Skizzenunterlagen (Bilder / PDF) des Teils „{0}“ werden nicht ins Skript übernommen
+poloha popisků kót ve skice se nepřenáší (jen hodnoty a odkazy)	die Lage der Maßtexte in Skizzen wird nicht übernommen (nur Werte und Verweise)
+popisové údaje (číslo, autor, revize) se nastavují razítkem výkresu – {0} dokumentů bez výkresu je do skriptu nepřenese (číslo dílu se v sestavě zapíše jako číslo komponenty)	Dokumenteigenschaften (Nummer, Ersteller, Revision) werden über das Schriftfeld gesetzt – {0} Dokumente ohne Zeichnung übernehmen sie nicht ins Skript (in der Baugruppe steht die Teilenummer als Komponentennummer)
+prvek „{0}“ ({1}) se ani jako JSON nepodařilo ověřit proti původnímu prvku – zkontrolujte ho po přečtení	Element „{0}“ ({1}) ließ sich auch als JSON nicht gegen das Original prüfen – nach dem Lesen kontrollieren
+prvky v dokumentu sestavy ({0}) se do skriptu nepřenášejí	Elemente im Baugruppendokument ({0}) werden nicht ins Skript übernommen
+přehrávání pohybové studie ve smyčce se do skriptu nepřenáší	die Schleifenwiedergabe der Bewegungsstudie wird nicht ins Skript übernommen
+razítko listu „{0}“ se nepodařilo zapsat	das Schriftfeld des Blatts „{0}“ konnte nicht geschrieben werden
+ruční kóty a značky výkresu se do skriptu nepřenášejí: {0} na {1} listech	manuelle Maße und Symbole der Zeichnung werden nicht ins Skript übernommen: {0} auf {1} Blättern
+skica na ploše / pomocné rovině: rovinu při přečtení znovu spočítá jádro z plochy F (číslo plochy tělesa před skicou)	Skizze auf Fläche / Hilfsebene: beim Lesen berechnet der Kern die Ebene neu aus der Fläche F (Flächennummer des Körpers vor der Skizze)
+skript se nepřečetl bez chyb ({0}): {1}	das Skript ließ sich nicht fehlerfrei zurücklesen ({0}): {1}
+tabulka revizí listu „{0}“ se do skriptu nepřenáší	die Änderungstabelle des Blatts „{0}“ wird nicht ins Skript übernommen
+textové příkazy, {0} řádků	Textbefehle, {0} Zeilen
+textový skript	Textskript
+Textový skript (.txt)	Textskript (.txt)
+Textový skript uložen: {0} ({1} řádků){2}	Textskript gespeichert: {0} ({1} Zeilen){2}
+údaj komponenty „{0}“ nejde zapsat na řádek skriptu	eine Angabe der Komponente „{0}“ lässt sich nicht in eine Skriptzeile schreiben
+údaj razítka „{0}“ listu „{1}“ nejde zapsat na řádek	das Schriftfeld-Feld „{0}“ des Blatts „{1}“ lässt sich nicht in eine Zeile schreiben
+úpravy vygenerovaných kót (tolerance, vlastní text, revize) se do skriptu nepřenášejí: {0} na {1} listech – doplňte je příkazem výkres tolerance <kóta> <tolerance>	Änderungen erzeugter Maße (Toleranz, eigener Text, Revision) werden nicht ins Skript übernommen: {0} auf {1} Blättern – mit dem Befehl zeichnung toleranz <Maß> <Toleranz> ergänzen
+volby listu „{0}“ se nepodařilo zapsat příkazem výkres – list vznikne s výchozími volbami	die Optionen des Blatts „{0}“ konnten nicht mit dem Befehl zeichnung geschrieben werden – das Blatt entsteht mit Standardoptionen
+volby listu bez zápisu ve skriptu ({0}) – list „{1}“ dokumentu „{2}“	Blattoptionen ohne Schreibweise im Skript ({0}) – Blatt „{1}“ des Dokuments „{2}“
+vygenerované kóty výkresů (Chytré kóty, {0}) se nezapisují jednotlivě – „kótovat chytře“ je při přečtení vygeneruje znovu (nová id, poloha podle generátoru)	erzeugte Zeichnungsmaße (Intelligente Maße, {0}) werden nicht einzeln geschrieben – „bemaßen intelligent“ erzeugt sie beim Lesen neu (neue Ids, Lage laut Generator)
+# kontrola (nálezy): odkazy názvem, otisky výběru a čísla hran ověřená jádrem, proměnné, smazané kóty
+list „{0}“ dílu „{1}“: smazané vygenerované kóty se nepodařilo určit ({2}) – po přečtení skriptu se vrátí	Blatt „{0}“ des Teils „{1}“: die gelöschten generierten Maße ließen sich nicht bestimmen ({2}) – nach dem Einlesen des Skripts kommen sie zurück
+list „{0}“ dílu „{1}“: {2} ze {3} smazaných vygenerovaných kót generátor už nevydává – ve skriptu nejsou	Blatt „{0}“ des Teils „{1}“: {2} von {3} gelöschten generierten Maßen erzeugt der Generator nicht mehr – sie stehen nicht im Skript
+název dílu „{0}“ nejde zapsat na řádek skriptu – ve skriptu se jmenuje „{1}“ (název dílu uvnitř komponenty se tím změní)	der Name des Teils „{0}“ lässt sich nicht in eine Skriptzeile schreiben – im Skript heißt es „{1}“ (der Teilename in der Komponente ändert sich dadurch)
+název prvku „{0}“ nejde zapsat na řádek skriptu – prvek dostane automatický název	der Name des Elements „{0}“ lässt sich nicht in eine Skriptzeile schreiben – das Element erhält einen automatischen Namen
+název sestavy „{0}“ nejde zapsat na řádek skriptu – sestava dostane výchozí název	der Name der Baugruppe „{0}“ lässt sich nicht in eine Skriptzeile schreiben – die Baugruppe erhält den Standardnamen
+otisky výběru hran / ploch ({0} prvků) jsou vynechané (sigs: "drop") – skript nese čísla hran a ploch tak, jak jsou uložená; po úpravě historie dílu mohou být zastaralá	Signaturen der Kanten- / Flächenauswahl ({0} Elemente) sind weggelassen (sigs: "drop") – das Skript trägt die Kanten- und Flächennummern wie gespeichert; nach einer Änderung der Teilehistorie können sie veraltet sein
+poznámku proměnné „{0}“ nejde zapsat na řádek skriptu	die Notiz der Variablen „{0}“ lässt sich nicht in eine Skriptzeile schreiben
+proměnnou „{0}“ = {1} nejde zapsat ({2}) – ve skriptu chybí i vazby, které ji používají	die Variable „{0}“ = {1} lässt sich nicht schreiben ({2}) – im Skript fehlen auch die Bindungen, die sie verwenden
+prvek „{0}“ dílu „{1}“: vybranou hranu / plochu se podle otisku nepodařilo najít – prvek je ve skriptu zapsán i s otisky	Element „{0}“ des Teils „{1}“: eine gewählte Kante / Fläche ließ sich über die Signatur nicht finden – das Element steht im Skript mit seinen Signaturen
+prvek „{0}“ má stejné id jako dřívější prvek – odkazy na něj se po přečtení skriptu nenajdou	Element „{0}“ hat dieselbe id wie ein früheres Element – Verweise darauf werden nach dem Einlesen des Skripts nicht gefunden
+prvky s otisky výběru hran / ploch ({0}) jsou zapsané obecným příkazem i s otisky – uložená čísla mohou být po úpravě historie zastaralá a bez jádra je nejde ověřit (v aplikaci je ověřuje export skript a window.mncad.script())	Elemente mit Signaturen der Kanten- / Flächenauswahl ({0}) sind mit dem allgemeinen Befehl samt Signaturen geschrieben – die gespeicherten Nummern können nach einer Änderung der Historie veraltet sein und lassen sich ohne Kern nicht prüfen (in der Anwendung prüfen sie export skript und window.mncad.script())
+smazané vygenerované kóty výkresů ({0} na {1} listech) se po „kótovat chytře“ vrátí – jejich id umí určit jen jádro (export v aplikaci je smaže příkazem výkres smazat a…)	gelöschte generierte Zeichnungsmaße ({0} auf {1} Blättern) kommen nach „bemaßen intelligent“ zurück – ihre ids kann nur der Kern bestimmen (der Export in der Anwendung löscht sie mit dem Befehl zeichnung löschen a…)
+vazbu parametru „{0}“ prvku „{1}“ na výraz „{2}“ nejde zapsat na řádek skriptu	die Bindung des Parameters „{0}“ des Elements „{1}“ an den Ausdruck „{2}“ lässt sich nicht in eine Skriptzeile schreiben
+vazbu sestavy č. {0} ({1}) nejde zapsat textem (plocha v podsestavě, odkaz na komponentu mimo skript nebo název) – doplňte ji ručně	Verknüpfung Nr. {0} ({1}) der Baugruppe lässt sich nicht als Text schreiben (Fläche in einer Unterbaugruppe, Verweis auf eine Komponente außerhalb des Skripts oder der Name) – bitte von Hand ergänzen
+výraz nejde zapsat na řádek	der Ausdruck lässt sich nicht in eine Zeile schreiben
+čísla vybraných hran a ploch ověřena jádrem podle otisků: {0} prvků, z toho {1} s jinými čísly než uloženými	Nummern der gewählten Kanten und Flächen vom Kern anhand der Signaturen geprüft: {0} Elemente, davon {1} mit anderen Nummern als den gespeicherten

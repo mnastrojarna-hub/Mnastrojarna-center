@@ -15,7 +15,8 @@ import { applySketchOp } from "@/cad/agent-sketch";
 import { applyDrawingCmd, type DrawingExtras } from "@/cad/drawing-agent";
 import { emptyAssembly, partComponent, sourceKey, computeBom, flattenAssembly } from "@/cad/assembly";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type Feature } from "@/cad/types";
-import { freeName } from "@/cad/agent-edit";
+import { applyEdit, freeName } from "@/cad/agent-edit";
+import { resolveDatumNames } from "@/cad/agent-prim";
 import { makeFromText } from "@/cad/library";
 import { buildShape, registerTextFont } from "@/cad/build";
 import { motionCached } from "@/cad/asm-agent-kin";
@@ -54,6 +55,8 @@ export const kernel = {
   cylFace: (key: string, radius: number) => call<number>({ op: "cylFace", key, radius }),
   interference: (doc: CadDoc) => call<Clash[]>({ op: "interference", doc }),
   drawing: (doc: CadDoc, meta: unknown, opts: unknown) => call<never>({ op: "drawing", doc, meta, opts }),
+  /** selection signatures / re-found indices of a feature on the body before it (client.ts `pickSigs`) – doc → script round trip */
+  pickSigs: (doc: CadDoc, feature: Feature) => call<{ feature: Feature; changed: boolean; warnings: string[] } | null>({ op: "pickSigs", doc, feature }),
 };
 
 /**
@@ -215,12 +218,29 @@ export class Session {
     const hasSolid = () => d.features.some((f) => SOLID.has(f.type) && !f.suppressed);
     const lastSketch = () => [...d.features].reverse().find((f) => f.type === "sketch");
     const prepare = (f0: Feature): Feature => {
-      const f = { ...f0, name: freeName(d.features, f0) } as Feature & { sketchId?: string; mode?: string };
+      const f = { ...f0, name: freeName(d.features, f0) } as Feature & { sketchId?: string; featureId?: string; mode?: string };
       if (f.sketchId === "$last") {
         const sk = lastSketch();
         if (!sk) throw new Error("no sketch for $last");
         f.sketchId = sk.id;
       }
+      // `pole …` (pattern of the last feature) – as cad-app.tsx prepare does; needed by the doc → script round trip
+      if (f.featureId === "$last") {
+        const lf = d.features[d.features.length - 1];
+        if (!lf) throw new Error("no feature for $last");
+        f.featureId = lf.id;
+      }
+      // references by name (`prvek extrude sketchId="Skica 1"`, `zrcadlit rovina "Rovina 1"`) – as cad-app.tsx prepare does;
+      // needed by the doc → script round trip
+      const rec = f as unknown as Record<string, unknown>;
+      for (const [k, sketchOnly] of [["sketchId", true], ["profileId", true], ["pathId", true], ["guideId", true], ["featureId", false]] as const) {
+        const v = rec[k];
+        if (typeof v !== "string" || v === "$last" || d.features.some((x) => x.id === v)) continue;
+        const hit = [...d.features].reverse().find((x) => (!sketchOnly || x.type === "sketch") && x.name.toLowerCase() === v.toLowerCase());
+        if (!hit) throw new Error(`"${v}" is not in the history`);
+        rec[k] = hit.id;
+      }
+      resolveDatumNames(f as Feature, d.features, true);
       if (f.mode === "$auto" || (f.mode === "add" && !hasSolid())) f.mode = hasSolid() ? "add" : "new";
       if (d.features.some((x) => x.id === f.id)) f.id = uid();
       return f as Feature;
@@ -348,6 +368,15 @@ export class Session {
           case "status": {
             const res = await kernel.build(d).catch(() => null);
             push(docStatusText(d, res));
+            break;
+          }
+          case "edit": {
+            // edits of the existing model (rename, suppress, bindings, variables, configurations – agent-edit.ts), as cad-app.tsx does;
+            // needed by the doc → script round trip. Undo / redo are document history (the app only).
+            if (op.cmd.kind === "undo" || op.cmd.kind === "redo") throw new Error("loopback: undo / redo need the app");
+            const res = await applyEdit(d, op.cmd, { kernel: { topology: kernel.topology, selectFaces, selectEdges, stamp: async (before, f) => (await kernel.pickSigs(before, f).catch(() => null))?.feature ?? f } }, op.sketch);
+            d = res.doc;
+            for (const l of res.log) push(l);
             break;
           }
           case "measure":

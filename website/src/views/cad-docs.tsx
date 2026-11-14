@@ -272,7 +272,7 @@ export function CadDocsPrint() {
             </li>
           ))}
           <li>
-            <a href="#faq">24. Časté otázky</a>
+            <a href="#faq">{CAD_DOCS.length + 1}. Časté otázky</a>
           </li>
         </ol>
       </section>
@@ -286,7 +286,7 @@ export function CadDocsPrint() {
         </section>
       ))}
       <section id="faq" className="doc-section">
-        <h2>24. Časté otázky</h2>
+        <h2>{CAD_DOCS.length + 1}. Časté otázky</h2>
         {CAD_FAQ.map((f) => (
           <div key={f.q} className="doc-faq">
             <h3>{f.q}</h3>

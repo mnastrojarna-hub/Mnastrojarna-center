@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { AGENT_COMMANDS, parseAgentText } from "./agent";
-import { checkFailed, exportCheck, fmtBytes, outFileName, parseOutLine, type OutCmd } from "./agent-out";
+import { checkFailed, exportCheck, fmtBytes, OUT_COMMANDS, outFileName, parseOutLine, type OutCmd } from "./agent-out";
 import { setLang } from "./i18n";
 import type { Vec3 } from "./types";
 
@@ -219,5 +219,32 @@ describe("kontrola exportu STEP / BREP", () => {
     expect(e.ok).toBe(false);
     expect(e.volumeDiffPct).toBe(100);
     expect(checkFailed("BREP", "Soubor nevypadá jako BREP OpenCascade.").line).toBe("✗ kontrola BREP: soubor se nepodařilo znovu načíst – Soubor nevypadá jako BREP OpenCascade.");
+  });
+});
+
+describe("export skript – dokument jako textové příkazy (cad/doc-script.ts)", () => {
+  it("česky, anglicky a německy; jazyk klíčových slov a název souboru", () => {
+    const P = (s: string) => parseOutLine(s.split(/\s+/));
+    expect(P("export skript")).toEqual({ kind: "script" });
+    expect(P("export script")).toEqual({ kind: "script" });
+    expect(P("exportieren skript")).toEqual({ kind: "script" });
+    expect(P("export skript en")).toEqual({ kind: "script", lang: "en" });
+    expect(P("export skript DE forma-v2")).toEqual({ kind: "script", lang: "de", name: "forma-v2" });
+    expect(P("export skript jako nastroj 959")).toEqual({ kind: "script", name: "nastroj 959" });
+    // přes celý rozbor konzole: jeden výstupní příkaz, žádná chyba
+    const prog = parseAgentText('export skript cs "Deska 1"');
+    expect(prog.errors).toEqual([]);
+    expect(prog.ops).toEqual([{ k: "out", cmd: { kind: "script", lang: "cs", name: "Deska 1" }, line: 1 }]);
+  });
+  it("název souboru .mncad.txt; zadaná přípona .txt zůstane", () => {
+    expect(outFileName(undefined, "Deska", ["mncad.txt", "txt"])).toBe("Deska.mncad.txt");
+    expect(outFileName("forma-v2", "Deska", ["mncad.txt", "txt"])).toBe("forma-v2.mncad.txt");
+    expect(outFileName("forma.txt", "Deska", ["mncad.txt", "txt"])).toBe("forma.txt");
+    expect(outFileName("forma.mncad.txt", "Deska", ["mncad.txt", "txt"])).toBe("forma.mncad.txt");
+  });
+  it("příkaz je v tabulce příkazů (nápověda konzole, window.mncad.commands)", () => {
+    const row = OUT_COMMANDS.find((c) => c.cmd.startsWith("export skript"));
+    expect(row).toMatchObject({ en: "export script", de: "export skript" });
+    expect(AGENT_COMMANDS.some((c) => c.cmd.startsWith("export skript"))).toBe(true);
   });
 });

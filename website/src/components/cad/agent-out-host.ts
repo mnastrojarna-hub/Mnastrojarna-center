@@ -8,6 +8,8 @@
  */
 import { cad } from "@/cad/client";
 import { cadLocale, tr } from "@/cad/i18n";
+import { scriptCoverageText, type ScriptLang } from "@/cad/doc-script";
+import { scriptOfDoc } from "./doc-script-host";
 import { embedBlobs, missingBlobFiles } from "@/cad/blobs";
 import { lostImportsText } from "@/cad/vault-blobs";
 import { createShareLink, groupShareCode, SHARE_DEFAULT_DAYS, type ShareMode, type ShareView } from "@/cad/share";
@@ -196,6 +198,20 @@ async function shareDoc(d: CadDoc, cmd: Extract<OutCmd, { kind: "share" }>): Pro
   return linkLines(l, tr("✓ sdílený odkaz vytvořen"));
 }
 
+/* ───────────────────────── textový skript ───────────────────────── */
+/** dokument jako textové příkazy `<název>.mncad.txt` (cad/doc-script.ts); protokol: řádky, velikost, pokrytí a poznámky */
+export async function exportScriptFile(d: CadDoc, name: string | undefined, lang?: ScriptLang): Promise<OutFileInfo> {
+  if (isEmpty(d) && d.kind !== "draft") throw new Error(tr("export skript: dokument je prázdný – není co zapsat"));
+  const r = await scriptOfDoc(d, lang ? { lang } : {}); // čísla vybraných hran / ploch ověří jádro podle otisků (doc-script-host.ts)
+  const file = outFileName(name, safeName(d.name), ["mncad.txt", "txt"]);
+  const bytes = new TextEncoder().encode(r.text);
+  await download(file, bytes, "text/plain");
+  const log = [fileLogLine(tr("textový skript"), file, bytes.length, tr("textové příkazy, {0} řádků", r.stats.lines)), `  ${scriptCoverageText(r.stats)}`];
+  if (r.fresh?.checked) log.push(`  ${tr("čísla vybraných hran a ploch ověřena jádrem podle otisků: {0} prvků, z toho {1} s jinými čísly než uloženými", r.fresh.checked, r.fresh.renumbered)}`);
+  for (const note of r.notes) log.push(`  ℹ ${note}`);
+  return { name: file, mime: "text/plain", bytes: bytes.length, format: "script", log };
+}
+
 /* ───────────────────────── příkaz ───────────────────────── */
 /** Provede výstupní příkaz nad dokumentem `d` (dokument běhu textových příkazů); vrátí řádky protokolu. */
 export async function runOutCmd(cmd: OutCmd, d: CadDoc, host: OutHost): Promise<string[]> {
@@ -210,6 +226,8 @@ export async function runOutCmd(cmd: OutCmd, d: CadDoc, host: OutHost): Promise<
       return exportSketchDxf(d, cmd, host);
     case "share":
       return shareDoc(d, cmd);
+    case "script":
+      return (await exportScriptFile(d, cmd.name, cmd.lang)).log;
     case "link": {
       if (!lastLink) throw new Error(tr("zatím žádný sdílený odkaz – vytvořte ho příkazem „sdílet“"));
       return linkLines(lastLink, tr("✓ poslední sdílený odkaz"));

@@ -38,6 +38,7 @@ import { parseFeatureHelp } from "./agent-help";
 import { COMMON_FIELDS, fieldsOf } from "./feature-fields";
 import { gapSummary, parseGapLine } from "./agent-gaps";
 import { OUT_COMMANDS, parseOutLine, type MncadOutApi, type OutOp } from "./agent-out";
+import { stripLineComment } from "./agent-comment";
 import { polylineClose, takeCloseWords } from "./poly-close";
 
 export const AGENT_API_VERSION = 1;
@@ -592,8 +593,8 @@ export function parseAgentText(text: string): AgentProgram {
     block = null;
   };
   lines.forEach((raw, idx) => {
-    // komentář „# …“ / „// …“ na konci řádku; „#e03930“ (barva) a „#2“ (pořadí komponenty) komentář nejsou
-    const line = raw.replace(/\s+(#(?!(?:[0-9a-f]{3}|[0-9a-f]{6})\b|\d)|\/\/).*$/i, "").trim();
+    // komentář „# …“ / „// …“ na konci řádku; „#e03930“ (barva), „#2“ (pořadí komponenty) a „#“ / „//“ v uvozovkách komentář nejsou
+    const line = stripLineComment(raw).trim();
     if (!line || line.startsWith("#") || line.startsWith("//")) return;
     const no = idx + 1;
     try {

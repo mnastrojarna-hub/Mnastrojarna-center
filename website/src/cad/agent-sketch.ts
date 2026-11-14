@@ -703,11 +703,19 @@ export async function sketchOnPlane(f0: Feature, op: Pick<SketchOnOp, "on" | "of
     } else n = op.on.face;
     if (!(n >= 1 && n <= r.metrics.faces)) throw new Error(tr("plocha F{0} v tělese není – těleso má {1} ploch (F1 až F{1}){2}", n, r.metrics.faces, await planarFaces(k, doc)));
     const index = n - 1;
-    const info = await k.face(index);
-    if (!info?.planar) throw new Error(tr("plocha F{0} není rovinná – skicu lze založit jen na rovinné ploše{1}", n, await planarFaces(k, doc)));
-    const ri = await k.refInfo(doc, { kind: "face", index });
+    // Rovinnost se čte z `topology` (stavba + inspekce v JEDNOM požadavku jádra). `face` a `refInfo` čtou naposledy postavené těleso
+    // a mezi dvěma požadavky ho může přepsat stavba jiné záložky, kterou rozhraní spouští samo – skript s „skica plocha F12“ pak
+    // občas skončil „plocha F12 není rovinná“, i když rovinná je. Otisk z `refInfo` se proto ověří plochou z `topology`.
+    const tf = (await k.topology?.(doc).catch(() => null))?.faces.find((x) => x.index === index);
+    if (!(tf ? tf.planar : (await k.face(index))?.planar)) throw new Error(tr("plocha F{0} není rovinná – skicu lze založit jen na rovinné ploše{1}", n, await planarFaces(k, doc)));
+    const sameFace = (sg: Sig | null) => !sg || tf?.area === undefined || Math.abs(sg.s - tf.area) <= 1e-6 * Math.max(1, tf.area);
+    let ri = await k.refInfo(doc, { kind: "face", index });
+    for (let i = 0; i < 3 && (ri.error || !sameFace(ri.sig)); i++) {
+      await k.build(doc);
+      ri = await k.refInfo(doc, { kind: "face", index });
+    }
     if (ri.error) throw new Error(tr("plochu F{0} nelze použít: {1}", n, ri.error));
-    const ref: Ref = ri.sig ? { kind: "face", index, sig: ri.sig } : { kind: "face", index };
+    const ref: Ref = ri.sig && sameFace(ri.sig) ? { kind: "face", index, sig: ri.sig } : { kind: "face", index };
     f.planeDef = { kind: "face", ref, ...(op.offset ? { offset: op.offset } : {}), ...(op.flip ? { flip: true } : {}) };
     where = tr("na ploše F{0}", n) + (rule ? ` (${rule})` : "");
   } else {

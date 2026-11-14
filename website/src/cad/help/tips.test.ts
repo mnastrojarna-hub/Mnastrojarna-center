@@ -177,7 +177,8 @@ function sourceButtons(): { found: Found[]; dyn: DynMenu[]; quick: Found[] } {
   const dyn: DynMenu[] = [];
   const F = "cad-app.tsx";
   const exportsBlock = between(app, "const EXPORTS:", "];");
-  const exportIds = [...exportsBlock.matchAll(/\{ f: "([^"]+)"/g)].map((m) => m[1]);
+  // formáty z tabulky EXPORTS + položky doplněné do nabídky zvlášť (`exportEntries.push({ id: "script", …`)
+  const exportIds = [...[...exportsBlock.matchAll(/\{ f: "([^"]+)"/g)].map((m) => m[1]), ...[...app.matchAll(/exportEntries\.push\(\{ id: "([^"]+)"/g)].map((m) => m[1])];
   const sketchPlanes = between(app, "const sketchPlanes: RMenuEntry[] = [", "\n  ];");
   const idents = {
     sketchPlanes: (ctx: string) => scanBlock(sketchPlanes.slice(sketchPlanes.indexOf("[")), ctx, F),

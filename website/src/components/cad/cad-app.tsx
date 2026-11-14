@@ -2566,6 +2566,17 @@ export function CadApp() {
       flash((e as Error).message);
     }
   };
+  /** Data ▸ Export ▸ Textový skript: dokument jako textové příkazy `.mncad.txt` (cad/doc-script.ts) */
+  const exportScript = async () => {
+    try {
+      const { scriptOfDoc } = await import("./doc-script-host");
+      const r = await scriptOfDoc(doc); // čísla vybraných hran / ploch ověří jádro podle otisků
+      const saved = await saveFile(`${safeName(doc.name)}.mncad.txt`, r.text, "text/plain");
+      flash(saved ? tr("Textový skript uložen: {0} ({1} řádků){2}", saved.name, r.stats.lines, r.notes.length ? tr(" – poznámek {0}: vypíše je příkaz „export skript“ v konzoli", r.notes.length) : "") : tr("Export skriptu zrušen."));
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
   /** cíl posledního uložení projektu (Ctrl+S pak ukládá bez dotazu; „Uložit jako…“ se zeptá znovu) */
   const projectTarget = useRef<SavedFile | null>(null);
   /** hlášení po uložení – soubor bez dat některého importu (data nejsou v paměti) se ohlásí, ne tiše uloží */
@@ -3005,6 +3016,8 @@ export function CadApp() {
     ...(datums.length ? ([{ divider: true, label: tr("Pomocné roviny") }, ...datums.map((d) => ({ id: d.id, label: d.name, icon: "datum" as CadIconName, tone: "ref" as const, onClick: () => createSketch({ kind: "custom", origin: d.origin, normal: d.normal, xDir: d.xDir, label: d.name }) }))] as RMenuEntry[]) : []),
   ];
   const exportEntries: RMenuEntry[] = EXPORTS.map((e) => ({ id: e.f, label: e.label, icon: "export", tone: "file", hint: e.hint, disabled: !hasBody, why: WHY_BODY, onClick: () => exportModel(e.f) }));
+  // dokument jako textové příkazy (cad/doc-script.ts) – díl i sestava, i bez tělesa
+  exportEntries.push({ id: "script", label: tr("Textový skript (.txt)"), icon: "export", tone: "file", hint: tr("dokument jako textové příkazy – k úpravě a novému spuštění v konzoli"), onClick: () => void exportScript() });
 
   // ---------- formařské nástroje ----------
   const draftResult = useMemo<DraftResult | null>(() => (draftSetup.on && !isAsm && result?.mesh ? draftAnalysis(result.mesh, draftSetup.pull, draftSetup.minDeg) : null), [draftSetup, result, isAsm]);

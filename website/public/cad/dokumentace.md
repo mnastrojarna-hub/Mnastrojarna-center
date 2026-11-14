@@ -1,11 +1,11 @@
 # Mnástrojárna CAD – kompletní dokumentace a návod k obsluze
 
-> Kompletní návod k online 3D/2D CADu Mnástrojárna CAD: ovládání, skicování s vazbami, tvorba dílů (vysunutí, rotace, díry, zaoblení, pole), plochy, plech, svařence, sestavy a vazby, výkresy do PDF/DXF/DWG, knihovna 103 rodin normálií, import a export STEP, IGES, STL, 3MF, DXF. Zdarma v prohlížeči, bez instalace, česky.
+> Kompletní návod k online 3D/2D CADu Mnástrojárna CAD: ovládání, skicování s vazbami, tvorba dílů (vysunutí, rotace, díry, zaoblení, pole), plochy, plech, svařence a svary, sestavy a vazby, výkresy do PDF/DXF/DWG, 2D CAD s příkazovým řádkem, hladinami, kótami, bloky a rozvrženími (editor DWG a DXF v prohlížeči), knihovna 103 rodin normálií, import a export STEP, IGES, STL, 3MF, DXF, DWG, sdílení krátkým odkazem. Zdarma v prohlížeči, bez instalace, česky.
 
 - Aplikace: https://www.mnastrojarna.cz/cad
 - Webová dokumentace: https://www.mnastrojarna.cz/cad/dokumentace
 - Příručka PDF: https://www.mnastrojarna.cz/cad/mnastrojarna-cad-prirucka.pdf
-- Verze: 5. vlna (listopad 2026), aktualizováno 2026-11-03
+- Verze: 16. vlna (listopad 2026), aktualizováno 2026-11-14
 - Jazyk: čeština · Licence: zdarma, bez registrace · Vydavatel: Mnástrojárna s.r.o., https://www.mnastrojarna.cz
 
 ## Hlavní funkce
@@ -13,15 +13,16 @@
 - Parametrické 3D modelování s historií prvků (vysunutí 8 ukončení, rotace, tažení, šablonování, díry podle ISO 273, závity, zaoblení 6 variant, sražení 5 variant, úkos, skořepina, žebro, pružina, text, pole 5 druhů, zrcadlení, přímé úpravy)
 - Skica s řešičem vazeb: 13 vazeb, 8 kót, automatické vazby, číselné zadání u kurzoru, stav určenosti, ořez, odsazení, projekce hran
 - Referenční systém zadání: 14 voleb bodu, 8 směrů, 12 definic rovin, 10 os, pomocná rovina / osa / bod / souřadný systém
-- Plochy (19 příkazů), plech s rozvinem DXF (12), svařence a rámy z profilů (10)
+- Plochy (19 příkazů), plech s rozvinem DXF (12), svařence a rámy z profilů (13) se svary koutovými, tupými podle ISO 9692-1, děrovými a bodovými a značkami ISO 2553
 - Sestavy: komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled, průvodce rámem vstřikovací formy
 - Výkresy: pohledy, řez, detail, kóty, drsnosti, geometrické tolerance, tabulka děr, kusovník; export PDF, DXF, DWG R2000–R2018, SVG
+- 2D CAD (2D výkres): příkazový řádek se zkratkami AutoCADu, hladiny, typy čar, uchopení, kóty a kótovací styly, šrafy, bloky s atributy, rozvržení s výřezy v měřítku, tisk PDF; editor DWG R2000–R2018 a DXF R12–R2018
 - Knihovna 103 rodin normálií ve 13 skupinách zadávaných textem
-- Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML
+- Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF, DWG; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML, DXF, DWG
 - Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
-- Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání
-- Sdílení odkazem: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams), platnost 1–90 dní, volitelné heslo; dokument je jen v odkazu, na serveru nic
-- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba
+- Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání, mikronávody u každé ikony (česky, anglicky, německy)
+- Sdílení krátkým odkazem mnastrojarna.cz/s#KÓD: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams, SMS), platnost 1–90 dní, volitelné heslo, zneplatnění; dokument se šifruje v prohlížeči, na serveru je jen šifrovaný obsah
+- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba, výstupy bez dialogů, příkazová řádka mncad bez prohlížeče pro stavbu a převod hotových dokumentů
 
 ## Obsah
 
@@ -38,18 +39,19 @@
 - 11. Sestavy
 - 12. Formařské nástroje
 - 13. Výkresy
-- 14. Analýza a měření
-- 15. Proměnné, rovnice a stavy dílu
-- 16. Soubory, import a export
-- 17. Sdílení odkazem
-- 18. Nastavení
-- 19. Klávesové zkratky
-- 20. Mobil a dotykové ovládání
-- 21. Pro AI agenty a automatizaci
-- 22. Omezení a poctivé srovnání s desktopovými CADy
-- 23. Vaše data a soukromí
-- 24. Slovníček pojmů
-- 25. Historie verzí
+- 14. 2D CAD – 2D výkres (DWG / DXF)
+- 15. Analýza a měření
+- 16. Proměnné, rovnice a stavy dílu
+- 17. Soubory, import a export
+- 18. Sdílení odkazem
+- 19. Nastavení
+- 20. Klávesové zkratky
+- 21. Mobil a dotykové ovládání
+- 22. Pro AI agenty a automatizaci
+- 23. Omezení a poctivé srovnání s desktopovými CADy
+- 24. Vaše data a soukromí
+- 25. Slovníček pojmů
+- 26. Historie verzí
 - Časté otázky
 
 ## 1. Co je Mnástrojárna CAD
@@ -60,19 +62,22 @@ Profesionální parametrický 3D a 2D CAD, který běží přímo ve webovém pr
 
 *Úvodní obrazovka: Nový díl, Nová sestava, Nový výkres, nedávné soubory s náhledy, otevřít / importovat, knihovna normálií.*
 
-Jádrem je geometrický modelář OpenCascade (OCCT) přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se neodesílají na server a ve výchozím nastavení se neukládají ani do prohlížeče – rozpracovaná práce žije jen v otevřené kartě a v souborech, které si uložíte do svého počítače (.mncad, STEP). To je důležité pro dokumentaci pod NDA.
+Jádrem je geometrický modelář OpenCascade (OCCT) přeložený do WebAssembly – stejná třída jádra jako u desktopových CADů. Počítá ve vašem prohlížeči (ve webovém workeru, aby uživatelské rozhraní zůstalo plynulé). Modely se neodesílají na server a ve výchozím nastavení se neukládají ani do prohlížeče – rozpracovaná práce žije jen v otevřené kartě a v souborech, které si uložíte do svého počítače (.mncad, STEP). To je důležité pro dokumentaci pod NDA. Jedinou výjimkou je sdílení odkazem, které spustíte sami: na server pak jde jen kopie zašifrovaná už ve vašem prohlížeči (kapitola 18).
 
 ### Co umí
 
 - Díly: skica s vazbami a kótami → vysunutí, rotace, tažení, šablonování, díry (průvodce), závity, zaoblení, sražení, úkosy, skořepina, žebra, pružiny, text, přímé úpravy ploch, pole 5 druhů, zrcadlení, proměnné a stavy (konfigurace).
 - Plochy: plošné vysunutí a rotace, tažení a šablonování ploch, odsazení, prodloužení, ořez, sešití, uzavření do tělesa, záplaty, křivky průniku, šroubovice.
 - Plech: základní plech, ohyby z hrany, lemy, ohyb podle čáry, výřezy, rohové úlevy, prolisy, rozvin do DXF/SVG, tabulka ohybů.
-- Svařence: konstrukční profily (IPE, HEB, UPN, L, jäkl, trubky), rámy z profilů, desky, ořezy, víčka, styčníky, svarové housenky a značky, kusovník řezů.
+- Svařence: konstrukční profily (IPE, HEB, UPN, L, jäkl, trubky), rámy z profilů, desky, ořezy, víčka, styčníky; svary koutové, tupé s úpravou hran, děrové a bodové se svarovým kovem jako tělesem a hmotností, značky svarů na výkrese, kusovník řezů a tabulka svarů.
 - Sestavy: komponenty, podsestavy, vazby, kontrola kolizí, kusovník, rozložený pohled, průvodce rámem vstřikovací formy.
 - Výkresy: pohledy, řezy, detaily, kóty, drsnosti, geometrické tolerance, tabulky děr, kusovník s pozicemi, razítko; export PDF, DXF, DWG (R2000–R2018) a SVG.
+- 2D výkresy (2D CAD): samostatný 2D výkres jako v AutoCADu – příkazový řádek, hladiny, typy čar, uchopení, kóty a kótovací styly, šrafy, bloky s atributy, rozvržení s výřezy v měřítku a tisk do PDF; otevře, upraví a uloží DWG (R2000–R2018) i DXF (R12–R2018) – kapitola 14.
 - Knihovna normálií: 103 rodin ve 13 skupinách (šrouby, matice, podložky, kolíky, pera, ložiska, ozubená a řetězová kola, řemenice, ocelové a hliníkové profily, pružiny, O-kroužky, normálie forem, lineární technika, pneumatika, potrubí) – stačí napsat „ISO 4762 M8x30“ nebo „IPE 200 1500“.
-- Import a export: STEP, IGES, BREP (přesná geometrie), STL, OBJ, 3MF, glTF/GLB, PLY, OFF (sítě), DXF (skici a výkresy), DWG (výkresy); u nativních formátů (SolidWorks, Inventor, ZW3D, CATIA, Creo, Fusion…) poradí, jak je převést.
+- Import a export: STEP, IGES, BREP (přesná geometrie), STL, OBJ, 3MF, glTF/GLB, PLY, OFF (sítě), DXF a DWG (2D výkresy; DXF i jako skica); u nativních formátů (SolidWorks, Inventor, ZW3D, CATIA, Creo, Fusion…) poradí, jak je převést.
 - Formařské nástroje: analýza úkosů, zebra pruhy, mapa křivosti, tloušťka stěn, smrštění podle materiálu, návrh vyhazovačů a chladicích kanálů, dělicí rovina, rám formy s normáliemi.
+- Sdílení a automatizace: krátký odkaz mnastrojarna.cz/s#KÓD s dokumentem zašifrovaným už v prohlížeči (kapitola 18); textové příkazy, API a příkazová řádka pro AI agenty a skripty (kapitola 22).
+- Mikronávody: po najetí myší na ikonu se ukáže, co nástroj dělá, postup a tip (kapitola 3).
 
 ### Požadavky
 
@@ -86,7 +91,7 @@ Jádrem je geometrický modelář OpenCascade (OCCT) přeložený do WebAssembly
 
 Postup, který vás provede od prázdného dílu k výkresu v PDF a souboru STEP.
 
-1. Nový díl: program se otevře s prázdným dílem (tři základní roviny XY, XZ, YZ, mřížka vypnutá); na úvodní obrazovce jsou tři šablony – Nový díl, Nová sestava, Nový výkres (otevře díl ze souboru a rovnou založí výkres).
+1. Nový díl: program se otevře s prázdným dílem (tři základní roviny XY, XZ, YZ, mřížka vypnutá); na úvodní obrazovce jsou čtyři šablony – Nový díl, Nová sestava, Nový výkres (otevře díl ze souboru a rovnou založí výkres) a Nový 2D výkres (2D CAD, kapitola 14). Nevíte-li, co která ikona dělá, najeďte na ni myší – ukáže se mikronávod s postupem (kapitola 3).
 2. Skica: v pásu Tvorba → Skica vyberte rovinu (XY = půdorys). Klávesou r nakreslete obdélník dvěma kliky, nebo začněte psát čísla: 60 Tab 40 Enter vytvoří obdélník 60 × 40 mm i s kótami.
 3. Dokončit skicu (tlačítko vpravo nahoře nebo Enter). Program rovnou nabídne Vysunutí – zadejte výšku (např. 20) a potvrďte Enter.
 4. Díra: h nebo Tvorba → Díra; klikněte na horní plochu – bod a osa se doplní samy. Zvolte typ (vrtaná, válcové / kuželové zahloubení, závit), např. „Pro šroub M8“, ukončení „Skrz vše“, Enter.
@@ -110,24 +115,41 @@ Logo (zpět na web), rychlé akce Nový díl / Otevřít / Uložit, Zpět / Znov
 
 ### Záložky dokumentů
 
-V jednom okně může být otevřeno více dílů, sestav a výkresů najednou – každý ve vlastní záložce (ikona krychle = díl, vrstvy = sestava, list = výkres). Název aktivní záložky lze přepsat přímo v ní. + otevře nový díl, × (nebo prostřední tlačítko myši) záložku zavře, Nový výkres otevře výkres jako další záložku vedle svého dílu. Záložky se pamatují i po obnovení stránky; dokumenty jsou uložené v nedávných souborech.
+V jednom okně může být otevřeno více dílů, sestav a výkresů najednou – každý ve vlastní záložce (ikona krychle = díl, vrstvy = sestava, list = výkres, lomená čára = 2D výkres). Název aktivní záložky lze přepsat přímo v ní. + otevře nový díl, × (nebo prostřední tlačítko myši) záložku zavře, Nový výkres otevře výkres jako další záložku vedle svého dílu. Záložky se pamatují i po obnovení stránky; dokumenty jsou uložené v nedávných souborech.
 
 ### Pás karet (ribbon)
 
-Tlačítka jsou seskupená a každá skupina má pod sebou název (Skica, Tvar, Primitiva, Konstrukční prvky, Úpravy…; ve skice Uchopení, Kreslení, Úpravy, Vazby, Kóty, Nástroje). Popisek tlačítka i název skupiny jsou psané čitelným písmem; po najetí myší se zobrazí nápověda s klávesovou zkratkou.
+Tlačítka jsou seskupená a každá skupina má pod sebou název (Skica, Tvar, Primitiva, Konstrukční prvky, Úpravy…; ve skice Uchopení, Kreslení, Úpravy, Vazby, Kóty, Nástroje). Popisek tlačítka i název skupiny jsou psané čitelným písmem; po najetí myší se zobrazí mikronávod (viz níže).
 
 | Záložka | Obsah |
 | --- | --- |
-| Soubor | Nový díl / sestava, otevřít a importovat, uložit projekt, export 3D, výkres, rám vstřikovací formy, ukázkové díly, knihovna normálií, nastavení, klávesové zkratky, poptávka výroby. |
+| Soubor | Nový díl / sestava / 2D výkres, otevřít a importovat, uložit projekt, sdílet odkazem, otevřít sdílený dokument, export 3D, výkres, rám vstřikovací formy, ukázkové díly, knihovna normálií, nastavení, klávesové zkratky, poptávka výroby. |
 | Tvorba | Skica (11 způsobů volby roviny), Vysunout, Rotovat, Tažení, Šablonovat, Text; Kvádr, Válec, Trubka, Kužel, Koule; Díra, Závit, Rozříznout, Žebro, Pružina; Zaoblit, Srazit, Úkos, Skořepina; Vytáhnout / Zatlačit, Odsadit, Odstranit plochu, Zesílit, Barva plochy; Pole, Zrcadlit, Přesunout / otočit; Rovina, Osa, Bod, Souřadný systém; Normálie; pokročilé úpravy (proměnné a plné zaoblení, zaoblení řetězce, sražení D1×D2 / D×úhel, zrcadlení prvků, pole podél křivky, výplňové pole, zkrut, kopule, text na válci, úkos od dělicí roviny, lem / drážka, měřítko v bodě, díry v bodech, znovu použít nástroj). |
-| Plochy | 19 příkazů + třída A: N-stranná výplň G0/G1/G2, přechodová plocha a prodloužení G1/G2, analýza návaznosti G0/G1/G2, hřebeny křivosti, zebra, úprava řídicích bodů volných B-spline ploch | přesnější přechody G2 (u nás přesné ve vzorkovacích bodech), globální modifikace, úprava řídicích bodů na stěnách těles |
+| Plochy | 19 příkazů plošného modelování a plochy třídy A: N-stranná výplň G0/G1/G2, přechodová plocha, prodloužení G1/G2, analýza návaznosti, hřebeny křivosti, zebra, úprava řídicích bodů volných ploch (kapitola 7). |
 | Plech | 12 příkazů plechových dílů včetně rozvinu (kapitola 8). |
-| Svařence | 10 příkazů pro rámy z profilů, svary a kusovník řezů (kapitola 9). |
+| Svařence | 13 příkazů: profily a rámy, spoje, svary koutové, tupé, děrové a bodové, kusovník řezů a tabulka svarů (kapitola 9). |
 | Nástroje | Měřit, Vlastnosti, Hmotnost, Řez, Proměnné, Stavy dílu, Formařské nástroje, Kontrola geometrie, Sjednotit plochy, Tloušťka stěn. |
 | Zobrazení | Pohledy (izometrie, přední, horní, pravý, zadní, spodní, levý), styl zobrazení, kamera (přizpůsobit, perspektiva / pravoúhlá), mřížka a osy, barva tělesa, pozadí, schéma myši (ZW3D / SolidWorks / touchpad). |
 | Výkres | Nový výkres a výkresová dokumentace (kapitola 13). |
 | Data | Nastavení, paleta příkazů, úvodní obrazovka, otevřít / import, uložit, export, sestavy, ukázky. |
-| Skica | číselné zadání u kurzoru, 13 vazeb + 8 kót, automatické vazby, stav určenosti, ořez / odsazení / projekce, spline s tečnami (úhel a váha v libovolném bodě) | srovnatelné; navíc bloky, vazba poměru |
+| Skica | Objeví se při otevřené skice: uchopení, kreslení, úpravy, vazby, kóty a nástroje (kapitola 5). |
+
+2D výkres má vlastní pás karet (Kreslení, Úpravy, Hladiny, Poznámky, Bloky, Rozvržení, Výstup) a příkazový řádek – viz kapitola 14.
+
+### Mikronávody u ikon
+
+Když najedete myší na kteroukoli ikonu pásu karet a chvíli počkáte (asi 0,4 s), objeví se u ní mikronávod: název a klávesová zkratka, jednou větou co příkaz dělá, kdy ho použít, co vybrat předem, postup v jednom až třech krocích s názvy polí přesně jako ve formuláři, odpovídající textový příkaz a tip na nejčastější past. Při přejíždění po sousedních tlačítkách se návod přepíná hned, bez dalšího čekání.
+
+![Mikronávod u ikony Díra na kartě Tvorba: co příkaz dělá, kdy ho použít, co vybrat, postup ve třech krocích, textový příkaz a tip](https://www.mnastrojarna.cz/cad/docs/mikronavod.webp)
+
+*Mikronávod u ikony Díra: co příkaz dělá, kdy ho použít, co vybrat, postup, odpovídající textový příkaz a tip.*
+
+- Neaktivní (šedé) tlačítko návod ukáže také – a zvýrazněným řádkem navíc řekne, proč je neaktivní a co udělat, například „Nejdřív vyberte plochu (filtr výběru Plocha).“ nebo „Sestava zatím nemá komponenty.“
+- Návody mají i položky rozbalovacích nabídek, rychlá lišta u výběru, tlačítka výkresového prostředí a pás 2D výkresu.
+- Klávesnice: návod se ukáže hned, když na tlačítko přejdete tabulátorem; Esc, kliknutí nebo posun ho zavře.
+- Dotykový displej: návod vyvolá dlouhý stisk ikony (asi půl sekundy) – příkaz se přitom nespustí; běžné klepnutí příkaz spustí.
+- Návody jsou v češtině, angličtině i němčině podle jazyka rozhraní.
+- Kdo je nepotřebuje, vypne je v Nastavení → Obecné → Mikronávody u ikon; potom se u ikon zobrazuje jen krátká bublina s názvem a zkratkou.
 
 ### Správce historie (vlevo)
 
@@ -148,7 +170,7 @@ Záložka Historie ukazuje strom prvků v pořadí stavby: kliknutím prvek vybe
 
 ### Formulář prvku (vpravo)
 
-Každý prvek má formulář s názvem, parametry a tlačítky OK (Enter) a Storno (Esc). Během úprav se model živě přepočítává; u prvků pracujících s plochami nebo hranami se zobrazuje stav před prvkem, aby šlo pohodlně vybírat. Číselná pole přijímají výrazy (25/2, 10+5*2) i proměnné (=d*3, viz kapitola 15). Pokročilé volby jsou sbalené v sekci „Začátek, směr, tenká stěna…“.
+Každý prvek má formulář s názvem, parametry a tlačítky OK (Enter) a Storno (Esc). Během úprav se model živě přepočítává; u prvků pracujících s plochami nebo hranami se zobrazuje stav před prvkem, aby šlo pohodlně vybírat. Číselná pole přijímají výrazy (25/2, 10+5*2) i proměnné (=d*3, viz kapitola 16). Pokročilé volby vysunutí jsou sbalené v sekci „Začátek, směr, tenká stěna, úkos, kroucení…“.
 
 ### Řádek výzev a stavový řádek (dole)
 
@@ -309,7 +331,7 @@ Vazby: vodorovně, svisle, totožnost, rovnoběžně, kolmo, tečně, stejná ve
 - Zaoblit roh / Srazit roh číslem, Zrcadlit podle osy, Přesunout / Kopírovat / Otočit / Měřítko, Lineární a kruhové pole entit, Rozložit složené tvary na úsečky a oblouky.
 - Pomocná geometrie: přepne entitu na konstrukční (čárkovaně, netvoří profil) a zpět.
 - Promítnout hrany modelu: hrany ležící v rovině skici (±0,01 mm) nebo všechny viditelné jako kolmý průmět – vznikne normální nebo pomocná geometrie, plně určená (jako „převést entity“).
-- Import a export DXF: skicu lze načíst z DXF a uložit do DXF (např. pro řezání laserem).
+- Import a export DXF: Skica → Nástroje → Import DXF… vloží obsah DXF do otevřené skici (s volbou jednotek, posunu a hladin), Export skici DXF ji uloží např. pro řezání laserem. Soubor DXF nebo DWG otevřený přes Ctrl+O se načte jako 2D výkres (kapitola 14); do skici ho pošle tlačítko Otevřít jako 3D skicu v hlášce po otevření.
 
 ![Kontextová nabídka pravého tlačítka ve skice s vazbami a kótami pro vybranou entitu](https://www.mnastrojarna.cz/cad/docs/skica-kontext.webp)
 
@@ -329,7 +351,7 @@ U vektorového PDF (výkres z CADu) tlačítko Převést čáry na entity skici 
 
 ### Dokončení
 
-Dokončit skicu (Enter) zavře skicář. Je-li v Nastavení zapnuto „Po dokončení skici rovnou nabídnout vysunutí“, otevře se formulář vysunutí; Esc jej zruší a skica zůstane k dispozici pro jiné prvky. Skica může obsahovat více uzavřených profilů i otvory (vnoření se rozpozná automaticky).
+Dokončit skicu (Enter) zavře skicář. Je-li v Nastavení zapnuto „Po dokončení skici rovnou nabídnout vysunutí“, otevře se formulář vysunutí; Esc jej zruší a skica zůstane k dispozici pro jiné prvky. Skica může obsahovat více uzavřených profilů i otvory (vnoření se rozpozná automaticky). Když profil nejde vysunout, chyba prvku řekne proč – otevřený konec, mezera mezi entitami, křížení nebo překryv – s čísly entit a souřadnicemi místa.
 
 ## 6. Tvorba těles – prvky a jejich možnosti
 
@@ -341,9 +363,15 @@ Každý prvek je uložený v historii s parametry a lze ho kdykoli upravit, potl
 | --- | --- |
 | Ukončení (směr 1 a nezávisle směr 2) | Na vzdálenost · Skrz vše · K dalšímu (první stěna tělesa) · K vrcholu · K ploše (rovinné i zakřivené) · Odsazeně od plochy · K tělesu · Střední rovina (symetricky) |
 | Začátek | Rovina skici · Odsazení od roviny · Od plochy · Od vrcholu |
-| Směr | Kolmo na skicu · Osa X/Y/Z · Podél hrany / osy válce · Dvěma body · Normála plochy · Vektor · Pod úhlem · Tečna |
+| Směr | Kolmo na skicu · Osa X/Y/Z · Podél hrany / osy válce · Dvěma body · Normála plochy · Vektor · Pod úhlem od normály (s polem Směrem k – šikmý propad) · Tečna; u šikmého směru volba Vzdálenost kolmo na skicu (výška) |
 | Tenká stěna | Ven · Dovnitř · Na střed · Dvě tloušťky; funguje i pro otevřený profil (čára se stane stěnou) |
-| Další | Úkos ±44° (obrys se zužuje, otvory rozšiřují), Kroucení (°), Měřítko konce (ZW3D smrštit / rozšířit), Jen vnější obrys (ignorovat otvory), Opačný směr |
+| Další | Úkos do 44° s přepínačem Úkos obrysu: Dovnitř / Ven, Břit (rovná část) a Ostré rohy; Kroucení (°), Měřítko konce (ZW3D smrštit / rozšířit), Jen vnější obrys (ignorovat otvory), Opačný směr |
+
+### Šikmé vysunutí a úkos s břitem
+
+Vysunutí nemusí jít kolmo na skicu. V sekci „Začátek, směr, tenká stěna, úkos, kroucení…“ zvolte směr Vektor, odkaz na hranu, osu nebo plochu, anebo Pod úhlem od normály a pole Směrem k – profil se vysune šikmo, například propad pod 25°. Zadaná vzdálenost se měří podél směru; zaškrtnutím Vzdálenost kolmo na skicu (výška) se měří kolmo na rovinu skici. Ukončení Skrz vše, K tělesu, K dalšímu, K ploše i K vrcholu fungují i šikmo.
+
+Úkos má stranu. Dovnitř: vnější obrys se od roviny skici zužuje a otvory v profilu se rozšiřují (u odebrání se otvor do hloubky zužuje). Ven: obrys se rozšiřuje a u odebrání se otvor do hloubky rozšiřuje – to je odlehčení střižnice. Břit (rovná část) nechá prvních několik milimetrů od roviny skici rovných a teprve pak začne úkos; Ostré rohy drží rohy ostré (rovinné stěny), jinak se zaoblí. Otvor střižnice s břitem 3 mm a odlehčením 2° je tedy jediné vysunutí: skica otvoru na střižné ploše, Odebrat, Skrz vše, Úkos 2° Ven, Břit 3 mm. Úkos nejde kombinovat s tenkou stěnou ani s ukončením k zakřivené ploše. Textem vysunout skrz odebrat obráceně úkos 2 ven břit 3, šikmo vysunout skrz odebrat obráceně sklon 25 k +X (kapitola 22).
 
 ### Rotace
 
@@ -367,7 +395,7 @@ Vystouplý nebo gravírovaný text (písmo Roboto) na libovolné rovině (12 def
 
 ### Primitiva
 
-Kvádr, Válec, Trubka, Kužel, Koule – poloha čísly nebo odkazem (vrchol, střed kružnice, odvozený bod…), osa X/Y/Z nebo libovolným směrem.
+Kvádr, Válec, Trubka, Kužel, Koule – poloha čísly nebo odkazem (vrchol, střed kružnice, střed plochy, odvozený bod…), osa X/Y/Z nebo libovolným směrem (vektor, hrana, osa válcové plochy, dva body) a Operace Přidat / Odebrat / Průnik / Nové těleso. Kužel s operací Odebrat tak udělá kuželové sedlo, válec podél vektoru šikmý průchod; kužel s horním průměrem 0 má špičku. Textem např. kužel 20 0 25 v 0 0 70 osa 0 0,5 -0,866 odebrat (kapitola 22).
 
 ### Díra (H) – průvodce
 
@@ -375,9 +403,11 @@ Kvádr, Válec, Trubka, Kužel, Koule – poloha čísly nebo odkazem (vrchol, s
 
 *Průvodce dírou: typ, norma, ukončení, více poloh naráz, osa libovolným směrem.*
 
-- Typ: vrtaná, válcové zahloubení (pro ISO 4762), kuželové zahloubení (úhel 90°), závitová (M2–M48, vrtá se jádrový průměr; závit se uvede ve výkrese).
+- Typ: vrtaná, válcové zahloubení (pro ISO 4762), kuželové zahloubení (úhel 90°), závitová (M2–M48, hrubé i jemné stoupání; závit se uvede ve výkrese).
+- Vrták pro závit: výchozí je Tabulkový vrták (M8 → Ø6,8); volba Jádro D1 vrtá malý průměr závitu podle ISO 965-1 (M8 → Ø6,647) a Vlastní průměr, který zadáte – zadaný průměr se zachová a výkres ho uvede vedle označení závitu. Vrták musí být menší než závit.
 - Pro šroub: průchozí díra podle ISO 273 v řadě jemná / střední / hrubá; rozměry zahloubení podle normy.
-- Ukončení: slepá (úhel špičky vrtáku nastavitelný, výchozí 118°), skrz vše, k dalšímu, k ploše (+ odsazení), k vrcholu / bodu, odsazeně od plochy.
+- Ukončení: slepá, skrz vše, k dalšímu, k ploše (+ odsazení), k vrcholu / bodu, odsazeně od plochy, k tělesu.
+- Dno díry u slepé díry: Kužel vrtáku s nastavitelným úhlem špičky (60–170°, výchozí 118°), nebo Ploché – rovné dno bez kužele, např. sedlo pružiny nebo frézované dno. Hloubka je vždy hloubka válcové části.
 - Skrz vše vrtá od zadaného bodu jen ve směru vrtání – materiál nad bodem (například protější příruba) zůstane. Volba Skrz oběma směry provrtá celé těleso na obě strany. Když díra ve směru vrtání žádný materiál nezasáhne, prvek dostane upozornění ⚠.
 - Poloha: klik na plochu (bod i osa se doplní podle normály), nebo více poloh z vrcholů, středů kružnic, bodů skici a pomocných bodů – jedna díra se vyvrtá všude naráz. Osa libovolným směrem (8 způsobů).
 - Pokročilé úpravy obsahují i Díry v bodech (díry podle bodů skici).
@@ -526,8 +556,24 @@ Rámy, stojany a konstrukce z válcovaných a uzavřených profilů včetně sva
 - Konstrukční profil (Shift+W) podél skici: IPE, HEA/HEB, UPN, úhelník L, jäkl čtvercový / obdélníkový, trubka, plochá a čtvercová tyč – rozměry podle norem z knihovny.
 - Rám z profilů vytvoří celý rám z obdélníkového půdorysu jedním příkazem; Deska (patka, příruba) s dírami.
 - Ořezat rovinou profily na pokos, Víčko uzavře konec profilu, Styčník spojí profily v uzlu.
-- Svarová housenka koutového svaru podél hran a Značka svaru (do výkresu).
-- Kusovník řezů: délky, úhly řezů a hmotnosti po profilech (pro pilu a nákup), Tabulka svarů.
+- Svary: Svarová housenka (koutový svar), Tupý svar, Děrový svar, Bodový svar a ruční Značka svaru – viz níže.
+- Kusovník řezů: délky, úhly řezů a hmotnosti po profilech (pro pilu a nákup); Tabulka svarů se součty.
+
+### Svary: koutové, tupé s úpravou hran, děrové a bodové
+
+Každý modelovaný svar vytvoří svarový kov jako samostatné těleso („Svar 1“, „Svar 2“…) a do stavu prvku zapíše délku, průřez, objem, hmotnost svarového kovu (podle hustoty materiálu dílu, jinak 7,85 g/cm³) a odhad přídavného materiálu podle účinnosti zvolené metody svařování (např. 135 MAG 0,9; 111 obalená elektroda 0,6; 141 TIG 0,98). Tabulka svarů vypíše všechny svary se součty.
+
+| Svar | Co vybrat a zadat | Výsledek a omezení |
+| --- | --- | --- |
+| Svarová housenka (koutový svar) | hrany koutu – vnitřní hranu mezi plochami nebo spodní hranu dílu stojícího na jiném tělese; Velikost svaru jako a (tloušťka) nebo z (rameno, z = a·√2); volby Oboustranný, Kolem, Přerušovaný (délka úseku / rozteč) | housenka podél rovných hran a kruhových oblouků; „Kolem“ obejde celou uzavřenou smyčku (profil nebo trubka na desce) |
+| Tupý svar | čelo dílu, které se dotýká druhého dílu, nebo hranu spáry na straně svaru; Úprava podle ISO 9692-1: I, V, Y, X, U, 2U, ½V, ½Y, K, J, 2J; Úhel, Otupení c, Mezera b, Převýšení housenky, Podložka kořene, Obrátit stranu svaru | úkosy se vyříznou do dílů a spára se vyplní svarovým kovem; souměrné úpravy (I, V, Y, X, U, 2U) do obou dílů, jednostranné (½V, ½Y, K, J, 2J) jen do vybraného; tupý, T i rohový spoj; jen rovná spára a stěny v pravém úhlu |
+| Děrový / žlábkový svar | horní plochu horního plechu přeplátování; Průměr / šířka otvoru d, u žlábku Délka žlábku l, Počet, Rozteč e, řada podél delší nebo kratší strany | otvory se vyříznou do horního plechu a vyplní svarem; převýšení má jen kruhový otvor |
+| Bodový svar | plochu horního plechu; Průměr bodu d, Počet bodů, Rozteč e, posun řady | značky bodů na ploše pro výkres a Tabulku svarů – bez přídavného materiálu a hmotnosti, čočka svaru se nemodeluje |
+| Značka svaru | ručně typ, velikost, délka, kolem, montážní, metoda; volitelně hrana spoje | pro svary, které se nemodelují; s hranou ukáže na výkrese šipkou na spoj |
+
+- Značky na výkrese: z každého svaru se na výkrese automaticky nakreslí značka podle ISO 2553 – šipka ke spoji, referenční čára, značka druhu svaru, velikost (a / z / s / Ø), délka × počet a rozteč, oboustranný, kolem, montážní, metoda. Značky jsou i v exportu PDF, DXF, DWG a SVG.
+- Textem: svar koutový a5 hrana u 5 50 12 oboustranně metoda 135, svar tupý V 60 otupení 1 mezera 2 plocha +X, svar ½V 45 otupení 1 mezera 0 hrana u -5 50 12, svar děrový Ø12 počet 3 rozteč 50 plocha u 150 50 18, svar bodový Ø6 rozteč 40 počet 5 plocha F9, svar tabulka. Spoj se zadá číslem hrany nebo plochy (E12, F7), pravidlem, nebo bodem hrana u x y z / plocha u x y z. Anglicky weld …, německy schweißnaht … nebo naht ….
+- Omezení: tupý svar s úpravou jen po rovné spáře, šikmý T spoj (jiný než 90°) jen koutovým svarem, trubky tupým svarem zatím ne; koutová housenka nevede po obecné křivce.
 
 ## 10. Knihovna normálií
 
@@ -589,6 +635,8 @@ Vyberte komponentu a zvolte typ vazby (karta Sestava nebo panel komponenty). Pan
 
 Pokročilé a mechanické vazby a pohybová studie. Sestava má 23 druhů trvalých vazeb: k sedmi základním (Kontakt, Zarovnat, Souosost, Vzdálenost, Úhel, Rovnoběžně, Ukotvit) přibyly pokročilé – Kolmo, Tečně (rovina, válec, koule; vnitřní dotyk), Shodně (vrchol, střed koule nebo kružnice, osa, rovina), Symetricky (podle roviny souměrnosti libovolné komponenty), Šířka (jazýček uprostřed drážky), Dráha (bod po hraně – úsečce, kružnici nebo křivce), Drážka (čep mezi dvěma konci drážky), Závěs (souosost a dosedací roviny), Zámek (dvě komponenty jako celek), Mez vzdálenosti a Mez úhlu (rozsah min–max) – a mechanické: Ozubená kola (převodový poměr nebo počty zubů, vnitřní ozubení), Hřeben a pastorek (posuv na otáčku, modul a zuby), Šroub (stoupání, levý závit), Vačka (zdvihátko s rovinou, válečkem, koulí nebo hrotem zůstává v dotyku s plochou vačky) a Kardan. Vybertě komponentu, v panelu komponenty rozbalte Pokročilé vazby nebo Mechanické vazby (případně pás karet Sestava ▸ Vazby ▸ Pokročilé / Mechanické) a zvolte druh. Průvodce ukáže kroky vazby: entity se vybírají ze seznamů ploch, hran a vrcholů (plochy i kliknutím v modelu), nepovinné kroky lze přeskočit; hodnoty jsou předvyplněné z geometrie (poměr z poloměrů os, posuv 2π·r, hrubé stoupání ISO, meze kolem aktuální hodnoty). Poměr, stoupání a meze lze později změnit v seznamu Vazby pod stromem. Mechanické vazby si pamatují výchozí natočení a posuv a drží vztah jejich změn. Pohybová studie (Sestava ▸ Pohyb ▸ Pohybová studie) přidá motory – rotační na vazbě Závěs, Souosost nebo Šroub (rozsah ve stupních nebo otáčky za minutu), lineární na vazbě Vzdálenost, Drážka, Dráha nebo Souosost (rozsah v mm nebo rychlost) – a zadáte délku a počet kroků. Po Vypočítat pohyb řešič spočítá polohy všech komponent v každém kroku se všemi vazbami včetně převodů a mezí; časová osa má přehrávání, pauzu, posuvník a smyčku, volitelně se v každém kroku kontrolují kolize (souhrn uvede první kolizi – krok, čas a dvojici) a kreslí stopa zvoleného bodu komponenty. Výsledek lze uložit jako tabulku CSV (poloha a natočení každé komponenty v každém kroku), snímky PNG (ZIP) nebo video WebM. Studie se ukládá do sestavy. Textem: sestava vazba ozubení "Kolo1" "Kolo2" poměr 2, sestava vazba šroub "Matice" "Šroub" stoupání 1,5, sestava vazba vačka "Zdvihátko" -Y "Vačka" F3, pohyb motor rotační "Klika" 0..360 krok 5 kolize, pohyb stav | krok 12 | přehrát | export csv; přes API window.mncad.motion(). Jde o kinematickou studii – síly, gravitace a pružiny se nepočítají.
 
+Kontrola kolizí v pohybové studii je přírůstková: v každém kroku se znovu počítají jen dvojice dílů, které se vůči sobě pohnuly, a díly spojené vazbou Zámek se berou jako jeden tuhý celek – zvládne tak i delší studie větších sestav. Textový souhrn (pohyb stav) uvádí první kolizi i vazby, které pohyb v některém kroku porušuje.
+
 ## 12. Formařské nástroje
 
 Nástroje pro konstrukci vstřikovacích forem a lisovacích nástrojů, které jinak najdete jen v drahých modulech.
@@ -616,15 +664,15 @@ Výrobní výkres z modelu nebo sestavy během minuty – pohledy, kóty, tolera
 - Pohledy: přední, horní, levý, pravý, zadní, spodní a izometrie – zapínají se přepínači; měřítko a formát listu A4–A0 automaticky nebo ručně; promítání E (evropské) / A (americké).
 - Řez rovinou s šrafováním, Detail (zvětšený výřez), tabulka děr, skryté hrany čárkovaně.
 - Anotace: kóta (zarovnaná, vodorovná, svislá, s předponou / příponou / textem), poznámka s odkazovou čarou, drsnost Ra, geometrická tolerance (rovinnost, válcovitost, kolmost, rovnoběžnost, souosost, házení…), základna, volný text. Kóty se umisťují tažením.
-- Sestavy: kusovník na listu, pozice s odkazovými čarami, více listů.
+- Sestavy: kusovník na listu, pozice s odkazovými čarami, více listů. Svary z modelu dostanou značku podle ISO 2553 automaticky (kapitola 9).
 - Razítko: název, číslo, materiál, hmotnost, měřítko, autor (Nastavení → Výkres), nepředepsané tolerance (ISO 2768-mK výchozí), datum, logo.
-- Export: PDF (vektorový), DXF a DWG (verze R2000 až R2018, otevře AutoCAD, ZWCAD, BricsCAD, DraftSight), SVG. Výkres je uložený v projektu .mncad a při změně modelu se aktualizuje.
+- Export: PDF (vektorový), DXF a DWG (verze R2000 až R2018, otevře AutoCAD, ZWCAD, BricsCAD, DraftSight), SVG. Má-li výkres více listů, volba Listy k exportu určí Všechny listy nebo Aktivní list: všechny listy dají jedno vícestránkové PDF, u DWG, DXF a SVG soubor ZIP s jedním souborem na list; stejná volba platí pro Tisk. Výkres je uložený v projektu .mncad a při změně modelu se aktualizuje.
 
 ### Kóty podle vybrané geometrie
 
 Nástroj Kóta (D) pozná, na co klikáte: kliknutím na kružnici vznikne kóta průměru Ø, na oblouk (zaoblení) kóta poloměru R – klávesa Shift nebo přepínač „Kružnice: Auto / Ø / R“ volbu obrátí. Kliknutím doprostřed hrany se okótuje její délka, kliknutím na druhou hranu úhel mezi nimi (u rovnoběžných hran jejich vzdálenost). Dva body (konce hran, středy děr) dají délkovou kótu. Pod kurzorem se zvýrazní, co by se vybralo, a po výběru se kóta kreslí u kurzoru jako náhled. Po umístění se u kurzoru otevře malé pole: do něj napíšete toleranci nebo příponu (H7, ±0,1) a případně odsazení kóty – Enter potvrdí. Kóty kružnic, hran a úhlů se drží své geometrie: změní-li se průměr díry nebo délka hrany, hodnota se přepočítá sama; když geometrie z pohledu zmizí, kóta se v seznamu označí ⚠. List výkresu se přejmenuje dvojklikem přímo na záložce.
 
-> Pro CAM a laser exportujte DXF (skica, rozvin nebo výkres); pro zákazníky a výrobu PDF; pro úpravy v 2D CADu DWG.
+> Pro CAM a laser exportujte DXF (skica, rozvin nebo výkres); pro zákazníky a výrobu PDF; pro úpravy v 2D CADu DWG – DWG i DXF výkresu lze otevřít a dál upravovat i přímo v 2D výkresu (kapitola 14).
 
 ### Rozvržení listu, otočení pohledu, poloviční řez, další modely
 
@@ -638,15 +686,169 @@ Nový výkres se kótuje automaticky podle prvků modelu, ne podle každé prom�
 
 - Soustružené díly: průměry osazení naskládané po straně (nejmenší nejblíž dílu), délky osazení v jedné řetězové řadě, celková délka ve vnější řadě; nejdelší článek řetězu je pomocná kóta v závorce, aby řetězec nebyl uzavřený. Zápich šířkou a průměrem, vnější závit označením (M20×1,5) a délkou, sražení a zaoblení jedním popisem s počtem (1,5×45°, 2× R1).
 - Hranolové díly: celkové rozměry jednou, polohy děr od levé a spodní hrany v pohledu, kde jsou díry kružnice; souměrné díry od osy souměrnosti, kruhové pole roztečnou kružnicí s poznámkou „rovnoměrně“.
-- Díry: každá skupina stejných děr má jeden popis s odkazem sestavený z parametrů díry – 4× M8 ↧10 / Ø6,8 ↧14, 6× Ø11 skrz / ⌴ Ø18 ↧11, ⌵ Ø12,4 × 90°. Značky ↧ ⌴ ⌵ se v náhledu, PDF, DXF, DWG i SVG kreslí čarami.
+- Díry: každá skupina stejných děr má jeden popis s odkazem sestavený z parametrů díry – 4× M8 ↧10 / Ø6,8 ↧14, 6× Ø11 skrz / ⌴ Ø18 ↧11, ⌵ Ø12,4 × 90°. Značky ↧ ⌴ ⌵ se v náhledu, PDF, DXF, DWG i SVG kreslí čarami. U závitové díry s jiným než tabulkovým vrtákem popis uvede skutečný průměr vrtáku (M8 ↧20 / Ø6,647 ↧20), u slepé díry s plochým dnem poznámku „(ploché dno)“.
 - Vygenerované kóty jsou běžné upravitelné kóty: lze jim dopsat toleranci, posunout je nebo smazat. Při změně modelu se přepočítají a vlastní kóty zůstanou. V nastavení kót lze přepnout řetězově / od základny, tlačítko Přegenerovat kóty je vytvoří znovu a ponechá tolerance i vlastní kóty.
-- Textem: výkres A3 na šířku pohledy přední,horní,iso, kótovat [řetězově|od základny], výkres tolerance Ø30 h6, výkres nepředepsané ISO 2768-mK, výkres stav (přehled kót po pohledech, duplicity, chybějící rozměry; pro skripty window.mncad.drawingStatus()).
+- Textem: výkres A3 na šířku pohledy přední,horní,iso, kótovat [řetězově|od základny], výkres tolerance Ø30 h6, výkres nepředepsané ISO 2768-mK, výkres export pdf|dxf|dwg|svg [list N|vše] (soubor bez dialogu, kapitola 22), výkres stav (přehled kót po pohledech, duplicity, chybějící rozměry; pro skripty window.mncad.drawingStatus()).
+
+### Více výkresů jednoho dílu a export všech listů
+
+Díl nebo sestava může mít několik samostatných výkresů (Výkres 1, Výkres 2…), každý s vlastními listy – například výrobní a montážní. Výkres → Nový výkres založí další výkres, Otevřít výkres nebo lišta listů ve výkresu mezi nimi přepíná. Číslování listů, razítko „List 1/2“ i export všech listů platí uvnitř jednoho výkresu. Textem: výkres nový "Montážní", výkres výkresy (přehled), výkres výkresy 2 (přepnutí) a výkres export pdf vše – všechny listy aktivního výkresu jako jedno vícestránkové PDF; výkres export dwg vše (stejně DXF, SVG a PNG) uloží ZIP s jedním souborem na list.
 
 ### Pomocný pohled, zalomený a částečný řez, přerušený pohled, uložení ISO 286, revize
 
 Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize. Ve výkresovém prostředí je sekce „Pomocné pohledy a řezy“ s nástroji na listu. Pomocný pohled vytvoříte kliknutím na hranu šikmé plochy v kterémkoli pohledu a pak kliknutím na místo na listu (Enter = zarovnaně s rodičovským pohledem). Vznikne „POHLED B“ promítnutý kolmo na plochu, takže plochu ukáže ve skutečném tvaru, a v rodičovském pohledu se nakreslí šipka s písmenem (metoda šipky ISO 128-30). Pohled lze přepnout na „podél hrany“ nebo „otočit“. Zalomený řez vznikne zadáním bodů čáry řezu v pohledu; úseky se přichytí vodorovně nebo svisle a Enter řez dokončí. Řez „ŘEZ C–C“ ukazuje šrafované řezné plochy ve všech rovnoběžných úsecích; skoky čáry řezu se v řezu nekreslí a v rodiči je čára řezu se silnými konci a zlomy, šipkami a písmeny. Natočený řez se zadává třemi body: konec hlavního ramena, vrchol (osa otočení) a konec šikmého ramena. Šikmé rameno se otočí do roviny hlavního, například u přírub s roztečí děr. Částečný řez je oblast v pohledu, ve které se materiál odebere od přední strany do zadané hloubky; řezná plocha se šrafuje a hranice se kreslí tenkou čarou od ruky (volitelně hladkou křivkou). Přerušení zkrátí dlouhý díl: dvěma kliky určíte vynechanou část, části se přisunou na mezeru 8 mm a kreslí se čáry přerušení (cikcak nebo vlnovka). Přerušení platí i v pohledech ve stejné promítací čáře a kóty přes přerušení ukazují skutečnou délku. U každé kóty a popisu díry je tlačítko „ISO“ pro výběr uložení ISO 286: díra nebo hřídel, základní úchylka A…ZC / a…zc, stupeň IT1…IT18 a doporučená uložení, s náhledem úchylek a vůle nebo přesahu (rozměry do 500 mm). Na listu se za značkou zobrazí úchylky „Ø40H7 (+0,025/0)“, mezní rozměry nebo jen značka; volíte to pro celý list nebo pro jednu kótu. „Tabulka uložení“ vypíše všechny kóty s polem tolerance s úchylkami a mezními rozměry. U kóty lze v seznamu vybrat revizi: vedle kóty se nakreslí trojúhelník s písmenem revize a pro každou revizi lze trojúhelníky skrýt. Volba „Zóny listu“ doplní na okraj rámu síť zón ISO 5457 a tabulka revizí dostane sloupec Zóna s polohou změn. Vše se exportuje do PDF, DWG, DXF, SVG i PNG a jde zadat i textem: „výkres pohled pomocný přední hrana …“, „výkres řez zalomený|natočený|částečný …“, „výkres přerušení přední x od 50 do 250“, „výkres uložení Ø40 H7“, „výkres uložení tabulka ano“, „výkres revize značka B na Ø40“, „výkres zóny ano“. Přehled vypíše „výkres stav“.
 
-## 14. Analýza a měření
+## 14. 2D CAD – 2D výkres (DWG / DXF)
+
+Samostatný druh dokumentu 2D výkres: kreslíte v rovině jako v AutoCADu nebo DraftSightu – příkazovým řádkem i myší, s hladinami, typy čar, uchopením, kótami, šrafami, bloky a rozvrženími pro tisk. Otevře a uloží DWG i DXF, takže výkres od zákazníka upravíte a pošlete zpět bez dalšího programu.
+
+### Kdy 2D výkres, kdy skica a kdy výkres z modelu
+
+| Potřebuji | Použiji |
+| --- | --- |
+| Profil pro vysunutí, rotaci nebo tažení 3D dílu | Skica (kapitola 5) – má vazby, řídicí kóty a řešič |
+| Výrobní výkres 3D dílu nebo sestavy | Výkres z modelu (kapitola 13) – pohledy a řezy se promítají samy a sledují změny modelu |
+| Upravit nebo dokreslit DWG / DXF, nakreslit schéma, rozmístění, přípravek nebo výpalek bez 3D modelu | 2D výkres (tato kapitola) – čáry kreslíte sami; přesnost dává zadání souřadnic a uchopení, vazby ani řešič tu nejsou |
+
+### Založení a otevření
+
+- Nový 2D výkres je na úvodní obrazovce a v nabídce Soubor. Výkres se otevře ve vlastní záložce (ikona lomené čáry), ukládá se jako projekt .mncad (Ctrl+S), má Zpět / Znovu (jeden příkaz = jeden krok) a jde sdílet odkazem.
+- Soubor DWG nebo DXF otevřený přes Ctrl+O, tlačítkem Otevřít nebo přetažením do okna se načte jako 2D výkres v nové záložce – s hladinami, bloky, kótami i rozvrženími. Velký soubor se čte na pozadí s průběhem a tlačítkem Zrušit.
+- Hláška po otevření vypíše počty entit, hladin, bloků a rozvržení a řekne, co se převedlo jinak nebo nepřevedlo. Je v ní i tlačítko Otevřít jako 3D skicu – pro případ, že jste z výkresu chtěli obrys pro 3D díl. Do už otevřené skici se DXF vkládá přes Skica → Nástroje → Import DXF….
+- Vložit výkres (karta Výstup, skupina DWG / DXF) přidá obsah jiného DWG / DXF do otevřeného výkresu: chybějící hladiny, styly a bloky se doplní, jiné jednotky se převedou měřítkem a vložené objekty zůstanou vybrané, abyste je mohli hned posunout. Ctrl+Z vrátí celé vložení jedním krokem.
+
+### Obrazovka 2D výkresu
+
+![2D výkres příruby v Mnástrojárna CAD: pás karet Kreslení, plátno s okótovaným a šrafovaným obrysem, panel Hladiny, příkazový řádek a stavový řádek s přepínači](https://www.mnastrojarna.cz/cad/docs/2d-vykres.webp)
+
+*2D výkres: pás karet, plátno s kótami, osami a šrafou, vpravo panel Hladiny, dole příkazový řádek a stavový řádek s přepínači MŘÍŽKA, KROK, ORTHO, POLÁRNÍ, UCHOP a TLOUŠŤKY.*
+
+- Pás karet má sedm karet: Kreslení (úsečka, křivka, kružnice, oblouk, obdélník, mnohoúhelník, elipsa, spline, přímka, polopřímka, bod, text, dotazy), Úpravy, Hladiny, Poznámky (texty, kóty, odkazy, šrafy, styly), Bloky, Rozvržení a Výstup (uložení, sdílení, DWG / DXF, tisk). Každé tlačítko má mikronávod (kapitola 3).
+- Příkazový řádek dole: stačí začít psát kdekoli nad plátnem. Název příkazu lze napsat česky, anglicky, německy nebo zkratkou AutoCADu (L, C, PL, REC, TR…); při psaní se nabízí doplnění (Tab). Enter nebo mezerník potvrdí, Esc zruší, prázdný Enter zopakuje poslední příkaz, šipky nahoru / dolů vracejí předchozí zadání a F2 rozbalí historii. Volby příkazu ve výzvě (Uzavřít, Zpět, Průměr…) jdou napsat i kliknout.
+- Stavový řádek: přepínače MŘÍŽKA (F7), KROK (F9), ORTHO (F8), POLÁRNÍ (F10, přírůstek 5–90°), UCHOP (F3, s nabídkou režimů uchopení) a TLOUŠŤKY, tmavé / světlé pozadí, počet entit a výběru, jednotky. Vlevo jsou záložky Model a jednotlivá rozvržení.
+- Panely vpravo: Vlastnosti (hladina, barva, typ a tloušťka čáry, měřítko typu čáry, geometrie vybraných objektů – hodnoty se dají přepsat) a Hladiny; další panely otevírají karty Poznámky (styly), Bloky, Rozvržení (Stránka) a Výstup (Tisk, DWG / DXF).
+- Myš: kolečko přibližuje k místu pod kurzorem, tažení prostředním tlačítkem posouvá, poklepání prostředním tlačítkem zobrazí celý výkres. Klik vybere objekt, tažení zleva doprava vybere jen objekty celé uvnitř okna, zprava doleva vše, čeho se okno dotkne (křížení); Shift + klik z výběru odebírá, Ctrl+A vybere vše. Pravé tlačítko otevře nabídku (Potvrdit, Zrušit, Opakovat poslední příkaz, Smazat, Vlastnosti, Zoom – rozsah). Na dotykovém displeji jeden prst posouvá, klepnutí kliká a dva prsty přibližují.
+- Úchopy: vybraný objekt ukáže úchopy. Tažením úchopu ho protáhnete (s uchopením a ORTHO); klik na úchop spustí úpravu úchopem, kde mezerník přepíná Protáhnout → Posun → Otočit → Měřítko → Zrcadlit.
+
+### První výkres za pět minut
+
+1. Nový 2D výkres (úvodní obrazovka). Jednotky jsou milimetry, kreslí se vždy ve skutečné velikosti 1:1.
+2. Hladiny: karta Hladiny → Správce hladin → Nová: OBRYS (tloušťka 0,5), OSY (červená, typ čáry CENTER, tloušťka 0,25) a KÓTY. Totéž na příkazovém řádku: hladina nová OSY barva 1 typčáry CENTER tloušťka 0.25. Hladinu OBRYS nastavte jako aktuální.
+3. Obrys: napište obdélník (nebo REC) a Enter, první roh 0,0, druhý roh @100,50 – deska 100 × 50 mm.
+4. Díra: kružnice (C), střed 50,25, volba Průměr a 20.
+5. Osy: přepněte aktuální hladinu na OSY, karta Poznámky → Značka středu, klikněte na kružnici a potvrďte Enter – vznikne křížek s osami.
+6. Kóty: aktuální hladina KÓTY, karta Poznámky → skupina Kóty → Lineární: klikněte na dva rohy desky (uchopení Koncový bod) a pak na místo kótovací čáry. Průměr: klikněte na kružnici a umístěte kótu. Hodnoty se měří samy; toleranci doplníte poklepáním na kótu (<> H7 – <> je naměřená hodnota).
+7. List: karta Rozvržení → Nové rozvržení → A4. Vznikne list s rámečkem a razítkem a výřez v měřítku, do kterého se výkres vejde. Název, číslo výkresu a materiál vyplňte v panelu Stránka (Vzhled stránky).
+8. Tisk a předání: Ctrl+P otevře tisk s náhledem → Tisk PDF. Pro zákazníka nebo CAM: karta Výstup → Uložit jako… → DWG nebo DXF ve zvolené verzi.
+
+### Souřadnice a přesné zadání
+
+| Zápis | Význam |
+| --- | --- |
+| 100,50 | absolutní bod X, Y (desetinná tečka, čárka odděluje X a Y); #100,50 totéž vždy absolutně |
+| @30,0 | relativně: 30 mm ve směru X od posledního bodu; samotné @ = poslední bod |
+| @50<45 | relativně polárně: délka 50 pod úhlem 45° od posledního bodu |
+| 50<45 | polárně od počátku 0,0 |
+| 25 (jen číslo) | vzdálenost od posledního bodu ve směru, kterým míří kurzor – s ORTHO nebo polárním trasováním přesně vodorovně, svisle nebo pod nastaveným úhlem |
+| 100/3, 2*25 | místo čísla lze napsat výraz |
+
+ORTHO (F8) drží kreslení vodorovně a svisle, polární trasování (F10) přichytává směr po zvoleném přírůstku (5°, 10°, 15°, 22,5°, 30°, 45°, 90°), KROK (F9) přichytává k mřížce.
+
+### Uchopení objektů
+
+Uchopení (F3) přichytí kurzor k přesnému bodu existující geometrie a ukáže u něj značku. Režimů je deset: Koncový bod, Polovina, Střed, Kvadrant, Průsečík, Kolmo, Tečně, Nejbližší, Uzel (bod) a Bod vložení (blok, text). Režimy Tečně a Nejbližší jsou ve výchozím stavu vypnuté; zapnete je v nabídce u přepínače UCHOP.
+
+### Hladiny, typy čar, tloušťky a barvy
+
+- Správce hladin (LA): nová hladina, přejmenování, barva, typ čáry, tloušťka, popis a stavy Zapnutá (vypnutá se nekreslí ani netiskne), Zmrazená (nekreslí se, nevybírá a nepočítá do rozsahu – u velkých výkresů zrychlí práci), Zamčená (je vidět, ale nejde upravit ani smazat) a Tisknout. Smazáním hladiny se její objekty přesunou na aktuální hladinu.
+- Tlačítka na kartě Hladiny pracují s hladinou vybraného objektu: nastavit jako aktuální, vypnout, zmrazit, zamknout; Zapnout a rozmrazit vše a Odemknout vše vrátí výchozí stav.
+- Typy čar se načítají z knihovny (CENTER, HIDDEN, DASHED, PHANTOM a další, i varianty s polovičním a dvojnásobným měřítkem). Délku čárek řídí globální měřítko čar (měřítkočar 0.5) a měřítko typu čáry u objektu.
+- Tloušťky čar se na obrazovce zobrazí přepínačem TLOUŠŤKY; tisk a PDF je používají vždy.
+- Barva objektu je číslo ACI (1 = červená, 7 = černá / bílá…) nebo pravá barva; výchozí DleHladiny přebírá barvu, typ i tloušťku z hladiny, DleBloku z vložení bloku.
+- Přenést vlastnosti (MA) zkopíruje hladinu, barvu, typ čáry a tloušťku ze zdrojového objektu na další.
+
+### Kreslení a úpravy
+
+| Skupina | Příkazy (zkratka) |
+| --- | --- |
+| Kreslení | čára (L) · křivka – úseky a oblouky jako jedna entita, i se šířkou (PL) · kružnice – střed a poloměr / průměr, 2 body, 3 body, tečna-tečna-poloměr (C) · oblouk (A) · obdélník se zaoblením nebo zkosením rohů (REC) · mnohoúhelník vepsaný / opsaný (POL) · elipsa a eliptický oblouk (EL) · spline proložením bodů nebo řídicími body (SPL) · přímka (XL) · polopřímka · bod (PO) |
+| Posun a kopie | posun (M) · kopie, i více cílů a v řadě (CO) · otočit (RO) · změnit-měřítko (SC) · zrcadlit (MI) · protáhnout křížícím oknem (S) · zarovnat-objekty (AL) |
+| Tvar | ekvidistanta (O) · oříznout (TR) · prodloužit (EX) · zaoblit (F) · zkosit (CHA) · přerušit (BR) a přerušit-v-bodě · spojit (J) · rozložit (X) · prodloužení o délku, procenta nebo na celkovou délku (LEN) · upravit-křivku (PE) · upravit-spline (SPE) · obrátit · rozdělit na N dílů (DIV) · rozměřit po délce (ME) |
+| Pole a pořádek | pole obdélníkové, polární a po dráze (AR) · přenést-vlastnosti (MA) · pořadí kreslení (DR) · odstranit-duplicity · smazat (E, klávesa Delete) |
+| Dotazy | vzdálenost (DI) · plocha a obvod (AA) · souřadnice bodu (ID) · výpis vlastností (LI) · stav · nápověda (?) |
+
+- Oříznout / Prodloužit pracují v rychlém režimu: řeznými hranami jsou všechny objekty, klikáte rovnou na části, které mají zmizet; Shift při kliknutí dělá opačnou operaci (u ořezu prodlouží, u prodloužení ořízne).
+- Zaoblit / Zkosit: poloměr nebo vzdálenosti se zadají volbou před výběrem; volba Křivka zaoblí všechny vrcholy křivky najednou; Shift u druhého objektu spojí objekty do ostrého rohu.
+- Objekty na zamčených hladinách příkazy přeskočí a ohlásí to. Každý příkaz je jeden krok Zpět.
+
+### Texty, kóty, šrafy a značky
+
+- Text jednořádkový (DT) a odstavcový text (MT) s editorem přímo na místě: zalamování do šířky rámečku, více řádků, tučně, barvy, zlomky a značky Ø, ° a ±. Textové styly určují písmo, výšku a sklon. Poklepání na text, kótu nebo odkaz otevře úpravu obsahu.
+- Kóty: chytrá kóta podle objektu (úsečka → délka, kružnice → Ø, oblouk → R), lineární (DLI), zarovnaná (DAL), úhlová (DAN), poloměr (DRA, i zalomená pro velké poloměry), průměr (DDI), délka oblouku (DAR), souřadnicová (DOR), základnicová (DBA) a řetězová (DCO); značka středu s osami. Kóty drží své definiční body – po úpravě úchopem se hodnota přepočítá.
+- Kótovací styly (D): výchozí styl ISO-25 (text 2,5 mm, šipky 2,5 mm, desetinná čárka). V panelu stylů nastavíte text, šipky, tolerance a měřítko, styl jde přepsat i jen u jedné kóty. Text kóty se doplňuje zápisem <> H7.
+- Multiodkaz se šipkou, zalomením a textem (MLD), Tolerance tvaru a polohy – rámeček podle ISO 1101 (TOL), Drsnost povrchu – značka podle ISO 1302 (s úběrem, bez úběru, základní) a Revizní obláček.
+- Šrafa (H): klik dovnitř uzavřené oblasti najde hranici i z více čar a vynechá ostrovy (díry). Vzory ANSI31–ANSI38, ISO a další, plná výplň, vlastní rovnoběžné čáry nebo barevný přechod; měřítko a úhel vzoru se dají změnit i dodatečně (HE).
+- Měřítko poznámek: anotativní texty, kóty a odkazy mají na papíře stálou velikost – v modelu se zvětší podle zvoleného měřítka (při 1:50 padesátkrát) a výřez rozvržení je kreslí ve svém měřítku.
+
+### Bloky a atributy
+
+- Vytvořit blok (B) udělá z vybraných objektů pojmenovaný blok s bodem vložení; Vložit blok (I) ho umístí s měřítkem X / Y a natočením (záporné měřítko zrcadlí). Blok se stejným názvem se předefinuje a změní se všechna jeho vložení.
+- Upravit blok (BE) otevře definici bloku: kreslíte a upravujete přímo jeho obsah, pruh ve stavovém řádku nabízí Uložit / Zahodit. Poklepání na vložený blok bez atributů dělá totéž.
+- Atributy jsou proměnné texty bloku (značka, výzva, výchozí hodnota) – typicky číslo pozice nebo popisové pole. Vyplní se při vložení, později se mění v panelu Atributy (poklepání na blok) a Atributy do CSV je vypíše do tabulky pro Excel.
+- Uložit blok jako soubor (W) zapíše blok, výběr nebo celý výkres jako samostatný DXF, DWG nebo .mncad. Vyčistit (PU) odstraní nepoužité bloky, hladiny, typy čar a styly.
+
+### Měřítka, rozvržení, výřezy a tisk
+
+V modelu se kreslí vždy 1:1 v jednotkách výkresu. Měřítko se volí až na papíře: rozvržení je list A4–A0 s rámečkem podle ISO 5457 a razítkem podle ISO 7200 a výřez je okno z listu do modelu v přesném měřítku (1:1, 1:2, 1:5, 2:1… nebo vlastní). Rozměr na papíře = rozměr v modelu × měřítko výřezu.
+
+- Nové rozvržení založí list zvoleného formátu (A4 na výšku, ostatní na šířku) s výřezem v měřítku, do kterého se model vejde. Mezi modelem a listy přepínají záložky ve stavovém řádku.
+- Panel Stránka (Vzhled stránky): formát a orientace listu, styl tisku, výřezy (měřítko, zámek, hladiny) a pole razítka. Pole Měřítko v razítku se přepisuje podle výřezu.
+- Výřezy: obdélník dvěma rohy, celá kreslicí plocha, dva / tři / čtyři výřezy najednou, mnohoúhelník nebo podle objektu. U zamčeného výřezu nejde měřítko ani pohled omylem změnit; ve výřezu lze zmrazit hladiny jen pro něj (v ostatních výřezech a v modelu zůstanou vidět).
+- Poklepáním do výřezu pracujete v modelu přes výřez – list kolem zůstane vidět; poklepáním mimo výřez se vrátíte na papír.
+- Tisk / PDF (Ctrl+P) s náhledem: co tisknout (rozvržení nebo model), papír, měřítko, styl Černobíle / Odstíny šedi / Barevně a tisk tlouštěk čar. PDF je vektorové, list vychází 1:1 a tloušťky čar v milimetrech. Dále PDF všech rozvržení (jeden vícestránkový soubor), Obrázek PNG (výchozí 150 DPI) a Vektor SVG.
+
+### DWG a DXF – import a export
+
+| Formát | Čtení | Zápis | Poznámka |
+| --- | --- | --- | --- |
+| DWG | R2000–R2018 | R2000, R2004, R2007, R2010, R2013, R2018 | bloky, kóty s geometrií, šrafy, rozvržení; otevře AutoCAD, ZWCAD, BricsCAD, DraftSight |
+| DXF | R12–R2018, textový i binární | R2000–R2018 (i binární) | zachová všechny druhy entit, tabulky, bloky a rozvržení |
+| DXF R12 | ano | ano (jen textový) | pro CAM a starší programy: elipsy a spline jako lomené křivky (odchylka do 0,005 mm), odstavcový text jako jednořádkový, šrafy rozložené na čáry, bez rozvržení; názvy velkými písmeny bez diakritiky |
+
+- Co se přenáší: hladiny (barva, typ čáry, tloušťka, stavy, popis), typy čar, textové a kótovací styly, bloky s atributy, rozvržení s papírem a výřezy, body, úsečky, přímky, polopřímky, křivky, kružnice, oblouky, elipsy, spline, texty, kóty všech druhů, odkazy, šrafy, tolerance a jednotky výkresu.
+- Co se převede jinak: vyplněné plochy SOLID / TRACE se načtou jako plná šrafa, 3DFACE jako uzavřená křivka, MLINE jako křivky, tabulka jako vložení bloku, obrázek a WIPEOUT jen jako rám. Entity, které 2D výkres nezobrazuje (3D tělesa, oblasti), se uchovají a při uložení zapíšou zpět.
+- Co se nenačte: externí reference (XREF) – hláška je vyjmenuje. Všechno, co se převedlo jinak nebo nepřevedlo, je v hlášce po otevření a v panelu Možnosti DWG / DXF.
+- Jednotky výkresu (mm, cm, m, palce) se ukládají do souboru; změna jednotek geometrii nepřepočítá, jen říká, v čem čísla jsou.
+- Velké soubory: čtení běží na pozadí s průběhem a tlačítkem Zrušit. Automatické testy hlídají, že se zkušební DXF o 10 MB načte do 5 sekund a DWG o 20 MB do 15 sekund; na pomalejším počítači to trvá déle.
+
+### 2D výkres textem (pro AI agenty a skripty)
+
+Všechny příkazy 2D výkresu jdou zadat i z konzole Textové příkazy (kapitola 22): řádek začíná 2d (anglicky i draft, německy zeichnen) a za ním je stejný příkaz jako na příkazovém řádku. Více příkazů na řádku odděluje středník. Objekty dostávají čísla e1, e2…, na která se dá odkazovat (e3.end, e3.mid, průsečík x(e1,e2)); u ořezu a zaoblení rozhoduje bod výběru e3@x,y. Protokol vrátí ✓ / ✗ a čísla vytvořených objektů, 2d stav vypíše jednotky, rozsah, hladiny a počty entit.
+
+| Řádek | Co udělá |
+| --- | --- |
+| 2d nový Deska | nová záložka s 2D výkresem (volitelně jednotky: mm, cm, m, in) |
+| 2d hladina nová OSY barva 1 typčáry CENTER tloušťka 0.25; hladina aktuální OSY | hladina a její nastavení jako aktuální |
+| 2d obdélník 0,0 @100,50; kružnice 50,25 průměr 20 | obrys a díra |
+| 2d zaoblit poloměr 10 křivka e1 | zaoblení všech rohů křivky e1 |
+| 2d kóta-lineární 0,0 100,0 50,-15; kóta-průměr e2 85,60 | kóty (dva body a poloha kótovací čáry; objekt a poloha textu) |
+| 2d šrafa vzor ANSI31 60,5 | šrafa oblasti kolem bodu |
+| 2d rozvržení nové Výroba A3 NAZEV=Příruba CISLO_VYKRESU=P-001 | list A3 s rámečkem, razítkem a výřezem |
+| 2d tisk mono · 2d export-pdf | PDF aktuálního rozvržení černobíle · všechna rozvržení v jednom PDF |
+| 2d export dwg verze R2013 název "Priruba" · 2d export dxf verze R12 | soubor DWG / DXF ve zvolené verzi |
+| 2d nápověda · 2d nápověda kružnice | seznam všech příkazů · zápis jednoho příkazu |
+
+Pro skripty je k dispozici window.mncad.draft("čára 0,0 100,0; kružnice 50,0 20") – vrací protokol a strukturovaný výsledek každého příkazu (vytvořené, změněné a smazané objekty, naměřené hodnoty, soubory exportu a tisku) – a window.mncad.importFile({ name, base64 }), které DWG / DXF otevře jako 2D výkres. Úplný popis zápisů je v návodu pro AI (/cad/schema-pro-ai.md, oddíl 2D výkres).
+
+### Omezení 2D výkresu
+
+- Kreslí se ve světovém souřadném systému; uživatelské souřadné systémy (UCS) nejsou.
+- Uchopení má deset režimů; trasování od bodů objektů (odvozené body mimo geometrii) není.
+- Písma SHX a TTF ze zdrojového výkresu se kreslí nejbližším webovým písmem – šířka textu se může od originálu mírně lišit; do DWG / DXF se název písma zapíše zpět.
+- Externí reference (XREF) se nenačítají; 3D tělesa se nezobrazují (uchovají se pro zápis zpět).
+- 2D výkres nemá geometrické vazby ani řídicí kóty – kóty jsou popisné a drží se bodů, které kótují.
+
+## 15. Analýza a měření
 
 ![Měření vzdálenosti mezi dvěma entitami s kótou v 3D okně a tabulkou výsledků](https://www.mnastrojarna.cz/cad/docs/mereni.webp)
 
@@ -666,16 +868,16 @@ Barevná mapa odchylek obarví model podle vzdálenosti od povrchu reference: ze
 
 ### Náhled bez WebGL
 
-Když prohlížeč nemůže spustit 3D okno (stará grafická karta, vzdálená plocha, akcelerace zakázaná správcem), zobrazí se místo něj zjednodušený softwarově kreslený náhled modelu. Tlačítky přepnete pohled (Izometrie, Přední, Zadní, Horní, Spodní, Levý, Pravý), Přizpůsobit vrátí celý model do okna, + / − nebo kolečko přibližují, tažení otáčí a Shift + tažení posouvá. Funguje styl zobrazení, řez i sestavy. Plochy a hrany se v náhledu kliknutím nevybírají – použijte seznamy ve formulářích (Ze seznamu…) nebo textové příkazy. Příčinu a postup nápravy ukáže tlačítko Proč nevidím 3D?.
+Když prohlížeč nemůže spustit 3D okno (stará grafická karta, vzdálená plocha, akcelerace zakázaná správcem), zobrazí se místo něj zjednodušený softwarově kreslený náhled modelu. Tlačítky přepnete pohled (Izometrie, Přední, Zadní, Horní, Spodní, Levý, Pravý), Přizpůsobit vrátí celý model do okna, + / − nebo kolečko přibližují, tažení otáčí a Shift + tažení posouvá. Funguje styl zobrazení, řez i sestavy. Výběr funguje i v náhledu: klik vybere plochu, hranu nebo vrchol, Ctrl / Shift + klik přidá či odebere a vybrané entity převezmou formuláře prvků, skica na ploše, měření i vazby sestav. Náhled je pravoúhlý (bez perspektivy). Příčinu a postup nápravy ukáže tlačítko Proč nevidím 3D?.
 
-## 15. Proměnné, rovnice a stavy dílu
+## 16. Proměnné, rovnice a stavy dílu
 
 - Proměnné (záložka vlevo): název, hodnota nebo výraz (L/2, sqrt(a^2+b^2), max(d, 10)), jednotka a popis. Funkce: sin, cos, tan, sqrt, abs, min, max, round, floor, ceil, pi…
 - Navázání parametru: do kteréhokoli číselného pole napište =výraz (např. =d*3) – pole se přepočítá při každé změně proměnné. Vazba se ukládá s dokumentem a zobrazuje ikonou u pole.
 - Stavy (konfigurace): varianty dílu s jinými hodnotami proměnných a potlačenými prvky (např. „s přírubou / bez příruby“, velikosti M8 / M10). Aktivní stav se přepíná ve správci; výkres a export respektují aktivní stav.
 - Nedávné soubory a rozpracovaná práce: ve výchozím režimu se nic neukládá (ochrana dokumentace). Zapnete-li v Nastavení → Soubory šifrované úložiště s heslem, ukládá se rozpracovaný model, záložky a nedávné soubory s náhledy (až 12) do tohoto prohlížeče zašifrovaně (AES-256) – bez hesla je nikdo nepřečte; odemčení platí do zavření karty.
 
-## 16. Soubory, import a export
+## 17. Soubory, import a export
 
 ![Nabídka Soubor: nový díl, otevřít, uložit projekt, export 3D, výkres, sestavy, ukázky, knihovna, nastavení](https://www.mnastrojarna.cz/cad/docs/menu-soubor.webp)
 
@@ -683,7 +885,7 @@ Když prohlížeč nemůže spustit 3D okno (stará grafická karta, vzdálená 
 
 | Formát | Import | Export | Poznámka |
 | --- | --- | --- | --- |
-| Mnástrojárna projekt (.mncad) | ano | ano | úplná historie prvků, skici, proměnné, stavy, výkresy, sestava; při uložení se program zeptá na místo a název (Uložit / Uložit jako…) |
+| Mnástrojárna projekt (.mncad) | ano | ano | úplná historie prvků, skici, proměnné, stavy, výkresy, sestava i 2D výkres; při uložení se program zeptá na místo a název (Uložit / Uložit jako…) |
 | STEP (.step/.stp) AP214 | ano | ano | přesná geometrie; doporučený formát pro výměnu se SolidWorks, Inventor, ZW3D, CATIA, Creo, Fusion, CAM |
 | IGES (.igs/.iges) | ano | — | starší přesný formát |
 | BREP (.brep) | ano | ano | nativní formát OpenCascade |
@@ -691,11 +893,11 @@ Když prohlížeč nemůže spustit 3D okno (stará grafická karta, vzdálená 
 | 3MF (.3mf) | ano | ano | 3D tisk s jednotkami a barvami |
 | OBJ · glTF/GLB · PLY · OFF | ano | OBJ, GLB | vizualizace, web, AR |
 | VRML (.wrl) | — | ano | starší prohlížeče |
-| DXF | skica | skica, rozvin, výkres | laser, CAM, 2D CAD |
-| DWG | — | výkres (R2000–R2018) | AutoCAD a kompatibilní |
-| SVG · PDF | — | výkres, rozvin | dokumentace, tisk |
+| DXF | 2D výkres (R12–R2018, textový i binární); do skici volbou | 2D výkres (R12–R2018), skica, rozvin, výkres z modelu | laser, CAM, 2D CAD; podrobnosti v kapitole 14 |
+| DWG | 2D výkres (R2000–R2018) | 2D výkres a výkres z modelu (R2000–R2018) | AutoCAD, ZWCAD, BricsCAD, DraftSight |
+| SVG · PDF | — | výkres, rozvin (SVG), tisk 2D výkresu (i PNG) | dokumentace, tisk |
 
-Přetažení myší: soubory lze přetáhnout přímo do okna CADu – z průzkumníka, z plochy i jako přílohu z Outlooku. Každý model se otevře ve vlastní záložce (v sestavě se vloží jako komponenta), DXF se načte jako skica. Tlačítko Otevřít / importovat (Ctrl+O) a úvodní obrazovka dělají totéž.
+Přetažení myší: soubory lze přetáhnout přímo do okna CADu – z průzkumníka, z plochy i jako přílohu z Outlooku. Každý model se otevře ve vlastní záložce (v sestavě se vloží jako komponenta), DXF a DWG se otevřou jako 2D výkres v nové záložce (kapitola 14) – i když je právě otevřená sestava; do skici se DXF vkládá volbou. Tlačítko Otevřít / importovat (Ctrl+O) a úvodní obrazovka dělají totéž.
 
 Nativní formáty (SLDPRT, SLDASM, IPT, IAM, Z3, CATPART, PRT, X_T, F3D, SKP, 3DM, IFC, JT, SAT…) prohlížeč otevřít nemůže – program je rozpozná a ukáže přesný postup, jak soubor ve zdrojovém CADu uložit jako STEP. Síťové formáty se importují jako těleso ze sítě (lze měřit, řezat, exportovat; booleovské operace fungují omezeně).
 
@@ -711,51 +913,76 @@ Po výběru nebo přetažení souboru se dole zobrazí průběh (co se čte, dí
 - Data importovaných souborů drží karta v paměti jen jednou, dokument obsahuje jen odkaz. Při uložení projektu .mncad a při sdílení odkazem se data vloží (každý díl jednou), takže uložený projekt je samostatný. Automaticky uložený dokument a nedávné soubory importovaná data neobsahují – otevřete znovu původní soubor nebo uložený .mncad.
 - Dojde-li jádru paměť nebo spadne-li, program to ohlásí a jádro spustí znovu. Jádro má k dispozici nejvýš 4 GB paměti; sestava 47,5 MB jako jedno přesné těleso potřebuje asi 1,5 GB, v lehkém režimu asi 350 MB.
 
-## 17. Sdílení odkazem
+## 18. Sdílení odkazem
 
-Jedno tlačítko a díl, sestava nebo výkres je u kolegy, zákazníka či dodavatele – kdekoli na světě, bez instalace a registrace. Odkaz pošlete WhatsAppem, e-mailem, přes Teams nebo jakkoli jinak.
+Jedno tlačítko a díl, sestava, výkres nebo 2D výkres je u kolegy, zákazníka či dodavatele – kdekoli na světě, bez instalace a registrace. Odkaz je krátký (https://mnastrojarna.cz/s#Ab3kZ9xQ2m), takže ho pošlete WhatsAppem, e-mailem, přes Teams i SMS – nebo ho prostě nadiktujete do telefonu.
 
-Tlačítko Sdílet je v horní liště vedle Nápovědy, v nabídce Soubor → Sdílet odkazem… a v paletě příkazů (Ctrl+K → „sdílet“). Dialog vytvoří odkaz okamžitě s výchozí platností 10 dní – stačí Kopírovat odkaz a vložit ho do zprávy, nebo použít tlačítka WhatsApp, E-mail či Sdílet… (systémová nabídka na mobilu: Teams, Messenger, Signal…). Tlačítko Kopírovat zprávu zkopíruje hotový text s názvem dílu, platností a odkazem.
+Tlačítko Sdílet je v horní liště vedle Nápovědy, v nabídce Soubor → Sdílet odkazem… a v paletě příkazů (Ctrl+K → „sdílet“). Dialog vytvoří odkaz okamžitě s výchozí platností 10 dní – stačí Kopírovat odkaz a vložit ho do zprávy, nebo použít tlačítka WhatsApp, E-mail či Sdílet… (systémová nabídka na mobilu: Teams, Messenger, Signal…). Kopírovat zprávu zkopíruje hotový text s názvem dokumentu, platností a odkazem.
 
-![Dialog Sdílet odkazem: platnost 10 dní, heslo, odesílatel, hotový odkaz a tlačítka Kopírovat odkaz, WhatsApp, E-mail](https://www.mnastrojarna.cz/cad/docs/sdileni.webp)
+![Dialog Sdílet odkazem s krátkým odkazem mnastrojarna.cz/s a desetimístným kódem: platnost 10 dní, heslo, odesílatel, volba Kde je dokument, kód po skupinách, Zneplatnit odkaz a tlačítka Kopírovat odkaz, WhatsApp, E-mail](https://www.mnastrojarna.cz/cad/docs/sdileni-kod.webp)
 
-*Dialog Sdílet odkazem: odkaz je hotový hned po otevření; volby platnosti, hesla a odesílatele ho přegenerují.*
+*Dialog Sdílet odkazem: krátký odkaz (36 znaků) je hotový hned po otevření; pod ním kód po skupinách, datum konce platnosti a Zneplatnit odkaz. Volby platnosti, hesla a odesílatele odkaz přegenerují.*
 
-### Co příjemce uvidí
+### Krátký odkaz a kód
+
+- Odkaz má tvar https://mnastrojarna.cz/s#Ab3kZ9xQ2m – celkem 36 znaků. Za znakem # je desetimístný kód z písmen a číslic. Záleží na velikosti písmen; znaky 0 (nula), O, I a l (malé L) se v kódu nepoužívají, aby se nepletly.
+- Dialog ukazuje kód i zvlášť, rozdělený do skupin (Ab3k Z9xQ 2m) – dá se přečíst nahlas nebo opsat.
+- Odkaz je stejně krátký pro malý díl i pro velkou sestavu s importovaným STEP a nemění délku ani s heslem.
+- Sdílení vyžaduje stránku na https://; odkaz otevřený přes http se na https přepne sám.
+
+### Jak příjemce dokument otevře
 
 ![Sdílený díl otevřený u příjemce s pruhem Sdílený dokument od Vít Volný, platí do data, snímek](https://www.mnastrojarna.cz/cad/docs/sdileni-prijemce.webp)
 
 *U příjemce: díl se otevře v nové záložce s pruhem „Sdílený dokument“ – vidí odesílatele i platnost, může měřit, řezat a uložit kopii.*
 
-- Odkaz otevře Mnástrojárna CAD v prohlížeči (Chrome, Edge, Firefox, Safari, i na mobilu) se snímkem dokumentu: lze otáčet, měřit, řezat, procházet historii prvků, prohlížet výkresy, exportovat STEP nebo uložit kopii .mncad.
+- Kliknutím na odkaz: otevře se Mnástrojárna CAD v prohlížeči (Chrome, Edge, Firefox, Safari, i na mobilu) se snímkem dokumentu. Lze otáčet, měřit, řezat, procházet historii prvků, prohlížet výkresy, exportovat STEP nebo uložit kopii .mncad.
+- Napsáním kódu: kdo na odkaz kliknout nemůže (má ho na papíře, slyšel ho v telefonu), otevře mnastrojarna.cz/s a kód napíše do okna Otevřít sdílený dokument. Pole přijme kód i po skupinách, celý odkaz nebo celou zprávu s odkazem. Když je kód špatně (jiná délka, zaměněný znak, jiná velikost písmen), řekne, co opravit. Stejné okno je v nabídce Soubor → Otevřít sdílený dokument… a na úvodní obrazovce (pole „Máte kód sdíleného dokumentu?“).
+- Otevření trvá o okamžik déle (zlomek sekundy až asi sekundu): prohlížeč z kódu záměrně pomalým výpočtem odvozuje šifrovací klíč.
 - Nad pracovní plochou je pruh „Sdílený dokument od … · platí do …“. Jde o snímek – úpravy příjemce se vám nepromítnou a vaše pozdější úpravy se do odkazu nedostanou; v takovém případě pošlete nový odkaz.
 - Stejný odkaz může otevřít libovolný počet lidí současně (například technolog, nákupčí a dodavatel na třech místech).
 - Sdílíte-li z výkresové záložky, příjemci se po otevření rovnou zobrazí výkres; model s historií má také.
-- Otevřený sdílený dokument přežije obnovení stránky (F5) v téže kartě; po zavření karty je pryč – nic se neukládá.
+- Otevřený sdílený dokument přežije obnovení stránky (F5) v téže kartě; po zavření karty je pryč – u příjemce se nic neukládá.
 
-### Platnost, heslo, odesílatel
+### Platnost, heslo, odesílatel, zneplatnění
 
-- Platnost 1, 7, 10, 30 nebo 90 dní, případně bez omezení. Po vypršení se odkaz neotevře („Platnost sdíleného odkazu vypršela“) – dokument prostě sdílejte znovu.
-- Heslo (volitelné): bez něj je odkaz nečitelný. Heslo pošlete jiným kanálem (SMS, telefon); příjemce ho zadá při otevření.
+- Platnost 1, 7, 10, 30 nebo 90 dní. Po vypršení se odkaz neotevře („Platnost sdíleného odkazu vypršela“) a zašifrovaný soubor se ze serveru smaže – dokument prostě sdílejte znovu.
+- Heslo (volitelné): klíč se pak odvozuje z kódu i z hesla, takže samotný odkaz dokument neotevře. Heslo pošlete jiným kanálem (SMS, telefon); příjemce ho zadá při otevření.
 - Odesílatel: jméno nebo firma, které příjemce uvidí v pruhu nad modelem. Program si ho pamatuje pro příště.
+- Zneplatnit odkaz: tlačítko v dialogu smaže zašifrovaný dokument ze serveru – odkaz přestane fungovat i těm, kdo ho už mají („Odesílatel tento sdílený odkaz zneplatnil“). Zneplatnit jde v dialogu, ve kterém odkaz vznikl, dokud je otevřený; po jeho zavření platí odkaz do konce platnosti. Rozmyslete si proto platnost předem.
+- Odkaz, který jste nezkopírovali ani neodeslali, se při změně voleb nebo zavření dialogu během nahrávání ze serveru smaže sám.
+- Zneplatněný nebo vypršelý odkaz už nikdy neožije: pod stejným kódem nejde nahrát jiný dokument.
 
-### Jak je to s ochranou dokumentace (NDA)
+### Co je na serveru a co ne (ochrana dokumentace, NDA)
 
-Dokument je zkomprimovaný přímo v odkazu, v části za znakem „#“. Tuto část prohlížeč nikdy neposílá na server – ani na hosting webu, ani do měření návštěvnosti; po otevření ji program z adresy hned odstraní, takže nezůstane v historii prohlížeče. Dokument tedy existuje jen ve zprávě, kterou sami pošlete, a v paměti karty příjemce. U příjemce platí výchozí režim bez ukládání.
+U krátkého odkazu se dokument zašifruje už ve vašem prohlížeči (AES-256-GCM) a na server mnastrojarna.cz se nahraje jen zašifrovaný soubor. Šifrovací klíč se odvozuje z kódu, který je v odkazu za znakem # – a tuto část adresy prohlížeč nikdy neposílá na server: ani na hosting webu, ani do měření návštěvnosti. Server tedy drží jen neprůhledný šifrovaný blok, který sám nedokáže přečíst, a po vypršení platnosti nebo po zneplatnění ho smaže. Po otevření program kód z adresy hned odstraní, takže nezůstane v historii prohlížeče. U příjemce platí výchozí režim bez ukládání.
 
-Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkazu nevejdou – dialog na to upozorní. Pro ně lze zapnout šifrované úložiště sdílení: dokument se zašifruje (AES-256) ještě v prohlížeči, na server jde jen šifrovaný soubor a klíč je pouze v odkazu; soubor se po vypršení platnosti smaže. Bez úložiště pošlete soubor .mncad nebo STEP klasicky jako přílohu.
+- Jak silná je ochrana: kód má 10 znaků z 58 možných, tedy přibližně 4 × 10^17 kombinací (osmnácticiferné číslo). Každý pokus o uhodnutí stojí pomalý výpočet (přes milion kroků odvození klíče) a server navíc omezuje počet neúspěšných dotazů z jedné sítě.
+- Kdo má odkaz, otevře dokument – zacházejte s ním jako s klíčem. Kód je záměrně krátký, aby šel nadiktovat; není to náhrada dlouhého šifrovacího klíče. Kdyby někdo získal zašifrovaná data přímo ze serveru, mohl by kódy zkoušet hrubou výpočetní silou.
+- Pro citlivou dokumentaci proto vždy přidejte heslo, zvolte krátkou platnost a heslo pošlete jinou cestou než odkaz.
+- Úložiště přijímá nahrávání jen ze stránek CADu, omezuje počet nových sdílení z jedné adresy za hodinu a adresu odesílatele neukládá (jen její otisk pro tento limit).
+
+### Kdy je odkaz dlouhý
+
+- Když úložiště sdílení není dostupné (výpadek sítě, web bez úložiště), zvolíte platnost bez omezení nebo v dialogu volbu jen v odkazu (bez serveru), vloží se celý zkomprimovaný dokument přímo do odkazu – do části za #. Na server se pak neposílá vůbec nic; dialog řekne, proč je odkaz dlouhý.
+- Dlouhý odkaz může mít tisíce znaků: WhatsApp, e-mail, Teams a Slack ho přenesou, SMS ne (dialog na to od 8 000 znaků upozorní). U e-mailu raději použijte Kopírovat odkaz a vložte ho do zprávy.
+- Do odkazu se vejde jen menší dokument (do 250 000 znaků). Modely s importovanou geometrií potřebují úložiště; to přijme dokument do 25 MB po kompresi a zašifrování. Větší model pošlete jako soubor .mncad nebo STEP.
+- Starší odkazy fungují dál: dřívější krátký tvar …/cad#q=… (67 znaků) i odkazy s dokumentem uvnitř se otevírají stejně jako dřív, do konce své platnosti.
 
 | Situace | Doporučení |
 | --- | --- |
-| Parametrický díl nebo sestava | Odkaz (jednotky až desítky kB) – WhatsApp, e-mail, Teams, Slack |
-| Dlouhý odkaz (nad 8 kB) | Kopírovat odkaz a vložit do zprávy; SMS odkaz nepřenese |
-| Importovaný STEP, velká sestava | Šifrované úložiště sdílení, nebo soubor .mncad / STEP jako příloha |
-| Citlivá dokumentace | Heslo + krátká platnost; heslo pošlete jiným kanálem |
+| Díl, sestava, výkres nebo 2D výkres | Krátký odkaz – WhatsApp, e-mail, Teams, Slack, SMS |
+| Příjemce nemůže na odkaz kliknout | Nadiktujte kód; příjemce otevře mnastrojarna.cz/s a kód napíše |
+| Importovaný STEP, velká sestava | Krátký odkaz (do 25 MB po kompresi); větší model jako soubor .mncad / STEP |
+| Citlivá dokumentace | Heslo + nejkratší možná platnost (1 den); heslo pošlete jiným kanálem než odkaz |
+| Nechci na server posílat ani zašifrovaná data | Volba „jen v odkazu (bez serveru)“ – dlouhý odkaz, nebo soubor .mncad jako příloha |
+| Úložiště není dostupné | Odkaz vznikne sám v dlouhém tvaru a dialog řekne proč |
 | Živá porada nad modelem | Všichni otevřou týž odkaz; změny pošlete jako nový odkaz nebo sdílejte obrazovku |
+| Skript nebo AI agent | Příkaz sdílet v konzoli nebo window.mncad.share() (kapitola 22) |
 
 > Odkaz je snímek: kdo ho má, otevře dokument do konce platnosti. Pro citlivé díly použijte heslo a kratší platnost.
 
-## 18. Nastavení
+## 19. Nastavení
 
 ![Dialog Nastavení se záložkami Obecné, Zobrazení, Myš a ovládání, Skica, Výkres, Soubory a Klávesové zkratky](https://www.mnastrojarna.cz/cad/docs/nastaveni.webp)
 
@@ -763,7 +990,7 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 
 | Záložka | Volby |
 | --- | --- |
-| Obecné | délkové jednotky, desetinná místa (délky, úhly), potvrzovat mazání, po dokončení skici nabídnout vysunutí, úvodní obrazovka, výchozí materiál |
+| Obecné | délkové jednotky, desetinná místa (délky, úhly), potvrzovat mazání, mikronávody u ikon, po dokončení skici nabídnout vysunutí, úvodní obrazovka, výchozí materiál |
 | Zobrazení | výchozí styl (stínovaný s hranami / drátový / průhledný), pozadí, kvalita sítě, tloušťka hran, pravoúhlé promítání, mřížka a osy, ViewCube, osový kříž, informační štítky, světlý / tmavý vzhled |
 | Myš a ovládání | schéma ZW3D / SolidWorks / touchpad, přiblížení ke kurzoru, obrácení kolečka |
 | Skica | přichytávání k mřížce, krok mřížky, automatické vazby, zobrazování značek vazeb |
@@ -771,7 +998,7 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 | Soubory | rozpracovaná práce v prohlížeči: neukládat (výchozí) nebo šifrované úložiště s heslem; vymazání všeho uloženého; počet nedávných souborů |
 | Klávesové zkratky | každou zkratku lze přemapovat; obnovit výchozí |
 
-## 19. Klávesové zkratky
+## 20. Klávesové zkratky
 
 | Zkratka | Akce |
 | --- | --- |
@@ -798,10 +1025,16 @@ Velké modely (importovaná geometrie STEP/BREP, rozsáhlé sestavy) se do odkaz
 | Skica: t o d m v | oříznout · odsadit · kóta · měřit · výběr |
 | Skica: Tab / Enter | další pole číselného zadání (zámek) / potvrdit |
 | Shift+F · Shift+W | ohyb z hrany (plech) · konstrukční profil (svařence) |
+| 2D výkres: F3 · F7 · F8 · F9 · F10 | uchopení · mřížka · ORTHO · krok mřížky · polární trasování |
+| 2D výkres: F2 | rozbalit historii příkazového řádku |
+| 2D výkres: Enter / mezerník | potvrdit zadání; prázdný opakuje poslední příkaz |
+| 2D výkres: Esc · Delete · Ctrl+A · Ctrl+P | zrušit příkaz nebo výběr · smazat vybrané · vybrat vše · tisk s náhledem |
+| 2D výkres: L · PL · C · A · REC · POL · EL · SPL · XL | úsečka · křivka · kružnice · oblouk · obdélník · mnohoúhelník · elipsa · spline · přímka (napsat a potvrdit) |
+| 2D výkres: M · CO · RO · SC · MI · O · TR · EX · F · CHA · X · E | posun · kopie · otočit · měřítko · zrcadlit · ekvidistanta · oříznout · prodloužit · zaoblit · zkosit · rozložit · smazat |
 
-Zkratky 3D i nástrojů skici se mění v Nastavení → Klávesové zkratky (skupiny „3D model“ a „Skica“ – stejnou klávesu lze mít v obou). Přehled Klávesové zkratky a ovládání (nabídka Nápověda) vždy ukazuje aktuální nastavení.
+Zkratky 3D i nástrojů skici se mění v Nastavení → Klávesové zkratky (skupiny „3D model“ a „Skica“ – stejnou klávesu lze mít v obou). Přehled Klávesové zkratky a ovládání (nabídka Nápověda) vždy ukazuje aktuální nastavení. V 2D výkresu (kapitola 14) neplatí jednopísmenné zkratky 3D modelu: písmena jdou do příkazového řádku jako názvy a zkratky příkazů jako v AutoCADu a potvrzují se Enter nebo mezerníkem.
 
-## 20. Mobil a dotykové ovládání
+## 21. Mobil a dotykové ovládání
 
 ![Mnástrojárna CAD na mobilním telefonu: nabídka Skica jako spodní list](https://www.mnastrojarna.cz/cad/docs/mobil.webp)
 
@@ -813,7 +1046,7 @@ Zkratky 3D i nástrojů skici se mění v Nastavení → Klávesové zkratky (sk
 - Skica dotykem: jeden prst dělá totéž co levé tlačítko myši (klepnutím kreslíte a vybíráte, tažením přesouváte entity, úchyty a kóty – tažení začne až po posunutí prstu asi o 8 px). Dlouhý stisk na místě otevře stejnou kontextovou nabídku jako pravé tlačítko a ukončí rozkreslený krok. Dvěma prsty skicu posouváte a roztažením nebo sevřením přibližujete.
 - Pás karet se při nedostatku místa sám zhustí (malá tlačítka bez pevné šířky, potom jen ikony s popiskem v bublině) a místo posuvníku má po stranách šipky; posouvá se i prstem. Paleta příkazů a knihovna fungují stejně jako na počítači. Pro produktivní práci doporučujeme tablet s klávesnicí nebo počítač.
 
-## 21. Pro AI agenty a automatizaci
+## 22. Pro AI agenty a automatizaci
 
 Vše, co jde v CADu udělat myší, jde udělat i textem. Konzole Textové příkazy, JSON formát dokumentu a JavaScript API dávají AI agentům (ChatGPT Agent, Claude, vlastní skripty) přístup ke všemu – a zpětnou vazbu jako text, bez čtení obrázku. Pro člověka se nic nemění: stejná obrazovka, stejné nabídky.
 
@@ -824,21 +1057,26 @@ Nápověda → Textové příkazy, zkratka Ctrl+Shift+K, nebo paleta Ctrl+K → 
 | Příkaz | Význam |
 | --- | --- |
 | nový díl [název] · nová sestava | nový dokument v nové záložce |
-| kvádr X Y Z [střed] [v x y z] · válec D H [osa Z] · koule D · kužel D1 D2 H · trubka D d H | primitiva (průměry); „odebrat“, „průnik“, „nové“ = booleovský režim |
+| kvádr X Y Z [střed] [v x y z \| na …] [osa …] · válec D H · koule D · kužel D1 D2 H · trubka D d H · pružina D stoupání P závity N drát d – vše [přidat\|odebrat\|průnik\|nové] | primitiva (průměry) s polohou čísly nebo odkazem (na střed kružnice E5, na V3), osou (osa -Z, osa 1 0 1, osa hrana E3) a booleovským režimem; kužel s D2 = 0 má špičku |
 | skica XY\|XZ\|YZ [odsazení N]: kružnice 165; obdélník 60 40 … | skica s entitami (obdélník, kružnice, mnohoúhelník, drážka, úsečka, čára, bod, elipsa; „pomocná“ = konstrukční) |
-| vysunout H [symetricky] [skrz] [odebrat] [úkos a] · rotovat [úhel] [osa X\|Y\|Z] | tvarové prvky z poslední skici |
-| díra D [hloubka H\|skrz] v x y [z] [zahloubení D2 H2] [kuželové D2] [závit M8] | bez z = na horní plochu tělesa |
-| zaoblit R [hrany svislé\|horní\|kruhové\|+Z…] · srazit C [hrany …] · skořepina T [otevřít +Z] | výběr hran a ploch pravidlem – bez klikání do 3D |
+| vysunout H\|výška H [směr …] [sklon a [k +X]] [symetricky] [skrz\|k tělesu\|k dalšímu\|k ploše F3\|k vrcholu V3] [odebrat] [obráceně] [úkos a [dovnitř\|ven] [břit N]] · rotovat [úhel] [osa X\|Y\|Z] | tvarové prvky z poslední skici; vysunutí i šikmo a s úkosem dovnitř / ven a břitem (viz níže) |
+| díra D [hloubka H [dno ploché \| hrot 118]\|skrz\|k tělesu] v x y [z] [zahloubení D2 H2] [kuželové D2] [závit M8 [jádro \| vrták N]] | bez z = na horní plochu tělesa; u závitu se vrtá tabulkový vrták, jádro = D1 podle ISO 965-1, zadaný průměr má přednost; dno ploché = slepá díra bez kužele |
+| zaoblit R [hrany svislé\|horní\|kruhové\|+Z…\|E3 E7] · srazit C [hrany …] · skořepina T [otevřít +Z\|F3 F5] | výběr hran a ploch pravidlem nebo čísly (popisky E3, F5) – bez klikání do 3D; čísla s pravidlem se zužují (hrany E2,E9,E10 svislé = jen svislé z nich) |
 | pole N rozteč P [směr X] [N2 rozteč P2 směr Y] · pole kruhové N · zrcadlit YZ · text "ABC" výška 8 hloubka 1 v x y | pole, zrcadlení, nápis |
 | závit M18×1,5 délka 20 v x y z [vnitřní] [modelovat] · kolize | katalogový závit (hrubé i jemné stoupání, vnější / v díře) · kontrola kolizí sestavy do protokolu |
-| oblouk x1 y1 xm ym x2 y2 · spline x y … · čára x1 y1 x2 y2 r 5 x3 y3 … | ve skice: oblouk třemi body, hladká křivka, „r N“ za bodem čáry zaoblí roh |
+| oblouk x1 y1 xm ym x2 y2 · spline x y … · čára x1 y1 x2 y2 r 5 x3 y3 … [uzavřít\|otevřená] | ve skice: oblouk třemi body, hladká křivka, „r N“ za bodem čáry zaoblí roh; uzavřít / otevřená určí, zda je lomená čára uzavřený obrys |
 | skica počátek x y z normála nx ny nz [osax …] | skica na obecné rovině |
 | díra D skrz [obousměrně] … · díra D … směr vx vy vz · díra D … sklon 13,5 · díra D skrz v x y z v x y z | díra skrz jen ve směru vrtání / na obě strany · šikmá díra · více děr naráz |
 | rotovat [úhel] [odebrat\|přidat\|průnik\|nové] | rotace s booleovským režimem (vysoustružení profilu) |
 | těleso 2 · rozdělit XY odsazení 10 jako Spodek · kopie těleso 2 posun 0 0 30 · sloučit 1 2 odebrat | více těles v dílu; „… nové těleso Název“ a „… těleso 2“ u prvků |
 | prvek <typ\|rozšíření> klíč=hodnota … | kterýkoli typ prvku i prvek rozšíření bez JSON, např. prvek adv.twist sketch=$last height=30 angle=45 |
+| prvek nápověda <typ> · nápověda díra · prvek nápověda | vypíše všechna pole typu prvku pro příkazy prvek a upravit – název, jednotku, povolené hodnoty, výchozí hodnotu; bez typu přehled všech typů |
 | normálie M8x30 · vložit "Hřídel" v 0 0 10 ukotvit · výkres | díl z knihovny · komponenta sestavy z otevřené záložky · výkres dokumentu |
 | stav · smazat poslední · zobraz iso | zpětná vazba a správa; stav prvku ✓ / ⚠ / ✗ se vypíše až po výpočtu (u delších prvků s časem), řádek Geometrie říká, zda je výsledek platné těleso |
+| svar koutový a5 hrana … · svar tupý V 60 … · svar děrový Ø12 … · svar tabulka | svary se svarovým kovem a hmotností (kapitola 9) |
+| vyber F3 E2 [přidat] · vyber nic · vyber | výběr ploch, hran a vrcholů čísly – stejné jako kliknutí; samotné vyber výběr vypíše |
+| uložit · export step · výkres export pdf vše · skica export dxf · sdílet · odkaz | výstupy bez systémového dialogu (viz níže) |
+| 2d čára 0,0 100,0 @0,50 · 2d hladina nová OSY barva 1 · 2d stav | příkazy 2D výkresu (kapitola 14) |
 | { … } / [ … ] | JSON: celý dokument .mncad, pole prvků nebo jeden prvek – všech 36 typů prvků včetně ploch, plechu, sestav; jeden prvek na jednom řádku lze míchat s textovými příkazy (např. tažení po šroubovici) |
 
 ### Příklad: příruba DN50 sedmi řádky
@@ -855,7 +1093,7 @@ nový díl Příruba DN50 · skica XY: kružnice 165 · vysunout 18 · trubka 88
 - Modelování myší jako člověk: Nápověda → „Popisky pro výběr myší“ (Ctrl+Shift+L) zobrazí na viditelných plochách, hranách a vrcholech štítky F1 / E2 / V3 (ve skice P1… a O v počátku). Štítek leží přesně na entitě a nepřijímá kliknutí – klik na jeho střed je klik na entitu. Agent, který ovládá prohlížeč, tak klikne na „plochu s normálou +Z“ bez trefování pixelů; člověku se bez zapnutí nic nemění.
 - Všechny prvky stránky mají textové popisky (title / aria-label) a historie prvků je textový seznam, takže agent, který čte stránku místo obrázku, se orientuje. Nic z toho neodesílá data mimo prohlížeč – ochrana dokumentace platí beze změny.
 
-> Doporučený postup pro agenta: otevřít /cad → Nápověda → Textové příkazy → vložit příkazy → Provést → přečíst protokol a stav → opravit řádky ✗ → export STEP / výkres / sdílení odkazem.
+> Doporučený postup pro agenta: otevřít /cad → Nápověda → Textové příkazy → vložit příkazy → Provést → přečíst protokol a stav → opravit řádky ✗ → výstupy textem: export step, výkres export pdf, sdílet (viz „Výstupy z konzole bez systémových dialogů“ níže).
 
 ### Skica, vazby a výkres textem
 
@@ -874,9 +1112,89 @@ Sestava textem. Sestavu lze celou postavit a zkontrolovat z konzole Textové př
 
 Výkres textem (pro AI agenty a automatizaci). Vše, co jde ve výkresovém prostředí udělat myší, lze zadat i řádkovými příkazy v konzoli Textové příkazy (česky výkres …, anglicky drawing …, německy zeichnung …). Příkazy pracují s aktivním listem: výkres list 2 nebo výkres list "Detail" list přepne (výkres se otevře na něm), výkres list nový "Detail", výkres list přejmenovat 2 "…" a výkres list smazat 2 listy spravují; výkres list A3 dál nastavuje formát listu. Razítko vyplní výkres razítko název="…" číslo="…" kreslil="…" revize="…" datum="…" materiál="…" (číslo, kreslil a revize se uloží i do vlastností dokumentu), tabulku revizí výkres revize B "popis změny" a výkres revize smazat B. Další volby listu: výkres otočení 90, výkres řez XZ poloviční, výkres kusovník ano|ne, výkres balónky ano|ne a kótovat základní (kóty Auto + Ø). Značky nástrojů Poznámka, Drsnost, Geometrická tolerance, Základna a Text: výkres značka drsnost Ra 1,6 na Ø40, výkres značka tolerance kolmost 0,02 A na Ø40, výkres značka základna A pohled přední v 0 0, výkres značka text "Kalit 58 HRC" v 20 30 – cílem je kóta (popisek nebo id) nebo bod pohledu v mm modelu, který se přichytí ke geometrii jako myš; popisek se sám umístí na volné místo. Ruční kóty: výkres kóta vodorovně|svisle|šikmo pohled přední x1 y1 x2 y2, výkres kóta průměr pohled horní střed 0 0, výkres kóta úhel pohled přední …. Kóty a značky se upravují a mažou podle id z výkresu stavu (výkres upravit a3 odsazení=8 přípona="H7", výkres upravit a5 posun="5 -3", výkres smazat a3, výkres smazat vlastní|vše), detailní pohledy výkres detail přední v 45 10 poloměr 5 měřítko 4:1 a další modely na listu výkres model "Hřídel" pohled horní. výkres stav [list N|vše] vypíše přehled listů, rozsah souřadnic každého pohledu, id kót a značek, razítko a revize; když se nový popisek překrývá s jiným textem nebo přesahuje rámeček listu, protokol to ohlásí řádkem „!“ s radou. Skripty a agenti získají soubor výkresu bez dialogu uložení přes window.mncad.exportDrawing("pdf"|"dxf"|"dwg"|"svg"|"csv"|"png", { sheet, dwgVersion, width }) (výsledek v base64; PNG slouží jako náhled listu) a stav listu přes window.mncad.drawingStatus({ sheet }). Volba „Kusovník nad razítkem“ se nově ukládá do listu výkresu.
 
-Automatizace pro AI agenty – soubory, obraz, výstupy a analýzy. Kromě textových příkazů nabízí window.mncad metody, které nahrazují vše, co by jinak vyžadovalo dialog nebo pohled do 3D okna: importFile({ name, base64 }) (nebo { name, text }, případně objekt File) otevře soubor stejnou cestou jako Otevřít a přetažení – STEP včetně sestav, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF, DXF i projekt .mncad; volbou as lze model vložit do otevřené sestavy jako komponentu ("component") nebo DXF do skici ("sketch") a slib se splní až po dokončení výpočtu s protokolem a stavem dokumentu. screenshot({ view: "iso", width: 1200 }) vrátí obrázek PNG 3D okna (při otevřené skice skicáře) a dočasně umí přepnout pohled, styl, řez, rozložení sestavy i popisky F1 / E2 / V3 – po snímku se vše vrátí; funguje i bez WebGL. select(["F3", "E2"]), selection() a clearSelection() vybírají a čtou výběr podle stejných čísel jako popisky a příkaz měřit (v sestavě comp:Název nebo Komponenta:F3, prvek historie feature:Díra 1). compare() porovná díl s modelem zákazníka (STEP…) a vrátí text, CSV a seznam rozdílových oblastí, share() vytvoří sdílený odkaz, settings() / setSettings() čtou a mění nastavení (např. askWhereToSave: false pro stahování bez dialogu), action("sheet.dxf") spustí akci rozšíření (rozvin DXF / SVG, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn) a vrátí text i soubory a exportFile("dxf", { sketch }) uloží skicu jako DXF. Nové textové příkazy (česky, anglicky i německy): zobraz drátový | stínovaný | hrany | skryté | průhledný | přizpůsobit, řez X 25 [obráceně] / řez vyp, barva plochy F3 #e03930 (nebo pravidlem: barva plochy horní modrá, … výchozí), akce tabulka ohybů, formařské analýzy analýza úkosů [směr +Z] [min 1] [zobrazit], analýza tloušťky [limit 2], analýza křivosti, analýza zebra, analýza vyp, a nástroje dělicí rovina, vyhazovače Ø 6 rozteč 60 [díry | sestava], chlazení Ø8 hloubka 15 větve 4 přesah 10 [díl | sestava] a smrštění 0,5 (nebo smrštění ABS). Každý příkaz zapíše do protokolu jeden srozumitelný řádek – např. „✓ Úkosy (směr vyhození +Z, min. 1°): Dostatečný 82,1 % · Malý 6,0 % · Svislá stěna 9,8 % · Podkos 2,1 % – nelze vyhodit bez posuvných čelistí“ – nebo českou chybu s nápovědou. Volba „zobrazit“ zapne barevnou mapu v 3D okně, takže ji agent uvidí na snímku. Barva dílu zapsaná jako barva #e03930 už se nebere jako komentář.
+Automatizace pro AI agenty – soubory, obraz, výstupy a analýzy. Kromě textových příkazů nabízí window.mncad metody, které nahrazují vše, co by jinak vyžadovalo dialog nebo pohled do 3D okna: importFile({ name, base64 }) (nebo { name, text }, případně objekt File) otevře soubor stejnou cestou jako Otevřít a přetažení – STEP včetně sestav, IGES, BREP, STL, OBJ, 3MF, glTF/GLB, PLY, OFF, DXF, DWG i projekt .mncad (DXF a DWG se otevřou jako 2D výkres); volbou as lze model vložit do otevřené sestavy jako komponentu ("component") nebo DXF / DWG do skici ("sketch") a slib se splní až po dokončení výpočtu s protokolem a stavem dokumentu. screenshot({ view: "iso", width: 1200 }) vrátí obrázek PNG 3D okna (při otevřené skice skicáře) a dočasně umí přepnout pohled, styl, řez, rozložení sestavy i popisky F1 / E2 / V3 – po snímku se vše vrátí; funguje i bez WebGL. select(["F3", "E2"]), selection() a clearSelection() vybírají a čtou výběr podle stejných čísel jako popisky a příkaz měřit (v sestavě comp:Název nebo Komponenta:F3, prvek historie feature:Díra 1). compare() porovná díl s modelem zákazníka (STEP…) a vrátí text, CSV a seznam rozdílových oblastí, share() vytvoří sdílený odkaz, settings() / setSettings() čtou a mění nastavení (např. askWhereToSave: false pro stahování bez dialogu), action("sheet.dxf") spustí akci rozšíření (rozvin DXF / SVG, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn) a vrátí text i soubory a exportFile("dxf", { sketch }) uloží skicu jako DXF. Nové textové příkazy (česky, anglicky i německy): zobraz drátový | stínovaný | hrany | skryté | průhledný | přizpůsobit, řez X 25 [obráceně] / řez vyp, barva plochy F3 #e03930 (nebo pravidlem: barva plochy horní modrá, … výchozí), akce tabulka ohybů, formařské analýzy analýza úkosů [směr +Z] [min 1] [zobrazit], analýza tloušťky [limit 2], analýza křivosti, analýza zebra, analýza vyp, a nástroje dělicí rovina, vyhazovače Ø 6 rozteč 60 [díry | sestava], chlazení Ø8 hloubka 15 větve 4 přesah 10 [díl | sestava] a smrštění 0,5 (nebo smrštění ABS). Každý příkaz zapíše do protokolu jeden srozumitelný řádek – např. „✓ Úkosy (směr vyhození +Z, min. 1°): Dostatečný 82,1 % · Malý 6,0 % · Svislá stěna 9,8 % · Podkos 2,1 % – nelze vyhodit bez posuvných čelistí“ – nebo českou chybu s nápovědou. Volba „zobrazit“ zapne barevnou mapu v 3D okně, takže ji agent uvidí na snímku. Barva dílu zapsaná jako barva #e03930 už se nebere jako komentář.
 
-## 22. Omezení a poctivé srovnání s desktopovými CADy
+### Výstupy z konzole bez systémových dialogů
+
+Agent, který umí jen psát do konzole nebo volat window.mncad.run, dokončí celou práci uvnitř CADu – uložení, export, výkres i sdílený odkaz. Výstupní příkazy nikdy neotevřou okno „Uložit jako“: soubor se rovnou stáhne pod výchozím nebo zadaným názvem a protokol napíše název souboru, velikost a formát. Lze je psát za modelovací řádky v témže vstupu.
+
+| Příkaz (anglicky · německy) | Co udělá |
+| --- | --- |
+| uložit [název] (save · speichern) | stáhne projekt .mncad; protokol potvrdí, že soubor jde znovu otevřít |
+| export step\|stl\|brep\|obj\|glb\|3mf\|wrl\|mncad [název] (export · exportieren) | 3D model; u STEP a BREP se stažený soubor znovu načte jádrem a porovná s modelem (počet těles, objem, obálka) – protokol napíše „věrná kopie modelu“, nebo co se liší; bez kontroly porovnání vynechá |
+| výkres export pdf\|dxf\|dwg\|svg\|csv\|png [list N\|vše] [název] (drawing export · zeichnung export) | list výkresu (bez udání aktivní list); vše = všechny listy aktivního výkresu v jednom souboru: PDF vícestránkové, DXF / DWG / SVG / PNG jako ZIP s jedním souborem na list |
+| skica export dxf ["Skica 1"] (sketch export dxf · skizze export dxf) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
+| sdílet [model\|výkres] [dní N\|bez omezení] [heslo X] [od "Jméno"] (share · freigeben) | sdílený odkaz jako tlačítko Sdílet (výchozí 10 dní, bez hesla); adresa je v protokolu na řádku URL: … a pod ní kód po skupinách |
+| odkaz (link) | vypíše poslední sdílený odkaz znovu |
+
+Příklad protokolu: ✓ export STEP: Konzola.step · 41 kB · STEP AP214 – staženo (bez dialogu) a pod ním ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 46 701 mm³ (rozdíl 0,0000 %) … → věrná kopie modelu; po příkazu sdílet řádek URL: https://mnastrojarna.cz/s#Ab3kZ9xQ2m. Stejné výstupy vrací API: await window.mncad.share({ days: 10, password }) → { url, code, exp, mode, … }, window.mncad.save("název"), exportFile("step") a exportDrawing("pdf", { sheet: "all" }). Po několika staženích za sebou se prohlížeč může zeptat „Stáhnout více souborů?“ – to je lišta prohlížeče, stačí ji pro stránku jednou povolit.
+
+### Automatizační režim prohlížeče
+
+Když prohlížeč řídí automatizace (Playwright, Selenium, Puppeteer – prohlížeč hlásí navigator.webdriver) nebo má adresa příznak ?agent=1 (např. mnastrojarna.cz/cad?agent=1 pro rozšíření prohlížeče), CAD neotevře žádné systémové okno, na kterém by skript uvízl:
+
+- Tlačítka Uložit projekt, Uložit jako, Ctrl+S, export 3D i export výkresu stahují rovnou pod výchozím názvem. Člověk bez automatizace dialog „Uložit jako“ dál dostane; trvale ho vypíná Nastavení → Soubory.
+- Dotazy a potvrzení (hodnota, smazání tělesa…) jsou okna na stránce, ne systémová – Enter = OK, Esc = zrušit.
+- Zavření karty s neuloženou prací se v automatizaci neptá.
+- Tlačítko Tisk ve výkresu neotevře dialog tisku, ale stáhne stejné listy jako PDF.
+- Příznak ?agent=1 si karta pamatuje i po přepnutí jazyka; vypne ho ?agent=0.
+- Nepoužívejte jen tlačítka, která otevírají okno systému nebo jiného programu: výběr souboru u Otevřít (soubor předejte přes window.mncad.importFile({ name, base64 })) a v dialogu sdílení „Sdílet…“ a „E-mail“ – místo nich příkaz sdílet.
+
+### Výběr klikem i bez WebGL
+
+Prohlížeč bez grafické akcelerace (například headless Chrome bez grafické karty) kreslí místo 3D okna softwarový náhled. Výběr v něm funguje stejně jako ve 3D okně: klik vybere plochu, hranu nebo vrchol, Ctrl / Shift + klik přidá či odebere, platí filtr výběru a vybrané entity převezmou formuláře prvků (Zaoblit, Skořepina, „+ aktuální výběr“), skica na ploše, měření, řez rovinou plochy i vazby sestav. Fungují i popisky pro výběr (Ctrl+Shift+L, window.mncad.hints(true), clickHint("F3")); bez myši totéž udělá vyber F3 E2 nebo window.mncad.select(["F3", "E2"]). Návod pro AI popisuje i přepínač, kterým se v headless Chromu zapne softwarové WebGL (--enable-unsafe-swiftshader).
+
+### Prvky textem: šikmé vysunutí, úkos s břitem, díry, primitiva, lomené čáry
+
+- Vysunutí ve směru: vysunout 20 směr 1 0 1, směr +X, směr hrana E3, směr plocha F2, směr osa "Osa 1", směr body V1 V5 (směr nesmí ležet v rovině skici). Propad pod úhlem: vysunout skrz odebrat obráceně sklon 25 k +X. Číslo za vysunout se měří podél směru, výška H kolmo na rovinu skici. Ukončení skrz, k tělesu, k dalšímu, k ploše F3, k rovině "Rovina 1" a k vrcholu V3 platí i šikmo.
+- Úkos se stranou: úkos 2 = úkos 2 dovnitř (obrys se od roviny skici zužuje), úkos 2 ven (rozšiřuje – u odebrání je to odlehčení). břit N nechá prvních N mm rovných, ostré rohy / zaoblené rohy určí rohy. Otvor střižnice s břitem 3 mm a odlehčením 2° je jeden řádek: vysunout skrz odebrat obráceně úkos 2 ven břit 3.
+- Závitová díra: díra závit M8 hloubka 20 v 30 20 vrtá tabulkový vrták Ø6,8; … jádro vrtá malý průměr závitu D1 podle ISO 965-1 (M8 → Ø6,647); díra 6,647 závit M8 … nebo … vrták 6,7 je vlastní průměr – zadaný průměr se zachová a protokol to poznamená. Vrták větší než závit je chyba.
+- Dno slepé díry: díra 10 hloubka 12 dno ploché (sedlo pružiny, frézované dno) nebo hrot 120 pro jiný vrcholový úhel vrtáku (60–170°, výchozí 118°). Zahloubení zahloubení D2 H2, kuželové D2 a více poloh díra 6,6 skrz v 10 10 12 v 90 10 12 fungují jako dřív.
+- Primitiva s polohou, osou a operací: kužel 20 0 25 v 0 0 70 osa 0 0,5 -0,866 odebrat (kuželové sedlo se skloněnou osou), válec 10 150 v -50 0 -40 osa 1 0 1 odebrat (šikmý průchod), kužel 12 0 6 na střed kružnice E17 osa -Z odebrat (zahloubení v ústí díry), pružina 22 stoupání 4 závity 5 drát 2 na střed plochy F15 nové těleso "Pružina". Operace je přidat, odebrat, průnik nebo nové.
+- prvek nápověda <typ> (také nápověda díra, prvek nápověda sheet.bend) vypíše všechna pole typu pro obecný příkaz prvek a upravit: název, jednotku, povolené hodnoty, výchozí hodnotu a zápis vlastním textovým příkazem. prvek nápověda bez typu dá přehled všech typů.
+- Lomená čára čára x1 y1 x2 y2 … [uzavřít|otevřená]: slova uzavřít a otevřená platí vždy. Bez nich zůstane čára, která s dalšími entitami skici tvoří uzavřený obrys, otevřená (je částí obrysu); osamocená čára se uzavře sama a protokol to oznámí řádkem ℹ. Jako dráha tažení nebo žebra se sama neuzavírá nikdy.
+- Stav profilu: stav vypíše u skici řádek profil: – a když profil nejde vysunout, řekne proč: otevřený konec, mezera mezi entitami, křížení nebo překryv, vždy s čísly entit a souřadnicemi. Stejný důvod je v chybě prvku.
+- Hrany a plochy čísly i pravidlem: zaoblit 2 hrany E3 E7, srazit 1 hrany E5, skořepina 2 otevřít F3 F5, úkos 3 plochy F2 F4; čísla s pravidlem se zužují – hrany E2,E9,E10 svislé vezme jen svislé z vyjmenovaných. Textové příkazy nečtou výběr z okna: vybrané entity zadejte čísly.
+- Neznámé nebo nepatřičné slovo v příkazu je chyba řádku s nápovědou – nic se tiše nevynechá.
+- Pohybová studie s kolizemi: pohyb motor rotační "Klika" 0..360 krok 5 kolize spočítá polohy všech komponent v každém kroku včetně kontroly kolizí; pohyb stav vypíše rozsah pohybu, první kolizi a vazby, které pohyb porušuje, pohyb krok 12 polohy v jednom kroku a pohyb export csv tabulku do protokolu. Přes API window.mncad.motion().
+
+### Běh bez prohlížeče: příkazová řádka mncad (fáze A)
+
+Stejné jádro, které počítá v prohlížeči, běží i v Node.js – bez prohlížeče, na serveru nebo v dávce. Balík se publikuje spolu s webem na adrese /cad/cli/ ve složce pojmenované číslem verze (soubory mncad.mjs, replicad_single.wasm, písma, balíček .tgz pro npx a kontrolní součty SHA256SUMS); aktuální verzi a cesty uvádí /cad/cli/latest.json. Potřebuje Node.js 22 nebo novější.
+
+| Příkaz / volba | Význam |
+| --- | --- |
+| mncad run skript.txt [--open dokument.mncad …] [--out složka] | jeden běh: otevře dokumenty, postaví je v jádře, zapíše výstupy do složky (výchozí mncad-out) a na standardní výstup vypíše protokol; - místo souboru čte skript ze standardního vstupu |
+| --formats auto\|none\|step,stl,pdf,dxf,dwg,svg,mncad | které soubory zapsat; auto = STEP a .mncad hlavního dokumentu a PDF listů, má-li dokument výkres |
+| --strict | přísný režim: první ⚠ nebo ✗ běh zastaví (kód 2) a žádný výstup se nezapíše |
+| --json · --full · --budget 2048 | protokol jako jeden objekt JSON · celý protokol · jiný rozpočet stručného protokolu v bajtech |
+| --timeout 300 · --max-mem 2048 | časový limit v sekundách a limit paměti v MB (hlídá je samostatné vlákno, takže zaberou i uprostřed dlouhého výpočtu) |
+| --share[=model\|drawing] · --share-days N | po běhu vytvoří sdílený odkaz hlavního dokumentu (řádek O protokolu) |
+| --lang cs\|en\|de | jazyk hlášek |
+| mncad serve [--port 8787] | místní HTTP rozhraní (POST /run se skriptem a soubory v těle požadavku); naslouchá jen na 127.0.0.1 a vyžaduje token |
+| mncad selftest · mncad help [guide\|commands] · mncad version | kontrola instalace · nápověda, celý návod pro AI a seznam příkazů · verze |
+
+Kódy ukončení: 0 bez chyb · 1 chyby ✗ · 2 přísný režim zastaven · 3 chyba použití nebo souboru · 4 pád výpočtu · 5 časový limit · 6 limit paměti · 130 přerušeno.
+
+Stručný protokol MNCAD/1 má pevnou stavbu, stejnou v češtině, angličtině i němčině, aby ho spolehlivě přečetl skript i jazykový model. Má tvrdý rozpočet 2 048 bajtů: chyby mají přednost před varováními, ta před soubory a měřeními; co se nevejde, je v souboru protocol-full.txt ve výstupní složce.
+
+| Řádek protokolu | Význam |
+| --- | --- |
+| MNCAD/1 OK lines=0 ops=0 err=0 warn=0 note=0 t=2.6 | hlavička: výsledek OK / FAIL / STOP, počet řádků skriptu, operací, chyb, varování a čas v sekundách |
+| ✗ L2 parse.error chyba zápisu: … | chyba (⚠ = varování) s číslem řádku skriptu a kódem hlášky; L- = bez řádku |
+| D "Deska 1" part feat=2/0/0 V=49.5cm3 m=0.389kg bbox=100x50x10 | dokument: díl / sestava / 2D výkres, prvky v pořádku / s varováním / s chybou, objem, hmotnost a obálka |
+| F step "Deska 1.step" 20233B | zapsaný soubor s formátem a velikostí |
+| O https://… exp=2026-11-24 mode=self | sdílený odkaz s datem konce platnosti |
+| Σ docs=1 V=49.5cm3 m=0.389kg files=5 t=2.6 mem=383MB | součet: dokumenty, soubory, čas a paměť |
+
+### Co fáze A bez prohlížeče umí a co zatím ne
+
+- Umí: otevřít hotové dokumenty .mncad (díl i sestavu) volbou --open, postavit je ve stejném jádře jako prohlížeč, vypsat stav prvků, objem, hmotnost a obálku a zapsat STEP, STL, .mncad a výkresy PDF, DXF, DWG a SVG; vytvořit sdílený odkaz; hlídat čas a paměť; vrátit kód ukončení pro skripty a CI.
+- Zatím neumí provádět textové příkazy skriptu. Skript se přečte a zkontroluje – chyby zápisu dostanou číslo řádku –, ale každý příkaz (modelování, sestava, výkres, měření, pohyb) zatím skončí řádkem ✗ … host.app-only příkaz funguje jen v aplikaci v prohlížeči. Modelování textem proto dnes běží v aplikaci v prohlížeči, kterou lze řídit automatizací i bez grafické karty (viz výše); do příkazové řádky se přesouvá v další fázi.
+- Další mezery fáze A: výkres s více listy se zapisuje jako jeden soubor na list (ne jedno vícestránkové PDF); u sestavy protokol uvádí počet komponent a dílů, ne objem; 2D výkres se zapíše jen jako .mncad (jeho tisk a export DWG / DXF jsou zatím jen v aplikaci); kusovník CSV se nezapisuje.
+- K čemu se hodí už dnes: dávkový převod uložených projektů .mncad na STEP a PDF a kontrola, že se díl postaví bez chyb. Například mncad run prazdny.txt --open deska.mncad --out vystup --formats step,pdf (skript může být prázdný soubor) skončí kódem 0 a do složky vystup zapíše STEP dílu a PDF jeho výkresu.
+
+## 23. Omezení a poctivé srovnání s desktopovými CADy
 
 Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde je, kde dnes stojíme vůči ZW3D, SolidWorks, Inventor, Fusion 360 a Onshape.
 
@@ -886,25 +1204,28 @@ Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde j
 | Zadání prvků | 14 voleb bodu, 8 směrů, 12 rovin, 10 os, 8 ukončení vysunutí | srovnatelné |
 | Tvarové prvky | vysunutí, rotace, tažení, šablonování (i hladké uzavřené), díry, zaoblení 8 variant vč. setback a eliptického, sražení 5, pole 5 druhů, skořepina, úkos vč. dělicí křivky a stupňovitého, žebro, přímé úpravy | navíc variabilní pole z tabulky; setback přesně jen u rohů z rovin a přímých hran, dělicí křivka po obloucích a splinech přibližně |
 | Plochy | 19 příkazů | více nástrojů pro třídu A (křivostní návaznost, úprava řídicích bodů) |
-| Plech / svařence | 12 + 8 / 10 příkazů: tvářecí nástroje (žaluzie, prolis, žebro po dráze, výstřih, můstek, lem díry, vodítko), křížový zlom, rozvin DXF se stopou nástrojů, kusovník řezů | knihovny vlastních tvářecích nástrojů, ztenčení materiálu, konfigurátory profilů |
+| Plech / svařence | 12 + 8 / 13 příkazů: tvářecí nástroje (žaluzie, prolis, žebro po dráze, výstřih, můstek, lem díry, vodítko), křížový zlom, rozvin DXF se stopou nástrojů, kusovník řezů; svary koutové, tupé s úpravou hran podle ISO 9692-1, děrové a bodové, svarový kov jako těleso s hmotností, značky ISO 2553 na výkrese | knihovny vlastních tvářecích nástrojů, ztenčení materiálu, konfigurátory profilů; tupé svary po křivkách a na trubkách, šikmé T spoje |
 | Sestavy | komponenty, podsestavy, 23 druhů vazeb vč. mechanických (ozubení, hřeben, šroub, vačka, kardan), kinematická pohybová studie s kolizemi, kusovník, rozložený pohled, rám formy | dynamika (síly, gravitace, pružiny, kontakt), tečnost s kuželem a anuloidem, velké sestavy |
-| Výkresy | 7 pohledů, pomocný pohled, řez celý / poloviční / zalomený / natočený / částečný, detail, přerušený pohled, kóty, chytré kóty, drsnosti, GD&T, uložení ISO 286 s tabulkou, tabulka revizí s trojúhelníky a zónami, tabulka děr, kusovník, PDF / DXF / DWG / SVG | natočený řez s více zalomeními, uložení nad 500 mm, chytré kóty i v pomocných pohledech |
-| Formáty | STEP, IGES, BREP, STL, 3MF, OBJ, glTF, PLY, OFF, DXF, DWG | navíc nativní formáty konkurence (přes překladače) |
+| Výkresy | 7 pohledů, pomocný pohled, řez celý / poloviční / zalomený / natočený / částečný, detail, přerušený pohled, kóty, chytré kóty, drsnosti, GD&T, uložení ISO 286 s tabulkou, tabulka revizí s trojúhelníky a zónami, tabulka děr, kusovník, více výkresů jednoho dílu, export všech listů najednou, PDF / DXF / DWG / SVG | natočený řez s více zalomeními, uložení nad 500 mm, chytré kóty i v pomocných pohledech |
+| 2D kreslení (2D CAD) | samostatný 2D výkres: příkazový řádek s názvy a zkratkami AutoCADu, zadání souřadnic, 10 režimů uchopení, hladiny, typy čar, úchopy, kóty a kótovací styly, šrafy, tolerance, bloky s atributy, rozvržení s výřezy v měřítku, tisk PDF; čtení i zápis DWG R2000–R2018 a DXF R12–R2018 | navíc uživatelské souřadné systémy (UCS), trasování uchopení, externí reference (XREF), dynamické bloky, tabulky, písma SHX, makra a LISP |
+| Formáty | STEP, IGES, BREP, STL, 3MF, OBJ, glTF, PLY, OFF; DXF (R12–R2018) a DWG (R2000–R2018) pro čtení i zápis | navíc nativní formáty konkurence (přes překladače) |
 | Knihovna | 103 rodin normálií textem | větší katalogy (Toolbox, Content Center), výrobci |
+| Sdílení | krátký odkaz s desetimístným kódem, šifrování už v prohlížeči, platnost 1–90 dní, heslo, zneplatnění; příjemce bez instalace a účtu | správa dat s účty, verzemi a právy (PDM, cloudové projekty), společné úpravy v reálném čase |
+| Automatizace | textové příkazy česky / anglicky / německy pro celý CAD, JSON dokumentu, API window.mncad, výstupy bez dialogů, režim pro automatizovaný prohlížeč; příkazová řádka mncad bez prohlížeče zatím jen pro stavbu a převod hotových dokumentů | makra a API s plným modelováním bez grafického rozhraní, dávkové úlohy na serveru |
 | Výkon | díly a sestavy desítek až stovek komponent v prohlížeči | velké sestavy tisíců dílů |
 | Cena a instalace | zdarma, bez instalace, data v prohlížeči | licence v řádu desítek až stovek tisíc Kč ročně |
 
-Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a přímých hran (jinde výchozí roh s ⚠); eliptické zaoblení obecných hran a úkos s nerovinnou dělicí křivkou jsou přiblížení; přechodová plocha a prodloužení G2 jsou přesné ve vzorkovacích bodech a ověřené analýzou návaznosti; úprava řídicích bodů jen u volných neořezaných ploch. Pohybová studie je kinematická (bez sil a dynamiky), vačka se počítá přes síť plochy (±0,002 mm). Tvářecí nástroje nemodelují ztenčení materiálu a nejde přidat vlastní nástroj z dílu. Natočený řez má jedno šikmé rameno, uložení ISO 286 pokrývá rozměry do 500 mm. Okrajové podmínky šablonování se aproximují pomocným řezem. Výkresy z DWG byly ověřeny zápisem a zpětným čtením; u exotických verzí AutoCADu doporučujeme kontrolu.
+Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a přímých hran (jinde výchozí roh s ⚠); eliptické zaoblení obecných hran a úkos s nerovinnou dělicí křivkou jsou přiblížení; přechodová plocha a prodloužení G2 jsou přesné ve vzorkovacích bodech a ověřené analýzou návaznosti; úprava řídicích bodů jen u volných neořezaných ploch. Pohybová studie je kinematická (bez sil a dynamiky), vačka se počítá přes síť plochy (±0,002 mm). Tvářecí nástroje nemodelují ztenčení materiálu a nejde přidat vlastní nástroj z dílu. Natočený řez má jedno šikmé rameno, uložení ISO 286 pokrývá rozměry do 500 mm. Okrajové podmínky šablonování se aproximují pomocným řezem. Výkresy z DWG byly ověřeny zápisem a zpětným čtením; u exotických verzí AutoCADu doporučujeme kontrolu. 2D výkres pracuje jen ve světovém souřadném systému, nemá trasování uchopení ani externí reference a písma SHX kreslí nejbližším webovým písmem. Tupý svar s úpravou hran funguje jen po rovné spáře a bodové svary jsou jen značky. Krátký sdílený odkaz chrání desetimístný kód – pro citlivou dokumentaci přidejte heslo. Příkazová řádka mncad (fáze A) zatím neprovádí textové příkazy skriptu; staví a převádí hotové dokumenty.
 
-## 23. Vaše data a soukromí
+## 24. Vaše data a soukromí
 
-- Modelování, výpočty i export probíhají ve vašem prohlížeči; soubory se na server neodesílají. Výjimkou je tlačítko Poptat výrobu, které připraví e-mail – odesíláte ho sami.
+- Modelování, výpočty i export probíhají ve vašem prohlížeči; soubory se na server neodesílají. Výjimky spouštíte vždy sami: tlačítko Poptat výrobu připraví e-mail, který odešlete, a sdílení odkazem nahraje na server kopii dokumentu zašifrovanou už v prohlížeči – klíč je jen v odkazu, server ji nepřečte a po vypršení platnosti ji smaže (kapitola 18).
 - Výchozí režim „neukládat“ (NDA): modely, výkresy ani jejich názvy se do prohlížeče neukládají. Rozpracovaná práce existuje jen v otevřené kartě a v souborech, které si uložíte do svého počítače tlačítkem Uložit (kam a pod jakým názvem si vyberete). Po zavření karty v prohlížeči nic nezůstane; při zavírání s neuloženými změnami prohlížeč varuje. Dokumenty uložené staršími verzemi programu se při prvním spuštění smažou.
 - Volitelné šifrované úložiště: kdo chce mít nedávné soubory a obnovu rozpracované práce, zapne v Nastavení → Soubory úložiště s heslem. Data se ukládají zašifrovaně (AES-GCM 256, klíč z hesla přes PBKDF2) jen v tomto prohlížeči na tomto počítači – bez hesla je nepřečte ani jiný uživatel téhož PC. Odemčení platí do zavření karty; „Vypnout a smazat uložené“ vše odstraní.
 - Nastavení programu (jednotky, myš, zkratky, formát listu) se ukládá nešifrovaně – neobsahuje žádná data z dokumentů.
 - Anonymní statistika použití (otevření aplikace, typ prvku) neobsahuje geometrii ani názvy souborů. Podrobnosti v zásadách ochrany osobních údajů na webu.
 
-## 24. Slovníček pojmů
+## 25. Slovníček pojmů
 
 | Pojem | Význam |
 | --- | --- |
@@ -921,8 +1242,23 @@ Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a
 | Kusovník (BOM) | seznam položek sestavy s počty, materiálem a hmotností. |
 | STEP | neutrální přesný formát pro výměnu 3D modelů mezi CADy (ISO 10303). |
 | OCCT | OpenCascade Technology – otevřené geometrické jádro, na kterém Mnástrojárna CAD běží. |
+| 2D výkres | samostatný dokument pro kreslení v rovině (hladiny, typy čar, kóty, bloky, rozvržení); čte a zapisuje DWG a DXF. |
+| Hladina | pojmenovaná skupina objektů 2D výkresu se společnou barvou, typem a tloušťkou čáry; lze ji vypnout, zmrazit, zamknout a vyřadit z tisku. |
+| Uchopení (OSNAP) | přichycení kurzoru k přesnému bodu geometrie – koncový bod, polovina, střed, průsečík, kolmo, tečně… |
+| ORTHO · polární trasování | omezení směru kreslení na vodorovný a svislý · na násobky zvoleného úhlu. |
+| Blok · atribut | pojmenovaná skupina objektů vkládaná opakovaně · proměnný text bloku vyplňovaný při vložení. |
+| Rozvržení · výřez | list papíru s rámečkem a razítkem · okno z listu do modelu v přesném měřítku. |
+| Modelový · papírový prostor | kreslení ve skutečné velikosti 1:1 · list, na kterém se volí měřítko a tiskne. |
+| Kótovací styl | sada nastavení vzhledu kót (text, šipky, přesnost, tolerance); výchozí ISO-25. |
+| Mikronávod | bublina u ikony pásu karet: co příkaz dělá, kdy ho použít, postup a tip; u neaktivního tlačítka i důvod. |
+| Kód sdílení | deset znaků za # v krátkém odkazu; prohlížeč z něj odvodí šifrovací klíč, na server se neposílá. |
+| Břit | rovná část stěny před začátkem úkosu vysunutí – např. střižná část otvoru střižnice před odlehčením. |
+| Tabulkový vrták · jádro závitu D1 | průměr vrtáku pro závit podle tabulky (M8 → 6,8) · malý průměr vnitřního závitu podle ISO 965-1 (M8 → 6,647). |
+| Úprava svarových ploch | tvar úkosu hran před svařením (I, V, X, U, ½V, K, J…) podle ISO 9692-1. |
+| Svarový kov | materiál svaru modelovaný jako samostatné těleso; z jeho objemu se počítá hmotnost svaru. |
+| MNCAD/1 | stručný textový protokol běhu příkazové řádky mncad s pevnou stavbou a rozpočtem 2 048 bajtů. |
 
-## 25. Historie verzí
+## 26. Historie verzí
 
 | Vlna | Obsah |
 | --- | --- |
@@ -934,6 +1270,14 @@ Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a
 | 5. – zpětná vazba z testu 3. 11. 2026 (II) | poctivý stav prvku: po každém prvku kontrola objemu/topologie a platnosti geometrie (⚠ „prvek těleso nezměnil“, „neplatná geometrie“, ✗ skořepina beze změny), řádek Geometrie ve stavu, protokol agenta s výsledkem až po výpočtu; závity s jemným stoupáním (M18×1,5), vnitřní závit v díře (prvek Závit i tažení po šroubovici se stranou a náběhem); tažení po spline jako hladká B-spline (forma zůstane solidem); kusovník s označením materiálu a číslem dílu, balónky uvnitř rámu, stav sestavy a kolize v textovém stavu; žádná ztráta rychlých změn ve formuláři ani formátu výkresu; kontrola kót pro rotační díly; poznámka v patičce jen na vyžádání |
 | 6. (12. 11. 2026) – test na výkresu oběžného kola a analýza nástrojů | díra skrz jen ve směru vrtání (+ volba oběma směry), průběh výpočtu po prvcích a tlačítko Zrušit, desetkrát rychlejší jádro u dílů s mnoha rotačními plochami a mezipaměť stavby, JSON na prvním řádku konzole; více těles v dílu (Rozdělit, Kopie, Sloučit, Nové těleso); textové příkazy pro všechny prvky (příkaz prvek, oblouk, spline, zaoblení rohu, šikmá díra, tělesa, normálie, vložit, výkres); výběr hran a ploch ze seznamu a pravidlem; vlastní dotaz na hodnotu místo systémového okna; rovina a bod odkazem u prvků rozšíření; vazby sestav ze seznamu ploch; kóty výkresu podle geometrie; dotyk ve skice a nastavitelné zkratky skici; samozhušťovací pás karet |
 | 7. (13. 11. 2026) – dokončení testu oběžného kola a analýzy | skica z klávesnice (pevné body, Ctrl+V seznamu souřadnic, živý spline), podklad obrázek/PDF s kalibrací a převodem vektorového PDF na entity; výkres: otočení pohledu, řez bez změny formátu, poloviční řez, více modelů na listu, rychlejší promítání, chytré kóty podle prvků (řetězové kóty, popisy děr ↧ ⌴ ⌵, závity) a textové příkazy výkresu; porovnání s referenčním STEP s mapou odchylek; vazby a kóty skici textem, skica na ploše; otisky vybraných hran a ploch, díra K tělesu; směr a osa odkazem u prvků rozšíření, skryté duplicitní prvky; náhled bez WebGL, řez číslem, rovinou z plochy a obecnou normálou; velké sestavy STEP v lehkém režimu, hláška o úspěchu až po zobrazení modelu; měření textem, kontrola 1:1 podle předlohy; agent ovládá celý CAD textem a přes API (úpravy prvků, zpět/znovu, proměnné, konfigurace, sestava a vazby, výkres a značky, export a snímky bez dialogu); setback a eliptické zaoblení, úkos s dělicí křivkou a stupňovitý, spline s tečnami, hladký uzavřený loft, plochy třídy A, 23 vazeb sestav a pohybová studie, pomocné / zalomené / částečné řezy, přerušené pohledy, uložení ISO 286, tvářecí nástroje a křížový zlom |
+| 8. (13. 11. 2026) – krátký sdílený odkaz a svary | sdílení krátkým odkazem přes šifrované úložiště na vlastním webu (dokument se šifruje v prohlížeči, platnost, heslo, zneplatnění, nahrávání po částech, starší odkazy fungují dál); svary: tupé s úpravou hran podle ISO 9692-1 vyříznutou do dílů, děrové / žlábkové a bodové, koutový svar a / z oboustranný, kolem a přerušovaný, svarový kov jako těleso, hmotnost svaru a přídavného materiálu, tabulka svarů se součty, automatické značky ISO 2553 na výkrese, textový příkaz svar |
+| 9. (13.–14. 11. 2026) – 2D CAD | nový druh dokumentu 2D výkres: příkazový řádek česky / anglicky / německy se zkratkami AutoCADu, zadání souřadnic, uchopení, ORTHO a polární trasování, hladiny, typy čar, tloušťky, vlastnosti; úpravy (posun až pole, úchopy, oříznout / prodloužit, zaoblit / zkosit), poznámky (odstavcový text, kóty a kótovací styly, odkazy, šrafy, tolerance, drsnost), bloky s atributy, rozvržení A4–A0 s výřezy v měřítku a tiskem PDF / PNG / SVG, import a export DWG R2000–R2018 a DXF R12–R2018; DXF a DWG se otevírají jako 2D výkres; text 2d … |
+| 10. (13. 11. 2026) – mikronávody | mikronávod po najetí myší na každou ikonu pásu karet (co dělá, kdy použít, co vybrat, postup, textový příkaz, tip) česky, anglicky a německy; u neaktivních tlačítek důvod; vypínač v Nastavení |
+| 11. (14. 11. 2026) – agent v prohlížeči | výstupy z konzole bez systémových dialogů (uložit, export, výkres export, skica export dxf, sdílet, odkaz) s kontrolou STEP znovunačtením, režim pro automatizovaný prohlížeč (?agent=1), výběr klikem v náhledu bez WebGL, předvídatelné uzavírání lomených čar a důvody chyb profilu, výběr hran a ploch čísly i pravidlem |
+| 12. (14. 11. 2026) – textové modelování | vysunutí ve směru vektoru nebo odkazu a pod úhlem od normály, úkos dovnitř / ven s břitem a ostrými rohy (otvor střižnice jedním řádkem), závitová díra s tabulkovým vrtákem, jádrem D1 nebo vlastním průměrem, ploché dno slepé díry, primitiva s polohou, osou a operací, prvek nápověda |
+| 13. (14. 11. 2026) – opravy tlačítek | 25 oprav chování tlačítek nalezených při psaní mikronávodů; více výkresů jednoho dílu, export a tisk všech listů (vícestránkové PDF, DXF / DWG / SVG v ZIPu) i z konzole, import DXF do otevřené skici |
+| 14. (14. 11. 2026) – CAD bez prohlížeče, fáze A | příkazová řádka mncad (run, serve) v Node.js se stejným jádrem: stavba a převod hotových dokumentů, stručný protokol MNCAD/1 s rozpočtem 2 048 bajtů, kódy ukončení, limity času a paměti; pohybová studie s přírůstkovou kontrolou kolizí |
+| 16. (14. 11. 2026) – nejkratší sdílený odkaz | odkaz mnastrojarna.cz/s#KÓD (36 znaků místo 67) s desetimístným kódem, který lze nadiktovat nebo napsat na mnastrojarna.cz/s; zneplatněný nebo vypršelý odkaz už neožije, limit hádání kódů |
 | 5. – dodatky (listopad 2026) | sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu |
 
 ## Časté otázky
@@ -972,7 +1316,7 @@ Po prvním načtení běží výpočty i export lokálně v prohlížeči. Pro n
 
 **Kde jsou moje soubory uložené? Uvidí je někdo jiný?**
 
-Jen tam, kam si je sami uložíte (.mncad, STEP, PDF…). Ve výchozím režimu CAD do prohlížeče nic neukládá – po zavření karty rozpracovaná práce zmizí, takže dokumentaci pod NDA neuvidí nikdo další ani na sdíleném počítači. Kdo chce obnovu práce a nedávné soubory, zapne šifrované úložiště s heslem; bez hesla jsou data nečitelná. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu.
+Jen tam, kam si je sami uložíte (.mncad, STEP, PDF…). Ve výchozím režimu CAD do prohlížeče nic neukládá – po zavření karty rozpracovaná práce zmizí, takže dokumentaci pod NDA neuvidí nikdo další ani na sdíleném počítači. Kdo chce obnovu práce a nedávné soubory, zapne šifrované úložiště s heslem; bez hesla jsou data nečitelná. Na server nic neposíláme – s výjimkou e-mailu, který sami odešlete tlačítkem Poptat výrobu, a sdílení odkazem, kdy na server jde jen kopie zašifrovaná už ve vašem prohlížeči.
 
 **Co znamená, že odkazy „přežijí změnu historie“?**
 
@@ -1000,7 +1344,7 @@ Klikněte na prvek v historii – pod ním je česká hláška, co je špatně (
 
 **Jak pošlu díl kolegovi nebo zákazníkovi, aby se na něj jen podíval?**
 
-Tlačítko Sdílet (horní lišta) → Kopírovat odkaz, nebo rovnou WhatsApp / E-mail. Příjemce odkaz otevře v prohlížeči bez instalace – vidí snímek dílu, sestavy i výkresů, může měřit, řezat a uložit si kopii. Platnost nastavíte na 1–90 dní (výchozí 10), volitelně s heslem. Dokument je uložený jen v odkazu (část za #, kterou prohlížeč neposílá na server); velké importované modely jdou do šifrovaného úložiště nebo jako příloha .mncad/STEP.
+Tlačítko Sdílet (horní lišta) → Kopírovat odkaz, nebo rovnou WhatsApp / E-mail. Příjemce odkaz otevře v prohlížeči bez instalace – vidí snímek dílu, sestavy i výkresů, může měřit, řezat a uložit si kopii. Platnost nastavíte na 1–90 dní (výchozí 10), volitelně s heslem. Odkaz je krátký (mnastrojarna.cz/s# a deset znaků), dá se i nadiktovat. Dokument se zašifruje už v prohlížeči a na server jde jen šifrovaný obsah – klíč je v části odkazu za #, kterou prohlížeč na server neposílá. Modely nad 25 MB pošlete jako přílohu .mncad nebo STEP.
 
 **Program hlásí „3D okno nelze spustit“ – co s tím?**
 
@@ -1008,7 +1352,7 @@ Prohlížeč neposkytl WebGL (grafickou akceleraci), kterou 3D zobrazení potře
 
 **Může CAD ovládat AI agent (ChatGPT Agent, Claude) nebo skript?**
 
-Ano. Nápověda → Textové příkazy (Ctrl+Shift+K): příkazy jako „kvádr 100 60 20“, „díra 8,5 skrz v 20 30“, „zaoblit 2 hrany svislé“ nebo rovnou JSON dokumentu; protokol vrátí ✓/✗ s důvodem a textový stav dokumentu (rozměry, objem, prvky), takže agent nepotřebuje číst obrázek. Pro skripty je k dispozici window.mncad (run, getDocument, setDocument, status). Návod a úplné schéma: /cad/schema-pro-ai.md. Pro člověka se nic nemění.
+Ano. Nápověda → Textové příkazy (Ctrl+Shift+K): příkazy jako „kvádr 100 60 20“, „díra 8,5 skrz v 20 30“, „zaoblit 2 hrany svislé“ nebo rovnou JSON dokumentu; protokol vrátí ✓/✗ s důvodem a textový stav dokumentu (rozměry, objem, prvky), takže agent nepotřebuje číst obrázek. Pro skripty je k dispozici window.mncad (run, getDocument, setDocument, status). Návod a úplné schéma: /cad/schema-pro-ai.md. Výstupy (uložit, export step, výkres export pdf, sdílet) jdou zadat textem bez systémových dialogů. Pro člověka se nic nemění.
 
 **Proč výkres neuvádí ISO 2768 ani sražení hran? Dříve tam byly.**
 
@@ -1029,3 +1373,23 @@ Prvek Závit přijímá hrubé i jemné stoupání (nabídka nebo text „M18×1
 **Stačí automatické kótování pro výrobní výkres?**
 
 Ne – „Auto + Ø“ je pomocný základ (celkové rozměry, průměry děr, závity). Funkční kóty, tolerance (H8, g6, ±0,1) a drsnosti doplní konstruktér – tolerance z geometrie odvodit nelze. Tlačítko „Kontrola kót“ ve výkresu porovná kóty na listu s historií prvků (u rotačních dílů průměry a délky osazení, závity, drážky, zaoblení; délka průchozího řezu se nenabízí) a vypíše, co chybí; toleranci zapíšete u kóty do pole „přípona“. Poznámka „Nekótované rozměry dle 3D modelu“ se na výkres nedoplňuje sama – zapnete ji v razítku (Poznámka v patičce).
+
+**Umí otevřít a upravit výkres DWG nebo DXF jako AutoCAD?**
+
+Ano. Soubor DWG (R2000–R2018) nebo DXF (R12–R2018) přetáhněte do okna nebo otevřete přes Ctrl+O – načte se jako 2D výkres s hladinami, bloky, kótami a rozvrženími. Kreslíte a upravujete příkazovým řádkem (čára, kružnice, oříznout…, i zkratkami L, C, TR) nebo myší, s uchopením, ORTHO, hladinami a typy čar; přidáte kóty, šrafy a texty, vytisknete do PDF v přesném měřítku a uložíte zpět do DWG nebo DXF ve zvolené verzi. Externí reference (XREF) se nenačítají a písma SHX se kreslí nejbližším webovým písmem. Návod je v kapitole 14 dokumentace.
+
+**Je krátký sdílený odkaz bezpečný? Co je uloženo na serveru?**
+
+Na serveru je jen dokument zašifrovaný už ve vašem prohlížeči (AES-256). Klíč se odvozuje z desetimístného kódu, který je v odkazu za znakem # – tu část adresy prohlížeč na server nikdy neposílá, takže server obsah nepřečte; po vypršení platnosti (1–90 dní) nebo po zneplatnění ho smaže. Kód má přibližně 4 × 10^17 kombinací, jeho zkoušení brzdí záměrně pomalý výpočet a limit dotazů. Platí ale, že kdo má odkaz, dokument otevře: pro citlivou dokumentaci přidejte heslo, pošlete ho jinou cestou a zvolte krátkou platnost. Kdo nechce na server posílat ani šifrovaná data, zvolí v dialogu „jen v odkazu (bez serveru)“.
+
+**Jde CAD spustit bez prohlížeče – ze skriptu nebo na serveru?**
+
+Zčásti. Příkazová řádka mncad (Node.js 22 nebo novější, balík na /cad/cli/) dnes bez prohlížeče otevře hotový dokument .mncad, postaví ho ve stejném jádře a zapíše STEP, STL a výkresy PDF, DXF, DWG a SVG; vypíše stručný protokol s objemem a hmotností a vrátí kód ukončení – hodí se pro dávkové převody a kontrolu v CI. Provádět textové příkazy (modelovat skriptem) zatím umí jen aplikace v prohlížeči; tu lze řídit automatizací (Playwright, Selenium) i bez grafické karty a výstupy z ní dostat bez dialogů. Podrobnosti v kapitole 22 dokumentace.
+
+**Co jsou bubliny u ikon a dají se vypnout?**
+
+Mikronávody: po najetí myší na ikonu pásu karet (na dotyku dlouhým stiskem) se ukáže, co příkaz dělá, kdy ho použít, co vybrat, postup v několika krocích a tip; u neaktivního tlačítka i důvod, proč nejde použít. Jsou česky, anglicky i německy. Vypnete je v Nastavení → Obecné → Mikronávody u ikon.
+
+**Jak udělám otvor střižnice s břitem a odlehčením?**
+
+Jedním vysunutím: skica otvoru na střižné ploše, Odebrat, Skrz vše, v pokročilých volbách Úkos 2° se stranou Ven a Břit 3 mm. Otvor má prvních 3 mm rovné stěny a pod nimi se rozšiřuje o 2°, takže výstřižek volně propadne. Textem: „vysunout skrz odebrat obráceně úkos 2 ven břit 3“.

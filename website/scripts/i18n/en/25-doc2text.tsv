@@ -1,0 +1,59 @@
+# Vlna 17 doc2text – dokument → textový skript (src/cad/doc-script.ts, export skript, Data › Export › Textový skript)
+ – poznámek {0}: vypíše je příkaz „export skript“ v konzoli	 – {0} notes: the console command “export script” lists them
+{0} prvků: {1} vlastním příkazem, {2} obecným příkazem „prvek“, {3} jako JSON	{0} features: {1} by their own command, {2} by the generic “feature” command, {3} as JSON
+2D výkres se do skriptu zapisuje jako jeden řádek JSON (celý dokument) – příkazy „2d …“ zatím jeho hladiny, styly, bloky a rozvržení nepokrývají	a 2D drawing is written to the script as one JSON line (the whole document) – the “2d …” commands do not cover its layers, styles, blocks and layouts yet
+barvy a skrytí těles dílu „{0}“ se do skriptu nepřenášejí	colours and hidden state of the bodies of part “{0}” are not carried into the script
+barvy ploch dílu „{0}“ se do skriptu nepřenášejí	face colours of part “{0}” are not carried into the script
+další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu	the additional drawing “{0}” could not be written – the sheet is added to the first drawing
+díl „{0}“ má stejný název jako jiný díl nebo sestava – ve skriptu se jmenuje „{1}“ (název dílu uvnitř komponenty se tím změní)	part “{0}” has the same name as another part or the assembly – in the script it is called “{1}” (the part name inside the component changes)
+dokument jako textové příkazy – k úpravě a novému spuštění v konzoli	the document as text commands – to edit and re-run in the console
+dokument jako textový skript <název>.mncad.txt (díly, sestava s polohami a vazbami, pohyb, výkresy) – stejné příkazy jako konzole, k úpravě a novému spuštění; protokol napíše počet řádků, velikost a pokrytí (vlastní příkaz / prvek / JSON); také window.mncad.script()	the document as a text script <name>.mncad.txt (parts, assembly with placement and mates, motion, drawings) – the same commands as the console, to edit and re-run; the log gives the line count, size and coverage (own command / feature / JSON); also window.mncad.script()
+export skript: dokument je prázdný – není co zapsat	export script: the document is empty – nothing to write
+Export skriptu zrušen.	Script export cancelled.
+komponenty z importovaného souboru a podsestavy se do skriptu nepřenášejí: {0} z {1} – vložte je ručně (Import do sestavy, sestava podsestava)	components from an imported file and sub-assemblies are not carried into the script: {0} of {1} – insert them by hand (Import into assembly, assembly subassembly)
+konfiguraci „{0}“ nejde zapsat na řádek skriptu	configuration “{0}” cannot be written on a script line
+list „{0}“ se nepodařilo zapsat jako nový list	sheet “{0}” could not be written as a new sheet
+motor pohybové studie č. {0} odkazuje na vazbu, která ve skriptu není	motor no. {0} of the motion study refers to a mate that is not in the script
+název dokumentu „{0}“ nejde zapsat na řádek skriptu – dokument je zapsán jako JSON	the document name “{0}” cannot be written on a script line – the document is written as JSON
+název listu „{0}“ se nepodařilo zapsat	the sheet name “{0}” could not be written
+názvy některých prvků se po přečtení skriptu mohou lišit (stejné názvy v jednom dílu)	some feature names may differ after the script is read (identical names in one part)
+orientaci vazeb Vzdálenost / Úhel („obráceně“) určuje aplikace měřením při vložení vazby – skript ji nezapisuje (komponenty stojí ve splněné poloze)	the orientation of Distance / Angle mates (“flip”) is measured by the app when the mate is inserted – the script does not write it (the components stand in the solved position)
+označení materiálu „{0}“ nejde zapsat příkazem materiál (čte se jako třída materiálu)	the material designation “{0}” cannot be written with the material command (it reads as a material class)
+podklady skic (obrázky / PDF) dílu „{0}“ se do skriptu nepřenášejí	sketch underlays (images / PDF) of part “{0}” are not carried into the script
+poloha popisků kót ve skice se nepřenáší (jen hodnoty a odkazy)	the position of dimension labels in sketches is not carried over (values and references only)
+popisové údaje (číslo, autor, revize) se nastavují razítkem výkresu – {0} dokumentů bez výkresu je do skriptu nepřenese (číslo dílu se v sestavě zapíše jako číslo komponenty)	document properties (number, author, revision) are set through the drawing title block – {0} documents without a drawing do not carry them into the script (in an assembly the part number is written as the component number)
+prvek „{0}“ ({1}) se ani jako JSON nepodařilo ověřit proti původnímu prvku – zkontrolujte ho po přečtení	feature “{0}” ({1}) could not be verified against the original feature even as JSON – check it after reading
+prvky v dokumentu sestavy ({0}) se do skriptu nepřenášejí	features in the assembly document ({0}) are not carried into the script
+přehrávání pohybové studie ve smyčce se do skriptu nepřenáší	looped playback of the motion study is not carried into the script
+razítko listu „{0}“ se nepodařilo zapsat	the title block of sheet “{0}” could not be written
+ruční kóty a značky výkresu se do skriptu nepřenášejí: {0} na {1} listech	manual drawing dimensions and marks are not carried into the script: {0} on {1} sheets
+skica na ploše / pomocné rovině: rovinu při přečtení znovu spočítá jádro z plochy F (číslo plochy tělesa před skicou)	sketch on a face / datum plane: when the script is read the kernel computes the plane again from face F (face number of the body before the sketch)
+skript se nepřečetl bez chyb ({0}): {1}	the script did not read back without errors ({0}): {1}
+tabulka revizí listu „{0}“ se do skriptu nepřenáší	the revision table of sheet “{0}” is not carried into the script
+textové příkazy, {0} řádků	text commands, {0} lines
+textový skript	text script
+Textový skript (.txt)	Text script (.txt)
+Textový skript uložen: {0} ({1} řádků){2}	Text script saved: {0} ({1} lines){2}
+údaj komponenty „{0}“ nejde zapsat na řádek skriptu	a property of component “{0}” cannot be written on a script line
+údaj razítka „{0}“ listu „{1}“ nejde zapsat na řádek	title block field “{0}” of sheet “{1}” cannot be written on a line
+úpravy vygenerovaných kót (tolerance, vlastní text, revize) se do skriptu nepřenášejí: {0} na {1} listech – doplňte je příkazem výkres tolerance <kóta> <tolerance>	edits of generated dimensions (tolerance, custom text, revision) are not carried into the script: {0} on {1} sheets – add them with the command drawing tolerance <dimension> <tolerance>
+volby listu „{0}“ se nepodařilo zapsat příkazem výkres – list vznikne s výchozími volbami	the options of sheet “{0}” could not be written with the drawing command – the sheet is created with default options
+volby listu bez zápisu ve skriptu ({0}) – list „{1}“ dokumentu „{2}“	sheet options without a script notation ({0}) – sheet “{1}” of document “{2}”
+vygenerované kóty výkresů (Chytré kóty, {0}) se nezapisují jednotlivě – „kótovat chytře“ je při přečtení vygeneruje znovu (nová id, poloha podle generátoru)	generated drawing dimensions (Smart dimensions, {0}) are not written one by one – “dimension smart” generates them again when the script is read (new ids, position by the generator)
+# kontrola (nálezy): odkazy názvem, otisky výběru a čísla hran ověřená jádrem, proměnné, smazané kóty
+list „{0}“ dílu „{1}“: smazané vygenerované kóty se nepodařilo určit ({2}) – po přečtení skriptu se vrátí	sheet “{0}” of part “{1}”: the deleted generated dimensions could not be determined ({2}) – they come back when the script is run
+list „{0}“ dílu „{1}“: {2} ze {3} smazaných vygenerovaných kót generátor už nevydává – ve skriptu nejsou	sheet “{0}” of part “{1}”: the generator no longer produces {2} of the {3} deleted generated dimensions – they are not in the script
+název dílu „{0}“ nejde zapsat na řádek skriptu – ve skriptu se jmenuje „{1}“ (název dílu uvnitř komponenty se tím změní)	the name of part “{0}” cannot be written on a script line – in the script it is called “{1}” (this changes the part name inside the component)
+název prvku „{0}“ nejde zapsat na řádek skriptu – prvek dostane automatický název	the name of feature “{0}” cannot be written on a script line – the feature gets an automatic name
+název sestavy „{0}“ nejde zapsat na řádek skriptu – sestava dostane výchozí název	the name of assembly “{0}” cannot be written on a script line – the assembly gets the default name
+otisky výběru hran / ploch ({0} prvků) jsou vynechané (sigs: "drop") – skript nese čísla hran a ploch tak, jak jsou uložená; po úpravě historie dílu mohou být zastaralá	edge / face selection signatures ({0} features) are left out (sigs: "drop") – the script carries the edge and face numbers as stored; after a change of the part history they may be stale
+poznámku proměnné „{0}“ nejde zapsat na řádek skriptu	the note of variable “{0}” cannot be written on a script line
+proměnnou „{0}“ = {1} nejde zapsat ({2}) – ve skriptu chybí i vazby, které ji používají	variable “{0}” = {1} cannot be written ({2}) – the bindings that use it are missing from the script as well
+prvek „{0}“ dílu „{1}“: vybranou hranu / plochu se podle otisku nepodařilo najít – prvek je ve skriptu zapsán i s otisky	feature “{0}” of part “{1}”: a selected edge / face could not be found by its signature – the feature is written to the script with its signatures
+prvek „{0}“ má stejné id jako dřívější prvek – odkazy na něj se po přečtení skriptu nenajdou	feature “{0}” has the same id as an earlier feature – references to it will not be found after the script is run
+prvky s otisky výběru hran / ploch ({0}) jsou zapsané obecným příkazem i s otisky – uložená čísla mohou být po úpravě historie zastaralá a bez jádra je nejde ověřit (v aplikaci je ověřuje export skript a window.mncad.script())	features with edge / face selection signatures ({0}) are written by the generic command including the signatures – the stored numbers may be stale after a change of the history and cannot be verified without the kernel (in the app, export script and window.mncad.script() verify them)
+smazané vygenerované kóty výkresů ({0} na {1} listech) se po „kótovat chytře“ vrátí – jejich id umí určit jen jádro (export v aplikaci je smaže příkazem výkres smazat a…)	deleted generated drawing dimensions ({0} on {1} sheets) come back after “dimension smart” – only the kernel can determine their ids (the export in the app deletes them with the command drawing delete a…)
+vazbu parametru „{0}“ prvku „{1}“ na výraz „{2}“ nejde zapsat na řádek skriptu	the binding of parameter “{0}” of feature “{1}” to the expression “{2}” cannot be written on a script line
+vazbu sestavy č. {0} ({1}) nejde zapsat textem (plocha v podsestavě, odkaz na komponentu mimo skript nebo název) – doplňte ji ručně	assembly mate no. {0} ({1}) cannot be written as text (a face inside a sub-assembly, a reference to a component outside the script, or the name) – add it by hand
+výraz nejde zapsat na řádek	the expression cannot be written on a line
+čísla vybraných hran a ploch ověřena jádrem podle otisků: {0} prvků, z toho {1} s jinými čísly než uloženými	numbers of the selected edges and faces verified by the kernel from their signatures: {0} features, {1} of them with numbers other than the stored ones
