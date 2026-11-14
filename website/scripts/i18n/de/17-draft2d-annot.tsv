@@ -1,0 +1,399 @@
+# Vlna 9 / fáze B – 2D CAD, balík 2 (annot): MTEXT, textové styly, kóty a kótovací styly, odkazy, šrafy, tolerance, značky
+{0} nesmí být záporné	{0} darf nicht negativ sein
+{0}: očekávám celé číslo	{0}: ganze Zahl erwartet
+{0}: rozsah {1}–{2}	{0}: Bereich {1}–{2}
+{0}: zadejte ano / ne (1 / 0)	{0}: ja / nein eingeben (1 / 0)
+<> = naměřená hodnota kóty	<> = gemessener Maßwert
+⚠ neuzavřené objekty vynechány: {0}	⚠ offene Objekte übersprungen: {0}
+✓ aktuální kótovací styl: {0}	✓ aktueller Bemaßungsstil: {0}
+✓ aktuální textový styl: {0}	✓ aktueller Textstil: {0}
+✓ Kóta {0} ({1}): {2}	✓ Bemaßung {0} ({1}): {2}
+✓ kótovací styl {0} přejmenován na {1}	✓ Bemaßungsstil {0} umbenannt in {1}
+✓ kótovací styl {0} smazán	✓ Bemaßungsstil {0} gelöscht
+✓ kótovací styl {0} upraven: {1}	✓ Bemaßungsstil {0} geändert: {1}
+✓ kótovací styl {0} vytvořen a nastaven jako aktuální	✓ Bemaßungsstil {0} erstellt und als aktuell gesetzt
+✓ měřítko poznámek: {0}	✓ Beschriftungsmaßstab: {0}
+✓ načtené vzory: {0}	✓ geladene Muster: {0}
+✓ přepsání zrušeno: {0}	✓ Überschreibungen entfernt: {0}
+✓ přepsáno u kót {0}: {1}	✓ bei Bemaßungen {0} überschrieben: {1}
+✓ styl {0} použit na kóty: {1}	✓ Stil {0} auf Bemaßungen angewendet: {1}
+✓ šrafa {0} upravena: {1}, měřítko {2}, úhel {3}°	✓ Schraffur {0} geändert: {1}, Skalierung {2}, Winkel {3}°
+✓ Šrafa {0}: {1}, {2} smyček, plocha {3}	✓ Schraffur {0}: {1}, {2} Konturen, Fläche {3}
+✓ textový styl {0} přejmenován na {1}	✓ Textstil {0} umbenannt in {1}
+✓ textový styl {0} smazán	✓ Textstil {0} gelöscht
+✓ textový styl {0} upraven	✓ Textstil {0} geändert
+✓ textový styl {0} vytvořen a nastaven jako aktuální	✓ Textstil {0} erstellt und als aktuell gesetzt
+✗ vyberte kružnici nebo oblouk	✗ Kreis oder Bogen wählen
+1. šipka (DIMBLK1)	1. Pfeilspitze (DIMBLK1)
+1. vynášecí čára	1. Hilfslinie
+2. šipka (DIMBLK2)	2. Pfeilspitze (DIMBLK2)
+2. vynášecí čára	2. Hilfslinie
+aktuální kótovací styl nelze smazat – nejdřív nastavte jiný	der aktuelle Bemaßungsstil kann nicht gelöscht werden – zuerst einen anderen setzen
+aktuální textový styl nelze smazat – nejdřív nastavte jiný	der aktuelle Textstil kann nicht gelöscht werden – zuerst einen anderen setzen
+anotativní	beschriftungsabhängig
+Anotativní	Beschriftungsabhängig
+Anotativní (měřítko poznámek)	Beschriftungsabhängig (Beschriftungsmaßstab)
+Asociativní hranice	Assoziative Umgrenzung
+Asociativní šrafa?	Assoziative Schraffur?
+Barva ACI {0}	ACI-Farbe {0}
+Barva kótovacích čar (DIMCLRD)	Farbe der Maßlinien (DIMCLRD)
+Barva přechodu 1	Verlaufsfarbe 1
+Barva přechodu 2	Verlaufsfarbe 2
+barva přechodu: číslo ACI nebo #rrggbb	Verlaufsfarbe: ACI-Nummer oder #rrggbb
+Barva textu (DIMCLRT)	Textfarbe (DIMCLRT)
+Barva vynášecích čar (DIMCLRE)	Farbe der Hilfslinien (DIMCLRE)
+bez šipky	ohne Pfeil
+Bez úběru materiálu	Materialabtrag unzulässig
+bez zalamování	kein Umbruch
+Bod na kružnici	Punkt auf dem Kreis
+bod neleží v uzavřené oblasti – hranice šrafy nenalezena (uzavřete obrys nebo vyberte objekty)	der Punkt liegt in keinem geschlossenen Bereich – keine Schraffurumgrenzung gefunden (Kontur schließen oder Objekte wählen)
+Bod prvku	Elementpunkt
+Celkové měřítko (DIMSCALE)	Gesamtskalierung (DIMSCALE)
+Ctrl+Enter = OK, Esc = zrušit	Strg+Enter = OK, Esc = abbrechen
+Čitelně	Lesbar
+Další proměnné textem: 2d kótovací-styl upravit {0} dimclrd 1 …	Weitere Variablen als Text: 2d bemstil ändern {0} dimclrd 1 …
+Délka vynášecích čar (DIMFXL)	Länge der Hilfslinien (DIMFXL)
+Délka zalomení	Abschlusslänge
+Desetinná místa	Dezimalstellen
+Desetinná místa (DIMDEC)	Dezimalstellen (DIMDEC)
+Desetinná místa tolerancí (DIMTDEC)	Dezimalstellen der Toleranz (DIMTDEC)
+Desetinná místa úhlů (DIMADEC)	Dezimalstellen der Winkel (DIMADEC)
+Desetinný oddělovač (DIMDSEP)	Dezimaltrennzeichen (DIMDSEP)
+DIMDSEP: jeden znak (čárka nebo tečka)	DIMDSEP: ein Zeichen (Komma oder Punkt)
+Dolní úchylka (DIMTM, kladně = minus)	Untere Abweichung (DIMTM, positiv = minus)
+drsnost 50,0 0 "Ra 1,6" | drsnost druh s-úběrem postup "broušeno" 50,0 90 "Ra 0,8"	rauheit 50,0 0 "Ra 1,6" | rauheit art abtrag verfahren "geschliffen" 50,0 90 "Ra 0,8"
+Drsnost povrchu	Oberflächenrauheit
+Druh (basic, removal, noremoval)	Art (basic, removal, noremoval)
+Druh kóty	Bemaßungsart
+druh značky: základní, s-úběrem, bez-úběru (basic, removal, noremoval)	Symbolart: grund, abtrag, ohne (basic, removal, noremoval)
+druhý objekt musí být úsečka (úsek křivky)	das zweite Objekt muss eine Linie sein (Polyliniensegment)
+dvě úsečky, oblouk nebo 3 body	zwei Linien, ein Bogen oder 3 Punkte
+Dvojitá (křížem)	Doppelt (Kreuzschraffur)
+Enter = nový řádek (\P)	Enter = neue Zeile (\P)
+Geometrická tolerance	Form- und Lagetoleranz
+Házení celkové	Gesamtlauf
+Házení obvodové	Rundlauf
+Horní úchylka (DIMTP)	Obere Abweichung (DIMTP)
+hranice: {0} smyček, plocha {1}	Umgrenzung: {0} Konturen, Fläche {1}
+hranici lze obnovit jen z uzavřených asociativních objektů ({0})	die Umgrenzung kann nur aus geschlossenen assoziativen Objekten neu erstellt werden ({0})
+chybí hodnota proměnné {0}	Wert der Variable {0} fehlt
+chybí nový obsah textu	neuer Textinhalt fehlt
+chytrá kóta podle objektu: úsečka → délka (vodorovně / svisle / zarovnaná), kružnice → průměr, oblouk → poloměr; volby Body, Úhlová, Základnicová, Řetězová, Souřadnicová, Zarovnaná, Poloměr, Průměr, Oblouková, Zalomená	intelligente Bemaßung nach Objekt: Linie → Länge (horizontal / vertikal / ausgerichtet), Kreis → Durchmesser, Bogen → Radius; Optionen Punkte, Winkel2, Basislinie, Weiter, Koordinate, Ausgerichtet, Radius, Durchmesser, Bogenlänge, Verkürzt
+ISO-25, text, šipky, tolerance, měřítko	ISO-25, Text, Pfeile, Toleranzen, Maßstab
+Jednotky úhlů (DIMAUNIT: 0 stupně, 1 st/min/s)	Winkeleinheiten (DIMAUNIT: 0 Grad, 1 Grad/Min/Sek)
+klikněte dovnitř uzavřené oblasti	in einen geschlossenen Bereich klicken
+Kolem dokola	Ringsum
+Konec odkazu	Führungsendpunkt
+kót	Bemaßungen
+kóta délky oblouku (symbol ⌒): oblouk nebo obloukový úsek křivky, poloha; volba Část = jen část oblouku mezi dvěma body	Bogenlängenbemaßung (Symbol ⌒): Bogen oder Bogensegment einer Polylinie, Position; Option Teil = nur ein Teil des Bogens zwischen zwei Punkten
+kóta e3 50,-15 | kóta e5 60,40 (kružnice → Ø) | kóta body 0,0 100,0 50,-15 | kóta úhlová e1 e2 40,15	bem e3 50,-15 | bem e5 60,40 (Kreis → Ø) | bem punkte 0,0 100,0 50,-15 | bem winkel2 e1 e2 40,15
+kóta poloměru R: oblouk / kružnice, poloha (text uvnitř nebo vně); Zalomená = náhradní střed a zalomení (velké poloměry, DIMJOGGED)	Radiusbemaßung R: Bogen / Kreis, Position (Text innen oder außen); Verkürzt = Ersatzmittelpunkt und Knick (große Radien, DIMJOGGED)
+kóta průměru Ø: kružnice / oblouk, poloha kótovací čáry (text uvnitř nebo vně)	Durchmesserbemaßung Ø: Kreis / Bogen, Position der Maßlinie (Text innen oder außen)
+kóta-lineární 0,0 100,0 50,-15 | kóta-lineární 0,0 30,40 svisle -15,20 | kóta-lineární "" e3 50,-15 (objekt) | kóta-lineární 0,0 100,0 text "<> H7" 50,-15	bemlinear 0,0 100,0 50,-15 | bemlinear 0,0 30,40 vertikal -15,20 | bemlinear "" e3 50,-15 (Objekt) | bemlinear 0,0 100,0 text "<> H7" 50,-15
+kóta-oblouku e4 0,60 | kóta-oblouku e4 část 50,0 0,50 0,70	bembogen e4 0,60 | bembogen e4 teil 50,0 0,50 0,70
+kóta-poloměr e3 40,30 | kóta-poloměr zalomená e3 0,-80 30,20 10,-20 (náhradní střed, poloha, zalomení)	bemradius e3 40,30 | bemradius verkürzt e3 0,-80 30,20 10,-20 (Ersatzmittelpunkt, Position, Knick)
+kóta-průměr e3 60,40	bemdurchm e3 60,40
+kóta-řetězová 150,0 200,0 (po kóta-lineární 0,0 100,0 50,-15)	bemweiter 150,0 200,0 (nach bemlinear 0,0 100,0 50,-15)
+kóta-souřadnicová 50,20 50,60 (X = 50) | kóta-souřadnicová 50,20 ybáze 90,20 | kóta-souřadnicová počátek 10,10 50,20 50,60	bemordinate 50,20 50,60 (X = 50) | bemordinate 50,20 ybezug 90,20 | bemordinate ursprung 10,10 50,20 50,60
+kóta-úhlová e1 e2 40,15 (dvě úsečky) | kóta-úhlová e5 30,30 (oblouk) | kóta-úhlová "" 0,0 50,0 0,50 30,30 (vrchol, body, oblouk)	bemwinkel e1 e2 40,15 (zwei Linien) | bemwinkel e5 30,30 (Bogen) | bemwinkel "" 0,0 50,0 0,50 30,30 (Scheitel, Punkte, Bogen)
+kóta-základnicová 150,0 200,0 (po kóta-lineární 0,0 100,0 50,-15)	bembasisl 150,0 200,0 (nach bemlinear 0,0 100,0 50,-15)
+kóta-zarovnaná 0,0 30,40 10,50	bemausg 0,0 30,40 10,50
+Kótovací čára	Maßlinie
+Kótovací čára i při šipkách vně (DIMTOFL)	Maßlinie auch bei Pfeilen außen (DIMTOFL)
+Kótovací styl	Bemaßungsstil
+kótovací styl „{0}“ už existuje	Bemaßungsstil „{0}“ existiert bereits
+kótovací styl „{0}“ ve výkresu není – styly: {1}	Bemaßungsstil „{0}“ ist nicht in der Zeichnung – Stile: {1}
+Kótovací styly	Bemaßungsstile
+kótovací styly (ISO-25 výchozí): výpis, nový [z ZDROJ] / upravit s proměnnými (dimtxt, dimasz, dimscale, dimdec, dimdsep, dimzin, dimlfac, dimpost, dimtol, dimtp, dimtm, dimlim…), aktuální, přejmenovat, smazat, použít na kóty, přepsat u kóty, vypsat, měřítko-poznámek 1:50	Bemaßungsstile (Vorgabe ISO-25): Liste, neu [von QUELLE] / ändern mit Variablen (dimtxt, dimasz, dimscale, dimdec, dimdsep, dimzin, dimlfac, dimpost, dimtol, dimtp, dimtm, dimlim…), aktuell, umbenennen, löschen, auf Bemaßungen anwenden, bei einer Bemaßung überschreiben, anzeigen, beschriftungsmassstab 1:50
+kótovací-styl nový Strojní z ISO-25 dimtxt 3.5 dimdec 1 | kótovací-styl aktuální Strojní | kótovací-styl upravit Strojní dimtol 1 dimtp 0.1 dimtm 0.05 | kótovací-styl přepsat e5 dimdec 3 | kótovací-styl měřítko-poznámek 1:50	bemstil neu Masch von ISO-25 dimtxt 3.5 dimdec 1 | bemstil aktuell Masch | bemstil ändern Masch dimtol 1 dimtp 0.1 dimtm 0.05 | bemstil überschreiben e5 dimdec 3 | bemstil beschriftungsmassstab 1:50
+Kóty: {0}	Bemaßung: {0}
+kříž a osy kružnice	Kreuz und Mittellinien des Kreises
+Kurzíva	Kursiv
+lineární	linear
+lineární kóta (vodorovná / svislá / natočená): dva body nebo objekt, poloha kótovací čáry; volby Mtext, Text (<> = hodnota), Úhel textu, Vodorovně, Svisle, Natočit	lineare Bemaßung (horizontal / vertikal / gedreht): zwei Punkte oder ein Objekt, Position der Maßlinie; Optionen Mtext, Text (<> = Wert), Textwinkel, Horizontal, Vertikal, Gedreht
+Maska pozadí	Hintergrundmaske
+Menší písmo (0,7×)	Kleinere Schrift (0,7×)
+Měřítko (u _USER rozteč)	Skalierung (Abstand bei _USER)
+Měřítko délek (DIMLFAC)	Längenfaktor (DIMLFAC)
+Měřítko poznámek (anotativní texty, kóty, odkazy)	Beschriftungsmaßstab (beschriftungsabhängige Texte, Bemaßungen, Führungen)
+Měřítko poznámek {0}	Beschriftungsmaßstab {0}
+měřítko poznámek: {0}	Beschriftungsmaßstab: {0}
+měřítko poznámek: 1:50, 2:1 nebo číslo, ne „{0}“	Beschriftungsmaßstab: 1:50, 2:1 oder eine Zahl, nicht „{0}“
+Mezera textu (DIMGAP, záporná = rámeček)	Textabstand (DIMGAP, negativ = Rahmen)
+Mezní rozměry (DIMLIM)	Grenzmaße (DIMLIM)
+mtext x,y @80,-20 "1. řádek\P2. řádek" | mtext výška 5 zarovnání mc x,y šířka 0 "Text"	mtext x,y @80,-20 "Zeile 1\PZeile 2" | mtext höhe 5 ausrichten mz x,y breite 0 "Text"
+Nadtržení	Überstrich
+Naměřeno	Gemessen
+Natočení kótovací čáry	Drehung der Maßlinie
+Natočení textu	Textdrehung
+Natočení textu (prázdné = podle čáry)	Textdrehung (leer = entlang der Linie)
+navazuje na poslední kótu	setzt an die letzte Bemaßung an
+neplatný název stylu „{0}“	ungültiger Stilname „{0}“
+neznámá proměnná kótovacího stylu „{0}“ – např. {1}	unbekannte Bemaßungsstilvariable „{0}“ – z. B. {1}
+neznámá vlastnost stylu „{0}“ – písmo, výška, šířka, sklon, anotativní	unbekannte Stileigenschaft „{0}“ – schrift, höhe, breite, neigung, beschriftung
+neznámá volba „{0}“ – nový, upravit, aktuální, přejmenovat, smazat nebo název stylu	unbekannte Option „{0}“ – neu, ändern, aktuell, umbenennen, löschen oder ein Stilname
+neznámá volba „{0}“ – nový, upravit, aktuální, přejmenovat, smazat, použít, přepsat, vypsat, měřítko-poznámek	unbekannte Option „{0}“ – neu, ändern, aktuell, umbenennen, löschen, anwenden, überschreiben, anzeigen, beschriftungsmassstab
+Nový	Neu
+nový název	neuer Name
+Nový z vybraného	Neu aus Auswahl
+obdélník, mnohoúhelník nebo objekt	Rechteck, Polygon oder Objekt
+objekt nejde okótovat	das Objekt kann nicht bemaßt werden
+objekt nejde okótovat – vyberte úsečku, kružnici nebo oblouk	das Objekt kann nicht bemaßt werden – Linie, Kreis oder Bogen wählen
+objekt nejde okótovat lineárně – vyberte úsečku, oblouk nebo kružnici	das Objekt kann nicht linear bemaßt werden – Linie, Bogen oder Kreis wählen
+objekt nejde převést na obláček	das Objekt kann nicht in eine Wolke umgewandelt werden
+obláček potřebuje aspoň 3 body	eine Wolke braucht mindestens 3 Punkte
+Oblouk kóty	Maßbogen
+Obsah (kódy MTEXT)	Inhalt (MTEXT-Codes)
+od 1. čáry poslední kóty	ab der 1. Linie der letzten Bemaßung
+od počátku 0,0 – X / Y	vom Ursprung 0,0 – X / Y
+odkaz 10,10 30,25 "Sražení 1×45°" | odkaz šipka tečka 10,10 bod 20,30 40,30 "Text" | odkaz 10,10 30,25 "" (bez textu)	mführung 10,10 30,25 "Fase 1×45°" | mführung pfeil punkt 10,10 punkt 20,30 40,30 "Text" | mführung 10,10 30,25 "" (ohne Text)
+odkaz se šipkou a textem: bod šipky, (Bod = další vrchol), bod zalomení, text; volby Šipka (Plná, Otevřená, Tečka, Šikmá, Prázdná, Bez), Velikost, Zalomení (délka), Spline, Výška textu	Führung mit Pfeil und Text: Pfeilpunkt, (Punkt = weiterer Scheitel), Abschlusspunkt, Text; Optionen Pfeil (Geschlossen, Offen, Punkt, Schräg, Leer, Keine), Größe, Abschluss (Länge), Spline, Texthöhe
+Odkazy	Führungen
+Odsazení vynášecí čáry (DIMEXO)	Abstand der Hilfslinie (DIMEXO)
+Odstavcový text	Absatztext
+odstavcový text v rámečku (MTEXT): dva rohy rámečku (šířka zalamování), obsah s kódy MTEXT (\P nový řádek, {\C1;…} barva, \S1/2; zlomek); volby Výška, Zarovnání (TL…BR), Řádkování, Natočení, Styl, Šířka	Absatztext im Rahmen (MTEXT): zwei Rahmenecken (Umbruchbreite), Inhalt mit MTEXT-Codes (\P neue Zeile, {\C1;…} Farbe, \S1/2; Bruch); Optionen Höhe, Ausrichten (OL…UR), Zeilenabstand, Drehung, Stil, Breite
+Osa mezi dvěma úsečkami	Mittellinie zwischen zwei Linien
+osa se kreslí mezi dvěma úsečkami	eine Mittellinie wird zwischen zwei Linien gezeichnet
+Pevná délka vynášecích čar (DIMFXLON)	Feste Hilfslinienlänge (DIMFXLON)
+písmo	Schrift
+Písmo	Schrift
+plná uzavřená	geschlossen gefüllt
+Plná výplň (SOLID)	Volltonfüllung (SOLID)
+Plus mínus	Plus/Minus
+Počátek vzoru	Musterursprung
+podle objektu: úsečka, kružnice, oblouk	nach Objekt: Linie, Kreis, Bogen
+Podtržení	Unterstrichen
+Poloha textu (prázdné = u konce)	Textposition (leer = am Ende)
+Poloha textu (prázdné = výchozí)	Textposition (leer = Vorgabe)
+poslední kótovací styl nelze smazat	der letzte Bemaßungsstil kann nicht gelöscht werden
+Potlačení nul (DIMZIN: 4 úvodní, 8 koncové)	Nullunterdrückung (DIMZIN: 4 führende, 8 nachfolgende)
+Potlačení nul tolerancí (DIMTZIN)	Nullunterdrückung der Toleranz (DIMTZIN)
+Potlačení nul úhlů (DIMAZIN)	Nullunterdrückung der Winkel (DIMAZIN)
+Potlačit 1. polovinu kótovací čáry (DIMSD1)	1. Maßlinienhälfte unterdrücken (DIMSD1)
+Potlačit 1. vynášecí čáru (DIMSE1)	1. Hilfslinie unterdrücken (DIMSE1)
+Potlačit 2. polovinu kótovací čáry (DIMSD2)	2. Maßlinienhälfte unterdrücken (DIMSD2)
+Potlačit 2. vynášecí čáru (DIMSE2)	2. Hilfslinie unterdrücken (DIMSE2)
+Požadavek	Anforderung
+Požadavek (např. Ra 1,6)	Anforderung (z. B. Ra 1,6)
+proměnná	variabel
+Protilehlý bod	Gegenüberliegender Punkt
+Předpona / přípona (DIMPOST, <> = hodnota)	Präfix / Suffix (DIMPOST, <> = Wert)
+přechod	Verlauf
+Přechod	Verlauf
+Přechod (LINEAR, CYLINDER, INVCYLINDER, prázdné = ne)	Verlauf (LINEAR, CYLINDER, INVCYLINDER, leer = keiner)
+Přepsané proměnné	Überschriebene Variablen
+Přesah vynášecí čáry (DIMEXE)	Überstand der Hilfslinie (DIMEXE)
+Přeškrtnutí	Durchgestrichen
+Připojení	Ausrichtung
+Připojení (TL…BR)	Ausrichtung (TL…BR)
+připojení: 1–9 nebo TL, TC, TR, ML, MC, MR, BL, BC, BR	Ausrichtung: 1–9 oder TL, TC, TR, ML, MC, MR, BL, BC, BR
+rámeček geometrické tolerance (ISO 1101): charakteristika (poloha, kolmost, rovnoběžnost, rovinnost, kruhovitost, válcovitost, přímost, sklon, souměrnost, soustřednost, házení, celkové-házení, tvar-čáry, tvar-plochy), hodnota (ø0.05M), základny (A,B,C nebo -), bod; Řetězec = zápis DXF	Toleranzrahmen (ISO 1101): Eigenschaft (position, rechtwinkligkeit, parallelität, ebenheit, rundheit, zylinderform, geradheit, neigung, symmetrie, konzentrizität, lauf, gesamtlauf, linienform, flächenform), Wert (ø0.05M), Bezüge (A,B,C oder -), Punkt; Zeichenfolge = DXF-Notation
+rámeček ISO 1101	Rahmen nach ISO 1101
+Revizní obláček	Revisionswolke
+revizní obláček (křivka z oblouků vypouklých ven): Obdélník (dva rohy, výchozí), Mnohoúhelník (body, Enter), Objekt (převede kružnici / uzavřenou křivku); Délka = délka oblouku; Obrátit = oblouky dovnitř	Revisionswolke (Polylinie aus nach außen gewölbten Bögen): Rechteckig (zwei Ecken, Vorgabe), Polygonal (Punkte, Enter), Objekt (wandelt Kreis / geschlossene Polylinie um); Bogenlänge = Länge der Bögen; Umkehren = Bögen nach innen
+revizní-obláček 0,0 100,50 | revizní-obláček délka 8 mnohoúhelník 0,0 50,0 25,40 "" | revizní-obláček objekt e3 | revizní-obláček obrátit 0,0 100,50	revwolke 0,0 100,50 | revwolke bogenlänge 8 polygonal 0,0 50,0 25,40 "" | revwolke objekt e3 | revwolke umkehren 0,0 100,50
+Rozestup základnicových kót (DIMDLI)	Abstand der Basislinienbemaßungen (DIMDLI)
+Řádkování	Zeilenabstand
+Řádků	Zeilen
+Řetězec (DXF: %%v buňky, {\Fgdt;j} značky)	Zeichenfolge (DXF: %%v Zellen, {\Fgdt;j} Symbole)
+Řetězec DXF	DXF-Zeichenfolge
+Řetězová	Weiter
+řetězové kóty navazující na 2. vynášecí čáru poslední (nebo vybrané) kóty na stejné kótovací čáře; Enter ukončí, Zpět, Vybrat	Kettenbemaßungen ab der 2. Hilfslinie der letzten (oder gewählten) Bemaßung auf derselben Maßlinie; Enter beendet, Zurück, Wählen
+S úběrem materiálu	Materialabtrag gefordert
+sklon	Neigung
+Sklon [°]	Neigungswinkel [°]
+Směr stop (=, ⊥, X, M, C, R, P)	Rillenrichtung (=, ⊥, X, M, C, R, P)
+Smyčky	Konturen
+soubor neobsahuje žádný vzor šrafy (*NÁZEV a řádky)	die Datei enthält kein Schraffurmuster (*NAME und Zeilen)
+souřadnicová	Koordinate
+Souřadnicová	Koordinate
+souřadnicová kóta od počátku (0,0 nebo volba Počátek): bod prvku, konec odkazu; osa X / Y podle směru odkazu nebo Xbáze / Ybáze	Koordinatenbemaßung vom Ursprung (0,0 oder Option Ursprung): Elementpunkt, Führungsendpunkt; X- / Y-Achse nach Führungsrichtung oder XBezug / YBezug
+Soustřednost / souosost	Konzentrizität / Koaxialität
+styl „{0}“ používá {1} kót – zadejte „přesunout-na STYL“	Stil „{0}“ wird von {1} Bemaßungen verwendet – „nach STIL“ angeben
+styl {0} používá {1} objektů – nejdřív je převeďte na jiný styl	Stil {0} wird von {1} Objekten verwendet – zuerst auf einen anderen Stil umstellen
+Styl ostrovů	Inselstil
+Styl ostrovů (normal, outer, ignore)	Inselstil (normal, outer, ignore)
+styl ostrovů: normální, vnější, ignorovat (0, 1, 2)	Inselstil: normal, außen, ignorieren (0, 1, 2)
+styl Standard nelze přejmenovat	der Stil Standard kann nicht umbenannt werden
+styl Standard nelze smazat	der Stil Standard kann nicht gelöscht werden
+styl-textu nový ISO písmo isocp.shx výška 0 šířka 1 | styl-textu aktuální ISO | styl-textu upravit ISO sklon 15 | styl-textu smazat ISO	stil neu ISO schrift isocp.shx höhe 0 breite 1 | stil aktuell ISO | stil ändern ISO neigung 15 | stil löschen ISO
+Styly	Stile
+Styly poznámek	Beschriftungsstile
+Svislá poloha textu (DIMTAD: 0 na čáře, 1 nad, 4 pod)	Vertikale Textposition (DIMTAD: 0 auf der Linie, 1 darüber, 4 darunter)
+Symbol délky oblouku (DIMARCSYM: 0 před, 1 nad, 2 bez)	Bogenlängensymbol (DIMARCSYM: 0 davor, 1 darüber, 2 keins)
+Šipka	Pfeilspitze
+Šipka ("" plná, _OPEN, _DOT, _NONE…)	Pfeilspitze ("" geschlossen gefüllt, _OPEN, _DOT, _NONE…)
+Šipka (DIMBLK: "" plná, _OPEN, _OBLIQUE, _ARCHTICK, _DOT, _NONE…)	Pfeilspitze (DIMBLK: "" geschlossen gefüllt, _OPEN, _OBLIQUE, _ARCHTICK, _DOT, _NONE…)
+šipka, zalomení, text	Pfeil, Abschluss, Text
+šířka	Breite
+Šířka rámečku	Rahmenbreite
+šířkový faktor musí být kladný	der Breitenfaktor muss positiv sein
+Šrafa	Schraffur
+šrafa 50,25 | šrafa vzor ANSI37 měřítko 2 úhel 0 50,25 | šrafa plná objekty e1 e2 | šrafa uživatelský měřítko 3 úhel 45 dvojitá 50,25	schraff 50,25 | schraff muster ANSI37 skalierung 2 winkel 0 50,25 | schraff solid objekte e1 e2 | schraff benutzer skalierung 3 winkel 45 doppelt 50,25
+šrafa: vnitřní bod (najde uzavřenou oblast i z více entit, ostrovy uvnitř) nebo Objekty; volby Vzor (ANSI31, ANSI37, … SOLID, USER), Měřítko, Úhel, Plná, Uživatelský (rozteč), Dvojitá, Přechod, Ostrovy (normální, vnější, ignorovat), Asociativní, Počátek, Zpět; Enter dokončí	Schraffur: innerer Punkt (findet einen geschlossenen Bereich auch aus mehreren Objekten, Inseln innen) oder Objekte; Optionen Muster (ANSI31, ANSI37, … SOLID, USER), Skalierung, Winkel, Solid, Benutzer (Abstand), Doppelt, Verlauf, Inseln (normal, außen, ignorieren), Assoziativ, Ursprung, Zurück; Enter beendet
+Šrafy	Schraffuren
+Text (<> = naměřená hodnota)	Text (<> = gemessener Wert)
+Text (kódy MTEXT)	Text (MTEXT-Codes)
+Text kóty	Maßtext
+Text odkazu	Führungstext
+Text uvnitř vodorovně (DIMTIH)	Text innen horizontal (DIMTIH)
+text v rámečku se zalamováním a formátováním	Text im Rahmen mit Umbruch und Formatierung
+Text vně vodorovně (DIMTOH)	Text außen horizontal (DIMTOH)
+text, kóta, odkaz – i poklepáním	Text, Bemaßung, Führung – auch per Doppelklick
+Text: {0}	Text: {0}
+Textové styly	Textstile
+textové styly: výpis, nový / upravit (písmo, výška – 0 = zadává se u textu, šířka, sklon, anotativní), aktuální, přejmenovat, smazat (nepoužitý)	Textstile: Liste, neu / ändern (schrift, höhe – 0 = beim Text angeben, breite, neigung, beschriftung), aktuell, umbenennen, löschen (unbenutzt)
+Textové styly…	Textstile…
+textový styl „{0}“ už existuje	Textstil „{0}“ existiert bereits
+Textový styl (DIMTXSTY)	Textstil (DIMTXSTY)
+Tloušťka kótovacích čar (DIMLWD)	Linienstärke der Maßlinien (DIMLWD)
+Tloušťka vynášecích čar (DIMLWE)	Linienstärke der Hilfslinien (DIMLWE)
+Tolerance (DIMTOL)	Toleranzen (DIMTOL)
+tolerance poloha ø0.05M A,B,C 120,40 | tolerance rovinnost 0.01 - 10,10 | tolerance řetězec "{\Fgdt;j}%%v0.1%%vA" 10,10	toleranz position ø0.05M A,B,C 120,40 | toleranz ebenheit 0.01 - 10,10 | toleranz zeichenfolge "{\Fgdt;j}%%v0.1%%vA" 10,10
+Tolerance tvaru a polohy	Form- und Lagetoleranz
+Tučně	Fett
+Tvar čáry	Linienform
+Úhel zalomení (DIMJOGANG)	Knickwinkel (DIMJOGANG)
+úhlová	Winkel
+Úhlová	Winkel
+úhlová (3 body)	Winkel (3 Punkte)
+úhlová kóta: dvě úsečky (úhel podle polohy oblouku – kterýkoli ze 4 úhlů), oblouk, kružnice + bod, nebo Enter = vrchol a dva body (i přes 180°)	Winkelbemaßung: zwei Linien (Winkel nach Bogenposition – jeder der 4 Winkel), Bogen, Kreis + Punkt oder Enter = Scheitel und zwei Punkte (auch über 180°)
+upraví obsah textu, odstavcového textu, kóty (<> = naměřená hodnota, prázdné = výchozí), odkazu, tolerance nebo značky; v GUI editor na místě	bearbeitet den Inhalt eines Textes, Absatztextes, einer Bemaßung (<> = gemessener Wert, leer = Vorgabe), Führung, Toleranz oder eines Symbols; Editor vor Ort in der Oberfläche
+upraví šrafu: Vzor, Měřítko, Úhel, Plná, Uživatelský, Dvojitá, Přechod, Ostrovy, Počátek; Hranice = obnovit smyčky z asociativních objektů; Načíst = vzory ze souboru .pat (text v uvozovkách)	bearbeitet eine Schraffur: Muster, Skalierung, Winkel, Solid, Benutzer, Doppelt, Verlauf, Inseln, Ursprung; Umgrenzung = Konturen aus assoziativen Objekten neu erstellen; Laden = Muster aus einer .pat-Datei (Text in Anführungszeichen)
+Upravit šrafu	Schraffur bearbeiten
+Upravit text	Text bearbeiten
+upravit-šrafu e7 vzor ANSI37 měřítko 2 úhel 30 | upravit-šrafu e7 ostrovy vnější | upravit-šrafu e7 hranice	schraffedit e7 muster ANSI37 skalierung 2 winkel 30 | schraffedit e7 inseln außen | schraffedit e7 umgrenzung
+upravit-text e5 "Nový text" | upravit-text e7 "<> H7" (kóta) | upravit-text e7 "<>" (kóta zpět na naměřenou hodnotu)	textedit e5 "Neuer Text" | textedit e7 "<> H7" (Bemaßung) | textedit e7 "<>" (Bemaßung zurück auf den gemessenen Wert)
+Uživatelská (rozteč, úhel)	Benutzerdefiniert (Abstand, Winkel)
+ve výkresu není lineární, zarovnaná, souřadnicová ani úhlová (3 body) kóta	die Zeichnung enthält keine lineare, ausgerichtete, Koordinaten- oder Winkelbemaßung (3 Punkte)
+Velikost šipky	Pfeilgröße
+Velikost šipky (DIMASZ)	Pfeilgröße (DIMASZ)
+Větší písmo (1,5×)	Größere Schrift (1,5×)
+Vložte obsah souboru .pat	Inhalt einer .pat-Datei einfügen
+vodorovná / svislá / natočená	horizontal / vertikal / gedreht
+Vodorovná poloha textu (DIMJUST: 0 střed, 1 u 1. čáry, 2 u 2. čáry)	Horizontale Textposition (DIMJUST: 0 zentriert, 1 an 1. Linie, 2 an 2. Linie)
+Výběrem objektů	Durch Objektwahl
+Vyberte druhou úsečku	Zweite Linie wählen
+vyberte kružnici nebo oblouk	Kreis oder Bogen wählen
+Vyberte kružnici nebo oblouk	Kreis oder Bogen wählen
+Vyberte navazovanou kótu	Fortzusetzende Bemaßung wählen
+Vyberte objekt ke kótování	Zu bemaßendes Objekt wählen
+Vyberte objekt nebo zvolte druh kóty	Objekt wählen oder Bemaßungsart wählen
+Vyberte oblouk	Bogen wählen
+Vyberte oblouk nebo kružnici	Bogen oder Kreis wählen
+Vyberte oblouk, kružnici, úsečku nebo <zadat vrchol>	Bogen, Kreis, Linie wählen oder <Scheitel angeben>
+Vyberte první úsečku	Erste Linie wählen
+Vyberte šrafu	Schraffur wählen
+Vyberte text, kótu nebo odkaz	Text, Bemaßung oder Führung wählen
+vyberte úsečku, oblouk nebo kružnici	Linie, Bogen oder Kreis wählen
+Vyberte uzavřené objekty hranice	Geschlossene Umgrenzungsobjekte wählen
+Vyberte základní kótu	Basisbemaßung wählen
+Výrobní postup	Fertigungsverfahren
+Výška (0 = zadává se u textu)	Höhe (0 = beim Text angeben)
+výška stylu: 0 (zadává se u textu) nebo kladné číslo	Stilhöhe: 0 (beim Text angeben) oder eine positive Zahl
+Výška textu (DIMTXT)	Texthöhe (DIMTXT)
+Výška tolerancí × (DIMTFAC)	Toleranzhöhe × (DIMTFAC)
+Vzor	Muster
+vzor {0}: neplatný řádek „{1}“	Muster {0}: ungültige Zeile „{1}“
+vzor je pro tuto plochu příliš hustý – zvětšete měřítko	das Muster ist für diese Fläche zu dicht – Skalierung erhöhen
+vzor šrafy „{0}“ neznám – vzory: {1}	unbekanntes Schraffurmuster „{0}“ – Muster: {1}
+vzor, měřítko, úhel, ostrovy	Muster, Skalierung, Winkel, Inseln
+Zadejte barvu 1 (ACI nebo #rrggbb)	Farbe 1 eingeben (ACI oder #rrggbb)
+Zadejte barvu 2 (Enter = světlejší odstín barvy 1)	Farbe 2 eingeben (Enter = hellerer Ton von Farbe 1)
+Zadejte bod na povrchu	Punkt auf der Oberfläche angeben
+Zadejte bod prvku	Elementpunkt angeben
+Zadejte další bod nebo <uzavřít>	Nächsten Punkt angeben oder <schließen>
+Zadejte další vnitřní bod nebo <dokončit>	Weiteren inneren Punkt angeben oder <beenden>
+Zadejte další vrchol odkazu	Nächsten Führungsscheitel angeben
+Zadejte délku oblouku	Bogenlänge eingeben
+Zadejte délku zalomení	Abschlusslänge eingeben
+Zadejte druh přechodu	Verlaufsart wählen
+Zadejte druh šipky	Pfeilart wählen
+Zadejte druh značky	Symbolart wählen
+Zadejte druhý bod na oblouku	Zweiten Punkt auf dem Bogen angeben
+Zadejte druhý koncový bod úhlu	Zweiten Winkelendpunkt angeben
+Zadejte faktor řádkování	Zeilenabstandsfaktor eingeben
+Zadejte hodnotu tolerance (ø0.05, M = max. materiál)	Toleranzwert eingeben (ø0.05, M = Maximum-Material)
+Zadejte charakteristiku	Eigenschaft wählen
+Zadejte koncový bod druhého ramene	Endpunkt des zweiten Schenkels angeben
+Zadejte koncový bod prvního ramene	Endpunkt des ersten Schenkels angeben
+Zadejte konec odkazu	Führungsendpunkt angeben
+zadejte kóty (e3 e5) nebo je nejdřív vyberte	Bemaßungen angeben (e3 e5) oder zuerst wählen
+Zadejte měřítko vzoru	Musterskalierung eingeben
+Zadejte náhradní střed (počátek kótovací čáry)	Ersatzmittelpunkt angeben (Beginn der Maßlinie)
+zadejte název nového stylu	Namen des neuen Stils eingeben
+Zadejte název vzoru ({0} … , SOLID, USER)	Musternamen eingeben ({0} … , SOLID, USER)
+Zadejte nový obsah	Neuen Inhalt eingeben
+Zadejte počátek druhé vynášecí čáry	Ursprung der zweiten Hilfslinie angeben
+Zadejte počátek první vynášecí čáry	Ursprung der ersten Hilfslinie angeben
+Zadejte počátek první vynášecí čáry nebo <vybrat objekt>	Ursprung der ersten Hilfslinie angeben oder <Objekt wählen>
+Zadejte počátek souřadnic kót	Ursprung der Koordinatenbemaßung angeben
+Zadejte počátek vzoru	Musterursprung angeben
+Zadejte polohu kótovací čáry	Position der Maßlinie angeben
+Zadejte polohu kóty délky oblouku	Position der Bogenlängenbemaßung angeben
+Zadejte polohu oblouku kóty	Position des Maßbogens angeben
+Zadejte polohu tolerance	Position der Toleranz angeben
+Zadejte polohu zalomení	Knickposition angeben
+Zadejte požadavek (např. Ra 1,6; Enter = bez)	Anforderung eingeben (z. B. Ra 1,6; Enter = keine)
+zadejte proměnné a hodnoty, např. dimdec 3	Variablen und Werte angeben, z. B. dimdec 3
+zadejte proměnné a hodnoty, např. dimtxt 3.5	Variablen und Werte angeben, z. B. dimtxt 3.5
+Zadejte protější roh	Gegenüberliegende Ecke angeben
+Zadejte protilehlý roh	Gegenüberliegende Ecke angeben
+Zadejte první bod na oblouku	Ersten Punkt auf dem Bogen angeben
+Zadejte první bod obláčku	Ersten Wolkenpunkt angeben
+Zadejte první roh obláčku	Erste Wolkenecke angeben
+Zadejte první roh rámečku	Erste Rahmenecke angeben
+Zadejte připojení	Ausrichtung wählen
+Zadejte rozteč čar	Linienabstand eingeben
+Zadejte řetězec tolerance (DXF)	Toleranz-Zeichenfolge eingeben (DXF)
+Zadejte směr povrchu	Richtung der Oberfläche angeben
+Zadejte směr stop (=, ⊥, X, M, C, R, P)	Rillenrichtung eingeben (=, ⊥, X, M, C, R, P)
+Zadejte styl ostrovů	Inselstil wählen
+Zadejte šířku rámečku (0 = bez zalamování)	Rahmenbreite eingeben (0 = kein Umbruch)
+Zadejte text (\P = nový řádek)	Text eingeben (\P = neue Zeile)
+Zadejte text kóty (<> = naměřená hodnota)	Maßtext eingeben (<> = gemessener Wert)
+Zadejte text odkazu (Enter = bez textu)	Führungstext eingeben (Enter = ohne Text)
+Zadejte úhel kótovací čáry	Winkel der Maßlinie angeben
+Zadejte úhel textu kóty	Winkel des Maßtextes angeben
+Zadejte úhel vzoru	Musterwinkel angeben
+Zadejte umístění šipky odkazu	Position der Führungspfeilspitze angeben
+Zadejte umístění zalomení odkazu	Position des Führungsabschlusses angeben
+Zadejte velikost šipky	Pfeilgröße eingeben
+Zadejte velikost značky středu	Größe der Mittelpunktmarke eingeben
+Zadejte vnitřní bod	Inneren Punkt wählen
+Zadejte volbu	Option wählen
+Zadejte výrobní postup	Fertigungsverfahren eingeben
+Zadejte výšku písma	Schrifthöhe eingeben
+Zadejte základny (A,B,C nebo - bez základen)	Bezüge eingeben (A,B,C oder - ohne Bezüge)
+zadejte změny: písmo, výška, šířka, sklon, anotativní	Änderungen angeben: schrift, höhe, breite, neigung, beschriftung
+základna „{0}“: písmeno A–Z, případně s modifikátorem (např. A, B(M))	Bezug „{0}“: ein Buchstabe A–Z, optional mit Modifikator (z. B. A, B(M))
+Základní značka	Grundsymbol
+Základnicová	Basislinie
+základnicové kóty od 1. vynášecí čáry poslední (nebo vybrané) kóty, rozestup DIMDLI; Enter ukončí, Zpět, Vybrat	Basislinienbemaßungen ab der 1. Hilfslinie der letzten (oder gewählten) Bemaßung, Abstand DIMDLI; Enter beendet, Zurück, Wählen
+Zalomená (velký poloměr)	Verkürzt (großer Radius)
+Zaokrouhlení (DIMRND)	Rundung (DIMRND)
+zarovnaná	ausgerichtet
+Zarovnaná	Ausgerichtet
+zarovnaná kóta (rovnoběžná se spojnicí bodů): dva body nebo objekt, poloha kótovací čáry	ausgerichtete Bemaßung (parallel zur Verbindung der Punkte): zwei Punkte oder ein Objekt, Position der Maßlinie
+Zlomek / stoh (vyberte a/b nebo +0,1^-0,2)	Bruch / Stapel (a/b oder +0,1^-0,2 auswählen)
+Značka drsnosti	Oberflächensymbol
+značka ISO 1302	Symbol nach ISO 1302
+značka struktury povrchu (ISO 1302 / 21920): bod na povrchu, směr povrchu, požadavek (Ra 1,6); volby Druh (základní, s-úběrem, bez-úběru), Postup (např. broušeno), Stopy (=, ⊥, X, M, C, R, P), Dokola, Výška	Oberflächensymbol (ISO 1302 / 21920): Punkt auf der Oberfläche, Richtung der Oberfläche, Anforderung (Ra 1,6); Optionen Art (grund, abtrag, ohne), Verfahren (z. B. geschliffen), Rillen (=, ⊥, X, M, C, R, P), Ringsum, Höhe
+Značka středu	Mittelpunktmarke
+Značka středu (DIMCEN, záporná = i osy)	Mittelpunktmarke (DIMCEN, negativ = mit Mittellinien)
+Značka středu a osy	Mittelpunktmarke und Mittellinien
+značka středu kružnice / oblouku s osami (čárkovaná CENTER, přesah 3 mm); Velikost = velikost kříže; Osa = osa mezi dvěma úsečkami	Mittelpunktmarke eines Kreises / Bogens mit Mittellinien (Linientyp CENTER, 3 mm Überstand); Größe = Kreuzgröße; Mittellinie = Mittellinie zwischen zwei Linien
+značka-středu e3 e4 | značka-středu velikost 5 e3 | značka-středu osa e1 e2	zentrumsmarke e3 e4 | zentrumsmarke größe 5 e3 | zentrumsmarke mittellinie e1 e2
+žádný z vybraných objektů není uzavřený	keines der gewählten Objekte ist geschlossen
+Jednotky délek (DIMLUNIT: 2 desetinné, 5 zlomky, 4 stopy-palce)	Längeneinheiten (DIMLUNIT: 2 dezimal, 5 Brüche, 4 Fuß-Zoll)
+Text – odstavce	Text – Absätze
+# oprava po kontrole (review)
+Multiodkaz	Multi-Führungslinie
+Nejdřív vyberte text, který se má formátovat	Zuerst den zu formatierenden Text markieren
+oblouky obláčku dovnitř	Wolkenbögen nach innen
+oblouky obláčku ven	Wolkenbögen nach außen
+Odkazová čára	Führungslinie
+úsečky jsou rovnoběžné – úhel mezi nimi nelze okótovat	die Linien sind parallel – der Winkel zwischen ihnen kann nicht bemaßt werden
+Velikost šipky (na papíře)	Pfeilgröße (auf dem Papier)
+Výška textu (na papíře)	Texthöhe (auf dem Papier)
+Díl poznámky	Beschriftungsteil

@@ -1,0 +1,328 @@
+# Vlna 9 / fáze B – 2D CAD balík 3 (layout): bloky, atributy, rozvržení, výřezy, tisk PDF
+ – objekty nahrazeny vložením	 – objects replaced by a block reference
+ – objekty smazány	 – objects deleted
+ – zahrňte ji do bloku (BLOK) nebo ji nakreslete v úpravě bloku	 – include it in a block (BLOCK) or draw it in the block editor
+ · výřez {0} v měřítku {1}	 · viewport {0} at scale {1}
+(žádné bloky)	(no blocks)
+{0} · {1} × {2} mm · měřítko {3}{4}	{0} · {1} × {2} mm · scale {3}{4}
+{0} · entit {1} · vložení {2}{3}	{0} · entities {1} · references {2}{3}
+{0} ({1}) · {2} {3}×{4} mm · výřezů {5}{6}	{0} ({1}) · {2} {3}×{4} mm · viewports {5}{6}
+{0} (definice chybí)	{0} (definition missing)
+{0} entit · {1}× vloženo	{0} entities · inserted {1}×
+{0} není výřez rozvržení „{1}“	{0} is not a viewport of layout “{1}”
+{0} s rámečkem a razítkem	{0} with frame and title block
+{0} stran	{0} pages
+{0}: {1} {2}×{3} mm, {4}, okraje {5}, styl {6}, tloušťky {7}	{0}: {1} {2}×{3} mm, {4}, margins {5}, style {6}, lineweights {7}
+{0}: beze změny	{0}: unchanged
+⚠ zamčené výřezy (beze změny): {0} – odemknout: výřez odemknout	⚠ locked viewports (unchanged): {0} – unlock: mview unlock
+✓ „{0}“ ({1} entit) – nová záložka	✓ “{0}” ({1} entities) – new tab
+✓ {0} ({1} entit, {2} kB)	✓ {0} ({1} entities, {2} kB)
+✓ {0} ({1} entit)	✓ {0} ({1} entities)
+✓ {0} ve výřezech {1}: {2}	✓ {0} in viewports {1}: {2}
+✓ {0}: {1} {2}×{3} mm, styl {4}	✓ {0}: {1} {2}×{3} mm, style {4}
+✓ {0}: {1} stran, {2}×{3} mm, měřítko {4} ({5} kB)	✓ {0}: {1} pages, {2}×{3} mm, scale {4} ({5} kB)
+✓ {0}: {1} vložení s atributy	✓ {0}: {1} references with attributes
+✓ {0}: definice atributu {1}{2}	✓ {0}: attribute definition {1}{2}
+✓ {0}: vložení bloku „{1}“ v {2}{3}	✓ {0}: reference of block “{1}” at {2}{3}
+✓ {0}: změněno atributů {1}	✓ {0}: attributes changed {1}
+✓ blok „{0}“ ({1} entit){2}	✓ block “{0}” ({1} entities){2}
+✓ blok „{0}“ předefinován ({1} entit, vložení obnovena: {2})	✓ block “{0}” redefined ({1} entities, references refreshed: {2})
+✓ blok „{0}“ uložen ({1} entit, vložení obnovena: {2})	✓ block “{0}” saved ({1} entities, references refreshed: {2})
+✓ kopie rozvržení „{0}“ → „{1}“	✓ copy of layout “{0}” → “{1}”
+✓ měřítko {0}: {1}	✓ scale {0}: {1}
+✓ modelový prostor	✓ model space
+✓ modelový prostor přes výřez {0} ({1}, měřítko {2}) – souřadnice modelu; zpět: papírový-prostor	✓ model space through viewport {0} ({1}, scale {2}) – model coordinates; back: pspace
+✓ nový blok „{0}“ zahozen	✓ new block “{0}” discarded
+✓ papírový prostor – rozvržení „{0}“	✓ paper space – layout “{0}”
+✓ rozvržení „{0}“	✓ layout “{0}”
+✓ rozvržení „{0}“ ({1}): {2} {3}×{4} mm{5}	✓ layout “{0}” ({1}): {2} {3}×{4} mm{5}
+✓ rozvržení „{0}“ → „{1}“	✓ layout “{0}” → “{1}”
+✓ rozvržení „{0}“ smazáno	✓ layout “{0}” deleted
+✓ střed pohledu {0}: {1}	✓ view centre {0}: {1}
+✓ úprava bloku „{0}“ ({1} entit) – kreslete a upravujte, konec: zavřít-blok	✓ editing block “{0}” ({1} entities) – draw and modify, finish: bclose
+✓ vyčištěno: {0}	✓ purged: {0}
+✓ výřez {0}	✓ viewport {0}
+✓ změny bloku „{0}“ zahozeny	✓ changes to block “{0}” discarded
+1:1 (rozvržení) / vejít (model)	1:1 (layout) / fit (model)
+A3 bez rámečku a razítka	A3 without frame and title block
+Aktuální ({0})	Current ({0})
+Atribut	Attribute
+atributy	attributes
+Atributy	Attributes
+Atributy do CSV	Attributes to CSV
+Atributy: {0}	Attributes: {0}
+automaticky	automatic
+Barevně	Colour
+Blok	Block
+blok „{0}“ nemůže obsahovat sám sebe (ani vnořeně)	block “{0}” cannot contain itself (not even nested)
+blok „{0}“ ve výkresu není – bloky: {1}	block “{0}” is not in the drawing – blocks: {1}
+Blok je vložený – nejdřív smažte vložení	The block is inserted – delete its references first
+blok ŠROUB 0,0 e1 e2 e3 | blok RÁM 10,10 okno 0,0 200,100 ponechat | blok ?	block BOLT 0,0 e1 e2 e3 | block FRAME 10,10 window 0,0 200,100 retain | block ?
+bloky	blocks
+Celý výkres jako .mncad	Whole drawing as .mncad
+Černobíle	Monochrome
+Čtyři	Four
+Definice atributu	Attribute definition
+definice atributu (pro bloky): režimy [Neviditelný/Konstantní/Ověřit/Předvolba] před značkou, značka, výzva, výchozí hodnota, bod [Zarovnání/Styl], výška, natočení	attribute definition (for blocks): modes [Invisible/Constant/Verify/Preset] before the tag, tag, prompt, default value, point [Justify/Style], height, rotation
+definice bloku z vybraných objektů: název, bod vložení, objekty, původní objekty [Převést/Ponechat/Smazat] (převést = nahradit vložením); stejný název blok předefinuje a obnoví všechna vložení; „blok ?“ = seznam bloků	block definition from the selected objects: name, insertion point, objects, original objects [Convert/Retain/Delete] (convert = replace by a reference); the same name redefines the block and refreshes all references; “block ?” = list of blocks
+definice-atributu CISLO "Číslo dílu" "001" 10,5 3.5 0 | definice-atributu neviditelný CENA "Cena" "0" 0,0 2.5 0	attdef NUMBER "Part number" "001" 10,5 3.5 0 | attdef invisible PRICE "Price" "0" 0,0 2.5 0
+Definovat atribut	Define attribute
+DPI 30–1200	DPI 30–1200
+Dva nad sebou	Two stacked
+Dva vedle sebe	Two side by side
+export všech rozvržení do jednoho vícestránkového PDF (každá strana svým formátem, 1:1); bez rozvržení model; volby jako TISK (aktuální, rozvržení X, mono, název)	export of all layouts into one multi-page PDF (each page in its own format, 1:1); without layouts the model; options as PLOT (current, layout X, mono, name)
+export-pdf | export-pdf mono | export-pdf aktuální | export-pdf název "Sada výkresů"	exportpdf | exportpdf mono | exportpdf current | exportpdf name "Drawing set"
+extrahovat-atributy | extrahovat-atributy blok RAZÍTKO | extrahovat-atributy výběr oddělovač , název kusovník	attext | attext block TITLE | attext selection separator , name partslist
+hladiny	layers
+Hladiny výřezu	Viewport layers
+hladiny-výřezu zmrazit KÓTY,OSY výřez e7 | hladiny-výřezu rozmrazit * vše | hladiny-výřezu seznam	vplayer freeze DIMS,AXES viewport e7 | vplayer thaw * all | vplayer list
+hladiny-výřezu: zmrazit, rozmrazit, reset, seznam – ne „{0}“	vplayer: freeze, thaw, reset, list – not “{0}”
+Hledat blok…	Find block…
+hodnoty atributů vložení bloku: vložení, pak ZNAČKA=hodnota … (Enter = konec); bez zadání = výpis atributů	attribute values of a block reference: the reference, then TAG=value … (Enter = done); without input = list of attributes
+konstantní	constant
+Kopie aktuálního rozvržení	Copy of the current layout
+kótovací styly	dimension styles
+Měřítko {0}	Scale {0}
+Měřítko a hladiny výřezu…	Viewport scale and layers…
+měřítko nesmí být 0	the scale must not be 0
+Měřítko výřezu	Viewport scale
+Měřítko výřezu (1:1, 1:2, 1:5, 1:10, 1:20, 1:50, 2:1…) nebo Vejít	Viewport scale (1:1, 1:2, 1:5, 1:10, 1:20, 1:50, 2:1…) or Fit
+Měřítko výřezu (např. 1:50, 2:1)	Viewport scale (e.g. 1:50, 2:1)
+Měřítko X	Scale X
+Měřítko X / Y	Scale X / Y
+Měřítko Y	Scale Y
+mnohoúhelník ({0} vrcholů)	polygon ({0} vertices)
+mnohoúhelník potřebuje aspoň 3 vrcholy	a polygon needs at least 3 vertices
+model	model
+Model – rozsah	Model – extents
+MODEL ve výřezu {0} · {1}	MODEL in viewport {0} · {1}
+Modelový prostor	Model space
+Modelový prostor výřezu	Viewport model space
+Modelový prostor výřezu {0} ({1}) – poklepáním mimo výřez zpět na papír	Model space of viewport {0} ({1}) – double-click outside the viewport to return to paper
+modelový-prostor | modelový-prostor e7	mspace | mspace e7
+náhled, papír, měřítko, styl tisku	preview, paper, scale, plot style
+Natočení pohledu	View twist
+název bloku „{0}“ obsahuje nepovolený znak (< > / \ " : ; ? * | = `)	block name “{0}” contains a forbidden character (< > / \ " : ; ? * | = `)
+název bloku je delší než 255 znaků	the block name is longer than 255 characters
+název bloku je prázdný	the block name is empty
+Název rozvržení	Layout name
+Název výkresu	Drawing title
+neplatné měřítko „{0}“ – např. 1:50, 2:1, 1:2.5 nebo 0.02	invalid scale “{0}” – e.g. 1:50, 2:1, 1:2.5 or 0.02
+neupravujete žádný blok (UPRAVIT-BLOK název)	you are not editing any block (BEDIT name)
+neviditelný	invisible
+Neviditelný	Invisible
+neznámé zadání „{0}“ – blok X, výběr, oddělovač ;, název soubor	unknown input “{0}” – block X, selection, separator ;, name file
+neznámé zadání „{0}“ – dxf, dwg, mncad, záložka, verze R2018, název X	unknown input “{0}” – dxf, dwg, mncad, tab, version R2018, name X
+neznámé zadání „{0}“ – formát A4–A0, na-šířku, na-výšku, bez-razítka, bez-rámečku, bez-výřezu, měřítko 1:50, ZNAČKA=hodnota	unknown input “{0}” – format A4–A0, landscape, portrait, notitle, noframe, noviewport, scale 1:50, TAG=value
+neznámé zadání tisku „{0}“ – rozvržení X, model, vše, pdf/png/svg, A4–A0, na-šířku, měřítko 1:1|vejít, mono|barevně|šedě, tloušťky ano|ne, okno x,y x,y, dpi N, název X	unknown plot input “{0}” – layout X, model, all, pdf/png/svg, A4–A0, landscape, scale 1:1|fit, mono|color|gray, lineweights yes|no, window x,y x,y, dpi N, name X
+neznámý formát „{0}“ – A4, A3, A2, A1, A0 nebo šířka×výška v mm	unknown format “{0}” – A4, A3, A2, A1, A0 or width×height in mm
+nic k vyčištění	nothing to purge
+nic není vybráno	nothing is selected
+nic nevybráno – blok potřebuje aspoň jeden objekt	nothing selected – a block needs at least one object
+Nové rozvržení	New layout
+Nové rozvržení A3	New A3 layout
+Nový blok z vybraných objektů	New block from the selected objects
+nový prázdný blok „{0}“ (bod vložení 0,0)	new empty block “{0}” (insertion point 0,0)
+Obdélník (dva rohy)	Rectangle (two corners)
+objekt neurčuje plochu	the object does not define an area
+objekty na zamčené hladině nelze převést ani smazat: {0}	objects on a locked layer cannot be converted or deleted: {0}
+Obrázek PNG	PNG image
+odemčeno	unlocked
+Odemknout výřez	Unlock viewport
+Odstíny šedi	Grayscale
+odstraní nepoužité bloky (i vnořené), hladiny, typy čar, textové a kótovací styly; bez zadání vše, jinak druh a případně názvy	removes unused blocks (also nested), layers, linetypes, text and dimension styles; without input everything, otherwise the kind and optionally names
+Odstranit	Remove
+Odstranit nepoužitý blok	Remove the unused block
+okno x,y x,y	window x,y x,y
+okraje: vlevo,dole,vpravo,nahoře v mm	margins: left,bottom,right,top in mm
+Orientace	Orientation
+Ořez	Clip
+ověřit	verify
+Ověřit	Verify
+panel Tisk – nastavte a stiskněte Tisk PDF	Plot panel – set it up and press Plot PDF
+Papír	Paper
+PAPÍR	PAPER
+Papírový prostor	Paper space
+papírový-prostor	pspace
+PDF všech rozvržení	PDF of all layouts
+počet musí být 1–10 000	the count must be 1–10,000
+Počet řádků	Number of rows
+Počet sloupců	Number of columns
+podle rozvržení (A3 u modelu)	as layout (A3 for the model)
+podle vzhledu stránky	as page setup
+Pole (sloupce × řádky)	Array (columns × rows)
+Poznámka nad razítkem	Note above the title block
+práce v modelu přes výřez rozvržení (jako poklepání do výřezu): kreslí se v souřadnicích modelu, okolí listu zůstane vidět; zpět PAPÍROVÝ-PROSTOR	working in the model through a layout viewport (like double-clicking into it): drawing in model coordinates, the sheet stays visible around; back with PSPACE
+předvolba	preset
+Předvolba	Preset
+Přepněte na rozvržení (záložka ve stavovém řádku) nebo založte nové: Rozvržení → Nové rozvržení.	Switch to a layout (tab in the status bar) or create one: Layout → New layout.
+Původní objekty	Original objects
+Rámeček ISO 5457 – {0} {1}	Frame ISO 5457 – {0} {1}
+Razítko ISO 7200	Title block ISO 7200
+režim {0}: {1}	mode {0}: {1}
+Režimy	Modes
+Rohové razítko ČSN EN ISO 7200	Title block ISO 7200
+rozmrazeno	thawed
+rozmrazeno vše	all thawed
+Rozteč řádků	Row spacing
+Rozteč sloupců	Column spacing
+rozvržení „{0}“ neexistuje – rozvržení: {1}	layout “{0}” does not exist – layouts: {1}
+rozvržení „{0}“ nemá zapnutý výřez – VÝŘEZ	layout “{0}” has no viewport switched on – MVIEW
+rozvržení „{0}“ už existuje	layout “{0}” already exists
+rozvržení (listy papíru): seznam; nové [název] [A4–A0] [na-šířku / na-výšku] [bez-razítka] [bez-rámečku] [bez-výřezu] [měřítko 1:50] [ZNAČKA=hodnota razítka]; kopírovat; smazat; přejmenovat; nastavit (přepnout); model	layouts (paper sheets): list; new [name] [A4–A0] [landscape / portrait] [notitle] [noframe] [noviewport] [scale 1:50] [TAG=title block value]; copy; delete; rename; set (switch); model
+rozvržení {0} neexistuje	layout {0} does not exist
+rozvržení nastavit NÁZEV – rozvržení: {0}	layout set NAME – layouts: {0}
+Rozvržení nemá výřez – Rozvržení → Výřez.	The layout has no viewport – Layout → Viewport.
+rozvržení nové Výroba A3 měřítko 1:5 NAZEV=Příruba | rozvržení nastavit Výroba | rozvržení model | rozvržení přejmenovat Výroba Dílna | rozvržení smazat Dílna	layout new Production A3 scale 1:5 NAZEV=Flange | layout set Production | layout model | layout rename Production Shop | layout delete Shop
+rozvržení přejmenovat STARÝ NOVÝ	layout rename OLD NEW
+rozvržení: seznam, nové, kopírovat, smazat, přejmenovat, nastavit, model – ne „{0}“	layout: list, new, copy, delete, rename, set, model – not “{0}”
+Rozvržení{0}	Layout{0}
+Řádky	Rows
+Sloupce	Columns
+Smazat rozvržení (Ctrl+Z vrátí)	Delete layout (Ctrl+Z restores)
+Správce bloků	Block manager
+Střed na papíře	Centre on paper
+Střed pohledu (model)	View centre (model)
+Styl tisku	Plot style
+styl tisku: mono, barva, šedá	plot style: mono, color, gray
+Šířka × výška	Width × height
+tabulka atributů vložení do CSV (id, blok, hladina, X, Y, natočení, měřítka, prostor, hodnoty): všechny prostory, jen blok X, nebo výběr; soubor se stáhne, data v results[].data.rows	table of block reference attributes to CSV (id, block, layer, X, Y, rotation, scales, space, values): all spaces, only block X, or the selection; the file is downloaded, data in results[].data.rows
+textové styly	text styles
+Tisk {0}	Plot {0}
+Tisk / PDF	Plot / PDF
+tisk | tisk rozvržení Výroba mono | tisk model okno 0,0 200,100 A4 měřítko 1:2 | tisk png dpi 300 | tisk svg	plot | plot layout Production mono | plot model window 0,0 200,100 A4 scale 1:2 | plot png dpi 300 | plot svg
+tisk do PDF (vektorově, tloušťky v mm, přesné měřítko), PNG nebo SVG: aktuální rozvržení 1:1, jiné rozvržení, model (rozsah / okno) v měřítku; volby formát A4–A0, orientace, měřítko 1:1 / vejít, mono / barevně / šedě, tloušťky; v GUI bez zadání panel Tisk s náhledem (Ctrl+P)	plot to PDF (vector, lineweights in mm, exact scale), PNG or SVG: current layout 1:1, another layout, model (extents / window) at a scale; options format A4–A0, orientation, scale 1:1 / fit, mono / color / gray, lineweights; in the GUI without input the Plot panel with preview (Ctrl+P)
+Tisk… (Ctrl+P)	Plot… (Ctrl+P)
+Tisknout tloušťky čar	Plot lineweights
+Tloušťky čar	Lineweights
+Tři	Three
+typy čar	linetypes
+ukončí úpravu bloku: Uložit (výchozí – všechna vložení se obnoví) nebo Zahodit (vrátí definici před UPRAVIT-BLOK)	ends block editing: Save (default – all references are refreshed) or Discard (restores the definition from before BEDIT)
+uloží blok (nebo výběr, nebo celý výkres „*“) jako samostatný výkres: DXF (výchozí), DWG, .mncad, nebo nová záložka; bod vložení bloku = počátek 0,0	saves a block (or the selection, or the whole drawing “*”) as a separate drawing: DXF (default), DWG, .mncad, or a new tab; the block insertion point = origin 0,0
+Uložit	Save
+Uložit blok jako soubor	Save block as file
+uložit-blok ŠROUB | uložit-blok ŠROUB dwg verze R2013 | uložit-blok výběr dxf název detail | uložit-blok * mncad | uložit-blok ŠROUB záložka	wblock BOLT | wblock BOLT dwg version R2013 | wblock selection dxf name detail | wblock * mncad | wblock BOLT tab
+Úprava bloku „{0}“	Editing block “{0}”
+úprava definice bloku: přepne do prostoru bloku (kreslí se a upravuje obsah bloku, počátek = bod vložení); neexistující název založí nový blok; konec ZAVŘÍT-BLOK [Uložit/Zahodit]	edit a block definition: switches to the block space (you draw and modify the block contents, origin = insertion point); a name that does not exist creates a new block; finish with BCLOSE [Save/Discard]
+Upravit atributy	Edit attributes
+Upravit blok	Edit block
+Upravit blok „{0}“	Edit block “{0}”
+upravit-atributy e5 CISLO=V-001 "NAZEV=Hřídel 2" | upravit-atributy e5 (výpis)	attedit e5 CISLO=V-001 "NAZEV=Shaft 2" | attedit e5 (list)
+upravit-blok ŠROUB · (kreslení…) · zavřít-blok | zavřít-blok zahodit	bedit BOLT · (drawing…) · bclose | bclose discard
+Upravit… (název na příkazovém řádku)	Edit… (name on the command line)
+Uspořádání	Arrangement
+už upravujete blok „{0}“ – nejdřív ZAVŘÍT-BLOK	you are already editing block “{0}” – BCLOSE first
+Vejít do kreslicí plochy	Fit the drawing area
+Vejít na papír	Fit to paper
+Vektor SVG	Vector SVG
+Vlastní měřítko	Custom scale
+vlastní…	custom…
+vložení {0} (blok {1}) nemá atributy	reference {0} (block {1}) has no attributes
+vložení {0} nemá atribut {1} – atributy: {2}	reference {0} has no attribute {1} – attributes: {2}
+Vložení bloku	Block reference
+vložení bloku: název, bod vložení [Měřítko/Otočit/Pole], měřítko X <1>, měřítko Y <=X>, natočení <0>, hodnoty atributů (v pořadí definic); záporné měřítko = zrcadlení; „vložit ?“ = seznam bloků	block insertion: name, insertion point [Scale/Rotate/Array], X scale <1>, Y scale <=X>, rotation <0>, attribute values (in definition order); a negative scale = mirror; “insert ?” = list of blocks
+Vložit blok	Insert block
+vložit ŠROUB 100,50 | vložit ŠROUB 100,50 2 2 45 | vložit RAZÍTKO 400,10 1 1 0 "Hřídel" "V-001" | vložit ŠROUB pole 3 2 20 15 0,0	insert BOLT 100,50 | insert BOLT 100,50 2 2 45 | insert TITLE 400,10 1 1 0 "Shaft" "V-001" | insert BOLT array 3 2 20 15 0,0
+Vložit… (název na příkazovém řádku)	Insert… (name on the command line)
+Vše nepoužité	All unused
+Všechna rozvržení	All layouts
+Výběr jako DXF	Selection as DXF
+Vyberte objekty bloku	Select the block objects
+Vyberte vložení bloku s atributy	Select a block reference with attributes
+Vyberte vložení bloku s atributy (poklepáním na blok se panel otevře).	Select a block reference with attributes (double-clicking a block opens the panel).
+Vyberte výřez	Select a viewport
+Vyberte výřez (klik na jeho rám)	Select a viewport (click its frame)
+Vyberte výřez (klik na jeho rám) nebo pracujte v jeho modelovém prostoru	Select a viewport (click its frame) or work in its model space
+Vyberte výřezy	Select viewports
+Vybraný blok „{0}“	Selected block “{0}”
+Vybrat výřez	Select viewport
+Vyčistit	Purge
+vyčistit | vyčistit bloky | vyčistit hladiny STARÁ POMOCNÁ | vyčistit typy-čar	purge | purge blocks | purge layers OLD HELPER | purge linetypes
+Vyčistit nepoužité	Purge unused
+vyčistit: vše, bloky, hladiny, typy-čar, styly, kótovací-styly – ne „{0}“	purge: all, blocks, layers, linetypes, styles, dimstyles – not “{0}”
+Výchozí hodnota	Default value
+výkres nemá rozvržení	the drawing has no layout
+výkres nemá rozvržení – modelový prostor je zobrazený	the drawing has no layout – model space is shown
+výkres nemá rozvržení – rozvržení nové A3	the drawing has no layout – layout new A3
+výkres nemá žádné bloky	the drawing has no blocks
+Výkres nemá žádné bloky – vyberte objekty a stiskněte Nový (BLOK).	The drawing has no blocks – select objects and press New (BLOCK).
+vypnuto	switched off
+Výřez {0} je zamčený – nejdřív ho odemkněte	Viewport {0} is locked – unlock it first
+výřez {0} je zamčený – nejdřív ho odemkněte (locked=0)	viewport {0} is locked – unlock it first (locked=0)
+výřez 25,60 405,282 1:5 | výřez vejít 1:10 | výřez dva svisle vejít vejít | výřez měřítko e7 1:20 | výřez zamknout e7 | výřez střed e7 120,40	mview 25,60 405,282 1:5 | mview fit 1:10 | mview two vertical fit fit | mview scale e7 1:20 | mview lock e7 | mview center e7 120,40
+výřez má nulový rozměr	the viewport has zero size
+výřez s nepravoúhlým ořezem – rozměr změňte úchopy	viewport with a non-rectangular clip – change its size with grips
+Výřezy	Viewports
+Výřezy ({0})	Viewports ({0})
+výřezy nemohou být součástí bloku	viewports cannot be part of a block
+výřezy rozvržení (pohled do modelu v měřítku): dva rohy + měřítko (1:50… / Vejít); volby Vejít (kreslicí plocha), Dva/Tři/Čtyři, Mnohoúhelník, Objekt (uzavřená křivka / kružnice), Zapnout / Vypnout, Zamknout / Odemknout, Měřítko, Střed (střed pohledu v modelu)	layout viewports (a scaled view into the model): two corners + scale (1:50… / Fit); options Fit (drawing area), Two/Three/Four, Polygonal, Object (closed polyline / circle), ON / OFF, Lock / Unlock, Scale, Center (view centre in the model)
+výřezy se kreslí v rozvržení – přepněte: rozvržení nastavit X (nebo rozvržení nové A3)	viewports are drawn in a layout – switch: layout set X (or layout new A3)
+Vytvořit blok	Create block
+Výzva	Prompt
+Vzhled stránky	Page setup
+vzhled stránky patří rozvržení – přepněte na rozvržení (rozvržení nastavit X) nebo zadejte „rozvržení X“	page setup belongs to a layout – switch to a layout (layout set X) or enter “layout X”
+Z objektu (kružnice, uzavřená křivka)	From an object (circle, closed polyline)
+z vybraných objektů – název, bod vložení	from the selected objects – name, insertion point
+Zadejte bod vložení	Specify insertion point
+Zadejte bod vložení (základní bod bloku)	Specify insertion point (block base point)
+Zadejte další vrchol nebo Enter	Specify next vertex or Enter
+zadejte hladiny (čárkou oddělené, * = vše)	enter layers (comma separated, * = all)
+Zadejte hodnotu atributu	Enter attribute value
+Zadejte měřítko	Specify scale factor
+Zadejte měřítko X	Specify X scale factor
+Zadejte měřítko Y <stejné jako X>	Specify Y scale factor <same as X>
+Zadejte název bloku k úpravě nebo [?]	Enter name of block to edit or [?]
+Zadejte název bloku nebo [?]	Enter block name or [?]
+zadejte název bloku, „výběr“ nebo „*“ – bloky: {0}	enter a block name, “selection” or “*” – blocks: {0}
+zadejte nový název	enter the new name
+Zadejte počáteční bod textu atributu	Specify start point of attribute text
+Zadejte první roh nebo	Specify first corner or
+Zadejte roh výřezu nebo	Specify corner of viewport or
+zadejte rozvržení ke kopírování – rozvržení: {0}	enter the layout to copy – layouts: {0}
+zadejte rozvržení ke smazání – rozvržení: {0}	enter the layout to delete – layouts: {0}
+Zadejte vrchol mnohoúhelníku	Specify polygon vertex
+Zadejte výchozí hodnotu	Enter default value
+zadejte výřez: „výřez e7“, „vše“, nebo vyberte výřez (v modelovém prostoru výřezu = aktivní)	specify the viewport: “viewport e7”, “all”, or select a viewport (in viewport model space = the active one)
+Zadejte výzvu atributu	Enter attribute prompt
+zadejte ZNAČKA=hodnota, ne „{0}“	enter TAG=value, not “{0}”
+Zadejte značku atributu nebo režim [{0}]	Enter attribute tag or mode [{0}]
+Zahodit	Discard
+Zamčené výřezy se nezměnily: {0}	Locked viewports did not change: {0}
+Zamčený	Locked
+Zamčený výřez: měřítko a pohled se nezmění	Locked viewport: scale and view do not change
+Zamknout výřez	Lock viewport
+zapnuto	switched on
+Zapnutý	On
+Zapnutý (obsah se zobrazuje)	On (contents are displayed)
+Zaškrtnuté hladiny jsou v tomto výřezu zmrazené (VPLAYER)	Ticked layers are frozen in this viewport (VPLAYER)
+Zavřít blok	Close block
+zavřít-blok | zavřít-blok uložit | zavřít-blok zahodit	bclose | bclose save | bclose discard
+Změny bloku „{0}“	Changes to block “{0}”
+Zmrazené hladiny	Frozen layers
+zmrazení hladin jen v některém výřezu: zmrazit / rozmrazit HLADINY (čárkou, * = vše) [výřez e7 | vše | aktuální]; reset = rozmrazit vše; seznam	freezing layers in a single viewport only: freeze / thaw LAYERS (comma separated, * = all) [viewport e7 | all | current]; reset = thaw all; list
+zmrazeno	frozen
+značka atributu nesmí být prázdná ani obsahovat mezery	the attribute tag must not be empty or contain spaces
+ZNAČKA=hodnota (atributy: {0}) nebo Enter	TAG=value (attributes: {0}) or Enter
+zpět na list rozvržení (papírový prostor) z modelového prostoru výřezu	back to the layout sheet (paper space) from the viewport's model space
+Zpět na papír (PAPÍROVÝ-PROSTOR)	Back to paper (PSPACE)
+# kontrola balíku 3 (výřezy, okraje, PSLTSCALE, bloky)
+{0} není uzavřený objekt – ořez výřezu potřebuje uzavřenou křivku, spline, kružnici nebo celou elipsu	{0} is not a closed object – a viewport clip needs a closed polyline, spline, circle or full ellipse
+{0}: formát {1} zatím neumí zapsat {2} – použijte .mncad (uložit-blok {3} mncad) nebo záložku	{0}: the {1} format cannot write {2} yet – use .mncad (wblock {3} mncad) or a new tab
+{0}: na zamčené hladině – nejdřív hladinu odemkněte	{0}: on a locked layer – unlock the layer first
+⚠ nezapsáno (převodník je zatím nepodporuje): {0}	⚠ not written (not supported by the converter yet): {0}
+⚠ výřezy mimo list: {0} – upravte je úchopy nebo vlastnostmi (c, w, h)	⚠ viewports off the sheet: {0} – adjust them with grips or properties (c, w, h)
+blok „{0}“ nelze vložit do bloku „{1}“ – blok nemůže obsahovat sám sebe (ani vnořeně)	block “{0}” cannot be inserted into block “{1}” – a block cannot contain itself (not even nested)
+blok „{0}“ ve výkresu už není – úprava bloku ukončena bez uložení	block “{0}” no longer exists in the drawing – block editing ended without saving
+Co tisknout	What to plot
+neznámá verze „{0}“ – R2018, R2013, R2010, R2007, R2004, R2000 (DXF i R12)	unknown version “{0}” – R2018, R2013, R2010, R2007, R2004, R2000 (DXF also R12)
+neznámé zadání „{0}“ – A4–A0, na-šířku, na-výšku, okraje l,d,p,h, styl mono|barva|šedá, tloušťky ano|ne, dpi N, psltscale 1|0	unknown input “{0}” – A4–A0, landscape, portrait, margins l,b,r,t, style mono|color|gray, lineweights yes|no, dpi N, psltscale 1|0
+Nový střed pohledu (bod modelu: klikněte do výřezu nebo x,y)	New view centre (model point: click into the viewport or x,y)
+okraje {0} mm – entity listu posunuty, aby zůstaly na stejném místě papíru	margins {0} mm – sheet entities shifted so that they stay at the same place on the paper
+okraje jsou větší než list ({0}×{1} mm)	the margins are larger than the sheet ({0}×{1} mm)
+PSLTSCALE = {0}	PSLTSCALE = {0}
+psltscale 1 (vzor čar ve výřezech v mm papíru) nebo 0 (v jednotkách modelu × měřítko výřezu)	psltscale 1 (linetype patterns in viewports in paper mm) or 0 (in model units × viewport scale)
+Vyberte uzavřený objekt ořezu (uzavřená křivka nebo spline, kružnice, celá elipsa)	Select a closed clipping object (closed polyline or spline, circle, full ellipse)
+výřez {0} je zamčený – odemknout: výřez odemknout	viewport {0} is locked – unlock: mview unlock
+Výřez listu	Viewport
+vzhled stránky rozvržení: formát A4–A0 (rámeček, razítko a výchozí výřez se přizpůsobí), orientace, okraje tisku (obsah zůstane na místě, tisk ho ořízne), styl tisku (mono / barva / šedá), tloušťky čar, DPI pro PNG, PSLTSCALE (vzor čar ve výřezech v mm papíru = 1); bez zadání = výpis	layout page setup: format A4–A0 (frame, title block and the default viewport adapt), orientation, plot margins (content stays in place, the plot clips it), plot style (mono / color / gray), lineweights, DPI for PNG, PSLTSCALE (linetype patterns in viewports in paper mm = 1); without input = list
+vzhled-stránky A2 na-šířku | vzhled-stránky styl mono tloušťky ano | vzhled-stránky rozvržení Výroba okraje 5,5,5,5 | vzhled-stránky psltscale 0	pagesetup A2 landscape | pagesetup style mono lineweights yes | pagesetup layout Production margins 5,5,5,5 | pagesetup psltscale 0

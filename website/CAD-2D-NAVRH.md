@@ -305,6 +305,26 @@ Společná pravidla pro všechny balíky:
 
 - UCS (uživatelský souřadný systém) – zatím jen WCS; dynamické zadání u kurzoru jen jako zobrazení vzdálenosti a úhlu.
 - Trasování uchopení (OTRACK), prodloužení a zdánlivý průsečík jako režimy uchopení – připraveny názvy (`ext`, `app`).
-- Text: jen jednořádkový, písmo SHX se kreslí nejbližším webovým písmem (šířka podle písma prohlížeče).
-- Otevření DXF tlačítkem Otevřít (Ctrl+O) stále vede do skici 3D dílu – 2D výkres: Výstup → „Otevřít DXF / DWG jako
-  2D výkres“ nebo `window.mncad.draftImport` (směrování převezme balík 4).
+- Písmo SHX se kreslí nejbližším webovým písmem (šířka podle písma prohlížeče); víceřádkový text = MTEXT (balík annot).
+- ~~Otevření DXF tlačítkem Otevřít vede do skici 3D dílu~~ – hotovo (balík io): Ctrl+O / přetažení .dxf / .dwg = 2D výkres,
+  3D skica volbou.
+
+## 13. Integrace fáze B (balíky edit, annot, layout, io)
+
+Změny jádra podle požadavků balíků (všechny pokryté testy `cad/draft/draft-int.test.ts`, `draft-tips.test.ts`
+a e2e `e2e/cad-w9-2d.e2e.cjs` – přejímka „jako nástrojař“ v GUI i textem):
+
+| Oblast | Změna | Soubor |
+|---|---|---|
+| Vykreslení | uzavřená cesta `lineTo` místo `closePath` (Chromium O(n²) na dávkové cestě; 20 MB DWG se otevře za 11 s), malý text < 4 px jako čárka („greeking“), texty jednou transformací, entity vrstvy 0 v blocích se stálou identitou (mezipaměti) | `render.ts` |
+| Příkazy | `Kw.alias` – zkratky AutoCADu, které nejsou začátkem názvu (TRIM T / O / R / E, CHAMFER E / M); výchozí volba výzvy se ukazuje názvem (`promptDefault`); neúspěšný příkaz vrací i protokol; `CmdRun.feedSelection` – výběr textem i v zadání předem v GUI | `commands.ts` |
+| Transakce | `DraftTx.restore(entita, index)` – vrácení smazané entity na místo (krok Zpět uvnitř příkazů balíku edit) | `tx.ts` |
+| Proměnné | PSLTSCALE v PROMĚNNÁ (přepočte mezipaměti výřezů) | `cmd-core.ts` |
+| Výběr | „alle“ (DE) = vše | `select.ts` |
+| GUI | pás jádra jako čistá funkce `draftCoreRibbon` (test mikronávodů prochází všechna id); duplicitní Export DXF / DWG a Otevřít ve Výstupu odstraněny (skupina DWG / DXF balíku io); dlouhá výzva se zalamuje; zapsaný výkres platí hned (příkaz spuštěný tlačítkem během jiného příkazu pracuje s novým výkresem); klíč řádku vlastností | `components/cad/draft/*` |
+| Mezi balíky | výřez kreslí a tiskne anotativní poznámky v měřítku výřezu (`vpDrawList` = `annoScaledList`); io: měřítko poznámek (CANNOSCALE), PSLTSCALE, DIMANNO stylu, příznak anotativní, směr osy souřadnicové kóty (51), poloha textu odkazu podle balíku annot, kótovací styly vždy úplné (metrický výkres = ISO-25 i bez kót), vlastní bod vložení každého bloku v DXF (oprava acad-ts) | `layout/kinds.ts`, `layout/plot.ts`, `io/to-cad.ts`, `io/from-cad.ts`, `io/acad-patch.ts` |
+| Mikronávody | `help/tips/draft-core.{cs,en,de}.ts` pro tlačítka jádra (balíky mají `draft-<balík>.*`) | `cad/help/tips/` |
+
+Zbývá (mimo integraci): NURBS `cClosest` a slučování
+blízkých průsečíků v `curves.ts`; volby úprav (FILLETRAD, CHAMFER…) se neukládají do DWG; posun / zoom pohledu uvnitř
+výřezu myší; výkon 20 000 entit se smíšenými texty (cíl < 50 ms na snímek) – viz report integrace.

@@ -6,7 +6,7 @@
  */
 import { tr } from "@/cad/i18n";
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { cmdName, commands, kwLabel, promptText, type Prompt } from "@/cad/draft/commands";
+import { cmdName, commands, kwLabel, promptDefault, promptText, type Prompt } from "@/cad/draft/commands";
 import { cn } from "@/lib/cn";
 
 export type CmdLineHandle = {
@@ -138,7 +138,7 @@ export const DraftCmdLine = forwardRef<CmdLineHandle, Props>(function DraftCmdLi
           {open ? "▾" : "▸"}
         </button>
         <span className="shrink-0 font-mono text-[11px] font-semibold text-brand">{running ? `${running}:` : ""}</span>
-        <span className="min-w-0 max-w-[55%] shrink truncate font-mono text-[11.5px]" data-draft-prompt title={prompt ? promptText(prompt) : ""}>
+        <span className="min-w-0 max-w-[62%] shrink whitespace-normal break-words font-mono text-[11.5px] leading-[1.35]" data-draft-prompt title={prompt ? promptText(prompt) : ""}>
           {prompt ? (
             <>
               {prompt.msg}
@@ -156,7 +156,7 @@ export const DraftCmdLine = forwardRef<CmdLineHandle, Props>(function DraftCmdLi
                   {"]"}
                 </>
               ) : null}
-              {"def" in prompt && prompt.def !== undefined && prompt.def !== "" ? ` <${typeof prompt.def === "number" ? Math.round(prompt.def * 1e4) / 1e4 : prompt.def}>` : ""}:
+              {promptDefault(prompt) ? ` <${promptDefault(prompt)}>` : ""}:
             </>
           ) : (
             tr("Příkaz:")

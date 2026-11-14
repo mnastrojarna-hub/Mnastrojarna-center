@@ -1,0 +1,335 @@
+# 2D CAD – balík 1 edit (úpravy): příkazy, výzvy, protokol, pás karet (de)
+ (příliš krátké úseky: {0})	 (zu kurze Segmente: {0})
+(režim {0}) délka = {1}, úhel = {2}	(Modus {0}) Länge = {1}, Winkel = {2}
+(režim {0}) vzdálenost 1 = {1}, vzdálenost 2 = {2}	(Modus {0}) Abstand 1 = {1}, Abstand 2 = {2}
+aktuální	aktuell
+Aktuální délka: {0}	Aktuelle Länge: {0}
+Aktuální délka: {0}, úhel: {1}	Aktuelle Länge: {0}, eingeschlossener Winkel: {1}
+Aktuální nastavení: režim = {0}, poloměr = {1}	Aktuelle Einstellungen: Modus = {0}, Radius = {1}
+Aktuální nastavení: režim {0}, hrany {1}	Aktuelle Einstellungen: Modus {0}, Kanten {1}
+Aktuální nastavení: smazat zdroj = {0}, hladina = {1}	Aktuelle Einstellungen: Quelle löschen = {0}, Layer = {1}
+blok „{0}“ ve výkresu není	Block „{0}“ ist nicht in der Zeichnung
+bloků {0}	Blöcke {0}
+bod leží na objektu – ekvidistanta nevznikla	der Punkt liegt auf dem Objekt – kein Versatz erstellt
+bod přerušení je na konci objektu	der Bruchpunkt liegt am Ende des Objekts
+body osy zrcadlení jsou totožné	die Punkte der Spiegelachse sind identisch
+bodů	Punkte
+delta, procenta, celkem, dynamicky	Delta, Prozent, Gesamt, dynamisch
+Dopředu	Nach vorne
+Dozadu	Nach hinten
+dráha nesmí být mezi kopírovanými objekty	der Pfad darf nicht zu den kopierten Objekten gehören
+Ekvidistanta	Versetzen
+ekvidistanta (rovnoběžná kopie) ve vzdálenosti nebo bodem: úsečka, kružnice, oblouk, křivka s oblouky přesně, elipsa a spline jako spline; Smazat zdroj, Hladina zdroj / aktuální, Vícekrát	Versatz (parallele Kopie) im Abstand oder durch einen Punkt: Linie, Kreis, Bogen, Polylinie mit Bögen exakt, Ellipse und Spline als Spline; Quelle löschen, Layer Quelle / aktuell, Mehrfach
+ekvidistanta 5 e1 0,100 | ekvidistanta bodem e1 50,30 | ekvidistanta 2 e3 0,0 e4 10,10 (strana bodem) | ekvidistanta smazat ano 5 e1 0,10	versetz 5 e1 0,100 | versetz durch e1 50,30 | versetz 2 e3 0,0 e4 10,10 (Seite per Punkt) | versetz löschen ja 5 e1 0,10
+entita {0} je na zamčené hladině	Objekt {0} liegt auf einem gesperrten Layer
+Hladina ekvidistanty	Layer des Versatzes
+hran: {0}	Kanten: {0}
+hrany: všechny objekty	Kanten: alle Objekte
+Ignorovat vlastnost (Enter = hotovo)	Eigenschaft ignorieren (Enter = fertig)
+Kopie	Kopieren
+kopie e3 0,0 50,0 100,0 | kopie e3 0,0 pole 5 20,0 | kopie e3 posunutí 0,30	kopieren e3 0,0 50,0 100,0 | kopieren e3 0,0 reihe 5 20,0 | kopieren e3 verschiebung 0,30
+křivka převedena na spline	Polylinie in Spline umgewandelt
+křížící okno	Kreuzen-Fenster
+Metoda rozmístění	Verteilungsmethode
+Metoda zkosení	Fasenmethode
+MĚŘÍTKO	VARIA
+měřítko musí být kladné	der Skalierfaktor muss positiv sein
+Nad objekty	Über Objekte
+Zadejte volbu nastavení (Enter = pokračovat)	Einstellungsoption eingeben (Eingabe = weiter)
+nejsou vybrány referenční objekty	keine Referenzobjekte gewählt
+NEOŘÍZNOUT	NICHT STUTZEN
+neprodlužovat	nicht dehnen
+nic	nichts
+nic nespojeno – konce se musí dotýkat	nichts verbunden – die Enden müssen sich berühren
+nic nespojeno – objekty spolu nesousedí (konce se musí dotýkat) nebo je nelze spojit	nichts verbunden – die Objekte grenzen nicht aneinander (Enden müssen sich berühren) oder lassen sich nicht verbinden
+nová délka musí být kladná	die neue Länge muss positiv sein
+Obdélníkové	Rechteckig
+obdélníkové pole: počet sloupců a řádků, vzdálenost sloupců a řádků (záporná = opačný směr), úhel pole	rechteckige Reihe: Anzahl Spalten und Zeilen, Spalten- und Zeilenabstand (negativ = Gegenrichtung), Reihenwinkel
+objekt je na zamčené hladině	das Objekt liegt auf einem gesperrten Layer
+objekt nelze zaoblit ani zkosit	das Objekt kann weder abgerundet noch gefast werden
+Objekt není křivka. Převést na křivku?	Objekt ist keine Polylinie. In Polylinie umwandeln?
+objekty nelze zaoblit – rovnoběžné, totožné nebo poloměr nevyhovuje	die Objekte können nicht abgerundet werden – parallel, identisch oder der Radius passt nicht
+obrátit e3 e4	umkehren e3 e4
+obrátí směr úseček, křivek a splajnů (pořadí vrcholů – směr typu čáry s textem, začátek pro ROZMĚŘIT)	kehrt die Richtung von Linien, Polylinien und Splines um (Scheitelreihenfolge – Richtung von Linientypen mit Text, Anfang für MESSEN)
+Odstranit duplicity	Duplikate löschen
+odstranit-duplicity vše | odstranit-duplicity vše tolerance 0.001 | odstranit-duplicity vše ignorovat barva hladina "" (konec)	overkill alles | overkill alles toleranz 0.001 | overkill alles ignorieren farbe layer "" (Ende)
+odstraní duplicitní entity (shodná geometrie a vlastnosti do tolerance), sloučí překrývající se kolineární úsečky a smaže nulové úsečky; Tolerance, Ignorovat vlastnosti, Sloučit ano / ne	entfernt doppelte Objekte (gleiche Geometrie und Eigenschaften innerhalb der Toleranz), führt überlappende kollineare Linien zusammen und löscht Linien der Länge null; Toleranz, Eigenschaften ignorieren, Zusammenführen ja / nein
+OTOČIT	DREHEN
+otočit e3 0,0 90 | otočit e3 0,0 kopie 45 | otočit e3 0,0 reference 30 90 | otočit e3 e3.start reference e3.start e3.end 0	drehen e3 0,0 90 | drehen e3 0,0 kopieren 45 | drehen e3 0,0 bezug 30 90 | drehen e3 e3.start bezug e3.start e3.end 0
+otočí se kopie vybraných objektů	eine Kopie der gewählten Objekte wird gedreht
+otočí vybrané entity kolem základního bodu o úhel (+ = proti směru hodin); Kopie = otočená kopie, Reference = z referenčního úhlu na nový	dreht die gewählten Objekte um einen Basispunkt um einen Winkel (+ = gegen den Uhrzeigersinn); Kopieren = gedrehte Kopie, Bezug = vom Bezugswinkel auf einen neuen
+Otáčet položky pole?	Elemente der Reihe drehen?
+ořízne objekty na průsečících s řeznými hranami (rychlý režim = všechny objekty jsou hrany; Řezné-hrany, Plot, Křížení, Režim, Hrana = prodloužené hrany, Smazat, Prodloužit / Shift = prodloužit, Zpět)	stutzt Objekte an den Schnittpunkten mit Schnittkanten (Schnellmodus = alle Objekte sind Kanten; Schnittkanten, Zaun, Kreuzen, Modus, Kante = verlängerte Kanten, Löschen, Dehnen / Umschalt = dehnen, Zurück)
+OŘÍZNOUT	STUTZEN
+oříznout e1@20,0 e1@80,0 | oříznout řezné-hrany e5 e6 e1@50,0 | oříznout plot 0,10 100,10 hotovo	stutzen e1@20,0 e1@80,0 | stutzen schnittkanten e5 e6 e1@50,0 | stutzen zaun 0,10 100,10 fertig
+Po dráze	Pfad
+Pod objekty	Unter Objekte
+pole by mělo víc než 100 000 položek	die Reihe hätte mehr als 100 000 Elemente
+pole e1 obdélníkové 4 3 20 15 | pole e1 polární 0,0 6 360 ano | pole e1 dráha e5 rozdělit 8 ano	reihe e1 rechteckig 4 3 20 15 | reihe e1 polar 0,0 6 360 ja | reihe e1 pfad e5 teilen 8 ja
+pole kopií vybraných entit: obdélníkové (sloupce, řádky, vzdálenosti, úhel), polární (střed, počet, úhel vyplnění, otáčet) nebo po dráze (rozdělit / měřit, zarovnat)	Reihe von Kopien der gewählten Objekte: rechteckig (Spalten, Zeilen, Abstände, Winkel), polar (Mittelpunkt, Anzahl, Füllwinkel, drehen) oder entlang eines Pfads (teilen / messen, ausrichten)
+pole po dráze (úsečka, oblouk, křivka, spline, elipsa): Rozdělit = počet položek, Měřit = vzdálenost; základní bod = začátek dráhy; zarovnat s tečnou	Reihe entlang eines Pfads (Linie, Bogen, Polylinie, Spline, Ellipse): Teilen = Anzahl Elemente, Messen = Abstand; Basispunkt = Pfadanfang; an der Tangente ausrichten
+pole-obdélníkové e1 4 3 25 20 [úhel]	reiherechteck e1 4 3 25 20 [Winkel]
+pole-po-dráze e1 "" e5 rozdělit 8 ano | pole-po-dráze e1 e5@0,0 měřit 25 ne	reihepfad e1 "" e5 teilen 8 ja | reihepfad e1 e5@0,0 messen 25 nein
+pole-polární e1 0,0 6 [360] [ano | ne]	reihepolar e1 0,0 6 [360] [ja | nein]
+Polární	Polar
+polární pole kolem středu: počet položek, úhel vyplnění (360 = rovnoměrně po kruhu), otáčet položky	polare Reihe um einen Mittelpunkt: Anzahl Elemente, Füllwinkel (360 = gleichmäßig im Kreis), Elemente drehen
+POSUN	SCHIEBEN
+posun e3 e5 0,0 100,50 | posun vše posunutí 10,0 | posun 0,0 @25<45 (vybrané)	schieben e3 e5 0,0 100,50 | schieben alles verschiebung 10,0 | schieben 0,0 @25<45 (gewählte)
+posune vybrané entity: základní bod a druhý bod, nebo Posunutí dx,dy (Enter u druhého bodu = první bod jako posunutí)	verschiebt die gewählten Objekte: Basispunkt und zweiter Punkt, oder Verschiebung dx,dy (Enter beim zweiten Punkt = erster Punkt als Verschiebung)
+Pořadí	Zeichenreihenfolge
+pořadí e3 dopředu | pořadí e3 dozadu | pořadí e3 nad-objekty e7	zeichreihenf e3 vorne | zeichreihenf e3 hinten | zeichreihenf e3 über e7
+Pořadí kreslení	Zeichenreihenfolge
+pořadí kreslení vybraných entit: dopředu, dozadu, nad / pod referenční objekty (pořadí v seznamu = pořadí ve výkresu a v DXF)	Zeichenreihenfolge der gewählten Objekte: nach vorne, nach hinten, über / unter Referenzobjekte (Listenreihenfolge = Reihenfolge in der Zeichnung und im DXF)
+prodloužené	verlängert
+prodloužení delta 10 e1@95,0 | prodloužení celkem 120 e1@95,0 | prodloužení procenta 50 e1@95,0 | prodloužení delta úhel 30 e4@x,y | prodloužení e1 (výpis)	länge delta 10 e1@95,0 | länge gesamt 120 e1@95,0 | länge prozent 50 e1@95,0 | länge delta winkel 30 e4@x,y | länge e1 (Ausgabe)
+prodloužit e1@95,0 | prodloužit hraniční-hrany e5 e1@95,0 e2@0,95	dehnen e1@95,0 | dehnen grenzkanten e5 e1@95,0 e2@0,95
+prodlouží konec objektu (u bodu výběru) k nejbližší hranici (rychlý režim = všechny objekty; Hraniční-hrany, Plot, Křížení, Režim, Hrana = prodloužené hrany, Oříznout / Shift = oříznout, Zpět)	dehnt das Ende eines Objekts (nahe dem Auswahlpunkt) bis zur nächsten Grenzkante (Schnellmodus = alle Objekte; Grenzkanten, Zaun, Kreuzen, Modus, Kante = verlängerte Kanten, Stutzen / Umschalt = stutzen, Zurück)
+Prodlužovat hrany do zdánlivého průsečíku?	Kanten bis zum projizierten Schnittpunkt verlängern?
+protáhne entity křížícím oknem (nebo mnohoúhelníkem): body uvnitř se posunou, entity celé uvnitř se přesunou; oblouky drží vzepětí	streckt Objekte mit einem Kreuzen-Fenster (oder Polygon): Punkte innerhalb werden verschoben, vollständig innen liegende Objekte werden verschoben; Bögen behalten ihre Stichhöhe
+Protáhnout	Strecken
+PROTÁHNOUT	STRECKEN
+protáhnout 90,-10 120,60 0,0 @20,0 | protáhnout mnohoúhelník p1 p2 p3 hotovo 0,0 @0,10	strecken 90,-10 120,60 0,0 @20,0 | strecken kpolygon p1 p2 p3 fertig 0,0 @0,10
+přenese vlastnosti zdrojové entity na cílové: hladina, barva, typ čáry, měřítko čáry, tloušťka, průhlednost, textový styl a výška, šířka křivky, kótovací styl, vzor šrafy (Nastavení = které)	überträgt die Eigenschaften des Quellobjekts auf die Zielobjekte: Layer, Farbe, Linientyp, Linientypfaktor, Linienstärke, Transparenz, Textstil und Höhe, Polylinienbreite, Bemaßungsstil, Schraffurmuster (Einstellungen = welche)
+přenáší se: {0}	übertragen wird: {0}
+Přenést vlastnosti	Eigenschaften übertragen
+přenést-vlastnosti e1 e2 e3 | přenést-vlastnosti nastavení nic hladina "" e1 e5	eigübertrag e1 e2 e3 | eigübertrag einstellungen keine layer "" e1 e5
+Přepnout vlastnost (Enter = hotovo)	Eigenschaft umschalten (Enter = fertig)
+Přerušit	Bruch
+přerušit e1@20,0 60,0 | přerušit e1 první 20,0 60,0 | přerušit e3 první 0,10 @	bruch e1@20,0 60,0 | bruch e1 erster 20,0 60,0 | bruch e3 erster 0,10 @
+Přerušit mezi dvěma body	Zwischen zwei Punkten brechen
+Přerušit v bodě	Am Punkt brechen
+přerušit-v-bodě e1 50,0	bruchpunkt e1 50,0
+Převést úsečky, oblouky a splajny na křivky?	Linien, Bögen und Splines in Polylinien umwandeln?
+referenční délka musí být kladná	die Bezugslänge muss positiv sein
+Režim	Modus
+Režim kopírování	Kopiermodus
+Režim ořezávání	Stutzmodus
+Roh (poloměr 0)	Ecke (Radius 0)
+rozdělit e1 5 | rozdělit e1 blok ŠROUB ano 8	teilen e1 5 | teilen e1 block SCHRAUBE ja 8
+rozdělí objekt na N stejně dlouhých dílů: na hranice dílů vloží body (nebo bloky, zarovnané s objektem)	teilt ein Objekt in N gleich lange Segmente: setzt Punkte (oder am Objekt ausgerichtete Blöcke) an die Segmentgrenzen
+rozdělí otevřený objekt v bodě na dva (bez mezery)	teilt ein offenes Objekt an einem Punkt in zwei (ohne Lücke)
+rozložit e3 | rozložit typ polyline	ursprung e3 | ursprung art polyline
+rozloží složené entity na části: křivka → úsečky a oblouky (šířky se ztratí), blok, kóta, mtext, šrafa → jejich prvky	löst zusammengesetzte Objekte in ihre Teile auf: Polylinie → Linien und Bögen (Breiten gehen verloren), Block, Bemaßung, MText, Schraffur → ihre Elemente
+Rozměřit	Messen
+rozměřit e1@0,0 25 | rozměřit e1 blok ŠROUB ne 40	messen e1@0,0 25 | messen e1 block SCHRAUBE nein 40
+rozměří objekt úseky dané délky od konce u bodu výběru: vloží body (nebo bloky)	misst ein Objekt in Segmenten gegebener Länge ab dem Ende nahe dem Auswahlpunkt: setzt Punkte (oder Blöcke)
+rychlý	schnell
+Shift = oříznout	Umschalt = stutzen
+Shift = prodloužit	Umschalt = dehnen
+Sloučit překrývající se kolineární úsečky?	Überlappende kollineare Linien zusammenführen?
+Smazat zdrojové objekty?	Quellobjekte löschen?
+Smazat zdrojový objekt po vytvoření ekvidistanty?	Quellobjekt nach dem Versetzen löschen?
+spline převedena na křivku	Spline in Polylinie umgewandelt
+spojeno: {0}	verbunden: {0}
+Spojit	Verbinden
+spojit e1 e2 e3 | spojit vše | spojit e4 e5 uzavřít (oblouky → kružnice)	verbinden e1 e2 e3 | verbinden alles | verbinden e4 e5 schließen (Bögen → Kreis)
+spojí entity: kolineární úsečky → úsečka, oblouky jedné kružnice → oblouk (Uzavřít = kružnice), úsečky / oblouky / křivky navazující konci → křivka, se splajnem nebo eliptickým obloukem → spline	verbindet Objekte: kollineare Linien → Linie, Bögen eines Kreises → Bogen (Schließen = Kreis), an den Enden verbundene Linien / Bögen / Polylinien → Polylinie, mit Spline oder Ellipsenbogen → Spline
+standardní	standard
+Typ pole	Reihentyp
+Upravit křivku	Polylinie bearbeiten
+Upravit objekty	Objekte ändern
+Upravit spline	Spline bearbeiten
+upravit-křivku e3 uzavřít | upravit-křivku e3 šířka 0.5 | upravit-křivku e1 ano spojit e2 e3 | upravit-křivku více e1 e2 ano proložit (ano = převést úsečky / oblouky / splajny – ptá se jen, jsou-li ve výběru)	pedit e3 schließen | pedit e3 breite 0.5 | pedit e1 ja verbinden e2 e3 | pedit mehrfach e1 e2 ja kurve (ja = Linien / Bögen / Splines umwandeln – nur gefragt, wenn die Auswahl solche enthält)
+upravit-spline e3 uzavřít | upravit-spline e3 posunout-bod 2 10,5 | upravit-spline e3 křivka 0.01 | upravit-spline e3 zvýšit-stupeň 4	splineedit e3 schließen | splineedit e3 punkt-schieben 2 10,5 | splineedit e3 polylinie 0.01 | splineedit e3 ordnung-erhöhen 4
+Uspořádat	Anordnen
+uzavřený objekt nelze přerušit v jednom bodě – zadejte dva různé body	ein geschlossenes Objekt kann nicht an einem Punkt gebrochen werden – geben Sie zwei verschiedene Punkte an
+Uzavřít oblouk na kružnici?	Bogen zu einem Kreis schließen?
+uzel nelze vložit (konec nebo plná násobnost)	der Knoten kann nicht eingefügt werden (Ende oder volle Vielfachheit)
+v bodě {0} není úchop – nejbližší úchop: {1}	bei {0} ist kein Griff – nächster Griff: {1}
+Vyberte 2D křivku	2D-Polylinie wählen
+vyberte alespoň dva objekty	wählen Sie mindestens zwei Objekte
+Vyberte cílové objekty	Zielobjekte wählen
+Vyberte druhou úsečku nebo se Shiftem pro roh	Zweite Linie wählen oder mit Umschalt für eine Ecke
+Vyberte druhý objekt nebo se Shiftem pro roh (poloměr 0)	Zweites Objekt wählen oder mit Umschalt für eine Ecke (Radius 0)
+Vyberte dráhu	Pfad wählen
+vyberte dva různé objekty (nebo dva sousední úseky křivky)	wählen Sie zwei verschiedene Objekte (oder zwei benachbarte Polyliniensegmente)
+Vyberte hraniční hrany (Enter = všechny objekty)	Grenzkanten wählen (Enter = alle Objekte)
+Vyberte křivku nebo	Polylinie wählen oder
+Vyberte objekt k měření nebo	Objekt zum Messen wählen oder
+Vyberte objekt k odsazení nebo	Zu versetzendes Objekt wählen oder
+Oříznout objekt (Shift = prodloužit) nebo	Objekt stutzen (Umschalt = dehnen) oder
+Prodloužit objekt (Shift = oříznout) nebo	Objekt dehnen (Umschalt = stutzen) oder
+Vyberte objekt k rozdělení	Zu teilendes Objekt wählen
+Vyberte objekt k rozměření	Zu messendes Objekt wählen
+Vyberte objekt ke změně nebo	Zu änderndes Objekt wählen oder
+Vyberte objekty k otočení	Zu drehende Objekte wählen
+Vyberte objekty k posunu	Zu verschiebende Objekte wählen
+Vyberte objekty k rozložení	Aufzulösende Objekte wählen
+Vyberte objekty k zarovnání	Auszurichtende Objekte wählen
+Vyberte objekty k zrcadlení	Zu spiegelnde Objekte wählen
+Vyberte objekty ke kopírování	Zu kopierende Objekte wählen
+Vyberte objekty ke smazání	Zu löschende Objekte wählen
+Vyberte objekty ke spojení	Zu verbindende Objekte wählen
+Vyberte objekty ke změně měřítka	Zu skalierende Objekte wählen
+Vyberte objekty pole	Objekte für die Reihe wählen
+Vyberte první objekt nebo	Erstes Objekt wählen oder
+Vyberte první úsečku nebo	Erste Linie wählen oder
+Vyberte referenční objekty	Referenzobjekte wählen
+Vyberte spline	Spline wählen
+Vyberte zdrojový objekt nebo	Quellobjekt wählen oder
+Vyberte úsečky, křivky nebo splajny	Linien, Polylinien oder Splines wählen
+Vyberte řezné hrany (Enter = všechny objekty)	Schnittkanten wählen (Enter = alle Objekte)
+vybrané objekty nemají úchopy	die gewählten Objekte haben keine Griffe
+vyjme část objektu mezi dvěma body (bod výběru = první bod, nebo volba První); u kružnice proti směru hodin; @ = přerušit v bodě	entfernt den Teil eines Objekts zwischen zwei Punkten (Auswahlpunkt = erster Punkt, oder Option Erster); bei Kreisen gegen den Uhrzeigersinn; @ = am Punkt brechen
+více kopií, pole v řadě	mehrere Kopien, Reihe in einer Linie
+vícenásobně	mehrfach
+výsledek spojení není spline	das Ergebnis der Verbindung ist kein Spline
+Zadejte bod mnohoúhelníku	Polygonpunkt angeben
+Zadejte bod mnohoúhelníku nebo	Polygonpunkt angeben oder
+Zadejte bod na splajnu pro nový uzel	Punkt auf dem Spline für den neuen Knoten angeben
+Zadejte bod na straně ekvidistanty nebo	Punkt auf der Versatzseite angeben oder
+Zadejte bod nového vrcholu na křivce	Punkt des neuen Scheitels auf der Polylinie angeben
+Zadejte bod přerušení	Bruchpunkt angeben
+Zadejte bod u odebíraného vrcholu	Punkt nahe dem zu entfernenden Scheitel angeben
+Zadejte bod, kterým ekvidistanta prochází, nebo	Durchgangspunkt angeben oder
+Zadejte celkovou délku nebo	Gesamtlänge angeben oder
+Zadejte celkový úhel	Gesamtwinkel angeben
+Zadejte další bod plotu nebo	Nächsten Zaunpunkt angeben oder
+Zadejte druhý bod nebo <první bod = posunutí>	Zweiten Punkt angeben oder <ersten Punkt als Verschiebung verwenden>
+Zadejte druhý bod nebo	Zweiten Punkt angeben oder
+Zadejte druhý bod osy zrcadlení	Zweiten Punkt der Spiegelachse angeben
+Zadejte druhý bod přerušení nebo	Zweiten Bruchpunkt angeben oder
+Zadejte druhý cílový bod	Zweiten Zielpunkt angeben
+Zadejte druhý zdrojový bod nebo <pokračovat>	Zweiten Quellpunkt angeben oder <weiter>
+Zadejte délku zkosení na první úsečce	Fasenlänge auf der ersten Linie angeben
+Zadejte délku úseku nebo	Segmentlänge angeben oder
+Zadejte měřítko nebo	Skalierfaktor angeben oder
+Zadejte novou délku nebo	Neue Länge angeben oder
+Zadejte novou polohu bodu	Neue Position des Punkts angeben
+Zadejte novou šířku všech úseků	Neue Breite für alle Segmente angeben
+Zadejte nový koncový bod	Neuen Endpunkt angeben
+Zadejte nový stupeň ({0}–26)	Neuen Grad eingeben ({0}–26)
+Zadejte nový úhel nebo	Neuen Winkel angeben oder
+Zadejte název bloku	Blocknamen eingeben
+Zadejte poloměr zaoblení	Rundungsradius angeben
+Zadejte poslední bod pole	Letzten Punkt der Reihe angeben
+Zadejte posunutí dx,dy	Verschiebung dx,dy angeben
+Zadejte počet dílů nebo	Anzahl der Segmente eingeben oder
+Zadejte počet položek	Anzahl der Elemente eingeben
+Zadejte počet položek po dráze	Anzahl der Elemente entlang des Pfads eingeben
+Zadejte počet položek pole	Anzahl der Elemente der Reihe eingeben
+Zadejte počet sloupců	Anzahl der Spalten eingeben
+Zadejte počet řádků	Anzahl der Zeilen eingeben
+Zadejte procento délky	Prozentuale Länge eingeben
+Zadejte první bod nové délky	Ersten Punkt der neuen Länge angeben
+Zadejte první bod nového úhlu	Ersten Punkt des neuen Winkels angeben
+Zadejte první bod osy zrcadlení	Ersten Punkt der Spiegelachse angeben
+Zadejte první bod plotu	Ersten Zaunpunkt angeben
+Zadejte první bod přerušení	Ersten Bruchpunkt angeben
+Zadejte první cílový bod	Ersten Zielpunkt angeben
+Zadejte první roh křížícího okna nebo	Erste Ecke des Kreuzen-Fensters angeben oder
+Zadejte první zdrojový bod	Ersten Quellpunkt angeben
+Zadejte přesnost (odchylka tětivy)	Genauigkeit angeben (Sehnenabweichung)
+Zadejte přírůstek délky nebo	Längenzuwachs eingeben oder
+Zadejte přírůstek úhlu	Winkelzuwachs eingeben
+Zadejte referenční délku	Bezugslänge angeben
+Zadejte referenční úhel	Bezugswinkel angeben
+Zadejte střed pole	Mittelpunkt der Reihe angeben
+Zadejte toleranci	Toleranz angeben
+Zadejte volbu (Enter = konec)	Option eingeben (Enter = beenden)
+Zadejte vzdálenost ekvidistanty nebo	Versatzabstand angeben oder
+Zadejte vzdálenost položek	Abstand der Elemente angeben
+Zadejte vzdálenost přichycení (mezery)	Fangabstand (Lücke) eingeben
+Zadejte vzdálenost sloupců	Spaltenabstand angeben
+Zadejte vzdálenost řádků	Zeilenabstand angeben
+Zadejte základní bod	Basispunkt angeben
+Zadejte úchop (bod úchopu vybraných objektů)	Griff angeben (Griffpunkt der gewählten Objekte)
+Zadejte úhel otočení nebo	Drehwinkel angeben oder
+Zadejte úhel pole	Reihenwinkel angeben
+Zadejte úhel vyplnění (+ proti směru hodin, − po směru)	Füllwinkel angeben (+ gegen den Uhrzeigersinn, − im Uhrzeigersinn)
+Zadejte úhel zkosení od první úsečky	Fasenwinkel ab der ersten Linie angeben
+Zadejte číslo bodu proložení (1–{0})	Nummer des Anpassungspunkts eingeben (1–{0})
+Zadejte číslo řídicího bodu (1–{0})	Nummer des Steuerpunkts eingeben (1–{0})
+zaobleno vrcholů: {0}{1}	abgerundete Scheitel: {0}{1}
+Zaoblit dva objekty	Zwei Objekte abrunden
+zaoblit poloměr 5 e1@10,0 e2@0,10 | zaoblit poloměr 0 e1 e2 | zaoblit poloměr 3 křivka e4 | zaoblit oříznout neoříznout poloměr 5 e1 e2 (bez oříznutí)	abrunden radius 5 e1@10,0 e2@0,10 | abrunden radius 0 e1 e2 | abrunden radius 3 polylinie e4 | abrunden stutzen nicht-stutzen radius 5 e1 e2 (ohne Stutzen)
+Zaoblit všechny vrcholy křivky	Alle Scheitel einer Polylinie abrunden
+zaoblí roh dvou objektů (úsečka, oblouk, kružnice, úsek křivky) obloukem daného poloměru a objekty ořízne / prodlouží; poloměr 0 = ostrý roh; Křivka = všechny vrcholy; rovnoběžné úsečky = půlkružnice	rundet die Ecke zweier Objekte (Linie, Bogen, Kreis, Polyliniensegment) mit einem Bogen gegebenen Radius ab und stutzt / dehnt die Objekte; Radius 0 = scharfe Ecke; Polylinie = alle Scheitel; parallele Linien = Halbkreis
+Zarovnat blok s objektem?	Block am Objekt ausrichten?
+Zarovnat položky s dráhou?	Elemente am Pfad ausrichten?
+zarovnat-objekty e3 0,0 50,50 100,0 50,150 ne | zarovnat-objekty e3 s1 d1 s2 d2 ano (i měřítko)	ausrichten e3 0,0 50,50 100,0 50,150 nein | ausrichten e3 s1 d1 s2 d2 ja (auch skalieren)
+zarovná entity dvojicemi bodů: 1. zdrojový → 1. cílový (posun), 2. zdrojový → 2. cílový (otočení, volitelně měřítko)	richtet Objekte mit Punktpaaren aus: 1. Quelle → 1. Ziel (Verschiebung), 2. Quelle → 2. Ziel (Drehung, optional Skalierung)
+zarovnávací body jsou totožné	die Ausrichtungspunkte sind identisch
+zdroj	Quelle
+zkopíruje vybrané entity: základní bod a libovolně mnoho cílových bodů (Pole = n kopií v řadě, Režim jednou / vícekrát, Zpět)	kopiert die gewählten Objekte: Basispunkt und beliebig viele Zielpunkte (Reihe = n Kopien in einer Linie, Modus einzeln / mehrfach, Zurück)
+zkoseno vrcholů: {0}{1}	gefaste Scheitel: {0}{1}
+zkosení s tímto úhlem nevznikne	mit diesem Winkel entsteht keine Fase
+Zkosit	Fase
+Zkosit dvě úsečky	Zwei Linien fasen
+zkosit lze jen dvě různoběžné úsečky (nebo přímé úseky křivky)	nur zwei nicht parallele Linien (oder gerade Polyliniensegmente) können gefast werden
+zkosit vzdálenost 5 5 e1@10,0 e2@0,10 | zkosit úhel 5 30 e1 e2 | zkosit vzdálenost 2 2 křivka e4	fase abstand 5 5 e1@10,0 e2@0,10 | fase winkel 5 30 e1 e2 | fase abstand 2 2 polylinie e4
+Zkosit všechny vrcholy křivky	Alle Scheitel einer Polylinie fasen
+zkosí roh dvou úseček (i přímých úseků křivky): dvě vzdálenosti, nebo délka a úhel; Křivka = všechny vrcholy; vzdálenost 0 = ostrý roh	fast die Ecke zweier Linien (auch gerader Polyliniensegmente): zwei Abstände, oder Länge und Winkel; Polylinie = alle Scheitel; Abstand 0 = scharfe Ecke
+Změnit měřítko objektů podle zarovnávacích bodů?	Objekte anhand der Ausrichtungspunkte skalieren?
+změnit-měřítko e3 0,0 2 | změnit-měřítko e3 0,0 reference 40 100 | změnit-měřítko e3 0,0 reference e3.start e3.end 100	varia e3 0,0 2 | varia e3 0,0 bezug 40 100 | varia e3 0,0 bezug e3.start e3.end 100
+změní délku otevřeného objektu na konci u bodu výběru: Delta (± délka nebo Úhel u oblouku), Procenta, Celkem (délka nebo úhel), Dynamicky; výběr bez volby vypíše délku	ändert die Länge eines offenen Objekts am Ende nahe dem Auswahlpunkt: Delta (± Länge oder Winkel bei Bögen), Prozent, Gesamt (Länge oder Winkel), Dynamisch; Auswahl ohne Option gibt die Länge aus
+změní se měřítko kopie vybraných objektů	eine Kopie der gewählten Objekte wird skaliert
+změní velikost vybraných entit vzhledem k základnímu bodu: měřítko, Reference (stávající → nová délka), Kopie	skaliert die gewählten Objekte um einen Basispunkt: Faktor, Bezug (aktuelle → neue Länge), Kopieren
+ZRCADLIT	SPIEGELN
+zrcadlit e3 e5 0,0 0,100 | zrcadlit e3 0,0 100,0 ano (smazat zdroj)	spiegeln e3 e5 0,0 0,100 | spiegeln e3 0,0 100,0 ja (Quelle löschen)
+zrcadlí vybrané entity podle osy dané dvěma body; zdroj se ponechá (nebo smaže); text podle MIRRTEXT	spiegelt die gewählten Objekte an einer durch zwei Punkte gegebenen Achse; die Quelle bleibt (oder wird gelöscht); Text gemäß MIRRTEXT
+základní bod → cílový bod	Basispunkt → Zielpunkt
+{0} ({1}) nelze obrátit	{0} ({1}) kann nicht umgekehrt werden
+{0} ({1}) nelze odsadit	{0} ({1}) kann nicht versetzt werden
+{0} ({1}) nelze oříznout	{0} ({1}) kann nicht gestutzt werden
+{0} ({1}) nelze prodloužit	{0} ({1}) kann nicht gedehnt werden
+{0} ({1}) nelze prodloužit – jen zkrátit	{0} ({1}) kann nicht verlängert werden – nur gekürzt
+{0} neprotíná řeznou hranu	{0} schneidet keine Schnittkante
+{0} Zadejte bod protažení	{0} Streckpunkt angeben
+{0} Zadejte cílový bod	{0} Zielpunkt angeben
+{0} Zadejte druhý bod osy	{0} Zweiten Punkt der Spiegelachse angeben
+{0} Zadejte měřítko	{0} Skalierfaktor angeben
+{0} Zadejte úhel otočení	{0} Drehwinkel angeben
+{0} {1} neprotíná žádnou hranu – smazán	{0} {1} schneidet keine Kante – gelöscht
+{0}: oblouk by přesáhl 360°	{0}: der Bogen würde 360° überschreiten
+{0}: prodloužení neprotíná žádnou hranici	{0}: die Verlängerung schneidet keine Grenzkante
+{0}: uzavřený objekt potřebuje alespoň dva průsečíky s hranami	{0}: ein geschlossenes Objekt braucht mindestens zwei Schnittpunkte mit Kanten
+{0}: ve vzdálenosti {1} by ekvidistanta zanikla	{0}: im Abstand {1} würde der Versatz verschwinden
+{0}: zkrácení je delší než objekt	{0}: die Kürzung ist länger als das Objekt
+úchop e3 100,0 150,20 (protáhnout) | úchop e3 e3.end posun @10,0 | úchop e3 50,50 otočit 90 | úchop e3 0,0 kopie 10,0 20,0	griff e3 100,0 150,20 (strecken) | griff e3 e3.end schieben @10,0 | griff e3 50,50 drehen 90 | griff e3 0,0 kopieren 10,0 20,0
+úhel lze zadat jen u oblouku	ein Winkel kann nur bei einem Bogen angegeben werden
+úhel vyplnění musí být v rozsahu −360° až 360° (ne 0)	der Füllwinkel muss zwischen −360° und 360° liegen (nicht 0)
+úhel, reference, kopie	Winkel, Bezug, Kopie
+úprava křivky: úsečku / oblouk převede na křivku; Uzavřít / Otevřít, Spojit (navazující objekty), Šířka, Proložit (oblouky přes vrcholy), Spline (rám zůstane – Vyrovnat ho vrátí), Vyrovnat (zruší oblouky i proložení), Obrátit, Vložit / Odebrat vrchol, Více křivek, Zpět	Polylinienbearbeitung: wandelt Linie / Bogen in eine Polylinie um; Schließen / Öffnen, Verbinden (anschließende Objekte), Breite, Kurve (Bögen durch die Scheitel), Spline (der Rahmen bleibt – Kurve löschen stellt ihn wieder her), Kurve löschen (entfernt Bögen und Kurvenanpassung), Umkehren, Scheitel einfügen / entfernen, mehrere Polylinien, Zurück
+úprava splajnu: Uzavřít / Otevřít, Spojit (navazující úsečky, oblouky, splajny), Posunout-bod (bod proložení nebo řídicí bod), Zjemnit (vložit uzel), Zvýšit-stupeň, Křivka (převod na křivku s přesností), Obrátit, Zpět	Splinebearbeitung: Schließen / Öffnen, Verbinden (anschließende Linien, Bögen, Splines), Punkt schieben (Anpassungspunkt oder Steuerpunkt), Verfeinern (Knoten einfügen), Ordnung erhöhen, Polylinie (Umwandlung mit Genauigkeit), Umkehren, Zurück
+úprava úchopem (jako klik na modrý úchop vybrané entity): protáhnout úchop, posun, otočit, měřítko, zrcadlit kolem úchopu; Enter / mezera = další režim, Kopie = více kopií, Základní bod, Zpět	Griffbearbeitung (wie ein Klick auf den blauen Griff eines gewählten Objekts): Griff strecken, schieben, drehen, skalieren, um den Griff spiegeln; Enter / Leertaste = nächster Modus, Kopieren = mehrere Kopien, Basispunkt, Zurück
+úseky jsou na zaoblení / zkosení příliš krátké nebo jsou to oblouky	die Segmente sind für die Abrundung / Fase zu kurz oder es sind Bögen
+úseky křivky spolu nesousedí	die Polyliniensegmente grenzen nicht aneinander
+⚠ nelze rozložit: {0}	⚠ kann nicht aufgelöst werden: {0}
+⚠ nelze transformovat: {0}	⚠ kann nicht transformiert werden: {0}
+⚠ nespojeno: {0} objektů	⚠ nicht verbunden: {0} Objekte
+⚠ {0} je na zamčené hladině	⚠ {0} liegt auf einem gesperrten Layer
+⚠ šířky křivek se rozložením ztratily	⚠ Polylinienbreiten gingen beim Auflösen verloren
+✓ ekvidistant: {0}	✓ Versätze: {0}
+✓ měřítko {0}: entit {1}	✓ Faktor {0}: {1} Objekte
+✓ obdélníkové pole {0} × {1}: {2} nových entit	✓ Rechteckige Reihe {0} × {1}: {2} neue Objekte
+✓ obrácen směr: {0}	✓ Richtung umgekehrt: {0}
+✓ odstraněno duplicit: {0}, sloučeno úseček: {1}	✓ Duplikate entfernt: {0}, Linien zusammengeführt: {1}
+✓ otočeno entit: {0} o {1}	✓ {0} Objekte um {1} gedreht
+✓ oříznuto: {0}	✓ gestutzt: {0}
+✓ pole po dráze {0}: {1} položek, {2} nových entit	✓ Pfadreihe entlang {0}: {1} Elemente, {2} neue Objekte
+✓ polární pole {0} položek po {1}: {2} nových entit	✓ Polare Reihe mit {0} Elementen zu je {1}: {2} neue Objekte
+✓ posunuto entit: {0} o {1}	✓ {0} Objekte um {1} verschoben
+✓ pořadí změněno: {0} entit	✓ Zeichenreihenfolge geändert: {0} Objekte
+✓ prodlouženo: {0}	✓ gedehnt: {0}
+✓ protaženo entit: {0} o {1}	✓ {0} Objekte um {1} gestreckt
+✓ rozloženo: {0} → {1} entit	✓ aufgelöst: {0} → {1} Objekte
+✓ spline {0} upravena	✓ Spline {0} bearbeitet
+✓ upraveno křivek: {0} ({1} operací)	✓ Polylinien bearbeitet: {0} ({1} Operationen)
+✓ vlastnosti z {0} přeneseny na {1} entit	✓ Eigenschaften von {0} auf {1} Objekte übertragen
+✓ zaoblení: {0}	✓ Abrundungen: {0}
+✓ zarovnáno entit: {0}	✓ ausgerichtete Objekte: {0}
+✓ zkopírováno entit: {0}	✓ kopierte Objekte: {0}
+✓ zkosení: {0}	✓ Fasen: {0}
+✓ změněna délka: {0} objektů	✓ Länge geändert: {0} Objekte
+✓ zrcadleno entit: {0} (zdroj nahrazen)	✓ gespiegelte Objekte: {0} (Quelle ersetzt)
+✓ zrcadlené kopie: {0}	✓ gespiegelte Kopien: {0}
+✓ {0} přerušen	✓ {0} gebrochen
+✓ {0} přerušen v bodě	✓ {0} am Punkt gebrochen
+✓ {0} rozdělen v bodě {1}	✓ {0} am Punkt {1} geteilt
+✓ {0}: spojeno {1} objektů → {2}	✓ {0}: {1} Objekte verbunden → {2}
+✓ {0}: {1} entit	✓ {0}: {1} Objekte
+✓ úprava úchopem: {0} operací	✓ Griffbearbeitung: {0} Operationen
+{0}: ekvidistanta se zúžením rozdělila na {1} části	{0}: Versatz an einer Engstelle in {1} Teile geteilt
+{0}: poloměr nebo vzdálenost je příliš velká – bod dotyku leží za koncem objektu	{0}: Radius oder Abstand zu groß – der Berührpunkt liegt hinter dem Objektende
+{0} – na zamčené hladině: {1}	{0} – auf gesperrtem Layer: {1}

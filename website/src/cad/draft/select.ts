@@ -71,7 +71,7 @@ export function windowSelect(model: DraftModel, idx: SpatialIndex, box: Box, cro
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
 /** slova zápisu výběru (cs / en / de) */
 const W = {
-  all: ["vse", "all", "alles", "*"],
+  all: ["vse", "all", "alles", "alle", "*"],
   last: ["posledni", "last", "letzte"],
   prev: ["predchozi", "previous", "vorher"],
   sel: ["vyber", "selection", "auswahl", "sel"],

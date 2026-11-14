@@ -1,0 +1,91 @@
+# Vlna 9 / fáze B – balík 4 (io): DWG / DXF import a export, vložení výkresu, panel DWG / DXF, průběh a Zrušit
+✓ {0} otevřen jako 2D výkres „{1}“ (nová záložka) · {2}	✓ {0} als 2D-Zeichnung „{1}“ geöffnet (neuer Tab) · {2}
+✓ {0}: vloženo {1} entit do výkresu (vybrané).	✓ {0}: {1} Objekte in die Zeichnung eingefügt (ausgewählt).
+Bez převodu měřítka (neznámý druh): {0}.	Nicht skaliert (unbekannte Art): {0}.
+binární	binär
+binární DXF (menší, rychlejší čtení)	binäres DXF (kleiner, schneller zu lesen)
+blok {0}	Block {0}
+blok {0}: {1}	Block {0}: {1}
+Bloky se stejným názvem už ve výkresu jsou – ponechány stávající: {0}.	Blöcke mit gleichem Namen sind bereits in der Zeichnung – vorhandene beibehalten: {0}.
+čtení souboru	Datei wird gelesen
+druh {0} nelze zapsat	Art {0} kann nicht geschrieben werden
+DWG {0} – podporované jsou verze R2000–R2018 (AC1015–AC1032). Uložte výkres v novější verzi.	DWG {0} – unterstützt werden die Versionen R2000–R2018 (AC1015–AC1032). Speichern Sie die Zeichnung in einer neueren Version.
+DWG / DXF	DWG / DXF
+DWG R12 nelze zapsat – použijte DXF R12 nebo DWG R2000 a novější	DWG R12 kann nicht geschrieben werden – verwenden Sie DXF R12 oder DWG R2000 und neuer
+DWG R2000–R2018 a DXF R12–R2018 (ASCII i binární). Velké soubory se čtou na pozadí s průběhem.	DWG R2000–R2018 und DXF R12–R2018 (ASCII und binär). Große Dateien werden im Hintergrund mit Fortschritt gelesen.
+DWG R2000–R2018: bloky, kóty s geometrií, šrafy, rozvržení, XDATA. Čeština do R2004 jako \U+.	DWG R2000–R2018: Blöcke, Bemaßungen mit Geometrie, Schraffuren, Layouts, XDATA. Sonderzeichen bis R2004 als \U+.
+DXF binární (R2018)	Binäres DXF (R2018)
+DXF R12: blok {0} chybí	DXF R12: Block {0} fehlt
+DXF R12: druh {0} nelze zapsat	DXF R12: Art {0} kann nicht geschrieben werden
+DXF R12: kóta délky oblouku zapsána jako zarovnaná (R12 ji nezná)	DXF R12: Bogenlängenbemaßung als ausgerichtete geschrieben (R12 kennt sie nicht)
+DXF R12: plná šrafa s ostrovy zapsána jen hranicí	DXF R12: Volltonschraffur mit Inseln nur als Umgrenzung geschrieben
+DXF R12: rozvržení (papírový prostor) se nezapisují – jen modelový prostor	DXF R12: Layouts (Papierbereich) werden nicht geschrieben – nur der Modellbereich
+DXF R12: výřezy rozvržení se nezapisují	DXF R12: Layout-Ansichtsfenster werden nicht geschrieben
+DXF R2000–R2018 zachová všechny druhy entit, tabulky, bloky, rozvržení a XDATA.	DXF R2000–R2018 behält alle Objektarten, Tabellen, Blöcke, Layouts und XDATA.
+Entit {0}, hladin {1}, bloků {2}, rozvržení {3}	Objekte {0}, Ebenen {1}, Blöcke {2}, Layouts {3}
+DWG / DXF ve zvolené verzi (R12–R2018, binární DXF)	DWG / DXF in der gewählten Version (R12–R2018, binäres DXF)
+export dxf | export dxf verze R12 | export dxf binární | export dwg verze R2013 | export dxf název "Deska"	exportieren dxf | exportieren dxf version R12 | exportieren dxf binary | exportieren dwg version R2013 | exportieren dxf name "Platte"
+export výkresu do DXF (R12, R2000–R2018, ASCII i binární) nebo DWG (R2000–R2018); soubor se stáhne (v API je v results[].data.file)	Export der Zeichnung als DXF (R12, R2000–R2018, ASCII oder binär) oder DWG (R2000–R2018); die Datei wird heruntergeladen (in der API in results[].data.file)
+export: binární je jen DXF	export: binär gibt es nur bei DXF
+export: neznámá verze {0} – R12 (jen DXF), R2000, R2004, R2007, R2010, R2013, R2018	export: unbekannte Version {0} – R12 (nur DXF), R2000, R2004, R2007, R2010, R2013, R2018
+export: neznámá volba {0}	export: unbekannte Option {0}
+Exportovat {0}	{0} exportieren
+Externí reference (XREF) se nenačítají: {0}.	Externe Referenzen (XREF) werden nicht geladen: {0}.
+Formát {0}.	Format {0}.
+hladina {0}	Ebene {0}
+hladina {0}: {1}	Ebene {0}: {1}
+import (GUI) | import sloučit (GUI) | import "vykres.dxf" <base64> | import "deska.dwg" <base64> sloučit	importieren (GUI) | importieren einfügen (GUI) | importieren "zeichnung.dxf" <base64> | importieren "platte.dwg" <base64> einfügen
+import: neznámá volba {0}	import: unbekannte Option {0}
+importFile: volba as je {0}	importFile: die Option as ist {0}
+Jednotky převedeny měřítkem {0}.	Einheiten mit Faktor {0} umgerechnet.
+Jednotky se ukládají do DWG / DXF ($INSUNITS); geometrie se nepřepočítává. Při vložení výkresu s jinými jednotkami se jeho obsah převede měřítkem.	Einheiten werden in DWG / DXF gespeichert ($INSUNITS); die Geometrie wird nicht umgerechnet. Beim Einfügen einer Zeichnung mit anderen Einheiten wird ihr Inhalt skaliert.
+Jednotky výkresu (INSUNITS)	Zeichnungseinheiten (INSUNITS)
+kóta {0}: neplatná hodnota	Bemaßung {0}: ungültiger Wert
+kóta {0}: neznámý druh {1}	Bemaßung {0}: unbekannte Art {1}
+kótovací styl {0}: {1}	Bemaßungsstil {0}: {1}
+Možnosti DWG / DXF	DWG / DXF-Optionen
+Možnosti exportu…	Exportoptionen…
+Načítání zrušeno.	Laden abgebrochen.
+Načteno {0} entit, {1} hladin, {2} bloků, {3} rozvržení.	{0} Objekte, {1} Ebenen, {2} Blöcke, {3} Layouts geladen.
+Název souboru	Dateiname
+Nepřevedeno: {0}	Nicht übernommen: {0}
+Nepřevedeno: {0}.	Nicht übernommen: {0}.
+nová záložka, průběh a Zrušit u velkých souborů	neuer Tab, Fortschritt und Abbrechen bei großen Dateien
+Nové: {0}.	Neu: {0}.
+obsah DXF / DWG do otevřeného výkresu (vybrané, jeden krok zpět)	DXF- / DWG-Inhalt in die offene Zeichnung (ausgewählt, ein Rückgängig-Schritt)
+Otevírám {0}	Öffne {0}
+otevře DXF / DWG jako nový 2D výkres v nové záložce, nebo s volbou sloučit vloží jeho obsah do otevřeného výkresu (GUI: výběr souboru s průběhem; textem: import "název.dxf" base64)	öffnet DXF / DWG als neue 2D-Zeichnung in einem neuen Tab oder fügt mit der Option einfügen den Inhalt in die offene Zeichnung ein (GUI: Dateiauswahl mit Fortschritt; per Text: importieren "name.dxf" base64)
+Otevřít DXF / DWG	DXF / DWG öffnen
+Otevřít jako 3D skicu	Als 3D-Skizze öffnen
+Otevřít…	Öffnen…
+pracovní vlákno importu selhalo	der Import-Worker ist fehlgeschlagen
+Převedeno na 2D entity: {0}.	In 2D-Objekte umgewandelt: {0}.
+Převedeno: {0}	Umgewandelt: {0}
+převod entit	Objekte werden umgewandelt
+R12: jen základní entity (křivky jako POLYLINE, MTEXT jako TEXT, šrafy rozložené) – pro CAM a staré programy.	R12: nur Grundobjekte (Polylinien als POLYLINE, MTEXT als TEXT, Schraffuren aufgelöst) – für CAM und alte Programme.
+rozvržení {0}: {1}	Layout {0}: {1}
+Rozvržení zdroje ({0}) se nevkládají – jen modelový prostor.	Layouts der Quelle ({0}) werden nicht eingefügt – nur der Modellbereich.
+sestavení výkresu	Zeichnung wird aufgebaut
+styl {0}: {1}	Stil {0}: {1}
+šrafa: vzor {0} není v knihovně – zapsán jako ANSI31	Schraffur: Muster {0} ist nicht in der Bibliothek – als ANSI31 geschrieben
+typ čáry {0}: {1}	Linientyp {0}: {1}
+Uchováno bez zobrazení (zapíše se zpět): {0}.	Ohne Anzeige beibehalten (wird zurückgeschrieben): {0}.
+Uchováno pro zápis zpět: {0}	Zum Zurückschreiben beibehalten: {0}
+Už se načítá jiný soubor ({0}) – počkejte nebo ho zrušte.	Es wird bereits eine andere Datei geladen ({0}) – warten oder abbrechen.
+Varování: {0}	Warnungen: {0}
+Verze	Version
+Vkládám {0}	Füge {0} ein
+Vkládání souboru {0} zrušeno.	Einfügen der Datei {0} abgebrochen.
+vložení {0}: blok {1} neexistuje	Einfügung {0}: Block {1} existiert nicht
+Vložit do výkresu…	In Zeichnung einfügen…
+Vložit výkres	Zeichnung einfügen
+SPLINE (jen body proložení → řídicí body)	SPLINE (nur Anpassungspunkte → Kontrollpunkte)
+# kontrola – oprava nálezů
+{0} je poškozený, neúplný nebo to není výkres {0} (chyba čtení: {1})	die {0}-Datei ist beschädigt, unvollständig oder keine {0}-Zeichnung (Lesefehler: {1})
+DXF R12: stejné názvy po úpravě pro R12 (velká písmena, bez diakritiky, 31 znaků) – přejmenováno: {0}	DXF R12: gleiche Namen nach der Anpassung für R12 (Großbuchstaben, ohne Diakritika, 31 Zeichen) – umbenannt: {0}
+importFile: as "draft" (2D výkres) je jen pro DXF / DWG – {0} otevřete s as auto | tab | component	importFile: as "draft" (2D-Zeichnung) gilt nur für DXF / DWG – {0} mit as auto | tab | component öffnen
+Na zamčených, zmrazených nebo vypnutých hladinách: {0} (nevybrané).	Auf gesperrten, gefrorenen oder ausgeschalteten Ebenen: {0} (nicht ausgewählt).
+není to výkres DWG (chybí hlavička verze AC10xx) ani DXF	es ist weder eine DWG-Zeichnung (Versionskopf AC10xx fehlt) noch eine DXF-Datei
+není to výkres DXF (soubor nezačíná sekcí „0 / SECTION“) ani DWG	es ist weder eine DXF-Zeichnung (die Datei beginnt nicht mit dem Abschnitt „0 / SECTION“) noch eine DWG-Datei
+soubor je prázdný	die Datei ist leer
+zobrazení výkresu – velký výkres může chvíli trvat	Zeichnung wird angezeigt – eine große Zeichnung kann etwas dauern

@@ -100,7 +100,6 @@ chlazení: průměr musí být kladný	kühlung: der Durchmesser muss positiv se
 chlazení: přesah nesmí být záporný	kühlung: der Überstand darf nicht negativ sein
 importFile potřebuje {0}, {1} nebo File	importFile braucht {0}, {1} oder File
 importFile: chybí obsah souboru – {0} nebo {1}	importFile: der Dateiinhalt fehlt – {0} oder {1}
-importFile: volba as je auto | tab | component | sketch	importFile: die Option as ist auto | tab | component | sketch
 komponenta „{0}“ se ještě načítá	Komponente „{0}“ wird noch geladen
 komponenta „{0}“ v sestavě není – komponenty: {1}	Komponente „{0}“ ist nicht in der Baugruppe – Komponenten: {1}
 Křivost: min {0} · max {1} 1/mm{2}	Krümmung: min {0} · max {1} 1/mm{2}

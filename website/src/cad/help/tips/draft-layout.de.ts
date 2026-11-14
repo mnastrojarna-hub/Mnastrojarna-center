@@ -1,0 +1,201 @@
+/** Mikroanleitungen – Paket „draft-layout“ (2D-Zeichnung, Registerkarten Blöcke, Layout und Ausgabe → Plot), Deutsch. */
+
+/** gleiche Form wie MicroTip in help/tips.ts (die Integration ersetzt sie durch den Import) */
+type MicroTip = { what: string; when: string; select?: string; steps: string[]; cmd?: string; note?: string };
+
+export default {
+  // ── Registerkarte Blöcke ──
+  "draft/lo-block": {
+    what: "Macht aus den gewählten Objekten einen benannten Block mit Einfügepunkt; ersetzt sie durch eine Blockreferenz.",
+    when: "Wiederkehrende Elemente: Schraube, Symbol, Fenster, Rahmen – eine Definition, viele Referenzen.",
+    select: "Die Objekte des Blocks (auch erst nach dem Start des Befehls wählbar).",
+    steps: ["Block erstellen klicken und den Namen eingeben.", "Einfügepunkt klicken (z. B. Schraubenmitte).", "Objekte wählen und Enter drücken (Umwandeln)."],
+    cmd: "2d block SCHRAUBE 0,0 fenster -10,-10 10,10",
+    note: "Derselbe Name definiert den Block neu – alle Referenzen ändern sich.",
+  },
+  "draft/lo-insert": {
+    what: "Fügt einen Block an einem Punkt mit X-/Y-Faktor und Drehung ein; füllt die Attributwerte aus.",
+    when: "Ein weiteres Exemplar eines vorhandenen Blocks – Schraube ins Loch, Symbol, Schriftfeld.",
+    steps: ["Block im Menü wählen (oder Namen eingeben).", "Einfügepunkt klicken; Enter = Faktor 1 und Winkel 0.", "Attributwerte ausfüllen (Enter = Vorgabe)."],
+    cmd: "2d einfüge SCHRAUBE 100,50 1 1 90",
+    note: "Ein negativer X-Faktor spiegelt die Referenz.",
+  },
+  "menu:lo-insert/*": {
+    what: "Startet EINFÜGE mit dem gewählten Block – nur noch den Einfügepunkt klicken.",
+    when: "Schnelles Einfügen aus der Blockliste der Zeichnung.",
+    steps: ["Block wählen.", "Einfügepunkt klicken und Faktor und Winkel mit Enter bestätigen."],
+    cmd: "2d einfüge SCHRAUBE 100,50",
+  },
+  "draft/lo-blocks": {
+    what: "Bedienfeld Blöcke: Blockliste mit Anzahl der Referenzen – einfügen, bearbeiten, als DXF / DWG speichern, Unbenutzte entfernen.",
+    when: "Überblick über die Blockbibliothek der Zeichnung; Attribute der gewählten Referenz bearbeiten.",
+    steps: ["Blockverwaltung öffnen.", "Beim Block Einfügen, Bearbeiten, DXF / DWG oder Entfernen wählen."],
+    cmd: "2d block ?",
+  },
+  "draft/lo-bedit": {
+    what: "Öffnet eine Blockdefinition zur Bearbeitung: Sie zeichnen und ändern direkt den Blockinhalt (Ursprung = Einfügepunkt).",
+    when: "Eine Änderung am Block, die in allen Referenzen erscheinen soll.",
+    select: "Eine Blockreferenz (oder den Block im Menü wählen).",
+    steps: ["Block im Menü wählen.", "Inhalt mit den üblichen Befehlen bearbeiten.", "In der Statusleiste Speichern (oder Verwerfen) drücken."],
+    cmd: "2d bbearb SCHRAUBE",
+    note: "Ein nicht vorhandener Name legt einen neuen leeren Block an.",
+  },
+  "menu:lo-bedit/*": {
+    what: "Öffnet den gewählten Block im Blockeditor.",
+    when: "Eine Blockdefinition aus der Liste bearbeiten.",
+    steps: ["Block wählen.", "Bearbeiten und in der Statusleiste Speichern drücken."],
+    cmd: "2d bbearb SCHRAUBE",
+  },
+  "draft/lo-bclose": {
+    what: "Beendet die Blockbearbeitung: Speichern (Referenzen werden aktualisiert) oder Änderungen verwerfen.",
+    when: "Wenn Sie im Blockeditor fertig sind.",
+    steps: ["Block schließen klicken.", "Enter = Speichern, oder Verwerfen wählen."],
+    cmd: "2d bschließen",
+  },
+  "draft/lo-wblock": {
+    what: "Speichert einen Block als eigene DXF-Zeichnung (oder DWG, .mncad) mit dem Einfügepunkt im Ursprung 0,0.",
+    when: "Eine Bibliothek von Teilen und Symbolen für andere Zeichnungen oder für Kollegen mit AutoCAD.",
+    select: "Eine Blockreferenz, oder den Block im Menü wählen.",
+    steps: ["Block im Menü wählen.", "Die Datei wird gespeichert; das Protokoll zeigt Name und Größe."],
+    cmd: "2d wblock SCHRAUBE dxf",
+  },
+  "menu:lo-wblock/*": {
+    what: "Speichert den gewählten Block, die Auswahl oder die ganze Zeichnung als eigene Datei.",
+    when: "Einen Teil der Zeichnung an ein anderes Programm oder in eine Bibliothek geben.",
+    steps: ["Menüeintrag wählen.", "Speichern der Datei bestätigen."],
+    cmd: "2d wblock auswahl dxf",
+  },
+  "draft/lo-attdef": {
+    what: "Attributdefinition: variabler Blocktext (Bezeichnung, Eingabeaufforderung, Vorgabewert), beim Einfügen ausgefüllt.",
+    when: "Teilenummer, Name, Werkstoff im Schriftfeld oder Etikett – bei jeder Referenz ein anderer Wert.",
+    steps: ["Bezeichnung (z. B. NUMMER), Aufforderung und Vorgabe eingeben.", "Punkt klicken, Höhe und Winkel eingeben.", "Die Definition mit Block erstellen in einen Block aufnehmen."],
+    cmd: "2d attdef NUMMER \"Nummer\" \"001\" 2,2 3.5 0",
+    note: "Die Modi Unsichtbar, Konstant, Prüfen, Vorgabe stehen vor der Bezeichnung.",
+  },
+  "draft/lo-attedit": {
+    what: "Ändert die Attributwerte einer Blockreferenz – im Bedienfeld Blöcke oder als Text BEZEICHNUNG=Wert.",
+    when: "Zeichnungsnummer im Schriftfeld korrigieren, Positionen neu nummerieren.",
+    select: "Eine Blockreferenz mit Attributen (Doppelklick öffnet das Bedienfeld direkt).",
+    steps: ["Blockreferenz wählen.", "Attribute bearbeiten klicken und Werte überschreiben.", "Mit Anwenden bestätigen."],
+    cmd: "2d attedit e7 NUMMER=V-002",
+  },
+  "draft/lo-attext": {
+    what: "Schreibt die Attribute aller Referenzen in eine CSV-Tabelle (ID, Block, Layer, X, Y, Winkel, Faktoren, Werte).",
+    when: "Stückliste aus beschrifteten Blöcken, Positionsliste, Kontrolle der Schriftfelder.",
+    steps: ["Attribute nach CSV klicken.", "Datei in Excel öffnen (Trennzeichen Semikolon)."],
+    cmd: "2d attextrahieren block ETIKETT",
+  },
+  "draft/lo-purge": {
+    what: "Entfernt unbenutzte Blöcke (auch verschachtelte), Layer, Linientypen und Textstile.",
+    when: "Zeichnung vor der Weitergabe oder nach dem Import einer fremden DWG aufräumen.",
+    steps: ["Wählen, was bereinigt wird (oder Alles Unbenutzte).", "Das Protokoll listet entfernte Namen; Strg+Z stellt sie wieder her."],
+    cmd: "2d bereinig",
+    note: "Layer 0, Defpoints und der aktuelle Layer bleiben immer.",
+  },
+  "menu:lo-purge/*": {
+    what: "Bereinigt nur die gewählte Art unbenutzter benannter Objekte.",
+    when: "Sie wollen z. B. nur unbenutzte Blöcke entfernen und die Layer behalten.",
+    steps: ["Art wählen.", "Protokoll prüfen; Strg+Z stellt wieder her."],
+    cmd: "2d bereinig blöcke",
+  },
+  // ── Registerkarte Layout ──
+  "draft/lo-new": {
+    what: "Ein neues Blatt A4–A0 mit Rahmen ISO 5457, Schriftfeld ISO 7200 und Ansichtsfenster ins Modell im ISO-Maßstab.",
+    when: "Zeichnung für den Druck vorbereiten: Format, Maßstab, Schriftfeld mit Benennung und Zeichnungsnummer.",
+    steps: ["Format im Menü wählen.", "Das Blatt öffnet sich; der Maßstab wird so gewählt, dass das Modell passt.", "Schriftfeld im Bedienfeld Seite ausfüllen."],
+    cmd: "2d layout neu Fertigung A3 maßstab 1:5",
+    note: "Die Registerkarten links in der Statusleiste wechseln zwischen Modell und Blättern.",
+  },
+  "menu:lo-new/*": {
+    what: "Legt ein Layout im gewählten Format an (A4 hoch, andere quer) mit Rahmen und Schriftfeld.",
+    when: "Ein Blattformat passend zu Teilegröße und Maßstab.",
+    steps: ["Format wählen.", "Maßstab des Ansichtsfensters im Bedienfeld Seite anpassen."],
+    cmd: "2d layout neu A2",
+  },
+  "draft/lo-pagesetup": {
+    what: "Bedienfeld Seite: Blattformat und Ausrichtung, Plotstil, Linienstärken, Ansichtsfenster (Maßstab, Sperre, Layer) und Schriftfeld.",
+    when: "Format ändern, Schwarzweißdruck, anderer Maßstab, Schriftfeld ausfüllen.",
+    steps: ["Zu einem Layout wechseln und Seite einrichten öffnen.", "Format, Stil oder Maßstab des Ansichtsfensters ändern.", "Felder des Schriftfelds ausfüllen (NAZEV, CISLO_VYKRESU…)."],
+    cmd: "2d seiteneinr A2 stil mono",
+    note: "Neues Format: Rahmen getauscht, Schriftfeld in die Ecke, Standard-Ansichtsfenster angepasst. Ränder schneiden nur den Plot zu.",
+  },
+  "draft/lo-mview": {
+    what: "Ansichtsfenster = Fenster vom Blatt ins Modell in exaktem Maßstab (1:1, 1:2, 1:5, 2:1… oder eigener).",
+    when: "Ansicht des Teils auf dem Blatt, Detail in größerem Maßstab, mehrere Ansichten auf einem Blatt.",
+    steps: ["Auf dem Blatt zwei Ecken des Ansichtsfensters klicken.", "Maßstab eingeben (z. B. 1:5) oder Enter = Einpassen."],
+    cmd: "2d mansfen 25,60 405,282 1:5",
+    note: "Optionen Einpassen, Zwei / Drei / Vier, Polygonal, Objekt sind im Menü.",
+  },
+  "menu:lo-mview/*": {
+    what: "Variante des Ansichtsfensters: Rechteck, ganze Zeichenfläche, 2–4 Fenster, Polygon oder aus Objekt.",
+    when: "Mehrere Ansichten auf einem Blatt oder ein rundes Detail.",
+    steps: ["Variante wählen.", "Punkte auf dem Blatt und den Maßstab eingeben."],
+    cmd: "2d mansfen zwei vertikal einpassen 1:2",
+  },
+  "draft/lo-vpscale": {
+    what: "Setzt einen exakten Maßstab für das gewählte Ansichtsfenster (oder das aktive im Modellbereich).",
+    when: "Das Modell passt nicht, oder Sie brauchen einen Normmaßstab nach ISO 5455.",
+    select: "Ein Ansichtsfenster (auf seinen Rahmen klicken) oder das aktive Fenster.",
+    steps: ["Ansichtsfenster wählen.", "Maßstab im Menü wählen."],
+    cmd: "2d mansfen maßstab e7 1:10",
+    note: "Ein gesperrtes Fenster behält den Maßstab; MERITKO im Schriftfeld wird angepasst.",
+  },
+  "menu:lo-vpscale/*": {
+    what: "Gibt den gewählten Ansichtsfenstern den gewählten Maßstab.",
+    when: "Maßstab eines Ansichtsfensters schnell auf einen Normwert ändern.",
+    steps: ["Ansichtsfenster wählen.", "Maßstab wählen."],
+    cmd: "2d setzen e7 scale=1:20",
+  },
+  "draft/lo-vplock": {
+    what: "Sperrt das Ansichtsfenster: Maßstab und Ansicht ins Modell lassen sich nicht versehentlich ändern.",
+    when: "Ein fertiges Blatt mit eingestelltem Maßstab.",
+    select: "Ein Ansichtsfenster (auf seinen Rahmen klicken).",
+    steps: ["Ansichtsfenster wählen.", "Ansichtsfenster sperren klicken (erneut = entsperren)."],
+    cmd: "2d mansfen sperren e7",
+  },
+  "draft/lo-vplayer": {
+    what: "Friert gewählte Layer nur in einem Ansichtsfenster – in anderen Fenstern und im Modell bleiben sie sichtbar.",
+    when: "Bemaßung nur im Detail, Mittellinien nur in der Hauptansicht.",
+    steps: ["Bedienfeld Seite öffnen.", "Beim Ansichtsfenster Layer klicken.", "Layer ankreuzen, die darin nicht erscheinen sollen."],
+    cmd: "2d afebene frieren ACHSEN viewport e7",
+  },
+  "draft/lo-mspace": {
+    what: "Arbeiten im Modell durch ein Ansichtsfenster: Sie zeichnen in Modellkoordinaten, das Blatt bleibt sichtbar.",
+    when: "Das Modell direkt vom Blatt aus ergänzen oder ändern.",
+    select: "Ein Ansichtsfenster, oder hineindoppelklicken.",
+    steps: ["In das Ansichtsfenster doppelklicken (oder es wählen und klicken).", "Zeichnen; Doppelklick außerhalb führt zurück zum Blatt."],
+    cmd: "2d mbereich e7",
+  },
+  "draft/lo-pspace": {
+    what: "Zurück aus dem Modellbereich des Ansichtsfensters auf das Papierblatt.",
+    when: "Nach der Modelländerung wollen Sie mit Rahmen, Schriftfeld oder Ansichtsfenstern arbeiten.",
+    steps: ["Papierbereich klicken (oder außerhalb des Fensters doppelklicken)."],
+    cmd: "2d pbereich",
+  },
+  // ── Registerkarte Ausgabe ──
+  "draft/lo-plot": {
+    what: "Plot nach PDF / PNG / SVG mit Vorschau: Blatt 1:1, Linienstärken in mm, schwarzweiß oder farbig.",
+    when: "Zeichnung für Fertigung, Kunden oder Archiv; Strg+P überall in der 2D-Zeichnung.",
+    steps: ["Strg+P oder Plot / PDF drücken.", "Was, Papier, Maßstab und Stil wählen; Vorschau prüfen.", "PDF plotten klicken."],
+    cmd: "2d plot mono",
+    note: "Maß auf dem Papier = Maß im Modell × Maßstab des Ansichtsfensters (exakt).",
+  },
+  "draft/lo-exportpdf": {
+    what: "Alle Layouts in ein mehrseitiges PDF, jede Seite im eigenen Format 1:1.",
+    when: "Ein Zeichnungssatz (Baugruppe + Teile) in einer Datei.",
+    steps: ["PDF aller Layouts klicken.", "Die Datei wird gespeichert; das Protokoll zeigt die Seitenzahl."],
+    cmd: "2d pdfexport",
+  },
+  "draft/lo-png": {
+    what: "Das aktuelle Blatt (oder Modell) als PNG-Bild (standardmäßig 150 DPI).",
+    when: "Vorschau für E-Mail, Angebot oder Dokumentation.",
+    steps: ["PNG-Bild klicken.", "Andere Auflösung: im Bedienfeld Plot PNG und DPI wählen."],
+    cmd: "2d plot png dpi 300",
+  },
+  "draft/lo-svg": {
+    what: "Das aktuelle Blatt (oder Modell) als Vektorbild SVG in mm.",
+    when: "Web, Präsentation oder Weiterbearbeitung in einem Vektoreditor.",
+    steps: ["Vektor SVG klicken.", "Die Datei wird gespeichert."],
+    cmd: "2d plot svg",
+  },
+} satisfies Record<string, MicroTip>;

@@ -12,22 +12,21 @@ import "@/cad/draft";
 import { cmdName, CmdRun, findCommand, runCommandLineAsync, tokenize, type DraftUiHooks, type Prompt } from "@/cad/draft/commands";
 import { angleOf, dist, sub } from "@/cad/draft/geom";
 import type { SnapKind } from "@/cad/draft/kinds";
-import { findLayer, setCurrentLayer, setLayer } from "@/cad/draft/layers";
-import { linetypeLibrary, loadLinetype } from "@/cad/draft/linetypes";
+import { findLayer, setCurrentLayer } from "@/cad/draft/layers";
 import { entityById, spaceEntities, type DraftEntity, type DraftModel, type DraftSpace, type Vec2 } from "@/cad/draft/model";
 import { pruneSelection, sessionFor, setSelection, subscribe, type DraftCmdResult } from "@/cad/draft/session";
 import { DEFAULT_SNAPS, SNAP_KINDS } from "@/cad/draft/snap";
 import { normalizeDraftDoc, emptyDraftDoc } from "@/cad/draft/doc";
 import { displayHex } from "@/cad/draft/colors";
 import { DRAFT_IMPORT_ACCEPT, draftImport } from "@/cad/draft/io";
-import { DWG_VERSIONS } from "@/cad/formats/dwg-versions";
 import type { CadDoc } from "@/cad/types";
 import { saveFile } from "@/lib/save-file";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName } from "../cad-icons";
-import { ContextMenu, Ribbon, type RGroup, type RItem, type RMenuEntry } from "../ribbon";
+import { ContextMenu, Ribbon, type RGroup, type RMenuEntry } from "../ribbon";
 import { DraftCanvas, SNAP_LABEL, type DraftCanvasHandle, type DraftPrefs } from "./draft-canvas";
 import { DraftCmdLine, type CmdLineHandle } from "./draft-cmdline";
+import { draftCoreRibbon } from "./draft-ribbon";
 import { LayerPanel, PropsPanel } from "./draft-panels";
 import { UI_EXTS } from "./ui-exts";
 import type { DraftRibbonTab, DraftUiApi } from "./ui-ext";
@@ -107,9 +106,24 @@ export function DraftWorkspace({ doc, onCommit, onUndo, onRedo, canUndo, canRedo
   const list = spaceEntities(model, space) ?? model.entities;
   const prompt: Prompt | null = run?.prompt ?? null;
 
-  const commitModel = useCallback((m: DraftModel) => onCommit({ ...doc, draft: m }), [doc, onCommit]);
+  /**
+   * Poslední zapsaný dokument. Zápis (konec příkazu) ho přepíše hned – příkaz spuštěný ve stejné obsluze události
+   * (tlačítko pásu během běžícího příkazu, Esc a nový příkaz) tak pracuje s novým výkresem, ne se starým z props.
+   */
   const docRef = useRef(doc);
-  docRef.current = doc;
+  const docProp = useRef(doc);
+  if (docProp.current !== doc) {
+    docProp.current = doc;
+    docRef.current = doc;
+  }
+  const commitModel = useCallback(
+    (m: DraftModel) => {
+      const d = { ...docRef.current, draft: m };
+      docRef.current = d;
+      onCommit(d);
+    },
+    [onCommit],
+  );
 
   // změna výkresu zvenku (textové příkazy, zpět / znovu): rozpracovaný příkaz se přeruší, výběr pročistí
   useEffect(() => {
@@ -228,9 +242,22 @@ export function DraftWorkspace({ doc, onCommit, onUndo, onRedo, canUndo, canRedo
     const r = new CmdRun(def, docRef.current.draft!, session, { interactive: true, ui: hooks });
     runRef.current = r;
     r.start();
-    for (const t of pre) {
-      if (r.done) break;
-      feedToken(t);
+    // zadání předem (napsaný řádek „blok A 0,0 okno x,y x,y smazat“, volby z pásu): výběr textem se zpracuje hned
+    // (všechny jeho tokeny), ostatní tokeny po jednom jako Enter
+    for (let i = 0; i < pre.length && !r.done; ) {
+      if (r.prompt?.k === "select" && pre[i].trim()) {
+        try {
+          const ni = r.feedSelection(pre, i);
+          // nic se nespotřebovalo (token není výběr): jde do další výzvy jako v textu; opakovaná výzva výběru → jako Enter
+          if (ni === i && r.prompt?.k === "select") feedToken(pre[i++]);
+          else i = ni;
+        } catch (e) {
+          log({ text: `✗ ${(e as Error).message}`, kind: "err" });
+          break;
+        }
+        continue;
+      }
+      feedToken(pre[i++]);
     }
     afterStep();
   };
@@ -412,7 +439,6 @@ export function DraftWorkspace({ doc, onCommit, onUndo, onRedo, canUndo, canRedo
   };
 
   // ---------------------------------------------------------------- pás karet
-  const cmdItem = (id: string, label: string, icon: CadIconName, cmd: string, pre: string[] = [], hint?: string, kbd?: string): RItem => ({ id, label, icon, tone: "sketch", hint, kbd, onClick: () => startCommand(cmd, pre), active: run?.def.id === findCommand(cmd)?.id });
   const selEnts = (): DraftEntity[] => session.sel.map((id) => entityById(list as DraftEntity[], id)).filter((e): e is DraftEntity => !!e);
   const layerOfSel = (fn: (m: DraftModel, layer: string) => DraftModel, what: string) => {
     const ents = selEnts();
@@ -425,98 +451,20 @@ export function DraftWorkspace({ doc, onCommit, onUndo, onRedo, canUndo, canRedo
       onFlash((e as Error).message);
     }
   };
-  const coreGroups: Record<DraftRibbonTab, RGroup[]> = {
-    draw: [
-      {
-        label: tr("Kreslit"),
-        big: 4,
-        items: [
-          cmdItem("line", tr("Úsečka"), "line", "LINE", [], tr("úsečky na sebe navazující · Uzavřít, Zpět"), "L"),
-          cmdItem("pline", tr("Křivka"), "polyline", "PLINE", [], tr("úseky a oblouky jedné entity, šířka"), "PL"),
-          { id: "circle", label: tr("Kružnice"), icon: "circle", tone: "sketch", kbd: "C", onClick: () => startCommand("CIRCLE"), menu: [
-            { id: "c1", label: tr("Střed, poloměr"), icon: "circle", onClick: () => startCommand("CIRCLE") },
-            { id: "c3", label: tr("2 body"), icon: "circle", onClick: () => startCommand("CIRCLE", ["2p"]) },
-            { id: "c4", label: tr("3 body"), icon: "circle", onClick: () => startCommand("CIRCLE", ["3p"]) },
-            { id: "c5", label: tr("Tečná, tečná, poloměr"), icon: "circle", onClick: () => startCommand("CIRCLE", ["ttr"]) },
-          ] },
-          { id: "arc", label: tr("Oblouk"), icon: "arc", tone: "sketch", kbd: "A", onClick: () => startCommand("ARC"), menu: [
-            { id: "a1", label: tr("3 body"), icon: "arc", onClick: () => startCommand("ARC") },
-            { id: "a2", label: tr("Počátek, střed, konec"), icon: "arcCenter", onClick: () => startCommand("ARC") },
-            { id: "a3", label: tr("Střed, počátek, konec"), icon: "arcCenter", onClick: () => startCommand("ARC", ["center"]) },
-          ] },
-          cmdItem("rect", tr("Obdélník"), "rect", "RECTANG", [], tr("dva rohy, rozměry, zaoblení, zkosení"), "REC"),
-          cmdItem("polygon", tr("Mnohoúhelník"), "polygon", "POLYGON", [], undefined, "POL"),
-          { id: "ellipse", label: tr("Elipsa"), icon: "ellipse", tone: "sketch", kbd: "EL", onClick: () => startCommand("ELLIPSE"), menu: [
-            { id: "e1", label: tr("Osa, konec"), icon: "ellipse", onClick: () => startCommand("ELLIPSE") },
-            { id: "e2", label: tr("Střed"), icon: "ellipse", onClick: () => startCommand("ELLIPSE", ["center"]) },
-            { id: "e3", label: tr("Eliptický oblouk"), icon: "arc", onClick: () => startCommand("ELLIPSE", ["arc"]) },
-          ] },
-          { id: "spline", label: tr("Spline"), icon: "spline", tone: "sketch", kbd: "SPL", onClick: () => startCommand("SPLINE"), menu: [
-            { id: "s1", label: tr("Proložením bodů"), icon: "spline", onClick: () => startCommand("SPLINE", ["method", "fit"]) },
-            { id: "s2", label: tr("Řídicími body"), icon: "spline", onClick: () => startCommand("SPLINE", ["method", "cv"]) },
-          ] },
-          cmdItem("xline", tr("Přímka"), "construction", "XLINE", [], tr("nekonečná konstrukční přímka"), "XL"),
-          cmdItem("ray", tr("Polopřímka"), "construction", "RAY"),
-          cmdItem("point", tr("Bod"), "point", "POINT", [], undefined, "PO"),
-        ],
-      },
-      { label: tr("Text"), big: 1, items: [cmdItem("text", tr("Text"), "text", "TEXT", [], tr("jednořádkový text"), "DT")] },
-      {
-        label: tr("Dotazy"),
-        items: [cmdItem("dist", tr("Vzdálenost"), "measure", "DIST", [], undefined, "DI"), cmdItem("area", tr("Plocha"), "measure", "AREA", [], undefined, "AA"), cmdItem("id", tr("Souřadnice"), "point", "ID"), cmdItem("list", tr("Výpis"), "info", "LIST", [], undefined, "LI")],
-      },
-    ],
-    modify: [
-      {
-        label: tr("Výběr"),
-        items: [
-          { id: "all", label: tr("Vybrat vše"), icon: "select", kbd: "Ctrl+A", onClick: () => setSelection(session, list.map((e) => e.id)) },
-          { id: "none", label: tr("Zrušit výběr"), icon: "x", kbd: "Esc", onClick: () => setSelection(session, []) },
-        ],
-      },
-      { label: tr("Upravit"), big: 2, items: [cmdItem("erase", tr("Smazat"), "trash", "ERASE", [], undefined, "Del"), { id: "props", label: tr("Vlastnosti"), icon: "edit", active: panel === "properties", onClick: () => setPanel(panel === "properties" ? null : "properties") }] },
-    ],
-    layers: [
-      {
-        label: tr("Hladiny"),
-        big: 2,
-        items: [
-          { id: "lm", label: tr("Správce hladin"), icon: "layers", tone: "view", active: panel === "layers", onClick: () => setPanel(panel === "layers" ? null : "layers"), kbd: "LA" },
-          { id: "cur", label: tr("Aktuální: {0}", model0.vars.clayer), icon: "check", menu: model0.layers.map((l) => ({ id: `cl-${l.name}`, label: l.name, icon: (l.name === model0.vars.clayer ? "check" : "layers") as CadIconName, disabled: l.frozen, onClick: () => commitModel(setCurrentLayer(model0, l.name)) })) },
-          { id: "mcur", label: tr("Aktuální podle objektu"), icon: "select", onClick: () => (selEnts()[0] ? commitModel(setCurrentLayer(model0, selEnts()[0].layer)) : startCommand("LAYMCUR")) },
-          { id: "loff", label: tr("Vypnout hladinu objektu"), icon: "eye", onClick: () => layerOfSel((m, l) => setLayer(m, l, { on: false }), tr("vypnout hladinu")) },
-          { id: "lfrz", label: tr("Zmrazit hladinu objektu"), icon: "eye", onClick: () => layerOfSel((m, l) => (l === m.vars.clayer ? m : setLayer(m, l, { frozen: true })), tr("zmrazit hladinu")) },
-          { id: "llck", label: tr("Zamknout hladinu objektu"), icon: "lock", onClick: () => layerOfSel((m, l) => setLayer(m, l, { locked: true }), tr("zamknout hladinu")) },
-          { id: "lall", label: tr("Zapnout a rozmrazit vše"), icon: "eye", onClick: () => commitModel({ ...model0, layers: model0.layers.map((l) => ({ ...l, on: true, frozen: false })) }) },
-          { id: "lunl", label: tr("Odemknout vše"), icon: "lock", onClick: () => commitModel({ ...model0, layers: model0.layers.map((l) => ({ ...l, locked: false })) }) },
-        ],
-      },
-      {
-        label: tr("Typy čar"),
-        items: [
-          { id: "ltload", label: tr("Načíst typ čáry"), icon: "centerline", menu: linetypeLibrary(model0.vars.measurement === 1).map((l) => ({ id: `lt-${l.name}`, label: `${l.name} — ${l.desc.split(" ")[0]}`, icon: "centerline" as CadIconName, active: model0.linetypes.some((x) => x.name === l.name), onClick: () => commitModel(loadLinetype(model0, l.name)[0]) })) },
-          { id: "lts", label: tr("Měřítko čar (LTSCALE {0})", model0.vars.ltscale), icon: "scale", onClick: () => startCommand("LTSCALE") },
-          { id: "lwt", label: tr("Zobrazit tloušťky"), icon: "line", active: model0.vars.lwdisplay, onClick: () => commitModel({ ...model0, vars: { ...model0.vars, lwdisplay: !model0.vars.lwdisplay } }) },
-        ],
-      },
-    ],
-    annotate: [{ label: tr("Text"), big: 1, items: [cmdItem("text2", tr("Text"), "text", "TEXT", [], tr("jednořádkový text"), "DT")] }],
-    blocks: [],
-    layout: [],
-    output: [
-      {
-        label: tr("Soubor"),
-        big: 3,
-        items: [
-          { id: "save", label: tr("Uložit .mncad"), icon: "save", tone: "file", kbd: "Ctrl+S", onClick: onSave },
-          { id: "dxf", label: tr("Export DXF"), icon: "export", tone: "file", onClick: () => startCommand("EXPORT", ["dxf"]) },
-          { id: "dwg", label: tr("Export DWG"), icon: "export", tone: "file", onClick: () => startCommand("EXPORT", ["dwg"]), menu: DWG_VERSIONS.map((v) => ({ id: `dwg-${v.id}`, label: `DWG ${v.label}`, icon: "export" as CadIconName, onClick: () => startCommand("EXPORT", ["dwg", "verze", v.id]) })) },
-          { id: "open", label: tr("Otevřít DXF / DWG jako 2D výkres"), icon: "open", tone: "file", onClick: () => fileInput.current?.click() },
-        ],
-      },
-      { label: tr("Sdílet"), big: 1, items: [{ id: "share", label: tr("Sdílet odkazem"), icon: "share", tone: "file", onClick: onShare }] },
-    ],
-  };
+  const coreGroups = draftCoreRibbon({
+    model: model0,
+    panel,
+    activeCmd: run?.def.id ?? null,
+    command: startCommand,
+    selectAll: () => setSelection(session, list.map((e) => e.id)),
+    selectNone: () => setSelection(session, []),
+    setPanel,
+    commit: commitModel,
+    layerOfSel,
+    currentFromSel: () => (selEnts()[0] ? commitModel(setCurrentLayer(model0, selEnts()[0].layer)) : startCommand("LAYMCUR")),
+    save: onSave,
+    share: onShare,
+  });
   const groups = { ...coreGroups } as Record<DraftRibbonTab, RGroup[]>;
   for (const ext of UI_EXTS) {
     const add = ext.ribbon?.(api);

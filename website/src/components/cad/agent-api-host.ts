@@ -509,10 +509,17 @@ function toFile(f: ImportFileInput): File {
   throw new Error(tr("importFile: chybí obsah souboru – {0} nebo {1}", "base64", "text"));
 }
 
-async function importFile(h: () => ApiHost, input: ImportFileInput, opts?: { as?: "auto" | "tab" | "component" | "sketch" }): Promise<string> {
+async function importFile(h: () => ApiHost, input: ImportFileInput, opts?: { as?: "auto" | "tab" | "component" | "sketch" | "draft" }): Promise<string> {
   const as = opts?.as ?? "auto";
-  if (!["auto", "tab", "component", "sketch"].includes(as)) throw new Error(tr("importFile: volba as je auto | tab | component | sketch"));
-  const file = toFile(input);
+  if (!["auto", "tab", "component", "sketch", "draft"].includes(as)) throw new Error(tr("importFile: volba as je {0}", "auto | tab | component | sketch | draft"));
+  let file = toFile(input);
+  if (as === "draft" && !/\.(dxf|dwg)$/i.test(file.name)) throw new Error(tr("importFile: as \"draft\" (2D výkres) je jen pro DXF / DWG – {0} otevřete s as auto | tab | component", file.name));
+  // DXF / DWG: jako Otevřít = 2D výkres v nové záložce (auto | tab | draft); do 3D skici (sketch) se DWG převede na DXF
+  if (/\.(dxf|dwg)$/i.test(file.name)) {
+    const io = await import("./draft/ui-io");
+    if (as === "auto" || as === "tab" || as === "draft") return io.importDraftForAgent(file, (d) => void h().openDocInTab(d), () => h().doc());
+    if (/\.dwg$/i.test(file.name)) file = (await io.dwgAsDxf(file)) ?? file;
+  }
   const ext = extOf(file.name);
   const cur = h().doc();
   const asm = !isPartDoc(cur);
@@ -562,7 +569,7 @@ async function importFile(h: () => ApiHost, input: ImportFileInput, opts?: { as?
       } else {
         if (as === "sketch" && asm) throw new Error(tr("{0}: skica patří do dílu – otevřený dokument je sestava", file.name));
         const f: SketchFeature = { id: uid(), name: res.name, type: "sketch", plane: { kind: "base", name: "XY", offset: 0 }, entities: ents };
-        const here = as === "sketch" || (as === "auto" && !asm && emptyDocLike(now));
+        const here = now.kind !== "draft" && (as === "sketch" || (as === "auto" && !asm && emptyDocLike(now)));
         if (here) h().commit({ ...now, ...(emptyDocLike(now) && now.name === tr("Nový díl") ? { name: res.name } : {}), features: [...now.features, f] });
         else h().openDocInTab({ app: "mnastrojarna-cad", version: 2, name: res.name, material: "ocel", kind: "part", features: [f] });
         h().openSketch(f.id);

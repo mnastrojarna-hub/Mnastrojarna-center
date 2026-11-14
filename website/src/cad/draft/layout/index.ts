@@ -4,4 +4,9 @@
  * měřítko 1:1 na papír). Vstupní bod balíku. Smlouva: website/CAD-2D-NAVRH.md, kapitola „Balík 3 – layout“.
  * Soubory balíku: src/cad/draft/layout/*.
  */
-export {};
+import "./kinds";
+import "./cmd-blocks";
+import "./cmd-layout";
+import "./cmd-plot";
+
+export { activeViewport, annoScale, layoutState } from "./state";

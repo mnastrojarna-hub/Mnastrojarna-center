@@ -1054,16 +1054,74 @@ bod dotyku tečny · \`nea(e3,x,y)\` nejbližší bod. Id entit (\`e12\`) vrací
 | přímka · xline (XL), polopřímka · ray | \`2d přímka 0,0 1,1\` · \`vodorovně p\` · \`svisle p\` · \`úhel 30 p\` · \`osa v a b\` · \`odsazení 10 e3 x,y\` |
 | bod · point (PO) | \`2d bod 1,1 2,2\` (vzhled \`2d proměnná pdmode 3\`) |
 | text (DT) | \`2d text 10,10 5 0 "Obsah"\` (bod, výška, úhel, text) · \`text zarovnání mc x,y 5 0 "…"\` |
+| mtext (MT, T) | \`2d mtext 10,10 @80,-20 "1. řádek\\P2. řádek"\` (rohy rámečku = šířka zalamování) · \`mtext výška 5 zarovnání mc x,y šířka 0 "…"\` · kódy \`{\\C1;červeně}\` \`{\\H0.7x;…}\` \`\\S1/2;\` \`%%c\` Ø \`%%d\` ° \`%%p\` ± |
+| styl-textu · style (ST) | \`2d styl-textu nový ISO písmo isocp.shx výška 0 šířka 0.8\` · \`aktuální ISO\` · \`upravit ISO sklon 15\` · \`přejmenovat A B\` · \`smazat A\` · bez voleb = výpis |
+| upravit-text · textedit (ED) | \`2d upravit-text e5 "Nový text"\` (text, mtext, odkaz, tolerance, drsnost) · kóta: \`"<> H7"\` (\`<>\` = naměřená hodnota), \`"<>"\` = zpět na hodnotu |
+| kóta · dim | chytrá kóta podle objektu: \`2d kóta e3 50,-15\` (úsečka → délka, kružnice → Ø, oblouk → R) · \`kóta body p1 p2 poloha\` · \`kóta úhlová …\` |
+| kóta-lineární · dimlinear (DLI) | \`2d kóta-lineární 0,0 100,0 50,-15\` (orientace podle polohy) · \`… svisle x,y\` · \`… natočit 30 x,y\` · \`… text "<> H7" x,y\` · \`kóta-lineární "" e3 x,y\` (objekt) |
+| kóta-zarovnaná · dimaligned (DAL) | \`2d kóta-zarovnaná 0,0 30,40 -10,50\` |
+| kóta-úhlová · dimangular (DAN) | \`2d kóta-úhlová e1 e2 40,15\` (poloha oblouku vybere jeden ze 4 úhlů) · \`kóta-úhlová e5 x,y\` (oblouk) · \`kóta-úhlová "" vrchol p1 p2 x,y\` (i přes 180°) |
+| kóta-poloměr · dimradius (DRA), kóta-průměr · dimdiameter (DDI) | \`2d kóta-poloměr e3 40,30\` · \`kóta-průměr e3 60,40\` (poloha = text uvnitř / vně) · \`kóta-poloměr zalomená e3 střed poloha zalomení\` |
+| kóta-oblouku · dimarc (DAR), kóta-souřadnicová · dimordinate (DOR) | \`2d kóta-oblouku e4 0,60\` · \`… část p1 p2 x,y\` · \`kóta-souřadnicová 50,20 50,60\` (X; vodorovně = Y) · \`… xbáze / ybáze / počátek x,y\` |
+| kóta-základnicová · dimbaseline (DBA), kóta-řetězová · dimcontinue (DCO) | po kótě: \`2d kóta-základnicová 150,0 200,0\` (rozestup DIMDLI) · \`kóta-řetězová 150,0 200,0\` · \`vybrat e7\` jiná výchozí kóta |
+| kótovací-styl · dimstyle (D, DST) | \`2d kótovací-styl nový Strojní z ISO-25 dimtxt 3.5 dimdec 1\` · \`aktuální Strojní\` · \`upravit Strojní dimtol 1 dimtp 0.1 dimtm 0.05\` · \`přepsat e5 dimdec 3\` · \`použít Strojní e5 e6\` · \`vypsat\` · \`měřítko-poznámek 1:50\` |
+| značka-středu · centermark (CM) | \`2d značka-středu e3 e4\` (kříž + osy CENTER) · \`velikost 5\` · \`osa e1 e2\` (osa mezi úsečkami) |
+| odkaz · mleader (MLD, LE) | \`2d odkaz 10,10 30,25 "Sražení 1×45°"\` (šipka, zalomení, text) · \`odkaz šipka tečka …\` · \`… bod x,y …\` (další vrchol) · \`… ""\` bez textu |
+| tolerance (TOL) | \`2d tolerance poloha ø0.05M A,B,C 120,40\` (charakteristika, hodnota, základny nebo \`-\`, bod) · \`tolerance řetězec "{\\Fgdt;j}%%v0.1%%vA" x,y\` |
+| šrafa · hatch (H, BH) | \`2d šrafa 50,25\` (vnitřní bod; ostrovy) · \`šrafa vzor ANSI37 měřítko 2 úhel 0 x,y\` · \`šrafa plná objekty e1 e2\` · \`… uživatelský měřítko 3 dvojitá\` · \`… přechod lineární 1 5\` · \`… ostrovy vnější\` · plocha v \`data.area\` |
+| upravit-šrafu · hatchedit (HE) | \`2d upravit-šrafu e7 vzor ANSI37 měřítko 2 úhel 30\` · \`… ostrovy ignorovat\` · \`… hranice\` (z asociativních objektů) |
+| revizní-obláček · revcloud, drsnost · surfsym | \`2d revizní-obláček 0,0 100,50\` (oblouky ven) · \`… objekt e3\` · \`… obrátit …\` (oblouky dovnitř) · \`2d drsnost 50,0 0 "Ra 1,6"\` (bod na povrchu, směr) · \`drsnost druh bez-úběru postup "broušeno" …\` |
 | hladina · layer (LA) | \`2d hladina nová OSY barva 1 typčáry CENTER tloušťka 0.25 [popis "…"]\` · \`aktuální OSY\` · \`vytvořit X\` (+aktuální) · \`OSY vypnout\` (zapnout, zmrazit, rozmrazit, zamknout, odemknout, netisk, tisk) · \`* rozmrazit\` · \`přejmenovat A B\` · \`smazat OSY přesunout-na 0\` |
 | typčáry · linetype | \`2d typčáry načíst CENTER2 HIDDENX2\` · \`načíst vše\` · \`aktuální DASHED\` · měřítko \`2d měřítkočar 0.5\` |
 | vlastnosti · properties | \`2d vlastnosti e3 e5 hladina OSY barva 5 typčáry DASHED tloušťka 0.5 měřítkočáry 2\` (bez id = výběr; \`barva ByLayer\` vrátí výchozí) |
 | nastavit · set | geometrie jako panel vlastností: \`2d nastavit e3 r 25 c 10,10\` · \`nastavit e7 s "Nový text" h 5\` · \`nastavit e2 length=120\` |
 | vyber · select | \`2d vyber hladina OSY typ circle\` · \`okno x,y x,y\` · \`křížení x,y x,y\` · \`vše\` · \`poslední\` · \`předchozí\` · \`výběr odebrat e3\` · \`nic\` |
 | smazat · erase (E) | \`2d smazat e3 e5\` · \`smazat hladina OSY\` · \`smazat\` (výběr) |
+| posun · move (M) | \`2d posun e3 e5 0,0 100,50\` (základní a cílový bod) · \`posun vše posunutí 10,0\` · \`posun 0,0 @25<45\` (vybrané) |
+| kopie · copy (CO) | \`2d kopie e3 0,0 50,0 100,0\` (více cílů) · \`kopie e3 0,0 pole 5 20,0\` (5 v řadě) · \`… pole 5 přizpůsobit 100,0\` |
+| otočit · rotate (RO) | \`2d otočit e3 0,0 90\` · \`otočit e3 0,0 kopie 45\` · \`otočit e3 0,0 reference 30 90\` · \`… reference e3.start e3.end 0\` |
+| změnit-měřítko · scale (SC) | \`2d změnit-měřítko e3 0,0 2\` · \`… kopie 0.5\` · \`… reference 40 100\` (stávající → nová délka) |
+| zrcadlit · mirror (MI) | \`2d zrcadlit e3 e5 0,0 0,100\` (kopie) · \`… ano\` (smazat zdroj); text čitelný dle \`proměnná mirrtext\` |
+| zarovnat-objekty · align (AL) | \`2d zarovnat-objekty e3 s1 d1 s2 d2 [ano = i měřítko]\` |
+| protáhnout · stretch (S) | \`2d protáhnout 90,-10 120,60 0,0 @20,0\` (křížící okno, základní a cílový bod) · \`protáhnout mnohoúhelník p1 p2 p3 hotovo …\` |
+| úchop · gripedit | úprava úchopem: \`2d úchop e3 100,0 150,20\` (protáhnout úchop) · \`… e3.end posun @10,0\` · \`… otočit 90\` · \`… měřítko 2\` · \`… zrcadlit p\` · \`""\` = další režim · \`kopie\` |
+| ekvidistanta · offset (O) | \`2d ekvidistanta 5 e1 0,100\` (vzdálenost, objekt, bod na straně) · \`ekvidistanta bodem e1 50,30\` · \`ekvidistanta smazat ano 5 …\` · \`hladina aktuální\` (EN: \`2d offset …\`, ne „draft offset“) |
+| oříznout · trim (TR) | \`2d oříznout e1@50,0\` (bod výběru = odebíraný díl; rychlý režim: hrany = vše) · \`oříznout řezné-hrany e5 e6 e1@50,0\` · \`plot p1 p2 hotovo\` · \`křížení p1 p2\` · \`hrana prodloužit\` · \`prodloužit e2@x,y\` (jednou opačně) · volby celým názvem nebo jednoznačným začátkem v cs / en / de (\`řez\`, \`cut\`, \`schn\`) – i písmena AutoCADu (TRIM: T řezné hrany, O režim, R smazat, E hrana; CHAMFER: E metoda, M vícekrát) · \`řezné-hrany\` platí jen pro tento běh, \`režim\` a poloměr / vzdálenosti zaoblení a zkosení si pamatuje každý výkres zvlášť |
+| prodloužit · extend (EX) | \`2d prodloužit e1@95,0\` (konec u bodu výběru k nejbližší hranici) · \`prodloužit hraniční-hrany e5 e1@95,0\` · \`hrana prodloužit …\` |
+| zaoblit · fillet (F) | \`2d zaoblit poloměr 5 e1@10,0 e2@0,10\` · \`zaoblit poloměr 0 e1 e2\` (roh) · \`zaoblit poloměr 3 křivka e4\` (všechny vrcholy) · \`zaoblit oříznout neoříznout poloměr 5 e1 e2\` (bez oříznutí; volba Oříznout se ptá na režim) · \`zaoblit vícekrát …\` |
+| zkosit · chamfer (CHA) | \`2d zkosit vzdálenost 5 5 e1@10,0 e2@0,10\` · \`zkosit úhel 5 30 e1 e2\` · \`zkosit vzdálenost 2 2 křivka e4\` |
+| přerušit · break (BR) | \`2d přerušit e1@20,0 60,0\` (vyjme část) · \`přerušit e1 první 20,0 60,0\` · \`přerušit-v-bodě e1 50,0\` (rozdělí na dvě) |
+| spojit · join (J) | \`2d spojit e1 e2 e3\` (kolineární úsečky → úsečka, oblouky jedné kružnice → oblouk / kružnice, navazující → křivka, se splajnem → spline) |
+| rozložit · explode (X) | \`2d rozložit e3\` (křivka → úsečky a oblouky; blok, kóta, šrafa → části) |
+| pole · array (AR) | \`2d pole e1 obdélníkové 4 3 20 15 [úhel]\` · \`pole e1 polární 0,0 6 360 ano\` · \`pole e1 dráha e5 rozdělit 8 ano\` · \`pole-po-dráze e1 "" e5 …\` (\`""\` ukončí výběr) · \`pole-obdélníkové\` \`pole-polární\` \`pole-po-dráze\` přímo |
+| prodloužení · lengthen (LEN) | \`2d prodloužení delta 10 e1@95,0\` · \`celkem 120 …\` · \`procenta 50 …\` · \`delta úhel 30 e4@x,y\` (oblouk) · \`prodloužení e1\` (výpis délky) |
+| upravit-křivku · pedit (PE) | \`2d upravit-křivku e3 uzavřít\` · \`… šířka 0.5\` · \`… proložit\` · \`… spline\` · \`… vyrovnat\` · \`… obrátit\` · \`… vložit-vrchol x,y\` · \`… odebrat-vrchol x,y\` · \`upravit-křivku e1 ano spojit e2 e3\` (úsečku převede) · \`upravit-křivku více e1 e2 ano proložit\` (\`ano\` = převést úsečky / oblouky / splajny – otázka padne jen, jsou-li ve výběru; samé křivky: \`upravit-křivku více e1 e2 proložit\`) · \`vyrovnat\` vrátí vrcholy před Proložit / Spline |
+| upravit-spline · splinedit (SPE) | \`2d upravit-spline e3 uzavřít\` · \`… posunout-bod 2 10,5\` · \`… zjemnit x,y\` · \`… zvýšit-stupeň 4\` · \`… křivka 0.01\` (na křivku) · \`… obrátit\` · \`… spojit e4\` |
+| přenést-vlastnosti · matchprop (MA) | \`2d přenést-vlastnosti e1 e2 e3\` (zdroj, cíle) · \`přenést-vlastnosti nastavení nic hladina "" e1 e5\` (jen hladina) |
+| pořadí · draworder (DR) | \`2d pořadí e3 dopředu\` · \`dozadu\` · \`nad-objekty e7\` · \`pod-objekty e7\` |
+| odstranit-duplicity · overkill | \`2d odstranit-duplicity vše\` · \`… tolerance 0.001\` · \`… ignorovat barva hladina ""\` · \`… sloučit ne\` |
+| rozdělit · divide (DIV), rozměřit · measure (ME) | \`2d rozdělit e1 5\` (body na hranicích dílů) · \`rozměřit e1@0,0 25\` (od konce u bodu) · \`… blok ŠROUB ano 8\` |
+| obrátit · reverse | \`2d obrátit e3\` (směr úsečky, křivky, splajnu) |
 | dotazy | \`2d vzdálenost p1 p2\` · \`plocha p1 p2 p3 …\` / \`plocha objekt e3\` · \`souřadnice x(e1,e2)\` · \`výpis e3\` · \`stav\` · \`rozsah\` |
-| proměnná · setvar | \`2d proměnná cecolor 1\` · \`celtype\` \`celweight\` \`clayer\` \`ltscale\` \`textsize\` \`pdmode\` \`luprec\` \`insunits\` \`mirrtext\` … · \`jednotky mm přesnost 3\` |
+| proměnná · setvar | \`2d proměnná cecolor 1\` · \`celtype\` \`celweight\` \`clayer\` \`ltscale\` \`textsize\` \`pdmode\` \`luprec\` \`insunits\` \`mirrtext\` \`psltscale\` (0 / 1, vzor čar ve výřezech) … · \`jednotky mm přesnost 3\` |
 | zoom | \`2d zoom rozsah\` · \`zoom okno x,y x,y\` · \`zoom střed x,y výška\` |
-| export / import | \`2d export dxf\` · \`export dwg verze R2013\` (soubor v \`results[].data.file\`) · import: \`window.mncad.draftImport({ name, base64 })\` nebo \`{ name, text }\` |
+| blok · block (B) | \`2d blok ŠROUB 0,0 e1 e2 e3\` (název, bod vložení, objekty; \`převést\` = nahradit vložením – výchozí, \`ponechat\`, \`smazat\`) · stejný název = předefinovat (vložení se obnoví) · \`blok ?\` seznam bloků v \`data.blocks\` |
+| vložit · insert (I) | \`2d vložit ŠROUB 100,50\` · \`vložit ŠROUB 100,50 2 2 45\` (měřítko X, Y, natočení; záporné měřítko = zrcadlení) · \`… 1 1 0 "M8" "V-001"\` hodnoty atributů v pořadí definic · \`vložit ŠROUB pole 3 2 20 15 0,0\` (MINSERT) · id vložení v \`data.insert\` |
+| upravit-blok · bedit (BE), zavřít-blok · bclose | \`2d upravit-blok ŠROUB\` → další příkazy kreslí a upravují obsah bloku (počátek = bod vložení; nový název = nový blok) → \`2d zavřít-blok\` (uložit, vložení se obnoví) · \`zavřít-blok zahodit\` |
+| definice-atributu · attdef (ATT) | \`2d definice-atributu CISLO "Číslo dílu" "001" 2,2 3.5 0\` (značka, výzva, výchozí hodnota, bod, výška, úhel) · režimy před značkou: \`neviditelný\` \`konstantní\` \`ověřit\` \`předvolba\` · \`… zarovnání mc …\` |
+| upravit-atributy · attedit (ATE) | \`2d upravit-atributy e7 CISLO=V-002 "NAZEV=Hřídel 2"\` · bez dvojic = výpis (\`data.attributes\`) · také \`2d nastavit e7 att.CISLO=V-003\` |
+| extrahovat-atributy · attext | \`2d extrahovat-atributy [blok ŠTÍTEK] [výběr] [oddělovač ,] [název kusovník]\` → CSV (id, blok, hladina, X, Y, natočení, měřítka, prostor, hodnoty) v \`data.file.text\`, řádky v \`data.rows\` |
+| uložit-blok · wblock (W) | \`2d uložit-blok ŠROUB [dxf / dwg / mncad / záložka] [verze R2013] [název X]\` · \`uložit-blok výběr dxf\` · \`uložit-blok * mncad\` (celý výkres) – bod vložení = 0,0; soubor v \`data.file\` |
+| vyčistit · purge (PU) | \`2d vyčistit\` (nepoužité bloky i vnořené, hladiny, typy čar, textové a kótovací styly) · \`vyčistit bloky\` · \`vyčistit hladiny STARÁ\` · co se smazalo: \`data.purged\` |
+| rozvržení · layout (LO) | \`2d rozvržení nové Výroba A3 [na-výšku] [měřítko 1:5] [bez-razítka] [bez-rámečku] [bez-výřezu] NAZEV=Hřídel CISLO_VYKRESU=V-1\` (list s rámečkem ISO 5457, razítkem ISO 7200 a výřezem; papír v mm, počátek v levém dolním rohu listu – s okraji tisku v rohu tisknutelné plochy) · \`rozvržení nastavit Výroba\` · \`rozvržení model\` · \`kopírovat\` · \`přejmenovat A B\` · \`smazat A\` · \`rozvržení\` = seznam s výřezy a měřítky v \`data.layouts\` |
+| vzhled-stránky · pagesetup | \`2d vzhled-stránky A2 na-šířku\` (rámeček se vymění, razítko přesune) · \`styl mono / barva / šedá\` · \`tloušťky ne\` · \`okraje 5,5,5,5\` (netisknutelný okraj – obsah listu zůstane na místě, tisk ho ořízne) · \`dpi 300\` · \`psltscale 0\` (vzor čar ve výřezech v jednotkách modelu; výchozí 1 = v mm papíru, obrazovka i tisk stejně) |
+| výřez · mview (MV) | v rozvržení: \`2d výřez 25,60 405,282 1:5\` (rohy na papíře, měřítko; \`vejít\` = model přesně) · \`výřez vejít 1:10\` (kreslicí plocha listu) · \`výřez dva svisle vejít 1:2\` · \`tři\` / \`čtyři\` · \`mnohoúhelník p1 p2 p3 "" 1:5\` · \`objekt e3 1:5\` · \`výřez měřítko e7 1:20\` · \`výřez střed e7 120,40\` (střed pohledu = bod modelu, i \`@10,0\` od středu; v GUI klik do výřezu) · hladina výřezu řídí jen rám (vypnutá / zmrazená = výřez bez rámu, obsah zůstane) · \`zamknout\` / \`odemknout\` / \`zapnout\` / \`vypnout e7\` · také \`2d nastavit e7 scale=1:50 locked=1\` |
+| modelový-prostor · mspace (MS), papírový-prostor · pspace (PS) | \`2d modelový-prostor [e7]\` = další příkazy kreslí v modelu přes výřez (souřadnice modelu) · \`2d papírový-prostor\` zpět na list |
+| hladiny-výřezu · vplayer | \`2d hladiny-výřezu zmrazit KÓTY,OSY výřez e7\` (jen v tomto výřezu; \`*\` = vše, \`vše\` = všechny výřezy) · \`rozmrazit …\` · \`reset výřez e7\` · \`seznam\` |
+| tisk · plot (Ctrl+P), export-pdf | \`2d tisk\` (aktuální rozvržení 1:1 do PDF – vektorově, tloušťky v mm, přesné měřítko) · \`tisk rozvržení Výroba mono\` · \`tisk model okno 0,0 200,100 A4 měřítko 1:2\` · \`tisk png dpi 300\` · \`tisk svg\` · \`2d export-pdf [mono]\` = všechna rozvržení, jedno PDF · soubor v \`data.file\` (\`base64\` / \`text\`), stránky v \`data.plot\` (\`w\`, \`h\`, \`ratio\`) |
+| export · dxfout (DWG / DXF) | \`2d export dxf verze R12\` (jen DXF; elipsy / splajny jako POLYLINE s odchylkou ≤ 0,005 mm, MTEXT jako TEXT, šrafy rozložené, názvy velkými písmeny bez diakritiky – kolize se přejmenují s varováním) · \`export dxf verze R2000 binární\` · \`export dwg verze R2018 název "Deska"\` – verze R2000, R2004, R2007, R2010, R2013, R2018 (také AC1015…AC1032); soubor v \`results[].data.file\` = \`{ name, mime, bytes, version, text \| base64, warnings? }\` |
+| import · dxfin (DWG / DXF) | \`2d import "deska.dwg" <base64>\` = nová záložka; přehled v \`results[].data.import\` (\`format, version, entities, layers, blocks, layouts, converted, kept, skipped, warnings\`) · \`2d import "rám.dxf" <base64> sloučit\` (en \`merge\`, de \`einfügen\`) = obsah do otevřeného výkresu: nová id, chybějící hladiny / styly / bloky se doplní, jiné jednotky (INSUNITS) se převedou měřítkem, anonymní bloky (*D, *U…) se stejným názvem se přejmenují, vložené entity jsou vybrané (kromě zamčených / zmrazených / vypnutých hladin), \`data.merge\` |
+| soubory DWG / DXF (API) | \`await window.mncad.importFile({ name: "x.dwg", base64 })\` = 2D výkres v nové záložce (\`as\`: auto / tab / draft – draft jen pro DXF / DWG; \`{ as: "sketch" }\` = DXF i DWG do 3D skici) · \`window.mncad.draftImport({ name, base64 \| text })\` · čte DWG R2000–R2018, DXF R12–R2018 ASCII i binární |
 | nápověda · help | \`2d nápověda\` (všechny příkazy s popisem) · \`2d nápověda kružnice\` |
 
 **API:** \`await window.mncad.draft("čára 0,0 100,0; kružnice 50,0 20")\` (předpona \`2d\` se doplní) vrací
@@ -1081,6 +1139,72 @@ Příklad – deska 100 × 50 s osami a dírou:
 2d hladina aktuální OSY; čára 45,25 55,25; čára 50,20 50,30
 2d stav
 \`\`\`
+
+**Poznámky 2D (balík annot):** text MTEXT a tolerance pište **v uvozovkách** (kódy obsahují \`;\`, který jinak dělí
+příkazy). Kóty jsou asociativní na definiční body – \`2d nastavit e5 p2 120,0\` nebo úchop přepočítá hodnotu; hodnotu
+formátuje kótovací styl (ISO-25: DIMDEC 2, desetinná čárka, bez koncových nul → \`100\`; \`dimdec 3 dimzin 0\` → \`100,000\`).
+Výsledek kóty: \`results[].data.measurement\` (mm / °) a \`data.dimensions[{ id, kind, measured, text }]\`; šrafa
+\`data.area\`; tolerance \`data.tolerance.plain\`. Vlastnosti panelu jsou i textem: \`2d nastavit e5 text "<> H7" dimdec 3\`
+(přepsání u kóty), \`2d nastavit e7 pattern ANSI37 scale 2\` (šrafa). Měřítko poznámek: anotativní kóty / texty mají
+velikost na papíře × \`kótovací-styl měřítko-poznámek 1:50\` (uloží CANNOSCALE = papír : skutečnost = 0,02 jako AutoCAD;
+kóta se stylem DIMANNO je anotativní, výřez rozvržení ji kreslí ve svém měřítku). Kótovací styl se při první kótě
+uloží se všemi proměnnými (ISO-25: DIMTXT 2,5, DIMASZ 2,5, DIMDSEP „,“) – export DWG / DXF je nepřepíše palcovými.
+
+Příklad – okótovaná příruba se šrafou, odkazem, tolerancí a drsností:
+\`\`\`
+2d nový Příruba
+2d obdélník 0,0 @120,80; kružnice 60,40 15; kružnice 20,20 4; kružnice 100,20 4
+2d hladina nová KÓTY barva 3; hladina aktuální KÓTY
+2d kótovací-styl nový Výrobní z ISO-25 dimtxt 3.5 dimdec 1
+2d kóta-lineární 0,0 120,0 60,-15; kóta-lineární 0,0 0,80 -15,40; kóta-průměr e2 85,60
+2d kóta-lineární 0,0 20,0 10,-30; kóta-řetězová 100,0 120,0
+2d šrafa vzor ANSI31 60,5
+2d odkaz 100,20 125,95 "2× díra ø8"; tolerance poloha ø0.1 A 130,40; drsnost 60,80 0 "Ra 3,2"
+2d stav
+\`\`\`
+
+**Úpravy 2D (balík edit):** výběr objektů je na začátku příkazu (\`e3 e5\`, \`vše\`, \`poslední\`, \`předchozí\`,
+\`okno x,y x,y\`, \`křížení x,y x,y\`, \`hladina X\`, \`typ line\`); bez výběru se použije aktuální výběr (\`2d vyber …\`).
+Výběr končí prvním slovem, které výběrem není – následuje-li výzva na jeden objekt (dráha pole), oddělte ho \`""\`
+(Enter) nebo zadejte objekt s bodem \`e5@x,y\`. U ořezu, prodloužení, zaoblení a přerušení rozhoduje **bod výběru**
+\`e3@x,y\` (který díl se odebere, který konec se prodlouží, která strana zůstane). Každý příkaz = jeden krok historie,
+entity na zamčených hladinách se přeskočí (⚠ v protokolu). Vytvořené / změněné / smazané id jsou v \`results[].created /
+changed / deleted\`; měření v \`data\` (\`displacement\`, \`angle\`, \`factor\`, \`length\`, \`items\`, \`points\`, \`removed\`).
+
+Příklad – úpravy (deska se zaoblenými rohy, otvory polárním polem, ekvidistanta):
+\`\`\`
+2d nový Příruba
+2d obdélník 0,0 @120,80; kružnice 60,65 4
+2d zaoblit poloměr 10 křivka e1
+2d pole e2 polární 60,40 6 360 ano
+2d ekvidistanta 3 e1 60,40
+2d stav
+\`\`\`
+
+Příklad – výkres pro dodavatele jako DWG a pro CAM jako DXF R12, zpět a vložení do jiného výkresu:
+\`\`\`
+2d nový Příruba mm
+2d hladina nová OBRYS barva 7 tloušťka 0.5; hladina aktuální OBRYS
+2d kružnice 0,0 průměr 120; kružnice 0,0 průměr 60; kružnice 45,0 průměr 11
+2d export dwg verze R2013 název "Priruba"
+2d export dxf verze R12 název "Priruba-CAM"
+\`\`\`
+V JavaScriptu: \`const f = (await window.mncad.draft('export dwg verze R2013 název "Priruba"')).results[0].data.file\`
+(\`f.name\` = "Priruba.dwg", \`f.base64\`); otevření zpět \`await window.mncad.importFile({ name: f.name, base64: f.base64 }, { as: "draft" })\`;
+vložení do jiného otevřeného výkresu \`await window.mncad.draft('import "' + f.name + '" ' + f.base64 + ' sloučit')\` (3 kružnice, nová id).
+
+Příklad – blok, rozvržení A3 s razítkem, výřez 1:1 a tisk PDF (rozměr na papíře = rozměr modelu × měřítko):
+\`\`\`
+2d nový Příruba
+2d hladina nová OBRYS tloušťka 0.5; hladina aktuální OBRYS
+2d kružnice 0,0 průměr 120; kružnice 0,0 průměr 60
+2d kružnice 45,0 průměr 11; blok DÍRA 45,0 okno 35,-10 55,10; vložit DÍRA -45,0; vložit DÍRA 0,45 1 1 90
+2d rozvržení nové Výroba A3 NAZEV=Příruba CISLO_VYKRESU=P-001 MATERIAL=S235
+2d výřez měřítko vše 1:1
+2d tisk mono název Priruba
+\`\`\`
+Výsledek: \`results[].data.layout\` (id, formát A3 420 × 297), výřez v měřítku 1:1 (atribut MERITKO razítka se
+přepíše), PDF v \`data.file.base64\` – kružnice Ø120 má na papíře průměr přesně 120 mm, čáry hladiny OBRYS 0,5 mm.
 
 ## JSON (formát .mncad) – přístup ke všemu
 
@@ -1192,10 +1316,11 @@ Vše z tohoto oddílu funguje bez dialogů a bez klikání; textové příkazy p
 
 **Soubory.** \`await window.mncad.importFile({ name: "dil.step", base64 })\` (nebo \`{ name, text }\` u DXF / .mncad, nebo
 objekt \`File\`) otevře soubor **stejnou cestou jako Otevřít / přetažení** – STEP (i sestavy), IGES, BREP, STL, OBJ, 3MF,
-glTF/GLB, PLY, OFF, DXF, .mncad. Volba \`{ as: "auto" | "tab" | "component" | "sketch" }\`: auto = jako Otevřít (v otevřené
+glTF/GLB, PLY, OFF, DXF, DWG, .mncad. Volba \`{ as: "auto" | "tab" | "component" | "sketch" | "draft" }\`: auto = jako Otevřít (v otevřené
 sestavě se díl vloží jako komponenta), tab = samostatný dokument v záložce (prázdnou záložku použije, jinak otevře novou),
 component = do otevřené sestavy (Sestava ▸ Vložit díl),
-sketch = DXF do otevřené skici, jinak jako nová skica v otevřeném dílu (Skica ▸ Import DXF). Slib se splní až po
+sketch = DXF do otevřené skici, jinak jako nová skica v otevřeném dílu (Skica ▸ Import DXF; DWG se převede na DXF),
+draft = 2D výkres v nové záložce – **DXF a DWG se s auto / tab / draft otevřou jako 2D výkres** (jako Otevřít). Slib se splní až po
 dokončení importu a výpočtu a vrátí protokol + stav dokumentu; chyba (nepodporovaný formát, prázdný soubor) = výjimka
 s důvodem. Export skici do DXF: \`await window.mncad.exportFile("dxf", { sketch: "Skica 1" })\` (výchozí otevřená, jinak
 poslední skica).

@@ -26,6 +26,8 @@ export interface DMText extends DraftBase {
   lineSpacing?: number;
   /** maska pozadí (90, 63 / 421, 45) */
   bg?: { color?: DraftColor; scale?: number; useBackground?: boolean };
+  /** poznámka s měřítkem poznámek (anotativní): `h` = výška na papíře, ve výkrese × měřítko poznámek (balík 2, nepovinné) */
+  annotative?: boolean;
 }
 
 export type DimKind = "linear" | "aligned" | "angular" | "angular3" | "radius" | "diameter" | "ordinate" | "arc";
@@ -68,6 +70,13 @@ export interface DDimension extends DraftBase {
   overrides?: Partial<DraftDimStyle>;
   /** naměřená hodnota (42) – mezipaměť pro DXF, vždy se dá přepočítat */
   measurement?: number;
+  /** směr osy X souřadnicové kóty [°] (51 – „horizontal direction“): kóta měří v soustavě natočené o tento úhel;
+   * chybí = 0 (vodorovná osa X). Vzniká otočením kóty o jiný úhel než násobek 90° (balík 2, nepovinné) */
+  hdir?: number;
+  /** zalomená kóta poloměru (DIMJOGGED, LARGE_RADIAL_DIMENSION): náhradní střed a bod zalomení (balík 2, nepovinné) */
+  jog?: { center: Vec2; jog: Vec2 };
+  /** anotativní kóta (velikosti stylu × měřítko poznámek místo DIMSCALE) – balík 2, nepovinné */
+  annotative?: boolean;
 }
 
 /** Odkaz (LEADER / MULTILEADER): šipka v pts[0], text MTEXT na konci */
@@ -89,6 +98,8 @@ export interface DLeader extends DraftBase {
   style?: string;
   /** délka zalomení u textu */
   dogleg?: number;
+  /** anotativní odkaz (balík 2, nepovinné) */
+  annotative?: boolean;
 }
 
 /** Šrafa (HATCH): smyčky hranice jako křivky s vydutím (oblouky přesně, elipsy / splajny vzorkované – originál v ext) */
@@ -113,6 +124,8 @@ export interface DHatch extends DraftBase {
   double?: boolean;
   /** přechod (450–470) */
   gradient?: { name: string; color1: DraftColor; color2?: DraftColor; angle?: number; shift?: number };
+  /** anotativní šrafa (měřítko vzoru × měřítko poznámek) – balík 2, nepovinné */
+  annotative?: boolean;
 }
 
 /** Geometrická tolerance (TOLERANCE): `s` = řetězec DXF (%%v oddělovače, {\Fgdt;j} symboly) */
@@ -123,15 +136,47 @@ export interface DTolerance extends DraftBase {
   h: number;
   rot?: number;
   style?: string;
+  /** anotativní tolerance (balík 2, nepovinné) */
+  annotative?: boolean;
+}
+
+/**
+ * Značka struktury povrchu (drsnosti) podle ČSN EN ISO 1302 / 21920-1 – druh balíku 2 navíc oproti smlouvě DXF:
+ * DWG / DXF ho zapíše rozložený (`explode` → úsečky a text). `p` = hrot značky na povrchu, `rot` [°] = směr povrchu
+ * (značka stojí kolmo nahoru vlevo od směru), `kind`: basic = libovolná výroba, removal = s úběrem, noremoval = bez úběru.
+ */
+export interface DSurfSym extends DraftBase {
+  type: "surfsym";
+  p: Vec2;
+  rot?: number;
+  /** výška písma (velikost značky = 1,4 × h … 3 × h podle ISO 81714) */
+  h: number;
+  kind?: "basic" | "removal" | "noremoval";
+  /** požadavek drsnosti (např. „Ra 1,6“) */
+  text?: string;
+  /** výrobní postup na vodorovném rameni (např. „broušeno“) */
+  process?: string;
+  /** směr stop (=, ⊥, X, M, C, R, P) */
+  lay?: string;
+  /** kolem dokola (kroužek ve vrcholu) */
+  allAround?: boolean;
+  /** textový styl */
+  style?: string;
+  annotative?: boolean;
 }
 
 declare module "../model" {
+  /** textový styl – balík 2 navíc: anotativní styl (nové texty stylu dostanou výšku na papíře) */
+  interface DraftTextStyle {
+    annotative?: boolean;
+  }
   interface DraftEntityMap {
     mtext: DMText;
     dimension: DDimension;
     leader: DLeader;
     hatch: DHatch;
     tolerance: DTolerance;
+    surfsym: DSurfSym;
   }
   /** kótovací styl (DIMSTYLE): názvy polí = systémové proměnné AutoCADu malými písmeny */
   interface DraftDimStyle {
@@ -175,6 +220,18 @@ declare module "../model" {
     dimtfac?: number;
     dimcen?: number;
     dimrnd?: number;
+    /** balík 2 – nepovinné navíc: desetinná místa a potlačení nul tolerancí (DIMTDEC, DIMTZIN), symbol délky oblouku
+     * (DIMARCSYM 0 před, 1 nad, 2 bez), pevná délka vynášecích čar (DIMFXL, DIMFXLON), úhel zalomení (DIMJOGANG),
+     * anotativní styl */
+    dimtdec?: number;
+    dimtzin?: number;
+    dimarcsym?: number;
+    dimfxl?: number;
+    dimfxlon?: boolean;
+    dimjogang?: number;
+    dimanno?: boolean;
+    /** jednotky délek (DIMLUNIT): 1 vědecké, 2 desetinné, 3 inženýrské, 4 architektonické, 5 zlomky */
+    dimlunit?: number;
   }
   interface DraftVars {
     /** DIMSTYLE – aktuální kótovací styl */
@@ -185,5 +242,10 @@ declare module "../model" {
     hpname?: string;
     hpscale?: number;
     hpang?: number;
+    /** balík 2 – nepovinné navíc: CANNOSCALE jako číslo – CANNOSCALEVALUE AutoCADu, papír : skutečnost (1:50 → 0,02,
+     * 2:1 → 2; stejný význam jako v balíku 3), HPSTYLE (styl ostrovů nové šrafy), HPASSOC (asociativní šrafa) */
+    cannoscale?: number;
+    hpisland?: 0 | 1 | 2;
+    hpassoc?: boolean;
   }
 }

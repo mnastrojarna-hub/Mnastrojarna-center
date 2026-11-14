@@ -99,11 +99,15 @@ declare module "../model" {
     /** list papíru: formát, rozměry [mm nebo in], orientace, okraje tisku [vlevo, dole, vpravo, nahoře] */
     paper: { size: string; w: number; h: number; units: "mm" | "in"; landscape: boolean; margins: [number, number, number, number] };
     /** nastavení tisku */
-    plot?: { styleTable?: string; scale?: number | "fit"; area?: "layout" | "extents" | "window"; window?: [Vec2, Vec2]; lineweights?: boolean; plotStyles?: boolean };
+    plot?: { styleTable?: string; scale?: number | "fit"; area?: "layout" | "extents" | "window"; window?: [Vec2, Vec2]; lineweights?: boolean; plotStyles?: boolean; dpi?: number };
   }
   interface DraftVars {
     /** naposledy použitý blok (INSNAME) */
     insname?: string;
+    /** PSLTSCALE – vzory čar ve výřezech v jednotkách papíru (1, výchozí) / modelu (0) – uplatní se při tisku */
+    psltscale?: 0 | 1;
+    /** CANNOSCALE – aktuální měřítko poznámek (papír : skutečnost, např. 0,02 = 1:50); nastaví MVIEW / MSPACE */
+    cannoscale?: number;
   }
 }
 

@@ -1,0 +1,399 @@
+# Vlna 9 / fáze B – 2D CAD, balík 2 (annot): MTEXT, textové styly, kóty a kótovací styly, odkazy, šrafy, tolerance, značky
+{0} nesmí být záporné	{0} must not be negative
+{0}: očekávám celé číslo	{0}: integer expected
+{0}: rozsah {1}–{2}	{0}: range {1}–{2}
+{0}: zadejte ano / ne (1 / 0)	{0}: enter yes / no (1 / 0)
+<> = naměřená hodnota kóty	<> = measured dimension value
+⚠ neuzavřené objekty vynechány: {0}	⚠ open objects skipped: {0}
+✓ aktuální kótovací styl: {0}	✓ current dimension style: {0}
+✓ aktuální textový styl: {0}	✓ current text style: {0}
+✓ Kóta {0} ({1}): {2}	✓ Dimension {0} ({1}): {2}
+✓ kótovací styl {0} přejmenován na {1}	✓ dimension style {0} renamed to {1}
+✓ kótovací styl {0} smazán	✓ dimension style {0} deleted
+✓ kótovací styl {0} upraven: {1}	✓ dimension style {0} modified: {1}
+✓ kótovací styl {0} vytvořen a nastaven jako aktuální	✓ dimension style {0} created and set current
+✓ měřítko poznámek: {0}	✓ annotation scale: {0}
+✓ načtené vzory: {0}	✓ patterns loaded: {0}
+✓ přepsání zrušeno: {0}	✓ overrides cleared: {0}
+✓ přepsáno u kót {0}: {1}	✓ overridden on dimensions {0}: {1}
+✓ styl {0} použit na kóty: {1}	✓ style {0} applied to dimensions: {1}
+✓ šrafa {0} upravena: {1}, měřítko {2}, úhel {3}°	✓ hatch {0} modified: {1}, scale {2}, angle {3}°
+✓ Šrafa {0}: {1}, {2} smyček, plocha {3}	✓ Hatch {0}: {1}, {2} loops, area {3}
+✓ textový styl {0} přejmenován na {1}	✓ text style {0} renamed to {1}
+✓ textový styl {0} smazán	✓ text style {0} deleted
+✓ textový styl {0} upraven	✓ text style {0} modified
+✓ textový styl {0} vytvořen a nastaven jako aktuální	✓ text style {0} created and set current
+✗ vyberte kružnici nebo oblouk	✗ select a circle or an arc
+1. šipka (DIMBLK1)	1st arrowhead (DIMBLK1)
+1. vynášecí čára	1st extension line
+2. šipka (DIMBLK2)	2nd arrowhead (DIMBLK2)
+2. vynášecí čára	2nd extension line
+aktuální kótovací styl nelze smazat – nejdřív nastavte jiný	the current dimension style cannot be deleted – set another one first
+aktuální textový styl nelze smazat – nejdřív nastavte jiný	the current text style cannot be deleted – set another one first
+anotativní	annotative
+Anotativní	Annotative
+Anotativní (měřítko poznámek)	Annotative (annotation scale)
+Asociativní hranice	Associative boundary
+Asociativní šrafa?	Associative hatch?
+Barva ACI {0}	ACI color {0}
+Barva kótovacích čar (DIMCLRD)	Dimension line color (DIMCLRD)
+Barva přechodu 1	Gradient color 1
+Barva přechodu 2	Gradient color 2
+barva přechodu: číslo ACI nebo #rrggbb	gradient color: ACI number or #rrggbb
+Barva textu (DIMCLRT)	Text color (DIMCLRT)
+Barva vynášecích čar (DIMCLRE)	Extension line color (DIMCLRE)
+bez šipky	no arrowhead
+Bez úběru materiálu	Material removal prohibited
+bez zalamování	no wrapping
+Bod na kružnici	Point on circle
+bod neleží v uzavřené oblasti – hranice šrafy nenalezena (uzavřete obrys nebo vyberte objekty)	the point is not inside a closed area – no hatch boundary found (close the contour or select objects)
+Bod prvku	Feature point
+Celkové měřítko (DIMSCALE)	Overall scale (DIMSCALE)
+Ctrl+Enter = OK, Esc = zrušit	Ctrl+Enter = OK, Esc = cancel
+Čitelně	Readable
+Další proměnné textem: 2d kótovací-styl upravit {0} dimclrd 1 …	More variables as text: 2d dimstyle modify {0} dimclrd 1 …
+Délka vynášecích čar (DIMFXL)	Extension line length (DIMFXL)
+Délka zalomení	Landing length
+Desetinná místa	Decimal places
+Desetinná místa (DIMDEC)	Decimal places (DIMDEC)
+Desetinná místa tolerancí (DIMTDEC)	Tolerance decimal places (DIMTDEC)
+Desetinná místa úhlů (DIMADEC)	Angle decimal places (DIMADEC)
+Desetinný oddělovač (DIMDSEP)	Decimal separator (DIMDSEP)
+DIMDSEP: jeden znak (čárka nebo tečka)	DIMDSEP: a single character (comma or period)
+Dolní úchylka (DIMTM, kladně = minus)	Lower deviation (DIMTM, positive = minus)
+drsnost 50,0 0 "Ra 1,6" | drsnost druh s-úběrem postup "broušeno" 50,0 90 "Ra 0,8"	surfsym 50,0 0 "Ra 1.6" | surfsym type removal process "ground" 50,0 90 "Ra 0.8"
+Drsnost povrchu	Surface roughness
+Druh (basic, removal, noremoval)	Type (basic, removal, noremoval)
+Druh kóty	Dimension type
+druh značky: základní, s-úběrem, bez-úběru (basic, removal, noremoval)	symbol type: basic, removal, noremoval
+druhý objekt musí být úsečka (úsek křivky)	the second object must be a line (polyline segment)
+dvě úsečky, oblouk nebo 3 body	two lines, an arc or 3 points
+Dvojitá (křížem)	Double (crosshatch)
+Enter = nový řádek (\P)	Enter = new line (\P)
+Geometrická tolerance	Geometric tolerance
+Házení celkové	Total runout
+Házení obvodové	Circular runout
+Horní úchylka (DIMTP)	Upper deviation (DIMTP)
+hranice: {0} smyček, plocha {1}	boundary: {0} loops, area {1}
+hranici lze obnovit jen z uzavřených asociativních objektů ({0})	the boundary can only be recreated from closed associative objects ({0})
+chybí hodnota proměnné {0}	missing value of variable {0}
+chybí nový obsah textu	new text contents missing
+chytrá kóta podle objektu: úsečka → délka (vodorovně / svisle / zarovnaná), kružnice → průměr, oblouk → poloměr; volby Body, Úhlová, Základnicová, Řetězová, Souřadnicová, Zarovnaná, Poloměr, Průměr, Oblouková, Zalomená	smart dimension by object: line → length (horizontal / vertical / aligned), circle → diameter, arc → radius; options Points, Angular, Baseline, Continue, Ordinate, Aligned, Radius, Diameter, Arclength, Jogged
+ISO-25, text, šipky, tolerance, měřítko	ISO-25, text, arrows, tolerances, scale
+Jednotky úhlů (DIMAUNIT: 0 stupně, 1 st/min/s)	Angle units (DIMAUNIT: 0 degrees, 1 deg/min/sec)
+klikněte dovnitř uzavřené oblasti	click inside a closed area
+Kolem dokola	All around
+Konec odkazu	Leader endpoint
+kót	dimensions
+kóta délky oblouku (symbol ⌒): oblouk nebo obloukový úsek křivky, poloha; volba Část = jen část oblouku mezi dvěma body	arc length dimension (⌒ symbol): arc or arc segment of a polyline, location; option Partial = only part of the arc between two points
+kóta e3 50,-15 | kóta e5 60,40 (kružnice → Ø) | kóta body 0,0 100,0 50,-15 | kóta úhlová e1 e2 40,15	dim e3 50,-15 | dim e5 60,40 (circle → Ø) | dim points 0,0 100,0 50,-15 | dim angular e1 e2 40,15
+kóta poloměru R: oblouk / kružnice, poloha (text uvnitř nebo vně); Zalomená = náhradní střed a zalomení (velké poloměry, DIMJOGGED)	radius dimension R: arc / circle, location (text inside or outside); Jogged = override center and jog (large radii, DIMJOGGED)
+kóta průměru Ø: kružnice / oblouk, poloha kótovací čáry (text uvnitř nebo vně)	diameter dimension Ø: circle / arc, dimension line location (text inside or outside)
+kóta-lineární 0,0 100,0 50,-15 | kóta-lineární 0,0 30,40 svisle -15,20 | kóta-lineární "" e3 50,-15 (objekt) | kóta-lineární 0,0 100,0 text "<> H7" 50,-15	dimlinear 0,0 100,0 50,-15 | dimlinear 0,0 30,40 vertical -15,20 | dimlinear "" e3 50,-15 (object) | dimlinear 0,0 100,0 text "<> H7" 50,-15
+kóta-oblouku e4 0,60 | kóta-oblouku e4 část 50,0 0,50 0,70	dimarc e4 0,60 | dimarc e4 partial 50,0 0,50 0,70
+kóta-poloměr e3 40,30 | kóta-poloměr zalomená e3 0,-80 30,20 10,-20 (náhradní střed, poloha, zalomení)	dimradius e3 40,30 | dimradius jogged e3 0,-80 30,20 10,-20 (override center, location, jog)
+kóta-průměr e3 60,40	dimdiameter e3 60,40
+kóta-řetězová 150,0 200,0 (po kóta-lineární 0,0 100,0 50,-15)	dimcontinue 150,0 200,0 (after dimlinear 0,0 100,0 50,-15)
+kóta-souřadnicová 50,20 50,60 (X = 50) | kóta-souřadnicová 50,20 ybáze 90,20 | kóta-souřadnicová počátek 10,10 50,20 50,60	dimordinate 50,20 50,60 (X = 50) | dimordinate 50,20 ydatum 90,20 | dimordinate origin 10,10 50,20 50,60
+kóta-úhlová e1 e2 40,15 (dvě úsečky) | kóta-úhlová e5 30,30 (oblouk) | kóta-úhlová "" 0,0 50,0 0,50 30,30 (vrchol, body, oblouk)	dimangular e1 e2 40,15 (two lines) | dimangular e5 30,30 (arc) | dimangular "" 0,0 50,0 0,50 30,30 (vertex, points, arc)
+kóta-základnicová 150,0 200,0 (po kóta-lineární 0,0 100,0 50,-15)	dimbaseline 150,0 200,0 (after dimlinear 0,0 100,0 50,-15)
+kóta-zarovnaná 0,0 30,40 10,50	dimaligned 0,0 30,40 10,50
+Kótovací čára	Dimension line
+Kótovací čára i při šipkách vně (DIMTOFL)	Dimension line also with arrows outside (DIMTOFL)
+Kótovací styl	Dimension style
+kótovací styl „{0}“ už existuje	dimension style “{0}” already exists
+kótovací styl „{0}“ ve výkresu není – styly: {1}	dimension style “{0}” is not in the drawing – styles: {1}
+Kótovací styly	Dimension styles
+kótovací styly (ISO-25 výchozí): výpis, nový [z ZDROJ] / upravit s proměnnými (dimtxt, dimasz, dimscale, dimdec, dimdsep, dimzin, dimlfac, dimpost, dimtol, dimtp, dimtm, dimlim…), aktuální, přejmenovat, smazat, použít na kóty, přepsat u kóty, vypsat, měřítko-poznámek 1:50	dimension styles (ISO-25 default): list, new [from SOURCE] / modify with variables (dimtxt, dimasz, dimscale, dimdec, dimdsep, dimzin, dimlfac, dimpost, dimtol, dimtp, dimtm, dimlim…), current, rename, delete, apply to dimensions, override on a dimension, show, annoscale 1:50
+kótovací-styl nový Strojní z ISO-25 dimtxt 3.5 dimdec 1 | kótovací-styl aktuální Strojní | kótovací-styl upravit Strojní dimtol 1 dimtp 0.1 dimtm 0.05 | kótovací-styl přepsat e5 dimdec 3 | kótovací-styl měřítko-poznámek 1:50	dimstyle new Mech from ISO-25 dimtxt 3.5 dimdec 1 | dimstyle current Mech | dimstyle modify Mech dimtol 1 dimtp 0.1 dimtm 0.05 | dimstyle override e5 dimdec 3 | dimstyle annoscale 1:50
+Kóty: {0}	Dimensions: {0}
+kříž a osy kružnice	cross and circle center lines
+Kurzíva	Italic
+lineární	linear
+lineární kóta (vodorovná / svislá / natočená): dva body nebo objekt, poloha kótovací čáry; volby Mtext, Text (<> = hodnota), Úhel textu, Vodorovně, Svisle, Natočit	linear dimension (horizontal / vertical / rotated): two points or an object, dimension line location; options Mtext, Text (<> = value), text Angle, Horizontal, Vertical, Rotated
+Maska pozadí	Background mask
+Menší písmo (0,7×)	Smaller text (0.7×)
+Měřítko (u _USER rozteč)	Scale (spacing for _USER)
+Měřítko délek (DIMLFAC)	Linear scale factor (DIMLFAC)
+Měřítko poznámek (anotativní texty, kóty, odkazy)	Annotation scale (annotative texts, dimensions, leaders)
+Měřítko poznámek {0}	Annotation scale {0}
+měřítko poznámek: {0}	annotation scale: {0}
+měřítko poznámek: 1:50, 2:1 nebo číslo, ne „{0}“	annotation scale: 1:50, 2:1 or a number, not “{0}”
+Mezera textu (DIMGAP, záporná = rámeček)	Text gap (DIMGAP, negative = box)
+Mezní rozměry (DIMLIM)	Limits (DIMLIM)
+mtext x,y @80,-20 "1. řádek\P2. řádek" | mtext výška 5 zarovnání mc x,y šířka 0 "Text"	mtext x,y @80,-20 "line 1\Pline 2" | mtext height 5 justify mc x,y width 0 "Text"
+Nadtržení	Overline
+Naměřeno	Measured
+Natočení kótovací čáry	Dimension line rotation
+Natočení textu	Text rotation
+Natočení textu (prázdné = podle čáry)	Text rotation (empty = along the line)
+navazuje na poslední kótu	continues from the last dimension
+neplatný název stylu „{0}“	invalid style name “{0}”
+neznámá proměnná kótovacího stylu „{0}“ – např. {1}	unknown dimension style variable “{0}” – e.g. {1}
+neznámá vlastnost stylu „{0}“ – písmo, výška, šířka, sklon, anotativní	unknown style property “{0}” – font, height, width, oblique, annotative
+neznámá volba „{0}“ – nový, upravit, aktuální, přejmenovat, smazat nebo název stylu	unknown option “{0}” – new, modify, current, rename, delete or a style name
+neznámá volba „{0}“ – nový, upravit, aktuální, přejmenovat, smazat, použít, přepsat, vypsat, měřítko-poznámek	unknown option “{0}” – new, modify, current, rename, delete, apply, override, show, annoscale
+Nový	New
+nový název	new name
+Nový z vybraného	New from selected
+obdélník, mnohoúhelník nebo objekt	rectangle, polygon or object
+objekt nejde okótovat	the object cannot be dimensioned
+objekt nejde okótovat – vyberte úsečku, kružnici nebo oblouk	the object cannot be dimensioned – select a line, circle or arc
+objekt nejde okótovat lineárně – vyberte úsečku, oblouk nebo kružnici	the object cannot be dimensioned linearly – select a line, arc or circle
+objekt nejde převést na obláček	the object cannot be converted to a cloud
+obláček potřebuje aspoň 3 body	a cloud needs at least 3 points
+Oblouk kóty	Dimension arc
+Obsah (kódy MTEXT)	Contents (MTEXT codes)
+od 1. čáry poslední kóty	from the 1st line of the last dimension
+od počátku 0,0 – X / Y	from origin 0,0 – X / Y
+odkaz 10,10 30,25 "Sražení 1×45°" | odkaz šipka tečka 10,10 bod 20,30 40,30 "Text" | odkaz 10,10 30,25 "" (bez textu)	mleader 10,10 30,25 "Chamfer 1×45°" | mleader arrowhead dot 10,10 vertex 20,30 40,30 "Text" | mleader 10,10 30,25 "" (no text)
+odkaz se šipkou a textem: bod šipky, (Bod = další vrchol), bod zalomení, text; volby Šipka (Plná, Otevřená, Tečka, Šikmá, Prázdná, Bez), Velikost, Zalomení (délka), Spline, Výška textu	leader with arrowhead and text: arrowhead point, (Vertex = another vertex), landing point, text; options Arrowhead (Closedfilled, Open, Dot, Oblique, Closedblank, None), Size, Landing (length), Spline, text Height
+Odkazy	Leaders
+Odsazení vynášecí čáry (DIMEXO)	Extension line offset (DIMEXO)
+Odstavcový text	Multiline text
+odstavcový text v rámečku (MTEXT): dva rohy rámečku (šířka zalamování), obsah s kódy MTEXT (\P nový řádek, {\C1;…} barva, \S1/2; zlomek); volby Výška, Zarovnání (TL…BR), Řádkování, Natočení, Styl, Šířka	multiline text in a frame (MTEXT): two frame corners (wrap width), contents with MTEXT codes (\P new line, {\C1;…} color, \S1/2; fraction); options Height, Justify (TL…BR), Linespacing, Rotation, Style, Width
+Osa mezi dvěma úsečkami	Centerline between two lines
+osa se kreslí mezi dvěma úsečkami	a centerline is drawn between two lines
+Pevná délka vynášecích čar (DIMFXLON)	Fixed extension line length (DIMFXLON)
+písmo	font
+Písmo	Font
+plná uzavřená	closed filled
+Plná výplň (SOLID)	Solid fill (SOLID)
+Plus mínus	Plus/minus
+Počátek vzoru	Pattern origin
+podle objektu: úsečka, kružnice, oblouk	by object: line, circle, arc
+Podtržení	Underline
+Poloha textu (prázdné = u konce)	Text position (empty = at the end)
+Poloha textu (prázdné = výchozí)	Text position (empty = default)
+poslední kótovací styl nelze smazat	the last dimension style cannot be deleted
+Potlačení nul (DIMZIN: 4 úvodní, 8 koncové)	Zero suppression (DIMZIN: 4 leading, 8 trailing)
+Potlačení nul tolerancí (DIMTZIN)	Tolerance zero suppression (DIMTZIN)
+Potlačení nul úhlů (DIMAZIN)	Angle zero suppression (DIMAZIN)
+Potlačit 1. polovinu kótovací čáry (DIMSD1)	Suppress 1st dimension line half (DIMSD1)
+Potlačit 1. vynášecí čáru (DIMSE1)	Suppress 1st extension line (DIMSE1)
+Potlačit 2. polovinu kótovací čáry (DIMSD2)	Suppress 2nd dimension line half (DIMSD2)
+Potlačit 2. vynášecí čáru (DIMSE2)	Suppress 2nd extension line (DIMSE2)
+Požadavek	Requirement
+Požadavek (např. Ra 1,6)	Requirement (e.g. Ra 1.6)
+proměnná	variable
+Protilehlý bod	Opposite point
+Předpona / přípona (DIMPOST, <> = hodnota)	Prefix / suffix (DIMPOST, <> = value)
+přechod	gradient
+Přechod	Gradient
+Přechod (LINEAR, CYLINDER, INVCYLINDER, prázdné = ne)	Gradient (LINEAR, CYLINDER, INVCYLINDER, empty = none)
+Přepsané proměnné	Overridden variables
+Přesah vynášecí čáry (DIMEXE)	Extension beyond dimension line (DIMEXE)
+Přeškrtnutí	Strikethrough
+Připojení	Attachment
+Připojení (TL…BR)	Attachment (TL…BR)
+připojení: 1–9 nebo TL, TC, TR, ML, MC, MR, BL, BC, BR	attachment: 1–9 or TL, TC, TR, ML, MC, MR, BL, BC, BR
+rámeček geometrické tolerance (ISO 1101): charakteristika (poloha, kolmost, rovnoběžnost, rovinnost, kruhovitost, válcovitost, přímost, sklon, souměrnost, soustřednost, házení, celkové-házení, tvar-čáry, tvar-plochy), hodnota (ø0.05M), základny (A,B,C nebo -), bod; Řetězec = zápis DXF	geometric tolerance frame (ISO 1101): characteristic (position, perpendicularity, parallelism, flatness, circularity, cylindricity, straightness, angularity, symmetry, concentricity, runout, totalrunout, lineprofile, surfaceprofile), value (ø0.05M), datums (A,B,C or -), point; String = DXF notation
+rámeček ISO 1101	ISO 1101 frame
+Revizní obláček	Revision cloud
+revizní obláček (křivka z oblouků vypouklých ven): Obdélník (dva rohy, výchozí), Mnohoúhelník (body, Enter), Objekt (převede kružnici / uzavřenou křivku); Délka = délka oblouku; Obrátit = oblouky dovnitř	revision cloud (polyline of outward-bulging arcs): Rectangular (two corners, default), Polygonal (points, Enter), Object (converts a circle / closed polyline); Arclength = arc length; Reverse = arcs inward
+revizní-obláček 0,0 100,50 | revizní-obláček délka 8 mnohoúhelník 0,0 50,0 25,40 "" | revizní-obláček objekt e3 | revizní-obláček obrátit 0,0 100,50	revcloud 0,0 100,50 | revcloud arclength 8 polygonal 0,0 50,0 25,40 "" | revcloud object e3 | revcloud reverse 0,0 100,50
+Rozestup základnicových kót (DIMDLI)	Baseline spacing (DIMDLI)
+Řádkování	Line spacing
+Řádků	Lines
+Řetězec (DXF: %%v buňky, {\Fgdt;j} značky)	String (DXF: %%v cells, {\Fgdt;j} symbols)
+Řetězec DXF	DXF string
+Řetězová	Continue
+řetězové kóty navazující na 2. vynášecí čáru poslední (nebo vybrané) kóty na stejné kótovací čáře; Enter ukončí, Zpět, Vybrat	continued dimensions from the 2nd extension line of the last (or selected) dimension on the same dimension line; Enter ends, Undo, Select
+S úběrem materiálu	Material removal required
+sklon	oblique
+Sklon [°]	Oblique angle [°]
+Směr stop (=, ⊥, X, M, C, R, P)	Lay direction (=, ⊥, X, M, C, R, P)
+Smyčky	Loops
+soubor neobsahuje žádný vzor šrafy (*NÁZEV a řádky)	the file contains no hatch pattern (*NAME and lines)
+souřadnicová	ordinate
+Souřadnicová	Ordinate
+souřadnicová kóta od počátku (0,0 nebo volba Počátek): bod prvku, konec odkazu; osa X / Y podle směru odkazu nebo Xbáze / Ybáze	ordinate dimension from the origin (0,0 or option Origin): feature point, leader endpoint; X / Y axis by leader direction or Xdatum / Ydatum
+Soustřednost / souosost	Concentricity / coaxiality
+styl „{0}“ používá {1} kót – zadejte „přesunout-na STYL“	style “{0}” is used by {1} dimensions – specify “moveto STYLE”
+styl {0} používá {1} objektů – nejdřív je převeďte na jiný styl	style {0} is used by {1} objects – change them to another style first
+Styl ostrovů	Island style
+Styl ostrovů (normal, outer, ignore)	Island style (normal, outer, ignore)
+styl ostrovů: normální, vnější, ignorovat (0, 1, 2)	island style: normal, outer, ignore (0, 1, 2)
+styl Standard nelze přejmenovat	the Standard style cannot be renamed
+styl Standard nelze smazat	the Standard style cannot be deleted
+styl-textu nový ISO písmo isocp.shx výška 0 šířka 1 | styl-textu aktuální ISO | styl-textu upravit ISO sklon 15 | styl-textu smazat ISO	style new ISO font isocp.shx height 0 width 1 | style current ISO | style modify ISO oblique 15 | style delete ISO
+Styly	Styles
+Styly poznámek	Annotation styles
+Svislá poloha textu (DIMTAD: 0 na čáře, 1 nad, 4 pod)	Vertical text position (DIMTAD: 0 on the line, 1 above, 4 below)
+Symbol délky oblouku (DIMARCSYM: 0 před, 1 nad, 2 bez)	Arc length symbol (DIMARCSYM: 0 preceding, 1 above, 2 none)
+Šipka	Arrowhead
+Šipka ("" plná, _OPEN, _DOT, _NONE…)	Arrowhead ("" closed filled, _OPEN, _DOT, _NONE…)
+Šipka (DIMBLK: "" plná, _OPEN, _OBLIQUE, _ARCHTICK, _DOT, _NONE…)	Arrowhead (DIMBLK: "" closed filled, _OPEN, _OBLIQUE, _ARCHTICK, _DOT, _NONE…)
+šipka, zalomení, text	arrowhead, landing, text
+šířka	width
+Šířka rámečku	Frame width
+šířkový faktor musí být kladný	the width factor must be positive
+Šrafa	Hatch
+šrafa 50,25 | šrafa vzor ANSI37 měřítko 2 úhel 0 50,25 | šrafa plná objekty e1 e2 | šrafa uživatelský měřítko 3 úhel 45 dvojitá 50,25	hatch 50,25 | hatch pattern ANSI37 scale 2 angle 0 50,25 | hatch solid objects e1 e2 | hatch user scale 3 angle 45 double 50,25
+šrafa: vnitřní bod (najde uzavřenou oblast i z více entit, ostrovy uvnitř) nebo Objekty; volby Vzor (ANSI31, ANSI37, … SOLID, USER), Měřítko, Úhel, Plná, Uživatelský (rozteč), Dvojitá, Přechod, Ostrovy (normální, vnější, ignorovat), Asociativní, Počátek, Zpět; Enter dokončí	hatch: internal point (finds a closed area even from several entities, islands inside) or Objects; options Pattern (ANSI31, ANSI37, … SOLID, USER), Scale, Angle, Solid, User (spacing), Double, Gradient, Islands (normal, outer, ignore), Associative, Origin, Undo; Enter finishes
+Šrafy	Hatches
+Text (<> = naměřená hodnota)	Text (<> = measured value)
+Text (kódy MTEXT)	Text (MTEXT codes)
+Text kóty	Dimension text
+Text odkazu	Leader text
+Text uvnitř vodorovně (DIMTIH)	Text inside horizontal (DIMTIH)
+text v rámečku se zalamováním a formátováním	text in a frame with wrapping and formatting
+Text vně vodorovně (DIMTOH)	Text outside horizontal (DIMTOH)
+text, kóta, odkaz – i poklepáním	text, dimension, leader – also by double-click
+Text: {0}	Text: {0}
+Textové styly	Text styles
+textové styly: výpis, nový / upravit (písmo, výška – 0 = zadává se u textu, šířka, sklon, anotativní), aktuální, přejmenovat, smazat (nepoužitý)	text styles: list, new / modify (font, height – 0 = set per text, width, oblique, annotative), current, rename, delete (unused)
+Textové styly…	Text styles…
+textový styl „{0}“ už existuje	text style “{0}” already exists
+Textový styl (DIMTXSTY)	Text style (DIMTXSTY)
+Tloušťka kótovacích čar (DIMLWD)	Dimension line lineweight (DIMLWD)
+Tloušťka vynášecích čar (DIMLWE)	Extension line lineweight (DIMLWE)
+Tolerance (DIMTOL)	Tolerances (DIMTOL)
+tolerance poloha ø0.05M A,B,C 120,40 | tolerance rovinnost 0.01 - 10,10 | tolerance řetězec "{\Fgdt;j}%%v0.1%%vA" 10,10	tolerance position ø0.05M A,B,C 120,40 | tolerance flatness 0.01 - 10,10 | tolerance string "{\Fgdt;j}%%v0.1%%vA" 10,10
+Tolerance tvaru a polohy	Geometric tolerance
+Tučně	Bold
+Tvar čáry	Profile of a line
+Úhel zalomení (DIMJOGANG)	Jog angle (DIMJOGANG)
+úhlová	angular
+Úhlová	Angular
+úhlová (3 body)	angular (3 points)
+úhlová kóta: dvě úsečky (úhel podle polohy oblouku – kterýkoli ze 4 úhlů), oblouk, kružnice + bod, nebo Enter = vrchol a dva body (i přes 180°)	angular dimension: two lines (angle by arc location – any of the 4 angles), arc, circle + point, or Enter = vertex and two points (also over 180°)
+upraví obsah textu, odstavcového textu, kóty (<> = naměřená hodnota, prázdné = výchozí), odkazu, tolerance nebo značky; v GUI editor na místě	edits the contents of a text, multiline text, dimension (<> = measured value, empty = default), leader, tolerance or symbol; in-place editor in the GUI
+upraví šrafu: Vzor, Měřítko, Úhel, Plná, Uživatelský, Dvojitá, Přechod, Ostrovy, Počátek; Hranice = obnovit smyčky z asociativních objektů; Načíst = vzory ze souboru .pat (text v uvozovkách)	edits a hatch: Pattern, Scale, Angle, Solid, User, Double, Gradient, Islands, Origin; Boundary = recreate loops from associative objects; Load = patterns from a .pat file (text in quotes)
+Upravit šrafu	Edit hatch
+Upravit text	Edit text
+upravit-šrafu e7 vzor ANSI37 měřítko 2 úhel 30 | upravit-šrafu e7 ostrovy vnější | upravit-šrafu e7 hranice	hatchedit e7 pattern ANSI37 scale 2 angle 30 | hatchedit e7 islands outer | hatchedit e7 boundary
+upravit-text e5 "Nový text" | upravit-text e7 "<> H7" (kóta) | upravit-text e7 "<>" (kóta zpět na naměřenou hodnotu)	textedit e5 "New text" | textedit e7 "<> H7" (dimension) | textedit e7 "<>" (dimension back to the measured value)
+Uživatelská (rozteč, úhel)	User-defined (spacing, angle)
+ve výkresu není lineární, zarovnaná, souřadnicová ani úhlová (3 body) kóta	the drawing contains no linear, aligned, ordinate or angular (3 points) dimension
+Velikost šipky	Arrowhead size
+Velikost šipky (DIMASZ)	Arrowhead size (DIMASZ)
+Větší písmo (1,5×)	Larger text (1.5×)
+Vložte obsah souboru .pat	Paste the contents of a .pat file
+vodorovná / svislá / natočená	horizontal / vertical / rotated
+Vodorovná poloha textu (DIMJUST: 0 střed, 1 u 1. čáry, 2 u 2. čáry)	Horizontal text position (DIMJUST: 0 centered, 1 at 1st line, 2 at 2nd line)
+Výběrem objektů	By selecting objects
+Vyberte druhou úsečku	Select the second line
+vyberte kružnici nebo oblouk	select a circle or an arc
+Vyberte kružnici nebo oblouk	Select a circle or an arc
+Vyberte navazovanou kótu	Select the dimension to continue
+Vyberte objekt ke kótování	Select the object to dimension
+Vyberte objekt nebo zvolte druh kóty	Select an object or choose the dimension type
+Vyberte oblouk	Select an arc
+Vyberte oblouk nebo kružnici	Select an arc or a circle
+Vyberte oblouk, kružnici, úsečku nebo <zadat vrchol>	Select an arc, circle, line or <specify vertex>
+Vyberte první úsečku	Select the first line
+Vyberte šrafu	Select a hatch
+Vyberte text, kótu nebo odkaz	Select a text, dimension or leader
+vyberte úsečku, oblouk nebo kružnici	select a line, arc or circle
+Vyberte uzavřené objekty hranice	Select closed boundary objects
+Vyberte základní kótu	Select the base dimension
+Výrobní postup	Manufacturing method
+Výška (0 = zadává se u textu)	Height (0 = set per text)
+výška stylu: 0 (zadává se u textu) nebo kladné číslo	style height: 0 (set per text) or a positive number
+Výška textu (DIMTXT)	Text height (DIMTXT)
+Výška tolerancí × (DIMTFAC)	Tolerance height × (DIMTFAC)
+Vzor	Pattern
+vzor {0}: neplatný řádek „{1}“	pattern {0}: invalid line “{1}”
+vzor je pro tuto plochu příliš hustý – zvětšete měřítko	the pattern is too dense for this area – increase the scale
+vzor šrafy „{0}“ neznám – vzory: {1}	unknown hatch pattern “{0}” – patterns: {1}
+vzor, měřítko, úhel, ostrovy	pattern, scale, angle, islands
+Zadejte barvu 1 (ACI nebo #rrggbb)	Enter color 1 (ACI or #rrggbb)
+Zadejte barvu 2 (Enter = světlejší odstín barvy 1)	Enter color 2 (Enter = lighter shade of color 1)
+Zadejte bod na povrchu	Specify a point on the surface
+Zadejte bod prvku	Specify the feature point
+Zadejte další bod nebo <uzavřít>	Specify next point or <close>
+Zadejte další vnitřní bod nebo <dokončit>	Specify another internal point or <finish>
+Zadejte další vrchol odkazu	Specify the next leader vertex
+Zadejte délku oblouku	Enter the arc length
+Zadejte délku zalomení	Enter the landing length
+Zadejte druh přechodu	Choose the gradient type
+Zadejte druh šipky	Choose the arrowhead type
+Zadejte druh značky	Choose the symbol type
+Zadejte druhý bod na oblouku	Specify the second point on the arc
+Zadejte druhý koncový bod úhlu	Specify the second angle endpoint
+Zadejte faktor řádkování	Enter the line spacing factor
+Zadejte hodnotu tolerance (ø0.05, M = max. materiál)	Enter the tolerance value (ø0.05, M = max. material)
+Zadejte charakteristiku	Choose the characteristic
+Zadejte koncový bod druhého ramene	Specify the endpoint of the second leg
+Zadejte koncový bod prvního ramene	Specify the endpoint of the first leg
+Zadejte konec odkazu	Specify the leader endpoint
+zadejte kóty (e3 e5) nebo je nejdřív vyberte	specify dimensions (e3 e5) or select them first
+Zadejte měřítko vzoru	Enter the pattern scale
+Zadejte náhradní střed (počátek kótovací čáry)	Specify the override center (start of the dimension line)
+zadejte název nového stylu	enter the name of the new style
+Zadejte název vzoru ({0} … , SOLID, USER)	Enter the pattern name ({0} … , SOLID, USER)
+Zadejte nový obsah	Enter the new contents
+Zadejte počátek druhé vynášecí čáry	Specify second extension line origin
+Zadejte počátek první vynášecí čáry	Specify first extension line origin
+Zadejte počátek první vynášecí čáry nebo <vybrat objekt>	Specify first extension line origin or <select object>
+Zadejte počátek souřadnic kót	Specify the ordinate origin
+Zadejte počátek vzoru	Specify the pattern origin
+Zadejte polohu kótovací čáry	Specify dimension line location
+Zadejte polohu kóty délky oblouku	Specify arc length dimension location
+Zadejte polohu oblouku kóty	Specify dimension arc line location
+Zadejte polohu tolerance	Specify the tolerance location
+Zadejte polohu zalomení	Specify jog location
+Zadejte požadavek (např. Ra 1,6; Enter = bez)	Enter the requirement (e.g. Ra 1.6; Enter = none)
+zadejte proměnné a hodnoty, např. dimdec 3	enter variables and values, e.g. dimdec 3
+zadejte proměnné a hodnoty, např. dimtxt 3.5	enter variables and values, e.g. dimtxt 3.5
+Zadejte protější roh	Specify opposite corner
+Zadejte protilehlý roh	Specify the opposite corner
+Zadejte první bod na oblouku	Specify the first point on the arc
+Zadejte první bod obláčku	Specify the first cloud point
+Zadejte první roh obláčku	Specify the first cloud corner
+Zadejte první roh rámečku	Specify the first frame corner
+Zadejte připojení	Choose the attachment
+Zadejte rozteč čar	Enter the line spacing
+Zadejte řetězec tolerance (DXF)	Enter the tolerance string (DXF)
+Zadejte směr povrchu	Specify the surface direction
+Zadejte směr stop (=, ⊥, X, M, C, R, P)	Enter the lay direction (=, ⊥, X, M, C, R, P)
+Zadejte styl ostrovů	Choose the island style
+Zadejte šířku rámečku (0 = bez zalamování)	Enter the frame width (0 = no wrapping)
+Zadejte text (\P = nový řádek)	Enter text (\P = new line)
+Zadejte text kóty (<> = naměřená hodnota)	Enter dimension text (<> = measured value)
+Zadejte text odkazu (Enter = bez textu)	Enter leader text (Enter = no text)
+Zadejte úhel kótovací čáry	Specify the dimension line angle
+Zadejte úhel textu kóty	Specify the dimension text angle
+Zadejte úhel vzoru	Specify the pattern angle
+Zadejte umístění šipky odkazu	Specify leader arrowhead location
+Zadejte umístění zalomení odkazu	Specify leader landing location
+Zadejte velikost šipky	Enter the arrowhead size
+Zadejte velikost značky středu	Enter the center mark size
+Zadejte vnitřní bod	Pick an internal point
+Zadejte volbu	Choose an option
+Zadejte výrobní postup	Enter the manufacturing method
+Zadejte výšku písma	Enter the text height
+Zadejte základny (A,B,C nebo - bez základen)	Enter datums (A,B,C or - for none)
+zadejte změny: písmo, výška, šířka, sklon, anotativní	enter the changes: font, height, width, oblique, annotative
+základna „{0}“: písmeno A–Z, případně s modifikátorem (např. A, B(M))	datum “{0}”: a letter A–Z, optionally with a modifier (e.g. A, B(M))
+Základní značka	Basic symbol
+Základnicová	Baseline
+základnicové kóty od 1. vynášecí čáry poslední (nebo vybrané) kóty, rozestup DIMDLI; Enter ukončí, Zpět, Vybrat	baseline dimensions from the 1st extension line of the last (or selected) dimension, spacing DIMDLI; Enter ends, Undo, Select
+Zalomená (velký poloměr)	Jogged (large radius)
+Zaokrouhlení (DIMRND)	Rounding (DIMRND)
+zarovnaná	aligned
+Zarovnaná	Aligned
+zarovnaná kóta (rovnoběžná se spojnicí bodů): dva body nebo objekt, poloha kótovací čáry	aligned dimension (parallel to the line through the points): two points or an object, dimension line location
+Zlomek / stoh (vyberte a/b nebo +0,1^-0,2)	Fraction / stack (select a/b or +0.1^-0.2)
+Značka drsnosti	Surface texture symbol
+značka ISO 1302	ISO 1302 symbol
+značka struktury povrchu (ISO 1302 / 21920): bod na povrchu, směr povrchu, požadavek (Ra 1,6); volby Druh (základní, s-úběrem, bez-úběru), Postup (např. broušeno), Stopy (=, ⊥, X, M, C, R, P), Dokola, Výška	surface texture symbol (ISO 1302 / 21920): point on the surface, surface direction, requirement (Ra 1.6); options Type (basic, removal, noremoval), Process (e.g. ground), Lay (=, ⊥, X, M, C, R, P), Around, Height
+Značka středu	Center mark
+Značka středu (DIMCEN, záporná = i osy)	Center mark (DIMCEN, negative = with center lines)
+Značka středu a osy	Center mark and center lines
+značka středu kružnice / oblouku s osami (čárkovaná CENTER, přesah 3 mm); Velikost = velikost kříže; Osa = osa mezi dvěma úsečkami	center mark of a circle / arc with center lines (CENTER linetype, 3 mm overhang); Size = cross size; Centerline = centerline between two lines
+značka-středu e3 e4 | značka-středu velikost 5 e3 | značka-středu osa e1 e2	centermark e3 e4 | centermark size 5 e3 | centermark centerline e1 e2
+žádný z vybraných objektů není uzavřený	none of the selected objects is closed
+Jednotky délek (DIMLUNIT: 2 desetinné, 5 zlomky, 4 stopy-palce)	Linear units (DIMLUNIT: 2 decimal, 5 fractional, 4 feet-inches)
+Text – odstavce	Text – paragraphs
+# oprava po kontrole (review)
+Multiodkaz	Multileader
+Nejdřív vyberte text, který se má formátovat	Select the text to format first
+oblouky obláčku dovnitř	cloud arcs inward
+oblouky obláčku ven	cloud arcs outward
+Odkazová čára	Leader
+úsečky jsou rovnoběžné – úhel mezi nimi nelze okótovat	the lines are parallel – the angle between them cannot be dimensioned
+Velikost šipky (na papíře)	Arrow size (on paper)
+Výška textu (na papíře)	Text height (on paper)
+Díl poznámky	Annotation part

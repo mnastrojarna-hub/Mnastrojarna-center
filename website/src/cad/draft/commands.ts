@@ -18,8 +18,9 @@ import { DraftTx } from "./tx";
 import { evalNumber, fmtAng, fmtLen, fmtPt, normDeg } from "./units";
 
 /** klíčové slovo výzvy (popisky ve třech jazycích; `_id` = anglický zápis vždy) */
-export type Kw = { id: string; cs: string; en: string; de: string };
-export const kw = (id: string, cs: string, en: string, de: string): Kw => ({ id, cs, en, de });
+/** volba výzvy; `alias` = zkratky AutoCADu, které nejsou začátkem názvu (TRIM: T = cuTting edges, O = mOde, R = eRase) */
+export type Kw = { id: string; cs: string; en: string; de: string; alias?: string[] };
+export const kw = (id: string, cs: string, en: string, de: string, alias?: string[]): Kw => (alias?.length ? { id, cs, en, de, alias } : { id, cs, en, de });
 
 /** náhled během výzvy (gumová čára): entity k vykreslení pro polohu kurzoru */
 export type Preview = (p: Vec2) => NewEntity[];
@@ -153,6 +154,8 @@ export function matchKw(tok: string, list: Kw[] | undefined): Kw | null {
   const t = fold(tok);
   if (!t) return null;
   for (const k of list) if (t === `_${k.id.toLowerCase()}` || t === fold(k.cs) || t === fold(k.en) || t === fold(k.de) || t === k.id.toLowerCase()) return k;
+  // zkratka AutoCADu (přesná shoda, má přednost před začátkem názvu)
+  for (const k of list) if (k.alias?.some((a) => fold(a) === t)) return k;
   const lang = getLang();
   const pick = (names: (k: Kw) => string[]) => {
     const hits = list.filter((k) => names(k).some((n) => fold(n).startsWith(t)));
@@ -165,8 +168,16 @@ export function matchKw(tok: string, list: Kw[] | undefined): Kw | null {
 /** text výzvy s volbami: „Zadejte další bod nebo [Zpět/Uzavřít] <10>:“ */
 export function promptText(p: Prompt): string {
   const kws = "kw" in p && p.kw?.length ? ` [${p.kw.map(kwLabel).join("/")}]` : "";
-  const def = "def" in p && p.def !== undefined && p.def !== "" ? ` <${typeof p.def === "number" ? Math.round(p.def * 1e6) / 1e6 : p.def}>` : "";
-  return `${p.msg}${kws}${def}:`;
+  const d = promptDefault(p, 1e6);
+  return `${p.msg}${kws}${d ? ` <${d}>` : ""}:`;
+}
+
+/** výchozí hodnota výzvy k zobrazení (u klíčového slova jeho název v jazyce rozhraní, ne id); "" = žádná */
+export function promptDefault(p: Prompt, round = 1e4): string {
+  if (!("def" in p) || p.def === undefined || p.def === "") return "";
+  if (typeof p.def === "number") return String(Math.round(p.def * round) / round);
+  const kw = "kw" in p ? p.kw?.find((k) => k.id === p.def) : undefined;
+  return kw ? kwLabel(kw) : String(p.def);
 }
 
 export class InputError extends Error {}
@@ -303,6 +314,22 @@ export class CmdRun {
   }
 
   /** kontext zadání bodu – model a entity se čtou až při odkazu na entitu (skript s tisíci příkazy zůstane rychlý) */
+  /**
+   * Výzva výběru zadaná textem: spotřebuje tokeny výběru od indexu `i` (e3 e5, vše, okno x,y x,y, hladina X …),
+   * předá výběr příkazu a vrátí index dalšího tokenu (stejně v textu pro agenty i u zadání předem v GUI).
+   */
+  feedSelection(tokens: string[], i: number): number {
+    const p = this.prompt;
+    if (!p || p.k !== "select") return i;
+    const c = this.coordCtx();
+    const m = this.tx.model;
+    const list = spaceEntities(m, this.session.space) ?? m.entities;
+    const r = parseSelection(tokens, i, { model: m, list, idx: spatialIndex(list, { model: m }), session: this.session, parsePoint: (t) => parsePoint(t, c) });
+    const ids = p.filter ? r.ids.filter((id) => { const e = this.tx.get(id); return !!e && p.filter!(e); }) : r.ids;
+    this.feed({ k: "sel", ids });
+    return r.next;
+  }
+
   coordCtx(base?: Vec2 | null): CoordCtx {
     const tx = this.tx;
     const s = this.session;
@@ -428,9 +455,11 @@ export function runCommandLine(model: DraftModel, session: DraftSession, line: s
   const tokens = tokenize(line);
   const name = tokens[0] ?? "";
   const def = findCommand(name);
-  const fail = (msg: string, cmd = def?.id ?? name): { model: DraftModel; result: DraftCmdResult } => ({ model, result: { cmd, input: line, ok: false, log: [], error: msg, created: [], changed: [], deleted: [] } });
+  // protokol neúspěšného příkazu se vrací také (varování ⚠ před chybou – např. přeskočené entity zamčené hladiny)
+  let run: CmdRun | null = null;
+  const fail = (msg: string, cmd = def?.id ?? name): { model: DraftModel; result: DraftCmdResult } => ({ model, result: { cmd, input: line, ok: false, log: run ? [...run.logLines] : [], error: msg, created: [], changed: [], deleted: [] } });
   if (!def) return fail(tr("neznámý příkaz „{0}“ – seznam: 2d nápověda", name), name);
-  const run = new CmdRun(def, model, session, opts);
+  run = new CmdRun(def, model, session, opts);
   if (def.line) {
     run.start(tokens.slice(1));
   } else {
@@ -441,18 +470,11 @@ export function runCommandLine(model: DraftModel, session: DraftSession, line: s
       const p = run.prompt;
       if (!p) break;
       if (p.k === "select") {
-        const c = run.coordCtx();
-        const m = run.tx.model;
-        const list = spaceEntities(m, session.space) ?? m.entities;
-        let r: { ids: string[]; next: number };
         try {
-          r = parseSelection(tokens, i, { model: m, list, idx: spatialIndex(list, { model: m }), session, parsePoint: (t) => parsePoint(t, c) });
+          i = run.feedSelection(tokens, i);
         } catch (e) {
           return fail((e as Error).message);
         }
-        i = r.next;
-        const ids = p.filter ? r.ids.filter((id) => { const e = run.tx.get(id); return !!e && p.filter!(e); }) : r.ids;
-        run.feed({ k: "sel", ids });
         continue;
       }
       const has = i < tokens.length;

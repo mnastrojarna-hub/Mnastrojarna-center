@@ -1,0 +1,201 @@
+/** Micro-guides – package "draft-layout" (2D drawing, tabs Blocks, Layout and Output → Plot), English. */
+
+/** same shape as MicroTip in help/tips.ts (the integration replaces it with the import) */
+type MicroTip = { what: string; when: string; select?: string; steps: string[]; cmd?: string; note?: string };
+
+export default {
+  // ── Blocks tab ──
+  "draft/lo-block": {
+    what: "Turns the selected objects into a named block with an insertion point; replaces them with one block reference.",
+    when: "Repeated items: bolt, symbol, window, frame – one definition, many references.",
+    select: "The block objects (can also be selected after starting the command).",
+    steps: ["Click Create block and type the name.", "Click the insertion point (e.g. the bolt centre).", "Select the objects and press Enter (Convert)."],
+    cmd: "2d block BOLT 0,0 window -10,-10 10,10",
+    note: "The same name redefines the block – all its references change.",
+  },
+  "draft/lo-insert": {
+    what: "Inserts a block at a point with X / Y scale and rotation; fills in the attribute values.",
+    when: "Another copy of an existing block – a bolt in a hole, a symbol, a title block.",
+    steps: ["Pick the block in the menu (or type its name).", "Click the insertion point; Enter = scale 1 and angle 0.", "Fill in attribute values (Enter = default)."],
+    cmd: "2d insert BOLT 100,50 1 1 90",
+    note: "A negative X scale mirrors the reference.",
+  },
+  "menu:lo-insert/*": {
+    what: "Starts INSERT with the chosen block – just click the insertion point.",
+    when: "Quick insertion from the drawing's block list.",
+    steps: ["Pick the block.", "Click the insertion point and confirm scale and angle with Enter."],
+    cmd: "2d insert BOLT 100,50",
+  },
+  "draft/lo-blocks": {
+    what: "Blocks panel: block list with reference counts – insert, edit, save as DXF / DWG, remove unused.",
+    when: "Overview of the drawing's block library; editing attributes of the selected reference.",
+    steps: ["Open the Block manager.", "For a block choose Insert, Edit, DXF / DWG or Remove."],
+    cmd: "2d block ?",
+  },
+  "draft/lo-bedit": {
+    what: "Opens a block definition for editing: you draw and modify the block contents directly (origin = insertion point).",
+    when: "A change to a block that must show in all its references.",
+    select: "A block reference (or pick the block in the menu).",
+    steps: ["Pick the block in the menu.", "Edit the contents with the usual commands.", "Press Save (or Discard) in the status bar."],
+    cmd: "2d bedit BOLT",
+    note: "A name that does not exist creates a new empty block.",
+  },
+  "menu:lo-bedit/*": {
+    what: "Opens the chosen block in the block editor.",
+    when: "Editing a block definition from the list.",
+    steps: ["Pick the block.", "Edit it and press Save in the status bar."],
+    cmd: "2d bedit BOLT",
+  },
+  "draft/lo-bclose": {
+    what: "Ends block editing: Save (references are refreshed) or Discard the changes.",
+    when: "When you are done in the block editor.",
+    steps: ["Click Close block.", "Enter = Save, or choose Discard."],
+    cmd: "2d bclose",
+  },
+  "draft/lo-wblock": {
+    what: "Saves a block as a separate DXF drawing (or DWG, .mncad) with its insertion point at the origin 0,0.",
+    when: "A library of parts and symbols for other drawings or for a colleague with AutoCAD.",
+    select: "A block reference, or pick the block in the menu.",
+    steps: ["Pick the block in the menu.", "The file is saved; the log shows name and size."],
+    cmd: "2d wblock BOLT dxf",
+  },
+  "menu:lo-wblock/*": {
+    what: "Saves the chosen block, the selection, or the whole drawing as a separate file.",
+    when: "Handing part of the drawing to another program or into a library.",
+    steps: ["Pick the menu item.", "Confirm saving the file."],
+    cmd: "2d wblock selection dxf",
+  },
+  "draft/lo-attdef": {
+    what: "Attribute definition: variable block text (tag, prompt, default value) filled in on insertion.",
+    when: "Part number, name, material in a title block or label – a different value for each reference.",
+    steps: ["Type the tag (e.g. NUMBER), prompt and default value.", "Click a point, enter height and angle.", "Include the definition in a block with Create block."],
+    cmd: "2d attdef NUMBER \"Number\" \"001\" 2,2 3.5 0",
+    note: "Modes Invisible, Constant, Verify, Preset are entered before the tag.",
+  },
+  "draft/lo-attedit": {
+    what: "Changes the attribute values of a block reference – in the Blocks panel or as TAG=value text.",
+    when: "Fixing the drawing number in a title block, renumbering item balloons.",
+    select: "A block reference with attributes (double-clicking opens the panel directly).",
+    steps: ["Select the block reference.", "Click Edit attributes and overwrite the values.", "Confirm with Apply."],
+    cmd: "2d attedit e7 NUMBER=V-002",
+  },
+  "draft/lo-attext": {
+    what: "Writes the attributes of all references to a CSV table (id, block, layer, X, Y, angle, scales, values).",
+    when: "A parts list from labelled blocks, an item list, checking title blocks.",
+    steps: ["Click Attributes to CSV.", "Open the file in Excel (semicolon separator)."],
+    cmd: "2d attext block LABEL",
+  },
+  "draft/lo-purge": {
+    what: "Removes unused blocks (also nested), layers, linetypes and text styles.",
+    when: "Cleaning up a drawing before handing it over or after importing someone else's DWG.",
+    steps: ["Choose what to purge (or All unused).", "The log lists removed names; Ctrl+Z restores them."],
+    cmd: "2d purge",
+    note: "Layer 0, Defpoints and the current layer always stay.",
+  },
+  "menu:lo-purge/*": {
+    what: "Purges only the chosen kind of unused named objects.",
+    when: "You want to remove e.g. only unused blocks and keep the layers.",
+    steps: ["Pick the kind.", "Check the log; Ctrl+Z restores."],
+    cmd: "2d purge blocks",
+  },
+  // ── Layout tab ──
+  "draft/lo-new": {
+    what: "A new A4–A0 sheet with an ISO 5457 frame, ISO 7200 title block and a viewport into the model at an ISO scale.",
+    when: "Preparing a drawing for printing: format, scale, title block with name and drawing number.",
+    steps: ["Pick the format in the menu.", "The sheet opens; the viewport scale is chosen so the model fits.", "Fill in the title block in the Page panel."],
+    cmd: "2d layout new Production A3 scale 1:5",
+    note: "The tabs at the left of the status bar switch between model and sheets.",
+  },
+  "menu:lo-new/*": {
+    what: "Creates a layout of the chosen format (A4 portrait, others landscape) with frame and title block.",
+    when: "A sheet format matching the part size and scale.",
+    steps: ["Pick the format.", "Adjust the viewport scale in the Page panel."],
+    cmd: "2d layout new A2",
+  },
+  "draft/lo-pagesetup": {
+    what: "Page panel: sheet size and orientation, plot style, lineweights, viewports (scale, lock, layers) and title block.",
+    when: "Changing the format, monochrome plotting, another viewport scale, filling in the title block.",
+    steps: ["Switch to a layout and open Page setup.", "Change the format, style or viewport scale.", "Fill in the title block fields (NAZEV, CISLO_VYKRESU…)."],
+    cmd: "2d pagesetup A2 style mono",
+    note: "New format: the frame is swapped, the title block moves to the corner, the default viewport adapts. Margins only clip the plot.",
+  },
+  "draft/lo-mview": {
+    what: "Viewport = a window from the sheet into the model at an exact scale (1:1, 1:2, 1:5, 2:1… or custom).",
+    when: "A view of the part on the sheet, a detail at a larger scale, several views on one sheet.",
+    steps: ["On the sheet click two corners of the viewport.", "Type the scale (e.g. 1:5) or Enter = Fit."],
+    cmd: "2d mview 25,60 405,282 1:5",
+    note: "Options Fit, Two / Three / Four, Polygonal, Object are in the menu.",
+  },
+  "menu:lo-mview/*": {
+    what: "Viewport variant: rectangle, whole drawing area, 2–4 viewports, polygon or from an object.",
+    when: "Several views on a sheet or a round detail.",
+    steps: ["Pick the variant.", "Enter points on the sheet and the scale."],
+    cmd: "2d mview two vertical fit 1:2",
+  },
+  "draft/lo-vpscale": {
+    what: "Sets an exact scale for the selected viewport (or the active one in model space).",
+    when: "The model does not fit, or you need a standard scale per ISO 5455.",
+    select: "A viewport (click its frame) or the active viewport.",
+    steps: ["Select the viewport.", "Pick the scale in the menu."],
+    cmd: "2d mview scale e7 1:10",
+    note: "A locked viewport keeps its scale; the title block MERITKO is updated.",
+  },
+  "menu:lo-vpscale/*": {
+    what: "Gives the selected viewports the chosen scale.",
+    when: "Quickly changing a viewport scale to a standard value.",
+    steps: ["Select the viewport.", "Pick the scale."],
+    cmd: "2d set e7 scale=1:20",
+  },
+  "draft/lo-vplock": {
+    what: "Locks the viewport: its scale and view into the model cannot be changed by accident.",
+    when: "A finished sheet with the scale set.",
+    select: "A viewport (click its frame).",
+    steps: ["Select the viewport.", "Click Lock viewport (again = unlock)."],
+    cmd: "2d mview lock e7",
+  },
+  "draft/lo-vplayer": {
+    what: "Freezes chosen layers in one viewport only – they stay visible in other viewports and in the model.",
+    when: "Dimensions only in the detail, centre lines only in the main view.",
+    steps: ["Open the Page panel.", "Click Layers at the viewport.", "Tick the layers that should not show in it."],
+    cmd: "2d vplayer freeze AXES viewport e7",
+  },
+  "draft/lo-mspace": {
+    what: "Working in the model through a viewport: you draw in model coordinates, the sheet stays visible around.",
+    when: "Adding to or editing the model directly from the sheet.",
+    select: "A viewport, or double-click into it.",
+    steps: ["Double-click into the viewport (or select it and click).", "Draw; double-click outside the viewport to return to the sheet."],
+    cmd: "2d mspace e7",
+  },
+  "draft/lo-pspace": {
+    what: "Returns from the viewport's model space to the paper sheet.",
+    when: "After editing the model you want to work with the frame, title block or viewports.",
+    steps: ["Click Paper space (or double-click outside the viewport)."],
+    cmd: "2d pspace",
+  },
+  // ── Output tab ──
+  "draft/lo-plot": {
+    what: "Plot to PDF / PNG / SVG with preview: sheet 1:1, lineweights in mm, monochrome or colour.",
+    when: "A drawing for production, a customer or the archive; Ctrl+P anywhere in the 2D drawing.",
+    steps: ["Press Ctrl+P or Plot / PDF.", "Choose what, paper, scale and style; check the preview.", "Click Plot PDF."],
+    cmd: "2d plot mono",
+    note: "Size on paper = size in the model × viewport scale (exactly).",
+  },
+  "draft/lo-exportpdf": {
+    what: "All layouts into one multi-page PDF, each page in its own format 1:1.",
+    when: "A drawing set (assembly + parts) in one file.",
+    steps: ["Click PDF of all layouts.", "The file is saved; the log shows the page count."],
+    cmd: "2d exportpdf",
+  },
+  "draft/lo-png": {
+    what: "The current sheet (or model) as a PNG image (150 DPI by default).",
+    when: "A preview for an e-mail, a quotation or documentation.",
+    steps: ["Click PNG image.", "Other resolution: choose PNG and DPI in the Plot panel."],
+    cmd: "2d plot png dpi 300",
+  },
+  "draft/lo-svg": {
+    what: "The current sheet (or model) as a vector SVG image in mm.",
+    when: "Web, presentations or further editing in a vector editor.",
+    steps: ["Click Vector SVG.", "The file is saved."],
+    cmd: "2d plot svg",
+  },
+} satisfies Record<string, MicroTip>;

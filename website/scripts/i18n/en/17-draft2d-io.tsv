@@ -1,0 +1,91 @@
+# Vlna 9 / fáze B – balík 4 (io): DWG / DXF import a export, vložení výkresu, panel DWG / DXF, průběh a Zrušit
+✓ {0} otevřen jako 2D výkres „{1}“ (nová záložka) · {2}	✓ {0} opened as 2D drawing “{1}” (new tab) · {2}
+✓ {0}: vloženo {1} entit do výkresu (vybrané).	✓ {0}: {1} entities inserted into the drawing (selected).
+Bez převodu měřítka (neznámý druh): {0}.	Not scaled (unknown kind): {0}.
+binární	binary
+binární DXF (menší, rychlejší čtení)	binary DXF (smaller, faster to read)
+blok {0}	block {0}
+blok {0}: {1}	block {0}: {1}
+Bloky se stejným názvem už ve výkresu jsou – ponechány stávající: {0}.	Blocks with the same name already exist in the drawing – existing ones kept: {0}.
+čtení souboru	reading file
+druh {0} nelze zapsat	kind {0} cannot be written
+DWG {0} – podporované jsou verze R2000–R2018 (AC1015–AC1032). Uložte výkres v novější verzi.	DWG {0} – supported versions are R2000–R2018 (AC1015–AC1032). Save the drawing in a newer version.
+DWG / DXF	DWG / DXF
+DWG R12 nelze zapsat – použijte DXF R12 nebo DWG R2000 a novější	DWG R12 cannot be written – use DXF R12 or DWG R2000 and newer
+DWG R2000–R2018 a DXF R12–R2018 (ASCII i binární). Velké soubory se čtou na pozadí s průběhem.	DWG R2000–R2018 and DXF R12–R2018 (ASCII and binary). Large files are read in the background with progress.
+DWG R2000–R2018: bloky, kóty s geometrií, šrafy, rozvržení, XDATA. Čeština do R2004 jako \U+.	DWG R2000–R2018: blocks, dimensions with geometry, hatches, layouts, XDATA. Non-ASCII characters up to R2004 as \U+.
+DXF binární (R2018)	Binary DXF (R2018)
+DXF R12: blok {0} chybí	DXF R12: block {0} is missing
+DXF R12: druh {0} nelze zapsat	DXF R12: kind {0} cannot be written
+DXF R12: kóta délky oblouku zapsána jako zarovnaná (R12 ji nezná)	DXF R12: arc length dimension written as aligned (R12 does not know it)
+DXF R12: plná šrafa s ostrovy zapsána jen hranicí	DXF R12: solid hatch with islands written as boundary only
+DXF R12: rozvržení (papírový prostor) se nezapisují – jen modelový prostor	DXF R12: layouts (paper space) are not written – model space only
+DXF R12: výřezy rozvržení se nezapisují	DXF R12: layout viewports are not written
+DXF R2000–R2018 zachová všechny druhy entit, tabulky, bloky, rozvržení a XDATA.	DXF R2000–R2018 keeps all entity kinds, tables, blocks, layouts and XDATA.
+Entit {0}, hladin {1}, bloků {2}, rozvržení {3}	Entities {0}, layers {1}, blocks {2}, layouts {3}
+DWG / DXF ve zvolené verzi (R12–R2018, binární DXF)	DWG / DXF in the chosen version (R12–R2018, binary DXF)
+export dxf | export dxf verze R12 | export dxf binární | export dwg verze R2013 | export dxf název "Deska"	export dxf | export dxf version R12 | export dxf binary | export dwg version R2013 | export dxf name "Plate"
+export výkresu do DXF (R12, R2000–R2018, ASCII i binární) nebo DWG (R2000–R2018); soubor se stáhne (v API je v results[].data.file)	export the drawing to DXF (R12, R2000–R2018, ASCII or binary) or DWG (R2000–R2018); the file is downloaded (in the API it is in results[].data.file)
+export: binární je jen DXF	export: binary is DXF only
+export: neznámá verze {0} – R12 (jen DXF), R2000, R2004, R2007, R2010, R2013, R2018	export: unknown version {0} – R12 (DXF only), R2000, R2004, R2007, R2010, R2013, R2018
+export: neznámá volba {0}	export: unknown option {0}
+Exportovat {0}	Export {0}
+Externí reference (XREF) se nenačítají: {0}.	External references (XREF) are not loaded: {0}.
+Formát {0}.	Format {0}.
+hladina {0}	layer {0}
+hladina {0}: {1}	layer {0}: {1}
+import (GUI) | import sloučit (GUI) | import "vykres.dxf" <base64> | import "deska.dwg" <base64> sloučit	import (GUI) | import merge (GUI) | import "drawing.dxf" <base64> | import "plate.dwg" <base64> merge
+import: neznámá volba {0}	import: unknown option {0}
+importFile: volba as je {0}	importFile: the as option is {0}
+Jednotky převedeny měřítkem {0}.	Units converted with scale {0}.
+Jednotky se ukládají do DWG / DXF ($INSUNITS); geometrie se nepřepočítává. Při vložení výkresu s jinými jednotkami se jeho obsah převede měřítkem.	Units are stored in DWG / DXF ($INSUNITS); geometry is not recalculated. When a drawing with other units is inserted, its content is scaled.
+Jednotky výkresu (INSUNITS)	Drawing units (INSUNITS)
+kóta {0}: neplatná hodnota	dimension {0}: invalid value
+kóta {0}: neznámý druh {1}	dimension {0}: unknown kind {1}
+kótovací styl {0}: {1}	dimension style {0}: {1}
+Možnosti DWG / DXF	DWG / DXF options
+Možnosti exportu…	Export options…
+Načítání zrušeno.	Loading cancelled.
+Načteno {0} entit, {1} hladin, {2} bloků, {3} rozvržení.	Loaded {0} entities, {1} layers, {2} blocks, {3} layouts.
+Název souboru	File name
+Nepřevedeno: {0}	Not converted: {0}
+Nepřevedeno: {0}.	Not converted: {0}.
+nová záložka, průběh a Zrušit u velkých souborů	new tab, progress and Cancel for large files
+Nové: {0}.	New: {0}.
+obsah DXF / DWG do otevřeného výkresu (vybrané, jeden krok zpět)	DXF / DWG content into the open drawing (selected, one undo step)
+Otevírám {0}	Opening {0}
+otevře DXF / DWG jako nový 2D výkres v nové záložce, nebo s volbou sloučit vloží jeho obsah do otevřeného výkresu (GUI: výběr souboru s průběhem; textem: import "název.dxf" base64)	opens DXF / DWG as a new 2D drawing in a new tab, or with the merge option inserts its content into the open drawing (GUI: file dialog with progress; by text: import "name.dxf" base64)
+Otevřít DXF / DWG	Open DXF / DWG
+Otevřít jako 3D skicu	Open as 3D sketch
+Otevřít…	Open…
+pracovní vlákno importu selhalo	the import worker failed
+Převedeno na 2D entity: {0}.	Converted to 2D entities: {0}.
+Převedeno: {0}	Converted: {0}
+převod entit	converting entities
+R12: jen základní entity (křivky jako POLYLINE, MTEXT jako TEXT, šrafy rozložené) – pro CAM a staré programy.	R12: basic entities only (polylines as POLYLINE, MTEXT as TEXT, hatches exploded) – for CAM and old programs.
+rozvržení {0}: {1}	layout {0}: {1}
+Rozvržení zdroje ({0}) se nevkládají – jen modelový prostor.	Layouts of the source ({0}) are not inserted – model space only.
+sestavení výkresu	building drawing
+styl {0}: {1}	style {0}: {1}
+šrafa: vzor {0} není v knihovně – zapsán jako ANSI31	hatch: pattern {0} is not in the library – written as ANSI31
+typ čáry {0}: {1}	linetype {0}: {1}
+Uchováno bez zobrazení (zapíše se zpět): {0}.	Kept without display (written back): {0}.
+Uchováno pro zápis zpět: {0}	Kept for writing back: {0}
+Už se načítá jiný soubor ({0}) – počkejte nebo ho zrušte.	Another file is already loading ({0}) – wait or cancel it.
+Varování: {0}	Warnings: {0}
+Verze	Version
+Vkládám {0}	Inserting {0}
+Vkládání souboru {0} zrušeno.	Inserting file {0} cancelled.
+vložení {0}: blok {1} neexistuje	insert {0}: block {1} does not exist
+Vložit do výkresu…	Insert into drawing…
+Vložit výkres	Insert drawing
+SPLINE (jen body proložení → řídicí body)	SPLINE (fit points only → control points)
+# kontrola – oprava nálezů
+{0} je poškozený, neúplný nebo to není výkres {0} (chyba čtení: {1})	the {0} file is damaged, incomplete or not a {0} drawing (read error: {1})
+DXF R12: stejné názvy po úpravě pro R12 (velká písmena, bez diakritiky, 31 znaků) – přejmenováno: {0}	DXF R12: names collide after the R12 adjustment (upper case, no diacritics, 31 characters) – renamed: {0}
+importFile: as "draft" (2D výkres) je jen pro DXF / DWG – {0} otevřete s as auto | tab | component	importFile: as "draft" (2D drawing) is only for DXF / DWG – open {0} with as auto | tab | component
+Na zamčených, zmrazených nebo vypnutých hladinách: {0} (nevybrané).	On locked, frozen or turned-off layers: {0} (not selected).
+není to výkres DWG (chybí hlavička verze AC10xx) ani DXF	it is neither a DWG drawing (missing the AC10xx version header) nor a DXF
+není to výkres DXF (soubor nezačíná sekcí „0 / SECTION“) ani DWG	it is neither a DXF drawing (the file does not start with a “0 / SECTION” section) nor a DWG
+soubor je prázdný	the file is empty
+zobrazení výkresu – velký výkres může chvíli trvat	displaying the drawing – a large drawing may take a while
