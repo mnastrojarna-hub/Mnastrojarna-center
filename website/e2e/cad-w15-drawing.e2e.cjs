@@ -71,10 +71,15 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   };
 
   // ── B5: řez v konvenci skici, ✗ mimo těleso ──
-  let log = await consoleRun('nový díl Hranol\nskica XZ: obdélník 40 30 v 0 15\nvysunout 60\nvýkres A3 pohledy přední,horní řez XZ odsazení -20');
+  let log = await consoleRun('nový díl Hranol\nskica XZ: obdélník 40 30 v 0 15\nvysunout 60\nvýkres A3 pohledy přední,horní řez XZ odsazení -80');
   fs.writeFileSync(S + 'b5-miss.txt', log);
-  ok(/✓ výkres: A3, pohledy přední, horní, řez XZ odsazení -20 \(rovina Y = 20\)/.test(log), 'B5: protokol ukáže rovinu řezu (odsazení -20 = rovina Y = 20)');
-  ok(/✗ rovina řezu Y = 20 leží mimo těleso \(Y -60…0\) – odsazení -20 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než 0 a menší než 60 \(krajní hodnoty leží na ploše tělesa\), např\. 30/.test(log), 'B5: rovina mimo těleso = řádek ✗ s otevřeným rozsahem odsazení 0…60 a příkladem');
+  ok(/✓ výkres: A3, pohledy přední, horní, řez XZ odsazení -80 \(rovina Y = 80\)/.test(log), 'B5: protokol ukáže rovinu řezu (odsazení -80 = rovina Y = 80)');
+  ok(/✗ rovina řezu Y = 80 leží mimo těleso \(Y -60…0\) – odsazení -80 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než 0 a menší než 60 \(krajní hodnoty leží na ploše tělesa\), např\. 30/.test(log), 'B5: rovina mimo těleso = řádek ✗ s otevřeným rozsahem odsazení 0…60 a příkladem');
+  // starší zápis (číslo jako souřadnice osy): dnešní výklad těleso mine, starý ho protne → vyloží se postaru s ⚠, bez ✗
+  await closeDrawing();
+  log = await consoleRun('výkres řez XZ odsazení -20');
+  fs.writeFileSync(S + 'b5-legacy.txt', log);
+  ok(/✓ výkres: řez XZ odsazení 20 \(rovina Y = -20\)/.test(log) && /⚠ řez XZ odsazení -20: rovina Y = 20 těleso míjí – číslo vyloženo postaru jako souřadnice Y = -20 .*dnes pište: výkres řez XZ odsazení 20/.test(log) && !/✗ rovina řezu/.test(log.split('\n').slice(-5).join('\n')), 'B5: starší zápis odsazení -20 = ⚠ s dnešním zápisem, řez uložen jako odsazení 20, bez ✗');
   await closeDrawing();
   log = await consoleRun('výkres řez XZ odsazení 20');
   fs.writeFileSync(S + 'b5-ok.txt', log);

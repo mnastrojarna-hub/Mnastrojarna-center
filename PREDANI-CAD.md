@@ -10,6 +10,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 18:05 | Vlna 15 na větvi (`29b31a5`), plán pushnut (`277a6bd`). Produkční build vlny 15 prošel (`S/build-w15.log`, `exit=0`). |
 | 14. 11. 18:06 | BĚŽÍ na pozadí: opakované testy (`S/vitest-w15c.log`, čekej na řádek `exit=`) a e2e 18 sad na portu 3199 (`S/e2e-w15.log`, končí řádkem `done`; server `next start -p 3199` běží – po e2e ho zastav a smaž `.next`). |
 | 14. 11. 18:06 | BĚŽÍ workflow: `wf_0a444c37-b25` (fáze B – integrace hotová, `S/w14/bint.patch`; následuje akceptace) a `wf_1fd5cfa9-922` (`fix:geom`). |
+| 14. 11. 18:20 | Opakované testy vlny 15 prošly: 6 souborů, 97 / 97 (převodník, přehrání zkušebního i skutečného nástroje, výkres). E2e běží; `cad-w15-drawing` měl 2 FAIL kvůli staršímu zápisu řezu – sada upravena (−80 = mimo těleso, −20 = `⚠` starší zápis), po doběhnutí dávky ji pusť znovu samostatně. |
 
 ## 0. Pevná pravidla (platí pořád)
 
