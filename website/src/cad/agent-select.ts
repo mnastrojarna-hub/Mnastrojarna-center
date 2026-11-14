@@ -50,3 +50,29 @@ export function parseSelectCommand(tokens: string[]): SelectCmd | null {
   if (!ids.length) throw new Error(tr("vyber: chybí co vybrat – {0}", selectUsage()));
   return { kind: "select", ids, additive };
 }
+
+/**
+ * Výběr nastavený textem / přes API, dokud ho aplikace nevykreslí (stav Reactu se projeví až po vykreslení) –
+ * `selection()` hned po `select()` / `vyber nic` tak vrátí nový výběr.
+ *
+ * Čekající výběr platí, jen dokud má aplikace pořád tentýž stav jako při jeho nastavení (`base`). Jakmile se stav
+ * změní – vykreslil se tento výběr, nebo ho už přepsal novější klik do modelu, Esc či formulář – platí zase stav
+ * aplikace. Pojistka: po `ttlMs` vždy stav aplikace (aplikace výběr nepřevzala).
+ *
+ * Dřív se čekající výběr zrušil, jen když ho někdo přečetl právě ve chvíli, kdy stav byl tentýž seznam; jinak až
+ * 2 s přebíjel i novější klik – `window.mncad.selection()` po kliku do 2 s od `vyber nic` vrátil prázdný výběr.
+ */
+export function pendingSelection<T>(ttlMs = 2000, now: () => number = Date.now) {
+  let pending: { items: T; base: T; until: number } | null = null;
+  return {
+    /** výběr `items` nastavený přes API; `base` = stav aplikace v tu chvíli (nový výběr ještě nevykreslený) */
+    set(base: T, items: T) {
+      pending = { items, base, until: now() + ttlMs };
+    },
+    /** aktuální výběr ke stavu aplikace `state`: čekající, dokud se stav od nastavení nezměnil */
+    current(state: T): T {
+      if (pending && (state !== pending.base || now() > pending.until)) pending = null;
+      return pending ? pending.items : state;
+    },
+  };
+}

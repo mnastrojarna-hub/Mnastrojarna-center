@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_COMMANDS, parseAgentText, selectEdges, selectFaces, type EdgeLite, type FaceLite, type Bbox } from "./agent";
-import { parseSelectCommand } from "./agent-select";
+import { parseSelectCommand, pendingSelection } from "./agent-select";
 
 const cmdOf = (text: string) => {
   const p = parseAgentText(text);
@@ -89,5 +89,85 @@ describe("výběr textem – oprava po kontrole", () => {
     }
     // bez hran zůstává „všechny hrany“ (zdokumentováno) – výběr se nepřebírá
     expect(parseAgentText("zaoblit 3").ops[0]).toMatchObject({ k: "feature", feature: { type: "fillet", edges: "all" } });
+  });
+});
+
+describe("výběr nastavený přes API, dokud ho aplikace nevykreslí (pendingSelection)", () => {
+  type Sel = { id: string }[];
+  /** aplikace jako React: setSelection se projeví až „vykreslením“; selection() čte poslední vykreslený stav */
+  const app = (start: Sel) => {
+    let t = 0;
+    let state = start;
+    let queued: Sel | null = null;
+    const pend = pendingSelection<Sel>(2000, () => t);
+    return {
+      tick: (ms: number) => void (t += ms),
+      render: () => {
+        if (queued) state = queued;
+        queued = null;
+      },
+      /** klik do modelu / Esc: vlastní setSelection aplikace (bez API) */
+      click: (s: Sel) => void (queued = s),
+      /** window.mncad.select / clearSelection / „vyber …“ */
+      apiSet: (items: Sel) => {
+        pend.set(state, items);
+        queued = items;
+      },
+      selection: () => pend.current(state),
+    };
+  };
+
+  it("regrese: klik do 2 s po „vyber nic“ – selection() vrátí kliknutou entitu, ne prázdný výběr z API", () => {
+    // e2e cad-soft-pick (produkční build): vyber F2 → vyber nic → řez → popisky → klik na F2 za 1,9 s → dřív „nic“
+    const a = app([{ id: "F2" }]);
+    const none: Sel = [];
+    a.apiSet(none);
+    expect(a.selection()).toBe(none); // hned po příkazu (stav ještě nevykreslený)
+    a.render(); // aplikace vykreslí prázdný výběr – nikdo ho mezitím nečte
+    a.tick(1900);
+    const f2: Sel = [{ id: "F2" }];
+    a.click(f2);
+    a.render();
+    expect(a.selection()).toBe(f2);
+    a.tick(500);
+    expect(a.selection()).toBe(f2);
+  });
+
+  it("klik, který přepíše výběr z API ještě před vykreslením, vyhraje (poslední změna)", () => {
+    const a = app([]);
+    a.apiSet([{ id: "E3" }]);
+    const f1: Sel = [{ id: "F1" }];
+    a.click(f1);
+    a.render();
+    expect(a.selection()).toBe(f1);
+  });
+
+  it("do vykreslení platí výběr z API (i dvě volání za sebou), po vykreslení stav aplikace", () => {
+    const start: Sel = [{ id: "F9" }];
+    const a = app(start);
+    const e2: Sel = [{ id: "E2" }];
+    a.apiSet(e2);
+    expect(a.selection()).toBe(e2);
+    const both: Sel = [{ id: "E2" }, { id: "V3" }];
+    a.apiSet(both);
+    expect(a.selection()).toBe(both);
+    a.tick(100);
+    expect(a.selection()).toBe(both);
+    a.render();
+    expect(a.selection()).toBe(both);
+    const esc: Sel = [];
+    a.click(esc);
+    a.render();
+    expect(a.selection()).toBe(esc);
+  });
+
+  it("aplikace výběr nepřevzala (stav se nezměnil) → po 2 s zase stav aplikace", () => {
+    const start: Sel = [{ id: "F4" }];
+    const a = app(start);
+    a.apiSet([{ id: "F5" }]);
+    a.tick(1999);
+    expect(a.selection()).toEqual([{ id: "F5" }]);
+    a.tick(2);
+    expect(a.selection()).toBe(start);
   });
 });

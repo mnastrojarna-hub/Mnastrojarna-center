@@ -9,6 +9,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { cad } from "@/cad/client";
 import { cadLocale, tr } from "@/cad/i18n";
 import { selectFaces, type MncadApi } from "@/cad/agent";
+import { pendingSelection } from "@/cad/agent-select";
 import {
   applySettingsPatch,
   bytesToBase64,
@@ -668,17 +669,15 @@ async function share(host: ApiHost, o: ShareApiOptions = {}) {
 
 /* ───────────────────────── výběr ───────────────────────── */
 /**
- * Výběr nastavený přes API, dokud ho aplikace nevykreslí (stav Reactu se projeví až po vykreslení) – selection() hned
- * po select() tak vrátí nový výběr. Po vykreslení (stav = tentýž seznam) nebo po 2 s platí zase stav aplikace.
+ * Výběr nastavený přes API, dokud ho aplikace nevykreslí – selection() hned po select() tak vrátí nový výběr; jakmile
+ * se stav aplikace změní (vykreslení, novější klik do modelu, Esc), platí zase on (pendingSelection, agent-select.ts).
  */
-let pendingSel: { items: SelItem[]; until: number } | null = null;
+const pendingSel = pendingSelection<SelItem[]>();
 function currentSel(host: ApiHost): SelItem[] {
-  const s = host.selection();
-  if (pendingSel && (s === pendingSel.items || Date.now() > pendingSel.until)) pendingSel = null;
-  return pendingSel ? pendingSel.items : s;
+  return pendingSel.current(host.selection());
 }
 function setSel(host: ApiHost, items: SelItem[]) {
-  pendingSel = { items, until: Date.now() + 2000 };
+  pendingSel.set(host.selection(), items);
   host.setSelection(items);
 }
 function selectionOf(host: ApiHost): SelectionEntry[] {
