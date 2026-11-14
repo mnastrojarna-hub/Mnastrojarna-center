@@ -205,6 +205,27 @@ describe.skipIf(!ENABLED)("doklady ze zakázky ↔ lokální Supabase (E2E)", ()
     expect(messages.some((m) => m.startsWith("Nahrán dokument"))).toBe(false);
   }, 60_000);
 
+  it("návrh e-mailu pro jiného adresáta (změna Komu, 14. 11.): jeho tykání a oslovení", async () => {
+    const USER = "156c7996-b488-4c53-a3f5-e51dd004f4ad";
+    const OTHER = `e2e-tyka-${Date.now()}@local.test`;
+    expect((await db.from("contact_tone").insert({ user_id: USER, email: OTHER, address: "ty", tone: "pratelsky" })).error).toBeNull();
+    try {
+      const plain = await d.draftJobDocumentEmail(jobId, confirmationFileId);
+      expect(plain.ok, plain.error).toBe(true);
+      expect(plain.body).toContain("děkujeme za Vaši objednávku");
+      const other = await d.draftJobDocumentEmail(jobId, confirmationFileId, { to: ` ${OTHER.toUpperCase()} ` });
+      expect(other.ok, other.error).toBe(true);
+      expect(other.to).toBe(OTHER);
+      expect(other.body?.startsWith("Ahoj,")).toBe(true);
+      expect(other.body).toContain("díky za tvou objednávku");
+      expect(other.body).not.toContain("Vaši objednávku");
+      // neplatná adresa = jako bez volby
+      expect((await d.draftJobDocumentEmail(jobId, confirmationFileId, { to: "nesmysl" })).body).toBe(plain.body);
+    } finally {
+      await db.from("contact_tone").delete().eq("user_id", USER).eq("email", OTHER);
+    }
+  }, 60_000);
+
   it("návrh e-mailu k potvrzení a odeslání s PDF → stav Potvrzená objednávka", async () => {
     const draft = await d.draftJobDocumentEmail(jobId, confirmationFileId);
     expect(draft.ok, draft.error).toBe(true);

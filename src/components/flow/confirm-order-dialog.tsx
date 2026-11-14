@@ -11,12 +11,13 @@ import { Switch } from "@/components/ui/switch";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { useNotify } from "@/components/jobs/detail/toast";
 import { updateJob } from "@/app/actions/jobs";
-import { draftJobDocumentEmail, generateJobDocument, sendJobDocument } from "@/app/actions/job-documents";
+import { draftJobDocumentEmail, generateJobDocument, previewDocumentRecipient, sendJobDocument } from "@/app/actions/job-documents";
 import { setOrderStatus } from "@/app/actions/flow-status";
 import type { OrderMismatch, OrderDocStatus } from "@/lib/supabase/database.types";
 import { cn } from "@/lib/utils";
-import { AttachmentChip, MailFields, mailDraftError, type MailDraft } from "./document-send-dialog";
-import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
+import { AttachmentChip, MailFields, mailDraftError, mailFromDraft, type MailDraft } from "./document-send-dialog";
+import { SenderPicker } from "@/components/mail/sender-picker";
+import { swapDraftSignature } from "@/lib/contacts/draft-retarget";
 import { czDay } from "./flow-utils";
 import type { OrderRevisionView } from "./flow-state";
 
@@ -73,6 +74,19 @@ export function ConfirmOrderDialog({
   const [mail, setMail] = React.useState<MailDraft>({ to: "", cc: "", subject: "", body: "" });
   /** „Odeslat z" (jen super admin; null = moje schránka). */
   const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
+  /** Komu potvrzení půjde podle karty zákazníka (Objednávky / potvrzení → kontakt zakázky…) — ukáže se hned. */
+  const [preview, setPreview] = React.useState<{ to: string; reason: string } | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    let alive = true;
+    setPreview(null);
+    void previewDocumentRecipient(job.id, "potvrzeni").then((r) => {
+      if (alive && r.ok && r.to) setPreview({ to: r.to, reason: r.reason ?? "" });
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [open, job.id]);
+  const recipientHint = preview?.to ?? job.email;
 
   const [wasOpen, setWasOpen] = React.useState(false);
   if (open !== wasOpen) {
@@ -89,6 +103,13 @@ export function ConfirmOrderDialog({
       setFromMailboxId(null);
     }
   }
+
+  /** Text potvrzení znovu pro jiného adresáta / po přepnutí tykání. */
+  const redraftFor = React.useCallback(async (to: string): Promise<string | null> => {
+    if (!file) return null;
+    const d = await draftJobDocumentEmail(job.id, file.id, { to }).catch(() => null);
+    return d?.ok && d.body ? d.body : null;
+  }, [file, job.id]);
 
   const rev = job.orderRevision && job.orderRevision > 1 ? job.orderRevision : null;
   const accepting = Boolean(mismatch?.length) && mode === "confirm";
@@ -145,13 +166,10 @@ export function ConfirmOrderDialog({
       if (!sendMail) return void (await confirmOther(f));
 
       const draft = await draftJobDocumentEmail(job.id, f.id);
-      setMail({
-        to: (draft.ok && draft.to) || job.email || "",
-        cc: (draft.ok && draft.cc) || "",
-        subject: (draft.ok && draft.subject) || `Potvrzení objednávky ${f.number}`,
-        body: (draft.ok && draft.body) || "",
-        reason: (draft.ok && draft.to && draft.recipientReason) || undefined,
-      });
+      // Komu podle karty zákazníka (Objednávky / potvrzení → kontakt zakázky v kopii), text pro toho adresáta
+      setMail(draft.ok
+        ? mailFromDraft({ ...draft, subject: draft.subject || `Potvrzení objednávky ${f.number}` }, { to: recipientHint ?? "" })
+        : { to: recipientHint || "", cc: "", subject: `Potvrzení objednávky ${f.number}`, body: "" });
       setStep("mail");
     } catch {
       setError("Spojení se nepovedlo — zkus to znovu.");
@@ -216,11 +234,11 @@ export function ConfirmOrderDialog({
             <SenderPicker
               value={fromMailboxId}
               onChange={setFromMailboxId}
-              onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+              onSignatureChange={(prev, next) => setMail((m) => swapDraftSignature(m, prev, next))}
               disabled={step === "sending"}
               className="px-1"
             />
-            <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId: job.id }} />
+            <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId: job.id }} redraftFor={redraftFor} />
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" className="min-h-11 sm:min-h-9" disabled={step === "sending"} onClick={() => void confirmOther(file)}>
                 {mode === "send" ? "Neposílat teď" : "Neposílat, jen potvrdit"}
@@ -278,7 +296,9 @@ export function ConfirmOrderDialog({
                       </label>
                       <span className="block truncate text-[11px] text-muted-foreground">
                         {sendMail
-                          ? job.email ? <>na {job.email} (před odesláním uvidíš text)</> : "E-mail zákazníka neznáme — doplníš ho v dalším kroku."
+                          ? recipientHint
+                            ? <>na {recipientHint}{preview?.reason ? ` · ${preview.reason}` : ""} (před odesláním uvidíš text)</>
+                            : "E-mail zákazníka neznáme — doplníš ho v dalším kroku."
                           : "Zapíše se „Potvrzeno jinak“ s tvým jménem."}
                       </span>
                     </div>

@@ -3,7 +3,7 @@
 import * as React from "react";
 import {
   AlertTriangle, ArrowLeftRight, Box, ChevronDown, ChevronRight, Crosshair, Diameter, Eye, EyeOff, Filter, Focus, HelpCircle, Layers,
-  Download, ListTree, Loader2, Maximize2, Move3d, MousePointer2, PaintBucket, Palette, Printer, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
+  Download, ListTree, Loader2, Maximize2, Move3d, MousePointer2, SquareDashedMousePointer, PaintBucket, Palette, Printer, Redo2, RotateCcw, Ruler, ScanEye, Scissors, Trash2, TriangleRight,
   Undo2, Weight, X, ZoomIn, ZoomOut,
 } from "lucide-react";
 import { printDocument } from "@/components/print/print-action";
@@ -18,9 +18,10 @@ import {
 import type { Model3DFormat } from "@/lib/viewer3d/sniff";
 import { cn } from "@/lib/utils";
 import {
-  COLOR_PALETTE, ViewerEngine, pickFilters, type ChangeKind, type ContextRequest, type DisplayMode, type PickFilter, type StdView, type Tool,
+  COLOR_PALETTE, ViewerEngine, pickFilters, type ChangeKind, type ContextRequest, type DisplayMode, type DrawingEdits, type PickFilter, type StdView, type Tool,
 } from "./engine";
 import { ModelLoadError, loadModel } from "./load-model";
+import { kindLabel, czPlural } from "@/lib/viewer3d/box-select";
 
 export interface ModelViewerProps {
   /** Obsah souboru (předá se do workeru — volající ho už nesmí potřebovat). */
@@ -32,6 +33,8 @@ export interface ModelViewerProps {
   className?: string;
   /** Stažení originálu (nabídne se, když model nejde zobrazit). */
   download?: { href: string; filename: string } | null;
+  /** 2D výkres: úpravy v prohlížeči (smazané prvky, skryté hladiny) — pro „Uložit upravené PDF". */
+  onDrawingEdits?: (edits: DrawingEdits | null) => void;
 }
 
 const STAGE_TEXT: Record<LoadStage, string> = {
@@ -109,7 +112,7 @@ function useEngineEvents(): { bump: (k: ChangeKind) => void; subscribeSnap: (fn:
 }
 
 /** Prohlížeč 3D modelu (STEP, IGES, STL, 3D PDF…) s ovládáním jako ZW3D. */
-export function ModelViewer({ bytes, format, name, formatLabel, className, download }: ModelViewerProps) {
+export function ModelViewer({ bytes, format, name, formatLabel, className, download, onDrawingEdits }: ModelViewerProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
   const engineRef = React.useRef<ViewerEngine | null>(null);
   const [stage, setStage] = React.useState<LoadStage | "ready">("download");
@@ -237,6 +240,15 @@ export function ModelViewer({ bytes, format, name, formatLabel, className, downl
 
   const eng = engineRef.current;
   const ready = stage === "ready" && !!eng && !error;
+  // úpravy výkresu → nadřazený prohlížeč (jen při změně)
+  const editsKey = React.useRef("null");
+  const edits = ready ? eng!.getDrawingEdits() : null;
+  const nextKey = JSON.stringify(edits);
+  React.useEffect(() => {
+    if (editsKey.current === nextKey) return;
+    editsKey.current = nextKey;
+    onDrawingEdits?.(edits);
+  });
   const tool = eng?.getTool() ?? "select";
   const selection = eng?.getSelection() ?? [];
   const measures = eng?.getMeasures() ?? [];
@@ -249,6 +261,9 @@ export function ModelViewer({ bytes, format, name, formatLabel, className, downl
   const entityMode = ["face", "edge", "vertex", "center", "midpoint"].includes(filter);
   const measuring = tool === "distance" || tool === "diameter" || tool === "angle";
   const drawing = eng?.isDrawing() ?? false;
+  const boxMode = eng?.getBoxMode() ?? false;
+  const itemSel = eng?.getDrawingSelection() ?? null;
+  const deleted = eng?.deletedCount() ?? 0;
   const openSection = () => {
     setSectionOpen(true);
     if (!isWide) setPanel(null);
@@ -265,6 +280,9 @@ export function ModelViewer({ bytes, format, name, formatLabel, className, downl
       // pravé tlačítko patří prohlížeči 3D — nabídka prohlížeče (Chrome na Windows ji otevírá až po puštění tlačítka) ne
       onContextMenu={(e) => e.preventDefault()}
       data-testid="viewer3d-root"
+      // výběr oknem tahem prstu → bez přepínání výkresů swipem (stejně jako přiblížený obrázek)
+      data-zoomed={boxMode ? "1" : undefined}
+      data-box-mode={boxMode ? "1" : undefined}
     >
       <div ref={hostRef} className="absolute inset-0" data-testid="viewer3d-canvas" />
 
@@ -302,9 +320,11 @@ export function ModelViewer({ bytes, format, name, formatLabel, className, downl
             onTool={setTool}
             canUndo={eng!.canUndo()}
             canRedo={eng!.canRedo()}
-            hasSelection={selection.length > 0}
-            canDelete={selection.length > 0 || !!entity}
-            hidden={hidden}
+            hasSelection={selection.length > 0 || !!itemSel}
+            canDelete={selection.length > 0 || !!entity || !!itemSel}
+            hidden={hidden + deleted}
+            boxMode={boxMode}
+            onBoxMode={() => { eng!.setBoxMode(!boxMode); setMenu(null); }}
             panel={panel}
             onPanel={(p) => {
               setPanel((cur) => (cur === p ? null : p));
@@ -328,7 +348,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className, downl
             onUndo={() => eng!.undo()}
             onRedo={() => eng!.redo()}
             onDelete={() => eng!.deleteSelected()}
-            onIsolate={() => eng!.isolate(selection)}
+            onIsolate={() => eng!.isolateSelected()}
             onShowAll={() => eng!.showAll()}
             onFit={() => eng!.fit()}
             onHelp={() => setHelp(true)}
@@ -420,6 +440,7 @@ export function ModelViewer({ bytes, format, name, formatLabel, className, downl
             {!massOpen && (tool === "select" || tool === "move") && selection.length > 0 && (
               <PartCard engine={eng!} selection={selection} materials={materials} onMass={() => setMassOpen(true)} />
             )}
+            {tool === "select" && itemSel && <DrawingSelectionCard engine={eng!} />}
             {tool === "select" && entity && <EntityCard engine={eng!} onSection={openSection} />}
             {(measuring || (measures.length > 0 && !massOpen && (isWide || (selection.length === 0 && !entity)))) && (
               <MeasurePanel
@@ -438,9 +459,21 @@ export function ModelViewer({ bytes, format, name, formatLabel, className, downl
           {(measuring || (tool === "select" && entityMode) || sectionPicking) && <SnapLayer engine={eng!} subscribe={subscribeSnap} />}
 
           {/* aktivní filtr / výběr plochy pro řez — připomínka nahoře */}
-          {(filter !== "auto" || sectionPicking) && (
-            <div className={cn("pointer-events-none absolute z-20 rounded-full bg-[#272425]/85 px-3 py-1 text-xs font-medium text-white", isWide ? "left-1/2 top-[3.6rem] -translate-x-1/2" : "left-2 top-2")} data-testid="filter-badge">
-              {sectionPicking ? "Klikni na rovinnou plochu pro řez" : `Filtr: ${pickFilters(drawing).find((f) => f.key === filter)?.label}`}
+          {(filter !== "auto" || sectionPicking || (boxMode && tool === "select")) && (
+            <div
+              className={cn(
+                "pointer-events-none absolute z-20 max-w-[calc(100%-1rem)] rounded-full bg-[#272425]/85 px-3 py-1 text-center text-xs font-medium text-white",
+                // telefon: výběr oknem nad stavovým řádkem (nahoře je karta výběru)
+                isWide ? "left-1/2 top-[3.6rem] -translate-x-1/2" : boxMode && tool === "select" && filter === "auto" && !sectionPicking ? "bottom-[6.4rem] left-2" : "left-2 top-2",
+              )}
+              data-testid="filter-badge"
+            >
+              {sectionPicking ? "Klikni na rovinnou plochu pro řez" : [
+                filter !== "auto" ? `Filtr: ${pickFilters(drawing).find((f) => f.key === filter)?.label}` : "",
+                boxMode && tool === "select"
+                  ? isWide ? "Výběr oknem: táhni doprava = jen celé uvnitř · doleva = vše, čeho se dotkne · Shift přidá · Ctrl odebere" : "Výběr oknem: táhni prstem (doprava = celé uvnitř, doleva = dotyk)"
+                  : "",
+              ].filter(Boolean).join(" · ")}
             </div>
           )}
 
@@ -510,6 +543,8 @@ function Toolbar(p: {
   hasSelection: boolean;
   canDelete: boolean;
   hidden: number;
+  boxMode: boolean;
+  onBoxMode: () => void;
   panel: string | null;
   onPanel: (p: "tree" | "views" | "display" | "filter") => void;
   filterLabel: string;
@@ -539,7 +574,8 @@ function Toolbar(p: {
       aria-label="Nástroje 3D prohlížeče"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <ToolButton icon={MousePointer2} label="Výběr" active={p.tool === "select"} onClick={() => p.onTool("select")} testId="tool-select" />
+      <ToolButton icon={MousePointer2} label="Výběr" active={p.tool === "select" && !p.boxMode} onClick={() => { if (p.boxMode) p.onBoxMode(); p.onTool("select"); }} testId="tool-select" />
+      <ToolButton icon={SquareDashedMousePointer} label="Oknem" kbd="B" active={p.boxMode && p.tool === "select"} onClick={p.onBoxMode} testId="tool-box" />
       <ToolButton icon={Ruler} label="Vzdálenost" kbd="M" active={p.tool === "distance"} onClick={() => p.onTool("distance")} testId="tool-distance" />
       <ToolButton icon={Diameter} label="Průměr" active={p.tool === "diameter"} onClick={() => p.onTool("diameter")} testId="tool-diameter" />
       <ToolButton icon={TriangleRight} label="Úhel" active={p.tool === "angle"} onClick={() => p.onTool("angle")} testId="tool-angle" />
@@ -556,9 +592,9 @@ function Toolbar(p: {
         </>
       )}
       <Sep />
-      <ToolButton icon={Trash2} label="Smazat díl" kbd="Del" disabled={!p.canDelete} onClick={p.onDelete} testId="tool-delete" />
+      <ToolButton icon={Trash2} label={p.drawing ? "Smazat" : "Smazat díl"} kbd="Del" disabled={!p.canDelete} onClick={p.onDelete} testId="tool-delete" />
       <ToolButton icon={Focus} label="Izolovat" kbd="I" disabled={!p.hasSelection} onClick={p.onIsolate} testId="tool-isolate" />
-      <ToolButton icon={Eye} label={p.hidden ? `Ukázat vše (${p.hidden})` : "Ukázat vše"} disabled={!p.hidden} onClick={p.onShowAll} testId="tool-showall" />
+      <ToolButton icon={Eye} label={p.hidden ? `Obnovit vše (${p.hidden})` : "Obnovit vše"} disabled={!p.hidden} onClick={p.onShowAll} testId="tool-showall" />
       <Sep />
       <ToolButton icon={Maximize2} label="Celý model" kbd="F" onClick={p.onFit} testId="tool-fit" />
       {!p.drawing && <ToolButton icon={Box} label="Pohledy" active={p.panel === "views"} onClick={() => p.onPanel("views")} testId="tool-views" />}
@@ -1271,15 +1307,39 @@ function SnapMarker({ kind, x, y, text }: { kind: string; x: number; y: number; 
 function PartCard({ engine, selection, materials, onMass }: { engine: ViewerEngine; selection: number[]; materials: ViewerMaterial[]; onMass: () => void }) {
   const one = selection.length === 1 ? engine.partInfo(selection[0]) : null;
   const mat = one ? materialOf(engine, one.index, materials) : null;
+  const many = one ? null : engine.getPartsSelection();
+  const drawing = engine.isDrawing();
   return (
     <div
       className="pointer-events-auto shrink-0 overflow-auto rounded-xl border bg-card/95 p-3 text-sm shadow-xl backdrop-blur"
       onPointerDown={(e) => e.stopPropagation()}
       data-testid="viewer3d-part"
+      data-count={selection.length}
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold" title={one?.name}>{one ? one.name : `Vybráno dílů: ${selection.length}`}</p>
+          <p className="truncate font-semibold" title={one?.name}>{one ? one.name : `Vybráno ${drawing ? "hladin" : "dílů"}: ${selection.length}`}</p>
+          {many && (
+            <div className="mt-1 space-y-1 text-xs" data-testid="parts-selection">
+              {many.size && (
+                <p className="flex justify-between gap-2 tabular-nums">
+                  <span className="text-muted-foreground">Rozměr výběru</span>
+                  <span>{(drawing ? many.size.slice(0, 2) : many.size).map(fmt1).join(" × ")} mm</span>
+                </p>
+              )}
+              {!drawing && many.names.length > 0 && (
+                <ul className="max-h-36 overflow-auto rounded-md border bg-background/60 px-2 py-1 scrollbar-thin" data-testid="parts-selection-names">
+                  {many.names.slice(0, 40).map(([n, c]) => (
+                    <li key={n} className="flex justify-between gap-2">
+                      <span className="min-w-0 truncate" title={n}>{n}</span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">{c}×</span>
+                    </li>
+                  ))}
+                  {many.names.length > 40 && <li className="text-muted-foreground">… a další ({many.names.length - 40})</li>}
+                </ul>
+              )}
+            </div>
+          )}
           {one && (
             <dl className="mt-1 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs tabular-nums">
               <dt className="text-muted-foreground">Rozměr</dt>
@@ -1323,10 +1383,66 @@ function PartCard({ engine, selection, materials, onMass }: { engine: ViewerEngi
         </div>
       </div>
       <div className="mt-2 flex flex-wrap gap-1.5">
-        <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Trash2 className="h-3.5 w-3.5" /> Smazat</button>
-        <button type="button" onClick={() => engine.isolate(selection)} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Focus className="h-3.5 w-3.5" /> Izolovat</button>
+        <button type="button" onClick={() => engine.deleteSelected()} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="part-delete"><Trash2 className="h-3.5 w-3.5" /> Smazat</button>
+        <button type="button" onClick={() => engine.isolate(selection)} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent" data-testid="part-isolate"><Focus className="h-3.5 w-3.5" /> Izolovat</button>
         <button type="button" onClick={() => engine.fit(true)} className="inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent"><Maximize2 className="h-3.5 w-3.5" /> Přiblížit</button>
       </div>
+      <p className="mt-1.5 text-[10px] text-muted-foreground">Smazání jen v prohlížeči — soubor se nemění · Ctrl+Z / Obnovit vše</p>
+    </div>
+  );
+}
+
+/** Výběr prvků 2D výkresu (oknem / Shift + klik): počty, délka obrysu pro řezání, průměry, rozměr, akce. */
+function DrawingSelectionCard({ engine }: { engine: ViewerEngine }) {
+  const sel = engine.getDrawingSelection();
+  if (!sel) return null;
+  const fmtLen = (v: number) => `${v.toLocaleString("cs-CZ", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mm`;
+  const holes = sel.diameters.reduce((a, [, n]) => a + n, 0);
+  const btn = "inline-flex min-h-9 items-center gap-1 rounded-md border px-2 text-xs font-medium hover:bg-accent";
+  return (
+    <div
+      className="pointer-events-auto shrink-0 overflow-auto rounded-xl border bg-card/95 p-3 text-sm shadow-xl backdrop-blur"
+      onPointerDown={(e) => e.stopPropagation()}
+      data-testid="viewer2d-selection"
+      data-count={sel.count}
+      data-length={sel.cutLength.toFixed(3)}
+    >
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">Vybráno: {czPlural(sel.count, ["prvek", "prvky", "prvků"])}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground" data-testid="viewer2d-selection-kinds">{sel.kinds.map(([k, n]) => kindLabel(k, n)).join(" · ")}</p>
+        </div>
+        <button type="button" onClick={() => engine.clearItemSelection()} aria-label="Zrušit výběr" className="rounded p-1 hover:bg-accent"><X className="h-4 w-4" /></button>
+      </div>
+      <dl className="mt-2 grid grid-cols-[auto,1fr] gap-x-3 gap-y-0.5 text-xs tabular-nums">
+        {sel.cutLength > 0 && (
+          <>
+            <dt className="text-muted-foreground" title="Součet délek čar, oblouků, kružnic a křivek (bez kót a textů) — pro nacenění řezání">Délka obrysu</dt>
+            <dd className="text-right font-semibold" data-testid="viewer2d-selection-length">{fmtLen(sel.cutLength)}</dd>
+          </>
+        )}
+        {holes > 0 && (
+          <>
+            <dt className="text-muted-foreground">Kružnice</dt>
+            <dd className="text-right">{sel.diameters.slice(0, 4).map(([d, n]) => `${n}× Ø${d.toLocaleString("cs-CZ")}`).join(" · ")}{sel.diameters.length > 4 ? " …" : ""}</dd>
+          </>
+        )}
+        {sel.size && (
+          <>
+            <dt className="text-muted-foreground">Rozměr výběru</dt>
+            <dd className="text-right">{sel.size.map(fmt1).join(" × ")} mm</dd>
+          </>
+        )}
+        <dt className="text-muted-foreground">Hladiny</dt>
+        <dd className="truncate text-right" title={sel.layers.map((i) => engine.partName(i)).join(", ")}>{sel.layers.map((i) => engine.partName(i)).join(", ")}</dd>
+      </dl>
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        <button type="button" onClick={() => engine.deleteSelected()} className={btn} data-testid="items-delete"><Trash2 className="h-3.5 w-3.5" /> Smazat</button>
+        <button type="button" onClick={() => engine.hideParts(sel.layers)} className={btn} data-testid="items-hide-layers"><EyeOff className="h-3.5 w-3.5" /> Skrýt hladiny</button>
+        <button type="button" onClick={() => engine.isolateSelected()} className={btn} data-testid="items-isolate-layers"><Focus className="h-3.5 w-3.5" /> Izolovat hladiny</button>
+        <button type="button" onClick={() => engine.fit(true)} className={btn}><Maximize2 className="h-3.5 w-3.5" /> Přiblížit</button>
+      </div>
+      <p className="mt-1.5 text-[10px] text-muted-foreground">Smazání jen v prohlížeči — originál výkresu se nemění · Ctrl+Z / Obnovit vše · „Uložit upravené PDF“ uloží kopii</p>
     </div>
   );
 }
@@ -1371,6 +1487,7 @@ function LoadingCard({ stage, prog, elapsedMs, sizeBytes }: { stage: LoadStage; 
 function StatusBar({ engine, format, wide, warnings }: { engine: ViewerEngine; format: string; wide: boolean; warnings: string[] }) {
   const size = engine.modelSize();
   const hidden = engine.hiddenCount();
+  const deleted = engine.deletedCount();
   return (
     <div
       className={cn(
@@ -1387,6 +1504,7 @@ function StatusBar({ engine, format, wide, warnings }: { engine: ViewerEngine; f
           : engine.partCount() === 1 ? "díl" : engine.partCount() < 5 ? "díly" : "dílů"}
         {hidden ? ` (${hidden} skryto)` : ""}
       </span>
+      {deleted > 0 && <span className="text-amber-700 dark:text-amber-400" data-testid="viewer2d-deleted">· smazáno {czPlural(deleted, ["prvek", "prvky", "prvků"])} (originál beze změny)</span>}
       {format && <span>· {format}</span>}
       {warnings.length > 0 && (
         <span className="pointer-events-auto inline-flex items-center gap-1 text-amber-700 dark:text-amber-400" title={warnings.join("\n")}>
@@ -1476,6 +1594,7 @@ const HELP: [string, string][] = [
   ["Přiblížení", "kolečko myši (ke kurzoru) · roztažení 2 prstů"],
   ["Celý model", "F nebo Ctrl+F · dvojklik do prázdna"],
   ["Výběr dílu", "klik · Ctrl / Shift + klik = více dílů"],
+  ["Výběr oknem", "tlačítko Oknem (B) a táhni levým tlačítkem / prstem, nebo Alt + táhni · doprava = jen díly celé uvnitř (modře), doleva = vše, čeho se dotkne (zeleně) · Shift = přidat, Ctrl = odebrat · Esc = zrušit"],
   ["Rozebrat sestavu", "Ctrl + táhni díl = přesun (Shift = jen po ose X/Y/Z) · tlačítko Rozebrat: posuvník rozložení, táhnutí bez Ctrl (telefon), Složit zpět"],
   ["Smazat díl", "klik na díl + Del (nebo H) · Izolovat = I · pravé tlačítko = smazat díl / celou podsestavu"],
   ["Výběrový filtr", "tlačítko Filtr nebo pravé tlačítko: tvar, díl, sestava, plocha, hrana, bod/roh, střed křivosti, střed hrany"],
@@ -1494,6 +1613,8 @@ const HELP_2D: [string, string][] = [
   ["Celý výkres", "F nebo Ctrl+F · dvojklik do prázdna"],
   ["Hladiny", "tlačítko Díly = seznam hladin: skrýt, izolovat, barva · vypnuté hladiny z výkresu jsou skryté (Ukázat vše)"],
   ["Výběr", "klik na čáru = hladina · Ctrl / Shift + klik = více · Del = skrýt · Ctrl+Z / Ctrl+Y"],
+  ["Výběr oknem", "tlačítko Oknem (B) a táhni levým tlačítkem / prstem, nebo Alt + táhni · doprava = jen prvky celé uvnitř, doleva = vše, čeho se dotkne · Shift = přidat, Ctrl = odebrat, Shift + klik = prvek přidat / odebrat · karta: počty, délka obrysu, průměry"],
+  ["Mazání prvků", "vybrané prvky Del / Smazat — jen v prohlížeči, originál se nemění · Ctrl+Z / Obnovit vše · „Uložit upravené PDF“ uloží upravený výkres jako nové PDF k zakázce"],
   ["Výběrový filtr", "hladina, čára, bod/roh, střed kružnice, střed čáry"],
   ["Měření", "M = vzdálenost · Průměr / rádius kružnice a oblouku · Úhel · chytá rohy, středy kružnic, poloviny čar · Esc = zrušit"],
   ["Barvy", "barvy hladin z výkresu; na tmavém pozadí se černá kreslí bíle · pravé tlačítko = barva hladiny"],

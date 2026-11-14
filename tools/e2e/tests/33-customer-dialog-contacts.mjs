@@ -6,12 +6,15 @@
 //     znovu otevřít → vše načtené; žádné vzory, které vypadají jako data;
 //  2. faktura jde na A (důvod „Fakturační e-mail zákazníka (A)"), mail opravdu odejde;
 //  3. dodací list jde na B (důvod „E-mail pro dodací listy (B)") — i když zakázka má kontaktní osobu; mail odejde;
-//  4. 390 px: dialog bez vodorovného přetékání, přidání osoby a účelu funguje.
+//  4. 390 px: dialog bez vodorovného přetékání, přidání osoby a účelu funguje;
+//  6. potvrzení objednávky (majitel 14. 11.): Komu = „Objednávky / potvrzení" (Natálie), kontakt zakázky (Pavel) v Kopii;
+//     změna Komu → tykání / oslovení / text nového adresáta; upravený text zůstane (jen oslovení + „Přegenerovat text");
+//     ruční Tykáme / Vykáme dál platí; mail odejde Natálii s Pavlem v kopii.
 //   E2E_BASE_URL=http://localhost:3600 [CUSTDLG_SHOTS=<adresář>] node tools/e2e/tests/33-customer-dialog-contacts.mjs
 // Vlastní data „E2E-33-" (zákazník, zakázky, e-maily), na začátku i na konci se uklidí.
 import fs from "node:fs";
 import path from "node:path";
-import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary, recipients } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary, recipients, setRecipients } from "../lib.mjs";
 import { lit, userIds, eventually, waitHydrated, expectNoOverflow, waitMail, removeStorageFiles, createJob } from "../lib-quotes-docs-flow.mjs";
 
 const browser = await launch();
@@ -287,6 +290,85 @@ await T("Upravit dodavatele: kontaktní osoba + Objednávky (bez Dodacích list�
   } finally {
     sql(`delete from suppliers where id = ${lit(SUP)}`);
   }
+});
+
+// ═════════════ 6. Potvrzení objednávky → Objednávky / potvrzení; změna adresáta → tón a text ═════════════
+await T("potvrzení: Komu = Natálie (Objednávky / potvrzení), Kopie = Pavel (kontakt zakázky); změna Komu přepne tykání, oslovení i text", async (context) => {
+  const NAT = { name: "Natálie Vojčíková", email: `vojcikova@${DOM}` };
+  const PAV = { name: "Pavel Novák", email: `pavel.novak@${DOM}` };
+  const natId = sql(`insert into customer_contacts (customer_id, name, position, email) values (${lit(CUST)}, ${lit(NAT.name)}, 'nákup', ${lit(NAT.email)}) returning id`).split("\n")[0];
+  sql(`insert into customer_contacts (customer_id, name, position, email) values (${lit(CUST)}, ${lit(PAV.name)}, 'technik', ${lit(PAV.email)})`);
+  sql(`insert into party_role_emails (customer_id, role, contact_id, is_default) values (${lit(CUST)}, 'nakup', ${lit(natId)}, true)`);
+  sql(`insert into contact_tone (user_id, email, address, tone) values (${lit(ID.obchod)}, ${lit(PAV.email)}, 'ty', 'pratelsky')`);
+  const CJ = createJob({ title: `${P}Potvrzení ${TAG}`, status: "objednavka", customerId: CUST, ownerId: ID.obchod, cpo: `PO-${TAG}-3`, reqDays: 20, contact: PAV.name, items: [{ name: "Pouzdro", qty: 6, price: 250 }] });
+  sql(`update orders set customer_contact_email = ${lit(PAV.email)} where id = ${lit(CJ.id)}`);
+  const toneOf = (email) => sql(`select address from contact_tone where user_id = ${lit(ID.obchod)} and email = ${lit(email)}`);
+
+  const page = await context.newPage();
+  await login(page, USERS.obchod);
+  await page.goto(`${BASE}/confirmations`);
+  await page.locator("main h1").filter({ hasText: "Potvrzení objednávek" }).first().waitFor({ timeout: 20_000 });
+  await page.waitForFunction(() => !document.querySelector('div[hidden][id^="S:"]'), null, { timeout: 20_000 });
+  const li = page.locator("main li").filter({ has: page.locator(`a[href="/orders/${CJ.id}"]`) }).first();
+  await li.waitFor({ timeout: 15_000 });
+  await waitHydrated(page, "main li button");
+  await li.getByRole("button", { name: "Potvrdit objednávku" }).click();
+  const dlg = page.getByRole("dialog");
+  await dlg.getByRole("heading", { name: `Potvrdit objednávku ${CJ.number}` }).waitFor({ timeout: 10_000 });
+  // už před vystavením: kam potvrzení půjde (karta zákazníka, ne kontakt zakázky)
+  await eventually(async () => expect(norm(await dlg.innerText()).includes(`na ${NAT.email}`), "formulář ukazuje Natálii"), { timeout: 15_000 });
+  await dlg.getByRole("button", { name: "Vystavit a pokračovat k e-mailu" }).click();
+  await dlg.getByRole("heading", { name: `Poslat potvrzení zakázky ${CJ.number}` }).waitFor({ timeout: 45_000 });
+  await eventually(async () => expect((await recipients(dlg, "Komu")) === NAT.email, `Komu = Natálie (${await recipients(dlg, "Komu")})`), { timeout: 20_000 });
+  expect((await recipients(dlg, "Kopie")) === PAV.email, `Kopie = Pavel (${await recipients(dlg, "Kopie")})`);
+  const reason = norm(await dlg.getByTestId("recipient-reason").innerText());
+  expect(reason === `Nákupní e-mail zákazníka (objednávky): ${NAT.name} · v kopii kontakt zakázky (${PAV.name})`, `důvod (${reason})`);
+  const body = dlg.getByLabel("Text e-mailu");
+  const toggle = dlg.getByTestId("tone-toggle");
+  expect((await body.inputValue()).startsWith("Dobrý den, paní Vojčíková,\n\nděkujeme za Vaši objednávku"), `text pro Natálii (${(await body.inputValue()).slice(0, 70)})`);
+  await eventually(async () => expect((await toggle.getAttribute("data-address")) === "vy", "Natálii vykáme"));
+  await snap(page, "desktop-05-confirm-natalie");
+
+  // Komu → Pavel (tyká) → oslovení, tykání a celý text pro Pavla, bez poznámky
+  await setRecipients(dlg, "Komu", PAV.email);
+  await eventually(async () => expect((await body.inputValue()).startsWith("Ahoj Pavle,\n\ndíky za tvou objednávku"), `text pro Pavla (${(await body.inputValue()).slice(0, 70)})`), { timeout: 20_000 });
+  await eventually(async () => expect((await toggle.getAttribute("data-address")) === "ty", "Pavlovi tykáme"));
+  expect(await dlg.getByTestId("tone-recipient-note").count() === 0, "neupravený text: bez poznámky");
+  await snap(page, "desktop-06-confirm-pavel");
+
+  // vlastní úprava textu → zpět na Natálii: text zůstane, vymění se oslovení + poznámka s „Přegenerovat text"
+  await body.fill(`${await body.inputValue()}\nPS: auto přijede ve čtvrtek.`);
+  await setRecipients(dlg, "Komu", NAT.email);
+  await eventually(async () => {
+    const v = await body.inputValue();
+    expect(v.startsWith("Dobrý den, paní Vojčíková,\n\ndíky za tvou objednávku") && v.includes("PS: auto přijede ve čtvrtek."), `úprava zůstala, oslovení nové (${v.slice(0, 70)})`);
+  }, { timeout: 20_000 });
+  const note = dlg.getByTestId("tone-recipient-note");
+  await note.waitFor({ timeout: 10_000 });
+  expect(norm(await note.innerText()).includes(`Oslovení upraveno pro ${NAT.name} (vykání).`), `poznámka (${norm(await note.innerText())})`);
+  await snap(page, "desktop-07-confirm-note");
+  await note.getByRole("button", { name: "Přegenerovat text" }).click();
+  await eventually(async () => {
+    const v = await body.inputValue();
+    expect(v.startsWith("Dobrý den, paní Vojčíková,\n\nděkujeme za Vaši objednávku") && !v.includes("PS: auto"), `přegenerováno (${v.slice(0, 70)})`);
+  }, { timeout: 20_000 });
+  await eventually(async () => expect(await dlg.getByTestId("tone-recipient-note").count() === 0, "poznámka zmizela"));
+
+  // ruční přepínač dál platí (uloží se k Natálii) a text se přizpůsobí
+  await toggle.getByRole("button", { name: "Tykáme" }).click();
+  await eventually(async () => expect((await body.inputValue()).startsWith("Ahoj Natálie,\n\ndíky za tvou objednávku") && toneOf(NAT.email) === "ty", `ruční tykání (${(await body.inputValue()).slice(0, 60)})`), { timeout: 20_000 });
+  await toggle.getByRole("button", { name: "Vykáme" }).click();
+  await eventually(async () => expect((await body.inputValue()).startsWith("Dobrý den, paní Vojčíková,\n\nděkujeme za Vaši objednávku") && toneOf(NAT.email) === "vy", "zpět vykání"), { timeout: 20_000 });
+
+  // Kopie: Pavel (kontakt zakázky) zůstal; odeslat
+  expect((await recipients(dlg, "Kopie")) === PAV.email, "Kopie = Pavel");
+  const t0 = new Date().toISOString();
+  await dlg.getByRole("button", { name: "Odeslat potvrzení" }).click();
+  const mail = await waitMail(NAT.email, (m) => m.receivedAt > t0 && /Potvrzení/.test(String(m.subject)), 45_000);
+  expect(mail, "potvrzení odešlo Natálii");
+  expect(String(mail?.text ?? "").startsWith("Dobrý den, paní Vojčíková,"), `odeslaný text (${String(mail?.text ?? "").slice(0, 40)})`);
+  expect(await waitMail(PAV.email, (m) => m.receivedAt > t0 && /Potvrzení/.test(String(m.subject)), 15_000), "Pavel v kopii");
+  await shot(page, S("06-confirm-sent"));
 });
 
 const cleaned = await cleanup();

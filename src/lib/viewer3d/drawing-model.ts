@@ -6,6 +6,7 @@
  */
 import type { Curve, PartTopology, Vec3 } from "./topology";
 import type { DrawColor, DrawEntity, Drawing2D, Pt } from "./drawing2d";
+import type { DrawItemKind } from "./box-select";
 import type { DrawingText, MeshPart, ModelNode, ParsedModel } from "./types";
 
 export type { DrawingText };
@@ -104,10 +105,10 @@ function addPolyline(b: Builder, pts: Pt[], color: DrawColor, closed: boolean, i
   if (!closed) b.corners.push(start[0], start[1], 0, end[0], end[1], 0);
 }
 
-function addEntity(b: Builder, e: DrawEntity) {
+function addEntity(b: Builder, e: DrawEntity, item: number) {
   switch (e.kind) {
     case "line":
-      addPolyline(b, [e.a, e.b], e.color, false, { kind: "line" });
+      addPolyline(b, [e.a, e.b], e.color, false, { kind: "line", item });
       return;
     case "polyline": {
       const n = e.points.length;
@@ -118,8 +119,8 @@ function addEntity(b: Builder, e: DrawEntity) {
         const arc = bulgeArc(p1, p2, e.bulges?.[i] ?? 0);
         if (arc) {
           const pts = arc.ccw ? arcPts(arc.c, arc.r, arc.a0, arc.a1) : arcPts(arc.c, arc.r, arc.a1, arc.a0).reverse();
-          addPolyline(b, pts, e.color, false, { kind: "arc", center: [arc.c[0], arc.c[1], 0], radius: arc.r });
-        } else addPolyline(b, [p1, p2], e.color, false, { kind: "line" });
+          addPolyline(b, pts, e.color, false, { kind: "arc", center: [arc.c[0], arc.c[1], 0], radius: arc.r, item });
+        } else addPolyline(b, [p1, p2], e.color, false, { kind: "line", item });
       }
       return;
     }
@@ -127,11 +128,11 @@ function addEntity(b: Builder, e: DrawEntity) {
       const pts = arcPts(e.c, e.r, 0, Math.PI * 2);
       pts.pop();
       pts.push(pts[0]);
-      addPolyline(b, pts, e.color, true, { kind: "circle", center: [e.c[0], e.c[1], 0], radius: e.r });
+      addPolyline(b, pts, e.color, true, { kind: "circle", center: [e.c[0], e.c[1], 0], radius: e.r, item });
       return;
     }
     case "arc":
-      addPolyline(b, arcPts(e.c, e.r, e.start, e.end), e.color, false, { kind: "arc", center: [e.c[0], e.c[1], 0], radius: e.r });
+      addPolyline(b, arcPts(e.c, e.r, e.start, e.end), e.color, false, { kind: "arc", center: [e.c[0], e.c[1], 0], radius: e.r, item });
       return;
     case "ellipse": {
       let a1 = e.end;
@@ -142,17 +143,17 @@ function addEntity(b: Builder, e: DrawEntity) {
         const t = e.start + ((a1 - e.start) * i) / n;
         pts.push([e.c[0] + e.major[0] * Math.cos(t) - e.major[1] * e.ratio * Math.sin(t), e.c[1] + e.major[1] * Math.cos(t) + e.major[0] * e.ratio * Math.sin(t)]);
       }
-      addPolyline(b, pts, e.color, Math.abs(a1 - e.start - Math.PI * 2) < 1e-6, { kind: "curve" });
+      addPolyline(b, pts, e.color, Math.abs(a1 - e.start - Math.PI * 2) < 1e-6, { kind: "curve", item });
       return;
     }
     case "curve":
-      addPolyline(b, e.closed ? [...e.points, e.points[0]] : e.points, e.color, e.closed, { kind: "curve" });
+      addPolyline(b, e.closed ? [...e.points, e.points[0]] : e.points, e.color, e.closed, { kind: "curve", item });
       return;
     case "point": {
       // malý křížek
       const s = 0.5;
-      addPolyline(b, [[e.p[0] - s, e.p[1]], [e.p[0] + s, e.p[1]]], e.color, false, { kind: "line" });
-      addPolyline(b, [[e.p[0], e.p[1] - s], [e.p[0], e.p[1] + s]], e.color, false, { kind: "line" });
+      addPolyline(b, [[e.p[0] - s, e.p[1]], [e.p[0] + s, e.p[1]]], e.color, false, { kind: "line", item });
+      addPolyline(b, [[e.p[0], e.p[1] - s], [e.p[0], e.p[1] + s]], e.color, false, { kind: "line", item });
       b.corners.push(e.p[0], e.p[1], 0);
       return;
     }
@@ -194,6 +195,57 @@ export function textBounds(t: DrawingText): [number, number, number, number] {
   return [minX, minY, maxX, maxY];
 }
 
+/**
+ * Vybíratelné prvky výkresu: samostatná entita, nebo celá skupina (blok, kóta, šrafa, odkaz).
+ * Vrací prvek každé entity a druh každého prvku — stejně v prohlížeči i na serveru (úpravy výkresu).
+ */
+export function drawingItemIds(d: Drawing2D): { ids: Int32Array; items: DrawItemKind[] } {
+  const ids = new Int32Array(d.entities.length);
+  const items: DrawItemKind[] = [];
+  const groupItem = new Map<number, number>();
+  d.entities.forEach((e, i) => {
+    const g = e.group !== undefined ? d.groups?.[e.group] : undefined;
+    if (g) {
+      let item = groupItem.get(e.group!);
+      if (item === undefined) {
+        item = items.push(g.kind) - 1;
+        groupItem.set(e.group!, item);
+      }
+      ids[i] = item;
+    } else ids[i] = items.push(e.kind) - 1;
+  });
+  return { ids, items };
+}
+
+/** Úpravy výkresu z prohlížeče (smazané prvky, skryté / zapnuté hladiny) — viz ViewerEngine.getDrawingEdits. */
+export interface DrawingEditsInput {
+  itemCount: number;
+  deletedItems: number[];
+  hiddenLayers: string[];
+  shownLayers: string[];
+}
+
+export class DrawingEditsMismatch extends Error {
+  constructor() {
+    super("Výkres se mezitím změnil — otevři ho znovu a úpravy zopakuj.");
+    this.name = "DrawingEditsMismatch";
+  }
+}
+
+/** Výkres s úpravami z prohlížeče (nový objekt; originál zůstává). Jiný počet prvků → DrawingEditsMismatch. */
+export function applyDrawingEdits(d: Drawing2D, edits: DrawingEditsInput): Drawing2D {
+  const { ids, items } = drawingItemIds(d);
+  if (items.length !== edits.itemCount) throw new DrawingEditsMismatch();
+  const del = new Set(edits.deletedItems);
+  const hide = new Set(edits.hiddenLayers);
+  const show = new Set(edits.shownLayers);
+  return {
+    ...d,
+    entities: d.entities.filter((e, i) => !del.has(ids[i]) && !hide.has(e.layer)),
+    layers: d.layers.map((l) => (hide.has(l.name) ? { ...l, off: true } : show.has(l.name) ? { ...l, off: false } : l)),
+  };
+}
+
 export interface DrawingModel {
   model: ParsedModel;
   topology: PartTopology[];
@@ -205,15 +257,17 @@ export function drawingToModel(d: Drawing2D): DrawingModel {
   const index = new Map(order.map((n, i) => [n, i]));
   const builders = order.map(() => newBuilder());
   const texts: DrawingText[] = [];
-  for (const e of d.entities) {
+  const { ids, items } = drawingItemIds(d);
+  d.entities.forEach((e, ei) => {
     const pi = index.get(e.layer)!;
+    const item = ids[ei];
     if (e.kind === "text") {
       texts.push({
         part: pi, x: e.p[0], y: e.p[1], text: e.text, height: e.height, rotation: e.rotation,
-        hAlign: e.hAlign, vAlign: e.vAlign, width: e.width, color: e.color === "fg" ? null : [e.color[0], e.color[1], e.color[2]],
+        hAlign: e.hAlign, vAlign: e.vAlign, width: e.width, color: e.color === "fg" ? null : [e.color[0], e.color[1], e.color[2]], item,
       });
-    } else addEntity(builders[pi], e);
-  }
+    } else addEntity(builders[pi], e, item);
+  });
   // hladiny bez čar i textů pryč
   const keep = order.map((_, i) => builders[i].seg.length > 0 || texts.some((t) => t.part === i));
   const remap = new Map<number, number>();
@@ -242,7 +296,7 @@ export function drawingToModel(d: Drawing2D): DrawingModel {
   // hladina jen s texty má díl (bez čar) — viz keep
   const root: ModelNode = { name: "Hladiny", parts: parts.map((_, i) => i), children: [] };
   return {
-    model: { parts, root, format: d.format, warnings: d.warnings, drawing: { texts, darkColors, hidden } },
+    model: { parts, root, format: d.format, warnings: d.warnings, drawing: { texts, darkColors, hidden, items } },
     topology,
   };
 }

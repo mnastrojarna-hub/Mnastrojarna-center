@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { acceleratedRaycast, computeBoundsTree, disposeBoundsTree } from "three-mesh-bvh";
-import type { ModelNode, ParsedModel } from "@/lib/viewer3d/types";
+import type { DrawingText, ModelNode, ParsedModel } from "@/lib/viewer3d/types";
 import type { PartTopology, Vec3 } from "@/lib/viewer3d/topology";
 import { chainSegments, sliceMesh, type SectionTopology } from "@/lib/viewer3d/section";
 import { buildAssemblyGroups, type AssemblyGroups } from "@/lib/viewer3d/assembly-groups";
@@ -10,6 +10,11 @@ import {
   measureAngle, measureDiameter, measureDistance, meshVolumeArea,
   type MeasureMode, type Measurement, type SnapGeometry, type SnapKind, type SnapPoint,
 } from "@/lib/viewer3d/measure";
+import {
+  CUT_KINDS, applySelectOp, boxHit, countByKind, diameterCounts, dragBox, expandGroups, projectedBoxRect, rectInside, rectOf,
+  rectRelation, rectsOverlap, segmentTouchesRect, segmentsRelation, selectOp, triangleTouchesRect,
+  type BoxMode, type DrawItemKind, type Rect, type SelectOp,
+} from "@/lib/viewer3d/box-select";
 import { CadControls } from "./cad-controls";
 import { CUBE_SIZE_PX, ViewCube } from "./view-cube";
 
@@ -114,6 +119,34 @@ export interface ContextRequest {
   face?: { part: number; index: number } | null;
 }
 
+/** Souhrn výběru oknem ve 2D výkresu (prvky: čáry, kružnice, texty, bloky, kóty…). */
+export interface DrawingSelection {
+  count: number;
+  kinds: [DrawItemKind, number][];
+  /** Délka obrysu (čáry, oblouky, kružnice, křivky, bloky — bez kót, textů, šraf) v mm. */
+  cutLength: number;
+  /** Průměry vybraných kružnic [Ø, počet]. */
+  diameters: [number, number][];
+  /** Rozměr výběru (š × v) v mm. */
+  size: [number, number] | null;
+  /** Hladiny vybraných prvků. */
+  layers: number[];
+}
+
+/** Souhrn výběru dílů (3D): počet, rozměr obalového kvádru, díly podle jména. */
+export interface PartsSelection {
+  count: number;
+  size: Vec3 | null;
+  names: [string, number][];
+}
+
+/** Řazení názvů dílů (jeden collator — localeCompare s jazykem ho vytváří při každém volání). */
+const NAME_ORDER = new Intl.Collator("cs", { numeric: true });
+
+/** Strop práce při upřesnění výběru oknem (vrcholy / trojúhelníky za jedno tažení). */
+const BOX_VERT_BUDGET = 4_000_000;
+const BOX_TRI_BUDGET = 1_500_000;
+
 export interface SnapState {
   kind: SnapKind;
   x: number;
@@ -150,6 +183,8 @@ interface PartView {
   lineLight?: Float32Array;
   lineDark?: Float32Array;
   texts?: THREE.Object3D | null;
+  /** 2D: topologie a barvy čar bez smazaných prvků — originál (ze souboru) pro zpět / obnovit. */
+  orig?: { topo: PartTopology; lineLight?: Float32Array; lineDark?: Float32Array; box: THREE.Box3 };
 }
 
 /** Geometrie dílu pro výpočet polotovaru + kde ho nakreslit. */
@@ -166,6 +201,18 @@ interface Snapshot {
   measures: Measurement[];
   offsets: Float32Array;
   colors: { over: (number | null)[]; faces: [number, [number, number][]][] };
+  /** Smazané prvky 2D výkresu (jen v prohlížeči). */
+  deleted: number[];
+}
+
+/** Úpravy 2D výkresu v prohlížeči (originál se nemění) — pro „Převést na PDF" upraveného výkresu. */
+export interface DrawingEdits {
+  /** Počet prvků výkresu (kontrola, že server čte stejný výkres). */
+  itemCount: number;
+  deletedItems: number[];
+  /** Hladiny skryté v prohlížeči / zapnuté, ač je výkres má vypnuté. */
+  hiddenLayers: string[];
+  shownLayers: string[];
 }
 
 /** Paleta pro barvy dílů / ploch (sRGB) — dobře rozlišitelné odstíny jako v CAD. */
@@ -277,12 +324,25 @@ export class ViewerEngine {
   private moveCtx: { parts: number[]; start: THREE.Vector3[]; from: THREE.Vector3; before: Snapshot; moved: boolean } | null = null;
   private explodeCtx: { before: Snapshot; base: THREE.Vector3[]; dirs: THREE.Vector3[]; parts: number[] } | null = null;
   private explodeValue = 0;
+  // výběr oknem (box select) a vybrané prvky 2D výkresu
+  private boxMode = false;
+  private boxEl: HTMLDivElement | null = null;
+  private drawTexts: DrawingText[] = [];
+  private itemKinds: DrawItemKind[] = [];
+  private itemSel = new Set<number>();
+  private itemSelObj: THREE.Object3D | null = null;
+  private itemIndex: { curveStart: Uint32Array; curvePart: Uint32Array; curveIdx: Uint32Array; textStart: Uint32Array; texts: Uint32Array } | null = null;
+  private itemSummary: DrawingSelection | null = null;
+  private projScratch = new Float32Array(0);
   // 2D výkres (DXF / DWG)
   private is2D = false;
   private darkBg = false;
   private lineVC = new THREE.LineBasicMaterial({ vertexColors: true });
   private lineHover = new THREE.LineBasicMaterial({ color: 0xd97706 });
-  private textItems: { part: number; obj: { color: number; sync: (cb?: () => void) => void }; raw: [number, number, number] | null }[] = [];
+  private textItems: { part: number; index: number; obj: { color: number; text: string; sync: (cb?: () => void) => void }; raw: [number, number, number] | null }[] = [];
+  /** Smazané prvky výkresu a hladiny skryté při otevření (vypnuté ve výkresu). */
+  private deleted = new Set<number>();
+  private initialHidden = new Set<number>();
   private hatch: THREE.Texture | null = null;
   private stencilBack = new THREE.MeshBasicMaterial({
     side: THREE.BackSide, colorWrite: false, depthWrite: false, depthTest: false, stencilWrite: true,
@@ -346,6 +406,10 @@ export class ViewerEngine {
       leave: () => this.clearHover(),
       contextMenu: (x, y, cx, cy) => this.openContext(x, y, cx, cy),
       canMove: (x, y, info) => this.canMove(x, y, info),
+      boxQuery: (x, y, info) => this.boxQuery(x, y, info),
+      boxMove: (sx, sy, x, y) => this.boxMove(sx, sy, x, y),
+      boxEnd: (sx, sy, x, y, mods) => this.boxEnd(sx, sy, x, y, mods),
+      boxCancel: () => this.boxCancel(),
       moveStart: (x, y) => this.moveStart(x, y),
       moveTo: (x, y, info) => this.moveTo(x, y, info),
       moveEnd: () => this.moveEnd(),
@@ -397,6 +461,10 @@ export class ViewerEngine {
     this.clearMeasureObjects();
     this.clearSectionObjects();
     this.setEntityObj(null);
+    this.setItemSelObj(null);
+    this.itemSel.clear();
+    this.itemIndex = null;
+    this.itemSummary = null;
     if (this.stockObj) {
       this.overlayGroup.remove(this.stockObj);
       disposeObject(this.stockObj);
@@ -543,8 +611,12 @@ export class ViewerEngine {
       });
     });
     this.is2D = !!model.drawing;
+    this.drawTexts = model.drawing?.texts ?? [];
+    this.itemKinds = model.drawing?.items ?? [];
     // vypnuté hladiny výkresu → po otevření skryté (mimo historii)
     for (const i of model.drawing?.hidden ?? []) if (this.parts[i]) this.parts[i].hidden = true;
+    this.initialHidden = new Set(model.drawing?.hidden ?? []);
+    this.deleted = new Set();
     if (this.is2D) this.buildTexts(model);
 
     const all = new THREE.Box3();
@@ -1137,7 +1209,8 @@ export class ViewerEngine {
 
   /** Zobrazit vše (nebo vybrané díly). */
   fit(onlySelection = false, animate = true) {
-    const box = onlySelection && this.selection.size ? this.visibleBox(this.selection) : this.visibleBox();
+    const items = onlySelection && this.itemSel.size ? this.itemsBox() : null;
+    const box = items ?? (onlySelection && this.selection.size ? this.visibleBox(this.selection) : this.visibleBox());
     if (box.isEmpty()) return;
     const c = box.getCenter(new THREE.Vector3());
     this.pivot.copy(c);
@@ -1168,7 +1241,7 @@ export class ViewerEngine {
 
   // ------------------------------------------------------------------ výběr a zobrazení
 
-  private raycastParts(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number; cap?: boolean } | null {
+  private raycastParts(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number; cap?: boolean; seg?: number } | null {
     if (!this.parts.length) return null;
     if (this.is2D) return this.pickLine(x, y);
     this.updateFrustum();
@@ -1208,7 +1281,7 @@ export class ViewerEngine {
   }
 
   /** 2D: nejbližší čára pod kurzorem (výběr hladiny). */
-  private pickLine(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number } | null {
+  private pickLine(x: number, y: number): { part: number; point: THREE.Vector3; tri: number; distance: number; seg?: number } | null {
     this.updateFrustum();
     const tol = this.touchMode ? 16 : 7;
     const m = this.camera.matrixWorldInverse.clone().premultiply(this.camera.projectionMatrix).elements;
@@ -1217,7 +1290,7 @@ export class ViewerEngine {
       const ny = m[1] * px + m[5] * py + m[13];
       return [((nx + 1) / 2) * this.width, ((1 - ny) / 2) * this.height];
     };
-    let best: { part: number; d: number; px: number; py: number } | null = null;
+    let best: { part: number; d: number; px: number; py: number; seg: number } | null = null;
     const wpp = this.worldPerPx();
     for (const p of this.parts) {
       if (p.hidden) continue;
@@ -1235,13 +1308,13 @@ export class ViewerEngine {
         const u = l2 > 0 ? Math.max(0, Math.min(1, ((x - ax) * vx + (y - ay) * vy) / l2)) : 0;
         const d = Math.hypot(ax + vx * u - x, ay + vy * u - y);
         if (d <= tol && (!best || d < best.d)) {
-          best = { part: p.index, d, px: seg[s] + ox + (seg[s + 3] - seg[s]) * u, py: seg[s + 1] + oy + (seg[s + 4] - seg[s + 1]) * u };
+          best = { part: p.index, d, px: seg[s] + ox + (seg[s + 3] - seg[s]) * u, py: seg[s + 1] + oy + (seg[s + 4] - seg[s + 1]) * u, seg: s / 6 };
         }
       }
     }
     if (!best) return null;
     const point = new THREE.Vector3(best.px, best.py, 0);
-    return { part: best.part, point, tri: -1, distance: point.clone().sub(this.camera.position).length() };
+    return { part: best.part, point, tri: -1, distance: point.clone().sub(this.camera.position).length(), seg: best.seg };
   }
 
   /** 2D: texty hladin (SDF písmo Roboto s diakritikou), dávkově po hladinách. */
@@ -1252,6 +1325,7 @@ export class ViewerEngine {
     void import("troika-three-text").then((troika) => {
       if (this.disposed) return;
       const byPart = new Map<number, typeof texts>();
+      const textIndex = new Map(texts.map((t, i) => [t, i]));
       let pending = 0;
       for (const t of texts.slice(0, 20000)) {
         const list = byPart.get(t.part) ?? [];
@@ -1274,7 +1348,9 @@ export class ViewerEngine {
           tx.lineHeight = 1.35;
           tx.position.set(t.x, t.y, 0.001);
           tx.rotation.z = t.rotation;
-          const item = { part, obj: tx as unknown as { color: number; sync: (cb?: () => void) => void }, raw: t.color };
+          // smazaný prvek (načtení textů po smazání) → prázdný text
+          if (t.item !== undefined && this.deleted.has(t.item)) tx.text = "";
+          const item = { part, index: textIndex.get(t) ?? -1, obj: tx as unknown as { color: number; text: string; sync: (cb?: () => void) => void }, raw: t.color };
           tx.color = this.textColor(item, p);
           batch.add(tx);
           this.textItems.push(item);
@@ -1427,6 +1503,7 @@ export class ViewerEngine {
 
   select(indices: number[], additive = false) {
     if (!additive) this.selection.clear();
+    if (this.itemSel.size) this.setItems(new Set());
     for (const i of indices) {
       if (!this.parts[i]) continue;
       if (additive && this.selection.has(i)) this.selection.delete(i);
@@ -1453,6 +1530,7 @@ export class ViewerEngine {
         over: this.parts.map((p) => p.colorOverride),
         faces: this.parts.filter((p) => p.faceColors.size).map((p) => [p.index, [...p.faceColors.entries()]]),
       },
+      deleted: [...this.deleted],
     };
   }
 
@@ -1486,6 +1564,11 @@ export class ViewerEngine {
     });
     this.measures = [...s.measures];
     this.syncMeasureObjects();
+    if (s.deleted.length !== this.deleted.size || s.deleted.some((i) => !this.deleted.has(i))) {
+      this.deleted = new Set(s.deleted);
+      this.applyDeleted();
+    }
+    this.syncItemSel();
     if (moved) {
       this.updateModelSphere();
       this.explodeValue = this.hasOffsets() ? this.explodeValue : 0;
@@ -1533,6 +1616,7 @@ export class ViewerEngine {
       this.applyPartState(this.parts[i]);
     }
     if (hidden && this.hoverPart !== null && changed.includes(this.hoverPart)) this.hoverPart = null;
+    this.syncItemSel();
     if (this.section) this.rebuildSection(true);
     this.commit(before);
     this.requestRender();
@@ -1550,7 +1634,9 @@ export class ViewerEngine {
   }
 
   deleteSelected() {
-    if (this.selection.size) this.hideParts([...this.selection]);
+    // vybrané prvky výkresu → smazat je (jen v prohlížeči, soubor se nemění; zpět Ctrl+Z)
+    if (this.itemSel.size) this.deleteItems([...this.itemSel]);
+    else if (this.selection.size) this.hideParts([...this.selection]);
     else if (this.entity) {
       // vybraná plocha / hrana / bod → smazat díl, ke kterému patří
       const part = this.entity.part;
@@ -1560,7 +1646,13 @@ export class ViewerEngine {
   }
 
   hasDeletable(): boolean {
-    return this.selection.size > 0 || !!this.entity;
+    return this.selection.size > 0 || !!this.entity || this.itemSel.size > 0;
+  }
+
+  /** Izolovat výběr: díly, nebo hladiny vybraných prvků výkresu. */
+  isolateSelected() {
+    if (this.itemSel.size) this.isolate(this.itemLayers());
+    else if (this.selection.size) this.isolate([...this.selection]);
   }
 
   isolate(indices: number[]) {
@@ -1577,6 +1669,7 @@ export class ViewerEngine {
       this.applyPartState(p);
     }
     if (!changed) return;
+    this.syncItemSel();
     if (this.section) this.rebuildSection(true);
     this.commit(before);
     this.requestRender();
@@ -1584,8 +1677,137 @@ export class ViewerEngine {
     this.onChange("selection");
   }
 
+  /** Ukázat / obnovit vše: skryté díly i hladiny a smazané prvky výkresu (jeden krok zpět). */
   showAll() {
-    this.setHidden(this.parts.map((p) => p.index), false);
+    if (!this.deleted.size) return this.setHidden(this.parts.map((p) => p.index), false);
+    const before = this.snapshot();
+    for (const p of this.parts) {
+      p.hidden = false;
+      this.applyPartState(p);
+    }
+    this.deleted = new Set();
+    this.applyDeleted();
+    this.syncItemSel();
+    this.commit(before);
+    this.requestRender();
+    this.onChange("visibility");
+    this.onChange("selection");
+  }
+
+  deletedCount(): number {
+    return this.deleted.size;
+  }
+
+  /** Smazat prvky 2D výkresu — jen v prohlížeči (zpět: Ctrl+Z, Obnovit vše); soubor se nemění. */
+  deleteItems(ids: number[]) {
+    const add = ids.filter((i) => i >= 0 && i < this.itemKinds.length && !this.deleted.has(i));
+    if (!add.length) return;
+    const before = this.snapshot();
+    for (const i of add) this.deleted.add(i);
+    this.applyDeleted();
+    this.itemSel = new Set([...this.itemSel].filter((i) => !this.deleted.has(i)));
+    this.itemSummary = null;
+    this.rebuildItemHighlight();
+    this.commit(before);
+    this.requestRender();
+    this.onChange("visibility");
+    this.onChange("selection");
+  }
+
+  /** Úpravy výkresu oproti souboru (smazané prvky, jinak skryté / zapnuté hladiny); null = beze změny. */
+  getDrawingEdits(): DrawingEdits | null {
+    if (!this.is2D) return null;
+    const hiddenLayers = this.parts.filter((p) => p.hidden && !this.initialHidden.has(p.index)).map((p) => p.name);
+    const shownLayers = this.parts.filter((p) => !p.hidden && this.initialHidden.has(p.index)).map((p) => p.name);
+    if (!this.deleted.size && !hiddenLayers.length && !shownLayers.length) return null;
+    return { itemCount: this.itemKinds.length, deletedItems: [...this.deleted].sort((a, b) => a - b), hiddenLayers, shownLayers };
+  }
+
+  /**
+   * Smazané prvky → topologie a čáry hladin bez nich (výběr, uchopení, měření i vykreslení je pak
+   * nevidí), texty prázdné. Počítá se vždy z originálu hladiny (zpět / obnovit).
+   */
+  private applyDeleted() {
+    if (!this.is2D) return;
+    const del = this.deleted;
+    for (const p of this.parts) {
+      const src = p.orig?.topo ?? p.topo;
+      const hit = src.curves.some((c) => c.item !== undefined && del.has(c.item));
+      if (!hit && !p.orig) continue;
+      if (!p.orig) p.orig = { topo: p.topo, lineLight: p.lineLight, lineDark: p.lineDark, box: p.localBox.clone() };
+      const o = p.orig;
+      if (!hit) {
+        p.topo = o.topo;
+        p.lineLight = o.lineLight;
+        p.lineDark = o.lineDark;
+      } else {
+        const curves = src.curves.filter((c) => c.item === undefined || !del.has(c.item));
+        let n = 0;
+        for (const c of curves) n += c.segCount;
+        const edge = new Float32Array(n * 6);
+        const segCurve = new Uint32Array(n);
+        const light = o.lineLight ? new Float32Array(n * 6) : undefined;
+        const dark = o.lineDark ? new Float32Array(n * 6) : undefined;
+        const corners: number[] = [];
+        let k = 0;
+        const out = curves.map((c, ci) => {
+          const from = c.segStart * 6;
+          const len = c.segCount * 6;
+          edge.set(src.edgeSegments.subarray(from, from + len), k * 6);
+          light?.set(o.lineLight!.subarray(from, from + len), k * 6);
+          dark?.set(o.lineDark!.subarray(from, from + len), k * 6);
+          segCurve.fill(ci, k, k + c.segCount);
+          const nc = { ...c, segStart: k };
+          k += c.segCount;
+          if (c.item !== undefined && this.itemKinds[c.item] === "point") corners.push(...c.mid);
+          else if (!c.closed) corners.push(...c.start, ...c.end);
+          return nc;
+        });
+        p.topo = { ...src, edgeSegments: edge, curves: out, segCurve, corners: Float32Array.from(corners) };
+        p.lineLight = light;
+        p.lineDark = dark;
+      }
+      for (const obj of [p.edges, p.wires]) {
+        if (!obj) continue;
+        obj.geometry.setAttribute("position", new THREE.BufferAttribute(p.topo.edgeSegments, 3));
+        obj.geometry.computeBoundingSphere();
+      }
+      if (p.wires && p.lineLight) {
+        p.wires.geometry.setAttribute("color", new THREE.BufferAttribute((this.darkBg ? p.lineDark ?? p.lineLight : p.lineLight).slice(), 3));
+        if (p.colorOverride !== null) this.applyColors(p);
+      }
+      // obalový kvádr hladiny ze zbylých čar a textů
+      const box = new THREE.Box3();
+      const v = new THREE.Vector3();
+      const e = p.topo.edgeSegments;
+      for (let i = 0; i < e.length; i += 3) box.expandByPoint(v.set(e[i], e[i + 1], e[i + 2]));
+      for (const t of this.drawTexts) {
+        if (t.part !== p.index || (t.item !== undefined && del.has(t.item))) continue;
+        const [x0, y0, x1, y1] = textBounds(t);
+        box.expandByPoint(v.set(x0, y0, 0)).expandByPoint(v.set(x1, y1, 0));
+      }
+      p.localBox = box.isEmpty() ? o.box.clone() : box;
+      this.setOffset(p, p.offset);
+    }
+    // texty smazaných prvků prázdné (troika) — jen dávky, kterých se to týká
+    const touched = new Set<number>();
+    for (const t of this.textItems) {
+      const src = this.drawTexts[t.index];
+      const want = src && src.item !== undefined && del.has(src.item) ? "" : src?.text ?? "";
+      if (t.obj.text !== want) {
+        t.obj.text = want;
+        touched.add(t.part);
+      }
+    }
+    for (const i of touched) (this.parts[i]?.texts as unknown as { sync?: (cb?: () => void) => void } | null)?.sync?.(() => this.requestRender());
+    this.itemIndex = null;
+    this.snap = null;
+    this.clearSnapHighlight();
+    if (this.hoverPart !== null) {
+      const hp = this.parts[this.hoverPart];
+      this.hoverPart = null;
+      if (hp) this.applyPartState(hp);
+    }
   }
 
   // ------------------------------------------------------------------ nástroje a měření
@@ -1636,8 +1858,16 @@ export class ViewerEngine {
       this.setTool("select");
       return true;
     }
+    if (this.itemSel.size) {
+      this.clearItemSelection();
+      return true;
+    }
     if (this.selection.size) {
       this.clearSelection();
+      return true;
+    }
+    if (this.boxMode) {
+      this.setBoxMode(false);
       return true;
     }
     return false;
@@ -1878,7 +2108,7 @@ export class ViewerEngine {
         if (part !== null) this.applyPartState(this.parts[part]);
         this.requestRender();
       }
-      this.container.style.cursor = part !== null ? (this.tool === "move" ? "move" : "pointer") : "default";
+      this.container.style.cursor = this.boxMode && this.tool === "select" ? "crosshair" : part !== null ? (this.tool === "move" ? "move" : "pointer") : "default";
       return;
     }
     this.container.style.cursor = "crosshair";
@@ -2076,8 +2306,17 @@ export class ViewerEngine {
         return;
       }
       const hit = this.raycastParts(x, y);
+      // výkres s vybranými prvky (výběr oknem): Shift / Ctrl + klik přidá / odebere prvek pod kurzorem
+      if (this.itemSel.size && info.additive) {
+        const item = hit ? this.itemOfHit(hit) : null;
+        if (item !== null) this.setItems(applySelectOp(this.itemSel, [item], this.itemSel.has(item) ? "remove" : "add"));
+        return;
+      }
       if (hit) this.select(this.filter === "shape" ? [hit.part] : this.filter === "assembly" ? this.assemblyGroup(hit.part) : this.partGroup(hit.part), info.additive);
-      else if (!info.additive) this.clearSelection();
+      else if (!info.additive) {
+        this.clearItemSelection();
+        this.clearSelection();
+      }
       return;
     }
     const s = info.touch || !this.snap ? this.findSnap(x, y, info.alt) : this.snap;
@@ -2115,7 +2354,7 @@ export class ViewerEngine {
   private openContext(x: number, y: number, clientX: number, clientY: number) {
     if (this.inCube(x, y)) return;
     const hit = this.raycastParts(x, y);
-    if (hit && !this.selection.has(hit.part) && this.tool === "select" && !ENTITY_FILTERS.includes(this.filter)) {
+    if (hit && !this.selection.has(hit.part) && !this.itemSel.size && this.tool === "select" && !ENTITY_FILTERS.includes(this.filter)) {
       this.select(this.filter === "shape" ? [hit.part] : this.filter === "assembly" ? this.assemblyGroup(hit.part) : this.partGroup(hit.part));
     }
     let facePlane: ContextRequest["facePlane"] = null;
@@ -2130,10 +2369,401 @@ export class ViewerEngine {
     this.onContext({ part: hit?.part ?? null, clientX, clientY, facePlane, face });
   }
 
+  // ------------------------------------------------------------------ výběr oknem (box select)
+
+  /** Režim „Výběr oknem": levé tlačítko / jeden prst tažením kreslí obdélník (otáčení prostředním, posun pravým). */
+  setBoxMode(on: boolean) {
+    if (on && this.tool !== "select") this.setTool("select");
+    if (this.boxMode === on) return;
+    this.boxMode = on;
+    this.container.style.cursor = on ? "crosshair" : "default";
+    this.onChange("tool");
+  }
+
+  getBoxMode(): boolean {
+    return this.boxMode;
+  }
+
+  /** Smí tažení z tohoto místa kreslit okno výběru? (režim Výběr oknem, nebo Alt + levé tlačítko.) */
+  private boxQuery(x: number, y: number, info: { alt: boolean; touch: boolean }): boolean {
+    if (this.sectionPick || this.tool !== "select" || !this.parts.length || this.inCube(x, y)) return false;
+    return this.boxMode || (info.alt && !info.touch);
+  }
+
+  private boxMove(sx: number, sy: number, x: number, y: number) {
+    const { rect, mode } = dragBox(sx, sy, x, y);
+    let el = this.boxEl;
+    if (!el) {
+      el = document.createElement("div");
+      el.dataset.testid = "box-select-rect";
+      el.style.cssText = "position:absolute;pointer-events:none;z-index:5;box-sizing:border-box;";
+      this.container.appendChild(el);
+      this.boxEl = el;
+    }
+    el.dataset.mode = mode;
+    // okno = plná modrá, křížení = čárkovaná zelená (AutoCAD)
+    el.style.border = mode === "window" ? "1.5px solid #1f6feb" : "1.5px dashed #16a34a";
+    el.style.background = mode === "window" ? "rgba(31,111,235,0.12)" : "rgba(22,163,74,0.12)";
+    el.style.left = `${rect.x0}px`;
+    el.style.top = `${rect.y0}px`;
+    el.style.width = `${rect.x1 - rect.x0}px`;
+    el.style.height = `${rect.y1 - rect.y0}px`;
+  }
+
+  private boxCancel() {
+    this.boxEl?.remove();
+    this.boxEl = null;
+  }
+
+  private boxEnd(sx: number, sy: number, x: number, y: number, mods: { shift: boolean; ctrl: boolean }) {
+    this.boxCancel();
+    const { rect, mode } = dragBox(sx, sy, x, y);
+    this.boxSelect(rect, mode, selectOp(mods));
+  }
+
+  /** Výběr obdélníkem v pixelech plátna (okno / křížení; nahradit / přidat / odebrat). */
+  boxSelect(rect: Rect, mode: BoxMode, op: SelectOp) {
+    if (!this.parts.length) return;
+    this.updateFrustum();
+    if (this.entity) this.setEntity(null);
+    if (this.is2D) {
+      const world = this.worldRect(rect);
+      const { items, layers } = this.scan2D(world, mode);
+      if (this.filter === "part") {
+        if (this.itemSel.size) this.setItems(new Set());
+        this.setPartSelection(applySelectOp(this.selection, layers, op));
+      }
+      else {
+        if (this.selection.size) this.setPartSelection(new Set());
+        this.setItems(applySelectOp(this.itemSel, items, op));
+      }
+      return;
+    }
+    const hits = this.boxBodies(rect, mode);
+    const visible = (i: number) => !!this.parts[i] && !this.parts[i].hidden;
+    const list = this.filter === "shape" ? [...hits]
+      : expandGroups(hits, (i) => (this.filter === "assembly" ? this.assemblyGroup(i) : this.partGroup(i)), visible, mode);
+    this.setPartSelection(applySelectOp(this.selection, list, op));
+  }
+
+  private setPartSelection(next: Set<number>) {
+    this.selection = next;
+    for (const p of this.parts) this.applyPartState(p);
+    this.requestRender();
+    this.onChange("selection");
+  }
+
+  /** 2D: obdélník v pixelech → obdélník ve výkresu (mm); výkres se neotáčí. */
+  private worldRect(r: Rect): Rect {
+    const a = this.viewPlanePoint(r.x0, r.y0);
+    const b = this.viewPlanePoint(r.x1, r.y1);
+    return rectOf(a.x, a.y, b.x, b.y);
+  }
+
+  /**
+   * 2D: které prvky (a hladiny) okno / křížení vybere. Prvek = všechny jeho viditelné křivky a texty:
+   * okno = všechny celé uvnitř, křížení = některá se dotýká. Hladina mimo / celá uvnitř bez práce po úsečkách.
+   */
+  private scan2D(r: Rect, mode: BoxMode): { items: number[]; layers: number[] } {
+    // příznaky: 1 = něco se dotýká, 2 = něco není celé uvnitř, 4 = má viditelnou část
+    const flags = new Uint8Array(this.itemKinds.length);
+    const layerFlags = new Uint8Array(this.parts.length);
+    const mark = (item: number | undefined, part: number, rel: 0 | 1 | 2) => {
+      const f = 4 | (rel >= 1 ? 1 : 0) | (rel < 2 ? 2 : 0);
+      if (item !== undefined && item < flags.length) flags[item] |= f;
+      layerFlags[part] |= f;
+    };
+    const hasTexts = new Set(this.drawTexts.map((t) => t.part));
+    for (const p of this.parts) {
+      if (p.hidden) continue;
+      const ox = p.offset.x;
+      const oy = p.offset.y;
+      const pr: Rect = { x0: p.box.min.x, y0: p.box.min.y, x1: p.box.max.x, y1: p.box.max.y };
+      const whole: 0 | 2 | null = !rectsOverlap(pr, r) ? 0 : rectInside(pr, r) ? 2 : null;
+      const seg = p.topo.edgeSegments;
+      for (const c of p.topo.curves) {
+        const rel = whole ?? segmentsRelation(seg, c.segStart, c.segStart + c.segCount, r, 3, ox, oy);
+        mark(c.item, p.index, rel);
+      }
+      if (!hasTexts.has(p.index)) continue;
+      for (const t of this.drawTexts) {
+        if (t.part !== p.index || (t.item !== undefined && this.deleted.has(t.item))) continue;
+        const [x0, y0, x1, y1] = whole === null ? textBounds(t) : [0, 0, 0, 0];
+        mark(t.item, p.index, whole ?? rectRelation({ x0: x0 + ox, y0: y0 + oy, x1: x1 + ox, y1: y1 + oy }, r));
+      }
+    }
+    const hit = (f: number) => (f & 4) !== 0 && boxHit(f & 1 ? (f & 2 ? 1 : 2) : 0, mode);
+    const items: number[] = [];
+    for (let i = 0; i < flags.length; i++) if (hit(flags[i])) items.push(i);
+    const layers: number[] = [];
+    for (let i = 0; i < layerFlags.length; i++) if (hit(layerFlags[i])) layers.push(i);
+    return { items, layers };
+  }
+
+  /**
+   * 3D: tělesa podle obalových kvádrů promítnutých na obrazovku; jen tělesa, jejichž kvádr okraj okna
+   * protíná, se upřesní podle vrcholů (okno: všechny uvnitř) a trojúhelníků (křížení) — se stropem
+   * práce, ať výběr ve velké sestavě (tisíce výskytů) nezdržuje.
+   */
+  private boxBodies(r: Rect, mode: BoxMode): Set<number> {
+    const m = this.camera.matrixWorldInverse.clone().premultiply(this.camera.projectionMatrix).elements;
+    const W = this.width;
+    const H = this.height;
+    const project = (x: number, y: number, z: number): [number, number] => [
+      ((m[0] * x + m[4] * y + m[8] * z + m[12] + 1) / 2) * W,
+      ((1 - (m[1] * x + m[5] * y + m[9] * z + m[13])) / 2) * H,
+    ];
+    const plane = this.clipPlane;
+    const budget = { v: 0, t: 0 };
+    const hits = new Set<number>();
+    const corner = new THREE.Vector3();
+    for (const p of this.parts) {
+      if (p.hidden || p.box.isEmpty()) continue;
+      if (plane) {
+        // celé těleso v odříznuté části řezu se nevybírá
+        let any = false;
+        for (let i = 0; i < 8 && !any; i++) {
+          corner.set(i & 1 ? p.box.max.x : p.box.min.x, i & 2 ? p.box.max.y : p.box.min.y, i & 4 ? p.box.max.z : p.box.min.z);
+          if (plane.distanceToPoint(corner) >= 0) any = true;
+        }
+        if (!any) continue;
+      }
+      const br = projectedBoxRect([p.box.min.x, p.box.min.y, p.box.min.z], [p.box.max.x, p.box.max.y, p.box.max.z], project);
+      if (!rectsOverlap(br, r)) continue;
+      if (rectInside(br, r) || this.refineBody(p, r, mode, m, budget)) hits.add(p.index);
+    }
+    return hits;
+  }
+
+  private refineBody(p: PartView, r: Rect, mode: BoxMode, m: ArrayLike<number>, budget: { v: number; t: number }): boolean {
+    const tris = this.triCount(p.index) > 0;
+    const geo = tris ? p.mesh.geometry : (p.wires ?? p.edges)?.geometry;
+    if (!geo) return mode === "crossing";
+    const pos = geo.getAttribute("position").array as ArrayLike<number>;
+    const n = pos.length / 3;
+    // strop práce překročen → u křížení stačí kvádr, u okna ne
+    if (budget.v + n > BOX_VERT_BUDGET) return mode === "crossing";
+    budget.v += n;
+    if (this.projScratch.length < n * 2) this.projScratch = new Float32Array(Math.max(n * 2, this.projScratch.length * 2));
+    const sp = this.projScratch;
+    const ox = p.offset.x, oy = p.offset.y, oz = p.offset.z;
+    const W = this.width, H = this.height;
+    let allIn = true;
+    let anyIn = false;
+    for (let i = 0; i < n; i++) {
+      const x = pos[i * 3] + ox, y = pos[i * 3 + 1] + oy, z = pos[i * 3 + 2] + oz;
+      const px = ((m[0] * x + m[4] * y + m[8] * z + m[12] + 1) / 2) * W;
+      const py = ((1 - (m[1] * x + m[5] * y + m[9] * z + m[13])) / 2) * H;
+      sp[i * 2] = px;
+      sp[i * 2 + 1] = py;
+      const inside = px >= r.x0 && px <= r.x1 && py >= r.y0 && py <= r.y1;
+      if (inside) anyIn = true;
+      else allIn = false;
+      if (mode === "window" && !allIn) return false;
+      if (mode === "crossing" && anyIn) return true;
+    }
+    if (mode === "window") return allIn;
+    // křížení bez vrcholu uvnitř: hrana přes okno, nebo okno uvnitř trojúhelníku
+    if (!tris) {
+      for (let i = 0; i + 1 < n; i += 2) if (segmentTouchesRect(sp[i * 2], sp[i * 2 + 1], sp[i * 2 + 2], sp[i * 2 + 3], r)) return true;
+      return false;
+    }
+    const idx = geo.index ? (geo.index.array as ArrayLike<number>) : null;
+    const nt = idx ? idx.length / 3 : n / 3;
+    if (budget.t + nt > BOX_TRI_BUDGET) return true;
+    budget.t += nt;
+    for (let t = 0; t < nt; t++) {
+      const a = idx ? idx[t * 3] : t * 3;
+      const b = idx ? idx[t * 3 + 1] : t * 3 + 1;
+      const c = idx ? idx[t * 3 + 2] : t * 3 + 2;
+      if (triangleTouchesRect(sp[a * 2], sp[a * 2 + 1], sp[b * 2], sp[b * 2 + 1], sp[c * 2], sp[c * 2 + 1], r)) return true;
+    }
+    return false;
+  }
+
+  // --- vybrané prvky 2D výkresu
+
+  hasItemSelection(): boolean {
+    return this.itemSel.size > 0;
+  }
+
+  getItemSelection(): number[] {
+    return [...this.itemSel];
+  }
+
+  clearItemSelection() {
+    if (this.itemSel.size) this.setItems(new Set());
+  }
+
+  private setItems(next: Set<number>) {
+    this.itemSel = next;
+    this.itemSummary = null;
+    this.rebuildItemHighlight();
+    this.requestRender();
+    this.onChange("selection");
+  }
+
+  /** Prvek pod kurzorem (2D klik) z nejbližší úsečky. */
+  private itemOfHit(hit: { part: number; seg?: number }): number | null {
+    const p = this.parts[hit.part];
+    if (!p || hit.seg === undefined) return null;
+    const c = p.topo.curves[p.topo.segCurve[hit.seg]];
+    return c?.item ?? null;
+  }
+
+  /** Index prvek → křivky (hladina, křivka) a texty (CSR), počítá se při prvním výběru. */
+  private items() {
+    if (this.itemIndex) return this.itemIndex;
+    const n = this.itemKinds.length;
+    const curveStart = new Uint32Array(n + 1);
+    const textStart = new Uint32Array(n + 1);
+    for (const p of this.parts) for (const c of p.topo.curves) if (c.item !== undefined && c.item < n) curveStart[c.item + 1]++;
+    for (const t of this.drawTexts) if (t.item !== undefined && t.item < n) textStart[t.item + 1]++;
+    for (let i = 0; i < n; i++) {
+      curveStart[i + 1] += curveStart[i];
+      textStart[i + 1] += textStart[i];
+    }
+    const curvePart = new Uint32Array(curveStart[n]);
+    const curveIdx = new Uint32Array(curveStart[n]);
+    const texts = new Uint32Array(textStart[n]);
+    const cf = curveStart.slice(0, n);
+    const tf = textStart.slice(0, n);
+    for (const p of this.parts) {
+      p.topo.curves.forEach((c, ci) => {
+        if (c.item === undefined || c.item >= n) return;
+        const k = cf[c.item]++;
+        curvePart[k] = p.index;
+        curveIdx[k] = ci;
+      });
+    }
+    this.drawTexts.forEach((t, ti) => {
+      if (t.item !== undefined && t.item < n) texts[tf[t.item]++] = ti;
+    });
+    this.itemIndex = { curveStart, curvePart, curveIdx, textStart, texts };
+    return this.itemIndex;
+  }
+
+  /** Projde viditelné části vybraných prvků. */
+  private forEachSelectedPiece(onCurve: (p: PartView, ci: number, item: number) => void, onText: (t: DrawingText, item: number) => void) {
+    const ix = this.items();
+    for (const it of this.itemSel) {
+      for (let k = ix.curveStart[it]; k < ix.curveStart[it + 1]; k++) {
+        const p = this.parts[ix.curvePart[k]];
+        if (p && !p.hidden) onCurve(p, ix.curveIdx[k], it);
+      }
+      for (let k = ix.textStart[it]; k < ix.textStart[it + 1]; k++) {
+        const t = this.drawTexts[ix.texts[k]];
+        if (t && !this.parts[t.part]?.hidden && !this.deleted.has(it)) onText(t, it);
+      }
+    }
+  }
+
+  /** Po skrytí hladin: prvky bez viditelné části z výběru pryč. */
+  private syncItemSel() {
+    if (!this.itemSel.size) return;
+    const alive = new Set<number>();
+    this.forEachSelectedPiece((_p, _c, it) => alive.add(it), (_t, it) => alive.add(it));
+    if (alive.size !== this.itemSel.size) this.setItems(alive);
+    else this.rebuildItemHighlight();
+  }
+
+  private setItemSelObj(obj: THREE.Object3D | null) {
+    if (this.itemSelObj) {
+      this.overlayGroup.remove(this.itemSelObj);
+      disposeObject(this.itemSelObj);
+    }
+    this.itemSelObj = obj;
+    if (obj) this.overlayGroup.add(obj);
+  }
+
+  /** Zvýraznění vybraných prvků: jejich úsečky a rámečky textů navrch v barvě výběru. */
+  private rebuildItemHighlight() {
+    if (!this.itemSel.size) return this.setItemSelObj(null);
+    const out: number[] = [];
+    this.forEachSelectedPiece((p, ci) => {
+      const c = p.topo.curves[ci];
+      const seg = p.topo.edgeSegments;
+      for (let k = c.segStart * 6; k < (c.segStart + c.segCount) * 6; k += 3) out.push(seg[k] + p.offset.x, seg[k + 1] + p.offset.y, 0.002);
+    }, (t) => {
+      const [x0, y0, x1, y1] = textBounds(t);
+      const o = this.parts[t.part].offset;
+      const a = [x0 + o.x, y0 + o.y], b = [x1 + o.x, y1 + o.y];
+      out.push(a[0], a[1], 0.002, b[0], a[1], 0.002, b[0], a[1], 0.002, b[0], b[1], 0.002, b[0], b[1], 0.002, a[0], b[1], 0.002, a[0], b[1], 0.002, a[0], a[1], 0.002);
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(out, 3));
+    const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: SELECT_COLOR, depthTest: false, transparent: true }));
+    l.renderOrder = 11;
+    this.setItemSelObj(l);
+  }
+
+  /** Hladiny vybraných prvků. */
+  private itemLayers(): number[] {
+    const set = new Set<number>();
+    this.forEachSelectedPiece((p) => set.add(p.index), (t) => set.add(t.part));
+    return [...set];
+  }
+
+  private itemsBox(): THREE.Box3 | null {
+    const b = new THREE.Box3();
+    const v = new THREE.Vector3();
+    this.forEachSelectedPiece((p, ci) => {
+      const c = p.topo.curves[ci];
+      const seg = p.topo.edgeSegments;
+      for (let k = c.segStart * 6; k < (c.segStart + c.segCount) * 6; k += 3) b.expandByPoint(v.set(seg[k] + p.offset.x, seg[k + 1] + p.offset.y, 0));
+    }, (t) => {
+      const [x0, y0, x1, y1] = textBounds(t);
+      b.expandByPoint(v.set(x0, y0, 0)).expandByPoint(v.set(x1, y1, 0));
+    });
+    return b.isEmpty() ? null : b;
+  }
+
+  /** Souhrn vybraných prvků výkresu (počty po druzích, délka obrysu, průměry, rozměr, hladiny). */
+  getDrawingSelection(): DrawingSelection | null {
+    if (!this.itemSel.size) return null;
+    if (this.itemSummary) return this.itemSummary;
+    let cutLength = 0;
+    const radii: number[] = [];
+    const layers = new Set<number>();
+    this.forEachSelectedPiece((p, ci, it) => {
+      const c = p.topo.curves[ci];
+      const kind = this.itemKinds[it];
+      layers.add(p.index);
+      if (CUT_KINDS.has(kind)) cutLength += c.length;
+      if (kind === "circle" && c.radius) radii.push(c.radius);
+    }, (t) => layers.add(t.part));
+    const box = this.itemsBox();
+    const size: [number, number] | null = box ? [box.max.x - box.min.x, box.max.y - box.min.y] : null;
+    this.itemSummary = {
+      count: this.itemSel.size,
+      kinds: countByKind([...this.itemSel].map((i) => this.itemKinds[i])),
+      cutLength, diameters: diameterCounts(radii), size, layers: [...layers],
+    };
+    return this.itemSummary;
+  }
+
+  /** Souhrn vybraných dílů (3D): počet, rozměr společného kvádru, počty podle jména dílu. */
+  getPartsSelection(): PartsSelection | null {
+    if (!this.selection.size) return null;
+    const box = this.visibleBox(this.selection);
+    const names = new Map<string, number>();
+    for (const i of this.selection) {
+      const n = this.parts[i]?.name || `Díl ${i + 1}`;
+      names.set(n, (names.get(n) ?? 0) + 1);
+    }
+    let size: Vec3 | null = null;
+    if (!box.isEmpty()) {
+      const s = box.getSize(new THREE.Vector3());
+      size = [s.x, s.y, s.z];
+    }
+    return { count: this.selection.size, size, names: [...names.entries()].sort((a, b) => b[1] - a[1] || NAME_ORDER.compare(a[0], b[0])) };
+  }
+
   // ------------------------------------------------------------------ výběrový filtr a entity
 
   setPickFilter(f: PickFilter) {
     this.filter = f;
+    if (this.itemSel.size) this.setItems(new Set());
     this.snap = null;
     this.clearSnapHighlight();
     if (!ENTITY_FILTERS.includes(f)) this.setEntity(null);
@@ -2784,17 +3414,17 @@ export class ViewerEngine {
         return true;
       case "h":
       case "H":
-        if (!this.selection.size) return false;
+        if (!this.selection.size && !this.itemSel.size) return false;
         this.deleteSelected();
         return true;
       case "i":
       case "I":
-        if (!this.selection.size) return false;
-        this.isolate([...this.selection]);
+        if (!this.selection.size && !this.itemSel.size) return false;
+        this.isolateSelected();
         return true;
       case "f":
       case "F":
-        this.fit(this.selection.size > 0);
+        this.fit(this.selection.size > 0 || this.itemSel.size > 0);
         return true;
       case "Escape":
         return this.cancel();
@@ -2808,6 +3438,8 @@ export class ViewerEngine {
       case "7": this.setView("iso"); return true;
       case "m":
       case "M": this.setTool(this.tool === "distance" ? "select" : "distance"); return true;
+      case "b":
+      case "B": this.setBoxMode(!this.boxMode); return true;
       case "+":
       case "=": this.zoomBy(1 / 1.25); return true;
       case "-": this.zoomBy(1.25); return true;

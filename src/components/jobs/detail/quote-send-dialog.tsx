@@ -5,9 +5,9 @@ import { AlertTriangle, Send, Loader2, FileText, ExternalLink, RotateCcw, Paperc
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { generateJobDocument, sendJobDocument, draftJobDocumentEmail } from "@/app/actions/job-documents";
-import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
-import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
-import { applySalutation } from "@/lib/contacts/tone";
+import { MailFields, mailFromDraft, type MailDraft } from "@/components/flow/document-send-dialog";
+import { SenderPicker } from "@/components/mail/sender-picker";
+import { swapDraftSignature } from "@/lib/contacts/draft-retarget";
 import { PremiumBanner } from "@/components/customers/premium-badge";
 import { useJobDetail } from "./detail-context";
 import { DialogHead, ErrorBox } from "./confirm-dialog";
@@ -53,17 +53,11 @@ export function QuoteSendDialog({
   /** „Odeslat z" (jen super admin; null = moje schránka). */
   const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
-  /** Text posledního návrhu ze serveru — po změně tykání se připraví znovu, jen když ho uživatel neupravil. */
-  const lastDraftBody = React.useRef<string | null>(null);
-  const mailNow = React.useRef(mail);
-  mailNow.current = mail;
-  const redraft = React.useCallback(async (salutation: string) => {
-    const before = lastDraftBody.current;
-    if (!file || before === null || applySalutation(before, salutation) !== mailNow.current.body) return;
-    const d = await draftJobDocumentEmail(jobId, file.id).catch(() => null);
-    if (!d?.ok || !d.body) return;
-    lastDraftBody.current = d.body;
-    setMail((m) => (applySalutation(before, salutation) === m.body ? { ...m, body: d.body ?? m.body } : m));
+  /** Text nabídky znovu pro jiného adresáta / po přepnutí tykání (MailFields rozhodne, zda ho použít). */
+  const redraftFor = React.useCallback(async (to: string): Promise<string | null> => {
+    if (!file) return null;
+    const d = await draftJobDocumentEmail(jobId, file.id, { to }).catch(() => null);
+    return d?.ok && d.body ? d.body : null;
   }, [file, jobId]);
 
   const fallbackMail = React.useCallback((): MailDraft => {
@@ -101,9 +95,8 @@ export function QuoteSendDialog({
       const draft = await draftJobDocumentEmail(jobId, gen.fileId);
       if (token !== run.current) return;
       if (draft.ok && (draft.subject || draft.body)) {
-        lastDraftBody.current = draft.body ?? null;
         setMail((m) => ({
-          to: draft.to || m.to || fallback.to, cc: m.cc || draft.cc || "", subject: draft.subject ?? "", body: draft.body ?? "",
+          ...mailFromDraft({ ...draft, subject: draft.subject ?? "", body: draft.body ?? "" }, { to: m.to || fallback.to, cc: m.cc }),
           reason: draft.to ? draft.recipientReason : undefined,
         }));
       }
@@ -229,10 +222,10 @@ export function QuoteSendDialog({
               <SenderPicker
                 value={fromMailboxId}
                 onChange={setFromMailboxId}
-                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                onSignatureChange={(prev, next) => setMail((m) => swapDraftSignature(m, prev, next))}
                 className="px-1"
               />
-              <MailFields mail={mail} onChange={setMail} context={{ jobId }} idPrefix="quote-mail" onToneSaved={(c) => void redraft(c.salutation)} />
+              <MailFields mail={mail} onChange={setMail} context={{ jobId }} idPrefix="quote-mail" redraftFor={redraftFor} />
             </>
           )}
           {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}

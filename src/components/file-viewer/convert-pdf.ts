@@ -4,10 +4,19 @@ export type ConvertPdfResult =
   | { ok: true; skipped: boolean; file: { id: string; filename: string; version?: number }; sheet?: string }
   | { ok: false; error: string };
 
-export async function convertDrawingToPdf(fileId: string, opts: { skipIfConverted?: boolean } = {}): Promise<ConvertPdfResult> {
+/** Úpravy výkresu z prohlížeče (smazané prvky, skryté / zapnuté hladiny) — PDF upraveného výkresu. */
+export interface ConvertEdits {
+  itemCount: number;
+  deletedItems: number[];
+  hiddenLayers: string[];
+  shownLayers: string[];
+}
+
+export async function convertDrawingToPdf(fileId: string, opts: { skipIfConverted?: boolean; edits?: ConvertEdits | null } = {}): Promise<ConvertPdfResult> {
   try {
     const res = await fetch(`/api/jobs/files/${encodeURIComponent(fileId)}/pdf${opts.skipIfConverted ? "?skip=1" : ""}`, {
       method: "POST", credentials: "same-origin",
+      ...(opts.edits ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ edits: opts.edits }) } : {}),
     });
     let body: Record<string, unknown> = {};
     try {

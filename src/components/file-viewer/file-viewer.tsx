@@ -16,6 +16,7 @@ import { swipeAllowed, swipeDirection, swipeGateOf, type SwipeGate, type SwipePo
 import { drawingNumberText, drawingQuantityText, isServerRasterName, type DrawingInfo } from "@/lib/jobs/drawing-set";
 import { jobFileIdFromHref } from "@/lib/jobs/drawing-convert-names";
 import { ConvertPdfButton } from "./convert-pdf-button";
+import type { ConvertEdits } from "./convert-pdf";
 import { MAX_MODEL_BYTES } from "@/lib/viewer3d/tessellation";
 
 // three.js + OpenCascade jen když se otevírá 3D model
@@ -135,6 +136,9 @@ export function FileViewer({
     { loading: true; done: number; total: number } | { loading: false; error: string } | { loading: false; tooBig: number } | { loading: false; data: Loaded }
   >({ loading: true, done: 0, total: 0 });
   const [mode, setMode] = React.useState<"3d" | "pages">("3d");
+  // úpravy výkresu DXF / DWG v prohlížeči (smazané prvky, skryté hladiny) → „Uložit upravené PDF"
+  const [drawingEdits, setDrawingEdits] = React.useState<ConvertEdits | null>(null);
+  React.useEffect(() => setDrawingEdits(null), [request.href]);
 
   React.useEffect(() => {
     if (rasterDirect) return;
@@ -333,7 +337,7 @@ export function FileViewer({
         )}
         {toolbar ?? request.toolbar}
         {/* výkres DXF / DWG zakázky → PDF (nový dokument zakázky, otevře se hned) */}
-        {data && !request.blob && cadFileId && (data.sniffed.format === "dxf" || data.sniffed.format === "dwg") && <ConvertPdfButton fileId={cadFileId} />}
+        {data && !request.blob && cadFileId && (data.sniffed.format === "dxf" || data.sniffed.format === "dwg") && <ConvertPdfButton fileId={cadFileId} edits={drawingEdits} />}
         {printable && (
           <button
             type="button"
@@ -436,6 +440,7 @@ export function FileViewer({
                 name={data.filename}
                 formatLabel={data.has3D ? "3D PDF" : data.sniffed.label}
                 download={{ href: data.blobUrl, filename: data.filename }}
+                onDrawingEdits={setDrawingEdits}
               />
             </div>
             {data.has3D && mode === "pages" && (

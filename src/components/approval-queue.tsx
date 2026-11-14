@@ -16,6 +16,7 @@ import { AiConfidence } from "@/components/ai-confidence";
 import { RecipientInput, isValidRecipient, tokensOf } from "@/components/mail/recipient-field";
 import { ToneToggle } from "@/components/contacts/tone-toggle";
 import { applySalutation } from "@/lib/contacts/tone";
+import { normEmail } from "@/lib/contacts/roles";
 import { useAutomation } from "@/components/automation-provider";
 import { OUTBOUND_APPROVAL_TYPES, type ApprovalItem } from "@/lib/data/types";
 import { resolveApproval, updateApprovalBody } from "@/app/actions/approvals";
@@ -78,6 +79,8 @@ function ApprovalRow({
   const [editing, setEditing] = React.useState(false);
   const [body, setBody] = React.useState(item.body);
   const [target, setTarget] = React.useState(item.target);
+  /** Pro koho je oslovení v textu (změna příjemce → oslovení s jeho jménem a tykáním / vykáním). */
+  const greetedFor = React.useRef<string | null>(normEmail(tokensOf(item.target ?? "").find(isValidRecipient) ?? null));
   const [savedBody, setSavedBody] = React.useState(item.body);
   const [busy, setBusy] = React.useState<"approve" | "reject" | "save" | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -234,7 +237,15 @@ function ApprovalRow({
                 <RecipientInput id={`approval-${item.id}-to`} label="Příjemce" value={target ?? ""} onChange={setTarget} placeholder="e-mail příjemce" />
               )}
               {isOutbound && target && (
-                <ToneToggle email={tokensOf(target).find(isValidRecipient) ?? null} compact onChange={(c) => c.changed && setBody((b) => applySalutation(b, c.salutation))} />
+                <ToneToggle
+                  email={tokensOf(target).find(isValidRecipient) ?? null}
+                  compact
+                  onChange={(c) => {
+                    if (!c.changed && c.email === greetedFor.current) return;
+                    greetedFor.current = c.email;
+                    setBody((b) => applySalutation(b, c.salutation));
+                  }}
+                />
               )}
               <Textarea
                 value={body}
