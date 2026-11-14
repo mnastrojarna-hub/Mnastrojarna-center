@@ -3,9 +3,10 @@
 import * as React from "react";
 import { AlertTriangle, Eye, ExternalLink, Info, Loader2, Paperclip, RotateCcw, Save, Send } from "lucide-react";
 import { RecipientInput, isValidRecipient, tokensOf, type RecipientContext } from "@/components/mail/recipient-field";
-import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
+import { SenderPicker } from "@/components/mail/sender-picker";
 import { ToneToggle, type ToneChange } from "@/components/contacts/tone-toggle";
 import { applySalutation } from "@/lib/contacts/tone";
+import { acceptRedraft, isUntouchedDraft, planRecipientSwitch, swapDraftSignature, type DraftTracking } from "@/lib/contacts/draft-retarget";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,13 +18,36 @@ import {
 import { INVOICE_NUMBER_PLACEHOLDER, fillInvoicePlaceholders, parseEmailList } from "@/lib/jobs/document-emails";
 import { PrintButton } from "@/components/print/print-button";
 
-export interface MailDraft {
+export interface MailDraft extends DraftTracking {
   to: string;
   cc: string;
   subject: string;
   body: string;
   /** Proč zrovna tahle adresa („Fakturační e-mail zákazníka") — ukáže se pod Komu. */
   reason?: string;
+}
+
+/**
+ * E-mail z návrhu serveru (Komu / Kopie / Předmět / Text) — i se sledováním návrhu (pro koho je text
+ * připravený), aby změna adresáta uměla vyměnit oslovení a text připravit znovu.
+ */
+export function mailFromDraft(
+  d: { to?: string | null; cc?: string | null; subject?: string | null; body?: string | null; recipientReason?: string | null },
+  prev?: Partial<MailDraft> | null,
+): MailDraft {
+  const to = d.to || prev?.to || "";
+  const body = d.body ?? prev?.body ?? "";
+  return {
+    to,
+    cc: prev?.cc || d.cc || "",
+    subject: d.subject ?? prev?.subject ?? "",
+    body,
+    reason: d.to ? d.recipientReason || undefined : prev?.reason,
+    draftTo: d.to ?? "",
+    draftBody: d.body ?? null,
+    sig: null,
+    toneNote: null,
+  };
 }
 
 const KIND_TEXT: Record<JobDocumentKind, { what: string; preparing: string }> = {
@@ -44,33 +68,87 @@ export function mailDraftError(mail: MailDraft): string | null {
   return null;
 }
 
+/** Hlavní adresát (první platná adresa v Komu). */
+function mainRecipient(to: string): string | null {
+  return tokensOf(to).find(isValidRecipient) ?? null;
+}
+
 /**
- * Komu / kopie / předmět / text — sdílí odeslání nabídky, potvrzení, dodacího listu i faktury.
- * Adresy s našeptávačem (kontakty zákazníka zakázky nahoře), pod Komu proč byla adresa vybrána
+ * Komu / kopie / předmět / text — sdílí odeslání nabídky, potvrzení, dodacího listu, faktury i objednávky
+ * dodavateli. Adresy s našeptávačem (kontakty zákazníka zakázky nahoře), pod Komu proč byla adresa vybrána
  * a moje tykání / vykání s adresátem (změna hned přepíše oslovení v textu).
+ *
+ * Změna adresáta (majitel 14. 11.): načte se tykání / vykání nového adresáta → oslovení s jeho jménem, a je-li
+ * text pořád návrh aplikace, připraví se celý znovu (`redraftFor`); upravený text zůstane, vymění se jen
+ * oslovení a ukáže se „Oslovení upraveno pro … [Přegenerovat text]" (draft-retarget.ts).
  */
-export function MailFields({ mail, onChange, disabled, context, idPrefix = "doc-mail", onToneSaved }: {
+export function MailFields({ mail, onChange, disabled, context, idPrefix = "doc-mail", onToneSaved, redraftFor }: {
   mail: MailDraft;
   onChange: (m: MailDraft) => void;
   disabled?: boolean;
   context?: RecipientContext | null;
   idPrefix?: string;
-  /** Tykání / vykání změněno — dialog může nechat text připravit znovu (tvary „ti / Vám"). */
+  /** Tykání / vykání změněno ručně. */
   onToneSaved?: (c: ToneChange) => void;
+  /** Text návrhu znovu pro adresáta `to` (s jeho tykáním / oslovením); null = nejde. */
+  redraftFor?: (to: string) => Promise<string | null>;
 }) {
-  const mainTo = tokensOf(mail.to).find(isValidRecipient) ?? null;
+  const mainTo = mainRecipient(mail.to);
   const mailRef = React.useRef(mail);
   mailRef.current = mail;
   const onChangeRef = React.useRef(onChange);
   onChangeRef.current = onChange;
   const savedRef = React.useRef(onToneSaved);
   savedRef.current = onToneSaved;
-  const onTone = React.useCallback((c: ToneChange) => {
-    if (!c.changed) return;
+  const redraftRef = React.useRef(redraftFor);
+  redraftRef.current = redraftFor;
+  const [redrafting, setRedrafting] = React.useState(false);
+  const redraftRun = React.useRef(0);
+
+  /** Celý text znovu pro adresáta (force = i přes úpravy uživatele — tlačítko „Přegenerovat text"). */
+  const regenerate = React.useCallback(async (email: string, force = false) => {
+    const fn = redraftRef.current;
+    if (!fn) return;
+    const token = ++redraftRun.current;
+    setRedrafting(true);
+    const fresh = await fn(email).catch(() => null);
+    if (token !== redraftRun.current) return;
+    setRedrafting(false);
+    if (!fresh) return;
     const m = mailRef.current;
-    onChangeRef.current({ ...m, body: applySalutation(m.body, c.salutation) });
-    savedRef.current?.(c);
+    const body = acceptRedraft({ body: m.body, draftBody: m.draftBody, mainTo: mainRecipient(m.to), email, fresh, sig: m.sig, force });
+    if (body === null) return;
+    onChangeRef.current({ ...m, body, draftBody: body, draftTo: email, toneNote: null });
   }, []);
+
+  const onTone = React.useCallback((c: ToneChange) => {
+    const m = mailRef.current;
+    if (c.changed) {
+      // ruční Tykáme / Vykáme (uloží se k adrese) má přednost: oslovení hned, neupravený text celý znovu
+      const untouched = isUntouchedDraft(m.body, m.draftBody);
+      const body = applySalutation(m.body, c.salutation);
+      onChangeRef.current({
+        ...m, body, toneNote: null,
+        ...(m.draftTo !== undefined ? { draftTo: c.email, draftBody: untouched ? body : m.draftBody } : {}),
+      });
+      savedRef.current?.(c);
+      if (untouched) void regenerate(c.email);
+      return;
+    }
+    if (m.draftTo === undefined) return; // dialog změnu adresáta nesleduje
+    const plan = planRecipientSwitch({
+      body: m.body, draftBody: m.draftBody, draftTo: m.draftTo, email: c.email, name: c.name,
+      salutation: c.salutation, address: c.setting.address, canRegenerate: Boolean(redraftRef.current),
+    });
+    if (plan.kind === "same") return;
+    if (plan.kind === "regenerate") {
+      onChangeRef.current({ ...m, body: plan.body, draftBody: plan.body, draftTo: c.email, toneNote: null });
+      void regenerate(c.email);
+      return;
+    }
+    onChangeRef.current({ ...m, body: plan.body, draftTo: c.email, toneNote: plan.note });
+  }, [regenerate]);
+
   return (
     <div className="space-y-3">
       <div className="space-y-2">
@@ -87,10 +165,31 @@ export function MailFields({ mail, onChange, disabled, context, idPrefix = "doc-
         <span className="text-xs font-medium text-muted-foreground">Předmět</span>
         <Input value={mail.subject} disabled={disabled} onChange={(e) => onChange({ ...mail, subject: e.target.value })} className="h-10" />
       </label>
-      <label className="block space-y-1">
-        <span className="text-xs font-medium text-muted-foreground">Text e-mailu</span>
-        <Textarea rows={10} value={mail.body} disabled={disabled} onChange={(e) => onChange({ ...mail, body: e.target.value })} className="font-[inherit] leading-relaxed" />
-      </label>
+      <div className="space-y-1">
+        <label className="block space-y-1">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            Text e-mailu
+            {redrafting && <Loader2 className="h-3 w-3 animate-spin" aria-label="Připravuji text pro nového adresáta" />}
+          </span>
+          <Textarea rows={10} value={mail.body} disabled={disabled} onChange={(e) => onChange({ ...mail, body: e.target.value })} className="font-[inherit] leading-relaxed" />
+        </label>
+        {mail.toneNote && (
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground" data-testid="tone-recipient-note" role="status">
+            <Info className="h-3.5 w-3.5 shrink-0 text-sky-500" aria-hidden />
+            <span>{mail.toneNote}</span>
+            {redraftFor && mainTo && !disabled && (
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded px-1 font-medium text-foreground underline-offset-2 hover:underline"
+                disabled={redrafting}
+                onClick={() => void regenerate(mainTo, true)}
+              >
+                <RotateCcw className="h-3 w-3" aria-hidden /> Přegenerovat text
+              </button>
+            )}
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -176,19 +275,12 @@ export function DocumentSendDialog({
   const run = React.useRef(0);
   const onPreparedRef = React.useRef(onPrepared);
   onPreparedRef.current = onPrepared;
-  /** Text posledního návrhu ze serveru — po změně tykání se připraví znovu, jen když ho uživatel neupravil. */
-  const lastDraftBody = React.useRef<string | null>(null);
-  const mailNow = React.useRef(mail);
-  mailNow.current = mail;
-
-  /** Po přepnutí tykání / vykání: celý text znovu (tvary „ti posíláme / Vám zasíláme"), když ho uživatel neměnil. */
-  const redraft = React.useCallback(async (salutation: string) => {
-    const before = lastDraftBody.current;
-    if (before === null || applySalutation(before, salutation) !== mailNow.current.body) return;
-    const d = deferred ? await draftInvoiceEmail(jobId).catch(() => null) : file ? await draftJobDocumentEmail(jobId, file.id).catch(() => null) : null;
-    if (!d?.ok || !d.body) return;
-    lastDraftBody.current = d.body;
-    setMail((m) => (applySalutation(before, salutation) === m.body ? { ...m, body: d.body ?? m.body } : m));
+  /** Text návrhu znovu pro jiného adresáta / po přepnutí tykání (MailFields rozhodne, zda ho použít). */
+  const redraftFor = React.useCallback(async (to: string): Promise<string | null> => {
+    const d = deferred
+      ? await draftInvoiceEmail(jobId, { to }).catch(() => null)
+      : file ? await draftJobDocumentEmail(jobId, file.id, { to }).catch(() => null) : null;
+    return d?.ok && d.body ? d.body : null;
   }, [deferred, file, jobId]);
 
   const prepare = React.useCallback(async (force = false) => {
@@ -220,8 +312,7 @@ export function DocumentSendDialog({
           // chybí bankovní účet / IBAN v Nastavení → upozornit ještě před vystavením (faktura bez QR)
           setBankWarning(d.bankWarning ?? null);
         }
-        lastDraftBody.current = d.body ?? null;
-        setMail((m) => ({ to: d.to || m.to, cc: m.cc || d.cc || "", subject: d.subject ?? m.subject, body: d.body ?? m.body, reason: d.to ? d.recipientReason : m.reason }));
+        setMail((m) => mailFromDraft(d, m));
         setStep("form");
         return;
       }
@@ -252,8 +343,7 @@ export function DocumentSendDialog({
       const draft = await draftJobDocumentEmail(jobId, f.id);
       if (token !== run.current) return;
       if (draft.ok) {
-        lastDraftBody.current = draft.body ?? null;
-        setMail((m) => ({ to: draft.to || m.to, cc: m.cc || draft.cc || "", subject: draft.subject ?? m.subject, body: draft.body ?? m.body, reason: draft.to ? draft.recipientReason : m.reason }));
+        setMail((m) => mailFromDraft(draft, m));
       } else if (draft.error) {
         setError(`Návrh e-mailu se nepodařilo připravit: ${draft.error}`);
       }
@@ -451,13 +541,13 @@ export function DocumentSendDialog({
                 <SenderPicker
                   value={fromMailboxId}
                   onChange={setFromMailboxId}
-                  onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                  onSignatureChange={(prev, next) => setMail((m) => swapDraftSignature(m, prev, next))}
                   disabled={step === "sending"}
                   className="px-1"
                 />
               )}
               {!blocked && (
-                <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} onToneSaved={(c) => void redraft(c.salutation)} />
+                <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} redraftFor={redraftFor} />
               )}
               {hasPlaceholder && (
                 <p className="text-[11px] text-muted-foreground">„{INVOICE_NUMBER_PLACEHOLDER}“ se při vystavení nahradí přiděleným číslem faktury.</p>

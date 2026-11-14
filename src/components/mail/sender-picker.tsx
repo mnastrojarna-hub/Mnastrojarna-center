@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { senderChoiceAction, senderSignatureAction } from "@/app/actions/mail-sender";
 import type { SenderChoice } from "@/lib/email/sender-rules";
 import { cn } from "@/lib/utils";
+import { swapSignature as swapSignatureText } from "@/lib/contacts/draft-retarget";
 
 /**
  * „Odeslat z" v dialozích odeslání. Majitel 9. 11.: každý posílá ze své schránky — vidí jen „Odejde z: adresa";
@@ -118,7 +119,5 @@ export function SenderPicker({
 
 /** Vymění podpis v textu (je-li tam starý); jinak text nechá. */
 export function swapSignature(body: string, prev: string, next: string): string {
-  const p = prev.trim();
-  if (!p || !body.includes(p)) return body;
-  return body.replace(p, next.trim());
+  return swapSignatureText(body, prev, next);
 }

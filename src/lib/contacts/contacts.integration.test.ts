@@ -169,6 +169,27 @@ describe.skipIf(!LOCAL_ENABLED)("Kontakty — účely e-mailů, tykání, našep
     expect((await recipientsFor(svc, "potvrzeni", { customerId }, null)).to).toEqual([`info@${DOM}`]);
   });
 
+  it("potvrzení objednávky (14. 11.): „Objednávky / potvrzení“ (Natálie) v Komu, kontakt zakázky (Pavel) v Kopii", async () => {
+    const { recipientsFor } = await import("./server");
+    const NATALIE = `vojcikova@${DOM}`;
+    const { data: c, error } = await svc.from("customer_contacts").insert({ customer_id: customerId, name: "Natálie Vojčíková", email: NATALIE, position: "nákup" }).select("id").single();
+    expect(error).toBeNull();
+    const contactId = (c as { id: string }).id;
+    try {
+      const role = await svc.from("party_role_emails").insert({ customer_id: customerId, role: "nakup", contact_id: contactId, is_default: true });
+      expect(role.error).toBeNull();
+      const job = { email: PAVEL, name: "Ing. Pavel Novák" };
+      const pick = await recipientsFor(svc, "potvrzeni", { customerId }, job);
+      expect(pick).toMatchObject({ to: [NATALIE], cc: [PAVEL], source: "role", role: "nakup" });
+      expect(pick.reason).toBe("Nákupní e-mail zákazníka (objednávky): Natálie Vojčíková · v kopii kontakt zakázky (Ing. Pavel Novák)");
+      // nabídka dál na kontakt zakázky (kdo poptával)
+      expect((await recipientsFor(svc, "nabidka", { customerId }, job)).to).toEqual([PAVEL]);
+    } finally {
+      await svc.from("party_role_emails").delete().eq("customer_id", customerId).eq("role", "nakup");
+      await svc.from("customer_contacts").delete().eq("id", contactId);
+    }
+  });
+
   it("tykání za uživatele: Volný tyká → „Ahoj Pavle,“, Šponer vyká → „Dobrý den, pane Nováku,“; návrh z odeslané pošty", async () => {
     const a = await import("@/app/actions/contacts");
     const { toneFor } = await import("./server");
