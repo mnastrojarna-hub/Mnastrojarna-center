@@ -39,7 +39,7 @@ const llms = [
   "",
   "## Mnástrojárna CAD",
   `- [Aplikace](${SITE}/cad): spuštění bez instalace a registrace, česky.`,
-  `- [Kompletní dokumentace (HTML)](${SITE}${CAD_DOCS_META.docsUrl}): ${CAD_DOCS.length} kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, formáty, nastavení, zkratky, FAQ.`,
+  `- [Kompletní dokumentace (HTML)](${SITE}${CAD_DOCS_META.docsUrl}): ${CAD_DOCS.length} kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, 2D CAD (DWG/DXF), formáty, sdílení odkazem, nastavení, zkratky, AI agenti a automatizace, FAQ.`,
   `- [Dokumentace jako Markdown](${SITE}${CAD_DOCS_META.mdUrl}): stejný obsah v prostém textu pro strojové zpracování.`,
   `- [Příručka PDF](${SITE}${CAD_DOCS_META.pdfUrl}): tisková verze s obrázky.`,
   `- [Rozhraní pro AI agenty a automatizaci](${SITE}/cad/schema-pro-ai.md): CAD lze celý ovládat textem – konzole Textové příkazy (Ctrl+Shift+K), JSON formát dokumentu se schématem, JavaScript API window.mncad; zpětná vazba jako text.`,
