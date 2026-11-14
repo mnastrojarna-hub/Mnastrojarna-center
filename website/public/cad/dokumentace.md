@@ -5,7 +5,7 @@
 - Aplikace: https://www.mnastrojarna.cz/cad
 - Webová dokumentace: https://www.mnastrojarna.cz/cad/dokumentace
 - Příručka PDF: https://www.mnastrojarna.cz/cad/mnastrojarna-cad-prirucka.pdf
-- Verze: 16. vlna (listopad 2026), aktualizováno 2026-11-14
+- Verze: 17. vlna (listopad 2026), aktualizováno 2026-11-14
 - Jazyk: čeština · Licence: zdarma, bez registrace · Vydavatel: Mnástrojárna s.r.o., https://www.mnastrojarna.cz
 
 ## Hlavní funkce
@@ -15,14 +15,15 @@
 - Referenční systém zadání: 14 voleb bodu, 8 směrů, 12 definic rovin, 10 os, pomocná rovina / osa / bod / souřadný systém
 - Plochy (19 příkazů), plech s rozvinem DXF (12), svařence a rámy z profilů (13) se svary koutovými, tupými podle ISO 9692-1, děrovými a bodovými a značkami ISO 2553
 - Sestavy: komponenty, podsestavy, vazby, kolize, kusovník, rozložený pohled, průvodce rámem vstřikovací formy
-- Výkresy: pohledy, řez, detail, kóty, drsnosti, geometrické tolerance, tabulka děr, kusovník; export PDF, DXF, DWG R2000–R2018, SVG
+- Výkresy: pohledy, řez, detail, chytré kóty s funkčními rozměry, drsnosti, geometrické tolerance, tabulka děr a souřadnicové kóty, kusovník, razítko ve třech šablonách s nepředepsanými tolerancemi ISO 2768; export PDF, DXF, DWG R2000–R2018, SVG
+- Kontrola modelu podle výkresu zákazníka: předloha DWG / DXF / PDF, výtah kót a děr, porovnání pohledů s pokrytím v %, kontrola kót
 - 2D CAD (2D výkres): příkazový řádek se zkratkami AutoCADu, hladiny, typy čar, uchopení, kóty a kótovací styly, šrafy, bloky s atributy, rozvržení s výřezy v měřítku, tisk PDF; editor DWG R2000–R2018 a DXF R12–R2018
 - Knihovna 103 rodin normálií ve 13 skupinách zadávaných textem
 - Import STEP, IGES, BREP, STL, OBJ, 3MF, glTF, PLY, OFF, DXF, DWG; export STEP, BREP, STL, 3MF, OBJ, GLB, VRML, DXF, DWG
 - Formařské nástroje: analýza úkosů, zebra, křivost, tloušťka stěn, smrštění, vyhazovače, chlazení
 - Proměnné, rovnice a stavy (konfigurace), paleta příkazů, nastavitelné klávesové zkratky, dotykové ovládání, mikronávody u každé ikony (česky, anglicky, německy)
 - Sdílení krátkým odkazem mnastrojarna.cz/s#KÓD: díl, sestava i výkres jedním tlačítkem (WhatsApp, e-mail, Teams, SMS), platnost 1–90 dní, volitelné heslo, zneplatnění; dokument se šifruje v prohlížeči, na serveru je jen šifrovaný obsah
-- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba, výstupy bez dialogů, příkazová řádka mncad bez prohlížeče pro stavbu a převod hotových dokumentů
+- Rozhraní pro AI agenty a automatizaci: konzole Textové příkazy (česky/anglicky/německy), JSON formát dokumentu se schématem, JavaScript API window.mncad, výběr hran a ploch pravidlem, textová zpětná vazba, výstupy bez dialogů, převod dokumentu na textový skript, příkazová řádka mncad bez prohlížeče pro stavbu a převod hotových dokumentů
 
 ## Obsah
 
@@ -131,7 +132,7 @@ Tlačítka jsou seskupená a každá skupina má pod sebou název (Skica, Tvar, 
 | Nástroje | Měřit, Vlastnosti, Hmotnost, Řez, Proměnné, Stavy dílu, Formařské nástroje, Kontrola geometrie, Sjednotit plochy, Tloušťka stěn. |
 | Zobrazení | Pohledy (izometrie, přední, horní, pravý, zadní, spodní, levý), styl zobrazení, kamera (přizpůsobit, perspektiva / pravoúhlá), mřížka a osy, barva tělesa, pozadí, schéma myši (ZW3D / SolidWorks / touchpad). |
 | Výkres | Nový výkres a výkresová dokumentace (kapitola 13). |
-| Data | Nastavení, paleta příkazů, úvodní obrazovka, otevřít / import, uložit, export, sestavy, ukázky. |
+| Data | Nastavení, paleta příkazů, úvodní obrazovka, otevřít / import, uložit, export (3D formáty i textový skript dokumentu), sestavy, ukázky. |
 | Skica | Objeví se při otevřené skice: uchopení, kreslení, úpravy, vazby, kóty a nástroje (kapitola 5). |
 
 2D výkres má vlastní pás karet (Kreslení, Úpravy, Hladiny, Poznámky, Bloky, Rozvržení, Výstup) a příkazový řádek – viz kapitola 14.
@@ -408,6 +409,7 @@ Kvádr, Válec, Trubka, Kužel, Koule – poloha čísly nebo odkazem (vrchol, s
 - Pro šroub: průchozí díra podle ISO 273 v řadě jemná / střední / hrubá; rozměry zahloubení podle normy.
 - Ukončení: slepá, skrz vše, k dalšímu, k ploše (+ odsazení), k vrcholu / bodu, odsazeně od plochy, k tělesu.
 - Dno díry u slepé díry: Kužel vrtáku s nastavitelným úhlem špičky (60–170°, výchozí 118°), nebo Ploché – rovné dno bez kužele, např. sedlo pružiny nebo frézované dno. Hloubka je vždy hloubka válcové části.
+- Zahloubení závitové díry: u závitové díry volba Bez / Válc. zahl. / Kuž. zahl. přidá nad závit zahloubení (Ø a hloubka, nebo Ø a úhel) – díra se vyrobí celá: zahloubení + vrták + závit, například sedlo pružiny nad závitem M8 nebo sražení vstupu. Výkres ji popíše M8 skrz / Ø6,8 skrz / ⌴ Ø20 ↧7; zahloubení menší než závit postaví, ale prvek dostane ⚠. Textem díra 6,8 skrz v 20 20 zahloubení 20 7 závit M8.
 - Skrz vše vrtá od zadaného bodu jen ve směru vrtání – materiál nad bodem (například protější příruba) zůstane. Volba Skrz oběma směry provrtá celé těleso na obě strany. Když díra ve směru vrtání žádný materiál nezasáhne, prvek dostane upozornění ⚠.
 - Poloha: klik na plochu (bod i osa se doplní podle normály), nebo více poloh z vrcholů, středů kružnic, bodů skici a pomocných bodů – jedna díra se vyvrtá všude naráz. Osa libovolným směrem (8 způsobů).
 - Pokročilé úpravy obsahují i Díry v bodech (díry podle bodů skici).
@@ -512,6 +514,17 @@ Textem (pro AI agenty):
 - zaoblit 3 hrany <pravidlo> setback 5 [vrchol V3 8]
 - zaoblit eliptické 4 2 hrany horní [rho 0,5]
 - úkos 3 plochy boční dělicí "Skica 2" [stupňovitý] [směr +Z]
+
+### Stav prvku a platnost tělesa (tečné a souběžné plochy)
+
+Po každém prvku program těleso zkontroluje a prvek dostane značku: ✓ = platné objemové těleso, ⚠ = výsledek, který si žádá pozornost, ✗ = operace se neprovedla. Hlášky ⚠ říkají, co se stalo a co změnit:
+
+- „Výsledek má neplatnou geometrii – vznikla u prvku „…““ stojí jen u prvního prvku, po kterém je těleso neplatné. Říká, která hrana nebo plocha je vadná (číslo jako ve výběru, E12 / F7, u krátké hrany i bod a délku) a co změnit. Export STEP z takového tělesa může selhat.
+- „Těleso je neplatné už od prvku „…““ mají prvky postavené až na vadném tělese – opravte prvek, který je v hlášce jmenovaný, ne ten, u kterého ji čtete.
+- „Prvek objem tělesa nezměnil“ – nástroj se tělesa jen dotýká, leží mimo něj, nebo jádro operaci u téměř tečných ploch neprovedlo.
+- „Výsledek operace neodpovídá průniku tělesa s nástrojem“ nebo „…závisí na toleranci výpočtu“ – jádro u téměř tečných ploch spočítalo jiný objem, než vychází z kontrolního výpočtu; hláška uvádí obě hodnoty v mm³. Těleso je platné, ale objem prvku nemusí sedět.
+
+Odebrání, přidání a průnik se počítají přesně. Jen když přesný výsledek nese příznak vady – typicky nástroj téměř tečný k ploše tělesa nebo končící přesně na jeho hraně, se souřadnicemi opsanými z výkresu na 4–6 desetinných míst (zadní odlehčení břitu střižnice, klín tečný ke kuželu v rohu) – zopakuje program operaci s malou tolerancí a výsledek použije, jen když ho potvrdí kontrolní výpočet. Jinak zůstane ⚠. Co dělat: posuňte nástroj tak, aby plochy tělesa jasně protínal (aspoň o 0,01 mm), nebo aby s nimi splýval přesně; rovinu skici zadejte úhlem nebo odkazem na plochu místo zaokrouhlených vektorů, a když zadáváte vektory čísly, pište je na 6 desetinných míst. Skoro-dotyky se naopak nezaokrouhlují: díry, které se překrývají o setinu mikrometru, se postaví přesně tak, jak jsou zadané.
 
 ## 7. Plochy (plošné modelování)
 
@@ -637,6 +650,14 @@ Pokročilé a mechanické vazby a pohybová studie. Sestava má 23 druhů trval�
 
 Kontrola kolizí v pohybové studii je přírůstková: v každém kroku se znovu počítají jen dvojice dílů, které se vůči sobě pohnuly, a díly spojené vazbou Zámek se berou jako jeden tuhý celek – zvládne tak i delší studie větších sestav. Textový souhrn (pohyb stav) uvádí první kolizi i vazby, které pohyb v některém kroku porušuje.
 
+### Přezdívky komponent, pružiny, obálka a kusovník
+
+- Přezdívka instance: v panelu komponenty pole Přezdívka instance (vazby místo #k), textem vložit "Šroub M6x20" v … jako "K48" nebo sestava komponenta #25 přezdívka "K48". Ve vazbách pak stačí "K48" místo pořadí #25; strom a výpisy ji ukazují v hranatých závorkách. Přezdívka musí být jednoznačná a kopie komponenty (duplikovat, pole, zrcadlit) ji nepřebírají; kusovník ji nepoužívá.
+- Pružina mezi komponentami: v panelu komponenty s pružinou (prvek Pružina, normálie pružiny, zjednodušeně i trubka nebo válec) sekce Pružina mezi komponentami – Dosedá na (A), Stlačuje (B), Volná délka L0, Délka na doraz Ln a Tuhost c. Délka pružiny pak sleduje vzdálenost dosedacích ploch při každém přepočtu vazeb, při posunu komponenty i v každém kroku pohybové studie a model pružiny se staví v aktuální délce. Protokol uvádí délku a sílu F = c·Δl; pružina stlačená pod délku na doraz je ✗, nedosednutá ⚠. Textem sestava pružina "Pružina R20" mezi "Vodicí deska" "Opěrná deska" volná 44 blok 20 tuhost 25, přehled sestava pružiny. Síla se jen počítá a hlásí – pohyb neovlivňuje (studie je kinematická).
+- Pohybová studie porovnává natočení komponent jako celé otočení, takže díl vložený pootočený, který se jen posouvá, už nehlásí „natáčí se“. Tabulka CSV má u pružin sloupce délky a síly.
+- Kusovník sčítá kusy podle zdrojového dílu: přejmenovaná instance ani přezdívka řádek nerozdělí, jiné číslo výkresu ano. Pružina je jedna položka bez ohledu na aktuální délku.
+- Obálka sestavy v textovém stavu (stav) je přesná – spočítaná jádrem z těles viditelných dílů v jejich umístění, i u pootočených dílů (u velkých importovaných sestav ze sítě, protokol to uvede).
+
 ## 12. Formařské nástroje
 
 Nástroje pro konstrukci vstřikovacích forem a lisovacích nástrojů, které jinak najdete jen v drahých modulech.
@@ -665,7 +686,7 @@ Výrobní výkres z modelu nebo sestavy během minuty – pohledy, kóty, tolera
 - Řez rovinou s šrafováním, Detail (zvětšený výřez), tabulka děr, skryté hrany čárkovaně.
 - Anotace: kóta (zarovnaná, vodorovná, svislá, s předponou / příponou / textem), poznámka s odkazovou čarou, drsnost Ra, geometrická tolerance (rovinnost, válcovitost, kolmost, rovnoběžnost, souosost, házení…), základna, volný text. Kóty se umisťují tažením.
 - Sestavy: kusovník na listu, pozice s odkazovými čarami, více listů. Svary z modelu dostanou značku podle ISO 2553 automaticky (kapitola 9).
-- Razítko: název, číslo, materiál, hmotnost, měřítko, autor (Nastavení → Výkres), nepředepsané tolerance (ISO 2768-mK výchozí), datum, logo.
+- Razítko: tři šablony (ISO 7200, kompaktní, nástrojářská), firma a logo, název, číslo, materiál, hmotnost, měřítko, formát, kreslil / kontroloval / schválil, datum, revize, zákazník, projekt, polotovar, počet kusů, tepelné a povrchové zpracování a nepředepsané tolerance – viz níže.
 - Export: PDF (vektorový), DXF a DWG (verze R2000 až R2018, otevře AutoCAD, ZWCAD, BricsCAD, DraftSight), SVG. Má-li výkres více listů, volba Listy k exportu určí Všechny listy nebo Aktivní list: všechny listy dají jedno vícestránkové PDF, u DWG, DXF a SVG soubor ZIP s jedním souborem na list; stejná volba platí pro Tisk. Výkres je uložený v projektu .mncad a při změně modelu se aktualizuje.
 
 ### Kóty podle vybrané geometrie
@@ -689,6 +710,32 @@ Nový výkres se kótuje automaticky podle prvků modelu, ne podle každé prom�
 - Díry: každá skupina stejných děr má jeden popis s odkazem sestavený z parametrů díry – 4× M8 ↧10 / Ø6,8 ↧14, 6× Ø11 skrz / ⌴ Ø18 ↧11, ⌵ Ø12,4 × 90°. Značky ↧ ⌴ ⌵ se v náhledu, PDF, DXF, DWG i SVG kreslí čarami. U závitové díry s jiným než tabulkovým vrtákem popis uvede skutečný průměr vrtáku (M8 ↧20 / Ø6,647 ↧20), u slepé díry s plochým dnem poznámku „(ploché dno)“.
 - Vygenerované kóty jsou běžné upravitelné kóty: lze jim dopsat toleranci, posunout je nebo smazat. Při změně modelu se přepočítají a vlastní kóty zůstanou. V nastavení kót lze přepnout řetězově / od základny, tlačítko Přegenerovat kóty je vytvoří znovu a ponechá tolerance i vlastní kóty.
 - Textem: výkres A3 na šířku pohledy přední,horní,iso, kótovat [řetězově|od základny], výkres tolerance Ø30 h6, výkres nepředepsané ISO 2768-mK, výkres export pdf|dxf|dwg|svg [list N|vše] (soubor bez dialogu, kapitola 22), výkres stav (přehled kót po pohledech, duplicity, chybějící rozměry; pro skripty window.mncad.drawingStatus()).
+
+### Funkční rozměry, tolerance hodnotou a desky s mnoha dírami
+
+- Přesnost kót: chytré kóty nesou až 3 desetinná místa rozměru modelu – 74,175 se nezaokrouhlí na 74,18.
+- Funkční rozměry (sekce Chytré kóty → Funkční rozměry (nikdy v závorce), např. 26,5; 74,175): rozměry, které budou tolerované, nikdy neskončí jako pomocná kóta v závorce – uzavřený řetěz rozbije jiný článek. Tolerance zadaná na pomocné kótě z ní funkční rozměr udělá sama a protokol řekne, který článek je nově pomocný.
+- Tolerance textem podle hodnoty: výkres tolerance 74,175 -0,005 najde kótu podle číselné hodnoty modelu, výkres tolerance a12 h7 podle id z výkres stav; při více shodách vypíše seznam id a výběr jde zúžit pohledem (… pohled horní).
+- Polohy děr (volba Polohy děr: auto / od hran / souřadnicově / tabulkou děr): auto kótuje polohy od hran; od 12 různých poloh, nebo když se kóty od hran nevejdou, přejde na souřadnicové kóty od levého dolního rohu obrysu (0 v rohu, hodnoty v jedné řadě) a když se nevejdou ani ty, na tabulku děr – žádná poloha díry se nevynechá. Textem kótovat díry tabulka|souřadnicově|řetězově.
+- Tabulka děr je jedna na list, v pohledu, kde jsou díry vidět (i levý, pravý nebo zadní). Každá díra je jeden řádek se značkou, polohou X; Y od levého dolního rohu obrysu pohledu a popisem (závitová díra se zahloubením jako M8 ⌴Ø20), přes 16 řádků ve dvou sloupcích. Polohy uvedené v tabulce se kótami už neopakují; vnější válce (hřídel, osazení) v tabulce nejsou.
+- Kontrola tolerancí: panel Kontrola kót – co chybí a textový příkaz výkres kontrola tolerancí vypíší funkční rozměry, které na listu ještě nemají toleranci.
+
+### Řez: odsazení jako u skici
+
+Odsazení roviny řezu A–A se měří stejně jako u skici – podél normály roviny: řez XZ odsazení 57 leží v rovině Y = −57, stejně jako skica XZ odsazení 57; XY odsazení N je Z = N, YZ odsazení N je X = N. Panel řezu to ukazuje textem „Odsazení podél normály roviny jako u skici“. Rovina, která těleso mine, je chyba s rozsahem odsazení, která těleso protnou. Výkresy uložené dříve mají v odsazení souřadnici osy a staví se beze změny (označené jako „starší řez“). Starší skript, který psal souřadnici (řez XZ odsazení -57), se přečte postaru, když dnešní výklad těleso mine a starý ho protne – protokol to oznámí řádkem ⚠ s dnešním zápisem. Když se pohledy v měřítku nevejdou na list, hlásí to ⚠ přímo v protokolu příkazu.
+
+### Razítko: šablony, pole a nepředepsané tolerance
+
+![Výkresové prostředí: vlevo sekce Razítko se šablonou nástrojářská, poli razítka a výběrem nepředepsaných tolerancí ISO 2768 – třída přesnosti, vpravo list s nástrojářským razítkem a značkou promítání](https://www.mnastrojarna.cz/cad/docs/razitko.webp)
+
+*Sekce Razítko: šablona, logo, pole razítka a nepředepsané tolerance vybrané třídou ISO 2768 (nebo tabulkou podle desetinných míst). Vpravo nástrojářské razítko se zákazníkem, projektem, polotovarem a značkou promítání.*
+
+- Šablona razítka listu: ISO 7200 (výchozí), kompaktní (nižší, pro malé a další listy) a nástrojářská (všechna pole). Všechny jsou široké 180 mm, kusovník a tabulka děr nad razítkem zůstávají na místě. Šablonu nových listů nastavíte v Nastavení → Výkres; každý list jde změnit zvlášť. Pole, která šablona nemá, se vypíšou v patičce nad razítkem – nic se neztratí.
+- Pole: firma (vlastník výkresu) a logo (PNG, JPEG nebo SVG – zmenší se na nejvýš 600 × 300 px; v DXF a DWG jako vyplněný obrys), název, číslo výkresu, materiál, kreslil, kontroloval, schválil, datum, revize, zákazník, projekt, polotovar, počet kusů, tepelné a povrchové zpracování, tolerance úhlů a sražení. Revize se, není-li vyplněná, vezme z tabulky revizí.
+- Dlouhé texty se nezkracují: písmo se zmenší (nejprve do 2 mm) a text se zalomí do více řádků uvnitř buňky; kdyby muselo být menší než 2 mm, výkres razítko to ohlásí ⚠.
+- Promítání se kreslí normalizovanou značkou (komolý kužel a kružnice podle ISO 5456-2), ne textem „ISO E“.
+- Nepředepsané tolerance se nevyplňují volným textem, ale vybírají: ISO 2768 – třída přesnosti (délky a úhly f / m / c / v podle ISO 2768-1 a geometrie H / K / L podle ISO 2768-2), Tabulka podle desetinných míst (X. / X.X / X.XX / X.XXX, výchozí ±0,1 / ±0,1 / ±0,01 / ±0,005), nebo Vlastní text. Výkres dílu bez nich panel označí ⚠ a export (PDF, DXF, DWG…) to ohlásí; u sestavy se nevyžadují.
+- Textem: výkres razítko šablona=nástrojářská zákazník="…" projekt="…" polotovar="plech 40×160×185" počet=4 tepelné="kalit 58–60 HRC" povrch="černit" kontroloval="…" schválil="…", logo výkres razítko logo="firma.png" (soubor připojený v konzoli tlačítkem Připojit soubor…), tolerance výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná ±0,1 ±0,1 ±0,01 ±0,005, zrušení výkres nepředepsané ne. výkres razítko bez polí vypíše šablonu, pole, tolerance a velikost písma každého pole.
 
 ### Více výkresů jednoho dílu a export všech listů
 
@@ -866,6 +913,20 @@ Nástroje → Analýza → Porovnat s referencí kontroluje vlastní model proti
 
 Barevná mapa odchylek obarví model podle vzdálenosti od povrchu reference: zelená = v toleranci, žlutá → červená = odchylka až do hodnoty „Červená od“; přesnost mapy je uvedena v legendě. Je-li reference jinak umístěná, zvolte Středy, Automaticky (24 otočení po 90°) nebo ruční otočení a posun. Report se exportuje jako CSV nebo text. Dlouhý výpočet ukazuje průběh a jde zrušit.
 
+### Kontrola podle výkresu zákazníka (předloha DWG / DXF / PDF)
+
+Když zákazník dodá 2D výkres a vy podle něj modelujete, připojte ho k dílu jako předlohu. CAD z něj vytáhne listy, pohledy, kóty, díry, kusovník a razítko a porovná je s modelem. Předloha se zatím ovládá textovými příkazy: v konzoli Textové příkazy (Ctrl+Shift+K) soubor připojte tlačítkem Připojit soubor… a napište příkazy.
+
+| Příkaz | Co udělá |
+| --- | --- |
+| předloha "výkres.dwg" | připojí předlohu – DWG (R2000–R2018), DXF nebo vektorové PDF – včetně objektů AutoCAD Mechanical (díry a normálie, kusovník, pozice, drsnosti) a vypíše souhrn; zároveň upozorní na rozpory v předloze, např. kótu, jejíž text neodpovídá nakreslené geometrii, nebo jiný rozměr v kusovníku a v razítku |
+| předloha stav · předloha výtah kóty\|díry\|kusovník\|razítko\|poznámky | souhrn a strukturovaný výtah: kóty s tolerancemi a uložením, díry podle druhu, řádky kusovníku, pole razítka |
+| porovnat předloha pohled přední [tolerance 0,06] | promítne model jako ve výkrese, položí ho přes pohled předlohy a vrátí pokrytí v % oběma směry, seznam úseků mimo toleranci s polohou a obrázek překryvu (SVG se stáhne). Porovnává se jen obrys tělesa – osy, kóty, šrafy a tenké čáry ne |
+| předloha kontrola kót | každou kótu předlohy změří v modelu mezi stejnými body: ✓ = sedí, ✗ = jiná hodnota, ⚠ = bod kóty v modelu nenalezen; úhly, závity a sražení se nekontrolují |
+| předloha otevřít · předloha odebrat | předloha jako 2D výkres v nové záložce · odebrat ji z dílu |
+
+Porovnání dostane ✓, když obě pokrytí dosáhnou aspoň 99,5 %, ⚠ od 90 %. Model je hotový, když porovnat předloha dává u všech pohledů ✓ a předloha kontrola kót nemá ✗ ani ⚠. Dokument si pamatuje jen název a otisk souboru a výsledky kontrol; po změně modelu je předloha stav označí jako zastaralé. Soubor samotný se do dokumentu neukládá – po obnovení stránky ho připojte znovu. Naskenované PDF bez vektorové kresby geometrii pro porovnání nemá. Pro skripty: window.mncad.attach(název, data) a window.mncad.reference("porovnat předloha pohled horní").
+
 ### Náhled bez WebGL
 
 Když prohlížeč nemůže spustit 3D okno (stará grafická karta, vzdálená plocha, akcelerace zakázaná správcem), zobrazí se místo něj zjednodušený softwarově kreslený náhled modelu. Tlačítky přepnete pohled (Izometrie, Přední, Zadní, Horní, Spodní, Levý, Pravý), Přizpůsobit vrátí celý model do okna, + / − nebo kolečko přibližují, tažení otáčí a Shift + tažení posouvá. Funguje styl zobrazení, řez i sestavy. Výběr funguje i v náhledu: klik vybere plochu, hranu nebo vrchol, Ctrl / Shift + klik přidá či odebere a vybrané entity převezmou formuláře prvků, skica na ploše, měření i vazby sestav. Náhled je pravoúhlý (bez perspektivy). Příčinu a postup nápravy ukáže tlačítko Proč nevidím 3D?.
@@ -896,6 +957,8 @@ Když prohlížeč nemůže spustit 3D okno (stará grafická karta, vzdálená 
 | DXF | 2D výkres (R12–R2018, textový i binární); do skici volbou | 2D výkres (R12–R2018), skica, rozvin, výkres z modelu | laser, CAM, 2D CAD; podrobnosti v kapitole 14 |
 | DWG | 2D výkres (R2000–R2018) | 2D výkres a výkres z modelu (R2000–R2018) | AutoCAD, ZWCAD, BricsCAD, DraftSight |
 | SVG · PDF | — | výkres, rozvin (SVG), tisk 2D výkresu (i PNG) | dokumentace, tisk |
+| Textový skript (.mncad.txt) | vložením do konzole Textové příkazy | díl s výkresy, sestava i 2D výkres (Data → Export → Textový skript) | model jako textové příkazy – kapitola 22 |
+| DWG · DXF · PDF jako předloha | připojením v konzoli (předloha …) | — | kontrola modelu podle výkresu zákazníka – kapitola 15 |
 
 Přetažení myší: soubory lze přetáhnout přímo do okna CADu – z průzkumníka, z plochy i jako přílohu z Outlooku. Každý model se otevře ve vlastní záložce (v sestavě se vloží jako komponenta), DXF a DWG se otevřou jako 2D výkres v nové záložce (kapitola 14) – i když je právě otevřená sestava; do skici se DXF vkládá volbou. Tlačítko Otevřít / importovat (Ctrl+O) a úvodní obrazovka dělají totéž.
 
@@ -994,7 +1057,7 @@ U krátkého odkazu se dokument zašifruje už ve vašem prohlížeči (AES-256-
 | Zobrazení | výchozí styl (stínovaný s hranami / drátový / průhledný), pozadí, kvalita sítě, tloušťka hran, pravoúhlé promítání, mřížka a osy, ViewCube, osový kříž, informační štítky, světlý / tmavý vzhled |
 | Myš a ovládání | schéma ZW3D / SolidWorks / touchpad, přiblížení ke kurzoru, obrácení kolečka |
 | Skica | přichytávání k mřížce, krok mřížky, automatické vazby, zobrazování značek vazeb |
-| Výkres | autor do razítka, výchozí formát listu, promítání E / A, nepředepsané tolerance (ISO 2768) |
+| Výkres | autor do razítka, výchozí formát listu, promítání E / A, šablona razítka nových listů, nepředepsané tolerance (ISO 2768) |
 | Soubory | rozpracovaná práce v prohlížeči: neukládat (výchozí) nebo šifrované úložiště s heslem; vymazání všeho uloženého; počet nedávných souborů |
 | Klávesové zkratky | každou zkratku lze přemapovat; obnovit výchozí |
 
@@ -1075,6 +1138,11 @@ Nápověda → Textové příkazy, zkratka Ctrl+Shift+K, nebo paleta Ctrl+K → 
 | stav · smazat poslední · zobraz iso | zpětná vazba a správa; stav prvku ✓ / ⚠ / ✗ se vypíše až po výpočtu (u delších prvků s časem), řádek Geometrie říká, zda je výsledek platné těleso |
 | svar koutový a5 hrana … · svar tupý V 60 … · svar děrový Ø12 … · svar tabulka | svary se svarovým kovem a hmotností (kapitola 9) |
 | vyber F3 E2 [přidat] · vyber nic · vyber | výběr ploch, hran a vrcholů čísly – stejné jako kliknutí; samotné vyber výběr vypíše |
+| vložit "Díl" v x y z [ukotvit] jako "K48" · sestava pružina "P" mezi "A" "B" volná L0 blok Ln tuhost c · sestava pružiny | přezdívka komponenty pro vazby místo #k · pružina mezi komponentami s délkou a silou (kapitola 11) |
+| kótovat funkční 26,5 74,175 · kótovat díry tabulka\|souřadnicově\|řetězově · výkres tolerance 74,175 -0,005 · výkres kontrola tolerancí | funkční rozměry, polohy děr a tolerance podle hodnoty nebo id (kapitola 13) |
+| výkres razítko šablona=nástrojářská zákazník="…" počet=4 · výkres nepředepsané ISO 2768-mK\|desetinná …\|ne | šablona a pole razítka, nepředepsané tolerance (kapitola 13) |
+| předloha "výkres.dwg" · porovnat předloha pohled přední · předloha kontrola kót | kontrola modelu podle výkresu zákazníka (kapitola 15) |
+| export skript [cs\|en\|de] [název] | dokument jako textový skript – viz „Dokument → textový skript“ níže |
 | uložit · export step · výkres export pdf vše · skica export dxf · sdílet · odkaz | výstupy bez systémového dialogu (viz níže) |
 | 2d čára 0,0 100,0 @0,50 · 2d hladina nová OSY barva 1 · 2d stav | příkazy 2D výkresu (kapitola 14) |
 | { … } / [ … ] | JSON: celý dokument .mncad, pole prvků nebo jeden prvek – všech 36 typů prvků včetně ploch, plechu, sestav; jeden prvek na jednom řádku lze míchat s textovými příkazy (např. tažení po šroubovici) |
@@ -1126,8 +1194,22 @@ Agent, který umí jen psát do konzole nebo volat window.mncad.run, dokončí c
 | skica export dxf ["Skica 1"] (sketch export dxf · skizze export dxf) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
 | sdílet [model\|výkres] [dní N\|bez omezení] [heslo X] [od "Jméno"] (share · freigeben) | sdílený odkaz jako tlačítko Sdílet (výchozí 10 dní, bez hesla); adresa je v protokolu na řádku URL: … a pod ní kód po skupinách |
 | odkaz (link) | vypíše poslední sdílený odkaz znovu |
+| export skript [cs\|en\|de] [název] (export script · export skript) | otevřený dokument jako textový skript <název>.mncad.txt (viz níže); protokol napíše počet řádků, velikost a pokrytí |
 
 Příklad protokolu: ✓ export STEP: Konzola.step · 41 kB · STEP AP214 – staženo (bez dialogu) a pod ním ✓ kontrola STEP: soubor znovu načten jádrem – těles: 1, objem 46 701 mm³ (rozdíl 0,0000 %) … → věrná kopie modelu; po příkazu sdílet řádek URL: https://mnastrojarna.cz/s#Ab3kZ9xQ2m. Stejné výstupy vrací API: await window.mncad.share({ days: 10, password }) → { url, code, exp, mode, … }, window.mncad.save("název"), exportFile("step") a exportDrawing("pdf", { sheet: "all" }). Po několika staženích za sebou se prohlížeč může zeptat „Stáhnout více souborů?“ – to je lišta prohlížeče, stačí ji pro stránku jednou povolit.
+
+### Dokument → textový skript (export skript)
+
+Opačný směr k textovým příkazům: otevřený díl, sestavu nebo 2D výkres uložíte jako textový skript <název>.mncad.txt – stejné příkazy, jaké se píší do konzole. V aplikaci Data → Export → Textový skript (.txt) (také v nabídce Soubor), v konzoli export skript (anglicky export script), pro skripty await window.mncad.script(). Skript vložený do konzole Textové příkazy postaví tentýž model v nové záložce – hodí se k úpravě modelu v textu a novému spuštění, k předání AI agentovi, k porovnání dvou verzí a k učení textových příkazů.
+
+- Co skript obsahuje: každý díl jako blok nový díl "…" – materiál, proměnné, skici s entitami, vazbami a kótami, prvky, konfigurace a výkresy; u sestavy pak nová sestava "…", vložení každé komponenty s polohou a natočením (stejný díl se zapíše jednou a vloží vícekrát), vazby sestava vazba … #1 F3 #2 F7 (komponenty pořadím, i závěs, šířka, drážka a souměrnost podle roviny) a pohybovou studii.
+- Přesnost: každý řádek prvku se před zápisem přečte stejně jako v konzoli a porovná s původním prvkem. Co vlastní příkaz neumí, zapíše se obecným příkazem prvek <typ> klíč=hodnota, výjimečně jedním řádkem JSON. Protokol exportu vypíše počet řádků, velikost a pokrytí („183 prvků: 183 vlastním příkazem, 0 obecným příkazem „prvek“, 0 jako JSON“).
+- Čísla hran a ploch: po úpravě historie (prvek přesunutý nebo vložený před výběr) se čísla hran a ploch mění. Program je před zápisem ověří jádrem podle otisků a zapíše platná; protokol uvede, kolik prvků ověřil a kolik dostalo jiná čísla.
+- Odkazy na dřívější prvky se píší názvem (zrcadlit rovina "Rovina 1", rotovat 90 osa "Osa 1"); potlačení, vazby parametrů a přejmenování míří na poslední prvek (potlačit poslední, upravit poslední size.2==t).
+- Jazyk: bez volby se klíčová slova píší v jazyce rozhraní; export skript en nebo de píše klíčová slova anglicky či německy a výslovně uvede každý název prvku, který by rozhraní toho jazyka pojmenovalo jinak – model má pak po přečtení v anglickém nebo německém rozhraní stejné názvy. Český skript přečtený v jiném jazyce rozhraní dá stejnou geometrii, vazby i konfigurace – liší se jen automatické názvy prvků, na které se nic neodkazuje.
+- Co se nepřenáší (protokol to vypíše řádky ℹ): ruční kóty a značky výkresu a ruční úpravy vygenerovaných kót (tolerance) – vygenerované kóty vzniknou znovu příkazem kótovat chytře a kóty, které jste smazali, skript smaže znovu; pomocné pohledy, detaily, zalomené a částečné řezy, přerušení a tabulka revizí; komponenty z importovaných souborů a podsestavy; barvy těles a ploch; podklady skic. 2D výkres se zapíše jako jeden řádek JSON.
+- Zatím nepřenáší novější údaje z vlny 15 – a protokol exportu na ně zatím neupozorní: šablonu a další pole razítka (logo, zákazník, polotovar…), tabulku nepředepsaných tolerancí podle desetinných míst, funkční rozměry, volbu Polohy děr (zapnutá tabulka děr se přenese), přezdívky komponent a pružiny mezi komponentami. Nepředepsané tolerance zadané třídou ISO 2768 se přenesou.
+- Doporučená kontrola: po přečtení porovnejte měřit těleso a stav v obou záložkách – objem a obálka každého dílu, počet komponent a splněné vazby musí být stejné.
 
 ### Automatizační režim prohlížeče
 
@@ -1149,7 +1231,9 @@ Prohlížeč bez grafické akcelerace (například headless Chrome bez grafické
 - Vysunutí ve směru: vysunout 20 směr 1 0 1, směr +X, směr hrana E3, směr plocha F2, směr osa "Osa 1", směr body V1 V5 (směr nesmí ležet v rovině skici). Propad pod úhlem: vysunout skrz odebrat obráceně sklon 25 k +X. Číslo za vysunout se měří podél směru, výška H kolmo na rovinu skici. Ukončení skrz, k tělesu, k dalšímu, k ploše F3, k rovině "Rovina 1" a k vrcholu V3 platí i šikmo.
 - Úkos se stranou: úkos 2 = úkos 2 dovnitř (obrys se od roviny skici zužuje), úkos 2 ven (rozšiřuje – u odebrání je to odlehčení). břit N nechá prvních N mm rovných, ostré rohy / zaoblené rohy určí rohy. Otvor střižnice s břitem 3 mm a odlehčením 2° je jeden řádek: vysunout skrz odebrat obráceně úkos 2 ven břit 3.
 - Závitová díra: díra závit M8 hloubka 20 v 30 20 vrtá tabulkový vrták Ø6,8; … jádro vrtá malý průměr závitu D1 podle ISO 965-1 (M8 → Ø6,647); díra 6,647 závit M8 … nebo … vrták 6,7 je vlastní průměr – zadaný průměr se zachová a protokol to poznamená. Vrták větší než závit je chyba.
-- Dno slepé díry: díra 10 hloubka 12 dno ploché (sedlo pružiny, frézované dno) nebo hrot 120 pro jiný vrcholový úhel vrtáku (60–170°, výchozí 118°). Zahloubení zahloubení D2 H2, kuželové D2 a více poloh díra 6,6 skrz v 10 10 12 v 90 10 12 fungují jako dřív.
+- Dno slepé díry: díra 10 hloubka 12 dno ploché (sedlo pružiny, frézované dno) nebo hrot 120 pro jiný vrcholový úhel vrtáku (60–170°, výchozí 118°).
+- Více děr jedním řádkem: každé v je jedna poloha – díra 6,6 skrz v 10 10 v 90 10 v 90 50 12. Dvě čísla = díra začne na povrchu tělesa v tomto místě (napříč osou vrtání), tři čísla = přesný bod x y z; polohy lze míchat. Poloha s jedním nebo čtyřmi a více čísly je chyba řádku s číslem polohy a nevznikne žádná díra. stav vypíše všechny polohy a skutečný směr vrtání (např. „vrtá +Z“ nebo vektor u šikmé díry). Tabulka děr ani měřit díry vnější válce (hřídele, osazení) neuvádějí.
+- Závitová díra se zahloubením: díra 6,8 skrz v 20 20 zahloubení 20 7 závit M8 nebo díra závit M8 hloubka 20 kuželové 10 v x y = zahloubení + vrták + závit; zahloubení a kuželové najednou je chyba.
 - Primitiva s polohou, osou a operací: kužel 20 0 25 v 0 0 70 osa 0 0,5 -0,866 odebrat (kuželové sedlo se skloněnou osou), válec 10 150 v -50 0 -40 osa 1 0 1 odebrat (šikmý průchod), kužel 12 0 6 na střed kružnice E17 osa -Z odebrat (zahloubení v ústí díry), pružina 22 stoupání 4 závity 5 drát 2 na střed plochy F15 nové těleso "Pružina". Operace je přidat, odebrat, průnik nebo nové.
 - prvek nápověda <typ> (také nápověda díra, prvek nápověda sheet.bend) vypíše všechna pole typu pro obecný příkaz prvek a upravit: název, jednotku, povolené hodnoty, výchozí hodnotu a zápis vlastním textovým příkazem. prvek nápověda bez typu dá přehled všech typů.
 - Lomená čára čára x1 y1 x2 y2 … [uzavřít|otevřená]: slova uzavřít a otevřená platí vždy. Bez nich zůstane čára, která s dalšími entitami skici tvoří uzavřený obrys, otevřená (je částí obrysu); osamocená čára se uzavře sama a protokol to oznámí řádkem ℹ. Jako dráha tažení nebo žebra se sama neuzavírá nikdy.
@@ -1205,17 +1289,18 @@ Cílem je plnohodnotný CAD pro díly, sestavy a výkresy v prohlížeči. Zde j
 | Tvarové prvky | vysunutí, rotace, tažení, šablonování (i hladké uzavřené), díry, zaoblení 8 variant vč. setback a eliptického, sražení 5, pole 5 druhů, skořepina, úkos vč. dělicí křivky a stupňovitého, žebro, přímé úpravy | navíc variabilní pole z tabulky; setback přesně jen u rohů z rovin a přímých hran, dělicí křivka po obloucích a splinech přibližně |
 | Plochy | 19 příkazů | více nástrojů pro třídu A (křivostní návaznost, úprava řídicích bodů) |
 | Plech / svařence | 12 + 8 / 13 příkazů: tvářecí nástroje (žaluzie, prolis, žebro po dráze, výstřih, můstek, lem díry, vodítko), křížový zlom, rozvin DXF se stopou nástrojů, kusovník řezů; svary koutové, tupé s úpravou hran podle ISO 9692-1, děrové a bodové, svarový kov jako těleso s hmotností, značky ISO 2553 na výkrese | knihovny vlastních tvářecích nástrojů, ztenčení materiálu, konfigurátory profilů; tupé svary po křivkách a na trubkách, šikmé T spoje |
-| Sestavy | komponenty, podsestavy, 23 druhů vazeb vč. mechanických (ozubení, hřeben, šroub, vačka, kardan), kinematická pohybová studie s kolizemi, kusovník, rozložený pohled, rám formy | dynamika (síly, gravitace, pružiny, kontakt), tečnost s kuželem a anuloidem, velké sestavy |
-| Výkresy | 7 pohledů, pomocný pohled, řez celý / poloviční / zalomený / natočený / částečný, detail, přerušený pohled, kóty, chytré kóty, drsnosti, GD&T, uložení ISO 286 s tabulkou, tabulka revizí s trojúhelníky a zónami, tabulka děr, kusovník, více výkresů jednoho dílu, export všech listů najednou, PDF / DXF / DWG / SVG | natočený řez s více zalomeními, uložení nad 500 mm, chytré kóty i v pomocných pohledech |
+| Sestavy | komponenty, podsestavy, 23 druhů vazeb vč. mechanických (ozubení, hřeben, šroub, vačka, kardan), kinematická pohybová studie s kolizemi, pružiny mezi komponentami (délka a síla podle polohy), přezdívky komponent, kusovník podle zdrojového dílu, rozložený pohled, rám formy | dynamika (síly, gravitace, pružiny působící na pohyb, kontakt), tečnost s kuželem a anuloidem, velké sestavy |
+| Výkresy | 7 pohledů, pomocný pohled, řez celý / poloviční / zalomený / natočený / částečný, detail, přerušený pohled, kóty, chytré kóty, drsnosti, GD&T, uložení ISO 286 s tabulkou, tabulka revizí s trojúhelníky a zónami, tabulka děr a souřadnicové kóty pro desky s mnoha dírami, funkční rozměry, tolerance podle hodnoty, razítko ve třech šablonách s logem a nepředepsanými tolerancemi ISO 2768 nebo podle desetinných míst, kusovník, více výkresů jednoho dílu, export všech listů najednou, PDF / DXF / DWG / SVG | natočený řez s více zalomeními, uložení nad 500 mm, chytré kóty i v pomocných pohledech |
 | 2D kreslení (2D CAD) | samostatný 2D výkres: příkazový řádek s názvy a zkratkami AutoCADu, zadání souřadnic, 10 režimů uchopení, hladiny, typy čar, úchopy, kóty a kótovací styly, šrafy, tolerance, bloky s atributy, rozvržení s výřezy v měřítku, tisk PDF; čtení i zápis DWG R2000–R2018 a DXF R12–R2018 | navíc uživatelské souřadné systémy (UCS), trasování uchopení, externí reference (XREF), dynamické bloky, tabulky, písma SHX, makra a LISP |
 | Formáty | STEP, IGES, BREP, STL, 3MF, OBJ, glTF, PLY, OFF; DXF (R12–R2018) a DWG (R2000–R2018) pro čtení i zápis | navíc nativní formáty konkurence (přes překladače) |
 | Knihovna | 103 rodin normálií textem | větší katalogy (Toolbox, Content Center), výrobci |
+| Kontrola podle výkresu zákazníka | předloha DWG / DXF / vektorové PDF: výtah kót, děr, kusovníku a razítka, rozpory v předloze, porovnání pohledů s pokrytím v %, kontrola kót předlohy proti modelu – zatím textovými příkazy | obvykle ruční překrytí podkladu nebo samostatný kontrolní software |
 | Sdílení | krátký odkaz s desetimístným kódem, šifrování už v prohlížeči, platnost 1–90 dní, heslo, zneplatnění; příjemce bez instalace a účtu | správa dat s účty, verzemi a právy (PDM, cloudové projekty), společné úpravy v reálném čase |
-| Automatizace | textové příkazy česky / anglicky / německy pro celý CAD, JSON dokumentu, API window.mncad, výstupy bez dialogů, režim pro automatizovaný prohlížeč; příkazová řádka mncad bez prohlížeče zatím jen pro stavbu a převod hotových dokumentů | makra a API s plným modelováním bez grafického rozhraní, dávkové úlohy na serveru |
+| Automatizace | textové příkazy česky / anglicky / německy pro celý CAD, JSON dokumentu, API window.mncad, výstupy bez dialogů, převod dokumentu na textový skript a zpět, režim pro automatizovaný prohlížeč; příkazová řádka mncad bez prohlížeče zatím jen pro stavbu a převod hotových dokumentů | makra a API s plným modelováním bez grafického rozhraní, dávkové úlohy na serveru |
 | Výkon | díly a sestavy desítek až stovek komponent v prohlížeči | velké sestavy tisíců dílů |
 | Cena a instalace | zdarma, bez instalace, data v prohlížeči | licence v řádu desítek až stovek tisíc Kč ročně |
 
-Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a přímých hran (jinde výchozí roh s ⚠); eliptické zaoblení obecných hran a úkos s nerovinnou dělicí křivkou jsou přiblížení; přechodová plocha a prodloužení G2 jsou přesné ve vzorkovacích bodech a ověřené analýzou návaznosti; úprava řídicích bodů jen u volných neořezaných ploch. Pohybová studie je kinematická (bez sil a dynamiky), vačka se počítá přes síť plochy (±0,002 mm). Tvářecí nástroje nemodelují ztenčení materiálu a nejde přidat vlastní nástroj z dílu. Natočený řez má jedno šikmé rameno, uložení ISO 286 pokrývá rozměry do 500 mm. Okrajové podmínky šablonování se aproximují pomocným řezem. Výkresy z DWG byly ověřeny zápisem a zpětným čtením; u exotických verzí AutoCADu doporučujeme kontrolu. 2D výkres pracuje jen ve světovém souřadném systému, nemá trasování uchopení ani externí reference a písma SHX kreslí nejbližším webovým písmem. Tupý svar s úpravou hran funguje jen po rovné spáře a bodové svary jsou jen značky. Krátký sdílený odkaz chrání desetimístný kód – pro citlivou dokumentaci přidejte heslo. Příkazová řádka mncad (fáze A) zatím neprovádí textové příkazy skriptu; staví a převádí hotové dokumenty.
+Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a přímých hran (jinde výchozí roh s ⚠); eliptické zaoblení obecných hran a úkos s nerovinnou dělicí křivkou jsou přiblížení; přechodová plocha a prodloužení G2 jsou přesné ve vzorkovacích bodech a ověřené analýzou návaznosti; úprava řídicích bodů jen u volných neořezaných ploch. Pohybová studie je kinematická (bez sil a dynamiky), vačka se počítá přes síť plochy (±0,002 mm). Tvářecí nástroje nemodelují ztenčení materiálu a nejde přidat vlastní nástroj z dílu. Natočený řez má jedno šikmé rameno, uložení ISO 286 pokrývá rozměry do 500 mm. Okrajové podmínky šablonování se aproximují pomocným řezem. Výkresy z DWG byly ověřeny zápisem a zpětným čtením; u exotických verzí AutoCADu doporučujeme kontrolu. 2D výkres pracuje jen ve světovém souřadném systému, nemá trasování uchopení ani externí reference a písma SHX kreslí nejbližším webovým písmem. Tupý svar s úpravou hran funguje jen po rovné spáře a bodové svary jsou jen značky. Krátký sdílený odkaz chrání desetimístný kód – pro citlivou dokumentaci přidejte heslo. Příkazová řádka mncad (fáze A) zatím neprovádí textové příkazy skriptu; staví a převádí hotové dokumenty. Předloha zákazníka se ovládá jen textovými příkazy a soubor se do dokumentu neukládá. Textový skript dokumentu nepřenáší ruční kóty, komponenty z importovaných souborů, podsestavy a novější údaje razítka a sestavy (kapitola 22). U nástrojů téměř tečných k plochám tělesa může zůstat ⚠ – pomůže jasný přesah aspoň 0,01 mm (kapitola 6).
 
 ## 24. Vaše data a soukromí
 
@@ -1257,6 +1342,15 @@ Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a
 | Úprava svarových ploch | tvar úkosu hran před svařením (I, V, X, U, ½V, K, J…) podle ISO 9692-1. |
 | Svarový kov | materiál svaru modelovaný jako samostatné těleso; z jeho objemu se počítá hmotnost svaru. |
 | MNCAD/1 | stručný textový protokol běhu příkazové řádky mncad s pevnou stavbou a rozpočtem 2 048 bajtů. |
+| Funkční rozměr | rozměr, který bude tolerovaný; na výkrese nikdy nebude pomocnou kótou v závorce. |
+| Pomocná kóta | kóta v závorce „(42)“ – rozměr, který plyne z ostatních článků řetězu; netoleruje se. |
+| Souřadnicové kóty | polohy (např. děr) jako vzdálenosti od jednoho výchozího bodu – „0“ v rohu a hodnoty v jedné řadě. |
+| Nepředepsané tolerance | tolerance rozměrů bez vlastní tolerance – třída ISO 2768 (např. mK) nebo tabulka podle počtu desetinných míst; uvádějí se v razítku. |
+| Šablona razítka | rozvržení razítka listu: ISO 7200, kompaktní nebo nástrojářská se všemi poli. |
+| Přezdívka komponenty | krátké jméno jedné instance v sestavě (např. K48), na které se odkazují vazby místo pořadí #k. |
+| Předloha | výkres zákazníka (DWG, DXF nebo PDF) připojený k dílu, podle kterého se model kontroluje. |
+| Pokrytí (porovnání s předlohou) | kolik procent čar předlohy leží v toleranci na promítnutém modelu a naopak. |
+| Textový skript dokumentu | model zapsaný textovými příkazy (.mncad.txt); vložením do konzole vznikne znovu. |
 
 ## 26. Historie verzí
 
@@ -1278,6 +1372,9 @@ Známá omezení: setback zaoblení je přesné jen u rohů z rovinných ploch a
 | 13. (14. 11. 2026) – opravy tlačítek | 25 oprav chování tlačítek nalezených při psaní mikronávodů; více výkresů jednoho dílu, export a tisk všech listů (vícestránkové PDF, DXF / DWG / SVG v ZIPu) i z konzole, import DXF do otevřené skici |
 | 14. (14. 11. 2026) – CAD bez prohlížeče, fáze A | příkazová řádka mncad (run, serve) v Node.js se stejným jádrem: stavba a převod hotových dokumentů, stručný protokol MNCAD/1 s rozpočtem 2 048 bajtů, kódy ukončení, limity času a paměti; pohybová studie s přírůstkovou kontrolou kolizí |
 | 16. (14. 11. 2026) – nejkratší sdílený odkaz | odkaz mnastrojarna.cz/s#KÓD (36 znaků místo 67) s desetimístným kódem, který lze nadiktovat nebo napsat na mnastrojarna.cz/s; zneplatněný nebo vypršelý odkaz už neožije, limit hádání kódů |
+| Dokument → textový skript (14. 11. 2026) | export dílu, sestavy i 2D výkresu do textového skriptu (Data → Export → Textový skript, příkaz export skript, window.mncad.script()) s kontrolou tam a zpět: pokrytí vlastními příkazy, ověření čísel hran a ploch jádrem, skripty pro české, anglické i německé rozhraní; tato dokumentace doplněná o 2D CAD, sdílení a běh bez prohlížeče |
+| 15. (14. 11. 2026) – test 959: díry, výkres, sestava, razítko a předloha | díry: každé „v“ jedna poloha, závitová díra se zahloubením, stav s polohami a směrem vrtání; výkres: odsazení řezu jako u skici (starší zápis s ⚠), ⚠ když se pohledy nevejdou, kóty na 3 desetinná místa, tolerance podle hodnoty i id, funkční rozměry, souřadnicové kóty a tabulka děr pro desky s mnoha dírami, kontrola tolerancí; razítko: šablony ISO 7200 / kompaktní / nástrojářská, logo a další pole, značka promítání, nepředepsané tolerance třídou ISO 2768 nebo podle desetinných míst s upozorněním při exportu; sestava: přesná obálka, pohyb bez falešného natáčení, kusovník podle zdrojového dílu, přezdívky komponent, pružiny se silou; předloha DWG / DXF / PDF zákazníka s výtahem, porovnáním a kontrolou kót |
+| 17. (14. 11. 2026) – platná geometrie u téměř tečných řezů | booleovské operace přesně a s tolerancí jen při příznaku vady (s kontrolou výsledku), neplatnost tělesa hlášená u prvního prvku, který ji způsobil, s číslem vadné hrany nebo plochy, další prvky odkazují na původce, varování při nesouladu objemu s nástrojem |
 | 5. – dodatky (listopad 2026) | sdílení odkazem (WhatsApp, e-mail, Teams; platnost 1–90 dní, heslo, šifrované úložiště pro velké modely), ochrana dokumentace (NDA): bez ukládání do prohlížeče / šifrované úložiště s heslem, záložky více dokumentů (díly, sestavy, výkresy) i na mobilu, dokumentace a příručka PDF v hlavním menu webu a v Nápovědě programu |
 
 ## Časté otázky
@@ -1356,7 +1453,7 @@ Ano. Nápověda → Textové příkazy (Ctrl+Shift+K): příkazy jako „kvádr 
 
 **Proč výkres neuvádí ISO 2768 ani sražení hran? Dříve tam byly.**
 
-Výrobní požadavky jsou konkrétní technické údaje, které by na výkres neměly přijít bez vědomí konstruktéra. Výkres proto standardně uvádí jen „Rozměry v mm“; nepředepsané tolerance (např. ISO 2768-mK) a opracování hran (např. srazit 0,5×45°) vyplníte v razítku – každé zvlášť, kdykoli lze smazat. Tlačítko „Doplnit obvyklé“ je vyplní jedním klikem.
+Výrobní požadavky jsou konkrétní technické údaje, které by na výkres neměly přijít bez vědomí konstruktéra. Výkres proto standardně uvádí jen „Rozměry v mm“; nepředepsané tolerance (např. ISO 2768-mK) a opracování hran (např. srazit 0,5×45°) vyplníte v razítku – každé zvlášť, kdykoli lze smazat. Tlačítko „Doplnit obvyklé“ je vyplní jedním klikem. Nepředepsané tolerance se vybírají třídou ISO 2768 nebo tabulkou podle počtu desetinných míst; výkres dílu bez nich panel Razítko označí ⚠ a export to ohlásí.
 
 **Jak dostanu do razítka materiál jako „ČSN 11 423“, když v nabídce je jen Ocel, Nerez…?**
 
@@ -1364,7 +1461,7 @@ Nabídka Materiál určuje třídu (hustotu) pro hmotnost. Pod ní je pole „Oz
 
 **Prvek je zelený, ale model se nezměnil / STEP se nedá uložit. Proč?**
 
-To už nenastává: po každém prvku program porovná objem a topologii tělesa a zkontroluje platnost geometrie (BRepCheck). Prvek, který těleso nezměnil (nástroj mimo těleso), nebo jehož výsledek má sebeprotínající plochy, dostane oranžové ⚠ s vysvětlením v historii, ve formuláři i ve stavovém řádku; operace, kterou jádro neprovede (např. skořepina přes zaoblené plochy), skončí červeně a těleso zůstane. Stav dokumentu (konzole „stav“) má řádek Geometrie: platná / neplatná / bez objemového tělesa.
+To už nenastává: po každém prvku program porovná objem a topologii tělesa a zkontroluje platnost geometrie (BRepCheck). Prvek, který těleso nezměnil (nástroj mimo těleso), nebo jehož výsledek má sebeprotínající plochy, dostane oranžové ⚠ s vysvětlením v historii, ve formuláři i ve stavovém řádku; operace, kterou jádro neprovede (např. skořepina přes zaoblené plochy), skončí červeně a těleso zůstane. Varování o neplatné geometrii stojí u prvního prvku, který ji způsobil, a jmenuje vadnou hranu nebo plochu; prvky za ním odkazují na něj („Těleso je neplatné už od prvku …“). Stav dokumentu (konzole „stav“) má řádek Geometrie: platná / neplatná / bez objemového tělesa.
 
 **Jak udělám jemný závit M18×1,5 nebo závit v díře?**
 
@@ -1393,3 +1490,15 @@ Mikronávody: po najetí myší na ikonu pásu karet (na dotyku dlouhým stiskem
 **Jak udělám otvor střižnice s břitem a odlehčením?**
 
 Jedním vysunutím: skica otvoru na střižné ploše, Odebrat, Skrz vše, v pokročilých volbách Úkos 2° se stranou Ven a Břit 3 mm. Otvor má prvních 3 mm rovné stěny a pod nimi se rozšiřuje o 2°, takže výstřižek volně propadne. Textem: „vysunout skrz odebrat obráceně úkos 2 ven břit 3“.
+
+**Jak převedu hotový model na textové příkazy?**
+
+Data → Export → Textový skript (.txt), v konzoli příkaz „export skript“, pro skripty window.mncad.script(). Vznikne soubor .mncad.txt se stejnými příkazy, jaké se píší do konzole Textové příkazy – díly, skici, prvky, proměnné, sestava s polohami a vazbami, pohybová studie a výkresy. Vložený do konzole postaví tentýž model v nové záložce. Ruční kóty výkresu, komponenty z importovaných souborů a podsestavy se nepřenášejí; protokol exportu vypíše, co chybí. Podrobnosti v kapitole 22 dokumentace.
+
+**Jak zkontroluji model podle výkresu zákazníka v DWG nebo PDF?**
+
+Připojte výkres jako předlohu: v konzoli Textové příkazy tlačítkem Připojit soubor… a příkazem předloha "výkres.dwg" (DWG, DXF nebo vektorové PDF). Příkaz porovnat předloha pohled přední položí promítnutý model přes pohled předlohy a vrátí pokrytí v procentech a odchylky s polohou, předloha kontrola kót změří kóty předlohy v modelu (✓ / ✗). Už při připojení CAD upozorní na rozpory v předloze, např. kótu, jejíž text neodpovídá nakreslené geometrii. Podrobnosti v kapitole 15 dokumentace.
+
+**Prvek má ⚠ „Výsledek operace neodpovídá průniku tělesa s nástrojem“. Co s tím?**
+
+Nástroj je téměř tečný k ploše tělesa nebo končí přesně na jeho hraně – typicky souřadnice opsané z výkresu na 4–6 desetinných míst. Kontrolní výpočet (opakování s malou tolerancí nebo průnik tělesa s nástrojem) dal jiný objem než přesná operace, proto program ponechal přesný výsledek a prvek označil; hláška uvádí obě hodnoty v mm³. Posuňte nástroj tak, aby plochy tělesa jasně protínal (aspoň o 0,01 mm), nebo aby s nimi splýval přesně; rovinu skici zadejte úhlem nebo odkazem na plochu místo zaokrouhlených vektorů.

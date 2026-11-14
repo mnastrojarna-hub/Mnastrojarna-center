@@ -18,6 +18,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 19:12 | Průchod e2e 19/49: zastaralá očekávání po vlně 15 opravena v `cad-agent-drawing` (dva „Příklad D“ v návodu → nový je „Příklad F“), `cad-bodies` (seznam příkazů obsahuje `nápověda`), `cad-verify` (tolerance razítka výběrem ISO 2768). Po doběhnutí průchodu: přestavět build (návod je v balíku) a tyto tři sady + všechna další selhání pustit znovu. Workflow: fáze B `w14:acceptance` běží, kola `w19:core` běží. |
 | 14. 11. 19:20 | Úkol D1 částečně rozjet dřív (nezávisí na B): agent dokumentace dopisuje vlnu 15, převodník a vlnu 17 do `cad-docs.ts` ve worktree `w18-docs2`, výstup `S/w18/docs2.patch` (zdroje `S/w18/docs-round2-sources.md`). Místa o fázi A nechává beze změny – přepíšou se až po B. |
 | 14. 11. 19:30 | Úkol B2 rozjet souběžně s akceptací: zkušební nanesení `bint.patch` na dnešní větev = 15 souborů s konflikty (největší `cad-app.tsx` – stará smyčka 378 řádků vs. volání enginu). Spuštěn workflow `wf_d020a109-e6f` (integrace → nezávislá kontrola ztracených změn → opravy), worktree `w14-int2` ze `4ceb0e7`, zadání `S/w14/int2/brief.md`, výstup `S/w14/int2/int2.patch` + `audit.md`. Až doběhne i akceptace (`w14-b6`), přenes její rozdíl `git -C .claude/worktrees/w14-b6 diff 7b86184 HEAD` na `w14-int2` (nebo do hlavní větve po int2). |
+| 14. 11. 19:45 | Dokumentace 2. kolo hotová a nanesena na větev (vlna 15, převodník, vlna 17; `S/w18/docs2.patch`). Do PR půjde spolu s opravami e2e po doběhnutí průchodu a ověření na novém buildu. Agent dokumentace zjistil 2 mezery → úkol E6 a E7. |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -188,7 +189,7 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 
 ## 6. Úkol D – dokumentace a příručka po sloučení B a C
 
-- [ ] D0. Převzít `S/w18/docs2.patch` (vlna 15, převodník, vlna 17 – agent dokumentace, worktree `w18-docs2`) podle
+- [x] D0. (naneseno 19:45, PR spolu s opravami e2e) Převzít `S/w18/docs2.patch` (vlna 15, převodník, vlna 17 – agent dokumentace, worktree `w18-docs2`) podle
       kapitoly 2 (stačí tsc, lint, `docs:text`), commit, PR, sloučit.
 - [ ] D1. `website/src/content/cad-docs.ts`: přepiš místa o fázi A (hledej „fáze A“, „host.app-only“; v
       `src/views/cad-docs-intl.tsx` „phase A“ / „Phase A“) podle toho, co CLI po fázi B skutečně umí (ověř spuštěním).
@@ -217,6 +218,15 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
   - tichý (stručný) protokol i v konzoli prohlížeče,
   - vícedokumentové běhy: ✓ jen u dokumentů, které se skutečně postavily (dřív se stavěl jen poslední),
   - B1 / B2 z hlášení (prázdná sestava se počítá jako prázdná záložka; závod evidence záložek).
+- [ ] E6. Převodník dokument → skript nepřenáší nic z vlny 15 kromě třídy ISO 2768 a NEHLÁSÍ to: šablona a další pole
+      razítka (logo, zákazník, polotovar…), tabulka nepředepsaných tolerancí podle desetinných míst, funkční rozměry
+      (`kótovat chytře funkční …`), režim poloh děr (`kótovat … díry tabulka|souřadnicově`), přezdívky komponent
+      (`vložit … jako`), pružiny (`sestava pružina …`). Doplň vyhrazené příkazy do `src/cad/doc-script.ts` (a do
+      ověření řádku), jinak aspoň poznámku ℹ; test tam a zpět pro každý bod (`doc-script.roundtrip.test.ts`). Po úkolu B
+      (patch B na doc-script nesahá, ale ověř).
+- [ ] E7. `stav` ve stejném běhu `window.mncad.run`, který sestavu teprve založil, nevypíše přesnou obálku („tělesa
+      komponent se stavějí zvlášť“); samostatné `stav` ji vypíše. Po úkolu B ověř v enginu (asynchronní stav sestavy)
+      a oprav, aby obálka byla i v témže běhu (nebo to jasně řekni v protokolu).
 - [ ] E4. Hostovaný koncový bod (HTTP služba pro agenty bez Node) je rozhodnutí majitele – nenasazuj, jen se v závěrečné
       zprávě zeptej, zda ho chce (je to jediná povolená otázka).
 - [ ] E5. Smaž zbylé worktree (`w18-docs`), tento soubor a odkaz v `CLAUDE.md`. Závěrečná zpráva majiteli.
