@@ -5,7 +5,9 @@
 import { tr } from "./i18n";
 import * as r from "replicad";
 import { flattenAssembly, MAX_DEPTH, rotMatrix, sourceKey } from "./assembly";
+import { springEffective } from "./asm-spring-geom";
 import { buildDoc, buildShape, shapeResult } from "./build";
+import { BIG_FACES } from "./mesh-budget";
 import { missingBlobs } from "./blobs";
 import { subShapes } from "./fastbox";
 import type { BuildResult, CadDoc, ComponentSource, Placement, Vec3 } from "./types";
@@ -134,8 +136,9 @@ function compoundOf(shapes: Shape[]): Shape {
 export async function assemblyShape(doc: CadDoc, depth = 0): Promise<Shape | null> {
   if (depth > MAX_DEPTH) throw new Error(tr("Sestava je zanořená příliš hluboko (nebo obsahuje sama sebe)."));
   const shapes: Shape[] = [];
-  for (const c of doc.components ?? []) {
-    if (c.hidden) continue;
+  for (const c0 of doc.components ?? []) {
+    if (c0.hidden) continue;
+    const c = springEffective(c0); // pružina v aktuální délce – přesný díl pro STEP, výkres, objem
     const e = await partEntry(sourceKey(c.source), c.source, depth);
     if (e.body) shapes.push(placed(e.body, c.placement));
   }
@@ -317,6 +320,81 @@ export async function interference(doc: CadDoc, tolerance = 1e-3, opts: { full?:
   lastStats = st;
   out.stats = st;
   return out;
+}
+
+/** otočení je jen záměna os se znaménkem (násobky 90°) – rohy lokální obálky pak dávají přesnou světovou obálku */
+const axisAligned = (R: number[]) => R.every((v) => Math.abs(v) < 1e-9 || Math.abs(Math.abs(v) - 1) < 1e-9);
+/** světové obálky natočených listů (klíč dílu + umístění) – stav modulu ve vlákně jádra */
+const turnedBoxCache = new Map<string, [Vec3, Vec3]>();
+const TURNED_MAX = 4000;
+
+/**
+ * Přesná obálka sestavy (stav sestavy, B10): sjednocení přesných obálek všech viditelných listových dílů v jejich umístění –
+ * jen tělesa (bez skic a pomocné geometrie), OCCT přes fastbox (ne síť). Listy natočené po násobcích 90° se přenesou rohy přesné
+ * lokální obálky (přesné); obecně natočené (např. otočení 0 0 20) se změří v umístění – rohy lokální obálky by obálku zvětšily
+ * (válec Ø72,5 natočený o 45° kolem Z: o 15 mm). Pružiny v aktuální délce (springEffective ve flattenAssembly).
+ */
+export async function asmEnvelope(doc: CadDoc): Promise<{ bbox: [Vec3, Vec3] | null; leaves: number; turned: number; approx: number }> {
+  let bbox: [Vec3, Vec3] | null = null;
+  let leaves = 0;
+  let turned = 0;
+  let approx = 0;
+  const grow = (b: [Vec3, Vec3]) => {
+    if (!bbox) bbox = [[...b[0]] as Vec3, [...b[1]] as Vec3];
+    else
+      for (let i = 0; i < 3; i++) {
+        bbox[0][i] = Math.min(bbox[0][i], b[0][i]);
+        bbox[1][i] = Math.max(bbox[1][i], b[1][i]);
+      }
+  };
+  for (const f of flattenAssembly(doc)) {
+    if (f.hidden) continue;
+    const e = await partEntry(f.key, f.comp.source);
+    if (!e.body) continue;
+    leaves++;
+    const m = rtOf(f.placement);
+    // velké importy (soubor s > BIG_FACES ploch, jinak > 20 × BIG_FACES): přesný kvádr by trval desítky sekund (46 MB STEP: 104 s)
+    // – obálka ze sítě dílu (vrcholy leží na tělese, odchylka ≤ tolerance sítě); počet takových listů vrací `approx`
+    const mesh = e.result.mesh;
+    const nf = e.result.metrics?.faces ?? 0;
+    if ((f.comp.source.kind === "file" ? nf > BIG_FACES : nf > 20 * BIG_FACES) && mesh?.vertices.length) {
+      approx++;
+      const v = mesh.vertices;
+      const b: [Vec3, Vec3] = [
+        [Infinity, Infinity, Infinity],
+        [-Infinity, -Infinity, -Infinity],
+      ];
+      for (let i = 0; i + 2 < v.length; i += 3)
+        for (let k = 0; k < 3; k++) {
+          const w = m.R[k * 3] * v[i] + m.R[k * 3 + 1] * v[i + 1] + m.R[k * 3 + 2] * v[i + 2] + m.t[k];
+          if (w < b[0][k]) b[0][k] = w;
+          if (w > b[1][k]) b[1][k] = w;
+        }
+      grow(b);
+      continue;
+    }
+    if (axisAligned(m.R)) {
+      grow(worldBox(localBox(f.key, e.body), m));
+      continue;
+    }
+    turned++;
+    const ck = `${f.key}|${m.R.map((v) => v.toFixed(12)).join(",")}|${m.t.map((v) => v.toFixed(9)).join(",")}`;
+    let b = turnedBoxCache.get(ck);
+    if (!b) {
+      const s = placed(e.body, f.placement);
+      try {
+        const bb = s.boundingBox;
+        b = bb.bounds as [Vec3, Vec3];
+        bb.delete();
+      } finally {
+        s.delete();
+      }
+      if (turnedBoxCache.size >= TURNED_MAX) turnedBoxCache.delete(turnedBoxCache.keys().next().value!);
+      turnedBoxCache.set(ck, b);
+    }
+    grow(b);
+  }
+  return { bbox, leaves, turned, approx };
 }
 
 /** Počty poslední kontroly kolizí (in-process volající; přes worker nesou počty pole výsledku `stats`). */

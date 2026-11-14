@@ -5,7 +5,7 @@
 import { cClosest, cIntersect, cPerpFrom, cTangentFrom } from "./curves";
 import { add, angleOf, dist, mul, polar, sub, unit, type Box } from "./geom";
 import { entityCurves, kindOf, type KindCtx, type SnapKind } from "./kinds";
-import { layerVisible } from "./layers";
+import { isVisible } from "./layers";
 import type { DraftModel, Vec2 } from "./model";
 import type { SpatialIndex } from "./spatial";
 
@@ -26,7 +26,7 @@ export function findSnap(model: DraftModel, idx: SpatialIndex, cursor: Vec2, ape
   if (!modes.size) return null;
   const box: Box = { x0: cursor[0] - aperture, y0: cursor[1] - aperture, x1: cursor[0] + aperture, y1: cursor[1] + aperture };
   const ctx: KindCtx = { model };
-  const cands = idx.query(box).filter((e) => layerVisible(model, e.layer));
+  const cands = idx.query(box).filter((e) => isVisible(model, e));
   let best: SnapHit | null = null;
   let bd = Infinity;
   const consider = (h: SnapHit) => {

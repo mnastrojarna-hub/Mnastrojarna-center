@@ -8,10 +8,13 @@ import type { ManualDim, MarkSpec, MarkTarget, AnnPatch } from "./agent-drawing"
 import { VIEW_CS } from "./agent-drawing";
 import { angleGeom, annotationGeometry, annToSheet, viewExtent, dimLabel, GDT_LABEL, isRadialDim, modelViewKey, pickViewEnt, scaleLabel, sheetToAnn, textBox, type DimAnn, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt } from "./drawing";
 import { calloutLines } from "./drawing-symbols";
+import { sameSize } from "./drawing-functional";
 import { tr } from "./i18n";
 import { uid, type DrawingAnnotation, type Vec2, type Vec3 } from "./types";
 
 const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",").replace(/^-/, "−");
+/** souřadnice modelu na tisíciny (rozsah pohledu – body ručních kót a značek se zadávají v mm modelu; B7) */
+const fmtM = (n: number) => String(Math.round(n * 1000) / 1000 || 0).replace(".", ",").replace(/^-/, "−");
 const fmtP = (p: Vec2) => `[${fmtN(p[0])}; ${fmtN(p[1])}]`;
 
 // ---------------------------------------------------------------- popisky
@@ -50,18 +53,23 @@ export function annLabel(views: PlacedView[], a: DrawingAnnotation): string {
   }
 }
 
-const num = (s: string) => parseFloat(s.replace(",", "."));
-/** Kóty / popisy, které odpovídají zadání (popisek kóty bez počtu, nebo první označení popisu: M8, Ø8,5, R2). */
+const num = (s: string) => parseFloat(s.replace("−", "-").replace(",", "."));
+/**
+ * Kóty / popisy, které odpovídají zadání: kóta podle ČÍSELNÉ hodnoty modelu (a druhu – Ø, M, R), ne podle textu popisku;
+ * popis díry podle prvního označení (M8, Ø8,5, R2).
+ */
 export function findDims(views: PlacedView[], anns: DrawingAnnotation[], target: string): DrawingAnnotation[] {
-  const t = target.trim().replace(/^ø/i, "Ø");
+  const t = target.trim().replace(/^ø/i, "Ø").replace(/^\((.*)\)$/, "$1");
   const tn = num(t.replace(/^[ØMR]/, ""));
   const pre = /^[ØMR]/.exec(t)?.[0] ?? "";
   return anns.filter((a) => {
     if (a.type === "dim") {
       const label = dimLabel({ kind: a.kind, prefix: a.prefix === "(" ? "" : a.prefix, text: a.text }, dimValue(views, a)).replace(/^\d+× /, "");
       if (label === t) return true;
-      const lp = /^[ØMR]/.exec(label)?.[0] ?? "";
-      return lp === pre && Math.abs(num(label.replace(/^[ØMR]/, "")) - tn) < 1e-6;
+      const lp = a.kind === "diameter" ? "Ø" : a.kind === "radius" ? "R" : /^[ØM]/.exec(a.prefix ?? "")?.[0] ?? "";
+      // úhel jen se značkou ° (45° = úhel, 45 = délka); úhel na setiny stupně jako popisek
+      if ((a.kind === "angle") !== /°$/.test(t)) return false;
+      return lp === pre && (a.kind === "angle" ? Math.abs(Math.round(dimValue(views, a) * 100) / 100 - tn) < 1e-9 : sameSize(tn, dimValue(views, a)));
     }
     if (a.type === "callout") {
       const first = a.lines[0].replace(/^\d+× /, "").split(" ")[0];
@@ -557,7 +565,7 @@ export function viewRangeLines(res: DrawingResult, o: Partial<DrawingOptions>): 
     const sx1 = v.px + v.w * v.s;
     const sy0 = H - (v.py + v.h * v.s);
     const sy1 = H - v.py;
-    L.push(tr("  {0}{1}: x {2}…{3}, y {4}…{5} mm · {6} · na listu x {7}…{8}, y {9}…{10}", NAME(v.key, o), ax ? ` (${ax})` : "", fmtN(b.x0), fmtN(b.x1), fmtN(b.y0), fmtN(b.y1), scaleLabel(v.s), fmtN(sx0), fmtN(sx1), fmtN(sy0), fmtN(sy1)));
+    L.push(tr("  {0}{1}: x {2}…{3}, y {4}…{5} mm · {6} · na listu x {7}…{8}, y {9}…{10}", NAME(v.key, o), ax ? ` (${ax})` : "", fmtM(b.x0), fmtM(b.x1), fmtM(b.y0), fmtM(b.y1), scaleLabel(v.s), fmtN(sx0), fmtN(sx1), fmtN(sy0), fmtN(sy1)));
   }
   for (const d of o.details ?? []) {
     const p = res.details?.find((x) => x.label === d.label);

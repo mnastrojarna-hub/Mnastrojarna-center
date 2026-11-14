@@ -1,0 +1,39 @@
+# 15. vlna – balík hole: polohy děr po skupinách (B3), zahloubení + závit (B4), tabulka děr bez vnějších válců (B9)
+ · polohy ({0}): {1}	 · positions ({0}): {1}
+{0} + závit {1} = závitová díra se zahloubením (zahloubení + vrták + závit)	{0} + thread {1} = tapped hole with a counterbore (counterbore + drill + thread)
+⚠ Zahloubení Ø{0} je menší než závit {1} (Ø{2}) – závit zasahuje do zahloubení.	⚠ The counterbore Ø{0} is smaller than the thread {1} (Ø{2}) – the thread reaches into the counterbore.
+Bez	None
+bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr – každé „v“ je jedna poloha: 2 čísla = na povrchu tělesa (u osy X jsou to y z, u osy Y x z), 3 čísla = x y z, jiný počet = chyba řádku; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit	without z = starts on the body surface at that location (from the mesh) and drills down; “through” drills from the point in the drilling direction only, “both” in both directions; angled hole: “direction” = drilling direction, “tilt” = angle from the axis; several positions = several holes – each “at” is one position: 2 numbers = on the body surface (for axis X they are y z, for axis Y x z), 3 numbers = x y z, any other count = line error; thread also with fine pitch (M18×1.5) – as in the thread command
+díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x y [z] …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2 | kuželové D2] [závit M8 [jádro | vrták [N]]]	hole D [depth H [flat bottom | tip 118]|through [both]|to body] at x y [z] [at x y [z] …] [axis Z] [direction vx vy vz | tilt angle] [cbore D2 H2 | csink D2] [thread M8 [core | drill [N]]]
+díra: „zahloubení“ a „kuželové“ najednou nejde – zadejte jedno: zahloubení D2 H2 (válcové) nebo kuželové D2 [úhel]	hole: “counterbore” and “countersink” cannot be combined – give one: counterbore D2 H2 (cylindrical) or countersink D2 [angle]
+díra: {0}„v {1}“ – počet čísel {2}; každá poloha má dvě čísla (v x y = na povrchu tělesa) nebo tři (v x y z), více děr: díra 8 skrz v 10 20 v 30 20 v 50 20 5	hole: {0}“at {1}” – {2} number(s); each position has two numbers (at x y = on the body surface) or three (at x y z), several holes: hole 8 through at 10 20 at 30 20 at 50 20 5
+head „{0}“ – zadejte counterbore (válcové zahloubení), countersink (kuželové zahloubení) nebo none	head “{0}” – enter counterbore (cylindrical counterbore), countersink (conical countersink) or none
+head (zahloubení závitové díry) platí jen pro závitovou díru: kind=tapped thread=M8 head=counterbore cbDiameter=20 cbDepth=7	head (counterbore of a tapped hole) applies to a tapped hole only: kind=tapped thread=M8 head=counterbore cbDiameter=20 cbDepth=7
+head=counterbore potřebuje průměr a hloubku zahloubení: cbDiameter=20 cbDepth=7	head=counterbore needs the counterbore diameter and depth: cbDiameter=20 cbDepth=7
+head=countersink potřebuje průměr kuželového zahloubení: csDiameter=10 [csAngle=90]	head=countersink needs the countersink diameter: csDiameter=10 [csAngle=90]
+kuželové zahloubení	countersink
+poloha {0} 	position {0} 
+v x1 y1 [z1] v x2 y2 [z2] (souřadnice; bez z = na povrchu tělesa)	at x1 y1 [z1] at x2 y2 [z2] (coordinates; without z = on the body surface)
+Vrtá se zahloubení, pod ním vrták Ø{0} a závit {1} – výkres: {2}.	The counterbore is machined, below it the drill Ø{0} and the thread {1} – drawing: {2}.
+zahloubení	counterbore
+zahloubení D2 H2 závit M8 | kuželové D2 závit M8	counterbore D2 H2 thread M8 | countersink D2 thread M8
+Zahloubení Ø{0} je menší než závit {1} (Ø{2}) – závit zasahuje do zahloubení; zvětšete zahloubení nad Ø{2}.	The counterbore Ø{0} is smaller than the thread {1} (Ø{2}) – the thread reaches into the counterbore; enlarge the counterbore above Ø{2}.
+Zahloubení závitové díry	Counterbore of the tapped hole
+zahloubení závitové díry (kind=tapped): counterbore = válcové cbDiameter × cbDepth, countersink = kuželové csDiameter / csAngle – zahloubení + vrták + závit	counterbore of a tapped hole (kind=tapped): counterbore = cylindrical cbDiameter × cbDepth, countersink = conical csDiameter / csAngle – counterbore + drill + thread
+závitová díra se zahloubením = zahloubení + vrták + závit (JSON kind tapped + head counterbore | countersink); výkres „M8 skrz“ + „Ø6,8 skrz“ + „⌴ Ø20 ↧7“, stav „M8 skrz (vrták Ø6,8) zahl. Ø20×7“; zahloubení menší než závit = ⚠ ve výsledku stavby; zahloubení i kuželové najednou = chyba; upravit kind=tapped thread=M8 u zahloubené díry zahloubení ponechá (bez něj head=none); starší díra bez head s uloženým zahloubením = ⚠ a poznámka ve stavu	tapped hole with a counterbore = counterbore + drill + thread (JSON kind tapped + head counterbore | countersink); drawing “M8 through” + “Ø6.8 through” + “⌴ Ø20 ↧7”, status “M8 through (drill Ø6.8) cbore Ø20×7”; a counterbore smaller than the thread = ⚠ in the build result; counterbore and countersink together = error; edit kind=tapped thread=M8 on a counterbored hole keeps the counterbore (without it: head=none); an older hole without head but with a stored counterbore = ⚠ and a note in the status
+Tabulka děr: žádné díry (vnější válce – hřídel, osazení – se nevypisují)	Hole table: no holes (outer cylinders – shaft, shoulders – are not listed)
+# oprava po revizi: senkung = válcové zahloubení, upravit kind=tapped ponechá zahloubení, starší díra bez head, směr vrtání, tabulka děr jednou řádkou
+ – bez zahloubení: head=none	 – without the counterbore: head=none
+ · díry s jinou osou nejsou v tabulce ({0}): {1}	 · holes with another axis are not in the table ({0}): {1}
+ (uložené kuž. Ø{0} se nevrtá – chybí head)	 (stored csink Ø{0} is not machined – head missing)
+ (uložené zahl. Ø{0}×{1} se nevrtá – chybí head)	 (stored cbore Ø{0}×{1} is not machined – head missing)
+, délka závitu {0}	, thread length {0}
+, směr vrtání {0}	, drilling direction {0}
+, směr vrtání {0}{1}	, drilling direction {0}{1}
+, vrtá {0}	, drills {0}
+kuželové Ø{0}	countersink Ø{0}
+Ø{0} osa {1}	Ø{0} axis {1}
+Tabulka děr (pohled {0}, {1}): {2}	Hole table (view {0}, {1}): {2}
+Tabulka děr: v pohledu {0} žádná díra s osou ve směru pohledu; díry s jinou osou ({1}): {2} – přidejte pohled ve směru jejich osy	Hole table: no hole with its axis along the view direction in view {0}; holes with another axis ({1}): {2} – add a view along their axis
+Uložené zahloubení {0} se nevrtá – závitová díra nemá head (starší zápis). Zahloubit: upravit "{1}" head={2}; smazat: upravit "{1}" head=none	The stored counterbore {0} is not machined – the tapped hole has no head (older notation). Counterbore it: edit "{1}" head={2}; remove it: edit "{1}" head=none
+závit {0} + head=none = závitová díra bez zahloubení	thread {0} + head=none = tapped hole without a counterbore

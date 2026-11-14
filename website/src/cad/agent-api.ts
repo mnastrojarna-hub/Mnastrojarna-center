@@ -686,4 +686,8 @@ export type MncadApiExt = {
   clearSelection: () => void;
   /** spustí akci rozšíření (Rozvin → DXF, Tabulka ohybů, Kusovník řezů, Tloušťka stěn, export skici DXF…) a vrátí text a soubory */
   action: (id: string) => Promise<{ log: string; files: CapturedFile[] }>;
+  /** připojí soubor pro příkazy, které berou soubor podle názvu (předloha "výkres.dwg", logo razítka) – jako tlačítko konzole „Připojit soubor…“; data = base64, data URL nebo bajty */
+  attach: (name: string, data: string | Uint8Array, mime?: string) => { name: string; bytes: number };
+  /** předloha: `předloha …` (bez textu = stav), `porovnat předloha …`, `kontrola kót …` → protokol a strukturovaný výsledek (výtah, porovnání se SVG, kontrola kót) */
+  reference: (cmd?: string) => Promise<{ log: string; data: unknown }>;
 };

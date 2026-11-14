@@ -163,7 +163,7 @@ export default {
     select: "Bei offenem Formular die Fläche anklicken, in die gebohrt wird (setzt Punkt und Achse).",
     steps: ["Bohrungstyp: Gebohrt, Zylindersenkung, Kegelsenkung oder Gewinde; Durchmesser.", "Fläche anklicken (Punkt auf der Oberfläche) oder Bohrungspositionen ausfüllen.", "Endbedingung (Tiefe, durch) einstellen und mit OK bestätigen."],
     cmd: "bohrung 8,5 durch bei 20 30",
-    note: "Gewinde: Tabellenbohrer (M8 → 6,8), Kerndurchmesser oder eigener Bohrer; Sackloch auch mit flachem Grund.",
+    note: "Gewinde: Tabellenbohrer (M8 → 6,8), Kern oder eigen; auch mit Senkung (Senkung + Bohrer + Gewinde); flacher Grund.",
   },
   thread: {
     what: "Fügt ein metrisches ISO-Gewinde an einem Zylinder oder in einer Bohrung hinzu – kosmetisch oder modelliert.",

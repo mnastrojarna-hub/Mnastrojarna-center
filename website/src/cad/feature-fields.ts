@@ -151,7 +151,7 @@ export function featureFields(): FieldTable {
       },
     },
     hole: {
-      cmd: tr("díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8 [jádro | vrták [N]]]"),
+      cmd: tr("díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x y [z] …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2 | kuželové D2] [závit M8 [jádro | vrták [N]]]"),
       ex: 'prvek hole diameter=10 depth=12 position=20;30;20 tipAngle=180',
       fields: {
         position: { ...POS(tr("bod začátku díry (text bez z = na povrchu tělesa)")), text: tr("v x y [z]") },
@@ -168,8 +168,9 @@ export function featureFields(): FieldTable {
         thread: { k: "text", opt: true, desc: tr("závit (M8, M18×1,5)"), text: tr("závit M8") },
         tapDrill: { k: "enum", opt: true, values: ["table", "minor", "custom"], desc: tr("vrták závitové díry: table = z tabulky (M8 → 6,8), minor = jádro D1 podle ISO 965-1 (M8 → 6,647), custom = vrtá se diameter"), text: tr("(bez volby) | jádro | vrták N | díra 6,647 závit M8") },
         threadDepth: N(tr("užitečná délka závitu"), "mm", tr("hloubka-závitu T"), true),
+        head: { k: "enum", opt: true, values: ["counterbore", "countersink"], desc: tr("zahloubení závitové díry (kind=tapped): counterbore = válcové cbDiameter × cbDepth, countersink = kuželové csDiameter / csAngle – zahloubení + vrták + závit"), text: tr("zahloubení D2 H2 závit M8 | kuželové D2 závit M8") },
         end: { k: "json", opt: true, desc: tr("ukončení: blind, throughAll, toNext, toFace, toVertex, offsetFromFace, toBody"), text: tr("k tělesu") },
-        points: { k: "refs", opt: true, desc: tr("více poloh (odkazy na body)"), text: tr("v x1 y1 z1 v x2 y2 z2 (souřadnice)") },
+        points: { k: "refs", opt: true, desc: tr("více poloh (odkazy na body)"), text: tr("v x1 y1 [z1] v x2 y2 [z2] (souřadnice; bez z = na povrchu tělesa)") },
         dirDef: { ...DIRDEF(), desc: tr("osa díry libovolným směrem – má přednost před axis"), text: tr("směr vx vy vz | sklon úhel") },
         tipAngle: N(tr("úhel špičky vrtáku slepé díry 60–170° (výchozí 118), 180 = ploché dno; jiná hodnota: text / prvek / upravit = chyba, starší JSON = varování a oříznutí"), "°", tr("hrot N | dno ploché"), true),
         fit: { k: "enum", opt: true, values: ["fine", "medium", "coarse"], desc: tr("řada průchozích děr ISO 273 (informativní)") },

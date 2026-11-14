@@ -4,6 +4,7 @@
  */
 import { groupKey, groupLabel } from "./asm-groups";
 import { tr } from "./i18n";
+import { springEffective } from "./asm-spring-geom";
 import { emptyDoc, uid, type AsmComponent, type CadDoc, type ComponentSource, type Feature, type Placement, type Vec3 } from "./types";
 
 // ---------------- matice ----------------
@@ -121,7 +122,7 @@ export function sourceKey(s: ComponentSource, depth = 0): string {
       : s.kind === "asm"
         ? depth > MAX_DEPTH
           ? "asm:cycle"
-          : "asm:" + JSON.stringify((s.doc.components ?? []).map((c) => [sourceKey(c.source, depth + 1), c.placement, c.hidden ? 1 : 0]))
+          : "asm:" + JSON.stringify((s.doc.components ?? []).map((c) => [sourceKey(c.source, depth + 1), c.placement, c.hidden ? 1 : 0, ...(c.spring?.length != null ? [c.spring.length, c.spring.offset ?? 0] : [])]))
         : `${s.format}:${s.data.length}:${s.data.slice(0, 2048)}:${s.data.slice(-2048)}`;
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
@@ -160,16 +161,68 @@ function compInfo(c: AsmComponent, info: (c: AsmComponent) => { material?: strin
   return { massKg: known ? m : undefined };
 }
 
+/** Odkaz na instanci v protokolu: přezdívka „[K3]“, jinak pořadí „#3“ (komponenta nejvyšší úrovně). */
+export function instanceRef(doc: CadDoc, c: AsmComponent): string {
+  return c.alias ? `[${c.alias}]` : `#${(doc.components ?? []).findIndex((x) => x.id === c.id) + 1}`;
+}
+/**
+ * Jednoznačný klíč instance pro strojové výstupy (window.mncad.motion): název, když je v sestavě jediný; jinak „název [K3]“
+ * (přezdívka) nebo „název #3“ (pořadí) – stejné názvy se nesmí slít do jednoho záznamu.
+ */
+export function instanceKey(doc: CadDoc, id: string): string {
+  const comps = doc.components ?? [];
+  const c = comps.find((x) => x.id === id);
+  if (!c) return id;
+  return comps.filter((x) => x.name === c.name).length > 1 ? `${c.name} ${instanceRef(doc, c)}` : c.name;
+}
+/** Kopie komponenty (duplikovat, pole, zrcadlit): nové id, BEZ přezdívky – přezdívka musí zůstat jednoznačná. */
+export function componentCopy(c: AsmComponent, patch: Partial<AsmComponent> = {}): AsmComponent {
+  const { alias: _alias, ...rest } = c;
+  void _alias;
+  return { ...rest, id: uid(), ...patch };
+}
+/**
+ * Sestava bez komponent `ids`: zmizí i definice pružin, které na nich dosedaly (pružina zůstane ve volné délce) – jinak by
+ * pružina držela starou délku a stav by hlásil ✓. Vazby se tu neřeší (text je odebírá, panel je nechá jako „chybí plocha“).
+ */
+export function removeComponents(doc: CadDoc, ids: Iterable<string>): { doc: CadDoc; springs: string[] } {
+  const gone = new Set(ids);
+  const springs: string[] = [];
+  const components = (doc.components ?? [])
+    .filter((c) => !gone.has(c.id))
+    .map((c) => {
+      if (!c.spring || (!gone.has(c.spring.a.compId) && !gone.has(c.spring.b.compId))) return c;
+      springs.push(c.name);
+      const { spring: _s, ...rest } = c;
+      void _s;
+      return rest;
+    });
+  return { doc: { ...doc, components }, springs };
+}
+
+/** Název zdroje komponenty (název vloženého dílu / podsestavy, u souboru název souboru) – název řádku kusovníku, když se instance jmenují různě. */
+export function sourceName(s: ComponentSource): string {
+  return (s.kind === "file" ? s.fileName.replace(/\.[^.]+$/, "") : s.doc.name)?.trim() ?? "";
+}
+
+/**
+ * Řádky kusovníku podle ZDROJE (stejný vložený díl – obsah, název dílu a materiál – → jeden řádek, počty se sčítají), bez ohledu na
+ * názvy a přezdívky instancí: přejmenovaná instance („… -1“) řádek nerozdělí (B15). Různá čísla výkresu (komponenta / vlastnosti
+ * dílu) jsou různé položky. Název řádku = společný název instancí, jinak název zdroje (dílu).
+ */
 function aggregate(comps: { c: AsmComponent; n: number }[], info: (c: AsmComponent) => { material?: string; massKg?: number }, level: number): BomRow[] {
   const rows = new Map<string, BomRow>();
   for (const { c, n } of comps) {
     // číslo výkresu: z komponenty, jinak z vlastností vloženého dílu (props.number) – ať se do kusovníku dostane
     const number = c.number?.trim() || (c.source.kind === "part" ? c.source.doc.props?.number?.trim() : undefined) || undefined;
-    const key = `${sourceKey(c.source)}|${c.name}|${number ?? ""}`;
+    // zdroj = obsah dílu (sourceKey) + jeho název a materiál – dva různé díly se stejnou geometrií zůstanou dvě položky
+    const mat = c.source.kind === "part" ? `${c.source.doc.material ?? ""}/${c.source.doc.materialName ?? ""}` : (c.material ?? "");
+    const key = `${sourceKey(c.source)}|${sourceName(c.source)}|${mat}|${number ?? ""}`;
     const r = rows.get(key);
     if (r) {
       r.qty += n;
       r.ids.push(c.id);
+      if (r.name !== c.name) r.name = sourceName(c.source) || r.name;
     } else {
       const i = compInfo(c, info);
       rows.set(key, { pos: 0, name: c.name, number, qty: n, material: i.material, massKg: i.massKg, group: c.source.kind === "asm" ? (c.group ?? "Podsestavy") : c.group, ids: [c.id], level, assembly: c.source.kind === "asm" || undefined });
@@ -254,7 +307,8 @@ export function flattenAssembly(doc: CadDoc): FlatComponent[] {
   const out: FlatComponent[] = [];
   const walk = (d: CadDoc, parent: Placement | null, path: string[], hidden: boolean, depth: number) => {
     if (depth > MAX_DEPTH) return;
-    for (const c of d.components ?? []) {
+    for (const c0 of d.components ?? []) {
+      const c = springEffective(c0); // pružina v aktuální délce (přesný díl, začátek na dosedací ploše) – cad/asm-spring-geom.ts
       const pl = parent ? composePlacement(parent, c.placement) : c.placement;
       const h = hidden || !!c.hidden;
       if (c.source.kind === "asm") walk(c.source.doc, pl, [...path, c.id], h, depth + 1);
@@ -633,7 +687,7 @@ export function patternComponent(doc: CadDoc, compId: string, p: CompPattern): C
       const rel = apply3(Rk, [c.placement.position[0] - p.center[0], c.placement.position[1] - p.center[1], c.placement.position[2] - p.center[2]]);
       placement = { position: [rel[0] + p.center[0], rel[1] + p.center[1], rel[2] + p.center[2]].map((v) => Math.round(v * 1e6) / 1e6) as Vec3, rotation: eulerXYZ(mul3(Rk, rotMatrix(c.placement.rotation))) };
     }
-    copies.push({ ...c, id: uid(), name: `${c.name} (${k + 1})`, placement, fixed: false });
+    copies.push(componentCopy(c, { name: `${c.name} (${k + 1})`, placement, fixed: false }));
   }
   const next = [...comps];
   next.splice(i + 1, 0, ...copies);
@@ -656,7 +710,7 @@ export function mirrorComponent(doc: CadDoc, compId: string, plane: "XY" | "XZ" 
   pos[k] = 2 * offset - pos[k];
   const R = rotMatrix(c.placement.rotation);
   const R2 = mul3(mul3(S, R), S);
-  const copy: AsmComponent = { ...c, id: uid(), name: `${c.name} (zrcadlo)`, placement: { position: pos, rotation: eulerXYZ(R2) }, fixed: false };
+  const copy: AsmComponent = componentCopy(c, { name: `${c.name} (zrcadlo)`, placement: { position: pos, rotation: eulerXYZ(R2) }, fixed: false });
   const next = [...comps];
   next.splice(i + 1, 0, copy);
   return { ...doc, components: next };

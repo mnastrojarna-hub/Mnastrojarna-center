@@ -14,6 +14,7 @@ export type SketchPlane =
   | { kind: "custom"; origin: Vec3; normal: Vec3; xDir: Vec3; label?: string };
 
 import { tr } from "./i18n";
+import type { RefDocInfo } from "./reference/types";
 import type { AxisDef, Direction, Extent, PlaneDef, Ref, Sig, StartFrom, Thin } from "./refs";
 import type { DraftModel } from "./draft/model";
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
@@ -128,6 +129,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       /** vrták závitové díry: chybí / "table" = z tabulky závitů (M8 → 6,8), "minor" = jádro D1 podle ISO 965-1 (6,647), "custom" = `diameter` */
       tapDrill?: "table" | "minor" | "custom";
       threadDepth?: number;
+      /** zahloubení závitové díry (kind "tapped"): válcové (cbDiameter × cbDepth) / kuželové (csDiameter, csAngle) + vrták + závit */
+      head?: "counterbore" | "countersink";
       /** ukončení (chybí-li: depth > 0 = slepá, jinak skrz) */
       end?: HoleEnd;
       /** více poloh naráz (odkazy na vrcholy, středy kružnic, body skici…); chybí-li, platí `position` */
@@ -282,6 +285,8 @@ export type CadDoc = {
   activeBody?: string | null;
   /** podklady skic (obrázek / stránka PDF pod geometrií): id skici → podklad; mimo prvky, aby neměnily klíč mezipaměti stavby */
   underlays?: Record<string, SketchUnderlay>;
+  /** předloha (výkres zákazníka DWG / DXF / PDF): název, otisk souboru, souhrn výtahu a výsledky kontrol – cad/reference */
+  reference?: RefDocInfo;
 };
 
 /**
@@ -339,6 +344,31 @@ export type AsmComponent = {
   material?: string;
   /** skupina v kusovníku (např. „Desky“, „Normálie“) */
   group?: string;
+  /**
+   * přezdívka instance (`vložit "Díl" jako "K48"`): jednoznačný odkaz ve vazbách a příkazech místo #k, zobrazí se ve stromu;
+   * kusovník ji nepoužívá (řádky kusovníku se tvoří podle zdroje)
+   */
+  alias?: string;
+  /** pružina mezi dvěma komponentami: délka podle vzdálenosti dosedacích ploch (cad/asm-spring.ts) */
+  spring?: SpringDef;
+};
+
+/**
+ * Pružina v sestavě (cad/asm-spring.ts): komponenta s prvkem Pružina (normálie DIN 2095 nebo vlastní díl) mezi dosedací plochou
+ * `a` (začátek pružiny – strana jejího počátku) a `b` (konec). Délka pružiny = vzdálenost obou rovin podél osy pružiny; mění se
+ * při přepočtu vazeb i v pohybové studii. `free` = volná délka L0, `solid` = délka na doraz Ln, `rate` = tuhost c [N/mm]
+ * (síla F = c·(L0 − L)). `length`, `offset` (posun začátku pružiny po ose k dosedací ploše A) a `seat` zapíše poslední přepočet.
+ */
+export type SpringDef = {
+  a: MateRef;
+  b: MateRef;
+  free: number;
+  solid?: number;
+  rate?: number;
+  length?: number;
+  offset?: number;
+  /** vzdálenost dosedacích ploch z posledního přepočtu (> L0 = nedosedá, < Ln = pod dorazem) */
+  seat?: number;
 };
 
 /**
@@ -397,7 +427,7 @@ export const uid = () => Math.random().toString(36).slice(2, 9);
  * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
  */
 export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string; /** revize, ve které se údaj změnil (trojúhelník s písmenem) */ rev?: string; /** kóta s polem tolerance ISO 286: jen značka / + úchylky / + mezní rozměry (jinak podle listu) */ tolShow?: "code" | "dev" | "limits" } & (
-  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean }
+  | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean; /** souřadnicová kóta (ISO 129-1): `a` = počátek (základna), `b` = bod; kreslí se jen vynášecí čára z `b` a hodnota na jejím konci, `jog` = posun textu podél řady [mm listu] (cad/drawing-ordinate.ts) */ ord?: boolean; jog?: number }
   /** průměr / poloměr kružnice nebo oblouku pohledu: střed `c` a poloměr `r` v souřadnicích pohledu, odkaz ve směru `ang` [°] o délce `offset` [mm listu] od kružnice */
   | { type: "dim"; kind: "diameter" | "radius"; c: Vec2; r: number; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
   /** úhel dvou hran pohledu (a–b, a2–b2): oblouk o poloměru `offset` [mm listu] v sektoru, kam míří směr `ang` [°] */
@@ -408,7 +438,7 @@ export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „
   | { type: "datum"; at: Vec2; label: string }
   | { type: "text"; at: Vec2; text: string; size: number }
   /** popis s odkazovou čarou (díry, sražení, zaoblení, roztečná kružnice): šipka v `tip`, koleno v `at`, řádky textu (↧ ⌴ ⌵ se kreslí jako značky); `circle` = osová kružnice; `tol` = tolerance za prvním označením */
-  | { type: "callout"; tip: Vec2; at: Vec2; lines: string[]; circle?: { c: Vec2; r: number }; tol?: string }
+  | { type: "callout"; tip: Vec2; at: Vec2; lines: string[]; circle?: { c: Vec2; r: number }; tol?: string; /** značka skupiny děr (souřadnicové kóty s více druhy děr): písmeno `tag` u každé kružnice `tags` */ tag?: string; tags?: { c: Vec2; r: number }[] }
   /** osa souměrnosti (čerchovaná čára) – souměrné kótování roztečí od ní */
   | { type: "centerline"; a: Vec2; b: Vec2 }
 );

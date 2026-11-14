@@ -127,7 +127,8 @@ export function layerVisible(m: DraftModel, name: string): boolean {
 }
 /** Entitu lze upravovat (hladina není zamčená). */
 export const layerLocked = (m: DraftModel, name: string) => !!findLayer(m, name)?.locked;
-export const isVisible = (m: DraftModel, e: DraftEntity) => layerVisible(m, e.layer);
+/** Entita je vidět: hladina zapnutá a nezmrazená, entita bez příznaku neviditelnosti DXF (60 = 1, ext.invisible). */
+export const isVisible = (m: DraftModel, e: DraftEntity) => !e.ext?.invisible && layerVisible(m, e.layer);
 export const isEditable = (m: DraftModel, e: DraftEntity) => !layerLocked(m, e.layer);
 
 /** Výsledný styl entity pro vykreslení / tisk. */

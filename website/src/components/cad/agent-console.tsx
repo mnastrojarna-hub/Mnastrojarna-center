@@ -4,6 +4,7 @@ import { tr } from "@/cad/i18n";
 import { useEffect, useRef, useState } from "react";
 import { AGENT_COMMANDS } from "@/cad/agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
+import { attachedFiles, readFileAsDataUrl } from "@/cad/attached-files";
 import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
@@ -139,6 +140,7 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
               {tr("Kopírovat návod pro AI")}
             </Btn>
           </div>
+          <AttachFiles flash={flash} />
           {note && <p className="mt-1 text-[12px] text-brand">{note}</p>}
           {help && (
             <div className="mt-3 max-h-64 overflow-y-auto rounded border border-[#e3e8ee] bg-[#f7f9fb] p-2" data-agent-commands>
@@ -183,5 +185,44 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
         </div>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Připojené soubory pro příkazy, které berou soubor podle názvu (např. výkres razítko logo="firma.png") – jen v paměti
+ * karty (cad/attached-files.ts), nic se neodesílá.
+ */
+function AttachFiles({ flash }: { flash: (m: string) => void }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [list, setList] = useState(() => attachedFiles.list());
+  useEffect(() => attachedFiles.subscribe(() => setList(attachedFiles.list())), []);
+  const add = async (files: FileList) => {
+    const names: string[] = [];
+    for (const f of [...files]) {
+      try {
+        attachedFiles.add({ name: f.name, mime: f.type || "application/octet-stream", dataUrl: await readFileAsDataUrl(f), bytes: f.size });
+        names.push(f.name);
+      } catch {
+        flash(tr("Soubor „{0}“ se nepodařilo načíst.", f.name));
+      }
+    }
+    if (names.length) flash(tr("Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo=\"{1}\"", names.join(", "), names[0]));
+    if (input.current) input.current.value = "";
+  };
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#4a5664]" data-agent-attach>
+      <Btn onClick={() => input.current?.click()} title={tr("Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu")}>
+        {tr("Připojit soubor…")}
+      </Btn>
+      <input ref={input} type="file" multiple className="hidden" data-agent-attach-input onChange={(e) => e.target.files?.length && void add(e.target.files)} />
+      {list.map((f) => (
+        <span key={f.name} className="inline-flex items-center gap-1 rounded bg-[#eef2f6] px-1.5 py-0.5 font-mono text-[11px]" data-attached={f.name}>
+          {f.name} ({Math.max(1, Math.round(f.bytes / 1024))} kB)
+          <button type="button" className="text-[#8a95a3] hover:text-brand" aria-label={tr("Odebrat {0}", f.name)} onClick={() => attachedFiles.remove(f.name)}>
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
   );
 }

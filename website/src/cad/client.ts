@@ -204,6 +204,8 @@ export const cad = {
   },
   asmFace: (key: string, index: number) => call<FaceInfo | null>({ op: "asmFace", key, index }),
   interference: (doc: CadDoc) => call<Interference[]>({ op: "interference", doc }),
+  /** přesná obálka sestavy z těles listových dílů v jejich umístění (OCCT, ne síť) – řádek „Sestava: … obálka“ ve stavu */
+  asmEnvelope: (doc: CadDoc) => call<{ bbox: [Vec3, Vec3] | null; leaves: number; turned: number; approx: number }>({ op: "asmEnvelope", doc }),
   /** porovnání dílu s referenčním modelem (STEP / BREP / STL): objemy, rozdílová tělesa, mapa odchylek – viz compare.ts */
   compare: (doc: CadDoc, file: ReferenceFile, opts?: CompareOptions) => call<CompareResult>({ op: "compare", doc, file, opts }),
   mateFace: (key: string, index: number) => call<MateFaceInfo | null>({ op: "mateFace", key, index }),

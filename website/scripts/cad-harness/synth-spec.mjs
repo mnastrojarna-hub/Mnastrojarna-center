@@ -414,7 +414,7 @@ export function restScript(faces) {
   L.push(
     ...header("výkresy: A1 sestava + 3 listy dílů"),
     "výkres A1 pohledy přední,horní,iso",
-    "výkres řez XZ odsazení 110 celý",
+    "výkres řez XZ odsazení -110 celý", // odsazení jako u skici: rovina XZ má normálu −Y, −110 = rovina Y = 110 (střed nástroje)
     "výkres kusovník ano",
     "výkres balónky ano",
     `výkres razítko název="Střižný nástroj" číslo="959-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"`,

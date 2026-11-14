@@ -36,6 +36,8 @@ import { resolveDatumNames } from "./agent-prim";
 import { applySketchOp, type SketchOp } from "./agent-sketch";
 import { bodiesAt, nextBodyName } from "./bodies";
 import { getExt } from "./ext/registry";
+import type { SectionOpt } from "./drawing";
+import { sectionToSketchConvention } from "./drawing-section";
 import { dictOf, getLang, setLang, tr } from "./i18n";
 import { KIN_SPEC } from "./mate-spec";
 import { exprRefs, resolveVariables, VAR_NAME } from "./params";
@@ -1509,7 +1511,8 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
     }
   }
   if (diff("section") && o.section && typeof o.section === "object") {
-    const s = o.section as { plane: string; offset: number; kind?: string };
+    // text píše odsazení jako u skici (podél normály roviny, vlna 15); starší uložený řez má v `offset` souřadnici na ose
+    const s = sectionToSketchConvention(o.section as SectionOpt) as { plane: string; offset: number; kind?: string };
     parts.push(`${c.w("section")} ${s.plane} ${c.w("offset")} ${n(s.offset ?? 0)}${s.kind === "half" ? ` ${c.w("half")}` : s.kind === "full" ? ` ${c.w("full")}` : ""}`);
     keys.push("section");
   }
@@ -1536,6 +1539,8 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
   }
   return { line: `${c.w("drawing")} ${parts.join(" ")}`, keys };
 }
+/** řez v konvenci skici (starší uložený řez má v `offset` souřadnici na ose) – k porovnání uloženého řezu s přečteným řádkem */
+const secNorm = (v: unknown): unknown => (v && typeof v === "object" ? sectionToSketchConvention(v as SectionOpt) : v);
 /** volby listu, které textový příkaz `výkres …` nenastavuje a které nejsou výchozí */
 export const SHEET_UNSUPPORTED = ["details", "models", "aux", "cuts", "brokenOut", "breaks", "fitShow", "fitTable", "dimRoom", "dimRoomMin", "weldSymbols"];
 /** nastavené volby listu, které skript nepřenese (pohledy navíc, detaily, další modely…) – list pak po přečtení vypadá jinak */
@@ -1577,7 +1582,7 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
     }
     setName = s.drawing;
     const { line, keys } = sheetLine(c, o);
-    if (check(line, (cmd) => cmd.k === "set" && keys.every((k) => stable((cmd.opts as Rec)[k]) === stable(k === "sheet" ? (o.sheet ?? "auto") : o[k])))) c.line(line);
+    if (check(line, (cmd) => cmd.k === "set" && keys.every((k) => (k === "section" ? stable(secNorm((cmd.opts as Rec)[k])) === stable(secNorm(o[k])) : stable((cmd.opts as Rec)[k]) === stable(k === "sheet" ? (o.sheet ?? "auto") : o[k]))))) c.line(line);
     else {
       c.line(`${c.w("drawing")} ${c.w("format")} auto`);
       c.note(tr("volby listu „{0}“ se nepodařilo zapsat příkazem výkres – list vznikne s výchozími volbami", s.name));

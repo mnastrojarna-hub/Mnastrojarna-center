@@ -8,7 +8,7 @@
 import { displayHex } from "./colors";
 import { add, boxOf, emptyBox, mul, rot90, xfDet, xfInv, xfMul, xfPt, xfUniform, xfVec, type Affine, type Box } from "./geom";
 import { entityPrims, kindOf, setTextMeasure, textWidth1, type ByBlockStyle, type KindCtx, type Prim, type Seg } from "./kinds";
-import { layerVisible, resolveStyle, type ResolvedStyle } from "./layers";
+import { isVisible, resolveStyle, type ResolvedStyle } from "./layers";
 import type { DraftEntity, DraftModel, NewEntity, Vec2 } from "./model";
 import { spatialIndex, type SpatialIndex } from "./spatial";
 
@@ -98,7 +98,7 @@ export function drawEntities(ctx: CanvasRenderingContext2D, model: DraftModel, l
   const clipped: { entities: DraftEntity[]; xf: Affine; outer: Affine | null; byBlock: ByBlockStyle; clip: Vec2[] }[] = [];
   let drawn = 0;
   const visit = (e: DraftEntity, fr: Frame, depth: number) => {
-    if (!layerVisible(model, e.layer)) return;
+    if (!isVisible(model, e)) return;
     const st = resolveStyle(model, e, fr.byBlock);
     if (opts.plotOnly && !st.plot) return;
     const color = opts.mono ?? displayHex(st.color, opts.dark);

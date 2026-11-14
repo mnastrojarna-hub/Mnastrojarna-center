@@ -123,7 +123,6 @@ otočení	Drehung
 plocha {0} není válcová plocha díry	Fläche {0} ist keine zylindrische Bohrungsfläche
 plochý	flach
 Plochy komponenty „{0}“ (souřadnice sestavy, {1}) – rovinné: {2}, válcové/kuželové: {3}{4}	Flächen der Komponente „{0}“ (Baugruppenkoordinaten, {1}) – eben: {2}, zylindrisch/kegelig: {3}{4}
-plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít	flächen, verknüpfung, verknüpfungen, komponente, entfernen, duplizieren, isolieren, ausblenden, einblenden, fixieren, lösen, muster, spiegeln, schraube, unterbaugruppe, auflösen, bearbeiten, fertig, öffnen
 plochy: {0}	Flächen: {0}
 počet	Anzahl
 podsestava ({0} ks)	Unterbaugruppe ({0} Stk.)
@@ -176,7 +175,6 @@ ukotvená	fixiert
 ukotvená ⚓	fixiert ⚓
 úprava v kontextu je dostupná jen v aplikaci	Bearbeiten im Kontext ist nur in der Anwendung verfügbar
 uvolněná	gelöst
-v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …	bei x y z, drehung rx ry rz, versatz dx dy dz, verdrehen X 90, fixieren, lösen, ausblenden, einblenden, farbe #hex, name "…", nummer "…", gruppe "…", werkstoff …
 válcové	zylindrisch
 válcové plochy: {0}	zylindrische Flächen: {0}
 vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	Verknüpfung „{0}“ ist {1}× in der Baugruppe – Nummer angeben: {2}
@@ -193,7 +191,6 @@ vazba: neznámá volba „{0}“ (plochu zadejte hned za názvem komponenty: F12
 vazbu Ukotvit nelze otočit	die Verknüpfung Fixiert kann nicht umgekehrt werden
 Vazby sestavy „{0}“: {1}	Verknüpfungen der Baugruppe „{0}“: {1}
 Vazby: {0}	Verknüpfungen: {0}
-vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název nebo pořadí #3; po přesunu se vazby přepočítají	Komponenteneigenschaften wie im Panel (Lage, Drehung, fixiert, Sichtbarkeit, Beschreibung, Stücklisten-Werkstoff); Komponente = Name oder Position #3; nach dem Verschieben werden Verknüpfungen neu berechnet
 výpis vazeb (číslo, druh, komponenty a plochy, hodnota, stav ok / konflikt) a úprava vazby podle čísla nebo názvu; po změně se vazby přepočítají	Liste der Verknüpfungen (Nummer, Art, Komponenten und Flächen, Wert, Status ok / Konflikt) und Ändern per Nummer oder Name; danach werden Verknüpfungen neu berechnet
 záložka „{0}“ je otevřená {1}× – zadejte číslo: {2}	Registerkarte „{0}“ ist {1}× offen – Nummer angeben: {2}
 záložka „{0}“ není otevřená – záložky: {1}	Registerkarte „{0}“ ist nicht offen – Registerkarten: {1}
@@ -203,4 +200,3 @@ záložky jsou dostupné jen v aplikaci	Registerkarten sind nur in der Anwendung
 zapnuta	aktiviert
 zavřít: zavřít záložku ["název"|N] – bez názvu zavře aktivní záložku	schließen: registerkarte schließen ["Name"|N] – ohne Namen wird die aktive geschlossen
 zobrazená	eingeblendet
-sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)	Baugruppe: fügt ein Teil aus einer geöffneten Registerkarte als Komponente ein (Verknüpfungen per Text: baugruppe verknüpfung …, siehe unten)

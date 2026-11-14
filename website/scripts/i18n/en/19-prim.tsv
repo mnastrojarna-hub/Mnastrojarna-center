@@ -371,7 +371,6 @@ ukončení: na vzdálenost, skrz vše, k dalšímu, k vrcholu, k ploše, odsazen
 úkos A plochy <pravidlo|F1 F2…> [dělicí "Skica"] [stupňovitý] [směr +Z] [rovina XY odsazení N]	draft A faces <rule|F1 F2…> [parting "Sketch"] [stepped] [direction +Z] [plane XY offset N]
 uzavřené (poslední profil zpět na první)	closed (last profile back to the first)
 užitečná délka závitu	usable thread length
-v x1 y1 z1 v x2 y2 z2 (souřadnice)	at x1 y1 z1 at x2 y2 z2 (coordinates)
 váha tečny na konci	tangent weight at the end
 váha tečny na začátku	tangent weight at the start
 válec	cylinder

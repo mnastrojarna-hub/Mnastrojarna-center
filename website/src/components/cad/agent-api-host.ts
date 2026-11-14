@@ -44,7 +44,10 @@ import { applyShrinkage, coolingCircuit, defaultCooling, draftAnalysis, ejectorH
 import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { ejectorPin, emptyAssembly, partComponent } from "@/cad/assembly";
 import { prepareImport } from "@/cad/formats/import";
-import { dataBytes, internBlobs } from "@/cad/blobs";
+import { b64ToBytes, bytesToB64, dataBytes, internBlobs } from "@/cad/blobs";
+import { attachedFiles } from "@/cad/attached-files";
+import { referenceStore } from "@/cad/reference/store";
+import { parseReferenceLine } from "@/cad/reference/parse";
 import { createShareLink, shareMessage, SHARE_DEFAULT_DAYS } from "@/cad/share";
 import { compareReportCsv, compareReportText, regionHint, regionList } from "@/cad/compare-report";
 import type { CompareOptions, ReferenceFile } from "@/cad/compare";
@@ -828,5 +831,25 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
       return saveProjectFile(h.doc(), name, h);
     },
     script: async (opts) => (await scriptOfDoc(host().doc(), opts)).text,
+    attach: (name, data, mime) => {
+      const bytes = typeof data === "string" ? b64ToBytes(data.replace(/^data:[^,]*,/, "")) : data;
+      const m = mime || (typeof data === "string" ? /^data:([^;,]+)/.exec(data)?.[1] : undefined) || "application/octet-stream";
+      const f = attachedFiles.add({ name, mime: m, dataUrl: `data:${m};base64,${bytesToB64(bytes)}`, bytes: bytes.length });
+      return { name: f.name, bytes: f.bytes };
+    },
+    reference: async (cmd) => {
+      const c = (cmd ?? "").trim();
+      // celý příkaz předlohy (i „kontrola kót“, „porovnat s předlohou …“, „Maßprüfung“) beze změny, jinak za slovo předloha
+      let whole = false;
+      try {
+        whole = !!c && parseReferenceLine(c) !== null;
+      } catch {
+        whole = true; // příkaz předlohy s chybou zápisu – chybu vypíše provedení
+      }
+      const text = whole ? c : `předloha ${c || "stav"}`;
+      referenceStore.setLast(null);
+      const log = await core.run(text);
+      return { log, data: referenceStore.last() };
+    },
   };
 }

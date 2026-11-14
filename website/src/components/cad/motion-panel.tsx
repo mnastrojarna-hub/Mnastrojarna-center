@@ -14,6 +14,7 @@ import { tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "@/cad/mates-kin";
 import { defaultStudy, motionCsv, motionSummary, type MotionResult } from "@/cad/motion";
+import type { SpringStep } from "@/cad/asm-spring";
 import { uid, type CadDoc, type MotionMotor, type MotionStudy, type Placement, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
@@ -22,7 +23,8 @@ import { FloatPanel } from "./ui";
 
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
-type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null };
+/** `springs` = délky pružin v kroku (cad/asm-spring.ts) – zobrazení protáhne síť volné pružiny */
+type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null; springs?: Record<string, SpringStep> | null };
 let view: View = { pose: null, trace: null };
 const subs = new Set<() => void>();
 const EMPTY: View = { pose: null, trace: null };
@@ -124,7 +126,7 @@ export function MotionPanel({
     }
     const s = res.steps[Math.min(step, res.steps.length - 1)];
     const trace = res.steps.slice(0, step + 1).flatMap((x) => (x.trace ? [x.trace] : []));
-    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null });
+    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null, springs: s?.springs ?? null });
   }, [res, step]);
   useEffect(() => () => motionView.set({ pose: null, trace: null }), []);
   const compute = useCallback(async (): Promise<MotionResult | null> => {

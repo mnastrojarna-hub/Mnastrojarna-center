@@ -7,15 +7,20 @@
  */
 import { cadLocale, tr } from "./i18n";
 import * as r from "replicad";
+import { drawTitleBlock, imageRects, nearestAci, titleBlockSize, type SheetImage, type TitleBlockInfo, type TitleLogo, type TitleTemplate } from "./title-block";
 import type { CadDoc, PlaneName, Vec2, Vec3 } from "./types";
 import { auxView, brkInView, breakDir, breakLines, brokenOut, clipBreaks, compress1, compressQ, cutSection, decompress1, decompressQ, normBrks, pickParent, type AuxViewOpt, type Brk, type BrokenOutOpt, type CutSectionOpt, type ExtraViewData, type ViewBreakOpt } from "./drawing-views";
 import { fitOfSuffix, fitRows, fitSuffix, type FitShow } from "./drawing-fits";
 import { weldSymbolsOnSheet, type WeldMark } from "./drawing-welds";
+import { absoluteSection, sectionCoord, sectionMiss, sectionOffsetRange } from "./drawing-section";
+import type { DrawingIssue } from "./drawing-issues";
+import { holeTableColumns, holeTableCounts, holeTableRows } from "./drawing-holetable";
 
 // ---------------------------------------------------------------- typy
 
 export type Layer = "visible" | "hidden" | "center" | "cut" | "dim" | "hatch" | "frame" | "thin" | "title";
-export type Poly = { pts: Vec2[]; layer: Layer; fill?: boolean; width?: number };
+/** `img` = obrázek na listu (logo v razítku): `pts` je jeho obdélník; SVG / PDF vloží bitmapu, DXF / DWG obrys (title-block.ts) */
+export type Poly = { pts: Vec2[]; layer: Layer; fill?: boolean; width?: number; img?: SheetImage };
 export type DText = {
   x: number;
   y: number;
@@ -58,13 +63,49 @@ export type DrawingMeta = {
   sheetCount?: number;
   /** značky svarů ISO 2553 z 3D svarů dílu (drawing-welds.ts – `weldMarksOf`) */
   welds?: WeldMark[];
+  // ---- razítko (cad/title-block.ts): šablona, logo a další pole – vše volitelné, prázdné = na výkrese se neuvádí
+  /** šablona razítka: iso7200 (výchozí, 180 × 38), compact (180 × 27), toolmaker (nástrojářská, 180 × 64 – všechna pole) */
+  template?: TitleTemplate;
+  /** logo firmy v razítku (data URL PNG / JPEG, rozměr v px, obrys pro DXF / DWG) */
+  logo?: TitleLogo;
+  company?: string;
+  customer?: string;
+  project?: string;
+  checkedBy?: string;
+  approvedBy?: string;
+  /** počet kusů */
+  quantity?: string;
+  /** polotovar (např. „plech 40×160×185“, „Ø14×20“) */
+  stock?: string;
+  heatTreatment?: string;
+  surfaceTreatment?: string;
+  /** tolerance úhlů a sražení zvlášť (prázdné + ISO 2768 = podle třídy) */
+  angleTol?: string;
+  chamferTol?: string;
+  /** nepředepsané tolerance jako tabulka podle počtu desetinných míst: [X., X.X, X.XX, X.XXX] (např. ±0,1 / ±0,1 / ±0,01 / ±0,005) */
+  tolTable?: string[];
 };
 
 export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3] };
 export type RevisionItem = { rev: string; date: string; note: string; author?: string; /** false = trojúhelníky revize u změněných kót se nekreslí */ marks?: boolean };
 /** Detailní pohled: kruh v pohledu `view` (střed a poloměr v souřadnicích pohledu = mm modelu), měřítko detailu a umístění na listu. */
 export type DetailView = { id: string; label: string; view: string; cx: number; cy: number; r: number; scale: number; at?: Vec2 };
-export type HoleRow = { tag: string; x: number; y: number; d: number; /** střed v souřadnicích pohledu */ c: Vec2; view: string };
+export type HoleRow = {
+  tag: string;
+  x: number;
+  y: number;
+  /** nejmenší průměr díry v místě (vrták, průchozí díra) */
+  d: number;
+  /** střed v souřadnicích pohledu */
+  c: Vec2;
+  view: string;
+  /** větší souosé průměry v témž místě (zahloubení, osazení díry) – jedna díra = jeden řádek */
+  steps?: number[];
+  /** závit (podle `meta.threads`: jádrový vrták) – „M8“ */
+  thread?: string;
+  /** popis do tabulky („Ø8 ⌴Ø14“, „M8 ⌴Ø20“) – cad/drawing-holetable.ts */
+  label?: string;
+};
 
 export type BomItem = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; note?: string };
 
@@ -72,8 +113,12 @@ export type SheetName = "A4" | "A3" | "A2" | "A1" | "A0";
 export type ViewKey = "front" | "top" | "left" | "right" | "back" | "bottom";
 /** otočení hlavního pohledu na listu [°] po směru hodin (s ním se otočí celé promítání – soustružený díl tak může ležet osou vodorovně) */
 export type ViewRotation = 0 | 90 | 180 | 270;
-/** řez rovinou: `full` = celý řez, `half` = polovina pohled / polovina řez podél osy souměrnosti (vpravo od svislé osy, pod vodorovnou) */
-export type SectionOpt = { plane: PlaneName; offset: number; kind?: "full" | "half" };
+/**
+ * řez rovinou: `full` = celý řez, `half` = polovina pohled / polovina řez podél osy souměrnosti (vpravo od svislé osy, pod vodorovnou).
+ * `normal: true` = `offset` se měří podél normály roviny jako u skici (`skica XZ odsazení N`: XY → z = N, XZ → y = −N,
+ * YZ → x = N); bez příznaku (starší dokumenty) je `offset` souřadnice na ose kolmé k rovině – cad/drawing-section.ts
+ */
+export type SectionOpt = { plane: PlaneName; offset: number; kind?: "full" | "half"; normal?: boolean };
 /** zdroj dalšího modelu na listu: komponenta sestavy (podle id), nebo dokument vložený do definice výkresu (kopie) */
 export type ModelSource = { kind: "component"; compId: string } | { kind: "doc"; doc: CadDoc };
 /** pohled jiného modelu na témže listu – vlastní měřítko s popiskem pod pohledem; klíč pohledu pro kóty = `m:<id>` */
@@ -112,6 +157,12 @@ export type DrawingOptions = {
   bomTable?: boolean;
   /** tabulka děr (souřadnice a průměry děr v půdorysu) */
   holeTable?: boolean;
+  /** pohled tabulky děr (výchozí horní, jinak přední) – Chytré kóty s polohami děr v tabulce (kótovat … díry tabulka) */
+  holeTableView?: ViewKey;
+  /** Chytré kóty: funkční rozměry (hodnoty v mm modelu) – nikdy pomocná kóta „(…)“ (kótovat … funkční 26,5 74,175) */
+  dimFunctional?: number[];
+  /** Chytré kóty: polohy děr – auto (souřadnicově od 12 poloh / když se nevejdou, pak tabulka), souřadnicově, tabulkou, od hran */
+  dimHoles?: "auto" | "ordinate" | "table" | "chain";
   /** detailní pohledy */
   details?: DetailView[];
   /** otočení hlavního pohledu (a s ním celého promítání) */
@@ -170,8 +221,12 @@ export type DrawingResult = {
   svg: string;
   dxf: string;
   warnings: string[];
+  /** strukturovaná hlášení (kód, úroveň, data) k varováním, která to potřebují – řez mimo těleso, nevejde se (cad/drawing-issues.ts) */
+  issues?: DrawingIssue[];
   /** řádky tabulky děr (je-li zapnutá) */
   holes?: HoleRow[];
+  /** tabulka děr: pohled, ze kterého jsou díry (s osou ve směru pohledu), a díry s jinou osou, které v ní nejsou (průměr, osa) */
+  holeTableInfo?: { view: string; other: { d: number; axis: string }[] };
   /** umístěné detailní pohledy (list: levý horní roh, velikost) */
   details?: { id: string; label: string; x: number; y: number; w: number; h: number }[];
   /** pozice (balónky) – střed kroužku na listu */
@@ -191,6 +246,8 @@ export type DrawingResult = {
   revZoneAt?: { rev: string; x: number; y: number; w: number }[];
   /** revize, u kterých se trojúhelníky nekreslí */
   revHide?: string[];
+  /** razítko na listu: šablona, obdélník, logo, každé pole s velikostí písma a počtem řádků (nic se nezkracuje) */
+  titleBlock?: TitleBlockInfo;
 };
 
 export const SHEETS: Record<SheetName, [number, number]> = {
@@ -810,7 +867,7 @@ function extent(polys: Poly[]) {
 
 // ---------------------------------------------------------------- kružnice (osy, průměry)
 
-type Circle = { c: Vec3; r: number; a: Vec3; /** hrana ohraničuje válcovou plochu */ cyl: boolean };
+type Circle = { c: Vec3; r: number; a: Vec3; /** hrana ohraničuje válcovou plochu */ cyl: boolean; /** … vnitřní (konkávní) válcovou plochu = díru (materiál vně) */ hole?: boolean };
 
 /** zaokrouhlení bez „-0“ (kvůli klíčům) */
 const k3 = (v: number, d: number) => (Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d);
@@ -838,16 +895,36 @@ function circlesOf(shape: r.Shape3D): Circle[] {
   circleCache.set(shape, out);
   return out;
 }
+/**
+ * Je válcová plocha díra (konkávní – materiál vně, normála ven z materiálu míří k ose)? `c` / `a` = bod a směr osy.
+ * Vnější válec (hřídel, osazení soustruženého dílu) má normálu od osy. Bez geometrie → null.
+ */
+function cylConcave(f: r.Face, c: Vec3, a: Vec3): boolean | null {
+  try {
+    const mid = V(f.pointOnSurface(0.5, 0.5));
+    const n = V(f.normalAt(mid));
+    const w = sub(mid, c);
+    return dot(sub(w, mul(a, dot(w, a))), n) < 0;
+  } catch {
+    return null;
+  }
+}
+
 function circlesOfRaw(shape: r.Shape3D): Circle[] {
   const out: Circle[] = [];
   const onCyl = new Set<string>();
+  const onHole = new Set<string>();
   try {
     for (const f of shape.faces) {
       if (f.geomType !== "CYLINDRE") continue;
+      let concave: boolean | null | undefined;
       for (const e of f.edges) {
         try {
           const c = circleOf(e);
-          if (c) onCyl.add(circleKey(c));
+          if (!c) continue;
+          onCyl.add(circleKey(c));
+          if (concave === undefined) concave = cylConcave(f, c.c, c.a);
+          if (concave) onHole.add(circleKey(c));
         } catch {
           /* bez geometrie */
         }
@@ -865,7 +942,7 @@ function circlesOfRaw(shape: r.Shape3D): Circle[] {
   for (const e of edges) {
     try {
       const c = circleOf(e);
-      if (c) out.push({ ...c, cyl: onCyl.has(circleKey(c)) });
+      if (c) out.push({ ...c, cyl: onCyl.has(circleKey(c)), hole: onHole.has(circleKey(c)) });
     } catch {
       /* hrana bez geometrie */
     }
@@ -879,13 +956,13 @@ function circlesOfRaw(shape: r.Shape3D): Circle[] {
       const k = circleKey(c);
       if (have.has(k) || onCyl.has(k)) continue;
       have.add(k);
-      out.push({ ...c, cyl: true });
+      out.push({ ...c, cyl: true, hole: cy.inner });
     }
   }
   return out;
 }
 
-type Cylinder = { a: Vec3; /** bod osy nejblíž počátku */ base: Vec3; r: number; tmin: number; tmax: number };
+type Cylinder = { a: Vec3; /** bod osy nejblíž počátku */ base: Vec3; r: number; tmin: number; tmax: number; /** vnitřní plocha = díra */ inner?: boolean };
 
 /** Válcové plochy s úplným obvodem (360°; i složené ze dvou a více ploch téhož válce): osa, poloměr a rozsah podél osy. */
 function fullCylinders(shape: r.Shape3D): Cylinder[] {
@@ -919,7 +996,7 @@ function fullCylinders(shape: r.Shape3D): Cylinder[] {
       const rad = len(sub(p0, c0));
       const key = `${a.map((v) => k3(v, 3)).join()}|${base.map((v) => k3(v, 2)).join()}|${k3(rad, 3)}`;
       const list = groups.get(key) ?? [];
-      list.push({ a, base, r: rad, tmin: Math.min(t0, t1), tmax: Math.max(t0, t1), ang: du });
+      list.push({ a, base, r: rad, tmin: Math.min(t0, t1), tmax: Math.max(t0, t1), ang: du, inner: cylConcave(f, c0, a) === true });
       groups.set(key, list);
     } catch {
       /* plocha bez geometrie */
@@ -931,7 +1008,7 @@ function fullCylinders(shape: r.Shape3D): Cylinder[] {
     list.sort((x, y) => x.tmin - y.tmin);
     let cur: Part | null = null;
     const flush = () => {
-      if (cur && cur.ang >= TWO_PI - 1e-3) out.push({ a: cur.a, base: cur.base, r: cur.r, tmin: cur.tmin, tmax: cur.tmax });
+      if (cur && cur.ang >= TWO_PI - 1e-3) out.push({ a: cur.a, base: cur.base, r: cur.r, tmin: cur.tmin, tmax: cur.tmax, inner: cur.inner });
     };
     for (const p of list) {
       if (cur && p.tmin < cur.tmax - 1e-6) {
@@ -1350,22 +1427,32 @@ function turnedCylinders(circles: Circle[]): { a: Vec3; base: Vec3; items: Stack
 }
 
 export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partial<DrawingOptions> = {}, extra: Record<string, r.Shape3D> = {}): DrawingResult {
+  // rozměr razítka podle šablony listu (title-block.ts) – místo pro pohledy, kusovník a patičku nad ním
+  const TB = titleBlockSize(meta);
   // přerušení při automatickém měřítku: mezera na listu podle měřítka z prvního průchodu (projekce jsou v mezipaměti)
   if (options.breaks?.length && typeof (options.scale ?? "auto") !== "number" && options.breakScale == null) {
     const first = makeDrawing(shape, meta, { ...options, breakScale: 0 }, extra);
     return makeDrawing(shape, meta, { ...options, breakScale: first.scaleValue }, extra);
   }
   const opts: DrawingOptions = { ...defaultDrawingOptions, ...options, views: { ...defaultDrawingOptions.views, ...(options.views ?? {}) } };
+  // řez: odsazení podle verze (konvence skici / starší souřadnice) → souřadnice na ose; dál se počítá jen s ní
+  const sec0 = opts.section;
+  if (sec0) opts.section = absoluteSection(sec0);
+  const issues: DrawingIssue[] = [];
   const rot = asRotation(opts.rotation);
   const ROOM = opts.dimRoom ?? 0;
   const loose = opts.dimRoomMin != null;
   const ROOM_MIN = Math.min(ROOM, opts.dimRoomMin ?? ROOM);
   const warnings: string[] = [];
   const circlesAll = opts.centerLines || opts.dimensions === "auto" || opts.holeTable ? circlesOf(shape) : [];
-  const holeView: ViewKey = opts.views.top ? "top" : "front";
-  const holeRows = opts.holeTable ? holeRowsOf(circlesAll, holeView, camOf(holeView, rot)) : [];
-  // výška pásu nad spodním okrajem: razítko + kusovník + tabulka děr
-  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeRows);
+  // tabulka děr: zvolený pohled (`kótovat díry tabulka` v levém / pravém / zadním pohledu – B12), jinak shora, nevidí-li
+  // v něm žádnou díru, pohled listu s nejvíc dírami (hřídel podél X: přední / boční)
+  const holePick = opts.holeTable ? pickHoleView(circlesAll, opts.views, rot, meta.threads ?? [], opts.holeTableView) : null;
+  const holeView: ViewKey = holePick?.view ?? (opts.views.top ? "top" : "front");
+  // jeden řádek na polohu díry (zahloubení ve stejném řádku, závit označením) – cad/drawing-holetable.ts
+  const holeRows = holePick ? holeTableRows(holePick.rows, meta.threads ?? []) : [];
+  // výška pásu nad spodním okrajem: razítko + kusovník + tabulka děr (dlouhá ve dvou sloupcích – výšku dá první)
+  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeTableColumns(holeRows)[0]);
 
   // --- projekce
   const keys = ISO_KEYS.filter((k) => opts.views[k]);
@@ -1375,11 +1462,20 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const v = projectView(shape, k, camOf(k, rot), opts.hidden);
     if (v.w > 0 || v.h > 0) views.set(k, v);
   }
+  // tabulka děr: polohy od levého dolního rohu obrysu pohledu (základna jako u souřadnicových kót), ne od krajní díry
+  const hv0 = views.get(holeView);
+  if (hv0) for (const h of holeRows) Object.assign(h, { x: Math.round((h.c[0] - hv0.x0) * 1000) / 1000, y: Math.round((hv0.y0 + hv0.h - h.c[1]) * 1000) / 1000 });
   let section: SectionData | null = null;
   if (opts.section) {
     try {
       section = makeSection(shape, opts.section, sectionCam(opts.section.plane, rot), () => circlesOf(shape));
-      if (!section) warnings.push(tr("Rovina řezu neprotíná těleso – upravte odsazení."));
+      if (!section) {
+        const badge = tr("Rovina řezu neprotíná těleso – upravte odsazení.");
+        warnings.push(badge);
+        const bb = shape.boundingBox.bounds as [Vec3, Vec3];
+        const s0 = sec0!;
+        issues.push({ level: "error", code: "drawing.section-miss", kind: "section-miss", text: sectionMiss(s0, bb) ?? badge, data: { badge, plane: s0.plane, offset: s0.offset, coord: sectionCoord(s0), offsetRange: sectionOffsetRange(s0.plane, bb), convention: s0.normal ? "sketch" : "coordinate" } });
+      }
     } catch {
       warnings.push(tr("Řez se nepodařilo vytvořit."));
     }
@@ -1593,12 +1689,20 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     if (opts.scale === "auto") scale = bestScale(sheet) ?? STANDARD_SCALES[STANDARD_SCALES.length - 1];
     else {
       scale = opts.scale;
-      if (!fits(sheet, scale)) warnings.push(tr("Pohledy se v měřítku {0} nevejdou na list {1}.", scaleLabel(scale), sheet));
+      if (!fits(sheet, scale)) {
+        const t = tr("Pohledy se v měřítku {0} nevejdou na list {1}.", scaleLabel(scale), sheet);
+        warnings.push(t);
+        issues.push({ level: "warn", code: "drawing.warning", kind: "sheet-fit", text: t, data: { scale: scaleLabel(scale), sheet } });
+      }
     }
   } else if (opts.scale !== "auto") {
     scale = opts.scale;
     sheet = SHEET_ORDER.find((n) => fits(n, scale)) ?? "A0";
-    if (!fits(sheet, scale)) warnings.push(tr("Pohledy se v měřítku {0} nevejdou ani na A0.", scaleLabel(scale)));
+    if (!fits(sheet, scale)) {
+      const t = tr("Pohledy se v měřítku {0} nevejdou ani na A0.", scaleLabel(scale));
+      warnings.push(t);
+      issues.push({ level: "warn", code: "drawing.warning", kind: "sheet-fit", text: t, data: { scale: scaleLabel(scale), sheet: "A0" } });
+    }
   } else {
     const pick = SHEET_ORDER.find((n) => (bestScale(n) ?? 0) >= 0.5);
     sheet = pick ?? "A0";
@@ -1624,7 +1728,11 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   for (const it of arr.items) {
     placed.set(it.v.key, { ...it.v, px: it.rect.x, py: it.rect.y, s: it.s });
     itemOf.set(it.v.key, it);
-    if (it.lost) warnings.push(it.v.key === "section" ? tr("Řez se na list nevejde – zvolte větší formát nebo menší měřítko.") : /^(aux|cut):/.test(it.v.key) ? tr("Pohled {0} se na list nevejde – zvolte větší formát nebo menší měřítko.", it.name ?? "") : tr("Pohled modelu {0} se na list nevejde – zvolte větší formát nebo menší měřítko.", it.name ?? ""));
+    if (it.lost) {
+      const t = it.v.key === "section" ? tr("Řez se na list nevejde – zvolte větší formát nebo menší měřítko.") : /^(aux|cut):/.test(it.v.key) ? tr("Pohled {0} se na list nevejde – zvolte větší formát nebo menší měřítko.", it.name ?? "") : tr("Pohled modelu {0} se na list nevejde – zvolte větší formát nebo menší měřítko.", it.name ?? "");
+      warnings.push(t);
+      issues.push({ level: "warn", code: "drawing.warning", kind: "view-lost", text: t, data: { view: it.v.key, sheet, scale: scaleLabel(scale) } });
+    }
   }
   /** pohledy hlavního modelu (bez pohledů dalších modelů) */
   const ownViews = () => [...placed.values()].filter((p) => !p.key.startsWith("m:"));
@@ -1770,13 +1878,24 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // rám, centrovací značky, zóny, razítko
   frame(SW, SH, polys);
   const zones = opts.zones ? zoneGrid(SW, SH, polys, texts) : undefined;
-  titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeRows));
+  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeTableColumns(holeRows)[0]));
   let yTop = SH - M - TB.h;
   if (meta.bom?.length) {
     partsList(SW - M - TB.w, yTop, meta.bom, polys, texts);
     yTop -= bomHeight(meta.bom);
   }
-  if (holeRows.length) holeTable(SW - M - TB.w, yTop, holeRows, polys, texts);
+  if (holeRows.length) {
+    holeTable(SW - M - TB.w, yTop, holeRows, polys, texts);
+    // tabulka nad razítkem nesmí ležet přes pohledy (plný list v pevném měřítku) – jinak varování s pohledy
+    const th = holeTableHeight(holeTableColumns(holeRows)[0]);
+    const band: Rect = { x: SW - M - TB.w, y: yTop - th, w: TB.w, h: th };
+    const hit = ownViews().filter((p) => overlaps({ x: p.px, y: p.py, w: p.w * p.s, h: p.h * p.s }, band));
+    if (hit.length) {
+      const t = tr("Tabulka děr ({0} řádků) překrývá pohled {1} – zvolte větší list nebo menší měřítko.", holeRows.length, hit.map((p) => viewName(p.key)).join(", "));
+      warnings.push(t);
+      issues.push({ level: "warn", code: "drawing.warning", kind: "hole-table-overlap", text: t, data: { rows: holeRows.length, views: hit.map((p) => p.key) } });
+    }
+  }
   const revZoneAt = meta.revisions?.length ? revisionTable(SW, meta.revisions, polys, texts, !!zones) : [];
 
   return {
@@ -1789,7 +1908,9 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     svg: toSvg(SW, SH, polys, texts),
     dxf: toDxf(SH, polys, texts),
     warnings,
+    ...(issues.length ? { issues } : {}),
     holes: holeRows.length ? holeRows : undefined,
+    holeTableInfo: holePick ? { view: holePick.view, other: holePick.other } : undefined,
     details: details.length ? details : undefined,
     balloons: balloons.length ? balloons : undefined,
     models: modelOut.length ? modelOut : undefined,
@@ -1800,6 +1921,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     zones,
     revZoneAt: revZoneAt.length ? revZoneAt : undefined,
     revHide: meta.revisions?.filter((x) => x.marks === false).map((x) => x.rev),
+    titleBlock: tbInfo,
   };
 }
 
@@ -2486,76 +2608,9 @@ function frame(W: number, H: number, polys: Poly[]) {
   polys.push({ layer: "frame", width: 0.7, pts: [[0, cym], [M_LEFT + 5, cym]] }, { layer: "frame", width: 0.7, pts: [[W, cym], [W - M - 5, cym]] });
 }
 
-function projectionSymbol(polys: Poly[], x: number, y: number, projection: "E" | "A") {
-  // komolý kužel: lichoběžník + dvě soustředné kružnice (ISO 5456-2), výška 8 mm
-  const h = 7;
-  const trap = (tx: number, wideLeft: boolean) => {
-    const big = h;
-    const small = h * 0.5;
-    const L = 9;
-    const [lh, rh] = wideLeft ? [big, small] : [small, big];
-    polys.push({ layer: "title", width: 0.35, pts: [[tx, y + (h - lh) / 2], [tx + L, y + (h - rh) / 2], [tx + L, y + (h + rh) / 2], [tx, y + (h + lh) / 2], [tx, y + (h - lh) / 2]] });
-    polys.push({ layer: "center", pts: [[tx - 1.5, y + h / 2], [tx + L + 1.5, y + h / 2]] });
-  };
-  const circ = (ccx: number) => {
-    for (const rr of [h / 2, h / 4]) {
-      const pts: Vec2[] = [];
-      for (let i = 0; i <= 36; i++) pts.push([ccx + rr * Math.cos((i / 36) * 2 * Math.PI), y + h / 2 + rr * Math.sin((i / 36) * 2 * Math.PI)]);
-      polys.push({ layer: "title", width: 0.35, pts });
-    }
-    polys.push({ layer: "center", pts: [[ccx - h / 2 - 1.5, y + h / 2], [ccx + h / 2 + 1.5, y + h / 2]] }, { layer: "center", pts: [[ccx, y - 1.5], [ccx, y + h + 1.5]] });
-  };
-  if (projection === "E") {
-    trap(x, true);
-    circ(x + 9 + 4 + h / 2);
-  } else {
-    circ(x + h / 2);
-    trap(x + h + 4, false);
-  }
-}
-
-function titleBlock(W: number, H: number, sheet: SheetName, scale: number, projection: "E" | "A", meta: DrawingMeta, polys: Poly[], texts: DText[], extraAbove = 0) {
-  const x = W - M - TB.w;
-  const y = H - M - TB.h;
-  const T = (tx: number, ty: number, s: string, size: number, bold = false, brand = false) => texts.push({ x: tx, y: ty, s, size, bold, brand, layer: "text" });
-  rect(polys, x, y, TB.w, TB.h, "frame", 0.7);
-  const L = 55; // levý blok
-  polys.push({ layer: "title", pts: [[x + L, y], [x + L, y + TB.h]] });
-  // řádky pravé části
-  const r1 = 13;
-  const r2 = 25.5;
-  polys.push({ layer: "title", pts: [[x + L, y + r1], [x + TB.w, y + r1]] }, { layer: "title", pts: [[x + L, y + r2], [x + TB.w, y + r2]] });
-  const vline = (vx: number, y0: number, y1: number) => polys.push({ layer: "title", pts: [[x + vx, y + y0], [x + vx, y + y1]] });
-  vline(115, r1, r2);
-  for (const vx of [75, 92, 117, 145, 166]) vline(vx, r2, TB.h);
-  const cell = (cx: number, cy: number, label: string, value: string, size = 3.2, bold = false) => {
-    T(x + cx + 1.5, y + cy + 3.2, label, 2);
-    if (value) T(x + cx + 1.5, y + cy + 3.2 + size + 2.6, value, size, bold);
-  };
-  // levý blok – firma
-  T(x + 3, y + 8.5, "Mnástrojárna s.r.o.", 4.6, true, true);
-  T(x + 3, y + 13.5, tr("Váš partner ve strojírenství"), 2.6);
-  T(x + 3, y + 18, "www.mnastrojarna.cz", 2.4);
-  polys.push({ layer: "title", pts: [[x, y + 21], [x + L, y + 21]] });
-  T(x + 3, y + 25, tr("Promítání"), 2);
-  projectionSymbol(polys, x + 4, y + 27.5, projection);
-  T(x + 30, y + 33, projection === "E" ? "ISO E" : "ISO A", 3, true);
-  // pravá část
-  cell(L, 0, tr("Název"), (meta.name || tr("Bez názvu")).slice(0, 46), 4.2, true);
-  cell(L, r1, tr("Číslo výkresu"), (meta.number ?? "").slice(0, 26), 3.4, true);
-  cell(115, r1, tr("Materiál"), (meta.material ?? "").slice(0, 28));
-  cell(L, r2, tr("Měřítko"), scaleLabel(scale), 3.2, true);
-  cell(75, r2, tr("Formát"), sheet);
-  cell(92, r2, tr("Hmotnost"), meta.massKg != null ? `${fmt(meta.massKg)} kg` : "—");
-  cell(117, r2, tr("Kreslil"), (meta.author ?? "").slice(0, 16));
-  cell(145, r2, tr("Datum"), meta.date ?? new Date().toLocaleDateString(cadLocale()), 2.8);
-  cell(166, r2, "Rev.", meta.revision ?? "–");
-  // poznámka nad razítkem a list
-  const ny = y - bomHeight(meta.bom) - extraAbove;
-  // výrobní požadavky (tolerance, hrany) jen když je uživatel zadal – nic se nedoplňuje automaticky
-  T(x, ny - 5.5, [tr("Rozměry v mm"), meta.tolerance?.trim() ? tr("Nepředepsané tolerance {0}", meta.tolerance.trim()) : "", meta.edges?.trim() ? tr("Hrany: {0}", meta.edges.trim()) : "", ...(meta.formNotes ?? [])].filter(Boolean).join(" · "), 2.5);
-  // poznámka k modelu jen na vyžádání (razítko → „Poznámka v patičce“) – nic nenaznačuje úplnost dokumentace automaticky
-  T(x, ny - 1.8, [meta.note?.trim() ?? "", tr("List {0}/{1}", meta.sheetIndex ?? 1, meta.sheetCount ?? 1)].filter(Boolean).join(" · "), 2.5);
+/** Razítko listu podle šablony (cad/title-block.ts): pole bez zkracování, značka promítání ISO 5456-2, logo, patička nad tabulkami. */
+function titleBlock(W: number, H: number, sheet: SheetName, scale: number, projection: "E" | "A", meta: DrawingMeta, polys: Poly[], texts: DText[], extraAbove = 0): TitleBlockInfo {
+  return drawTitleBlock({ W, H, margin: M, ctx: { sheet, scaleLabel: scaleLabel(scale), projection }, meta, polys, texts, above: bomHeight(meta.bom) + extraAbove });
 }
 
 // ---------------------------------------------------------------- kusovník (ISO 7573)
@@ -2622,17 +2677,30 @@ const HOLE_COLS: [string, number][] = [
 ];
 const holeTableHeight = (rows: HoleRow[]) => (rows.length ? (rows.length + 1) * HOLE_ROW + 4 : 0);
 
-/** Díry v daném pohledu: kružnice ohraničující válcové plochy s osou ve směru pohledu; obě hrany téže díry = jeden řádek. */
-function holeRowsOf(circles: Circle[], viewKey: string, cam: Cam): HoleRow[] {
-  const seen = new Map<string, { c: Vec2; d: number }>();
+/**
+ * Díry v daném pohledu: kružnice ohraničující vnitřní (konkávní) válcové plochy s osou ve směru pohledu – vnější válce
+ * (hřídel, osazení soustruženého dílu) díry nejsou. Jedna díra = jeden řádek: obě hrany téže díry i souosé průměry v témž
+ * místě (zahloubení nad vrtákem závitu) se sloučí – řádek nese nejmenší průměr (vrták), větší souosé průměry (`steps`)
+ * a závit podle jádrového vrtání (`threads`, jako popisy děr).
+ */
+function holeRowsOf(circles: Circle[], viewKey: string, cam: Cam, threads: { r: number; label: string }[] = []): HoleRow[] {
+  const seen = new Map<string, { c: Vec2; ds: Set<number> }>();
   for (const c of circles) {
-    if (!c.cyl) continue;
+    if (!c.cyl || !c.hole) continue;
     if (Math.abs(Math.abs(dot(c.a, cam.d)) - 1) > 1e-3) continue;
     const q = proj(cam, c.c);
-    const key = `${k3(q[0], 2)},${k3(q[1], 2)},${k3(c.r * 2, 2)}`;
-    if (!seen.has(key)) seen.set(key, { c: q, d: Math.round(c.r * 200) / 100 });
+    const key = `${k3(q[0], 2)},${k3(q[1], 2)}`;
+    const e = seen.get(key) ?? { c: q, ds: new Set<number>() };
+    e.ds.add(Math.round(c.r * 2000) / 1000); // průměr na tisíciny jako popis díry (B7)
+    seen.set(key, e);
   }
-  const list = [...seen.values()].sort((a, b) => a.d - b.d || a.c[1] - b.c[1] || a.c[0] - b.c[0]);
+  const list = [...seen.values()].map((h) => {
+    const ds = [...h.ds].sort((a, b) => a - b);
+    const t = threads.find((x) => Math.abs(2 * x.r - ds[0]) < 0.06);
+    return { c: h.c, d: ds[0], steps: ds.slice(1), thread: t ? t.label.split(" ")[0] : undefined };
+  });
+  const kindKey = (h: { d: number; steps: number[]; thread?: string }) => `${h.d}|${h.steps.join(",")}|${h.thread ?? ""}`;
+  list.sort((a, b) => a.d - b.d || (a.steps[0] ?? 0) - (b.steps[0] ?? 0) || a.c[1] - b.c[1] || a.c[0] - b.c[0]);
   // počátek souřadnic = levý dolní roh obrysu v pohledu (min x, max y obrazu)
   let x0 = Infinity;
   let yMax = -Infinity;
@@ -2640,39 +2708,98 @@ function holeRowsOf(circles: Circle[], viewKey: string, cam: Cam): HoleRow[] {
     x0 = Math.min(x0, h.c[0]);
     yMax = Math.max(yMax, h.c[1]);
   }
-  const diameters = [...new Set(list.map((h) => h.d))];
+  const kinds = [...new Set(list.map(kindKey))];
   const counters: Record<string, number> = {};
   return list.map((h) => {
-    const letter = String.fromCharCode(65 + Math.min(25, diameters.indexOf(h.d)));
+    const letter = String.fromCharCode(65 + Math.min(25, kinds.indexOf(kindKey(h))));
     counters[letter] = (counters[letter] ?? 0) + 1;
-    return { tag: `${letter}${counters[letter]}`, x: Math.round((h.c[0] - x0) * 100) / 100, y: Math.round((yMax - h.c[1]) * 100) / 100, d: h.d, c: h.c, view: viewKey in CAMS ? viewKey : "top" };
+    return { tag: `${letter}${counters[letter]}`, x: Math.round((h.c[0] - x0) * 100) / 100, y: Math.round((yMax - h.c[1]) * 100) / 100, d: h.d, c: h.c, view: viewKey in CAMS ? viewKey : "top", ...(h.steps.length ? { steps: h.steps } : {}), ...(h.thread ? { thread: h.thread } : {}) };
   });
 }
 
-/** Tabulka děr nad kusovníkem/razítkem: Značka | X | Y | Ø | Ks (shodné průměry se sečtou do Ks ve sloupci „Ks“ řádku). */
-function holeTable(x: number, yBottom: number, rows: HoleRow[], polys: Poly[], texts: DText[]) {
-  const h = holeTableHeight(rows) - 4;
-  const y0 = yBottom - 4 - h;
-  rect(polys, x, y0, TB.w, h, "frame", 0.7);
-  for (let i = 1; i <= rows.length; i++) polys.push({ layer: "title", width: i === 1 ? 0.5 : undefined, pts: [[x, y0 + i * HOLE_ROW], [x + TB.w, y0 + i * HOLE_ROW]] });
-  let cx = x;
-  const colX: number[] = [];
-  for (const [, w] of HOLE_COLS) {
-    colX.push(cx);
-    cx += w;
-    if (cx < x + TB.w - 1e-6) polys.push({ layer: "title", pts: [[cx, y0], [cx, y0 + h]] });
+/** popis díry v tabulce děr: „M8 ⌴Ø20“, „Ø6 ⌴Ø12“, „Ø20“ */
+export const holeRowText = (r: Pick<HoleRow, "d" | "steps" | "thread">, f: (n: number) => string = fmt): string => `${r.thread ?? `Ø${f(r.d)}`}${(r.steps ?? []).map((x) => ` ⌴Ø${f(x)}`).join("")}`;
+
+/** osa díry do textu: „X“ / „Y“ / „Z“, jinak složky jednotkového vektoru */
+const axisText = (a: Vec3): string => {
+  const k = a.findIndex((v) => Math.abs(Math.abs(v) - 1) < 1e-3);
+  return k >= 0 ? "XYZ"[k] : `[${a.map((v) => fmt(Math.abs(a[0]) > 1e-6 && a[0] < 0 ? -v : v)).join("; ")}]`;
+};
+
+/**
+ * Pohled tabulky děr: shora, vidí-li díru; jinak pohled listu s nejvíc dírami (pořadí přední, levý, pravý, zadní, spodní) –
+ * dřív jen shora / zepředu, takže hřídel podél X s pohledem shora měl prázdnou tabulku. `other` = díry s osou jinou než
+ * směr zvoleného pohledu (v tabulce nejsou) – pro textový stav výkresu.
+ */
+function pickHoleView(circles: Circle[], views: DrawingOptions["views"], rot: ViewRotation, threads: { r: number; label: string }[], prefer?: ViewKey): { view: ViewKey; rows: HoleRow[]; other: { d: number; axis: string }[] } {
+  const keys = (["top", "front", "left", "right", "back", "bottom"] as ViewKey[]).filter((k) => views[k]);
+  let best: { view: ViewKey; rows: HoleRow[] } = { view: views.top ? "top" : "front", rows: [] };
+  // pohled zvolený Chytrými kótami (`kótovat díry tabulka`, B12) má přednost
+  if (prefer && views[prefer]) best = { view: prefer, rows: holeRowsOf(circles, prefer, camOf(prefer, rot), threads) };
+  else
+    for (const k of keys) {
+      const rows = holeRowsOf(circles, k, camOf(k, rot), threads);
+      if (rows.length > best.rows.length) best = { view: k, rows };
+      if (k === "top" && rows.length) break;
+    }
+  if (!best.rows.length && !keys.includes(best.view)) best.rows = holeRowsOf(circles, best.view, camOf(best.view, rot), threads);
+  // díry jiné osy: jedna osa díry (přímka) = jedna díra, nejmenší průměr
+  const d = camOf(best.view, rot).d;
+  const other = new Map<string, { d: number; axis: string }>();
+  for (const c of circles) {
+    if (!c.cyl || !c.hole || Math.abs(Math.abs(dot(c.a, d)) - 1) <= 1e-3) continue;
+    const a = c.a;
+    const foot = sub(c.c, mul(a, dot(c.c, a)));
+    const key = `${a.map((v) => k3(Math.abs(v), 3)).join()}|${foot.map((v) => k3(v, 2)).join()}`;
+    const dd = Math.round(c.r * 2000) / 1000;
+    const e = other.get(key);
+    if (!e || dd < e.d) other.set(key, { d: dd, axis: axisText(a) });
   }
-  const cell = (col: number, rowBottom: number, s: string, bold = false) => texts.push({ x: colX[col] + HOLE_COLS[col][1] / 2, y: rowBottom - 1.6, s, size: 2.6, bold, anchor: "middle", layer: "text" });
-  HOLE_COLS.forEach(([label], i) => cell(i, y0 + HOLE_ROW, i === 0 ? tr("Tabulka děr") : label, true));
-  const countByD = new Map<number, number>();
-  for (const r of rows) countByD.set(r.d, (countByD.get(r.d) ?? 0) + 1);
-  rows.forEach((r, i) => {
-    const rb = y0 + (i + 2) * HOLE_ROW;
-    cell(0, rb, r.tag, true);
-    cell(1, rb, fmt(r.x));
-    cell(2, rb, fmt(r.y));
-    cell(3, rb, `Ø${fmt(r.d)}`);
-    cell(4, rb, `${countByD.get(r.d) ?? 1}×`);
+  return { ...best, other: [...other.values()].sort((x, y) => x.d - y.d) };
+}
+
+/** Pohled tabulky děr listu (jako `makeDrawing`) – pro Chytré kóty: polohy děr tohoto pohledu jsou v tabulce, kótami se neopakují. */
+export function holeTableViewOf(shape: r.Shape3D, meta: DrawingMeta, opts: Partial<DrawingOptions>): ViewKey {
+  const views = { ...defaultDrawingOptions.views, ...(opts.views ?? {}) };
+  return pickHoleView(circlesOf(shape), views, asRotation(opts.rotation), meta.threads ?? [], opts.holeTableView).view;
+}
+
+/**
+ * Tabulka děr nad kusovníkem/razítkem: Značka | X | Y | Ø | Ks (počet děr se stejným popisem). Víc než HOLE_SPLIT řádků =
+ * dva sloupce vedle sebe v šířce razítka (cad/drawing-holetable.ts).
+ */
+function holeTable(x: number, yBottom: number, rows: HoleRow[], polys: Poly[], texts: DText[]) {
+  const cols = holeTableColumns(rows);
+  const h = holeTableHeight(cols[0]) - 4;
+  const y0 = yBottom - 4 - h;
+  const gw = TB.w / cols.length;
+  const k = gw / TB.w;
+  const count = holeTableCounts(rows);
+  cols.forEach((part, g) => {
+    const gx = x + g * gw;
+    rect(polys, gx, y0, gw, h, "frame", 0.7);
+    for (let i = 1; i <= part.length; i++) polys.push({ layer: "title", width: i === 1 ? 0.5 : undefined, pts: [[gx, y0 + i * HOLE_ROW], [gx + gw, y0 + i * HOLE_ROW]] });
+    // ve dvou sloupcích užší sloupec značky a počtu, širší popis
+    const widths = cols.length > 1 ? [12, 20, 20, 26, 12] : HOLE_COLS.map(([, w]) => w * k);
+    let cx = gx;
+    const colX: number[] = [];
+    for (const w of widths) {
+      colX.push(cx);
+      cx += w;
+      if (cx < gx + gw - 1e-6) polys.push({ layer: "title", pts: [[cx, y0], [cx, y0 + h]] });
+    }
+    const cell = (col: number, rowBottom: number, s: string, bold = false) => texts.push({ x: colX[col] + widths[col] / 2, y: rowBottom - 1.6, s, size: 2.6, bold, anchor: "middle", layer: "text" });
+    // ve dvou sloupcích je název tabulky nad ní (do úzkého sloupce značky se nevejde)
+    HOLE_COLS.forEach(([label], i) => cell(i, y0 + HOLE_ROW, i === 0 ? (cols.length > 1 ? tr("Zn.") : tr("Tabulka děr")) : label, true));
+    if (cols.length > 1 && g === 0) texts.push({ x: gx + 1, y: y0 - 1.2, s: tr("Tabulka děr"), size: 2.6, bold: true, anchor: "start", layer: "text" });
+    part.forEach((r, i) => {
+      const rb = y0 + (i + 2) * HOLE_ROW;
+      cell(0, rb, r.tag, true);
+      cell(1, rb, fmtVal(r.x));
+      cell(2, rb, fmtVal(r.y));
+      cell(3, rb, r.label ?? `Ø${fmtVal(r.d)}`);
+      cell(4, rb, `${count.get(r.label ?? String(r.d)) ?? 1}×`);
+    });
   });
 }
 
@@ -2915,6 +3042,10 @@ export function toSvg(W: number, H: number, polys: Poly[], texts: DText[]) {
   const out: string[] = [];
   for (const p of polys) {
     const st = STYLE[p.layer];
+    if (p.img) {
+      out.push(`<image x="${f(p.img.x)}" y="${f(p.img.y)}" width="${f(p.img.w)}" height="${f(p.img.h)}" preserveAspectRatio="xMidYMid meet" href="${esc(p.img.src)}"/>`);
+      continue;
+    }
     const pts = p.pts.map(([x, y]) => `${f(x)},${f(y)}`).join(" ");
     if (p.fill) out.push(`<polygon points="${pts}" fill="${st.color}" stroke="none"/>`);
     else {
@@ -2995,6 +3126,13 @@ export function toDxf(H: number, polys: Poly[], texts: DText[]) {
   add(0, "SECTION", 2, "ENTITIES");
   for (const p of polys) {
     const layer = DXF_LAYER[p.layer];
+    if (p.img) {
+      // logo: obrys z plných plošek SOLID (pořadí rohů 1-2-4-3) v nejbližší barvě ACI; bez obrysu jen rámeček
+      const rs = imageRects(p.img);
+      const aci = nearestAci(p.img.trace?.color ?? "#000000");
+      for (const q of rs) add(0, "SOLID", 8, layer, 62, aci, 10, f(q.x0), 20, f(H - q.y0), 30, 0, 11, f(q.x1), 21, f(H - q.y0), 31, 0, 12, f(q.x0), 22, f(H - q.y1), 32, 0, 13, f(q.x1), 23, f(H - q.y1), 33, 0);
+      if (rs.length) continue;
+    }
     if (p.fill && p.pts.length >= 3) {
       const [a, b, c] = p.pts;
       add(0, "SOLID", 8, layer, 10, f(a[0]), 20, f(H - a[1]), 30, 0, 11, f(b[0]), 21, f(H - b[1]), 31, 0, 12, f(c[0]), 22, f(H - c[1]), 32, 0, 13, f(c[0]), 23, f(H - c[1]), 33, 0);
@@ -3085,11 +3223,13 @@ function fitTable(d: DrawingResult, rows: ReturnType<typeof fitRows>, polys: Pol
 
 import type { DrawingAnnotation, GdtSymbol } from "./types";
 import { calloutGeometry, calloutLines, symbolsAsGeometry } from "./drawing-symbols";
+import { ordinateGeom } from "./drawing-ordinate";
 
 /** první řádek popisu s tolerancí (popisek do Tabulky uložení) */
 const calloutFirst = (a: Extract<DrawingAnnotation, { type: "callout" }>) => calloutLines(a)[0] ?? "";
 
-const fmtVal = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale());
+/** hodnota kóty: desetinná místa modelu až na tisíciny bez koncových nul (74,175 – ne 74,18; B7), úhel na setiny stupně */
+export const fmtVal = (n: number, digits = 3) => (Math.round(n * 10 ** digits) / 10 ** digits || 0).toLocaleString(cadLocale(), { maximumFractionDigits: digits });
 
 /** souřadnice pohledu → list; `view: "sheet"` = už v mm listu */
 export function annToSheet(views: PlacedView[], view: string, q: Vec2): Vec2 {
@@ -3473,7 +3613,7 @@ export function annotationStatus(d: Pick<DrawingResult, "views">, annotations: D
 export function dimLabel(a: Pick<DimAnn, "kind" | "prefix" | "suffix" | "text">, value: number): string {
   if (a.text != null) return a.text;
   const sym = a.kind === "diameter" ? "Ø" : a.kind === "radius" ? "R" : "";
-  return `${a.prefix ?? ""}${sym}${fmtVal(value)}${a.kind === "angle" ? "°" : ""}${a.suffix ?? ""}`;
+  return `${a.prefix ?? ""}${sym}${fmtVal(value, a.kind === "angle" ? 2 : 3)}${a.kind === "angle" ? "°" : ""}${a.suffix ?? ""}`;
 }
 
 /** Kóta průměru / poloměru: odkazová čára ve směru `ang` se šipkou na kružnici a vodorovnou policí s textem (uvnitř kružnice kótovací čára přes průměr / ze středu). */
@@ -3638,6 +3778,17 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
         }
         const A = S(dm.view, dm.a);
         const B = S(dm.view, dm.b);
+        if (dm.ord && (dm.kind === "horizontal" || dm.kind === "vertical")) {
+          // souřadnicová kóta: vynášecí čára z bodu do řady a hodnota od počátku na jejím konci (cad/drawing-ordinate.ts)
+          const h = dm.kind === "horizontal";
+          const value = Math.abs(modelLen(dm.view, h ? [dm.a[0], 0] : [0, dm.a[1]], h ? [dm.b[0], 0] : [0, dm.b[1]]));
+          const og = ordinateGeom(B, h ? "h" : "v", h ? A[1] + dm.offset : A[0] + dm.offset, dm.jog ?? 0, dimLabel(dm, value));
+          for (const sg of og.segs) polys.push({ layer: "dim", pts: [sg[0], sg[1]] });
+          texts.push(og.text);
+          const dev = fitDev(dm, value, og.text.s);
+          if (dev) pushDev(texts[texts.length - 1], dev);
+          break;
+        }
         let A2: Vec2;
         let B2: Vec2;
         let value: number;
@@ -3757,6 +3908,15 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
       }
       case "callout": {
         calloutGeometry(polys, texts, a, (q) => S(a.view, q));
+        // značka skupiny děr u každé díry (souřadnicové kóty – který popis patří ke které díře)
+        if (a.tag && a.tags?.length) {
+          const pv = d.views.find((v) => v.key === a.view);
+          for (const g of a.tags) {
+            const q = S(a.view, g.c);
+            const rr = g.r * (pv?.s ?? 1) * Math.SQRT1_2;
+            texts.push({ x: q[0] + rr + 0.4, y: q[1] - rr - 0.4, s: a.tag, size: 2.5, layer: "dim" });
+          }
+        }
         // popis díry s polem tolerance (Ø12H7 skrz): úchylky za prvním řádkem
         const code = fitOfSuffix(a.tol);
         const m = code ? /Ø(\d+(?:[.,]\d+)?)/.exec(a.lines[0] ?? "") : null;

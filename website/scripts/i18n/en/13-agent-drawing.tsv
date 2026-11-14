@@ -60,7 +60,6 @@ kóta šikmo: body splývají	aligned dimension: the points coincide
 kóta: nečekané „{0}“ – {1}	dimension: unexpected “{0}” – {1}
 kóta: odsazení musí být číslo	dimension: the offset must be a number
 kóta: zadejte dva body čtyřmi čísly – x1 y1 x2 y2 (mm modelu v rovině pohledu)	dimension: give two points with four numbers – x1 y1 x2 y2 (model mm in the view plane)
-kótovat [chytře|celkově|základní|nic] [řetězově|od základny] – neznámé slovo „{0}“	dimension [smart|overall|basic|none] [chain|baseline] – unknown word “{0}”
 Kóty a poznámky bez geometrie: {0}	Dimensions and notes without geometry: {0}
 kóty se zadávají v pohledu, ne v detailu – použijte pohled, ze kterého je detail	dimensions are placed in a view, not in a detail – use the view the detail comes from
 list {0}	sheet {0}
@@ -111,7 +110,6 @@ výkres kóta vodorovně|svisle|šikmo pohled <p> x1 y1 x2 y2 · kóta průměr|
 výkres list <číslo|"název"> · výkres list nový ["název"] · výkres list přejmenovat [<číslo>] "název" · výkres list smazat <číslo|"název">	drawing sheet <number|"name"> · drawing sheet new ["name"] · drawing sheet rename [<number>] "name" · drawing sheet delete <number|"name">
 výkres model "<komponenta|záložka>" [pohled horní] [měřítko 1:2|auto] · výkres model smazat "<název>"	drawing model "<component|tab>" [view top] [scale 1:2|auto] · drawing model delete "<name>"
 výkres má jen jeden list – ten smazat nelze	the drawing has only one sheet – it cannot be deleted
-výkres razítko název="…" číslo="…" kreslil="…" revize="…" datum="…" materiál="…" [nepředepsané="…" hrany="…" poznámka="…"] – neznámé „{0}“	drawing titleblock name="…" number="…" author="…" revision="…" date="…" material="…" [general="…" edges="…" note="…"] – unknown “{0}”
 výkres revize <znak> "popis změny" [datum 13.11.2026] [kreslil "…"] · výkres revize smazat <znak>	drawing revision <mark> "change description" [date 2026-11-13] [author "…"] · drawing revision delete <mark>
 výkres smazat <id|popisek> [další id…] · výkres smazat vlastní · výkres smazat vše	drawing delete <id|label> [more ids…] · drawing delete custom · drawing delete all
 výkres stav [list <číslo|"název">|vše]	drawing status [sheet <number|"name">|all]

@@ -258,7 +258,7 @@ describe("výkres stav: listy, souřadnice pohledů, id, razítko; volby listu",
     const all = await drawingStatus(doc, fixtureCompute, { sheet: "all" });
     expect(all.text.split("\n\n")).toHaveLength(2);
     expect(all.text).toContain("Výkres „Detail“ (list 2/2)");
-    expect(all.text).toContain("Volby: otočení 90° · řez XZ poloviční");
+    expect(all.text).toContain("Volby: otočení 90° · řez XZ odsazení 0 (rovina Y = 0) poloviční");
     // výchozí = aktivní list
     expect((await drawingStatus(doc, fixtureCompute)).text).toMatch(/^Výkres „Detail“/);
     await expect(drawingStatus(doc, fixtureCompute, { sheet: 3 })).rejects.toThrow(/list 3 neexistuje/);

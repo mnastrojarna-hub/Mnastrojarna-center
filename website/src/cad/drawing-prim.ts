@@ -8,7 +8,7 @@
  * Poloha a osa prvků zadaných odkazem z placements.ts (zapisuje je stavba). Čisté funkce nad výtahem geometrie (bez jádra).
  */
 import { threadByName } from "./defaults";
-import { drillFitsThread, threadMinorD } from "./hole-spec";
+import { drillFitsThread, holeKindOf, threadMinorD } from "./hole-spec";
 import type { GAxis, GCyl, PartGeom } from "./drawing-dims-geom";
 import { tr } from "./i18n";
 import { placementOf } from "./placements";
@@ -122,7 +122,10 @@ export function primHoles(doc: CadDoc, g: PartGeom, holes: HoleF[], tol: number)
       continue;
     }
     if (h) {
-      out[i] = { ...h, kind: "tapped", thread: t.name, threadDepth: th.length, diameter: own ? h.diameter : t.tap, ...(own ? { tapDrill: Math.abs(h.diameter - threadMinorD(t)) < 1e-3 ? ("minor" as const) : ("custom" as const) } : {}) };
+      // zahloubená díra + vnitřní závit = závitová díra se zahloubením (zahloubení zůstane v popisu – hole-spec.ts holeHeadOf)
+      const hkind = holeKindOf(h);
+      const hk = hkind === "counterbore" || hkind === "countersink" ? { head: hkind } : {};
+      out[i] = { ...h, kind: "tapped", thread: t.name, threadDepth: th.length, diameter: own ? h.diameter : t.tap, ...hk, ...(own ? { tapDrill: Math.abs(h.diameter - threadMinorD(t)) < 1e-3 ? ("minor" as const) : ("custom" as const) } : {}) };
       continue;
     }
     const bore = boreOf(g, pl.position, pl.dir, t.tap / 2, tol);

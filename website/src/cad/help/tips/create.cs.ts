@@ -163,7 +163,7 @@ export default {
     select: "Po otevření formuláře klikněte na plochu, kam se má vrtat (nastaví Bod na povrchu i osu).",
     steps: ["Typ díry: Vrtaná, Válc. zahl., Kuž. zahl. nebo Závit; zadejte Průměr.", "Klikněte na plochu (Bod na povrchu) nebo vyplňte Polohy děr.", "Nastavte Ukončení (hloubka, skrz) a potvrďte OK."],
     cmd: "díra 8,5 skrz v 20 30",
-    note: "Závit: vrták z tabulky (M8 → 6,8), volba jádro nebo vlastní průměr; slepá díra i s plochým dnem.",
+    note: "Závit: vrták z tabulky (M8 → 6,8), jádro či vlastní; i se zahloubením (zahl. + vrták + závit); dno i ploché.",
   },
   thread: {
     what: "Přidá metrický závit ISO na válec nebo do díry – kosmetický, nebo vymodelovaný.",

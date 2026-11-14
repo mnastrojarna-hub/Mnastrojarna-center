@@ -16,11 +16,12 @@
  * - rozmístění: cad/drawing-dims-layout.ts (řady mimo obrys, texty bez překryvů; co se nevejde, se vynechá a nahlásí).
  */
 import type * as r from "replicad";
-import { camOf, makeDrawing, proj, viewExtent, type Cam, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt, type ViewKey, type ViewRotation } from "./drawing";
+import { camOf, holeTableViewOf, makeDrawing, proj, viewExtent, type Cam, type DrawingMeta, type DrawingOptions, type DrawingResult, type PlacedView, type ViewEnt, type ViewKey, type ViewRotation } from "./drawing";
 import { DimLayout, type CallReq, type LinReq, type Side } from "./drawing-dims-layout";
+import { chooseReference, sameSize } from "./drawing-functional";
 import { partGeom, type GAxis, type GCone, type GCyl, type PartGeom } from "./drawing-dims-geom";
 import { threadByName } from "./defaults";
-import { holeDrillD, holeTip } from "./hole-spec";
+import { holeDrillD, holeHeadOf, holeKindOf, holeTip } from "./hole-spec";
 import { expectedDims } from "./dim-check";
 import { primHoles } from "./drawing-prim";
 import { placementOf } from "./placements";
@@ -40,10 +41,31 @@ export type SmartReport = {
   noRoom: number;
   /** klíče kót a popisů, které se tentokrát nevešly – upravené (tolerance, revize) se při sloučení ponechají */
   dropped?: string[];
+  /** polohy děr podle pohledu (B12): souřadnicově / tabulkou děr / od hran (řetězově, od základny) */
+  holeMode?: Record<string, "ordinate" | "table" | "edges">;
+  /** pohledy, ve kterých se kóty poloh děr nevešly (automatika přejde na souřadnicové kóty) */
+  posSkipped?: string[];
+  /** pohledy, ve kterých se nevešly ani souřadnicové kóty (automatika přejde na tabulku děr) */
+  ordFailed?: string[];
+  /** pohled tabulky děr (polohy děr v tabulce na listu, ne kótami) */
+  table?: string;
+  /** počet poloh děr podle pohledu (volba pohledu tabulky děr – na listu je jedna) */
+  holeN?: Record<string, number>;
+  /** funkční rozměry, které jsou na listu (zadané hodnoty – kótovat … funkční) */
+  functional?: number[];
 };
 export type SmartDims = { /** otisk modelu a rozvržení – shoda = není co přegenerovat */ gen: string; annotations: DrawingAnnotation[]; report: SmartReport };
-/** `rotation` = otočení hlavního pohledu (rady „zapněte pohled …“ podle otočených kamer) */
-export type SmartOptions = { style?: "chain" | "baseline"; rotation?: ViewRotation };
+/** polohy děr (kótovat … díry …): auto = od hran, u ≥ 12 poloh nebo když se nevejdou souřadnicově, pak tabulkou děr */
+export type HoleDimMode = "auto" | "ordinate" | "table" | "chain";
+/** u kolika poloh děr v pohledu přejde automatika na souřadnicové kóty */
+export const ORDINATE_MIN = 12;
+/**
+ * `rotation` = otočení hlavního pohledu (rady „zapněte pohled …“ podle otočených kamer); `functional` = funkční rozměry
+ * (nikdy pomocné „(…)“; B8); `holes` = kótování poloh děr (B12); `forceOrd` / `forceTable` = pohledy, kde automatika
+ * po prvním průchodu přešla na souřadnicové kóty / tabulku děr; `tableOnly` = pohled jediné tabulky děr listu (ostatní pohledy
+ * v režimu tabulky dostanou souřadnicové kóty – tabulka na listu je jen jedna).
+ */
+export type SmartOptions = { style?: "chain" | "baseline"; rotation?: ViewRotation; functional?: number[]; holes?: HoleDimMode; forceOrd?: string[]; forceTable?: string[]; tableOnly?: string };
 
 type PV = PlacedView & { cam: Cam };
 type HoleF = Extract<Feature, { type: "hole" }>;
@@ -58,8 +80,8 @@ const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0
 const len = (a: Vec3) => Math.hypot(a[0], a[1], a[2]);
 const unit = (a: Vec3): Vec3 => mul(a, 1 / (len(a) || 1));
 const r3 = (n: number) => (Math.round(n * 1000) / 1000 || 0).toFixed(3);
-/** číslo do popisu (desetinná čárka podle jazyka, bez oddělovače tisíců) */
-export const fmtDim = (n: number) => (Math.round(n * 100) / 100).toLocaleString(cadLocale(), { useGrouping: false });
+/** číslo do popisu (desetinná čárka podle jazyka, bez oddělovače tisíců): desetinná místa modelu až na tisíciny (74,175; B7) */
+export const fmtDim = (n: number) => (Math.round(n * 1000) / 1000 || 0).toLocaleString(cadLocale(), { useGrouping: false, maximumFractionDigits: 3 });
 /** průměr vrtáku na tisíciny (jádro závitu D1 = 6,647) */
 const fmtDrill = (n: number) => (Math.round(n * 1000) / 1000).toLocaleString(cadLocale(), { useGrouping: false, maximumFractionDigits: 3 });
 const upOf = (c: Cam) => cross(c.d, c.x);
@@ -87,7 +109,9 @@ export function hashText(s: string): string {
 export function smartGenKey(doc: CadDoc, views: Pick<PlacedView, "key" | "px" | "py" | "s">[], opts: SmartOptions): string {
   const model = JSON.stringify({ f: doc.features, v: doc.variables, c: doc.configs, a: doc.activeConfig });
   const lay = views.map((v) => `${v.key}:${v.px.toFixed(2)}:${v.py.toFixed(2)}:${v.s}`).join("|");
-  return hashText(`${model}#${lay}#${opts.style ?? "chain"}`);
+  // w15: kóty na tisíciny, funkční rozměry a kótování děr (jiné volby = přegenerovat)
+  const w15 = `#w15r2${opts.functional?.length ? `#f${opts.functional.join(";")}` : ""}${opts.holes && opts.holes !== "auto" ? `#h${opts.holes}` : ""}`;
+  return hashText(`${model}#${lay}#${opts.style ?? "chain"}${w15}`);
 }
 
 /** Bod skici (u; v) ve 3D (stejně jako replicad makePlane: XY → (u; v; d), XZ → (u; −d; v), YZ → (d; u; v)). */
@@ -167,9 +191,12 @@ const holeDir = (f: HoleF): Vec3 => unit(f.dirDef?.kind === "vector" ? f.dirDef.
  * Závitová díra s vrtákem jiným než tabulkovým (jádro D1, zadaný průměr) nese i řádek vrtáku („M8 ↧20“ + „Ø6,647 ↧20“);
  * slepá díra s jiným hrotem než 118° má úhel v závorce, ploché dno poznámku „(ploché dno)“ (hloubka = celá hloubka).
  */
-export function holeCallout(f: Pick<HoleF, "kind" | "diameter" | "depth" | "cbDiameter" | "cbDepth" | "csDiameter" | "csAngle" | "thread" | "threadDepth" | "end" | "tipAngle" | "tapDrill">, count: number, measuredDepth?: number): string[] {
+export function holeCallout(f: Pick<HoleF, "kind" | "diameter" | "depth" | "cbDiameter" | "cbDepth" | "csDiameter" | "csAngle" | "thread" | "threadDepth" | "end" | "tipAngle" | "tapDrill" | "head">, count: number, measuredDepth?: number): string[] {
   const n = count > 1 ? `${count}× ` : "";
-  const kind = f.kind ?? (f.cbDiameter > f.diameter && f.cbDepth > 0 ? "counterbore" : "simple");
+  const kind = holeKindOf(f);
+  // zahloubení (i u závitové díry se zahloubením = zahloubení + vrták + závit): řádek „⌴ Ø20 ↧7“ / „⌵ Ø10 × 90°“ za dírou
+  const hd = holeHeadOf(f);
+  const headLine = hd && hd.d > 0 ? (hd.kind === "counterbore" ? `⌴ Ø${fmtDim(hd.d)}${hd.depth > 0 ? ` ↧${fmtDim(hd.depth)}` : ""}` : `⌵ Ø${fmtDim(hd.d)} × ${fmtDim(hd.angle)}°`) : "";
   const through = (f.end ? f.end.kind === "throughAll" || f.end.kind === "toNext" : !(f.depth > 0)) && f.end?.kind !== "toNext";
   const depth = f.end && f.end.kind !== "blind" && f.end.kind !== "throughAll" ? measuredDepth ?? 0 : f.depth;
   const deep = (d: number) => (d > 0 ? ` ↧${fmtDim(d)}` : "");
@@ -186,15 +213,18 @@ export function holeCallout(f: Pick<HoleF, "kind" | "diameter" | "depth" | "cbDi
     // vrták na výkres: průměr na tisíciny (jádro D1 6,647), jiný než tabulkový se uvádí vždy
     const drill = `Ø${fmtDrill(holeDrillD({ ...f, kind }))}`;
     const special = f.tapDrill === "minor" || f.tapDrill === "custom";
-    if (through) lines.push(`${n}${name}${skrz}`, ...(special ? [`${drill}${skrz}`] : []));
+    // se zahloubením se vrták uvádí vždy (průměr i hloubka od povrchu) – jinak by z popisu nebylo poznat, co se vrtá pod zahloubením
+    const withDrill = special || !!headLine;
+    // průchozí díra se závitem jen do hloubky (hloubka-závitu): „M8 ↧12“ + „Ø6,8 skrz“ – délka závitu se neztratí
+    if (through) lines.push(`${n}${name}${td > 0 ? deep(td) : skrz}`, ...(withDrill || td > 0 ? [`${drill}${skrz}`] : []));
     else if (td > 0 && td < depth - 1e-6) lines.push(`${n}${name}${deep(td)}`, `${drill}${deep(depth)}${bottom}`);
-    else if (special) lines.push(`${n}${name}${deep(depth)}`, `${drill}${deep(depth)}${bottom}`);
+    else if (withDrill) lines.push(`${n}${name}${deep(depth)}`, `${drill}${deep(depth)}${bottom}`);
     else lines.push(`${n}${name}${deep(depth)}${bottom}`);
+    if (headLine) lines.push(headLine);
     return lines;
   }
   lines.push(`${n}Ø${fmtDim(f.diameter)}${through ? skrz : deep(depth)}`);
-  if (kind === "counterbore" && f.cbDiameter > 0) lines.push(`⌴ Ø${fmtDim(f.cbDiameter)}${deep(f.cbDepth)}`);
-  if (kind === "countersink" && (f.csDiameter ?? 0) > 0) lines.push(`⌵ Ø${fmtDim(f.csDiameter!)} × ${fmtDim(f.csAngle ?? 90)}°`);
+  if (headLine) lines.push(headLine);
   lines[0] += bottom;
   return lines;
 }
@@ -236,6 +266,18 @@ type Ctx = {
   rot: ViewRotation;
   /** rotační díl: osa a čela (poloha příčných děr podél osy se kótuje od čela, ne od počátku modelu) */
   turn: { ax: GAxis; tMin: number; tMax: number; rMin: number; rMax: number } | null;
+  /** funkční rozměry (nikdy pomocná kóta v závorce) */
+  functional: number[];
+  holes: HoleDimMode;
+  /** pohledy se souřadnicovými kótami poloh (body poloh se sbírají a umístí `flushOrd`) / s polohami v tabulce děr */
+  ordViews: Set<string>;
+  tableViews: Set<string>;
+  ord: Map<string, { v: PV; pts: Vec2[] }>;
+  ordFailed: string[];
+  holeMode: Record<string, "ordinate" | "table" | "edges">;
+  /** pohled jediné tabulky děr listu (null = zatím kterýkoli) a počty poloh děr podle pohledu */
+  tableOnly: string | null;
+  holeN: Record<string, number>;
 };
 
 const P = (v: PV, p: Vec3): Vec2 => proj(v.cam, p);
@@ -244,8 +286,10 @@ const viewSide = (c: Ctx, dir: Vec3) => c.views.filter((v) => v.key !== "section
 const VIEW_ORDER = ["front", "top", "left", "right", "bottom", "back", "section"];
 const VIEW_KEYS: ViewKey[] = ["front", "back", "left", "right", "top", "bottom"];
 /** pohledy, které na listu nejsou a díval by se jimi pozorovatel ve směru `dir` (podle otočených kamer) – rada „zapněte pohled …“ */
-const missingViewsAlong = (c: Ctx, dir: Vec3) =>
-  VIEW_KEYS.filter((k) => !c.views.some((v) => v.key === k) && Math.abs(Math.abs(dot(camOf(k, c.rot).d, dir)) - 1) < 1e-6).map((k) => tr(VIEW_NAME[k]));
+function missingViewsAlong(c: Ctx, dir: Vec3, keys = false): string[] {
+  const list = VIEW_KEYS.filter((k) => !c.views.some((v) => v.key === k) && Math.abs(Math.abs(dot(camOf(k, c.rot).d, dir)) - 1) < 1e-6);
+  return keys ? list : list.map((k) => tr(VIEW_NAME[k]));
+}
 const byOrder = (a: PV, b: PV) => VIEW_ORDER.indexOf(a.key) - VIEW_ORDER.indexOf(b.key);
 
 /** viditelná (ne skrytá) kružnice / oblouk pohledu se středem c a poloměrem r */
@@ -363,13 +407,16 @@ export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "
   // pomocné pohledy a řezy lomenou čarou (`aux:` / `cut:`) se kótují ručně
   const views = d.views.filter((v): v is PV => !!v.cam && !v.key.startsWith("m:") && !/^(aux|cut):/.test(v.key)).sort(byOrder);
   const size = Math.max(1e-6, ...g.bbox[1].map((v, i) => v - g.bbox[0][i]));
-  const c: Ctx = { doc, g, views, lay: new DimLayout(d), style: opts.style ?? "chain", skipped: [], seen: new Set(), size, queue: [], calls: [], noRoom: 0, dropped: [], rot: opts.rotation ?? 0, turn: null };
+  const c: Ctx = { doc, g, views, lay: new DimLayout(d), style: opts.style ?? "chain", skipped: [], seen: new Set(), size, queue: [], calls: [], noRoom: 0, dropped: [], rot: opts.rotation ?? 0, turn: null, functional: opts.functional ?? [], holes: opts.holes ?? "auto", ordViews: new Set(opts.forceOrd ?? []), tableViews: new Set(opts.forceTable ?? []), ord: new Map(), ordFailed: [], holeMode: {}, tableOnly: opts.tableOnly ?? null, holeN: {} };
   const turned = turnedAxis(g);
   const holeAxes: GAxis[] = [];
   if (turned) turnedDims(c, turned.ax, turned.R);
   holeDims(c, turned?.ax ?? null, holeAxes, !turned);
   // prvky z vysunutých skic (kapsy, výstupky, drážky): rozměry, poloha, hloubka
   if (!turned) extrudeDims(c);
+  if (!turned) boxDims(c);
+  // souřadnicové kóty poloh (desky s mnoha dírami) v první řadě u obrysu
+  flushOrd(c);
   // polohy a rozměry prvků najednou – kratší blíž obrysu, delší vně (vynášecí čáry se nekříží s kótovacími)
   flushLin(c);
   flushCalls(c);
@@ -379,7 +426,22 @@ export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "
   const annotations = c.lay.placed.map((p) => ({ ...p.ann, id: uid() }) as DrawingAnnotation);
   const perView: Record<string, number> = {};
   for (const a of annotations) if (a.type !== "centerline") perView[a.view] = (perView[a.view] ?? 0) + 1;
-  return { gen: smartGenKey(doc, d.views, opts), annotations, report: { kind: turned ? "turned" : "prismatic", perView, skipped: c.skipped, expected: expectedDims(doc, g.bbox).length, noRoom: c.noRoom, dropped: c.dropped } };
+  const posSkipped = [...new Set(c.dropped.filter((k) => k.startsWith("pos:")).map((k) => k.split(":")[1]))];
+  const table = Object.keys(c.holeMode).find((k) => c.holeMode[k] === "table");
+  const functional = c.functional.filter((x) => annotations.some((a) => a.type === "dim" && (a.kind === "horizontal" || a.kind === "vertical") && !a.ord && a.prefix !== "(" && sameSize(x, Math.abs(a.kind === "horizontal" ? a.b[0] - a.a[0] : a.b[1] - a.a[1]))));
+  return {
+    gen: smartGenKey(doc, d.views, opts),
+    annotations,
+    report: {
+      kind: turned ? "turned" : "prismatic", perView, skipped: c.skipped, expected: expectedDims(doc, g.bbox).length, noRoom: c.noRoom, dropped: c.dropped,
+      ...(Object.keys(c.holeMode).length ? { holeMode: c.holeMode } : {}),
+      ...(posSkipped.length ? { posSkipped } : {}),
+      ...(c.ordFailed.length ? { ordFailed: c.ordFailed } : {}),
+      ...(table ? { table } : {}),
+      ...(Object.keys(c.holeN).length ? { holeN: c.holeN } : {}),
+      ...(functional.length ? { functional } : {}),
+    },
+  };
 }
 
 /**
@@ -389,17 +451,43 @@ export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "
  */
 export function makeSmartDrawing(shape: r.Shape3D, doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions> = {}, extra: Record<string, r.Shape3D> = {}): DrawingResult & { smart: SmartDims } {
   const g = partGeom(shape);
-  const so: SmartOptions = { style: opts.dimStyle, rotation: opts.rotation };
+  // tabulka děr zapnutá na listu: polohy děr v jejím pohledu jsou v tabulce – kótami se neopakují (auto)
+  const sheetTable = opts.holeTable ? holeTableViewOf(shape, meta, opts) : null;
+  const tableView = sheetTable && !opts.dimHoles ? sheetTable : null;
+  const so: SmartOptions = { style: opts.dimStyle, rotation: opts.rotation, ...(opts.dimFunctional?.length ? { functional: opts.dimFunctional } : {}), ...(opts.dimHoles ? { holes: opts.dimHoles } : {}), ...(tableView ? { forceTable: [tableView] } : {}) };
   type Res = { d: DrawingResult; smart: SmartDims; pads?: DrawingOptions["dimPads"] };
-  const run = (room: Partial<DrawingOptions>): Res => {
+  const once = (room: Partial<DrawingOptions>, o: SmartOptions): Res => {
     const d = makeDrawing(shape, meta, { ...opts, dimensions: "none", ...room }, extra);
     const out: { pads?: DrawingOptions["dimPads"] } = {};
     try {
-      return { d, smart: planSmartDims(g, doc, d, so, out), pads: out.pads };
+      return { d, smart: planSmartDims(g, doc, d, o, out), pads: out.pads };
     } catch (e) {
       // chyba plánovače nesmí shodit výkres – list bez kót a hlášení ve stavu výkresu
       return { d, smart: { gen: smartGenKey(doc, d.views, so), annotations: [], report: { kind: "prismatic", perView: {}, skipped: [tr("Chytré kóty se nepodařilo vytvořit: {0}", e instanceof Error ? e.message : String(e))], expected: 0, noRoom: 0 } } };
     }
+  };
+  // polohy děr (B12): nevešly se kóty od hran → souřadnicové kóty; nevešly se ani ty → tabulka děr (list s tabulkou)
+  const auto = (so.holes ?? "auto") === "auto";
+  const run = (room: Partial<DrawingOptions>): Res => {
+    let x = once(room, so);
+    if (auto) {
+      const failed = new Set(x.smart.report.ordFailed ?? []);
+      if (x.smart.report.posSkipped?.length) {
+        const y = once(room, { ...so, forceOrd: x.smart.report.posSkipped });
+        for (const k of y.smart.report.ordFailed ?? []) failed.add(k);
+        if (!y.smart.report.ordFailed?.length) x = y;
+      }
+      if (failed.size) x = once(room, { ...so, forceTable: [...failed, ...(so.forceTable ?? [])] });
+    }
+    // tabulka děr na listu (polohy v ní) – jedna, v kterémkoli pohledu (i levém / pravém / zadním): zapne se, když ji list
+    // nemá nebo ji má pro jiný pohled; víc pohledů v režimu tabulky → tabulka pro ten s nejvíc dírami, ostatní souřadnicově
+    const tables = Object.entries(x.smart.report.holeMode ?? {}).filter(([, m]) => m === "table").map(([k]) => k);
+    if (tables.length && !(tables.length === 1 && tables[0] === sheetTable)) {
+      const n = x.smart.report.holeN ?? {};
+      const tv = sheetTable && tables.includes(sheetTable) ? sheetTable : [...tables].sort((a, b) => (n[b] ?? 0) - (n[a] ?? 0))[0];
+      x = once({ ...room, holeTable: true, holeTableView: tv as ViewKey }, { ...so, forceTable: [tv], tableOnly: tv });
+    }
+    return x;
   };
   // lepší výsledek: bez varování, méně nevešlých kót, menší formát, větší měřítko; při shodě dřívější pokus
   const rank = (x: Res) => [x.d.warnings.length, x.smart.report.noRoom, x.d.sheet.w * x.d.sheet.h, -x.d.scaleValue];
@@ -411,7 +499,12 @@ export function makeSmartDrawing(shape: r.Shape3D, doc: CadDoc, meta: DrawingMet
     if (!b || (i >= 0 && a[i] < b[i])) best = x;
     return x;
   };
-  const done = () => ({ ...best!.d, smart: best!.smart });
+  const done = () => {
+    const b = best!;
+    // pojistka: pohled v režimu tabulky, jehož díry tabulka na listu nemá → polohy by chyběly beze stopy
+    for (const [k, m] of Object.entries(b.smart.report.holeMode ?? {})) if (m === "table" && !b.d.holes?.some((h) => h.view === k)) b.smart.report.skipped.push(tr("polohy děr ({0}): tabulka děr na listu je nemá – kótovat díry souřadnicově", tr(VIEW_NAME[k] ?? k)));
+    return { ...b.d, smart: b.smart };
+  };
   if (opts.dimRoom != null) {
     consider(run({ dimRoom: opts.dimRoom, dimRoomMin: 0 }));
     return done();
@@ -584,18 +677,23 @@ function turnedDims(c: Ctx, ax: GAxis, Rmax: number) {
     return res;
   };
   const L = Math.abs(tMax - tMin);
+  let refAll = false;
   if (ts.length > 2) {
     if (c.style === "baseline") {
       ts.slice(1).forEach((t, i) => placeLen(ts[0], t, `len:b:${spanKey(ts[0], t)}`, fmtDim(Math.abs(t - ts[0])), { minRow: i }));
     } else {
-      // řetěz bez uzavření: nejdelší článek jako pomocná kóta v závorce
+      // řetěz bez uzavření: nejdelší článek, který není funkční, jako pomocná kóta v závorce (funkční rozměry nikdy –
+      // B8; jsou-li funkční všechny články, je pomocná celková délka)
       const links = ts.slice(1).map((t, i) => ({ t0: ts[i], t1: t, i, l: Math.abs(t - ts[i]) }));
-      const refLink = links.reduce((m, x) => (x.l > m.l ? x : m), links[0]);
+      const pick = chooseReference(links.map((k) => k.l), L, c.functional);
+      refAll = pick.ref === "overall";
+      const refLink = typeof pick.ref === "number" ? links[pick.ref] : null;
+      if (pick.note) c.skipped.push(pick.note);
       for (const k of links) placeLen(k.t0, k.t1, `len:c:${spanKey(k.t0, k.t1)}`, fmtDim(k.l), k === refLink ? { prefix: "(", suffix: ")" } : {});
-      c.seen.add(`ref:${r3(refLink.t0)}:${r3(refLink.t1)}`);
+      if (refLink) c.seen.add(`ref:${r3(refLink.t0)}:${r3(refLink.t1)}`);
     }
   }
-  if (c.style !== "baseline" || ts.length <= 2) placeLen(ts[0], ts[ts.length - 1], "len:all", fmtDim(L), { minRow: lenRows });
+  if (c.style !== "baseline" || ts.length <= 2) placeLen(ts[0], ts[ts.length - 1], "len:all", fmtDim(L), { minRow: lenRows, ...(refAll ? { prefix: "(", suffix: ")" } : {}) });
 
   // délka závitu (pokud není totožná s článkem)
   for (const th of threads) {
@@ -763,11 +861,11 @@ function holeDims(c: Ctx, mainAx: GAxis | null, out: GAxis[], positions: boolean
       c.skipped.push(tr("{0}: díra v geometrii nenalezena", f.name));
       continue;
     }
-    const kind = f.kind ?? (f.cbDiameter > f.diameter && f.cbDepth > 0 ? "counterbore" : "simple");
-    const head = kind === "counterbore" ? f.cbDiameter / 2 : kind === "countersink" ? (f.csDiameter ?? 0) / 2 : rd;
+    const hd = holeHeadOf(f); // zahloubení (i závitové díry se zahloubením)
+    const head = hd && hd.d > 0 ? hd.d / 2 : rd;
     // hloubka ukončení „k ploše / k bodu“ z geometrie (délka válce)
     const cyl = cands.find((x) => sameAxis(x, lines[0], tol));
-    const measured = cyl ? Math.abs(cyl.t1 - cyl.t0) + (kind === "counterbore" ? f.cbDepth : 0) : undefined;
+    const measured = cyl ? Math.abs(cyl.t1 - cyl.t0) + (hd?.kind === "counterbore" ? hd.depth : 0) : undefined;
     const base = holeCallout(f, 1, measured);
     const key = `${base.join("|")}#${dir.map((v) => r3(Math.abs(v))).join()}`;
     const e = groups.get(key);
@@ -788,24 +886,40 @@ function holeDims(c: Ctx, mainAx: GAxis | null, out: GAxis[], positions: boolean
     const at = (tt: number) => P(v, add(t.ax.p, mul(t.ax.dir, tt)))[k];
     return { axis: k, faces: [{ at: at(t.tMin), r: t.rMin }, { at: at(t.tMax), r: t.rMax }] };
   };
+  if (positions) choosePositionMode(c, [...groups.values()]);
+  // souřadnicové kóty s více druhy děr v pohledu: značka skupiny (A, B …) u každé díry i v popisu – jinak by z kót nebylo
+  // poznat, který popis patří ke které díře (popis má jeden odkaz)
+  const inView = new Map<string, HoleGroup[]>();
+  for (const grp of groups.values()) {
+    const v = positions ? groupView(c, grp) : null;
+    if (v && c.holeMode[v.key] === "ordinate") inView.set(v.key, [...(inView.get(v.key) ?? []), grp]);
+  }
   for (const grp of groups.values()) {
     const n = grp.inst.length;
     const label = grp.lines.map((l, i) => (i === 0 && n > 1 ? `${n}× ${l}` : l));
     const fvs = viewAlong(c, grp.dir).sort(byOrder);
     let fv: PV | null = null;
-    let hiddenOnly = false;
+    let hiddenView: PV | null = null;
     for (const v of fvs) {
       const vis = grp.inst.filter((h) => visibleArc(v, P(v, h.line.p), grp.head) || visibleArc(v, P(v, h.line.p), holeR(grp.f)));
       if (vis.length) {
         fv = v;
         break;
       }
-      if (grp.inst.some((h) => hiddenArc(v, P(v, h.line.p), grp.head))) hiddenOnly = true;
+      if (!hiddenView && grp.inst.some((h) => hiddenArc(v, P(v, h.line.p), grp.head) || hiddenArc(v, P(v, h.line.p), holeR(grp.f)))) hiddenView = v;
+    }
+    let side = "";
+    if (!fv && hiddenView) {
+      // díra z protější strany (zespodu) a pohled z té strany na listu není: popis a polohy na skrytých kružnicích
+      // s poznámkou strany („ze spodní strany“) – místo vynechání (závity zespodu desky bez pohledu spodní)
+      fv = hiddenView;
+      side = sideNote(missingViewsAlong(c, grp.dir, true)[0]);
     }
     if (!fv) {
-      // pohledy ve směru osy díry, které na listu nejsou
+      // pohledy ve směru osy díry, které na listu nejsou; šikmá díra (osa mimo směry pohledů) → pomocný pohled
       const want = missingViewsAlong(c, grp.dir);
-      c.skipped.push(hiddenOnly ? tr("{0}: díra je v pohledu vidět jen skrytě – zapněte pohled {1}", label[0], want.join(" / ") || "—") : tr("{0}: chybí pohled ve směru osy díry – zapněte pohled {1}", label[0], want.join(" / ") || "—"));
+      const toViewer = mul(grp.dir, -1).map((x) => fmtDim(Math.round(x * 1000) / 1000)).join(" ");
+      c.skipped.push(want.length ? tr("{0}: chybí pohled ve směru osy díry – zapněte pohled {1}", label[0], want.join(" / ")) : tr("{0}: šikmá díra – osa není ve směru žádného pohledu; kótujte ji v pomocném pohledu kolmém na osu (výkres pohled pomocný směr {1}) ručně", label[0], toViewer));
       continue;
     }
     // kruhové pole: středy na kružnici kolem společného středu
@@ -831,14 +945,97 @@ function holeDims(c: Ctx, mainAx: GAxis | null, out: GAxis[], positions: boolean
         const pcdLines = [`Ø${fmtDim(2 * circ.r)}`];
         if (!equal) {
           const minGap = Math.min(...gaps);
-          pcdLines.push(`${fmtDim((minGap * 180) / Math.PI)}°`);
+          pcdLines.push(`${fmtDim(Math.round(((minGap * 180) / Math.PI) * 100) / 100)}°`);
         }
         callQ(c, { key: pcdKey, view: fv.key, tip: circ.c, lines: pcdLines, circle: { c: circ.c, r: circ.r }, ring: { c: circ.c, r: circ.r } }, pcdLines[0]);
       }
       if (!mainCenter || Math.hypot(mainCenter[0] - circ.c[0], mainCenter[1] - circ.c[1]) > 1e-3) positionDims(c, fv, [circ.c], center(fv), axialOf(fv));
     } else positionDims(c, fv, pts2, center(fv), axialOf(fv));
-    callQ(c, { key: `hole:${grp.f.id}`, view: fv.key, tip: rings[0].c, lines: callLines, rings }, callLines[0]);
+    if (side) callLines.push(side);
+    const peers = inView.get(fv.key) ?? [];
+    const tag = peers.length > 1 && peers.includes(grp) ? String.fromCharCode(65 + Math.min(25, peers.indexOf(grp))) : undefined;
+    if (tag) callLines[0] += ` (${tag})`;
+    callQ(c, { key: `hole:${grp.f.id}`, view: fv.key, tip: rings[0].c, lines: callLines, rings, ...(tag ? { tag } : {}) }, callLines[0]);
   }
+}
+
+/** poznámka strany u díry kótované na skrytých kružnicích (pohled z její strany na listu není) */
+function sideNote(view: string | undefined): string {
+  const m: Record<string, string> = { bottom: tr("ze spodní strany"), top: tr("z horní strany"), front: tr("z přední strany"), back: tr("ze zadní strany"), left: tr("z levé strany"), right: tr("z pravé strany") };
+  return (view && m[view]) || tr("z protější strany");
+}
+
+/** pohled, ve kterém jsou díry skupiny vidět kružnicemi (první podle pořadí pohledů; jinak skrytými – díra z protější strany), nebo null */
+function groupView(c: Ctx, grp: HoleGroup): PV | null {
+  const along = viewAlong(c, grp.dir).sort(byOrder);
+  return along.find((v) => grp.inst.some((h) => visibleArc(v, P(v, h.line.p), grp.head) || visibleArc(v, P(v, h.line.p), holeR(grp.f)))) ?? along.find((v) => grp.inst.some((h) => hiddenArc(v, P(v, h.line.p), grp.head) || hiddenArc(v, P(v, h.line.p), holeR(grp.f)))) ?? null;
+}
+
+/**
+ * Kótování poloh děr hranolového dílu podle pohledu (B12): `kótovat … díry souřadnicově|tabulka|řetězově`; automaticky
+ * souřadnicové kóty od ORDINATE_MIN poloh v pohledu – poloha = různá souřadnice x nebo y středu díry (tolik kót by
+ * potřebovalo kótování od hran; pravidelná mřížka 5 × 4 = 9 poloh zůstane u roztečí „4× 40“) – nebo když se kóty od hran
+ * v prvním průchodu nevešly (`forceOrd`); tabulka děr, když se nevešly ani souřadnicové (`forceTable`). Kruhové pole se
+ * počítá jako jeden bod (střed roztečné kružnice).
+ */
+function choosePositionMode(c: Ctx, groups: HoleGroup[]) {
+  const per = new Map<string, Vec2[]>();
+  for (const grp of groups) {
+    const fv = groupView(c, grp);
+    if (!fv) continue;
+    const pts = grp.inst.map((h) => P(fv, h.line.p));
+    const onCircle = pts.length >= 3 ? circleThrough(pts) : null;
+    const circPattern = c.doc.features.some((p) => p.type === "pattern" && !p.suppressed && p.kind === "circular" && (p.featureIds?.length ? p.featureIds : [p.featureId]).includes(grp.f.id));
+    const list = per.get(fv.key) ?? [];
+    for (const q of onCircle && circPattern ? [onCircle.c] : pts) if (!list.some((o) => Math.hypot(o[0] - q[0], o[1] - q[1]) < 1e-3)) list.push(q);
+    per.set(fv.key, list);
+  }
+  for (const [k, list] of per) {
+    c.holeN[k] = list.length;
+    // tabulka děr je na listu jedna (`tableOnly`) – pohled, pro který není, dostane souřadnicové kóty
+    const tableOk = !c.tableOnly || c.tableOnly === k;
+    if (c.tableViews.has(k) && tableOk) c.holeMode[k] = "table";
+    else if (c.ordViews.has(k) || c.tableViews.has(k) || (c.holes === "table" && !tableOk)) {
+      c.tableViews.delete(k);
+      c.ordViews.add(k);
+      c.holeMode[k] = "ordinate";
+    } else if (c.holes === "table") (c.tableViews.add(k), (c.holeMode[k] = "table"));
+    else if (c.holes === "ordinate" || (c.holes === "auto" && uniq(list.map((q) => q[0])).length + uniq(list.map((q) => q[1])).length >= ORDINATE_MIN)) (c.ordViews.add(k), (c.holeMode[k] = "ordinate"));
+    else c.holeMode[k] = "edges";
+  }
+}
+
+/**
+ * Souřadnicové kóty poloh (B12): v každém pohledu se sebranými body jedna řada hodnot x (pod / nad pohledem) a jedna
+ * hodnot y (vlevo / vpravo) od počátku v levém dolním rohu obrysu, „0“ v počátku a vzdálená hrana jako poslední hodnota
+ * (celkový rozměr – samostatná kóta celkové délky se pak nekreslí). Nevejdou-li se, automatika přejde na tabulku děr.
+ */
+function flushOrd(c: Ctx) {
+  for (const [key, { v, pts }] of c.ord) {
+    const { x0, x1, y0, y1 } = viewExtent(v);
+    let ok = true;
+    for (const axis of [0, 1] as const) {
+      const dir: "h" | "v" = axis === 0 ? "h" : "v";
+      const origin: Vec2 = [x0, y1]; // levý dolní roh (y pohledu dolů)
+      const far: Vec2 = axis === 0 ? [x1, y1] : [x0, y0];
+      // rohy obrysu: počátek a vzdálená hrana z té strany, kde bude řada
+      const corners: Vec2[] = [[x0, y0], [x1, y0], [x0, y1], [x1, y1]];
+      const res = c.lay.placeOrdinates({ key: `ord:${key}:${axis}`, view: key, dir, origin, pts: [...pts, ...corners], sides: axis === 0 ? ["bottom", "top"] : ["left", "right"] });
+      if (res) {
+        // vzdálená hrana je poslední souřadnice = celkový rozměr osy (celková kóta by byla duplicitní)
+        c.seen.add(linMeaning(v.cam, dir, origin, far));
+        continue;
+      }
+      ok = false;
+      // automatika přejde na tabulku děr – jen v pohledu, pro který může být (na listu je jedna)
+      if (c.holes === "auto" && (!c.tableOnly || c.tableOnly === key)) continue;
+      c.skipped.push(tr("souřadnicové kóty poloh děr se nevešly čistě na list ({0}) – zkuste kótovat díry tabulka nebo větší list", tr(VIEW_NAME[v.key] ?? v.key)));
+      c.noRoom++;
+      c.dropped.push(`ord:${key}:${axis}`);
+    }
+    if (!ok && c.holes === "auto" && (!c.tableOnly || c.tableOnly === key)) c.ordFailed.push(key);
+  }
+  c.ord.clear();
 }
 
 /** kružnice přes body (všechny stejně daleko od těžiště) */
@@ -862,6 +1059,14 @@ type Axial = { axis: 0 | 1; faces: { at: number; r: number }[] };
  */
 function positionDims(c: Ctx, v: PV, pts: Vec2[], center: Vec2 | null, axial: Axial | null = null) {
   if (!pts.length) return;
+  // desky s mnoha dírami (B12): souřadnicové kóty od základny (umístí flushOrd), nebo polohy v tabulce děr
+  if (!center && !axial && c.tableViews.has(v.key)) return;
+  if (!center && !axial && c.ordViews.has(v.key)) {
+    const e = c.ord.get(v.key) ?? { v, pts: [] };
+    e.pts.push(...pts);
+    c.ord.set(v.key, e);
+    return;
+  }
   // skutečný rozsah (přerušený pohled je na listu kratší, souřadnice kót zůstávají skutečné)
   const { x0: vx0, x1: vx1, y0: vy0, y1: vy1 } = viewExtent(v);
   for (const axis of [0, 1] as const) {
@@ -1009,13 +1214,21 @@ function prismaticDims(c: Ctx) {
 function extrudeDims(c: Ctx) {
   const feats = c.doc.features;
   const firstSolid = feats.find((f) => !f.suppressed && (f.type === "extrude" || f.type === "box" || f.type === "revolve" || f.type === "cylinder"));
+  // rotační prvky hranolového dílu (vybrání, zápichy) Chytré kóty neokótují – řekne se to (Kontrola kót je pak vysvětlená)
+  for (const f of feats) if (!f.suppressed && f.type === "revolve" && f !== firstSolid) c.skipped.push(tr("{0}: rotační prvek hranolového dílu kótujte ručně (průměry a délky – nejlépe v řezu osou prvku)", f.name));
   for (const f of feats) {
     if (f.suppressed || f.type !== "extrude" || f === firstSolid) continue;
     const sk = feats.find((x): x is Extract<Feature, { type: "sketch" }> => x.type === "sketch" && x.id === f.sketchId);
     if (!sk) continue;
     const n = planeNormal(sk.plane);
     const v = viewAlong(c, n).sort(byOrder)[0];
-    if (!v) continue;
+    const solid = sk.entities.filter((e) => !e.construction);
+    // co Chytré kóty u vysunutí neokótují, řeknou (Kontrola kót pak nechybí beze stopy)
+    if (!v) {
+      if (solid.length) c.skipped.push(sk.plane.kind === "custom" && !VIEW_KEYS.some((k) => Math.abs(Math.abs(dot(camOf(k, c.rot).d, n)) - 1) < 1e-6) ? tr("{0}: skica ve šikmé rovině – kótujte obrys v pomocném pohledu kolmém na rovinu skici (výkres pohled pomocný směr {1}) ručně", f.name, n.map((x) => fmtDim(Math.round(x * 1000) / 1000)).join(" ")) : tr("{0}: chybí pohled ve směru vysunutí – zapněte pohled {1}", f.name, missingViewsAlong(c, n).join(" / ") || "—"));
+      continue;
+    }
+    if (solid.some((e) => e.type !== "circle" && e.type !== "rect" && e.type !== "slot")) c.skipped.push(tr("{0}: obecný obrys skici (lomená čára, oblouky, elipsa) kótujte ručně – výkres kóta …", f.name));
     const blind = !f.extent || f.extent.kind === "blind";
     const dist = f.extent?.kind === "blind" ? f.extent.d : f.distance;
     const depthTxt = f.mode === "cut" && blind ? ` ↧${fmtDim(dist)}` : "";
@@ -1057,6 +1270,82 @@ function extrudeDims(c: Ctx) {
   }
 }
 
+/**
+ * Kvádry přidané / odebrané k dílu (osazení, průchozí okna, kapsy z primitiv): rozměry, které
+ * nepokryje celkový rozměr (ani průchod skrz těleso), v pohledu, kde je obdélník kvádru vidět viditelnými hranami; poloha od
+ * hrany obrysu, není-li kvádr u hrany nebo souměrně; hloubka odebrání „↧“ ve směru pohledu. Co se nikde nepodaří, se hlásí.
+ * První těleso dílu (základ, k němuž se další kvádry přidaly) má rozměry, které nepokryje celkový, jako pomocné „(15)“ –
+ * plynou z celkového rozměru a osazení (žádný uzavřený řetězec).
+ */
+function boxDims(c: Ctx) {
+  const feats = c.doc.features;
+  const firstSolid = feats.find((f) => !f.suppressed && (f.type === "extrude" || f.type === "box" || f.type === "revolve" || f.type === "cylinder"));
+  const [blo, bhi] = c.g.bbox;
+  const eps = 1e-3;
+  for (const f of feats) {
+    if (f.suppressed || f.type !== "box") continue;
+    const refDim = f === firstSolid ? { prefix: "(", suffix: ")" } : {};
+    if (f.dirDef || f.positionRef) {
+      c.skipped.push(tr("{0}: natočený kvádr kótujte ručně", f.name));
+      continue;
+    }
+    const lo0 = f.size.map((sz, k) => (f.centered ? f.position[k] - sz / 2 : f.position[k]));
+    // v tělese (odebraný kvádr vyčnívá – část mimo těleso se nekótuje)
+    const lo = lo0.map((x, k) => Math.max(x, blo[k]));
+    const hi = lo0.map((x, k) => Math.min(x + f.size[k], bhi[k]));
+    if (hi.some((x, k) => x - lo[k] < eps)) continue;
+    const covers = (k: number) => lo[k] <= blo[k] + eps && hi[k] >= bhi[k] - eps;
+    const need = new Set([0, 1, 2].filter((k) => !covers(k)));
+    if (!need.size) continue;
+    const corner = (bits: number): Vec3 => [0, 1, 2].map((k) => ((bits >> k) & 1 ? hi[k] : lo[k])) as Vec3;
+    // pohledy podle osy pohledu: nejdřív ta, podél které je kvádr „skrz“ (okno je vidět celé), pak ostatní
+    const order = [...c.views].filter((v) => v.key !== "section").sort((a, b) => Number(covers(axisOf(b.cam.d))) - Number(covers(axisOf(a.cam.d))) || byOrder(a, b));
+    for (const v of order) {
+      if (!need.size) break;
+      const kd = axisOf(v.cam.d);
+      const pts = [0, 1, 2, 3, 4, 5, 6, 7].map((b) => P(v, corner(b)));
+      const x0 = Math.min(...pts.map((q) => q[0]));
+      const x1 = Math.max(...pts.map((q) => q[0]));
+      const y0 = Math.min(...pts.map((q) => q[1]));
+      const y1 = Math.max(...pts.map((q) => q[1]));
+      const ext = viewExtent(v);
+      let used = false;
+      for (const k of [...need]) {
+        if (k === kd) continue;
+        const h = axisOf(v.cam.x) === k;
+        // hrany obdélníku kvádru, které jsou v pohledu nakreslené (viditelně) – na ně vynášecí čáry
+        const edges: { side: Side; a: Vec2; b: Vec2 }[] = h
+          ? [{ side: "top", a: [x0, y0], b: [x1, y0] }, { side: "bottom", a: [x0, y1], b: [x1, y1] }]
+          : [{ side: "left", a: [x0, y1], b: [x0, y0] }, { side: "right", a: [x1, y1], b: [x1, y0] }];
+        const vis = edges.filter((e) => onVisibleLine(v, [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2]) && onVisibleLine(v, e.a) && onVisibleLine(v, e.b));
+        if (!vis.length) continue;
+        const alt = Object.fromEntries(vis.map((e) => [e.side, { a: e.a, b: e.b }])) as Partial<Record<Side, { a: Vec2; b: Vec2 }>>;
+        linQ(c, v, { key: `box:${f.id}:${"xyz"[k]}`, dir: h ? "h" : "v", a: vis[0].a, b: vis[0].b, sides: vis.map((e) => e.side), ...refDim }, f.name, alt);
+        // poloha: od hrany obrysu (kvádr u hrany ani souměrný polohu nepotřebuje)
+        const atEdge = lo[k] <= blo[k] + eps || hi[k] >= bhi[k] - eps;
+        const sym = Math.abs(lo[k] - blo[k] - (bhi[k] - hi[k])) < eps;
+        if (!atEdge && !sym) {
+          const e = vis[0];
+          const base: Vec2 = h ? [ext.x0, e.a[1]] : [e.a[0], ext.y1];
+          const near: Vec2 = h ? [x0, e.a[1]] : [e.a[0], y1];
+          linQ(c, v, { key: `box:${f.id}:${"xyz"[k]}:p`, dir: h ? "h" : "v", a: base, b: near, sides: [e.side] }, f.name);
+        }
+        need.delete(k);
+        used = true;
+      }
+      // hloubka odebrání ve směru pohledu (není-li skrz): popis „↧ h“ u obdélníku
+      if (used && f.mode === "cut" && need.has(kd)) {
+        const depth = hi[kd] - lo[kd];
+        callQ(c, { key: `box:${f.id}:d`, view: v.key, tip: [(x0 + x1) / 2, y0], lines: [`↧${fmtDim(depth)}`], prefer: [0.7, -0.7] }, `${f.name} ↧${fmtDim(depth)}`);
+        need.delete(kd);
+      }
+    }
+    for (const k of need) c.skipped.push(tr("{0}: rozměr {1} ({2}) není v žádném pohledu vidět viditelnými hranami – kótujte ručně", f.name, fmtDim(hi[k] - lo[k]), "XYZ"[k]));
+  }
+}
+/** osa modelu (0 X, 1 Y, 2 Z), se kterou je směr rovnoběžný (jinak −1) */
+const axisOf = (d: Vec3) => [0, 1, 2].find((k) => Math.abs(Math.abs(d[k]) - 1) < 1e-6) ?? -1;
+
 /** Zaoblení a sražení hran: jeden popis s počtem hran, odkaz na oblouk / šikmou hranu v pohledu, kde jsou vidět. */
 function edgeFeatureDims(c: Ctx) {
   for (const f of c.doc.features) {
@@ -1090,14 +1379,21 @@ function edgeFeatureDims(c: Ctx) {
       const d = f.distance;
       const lines = [`${cnt}${fmtDim(d)}×45°`];
       let placed = false;
+      let found: string | null = null;
       for (const v of c.views) {
         const e = (v.ents ?? []).find((x) => x.t === "line" && !x.hidden && Math.abs(Math.hypot(x.b[0] - x.a[0], x.b[1] - x.a[1]) - d * Math.SQRT2) < 0.02 && Math.abs(Math.abs(x.b[0] - x.a[0]) - Math.abs(x.b[1] - x.a[1])) < 0.02);
         if (!e || e.t !== "line") continue;
+        found ??= v.key;
         const mid: Vec2 = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2];
-        placed = call(c, { key: `cham:${f.id}`, view: v.key, tip: mid, lines }, lines[0]);
-        break;
+        // nevejde-li se popis v tomto pohledu, zkusí se další s touž hranou; „nevešlo se“ jen jednou, když nikde
+        placed = call(c, { key: `cham:${f.id}`, view: v.key, tip: mid, lines }, lines[0], true);
+        if (placed) break;
       }
-      if (!placed && !c.seen.has(`C:${lines.join("|")}`)) c.skipped.push(tr("{0}: sražení v pohledu nenalezeno", lines[0]));
+      if (!placed && found && !c.seen.has(`C:${lines.join("|")}`)) {
+        c.skipped.push(tr("{0}: popis se nevešel čistě na list ({1})", lines[0], tr(VIEW_NAME[found] ?? found)));
+        c.noRoom++;
+        c.dropped.push(`cham:${f.id}`);
+      } else if (!placed && !c.seen.has(`C:${lines.join("|")}`)) c.skipped.push(tr("{0}: sražení v pohledu nenalezeno", lines[0]));
     }
   }
 }

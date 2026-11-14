@@ -18,7 +18,7 @@ import { perfMark } from "./perf-log";
 import { missingBlobs } from "./blobs";
 import { BIG_FACES, meshMetrics, meshParams, quickDiag } from "./mesh-budget";
 import { threadByName } from "./defaults";
-import { drillFitsThread, fmtDrill, holeTip, tapDrillD, tipAngleOk } from "./hole-spec";
+import { drillFitsThread, fmtDrill, headBelowThread, holeHeadOf, holeKindOf, holeTip, staleHeadOf, tapDrillD, tipAngleOk, type HoleHead } from "./hole-spec";
 import { resolveDoc } from "./params";
 import { entityIndex, planeDefToSketchPlane, pointOf, resolveAxis, resolveDirection, resolvePlaneDef, resolveRef, V, type ResolveCtx } from "./ref-resolve";
 import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
@@ -368,9 +368,13 @@ const csDepthOf = (csD: number, d: number, angle: number) => Math.max(0, (csD / 
 
 type HoleF = Extract<Feature, { type: "hole" }>;
 
-/** Průměr vrtání a poloměr „hlavy“ díry (zahloubení) – z něj se odvozuje krátký nástup nad zadaným bodem. */
-function holeHead(f: HoleF): { kind: NonNullable<HoleF["kind"]>; d: number; headR: number; back: number } {
-  const kind = f.kind ?? (f.cbDiameter > f.diameter && f.cbDepth > 0 ? "counterbore" : "simple");
+/**
+ * Průměr vrtání a „hlava“ díry (zahloubení; u závitové díry s `head` zahloubení + vrták + závit – hole-spec.ts) – z poloměru
+ * hlavy se odvozuje krátký nástup nad zadaným bodem.
+ */
+function holeHead(f: HoleF): { kind: NonNullable<HoleF["kind"]>; head: HoleHead | null; d: number; headR: number; back: number } {
+  const kind = holeKindOf(f);
+  const head = holeHeadOf(f);
   let d = f.diameter;
   if (kind === "tapped") {
     const t = threadByName(f.thread);
@@ -383,8 +387,14 @@ function holeHead(f: HoleF): { kind: NonNullable<HoleF["kind"]>; d: number; head
   }
   if (!(d > 0)) throw new Error(tr("Průměr díry musí být kladný."));
   const rd = d / 2;
-  const headR = kind === "counterbore" ? Math.max(rd, f.cbDiameter / 2) : kind === "countersink" ? Math.max(rd, (f.csDiameter ?? 0) / 2) : rd;
-  return { kind, d, headR, back: Math.max(headR, 0.5) };
+  const headR = head ? Math.max(rd, head.d / 2) : rd;
+  // zahloubení menší než závit: závit by zasahoval do zahloubení (stavba proběhne, protokol ⚠)
+  const low = headBelowThread(f);
+  if (low && low.d > d) noteFeatureWarning(tr("Zahloubení Ø{0} je menší než závit {1} (Ø{2}) – závit zasahuje do zahloubení; zvětšete zahloubení nad Ø{2}.", fmtDrill(low.d), low.thread.name, fmtDrill(low.thread.d)));
+  // starší závitová díra bez head s uloženým zahloubením: geometrie beze změny, ale ne potichu (hole-spec.ts staleHeadOf)
+  const old = staleHeadOf(f);
+  if (old) noteFeatureWarning(tr("Uložené zahloubení {0} se nevrtá – závitová díra nemá head (starší zápis). Zahloubit: upravit \"{1}\" head={2}; smazat: upravit \"{1}\" head=none", old.kind === "counterbore" ? `Ø${fmtDrill(old.d)}×${fmtDrill(old.depth)}` : tr("kuželové Ø{0}", fmtDrill(old.d)), f.name, old.kind));
+  return { kind, head, d, headR, back: Math.max(headR, 0.5) };
 }
 
 /**
@@ -392,26 +402,26 @@ function holeHead(f: HoleF): { kind: NonNullable<HoleF["kind"]>; d: number; head
  * `strict` = bez nástupu nad bodem (přesně od bodu) – pro kontrolu, že díra ve směru vrtání opravdu zasáhne materiál.
  */
 function holeToolAt(f: HoleF, body: Shape | null, at: Vec3, dir: Vec3, end: { through: boolean; depth: number; flat: boolean }, strict = false): Shape {
-  const { kind, d, back } = holeHead(f);
+  const { head, d, back } = holeHead(f);
   const big = body ? bboxDiag(body) * 2 + V.len(V.sub(at, body.boundingBox.center as Vec3)) * 2 + 10 : 1000;
   const rd = d / 2;
   // Díra začíná v zadaném bodě a vrtá jen ve směru vrtání. Nad bodem se odebere jen krátký nástup (poloměr hlavy díry) –
   // čistý začátek na šikmé nebo válcové ploše; materiál dál nad bodem (protější stěna) zůstane. `bothWays` = skrz oběma směry.
   const B = f.bothWays && end.through ? big : strict ? 0 : back;
   const pts: [number, number][] = [[0, -B]];
-  if (kind === "counterbore") {
-    if (!(f.cbDiameter > d && f.cbDepth > 0)) throw new Error(tr("Zahloubení musí mít větší průměr než díra a kladnou hloubku."));
-    pts.push([f.cbDiameter / 2, -B], [f.cbDiameter / 2, f.cbDepth], [rd, f.cbDepth]);
-  } else if (kind === "countersink") {
-    const csD = f.csDiameter ?? 0;
+  if (head?.kind === "counterbore") {
+    if (!(head.d > d && head.depth > 0)) throw new Error(tr("Zahloubení musí mít větší průměr než díra a kladnou hloubku."));
+    pts.push([head.d / 2, -B], [head.d / 2, head.depth], [rd, head.depth]);
+  } else if (head?.kind === "countersink") {
+    const csD = head.d;
     if (!(csD > d)) throw new Error(tr("Průměr kuželového zahloubení musí být větší než průměr díry."));
-    const angle = Math.min(170, Math.max(30, f.csAngle ?? 90));
+    const angle = Math.min(170, Math.max(30, head.angle));
     pts.push([csD / 2, -B], [csD / 2, 0], [rd, csDepthOf(csD, d, angle)]);
   } else pts.push([rd, -B]);
   if (end.through) pts.push([rd, big], [0, big]);
   else {
     if (!(end.depth > 0)) throw new Error(tr("Hloubka díry musí být kladná."));
-    if (kind === "counterbore" && end.depth <= f.cbDepth) throw new Error(tr("Hloubka díry musí být větší než hloubka zahloubení."));
+    if (head?.kind === "counterbore" && end.depth <= head.depth) throw new Error(tr("Hloubka díry musí být větší než hloubka zahloubení."));
     const tip = holeTip(f); // null = ploché dno (tipAngle 180)
     if (!end.flat && f.tipAngle !== undefined && !tipAngleOk(f.tipAngle)) noteFeatureWarning(tr("Úhel hrotu {0}° je mimo 60–170° – použito {1}.", fmtDrill(f.tipAngle), tip === null ? tr("ploché dno") : `${fmtDrill(tip)}°`));
     pts.push([rd, end.depth], [0, end.flat || tip === null ? end.depth : end.depth + rd / Math.tan((tip * Math.PI) / 360)]);

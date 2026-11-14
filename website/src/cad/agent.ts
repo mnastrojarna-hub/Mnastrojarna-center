@@ -27,7 +27,7 @@ import { toAxisDef, toDirection } from "./ext/place";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
 import { parseApiCommand, type ApiOp, type MncadApiExt } from "./agent-api";
 import { parseShapesLine, shapesSummary } from "./agent-shapes";
-import { holeBottomText, holeDrillText, holeFieldRules, holeTextExtras, holeThreadDrill } from "./agent-hole";
+import { holeBottomText, holeDirText, holeDrillText, holeFieldRules, holeHeadText, holePointsText, holePositions, holeTextExtras, holeThreadDrill, holeThreadLenText } from "./agent-hole";
 import { applySplineTangents, parseSurfaceLine, splitSplineTangents, type SurfCmd } from "./agent-surfaces";
 import { draftDocStatusText, draftLine, draftUndoLine } from "./draft/prefix";
 import type { DraftApiResult } from "./draft/agent";
@@ -39,6 +39,7 @@ import { COMMON_FIELDS, fieldsOf } from "./feature-fields";
 import { gapSummary, parseGapLine } from "./agent-gaps";
 import { OUT_COMMANDS, parseOutLine, type MncadOutApi, type OutOp } from "./agent-out";
 import { stripLineComment } from "./agent-comment";
+import { parseReferenceLine, REFERENCE_COMMANDS, type RefCmd } from "./reference/parse";
 import { polylineClose, takeCloseWords } from "./poly-close";
 
 export const AGENT_API_VERSION = 1;
@@ -80,8 +81,11 @@ export type AgentOp =
   | OutOp
   | { k: "new"; name: string; assembly: boolean; line: number }
   | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string }; line: number }
-  /** prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text); `note` = poznámka do protokolu */
-  | { k: "feature"; feature: Feature; line: number; fillTop?: boolean; note?: string }
+  /**
+   * prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text); `fillPoints` = u díry
+   * s více polohami, které body `points` se doplní (fillHoleTops, agent-hole.ts); `note` = poznámka do protokolu
+   */
+  | { k: "feature"; feature: Feature; line: number; fillTop?: boolean; fillPoints?: boolean[]; note?: string }
   /** entity, vazby a kóty do skici bloku (skica z tohoto vstupu, jinak poslední skica); skica na ploše / pomocné rovině – agent-sketch.ts */
   | SketchOp
   | SketchOnOp
@@ -95,7 +99,7 @@ export type AgentOp =
   /** normálie z knihovny podle textu („M8x30“, „ložisko 6204“): v dílu nová záložka, v sestavě komponenta */
   | { k: "library"; query: string; at?: Vec3; line: number }
   /** sestava: vloží komponentu z otevřené záložky (díl podle názvu) */
-  | { k: "insert"; tab: string; at: Vec3; rotation: Vec3; fixed: boolean; line: number }
+  | { k: "insert"; tab: string; at: Vec3; rotation: Vec3; fixed: boolean; alias?: string; line: number }
   /** otevře výkres otevřeného dokumentu */
   | { k: "drawing"; line: number }
   /** výkres: volby listu, Chytré kóty, tolerance, údaje u razítka, stav (cad/agent-drawing.ts, provedení cad/drawing-agent.ts) */
@@ -116,7 +120,9 @@ export type AgentOp =
   /** 2D výkres: řádek za předponou `2d` (cad/draft/agent.ts) */
   | { k: "draft"; text: string; line: number }
   /** jen text do protokolu (nápověda polí prvku – agent-help.ts) */
-  | { k: "info"; lines: string[]; line: number };
+  | { k: "info"; lines: string[]; line: number }
+  /** předloha DWG / DXF / PDF: připojení, stav, výtah, porovnání s modelem, kontrola kót (cad/reference) */
+  | { k: "reference"; cmd: RefCmd; line: number };
 export type AgentError = { line: number; text: string; message: string };
 export type AgentProgram = { ops: AgentOp[]; errors: AgentError[] };
 
@@ -347,7 +353,8 @@ const DIRS: Record<string, Vec3> = { "+x": [1, 0, 0], "-x": [-1, 0, 0], "+y": [0
 const VIEWS: Record<string, string> = { iso: "iso", izo: "iso", izometrie: "iso", front: "front", predni: "front", zadni: "back", back: "back", top: "top", horni: "top", shora: "top", bottom: "bottom", spodni: "bottom", left: "left", levy: "left", zleva: "left", right: "right", pravy: "right", zprava: "right", isometrisch: "iso", vorne: "front", vorder: "front", hinten: "back", oben: "top", unten: "bottom", links: "left", rechts: "right" };
 
 /** volby za příkazem: `{klíč: čísla | slova}` + příznaky */
-type Opts = { flags: Set<string>; nums: Record<string, number[]>; words: Record<string, string[]>; free: number[]; strings: string[] };
+/** `groups` = čísla číselné volby po jednotlivých výskytech klíčového slova (`v 1 2 v 3 4 5` → at: [[1, 2], [3, 4, 5]]) */
+type Opts = { flags: Set<string>; nums: Record<string, number[]>; words: Record<string, string[]>; free: number[]; strings: string[]; groups?: Record<string, number[][]> };
 const FLAGS = new Set(["fixed", "center", "through", "bothways", "symmetric", "reverse", "cut", "add", "intersect", "newbody", "engrave", "construction", "closed", "keep", "linear", "circular", "internal", "modeled"]);
 const NUM_OPTS = new Set(["threaddepth", "tilt", "origin", "normal", "xdir", "rotation", "at", "depth", "angle", "draft", "offset", "spacing", "count", "counterbore", "countersink", "height", "radius", "diameter", "sides", "rect-r", "length", "width", "longer", "shorter", "corner"]);
 const WORD_OPTS = new Set(["axis", "direction", "thread", "edges", "open", "name", "material", "color", "body", "as"]);
@@ -367,6 +374,7 @@ function parseOpts(tokens: string[]): Opts {
       i++;
       while (i < tokens.length && isNum(tokens[i])) vals.push(num(tokens[i++]));
       o.nums[c] = [...(o.nums[c] ?? []), ...vals];
+      ((o.groups ??= {})[c] ??= []).push(vals);
       continue;
     }
     if (WORD_OPTS.has(c)) {
@@ -569,7 +577,7 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
   if (!name) feature.name = named(feature.type);
   // díra: vrták závitové díry a dno jako text `díra` (zadaný diameter má přednost, tapDrill / tipAngle ověřené) – agent-hole.ts
   const has = (k: string) => pairs.some(([x]) => x.split(".")[0] === k);
-  const note = feature.type === "hole" ? holeFieldRules(feature, { diameter: has("diameter"), thread: has("thread"), tapDrill: has("tapDrill"), tipAngle: has("tipAngle") }).join(" ") : "";
+  const note = feature.type === "hole" ? holeFieldRules(feature, { diameter: has("diameter"), thread: has("thread"), tapDrill: has("tapDrill"), tipAngle: has("tipAngle"), kind: has("kind"), head: has("head"), cb: has("cbDiameter") || has("cbDepth"), cs: has("csDiameter") || has("csAngle") }).join(" ") : "";
   return into ? { k: "select", feature, rule, line: no, into } : { k: "feature", feature, line: no, ...(note ? { note } : {}) };
 }
 
@@ -622,6 +630,13 @@ export function parseAgentText(text: string): AgentProgram {
       if (out) {
         endBlock();
         ops.push({ k: "out", cmd: out, line: no });
+        return;
+      }
+      // předloha: předloha "výkres.dwg" / stav / výtah …, porovnat předloha pohled …, kontrola kót (cad/reference) – null = jiný příkaz
+      const ref = parseReferenceLine(line);
+      if (ref) {
+        endBlock();
+        ops.push({ k: "reference", cmd: ref, line: no });
         return;
       }
       // úpravy existujícího modelu a skici (agent-edit.ts): upravit, potlačit / zapnout, smazat <prvek>, přejmenovat, přesunout,
@@ -804,23 +819,16 @@ export function parseAgentText(text: string): AgentProgram {
           const dIn = o.free[0] ?? o.nums.diameter?.[0];
           if (!((dIn ?? 0) > 0) && !(thr && dIn === undefined)) throw new Error(tr("díra potřebuje průměr: díra 8,5 [hloubka 20 | skrz] v X Y [Z]"));
           const d = dIn ?? 0;
-          const at = o.nums.at ?? [];
           const axis = axisOf(o);
-          // více děr jedním příkazem: `v x1 y1 z1 v x2 y2 z2 …` (trojice souřadnic)
-          const many = at.length >= 6 && at.length % 3 === 0;
-          if (at.length > 3 && !many) throw new Error(tr("více děr jedním příkazem potřebuje u každé polohy tři souřadnice: díra 8 skrz v x1 y1 z1 v x2 y2 z2"));
-          const fillTop = at.length < 3;
-          const position: Vec3 = [at[0] ?? 0, at[1] ?? 0, at[2] ?? 0];
+          // polohy po skupinách: každé „v“ = jedna díra, 2 čísla (na povrchu tělesa v ose vrtání) nebo 3 (x y z) – agent-hole.ts
+          const pos = holePositions(o.groups?.at ?? [], axis);
           // „k tělesu“ (EN „to body“, DE „bis Körper“) = po první stěnu stávajícího tělesa ve směru vrtání (jako u vysunutí)
           const toBody = hasPhrase(tokens, TO_BODY);
-          const f: Feature = { id: uid(), name: named("hole", nm), type: "hole", position, axis, flip: o.flags.has("reverse"), diameter: d, depth: o.flags.has("through") || toBody ? 0 : (o.nums.depth?.[0] ?? 0), cbDiameter: o.nums.counterbore?.[0] ?? 0, cbDepth: o.nums.counterbore?.[1] ?? 0 };
+          const f: Feature = { id: uid(), name: named("hole", nm), type: "hole", position: pos.position, axis, flip: o.flags.has("reverse"), diameter: d, depth: o.flags.has("through") || toBody ? 0 : (o.nums.depth?.[0] ?? 0), cbDiameter: o.nums.counterbore?.[0] ?? 0, cbDepth: o.nums.counterbore?.[1] ?? 0 };
           if (toBody) f.end = { kind: "toBody" };
           // „skrz“ vrtá od zadaného bodu jen ve směru vrtání; „obousměrně“ = skrz celé těleso na obě strany od bodu
           else if (o.flags.has("bothways") || o.flags.has("symmetric")) f.bothWays = true;
-          if (many) {
-            f.points = [];
-            for (let j = 0; j < at.length; j += 3) f.points.push({ kind: "xyz", p: [at[j], at[j + 1], at[j + 2]] });
-          }
+          if (pos.points) f.points = pos.points.map((p) => ({ kind: "xyz", p }));
           // šikmá díra: `směr vx vy vz` = směr vrtání; `sklon úhel [směr +X]` = odklon od osy díry (výchozí k další ose: Z→X, X→Y, Y→Z)
           const dv = dirOf(o.words.direction);
           const tiltDeg = o.nums.tilt?.[0];
@@ -835,6 +843,7 @@ export function parseAgentText(text: string): AgentProgram {
             f.dirDef = { kind: "vector", v: unit(dv).map(r6) as Vec3 };
             f.flip = !o.flags.has("reverse");
           }
+          if (o.nums.counterbore?.length && o.nums.countersink?.length) throw new Error(tr("díra: „zahloubení“ a „kuželové“ najednou nejde – zadejte jedno: zahloubení D2 H2 (válcové) nebo kuželové D2 [úhel]"));
           if (o.nums.counterbore?.length) f.kind = "counterbore";
           if (o.nums.countersink?.length) {
             f.kind = "countersink";
@@ -845,6 +854,8 @@ export function parseAgentText(text: string): AgentProgram {
           if (thr) {
             const t = threadByName(thr);
             if (!t) throw new Error(tr("neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)", thr));
+            // zahloubení + závit = zahloubení + vrták + závit (B4: dřív se zahloubení tiše zahodilo)
+            if (f.kind === "counterbore" || f.kind === "countersink") f.head = f.kind;
             f.kind = "tapped";
             f.thread = t.name;
             const td = holeThreadDrill(dIn, t, hx ?? {});
@@ -858,7 +869,8 @@ export function parseAgentText(text: string): AgentProgram {
             if (f.end || !(f.depth > 0)) throw new Error(tr("díra: „dno ploché“ / „hrot“ platí jen pro slepou díru s hloubkou: díra 10 hloubka 12 dno ploché"));
             f.tipAngle = hx.tip;
           }
-          ops.push({ k: "feature", feature: f, line: no, fillTop, ...(note ? { note } : {}) });
+          const fillTop = pos.fill.some(Boolean);
+          ops.push({ k: "feature", feature: f, line: no, fillTop, ...(fillTop && pos.points ? { fillPoints: pos.fill } : {}), ...(note ? { note } : {}) });
           return;
         }
         case "fillet":
@@ -975,11 +987,13 @@ export function parseAgentText(text: string): AgentProgram {
           return;
         }
         case "insert": {
-          // sestava: vložit "Název záložky" [v x y z] [otočení rx ry rz] [ukotvit]
+          // sestava: vložit "Název záložky" [v x y z] [otočení rx ry rz] [ukotvit] [jako "K48"] – přezdívka instance pro vazby místo #k
           const name = o.strings.join(" ").trim();
           if (!name) throw new Error(tr("vložit potřebuje název otevřené záložky s dílem: vložit \"Hřídel\" v 0 0 10 [otočení 0 90 0] [ukotvit]"));
           const rt = o.nums.rotation ?? [];
-          ops.push({ k: "insert", tab: name, at: posOf(o) ?? [0, 0, 0], rotation: [rt[0] ?? 0, rt[1] ?? 0, rt[2] ?? 0], fixed: o.flags.has("fixed"), line: no });
+          if (o.words.as && !o.words.as.join(" ").trim()) throw new Error(tr("vložit … jako: chybí přezdívka – např. vložit \"Šroub\" jako \"K48\""));
+          const alias = o.words.as?.join(" ").trim();
+          ops.push({ k: "insert", tab: name, at: posOf(o) ?? [0, 0, 0], rotation: [rt[0] ?? 0, rt[1] ?? 0, rt[2] ?? 0], fixed: o.flags.has("fixed"), ...(alias ? { alias } : {}), line: no });
           return;
         }
         case "drawing": {
@@ -1382,7 +1396,7 @@ export function featureSummary(f: Feature, doc?: CadDoc): string {
     case "revolve":
       return `${fmt(f.angle)}°, ${f.mode}`;
     case "hole":
-      return tr("{0}{1}{2} v [{3}], osa {4}", (f.kind === "tapped" && f.thread ? tr("{0}{1} ({2})", threadLabel(f.thread), f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hl. {0}", fmt(f.depth)) : tr(" skrz"), holeDrillText(f)) : `Ø${fmt(f.diameter, 2)}${f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hloubka {0}", fmt(f.depth)) : f.bothWays ? tr(" skrz oběma směry") : tr(" skrz")}`) + holeBottomText(f), f.cbDiameter > 0 ? tr(" zahl. Ø{0}×{1}", fmt(f.cbDiameter), fmt(f.cbDepth)) : "", f.csDiameter ? tr(" kuž. Ø{0}", fmt(f.csDiameter)) : "", f.position.map((v) => fmt(v)).join("; "), f.axis);
+      return tr("{0}{1}{2} v [{3}], osa {4}", (f.kind === "tapped" && f.thread ? tr("{0}{1} ({2})", threadLabel(f.thread), f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hl. {0}", fmt(f.depth)) : tr(" skrz"), holeDrillText(f)) : `Ø${fmt(f.diameter, 2)}${f.end?.kind === "toBody" ? tr(" k tělesu") : f.depth > 0 ? tr(" hloubka {0}", fmt(f.depth)) : f.bothWays ? tr(" skrz oběma směry") : tr(" skrz")}`) + holeBottomText(f), holeHeadText(f, fmt, "cb"), holeHeadText(f, fmt, "cs") + holeThreadLenText(f, fmt), f.position.map((v) => fmt(v)).join("; "), f.axis) + holeDirText(f) + holePointsText(f, fmt);
     case "fillet":
       return tr("R{0}, hrany {1}", fmt(f.radius, 2), f.edges === "all" ? tr("vše") : f.edges.length);
     case "chamfer":
@@ -1412,6 +1426,8 @@ export type AsmStatus = {
   components: number;
   parts: number;
   bbox?: [Vec3, Vec3];
+  /** kolik listů má obálku ze sítě (velké importy) – jinak je obálka přesná z těles */
+  bboxApprox?: number;
   volume?: number;
   massKg?: number;
   /** null = kolize zatím nekontrolovány */
@@ -1441,7 +1457,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
     lines.push(...asmStatusLines(doc, asm?.mates)); // komponenty s polohou (⚓ = ukotvená) a souhrn vazeb
     if (asm) {
       const [a, b] = asm.bbox ?? [null, null];
-      lines.push(tr("Sestava: {0} komponent ({1} dílů po rozložení podsestav){2}{3}{4}", asm.components, asm.parts, a && b ? tr(" · obálka {0} × {1} × {2} mm", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2])) : "", asm.volume != null ? tr(" · objem Σ {0} cm³", fmt(asm.volume / 1000, 2)) : "", asm.massKg != null ? tr(" · hmotnost Σ {0} kg", fmt(asm.massKg, 3)) : ""));
+      lines.push(tr("Sestava: {0} komponent ({1} dílů po rozložení podsestav){2}{3}{4}", asm.components, asm.parts, a && b ? tr(" · obálka {0} × {1} × {2} mm", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2])) + (asm.bboxApprox ? tr(" (u {0} velkých importů ze sítě)", asm.bboxApprox) : "") : "", asm.volume != null ? tr(" · objem Σ {0} cm³", fmt(asm.volume / 1000, 2)) : "", asm.massKg != null ? tr(" · hmotnost Σ {0} kg", fmt(asm.massKg, 3)) : ""));
       lines.push(asm.clash ? tr("Kolize: {0} (zkontrolováno {1})", asm.clash.count ? `${asm.clash.count} – ${asm.clash.pairs.join("; ")}` : tr("žádné"), asm.clash.at) : tr("Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava"));
     } else lines.push(tr("Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)"));
   }
@@ -1488,7 +1504,8 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
     desc: tr("vysune poslední skicu; H = délka podél směru, „výška H“ = kolmo na skicu; „sklon 25 k +X“ = šikmý hranol (propad); úkos + / dovnitř = obrys se od skici zužuje, − / ven = rozšiřuje (u odebrání otvor do hloubky – odlehčení střižnice), břit N = rovná část před úkosem"),
   },
   { cmd: "rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]", en: "revolve", de: "rotieren", desc: tr("orotuje poslední skicu (výchozí osa Y skici, 360°); „odebrat“ = vysoustružit z tělesa") },
-  { cmd: "díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x2 y2 z2 …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2] [kuželové D2] [závit M8 [hloubka-závitu T] [jádro | vrták [N]]]", en: "hole", de: "bohrung", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit") },
+  { cmd: "díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x2 y2 [z2] …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2 | kuželové D2] [závit M8 [hloubka-závitu T] [jádro | vrták [N]]]", en: "hole … at x y [z] at x2 y2 [z2]", de: "bohrung … bei x y [z] bei x2 y2 [z2]", desc: tr("bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr – každé „v“ je jedna poloha: 2 čísla = na povrchu tělesa (u osy X jsou to y z, u osy Y x z), 3 čísla = x y z, jiný počet = chyba řádku; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit") },
+  { cmd: "díra 6,8 skrz v x y zahloubení 20 7 závit M8 · díra závit M8 hloubka 20 kuželové 10 v x y", en: "hole … counterbore 20 7 thread M8", de: "bohrung … senkung 20 7 gewinde M8", desc: tr("závitová díra se zahloubením = zahloubení + vrták + závit (JSON kind tapped + head counterbore | countersink); výkres „M8 skrz“ + „Ø6,8 skrz“ + „⌴ Ø20 ↧7“, stav „M8 skrz (vrták Ø6,8) zahl. Ø20×7“; zahloubení menší než závit = ⚠ ve výsledku stavby; zahloubení i kuželové najednou = chyba; upravit kind=tapped thread=M8 u zahloubené díry zahloubení ponechá (bez něj head=none); starší díra bez head s uloženým zahloubením = ⚠ a poznámka ve stavu") },
   { cmd: "díra závit M8 hloubka 20 [jádro | vrták | vrták 6,7] · díra 6,647 závit M8 … · díra 10 hloubka 12 dno ploché · díra … hrot 120", en: "hole", de: "bohrung", desc: tr("závitová díra: bez průměru = tabulkový vrták (M8 → 6,8, M18×1,5 → 16,5); zadaný průměr má přednost (protokol: vrták zadán ručně); jmenovitý průměr (díra 8 závit M8) = tabulkový vrták s poznámkou; „jádro“ (EN core, DE Kern) = malý průměr D1 podle ISO 965-1 (M8 → 6,647); „vrták N“ (EN drill N, DE Bohrer N) = vlastní vrták. Dno slepé díry: „dno ploché“ (EN flat bottom, DE flacher Grund) – sedlo pružiny, frézované dno – nebo „hrot 118|120|90“ (EN tip, DE Spitze; 60–170°, „hrot 180“ = ploché; také „ploché“, „bez hrotu“, „dno kužel 120“); platí i pro závitovou a zahloubenou díru; volby díry pište před „název“") },
   { cmd: "závit M18×1,5 délka L [v x y z] [osa Z] [vnitřní] [modelovat]", en: "thread", de: "gewinde", desc: tr("závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii") },
   { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z…|E2;E5] [poloměr N] [delší N]", en: "fillet", de: "verrunden", desc: tr("pravidla lze kombinovat (horní kruhové)") },
@@ -1507,14 +1524,19 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "rotovat [úhel] osa hrana E3|plocha F7|\"Osa 1\"|body V1 V5 [symetricky] · pole N rozteč P směr hrana E3|body V1 V5 · pole kruhové N osa hrana E3|plocha F7|\"Osa 1\" · zrcadlit plocha F3|rovina \"Rovina 1\" [odsazení N] · srazit D úhel A plocha F3 [hrany …] · srazit D1 D2 plocha F3 · zaoblit R hrany E3 E7 · skořepina T otevřít F3 F5", en: "revolve, pattern, mirror, chamfer, fillet, shell", de: "rotieren, muster, spiegeln, fase, verrunden, schale", desc: tr("odkazy místo čísel: osa rotace a kruhového pole hranou, osou válcové plochy, pomocnou osou nebo dvěma body; směr řady pole hranou / dvěma body; rovina zrcadlení plochou nebo pomocnou rovinou; sražení vzdálenost + úhel nebo dvě vzdálenosti od referenční plochy; hrany a plochy čísly (E, F jako popisky pro výběr) místo pravidla") },
   { cmd: "prvek nápověda <typ|rozšíření> · nápověda <typ> · prvek nápověda", en: "feature help, help", de: "element hilfe, hilfe", desc: tr("všechna pole typu prvku pro „prvek <typ> klíč=hodnota“ a „upravit“: název, druh hodnoty, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem (typ i slovem příkazu: díra, kužel, pružina; u rozšíření jeho parametry); bez typu = přehled typů a polí, která jdou zadat jen přes prvek") },
   { cmd: "normálie <označení> [v x y z]", en: "library", de: "normteil", desc: tr("díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta") },
-  { cmd: "vložit \"název záložky\" [v x y z] [otočení rx ry rz] [ukotvit]", en: "insert", de: "einfügen", desc: tr("sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)") },
+  { cmd: "vložit \"název záložky\" [v x y z] [otočení rx ry rz] [ukotvit] [jako \"přezdívka\"]", en: "insert … as", de: "einfügen … als", desc: tr("sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže); „jako \"K48\"“ = přezdívka instance – odkaz ve vazbách místo #k, ve stromu v [ ], kusovník ji nepoužívá") },
   { cmd: "výkres", en: "drawing", de: "zeichnung", desc: tr("otevře výkres otevřeného dokumentu v záložce") },
   { cmd: "výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]", en: "drawing A3 landscape scale 1:2 views front,top,iso section XZ offset 0 hidden no axes yes holetable no projection E", de: "zeichnung A3 quer maßstab 1:2 ansichten vorne,oben,iso schnitt XZ versatz 0 verdeckt nein achsen ja bohrungstabelle nein projektion E", desc: tr("volby listu výkresu (aktivní list – výkres list N; jinak první) a otevření výkresu; nové výkresy mají Chytré kóty") },
   { cmd: "kótovat [chytře|celkově|nic] [řetězově|od základny]", en: "dimension smart chain / dimension smart baseline / dimension overall / dimension none", de: "bemaßen intelligent kette / bemaßen intelligent basis / bemaßen gesamt / bemaßen keine", desc: tr("(pře)generuje Chytré kóty podle prvků modelu – nahradí jen vygenerované, vlastní kóty zůstanou; vypíše počet kót podle pohledů a co se nevešlo") },
-  { cmd: "výkres tolerance <kóta> <tolerance> · výkres poznámka \"…\" · výkres nepředepsané ISO 2768-mK · výkres hrany ISO 13715 … · výkres drsnost Ra 3,2", en: "drawing tolerance Ø40 h6, drawing note, drawing general ISO 2768-mK, drawing edges ISO 13715, drawing roughness Ra 3.2", de: "zeichnung toleranz Ø40 h6, zeichnung notiz, zeichnung allgemein ISO 2768-mK, zeichnung kanten ISO 13715, zeichnung rauheit Ra 3,2", desc: tr("tolerance ke kótě podle popisku (Ø40 h6, 25 ±0,1, M8 6H); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka") },
+  { cmd: "výkres tolerance <kóta> <tolerance> · výkres poznámka \"…\" · výkres nepředepsané ISO 2768-mK · výkres hrany ISO 13715 … · výkres drsnost Ra 3,2", en: "drawing tolerance Ø40 h6, drawing note, drawing general ISO 2768-mK, drawing edges ISO 13715, drawing roughness Ra 3.2", de: "zeichnung toleranz Ø40 h6, zeichnung notiz, zeichnung allgemein ISO 2768-mK, zeichnung kanten ISO 13715, zeichnung rauheit Ra 3,2", desc: tr("tolerance ke kótě podle číselné hodnoty modelu nebo id (Ø40 h6, 74,175 -0,005, M8 6H, a12 ±0,1); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka") },
   { cmd: "výkres list <N|\"název\"> · výkres list nový [\"název\"] · výkres list přejmenovat [N] \"název\" · výkres list smazat N · výkres listy", en: "drawing sheet 2 / drawing sheet new \"Detail\" / drawing sheet rename 2 \"Main\" / drawing sheet delete 2 / drawing sheets", de: "zeichnung blatt 2 / zeichnung blatt neu \"Detail\" / zeichnung blatt umbenennen 2 \"Haupt\" / zeichnung blatt löschen 2 / zeichnung blätter", desc: tr("listy výkresu: další příkazy výkresu pracují s vybraným listem a výkres se otevře na něm; „výkres list A3“ dál znamená formát") },
   { cmd: "výkres razítko název=\"…\" číslo=\"…\" kreslil=\"…\" revize=\"…\" datum=\"…\" materiál=\"…\" · výkres revize <znak> \"popis\" [datum …] · výkres revize smazat <znak>", en: "drawing titleblock name=\"Flange\" number=\"MN-1\" author=\"AI\" revision=A date=2026-11-13 material=\"1.0503\" / drawing revision B \"new hole\" date 2026-11-13 / drawing revision delete B", de: "zeichnung schriftfeld benennung=\"Flansch\" nummer=\"MN-1\" ersteller=\"AI\" revision=A datum=13.11.2026 werkstoff=\"1.0503\" / zeichnung änderung B \"Bohrung\" datum 13.11.2026 / zeichnung änderung löschen B", desc: tr("razítko listu (číslo, kreslil a revize i do vlastností dokumentu, materiál do označení materiálu) a tabulka revizí") },
+  { cmd: "kótovat … funkční 26,5 74,175 · kótovat funkční ne", en: "dimension smart functional 26.5 74.175 / dimension functional no", de: "bemaßen intelligent funktional 26,5 74,175 / bemaßen funktional nein", desc: tr("funkční rozměry (mm modelu, oddělené mezerou nebo středníkem): nikdy nebudou pomocnou kótou v závorce – uzavřený řetěz rozbije jiný článek (jsou-li funkční všechny, celková délka; jsou-li funkční i ta, funkční rozměr bez tolerance); pamatují se u listu, „ne“ je zruší") },
+  { cmd: "kótovat … díry tabulka|souřadnicově|řetězově|auto", en: "dimension holes table / dimension holes ordinate / dimension holes chain / dimension holes auto", de: "bemaßen bohrungen tabelle / bemaßen bohrungen koordinaten / bemaßen bohrungen kette / bemaßen bohrungen auto", desc: tr("polohy děr: tabulka děr (X, Y od levého dolního rohu obrysu; v pohledu s dírami – i levém, pravém, zadním; jedna na list), souřadnicové kóty od základny (0 v rohu, hodnoty v jedné řadě, více druhů děr = značky A, B … u děr i v popisu), nebo od hran; auto = od hran, od 12 poloh nebo když se nevejdou souřadnicově, pak tabulka; souřadnicově / řetězově tabulku děr listu vypne, tabulka ji zapne") },
+  { cmd: "výkres tolerance <hodnota|id> <tolerance> [pohled <p>]", en: "drawing tolerance 74.175 -0.005 / drawing tolerance a12 h7 / drawing tolerance 40 ±0.1 view top", de: "zeichnung toleranz 74,175 -0,005 / zeichnung toleranz a12 h7 / zeichnung toleranz 40 ±0,1 ansicht oben", desc: tr("kóta se najde číselnou hodnotou modelu (±0,000001; popisky mají až 3 desetinná místa), druhem (Ø40, M8) nebo id (a12 z výkres stav); pohled zúží výběr; desetinná tečka tolerance se na českém listu zapíše čárkou; tolerance na pomocné kótě „(50)“ udělá rozměr funkčním a pomocnou kótou se stane jiný článek (přeurčený řetěz: funkční rozměr bez tolerance; ruční náhradní kóta se odstraní)") },
+  { cmd: "výkres kontrola tolerancí", en: "drawing check tolerances", de: "zeichnung prüfen toleranzen", desc: tr("funkční rozměry (kótovat … funkční), které na listu nemají toleranci (⚠ s id kót a radou); tolerované kóty předlohy až po připojení předlohy (balík předlohy) – bez ní protokol řekne „předloha není připojena“") },
   { cmd: "výkres otočení 0|90|180|270 · výkres řez XZ [odsazení N] poloviční|celý · výkres kusovník ano|ne · výkres balónky ano|ne · kótovat základní", en: "drawing rotation 90 / drawing section XZ offset 0 half / drawing bom yes / drawing balloons no / dimension basic", de: "zeichnung drehung 90 / zeichnung schnitt XZ versatz 0 halb / zeichnung stückliste ja / zeichnung positionsnummern nein / bemaßen einfach", desc: tr("další volby listu: otočení hlavního pohledu, poloviční řez, kusovník nad razítkem, pozice komponent; kóty „Auto + Ø“ zapečené do pohledů") },
+  { cmd: "výkres řez XZ|YZ|XY odsazení N", en: "drawing section XZ offset 57", de: "zeichnung schnitt XZ versatz 57", desc: tr("odsazení roviny řezu se měří podél normály roviny jako u skici (skica XZ odsazení 57 = rovina Y = −57): XY → Z = N, XZ → Y = −N, YZ → X = N; rovina mimo těleso = ✗ s rozsahem odsazení, které těleso protne") },
   { cmd: "výkres značka poznámka \"…\" | drsnost Ra 1,6 | tolerance kolmost 0,02 A | základna A <cíl> [posun dx dy] · výkres značka text \"…\" v x y [výška 5]", en: "drawing mark roughness Ra 1.6 on Ø40 / drawing mark gdt perpendicularity 0.02 A on Ø40 / drawing mark note \"Harden\" view front at 0 20 shift 5 5 / drawing mark datum A view top at -50 0 / drawing mark text \"Note\" at 20 30 height 5", de: "zeichnung symbol rauheit Ra 1,6 an Ø40 / zeichnung symbol form rechtwinkligkeit 0,02 A an Ø40 / zeichnung symbol hinweis \"Härten\" ansicht vorne bei 0 20 / zeichnung symbol bezug A ansicht oben bei -50 0 / zeichnung symbol text \"Hinweis\" bei 20 30 höhe 5", desc: tr("značky jako nástroje výkresu: cíl „na <kóta>“ (popisek nebo id a3) nebo „pohled přední v x y“ (mm modelu v rovině pohledu, přichytí se ke geometrii); text v mm listu od levého dolního rohu") },
   { cmd: "výkres kóta vodorovně|svisle|šikmo pohled <p> x1 y1 x2 y2 · výkres kóta průměr|poloměr pohled <p> střed x y [r R] [úhel 45] · výkres kóta úhel pohled <p> x1 y1 x2 y2 x3 y3 x4 y4 – [odsazení 10] [text \"…\"]", en: "drawing dim horizontal view front -50 20 50 20 offset 10 / drawing dim diameter view top center 0 0 r 20 angle 45 / drawing dim angle view front -50 20 50 20 50 20 50 0", de: "zeichnung maß waagerecht ansicht vorne -50 20 50 20 versatz 10 / zeichnung maß durchmesser ansicht oben mitte 0 0 r 20 winkel 45 / zeichnung maß winkel ansicht vorne -50 20 50 20 50 20 50 0", desc: tr("ruční kóta (nástroj Kóta): body v mm modelu v rovině pohledu, přichytí se ke koncům hran a kružnicím; konce jedné hrany = kóta hrany") },
   { cmd: "výkres upravit <id|popisek> odsazení=8 text=\"…\" přípona=\"…\" · výkres smazat <id|popisek>…|vlastní|vše", en: "drawing edit a3 offset=8 suffix=\"H7\" / drawing delete a3 / drawing delete custom / drawing delete all", de: "zeichnung bearbeiten a3 versatz=8 suffix=\"H7\" / zeichnung löschen a3 / zeichnung löschen eigene / zeichnung löschen alle", desc: tr("úprava a mazání kót a značek podle id z výkres stav (a1, a2…) nebo popisku; smazané vygenerované kóty se při přegenerování nevrátí") },
@@ -1526,6 +1548,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "výkres revize značka <znak> na <kóta>[, <kóta>…] · výkres revize značka smazat na <kóta> · výkres revize <znak> značky ano|ne · výkres zóny ano|ne", en: "drawing revision mark B on Ø40 / drawing revision mark delete on Ø40 / drawing revision B marks no / drawing zones yes", de: "zeichnung änderung zeichen B auf Ø40 / zeichnung änderung zeichen löschen auf Ø40 / zeichnung änderung B dreiecke nein / zeichnung zonen ja", desc: tr("trojúhelník revize u změněné kóty (volitelně pro každou revizi), zóny listu ISO 5457 a sloupec Zóna v tabulce revizí") },
   { cmd: "výkres nový [\"název\"] · výkres výkresy [N|přejmenovat|smazat] · výkres export pdf|dxf|dwg|svg|csv|png [vše|list N]", en: "drawing new / drawing drawings 2 / drawing export pdf all", de: "zeichnung neu / zeichnung zeichnungen 2 / zeichnung export pdf alle", desc: tr("další výkres téhož dílu s vlastními listy (Výkres 2…), přepnutí a správa výkresů; export do souboru – vše = všechny listy aktivního výkresu (PDF vícestránkové, jinak ZIP), také window.mncad.exportDrawing(\"pdf\", { sheet: \"all\" })") },
   { cmd: "výkres stav [list N|vše]", en: "drawing status sheet 2 / drawing status all", de: "zeichnung status blatt 2 / zeichnung status alle", desc: tr("stav vybraného nebo všech listů: přehled listů, souřadnice pohledů pro značky a kóty, id kót a značek (a1…), razítko a revize; také window.mncad.drawingStatus({ sheet }) a export bez dialogu window.mncad.exportDrawing(\"pdf\"|\"dxf\"|\"dwg\"|\"svg\"|\"csv\"|\"png\")") },
+  { cmd: "výkres razítko šablona=iso7200|kompaktní|nástrojářská logo=\"firma.png\" firma=\"…\" zákazník=\"…\" projekt=\"…\" kontroloval=\"…\" schválil=\"…\" polotovar=\"…\" počet=4 tepelné=\"…\" povrch=\"…\" úhly=\"…\" sražení=\"…\" · výkres nepředepsané ISO 2768-mK|desetinná [±0,1 ±0,1 ±0,01 ±0,005]|ne", en: "drawing titleblock template=toolmaker logo=\"logo.png\" company=\"…\" customer=\"…\" project=\"…\" checked=\"…\" approved=\"…\" stock=\"…\" quantity=4 heat=\"…\" surface=\"…\" angles=\"…\" chamfers=\"…\" / drawing general ISO 2768-fH / drawing general decimals", de: "zeichnung schriftfeld vorlage=werkzeugbau logo=\"logo.png\" firma=\"…\" kunde=\"…\" projekt=\"…\" geprüft=\"…\" genehmigt=\"…\" rohteil=\"…\" menge=4 wärmebehandlung=\"…\" oberflächenbehandlung=\"…\" winkel=\"…\" fasen=\"…\" / zeichnung allgemein ISO 2768-mK / zeichnung allgemein dezimal", desc: tr("šablona razítka (ISO 7200, kompaktní, nástrojářská se všemi poli), logo z připojeného souboru (konzole → Připojit soubor…) nebo data URL, další pole a nepředepsané tolerance ISO 2768 nebo tabulkou podle desetinných míst; dlouhé texty se zmenší / zalomí, nic se nezkracuje; export dílu bez nepředepsaných tolerancí = ⚠") },
   { cmd: "měřit F3|E5|V2 [F7|E9|V8|x y z] · měřit těleso · měřit díry · měřit válce · měřit plocha|hrany <pravidlo>", en: "measure", de: "messen", desc: tr("měření pro kontrolu modelu: údaje o ploše / hraně / vrcholu (čísla jako popisky pro výběr), vzdálenost, úhel a rovnoběžnost dvou entit, rozteč os děr, těleso (obálka, objem, hmotnost, těžiště), seznam děr (Ø, hloubka, osa, střed, po průměrech) a vnějších válců; v sestavě Komponenta:F3; také window.mncad.measure()") },
   { cmd: "smazat poslední · stav · zobraz iso|přední|horní…", en: "delete last, status, view", de: "löschen letzte, status, ansicht", desc: tr("správa") },
   // ── úpravy existujícího modelu (agent-edit.ts) ──
@@ -1558,7 +1581,8 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu \"<A>\" <F|E|V> [2. plocha] \"<B>\" <F|E|V> [2. plocha] [rovina \"<C>\" F] [min N max N] [obráceně]", en: "assembly mate perpendicular, assembly mate tangent, assembly mate coincident, assembly mate symmetric, assembly mate width, assembly mate path, assembly mate slot, assembly mate hinge, assembly mate lock, assembly mate limit distance, assembly mate limit angle", de: "baugruppe verknüpfung senkrecht, baugruppe verknüpfung tangential, baugruppe verknüpfung koinzident, baugruppe verknüpfung symmetrisch, baugruppe verknüpfung breite, baugruppe verknüpfung pfad, baugruppe verknüpfung langloch, baugruppe verknüpfung scharnier, baugruppe verknüpfung sperren, baugruppe verknüpfung abstandsgrenze, baugruppe verknüpfung winkelgrenze", desc: tr("pokročilé vazby jako v panelu sestavy: entita = F12 (plocha), E5 (hrana), V3 (vrchol) nebo pravidlo (+Z, válcová Ø8, koule, kružnice Ø40); Šířka a Závěs berou dvě plochy na straně, Drážka dva konce; meze min / max") },
   { cmd: "sestava vazba ozubení|hřeben|šroub|vačka|kardan \"<A>\" [plocha] \"<B>\" [plocha] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [obráceně|levý|vnitřní]", en: "assembly mate gear, assembly mate rack, assembly mate screw, assembly mate cam, assembly mate universal", de: "baugruppe verknüpfung zahnrad, baugruppe verknüpfung zahnstange, baugruppe verknüpfung schraube, baugruppe verknüpfung nocken, baugruppe verknüpfung kardangelenk", desc: tr("mechanické vazby: vztah stupňů volnosti (otáčení A ↔ otáčení / posuv B); bez plochy se vezme osa z vazby Závěs / Souosost komponenty nebo největší válec, bez hodnoty poměr poloměrů / stoupání ISO / 2π·r") },
   { cmd: "pohyb motor rotační|lineární \"<komponenta>\"|vazba <N> <od>..<do> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa \"<X>\" [bod x y z]] · pohyb [stav] · pohyb spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat", en: "motion motor rotary, motion motor linear, motion status, motion run, motion play, motion stop, motion step, motion export", de: "bewegung antrieb dreh, bewegung antrieb linear, bewegung status, bewegung starten, bewegung abspielen, bewegung stop, bewegung schritt, bewegung export", desc: tr("pohybová studie sestavy: motor na vazbě Závěs / Souosost / Šroub (°) nebo Vzdálenost / Drážka / Dráha (mm), řešič spočítá polohy všech komponent v každém kroku (mechanické vazby, meze), volitelně kolize a stopa bodu; tabulka poloh CSV, přehrání v 3D okně; window.mncad.motion()") },
-  { cmd: "sestava komponenta \"<X>\" [v x y z] [otočení rx ry rz] [posun dx dy dz] [pootočit X 90] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název \"…\"] [číslo \"…\"] [skupina \"…\"] [materiál …] · sestava odebrat|duplikovat|izolovat|skrýt|zobrazit|ukotvit|uvolnit \"<X>\" · sestava zobrazit vše", en: "assembly component, assembly remove, assembly duplicate, assembly isolate, assembly show all", de: "baugruppe komponente, baugruppe entfernen, baugruppe duplizieren, baugruppe isolieren, baugruppe alle einblenden", desc: tr("vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název nebo pořadí #3; po přesunu se vazby přepočítají") },
+  { cmd: "sestava komponenta \"<X>\" [v x y z] [otočení rx ry rz] [posun dx dy dz] [pootočit X 90] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název \"…\"] [číslo \"…\"] [skupina \"…\"] [materiál …] [přezdívka \"…\"] · sestava odebrat|duplikovat|izolovat|skrýt|zobrazit|ukotvit|uvolnit \"<X>\" · sestava zobrazit vše", en: "assembly component, assembly remove, assembly duplicate, assembly isolate, assembly show all", de: "baugruppe komponente, baugruppe entfernen, baugruppe duplizieren, baugruppe isolieren, baugruppe alle einblenden", desc: tr("vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název, pořadí #3 nebo přezdívka (vložit … jako \"K48\", sestava komponenta #3 přezdívka \"K48\"; EN alias, DE als); po přesunu se vazby přepočítají; kusovník sčítá komponenty podle zdroje (dílu) – přejmenování instance řádek nerozdělí") },
+  { cmd: "sestava pružina \"<P>\" mezi \"<A>\" [plocha] \"<B>\" [plocha] [volná L0] [blok Ln] [tuhost c] · sestava pružina \"<P>\" odebrat · sestava pružiny", en: "assembly spring … between … free … solid … rate …, assembly springs", de: "baugruppe feder … zwischen … frei … block … steifigkeit …, baugruppe federn", desc: tr("pružina mezi dvěma komponentami: díl s prvkem Pružina (normálie pružina …, pružina D stoupání …) nebo trubkou; délka = vzdálenost dosedacích ploch A a B po ose pružiny (bez plochy nejbližší kolmá rovinná plocha obrácená k pružině), mění se při přepočtu vazeb i v pohybové studii; síla F = c·(L0 − L), ✗ pod délkou na doraz Ln (výchozí (závity + 1)·drát), ⚠ nedosedá nad L0; plocha, kterou pružina prochází otvorem, se přeskočí; blok 0 / tuhost 0 = zrušit; export STEP s tvarem v aktuální délce; stejný název = všechny instance") },
   { cmd: "sestava pole \"<X>\" N rozteč P [směr X|dx dy dz] · sestava pole \"<X>\" kruhové N [úhel 360] [osa Z|dx dy dz] [v cx cy cz] · sestava zrcadlit \"<X>\" XY|XZ|YZ [odsazení N]", en: "assembly pattern, assembly mirror", de: "baugruppe muster, baugruppe spiegeln", desc: tr("pole komponenty (kopie „X (2)“…) a zrcadlení polohy a natočení komponenty") },
   { cmd: "sestava šroub \"<X>\" <plocha díry> [matice] [bez podložky] [obráceně]", en: "assembly bolt", de: "baugruppe schraube", desc: tr("šroubový spoj do válcové plochy díry (F12 nebo Ø9): šroub ISO 4762 podle průměru díry, délka podle sevřené tloušťky, podložka (výchozí) a matice, vazba Souosost; hlava nahoře, „obráceně“ = na druhém konci díry") },
   { cmd: "sestava podsestava \"<A>\" \"<B>\" … [jako \"název\"] · sestava rozpustit \"<P>\" · sestava upravit \"<X>\" … sestava hotovo · sestava otevřít \"<X>\"", en: "assembly subassembly, assembly dissolve, assembly edit, assembly done, assembly open", de: "baugruppe unterbaugruppe, baugruppe auflösen, baugruppe bearbeiten, baugruppe fertig, baugruppe öffnen", desc: tr("podsestavy (vazby se převedou), úprava dílu v kontextu sestavy – příkazy mezi upravit a hotovo pracují s dílem a změna se propíše do všech stejných komponent; otevřít = kopie v nové záložce") },
@@ -1567,6 +1591,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "záložky · záložka \"název\"|N · zavřít záložku [\"název\"|N]", en: "tabs, tab, close tab", de: "registerkarten, registerkarte, registerkarte schließen", desc: tr("otevřené dokumenty: výpis, přepnutí (další příkazy pracují s vybranou záložkou), zavření; také window.mncad.tabs(), activateTab(), closeTab()") },
   { cmd: "2d <příkaz 2D výkresu> · 2d nový [název] [mm] · 2d čára 0,0 100,0 @0,50 · 2d hladina nová OSY barva 1 · 2d stav", en: "2d, draft", de: "2d, zeichnen", desc: tr("2D výkres (jako AutoCAD): kreslení, hladiny, typy čar, vlastnosti, výběr, dotazy, export DXF / DWG – stejné příkazy jako příkazový řádek 2D výkresu; také window.mncad.draft()") },
   ...OUT_COMMANDS,
+  ...REFERENCE_COMMANDS,
   { cmd: "{ … } nebo [ … ] (JSON)", en: "JSON", de: "JSON", desc: tr("celý dokument .mncad, pole prvků nebo jeden prvek – přístup ke všem 36 typům prvků; jeden prvek na jednom řádku lze míchat s textovými příkazy") },
 ];
 

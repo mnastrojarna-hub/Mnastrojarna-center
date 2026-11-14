@@ -12,7 +12,7 @@
 import { aciRgb, hexRgb } from "../colors";
 import { add, boxOf, mul, rot90, xfDet, xfInv, xfMul, xfPt, xfUniform, xfVec, type Affine, type Box } from "../geom";
 import { entityPrims, kindOf, type ByBlockStyle, type KindCtx, type Prim, type Seg } from "../kinds";
-import { layerVisible, resolveStyle } from "../layers";
+import { isVisible, layerVisible, resolveStyle } from "../layers";
 import { dashPolyline } from "../linetypes";
 import type { DraftEntity, DraftLayout, DraftModel, Vec2 } from "../model";
 import { spatialIndex } from "../spatial";
@@ -300,7 +300,7 @@ function emitEntity(c: Ctx, e0: DraftEntity, fr: Frame) {
   if (isViewportInner(e0)) return;
   const e = fr.layer0 && e0.layer === "0" ? ({ ...e0, layer: fr.layer0 } as DraftEntity) : e0;
   if (e.type === "viewport") return emitViewport(c, e as DViewport, fr);
-  if (!layerVisible(c.model, e.layer)) return;
+  if (!isVisible(c.model, e)) return;
   const st = resolveStyle(c.model, e, fr.byBlock);
   if (!st.plot) return;
   const color = plotColor(st.color, c.style);

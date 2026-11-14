@@ -12,6 +12,7 @@ import {
   bomCsv,
   composePlacement,
   computeBom,
+  componentCopy,
   dissolveSubassembly,
   eulerXYZ,
   flattenAssembly,
@@ -21,6 +22,7 @@ import {
   moldBase,
   partComponent,
   patternComponent,
+  removeComponents,
   rotMatrix,
   rotationBetween,
   sourceKey,
@@ -29,6 +31,8 @@ import {
   type FlatComponent,
 } from "./assembly";
 import {
+  aliasProblem,
+  renameProblem,
   bomPartInfo,
   bomText,
   componentLines,
@@ -49,6 +53,8 @@ import {
 } from "./agent-asm";
 import { tr } from "./i18n";
 import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin";
+import { applySpringCmd, refreshSprings } from "./asm-spring-agent";
+import { springEffective } from "./asm-spring-geom";
 import { kinHasLimits, kinHasValue } from "./mate-spec";
 import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
 import { isKinMate } from "./mates-kin";
@@ -246,7 +252,9 @@ export function geoProvider(doc: CadDoc, env: AsmEnv): GeoProvider {
  * vyřeší vazby a vrátí sestavu s novými polohami pohnutých komponent. `anchorId` = komponenta, kterou uživatel právě přesunul.
  */
 export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | null): Promise<{ doc: CadDoc; status: Record<string, MateStatus>; moved: string[] }> {
-  if (doc.kind !== "assembly" || !doc.mates?.length) return { doc, status: {}, moved: [] };
+  if (doc.kind !== "assembly") return { doc, status: {}, moved: [] };
+  // bez vazeb: jen délky pružin podle aktuálních poloh (přesun dosedací komponenty)
+  if (!doc.mates?.length) return { doc: await refreshSprings(doc, env), status: {}, moved: [] };
   const flat = flattenAssembly(doc);
   const byLeaf = new Map(flat.map((l) => [leafId(l), l]));
   const used = new Map<string, FlatComponent>();
@@ -261,7 +269,9 @@ export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | nul
   const r = solveMates(withMates, geoProvider(withMates, env), anchorId);
   if (r.mates) withMates = { ...withMates, mates: r.mates }; // zachycený výchozí stav pokročilých vazeb
   const byId = new Map(r.components.map((c) => [c.id, c.placement]));
-  return { doc: { ...withMates, components: (doc.components ?? []).map((c) => (r.moved.includes(c.id) && byId.has(c.id) ? { ...c, placement: byId.get(c.id)! } : c)) }, status: r.status, moved: r.moved };
+  const solved = { ...withMates, components: (doc.components ?? []).map((c) => (r.moved.includes(c.id) && byId.has(c.id) ? { ...c, placement: byId.get(c.id)! } : c)) };
+  // pružiny: délka podle nových poloh dosedacích ploch (cad/asm-spring-agent.ts)
+  return { doc: await refreshSprings(solved, env), status: r.status, moved: r.moved };
 }
 
 /* ───────────────────────── provedení ───────────────────────── */
@@ -400,6 +410,9 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       if (Object.values(s.status).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
       return done(s.doc, true, { mateStatus: s.status });
     }
+    case "spring":
+    case "springs":
+      return applySpringCmd(d, cmd, env);
     case "comp": {
       asmOnly();
       const c0 = findComp(d, cmd.comp);
@@ -433,6 +446,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       }
       if (p.name !== undefined) {
         if (!p.name) throw new Error(tr("název komponenty nesmí být prázdný"));
+        const why = renameProblem(doc, p.name, c.id);
+        if (why) throw new Error(why);
         c.name = p.name;
         what.push(tr("název „{0}“", p.name));
       }
@@ -461,6 +476,18 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         }
         what.push(tr("materiál {0}", id ? (MATERIALS.find((m) => m.id === id)?.label ?? id) : `„${p.material}“`));
       }
+      if (p.alias !== undefined) {
+        // přezdívka instance: odkaz ve vazbách místo #k; kusovník ji nepoužívá
+        if (!p.alias.trim()) {
+          delete c.alias;
+          what.push(tr("bez přezdívky"));
+        } else {
+          const why = aliasProblem(doc, p.alias, c.id);
+          if (why) throw new Error(why);
+          c.alias = p.alias.trim();
+          what.push(tr("přezdívka „{0}“", c.alias));
+        }
+      }
       doc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? c : x)) };
       let st: Record<string, MateStatus> | undefined;
       let movedOthers: string[] = [];
@@ -470,7 +497,7 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         doc = s.doc;
         st = s.status;
         movedOthers = s.moved.filter((id) => id !== c.id);
-      }
+      } else if (moved) doc = await refreshSprings(doc, env); // bez vazeb: délka pružin podle nové polohy dosedací komponenty
       log.push(tr("✓ komponenta „{0}“: {1}", c0.name, what.join(" · ")));
       if (movedOthers.length) log.push(tr("  vazby pohnuly: {0}", movedText(doc, movedOthers)));
       if (st && Object.values(st).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
@@ -481,21 +508,27 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       let doc = d;
       const names: string[] = [];
       let lost = 0;
+      const springs: string[] = [];
       for (const ref of cmd.comps) {
         const c = findComp(doc, ref);
         const before = doc.mates?.length ?? 0;
-        doc = { ...doc, components: (doc.components ?? []).filter((x) => x.id !== c.id), mates: (doc.mates ?? []).filter((m) => m.a.compId !== c.id && m.b.compId !== c.id) };
+        // i definice pružin, které na komponentě dosedaly (pružina zůstane ve volné délce)
+        const r = removeComponents(doc, [c.id]);
+        springs.push(...r.springs);
+        doc = { ...r.doc, mates: (doc.mates ?? []).filter((m) => m.a.compId !== c.id && m.b.compId !== c.id) };
         lost += before - (doc.mates?.length ?? 0);
         names.push(`„${c.name}“`);
       }
       log.push(tr("✓ odebráno ze sestavy: {0}{1} · zbývá komponent: {2}", names.join(", "), lost ? tr(" (a jejich vazby: {0})", lost) : "", doc.components?.length ?? 0));
+      if (springs.length) log.push(tr("  pružiny bez dosedací komponenty (definice odebrána, tvar ve volné délce): {0}", [...new Set(springs)].map((n) => `„${n}“${springs.filter((x) => x === n).length > 1 ? ` (${springs.filter((x) => x === n).length}×)` : ""}`).join(", ")));
       return done(doc, true);
     }
     case "duplicate": {
       asmOnly();
       const c = findComp(d, cmd.comp);
       // stejný název jako v panelu (Duplikovat) – v kusovníku se kopie sečtou; textem ji lze zadat pořadím #N
-      const copy: AsmComponent = { ...clone(c), id: uid(), placement: { ...c.placement, position: c.placement.position.map((v, k) => Math.round((v + cmd.offset[k]) * 1e6) / 1e6) as Vec3 } };
+      // kopie bez přezdívky (musí zůstat jednoznačná)
+      const copy: AsmComponent = componentCopy(clone(c), { placement: { ...c.placement, position: c.placement.position.map((v, k) => Math.round((v + cmd.offset[k]) * 1e6) / 1e6) as Vec3 } });
       log.push(tr("✓ kopie „{0}“ → #{1} {2}", c.name, (d.components?.length ?? 0) + 1, posText(copy)));
       return done({ ...d, components: [...(d.components ?? []), copy] }, true);
     }
@@ -550,7 +583,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         } else if (inA && inB) inner.push(m);
         else outer.push(inA || inB ? { ...m, a: remap(m.a), b: remap(m.b) } : m);
       }
-      const comps = (made.doc.components ?? []).map((c) => (c.id === subId && c.source.kind === "asm" ? { ...c, ...(wasFixed ? { fixed: true } : {}), source: { kind: "asm" as const, doc: { ...c.source.doc, mates: inner } } } : c));
+      // pružiny venku, které dosedají na komponentu v podsestavě: odkaz přes cestu listu (jako vazby)
+      const comps = (made.doc.components ?? []).map((c) => (c.id === subId && c.source.kind === "asm" ? { ...c, ...(wasFixed ? { fixed: true } : {}), source: { kind: "asm" as const, doc: { ...c.source.doc, mates: inner } } } : c.spring ? { ...c, spring: { ...c.spring, a: remap(c.spring.a), b: remap(c.spring.b) } } : c));
       const doc = { ...made.doc, components: comps, mates: outer };
       const s = await resolve(doc);
       log.push(tr("✓ podsestava „{0}“: {1}{2}{3}", name, ids.map((id) => `„${d.components!.find((c) => c.id === id)!.name}“`).join(", "), inner.length ? tr(" · vazby uvnitř: {0}", inner.length) : "", wasFixed ? tr(" · ukotvená") : ""));
@@ -586,7 +620,18 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         else mates.push({ ...m, a, b });
       }
       for (const m of P.source.doc.mates ?? []) mates.push({ ...m, a: lift(m.a, m.a.leaf ?? m.a.compId), b: lift(m.b, m.b.leaf ?? m.b.compId) });
-      const doc = { ...next, mates, components: (next.components ?? []).map((c) => (fixed && kids.includes(c) ? { ...c, fixed: true } : c)) };
+      // pružiny, které dosedaly na díl v podsestavě: odkaz o úroveň výš (jako vazby); bez převodu definice zmizí
+      const liftSpring = (c: AsmComponent): AsmComponent => {
+        if (!c.spring || (c.spring.a.compId !== P.id && c.spring.b.compId !== P.id)) return c;
+        const fx = (r: MateRef): MateRef | null => (r.compId !== P.id ? r : r.leaf?.startsWith(`${P.id}/`) ? lift(r, r.leaf.slice(P.id.length + 1)) : null);
+        const a = fx(c.spring.a);
+        const b = fx(c.spring.b);
+        if (a && b) return { ...c, spring: { ...c.spring, a, b } };
+        const { spring: _s, ...rest } = c;
+        void _s;
+        return rest;
+      };
+      const doc = { ...next, mates, components: (next.components ?? []).map((c) => liftSpring(fixed && kids.includes(c) ? { ...c, fixed: true } : c)) };
       const s = await resolve(doc);
       log.push(tr("✓ podsestava „{0}“ rozpuštěna – o úroveň výš: {1}{2}", P.name, kids.map((c) => `„${c.name}“`).join(", "), dropped ? tr(" · vazby, které nešlo převést (odebrány): {0}", dropped) : ""));
       return done(s.doc, true, s.doc.mates?.length ? { mateStatus: s.status } : {});
@@ -717,7 +762,8 @@ function needTabs(env: AsmEnv) {
 /** Kusovník sestavy (plochý / strukturovaný) – řádky, textová tabulka a CSV jako „Export CSV (Excel)“. */
 export async function bomData(d: CadDoc, env: AsmEnv, structured: boolean): Promise<{ rows: BomRow[]; text: string; csv: string }> {
   const built = await ensureBuilt(env, flattenAssembly(d));
-  const rows = computeBom(d, (c) => bomPartInfo(c, built.get(sourceKey(c.source))), { structured });
+  // řádky podle zdroje (pružina = jedna položka v jakékoli délce), hmotnost z tělesa v sestavě (pružina v aktuální délce, jako stav)
+  const rows = computeBom(d, (c) => bomPartInfo(c, built.get(sourceKey(springEffective(c).source)) ?? built.get(sourceKey(c.source))), { structured });
   return { rows, text: bomText(rows, d.name, structured), csv: bomCsv(rows) };
 }
 

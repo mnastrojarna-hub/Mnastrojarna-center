@@ -7,6 +7,7 @@
 import { annotationGeometry, annToSheet, dimLabel, sheetToAnn, type DrawingResult, type PlacedView } from "./drawing";
 import { boxesOverlap, calloutLines, calloutTexts, CALLOUT_SIZE, symbolsAsGeometry, textBox, textWidth, type Box } from "./drawing-symbols";
 import type { DrawingAnnotation, Vec2 } from "./types";
+import { ordinateGeom, spreadOrdinates } from "./drawing-ordinate";
 
 export type Side = "top" | "bottom" | "left" | "right";
 type Seg = [Vec2, Vec2];
@@ -26,6 +27,8 @@ export type CallReq = {
   /** kružnice (souřadnice pohledu), na kterou míří šipka radiálně – hrot se dopočítá podle směru odkazu; více = vybere se nejkratší odkaz */
   ring?: { c: Vec2; r: number };
   rings?: { c: Vec2; r: number }[];
+  /** značka skupiny děr – písmeno u každé kružnice `rings` (souřadnicové kóty s více druhy děr v pohledu) */
+  tag?: string;
 };
 
 export const ROW0 = 8;
@@ -61,6 +64,15 @@ export function annotationBoxes(d: Pick<DrawingResult, "views" | "scaleValue">, 
   return anns.map((a) => ({ id: a.id, boxes: symbolsAsGeometry(annotationGeometry(d, [a])).texts.map((t) => textBox(t)) }));
 }
 
+/**
+ * Razítko jako překážka kót: skutečný obdélník šablony listu (ISO 7200 180 × 38, kompaktní 180 × 27, nástrojářská
+ * 180 × 64 – cad/title-block.ts) včetně tabulek nad ním (kusovník, tabulka děr); bez údaje razítka výchozí 180 × 38.
+ */
+export function titleBlockBox(tb: DrawingResult["titleBlock"] | undefined, W: number, H: number): Box {
+  if (!tb) return { x0: W - 10 - 180, y0: H - 10 - 38, x1: W - 10, y1: H - 10 };
+  return { x0: tb.x, y0: tb.y - (tb.above ?? 0), x1: tb.x + tb.w, y1: tb.y + tb.h };
+}
+
 export class DimLayout {
   readonly views: PlacedView[];
   /** obsazené texty (překážky) a čáry umístěných kót */
@@ -72,7 +84,7 @@ export class DimLayout {
   private readonly area: Box;
   readonly placed: { key: string; ann: NewAnn; side?: Side; row?: number; boxes?: Box[]; segs?: Seg[] }[] = [];
 
-  constructor(d: Pick<DrawingResult, "views" | "sheet" | "texts" | "polys">) {
+  constructor(d: Pick<DrawingResult, "views" | "sheet" | "texts" | "polys"> & Partial<Pick<DrawingResult, "titleBlock">>) {
     this.views = d.views;
     this.rects = d.views.map(rectOf);
     // izometrie (tenké čáry) a razítko jako překážky
@@ -80,7 +92,7 @@ export class DimLayout {
     if (thin.length) this.rects.push({ x0: Math.min(...thin.map((p) => p[0])), y0: Math.min(...thin.map((p) => p[1])), x1: Math.max(...thin.map((p) => p[0])), y1: Math.max(...thin.map((p) => p[1])) });
     const W = d.sheet.w;
     const H = d.sheet.h;
-    this.rects.push({ x0: W - 10 - 180, y0: H - 10 - 38, x1: W - 10, y1: H - 10 });
+    this.rects.push(titleBlockBox(d.titleBlock, W, H));
     for (const t of d.texts) this.boxes.push(textBox(t));
     this.area = { x0: 21, y0: 11, x1: W - 11, y1: H - 11 };
   }
@@ -163,6 +175,50 @@ export class DimLayout {
     return null;
   }
 
+  /**
+   * Souřadnicové kóty jedné osy pohledu (cad/drawing-ordinate.ts, B12): hodnoty `pts` (souřadnice pohledu) podél osy
+   * `dir` od počátku `origin`, všechny v jedné řadě na první volné straně; ke každé hodnotě vede vynášecí čára z bodu
+   * nejblíž řadě, blízké texty se rozestoupí zalomením. Vrátí stranu a řadu, nebo null (nevešly se – nic se neumístí).
+   */
+  placeOrdinates(req: { key: string; view: string; dir: "h" | "v"; origin: Vec2; pts: Vec2[]; sides: Side[] }): { side: Side; row: number } | null {
+    const r = this.rectOfView(req.view);
+    if (!r) return null;
+    const ax = req.dir === "h" ? 0 : 1;
+    const across = 1 - ax;
+    const vals: { v: number; pts: Vec2[] }[] = [];
+    for (const p of [req.origin, ...req.pts]) {
+      const e = vals.find((x) => Math.abs(x.v - p[ax]) < 1e-3);
+      if (e) e.pts.push(p);
+      else vals.push({ v: p[ax], pts: [p] });
+    }
+    vals.sort((a, b) => a.v - b.v);
+    const kind = req.dir === "h" ? "horizontal" : "vertical";
+    const O = this.S(req.view, req.origin);
+    for (const side of req.sides) {
+      if ((req.dir === "h") !== (side === "top" || side === "bottom")) continue;
+      for (let row = 0; row < MAX_ROWS; row++) {
+        const dist = ROW0 + ROW_STEP * row;
+        const rowC = side === "bottom" ? r.y1 + dist : side === "top" ? r.y0 - dist : side === "left" ? r.x0 - dist : r.x1 + dist;
+        // bod každé hodnoty nejblíž řadě (nejkratší vynášecí čára)
+        const reps = vals.map((x) => x.pts.reduce((m, p) => (Math.abs(this.S(req.view, p)[across] - rowC) < Math.abs(this.S(req.view, m)[across] - rowC) ? p : m)));
+        const S = reps.map((p) => this.S(req.view, p));
+        const jogs = spreadOrdinates(S.map((q) => q[ax]));
+        const geoms = reps.map((p, i) => ordinateGeom(S[i], req.dir, rowC, jogs[i], dimLabel({ kind }, Math.abs(p[ax] - req.origin[ax]))));
+        const texts = geoms.map((g) => textBox(g.text));
+        if (!this.free(texts, geoms.flatMap((g) => g.segs), req.view)) continue;
+        this.boxes.push(...texts);
+        reps.forEach((p, i) => {
+          this.segs.push(...geoms[i].segs);
+          const jog = Math.round(jogs[i] * 100) / 100;
+          const ann = { type: "dim", view: req.view, auto: `${req.key}:${vals[i].v.toFixed(3)}`, a: req.origin, b: p, kind, offset: Math.round((rowC - O[across]) * 100) / 100, ord: true, ...(Math.abs(jog) >= 0.05 ? { jog } : {}) } as NewAnn;
+          this.placed.push({ key: ann.auto!, ann, side, row, boxes: [texts[i]], segs: geoms[i].segs });
+        });
+        return { side, row };
+      }
+    }
+    return null;
+  }
+
   /** Jak daleko za obrys pohledu sahají umístěné kóty a popisy [mm listu] – místo, které je kolem pohledu třeba nechat. */
   overhang(): Record<string, Record<"l" | "t" | "r" | "b", number>> {
     const out: Record<string, Record<"l" | "t" | "r" | "b", number>> = {};
@@ -238,7 +294,8 @@ export class DimLayout {
         this.leaders.push(...segs);
         const at: Vec2 = sheetToAnn(view, K);
         const round = (q: Vec2): Vec2 => [Math.round(q[0] * 1000) / 1000, Math.round(q[1] * 1000) / 1000];
-        this.placed.push({ key: req.key, ann: { type: "callout", view: req.view, auto: req.key, tip: round(tip), at: round(at), lines: req.lines, ...(req.circle ? { circle: req.circle } : {}) } as NewAnn, boxes: texts, segs });
+        const tags = req.tag ? { tag: req.tag, tags: rings.map((g) => ({ c: round(g.c), r: Math.round(g.r * 1000) / 1000 })) } : {};
+        this.placed.push({ key: req.key, ann: { type: "callout", view: req.view, auto: req.key, tip: round(tip), at: round(at), lines: req.lines, ...(req.circle ? { circle: req.circle } : {}), ...tags } as NewAnn, boxes: texts, segs });
         return true;
       }
     }

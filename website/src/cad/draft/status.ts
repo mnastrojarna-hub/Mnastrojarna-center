@@ -10,11 +10,12 @@ import { spaceEntities, type DraftEntity, type DraftModel, type Vec2 } from "./m
 import type { DraftSession } from "./session";
 import { fmtLen, fmtPt, unitsLabel } from "./units";
 
-/** rozsah viditelných i skrytých konečných entit (přímky a polopřímky se nepočítají) */
+/** rozsah viditelných i skrytých konečných entit (přímky a polopřímky se nepočítají; neviditelné entity DXF 60 také ne) */
 export function extents(model: DraftModel, list: readonly DraftEntity[]): Box | null {
   const ctx: KindCtx = { model };
   let b = emptyBox();
   for (const e of list) {
+    if (e.ext?.invisible) continue;
     const eb = entityBox(e, ctx);
     if (eb) b = boxUnion(b, eb);
   }

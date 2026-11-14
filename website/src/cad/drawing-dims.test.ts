@@ -75,7 +75,9 @@ describe("popisy děr z parametrů prvku Díra (ISO 129-1, ISO 15786)", () => {
     const t = { ...base, kind: "tapped" as const, thread: "M8", diameter: 6.8, depth: 20, threadDepth: 16 };
     expect(holeCallout(t, 4)).toEqual(["4× M8 ↧16", "Ø6,8 ↧20"]);
     expect(holeCallout({ ...t, threadDepth: 0 }, 2)).toEqual(["2× M8 ↧20"]);
-    expect(holeCallout({ ...t, depth: 0 }, 1)).toEqual(["M8 skrz"]);
+    expect(holeCallout({ ...t, depth: 0, threadDepth: 0 }, 1)).toEqual(["M8 skrz"]);
+    // průchozí díra se závitem jen do hloubky (15. vlna, revize): délka závitu se neztratí – „M8 ↧16“ + „Ø6,8 skrz“
+    expect(holeCallout({ ...t, depth: 0 }, 1)).toEqual(["M8 ↧16", "Ø6,8 skrz"]);
     expect(holeCallout({ ...t, thread: "M18x1.5", diameter: 16.5, depth: 20, threadDepth: 15 }, 1)).toEqual(["M18×1,5 ↧15", "Ø16,5 ↧20"]);
   });
   it("válcové a kuželové zahloubení", () => {

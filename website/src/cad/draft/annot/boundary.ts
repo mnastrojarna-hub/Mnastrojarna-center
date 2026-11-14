@@ -10,7 +10,7 @@ import { tr } from "../../i18n";
 import { cIntersect, cPoint, cRange, type Curve } from "../curves";
 import { angleOf, bulgeOf, circle3, dist, normA, TAU, type Box } from "../geom";
 import { entityBox, entityCurves, type KindCtx } from "../kinds";
-import { layerVisible } from "../layers";
+import { isVisible } from "../layers";
 import type { DraftEntity, DraftModel, Vec2 } from "../model";
 import { inPoly, loopArea, loopPolygon } from "./patterns";
 import type { DHatch } from "./types";
@@ -123,7 +123,7 @@ export function boundaryAt(model: DraftModel, list: readonly DraftEntity[], p: V
   let all: Box = { x0: p[0], y0: p[1], x1: p[0], y1: p[1] };
   let near = Infinity;
   for (const e of list) {
-    if (e.type === "hatch" || e.type === "dimension" || !layerVisible(model, e.layer)) continue;
+    if (e.type === "hatch" || e.type === "dimension" || !isVisible(model, e)) continue;
     const b = entityBox(e, ctx);
     ents.push(e);
     boxes.push(b);

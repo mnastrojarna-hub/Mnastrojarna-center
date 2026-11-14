@@ -151,6 +151,8 @@ type Ctx = {
   gdt: string;
   /** tolerance tětivy ve výkresových jednotkách */
   tol: number;
+  /** neviditelné entity (DXF 60 = 1), které se do R12 nezapisují – R12 příznak viditelnosti nezná */
+  invisible: number;
 };
 
 /** 2D model → text DXF R12 */
@@ -175,6 +177,7 @@ export function draftToR12(model: DraftModel): { text: string; warnings: string[
     style: new Map(model.textStyles.map((s) => [s.name.toLowerCase(), styleNames.take(s.name)])),
     gdt: "",
     tol: R12_CHORD_TOL_MM / (UNITS[model.vars.units]?.mm || 1),
+    invisible: 0,
   };
   const hasTolerance = (list: DraftEntity[]) => list.some((e) => e.type === "tolerance");
   if (hasTolerance(model.entities) || (model.blocks ?? []).some((b) => hasTolerance(b.entities))) {
@@ -188,6 +191,7 @@ export function draftToR12(model: DraftModel): { text: string; warnings: string[
   let box = emptyBox();
   const memo = new Map<string, Box | null>();
   for (const e of model.entities) {
+    if (e.ext?.invisible) continue;
     const b = extBox(ctx, e, memo, 0);
     if (b) box = boxUnion(box, b);
   }
@@ -338,6 +342,7 @@ export function draftToR12(model: DraftModel): { text: string; warnings: string[
   w.g(0, "ENDSEC");
   w.g(0, "EOF");
   if (model.layouts?.some((l) => l.entities.length)) ctx.warn.add(tr("DXF R12: rozvržení (papírový prostor) se nezapisují – jen modelový prostor"));
+  if (ctx.invisible) ctx.warn.add(tr("DXF R12: {0} neviditelných entit se nezapsalo (R12 nemá příznak viditelnosti – v jiných programech by byly vidět); zachová je DXF / DWG 2000 a novější", ctx.invisible));
   const renamed = [layerNames, ltNames, styleNames, blockNames].flatMap((n) => n.renamed);
   if (renamed.length) ctx.warn.add(tr("DXF R12: stejné názvy po úpravě pro R12 (velká písmena, bez diakritiky, 31 znaků) – přejmenováno: {0}", renamed.slice(0, 8).join(", ") + (renamed.length > 8 ? " …" : "")));
   return { text: w.out.join("\r\n") + "\r\n", warnings: [...ctx.warn] };
@@ -496,6 +501,10 @@ const explodeOf = (ctx: Ctx, e: DraftEntity): NewEntity[] | null => {
 };
 
 function writeEntity(ctx: Ctx, w: W, e: DraftEntity) {
+  if (e.ext?.invisible) {
+    ctx.invisible++;
+    return;
+  }
   switch (e.type) {
     case "point":
       common(ctx, w, "POINT", e);

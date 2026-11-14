@@ -1,0 +1,118 @@
+# w15 titleblock: razítko – šablony, logo, další pole, nepředepsané tolerance, připojené soubory (cad/title-block.ts, title-logo.ts, agent-title.ts, drawing-title-panel.tsx)
+ · ⚠ výkres nemá nepředepsané tolerance	 · ⚠ die Zeichnung hat keine Allgemeintoleranzen
+ · logo „{0}“ {1}×{2} px{3}	 · Logo „{0}“ {1}×{2} px{3}
+ (listy: {0})	 (Blätter: {0})
+ (v DXF/DWG jen rámeček)	 (in DXF/DWG nur ein Rahmen)
+ (v patičce)	 (in der Fußzeile)
+— nezadané —	— nicht angegeben —
+, geometrie {0}	, Geometrie {0}
+, obrys pro DXF/DWG {0} ploch	, DXF/DWG-Kontur {0} Flächen
+{0} – neznámé „{1}“	{0} – unbekannt „{1}“
+{0} {1} řádky {2} mm	{0} {1} Zeilen {2} mm
+{0} písmo {1} mm	{0} Schrift {1} mm
+⚠ Bez nepředepsaných tolerancí – export výkresu to ohlásí.	⚠ Ohne Allgemeintoleranzen – der Zeichnungsexport meldet es.
+Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná	Allgemeintoleranzen: nicht angegeben – der Export der Teilzeichnung meldet sie; geben Sie zeichnung allgemein ISO 2768-mK oder zeichnung allgemein dezimal ein
+⚠ pole „{0}“ má písmo jen {1} mm – zkraťte text nebo zvolte šablonu nástrojářská (výkres razítko šablona=nástrojářská)	⚠ Feld „{0}“ hat nur {1} mm Schrift – Text kürzen oder die Vorlage Werkzeugbau wählen (zeichnung schriftfeld vorlage=werkzeugbau)
+✓ nepředepsané tolerance zrušeny – export výkresu dílu to ohlásí ⚠	✓ Allgemeintoleranzen entfernt – der Export der Teilzeichnung meldet ⚠
+1. kvadrant, kružnice vpravo	1. Quadrant, Kreise rechts
+3. kvadrant, kružnice vlevo	3. Quadrant, Kreise links
+c – hrubá	c – grob
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")	Weitere Schriftfeldfelder: — (geprüft, genehmigt, Kunde, Projekt, Rohteil, Stückzahl, Wärmebehandlung, Oberflächenbehandlung, Winkel- und Fasentoleranzen: zeichnung schriftfeld feld="…")
+Další pole razítka: {0}	Weitere Schriftfeldfelder: {0}
+data URL	Daten-URL
+Délky a úhly (ISO 2768-1)	Längen und Winkel (ISO 2768-1)
+f – jemná	f – fein
+firma	Firma
+Firma	Firma
+Firma (vlastník výkresu)	Firma (Eigentümer der Zeichnung)
+Geometrie (ISO 2768-2)	Geometrie (ISO 2768-2)
+hrubá	grob
+ISO 2768 – třída přesnosti	ISO 2768 – Toleranzklasse
+ISO 2768-{0}{1} (délky, úhly a sražení třída {0} – {2}{3})	ISO 2768-{0}{1} (Längen, Winkel und Fasen Klasse {0} – {2}{3})
+ISO 7200 (výchozí)	ISO 7200 (Standard)
+jemná	fein
+kompaktní	kompakt
+kontroloval	geprüft
+Kontroloval	Geprüft
+logo	Logo
+Logo	Logo
+Logo „{0}“ {1}×{2} px vloženo do razítka	Logo „{0}“ {1}×{2} px in das Schriftfeld eingefügt
+logo „{0}“ {1}×{2} px{3}	Logo „{0}“ {1}×{2} px{3}
+logo „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“ nebo zadejte data URL (data:image/png;base64,…); připojené: {1}	Logo „{0}“: die Datei ist nicht angehängt – in der Konsole mit „Datei anhängen…“ anhängen oder eine Daten-URL angeben (data:image/png;base64,…); angehängt: {1}
+logo {0} jde převést jen v prohlížeči – bez něj použijte PNG nebo JPEG	ein {0}-Logo lässt sich nur im Browser umwandeln – ohne Browser PNG oder JPEG verwenden
+logo je příliš velké ({0} kB) – nejvýš {1} kB	das Logo ist zu groß ({0} kB) – höchstens {1} kB
+logo JPEG bez prohlížeče: v DXF / DWG jen rámeček (pro obrys použijte PNG)	JPEG-Logo ohne Browser: in DXF / DWG nur ein Rahmen (für eine Kontur PNG verwenden)
+logo odstraněno	Logo entfernt
+Logo se nepodařilo načíst: {0}	Das Logo konnte nicht geladen werden: {0}
+logo zmenšeno na {0} × {1} px	Logo auf {0} × {1} px verkleinert
+logo: čekám data URL obrázku (data:image/png;base64,…) nebo název připojeného souboru	Logo: erwartet eine Bild-Daten-URL (data:image/png;base64,…) oder den Namen einer angehängten Datei
+logo: JPEG bez hlavičky rozměru	Logo: JPEG ohne Größenangabe
+logo: neznámý formát obrázku – použijte PNG nebo JPEG	Logo: unbekanntes Bildformat – PNG oder JPEG verwenden
+m – střední	m – mittel
+Nahrát obrázek loga (PNG, JPEG, SVG) – zmenší se na nejvýš 600 × 300 px	Logobild hochladen (PNG, JPEG, SVG) – wird auf höchstens 600 × 300 px verkleinert
+Nahrát…	Hochladen…
+např. černit	z. B. brünieren
+např. DIN ISO 2768-mK	z. B. DIN ISO 2768-mK
+např. kalit 58–60 HRC	z. B. härten 58–60 HRC
+např. plech 40×160×185	z. B. Blech 40×160×185
+nástrojářská (všechna pole)	Werkzeugbau (alle Felder)
+nepodporovaný barevný typ PNG {0}	nicht unterstützter PNG-Farbtyp {0}
+nepředepsané desetinná: čekám tolerance, např. desetinná ±0,1 ±0,1 ±0,01 ±0,005 nebo X.=±0,1 X.XX=±0,01 – „{0}“	allgemein dezimal: Toleranzen erwartet, z. B. dezimal ±0,1 ±0,1 ±0,01 ±0,005 oder X.=±0,1 X.XX=±0,01 – „{0}“
+nepředepsané desetinná: nejvýš 3 desetinná místa (X.XXX)	allgemein dezimal: höchstens 3 Nachkommastellen (X.XXX)
+Nepředepsané tolerance – text	Allgemeintoleranzen – Text
+Nepředepsané tolerance: {0}	Allgemeintoleranzen: {0}
+Nepředepsané tolerance: nezadané (sestava – nevyžadují se)	Allgemeintoleranzen: nicht angegeben (Baugruppe – nicht erforderlich)
+nezadané	nicht angegeben
+Odebrat {0}	{0} entfernen
+Odebrat logo	Logo entfernen
+PNG je poškozené (málo dat)	das PNG ist beschädigt (zu wenig Daten)
+PNG je příliš velké ({0} × {1} px)	das PNG ist zu groß ({0} × {1} px)
+PNG nemá hlavičku IHDR	das PNG hat keinen IHDR-Kopf
+počet kusů	Stückzahl
+Pole, která šablona nemá, se vypíšou v patičce nad razítkem. Výchozí šablona nových listů je v Nastavení → Výkres.	Felder ohne Zelle in der Vorlage stehen in der Fußzeile über dem Schriftfeld. Die Standardvorlage neuer Blätter steht in Einstellungen → Zeichnung.
+polotovar	Rohteil
+Polotovar	Rohteil
+povrchová úprava	Oberflächenbehandlung
+Povrchová úprava	Oberflächenbehandlung
+pro nové listy – každý list jde změnit zvlášť	für neue Blätter – jedes Blatt lässt sich einzeln ändern
+projekt	Projekt
+Projekt	Projekt
+{0} (z tabulky revizí)	{0} (aus der Änderungstabelle)
+logo „{0}“: název odpovídá více připojeným souborům ({1}) – zadejte celý název s příponou, např. logo="{2}"	Logo „{0}“: der Name passt zu mehreren angehängten Dateien ({1}) – den vollständigen Namen mit Endung angeben, z. B. logo="{2}"
+nepodporované prokládání PNG {0}	nicht unterstütztes PNG-Interlacing {0}
+nepředepsané desetinná: u {0} chybí tolerance	allgemein dezimal: bei {0} fehlt die Toleranz
+revize v razítku „{0}“ není v tabulce revizí ({1}) – doplňte ji (výkres revize {0} "…") nebo pole vyprázdněte (výkres razítko revize="") a razítko vezme poslední revizi z tabulky	Index „{0}“ im Schriftfeld steht nicht in der Änderungstabelle ({1}) – ergänzen (zeichnung änderung {0} "…") oder das Feld leeren (zeichnung schriftfeld revision="") – das Schriftfeld nimmt dann den letzten Index aus der Tabelle
+Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo="{1}"	Angehängt: {0} – in Befehlen über den Namen, z. B. zeichnung schriftfeld logo="{1}"
+Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu	Hängt eine Datei an (Schriftfeldlogo, Vorlage …) – Befehle finden sie über den Namen
+Připojit soubor…	Datei anhängen…
+Razítko bez zkracování textu: {0}	Schriftfeld ohne gekürzten Text: {0}
+Razítko bez zkracování textu: všechna pole v nominální velikosti	Schriftfeld ohne gekürzten Text: alle Felder in Nenngröße
+schválil	genehmigt
+Schválil	Genehmigt
+Soubor „{0}“ se nepodařilo načíst.	Die Datei „{0}“ konnte nicht geladen werden.
+soubor není PNG	die Datei ist kein PNG
+střední	mittel
+šablona	Vorlage
+šablona {0} ({1}×{2} mm)	Vorlage {0} ({1}×{2} mm)
+Šablona razítka	Schriftfeldvorlage
+šablona razítka „{0}“ neexistuje – iso7200 (výchozí), kompaktní, nástrojářská	Schriftfeldvorlage „{0}“ existiert nicht – iso7200 (Standard), kompakt, werkzeugbau
+šablona razítka (ISO 7200, kompaktní, nástrojářská se všemi poli), logo z připojeného souboru (konzole → Připojit soubor…) nebo data URL, další pole a nepředepsané tolerance ISO 2768 nebo tabulkou podle desetinných míst; dlouhé texty se zmenší / zalomí, nic se nezkracuje; export dílu bez nepředepsaných tolerancí = ⚠	Schriftfeldvorlage (ISO 7200, kompakt, Werkzeugbau mit allen Feldern), Logo aus einer angehängten Datei (Konsole → Datei anhängen…) oder Daten-URL, weitere Felder und Allgemeintoleranzen ISO 2768 oder als Tabelle nach Nachkommastellen; lange Texte werden verkleinert / umbrochen, nichts wird gekürzt; Export eines Teils ohne Allgemeintoleranzen = ⚠
+Šablona razítka nových listů	Schriftfeldvorlage neuer Blätter
+Šablona razítka: {0} {1}×{2} mm · promítání ISO {3} – značka ISO 5456-2 ({4}){5}	Schriftfeldvorlage: {0} {1}×{2} mm · Projektion ISO {3} – Symbol ISO 5456-2 ({4}){5}
+Tabulka podle desetinných míst	Tabelle nach Nachkommastellen
+tabulka podle desetinných míst: {0}	Tabelle nach Nachkommastellen: {0}
+tepelné zpracování	Wärmebehandlung
+Tepelné zpracování	Wärmebehandlung
+text „{0}“	Text „{0}“
+Tolerance pro {0}	Toleranz für {0}
+tolerance sražení	Fasentoleranz
+Tolerance sražení	Fasentoleranz
+tolerance úhlů	Winkeltoleranz
+Tolerance úhlů	Winkeltoleranz
+v – velmi hrubá	v – sehr grob
+velmi hrubá	sehr grob
+Vlastní text	Eigener Text
+Výkres nemá nepředepsané tolerance{0} – zadejte je: výkres nepředepsané ISO 2768-mK (třída f/m/c/v + H/K/L) nebo výkres nepředepsané desetinná (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)	Die Zeichnung hat keine Allgemeintoleranzen{0} – angeben: zeichnung allgemein ISO 2768-mK (Klasse f/m/c/v + H/K/L) oder zeichnung allgemein dezimal (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)
+výkres razítko název="…" číslo="…" kreslil="…" kontroloval="…" schválil="…" revize="…" datum="…" materiál="…" polotovar="…" počet="…" tepelné="…" povrch="…" nepředepsané="ISO 2768-mK|desetinná" úhly="…" sražení="…" hrany="…" zákazník="…" projekt="…" firma="…" logo="soubor.png" šablona=iso7200|kompaktní|nástrojářská poznámka="…"	zeichnung schriftfeld benennung="…" nummer="…" ersteller="…" geprüft="…" genehmigt="…" revision="…" datum="…" werkstoff="…" rohteil="…" menge="…" wärmebehandlung="…" oberflächenbehandlung="…" allgemeintoleranz="ISO 2768-mK|dezimal" winkel="…" fasen="…" kanten="…" kunde="…" projekt="…" firma="…" logo="datei.png" vorlage=iso7200|kompakt|werkzeugbau hinweis="…"
+zákazník	Kunde
+Zákazník	Kunde

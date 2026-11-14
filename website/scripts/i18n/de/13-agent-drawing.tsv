@@ -60,7 +60,6 @@ kóta šikmo: body splývají	schräges Maß: die Punkte fallen zusammen
 kóta: nečekané „{0}“ – {1}	Maß: unerwartetes „{0}“ – {1}
 kóta: odsazení musí být číslo	Maß: der Versatz muss eine Zahl sein
 kóta: zadejte dva body čtyřmi čísly – x1 y1 x2 y2 (mm modelu v rovině pohledu)	Maß: zwei Punkte mit vier Zahlen angeben – x1 y1 x2 y2 (Modell-mm in der Ansichtsebene)
-kótovat [chytře|celkově|základní|nic] [řetězově|od základny] – neznámé slovo „{0}“	bemaßen [intelligent|gesamt|einfach|keine] [kette|basis] – unbekanntes Wort „{0}“
 Kóty a poznámky bez geometrie: {0}	Maße und Anmerkungen ohne Geometrie: {0}
 kóty se zadávají v pohledu, ne v detailu – použijte pohled, ze kterého je detail	Maße werden in einer Ansicht angegeben, nicht in einer Einzelheit – verwenden Sie die Ansicht, aus der die Einzelheit stammt
 list {0}	Blatt {0}
@@ -111,7 +110,6 @@ výkres kóta vodorovně|svisle|šikmo pohled <p> x1 y1 x2 y2 · kóta průměr|
 výkres list <číslo|"název"> · výkres list nový ["název"] · výkres list přejmenovat [<číslo>] "název" · výkres list smazat <číslo|"název">	zeichnung blatt <nummer|"name"> · zeichnung blatt neu ["name"] · zeichnung blatt umbenennen [<nummer>] "name" · zeichnung blatt löschen <nummer|"name">
 výkres model "<komponenta|záložka>" [pohled horní] [měřítko 1:2|auto] · výkres model smazat "<název>"	zeichnung modell "<komponente|tab>" [ansicht oben] [maßstab 1:2|auto] · zeichnung modell löschen "<name>"
 výkres má jen jeden list – ten smazat nelze	die Zeichnung hat nur ein Blatt – es kann nicht gelöscht werden
-výkres razítko název="…" číslo="…" kreslil="…" revize="…" datum="…" materiál="…" [nepředepsané="…" hrany="…" poznámka="…"] – neznámé „{0}“	zeichnung schriftfeld benennung="…" nummer="…" ersteller="…" revision="…" datum="…" werkstoff="…" [allgemeintoleranz="…" kanten="…" hinweis="…"] – unbekannt „{0}“
 výkres revize <znak> "popis změny" [datum 13.11.2026] [kreslil "…"] · výkres revize smazat <znak>	zeichnung änderung <zeichen> "Änderungsbeschreibung" [datum 13.11.2026] [ersteller "…"] · zeichnung änderung löschen <zeichen>
 výkres smazat <id|popisek> [další id…] · výkres smazat vlastní · výkres smazat vše	zeichnung löschen <id|beschriftung> [weitere Ids…] · zeichnung löschen eigene · zeichnung löschen alle
 výkres stav [list <číslo|"název">|vše]	zeichnung status [blatt <nummer|"name">|alle]

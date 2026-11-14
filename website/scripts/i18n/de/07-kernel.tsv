@@ -48,7 +48,6 @@ Výpočet zrušen.	Berechnung abgebrochen.
 aktivní	aktiv
 aktivní ({0})	aktiv ({0})
 Aktivní těleso – pracují s ním nové prvky	Aktiver Körper – neue Elemente arbeiten an ihm
-bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit	ohne z = beginnt an der Körperoberfläche an dieser Stelle (laut Netz) und bohrt nach unten; „durch“ bohrt vom Punkt nur in Bohrrichtung, „beidseits“ in beide Richtungen; schräge Bohrung: „richtung“ = Bohrrichtung, „neigung“ = Abweichung von der Achse; mehrere Positionen = mehrere Bohrungen; Gewinde auch mit Feinsteigung (M18×1,5) – wie beim Befehl gewinde
 Cílové těleso	Zielkörper
 Cílové těleso (výsledek)	Zielkörper (Ergebnis)
 čára: neznámé slovo „{0}“ – body po dvojicích, „r N“ za bodem zaoblí roh, „uzavřít“ spojí konec se začátkem	polylinie: unbekanntes Wort „{0}“ – Punkte paarweise, „r N“ nach einem Punkt verrundet diese Ecke, „schließen“ verbindet Ende und Anfang
@@ -107,7 +106,6 @@ těleso „{0}“ v dílu není – tělesa: {1}	Körper „{0}“ ist im Teil n
 těleso potřebuje název nebo číslo: těleso 2 (= „Těleso 2“) – další prvky pak pracují s ním	körper braucht einen Namen oder eine Nummer: körper 2 (= „Těleso 2“) – folgende Elemente arbeiten dann an ihm
 Těleso, na kterém prvek pracuje	Körper, an dem das Element arbeitet
 tři body oblouku leží v přímce – použijte úsečku	die drei Bogenpunkte liegen auf einer Geraden – verwenden Sie eine Linie
-více děr jedním příkazem potřebuje u každé polohy tři souřadnice: díra 8 skrz v x1 y1 z1 v x2 y2 z2	mehrere Bohrungen in einem Befehl brauchen für jede Position drei Koordinaten: bohrung 8 durch bei x1 y1 z1 bei x2 y2 z2
 více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným	mehrere Körper im Teil: „körper 2“ schaltet folgende Elemente auf Těleso 2; teilen = zwei Körper durch eine Ebene; kopieren = weiterer Körper; kombinieren = zwei Körper vereinigen / abziehen / schneiden. Bei Elementen: „… separat [körper Name]“ legt einen neuen Körper an, „… körper 2“ arbeitet am gewählten
 vložit potřebuje název otevřené záložky s dílem: vložit "Hřídel" v 0 0 10 [otočení 0 90 0] [ukotvit]	einfügen braucht den Namen eines geöffneten Tabs mit einem Teil: einfügen "Welle" bei 0 0 10 [drehung 0 90 0] [fixieren]
 vložit: otevřený dokument není sestava – nejdřív „nová sestava“	einfügen: das geöffnete Dokument ist keine Baugruppe – zuerst „neu baugruppe“

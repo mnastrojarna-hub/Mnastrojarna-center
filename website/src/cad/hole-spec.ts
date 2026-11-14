@@ -81,3 +81,60 @@ export function threadChangePatch(f: Pick<HoleF, "tapDrill" | "diameter">, name:
   if (f.tapDrill === "custom") return drillFitsThread(f.diameter, t) ? { thread: name } : { thread: name, tapDrill: undefined, diameter: t.tap };
   return { thread: name, diameter: tapDrillD(t, f.tapDrill, f.diameter) };
 }
+
+/** Zahloubení díry: válcové (průměr × hloubka) nebo kuželové (průměr, vrcholový úhel). */
+export type HoleHead = { kind: "counterbore"; d: number; depth: number } | { kind: "countersink"; d: number; angle: number };
+
+/** Druh díry (chybí-li `kind`: válcové zahloubení, má-li kladné rozměry, jinak vrtaná – chování starších dokumentů). */
+export const holeKindOf = (f: Pick<HoleF, "kind" | "cbDiameter" | "cbDepth" | "diameter">): NonNullable<HoleF["kind"]> => f.kind ?? (f.cbDiameter > f.diameter && f.cbDepth > 0 ? "counterbore" : "simple");
+
+/**
+ * Zahloubení díry – jedno místo pro jádro, výkres, kontrolu kót, stav i formulář:
+ * - díra „counterbore“ / „countersink“ = zahloubení podle druhu;
+ * - závitová díra (`kind: "tapped"`) jen s `head` = zahloubení + vrták + závit (sedlo pružiny nad závitem, sražení vstupu);
+ *   závitová díra bez `head` zahloubení nemá ani se staršími poli cbDiameter / csDiameter (chování starších dokumentů);
+ * - jinak null.
+ */
+export function holeHeadOf(f: Pick<HoleF, "kind" | "head" | "cbDiameter" | "cbDepth" | "csDiameter" | "csAngle" | "diameter">): HoleHead | null {
+  const kind = holeKindOf(f);
+  const h = kind === "tapped" ? f.head : kind === "counterbore" || kind === "countersink" ? kind : undefined;
+  if (h === "counterbore") return { kind: h, d: f.cbDiameter, depth: f.cbDepth };
+  if (h === "countersink") return { kind: h, d: f.csDiameter ?? 0, angle: f.csAngle ?? 90 };
+  return null;
+}
+
+/**
+ * Druh zahloubení ze slova (prvek / upravit `head=…`): counterbore | countersink i česky / německy; prázdné / none = bez; jinak undefined.
+ * Slova jako v textovém příkazu `díra` (agent.ts): DE „Senkung“ = válcové zahloubení (counterbore), „Kegelsenkung“ = kuželové.
+ */
+export function holeHeadKindOf(v: unknown): HoleF["head"] | null | undefined {
+  const w = fold(String(v ?? "")).trim();
+  if (["", "none", "ne", "bez", "zadne", "kein", "keine", "ohne"].includes(w)) return null;
+  if (["counterbore", "cbore", "zahloubeni", "valcove", "valcove zahloubeni", "senkung", "flachsenkung", "zylindersenkung", "senkung zylindrisch"].includes(w)) return "counterbore";
+  if (["countersink", "csink", "kuzelove", "kuzelove zahloubeni", "zapusteni", "kegelsenkung", "senkung kegelig", "versenkt"].includes(w)) return "countersink";
+  return undefined;
+}
+
+/**
+ * Starší závitová díra bez `head` s uloženými rozměry zahloubení (dřívější `díra … zahloubení 20 7 závit M8`, kdy se zahloubení
+ * tiše zahodilo, nebo JSON): zahloubení se nevrtá (geometrie starších dokumentů beze změny), ale stavba to ohlásí ⚠ a stav to
+ * vypíše – vrací uložené zahloubení, jinak null.
+ */
+export function staleHeadOf(f: Pick<HoleF, "kind" | "head" | "cbDiameter" | "cbDepth" | "csDiameter" | "csAngle">): HoleHead | null {
+  if (f.kind !== "tapped" || f.head) return null;
+  if (f.cbDiameter > 0 && f.cbDepth > 0) return { kind: "counterbore", d: f.cbDiameter, depth: f.cbDepth };
+  if ((f.csDiameter ?? 0) > 0) return { kind: "countersink", d: f.csDiameter!, angle: f.csAngle ?? 90 };
+  return null;
+}
+
+/**
+ * Zahloubení závitové díry je menší než jmenovitý průměr závitu (Ø zahloubení < D; rovný D se nehlásí) – závit by zasahoval do zahloubení.
+ * Vrací závit a průměr zahloubení pro upozornění ⚠ (jádro, formulář), jinak null.
+ */
+export function headBelowThread(f: Pick<HoleF, "kind" | "head" | "thread" | "cbDiameter" | "cbDepth" | "csDiameter" | "csAngle" | "diameter">): { thread: MetricThread; d: number } | null {
+  if (holeKindOf(f) !== "tapped") return null;
+  const h = holeHeadOf(f);
+  const t = threadByName(f.thread);
+  if (!h || !t || !(h.d > 0)) return null;
+  return h.d < t.d - 5e-4 ? { thread: t, d: h.d } : null;
+}

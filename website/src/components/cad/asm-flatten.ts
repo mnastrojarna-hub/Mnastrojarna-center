@@ -1,6 +1,7 @@
 /** Podsestavy v UI: zploštění stromu komponent na listové díly se světovými maticemi, vytváření a rozpouštění podsestav. */
 import { tr } from "@/cad/i18n";
 import { computeBom, emptyAssembly, eulerXYZ, placementMatrix, sourceKey, type BomRow, type Mat3 } from "@/cad/assembly";
+import { springEffective, springMeshMatrix } from "@/cad/asm-spring-geom";
 import { uid, type AsmComponent, type CadDoc, type Placement } from "@/cad/types";
 
 export type Leaf = {
@@ -31,12 +32,17 @@ export function matrixToPlacement(m: number[]): Placement {
 
 const IDENT = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
-/** Všechny listové díly sestavy (včetně dílů ve vnořených podsestavách). */
-export function flattenLeaves(doc: CadDoc): Leaf[] {
+/**
+ * Všechny listové díly sestavy (včetně dílů ve vnořených podsestavách). Pružina (cad/asm-spring-geom.ts) má díl v aktuální délce;
+ * `springMesh` (přehrávání pohybové studie) místo toho protáhne síť volné pružiny po ose – bez stavby v jádře v každém kroku.
+ */
+export function flattenLeaves(doc: CadDoc, o: { springMesh?: boolean } = {}): Leaf[] {
   const out: Leaf[] = [];
   const walk = (comps: AsmComponent[], parent: number[], prefix: string, top: string | null, names: string[], hidden: boolean) => {
-    for (const c of comps) {
-      const m = mul4(parent, placementMatrix(c.placement));
+    for (const c0 of comps) {
+      const sm = o.springMesh ? springMeshMatrix(c0) : null;
+      const c = o.springMesh ? c0 : springEffective(c0);
+      const m = mul4(parent, sm ? mul4(placementMatrix(c.placement), sm) : placementMatrix(c.placement));
       const id = prefix ? `${prefix}/${c.id}` : c.id;
       const topId = top ?? c.id;
       const h = hidden || !!c.hidden;
@@ -110,18 +116,20 @@ export function dissolveSubassembly(doc: CadDoc, id: string): CadDoc {
   return { ...doc, components: next };
 }
 
-/** Kusovník: plochý (všechny díly) nebo strukturovaný (první úroveň, podsestavy jako položky). */
-export function bomOf(doc: CadDoc, flat: boolean, info: (c: AsmComponent) => { material?: string; massKg?: number }): BomRow[] {
-  if (flat) {
-    const leaves = flattenLeaves(doc).map((l) => l.comp);
-    return computeBom({ ...doc, components: leaves }, info);
-  }
+/**
+ * Kusovník: plochý (všechny díly) nebo strukturovaný (první úroveň, podsestavy jako položky). Řádky podle ZDROJE komponent
+ * (pružina je jedna položka v jakékoli délce – dřív se zdroj pružiny nahradil dílem v aktuální délce a řádky se rozdělily podle
+ * délky); hmotnost z tělesa v sestavě (`info` dostane komponentu v aktuální délce pružiny – jako stav sestavy).
+ */
+export function bomOf(doc: CadDoc, flat: boolean, info0: (c: AsmComponent) => { material?: string; massKg?: number }): BomRow[] {
+  const info = (c: AsmComponent) => info0(springEffective(c));
+  if (flat) return computeBom(doc, info);
   const top = doc.components ?? [];
   const parts = computeBom({ ...doc, components: top.filter((c) => c.source.kind !== "asm") }, info);
   const subs = new Map<string, BomRow>();
   for (const c of top) {
     if (c.source.kind !== "asm") continue;
-    const k = c.name;
+    const k = `${sourceKey(c.source)}|${c.source.doc.name}|${c.number ?? ""}`; // podle zdroje jako díly – přejmenovaná instance řádek nerozdělí
     const r = subs.get(k);
     if (r) {
       r.qty++;

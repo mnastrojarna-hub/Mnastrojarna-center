@@ -9,6 +9,10 @@
  * SOLID / TRACE (→ plná šrafa), 3DFACE (→ uzavřená křivka), WIPEOUT / IMAGE (→ rám), MLINE (→ křivky),
  * ACAD_TABLE (→ vložení bloku tabulky), REGION / 3DSOLID / BODY (→ uchované v ext.raw pro zápis zpět).
  * Entity s normálou −Z (zrcadlené OCS) se převedou do WCS. Co převést nejde, je spočítané v poznámce importu.
+ * Objekty vlastních tříd s náhradní grafikou (AutoCAD Mechanical: normálie STDPART2D, kusovník ACMPARTLIST, pozice
+ * ACMBALLOON, drsnost ACMSURFSYM, tolerance tvaru ACMFCFRAME, základny ACMDATUMID, řezy AMDTSECTIONSYM…) se převedou
+ * na anonymní blok + vložení s `ext.acm` (třída, handle, u normálií označení z dat třídy) – jeden objekt = jedna entita.
+ * U kót se uchová původní zobrazený text (`ext.shown`, z bloku *D) a rozpor „text ≠ geometrie“ jde do poznámky importu.
  */
 import {
   Arc,
@@ -78,7 +82,10 @@ import { unitsFromCode } from "../units";
 import { interpolateFit } from "../curves";
 import { decodeMText, decodeText, deg, geomKey, H_ALIGN, norm360, unitV, V_ALIGN } from "./common";
 import { DIMVAR_CODE } from "./to-cad";
-import type { DraftRawObject, HatchEdge, PatLine, XRec } from "./types";
+import type { UnknownPayload } from "./acad-patch";
+import { checkDimText, parseDimText } from "./dimtext";
+import { codePageDecoder, payloadStrings, proxyToEntities, stdPartInfo, type ProxyTables } from "./proxy";
+import type { AcmData, DraftRawObject, HatchEdge, PatLine, XRec } from "./types";
 import { readXData } from "./xdata";
 
 export type ImportNote = {
@@ -94,10 +101,18 @@ export type ImportNote = {
   /** uchované bez zobrazení (REGION, 3DSOLID…) */
   kept: Record<string, number>;
   warnings: string[];
+  /** kóty, jejichž zobrazený text (blok *D) neodpovídá geometrii – handle, text, změřená hodnota */
+  dimText?: { h: string; shown: string; measured: number }[];
+  /** kóty se zaokrouhleným textem (geometrie má víc desetinných míst) */
+  dimRounded?: number;
+  /** negrafické objekty vlastních tříd (AutoCAD Mechanical – databáze kusovníku, normy…) podle třídy */
+  customObjects?: Record<string, number>;
 };
 
 export type FromCadOpts = {
   fmt: "dxf" | "dwg";
+  /** data tříd neznámých objektů DWG (acad-patch.ts captureUnknownPayloads) */
+  payloads?: UnknownPayload[];
   /** průběh převodu entit (0–1) */
   onProgress?: (f: number) => void;
 };
@@ -150,6 +165,14 @@ type Ctx = {
   onProgress?: (f: number) => void;
   lastP: number;
   dimStyles: Map<string, DraftDimStyle>;
+  /** anonymní bloky objektů s náhradní grafikou (AutoCAD Mechanical) */
+  extraBlocks: DraftBlock[];
+  /** dekodér řetězců podle kódové stránky výkresu */
+  dec: TextDecoder;
+  /** handle → data třídy neznámé entity */
+  payload: Map<number, Uint8Array>;
+  /** tabulky hladin a typů čar v pořadí výkresu – indexy podřízených entit náhradní grafiky (proxy.ts) */
+  proxyTables: ProxyTables;
 };
 const inc = (r: Record<string, number>, k: string) => void (r[k] = (r[k] ?? 0) + 1);
 
@@ -298,6 +321,16 @@ export function cadToDraft(doc: CadDocument, opts: FromCadOpts): { model: DraftM
     onProgress: opts.onProgress,
     lastP: 0,
     dimStyles: new Map(dimStyles.map((d) => [d.name.toLowerCase(), d])),
+    extraBlocks: [],
+    dec: codePageDecoder(String((h as unknown as { codePage?: string }).codePage ?? "")),
+    payload: new Map((opts.payloads ?? []).filter((p) => p.entity).map((p) => [p.handle, p.bytes])),
+    proxyTables: {
+      layers: [...doc.layers!].map((L) => {
+        const n = decodeText(L.name);
+        return layers.some((l) => l.name === n) ? n : LAYER0;
+      }),
+      linetypes: [...doc.lineTypes!].map((t) => (/^bylayer$/i.test(t.name) ? undefined : /^byblock$/i.test(t.name) ? "ByBlock" : /^continuous$/i.test(t.name) ? "Continuous" : linetypes.some((x) => x.name === decodeText(t.name)) ? decodeText(t.name) : undefined)),
+    },
   };
   // počet entit pro průběh; id z MNCAD XDATA se zaberou předem (bloky se převádí před modelovým prostorem)
   const records = [...doc.blockRecords!];
@@ -355,6 +388,8 @@ export function cadToDraft(doc: CadDocument, opts: FromCadOpts): { model: DraftM
   }
   note.layouts = layouts.length;
   const entities = convertList(ctx, doc.modelSpace!.entities, "model");
+  blocks.push(...ctx.extraBlocks);
+  const acmData = customObjectData(ctx, opts.payloads ?? []);
   // hranice šraf podle handle → id
   for (const hb of ctx.hatchBoundary) {
     const ids = hb.handles.map((x) => ctx.handleId.get(x)).filter((x): x is string => !!x);
@@ -366,7 +401,7 @@ export function cadToDraft(doc: CadDocument, opts: FromCadOpts): { model: DraftM
     entities,
     ...(blocks.length ? { blocks } : {}),
     ...(layouts.length ? { layouts } : {}),
-    ext: { ...model.ext, ...(ctx.raw.length ? { raw: ctx.raw } : {}), appIds: [...doc.appIds!].map((a) => a.name).filter((n) => !/^(ACAD|MNCAD)$/i.test(n)) },
+    ext: { ...model.ext, ...(ctx.raw.length ? { raw: ctx.raw } : {}), ...(acmData.length ? { acmData } : {}), appIds: [...doc.appIds!].map((a) => a.name).filter((n) => !/^(ACAD|MNCAD)$/i.test(n)) },
   };
   // seq za nejvyšší číslo id
   for (const id of ctx.used) {
@@ -556,7 +591,24 @@ function finish(ctx: Ctx, ent: Entity, ne: NewEntity, main: boolean): DraftEntit
     const jj = readXData(ent).mncad?.json;
     if (jj) applyJson(e, jj);
   }
+  if (e.type === "dimension") noteDimText(ctx, e as DraftEntity & DDimension);
   return e;
+}
+
+/**
+ * Zobrazený text kóty (blok *D, `ext.shown`) × změřená geometrie × DIMLFAC – až nad hotovou entitou, aby platilo
+ * i přepsání DIMLFAC jednotlivé kóty (XDATA ACAD DSTYLE / MNCAD ov z našeho zápisu), ne jen styl.
+ */
+function noteDimText(ctx: Ctx, e: DraftEntity & DDimension) {
+  const shown = e.ext?.shown;
+  const meas = e.measurement;
+  if (shown === undefined || meas === undefined || !Number.isFinite(meas) || e.kind === "angular" || e.kind === "angular3") return;
+  const style = ctx.dimStyles.get(String(e.style ?? "standard").toLowerCase());
+  const lfac = Number((e.overrides as { dimlfac?: unknown } | undefined)?.dimlfac ?? (style as { dimlfac?: number } | undefined)?.dimlfac ?? 1) || 1;
+  const info = parseDimText(shown);
+  const chk = checkDimText(info, meas * lfac);
+  if (chk === "mismatch") (ctx.note.dimText ??= []).push({ h: e.ext?.handle ?? "?", shown: info.text, measured: +(meas * lfac).toFixed(6) });
+  else if (chk === "rounded") ctx.note.dimRounded = (ctx.note.dimRounded ?? 0) + 1;
 }
 
 /** doplnění údajů z MNCAD JSON (zapsal je náš export) */
@@ -828,7 +880,58 @@ function fromEnt(ctx: Ctx, ent: Entity, space: string): NewEntity | NewEntity[] 
     }
     return skip(ctx, name);
   }
+  // vlastní třídy (AutoCAD Mechanical…) a ACAD_PROXY_ENTITY s náhradní grafikou → anonymní blok + vložení
+  if ((ent as { proxyGeometries?: unknown[] }).proxyGeometries?.length) {
+    const r = proxyOf(ctx, ent, name);
+    if (r) return r;
+  }
   return skip(ctx, name);
+}
+
+/**
+ * Náhradní grafika objektu vlastní třídy → anonymní blok `*U<handle>` (souřadnice výkresu, bod vložení 0,0) a jeho
+ * vložení s `ext.dxf` = třída a `ext.acm` (třída, handle, texty grafiky, u STDPART2D údaje normálie z dat třídy).
+ */
+function proxyOf(ctx: Ctx, ent: Entity, name: string): NewEntity | null {
+  const geoms = (ent as { proxyGeometries?: unknown[] }).proxyGeometries ?? [];
+  const r = proxyToEntities(geoms, ctx.dec, ctx.proxyTables);
+  if (!r.entities.length) return null;
+  const hex = ent.handle ? ent.handle.toString(16).toUpperCase() : "";
+  const blockName = `*U${ent.handle ? ent.handle : ++ctx.seq}`;
+  const ents: DraftEntity[] = r.entities.map((ne) => {
+    let id: string;
+    do id = `e${++ctx.seq}`;
+    while (ctx.used.has(id) || ctx.reserved.has(id));
+    ctx.used.add(id);
+    return { ...ne, id } as DraftEntity;
+  });
+  ctx.extraBlocks.push({ name: blockName, base: [0, 0], entities: ents, anonymous: true } as DraftBlock);
+  const acm: AcmData = { cls: name, h: hex };
+  const texts = r.texts.filter((t) => t.trim());
+  if (texts.length) acm.texts = texts.slice(0, 400);
+  const raw = ent.handle ? ctx.payload.get(ent.handle) : undefined;
+  if (raw) {
+    const strs = payloadStrings(raw, ctx.dec);
+    if (/^STDPART/i.test(name)) Object.assign(acm, stdPartInfo(strs));
+    else if (strs.length) acm.strs = strs.slice(0, 40);
+  }
+  inc(ctx.note.converted, name);
+  return { type: "insert", block: blockName, p: [0, 0], sx: 1, sy: 1, rot: 0, ext: { dxf: name, acm } } as unknown as NewEntity;
+}
+
+/** negrafické objekty vlastních tříd (databáze kusovníku ACMDATAENTRYPART, ACMBOMROW…) – čitelné řetězce z dat třídy */
+function customObjectData(ctx: Ctx, payloads: UnknownPayload[]): AcmData[] {
+  const out: AcmData[] = [];
+  const by: Record<string, number> = {};
+  for (const p of payloads) {
+    if (p.entity) continue;
+    inc(by, p.cls);
+    if (!/^ACM(DATAENTRYPART|BOMROW|BOM)$/i.test(p.cls)) continue;
+    const strs = payloadStrings(p.bytes, ctx.dec);
+    if (strs.length) out.push({ cls: p.cls, h: p.handle.toString(16).toUpperCase(), strs: strs.slice(0, 60) });
+  }
+  if (Object.keys(by).length) ctx.note.customObjects = by;
+  return out;
 }
 const skip = (ctx: Ctx, name: string): null => {
   inc(ctx.note.skipped, name);
@@ -894,6 +997,8 @@ function dimOf(ctx: Ctx, d: DimensionAligned | DimensionRadius | DimensionDiamet
     /* bez přepsání */
   }
   const tp = d.isTextUserDefinedLocation ? z(d.textMiddlePoint) : undefined;
+  const shownT = shownDimText(d);
+  const shown = shownT?.s;
   return {
     type: "dimension",
     ...o,
@@ -903,8 +1008,28 @@ function dimOf(ctx: Ctx, d: DimensionAligned | DimensionRadius | DimensionDiamet
     ...(tr ? { textRot: tr } : {}),
     ...(Object.keys(ov).length ? { overrides: ov } : {}),
     ...(meas !== undefined && Number.isFinite(meas) ? { measurement: meas } : {}),
-    ...(d.block?.name ? { ext: { block: decodeText(d.block.name) } } : {}),
+    ...(d.block?.name || shown !== undefined ? { ext: { ...(d.block?.name ? { block: decodeText(d.block.name) } : {}), ...(shownT ? { shown: shownT.s, ...(shownT.at ? { shownAt: shownT.at } : {}) } : {}) } } : {}),
   } as unknown as NewEntity;
+}
+
+/** zobrazený text kóty z jejího anonymního bloku (*D): MTEXT / TEXT v pořadí bloku (formátovací kódy zůstanou) a poloha prvního */
+function shownDimText(d: { block?: BlockRecord | null }): { s: string; at?: Vec2 } | undefined {
+  try {
+    const parts: string[] = [];
+    let at: Vec2 | undefined;
+    for (const e of d.block?.entities ?? []) {
+      if (e instanceof MText) {
+        parts.push(decodeMText(e.value ?? ""));
+        at ??= v2(e.insertPoint);
+      } else if (e instanceof TextEntity && !(e instanceof AttributeDefinition) && !(e instanceof AttributeEntity)) {
+        parts.push(decodeText(e.value ?? ""));
+        at ??= v2(e.insertPoint);
+      }
+    }
+    return parts.length ? { s: parts.join(" "), ...(at ? { at } : {}) } : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function leaderOf(L: Leader): NewEntity {

@@ -123,7 +123,6 @@ otočení	rotation
 plocha {0} není válcová plocha díry	face {0} is not the cylindrical face of a hole
 plochý	flat
 Plochy komponenty „{0}“ (souřadnice sestavy, {1}) – rovinné: {2}, válcové/kuželové: {3}{4}	Faces of component „{0}“ (assembly coordinates, {1}) – planar: {2}, cylindrical/conical: {3}{4}
-plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít	faces, mate, mates, component, remove, duplicate, isolate, hide, show, fix, release, pattern, mirror, bolt, subassembly, dissolve, edit, done, open
 plochy: {0}	faces: {0}
 počet	count
 podsestava ({0} ks)	sub-assembly ({0} pcs)
@@ -176,7 +175,6 @@ ukotvená	fixed
 ukotvená ⚓	fixed ⚓
 úprava v kontextu je dostupná jen v aplikaci	editing in context is only available in the application
 uvolněná	released
-v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …	at x y z, rotation rx ry rz, move dx dy dz, turn X 90, fixed, release, hide, show, color #hex, name "…", number "…", group "…", material …
 válcové	cylindrical
 válcové plochy: {0}	cylindrical faces: {0}
 vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	mate „{0}“ is in the assembly {1}× – give its number: {2}
@@ -193,7 +191,6 @@ vazba: neznámá volba „{0}“ (plochu zadejte hned za názvem komponenty: F12
 vazbu Ukotvit nelze otočit	the Fix mate cannot be flipped
 Vazby sestavy „{0}“: {1}	Mates of assembly „{0}“: {1}
 Vazby: {0}	Mates: {0}
-vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název nebo pořadí #3; po přesunu se vazby přepočítají	component properties as in the panel (position, rotation, fixed, visibility, description, BOM material); component = name or position #3; mates are recomputed after a move
 výpis vazeb (číslo, druh, komponenty a plochy, hodnota, stav ok / konflikt) a úprava vazby podle čísla nebo názvu; po změně se vazby přepočítají	list of mates (number, type, components and faces, value, status ok / conflict) and editing a mate by number or name; mates are recomputed after a change
 záložka „{0}“ je otevřená {1}× – zadejte číslo: {2}	tab „{0}“ is open {1}× – give its number: {2}
 záložka „{0}“ není otevřená – záložky: {1}	tab „{0}“ is not open – tabs: {1}
@@ -203,4 +200,3 @@ záložky jsou dostupné jen v aplikaci	tabs are only available in the applicati
 zapnuta	enabled
 zavřít: zavřít záložku ["název"|N] – bez názvu zavře aktivní záložku	close: close tab ["name"|N] – without a name it closes the active tab
 zobrazená	shown
-sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže)	assembly: inserts a part from an open tab as a component (mates by text: assembly mate …, see below)

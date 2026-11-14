@@ -19,9 +19,16 @@
  *    Oprava hledá jen záznam bloku (BLOCK_RECORD).
  * 5. Čtení hladin DXF (DxfTablesSectionReader._readLayer): barva 62 se čte bez znaménka (−6 → 65530), takže vypnutá
  *    hladina (záporná barva) byla zapnutá s barvou 7 – ve všech verzích, ASCII i binárně. Oprava čte se znaménkem.
+ * 7. Čtení DWG (DwgObjectReader._readUnknownEntity / _readUnknownNonGraphicalObject): objekty vlastních tříd
+ *    (AutoCAD Mechanical STDPART2D, ACMDATAENTRYPART, ACMBOMROW…) acad-ts přečte jen se společnou hlavičkou a data
+ *    třídy zahodí. Během `captureUnknownPayloads` se tato data (bajty od konce hlavičky do konce objektu) uloží
+ *    stranou – čtení pokračuje beze změny (poloha čtečky se vrátí).
+ * 8. Čtení DXF (DxfSectionReaderBase.readCommonEntityCodes): náhradní grafika entit vlastních tříd (92 + 310) se
+ *    přeskakovala – AutoCAD Mechanical v DXF tak zmizel stejně jako v DWG. Oprava ji u neznámých entit uloží.
  */
 import {
   ACadVersion,
+  DwgObjectReader,
   AttributeBase,
   Block,
   BlockRecord,
@@ -32,6 +39,8 @@ import {
   DwgStreamReaderBase,
   DwgStreamWriterBase,
   DxfBlockSectionReader,
+  DxfSectionReaderBase,
+  UnknownEntity,
   DxfCode,
   DxfSectionWriterBase,
   DxfSubclassMarker,
@@ -60,6 +69,8 @@ export function applyAcadPatches(): void {
   patchR12BlockReader();
   patchBlockBasePoint();
   patchLayerColorReader();
+  patchUnknownPayload();
+  patchDxfUnknownProxyGraphics();
   if (LE) {
     const wp = (DwgStreamWriterBase as unknown as { prototype: Record<string, unknown> }).prototype;
     if (typeof wp.writeBitDoubleWithDefault === "function")
@@ -333,5 +344,74 @@ function patchLayerColorReader(): void {
     }
     if (index >= 1 && index <= 255) layer.color = new Color(index);
     return true;
+  };
+}
+
+/** data třídy neznámého objektu DWG (oprava 7) */
+export type UnknownPayload = { cls: string; handle: number; entity: boolean; bytes: Uint8Array };
+let payloadSink: UnknownPayload[] | null = null;
+/** největší uchovaná data jednoho objektu (bajty) */
+const PAYLOAD_MAX = 65536;
+
+/** spustí čtení a vrátí s výsledkem i data tříd neznámých objektů DWG (AutoCAD Mechanical…) */
+export function captureUnknownPayloads<T>(fn: () => T): { result: T; payloads: UnknownPayload[] } {
+  applyAcadPatches();
+  const prev = payloadSink;
+  const sink: UnknownPayload[] = [];
+  payloadSink = sink;
+  try {
+    return { result: fn(), payloads: sink };
+  } finally {
+    payloadSink = prev;
+  }
+}
+
+/** oprava 7: data tříd neznámých objektů DWG */
+function patchUnknownPayload(): void {
+  const op = (DwgObjectReader as unknown as { prototype: Record<string, unknown> }).prototype;
+  const grab = (self: Rec, tpl: Rec, c: Rec | null, entity: boolean) => {
+    if (!payloadSink) return;
+    try {
+      const r = self._objectReader;
+      const start = Number(r.positionInBits());
+      const end = Number(self._objectInitialPos) + Number(self._size) * 8;
+      const n = Math.floor((end - start) / 8);
+      if (!(n > 0)) return;
+      const bytes: Uint8Array = r.readBytes(Math.min(n, PAYLOAD_MAX));
+      r.setPositionInBits(start);
+      const obj = tpl?.cadObject as Rec | undefined;
+      payloadSink.push({ cls: String(c?.dxfName ?? obj?.objectName ?? "?"), handle: Number(obj?.handle ?? 0), entity, bytes: bytes.slice() });
+    } catch {
+      /* data se nepodařilo přečíst – objekt zůstane bez nich */
+    }
+  };
+  for (const [name, entity] of [["_readUnknownEntity", true], ["_readUnknownNonGraphicalObject", false]] as const) {
+    const orig = op[name] as ((this: Rec, c: Rec | null) => Rec) | undefined;
+    if (typeof orig !== "function") continue;
+    op[name] = function readUnknownWithPayload(this: Rec, c: Rec | null) {
+      const t = orig.call(this, c);
+      grab(this, t, c, entity);
+      return t;
+    };
+  }
+}
+
+/** oprava 8: náhradní grafika neznámých entit v DXF (92 / 160 počet bajtů, 310 data) */
+function patchDxfUnknownProxyGraphics(): void {
+  const rp = (DxfSectionReaderBase as unknown as { prototype: Record<string, unknown> }).prototype;
+  const orig = rp.readCommonEntityCodes as ((this: Rec, template: Rec, isExtendedData: { value: boolean }, map: unknown) => void) | undefined;
+  if (typeof orig !== "function" || typeof rp._readProxyBytes !== "function") return;
+  rp.readCommonEntityCodes = function readCommonEntityCodesProxy(this: Rec, template: Rec, isExtendedData: { value: boolean }, map: unknown) {
+    const code = this._reader.code;
+    if ((code === 92 || code === 160) && template?.cadObject instanceof UnknownEntity && Number(this._reader.valueAsInt) > 0) {
+      isExtendedData.value = false;
+      const bytes = this._readProxyBytes(310) as Uint8Array | null;
+      if (bytes?.length) template.proxyGraphics = bytes;
+      // čtečka už stojí na další skupině – volající ji nesmí přeskočit (stejně jako za XDATA)
+      this.lockPointer = false;
+      isExtendedData.value = true;
+      return;
+    }
+    return orig.call(this, template, isExtendedData, map);
   };
 }

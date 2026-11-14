@@ -75,6 +75,16 @@ function drawPage(pdf: JsPdf, d: PdfPage, f: PdfFonts) {
 
   for (const p of d.polys) {
     if (p.pts.length < 2) continue;
+    if (p.img) {
+      // logo razítka jako bitmapa (PNG / JPEG); nečitelný obrázek → jen rámeček
+      try {
+        const kind = /^data:image\/jpe?g/i.test(p.img.src) ? "JPEG" : "PNG";
+        pdf.addImage(p.img.src, kind, p.img.x, p.img.y, p.img.w, p.img.h, undefined, "FAST");
+        continue;
+      } catch {
+        /* rámeček níže */
+      }
+    }
     const st = LAYER_STYLE[p.layer];
     const gray = st.color === "#111" ? 17 : st.color === "#222" ? 34 : 51;
     if (p.fill) {

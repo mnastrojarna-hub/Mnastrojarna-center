@@ -35,6 +35,23 @@ export type DraftRawObject = {
   acisVersion?: number;
 };
 
+/**
+ * Objekt vlastní třídy DWG (AutoCAD Mechanical) převedený z náhradní grafiky: třída, handle, texty grafiky
+ * (čísla pozic, buňky kusovníku, hodnoty drsnosti…) a údaje z dat třídy (u normálií STDPART2D větev databáze,
+ * norma, druh, pohled a označení; u ostatních čitelné řetězce).
+ */
+export type AcmData = {
+  cls: string;
+  h: string;
+  texts?: string[];
+  strs?: string[];
+  branch?: string;
+  std?: string;
+  type?: string;
+  view?: string;
+  desig?: string;
+};
+
 declare module "../model" {
   interface DraftEntityExt {
     /** původní typ objektu DWG/DXF, liší-li se od druhu entity (SOLID, TRACE, 3DFACE, POLYLINE, POLYLINE3D, WIPEOUT, IMAGE, MLINE, ACAD_TABLE, MULTILEADER, SHAPE) */
@@ -57,6 +74,11 @@ declare module "../model" {
     image?: { file?: string; size?: Vec2; u?: Vec2; v?: Vec2; p?: Vec2; kind?: string };
     /** neviditelné hrany 3DFACE (70) */
     edges?: number;
+    /** objekt vlastní třídy (AutoCAD Mechanical) převedený z náhradní grafiky – viz AcmData */
+    acm?: AcmData;
+    /** kóta: původní zobrazený text z anonymního bloku *D (MTEXT s formátovacími kódy) a jeho poloha */
+    shown?: string;
+    shownAt?: Vec2;
   }
   interface DraftDocExt {
     /** hlavičkové proměnné DWG/DXF, které model nepoužívá (název bez $ → hodnota) – zapíší se zpět */
@@ -67,6 +89,8 @@ declare module "../model" {
     appIds?: string[];
     /** textový styl: velké písmo (SHX big font) a příznaky podle názvu stylu */
     styleExt?: Record<string, { bigFont?: string; flags?: number }>;
+    /** negrafické objekty AutoCAD Mechanical (databáze kusovníku ACMDATAENTRYPART, ACMBOMROW) – čitelné řetězce */
+    acmData?: AcmData[];
   }
 }
 

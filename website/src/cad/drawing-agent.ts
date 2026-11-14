@@ -7,18 +7,24 @@
  */
 import type { DrawingCmd, SheetRef, TitleField } from "./agent-drawing";
 import { VIEW_CS } from "./agent-drawing";
-import { defaultDrawingOptions, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
-import { linMeaning, type SmartDims } from "./drawing-dims";
+import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
+import { linMeaning, type SmartDims, type SmartReport } from "./drawing-dims";
+import { overdeterminedChain, sameSize, toleranceCheck, type ChainMember, type RefTolDim, type TolDim } from "./drawing-functional";
 import { threadsOfDoc } from "./drawing-doc";
 import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
 import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
 import { applyViewsCmd, viewsStatusLines } from "./drawing-views-agent";
-import { cadLocale, tr } from "./i18n";
+import { cadLocale, getLang, tr } from "./i18n";
+import { applyGeneralTol, applyTitleFields, titleRevisionCheck, titleStatusLines, type TitleCmdField } from "./agent-title";
+import { inheritTitle } from "./title-block";
+import { loadSettings } from "./settings";
 import { MATERIALS } from "../lib/mesh-metrics";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec3 } from "./types";
 import { drawingKey, drawingSets, drawingsLine, inDrawing, nextDrawingName, resolveDrawing, setSheets, sheetCount, sheetPos } from "./drawing-sets";
 import type { DrawingExportResult } from "./drawing-export";
+import { issueLine, issuesOf, type DrawingIssue } from "./drawing-issues";
+import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
 
 export { annLabel, dimValue, findDims } from "./drawing-marks";
 
@@ -26,13 +32,42 @@ export type SmartResult = DrawingResult & { smart?: SmartDims };
 export type DrawingCompute = (doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions>) => Promise<SmartResult>;
 /** Údaje, které zná jen aplikace: hmotnost (výsledek stavby), kusovník a pozice komponent sestavy – jako výkresové prostředí. */
 export type DrawingExtras = { massKg?: number; bom?: BomItem[]; balloons?: BalloonItem[] };
-/** Prostředí příkazů výkresu v aplikaci: doplňky razítka a otevřené záložky (pro „výkres model "záložka"“). */
-export type DrawingEnv = { extras?: (doc: CadDoc) => DrawingExtras; tabs?: () => { title: string; doc: CadDoc }[] };
+/**
+ * Prostředí příkazů výkresu v aplikaci: doplňky razítka a otevřené záložky (pro „výkres model "záložka"“);
+ * `referenceDims` = tolerované kóty předlohy (výtah z DWG/DXF/PDF – balík předlohy) pro `výkres kontrola tolerancí`.
+ */
+export type DrawingEnv = { extras?: (doc: CadDoc) => DrawingExtras; tabs?: () => { title: string; doc: CadDoc }[]; referenceDims?: (doc: CadDoc) => RefTolDim[] };
 
-const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+/** číslo do protokolu: na setiny, desetinná čárka podle jazyka (EN 6.8, CS / DE 6,8) */
+const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", getLang() === "en" ? "." : ",");
+/** rozměr na tisíciny (hodnoty kót – B7) */
+const fmtN3 = (n: number) => String(Math.round(n * 1000) / 1000).replace(".", ",");
+/** číslo na 3 desetinná místa s oddělovačem jazyka (protokol) */
+const fmtN3L = (n: number) => String(Math.round(n * 1000) / 1000 || 0).replace(".", getLang() === "en" ? "." : ",");
+/** desetinná místa tolerance v zápisu jazyka (cs/de „0,005“, en „0.005“) – lícování (H7, g6) zůstávají */
+export const localDecimals = (t: string) => {
+  const sep = (1.5).toLocaleString(cadLocale()).includes(",") ? "," : ".";
+  return t.replace(/(\d)[.,](\d)/g, `$1${sep}$2`);
+};
 /** název pohledu; pohled dalšího modelu na listu (`m:<id>`) názvem modelu z voleb listu */
 const VIEW_NAME = (k: string, o?: Partial<DrawingOptions>) =>
   k.startsWith("m:") ? (o?.models?.find((m) => modelViewKey(m.id) === k)?.name ?? k) : k.startsWith("aux:") ? tr("pohled {0}", k.slice(4)) : k.startsWith("cut:") ? tr("řez {0}–{0}", k.slice(4)) : tr(k === "section" ? "řez" : k === "sheet" ? "list" : VIEW_CS[k as keyof typeof VIEW_CS] ?? k);
+
+/**
+ * Tabulka děr textem (15. vlna, B9): jen díry – konkávní válcové plochy; vnější válce soustruženého dílu se nevypisují. Řádek
+ * = jedna díra („A1 M8 Ø6,8 ⌴Ø20 [0; 60]“), pohled tabulky (díry s osou ve směru pohledu) a díry s jinou osou, které v ní nejsou.
+ */
+function holeTableLine(res: DrawingResult, o?: Partial<DrawingOptions>): string {
+  const info = res.holeTableInfo;
+  const other = info?.other.length ? info.other.map((h) => tr("Ø{0} osa {1}", fmtN(h.d), h.axis)).join(", ") : "";
+  const view = info ? VIEW_NAME(info.view, o) : "";
+  if (res.holes?.length) {
+    const rows = res.holes.map((h) => `${h.tag} ${h.thread ? `${h.thread} Ø${fmtN(h.d)}${(h.steps ?? []).map((x) => ` ⌴Ø${fmtN(x)}`).join("")}` : holeRowText(h, fmtN)} [${fmtN(h.x)}; ${fmtN(h.y)}]`).join(" · ");
+    return tr("Tabulka děr (pohled {0}, {1}): {2}", view, res.holes.length, rows) + (other ? tr(" · díry s jinou osou nejsou v tabulce ({0}): {1}", info!.other.length, other) : "");
+  }
+  if (other) return tr("Tabulka děr: v pohledu {0} žádná díra s osou ve směru pohledu; díry s jinou osou ({1}): {2} – přidejte pohled ve směru jejich osy", view, info!.other.length, other);
+  return tr("Tabulka děr: žádné díry (vnější válce – hřídel, osazení – se nevypisují)");
+}
 
 // ---------------------------------------------------------------- aktivní list (textové příkazy ↔ výkresové prostředí)
 
@@ -91,9 +126,15 @@ export function newSheet(doc: CadDoc, n = 1): DrawingDoc {
     id: uid(),
     name: tr("List {0}", n),
     options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>,
-    meta: { name: doc.name, number: doc.props?.number ?? "", author: doc.props?.author ?? "", revision: doc.props?.revision ?? "", tolerance: "" },
+    meta: { name: doc.name, number: doc.props?.number ?? "", author: doc.props?.author ?? "", revision: doc.props?.revision ?? "", tolerance: "", ...defaultTemplate() },
     annotations: [],
   };
+}
+
+/** šablona razítka nových listů z Nastavení (výchozí ISO 7200 se do listu nezapisuje) */
+function defaultTemplate(): { template?: string } {
+  const t = loadSettings().titleTemplate;
+  return t && t !== "iso7200" ? { template: t } : {};
 }
 
 /**
@@ -193,6 +234,62 @@ function userEdited(a: DrawingAnnotation): boolean {
   return a.type === "callout" && !!a.tol?.trim();
 }
 
+// ---------------------------------------------------------------- funkční rozměry a kontrola tolerancí (B8, 5.3)
+
+type DimA = Extract<DrawingAnnotation, { type: "dim" }>;
+/** vygenerovaná kóta uzavřeného řetězu rotačního dílu (článek `len:c:` nebo celková délka `len:all`) */
+const isChainDim = (a: DrawingAnnotation): a is DimA => a.type === "dim" && !!a.auto && (a.auto.startsWith("len:c:") || a.auto === "len:all");
+/** rozměry řetězu v pohledu `view` (hodnota, nese-li toleranci) – přeurčený řetěz (B8) */
+function chainMembers(views: PlacedView[], anns: DrawingAnnotation[], view: string): ChainMember[] {
+  return anns.filter((a): a is DimA => isChainDim(a) && a.view === view).map((a) => ({ value: dimValue(views, a), tol: !!splitSuffix(a).user.trim() }));
+}
+
+/** doplněk řádku „✓ Chytré kóty …“: funkční rozměry a způsob kótování poloh děr podle pohledů */
+function smartExtras(o: DrawingOptions, rep: SmartReport): string {
+  const parts: string[] = [];
+  if (o.dimFunctional?.length) parts.push(tr("funkční {0}", o.dimFunctional.map(fmtN3).join(", ")));
+  const hm = Object.entries(rep.holeMode ?? {}).filter(([, m]) => m !== "edges");
+  if (hm.length) parts.push(tr("polohy děr {0}", hm.map(([k, m]) => `${m === "ordinate" ? tr("souřadnicově") : tr("tabulkou děr")} (${VIEW_NAME(k, o)})`).join(", ")));
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
+/**
+ * `výkres kontrola tolerancí` (5.3): funkční rozměry listu (kótovat … funkční …) a tolerované kóty předlohy (`ref`)
+ * musí být na listu kótou s tolerancí. Řádky protokolu (⚠ / ✓ a seznam) a hlášení `drawing.tolerance-missing`.
+ */
+export function tolCheckLines(views: PlacedView[], anns: DrawingAnnotation[], o: Partial<DrawingOptions>, refDims: RefTolDim[] | null = null): { lines: string[]; issues: DrawingIssue[] } {
+  // null = předloha není připojena (výtah kót předlohy dodá balík předlohy) – kontrolují se jen funkční rozměry
+  const ref = refDims ?? [];
+  const dims: TolDim[] = anns.flatMap((a, i): TolDim[] => {
+    if (a.type === "dim" && a.kind !== "angle") return [{ id: shortId(i), label: annLabel(views, a), value: dimValue(views, a), view: a.view, tolerance: splitSuffix(a).user.trim() || (a.text && /[±+\-]\d|[A-Za-z]{1,2}\d/.test(a.text) ? a.text : ""), reference: a.prefix === "(", dia: a.kind === "diameter" || a.kind === "radius" || /^[ØM]/.test(a.prefix ?? "") }];
+    if (a.type === "callout") {
+      const m = /[ØM](\d+(?:[.,]\d+)?)/.exec(a.lines[0] ?? "");
+      return m ? [{ id: shortId(i), label: annLabel(views, a), value: Number(m[1].replace(",", ".")), view: a.view, tolerance: a.tol ?? "", reference: false, dia: true }] : [];
+    }
+    return [];
+  });
+  const rows = toleranceCheck(dims, o.dimFunctional ?? [], ref);
+  if (!rows.length) return { lines: [tr("✓ kontrola tolerancí: list nemá funkční rozměry (kótovat … funkční …) ani tolerované kóty předlohy – není co kontrolovat")], issues: [] };
+  const at = (d: TolDim) => `${d.id} ${d.label} (${VIEW_NAME(d.view, o)})`;
+  const issues: DrawingIssue[] = [];
+  const body = rows.map((r) => {
+    const what = r.kind === "functional" ? tr("funkční") : tr("předloha {0}", r.expect ?? "");
+    const real = r.dims.filter((d) => !d.reference);
+    let text: string;
+    if (r.status === "ok") return `  ✓ ${fmtN3(r.value)} ${what}: ${real.filter((d) => d.tolerance).map(at).join(", ")}`;
+    if (r.status === "missing-dim") text = tr("{0} ({1}): na listu není kóta s touto hodnotou – doplňte ji (kótovat / výkres kóta …)", fmtN3(r.value), what);
+    else if (r.status === "reference") text = tr("{0} ({1}): na listu jen pomocná kóta {2} – výkres tolerance {0} … ji převede na funkční", fmtN3(r.value), what, r.dims.map(at).join(", "));
+    else text = tr("{0} ({1}): kóta bez tolerance {2} – výkres tolerance {3} …", fmtN3(r.value), what, real.map(at).join(", "), real[0].id);
+    issues.push({ level: "warn", code: "drawing.tolerance-missing", kind: "tolerance-missing", text, data: { value: r.value, source: r.kind, status: r.status, ids: r.dims.map((d) => d.id), ...(r.expect ? { expected: r.expect } : {}) } });
+    return `  ⚠ ${text}`;
+  });
+  const nf = rows.filter((r) => r.kind === "functional").length;
+  const head = refDims === null
+    ? issues.length ? tr("⚠ kontrola tolerancí: bez tolerance {0} z {1} funkčních rozměrů (předloha není připojena – kóty předlohy se nekontrolují)", issues.length, rows.length) : tr("✓ kontrola tolerancí: všech {0} funkčních rozměrů má toleranci (předloha není připojena – kóty předlohy se nekontrolují)", rows.length)
+    : issues.length ? tr("⚠ kontrola tolerancí: bez tolerance {0} z {1} rozměrů (funkčních {2}, z předlohy {3})", issues.length, rows.length, nf, rows.filter((r) => r.kind === "reference").length) : tr("✓ kontrola tolerancí: všech {0} rozměrů má toleranci (funkčních {1}, z předlohy {2})", rows.length, nf, rows.filter((r) => r.kind === "reference").length);
+  return { lines: [head, ...body], issues };
+}
+
 // ---------------------------------------------------------------- popisky a duplicity
 
 /** Skupiny kót se stejným významem (stejná osa a interval, stejná kružnice, stejný popis) – duplicity. */
@@ -214,8 +311,11 @@ export function dimDuplicates(views: PlacedView[], anns: DrawingAnnotation[]): D
 
 // ---------------------------------------------------------------- provedení příkazů
 
-/** `file` = soubor z `výkres export …` (aplikace ho uloží / stáhne) */
-export type DrawingCmdResult = { doc: CadDoc; log: string[]; changed: boolean; open: boolean; file?: DrawingExportResult };
+/**
+ * `file` = soubor z `výkres export …` (aplikace ho uloží / stáhne); `issues` = strukturovaná hlášení posledního výpočtu
+ * listu (řez mimo těleso ✗, pohledy se nevejdou ⚠ … – cad/drawing-issues.ts) pro protokol.
+ */
+export type DrawingCmdResult = { doc: CadDoc; log: string[]; changed: boolean; open: boolean; file?: DrawingExportResult; issues?: DrawingIssue[] };
 
 const TITLE_KEY: Record<TitleField, string> = { name: "název", number: "číslo", author: "kreslil", revision: "revize", date: "datum", material: "materiál", tolerance: "nepředepsané", edges: "hrany", note: "poznámka" };
 const today = () => new Date().toLocaleDateString(cadLocale());
@@ -225,17 +325,41 @@ function titleLines(doc: CadDoc, s: DrawingDoc): string[] {
   const m = s.meta as Partial<DrawingMeta>;
   const v = (x?: string) => x?.trim() || "—";
   const revs = m.revisions ?? [];
+  // revize jako na listu: prázdné pole = poslední z tabulky revizí; revize mimo tabulku = upozornění
+  const rev = titleRevisionCheck(m);
   return [
-    tr("Razítko: název {0} · číslo {1} · kreslil {2} · revize {3} · datum {4} · materiál {5}", v(m.name || doc.name), v(m.number), v(m.author), v(m.revision), m.date?.trim() || today(), v(materialLabel(doc))),
+    tr("Razítko: název {0} · číslo {1} · kreslil {2} · revize {3} · datum {4} · materiál {5}", v(m.name || doc.name), v(m.number), v(m.author), rev.shown, m.date?.trim() || today(), v(materialLabel(doc))),
     revs.length ? tr("Revize ({0}): {1}", revs.length, revs.map((r) => `${r.rev} ${r.date || "—"} „${r.note}“${r.author ? ` (${r.author})` : ""}`).join(" · ")) : tr("Revize: žádné"),
+    ...(rev.warning ? [tr("⚠ {0}", rev.warning)] : []),
+    // šablona, promítání, logo, další pole, nepředepsané tolerance a jak se pole vešla (cad/agent-title.ts) – s názvem
+    // a materiálem z dokumentu jako na listu
+    ...titleStatusLines(doc, { ...m, name: m.name || doc.name, material: materialLabel(doc) }, sheetOptions(s).projection),
   ];
 }
+
+/** příkazy, u kterých protokol ukáže hlášení výpočtu listu řádkem ✗ / ⚠ (ostatní je vrací jen v `issues`) */
+const ISSUE_LINES = new Set<DrawingCmd["k"]>(["set", "dim", "views"]);
+const ISSUE_KINDS = new Set<DrawingIssue["kind"]>(["section-miss", "section-legacy", "sheet-fit", "view-lost", "hole-table-overlap"]);
 
 /**
  * Provede příkaz výkresu nad dokumentem – nad aktivním listem (`výkres list N`; chybí-li list, založí se první).
  * `compute` = výpočet výkresu v jádře; `env` = doplňky aplikace (kusovník, pozice, hmotnost, otevřené záložky).
+ * Výsledek nese `issues` posledního výpočtu listu; u voleb listu a kót je protokol ukáže i řádkem ✗ / ⚠ (B5, B6).
  */
-export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, env: DrawingEnv = {}): Promise<DrawingCmdResult> {
+export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute0: DrawingCompute, env: DrawingEnv = {}): Promise<DrawingCmdResult> {
+  let last: SmartResult | null = null;
+  const compute: DrawingCompute = async (d, m, o) => (last = await compute0(d, m, o));
+  const r = await applyCmd(doc0, cmd, compute, env);
+  const res = last as SmartResult | null;
+  if (!res) return r;
+  // stav výkresu sbírá hlášení všech vypsaných listů sám
+  const issues = cmd.k === "status" ? [...(r.issues ?? [])] : [...issuesOf(res), ...(r.issues ?? []).filter((i) => i.kind === "tolerance-missing" || i.kind === "section-legacy")];
+  if (cmd.k === "dim" && res.smart) for (const t of res.smart.report.skipped) issues.push({ level: "warn", code: "drawing.warning", kind: "dims-skipped", text: t });
+  const lines = ISSUE_LINES.has(cmd.k) || (cmd.k === "sheet" && "then" in cmd && !!cmd.then) ? issues.filter((i) => i.level === "error" || ISSUE_KINDS.has(i.kind)).map(issueLine) : [];
+  return { ...r, log: [...r.log, ...lines.filter((l) => !r.log.includes(l))], ...(issues.length ? { issues } : {}) };
+}
+
+async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, env: DrawingEnv): Promise<DrawingCmdResult> {
   if (doc0.kind === "assembly" && cmd.k === "dim" && cmd.mode === "smart") throw new Error(tr("Chytré kóty jsou pro díly – u sestavy použijte „kótovat celkově“ a pozice"));
   const doc: CadDoc = { ...doc0, drawings: doc0.drawings?.length ? [...doc0.drawings] : [newSheet(doc0)] };
   const created = !doc0.drawings?.length;
@@ -268,6 +392,24 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
       const o = { ...sheetOptions(sheet()), ...cmd.opts };
       put({ ...sheet(), options: o as unknown as Record<string, unknown> });
       log.push(tr("✓ výkres: {0}", cmd.summary.join(", ") || tr("beze změny voleb")));
+      // výpočet listu: řez mimo těleso a „pohledy se nevejdou“ jdou do protokolu (✗ / ⚠) a do `issues`
+      const res = await computeSheet();
+      // Starší zápis (skripty před vlnou 15 psaly odsazení řezu jako souřadnici na ose: `řez XZ odsazení -57` = rovina Y = −57).
+      // Číslo, které v dnešní konvenci (jako u skici) těleso mine, ale jako souřadnice ho protne, se vyloží postaru – řez
+      // se uloží v dnešní konvenci a protokol to řekne řádkem ⚠ i s dnešním zápisem (žádná tichá změna vstupu).
+      const sec = cmd.opts.section;
+      const range = sec?.normal ? ((res.issues ?? []).find((i) => i.kind === "section-miss")?.data?.offsetRange as [number, number] | undefined) : undefined;
+      if (sec && range) {
+        const legacy = sectionAt(sec.plane, sec.offset, sec.kind);
+        if (legacy.offset > range[0] + 1e-9 && legacy.offset < range[1] - 1e-9) {
+          put({ ...sheet(), options: { ...sheetOptions(sheet()), section: legacy } as unknown as Record<string, unknown> });
+          log[log.length - 1] = log[log.length - 1].replace(sectionText(sec), sectionText(legacy));
+          await computeSheet();
+          const ax = (["X", "Y", "Z"] as const)[SECTION_AXIS[sec.plane]];
+          const text = tr("řez {0} odsazení {1}: rovina {2} = {3} těleso míjí – číslo vyloženo postaru jako souřadnice {2} = {1} (zápis před sjednocením znaménka se skicou); dnes pište: výkres řez {0} odsazení {4}", sec.plane, fmtN3L(sec.offset), ax, fmtN3L(sectionCoord(sec)), fmtN3L(legacy.offset));
+          return done({ changed: true, open: true, issues: [{ level: "warn", code: "drawing.warning", kind: "section-legacy", text, data: { plane: sec.plane, typed: sec.offset, offset: legacy.offset, coord: sectionCoord(legacy) } }] });
+        }
+      }
       return done({ changed: true, open: true });
     }
     case "meta": {
@@ -277,15 +419,19 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
         const base = String(m.note ?? "").replace(/\s*·?\s*Nepředepsaná drsnost [^·]*/u, "").trim();
         m.note = [base, tr("Nepředepsaná drsnost {0}", cmd.value)].filter(Boolean).join(" · ");
         log.push(tr("✓ obecná drsnost {0} (poznámka u razítka)", cmd.value));
+      } else if (cmd.field === "tolerance") {
+        // ISO 2768 třída (mK, f H …), tabulka podle desetinných míst nebo text; „ne“ = zrušit (cad/title-block.ts)
+        log.push(applyGeneralTol(m, cmd.value));
       } else {
         m[cmd.field] = cmd.value;
-        log.push(cmd.field === "note" ? tr("✓ poznámka: {0}", cmd.value || "—") : cmd.field === "tolerance" ? tr("✓ nepředepsané tolerance {0}", cmd.value) : tr("✓ hrany: {0}", cmd.value));
+        log.push(cmd.field === "note" ? tr("✓ poznámka: {0}", cmd.value || "—") : tr("✓ hrany: {0}", cmd.value));
       }
       put({ ...sheet(), meta: m });
       return done({ changed: true, open: false });
     }
     case "dim": {
-      const o: DrawingOptions = { ...sheetOptions(sheet()), dimensions: cmd.mode, ...(cmd.style ? { dimStyle: cmd.style } : {}) };
+      // funkční rozměry a polohy děr se pamatují u listu (prázdné / auto = zrušit) – B8, B12
+      let o: DrawingOptions = { ...sheetOptions(sheet()), dimensions: cmd.mode, ...(cmd.style ? { dimStyle: cmd.style } : {}), ...(cmd.functional ? { dimFunctional: cmd.functional.length ? cmd.functional : undefined } : {}), ...(cmd.holes ? { dimHoles: cmd.holes === "auto" ? undefined : cmd.holes } : {}) };
       if (cmd.mode !== "smart") {
         const keep = sheet().annotations.filter((a) => !a.auto);
         const removed = sheet().annotations.length - keep.length;
@@ -293,44 +439,114 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
         log.push(cmd.mode === "overall" ? tr("✓ kóty: jen celkové rozměry (odstraněno vygenerovaných: {0})", removed) : cmd.mode === "auto" ? tr("✓ kóty: Auto + Ø – základní kóty zapečené do pohledů (odstraněno vygenerovaných: {0})", removed) : tr("✓ kóty: žádné automatické (odstraněno vygenerovaných: {0})", removed));
         return done({ changed: true, open: true });
       }
-      const res = await compute(doc, sheetMeta(doc, sheet(), idx, extras), o);
+      // polohy děr kótami (souřadnicově / od hran) = tabulka děr je na listu navíc (polohy dvakrát) → vypne se;
+      // tabulkou = tabulka se zapne (pohled tabulky volí jádro – ten, kde jsou díry)
+      let tableNote = "";
+      if ((cmd.holes === "ordinate" || cmd.holes === "chain") && o.holeTable) {
+        o = { ...o, holeTable: false };
+        tableNote = tr(" · tabulka děr vypnuta – polohy děr jsou kótami (zpět: kótovat díry tabulka)");
+      } else if (cmd.holes === "table") o = { ...o, holeTable: true };
+      let res = await compute(doc, sheetMeta(doc, sheet(), idx, extras), o);
       if (!res.smart) throw new Error(tr("jádro nevrátilo Chytré kóty"));
-      const m = mergeSmart(sheet().annotations, o, res.smart, true)!;
+      let m = mergeSmart(sheet().annotations, o, res.smart, true)!;
+      // B8: pomocná kóta s tolerancí = řetěz přeurčený funkčními rozměry → pomocnou bude funkční rozměr bez tolerance
+      const tolRef = m.annotations.find((a): a is DimA => isChainDim(a) && a.prefix === "(" && !!splitSuffix(a).user.trim());
+      let overNote = "";
+      if (tolRef && o.dimFunctional?.length) {
+        const value = dimValue(res.views, tolRef);
+        const od = overdeterminedChain(chainMembers(res.views, m.annotations, tolRef.view), value, o.dimFunctional);
+        if (od && "drop" in od) {
+          o = { ...o, dimFunctional: o.dimFunctional.filter((v) => !sameSize(v, od.drop)) };
+          const r2 = await compute(doc, sheetMeta(doc, sheet(), idx, extras), o);
+          if (r2.smart) {
+            res = r2;
+            m = mergeSmart(sheet().annotations, o, r2.smart, true)!;
+            overNote = tr("! řetěz byl přeurčený (funkční byly všechny jeho rozměry) – pomocnou kótou je funkční rozměr bez tolerance {0}, tolerovaný {1} zůstává funkční", fmtN3(od.drop), fmtN3(value));
+          }
+        } else overNote = tr("! pomocná kóta {0} nese toleranci – řetěz je přeurčený (všechny jeho rozměry jsou funkční a tolerované); zrušte funkčnost jednoho rozměru (kótovat … funkční …)", annLabel(res.views, tolRef));
+      }
       put({ ...sheet(), options: { ...o, smartGen: m.gen, smartOff: [] } as unknown as Record<string, unknown>, annotations: m.annotations });
-      const rep = res.smart.report;
+      const rep = res.smart!.report;
       const per = Object.entries(rep.perView).map(([k, n]) => `${VIEW_NAME(k, o)} ${n}`).join(", ");
-      log.push(tr("✓ Chytré kóty ({0}): {1} kót a popisů – {2} · očekávaných rozměrů {3}", o.dimStyle === "baseline" ? tr("od základny") : tr("řetězově"), res.smart.annotations.filter((a) => a.type !== "centerline").length, per || "—", rep.expected));
+      log.push(tr("✓ Chytré kóty ({0}): {1} kót a popisů – {2} · očekávaných rozměrů {3}", o.dimStyle === "baseline" ? tr("od základny") : tr("řetězově"), res.smart!.annotations.filter((a) => a.type !== "centerline").length, per || "—", rep.expected) + smartExtras(o, rep) + tableNote);
+      if (overNote) log.push(overNote);
+      for (const v of o.dimFunctional ?? []) if (!rep.functional?.some((x) => x === v)) log.push(tr("! funkční rozměr {0}: na listu není délková kóta s touto hodnotou (hodnoty kót: výkres stav)", fmtN3(v)));
       for (const s of rep.skipped) log.push(tr("! vynecháno: {0}", s));
       return done({ changed: true, open: true });
     }
-    case "tol": {
+    case "tolcheck": {
       const res = await computeSheet();
-      const views = res.views;
-      const anns = sheet().annotations;
-      const so = sheetOptions(sheet());
+      const r = tolCheckLines(res.views, sheet().annotations, sheetOptions(sheet()), env.referenceDims ? env.referenceDims(doc) : null);
+      log.push(...r.lines);
+      return { ...done({ changed: created, open: false }), ...(r.issues.length ? { issues: r.issues } : {}) };
+    }
+    case "tol": {
+      // desetinná čárka podle jazyka listu (skript s tečkami „-0.005“ → „-0,005“ na českém výkrese)
+      const tolS = localDecimals(cmd.tol);
+      const res = await computeSheet();
+      let views = res.views;
+      let anns = sheet().annotations;
+      let so = sheetOptions(sheet());
+      // kóta podle ČÍSELNÉ hodnoty modelu (±1e-6; B7), druhu (Ø, M, R), nebo id (a12); `pohled …` zúží výběr
       let hits = findDims(views, anns, cmd.target);
       if (/^a\d+$/i.test(cmd.target)) hits = resolveAnns(views, anns, cmd.target, true).map((i) => anns[i]);
-      if (!hits.length) throw new Error(tr("kóta „{0}“ na výkrese není – kóty: {1}", cmd.target, anns.filter((a) => a.type === "dim" || a.type === "callout").map((a) => annLabel(views, a)).join(", ") || "—"));
+      if (cmd.view) hits = hits.filter((a) => a.view === cmd.view);
+      const dimList = () => annList(views, anns, so, (a) => a.type === "dim" || a.type === "callout") || "—";
+      if (!hits.length) throw new Error(tr("kóta „{0}“{1} na výkrese není – kóty: {2}", cmd.target, cmd.view ? tr(" (pohled {0})", VIEW_NAME(cmd.view, so)) : "", dimList()));
       // pomocná kóta v závorce se netoleruje (ISO 129-1): shoduje-li se zadání i s jinou kótou, platí ta jiná
       const isRef = (a: DrawingAnnotation) => a.type === "dim" && a.prefix === "(";
-      if (hits.some(isRef) && !hits.every(isRef)) hits = hits.filter((a) => !isRef(a));
+      // starší dokument: ruční náhradní kóta (dřív se pomocná kóta tolerovat nedala) se stejnou hodnotou jako vygenerovaná
+      // pomocná kóta řetězu → převede se vygenerovaná a ruční duplicita se odstraní (B8)
+      const refHits = hits.filter(isRef);
+      const manual = refHits.length && isChainDim(refHits[0]) ? hits.filter((a) => !isRef(a)) : [];
+      const dupes = manual.length && manual.every((a) => !a.auto && a.type === "dim" && a.view === refHits[0].view && a.kind === (refHits[0] as DimA).kind) ? manual : [];
+      if (dupes.length) hits = refHits;
+      else if (refHits.length && refHits.length < hits.length) hits = hits.filter((a) => !isRef(a));
+      let converted = "";
+      if (hits.every(isRef) && so.dimensions === "smart" && isChainDim(hits[0])) {
+        // B8: tolerance na pomocné kótě = rozměr je funkční → řetěz se přepočte (pomocnou kótou bude jiný článek); byly-li by
+        // pak funkční všechny rozměry řetězu (přeurčený), pomocným bude funkční rozměr bez tolerance
+        const ref = hits[0] as DimA;
+        const value = dimValue(views, ref);
+        const members = chainMembers(views, anns, ref.view);
+        const od = overdeterminedChain(members, value, so.dimFunctional ?? []);
+        if (od && "stuck" in od) throw new Error(tr("rozměr {0} nelze tolerovat: řetěz {1} by byl přeurčený – všechny jeho rozměry jsou funkční a ostatní mají toleranci, jeden musí zůstat pomocný (ISO 129-1); zrušte funkčnost jednoho z nich (kótovat … funkční …)", fmtN3(value), members.map((x) => fmtN3(x.value)).join(" · ")));
+        const drop = od && "drop" in od ? od.drop : null;
+        const o2: DrawingOptions = { ...so, dimFunctional: [...(so.dimFunctional ?? []).filter((v) => !sameSize(v, value) && !(drop !== null && sameSize(v, drop))), Math.round(value * 1000) / 1000] };
+        const r2 = await compute(doc, sheetMeta(doc, sheet(), idx, extras), o2);
+        const m2 = r2.smart ? mergeSmart(anns, o2, r2.smart) : null;
+        const same = m2?.annotations.find((a) => a.auto === ref.auto);
+        if (m2 && same && !isRef(same)) {
+          // ruční duplicity převedené kóty pryč
+          const gone = new Set(dupes.map((a) => a.id));
+          put({ ...sheet(), options: { ...o2, smartGen: m2.gen } as unknown as Record<string, unknown>, annotations: m2.annotations.filter((a) => !gone.has(a.id)) });
+          const now = m2.annotations.find((a) => a.type === "dim" && a.prefix === "(" && a.view === ref.view);
+          const nowL = now ? annLabel(r2.views, now) : tr("celková délka");
+          converted = drop !== null ? tr(" – rozměr {0} je nyní funkční; řetěz by byl přeurčený, pomocnou kótou je proto funkční rozměr bez tolerance {1}", fmtN3(value), nowL) : tr(" – rozměr {0} je nyní funkční (pomocnou kótou řetězu je {1})", fmtN3(value), nowL);
+          if (dupes.length) converted += tr(" · odstraněna ruční náhradní kóta {0}", dupes.map((a) => annLabel(views, a)).join(", "));
+          hits = [same];
+          views = r2.views;
+          anns = sheet().annotations;
+          so = sheetOptions(sheet());
+        } else if (dupes.length) hits = dupes; // převod nevyšel: tolerance na ruční kótu jako dřív
+      }
       if (hits.every(isRef)) {
         const ref = hits[0] as Extract<DrawingAnnotation, { type: "dim" }>;
         const chain = ref.auto?.startsWith("len:c:");
         const others = anns.filter((a) => a.type === "dim" && !isRef(a) && a.view === ref.view && a.kind === ref.kind && (!chain || !!a.auto?.startsWith("len:c:")));
         throw new Error(tr("kóta „{0}“ je pomocná (v závorce) – pomocná kóta se netoleruje (ISO 129-1); tolerujte jiný článek řetězu: {1}", annLabel(views, ref), others.map((a) => annLabel(views, a)).join(", ") || "—"));
       }
-      if (hits.length > 1) throw new Error(tr("kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji (např. celým popiskem)", cmd.target, hits.length, hits.map((a) => `${annLabel(views, a)} (${VIEW_NAME(a.view, so)})`).join(", ")));
+      if (hits.length > 1) throw new Error(tr("kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji id (výkres tolerance a3 …) nebo pohledem (… pohled horní)", cmd.target, hits.length, hits.map((a) => `${shortId(anns.indexOf(a))} ${annLabel(views, a)} (${VIEW_NAME(a.view, so)})`).join(", ")));
       const h = hits[0];
-      const fit = /^[A-Za-z]{1,2}\d/.test(cmd.tol); // lícování (h6, H7, 6H) bez mezery, ±0,1 také bez mezery (ISO 129)
+      const fit = /^[A-Za-z]{1,2}\d/.test(tolS); // lícování (h6, H7, 6H) bez mezery, ±0,1 také bez mezery (ISO 129)
       // pole tolerance ISO 286 (H7, g6, H7/g6): úchylky podle jmenovitého rozměru kóty (výkres uložení je vyžaduje)
       const holeD = h.type === "callout" ? /Ø(\d+(?:[.,]\d+)?)/.exec(h.lines[0] ?? "") : null;
-      const iso = parseFit(cmd.tol) && ((h.type === "dim" && h.prefix !== "M") || holeD) ? cmd.tol.replace(/\s+/g, "") : null;
+      const iso = parseFit(tolS) && ((h.type === "dim" && h.prefix !== "M") || holeD) ? tolS.replace(/\s+/g, "") : null;
       const nominal = !iso ? 0 : h.type === "dim" ? dimValue(views, h) : Number(holeD![1].replace(",", "."));
       if (cmd.fit) {
-        if (!parseFit(cmd.tol)) throw new Error(tr("„{0}“ není pole tolerance ISO 286 – např. H7, g6, js6, H7/g6", cmd.tol));
+        if (!parseFit(tolS)) throw new Error(tr("„{0}“ není pole tolerance ISO 286 – např. H7, g6, js6, H7/g6", tolS));
         if (!iso) throw new Error(tr("uložení ISO 286 patří ke kótě rozměru nebo díry (Ø40, 25, Ø12 skrz) – u závitu použijte výkres tolerance M8 6H"));
-        if (!(iso && (iso.includes("/") ? iso.split("/").every((z) => fitDeviations(nominal, z)) : fitDeviations(nominal, iso)))) throw new Error(tr("pole {0} není pro rozměr {1} mm v ISO 286 definováno (tabulky do 500 mm)", cmd.tol, fmtN(nominal)));
+        if (!(iso && (iso.includes("/") ? iso.split("/").every((z) => fitDeviations(nominal, z)) : fitDeviations(nominal, iso)))) throw new Error(tr("pole {0} není pro rozměr {1} mm v ISO 286 definováno (tabulky do 500 mm)", tolS, fmtN(nominal)));
       }
       const next = anns.map((a) => {
         if (a.id !== h.id) return a;
@@ -338,14 +554,14 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
           // závit: „M20×1,5“ + „-6g“; jinak tolerance za hodnotou. Vygenerovaná část přípony (stoupání, „ (=90)“) zůstane,
           // dřívější tolerance se nahradí
           const p = splitSuffix(a);
-          const t = a.prefix === "M" ? `-${cmd.tol}` : fit || /^[±+-]/.test(cmd.tol) ? cmd.tol : ` ${cmd.tol}`;
+          const t = a.prefix === "M" ? `-${tolS}` : fit || /^[±+-]/.test(tolS) ? tolS : ` ${tolS}`;
           return { ...a, suffix: `${p.head}${t}${p.tail}`, ...(cmd.show ? { tolShow: cmd.show } : {}) };
         }
-        return a.type === "callout" ? { ...a, tol: cmd.tol, ...(cmd.show ? { tolShow: cmd.show } : {}) } : a;
+        return a.type === "callout" ? { ...a, tol: tolS, ...(cmd.show ? { tolShow: cmd.show } : {}) } : a;
       });
       put({ ...sheet(), annotations: next });
       const dev = iso ? fitSuffix(nominal, iso, cmd.show ?? h.tolShow ?? so.fitShow ?? "dev") : "";
-      log.push(tr("✓ tolerance {0} → {1} ({2})", cmd.tol, annLabel(views, next.find((a) => a.id === h.id)!) + (dev ? ` ${dev}` : ""), VIEW_NAME(h.view, so)));
+      log.push(tr("✓ tolerance {0} → {1} ({2})", tolS, annLabel(views, next.find((a) => a.id === h.id)!) + (dev ? ` ${dev}` : ""), VIEW_NAME(h.view, so)) + converted);
       return done({ changed: true, open: false });
     }
     case "views": {
@@ -357,7 +573,7 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
       const st = await drawingStatus(doc, compute, { sheet: cmd.sheet, extras });
       if (st.doc) Object.assign(doc, { drawings: st.doc.drawings });
       log.push(st.text);
-      return { doc, log, changed: !!st.doc || created, open: false };
+      return { doc, log, changed: !!st.doc || created, open: false, ...(st.issues?.length ? { issues: st.issues } : {}) };
     }
     case "sheet": {
       const list = doc.drawings!;
@@ -379,7 +595,8 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
           const s = newSheet(doc, n);
           const name = cmd.name?.trim() || s.name;
           if (set.some((k) => list[k].name.toLowerCase() === name.toLowerCase())) throw new Error(tr("list „{0}“ už existuje – {1}", name, sheetsLine(doc, idx)));
-          list.push(inDrawing({ ...s, name, meta: { name: cur.name ?? doc.name, number: cur.number ?? "", author: cur.author ?? "", revision: cur.revision ?? "", date: cur.date ?? "", tolerance: cur.tolerance ?? "" } }, drawingKey(sheet())));
+          // údaje razítka (šablona, logo, firma, zákazník …) převezme nový list z aktivního
+          list.push(inDrawing({ ...s, name, meta: { ...inheritTitle(cur), name: cur.name ?? doc.name, number: cur.number ?? "", author: cur.author ?? "", revision: cur.revision ?? "", date: cur.date ?? "", tolerance: cur.tolerance ?? "" } }, drawingKey(sheet())));
           idx = list.length - 1;
           activeSheet.set(sheet().id);
           log.push(tr("✓ nový list {0} (Chytré kóty) – další příkazy výkresu pracují s ním", sheetName(doc, idx)));
@@ -471,20 +688,26 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
     }
     case "title": {
       const f = cmd.fields;
-      const keys = Object.keys(f) as TitleField[];
+      const keys = Object.keys(f) as TitleCmdField[];
       if (!keys.length) {
         log.push(...titleLines(doc, sheet()));
         return { doc, log, changed: created, open: false };
       }
       const m = { ...(sheet().meta as Record<string, unknown>) };
-      for (const k of keys) if (k !== "material") m[k] = f[k];
+      // pole, šablona, logo (připojený soubor / data URL) a nepředepsané tolerance – cad/agent-title.ts
+      const applied = await applyTitleFields(m, f);
       put({ ...sheet(), meta: m });
       // číslo, autor a revize i do dokumentu (výchozí pro nové listy, sdílí se se souborem) – jako výkresové prostředí
       if (f.number !== undefined || f.author !== undefined || f.revision !== undefined) {
         doc.props = { ...(doc.props ?? {}), ...(f.number !== undefined ? { number: f.number } : {}), ...(f.author !== undefined ? { author: f.author } : {}), ...(f.revision !== undefined ? { revision: f.revision } : {}) };
       }
       if (f.material !== undefined) doc.materialName = f.material.trim() || undefined;
-      log.push(tr("✓ razítko: {0}", keys.map((k) => `${tr(TITLE_KEY[k])} „${f[k]}“`).join(", ")));
+      // dosavadní pole se v protokolu jmenují jako dřív (TITLE_KEY), nová podle cad/agent-title.ts
+      log.push(tr("✓ razítko: {0}", applied.parts.map((p, i) => (keys[i] in TITLE_KEY && !["tolerance", "logo", "template"].includes(keys[i]) ? `${tr(TITLE_KEY[keys[i] as TitleField])} „${f[keys[i]]}“` : p)).join(", ")));
+      for (const w of applied.warnings) log.push(tr("! {0}", w));
+      // revize mimo tabulku revizí se ohlásí hned (razítko a tabulka by si odporovaly)
+      const rw = f.revision !== undefined ? titleRevisionCheck(m as Partial<DrawingMeta>).warning : undefined;
+      if (rw) log.push(tr("! {0}", rw));
       return done({ changed: true, open: false });
     }
     case "rev": {
@@ -656,9 +879,10 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute: Dr
 /**
  * Textový stav výkresu – zpětná vazba pro agenta: aktivní list (nebo `sheet`: číslo / název / "all"), přehled listů,
  * souřadnice pohledů, kóty a značky s id, razítko a revize. Chytré kóty, které ještě nejsou na listu (změna modelu),
- * se do stavu započítají a vrátí se i upravený dokument (`doc`) k uložení.
+ * se do stavu započítají a vrátí se i upravený dokument (`doc`) k uložení. `issues` = strukturovaná hlášení listů
+ * (řez mimo těleso, pohledy se nevejdou … – cad/drawing-issues.ts; `data.sheetName` = název listu).
  */
-export async function drawingStatus(doc0: CadDoc, compute: DrawingCompute, opts: { sheet?: SheetRef | "all"; extras?: DrawingExtras } = {}): Promise<{ text: string; doc?: CadDoc }> {
+export async function drawingStatus(doc0: CadDoc, compute: DrawingCompute, opts: { sheet?: SheetRef | "all"; extras?: DrawingExtras } = {}): Promise<{ text: string; doc?: CadDoc; issues?: DrawingIssue[] }> {
   if (!doc0.features.length && !doc0.components?.length) return { text: tr("Výkres: model je prázdný – nejdřív vymodelujte díl") };
   const has = !!doc0.drawings?.length;
   const doc: CadDoc = has ? { ...doc0, drawings: [...doc0.drawings!] } : { ...doc0, drawings: [newSheet(doc0)] };
@@ -666,16 +890,18 @@ export async function drawingStatus(doc0: CadDoc, compute: DrawingCompute, opts:
   const which = opts.sheet === "all" ? setSheets(doc, activeSheetIndex(doc)) : [opts.sheet === undefined ? activeSheetIndex(doc) : resolveSheet(doc, opts.sheet)];
   let changed = false;
   const blocks: string[] = [];
+  const issues: DrawingIssue[] = [];
   for (const i of which) {
     const r = await sheetStatus(doc, i, has, compute, opts.extras, blocks.length === 0);
     changed = changed || r.changed;
     blocks.push(r.text);
+    issues.push(...r.issues.map((x) => ({ ...x, data: { ...(x.data ?? {}), sheetName: doc.drawings![i].name } })));
   }
-  return { text: blocks.join("\n\n"), ...(changed ? { doc } : {}) };
+  return { text: blocks.join("\n\n"), ...(changed ? { doc } : {}), ...(issues.length ? { issues } : {}) };
 }
 
 /** Stav jednoho listu (mění `doc.drawings[idx]`, když se doplnily Chytré kóty). */
-async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: DrawingCompute, extras: DrawingExtras | undefined, first: boolean): Promise<{ text: string; changed: boolean }> {
+async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: DrawingCompute, extras: DrawingExtras | undefined, first: boolean): Promise<{ text: string; changed: boolean; issues: DrawingIssue[] }> {
   const s = doc.drawings![idx];
   const o = sheetOptions(s);
   const res = await compute(doc, sheetMeta(doc, s, idx, extras), o);
@@ -696,7 +922,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const where = has ? (n > 1 ? tr(" (list {0}/{1})", pos + 1, n) : "") : tr(" (zatím neuložený – výchozí volby)");
   L.push(tr("Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}", s.name, where, res.sheet.name, o.orientation === "portrait" ? tr("na výšku") : tr("na šířku"), res.scale, [...views.map((v) => VIEW_NAME(v.key, o)), ...(o.views.iso ? [VIEW_NAME("iso")] : [])].join(", ") || "—", mode));
   if (first) L.push(sheetsLine(doc, activeSheetIndex(doc)));
-  const extra = [o.rotation ? tr("otočení {0}°", o.rotation) : "", o.section ? tr("řez {0} {1}", o.section.plane, o.section.kind === "half" ? tr("poloviční") : tr("celý")) : "", o.bomTable === false ? tr("bez kusovníku") : "", o.balloons === false ? tr("bez balónků") : ""].filter(Boolean);
+  const extra = [o.rotation ? tr("otočení {0}°", o.rotation) : "", o.section ? sectionStatusText(o.section, o.section.kind === "half" ? tr("poloviční") : tr("celý")) : "", o.bomTable === false ? tr("bez kusovníku") : "", o.balloons === false ? tr("bez balónků") : ""].filter(Boolean);
   if (extra.length) L.push(tr("Volby: {0}", extra.join(" · ")));
   const dims = anns.filter((a) => a.type === "dim" || a.type === "callout");
   L.push(tr("Kóty a popisy ({0}, z toho vygenerovaných {1}):", dims.length, dims.filter((a) => a.auto).length));
@@ -715,6 +941,12 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const miss = chk.filter((x) => !x.present);
   L.push(miss.length ? tr("Kontrola kót: chybí {0} z {1}: {2}", miss.length, chk.length, miss.map((x) => `${x.label} (${x.source})`).join("; ")) : tr("Kontrola kót: všech {0} očekávaných rozměrů je na listu", chk.length));
   if (res.smart?.report.skipped.length) L.push(tr("Vynecháno (nevešlo se nebo nejde okótovat automaticky): {0}", res.smart.report.skipped.join("; ")));
+  // tabulka děr: zapnutá volbou listu, nebo ji zapnuly Chytré kóty (polohy děr tabulkou – B12)
+  if (o.holeTable || res.holes?.length) L.push(holeTableLine(res, o));
+  // funkční rozměry, polohy děr a kontrola tolerancí (B8, B12, 5.3)
+  const hm = Object.entries(res.smart?.report.holeMode ?? {});
+  if (o.dimensions === "smart" && hm.length) L.push(tr("Polohy děr: {0}", hm.map(([k, m]) => `${m === "ordinate" ? tr("souřadnicové kóty od levého dolního rohu") : m === "table" ? tr("tabulka děr") : tr("kóty od hran")} (${VIEW_NAME(k, o)})`).join(" · ")));
+  if (o.dimFunctional?.length) L.push(tr("Funkční rozměry: {0} · {1}", o.dimFunctional.map(fmtN3).join(", "), tolCheckLines(views, anns, o).lines[0].replace(/^[✓⚠] /, "")));
   const m = s.meta as Partial<DrawingMeta>;
   L.push(tr("U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}", m.tolerance?.trim() || "—", m.edges?.trim() || "—", m.note?.trim() || "—"));
   L.push(...titleLines(doc, doc.drawings![idx]));
@@ -722,7 +954,10 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   L.push(...viewsStatusLines(res, o, anns, s.meta as Partial<DrawingMeta>));
   L.push(...viewRangeLines(res, o));
   if (res.warnings.length) L.push(tr("Varování výkresu: {0}", res.warnings.join("; ")));
-  return { text: L.join("\n"), changed };
+  const issues = issuesOf(res);
+  // řez mimo těleso: přesný důvod a rozsah odsazení (odznak ve výkresovém prostředí je stručný)
+  for (const i of issues) if (i.level === "error") L.push(issueLine(i));
+  return { text: L.join("\n"), changed, issues };
 }
 
 /** obálka modelu z pohledů výkresu (přední + horní / boční) – pro Kontrolu kót bez další stavby */

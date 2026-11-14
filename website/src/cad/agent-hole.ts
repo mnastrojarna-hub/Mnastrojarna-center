@@ -11,8 +11,9 @@
  */
 import { getLang, tr } from "./i18n";
 import { threadByName, type MetricThread } from "./defaults";
-import { DEFAULT_TIP, FLAT_TIP, drillFitsThread, holeDrillD, holeTip, tapDrillD, tapDrillOf, threadMinorD, tipAngleOk, type TapDrill } from "./hole-spec";
-import type { Feature } from "./types";
+import { DEFAULT_TIP, FLAT_TIP, drillFitsThread, holeDrillD, holeHeadKindOf, holeHeadOf, holeKindOf, holeTip, staleHeadOf, tapDrillD, tapDrillOf, threadMinorD, tipAngleOk, type TapDrill } from "./hole-spec";
+import { directionLabel } from "./refs";
+import type { Axis, Feature, Vec3 } from "./types";
 
 type HoleF = Extract<Feature, { type: "hole" }>;
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -204,10 +205,82 @@ export function holeBottomText(f: HoleF): string {
   return Math.abs(tip - DEFAULT_TIP) > 1e-9 ? tr(" · hrot {0}°", fmtD(tip)) : "";
 }
 
-/** Které z polí díry zadal uživatel / změnila úprava (upravit, prvek hole …). */
-export type HoleKeys = { diameter?: boolean; thread?: boolean; tapDrill?: boolean; tipAngle?: boolean };
+/**
+ * Které z polí díry zadal uživatel / změnila úprava (upravit, prvek hole …); `cb` = cbDiameter / cbDepth, `cs` = csDiameter / csAngle;
+ * `from` = druh díry před úpravou (upravit – změna druhu zahloubené díry na závitovou zahloubení ponechá).
+ */
+export type HoleKeys = { diameter?: boolean; thread?: boolean; tapDrill?: boolean; tipAngle?: boolean; kind?: boolean; head?: boolean; cb?: boolean; cs?: boolean; from?: NonNullable<HoleF["kind"]> };
 /** pole díry změněná úpravou (porovnání před / po) */
-export const changedHoleKeys = (a: HoleF, b: HoleF): HoleKeys => ({ diameter: a.diameter !== b.diameter, thread: a.thread !== b.thread, tapDrill: a.tapDrill !== b.tapDrill, tipAngle: a.tipAngle !== b.tipAngle });
+export const changedHoleKeys = (a: HoleF, b: HoleF): HoleKeys => ({
+  diameter: a.diameter !== b.diameter,
+  thread: a.thread !== b.thread,
+  tapDrill: a.tapDrill !== b.tapDrill,
+  tipAngle: a.tipAngle !== b.tipAngle,
+  kind: a.kind !== b.kind,
+  head: a.head !== b.head,
+  cb: a.cbDiameter !== b.cbDiameter || a.cbDepth !== b.cbDepth,
+  cs: a.csDiameter !== b.csDiameter || a.csAngle !== b.csAngle,
+  from: holeKindOf(a),
+});
+
+/**
+ * Zahloubení závitové díry (B4) pro `prvek hole …` a `upravit "Díra 1" …` – stejně jako text `díra … zahloubení 20 7 závit M8`:
+ * - `head=` přijme counterbore | countersink | none (i zahloubení / kuželové, DE Flachsenkung / Kegelsenkung), jinak chyba;
+ * - zahloubená díra (kind counterbore / countersink) se zadaným závitem = závitová díra se zahloubením (zahloubení + vrták + závit);
+ *   totéž `upravit … kind=tapped thread=M8` u zahloubené díry (`from`) – zahloubení se nikdy tiše nezahodí, bez něj: head=none;
+ * - závitová díra se zadanými rozměry zahloubení (cbDiameter + cbDepth / csDiameter) = zahloubení se doplní (`head`);
+ * - `head=none` u závitové díry smaže i uložené rozměry zahloubení (jinak by stavba hlásila ⚠ nevrtaného zahloubení);
+ * - `head` u díry bez závitu: zadané = chyba, zbylé po změně druhu = smaže se; rozměry zahloubení musí být kladné.
+ * Vrací poznámky do protokolu a klíče pro další pravidla vrtáku (převod na závitovou díru = změna závitu).
+ */
+function holeHeadRules(f: HoleF, keys: HoleKeys): { notes: string[]; keys: HoleKeys } {
+  const notes: string[] = [];
+  const rec = f as unknown as Record<string, unknown>;
+  let none = false; // head=none zadané výslovně
+  if (keys.head && rec.head !== undefined) {
+    const h = holeHeadKindOf(rec.head);
+    if (h === undefined) throw new Error(tr("head „{0}“ – zadejte counterbore (válcové zahloubení), countersink (kuželové zahloubení) nebo none", String(rec.head)));
+    if (h === null) {
+      delete f.head;
+      none = true;
+    } else f.head = h;
+  }
+  const t = threadByName(f.thread);
+  const headNote = (h: NonNullable<HoleF["head"]>, name: string) => tr("{0} + závit {1} = závitová díra se zahloubením (zahloubení + vrták + závit)", h === "counterbore" ? tr("zahloubení") : tr("kuželové zahloubení"), name);
+  if ((f.kind === "counterbore" || f.kind === "countersink") && (keys.thread || (keys.head && f.head)) && t) {
+    const was = f.kind;
+    f.kind = "tapped";
+    if (none) notes.push(tr("závit {0} + head=none = závitová díra bez zahloubení", t.name));
+    else {
+      f.head = f.head ?? was;
+      notes.push(headNote(f.head, t.name));
+    }
+    keys = { ...keys, thread: true };
+  } else if (f.kind === "tapped" && keys.kind && !keys.head && !f.head && (keys.from === "counterbore" || keys.from === "countersink") && t) {
+    // upravit … kind=tapped thread=M8 u zahloubené díry: zahloubení zůstane (jako text `díra … zahloubení 20 7 závit M8`)
+    f.head = keys.from;
+    notes.push(headNote(f.head, t.name) + tr(" – bez zahloubení: head=none"));
+  }
+  if (none && f.kind === "tapped") {
+    f.cbDiameter = 0;
+    f.cbDepth = 0;
+    delete f.csDiameter;
+    delete f.csAngle;
+  }
+  if (f.kind === "tapped" && !f.head && !keys.head) {
+    const cb = keys.cb && f.cbDiameter > 0 && f.cbDepth > 0;
+    const cs = keys.cs && (f.csDiameter ?? 0) > 0;
+    if (cb && cs) throw new Error(tr("díra: „zahloubení“ a „kuželové“ najednou nejde – zadejte jedno: zahloubení D2 H2 (válcové) nebo kuželové D2 [úhel]"));
+    if (cb || cs) f.head = cb ? "counterbore" : "countersink";
+  }
+  if (f.head && f.kind !== "tapped") {
+    if (keys.head) throw new Error(tr("head (zahloubení závitové díry) platí jen pro závitovou díru: kind=tapped thread=M8 head=counterbore cbDiameter=20 cbDepth=7"));
+    delete f.head; // zbylé po změně druhu díry (upravit kind=simple)
+  }
+  if (f.kind === "tapped" && f.head === "counterbore" && !(f.cbDiameter > 0 && f.cbDepth > 0)) throw new Error(tr("head=counterbore potřebuje průměr a hloubku zahloubení: cbDiameter=20 cbDepth=7"));
+  if (f.kind === "tapped" && f.head === "countersink" && !((f.csDiameter ?? 0) > 0)) throw new Error(tr("head=countersink potřebuje průměr kuželového zahloubení: csDiameter=10 [csAngle=90]"));
+  return { notes, keys };
+}
 
 /**
  * Pravidla vrtáku a dna pro `upravit "Díra 1" …` a `prvek hole …` – stejná jako text `díra` a formulář (žádná tichá změna):
@@ -218,8 +291,8 @@ export const changedHoleKeys = (a: HoleF, b: HoleF): HoleKeys => ({ diameter: a.
  * - změna závitu u vlastního vrtáku: vrták zůstane, jen když se k novému závitu hodí (D1 − P ≤ d < D), jinak tabulkový s poznámkou.
  * Upraví `f` na místě, vrací poznámky do protokolu.
  */
-export function holeFieldRules(f: HoleF, keys: HoleKeys): string[] {
-  const notes: string[] = [];
+export function holeFieldRules(f: HoleF, keys0: HoleKeys): string[] {
+  const { notes, keys } = holeHeadRules(f, keys0);
   const rec = f as unknown as Record<string, unknown>;
   if (keys.tapDrill && f.tapDrill !== undefined) {
     const m = tapDrillOf(f.tapDrill);
@@ -256,4 +329,132 @@ export function holeFieldRules(f: HoleF, keys: HoleKeys): string[] {
     if (f.diameter >= t.d - 5e-4) throw new Error(tr("díra: vrták Ø{0} musí být menší než závit {1} (Ø{2}) – průchozí díra pro šroub je díra bez závitu (např. díra 9 skrz)", fmtD(f.diameter), t.name, fmtD(t.d)));
   } else f.diameter = tapDrillD(t, f.tapDrill, f.diameter); // uložený průměr = skutečný vrták (tabulkový / jádro D1)
   return notes;
+}
+
+/* ───────────── polohy děr (B3: `v x y [z] v x y [z] …`) ───────────── */
+
+/** index osy vrtání a dvou souřadnic napříč (osa Z → x y, osa X → y z, osa Y → x z) */
+const axisIdx = (axis: Axis): { ai: number; ui: number; vi: number } => (axis === "X" ? { ai: 0, ui: 1, vi: 2 } : axis === "Y" ? { ai: 1, ui: 0, vi: 2 } : { ai: 2, ui: 0, vi: 1 });
+
+export type HolePositions = {
+  /** první poloha (u jedné díry jediná) */
+  position: Vec3;
+  /** dvě a více poloh: body díry v pořadí zápisu */
+  points?: Vec3[];
+  /** u každé polohy: souřadnice v ose vrtání se doplní na povrch tělesa (poloha zadaná dvěma čísly / bez „v“) */
+  fill: boolean[];
+};
+
+/**
+ * Polohy díry z textu po skupinách – každé slovo `v` (EN `at`, DE `bei`) = jedna poloha, čísla se mezi skupinami nikdy nemíchají:
+ * - 3 čísla = x y z;
+ * - 2 čísla = dvě souřadnice napříč osou vrtání (osa Z: x y, osa X: y z, osa Y: x z); souřadnice v ose vrtání = povrch tělesa
+ *   v místě díry (jako dosud u jedné polohy);
+ * - 1, 0 nebo 4 a více čísel = chyba řádku (s číslem polohy), nikdy tichá díra jinde;
+ * - bez `v` = jedna díra v počátku na povrchu tělesa (dosavadní chování).
+ */
+export function holePositions(groups: number[][], axis: Axis): HolePositions {
+  if (!groups.length) return { position: [0, 0, 0], fill: [true] };
+  const { ui, vi } = axisIdx(axis);
+  const pts: Vec3[] = [];
+  const fill: boolean[] = [];
+  groups.forEach((g, i) => {
+    const where = groups.length > 1 ? tr("poloha {0} ", i + 1) : "";
+    if (g.length !== 2 && g.length !== 3)
+      throw new Error(tr("díra: {0}„v {1}“ – počet čísel {2}; každá poloha má dvě čísla (v x y = na povrchu tělesa) nebo tři (v x y z), více děr: díra 8 skrz v 10 20 v 30 20 v 50 20 5", where, g.length ? g.map(fmtD).join(" ") : "…", g.length));
+    if (g.length === 3) {
+      pts.push([g[0], g[1], g[2]]);
+      fill.push(false);
+      return;
+    }
+    const p: Vec3 = [0, 0, 0];
+    p[ui] = g[0];
+    p[vi] = g[1];
+    pts.push(p);
+    fill.push(true);
+  });
+  return { position: [...pts[0]] as Vec3, ...(pts.length > 1 ? { points: pts } : {}), fill };
+}
+
+/**
+ * Doplní souřadnici v ose vrtání na povrch tělesa (díra „v x y“ bez z) – jedna poloha (`position`) nebo body `points`
+ * označené ve `fill` (poloha zadaná dvěma čísly). `top(u, v)` = nejvyšší bod povrchu tělesa v ose díry v místě (u, v)
+ * (síť modelu, `topAt`); mimo těleso → horní okraj obálky `bbox` a upozornění „!“ s číslem řádku. Upraví `f` na místě,
+ * vrací řádky upozornění do protokolu.
+ */
+export function fillHoleTops(f: HoleF, fill: boolean[] | undefined, top: (u: number, v: number) => number | null, bbox: [Vec3, Vec3], line: number): string[] {
+  const { ai, ui, vi } = axisIdx(f.axis);
+  const notes: string[] = [];
+  const put = (p: Vec3) => {
+    const h = top(p[ui], p[vi]);
+    if (h === null) notes.push(tr("! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})", line, p[ui], p[vi], bbox[1][ai]));
+    p[ai] = h ?? bbox[1][ai];
+  };
+  const pts = f.points?.flatMap((q) => (q.kind === "xyz" ? [q] : [])) ?? [];
+  if (fill && pts.length && pts.length === f.points?.length) {
+    pts.forEach((q, i) => {
+      if (fill[i]) put(q.p);
+    });
+    f.position = [...pts[0].p] as Vec3;
+  } else put(f.position);
+  return notes;
+}
+
+/**
+ * Zahloubení pro stav: „ zahl. Ø20×7“ (válcové, `which` "cb") / „ kuž. Ø16“ (kuželové, "cs"); i u závitové díry se zahloubením.
+ * Starší závitová díra bez `head` s uloženým zahloubením (staleHeadOf): „ (uložené zahl. Ø20×7 se nevrtá – chybí head)“.
+ */
+export function holeHeadText(f: HoleF, fmt: (n: number) => string, which: "cb" | "cs"): string {
+  const old = staleHeadOf(f);
+  if (old) {
+    if (which === "cb") return old.kind === "counterbore" ? tr(" (uložené zahl. Ø{0}×{1} se nevrtá – chybí head)", fmt(old.d), fmt(old.depth)) : "";
+    return old.kind === "countersink" ? tr(" (uložené kuž. Ø{0} se nevrtá – chybí head)", fmt(old.d)) : "";
+  }
+  const h = holeHeadOf(f);
+  if (!h || !(h.d > 0)) return "";
+  if (which === "cb") return h.kind === "counterbore" ? tr(" zahl. Ø{0}×{1}", fmt(h.d), fmt(h.depth)) : "";
+  return h.kind === "countersink" ? tr(" kuž. Ø{0}", fmt(h.d)) : "";
+}
+
+/** Více poloh díry pro stav: „ · polohy (3): [10; 20; 30] [30; 20; 30] [50; 20; 25]“ – vždy všechny (agent bez obrázku je čte ze stavu); jedna poloha = "". */
+export function holePointsText(f: HoleF, fmt: (n: number) => string): string {
+  const pts = f.points ?? [];
+  if (pts.length < 2) return "";
+  const list = pts.map((q) => (q.kind === "xyz" ? `[${q.p.map((v) => fmt(v)).join("; ")}]` : q.kind));
+  return tr(" · polohy ({0}): {1}", pts.length, list.join(" "));
+}
+
+const AXV: Record<Axis, Vec3> = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
+/** směr do stavu: hlavní osa „+Z“ / „−X“, jinak složky jednotkového vektoru „[0,707; 0; -0,707]“ */
+function dirText(v: Vec3): string {
+  const l = Math.hypot(...v) || 1;
+  const n = v.map((x) => Math.round((x / l) * 1e6) / 1e6 || 0);
+  const k = n.findIndex((x) => Math.abs(Math.abs(x) - 1) < 1e-6);
+  return k >= 0 ? `${n[k] > 0 ? "+" : "−"}${"XYZ"[k]}` : `[${n.map(fmtD).join("; ")}]`;
+}
+
+/**
+ * Skutečný směr vrtání pro stav (jako jádro build.ts holeTools): výchozí směr osy (osa Z = shora dolů, −Z) se nevypisuje,
+ * jinak „, vrtá +Z“ (`směr 0 0 1`, obráceně) / „, směr vrtání [0,707; 0; -0,707]“ (šikmá díra) / „, směr vrtání Hrana: E3“ (odkaz).
+ */
+export function holeDirText(f: HoleF): string {
+  const d = f.dirDef;
+  if (!d || d.kind === "vector" || d.kind === "axis") {
+    const base = !d ? AXV[f.axis] : d.kind === "axis" ? AXV[d.axis] : d.v;
+    const dir = base.map((x) => (f.flip ? x : -x) || 0) as Vec3; // výchozí: vrtání proti směru (shora dolů)
+    const dflt = AXV[f.axis].map((x) => -x) as Vec3;
+    const s = dirText(dir);
+    if (s === dirText(dflt)) return "";
+    return /^[+−]/.test(s) ? tr(", vrtá {0}", s) : tr(", směr vrtání {0}", s);
+  }
+  return tr(", směr vrtání {0}{1}", directionLabel(d), f.flip ? "" : tr(" (obráceně)"));
+}
+
+/** Užitečná délka závitu závitové díry (`hloubka-závitu`, i u průchozí díry) pro stav: „, délka závitu 12“; závit po celé hloubce = "". */
+export function holeThreadLenText(f: HoleF, fmt: (n: number) => string): string {
+  const td = f.threadDepth ?? 0;
+  if (f.kind !== "tapped" || !f.thread || !(td > 0)) return "";
+  const blind = f.end ? f.end.kind === "blind" : f.depth > 0;
+  if (blind && td >= f.depth - 1e-6) return "";
+  return tr(", délka závitu {0}", fmt(td));
 }

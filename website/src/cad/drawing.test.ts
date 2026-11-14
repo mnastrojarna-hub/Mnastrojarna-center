@@ -158,10 +158,11 @@ describe("tabulka děr, pozice, detail, revize, listy", () => {
     expect(d.holes![4].d).toBe(20);
     expect(d.svg).toContain("Tabulka děr");
     expect(d.svg).toContain("B1");
-    // souřadnice relativně k levé dolní díře
+    // souřadnice od levého dolního rohu obrysu půdorysu (základna jako u souřadnicových kót – w15), ne od krajní díry
     const a1 = d.holes![0];
-    expect(a1.x).toBe(0);
-    expect(d.holes!.map((h) => h.x)).toContain(60);
+    expect([a1.x, a1.y]).toEqual([10, 40]); // A1 = levá horní díra (x −30, y 15) → 10 od levé hrany, 40 od spodní
+    expect(d.holes!.map((h) => h.x)).toContain(70);
+    expect([d.holes![4].x, d.holes![4].y]).toEqual([40, 25]);
   });
   it("pozice (balónky) = počet komponent, odkazy na průmět středu", () => {
     const comps = [

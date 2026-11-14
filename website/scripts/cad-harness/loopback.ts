@@ -10,10 +10,11 @@ import path from "node:path";
 import * as r from "replicad";
 import { parseAgentText, selectEdges, selectFaces, docStatusText, type AgentOp } from "@/cad/agent";
 import { applyAsmCmd, compFaces, ensureBuilt, type AsmEnv, type PartFaces } from "@/cad/asm-agent";
-import type { TabInfo } from "@/cad/agent-asm";
+import { insertExtras, type TabInfo } from "@/cad/agent-asm";
 import { applySketchOp } from "@/cad/agent-sketch";
 import { applyDrawingCmd, type DrawingExtras } from "@/cad/drawing-agent";
 import { emptyAssembly, partComponent, sourceKey, computeBom, flattenAssembly } from "@/cad/assembly";
+import { springEffective } from "@/cad/asm-spring-geom";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type Feature } from "@/cad/types";
 import { applyEdit, freeName } from "@/cad/agent-edit";
 import { resolveDatumNames } from "@/cad/agent-prim";
@@ -185,7 +186,8 @@ export class Session {
     return [...this.tabs].reverse().find((t) => t.doc.kind === "assembly")?.doc ?? null;
   }
   private partInfo = (c: AsmComponent) => {
-    const res = this.asmCache.get(sourceKey(c.source));
+    // pružina: těleso v aktuální délce (jako stav a aplikace) – kusovník má řádek podle zdroje
+    const res = this.asmCache.get(sourceKey(springEffective(c).source)) ?? this.asmCache.get(sourceKey(c.source));
     const mt = MATERIALS.find((x) => x.id === (c.source.kind === "part" ? c.source.doc.material : "ocel")) ?? MATERIALS[0];
     return { material: mt.label, massKg: res?.metrics ? massKg(res.metrics.volume, mt.density) : undefined };
   };
@@ -326,7 +328,7 @@ export class Session {
             const key = op.tab.toLowerCase();
             const src = this.tabs.find((t) => t.doc.kind !== "assembly" && t.doc.name.toLowerCase() === key)?.doc;
             if (!src) throw new Error(`part "${op.tab}" is not among the tabs`);
-            d = { ...d, components: [...(d.components ?? []), partComponent(JSON.parse(JSON.stringify(src)) as CadDoc, { position: op.at, rotation: op.rotation }, op.fixed ? { fixed: true } : {})] };
+            d = { ...d, components: [...(d.components ?? []), partComponent(JSON.parse(JSON.stringify(src)) as CadDoc, { position: op.at, rotation: op.rotation }, insertExtras(d, op))] };
             break;
           }
           case "asm": {

@@ -2,10 +2,11 @@
 /**
  * Formulář díry – volby 12. vlny, stejné jako v textu (`díra … jádro | vrták | vrták 6,7 | dno ploché | hrot 120`, agent-hole.ts):
  * vrták závitové díry (tabulkový / jádro D1 podle ISO 965-1 / vlastní průměr) a dno slepé díry (kužel vrtáku s úhlem / ploché).
+ * 15. vlna: zahloubení závitové díry (`díra … zahloubení 20 7 závit M8` = zahloubení + vrták + závit, pole `head`).
  */
 import { tr } from "@/cad/i18n";
 import type { MetricThread } from "@/cad/defaults";
-import { DEFAULT_TIP, FLAT_TIP, holeTip, isFlatBottom, tapDrillD, threadChangePatch, threadMinorD, type TapDrill } from "@/cad/hole-spec";
+import { DEFAULT_TIP, FLAT_TIP, headBelowThread, holeTip, isFlatBottom, tapDrillD, threadChangePatch, threadMinorD, type TapDrill } from "@/cad/hole-spec";
 import type { Feature } from "@/cad/types";
 import { Info, Num, Seg } from "../props";
 
@@ -58,5 +59,48 @@ export function HoleBottomField({ f, set, b }: { f: HoleF; set: Set; b: (p: stri
       />
       {!flat && <Num label={tr("Úhel špičky vrtáku")} value={holeTip(f) ?? DEFAULT_TIP} min={60} suffix="°" bind={b("tipAngle")} onChange={(v) => set({ tipAngle: Math.min(170, Math.max(60, v)) })} />}
     </>
+  );
+}
+
+/**
+ * Zahloubení závitové díry (pole `head`): bez / válcové (Ø × hloubka) / kuželové (Ø, úhel) – zahloubení + vrták + závit,
+ * stejně jako text `díra … zahloubení 20 7 závit M8` a `prvek hole … head=counterbore`. Upozornění, je-li zahloubení menší než závit.
+ */
+export function TappedHeadField({ f, t, set, b }: { f: HoleF; t: MetricThread; set: Set; b: (p: string) => string }) {
+  const head = f.head ?? "none";
+  const pick = (v: "none" | "counterbore" | "countersink") => {
+    if (v === "none") return set({ head: undefined, cbDiameter: 0, cbDepth: 0, csDiameter: undefined, csAngle: undefined }); // jako head=none: bez uložených rozměrů
+    // výchozí rozměry: dosavadní hodnoty, jsou-li větší než závit, jinak zahloubení ~2× závit (sedlo pružiny) / sražení vstupu D + 1
+    if (v === "counterbore") return set({ head: v, cbDiameter: f.cbDiameter > t.d ? f.cbDiameter : Math.round(t.d * 2), cbDepth: f.cbDepth > 0 ? f.cbDepth : t.d });
+    set({ head: v, csDiameter: (f.csDiameter ?? 0) > t.d ? f.csDiameter : t.d + 1, csAngle: f.csAngle ?? 90 });
+  };
+  const low = headBelowThread(f);
+  return (
+    <div data-tapped-head className="space-y-3.5">
+      <Seg
+        label={tr("Zahloubení závitové díry")}
+        value={head}
+        options={[
+          { v: "none", l: tr("Bez") },
+          { v: "counterbore", l: tr("Válc. zahl.") },
+          { v: "countersink", l: tr("Kuž. zahl.") },
+        ]}
+        onChange={pick}
+      />
+      {head === "counterbore" && (
+        <div className="grid grid-cols-2 gap-2">
+          <Num label={tr("Ø zahloubení")} value={f.cbDiameter} min={0} bind={b("cbDiameter")} onChange={(v) => set({ cbDiameter: v })} />
+          <Num label={tr("Hl. zahloubení")} value={f.cbDepth} min={0} bind={b("cbDepth")} onChange={(v) => set({ cbDepth: v })} />
+        </div>
+      )}
+      {head === "countersink" && (
+        <div className="grid grid-cols-2 gap-2">
+          <Num label={tr("Ø zahloubení")} value={f.csDiameter ?? 0} min={0} bind={b("csDiameter")} onChange={(v) => set({ csDiameter: v })} />
+          <Num label={tr("Úhel")} value={f.csAngle ?? 90} min={30} suffix="°" bind={b("csAngle")} onChange={(v) => set({ csAngle: Math.min(170, v) })} />
+        </div>
+      )}
+      {head !== "none" && <Info>{tr("Vrtá se zahloubení, pod ním vrták Ø{0} a závit {1} – výkres: {2}.", fmtMm(tapDrillD(t, f.tapDrill, f.diameter)), t.name, head === "counterbore" ? `${t.name} + ⌴ Ø${fmtMm(f.cbDiameter)} ↧${fmtMm(f.cbDepth)}` : `${t.name} + ⌵ Ø${fmtMm(f.csDiameter ?? 0)} × ${fmtMm(f.csAngle ?? 90)}°`)}</Info>}
+      {low && <span data-head-warning className="block text-[11px] text-brand-600">{tr("⚠ Zahloubení Ø{0} je menší než závit {1} (Ø{2}) – závit zasahuje do zahloubení.", fmtMm(low.d), t.name, fmtMm(t.d))}</span>}
+    </div>
   );
 }

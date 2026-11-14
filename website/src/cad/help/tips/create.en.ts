@@ -163,7 +163,7 @@ export default {
     select: "With the form open click the face to drill into (sets Point on the surface and the axis).",
     steps: ["Hole type: Drilled, Counterbore, Countersink or Thread; enter the Diameter.", "Click the face (Point on the surface) or fill in Hole positions.", "Set the End condition (depth, through) and confirm OK."],
     cmd: "hole 8.5 through at 20 30",
-    note: "Thread: table drill (M8 → 6.8), minor diameter or a custom drill; blind holes also with a flat bottom.",
+    note: "Thread: table drill (M8 → 6.8), minor or custom; also with a counterbore (cbore + drill + thread); flat bottom.",
   },
   thread: {
     what: "Adds an ISO metric thread on a cylinder or in a hole – cosmetic or modelled.",
