@@ -12,6 +12,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 18:06 | BĚŽÍ workflow: `wf_0a444c37-b25` (fáze B – integrace hotová, `S/w14/bint.patch`; následuje akceptace) a `wf_1fd5cfa9-922` (`fix:geom`). |
 | 14. 11. 18:20 | Opakované testy vlny 15 prošly: 6 souborů, 97 / 97 (převodník, přehrání zkušebního i skutečného nástroje, výkres). E2e běží; `cad-w15-drawing` měl 2 FAIL kvůli staršímu zápisu řezu – sada upravena (−80 = mimo těleso, −20 = `⚠` starší zápis), po doběhnutí dávky ji pusť znovu samostatně. |
 | 14. 11. 18:40 | NOVÝ požadavek majitele: kola „vyplním tabulku a mám díl, extra snadno“ → vlna 19 (kapitola 7a). Spuštěn workflow `wf_a5f62aa9-09a` (návrh → jádro → průvodce + text), základ `3bb04d9`. |
+| 14. 11. 19:00 | Workflow `wf_1fd5cfa9-922` DOKONČEN: střižnice (geom) hotová vč. oprav 8 nálezů kontroly – commit `5b303bc` ve worktree `w17-geom`, patch `S/w17/geom.patch` (základ `bf91b0b`, 10 souborů). Výsledek agenta: 27/27 dílů platných, Σ 5241,7333 cm³, střižnice 450,46 cm³. Úkol C1 hotov, zbývá C2–C4. |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -167,7 +168,7 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 (worktree `w17-geom`, patch `S/w17/geom.patch`, základ `bf91b0b`) je implementovaný a zkontrolovaný; běží `fix:geom`
 (opravy nálezů kontroly). Zadání: `S/w17/brief.md`, „Package geom“.
 
-- [ ] C1. Počkej na dokončení (případně obnov `resumeFromRunId: "wf_1fd5cfa9-922"`), přečti zprávu `fix:geom` v deníku.
+- [x] C1. (hotovo 14. 11. 19:00) Počkej na dokončení (případně obnov `resumeFromRunId: "wf_1fd5cfa9-922"`), přečti zprávu `fix:geom` v deníku.
 - [ ] C2. Aplikuj `S/w17/geom.patch` na `main` (po úkolu B; když B ještě běží, klidně před ním – patch sahá hlavně do
       `src/cad/build.ts` a jádra). Kontroly podle kapitoly 2 + `e2e/cad-w17-geom` + sady `cad cad-agent cad-w12-parts
       cad-impeller` (regrese objemů).
