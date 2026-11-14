@@ -1723,7 +1723,7 @@ Hotový výkres (horní pohled = půdorys s dírami): \`4× M8 ↧10\` + \`Ø6,8
 \`90\` a \`50\` (závitové díry), \`60\` (průchozí díry); kapsa \`50\` × \`30\`, hloubka \`↧8\`, \`4× R5\` (kapsa je uprostřed – bez
 polohových kót); celkové \`120\` × \`80\`; v předním pohledu tloušťka \`20\`.
 
-### Příklad D – funkční rozměry, tolerance hodnotou a kontrola tolerancí
+### Příklad F – funkční rozměry, tolerance hodnotou a kontrola tolerancí
 
 \`\`\`
 nový díl Hřídel
