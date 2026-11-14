@@ -8,6 +8,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { cad } from "@/cad/client";
 import { cadLocale, tr } from "@/cad/i18n";
+import { scriptOfDoc } from "./doc-script-host";
 import { selectFaces, type MncadApi } from "@/cad/agent";
 import { pendingSelection } from "@/cad/agent-select";
 import {
@@ -826,5 +827,6 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
       const h = host();
       return saveProjectFile(h.doc(), name, h);
     },
+    script: async (opts) => (await scriptOfDoc(host().doc(), opts)).text,
   };
 }

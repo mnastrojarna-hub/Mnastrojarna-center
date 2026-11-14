@@ -139,6 +139,7 @@ export const TIP_MANIFEST: Record<TipPackage, readonly ManifestRow[]> = {
     ["menu:export/obj", "Wavefront OBJ (.obj)", "Data › Export 3D › Export ▼"],
     ["menu:export/glb", "glTF binární (.glb)", "Data › Export 3D › Export ▼"],
     ["menu:export/wrl", "VRML (.wrl)", "Data › Export 3D › Export ▼"],
+    ["menu:export/script", "Textový skript (.txt)", "Data › Export 3D › Export ▼"],
     ["menu:asm/na", "Nová prázdná sestava", "Data › Sestava › Sestava ▼"],
     ["menu:asm/nc", "Sestava z aktuálního dílu", "Data › Sestava › Sestava ▼"],
     ["menu:asm/mold", "Rám vstřikovací formy…", "Data › Sestava › Sestava ▼"],

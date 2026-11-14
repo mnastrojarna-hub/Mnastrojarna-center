@@ -355,6 +355,13 @@ export default {
     when: "Starší prohlížeče a programy, které novější formáty nečtou.",
     steps: ["Klikněte na VRML, zvolte místo a název souboru."],
   },
+  "menu:export/script": {
+    what: "Uloží dokument jako textový skript – stejné příkazy, jaké čte konzole Textové příkazy.",
+    when: "Úprava modelu v textu a nové spuštění, předání AI agentovi, porovnání dvou verzí.",
+    steps: ["Klikněte na Textový skript, zvolte místo a název.", "Text vložte do konzole – vznikne tentýž model v nové záložce."],
+    cmd: "export skript",
+    note: "Vygenerované kóty výkresu skript vytvoří znovu příkazem kótovat; ruční kóty nepřenáší.",
+  },
 
   // ── Data › Sestava, Ukázky ──
   asm: {

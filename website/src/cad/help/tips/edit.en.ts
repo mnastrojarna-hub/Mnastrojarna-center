@@ -355,6 +355,13 @@ export default {
     when: "Older viewers and programs that cannot read newer formats.",
     steps: ["Click VRML, choose the location and file name."],
   },
+  "menu:export/script": {
+    what: "Saves the document as a text script – the same commands the Text commands console reads.",
+    when: "Editing the model as text and re-running it, handing it to an AI agent, comparing two versions.",
+    steps: ["Click Text script, choose the location and name.", "Paste the text into the console – the same model appears in a new tab."],
+    cmd: "export script",
+    note: "Generated drawing dimensions are re-created by the dimension command; manual ones are not carried over.",
+  },
 
   // ── Data › Assembly, Samples ──
   asm: {

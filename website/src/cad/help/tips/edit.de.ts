@@ -355,6 +355,13 @@ export default {
     when: "Ältere Betrachter und Programme, die neuere Formate nicht lesen.",
     steps: ["Auf VRML klicken, Ort und Dateinamen wählen."],
   },
+  "menu:export/script": {
+    what: "Speichert das Dokument als Textskript – dieselben Befehle, die die Konsole Textbefehle liest.",
+    when: "Modell als Text bearbeiten und neu ausführen, an einen KI-Agenten geben, zwei Versionen vergleichen.",
+    steps: ["Auf Textskript klicken, Ort und Namen wählen.", "Text in die Konsole einfügen – dasselbe Modell entsteht in einem neuen Tab."],
+    cmd: "export skript",
+    note: "Erzeugte Zeichnungsmaße erstellt der Befehl bemaßen neu; manuelle Maße werden nicht übernommen.",
+  },
 
   // ── Daten › Baugruppe, Beispiele ──
   asm: {

@@ -387,8 +387,9 @@ describe("skica na ploše modelu a na pomocné rovině", () => {
     expect(r.feature.planeDef).toEqual({ kind: "face", ref: { kind: "face", index: 5, sig: { t: "PLANE", c: [20, 15, 20], s: 1200 } }, offset: 2, flip: true });
     expect(r.feature.plane).toEqual(resolvedPlane);
     expect(r.log).toBe("✓ Skica 1 na ploše F6 +2 mm (obráceně) – rovina: počátek [20; 15; 22], normála −Z, osa X skici +Y");
-    // nejdřív stavba dokumentu (těleso v jádře), pak plocha a otisk, nakonec stavba se skicou (vyřešená rovina)
-    expect(calls).toEqual(["build 1", "face 5", 'refInfo {"kind":"face","index":5}', "build 2"]);
+    // nejdřív stavba dokumentu (těleso v jádře), pak otisk plochy, nakonec stavba se skicou (vyřešená rovina); rovinnost se čte
+    // z topologie (stavba + inspekce v jednom požadavku jádra), ne z naposledy postaveného tělesa (`face`)
+    expect(calls).toEqual(["build 1", 'refInfo {"kind":"face","index":5}', "build 2"]);
     expect(doc.features).toHaveLength(1); // dokument mění až aplikace
     // pravidlem: horní plocha = F6, +X = F4
     const top = sketchOn("skica plocha horní").op;
@@ -401,6 +402,31 @@ describe("skica na ploše modelu a na pomocné rovině", () => {
     await expect(sketchOnPlane(many.feature, many, doc, kernel().k)).rejects.toThrow(/^pravidlu „rovinne“ odpovídá 3 rovinných ploch – zadejte ho jednoznačně/);
     const bad = sketchOn("skica plocha modrá").op;
     await expect(sketchOnPlane(bad.feature, bad, doc, kernel().k)).rejects.toThrow(/neznámé pravidlo pro plochy „modra“/);
+  });
+  it("plocha: jádro mezitím postavilo jinou záložku – rovinnost z topologie, otisk se ověří plochou a vyžádá znovu", async () => {
+    // `face` a `refInfo` čtou naposledy postavené těleso; rozhraní mezi dvěma požadavky postavilo jiný dokument (jiná plocha na indexu 5)
+    const { op } = sketchOn("skica plocha F6");
+    const calls: string[] = [];
+    let other = true; // jádro drží těleso jiné záložky, dokud dokument nepostavíme znovu
+    const k: SketchKernel = {
+      build: async (doc) => {
+        calls.push(`build ${doc.features.length}`);
+        if (calls.filter((c) => c.startsWith("build")).length >= 2) other = false;
+        const planes: Record<string, SketchPlane> = {};
+        for (const f of doc.features) if (f.type === "sketch" && f.planeDef) planes[f.id] = resolvedPlane;
+        return { metrics: { volume: 1, area: 1, bbox: [[0, 0, 0], [40, 30, 20]], faces: 6, edges: 12 }, status: [], resolved: { planes, datums: {} } };
+      },
+      face: async () => (calls.push("face"), { planar: false }),
+      refInfo: async () => (calls.push("refInfo"), other ? { sig: { t: "CYLINDER", c: [5, 5, 5], s: 77 } } : { sig: { t: "PLANE", c: [20, 15, 20], s: 1200 } }),
+      topology: async () => ({ faces: [{ index: 5, planar: true, normal: [0, 0, 1], center: [20, 15, 20], area: 1200, surface: "PLANE" }], bbox: [[0, 0, 0], [40, 30, 20]] }),
+      selectFaces,
+    };
+    const r = await sketchOnPlane(op.feature, op, box(), k);
+    expect(r.feature.planeDef).toEqual({ kind: "face", ref: { kind: "face", index: 5, sig: { t: "PLANE", c: [20, 15, 20], s: 1200 } } });
+    expect(calls).toEqual(["build 1", "refInfo", "build 1", "refInfo", "build 2"]);
+    // otisk, který ploše neodpovídá ani po opakování, se nezapíše (odkaz zůstane číslem plochy)
+    const never: SketchKernel = { ...k, refInfo: async () => ({ sig: { t: "CYLINDER", c: [5, 5, 5], s: 77 } }) };
+    expect((await sketchOnPlane(op.feature, op, box(), never)).feature.planeDef).toEqual({ kind: "face", ref: { kind: "face", index: 5 } });
   });
   it("plocha: chyby s nápovědou rovinných ploch", async () => {
     const doc = box();

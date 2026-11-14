@@ -7,7 +7,9 @@
  *  - `skica export dxf [skica] [jako název]` – skica jako DXF,
  *  - `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` (EN share, DE freigeben – „teilen“ je rozdělit
  *    tělesa) – sdílený odkaz,
- *  - `odkaz` (EN/DE link) – znovu vypíše poslední odkaz.
+ *  - `odkaz` (EN/DE link) – znovu vypíše poslední odkaz,
+ *  - `export skript [cs|en|de] [název]` (EN export script, DE export skript) – dokument jako textové příkazy
+ *    `<název>.mncad.txt` (cad/doc-script.ts).
  * Soubory se z konzole vždy stahují přímo (žádný dialog „Uložit jako“) a protokol napíše název, velikost a formát;
  * u STEP / BREP i kontrolu: soubor se znovu načte jádrem a porovná s modelem (tělesa, objem, obálka).
  *
@@ -32,7 +34,9 @@ export type OutCmd =
   /** sdílený odkaz; days null = bez omezení */
   | { kind: "share"; view?: "model" | "drawing"; days?: number | null; password?: string; from?: string; mode?: "link" | "store" }
   /** znovu vypsat poslední odkaz */
-  | { kind: "link" };
+  | { kind: "link" }
+  /** dokument jako textový skript `.mncad.txt` (cad/doc-script.ts); lang = jazyk klíčových slov (bez hodnoty jazyk rozhraní) */
+  | { kind: "script"; name?: string; lang?: "cs" | "en" | "de" };
 export type OutOp = { k: "out"; cmd: OutCmd; line: number };
 
 /* ───────────────────────── slova (CS / EN / DE) ───────────────────────── */
@@ -43,6 +47,7 @@ const EXPORT = W("export", "exportovat", "exportuj", "exportieren", "exportiere"
 // DE „teilen“ NE: je to rozdělit tělesa (splitbodies, agent.ts) – sdílení je „freigeben“
 const SHARE = W("sdílet", "sdílej", "sdílení", "share", "freigeben");
 const LINK = W("odkaz", "link");
+const SCRIPT = W("skript", "skriptu", "script", "textový-skript");
 const DRAWING = W("výkres", "drawing", "zeichnung");
 const SKETCH = W("skica", "skicu", "náčrt", "sketch", "skizze");
 /** slovo před vlastním názvem souboru (lze vynechat) */
@@ -132,6 +137,13 @@ export function parseOutLine(tokens: string[]): OutCmd | null {
   if (EXPORT.has(h)) {
     const raw = t[1];
     if (!raw) throw new Error(tr("export potřebuje formát: {0}", outUsage.export()));
+    if (SCRIPT.has(fold(raw))) {
+      // export skript [cs|en|de] [název] – dokument jako textové příkazy (cad/doc-script.ts)
+      const rest = t.slice(2);
+      const lang = /^(cs|en|de)$/i.test(rest[0] ?? "") ? (rest.shift()!.toLowerCase() as "cs" | "en" | "de") : undefined;
+      const name = nameOf(rest);
+      return { kind: "script", ...(name ? { name } : {}), ...(lang ? { lang } : {}) };
+    }
     const f = FORMAT_ALIAS[fold(raw).replace(/^\./, "")];
     if (f === "dxf") throw new Error(tr("export dxf: výkres → „výkres export dxf“, skica → „skica export dxf“"));
     if (f && (OUT_DRAWING as string[]).includes(f)) throw new Error(tr("export {0}: výkres se exportuje příkazem „výkres export {0}“ (nejdřív „výkres A3 …“)", f));
@@ -332,6 +344,13 @@ export type OutFileInfo = { name: string; mime: string; bytes: number; format: s
 export type MncadOutApi = {
   /** uloží projekt .mncad přímo do Stažených (bez dialogu, jako příkaz „uložit [název]“); vrátí název, velikost a protokol */
   save: (name?: string) => Promise<OutFileInfo>;
+  /**
+   * otevřený dokument jako textový skript (stejné příkazy jako konzole – cad/doc-script.ts): díly, sestava s polohami a vazbami,
+   * pohybová studie, výkresy; `lang` = jazyk klíčových slov a rozhraní, pro které je skript určen (výchozí jazyk rozhraní),
+   * `names: "all"` = název u každého prvku. Čísla vybraných hran a ploch před zápisem ověří jádro podle otisků (proto Promise);
+   * `sigs: "keep"` = bez ověření, prvky s otisky výběru zapsat i s nimi (obecný příkaz / JSON)
+   */
+  script: (opts?: { lang?: "cs" | "en" | "de"; names?: "auto" | "all"; sigs?: "drop" | "keep"; comments?: boolean }) => Promise<string>;
 };
 
 /* ───────────────────────── nápověda příkazů ───────────────────────── */
@@ -348,6 +367,12 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     en: "export",
     de: "exportieren",
     desc: tr("3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) → „věrná kopie modelu“; „bez kontroly“ ji vynechá"),
+  },
+  {
+    cmd: "export skript [cs|en|de] [název]",
+    en: "export script",
+    de: "export skript",
+    desc: tr("dokument jako textový skript <název>.mncad.txt (díly, sestava s polohami a vazbami, pohyb, výkresy) – stejné příkazy jako konzole, k úpravě a novému spuštění; protokol napíše počet řádků, velikost a pokrytí (vlastní příkaz / prvek / JSON); také window.mncad.script()"),
   },
   {
     cmd: "výkres export pdf|dxf|dwg|svg|csv|png [list N|N|vše] [název]",

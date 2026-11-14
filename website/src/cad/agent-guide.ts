@@ -1311,6 +1311,52 @@ které webdriver nenastavuje), CAD neotevře žádné systémové okno, na kter�
   (systémová nabídka sdílení) a „E-mail“ (otevře poštovní program, prohlížeč se na něj ptá) – místo nich příkaz
   \`sdílet\` a adresa z řádku \`URL: …\`.
 
+## Dokument → textový skript, kontrola tam a zpět
+
+Opačný směr k textovým příkazům: otevřený dokument (vzniklý klikáním, z JSON nebo dřívějším skriptem) se vypíše jako
+TENTÝŽ model v textových příkazech – k učení jazyka, úpravě a novému spuštění, porovnání verzí.
+
+\`\`\`
+export skript                 # stáhne <název>.mncad.txt; protokol: řádky, velikost, pokrytí, poznámky
+export skript en "forma-v2"   # klíčová slova anglicky (cs | en | de), vlastní název souboru
+\`\`\`
+
+JavaScript: \`await window.mncad.script()\` vrátí text (\`{ lang: "en", names: "all", sigs: "keep" }\` = volby). V nabídce:
+Data ▸ Export ▸ Textový skript (.txt).
+
+- **Co skript obsahuje:** každý díl jako blok \`nový díl "…"\` (materiál, proměnné, skici s entitami / vazbami / kótami, prvky
+  vlastními příkazy, výkresy), u sestavy pak \`nová sestava "…"\`, \`vložit "díl" v x y z otočení rx ry rz [ukotvit]\` pro každou
+  komponentu (stejný díl se zapíše jednou a vloží N×), vazby \`sestava vazba … #1 F3 #2 F7\` (komponenty pořadím \`#k\`;
+  závěs / šířka / drážka i s druhými plochami, symetricky s \`rovina #1 F1\`), pohybovou studii a listy výkresu.
+- **Přesnost:** každý řádek prvku se před zápisem přečte stejným rozborem jako konzole, doplní nad prvky tak, jak budou
+  v dokumentu PO PŘEČTENÍ skriptu (nová id), a porovná s původním prvkem. Co vlastní příkaz neumí, zapíše se obecným
+  \`prvek <typ> klíč=hodnota\`, a co ani ten, jako jednořádkový JSON – protokol napíše pokrytí („183 prvků: 183 vlastním
+  příkazem, 0 obecným příkazem „prvek“, 0 jako JSON“).
+- **Odkazy na dřívější prvky:** poslední skica / prvek (\`$last\`), jinak název – \`zrcadlit rovina "Rovina 1"\`,
+  \`rotovat 90 osa "Osa 1"\`, \`vysunout k rovině "Rovina 1"\`, \`koule 8 na bod "Bod 1"\`, \`prvek extrude sketchId="Skica 2"\`.
+  Prvek, na který se odkazuje názvem, má název ve skriptu vždy výslovně. Potlačení, vazba parametru a přejmenování míří
+  na poslední prvek: \`potlačit poslední\`, \`upravit poslední size.2==t\` (výraz s mezerami \`size.1="=b + 25"\`),
+  \`přejmenovat poslední na "Díra 1"\` (dva prvky stejného názvu); konfigurace na název nebo \`@pořadí\`.
+- **Čísla hran a ploch:** výběr prvku má v dokumentu otisky; po úpravě historie (prvek přesunutý nebo vložený před výběr)
+  uložená čísla neplatí a aplikace entity hledá podle otisku. Export proto čísla nejdřív ověří jádrem a zapíše platná
+  (\`zaoblit 4 hrany E3 E5 E9 E11\`, \`skica plocha F9\`). S \`sigs: "keep"\` se jádro vynechá a prvky s otisky se zapíší
+  i s nimi obecným příkazem.
+- **Jazyk:** \`export skript en\` / \`{ lang: "en" }\` píše anglická klíčová slova a počítá s anglickým rozhraním:
+  automatický název („Kvádr 1“ / „Box 1“ / „Quader 1“) se vynechá jen tehdy, když by ho rozhraní toho jazyka přidělilo samo
+  – český dokument má v anglickém skriptu názvy výslovně a po přečtení v /en/cad jsou stejné. Český skript přečtený
+  v jiném jazyce rozhraní dá stejnou geometrii, vazby parametrů, potlačení i konfigurace; liší se jen automatické názvy
+  prvků, na které se nic neodkazuje (\`names: "all"\` píše název u každého prvku).
+- **Názvy dokumentů a texty:** díl „Nový díl“ / sestava „Nová sestava“ má za \`nový díl "Nový díl"\` ještě řádek
+  \`název "Nový díl"\` – výchozí název aplikace jinak čísluje („Nový díl 2“) a \`vložit\` by minulo. Text s „#“ nebo „//“
+  patří do uvozovek (\`nový díl "Držák # levý"\`) – komentář se hledá jen mimo uvozovky.
+- **Kontrola tam a zpět (doporučený postup):** \`const t = await window.mncad.script()\` → \`await window.mncad.run(t)\` (nová
+  záložka) → \`měřit těleso\` / \`stav\` v obou záložkách: objem a obálka každého dílu, počet komponent a „Vazby: N splněno“
+  musí být stejné.
+- **Co se nepřenáší** (protokol to vypíše řádky ℹ): vygenerované kóty výkresu vznikají znovu příkazem \`kótovat chytře\`
+  (nová id; kóty, které jste smazali, smaže skript znovu – \`výkres smazat a3 a8\`), jejich ruční úpravy (tolerance)
+  a ruční kóty / značky je třeba doplnit (\`výkres tolerance …\`); komponenty z importovaných souborů a podsestavy; barvy
+  těles a ploch, podklady skic; 2D výkres se zapíše jako jeden řádek JSON.
+
 ## Soubory, obraz, výstupy a analýzy – API pro agenty
 
 Vše z tohoto oddílu funguje bez dialogů a bez klikání; textové příkazy píší do protokolu jeden řádek ✓ / ✗ s výsledkem.
