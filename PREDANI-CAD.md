@@ -24,6 +24,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 19:58 | **POZASTAVENO na přání majitele** (šetří se limit; majitel teď sám nasadí `main` a testuje). Zastaveny všechny 4 workflow a jejich procesy. Statický export `npm run build:ftp` na `main` (`12e7108`) ověřen: prošel. Postup obnovení viz kapitola 0a. |
 | 14. 11. 20:25 | Majitel hlásí: „Online CAD neumí pružiny, ani pro simulaci pohybu.“ Živý web běží na STARÉ verzi (bez vlny 15 – pružina mezi díly tam není; `cad/share/?ping` vrací chybovou stránku = nenasazena ani vlna 16). V `main` pružiny jsou, ale jen jako šroubovice se stálým stoupáním, bez výpočtu a bez dynamiky. → vlna 21 (kapitola 7c), workflow `wf_1e1ed70b-b6a`. Obnoven workflow integrace fáze B `wf_d020a109-e6f` (do zadání doplněna poznámka o obnovení a o rozdílu akceptace `S/w14/acceptance-delta.patch`). G a F zatím pozastaveny (šetří se stroj: běží 2 workflow). |
 | 14. 11. 22:16 | Integrace fáze B na main HOTOVÁ (agent): commit `75e90ed` ve `w14-int2`, patch `S/w14/int2/int2.patch` (330 souborů), audit `S/w14/int2/audit.md` – všech 182 kusů main nalezeno. Kontroly agenta: celý `src/cad` 2862 testů zelených, build, 28 e2e sad zelených. **Akceptační brána na skutečném skriptu 959: PASS** – 70 komponent, 53/53 vazeb, Σ 5241,733 cm³, 27 kolizí jen závit, STEP ok, odkaz 35 znaků, protokol 1641 B, 29,9 s. Běží nezávislá kontrola `verify:int2`. Pružiny (vlna 21) dál rozpracované. |
+| 14. 11. 23:50 | Fáze B dokončena agenty i po opravách 3 nálezů kontroly (`w14-int2` commit `5ca5da6`, 25 e2e sad zelených). **Nanesena na větev bez konfliktů** jako commit `e0b08dd` (patch `S/w14/int2/int2.patch`; kontrola NDA čistá; typy, lint 5, překlady 0/0). GitHub Actions `cad-acceptance.yml` omezen na PR do main + ruční spuštění (šetří minuty). BĚŽÍ: testy + build + 14 e2e sad na :3199 (`S/vitest-b-main.log`, `S/build-b-main.log`, pak `S/e2e/*.log`). Po zelené: PR „CAD bez prohlížeče – fáze B“ (zmínit i PR #99 aplikace Sales OS, který je na větvi) → sloučit → smazat `w14-*`. Pružiny: oba balíky v opravách po kontrole. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -145,10 +146,10 @@ Hotové a ověřené balíky (základ `0bd472e`): kernel-client, engine (smyčka
 `src/cad/engine/`), outputs, strict-silent, check-compare, drawing-perf – každý prošel protistrannou kontrolou a opravami.
 Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff proti `0bd472e`), po něm akceptace `w14-b6`.
 
-- [ ] B1. Počkej na oznámení o dokončení workflow. Kdyby workflow neběželo (restart), obnov ho:
+- [x] B1. Počkej na oznámení o dokončení workflow. Kdyby workflow neběželo (restart), obnov ho:
       `Workflow({ scriptPath: "<cesta ke skriptu výše>", resumeFromRunId: "wf_0a444c37-b25" })` – hotoví agenti se vrátí
       z mezipaměti. Zprávu integrace najdeš v deníku (`journal.jsonl`, záznam `result` se štítkem `w14:integrate`).
-- [ ] B2. (BĚŽÍ jako workflow `wf_d020a109-e6f`, viz Průběžný stav) Aplikuj `S/w14/bint.patch` na aktuální `main` (po úkolu A). Čekej konflikty v `src/components/cad/cad-app.tsx`,
+- [x] B2. (BĚŽÍ jako workflow `wf_d020a109-e6f`, viz Průběžný stav) Aplikuj `S/w14/bint.patch` na aktuální `main` (po úkolu A). Čekej konflikty v `src/components/cad/cad-app.tsx`,
       `src/cad/agent.ts`, `src/cad/agent-out.ts`, `src/components/cad/agent-out-host.ts`, `agent-api-host.ts`,
       `agent-guide.ts`, `scripts/cad-harness/*`, `e2e/cad-cli.e2e.cjs`. Zásada: **smyčka operací žije v enginu**
       (`src/cad/engine/ops/*`), `cad-app.tsx` ji jen volá. Co mezitím přibylo do staré smyčky v `cad-app.tsx`, přenes
@@ -166,7 +167,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
     položka nabídky Data ▸ Export ▸ Textový skript (`exportScript` v `cad-app.tsx`), `stripLineComment` v `parseAgentText`,
   - z integrace vlny 15: hlášení výkresu druhu `section-legacy` – v přísném režimu ho ber jako chybu (automatický
     výklad vstupu) a doplň o tom větu do návodu pro AI u odsazení řezu (hledej „dnes pište“ v `agent-guide.ts`).
-- [ ] B3. Ověř, že každý z těch přenesených příkazů běží v prohlížeči i v CLI: po buildu
+- [x] B3. Ověř, že každý z těch přenesených příkazů běží v prohlížeči i v CLI: po buildu
       `node public/cad/cli/<verze>/mncad.mjs run <skript> --out <složka>` se skriptem, který obsahuje `díra … v x y`,
       `vložit "Díl" jako "K1"`, `sestava pružina …`, `výkres … řez XZ odsazení N`, `export skript`, `předloha stav`.
       Žádný řádek nesmí skončit `host.app-only`, pokud ho návrh nevyhrazuje prohlížeči (seznam v
@@ -174,7 +175,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
 - [ ] B4. Kontroly podle kapitoly 2. E2e navíc: `cad-cli cad-agent-out cad-agent-api cad-agent-journey cad-agent-asm
       cad-w13-docs cad-w15-* cad-doc2text` a všechny nové sady z patche (`git diff --cached --name-only | grep e2e/`).
       Testy harness: `node --test scripts/cad-harness/harness.test.mjs` (s `CAD_HARNESS_KERNEL=1` i velký běh).
-- [ ] B5. **Akceptační test na skutečném skriptu** (jen lokálně, nic z toho necommituj):
+- [x] B5. **Akceptační test na skutečném skriptu** (jen lokálně, nic z toho necommituj):
       `node public/cad/cli/<verze>/mncad.mjs run website/.local/fixtures/959-skript.txt --out S/accept --formats step,pdf`
       (+ přepínač sdílení podle nápovědy CLI). Musí platit:
 
