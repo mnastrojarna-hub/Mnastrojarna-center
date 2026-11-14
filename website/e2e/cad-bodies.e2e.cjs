@@ -100,7 +100,7 @@ stav`);
   log = await run('prvek adv.twist nesmysl=1');
   ok(/neznámý parametr „nesmysl“ – parametry: sketch, height, angle/.test(log), 'neznámý parametr rozšíření → chyba se seznamem parametrů');
   log = await run('nesmysl 1 2');
-  ok(/neznámý příkaz „nesmysl“ – příkazy: nový díl, nová sestava, název, materiál, barva, kvádr/.test(log) && /prvek, normálie, vložit, výkres/.test(log), 'hláška o neznámém příkazu uvádí stejný seznam jako tabulka příkazů');
+  ok(/neznámý příkaz „nesmysl“ – příkazy: nový díl, nová sestava, název, materiál, barva, kvádr/.test(log) && ['prvek', 'normálie', 'vložit', 'výkres', 'nápověda'].every((w) => new RegExp(`[–,] ${w}[,\\s]`).test(log)), 'hláška o neznámém příkazu uvádí stejný seznam jako tabulka příkazů');
 
   // ── normálie, sestava, výkres ──
   const tabs = () => p.locator('[role="tab"]').count();
