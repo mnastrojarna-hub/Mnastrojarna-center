@@ -8,6 +8,7 @@
 4. **Commituj a pushuj** průběžně na branch `claude/cnc-sales-os-ai-cbR2f`. Žádný krok nenechávej rozdělaný.
 5. **Výjimka pro dotaz:** pouze když fyzicky chybí tajný údaj (token/heslo/secret), který nemůžu sám získat — i tak připravím vše tak, aby to fungovalo po jeho doplnění, a pokračuji dál.
 6. Hotovo = zelený build, zelené testy, projité všechny moduly, nasaditelné na Vercel + Supabase.
+7. **Rozdělaná práce na CADu (`website/`)**: přesný stav a závazný postup pokračování je v souboru `PREDANI-CAD.md` v kořeni repozitáře – nejdřív ho celý přečti a pokračuj podle něj krok po kroku.
 
 ---
 
