@@ -9,7 +9,8 @@ import { registerJobFileCore } from "@/lib/jobs/job-files-store";
 import { jobFilePath } from "@/lib/jobs/mapping";
 import type { DocIssuerKey, JobFileOrigin } from "@/lib/supabase/database.types";
 import type { JobFile } from "@/lib/jobs/types";
-import { convertNote, isCadDrawingName, pdfNameFor } from "@/lib/jobs/drawing-convert-names";
+import { convertNote, editedNote, editedPdfName, isCadDrawingName, isEditedNote, pdfNameFor } from "@/lib/jobs/drawing-convert-names";
+import type { DrawingEditsInput } from "@/lib/viewer3d/drawing-model";
 
 /**
  * Výkres DXF / DWG zakázky → PDF (nový dokument zakázky, druh výkres). Server: stejná kontrola přístupu
@@ -49,6 +50,7 @@ interface DerivedRow {
   filename: string;
   source_file_id: string | null;
   version: number | null;
+  note?: string | null;
 }
 
 const fail = (status: number, error: string): ConvertOutcome => ({ ok: false, status, error });
@@ -67,7 +69,7 @@ async function versionChain(db: JobsDb, id: string): Promise<string[]> {
 
 /** Aktuální PDF převedená z tohoto výkresu (nebo jeho starší verze); null = vazba v DB není (stará DB). */
 async function derivedPdfs(db: JobsDb, chain: string[]): Promise<DerivedRow[] | null> {
-  const { data, error } = await db.from("job_files").select("id, filename, source_file_id, version")
+  const { data, error } = await db.from("job_files").select("id, filename, source_file_id, version, note")
     .in("source_file_id", chain).eq("archived", false).order("created_at", { ascending: false });
   if (error) {
     if ((error as { code?: string }).code !== UNDEFINED_COLUMN) console.error(`[drawing-convert] Vazba PDF → výkres: ${error.message}`);
@@ -84,8 +86,10 @@ async function derivedByName(db: JobsDb, jobId: string, sourceName: string): Pro
 }
 
 export async function convertJobFileToPdf(
-  db: JobsDb, userId: string, access: Pick<Access, "user" | "can">, fileId: string, opts: { skipIfConverted?: boolean } = {},
+  db: JobsDb, userId: string, access: Pick<Access, "user" | "can">, fileId: string,
+  opts: { skipIfConverted?: boolean; edits?: DrawingEditsInput | null } = {},
 ): Promise<ConvertOutcome> {
+  const edits = opts.edits ?? null;
   const checked = await assertJobFileAccess(db, fileId, access, "view");
   if (!checked.ok) return fail(checked.status, checked.error);
   const { data: rowData } = await db.from("job_files")
@@ -97,11 +101,15 @@ export async function convertJobFileToPdf(
 
   const chain = await versionChain(db, src.id);
   const linked = await derivedPdfs(db, chain);
-  const derived = linked ?? (await derivedByName(db, src.job_id, src.filename));
+  const all = linked ?? (await derivedByName(db, src.job_id, src.filename));
+  // upravené kopie (smazané prvky v prohlížeči) jsou zvlášť — převod celého výkresu je nenahrazuje
+  const derived = all.filter((d) => !isEditedNote(d.note));
   const own = derived.find((d) => d.source_file_id === src.id) ?? (linked === null ? derived[0] : undefined);
-  if (opts.skipIfConverted && own) return { ok: true, skipped: true, existing: { id: own.id, filename: own.filename }, sourceName: src.filename };
-  // starší verze výkresu už PDF má → nová verze téhož PDF
-  const replace = own ?? derived[0] ?? null;
+  if (!edits && opts.skipIfConverted && own) return { ok: true, skipped: true, existing: { id: own.id, filename: own.filename }, sourceName: src.filename };
+  // starší verze výkresu už PDF má → nová verze téhož PDF; upravená kopie → nová verze předchozí upravené kopie
+  const replace = edits
+    ? all.find((d) => isEditedNote(d.note) && d.filename === editedPdfName(src.filename)) ?? null
+    : own ?? derived[0] ?? null;
 
   const { data: blob, error: dlErr } = await db.storage.from(BUCKET).download(src.storage_path);
   if (dlErr || !blob) return fail(404, "Soubor výkresu v úložišti nenalezen.");
@@ -125,16 +133,21 @@ export async function convertJobFileToPdf(
       const { parseDxf } = await import("@/lib/viewer3d/formats/dxf");
       drawing = parseDxf(bytes);
     }
+    if (edits) {
+      const { applyDrawingEdits } = await import("@/lib/viewer3d/drawing-model");
+      drawing = applyDrawingEdits(drawing, edits);
+    }
     const font = new Uint8Array(await readFile(path.join(process.cwd(), "public", "fonts", "Roboto-Regular.ttf")));
     pdf = await drawingToPdf(drawing, { font, sourceName: src.filename });
   } catch (e) {
     if (e instanceof ModelImportError || e instanceof EmptyDrawingError) return fail(422, e.message);
+    if (e instanceof Error && e.name === "DrawingEditsMismatch") return fail(409, e.message);
     console.error(`[drawing-convert] ${src.filename}: ${e instanceof Error ? e.stack ?? e.message : String(e)}`);
     return fail(500, "Výkres se nepodařilo převést na PDF (neočekávaná chyba).");
   }
 
   // název: nová verze drží jméno předchozího PDF; jinak základ výkresu, kolize s jiným dokumentem → „(z DXF)"
-  let filename = replace?.filename ?? "";
+  let filename = replace?.filename ?? (edits ? editedPdfName(src.filename) : "");
   if (!filename) {
     const { data: same } = await db.from("job_files").select("filename").eq("job_id", src.job_id).eq("archived", false).ilike("filename", "%.pdf");
     const names = new Set(((same ?? []) as { filename: string }[]).map((r) => r.filename.toLowerCase()));
@@ -147,7 +160,7 @@ export async function convertJobFileToPdf(
   const origin = (src.origin === "generated" || !src.origin ? "upload" : src.origin) as JobFileOrigin;
   const res = await registerJobFileCore(db, userId, {
     jobId: src.job_id, path: storagePath, filename, mimeType: "application/pdf", size: pdf.bytes.length, kind: "vykres",
-    note: convertNote(src.filename), noAutoVersion: true, silent: true, replaceFileId: replace?.id,
+    note: edits ? editedNote(src.filename, edits.deletedItems.length, edits.hiddenLayers.length + edits.shownLayers.length) : convertNote(src.filename), noAutoVersion: true, silent: true, replaceFileId: replace?.id,
     orderItemId: src.order_item_id ?? undefined, origin, issuer: (src.issuer as DocIssuerKey | null) ?? null,
   });
   if (!res.ok || !res.file) {
@@ -159,8 +172,8 @@ export async function convertJobFileToPdf(
   if (linkErr && (linkErr as { code?: string }).code !== UNDEFINED_COLUMN) console.error(`[drawing-convert] Vazba PDF → výkres: ${linkErr.message}`);
   await logJobEvent(db, {
     jobId: src.job_id, type: "file",
-    message: `Výkres převeden do PDF: ${src.filename} → ${filename}${file.version > 1 ? ` (v${file.version})` : ""}`,
-    data: { fileId: file.id, sourceFileId: src.id, filename, version: file.version, action: "converted_pdf" },
+    message: `${edits ? "Upravený výkres uložen jako PDF" : "Výkres převeden do PDF"}: ${src.filename} → ${filename}${file.version > 1 ? ` (v${file.version})` : ""}`,
+    data: { fileId: file.id, sourceFileId: src.id, filename, version: file.version, action: "converted_pdf", ...(edits ? { edited: true, deletedItems: edits.deletedItems.length } : {}) },
     actorId: userId,
   });
   return { ok: true, skipped: false, file, version: file.version, sheet: pdf.sheet, sourceName: src.filename };

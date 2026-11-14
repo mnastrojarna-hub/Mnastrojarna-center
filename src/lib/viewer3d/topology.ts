@@ -27,6 +27,8 @@ export interface Curve {
   radius?: number;
   /** Normála roviny kružnice / směr úsečky. */
   normal?: Vec3;
+  /** 2D výkres: prvek výkresu (DrawingExtras.items), ke kterému křivka patří — výběr oknem. */
+  item?: number;
 }
 
 export type FaceKind = "plane" | "cylinder" | "other";

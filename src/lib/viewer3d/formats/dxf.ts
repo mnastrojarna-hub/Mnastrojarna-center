@@ -1,6 +1,6 @@
 import DxfParser from "dxf-parser";
 import { ModelImportError } from "../types";
-import { aciColor, insunitsToMm, plainText, trueColor, type DrawColor, type DrawEntity, type DrawLayer, type Drawing2D, type Pt } from "../drawing2d";
+import { aciColor, insunitsToMm, plainText, runGrouped, trueColor, type DrawGroup, type DrawColor, type DrawEntity, type DrawLayer, type Drawing2D, type Pt } from "../drawing2d";
 import {
   detectDecimalSeparator, dimFallbackGeometry, dimTextFrame, dimTextHeight, dimValueText, mergeDimStyle, readableAngle, resolveDimText,
   type DimDef, type DimStyle,
@@ -547,10 +547,12 @@ export function parseDxf(bytes: Uint8Array): Drawing2D {
   };
   const scale = insunitsToMm(Number(dxf.header?.$INSUNITS ?? 0));
   const m: M2 = scale === 1 ? I : [scale, 0, 0, scale, 0, 0];
+  const groups: DrawGroup[] = [];
   for (const e of (dxf.entities ?? []) as Any[]) {
     if (e.inPaperSpace) continue;
     try {
-      emit(ctx, e, m, null, null);
+      // blok / kóta = jeden prvek pro výběr oknem
+      runGrouped(ctx, groups, String(e.type ?? ""), e.type === "INSERT" ? String(e.name ?? "") || undefined : undefined, () => emit(ctx, e, m, null, null));
     } catch {
       ctx.skipped.set(String(e.type), (ctx.skipped.get(String(e.type)) ?? 0) + 1);
     }
@@ -570,5 +572,6 @@ export function parseDxf(bytes: Uint8Array): Drawing2D {
     entities: ctx.out,
     format: ver ? `DXF (${ver})` : "DXF",
     warnings,
+    groups,
   };
 }
