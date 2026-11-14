@@ -118,7 +118,7 @@ const part = (name, number, materialName, size) => ({ app: 'mnastrojarna-cad', v
   await p.getByRole('button', { name: /Výkres PDF/ }).click();
   await p.waitForFunction(() => /Rozměry v mm/.test(document.querySelector('[data-sheet]')?.textContent || ''), null, { timeout: 120000 }); await p.waitForTimeout(500);
   const dims = await p.evaluate(() => [...document.querySelectorAll('[data-sheet] svg text')].map((t) => t.textContent));
-  ok(dims.some((t) => /M18×1,5 dl\. 30/.test(t)), 'výkres: kružnice jádra kótována katalogovým označením M18×1,5 dl. 30 (ne odvozeným z šroubovice)\n' + dims.filter((t) => /M|Ø/.test(t)).join(' | '));
+  ok(dims.some((t) => /^(\d+× )?M18×1,5( |$)/.test(t)) && !dims.some((t) => /^M1[67][,.]\d/.test(t)), 'výkres: kružnice jádra kótována katalogovým označením M18×1,5 (závit přes celou délku díry – bez hloubky; ne odvozeným z šroubovice)\n' + dims.filter((t) => /M|Ø/.test(t)).join(' | '));
   await p.keyboard.press('Escape');
 
   ok(errs.length === 0, 'bez JS chyb ' + errs.join(' | '));

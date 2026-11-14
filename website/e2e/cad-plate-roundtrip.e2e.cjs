@@ -60,13 +60,16 @@ stav`;
   const threadOk = (t) => /M6 hl\. 8/.test(t) || /\d+× M6\b/.test(t);
   ok(threadOk(txt) && !/Ø5\b/.test(txt), 'výkres: závit kótován označením M6 (2× M6 ↧8), ne Ø5 (kóty: ' + (await dimTexts(p)) + ')');
   const aside = p.locator('[data-drawing-workspace] aside').first();
-  await aside.getByPlaceholder('např. ISO 2768-mK').fill('ISO 2768-mK');
+  // nepředepsané tolerance se od vlny 15 volí třídou ISO 2768 (výběr režimu + třídy), ne volným textem
+  await aside.locator('[data-title-tol-mode]').selectOption('iso2768');
+  await aside.locator('[data-title-tol-lin]').selectOption('m');
+  await aside.locator('[data-title-tol-geo]').selectOption('K');
   await waitDrawing(p); await p.waitForTimeout(700); txt = await drawingText(p);
-  ok(/Nepředepsané tolerance ISO 2768-mK/.test(txt) && !/Hrany:/.test(txt), 'tolerance se uvede jen po vyplnění, hrany zatím ne');
+  ok(/ISO 2768-mK/.test(txt) && !/Hrany:/.test(txt), 'tolerance se uvede jen po vyplnění, hrany zatím ne');
   await aside.getByPlaceholder('např. srazit 0,5×45°').fill('srazit 0,5×45°');
   await waitDrawing(p); await p.waitForTimeout(700); txt = await drawingText(p);
   ok(/Hrany: srazit 0,5×45°/.test(txt), 'opracování hran se uvede po vyplnění');
-  await aside.getByPlaceholder('např. ISO 2768-mK').fill('');
+  await aside.locator('[data-title-tol-mode]').selectOption('none');
   await waitDrawing(p); await p.waitForTimeout(700); txt = await drawingText(p);
   ok(!/2768/.test(txt) && /Hrany: srazit/.test(txt), 'tolerance lze samostatně odstranit, hrany zůstávají');
   // rychlost: změna razítka nepřepočítává projekce

@@ -1967,10 +1967,31 @@ předloha kontrola kót
 
 - Výsledek prvku se v protokolu vypíše **až po výpočtu** (řádek „→ … přidán“ jen potvrzuje zařazení do historie).
 - **✓** = výsledek je platné objemové těleso a operace se projevila (objem nebo topologie se změnily).
-- **⚠** = prvek se zpracoval, ale výsledek si žádá pozornost: *„Prvek těleso nezměnil“* (nástroj leží mimo těleso
-  nebo se s ním nepřekrývá – zkontrolujte polohu, poloměr, stranu) nebo *„Výsledek má neplatnou geometrii“*
-  (sebeprotínající plochy – typicky profil tečný k povrchu; export STEP pak může selhat). V historii je prvek
-  oranžový, ve stavovém řádku je čip „prvek s upozorněním“ / „neplatná geometrie“.
+- **⚠** = prvek se zpracoval, ale výsledek si žádá pozornost:
+  - *„Prvek těleso nezměnil“* / *„Prvek objem tělesa nezměnil (jen rozdělil plochy)“* – nástroj leží mimo těleso, jen se
+    ho dotýká, nebo jádro operaci u téměř tečných ploch neprovedlo. Zkontrolujte polohu, poloměr, stranu.
+  - *„Výsledek má neplatnou geometrii – vznikla u prvku „…““* – typicky profil tečný k povrchu; export STEP pak může
+    selhat. Toto varování stojí **jen u prvního prvku, po kterém je těleso neplatné**, a říká, co je vadné (hrana
+    \`E12\` s bodem, plochy \`F7\`) a co změnit. Každý další prvek postavený na takovém tělese má ⚠ *„Těleso je neplatné
+    už od prvku „…““* – opravte prvek, který je v něm jmenovaný, ne ten, u kterého to čtete.
+  - *„Výsledek operace neodpovídá průniku tělesa s nástrojem“* / *„…závisí na toleranci výpočtu“* / *„…neodpovídá
+    nástroji“* – jádro operaci u téměř tečných ploch spočítalo jinak, než vychází kontrolní výpočet (v hlášce jsou obě
+    hodnoty v mm³). Těleso je platné, ale objem prvku nemusí sedět: posuňte nástroj tak, aby plochy tělesa jasně
+    protínal (aspoň o 0,01 mm), nebo aby s nimi splýval přesně.
+  V historii je prvek oranžový, ve stavovém řádku je čip „prvek s upozorněním“ / „neplatná geometrie“.
+- Tečné a souběžné plochy (klín odlehčení tečný ke kuželu v rohu, hrana nástroje přesně na stěně otvoru): operace se
+  počítá přesně; když přesný výsledek nese příznak vady (vrchol s tolerancí nad 0,0005 mm, neplatná geometrie, úběr,
+  který se neprovedl), zopakuje se s tolerancí 1e-7 × rozměr modelu (0,00001 až 0,0001 mm), s 10× a se 100× větší a
+  výsledek se přijme, jen když se dvě tolerance shodnou a potvrdí ho kontrolní výpočet. Díl se zadním odlehčením břitu
+  se tak postaví platně se souřadnicemi i směrovými vektory rovin (\`normála\`, \`osax\`) na 4 až 6 desetinných míst.
+  Chyba objemu roste s hrubším zaokrouhlením – na syntetické střižnici 60 × 40 × 12 mm v 89 natočeních: do 0,002 mm³ při
+  6 místech u všeho, do 0,3 mm³ při vektorech na 6 a souřadnicích na 5 míst, do 0,08 mm³ při 5 místech u všeho, do
+  0,17 mm³ při 4 místech; při 3 místech kolem 1 mm³ a těleso bývá občas neplatné. U 1 až 4 natočení z 89 (6 míst) zůstane
+  ⚠ u řezu, který jádro neprovede přesně ani s tolerancí (takový prvek ✓ nedostane). Pište proto vektory **na 6 míst** a souřadnice
+  aspoň na 5; když u prvku zůstane ⚠, nechte profil plochu protnout s přesahem aspoň 0,01 mm, nebo rovinu zadejte úhlem
+  či odkazem na plochu.
+- Skoro-dotyk se nikdy „nezaokrouhluje“: dvě díry, které se překrývají o 0,00001 mm, kanál, který prorazí plochu
+  o 0,00001 mm, nebo nálitek s mezerou 0,00001 mm se postaví přesně tak, jak jsou zadané.
 - **✗** = operace selhala, těleso zůstalo jako před prvkem (např. skořepina, kterou jádro neumí, tažení bez objemu).
 - Řádek **Geometrie:** ve \`stav\` říká „platná · 1 těleso“, nebo „NEPLATNÁ“ / „ŽÁDNÉ objemové těleso (jen plochy)“.
   Pokles objemu ani „1 těleso“ samy o sobě správnost nedokazují – rozhoduje tento řádek a nepřítomnost ⚠.

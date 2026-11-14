@@ -13,6 +13,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 18:08 | Opakované testy vlny 15 prošly: 6 souborů, 97 / 97 (převodník, přehrání zkušebního i skutečného nástroje, výkres). E2e běží; `cad-w15-drawing` měl 2 FAIL kvůli staršímu zápisu řezu – sada upravena (−80 = mimo těleso, −20 = `⚠` starší zápis), po doběhnutí dávky ji pusť znovu samostatně. |
 | 14. 11. 18:13 | NOVÝ požadavek majitele: kola „vyplním tabulku a mám díl, extra snadno“ → vlna 19 (kapitola 7a). Spuštěn workflow `wf_a5f62aa9-09a` (návrh → jádro → průvodce + text), základ `3bb04d9`. |
 | 14. 11. 18:17 | Workflow `wf_1fd5cfa9-922` DOKONČEN: střižnice (geom) hotová vč. oprav 8 nálezů kontroly – commit `5b303bc` ve worktree `w17-geom`, patch `S/w17/geom.patch` (základ `bf91b0b`, 10 souborů). Výsledek agenta: 27/27 dílů platných, Σ 5241,7333 cm³, střižnice 450,46 cm³. Úkol C1 hotov, zbývá C2–C4. |
+| 14. 11. 18:30 | **Úkol A HOTOV**: vlna 15 sloučena do `main` (PR #96, `23c34b0`); e2e 18 sad bez nových selhání; worktree `w15-*` smazány. Začíná úkol C2 (střižnice) – patch `S/w17/geom.patch` jde na `main` nanést čistě. |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -38,8 +39,8 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 
 | Co | Kde |
 | --- | --- |
-| `main` | `053c765` (PR #95: převodník dokument → skript, dokumentace) |
-| pracovní větev | `claude/cnc-sales-os-ai-cbR2f`, hlava `29b31a5` = `main` + vlna 15 (pushnuto, **ještě nesloučeno**) |
+| `main` | `23c34b0` (PR #96: vlna 15; předtím PR #95 převodník a dokumentace) |
+| pracovní větev | `claude/cnc-sales-os-ai-cbR2f` = `main` + rozdělaný úkol (viz Průběžný stav) |
 | scratchpad `S` | `/tmp/claude-0/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/scratchpad` |
 | worktree agentů | `/home/user/Mnastrojarna-center/.claude/worktrees/<název>` |
 | deníky workflow | `/root/.claude/projects/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/subagents/workflows/<runId>/journal.jsonl` |
@@ -91,15 +92,15 @@ První běh testů: 467 z 470; 3 selhání způsobila změna znaménka odsazení
 - `src/cad/drawing-w15.test.ts`: test „mimo těleso“ používá −80, nový test staršího zápisu.
 
 Zbývá:
-- [ ] A1. (build hotov, testy běží) Přečti výsledek opakovaných testů `S/vitest-w15c.log` (poslední řádek `exit=0`?) a buildu `S/build-w15.log`.
+- [x] A1. (build hotov, testy běží) Přečti výsledek opakovaných testů `S/vitest-w15c.log` (poslední řádek `exit=0`?) a buildu `S/build-w15.log`.
       Nejsou-li, pusť znovu: testy `src/cad/doc-script.test.ts doc-script.roundtrip.test.ts doc-script.review.test.ts
       drawing-w15.test.ts drawing-w15-int.test.ts i18n/i18n.test.ts` a pak celou sadu z patche
       (`git show --name-only 29b31a5 | grep "\.test\.ts$"`). Všechno musí projít.
-- [ ] A2. Build + e2e na portu 3199, sady: `cad-w15-hole cad-w15-drawing cad-w15-asm cad-w15-titleblock cad-w15-reference
+- [x] A2. Build + e2e na portu 3199, sady: `cad-w15-hole cad-w15-drawing cad-w15-asm cad-w15-titleblock cad-w15-reference
       cad-drawing-smart cad-drawing-dims cad-w13-docs cad-asm-mates cad-agent-asm cad-w12-parts cad-forms cad-doc2text
       cad-agent-out cad-agent-journey cad cad-agent cad-tips`. Očekávání: 0 FAIL kromě známého u `cad-asm-mates`.
-- [ ] A3. PR „CAD: test 959 – díry, výkres, sestava, razítko a předloha (vlna 15)“ → sloučit → `git pull`.
-- [ ] A4. Smaž worktree `w15-hole w15-drawing w15-asm w15-titleblock w15-reference w15-int`.
+- [x] A3. PR „CAD: test 959 – díry, výkres, sestava, razítko a předloha (vlna 15)“ → sloučit → `git pull`.
+- [x] A4. Smaž worktree `w15-hole w15-drawing w15-asm w15-titleblock w15-reference w15-int`.
 
 Co vlna 15 přináší (pro zprávu majiteli) je v těle commitu `29b31a5`.
 

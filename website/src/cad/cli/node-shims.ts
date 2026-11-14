@@ -218,6 +218,7 @@ export function makeLoopbackKernel(port: LoopbackPort): LoopbackKernel {
     exportFile: (doc, format) => call({ op: "export", doc, format }),
     exportStats: (doc, bytes, format) => call({ op: "exportStats", doc, bytes, format }),
     faceOwner: (doc, index, point) => call({ op: "faceOwner", doc, index, point }),
+    asmEnvelope: (doc) => call({ op: "asmEnvelope", doc }),
     asmParts: (parts, offset = 0, total = parts.length) => call({ op: "asmParts", parts, offset, total }),
     stepSplit: ((bytes: Uint8Array, fileName: string) => call({ op: "stepSplit", bytes, fileName })) as C["stepSplit"],
     // restart jádra ve vlákně neexistuje (pád = konec vlákna, kód 4) – odběr se přijme a nikdy nezavolá
