@@ -225,6 +225,13 @@ export function applySalutation(body: string, salutation: string): string {
   return text.trim() ? `${salutation}\n\n${text}` : `${salutation}\n\n`;
 }
 
+/** Text bez úvodního řádku s pozdravem (k porovnání „neupravený návrh až na oslovení"). */
+export function bodyWithoutGreeting(body: string): string {
+  const text = String(body ?? "").replace(/\r\n/g, "\n").replace(/^\s*\n/, "");
+  const m = GREETING_LINE_RE.exec(text);
+  return (m && m.index === 0 ? text.slice(m[0].length) : text).trim();
+}
+
 /** Začíná text pozdravem? (aby se pozdrav nepřidal dvakrát). */
 export function startsWithGreeting(body: string): boolean {
   const m = GREETING_LINE_RE.exec(String(body ?? "").replace(/^\s*\n/, ""));

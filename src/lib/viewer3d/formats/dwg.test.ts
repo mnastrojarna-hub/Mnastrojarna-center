@@ -287,6 +287,17 @@ describe("parseDwg — skutečné výkresy", () => {
     expect(d.warnings![0]).toContain("TCH_WALL 9×");
   });
 
+  it("výběr oknem: kóty a šrafy jsou skupiny (jeden prvek), entity skupiny označené", async () => {
+    const d = await load("dwg-dims-r2013.dwg");
+    const kinds = new Set((d.groups ?? []).map((g) => g.kind));
+    expect(kinds.has("dimension")).toBe(true);
+    expect(kinds.has("hatch")).toBe(true);
+    const used = new Set(d.entities.map((e) => e.group).filter((g) => g !== undefined));
+    expect(used.size).toBe(d.groups!.length);
+    // text hodnoty kóty patří do skupiny kóty
+    expect(d.entities.some((e) => e.kind === "text" && e.group !== undefined && d.groups![e.group].kind === "dimension")).toBe(true);
+  });
+
   it("výkon: všechny fixtures do pár sekund", async () => {
     const names = ["dwg-sample.dwg", "dwg-entities2d-r2000.dwg", "dwg-example-r2004.dwg", "dwg-mtext-r2007.dwg", "dwg-blocks-meters-r2010.dwg", "dwg-dims-r2013.dwg", "dwg-example-r2018.dwg"];
     const t0 = performance.now();

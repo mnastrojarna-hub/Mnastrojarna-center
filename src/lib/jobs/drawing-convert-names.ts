@@ -25,3 +25,20 @@ export function pdfNameFor(sourceName: string, taken: (name: string) => boolean)
   for (let i = 2; i < 100; i++) if (!taken(`${base} (z ${ext} ${i}).pdf`)) return `${base} (z ${ext} ${i}).pdf`;
   return `${base} (z ${ext} ${Date.now()}).pdf`;
 }
+
+/** Poznámka PDF upraveného výkresu (smazané prvky / skryté hladiny v prohlížeči; originál beze změny). */
+export function editedNote(sourceName: string, deleted: number, layers: number): string {
+  const parts: string[] = [];
+  if (deleted) parts.push(`smazáno prvků: ${deleted}`);
+  if (layers) parts.push(`změněné hladiny: ${layers}`);
+  return `Upravená kopie z ${sourceName}${parts.length ? ` (${parts.join(", ")})` : ""} — originál beze změny`;
+}
+
+export function isEditedNote(note: string | null | undefined): boolean {
+  return String(note ?? "").startsWith("Upravená kopie z ");
+}
+
+/** Název PDF upraveného výkresu: „<základ> (upraveno).pdf". */
+export function editedPdfName(sourceName: string): string {
+  return `${sourceName.replace(/\.(dxf|dwg)$/i, "") || "vykres"} (upraveno).pdf`;
+}

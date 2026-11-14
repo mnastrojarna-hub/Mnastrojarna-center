@@ -2,11 +2,15 @@
  * E-maily zákazníka / dodavatele podle účelu („kam co posílat") a výběr adresátů pro odeslání —
  * čistá logika (testy v roles.test.ts). Data: tabulka party_role_emails + kontaktní osoby.
  *
- * Pravidla výběru (rozhodnutí 30. 10., dodací listy 31. 10.):
+ * Pravidla výběru (rozhodnutí 30. 10., dodací listy 31. 10., potvrzení objednávky 14. 11.):
  *  - faktura → VŽDY fakturační e-mail (výchozí v Komu, další fakturační v Kopii) + kontakt zakázky v Kopii;
+ *  - potvrzení objednávky → e-mail „Objednávky / potvrzení" (nákup) zákazníka, když ho karta zákazníka má
+ *    (výchozí v Komu, další nákupní v Kopii) + kontakt zakázky v Kopii (majitel 14. 11.: „v kartě mám pro
+ *    potvrzení Natálii, ale výchozí byl Pavel Novák" — kontakt zakázky bývá ten, kdo poptával / objednal);
+ *    bez nákupní role dál kontakt zakázky → běžná komunikace → …;
  *  - dodací list → e-mail pro dodací listy → Objednávky / potvrzení (nákup) → kontakt zakázky → běžná komunikace…;
- *  - ostatní doklady → kontaktní osoba zakázky; když zakázka kontakt nemá → e-mail role
- *    (nabídka → Nabídky, potvrzení → Objednávky / potvrzení, objednávka dodavateli → Objednávky …);
+ *  - nabídka (a ostatní doklady) → kontaktní osoba zakázky (kdo poptával, ten dostane nabídku); když zakázka
+ *    kontakt nemá → e-mail role (nabídka → Nabídky, objednávka dodavateli → Objednávky …);
  *  - bez role → běžná komunikace → e-mail firmy → hlavní kontakt → první kontakt s e-mailem.
  */
 
@@ -139,8 +143,10 @@ function uniq(list: (string | null | undefined)[], exclude: string[] = []): stri
   return out;
 }
 
-function personLabel(entry: RoleEntry): string {
-  return entry.contactName ? ` (${entry.contactName})` : "";
+/** „ (Eva Účetní)" za důvodem; důvod končící závorkou („… (objednávky)") dostane „: Natálie Vojčíková". */
+function personLabel(entry: RoleEntry, base = ""): string {
+  if (!entry.contactName) return "";
+  return base.trimEnd().endsWith(")") ? `: ${entry.contactName}` : ` (${entry.contactName})`;
 }
 
 /** Výběr Komu / Kopie a důvodu pro odeslání dokladu nebo zprávy. */
@@ -162,6 +168,16 @@ export function pickRecipients(
     const ccNote = jc && cc.includes(jc) ? " · v kopii kontakt zakázky" : cc.length ? " · další fakturační v kopii" : "";
     return { to, cc, reason: `${text.fakturace.reason}${personLabel(roleList[0].entry)}${ccNote}`, source: "role", role };
   }
+  // potvrzení objednávky: e-mail „Objednávky / potvrzení" z karty zákazníka má přednost, kontakt zakázky jde do kopie
+  if (purpose === "potvrzeni" && roleList.length) {
+    const to = [roleList[0].email];
+    const cc = uniq([...roleList.slice(1).map((r) => r.email), jc], to);
+    const ccNote = jc && cc.includes(jc)
+      ? ` · v kopii kontakt zakázky${jcName ? ` (${jcName})` : ""}`
+      : cc.length ? " · další v kopii" : "";
+    const base = text.nakup.reason;
+    return { to, cc, reason: `${base}${personLabel(roleList[0].entry, base)}${ccNote}`, source: "role", role };
+  }
   // dodací list: e-mail pro dodací listy → Objednávky / potvrzení → (dál jako ostatní) kontakt zakázky → běžná komunikace…
   if (purpose === "dodaci_list" && book) {
     if (roleList.length) {
@@ -173,7 +189,7 @@ export function pickRecipients(
     if (buy.length) {
       const to = [buy[0].email];
       const cc = uniq(buy.slice(1).map((r) => r.email), to);
-      return { to, cc, reason: `${text.nakup.reason}${personLabel(buy[0].entry)} — dodací listy nemají vlastní e-mail`, source: "fallback_role", role };
+      return { to, cc, reason: `${text.nakup.reason}${personLabel(buy[0].entry, text.nakup.reason)} — dodací listy nemají vlastní e-mail`, source: "fallback_role", role };
     }
   }
   if (jc) {
@@ -182,13 +198,13 @@ export function pickRecipients(
   if (roleList.length) {
     const to = [roleList[0].email];
     const cc = uniq(roleList.slice(1).map((r) => r.email), to);
-    return { to, cc, reason: `${text[role].reason}${personLabel(roleList[0].entry)}${cc.length ? " · další v kopii" : ""}`, source: "role", role };
+    return { to, cc, reason: `${text[role].reason}${personLabel(roleList[0].entry, text[role].reason)}${cc.length ? " · další v kopii" : ""}`, source: "role", role };
   }
   if (!book) return { to: [], cc: [], reason: "", source: "none", role };
   if (role !== "komunikace") {
     const general = roleAddresses(book, "komunikace");
     if (general.length) {
-      return { to: [general[0].email], cc: [], reason: `${text.komunikace.reason}${personLabel(general[0].entry)} — pro „${text[role].label}“ není nastavený vlastní e-mail`, source: "fallback_role", role };
+      return { to: [general[0].email], cc: [], reason: `${text.komunikace.reason}${personLabel(general[0].entry, text.komunikace.reason)} — pro „${text[role].label}“ není nastavený vlastní e-mail`, source: "fallback_role", role };
     }
   }
   const party = normEmail(book.partyEmail);

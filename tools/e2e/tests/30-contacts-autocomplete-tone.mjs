@@ -6,14 +6,15 @@
 //  2. okno psaní (A = obchodník): „nov" → Pavel Novák (firma, pozice, účel) → štítek, oslovení „Dobrý den, pane Nováku,";
 //     návrh z dřívější pošty „Ahoj Pavle" → „Ano, tykáme" → „Ahoj Pavle,"; AI návrh odpovědi „Ahoj Pavle,";
 //     B (super admin) stejnému kontaktu vyká → AI návrh „Dobrý den, pane Nováku,";
-//  3. nabídka jde na e-mail pro nabídky (Pavel, s tykáním A), faktura na fakturační e-mail; v Kopii našeptávač
+//  3. nabídka jde na e-mail pro nabídky (Pavel, s tykáním A; změna Komu na Evu přepne vykání a text a zpět), faktura
+//     na fakturační e-mail; v Kopii našeptávač
 //     z konverzace; oba e-maily opravdu odejdou (mail catcher);
 //  4. 390 px bez vodorovného přetékání.
 //   E2E_BASE_URL=http://localhost:3600 [CONTACTS_SHOTS=<adresář>] node tools/e2e/tests/30-contacts-autocomplete-tone.mjs
 // Vlastní data „E2E-30-" (zákazník, kontakty, zakázky, e-maily), na začátku i na konci se uklidí.
 import fs from "node:fs";
 import path from "node:path";
-import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary, recipients } from "../lib.mjs";
+import { BASE, USERS, launch, withContext, login, shot, sql, test, expect, summary, recipients, setRecipients } from "../lib.mjs";
 import { lit, userIds, eventually, waitHydrated, expectNoOverflow, waitMail, removeStorageFiles, createJob, createQuote } from "../lib-quotes-docs-flow.mjs";
 
 const browser = await launch();
@@ -261,6 +262,13 @@ await T("nabídka: Komu = e-mail pro nabídky (Pavel, s důvodem), text „Ahoj 
   expect(reason === "E-mail zákazníka pro nabídky (Pavel Novák)", `důvod adresy (${reason})`);
   const body = await dlg.getByLabel("Text e-mailu").inputValue();
   expect(body.startsWith("Ahoj Pavle,\n\ndíky za tvou poptávku"), `text s tykáním A (${body.slice(0, 80)})`);
+  // změna Komu (14. 11.): Eva (A jí vyká) → oslovení, vykání i text pro Evu; zpět Pavel → zase tykání
+  const bodyField = dlg.getByLabel("Text e-mailu");
+  await setRecipients(dlg, "Komu", EVA);
+  await eventually(async () => expect((await bodyField.inputValue()).startsWith("Dobrý den, paní Účetní,\n\nděkujeme za Vaši poptávku"), `text pro Evu (${(await bodyField.inputValue()).slice(0, 70)})`), { timeout: 20_000 });
+  await setRecipients(dlg, "Komu", PAVEL);
+  await eventually(async () => expect((await bodyField.inputValue()) === body, `zpět Pavel: původní text (${(await bodyField.inputValue()).slice(0, 70)})`), { timeout: 20_000 });
+  expect(await dlg.getByTestId("tone-recipient-note").count() === 0, "neupravený text: bez poznámky");
   // Kopie: našeptávač s adresami zákazníka zakázky (fakturační s účelem)
   const ccInput = dlg.locator("#quote-mail-cc");
   await ccInput.fill("fakt");

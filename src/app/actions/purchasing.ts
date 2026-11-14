@@ -44,6 +44,7 @@ import {
 import { userActor } from "@/lib/supabase/actor-headers";
 import { normalizeExtracted } from "@/lib/jobs/extracted-normalize";
 import { recipientsFor, toneFor } from "@/lib/contacts/server";
+import { normEmail } from "@/lib/contacts/roles";
 import { czDate } from "@/lib/pdf/types";
 import type { JobStage, PurchaseOrderStatus } from "@/lib/supabase/database.types";
 import type { ActionResult } from "@/lib/jobs/types";
@@ -1005,7 +1006,8 @@ function drawingChangeMode(po: PurchaseOrderView, drawingChange: boolean | undef
  */
 export async function draftPurchaseOrderEmail(
   id: string,
-  opts: { drawingChange?: boolean; fromMailboxId?: string | null } = {},
+  /** to: text pro jiného adresáta (uživatel změnil Komu) — jeho tykání / vykání a oslovení. */
+  opts: { drawingChange?: boolean; fromMailboxId?: string | null; to?: string | null } = {},
 ): Promise<ActionResult<{
   to: string; cc: string; recipientReason: string; supplierId: string | null; subject: string; body: string; attachmentName: string;
   mode: "issue" | "change"; attachments: PoMailAttachmentView[]; missingDrawing: string[]; deviations: { ref: string; lines: string[] }[];
@@ -1026,7 +1028,8 @@ export async function draftPurchaseOrderEmail(
     // dodavatel → e-mail pro objednávky (karta dodavatele), tykání / vykání podepisujícího s adresátem
     const pick = await recipientsFor(c.db, "objednavka_dodavateli", { supplierId: po.supplier?.id ?? null }).catch(() => null);
     const to = pick?.to[0] ?? po.supplier?.email ?? "";
-    const tone = to ? await toneFor(c.db, sender.signerId ?? c.user.id, [to]).catch(() => null) : null;
+    const toneTo = normEmail(opts?.to) ?? to;
+    const tone = toneTo ? await toneFor(c.db, sender.signerId ?? c.user.id, [toneTo]).catch(() => null) : null;
     const address = tone?.setting.address ?? null;
     const extras = await purchaseOrderMailExtras(c.db, po, change ? "change" : "issue", address);
     const signer = {

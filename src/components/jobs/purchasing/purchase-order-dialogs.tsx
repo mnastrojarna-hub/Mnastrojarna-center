@@ -16,8 +16,9 @@ import type { PurchaseOrderView } from "@/lib/jobs/purchasing-types";
 import { parseEmailList } from "@/lib/jobs/purchasing";
 import type { Notify } from "@/components/jobs/detail/toast";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
-import { MailFields, type MailDraft } from "@/components/flow/document-send-dialog";
-import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
+import { MailFields, mailFromDraft, type MailDraft } from "@/components/flow/document-send-dialog";
+import { swapDraftSignature } from "@/lib/contacts/draft-retarget";
+import { SenderPicker } from "@/components/mail/sender-picker";
 import { isoToday } from "@/components/jobs/detail/detail-helpers";
 import { PurchaseOrderForm } from "./purchase-order-form";
 import { FULLSCREEN_DIALOG, Field } from "./ui-bits";
@@ -121,6 +122,12 @@ export function SendPurchaseOrderDialog({
   const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
   const orderId = order?.id ?? null;
+  /** Text objednávky znovu pro jiného adresáta / po přepnutí tykání (podpis zvolené schránky). */
+  const redraftFor = React.useCallback(async (to: string): Promise<string | null> => {
+    if (!orderId) return null;
+    const d = await draftPurchaseOrderEmail(orderId, { ...(drawingChange ? { drawingChange: true } : {}), fromMailboxId, to }).catch(() => null);
+    return d?.ok && d.body ? d.body : null;
+  }, [orderId, drawingChange, fromMailboxId]);
 
   React.useEffect(() => {
     if (!open || !orderId) {
@@ -143,7 +150,7 @@ export function SendPurchaseOrderDialog({
         if (token !== run.current) return;
         if (!res.ok) setError(res.error ?? "Návrh e-mailu se nepodařilo připravit.");
         else {
-          setMail({ to: res.to ?? "", cc: res.cc ?? "", subject: res.subject ?? "", body: res.body ?? "", reason: res.to ? res.recipientReason : undefined });
+          setMail(mailFromDraft(res));
           setSupplierId(res.supplierId ?? null);
           setAttachment(res.attachmentName ?? null);
           setFiles(res.attachments ?? []);
@@ -243,11 +250,11 @@ export function SendPurchaseOrderDialog({
               <SenderPicker
                 value={fromMailboxId}
                 onChange={setFromMailboxId}
-                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                onSignatureChange={(prev, next) => setMail((m) => swapDraftSignature(m, prev, next))}
                 disabled={step === "sending"}
                 className="px-1"
               />
-              <MailFields mail={mail} onChange={setMail} context={supplierId ? { supplierId } : null} idPrefix="po-mail" />
+              <MailFields mail={mail} onChange={setMail} context={supplierId ? { supplierId } : null} idPrefix="po-mail" redraftFor={redraftFor} />
             </>
           )}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

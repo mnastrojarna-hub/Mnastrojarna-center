@@ -8,8 +8,9 @@ import { PremiumBanner } from "@/components/customers/premium-badge";
 import { DialogHead, ErrorBox } from "@/components/jobs/detail/confirm-dialog";
 import { draftQuoteEmail } from "@/app/actions/job-documents";
 import { approveAndSendQuote } from "@/app/actions/flow-status";
-import { MailFields, mailDraftError, type MailDraft } from "./document-send-dialog";
-import { SenderPicker, swapSignature } from "@/components/mail/sender-picker";
+import { MailFields, mailDraftError, mailFromDraft, type MailDraft } from "./document-send-dialog";
+import { SenderPicker } from "@/components/mail/sender-picker";
+import { swapDraftSignature } from "@/lib/contacts/draft-retarget";
 
 /**
  * „Schválit a odeslat“ (#25, jen super admin): návrh e-mailu se připraví BEZ PDF (draftQuoteEmail),
@@ -38,6 +39,11 @@ export function QuoteApproveSendDialog({
   /** „Odeslat z" (super admin; null = jeho schránka). */
   const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
+  /** Text nabídky znovu pro jiného adresáta / po přepnutí tykání. */
+  const redraftFor = React.useCallback(async (to: string): Promise<string | null> => {
+    const d = await draftQuoteEmail(jobId, quoteId, { to }).catch(() => null);
+    return d?.ok && d.body ? d.body : null;
+  }, [jobId, quoteId]);
 
   React.useEffect(() => {
     if (!open) {
@@ -51,7 +57,7 @@ export function QuoteApproveSendDialog({
     draftQuoteEmail(jobId, quoteId).then((d) => {
       if (token !== run.current) return;
       if (d.ok) {
-        setMail({ to: d.to ?? "", cc: d.cc ?? "", subject: d.subject ?? "", body: d.body ?? "", reason: d.to ? d.recipientReason : undefined });
+        setMail(mailFromDraft(d));
         setFilename(d.filename ?? null);
       } else {
         setError(d.error ?? "Návrh e-mailu se nepodařilo připravit.");
@@ -119,11 +125,11 @@ export function QuoteApproveSendDialog({
               <SenderPicker
                 value={fromMailboxId}
                 onChange={setFromMailboxId}
-                onSignatureChange={(prev, next) => setMail((m) => ({ ...m, body: swapSignature(m.body, prev, next) }))}
+                onSignatureChange={(prev, next) => setMail((m) => swapDraftSignature(m, prev, next))}
                 disabled={step === "sending"}
                 className="px-1"
               />
-              <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} />
+              <MailFields mail={mail} onChange={setMail} disabled={step === "sending"} context={{ jobId }} redraftFor={redraftFor} />
             </>
           )}
           {/* tlačítka přilepená dole: na telefonu jsou vidět hned, bez rolování na konec (majitel 6. 11.) */}

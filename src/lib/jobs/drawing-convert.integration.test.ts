@@ -96,8 +96,9 @@ describe.skipIf(!LOCAL_ENABLED)("výkres DXF / DWG → PDF (lokální Supabase)"
     return (data as { id: string }).id;
   }
 
-  const post = async (id: string, skip = false) => {
-    const res = await route.POST(new Request(`http://localhost/api/jobs/files/${id}/pdf${skip ? "?skip=1" : ""}`, { method: "POST" }), { params: Promise.resolve({ id }) });
+  const post = async (id: string, skip = false, edits?: unknown) => {
+    const init: RequestInit = edits === undefined ? { method: "POST" } : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ edits }) };
+    const res = await route.POST(new Request(`http://localhost/api/jobs/files/${id}/pdf${skip ? "?skip=1" : ""}`, init), { params: Promise.resolve({ id }) });
     return { status: res.status, body: (await res.json()) as { skipped?: boolean; file?: { id: string; filename: string; version: number }; error?: string; sheet?: string } };
   };
 
@@ -177,6 +178,39 @@ describe.skipIf(!LOCAL_ENABLED)("výkres DXF / DWG → PDF (lokální Supabase)"
     const text = await pdfTextOf(await download(String((await row(r.body.file!.id)).storage_path)));
     for (const s of ["1504,68", "108°", "277,87"]) expect(text, s).toContain(s);
   }, 90_000);
+
+  it("upravený výkres (smazané prvky v prohlížeči) → samostatná kopie „(upraveno)“, originál i převod celého výkresu zůstávají", async () => {
+    const srcBytes = new TextEncoder().encode(dimsDxf());
+    const src = await addFile("PLECH-80x25.dxf", srcBytes, "application/dxf");
+    const full = await post(src);
+    expect(full.status).toBe(200);
+    const { parseDxf } = await import("@/lib/viewer3d/formats/dxf");
+    const { drawingItemIds } = await import("@/lib/viewer3d/drawing-model");
+    const { items } = drawingItemIds(parseDxf(srcBytes));
+    // smazat text „DESKA — materiál…" (poslední prvek), skrýt hladinu kót
+    const edits = { itemCount: items.length, deletedItems: [items.length - 1], hiddenLayers: ["KOTY"], shownLayers: [] };
+    const r = await post(src, false, edits);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.file).toMatchObject({ filename: "PLECH-80x25 (upraveno).pdf", version: 1 });
+    const copy = await row(r.body.file!.id);
+    expect(copy).toMatchObject({ kind: "vykres", source_file_id: src, archived: false });
+    expect(String(copy.note)).toBe("Upravená kopie z PLECH-80x25.dxf (smazáno prvků: 1, změněné hladiny: 1) — originál beze změny");
+    const text = await pdfTextOf(await download(String(copy.storage_path)));
+    expect(text).not.toContain("DESKA — materiál S235JR");
+    // hladina kót skrytá → čísla kót v PDF nejsou
+    const lines = text.split("\n").map((l) => l.trim());
+    expect(lines.includes("80") || lines.includes("25")).toBe(false);
+    // převod celého výkresu nenahrazen, originál beze změny
+    expect(await row(full.body.file!.id)).toMatchObject({ archived: false });
+    expect(await download(String((await row(src)).storage_path))).toEqual(srcBytes);
+    // znovu upravené → nová verze kopie; hromadný převod pořád vidí PDF celého výkresu
+    const r2 = await post(src, false, edits);
+    expect(r2.body.file).toMatchObject({ filename: "PLECH-80x25 (upraveno).pdf", version: 2 });
+    expect((await post(src, true)).body).toMatchObject({ skipped: true, file: { id: full.body.file!.id } });
+    // jiný počet prvků → 409, nesmysl → 400
+    expect((await post(src, false, { ...edits, itemCount: 999 })).status).toBe(409);
+    expect((await post(src, false, { itemCount: "x" })).status).toBe(400);
+  }, 60_000);
 
   it("jiný soubor → 415, neexistující → 404, poškozený DXF → 422 se srozumitelnou chybou", async () => {
     const txt = await addFile("poznamka.txt", new TextEncoder().encode("ahoj"), "text/plain", "ostatni");

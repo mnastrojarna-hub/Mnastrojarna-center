@@ -4,6 +4,8 @@
  * s trojúhelníkovou sítí v milimetrech (transformace už zapečené) a strom sestavy.
  */
 
+import type { DrawItemKind } from "./box-select";
+
 /** Barva RGB 0–1. */
 export type Rgb = [number, number, number];
 
@@ -50,6 +52,8 @@ export interface DrawingText {
   width?: number;
   /** Barva [r,g,b] 0–1, null = barva popředí (černá / bílá podle pozadí). */
   color: [number, number, number] | null;
+  /** Prvek výkresu (DrawingExtras.items), ke kterému text patří. */
+  item?: number;
 }
 
 /** Navíc u 2D výkresu: texty, barvy čar pro tmavé pozadí, vypnuté hladiny. */
@@ -57,6 +61,11 @@ export interface DrawingExtras {
   texts: DrawingText[];
   darkColors: Float32Array[];
   hidden: number[];
+  /**
+   * Vybíratelné prvky výkresu (výběr oknem): druh každého prvku. Křivky (Curve.item) a texty
+   * (DrawingText.item) na ně odkazují — polyčára, blok nebo kóta je jeden prvek.
+   */
+  items?: DrawItemKind[];
 }
 
 /** Uzel stromu sestavy. */
