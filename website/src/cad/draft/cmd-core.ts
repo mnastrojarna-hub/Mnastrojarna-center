@@ -6,7 +6,7 @@ import { tr } from "../i18n";
 import { colorLabel, parseColor } from "./colors";
 import { cmdName, commands, findCommand, registerCommand, type CmdCtx, type CmdGen } from "./commands";
 import { angleOf, deg, dist, polyArea, sub } from "./geom";
-import { kindOf } from "./kinds";
+import { invalidateGeometry, kindOf } from "./kinds";
 import { createLayer, deleteLayer, findLayer, layerUse, linetypeUsed, ltLabel, lwLabel, renameLayer, setCurrentLayer, setLayer, type LayerPatch } from "./layers";
 import { findLinetype, linetypeLibrary, loadLinetype } from "./linetypes";
 import { snapLineweight, spaceEntities, type DraftColor, type DraftEntity, type DraftLw, type DraftVars, type Vec2 } from "./model";
@@ -457,7 +457,7 @@ registerCommand({
 
 // ---------------------------------------------------------------- PROMĚNNÉ, JEDNOTKY
 
-type VarSpec = { key: keyof DraftVars; parse: (t: string, c: CmdCtx) => unknown };
+type VarSpec = { key: keyof DraftVars; parse: (t: string, c: CmdCtx) => unknown; /** po změně (např. přepočet mezipamětí) */ after?: () => void };
 const VARS: Record<string, VarSpec> = {
   clayer: { key: "clayer", parse: (t, c) => (c.tx.setModel((m) => setCurrentLayer(m, t)), c.tx.vars.clayer) },
   cecolor: { key: "cecolor", parse: (t) => colorOf(t) },
@@ -478,12 +478,14 @@ const VARS: Record<string, VarSpec> = {
   gridunit: { key: "grid", parse: (t) => posNum(t, "GRIDUNIT") },
   snapunit: { key: "snap", parse: (t) => posNum(t, "SNAPUNIT") },
   measurement: { key: "measurement", parse: (t) => (evalNumber(t) ? 1 : 0) },
+  // vzor čar ve výřezech rozvržení: 1 = v mm papíru (výchozí), 0 = v jednotkách modelu × měřítko výřezu (balík layout)
+  psltscale: { key: "psltscale", parse: (t) => { if (!isW(t, "0", "1")) throw new Error(tr("PSLTSCALE: 0 nebo 1")); return t === "0" ? 0 : 1; }, after: () => invalidateGeometry() },
 };
 registerCommand({
   id: "SETVAR",
   names: { cs: ["proměnná", "promenna"], en: ["setvar"], de: ["variable", "setvar2"] },
   group: "util",
-  desc: () => tr("proměnné výkresu (jako AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT; bez hodnoty = výpis"),
+  desc: () => tr("proměnné výkresu (jako AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT, PSLTSCALE; bez hodnoty = výpis"),
   usage: () => tr("proměnná cecolor 1 | proměnná pdmode 3 | proměnná luprec 2 | proměnná (výpis všech)"),
   line: (c, a) => {
     if (!a[0]) {
@@ -500,6 +502,7 @@ registerCommand({
     }
     const val = spec.parse(a[1], c);
     c.tx.setVars({ [spec.key]: val } as Partial<DraftVars>);
+    spec.after?.();
     c.log(`✓ ${a[0].toUpperCase()} = ${JSON.stringify(val)}`);
   },
 });

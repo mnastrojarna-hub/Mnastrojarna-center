@@ -83,10 +83,6 @@ entita {0} ({1}) tu nejde použít	Objekt {0} ({1}) ist hier nicht verwendbar
 entita {0} je na zamčené hladině „{1}“	Objekt {0} liegt auf der gesperrten Ebene „{1}“
 entita {0} neexistuje	Objekt {0} existiert nicht
 entitu nelze takto transformovat	das Objekt kann so nicht transformiert werden
-Export DWG	DWG exportieren
-Export DXF	DXF exportieren
-export dxf | export dwg verze R2013 | export dxf název "Deska"	exportieren dxf | exportieren dwg version R2013 | exportieren dxf name "Platte"
-export výkresu do DXF nebo DWG (verze R2000–R2018); soubor se stáhne (v API je v results[].data.file)	Export der Zeichnung nach DXF oder DWG (Versionen R2000–R2018); die Datei wird heruntergeladen (in der API in results[].data.file)
 export: dxf nebo dwg	export: dxf oder dwg
 globální měřítko typů čar (LTSCALE) – délky čárek a mezer se násobí	globaler Linientypfaktor (LTFAKTOR) – Strich- und Lückenlängen werden multipliziert
 hladina	Ebene
@@ -110,7 +106,6 @@ chybí hodnota vlastnosti {0}	Wert der Eigenschaft {0} fehlt
 chybí název hladiny	Ebenenname fehlt
 chybí název typu čáry	Linientypname fehlt
 chybí zadání – {0}	Eingabe fehlt – {0}
-import (GUI) | import "vykres.dxf" <base64>	importieren (GUI) | importieren "zeichnung.dxf" <base64>
 import: zadejte název a obsah souboru v base64, nebo použijte window.mncad.draftImport	import: Dateiname und Inhalt in Base64 angeben oder window.mncad.draftImport verwenden
 jedna entita z úseků a oblouků (Oblouk = tečný oblouk, Druhý = oblouk třemi body, Úsečka = zpět na úseky), šířka, uzavření	ein Objekt aus Segmenten und Bögen (Bogen = tangentialer Bogen, Zweiter = Bogen durch drei Punkte, Linie = zurück zu Segmenten), Breite, schließen
 jednořádkový text	einzeiliger Text
@@ -146,8 +141,6 @@ modrá	blau
 MŘÍŽKA	RASTER
 Načíst typ čáry	Linientyp laden
 Načíst z knihovny	Aus Bibliothek laden
-Načteno {0} entit, {1} hladin.	{0} Objekte, {1} Ebenen geladen.
-Načteno {0} entit, {1} hladin. Zatím nepřevedeno: {2}.	{0} Objekte, {1} Ebenen geladen. Noch nicht übernommen: {2}.
 nadbytečné zadání „{0}“ – příkaz {1} skončil dřív	überzählige Eingabe „{0}“ – Befehl {1} wurde schon beendet
 napište příkaz (čára, kružnice, L, C…) nebo x,y	Befehl eingeben (linie, kreis, L, C…) oder x,y
 nápověda | nápověda kružnice	hilfe | hilfe kreis
@@ -200,9 +193,7 @@ Odemknout vše	Alle entsperren
 Opakovat {0}	{0} wiederholen
 osa elipsy má nulovou délku	die Ellipsenachse hat die Länge null
 Osa, konec	Achse, Endpunkt
-otevře DXF / DWG jako nový 2D výkres v nové záložce (v GUI výběr souboru; textem: import "název.dxf" base64)	öffnet DXF / DWG als neue 2D-Zeichnung in einer neuen Registerkarte (in der GUI Dateiauswahl; per Text: importieren "name.dxf" base64)
 otevřený dokument „{0}“ není 2D výkres – nejdřív „2d nový“ nebo přepněte na záložku s 2D výkresem	das geöffnete Dokument „{0}“ ist keine 2D-Zeichnung – zuerst „2d neu“ oder zur Registerkarte mit einer 2D-Zeichnung wechseln
-Otevřít DXF / DWG jako 2D výkres	DXF / DWG als 2D-Zeichnung öffnen
 Panel vlastností a hladin	Eigenschaften- und Ebenenfenster
 PDMODE: 0, 2, 3, 32, 34, 35 …	PDMODE: 0, 2, 3, 32, 34, 35 …
 Plocha = {0}, obvod = {1}	Fläche = {0}, Umfang = {1}
@@ -230,7 +221,7 @@ pravidelný mnohoúhelník (3–1024 stran): střed a poloměr vepsaný / opsan�
 Prodloužení	Verlängerung
 Proložením bodů	Durch Anpassungspunkte
 proměnná cecolor 1 | proměnná pdmode 3 | proměnná luprec 2 | proměnná (výpis všech)	variable cecolor 1 | variable pdmode 3 | variable luprec 2 | variable (alle auflisten)
-proměnné výkresu (jako AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT; bez hodnoty = výpis	Zeichnungsvariablen (wie AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT; ohne Wert = Liste
+proměnné výkresu (jako AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT, PSLTSCALE; bez hodnoty = výpis	Zeichnungsvariablen (wie AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT, PSLTSCALE; ohne Wert = Liste
 průhlednost 0–90 %	Transparenz 0–90 %
 průsečík: x(e1,e2) nebo x(e1,e2,k) nebo x(e1,e2,x,y)	Schnittpunkt: x(e1,e2) oder x(e1,e2,k) oder x(e1,e2,x,y)
 přejmenovat: hladina přejmenovat STARÝ NOVÝ	umbenennen: ebene umbenennen ALT NEU

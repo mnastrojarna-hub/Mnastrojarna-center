@@ -1,0 +1,335 @@
+# 2D CAD – balík 1 edit (úpravy): příkazy, výzvy, protokol, pás karet (en)
+ (příliš krátké úseky: {0})	 (segments too short: {0})
+(režim {0}) délka = {1}, úhel = {2}	(mode {0}) length = {1}, angle = {2}
+(režim {0}) vzdálenost 1 = {1}, vzdálenost 2 = {2}	(mode {0}) distance 1 = {1}, distance 2 = {2}
+aktuální	current
+Aktuální délka: {0}	Current length: {0}
+Aktuální délka: {0}, úhel: {1}	Current length: {0}, included angle: {1}
+Aktuální nastavení: režim = {0}, poloměr = {1}	Current settings: mode = {0}, radius = {1}
+Aktuální nastavení: režim {0}, hrany {1}	Current settings: mode {0}, edges {1}
+Aktuální nastavení: smazat zdroj = {0}, hladina = {1}	Current settings: erase source = {0}, layer = {1}
+blok „{0}“ ve výkresu není	block “{0}” is not in the drawing
+bloků {0}	blocks {0}
+bod leží na objektu – ekvidistanta nevznikla	the point lies on the object – no offset created
+bod přerušení je na konci objektu	the break point is at the end of the object
+body osy zrcadlení jsou totožné	the mirror line points coincide
+bodů	points
+delta, procenta, celkem, dynamicky	delta, percent, total, dynamic
+Dopředu	Bring to front
+Dozadu	Send to back
+dráha nesmí být mezi kopírovanými objekty	the path must not be among the copied objects
+Ekvidistanta	Offset
+ekvidistanta (rovnoběžná kopie) ve vzdálenosti nebo bodem: úsečka, kružnice, oblouk, křivka s oblouky přesně, elipsa a spline jako spline; Smazat zdroj, Hladina zdroj / aktuální, Vícekrát	offset (parallel copy) by distance or through a point: line, circle, arc, polyline with arcs exactly, ellipse and spline as a spline; Erase source, Layer source / current, Multiple
+ekvidistanta 5 e1 0,100 | ekvidistanta bodem e1 50,30 | ekvidistanta 2 e3 0,0 e4 10,10 (strana bodem) | ekvidistanta smazat ano 5 e1 0,10	offset 5 e1 0,100 | offset through e1 50,30 | offset 2 e3 0,0 e4 10,10 (side by point) | offset erase yes 5 e1 0,10
+entita {0} je na zamčené hladině	entity {0} is on a locked layer
+Hladina ekvidistanty	Layer of the offset
+hran: {0}	edges: {0}
+hrany: všechny objekty	edges: all objects
+Ignorovat vlastnost (Enter = hotovo)	Ignore property (Enter = done)
+Kopie	Copy
+kopie e3 0,0 50,0 100,0 | kopie e3 0,0 pole 5 20,0 | kopie e3 posunutí 0,30	copy e3 0,0 50,0 100,0 | copy e3 0,0 array 5 20,0 | copy e3 displacement 0,30
+křivka převedena na spline	polyline converted to spline
+křížící okno	crossing window
+Metoda rozmístění	Distribution method
+Metoda zkosení	Chamfer method
+MĚŘÍTKO	SCALE
+měřítko musí být kladné	the scale factor must be positive
+Nad objekty	Above objects
+Zadejte volbu nastavení (Enter = pokračovat)	Enter a settings option (Enter = continue)
+nejsou vybrány referenční objekty	no reference objects selected
+NEOŘÍZNOUT	NO TRIM
+neprodlužovat	no extend
+nic	none
+nic nespojeno – konce se musí dotýkat	nothing joined – the ends must touch
+nic nespojeno – objekty spolu nesousedí (konce se musí dotýkat) nebo je nelze spojit	nothing joined – the objects are not adjacent (ends must touch) or cannot be joined
+nová délka musí být kladná	the new length must be positive
+Obdélníkové	Rectangular
+obdélníkové pole: počet sloupců a řádků, vzdálenost sloupců a řádků (záporná = opačný směr), úhel pole	rectangular array: number of columns and rows, column and row spacing (negative = opposite direction), array angle
+objekt je na zamčené hladině	the object is on a locked layer
+objekt nelze zaoblit ani zkosit	the object cannot be filleted or chamfered
+Objekt není křivka. Převést na křivku?	Object is not a polyline. Convert it to a polyline?
+objekty nelze zaoblit – rovnoběžné, totožné nebo poloměr nevyhovuje	the objects cannot be filleted – parallel, identical or the radius does not fit
+obrátit e3 e4	reverse e3 e4
+obrátí směr úseček, křivek a splajnů (pořadí vrcholů – směr typu čáry s textem, začátek pro ROZMĚŘIT)	reverses the direction of lines, polylines and splines (vertex order – direction of linetypes with text, start for MEASURE)
+Odstranit duplicity	Delete duplicates
+odstranit-duplicity vše | odstranit-duplicity vše tolerance 0.001 | odstranit-duplicity vše ignorovat barva hladina "" (konec)	overkill all | overkill all tolerance 0.001 | overkill all ignore color layer "" (end)
+odstraní duplicitní entity (shodná geometrie a vlastnosti do tolerance), sloučí překrývající se kolineární úsečky a smaže nulové úsečky; Tolerance, Ignorovat vlastnosti, Sloučit ano / ne	removes duplicate entities (same geometry and properties within tolerance), merges overlapping collinear lines and deletes zero-length lines; Tolerance, Ignore properties, Merge yes / no
+OTOČIT	ROTATE
+otočit e3 0,0 90 | otočit e3 0,0 kopie 45 | otočit e3 0,0 reference 30 90 | otočit e3 e3.start reference e3.start e3.end 0	rotate e3 0,0 90 | rotate e3 0,0 copy 45 | rotate e3 0,0 reference 30 90 | rotate e3 e3.start reference e3.start e3.end 0
+otočí se kopie vybraných objektů	a copy of the selected objects will be rotated
+otočí vybrané entity kolem základního bodu o úhel (+ = proti směru hodin); Kopie = otočená kopie, Reference = z referenčního úhlu na nový	rotates the selected entities about a base point by an angle (+ = counterclockwise); Copy = rotated copy, Reference = from a reference angle to a new one
+Otáčet položky pole?	Rotate array items?
+ořízne objekty na průsečících s řeznými hranami (rychlý režim = všechny objekty jsou hrany; Řezné-hrany, Plot, Křížení, Režim, Hrana = prodloužené hrany, Smazat, Prodloužit / Shift = prodloužit, Zpět)	trims objects at their intersections with cutting edges (quick mode = all objects are edges; Cutting edges, Fence, Crossing, Mode, Edge = extended edges, Erase, Extend / Shift = extend, Undo)
+OŘÍZNOUT	TRIM
+oříznout e1@20,0 e1@80,0 | oříznout řezné-hrany e5 e6 e1@50,0 | oříznout plot 0,10 100,10 hotovo	trim e1@20,0 e1@80,0 | trim cutting e5 e6 e1@50,0 | trim fence 0,10 100,10 done
+Po dráze	Path
+Pod objekty	Under objects
+pole by mělo víc než 100 000 položek	the array would have more than 100,000 items
+pole e1 obdélníkové 4 3 20 15 | pole e1 polární 0,0 6 360 ano | pole e1 dráha e5 rozdělit 8 ano	array e1 rectangular 4 3 20 15 | array e1 polar 0,0 6 360 yes | array e1 path e5 divide 8 yes
+pole kopií vybraných entit: obdélníkové (sloupce, řádky, vzdálenosti, úhel), polární (střed, počet, úhel vyplnění, otáčet) nebo po dráze (rozdělit / měřit, zarovnat)	array of copies of the selected entities: rectangular (columns, rows, spacing, angle), polar (center, count, angle to fill, rotate) or along a path (divide / measure, align)
+pole po dráze (úsečka, oblouk, křivka, spline, elipsa): Rozdělit = počet položek, Měřit = vzdálenost; základní bod = začátek dráhy; zarovnat s tečnou	array along a path (line, arc, polyline, spline, ellipse): Divide = number of items, Measure = spacing; base point = start of the path; align with the tangent
+pole-obdélníkové e1 4 3 25 20 [úhel]	arrayrect e1 4 3 25 20 [angle]
+pole-po-dráze e1 "" e5 rozdělit 8 ano | pole-po-dráze e1 e5@0,0 měřit 25 ne	arraypath e1 "" e5 divide 8 yes | arraypath e1 e5@0,0 measure 25 no
+pole-polární e1 0,0 6 [360] [ano | ne]	arraypolar e1 0,0 6 [360] [yes | no]
+Polární	Polar
+polární pole kolem středu: počet položek, úhel vyplnění (360 = rovnoměrně po kruhu), otáčet položky	polar array around a center: number of items, angle to fill (360 = evenly around the circle), rotate items
+POSUN	MOVE
+posun e3 e5 0,0 100,50 | posun vše posunutí 10,0 | posun 0,0 @25<45 (vybrané)	move e3 e5 0,0 100,50 | move all displacement 10,0 | move 0,0 @25<45 (selected)
+posune vybrané entity: základní bod a druhý bod, nebo Posunutí dx,dy (Enter u druhého bodu = první bod jako posunutí)	moves the selected entities: base point and second point, or Displacement dx,dy (Enter at the second point = first point as displacement)
+Pořadí	Draw order
+pořadí e3 dopředu | pořadí e3 dozadu | pořadí e3 nad-objekty e7	draworder e3 front | draworder e3 back | draworder e3 above e7
+Pořadí kreslení	Draw order
+pořadí kreslení vybraných entit: dopředu, dozadu, nad / pod referenční objekty (pořadí v seznamu = pořadí ve výkresu a v DXF)	draw order of the selected entities: front, back, above / under reference objects (list order = order in the drawing and in DXF)
+prodloužené	extended
+prodloužení delta 10 e1@95,0 | prodloužení celkem 120 e1@95,0 | prodloužení procenta 50 e1@95,0 | prodloužení delta úhel 30 e4@x,y | prodloužení e1 (výpis)	lengthen delta 10 e1@95,0 | lengthen total 120 e1@95,0 | lengthen percent 50 e1@95,0 | lengthen delta angle 30 e4@x,y | lengthen e1 (report)
+prodloužit e1@95,0 | prodloužit hraniční-hrany e5 e1@95,0 e2@0,95	extend e1@95,0 | extend boundary e5 e1@95,0 e2@0,95
+prodlouží konec objektu (u bodu výběru) k nejbližší hranici (rychlý režim = všechny objekty; Hraniční-hrany, Plot, Křížení, Režim, Hrana = prodloužené hrany, Oříznout / Shift = oříznout, Zpět)	extends the end of an object (near the pick point) to the nearest boundary (quick mode = all objects; Boundary edges, Fence, Crossing, Mode, Edge = extended edges, Trim / Shift = trim, Undo)
+Prodlužovat hrany do zdánlivého průsečíku?	Extend edges to the apparent intersection?
+protáhne entity křížícím oknem (nebo mnohoúhelníkem): body uvnitř se posunou, entity celé uvnitř se přesunou; oblouky drží vzepětí	stretches entities with a crossing window (or polygon): points inside move, entities completely inside are moved; arcs keep their height
+Protáhnout	Stretch
+PROTÁHNOUT	STRETCH
+protáhnout 90,-10 120,60 0,0 @20,0 | protáhnout mnohoúhelník p1 p2 p3 hotovo 0,0 @0,10	stretch 90,-10 120,60 0,0 @20,0 | stretch cpolygon p1 p2 p3 done 0,0 @0,10
+přenese vlastnosti zdrojové entity na cílové: hladina, barva, typ čáry, měřítko čáry, tloušťka, průhlednost, textový styl a výška, šířka křivky, kótovací styl, vzor šrafy (Nastavení = které)	copies the properties of the source entity to the destination entities: layer, color, linetype, linetype scale, lineweight, transparency, text style and height, polyline width, dimension style, hatch pattern (Settings = which)
+přenáší se: {0}	matching: {0}
+Přenést vlastnosti	Match properties
+přenést-vlastnosti e1 e2 e3 | přenést-vlastnosti nastavení nic hladina "" e1 e5	matchprop e1 e2 e3 | matchprop settings none layer "" e1 e5
+Přepnout vlastnost (Enter = hotovo)	Toggle property (Enter = done)
+Přerušit	Break
+přerušit e1@20,0 60,0 | přerušit e1 první 20,0 60,0 | přerušit e3 první 0,10 @	break e1@20,0 60,0 | break e1 first 20,0 60,0 | break e3 first 0,10 @
+Přerušit mezi dvěma body	Break between two points
+Přerušit v bodě	Break at point
+přerušit-v-bodě e1 50,0	breakatpoint e1 50,0
+Převést úsečky, oblouky a splajny na křivky?	Convert lines, arcs and splines to polylines?
+referenční délka musí být kladná	the reference length must be positive
+Režim	Mode
+Režim kopírování	Copy mode
+Režim ořezávání	Trim mode
+Roh (poloměr 0)	Corner (radius 0)
+rozdělit e1 5 | rozdělit e1 blok ŠROUB ano 8	divide e1 5 | divide e1 block SCREW yes 8
+rozdělí objekt na N stejně dlouhých dílů: na hranice dílů vloží body (nebo bloky, zarovnané s objektem)	divides an object into N segments of equal length: places points (or blocks aligned with the object) at the segment boundaries
+rozdělí otevřený objekt v bodě na dva (bez mezery)	splits an open object at a point into two (without a gap)
+rozložit e3 | rozložit typ polyline	explode e3 | explode type polyline
+rozloží složené entity na části: křivka → úsečky a oblouky (šířky se ztratí), blok, kóta, mtext, šrafa → jejich prvky	explodes compound entities into their parts: polyline → lines and arcs (widths are lost), block, dimension, mtext, hatch → their elements
+Rozměřit	Measure
+rozměřit e1@0,0 25 | rozměřit e1 blok ŠROUB ne 40	measure e1@0,0 25 | measure e1 block SCREW no 40
+rozměří objekt úseky dané délky od konce u bodu výběru: vloží body (nebo bloky)	measures an object in segments of a given length from the end nearest the pick point: places points (or blocks)
+rychlý	quick
+Shift = oříznout	Shift = trim
+Shift = prodloužit	Shift = extend
+Sloučit překrývající se kolineární úsečky?	Merge overlapping collinear lines?
+Smazat zdrojové objekty?	Erase source objects?
+Smazat zdrojový objekt po vytvoření ekvidistanty?	Erase the source object after offsetting?
+spline převedena na křivku	spline converted to polyline
+spojeno: {0}	joined: {0}
+Spojit	Join
+spojit e1 e2 e3 | spojit vše | spojit e4 e5 uzavřít (oblouky → kružnice)	join e1 e2 e3 | join all | join e4 e5 close (arcs → circle)
+spojí entity: kolineární úsečky → úsečka, oblouky jedné kružnice → oblouk (Uzavřít = kružnice), úsečky / oblouky / křivky navazující konci → křivka, se splajnem nebo eliptickým obloukem → spline	joins entities: collinear lines → line, arcs of one circle → arc (Close = circle), lines / arcs / polylines connected end to end → polyline, with a spline or elliptical arc → spline
+standardní	standard
+Typ pole	Array type
+Upravit křivku	Edit polyline
+Upravit objekty	Modify objects
+Upravit spline	Edit spline
+upravit-křivku e3 uzavřít | upravit-křivku e3 šířka 0.5 | upravit-křivku e1 ano spojit e2 e3 | upravit-křivku více e1 e2 ano proložit (ano = převést úsečky / oblouky / splajny – ptá se jen, jsou-li ve výběru)	pedit e3 close | pedit e3 width 0.5 | pedit e1 yes join e2 e3 | pedit multiple e1 e2 yes fit (yes = convert lines / arcs / splines – asked only when the selection contains them)
+upravit-spline e3 uzavřít | upravit-spline e3 posunout-bod 2 10,5 | upravit-spline e3 křivka 0.01 | upravit-spline e3 zvýšit-stupeň 4	splinedit e3 close | splinedit e3 move-point 2 10,5 | splinedit e3 polyline 0.01 | splinedit e3 elevate-order 4
+Uspořádat	Arrange
+uzavřený objekt nelze přerušit v jednom bodě – zadejte dva různé body	a closed object cannot be broken at a single point – specify two different points
+Uzavřít oblouk na kružnici?	Close the arc into a circle?
+uzel nelze vložit (konec nebo plná násobnost)	the knot cannot be inserted (end or full multiplicity)
+v bodě {0} není úchop – nejbližší úchop: {1}	there is no grip at {0} – nearest grip: {1}
+Vyberte 2D křivku	Select a 2D polyline
+vyberte alespoň dva objekty	select at least two objects
+Vyberte cílové objekty	Select destination objects
+Vyberte druhou úsečku nebo se Shiftem pro roh	Select second line or shift-select for a corner
+Vyberte druhý objekt nebo se Shiftem pro roh (poloměr 0)	Select second object or shift-select for a corner (radius 0)
+Vyberte dráhu	Select the path
+vyberte dva různé objekty (nebo dva sousední úseky křivky)	select two different objects (or two adjacent polyline segments)
+Vyberte hraniční hrany (Enter = všechny objekty)	Select boundary edges (Enter = all objects)
+Vyberte křivku nebo	Select polyline or
+Vyberte objekt k měření nebo	Select an object to measure or
+Vyberte objekt k odsazení nebo	Select object to offset or
+Oříznout objekt (Shift = prodloužit) nebo	Select object to trim (Shift = extend) or
+Prodloužit objekt (Shift = oříznout) nebo	Select object to extend (Shift = trim) or
+Vyberte objekt k rozdělení	Select object to divide
+Vyberte objekt k rozměření	Select object to measure
+Vyberte objekt ke změně nebo	Select an object to change or
+Vyberte objekty k otočení	Select objects to rotate
+Vyberte objekty k posunu	Select objects to move
+Vyberte objekty k rozložení	Select objects to explode
+Vyberte objekty k zarovnání	Select objects to align
+Vyberte objekty k zrcadlení	Select objects to mirror
+Vyberte objekty ke kopírování	Select objects to copy
+Vyberte objekty ke smazání	Select objects to erase
+Vyberte objekty ke spojení	Select objects to join
+Vyberte objekty ke změně měřítka	Select objects to scale
+Vyberte objekty pole	Select objects to array
+Vyberte první objekt nebo	Select first object or
+Vyberte první úsečku nebo	Select first line or
+Vyberte referenční objekty	Select reference objects
+Vyberte spline	Select a spline
+Vyberte zdrojový objekt nebo	Select source object or
+Vyberte úsečky, křivky nebo splajny	Select lines, polylines or splines
+Vyberte řezné hrany (Enter = všechny objekty)	Select cutting edges (Enter = all objects)
+vybrané objekty nemají úchopy	the selected objects have no grips
+vyjme část objektu mezi dvěma body (bod výběru = první bod, nebo volba První); u kružnice proti směru hodin; @ = přerušit v bodě	removes the part of an object between two points (pick point = first point, or option First); counterclockwise on circles; @ = break at point
+více kopií, pole v řadě	multiple copies, array in a row
+vícenásobně	multiple
+výsledek spojení není spline	the result of the join is not a spline
+Zadejte bod mnohoúhelníku	Specify polygon point
+Zadejte bod mnohoúhelníku nebo	Specify polygon point or
+Zadejte bod na splajnu pro nový uzel	Specify a point on the spline for the new knot
+Zadejte bod na straně ekvidistanty nebo	Specify point on side to offset or
+Zadejte bod nového vrcholu na křivce	Specify the point of the new vertex on the polyline
+Zadejte bod přerušení	Specify break point
+Zadejte bod u odebíraného vrcholu	Specify a point near the vertex to remove
+Zadejte bod, kterým ekvidistanta prochází, nebo	Specify through point or
+Zadejte celkovou délku nebo	Specify total length or
+Zadejte celkový úhel	Specify total angle
+Zadejte další bod plotu nebo	Specify next fence point or
+Zadejte druhý bod nebo <první bod = posunutí>	Specify second point or <use first point as displacement>
+Zadejte druhý bod nebo	Specify second point or
+Zadejte druhý bod osy zrcadlení	Specify second point of mirror line
+Zadejte druhý bod přerušení nebo	Specify second break point or
+Zadejte druhý cílový bod	Specify second destination point
+Zadejte druhý zdrojový bod nebo <pokračovat>	Specify second source point or <continue>
+Zadejte délku zkosení na první úsečce	Specify chamfer length on the first line
+Zadejte délku úseku nebo	Specify length of segment or
+Zadejte měřítko nebo	Specify scale factor or
+Zadejte novou délku nebo	Specify new length or
+Zadejte novou polohu bodu	Specify the new location of the point
+Zadejte novou šířku všech úseků	Specify new width for all segments
+Zadejte nový koncový bod	Specify new end point
+Zadejte nový stupeň ({0}–26)	Enter the new degree ({0}–26)
+Zadejte nový úhel nebo	Specify the new angle or
+Zadejte název bloku	Enter block name
+Zadejte poloměr zaoblení	Specify fillet radius
+Zadejte poslední bod pole	Specify the last point of the array
+Zadejte posunutí dx,dy	Specify displacement dx,dy
+Zadejte počet dílů nebo	Enter the number of segments or
+Zadejte počet položek	Enter the number of items
+Zadejte počet položek po dráze	Enter the number of items along the path
+Zadejte počet položek pole	Enter the number of items in the array
+Zadejte počet sloupců	Enter the number of columns
+Zadejte počet řádků	Enter the number of rows
+Zadejte procento délky	Enter percentage length
+Zadejte první bod nové délky	Specify first point of the new length
+Zadejte první bod nového úhlu	Specify first point of the new angle
+Zadejte první bod osy zrcadlení	Specify first point of mirror line
+Zadejte první bod plotu	Specify first fence point
+Zadejte první bod přerušení	Specify first break point
+Zadejte první cílový bod	Specify first destination point
+Zadejte první roh křížícího okna nebo	Specify first corner of the crossing window or
+Zadejte první zdrojový bod	Specify first source point
+Zadejte přesnost (odchylka tětivy)	Specify precision (chord deviation)
+Zadejte přírůstek délky nebo	Enter delta length or
+Zadejte přírůstek úhlu	Enter delta angle
+Zadejte referenční délku	Specify reference length
+Zadejte referenční úhel	Specify the reference angle
+Zadejte střed pole	Specify center point of array
+Zadejte toleranci	Specify tolerance
+Zadejte volbu (Enter = konec)	Enter an option (Enter = exit)
+Zadejte vzdálenost ekvidistanty nebo	Specify offset distance or
+Zadejte vzdálenost položek	Specify the distance between items
+Zadejte vzdálenost přichycení (mezery)	Enter fuzz distance (gap)
+Zadejte vzdálenost sloupců	Specify the distance between columns
+Zadejte vzdálenost řádků	Specify the distance between rows
+Zadejte základní bod	Specify base point
+Zadejte úchop (bod úchopu vybraných objektů)	Specify grip (grip point of the selected objects)
+Zadejte úhel otočení nebo	Specify rotation angle or
+Zadejte úhel pole	Specify the array angle
+Zadejte úhel vyplnění (+ proti směru hodin, − po směru)	Specify the angle to fill (+ counterclockwise, − clockwise)
+Zadejte úhel zkosení od první úsečky	Specify chamfer angle from the first line
+Zadejte číslo bodu proložení (1–{0})	Enter the fit point number (1–{0})
+Zadejte číslo řídicího bodu (1–{0})	Enter the control point number (1–{0})
+zaobleno vrcholů: {0}{1}	vertices filleted: {0}{1}
+Zaoblit dva objekty	Fillet two objects
+zaoblit poloměr 5 e1@10,0 e2@0,10 | zaoblit poloměr 0 e1 e2 | zaoblit poloměr 3 křivka e4 | zaoblit oříznout neoříznout poloměr 5 e1 e2 (bez oříznutí)	fillet radius 5 e1@10,0 e2@0,10 | fillet radius 0 e1 e2 | fillet radius 3 polyline e4 | fillet trim no-trim radius 5 e1 e2 (without trimming)
+Zaoblit všechny vrcholy křivky	Fillet all vertices of a polyline
+zaoblí roh dvou objektů (úsečka, oblouk, kružnice, úsek křivky) obloukem daného poloměru a objekty ořízne / prodlouží; poloměr 0 = ostrý roh; Křivka = všechny vrcholy; rovnoběžné úsečky = půlkružnice	rounds the corner of two objects (line, arc, circle, polyline segment) with an arc of a given radius and trims / extends the objects; radius 0 = sharp corner; Polyline = all vertices; parallel lines = semicircle
+Zarovnat blok s objektem?	Align block with object?
+Zarovnat položky s dráhou?	Align items with the path?
+zarovnat-objekty e3 0,0 50,50 100,0 50,150 ne | zarovnat-objekty e3 s1 d1 s2 d2 ano (i měřítko)	align e3 0,0 50,50 100,0 50,150 no | align e3 s1 d1 s2 d2 yes (also scale)
+zarovná entity dvojicemi bodů: 1. zdrojový → 1. cílový (posun), 2. zdrojový → 2. cílový (otočení, volitelně měřítko)	aligns entities with pairs of points: 1st source → 1st destination (move), 2nd source → 2nd destination (rotation, optionally scale)
+zarovnávací body jsou totožné	the alignment points coincide
+zdroj	source
+zkopíruje vybrané entity: základní bod a libovolně mnoho cílových bodů (Pole = n kopií v řadě, Režim jednou / vícekrát, Zpět)	copies the selected entities: base point and any number of destination points (Array = n copies in a row, Mode single / multiple, Undo)
+zkoseno vrcholů: {0}{1}	vertices chamfered: {0}{1}
+zkosení s tímto úhlem nevznikne	no chamfer is possible with this angle
+Zkosit	Chamfer
+Zkosit dvě úsečky	Chamfer two lines
+zkosit lze jen dvě různoběžné úsečky (nebo přímé úseky křivky)	only two non-parallel lines (or straight polyline segments) can be chamfered
+zkosit vzdálenost 5 5 e1@10,0 e2@0,10 | zkosit úhel 5 30 e1 e2 | zkosit vzdálenost 2 2 křivka e4	chamfer distance 5 5 e1@10,0 e2@0,10 | chamfer angle 5 30 e1 e2 | chamfer distance 2 2 polyline e4
+Zkosit všechny vrcholy křivky	Chamfer all vertices of a polyline
+zkosí roh dvou úseček (i přímých úseků křivky): dvě vzdálenosti, nebo délka a úhel; Křivka = všechny vrcholy; vzdálenost 0 = ostrý roh	chamfers the corner of two lines (also straight polyline segments): two distances, or length and angle; Polyline = all vertices; distance 0 = sharp corner
+Změnit měřítko objektů podle zarovnávacích bodů?	Scale objects based on alignment points?
+změnit-měřítko e3 0,0 2 | změnit-měřítko e3 0,0 reference 40 100 | změnit-měřítko e3 0,0 reference e3.start e3.end 100	scale e3 0,0 2 | scale e3 0,0 reference 40 100 | scale e3 0,0 reference e3.start e3.end 100
+změní délku otevřeného objektu na konci u bodu výběru: Delta (± délka nebo Úhel u oblouku), Procenta, Celkem (délka nebo úhel), Dynamicky; výběr bez volby vypíše délku	changes the length of an open object at the end nearest the pick point: Delta (± length or Angle for arcs), Percent, Total (length or angle), Dynamic; picking without an option reports the length
+změní se měřítko kopie vybraných objektů	a copy of the selected objects will be scaled
+změní velikost vybraných entit vzhledem k základnímu bodu: měřítko, Reference (stávající → nová délka), Kopie	scales the selected entities about a base point: factor, Reference (current → new length), Copy
+ZRCADLIT	MIRROR
+zrcadlit e3 e5 0,0 0,100 | zrcadlit e3 0,0 100,0 ano (smazat zdroj)	mirror e3 e5 0,0 0,100 | mirror e3 0,0 100,0 yes (erase source)
+zrcadlí vybrané entity podle osy dané dvěma body; zdroj se ponechá (nebo smaže); text podle MIRRTEXT	mirrors the selected entities about a line given by two points; the source is kept (or erased); text according to MIRRTEXT
+základní bod → cílový bod	base point → destination point
+{0} ({1}) nelze obrátit	{0} ({1}) cannot be reversed
+{0} ({1}) nelze odsadit	{0} ({1}) cannot be offset
+{0} ({1}) nelze oříznout	{0} ({1}) cannot be trimmed
+{0} ({1}) nelze prodloužit	{0} ({1}) cannot be extended
+{0} ({1}) nelze prodloužit – jen zkrátit	{0} ({1}) cannot be lengthened – only shortened
+{0} neprotíná řeznou hranu	{0} does not intersect a cutting edge
+{0} Zadejte bod protažení	{0} Specify stretch point
+{0} Zadejte cílový bod	{0} Specify move point
+{0} Zadejte druhý bod osy	{0} Specify second point of mirror line
+{0} Zadejte měřítko	{0} Specify scale factor
+{0} Zadejte úhel otočení	{0} Specify rotation angle
+{0} {1} neprotíná žádnou hranu – smazán	{0} {1} does not intersect any edge – erased
+{0}: oblouk by přesáhl 360°	{0}: the arc would exceed 360°
+{0}: prodloužení neprotíná žádnou hranici	{0}: the extension does not intersect any boundary
+{0}: uzavřený objekt potřebuje alespoň dva průsečíky s hranami	{0}: a closed object needs at least two intersections with edges
+{0}: ve vzdálenosti {1} by ekvidistanta zanikla	{0}: at distance {1} the offset would vanish
+{0}: zkrácení je delší než objekt	{0}: the shortening is longer than the object
+úchop e3 100,0 150,20 (protáhnout) | úchop e3 e3.end posun @10,0 | úchop e3 50,50 otočit 90 | úchop e3 0,0 kopie 10,0 20,0	gripedit e3 100,0 150,20 (stretch) | gripedit e3 e3.end move @10,0 | gripedit e3 50,50 rotate 90 | gripedit e3 0,0 copy 10,0 20,0
+úhel lze zadat jen u oblouku	an angle can only be given for an arc
+úhel vyplnění musí být v rozsahu −360° až 360° (ne 0)	the angle to fill must be between −360° and 360° (not 0)
+úhel, reference, kopie	angle, reference, copy
+úprava křivky: úsečku / oblouk převede na křivku; Uzavřít / Otevřít, Spojit (navazující objekty), Šířka, Proložit (oblouky přes vrcholy), Spline (rám zůstane – Vyrovnat ho vrátí), Vyrovnat (zruší oblouky i proložení), Obrátit, Vložit / Odebrat vrchol, Více křivek, Zpět	polyline editing: converts a line / arc to a polyline; Close / Open, Join (connected objects), Width, Fit (arcs through the vertices), Spline (the frame is kept – Decurve restores it), Decurve (removes arcs and fitting), Reverse, Insert / Remove vertex, Multiple polylines, Undo
+úprava splajnu: Uzavřít / Otevřít, Spojit (navazující úsečky, oblouky, splajny), Posunout-bod (bod proložení nebo řídicí bod), Zjemnit (vložit uzel), Zvýšit-stupeň, Křivka (převod na křivku s přesností), Obrátit, Zpět	spline editing: Close / Open, Join (connected lines, arcs, splines), Move point (fit point or control point), Refine (insert knot), Elevate order, Polyline (convert to polyline with precision), Reverse, Undo
+úprava úchopem (jako klik na modrý úchop vybrané entity): protáhnout úchop, posun, otočit, měřítko, zrcadlit kolem úchopu; Enter / mezera = další režim, Kopie = více kopií, Základní bod, Zpět	grip editing (like clicking the blue grip of a selected entity): stretch the grip, move, rotate, scale, mirror about the grip; Enter / space = next mode, Copy = multiple copies, Base point, Undo
+úseky jsou na zaoblení / zkosení příliš krátké nebo jsou to oblouky	the segments are too short for the fillet / chamfer or they are arcs
+úseky křivky spolu nesousedí	the polyline segments are not adjacent
+⚠ nelze rozložit: {0}	⚠ cannot explode: {0}
+⚠ nelze transformovat: {0}	⚠ cannot transform: {0}
+⚠ nespojeno: {0} objektů	⚠ not joined: {0} objects
+⚠ {0} je na zamčené hladině	⚠ {0} is on a locked layer
+⚠ šířky křivek se rozložením ztratily	⚠ polyline widths were lost by exploding
+✓ ekvidistant: {0}	✓ offsets: {0}
+✓ měřítko {0}: entit {1}	✓ scale {0}: {1} entities
+✓ obdélníkové pole {0} × {1}: {2} nových entit	✓ rectangular array {0} × {1}: {2} new entities
+✓ obrácen směr: {0}	✓ direction reversed: {0}
+✓ odstraněno duplicit: {0}, sloučeno úseček: {1}	✓ duplicates removed: {0}, lines merged: {1}
+✓ otočeno entit: {0} o {1}	✓ rotated {0} entities by {1}
+✓ oříznuto: {0}	✓ trimmed: {0}
+✓ pole po dráze {0}: {1} položek, {2} nových entit	✓ path array along {0}: {1} items, {2} new entities
+✓ polární pole {0} položek po {1}: {2} nových entit	✓ polar array of {0} items at {1}: {2} new entities
+✓ posunuto entit: {0} o {1}	✓ moved {0} entities by {1}
+✓ pořadí změněno: {0} entit	✓ draw order changed: {0} entities
+✓ prodlouženo: {0}	✓ extended: {0}
+✓ protaženo entit: {0} o {1}	✓ stretched {0} entities by {1}
+✓ rozloženo: {0} → {1} entit	✓ exploded: {0} → {1} entities
+✓ spline {0} upravena	✓ spline {0} edited
+✓ upraveno křivek: {0} ({1} operací)	✓ polylines edited: {0} ({1} operations)
+✓ vlastnosti z {0} přeneseny na {1} entit	✓ properties of {0} matched to {1} entities
+✓ zaoblení: {0}	✓ fillets: {0}
+✓ zarovnáno entit: {0}	✓ aligned entities: {0}
+✓ zkopírováno entit: {0}	✓ copied entities: {0}
+✓ zkosení: {0}	✓ chamfers: {0}
+✓ změněna délka: {0} objektů	✓ length changed: {0} objects
+✓ zrcadleno entit: {0} (zdroj nahrazen)	✓ mirrored entities: {0} (source replaced)
+✓ zrcadlené kopie: {0}	✓ mirrored copies: {0}
+✓ {0} přerušen	✓ {0} broken
+✓ {0} přerušen v bodě	✓ {0} broken at point
+✓ {0} rozdělen v bodě {1}	✓ {0} split at point {1}
+✓ {0}: spojeno {1} objektů → {2}	✓ {0}: joined {1} objects → {2}
+✓ {0}: {1} entit	✓ {0}: {1} entities
+✓ úprava úchopem: {0} operací	✓ grip edit: {0} operations
+{0}: ekvidistanta se zúžením rozdělila na {1} části	{0}: the offset split at a narrowing into {1} parts
+{0}: poloměr nebo vzdálenost je příliš velká – bod dotyku leží za koncem objektu	{0}: radius or distance is too large – the tangent point lies beyond the end of the object
+{0} – na zamčené hladině: {1}	{0} – on a locked layer: {1}

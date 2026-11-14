@@ -397,7 +397,8 @@ const mgrTab = (p) => p.evaluate(() => [...document.querySelectorAll('aside butt
     await p.waitForTimeout(2500);
     const t2 = await tabs(p);
     const act = await doc(p);
-    ok(t2.length === n1 + 1 && act.kind !== 'assembly' && act.features.some((f) => f.type === 'sketch'), `#8 Otevřít ${asmBefore.name}.dxf v sestavě ${asmBefore.name}: skica v nové záložce (${n1} → ${t2.length})`);
+    // DXF / DWG se otevírá jako 2D výkres (vlna 9; do 3D skici jen volbou) – v nové záložce, sestava se nemění
+    ok(t2.length === n1 + 1 && act.kind !== 'assembly' && (act.kind === 'draft' || (act.features || []).some((f) => f.type === 'sketch')), `#8 Otevřít ${asmBefore.name}.dxf v sestavě ${asmBefore.name}: 2D výkres v nové záložce (${n1} → ${t2.length}, ${act.kind})`);
     await p.evaluate((id) => window.mncad.activateTab(id), asmTab);
     await p.waitForTimeout(1500);
     const asmAfter = await doc(p);

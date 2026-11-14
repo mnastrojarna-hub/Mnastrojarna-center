@@ -155,6 +155,23 @@ export class DraftTx {
     this.chSet.delete(id);
     this.dList.push(id);
   }
+  /**
+   * Vrátí entitu smazanou v této transakci na místo `index` v pořadí kreslení (stejné id) a opraví evidenci
+   * (smazaná → změněná, jen pokud se liší od původní). false = entita v této transakci smazaná nebyla.
+   */
+  restore(e: DraftEntity, index: number): boolean {
+    const di = this.dList.lastIndexOf(e.id);
+    if (di < 0 || this.get(e.id)) return false;
+    const m = this.model;
+    const list = (spaceEntities(m, this.space) ?? []).slice();
+    list.splice(Math.max(0, Math.min(index, list.length)), 0, e);
+    this.cur = withSpaceEntities(m, this.space, list);
+    this.baseList = list;
+    this.dList.splice(di, 1);
+    const orig = entityById(spaceEntities(this.base, this.space) ?? [], e.id);
+    if (orig !== e) this.chSet.add(e.id);
+    return true;
+  }
   /** změna celého modelu (tabulky hladin, typů čar, stylů, bloků…) */
   setModel(fn: (m: DraftModel) => DraftModel): void {
     const m = this.model;

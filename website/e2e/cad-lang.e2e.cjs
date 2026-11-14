@@ -6,7 +6,7 @@ const fs = require('fs');
 const S = (process.argv[2] || '/tmp/e2e').replace(/\/?$/, '/');
 fs.mkdirSync(S, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
-const BASE = 'http://localhost:3100';
+const BASE = (process.env.E2E_BASE || 'http://localhost:3100') + '';
 const coreReady = (page) => page.waitForFunction(() => document.body.innerText.includes('OCCT') && !/Načítám jádro|Loading the OpenCascade|OpenCascade-Kern wird geladen/.test(document.body.innerText), null, { timeout: 120000 });
 const start = async (page, cont) => { const c = page.getByText(cont); if (await c.isVisible({ timeout: 6000 }).catch(() => false)) await c.click(); await coreReady(page); await page.waitForTimeout(800); };
 const run = (p, t) => p.evaluate((t) => window.mncad.run(t), t);

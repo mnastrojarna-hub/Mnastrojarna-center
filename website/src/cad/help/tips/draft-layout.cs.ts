@@ -1,0 +1,201 @@
+/** Mikronávody – balík „draft-layout“ (2D výkres, karty Bloky, Rozvržení a Výstup → Tisk), čeština (zdroj). */
+
+/** stejný tvar jako MicroTip v help/tips.ts (integrace ho nahradí importem) */
+type MicroTip = { what: string; when: string; select?: string; steps: string[]; cmd?: string; note?: string };
+
+export default {
+  // ── karta Bloky ──
+  "draft/lo-block": {
+    what: "Z vybraných objektů udělá pojmenovaný blok s bodem vložení; objekty nahradí jedním vložením.",
+    when: "Opakované prvky: šroub, značka, okno, rámeček – jedna definice, mnoho vložení.",
+    select: "Objekty bloku (lze vybrat i až po spuštění příkazu).",
+    steps: ["Klikněte na Vytvořit blok a napište název.", "Klikněte bod vložení (např. střed šroubu).", "Vyberte objekty a potvrďte Enter (Převést)."],
+    cmd: "2d blok ŠROUB 0,0 okno -10,-10 10,10",
+    note: "Stejný název blok předefinuje – změní se všechna jeho vložení.",
+  },
+  "draft/lo-insert": {
+    what: "Vloží blok do výkresu v bodě s měřítkem X / Y a natočením; vyplní hodnoty atributů.",
+    when: "Další kus už definovaného bloku – šroub do díry, značka, razítko.",
+    steps: ["V nabídce zvolte blok (nebo napište jeho název).", "Klikněte bod vložení; Enter = měřítko 1 a úhel 0.", "Vyplňte hodnoty atributů (Enter = výchozí)."],
+    cmd: "2d vložit ŠROUB 100,50 1 1 90",
+    note: "Záporné měřítko X vložení zrcadlí.",
+  },
+  "menu:lo-insert/*": {
+    what: "Spustí VLOŽIT s vybraným blokem – zbývá kliknout bod vložení.",
+    when: "Rychlé vložení bloku ze seznamu bloků výkresu.",
+    steps: ["Zvolte blok.", "Klikněte bod vložení a potvrďte měřítko a úhel Enterem."],
+    cmd: "2d vložit ŠROUB 100,50",
+  },
+  "draft/lo-blocks": {
+    what: "Panel Bloky: seznam bloků s počtem vložení, vložit, upravit, uložit do DXF / DWG, odstranit nepoužité.",
+    when: "Přehled knihovny bloků výkresu, úprava atributů vybraného vložení.",
+    steps: ["Otevřete Správce bloků.", "U bloku zvolte Vložit, Upravit, DXF / DWG nebo Odstranit."],
+    cmd: "2d blok ?",
+  },
+  "draft/lo-bedit": {
+    what: "Otevře definici bloku k úpravě: kreslíte a upravujete přímo obsah bloku (počátek = bod vložení).",
+    when: "Změna bloku, která se má projevit ve všech jeho vloženích.",
+    select: "Vložení bloku (nebo zvolte blok v nabídce).",
+    steps: ["Zvolte blok v nabídce.", "Upravte obsah běžnými příkazy.", "Ve stavovém řádku stiskněte Uložit (nebo Zahodit)."],
+    cmd: "2d upravit-blok ŠROUB",
+    note: "Neexistující název založí nový prázdný blok.",
+  },
+  "menu:lo-bedit/*": {
+    what: "Otevře vybraný blok v úpravě bloku.",
+    when: "Úprava definice bloku ze seznamu.",
+    steps: ["Zvolte blok.", "Upravte a stiskněte Uložit ve stavovém řádku."],
+    cmd: "2d upravit-blok ŠROUB",
+  },
+  "draft/lo-bclose": {
+    what: "Ukončí úpravu bloku: Uložit (vložení se obnoví) nebo Zahodit změny.",
+    when: "Po dokončení úprav v editoru bloku.",
+    steps: ["Klikněte Zavřít blok.", "Enter = Uložit, nebo zvolte Zahodit."],
+    cmd: "2d zavřít-blok",
+  },
+  "draft/lo-wblock": {
+    what: "Uloží blok jako samostatný výkres DXF (nebo DWG, .mncad) s bodem vložení v počátku 0,0.",
+    when: "Knihovna dílů a značek pro jiné výkresy nebo pro kolegu s AutoCADem.",
+    select: "Vložení bloku, nebo zvolte blok v nabídce.",
+    steps: ["Zvolte blok v nabídce.", "Soubor se uloží; protokol ukáže název a velikost."],
+    cmd: "2d uložit-blok ŠROUB dxf",
+  },
+  "menu:lo-wblock/*": {
+    what: "Uloží zvolený blok, výběr, nebo celý výkres jako samostatný soubor.",
+    when: "Předání části výkresu jinému programu nebo do knihovny.",
+    steps: ["Zvolte položku nabídky.", "Potvrďte uložení souboru."],
+    cmd: "2d uložit-blok výběr dxf",
+  },
+  "draft/lo-attdef": {
+    what: "Definice atributu: proměnný text bloku (značka, výzva, výchozí hodnota) – vyplní se při vložení.",
+    when: "Číslo dílu, název, materiál v razítku nebo štítku – jiná hodnota u každého vložení.",
+    steps: ["Napište značku (např. CISLO), výzvu a výchozí hodnotu.", "Klikněte bod, zadejte výšku a úhel.", "Definici zahrňte do bloku příkazem Vytvořit blok."],
+    cmd: "2d definice-atributu CISLO \"Číslo\" \"001\" 2,2 3.5 0",
+    note: "Režimy Neviditelný, Konstantní, Ověřit, Předvolba se zadávají před značkou.",
+  },
+  "draft/lo-attedit": {
+    what: "Změní hodnoty atributů vloženého bloku – v panelu Bloky nebo textem ZNAČKA=hodnota.",
+    when: "Oprava čísla výkresu v razítku, přečíslování pozic.",
+    select: "Vložení bloku s atributy (poklepáním se panel otevře rovnou).",
+    steps: ["Vyberte vložení bloku.", "Klikněte Upravit atributy a přepište hodnoty.", "Potvrďte Použít."],
+    cmd: "2d upravit-atributy e7 CISLO=V-002",
+  },
+  "draft/lo-attext": {
+    what: "Vypíše atributy všech vložení do tabulky CSV (id, blok, hladina, X, Y, úhel, měřítka, hodnoty).",
+    when: "Kusovník z bloků se štítky, seznam pozic, kontrola razítek.",
+    steps: ["Klikněte Atributy do CSV.", "Soubor otevřete v Excelu (oddělovač středník)."],
+    cmd: "2d extrahovat-atributy blok ŠTÍTEK",
+  },
+  "draft/lo-purge": {
+    what: "Odstraní nepoužité bloky (i vnořené), hladiny, typy čar a textové styly.",
+    when: "Úklid výkresu před předáním nebo po importu cizího DWG.",
+    steps: ["Zvolte, co vyčistit (nebo Vše nepoužité).", "Protokol vypíše odstraněné názvy; Ctrl+Z vrátí."],
+    cmd: "2d vyčistit",
+    note: "Hladina 0, Defpoints a aktuální hladina zůstanou vždy.",
+  },
+  "menu:lo-purge/*": {
+    what: "Vyčistí jen zvolený druh nepoužitých pojmenovaných objektů.",
+    when: "Chcete odstranit např. jen nepoužité bloky a hladiny ponechat.",
+    steps: ["Zvolte druh.", "Zkontrolujte protokol; Ctrl+Z vrátí."],
+    cmd: "2d vyčistit bloky",
+  },
+  // ── karta Rozvržení ──
+  "draft/lo-new": {
+    what: "Nový list papíru A4–A0 s rámečkem ISO 5457, razítkem ISO 7200 a výřezem do modelu v měřítku ISO.",
+    when: "Příprava výkresu k tisku: formát, měřítko, razítko s názvem a číslem výkresu.",
+    steps: ["Zvolte formát v nabídce.", "List se otevře; měřítko výřezu se zvolí, aby se model vešel.", "Údaje razítka vyplňte v panelu Stránka."],
+    cmd: "2d rozvržení nové Výroba A3 měřítko 1:5",
+    note: "Mezi modelem a listy přepínají záložky vlevo ve stavovém řádku.",
+  },
+  "menu:lo-new/*": {
+    what: "Založí rozvržení zvoleného formátu (A4 na výšku, ostatní na šířku) s rámečkem a razítkem.",
+    when: "Formát listu odpovídající velikosti dílu a měřítku.",
+    steps: ["Zvolte formát.", "Upravte měřítko výřezu v panelu Stránka."],
+    cmd: "2d rozvržení nové A2",
+  },
+  "draft/lo-pagesetup": {
+    what: "Panel Stránka: formát a orientace listu, styl tisku, tloušťky, výřezy (měřítko, zámek, hladiny) a razítko.",
+    when: "Změna formátu, černobílý tisk, jiné měřítko výřezu, vyplnění razítka.",
+    steps: ["Přepněte na rozvržení a otevřete Vzhled stránky.", "Změňte formát, styl nebo měřítko výřezu.", "Vyplňte pole razítka (NAZEV, CISLO_VYKRESU…)."],
+    cmd: "2d vzhled-stránky A2 styl mono",
+    note: "Nový formát: rámeček se vymění, razítko přesune do rohu, výchozí výřez se přizpůsobí. Okraje jen ořežou tisk.",
+  },
+  "draft/lo-mview": {
+    what: "Výřez = okno z listu do modelu v přesném měřítku (1:1, 1:2, 1:5, 2:1… nebo vlastní).",
+    when: "Pohled na díl na listu, detail ve větším měřítku, více pohledů na jednom listu.",
+    steps: ["Na listu klikněte dva rohy výřezu.", "Napište měřítko (např. 1:5) nebo Enter = Vejít."],
+    cmd: "2d výřez 25,60 405,282 1:5",
+    note: "Volby Vejít, Dva / Tři / Čtyři, Mnohoúhelník, Objekt jsou v nabídce.",
+  },
+  "menu:lo-mview/*": {
+    what: "Varianta výřezu: obdélník, celá kreslicí plocha, rozdělení na 2–4 výřezy, mnohoúhelník nebo podle objektu.",
+    when: "Více pohledů na listu nebo kruhový detail.",
+    steps: ["Zvolte variantu.", "Zadejte body na listu a měřítko."],
+    cmd: "2d výřez dva svisle vejít 1:2",
+  },
+  "draft/lo-vpscale": {
+    what: "Nastaví přesné měřítko vybraného výřezu (nebo aktivního v modelovém prostoru).",
+    when: "Model se nevejde, nebo potřebujete normalizované měřítko podle ISO 5455.",
+    select: "Výřez (klik na jeho rám) nebo aktivní výřez.",
+    steps: ["Vyberte výřez.", "V nabídce zvolte měřítko."],
+    cmd: "2d výřez měřítko e7 1:10",
+    note: "Zamčený výřez měřítko nezmění; razítko MERITKO se přepíše.",
+  },
+  "menu:lo-vpscale/*": {
+    what: "Nastaví vybraným výřezům zvolené měřítko.",
+    when: "Rychlá změna měřítka výřezu na normalizovanou hodnotu.",
+    steps: ["Vyberte výřez.", "Zvolte měřítko."],
+    cmd: "2d nastavit e7 scale=1:20",
+  },
+  "draft/lo-vplock": {
+    what: "Zamkne výřez: měřítko a pohled do modelu se nedají omylem změnit.",
+    when: "Hotový list s nastaveným měřítkem.",
+    select: "Výřez (klik na jeho rám).",
+    steps: ["Vyberte výřez.", "Klikněte Zamknout výřez (znovu = odemknout)."],
+    cmd: "2d výřez zamknout e7",
+  },
+  "draft/lo-vplayer": {
+    what: "Zmrazí vybrané hladiny jen v jednom výřezu – v ostatních výřezech a v modelu zůstanou vidět.",
+    when: "Kóty jen v detailu, osy jen v hlavním pohledu.",
+    steps: ["Otevřete panel Stránka.", "U výřezu klikněte Hladiny.", "Zaškrtněte hladiny, které se v něm nemají zobrazit."],
+    cmd: "2d hladiny-výřezu zmrazit OSY výřez e7",
+  },
+  "draft/lo-mspace": {
+    what: "Práce v modelu přes výřez: kreslíte v souřadnicích modelu, list kolem zůstane vidět.",
+    when: "Doplnění nebo úprava modelu přímo z listu.",
+    select: "Výřez, nebo poklepejte do výřezu.",
+    steps: ["Poklepejte do výřezu (nebo vyberte výřez a klikněte).", "Kreslete; poklepáním mimo výřez se vrátíte na list."],
+    cmd: "2d modelový-prostor e7",
+  },
+  "draft/lo-pspace": {
+    what: "Návrat z modelového prostoru výřezu na list papíru.",
+    when: "Po úpravě modelu chcete pracovat s rámečkem, razítkem nebo výřezy.",
+    steps: ["Klikněte Papírový prostor (nebo poklepejte mimo výřez)."],
+    cmd: "2d papírový-prostor",
+  },
+  // ── karta Výstup ──
+  "draft/lo-plot": {
+    what: "Tisk do PDF / PNG / SVG s náhledem: list 1:1, tloušťky čar v mm, černobíle nebo barevně.",
+    when: "Výkres pro výrobu, zákazníka nebo archiv; Ctrl+P kdekoli ve 2D výkresu.",
+    steps: ["Stiskněte Ctrl+P nebo Tisk / PDF.", "Zvolte co, papír, měřítko a styl; zkontrolujte náhled.", "Klikněte Tisk PDF."],
+    cmd: "2d tisk mono",
+    note: "Rozměr na papíře = rozměr v modelu × měřítko výřezu (přesně).",
+  },
+  "draft/lo-exportpdf": {
+    what: "Všechna rozvržení do jednoho vícestránkového PDF, každá strana svým formátem 1:1.",
+    when: "Sada výkresů (sestava + díly) jedním souborem.",
+    steps: ["Klikněte PDF všech rozvržení.", "Soubor se uloží; protokol ukáže počet stran."],
+    cmd: "2d export-pdf",
+  },
+  "draft/lo-png": {
+    what: "Aktuální list (nebo model) jako obrázek PNG (výchozí 150 DPI).",
+    when: "Náhled do e-mailu, nabídky nebo dokumentace.",
+    steps: ["Klikněte Obrázek PNG.", "Jiné rozlišení: v panelu Tisk zvolte PNG a DPI."],
+    cmd: "2d tisk png dpi 300",
+  },
+  "draft/lo-svg": {
+    what: "Aktuální list (nebo model) jako vektorový obrázek SVG v mm.",
+    when: "Web, prezentace nebo další úprava ve vektorovém editoru.",
+    steps: ["Klikněte Vektor SVG.", "Soubor se uloží."],
+    cmd: "2d tisk svg",
+  },
+} satisfies Record<string, MicroTip>;

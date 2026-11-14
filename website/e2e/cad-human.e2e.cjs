@@ -6,7 +6,7 @@ const fs = require('fs');
 const S = (process.argv[2] || '/tmp/e2e').replace(/\/?$/, '/');
 fs.mkdirSync(S, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
-const CAD = 'http://localhost:3100/cad';
+const CAD = (process.env.E2E_BASE || 'http://localhost:3100') + '/cad';
 const status = (p) => p.evaluate(() => window.mncad.status());
 const volumeOf = (st) => parseFloat(((st.match(/objem ([\d,]+) cm³/) || [, '0'])[1]).replace(',', '.'));
 /** střed štítku podle predikátu nad jeho popisem (title) – klik tam = klik na entitu */

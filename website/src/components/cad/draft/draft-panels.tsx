@@ -272,8 +272,8 @@ export function PropsPanel({ model, ids, space = "model", onCommit, onFlash }: {
       return n as unknown as DraftEntity;
     });
   const setVars = (p: Partial<DraftModel["vars"]>) => onCommit({ ...model, vars: { ...model.vars, ...p } });
-  const row = (label: string, el: React.ReactNode) => (
-    <div className="grid grid-cols-[42%_58%] items-center gap-1 border-b border-[#eef2f6] px-2 py-1">
+  const row = (label: string, el: React.ReactNode, key?: string) => (
+    <div key={key} className="grid grid-cols-[42%_58%] items-center gap-1 border-b border-[#eef2f6] px-2 py-1">
       <span className="truncate text-[#6b7785]">{label}</span>
       <div className="min-w-0">{el}</div>
     </div>
@@ -385,6 +385,7 @@ export function PropsPanel({ model, ids, space = "model", onCommit, onFlash }: {
               ) : (
                 <TextInput key={`${single.id}:${f.key}:${f.value}`} value={String(f.value).replace(/°$/, "")} mono={f.kind !== "text"} data-field={f.key} onCommit={(raw) => patchAll((x) => kindOf(x)!.setField(x, f.key, raw, kctx))} />
               ),
+              f.key,
             ),
           )}
           {(() => {

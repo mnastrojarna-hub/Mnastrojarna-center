@@ -100,7 +100,6 @@ chlazení: průměr musí být kladný	cooling: the diameter must be positive
 chlazení: přesah nesmí být záporný	cooling: the overhang must not be negative
 importFile potřebuje {0}, {1} nebo File	importFile needs {0}, {1} or File
 importFile: chybí obsah souboru – {0} nebo {1}	importFile: the file content is missing – {0} or {1}
-importFile: volba as je auto | tab | component | sketch	importFile: the as option is auto | tab | component | sketch
 komponenta „{0}“ se ještě načítá	component “{0}” is still loading
 komponenta „{0}“ v sestavě není – komponenty: {1}	component “{0}” is not in the assembly – components: {1}
 Křivost: min {0} · max {1} 1/mm{2}	Curvature: min {0} · max {1} 1/mm{2}

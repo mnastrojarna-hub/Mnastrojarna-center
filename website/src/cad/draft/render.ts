@@ -68,6 +68,16 @@ const lwPx = (mm: number, opts: RenderOpts, dpr: number) => (opts.lwPxPerMm ? Ma
 
 type Group = { color: string; width: number; dash: number[] | null; segs: { xf: Affine | null; prim: Extract<Prim, { k: "path" | "inf" }> }[] };
 
+/** entita vrstvy 0 uvnitř bloku na vrstvě vložení – stejný objekt pro stejnou dvojici (mezipaměti prims / křivek podle identity) */
+const layer0Cache = new WeakMap<DraftEntity, Map<string, DraftEntity>>();
+function onLayer(c: DraftEntity, layer: string): DraftEntity {
+  let m = layer0Cache.get(c);
+  if (!m) layer0Cache.set(c, (m = new Map()));
+  let r = m.get(layer);
+  if (!r) m.set(layer, (r = { ...c, layer } as DraftEntity));
+  return r;
+}
+
 /** kontext vykreslení vnořených entit (bloky, výřezy): transformace do světa, vlastnosti pro ByBlock */
 export type Frame = { xf: Affine | null; byBlock?: ByBlockStyle | null; clip?: Vec2[] };
 
@@ -107,12 +117,15 @@ export function drawEntities(ctx: CanvasRenderingContext2D, model: DraftModel, l
         const xf = fr.xf ? xfMul(fr.xf, prim.xf) : prim.xf;
         const bb: ByBlockStyle = prim.byBlock ?? { color: st.color, linetype: st.linetype?.name ?? "Continuous", lineweight: st.lineweight };
         if (prim.clip && prim.clip.length >= 3) clipped.push({ entities: prim.entities, xf, outer: fr.xf, byBlock: bb, clip: prim.clip });
-        else for (const c of prim.entities) visit(c.layer === "0" ? { ...c, layer: e.layer } : c, { xf, byBlock: bb, clip: fr.clip }, depth + 1);
+        else for (const c of prim.entities) visit(c.layer === "0" ? onLayer(c, e.layer) : c, { xf, byBlock: bb, clip: fr.clip }, depth + 1);
       }
     }
     drawn++;
   };
   for (const e of vis) visit(e, frame, 0);
+  // výchozí transformace volajícího (obvykle jednotková) – texty ji nastavují přímo místo save / restore
+  const T0 = typeof ctx.getTransform === "function" ? ctx.getTransform() : null;
+  const fastText = !!T0 && T0.isIdentity;
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "butt";
@@ -143,7 +156,32 @@ export function drawEntities(ctx: CanvasRenderingContext2D, model: DraftModel, l
     ctx.stroke();
   }
   ctx.setLineDash([]);
-  for (const t of texts) drawText(ctx, t.prim, t.color, view, t.xf);
+  // malý text (< 4 px na obrazovce) jen jako čárka – jedna cesta za barvu (jako AutoCAD); tisk kreslí text od 1,2 px
+  const greekPx = opts.plotOnly || opts.lwPxPerMm ? 1.2 : 4 * view.dpr;
+  const greek = new Map<string, [number, number, number, number][]>();
+  for (const t of texts) {
+    const g = drawText(ctx, t.prim, t.color, view, t.xf, greekPx, fastText);
+    if (g) {
+      let arr = greek.get(t.color);
+      if (!arr) greek.set(t.color, (arr = []));
+      arr.push(g);
+    }
+  }
+  if (fastText) ctx.setTransform(1, 0, 0, 1, 0, 0);
+  if (greek.size) {
+    ctx.lineWidth = view.dpr;
+    for (const [color, segs] of greek) {
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = 0.6;
+      ctx.beginPath();
+      for (const g of segs) {
+        ctx.moveTo(g[0], g[1]);
+        ctx.lineTo(g[2], g[3]);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
   for (const m of marks) drawMark(ctx, m.xf ? xfPt(m.xf, m.p) : m.p, m.color, model, view);
   // výřezy: ořez polygonem a jen entity v jeho dosahu (prostorový index seznamu, např. modelového prostoru)
   for (const c of clipped) {
@@ -242,7 +280,8 @@ function addPrim(ctx: CanvasRenderingContext2D, prim: Extract<Prim, { k: "path" 
     }
     first = false;
   }
-  if (prim.closed && start) ctx.closePath();
+  // lineTo místo closePath: closePath na jedné velké dávkové cestě je v Chromiu O(n²) (2000 smyček 763 ms → 12 ms)
+  if (prim.closed && start) ctx.lineTo(start[0], start[1]);
 }
 
 /** úsek dráhy v afinní transformaci (oblouk při nestejném měřítku → eliptický oblouk) */
@@ -305,7 +344,7 @@ export function clipInfinite(p: Vec2, d: Vec2, ray: boolean, b: Box): [Vec2, Vec
   return [add(p, mul(u, t0)), add(p, mul(u, t1))];
 }
 
-function drawText(ctx: CanvasRenderingContext2D, t: Extract<Prim, { k: "text" }>, color: string, v: View, xf: Affine | null) {
+function drawText(ctx: CanvasRenderingContext2D, t: Extract<Prim, { k: "text" }>, color: string, v: View, xf: Affine | null, greekPx = 1.2, fast = false): [number, number, number, number] | null {
   let p = t.p;
   let dir: Vec2 = [Math.cos(t.rot), Math.sin(t.rot)];
   let h = t.h;
@@ -319,24 +358,42 @@ function drawText(ctx: CanvasRenderingContext2D, t: Extract<Prim, { k: "text" }>
     dir = d2;
   }
   const px = h * v.scale * v.dpr;
-  if (px < 1.2) {
-    // nečitelně malý text: jen čárka účaří (rychlost + přehled jako AutoCAD)
-    return;
-  }
+  // nečitelně malý text se nekreslí
+  if (px < 1.2 || !t.s) return null;
   const s = dev(v, p);
   const ang = Math.atan2(dir[1], dir[0]);
-  ctx.save();
-  ctx.translate(s[0], s[1]);
-  ctx.rotate(-ang);
   const sx = Math.hypot(dir[0], dir[1]) / (xf ? Math.hypot(...xfVec(xf, [1, 0])) || 1 : 1);
-  ctx.scale(t.wf * (sx || 1), mirror ? -1 : 1);
+  const kx = t.wf * (sx || 1);
+  if (px < greekPx) {
+    // „řecký“ text: čárka v půli výšky, délka odhadem 0,6 výšky na znak (bez měření písma)
+    const c = Math.cos(-ang);
+    const sn = Math.sin(-ang);
+    const len = px * 0.6 * kx * t.s.length;
+    const up = (mirror ? 1 : -1) * px * 0.35;
+    const x0 = s[0] - sn * up;
+    const y0 = s[1] + c * up;
+    return [x0, y0, x0 + c * len, y0 + sn * len];
+  }
+  const my = mirror ? -1 : 1;
+  if (fast) {
+    // jedna transformace místo save / translate / rotate / restore (rychlejší u tisíců textů); volající ji vrátí
+    const c = Math.cos(-ang);
+    const sn = Math.sin(-ang);
+    ctx.setTransform(c * kx, sn * kx, -sn * my, c * my, s[0], s[1]);
+  } else {
+    ctx.save();
+    ctx.translate(s[0], s[1]);
+    ctx.rotate(-ang);
+    ctx.scale(kx, my);
+  }
   if (t.oblique) ctx.transform(1, 0, -Math.tan(t.oblique), 1, 0, 0);
   // výška textu = výška verzálek: velikost písma ≈ výška / 0,72
   ctx.font = `${px / 0.72}px ${t.font}`;
   ctx.textBaseline = "alphabetic";
   ctx.fillStyle = color;
   ctx.fillText(t.s, 0, 0);
-  ctx.restore();
+  if (!fast) ctx.restore();
+  return null;
 }
 
 function drawMark(ctx: CanvasRenderingContext2D, p: Vec2, color: string, model: DraftModel, v: View) {

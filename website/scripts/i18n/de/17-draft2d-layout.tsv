@@ -1,0 +1,328 @@
+# Vlna 9 / fáze B – 2D CAD balík 3 (layout): bloky, atributy, rozvržení, výřezy, tisk PDF
+ – objekty nahrazeny vložením	 – Objekte durch eine Blockreferenz ersetzt
+ – objekty smazány	 – Objekte gelöscht
+ – zahrňte ji do bloku (BLOK) nebo ji nakreslete v úpravě bloku	 – nehmen Sie sie in einen Block auf (BLOCK) oder zeichnen Sie sie im Blockeditor
+ · výřez {0} v měřítku {1}	 · Ansichtsfenster {0} im Maßstab {1}
+(žádné bloky)	(keine Blöcke)
+{0} · {1} × {2} mm · měřítko {3}{4}	{0} · {1} × {2} mm · Maßstab {3}{4}
+{0} · entit {1} · vložení {2}{3}	{0} · Objekte {1} · Referenzen {2}{3}
+{0} ({1}) · {2} {3}×{4} mm · výřezů {5}{6}	{0} ({1}) · {2} {3}×{4} mm · Ansichtsfenster {5}{6}
+{0} (definice chybí)	{0} (Definition fehlt)
+{0} entit · {1}× vloženo	{0} Objekte · {1}× eingefügt
+{0} není výřez rozvržení „{1}“	{0} ist kein Ansichtsfenster des Layouts „{1}“
+{0} s rámečkem a razítkem	{0} mit Rahmen und Schriftfeld
+{0} stran	{0} Seiten
+{0}: {1} {2}×{3} mm, {4}, okraje {5}, styl {6}, tloušťky {7}	{0}: {1} {2}×{3} mm, {4}, Ränder {5}, Stil {6}, Linienstärken {7}
+{0}: beze změny	{0}: unverändert
+⚠ zamčené výřezy (beze změny): {0} – odemknout: výřez odemknout	⚠ gesperrte Ansichtsfenster (unverändert): {0} – entsperren: mansfen entsperren
+✓ „{0}“ ({1} entit) – nová záložka	✓ „{0}“ ({1} Objekte) – neue Registerkarte
+✓ {0} ({1} entit, {2} kB)	✓ {0} ({1} Objekte, {2} kB)
+✓ {0} ({1} entit)	✓ {0} ({1} Objekte)
+✓ {0} ve výřezech {1}: {2}	✓ {0} in Ansichtsfenstern {1}: {2}
+✓ {0}: {1} {2}×{3} mm, styl {4}	✓ {0}: {1} {2}×{3} mm, Stil {4}
+✓ {0}: {1} stran, {2}×{3} mm, měřítko {4} ({5} kB)	✓ {0}: {1} Seiten, {2}×{3} mm, Maßstab {4} ({5} kB)
+✓ {0}: {1} vložení s atributy	✓ {0}: {1} Referenzen mit Attributen
+✓ {0}: definice atributu {1}{2}	✓ {0}: Attributdefinition {1}{2}
+✓ {0}: vložení bloku „{1}“ v {2}{3}	✓ {0}: Referenz von Block „{1}“ bei {2}{3}
+✓ {0}: změněno atributů {1}	✓ {0}: Attribute geändert {1}
+✓ blok „{0}“ ({1} entit){2}	✓ Block „{0}“ ({1} Objekte){2}
+✓ blok „{0}“ předefinován ({1} entit, vložení obnovena: {2})	✓ Block „{0}“ neu definiert ({1} Objekte, Referenzen aktualisiert: {2})
+✓ blok „{0}“ uložen ({1} entit, vložení obnovena: {2})	✓ Block „{0}“ gespeichert ({1} Objekte, Referenzen aktualisiert: {2})
+✓ kopie rozvržení „{0}“ → „{1}“	✓ Kopie des Layouts „{0}“ → „{1}“
+✓ měřítko {0}: {1}	✓ Maßstab {0}: {1}
+✓ modelový prostor	✓ Modellbereich
+✓ modelový prostor přes výřez {0} ({1}, měřítko {2}) – souřadnice modelu; zpět: papírový-prostor	✓ Modellbereich durch Ansichtsfenster {0} ({1}, Maßstab {2}) – Modellkoordinaten; zurück: pbereich
+✓ nový blok „{0}“ zahozen	✓ neuer Block „{0}“ verworfen
+✓ papírový prostor – rozvržení „{0}“	✓ Papierbereich – Layout „{0}“
+✓ rozvržení „{0}“	✓ Layout „{0}“
+✓ rozvržení „{0}“ ({1}): {2} {3}×{4} mm{5}	✓ Layout „{0}“ ({1}): {2} {3}×{4} mm{5}
+✓ rozvržení „{0}“ → „{1}“	✓ Layout „{0}“ → „{1}“
+✓ rozvržení „{0}“ smazáno	✓ Layout „{0}“ gelöscht
+✓ střed pohledu {0}: {1}	✓ Ansichtsmitte {0}: {1}
+✓ úprava bloku „{0}“ ({1} entit) – kreslete a upravujte, konec: zavřít-blok	✓ Bearbeitung von Block „{0}“ ({1} Objekte) – zeichnen und ändern, Ende: bschließen
+✓ vyčištěno: {0}	✓ bereinigt: {0}
+✓ výřez {0}	✓ Ansichtsfenster {0}
+✓ změny bloku „{0}“ zahozeny	✓ Änderungen an Block „{0}“ verworfen
+1:1 (rozvržení) / vejít (model)	1:1 (Layout) / einpassen (Modell)
+A3 bez rámečku a razítka	A3 ohne Rahmen und Schriftfeld
+Aktuální ({0})	Aktuell ({0})
+Atribut	Attribut
+atributy	Attribute
+Atributy	Attribute
+Atributy do CSV	Attribute nach CSV
+Atributy: {0}	Attribute: {0}
+automaticky	automatisch
+Barevně	Farbig
+Blok	Block
+blok „{0}“ nemůže obsahovat sám sebe (ani vnořeně)	Block „{0}“ kann sich nicht selbst enthalten (auch nicht verschachtelt)
+blok „{0}“ ve výkresu není – bloky: {1}	Block „{0}“ ist nicht in der Zeichnung – Blöcke: {1}
+Blok je vložený – nejdřív smažte vložení	Der Block ist eingefügt – zuerst die Referenzen löschen
+blok ŠROUB 0,0 e1 e2 e3 | blok RÁM 10,10 okno 0,0 200,100 ponechat | blok ?	block SCHRAUBE 0,0 e1 e2 e3 | block RAHMEN 10,10 fenster 0,0 200,100 beibehalten | block ?
+bloky	Blöcke
+Celý výkres jako .mncad	Ganze Zeichnung als .mncad
+Černobíle	Schwarzweiß
+Čtyři	Vier
+Definice atributu	Attributdefinition
+definice atributu (pro bloky): režimy [Neviditelný/Konstantní/Ověřit/Předvolba] před značkou, značka, výzva, výchozí hodnota, bod [Zarovnání/Styl], výška, natočení	Attributdefinition (für Blöcke): Modi [Unsichtbar/Konstant/Prüfen/Vorgabe] vor der Bezeichnung, Bezeichnung, Aufforderung, Vorgabewert, Punkt [Ausrichten/Stil], Höhe, Drehung
+definice bloku z vybraných objektů: název, bod vložení, objekty, původní objekty [Převést/Ponechat/Smazat] (převést = nahradit vložením); stejný název blok předefinuje a obnoví všechna vložení; „blok ?“ = seznam bloků	Blockdefinition aus den gewählten Objekten: Name, Einfügepunkt, Objekte, ursprüngliche Objekte [Umwandeln/Beibehalten/Löschen] (umwandeln = durch Referenz ersetzen); derselbe Name definiert den Block neu und aktualisiert alle Referenzen; „block ?“ = Blockliste
+definice-atributu CISLO "Číslo dílu" "001" 10,5 3.5 0 | definice-atributu neviditelný CENA "Cena" "0" 0,0 2.5 0	attdef NUMMER "Teilenummer" "001" 10,5 3.5 0 | attdef unsichtbar PREIS "Preis" "0" 0,0 2.5 0
+Definovat atribut	Attribut definieren
+DPI 30–1200	DPI 30–1200
+Dva nad sebou	Zwei übereinander
+Dva vedle sebe	Zwei nebeneinander
+export všech rozvržení do jednoho vícestránkového PDF (každá strana svým formátem, 1:1); bez rozvržení model; volby jako TISK (aktuální, rozvržení X, mono, název)	Export aller Layouts in ein mehrseitiges PDF (jede Seite im eigenen Format, 1:1); ohne Layouts das Modell; Optionen wie PLOT (aktuell, layout X, mono, name)
+export-pdf | export-pdf mono | export-pdf aktuální | export-pdf název "Sada výkresů"	pdfexport | pdfexport mono | pdfexport aktuell | pdfexport name "Zeichnungssatz"
+extrahovat-atributy | extrahovat-atributy blok RAZÍTKO | extrahovat-atributy výběr oddělovač , název kusovník	attextrahieren | attextrahieren block SCHRIFTFELD | attextrahieren auswahl trennzeichen , name stueckliste
+hladiny	Layer
+Hladiny výřezu	Ansichtsfenster-Layer
+hladiny-výřezu zmrazit KÓTY,OSY výřez e7 | hladiny-výřezu rozmrazit * vše | hladiny-výřezu seznam	afebene frieren BEMASSUNG,ACHSEN ansichtsfenster e7 | afebene tauen * alle | afebene liste
+hladiny-výřezu: zmrazit, rozmrazit, reset, seznam – ne „{0}“	afebene: frieren, tauen, zurücksetzen, liste – nicht „{0}“
+Hledat blok…	Block suchen…
+hodnoty atributů vložení bloku: vložení, pak ZNAČKA=hodnota … (Enter = konec); bez zadání = výpis atributů	Attributwerte einer Blockreferenz: die Referenz, dann BEZEICHNUNG=Wert … (Enter = Ende); ohne Eingabe = Attributliste
+konstantní	konstant
+Kopie aktuálního rozvržení	Kopie des aktuellen Layouts
+kótovací styly	Bemaßungsstile
+Měřítko {0}	Maßstab {0}
+Měřítko a hladiny výřezu…	Maßstab und Layer des Ansichtsfensters…
+měřítko nesmí být 0	der Faktor darf nicht 0 sein
+Měřítko výřezu	Maßstab des Ansichtsfensters
+Měřítko výřezu (1:1, 1:2, 1:5, 1:10, 1:20, 1:50, 2:1…) nebo Vejít	Maßstab des Ansichtsfensters (1:1, 1:2, 1:5, 1:10, 1:20, 1:50, 2:1…) oder Einpassen
+Měřítko výřezu (např. 1:50, 2:1)	Maßstab des Ansichtsfensters (z. B. 1:50, 2:1)
+Měřítko X	Faktor X
+Měřítko X / Y	Faktor X / Y
+Měřítko Y	Faktor Y
+mnohoúhelník ({0} vrcholů)	Polygon ({0} Scheitelpunkte)
+mnohoúhelník potřebuje aspoň 3 vrcholy	ein Polygon braucht mindestens 3 Scheitelpunkte
+model	Modell
+Model – rozsah	Modell – Grenzen
+MODEL ve výřezu {0} · {1}	MODELL im Ansichtsfenster {0} · {1}
+Modelový prostor	Modellbereich
+Modelový prostor výřezu	Modellbereich des Ansichtsfensters
+Modelový prostor výřezu {0} ({1}) – poklepáním mimo výřez zpět na papír	Modellbereich des Ansichtsfensters {0} ({1}) – Doppelklick außerhalb führt zurück zum Papier
+modelový-prostor | modelový-prostor e7	mbereich | mbereich e7
+náhled, papír, měřítko, styl tisku	Vorschau, Papier, Maßstab, Plotstil
+Natočení pohledu	Ansichtsdrehung
+název bloku „{0}“ obsahuje nepovolený znak (< > / \ " : ; ? * | = `)	Blockname „{0}“ enthält ein unzulässiges Zeichen (< > / \ " : ; ? * | = `)
+název bloku je delší než 255 znaků	der Blockname ist länger als 255 Zeichen
+název bloku je prázdný	der Blockname ist leer
+Název rozvržení	Layoutname
+Název výkresu	Zeichnungsbenennung
+neplatné měřítko „{0}“ – např. 1:50, 2:1, 1:2.5 nebo 0.02	ungültiger Maßstab „{0}“ – z. B. 1:50, 2:1, 1:2.5 oder 0.02
+neupravujete žádný blok (UPRAVIT-BLOK název)	Sie bearbeiten keinen Block (BBEARB Name)
+neviditelný	unsichtbar
+Neviditelný	Unsichtbar
+neznámé zadání „{0}“ – blok X, výběr, oddělovač ;, název soubor	unbekannte Eingabe „{0}“ – block X, auswahl, trennzeichen ;, name Datei
+neznámé zadání „{0}“ – dxf, dwg, mncad, záložka, verze R2018, název X	unbekannte Eingabe „{0}“ – dxf, dwg, mncad, registerkarte, version R2018, name X
+neznámé zadání „{0}“ – formát A4–A0, na-šířku, na-výšku, bez-razítka, bez-rámečku, bez-výřezu, měřítko 1:50, ZNAČKA=hodnota	unbekannte Eingabe „{0}“ – Format A4–A0, quer, hoch, ohne-schriftfeld, ohne-rahmen, ohne-ansichtsfenster, maßstab 1:50, BEZEICHNUNG=Wert
+neznámé zadání tisku „{0}“ – rozvržení X, model, vše, pdf/png/svg, A4–A0, na-šířku, měřítko 1:1|vejít, mono|barevně|šedě, tloušťky ano|ne, okno x,y x,y, dpi N, název X	unbekannte Ploteingabe „{0}“ – layout X, modell, alle, pdf/png/svg, A4–A0, quer, maßstab 1:1|einpassen, mono|farbe|grau, linienstärken ja|nein, fenster x,y x,y, dpi N, name X
+neznámý formát „{0}“ – A4, A3, A2, A1, A0 nebo šířka×výška v mm	unbekanntes Format „{0}“ – A4, A3, A2, A1, A0 oder Breite×Höhe in mm
+nic k vyčištění	nichts zu bereinigen
+nic není vybráno	nichts ist gewählt
+nic nevybráno – blok potřebuje aspoň jeden objekt	nichts gewählt – ein Block braucht mindestens ein Objekt
+Nové rozvržení	Neues Layout
+Nové rozvržení A3	Neues Layout A3
+Nový blok z vybraných objektů	Neuer Block aus den gewählten Objekten
+nový prázdný blok „{0}“ (bod vložení 0,0)	neuer leerer Block „{0}“ (Einfügepunkt 0,0)
+Obdélník (dva rohy)	Rechteck (zwei Ecken)
+objekt neurčuje plochu	das Objekt bestimmt keine Fläche
+objekty na zamčené hladině nelze převést ani smazat: {0}	Objekte auf einem gesperrten Layer können nicht umgewandelt oder gelöscht werden: {0}
+Obrázek PNG	PNG-Bild
+odemčeno	entsperrt
+Odemknout výřez	Ansichtsfenster entsperren
+Odstíny šedi	Graustufen
+odstraní nepoužité bloky (i vnořené), hladiny, typy čar, textové a kótovací styly; bez zadání vše, jinak druh a případně názvy	entfernt unbenutzte Blöcke (auch verschachtelte), Layer, Linientypen, Text- und Bemaßungsstile; ohne Eingabe alles, sonst die Art und ggf. Namen
+Odstranit	Entfernen
+Odstranit nepoužitý blok	Unbenutzten Block entfernen
+okno x,y x,y	fenster x,y x,y
+okraje: vlevo,dole,vpravo,nahoře v mm	Ränder: links,unten,rechts,oben in mm
+Orientace	Ausrichtung
+Ořez	Zuschnitt
+ověřit	prüfen
+Ověřit	Prüfen
+panel Tisk – nastavte a stiskněte Tisk PDF	Bedienfeld Plot – einstellen und PDF plotten drücken
+Papír	Papier
+PAPÍR	PAPIER
+Papírový prostor	Papierbereich
+papírový-prostor	pbereich
+PDF všech rozvržení	PDF aller Layouts
+počet musí být 1–10 000	die Anzahl muss 1–10.000 sein
+Počet řádků	Anzahl Zeilen
+Počet sloupců	Anzahl Spalten
+podle rozvržení (A3 u modelu)	wie Layout (A3 beim Modell)
+podle vzhledu stránky	wie Seiteneinrichtung
+Pole (sloupce × řádky)	Reihe (Spalten × Zeilen)
+Poznámka nad razítkem	Anmerkung über dem Schriftfeld
+práce v modelu přes výřez rozvržení (jako poklepání do výřezu): kreslí se v souřadnicích modelu, okolí listu zůstane vidět; zpět PAPÍROVÝ-PROSTOR	Arbeiten im Modell durch ein Ansichtsfenster des Layouts (wie Doppelklick hinein): Zeichnen in Modellkoordinaten, das Blatt bleibt sichtbar; zurück mit PBEREICH
+předvolba	vorgabe
+Předvolba	Vorgabe
+Přepněte na rozvržení (záložka ve stavovém řádku) nebo založte nové: Rozvržení → Nové rozvržení.	Wechseln Sie zu einem Layout (Registerkarte in der Statusleiste) oder legen Sie eines an: Layout → Neues Layout.
+Původní objekty	Ursprüngliche Objekte
+Rámeček ISO 5457 – {0} {1}	Rahmen ISO 5457 – {0} {1}
+Razítko ISO 7200	Schriftfeld ISO 7200
+režim {0}: {1}	Modus {0}: {1}
+Režimy	Modi
+Rohové razítko ČSN EN ISO 7200	Schriftfeld DIN EN ISO 7200
+rozmrazeno	getaut
+rozmrazeno vše	alles getaut
+Rozteč řádků	Zeilenabstand
+Rozteč sloupců	Spaltenabstand
+rozvržení „{0}“ neexistuje – rozvržení: {1}	Layout „{0}“ existiert nicht – Layouts: {1}
+rozvržení „{0}“ nemá zapnutý výřez – VÝŘEZ	Layout „{0}“ hat kein eingeschaltetes Ansichtsfenster – MANSFEN
+rozvržení „{0}“ už existuje	Layout „{0}“ existiert bereits
+rozvržení (listy papíru): seznam; nové [název] [A4–A0] [na-šířku / na-výšku] [bez-razítka] [bez-rámečku] [bez-výřezu] [měřítko 1:50] [ZNAČKA=hodnota razítka]; kopírovat; smazat; přejmenovat; nastavit (přepnout); model	Layouts (Papierblätter): liste; neu [Name] [A4–A0] [quer / hoch] [ohne-schriftfeld] [ohne-rahmen] [ohne-ansichtsfenster] [maßstab 1:50] [BEZEICHNUNG=Wert im Schriftfeld]; kopieren; löschen; umbenennen; setzen (wechseln); model
+rozvržení {0} neexistuje	Layout {0} existiert nicht
+rozvržení nastavit NÁZEV – rozvržení: {0}	layout setzen NAME – Layouts: {0}
+Rozvržení nemá výřez – Rozvržení → Výřez.	Das Layout hat kein Ansichtsfenster – Layout → Ansichtsfenster.
+rozvržení nové Výroba A3 měřítko 1:5 NAZEV=Příruba | rozvržení nastavit Výroba | rozvržení model | rozvržení přejmenovat Výroba Dílna | rozvržení smazat Dílna	layout neu Fertigung A3 maßstab 1:5 NAZEV=Flansch | layout setzen Fertigung | layout model | layout umbenennen Fertigung Werkstatt | layout löschen Werkstatt
+rozvržení přejmenovat STARÝ NOVÝ	layout umbenennen ALT NEU
+rozvržení: seznam, nové, kopírovat, smazat, přejmenovat, nastavit, model – ne „{0}“	layout: liste, neu, kopieren, löschen, umbenennen, setzen, model – nicht „{0}“
+Rozvržení{0}	Layout{0}
+Řádky	Zeilen
+Sloupce	Spalten
+Smazat rozvržení (Ctrl+Z vrátí)	Layout löschen (Strg+Z stellt wieder her)
+Správce bloků	Blockverwaltung
+Střed na papíře	Mitte auf dem Papier
+Střed pohledu (model)	Ansichtsmitte (Modell)
+Styl tisku	Plotstil
+styl tisku: mono, barva, šedá	Plotstil: mono, farbe, grau
+Šířka × výška	Breite × Höhe
+tabulka atributů vložení do CSV (id, blok, hladina, X, Y, natočení, měřítka, prostor, hodnoty): všechny prostory, jen blok X, nebo výběr; soubor se stáhne, data v results[].data.rows	Tabelle der Attribute von Blockreferenzen nach CSV (ID, Block, Layer, X, Y, Drehung, Faktoren, Bereich, Werte): alle Bereiche, nur Block X oder die Auswahl; die Datei wird heruntergeladen, Daten in results[].data.rows
+textové styly	Textstile
+Tisk {0}	{0} plotten
+Tisk / PDF	Plot / PDF
+tisk | tisk rozvržení Výroba mono | tisk model okno 0,0 200,100 A4 měřítko 1:2 | tisk png dpi 300 | tisk svg	plot | plot layout Fertigung mono | plot model fenster 0,0 200,100 A4 maßstab 1:2 | plot png dpi 300 | plot svg
+tisk do PDF (vektorově, tloušťky v mm, přesné měřítko), PNG nebo SVG: aktuální rozvržení 1:1, jiné rozvržení, model (rozsah / okno) v měřítku; volby formát A4–A0, orientace, měřítko 1:1 / vejít, mono / barevně / šedě, tloušťky; v GUI bez zadání panel Tisk s náhledem (Ctrl+P)	Plot nach PDF (vektoriell, Linienstärken in mm, exakter Maßstab), PNG oder SVG: aktuelles Layout 1:1, anderes Layout, Modell (Grenzen / Fenster) im Maßstab; Optionen Format A4–A0, Ausrichtung, Maßstab 1:1 / einpassen, mono / farbe / grau, Linienstärken; in der Oberfläche ohne Eingabe das Bedienfeld Plot mit Vorschau (Strg+P)
+Tisk… (Ctrl+P)	Plot… (Strg+P)
+Tisknout tloušťky čar	Linienstärken plotten
+Tloušťky čar	Linienstärken
+Tři	Drei
+typy čar	Linientypen
+ukončí úpravu bloku: Uložit (výchozí – všechna vložení se obnoví) nebo Zahodit (vrátí definici před UPRAVIT-BLOK)	beendet die Blockbearbeitung: Speichern (Vorgabe – alle Referenzen werden aktualisiert) oder Verwerfen (stellt die Definition vor BBEARB wieder her)
+uloží blok (nebo výběr, nebo celý výkres „*“) jako samostatný výkres: DXF (výchozí), DWG, .mncad, nebo nová záložka; bod vložení bloku = počátek 0,0	speichert einen Block (oder die Auswahl, oder die ganze Zeichnung „*“) als eigene Zeichnung: DXF (Vorgabe), DWG, .mncad oder neue Registerkarte; Einfügepunkt des Blocks = Ursprung 0,0
+Uložit	Speichern
+Uložit blok jako soubor	Block als Datei speichern
+uložit-blok ŠROUB | uložit-blok ŠROUB dwg verze R2013 | uložit-blok výběr dxf název detail | uložit-blok * mncad | uložit-blok ŠROUB záložka	wblock SCHRAUBE | wblock SCHRAUBE dwg version R2013 | wblock auswahl dxf name detail | wblock * mncad | wblock SCHRAUBE registerkarte
+Úprava bloku „{0}“	Bearbeitung von Block „{0}“
+úprava definice bloku: přepne do prostoru bloku (kreslí se a upravuje obsah bloku, počátek = bod vložení); neexistující název založí nový blok; konec ZAVŘÍT-BLOK [Uložit/Zahodit]	Blockdefinition bearbeiten: wechselt in den Blockbereich (Blockinhalt zeichnen und ändern, Ursprung = Einfügepunkt); ein nicht vorhandener Name legt einen neuen Block an; Ende mit BSCHLIESSEN [Speichern/Verwerfen]
+Upravit atributy	Attribute bearbeiten
+Upravit blok	Block bearbeiten
+Upravit blok „{0}“	Block „{0}“ bearbeiten
+upravit-atributy e5 CISLO=V-001 "NAZEV=Hřídel 2" | upravit-atributy e5 (výpis)	attedit e5 CISLO=V-001 "NAZEV=Welle 2" | attedit e5 (Liste)
+upravit-blok ŠROUB · (kreslení…) · zavřít-blok | zavřít-blok zahodit	bbearb SCHRAUBE · (zeichnen…) · bschließen | bschließen verwerfen
+Upravit… (název na příkazovém řádku)	Bearbeiten… (Name in der Befehlszeile)
+Uspořádání	Anordnung
+už upravujete blok „{0}“ – nejdřív ZAVŘÍT-BLOK	Sie bearbeiten bereits Block „{0}“ – zuerst BSCHLIESSEN
+Vejít do kreslicí plochy	Zeichenfläche ausfüllen
+Vejít na papír	Auf Papier einpassen
+Vektor SVG	Vektor SVG
+Vlastní měřítko	Eigener Maßstab
+vlastní…	eigener…
+vložení {0} (blok {1}) nemá atributy	Referenz {0} (Block {1}) hat keine Attribute
+vložení {0} nemá atribut {1} – atributy: {2}	Referenz {0} hat kein Attribut {1} – Attribute: {2}
+Vložení bloku	Blockreferenz
+vložení bloku: název, bod vložení [Měřítko/Otočit/Pole], měřítko X <1>, měřítko Y <=X>, natočení <0>, hodnoty atributů (v pořadí definic); záporné měřítko = zrcadlení; „vložit ?“ = seznam bloků	Block einfügen: Name, Einfügepunkt [Faktor/Drehen/Reihe], X-Faktor <1>, Y-Faktor <=X>, Drehung <0>, Attributwerte (in Definitionsreihenfolge); negativer Faktor = spiegeln; „einfüge ?“ = Blockliste
+Vložit blok	Block einfügen
+vložit ŠROUB 100,50 | vložit ŠROUB 100,50 2 2 45 | vložit RAZÍTKO 400,10 1 1 0 "Hřídel" "V-001" | vložit ŠROUB pole 3 2 20 15 0,0	einfüge SCHRAUBE 100,50 | einfüge SCHRAUBE 100,50 2 2 45 | einfüge SCHRIFTFELD 400,10 1 1 0 "Welle" "V-001" | einfüge SCHRAUBE reihe 3 2 20 15 0,0
+Vložit… (název na příkazovém řádku)	Einfügen… (Name in der Befehlszeile)
+Vše nepoužité	Alles Unbenutzte
+Všechna rozvržení	Alle Layouts
+Výběr jako DXF	Auswahl als DXF
+Vyberte objekty bloku	Objekte des Blocks wählen
+Vyberte vložení bloku s atributy	Blockreferenz mit Attributen wählen
+Vyberte vložení bloku s atributy (poklepáním na blok se panel otevře).	Wählen Sie eine Blockreferenz mit Attributen (Doppelklick auf einen Block öffnet das Bedienfeld).
+Vyberte výřez	Ansichtsfenster wählen
+Vyberte výřez (klik na jeho rám)	Ansichtsfenster wählen (auf seinen Rahmen klicken)
+Vyberte výřez (klik na jeho rám) nebo pracujte v jeho modelovém prostoru	Ansichtsfenster wählen (auf seinen Rahmen klicken) oder in seinem Modellbereich arbeiten
+Vyberte výřezy	Ansichtsfenster wählen
+Vybraný blok „{0}“	Gewählter Block „{0}“
+Vybrat výřez	Ansichtsfenster wählen
+Vyčistit	Bereinigen
+vyčistit | vyčistit bloky | vyčistit hladiny STARÁ POMOCNÁ | vyčistit typy-čar	bereinig | bereinig blöcke | bereinig ebenen ALT HILFE | bereinig linientypen
+Vyčistit nepoužité	Unbenutzte bereinigen
+vyčistit: vše, bloky, hladiny, typy-čar, styly, kótovací-styly – ne „{0}“	bereinig: alles, blöcke, ebenen, linientypen, textstile, bemstile – nicht „{0}“
+Výchozí hodnota	Vorgabewert
+výkres nemá rozvržení	die Zeichnung hat kein Layout
+výkres nemá rozvržení – modelový prostor je zobrazený	die Zeichnung hat kein Layout – der Modellbereich wird angezeigt
+výkres nemá rozvržení – rozvržení nové A3	die Zeichnung hat kein Layout – layout neu A3
+výkres nemá žádné bloky	die Zeichnung hat keine Blöcke
+Výkres nemá žádné bloky – vyberte objekty a stiskněte Nový (BLOK).	Die Zeichnung hat keine Blöcke – Objekte wählen und Neu drücken (BLOCK).
+vypnuto	ausgeschaltet
+Výřez {0} je zamčený – nejdřív ho odemkněte	Ansichtsfenster {0} ist gesperrt – zuerst entsperren
+výřez {0} je zamčený – nejdřív ho odemkněte (locked=0)	Ansichtsfenster {0} ist gesperrt – zuerst entsperren (locked=0)
+výřez 25,60 405,282 1:5 | výřez vejít 1:10 | výřez dva svisle vejít vejít | výřez měřítko e7 1:20 | výřez zamknout e7 | výřez střed e7 120,40	mansfen 25,60 405,282 1:5 | mansfen einpassen 1:10 | mansfen zwei vertikal einpassen einpassen | mansfen maßstab e7 1:20 | mansfen sperren e7 | mansfen mitte e7 120,40
+výřez má nulový rozměr	das Ansichtsfenster hat die Größe null
+výřez s nepravoúhlým ořezem – rozměr změňte úchopy	Ansichtsfenster mit nicht rechteckigem Zuschnitt – Größe mit Griffen ändern
+Výřezy	Ansichtsfenster
+Výřezy ({0})	Ansichtsfenster ({0})
+výřezy nemohou být součástí bloku	Ansichtsfenster können nicht Teil eines Blocks sein
+výřezy rozvržení (pohled do modelu v měřítku): dva rohy + měřítko (1:50… / Vejít); volby Vejít (kreslicí plocha), Dva/Tři/Čtyři, Mnohoúhelník, Objekt (uzavřená křivka / kružnice), Zapnout / Vypnout, Zamknout / Odemknout, Měřítko, Střed (střed pohledu v modelu)	Ansichtsfenster des Layouts (Ansicht ins Modell im Maßstab): zwei Ecken + Maßstab (1:50… / Einpassen); Optionen Einpassen (Zeichenfläche), Zwei/Drei/Vier, Polygonal, Objekt (geschlossene Polylinie / Kreis), Ein / Aus, Sperren / Entsperren, Maßstab, Mitte (Ansichtsmitte im Modell)
+výřezy se kreslí v rozvržení – přepněte: rozvržení nastavit X (nebo rozvržení nové A3)	Ansichtsfenster werden im Layout gezeichnet – wechseln: layout setzen X (oder layout neu A3)
+Vytvořit blok	Block erstellen
+Výzva	Aufforderung
+Vzhled stránky	Seite einrichten
+vzhled stránky patří rozvržení – přepněte na rozvržení (rozvržení nastavit X) nebo zadejte „rozvržení X“	die Seiteneinrichtung gehört zu einem Layout – zu einem Layout wechseln (layout setzen X) oder „layout X“ eingeben
+Z objektu (kružnice, uzavřená křivka)	Aus Objekt (Kreis, geschlossene Polylinie)
+z vybraných objektů – název, bod vložení	aus den gewählten Objekten – Name, Einfügepunkt
+Zadejte bod vložení	Einfügepunkt angeben
+Zadejte bod vložení (základní bod bloku)	Einfügepunkt angeben (Basispunkt des Blocks)
+Zadejte další vrchol nebo Enter	Nächsten Scheitelpunkt angeben oder Enter
+zadejte hladiny (čárkou oddělené, * = vše)	Layer angeben (durch Komma getrennt, * = alle)
+Zadejte hodnotu atributu	Attributwert eingeben
+Zadejte měřítko	Faktor angeben
+Zadejte měřítko X	X-Faktor angeben
+Zadejte měřítko Y <stejné jako X>	Y-Faktor angeben <wie X>
+Zadejte název bloku k úpravě nebo [?]	Name des zu bearbeitenden Blocks eingeben oder [?]
+Zadejte název bloku nebo [?]	Blocknamen eingeben oder [?]
+zadejte název bloku, „výběr“ nebo „*“ – bloky: {0}	Blocknamen, „auswahl“ oder „*“ eingeben – Blöcke: {0}
+zadejte nový název	neuen Namen eingeben
+Zadejte počáteční bod textu atributu	Startpunkt des Attributtexts angeben
+Zadejte první roh nebo	Erste Ecke angeben oder
+Zadejte roh výřezu nebo	Ecke des Ansichtsfensters angeben oder
+zadejte rozvržení ke kopírování – rozvržení: {0}	zu kopierendes Layout angeben – Layouts: {0}
+zadejte rozvržení ke smazání – rozvržení: {0}	zu löschendes Layout angeben – Layouts: {0}
+Zadejte vrchol mnohoúhelníku	Scheitelpunkt des Polygons angeben
+Zadejte výchozí hodnotu	Vorgabewert eingeben
+zadejte výřez: „výřez e7“, „vše“, nebo vyberte výřez (v modelovém prostoru výřezu = aktivní)	Ansichtsfenster angeben: „ansichtsfenster e7“, „alle“, oder ein Ansichtsfenster wählen (im Modellbereich = das aktive)
+Zadejte výzvu atributu	Attributaufforderung eingeben
+zadejte ZNAČKA=hodnota, ne „{0}“	BEZEICHNUNG=Wert eingeben, nicht „{0}“
+Zadejte značku atributu nebo režim [{0}]	Attributbezeichnung oder Modus eingeben [{0}]
+Zahodit	Verwerfen
+Zamčené výřezy se nezměnily: {0}	Gesperrte Ansichtsfenster blieben unverändert: {0}
+Zamčený	Gesperrt
+Zamčený výřez: měřítko a pohled se nezmění	Gesperrtes Ansichtsfenster: Maßstab und Ansicht ändern sich nicht
+Zamknout výřez	Ansichtsfenster sperren
+zapnuto	eingeschaltet
+Zapnutý	Ein
+Zapnutý (obsah se zobrazuje)	Ein (Inhalt wird angezeigt)
+Zaškrtnuté hladiny jsou v tomto výřezu zmrazené (VPLAYER)	Angekreuzte Layer sind in diesem Ansichtsfenster gefroren (AFEBENE)
+Zavřít blok	Block schließen
+zavřít-blok | zavřít-blok uložit | zavřít-blok zahodit	bschließen | bschließen speichern | bschließen verwerfen
+Změny bloku „{0}“	Änderungen an Block „{0}“
+Zmrazené hladiny	Gefrorene Layer
+zmrazení hladin jen v některém výřezu: zmrazit / rozmrazit HLADINY (čárkou, * = vše) [výřez e7 | vše | aktuální]; reset = rozmrazit vše; seznam	Layer nur in einem Ansichtsfenster frieren: frieren / tauen LAYER (Komma, * = alle) [ansichtsfenster e7 | alle | aktuell]; zurücksetzen = alles tauen; liste
+zmrazeno	gefroren
+značka atributu nesmí být prázdná ani obsahovat mezery	die Attributbezeichnung darf nicht leer sein und keine Leerzeichen enthalten
+ZNAČKA=hodnota (atributy: {0}) nebo Enter	BEZEICHNUNG=Wert (Attribute: {0}) oder Enter
+zpět na list rozvržení (papírový prostor) z modelového prostoru výřezu	zurück zum Layoutblatt (Papierbereich) aus dem Modellbereich des Ansichtsfensters
+Zpět na papír (PAPÍROVÝ-PROSTOR)	Zurück zum Papier (PBEREICH)
+# kontrola balíku 3 (výřezy, okraje, PSLTSCALE, bloky)
+{0} není uzavřený objekt – ořez výřezu potřebuje uzavřenou křivku, spline, kružnici nebo celou elipsu	{0} ist kein geschlossenes Objekt – ein Zuschnitt des Ansichtsfensters braucht eine geschlossene Polylinie, Spline, einen Kreis oder eine volle Ellipse
+{0}: formát {1} zatím neumí zapsat {2} – použijte .mncad (uložit-blok {3} mncad) nebo záložku	{0}: das Format {1} kann {2} noch nicht schreiben – .mncad (wblock {3} mncad) oder eine neue Registerkarte verwenden
+{0}: na zamčené hladině – nejdřív hladinu odemkněte	{0}: auf einem gesperrten Layer – zuerst den Layer entsperren
+⚠ nezapsáno (převodník je zatím nepodporuje): {0}	⚠ nicht geschrieben (vom Konverter noch nicht unterstützt): {0}
+⚠ výřezy mimo list: {0} – upravte je úchopy nebo vlastnostmi (c, w, h)	⚠ Ansichtsfenster außerhalb des Blatts: {0} – mit Griffen oder Eigenschaften anpassen (c, w, h)
+blok „{0}“ nelze vložit do bloku „{1}“ – blok nemůže obsahovat sám sebe (ani vnořeně)	Block „{0}“ kann nicht in Block „{1}“ eingefügt werden – ein Block kann sich nicht selbst enthalten (auch nicht verschachtelt)
+blok „{0}“ ve výkresu už není – úprava bloku ukončena bez uložení	Block „{0}“ gibt es in der Zeichnung nicht mehr – Blockbearbeitung ohne Speichern beendet
+Co tisknout	Was drucken
+neznámá verze „{0}“ – R2018, R2013, R2010, R2007, R2004, R2000 (DXF i R12)	unbekannte Version „{0}“ – R2018, R2013, R2010, R2007, R2004, R2000 (DXF auch R12)
+neznámé zadání „{0}“ – A4–A0, na-šířku, na-výšku, okraje l,d,p,h, styl mono|barva|šedá, tloušťky ano|ne, dpi N, psltscale 1|0	unbekannte Eingabe „{0}“ – A4–A0, quer, hoch, ränder l,u,r,o, stil mono|farbe|grau, linienstärken ja|nein, dpi N, psltscale 1|0
+Nový střed pohledu (bod modelu: klikněte do výřezu nebo x,y)	Neue Ansichtsmitte (Modellpunkt: in das Ansichtsfenster klicken oder x,y)
+okraje {0} mm – entity listu posunuty, aby zůstaly na stejném místě papíru	Ränder {0} mm – Objekte des Blatts verschoben, damit sie an derselben Stelle des Papiers bleiben
+okraje jsou větší než list ({0}×{1} mm)	die Ränder sind größer als das Blatt ({0}×{1} mm)
+PSLTSCALE = {0}	PSLTSCALE = {0}
+psltscale 1 (vzor čar ve výřezech v mm papíru) nebo 0 (v jednotkách modelu × měřítko výřezu)	psltscale 1 (Linientypmuster in Ansichtsfenstern in mm Papier) oder 0 (in Modelleinheiten × Maßstab des Ansichtsfensters)
+Vyberte uzavřený objekt ořezu (uzavřená křivka nebo spline, kružnice, celá elipsa)	Geschlossenes Zuschneideobjekt wählen (geschlossene Polylinie oder Spline, Kreis, volle Ellipse)
+výřez {0} je zamčený – odemknout: výřez odemknout	Ansichtsfenster {0} ist gesperrt – entsperren: mansfen entsperren
+Výřez listu	Ansichtsfenster
+vzhled stránky rozvržení: formát A4–A0 (rámeček, razítko a výchozí výřez se přizpůsobí), orientace, okraje tisku (obsah zůstane na místě, tisk ho ořízne), styl tisku (mono / barva / šedá), tloušťky čar, DPI pro PNG, PSLTSCALE (vzor čar ve výřezech v mm papíru = 1); bez zadání = výpis	Seiteneinrichtung des Layouts: Format A4–A0 (Rahmen, Schriftfeld und das Standard-Ansichtsfenster passen sich an), Ausrichtung, Plotränder (der Inhalt bleibt an seiner Stelle, der Plot schneidet ihn zu), Plotstil (mono / farbe / grau), Linienstärken, DPI für PNG, PSLTSCALE (Linientypmuster in Ansichtsfenstern in mm Papier = 1); ohne Eingabe = Liste
+vzhled-stránky A2 na-šířku | vzhled-stránky styl mono tloušťky ano | vzhled-stránky rozvržení Výroba okraje 5,5,5,5 | vzhled-stránky psltscale 0	seiteneinr A2 quer | seiteneinr stil mono linienstärken ja | seiteneinr layout Fertigung ränder 5,5,5,5 | seiteneinr psltscale 0

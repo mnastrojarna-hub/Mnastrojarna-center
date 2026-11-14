@@ -2563,10 +2563,21 @@ export function CadApp() {
   freshNameRef.current = freshName;
   const newDoc = () => openDocInTab(emptyDoc(freshName(tr("Nový díl"))));
   const newDraft = () => openDocInTab(emptyDraftDoc(freshName(tr("Nový 2D výkres"))));
-  /** `insert` = v sestavě vložit jako komponentu (Vložit díl / model, přetažení do sestavy); jinak otevřít v nové záložce */
-  const openFile = async (file: File, insert = isAsm) => {
-    const toAsm = insert && isAsm && !drawAfterImport.current;
+  /** `insert` = v sestavě vložit jako komponentu (Vložit díl / model, přetažení do sestavy; výchozí v sestavě), jinak otevřít v nové záložce;
+   *  `asSketch` = DXF / DWG do 3D skice místo 2D výkresu */
+  const openFile = async (file: File, opts: { insert?: boolean; asSketch?: boolean } = {}): Promise<void> => {
+    const asSketch = !!opts.asSketch;
+    const toAsm = (opts.insert ?? isAsm) && isAsm && !drawAfterImport.current;
     const ext = file.name.split(".").pop()?.toLowerCase();
+    // DXF / DWG → 2D výkres v nové záložce (průběh, Zrušit); do 3D skici jen volbou (Skica ▸ Import DXF, tlačítko v hlášce)
+    if (ext === "dxf" || ext === "dwg") {
+      const io = await import("./draft/ui-io");
+      if (!asSketch) return io.openDraftFile(file, { openDoc: (d) => void openDocInTabRef.current(d), flash, asSketch: (f) => void openFileRef.current(f, { asSketch: true }) });
+      if (ext === "dwg") {
+        const f = await io.dwgAsDxf(file, flash);
+        return f ? openFile(f, { asSketch: true }) : undefined;
+      }
+    }
     if (ext === "mncad" || ext === "json") {
       try {
         const d = internBlobs(JSON.parse(await file.text()) as CadDoc); // data importů → úložiště (odkazy mnblob:)
@@ -2632,6 +2643,8 @@ export function CadApp() {
       else flash((e as Error).message || tr("Soubor se nepodařilo načíst."));
     }
   };
+  const openFileRef = useRef(openFile); // volba „Otevřít jako 3D skicu“ po otevření 2D výkresu – aktuální dokument
+  openFileRef.current = openFile;
   // přetažení souborů do okna: každý se otevře ve vlastní záložce (bez výchozího chování prohlížeče = nové okno)
   const [dropHint, setDropHint] = useState(false);
   const hasFiles = (dt: DataTransfer) => dt.types.includes("Files") || Array.from(dt.items ?? []).some((i) => i.kind === "file");
@@ -3611,7 +3624,7 @@ export function CadApp() {
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) openFile(f, false); // Otevřít / Import, Ctrl+O: vždy otevřít (v sestavě v nové záložce)
+              if (f) openFile(f, { insert: false }); // Otevřít / Import, Ctrl+O: vždy otevřít (v sestavě v nové záložce)
               e.target.value = "";
             }}
           />
@@ -3623,7 +3636,7 @@ export function CadApp() {
             data-insert-input
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) openFile(f, true);
+              if (f) openFile(f, { insert: true });
               e.target.value = "";
             }}
           />

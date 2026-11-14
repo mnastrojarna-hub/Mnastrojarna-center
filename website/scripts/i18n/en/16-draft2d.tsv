@@ -83,10 +83,6 @@ entita {0} ({1}) tu nejde použít	entity {0} ({1}) cannot be used here
 entita {0} je na zamčené hladině „{1}“	entity {0} is on the locked layer “{1}”
 entita {0} neexistuje	entity {0} does not exist
 entitu nelze takto transformovat	the entity cannot be transformed this way
-Export DWG	Export DWG
-Export DXF	Export DXF
-export dxf | export dwg verze R2013 | export dxf název "Deska"	export dxf | export dwg version R2013 | export dxf name "Plate"
-export výkresu do DXF nebo DWG (verze R2000–R2018); soubor se stáhne (v API je v results[].data.file)	export the drawing to DXF or DWG (versions R2000–R2018); the file is downloaded (in the API it is in results[].data.file)
 export: dxf nebo dwg	export: dxf or dwg
 globální měřítko typů čar (LTSCALE) – délky čárek a mezer se násobí	global linetype scale (LTSCALE) – dash and gap lengths are multiplied
 hladina	layer
@@ -110,7 +106,6 @@ chybí hodnota vlastnosti {0}	missing value of property {0}
 chybí název hladiny	missing layer name
 chybí název typu čáry	missing linetype name
 chybí zadání – {0}	missing input – {0}
-import (GUI) | import "vykres.dxf" <base64>	import (GUI) | import "drawing.dxf" <base64>
 import: zadejte název a obsah souboru v base64, nebo použijte window.mncad.draftImport	import: give the file name and its content in base64, or use window.mncad.draftImport
 jedna entita z úseků a oblouků (Oblouk = tečný oblouk, Druhý = oblouk třemi body, Úsečka = zpět na úseky), šířka, uzavření	one entity of segments and arcs (Arc = tangent arc, Second = three-point arc, Line = back to segments), width, close
 jednořádkový text	single-line text
@@ -146,8 +141,6 @@ modrá	blue
 MŘÍŽKA	GRID
 Načíst typ čáry	Load linetype
 Načíst z knihovny	Load from library
-Načteno {0} entit, {1} hladin.	Loaded {0} entities, {1} layers.
-Načteno {0} entit, {1} hladin. Zatím nepřevedeno: {2}.	Loaded {0} entities, {1} layers. Not converted yet: {2}.
 nadbytečné zadání „{0}“ – příkaz {1} skončil dřív	extra input “{0}” – command {1} finished earlier
 napište příkaz (čára, kružnice, L, C…) nebo x,y	type a command (line, circle, L, C…) or x,y
 nápověda | nápověda kružnice	help | help circle
@@ -200,9 +193,7 @@ Odemknout vše	Unlock all
 Opakovat {0}	Repeat {0}
 osa elipsy má nulovou délku	the ellipse axis has zero length
 Osa, konec	Axis, end
-otevře DXF / DWG jako nový 2D výkres v nové záložce (v GUI výběr souboru; textem: import "název.dxf" base64)	opens DXF / DWG as a new 2D drawing in a new tab (file dialog in the GUI; by text: import "name.dxf" base64)
 otevřený dokument „{0}“ není 2D výkres – nejdřív „2d nový“ nebo přepněte na záložku s 2D výkresem	the open document “{0}” is not a 2D drawing – first “2d new” or switch to a tab with a 2D drawing
-Otevřít DXF / DWG jako 2D výkres	Open DXF / DWG as a 2D drawing
 Panel vlastností a hladin	Properties and layers panel
 PDMODE: 0, 2, 3, 32, 34, 35 …	PDMODE: 0, 2, 3, 32, 34, 35 …
 Plocha = {0}, obvod = {1}	Area = {0}, perimeter = {1}
@@ -230,7 +221,7 @@ pravidelný mnohoúhelník (3–1024 stran): střed a poloměr vepsaný / opsan�
 Prodloužení	Extension
 Proložením bodů	By fit points
 proměnná cecolor 1 | proměnná pdmode 3 | proměnná luprec 2 | proměnná (výpis všech)	setvar cecolor 1 | setvar pdmode 3 | setvar luprec 2 | setvar (list all)
-proměnné výkresu (jako AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT; bez hodnoty = výpis	drawing variables (like AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT; without a value = list
+proměnné výkresu (jako AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT, PSLTSCALE; bez hodnoty = výpis	drawing variables (like AutoCAD): CLAYER, CECOLOR, CELTYPE, CELWEIGHT, CELTSCALE, LTSCALE, TEXTSIZE, TEXTSTYLE, PDMODE, PDSIZE, LUPREC, AUPREC, INSUNITS, MIRRTEXT, LWDISPLAY, LWDEFAULT, GRIDUNIT, SNAPUNIT, MEASUREMENT, PSLTSCALE; without a value = list
 průhlednost 0–90 %	transparency 0–90 %
 průsečík: x(e1,e2) nebo x(e1,e2,k) nebo x(e1,e2,x,y)	intersection: x(e1,e2) or x(e1,e2,k) or x(e1,e2,x,y)
 přejmenovat: hladina přejmenovat STARÝ NOVÝ	rename: layer rename OLD NEW
