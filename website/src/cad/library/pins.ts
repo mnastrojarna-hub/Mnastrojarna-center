@@ -199,7 +199,7 @@ export const compressionSpring: Family = {
   group: "Pružiny a těsnění",
   icon: "sweep",
   standards: ["DIN 2095", "EN 13906-1"],
-  keywords: ["pruzina", "tlacna pruzina", "spring", "compression spring", "din 2095"],
+  keywords: ["pruzina", "tlacna pruzina", "spring", "compression spring", "din 2095", "feder", "druckfeder"],
   params: [
     { key: "d", label: tr("Průměr drátu d"), kind: "number", min: 0.2, max: 20, step: 0.1, unit: "mm", default: 1.6 },
     { key: "D", label: tr("Vnější průměr De"), kind: "number", min: 1, max: 300, step: 0.5, unit: "mm", default: 12 },
@@ -207,7 +207,8 @@ export const compressionSpring: Family = {
     { key: "n", label: tr("Počet činných závitů n"), kind: "number", min: 1, max: 60, step: 0.5, unit: "", default: 8 },
   ],
   parse: (q) => {
-    const kw = has(q, "pruzin", "spring", "2095");
+    // DE „Feder“ / „Druckfeder“ (has() hledá začátek slova – Passfeder, Tellerfeder, Zugfeder se nechytí)
+    const kw = has(q, "pruzin", "spring", "2095", "feder", "druckfeder");
     if (!kw || has(q, "podloz", "washer", "kolik", "pin", "tazn", "extension", "tension", "ocky", "zkrut", "torzn", "torsion", "talir", "disc", "belleville", "plynov", "gas", "vzper", "2097", "2088", "2093")) return null;
     const values: Record<string, number> = {};
     // „d1.6 D12“ – po normalizaci jsou obě malá: menší = drát, větší = vnější průměr
@@ -230,7 +231,7 @@ export const compressionSpring: Family = {
     if (n) values.n = n;
     return { values, score: score(kw, Math.min(0.4, Object.keys(values).length * 0.1)) };
   },
-  describe: (v) => `Pružina ${fmt(num(v.d))}×${fmt(num(v.D))}×${fmt(num(v.L))} – n=${v.n}`,
+  describe: (v) => tr("Pružina {0}×{1}×{2} – n={3}", fmt(num(v.d)), fmt(num(v.D)), fmt(num(v.L)), v.n),
   make: (v) => {
     const d = num(v.d, 1.6);
     const D = num(v.D, 12);

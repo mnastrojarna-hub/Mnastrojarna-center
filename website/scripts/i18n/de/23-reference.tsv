@@ -1,0 +1,151 @@
+# Vlna 15 – předloha (výkres zákazníka DWG / DXF / PDF): výtah, porovnání s modelem, kontrola kót, import AutoCAD Mechanical
+ (pohled normálie {0})	 (Normteilansicht {0})
+ (značka dílu)	 (Teilemarke)
+ na listu {0}	 auf Blatt {0}
+, pozice {0}	, Position {0}
+, zrcadleně	, gespiegelt
+· … dalších {0} – {1} vše	· … {0} weitere – {1} alle
+· … dalších {0} ✗	· … {0} weitere ✗
+· … dalších {0} listů – předloha výtah listy	· … {0} weitere Blätter – vorlage auszug blätter
+· … dalších {0} rozporů – předloha výtah rozpory	· … {0} weitere Widersprüche – vorlage auszug widersprüche
+· chybí v modelu: úsek předlohy {0} mm u [{1}] (od levého dolního rohu pohledu), odchylka až {2} mm	· fehlt im Modell: Vorlagenabschnitt {0} mm bei [{1}] (von der linken unteren Ecke der Ansicht), Abweichung bis {2} mm
+· k dokumentu není připojená předloha	· dem Dokument ist keine Vorlage zugeordnet
+· kóta {0} „{1}“: model {2} – {3}	· Maß {0} „{1}“: Modell {2} – {3}
+· kóty: {0} s tolerancí, {1} s uložením, {2} informativních, {3} Ø, {4} závitů, {5} sražení; značky: drsnost {6}, tolerance tvaru {7}, základny {8}, řezy {9}, popisky pohledů {10}	· Maße: {0} mit Toleranz, {1} mit Passung, {2} Hilfsmaße, {3} Ø, {4} Gewinde, {5} Fasen; Symbole: Rauheit {6}, Form- und Lagetoleranzen {7}, Bezüge {8}, Schnitte {9}, Ansichtsbeschriftungen {10}
+· kusovník (list {0}): pozice {1}, řádky s počtem {2}, celkem {3} ks	· Stückliste (Blatt {0}): Positionen {1}, Zeilen mit Menge {2}, gesamt {3} Stk
+· kusovník v předloze není	· die Vorlage hat keine Stückliste
+· list {0}: {1} {2}{3}, pohledy {4}{5}	· Blatt {0}: {1} {2}{3}, Ansichten {4}{5}
+· navíc v modelu: úsek {0} mm u [{1}], odchylka až {2} mm	· zusätzlich im Modell: Abschnitt {0} mm bei [{1}], Abweichung bis {2} mm
+· nic (filtr list / pohled)	· nichts (Filter Blatt / Ansicht)
+· obrázek překryvu: {0} ({1})	· Überlagerungsbild: {0} ({1})
+· podrobně: předloha výtah kóty | díry | kusovník | razítko | poznámky | značky | pozice | rozpory [list N] [pohled N.M] [vše]	· im Detail: vorlage auszug maße | bohrungen | stückliste | schriftfeld | notizen | symbole | positionen | widersprüche [blatt N] [ansicht N.M] [alle]
+· razítka (bloky s atributy) v předloze nejsou	· die Vorlage hat keine Schriftfelder (Blöcke mit Attributen)
+· zaokrouhlené texty kót ({0}): {1}	· gerundete Maßtexte ({0}): {1}
+· zaokrouhlený text (geometrie má víc desetinných míst): {0} kót – předloha výtah kóty	· gerundeter Text (die Geometrie hat mehr Nachkommastellen): {0} Maße – vorlage auszug maße
+{0} (odhad z kót)	{0} (aus Maßen geschätzt)
+{0} {1}: {2}{3} · změřeno {4} · [{5}]{6}	{0} {1}: {2}{3} · gemessen {4} · [{5}]{6}
+{0} porovnání pohled {1} × předloha {2} (tolerance {3} mm): předloha pokryta modelem {4} %, model pokryt předlohou {5} % (délky {6} / {7} mm; sesouhlasení otočení {8}°{9}, posun {10})	{0} Vergleich Ansicht {1} × Vorlage {2} (Toleranz {3} mm): Vorlage vom Modell abgedeckt {4} %, Modell von der Vorlage abgedeckt {5} % (Längen {6} / {7} mm; Ausrichtung Drehung {8}°{9}, Versatz {10})
+{0}× {1} {2}{3}{4} – pohled {5}, první [{6}]	{0}× {1} {2}{3}{4} – Ansicht {5}, erste [{6}]
+⚠ možný rozpor: {0}	⚠ möglicher Widerspruch: {0}
+⚠ nepřevedené objekty předlohy: {0}	⚠ nicht konvertierte Vorlagenobjekte: {0}
+✓ předloha „{0}“ ({1}{2}, {3}): listy {4} ({5}), pohledy {6}, kóty {7}, díry a normálie {8}, pozice {9}, razítka {10}	✓ Vorlage „{0}“ ({1}{2}, {3}): Blätter {4} ({5}), Ansichten {6}, Maße {7}, Bohrungen und Normteile {8}, Positionen {9}, Schriftfelder {10}
+✓ předloha „{0}“ odebrána z dokumentu	✓ Vorlage „{0}“ aus dem Dokument entfernt
+✓ předloha „{0}“ otevřena jako 2D výkres v nové záložce (jen k prohlížení; změny předlohu v dokumentu nemění)	✓ Vorlage „{0}“ als 2D-Zeichnung in neuer Registerkarte geöffnet (zum Ansehen; Änderungen ändern die Vorlage im Dokument nicht)
+✓ rozpory v předloze nenalezeny	✓ keine Widersprüche in der Vorlage gefunden
+✓ text kóty = geometrie u všech {0} kót s číslem	✓ Maßtext = Geometrie bei allen {0} Maßen mit Zahl
+✗ kóta {0} „{1}“ [{2}]: model {3}	✗ Maß {0} „{1}“ [{2}]: Modell {3}
+✗ rozpor: {0}	✗ Widerspruch: {0}
+✗ text kóty ≠ geometrie: {0} – {1}	✗ Maßtext ≠ Geometrie: {0} – {1}
+bod kóty v modelu nenalezen	Maßpunkt im Modell nicht gefunden
+informativní	Hilfsmaß
+k dokumentu není připojená předloha – předloha "výkres.dwg" (soubor připojte v konzoli tlačítkem „Připojit soubor…“)	dem Dokument ist keine Vorlage zugeordnet – vorlage "zeichnung.dwg" (Datei in der Konsole mit „Datei anhängen…“ anhängen)
+kolík	Stift
+kontrola kót: neznámá volba „{0}“	maße prüfen: unbekannte Option „{0}“
+kontrola kót: pohled přední, horní, levý, pravý, zadní nebo spodní (ne „{0}“)	maße prüfen: Ansicht vorne, oben, links, rechts, hinten oder unten (nicht „{0}“)
+Kót se zaokrouhleným textem (geometrie má víc desetinných míst): {0}.	Maße mit gerundetem Text (die Geometrie hat mehr Nachkommastellen): {0}.
+kóta {0} (pohled {1}) – díry na listu {2} mají Ø{3}, žádná nemá Ø{4}	Maß {0} (Ansicht {1}) – Bohrungen auf Blatt {2} haben Ø{3}, keine hat Ø{4}
+kóta {0} ukazuje {1}, geometrie {2}	Maß {0} zeigt {1}, Geometrie {2}
+Kóty s textem jiným než geometrie: {0} ({1}).	Maße mit anderem Text als die Geometrie: {0} ({1}).
+kusovník (list {0}): {1}	Stückliste (Blatt {0}): {1}
+kuželové zahloubení	Kegelsenkung
+list {0} [{1}]: {2}	Blatt {0} [{1}]: {2}
+list {0} {1} [{2}]: {3}	Blatt {0} {1} [{2}]: {3}
+list {0} kóta {1}: text {2}, geometrie {3}	Blatt {0} Maß {1}: Text {2}, Geometrie {3}
+list {0} pozice {1} [{2}]{3}	Blatt {0} Position {1} [{2}]{3}
+list {0}: {1} {2}×{3} mm, měřítko {4}, rámeček [{5}] – [{6}] ({7})	Blatt {0}: {1} {2}×{3} mm, Maßstab {4}, Rahmen [{5}] – [{6}] ({7})
+list {0}{1}: {2}	Blatt {0}{1}: {2}
+matice	Mutter
+model je prázdný – není co porovnat	das Modell ist leer – nichts zu vergleichen
+na listu {0} předlohy nejsou pohledy	Blatt {0} der Vorlage hat keine Ansichten
+Negrafická data vlastních tříd (AutoCAD Mechanical – databáze kusovníku, normy; nezobrazují se ani nezapíší zpět): {0}.	Nichtgrafische Daten eigener Klassen (AutoCAD Mechanical – Stücklistendatenbank, Normen; werden weder angezeigt noch zurückgeschrieben): {0}.
+nekontroluje se (úhel, závit, sražení)	nicht geprüft (Winkel, Gewinde, Fase)
+normálie	Normteil
+Odebrat {0}	{0} entfernen
+otočení: násobek 90°	Drehung: ein Vielfaches von 90°
+PDF: {0} stránek, {1} vektorových cest, {2} textů.	PDF: {0} Seiten, {1} Vektorpfade, {2} Texte.
+pohled {0} modelu je prázdný	Ansicht {0} des Modells ist leer
+pohled předlohy {0} není – pohledy: {1}	Vorlagenansicht {0} existiert nicht – Ansichten: {1}
+popisek	Beschriftung
+porovnání s předlohou potřebuje 3D díl nebo sestavu (otevřený dokument je 2D výkres)	der Vergleich mit der Vorlage braucht ein 3D-Teil oder eine Baugruppe (das offene Dokument ist eine 2D-Zeichnung)
+porovnání s předlohou: porovnat předloha pohled přední [N.M] [tolerance 0,06]	Vergleich mit der Vorlage: vergleichen vorlage ansicht vorne [N.M] [toleranz 0,06]
+porovnat předloha: chybí pohled modelu – porovnat předloha pohled přední [N.M] [tolerance 0,06]	vergleichen vorlage: die Modellansicht fehlt – vergleichen vorlage ansicht vorne [N.M] [toleranz 0,06]
+porovnat předloha: neznámá volba „{0}“	vergleichen vorlage: unbekannte Option „{0}“
+porovnat předloha: pohled přední, horní, levý, pravý, zadní nebo spodní (ne „{0}“)	vergleichen vorlage: Ansicht vorne, oben, links, rechts, hinten oder unten (nicht „{0}“)
+posun: dvě čísla dx dy (mm)	Versatz: zwei Zahlen dx dy (mm)
+pozice {0} (list {1}) v kusovníku není	Position {0} (Blatt {1}) ist nicht in der Stückliste
+pozice {0}: kusovník „{1}“, razítko listu {2} „{3}“	Position {0}: Stückliste „{1}“, Schriftfeld von Blatt {2} „{3}“
+pozice {0}: materiál v kusovníku „{1}“, v razítku listu {2} „{3}“	Position {0}: Werkstoff in der Stückliste „{1}“, im Schriftfeld von Blatt {2} „{3}“
+předloha „{0}“ je zapsaná v dokumentu, ale soubor v této relaci není načtený – připojte ho znovu a zadejte předloha "{0}"	Vorlage „{0}“ ist im Dokument eingetragen, aber die Datei ist in dieser Sitzung nicht geladen – hängen Sie sie erneut an und geben Sie vorlage "{0}" ein
+předloha „{0}“: data nejsou base64 ani data URL	Vorlage „{0}“: die Daten sind weder Base64 noch eine Data-URL
+předloha „{0}“: PDF nemá žádnou stránku	Vorlage „{0}“: das PDF hat keine Seite
+předloha „{0}“: soubor je prázdný	Vorlage „{0}“: die Datei ist leer
+předloha „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“ (nebo window.mncad.attach) a zopakujte příkaz; připojené: {1}	Vorlage „{0}“: die Datei ist nicht angehängt – hängen Sie sie in der Konsole mit „Datei anhängen…“ (oder window.mncad.attach) an und wiederholen Sie den Befehl; angehängt: {1}
+Předloha {0}	Vorlage {0}
+předloha {0} (modře) × model {1} (černě); mimo toleranci: oranžově předloha, červeně model	Vorlage {0} (blau) × Modell {1} (schwarz); außerhalb der Toleranz: orange Vorlage, rot Modell
+předloha = výkres zákazníka DWG / DXF / vektorové PDF připojený k dokumentu (soubor připojte v konzoli tlačítkem „Připojit soubor…“ nebo window.mncad.attach): listy, pohledy, měřítka, kóty s tolerancí / uložením / počtem a změřenou hodnotou (rozpor „text ≠ geometrie“), díry i normálie AutoCAD Mechanical, kusovník, pozice, razítka, poznámky, drsnost, tolerance tvaru, rozpory; otevřít = jako 2D výkres v nové záložce	Vorlage = Kundenzeichnung DWG / DXF / Vektor-PDF, dem Dokument zugeordnet (Datei in der Konsole mit „Datei anhängen…“ oder window.mncad.attach anhängen): Blätter, Ansichten, Maßstäbe, Maße mit Toleranz / Passung / Anzahl und gemessenem Wert (Widerspruch „Text ≠ Geometrie“), Bohrungen und AutoCAD-Mechanical-Normteile, Stückliste, Positionen, Schriftfelder, Notizen, Rauheit, Form- und Lagetoleranzen, Widersprüche; öffnen = als 2D-Zeichnung in neuer Registerkarte
+předloha výtah díry	vorlage auszug bohrungen
+předloha výtah kóty	vorlage auszug maße
+předloha výtah kusovník	vorlage auszug stückliste
+předloha výtah pohledy	vorlage auszug ansichten
+předloha výtah pozice	vorlage auszug positionen
+předloha výtah poznámky	vorlage auszug notizen
+předloha výtah značky	vorlage auszug symbole
+předloha výtah: neznámá volba „{0}“ – kóty, díry, kusovník, razítko, poznámky, značky, pohledy, listy, rozpory, pozice, list N, pohled N.M, vše	vorlage auszug: unbekannte Option „{0}“ – maße, bohrungen, stückliste, schriftfeld, notizen, symbole, ansichten, blätter, widersprüche, positionen, blatt N, ansicht N.M, alle
+předloha: neznámá volba „{0}“	vorlage: unbekannte Option „{0}“
+připojeno	angehängt
+Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo="{1}"	Angehängt: {0} – in Befehlen über den Namen, z. B. zeichnung schriftfeld logo="{1}"
+Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu	Hängt eine Datei an (Schriftfeldlogo, Vorlage …) – Befehle finden sie über den Namen
+Připojit soubor…	Datei anhängen…
+slepá díra	Sackloch
+Soubor „{0}“ se nepodařilo načíst.	Die Datei „{0}“ konnte nicht geladen werden.
+sražení {0}×{1}°	Fase {0}×{1}°
+Stránky nemají vektorovou kresbu (sken?) – geometrie pro porovnání chybí.	Die Seiten haben keine Vektorzeichnung (Scan?) – es fehlt Geometrie zum Vergleichen.
+šroub	Schraube
+text předlohy je zaokrouhlený – geometrie předlohy {0}	der Vorlagentext ist gerundet – Vorlagengeometrie {0}
+tolerance tvaru	Form- und Lagetoleranz
+tolerance: kladné číslo v mm (např. 0,06)	Toleranz: positive Zahl in mm (z. B. 0,06)
+uložení {0}	Passung {0}
+v předloze nejsou pohledy (geometrie)	die Vorlage hat keine Ansichten (Geometrie)
+v toleranci, ne jmenovitá hodnota	innerhalb der Toleranz, nicht der Nennwert
+vrtání	Bohrung
+zahloubení	Senkung
+závit {0}	Gewinde {0}
+žádný pohled předlohy s kótami neodpovídá pohledům modelu (pokrytí pod 50 %) – porovnat předloha pohled přední ukáže, co nesedí	keine Vorlagenansicht mit Maßen passt zu den Modellansichten (Abdeckung unter 50 %) – vergleichen vorlage ansicht vorne zeigt, was nicht passt
+přední	vorne
+horní	oben
+levý	links
+pravý	rechts
+zadní	hinten
+spodní	unten
+# revize: tenké čáry, virtuální roh, výběr listu, zastaralé výsledky, měřítko pohledu, R12 neviditelné
+ – ZASTARALÉ: model se od té doby změnil, zopakujte	 – VERALTET: das Modell hat sich seitdem geändert, wiederholen
+ (příkazy předlohy: stav, výtah, kontrola kót, otevřít, odebrat)	 (Vorlagenbefehle: status, auszug, maße prüfen, öffnen, entfernen)
+, číslo výkresu {0}	, Zeichnungsnr. {0}
+, list {0}	, Blatt {0}
+· … dalších {0} bez bodu	· … weitere {0} ohne Punkt
+· kontrolován list {0} (odpovídá modelu nejlépe); kóty listů {1} se nekontrolovaly – kontrola kót list N	· Blatt {0} geprüft (passt am besten zum Modell); Maße der Blätter {1} wurden nicht geprüft – maße prüfen blatt N
+· měřítko geometrie pohledu předlohy zadané příkazem: {0} jednotek výkresu na 1 mm	· Geometriemaßstab der Vorlagenansicht aus dem Befehl: {0} Zeichnungseinheiten je 1 mm
+· pohled předlohy nemá skryté hrany – porovnány jen viditelné hrany modelu (se skrytými: porovnat … se skrytými)	· die Vorlagenansicht hat keine verdeckten Kanten – nur sichtbare Modellkanten verglichen (mit verdeckten: vergleichen … mit-verdeckten)
+· pohled předlohy zadaný ručně – bez kontroly velikosti	· Vorlagenansicht ausdrücklich angegeben – ohne Größenprüfung
+· závity normálií: {0} mm předlohy (jádro d1) se shoduje s vrtákem modelu jen v toleranci {1} mm	· Normteil-Gewinde: {0} mm der Vorlage (Kerndurchmesser d1) stimmen mit dem Bohrer des Modells nur in der Toleranz {1} mm überein
+{0} celkem: {1} ✓, {2} ✗, {3} bez bodu v modelu, {4} nekontrolováno ({5} pohledů)	{0} gesamt: {1} ✓, {2} ✗, {3} ohne Punkt im Modell, {4} nicht geprüft ({5} Ansichten)
+{0} kontrola kót předlohy {1} × model (pohled {2}): {3} ✓, {4} ✗, {5} bez bodu v modelu, {6} nekontrolováno (úhel, závit, sražení)	{0} Maßprüfung der Vorlage {1} × Modell (Ansicht {2}): {3} ✓, {4} ✗, {5} ohne Punkt im Modell, {6} nicht geprüft (Winkel, Gewinde, Fase)
+⚠ kóta {0} „{1}“ [{2}]: bod kóty v modelu nenalezen	⚠ Maß {0} „{1}“ [{2}]: Maßpunkt im Modell nicht gefunden
+bod ve virtuálním rohu (průsečík hran)	Punkt in einer virtuellen Ecke (Schnitt der Kanten)
+DXF R12: {0} neviditelných entit se nezapsalo (R12 nemá příznak viditelnosti – v jiných programech by byly vidět); zachová je DXF / DWG 2000 a novější	DXF R12: {0} unsichtbare Elemente wurden nicht geschrieben (R12 kennt kein Sichtbarkeitsflag – andere Programme würden sie zeigen); DXF / DWG 2000 und neuer behalten sie
+k dokumentu není připojená předloha – předloha kontrola kót porovnává kóty připojeného výkresu zákazníka s modelem; kontrolu kót vlastního výkresu (očekávané rozměry na listu, tlačítko Kontrola kót) vypíše výkres stav – řádek „Kontrola kót“	dem Dokument ist keine Vorlage zugeordnet – vorlage maße prüfen vergleicht die Maße einer angehängten Kundenzeichnung mit dem Modell; die Maßprüfung der eigenen Zeichnung (erwartete Maße auf dem Blatt, Schaltfläche Maßprüfung) gibt zeichnung status aus – Zeile „Maßprüfung“
+kontrola 1:1: pohled modelu (promítnutý jako ve výkrese) proti obrysu pohledu předlohy (bez os, kót, šraf, tenkých a konstrukčních čar) – pokrytí v toleranci (výchozí 0,06 mm) oběma směry, úseky mimo toleranci s polohou a obrázek SVG překryvu (stáhne se); bez N.M se najde nejlépe odpovídající pohled předlohy, zadaný N.M bez kontroly velikosti; ✓ obě pokrytí ≥ 99,5 %, ✗ i model s geometrií navíc	1:1-Prüfung: Modellansicht (wie in der Zeichnung projiziert) gegen die Kontur der Vorlagenansicht (ohne Mittellinien, Maße, Schraffuren, dünne und Konstruktionslinien) – Abdeckung in der Toleranz (Standard 0,06 mm) in beide Richtungen, Abschnitte außerhalb der Toleranz mit Lage und ein SVG-Überlagerungsbild (wird heruntergeladen); ohne N.M wird die am besten passende Vorlagenansicht genommen, eine angegebene N.M ohne Größenprüfung; ✓ beide Abdeckungen ≥ 99,5 %, ✗ auch bei einem Modell mit zusätzlicher Geometrie
+kontrola kót předlohy proti modelu: předloha kontrola kót [pohled přední] [N.M]	Maßprüfung der Vorlage gegen das Modell: vorlage maße prüfen [ansicht vorne] [N.M]
+kóty předlohy proti modelu: každá kóta se změří v modelu mezi stejnými body (rozměry, rozteče děr, Ø, R, i od virtuálního rohu) → ✓ / ✗ s hodnotou modelu, ⚠ bez bodu v modelu; u výkresu více dílů jen list, který modelu odpovídá; výsledek se uloží do dokumentu (po změně modelu zastaralý); kontrolu kót vlastního výkresu ukazuje výkres stav	Maße der Vorlage gegen das Modell: jedes Maß wird im Modell zwischen denselben Punkten gemessen (Abmessungen, Lochabstände, Ø, R, auch von einer virtuellen Ecke) → ✓ / ✗ mit dem Modellwert, ⚠ ohne Punkt im Modell; bei einer Zeichnung mehrerer Teile nur das Blatt, das zum Modell passt; das Ergebnis wird im Dokument gespeichert (nach einer Modelländerung veraltet); die Maßprüfung der eigenen Zeichnung zeigt zeichnung status
+měřítko: 1:2, 2:1 nebo kladné číslo (ne „{0}“)	Maßstab: 1:2, 2:1 oder eine positive Zahl (nicht „{0}“)
+pohled {0}{1}: {2} × {3} mm (geometrie {4}:1 {5}), vlevo dole [{6}], {7} entit	Ansicht {0}{1}: {2} × {3} mm (Geometrie {4}:1 {5}), links unten [{6}], {7} Elemente
+pohled předlohy {0} se s pohledem {1} modelu ({2} × {3} mm) nepodařilo sesouhlasit – zkuste měřítko 1:N, otočení 90 / zrcadlit nebo posun dx dy	die Vorlagenansicht {0} ließ sich nicht mit der Modellansicht {1} ({2} × {3} mm) ausrichten – versuchen Sie maßstab 1:N, drehung 90 / spiegeln oder versatz dx dy
+poslední kontrola kót ({0}{1}): {2} ✓, {3} ✗, {4} bez bodu v modelu, {5} nekontrolováno	letzte Maßprüfung ({0}{1}): {2} ✓, {3} ✗, {4} ohne Punkt im Modell, {5} nicht geprüft
+poslední porovnání ({0}): pohled {1} × předloha {2}: pokrytí {3} % / model {4} %	letzter Vergleich ({0}): Ansicht {1} × Vorlage {2}: Abdeckung {3} % / Modell {4} %
+předloha „{0}“: neznámá volba „{1}“ – za názvem souboru smí být jen data souboru (data URL nebo base64); další příkazy: předloha stav | výtah | kontrola kót | otevřít | odebrat	vorlage „{0}“: unbekannte Option „{1}“ – nach dem Dateinamen dürfen nur die Dateidaten folgen (Data-URL oder Base64); weitere Befehle: vorlage status | auszug | maße prüfen | öffnen | entfernen
+předloha si odporuje: text {0}, geometrie předlohy {1} – model odpovídá geometrii, ne textu kóty; ověřte u zákazníka	die Vorlage widerspricht sich: Text {0}, Geometrie der Vorlage {1} – das Modell entspricht der Geometrie, nicht dem Maßtext; beim Kunden klären
+výchozí – bez kót a měřítka; porovnat … měřítko 1:N	Standard – ohne Maße und Maßstab; vergleichen … maßstab 1:N
+z kót	aus Maßen
+z kót listu	aus Maßen des Blatts
+z měřítka listu	aus dem Blattmaßstab
+žádný pohled předlohy{0} neodpovídá velikostí pohledu {1} modelu ({2} × {3} mm) – zadejte pohled předlohy (N.M), měřítko 1:N nebo posun	keine Vorlagenansicht{0} passt in der Größe zur Modellansicht {1} ({2} × {3} mm) – geben Sie die Vorlagenansicht (N.M), maßstab 1:N oder einen Versatz an

@@ -68,6 +68,9 @@ export function importNoteText(n: ImportNote, version?: string): string {
   if (Object.keys(n.skipped).length) parts.push(tr("Nepřevedeno: {0}.", list(n.skipped)));
   const xrefs = n.warnings.filter((w) => w.startsWith("xref:")).map((w) => w.slice(5));
   if (xrefs.length) parts.push(tr("Externí reference (XREF) se nenačítají: {0}.", xrefs.join(", ")));
+  if (n.customObjects && Object.keys(n.customObjects).length) parts.push(tr("Negrafická data vlastních tříd (AutoCAD Mechanical – databáze kusovníku, normy; nezobrazují se ani nezapíší zpět): {0}.", list(n.customObjects)));
+  if (n.dimText?.length) parts.push(tr("Kóty s textem jiným než geometrie: {0} ({1}).", n.dimText.length, n.dimText.slice(0, 4).map((d) => tr("kóta {0} ukazuje {1}, geometrie {2}", d.h, d.shown, +d.measured.toFixed(4))).join("; ") + (n.dimText.length > 4 ? " …" : "")));
+  if (n.dimRounded) parts.push(tr("Kót se zaokrouhleným textem (geometrie má víc desetinných míst): {0}.", n.dimRounded));
   const other = n.warnings.filter((w) => !w.startsWith("xref:"));
   if (other.length) parts.push(tr("Varování: {0}", other.slice(0, 5).join("; ") + (other.length > 5 ? " …" : "")));
   return parts.join(" ");

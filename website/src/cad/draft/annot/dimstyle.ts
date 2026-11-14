@@ -116,8 +116,11 @@ export function roundDec(x: number, dec: number): number {
   // 15 platných číslic odstraní šum výpočtu (1,0049999999999999 → 1,005)
   const a = Number(Math.abs(x).toPrecision(15));
   const [mant, ex] = a.toExponential().split("e");
-  const shifted = Number(`${mant}e${Number(ex) + dec}`);
+  let shifted = Number(`${mant}e${Number(ex) + dec}`);
   if (!Number.isFinite(shifted) || shifted > 9e15) return x;
+  // relativní tolerance 1e-9 u poloviny jako AutoCAD: uložené 4,349999999999909 (šum výpočtu bodů) ukáže 4,4, ne 4,3
+  const fl = Math.floor(shifted);
+  if (Math.abs(shifted - fl - 0.5) <= 1e-9 * Math.max(1, shifted)) shifted = fl + 0.5;
   const r = Number(`${Math.round(shifted)}e${-dec}`);
   return x < 0 ? -r : r;
 }

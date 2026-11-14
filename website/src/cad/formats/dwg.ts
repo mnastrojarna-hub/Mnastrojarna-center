@@ -29,6 +29,7 @@ import {
   XYZ,
 } from "@node-projects/acad-ts";
 import type { DText, DrawingResult, Layer as DLayer, Poly } from "../drawing";
+import { imageRects, nearestAci } from "../title-block";
 import { circleFrom3, entityPath } from "../sketch";
 import type { SketchEntity, Vec2 } from "../types";
 import { DWG_SIGNATURE, DWG_VERSIONS, type DwgVersion } from "./dwg-versions";
@@ -143,6 +144,18 @@ function toBuffer(doc: CadDocument): ArrayBuffer {
 function addPoly(ctx: Ctx, p: Poly, H: number) {
   const layer = ctx.layers.get(DWG_LAYER[p.layer] ?? "OBRYS")!;
   const Y = (y: number) => H - y;
+  if (p.img) {
+    // logo razítka: obrys z plošek SOLID (rohy 1-2-4-3) v nejbližší barvě ACI; bez obrysu zůstane jen rámeček obrázku
+    const rs = imageRects(p.img);
+    const color = new Color(nearestAci(p.img.trace?.color ?? "#000000"));
+    for (const q of rs) {
+      const so = new Solid(new XYZ(q.x0, Y(q.y0), 0), new XYZ(q.x1, Y(q.y0), 0), new XYZ(q.x0, Y(q.y1), 0), new XYZ(q.x1, Y(q.y1), 0));
+      so.layer = layer;
+      so.color = color;
+      ctx.doc.entities!.add(so);
+    }
+    if (rs.length) return;
+  }
   if (p.fill && p.pts.length >= 3) {
     const [a, b, c] = p.pts;
     const d = p.pts[3] ?? c;

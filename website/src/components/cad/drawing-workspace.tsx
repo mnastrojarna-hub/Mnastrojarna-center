@@ -13,6 +13,8 @@ import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { threadsOfDoc } from "@/cad/drawing-doc";
+import { sectionAt, sectionText } from "@/cad/drawing-section";
+import { SmartDimsExtra, TolCheckBlock } from "./drawing-smart-extra";
 import { dimCheck } from "@/cad/dim-check";
 import { activeSheet, mergeSmart, NEW_DRAWING_OPTIONS } from "@/cad/drawing-agent";
 import { drawingBase, drawingFile, drawingFileSheets, drawingSheetsOut, type DrawingExportFormat } from "@/cad/drawing-export";
@@ -24,6 +26,9 @@ import { cn } from "@/lib/cn";
 import { ShareCta } from "./share-cta";
 import { TipBox, microTipsEnabled, type TipSpec } from "./micro-tip";
 import { AnnFitRev, FitsSection, useViewTools, ViewToolsOverlay, ViewToolsSection } from "./drawing-views-panel";
+import { TitleBlockSection } from "./drawing-title-panel";
+import { inheritTitle } from "@/cad/title-block";
+import { generalTolWarnings } from "@/cad/drawing-export";
 
 type Props = {
   doc: CadDoc;
@@ -148,7 +153,7 @@ function loadOpts(): DrawingOptions {
 
 export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons }: Props) {
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
-  const [meta, setMeta] = useState<DrawingMeta>(() => ({
+  const freshMeta = (): DrawingMeta => ({
     name: doc.name,
     material: materialLabel,
     massKg,
@@ -157,7 +162,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     revision: doc.props?.revision ?? "",
     date: new Date().toLocaleDateString(cadLocale()),
     tolerance: "", // výrobní požadavky (tolerance, hrany) se nedoplňují automaticky – uvedou se jen zadané
-  }));
+  });
+  const [meta, setMeta] = useState<DrawingMeta>(freshMeta);
   /** závity: kružnice válce / jádra se kótuje označením („M6 hl. 12“, „M18×1,5 dl. 18“) – modelované šroubovice se na výkrese nekreslí (ISO 6410) */
   const threads = useMemo(() => threadsOfDoc(doc), [doc.features]);
   const [repeatTool, setRepeatTool] = useState(false);
@@ -254,7 +260,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       // Nový výkres = „Výkres 2“), i když se na něm nic nezmění (sestava bez Chytrých kót)
       if (!all.length && onDrawingsChange) emit([{ ...sheetDoc(), options: o as unknown as Record<string, unknown> }]);
     }
-    if (sv?.meta) setMeta((m) => ({ ...m, ...(sv.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
+    // údaje razítka listu od výchozích – pole předchozího listu (logo, šablona, zákazník …) se do jiného listu nepřenesou
+    if (sv?.meta) setMeta(() => ({ ...freshMeta(), ...(sv.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
     setAnn(sv?.annotations ?? []);
     setSheetName(sv?.name ?? tr("List {0}", sheetIdx + 1));
     setAnnTool(null);
@@ -361,7 +368,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const cur = sheets.length ? [...sheets] : [];
     cur[sheetIdx] = sheetDoc();
     const n = cur.length + 1;
-    cur.push({ id: uid(), name: tr("List {0}", n), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] });
+    cur.push({ id: uid(), name: tr("List {0}", n), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { ...inheritTitle(meta), name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance } as Record<string, unknown>, annotations: [] });
     dirty.current = false;
     emit(cur);
     setSheetIdx(n - 1, cur[n - 1].id);
@@ -383,7 +390,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     // rozpracovaný list se uloží zvlášť (bez kroku historie); založení výkresu je jeden krok – Ctrl+Z vrátí jen nový výkres
     const base = persistNow() ?? all;
     const name = nextDrawingName({ drawings: base } as CadDoc);
-    const first: DrawingDoc = inDrawing({ id: uid(), name: tr("List {0}", 1), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance }, annotations: [] }, name);
+    const first: DrawingDoc = inDrawing({ id: uid(), name: tr("List {0}", 1), options: { ...NEW_DRAWING_OPTIONS, views: { ...defaultDrawingOptions.views }, details: [] } as unknown as Record<string, unknown>, meta: { ...inheritTitle(meta), name: meta.name, number: meta.number, author: meta.author, revision: meta.revision, date: meta.date, tolerance: meta.tolerance } as Record<string, unknown>, annotations: [] }, name);
     const out = [...base, first];
     dirty.current = false;
     wrote.current = JSON.stringify(out);
@@ -554,7 +561,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         flash(exportAll ? tr("Generuji PDF (listů: {0})…", sheets.length) : tr("Generuji PDF…"));
         return new Blob([(await fileOf("pdf")).data as BlobPart], { type: "application/pdf" });
       }, "application/pdf");
-      if (saved) flash(tr("PDF uloženo: {0}", saved.name));
+      if (saved) flash(tr("PDF uloženo: {0}", saved.name) + tolNote());
     } catch (e) {
       flash((e as Error).message || tr("PDF se nepodařilo vytvořit."));
     }
@@ -568,7 +575,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         const f = await fileOf("dwg");
         return new Blob([f.data as BlobPart], { type: f.mime });
       }, exportAll ? "application/zip" : "application/acad");
-      if (saved) flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name));
+      if (saved) flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name) + tolNote());
     } catch (e) {
       flash((e as Error).message || tr("DWG se nepodařilo vytvořit."));
     }
@@ -576,8 +583,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   /** DXF / SVG / kusovník CSV (textové soubory) */
   const exportText = (f: DrawingExportFormat) => {
     if (!out && f !== "csv") return;
-    void fileOf(f).then((x) => download(x.name, new Blob([x.data as BlobPart], { type: x.mime }), x.mime)).catch((e) => flash((e as Error).message));
+    void fileOf(f).then((x) => (download(x.name, new Blob([x.data as BlobPart], { type: x.mime }), x.mime), f !== "csv" && tolNote() && flash(tolNote().replace(/^ · /, "")))).catch((e) => flash((e as Error).message));
   };
+  /** export dílu bez nepředepsaných tolerancí – upozornění jako u window.mncad.exportDrawing (drawing-export.ts) */
+  const tolNote = () => (generalTolWarnings(doc, (exportAll ? sheets.map((x, k) => ({ name: x.name, meta: (k === sheetIdx ? meta : x.meta) as unknown as DrawingMeta })) : [{ name: sheetName, meta }])).length ? tr(" · ⚠ výkres nemá nepředepsané tolerance") : "");
 
   // ---------- náhled: zoom & posun ----------
   const canvas = useRef<HTMLDivElement>(null);
@@ -1123,6 +1132,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                   return (
                     <div data-dim-check className="mt-1 rounded-md border border-ink-700/10 bg-steel-100/60 p-2 text-[11px]">
                       <p className="font-semibold">{missing.length ? tr("Chybí {0} z {1} očekávaných kót", missing.length, items.length) : tr("Všech {0} očekávaných kót je na listu", items.length)}</p>
+                      <TolCheckBlock views={out?.views ?? []} ann={ann} opts={opts} />
                       {missing.length > 0 && (
                         <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
                           {missing.map((m, i) => (
@@ -1261,7 +1271,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           <Section title={tr("Řez A–A")}>
             <Check
               checked={!!opts.section}
-              onChange={(v) => set("section", v ? { plane: "XZ", offset: centerOf("XZ") } : null)}
+              onChange={(v) => set("section", v ? sectionAt("XZ", centerOf("XZ")) : null)}
             >
               {tr("Zobrazit řez se šrafováním")}
             </Check>
@@ -1269,7 +1279,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <>
                 <Seg
                   value={opts.section.plane}
-                  onChange={(p) => set("section", { plane: p, offset: centerOf(p), kind: opts.section!.kind })}
+                  onChange={(p) => set("section", sectionAt(p, centerOf(p), opts.section!.kind))}
                   options={[
                     { v: "XZ", l: tr("XZ (čelní)") },
                     { v: "YZ", l: tr("YZ (boční)") },
@@ -1287,6 +1297,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 <Row label={tr("Poloha roviny")}>
                   <NumInput value={opts.section.offset} onChange={(n) => set("section", { ...opts.section!, offset: n })} suffix="mm" />
                 </Row>
+                <p data-section-pos className="-mt-1 text-[10.5px] leading-snug text-ink-700/50">
+                  {opts.section.normal ? tr("Odsazení podél normály roviny jako u skici: {0}", sectionText(opts.section)) : tr("Starší řez – odsazení je souřadnice na ose: {0}", sectionText(opts.section))}
+                </p>
                 {opts.section.kind === "half" && <p className="text-[10.5px] leading-snug text-ink-700/50">{tr("Polovina pohled, polovina řez – dělí je osa souměrnosti (u soustružených dílů osa rotace).")}</p>}
               </>
             )}
@@ -1312,6 +1325,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 </button>
               </div>
             )}
+            {opts.dimensions === "smart" && <SmartDimsExtra opts={opts} set={set} />}
             <p className="-mt-1 mb-1.5 text-[10.5px] leading-snug text-ink-700/50">{tr("Auto + Ø je jen pomocný základ: funkční kóty, tolerance (H8, ±0,1) a drsnosti doplňte ručně. „Kontrola kót“ v sekci Kóty a poznámky ukáže, co chybí.")}</p>
             {bom?.length ? (
               <Check checked={showBom} onChange={(v) => set("bomTable", v)}>
@@ -1355,28 +1369,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           <ModelsSection doc={doc} models={opts.models ?? []} onChange={(m) => set("models", m)} flash={flash} />
 
           <Section title={tr("Razítko")}>
-            <Row label={tr("Název")}>
-              <TextInput value={meta.name} onChange={(v) => setM({ name: v })} />
-            </Row>
-            <Row label={tr("Číslo výkresu")}>
-              <TextInput value={meta.number ?? ""} onChange={(v) => setM({ number: v })} onBlur={persistProps} placeholder={tr("např. MN-2026-001")} />
-            </Row>
-            <div className="grid grid-cols-2 gap-2">
-              <Row label={tr("Kreslil")}>
-                <TextInput value={meta.author ?? ""} onChange={(v) => setM({ author: v })} onBlur={persistProps} />
-              </Row>
-              <Row label={tr("Revize")}>
-                <TextInput value={meta.revision ?? ""} onChange={(v) => setM({ revision: v })} onBlur={persistProps} placeholder="A" />
-              </Row>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Row label={tr("Datum")}>
-                <TextInput value={meta.date ?? ""} onChange={(v) => setM({ date: v })} />
-              </Row>
-              <Row label={tr("Nepředepsané tolerance")}>
-                <TextInput value={meta.tolerance ?? ""} onChange={(v) => setM({ tolerance: v })} placeholder={tr("např. ISO 2768-mK")} />
-              </Row>
-            </div>
+            {/* šablona, logo, firma, všechna pole a nepředepsané tolerance (drawing-title-panel.tsx – jako výkres razítko …) */}
+            <TitleBlockSection meta={meta} setM={setM} persistProps={persistProps} onMaterialChange={onMaterialChange} assembly={doc.kind === "assembly"} flash={flash} sheetKey={saved?.id ?? String(sheetIdx)} />
             <Row label={tr("Opracování hran")}>
               <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder={tr("např. srazit 0,5×45°")} />
             </Row>
@@ -1391,22 +1385,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 </button>
               )}
             </p>
-            <Row label={tr("Materiál")}>
-              <TextInput value={meta.material} onChange={(v) => setM({ material: v })} onBlur={() => onMaterialChange?.(meta.material)} placeholder={tr("označení do razítka, např. ČSN 11 423")} />
-            </Row>
           </Section>
 
           <Section title={tr("Tabulka revizí")}>
             {(meta.revisions ?? []).map((r, i) => (
               <div key={i} className="mb-1.5 rounded border border-ink-700/10 p-1.5">
                 <div className="grid grid-cols-[2.2rem_1fr_1fr] gap-1">
-                  <TextInput value={r.rev} placeholder="A" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, rev: v } : x)) })} />
+                  <TextInput value={r.rev} placeholder="A" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, rev: v } : x)), ...(meta.revision === r.rev ? { revision: v } : {}) })} />
                   <TextInput value={r.date} placeholder="datum" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, date: v } : x)) })} />
                   <TextInput value={r.author ?? ""} placeholder="kreslil" onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, author: v } : x)) })} />
                 </div>
                 <div className="mt-1 flex gap-1">
                   <TextInput value={r.note} placeholder={tr("popis změny")} onChange={(v) => setM({ revisions: (meta.revisions ?? []).map((x, k) => (k === i ? { ...x, note: v } : x)) })} />
-                  <button type="button" title={tr("Smazat revizi")} onClick={() => setM({ revisions: (meta.revisions ?? []).filter((_, k) => k !== i) })} className="px-1 text-ink-700/40 hover:text-brand">
+                  <button type="button" title={tr("Smazat revizi")} onClick={() => { const rest = (meta.revisions ?? []).filter((_, k) => k !== i); setM({ revisions: rest, ...(meta.revision === r.rev ? { revision: rest[rest.length - 1]?.rev ?? "" } : {}) }); }} className="px-1 text-ink-700/40 hover:text-brand">
                     ×
                   </button>
                 </div>

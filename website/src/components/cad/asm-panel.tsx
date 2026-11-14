@@ -31,6 +31,8 @@ import { MATERIALS, fmtNum } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
 import { KinMateButtons, KinMatePicker, kinPrompt } from "./asm-mates-kin";
+import { AsmInstanceProps } from "./asm-spring-props";
+import { renameProblem } from "@/cad/agent-asm";
 import { KIN_SPEC, isKinMode, kinHasLimits, kinHasValue } from "@/cad/mate-spec";
 import { CadIcon } from "./cad-icons";
 import { DirVecField } from "./dir-vec-field";
@@ -115,6 +117,8 @@ export function AsmTree({
                 ) : null}
                 {c.source.kind === "asm" ? <CadIcon name="layers" tone="create" className="h-3.5 w-3.5 shrink-0" /> : <span className="h-3 w-3 shrink-0 rounded-sm border border-black/20" style={{ background: c.color ?? "#b9c2cc" }} />}
                 <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                {c.alias && <span className="shrink-0 rounded bg-[#eef2f6] px-1 font-mono text-[10px] text-[#4a5563]" data-tree-alias title={tr("Přezdívka instance (vazby místo #k)")}>{c.alias}</span>}
+                {c.spring && <span className="shrink-0 font-mono text-[10px] text-[#8a95a3]" title={tr("Pružina mezi komponentami")}>⌇</span>}
                 {c.source.kind === "asm" && <span className="font-mono text-[10px] text-[#8a95a3]">{c.source.doc.components?.length ?? 0}</span>}
                 {(c.fixed || hasFixedMate(doc, c.id)) && <CadIcon name="lock" className="h-3 w-3 text-[#8a95a3]" />}
                 <button
@@ -540,7 +544,9 @@ function MatePicker({
 }
 
 /** Textová vlastnost komponenty: potvrdí se Enterem nebo opuštěním pole (jen když se změnila), Esc vrátí původní hodnotu. */
-function TextProp({ label, value, required, onCommit }: { label: string; value: string; required?: boolean; onCommit: (v: string) => void }) {
+/** `invalid` = proč hodnotu nejde přijmout (název = přezdívka jiné komponenty) – pole se vrátí a ukáže důvod. */
+function TextProp({ label, value, required, onCommit, invalid }: { label: string; value: string; required?: boolean; onCommit: (v: string) => void; invalid?: (v: string) => string | null }) {
+  const [err, setErr] = useState<string | null>(null);
   return (
     <label className="block">
       <span className="mb-1 block text-[11px] font-medium uppercase tracking-wider text-ink-700/55">{label}</span>
@@ -549,9 +555,16 @@ function TextProp({ label, value, required, onCommit }: { label: string; value: 
         aria-label={label}
         onBlur={(e) => {
           const v = e.target.value.trim();
+          setErr(null);
           if (v === value) return;
           if (!v && required) {
             e.target.value = value;
+            return;
+          }
+          const why = invalid?.(v) ?? null;
+          if (why) {
+            e.target.value = value;
+            setErr(why);
             return;
           }
           onCommit(v);
@@ -565,6 +578,7 @@ function TextProp({ label, value, required, onCommit }: { label: string; value: 
         }}
         className="w-full rounded-lg border border-ink-700/12 px-2.5 py-1.5 text-[13px] outline-none focus:border-brand"
       />
+      {err && <span className="mt-1 block text-[11px] text-[#b42318]">{err}</span>}
     </label>
   );
 }
@@ -587,6 +601,7 @@ export function AsmProps({
   onMirror,
   onBolt,
   bolting,
+  onRun,
 }: {
   c: AsmComponent;
   /** sestava (komponenty a vazby) – seznamy ploch pro vazby, vazba Ukotvit */
@@ -610,6 +625,8 @@ export function AsmProps({
   onMirror?: (plane: PlaneName, offset: number) => void;
   onBolt?: (opts: { washer: boolean; nut: boolean }) => void;
   bolting?: boolean;
+  /** textový příkaz z panelu (pružina mezi komponentami) – provede ho konzole aplikace */
+  onRun?: (text: string) => void;
 }) {
   const [pat, setPat] = useState<CompPattern>({ kind: "linear", count: 3, spacing: 50, direction: [1, 0, 0] });
   const [mirrorPlane, setMirrorPlane] = useState<PlaneName>("YZ");
@@ -632,11 +649,12 @@ export function AsmProps({
   );
   return (
     <div className="space-y-4">
-      <TextProp key={`${c.id}:name:${c.name}`} label={tr("Název")} value={c.name} required onCommit={(v) => onChange({ name: v })} />
+      <TextProp key={`${c.id}:name:${c.name}`} label={tr("Název")} value={c.name} required onCommit={(v) => onChange({ name: v })} invalid={(v) => renameProblem(doc, v, c.id)} />
       <div className="grid grid-cols-2 gap-2">
         <TextProp key={`${c.id}:number:${c.number ?? ""}`} label={tr("Číslo / norma")} value={c.number ?? ""} onCommit={(v) => onChange({ number: v || undefined })} />
         <TextProp key={`${c.id}:group:${c.group ?? ""}`} label={tr("Skupina")} value={c.group ? groupLabel(c.group) : ""} onCommit={(v) => onChange({ group: v.trim() ? groupKey(v) : undefined })} />
       </div>
+      <AsmInstanceProps key={`${c.id}:${JSON.stringify(c.spring ?? null)}`} c={c} doc={doc} onChange={onChange} onRun={onRun} />
       {/* ukotvená komponenta (příznak nebo vazba Ukotvit) se nepřesouvá – jako gizmo a klávesa G; poloha jde změnit po uvolnění */}
       <fieldset disabled={!!c.fixed || fixedByMate} data-placement-locked={!!c.fixed || fixedByMate || undefined} className="space-y-4 disabled:opacity-55">
       {(!!c.fixed || fixedByMate) && <p className="rounded bg-[#eef2f6] px-2 py-1 text-[11px] text-[#5b6776]">{tr("Komponenta je ukotvená – polohu a natočení změníte po uvolnění (Ukotvená dole).")}</p>}

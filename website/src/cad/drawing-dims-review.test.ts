@@ -121,8 +121,14 @@ describe("sloučení: vygenerovaná část přípony se nepřenáší, úprava u
 });
 
 describe("tolerance pomocné kóty (ISO 129-1: pomocná kóta se netoleruje)", () => {
-  it("„výkres tolerance 50 ±0,05“ na pomocnou kótu (50) skončí chybou s kandidáty", async () => {
-    await expect(runText(`${guideExample("### Příklad A")}\nvýkres tolerance 50 ±0,05`)).rejects.toThrow(/pomocná kóta.*netoleruje.*42/);
+  it("„výkres tolerance 50 ±0,05“ na pomocnou kótu (50): rozměr je funkční, pomocnou kótou se stane jiný článek (w15 B8)", async () => {
+    const { doc, log } = await runText(`${guideExample("### Příklad A")}\nvýkres tolerance 50 ±0,05`);
+    expect(log.at(-1)).toMatch(/^✓ tolerance ±0,05 → 50±0,05 \(přední\) – rozměr 50 je nyní funkční \(pomocnou kótou řetězu je \(42\)\)$/);
+    const st = (await drawingStatus(doc, computeDrawing)).text;
+    expect(statusLine(st, "přední")).toContain("50±0,05");
+    expect(statusLine(st, "přední")).toContain("(42)");
+    expect(statusLine(st, "přední")).not.toContain("(50)");
+    expect(st).toContain("Funkční rozměry: 50");
   }, 120_000);
   it("tolerance na článek řetězu ponechá závorky pomocné kóty a návod ukazuje jen proveditelné tolerance", async () => {
     const { doc } = await runText(`${guideExample("### Příklad A")}\nvýkres tolerance 42 ±0,05`);

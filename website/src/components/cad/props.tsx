@@ -16,7 +16,7 @@ import type { Extent, HoleEnd } from "@/cad/types";
 import { AxisField, DirectionField, ExtentField, PlaneDefField, RefField, RefListField, RefPickContext, StartField, ThinField } from "./ref-field";
 import "./forms/index";
 import { getFeatureForm } from "./forms/registry";
-import { HoleBottomField, TapDrillField, threadPatch } from "./forms/hole-fields";
+import { HoleBottomField, TapDrillField, TappedHeadField, threadPatch } from "./forms/hole-fields";
 import { ExtrudeDraftFields, ExtrudeHeightCheck } from "./extrude-fields";
 
 // ---------- parametry (proměnné / rovnice) ----------
@@ -602,7 +602,8 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
   const forScrew = METRIC_THREADS.find((t) => Math.abs(t.clear - f.diameter) < 1e-6);
   const changeKind = (k: HoleKind) => {
     const t = forScrew ?? METRIC_THREADS.find((x) => x.name === "M8")!;
-    if (k === "tapped") return set({ kind: k, thread: f.thread && threadByName(f.thread) ? f.thread : t.name, threadDepth: f.threadDepth ?? 0 });
+    // zahloubená díra → závitová: zahloubení zůstane (zahloubení + vrták + závit, jako text a upravit); „Bez“ ho smaže
+    if (k === "tapped") return set({ kind: k, thread: f.thread && threadByName(f.thread) ? f.thread : t.name, threadDepth: f.threadDepth ?? 0, ...(kind === "counterbore" || kind === "countersink" ? { head: kind } : {}) });
     if (k === "counterbore") return set({ kind: k, diameter: forScrew ? f.diameter : t.clear, cbDiameter: f.cbDiameter > f.diameter ? f.cbDiameter : t.cb?.[0] ?? t.clear * 1.8, cbDepth: f.cbDepth > 0 ? f.cbDepth : t.cb?.[1] ?? t.d });
     if (k === "countersink") return set({ kind: k, diameter: forScrew ? f.diameter : t.clear, csDiameter: (f.csDiameter ?? 0) > f.diameter ? f.csDiameter : t.cs ?? t.clear * 2, csAngle: f.csAngle ?? 90 });
     set({ kind: k });
@@ -651,6 +652,7 @@ function HoleProps({ f, set, b }: { f: Extract<Feature, { type: "hole" }>; set: 
           </Field>
           <Num label={tr("Hloubka závitu")} value={f.threadDepth ?? 0} min={0} hint={tr("0 = celá")} bind={b("threadDepth")} onChange={(v) => set({ threadDepth: v })} />
           {thread && <TapDrillField f={f} t={thread} set={set} b={b} />}
+          {thread && <TappedHeadField f={f} t={thread} set={set} b={b} />}
         </>
       ) : (
         <>

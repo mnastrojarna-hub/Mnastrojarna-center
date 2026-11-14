@@ -13,6 +13,8 @@ import { ensureMateRefs, entKey } from "./mate-geo";
 import { KIN_SPEC, accepts, entKindOf, kinDefaults, kinHasValue, type EntKind, type SlotSpec } from "./mate-spec";
 import { MATE_LABEL, faceAreas, worldGeo, type FaceGeo, type KinMateType } from "./mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "./mates-kin";
+import { springSeatMates } from "./asm-spring";
+import { instanceKey } from "./assembly";
 import { defaultStudy, motionCsv, motionSummary, motorProblem, motorText, poseDoc, runMotion, type MotionClashes, type MotionResult } from "./motion";
 import { uid, type AsmComponent, type CadDoc, type Mate, type MateRef, type MotionMotor, type MotionStudy, type Vec3 } from "./types";
 
@@ -205,7 +207,7 @@ export async function applyKinMate(d: CadDoc, cmd: MateCmd, env: AsmEnv): Promis
 /* ───────────────────────── pohybová studie ───────────────────────── */
 
 let last: { sig: string; res: MotionResult } | null = null;
-const studySig = (d: CadDoc) => JSON.stringify({ c: (d.components ?? []).map((c) => [c.id, c.placement, c.fixed, c.hidden]), m: d.mates, s: d.motion });
+const studySig = (d: CadDoc) => JSON.stringify({ c: (d.components ?? []).map((c) => [c.id, c.placement, c.fixed, c.hidden, c.spring ?? null]), m: d.mates, s: d.motion });
 
 /** Spočítá pohybovou studii sestavy (geometrie z jádra, volitelně kolize); výsledek se pamatuje pro stejnou sestavu a studii. */
 export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: number, n: number) => void; cancel?: () => boolean; force?: boolean } = {}): Promise<MotionResult> {
@@ -216,7 +218,9 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
   const flat = flattenAssembly(d);
   const byLeaf = new Map(flat.map((l) => [leafId(l), l]));
   await ensureBuilt(env, flat);
-  const mates = await ensureMateRefs(d.mates ?? [], (ref) => byLeaf.get(ref.leaf ?? ref.compId)?.key ?? null, env.geo, { face: env.mateFace, ent: env.mateEnt, cylFace: env.cylFace });
+  // geometrie i pro dosedací plochy pružin (pomocné „vazby“ se do dokumentu nevrací)
+  const n0 = d.mates?.length ?? 0;
+  const mates = (await ensureMateRefs([...(d.mates ?? []), ...springSeatMates(d)], (ref) => byLeaf.get(ref.leaf ?? ref.compId)?.key ?? null, env.geo, { face: env.mateFace, ent: env.mateEnt, cylFace: env.cylFace })).slice(0, n0);
   const doc = { ...d, mates };
   // kolize v kroku: jádro kontroluje přírůstkově (dvojice se stejnou vzájemnou polohou se nepočítají znovu); počty jdou do časů studie
   const collide = env.interference
@@ -234,9 +238,12 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
 /** poslední spočtený výsledek pro tuto sestavu (bez výpočtu) */
 export const motionCached = (d: CadDoc): MotionResult | null => (last && last.sig === studySig(d) ? last.res : null);
 
-/** Řádky tabulky pro window.mncad.motion: krok, čas, motory, polohy a natočení komponent podle názvu, stopa, kolize. */
+/**
+ * Řádky tabulky pro window.mncad.motion: krok, čas, motory, polohy a natočení komponent, stopa, kolize, pružiny. Klíč komponenty =
+ * název, u stejných názvů „název #k“ / „název [přezdívka]“ (instanceKey) – 70 komponent 959 = 70 záznamů, ne 27 podle názvů.
+ */
 export function motionTable(d: CadDoc, res: MotionResult) {
-  const name = (id: string) => d.components?.find((c) => c.id === id)?.name ?? id;
+  const name = (id: string) => instanceKey(d, id);
   return res.steps.map((s) => ({
     step: s.i,
     t: s.t,
@@ -244,6 +251,7 @@ export function motionTable(d: CadDoc, res: MotionResult) {
     comps: Object.fromEntries(Object.entries(s.place).map(([id, p]) => [name(id), { position: p.position, rotation: p.rotation }])),
     ...(s.trace ? { trace: s.trace } : {}),
     ...(s.clashes ? { clashes: s.clashes.map((c) => `${name(c.a)} × ${name(c.b)}`) } : {}),
+    ...(s.springs ? { springs: Object.fromEntries(Object.entries(s.springs).map(([id, x]) => [name(id), { length: x.length, seat: x.seat, ...(x.force !== undefined ? { force: x.force } : {}), level: x.level }])) } : {}),
     conflicts: s.conflicts.length,
   }));
 }
@@ -379,4 +387,7 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
 }
 
 /** Sestava v poloze kroku studie (pro zobrazení v panelu). */
-export const stepDoc = (d: CadDoc, res: MotionResult, i: number) => poseDoc(d, res.steps[Math.max(0, Math.min(res.steps.length - 1, i))]?.place ?? {});
+export const stepDoc = (d: CadDoc, res: MotionResult, i: number) => {
+  const s = res.steps[Math.max(0, Math.min(res.steps.length - 1, i))];
+  return poseDoc(d, s?.place ?? {}, s?.springs);
+};

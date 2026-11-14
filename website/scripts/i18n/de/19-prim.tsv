@@ -371,7 +371,6 @@ ukončení: na vzdálenost, skrz vše, k dalšímu, k vrcholu, k ploše, odsazen
 úkos A plochy <pravidlo|F1 F2…> [dělicí "Skica"] [stupňovitý] [směr +Z] [rovina XY odsazení N]	schräge A flächen <regel|F1 F2…> [trennlinie "Skizze"] [gestuft] [richtung +Z] [ebene XY versatz N]
 uzavřené (poslední profil zpět na první)	geschlossen (letztes Profil zurück zum ersten)
 užitečná délka závitu	nutzbare Gewindelänge
-v x1 y1 z1 v x2 y2 z2 (souřadnice)	bei x1 y1 z1 bei x2 y2 z2 (Koordinaten)
 váha tečny na konci	Tangentengewicht am Ende
 váha tečny na začátku	Tangentengewicht am Anfang
 válec	Zylinder

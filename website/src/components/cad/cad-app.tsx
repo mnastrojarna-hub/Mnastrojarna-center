@@ -6,11 +6,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { Interference } from "@/cad/asm-kernel";
-import { apply3, boltStack, bomCsv, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
+import { apply3, boltStack, bomCsv, componentCopy, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, removeComponents, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
 import { groupKey } from "@/cad/asm-groups";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
 import { MATE_LABEL, hasFixedMate, mateFromPending, measureMateIn, releaseComponent, solveMates, type FaceGeo, type MateStatus } from "@/cad/mates";
 import { ensureMateRefs, entKey, refGeo } from "@/cad/mate-geo";
+import { springComps, springSeatMates, withSprings } from "@/cad/asm-spring";
+import { springRunNote } from "./asm-spring-props";
+import { poseDoc } from "@/cad/motion";
 import { bodiesAt, isNewBodyMode, nextBodyName } from "@/cad/bodies";
 import { makeFromText } from "@/cad/library";
 import { cad, isCancelled } from "@/cad/client";
@@ -29,9 +32,10 @@ import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
 import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
 import { AGENT_API_VERSION, AGENT_COMMANDS, docStatusText, parseAgentText, selectEdges, selectFaces, topAt, type AsmStatus, type EdgeLite, type FaceLite } from "@/cad/agent";
+import { fillHoleTops } from "@/cad/agent-hole";
 import { applySketchOp, sketchOnPlane } from "@/cad/agent-sketch";
 import { applyEdit, freeName, histStep, historyText } from "@/cad/agent-edit";
-import { resolveTab, type TabInfo } from "@/cad/agent-asm";
+import { insertExtras, insertNote, resolveTab, type TabInfo } from "@/cad/agent-asm";
 import type { AsmEnv, PartFaces } from "@/cad/asm-agent";
 import { resolveDatumNames } from "@/cad/agent-prim";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
@@ -749,12 +753,9 @@ export function CadApp() {
               const r = await build();
               if (!r.metrics) throw new Error(tr("není těleso, na jehož povrch by se prvek umístil – zadejte i souřadnici z"));
               if (f.type === "hole") {
-                // povrch tělesa přímo v místě díry (podle sítě) – deska i vedle vyššího náboje; mimo těleso = obálka + upozornění
-                const ai = f.axis === "X" ? 0 : f.axis === "Y" ? 1 : 2;
-                const [u, v] = f.axis === "X" ? [f.position[1], f.position[2]] : f.axis === "Y" ? [f.position[0], f.position[2]] : [f.position[0], f.position[1]];
-                const h = topAt(r.mesh, f.axis, u, v);
-                if (h === null) log.push(tr("! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})", op.line, u, v, r.metrics.bbox[1][ai]));
-                f.position[ai] = h ?? r.metrics.bbox[1][ai];
+                // povrch tělesa přímo v místě díry (podle sítě) – deska i vedle vyššího náboje; mimo těleso = obálka + upozornění;
+                // více poloh: jen polohy zadané dvěma čísly (fillHoleTops, agent-hole.ts)
+                log.push(...fillHoleTops(f, op.fillPoints, (u, v) => topAt(r.mesh, f.axis, u, v), r.metrics.bbox, op.line));
               } else if (f.type === "text" && f.plane.kind === "base") {
                 const h = f.plane.name === "XY" ? topAt(r.mesh, "Z", f.position[0], f.position[1]) : null;
                 f.plane.offset = h ?? r.metrics.bbox[1][f.plane.name === "XY" ? 2 : f.plane.name === "XZ" ? 1 : 0];
@@ -815,9 +816,9 @@ export function CadApp() {
             const key = op.tab.toLowerCase();
             const src = madeDocs.get(key) ?? docTabsRef.current.find((t) => t.kind === "part" && t.title.toLowerCase() === key)?.hist.present;
             if (!src || src.kind === "assembly") throw new Error(tr("díl „{0}“ není mezi otevřenými záložkami – otevřené díly: {1}", op.tab, [...new Set([...madeDocs.values()].map((x) => x.name).concat(docTabsRef.current.filter((t) => t.kind === "part").map((t) => t.title)))].join(", ") || "—"));
-            d = { ...d, components: [...(d.components ?? []), partComponent(JSON.parse(JSON.stringify(src)) as CadDoc, { position: op.at, rotation: op.rotation }, op.fixed ? { fixed: true } : {})] };
+            d = { ...d, components: [...(d.components ?? []), partComponent(JSON.parse(JSON.stringify(src)) as CadDoc, { position: op.at, rotation: op.rotation }, insertExtras(d, op))] };
             changed = true;
-            log.push(tr("✓ komponenta „{0}“ vložena do sestavy{1}", src.name, op.fixed ? tr(" (ukotvená)") : ""));
+            log.push(tr("✓ komponenta „{0}“ vložena do sestavy{1}", src.name, insertNote(op)));
             break;
           }
           case "drawing":
@@ -1008,11 +1009,24 @@ export function CadApp() {
             log.push(...r.log);
             break;
           }
+          case "reference": {
+            // předloha DWG / DXF / PDF: připojení, stav, výtah, porovnání s modelem, kontrola kót (cad/reference, reference-host.ts)
+            const r = await (await import("./reference-host")).runReferenceOp(op.cmd, d);
+            if (r.newDoc) {
+              flush();
+              currentBody = null;
+              d = r.newDoc;
+              openNew = true;
+            } else if (r.doc) d = r.doc;
+            changed = changed || !!r.newDoc || !!r.doc;
+            log.push(...r.log);
+            break;
+          }
           case "status": {
             // „stav“ na konci vstupu vypíše až závěrečný stav (jednou); uprostřed vstupu stav v tom okamžiku
             if (op === lastOp) break;
             const r = await build();
-            log.push(docStatusText(d, r, openNew ? undefined : asmStatusRef.current(d)));
+            log.push(docStatusText(d, r, openNew ? undefined : await asmStatusRef.current(d)));
             break;
           }
         }
@@ -1029,8 +1043,14 @@ export function CadApp() {
       return null;
     });
     if (changed) {
-      if (openNew) openDocInTab(d);
-      else commit(d);
+      // další volání API hned za sebou (window.mncad.run / reference) musí vidět tento dokument – počkat na propsání stavu
+      if (openNew) {
+        const id = openDocInTab(d);
+        await settleUi(() => tabIdRef.current === id && histRef.current.present.name === d.name);
+      } else {
+        commit(d);
+        await settleUi(() => histRef.current.present === d);
+      }
       setStartOpen(false);
       track("cad_agent_run");
     }
@@ -1049,13 +1069,13 @@ export function CadApp() {
       const total = Date.now() - tBuild;
       if (total >= 2000) tail.push(tr("Výpočet modelu: {0} s", fmtNum(total / 1000, 1)));
     } else if (added.length) tail.push(tr("✗ stavba selhala – prvky {0} nebyly ověřeny", added.map((f) => f.name).join(", ")));
-    tail.push("", docStatusText(d, res, openNew ? undefined : asmStatusRef.current(d)));
+    tail.push("", docStatusText(d, res, openNew ? undefined : await asmStatusRef.current(d)));
     return [...ordered(), ...tail].join("\n");
     } catch (e) {
       if (!isCancelled(e)) throw e;
       // zrušeno tlačítkem Zrušit: nic se nezapsalo; jádro se znovu připraví nad dosavadním dokumentem
       restoreKernelRef.current();
-      return [...ordered(), tr("✗ Výpočet zrušen – dokument zůstal beze změny."), "", docStatusText(histRef.current.present, null, asmStatusRef.current())].join("\n");
+      return [...ordered(), tr("✗ Výpočet zrušen – dokument zůstal beze změny."), "", docStatusText(histRef.current.present, null, await asmStatusRef.current(undefined, true))].join("\n");
     }
   };
   /** po zrušeném výpočtu mimo běžnou stavbu (konzole, export, výkres) znovu postaví otevřený dokument, aby jádro mělo těleso */
@@ -1063,7 +1083,7 @@ export function CadApp() {
   const cancelRef = useRef<() => void>(() => undefined);
   const runAgentRef = useRef(runAgentText);
   runAgentRef.current = runAgentText;
-  const agentStatus = async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current());
+  const agentStatus = async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), await asmStatusRef.current());
   // automatizační API pro agenty (agent-api-host.ts): přístup ke stavu aplikace – obnovuje se při každém vykreslení
   const apiHostRef = useRef<ApiHost | null>(null);
   apiHostRef.current = {
@@ -1230,7 +1250,7 @@ export function CadApp() {
       undo: (n) => runAgentRef.current(`zpět ${Math.max(1, Math.floor(Number(n) || 1))}`),
       redo: (n) => runAgentRef.current(`znovu ${Math.max(1, Math.floor(Number(n) || 1))}`),
       history: () => ({ undo: histRef.current.past.length, redo: histRef.current.future.length }),
-      status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), asmStatusRef.current()),
+      status: async () => docStatusText(histRef.current.present, await cad.build(histRef.current.present).catch(() => null), await asmStatusRef.current()),
       drawingStatus: async (o) => (await (await import("@/cad/drawing-agent")).drawingStatus(histRef.current.present, (doc, meta, op) => cad.drawing(doc, meta, op), { sheet: o?.sheet, extras: drawEnvRef.current })).text,
       exportDrawing: async (format, o) => (await import("@/cad/drawing-export")).exportDrawing(histRef.current.present, format, o ?? {}, (doc, meta, op) => cad.drawing(doc, meta, op), drawEnvRef.current),
       measure: (a, b) => measureApi(histRef.current.present, a, b),
@@ -1529,7 +1549,8 @@ export function CadApp() {
   }, [asmVer, leaves]);
 
   // pohybová studie: zobrazená poloha kroku (bez zápisu do dokumentu)
-  const motionLeaves = useMemo(() => (isAsm && motionShow.pose ? flattenLeaves({ ...doc, components: (doc.components ?? []).map((c) => (motionShow.pose![c.id] ? { ...c, placement: motionShow.pose![c.id] } : c)) }) : null), [isAsm, doc, motionShow.pose]);
+  // krok pohybové studie: polohy a délky pružin (síť volné pružiny protažená po ose – bez stavby v jádře v každém kroku)
+  const motionLeaves = useMemo(() => (isAsm && motionShow.pose ? flattenLeaves(poseDoc(doc, motionShow.pose, motionShow.springs), { springMesh: true }) : null), [isAsm, doc, motionShow.pose, motionShow.springs]);
   const asmViews = useMemo<AsmView[]>(() => {
     if (!isAsm) return [];
     const comps = (motionLeaves ?? leaves).filter((l) => !l.hidden);
@@ -1631,7 +1652,7 @@ export function CadApp() {
     { id: "hide", label: c.hidden ? tr("Zobrazit") : tr("Skrýt"), icon: "eye", onClick: () => setComp(c.id, { hidden: !c.hidden }) },
     { id: "iso", label: tr("Izolovat (skrýt ostatní)"), icon: "eye", onClick: () => commit({ ...doc, components: (doc.components ?? []).map((x) => ({ ...x, hidden: x.id !== c.id })) }) },
     { id: "all", label: tr("Zobrazit vše"), icon: "eye", onClick: () => commit({ ...doc, components: (doc.components ?? []).map((x) => ({ ...x, hidden: false })) }) },
-    { id: "dup", label: tr("Duplikovat (+ posun X)"), icon: "copy", onClick: () => insertComponent({ ...structuredClone(c), id: uid(), placement: { ...c.placement, position: [c.placement.position[0] + 50, c.placement.position[1], c.placement.position[2]] } }) },
+    { id: "dup", label: tr("Duplikovat (+ posun X)"), icon: "copy", onClick: () => insertComponent(componentCopy(structuredClone(c), { placement: { ...c.placement, position: [c.placement.position[0] + 50, c.placement.position[1], c.placement.position[2]] } })) },
     { id: "fix", label: c.fixed ? tr("Uvolnit") : tr("Ukotvit"), icon: "lock", onClick: () => (c.fixed ? commit(releaseComponent(doc, c.id)) : setComp(c.id, { fixed: true })) },
     { divider: true },
     { id: "mate", label: tr("Vazba Kontakt…"), icon: "datum", tone: "ref", onClick: () => startMate(c.id, "mate") },
@@ -1639,7 +1660,7 @@ export function CadApp() {
       ? { id: "export", label: tr("Uložit podsestavu (.mncad)"), icon: "save", onClick: () => c.source.kind === "asm" && download(`${safeName(c.name)}.mncad`, JSON.stringify({ ...c.source.doc, name: c.name, kind: "assembly" }, null, 1), "application/json") }
       : { id: "export", label: tr("Uložit díl (.mncad)"), icon: "save", disabled: c.source.kind !== "part", onClick: () => c.source.kind === "part" && download(`${safeName(c.name)}.mncad`, JSON.stringify(c.source.doc, null, 1), "application/json") },
     { divider: true },
-    { id: "del", label: tr("Odebrat ze sestavy"), icon: "trash", tone: "cut", kbd: "Del", onClick: () => { commit({ ...doc, components: (doc.components ?? []).filter((x) => x.id !== c.id) }); setAsmSel(null); } },
+    { id: "del", label: tr("Odebrat ze sestavy"), icon: "trash", tone: "cut", kbd: "Del", onClick: () => { commit(removeComponents(doc, [c.id]).doc); setAsmSel(null); } },
   ];
   const startMate = (compId: string, mode: PendingMate["mode"]) => {
     const c = doc.components?.find((x) => x.id === compId);
@@ -1665,9 +1686,11 @@ export function CadApp() {
   };
   /** doplní chybějící geometrii ploch, hran, vrcholů a sítí vaček (a indexy válcových ploch u normálií) – async přes worker */
   const ensureMateGeo = (d: CadDoc): Promise<Mate[]> =>
-    ensureMateRefs(d.mates ?? [], (ref) => leafOf(ref, d)?.key ?? null, mateGeo.current, { face: (k, i) => cad.mateFace(k, i), ent: (k, i, e) => cad.mateEnt(k, i, e), cylFace: (k, r) => cad.cylFace(k, r) });
+    // i dosedací plochy pružin (pomocné „vazby“ se odříznou) – délka pružin po přepočtu (cad/asm-spring.ts)
+    ensureMateRefs([...(d.mates ?? []), ...springSeatMates(d)], (ref) => leafOf(ref, d)?.key ?? null, mateGeo.current, { face: (k, i) => cad.mateFace(k, i), ent: (k, i, e) => cad.mateEnt(k, i, e), cylFace: (k, r) => cad.cylFace(k, r) }).then((m) => m.slice(0, d.mates?.length ?? 0));
   const resolveMates = async (d: CadDoc, anchorId?: string | null) => {
-    if (d.kind !== "assembly" || !d.mates?.length) {
+    const springs = d.kind === "assembly" && springComps(d).length > 0; // pružiny: délka i bez vazeb a bez pohnutí řešičem
+    if (d.kind !== "assembly" || (!d.mates?.length && !springs)) {
       setMateStatus({});
       return;
     }
@@ -1676,12 +1699,16 @@ export function CadApp() {
     const r = solveMates(withMates, geoProvider(withMates), anchorId);
     if (r.mates) mates.splice(0, mates.length, ...r.mates); // pokročilé vazby: výchozí stav stupňů volnosti se uloží do dokumentu
     setMateStatus(r.status);
-    const matesChanged = JSON.stringify(mates) !== JSON.stringify(d.mates);
-    if (!r.moved.length && !matesChanged) return;
+    const matesChanged = JSON.stringify(mates) !== JSON.stringify(d.mates ?? []);
+    if (!r.moved.length && !matesChanged && !springs) return;
     // aplikovat na aktuální dokument (uživatel mohl mezitím pokračovat) – funkčně nad nejnovějším stavem: `docRef` se obnoví až při
     // vykreslení, takže hned po commit() mimo obsluhu události (výběr plochy přes worker) by vrátil dokument ještě bez nové vazby a ta by se ztratila
     const byId = new Map(r.components.map((c) => [c.id, c.placement]));
-    liveWith((cur) => (cur.kind !== "assembly" ? cur : { ...cur, mates: matesChanged ? mates : cur.mates, components: (cur.components ?? []).map((c) => (r.moved.includes(c.id) && byId.has(c.id) ? { ...c, placement: byId.get(c.id)! } : c)) }));
+    liveWith((cur) => {
+      if (cur.kind !== "assembly") return cur;
+      const next = r.moved.length || matesChanged ? { ...cur, mates: matesChanged ? mates : cur.mates, components: (cur.components ?? []).map((c) => (r.moved.includes(c.id) && byId.has(c.id) ? { ...c, placement: byId.get(c.id)! } : c)) } : cur;
+      return springs ? withSprings(next, geoProvider(withMates)) : next; // beze změny délek tentýž dokument
+    });
   };
   /** vazba: leafId = list (díl), face = index plochy v dílu */
   const onMateFace = async (leafId: string, face: number) => {
@@ -2120,7 +2147,7 @@ export function CadApp() {
       const pl = matrixToPlacement(mul4(delta, placementMatrix(c.placement)));
       const nextDoc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? { ...x, placement: pl } : x)) };
       commit(nextDoc);
-      if (doc.mates?.length) void resolveMates(nextDoc, c.id);
+      if (doc.mates?.length || springComps(doc).length) void resolveMates(nextDoc, c.id);
       return;
     }
     const f = doc.features.find((x) => x.id === gizmoOn.id);
@@ -2244,8 +2271,8 @@ export function CadApp() {
   };
   const compName = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
   /** stav sestavy pro textový stav (agenti): počty, obálka, objem, hmotnost, poslední kontrola kolizí */
-  const asmStatusRef = useRef<(dd?: CadDoc) => AsmStatus | undefined>(() => undefined);
-  asmStatusRef.current = (dd = doc) => {
+  const asmStatusRef = useRef<(dd?: CadDoc, quick?: boolean) => Promise<AsmStatus | undefined>>(async () => undefined);
+  asmStatusRef.current = async (dd = doc, quick = false) => {
     // `dd` = dokument rozpracovaný textovými příkazy (stav aplikace se propíše až po jejich dokončení)
     if (dd.kind !== "assembly") return undefined;
     const vis = (dd === doc ? leaves : flattenLeaves(dd)).filter((l) => !l.hidden);
@@ -2261,9 +2288,10 @@ export function CadApp() {
       volume += v;
       mass += asmPartInfo(l.comp).massKg ?? 0;
     }
-    // obálka z listových dílů (i uvnitř podsestav – řádky kusovníku podsestav nemají id komponent nejvyšší úrovně)
-    let bbox: [Vec3, Vec3] | undefined;
-    for (const l of vis) {
+    // obálka: přesně z těles listových dílů v jádře (B10 – natočené díly by rohy lokální obálky zvětšily); bez jádra z lokálních obálek
+    const env = quick ? null : await cad.asmEnvelope(dd).catch(() => null);
+    let bbox = env?.bbox ?? undefined;
+    if (!bbox) for (const l of vis) {
       const m = asmCache.current.get(l.key)?.metrics?.bbox;
       if (!m) continue;
       const pl = matrixToPlacement(l.matrix);
@@ -2280,6 +2308,7 @@ export function CadApp() {
       components: (dd.components ?? []).length,
       parts: vis.length,
       bbox,
+      ...(env?.approx ? { bboxApprox: env.approx } : {}),
       volume: known ? volume : undefined,
       massKg: known ? mass : undefined,
       clash: clashes ? { count: clashes.length, pairs: clashes.map((x) => `${compName(x.a)} × ${compName(x.b)} (${fmtNum(x.volume, 1)} mm³)`), at: clashInfo?.at ?? "" } : null,
@@ -2426,7 +2455,7 @@ export function CadApp() {
       if (asmSel) ids.add(asmSel);
       if (!ids.size) return flash(tr("Vyberte komponentu, kterou chcete odebrat (klik v 3D okně nebo ve stromu)."));
       if (!(await ask(tr("Odebrat {0} komponent ze sestavy?", ids.size)))) return;
-      commitWith((d) => ({ ...d, components: (d.components ?? []).filter((c) => !ids.has(c.id)) }));
+      commitWith((d) => removeComponents(d, ids).doc);
       setAsmSel(null);
       setSelection([]);
       return;
@@ -4133,7 +4162,7 @@ export function CadApp() {
                   onChange={(p) => {
                     const nextDoc = { ...doc, components: (doc.components ?? []).map((c) => (c.id === asmSel ? { ...c, ...p } : c)) };
                     commit(nextDoc);
-                    if (p.placement && doc.mates?.length) void resolveMates(nextDoc, asmSel);
+                    if (p.placement && (doc.mates?.length || springComps(doc).length)) void resolveMates(nextDoc, asmSel);
                   }}
                   doc={doc}
                   onDoc={(d) => {
@@ -4154,13 +4183,14 @@ export function CadApp() {
                     flash(tr("Klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu)."));
                   }}
                   bolting={!!boltPick}
+                  onRun={(t) => void runAgentRef.current(t).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))}
                 />
               </div>
               <div className="flex gap-2 border-t border-[#d5dbe2] p-3">
                 <button type="button" disabled={doc.components.find((c) => c.id === asmSel)!.source.kind !== "part"} onClick={() => editPartInContext(doc.components!.find((c) => c.id === asmSel)!)} className="flex-1 rounded bg-[#2563eb] py-2 text-[12.5px] font-semibold text-white hover:bg-[#1d4ed8] disabled:opacity-40">
                   {tr("Upravit díl")}
                 </button>
-                <button type="button" className="rounded border border-[#cfd6de] px-2 text-brand hover:bg-brand/5" title={tr("Odebrat")} onClick={() => { commit({ ...doc, components: (doc.components ?? []).filter((x) => x.id !== asmSel) }); setAsmSel(null); }}>
+                <button type="button" className="rounded border border-[#cfd6de] px-2 text-brand hover:bg-brand/5" title={tr("Odebrat")} onClick={() => { commit(removeComponents(doc, [asmSel]).doc); setAsmSel(null); }}>
                   <CadIcon name="trash" className="h-4 w-4" />
                 </button>
               </div>

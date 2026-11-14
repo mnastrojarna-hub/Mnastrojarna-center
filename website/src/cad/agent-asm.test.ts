@@ -454,13 +454,13 @@ describe("provedení: podsestavy, úprava v kontextu, otevřít, kusovník, rám
     const { env } = mockEnv();
     const d = (await run(asm(), 'sestava pole "Čep" 2 rozteč 30', env)).doc;
     const b = await bomData(d, env, false);
+    // vlna 15 (B15): kopie z pole jsou tentýž díl → jeden řádek podle zdroje (dřív „Čep“ a „Čep (2)“ zvlášť)
     expect(b.rows.map((x) => [x.name, x.qty, x.material])).toEqual([
       ["Deska", 1, "Ocel"],
-      ["Čep", 1, "Ocel"],
-      ["Čep (2)", 1, "Ocel"],
+      ["Čep", 2, "Ocel"],
     ]);
     expect(b.rows[0].massKg).toBeCloseTo(0.3611, 4);
-    expect(b.text.split("\n")[0]).toBe("Kusovník „Sestava“ (plochý): položek 3, kusů 3, hmotnost Σ 0,408 kg");
+    expect(b.text.split("\n")[0]).toBe("Kusovník „Sestava“ (plochý): položek 2, kusů 3, hmotnost Σ 0,408 kg");
     expect(b.text.split("\n")[2]).toBe("1 | Deska |  | 1 | Ocel | 0,361");
     expect(b.csv).toBe(bomCsv(b.rows));
     expect(b.csv).toMatch(/^﻿Pozice;Název;Číslo výkresu \/ norma;Ks;Materiál/);
@@ -471,8 +471,7 @@ describe("provedení: podsestavy, úprava v kontextu, otevřít, kusovník, rám
     const s = await bomData(sub, env, true);
     expect(s.rows.map((x) => [x.name, x.qty, x.level ?? 0])).toEqual([
       ["Kolíky", 1, 0],
-      ["Čep", 1, 1],
-      ["Čep (2)", 1, 1],
+      ["Čep", 2, 1],
       ["Deska", 1, 0],
     ]);
     expect(s.text).toMatch(/\(strukturovaný\)/);

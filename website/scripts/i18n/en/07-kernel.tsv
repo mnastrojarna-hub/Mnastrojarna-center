@@ -48,7 +48,6 @@ Výpočet zrušen.	Computation cancelled.
 aktivní	active
 aktivní ({0})	active ({0})
 Aktivní těleso – pracují s ním nové prvky	Active body – new features work on it
-bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit	without z = starts on the body surface at that location (from the mesh) and drills down; “through” drills from the point in the drilling direction only, “both” in both directions; angled hole: “direction” = drilling direction, “tilt” = angle from the axis; several positions = several holes; thread also with fine pitch (M18×1.5) – as in the thread command
 Cílové těleso	Target body
 Cílové těleso (výsledek)	Target body (result)
 čára: neznámé slovo „{0}“ – body po dvojicích, „r N“ za bodem zaoblí roh, „uzavřít“ spojí konec se začátkem	polyline: unknown word “{0}” – points in pairs, “r N” after a point fillets that corner, “closed” joins the end with the start
@@ -107,7 +106,6 @@ těleso „{0}“ v dílu není – tělesa: {1}	body “{0}” is not in the pa
 těleso potřebuje název nebo číslo: těleso 2 (= „Těleso 2“) – další prvky pak pracují s ním	body needs a name or a number: body 2 (= “Těleso 2”) – following features then work on it
 Těleso, na kterém prvek pracuje	Body the feature works on
 tři body oblouku leží v přímce – použijte úsečku	the three arc points lie on a straight line – use a line
-více děr jedním příkazem potřebuje u každé polohy tři souřadnice: díra 8 skrz v x1 y1 z1 v x2 y2 z2	several holes in one command need three coordinates for each position: hole 8 through at x1 y1 z1 at x2 y2 z2
 více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným	several bodies in a part: “body 2” switches following features to Těleso 2; splitbodies = two bodies by a plane; copybody = another body; combine = unite / subtract / intersect two bodies. On features: “… newbody [body Name]” starts a new body, “… body 2” works on the chosen one
 vložit potřebuje název otevřené záložky s dílem: vložit "Hřídel" v 0 0 10 [otočení 0 90 0] [ukotvit]	insert needs the name of an open tab with a part: insert "Shaft" at 0 0 10 [rotation 0 90 0] [fixed]
 vložit: otevřený dokument není sestava – nejdřív „nová sestava“	insert: the open document is not an assembly – first “new assembly”

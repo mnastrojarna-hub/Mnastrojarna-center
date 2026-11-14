@@ -648,6 +648,8 @@ for (const k of ["rho", "setbacks"]) OPTIONAL_KEYS.add(k);
 OPTIONAL_KEYS.add("tapDrill");
 // vlna 12 (agent-extr.ts): břit a rohy úkosu vysunutí, výška kolmo na skicu u šikmého směru
 for (const k of ["draftLand", "draftCorners", "normalHeight"]) OPTIONAL_KEYS.add(k);
+// díra 15. vlny (agent-hole.ts): zahloubení závitové díry – upravit "Díra 1" head=counterbore cbDiameter=20 cbDepth=7
+OPTIONAL_KEYS.add("head");
 const SKETCH_KEYS = new Set(["sketchId", "profileId", "pathId", "guideId", "partingSketchId", "centerlineId"]);
 const SKETCH_LISTS = new Set(["sketchIds", "profileIds", "guideIds"]);
 const MODE_WORDS: [string, Set<string>][] = [

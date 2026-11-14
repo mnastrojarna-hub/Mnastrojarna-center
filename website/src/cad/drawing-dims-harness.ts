@@ -4,6 +4,7 @@
  */
 import { parseAgentText, selectEdges, selectFaces, topAt, type EdgeLite, type FaceLite } from "./agent";
 import { applySketchOp } from "./agent-sketch";
+import { fillHoleTops } from "./agent-hole";
 import { buildDoc } from "./build";
 import { drawingDoc, threadsOfDoc } from "./drawing-doc";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
@@ -42,10 +43,9 @@ export async function runText(text: string): Promise<{ doc: CadDoc; log: string[
     else if (op.k === "feature") {
       const f = prepare(op.feature);
       if (op.fillTop && f.type === "hole") {
+        // jako konzole: povrch tělesa v místě díry, u více poloh jen polohy zadané dvěma čísly (agent-hole.ts)
         const r = await buildDoc(d);
-        const ai = f.axis === "X" ? 0 : f.axis === "Y" ? 1 : 2;
-        const [u, v] = f.axis === "X" ? [f.position[1], f.position[2]] : f.axis === "Y" ? [f.position[0], f.position[2]] : [f.position[0], f.position[1]];
-        f.position[ai] = topAt(r.mesh, f.axis, u, v) ?? r.metrics!.bbox[1][ai];
+        log.push(...fillHoleTops(f, op.fillPoints, (u, v) => topAt(r.mesh, f.axis, u, v), r.metrics!.bbox, op.line));
       }
       d.features.push(f);
     } else if (op.k === "select") {

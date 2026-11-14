@@ -1,0 +1,85 @@
+# Vlna 15 – balík výkresu (drawing): řez v konvenci skici (B5), hlášení výkresu (B6), kóty na tisíciny a hledání hodnotou (B7),
+# funkční rozměry (B8), souřadnicové kóty / tabulka děr (B12), kontrola tolerancí (5.3)
+ – rozměr {0} je nyní funkční (pomocnou kótou řetězu je {1})	 – size {0} is now functional (the chain's reference dimension is {1})
+ (pohled {0})	 (view {0})
+! funkční rozměr {0}: na listu není délková kóta s touto hodnotou (hodnoty kót: výkres stav)	! functional size {0}: there is no linear dimension with this value on the sheet (dimension values: drawing status)
+{0} ({1}): kóta bez tolerance {2} – výkres tolerance {3} …	{0} ({1}): dimension without tolerance {2} – drawing tolerance {3} …
+{0} ({1}): na listu jen pomocná kóta {2} – výkres tolerance {0} … ji převede na funkční	{0} ({1}): only the reference dimension {2} is on the sheet – drawing tolerance {0} … makes it functional
+{0} ({1}): na listu není kóta s touto hodnotou – doplňte ji (kótovat / výkres kóta …)	{0} ({1}): no dimension with this value on the sheet – add it (dimension / drawing dim …)
+{0} odsazení {1} (rovina {2} = {3})	{0} offset {1} (plane {2} = {3})
+⚠ kontrola tolerancí: bez tolerance {0} z {1} rozměrů (funkčních {2}, z předlohy {3})	⚠ tolerance check: {0} of {1} sizes without tolerance (functional {2}, from the reference {3})
+✓ kontrola tolerancí: list nemá funkční rozměry (kótovat … funkční …) ani tolerované kóty předlohy – není co kontrolovat	✓ tolerance check: the sheet has no functional sizes (dimension … functional …) and no toleranced reference dimensions – nothing to check
+✓ kontrola tolerancí: všech {0} rozměrů má toleranci (funkčních {1}, z předlohy {2})	✓ tolerance check: all {0} sizes have a tolerance (functional {1}, from the reference {2})
+Auto: od hran; od 12 poloh nebo když se nevejdou souřadnicové kóty od levého dolního rohu, pak tabulka děr.	Auto: from the edges; from 12 positions or when they do not fit, ordinate dimensions from the lower left corner, then a hole table.
+celková délka	overall length
+funkční	functional
+funkční {0}	functional {0}
+funkční rozměry (kótovat … funkční), které na listu nemají toleranci (⚠ s id kót a radou); tolerované kóty předlohy až po připojení předlohy (balík předlohy) – bez ní protokol řekne „předloha není připojena“	functional sizes (dimension … functional) without a tolerance on the sheet (⚠ with dimension ids and advice); toleranced dimensions of a reference drawing only once one is attached (reference package) – without it the protocol says “no reference drawing attached”
+funkční rozměry (mm modelu, oddělené mezerou nebo středníkem): nikdy nebudou pomocnou kótou v závorce – uzavřený řetěz rozbije jiný článek (jsou-li funkční všechny, celková délka; jsou-li funkční i ta, funkční rozměr bez tolerance); pamatují se u listu, „ne“ je zruší	functional sizes (model mm, separated by spaces or semicolons): never become a reference dimension in parentheses – another link breaks the closed chain (if all are functional, the overall length; if that is functional too, a functional size without a tolerance); stored with the sheet, “no” clears them
+Funkční rozměry (nikdy v závorce)	Functional sizes (never in parentheses)
+Funkční rozměry: {0} · {1}	Functional sizes: {0} · {1}
+kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji id (výkres tolerance a3 …) nebo pohledem (… pohled horní)	dimension “{0}” is ambiguous ({1}×: {2}) – specify it by id (drawing tolerance a3 …) or by view (… view top)
+kóta „{0}“{1} na výkrese není – kóty: {2}	dimension “{0}”{1} is not on the drawing – dimensions: {2}
+kóta se najde číselnou hodnotou modelu (±0,000001; popisky mají až 3 desetinná místa), druhem (Ø40, M8) nebo id (a12 z výkres stav); pohled zúží výběr; desetinná tečka tolerance se na českém listu zapíše čárkou; tolerance na pomocné kótě „(50)“ udělá rozměr funkčním a pomocnou kótou se stane jiný článek (přeurčený řetěz: funkční rozměr bez tolerance; ruční náhradní kóta se odstraní)	the dimension is found by the model's numeric value (±0.000001; labels carry up to 3 decimals), by kind (Ø40, M8) or by id (a12 from drawing status); a view narrows the choice; a decimal point in the tolerance is written as the sheet language's separator; a tolerance on a reference dimension “(50)” makes the size functional and another link becomes the reference (over-determined chain: a functional size without a tolerance; a manual substitute dimension is removed)
+kótovat [chytře|celkově|základní|nic] [řetězově|od základny] [funkční 26,5 74,175] [díry tabulka|souřadnicově|řetězově] – neznámé slovo „{0}“	dimension [smart|overall|basic|none] [chain|baseline] [functional 26.5 74.175] [holes table|ordinate|chain] – unknown word “{0}”
+kótovat díry tabulka|souřadnicově|řetězově|auto – polohy děr tabulkou děr, souřadnicovými kótami od základny, nebo od hran	dimension holes table|ordinate|chain|auto – hole positions in a hole table, as ordinate dimensions from the datum, or from the edges
+kótovat funkční <rozměr> [<rozměr> …] – funkční rozměry nikdy nebudou pomocnou kótou v závorce, např. kótovat chytře funkční 26,5 74,175 (zrušit: kótovat funkční ne)	dimension functional <size> [<size> …] – functional sizes never become a reference dimension in parentheses, e.g. dimension smart functional 26.5 74.175 (clear: dimension functional no)
+kóty od hran	dimensions from the edges
+např. 26,5; 74,175	e.g. 26.5; 74.175
+od hran	from edges
+Odsazení podél normály roviny jako u skici: {0}	Offset along the plane normal as in a sketch: {0}
+odsazení roviny řezu se měří podél normály roviny jako u skici (skica XZ odsazení 57 = rovina Y = −57): XY → Z = N, XZ → Y = −N, YZ → X = N; rovina mimo těleso = ✗ s rozsahem odsazení, které těleso protne	the section plane offset is measured along the plane normal as in a sketch (sketch XZ offset 57 = plane Y = −57): XY → Z = N, XZ → Y = −N, YZ → X = N; a plane outside the body = ✗ with the offset range that cuts the body
+Polohy děr	Hole positions
+polohy děr {0}	hole positions {0}
+Polohy děr: {0}	Hole positions: {0}
+polohy děr: tabulka děr (X, Y od levého dolního rohu obrysu; v pohledu s dírami – i levém, pravém, zadním; jedna na list), souřadnicové kóty od základny (0 v rohu, hodnoty v jedné řadě, více druhů děr = značky A, B … u děr i v popisu), nebo od hran; auto = od hran, od 12 poloh nebo když se nevejdou souřadnicově, pak tabulka; souřadnicově / řetězově tabulku děr listu vypne, tabulka ji zapne	hole positions: hole table (X, Y from the lower left corner of the outline; in the view with the holes – also left, right, back; one per sheet), ordinate dimensions from the datum (0 in the corner, values in one row, several hole kinds = tags A, B … at the holes and in the callout), or from the edges; auto = from the edges, from 12 positions or when they do not fit as ordinates, then a table; ordinate / chain turn the sheet's hole table off, table turns it on
+předloha {0}	reference {0}
+řez {0}	section {0}
+souřadnicově	ordinate
+souřadnicové kóty od levého dolního rohu	ordinate dimensions from the lower left corner
+souřadnicové kóty poloh děr se nevešly čistě na list ({0}) – zkuste kótovat díry tabulka nebo větší list	ordinate dimensions of the hole positions did not fit cleanly on the sheet ({0}) – try dimension holes table or a larger sheet
+Starší řez – odsazení je souřadnice na ose: {0}	Older section – the offset is the axis coordinate: {0}
+tabulkou děr	hole table
+tolerance ke kótě podle číselné hodnoty modelu nebo id (Ø40 h6, 74,175 -0,005, M8 6H, a12 ±0,1); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka	tolerance on a dimension by the model's numeric value or id (Ø40 h6, 74.175 -0.005, M8 6H, a12 ±0.1); note, general tolerances, edges and general roughness at the title block
+uzavřený řetěz: všechny články i celková délka jsou funkční – pomocnou kótou zůstává nejdelší článek; zrušte funkčnost jednoho z nich (kótovat … funkční …)	closed chain: all links and the overall length are functional – the longest link stays the reference dimension; remove one of them from the functional sizes (dimension … functional …)
+výkres tolerance <kóta> <tolerance> [pohled <p>] – kóta hodnotou (74,175), druhem (Ø40, M8) nebo id (a12), např. výkres tolerance Ø40 h6 · výkres tolerance 25 ±0,1 pohled horní · výkres tolerance a12 -0,005	drawing tolerance <dimension> <tolerance> [view <v>] – dimension by value (74.175), kind (Ø40, M8) or id (a12), e.g. drawing tolerance Ø40 h6 · drawing tolerance 25 ±0.1 view top · drawing tolerance a12 -0.005
+# vlna 15 – 2. kontrola (přeurčený řetěz, tabulka děr v každém pohledu, kontrola kót desek, starší řez)
+ – rozměr {0} je nyní funkční; řetěz by byl přeurčený, pomocnou kótou je proto funkční rozměr bez tolerance {1}	 – size {0} is now functional; the chain would be over-determined, so the reference dimension is the functional size without a tolerance {1}
+ – starší řez uložený souřadnicí {0} = {1}; týž řez příkazem: výkres řez {2} odsazení {3}	 – older section stored as coordinate {0} = {1}; the same section by command: drawing section {2} offset {3}
+ · odstraněna ruční náhradní kóta {0}	 · removed manual substitute dimension {0}
+ · tabulka děr vypnuta – polohy děr jsou kótami (zpět: kótovat díry tabulka)	 · hole table turned off – hole positions are dimensions (back: dimension holes table)
+! pomocná kóta {0} nese toleranci – řetěz je přeurčený (všechny jeho rozměry jsou funkční a tolerované); zrušte funkčnost jednoho rozměru (kótovat … funkční …)	! reference dimension {0} carries a tolerance – the chain is over-determined (all its sizes are functional and toleranced); remove one size from the functional sizes (dimension … functional …)
+! řetěz byl přeurčený (funkční byly všechny jeho rozměry) – pomocnou kótou je funkční rozměr bez tolerance {0}, tolerovaný {1} zůstává funkční	! the chain was over-determined (all its sizes were functional) – the reference dimension is the functional size without a tolerance {0}, the toleranced {1} stays functional
+{0} (hloubka odebrání v tělese)	{0} (cut depth inside the body)
+{0} (v tělese)	{0} (inside the body)
+{0}: chybí pohled ve směru vysunutí – zapněte pohled {1}	{0}: no view along the extrusion direction – turn on the {1} view
+{0}: natočený kvádr kótujte ručně	{0}: dimension the rotated box manually
+{0}: obecný obrys skici (lomená čára, oblouky, elipsa) kótujte ručně – výkres kóta …	{0}: dimension the general sketch outline (polyline, arcs, ellipse) manually – drawing dimension …
+{0}: rotační prvek hranolového dílu kótujte ručně (průměry a délky – nejlépe v řezu osou prvku)	{0}: dimension the revolved feature of the prismatic part manually (diameters and lengths – best in a section through the feature axis)
+{0}: rozměr {1} ({2}) není v žádném pohledu vidět viditelnými hranami – kótujte ručně	{0}: size {1} ({2}) is not shown by visible edges in any view – dimension it manually
+{0}: skica ve šikmé rovině – kótujte obrys v pomocném pohledu kolmém na rovinu skici (výkres pohled pomocný směr {1}) ručně	{0}: sketch in an inclined plane – dimension the outline manually in an auxiliary view normal to the sketch plane (drawing view auxiliary direction {1})
+{0}: šikmá díra – osa není ve směru žádného pohledu; kótujte ji v pomocném pohledu kolmém na osu (výkres pohled pomocný směr {1}) ručně	{0}: inclined hole – its axis is not along any view; dimension it manually in an auxiliary view normal to the axis (drawing view auxiliary direction {1})
+⚠ kontrola tolerancí: bez tolerance {0} z {1} funkčních rozměrů (předloha není připojena – kóty předlohy se nekontrolují)	⚠ tolerance check: {0} of {1} functional sizes without a tolerance (no reference drawing attached – reference dimensions are not checked)
+✓ kontrola tolerancí: všech {0} funkčních rozměrů má toleranci (předloha není připojena – kóty předlohy se nekontrolují)	✓ tolerance check: all {0} functional sizes have a tolerance (no reference drawing attached – reference dimensions are not checked)
+polohy děr ({0}): tabulka děr na listu je nemá – kótovat díry souřadnicově	hole positions ({0}): the hole table on the sheet does not list them – dimension holes ordinate
+rovina řezu {0} = {1} leží mimo těleso ({0} {2}…{3}) – odsazení {4} se měří podél normály roviny {5} jako u skici; řez protne těleso pro odsazení větší než {6} a menší než {7} (krajní hodnoty leží na ploše tělesa), např. {8}	section plane {0} = {1} lies outside the body ({0} {2}…{3}) – offset {4} is measured along the normal of plane {5} as in a sketch; the section cuts the body for offsets greater than {6} and less than {7} (the limits lie on a face of the body), e.g. {8}
+rovina řezu {0} = {1} leží mimo těleso ({0} {2}…{3}) – u tohoto (staršího) řezu je odsazení souřadnicí {0}; řez protne těleso pro odsazení větší než {2} a menší než {3} (krajní hodnoty leží na ploše tělesa), např. {4}	section plane {0} = {1} lies outside the body ({0} {2}…{3}) – in this (older) section the offset is the {0} coordinate; the section cuts the body for offsets greater than {2} and less than {3} (the limits lie on a face of the body), e.g. {4}
+rozměr {0} nelze tolerovat: řetěz {1} by byl přeurčený – všechny jeho rozměry jsou funkční a ostatní mají toleranci, jeden musí zůstat pomocný (ISO 129-1); zrušte funkčnost jednoho z nich (kótovat … funkční …)	size {0} cannot be toleranced: chain {1} would be over-determined – all its sizes are functional and the others have a tolerance, one must stay a reference dimension (ISO 129-1); remove one of them from the functional sizes (dimension … functional …)
+Tabulka děr ({0} řádků) překrývá pohled {1} – zvolte větší list nebo menší měřítko.	The hole table ({0} rows) overlaps the view {1} – choose a larger sheet or a smaller scale.
+z horní strany	from the top side
+z levé strany	from the left side
+z pravé strany	from the right side
+z protější strany	from the opposite side
+z přední strany	from the front side
+ze spodní strany	from the bottom side
+ze zadní strany	from the back side
+# názvy pohledů v protokolu (tr(VIEW_CS[k]) – klíč není literál)
+#!dynamic
+přední	front
+zadní	back
+horní	top
+spodní	bottom
+levý	left
+pravý	right
+izometrie	isometric
+list	sheet

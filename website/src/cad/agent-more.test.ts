@@ -66,7 +66,9 @@ describe("díra: více poloh, směr, sklon; rotace odebrat", () => {
   it("více děr jedním příkazem", () => {
     const f = feat("díra 8 skrz v 10 0 5 v 20 0 5 v 30 0 5");
     expect(f.points).toEqual([{ kind: "xyz", p: [10, 0, 5] }, { kind: "xyz", p: [20, 0, 5] }, { kind: "xyz", p: [30, 0, 5] }]);
-    expect(err("díra 8 skrz v 10 0 5 v 20 0")).toMatch(/tři souřadnice/);
+    // 15. vlna (B3): každé „v“ je jedna poloha – 2 čísla = na povrchu tělesa, 3 = x y z; jiný počet = chyba s číslem polohy
+    expect(feat("díra 8 skrz v 10 0 5 v 20 0").points).toEqual([{ kind: "xyz", p: [10, 0, 5] }, { kind: "xyz", p: [20, 0, 0] }]);
+    expect(err("díra 8 skrz v 10 0 5 v 20")).toMatch(/poloha 2 „v 20“ – počet čísel 1/);
   });
   it("šikmá díra směrem a sklonem", () => {
     const d = feat("díra 6 hloubka 20 v 0 0 10 směr 1 0 -1");

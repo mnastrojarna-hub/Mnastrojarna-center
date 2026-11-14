@@ -156,9 +156,11 @@ const drawCache = new WeakMap<DraftEntity[], DraftEntity[]>();
 export function blockDrawList(b: DraftBlock): DraftEntity[] {
   let out = drawCache.get(b.entities);
   if (!out) {
-    if (!b.entities.some((e) => e.type === "attdef")) out = b.entities;
+    // neviditelné entity (DXF 60 – pomocné texty a body rámů AutoCAD Mechanical) se nekreslí ani nepočítají do rozsahu
+    if (!b.entities.some((e) => e.type === "attdef" || e.ext?.invisible)) out = b.entities;
     else
       out = b.entities.flatMap((e): DraftEntity[] => {
+        if (e.ext?.invisible) return [];
         if (e.type !== "attdef") return [e];
         const d = e as DAttDef;
         if (!d.constant || d.invisible) return [];

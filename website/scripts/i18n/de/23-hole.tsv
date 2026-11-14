@@ -1,0 +1,39 @@
+# 15. vlna – balík hole: polohy děr po skupinách (B3), zahloubení + závit (B4), tabulka děr bez vnějších válců (B9)
+ · polohy ({0}): {1}	 · Positionen ({0}): {1}
+{0} + závit {1} = závitová díra se zahloubením (zahloubení + vrták + závit)	{0} + Gewinde {1} = Gewindebohrung mit Senkung (Senkung + Bohrer + Gewinde)
+⚠ Zahloubení Ø{0} je menší než závit {1} (Ø{2}) – závit zasahuje do zahloubení.	⚠ Die Senkung Ø{0} ist kleiner als das Gewinde {1} (Ø{2}) – das Gewinde reicht in die Senkung.
+Bez	Ohne
+bez z = začíná na povrchu tělesa v daném místě (podle sítě) a vrtá dolů; „skrz“ vrtá od bodu jen ve směru vrtání, „obousměrně“ na obě strany; šikmá díra: „směr“ = směr vrtání, „sklon“ = odklon od osy; více poloh = více děr – každé „v“ je jedna poloha: 2 čísla = na povrchu tělesa (u osy X jsou to y z, u osy Y x z), 3 čísla = x y z, jiný počet = chyba řádku; závit i s jemným stoupáním (M18×1,5) – jako u příkazu závit	ohne z = beginnt an der Körperoberfläche an dieser Stelle (laut Netz) und bohrt nach unten; „durch“ bohrt vom Punkt nur in Bohrrichtung, „beidseits“ in beide Richtungen; schräge Bohrung: „richtung“ = Bohrrichtung, „neigung“ = Abweichung von der Achse; mehrere Positionen = mehrere Bohrungen – jedes „bei“ ist eine Position: 2 Zahlen = an der Körperoberfläche (bei Achse X sind es y z, bei Achse Y x z), 3 Zahlen = x y z, eine andere Anzahl = Zeilenfehler; Gewinde auch mit Feinsteigung (M18×1,5) – wie beim Befehl gewinde
+díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x y [z] …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2 | kuželové D2] [závit M8 [jádro | vrták [N]]]	bohrung D [tiefe H [flacher Grund | Spitze 118]|durch [beidseits]|bis körper] bei x y [z] [bei x y [z] …] [achse Z] [richtung vx vy vz | neigung winkel] [senkung D2 H2 | kegelsenkung D2] [gewinde M8 [Kern | Bohrer [N]]]
+díra: „zahloubení“ a „kuželové“ najednou nejde – zadejte jedno: zahloubení D2 H2 (válcové) nebo kuželové D2 [úhel]	Bohrung: „senkung“ und „kegelsenkung“ gehen nicht zusammen – nur eines angeben: senkung D2 H2 (zylindrisch) oder kegelsenkung D2 [Winkel]
+díra: {0}„v {1}“ – počet čísel {2}; každá poloha má dvě čísla (v x y = na povrchu tělesa) nebo tři (v x y z), více děr: díra 8 skrz v 10 20 v 30 20 v 50 20 5	Bohrung: {0}„bei {1}“ – Anzahl der Zahlen {2}; jede Position hat zwei Zahlen (bei x y = an der Körperoberfläche) oder drei (bei x y z), mehrere Bohrungen: bohrung 8 durch bei 10 20 bei 30 20 bei 50 20 5
+head „{0}“ – zadejte counterbore (válcové zahloubení), countersink (kuželové zahloubení) nebo none	head „{0}“ – counterbore (Zylindersenkung), countersink (Kegelsenkung) oder none angeben
+head (zahloubení závitové díry) platí jen pro závitovou díru: kind=tapped thread=M8 head=counterbore cbDiameter=20 cbDepth=7	head (Senkung einer Gewindebohrung) gilt nur für eine Gewindebohrung: kind=tapped thread=M8 head=counterbore cbDiameter=20 cbDepth=7
+head=counterbore potřebuje průměr a hloubku zahloubení: cbDiameter=20 cbDepth=7	head=counterbore braucht Durchmesser und Tiefe der Senkung: cbDiameter=20 cbDepth=7
+head=countersink potřebuje průměr kuželového zahloubení: csDiameter=10 [csAngle=90]	head=countersink braucht den Durchmesser der Kegelsenkung: csDiameter=10 [csAngle=90]
+kuželové zahloubení	Kegelsenkung
+poloha {0} 	Position {0} 
+v x1 y1 [z1] v x2 y2 [z2] (souřadnice; bez z = na povrchu tělesa)	bei x1 y1 [z1] bei x2 y2 [z2] (Koordinaten; ohne z = an der Körperoberfläche)
+Vrtá se zahloubení, pod ním vrták Ø{0} a závit {1} – výkres: {2}.	Gefertigt wird die Senkung, darunter Bohrer Ø{0} und Gewinde {1} – Zeichnung: {2}.
+zahloubení	Senkung
+zahloubení D2 H2 závit M8 | kuželové D2 závit M8	senkung D2 H2 gewinde M8 | kegelsenkung D2 gewinde M8
+Zahloubení Ø{0} je menší než závit {1} (Ø{2}) – závit zasahuje do zahloubení; zvětšete zahloubení nad Ø{2}.	Die Senkung Ø{0} ist kleiner als das Gewinde {1} (Ø{2}) – das Gewinde reicht in die Senkung; die Senkung über Ø{2} vergrößern.
+Zahloubení závitové díry	Senkung der Gewindebohrung
+zahloubení závitové díry (kind=tapped): counterbore = válcové cbDiameter × cbDepth, countersink = kuželové csDiameter / csAngle – zahloubení + vrták + závit	Senkung einer Gewindebohrung (kind=tapped): counterbore = zylindrisch cbDiameter × cbDepth, countersink = kegelig csDiameter / csAngle – Senkung + Bohrer + Gewinde
+závitová díra se zahloubením = zahloubení + vrták + závit (JSON kind tapped + head counterbore | countersink); výkres „M8 skrz“ + „Ø6,8 skrz“ + „⌴ Ø20 ↧7“, stav „M8 skrz (vrták Ø6,8) zahl. Ø20×7“; zahloubení menší než závit = ⚠ ve výsledku stavby; zahloubení i kuželové najednou = chyba; upravit kind=tapped thread=M8 u zahloubené díry zahloubení ponechá (bez něj head=none); starší díra bez head s uloženým zahloubením = ⚠ a poznámka ve stavu	Gewindebohrung mit Senkung = Senkung + Bohrer + Gewinde (JSON kind tapped + head counterbore | countersink); Zeichnung „M8 durch“ + „Ø6,8 durch“ + „⌴ Ø20 ↧7“, Status „M8 durch (Bohrer Ø6,8) Senk. Ø20×7“; Senkung kleiner als das Gewinde = ⚠ im Bauergebnis; senkung und kegelsenkung zusammen = Fehler; bearbeiten kind=tapped thread=M8 an einer gesenkten Bohrung behält die Senkung (ohne sie: head=none); ältere Bohrung ohne head mit gespeicherter Senkung = ⚠ und Hinweis im Status
+Tabulka děr: žádné díry (vnější válce – hřídel, osazení – se nevypisují)	Bohrungstabelle: keine Bohrungen (Außenzylinder – Welle, Absätze – werden nicht aufgeführt)
+# oprava po revizi: senkung = válcové zahloubení, upravit kind=tapped ponechá zahloubení, starší díra bez head, směr vrtání, tabulka děr jednou řádkou
+ – bez zahloubení: head=none	 – ohne Senkung: head=none
+ · díry s jinou osou nejsou v tabulce ({0}): {1}	 · Bohrungen mit anderer Achse stehen nicht in der Tabelle ({0}): {1}
+ (uložené kuž. Ø{0} se nevrtá – chybí head)	 (gespeicherte Kegelsenk. Ø{0} wird nicht gebohrt – head fehlt)
+ (uložené zahl. Ø{0}×{1} se nevrtá – chybí head)	 (gespeicherte Senkung Ø{0}×{1} wird nicht gebohrt – head fehlt)
+, délka závitu {0}	, Gewindelänge {0}
+, směr vrtání {0}	, Bohrrichtung {0}
+, směr vrtání {0}{1}	, Bohrrichtung {0}{1}
+, vrtá {0}	, bohrt {0}
+kuželové Ø{0}	Kegelsenkung Ø{0}
+Ø{0} osa {1}	Ø{0} Achse {1}
+Tabulka děr (pohled {0}, {1}): {2}	Bohrungstabelle (Ansicht {0}, {1}): {2}
+Tabulka děr: v pohledu {0} žádná díra s osou ve směru pohledu; díry s jinou osou ({1}): {2} – přidejte pohled ve směru jejich osy	Bohrungstabelle: in Ansicht {0} keine Bohrung mit Achse in Blickrichtung; Bohrungen mit anderer Achse ({1}): {2} – eine Ansicht in Richtung ihrer Achse hinzufügen
+Uložené zahloubení {0} se nevrtá – závitová díra nemá head (starší zápis). Zahloubit: upravit "{1}" head={2}; smazat: upravit "{1}" head=none	Die gespeicherte Senkung {0} wird nicht gebohrt – die Gewindebohrung hat kein head (ältere Schreibweise). Senken: bearbeiten "{1}" head={2}; entfernen: bearbeiten "{1}" head=none
+závit {0} + head=none = závitová díra bez zahloubení	Gewinde {0} + head=none = Gewindebohrung ohne Senkung

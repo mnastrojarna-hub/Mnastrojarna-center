@@ -1,0 +1,72 @@
+# vlna 15 – balík asm: přesná obálka sestavy, natočení v pohybové studii, kusovník podle zdroje, přezdívka instance, pružiny v sestavě
+ · přezdívka „{0}“	 · Alias „{0}“
+„{0}“ je název jiné komponenty – přezdívka musí být jednoznačná	„{0}“ ist der Name einer anderen Komponente – der Alias muss eindeutig sein
+✓ pružina odebrána: {0} (komponenta zůstává v sestavě, tvar ve volné délce)	✓ Feder entfernt: {0} (die Komponente bleibt in der Baugruppe, Form in freier Länge)
+bez přezdívky	ohne Alias
+délka na doraz	Blocklänge
+Délka na doraz Ln (0 = z modelu)	Blocklänge Ln (0 = aus dem Modell)
+Dosedá na (A)	Liegt auf (A)
+dosedací plocha A: 	Auflagefläche A: 
+dosedací plocha B: 	Auflagefläche B: 
+dosedací plochy jsou v obráceném pořadí nebo splývají (vzdálenost {0} mm) – prohoďte A a B	die Auflageflächen sind vertauscht oder fallen zusammen (Abstand {0} mm) – A und B tauschen
+Dosedací plochy: nejbližší rovinná plocha komponenty kolmá na osu pružiny. Délka se přepočítá při každém přepočtu vazeb i v pohybové studii.	Auflageflächen: die nächste ebene Fläche der Komponente senkrecht zur Federachse. Die Länge wird bei jeder Neuberechnung der Verknüpfungen und in der Bewegungsstudie neu berechnet.
+chybí název komponenty: {0}	Komponentenname fehlt: {0}
+komponenta „{0}“ není pružina – díl potřebuje prvek Pružina (normálie pružina d2 D20 L44 n8 · pružina D stoupání P závity N drát d) nebo trubku / válec po ose	Komponente „{0}“ ist keine Feder – das Teil braucht ein Feder-Feature (normteil feder d2 D20 L44 n8 · feder D steigung P windungen N draht d) oder ein Rohr / einen Zylinder entlang der Achse
+např. K48	z. B. K48
+Nastavit pružinu	Feder festlegen
+nedosedá – vzdálenost ploch {0} mm je větší než volná délka L0 {1} mm (mezera {2} mm)	liegt nicht an – Flächenabstand {0} mm ist größer als die freie Länge L0 {1} mm (Spalt {2} mm)
+nedosedá v krocích {0} (mezera max {1} mm)	liegt nicht an in Schritten {0} (Spalt bis {1} mm)
+otevřený dokument „{0}“ není sestava – nejdřív „nová sestava“ nebo „záložka "…"“	das geöffnete Dokument „{0}“ ist keine Baugruppe – zuerst „neu baugruppe“ oder „registerkarte "…"“
+plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít, pružina, pružiny	flächen, verknüpfung, verknüpfungen, komponente, entfernen, duplizieren, isolieren, ausblenden, einblenden, fixieren, lösen, muster, spiegeln, schraube, unterbaugruppe, auflösen, bearbeiten, fertig, öffnen, feder, federn
+pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)	unter der Blocklänge in Schritten {0} (Flächenabstand bis {1} mm)
+pružina „{0}“	Feder „{0}“
+pružina „{0}“: délku nešlo určit – dosedací plocha je rovnoběžná s osou pružiny nebo se díl nepostavil	Feder „{0}“: Länge nicht bestimmbar – eine Auflagefläche ist parallel zur Federachse oder das Teil wurde nicht gebaut
+pružina „{0}“: chybí dosedací komponenty – {1}	Feder „{0}“: Auflage-Komponenten fehlen – {1}
+pružina „{0}“: komponenta „{1}“ nemá rovinnou plochu kolmou na osu pružiny obrácenou k ní – zadejte plochu F-číslem (sestava plochy "{1}" rovinné)	Feder „{0}“: Komponente „{1}“ hat keine ebene Fläche senkrecht zur Federachse, die ihr zugewandt ist – Fläche per F-Nummer angeben (baugruppe flächen "{1}" eben)
+pružina mezi dvěma komponentami: díl s prvkem Pružina (normálie pružina …, pružina D stoupání …) nebo trubkou; délka = vzdálenost dosedacích ploch A a B po ose pružiny (bez plochy nejbližší kolmá rovinná plocha obrácená k pružině), mění se při přepočtu vazeb i v pohybové studii; síla F = c·(L0 − L), ✗ pod délkou na doraz Ln (výchozí (závity + 1)·drát), ⚠ nedosedá nad L0; plocha, kterou pružina prochází otvorem, se přeskočí; blok 0 / tuhost 0 = zrušit; export STEP s tvarem v aktuální délce; stejný název = všechny instance	Feder zwischen zwei Komponenten: Teil mit Feder-Feature (normteil feder …, feder D steigung …) oder Rohr; Länge = Abstand der Auflageflächen A und B entlang der Federachse (ohne Fläche die nächste senkrechte ebene Fläche, die der Feder zugewandt ist), ändert sich bei Neuberechnung der Verknüpfungen und in der Bewegungsstudie; Kraft F = c·(L0 − L), ✗ unter der Blocklänge Ln (Standard (Windungen + 1)·Draht), ⚠ liegt nicht an über L0; eine Fläche, deren Öffnung die Feder durchläuft, wird übersprungen; block 0 / steifigkeit 0 = löschen; STEP-Export mit der Form in aktueller Länge; gleicher Name = alle Instanzen
+Pružina mezi komponentami	Feder zwischen Komponenten
+pružina: dosedací plocha nemůže být na samotné pružině „{0}“	Feder: eine Auflagefläche kann nicht auf der Feder „{0}“ selbst liegen
+pružina: dosedací plochy musí být na dvou různých komponentách (A ≠ B)	Feder: die Auflageflächen müssen auf zwei verschiedenen Komponenten liegen (A ≠ B)
+pružina: chybí komponenta A za „mezi“ – {0}	Feder: Komponente A fehlt nach „zwischen“ – {0}
+pružina: chybí komponenta B – {0}	Feder: Komponente B fehlt – {0}
+pružina: komponenta „{0}“ není díl (podsestava / import) – pružina potřebuje díl s prvkem Pružina	Feder: Komponente „{0}“ ist kein Teil (Unterbaugruppe / Import) – eine Feder braucht ein Teil mit Feder-Feature
+Pružiny ({0}):	Federn ({0}):
+Pružiny: {0}	Federn: {0}
+Pružiny: žádné – {0}	Federn: keine – {0}
+přezdívka	Alias
+přezdívka „{0}“	Alias „{0}“
+Přezdívka instance (vazby místo #k)	Instanz-Alias (Verknüpfungen statt #k)
+přezdívka nesmí být prázdná	der Alias darf nicht leer sein
+přezdívka nesmí začínat „#“ (to je pořadí komponenty) – např. jako "K48"	der Alias darf nicht mit „#“ beginnen (das ist die Position der Komponente) – z. B. als "K48"
+přezdívku „{0}“ už má komponenta „{1}“ – zvolte jinou	die Komponente „{1}“ hat bereits den Alias „{0}“ – anderen wählen
+sestava pružina "Pružina" mezi "Deska A" [F3] "Deska B" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina "Pružina" odebrat · sestava pružiny	baugruppe feder "Feder" zwischen "Platte A" [F3] "Platte B" [F7] [frei L0] [block Ln] [steifigkeit c] · baugruppe feder "Feder" entfernen · baugruppe federn
+sestava pružina: {0} musí být kladná	baugruppe feder: {0} muss positiv sein
+sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm	baugruppe feder: die Blocklänge {0} mm muss kleiner als die freie Länge {1} mm sein
+sestava pružina: neznámá volba „{0}“ – {1}	baugruppe feder: unbekannte Option „{0}“ – {1}
+sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže); „jako "K48"“ = přezdívka instance – odkaz ve vazbách místo #k, ve stromu v [ ], kusovník ji nepoužívá	Baugruppe: fügt ein Teil aus einer geöffneten Registerkarte als Komponente ein (Verknüpfungen per Text: baugruppe verknüpfung …, siehe unten); „als "K48"“ = Instanz-Alias – Verweis in Verknüpfungen statt #k, im Baum in [ ], die Stückliste verwendet ihn nicht
+síla {0} N (c {1} N/mm)	Kraft {0} N (c {1} N/mm)
+síla {0} N (max {1} N)	Kraft {0} N (max. {1} N)
+stlačena pod délku na doraz Ln {0} mm (vzdálenost ploch {1} mm, chybí {2} mm)	unter die Blocklänge Ln {0} mm zusammengedrückt (Flächenabstand {1} mm, es fehlen {2} mm)
+stlačení {0} mm	Federweg {0} mm
+Stlačuje (B)	Gedrückt von (B)
+tuhost	Steifigkeit
+Tuhost c (0 = neuvádět)	Steifigkeit c (0 = keine Angabe)
+Upravit pružinu	Feder ändern
+v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …, přezdívka "…"	bei x y z, drehung rx ry rz, versatz dx dy dz, verdrehen X 90, fixieren, lösen, ausblenden, einblenden, farbe #hex, name "…", nummer "…", gruppe "…", werkstoff …, als "…"
+vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název, pořadí #3 nebo přezdívka (vložit … jako "K48", sestava komponenta #3 přezdívka "K48"; EN alias, DE als); po přesunu se vazby přepočítají; kusovník sčítá komponenty podle zdroje (dílu) – přejmenování instance řádek nerozdělí	Komponenteneigenschaften wie im Panel (Lage, Drehung, fixiert, Sichtbarkeit, Beschreibung, Stücklisten-Werkstoff); Komponente = Name, Position #3 oder Alias (einfügen … als "K48", baugruppe komponente #3 als "K48"; EN alias); nach dem Verschieben werden Verknüpfungen neu berechnet; die Stückliste zählt Komponenten nach Quelle (Teil) – Umbenennen einer Instanz teilt die Zeile nicht
+vložit … jako: chybí přezdívka – např. vložit "Šroub" jako "K48"	einfügen … als: Alias fehlt – z. B. einfügen "Schraube" als "K48"
+vložit: {0}	einfügen: {0}
+volná délka	freie Länge
+ (u {0} velkých importů ze sítě)	 (aus dem Netz bei {0} großen Importen)
+# vlna 15 – oprava po revizi: řádky pružin podle instance, dosednutí přes otvor, zrušení hodnot, přezdívka
+  dosedací plochy pružiny „{0}“{1}: {2}	  Auflageflächen der Feder „{0}“{1}: {2}
+  pružiny bez dosedací komponenty (definice odebrána, tvar ve volné délce): {0}	  Federn ohne Auflagekomponente (Definition entfernt, Form in freier Länge): {0}
+ – definice se neuložila	 – die Definition wurde nicht gespeichert
+ (přeskočena {0} – pružina jí prochází otvorem)	 ({0} übersprungen – die Feder geht durch ihre Öffnung)
+„{0}“ je přezdívka #{1} i název {2} – zadejte pořadím: {3}	„{0}“ ist der Alias von #{1} und der Name von {2} – geben Sie die Nummer an: {3}
+„{0}“ je přezdívka komponenty #{1} {2} – název musí být jiný (nebo nejdřív změňte přezdívku)	„{0}“ ist der Alias der Komponente #{1} {2} – wählen Sie einen anderen Namen (oder ändern Sie zuerst den Alias)
+„{0}“{1} – délka zatím nespočtena (sestava pružina / přepočet vazeb)	„{0}“{1} – Länge noch nicht berechnet (baugruppe feder / Verknüpfungen neu berechnen)
+⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)	⚠ Feder „{0}“{1}: Länge nicht bestimmbar (Geometrie der Auflagefläche fehlt)
+pružina „{0}“: osa pružiny prochází komponentou „{1}“ otvorem – plocha {2} nemá pod pružinou materiál, pružina na ní nedosedá; zadejte komponentu, o kterou se pružina opírá (např. další desku), nebo plochu F-číslem	Feder „{0}“: die Federachse geht durch eine Öffnung der Komponente „{1}“ – Fläche {2} hat unter der Feder kein Material, die Feder liegt dort nicht an; geben Sie die Komponente an, an der die Feder anliegt (z. B. die nächste Platte), oder die Fläche mit F-Nummer
+Pružina {0}×{1}×{2} – n={3}	Feder {0}×{1}×{2} – n={3}
+sestava pružina: {0} nesmí být záporná (0 = zrušit zadanou hodnotu)	baugruppe feder: {0} darf nicht negativ sein (0 = Wert löschen)

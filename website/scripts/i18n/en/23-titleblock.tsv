@@ -1,0 +1,118 @@
+# w15 titleblock: razítko – šablony, logo, další pole, nepředepsané tolerance, připojené soubory (cad/title-block.ts, title-logo.ts, agent-title.ts, drawing-title-panel.tsx)
+ · ⚠ výkres nemá nepředepsané tolerance	 · ⚠ the drawing has no general tolerances
+ · logo „{0}“ {1}×{2} px{3}	 · logo “{0}” {1}×{2} px{3}
+ (listy: {0})	 (sheets: {0})
+ (v DXF/DWG jen rámeček)	 (only a frame in DXF/DWG)
+ (v patičce)	 (in the footer)
+— nezadané —	— not set —
+, geometrie {0}	, geometry {0}
+, obrys pro DXF/DWG {0} ploch	, DXF/DWG outline {0} fills
+{0} – neznámé „{1}“	{0} – unknown “{1}”
+{0} {1} řádky {2} mm	{0} {1} lines {2} mm
+{0} písmo {1} mm	{0} text {1} mm
+⚠ Bez nepředepsaných tolerancí – export výkresu to ohlásí.	⚠ No general tolerances – the drawing export will report it.
+Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná	General tolerances: not set – the part drawing export will report them; enter drawing general ISO 2768-mK or drawing general decimals
+⚠ pole „{0}“ má písmo jen {1} mm – zkraťte text nebo zvolte šablonu nástrojářská (výkres razítko šablona=nástrojářská)	⚠ field “{0}” has text of only {1} mm – shorten it or choose the toolmaker template (drawing titleblock template=toolmaker)
+✓ nepředepsané tolerance zrušeny – export výkresu dílu to ohlásí ⚠	✓ general tolerances removed – the part drawing export will report ⚠
+1. kvadrant, kružnice vpravo	first angle, circles on the right
+3. kvadrant, kružnice vlevo	third angle, circles on the left
+c – hrubá	c – coarse
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")	More title block fields: — (checked, approved, customer, project, stock, quantity, heat treatment, surface treatment, angle and chamfer tolerances: drawing titleblock field="…")
+Další pole razítka: {0}	More title block fields: {0}
+data URL	data URL
+Délky a úhly (ISO 2768-1)	Lengths and angles (ISO 2768-1)
+f – jemná	f – fine
+firma	company
+Firma	Company
+Firma (vlastník výkresu)	Company (drawing owner)
+Geometrie (ISO 2768-2)	Geometry (ISO 2768-2)
+hrubá	coarse
+ISO 2768 – třída přesnosti	ISO 2768 – tolerance class
+ISO 2768-{0}{1} (délky, úhly a sražení třída {0} – {2}{3})	ISO 2768-{0}{1} (lengths, angles and chamfers class {0} – {2}{3})
+ISO 7200 (výchozí)	ISO 7200 (default)
+jemná	fine
+kompaktní	compact
+kontroloval	checked by
+Kontroloval	Checked by
+logo	logo
+Logo	Logo
+Logo „{0}“ {1}×{2} px vloženo do razítka	Logo “{0}” {1}×{2} px placed in the title block
+logo „{0}“ {1}×{2} px{3}	logo “{0}” {1}×{2} px{3}
+logo „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“ nebo zadejte data URL (data:image/png;base64,…); připojené: {1}	logo “{0}”: the file is not attached – attach it in the console with “Attach file…” or give a data URL (data:image/png;base64,…); attached: {1}
+logo {0} jde převést jen v prohlížeči – bez něj použijte PNG nebo JPEG	a {0} logo can only be converted in the browser – without it use PNG or JPEG
+logo je příliš velké ({0} kB) – nejvýš {1} kB	the logo is too large ({0} kB) – at most {1} kB
+logo JPEG bez prohlížeče: v DXF / DWG jen rámeček (pro obrys použijte PNG)	JPEG logo without a browser: only a frame in DXF / DWG (use PNG for an outline)
+logo odstraněno	logo removed
+Logo se nepodařilo načíst: {0}	The logo could not be loaded: {0}
+logo zmenšeno na {0} × {1} px	logo reduced to {0} × {1} px
+logo: čekám data URL obrázku (data:image/png;base64,…) nebo název připojeného souboru	logo: expected an image data URL (data:image/png;base64,…) or the name of an attached file
+logo: JPEG bez hlavičky rozměru	logo: JPEG without a size header
+logo: neznámý formát obrázku – použijte PNG nebo JPEG	logo: unknown image format – use PNG or JPEG
+m – střední	m – medium
+Nahrát obrázek loga (PNG, JPEG, SVG) – zmenší se na nejvýš 600 × 300 px	Upload a logo image (PNG, JPEG, SVG) – reduced to at most 600 × 300 px
+Nahrát…	Upload…
+např. černit	e.g. black oxide
+např. DIN ISO 2768-mK	e.g. DIN ISO 2768-mK
+např. kalit 58–60 HRC	e.g. harden 58–60 HRC
+např. plech 40×160×185	e.g. plate 40×160×185
+nástrojářská (všechna pole)	toolmaker (all fields)
+nepodporovaný barevný typ PNG {0}	unsupported PNG colour type {0}
+nepředepsané desetinná: čekám tolerance, např. desetinná ±0,1 ±0,1 ±0,01 ±0,005 nebo X.=±0,1 X.XX=±0,01 – „{0}“	general decimals: expected tolerances, e.g. decimals ±0.1 ±0.1 ±0.01 ±0.005 or X.=±0.1 X.XX=±0.01 – “{0}”
+nepředepsané desetinná: nejvýš 3 desetinná místa (X.XXX)	general decimals: at most 3 decimal places (X.XXX)
+Nepředepsané tolerance – text	General tolerances – text
+Nepředepsané tolerance: {0}	General tolerances: {0}
+Nepředepsané tolerance: nezadané (sestava – nevyžadují se)	General tolerances: not set (assembly – not required)
+nezadané	not set
+Odebrat {0}	Remove {0}
+Odebrat logo	Remove logo
+PNG je poškozené (málo dat)	the PNG is damaged (too little data)
+PNG je příliš velké ({0} × {1} px)	the PNG is too large ({0} × {1} px)
+PNG nemá hlavičku IHDR	the PNG has no IHDR header
+počet kusů	quantity
+Pole, která šablona nemá, se vypíšou v patičce nad razítkem. Výchozí šablona nových listů je v Nastavení → Výkres.	Fields the template has no cell for are printed in the footer above the title block. The default template for new sheets is in Settings → Drawing.
+polotovar	stock
+Polotovar	Stock
+povrchová úprava	surface treatment
+Povrchová úprava	Surface treatment
+pro nové listy – každý list jde změnit zvlášť	for new sheets – each sheet can be changed separately
+projekt	project
+Projekt	Project
+{0} (z tabulky revizí)	{0} (from the revision table)
+logo „{0}“: název odpovídá více připojeným souborům ({1}) – zadejte celý název s příponou, např. logo="{2}"	logo “{0}”: the name matches several attached files ({1}) – enter the full name with the extension, e.g. logo="{2}"
+nepodporované prokládání PNG {0}	unsupported PNG interlace method {0}
+nepředepsané desetinná: u {0} chybí tolerance	general decimals: {0} has no tolerance
+revize v razítku „{0}“ není v tabulce revizí ({1}) – doplňte ji (výkres revize {0} "…") nebo pole vyprázdněte (výkres razítko revize="") a razítko vezme poslední revizi z tabulky	title block revision “{0}” is not in the revision table ({1}) – add it (drawing revision {0} "…") or clear the field (drawing titleblock revision="") and the title block takes the last revision from the table
+Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo="{1}"	Attached: {0} – use it in commands by name, e.g. drawing titleblock logo="{1}"
+Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu	Attaches a file (title block logo, reference …) – commands find it by name
+Připojit soubor…	Attach file…
+Razítko bez zkracování textu: {0}	Title block without truncated text: {0}
+Razítko bez zkracování textu: všechna pole v nominální velikosti	Title block without truncated text: all fields at nominal size
+schválil	approved by
+Schválil	Approved by
+Soubor „{0}“ se nepodařilo načíst.	The file “{0}” could not be loaded.
+soubor není PNG	the file is not a PNG
+střední	medium
+šablona	template
+šablona {0} ({1}×{2} mm)	template {0} ({1}×{2} mm)
+Šablona razítka	Title block template
+šablona razítka „{0}“ neexistuje – iso7200 (výchozí), kompaktní, nástrojářská	title block template “{0}” does not exist – iso7200 (default), compact, toolmaker
+šablona razítka (ISO 7200, kompaktní, nástrojářská se všemi poli), logo z připojeného souboru (konzole → Připojit soubor…) nebo data URL, další pole a nepředepsané tolerance ISO 2768 nebo tabulkou podle desetinných míst; dlouhé texty se zmenší / zalomí, nic se nezkracuje; export dílu bez nepředepsaných tolerancí = ⚠	title block template (ISO 7200, compact, toolmaker with all fields), logo from an attached file (console → Attach file…) or a data URL, more fields and general tolerances ISO 2768 or as a table by decimal places; long texts shrink / wrap, nothing is truncated; exporting a part without general tolerances = ⚠
+Šablona razítka nových listů	Title block template for new sheets
+Šablona razítka: {0} {1}×{2} mm · promítání ISO {3} – značka ISO 5456-2 ({4}){5}	Title block template: {0} {1}×{2} mm · projection ISO {3} – ISO 5456-2 symbol ({4}){5}
+Tabulka podle desetinných míst	Table by decimal places
+tabulka podle desetinných míst: {0}	table by decimal places: {0}
+tepelné zpracování	heat treatment
+Tepelné zpracování	Heat treatment
+text „{0}“	text “{0}”
+Tolerance pro {0}	Tolerance for {0}
+tolerance sražení	chamfer tolerance
+Tolerance sražení	Chamfer tolerance
+tolerance úhlů	angle tolerance
+Tolerance úhlů	Angle tolerance
+v – velmi hrubá	v – very coarse
+velmi hrubá	very coarse
+Vlastní text	Custom text
+Výkres nemá nepředepsané tolerance{0} – zadejte je: výkres nepředepsané ISO 2768-mK (třída f/m/c/v + H/K/L) nebo výkres nepředepsané desetinná (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)	The drawing has no general tolerances{0} – enter them: drawing general ISO 2768-mK (class f/m/c/v + H/K/L) or drawing general decimals (X. ±0.1 / X.X ±0.1 / X.XX ±0.01 / X.XXX ±0.005)
+výkres razítko název="…" číslo="…" kreslil="…" kontroloval="…" schválil="…" revize="…" datum="…" materiál="…" polotovar="…" počet="…" tepelné="…" povrch="…" nepředepsané="ISO 2768-mK|desetinná" úhly="…" sražení="…" hrany="…" zákazník="…" projekt="…" firma="…" logo="soubor.png" šablona=iso7200|kompaktní|nástrojářská poznámka="…"	drawing titleblock name="…" number="…" author="…" checked="…" approved="…" revision="…" date="…" material="…" stock="…" quantity="…" heat="…" surface="…" general="ISO 2768-mK|decimals" angles="…" chamfers="…" edges="…" customer="…" project="…" company="…" logo="file.png" template=iso7200|compact|toolmaker note="…"
+zákazník	customer
+Zákazník	Customer

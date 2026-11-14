@@ -61,11 +61,12 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `kóta <druh> <odkaz> [<odkaz>] <hodnota> [referenční]; …` | kóta ve skice (délka, vzdálenost, vodorovně, svisle, poloměr, průměr, úhel, délka oblouku) |
 | `vysunout H|výška H [směr x y z|směr +X|směr hrana E3|směr osa "Osa 1"|směr plocha F2|směr body V1 V2] [sklon a [k +X|k x y z]] [symetricky] [skrz|k tělesu|k dalšímu|k ploše F3 [odsazení N]|k rovině "Rovina 1"|k vrcholu V3] [odebrat|přidat|průnik|nové] [obráceně] [úkos a [dovnitř|ven] [břit N] [ostré rohy|zaoblené rohy]]` | vysune poslední skicu; šikmo (`sklon 25 k +X` = propad), úkos dovnitř / ven s břitem (střižnice) – viz „Šikmé vysunutí, úkos dovnitř / ven a břit“ |
 | `rotovat [úhel] [osa X|Y|Z] [odebrat|přidat|průnik|nové]` | orotuje poslední skicu (výchozí osa Y skici, 360°); `odebrat` = vysoustružit profil z tělesa |
-| `díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [osa Z] [zahloubení D2 H2] [kuželové D2] [závit M8 [hloubka-závitu T] [jádro | vrták [N]]]` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; `skrz` vrtá **od zadaného bodu jen ve směru vrtání** (materiál nad bodem zůstane), `obousměrně` na obě strany; `k tělesu` (EN `to body`, DE `bis Körper`) vrtá po první stěnu stávajícího tělesa – projde první stěnou ve směru vrtání a dál nepokračuje (např. jen horní stěnou dutého dílu), jako ukončení „K tělesu“ u vysunutí; `závit M6` vrtá tabulkový vrták (viz další řádek), `hloubka` = hloubka vrtání, `hloubka-závitu` = užitečná délka závitu (výkres pak ukáže „M8 ↧10“ + „Ø6,8 ↧14“) |
+| `díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x y [z] …] [osa Z] [zahloubení D2 H2 | kuželové D2] [závit M8 [hloubka-závitu T] [jádro | vrták [N]]]` | bez z = díra začíná na povrchu tělesa v daném místě (zjistí se ze sítě modelu) a vrtá dolů; `skrz` vrtá **od zadaného bodu jen ve směru vrtání** (materiál nad bodem zůstane), `obousměrně` na obě strany; `k tělesu` (EN `to body`, DE `bis Körper`) vrtá po první stěnu stávajícího tělesa – projde první stěnou ve směru vrtání a dál nepokračuje (např. jen horní stěnou dutého dílu), jako ukončení „K tělesu“ u vysunutí; `závit M6` vrtá tabulkový vrták (viz další řádek), `hloubka` = hloubka vrtání, `hloubka-závitu` = užitečná délka závitu (výkres pak ukáže „M8 ↧10“ + „Ø6,8 ↧14“, u průchozí díry „M8 ↧12“ + „Ø6,8 skrz“; stav „…, délka závitu 12“) |
 | `díra závit M8 hloubka 20 v x y` · `díra 6,647 závit M8 …` · `díra závit M8 … jádro` · `díra závit M8 … vrták 6,7` | **průměr vrtáku závitové díry**: bez průměru = tabulkový vrták (M8 → Ø6,8, jemný M18×1,5 → Ø16,5); **zadaný průměr má přednost** (protokol: „vrták Ø6,647 zadán ručně (tabulkový 6,8)“); jmenovitý průměr (`díra 8 závit M8`) i nesmyslně malé zástupné číslo (pod D1 − P, např. `díra 5 závit M18×1,5` ze starších zápisů) = tabulkový vrták s poznámkou v protokolu; `jádro` (EN `core`/`minor`, DE `Kern`) = malý průměr vnitřního závitu D1 = D − 1,082532·P podle ISO 965-1 (M8 → 6,647, M12 → 10,106, M18×1,5 → 16,376); `vrták` (EN `drill`, DE `Bohrer`) = tabulkový, `vrták 6,7` = vlastní; vrták větší než závit = chyba. Označení `M8` lze psát i bez slova `závit`. Výkres u jiného než tabulkového vrtáku uvede i řádek vrtáku („M8 ↧20“ + „Ø6,647 ↧20“), stav ukáže „(vrták = jádro D1 Ø6,647)“. V JSON je to pole `tapDrill`: `"table"` (nebo chybí) / `"minor"` / `"custom"` + `diameter` – v JSON bez `tapDrill: "custom"` se `diameter` závitové díry nepoužije (stavba to ohlásí ⚠). `upravit "Díra 1" diameter=6,647` a `prvek hole … kind=tapped thread=M8 diameter=6,647` platí jako text (zadaný průměr má přednost, `tapDrill` se doplní); `tapDrill=` přijme jen `table` / `minor` / `custom` (i `tabulkový` / `jádro` / `vlastní`); změna závitu (`thread=M10`, formulář) ponechá vlastní vrták, jen když se k novému závitu hodí (D1 − P až pod D), jinak vrtá tabulkový s poznámkou. Volby díry pište **před** `název` – vše za `název` až do další volby je název (`… název M8` je díra pojmenovaná M8, ne závit) |
 | `díra D hloubka H dno ploché` · `díra D hloubka H hrot 120` | **dno slepé díry**: výchozí kužel hrotu vrtáku 118°; `hrot N` (EN `tip`, DE `Spitze`) = jiný vrcholový úhel 60–170°; `dno ploché` / `ploché dno` (EN `flat bottom`, DE `flacher Grund`) = rovné dno bez kužele (sedlo pružiny, frézované dno; v JSON `tipAngle: 180`); také `ploché`, `s plochým dnem`, `bez hrotu`, `dno=ploché`, `dno kužel 120` (EN `flat`, `without tip`, DE `ohne Spitze`); slovo podobné volbě dna, kterému CAD nerozumí, je chyba řádku. Hloubka H je vždy hloubka válcové části (u plochého dna celá hloubka). Platí i pro závitovou a zahloubenou díru; u díry skrz / k tělesu je to chyba; úhel mimo 60–170° je chyba i v `upravit` / `prvek` (v JSON jádro úhel ořízne a ohlásí ⚠, stav i výkres ukazují použitý úhel). `měřit díry` vypíše „dno ploché“ (i se souosou dírou ze dna) nebo „hrot 118° (ke špičce …)“, výkres u plochého dna připíše „(ploché dno)“ |
-| `díra D … směr vx vy vz` · `díra D … sklon úhel [směr +X]` | šikmá díra: `směr` = směr vrtání vektorem; `sklon` = odklon od osy díry (výchozí k +X u osy Z) |
-| `díra D skrz v x1 y1 z1 v x2 y2 z2 …` | více děr jedním příkazem (každá poloha třemi souřadnicemi) |
+| `díra D … směr vx vy vz` · `díra D … sklon úhel [směr +X]` | šikmá díra: `směr` = směr vrtání vektorem; `sklon` = odklon od osy díry (výchozí k +X u osy Z). Stav ukáže skutečný směr vrtání: „osa Z“ bez dalšího = výchozí shora dolů (−Z, u osy X −X, u osy Y −Y); jinak „…, osa Z, vrtá +Z“ (`směr 0 0 1`, `obráceně`) nebo „…, osa Z, směr vrtání [0,707; 0; -0,707]“ (šikmá díra) |
+| `díra D skrz v x1 y1 [z1] v x2 y2 [z2] …` | více děr jedním příkazem: **každé `v` = jedna poloha** (EN `at`, DE `bei`); 2 čísla = dvě souřadnice napříč osou vrtání (osa Z: x y, osa X: y z, osa Y: x z) a díra začíná na povrchu tělesa právě v tomto místě (jako u jedné polohy), 3 čísla = x y z přesně; polohy lze míchat (`v 10 20 v 30 20 5`), čísla se mezi polohami nikdy nepřelévají; poloha s 1 nebo 4 a více čísly je chyba řádku („díra: poloha 2 „v 15,1“ – počet čísel 1 …“) a nevznikne žádná díra. Stav vypíše všechny polohy bez zkracování, i 20 a víc („· polohy (3): [10; 20; 30] [30; 20; 30] [30; 20; 5]“) |
+| `díra 6,8 skrz v 15,1 -30 v 15,1 -90 zahloubení 20 7 závit M8` · `díra závit M8 hloubka 20 kuželové 10 v x y` | **závitová díra se zahloubením** = zahloubení + vrták + závit (sedlo pružiny nad závitem, sražení vstupu); EN `counterbore 20 7 thread M8` / `countersink 10`, DE `senkung 20 7 gewinde M8` / `kegelsenkung 10`. Vrták podle pravidel závitové díry (tabulkový / zadaný / `jádro`), hloubky se měří od povrchu (zahloubení 0–7, vrták po hloubku díry). Výkres: „M8 skrz“ + „Ø6,8 skrz“ + „⌴ Ø20 ↧7“ (kuželové „⌵ Ø10 × 90°“), stav „M8 skrz (vrták Ø6,8) zahl. Ø20×7“, `měřit díry` ukáže zahloubení Ø20 (slepá, hloubka 7) a vrták Ø6,8, kontrola kót čeká závit, vrták, Ø a hloubku zahloubení. Zahloubení menší než závit (`zahloubení 7,5 3 závit M8`) postaví, ale výsledek stavby hlásí ⚠; `zahloubení` i `kuželové` najednou = chyba řádku. JSON: `{ "type": "hole", "kind": "tapped", "thread": "M8", "head": "counterbore", "cbDiameter": 20, "cbDepth": 7, … }` (`"head": "countersink"` + `csDiameter`, `csAngle`); `prvek hole kind=counterbore thread=M8 …` i `upravit "Díra 1" thread=M8` nebo `upravit "Díra 1" kind=tapped thread=M8` u zahloubené díry udělá totéž (protokol to oznámí, zahloubení se nikdy tiše nezahodí), `head=` přijme counterbore | countersink | none (i `zahloubení` / `kuželové`, DE `Senkung` = válcové jako v textu, `Kegelsenkung` = kuželové); `head=none` smaže i uložené rozměry zahloubení. Závitová díra bez `head` zahloubení nemá (geometrie starších dokumentů beze změny), ale má-li uložené `cbDiameter`/`cbDepth` (dřívější zápis `zahloubení 20 7 závit M8`), stavba hlásí ⚠ „Uložené zahloubení Ø20×7 se nevrtá …“ a stav „(uložené zahl. Ø20×7 se nevrtá – chybí head)“ – opravíte `upravit "Díra 1" head=counterbore` (zahloubit) nebo `head=none` (smazat). ⚠ jen při zahloubení menším než závit (Ø8 u M8 je v pořádku) |
 | `zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z|-Z|+X|-X|+Y|-Y] [poloměr N] [delší N] [kratší N]` | pravidla lze kombinovat: `hrany horní kruhové` |
 | `srazit C [hrany …]` | sražení hran, stejná pravidla |
 | `zaoblit R hrany <pravidlo> setback S [vrchol V3 S2]` | zaoblení se setbackem: ve vrcholu se 3+ zaoblenými hranami skončí zaoblení S od vrcholu a roh uzavře hladká záplata (G1) – viz „Zaoblení se setbackem, eliptické zaoblení a úkos s dělicí křivkou“ |
@@ -78,17 +79,18 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `těleso N` · `rozdělit XY|XZ|YZ [odsazení N] [jako Název]` · `kopie [těleso N] [posun dx dy dz] [jako Název]` · `sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]` | více těles v dílu (viz níže) |
 | `prvek <typ|rozšíření> klíč=hodnota …` | kterýkoli typ prvku i prvek rozšíření bez JSON (viz níže) |
 | `normálie <označení> [v x y z]` | díl z knihovny (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta |
-| `vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit]` | sestava: vloží díl z otevřené záložky jako komponentu |
+| `vložit "název záložky" [v x y z] [otočení rx ry rz] [ukotvit] [jako "K48"]` | sestava: vloží díl z otevřené záložky jako komponentu; `jako` (EN `as`, DE `als`) = přezdívka instance pro vazby místo #k |
 | `sestava` · `sestava plochy "Čep" [rovinné|válcové]` · `sestava vazba <druh> "A" <plocha> "B" <plocha> [hodnota N] [obráceně]` · `sestava vazby` · `sestava vazba 2 hodnota=5|obráceně|potlačit|zapnout|smazat` | sestava textem: komponenty, plochy pro vazby, trvalé vazby a jejich správa (viz „Sestava textem“) |
 | `sestava vazba ozubení|šroub|hřeben|vačka|kardan|kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez … "A" <F|E|V> "B" <F|E|V> [poměr|stoupání|min|max]` · `pohyb motor rotační "Klika" 0..360 krok 5 [kolize]` · `pohyb stav|krok N|přehrát|export csv` | pokročilé a mechanické vazby (23 druhů) a pohybová studie (viz „Pokročilé a mechanické vazby, pohybová studie“) |
-| `sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …]` · `sestava odebrat|duplikovat|izolovat "X"` · `sestava zobrazit vše` | vlastnosti komponenty jako v panelu |
+| `sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …] [přezdívka "…"]` · `sestava odebrat|duplikovat|izolovat "X"` · `sestava zobrazit vše` | vlastnosti komponenty jako v panelu |
+| `sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c]` · `sestava pružina "P" odebrat` · `sestava pružiny` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
 | `sestava pole "X" N rozteč P [směr Y]` · `sestava pole "X" kruhové N [osa Z] [v cx cy cz]` · `sestava zrcadlit "X" YZ` · `sestava šroub "Deska" Ø9 [matice] [bez podložky]` | pole, zrcadlení, šroubový spoj do díry |
 | `sestava podsestava "A" "B" [jako "…"]` · `sestava rozpustit "P"` · `sestava upravit "X"` … `sestava hotovo` · `sestava otevřít "X"` | podsestavy, úprava dílu v kontextu sestavy |
 | `kusovník [strukturovaně] [csv]` · `rám formy [šířka délka] [dutina X Y H] …` · `záložky` · `záložka "název"|N` · `zavřít záložku` | kusovník do protokolu, rám vstřikovací formy, záložky dokumentů |
 | `výkres` | otevře výkres otevřeného dokumentu v záložce |
-| `výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]` | volby aktivního listu výkresu (`výkres list N`; bez něj první list – založí ho, chybí-li) a otevře výkres |
-| `kótovat [chytře|celkově|nic] [řetězově|od základny]` | Chytré kóty podle prvků modelu (viz „Výkres a kóty“) – nahradí jen vygenerované kóty |
-| `výkres tolerance <kóta> <tolerance>` · `výkres poznámka "…"` · `výkres nepředepsané ISO 2768-mK` · `výkres hrany ISO 13715 …` · `výkres drsnost Ra 3,2` | tolerance ke kótě podle popisku (`Ø40 h6`, `25 ±0,1`, `M8 6H`); údaje u razítka |
+| `výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]` | volby aktivního listu výkresu (`výkres list N`; bez něj první list – založí ho, chybí-li) a otevře výkres; **odsazení řezu jako u skici** (podél normály roviny: `řez XZ odsazení 57` = rovina Y = −57 jako `skica XZ odsazení 57`; XY → Z = N, YZ → X = N); rovina mimo těleso = ✗ s rozsahem odsazení, `⚠ Pohledy se v měřítku … nevejdou na list …` při volbách listu; tabulka děr obsahuje jen díry (vnitřní – konkávní – válcové plochy), vnější válce soustruženého dílu (hřídel, osazení) v ní nejsou; jedna díra = jeden řádek (zahloubení nad vrtákem se sloučí: „M8 ⌴Ø20“), bere díry s osou ve směru pohledu shora, a nevidí-li tam žádnou, pohled listu s nejvíc dírami; `výkres stav` vypíše „Tabulka děr (pohled horní, 3): A1 M8 Ø6,8 ⌴Ø20 [20; 80] · …“ (X; Y od levého dolního rohu obrysu pohledu, jako souřadnicové kóty) a díry s jinou osou, které v tabulce nejsou |
+| `kótovat [chytře|celkově|nic] [řetězově|od základny] [funkční 26,5 74,175] [díry tabulka|souřadnicově|řetězově]` | Chytré kóty podle prvků modelu (viz „Výkres a kóty“) – nahradí jen vygenerované kóty; `funkční` = rozměry, které nikdy nebudou pomocné „(…)“; `díry` = polohy děr tabulkou / souřadnicovými kótami / od hran (výchozí auto) |
+| `výkres tolerance <kóta> <tolerance> [pohled <p>]` · `výkres kontrola tolerancí` · `výkres poznámka "…"` · `výkres nepředepsané ISO 2768-mK` · `výkres hrany ISO 13715 …` · `výkres drsnost Ra 3,2` | tolerance ke kótě podle **číselné hodnoty modelu** (`74,175 -0,005`, `Ø40 h6`, `M8 6H`) nebo id (`a12`); kontrola funkčních rozměrů bez tolerance; údaje u razítka |
 | `výkres stav` | textový stav výkresu: list, měřítko, pohledy, všechny kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo (také `window.mncad.drawingStatus()`) |
 | `měřit F3|E5|V2 [F7|E9|V8|x y z]` · `měřit těleso|díry|válce` · `měřit plocha|hrany <pravidlo>` | měření pro kontrolu modelu (viz „Měření“); také `window.mncad.measure()` |
 | `výkres list 2` · `výkres list nový "Detail"` · `výkres list přejmenovat 2 "…"` · `výkres list smazat 2` · `výkres stav [list N|vše]` | listy výkresu – další příkazy výkresu pracují s vybraným listem (viz „Výkres textem: listy, značky, kóty, export“) |
@@ -670,8 +672,15 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky `
 4. `sestava vazby` – očíslovaný výpis (druh, komponenty a plochy, hodnota, stav); `sestava vazba 3 hodnota=8`,
    `… obráceně`, `… potlačit`, `… zapnout`, `… smazat` (číslo nebo název vazby). Po každé změně se vazby přepočítají.
 5. `sestava` (bez podpříkazu) vypíše komponenty `#1 Deska · díl · poloha [0; 0; 0] · ukotvená ⚓`; komponentu lze zadat
-   názvem nebo pořadím `#2`. `stav` u sestavy obsahuje řádky `Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; -20]` a
-   `Vazby: 2 (2 ok)`.
+   názvem, pořadím `#2` nebo **přezdívkou**: `vložit "Šroub M6x20" v … jako "K48"` (EN `insert … as "K48"`, DE
+   `einfügen … als "K48"`) nebo `sestava komponenta #25 přezdívka "K48"` (EN `alias`; prázdná `přezdívka ""` ji zruší) –
+   pak `sestava vazba zámek "K48" "Upínací deska"`. Přezdívka je jednoznačná (ne „#…“, ne název jiné komponenty; komponentu
+   nejde přejmenovat na přezdívku jiné), ve výpisu, ve stromu a ve vazbách v hranatých závorkách `#25 Šroub M6x20 [K48]`,
+   `Zámek „Šroub M6x20“ [K48] → „Upínací deska“`; kopie (`sestava duplikovat|pole|zrcadlit`, Duplikovat v panelu) přezdívku
+   nepřebírají. Kusovník ji nepoužívá. `stav` u sestavy obsahuje řádky
+   `Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; -20]`, `Vazby: 2 (2 ok)` a `Sestava: 70 komponent … · obálka X × Y × Z mm` –
+   obálka je **přesná** obálka těles všech viditelných listových dílů v jejich umístění (jádro, ne síť, bez skic a pomocné
+   geometrie; i natočené díly, např. otočení 0 0 20).
 6. `sestava komponenta "Čep" v x y z | posun dx dy dz | otočení rx ry rz | pootočit X 90 | ukotvit | uvolnit | skrýt | zobrazit |
    barva #hex | název "…" | číslo "…" | skupina "…" | materiál ocel` (třída hustoty, jiný text = označení do kusovníku);
    po přesunu se vazby přepočítají (přesunutá komponenta drží). `sestava odebrat "X"` (i s jejími vazbami),
@@ -683,6 +692,8 @@ Sestava se dá postavit a ověřit celá textem, bez klikání do 3D (anglicky `
    `sestava upravit "Čep"` → další řádky pracují s dílem (`díra 3 skrz v 0 0`…) → `sestava hotovo` vrátí díl do sestavy
    (změna platí pro všechny stejné komponenty); `sestava otevřít "Čep"` = kopie v nové záložce.
 9. `kusovník [strukturovaně] [csv]` – tabulka `Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks`; `kolize` = průniky.
+   Řádky se tvoří podle **zdroje** (stejný vložený díl = jeden řádek, kusy se sečtou) – přejmenovaná instance („… -1“) ani přezdívka
+   řádek nerozdělí; jiné číslo výkresu (`číslo "…"`) je jiná položka. Název řádku = společný název instancí, jinak název dílu.
 10. `rám formy 296 346 [deska-a 56] [deska-b 56] [upínací 27] [opěrná 36] [rozpěrky 96] [šířka-rozpěrek 56] [vyhazovací 22]
     [kotevní 17] [sloupky 24] [dutina 140 180 30 | bez dutiny] [materiál 1.2311]` – rám formy v nové záložce.
 11. `záložky` (výpis), `záložka "Čep"` / `záložka 2` (další řádky pracují s ní), `zavřít záložku ["…"]`.
@@ -752,8 +763,58 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
   `pohyb kroky 48 čas 2 kolize vyp`, `pohyb motor smazat 1`, `pohyb smazat`.
 - API: `await window.mncad.motion('motor rotační "Klika" 0..360 krok 5')` (text = volitelný příkaz `pohyb …` předem) vrátí
-  `{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }`.
+  `{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }`;
+  klíč v `comps` = instance: název, u stejně pojmenovaných komponent `"Šroub #12"` (pořadí) nebo `"Šroub [K48]"` (přezdívka) –
+  každá komponenta má svůj záznam (stejně sloupce CSV).
 - Studie se ukládá do sestavy (`motion` v JSON) a v `stav` je řádek „Pohybová studie: …“.
+- Natočení v souhrnu (` · natáčí se 30°`) = největší úhel mezi natočením v kroku a výchozím natočením (krok 0) – porovnávají se
+  matice, ne Eulerovy úhly: komponenta vložená s `otočení 180 0 0`, která se jen posouvá, „natáčí se“ nehlásí.
+
+**Pružina v sestavě** (`sestava pružina`, EN `assembly spring`, DE `baugruppe feder`): komponenta s prvkem Pružina
+(`normálie pružina d2 D20 L44 n8` = DIN 2095, DE `normteil feder d2 D20 L44 n8`, nebo vlastní díl
+`pružina 18 stoupání 5,25 závity 8 drát 2`; zjednodušeně i trubka / válec) mezi dvěma komponentami. Délka L = vzdálenost dosedací
+plochy A (strana začátku pružiny) a B po ose pružiny; začátek pružiny se posune na plochu A. Bez zadané plochy se vezme nejbližší
+rovinná plocha komponenty kolmá na osu pružiny, obrácená k ní (u A ve směru osy, u B proti ní) **a s materiálem pod pružinou** –
+plocha, kterou pružina prochází otvorem (díra Ø ≥ průměr pružiny), se přeskočí; když jiná není, příkaz skončí ✗ „osa pružiny
+prochází komponentou „…“ otvorem“ – zadejte komponentu, o kterou se pružina opravdu opírá (např. další desku), nebo plochu `F12` /
+pravidlem jako u vazeb. Polohu napříč (osu) určuje umístění pružiny (`vložit … v x y z`, `sestava vazba zámek #k "A"`).
+
+- `sestava pružina "P" mezi "A" "B" volná 44 blok 20 tuhost 25` (EN `between … and … free 44 solid 20 rate 25`, DE
+  `zwischen … und … frei 44 block 20 steifigkeit 25`) – `volná` = L0 (výchozí délka modelu), `blok` = délka na doraz Ln (výchozí
+  (závity + 1) · drát), `tuhost` = c [N/mm]; `blok 0` / `tuhost 0` dřív zadanou hodnotu zruší (doraz z modelu, bez síly).
+  Stejný název = všechny instance (6 pružin jedním řádkem), `#k` / přezdívka = jedna. Protokol: stejné pružiny ve stejném
+  stavu jeden řádek s počtem `(6×)`, stejný název v různém stavu řádek pro každý stav s `#k` / `[přezdívka]`
+  (`✓ pružina „P“ #3: …`, `⚠ pružina „P“ [P2]: …`).
+- ✗ = stlačena pod délku na doraz (`… – stlačena pod délku na doraz Ln 20 mm (vzdálenost ploch 18 mm, chybí 2 mm)`), ⚠ = nedosedá
+  (vzdálenost ploch > L0 – tvar zůstane volný, napíše mezeru). Bez tuhosti se síla nepíše. Plochy v obráceném pořadí (B pod A) =
+  ✗ „prohoďte A a B“ a definice se **neuloží**.
+- Délka se přepočítá při každém přepočtu vazeb (`sestava vazba …`, `sestava vazba 3 hodnota=…`), při přesunu komponenty (i v sestavě
+  bez vazeb – `sestava komponenta "B" v …`, gizmo, panel) a v každém kroku pohybové studie; souhrn studie má řádek
+  ` ✓|⚠|✗ pružina „…“: délka 38 → 32 mm (min 32 · L0 44 · Ln 20) · síla 150 → 300 N (max 300 N)` (✗ s kroky pod dorazem),
+  `pohyb export csv` přidá sloupce `<pružina> L [mm]` a `<pružina> F [N]`, `window.mncad.motion()` vrátí v kroku
+  `springs: { "<pružina>": { length, seat, force, level } }`. Klíče `springs` i `comps` jsou podle **instance**: název, u
+  stejných názvů `"P #3"` (pořadí) nebo `"P [P2]"` (přezdívka). Kolize v kroku počítají s pružinou v délce kroku.
+- `sestava pružiny` – stav všech pružin; `stav` má řádek `Pružiny: „P“ 38 mm (L0 44 · Ln 20) · F 150 N ✓ (6×)`;
+  `sestava pružina "P" odebrat` – definice pryč, tvar ve volné délce. `sestava odebrat "A"` (dosedací komponenta) odebere i
+  definice pružin, které na ní dosedaly (`pružiny bez dosedací komponenty …`).
+- Tvar: v jádře (export STEP / BREP, kolize, objem, výkres, zobrazení po přepočtu) se díl pružiny staví **přesně v aktuální délce** –
+  mění se stoupání (počet závitů a drát zůstávají), u trubky / válce výška; při přehrávání pohybové studie v okně se síť volné
+  pružiny jen protáhne po ose (bez stavby v každém kroku). V kusovníku (`kusovník`, panel Kusovník, tabulka na výkrese) je pružina
+  jedna položka podle zdroje bez ohledu na délku; hmotnost = těleso v aktuální délce (stejně jako `stav`).
+- V aplikaci: panel komponenty › Pružina mezi komponentami (Dosedá na A, Stlačuje B, L0, Ln, c) – provede tentýž příkaz.
+
+Příklad (sestava: „Vodicí deska“ dole, nad ní „Kotevní deska“ s otvory Ø20, kterými pružiny procházejí, nahoře „Opěrná deska“
+s vazbou Vzdálenost „ZDVIH“ 38 k vodicí desce; 2× „Pružina R20“ = trubka Ø20/Ø10 × 38 stojící na vodicí desce):
+
+```
+sestava pružina "Pružina R20" mezi "Vodicí deska" "Opěrná deska" volná 44 blok 20 tuhost 25
+pohyb motor lineární vazba "ZDVIH" 38..32 kroky 6
+pohyb
+```
+
+Protokol: `✓ pružina „Pružina R20“: délka 38 mm · L0 44 · Ln 20 · stlačení 6 mm · síla 150 N (c 25 N/mm) (2×)` a v souhrnu
+studie ` ✓ pružina „Pružina R20“: délka 38 → 32 mm (min 32 · L0 44 · Ln 20) · síla 150 → 300 N (max 300 N) (2×)`. Se „Kotevní
+deska“ místo „Opěrná deska“ skončí řádek ✗ (pružiny procházejí jejími otvory a na ní nedosedají).
 
 ```
 nová sestava Klikový mechanismus
@@ -1516,17 +1577,48 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
    kružnic) – jen tak výkres zná závit, hloubku, zahloubení a počet děr.
 2. **List a pohledy:** `výkres A3 na šířku pohledy přední,horní,iso`. Pohledy volte podle dílu:
    rotační díl s osou X → `přední,levý` (osa vodorovně, čelní pohled pro díry v čele); díry shora → `horní`;
-   díry zespodu → `spodní`; vnitřní tvary (vrtání, osazení uvnitř) → `řez XZ odsazení 0` (řez osou).
+   díry zespodu → `spodní`; vnitřní tvary (vrtání, osazení uvnitř) → `řez XZ odsazení 0` (řez osou). Odsazení řezu se
+   měří **stejně jako u skici** – podél normály roviny skici: `řez XZ odsazení 57` je rovina Y = −57 (jako `skica XZ odsazení
+   57`), `řez XY odsazení 10` je Z = 10, `řez YZ odsazení 10` je X = 10. Protokol to ukáže („řez XZ odsazení 57 (rovina
+   Y = -57)“); rovina mimo těleso = řádek ✗ s rozsahem odsazení, které těleso protne (rozsah je otevřený – rovina přímo na
+   ploše tělesa řez nedá; hláška dá i příklad uvnitř). (Výkresy uložené před touto změnou mají v odsazení souřadnici osy
+   a staví se beze změny – `výkres stav` je označí „starší řez uložený souřadnicí Y = -57“ a ukáže odsazení v dnešní
+   konvenci i hotový příkaz `výkres řez XZ odsazení 57`; kopírujte odsazení z něj.) Starší skripty psaly číslo jako
+   souřadnici osy (`řez XZ odsazení -57` = Y = −57): když takové číslo v dnešním výkladu těleso mine a jako souřadnice ho
+   protne, řez se vyloží postaru, uloží v dnešní konvenci a protokol to řekne řádkem `⚠ řez XZ odsazení -57: … dnes pište:
+   výkres řez XZ odsazení 57`. Číslo platné v dnešním výkladu se nikdy nepřekládá.
 3. **Kóty:** `kótovat` (= chytře, řetězově) nebo `kótovat od základny`. Protokol vypíše počet kót podle pohledů
-   a co se nevešlo.
+   a co se nevešlo. Rozměry, které jsou funkční (budou tolerované), řekněte hned: `kótovat funkční 26,5 74,175` – ty nikdy
+   nebudou pomocnou kótou v závorce (seznam i se středníkem jako v poli formuláře: `kótovat funkční 50; 30`). Desky
+   s mnoha dírami: od 12 poloh (různých souřadnic x a y středů) přejdou polohy děr samy na **souřadnicové kóty** od levého
+   dolního rohu (0 v rohu, hodnoty v jedné řadě; více druhů děr v pohledu = značka skupiny A, B … u každé díry i v popisu
+   „11× Ø8 skrz (A)“), a když se nevejdou ani ty, na **tabulku děr**; ručně `kótovat díry tabulka|souřadnicově|řetězově`.
+   Tabulka děr je na listu jedna – v pohledu, kde jsou díry vidět (i levý / pravý / zadní); jsou-li díry ve dvou pohledech,
+   dostane ji pohled s víc dírami a druhý souřadnicové kóty. Jedna poloha = jeden řádek („Ø8 ⌴Ø14“, závit „M8“), přes
+   16 řádků dva sloupce; překryje-li tabulka na plném listu pohled, protokol to řekne (⚠ → větší list / měřítko auto).
+   `kótovat díry souřadnicově|řetězově` tabulku děr listu vypne (polohy by byly dvakrát), `kótovat díry tabulka` ji zapne.
 4. **Kontrola:** `výkres stav` – musí platit „Duplicity: žádné“ a „Kontrola kót: všech … je na listu“. Řádek
    „Vynecháno“ říká proč (např. „zapněte pohled spodní“, „zapněte řez osou“, „nevešlo se“ → `výkres A2` nebo jiné
-   měřítko) – opravte a spusťte `kótovat` znovu.
+   měřítko) – opravte a spusťte `kótovat` znovu. Každý chybějící rozměr Kontroly kót má svůj řádek „Vynecháno“:
+   šikmá díra / skica ve šikmé rovině → „kótujte v pomocném pohledu … (`výkres pohled pomocný směr dx dy dz`)“, obecný
+   obrys skici (lomená čára, oblouky, elipsa) a rotační prvek hranolového dílu → ruční kóty (`výkres kóta …`). Díra
+   zespodu bez pohledu spodní se okótuje na skrytých kružnicích pohledu shora s poznámkou „ze spodní strany“ (čistší je
+   zapnout pohled spodní). Kvádry přidané / odebrané k dílu (osazení, okna) dostanou rozměry a polohu samy; rozměr
+   základního kvádru, který plyne z celkového rozměru a osazení, je pomocný „(15)“.
 5. **Tolerance** jen na funkční rozměry: `výkres tolerance Ø30 h6`, `výkres tolerance 42 ±0,05`,
-   `výkres tolerance M20 6g`, `výkres tolerance Ø50 H7` (kóta se najde podle popisku; nejednoznačná → chyba se seznamem).
-   **Pomocná kóta v závorce** („(50)“ – nejdelší článek řetězu) se netoleruje (ISO 129-1): příkaz ji odmítne a vypíše
-   ostatní články řetězu – tolerujte některý z nich. Tolerance zůstane u kóty i po změně modelu, dokud kóta existuje
-   (průměr podle hodnoty, délka podle polohy čel); zmizí-li kóta, tolerance se ztratí – zkontrolujte `výkres stav`.
+   `výkres tolerance M20 6g`, `výkres tolerance Ø50 H7`. Kóta se najde **číselnou hodnotou modelu** (±0,000001 – kóty
+   nesou až 3 desetinná místa modelu, `74,175`, ne zaokrouhlené `74,18`), druhem (Ø, M, R) nebo id z `výkres stav`
+   (`výkres tolerance a12 -0,005`); nejednoznačná → chyba se seznamem id, zúžit jde i pohledem (`… pohled horní`).
+   **Pomocná kóta v závorce** („(50)“ – nejdelší článek řetězu) se netoleruje (ISO 129-1): tolerance na ní rozměr udělá
+   **funkčním** – řetěz se přepočte a pomocnou kótou se stane jiný článek (protokol ho jmenuje). Jsou-li funkční všechny
+   články i celková délka (přeurčený řetěz), pomocnou kótou bude funkční rozměr **bez tolerance** (protokol to řekne);
+   mají-li toleranci všechny ostatní, je to ✗ s radou (jeden rozměr musí zůstat pomocný). Ruční náhradní kóta starších
+   dokumentů se stejnou hodnotou jako pomocná kóta se při převodu odstraní (protokol: „odstraněna ruční náhradní kóta …“).
+   Desetinnou tečku v toleranci (`-0.005` ze skriptu) zapíše český / německý list čárkou. Tolerance zůstane u kóty
+   i po změně modelu, dokud kóta existuje (průměr podle hodnoty, délka podle polohy čel); zmizí-li kóta, tolerance se
+   ztratí – zkontrolujte `výkres stav`. `výkres kontrola tolerancí` vypíše funkční rozměry, které toleranci nemají;
+   tolerované kóty předlohy kontroluje až po připojení předlohy (balík předlohy) – bez ní hlavička řekne „předloha není
+   připojena – kóty předlohy se nekontrolují“.
 6. **Razítko:** `výkres nepředepsané ISO 2768-mK`, `výkres hrany ISO 13715 -0,3`, `výkres drsnost Ra 3,2`,
    `výkres poznámka "…"`.
 7. `výkres stav` naposledy, pak export (výkres → PDF / DXF / DWG / SVG).
@@ -1534,8 +1626,10 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
 ### Pravidla Chytrých kót (ČSN EN ISO 129-1) – kontrolní seznam
 
 - Každý funkční rozměr **jednou** – žádná kóta dvakrát (ani v jiném pohledu), **žádný uzavřený řetězec**: řetěz délek
-  + celková délka → nejdelší článek je pomocná kóta v závorce „(50)“.
-- Prvek se kótuje v pohledu, kde je vidět ve skutečném tvaru; **nikdy na skryté (čárkované) hraně** – vnitřní tvary v řezu.
+  + celková délka → nejdelší článek, který není funkční (`kótovat … funkční …`), je pomocná kóta v závorce „(50)“;
+  jsou-li funkční všechny články, je pomocná celková délka (je-li funkční i ta, funkční rozměr bez tolerance).
+- Prvek se kótuje v pohledu, kde je vidět ve skutečném tvaru; **nikdy na skryté (čárkované) hraně** – vnitřní tvary v řezu
+  (jediná výjimka: díra zespodu, když list nemá pohled spodní – popis na skryté kružnici nese „ze spodní strany“).
 - **Rotační díl** (osa vodorovně): průměry osazení naskládané na straně (nejmenší nejblíž dílu, rozestup 7 mm), délky
   osazení **řetězově na jedné čáře**, celková délka ve vnější řadě (`kótovat od základny` = všechny délky od jednoho čela);
   zápich šířkou (v řetězu) a Ø popisem; sražení „1,5×45°“ a zaoblení „R1“ jednou s počtem „2×“; vnější závit
@@ -1543,7 +1637,10 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
 - Další modely na listu (komponenta, vložený soubor) se Chytrými kótami nekótují – kóty patří jen pohledům hlavního dílu.
 - **Hranolový díl:** celkové rozměry délka × šířka × výška jednou; polohy děr od základních hran (levá / spodní) v pohledu,
   kde jsou díry kružnicemi; souměrně rozmístěné díry roztečí od osy souměrnosti; kruhové pole roztečnou kružnicí „Ø120“
-  na osové kružnici + „rovnoměrně“ (nebo úhel).
+  na osové kružnici + „rovnoměrně“ (nebo úhel). **Mnoho děr** (od 12 poloh, nebo když se kóty od hran nevejdou):
+  souřadnicové kóty od levého dolního rohu obrysu – „0“ v rohu, ke každé poloze vynášecí čára a hodnota na jejím konci
+  (blízké hodnoty se rozestoupí zalomením), poslední hodnota je celkový rozměr; nevejdou-li se, tabulka děr (značka,
+  X, Y od téhož rohu, Ø) – nikdy „! vynecháno“ u poloh děr.
 - **Díry – jeden popis s odkazem na skupinu stejných děr** (z parametrů příkazu `díra` a počtu z pole):
   `4× Ø8,5 skrz` · `4× Ø8,5 ↧12` · `4× M8 ↧10` + `Ø6,8 ↧14` (hloubka závitu / hloubka vrtání) ·
   `6× Ø11 skrz` + `⌴ Ø18 ↧11` (válcové zahloubení) · `4× Ø6,6 skrz` + `⌵ Ø12,4 × 90°` (kuželové zahloubení).
@@ -1621,6 +1718,23 @@ Hotový výkres (horní pohled = půdorys s dírami): `4× M8 ↧10` + `Ø6,8 �
 `90` a `50` (závitové díry), `60` (průchozí díry); kapsa `50` × `30`, hloubka `↧8`, `4× R5` (kapsa je uprostřed – bez
 polohových kót); celkové `120` × `80`; v předním pohledu tloušťka `20`.
 
+### Příklad D – funkční rozměry, tolerance hodnotou a kontrola tolerancí
+
+```
+nový díl Hřídel
+skica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,5 33 15 83 15 83 20 98 20 98 12,5 140 12,5 140 0 uzavřít
+rotovat osa X
+výkres A3 na šířku pohledy přední,levý,iso
+kótovat funkční 50 30
+výkres tolerance 50 -0,1
+výkres kontrola tolerancí
+```
+
+Řetěz délek je `30` · `3` · `50-0,1` · `15` · `(42)` – funkční `50` už není v závorce, pomocnou kótou je nejdelší
+nefunkční článek `(42)`. Kontrola tolerancí vypíše `⚠ kontrola tolerancí: bez tolerance 1 z 2 funkčních rozměrů …` a řádek
+`⚠ 30 (funkční): kóta bez tolerance a6 30 (přední) – výkres tolerance a6 …`. Deska s 20 a více nepravidelnými dírami
+dostane po `kótovat` souřadnicové kóty (protokol: „· polohy děr souřadnicově (horní)“), `kótovat díry tabulka` tabulku děr.
+
 ### Výkres textem: listy, značky, kóty, export
 
 Vše, co jde ve výkresovém prostředí myší, jde i textem (anglicky `drawing …`, německy `zeichnung …`). Příkazy
@@ -1641,6 +1755,10 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | Příkaz | Význam |
 | --- | --- |
 | `výkres razítko název="…" číslo="MN-1" kreslil="AI" revize=A datum="13.11.2026" materiál="ČSN 11 523"` | razítko listu (+ `nepředepsané=`, `hrany=`, `poznámka=`); číslo, kreslil a revize se uloží i do dokumentu |
+| `výkres razítko kontroloval="…" schválil="…" zákazník="…" projekt="…" polotovar="…" počet=4 tepelné="kalit 58–60 HRC" povrch="černit" úhly="±0°30′" sražení="±0,2" firma="…"` | další pole razítka (en checked/approved/customer/project/stock/quantity/heat/surface/angles/chamfers/company, de geprüft/genehmigt/kunde/projekt/rohteil/menge/wärmebehandlung/oberflächenbehandlung/winkel/fasen/firma); pole, které šablona nemá, se vypíše v patičce nad razítkem |
+| `výkres razítko šablona=iso7200|kompaktní|nástrojářská` | šablona razítka listu: ISO 7200 (výchozí, 180×38), kompaktní (180×27), nástrojářská (180×64, všechna pole); výchozí pro nové listy v Nastavení → Výkres |
+| `výkres razítko logo="firma.png"` · `… logo="data:image/png;base64,…"` · `… logo=ne` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek, DXF/DWG jako vyplněný obrys (SOLID) |
+| `výkres nepředepsané ISO 2768-mK` · `… mK` · `… f H` · `… desetinná` · `… desetinná ±0,1 ±0,1 ±0,01 ±0,005` · `… X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005` · `… X.XX=±0,02` · `… ne` | nepředepsané tolerance: třída ISO 2768-1 (f/m/c/v, platí i pro úhly a sražení) + ISO 2768-2 (H/K/L), nebo tabulka podle počtu desetinných míst (X. / X.X / X.XX / X.XXX; hodnoty oddělené mezerou, „/“, „·“ nebo „;“, s popisky i bez – i jak je CAD sám vypisuje); `ne` = zrušit. Export výkresu **dílu** bez nich vrátí ⚠ „Výkres nemá nepředepsané tolerance …“ |
 | `výkres revize B "Přidána díra Ø8" [datum …] [kreslil …]` · `výkres revize smazat B` | tabulka revizí; poslední revize se zapíše do razítka |
 | `výkres otočení 0|90|180|270` · `výkres řez XZ odsazení 0 poloviční|celý` · `výkres kusovník ano|ne` · `výkres balónky ano|ne` | otočení hlavního pohledu, poloviční řez, kusovník nad razítkem a pozice komponent (sestava) |
 | `kótovat základní` | kóty „Auto + Ø“ zapečené do pohledů (jen pomocný základ – místo Chytrých kót) |
@@ -1657,6 +1775,15 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | `výkres detail přední v 45 10 poloměr 5 [měřítko 4:1] [umístit 330 200]` · `výkres detail A měřítko 5:1` · `výkres detail smazat A` | detailní pohled (střed v mm modelu, umístění středu v mm listu) |
 | `výkres model "Hřídel" [pohled horní] [měřítko 1:2]` · `výkres model smazat "Hřídel"` | další model na listu: komponenta sestavy nebo otevřená záložka |
 | `výkres stav list 2` · `výkres stav vše` | stav zvoleného / všech listů (přehled listů, souřadnice, id, razítko, revize) |
+
+**Razítko textem – ověření.** `výkres razítko` (bez polí) i `výkres stav` vypíší kromě řádku „Razítko: …“ také
+`Šablona razítka: … · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo) · logo „firma.png“ 240×80 px`,
+`Další pole razítka: …` (u pole mimo šablonu „(v patičce)“), `Nepředepsané tolerance: ISO 2768-mK (…)` nebo
+`Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí …` (samotný export pak vrátí ⚠) a `Razítko bez zkracování textu: Název 2 řádky 3,1 mm · Kreslil písmo 2,6 mm`
+(dlouhé texty se zmenší do 2 mm a zalomí uvnitř buňky – nic se nezkracuje; pod 2 mm řádek ⚠ s radou; platí i pro materiál
+z dokumentu). Revize v razítku je poslední revize z tabulky revizí, když pole revize není vyplněné – řádek „Razítko: …“ ji pak
+uvede jako „revize B (z tabulky revizí)“; revize zadaná v poli, která v tabulce není, dá ⚠ (při zadání !). Promítání se kreslí normalizovanou značkou (komolý kužel
+a kružnice), ne textem „ISO E“.
 
 **Export bez dialogu** (JavaScript API): `await window.mncad.exportDrawing("pdf" | "dxf" | "dwg" | "svg" | "csv" | "png",
 { sheet: 2, dwgVersion: "R2018", width: 2000 })` vrátí `{ name, mime, bytes, base64, width?, height?, warnings? }` –
@@ -1795,6 +1922,42 @@ Výkres:
 - Seznam odhadnutých rozměrů a kdo je má potvrdit; otevřené otázky.
 - Napište „odpovídá předloze 1:1“ jen tehdy, když jsou všechny řádky ✓ a žádný odhad nezůstal nepotvrzený.
 
+## Předloha v dokumentu: DWG / DXF / PDF zákazníka – výtah a kontrola 1:1 textem
+
+Výkres zákazníka se připojí k dokumentu jako **předloha** – CAD z něj vytáhne listy, pohledy, kóty a vše ostatní
+a umí ho porovnat s modelem. Soubor nejdřív připojte: konzole Textové příkazy → **Připojit soubor…** (prohlížeč bez
+`window.mncad` – výběr souboru), nebo `window.mncad.attach("vykres.dwg", base64)`; menší soubor jde i přímo
+`předloha "deska.dxf" data:application/dxf;base64,…`.
+
+| Příkaz (EN · DE) | Co udělá |
+| --- | --- |
+| `předloha "výkres.dwg"` (`reference` · `vorlage`) | připojí předlohu (DWG R2000–R2018, DXF, vektorové PDF) k dokumentu a vypíše stav; AutoCAD Mechanical (normálie STDPART2D, kusovník, pozice, drsnost, tolerance tvaru, základny, řezy) se převede, nic se neztratí potichu (poznámka importu) |
+| `předloha stav` (`reference status` · `vorlage status`) | listy (formát, měřítko, razítko), počty pohledů / kót / děr / pozic, **text kóty = geometrie** (✗ = text lže, ≈ = zaokrouhlený), rozpory, poslední porovnání a kontrola kót |
+| `předloha výtah kóty|díry|kusovník|razítko|poznámky|značky|pozice|pohledy|listy|rozpory [list N] [pohled N.M] [vše]` (`reference extract dims|holes|bom|title|notes|symbols|balloons|views|sheets|contradictions` · `vorlage auszug maße|bohrungen|stückliste|schriftfeld|notizen|symbole|positionen|ansichten|blätter|widersprüche`) | strukturovaný výtah: kóta = pohled, text, tolerance, uložení, počet, změřená hodnota, poloha; díry podle druhu (závit, vrtání, zahloubení, šroub, kolík) s označením normy; kusovník po řádcích; razítka po polích; nejvýš 40 řádků, `vše` = celý |
+| `porovnat předloha pohled přední [N.M] [list N] [tolerance 0,06] [měřítko 1:2] [se skrytými | bez skrytých] [otočení 90] [zrcadlit] [posun dx dy]` (`compare reference view front` · `vergleichen vorlage ansicht vorne`; i `porovnat s předlohou …`) | pohled modelu (promítnutý jako ve výkrese) proti pohledu předlohy: **pokrytí %** oběma směry v toleranci, úseky mimo toleranci s polohou od levého dolního rohu pohledu předlohy, obrázek SVG překryvu se stáhne. Bez N.M se vezme pohled předlohy, který nejlépe sedí; zadaný N.M se porovná bez kontroly velikosti. Porovnává se jen **obrys tělesa**: osy, kóty, šrafy, tenké čáry (tloušťka pod 0,7 × obrysu, AM_4 / AM_5 / AM_8, KOTY, SRAFY…), konstrukční značky (AM_9) a ¾ kružnice závitu se nepočítají. Pohled předlohy bez skrytých hran → jen viditelné hrany modelu. Jádro závitu d1 předlohy proti vrtáku modelu platí v toleranci 0,15 mm (řádek „závity normálií“). `měřítko 1:2` = měřítko pohledu, když ho předloha neříká (pohled bez kót, `předloha výtah pohledy` ukáže, odkud měřítko je) |
+| `předloha kontrola kót [pohled přední] [N.M] [list N] [měřítko 1:2]` (zkráceně `kontrola kót`; `reference check dimensions` · `vorlage maße prüfen`) | každá kóta předlohy se změří v modelu mezi stejnými body (délky, rozteče děr, Ø, R; bod ve **virtuálním rohu** sražené / zaoblené hrany se vezme na přímce hrany): ✓ = hodnota modelu = text kóty (± 0,005) nebo text je jen zaokrouhlená geometrie předlohy, ✗ = jiná hodnota (i když model odpovídá geometrii předlohy, jejíž text jí odporuje – „předloha si odporuje“, ověřit u zákazníka), ⚠ = bod kóty v modelu nenalezen. Úhly, závity a sražení se nekontrolují (počet „nekontrolováno“). U výkresu více dílů se kontroluje **jen list, který modelu odpovídá** (řádek „kontrolován list N“); jiný list: `list N`. Pozor: kontrola kót **vlastního výkresu** (očekávané rozměry na listu, tlačítko Kontrola kót / Maßprüfung) je řádek „Kontrola kót“ ve `výkres stav` |
+| `předloha otevřít` · `předloha odebrat` | předloha jako 2D výkres v nové záložce (prohlížení) · odebrat z dokumentu |
+
+Pohledy předlohy mají čísla `list.pořadí` (`14.2` = list 14, druhý pohled shora zleva); polohy jsou
+souřadnice výkresu předlohy. Listy se najdou i bez bloku formátu (rámeček z čar nebo křivky velikosti A0–A4). Dokument
+si pamatuje název a otisk souboru a výsledky kontrol s **otiskem modelu** – `předloha stav` je po změně modelu
+označí „⚠ … ZASTARALÉ“ (zopakujte). Soubor sám se neukládá – po obnovení stránky ho připojte znovu. Značky:
+porovnání ✓ = obě pokrytí ≥ 99,5 %, ⚠ = obě ≥ 90 %, ✗ = jinak (i model s dírami navíc); kontrola kót ✓ = vše změřeno
+a sedí. Model označte za hotový, až `porovnat předloha` dává u všech pohledů ✓ (zbylé úseky „chybí / navíc“
+projděte – předloha nemusí kreslit malá sražení) a `předloha kontrola kót` ✓ bez ✗ a bez ⚠.
+
+```
+předloha "deska.dxf"
+# ✓ připojeno: předloha „deska.dxf“ (DXF, 35 kB): listy 1 (1× A3), pohledy 2, kóty 7, díry a normálie 5, pozice 1, razítka 1
+# ✗ text kóty ≠ geometrie: 1 – list 1 kóta BA: text 19.8, geometrie 20
+# ✗ rozpor: pozice 1: kusovník „20*80*125“, razítko listu 1 „20*80*120“
+porovnat předloha pohled horní
+# ✓ porovnání pohled horní × předloha 1.1 (tolerance 0,06 mm): předloha pokryta modelem 100 %, model pokryt předlohou 100 % …
+předloha kontrola kót
+# ✓ kontrola kót předlohy 1.1 × model (pohled horní): 6 ✓, 0 ✗, 0 bez bodu v modelu, 0 nekontrolováno (úhel, závit, sražení)
+# ✗ kóta BA „19.8“ […]: model 20 – předloha si odporuje: text 19.8, geometrie předlohy 20 – …
+```
+
 ## Stav prvku: ✓ / ⚠ / ✗ – co znamená
 
 - Výsledek prvku se v protokolu vypíše **až po výpočtu** (řádek „→ … přidán“ jen potvrzuje zařazení do historie).
@@ -1869,6 +2032,7 @@ export type SketchPlane =
   | { kind: "custom"; origin: Vec3; normal: Vec3; xDir: Vec3; label?: string };
 
 import { tr } from "./i18n";
+import type { RefDocInfo } from "./reference/types";
 import type { AxisDef, Direction, Extent, PlaneDef, Ref, Sig, StartFrom, Thin } from "./refs";
 import type { DraftModel } from "./draft/model";
 export type { AxisDef, Direction, Extent, PlaneDef, Ref, StartFrom, Thin } from "./refs";
@@ -1983,6 +2147,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
       /** vrták závitové díry: chybí / "table" = z tabulky závitů (M8 → 6,8), "minor" = jádro D1 podle ISO 965-1 (6,647), "custom" = `diameter` */
       tapDrill?: "table" | "minor" | "custom";
       threadDepth?: number;
+      /** zahloubení závitové díry (kind "tapped"): válcové (cbDiameter × cbDepth) / kuželové (csDiameter, csAngle) + vrták + závit */
+      head?: "counterbore" | "countersink";
       /** ukončení (chybí-li: depth > 0 = slepá, jinak skrz) */
       end?: HoleEnd;
       /** více poloh naráz (odkazy na vrcholy, středy kružnic, body skici…); chybí-li, platí `position` */
@@ -2122,6 +2288,8 @@ export type CadDoc = {
   activeBody?: string | null;
   /** podklady skic (obrázek / stránka PDF pod geometrií): id skici → podklad; mimo prvky, aby neměnily klíč mezipaměti stavby */
   underlays?: Record<string, SketchUnderlay>;
+  /** předloha (výkres zákazníka DWG / DXF / PDF): název, otisk souboru, souhrn výtahu a výsledky kontrol – cad/reference */
+  reference?: RefDocInfo;
 };
 
 /**

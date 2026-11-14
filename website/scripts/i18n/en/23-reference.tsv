@@ -1,0 +1,151 @@
+# Vlna 15 – předloha (výkres zákazníka DWG / DXF / PDF): výtah, porovnání s modelem, kontrola kót, import AutoCAD Mechanical
+ (pohled normálie {0})	 (standard part view {0})
+ (značka dílu)	 (part marker)
+ na listu {0}	 on sheet {0}
+, pozice {0}	, item {0}
+, zrcadleně	, mirrored
+· … dalších {0} – {1} vše	· … {0} more – {1} all
+· … dalších {0} ✗	· … {0} more ✗
+· … dalších {0} listů – předloha výtah listy	· … {0} more sheets – reference extract sheets
+· … dalších {0} rozporů – předloha výtah rozpory	· … {0} more contradictions – reference extract contradictions
+· chybí v modelu: úsek předlohy {0} mm u [{1}] (od levého dolního rohu pohledu), odchylka až {2} mm	· missing in the model: reference segment {0} mm at [{1}] (from the lower left corner of the view), deviation up to {2} mm
+· k dokumentu není připojená předloha	· no reference is attached to the document
+· kóta {0} „{1}“: model {2} – {3}	· dimension {0} “{1}”: model {2} – {3}
+· kóty: {0} s tolerancí, {1} s uložením, {2} informativních, {3} Ø, {4} závitů, {5} sražení; značky: drsnost {6}, tolerance tvaru {7}, základny {8}, řezy {9}, popisky pohledů {10}	· dimensions: {0} with tolerance, {1} with fit, {2} reference, {3} Ø, {4} threads, {5} chamfers; symbols: roughness {6}, geometric tolerances {7}, datums {8}, sections {9}, view labels {10}
+· kusovník (list {0}): pozice {1}, řádky s počtem {2}, celkem {3} ks	· BOM (sheet {0}): items {1}, rows with quantity {2}, total {3} pcs
+· kusovník v předloze není	· the reference has no BOM
+· list {0}: {1} {2}{3}, pohledy {4}{5}	· sheet {0}: {1} {2}{3}, views {4}{5}
+· navíc v modelu: úsek {0} mm u [{1}], odchylka až {2} mm	· extra in the model: segment {0} mm at [{1}], deviation up to {2} mm
+· nic (filtr list / pohled)	· nothing (sheet / view filter)
+· obrázek překryvu: {0} ({1})	· overlay image: {0} ({1})
+· podrobně: předloha výtah kóty | díry | kusovník | razítko | poznámky | značky | pozice | rozpory [list N] [pohled N.M] [vše]	· in detail: reference extract dims | holes | bom | title | notes | symbols | balloons | contradictions [sheet N] [view N.M] [all]
+· razítka (bloky s atributy) v předloze nejsou	· the reference has no title blocks (blocks with attributes)
+· zaokrouhlené texty kót ({0}): {1}	· rounded dimension texts ({0}): {1}
+· zaokrouhlený text (geometrie má víc desetinných míst): {0} kót – předloha výtah kóty	· rounded text (the geometry has more decimals): {0} dimensions – reference extract dims
+{0} (odhad z kót)	{0} (estimated from dimensions)
+{0} {1}: {2}{3} · změřeno {4} · [{5}]{6}	{0} {1}: {2}{3} · measured {4} · [{5}]{6}
+{0} porovnání pohled {1} × předloha {2} (tolerance {3} mm): předloha pokryta modelem {4} %, model pokryt předlohou {5} % (délky {6} / {7} mm; sesouhlasení otočení {8}°{9}, posun {10})	{0} comparison view {1} × reference {2} (tolerance {3} mm): reference covered by the model {4} %, model covered by the reference {5} % (lengths {6} / {7} mm; alignment rotation {8}°{9}, offset {10})
+{0}× {1} {2}{3}{4} – pohled {5}, první [{6}]	{0}× {1} {2}{3}{4} – view {5}, first [{6}]
+⚠ možný rozpor: {0}	⚠ possible contradiction: {0}
+⚠ nepřevedené objekty předlohy: {0}	⚠ reference objects not converted: {0}
+✓ předloha „{0}“ ({1}{2}, {3}): listy {4} ({5}), pohledy {6}, kóty {7}, díry a normálie {8}, pozice {9}, razítka {10}	✓ reference “{0}” ({1}{2}, {3}): sheets {4} ({5}), views {6}, dimensions {7}, holes and standard parts {8}, balloons {9}, title blocks {10}
+✓ předloha „{0}“ odebrána z dokumentu	✓ reference “{0}” removed from the document
+✓ předloha „{0}“ otevřena jako 2D výkres v nové záložce (jen k prohlížení; změny předlohu v dokumentu nemění)	✓ reference “{0}” opened as a 2D drawing in a new tab (for viewing; changes do not alter the reference in the document)
+✓ rozpory v předloze nenalezeny	✓ no contradictions found in the reference
+✓ text kóty = geometrie u všech {0} kót s číslem	✓ dimension text = geometry for all {0} dimensions with a number
+✗ kóta {0} „{1}“ [{2}]: model {3}	✗ dimension {0} “{1}” [{2}]: model {3}
+✗ rozpor: {0}	✗ contradiction: {0}
+✗ text kóty ≠ geometrie: {0} – {1}	✗ dimension text ≠ geometry: {0} – {1}
+bod kóty v modelu nenalezen	dimension point not found in the model
+informativní	reference
+k dokumentu není připojená předloha – předloha "výkres.dwg" (soubor připojte v konzoli tlačítkem „Připojit soubor…“)	no reference is attached to the document – reference "drawing.dwg" (attach the file in the console with “Attach file…”)
+kolík	pin
+kontrola kót: neznámá volba „{0}“	check dimensions: unknown option “{0}”
+kontrola kót: pohled přední, horní, levý, pravý, zadní nebo spodní (ne „{0}“)	check dimensions: view front, top, left, right, back or bottom (not “{0}”)
+Kót se zaokrouhleným textem (geometrie má víc desetinných míst): {0}.	Dimensions with rounded text (the geometry has more decimals): {0}.
+kóta {0} (pohled {1}) – díry na listu {2} mají Ø{3}, žádná nemá Ø{4}	dimension {0} (view {1}) – holes on sheet {2} are Ø{3}, none is Ø{4}
+kóta {0} ukazuje {1}, geometrie {2}	dimension {0} shows {1}, geometry {2}
+Kóty s textem jiným než geometrie: {0} ({1}).	Dimensions whose text differs from the geometry: {0} ({1}).
+kusovník (list {0}): {1}	BOM (sheet {0}): {1}
+kuželové zahloubení	countersink
+list {0} [{1}]: {2}	sheet {0} [{1}]: {2}
+list {0} {1} [{2}]: {3}	sheet {0} {1} [{2}]: {3}
+list {0} kóta {1}: text {2}, geometrie {3}	sheet {0} dimension {1}: text {2}, geometry {3}
+list {0} pozice {1} [{2}]{3}	sheet {0} item {1} [{2}]{3}
+list {0}: {1} {2}×{3} mm, měřítko {4}, rámeček [{5}] – [{6}] ({7})	sheet {0}: {1} {2}×{3} mm, scale {4}, frame [{5}] – [{6}] ({7})
+list {0}{1}: {2}	sheet {0}{1}: {2}
+matice	nut
+model je prázdný – není co porovnat	the model is empty – nothing to compare
+na listu {0} předlohy nejsou pohledy	sheet {0} of the reference has no views
+Negrafická data vlastních tříd (AutoCAD Mechanical – databáze kusovníku, normy; nezobrazují se ani nezapíší zpět): {0}.	Non-graphical data of custom classes (AutoCAD Mechanical – BOM database, standards; not displayed and not written back): {0}.
+nekontroluje se (úhel, závit, sražení)	not checked (angle, thread, chamfer)
+normálie	standard part
+Odebrat {0}	Remove {0}
+otočení: násobek 90°	rotation: a multiple of 90°
+PDF: {0} stránek, {1} vektorových cest, {2} textů.	PDF: {0} pages, {1} vector paths, {2} texts.
+pohled {0} modelu je prázdný	view {0} of the model is empty
+pohled předlohy {0} není – pohledy: {1}	reference view {0} does not exist – views: {1}
+popisek	label
+porovnání s předlohou potřebuje 3D díl nebo sestavu (otevřený dokument je 2D výkres)	comparison with the reference needs a 3D part or assembly (the open document is a 2D drawing)
+porovnání s předlohou: porovnat předloha pohled přední [N.M] [tolerance 0,06]	comparison with the reference: compare reference view front [N.M] [tolerance 0.06]
+porovnat předloha: chybí pohled modelu – porovnat předloha pohled přední [N.M] [tolerance 0,06]	compare reference: the model view is missing – compare reference view front [N.M] [tolerance 0.06]
+porovnat předloha: neznámá volba „{0}“	compare reference: unknown option “{0}”
+porovnat předloha: pohled přední, horní, levý, pravý, zadní nebo spodní (ne „{0}“)	compare reference: view front, top, left, right, back or bottom (not “{0}”)
+posun: dvě čísla dx dy (mm)	offset: two numbers dx dy (mm)
+pozice {0} (list {1}) v kusovníku není	item {0} (sheet {1}) is not in the BOM
+pozice {0}: kusovník „{1}“, razítko listu {2} „{3}“	item {0}: BOM “{1}”, title block of sheet {2} “{3}”
+pozice {0}: materiál v kusovníku „{1}“, v razítku listu {2} „{3}“	item {0}: material in the BOM “{1}”, in the title block of sheet {2} “{3}”
+předloha „{0}“ je zapsaná v dokumentu, ale soubor v této relaci není načtený – připojte ho znovu a zadejte předloha "{0}"	reference “{0}” is recorded in the document, but the file is not loaded in this session – attach it again and enter reference "{0}"
+předloha „{0}“: data nejsou base64 ani data URL	reference “{0}”: the data is neither base64 nor a data URL
+předloha „{0}“: PDF nemá žádnou stránku	reference “{0}”: the PDF has no page
+předloha „{0}“: soubor je prázdný	reference “{0}”: the file is empty
+předloha „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“ (nebo window.mncad.attach) a zopakujte příkaz; připojené: {1}	reference “{0}”: the file is not attached – attach it in the console with “Attach file…” (or window.mncad.attach) and repeat the command; attached: {1}
+Předloha {0}	Reference {0}
+předloha {0} (modře) × model {1} (černě); mimo toleranci: oranžově předloha, červeně model	reference {0} (blue) × model {1} (black); outside the tolerance: orange reference, red model
+předloha = výkres zákazníka DWG / DXF / vektorové PDF připojený k dokumentu (soubor připojte v konzoli tlačítkem „Připojit soubor…“ nebo window.mncad.attach): listy, pohledy, měřítka, kóty s tolerancí / uložením / počtem a změřenou hodnotou (rozpor „text ≠ geometrie“), díry i normálie AutoCAD Mechanical, kusovník, pozice, razítka, poznámky, drsnost, tolerance tvaru, rozpory; otevřít = jako 2D výkres v nové záložce	reference = the customer drawing DWG / DXF / vector PDF attached to the document (attach the file in the console with “Attach file…” or window.mncad.attach): sheets, views, scales, dimensions with tolerance / fit / count and measured value (contradiction “text ≠ geometry”), holes and AutoCAD Mechanical standard parts, BOM, balloons, title blocks, notes, roughness, geometric tolerances, contradictions; open = as a 2D drawing in a new tab
+předloha výtah díry	reference extract holes
+předloha výtah kóty	reference extract dims
+předloha výtah kusovník	reference extract bom
+předloha výtah pohledy	reference extract views
+předloha výtah pozice	reference extract balloons
+předloha výtah poznámky	reference extract notes
+předloha výtah značky	reference extract symbols
+předloha výtah: neznámá volba „{0}“ – kóty, díry, kusovník, razítko, poznámky, značky, pohledy, listy, rozpory, pozice, list N, pohled N.M, vše	reference extract: unknown option “{0}” – dims, holes, bom, title, notes, symbols, views, sheets, contradictions, balloons, sheet N, view N.M, all
+předloha: neznámá volba „{0}“	reference: unknown option “{0}”
+připojeno	attached
+Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo="{1}"	Attached: {0} – use it in commands by name, e.g. drawing titleblock logo="{1}"
+Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu	Attaches a file (title block logo, reference …) – commands find it by name
+Připojit soubor…	Attach file…
+slepá díra	blind hole
+Soubor „{0}“ se nepodařilo načíst.	The file “{0}” could not be loaded.
+sražení {0}×{1}°	chamfer {0}×{1}°
+Stránky nemají vektorovou kresbu (sken?) – geometrie pro porovnání chybí.	The pages have no vector drawing (a scan?) – there is no geometry to compare.
+šroub	screw
+text předlohy je zaokrouhlený – geometrie předlohy {0}	the reference text is rounded – reference geometry {0}
+tolerance tvaru	geometric tolerance
+tolerance: kladné číslo v mm (např. 0,06)	tolerance: a positive number in mm (e.g. 0.06)
+uložení {0}	fit {0}
+v předloze nejsou pohledy (geometrie)	the reference has no views (geometry)
+v toleranci, ne jmenovitá hodnota	within the tolerance, not the nominal value
+vrtání	bore
+zahloubení	counterbore
+závit {0}	thread {0}
+žádný pohled předlohy s kótami neodpovídá pohledům modelu (pokrytí pod 50 %) – porovnat předloha pohled přední ukáže, co nesedí	no reference view with dimensions matches the model views (coverage below 50 %) – compare reference view front shows what does not fit
+přední	front
+horní	top
+levý	left
+pravý	right
+zadní	back
+spodní	bottom
+# revize: tenké čáry, virtuální roh, výběr listu, zastaralé výsledky, měřítko pohledu, R12 neviditelné
+ – ZASTARALÉ: model se od té doby změnil, zopakujte	 – OUTDATED: the model has changed since, repeat it
+ (příkazy předlohy: stav, výtah, kontrola kót, otevřít, odebrat)	 (reference commands: status, extract, check dimensions, open, remove)
+, číslo výkresu {0}	, drawing no. {0}
+, list {0}	, sheet {0}
+· … dalších {0} bez bodu	· … {0} more without a point
+· kontrolován list {0} (odpovídá modelu nejlépe); kóty listů {1} se nekontrolovaly – kontrola kót list N	· sheet {0} checked (matches the model best); dimensions of sheets {1} were not checked – check dimensions sheet N
+· měřítko geometrie pohledu předlohy zadané příkazem: {0} jednotek výkresu na 1 mm	· geometry scale of the reference view given by the command: {0} drawing units per 1 mm
+· pohled předlohy nemá skryté hrany – porovnány jen viditelné hrany modelu (se skrytými: porovnat … se skrytými)	· the reference view has no hidden edges – only visible model edges compared (with hidden: compare … with-hidden)
+· pohled předlohy zadaný ručně – bez kontroly velikosti	· reference view given explicitly – no size check
+· závity normálií: {0} mm předlohy (jádro d1) se shoduje s vrtákem modelu jen v toleranci {1} mm	· standard-part threads: {0} mm of the reference (minor diameter d1) match the model's tap drill only within {1} mm
+{0} celkem: {1} ✓, {2} ✗, {3} bez bodu v modelu, {4} nekontrolováno ({5} pohledů)	{0} total: {1} ✓, {2} ✗, {3} without a point in the model, {4} not checked ({5} views)
+{0} kontrola kót předlohy {1} × model (pohled {2}): {3} ✓, {4} ✗, {5} bez bodu v modelu, {6} nekontrolováno (úhel, závit, sražení)	{0} dimension check of reference {1} × model (view {2}): {3} ✓, {4} ✗, {5} without a point in the model, {6} not checked (angle, thread, chamfer)
+⚠ kóta {0} „{1}“ [{2}]: bod kóty v modelu nenalezen	⚠ dimension {0} “{1}” [{2}]: dimension point not found in the model
+bod ve virtuálním rohu (průsečík hran)	point in a virtual corner (intersection of edges)
+DXF R12: {0} neviditelných entit se nezapsalo (R12 nemá příznak viditelnosti – v jiných programech by byly vidět); zachová je DXF / DWG 2000 a novější	DXF R12: {0} invisible entities were not written (R12 has no visibility flag – other programs would show them); DXF / DWG 2000 and newer keep them
+k dokumentu není připojená předloha – předloha kontrola kót porovnává kóty připojeného výkresu zákazníka s modelem; kontrolu kót vlastního výkresu (očekávané rozměry na listu, tlačítko Kontrola kót) vypíše výkres stav – řádek „Kontrola kót“	no reference is attached to the document – reference check dimensions compares the dimensions of an attached customer drawing with the model; the dimension check of your own drawing (expected dimensions on the sheet, button Dimension check) is printed by drawing status – line “Dimension check”
+kontrola 1:1: pohled modelu (promítnutý jako ve výkrese) proti obrysu pohledu předlohy (bez os, kót, šraf, tenkých a konstrukčních čar) – pokrytí v toleranci (výchozí 0,06 mm) oběma směry, úseky mimo toleranci s polohou a obrázek SVG překryvu (stáhne se); bez N.M se najde nejlépe odpovídající pohled předlohy, zadaný N.M bez kontroly velikosti; ✓ obě pokrytí ≥ 99,5 %, ✗ i model s geometrií navíc	1:1 check: model view (projected as on the drawing) against the outline of the reference view (without centre lines, dimensions, hatches, thin and construction lines) – coverage within tolerance (default 0.06 mm) both ways, out-of-tolerance segments with position and an SVG overlay image (downloaded); without N.M the best matching reference view is used, a given N.M without a size check; ✓ both coverages ≥ 99.5 %, ✗ also for a model with extra geometry
+kontrola kót předlohy proti modelu: předloha kontrola kót [pohled přední] [N.M]	dimension check of the reference against the model: reference check dimensions [view front] [N.M]
+kóty předlohy proti modelu: každá kóta se změří v modelu mezi stejnými body (rozměry, rozteče děr, Ø, R, i od virtuálního rohu) → ✓ / ✗ s hodnotou modelu, ⚠ bez bodu v modelu; u výkresu více dílů jen list, který modelu odpovídá; výsledek se uloží do dokumentu (po změně modelu zastaralý); kontrolu kót vlastního výkresu ukazuje výkres stav	reference dimensions against the model: each dimension is measured in the model between the same points (sizes, hole pitches, Ø, R, also from a virtual corner) → ✓ / ✗ with the model value, ⚠ without a point in the model; for a drawing of several parts only the sheet that matches the model; the result is stored in the document (outdated after a model change); the dimension check of your own drawing is shown by drawing status
+měřítko: 1:2, 2:1 nebo kladné číslo (ne „{0}“)	scale: 1:2, 2:1 or a positive number (not “{0}”)
+pohled {0}{1}: {2} × {3} mm (geometrie {4}:1 {5}), vlevo dole [{6}], {7} entit	view {0}{1}: {2} × {3} mm (geometry {4}:1 {5}), lower left [{6}], {7} entities
+pohled předlohy {0} se s pohledem {1} modelu ({2} × {3} mm) nepodařilo sesouhlasit – zkuste měřítko 1:N, otočení 90 / zrcadlit nebo posun dx dy	reference view {0} could not be aligned with model view {1} ({2} × {3} mm) – try scale 1:N, rotation 90 / mirror or offset dx dy
+poslední kontrola kót ({0}{1}): {2} ✓, {3} ✗, {4} bez bodu v modelu, {5} nekontrolováno	last dimension check ({0}{1}): {2} ✓, {3} ✗, {4} without a point in the model, {5} not checked
+poslední porovnání ({0}): pohled {1} × předloha {2}: pokrytí {3} % / model {4} %	last comparison ({0}): view {1} × reference {2}: coverage {3} % / model {4} %
+předloha „{0}“: neznámá volba „{1}“ – za názvem souboru smí být jen data souboru (data URL nebo base64); další příkazy: předloha stav | výtah | kontrola kót | otevřít | odebrat	reference “{0}”: unknown option “{1}” – after the file name only the file data may follow (data URL or base64); other commands: reference status | extract | check dimensions | open | remove
+předloha si odporuje: text {0}, geometrie předlohy {1} – model odpovídá geometrii, ne textu kóty; ověřte u zákazníka	the reference contradicts itself: text {0}, reference geometry {1} – the model matches the geometry, not the dimension text; check with the customer
+výchozí – bez kót a měřítka; porovnat … měřítko 1:N	default – no dimensions and no scale; compare … scale 1:N
+z kót	from dimensions
+z kót listu	from the sheet's dimensions
+z měřítka listu	from the sheet scale
+žádný pohled předlohy{0} neodpovídá velikostí pohledu {1} modelu ({2} × {3} mm) – zadejte pohled předlohy (N.M), měřítko 1:N nebo posun	no reference view{0} matches the size of model view {1} ({2} × {3} mm) – give the reference view (N.M), scale 1:N or an offset

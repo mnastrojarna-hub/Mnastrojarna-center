@@ -7,7 +7,7 @@ import { tr } from "../i18n";
 import { cIntersect, type Curve } from "./curves";
 import { boxHits, boxInside, inBox, type Box } from "./geom";
 import { entityBox, entityCurves, entityDist, kinds, type KindCtx } from "./kinds";
-import { findLayer, layerVisible } from "./layers";
+import { findLayer, isVisible } from "./layers";
 import { entityById, type DraftEntity, type DraftModel, type Vec2 } from "./model";
 import type { DraftSession } from "./session";
 import type { SpatialIndex } from "./spatial";
@@ -20,7 +20,7 @@ export function pickEntity(model: DraftModel, idx: SpatialIndex, p: Vec2, tol: n
   let best: DraftEntity | null = null;
   let bd = Infinity;
   for (const e of cands) {
-    if (!layerVisible(model, e.layer) || (filter && !filter(e))) continue;
+    if (!isVisible(model, e) || (filter && !filter(e))) continue;
     const d = entityDist(e, p, ctx);
     if (d <= tol && d <= bd) {
       best = e;
@@ -43,7 +43,7 @@ export function windowSelect(model: DraftModel, idx: SpatialIndex, box: Box, cro
   const out: string[] = [];
   const edges = boxEdges(box);
   for (const e of idx.query(box)) {
-    if (!layerVisible(model, e.layer)) continue;
+    if (!isVisible(model, e)) continue;
     const eb = entityBox(e, ctx);
     if (eb && boxInside(eb, box)) {
       out.push(e.id);
@@ -103,7 +103,7 @@ export type SelParseCtx = { model: DraftModel; list: readonly DraftEntity[]; idx
 export function parseSelection(tokens: string[], i: number, c: SelParseCtx, start: string[] = []): { ids: string[]; next: number } {
   const set = new Set(start);
   let removing = false;
-  const vis = (e: DraftEntity) => layerVisible(c.model, e.layer);
+  const vis = (e: DraftEntity) => isVisible(c.model, e);
   const apply = (ids: Iterable<string>) => {
     for (const id of ids) {
       if (removing) set.delete(id);

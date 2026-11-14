@@ -15,8 +15,8 @@ import { uid, type SketchEntity, type Vec2 } from "./types";
 export type Mat = [number, number, number, number, number, number];
 /** Úsek cesty: úsečka do `b`, nebo kubická Bézierova křivka (řídicí body `c1`, `c2`) do `b`. */
 export type PdfSeg = { k: "L"; b: Vec2 } | { k: "C"; c1: Vec2; c2: Vec2; b: Vec2 };
-/** Jedna souvislá cesta stránky (`stroke` = kreslená čarou, `fill` = vyplněná). */
-export type PdfPath = { start: Vec2; segs: PdfSeg[]; closed: boolean; stroke: boolean; fill: boolean };
+/** Jedna souvislá cesta stránky (`stroke` = kreslená čarou, `fill` = vyplněná, `dash` = vzor čárkování setDash, je-li, `width` = tloušťka čáry v bodech stránky). */
+export type PdfPath = { start: Vec2; segs: PdfSeg[]; closed: boolean; stroke: boolean; fill: boolean; dash?: number[]; width?: number };
 /** Seznam operátorů stránky z pdf.js. */
 export type PdfOpList = { fnArray: ArrayLike<number>; argsArray: ArrayLike<unknown> };
 
@@ -50,12 +50,20 @@ export function extractPdfPaths(list: PdfOpList, OPS: Record<string, number>, vi
   const pop = new Set([OPS.restore, OPS.paintFormXObjectEnd, OPS.endGroup, OPS.endAnnotation]);
   let ctm: Mat = IDENT;
   const stack: Mat[] = [];
+  /** vzor čárkování (setDash) – ukládá se a obnovuje s grafickým stavem */
+  let dash: number[] | undefined;
+  const dashStack: (number[] | undefined)[] = [];
+  /** tloušťka čáry (setLineWidth, v uživatelském prostoru – na stránku přepočtená maticí) */
+  let lw: number | undefined;
+  const lwStack: (number | undefined)[] = [];
   const n = list.fnArray.length;
   for (let i = 0; i < n; i++) {
     const fn = list.fnArray[i];
     const args = list.argsArray[i] as unknown[] | null;
     if (push.has(fn)) {
       stack.push(ctm);
+      dashStack.push(dash);
+      lwStack.push(lw);
       // vnořený formulář má vlastní matici; anotace transformaci a matici (3. a 4. argument)
       if (fn === OPS.paintFormXObjectBegin && isMat(args?.[0])) ctm = mul(ctm, args![0] as Mat);
       if (fn === OPS.beginAnnotation) for (const m of [args?.[2], args?.[3]]) if (isMat(m)) ctm = mul(ctm, m);
@@ -63,6 +71,19 @@ export function extractPdfPaths(list: PdfOpList, OPS: Record<string, number>, vi
     }
     if (pop.has(fn)) {
       ctm = stack.pop() ?? ctm;
+      if (dashStack.length) dash = dashStack.pop();
+      if (lwStack.length) lw = lwStack.pop();
+      continue;
+    }
+    if (fn === OPS.setLineWidth) {
+      const w = Number(args?.[0]);
+      if (Number.isFinite(w) && w >= 0) lw = w;
+      continue;
+    }
+    if (fn === OPS.setDash) {
+      const arr = args?.[0];
+      const list = Array.isArray(arr) || ArrayBuffer.isView(arr) ? Array.from(arr as ArrayLike<number>).filter((x) => typeof x === "number" && x > 0) : [];
+      dash = list.length ? list : undefined;
       continue;
     }
     if (fn === OPS.transform) {
@@ -86,7 +107,7 @@ export function extractPdfPaths(list: PdfOpList, OPS: Record<string, number>, vi
     let sx = 0;
     let sy = 0;
     const open = (x: number, y: number): PdfPath => {
-      const p: PdfPath = { start: apply(m, x, y), segs: [], closed: false, stroke: st, fill: fl };
+      const p: PdfPath = { start: apply(m, x, y), segs: [], closed: false, stroke: st, fill: fl, ...(dash && st ? { dash } : {}), ...(st && lw !== undefined ? { width: lw * Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2])) } : {}) };
       out.push(p);
       return p;
     };

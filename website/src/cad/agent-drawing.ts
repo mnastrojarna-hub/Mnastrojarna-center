@@ -14,7 +14,9 @@ import { tr } from "./i18n";
 import type { DrawingOptions, ViewKey, ViewRotation } from "./drawing";
 import { parseDrawingViews, type ViewsCmd } from "./agent-drawing-views";
 import type { FitShow } from "./drawing-fits";
+import { sectionText } from "./drawing-section";
 import type { GdtSymbol, PlaneName, Vec2 } from "./types";
+import { titleFieldOf, titleUsage, type TitleCmdField } from "./agent-title";
 
 /** Pohled jako cíl značky / kóty: pohled modelu (front…), „section“ (řez), „iso“, „detail:A“ (detail), „model:<název>“ (další model). */
 export type ViewRef = string;
@@ -44,10 +46,18 @@ export type AnnPatch = { offset?: number; text?: string; suffix?: string; value?
 export type DrawingCmd =
   /** volby listu (výkres A3 …) */
   | { k: "set"; opts: Partial<DrawingOptions>; summary: string[] }
-  /** kótovat chytře / celkově / nic / základní (Auto + Ø), řetězově / od základny */
-  | { k: "dim"; mode: "smart" | "overall" | "none" | "auto"; style?: "chain" | "baseline" }
-  /** tolerance ke kótě podle popisku / hodnoty; `fit` = výkres uložení (pole ISO 286, kontrola), `show` = zobrazení úchylek u kóty */
-  | { k: "tol"; target: string; tol: string; fit?: boolean; show?: FitShow }
+  /**
+   * kótovat chytře / celkově / nic / základní (Auto + Ø), řetězově / od základny; `functional` = funkční rozměry (nikdy
+   * pomocné „(…)“; prázdné = zrušit), `holes` = polohy děr (auto / souřadnicově / tabulkou / od hran řetězově)
+   */
+  | { k: "dim"; mode: "smart" | "overall" | "none" | "auto"; style?: "chain" | "baseline"; functional?: number[]; holes?: "auto" | "ordinate" | "table" | "chain" }
+  /**
+   * tolerance ke kótě podle ČÍSELNÉ hodnoty modelu (74,175), druhu (Ø40, M8) nebo id (a12); `view` = jen kóty pohledu;
+   * `fit` = výkres uložení (pole ISO 286, kontrola), `show` = zobrazení úchylek u kóty
+   */
+  | { k: "tol"; target: string; tol: string; fit?: boolean; show?: FitShow; view?: ViewRef }
+  /** kontrola tolerancí: funkční rozměry (a tolerované rozměry předlohy) bez tolerance na listu */
+  | { k: "tolcheck" }
   /** pomocné pohledy, řezy lomenou čarou, částečné řezy, přerušení, uložení, značky revizí, zóny (cad/agent-drawing-views.ts) */
   | { k: "views"; cmd: ViewsCmd }
   /** údaje u razítka: poznámka, nepředepsané tolerance, hrany, drsnost */
@@ -68,8 +78,8 @@ export type DrawingCmd =
   | { k: "drawings"; op: "delete"; ref: SheetRef }
   /** export do souboru: aktivní list, list N nebo všechny listy aktivního výkresu (PDF vícestránkové, jinak ZIP) */
   | { k: "export"; format: DrawingFileFormat; sheet?: SheetRef | "all"; dwgVersion?: string }
-  /** razítko (prázdné = vypsat) */
-  | { k: "title"; fields: Partial<Record<TitleField, string>> }
+  /** razítko (prázdné = vypsat); pole včetně šablony a loga – cad/agent-title.ts */
+  | { k: "title"; fields: Partial<Record<TitleCmdField, string>> }
   /** tabulka revizí */
   | { k: "rev"; op: "set"; rev: string; note: string; date?: string; author?: string }
   | { k: "rev"; op: "delete"; rev: string }
@@ -194,8 +204,9 @@ export const VOLBY: OptRow[] = [
           n++;
         } else break;
       }
-      o.section = { plane, offset, ...(kind ? { kind } : {}) };
-      sum.push(tr("řez {0} odsazení {1}", plane, String(offset).replace(".", ",")) + (kind === "half" ? tr(" (poloviční)") : kind === "full" ? tr(" (celý)") : ""));
+      // odsazení podél normály roviny jako u skici (skica XZ odsazení 57 = rovina Y = −57) – cad/drawing-section.ts
+      o.section = { plane, offset, normal: true, ...(kind ? { kind } : {}) };
+      sum.push(tr("řez {0}", sectionText(o.section)) + (kind === "half" ? tr(" (poloviční)") : kind === "full" ? tr(" (celý)") : ""));
       return n;
     },
   },
@@ -270,7 +281,7 @@ export const VOLBY: OptRow[] = [
 ];
 
 const SUB: Record<string, DrawingCmd["k"] | "note" | "tolerance" | "edges" | "roughness"> = {
-  tolerance: "tol", tol: "tol", toleranz: "tol", licovani: "tol",
+  tolerance: "tol", tol: "tol", toleranz: "tol", licovani: "tol", toleranci: "tol", tolerances: "tol", toleranzen: "tol",
   poznamka: "note", note: "note", notiz: "note", hinweis: "note",
   nepredepsane: "tolerance", general: "tolerance", allgemein: "tolerance", allgemeintoleranz: "tolerance", allgemeintoleranzen: "tolerance",
   hrany: "edges", edges: "edges", kanten: "edges", werkstuckkanten: "edges",
@@ -293,9 +304,21 @@ export function parseDrawing(tokens: string[], raw?: string): DrawingCmd | null 
   const rest = tokens.slice(1).join(" ").trim();
   if (sub === "status") return parseStatus(rt.slice(1));
   if (sub === "tol") {
-    if (tokens.length < 3) throw new Error(tr("výkres tolerance <kóta> <tolerance> – např. výkres tolerance Ø40 h6 · výkres tolerance 25 ±0,1 · výkres tolerance M8 6H"));
-    return { k: "tol", target: tokens[1], tol: tokens.slice(2).join(" ") };
+    const usage = tr("výkres tolerance <kóta> <tolerance> [pohled <p>] – kóta hodnotou (74,175), druhem (Ø40, M8) nebo id (a12), např. výkres tolerance Ø40 h6 · výkres tolerance 25 ±0,1 pohled horní · výkres tolerance a12 -0,005");
+    const rest = tokens.slice(2);
+    // výkres kontrola tolerancí / drawing check tolerances (i „výkres tolerance kontrola“)
+    if (rest.length === 0 && CHECK_W.has(fold(tokens[1] ?? ""))) return { k: "tolcheck" };
+    let view: ViewRef | undefined;
+    const vi = rest.findIndex((w) => VIEW_W.has(fold(w)));
+    if (vi >= 0) {
+      const [v, n] = viewRef(rawTokens(rest.slice(vi + 1).join(" ")), 0);
+      view = v;
+      rest.splice(vi, 1 + n);
+    }
+    if (tokens.length < 3 || !rest.length) throw new Error(usage);
+    return { k: "tol", target: tokens[1], tol: rest.join(" "), ...(view ? { view } : {}) };
   }
+  if (CHECK_W.has(fold(tokens[0])) && tokens.length === 2 && SUB[fold(tokens[1])] === "tol") return { k: "tolcheck" };
   if (sub === "note" || sub === "tolerance" || sub === "edges" || sub === "roughness") {
     if (!rest && sub !== "note") throw new Error(tr("výkres {0} potřebuje text, např. {1}", tokens[0], sub === "tolerance" ? "ISO 2768-mK" : sub === "edges" ? "ISO 13715 -0,3" : "Ra 3,2"));
     return { k: "meta", field: sub, value: rest };
@@ -331,12 +354,43 @@ function parseSet(tokens: string[]): DrawingCmd {
   return { k: "set", opts: o, summary: sum };
 }
 
-/** Příkaz „kótovat …“ → povel (výchozí chytře, řetězově). */
+const FUNCTIONAL_W = ["funkcni", "funkcne", "functional", "function", "funktional", "funktionsmass", "funktionsmasse", "funktion"];
+const HOLES_W = ["diry", "otvory", "holes", "hole", "bohrungen", "locher", "loecher"];
+const HOLE_MODE: Record<string, "auto" | "ordinate" | "table" | "chain"> = {
+  auto: "auto", automaticky: "auto", automatisch: "auto",
+  tabulka: "table", tabulkou: "table", table: "table", tabelle: "table", bohrungstabelle: "table",
+  souradnicove: "ordinate", souradnice: "ordinate", souradnicovy: "ordinate", ordinate: "ordinate", ordinates: "ordinate", koordinaten: "ordinate", koordinatenbemassung: "ordinate", ordinaten: "ordinate",
+  retezove: "chain", chain: "chain", kette: "chain", ketten: "chain", hrany: "chain", edges: "chain", kanten: "chain",
+};
+/** číslo, nebo čísla oddělená středníkem jako v poli formuláře („50; 30“, „50;30“, „50;“) */
+const isNumWord = (w: string | undefined) => !!w && /^;*[+]?(\d+([.,]\d*)?|[.,]\d+)(;+[+]?(\d+([.,]\d*)?|[.,]\d+))*;*$/.test(w);
+
+/** Příkaz „kótovat …“ → povel (výchozí chytře, řetězově); `funkční 26,5 74,175`, `díry tabulka|souřadnicově|řetězově`. */
 export function parseDimension(tokens: string[]): DrawingCmd {
   let mode: "smart" | "overall" | "none" | "auto" = "smart";
   let style: "chain" | "baseline" | undefined;
+  let functional: number[] | undefined;
+  let holes: "auto" | "ordinate" | "table" | "chain" | undefined;
   for (let i = 0; i < tokens.length; i++) {
     const w = fold(tokens[i]);
+    if (FUNCTIONAL_W.includes(w)) {
+      // funkční rozměry (mm modelu): čísla až do dalšího slova; „funkční ne“ = zrušit
+      const vals: number[] = [];
+      while (isNumWord(tokens[i + 1])) vals.push(...tokens[++i].split(";").filter(Boolean).map((x) => Number(x.replace(",", "."))));
+      if (!vals.length) {
+        if (!NO.has(fold(tokens[i + 1] ?? ""))) throw new Error(tr("kótovat funkční <rozměr> [<rozměr> …] – funkční rozměry nikdy nebudou pomocnou kótou v závorce, např. kótovat chytře funkční 26,5 74,175 (zrušit: kótovat funkční ne)"));
+        i++;
+      }
+      functional = vals;
+      continue;
+    }
+    if (HOLES_W.includes(w)) {
+      const m = HOLE_MODE[fold(tokens[i + 1] ?? "")];
+      if (!m) throw new Error(tr("kótovat díry tabulka|souřadnicově|řetězově|auto – polohy děr tabulkou děr, souřadnicovými kótami od základny, nebo od hran"));
+      holes = m;
+      i++;
+      continue;
+    }
     if (["chytre", "smart", "intelligent", "auto", "automaticky"].includes(w)) mode = "smart";
     else if (["zakladni", "basic", "einfach", "jednoduse", "jednoduche"].includes(w)) mode = "auto";
     else if (["celkove", "overall", "gesamt", "gesamtmasse", "aussenmasse"].includes(w)) mode = "overall";
@@ -346,9 +400,9 @@ export function parseDimension(tokens: string[]): DrawingCmd {
     else if (w === "od" && ["zakladny", "zakladna"].includes(fold(tokens[i + 1] ?? ""))) {
       style = "baseline";
       i++;
-    } else throw new Error(tr("kótovat [chytře|celkově|základní|nic] [řetězově|od základny] – neznámé slovo „{0}“", tokens[i]));
+    } else throw new Error(tr("kótovat [chytře|celkově|základní|nic] [řetězově|od základny] [funkční 26,5 74,175] [díry tabulka|souřadnicově|řetězově] – neznámé slovo „{0}“", tokens[i]));
   }
-  return { k: "dim", mode, ...(style ? { style } : {}) };
+  return { k: "dim", mode, ...(style ? { style } : {}), ...(functional ? { functional } : {}), ...(holes ? { holes } : {}) };
 }
 
 // ---------------------------------------------------------------- listy, razítko, revize, značky, kóty, detaily, modely
@@ -372,6 +426,8 @@ export function rawTokens(line: string): RawTok[] {
 }
 
 const W = (...w: string[]) => new Set(w);
+/** kontrola (výkres kontrola tolerancí · drawing check tolerances · zeichnung prüfen toleranzen) */
+const CHECK_W = W("kontrola", "kontrolovat", "zkontrolovat", "check", "pruefen", "prufen", "prufung", "pruefung", "kontrolle");
 const SHEET_W = W("list", "sheet", "blatt");
 const SHEETS_W = W("listy", "sheets", "blatter", "blaetter");
 const NEW_W = W("novy", "nova", "nove", "new", "neu", "neues", "pridat", "add");
@@ -597,10 +653,11 @@ function parseStatus(rt: RawTok[]): DrawingCmd {
 }
 
 function parseTitle(rt: RawTok[]): DrawingCmd {
-  const fields: Partial<Record<TitleField, string>> = {};
+  const fields: Partial<Record<TitleCmdField, string>> = {};
   for (const t of rt) {
-    const f = t.key ? TITLE_W[fold(t.key)] : undefined;
-    if (!f) throw new Error(tr("výkres razítko název=\"…\" číslo=\"…\" kreslil=\"…\" revize=\"…\" datum=\"…\" materiál=\"…\" [nepředepsané=\"…\" hrany=\"…\" poznámka=\"…\"] – neznámé „{0}“", t.key ? `${t.key}=` : t.s));
+    // pole razítka česky / anglicky / německy (kontroloval=, checked=, geprüft= …) – cad/agent-title.ts
+    const f = t.key ? titleFieldOf(t.key) : undefined;
+    if (!f) throw new Error(tr("{0} – neznámé „{1}“", titleUsage(), t.key ? `${t.key}=` : t.s));
     fields[f] = t.s;
   }
   return { k: "title", fields };

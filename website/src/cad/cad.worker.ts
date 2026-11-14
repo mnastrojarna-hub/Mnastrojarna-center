@@ -10,7 +10,7 @@ import { drawingDoc } from "./drawing-doc";
 import { drawingModelShapes } from "./drawing-models";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { makeSmartDrawing } from "./drawing-dims";
-import { cachedBody, findCylFace, interference, mateEdgeInfo, mateFaceInfo, mateFaceMesh, mateVertexInfo, partEntry, shapeOfDoc } from "./asm-kernel";
+import { asmEnvelope, cachedBody, findCylFace, interference, mateEdgeInfo, mateFaceInfo, mateFaceMesh, mateVertexInfo, partEntry, shapeOfDoc } from "./asm-kernel";
 import { compareTransferables, compareWithReference, type CompareOptions, type ReferenceFile } from "./compare";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
@@ -58,6 +58,8 @@ type Req =
   | { id: number; op: "asmFace"; key: string; index: number }
   | { id: number; op: "lang"; lang: CadLang }
   | { id: number; op: "interference"; doc: CadDoc }
+  /** přesná obálka sestavy z těles listových dílů (stav sestavy) */
+  | { id: number; op: "asmEnvelope"; doc: CadDoc }
   | { id: number; op: "compare"; doc: CadDoc; file: ReferenceFile; opts?: CompareOptions }
   | { id: number; op: "mateFace"; key: string; index: number }
   | { id: number; op: "mateEnt"; key: string; index: number; ent: "edge" | "vertex" | "mesh" }
@@ -301,6 +303,9 @@ ctx.onmessage = async (e: MessageEvent<Req & { blobs?: Record<string, Uint8Array
       }
       case "interference":
         ctx.postMessage({ id: m.id, ok: true, result: await interference(m.doc) });
+        break;
+      case "asmEnvelope":
+        ctx.postMessage({ id: m.id, ok: true, result: await asmEnvelope(m.doc) });
         break;
       case "compare": {
         // porovnání s referenčním modelem: těleso dokumentu (z mezipaměti stavby) proti souboru STEP / BREP / STL

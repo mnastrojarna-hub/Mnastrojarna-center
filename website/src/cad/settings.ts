@@ -45,6 +45,8 @@ export type Settings = {
   sheet: "auto" | "A4" | "A3" | "A2" | "A1" | "A0";
   projection: "E" | "A";
   tolerance: string;
+  /** šablona razítka nových listů výkresu (cad/title-block.ts): iso7200 (výchozí), compact, toolmaker */
+  titleTemplate?: "iso7200" | "compact" | "toolmaker";
   // zkratky (příkaz → klávesa)
   shortcuts: Record<string, string>;
 };
@@ -162,6 +164,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sheet: "auto",
   projection: "E",
   tolerance: "ISO 2768-mK",
+  titleTemplate: "iso7200",
   shortcuts: withDefaultShortcuts(),
 };
 

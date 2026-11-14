@@ -75,7 +75,8 @@ describe("exportDrawing – list podle čísla / názvu, Chytré kóty a značky
     expect(Buffer.from(r.base64, "base64").toString("utf8")).toContain("1;Hřídel;;2;Ocel");
     const d = await run(plateDoc(), "výkres detail přední v 0 10 poloměr 3");
     const w = await exportDrawing({ ...d, drawings: [{ ...d.drawings![0], options: { ...d.drawings![0].options, details: [{ id: "x", label: "Z", view: "left", cx: 0, cy: 0, r: 1, scale: 2 }] } }] }, "svg", {}, fixtureCompute);
-    expect(w.warnings).toEqual(["Detail Z: pohled left není na listu."]);
+    // díl bez nepředepsaných tolerancí: export to ohlásí (w15 – razítko 5.4)
+    expect(w.warnings).toEqual(["Detail Z: pohled left není na listu.", expect.stringMatching(/^Výkres nemá nepředepsané tolerance – zadejte je: výkres nepředepsané ISO 2768-mK/)]);
   });
   it("dokument bez výkresu: výchozí list s Chytrými kótami; prázdný model = chyba", async () => {
     const r = await exportDrawing(plateDoc(), "svg", {}, fixtureCompute);

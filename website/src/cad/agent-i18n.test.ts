@@ -147,7 +147,7 @@ describe("pravidla hran a ploch anglicky a německy", () => {
 });
 
 describe("souhrn prvku ve stavovém textu je přeložený", () => {
-  const hole: Feature = { id: "h", name: "Díra 1", type: "hole", diameter: 8.5, depth: 10, position: [20, 30, 12], axis: "Z", cbDiameter: 15, cbDepth: 5, csDiameter: 0, kind: "simple" } as unknown as Feature;
+  const hole: Feature = { id: "h", name: "Díra 1", type: "hole", diameter: 8.5, depth: 10, position: [20, 30, 12], axis: "Z", cbDiameter: 15, cbDepth: 5, csDiameter: 0, kind: "counterbore" } as unknown as Feature; // 15. vlna: zahloubení jen u díry, která ho má (holeHeadOf)
   const ext: Feature = { id: "e", name: "Vysunutí 1", type: "extrude", sketchId: "s", distance: 20, symmetric: true, reverse: false, mode: "cut" } as unknown as Feature;
   it("čeština", () => {
     expect(featureSummary(hole)).toBe("Ø8,50 hloubka 10 zahl. Ø15×5 v [20; 30; 12], osa Z");

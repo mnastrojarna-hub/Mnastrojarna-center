@@ -11,6 +11,7 @@ import type { DwgVersion } from "./formats/dwg-versions";
 import { DWG_VERSIONS } from "./formats/dwg-versions";
 import { writeZip } from "./formats/zip";
 import { tr } from "./i18n";
+import { generalTolOf } from "./title-block";
 import type { CadDoc } from "./types";
 
 export type DrawingExportFormat = "pdf" | "dxf" | "dwg" | "svg" | "csv" | "png";
@@ -169,6 +170,18 @@ export async function drawingFileSheets(
 }
 
 /**
+ * Výkres dílu bez nepředepsaných tolerancí (ISO 2768 / tabulka podle desetinných míst / text) není úplný – export to
+ * ohlásí u každého takového listu. Sestava je nevyžaduje (montážní výkres netoleruje nekótované rozměry).
+ */
+export function generalTolWarnings(doc: CadDoc, sheets: Pick<SheetOut, "meta" | "name">[]): string[] {
+  if (doc.kind === "assembly") return [];
+  const miss = sheets.filter((s) => !generalTolOf(s.meta));
+  if (!miss.length) return [];
+  const where = sheets.length > 1 ? tr(" (listy: {0})", miss.map((s) => `„${s.name}“`).join(", ")) : "";
+  return [tr("Výkres nemá nepředepsané tolerance{0} – zadejte je: výkres nepředepsané ISO 2768-mK (třída f/m/c/v + H/K/L) nebo výkres nepředepsané desetinná (X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005)", where)];
+}
+
+/**
  * Výkres listu dokumentu jako soubor (API pro agenty): list podle čísla / názvu (jinak aktivní), výpočet jako výkresové
  * prostředí včetně Chytrých kót, které ještě nejsou na listu, kót a značek. Vrací název, MIME, velikost, base64
  * a varování (pohled se nevešel, kóta bez geometrie…).
@@ -183,7 +196,7 @@ export async function exportDrawing(doc: CadDoc, format: DrawingExportFormat, op
   const f = await drawingFileSheets(sheets, format, { base, title: meta.name, dwgVersion: opts.dwgVersion, bom: meta.bom, width: opts.width });
   const multi = sheets.length > 1;
   const lost = sheets.reduce((n, x) => n + x.lost, 0);
-  const warnings = [...sheets.flatMap((x) => x.warnings.map((w) => (multi ? `${x.name}: ${w}` : w))), ...(lost ? [tr("Kóty a poznámky bez geometrie: {0}", lost)] : [])];
+  const warnings = [...sheets.flatMap((x) => x.warnings.map((w) => (multi ? `${x.name}: ${w}` : w))), ...(lost ? [tr("Kóty a poznámky bez geometrie: {0}", lost)] : []), ...generalTolWarnings(doc, sheets)];
   const px = f as { width?: number; height?: number };
   const one = !multi && px.width ? { width: px.width, height: px.height } : {};
   return { name: f.name, mime: f.mime, bytes: f.data.length, base64: toBase64(f.data), ...one, ...(warnings.length ? { warnings } : {}), ...(multi && format !== "csv" ? { sheets: sheets.length } : {}), ...("files" in f && f.files ? { files: f.files } : {}) };

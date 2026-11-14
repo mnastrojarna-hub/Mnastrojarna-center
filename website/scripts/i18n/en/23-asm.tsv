@@ -1,0 +1,72 @@
+# vlna 15 – balík asm: přesná obálka sestavy, natočení v pohybové studii, kusovník podle zdroje, přezdívka instance, pružiny v sestavě
+ · přezdívka „{0}“	 · alias “{0}”
+„{0}“ je název jiné komponenty – přezdívka musí být jednoznačná	“{0}” is the name of another component – the alias must be unique
+✓ pružina odebrána: {0} (komponenta zůstává v sestavě, tvar ve volné délce)	✓ spring removed: {0} (the component stays in the assembly, shape at free length)
+bez přezdívky	no alias
+délka na doraz	solid length
+Délka na doraz Ln (0 = z modelu)	Solid length Ln (0 = from the model)
+Dosedá na (A)	Seats on (A)
+dosedací plocha A: 	seat face A: 
+dosedací plocha B: 	seat face B: 
+dosedací plochy jsou v obráceném pořadí nebo splývají (vzdálenost {0} mm) – prohoďte A a B	the seat faces are in reverse order or coincide (distance {0} mm) – swap A and B
+Dosedací plochy: nejbližší rovinná plocha komponenty kolmá na osu pružiny. Délka se přepočítá při každém přepočtu vazeb i v pohybové studii.	Seat faces: the nearest planar face of the component perpendicular to the spring axis. The length is recomputed with every mate update and in the motion study.
+chybí název komponenty: {0}	component name missing: {0}
+komponenta „{0}“ není pružina – díl potřebuje prvek Pružina (normálie pružina d2 D20 L44 n8 · pružina D stoupání P závity N drát d) nebo trubku / válec po ose	component “{0}” is not a spring – the part needs a Spring feature (library spring d2 D20 L44 n8 · spring D pitch P turns N wire d) or a tube / cylinder along the axis
+např. K48	e.g. K48
+Nastavit pružinu	Set spring
+nedosedá – vzdálenost ploch {0} mm je větší než volná délka L0 {1} mm (mezera {2} mm)	not seated – the face distance {0} mm is larger than the free length L0 {1} mm (gap {2} mm)
+nedosedá v krocích {0} (mezera max {1} mm)	not seated in steps {0} (gap up to {1} mm)
+otevřený dokument „{0}“ není sestava – nejdřív „nová sestava“ nebo „záložka "…"“	the open document “{0}” is not an assembly – first “new assembly” or “tab "…"”
+plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít, pružina, pružiny	faces, mate, mates, component, remove, duplicate, isolate, hide, show, fix, release, pattern, mirror, bolt, subassembly, dissolve, edit, done, open, spring, springs
+pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)	below the solid length in steps {0} (face distance down to {1} mm)
+pružina „{0}“	spring “{0}”
+pružina „{0}“: délku nešlo určit – dosedací plocha je rovnoběžná s osou pružiny nebo se díl nepostavil	spring “{0}”: length could not be determined – a seat face is parallel to the spring axis or the part did not build
+pružina „{0}“: chybí dosedací komponenty – {1}	spring “{0}”: seat components missing – {1}
+pružina „{0}“: komponenta „{1}“ nemá rovinnou plochu kolmou na osu pružiny obrácenou k ní – zadejte plochu F-číslem (sestava plochy "{1}" rovinné)	spring “{0}”: component “{1}” has no planar face perpendicular to the spring axis facing it – give the face by F number (assembly faces "{1}" planar)
+pružina mezi dvěma komponentami: díl s prvkem Pružina (normálie pružina …, pružina D stoupání …) nebo trubkou; délka = vzdálenost dosedacích ploch A a B po ose pružiny (bez plochy nejbližší kolmá rovinná plocha obrácená k pružině), mění se při přepočtu vazeb i v pohybové studii; síla F = c·(L0 − L), ✗ pod délkou na doraz Ln (výchozí (závity + 1)·drát), ⚠ nedosedá nad L0; plocha, kterou pružina prochází otvorem, se přeskočí; blok 0 / tuhost 0 = zrušit; export STEP s tvarem v aktuální délce; stejný název = všechny instance	spring between two components: a part with a Spring feature (library spring …, spring D pitch …) or a tube; length = distance of the seat faces A and B along the spring axis (without a face the nearest perpendicular planar face facing the spring), changes with mate updates and in the motion study; force F = c·(L0 − L), ✗ below the solid length Ln (default (turns + 1)·wire), ⚠ not seated above L0; a face the spring passes through an opening of is skipped; solid 0 / rate 0 = clear; STEP export with the shape at the current length; same name = all instances
+Pružina mezi komponentami	Spring between components
+pružina: dosedací plocha nemůže být na samotné pružině „{0}“	spring: a seat face cannot be on the spring “{0}” itself
+pružina: dosedací plochy musí být na dvou různých komponentách (A ≠ B)	spring: the seat faces must be on two different components (A ≠ B)
+pružina: chybí komponenta A za „mezi“ – {0}	spring: component A missing after “between” – {0}
+pružina: chybí komponenta B – {0}	spring: component B missing – {0}
+pružina: komponenta „{0}“ není díl (podsestava / import) – pružina potřebuje díl s prvkem Pružina	spring: component “{0}” is not a part (subassembly / import) – a spring needs a part with a Spring feature
+Pružiny ({0}):	Springs ({0}):
+Pružiny: {0}	Springs: {0}
+Pružiny: žádné – {0}	Springs: none – {0}
+přezdívka	alias
+přezdívka „{0}“	alias “{0}”
+Přezdívka instance (vazby místo #k)	Instance alias (mates instead of #k)
+přezdívka nesmí být prázdná	the alias must not be empty
+přezdívka nesmí začínat „#“ (to je pořadí komponenty) – např. jako "K48"	the alias must not start with “#” (that is the component position) – e.g. as "K48"
+přezdívku „{0}“ už má komponenta „{1}“ – zvolte jinou	component “{1}” already has the alias “{0}” – choose another one
+sestava pružina "Pružina" mezi "Deska A" [F3] "Deska B" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina "Pružina" odebrat · sestava pružiny	assembly spring "Spring" between "Plate A" [F3] "Plate B" [F7] [free L0] [solid Ln] [rate c] · assembly spring "Spring" remove · assembly springs
+sestava pružina: {0} musí být kladná	assembly spring: {0} must be positive
+sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm	assembly spring: the solid length {0} mm must be smaller than the free length {1} mm
+sestava pružina: neznámá volba „{0}“ – {1}	assembly spring: unknown option “{0}” – {1}
+sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže); „jako "K48"“ = přezdívka instance – odkaz ve vazbách místo #k, ve stromu v [ ], kusovník ji nepoužívá	assembly: inserts a part from an open tab as a component (mates by text: assembly mate …, see below); “as "K48"” = instance alias – reference in mates instead of #k, shown in [ ] in the tree, not used by the BOM
+síla {0} N (c {1} N/mm)	force {0} N (c {1} N/mm)
+síla {0} N (max {1} N)	force {0} N (max {1} N)
+stlačena pod délku na doraz Ln {0} mm (vzdálenost ploch {1} mm, chybí {2} mm)	compressed below the solid length Ln {0} mm (face distance {1} mm, {2} mm short)
+stlačení {0} mm	compression {0} mm
+Stlačuje (B)	Compressed by (B)
+tuhost	rate
+Tuhost c (0 = neuvádět)	Rate c (0 = not given)
+Upravit pružinu	Update spring
+v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …, přezdívka "…"	at x y z, rotation rx ry rz, move dx dy dz, turn X 90, fixed, release, hide, show, color #hex, name "…", number "…", group "…", material …, alias "…"
+vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název, pořadí #3 nebo přezdívka (vložit … jako "K48", sestava komponenta #3 přezdívka "K48"; EN alias, DE als); po přesunu se vazby přepočítají; kusovník sčítá komponenty podle zdroje (dílu) – přejmenování instance řádek nerozdělí	component properties as in the panel (position, rotation, fixed, visibility, description, BOM material); component = name, position #3 or alias (insert … as "K48", assembly component #3 alias "K48"; DE als); mates are recomputed after a move; the BOM counts components by source (part) – renaming an instance does not split the row
+vložit … jako: chybí přezdívka – např. vložit "Šroub" jako "K48"	insert … as: alias missing – e.g. insert "Screw" as "K48"
+vložit: {0}	insert: {0}
+volná délka	free length
+ (u {0} velkých importů ze sítě)	 (from the mesh for {0} large imports)
+# vlna 15 – oprava po revizi: řádky pružin podle instance, dosednutí přes otvor, zrušení hodnot, přezdívka
+  dosedací plochy pružiny „{0}“{1}: {2}	  spring seats of “{0}”{1}: {2}
+  pružiny bez dosedací komponenty (definice odebrána, tvar ve volné délce): {0}	  springs without a seat component (definition removed, shape at free length): {0}
+ – definice se neuložila	 – the definition was not saved
+ (přeskočena {0} – pružina jí prochází otvorem)	 (skipped {0} – the spring passes through its opening)
+„{0}“ je přezdívka #{1} i název {2} – zadejte pořadím: {3}	“{0}” is the alias of #{1} and the name of {2} – give the index: {3}
+„{0}“ je přezdívka komponenty #{1} {2} – název musí být jiný (nebo nejdřív změňte přezdívku)	“{0}” is the alias of component #{1} {2} – choose another name (or change the alias first)
+„{0}“{1} – délka zatím nespočtena (sestava pružina / přepočet vazeb)	“{0}”{1} – length not computed yet (assembly spring / mate update)
+⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)	⚠ spring “{0}”{1}: length could not be determined (seat face geometry missing)
+pružina „{0}“: osa pružiny prochází komponentou „{1}“ otvorem – plocha {2} nemá pod pružinou materiál, pružina na ní nedosedá; zadejte komponentu, o kterou se pružina opírá (např. další desku), nebo plochu F-číslem	spring “{0}”: the spring axis passes through an opening of component “{1}” – face {2} has no material under the spring, the spring does not seat on it; give the component the spring rests on (e.g. the next plate) or the face by its F number
+Pružina {0}×{1}×{2} – n={3}	Spring {0}×{1}×{2} – n={3}
+sestava pružina: {0} nesmí být záporná (0 = zrušit zadanou hodnotu)	assembly spring: {0} must not be negative (0 = clear the value)

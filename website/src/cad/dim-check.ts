@@ -6,7 +6,7 @@
  */
 import { tr } from "./i18n";
 import { threadByName, threadLabel } from "./defaults";
-import { holeDrillD } from "./hole-spec";
+import { holeDrillD, holeHeadOf } from "./hole-spec";
 import { placementOf } from "./placements";
 import type { CadDoc, Feature, Vec3 } from "./types";
 
@@ -45,6 +45,31 @@ function throughBox(f: Extract<Feature, { type: "cylinder" }>, bbox: [Vec3, Vec3
   return t0 <= Math.min(...ts) + 1e-6 && t0 + f.height >= Math.max(...ts) - 1e-6;
 }
 
+/**
+ * Délka nástroje odebrání v tělese: interval [t0, t1] podél jednotkového směru `d` od bodu `o` proti obálce `bbox`.
+ * `through` = interval pokryje celé těleso (průchozí – délka nástroje není rozměr součásti); jinak `len` = délka uvnitř
+ * obálky (odebrání vyčnívající z tělesa – např. náběh od čela – má na výkrese jen svou část v tělese).
+ */
+function cutSpan(o: Vec3, d: Vec3, t0: number, t1: number, bbox: [Vec3, Vec3]): { through: boolean; len: number } {
+  const ts = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => [0, 1, 2].reduce((s, i) => s + d[i] * (bbox[(k >> i) & 1][i] - o[i]), 0));
+  const lo = Math.min(...ts);
+  const hi = Math.max(...ts);
+  const a = Math.min(t0, t1);
+  const b = Math.max(t0, t1);
+  return { through: a <= lo + 1e-6 && b >= hi - 1e-6, len: Math.max(0, Math.min(b, hi) - Math.max(a, lo)) };
+}
+type PlaneLike = { kind: "base"; name: string; offset: number } | { kind: "custom"; origin: Vec3; normal: Vec3 };
+/** počátek a normála roviny skici (jako replicad makePlane: XZ má normálu −Y) */
+function planeFrame(pl: PlaneLike): { o: Vec3; n: Vec3 } {
+  if (pl.kind === "custom") {
+    const l = Math.hypot(...pl.normal) || 1;
+    return { o: pl.origin, n: [pl.normal[0] / l, pl.normal[1] / l, pl.normal[2] / l] };
+  }
+  if (pl.name === "XZ") return { o: [0, -pl.offset, 0], n: [0, -1, 0] };
+  if (pl.name === "YZ") return { o: [pl.offset, 0, 0], n: [1, 0, 0] };
+  return { o: [0, 0, pl.offset], n: [0, 0, 1] };
+}
+
 /** Očekávané kóty z historie prvků. */
 export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[] {
   const out: DimExpect[] = [];
@@ -71,11 +96,14 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
           if (f.tapDrill === "minor" || f.tapDrill === "custom") push(out, "dia", holeDrillD(f), tr("Ø{0} (vrták závitu {1})", String(Math.round(holeDrillD(f) * 1000) / 1000).replace(".", ","), threadLabel(f.thread)), src);
         } else push(out, "dia", f.diameter, `${cnt}Ø${fmt(f.diameter)}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : " skrz"}`, src);
         if (f.depth > 0) push(out, "lin", f.depth, tr("{0} (hloubka díry)", fmt(f.depth)), src);
-        if (f.cbDiameter > 0) {
-          push(out, "dia", f.cbDiameter, tr("Ø{0} (zahloubení)", fmt(f.cbDiameter)), src);
-          push(out, "lin", f.cbDepth, tr("{0} (hloubka zahloubení)", fmt(f.cbDepth)), src);
+        // zahloubení – i u závitové díry se zahloubením (zahloubení + vrták + závit); vrták pod zahloubením patří na výkres
+        const hd = holeHeadOf(f);
+        if (hd?.kind === "counterbore" && hd.d > 0) {
+          push(out, "dia", hd.d, tr("Ø{0} (zahloubení)", fmt(hd.d)), src);
+          push(out, "lin", hd.depth, tr("{0} (hloubka zahloubení)", fmt(hd.depth)), src);
         }
-        if (f.csDiameter) push(out, "dia", f.csDiameter, tr("Ø{0} (kuželové zahloubení)", fmt(f.csDiameter)), src);
+        if (hd?.kind === "countersink" && hd.d > 0) push(out, "dia", hd.d, tr("Ø{0} (kuželové zahloubení)", fmt(hd.d)), src);
+        if (hd && f.kind === "tapped" && f.thread && f.tapDrill !== "minor" && f.tapDrill !== "custom") push(out, "dia", holeDrillD(f), tr("Ø{0} (vrták závitu {1})", String(Math.round(holeDrillD(f) * 1000) / 1000).replace(".", ","), threadLabel(f.thread)), src);
         break;
       }
       case "cylinder":
@@ -98,13 +126,35 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
         if (!(f.mode === "cut" && (f.radius1 === 0 || f.radius2 === 0))) push(out, "lin", f.height, tr("{0} (výška)", fmt(f.height)), src);
         break;
       case "box":
-        for (const v of f.size) push(out, "lin", v, `${fmt(v)}`, src);
+        f.size.forEach((v, k) => {
+          // odebraný kvádr: rozměr skrz celé těleso není rozměr součásti, vyčnívající část se nekótuje
+          if (f.mode === "cut" && bbox && !f.dirDef) {
+            const lo = f.centered ? f.position[k] - v / 2 : f.position[k];
+            const ax: Vec3 = [0, 0, 0];
+            ax[k] = 1;
+            const sp = cutSpan([0, 0, 0], ax, lo, lo + v, bbox);
+            if (sp.through) return;
+            if (sp.len < v - 1e-6) return push(out, "lin", sp.len, tr("{0} (v tělese)", fmt(sp.len)), src);
+          }
+          push(out, "lin", v, `${fmt(v)}`, src);
+        });
         break;
       case "extrude": {
         if (f.extent && f.extent.kind !== "blind") break;
         const d = f.extent?.kind === "blind" ? f.extent.d : f.distance;
         // průchozí odebrání (řez skrz celý díl): délka nástroje není rozměr součásti
         if (f.mode === "cut" && bbox && d >= Math.max(bbox[1][0] - bbox[0][0], bbox[1][1] - bbox[0][1], bbox[1][2] - bbox[0][2]) - 1e-6) break;
+        // odebrání podél normály skici: skrz těleso (i šikmá rovina) → bez kóty; vyčnívá-li z tělesa → jen část v tělese
+        const sk = doc.features.find((x): x is Extract<Feature, { type: "sketch" }> => x.type === "sketch" && x.id === f.sketchId);
+        if (f.mode === "cut" && bbox && sk) {
+          const { o, n } = planeFrame(sk.plane as PlaneLike);
+          const sp = f.symmetric ? cutSpan(o, n, -d / 2, d / 2, bbox) : cutSpan(o, n, 0, f.reverse ? -d : d, bbox);
+          if (sp.through) break;
+          if (sp.len > 1e-6 && sp.len < d - 1e-6) {
+            push(out, "lin", sp.len, tr("{0} (hloubka odebrání v tělese)", fmt(sp.len)), src);
+            break;
+          }
+        }
         push(out, "lin", d, tr("{0} ({1})", fmt(d), f.mode === "cut" ? tr("hloubka odebrání") : tr("výška vysunutí")), src);
         break;
       }

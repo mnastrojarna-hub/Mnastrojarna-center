@@ -17,6 +17,7 @@ import { MATERIALS, massKg } from "@/lib/mesh-metrics";
 import { defaultMoldBase, type BomRow, type CompPattern, type MoldBaseParams } from "./assembly";
 import { MATE_LABEL, axisLabel, dirLabel, sortFaceRows, type FaceRow, type KinMateType, type MateStatus } from "./mates";
 import { isKinMate } from "./mates-kin";
+import { springStatusLine } from "./asm-spring";
 import type { MotionCmd } from "./agent-motion";
 import type { AsmComponent, BuildResult, CadDoc, Mate, Vec3 } from "./types";
 
@@ -38,6 +39,8 @@ export type CompPatch = {
   number?: string;
   group?: string;
   material?: string;
+  /** přezdívka instance („“ = zrušit) */
+  alias?: string;
 };
 export type AsmCmd =
   | { k: "list" }
@@ -82,7 +85,10 @@ export type AsmCmd =
   | { k: "tab"; target: string | number }
   | { k: "closeTab"; target?: string | number }
   /** pohybová studie (`pohyb …`, cad/agent-motion.ts) */
-  | { k: "motion"; cmd: MotionCmd };
+  | { k: "motion"; cmd: MotionCmd }
+  /** pružina mezi dvěma komponentami (cad/asm-spring-agent.ts): dosedací plochy A / B (bez plochy = nejbližší kolmá rovina), L0, Ln, c */
+  | { k: "spring"; comp: string; a?: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; free?: number; solid?: number; rate?: number; remove?: boolean }
+  | { k: "springs" };
 
 /* ───────────────────────── tokeny a slova ───────────────────────── */
 
@@ -134,8 +140,10 @@ const SUB: [AsmSub, Set<string>][] = [
   ["edit", W("upravit", "edit", "bearbeiten")],
   ["done", W("hotovo", "zpět", "done", "finish", "back", "fertig", "zurück")],
   ["open", W("otevřít", "open", "öffnen", "oeffnen")],
+  ["spring", W("pružina", "pružinu", "spring", "feder")],
+  ["springs", W("pružiny", "springs", "federn")],
 ];
-type AsmSub = "faces" | "mate" | "mates" | "comp" | "list" | "remove" | "duplicate" | "isolate" | "hide" | "show" | "fix" | "release" | "pattern" | "mirror" | "bolt" | "sub" | "dissolve" | "edit" | "done" | "open";
+type AsmSub = "faces" | "mate" | "mates" | "comp" | "list" | "remove" | "duplicate" | "isolate" | "hide" | "show" | "fix" | "release" | "pattern" | "mirror" | "bolt" | "sub" | "dissolve" | "edit" | "done" | "open" | "spring" | "springs";
 const ALL = W("vše", "všechny", "všechno", "all", "everything", "alle", "alles");
 
 const MATE_KIND: Record<string, MateKind> = Object.fromEntries(
@@ -183,6 +191,7 @@ const O = {
   number: W("číslo", "norma", "number", "nr", "nummer", "norm"),
   group: W("skupina", "group", "gruppe"),
   material: W("materiál", "material", "werkstoff"),
+  alias: W("přezdívka", "alias", "spitzname"),
   spacing: W("rozteč", "krok", "spacing", "pitch", "step", "abstand", "teilung"),
   count: W("počet", "ks", "count", "anzahl"),
   direction: W("směr", "direction", "dir", "richtung"),
@@ -314,7 +323,7 @@ export { Cur as AsmCursor, W as asmWords, isNum as asmIsNum, num as asmNum };
 /** číslo nebo název (záložka, vazba) */
 const target = (t: Tok): string | number => (!t.q && /^#?\d+$/.test(t.t) ? Number(t.t.replace("#", "")) : t.t.trim());
 
-const SUB_HELP = () => tr("plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít");
+const SUB_HELP = () => tr("plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít, pružina, pružiny");
 
 /**
  * Rozbor příkazu sestavy. `cmd` = kanonický název příkazu z agent.ts (assembly, bom, moldbase, tabs, tab, closetab, closed),
@@ -434,7 +443,7 @@ const MOLD_LABEL = (): Record<MoldKey, string> => ({ aPlate: tr("Deska A (pevná
 
 /* ───────────────────────── sestava … ───────────────────────── */
 
-const COMP_HELP = () => tr("v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název \"…\", číslo \"…\", skupina \"…\", materiál …");
+const COMP_HELP = () => tr("v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název \"…\", číslo \"…\", skupina \"…\", materiál …, přezdívka \"…\"");
 
 function parseAssembly(c: Cur): AsmCmd {
   if (c.done) return { k: "list" };
@@ -551,7 +560,54 @@ function parseAssembly(c: Cur): AsmCmd {
       return { k: "done" };
     case "open":
       return { k: "open", comp: compArg(c, tr("chybí název komponenty: sestava otevřít \"Čep\"")) };
+    case "springs":
+      return { k: "springs" };
+    case "spring":
+      return c.done ? { k: "springs" } : parseSpring(c);
   }
+}
+
+const SP = {
+  between: W("mezi", "between", "zwischen"),
+  and: W("a", "and", "und", "&"),
+  free: W("volná", "volna", "l0", "free", "frei"),
+  solid: W("blok", "doraz", "ln", "solid", "block"),
+  rate: W("tuhost", "c", "rate", "stiffness", "federrate", "steifigkeit"),
+};
+export const SPRING_USE = () => tr("sestava pružina \"Pružina\" mezi \"Deska A\" [F3] \"Deska B\" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina \"Pružina\" odebrat · sestava pružiny");
+function parseSpring(c: Cur): AsmCmd {
+  const comp = compArg(c, tr("chybí název komponenty: {0}", SPRING_USE()));
+  const out: Extract<AsmCmd, { k: "spring" }> = { k: "spring", comp };
+  while (!c.done) {
+    if (c.is(SP.between)) {
+      c.i++;
+      out.a = compArg(c, tr("pružina: chybí komponenta A za „mezi“ – {0}", SPRING_USE()));
+      const fa = faceArg(c);
+      if (fa) out.faceA = fa;
+      if (c.is(SP.and)) c.i++;
+      out.b = compArg(c, tr("pružina: chybí komponenta B – {0}", SPRING_USE()));
+      const fb = faceArg(c);
+      if (fb) out.faceB = fb;
+    } else if (c.is(SP.free)) {
+      c.i++;
+      out.free = c.num(tr("volná délka"));
+    } else if (c.is(SP.solid)) {
+      c.i++;
+      out.solid = c.num(tr("délka na doraz"));
+    } else if (c.is(SP.rate)) {
+      c.i++;
+      out.rate = c.num(tr("tuhost"));
+    } else if (c.is(O.del)) {
+      c.i++;
+      out.remove = true;
+    } else throw new Error(tr("sestava pružina: neznámá volba „{0}“ – {1}", c.peek()!.t, SPRING_USE()));
+  }
+  if (out.free !== undefined && !(out.free > 0)) throw new Error(tr("sestava pružina: {0} musí být kladná", tr("volná délka")));
+  // blok 0 / tuhost 0 = zrušit dřív zadanou hodnotu (délka na doraz z modelu, bez síly)
+  for (const [v, what] of [[out.solid, tr("délka na doraz")], [out.rate, tr("tuhost")]] as const)
+    if (v !== undefined && !(v >= 0)) throw new Error(tr("sestava pružina: {0} nesmí být záporná (0 = zrušit zadanou hodnotu)", what));
+  if (out.free !== undefined && out.solid && out.solid >= out.free) throw new Error(tr("sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm", out.solid, out.free));
+  return out;
 }
 
 function parseComp(c: Cur): AsmCmd {
@@ -610,6 +666,14 @@ function parseComp(c: Cur): AsmCmd {
     } else if (c.is(O.material)) {
       c.i++;
       p.material = c.str(tr("materiál"));
+    } else if (c.is(O.alias) || c.is(O.as)) {
+      c.i++;
+      // `přezdívka ""` nebo `přezdívka` na konci řádku = zrušit
+      const t = c.peek();
+      if (!t || (t.q && !t.t.trim())) {
+        if (t) c.i++;
+        p.alias = "";
+      } else p.alias = c.str(tr("přezdívka"));
     } else throw new Error(tr("sestava komponenta: neznámá volba „{0}“ – volby: {1}", c.peek()!.t, COMP_HELP()));
   }
   return { k: "comp", comp, patch: p };
@@ -880,19 +944,59 @@ export const pt = (v: Vec3, d = 2) => `[${v.map((x) => fmt(x, d)).join("; ")}]`;
 /** Komponenta nejvyšší úrovně podle názvu (bez ohledu na velikost písmen a diakritiku) nebo pořadí `#3`; chyba vyjmenuje komponenty. */
 export function findComp(doc: CadDoc, ref: string): AsmComponent {
   const comps = doc.components ?? [];
-  const list = () => comps.map((c, i) => `#${i + 1} ${c.name}`).join(", ") || tr("žádné");
+  const list = () => comps.map((c, i) => `#${i + 1} ${c.name}${c.alias ? ` [${c.alias}]` : ""}`).join(", ") || tr("žádné");
   const n = /^#(\d+)$/.exec(ref.trim());
   if (n) {
     const c = comps[Number(n[1]) - 1];
     if (!c) throw new Error(tr("komponenta {0} v sestavě není – komponenty: {1}", ref, list()));
     return c;
   }
+  // přezdívka instance (vložit … jako "K48") má přednost před názvem – je jednoznačná
+  const byAlias = comps.filter((c) => c.alias && fold(c.alias) === fold(ref.trim()));
   const exact = comps.filter((c) => c.name === ref);
   const hits = exact.length ? exact : comps.filter((c) => fold(c.name) === fold(ref));
+  if (byAlias.length === 1) {
+    // přezdívka i název jiné komponenty (vložený díl se jmenuje jako přezdívka) – nevybírat potichu
+    const other = hits.filter((c) => c.id !== byAlias[0].id);
+    if (other.length) throw new Error(tr("„{0}“ je přezdívka #{1} i název {2} – zadejte pořadím: {3}", ref, comps.indexOf(byAlias[0]) + 1, other.map((c) => `#${comps.indexOf(c) + 1}`).join(", "), [byAlias[0], ...other].map((c) => `#${comps.indexOf(c) + 1}`).join(", ")));
+    return byAlias[0];
+  }
   if (hits.length === 1) return hits[0];
-  if (hits.length > 1) throw new Error(tr("„{0}“ je v sestavě {1}× – zadejte pořadí: {2}", ref, hits.length, hits.map((c) => `#${comps.indexOf(c) + 1}`).join(", ")));
+  if (hits.length > 1) throw new Error(tr("„{0}“ je v sestavě {1}× – zadejte pořadí: {2}", ref, hits.length, hits.map((c) => `#${comps.indexOf(c) + 1}${c.alias ? ` (${c.alias})` : ""}`).join(", ")));
   throw new Error(tr("komponenta „{0}“ v sestavě není – komponenty: {1}", ref, list()));
 }
+
+/**
+ * Proč přezdívku `alias` nejde dát komponentě `selfId` (null = jde): prázdná, začíná „#“ (pořadí), má ji jiná komponenta, nebo je
+ * názvem jiné komponenty (odkaz by nebyl jednoznačný).
+ */
+export function aliasProblem(doc: CadDoc, alias: string, selfId?: string): string | null {
+  const a = alias.trim();
+  if (!a) return tr("přezdívka nesmí být prázdná");
+  if (a.startsWith("#")) return tr("přezdívka nesmí začínat „#“ (to je pořadí komponenty) – např. jako \"K48\"");
+  const comps = (doc.components ?? []).filter((c) => c.id !== selfId);
+  const i = comps.findIndex((c) => c.alias && fold(c.alias) === fold(a));
+  if (i >= 0) return tr("přezdívku „{0}“ už má komponenta „{1}“ – zvolte jinou", a, comps[i].name);
+  const n = comps.find((c) => fold(c.name) === fold(a));
+  if (n) return tr("„{0}“ je název jiné komponenty – přezdívka musí být jednoznačná", a);
+  return null;
+}
+/** Proč název `name` nejde dát komponentě `selfId` (null = jde): je přezdívkou jiné komponenty – odkaz názvem by vedl na ni. */
+export function renameProblem(doc: CadDoc, name: string, selfId?: string): string | null {
+  const comps = doc.components ?? [];
+  const o = comps.find((c) => c.id !== selfId && c.alias && fold(c.alias) === fold(name.trim()));
+  return o ? tr("„{0}“ je přezdívka komponenty #{1} {2} – název musí být jiný (nebo nejdřív změňte přezdívku)", name.trim(), comps.indexOf(o) + 1, o.name) : null;
+}
+/** Volby nové komponenty z příkazu `vložit … [ukotvit] [jako "K48"]` (s kontrolou přezdívky). */
+export function insertExtras(doc: CadDoc, op: { fixed: boolean; alias?: string }): Partial<AsmComponent> {
+  if (op.alias !== undefined) {
+    const p = aliasProblem(doc, op.alias);
+    if (p) throw new Error(tr("vložit: {0}", p));
+  }
+  return { ...(op.fixed ? { fixed: true } : {}), ...(op.alias?.trim() ? { alias: op.alias.trim() } : {}) };
+}
+/** dovětek hlášky „✓ komponenta … vložena do sestavy“: „ (ukotvená) · přezdívka „K48““ */
+export const insertNote = (op: { fixed: boolean; alias?: string }) => `${op.fixed ? tr(" (ukotvená)") : ""}${op.alias?.trim() ? tr(" · přezdívka „{0}“", op.alias.trim()) : ""}`;
 
 /** Řádek seznamu ploch komponenty ve světových souřadnicích sestavy (`leafId` = list – díl; `part` = cesta dílu uvnitř podsestavy). */
 export type CompFaceRow = FaceRow & { leafId: string; part?: string };
@@ -993,13 +1097,16 @@ export function matesSummary(doc: CadDoc, status?: Record<string, MateStatus>): 
 
 /** Text vazby: „Souosost „Čep“ F3 → „Deska“ F7 · 5 mm · obráceně“. */
 export function mateText(doc: CadDoc, m: Mate): string {
-  const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
+  // název v uvozovkách s přezdívkou instance („S“ [K50]) – vazba dvou stejně pojmenovaných instancí jde rozlišit
+  const comp = (id: string) => doc.components?.find((x) => x.id === id);
+  const alias = (id: string) => (comp(id)?.alias ? ` [${comp(id)!.alias}]` : "");
+  const name = (id: string) => `„${comp(id)?.name ?? "?"}“${alias(id)}`;
   const face = (r: Mate["a"]) => (r.face >= 0 ? ` ${r.ent === "edge" ? "E" : r.ent === "vertex" ? "V" : "F"}${r.face + 1}` : r.radius ? ` R${fmt(r.radius)}` : "");
   const label = m.name ?? (m.type === "mate" && m.center ? tr("Vystředit") : tr(MATE_LABEL[m.type]));
-  const parts = [m.type === "fixed" ? `${label} „${name(m.a.compId)}“` : `${label} „${name(m.a.compId)}“${face(m.a)}${m.c && m.type !== "symmetric" && m.c.compId === m.a.compId ? `+${face(m.c).trim()}` : ""} → „${name(m.b.compId)}“${face(m.b)}${m.d ? `+${face(m.d).trim()}` : ""}${m.c && m.type === "slot" ? `+${face(m.c).trim()}` : ""}`];
+  const parts = [m.type === "fixed" ? `${label} ${name(m.a.compId)}` : `${label} ${name(m.a.compId)}${face(m.a)}${m.c && m.type !== "symmetric" && m.c.compId === m.a.compId ? `+${face(m.c).trim()}` : ""} → ${name(m.b.compId)}${face(m.b)}${m.d ? `+${face(m.d).trim()}` : ""}${m.c && m.type === "slot" ? `+${face(m.c).trim()}` : ""}`];
   if (m.type === "distance") parts.push(`${fmt(m.value ?? 0)} mm`);
   if (m.type === "angle") parts.push(`${fmt(m.value ?? 0)}°`);
-  parts.push(...kinMateParts(m, face, name));
+  parts.push(...kinMateParts(m, (r) => `${alias(r.compId)}${face(r)}`, (id) => comp(id)?.name ?? "?"));
   if (m.flip) parts.push(m.type === "screw" ? tr("levý závit") : m.type === "gear" ? tr("stejný smysl otáčení") : m.type === "tangent" ? tr("vnitřní dotyk") : tr("obráceně"));
   if (m.suppressed) parts.push(tr("potlačeno"));
   return parts.join(" · ");
@@ -1062,7 +1169,7 @@ export function componentLines(doc: CadDoc, status?: Record<string, MateStatus>)
   const out = [tr("Sestava „{0}“: komponent {1} · vazby {2}", doc.name, comps.length, matesSummary(doc, status))];
   comps.forEach((c, i) => {
     const flags = [isFixed(doc, c) ? tr("ukotvená ⚓") : "", c.hidden ? tr("skrytá") : "", c.number ? tr("č. {0}", c.number) : "", c.group ? tr("skupina {0}", c.group) : ""].filter(Boolean);
-    out.push(` #${i + 1} ${c.name} · ${srcText(c)} · ${tr("poloha {0}", pt(c.placement.position))}${rotText(c.placement.rotation) ? ` · ${tr("natočení {0}", pt(c.placement.rotation))}` : ""}${flags.length ? ` · ${flags.join(" · ")}` : ""}`);
+    out.push(` #${i + 1} ${c.name}${c.alias ? ` [${c.alias}]` : ""} · ${srcText(c)} · ${tr("poloha {0}", pt(c.placement.position))}${rotText(c.placement.rotation) ? ` · ${tr("natočení {0}", pt(c.placement.rotation))}` : ""}${flags.length ? ` · ${flags.join(" · ")}` : ""}`);
   });
   if (!comps.length) out.push(tr(" (prázdná – vložit \"díl\" · normálie M8x30 · rám formy)"));
   return out;
@@ -1072,9 +1179,11 @@ export function componentLines(doc: CadDoc, status?: Record<string, MateStatus>)
 export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>): string[] {
   const comps = doc.components ?? [];
   const MAX = 60;
-  const items = comps.slice(0, MAX).map((c) => `${c.name} ${pt(c.placement.position)}${rotText(c.placement.rotation)}${isFixed(doc, c) ? " ⚓" : ""}${c.hidden ? tr(" (skrytá)") : ""}${c.source.kind === "asm" ? tr(" (podsestava)") : ""}`);
+  const items = comps.slice(0, MAX).map((c) => `${c.name}${c.alias ? ` [${c.alias}]` : ""} ${pt(c.placement.position)}${rotText(c.placement.rotation)}${isFixed(doc, c) ? " ⚓" : ""}${c.hidden ? tr(" (skrytá)") : ""}${c.source.kind === "asm" ? tr(" (podsestava)") : ""}`);
   const out = [tr("Komponenty: {0}", items.join(" · ") || tr("žádné")) + (comps.length > MAX ? tr(" … a dalších {0} (sestava)", comps.length - MAX) : "")];
   if (doc.mates?.length) out.push(tr("Vazby: {0}", matesSummary(doc, status)));
+  const sp = springStatusLine(doc); // pružiny: uložená délka, L0, Ln, síla, ✓/⚠/✗
+  if (sp) out.push(sp);
   const ms = doc.motion;
   if (ms?.motors.length) out.push(tr("Pohybová studie: motorů {0} · kroků {1} · {2} s{3} – pohyb stav", ms.motors.length, ms.steps, fmt(ms.duration, 3), ms.collisions ? tr(" · kolize") : ""));
   return out;

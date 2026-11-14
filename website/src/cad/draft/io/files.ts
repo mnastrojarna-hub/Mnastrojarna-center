@@ -7,7 +7,7 @@ import { ACadVersion, DwgReader, DwgWriter, DxfReader, DxfWriter } from "@node-p
 import { tr } from "../../i18n";
 import type { DwgVersion } from "../../formats/dwg-versions";
 import type { DraftModel } from "../model";
-import { applyAcadPatches } from "./acad-patch";
+import { applyAcadPatches, captureUnknownPayloads } from "./acad-patch";
 import { cadToDraft, type ImportNote } from "./from-cad";
 import { cp1250Map, uEsc } from "./common";
 import { draftToR12 } from "./r12";
@@ -132,6 +132,16 @@ export const versionLabel = (ac: string) => `${DWG_NAMES[ac] ?? ac} (${ac})`;
 
 export type ReadProgress = (stage: "read" | "build" | "convert", f: number) => void;
 
+/**
+ * Volby čtečky acad-ts: neznámé entity (vlastní třídy – AutoCAD Mechanical STDPART2D, ACMPARTLIST, ACMBALLOON…)
+ * a jejich náhradní grafika se ponechají – převod na 2D entity je v from-cad.ts (proxy.ts). Výchozí acad-ts je zahodí
+ * bez hlášení (v poznámce importu pak nic nechybělo, i když chybělo 13 % výkresu).
+ */
+function keepProxyObjects(r: { configuration: { keepUnknownEntities: boolean; ignoreProxyGraphics: boolean } }): void {
+  r.configuration.keepUnknownEntities = true;
+  r.configuration.ignoreProxyGraphics = false;
+}
+
 /** chyba knihovny při čtení → srozumitelná zpráva (technický detail zkráceně v závorce) */
 function readFailed(kind: "DWG" | "DXF", e: unknown): Error {
   const msg = String((e as Error)?.message ?? e).replace(/\s+/g, " ").trim();
@@ -161,6 +171,7 @@ export function draftFromFile(name: string, bytes: Uint8Array, onProgress?: Read
     if (ver === "AC1009" || ver === "AC1012" || ver === "AC1014" || /^AC1\.|^AC2\.|^MC0/.test(ver)) throw new Error(tr("DWG {0} – podporované jsou verze R2000–R2018 (AC1015–AC1032). Uložte výkres v novější verzi.", versionLabel(ver)));
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const r = new DwgReader(buf);
+    keepProxyObjects(r);
     if (onProgress) {
       try {
         est = Math.max(1000, Number(new DwgReader(buf).readHeader().handleSeed) || bytes.length / 30) * 2;
@@ -170,13 +181,14 @@ export function draftFromFile(name: string, bytes: Uint8Array, onProgress?: Read
       r.onProgress = reading("read");
     }
     let doc: ReturnType<DwgReader["read"]>;
+    let payloads: ReturnType<typeof captureUnknownPayloads>["payloads"];
     try {
-      doc = r.read();
+      ({ result: doc, payloads } = captureUnknownPayloads(() => r.read()));
     } catch (e) {
       throw readFailed("DWG", e);
     }
     onProgress?.("convert", 0);
-    const res = cadToDraft(doc, { fmt: "dwg", onProgress: (f) => onProgress?.("convert", f) });
+    const res = cadToDraft(doc, { fmt: "dwg", payloads, onProgress: (f) => onProgress?.("convert", f) });
     return { ...res, format: "dwg", version: versionLabel(ver) };
   }
   const isBinary = DxfReader.isBinaryStream(bytes, true);
@@ -212,6 +224,7 @@ export function draftFromFile(name: string, bytes: Uint8Array, onProgress?: Read
     if (onProgress) est = Math.max(1000, bytes.length / 80) * 2;
   }
   const reader = new DxfReader(data);
+  keepProxyObjects(reader);
   if (onProgress) reader.onProgress = reading("read");
   let doc: ReturnType<DxfReader["read"]>;
   try {

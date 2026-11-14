@@ -296,7 +296,7 @@ describe("výkresy", () => {
     });
     const r = docToScript(d);
     const l = body(r.text);
-    expect(l).toContain("výkres A3 měřítko 1:2 pohledy přední,horní,iso řez XZ odsazení -5 poloviční skryté ano tabulka děr ano");
+    expect(l).toContain("výkres A3 měřítko 1:2 pohledy přední,horní,iso řez XZ odsazení 5 poloviční skryté ano tabulka děr ano");
     expect(l).toContain('výkres razítko číslo="MN-7" kreslil="AI" datum="14. 11. 2026" nepředepsané="ISO 2768-mK"');
     expect(l).toContain("kótovat chytře");
     expect(l).toContain('výkres list nový "Detail"');

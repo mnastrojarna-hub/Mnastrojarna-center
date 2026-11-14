@@ -6,6 +6,7 @@ import { useEffect, useState as useLocalState } from "react";
 import { useRef, useState } from "react";
 import { DEFAULT_SETTINGS, SHORTCUT_GROUPS, exportSettings, importSettings, keyCombo, shortcutOf, type Settings } from "@/cad/settings";
 import { MATERIALS } from "@/lib/mesh-metrics";
+import { templateLabel, TITLE_TEMPLATES } from "@/cad/title-block";
 import { cn } from "@/lib/cn";
 import { CadIcon, type CadIconName } from "./cad-icons";
 import type { DisplayMode, MouseScheme } from "./viewport";
@@ -269,6 +270,15 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
               </div>
               <Field label={tr("Nepředepsané tolerance")}>
                 <input value={draft.tolerance} onChange={(e) => set("tolerance", e.target.value)} className={inputCls} />
+              </Field>
+              <Field label={tr("Šablona razítka nových listů")} hint={tr("pro nové listy – každý list jde změnit zvlášť")}>
+                <select value={draft.titleTemplate ?? "iso7200"} onChange={(e) => set("titleTemplate", e.target.value as NonNullable<Settings["titleTemplate"]>)} className={selectCls} aria-label={tr("Šablona razítka nových listů")}>
+                  {TITLE_TEMPLATES.map((t) => (
+                    <option key={t} value={t}>
+                      {templateLabel(t)}
+                    </option>
+                  ))}
+                </select>
               </Field>
             </>
           )}

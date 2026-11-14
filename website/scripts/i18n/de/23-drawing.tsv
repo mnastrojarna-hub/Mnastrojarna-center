@@ -1,0 +1,85 @@
+# Vlna 15 – balík výkresu (drawing): řez v konvenci skici (B5), hlášení výkresu (B6), kóty na tisíciny a hledání hodnotou (B7),
+# funkční rozměry (B8), souřadnicové kóty / tabulka děr (B12), kontrola tolerancí (5.3)
+ – rozměr {0} je nyní funkční (pomocnou kótou řetězu je {1})	 – Maß {0} ist jetzt funktional (Hilfsmaß der Kette ist {1})
+ (pohled {0})	 (Ansicht {0})
+! funkční rozměr {0}: na listu není délková kóta s touto hodnotou (hodnoty kót: výkres stav)	! funktionales Maß {0}: kein Längenmaß mit diesem Wert auf dem Blatt (Maßwerte: zeichnung status)
+{0} ({1}): kóta bez tolerance {2} – výkres tolerance {3} …	{0} ({1}): Maß ohne Toleranz {2} – zeichnung toleranz {3} …
+{0} ({1}): na listu jen pomocná kóta {2} – výkres tolerance {0} … ji převede na funkční	{0} ({1}): auf dem Blatt nur das Hilfsmaß {2} – zeichnung toleranz {0} … macht es funktional
+{0} ({1}): na listu není kóta s touto hodnotou – doplňte ji (kótovat / výkres kóta …)	{0} ({1}): kein Maß mit diesem Wert auf dem Blatt – ergänzen (bemaßen / zeichnung maß …)
+{0} odsazení {1} (rovina {2} = {3})	{0} Versatz {1} (Ebene {2} = {3})
+⚠ kontrola tolerancí: bez tolerance {0} z {1} rozměrů (funkčních {2}, z předlohy {3})	⚠ Toleranzprüfung: {0} von {1} Maßen ohne Toleranz (funktional {2}, aus der Vorlage {3})
+✓ kontrola tolerancí: list nemá funkční rozměry (kótovat … funkční …) ani tolerované kóty předlohy – není co kontrolovat	✓ Toleranzprüfung: das Blatt hat keine funktionalen Maße (bemaßen … funktional …) und keine tolerierten Vorlagenmaße – nichts zu prüfen
+✓ kontrola tolerancí: všech {0} rozměrů má toleranci (funkčních {1}, z předlohy {2})	✓ Toleranzprüfung: alle {0} Maße haben eine Toleranz (funktional {1}, aus der Vorlage {2})
+Auto: od hran; od 12 poloh nebo když se nevejdou souřadnicové kóty od levého dolního rohu, pak tabulka děr.	Auto: von den Kanten; ab 12 Positionen oder wenn sie nicht passen Koordinatenmaße von der linken unteren Ecke, dann eine Bohrungstabelle.
+celková délka	Gesamtlänge
+funkční	funktional
+funkční {0}	funktional {0}
+funkční rozměry (kótovat … funkční), které na listu nemají toleranci (⚠ s id kót a radou); tolerované kóty předlohy až po připojení předlohy (balík předlohy) – bez ní protokol řekne „předloha není připojena“	Funktionsmaße (bemaßen … funktional) ohne Toleranz auf dem Blatt (⚠ mit Maß-Ids und Hinweis); tolerierte Maße einer Vorlage erst, wenn eine Vorlage angehängt ist (Vorlagenpaket) – ohne sie meldet das Protokoll „keine Vorlage angehängt“
+funkční rozměry (mm modelu, oddělené mezerou nebo středníkem): nikdy nebudou pomocnou kótou v závorce – uzavřený řetěz rozbije jiný článek (jsou-li funkční všechny, celková délka; jsou-li funkční i ta, funkční rozměr bez tolerance); pamatují se u listu, „ne“ je zruší	Funktionsmaße (mm im Modell, durch Leerzeichen oder Semikolon getrennt): werden nie zum Hilfsmaß in Klammern – die geschlossene Kette bricht ein anderes Glied (sind alle funktional, die Gesamtlänge; ist auch diese funktional, ein Funktionsmaß ohne Toleranz); werden beim Blatt gespeichert, „nein“ löscht sie
+Funkční rozměry (nikdy v závorce)	Funktionale Maße (nie in Klammern)
+Funkční rozměry: {0} · {1}	Funktionale Maße: {0} · {1}
+kóta „{0}“ není jednoznačná ({1}×: {2}) – upřesněte ji id (výkres tolerance a3 …) nebo pohledem (… pohled horní)	Maß „{0}“ ist nicht eindeutig ({1}×: {2}) – per ID (zeichnung toleranz a3 …) oder Ansicht (… ansicht oben) angeben
+kóta „{0}“{1} na výkrese není – kóty: {2}	Maß „{0}“{1} ist nicht auf der Zeichnung – Maße: {2}
+kóta se najde číselnou hodnotou modelu (±0,000001; popisky mají až 3 desetinná místa), druhem (Ø40, M8) nebo id (a12 z výkres stav); pohled zúží výběr; desetinná tečka tolerance se na českém listu zapíše čárkou; tolerance na pomocné kótě „(50)“ udělá rozměr funkčním a pomocnou kótou se stane jiný článek (přeurčený řetěz: funkční rozměr bez tolerance; ruční náhradní kóta se odstraní)	das Maß wird über den Zahlenwert des Modells (±0,000001; Beschriftungen haben bis zu 3 Dezimalstellen), die Art (Ø40, M8) oder die Id (a12 aus zeichnung status) gefunden; eine Ansicht grenzt die Auswahl ein; der Dezimalpunkt der Toleranz wird mit dem Trennzeichen der Blattsprache geschrieben; eine Toleranz an einem Hilfsmaß „(50)“ macht das Maß funktional und ein anderes Glied wird zum Hilfsmaß (überbestimmte Kette: ein Funktionsmaß ohne Toleranz; ein manuelles Ersatzmaß wird entfernt)
+kótovat [chytře|celkově|základní|nic] [řetězově|od základny] [funkční 26,5 74,175] [díry tabulka|souřadnicově|řetězově] – neznámé slovo „{0}“	bemaßen [intelligent|gesamt|einfach|keine] [kette|basis] [funktional 26,5 74,175] [bohrungen tabelle|koordinaten|kette] – unbekanntes Wort „{0}“
+kótovat díry tabulka|souřadnicově|řetězově|auto – polohy děr tabulkou děr, souřadnicovými kótami od základny, nebo od hran	bemaßen bohrungen tabelle|koordinaten|kette|auto – Bohrungspositionen per Bohrungstabelle, Koordinatenmaßen ab Bezug oder von den Kanten
+kótovat funkční <rozměr> [<rozměr> …] – funkční rozměry nikdy nebudou pomocnou kótou v závorce, např. kótovat chytře funkční 26,5 74,175 (zrušit: kótovat funkční ne)	bemaßen funktional <Maß> [<Maß> …] – funktionale Maße werden nie zum Hilfsmaß in Klammern, z. B. bemaßen intelligent funktional 26,5 74,175 (löschen: bemaßen funktional nein)
+kóty od hran	Maße von den Kanten
+např. 26,5; 74,175	z. B. 26,5; 74,175
+od hran	von Kanten
+Odsazení podél normály roviny jako u skici: {0}	Versatz entlang der Ebenennormalen wie bei einer Skizze: {0}
+odsazení roviny řezu se měří podél normály roviny jako u skici (skica XZ odsazení 57 = rovina Y = −57): XY → Z = N, XZ → Y = −N, YZ → X = N; rovina mimo těleso = ✗ s rozsahem odsazení, které těleso protne	der Versatz der Schnittebene wird entlang der Ebenennormalen gemessen wie bei einer Skizze (skizze XZ versatz 57 = Ebene Y = −57): XY → Z = N, XZ → Y = −N, YZ → X = N; Ebene außerhalb des Körpers = ✗ mit dem Versatzbereich, der den Körper schneidet
+Polohy děr	Bohrungspositionen
+polohy děr {0}	Bohrungspositionen {0}
+Polohy děr: {0}	Bohrungspositionen: {0}
+polohy děr: tabulka děr (X, Y od levého dolního rohu obrysu; v pohledu s dírami – i levém, pravém, zadním; jedna na list), souřadnicové kóty od základny (0 v rohu, hodnoty v jedné řadě, více druhů děr = značky A, B … u děr i v popisu), nebo od hran; auto = od hran, od 12 poloh nebo když se nevejdou souřadnicově, pak tabulka; souřadnicově / řetězově tabulku děr listu vypne, tabulka ji zapne	Bohrungspositionen: Bohrungstabelle (X, Y von der linken unteren Ecke der Kontur; in der Ansicht mit den Bohrungen – auch links, rechts, hinten; eine je Blatt), Koordinatenmaße von der Basis (0 in der Ecke, Werte in einer Reihe, mehrere Bohrungsarten = Kennbuchstaben A, B … an den Bohrungen und im Hinweis) oder von den Kanten; auto = von den Kanten, ab 12 Positionen oder wenn Koordinatenmaße nicht passen, dann Tabelle; koordinaten / kette schalten die Bohrungstabelle des Blatts aus, tabelle schaltet sie ein
+předloha {0}	Vorlage {0}
+řez {0}	Schnitt {0}
+souřadnicově	Koordinaten
+souřadnicové kóty od levého dolního rohu	Koordinatenmaße ab linker unterer Ecke
+souřadnicové kóty poloh děr se nevešly čistě na list ({0}) – zkuste kótovat díry tabulka nebo větší list	Koordinatenmaße der Bohrungspositionen passten nicht sauber auf das Blatt ({0}) – versuchen Sie bemaßen bohrungen tabelle oder ein größeres Blatt
+Starší řez – odsazení je souřadnice na ose: {0}	Älterer Schnitt – der Versatz ist die Achskoordinate: {0}
+tabulkou děr	Bohrungstabelle
+tolerance ke kótě podle číselné hodnoty modelu nebo id (Ø40 h6, 74,175 -0,005, M8 6H, a12 ±0,1); poznámka, nepředepsané tolerance, hrany a obecná drsnost u razítka	Toleranz an einem Maß über den Zahlenwert des Modells oder die ID (Ø40 h6, 74,175 -0,005, M8 6H, a12 ±0,1); Notiz, Allgemeintoleranzen, Kanten und allgemeine Rauheit am Schriftfeld
+uzavřený řetěz: všechny články i celková délka jsou funkční – pomocnou kótou zůstává nejdelší článek; zrušte funkčnost jednoho z nich (kótovat … funkční …)	geschlossene Kette: alle Glieder und die Gesamtlänge sind funktional – das längste Glied bleibt Hilfsmaß; entfernen Sie eines aus den funktionalen Maßen (bemaßen … funktional …)
+výkres tolerance <kóta> <tolerance> [pohled <p>] – kóta hodnotou (74,175), druhem (Ø40, M8) nebo id (a12), např. výkres tolerance Ø40 h6 · výkres tolerance 25 ±0,1 pohled horní · výkres tolerance a12 -0,005	zeichnung toleranz <Maß> <Toleranz> [ansicht <A>] – Maß per Wert (74,175), Art (Ø40, M8) oder ID (a12), z. B. zeichnung toleranz Ø40 h6 · zeichnung toleranz 25 ±0,1 ansicht oben · zeichnung toleranz a12 -0,005
+# vlna 15 – 2. kontrola (přeurčený řetěz, tabulka děr v každém pohledu, kontrola kót desek, starší řez)
+ – rozměr {0} je nyní funkční; řetěz by byl přeurčený, pomocnou kótou je proto funkční rozměr bez tolerance {1}	 – Maß {0} ist jetzt funktional; die Kette wäre überbestimmt, Hilfsmaß ist daher das funktionale Maß ohne Toleranz {1}
+ – starší řez uložený souřadnicí {0} = {1}; týž řez příkazem: výkres řez {2} odsazení {3}	 – älterer Schnitt, gespeichert als Koordinate {0} = {1}; derselbe Schnitt per Befehl: zeichnung schnitt {2} versatz {3}
+ · odstraněna ruční náhradní kóta {0}	 · manuelles Ersatzmaß {0} entfernt
+ · tabulka děr vypnuta – polohy děr jsou kótami (zpět: kótovat díry tabulka)	 · Bohrungstabelle ausgeschaltet – Bohrungspositionen sind Maße (zurück: bemaßen bohrungen tabelle)
+! pomocná kóta {0} nese toleranci – řetěz je přeurčený (všechny jeho rozměry jsou funkční a tolerované); zrušte funkčnost jednoho rozměru (kótovat … funkční …)	! Hilfsmaß {0} trägt eine Toleranz – die Kette ist überbestimmt (alle ihre Maße sind funktional und toleriert); nehmen Sie ein Maß aus den Funktionsmaßen (bemaßen … funktional …)
+! řetěz byl přeurčený (funkční byly všechny jeho rozměry) – pomocnou kótou je funkční rozměr bez tolerance {0}, tolerovaný {1} zůstává funkční	! die Kette war überbestimmt (alle ihre Maße waren funktional) – Hilfsmaß ist das funktionale Maß ohne Toleranz {0}, das tolerierte {1} bleibt funktional
+{0} (hloubka odebrání v tělese)	{0} (Abtragtiefe im Körper)
+{0} (v tělese)	{0} (im Körper)
+{0}: chybí pohled ve směru vysunutí – zapněte pohled {1}	{0}: keine Ansicht in Extrusionsrichtung – Ansicht {1} einschalten
+{0}: natočený kvádr kótujte ručně	{0}: gedrehten Quader manuell bemaßen
+{0}: obecný obrys skici (lomená čára, oblouky, elipsa) kótujte ručně – výkres kóta …	{0}: allgemeine Skizzenkontur (Polylinie, Bögen, Ellipse) manuell bemaßen – zeichnung maß …
+{0}: rotační prvek hranolového dílu kótujte ručně (průměry a délky – nejlépe v řezu osou prvku)	{0}: Rotationselement des prismatischen Teils manuell bemaßen (Durchmesser und Längen – am besten im Schnitt durch die Elementachse)
+{0}: rozměr {1} ({2}) není v žádném pohledu vidět viditelnými hranami – kótujte ručně	{0}: Maß {1} ({2}) ist in keiner Ansicht mit sichtbaren Kanten zu sehen – manuell bemaßen
+{0}: skica ve šikmé rovině – kótujte obrys v pomocném pohledu kolmém na rovinu skici (výkres pohled pomocný směr {1}) ručně	{0}: Skizze in geneigter Ebene – Kontur manuell in einer Hilfsansicht senkrecht zur Skizzenebene bemaßen (zeichnung ansicht hilfsansicht richtung {1})
+{0}: šikmá díra – osa není ve směru žádného pohledu; kótujte ji v pomocném pohledu kolmém na osu (výkres pohled pomocný směr {1}) ručně	{0}: schräge Bohrung – die Achse liegt in keiner Ansichtsrichtung; manuell in einer Hilfsansicht senkrecht zur Achse bemaßen (zeichnung ansicht hilfsansicht richtung {1})
+⚠ kontrola tolerancí: bez tolerance {0} z {1} funkčních rozměrů (předloha není připojena – kóty předlohy se nekontrolují)	⚠ Toleranzprüfung: {0} von {1} Funktionsmaßen ohne Toleranz (keine Vorlage angehängt – Maße der Vorlage werden nicht geprüft)
+✓ kontrola tolerancí: všech {0} funkčních rozměrů má toleranci (předloha není připojena – kóty předlohy se nekontrolují)	✓ Toleranzprüfung: alle {0} Funktionsmaße haben eine Toleranz (keine Vorlage angehängt – Maße der Vorlage werden nicht geprüft)
+polohy děr ({0}): tabulka děr na listu je nemá – kótovat díry souřadnicově	Bohrungspositionen ({0}): die Bohrungstabelle des Blatts enthält sie nicht – bemaßen bohrungen koordinaten
+rovina řezu {0} = {1} leží mimo těleso ({0} {2}…{3}) – odsazení {4} se měří podél normály roviny {5} jako u skici; řez protne těleso pro odsazení větší než {6} a menší než {7} (krajní hodnoty leží na ploše tělesa), např. {8}	Schnittebene {0} = {1} liegt außerhalb des Körpers ({0} {2}…{3}) – Versatz {4} wird entlang der Normalen der Ebene {5} gemessen wie bei einer Skizze; der Schnitt trifft den Körper für Versatz größer als {6} und kleiner als {7} (die Grenzwerte liegen auf einer Fläche des Körpers), z. B. {8}
+rovina řezu {0} = {1} leží mimo těleso ({0} {2}…{3}) – u tohoto (staršího) řezu je odsazení souřadnicí {0}; řez protne těleso pro odsazení větší než {2} a menší než {3} (krajní hodnoty leží na ploše tělesa), např. {4}	Schnittebene {0} = {1} liegt außerhalb des Körpers ({0} {2}…{3}) – bei diesem (älteren) Schnitt ist der Versatz die {0}-Koordinate; der Schnitt trifft den Körper für Versatz größer als {2} und kleiner als {3} (die Grenzwerte liegen auf einer Fläche des Körpers), z. B. {4}
+rozměr {0} nelze tolerovat: řetěz {1} by byl přeurčený – všechny jeho rozměry jsou funkční a ostatní mají toleranci, jeden musí zůstat pomocný (ISO 129-1); zrušte funkčnost jednoho z nich (kótovat … funkční …)	Maß {0} kann nicht toleriert werden: die Kette {1} wäre überbestimmt – alle ihre Maße sind funktional und die anderen haben eine Toleranz, eines muss Hilfsmaß bleiben (ISO 129-1); nehmen Sie eines aus den Funktionsmaßen (bemaßen … funktional …)
+Tabulka děr ({0} řádků) překrývá pohled {1} – zvolte větší list nebo menší měřítko.	Die Bohrungstabelle ({0} Zeilen) überdeckt die Ansicht {1} – wählen Sie ein größeres Blatt oder einen kleineren Maßstab.
+z horní strany	von oben
+z levé strany	von links
+z pravé strany	von rechts
+z protější strany	von der Gegenseite
+z přední strany	von vorne
+ze spodní strany	von unten
+ze zadní strany	von hinten
+# názvy pohledů v protokolu (tr(VIEW_CS[k]) – klíč není literál)
+#!dynamic
+přední	vorne
+zadní	hinten
+horní	oben
+spodní	unten
+levý	links
+pravý	rechts
+izometrie	Isometrie
+list	Blatt
