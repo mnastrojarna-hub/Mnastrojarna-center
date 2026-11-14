@@ -10,8 +10,13 @@ if (!existsSync("out")) {
 }
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// cíl smí nést parametry (…/cad?kod=1): lomítko na konci patří před „?“
+const target = (to) => {
+  const [p, q] = to.split("?");
+  return (p === "/" ? "/" : p + (p.includes(".") ? "" : "/")) + (q ? "?" + q : "");
+};
 const rules = legacy
-  .map(([from, to]) => `RewriteRule ^${esc(from.replace(/^\//, ""))}/?$ ${to === "/" ? "/" : to + (to.includes(".") ? "" : "/")} [R=301,L,NC]`)
+  .map(([from, to]) => `RewriteRule ^${esc(from.replace(/^\//, ""))}/?$ ${target(to)} [R=301,L,NC]`)
   .join("\n");
 // přejmenované složky: celý obsah (obrázky…) na stejné jméno souboru v nové složce
 const dirRules = legacyDirs.map(([from, to]) => `RewriteRule ^${esc(from.replace(/^\//, ""))}/(.+)$ ${to}/$1 [R=301,L,NC]`).join("\n");

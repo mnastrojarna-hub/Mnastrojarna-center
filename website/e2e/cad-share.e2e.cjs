@@ -1,7 +1,9 @@
 // E2E: sdílení odkazem – tlačítko Sdílet, dialog (platnost, heslo, WhatsApp / e-mail / kopírovat), otevření odkazu
 // v jiném prohlížeči (snímek + pruh „Sdílený dokument“, nic se neukládá, přežije F5), heslo, výkres, neplatný odkaz, mobil.
 // Spuštění (server na E2E_BASE, výchozí :3100): node e2e/cad-share.e2e.cjs <složka pro výstupy>
-// Režim „v odkazu“ (#s=): server bez úložiště /cad/share/ (next dev / next start); krátké odkazy testuje cad-w8-share.e2e.cjs.
+// Režim „v odkazu“ (#s=): server bez úložiště /cad/share/ (next dev / next start); krátké odkazy testují
+// cad-w8-share.e2e.cjs a cad-w16-short.e2e.cjs. Vlna 16: /s bez kódu → /cad s dialogem pro kód; pole je i na úvodní obrazovce (přijme
+// i celý starší odkaz), odkaz dopsaný za adresu otevřeného CADu, část za # jiného tvaru se ignoruje, kód bez úložiště.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const S = (process.argv[2] || '/tmp/e2e').replace(/\/?$/, '/');
@@ -75,7 +77,7 @@ const linkValue = async (dlg, page, notEqual) => {
   const stored = await r.evaluate(() => Object.keys(localStorage).filter((k) => k.startsWith('mn-cad-doc') || k === 'mn-cad-recent-v1'));
   ok(stored.length === 0, 'u příjemce se do localStorage nic neuložilo');
   await r.screenshot({ path: S + 'share-recipient.png' });
-  await r.reload({ waitUntil: 'networkidle' }); await coreReady(r); await r.waitForTimeout(3500);
+  await r.reload({ waitUntil: 'networkidle', timeout: 240000 }); await coreReady(r); await r.waitForTimeout(3500);
   ok(/Díra 1/.test(await r.locator('aside').first().innerText()), 'po F5 v téže kartě sdílený díl zůstává');
   await r.locator('[role=status]').getByRole('button', { name: 'Skrýt' }).click();
   ok(!(await r.locator('[role=status]').isVisible().catch(() => false)), 'pruh lze skrýt');
@@ -111,6 +113,50 @@ const linkValue = async (dlg, page, notEqual) => {
   const r4 = await ctx2.newPage();
   await r4.goto(CAD + '#s=1d.AAAAAAAA', { waitUntil: 'networkidle', timeout: 180000 }); await r4.waitForTimeout(2500);
   ok(/nelze otevřít/.test(await r4.locator('body').innerText()), 'neplatný odkaz: srozumitelné hlášení');
+
+  // ── vlna 16: /s, ruční zadání na úvodní obrazovce, odkaz dopsaný za adresu, cizí # ──
+  const ctx3 = await b.newContext({ viewport: { width: 1400, height: 850 } });
+  const s1 = await ctx3.newPage();
+  s1.on('pageerror', (e) => errs2.push(e.message));
+  await s1.goto(CAD.replace(/\/cad$/, '/s'), { waitUntil: 'networkidle', timeout: 180000 });
+  const field = s1.getByLabel('Kód sdíleného dokumentu');
+  const codeDlg = s1.locator('div.fixed.z-\\[70\\]');
+  ok(await field.waitFor({ timeout: 120000 }).then(() => true, () => false) && /Otevřít sdílený dokument/.test(await codeDlg.innerText()) && !(await s1.getByText('Pokračovat v práci').isVisible().catch(() => false)), '/s bez kódu: dialog „Otevřít sdílený dokument“ s polem pro kód (bez úvodní obrazovky)');
+  ok(s1.url() === CAD, `/s bez kódu přesměruje na /cad (parametr kod aplikace z adresy odstraní: ${s1.url()})`);
+  await field.fill('Ab3kZ9xQ2'); await field.press('Enter');
+  ok(await s1.getByText(/Kód má 10 znaků, zadáno je 9/).isVisible({ timeout: 5000 }).catch(() => false) && await field.isVisible(), 'kód o 9 znacích: hláška říká, co je špatně, dialog zůstává');
+  await field.fill('Ab3kZ9xQ0m'); await field.press('Enter');
+  ok(await s1.getByText(/znak „0“.*v kódech nepoužívá/).isVisible({ timeout: 5000 }).catch(() => false), 'kód s nulou: hláška, že 0 / O / I / l v kódech nejsou');
+  await field.fill(url); await field.press('Enter');
+  await coreReady(s1); await s1.waitForTimeout(3500);
+  ok(/Sdílený dokument/.test(await s1.locator('[role=status]').first().innerText().catch(() => '')) && /Díra 1/.test(await s1.locator('aside').first().innerText()) && !(await field.isVisible().catch(() => false)), 'do pole lze vložit i celý (starší, dlouhý) odkaz – dokument se otevře a dialog zavře');
+  await s1.reload({ waitUntil: 'networkidle', timeout: 240000 }); await coreReady(s1); await s1.waitForTimeout(3000);
+  ok(/Díra 1/.test(await s1.locator('aside').first().innerText()), 'po F5 dokument otevřený zadáním zůstává');
+  // pole na úvodní obrazovce (první otevření CADu v kartě) přijme odkaz stejně
+  const s0 = await (await b.newContext({ viewport: { width: 1400, height: 850 } })).newPage();
+  s0.on('pageerror', (e) => errs2.push(e.message));
+  await s0.goto(CAD, { waitUntil: 'networkidle', timeout: 180000 });
+  const startField = s0.locator('[data-share-code-form]').getByLabel('Kód sdíleného dokumentu');
+  ok(await startField.waitFor({ timeout: 60000 }).then(() => true, () => false) && await s0.getByText('Pokračovat v práci').isVisible() && await s0.getByText('Máte kód sdíleného dokumentu?').isVisible(), 'úvodní obrazovka nabízí pole „Máte kód sdíleného dokumentu?“');
+  await startField.fill('nesmysl'); await startField.press('Enter');
+  ok(await s0.getByText(/Kód má 10 znaků/).isVisible({ timeout: 5000 }).catch(() => false) && await s0.getByText('Pokračovat v práci').isVisible(), 'úvodní obrazovka: neplatné zadání → hláška, obrazovka zůstává');
+  await startField.fill('Posílám: ' + url + ' díky'); await startField.press('Enter');
+  await coreReady(s0); await s0.waitForTimeout(3500);
+  ok(/Sdílený dokument/.test(await s0.locator('[role=status]').first().innerText().catch(() => '')) && !(await s0.getByText('Pokračovat v práci').isVisible().catch(() => false)), 'úvodní obrazovka: odkaz uprostřed textu dokument otevře a obrazovka se zavře');
+  await s0.context().close();
+  const s2 = await ctx3.newPage();
+  await s2.goto(CAD + '#app', { waitUntil: 'networkidle', timeout: 180000 }); await coreReady(s2); await s2.waitForTimeout(1500);
+  ok((await s2.evaluate(() => location.hash)) === '#app' && !/nelze otevřít/.test(await s2.locator('body').innerText()) && (await s2.evaluate(() => sessionStorage.getItem('mn-cad-share'))) === null, 'část za # jiného tvaru (#app) není sdílený odkaz – nic se neděje, adresa zůstává');
+  await s2.evaluate((h) => { location.hash = h; }, url.slice(url.indexOf('#')));
+  await s2.locator('[role=status]').first().waitFor({ timeout: 60000 }).catch(() => {});
+  ok(/Sdílený dokument/.test(await s2.locator('[role=status]').first().innerText().catch(() => '')) && (await s2.evaluate(() => location.hash)) === '', 'odkaz dopsaný za adresu otevřeného CADu (hashchange) dokument otevře a z adresy zmizí');
+  const s3 = await ctx3.newPage();
+  await s3.goto(CAD.replace(/\/cad$/, '/s') + '#Zz99999999', { waitUntil: 'networkidle', timeout: 180000 });
+  const f3 = s3.getByLabel('Kód sdíleného dokumentu');
+  await f3.waitFor({ timeout: 60000 }).catch(() => {});
+  ok(s3.url() === CAD && (await f3.inputValue().catch(() => '')) === 'Zz99999999' && /Dokument s tímto kódem v úložišti není\. Zkontrolujte kód/.test(await s3.locator('body').innerText()), 'kód bez úložiště / neznámý kód (/s#Zz99999999): pole s kódem k opravě a radou zkontrolovat kód; část za # z adresy odstraněna');
+  ok((await s3.evaluate(() => sessionStorage.getItem('mn-cad-share'))) === null, 'neznámý kód se na kartu nepřilepí');
+  await ctx3.close();
 
   // ── mobil: dialog použitelný na 390 px ──
   const m = await b.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });

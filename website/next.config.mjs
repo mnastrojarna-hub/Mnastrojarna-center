@@ -23,6 +23,12 @@ const legacy = [
   ["/cz/kontakt", "/kontakt"],
   ["/cz/mapa-stranek", "/sitemap.xml"],
   ["/3d-prohlizec", "/cad"],
+  // nejkratší sdílený odkaz CADu: https://mnastrojarna.cz/s#<KÓD> → /cad (část za # prohlížeč přes přesměrování zachová).
+  // Parametr kod=1 řekne stránce, že příjemce přišel přes /s: bez kódu za # se CAD zeptá na kód (src/cad/share-entry.ts),
+  // s kódem parametr hned zmizí z adresy.
+  ["/s", "/cad?kod=1"],
+  ["/en/s", "/en/cad?kod=1"],
+  ["/de/s", "/de/cad?kod=1"],
   // poptávkový formulář byl zrušen → kontakt (primární kontakt Vít Volný)
   ["/poptavka", "/kontakt"],
   ["/en/request-a-quote", "/en/contact"],

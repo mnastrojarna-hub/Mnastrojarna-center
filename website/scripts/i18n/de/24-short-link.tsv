@@ -1,0 +1,24 @@
+# Vlna 16 – nejkratší sdílený odkaz (kód za #)
+  kód k přečtení nebo opsání: {0} ({1} znaků odkazu)	  Code zum Vorlesen oder Abtippen: {0} (Link hat {1} Zeichen)
+Kód má 10 znaků (písmena a číslice, záleží na velikosti písmen) – nebo vložte celý odkaz.	Der Code hat 10 Zeichen (Buchstaben und Ziffern, Groß-/Kleinschreibung beachten) – oder fügen Sie den ganzen Link ein.
+Kód sdíleného dokumentu	Code des geteilten Dokuments
+Kód:	Code:
+Máte kód sdíleného dokumentu?	Haben Sie einen Code für ein geteiltes Dokument?
+např. Ab3k Z9xQ 2m	z. B. Ab3k Z9xQ 2m
+Otevírám sdílený dokument…	Geteiltes Dokument wird geöffnet…
+Úložiště sdílení na serveru je starší verze (bez krátkých kódů) – odkaz má proto delší tvar. Nahrajte na web aktuální soubor cad/share/index.php.	Der Freigabespeicher auf dem Server ist eine ältere Version (ohne Kurzcodes) – der Link ist deshalb länger. Laden Sie die aktuelle Datei cad/share/index.php auf die Website hoch.
+# oprava po revizi: dialog pro zadání kódu, srozumitelná hlášení, zabezpečené připojení
+dá se přečíst nahlas nebo opsat (záleží na velikosti písmen). Příjemce může otevřít {0} a kód tam zadat.	lässt sich vorlesen oder abtippen (Groß-/Kleinschreibung beachten). Der Empfänger kann auch {0} öffnen und den Code dort eingeben.
+Dokument s tímto kódem v úložišti není. Zkontrolujte kód – záleží na velikosti písmen a znaky 0, O, I a l se v něm nevyskytují. Je-li kód správně, požádejte odesílatele o nové sdílení.	Zu diesem Code gibt es im Speicher kein Dokument. Prüfen Sie den Code – Groß-/Kleinschreibung zählt und die Zeichen 0, O, I und l kommen darin nie vor. Stimmt der Code, bitten Sie den Absender um eine neue Freigabe.
+Kód má 10 znaků, zadáno je {0}. Zkontrolujte, zda se zkopíroval celý – záleží i na velikosti písmen.	Der Code hat 10 Zeichen, eingegeben wurden {0}. Prüfen Sie, ob er vollständig kopiert wurde – auch die Groß-/Kleinschreibung zählt.
+Odesílatel tento sdílený odkaz zneplatnil. Požádejte ho o nové sdílení.	Der Absender hat diesen Freigabelink ungültig gemacht. Bitten Sie ihn um eine neue Freigabe.
+Otevírám…	Wird geöffnet…
+Otevřít sdílený dokument	Geteiltes Dokument öffnen
+Otevřít sdílený dokument – zadat kód nebo odkaz	Geteiltes Dokument öffnen – Code oder Link eingeben
+Otevřít sdílený dokument…	Geteiltes Dokument öffnen…
+Sdílení odkazem potřebuje zabezpečené připojení: otevřete CAD na adrese začínající https:// (na http:// prohlížeč šifrování nedovolí).	Die Freigabe per Link braucht eine sichere Verbindung: Öffnen Sie das CAD unter einer Adresse, die mit https:// beginnt (unter http:// erlaubt der Browser keine Verschlüsselung).
+Sdílený dokument se nepodařilo otevřít. Zkuste to znovu.	Das geteilte Dokument konnte nicht geöffnet werden. Bitte versuchen Sie es erneut.
+Sdílený odkaz jde otevřít jen přes zabezpečené připojení: otevřete ho na adrese začínající https:// (na http:// prohlížeč šifrování nedovolí).	Ein Freigabelink lässt sich nur über eine sichere Verbindung öffnen: Öffnen Sie ihn unter einer Adresse, die mit https:// beginnt (unter http:// erlaubt der Browser keine Verschlüsselung).
+V kódu je znak {0}, který se v kódech nepoužívá: 0 (nula), O (velké o), I (velké i) a l (malé L) v nich nejsou, aby se nepletly. Zkontrolujte podobné znaky a velikost písmen.	Der Code enthält {0}; dieses Zeichen kommt in Codes nie vor: 0 (Null), O (großes o), I (großes i) und l (kleines L) fehlen, damit man sie nicht verwechselt. Prüfen Sie ähnliche Zeichen und die Groß-/Kleinschreibung.
+Zadejte kód (10 znaků) nebo vložte odkaz, který vám někdo poslal	Geben Sie den Code (10 Zeichen) ein oder fügen Sie den Link ein, den Ihnen jemand geschickt hat
+Zadejte kód, který vám odesílatel poslal (10 znaků, záleží na velikosti písmen), nebo vložte celý odkaz.	Geben Sie den Code ein, den Ihnen der Absender geschickt hat (10 Zeichen, Groß-/Kleinschreibung beachten), oder fügen Sie den ganzen Link ein.

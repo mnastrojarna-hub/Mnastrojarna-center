@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SHARE_STASH_SCRIPT } from "@/cad/share-code";
 import { CadLoader } from "@/components/cad/cad-loader";
 import { JsonLd } from "@/components/json-ld";
 import { SITE } from "@/content/site";
@@ -12,11 +13,10 @@ export const metadata: Metadata = {
 };
 
 export default function CadPage() {
-  // Geteilter Link (#q=… / #s=… / #r=…): der Teil nach # wird sofort in sessionStorage abgelegt und aus der Adresse entfernt (NDA-Dokumente).
-  const shareScript = "try{var h=location.hash;if(/^#[sqr]=/.test(h)){sessionStorage.setItem('mn-cad-share',h);history.replaceState(null,'',location.pathname+location.search)}}catch(e){}";
+  // Geteilter Link (#<CODE> / #q=… / #s=… / #r=…): der Teil nach # wird sofort in sessionStorage abgelegt und aus der Adresse entfernt (NDA-Dokumente).
   return (
     <>
-      <script dangerouslySetInnerHTML={{ __html: shareScript }} />
+      <script dangerouslySetInnerHTML={{ __html: SHARE_STASH_SCRIPT }} />
       <CadLoader lang="de" />
       <JsonLd
         data={{

@@ -1,0 +1,24 @@
+# Vlna 16 – nejkratší sdílený odkaz (kód za #)
+  kód k přečtení nebo opsání: {0} ({1} znaků odkazu)	  code to read aloud or retype: {0} (link is {1} characters)
+Kód má 10 znaků (písmena a číslice, záleží na velikosti písmen) – nebo vložte celý odkaz.	The code has 10 characters (letters and digits, case matters) – or paste the whole link.
+Kód sdíleného dokumentu	Shared document code
+Kód:	Code:
+Máte kód sdíleného dokumentu?	Got a shared document code?
+např. Ab3k Z9xQ 2m	e.g. Ab3k Z9xQ 2m
+Otevírám sdílený dokument…	Opening the shared document…
+Úložiště sdílení na serveru je starší verze (bez krátkých kódů) – odkaz má proto delší tvar. Nahrajte na web aktuální soubor cad/share/index.php.	The share storage on the server is an older version (no short codes) – the link is therefore longer. Upload the current cad/share/index.php to the website.
+# oprava po revizi: dialog pro zadání kódu, srozumitelná hlášení, zabezpečené připojení
+dá se přečíst nahlas nebo opsat (záleží na velikosti písmen). Příjemce může otevřít {0} a kód tam zadat.	can be read aloud or retyped (case matters). The recipient can also open {0} and enter the code there.
+Dokument s tímto kódem v úložišti není. Zkontrolujte kód – záleží na velikosti písmen a znaky 0, O, I a l se v něm nevyskytují. Je-li kód správně, požádejte odesílatele o nové sdílení.	There is no document with this code in the storage. Check the code – case matters and the characters 0, O, I and l never occur in it. If the code is right, ask the sender to share again.
+Kód má 10 znaků, zadáno je {0}. Zkontrolujte, zda se zkopíroval celý – záleží i na velikosti písmen.	The code has 10 characters, {0} were entered. Check that it was copied completely – case matters too.
+Odesílatel tento sdílený odkaz zneplatnil. Požádejte ho o nové sdílení.	The sender has revoked this shared link. Ask them to share again.
+Otevírám…	Opening…
+Otevřít sdílený dokument	Open a shared document
+Otevřít sdílený dokument – zadat kód nebo odkaz	Open a shared document – enter a code or link
+Otevřít sdílený dokument…	Open a shared document…
+Sdílení odkazem potřebuje zabezpečené připojení: otevřete CAD na adrese začínající https:// (na http:// prohlížeč šifrování nedovolí).	Sharing by link needs a secure connection: open the CAD at an address starting with https:// (on http:// the browser does not allow encryption).
+Sdílený dokument se nepodařilo otevřít. Zkuste to znovu.	The shared document could not be opened. Please try again.
+Sdílený odkaz jde otevřít jen přes zabezpečené připojení: otevřete ho na adrese začínající https:// (na http:// prohlížeč šifrování nedovolí).	A shared link can only be opened over a secure connection: open it at an address starting with https:// (on http:// the browser does not allow encryption).
+V kódu je znak {0}, který se v kódech nepoužívá: 0 (nula), O (velké o), I (velké i) a l (malé L) v nich nejsou, aby se nepletly. Zkontrolujte podobné znaky a velikost písmen.	The code contains {0}, which is never used in codes: 0 (zero), O (capital o), I (capital i) and l (lowercase L) are left out so they cannot be confused. Check look-alike characters and the case.
+Zadejte kód (10 znaků) nebo vložte odkaz, který vám někdo poslal	Enter the code (10 characters) or paste the link someone sent you
+Zadejte kód, který vám odesílatel poslal (10 znaků, záleží na velikosti písmen), nebo vložte celý odkaz.	Enter the code the sender gave you (10 characters, case matters), or paste the whole link.

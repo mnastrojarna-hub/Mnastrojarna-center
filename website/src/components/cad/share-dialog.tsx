@@ -2,7 +2,7 @@
 
 import { cadLocale, tr } from "@/cad/i18n";
 import { useEffect, useRef, useState } from "react";
-import { createShareLink, LINK_WARN_CHARS, revokeShare, SHARE_DAYS, SHARE_DEFAULT_DAYS, shareMessage, shareStores, type ShareMode, type ShareResult, type ShareView } from "@/cad/share";
+import { createShareLink, groupShareCode, LINK_WARN_CHARS, revokeShare, SHARE_DAYS, SHARE_DEFAULT_DAYS, shareMessage, shareStores, type ShareMode, type ShareResult, type ShareView } from "@/cad/share";
 import type { CadDoc } from "@/cad/types";
 import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/cn";
@@ -14,7 +14,7 @@ const FROM_KEY = "mn-cad-share-from"; // jen jméno odesílatele (není to dokum
 const fmtDate = (t: number | null) => (t ? new Date(t).toLocaleDateString(cadLocale(), { day: "numeric", month: "long", year: "numeric" }) : tr("bez omezení"));
 const kb = (n: number) => (n < 1024 ? `${n} B` : n < 1024 * 1024 ? `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} kB` : `${(n / 1024 / 1024).toFixed(1)} MB`);
 
-/** do této délky se odkaz ukáže na jednom řádku (krátký odkaz z úložiště má ~70 znaků) */
+/** do této délky se odkaz ukáže na jednom řádku (odkaz s kódem má na produkci 36 znaků, starší #q= ~70) */
 const SHORT_CHARS = 200;
 
 /**
@@ -255,6 +255,15 @@ export function ShareDialog({ doc, view, onClose, onFlash }: { doc: CadDoc; view
               data-share-mode={res?.mode}
               className="w-full resize-none rounded border border-[#cfd6de] bg-[#f7f9fb] px-2 py-1.5 font-mono text-[11px] leading-snug text-[#26303b] outline-none focus:border-brand"
             />
+          )}
+          {res?.code && !busy && !revoked && (
+            // kód z odkazu po skupinách: dá se přečíst do telefonu nebo opsat; příjemce otevře …/s a zadá ho do dialogu
+            <p className="mt-1 text-[11.5px] leading-relaxed text-[#6b7785]" data-share-code={res.code}>
+              {tr("Kód:")}{" "}
+              <strong className="select-all whitespace-nowrap font-mono text-[13px] tracking-wide text-[#26303b]">{groupShareCode(res.code)}</strong>
+              {" – "}
+              {tr("dá se přečíst nahlas nebo opsat (záleží na velikosti písmen). Příjemce může otevřít {0} a kód tam zadat.", res.url.slice(0, res.url.indexOf("#")).replace(/^https?:\/\//, ""))}
+            </p>
           )}
           {err && <p className="mt-1 rounded border border-brand/30 bg-[#fff7f6] px-2 py-1.5 text-[12px] text-brand">{err}</p>}
           {res?.note && !err && !busy && <p className="mt-1 rounded border border-[#e9d9a6] bg-[#fffaf0] px-2 py-1.5 text-[11.5px] text-[#8a6d1f]" data-share-note>{res.note}</p>}

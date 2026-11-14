@@ -8,6 +8,7 @@ import { CAD_LINKS } from "@/content/cad-links";
 import { cn } from "@/lib/cn";
 import { LogoMark } from "../logo";
 import { CadIcon, type CadIconName, type Tone } from "./cad-icons";
+import { ShareCodeField, type OpenShareInput } from "./share-code-dialog";
 import { Kbd } from "./ui";
 
 type Action = { id: string; label: string; desc: string; icon: CadIconName; tone: Tone; run: () => void; kbd?: string };
@@ -18,6 +19,7 @@ export function StartScreen({
   secondary = [],
   examples,
   onOpenRecent,
+  onOpenShare,
   onClose,
   onDisable,
 }: {
@@ -27,6 +29,8 @@ export function StartScreen({
   secondary?: Action[];
   examples: { id: string; label: string; run: () => void }[];
   onOpenRecent: (r: RecentDoc) => void;
+  /** otevře sdílený dokument podle ručně zadaného kódu (nebo vloženého odkazu); null = otevřeno, jinak text chyby */
+  onOpenShare?: OpenShareInput;
   onClose: () => void;
   onDisable: () => void;
 }) {
@@ -111,6 +115,8 @@ export function StartScreen({
               ))}
             </div>
           )}
+
+          {onOpenShare && <ShareCodeField onOpen={onOpenShare} label={tr("Máte kód sdíleného dokumentu?")} className="mt-4" />}
 
           <h2 className="mb-3 mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#6b7785]">{tr("Ukázkové modely")}</h2>
           <div className="flex flex-wrap gap-2">

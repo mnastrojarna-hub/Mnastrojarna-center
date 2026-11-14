@@ -13,9 +13,16 @@
 //    v konzoli; Tisk v automatizaci = PDF bez dialogu tisku; „výkres export pdf 2“ = list 2; export step: kontrola bez
 //    sítě (rychlá), opakovaná z paměti, „bez kontroly“; člověk: „uložit“ z konzole = nic neuloženého (žádný beforeunload);
 //    ?agent=1 přežije přepnutí jazyka i přechod na adresu bez příznaku
+//  - vlna 16: s úložištěm sdílení (skutečné PHP `php -S`, požadavky na /cad/share/ přesměrované jako u cad-w8-share) vypíše
+//    `sdílet` NEJKRATŠÍ odkaz <web>/s#<KÓD 10 znaků> + kód po skupinách; `odkaz` ho zopakuje; odkaz se otevře v nové kartě
+//    (bez příkazu php se tato část přeskočí)
 // Spuštění: E2E_BASE=http://localhost:3361 node e2e/cad-agent-out.e2e.cjs <složka pro výstupy>   (výchozí server :3100)
 const { chromium } = require('playwright');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
+const net = require('net');
+const os = require('os');
+const path = require('path');
 const S = (process.argv[2] || '/tmp/e2e-out').replace(/\/?$/, '/');
 fs.mkdirSync(S, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -402,4 +409,85 @@ const volumeOf = (status) => { const m = /objem ([\d\s  ]+,\d+) cm³/.exec(statu
     ok(errs.length === 0, 'C: bez JS chyb ' + errs.join(' | '));
     await b.close();
   }
+
+  // ════════════ D) vlna 16: konzole s úložištěm sdílení → nejkratší odkaz <web>/s#<KÓD> ════════════
+  if (spawnSync('php', ['-v'], { stdio: 'ignore' }).status === 0) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-out-share-'));
+    const docroot = path.join(root, 'www');
+    fs.mkdirSync(path.join(docroot, 'cad', 'share'), { recursive: true });
+    fs.copyFileSync(path.join(__dirname, '..', 'public', 'cad', 'share', 'index.php'), path.join(docroot, 'cad', 'share', 'index.php'));
+    const port = await new Promise((resolve, reject) => { const s = net.createServer(); s.once('error', reject); s.listen(0, '127.0.0.1', () => { const n = s.address().port; s.close(() => resolve(n)); }); });
+    const php = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', docroot], { stdio: 'ignore' });
+    const phpOrigin = `http://127.0.0.1:${port}`;
+    for (let i = 0; i < 200; i++) { try { if ((await fetch(phpOrigin + '/cad/share/?ping')).ok) break; } catch { /* start */ } await new Promise((r) => setTimeout(r, 50)); }
+    const isShare = (url) => new URL(url).pathname.startsWith('/cad/share/');
+    /** požadavky prohlížeče na /cad/share/ → PHP server (Origin přepíše na adresu PHP, jako reverzní proxy se stejným Host) */
+    const forward = async (route) => {
+      const req = route.request();
+      const u = new URL(req.url());
+      const headers = { ...req.headers() };
+      for (const h of ['host', 'content-length', 'connection', 'accept-encoding']) delete headers[h];
+      if (headers.origin) headers.origin = phpOrigin;
+      try {
+        const res = await fetch(phpOrigin + u.pathname + u.search, { method: req.method(), headers, body: ['GET', 'HEAD'].includes(req.method()) ? undefined : req.postDataBuffer() || undefined });
+        const out = {};
+        res.headers.forEach((v, k) => { if (!['content-encoding', 'content-length', 'transfer-encoding', 'connection'].includes(k)) out[k] = v; });
+        await route.fulfill({ status: res.status, headers: out, body: Buffer.from(await res.arrayBuffer()) });
+      } catch { await route.abort('failed').catch(() => {}); }
+    };
+    const b = await chromium.launch({ args: NO_GL });
+    try {
+      const ctx = await b.newContext({ viewport: { width: 1400, height: 860 } });
+      await ctx.route(isShare, forward);
+      const p = await ctx.newPage();
+      const dialogs = [];
+      const errs = [];
+      p.on('dialog', (d) => { dialogs.push(`${d.type()}: ${d.message()}`); d.dismiss().catch(() => {}); });
+      p.on('pageerror', (e) => errs.push(e.message));
+      await ready(p);
+      await p.keyboard.press('Control+Shift+K');
+      const input = p.getByLabel('Textové příkazy nebo JSON');
+      if (!(await input.isVisible({ timeout: 5000 }).catch(() => false))) await p.evaluate(() => window.mncad.openConsole());
+      await input.waitFor({ timeout: 20000 });
+      const out = p.locator('[data-agent-output]');
+      const consoleRun = async (text, ms = 240000) => {
+        const before = await out.innerText().catch(() => '');
+        await input.fill(text);
+        await p.getByRole('button', { name: 'Provést', exact: true }).click();
+        await p.waitForFunction((prev) => { const o = document.querySelector('[data-agent-output]'); const busy = [...document.querySelectorAll('button')].some((x) => x.textContent === 'Provádím…'); return !busy && !!o && o.textContent !== prev; }, before, { timeout: ms });
+        return out.innerText();
+      };
+      await consoleRun('nový díl Konzola\nskica XY: obdélník 80 50\nvysunout 12\ndíra 8 skrz v -20 0');
+      const CODE = '[1-9A-HJ-NP-Za-km-z]{10}';
+      const esc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const SHORT = new RegExp('^' + esc(BASE) + '/s#(' + CODE + ')$');
+      let log = await consoleRun('sdílet');
+      const url = (/^URL: (\S+)$/m.exec(log) || [])[1] || '';
+      const code = (SHORT.exec(url) || [])[1] || '';
+      ok(!!code && url.length === BASE.length + 13, `D: sdílet → nejkratší odkaz v protokolu: ${url} (${url.length} znaků = adresa serveru + 13; na produkci https://mnastrojarna.cz/s#… = 36)`);
+      ok(/✓ sdílený odkaz vytvořen – „Konzola“ \(model\), platí do: .+, bez hesla, .+ v úložišti/.test(log), 'D: protokol: platnost, heslo, velikost, „v úložišti“');
+      const grouped = code.replace(/(.{4})(?=.)/g, '$1 ');
+      ok(log.includes(`kód k přečtení nebo opsání: ${grouped} (${url.length} znaků odkazu)`), `D: protokol: kód po skupinách „${grouped}“ a délka odkazu`);
+      ok(fs.readdirSync(path.join(root, 'cad-share-data')).filter((f) => f.endsWith('.bin')).length === 1 && !fs.readdirSync(path.join(root, 'cad-share-data')).some((f) => f.includes(code)), 'D: na serveru je jeden šifrovaný obsah, kód v názvu souboru není');
+      log = await consoleRun('odkaz');
+      ok(log.includes('URL: ' + url) && /✓ poslední sdílený odkaz/.test(log) && log.includes(grouped), 'D: odkaz → vypíše poslední krátký odkaz i kód znovu');
+      log = await consoleRun('výkres A3\nsdílet výkres dní 7 heslo tajne');
+      const urlPw = [...log.matchAll(/^URL: (\S+)$/gm)].map((m) => m[1]).pop() || '';
+      ok(SHORT.test(urlPw) && urlPw !== url && /\(výkres\)/.test(log) && /s heslem/.test(log), `D: sdílet výkres dní 7 heslo … → stejně krátký odkaz s heslem (${urlPw.length} znaků)`);
+      const api = await p.evaluate(() => window.mncad.share({ days: 1 }));
+      ok(SHORT.test(api.url) && api.chars === api.url.length && api.mode === 'self' && api.code === api.url.slice(-10), `D: window.mncad.share() → ${api.url} (chars ${api.chars}, code ${api.code})`);
+      // odkaz z protokolu otevře model v nové kartě (přes přesměrování /s → /cad?kod=1; část za # i parametr z adresy zmizí)
+      const r = await ctx.newPage();
+      await r.goto(url, { waitUntil: 'networkidle', timeout: 300000 });
+      await r.waitForFunction(() => !!window.mncad && window.mncad.getDocument().name === 'Konzola', null, { timeout: 240000 }).catch(() => {});
+      const shared = await r.evaluate(() => window.mncad.getDocument());
+      ok(new URL(r.url()).pathname === '/cad' && !r.url().includes('#') && new URL(r.url()).search === '' && shared.name === 'Konzola' && shared.features.length === 3, `D: krátký odkaz z protokolu otevře model v nové kartě („${shared.name}“, ${shared.features.length} prvků) na ${new URL(r.url()).pathname}`);
+      ok(dialogs.length === 0, `D: žádné systémové okno: ${dialogs.join(' | ') || '0'}`);
+      ok(errs.length === 0, 'D: bez JS chyb ' + errs.join(' | '));
+    } finally {
+      await b.close().catch(() => {});
+      php.kill();
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  } else console.log('# php chybí – část D (krátký odkaz z konzole proti úložišti) přeskočena');
 })().catch((e) => { console.error('ERR', e.message); process.exit(1); });
