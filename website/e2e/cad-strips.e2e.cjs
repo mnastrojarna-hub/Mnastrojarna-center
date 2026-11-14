@@ -6,7 +6,7 @@ const fs = require('fs');
 const S = (process.argv[2] || '/tmp/e2e').replace(/\/?$/, '/');
 fs.mkdirSync(S, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
-const CAD = 'http://localhost:3100/cad';
+const CAD = (process.env.E2E_BASE || 'http://localhost:3100') + '/cad';
 const start = async (page) => {
   const c = page.getByText('Pokračovat v práci');
   if (await c.isVisible({ timeout: 6000 }).catch(() => false)) await c.click();

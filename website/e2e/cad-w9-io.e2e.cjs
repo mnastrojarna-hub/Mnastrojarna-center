@@ -33,7 +33,12 @@ const BIG = process.env.E2E_BIG_DWG || '';
   const waitDoc = (fn, ms = 60000) => p.waitForFunction(fn, null, { timeout: ms, polling: 250 });
   const toast = () => p.evaluate(() => [...document.querySelectorAll('div')].filter((d) => /bottom-14/.test(d.className) && d.offsetParent).map((d) => d.textContent).join(' | '));
   const newPart = () => p.evaluate(() => window.mncad.setDocument({ app: 'mnastrojarna-cad', version: 2, name: 'Díl', material: 'ocel', features: [] }));
-  const ribbonBtn = (title) => p.locator(`[data-draft-workspace] [data-ribbon] button[title^="${title}"]`).first();
+  // tlačítko pásu podle popisku (s mikronávody nemá nativní title; velké tlačítko = text, malé = aria-label); „(Ctrl+O)“ = zkratka, ne popisek
+  const ribbonBtn = (title) => {
+    const label = title.replace(/\s*\([^)]*\)$/, '');
+    const all = p.locator('[data-draft-workspace] [data-ribbon] button');
+    return all.filter({ hasText: label }).or(p.locator(`[data-draft-workspace] [data-ribbon] button[aria-label^="${label}"]`)).first();
+  };
   /** výběr souboru vyvolaný akcí (klávesa, tlačítko); pomalý stroj → až 3 pokusy */
   const chooser = async (act, what) => {
     for (let i = 0; i < 3; i++) {

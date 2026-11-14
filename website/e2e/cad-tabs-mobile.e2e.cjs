@@ -5,7 +5,7 @@ const fs = require('fs');
 const S = (process.argv[2] || '/tmp/e2e').replace(/\/?$/, '/');
 fs.mkdirSync(S, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
-const CAD = 'http://localhost:3100/cad';
+const CAD = (process.env.E2E_BASE || 'http://localhost:3100') + '/cad';
 const coreReady = (page) => page.waitForFunction(() => !document.body.innerText.includes('Načítám jádro') && !!document.querySelector('[role=tab]'), null, { timeout: 120000 });
 const start = async (page) => {
   const c = page.getByText('Pokračovat v práci');

@@ -14,7 +14,7 @@ const dl = async (page, trigger) => { const [d] = await Promise.all([page.waitFo
   await page.addInitScript(() => { Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true }); }); // headless: ukládání přes dotaz na název
   page.on('dialog', (d) => d.accept());
   const errs = []; page.on('pageerror', (e) => errs.push(e.message));
-  await page.goto('http://localhost:3100/cad', { waitUntil: 'networkidle' });
+  await page.goto((process.env.E2E_BASE || 'http://localhost:3100') + '/cad', { waitUntil: 'networkidle' });
   // úvodní obrazovka
   const cont = page.getByText('Pokračovat v práci');
   if (await cont.isVisible({ timeout: 5000 }).catch(() => false)) { await cont.click(); ok(true, 'úvodní obrazovka zavřena'); }
