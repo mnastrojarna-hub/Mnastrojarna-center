@@ -19,6 +19,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 19:20 | Úkol D1 částečně rozjet dřív (nezávisí na B): agent dokumentace dopisuje vlnu 15, převodník a vlnu 17 do `cad-docs.ts` ve worktree `w18-docs2`, výstup `S/w18/docs2.patch` (zdroje `S/w18/docs-round2-sources.md`). Místa o fázi A nechává beze změny – přepíšou se až po B. |
 | 14. 11. 19:30 | Úkol B2 rozjet souběžně s akceptací: zkušební nanesení `bint.patch` na dnešní větev = 15 souborů s konflikty (největší `cad-app.tsx` – stará smyčka 378 řádků vs. volání enginu). Spuštěn workflow `wf_d020a109-e6f` (integrace → nezávislá kontrola ztracených změn → opravy), worktree `w14-int2` ze `4ceb0e7`, zadání `S/w14/int2/brief.md`, výstup `S/w14/int2/int2.patch` + `audit.md`. Až doběhne i akceptace (`w14-b6`), přenes její rozdíl `git -C .claude/worktrees/w14-b6 diff 7b86184 HEAD` na `w14-int2` (nebo do hlavní větve po int2). |
 | 14. 11. 19:45 | Dokumentace 2. kolo hotová a nanesena na větev (vlna 15, převodník, vlna 17; `S/w18/docs2.patch`). Do PR půjde spolu s opravami e2e po doběhnutí průchodu a ověření na novém buildu. Agent dokumentace zjistil 2 mezery → úkol E6 a E7. |
+| 14. 11. 19:55 | NOVÝ požadavek majitele: výběr myší oknem (více prvků naráz) ve 3D i 2D → vlna 20 (kapitola 7b). Spuštěn workflow `wf_533a7c7c-a4a` (balíky `3d` a `2d` souběžně, každý implementace → kontrola → opravy), základ `210a1e8`, zadání `S/w20/brief.md`. Průchod e2e: 35/49, dosud jen zastaralá očekávání (`cad-big-step` – vkládání do sestavy přes vstup Vložit – opraveno). |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -270,6 +271,27 @@ patche jsou proti poslednímu commitu `w19-core`. Každý balík: implementace �
       textem v CLI (`mncad run`), až bude sloučen úkol B.
 - [ ] F4. Dokumentace (nová podkapitola v kapitole Prvky / Knihovna + FAQ „Jak udělám ozubené kolo?“), PR, sloučení,
       smazat worktree `w19-*`.
+
+## 7b. Úkol G – vlna 20: výběr oknem (tažením obdélníku) ve 3D, ve skice, ve 2D výkresu a ve výkresu dílu
+
+Zadání majitele: „Mnástrojárna CAD 3D a 2D neumí vybrat jednoduše myší oknem, tedy více prvků naráz.“
+Očekávání (jako AutoCAD / SolidWorks): tažení levým tlačítkem = obdélník; zleva doprava = okno (jen celé uvnitř),
+zprava doleva = křížení (i dotčené); bez klávesy nahradí výběr, Ctrl/Shift přidá, Ctrl+Shift/Alt ubere; Esc zruší;
+ve 3D jen viditelné (volba „i skryté“), podle filtru výběru; funguje i ve výběrech formulářů (hrany zaoblení),
+v měření, v sestavě (komponenty), bez WebGL; ve skice (mazání, vazby na vícenásobném výběru), ve 2D výkresu
+(i uvnitř příkazů „Vyberte objekty“) a ve výkresu dílu (kóty, poznámky). Pro agenty `window.mncad.selectBox(...)`.
+Úplné zadání `S/w20/brief.md`.
+
+Workflow `wf_533a7c7c-a4a` (skript `…/workflows/scripts/cad-wave20-box-select-wf_533a7c7c-a4a.js`): balíky `3d`
+(worktree `w20-3d`, patch `S/w20/3d.patch`) a `2d` (`w20-2d`, `S/w20/2d.patch`), oba proti `210a1e8`.
+
+- [ ] G1. Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
+- [ ] G2. Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
+      – malé kusy; je-li B už sloučen, nanes na nový `main`).
+- [ ] G3. Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
+      plochy vybere jen viditelné plochy; křížení vybere i dotčené; Ctrl přidá; zaoblení – hrany oknem; sestava –
+      komponenty oknem; skica – smazat více entit; 2D – MOVE s výběrem oknem; výkres dílu – smazat více kót.
+- [ ] G4. Dokumentace (kapitola 3 Obrazovka, 5 Skica, 14 2D CAD, 13 Výkresy + mikronávody), PR, sloučení, smazat `w20-*`.
 
 ## 8. Co říct majiteli o nasazení (po každém sloučení)
 
