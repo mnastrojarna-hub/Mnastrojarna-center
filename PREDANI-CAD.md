@@ -11,6 +11,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 18:06 | BĚŽÍ na pozadí: opakované testy (`S/vitest-w15c.log`, čekej na řádek `exit=`) a e2e 18 sad na portu 3199 (`S/e2e-w15.log`, končí řádkem `done`; server `next start -p 3199` běží – po e2e ho zastav a smaž `.next`). |
 | 14. 11. 18:06 | BĚŽÍ workflow: `wf_0a444c37-b25` (fáze B – integrace hotová, `S/w14/bint.patch`; následuje akceptace) a `wf_1fd5cfa9-922` (`fix:geom`). |
 | 14. 11. 18:20 | Opakované testy vlny 15 prošly: 6 souborů, 97 / 97 (převodník, přehrání zkušebního i skutečného nástroje, výkres). E2e běží; `cad-w15-drawing` měl 2 FAIL kvůli staršímu zápisu řezu – sada upravena (−80 = mimo těleso, −20 = `⚠` starší zápis), po doběhnutí dávky ji pusť znovu samostatně. |
+| 14. 11. 18:40 | NOVÝ požadavek majitele: kola „vyplním tabulku a mám díl, extra snadno“ → vlna 19 (kapitola 7a). Spuštěn workflow `wf_a5f62aa9-09a` (návrh → jádro → průvodce + text), základ `3bb04d9`. |
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -207,6 +208,46 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 - [ ] E4. Hostovaný koncový bod (HTTP služba pro agenty bez Node) je rozhodnutí majitele – nenasazuj, jen se v závěrečné
       zprávě zeptej, zda ho chce (je to jediná povolená otázka).
 - [ ] E5. Smaž zbylé worktree (`w18-docs`), tento soubor a odkaz v `CLAUDE.md`. Závěrečná zpráva majiteli.
+
+## 7a. Úkol F – vlna 19: „Kola a ozubení“ – vyplním tabulku a mám kolo (nový požadavek majitele)
+
+Zadání majitele: „CAD by měl umět extra snadno modelovat kola pomocí vyplněné tabulky: ozubená, lineární (hřeben),
+hypoidní, šikmá, evolventní či cykloidní i řetězová – prostě vyplním tabulku a mám polotovar.“
+
+Dnes: kola jsou jen rodiny v knihovně (`src/cad/library/gears.ts`, `gears2.ts`) – vznikne dokument z obyčejných prvků,
+kolo nejde později upravit „jako kolo“, chybí soukolí, tabulka ozubení, cykloidní a hypoidní ozubení.
+
+Co má vlna dodat (úplné zadání `S/w19/brief.md`, návrh `S/w19/NAVRH.md`):
+1. Jeden vstup „Kola a ozubení“ (pás Tvorba, knihovna, paleta, úvodní obrazovka): galerie druhů → JEDNA tabulka s málo
+   povinnými řádky, výchozími hodnotami, nápovědou a živým náhledem profilu; dopočtené hodnoty ve stejné tabulce.
+   Výsledek je JEDEN parametrický prvek historie, jehož úprava je táž tabulka. Cíl: správné kolo na 3 kliknutí a 2 čísla.
+2. Druhy: čelní přímé, šikmé, šípové, vnitřní, hřeben přímý i šikmý, kuželové přímé / spirální / hypoidní, šnek a šnekové
+   kolo, cykloidní (epi / hypocykloida, hodinové, kotouč cykloidní převodovky s čepy), řetězová ISO 606 (1–3 řady),
+   řemenice, případně rohatka. Společné volby: šířka, díra, drážka pro pero, náboj, odlehčení, vůle;
+   výstup = hotové kolo | jen polotovar (bez zubů) | zuby vyříznuté do aktivního tělesa.
+3. Soukolí: z1, z2, modul, osová vzdálenost, korekce, vůle → převod, součinitel záběru, varování (podřezání, špičatý
+   zub) → sestava dvou kol s vazbou ozubení.
+4. Tabulka ozubení (modul, z, úhel záběru, sklon, korekce, Ø roztečný / základní / hlavový / patní, míra přes zuby W,
+   míra přes kuličky M …): v průvodci, textem `kolo tabulka`, na výkrese `výkres tabulka ozubení ano`.
+5. Přesná evolventa (chyba < 0,001 mm), patní přechod, platná tělesa, z = 200 do 5 s.
+6. Textem pro agenty: `kolo čelní m 2 z 24 b 20 …`, `kolo hřeben …`, `kolo řetězové 08B z 19`, `kolo cykloidní …`,
+   `soukolí čelní m 2 z1 20 z2 60 …`, `kolo nápověda`; česky / anglicky / německy; BEZ nové větve ve smyčce operací
+   (příkaz se převede na existující operaci prvku jako `svar …`).
+
+Workflow `wf_a5f62aa9-09a` (skript `…/workflows/scripts/cad-wave19-gears-wf_a5f62aa9-09a.js`): návrh → balík `core`
+(worktree `w19-core`, patch `S/w19/core.patch` proti `3bb04d9`) → souběžně `ui` (`w19-ui`) a `text` (`w19-text`), jejich
+patche jsou proti poslednímu commitu `w19-core`. Každý balík: implementace → protistranná kontrola → opravy.
+
+- [ ] F1. Počkej na dokončení workflow (při restartu obnov `resumeFromRunId: "wf_a5f62aa9-09a"`). Přečti zprávy v deníku.
+- [ ] F2. Aplikuj postupně `core.patch`, `ui.patch`, `text.patch` na `main` podle kapitoly 2 (po úkolech A–C; s úkolem B
+      se potká jen v `agent.ts`, `agent-guide.ts`, `cad-app.tsx` – malé kusy). Kontrola NDA není potřeba (žádná data
+      zákazníka), ale zkontroluj, že patch neobsahuje nic z `website/.local/`.
+- [ ] F3. Vlastní zkouška „extra snadno“ v prohlížeči (Playwright, produkční build): nový díl → Kola a ozubení → čelní →
+      zadat jen modul a počet zubů → Vytvořit → těleso platné, Ø hlavové = m·(z+2); změna z v historii přestaví kolo;
+      soukolí → sestava s vazbou; `kolo tabulka` vypíše míru přes zuby; výkres s tabulkou ozubení do PDF. Totéž
+      textem v CLI (`mncad run`), až bude sloučen úkol B.
+- [ ] F4. Dokumentace (nová podkapitola v kapitole Prvky / Knihovna + FAQ „Jak udělám ozubené kolo?“), PR, sloučení,
+      smazat worktree `w19-*`.
 
 ## 8. Co říct majiteli o nasazení (po každém sloučení)
 
