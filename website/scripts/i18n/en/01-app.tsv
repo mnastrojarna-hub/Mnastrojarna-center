@@ -1,7 +1,6 @@
 # Anglické překlady rozhraní CADu – klíč = český zdrojový text (tabulátor) překlad. Generuje src/cad/i18n/en.ts (scripts/cad-i18n-build.mjs).
 # agent-console
 (run, getDocument, setDocument, status, guide). Úplný návod a schéma:	(run, getDocument, setDocument, status, guide). Full guide and schema:
-. Nic z toho neodesílá data mimo tento prohlížeč.	. None of this sends data outside this browser.
 Ctrl+Shift+K otevře konzoli kdykoli · Ctrl+Enter provede · příkazy se připojují k otevřenému dokumentu	Ctrl+Shift+K opens the console any time · Ctrl+Enter runs · commands are appended to the open document
 Dokument (JSON) zkopírován.	Document (JSON) copied.
 Kopírovat dokument (JSON)	Copy document (JSON)
@@ -102,7 +101,6 @@ ks ·	pcs ·
 Šířka rozpěrek	Spacer width
 # cad-app
  (úroveň {0})	 (level {0})
-! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})	! line {0}: there is no body surface at [{1}; {2}] – the hole starts at the body's bounding box ({3})
 .mncad díl nebo STEP/IGES/STL… jako komponenta	.mncad part or STEP/IGES/STL… as a component
 103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.	103 families: screws, bearings, gears, profiles, mould standards… Just type “M8x30”.
 24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce	24 chapters, step-by-step procedures, FAQ – opens in a new tab
@@ -558,7 +556,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 → {0} (shell) – otevřeno ploch: {1} – výsledek po výpočtu níže	→ {0} (shell) – faces opened: {1} – result after computation below
 → {0} ({1}) přidán – výsledek po výpočtu níže	→ {0} ({1}) added – result after computation below
 → {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} edges by rule “{3}” – result after computation below
-⚠ kolize: {0} – {1}	⚠ interferences: {0} – {1}
 ✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ document “{0}” ({1} features) – opens in a new tab
 ✓ kolize: žádné ({0} komponent)	✓ interferences: none ({0} components)
 ✓ materiál = {0}	✓ material = {0}

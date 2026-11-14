@@ -1,0 +1,6 @@
+# 2D výkres (op draft): nový, kreslení, hladina, stav
+2d nový Půdorys
+2d čára 0,0 100,0 @0,50
+2d kružnice 50,25 10
+2d hladina nová OSY barva 1
+2d stav

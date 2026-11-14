@@ -1,0 +1,61 @@
+# balík B5 check-compare (CAD-HEADLESS-NAVRH.md kap. 6): kontrola, porovnat, třídy kolizí, přiložené soubory
+ · vazby {0} z {1} ok	 · mates {0} of {1} ok
+ (+{0} dalších)	 (+{0} more)
+, předpokládaná – materiál zadán jen označením	, assumed – material given only as a designation
+{0} dvojic komponent nelze vyhodnotit – booleovská operace jádra selhala (dvojice se nehlásí jako kolize)	{0} component pairs cannot be evaluated – the kernel boolean operation failed (the pairs are not reported as clashes)
+{0}× „{1}“ – objem {2} cm³ · hmotnost {3} kg · obálka {4} · těles {5}{6}	{0}× “{1}” – volume {2} cm³ · mass {3} kg · bounding box {4} · solids {5}{6}
+attach potřebuje {0}	attach needs {0}
+attach: base64 obsahuje neplatné znaky	attach: base64 contains invalid characters
+attach: chybí název souboru	attach: file name missing
+bez prvku díry	no hole feature
+booleovská operace jádra selhala	the kernel boolean operation failed
+díl „{0}“ není mezi otevřenými záložkami – dostupné: {1}	part “{0}” is not among the open tabs – available: {1}
+Díly ({0}):	Parts ({0}):
+Díry ({0}):	Holes ({0}):
+dno kužel {0}°	cone bottom {0}°
+chybí	missing
+chybí název dílu – {0}	part name missing – {0}
+kolize: {0} – šroub v závitu {1}, pod hlavou {2}, skutečné {3}, nevyhodnotitelné {4}	clashes: {0} – screw in thread {1}, under head {2}, real {3}, undetermined {4}
+kolize: {0} – šroub v závitu {1}, skutečné {2}	clashes: {0} – screw in thread {1}, real {2}
+komponenta dvojice v sestavě není	a component of the pair is not in the assembly
+Kontrola „{0}“: objem {1} cm³ · hmotnost {2} kg (hustota {3} g/cm³{4}) · obálka {5} · těles {6} · {7}	Check “{0}”: volume {1} cm³ · mass {2} kg (density {3} g/cm³{4}) · bounding box {5} · solids {6} · {7}
+kontrola [díl "A" | sestava | vše] [díry] [polohy]	check [part "A" | assembly | all] [holes] [positions]
+kontrola díl: komponenta „{0}“ není díl s historií (importovaný soubor) – kontrola sestava	check part: component “{0}” is not a part with history (imported file) – check assembly
+kontrola modelu jako tabulka: přesný objem, hmotnost, hustota (rho.assumed = materiál jen označením), obálka, počet těles, platnost; díry (souosé úseky sloučené, zahloubení, závit a hloubka závitu, ploché dno / kužel hrotu) spojené s prvky díry – prvek bez díry v geometrii = ⚠ check.hole-missing; sestava: V.sum i V.union, hmotnost, přesná obálka, vazby, kolize po třídách a řádek na každý různý díl; polohy = i středy děr	model check as a table: exact volume, mass, density (rho.assumed = material given only as a designation), bounding box, number of solids, validity; holes (coaxial segments merged, counterbore, thread and thread depth, flat bottom / drill point cone) joined with the hole features – a feature without a hole in the geometry = ⚠ check.hole-missing; assembly: V.sum and V.union, mass, exact bounding box, mates, clashes by class and one row per distinct part; positions = also the hole centres
+kontrola sestava: otevřený dokument není sestava	check assembly: the open document is not an assembly
+Kontrola sestavy „{0}“: {1} komponent ({2} různých dílů) · objem Σ {3} cm³, sjednocení {4} cm³ · hmotnost Σ {5} kg · obálka {6}{7} · kolize {8} (šroub v závitu {9}, pod hlavou {10}, skutečné {11}, nevyhodnotitelné {12}) · platných dílů {13} z {14}	Assembly check “{0}”: {1} components ({2} distinct parts) · volume Σ {3} cm³, union {4} cm³ · mass Σ {5} kg · bounding box {6}{7} · clashes {8} (screw in thread {9}, under head {10}, real {11}, undetermined {12}) · valid parts {13} of {14}
+kontrola: díl „{0}“ nemá těleso	check: part “{0}” has no solid
+kontrola: neznámá volba „{0}“ – {1}	check: unknown option “{0}” – {1}
+kontrola: otevřený dokument je 2D výkres	check: the open document is a 2D drawing
+kontrola: sestava nemá viditelné komponenty	check: the assembly has no visible components
+kontrola: zadejte jen jeden cíl (díl, sestava nebo vše) – {0}	check: give only one target (part, assembly or all) – {0}
+kuželové zahloubení Ø{0} × {1}°	countersink Ø{0} × {1}°
+navíc	extra
+NEPLATNÉ (BRepCheck)	INVALID (BRepCheck)
+neznámé označení závitu „{0}“ (jmenovitý průměr jen z označení M…)	unknown thread designation “{0}” (nominal diameter only from an M… designation)
+odchylka povrchu až {0} mm (tolerance {1} mm)	surface deviation up to {0} mm (tolerance {1} mm)
+platné	valid
+polohy {0}	positions {0}
+porovnání modelu se souborem reference (STEP, BREP, STL) ze vstupních souborů: CLI --files / složka skriptu, HTTP files, v prohlížeči přiložený soubor (tlačítko Připojit soubor… v konzoli nebo window.mncad.attach); sestava = složené těleso; výsledek jeden řádek (ok, rozdíl objemu, navíc / chybí, odchylky, podíl v toleranci), mimo toleranci ⚠ compare.mismatch se 3 největšími oblastmi, s „přísně“ ✗	comparison of the model with a reference file (STEP, BREP, STL) from the input files: CLI --files / script folder, HTTP files, in the browser an attached file (Attach file… button in the console or window.mncad.attach); assembly = compound solid; result one line (ok, volume difference, extra / missing, deviations, share within tolerance), out of tolerance ⚠ compare.mismatch with the 3 largest regions, with “strict” ✗
+porovnat "ref.step" [tolerance 0,05] [zarovnat auto|střed|ne] [díl "A" | sestava] [mapa ne] [přísně]	compare "ref.step" [tolerance 0.05] [align auto|center|none] [part "A" | assembly] [map no] [strict]
+porovnat díl: komponenta „{0}“ není díl s historií – porovnat … sestava	compare part: component “{0}” is not a part with history – compare … assembly
+porovnat sestava: otevřený dokument není sestava	compare assembly: the open document is not an assembly
+porovnat: chybí soubor reference – {0}	compare: reference file missing – {0}
+porovnat: mapa ano nebo ne (ne „{0}“)	compare: map yes or no (not “{0}”)
+porovnat: neznámá volba „{0}“ – {1}	compare: unknown option “{0}” – {1}
+porovnat: otevřený dokument je 2D výkres	compare: the open document is a 2D drawing
+porovnat: tolerance musí být kladné číslo v mm (ne „{0}“)	compare: the tolerance must be a positive number in mm (not “{0}”)
+porovnat: zadejte jen jeden cíl (díl nebo sestava) – {0}	compare: give only one target (part or assembly) – {0}
+porovnat: zarovnat auto, střed nebo ne (ne „{0}“)	compare: align auto, center or none (not “{0}”)
+prvek díry „{0}“: {1} z {2} poloh nemá v geometrii díru	hole feature “{0}”: {1} of {2} positions have no hole in the geometry
+přiložené soubory by měly víc než {0} MB	the attached files would exceed {0} MB
+přiložit lze nejvýš {0} souborů – odeberte některý (window.mncad.detach)	at most {0} files can be attached – remove one (window.mncad.detach)
+zahloubení Ø{0} ↧{1}	counterbore Ø{0} ↧{1}
+NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu	OUTDATED: the assembly changed after the check, run “collisions” again
+rozdíl objemů {0} mm³	volume difference {0} mm³
+Sražení konce	End chamfer
+Třídím kolize (šroub v závitu / skutečné)…	Classifying interferences (screw in thread / real)…
+#!dynamic – texty kódů protokolu (engine/codes.ts) se překládají za běhu tr(def.key)
+těleso dílu „{0}“ není platné (BRepCheck) – export STEP a výpočty mohou selhat	the solid of part “{0}” is not valid (BRepCheck) – STEP export and computations may fail
+kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila	interferences recomputed for the final state of the assembly – the assembly changed after the interference check ({0})
+rozdílová tělesa nejsou spolehlivá (kontrola booleovských operací nesedí o {0} mm³) – shoda podle objemu a mapy odchylek	the difference solids are not reliable (the boolean check is off by {0} mm³) – match decided by volume and deviation map

@@ -1,6 +1,7 @@
 // E2E – předloha (w15, zpráva 959 kap. 5.1 / 5.2) přes TEXTOVOU KONZOLI (bez window.mncad) a v GUI:
 //  - konzole: díl desky textem, předloha bez připojeného souboru (✗ s návodem), Připojit soubor… (DXF předlohy
-//    z src/cad/reference/__fixtures__/deska-predloha.dxf – vygenerovaná, žádná data zákazníka), předloha "…" (stav:
+//    z src/cad/reference/__fixtures__/deska-predloha.dxf – vygenerovaná, žádná data zákazníka), předloha "…" (v pracovním
+//    vlákně importu, ne ve vlákně okna; stav:
 //    listy, pohledy, kóty, rozpor text × geometrie, rozpor kusovník × razítko), výtah kót / kusovníku / razítka
 //    (cs / en / de), porovnat předloha pohled horní (100 %, obrázek SVG ke stažení), kontrola kót (✓), předloha stav
 //    (poslední kontroly v dokumentu); druhý díl s menší dírou: pokrytí < 100 %, úsek mimo toleranci na místě díry,
@@ -22,6 +23,13 @@ const PLATE = (dc) => ['kvádr 120 80 20 střed', 'díra 8 skrz v -45 -25 20 v 4
 (async () => {
   const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   const ctx = await b.newContext({ viewport: { width: 1600, height: 1000 }, acceptDownloads: true });
+  // vlákna Worker stránky (předloha DWG / DXF se čte v pracovním vlákně importu, ne ve vlákně okna – recenze int2, nález 3)
+  await ctx.addInitScript(() => {
+    const W = window.Worker;
+    window.__e2eWorkers = [];
+    window.Worker = function (url, o) { window.__e2eWorkers.push(String(url)); return new W(url, o); };
+    window.Worker.prototype = W.prototype;
+  });
   const p = await ctx.newPage();
   const errs = [];
   const dl = [];
@@ -76,7 +84,10 @@ const PLATE = (dc) => ['kvádr 120 80 20 střed', 'díra 8 skrz v -45 -25 20 v 4
   await p.locator('[data-agent-attach-input]').setInputFiles({ name: 'deska-predloha.dxf', mimeType: 'application/dxf', buffer: DXF });
   await p.waitForSelector('[data-attached="deska-predloha.dxf"]', { timeout: 10000 }).catch(() => {});
   ok(await p.locator('[data-attached="deska-predloha.dxf"]').isVisible().catch(() => false), 'konzole: Připojit soubor… → deska-predloha.dxf v seznamu připojených');
+  const w0 = await p.evaluate(() => window.__e2eWorkers.length);
   log = await run('předloha "deska-predloha.dxf"');
+  const wNew = await p.evaluate((n) => window.__e2eWorkers.slice(n), w0);
+  ok(wNew.length >= 1, `předloha DXF se čte v pracovním vlákně importu (nová vlákna během příkazu: ${JSON.stringify(wNew)})`);
   fs.writeFileSync(S + 'log3.txt', log);
   ok(/✓ připojeno: předloha „deska-predloha\.dxf“ \(DXF R2018 \(AC1032\), \d+ kB\): listy 1 \(1× A3\), pohledy 2, kóty 7, díry a normálie 5, pozice 1, razítka 1/.test(log), 'předloha: listy, pohledy, kóty, díry, pozice, razítka');
   ok(/· list 1: A3 1:1 „DESKA 120x80“, pohledy 2, číslo výkresu RD-001, pozice 1/.test(log), 'stav: list A3 1:1 s razítkem');

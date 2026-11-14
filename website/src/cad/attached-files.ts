@@ -1,35 +1,45 @@
 /**
  * Soubory připojené k textovým příkazům (tlačítko „Připojit soubor…“ v konzoli Textové příkazy, logo v razítku a další
- * příkazy, které berou soubor podle názvu – např. `výkres razítko logo="firma.png"`). Jen v paměti karty (nic se
- * neukládá ani neodesílá); název se hledá bez ohledu na velikost písmen, i bez cesty a přípony.
+ * příkazy, které berou soubor podle názvu – např. `výkres razítko logo="firma.png"`, `předloha "výkres.dwg"`,
+ * `porovnat "ref.step"`, `otevřít "díl.mncad"`). Jen v paměti karty (nic se neukládá ani neodesílá); název se hledá bez
+ * ohledu na velikost písmen, i bez cesty a přípony.
+ *
+ * Úložiště je jedno – přiložené soubory enginu (`appAttachments`, cad/engine/attachments.ts: vstupy příkazů v aplikaci);
+ * tento modul nad ním dává pohled s typem a data URL pro razítko a předlohu.
  */
-export type AttachedFile = { name: string; mime: string; dataUrl: string; bytes: number; at: number };
+import { b64ToBytes, bytesToB64 } from "./blobs";
+import { appAttachments, type AttachedItem } from "./engine/attachments";
 
-const files = new Map<string, AttachedFile>();
-const subs = new Set<() => void>();
-const key = (n: string) => n.trim().replace(/^.*[\\/]/, "").toLowerCase();
-const stem = (n: string) => key(n).replace(/\.[^.]+$/, "");
+export type AttachedFile = { name: string; mime: string; dataUrl: string; bytes: number; at: number; data: Uint8Array };
+
+/** připojený soubor jako záznam s data URL (počítá se až při čtení – velké soubory reference ho nepotřebují) */
+function view(f: AttachedItem): AttachedFile {
+  let url: string | null = null;
+  return {
+    name: f.name,
+    mime: f.mime,
+    bytes: f.data.length,
+    at: f.at,
+    data: f.data,
+    get dataUrl() {
+      return (url ??= `data:${f.mime};base64,${bytesToB64(f.data)}`);
+    },
+  };
+}
 
 export const attachedFiles = {
-  /** připojí soubor (stejný název = nahradí) */
-  add(f: Omit<AttachedFile, "at"> & { at?: number }): AttachedFile {
-    const v = { ...f, name: f.name.replace(/^.*[\\/]/, ""), at: f.at ?? Date.now() };
-    files.set(key(v.name), v);
-    for (const s of subs) s();
-    return v;
+  /** připojí soubor (stejný název = nahradí) – data jako data URL nebo bajty */
+  add(f: { name: string; mime: string; dataUrl?: string; data?: Uint8Array; bytes?: number; at?: number }): AttachedFile {
+    const data = f.data ?? b64ToBytes((f.dataUrl ?? "").replace(/^data:[^,]*,/, ""));
+    const r = appAttachments.add(f.name, data, f.mime);
+    return view(appAttachments.items().find((x) => x.name === r.name)!);
   },
   /**
    * Soubory odpovídající názvu: přesný název, jinak shoda bez přípony, jinak názvy začínající zadaným textem.
    * Víc než jeden = nejednoznačný název (volající ho ohlásí se seznamem); žádný = soubor není připojený.
    */
   matches(name: string): AttachedFile[] {
-    const k = key(name);
-    if (!k) return [];
-    if (files.has(k)) return [files.get(k)!];
-    const all = [...files.values()].sort((a, b) => a.at - b.at);
-    const byStem = all.filter((f) => stem(f.name) === stem(name));
-    if (byStem.length) return byStem;
-    return all.filter((f) => key(f.name).startsWith(k));
+    return appAttachments.matches(name).map(view);
   },
   /** soubor podle názvu (jednoznačná shoda podle `matches`), jinak null */
   get(name: string): AttachedFile | null {
@@ -37,20 +47,16 @@ export const attachedFiles = {
     return m.length === 1 ? m[0] : null;
   },
   list(): AttachedFile[] {
-    return [...files.values()].sort((a, b) => a.at - b.at);
+    return appAttachments.items().map(view);
   },
   remove(name: string): boolean {
-    const ok = files.delete(key(name));
-    if (ok) for (const s of subs) s();
-    return ok;
+    return appAttachments.remove(name);
   },
   clear() {
-    files.clear();
-    for (const s of subs) s();
+    appAttachments.clear();
   },
   subscribe(f: () => void) {
-    subs.add(f);
-    return () => void subs.delete(f);
+    return appAttachments.subscribe(f);
   },
 };
 

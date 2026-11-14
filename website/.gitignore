@@ -17,3 +17,5 @@ public/cad/cli/README.txt
 # CAD i18n – pracovní soubory sestavení slovníků
 .i18n-missing-*.txt
 .next-i18n-keys.json
+# brána hotovosti B6 (scripts/cad-acceptance.mjs --json)
+cad-acceptance.json

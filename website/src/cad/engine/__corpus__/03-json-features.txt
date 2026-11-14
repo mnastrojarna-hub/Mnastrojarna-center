@@ -1,0 +1,6 @@
+# pole prvků v JSON (op features) a jeden prvek na řádku smíchaný s textem; $last na skicu
+nový díl Prvky JSON
+[{"type":"sketch","plane":{"kind":"base","name":"XY","offset":0},"entities":[{"type":"circle","cx":0,"cy":0,"r":20}]},{"type":"extrude","sketchId":"$last","distance":12,"symmetric":false,"reverse":false,"mode":"$auto"}]
+{"type":"box","size":[10,10,30],"position":[-5,-5,0],"centered":false,"mode":"add"}
+díra 5 skrz v 0 0
+stav

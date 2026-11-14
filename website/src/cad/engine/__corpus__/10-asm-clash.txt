@@ -1,0 +1,11 @@
+# kolize (op clash) v sestavě s překryvem a bez něj
+nový díl Blok
+kvádr 40 40 40
+#--- run
+nová sestava Kolize
+vložit "Blok" ukotvit
+vložit "Blok" v 30 0 0
+vložit "Blok" v 100 0 0
+#--- run
+kolize
+stav

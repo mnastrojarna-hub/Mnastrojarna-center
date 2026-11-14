@@ -1,0 +1,36 @@
+=== run 1 ===
+✓ nový díl „Kus“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+
+Dokument: „Kus“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 25 × 25 × 25 mm (X 0…25, Y 0…25, Z 0…25) · objem 15,62 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 25 × 25 × 25 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Dvojice“ – nová záložka
+✓ komponenta „Kus“ vložena do sestavy (ukotvená)
+✓ komponenta „Kus“ vložena do sestavy
+
+Dokument: „Dvojice“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Kus [0; 0; 0] ⚓ · Kus [40; 0; 0]
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+=== run 3 ===
+✓ komponenta „Kus“: poloha [40; 10; 0]
+
+Dokument: „Dvojice“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Kus [0; 0; 0] ⚓ · Kus [40; 10; 0]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 65 × 35 × 25 mm · objem Σ 31,25 cm³ · hmotnost Σ 0,245 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 4 ===
+✓ záložka „Kus“ (díl) je aktivní – další příkazy pracují s ní
+→ Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
+✓ Zaoblení 1 (fillet)
+
+Dokument: „Kus“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 25 × 25 × 25 mm (X 0…25, Y 0…25, Z 0…25) · objem 15,38 cm³ · ploch 26 · hran 56
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 25 × 25 × 25 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✓ – R2, hrany vše

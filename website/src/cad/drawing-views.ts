@@ -12,6 +12,8 @@ import * as r from "replicad";
 import { tr } from "./i18n";
 import type { Vec2, Vec3 } from "./types";
 import type { Cam, Layer, Poly, View, ViewEnt } from "./drawing";
+import type { SpringMark } from "./drawing-doc";
+import { inSpringEnvelope } from "./drawing-springs";
 
 // ---------------------------------------------------------------- volby (uložené v DrawingOptions)
 
@@ -376,6 +378,49 @@ function cached(shape: Shape3, key: string, make: () => Shape3 | null): Shape3 |
   return s;
 }
 
+/** Obrysy řezných ploch po plochách (každá plocha = vnější a vnitřní obrysy; šrafuje se po plochách – `hatchView`). */
+export type FaceLoops = Vec2[][][];
+
+const apart = (a: [Vec3, Vec3], b: [Vec3, Vec3]) => [0, 1, 2].some((k) => a[1][k] < b[0][k] || b[1][k] < a[0][k]);
+
+/**
+ * Odebrání / průnik nástroje po jednotlivých objemových tělesech tvaru. Složený tvar s tělesy, která se překrývají (pružina
+ * zasahující do sedla desky, šroub v závitové díře sestavy, druhé těleso dílu zasahující do prvního), není platný argument
+ * jedné booleovské operace: jádro vrátí poškozený výsledek – zmizí kapsa a řezné plochy desky nemají šrafy. Každé těleso
+ * zvlášť je platný argument. Těleso mimo obalový kvádr nástroje se nepočítá: u odebrání zůstane celé, u průniku zmizí.
+ * Tvar s jedním tělesem se počítá jako dřív.
+ */
+export function booleanEach(shape: Shape3, tool: Shape3, op: "cut" | "intersect"): Shape3 {
+  const run = (s: Shape3) => (op === "cut" ? s.cut(tool) : s.intersect(tool)) as Shape3;
+  let solids: Shape3[] = [];
+  try {
+    solids = shape.solids as unknown as Shape3[];
+  } catch {
+    solids = [];
+  }
+  if (solids.length <= 1) return run(shape.clone() as Shape3);
+  const tb = tool.boundingBox.bounds as [Vec3, Vec3];
+  const out: Shape3[] = [];
+  const drop: Shape3[] = [];
+  for (const s of solids) {
+    if (apart(s.boundingBox.bounds as [Vec3, Vec3], tb)) {
+      if (op === "cut") out.push(s);
+      else drop.push(s);
+      continue;
+    }
+    drop.push(s);
+    try {
+      const res = run(s);
+      if (res.faces.length) out.push(res);
+    } catch {
+      /* těleso, které operace nezvládla, v řezu chybí (dřív chyběl celý řez) */
+    }
+  }
+  const res = r.makeCompound(out) as unknown as Shape3;
+  for (const s of drop) s.delete?.();
+  return res;
+}
+
 /** rozsah tělesa podél směru */
 function spanAlong(shape: Shape3, d: Vec3): [number, number] {
   const [[x0, y0, z0], [x1, y1, z1]] = shape.boundingBox.bounds as [Vec3, Vec3];
@@ -400,9 +445,9 @@ function prism(cam: Cam, poly: Vec2[], t0: number, t1: number): Shape3 {
   return r.basicFaceExtrusion(face, new r.Vector(mul(cam.d, t1 - t0))) as unknown as Shape3;
 }
 
-/** Rovinné plochy tělesa ležící v rovině (normála n, n·p = c) – obrysy pro šrafování v obraze `cam`; `keep` = další podmínka na střed plochy. */
-function planeLoops(shape: Shape3, n: Vec3, c: number, cam: Cam, keep?: (center: Vec3) => boolean): Vec2[][] {
-  const loops: Vec2[][] = [];
+/** Rovinné plochy tělesa ležící v rovině (normála n, n·p = c) – obrysy pro šrafování v obraze `cam` po plochách; `keep` = další podmínka na střed plochy. */
+function planeLoops(shape: Shape3, n: Vec3, c: number, cam: Cam, keep?: (center: Vec3) => boolean, springs: SpringMark[] = []): FaceLoops {
+  const loops: FaceLoops = [];
   const tol = Math.max(1e-4, diag(shape) * 1e-6) * 10;
   for (const f of shape.faces) {
     try {
@@ -412,12 +457,16 @@ function planeLoops(shape: Shape3, n: Vec3, c: number, cam: Cam, keep?: (center:
       const fn = V(f.normalAt(f.center));
       if (Math.abs(Math.abs(dot(fn, n)) - 1) > 1e-6) continue;
       if (keep && !keep(ctr)) continue;
+      const face: Vec3[][] = [];
       for (const e of f.edges) {
         const nseg = e.geomType === "LINE" ? 1 : 40;
-        const pts: Vec2[] = [];
-        for (let i = 0; i <= nseg; i++) pts.push(projQ(cam, V(e.pointAt(i / nseg))));
-        loops.push(pts);
+        const pts: Vec3[] = [];
+        for (let i = 0; i <= nseg; i++) pts.push(V(e.pointAt(i / nseg)));
+        face.push(pts);
       }
+      // řez obalem zjednodušené pružiny (ISO 2162-1) se nešrafuje – jako v řezu A–A (drawing.ts)
+      if (springs.length && inSpringEnvelope(face.flat(), springs, tol)) continue;
+      if (face.length) loops.push(face.map((pts) => pts.map((q) => projQ(cam, q))));
     } catch {
       /* plocha bez geometrie */
     }
@@ -456,8 +505,8 @@ export type ExtraViewData = {
   label: string;
   parent: string;
   view: View;
-  /** obrysy řezných ploch (souřadnice obrazu) */
-  loops: Vec2[][];
+  /** obrysy řezných ploch po plochách (souřadnice obrazu) */
+  loops: FaceLoops;
   /** směr šipky v rodiči (obraz rodiče, y dolů) */
   arrow: Vec2;
   /** kotevní bod: v obraze rodiče a v obraze nového pohledu (zarovnání) */
@@ -519,7 +568,7 @@ export function pickParent(views: { key: string; cam: Cam }[], d: Vec3): string 
  * rodičovského pohledu), u natočeného řezu otočí část za šikmým ramenem do roviny hlavního ramena. Šrafují se plochy
  * ležící v rovinách ramen; čáry skoků (zalomení) a hrany dělení u natočeného řezu se v řezu nekreslí.
  */
-export function cutSection(shape: Shape3, c: CutSectionOpt, parent: View, hidden: boolean, project: ProjectFn): ExtraViewData {
+export function cutSection(shape: Shape3, c: CutSectionOpt, parent: View, hidden: boolean, project: ProjectFn, springs: SpringMark[] = []): ExtraViewData {
   const P = parent.cam;
   const pts = c.pts;
   if (pts.length < 2) throw new Error(tr("řez potřebuje alespoň dva body čáry řezu"));
@@ -539,7 +588,7 @@ export function cutSection(shape: Shape3, c: CutSectionOpt, parent: View, hidden
   const { cam } = neighborCam(P, d);
   const n3 = d; // normála hlavní roviny řezu (k pozorovateli)
   let body: Shape3 | null;
-  let loops: Vec2[][];
+  let loops: FaceLoops;
   let drops: { o: Vec2; u: Vec2 }[] = [];
   const imgD = projQ(cam, P.d); // obraz směru rodiče v řezu (čáry skoků a dělení leží v tomto směru)
   const arrows: { at: Vec2; dir: Vec2 }[] = [];
@@ -550,7 +599,7 @@ export function cutSection(shape: Shape3, c: CutSectionOpt, parent: View, hidden
     const a0: Vec2 = [pts[0][0] - first[0] * E, pts[0][1] - first[1] * E];
     const an: Vec2 = [pts[pts.length - 1][0] + last[0] * E, pts[pts.length - 1][1] + last[1] * E];
     const poly: Vec2[] = [a0, ...pts, an, [an[0] + s1[0] * E, an[1] + s1[1] * E], [a0[0] + s1[0] * E, a0[1] + s1[1] * E]];
-    body = cached(shape, keyOf({ k: "step", P, poly, T0, T1 }), () => shape.clone().cut(prism(P, poly, T0, T1)) as Shape3);
+    body = cached(shape, keyOf({ k: "step", P, poly, T0, T1 }), () => booleanEach(shape, prism(P, poly, T0, T1), "cut"));
     if (!body) throw new Error(tr("řez {0}–{0} se nepodařilo vytvořit", c.label));
     // šrafují se plochy v rovinách ramen kolmých na směr pohledu (skoky jsou vidět z boku)
     loops = [];
@@ -568,7 +617,7 @@ export function cutSection(shape: Shape3, c: CutSectionOpt, parent: View, hidden
         ...planeLoops(body, ln, dot(ln, o3), cam, (ctr) => {
           const t = dot(sub(ctr, o3), dirTo3(P, dir));
           return t >= tMin && t <= tMax;
-        }),
+        }, springs),
       );
     }
     for (let i = 1; i + 1 < pts.length; i++) drops.push({ o: projQ(cam, imgTo3(P, pts[i])), u: imgD });
@@ -587,14 +636,14 @@ export function cutSection(shape: Shape3, c: CutSectionOpt, parent: View, hidden
     const q2 = quad(u2, s2);
     const V3 = imgTo3(P, Vx);
     body = cached(shape, keyOf({ k: "align", P, q1, q2, T0, T1 }), () => {
-      const p1 = shape.clone().intersect(prism(P, q1, T0, T1)) as Shape3;
-      const p2 = shape.clone().intersect(prism(P, q2, T0, T1)) as Shape3;
+      const p1 = booleanEach(shape, prism(P, q1, T0, T1), "intersect");
+      const p2 = booleanEach(shape, prism(P, q2, T0, T1), "intersect");
       // otočení v obraze o +th (z u2 do −u1) = otočení v modelu o −th kolem směru pohledu rodiče
       const p2r = p2.rotate((-th * 180) / Math.PI, V3, P.d) as Shape3;
       return r.makeCompound([p1, p2r]) as unknown as Shape3;
     });
     if (!body) throw new Error(tr("řez {0}–{0} se nepodařilo vytvořit", c.label));
-    loops = planeLoops(body, n3, dot(n3, V3), cam);
+    loops = planeLoops(body, n3, dot(n3, V3), cam, undefined, springs);
     drops = [{ o: projQ(cam, V3), u: imgD }];
     arrows.push({ at: pts[0], dir: arrow }, { at: pts[2], dir: [-s2[0], -s2[1]] });
   }
@@ -608,14 +657,14 @@ export function cutSection(shape: Shape3, c: CutSectionOpt, parent: View, hidden
  * Částečný řez v pohledu: materiál uvnitř oblasti se odebere od přední strany do hloubky `depth`; uvnitř oblasti se
  * kreslí obraz řezu, vně původní pohled, hranice tenkou čarou od ruky a řezné plochy (v hloubce řezu) se šrafují.
  */
-export function brokenOut(shape: Shape3, b: BrokenOutOpt, view: View, hidden: boolean, project: ProjectFn): { view: View; loops: Vec2[][]; boundary: Vec2[] } {
+export function brokenOut(shape: Shape3, b: BrokenOutOpt, view: View, hidden: boolean, project: ProjectFn, springs: SpringMark[] = []): { view: View; loops: FaceLoops; boundary: Vec2[] } {
   const poly = brokenOutPolygon(b);
   if (poly.length < 3) throw new Error(tr("částečný řez: oblast potřebuje alespoň 3 body"));
   if (!(b.depth > 0)) throw new Error(tr("částečný řez: hloubka musí být kladná"));
   const cam = view.cam;
   const [, front] = spanAlong(shape, cam.d);
   const tCut = front - b.depth;
-  const body = cached(shape, keyOf({ k: "bo", cam, poly, tCut }), () => shape.clone().cut(prism(cam, poly, tCut, front + 10)) as Shape3);
+  const body = cached(shape, keyOf({ k: "bo", cam, poly, tCut }), () => booleanEach(shape, prism(cam, poly, tCut, front + 10), "cut"));
   if (!body) throw new Error(tr("částečný řez se nepodařilo vytvořit"));
   const cutView = project(body, `${view.key}#bo`, cam, hidden);
   const polys: Poly[] = [];
@@ -625,6 +674,6 @@ export function brokenOut(shape: Shape3, b: BrokenOutOpt, view: View, hidden: bo
   polys.push({ layer: "thin" as Layer, pts: boundary });
   const mid = (e: ViewEnt): Vec2 => (e.t === "line" ? [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2] : e.c);
   const ents = [...view.ents.filter((e) => !inPolygon(mid(e), poly)), ...cutView.ents.filter((e) => inPolygon(mid(e), poly))];
-  const loops = planeLoops(body, cam.d, tCut, cam, (ctr) => inPolygon(projQ(cam, ctr), poly));
+  const loops = planeLoops(body, cam.d, tCut, cam, (ctr) => inPolygon(projQ(cam, ctr), poly), springs);
   return { view: { ...view, polys, ents }, loops, boundary };
 }

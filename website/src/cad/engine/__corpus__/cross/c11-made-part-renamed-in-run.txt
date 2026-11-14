@@ -1,0 +1,7 @@
+# díl přejmenovaný v témže běhu
+nový díl A
+kvádr 1 1 1
+název "B"
+nová sestava S
+vložit "B"
+vložit "A"

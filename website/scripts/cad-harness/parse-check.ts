@@ -1,6 +1,5 @@
 // Parses a harness script with the CAD text parser (no kernel) and prints {lines, ops, errors} as JSON on stdout.
-// Bundled by harness.test.mjs: every line of synth-959.txt must parse; the only tolerated error is `kontrola`
-// (package B5 check-compare adds the command).
+// Bundled by harness.test.mjs: every line of synth-959.txt must parse (`kontrola sestava` since package B5 check-compare).
 import fs from "node:fs";
 import { parseAgentText } from "@/cad/agent";
 

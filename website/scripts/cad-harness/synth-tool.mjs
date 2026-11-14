@@ -90,8 +90,9 @@ async function verify(lb, session, faces) {
   const rest = await session.run(spec.restScript(faces), { skipMotion: true, skipDrawings: flag("--no-drawings"), onOp: (t) => (peak.heap = Math.max(peak.heap, t.heapMB)) });
   report.timing.restMs = Date.now() - t0;
   const errs = rest.log.filter((l) => l.text.startsWith("✗"));
-  // `kontrola sestava` is a parse error until package B5 (check-compare) lands – the only tolerated one
-  const unexpected = errs.filter((l) => !/„kontrola“/.test(l.text));
+  // `kontrola sestava` (package B5) is the only tolerated ✗: a parse error before B5, after B5 an op the loopback does not
+  // run (it is not the engine) – the built CLI checks it in the B6 gate (scripts/cad-acceptance.mjs)
+  const unexpected = errs.filter((l) => !/„kontrola“|loopback does not run op "check"/.test(l.text));
   check("script runs without ✗ (kontrola is B5)", unexpected.length === 0, { errors: unexpected.slice(0, 8).map((l) => `${at(l)} ${l.text.slice(0, 200)}`), kontrolaPending: errs.length - unexpected.length });
   // lines a strict engine run (B4) would stop on: ⚠ / ! lines and ambiguous rule-based face picks (design 5.2 #13)
   report.warnings = rest.warnings;

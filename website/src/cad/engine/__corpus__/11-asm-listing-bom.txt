@@ -1,0 +1,16 @@
+# výpis sestavy a kusovník (op asm)
+nový díl Hřídel
+materiál ocel
+válec 20 100
+nový díl Kotouč
+materiál hliník
+trubka 80 20 10
+#--- run
+nová sestava Hřídel s kotoučem
+vložit "Hřídel" ukotvit
+vložit "Kotouč" v 0 0 40
+vložit "Kotouč" v 0 0 60
+#--- run
+sestava
+kusovník
+kusovník csv

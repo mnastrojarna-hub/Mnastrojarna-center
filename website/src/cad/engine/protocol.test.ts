@@ -131,7 +131,7 @@ function checkGrammar(text: string) {
 function bodyItems(text: string): string[] {
   const out: string[] = [];
   for (const l of text.split("\n").slice(1, -1)) {
-    if (GRAMMAR.overflow.test(l)) continue;
+    if (GRAMMAR.overflow.test(l) || GRAMMAR.link.test(l)) continue; // řádek O je pevný jako hlavička a Σ (B3)
     if (GRAMMAR.cont.test(l) && out.length) out[out.length - 1] += "\n" + l;
     else out.push(l);
   }
@@ -148,8 +148,13 @@ const markerB = (n: number, bytes: number) => (n > 0 ? B(`… ${n} entries ${byt
  * (b) maximalita: žádný vynechaný záznam by se už nevešel do zbylého místa (se značkou za zbylé vynechané);
  * (c) přebytek a velikost přesně odpovídají vynechaným záznamům; rozpočet drží.
  */
+/** souhrnný řádek F (mnoho souborů, málo místa – B3): zastupuje všechny řádky F, ty jsou v přebytku */
+const SUM_F = /^F \S+ "\*" \d+B files=\d+/;
 function checkSelection(s: ShortProtocol, all: string[]) {
-  const kept = bodyItems(s.text);
+  const lines = s.text.split("\n");
+  const oLine = lines.find((l) => GRAMMAR.link.test(l));
+  const sumLine = lines.find((l) => SUM_F.test(l));
+  const kept = bodyItems(s.text).filter((t) => t !== sumLine);
   const isKept: boolean[] = [];
   let j = 0;
   for (const t of all) {
@@ -158,8 +163,7 @@ function checkSelection(s: ShortProtocol, all: string[]) {
     if (k) j++;
   }
   expect(j, "vypsané záznamy = podposloupnost všech kandidátů v pořadí tisku").toBe(kept.length);
-  const lines = s.text.split("\n");
-  const fixed = B(lines[0]) + 1 + B(lines.at(-1)!) + 1;
+  const fixed = B(lines[0]) + 1 + B(lines.at(-1)!) + 1 + (oLine ? B(oLine) + 1 : 0) + (sumLine ? B(sumLine) + 1 : 0);
   const bytes = all.map((t) => B(t) + 1);
   const order = all.map((_, i) => i).sort((a, b) => prioOf(all[a]) - prioOf(all[b]) || a - b);
   const total = bytes.reduce((a, b) => a + b, 0);
@@ -177,6 +181,7 @@ function checkSelection(s: ShortProtocol, all: string[]) {
       hiB += bytes[x];
       continue;
     }
+    if (sumLine && all[x].startsWith("F ")) continue; // zastoupen souhrnným řádkem F
     // (a) jen vypsané záznamy vyšší priority + x; všechno ostatní do přebytku
     const strict = fixed + hiB + bytes[x] + markerB(all.length - hiN - 1, total - hiB - bytes[x]);
     expect(strict, `přesná priorita: ${all[x].slice(0, 50)}`).toBeGreaterThan(s.budget);
@@ -214,7 +219,7 @@ function withDefaultLocale<T>(loc: string, fn: () => T): T {
 const GOLDEN_CS = `MNCAD/1 FAIL lines=397 ops=390 err=1 warn=44 note=6 t=41.8
 ✗ L- build.failed "959-01-00-03 Střižnicová deska": stavba selhala: prvek „Úkos 2“
 ⚠ L57 drawing.section-miss "959-01-00 Nástroj": rovina řezu neprotíná těleso: list 1, XZ 0
-⚠ L120,L131,L142 ×3 hole.cbore-dropped "959-01-00-01 Základová deska": zahloubení Ø16 je menší než závit M10
+⚠ L120,L131,L142 ×3 hole.cbore-dropped "959-01-00-01 Základová deska": zahloubení Ø16 se u díry se závitem M10 nepostaví
 ⚠ L200-L395 ×40 select.ambiguous více vyhovujících ploch – použita první
 = L388 measure "959-01-00-01 Základová deska" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
 = L390 measure "959-01-00-03 Střižnicová deska" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
@@ -389,10 +394,13 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
       rb.code("drawing.section-miss", { line: 57, doc: MAIN, args: ["list 1, XZ 0"] });
       return rb.finish({ docs: [{ ref: "m", name: MAIN, kind: "assembly", main: true, components: 70 }], files: [{ name: `${MAIN}.step`, format: "step", bytes: 1402368, sha256: "", doc: "m" }], share: { url: "https://www.mnastrojarna.cz/cad#q=XW830bNW7w.UmyMkW-xoYRPXawojuAAqw", mode: "store", bytes: 61, exp: "2026-11-23" } });
     };
-    // přesně případ z recenze (n=10, pad=11): dříve ✗ L31 a ✗ L32 v přebytku a ⚠ L57, ⚠ L120 vypsané
+    // přesně případ z recenze (n=10, pad=11): dříve ✗ L31 a ✗ L32 v přebytku a ⚠ L57, ⚠ L120 vypsané; od B3 je řádek O
+    // pevný (vždy vypsaný) – zbude méně místa, ale ✗ se dál nikdy nevynechá kvůli ⚠
     const s = shortProtocol(make(10, 11));
     expect(s.text).toContain("✗ L31 parse.unknown neznámý příkaz „vložit2“");
-    expect(s.text).toContain("✗ L32 op.failed příkaz selhal: sestava hotovo bez upravit");
+    expect(s.text).toMatch(/^O https:\/\/www\.mnastrojarna\.cz\/cad#q=\S+ exp=2026-11-23 mode=store$/m);
+    const printed = s.text.split("\n");
+    if (printed.filter((l) => l.startsWith("✗")).length < allItems(make(10, 11)).filter((t) => t.startsWith("✗")).length) expect(printed.some((l) => l.startsWith("⚠"))).toBe(false);
     checkSelection(s, allItems(make(10, 11)));
     for (let n = 5; n <= 12; n++)
       for (let pad = 1; pad <= 158; pad += 3) {
@@ -412,6 +420,65 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
     const all = allItems(r);
     const min = shortProtocol(r, { budget: 0 }).budget;
     for (let budget = min; budget <= min + 400; budget++) checkSelection(shortProtocol(r, { budget }), all);
+  });
+  it("regrese B3: dlouhý odkaz (#s=, 4156 znaků) nevytlačí ✗, ⚠ ani D – O zkrácený s délkou, celý v přebytku a v plném protokolu", () => {
+    const url = `https://www.mnastrojarna.cz/cad#s=1d.${"A".repeat(4156 - 37)}`;
+    expect(url.length).toBe(4156);
+    const rb = new ReportBuilder({ lang: "cs", lines: 6, now: () => 0 });
+    rb.code("parse.unknown", { line: 5, args: ["neznámýpříkaz"] });
+    rb.code("share.long-link", { line: 6, doc: "Hvězda", args: [url.length] });
+    const r = rb.finish({ docs: [{ ref: "h", name: "Hvězda", kind: "part", main: true, volume_mm3: 89950, mass_kg: 0.706, bbox: [[0, 0, 0], [100, 100, 10]] }], files: [], share: { url, mode: "link", bytes: 3100, exp: "2026-11-24" } });
+    const s = shortProtocol(r);
+    const lines = s.text.split("\n");
+    expect(s.bytes).toBeLessThanOrEqual(DEFAULT_BUDGET);
+    expect(lines.some((l) => l.startsWith("✗ L5 parse.unknown"))).toBe(true);
+    expect(lines.some((l) => l.startsWith("⚠ L6 share.long-link"))).toBe(true);
+    expect(lines.some((l) => l.startsWith('D "Hvězda" part'))).toBe(true);
+    const o = lines.find((l) => l.startsWith("O "))!;
+    expect(o).toMatch(GRAMMAR.link);
+    expect(o).toBe(`O ${url.slice(0, 64)}…(4156chars) exp=2026-11-24 mode=link`);
+    expect(s.overflow).toEqual({ entries: 1, bytes: B(`O ${url} exp=2026-11-24 mode=link`) + 1, file: "protocol-full.txt" });
+    expect(lines.at(-2)).toMatch(GRAMMAR.overflow);
+    expect(checkGrammar(s.text)).toEqual([]);
+    expect(formatFull(r).split("\n")).toContain(`O ${url} exp=2026-11-24 mode=link`);
+    // bez omezení rozpočtu je celý odkaz ve stručném protokolu
+    expect(formatShort(r, { budget: Infinity }).split("\n")).toContain(`O ${url} exp=2026-11-24 mode=link`);
+  });
+  it("regrese B3: odkaz, který se vejde, je celý; krátký odkaz úložiště (≤ 200 znaků) se nikdy nezkracuje", () => {
+    const mid = `https://www.mnastrojarna.cz/cad#s=1d.${"B".repeat(1500)}`;
+    const rb = new ReportBuilder({ lang: "cs", lines: 2, now: () => 0 });
+    const r = rb.finish({ docs: [{ ref: "d", name: "Deska", kind: "part", main: true }], files: [], share: { url: mid, mode: "link", bytes: 1100, exp: null } });
+    const s = shortProtocol(r);
+    expect(s.text.split("\n")).toContain(`O ${mid} exp=none mode=link`);
+    expect(s.overflow).toBeUndefined();
+    // 150 děr: 2902 znaků + D → D zůstane, O zkrácený
+    const big = `https://www.mnastrojarna.cz/cad#s=1d.${"C".repeat(2902 - 37)}`;
+    const r2 = new ReportBuilder({ lang: "cs", lines: 2, now: () => 0 }).finish({ docs: [{ ref: "d", name: "Deska 150 děr", kind: "part", main: true, volume_mm3: 1e5 }], files: [], share: { url: big, mode: "link", bytes: 2100, exp: null } });
+    const s2 = shortProtocol(r2);
+    expect(s2.bytes).toBeLessThanOrEqual(DEFAULT_BUDGET);
+    expect(s2.text).toContain('\nD "Deska 150 děr" part ');
+    expect(s2.text).toContain("…(2902chars) exp=none mode=link\n");
+    // krátký odkaz úložiště se vypíše celý i při malém rozpočtu
+    const q = "https://www.mnastrojarna.cz/cad#q=XW830bNW7w.UmyMkW-xoYRPXawojuAAqw";
+    const rb3 = new ReportBuilder({ lang: "cs", lines: 9, now: () => 0 });
+    for (let i = 0; i < 30; i++) rb3.code("op.failed", { line: i + 1, text: "x".repeat(120) });
+    const s3 = shortProtocol(rb3.finish({ share: { url: q, mode: "self", bytes: 61, exp: "2026-11-23" } }));
+    expect(s3.text.split("\n")).toContain(`O ${q} exp=2026-11-23 mode=self`);
+    expect(s3.bytes).toBeLessThanOrEqual(DEFAULT_BUDGET);
+  });
+  it("regrese B3: data „… base64“ jsou v přebytku vždy – stručný protokol má značku protocol-full.txt, plný protokol data", () => {
+    const b64 = "QUJD".repeat(5151);
+    const rb = new ReportBuilder({ lang: "cs", lines: 3, now: () => 0 });
+    rb.measure(3, "file", `name="Deska.step" format=step bytes=15451 sha256=00 base64=${b64.length}`, { doc: "Deska", detail: b64, data: { name: "Deska.step", base64: b64 } });
+    const r = rb.finish({ docs: [{ ref: "d", name: "Deska", kind: "part", main: true }], files: [] });
+    for (const budget of [DEFAULT_BUDGET, Infinity]) {
+      const s = shortProtocol(r, { budget });
+      expect(s.overflow).toEqual({ entries: 1, bytes: b64.length + 3, file: "protocol-full.txt" });
+      expect(s.text).toContain(`\n= L3 file "Deska" name="Deska.step" format=step bytes=15451 sha256=00 base64=${b64.length}\n`);
+      expect(s.text.split("\n").at(-2)).toBe(`… 1 entries ${b64.length + 3}B in protocol-full.txt`);
+      expect(s.text).not.toContain(b64);
+    }
+    expect(formatFull(r)).toContain(`\n  ${b64}\n`);
   });
   it("D jen hlavní dokument a dokumenty s ✗/⚠ (ze stavby nebo ze záznamů); plný protokol má D všech", () => {
     const rb = new ReportBuilder({ lang: "cs", lines: 3 });
@@ -473,7 +540,7 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
       const big = shortProtocol(r, { budget: 1e7, notes });
       const items = (t: string) => t.split("\n").filter((l) => !/^(MNCAD|Σ|…| {2})/.test(l)).length;
       expect(big.overflow).toBeUndefined();
-      expect(items(s.text) + (s.overflow?.entries ?? 0)).toBe(items(big.text));
+      expect(items(s.text) - (s.text.split("\n").some((l) => SUM_F.test(l)) ? 1 : 0) + (s.overflow?.entries ?? 0)).toBe(items(big.text));
       checkSelection(s, allItems(r, notes));
     }
   });

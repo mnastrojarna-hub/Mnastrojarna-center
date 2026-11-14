@@ -1,0 +1,7 @@
+# prázdná sestava z běhu 1 nepřepíše další běh (zpráva B1): záložky S i A
+nová sestava "S"
+#--- run
+nový díl "A"
+kvádr 1 1 1
+#--- run
+záložky

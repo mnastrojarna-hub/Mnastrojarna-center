@@ -10,7 +10,7 @@ import { VIEW_CS } from "./agent-drawing";
 import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
 import { linMeaning, type SmartDims, type SmartReport } from "./drawing-dims";
 import { overdeterminedChain, sameSize, toleranceCheck, type ChainMember, type RefTolDim, type TolDim } from "./drawing-functional";
-import { threadsOfDoc } from "./drawing-doc";
+import { hasDrawnSprings, threadsOfDoc } from "./drawing-doc";
 import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
 import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
@@ -23,7 +23,7 @@ import { MATERIALS } from "../lib/mesh-metrics";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec3 } from "./types";
 import { drawingKey, drawingSets, drawingsLine, inDrawing, nextDrawingName, resolveDrawing, setSheets, sheetCount, sheetPos } from "./drawing-sets";
 import type { DrawingExportResult } from "./drawing-export";
-import { issueLine, issuesOf, type DrawingIssue } from "./drawing-issues";
+import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
 
 export { annLabel, dimValue, findDims } from "./drawing-marks";
@@ -194,7 +194,11 @@ export function splitSuffix(a: { prefix?: string; suffix?: string }): { head: st
  * Sloučí vygenerované Chytré kóty do poznámek listu. `force` = přegenerovat (i smazané vygenerované); jinak jen když se
  * změnil model nebo rozvržení (`smartGen`). Vrátí null, když není co měnit.
  */
-export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOptions>, smart: SmartDims, force = false): { annotations: DrawingAnnotation[]; gen: string } | null {
+/**
+ * `userLost` = vygenerované kóty s úpravou uživatele (tolerance, uložení, přípona, revize), jejichž klíč nová generace nezná
+ * a které se nezachovaly – úprava zmizí (zkouška 959: díly vložené do sestavy mají nová id prvků); volající ji ohlásí ⚠.
+ */
+export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOptions>, smart: SmartDims, force = false): { annotations: DrawingAnnotation[]; gen: string; userLost?: number } | null {
   if (!force && opts.smartGen === smart.gen) return null;
   const off = new Set(force ? [] : (opts.smartOff ?? []));
   const old = new Map(ann.filter((a) => a.auto).map((a) => [a.auto!, a]));
@@ -224,8 +228,12 @@ export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOption
   const dropped = new Set(smart.report.dropped ?? []);
   const have = new Set(gen.map((a) => a.auto));
   const kept = ann.filter((a) => a.auto && dropped.has(a.auto) && !have.has(a.auto) && !off.has(a.auto) && userEdited(a));
-  return { annotations: [...user, ...gen, ...kept], gen: smart.gen };
+  const userLost = force ? 0 : ann.filter((a) => a.auto && !have.has(a.auto) && !off.has(a.auto) && !kept.includes(a) && userEdited(a)).length;
+  return { annotations: [...user, ...gen, ...kept], gen: smart.gen, ...(userLost ? { userLost } : {}) };
 }
+
+/** varování listu: ruční úpravy vygenerovaných kót se nepodařilo přiřadit (do protokolu ⚠ drawing.warning) */
+export const lostEditsText = (n: number) => tr("{0} ručních úprav kót se nepodařilo přiřadit – kóty se přegenerovaly bez nich (tolerance, uložení, přípony)", n);
 
 /** vygenerovaná poznámka s úpravou uživatele (tolerance / přípona, vlastní text, revize, zobrazení úchylek) */
 function userEdited(a: DrawingAnnotation): boolean {
@@ -313,7 +321,8 @@ export function dimDuplicates(views: PlacedView[], anns: DrawingAnnotation[]): D
 
 /**
  * `file` = soubor z `výkres export …` (aplikace ho uloží / stáhne); `issues` = strukturovaná hlášení posledního výpočtu
- * listu (řez mimo těleso ✗, pohledy se nevejdou ⚠ … – cad/drawing-issues.ts) pro protokol.
+ * listu (řez mimo těleso ✗, pohledy se nevejdou ⚠ … – cad/drawing-issues.ts) a vlastní nálezy příkazu (překryv poznámky,
+ * vynechané kóty, řádky „! …“) pro protokol – engine podle druhu rozhodne, kdy je zapíše (cad/engine/ops/drawing-cmd.ts).
  */
 export type DrawingCmdResult = { doc: CadDoc; log: string[]; changed: boolean; open: boolean; file?: DrawingExportResult; issues?: DrawingIssue[] };
 
@@ -351,10 +360,15 @@ export async function applyDrawingCmd(doc0: CadDoc, cmd: DrawingCmd, compute0: D
   const compute: DrawingCompute = async (d, m, o) => (last = await compute0(d, m, o));
   const r = await applyCmd(doc0, cmd, compute, env);
   const res = last as SmartResult | null;
-  if (!res) return r;
-  // stav výkresu sbírá hlášení všech vypsaných listů sám
-  const issues = cmd.k === "status" ? [...(r.issues ?? [])] : [...issuesOf(res), ...(r.issues ?? []).filter((i) => i.kind === "tolerance-missing" || i.kind === "section-legacy")];
-  if (cmd.k === "dim" && res.smart) for (const t of res.smart.report.skipped) issues.push({ level: "warn", code: "drawing.warning", kind: "dims-skipped", text: t });
+  // stav výkresu sbírá hlášení všech vypsaných listů sám, export hlásí varování všech exportovaných listů sám
+  if (!res || cmd.k === "status" || cmd.k === "export") return r;
+  const own = r.issues ?? [];
+  const sheetId = r.doc.drawings?.[activeSheetIndex(r.doc)]?.id;
+  // hlášení výpočtu listu (`computed`) – vlastní nález příkazu se stejným textem se neopakuje
+  const computed = issuesOf(res)
+    .filter((i) => !own.some((o) => o.text === i.text))
+    .map((i): DrawingIssue => ({ ...i, computed: true, ...(sheetId ? { sheetId } : {}) }));
+  const issues = [...computed, ...own];
   const lines = ISSUE_LINES.has(cmd.k) || (cmd.k === "sheet" && "then" in cmd && !!cmd.then) ? issues.filter((i) => i.level === "error" || ISSUE_KINDS.has(i.kind)).map(issueLine) : [];
   return { ...r, log: [...r.log, ...lines.filter((l) => !r.log.includes(l))], ...(issues.length ? { issues } : {}) };
 }
@@ -367,6 +381,12 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
   const sheet = (): DrawingDoc => doc.drawings![idx];
   const put = (s: DrawingDoc) => (doc.drawings![idx] = s);
   const log: string[] = [];
+  const issues: DrawingIssue[] = [];
+  /** řádek „! …“ do protokolu konzole a týž nález strojově (`issues`; překryv / přesah rámečku = drawing.overlap) */
+  const issue = (kind: DrawingIssue["kind"], text: string, ann?: DrawingAnnotation) => {
+    log.push(text);
+    issues.push({ level: "warn", code: kind === "overlap" || kind === "frame" ? "drawing.overlap" : "drawing.warning", kind, text: text.replace(/^! /, ""), sheetId: sheet().id, ...(ann ? { ann } : {}) });
+  };
   if (created) log.push(tr("✓ nový list výkresu „{0}“ (Chytré kóty)", sheet().name));
   const extras = env.extras?.(doc);
   /** výpočet listu (s kusovníkem a pozicemi) a sloučení dosud nevložených Chytrých kót – kóty a značky se váží na list */
@@ -385,7 +405,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       const k = log.findIndex((l) => l.startsWith("✓"));
       if (k >= 0) log[k] += tr(" · list {0}", sheetName(doc, idx));
     }
-    return { doc, log, ...r };
+    const all = [...(r.issues ?? []), ...issues];
+    return { doc, log, ...r, ...(all.length ? { issues: all } : {}) };
   };
   switch (cmd.k) {
     case "set": {
@@ -469,9 +490,9 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       const rep = res.smart!.report;
       const per = Object.entries(rep.perView).map(([k, n]) => `${VIEW_NAME(k, o)} ${n}`).join(", ");
       log.push(tr("✓ Chytré kóty ({0}): {1} kót a popisů – {2} · očekávaných rozměrů {3}", o.dimStyle === "baseline" ? tr("od základny") : tr("řetězově"), res.smart!.annotations.filter((a) => a.type !== "centerline").length, per || "—", rep.expected) + smartExtras(o, rep) + tableNote);
-      if (overNote) log.push(overNote);
-      for (const v of o.dimFunctional ?? []) if (!rep.functional?.some((x) => x === v)) log.push(tr("! funkční rozměr {0}: na listu není délková kóta s touto hodnotou (hodnoty kót: výkres stav)", fmtN3(v)));
-      for (const s of rep.skipped) log.push(tr("! vynecháno: {0}", s));
+      if (overNote) issue("other", overNote);
+      for (const v of o.dimFunctional ?? []) if (!rep.functional?.some((x) => x === v)) issue("other", tr("! funkční rozměr {0}: na listu není délková kóta s touto hodnotou (hodnoty kót: výkres stav)", fmtN3(v)));
+      for (const s of rep.skipped) issue("dims-skipped", tr("! vynecháno: {0}", s));
       return done({ changed: true, open: true });
     }
     case "tolcheck": {
@@ -573,6 +594,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       const st = await drawingStatus(doc, compute, { sheet: cmd.sheet, extras });
       if (st.doc) Object.assign(doc, { drawings: st.doc.drawings });
       log.push(st.text);
+      // hlášení listů ve výpisu („Varování výkresu: …“, ✗ řez mimo těleso) i strojově – engine je zapíše s kódem na řádek `výkres stav`
       return { doc, log, changed: !!st.doc || created, open: false, ...(st.issues?.length ? { issues: st.issues } : {}) };
     }
     case "sheet": {
@@ -683,8 +705,11 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       const { exportDrawing } = await import("./drawing-export");
       const r = await exportDrawing(doc0, cmd.format, { sheet: cmd.sheet, ...(cmd.dwgVersion ? { dwgVersion: cmd.dwgVersion as never } : {}) }, compute, extras);
       log.push(tr("✓ výkres export {0}: {1} ({2} kB{3})", cmd.format.toUpperCase(), r.name, Math.max(1, Math.round(r.bytes / 1024)), r.sheets && r.sheets > 1 ? tr(", listů {0}", r.sheets) : ""));
-      for (const w of r.warnings ?? []) log.push(tr("! {0}", w));
-      return { doc: doc0, log, changed: false, open: false, file: r };
+      for (const w of r.warnings ?? []) {
+        log.push(tr("! {0}", w));
+        issues.push({ ...warningIssue(w), sheetId: sheet().id }); // varování exportovaných listů (řez mimo těleso = ✗)
+      }
+      return { doc: doc0, log, changed: false, open: false, file: r, ...(issues.length ? { issues } : {}) };
     }
     case "title": {
       const f = cmd.fields;
@@ -704,10 +729,10 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       if (f.material !== undefined) doc.materialName = f.material.trim() || undefined;
       // dosavadní pole se v protokolu jmenují jako dřív (TITLE_KEY), nová podle cad/agent-title.ts
       log.push(tr("✓ razítko: {0}", applied.parts.map((p, i) => (keys[i] in TITLE_KEY && !["tolerance", "logo", "template"].includes(keys[i]) ? `${tr(TITLE_KEY[keys[i] as TitleField])} „${f[keys[i]]}“` : p)).join(", ")));
-      for (const w of applied.warnings) log.push(tr("! {0}", w));
+      for (const w of applied.warnings) issue("other", tr("! {0}", w));
       // revize mimo tabulku revizí se ohlásí hned (razítko a tabulka by si odporovaly)
       const rw = f.revision !== undefined ? titleRevisionCheck(m as Partial<DrawingMeta>).warning : undefined;
-      if (rw) log.push(tr("! {0}", rw));
+      if (rw) issue("other", tr("! {0}", rw));
       return done({ changed: true, open: false });
     }
     case "rev": {
@@ -739,8 +764,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       put({ ...sheet(), annotations: [...anns, ann] });
       log.push(tr("✓ značka {0} · {1}", where, shortId(anns.length)));
       const over = overlappingTexts(res, anns, ann);
-      if (over.length) log.push(tr("! popisek se překrývá s „{0}“ – posuňte ho: výkres upravit {1} posun=\"dx dy\" (mm listu)", over.join("“, „"), shortId(anns.length)));
-      if (outsideFrame(res, ann)) log.push(tr("! značka přesahuje rámeček listu – posuňte ji: výkres upravit {0} posun=\"dx dy\"", shortId(anns.length)));
+      if (over.length) issue("overlap", tr("! popisek se překrývá s „{0}“ – posuňte ho: výkres upravit {1} posun=\"dx dy\" (mm listu)", over.join("“, „"), shortId(anns.length)), ann);
+      if (outsideFrame(res, ann)) issue("frame", tr("! značka přesahuje rámeček listu – posuňte ji: výkres upravit {0} posun=\"dx dy\"", shortId(anns.length)), ann);
       return done({ changed: true, open: true });
     }
     case "mdim": {
@@ -751,8 +776,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       put({ ...sheet(), annotations: [...anns, ann] });
       log.push(tr("✓ kóta {0} ({1}) · {2}", annLabel(res.views, ann), where, shortId(anns.length)));
       const over = overlappingTexts(res, anns, ann);
-      if (over.length) log.push(tr("! text kóty se překrývá s „{0}“ – změňte odsazení: výkres upravit {1} odsazení=…", over.join("“, „"), shortId(anns.length)));
-      if (outsideFrame(res, ann)) log.push(tr("! kóta přesahuje rámeček listu – zmenšete odsazení: výkres upravit {0} odsazení=…", shortId(anns.length)));
+      if (over.length) issue("overlap", tr("! text kóty se překrývá s „{0}“ – změňte odsazení: výkres upravit {1} odsazení=…", over.join("“, „"), shortId(anns.length)), ann);
+      if (outsideFrame(res, ann)) issue("frame", tr("! kóta přesahuje rámeček listu – zmenšete odsazení: výkres upravit {0} odsazení=…", shortId(anns.length)), ann);
       return done({ changed: true, open: true });
     }
     case "edit": {
@@ -766,8 +791,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       const off = cmd.patch.offset !== undefined ? tr(" (odsazení {0})", fmtN(cmd.patch.offset)) : cmd.patch.shift ? tr(" (posun {0} {1})", fmtN(cmd.patch.shift[0]), fmtN(cmd.patch.shift[1])) : "";
       log.push(tr("✓ upraveno {0}: {1} → {2}{3}", shortId(i), before, annLabel(res.views, next), off));
       const over = overlappingTexts(res, anns.filter((_, k) => k !== i), next);
-      if (over.length) log.push(tr("! text se překrývá s „{0}“", over.join("“, „")));
-      if (outsideFrame(res, next)) log.push(tr("! přesahuje rámeček listu"));
+      if (over.length) issue("overlap", tr("! text se překrývá s „{0}“", over.join("“, „")), next);
+      if (outsideFrame(res, next)) issue("frame", tr("! přesahuje rámeček listu"), next);
       return done({ changed: true, open: false });
     }
     case "del": {
@@ -895,7 +920,7 @@ export async function drawingStatus(doc0: CadDoc, compute: DrawingCompute, opts:
     const r = await sheetStatus(doc, i, has, compute, opts.extras, blocks.length === 0);
     changed = changed || r.changed;
     blocks.push(r.text);
-    issues.push(...r.issues.map((x) => ({ ...x, data: { ...(x.data ?? {}), sheetName: doc.drawings![i].name } })));
+    issues.push(...r.issues.map((x) => ({ ...x, sheetId: doc.drawings![i].id, data: { ...(x.data ?? {}), sheetName: doc.drawings![i].name } })));
   }
   return { text: blocks.join("\n\n"), ...(changed ? { doc } : {}), ...(issues.length ? { issues } : {}) };
 }
@@ -904,7 +929,7 @@ export async function drawingStatus(doc0: CadDoc, compute: DrawingCompute, opts:
 async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: DrawingCompute, extras: DrawingExtras | undefined, first: boolean): Promise<{ text: string; changed: boolean; issues: DrawingIssue[] }> {
   const s = doc.drawings![idx];
   const o = sheetOptions(s);
-  const res = await compute(doc, sheetMeta(doc, s, idx, extras), o);
+  let res = await compute(doc, sheetMeta(doc, s, idx, extras), o);
   let anns = s.annotations;
   let changed = false;
   if (o.dimensions === "smart" && res.smart) {
@@ -913,6 +938,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
       anns = m.annotations;
       doc.drawings![idx] = { ...s, options: { ...o, smartGen: m.gen } as unknown as Record<string, unknown>, annotations: anns };
       changed = true;
+      if (m.userLost) res = { ...res, warnings: [...res.warnings, lostEditsText(m.userLost)] };
     }
   }
   const views = res.views;
@@ -922,7 +948,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const where = has ? (n > 1 ? tr(" (list {0}/{1})", pos + 1, n) : "") : tr(" (zatím neuložený – výchozí volby)");
   L.push(tr("Výkres „{0}“{1}: list {2} {3} · měřítko {4} · pohledy: {5} · kóty: {6}", s.name, where, res.sheet.name, o.orientation === "portrait" ? tr("na výšku") : tr("na šířku"), res.scale, [...views.map((v) => VIEW_NAME(v.key, o)), ...(o.views.iso ? [VIEW_NAME("iso")] : [])].join(", ") || "—", mode));
   if (first) L.push(sheetsLine(doc, activeSheetIndex(doc)));
-  const extra = [o.rotation ? tr("otočení {0}°", o.rotation) : "", o.section ? sectionStatusText(o.section, o.section.kind === "half" ? tr("poloviční") : tr("celý")) : "", o.bomTable === false ? tr("bez kusovníku") : "", o.balloons === false ? tr("bez balónků") : ""].filter(Boolean);
+  const extra = [o.rotation ? tr("otočení {0}°", o.rotation) : "", o.section ? sectionStatusText(o.section, o.section.kind === "half" ? tr("poloviční") : tr("celý")) : "", o.bomTable === false ? tr("bez kusovníku") : "", o.balloons === false ? tr("bez balónků") : "", hasDrawnSprings(doc) ? (o.springs === "full" ? tr("pružiny plně (šroubovice)") : tr("pružiny zjednodušeně (ISO 2162-1)")) : ""].filter(Boolean);
   if (extra.length) L.push(tr("Volby: {0}", extra.join(" · ")));
   const dims = anns.filter((a) => a.type === "dim" || a.type === "callout");
   L.push(tr("Kóty a popisy ({0}, z toho vygenerovaných {1}):", dims.length, dims.filter((a) => a.auto).length));

@@ -1,0 +1,7 @@
+# entity, vazby a kóty skici (op entities / constraints / dims), vyřešení skici a vysunutí
+nový díl Skica s vazbami
+skica XY: úsečka 0 0 60 2; úsečka 60 2 62 40; úsečka 62 40 0 38; úsečka 0 38 0 0
+vazba vodorovně e1; svisle e2; vodorovně e3; svisle e4
+kóta délka e1 60; kóta délka e2 40
+vysunout 8
+stav

@@ -1,0 +1,11 @@
+# díl přejmenovaný a změněný v dřívějším běhu: starý název už neplatí
+nový díl A
+kvádr 10 10 10
+#--- run
+název "B"
+válec 5 30
+#--- run
+nová sestava S
+vložit "A"
+#--- run
+stav

@@ -16,6 +16,7 @@
     "prebuild": "node scripts/vendor-occt.mjs && node scripts/vendor-pdfjs.mjs && node scripts/cad-cli-build.mjs",
     "cad:cli": "node scripts/cad-cli-build.mjs",
     "cad:cli:e2e": "node e2e/cad-cli.e2e.cjs",
+    "cad:acceptance": "node scripts/cad-acceptance.mjs",
     "mncad": "node scripts/cad-cli-build.mjs --if-stale --run",
     "docs:assets": "node scripts/cad-docs-assets.mjs",
     "docs:text": "node --experimental-strip-types scripts/cad-docs-text.mjs",

@@ -1,0 +1,61 @@
+# balík B5 check-compare (CAD-HEADLESS-NAVRH.md kap. 6): kontrola, porovnat, třídy kolizí, přiložené soubory
+ · vazby {0} z {1} ok	 · Verknüpfungen {0} von {1} ok
+ (+{0} dalších)	 (+{0} weitere)
+, předpokládaná – materiál zadán jen označením	, angenommen – Werkstoff nur als Bezeichnung angegeben
+{0} dvojic komponent nelze vyhodnotit – booleovská operace jádra selhala (dvojice se nehlásí jako kolize)	{0} Komponentenpaare können nicht ausgewertet werden – die boolesche Operation des Kerns ist fehlgeschlagen (die Paare werden nicht als Kollision gemeldet)
+{0}× „{1}“ – objem {2} cm³ · hmotnost {3} kg · obálka {4} · těles {5}{6}	{0}× „{1}“ – Volumen {2} cm³ · Masse {3} kg · Hüllquader {4} · Körper {5}{6}
+attach potřebuje {0}	attach benötigt {0}
+attach: base64 obsahuje neplatné znaky	attach: base64 enthält ungültige Zeichen
+attach: chybí název souboru	attach: Dateiname fehlt
+bez prvku díry	ohne Bohrungs-Feature
+booleovská operace jádra selhala	die boolesche Operation des Kerns ist fehlgeschlagen
+díl „{0}“ není mezi otevřenými záložkami – dostupné: {1}	Teil „{0}“ ist nicht unter den geöffneten Registerkarten – verfügbar: {1}
+Díly ({0}):	Teile ({0}):
+Díry ({0}):	Bohrungen ({0}):
+dno kužel {0}°	Kegelgrund {0}°
+chybí	fehlt
+chybí název dílu – {0}	Teilname fehlt – {0}
+kolize: {0} – šroub v závitu {1}, pod hlavou {2}, skutečné {3}, nevyhodnotitelné {4}	Kollisionen: {0} – Schraube im Gewinde {1}, unter dem Kopf {2}, echt {3}, nicht auswertbar {4}
+kolize: {0} – šroub v závitu {1}, skutečné {2}	Kollisionen: {0} – Schraube im Gewinde {1}, echt {2}
+komponenta dvojice v sestavě není	eine Komponente des Paares ist nicht in der Baugruppe
+Kontrola „{0}“: objem {1} cm³ · hmotnost {2} kg (hustota {3} g/cm³{4}) · obálka {5} · těles {6} · {7}	Prüfung „{0}“: Volumen {1} cm³ · Masse {2} kg (Dichte {3} g/cm³{4}) · Hüllquader {5} · Körper {6} · {7}
+kontrola [díl "A" | sestava | vše] [díry] [polohy]	prüfen [teil "A" | baugruppe | alle] [bohrungen] [positionen]
+kontrola díl: komponenta „{0}“ není díl s historií (importovaný soubor) – kontrola sestava	prüfen teil: Komponente „{0}“ ist kein Teil mit Verlauf (importierte Datei) – prüfen baugruppe
+kontrola modelu jako tabulka: přesný objem, hmotnost, hustota (rho.assumed = materiál jen označením), obálka, počet těles, platnost; díry (souosé úseky sloučené, zahloubení, závit a hloubka závitu, ploché dno / kužel hrotu) spojené s prvky díry – prvek bez díry v geometrii = ⚠ check.hole-missing; sestava: V.sum i V.union, hmotnost, přesná obálka, vazby, kolize po třídách a řádek na každý různý díl; polohy = i středy děr	Modellprüfung als Tabelle: exaktes Volumen, Masse, Dichte (rho.assumed = Werkstoff nur als Bezeichnung), Hüllquader, Anzahl der Körper, Gültigkeit; Bohrungen (koaxiale Abschnitte zusammengefasst, Senkung, Gewinde und Gewindetiefe, flacher Grund / Bohrspitzenkegel) mit den Bohrungs-Features verknüpft – Feature ohne Bohrung in der Geometrie = ⚠ check.hole-missing; Baugruppe: V.sum und V.union, Masse, exakter Hüllquader, Verknüpfungen, Kollisionen nach Klassen und eine Zeile je Teil; positionen = auch Bohrungsmitten
+kontrola sestava: otevřený dokument není sestava	prüfen baugruppe: das geöffnete Dokument ist keine Baugruppe
+Kontrola sestavy „{0}“: {1} komponent ({2} různých dílů) · objem Σ {3} cm³, sjednocení {4} cm³ · hmotnost Σ {5} kg · obálka {6}{7} · kolize {8} (šroub v závitu {9}, pod hlavou {10}, skutečné {11}, nevyhodnotitelné {12}) · platných dílů {13} z {14}	Baugruppenprüfung „{0}“: {1} Komponenten ({2} verschiedene Teile) · Volumen Σ {3} cm³, Vereinigung {4} cm³ · Masse Σ {5} kg · Hüllquader {6}{7} · Kollisionen {8} (Schraube im Gewinde {9}, unter dem Kopf {10}, echt {11}, nicht auswertbar {12}) · gültige Teile {13} von {14}
+kontrola: díl „{0}“ nemá těleso	prüfen: Teil „{0}“ hat keinen Körper
+kontrola: neznámá volba „{0}“ – {1}	prüfen: unbekannte Option „{0}“ – {1}
+kontrola: otevřený dokument je 2D výkres	prüfen: das geöffnete Dokument ist eine 2D-Zeichnung
+kontrola: sestava nemá viditelné komponenty	prüfen: die Baugruppe hat keine sichtbaren Komponenten
+kontrola: zadejte jen jeden cíl (díl, sestava nebo vše) – {0}	prüfen: nur ein Ziel angeben (Teil, Baugruppe oder alle) – {0}
+kuželové zahloubení Ø{0} × {1}°	Kegelsenkung Ø{0} × {1}°
+navíc	zusätzlich
+NEPLATNÉ (BRepCheck)	UNGÜLTIG (BRepCheck)
+neznámé označení závitu „{0}“ (jmenovitý průměr jen z označení M…)	unbekannte Gewindebezeichnung „{0}“ (Nenndurchmesser nur aus der Bezeichnung M…)
+odchylka povrchu až {0} mm (tolerance {1} mm)	Oberflächenabweichung bis {0} mm (Toleranz {1} mm)
+platné	gültig
+polohy {0}	Positionen {0}
+porovnání modelu se souborem reference (STEP, BREP, STL) ze vstupních souborů: CLI --files / složka skriptu, HTTP files, v prohlížeči přiložený soubor (tlačítko Připojit soubor… v konzoli nebo window.mncad.attach); sestava = složené těleso; výsledek jeden řádek (ok, rozdíl objemu, navíc / chybí, odchylky, podíl v toleranci), mimo toleranci ⚠ compare.mismatch se 3 největšími oblastmi, s „přísně“ ✗	Vergleich des Modells mit einer Referenzdatei (STEP, BREP, STL) aus den Eingabedateien: CLI --files / Skriptordner, HTTP files, im Browser eine angehängte Datei (Schaltfläche Datei anhängen… in der Konsole oder window.mncad.attach); Baugruppe = zusammengesetzter Körper; Ergebnis eine Zeile (ok, Volumendifferenz, zusätzlich / fehlt, Abweichungen, Anteil in Toleranz), außerhalb der Toleranz ⚠ compare.mismatch mit den 3 größten Bereichen, mit „streng“ ✗
+porovnat "ref.step" [tolerance 0,05] [zarovnat auto|střed|ne] [díl "A" | sestava] [mapa ne] [přísně]	vergleichen "ref.step" [toleranz 0,05] [ausrichten auto|mitte|nein] [teil "A" | baugruppe] [karte nein] [streng]
+porovnat díl: komponenta „{0}“ není díl s historií – porovnat … sestava	vergleichen teil: Komponente „{0}“ ist kein Teil mit Verlauf – vergleichen … baugruppe
+porovnat sestava: otevřený dokument není sestava	vergleichen baugruppe: das geöffnete Dokument ist keine Baugruppe
+porovnat: chybí soubor reference – {0}	vergleichen: Referenzdatei fehlt – {0}
+porovnat: mapa ano nebo ne (ne „{0}“)	vergleichen: Karte ja oder nein (nicht „{0}“)
+porovnat: neznámá volba „{0}“ – {1}	vergleichen: unbekannte Option „{0}“ – {1}
+porovnat: otevřený dokument je 2D výkres	vergleichen: das geöffnete Dokument ist eine 2D-Zeichnung
+porovnat: tolerance musí být kladné číslo v mm (ne „{0}“)	vergleichen: die Toleranz muss eine positive Zahl in mm sein (nicht „{0}“)
+porovnat: zadejte jen jeden cíl (díl nebo sestava) – {0}	vergleichen: nur ein Ziel angeben (Teil oder Baugruppe) – {0}
+porovnat: zarovnat auto, střed nebo ne (ne „{0}“)	vergleichen: ausrichten auto, mitte oder nein (nicht „{0}“)
+prvek díry „{0}“: {1} z {2} poloh nemá v geometrii díru	Bohrungs-Feature „{0}“: {1} von {2} Positionen haben keine Bohrung in der Geometrie
+přiložené soubory by měly víc než {0} MB	die angehängten Dateien würden {0} MB überschreiten
+přiložit lze nejvýš {0} souborů – odeberte některý (window.mncad.detach)	höchstens {0} Dateien können angehängt werden – entfernen Sie eine (window.mncad.detach)
+zahloubení Ø{0} ↧{1}	Senkung Ø{0} ↧{1}
+NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu	UNGÜLTIG: die Baugruppe hat sich seit der Prüfung geändert, „Kollision“ erneut ausführen
+rozdíl objemů {0} mm³	Volumendifferenz {0} mm³
+Sražení konce	Endfase
+Třídím kolize (šroub v závitu / skutečné)…	Kollisionen werden eingeordnet (Schraube im Gewinde / echt)…
+#!dynamic – texty kódů protokolu (engine/codes.ts) se překládají za běhu tr(def.key)
+těleso dílu „{0}“ není platné (BRepCheck) – export STEP a výpočty mohou selhat	der Körper des Teils „{0}“ ist nicht gültig (BRepCheck) – STEP-Export und Berechnungen können fehlschlagen
+kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila	Kollisionen für den Endzustand der Baugruppe neu berechnet – die Baugruppe hat sich nach der Kollisionsprüfung ({0}) geändert
+rozdílová tělesa nejsou spolehlivá (kontrola booleovských operací nesedí o {0} mm³) – shoda podle objemu a mapy odchylek	die Differenzkörper sind nicht zuverlässig (die Kontrolle der booleschen Operationen weicht um {0} mm³ ab) – Übereinstimmung nach Volumen und Abweichungskarte

@@ -1,0 +1,32 @@
+=== run 1 ===
+✓ nový díl „English“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Zaoblení 1 (fillet) – 5 hran podle pravidla „top“ – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Válec 1 (cylinder)
+✓ Zaoblení 1 (fillet)
+
+Dokument: „English“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 40 × 30 × 20 mm (X 0…40, Y 0…30, Z 0…20) · objem 22,39 cm³ · ploch 12 · hran 25
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 40 × 30 × 20 mm, new, roh [0; 0; 0]
+ 2. Válec 1 [cylinder, id #] ✓ – Ø10 × 25 mm, cut, podstava [20; 15; 0], osa Z
+ 3. Zaoblení 1 [fillet, id #] ✓ – R1, hrany 5
+=== run 2 ===
+✓ nový díl „Deutsch“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Sražení 1 (chamfer) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Sražení 1 (chamfer)
+
+Dokument: „Deutsch“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 25,29 cm³ · ploch 29 · hran 55
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 30 × 30 × 30 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ – Ø8 skrz v [15; 15; 30], osa Z
+ 3. Sražení 1 [chamfer, id #] ✓ – 1 mm, hrany vše

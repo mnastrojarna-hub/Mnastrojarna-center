@@ -14,6 +14,16 @@ const materialOf = (grade: string) => (/A2|A4|nerez/i.test(grade) ? "nerez" : "o
 const socket = (s: number, t: number, zTop: number): Feature[] => hexPrism(tr("Vnitřní šestihran"), s, t, zTop - t, "cut");
 const cosmeticThread = (size: string, from: number, len: number): Feature => ({ id: uid(), name: `Závit ${size}`, type: "thread", designation: size, position: [0, 0, from], axis: "Z", length: len, modeled: false });
 
+/**
+ * Dřík šroubu se sraženým koncem, přidaný až PO sražení hlavy (rozhodnutí 15.9): sražení „všech hran“ by jinak srazilo
+ * i vydutou hranu dřík–hlava a pod hlavou by vznikl prstenec materiálu (Ø d + 2c), který se v průchozí díře nebo v podložce
+ * vždy protne se sevřeným dílem (kolize šroubu, který v sestavě sedí správně). Konec dříku = kužel výšky `c`.
+ */
+const shankWithTip = (d: number, l: number, c: number): Feature[] => [
+  cyl(tr("Dřík"), d, l - c, -l + c, "add"),
+  { id: uid(), name: tr("Sražení konce"), type: "cone", radius1: d / 2 - c, radius2: d / 2, height: c, position: [0, 0, -l], axis: "Z", mode: "add" },
+];
+
 /** Délka závitu b dle ISO 4014 / ISO 4762 (částečný závit). */
 const threadLen = (d: number, l: number) => Math.min(l, l <= 125 ? 2 * d + 6 : l <= 200 ? 2 * d + 12 : 2 * d + 25);
 
@@ -50,11 +60,12 @@ export const socketCap: Family = {
     const g = ISO4762[size] ?? ISO4762.M8;
     const d = METRIC[size].d;
     const l = num(v.l, 30);
+    const c = Math.max(0.3, d * 0.08);
     return part(tr("Šroub {0}×{1} ISO 4762", size, fmt(l)), materialOf(str(v.grade)), [
-      cyl(tr("Dřík"), d, l, -l, "new"),
-      cyl("Hlava", g.dk, g.k, 0),
+      cyl("Hlava", g.dk, g.k, 0, "new"),
       ...socket(g.s, g.t, g.k),
-      chamferAll(Math.max(0.3, d * 0.08)),
+      chamferAll(c), // jen hlava – vydutá hrana dřík–hlava zůstane ostrá (rozhodnutí 15.9)
+      ...shankWithTip(d, l, c),
       cosmeticThread(size, -l, threadLen(d, l)),
     ], tr("ISO 4762 – {0}×{1} – {2}", size, fmt(l), v.grade), "#3a3f45");
   },
@@ -83,10 +94,11 @@ const hexBolt = (id: string, std: string, full: boolean): Family => ({
     const m = METRIC[size] ?? METRIC.M8;
     const l = num(v.l, 40);
     const b = full ? l : threadLen(m.d, l);
+    const c = Math.min(0.6, m.d * 0.06);
     return part(tr("Šroub {0}×{1} {2}", size, fmt(l), std), materialOf(str(v.grade)), [
-      cyl(tr("Dřík"), m.d, l, -l, "new"),
-      ...hexPrism("Hlava", m.s, m.k, 0),
-      chamferAll(Math.min(0.6, m.d * 0.06)),
+      ...hexPrism("Hlava", m.s, m.k, 0, "new"),
+      chamferAll(c), // jen hlava – vydutá hrana dřík–hlava zůstane ostrá (rozhodnutí 15.9)
+      ...shankWithTip(m.d, l, c),
       cosmeticThread(size, -l, b),
     ], `${std} – ${size}×${fmt(l)} – ${v.grade}`, "#3a3f45");
   },

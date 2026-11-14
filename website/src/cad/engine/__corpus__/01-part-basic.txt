@@ -1,0 +1,11 @@
+# díl: nový, materiál, skica, vysunutí, díra, výběr hran pravidlem (select), sražení, stav na konci
+nový díl Příruba
+materiál nerez
+skica XY: kružnice 120
+vysunout 15
+trubka 60 40 25 v 0 0 15
+díra 12 skrz v 45 0
+pole kruhové 4
+zaoblit 2 hrany svislé
+srazit 1 hrany horní kruhové
+stav

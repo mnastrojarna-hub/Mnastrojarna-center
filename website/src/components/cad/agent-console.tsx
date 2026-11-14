@@ -4,7 +4,7 @@ import { tr } from "@/cad/i18n";
 import { useEffect, useRef, useState } from "react";
 import { AGENT_COMMANDS } from "@/cad/agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
-import { attachedFiles, readFileAsDataUrl } from "@/cad/attached-files";
+import { attachedFiles } from "@/cad/attached-files";
 import { copyText } from "@/lib/clipboard";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
@@ -179,7 +179,7 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
           <p className="mt-3 flex items-start gap-1.5 text-[11.5px] leading-relaxed text-[#6b7785]">
             <CadIcon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              {tr("Pro skripty je k dispozici")}{" "}<code>window.mncad</code> {tr("(run, getDocument, setDocument, status, guide). Úplný návod a schéma:")}{" "}<a href="/cad/schema-pro-ai.md" target="_blank" rel="noopener" className="text-brand underline-offset-2 hover:underline">/cad/schema-pro-ai.md</a>{tr(". Nic z toho neodesílá data mimo tento prohlížeč.")}
+              {tr("Pro skripty je k dispozici")}{" "}<code>window.mncad</code> {tr("(run, getDocument, setDocument, status, guide). Úplný návod a schéma:")}{" "}<a href="/cad/schema-pro-ai.md" target="_blank" rel="noopener" className="text-brand underline-offset-2 hover:underline">/cad/schema-pro-ai.md</a>{tr(". Data opouštějí prohlížeč jen u „sdílet“ a výstupů „… odkaz“: dokument nebo soubor se v prohlížeči zašifruje a nahraje do úložiště odkazů, klíč je jen v odkazu.")}
             </span>
           </p>
         </div>
@@ -189,8 +189,9 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
 }
 
 /**
- * Připojené soubory pro příkazy, které berou soubor podle názvu (např. výkres razítko logo="firma.png") – jen v paměti
- * karty (cad/attached-files.ts), nic se neodesílá.
+ * Připojené soubory pro příkazy, které berou soubor podle názvu (výkres razítko logo="firma.png", předloha "výkres.dwg",
+ * porovnat "ref.step", otevřít "díl.mncad") – jen v paměti karty (jedno úložiště cad/engine/attachments.ts; také
+ * window.mncad.attach), nic se neodesílá.
  */
 function AttachFiles({ flash }: { flash: (m: string) => void }) {
   const input = useRef<HTMLInputElement>(null);
@@ -200,10 +201,10 @@ function AttachFiles({ flash }: { flash: (m: string) => void }) {
     const names: string[] = [];
     for (const f of [...files]) {
       try {
-        attachedFiles.add({ name: f.name, mime: f.type || "application/octet-stream", dataUrl: await readFileAsDataUrl(f), bytes: f.size });
+        attachedFiles.add({ name: f.name, mime: f.type || "application/octet-stream", data: new Uint8Array(await f.arrayBuffer()) });
         names.push(f.name);
-      } catch {
-        flash(tr("Soubor „{0}“ se nepodařilo načíst.", f.name));
+      } catch (e) {
+        flash(tr("Soubor „{0}“ se nepodařilo načíst.", f.name) + (e instanceof Error && e.message ? ` ${e.message}` : ""));
       }
     }
     if (names.length) flash(tr("Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo=\"{1}\"", names.join(", "), names[0]));
@@ -211,7 +212,7 @@ function AttachFiles({ flash }: { flash: (m: string) => void }) {
   };
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11.5px] text-[#4a5664]" data-agent-attach>
-      <Btn onClick={() => input.current?.click()} title={tr("Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu")}>
+      <Btn onClick={() => input.current?.click()} title={tr("Připojí soubor (logo do razítka, předlohu DWG / PDF, referenci pro porovnat \"ref.step\", dokument pro otevřít \"díl.mncad\") – příkazy ho najdou podle názvu; zůstane do obnovení stránky")}>
         {tr("Připojit soubor…")}
       </Btn>
       <input ref={input} type="file" multiple className="hidden" data-agent-attach-input onChange={(e) => e.target.files?.length && void add(e.target.files)} />

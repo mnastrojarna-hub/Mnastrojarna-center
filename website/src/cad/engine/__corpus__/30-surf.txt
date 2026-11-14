@@ -1,0 +1,8 @@
+# analýza ploch (op surf): návaznost hran a hřebeny křivosti, řídicí body
+nový díl Plochy
+kvádr 40 40 20
+zaoblit 5 hrany horní
+#--- run
+analýza návaznosti
+analýza hřebenu E1 měřítko 20
+plocha F1 cv

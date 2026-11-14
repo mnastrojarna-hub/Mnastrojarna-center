@@ -379,15 +379,17 @@ export function holePositions(groups: number[][], axis: Axis): HolePositions {
 /**
  * Doplní souřadnici v ose vrtání na povrch tělesa (díra „v x y“ bez z) – jedna poloha (`position`) nebo body `points`
  * označené ve `fill` (poloha zadaná dvěma čísly). `top(u, v)` = nejvyšší bod povrchu tělesa v ose díry v místě (u, v)
- * (síť modelu, `topAt`); mimo těleso → horní okraj obálky `bbox` a upozornění „!“ s číslem řádku. Upraví `f` na místě,
- * vrací řádky upozornění do protokolu.
+ * (síť modelu, `topAt`); mimo těleso → horní okraj obálky `bbox` a upozornění „!“ s číslem řádku (nebo `miss` – engine
+ * ho zapíše s kódem `hole.no-surface`). Upraví `f` na místě, vrací řádky upozornění do protokolu.
  */
-export function fillHoleTops(f: HoleF, fill: boolean[] | undefined, top: (u: number, v: number) => number | null, bbox: [Vec3, Vec3], line: number): string[] {
+export function fillHoleTops(f: HoleF, fill: boolean[] | undefined, top: (u: number, v: number) => number | null, bbox: [Vec3, Vec3], line: number, miss?: (u: number, v: number, at: number) => void): string[] {
   const { ai, ui, vi } = axisIdx(f.axis);
   const notes: string[] = [];
   const put = (p: Vec3) => {
     const h = top(p[ui], p[vi]);
-    if (h === null) notes.push(tr("! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})", line, p[ui], p[vi], bbox[1][ai]));
+    // `miss` = volající hlášku zapíše sám (engine: ⚠ hole.no-surface s kódem), jinak řádek „!“ do protokolu
+    if (h === null && miss) miss(p[ui], p[vi], bbox[1][ai]);
+    else if (h === null) notes.push(tr("! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})", line, p[ui], p[vi], bbox[1][ai]));
     p[ai] = h ?? bbox[1][ai];
   };
   const pts = f.points?.flatMap((q) => (q.kind === "xyz" ? [q] : [])) ?? [];

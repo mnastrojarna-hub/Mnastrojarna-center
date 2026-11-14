@@ -1,0 +1,13 @@
+# měření v sestavě: entity komponent, těleso komponenty; chybějící komponenta
+nový díl Spodek
+kvádr 40 40 10
+nový díl Vršek
+kvádr 20 20 10
+#--- run
+nová sestava Měření sestavy
+vložit "Spodek" ukotvit
+vložit "Vršek" v 10 10 30
+#--- run
+měřit Spodek:F6 Vršek:F5
+měřit Vršek:těleso
+měřit F1

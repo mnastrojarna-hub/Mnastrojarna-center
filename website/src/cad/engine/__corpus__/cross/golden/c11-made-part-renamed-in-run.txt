@@ -1,0 +1,15 @@
+=== run 1 ===
+✓ nový díl „A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ název = B
+✓ nová sestava „S“ – nová záložka
+✓ komponenta „B“ vložena do sestavy
+✗ řádek 7: díl „A“ není mezi otevřenými záložkami – otevřené díly: B
+✓ Kvádr 1 (box)
+
+Dokument: „S“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: B [0; 0; 0]
+Sestava: 1 komponent (1 dílů po rozložení podsestav) · obálka 1 × 1 × 1 mm · objem Σ 0 cm³ · hmotnost Σ 0 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== tabs ===
+B | S

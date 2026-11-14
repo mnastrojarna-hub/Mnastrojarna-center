@@ -448,9 +448,11 @@ export function planSmartDims(g: PartGeom, doc: CadDoc, d: Pick<DrawingResult, "
  * Pro jádro (worker): list bez zapečených kót s místem pro kóty + plán Chytrých kót. List a měřítko se volí jako bez kót
  * a místo mezi pohledy a kolem nich se dá podle toho, kolik se vejde. Když se kóty nevejdou, zkusí list s plným místem
  * kolem pohledů (větší formát / menší měřítko) a pak znovu s místem jen tam, kde kóty skutečně jsou; ponechá lepší výsledek.
+ * `geom` = geometrický výtah skutečného tvaru, když list kreslí zjednodušený tvar (pružina jako obal vinutí – kótuje se
+ * podle skutečné šroubovice, ne podle obalu); jinak výtah kresleného tělesa.
  */
-export function makeSmartDrawing(shape: r.Shape3D, doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions> = {}, extra: Record<string, r.Shape3D> = {}): DrawingResult & { smart: SmartDims } {
-  const g = partGeom(shape);
+export function makeSmartDrawing(shape: r.Shape3D, doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions> = {}, extra: Record<string, r.Shape3D> = {}, geom?: PartGeom): DrawingResult & { smart: SmartDims } {
+  const g = geom ?? partGeom(shape);
   // tabulka děr zapnutá na listu: polohy děr v jejím pohledu jsou v tabulce – kótami se neopakují (auto)
   const sheetTable = opts.holeTable ? holeTableViewOf(shape, meta, opts) : null;
   const tableView = sheetTable && !opts.dimHoles ? sheetTable : null;

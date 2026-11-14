@@ -79,6 +79,7 @@ import {
   type PartFace,
 } from "./mates";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type Mate, type MateRef, type Vec3 } from "./types";
+import type { ClashDetail, ClashPair } from "./clash-class";
 
 /** Seznam ploch jednoho dílu (souřadnice dílu) – jako seznam ploch v panelu vazby. */
 export type PartFaces = { faces: { face: number; info: PartFace; area?: number }[]; truncated: boolean };
@@ -104,7 +105,11 @@ export type AsmEnv = {
   /** záložky dokumentů (jen v aplikaci) */
   tabs?: { list: () => TabInfo[]; activate: (id: string) => Promise<CadDoc>; close: (id: string) => Promise<CadDoc> };
   /** kontrola kolizí sestavy v jádře (pohybová studie s kolizemi) */
-  interference?: (doc: CadDoc) => Promise<{ a: string; b: string; volume: number }[]>;
+  interference?: (doc: CadDoc) => Promise<{ a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] }[]>;
+  /** geometrické zařazení dvojic kolize v jádře (šroub × závit, kap. 6.3 – clash-class.ts) – v pohybu stejné jako `kolize` */
+  clashDetail?: (doc: CadDoc, pairs: ClashPair[]) => Promise<ClashDetail[]>;
+  /** díl má víc ploch, než se načte (`FACE_LIMIT`) – plochy navíc nejdou vybrat pro vazbu (⚠ asm.faces-truncated, 5.2 č. 30) */
+  onFacesTruncated?: (key: string, limit: number) => void;
 };
 
 export type AsmResult = {
@@ -121,6 +126,15 @@ export type AsmResult = {
   stackChanged?: boolean;
   /** pohybová studie: pokyn pro panel v aplikaci (přehrát, zastavit, krok, export snímků) */
   motion?: MotionSignal;
+  /** záznamy protokolu s kódem (engine/codes.ts) – kolize v pohybu podle tříd (ℹ clash.thread, ⚠ clash.real) */
+  codes?: { code: string; args?: unknown[]; text?: string }[];
+  /** strojová část výpisu (`= <loc> asm "<sestava>" <kv>`, engine/ops/util.ts `sayKv`) – souhrn pohybové studie na jeden řádek */
+  kv?: string;
+  /**
+   * prvky dílu upraveného v kontextu, které při `sestava hotovo` selhaly (`doc` = název dílu) – engine je ohlásí jedním
+   * ✗ feature.failed (ověření dílu na řádku prvku, jinak na řádku `sestava hotovo`), ne druhým obecným řádkem ✗
+   */
+  failures?: { doc: string; name: string; error: string }[];
 };
 
 /* ───────────────────────── díly, plochy, řešič ───────────────────────── */
@@ -210,6 +224,7 @@ export async function partFaces(env: AsmEnv, key: string, result: BuildResult | 
     });
   }
   const out = { faces, truncated: total > n };
+  if (out.truncated) env.onFacesTruncated?.(key, FACE_LIMIT);
   if (result?.metrics) env.faceLists?.set(key, out);
   return out;
 }
@@ -686,11 +701,11 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       log.push(
         tr("✓ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}", d.name, top.asm.name, n, res?.metrics ? tr(" · objem dílu {0} cm³", fmt(res.metrics.volume / 1000, 2)) : "", s.doc.mates?.length ? tr(" · vazby {0}", Object.values(s.status).filter((x) => x === "ok").length + "/" + s.doc.mates.length + " ok") : ""),
       );
-      for (const f of failed) log.push(tr("✗ prvek dílu {0}: {1}", (d.features.find((x) => x.id === f.id)?.name ?? f.id), f.error ?? "?"));
+      const failures = failed.map((f) => ({ doc: d.name, name: d.features.find((x) => x.id === f.id)?.name ?? f.id, error: f.error ?? "?" }));
       if (renumbered) log.push(tr("  plochy vazeb přečíslovány podle geometrie: {0}", renumbered));
       if (lost) log.push(tr("⚠ plochy vazeb, které po úpravě dílu nejde najít: {0} – sestava vazby", lost));
       if (s.moved.length) log.push(tr("  vazby pohnuly: {0}", movedText(s.doc, s.moved)));
-      return done(s.doc, true, { stackChanged: true, ...(s.doc.mates?.length ? { mateStatus: s.status } : {}) });
+      return done(s.doc, true, { stackChanged: true, ...(s.doc.mates?.length ? { mateStatus: s.status } : {}), ...(failures.length ? { failures } : {}) });
     }
     case "open": {
       asmOnly();

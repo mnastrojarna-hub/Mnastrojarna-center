@@ -412,12 +412,16 @@ export function screwISO4762(size: keyof typeof ISO4762 | string, length: number
   const d = Number(String(size).replace(/\D/g, "")) || 8;
   const g = ISO4762[size as string] ?? ISO4762.M8;
   const hex = uid();
+  const c = Math.max(0.3, d * 0.08);
+  // hlava se srazí dřív, než se přidá dřík: sražení všech hran by jinak srazilo i vydutou hranu dřík–hlava a pod hlavou by
+  // vznikl prstenec (Ø d + 2c), který se v průchozí díře / podložce vždy protne se sevřeným dílem (rozhodnutí 15.9)
   return part(tr("Šroub {0}×{1}", size, length), "ocel", [
-    { id: uid(), name: "Dřík", type: "cylinder", radius: d / 2, height: length, position: [0, 0, -length], axis: "Z", mode: "new" },
-    { id: uid(), name: "Hlava", type: "cylinder", radius: g.dk / 2, height: g.k, position: [0, 0, 0], axis: "Z", mode: "add" },
+    { id: uid(), name: "Hlava", type: "cylinder", radius: g.dk / 2, height: g.k, position: [0, 0, 0], axis: "Z", mode: "new" },
     sk(hex, tr("Šestihran"), { kind: "base", name: "XY", offset: g.k }, [{ id: uid(), type: "polygon", cx: 0, cy: 0, r: g.s / Math.sqrt(3), sides: 6, angle: 0 }]),
     { id: uid(), name: "Imbus", type: "extrude", sketchId: hex, distance: g.t, symmetric: false, reverse: true, mode: "cut" },
-    { id: uid(), name: "Sražení", type: "chamfer", distance: Math.max(0.3, d * 0.08), edges: "all" },
+    { id: uid(), name: "Sražení", type: "chamfer", distance: c, edges: "all" },
+    { id: uid(), name: "Dřík", type: "cylinder", radius: d / 2, height: length - c, position: [0, 0, -length + c], axis: "Z", mode: "add" },
+    { id: uid(), name: "Sražení konce", type: "cone", radius1: d / 2 - c, radius2: d / 2, height: c, position: [0, 0, -length], axis: "Z", mode: "add" },
   ], tr("ISO 4762 – {0}×{1} – 12.9", size, length));
 }
 

@@ -20,7 +20,11 @@ export type Level = "ok" | "note" | "warn" | "error" | "measure";
  * * `text` – u ✓/ℹ/⚠/✗ lokalizovaný volný text; u `=` strojová část `klíč=hodnota …` (víc řádků = víceřádkový výpis).
  * * `doc` – název dokumentu, ke kterému se záznam vztahuje.
  */
-export type Entry = { line: number | null; lines?: number[]; level: Level; code?: string; text: string; doc?: string; data?: unknown; count?: number };
+/**
+ * Záznam protokolu. U výpisu `=` (`level: "measure"`) je `text` strojová část (`klíč=hodnota …`, kap. 4.2; další řádky =
+ * pokračovací řádky výpisu) a `detail` lokalizovaný text výpisu, jak ho ukazuje konzole prohlížeče (plný protokol, JSON).
+ */
+export type Entry = { line: number | null; lines?: number[]; level: Level; code?: string; text: string; doc?: string; data?: unknown; count?: number; detail?: string };
 
 /** souhrn jednoho dokumentu běhu (řádek `D`, JSON `docs[]`) */
 export type DocSummary = {
@@ -43,7 +47,7 @@ export type DocSummary = {
   components?: number;
   parts?: number;
   mates?: { total: number; ok: number; conflict: number; missing: number; suppressed: number };
-  clashes?: { total: number; thread: number; real: number; undetermined: number };
+  clashes?: { total: number; thread: number; real: number; undetermined: number; /** prstenec pod hlavou šroubu (ℹ clash.underhead) */ underhead?: number };
   sheets?: number;
 };
 
@@ -94,6 +98,11 @@ export type RunReport = {
   overflow?: Overflow;
   /** plný protokol (jen na vyžádání: `--full`, HTTP `full: true`) */
   full?: string;
+  /**
+   * protokol konzole prohlížeče (dnešní text `runAgentText`: řádky operací, výsledky prvků po stavbě, stav dokumentu) –
+   * vyplní `runScript`; do JSON / HTTP se nepřenáší (`finalizeReport` ho odebere)
+   */
+  console?: string;
 };
 
 /** volby běhu skriptu (`runScript`, balík B2; CLI a HTTP je předávají beze změny) */

@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 /**
- * Svazek CLI `mncad` (CAD-HEADLESS-NAVRH.md kap. 3.6) – rolldown, `platform: "node"`, minifikovaný, jen `node:` externí.
+ * Svazek CLI `mncad` (CAD-HEADLESS-NAVRH.md kap. 3.6) – rolldown, `platform: "node"`, minifikovaný (s názvy tříd), jen `node:` externí.
  *
  *   node scripts/cad-cli-build.mjs [--out public/cad/cli] [--keep 2] [--no-tgz] [--if-stale] [--quiet]
  *   node scripts/cad-cli-build.mjs --if-stale --run <argumenty mncad…>      (npm run mncad -- run skript.txt --out /tmp/x)
  *
  * Výstup (generuje se v `prebuild`, je v .gitignore – jako public/vendor/occt-*):
- *   public/cad/cli/<verze>/  mncad.mjs, replicad_single.wasm (vedle svazku – emscripten ho hledá u import.meta.url),
+ *   public/cad/cli/<verze>/  mncad.mjs, replicad_single.wasm (vedle svazku; hostitel `cli/main.ts` `wasmFile` najde i
+ *                            replicad_single.<hash>.wasm, nebo cestu z MNCAD_WASM, a předá ji jádru přes `locateFile`),
  *                            fonts/Roboto-{Regular,Bold}.ttf, package.json (bin mncad, engines node >=22),
  *                            THIRD_PARTY_LICENSES.txt, README.txt, mncad-<verze>.tgz (npx), SHA256SUMS
  *   public/cad/cli/latest.json, public/cad/cli/README.txt  (bez mezipaměti – gen-htaccess.mjs)
  * Verze = <základ>-<prvních 8 znaků SHA-256 svazku a WASM>; ponechají se 2 nejnovější verze (statický hosting, 23 MB WASM).
+ *
+ * Minifikace (`CLI_MINIFY`) zachová názvy tříd a funkcí: čtečka a zapisovač DXF knihovny acad-ts hledají mapu kódů skupin
+ * entity podle názvu její třídy (`DxfMap.create(type.name)`, metadata podle `typeName`) – s přejmenovanými třídami
+ * by DXF v CLI přečetl jen kostru (VERTEX / SEQEND „nepřevedeno“, předloha bez pohledů a kót). Proto `mangle.keepNames`
+ * a `output.keepNames` (i přejmenování při spojení modulů do jednoho rozsahu, např. dvě třídy `Point`).
  *
  * Hranice (kap. 2.2): sestavení SELŽE, je-li v grafu modulů svazku `src/cad/client.ts` (prohlížečový Web Worker) nebo
  * cokoli ze `src/components/**` – ESLint pravidlo nechytí dynamický import, tato kontrola ano.
@@ -40,11 +46,15 @@ export function forbiddenModules(ids, src = SRC) {
 
 const BUILTIN = new Set(builtinModules.flatMap((m) => [m, `node:${m}`]));
 
+/** minifikace svazku: zkrácené proměnné, ale `name` tříd a funkcí beze změny (acad-ts DXF – viz hlavička) */
+export const CLI_MINIFY = Object.freeze({ compress: true, mangle: { keepNames: true } });
+
 /**
- * Sestaví svazek do `outFile`. `entry` = vstupní modul (výchozí virtuální vstup, který zavolá `boot()` z cli/main.ts).
+ * Sestaví svazek do `outFile`. `entry` = vstupní modul (výchozí virtuální vstup, který zavolá `boot()` z cli/main.ts);
+ * `minify` / `keepNames` jen pro testy (výchozí = distribuce: `CLI_MINIFY`, názvy tříd zachované).
  * Vrací seznam modulů grafu; při zakázaném modulu vyhodí chybu (a soubor nezapíše).
  */
-export async function bundle({ outFile, entryCode, minify = true, src = SRC } = {}) {
+export async function bundle({ outFile, entryCode, minify = CLI_MINIFY, keepNames = true, src = SRC } = {}) {
   const require = createRequire(path.join(ROOT, "package.json"));
   const { build } = await import(pathToFileURL(require.resolve("rolldown")).href);
   let moduleIds = [];
@@ -84,7 +94,7 @@ export async function bundle({ outFile, entryCode, minify = true, src = SRC } = 
         },
       },
     ],
-    output: { file: outFile, format: "esm", codeSplitting: false, minify, banner: "#!/usr/bin/env node", comments: { legal: false } },
+    output: { file: outFile, format: "esm", codeSplitting: false, minify, keepNames, banner: "#!/usr/bin/env node", comments: { legal: false } },
   });
   return { moduleIds, externals, warnings, ms: Date.now() - t0, bytes: fs.statSync(outFile).size };
 }
@@ -139,7 +149,8 @@ function licenseText(moduleIds) {
     "MN CAD CLI (mncad) – licence knihoven třetích stran / third-party licenses",
     "",
     "OpenCascade (replicad-opencascadejs) is licensed under LGPL-2.1 and ships as the separate, replaceable file",
-    "replicad_single.wasm next to mncad.mjs. You may replace it with your own build of the same interface.",
+    "replicad_single.wasm next to mncad.mjs. You may replace it with your own build of the same interface",
+    "(next to mncad.mjs, or anywhere with MNCAD_WASM=/path/to/file.wasm).",
     "",
     "Roboto (fonts/Roboto-Regular.ttf, fonts/Roboto-Bold.ttf) – Copyright Google LLC, Apache License 2.0",
     "(https://www.apache.org/licenses/LICENSE-2.0).",
@@ -171,6 +182,10 @@ function readme(version) {
     "  node mncad.mjs run skript.txt --out out [--strict] [--share] [--formats step,pdf] [--json]",
     "  node mncad.mjs serve        (místní HTTP API / local HTTP API, token v ~/.config/mncad/token)",
     "  node mncad.mjs help · node mncad.mjs help guide · node mncad.mjs selftest",
+    "",
+    "Jádro jinde / kernel elsewhere: MNCAD_WASM=/cesta/replicad_single.wasm node mncad.mjs run …",
+    "  (vedle mncad.mjs smí mít WASM i obsahový hash v názvu / a content-hashed name next to mncad.mjs also works:",
+    "  replicad_single.<hash>.wasm)",
     "",
     "Kódy ukončení / exit codes: 0 OK · 1 ✗ · 2 strict STOP · 3 usage/file · 4 crash · 5 timeout · 6 memory · 130 interrupted",
     "Ověření / verify: sha256sum -c SHA256SUMS",

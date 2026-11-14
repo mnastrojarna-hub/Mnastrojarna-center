@@ -1,0 +1,6 @@
+# prázdný díl z běhu 1 nepřepíše další běh (5.2 č. 14): záložky A i S
+nový díl "A"
+#--- run
+nová sestava "S"
+#--- run
+záložky

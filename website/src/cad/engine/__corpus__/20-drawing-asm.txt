@@ -1,0 +1,14 @@
+# výkres sestavy s kusovníkem a balónky (doplňky razítka z ws), stav listu
+nový díl Základ
+kvádr 60 40 10
+nový díl Sloupek
+válec 10 40
+#--- run
+nová sestava Stojan
+vložit "Základ" ukotvit
+vložit "Sloupek" v 30 20 10
+#--- run
+výkres A3 na šířku pohledy přední,horní
+výkres kusovník ano
+výkres balónky ano
+výkres stav

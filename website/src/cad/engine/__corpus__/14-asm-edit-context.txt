@@ -1,0 +1,16 @@
+# úprava dílu v kontextu sestavy (zásobník ws.asm.stack), návrat do sestavy
+nový díl Deska
+kvádr 50 50 10
+#--- run
+nová sestava Kontext
+vložit "Deska" ukotvit
+#--- run
+sestava upravit "Deska"
+kvádr 10 10 10 v 20 20 0 odebrat
+sestava hotovo
+sestava
+#--- run
+sestava upravit "Deska"
+#--- run
+válec 6 5 v 5 5 10
+sestava hotovo

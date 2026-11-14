@@ -1,0 +1,10 @@
+# úprava existující skici (op edit: skica "…", entita, smazat entitu, kóta) a nová stavba
+nový díl Úprava skici
+skica XY: obdélník 40 20; kružnice 6 v 10 0
+vysunout 5
+#--- run
+skica "Skica 1"
+entita e1 w=60
+kóta průměr e2 8
+smazat e2
+stav

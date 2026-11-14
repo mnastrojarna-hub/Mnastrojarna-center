@@ -39,11 +39,14 @@ test("synth-959.txt has the content of design 10.1", () => {
   // A1 assembly sheet + 3 part sheets IN THE PART DOCUMENTS (a sheet of the assembly document always projects the assembly)
   assert.equal(count(/^výkres list nový /), 0);
   assert.equal(count(/^výkres model /), 0);
-  assert.equal(count(/^výkres A3( měřítko 1:2)? pohledy přední,horní,iso$/), 3);
+  // part sheets: layouts on which a strict run passes (synth-spec.mjs SHEET_OPTS / SHEET_VIEWS – B6 gate)
+  assert.equal(count(/^výkres A3 pohledy přední,horní,iso$/), 1, "die plate");
+  assert.equal(count(/^výkres A2 měřítko 1:2 pohledy přední,horní,iso$/), 1, "base plate: the 220 dimension needs A2 at 1:2");
+  assert.equal(count(/^výkres A3 pohledy přední,horní,spodní,iso$/), 1, "holder plate: counterbores from below need the bottom view");
   assert.equal(count(/^kótovat chytře$/), 3, "Chytré kóty on every part sheet");
   for (const k of spec.PART_SHEETS) {
     const i = lines.indexOf(`záložka "${spec.NAMES[k]}"`);
-    assert.ok(i > lines.indexOf("výkres A1 pohledy přední,horní,iso") && lines[i + 1].startsWith("výkres A3 ") && lines[i + 2] === "kótovat chytře", spec.NAMES[k]);
+    assert.ok(i > lines.indexOf("výkres A1 pohledy přední,horní,iso") && /^výkres A[23] /.test(lines[i + 1]) && lines[i + 2] === "kótovat chytře", spec.NAMES[k]);
   }
   assert.equal(lines[lines.indexOf("kolize") - 1], `záložka "${spec.NAMES.asm}"`, "kolize runs on the assembly tab");
   assert.equal(count(/^výkres řez /), 1);
@@ -226,10 +229,11 @@ test("text area: exact Bézier integral = densely flattened outline", async () =
   assert.ok(flat > 20 && flat < 200);
 });
 
-test("every line parses with the CAD parser; only `kontrola` waits for package B5", async () => {
+test("every line parses with the CAD parser (`kontrola sestava` = package B5 check-compare)", async () => {
   const file = await bundle("parse-check.ts", { quiet: true });
   const out = JSON.parse(execFileSync(process.execPath, [file, path.join(HARNESS, "synth-959.txt")], { encoding: "utf8" }));
-  assert.deepEqual(out.errors.map((e) => e.text), ["kontrola sestava"]);
+  assert.deepEqual(out.errors.map((e) => e.text), []);
+  assert.equal(out.kinds.check, 1);
   assert.equal(out.kinds.insert, 70);
   assert.equal(out.kinds.library, 5);
   assert.equal(out.kinds.measure, 3);

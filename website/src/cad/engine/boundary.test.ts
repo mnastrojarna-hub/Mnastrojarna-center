@@ -77,7 +77,7 @@ describe("ESLint hranice enginu a CLI", () => {
     expect(res.length).toBeGreaterThanOrEqual(10);
     const msgs = res.flatMap((r) => r.messages.map((m) => `${path.relative(ROOT, r.filePath)}:${m.line} ${m.ruleId} ${m.message}`));
     expect(msgs).toEqual([]);
-  });
+  }, 60_000); // celý lint všech souborů enginu (po B3–B5 přes 40 souborů) trvá na sdíleném stroji déle než výchozích 5 s
 });
 
 /* ───────────────────────── skutečný graf modulů (TypeScript) ───────────────────────── */
@@ -178,5 +178,5 @@ describe("hranice enginu a CLI – skutečný graf modulů (TypeScript resolutio
     expect([...seen].some((f) => f.endsWith(path.join("cad", "blobs.ts")))).toBe(true);
     expect([...seen].some((f) => f.endsWith(path.join("cad", "draft", "doc.ts")))).toBe(true);
     expect(seen.has(path.join(SRC, "cad/client.ts"))).toBe(false);
-  });
+  }, 60_000); // tranzitivní graf všech souborů enginu a CLI (TypeScript resolution) – na sdíleném stroji přes 5 s
 });

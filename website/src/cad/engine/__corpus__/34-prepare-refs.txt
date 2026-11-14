@@ -1,0 +1,11 @@
+# prepare(): odkazy na skici a prvky názvem a $last, obsazený výchozí název (Skica 2), chybějící odkaz
+nový díl Odkazy
+skica XY: kružnice 10
+skica XZ: úsečka 0 0 0 50
+prvek sweep profileId="Skica 1" pathId=$last
+prvek pattern featureId="Tažení 1" count=2 spacing=30 direction=X
+prvek mirror featureId="Neexistuje" plane=YZ
+#--- run
+skica XY: obdélník 10 10 v 50 0
+vysunout 5
+stav

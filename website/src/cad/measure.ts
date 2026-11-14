@@ -436,9 +436,13 @@ export function holeBottom(test: (p: Vec3) => boolean, end: Vec3, out: Vec3, u: 
   return { bottom: "cone", tipAngle: deg(h), tipDepth: q6(h) };
 }
 
-/** Díry (vnitřní válcové plochy) nebo vnější válce (osazení, čepy) tělesa. */
-export function measureCylinders(shape: Shape, holes: boolean): MeasureCyl[] {
-  const groups = cylGroups(shape).filter((g) => (holes ? g.inner >= g.outer : g.outer > g.inner) && g.span >= MIN_SPAN);
+/**
+ * Díry (vnitřní válcové plochy) nebo vnější válce (osazení, čepy) tělesa. `bottom: false` = bez tvaru dna slepé díry,
+ * `keep` = jen vybrané válce (zařazení kolizí šroub × závit potřebuje jen vstup a délku děr se závitem – vstup i tvar dna
+ * se zjišťují body uvnitř tělesa, desítky bodů na díru).
+ */
+export function measureCylinders(shape: Shape, holes: boolean, o: { bottom?: boolean; keep?: (c: { radius: number; axis: Vec3; from: Vec3 }) => boolean } = {}): MeasureCyl[] {
+  const groups = cylGroups(shape).filter((g) => (holes ? g.inner >= g.outer : g.outer > g.inner) && g.span >= MIN_SPAN && (!o.keep || o.keep({ radius: g.r, axis: g.d, from: add(g.o, mul(g.d, g.t0)) })));
   const inside = holes && groups.length ? insideFn(shape) : null;
   try {
     const out = groups.map((g): MeasureCyl => {
@@ -459,7 +463,7 @@ export function measureCylinders(shape: Shape, holes: boolean): MeasureCyl[] {
         c.drill = qv(entryAtTo ? mul(g.d, -1) : g.d);
         if (!c.through) c.depth = c.length;
         // tvar dna jen u díry uzavřené na jednom konci
-        if (!c.through && c0 !== c1) Object.assign(c, holeBottom(inside.test, entryAtTo ? from : to, entryAtTo ? mul(g.d, -1) : g.d, u, g.r));
+        if (!c.through && c0 !== c1 && o.bottom !== false) Object.assign(c, holeBottom(inside.test, entryAtTo ? from : to, entryAtTo ? mul(g.d, -1) : g.d, u, g.r));
         if (c.tipDepth !== undefined) c.tipDepth = q6(c.length + c.tipDepth);
       }
       return c;

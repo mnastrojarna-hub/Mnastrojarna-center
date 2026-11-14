@@ -1,0 +1,8 @@
+# smazat poslední (op pop) – i v prázdném dílu (✗ není co odstranit)
+nový díl Odebírání
+kvádr 20 20 20
+zaoblit 2
+smazat poslední
+smazat poslední
+smazat poslední
+stav

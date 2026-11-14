@@ -1,0 +1,33 @@
+=== run 1 ===
+✓ nový díl „Kostka“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+
+Dokument: „Kostka“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 20 × 20 mm (X 0…20, Y 0…20, Z 0…20) · objem 8 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 20 × 20 × 20 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Skupiny“ – nová záložka
+✓ komponenta „Kostka“ vložena do sestavy (ukotvená)
+
+Dokument: „Skupiny“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Kostka [0; 0; 0] ⚓
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+=== run 3 ===
+✓ pole „Kostka“: 3 ks (lineární, rozteč 30 mm, směr [1; 0; 0]) – kopie „Kostka (2)“ [30; 0; 0], „Kostka (3)“ [60; 0; 0]
+✓ podsestava „Dvojice“: „Kostka (2)“, „Kostka (3)“
+Sestava „Skupiny“: komponent 2 · vazby 0
+ #1 Kostka · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Dvojice · podsestava (2 ks) · poloha [0; 0; 0] · skupina Podsestavy
+✓ podsestava „Dvojice“ rozpuštěna – o úroveň výš: „Kostka (2)“, „Kostka (3)“
+Sestava „Skupiny“: komponent 3 · vazby 0
+ #1 Kostka · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Kostka (2) · díl · poloha [30; 0; 0]
+ #3 Kostka (3) · díl · poloha [60; 0; 0]
+
+Dokument: „Skupiny“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Kostka [0; 0; 0] ⚓ · Kostka (2) [30; 0; 0] · Kostka (3) [60; 0; 0]
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 80 × 20 × 20 mm · objem Σ 24 cm³ · hmotnost Σ 0,188 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

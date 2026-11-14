@@ -1,0 +1,42 @@
+=== run 1 ===
+✓ nový díl „Deska“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Kolík“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Válec 1 (cylinder)
+
+Dokument: „Kolík“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 8 × 8 × 20 mm (X -4…4, Y -4…4, Z 0…20) · objem 1,01 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ – Ø8 × 20 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Spoj“ – nová záložka
+✓ komponenta „Deska“ vložena do sestavy (ukotvená)
+✓ komponenta „Kolík“ vložena do sestavy
+
+Dokument: „Spoj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Kolík [60; 30; 10]
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+=== run 3 ===
+✓ pole „Kolík“: 3 ks (lineární, rozteč 10 mm, směr [0; 1; 0]) – kopie „Kolík (2)“ [60; 40; 10], „Kolík (3)“ [60; 50; 10]
+✓ komponenta „Kolík (3)“: poloha [60; 50; 15] · barva #e03930 · číslo „K-3“
+✓ šroub „Šroub M8×25“ (ISO 4762 – M8×25 – 12.9) do díry F7 komponenty „Deska“ (Ø9, délka díry 10 mm) + podložka + matice · vazba Souosost: ok · poloha [20; 15; 11,6]
+Sestava „Spoj“: komponent 8 · vazby 2 (2 ok)
+ #1 Deska · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Kolík · díl · poloha [60; 30; 10]
+ #3 Kolík (2) · díl · poloha [60; 40; 10]
+ #4 Kolík (3) · díl · poloha [60; 50; 15] · č. K-3
+ #5 Podložka M8 · díl · poloha [20; 15; 10] · č. ISO 7089 – M8 – 200 HV · skupina Normálie
+ #6 Šroub M8×25 · díl · poloha [20; 15; 11,6] · č. ISO 4762 – M8×25 – 12.9 · skupina Normálie
+ #7 Podložka M8 · díl · poloha [20; 15; 0] · natočení [-180; 0; -180] · č. ISO 7089 – M8 – 200 HV · skupina Normálie
+ #8 Matice M8 · díl · poloha [20; 15; -1,6] · natočení [-180; 0; -180] · č. ISO 4032 – M8 – 8 · skupina Normálie
+
+Dokument: „Spoj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Kolík [60; 30; 10] · Kolík (2) [60; 40; 10] · Kolík (3) [60; 50; 15] · Podložka M8 [20; 15; 10] · Šroub M8×25 [20; 15; 11,6] · Podložka M8 [20; 15; 0] ∠[-180; 0; -180] · Matice M8 [20; 15; -1,6] ∠[-180; 0; -180]
+Vazby: 2 (2 ok)
+Sestava: 8 komponent (8 dílů po rozložení podsestav) · obálka 80 × 60 × 48,4 mm
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

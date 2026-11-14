@@ -1,0 +1,34 @@
+# Vlna 14 B4 – žádné tiché změny a přísný režim (engine/strict.ts, lint.ts, verify.ts, sheet-eval.ts, clash-thread.ts)
+ (kroky {0})	 (Schritte {0})
+ (kromě {0})	 (außer {0})
+ kolize šroub v závitu: {0}	 Kollision Schraube im Gewinde: {0}
+{0} dvojic komponent nelze vyhodnotit – booleovská operace jádra selhala (dvojice se nehlásí jako kolize)	{0} Komponentenpaare lassen sich nicht auswerten – die boolesche Operation des Kerns ist fehlgeschlagen (die Paare werden nicht als Kollision gemeldet)
+{0} ručních úprav kót se nepodařilo přiřadit – kóty se přegenerovaly bez nich (tolerance, uložení, přípony)	{0} manuelle Bemaßungsänderungen ließen sich nicht zuordnen – die Maße wurden ohne sie neu erzeugt (Toleranzen, Passungen, Zusätze)
+■ přísný režim: zastaveno na řádku {0} ({1}) – další řádky se neprovedly	■ Strenger Modus: angehalten in Zeile {0} ({1}) – die folgenden Zeilen wurden nicht ausgeführt
+✓ materiál „{0}“ = označení do razítka, třída „{1}“ ({2} g/cm³)	✓ Werkstoff „{0}“ = Bezeichnung für das Schriftfeld, Klasse „{1}“ ({2} g/cm³)
+✓ přísný režim – první ⚠ nebo ✗ zastaví běh{0}	✓ Strenger Modus – die erste ⚠ oder ✗ hält den Lauf an{0}
+✓ přísný režim vypnut	✓ Strenger Modus aus
+díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – tato změna se do sestavy nepromítne (vložit znovu, nebo sestava upravit)	Teil „{0}“ wurde in Zeile {1} als Kopie in die Baugruppe eingefügt – diese Änderung erreicht die Baugruppe nicht (erneut einfügen oder Baugruppe bearbeiten)
+hrot vrtáku 60–170° (180 = ploché dno)	Bohrerspitze 60–170° (180 = flacher Grund)
+Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}	Kollisionen in der Bewegung: Schritte mit Kollision {0} von {1} · Schraube im Gewinde {2} Paare{3} · echte: {4}
+kolize: {0} – šroub v závitu {1}, skutečné {2}	Kollisionen: {0} – Schraube im Gewinde {1}, echte {2}
+neznámá osa „{0}“ – osa X, Y nebo Z (šikmý směr: směr vx vy vz)	unbekannte Achse „{0}“ – Achse X, Y oder Z (schräge Richtung: Richtung vx vy vz)
+neznámá osa rotace „{0}“ – osa X | Y | Z (osa skici Y je výchozí; odkazem: osa body V1 V5, osa hrana E3)	unbekannte Drehachse „{0}“ – Achse X | Y | Z (Standard ist die Skizzenachse Y; per Bezug: Achse Punkte V1 V5, Achse Kante E3)
+přísně kromě: „{0}“ není kód protokolu (např. hole.depth-default, select.ambiguous, hole.)	streng außer: „{0}“ ist kein Protokollcode (z. B. hole.depth-default, select.ambiguous, hole.)
+přísně vyp nemá výjimky – přísně kromě kód,kód zapne přísný režim s výjimkami	streng aus hat keine Ausnahmen – streng außer Code,Code schaltet den strengen Modus mit Ausnahmen ein
+přísně: neznámé slovo „{0}“ – přísně [vyp] [kromě kód,kód]	streng: unbekanntes Wort „{0}“ – streng [aus] [außer Code,Code]
+přísný režim od tohoto řádku: chyba nebo varování rozboru = nic se neprovede, za běhu první ⚠ / ✗ zastaví (model se staví po každé operaci, list výkresu po bloku příkazů výkres); výjimky kódem nebo předponou (hole.); ℹ nezastaví nikdy	strenger Modus ab dieser Zeile: ein Lesefehler oder eine Lesewarnung = nichts wird ausgeführt, zur Laufzeit hält die erste ⚠ / ✗ an (das Modell wird nach jeder Operation aufgebaut, ein Zeichnungsblatt nach jedem Block von Zeichnungsbefehlen); Ausnahmen per Code oder Präfix (hole.); ℹ hält nie an
+šroub v závitu: {0} dvojic v krocích {1}	Schraube im Gewinde: {0} Paare in den Schritten {1}
+úhel kuželového zahloubení 30–170°	Kegelsenkungswinkel 30–170°
+úhel rotace 0,01–360° (0 = celá otáčka)	Drehwinkel 0,01–360° (0 = volle Umdrehung)
+úhel rotace plochy 0,1–360°	Flächen-Drehwinkel 0,1–360°
+úhel stěny tvářecího nástroje 5–90°	Wandwinkel des Umformwerkzeugs 5–90°
+v místě [{0}; {1}] není povrch tělesa – díra začíná na obálce tělesa ({2})	an [{0}; {1}] gibt es keine Körperoberfläche – die Bohrung beginnt am Hüllquader des Körpers ({2})
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+prvek „{0}“ nebyl ověřen stavbou	Element „{0}“ wurde durch keinen Aufbau geprüft
+zahloubení Ø{0} se u díry se závitem {1} nepostaví	die Senkung Ø{0} wird an der Gewindebohrung {1} nicht gebaut
+{0} dvojic dílů v {1} krocích, první v kroku {2}	{0} Teilepaare in {1} Schritten, erstes in Schritt {2}
+■ přísný režim: STOP – {0} na řádku {1} (všechny řádky skriptu se provedly)	■ Strenger Modus: STOP – {0} in Zeile {1} (alle Zeilen des Skripts wurden ausgeführt)
+v pohybu „{0}“ × „{1}“ od kroku {2} (t = {3} s): kroků {4}, dvojic komponent {5}, největší průnik {6} mm³	in der Bewegung „{0}“ × „{1}“ ab Schritt {2} (t = {3} s): Schritte {4}, Komponentenpaare {5}, größte Überschneidung {6} mm³
+v pohybu další dvojice dílů s kolizí: {0} – pohyb krok N je vypíše	in der Bewegung weitere Teilepaare mit Kollision: {0} – bewegung schritt N listet sie auf
+vynecháno: {0}	ausgelassen: {0}

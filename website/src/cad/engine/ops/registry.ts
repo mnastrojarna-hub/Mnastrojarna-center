@@ -8,26 +8,54 @@
  */
 import type { AgentOp } from "../../agent";
 import { tr } from "../../i18n";
-import type { CadDoc } from "../../types";
+import type { CadDoc, Feature } from "../../types";
+import type { ConsoleLog } from "../console";
 import type { EngineHost } from "../host";
 import type { ReportBuilder } from "../protocol";
 import type { RunOptions } from "../protocol-types";
+import type { StrictState } from "../strict";
 import type { Workspace } from "../workspace";
 
 export type OpKind = AgentOp["k"];
 export type OpOf<K extends OpKind> = Extract<AgentOp, { k: K }>;
 
-/** stav jednoho běhu skriptu (pracovní dokument a příznaky smyčky); smyčka B2 ho vyplní a podle potřeby rozšíří */
+/** stav jednoho běhu skriptu (pracovní dokument a příznaky smyčky, engine/run.ts) */
 export interface RunState {
   /** pracovní kopie dokumentu, na kterou se operace aplikují */
   doc: CadDoc;
   /** dokument se během změnil – na konci / při přechodu na jiný dokument se zapíše (`ws.commit` / `ws.openInTab`) */
   changed: boolean;
-  /** dokument je nový – zapíše se do nové záložky */
+  /** dokument je nový – zapíše se do nové záložky (stav na konci pak sestavu nepočítá z mezipaměti – jako dřív) */
   openNew: boolean;
+  /** nový dokument už v tomto běhu záložku dostal (`flush`) – další změny jdou do ní, nevzniká druhá záložka */
+  tabbed?: boolean;
+  /**
+   * klíč nového dokumentu (`Workspace.docKey`) ještě před jeho záložkou – `flush` ho předá `openInTab` jako `docId`, takže
+   * stav vazeb a kolizí zapsaný před zápisem do záložky k dokumentu patří i potom (`docKeyOf` v run-doc.ts)
+   */
+  docId?: string;
+  /** prvky přidané během – jejich výsledek (✓ / ⚠ / ✗) se vypíše až po stavbě */
+  added?: Feature[];
+  /** těleso zvolené příkazem „těleso N“ – další prvky pracují s ním */
+  currentBody?: string | null;
+  /** po běhu otevřít výkres (aplikace) */
+  openDrawingAfter?: boolean;
+  /** poslední operace skriptu („stav“ na konci vypíše jen závěrečný stav) */
+  lastOp?: AgentOp;
+  /** díly vložené během do sestavy (název malými písmeny → řádek vložení) – pozdější změna dílu = ⚠ asm.stale-copy */
+  inserted?: Map<string, number>;
+  /** řádky skriptu (kontrola výslovných slov u tichých normalizací – run-doc.ts `prepare`) */
+  srcLines?: string[];
+  /**
+   * nálezy příkazu výkresu, které rozhodne až konec bloku příkazů `výkres …` (překryv / přesah rámečku poznámky, vynechané
+   * Chytré kóty – kap. 5.3); smyčka běhu je po operaci převezme (engine/drawing-track.ts)
+   */
+  drawIssues?: { line: number; issue: import("../../drawing-issues").DrawingIssue }[];
+  /** prvky dílu upraveného v kontextu sestavy, které při `sestava hotovo` selhaly (ohlásí je ověření, jinak řádek operace) */
+  partFailures?: { doc: string; name: string; error: string }[];
 }
 
-/** kontext operace: porty, volby běhu, report a stav běhu */
+/** kontext operace: porty, volby běhu, report, protokol konzole a stav běhu */
 export interface OpCtx {
   ws: Workspace;
   host: EngineHost;
@@ -36,16 +64,28 @@ export interface OpCtx {
   run: RunState;
   /** řádek skriptu právě prováděné operace (nastaví `runEngineOp`) */
   line: number;
+  /** protokol konzole (dnešní text) souběžně se záznamy s kódem – engine/console.ts; bez něj jen report */
+  log?: ConsoleLog;
+  /** druh právě prováděné operace (nastaví `runEngineOp`) – druh výpisu `=` */
+  kind?: OpKind;
+  /** přísný režim běhu (volba běhu + řádky `přísně`, engine/strict.ts) */
+  strict?: StrictState;
 }
 
 export type OpHandler<K extends OpKind> = (op: OpOf<K>, ctx: OpCtx) => Promise<void>;
 
 const handlers = new Map<OpKind, OpHandler<OpKind>>();
+const owners = new Map<OpKind, string>();
 
-/** Zaregistruje obsluhu druhu operace. Druhá registrace téhož druhu vyhodí chybu (jeden vlastník na druh operace). */
-export function registerOp<K extends OpKind>(k: K, h: OpHandler<K>): void {
-  if (handlers.has(k)) throw new Error(tr("operace „{0}“ už má obsluhu – každý druh operace má jednoho vlastníka", k));
+/**
+ * Zaregistruje obsluhu druhu operace. Druhá registrace téhož druhu jiným vlastníkem vyhodí chybu (jeden vlastník na druh
+ * operace); tentýž `owner` smí obsluhu nahradit (nové vyhodnocení modulu – Fast Refresh ve vývojovém serveru).
+ */
+export function registerOp<K extends OpKind>(k: K, h: OpHandler<K>, owner?: string): void {
+  if (handlers.has(k) && (owner === undefined || owners.get(k) !== owner)) throw new Error(tr("operace „{0}“ už má obsluhu – každý druh operace má jednoho vlastníka", k));
   handlers.set(k, h as unknown as OpHandler<OpKind>);
+  if (owner !== undefined) owners.set(k, owner);
+  else owners.delete(k);
 }
 
 /**
@@ -58,6 +98,7 @@ export async function runEngineOp(op: AgentOp, ctx: OpCtx): Promise<boolean> {
   if (!h) return false;
   const now = ctx.host.now ?? (() => Date.now());
   ctx.line = op.line;
+  ctx.kind = op.k;
   const t0 = now();
   try {
     await h(op as OpOf<OpKind>, ctx);
@@ -72,4 +113,4 @@ export const hasOp = (k: OpKind): boolean => handlers.has(k);
 /** zaregistrované druhy operací (seřazené) – pro kontrolu pokrytí v testech a `mncad selftest` */
 export const registeredOps = (): OpKind[] => [...handlers.keys()].sort();
 /** odebere obsluhu (jen testy) */
-export const unregisterOp = (k: OpKind): boolean => handlers.delete(k);
+export const unregisterOp = (k: OpKind): boolean => (owners.delete(k), handlers.delete(k));

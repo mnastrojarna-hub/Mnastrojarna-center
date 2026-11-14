@@ -115,7 +115,13 @@ const VIEW_WORDS: Record<string, ViewKey | "iso"> = {
 export const VIEW_CS: Record<ViewKey | "iso", string> = { front: "přední", back: "zadní", top: "horní", bottom: "spodní", left: "levý", right: "pravý", iso: "izometrie" };
 
 /** Řádek tabulky voleb: slova (cs/en/de, bez diakritiky), nápověda a čtení hodnoty (vrátí počet spotřebovaných tokenů). */
-type OptRow = { words: string[]; help: () => string; read: (t: string[], i: number, o: Partial<DrawingOptions>, sum: string[]) => number };
+type OptRow = {
+  words: string[];
+  help: () => string;
+  read: (t: string[], i: number, o: Partial<DrawingOptions>, sum: string[]) => number;
+  /** slovo začíná volbu jen s platnou hodnotou za ním – jinak je to slovo názvu (list „Pružina“: `výkres list nový Pružina`) */
+  needs?: (next: string | undefined) => boolean;
+};
 
 const bool = (w: string | undefined, what: string): boolean => {
   const f = fold(w ?? "");
@@ -125,9 +131,11 @@ const bool = (w: string | undefined, what: string): boolean => {
 };
 const HALF = ["polovicni", "polovina", "half", "halb", "halbschnitt"];
 const FULL = ["cely", "full", "voll", "vollschnitt"];
+const SPRING_SIMPLE = ["zjednodusene", "zjednodusena", "zjednodusit", "simplified", "simple", "vereinfacht", "iso"];
+const SPRING_FULL = ["plne", "plny", "plna", "full", "skutecne", "sroubovice", "voll", "vollstandig", "vollstaendig", "helix", "real"];
 const ORIENT = ["na", "sirku", "sirka", "landscape", "quer", "querformat", "vysku", "vyska", "portrait", "hoch", "hochformat"];
 /** slovo, kterým začíná další volba (konec výčtu pohledů) */
-const isOptWord = (w: string) => VOLBY.some((r) => r.words.includes(fold(w))) || ORIENT.includes(fold(w)) || /^a[0-4]$/i.test(w);
+const isOptWord = (w: string, next?: string) => VOLBY.some((r) => r.words.includes(fold(w)) && (!r.needs || r.needs(next))) || ORIENT.includes(fold(w)) || /^a[0-4]$/i.test(w);
 
 /** Volby příkazu „výkres“ – nová volba (např. natočení pohledu, poloviční řez) = nový řádek. */
 export const VOLBY: OptRow[] = [
@@ -165,7 +173,7 @@ export const VOLBY: OptRow[] = [
     read: (t, i, o, sum) => {
       const list: string[] = [];
       let j = i + 1;
-      while (j < t.length && !isOptWord(t[j])) list.push(...t[j++].split(/[,;]/).filter(Boolean));
+      while (j < t.length && !isOptWord(t[j], t[j + 1])) list.push(...t[j++].split(/[,;]/).filter(Boolean));
       const views = { front: false, top: false, left: false, right: false, back: false, bottom: false, iso: false };
       for (const w of list) {
         const k = VIEW_WORDS[fold(w)];
@@ -264,6 +272,20 @@ export const VOLBY: OptRow[] = [
     read: (t, i, o, sum) => {
       o.balloons = bool(t[i + 1], tr("balónky"));
       sum.push(o.balloons ? tr("pozice komponent (balónky)") : tr("bez balónků"));
+      return 2;
+    },
+  },
+  {
+    // pružiny na výkrese: zjednodušeně podle ISO 2162-1 (obrys vinutí + osy; výchozí) nebo plným tvarem šroubovice (pomalé)
+    words: ["pruziny", "pruzina", "springs", "spring", "federn", "feder"],
+    help: () => tr("pružiny zjednodušeně|plně"),
+    needs: (v) => SPRING_SIMPLE.includes(fold(v ?? "")) || SPRING_FULL.includes(fold(v ?? "")),
+    read: (t, i, o, sum) => {
+      const v = fold(t[i + 1] ?? "");
+      if (SPRING_SIMPLE.includes(v)) o.springs = "simple";
+      else if (SPRING_FULL.includes(v)) o.springs = "full";
+      else throw new Error(tr("pružiny: zjednodušeně (ISO 2162-1, rychlé) nebo plně (skutečná šroubovice, pomalé)"));
+      sum.push(o.springs === "full" ? tr("pružiny plně (šroubovice)") : tr("pružiny zjednodušeně (ISO 2162-1)"));
       return 2;
     },
   },
@@ -587,7 +609,7 @@ function parseSheet(rt: RawTok[]): DrawingCmd {
   if (isKw(t0, NEW_W)) {
     const n = rt[1];
     // název: v uvozovkách, nebo slovo, které nezačíná volbu listu
-    const named = !!n && (n.q || (!isFormat(n) && !isOptWord(n.s) && !n.key));
+    const named = !!n && (n.q || (!isFormat(n) && !isOptWord(n.s, rt[2]?.s) && !n.key));
     const then = thenSet(rt.slice(named ? 2 : 1));
     return { k: "sheet", op: "new", ...(named ? { name: n.s } : {}), ...(then ? { then } : {}) };
   }

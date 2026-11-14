@@ -1,0 +1,6 @@
+# stav uprostřed vstupu (v tom okamžiku) a na konci (jen závěrečný stav)
+nový díl Průběžný stav
+kvádr 20 20 20
+stav
+válec 10 30 v 10 10 20
+stav

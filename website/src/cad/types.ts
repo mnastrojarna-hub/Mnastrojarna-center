@@ -404,6 +404,10 @@ export type BuildResult = {
     valid?: boolean;
     /** počet objemových těles (0 = jen pláště / plochy) */
     solids?: number;
+    /** objem a plocha ze sítě (velké těleso, lehká komponenta) – ℹ geom.approx (5.2 č. 27) */
+    approx?: boolean;
+    /** měření objemu selhalo – objem je 0 (⚠ geom.volume-failed, 5.2 č. 28) */
+    volumeFailed?: boolean;
   } | null;
   /** polohy topologických vrcholů tělesa (x,y,z po trojicích) – pro výběr bodů */
   vertices?: Float32Array;

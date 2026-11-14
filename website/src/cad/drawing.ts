@@ -9,12 +9,14 @@ import { cadLocale, tr } from "./i18n";
 import * as r from "replicad";
 import { drawTitleBlock, imageRects, nearestAci, titleBlockSize, type SheetImage, type TitleBlockInfo, type TitleLogo, type TitleTemplate } from "./title-block";
 import type { CadDoc, PlaneName, Vec2, Vec3 } from "./types";
-import { auxView, brkInView, breakDir, breakLines, brokenOut, clipBreaks, compress1, compressQ, cutSection, decompress1, decompressQ, normBrks, pickParent, type AuxViewOpt, type Brk, type BrokenOutOpt, type CutSectionOpt, type ExtraViewData, type ViewBreakOpt } from "./drawing-views";
+import { auxView, booleanEach, brkInView, breakDir, breakLines, brokenOut, clipBreaks, compress1, compressQ, cutSection, decompress1, decompressQ, normBrks, pickParent, type AuxViewOpt, type Brk, type BrokenOutOpt, type CutSectionOpt, type ExtraViewData, type FaceLoops, type ViewBreakOpt } from "./drawing-views";
 import { fitOfSuffix, fitRows, fitSuffix, type FitShow } from "./drawing-fits";
 import { weldSymbolsOnSheet, type WeldMark } from "./drawing-welds";
 import { absoluteSection, sectionCoord, sectionMiss, sectionOffsetRange } from "./drawing-section";
 import type { DrawingIssue } from "./drawing-issues";
 import { holeTableColumns, holeTableCounts, holeTableRows } from "./drawing-holetable";
+import type { SpringMark } from "./drawing-doc";
+import { inSpringEnvelope, springWireLines } from "./drawing-springs";
 
 // ---------------------------------------------------------------- typy
 
@@ -84,6 +86,8 @@ export type DrawingMeta = {
   chamferTol?: string;
   /** nepředepsané tolerance jako tabulka podle počtu desetinných míst: [X., X.X, X.XX, X.XXX] (např. ±0,1 / ±0,1 / ±0,01 / ±0,005) */
   tolTable?: string[];
+  /** zjednodušené pružiny (ISO 2162-1) – osy drátu v pohledech (drawing-doc.ts `springMarksOf`, doplní jádro) */
+  springs?: SpringMark[];
 };
 
 export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3] };
@@ -187,6 +191,8 @@ export type DrawingOptions = {
   breakScale?: number;
   /** značky svarů z 3D svarů (meta.welds); false = nekreslit */
   weldSymbols?: boolean;
+  /** pružiny: zjednodušeně podle ISO 2162-1 (obrys + osy; výchozí), nebo plným tvarem šroubovice (pomalé) – drawing-doc.ts */
+  springs?: "simple" | "full";
 };
 
 export const defaultDrawingOptions: DrawingOptions = {
@@ -1061,7 +1067,8 @@ function sectionCam(plane: PlaneName, rot: ViewRotation): Cam {
 
 /** dělicí přímka polovičního řezu v obraze (osa souměrnosti): `axis` 0 = svislá přímka u = c, 1 = vodorovná v = c */
 type SplitLine = { axis: 0 | 1; c: number };
-type SectionData = { view: View; loops: Vec2[][]; split?: SplitLine };
+/** `loops` = obrysy řezných ploch po plochách (šrafují se po plochách – překrývající se tělesa se navzájem nevyruší) */
+type SectionData = { view: View; loops: FaceLoops; split?: SplitLine };
 
 /** Osy, na kterých leží 3 a více různých průměrů (soustružený díl): směr, bod osy nejblíž počátku a počet kružnic. */
 function turnedAxes(circles: Circle[]): { a: Vec3; base: Vec3; n: number }[] {
@@ -1082,19 +1089,23 @@ const axisAligned = (v: Vec3) => v.filter((x) => Math.abs(x) > 1e-9).length === 
 const sectionCache = new WeakMap<object, Map<string, SectionData | null>>();
 /** těleso po odebrání části před rovinou řezu (podle odebírané oblasti) */
 const cutCache = new WeakMap<object, Map<string, r.Shape3D>>();
-function makeSection(shape: r.Shape3D, sec: SectionOpt, cam: Cam, circles: () => Circle[]): SectionData | null {
+function makeSection(shape: r.Shape3D, sec: SectionOpt, cam: Cam, circles: () => Circle[], springs: SpringMark[] = []): SectionData | null {
   let m = sectionCache.get(shape);
   if (!m) sectionCache.set(shape, (m = new Map()));
   const half = sec.kind === "half";
-  const k = `${sec.plane}|${sec.offset}|${half ? "half" : "full"}|${cam.d.join(",")}|${cam.x.join(",")}`;
+  const sp = springs.map((q) => [...q.p, ...q.a, q.len, q.ri, q.ro].map((v) => v.toFixed(4)).join(",")).join(";");
+  const k = `${sec.plane}|${sec.offset}|${half ? "half" : "full"}|${cam.d.join(",")}|${cam.x.join(",")}|${sp}`;
   if (m.has(k)) return m.get(k) ?? null;
   projectionStats.section++;
-  const s = makeSectionRaw(shape, sec.plane, sec.offset, cam, half ? circles() : null);
+  const s = makeSectionRaw(shape, sec.plane, sec.offset, cam, half ? circles() : null, springs);
   m.set(k, s);
   return s;
 }
-/** `circles` = kružnice tělesa pro poloviční řez (hledá se osa souměrnosti); null = celý řez */
-function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam: Cam, circles: Circle[] | null): SectionData | null {
+/**
+ * `circles` = kružnice tělesa pro poloviční řez (hledá se osa souměrnosti); null = celý řez. `springs` = obaly zjednodušených
+ * pružin: jejich řezné plochy se nešrafují (ISO 2162-1 – zjednodušená pružina je i v řezu jen obrys a osy drátu).
+ */
+function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam: Cam, circles: Circle[] | null, springs: SpringMark[] = []): SectionData | null {
   const n = PLANE_N[plane];
   const [[x0, y0, z0], [x1, y1, z1]] = shape.boundingBox.bounds as [Vec3, Vec3];
   const pad = Math.hypot(x1 - x0, y1 - y0, z1 - z0) + 10;
@@ -1126,7 +1137,8 @@ function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam:
   if (!cuts) cutCache.set(shape, (cuts = new Map()));
   const ck = `${bLo.join(",")}|${bHi.join(",")}`;
   let cut = cuts.get(ck);
-  if (!cut) cuts.set(ck, (cut = shape.clone().cut(r.makeBox(bLo, bHi)) as r.Shape3D));
+  // po tělesech: složený tvar s překrývajícími se tělesy (pružina v sedle, druhé těleso v prvním) by jedna operace poškodila
+  if (!cut) cuts.set(ck, (cut = booleanEach(shape, r.makeBox(bLo, bHi) as r.Shape3D, "cut")));
   const view = projectView(cut, "section", cam, false);
   if (split) {
     // hranice mezi polovinou pohledu a polovinou řezu se nekreslí obrysem – je jí osa souměrnosti (tenká čerchovaná)
@@ -1134,8 +1146,9 @@ function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam:
     view.polys = dropOnLine(view.polys, line);
     view.ents = view.ents.filter((e) => !(e.t === "line" && onLine(e.a, line) && onLine(e.b, line)));
   }
-  const loops: Vec2[][] = [];
+  const loops: FaceLoops = [];
   const tol = Math.max(1e-4, pad * 1e-6);
+  let cutFaces = 0;
   for (const f of cut.faces) {
     try {
       if (f.geomType !== "PLANE") continue;
@@ -1143,17 +1156,21 @@ function makeSectionRaw(shape: r.Shape3D, plane: PlaneName, offset: number, cam:
       if (Math.abs(dot(c, n) - offset) > tol * 10) continue;
       const fn = V(f.normalAt(f.center));
       if (Math.abs(Math.abs(dot(fn, n)) - 1) > 1e-6) continue;
+      cutFaces++;
+      const face: Vec3[][] = [];
       for (const e of f.edges) {
         const nseg = e.geomType === "LINE" ? 1 : 40;
-        const pts: Vec2[] = [];
-        for (let i = 0; i <= nseg; i++) pts.push(proj(cam, V(e.pointAt(i / nseg))));
-        loops.push(pts);
+        const pts: Vec3[] = [];
+        for (let i = 0; i <= nseg; i++) pts.push(V(e.pointAt(i / nseg)));
+        face.push(pts);
       }
+      if (springs.length && inSpringEnvelope(face.flat(), springs, tol * 10)) continue; // řez obalem pružiny: bez šraf
+      if (face.length) loops.push(face.map((pts) => pts.map((q) => proj(cam, q))));
     } catch {
       /* plocha bez geometrie */
     }
   }
-  if (!loops.length) return null;
+  if (!cutFaces) return null;
   return { view, loops, split };
 }
 
@@ -1468,7 +1485,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   let section: SectionData | null = null;
   if (opts.section) {
     try {
-      section = makeSection(shape, opts.section, sectionCam(opts.section.plane, rot), () => circlesOf(shape));
+      section = makeSection(shape, opts.section, sectionCam(opts.section.plane, rot), () => circlesOf(shape), meta.springs);
       if (!section) {
         const badge = tr("Rovina řezu neprotíná těleso – upravte odsazení.");
         warnings.push(badge);
@@ -1507,7 +1524,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     }
   }
   // --- částečné řezy, pomocné pohledy, řezy lomenou čarou a přerušení (cad/drawing-views.ts)
-  const xt = extraViewsOf(shape, opts, views, section, warnings);
+  const xt = extraViewsOf(shape, opts, views, section, warnings, meta.springs);
   section = xt.section;
 
   // --- mřížka pohledů (sloupce left | center | right | far…, řádky above | center | below)
@@ -1801,6 +1818,9 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   const ortho = ownViews();
   if (opts.centerLines) {
     for (const p of ortho) centerLines(p, circles, polys);
+    // zjednodušené pružiny: čerchované osy drátu podél viditelného obrysu vinutí (drawing-springs.ts) – v pohledech i v řezu
+    // A–A (obal pružiny se v řezu nešrafuje, osy drátu ho odliší od pouzdra)
+    if (meta.springs?.length) for (const p of ortho) for (const pts of springWireLines(p.cam, p.polys, meta.springs, (q) => toSheet(p, q))) polys.push({ layer: "center", pts });
     for (const x of models) {
       const p = placed.get(x.v.key);
       if (p && x.m.view !== "iso") centerLines(p, circlesOf(x.shape), polys);
@@ -1930,15 +1950,15 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
 const viewName = (k: string) => tr(VIEW_LABEL[k as ViewKey] ?? (k === "section" ? "Řez A–A" : k));
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-type Extras = { section: SectionData | null; list: ExtraViewData[]; boLoops: Map<string, Vec2[][]> };
+type Extras = { section: SectionData | null; list: ExtraViewData[]; boLoops: Map<string, FaceLoops> };
 
 /**
  * Úpravy pohledů před rozvržením: částečné řezy (nahradí obraz pohledu uvnitř oblasti), pomocné pohledy a řezy lomenou
  * čarou (nové pohledy umístěné mimo mřížku) a přerušení (zkrácení pohledů, ve kterých směr přerušení leží).
  */
-function extraViewsOf(shape: r.Shape3D, opts: DrawingOptions, views: Map<ViewKey, View>, section0: SectionData | null, warnings: string[]): Extras {
+function extraViewsOf(shape: r.Shape3D, opts: DrawingOptions, views: Map<ViewKey, View>, section0: SectionData | null, warnings: string[], springs: SpringMark[] = []): Extras {
   let section = section0;
-  const boLoops = new Map<string, Vec2[][]>();
+  const boLoops = new Map<string, FaceLoops>();
   for (const b of opts.brokenOut ?? []) {
     const v = views.get(b.view as ViewKey);
     if (!v) {
@@ -1946,7 +1966,7 @@ function extraViewsOf(shape: r.Shape3D, opts: DrawingOptions, views: Map<ViewKey
       continue;
     }
     try {
-      const res = brokenOut(shape, b, v, opts.hidden, projectView);
+      const res = brokenOut(shape, b, v, opts.hidden, projectView, springs);
       views.set(b.view as ViewKey, res.view);
       boLoops.set(b.view, [...(boLoops.get(b.view) ?? []), ...res.loops]);
     } catch (e) {
@@ -1977,7 +1997,7 @@ function extraViewsOf(shape: r.Shape3D, opts: DrawingOptions, views: Map<ViewKey
       continue;
     }
     try {
-      list.push(cutSection(shape, c, pv, opts.hidden, projectView));
+      list.push(cutSection(shape, c, pv, opts.hidden, projectView, springs));
     } catch (e) {
       warnings.push(tr("Řez {0}–{0}: {1}", c.label, errText(e)));
     }
@@ -2033,13 +2053,17 @@ function faceDir(shape: r.Shape3D, face: number): Vec3 | null {
 }
 
 /** Šrafy řezných ploch pohledu (obrysy v souřadnicích obrazu); u přerušeného pohledu se šrafy v mezeře vynechají. */
-function hatchView(p: Placed, loops: Vec2[][], polys: Poly[]) {
+function hatchView(p: Placed, faces: FaceLoops, polys: Poly[]) {
   const s = p.s;
   const spacing = Math.max(1.5, Math.min(4, Math.sqrt(p.w * p.h * s * s) / 25));
-  const big = loops.map((l) => l.map((q): Vec2 => [q[0] * s, q[1] * s]));
-  for (const h of hatch(big, spacing)) {
-    const hv = h.map((q): Vec2 => [q[0] / s, q[1] / s]);
-    for (const part of clipBreaks(hv, p.brk)) polys.push({ layer: "hatch", pts: part.map((q) => toSheet(p, q)) });
+  // po plochách: sudo-liché pravidlo přes všechny obrysy by vyrušilo šrafy tam, kde se řezné plochy dvou těles překrývají
+  // (šrafy leží na společné mřížce listu, sousední plochy na sebe navazují)
+  for (const loops of faces) {
+    const big = loops.map((l) => l.map((q): Vec2 => [q[0] * s, q[1] * s]));
+    for (const h of hatch(big, spacing)) {
+      const hv = h.map((q): Vec2 => [q[0] / s, q[1] / s]);
+      for (const part of clipBreaks(hv, p.brk)) polys.push({ layer: "hatch", pts: part.map((q) => toSheet(p, q)) });
+    }
   }
 }
 

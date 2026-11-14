@@ -163,15 +163,15 @@ export type InterferenceStats = { pairs: number; culled: number; exact: number; 
 /* ───── přírůstková kontrola kolizí: mezipaměť dvojic (stav modulu ve vlákně jádra) ───── */
 
 /** Poloha listu jako R (po řádcích) a posun – shodná s `trsfOf` (R = Rx·Ry·Rz). */
-type Rt = { R: number[]; t: Vec3 };
-const rtOf = (p: Placement): Rt => ({ R: rotMatrix(p.rotation), t: [p.position[0], p.position[1], p.position[2]] });
+export type Rt = { R: number[]; t: Vec3 };
+export const rtOf = (p: Placement): Rt => ({ R: rotMatrix(p.rotation), t: [p.position[0], p.position[1], p.position[2]] });
 /**
  * Vzájemná poloha A⁻¹·B (B v souřadnicích A) zaokrouhlená na mřížku 1e-7: `q` = celá čísla (klíč), `m` = zaokrouhlené hodnoty
  * [R po řádcích, t]. Přesný průnik se počítá právě s `m`, takže objem je funkcí klíče (plná a přírůstková kontrola dávají totéž)
  * a šum poloh z řešiče (1e-9 mm) nerozbije souosé plochy: OCCT u šroubu posunutého o 1e-9 mm vůči ose závitové díry vrátí
  * prázdný průnik (ověřeno i dřívějším algoritmem: 515,736 mm³ → 0).
  */
-function relOf(A: Rt, B: Rt): { key: string; m: number[] } {
+export function relOf(A: Rt, B: Rt): { key: string; m: number[] } {
   const a = A.R;
   const R = new Array<number>(9);
   for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) R[i * 3 + j] = a[i] * B.R[j] + a[3 + i] * B.R[3 + j] + a[6 + i] * B.R[6 + j];
@@ -224,6 +224,28 @@ function localBox(key: string, body: Shape): [Vec3, Vec3] {
  * se dvěma tělesy už staví a pak ještě Build()).
  */
 function pairVolume(a: Shape, b: Shape, m: number[]): number {
+  return pairCommon(a, b, m, (res) => {
+    const oc = r.getOC() as Oc;
+    const props = new oc.GProp_GProps();
+    try {
+      oc.BRepGProp.VolumeProperties(res, props, false, false, false);
+      return props.Mass() as number;
+    } finally {
+      props.delete();
+    }
+  }) ?? NaN;
+}
+
+/**
+ * Průnik A ∩ B jako těleso v souřadnicích A (`m` = zaokrouhlená A⁻¹·B z `relOf`) – stejný výpočet jako objem kolize, pro
+ * zařazení dvojice (clash-detail.ts). Volající výsledek smaže; selhání booleovské operace → null.
+ */
+export function pairIntersection(a: Shape, b: Shape, m: number[]): Shape | null {
+  return pairCommon(a, b, m, (res) => r.cast(res as Parameters<typeof r.cast>[0]) as Shape);
+}
+
+/** A ∩ B (B s polohou `m` v souřadnicích A): `take` dostane výsledek OCCT před úklidem (výsledek se pak smaže); selhání → null */
+function pairCommon<T>(a: Shape, b: Shape, m: number[], take: (res: unknown) => T): T | null {
   const oc = r.getOC() as Oc;
   const rel = new oc.gp_Trsf();
   rel.SetValues(m[0], m[1], m[2], m[9], m[3], m[4], m[5], m[10], m[6], m[7], m[8], m[11]);
@@ -244,18 +266,15 @@ function pairVolume(a: Shape, b: Shape, m: number[]): number {
     op.SetTools(tools);
     op.SetNonDestructive(true);
     op.Build();
-    if (op.HasErrors() || !op.IsDone()) return NaN;
+    if (op.HasErrors() || !op.IsDone()) return null;
     const res = op.Shape();
-    const props = new oc.GProp_GProps();
     try {
-      oc.BRepGProp.VolumeProperties(res, props, false, false, false);
-      return props.Mass() as number;
+      return take(res);
     } finally {
-      props.delete();
       res.delete();
     }
   } catch {
-    return NaN;
+    return null;
   } finally {
     // Clear() uvolní data průniku (PaveFiller, DS, historie): samotné delete() z vazby WASM je neuvolní – bez Clear() roste halda
     // o ~0,6–1 MB na každý přesný průnik (P7; ověřeno sondou: 200× Common + delete → +139 MB, s Clear() → +0 MB)
@@ -407,6 +426,14 @@ export function clearInterferenceCache(): void {
 
 export function cachedBody(key: string): Shape | null {
   return cache.get(key)?.body ?? null;
+}
+
+/**
+ * Zapomene díly v mezipaměti (nová instance jádra ve stejném vlákně – `kernel-ops.ts` `resetKernel`). Tělesa se nemažou:
+ * patří staré, možná spadlé instanci OCCT.
+ */
+export function clearPartCache(): void {
+  cache.clear();
 }
 
 // ---------------- geometrie ploch pro vazby ----------------

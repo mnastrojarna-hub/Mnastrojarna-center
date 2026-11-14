@@ -1,0 +1,16 @@
+# úpravy modelu (op edit): upravit, přejmenovat, potlačit, zapnout, přesunout, duplikovat, smazat prvek
+nový díl Úpravy
+kvádr 60 40 10
+díra 8 skrz v 15 20
+díra 8 skrz v 45 20
+zaoblit 2 hrany svislé
+#--- run
+upravit "Kvádr 1" size=70;40;10
+přejmenovat "Díra 1" na "Levá díra"
+potlačit "Díra 2"
+duplikovat "Levá díra" jako "Kopie díry"
+upravit "Kopie díry" position=35;10;10
+přesunout "Zaoblení 1" před "Díra 2"
+zapnout "Díra 2"
+smazat "Kopie díry"
+stav
