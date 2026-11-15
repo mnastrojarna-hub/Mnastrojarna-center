@@ -969,6 +969,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   if (res.smart?.report.skipped.length) L.push(tr("Vynecháno (nevešlo se nebo nejde okótovat automaticky): {0}", res.smart.report.skipped.join("; ")));
   // tabulka děr: zapnutá volbou listu, nebo ji zapnuly Chytré kóty (polohy děr tabulkou – B12)
   if (o.holeTable || res.holes?.length) L.push(holeTableLine(res, o));
+  if (o.springTable) L.push(res.springTables ? tr("Tabulka pružiny: {0}× nad razítkem (EN ISO 2162-2)", res.springTables) : tr("Tabulka pružiny: v dílu není pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová)"));
   // funkční rozměry, polohy děr a kontrola tolerancí (B8, B12, 5.3)
   const hm = Object.entries(res.smart?.report.holeMode ?? {});
   if (o.dimensions === "smart" && hm.length) L.push(tr("Polohy děr: {0}", hm.map(([k, m]) => `${m === "ordinate" ? tr("souřadnicové kóty od levého dolního rohu") : m === "table" ? tr("tabulka děr") : tr("kóty od hran")} (${VIEW_NAME(k, o)})`).join(" · ")));

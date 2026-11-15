@@ -8,4 +8,5 @@ import "./sheetmetal";
 import "./advanced";
 import "./weld";
 import "./sheetmetal-form";
+import "./springs";
 export * from "./registry";

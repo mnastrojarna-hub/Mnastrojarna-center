@@ -8,7 +8,8 @@
  * úrovně (GeoProvider jako u vazeb), polohy komponent z dokumentu (u pohybové studie z kroku).
  */
 import { instanceRef, transformPoint } from "./assembly";
-import { springGeom, springRound, springWorldAxis } from "./asm-spring-geom";
+import { springMotionCheck } from "./asm-spring-check";
+import { springGeom, springPosRound, springRound, springShapeLen, springWorldAxis } from "./asm-spring-geom";
 import { getLang, tr } from "./i18n";
 import { worldGeo, type GeoProvider } from "./mates";
 import type { AsmComponent, CadDoc, Mate, Vec3 } from "./types";
@@ -118,10 +119,11 @@ export function springState(doc: CadDoc, c: AsmComponent, geo: GeoProvider): Spr
   const seat = springRound(tB - tA);
   const solid = solidOf(c);
   const v = springVerdict(seat, s.free, solid);
-  // tvar: nad L0 zůstane volný (mezera), pod dorazem se tvar sám omezí (asm-spring-geom springDocAt)
-  const length = springRound(Math.max(1e-3, Math.min(seat, s.free)));
+  // tvar: nad L0 zůstane volný (mezera), pod dorazem se tvar sám omezí (asm-spring-geom springDocAt); délka tvaru z nezaokrouhlené
+  // vzdálenosti ploch zaokrouhlená dolů a začátek přesně na ploše A (springShapeLen / springPosRound) – pružina dosedá bez průniku
+  const length = springShapeLen(Math.max(1e-3, Math.min(tB - tA, s.free)));
   const force = s.rate !== undefined ? s.rate * (s.free - length) : undefined;
-  return { id: c.id, name: c.name, seat, length, offset: springRound(tA), free: s.free, ...(solid !== undefined ? { solid } : {}), ...(s.rate !== undefined ? { rate: s.rate } : {}), ...(force !== undefined ? { force } : {}), level: v.level, ...(v.note ? { note: v.note } : {}) };
+  return { id: c.id, name: c.name, seat, length, offset: springPosRound(tA), free: s.free, ...(solid !== undefined ? { solid } : {}), ...(s.rate !== undefined ? { rate: s.rate } : {}), ...(force !== undefined ? { force } : {}), level: v.level, ...(v.note ? { note: v.note } : {}) };
 }
 type SpringDefRef = NonNullable<AsmComponent["spring"]>["a"];
 
@@ -219,8 +221,12 @@ export function springMotionLines(doc: CadDoc, steps: { i: number; t: number; sp
     let body = `: ${tr("délka {0} mm", range(L))} (min ${fmt(Math.min(...L), 3)} · L0 ${fmt(c.spring!.free, 3)}${solid !== undefined ? ` · Ln ${fmt(solid, 3)}` : ""})`;
     if (fr.length) body += ` · ${tr("síla {0} N (max {1} N)", range(fr, 1), fmt(Math.max(...fr), 1))}`;
     const head = (ref: string) => `${tr("pružina „{0}“", c.name)}${ref}`;
-    if (bad.length) items.push({ c, text: (ref) => `✗ ${head(ref)}${body} – ${tr("pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)", span(bad), fmt(Math.min(...seat), 3))}` });
-    else if (loose.length) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${tr("nedosedá v krocích {0} (mezera max {1} mm)", span(loose), fmt(Math.max(...seat) - c.spring!.free, 3))}` });
+    // pevnost, nejmenší mezery a vzpěr při nejkratší dosažené délce (EN 13906-1, cad/asm-spring-check.ts)
+    const chk = springMotionCheck(c, Math.min(...L))?.issues.map((x) => x.text) ?? [];
+    const more = chk.length ? `; ${chk.join("; ")}` : "";
+    if (bad.length) items.push({ c, text: (ref) => `✗ ${head(ref)}${body} – ${tr("pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)", span(bad), fmt(Math.min(...seat), 3))}${more}` });
+    else if (loose.length) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${tr("nedosedá v krocích {0} (mezera max {1} mm)", span(loose), fmt(Math.max(...seat) - c.spring!.free, 3))}${more}` });
+    else if (chk.length) items.push({ c, text: (ref) => `⚠ ${head(ref)}${body} – ${chk.join("; ")}` });
     else items.push({ c, text: (ref) => `✓ ${head(ref)}${body}` });
   }
   // stejné pružiny ve stejném průběhu jednou „(6×)“; stejný název v různém průběhu s #k / přezdívkou

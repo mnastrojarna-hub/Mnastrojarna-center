@@ -29,6 +29,7 @@ import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark } from "./perf-log";
 import { formNotesOfDoc, springMarksOf } from "./drawing-doc";
 import { hasWelds, weldMarksOf } from "./drawing-welds";
+import { springDrawTables } from "./drawing-springtable";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 import { exportStats } from "./export-verify";
@@ -376,6 +377,9 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         let meta: DrawingMeta = m.meta.formNotes ? m.meta : { ...m.meta, formNotes: formNotesOfDoc(m.doc) };
         // značky svarů ISO 2553 z 3D svarů (stav prvků po stavbě – mezipaměť stavby) – drawing-welds.ts
         if (!meta.welds && hasWelds(dd)) meta = { ...meta, welds: weldMarksOf(dd, (await buildShape(dd)).status) };
+        // tabulka údajů pružin (EN ISO 2162-2) z prvků spring.* – drawing-springtable.ts; z dokumentu, ne z kopie pro výkres
+        // (tam je tlačná pružina z tabulky nahrazená obalem vinutí ISO 2162-1)
+        if (m.opts?.springTable && !meta.springData) meta = { ...meta, springData: springDrawTables(m.doc) };
         // osy drátu zjednodušených pružin (poloha odkazem je známá ze stavby výše)
         if (!meta.springs && springs === "simple") {
           const marks = springMarksOf(dd);

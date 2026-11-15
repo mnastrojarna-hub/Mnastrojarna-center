@@ -455,6 +455,12 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
     return [f];
   }
   if (d.kind === "draft") {
+    // DXF / DWG 2D výkresu píše stejný exportér jako `2d export …` (běží i v Node); tisk PDF / SVG rozvržení je jen v aplikaci
+    if ((fmt === "dxf" || fmt === "dwg") && d.draft) {
+      const f = await (await import("../draft/io")).draftExport(d.draft, fmt, { name: base });
+      for (const w of f.warnings.slice(0, 5)) note({ code: "drawing.warning", text: w, level: "warn" });
+      return [await write(`${base}.${fmt}`, f.mime, f.data, fmt)];
+    }
     note({ code: "host.app-only", args: [tr("export 2D výkresu do {0}", fmt.toUpperCase())] });
     return [];
   }

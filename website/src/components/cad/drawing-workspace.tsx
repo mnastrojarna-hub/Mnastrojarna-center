@@ -1371,6 +1371,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <Check checked={!!opts.holeTable} onChange={(v) => set("holeTable", v)}>
               {tr("Tabulka děr (X, Y, Ø v půdorysu)")}
             </Check>
+            <Check checked={!!opts.springTable} onChange={(v) => set("springTable", v)}>
+              {tr("Tabulka údajů pružiny (EN ISO 2162-2)")}
+            </Check>
           </Section>
 
           <Section title={tr("Detailní pohledy")}>

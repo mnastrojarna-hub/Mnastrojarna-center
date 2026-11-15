@@ -87,7 +87,7 @@ export type AsmCmd =
   /** pohybová studie (`pohyb …`, cad/agent-motion.ts) */
   | { k: "motion"; cmd: MotionCmd }
   /** pružina mezi dvěma komponentami (cad/asm-spring-agent.ts): dosedací plochy A / B (bez plochy = nejbližší kolmá rovina), L0, Ln, c */
-  | { k: "spring"; comp: string; a?: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; free?: number; solid?: number; rate?: number; remove?: boolean }
+  | { k: "spring"; comp: string; a?: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; free?: number; solid?: number; rate?: number; remove?: boolean; /** nová pružina z tabulky (cad/asm-spring-between.ts) */ create?: { d?: number; De?: number; n?: number; at?: Vec3; name?: string; material?: string }; /** do všech děr vzoru (stejný Ø a osa) */ holes?: boolean; /** `sestava pružina nápověda` */ help?: boolean }
   | { k: "springs" };
 
 /* ───────────────────────── tokeny a slova ───────────────────────── */
@@ -573,13 +573,51 @@ const SP = {
   free: W("volná", "volna", "l0", "free", "frei"),
   solid: W("blok", "doraz", "ln", "solid", "block"),
   rate: W("tuhost", "c", "rate", "stiffness", "federrate", "steifigkeit"),
+  // nová pružina z tabulky a díry vzoru (vlna 21, cad/asm-spring-between.ts)
+  create: W("nová", "nova", "nový", "new", "neu", "neue"),
+  d: W("d", "drát", "drat", "wire", "draht"),
+  De: W("de"),
+  n: W("n", "závity", "zavity", "coils", "windungen"),
+  at: W("v", "na", "at", "bei"),
+  name: W("název", "nazev", "name"),
+  material: W("materiál", "material", "werkstoff"),
+  holes: W("do", "díry", "diry", "všechny", "vsechny", "all", "alle", "pattern", "vzor"),
+  holeWords: W("děr", "der", "díry", "diry", "vzoru", "vzor", "všech", "vsech", "holes", "hole", "of", "pattern", "bohrungen", "bohrung", "des", "musters", "muster"),
+  help: W("nápověda", "napoveda", "help", "hilfe", "?"),
 };
 export const SPRING_USE = () => tr("sestava pružina \"Pružina\" mezi \"Deska A\" [F3] \"Deska B\" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina \"Pružina\" odebrat · sestava pružiny");
 function parseSpring(c: Cur): AsmCmd {
+  // „sestava pružina nápověda“ (bez uvozovek – komponenta „nápověda“ v uvozovkách zůstává komponentou)
+  if (c.is(SP.help) && c.i + 1 >= c.tk.length) return { k: "spring", comp: "", help: true };
   const comp = compArg(c, tr("chybí název komponenty: {0}", SPRING_USE()));
   const out: Extract<AsmCmd, { k: "spring" }> = { k: "spring", comp };
+  // „sestava pružina nová d 2 De 20 L0 35 n 6 mezi "A" F3 "B" F7 [v x y z] [do děr vzoru] [název "P"]“ (cad/asm-spring-between.ts)
+  if (SP.create.has(fold(comp)) && !c.peek()?.q) out.create = {};
   while (!c.done) {
-    if (c.is(SP.between)) {
+    if (out.create && c.is(SP.d) && isNum(c.peek(1)?.t ?? "")) {
+      c.i++;
+      out.create.d = c.num(tr("drát d"));
+    } else if (out.create && c.is(SP.De) && isNum(c.peek(1)?.t ?? "")) {
+      c.i++;
+      out.create.De = c.num(tr("vnější průměr De"));
+    } else if (out.create && c.is(SP.n) && isNum(c.peek(1)?.t ?? "")) {
+      c.i++;
+      out.create.n = c.num(tr("činné závity n"));
+    } else if (out.create && c.is(SP.at) && isNum(c.peek(1)?.t ?? "")) {
+      c.i++;
+      out.create.at = c.vec(tr("poloha"));
+    } else if (out.create && c.is(SP.name)) {
+      c.i++;
+      out.create.name = c.str(tr("název"));
+    } else if (out.create && c.is(SP.material)) {
+      c.i++;
+      out.create.material = c.str(tr("materiál"));
+    } else if (c.is(SP.holes) && (c.is(SP.holeWords, 1) || fold(c.peek()?.t ?? "") === "pattern")) {
+      // „do děr vzoru“, „do všech děr“, „všechny díry“, „all holes“, „pattern“, „alle Bohrungen“
+      c.i++;
+      while (!c.done && c.is(SP.holeWords)) c.i++;
+      out.holes = true;
+    } else if (c.is(SP.between)) {
       c.i++;
       out.a = compArg(c, tr("pružina: chybí komponenta A za „mezi“ – {0}", SPRING_USE()));
       const fa = faceArg(c);

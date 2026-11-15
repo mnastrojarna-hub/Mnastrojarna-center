@@ -2,6 +2,8 @@
 import { tr } from "@/cad/i18n";
 import { computeBom, emptyAssembly, eulerXYZ, placementMatrix, sourceKey, type BomRow, type Mat3 } from "@/cad/assembly";
 import { springEffective, springMeshMatrix } from "@/cad/asm-spring-geom";
+import { springCoilView } from "@/cad/spring-coil-mesh";
+import type { MeshData } from "@/cad/types";
 import { uid, type AsmComponent, type CadDoc, type Placement } from "@/cad/types";
 
 export type Leaf = {
@@ -16,6 +18,8 @@ export type Leaf = {
   /** cesta názvů (pro strom) */
   path: string[];
   hidden: boolean;
+  /** pružina v kroku pohybové studie: síť drátu v aktuální délce (cad/spring-coil-mesh.ts) místo sítě dílu, `key` pro zobrazení */
+  coil?: { key: string; mesh: MeshData };
 };
 
 export function mul4(a: number[], b: number[]): number[] {
@@ -40,14 +44,16 @@ export function flattenLeaves(doc: CadDoc, o: { springMesh?: boolean } = {}): Le
   const out: Leaf[] = [];
   const walk = (comps: AsmComponent[], parent: number[], prefix: string, top: string | null, names: string[], hidden: boolean) => {
     for (const c0 of comps) {
-      const sm = o.springMesh ? springMeshMatrix(c0) : null;
+      // přehrávání studie: síť drátu v aktuální délce (stoupání se mění, drát zůstává kulatý); jen trubka / válec se protáhne po ose
+      const coil = o.springMesh && c0.source.kind === "part" && c0.spring ? springCoilView(c0, sourceKey(c0.source)) : null;
+      const sm = o.springMesh ? (coil?.matrix ?? springMeshMatrix(c0)) : null;
       const c = o.springMesh ? c0 : springEffective(c0);
       const m = mul4(parent, sm ? mul4(placementMatrix(c.placement), sm) : placementMatrix(c.placement));
       const id = prefix ? `${prefix}/${c.id}` : c.id;
       const topId = top ?? c.id;
       const h = hidden || !!c.hidden;
       if (c.source.kind === "asm") walk(c.source.doc.components ?? [], m, id, topId, [...names, c.name], h);
-      else out.push({ id, topId, comp: c, key: sourceKey(c.source), matrix: m, path: [...names, c.name], hidden: h });
+      else out.push({ id, topId, comp: c, key: sourceKey(c.source), matrix: m, path: [...names, c.name], hidden: h, ...(coil ? { coil: { key: coil.key, mesh: coil.mesh } } : {}) });
     }
   };
   walk(doc.components ?? [], IDENT, "", null, [], false);

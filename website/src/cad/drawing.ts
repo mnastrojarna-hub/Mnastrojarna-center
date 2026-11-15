@@ -17,6 +17,7 @@ import type { DrawingIssue } from "./drawing-issues";
 import { holeTableColumns, holeTableCounts, holeTableRows } from "./drawing-holetable";
 import type { SpringMark } from "./drawing-doc";
 import { inSpringEnvelope, springWireLines } from "./drawing-springs";
+import { drawSpringTables, springTableHeight, type SpringDrawTable } from "./drawing-springtable";
 
 // ---------------------------------------------------------------- typy
 
@@ -65,6 +66,9 @@ export type DrawingMeta = {
   sheetCount?: number;
   /** značky svarů ISO 2553 z 3D svarů dílu (drawing-welds.ts – `weldMarksOf`) */
   welds?: WeldMark[];
+  /** údaje pružin z tabulky (drawing-springtable.ts – `springDrawTables`), kreslí se při volbě springTable
+   *  (pole `springs` níže jsou osy drátu zjednodušených pružin ISO 2162-1 – jiná věc) */
+  springData?: SpringDrawTable[];
   // ---- razítko (cad/title-block.ts): šablona, logo a další pole – vše volitelné, prázdné = na výkrese se neuvádí
   /** šablona razítka: iso7200 (výchozí, 180 × 38), compact (180 × 27), toolmaker (nástrojářská, 180 × 64 – všechna pole) */
   template?: TitleTemplate;
@@ -176,6 +180,8 @@ export type DrawingOptions = {
   holeTable?: boolean;
   /** pohled tabulky děr (výchozí horní, jinak přední) – Chytré kóty s polohami děr v tabulce (kótovat … díry tabulka) */
   holeTableView?: ViewKey;
+  /** tabulka údajů pružiny EN ISO 2162-2 nad razítkem (meta.springData – prvky spring.* dílu, cad/drawing-springtable.ts) */
+  springTable?: boolean;
   /** Chytré kóty: funkční rozměry (hodnoty v mm modelu) – nikdy pomocná kóta „(…)“ (kótovat … funkční 26,5 74,175) */
   dimFunctional?: number[];
   /** Chytré kóty: polohy děr – auto (souřadnicově od 12 poloh / když se nevejdou, pak tabulka), souřadnicově, tabulkou, od hran */
@@ -246,6 +252,8 @@ export type DrawingResult = {
   holes?: HoleRow[];
   /** tabulka děr: pohled, ze kterého jsou díry (s osou ve směru pohledu), a díry s jinou osou, které v ní nejsou (průměr, osa) */
   holeTableInfo?: { view: string; other: { d: number; axis: string }[] };
+  /** počet tabulek údajů pružin na listu (volba springTable) */
+  springTables?: number;
   /** umístěné detailní pohledy (list: levý horní roh, velikost) */
   details?: { id: string; label: string; x: number; y: number; w: number; h: number }[];
   /** pozice (balónky) – střed kroužku na listu */
@@ -1484,7 +1492,9 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // jeden řádek na polohu díry (zahloubení ve stejném řádku, závit označením) – cad/drawing-holetable.ts
   const holeRows = holePick ? holeTableRows(holePick.rows, meta.threads ?? []) : [];
   // výška pásu nad spodním okrajem: razítko + kusovník + tabulka děr (dlouhá ve dvou sloupcích – výšku dá první)
-  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeTableColumns(holeRows)[0]);
+  // tabulka údajů pružin leží nad tabulkou děr – její výška patří do pásu i do odsazení patičky razítka („Rozměry v mm“, List)
+  const springH = opts.springTable ? springTableHeight(meta.springData) : 0;
+  const TBH = TB.h + bomHeight(meta.bom) + holeTableHeight(holeTableColumns(holeRows)[0]) + springH;
 
   // --- projekce
   const keys = ISO_KEYS.filter((k) => opts.views[k]);
@@ -1922,7 +1932,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   // rám, centrovací značky, zóny, razítko
   frame(SW, SH, polys);
   const zones = opts.zones ? zoneGrid(SW, SH, polys, texts) : undefined;
-  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeTableColumns(holeRows)[0]));
+  const tbInfo = titleBlock(SW, SH, sheet, scale, opts.projection, meta, polys, texts, holeTableHeight(holeTableColumns(holeRows)[0]) + springH);
   let yTop = SH - M - TB.h;
   if (meta.bom?.length) {
     partsList(SW - M - TB.w, yTop, meta.bom, polys, texts);
@@ -1940,6 +1950,8 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       issues.push({ level: "warn", code: "drawing.warning", kind: "hole-table-overlap", text: t, data: { rows: holeRows.length, views: hit.map((p) => p.key) } });
     }
   }
+  // tabulka údajů pružiny (EN ISO 2162-2) nad tabulkou děr / kusovníkem – místo je v TBH
+  if (opts.springTable && meta.springData?.length) drawSpringTables(SW - M - TB.w, yTop - holeTableHeight(holeTableColumns(holeRows)[0]), TB.w, meta.springData, polys, texts);
   const revZoneAt = meta.revisions?.length ? revisionTable(SW, meta.revisions, polys, texts, !!zones) : [];
 
   return {
@@ -1955,6 +1967,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     ...(issues.length ? { issues } : {}),
     holes: holeRows.length ? holeRows : undefined,
     holeTableInfo: holePick ? { view: holePick.view, other: holePick.other } : undefined,
+    ...(opts.springTable ? { springTables: meta.springData?.length ?? 0 } : {}),
     details: details.length ? details : undefined,
     balloons: balloons.length ? balloons : undefined,
     generated: generated.length ? generated : undefined,

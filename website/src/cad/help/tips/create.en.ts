@@ -189,11 +189,11 @@ export default {
     note: "The rib extends up to the material – the line need not touch the body exactly.",
   },
   spring: {
-    what: "Creates a helical spring from round wire.",
-    when: "Compression spring for an assembly, fixture or mould.",
-    steps: ["Enter Spring diameter, Wire diameter, Pitch and Number of turns.", "Choose the axis and Position (axis start).", "Check the Free length and confirm OK."],
-    cmd: "feature spring radius=10 wire=2 pitch=5 turns=8",
-    note: "The pitch must exceed the wire diameter, otherwise the coils intersect.",
+    what: "Compression, extension, torsion or disc spring from a table – computes rate, forces, stress and buckling.",
+    when: "Stripper and ejector springs of a die, fixture clamping, toggle clamp, disc spring stack.",
+    steps: ["Pick the kind (Compression, Extension, Torsion, Disc).", "Fill in the bold rows (wire d, diameter, L0, coils n); the rest is computed.", "Check the Computed rows and the warnings, then Create."],
+    cmd: "spring compression d 2 De 20 L0 50 n 8 L2 30",
+    note: "Ground ends = flat seating faces at 0 and L0; editing the feature opens the same table.",
   },
 
   // ── Modify ──

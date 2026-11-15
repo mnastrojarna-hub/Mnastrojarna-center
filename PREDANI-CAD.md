@@ -32,6 +32,11 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 15. 11. 02:56 | **G1 hotov**: výběr oknem dokončen v obou balících i po opravách kontroly (`w20-3d` `5812746`, 5 nálezů; `w20-2d` `c6cb7f5`, 4 nálezy). G2 BĚŽÍ: `S/w20/3d.patch` + `2d.patch` naneseny na větev bez konfliktů (index, necommitnuto), NDA čisté, překlady 0/0, typy, lint 5. Běží vitest (`S/w20/vitest-int.log`, končí `exit=`), pak build + e2e na :3199. Pružiny: workflow `wf_60b96c19-df2` je v kroku `fix:w21int` (5 nálezů kontroly). |
 | 15. 11. 03:01 | G2: na větvi (necommitnuto) vitest 55 souborů 849/849, produkční build prošel; dokumentace výběru oknem dopsána do `cad-docs.ts` (kap. 3, 5, 13, 14, 19, 21, 26 + FAQ) = G4 text hotový. BĚŽÍ e2e 16 sad na :3199 (`S/w20/int-e2e.summary`, končí `done`; logy `S/w20/int-e2e/`), pak vlastní zkouška `node S/w20/own-probe.cjs` (G3). Tělo PR připraveno `S/w20/pr-body.md` (doplnit tabulku e2e). |
 | 15. 11. 03:18 | **G2 + G3 + G4 (text) hotovo**: commit `851273d` na větvi. e2e 17 sad 872 ok / 0 FAIL (logy `S/w20/int-e2e/`), vlastní zkouška tažením 13/13 (`S/w20/own-probe.cjs` + `own-probe2.cjs`; pozor: s vybranými komponentami je uprostřed gizmo a okno na něm záměrně nezačne). Zakládám PR do `main` (tělo `S/w20/pr-body.md`), po sloučení smazat `w20-*`. Pružiny: `fix:w21int` stále běží. |
+| 15. 11. 03:23 | **Úkol G HOTOV: výběr oknem sloučen do `main` (PR #101, `31bf0c7`)**; GitHub kontrola `acceptance (22)` zelená, lokální akceptační brána PASS (100 ok, 0 FAIL, 178 s; 4 nálezy ke třídění = známé ⚠ ze skriptu 959: kolize pružina × deska v pohybu, starší zápis řezu, ruční úprava kóty – řeší vlna 21 / E6). Worktree `w20-*` smazány (zbytky `S/w20/w20-*-final-wip.patch`). Dál: H2 – až doběhne `fix:w21int`, nanést `S/w21/int.patch` (základ `87ca363`) na nový `main`; překryv s vlnou 20 v 9 souborech (`cad-app.tsx`, `agent-guide.ts`, `agent-api.ts`, `agent-api-host.ts`, `doc-script.ts`, `drawing.ts`, `drawing-workspace.tsx`, `tips-manifest.ts`, `schema-pro-ai.md`). |
+| 15. 11. 03:27 | Úkol F (kola) OBNOVEN na základu `3814b85` (main + vlna 20): nový workflow `wf_fe2fa9ab-38a` (skript `…/workflows/scripts/cad-wave19-gears-resume-wf_fe2fa9ab-38a.js`), návrh `S/w19/NAVRH.md` hotový se nepřepisuje; balík core ve worktree `w19-core2` začne nanesením `S/w19/core-wip-snapshot.patch`, pak `w19-ui2` + `w19-text2`; patche `S/w19/{core,ui,text}.patch`. Do zadání `S/w19/brief.md` doplněna kapitola RESUME NOTE (engine, CLI, pružiny). Starý worktree `w19-core` je jen záloha – smazat až po sloučení F. Původní workflow `wf_a5f62aa9-09a` NEobnovovat. |
+| 15. 11. 03:33 | **D1 hotov (část CLI)**: dokumentace (`cad-docs.ts` kap. 22 + historie verzí + `cad-docs-intl.tsx` EN/DE + návod pro AI) přepsána podle skutečného CLI po fázi B – ověřeno během `mncad run` (modelování, sestava, kusovník CSV, kontrola, vícestránkové PDF, 2D). Při ověřování nalezena a opravena CHYBA: `2d export dwg|dxf`, `2d tisk` aj. v CLI (i přes `window.mncad.run`/`draft` v prohlížeči) hlásily ✓, ale soubor se nikam nezapsal → engine `ops/draft.ts` teď doručí soubor přes FileSink (řádek F); `--formats dxf,dwg` u 2D výkresu už není ✗ host.app-only (`engine/files.ts`). Testy: engine+cli+draft 45 souborů 700/700, nové 2 regresní testy v `engine/run.test.ts`, `cad-cli` e2e 99/0, tsc, lint 5, i18n 0/0. Zbývá z D: vlna 15/17 doplňky (většinou už v D0), D2 obrázky, D3 PDF příručka. |
+| 15. 11. 03:45 | **H1/H2 – pružiny hotové i po opravě 5 nálezů kontroly integrace** (`w21-int` `8a31bd6`: falešná kolize pružiny z tabulky, vzpěr s ν, čísla v EN, rychlejší dynamika s kolizí, úklid serveru). `S/w21/int.patch` (102 souborů, základ `87ca363`) nanesen na větev (`7cc4055`) BEZ konfliktů, v indexu necommitnut; NDA čisté (shody jen „Kvádr 1“, „List 1“), překlady 0/0, typy, lint 5. BĚŽÍ: celý `src/cad`+`src/components` vitest (`S/w21/vitest-main.log`, končí `exit=`; po něm harness `S/w21/harness-main.log`) a build (`S/w21/build-main.log`). Pak e2e na :3199 + H3 vlastní zkouška. Kola: `wf_fe2fa9ab-38a` balík core běží. |
+| 15. 11. 04:27 | Pružiny na větvi zelené: vitest celý `src/cad`+`src/components` 3036 ok (2 selhání: `agent-more` – EN/DE seznam příkazů, OPRAVENO `0f25dde`; `ext/springs.test.ts` jen limit 60 s při zátěži, samostatně zelený), harness, build, e2e 18 sad 905/0, `cad-cli` 99/0, akceptační brána PASS 100/0 (nálezy beze změny), vlastní zkouška H3 14/14; dokumentace pružin (Prvky, Sestavy – dynamika, srovnání, FAQ, historie) = H4 text. **PR #102** založen, čeká na GitHub kontrolu `acceptance (22)`, pak sloučit, smazat `w21-*`. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -221,7 +226,7 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 
 - [x] D0. (naneseno 19:45, PR spolu s opravami e2e) Převzít `S/w18/docs2.patch` (vlna 15, převodník, vlna 17 – agent dokumentace, worktree `w18-docs2`) podle
       kapitoly 2 (stačí tsc, lint, `docs:text`), commit, PR, sloučit.
-- [ ] D1. `website/src/content/cad-docs.ts`: přepiš místa o fázi A (hledej „fáze A“, „host.app-only“; v
+- [x] D1. (hotovo 15. 11. 03:33 – místa o fázi A přepsána, ověřeno spuštěním CLI) `website/src/content/cad-docs.ts`: přepiš místa o fázi A (hledej „fáze A“, „host.app-only“; v
       `src/views/cad-docs-intl.tsx` „phase A“ / „Phase A“) podle toho, co CLI po fázi B skutečně umí (ověř spuštěním).
       Doplň: vlna 15 (odstavec je v deníku `wf_5f997da2-2d8`, `w15:integrate`, pole `docs_cs`), převodník `export skript`,
       vlna 17, `kontrola`, `porovnat`, přísný režim. Řádky do historie verzí, FAQ, slovníček, `CAD_DOCS_META.updated`.
@@ -290,7 +295,7 @@ Workflow `wf_a5f62aa9-09a` (skript `…/workflows/scripts/cad-wave19-gears-wf_a5
 (worktree `w19-core`, patch `S/w19/core.patch` proti `3bb04d9`) → souběžně `ui` (`w19-ui`) a `text` (`w19-text`), jejich
 patche jsou proti poslednímu commitu `w19-core`. Každý balík: implementace → protistranná kontrola → opravy.
 
-- [ ] F1. Počkej na dokončení workflow (při restartu obnov `resumeFromRunId: "wf_a5f62aa9-09a"`). Přečti zprávy v deníku.
+- [ ] F1. (BĚŽÍ od 15. 11. 03:27 nový workflow `wf_fe2fa9ab-38a`, worktree `w19-core2`/`w19-ui2`/`w19-text2`, základ `3814b85`) Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_fe2fa9ab-38a"` se skriptem výše). Přečti zprávy v deníku.
 - [ ] F2. Aplikuj postupně `core.patch`, `ui.patch`, `text.patch` na `main` podle kapitoly 2 (po úkolech A–C; s úkolem B
       se potká jen v `agent.ts`, `agent-guide.ts`, `cad-app.tsx` – malé kusy). Kontrola NDA není potřeba (žádná data
       zákazníka), ale zkontroluj, že patch neobsahuje nic z `website/.local/`.
@@ -320,7 +325,7 @@ Workflow `wf_533a7c7c-a4a` (skript `…/workflows/scripts/cad-wave20-box-select-
 - [x] G3. (hotovo 15. 11. 03:18, 13/13) Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
       plochy vybere jen viditelné plochy; křížení vybere i dotčené; Ctrl přidá; zaoblení – hrany oknem; sestava –
       komponenty oknem; skica – smazat více entit; 2D – MOVE s výběrem oknem; výkres dílu – smazat více kót.
-- [ ] G4. Dokumentace (kapitola 3 Obrazovka, 5 Skica, 14 2D CAD, 13 Výkresy + mikronávody), PR, sloučení, smazat `w20-*`.
+- [x] G4. (hotovo 15. 11. 03:23, PR #101) Dokumentace (kapitola 3 Obrazovka, 5 Skica, 14 2D CAD, 13 Výkresy + mikronávody), PR, sloučení, smazat `w20-*`.
 
 ## 7c. Úkol H – vlna 21: pružiny (tabulka → správná pružina; pružiny v pohybu i v dynamické simulaci)
 
@@ -333,8 +338,8 @@ Zadání majitele: „Online CAD neumí pružiny a to ani pro simulaci pohybu.�
   skutečný tvar pružiny při přehrávání pohybu (drát zůstane kulatý), **dynamická pohybová studie** (hmotnosti, gravitace,
   síly pružin, tlumení, dorazy) s grafem a CSV; příklad: stírací deska střihadla na pružinách.
 - [x] H1. (hotovo 15. 11. 01:15) Počkej na `wf_1e1ed70b-b6a` (obnova `resumeFromRunId`), přečti zprávy.
-- [ ] H2. (BĚŽÍ workflow `wf_60b96c19-df2` → `S/w21/int.patch`) Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
-- [ ] H3. Vlastní zkouška v prohlížeči: tabulka → tlačná pružina d 2 De 20 L0 50 n 8 broušená (L0 a De změřit na tělese,
+- [x] H2. (workflow `wf_60b96c19-df2` hotov 15. 11. 03:40, `S/w21/int.patch` nanesen 03:43) Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
+- [x] H3. (hotovo 15. 11. 03:50, 14/14: `S/w21/own-probe.cjs`; prohlížeč = CLI: 107 N v 0,24 s, návrat 0,375 s) Vlastní zkouška v prohlížeči: tabulka → tlačná pružina d 2 De 20 L0 50 n 8 broušená (L0 a De změřit na tělese,
       tuhost ručně ověřit); sestava se 4 pružinami pod stírací deskou → dynamika → deska se vrátí na doraz, graf, CSV.
 - [ ] H4. Dokumentace (kapitola Prvky – pružiny, Sestavy – pohyb a dynamika, FAQ „Jak udělám pružinu?“), PR, sloučit,
       smazat `w21-*`.

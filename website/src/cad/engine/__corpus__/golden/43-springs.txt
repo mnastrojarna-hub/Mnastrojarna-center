@@ -1,0 +1,142 @@
+=== run 1 ===
+✓ nový díl „Pružina z tabulky“ – nová záložka
+→ Tlačná pružina 1 (ext) přidán – výsledek po výpočtu níže
+  tlačná d 2 · De 20 · L0 50 · n 8 · R 3,494 N/mm · Ln 20 mm
+Pružina „Tlačná pružina 1“ – Tlačná pružina (EN 13906-1) · Tlačná pružina 2 × 20 × 50
+  zadáno: d 2 mm · De 20 mm · L0 50 mm · n 8
+  střední průměr D: 18 mm
+  vnější průměr De: 20 mm
+  vnitřní průměr Di: 16 mm
+  index vinutí w = D/d: 9
+  celkový počet závitů nt: 10
+  stoupání činných závitů: 5,86 mm
+  tuhost R: 3,494 N/mm
+  délka na doraz Ln: 20 mm
+  nejmenší součet mezer Sa: 3,54 mm
+  nejmenší pracovní délka Ln + Sa: 23,54 mm
+  síla na doraz Fn: 104,8 N
+  součinitel korekce napětí k: 1,152
+  napětí τn na dorazu (statická kontrola): 601 MPa (61 %)
+  napětí τkn = k · τn na dorazu: 692 MPa (70 %)
+  dovolené napětí τzul = 0,5 · Rm: 990 MPa (Rm 1980)
+  kritický zdvih vzpěru sK: nevybočí
+  vlastní frekvence fe: 280 Hz
+  zvětšení De při stlačení na doraz: 0,13 mm
+  délka drátu: 565 mm
+  hmotnost: 13,9 g
+  materiál: patentovaný drát SH (EN 10270-1) · G 81500 MPa
+  konce: přiložené a broušené
+✓ Tlačná pružina 1 (ext)
+
+Dokument: „Pružina z tabulky“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 20 × 50 mm (X -10…10, Y -10…10, Z 0…50) · objem 1,71 cm³ · ploch 9 · hran 19
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Tlačná pružina 1 [ext, id #] ✓ – tlačná d 2 · De 20 · L0 50 · n 8 · R 3,494 N/mm · Ln 20 mm
+    → Ln + Sa 23,54 mm · Fn 104,8 N · τn 61 % τzul · vzpěr nevybočí · fe 280 Hz · 13,9 g
+=== run 2 ===
+✓ nový díl „Spodní deska“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Horní deska“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+→ Válec 3 (cylinder) přidán – výsledek po výpočtu níže
+→ Válec 4 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Stírací deska“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Válec 1 (cylinder)
+✓ Válec 2 (cylinder)
+✓ Válec 3 (cylinder)
+✓ Válec 4 (cylinder)
+✓ Kvádr 3 (box)
+
+Dokument: „Stírací deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 200 × 120 × 15 mm (X 0…200, Y 0…120, Z 0…15) · objem 360 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 3 [box, id #] ✓ – 200 × 120 × 15 mm, new, roh [0; 0; 0]
+=== run 3 ===
+✓ nová sestava „Střižník“ – nová záložka
+✓ komponenta „Spodní deska“ vložena do sestavy (ukotvená)
+✓ komponenta „Stírací deska“ vložena do sestavy
+✓ komponenta „Horní deska“ vložena do sestavy
+✓ vazba LIS „Horní deska“ F5 → „Spodní deska“ F6 · 55 mm: ok (vybrána F5 z 5 vyhovujících) · poloha beze změny
+✓ vazba Doraz stírače „Stírací deska“ F6 → „Horní deska“ F5 · ⟨5; 25⟩ mm: ok · poloha beze změny
+  vybráno: A F6 rovinná · B F5 rovinná
+✓ vazba Matrice „Stírací deska“ F5 → „Spodní deska“ F6 · ⟨0; 500⟩ mm: ok · poloha beze změny
+  vybráno: A F5 rovinná · B F6 rovinná
+✓ nová pružina „Pružina 2×19,5×41“ 4× · d 2 · De 19,5 · L0 41 · n 6 · R 5,069 N/mm · Ln 16 mm · do děr F7/F9/F8/F10 Ø21 – zámek ke komponentě „Horní deska“
+  dosedací plochy pružiny „Pružina 2×19,5×41“ (4×): „Horní deska“ F11/F13/F12/F14 rovinná −Z → „Stírací deska“ F6 rovinná +Z
+✓ pružina „Pružina 2×19,5×41“: délka 35 mm · L0 41 · Ln 16 · stlačení 6 mm · síla 30,4 N (c 5,069 N/mm) (4×)
+
+Dokument: „Střižník“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Spodní deska [0; 0; 0] ⚓ · Stírací deska [0; 0; 45] · Horní deska [0; 0; 85] · Pružina 2×19,5×41 [40; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [40; 90; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 90; 95] ∠[-180; 0; -180]
+Vazby: 7 (7 ok)
+Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×)
+Sestava: 7 komponent (7 dílů po rozložení podsestav) · obálka 200 × 120 × 115 mm · objem Σ 1791,39 cm³ · hmotnost Σ 14,062 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 4 ===
+✓ hmotnost „Stírací deska“: 2,4 kg
+Pohybová studie: motorů 0 · kroků 36
+Pohybová studie: motorů 0 · kroků 36
+Dynamika: krok 0,0005 s · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2 · hmotnost „Stírací deska“ 2,4 kg
+Pohybová studie: 334 kroků · 0,5 s · motory: 
+Vazby splněny ve všech krocích
+ ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 35 · L0 41 · Ln 16) · síla 30,4 N (max 30,4 N) (4×)
+Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
+ „Horní deska“ 5,5844 kg (z objemu × hustoty): v klidu
+ „Stírací deska“ 2,4 kg (zadaná): v klidu
+ Největší síla pružiny: „Pružina 2×19,5×41“ 30,4 N v t = 0,0005 s
+ doraz „Doraz stírače Stírací deska → Horní deska“ (max 25 mm): dotyk 0–0,5 s
+ Kontrola energie: odchylka 0 % z 0,02288 J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení 0,0229 J, dotyky -0,0229 J, zadané síly 0 J)
+✓ motor 1: lineární motor · LIS „Horní deska“ → „Spodní deska“ · 55…25 mm tam a zpět
+Pohybová studie: 334 kroků · 0,5 s · motory: lineární motor · LIS „Horní deska“ → „Spodní deska“ · 55…25 mm tam a zpět
+ Stírací deska: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [0; 0; 45]
+ Horní deska: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [0; 0; 85]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 30; 95]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 90; 95]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 30; 95]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 90; 95]
+Vazby splněny ve všech krocích
+ ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 → 30,4 N (max 107 N) (4×)
+Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
+ „Horní deska“ 5,5844 kg (z objemu × hustoty): zdvih Z 30 mm · v max 0,188 m/s · a max 2,37 m/s² (bez rázů na dorazech)
+ „Stírací deska“ 2,4 kg (zadaná): zdvih Z 15 mm · v max 0,226 m/s · a max 63,02 m/s² (bez rázů na dorazech)
+ Největší síla pružiny: „Pružina 2×19,5×41“ 107 N v t = 0,24 s
+ doraz „Doraz stírače Stírací deska → Horní deska“ (max 25 mm): dotyk 0–0,125 s, 0,375 s, 0,3765–0,5 s · nárazy 0,188 m/s (t = 0,375 s), 0,024 m/s (t = 0,3765 s)
+  návrat na doraz v t = 0,375 s
+ doraz „Matrice Stírací deska → Spodní deska“ (min 0 mm): dotyk 0,125–0,375 s · nárazy 0,188 m/s (t = 0,125 s)
+  první dotyk v t = 0,125 s
+ Energie: na začátku 0,365 J, na konci 0,365 J (motor koná práci – bilance se nekontroluje)
+Pohybová studie: motorů 1 · kroků 36
+ 1. lineární motor · LIS „Horní deska“ → „Spodní deska“ · 55…25 mm tam a zpět
+Dynamika: krok 0,0005 s · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2 · hmotnost „Stírací deska“ 2,4 kg
+Pohybová studie: 334 kroků · 0,5 s · motory: lineární motor · LIS „Horní deska“ → „Spodní deska“ · 55…25 mm tam a zpět
+ Stírací deska: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [0; 0; 45]
+ Horní deska: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [0; 0; 85]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 30; 95]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [40; 90; 95]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 30; 95]
+ Pružina 2×19,5×41: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [160; 90; 95]
+Vazby splněny ve všech krocích
+ ✓ pružina „Pružina 2×19,5×41“: délka 35 mm (min 20 · L0 41 · Ln 16) · síla 30,4 → 30,4 N (max 107 N) (4×)
+Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05 N·s/mm · odraz 0,2
+ „Horní deska“ 5,5844 kg (z objemu × hustoty): zdvih Z 30 mm · v max 0,188 m/s · a max 2,37 m/s² (bez rázů na dorazech)
+ „Stírací deska“ 2,4 kg (zadaná): zdvih Z 15 mm · v max 0,226 m/s · a max 63,02 m/s² (bez rázů na dorazech)
+ Největší síla pružiny: „Pružina 2×19,5×41“ 107 N v t = 0,24 s
+ doraz „Doraz stírače Stírací deska → Horní deska“ (max 25 mm): dotyk 0–0,125 s, 0,375 s, 0,3765–0,5 s · nárazy 0,188 m/s (t = 0,375 s), 0,024 m/s (t = 0,3765 s)
+  návrat na doraz v t = 0,375 s
+ doraz „Matrice Stírací deska → Spodní deska“ (min 0 mm): dotyk 0,125–0,375 s · nárazy 0,188 m/s (t = 0,125 s)
+  první dotyk v t = 0,125 s
+ Energie: na začátku 0,365 J, na konci 0,365 J (motor koná práci – bilance se nekontroluje)
+
+Dokument: „Střižník“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Spodní deska [0; 0; 0] ⚓ · Stírací deska [0; 0; 45] · Horní deska [0; 0; 85] · Pružina 2×19,5×41 [40; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [40; 90; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 90; 95] ∠[-180; 0; -180]
+Vazby: 7 (7 ok)
+Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×)
+Pohybová studie: motorů 1 · kroků 36 · 0,5 s – pohyb stav
+Sestava: 7 komponent (7 dílů po rozložení podsestav) · obálka 200 × 120 × 115 mm · objem Σ 1791,39 cm³ · hmotnost Σ 14,062 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

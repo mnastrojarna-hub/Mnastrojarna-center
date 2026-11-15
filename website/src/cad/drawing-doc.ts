@@ -4,8 +4,8 @@
  * pro výkres potlačí: zůstane hladký válec / díra a označení (M18×1,5) přidá `threadsOfDoc`.
  * Přesná projekce (HLR) šroubovicových ploch v jádře trvá minuty – to byl důvod „zaseknutého“ výkresu i exportu PDF.
  *
- * Pružiny (prvek Pružina, normálie pružin, Tažení po šroubovici s profilem Kruh – nové těleso, nebo první materiál tělesa;
- * i jako komponenty sestavy a v podsestavách) se kreslí zjednodušeně podle ISO 2162-1: obrys vinutí (vnější a vnitřní průměr
+ * Pružiny (prvek Pružina, normálie pružin, Tažení po šroubovici s profilem Kruh, tlačná pružina z tabulky `spring.compression`
+ * – nové těleso, nebo první materiál tělesa; i jako komponenty sestavy a v podsestavách) se kreslí zjednodušeně podle ISO 2162-1: obrys vinutí (vnější a vnitřní průměr
  * přes celou volnou délku – `springEnvelopeDims`), osa pružiny a čerchované osy drátu na středním průměru (`springMarksOf`,
  * kreslí je `makeDrawing` v pohledech i v řezu; řez obal nešrafuje). Které šroubovice jsou pružiny, určuje `drawnSpringIndices`:
  * šroubovice přidaná na existující těleso je závit nebo šnek (normálie šnek, oblý závit na hřídeli) a kreslí se přesně.
@@ -19,6 +19,7 @@ import { holeDrillD } from "./hole-spec";
 import { tr } from "./i18n";
 import { placementOf } from "./placements";
 import type { Direction, Ref } from "./refs";
+import { readCompression, springAxisOf } from "./springs";
 import type { Axis, CadDoc, ComponentSource, Feature, Vec3 } from "./types";
 
 /** Kreslení pružin na výkrese: zjednodušeně podle ISO 2162-1 (výchozí), nebo plným tvarem šroubovice. */
@@ -53,8 +54,12 @@ const addsBody = (mode: unknown) => mode === "add" || mode === "new";
 function isHelixWire(f: Feature): f is ExtF {
   return f.type === "ext" && f.ext === "surf.helixSweep" && (f.data?.profile ?? "circle") === "circle" && addsBody(f.data?.mode ?? "add");
 }
+/** tlačná pružina z tabulky (`spring.compression`, vlna 21) s osou bez odkazu na geometrii, která přidává materiál / tvoří těleso */
+function isTableSpring(f: Feature): boolean {
+  return f.type === "ext" && f.ext === "spring.compression" && addsBody(f.data?.mode ?? "new") && !f.data?.atRef && springAxisOf(f.data ?? {}) !== null;
+}
 /** šroubovice s kruhovým průřezem, která přidává materiál (pružina, šnek, oblý závit – co z toho, rozhodne těleso) */
-const isHelixCandidate = (f: Feature) => (f.type === "spring" && addsBody(f.mode) && !isSpringEnvelope(f)) || isHelixWire(f);
+const isHelixCandidate = (f: Feature) => (f.type === "spring" && addsBody(f.mode) && !isSpringEnvelope(f)) || isHelixWire(f) || isTableSpring(f);
 /** operace prvku (přidat / odebrat / …); prvky bez operace (zaoblení, přesun, pole…) těleso mění jinak */
 const modeOf = (f: Feature): unknown => {
   if (f.type === "ext") return f.ext === "surf.helixSweep" ? (f.data?.mode ?? "add") : f.data?.mode;
@@ -161,9 +166,36 @@ function helixAxis(v: unknown): { axis: Axis; dirDef?: Direction } | null {
   return d.kind === "edge" || d.kind === "twoPoints" || d.kind === "faceNormal" || d.kind === "tangent" ? { axis: "Z", dirDef: d } : null;
 }
 
+/**
+ * Obal tlačné pružiny z tabulky: prvek Pružina se značkou obalu, jehož obal (`springEnvelopeDims`) leží přesně mezi koncovými
+ * rovinami pružiny 0 a L (délka tvaru `len`, jinak L0) a má průměry De / Di z výpočtu (`@/cad/springs`). Poloha a osa z dat
+ * prvku (bod `at`, osa X / Y / Z / vektor); osa odkazem → null (plný tvar).
+ */
+function tableEnvelope(f: ExtF): Feature | null {
+  const i = readCompression(f.data ?? {});
+  const ax = springAxisOf(f.data ?? {});
+  if (!ax || !(i.d > 0 && i.D > i.d && i.n > 0 && i.L0 > 0)) return null;
+  const L = typeof f.data?.len === "number" && f.data.len > 0 ? f.data.len : i.L0;
+  const nt = i.ends === "open" ? i.n : i.n + 2;
+  const R = i.D / 2;
+  // stoupání p a přesah konců e = (d/2)·cos α (springEnvelopeDims) tak, aby obal byl 0 … L: p·nt + 2e = L
+  let p = Math.max(1e-3, (L - i.d) / nt);
+  let e = i.d / 2;
+  for (let k = 0; k < 6; k++) {
+    e = springEnvelopeDims({ radius: R, pitch: p, turns: nt, wire: i.d }).len / 2 - (p * nt) / 2;
+    p = Math.max(1e-3, (L - 2 * e) / nt);
+  }
+  const at = Array.isArray(f.data?.at) ? (f.data.at as unknown[]).slice(0, 3).map((x) => Number(x) || 0) : [0, 0, 0];
+  const position: Vec3 = [at[0] + ax[0] * e, at[1] + ax[1] * e, at[2] + ax[2] * e];
+  const z = ax[2] > 1 - 1e-12;
+  const sp: SpringF = { id: f.id, name: f.name, ...(f.body ? { body: f.body } : {}), type: "spring", radius: R, pitch: p, turns: nt, wire: i.d, position, mode: f.data?.mode === "add" ? "add" : "new", axis: "Z", ...(z ? {} : { dirDef: { kind: "vector", v: ax } }) };
+  return asEnvelope(sp);
+}
+
 /** Zjednodušená pružina pro výkres: tentýž prvek (id, těleso, poloha, osa) s obalem vinutí; null = nelze (zůstane plný tvar). */
 function envelopeOf(f: Feature): Feature | null {
   if (f.type === "spring") return asEnvelope(f);
+  if (isTableSpring(f)) return tableEnvelope(f as ExtF);
   if (!isHelixWire(f)) return null;
   const d = f.data;
   const [radius, pitch, turns, wire] = [d.radius, d.pitch, d.turns, d.wire].map(Number);

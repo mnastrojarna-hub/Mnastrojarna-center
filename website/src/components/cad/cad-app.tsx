@@ -58,6 +58,7 @@ import { extPickOf, getExtUi, type ExtActionApi } from "./ext";
 import { weldFaceColors } from "@/cad/ext/weld-colors";
 import { extendMncad, runApiCmd, textSelectionNote, type ApiHost } from "./agent-api-host";
 import { LibraryDialog } from "./library-dialog";
+import { libraryToSpring, springFromTable } from "./springs/create";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { CompareDialog, type CompareView } from "./compare-dialog";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
@@ -77,6 +78,7 @@ import { measureApi } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
+import { useSpringBetween } from "./springs/spring-between";
 import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
 import { AskHost, askBusy, askConfirm, askNumber } from "./ask-dialog";
 import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps } from "./engine-port";
@@ -862,22 +864,24 @@ export function CadApp() {
       measure: (a, b) => measureApi(histRef.current.present, a, b),
       draft: async (text) => (await import("@/cad/draft/agent")).draftApi(text, (t) => runAgentRef.current(t), () => histRef.current.present),
       draftImport: async (file) => (await import("@/cad/draft/agent")).draftImportApi(file, (d) => void openDocInTabRef.current(d)),
-      motion: async (cmd) => {
-        if (cmd?.trim()) {
+      motion: async (arg) => {
+        // objekt nastavení (dynamika, hmotnosti, síly – vlna 21) → řádky „pohyb …“ (cad/asm-agent-dyn.ts motionApiLines)
+        const cmds = typeof arg === "object" && arg ? (await import("@/cad/asm-agent-dyn")).motionApiLines(arg) : arg?.trim() ? [arg] : [];
+        for (const cmd of cmds) {
           const before = JSON.stringify(histRef.current.present.motion ?? null);
           const out = await runAgentRef.current(`pohyb ${cmd}`);
           const bad = out.split("\n").find((l) => l.startsWith("✗"));
           if (bad) throw new Error(bad);
           // změněná studie se do dokumentu promítne až po vykreslení
-          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
+          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
         }
         const d = histRef.current.present;
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
         const k = await import("@/cad/asm-agent-kin");
-        const { motionCsv, motionSummary } = await import("@/cad/motion");
+        const { studyCsv, studySummary, dynApi } = await import("@/cad/motion-dynamic-report");
         const res = await k.motionRun(d, asmEnvRef.current());
         const nm = (id: string) => d.components?.find((c) => c.id === id)?.name ?? id;
-        return { steps: k.motionTable(d, res), summary: motionSummary(res, d), collision: res.collision ? { ...res.collision, a: nm(res.collision.a), b: nm(res.collision.b) } : null, csv: motionCsv(res, d) };
+        return { steps: k.motionTable(d, res), summary: studySummary(res, d), collision: res.collision ? { ...res.collision, a: nm(res.collision.a), b: nm(res.collision.b) } : null, csv: studyCsv(res, d), ...dynApi(res, d) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -1125,6 +1129,8 @@ export function CadApp() {
 
   // ---------- sestava: sítě dílů (mezipaměť podle obsahu) ----------
   const leaves = useMemo(() => (isAsm ? flattenLeaves(doc) : []), [isAsm, doc]);
+  // Sestava › Pružina mezi díly: výběr dosedacích ploch a tabulka (components/cad/springs/spring-between.tsx)
+  const springPick = useSpringBetween({ doc, isAsm, leaves, faceInfo: (k, i) => cad.mateFace(k, i), faceRows: async (id) => (await (await import("@/cad/asm-agent")).compFaces(histRef.current.present, id, asmEnvRef.current())).rows, run: (t) => runAgentRef.current(t), flash: (t) => flash(t) });
   const compKeys = useMemo(() => new Map(leaves.map((l) => [l.id, l.key])), [leaves]);
   useEffect(() => {
     if (core !== "ready" || !isAsm) return;
@@ -1173,7 +1179,9 @@ export function CadApp() {
     const out: AsmView[] = [];
     for (const l of comps) {
       const r = asmCache.current.get(l.key);
-      if (!r?.mesh) continue;
+      // pružina v kroku studie má vlastní síť drátu – díl ve volné délce nemusí být v jádře postavený
+      const mesh = l.coil?.mesh ?? r?.mesh;
+      if (!mesh) continue;
       const off = explode && centers.has(l.id) ? explodeOffset(mid, centers.get(l.id)!, explode, "Z") : [0, 0, 0];
       const m = [...l.matrix];
       m[12] += off[0];
@@ -1183,9 +1191,9 @@ export function CadApp() {
       out.push({
         id: l.id,
         topId: l.topId,
-        key: l.key,
-        mesh: r.mesh,
-        vertices: r.vertices,
+        key: l.coil?.key ?? l.key, // pružina v kroku studie: síť drátu v aktuální délce (cad/spring-coil-mesh.ts)
+        mesh,
+        vertices: l.coil ? undefined : r?.vertices,
         matrix: m,
         color: l.comp.color ?? top?.color ?? "#b9c2cc",
         selected: l.topId === asmSel || l.topId === mate?.compId,
@@ -1573,6 +1581,10 @@ export function CadApp() {
     }
     if (boltPick) {
       if (it?.kind === "face" && it.compId) void addBoltAt(it.compId, it.index, it.point);
+      return;
+    }
+    if (springPick.active) {
+      if (it?.kind === "face" && it.compId) void springPick.onFace(it.compId, it.index, it.point);
       return;
     }
     if (mate) {
@@ -2093,7 +2105,7 @@ export function CadApp() {
   const pickMode: PickMode = refPick
     ? "select"
     : isAsm
-    ? mate || boltPick
+    ? mate || boltPick || springPick.active
       ? "asmFace"
       : "select"
     : planePick
@@ -2459,6 +2471,7 @@ export function CadApp() {
       if (e.key === "Escape") {
         if (mate) setMate(null);
         if (boltPick) setBoltPick(null);
+        else if (springPick.open) springPick.cancel();
         else if (asmSel) setAsmSel(null);
         if (active) cancelEdit();
         setPlanePick(false);
@@ -2724,7 +2737,7 @@ export function CadApp() {
           { id: "thread", label: tr("Závit"), icon: "thread", tone: "cut", onClick: () => addFeature("thread") },
           { id: "split", label: tr("Rozříznout"), icon: "split", tone: "cut", onClick: () => addFeature("split") },
           { id: "rib", label: tr("Žebro"), icon: "rib", tone: "create", onClick: () => addFeature("rib"), hint: tr("z otevřené skici") },
-          { id: "spring", label: tr("Pružina"), icon: "spring", tone: "create", onClick: () => addFeature("spring"), hint: tr("šroubovice s průřezem") },
+          { id: "spring", label: tr("Pružina"), icon: "spring", tone: "create", onClick: () => void springFromTable({ doc, isAsm, commit, openDocInTab, insertPart, flash }), hint: tr("tlačná, tažná, zkrutná, talířová – tabulka s výpočtem") },
         ],
       },
       {
@@ -2850,7 +2863,7 @@ export function CadApp() {
           { id: "mMech", label: tr("Mechanické"), icon: "patternCircular", tone: "ref", disabled: !asmSel, why: WHY_COMP, active: !!mate && MECHANICAL.includes(mate.mode as never), menu: MECHANICAL.map((t) => ({ id: t, label: tr(MATE_LABEL[t]), icon: "datum" as CadIconName, active: mate?.mode === t, onClick: () => asmSel && startMate(asmSel, t) })) },
         ],
       },
-      { label: tr("Pohyb"), items: [{ id: "motion", label: tr("Pohybová studie"), icon: "rotate", tone: "pattern", active: motionOpen, disabled: !(doc.components?.length ?? 0), why: tr("Sestava zatím nemá komponenty."), onClick: () => setMotionOpen((v) => !v), hint: tr("motory na vazbách, kroky, kolize, přehrání a export") }] },
+      { label: tr("Pohyb"), items: [{ id: "motion", label: tr("Pohybová studie"), icon: "rotate", tone: "pattern", active: motionOpen, disabled: !(doc.components?.length ?? 0), why: tr("Sestava zatím nemá komponenty."), onClick: () => setMotionOpen((v) => !v), hint: tr("motory na vazbách, kroky, kolize, přehrání a export") }, { ...springPick.ribbonItem, id: "springBetween" }] },
       {
         label: tr("Analýza"),
         big: 2,
@@ -3039,7 +3052,9 @@ export function CadApp() {
   const prompt = refPick
     ? tr("{0} · nebo zadejte hodnotu v poli · pravé tlačítko v poli = další způsoby · Esc zruší", refPick.label)
     : isAsm
-    ? boltPick
+    ? springPick.prompt
+      ? springPick.prompt
+      : boltPick
       ? tr("Šroubový spoj: klikněte na válcovou plochu díry (strana kliknutí = hlava šroubu) · Esc zruší")
       : mate
       ? matePrompt(mate)
@@ -3665,6 +3680,7 @@ export function CadApp() {
             )}
             {surfSt.panel && !isAsm && <SurfAnalysisPanel doc={doc} selEdges={selEdges} surfaceMode={surface.mode} onSurface={(mode) => setSurface((x) => ({ ...x, mode }))} />}
             {compareOpen && !isAsm && <CompareDialog doc={buildDocView} vp={vp} onView={setCmpView} onClose={() => setCompareOpen(false)} />}
+            {isAsm && springPick.dialog}
             {motionOpen && isAsm && (
               <MotionPanel doc={doc} env={() => asmEnvRef.current()} onDoc={commit} onClose={() => setMotionOpen(false)} snapshot={() => vp.current?.snapshot() ?? null} canvas={() => document.querySelector<HTMLCanvasElement>("main canvas")} flash={flash} />
             )}
@@ -3999,6 +4015,10 @@ export function CadApp() {
               setLibraryOpen(null);
               insertPart(d, group || tr("Normálie"));
               flash(tr("{0} vložen do sestavy.", d.name));
+            }}
+            onOpenSprings={(fam, v) => {
+              setLibraryOpen(null);
+              void springFromTable({ doc, isAsm, commit, openDocInTab, insertPart, flash }, libraryToSpring(fam, v));
             }}
           />
         )}

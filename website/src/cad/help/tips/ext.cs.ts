@@ -597,6 +597,14 @@ export default {
     cmd: 'pohyb motor rotační "Klika" 0..360 krok 5',
     note: "Bez vhodné vazby motor nepřidáte – nejdřív vytvořte např. Závěs nebo Souosost.",
   },
+  springBetween: {
+    what: "Vloží pružinu mezi dva díly: klik na díru nebo plochu A a protější plochu B, tabulka pružiny se předvyplní.",
+    when: "Stírací deska na pružinách, pérový kolík, přítlačná deska – jedním klikem i do všech děr vzoru.",
+    select: "Sestavu se dvěma díly: v dílu A díra / kapsa nebo rovinná plocha, v dílu B protější rovinná plocha.",
+    steps: ["Klikněte na kapsu (válcovou plochu) nebo rovinu A – v modelu nebo v seznamu.", "Klikněte na protější plochu B jiného dílu.", "Upravte d, De, L0, n v tabulce a klikněte Vytvořit."],
+    cmd: "sestava pružina nová mezi #1 Ø21 #2 horní do děr vzoru",
+    note: "Pružina se zamkne k dílu A; délka a síla se přepočítají s vazbami i v pohybové studii (i v Dynamice).",
+  },
 
   // ── Sestava › Analýza ──
   clash: {
