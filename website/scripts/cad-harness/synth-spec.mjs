@@ -1,4 +1,4 @@
-// Synthetic acceptance tool "959" (design CAD-HEADLESS-NAVRH.md 10.1): a cutting die with 19 parts (chamfered plates with
+// Synthetic acceptance tool "900" (design CAD-HEADLESS-NAVRH.md 10.1): a cutting die with 19 parts (chamfered plates with
 // tapped holes, die, strip rails, pillars and bushes, punches, springs, ISO 7089 washers, dowels, ISO 4762 M8/M10 screws,
 // stops, shank, text plate), 70 components and 53 mates (every mate face resolved to an F-number by the first pass),
 // a 40-step linear motor with collisions, 4 drawing sheets (A1 assembly in the assembly document, 3 part sheets with
@@ -60,18 +60,18 @@ export const formulas = { cyl, ring, blind, cbore, plate, TIP, TAP };
 
 /* ───────────── layout (assembly coordinates, mm; base plate corner = origin, Z up) ───────────── */
 export const NAMES = {
-  asm: "959-01-00 Střižný nástroj",
-  base: "959-01-00-01 Základová deska",
-  die: "959-01-00-02 Matrice",
-  stripper: "959-01-00-03 Stírací deska",
-  holder: "959-01-00-04 Kotevní deska",
-  backing: "959-01-00-05 Opěrná deska",
-  top: "959-01-00-06 Horní deska",
-  rail: "959-01-00-07 Vodicí lišta",
-  stop: "959-01-00-08 Doraz",
-  plate: "959-01-00-09 Štítek",
-  shank: "959-01-00-10 Stopka",
-  punch: "959-01-00-11 Střižník",
+  asm: "900-01-00 Střižný nástroj",
+  base: "900-01-00-01 Základová deska",
+  die: "900-01-00-02 Matrice",
+  stripper: "900-01-00-03 Stírací deska",
+  holder: "900-01-00-04 Kotevní deska",
+  backing: "900-01-00-05 Opěrná deska",
+  top: "900-01-00-06 Horní deska",
+  rail: "900-01-00-07 Vodicí lišta",
+  stop: "900-01-00-08 Doraz",
+  plate: "900-01-00-09 Štítek",
+  shank: "900-01-00-10 Stopka",
+  punch: "900-01-00-11 Střižník",
   m10x45: "Šroub M10x45 ISO 4762",
   m10x50: "Šroub M10x50 ISO 4762",
   m8x16: "Šroub M8x16 ISO 4762",
@@ -82,7 +82,7 @@ export const NAMES = {
   spring: "Pružina 2,5×20×38,5",
   washer: "Podložka 8 ISO 7089",
 };
-export const TEXT = "959-01-00";
+export const TEXT = "900-01-00";
 const PIL = [[30, 30], [290, 30], [30, 190], [290, 190]];
 const DIE0 = [60, 50, 40]; // die corner
 const DIE_SCR = [15, 55, 85, 115, 145, 185].flatMap((x) => [[x, 30], [x, 90]]).sort((p, q) => p[1] - q[1] || p[0] - q[0]); // die local
@@ -120,7 +120,7 @@ const cross = (a, b) => a[0] * b[1] - a[1] * b[0];
  * Area of a text in the CAD's text feature (replicad drawText: opentype getPath, M/L/Q/C/Z with exact Bézier edges).
  * Green's theorem: ∮x dy − y dx; line: P0×P1; quadratic: (2·P0×P1 + 2·P1×P2 + P0×P2)/3; cubic: (6·P0×P1 + 3·P0×P2 +
  * P0×P3 + 3·P1×P2 + 3·P1×P3 + 6·P2×P3)/10. TrueType contours are oriented (outer vs. counter), so the signed sum is the
- * filled area as long as glyphs do not overlap (true for "959-01-00" in Roboto Bold; the kernel check confirms it).
+ * filled area as long as glyphs do not overlap (true for "900-01-00" in Roboto Bold; the kernel check confirms it).
  */
 export function textArea(text, size) {
   const cmds = font().getPath(text, 0, 0, size, { drawLayers: false, drawSVG: false }).commands;
@@ -421,13 +421,13 @@ export function restScript(faces) {
     "výkres řez XZ odsazení -110 celý", // odsazení jako u skici: rovina XZ má normálu −Y, −110 = rovina Y = 110 (střed nástroje)
     "výkres kusovník ano",
     "výkres balónky ano",
-    `výkres razítko název="Střižný nástroj" číslo="959-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"`,
+    `výkres razítko název="Střižný nástroj" číslo="900-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"`,
     "kótovat celkově",
   );
   // part sheets live in the PART documents (a sheet of the assembly document always projects the whole assembly):
   // three orthographic views + iso, Chytré kóty generated from the features (holes, threads, chamfers)
   for (const k of PART_SHEETS) {
-    const nm = N[k].replace(/^959-01-00-\d\d /, "");
+    const nm = N[k].replace(/^900-01-00-\d\d /, "");
     L.push(`záložka "${N[k]}"`, `výkres ${SHEET_OPTS[k]} pohledy ${SHEET_VIEWS[k]}`, "kótovat chytře", `výkres razítko název="${nm}" číslo="${N[k].slice(0, 12)}" kreslil="AI" nepředepsané="ISO 2768-mK"`);
   }
   L.push(...header("kontrola"), `záložka "${N.asm}"`, "kolize", "kontrola sestava");
@@ -469,7 +469,7 @@ export function expected(faces) {
   const r3 = (v) => Math.round(v * 1000) / 1000;
   return {
     v: 1,
-    script: "synth-959.txt",
+    script: "synth-tool.txt",
     lines: script(faces).trimEnd().split("\n").length,
     assembly: NAMES.asm,
     components: C.length,

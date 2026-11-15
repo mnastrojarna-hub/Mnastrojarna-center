@@ -31,25 +31,25 @@ import type { DocSummary, Entry, OutFile, RunReport } from "./protocol-types";
 afterEach(() => setLang("cs"));
 
 const B = (s: string) => Buffer.byteLength(s, "utf8");
-const MAIN = "959-01-00 Nástroj";
+const MAIN = "900-01-00 Nástroj";
 const PARTS = [
-  "959-01-00-01 Základová deska",
-  "959-01-00-02 Kotevní deska",
-  "959-01-00-03 Střižnicová deska",
-  "959-01-00-04 Opěrná deska",
-  "959-01-00-05 Stírací deska",
-  "959-01-00-06 Vodicí lišta L",
-  "959-01-00-07 Vodicí lišta P",
-  "959-01-00-08 Střižník Ø20",
-  "959-01-00-09 Střižnice",
-  "959-01-00-10 Sloupek Ø25",
-  "959-01-00-11 Pouzdro Ø25",
-  "959-01-00-12 Pružina 20×2,5×50",
-  "959-01-00-13 Distanční podložka",
-  "959-01-00-14 Doraz",
-  "959-01-00-15 Stopka",
-  "959-01-00-16 Hledáček",
-  "959-01-00-17 Štítek",
+  "900-01-00-01 Základová deska",
+  "900-01-00-02 Kotevní deska",
+  "900-01-00-03 Střižnicová deska",
+  "900-01-00-04 Opěrná deska",
+  "900-01-00-05 Stírací deska",
+  "900-01-00-06 Vodicí lišta L",
+  "900-01-00-07 Vodicí lišta P",
+  "900-01-00-08 Střižník Ø20",
+  "900-01-00-09 Střižnice",
+  "900-01-00-10 Sloupek Ø25",
+  "900-01-00-11 Pouzdro Ø25",
+  "900-01-00-12 Pružina 20×2,5×50",
+  "900-01-00-13 Distanční podložka",
+  "900-01-00-14 Doraz",
+  "900-01-00-15 Stopka",
+  "900-01-00-16 Hledáček",
+  "900-01-00-17 Štítek",
   "Kolík Ø8×40 ISO 8734",
   "Šroub M10×60 ISO 4762",
 ];
@@ -217,21 +217,21 @@ function withDefaultLocale<T>(loc: string, fn: () => T): T {
 
 /** zlatý výstup (cs) syntetického nástroje P10 – mění se jen záměrnou změnou gramatiky */
 const GOLDEN_CS = `MNCAD/1 FAIL lines=397 ops=390 err=1 warn=44 note=6 t=41.8
-✗ L- build.failed "959-01-00-03 Střižnicová deska": stavba selhala: prvek „Úkos 2“
-⚠ L57 drawing.section-miss "959-01-00 Nástroj": rovina řezu neprotíná těleso: list 1, XZ 0
-⚠ L120,L131,L142 ×3 hole.cbore-dropped "959-01-00-01 Základová deska": zahloubení Ø16 se u díry se závitem M10 nepostaví
+✗ L- build.failed "900-01-00-03 Střižnicová deska": stavba selhala: prvek „Úkos 2“
+⚠ L57 drawing.section-miss "900-01-00 Nástroj": rovina řezu neprotíná těleso: list 1, XZ 0
+⚠ L120,L131,L142 ×3 hole.cbore-dropped "900-01-00-01 Základová deska": zahloubení Ø16 se u díry se závitem M10 nepostaví
 ⚠ L200-L395 ×40 select.ambiguous více vyhovujících ploch – použita první
-= L388 measure "959-01-00-01 Základová deska" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
-= L390 measure "959-01-00-03 Střižnicová deska" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
-= L392 measure "959-01-00-08 Střižník Ø20" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
-= L394 clash "959-01-00 Nástroj" total=40 thread=40 real=0 undetermined=0
-= L395 motion "959-01-00 Nástroj" steps=40 stroke=60 conflicts=0 clashes=0 t=12.1
-D "959-01-00 Nástroj" asm comp=70 parts=19 mates=53/53 V.sum=5241.73cm3 V.union=5239.11cm3 m=41.15kg clash=40(thread=40,real=0) sheets=4
-D "959-01-00-01 Základová deska" part feat=12/0/1 V=2347.22cm3 m=18.426kg bbox=300x200x40
-D "959-01-00-03 Střižnicová deska" part feat=8/1/0 V=- bbox=-
-F step "959-01-00 Nástroj.step" 1402368B check=ok run=fail
-F pdf "959-01-00 Nástroj výkres.pdf" 831488B sheets=4 run=fail
-F mncad "959-01-00 Nástroj.mncad" 412001B run=fail
+= L388 measure "900-01-00-01 Základová deska" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
+= L390 measure "900-01-00-03 Střižnicová deska" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
+= L392 measure "900-01-00-08 Střižník Ø20" V=2347.216cm3 m=18.426kg bbox=300x200x40 solids=1 valid=1
+= L394 clash "900-01-00 Nástroj" total=40 thread=40 real=0 undetermined=0
+= L395 motion "900-01-00 Nástroj" steps=40 stroke=60 conflicts=0 clashes=0 t=12.1
+D "900-01-00 Nástroj" asm comp=70 parts=19 mates=53/53 V.sum=5241.73cm3 V.union=5239.11cm3 m=41.15kg clash=40(thread=40,real=0) sheets=4
+D "900-01-00-01 Základová deska" part feat=12/0/1 V=2347.22cm3 m=18.426kg bbox=300x200x40
+D "900-01-00-03 Střižnicová deska" part feat=8/1/0 V=- bbox=-
+F step "900-01-00 Nástroj.step" 1402368B check=ok run=fail
+F pdf "900-01-00 Nástroj výkres.pdf" 831488B sheets=4 run=fail
+F mncad "900-01-00 Nástroj.mncad" 412001B run=fail
 O https://www.mnastrojarna.cz/cad#q=XW830bNW7w.UmyMkW-xoYRPXawojuAAqw exp=2026-11-23 mode=store
 … 1 entries 1453B in protocol-full.txt
 Σ docs=20 comp=70 mates=53/53 V.sum=5241.73cm3 V.union=5239.11cm3 clash=thread:40,real:0 files=3 share=store t=41.8 slow=L395:asm:12.1 mem=812MB`;
@@ -386,8 +386,8 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
     const make = (n: number, pad: number) => {
       const rb = new ReportBuilder({ lang: "cs", lines: 397, now: () => 0 });
       rb.code("parse.error", { line: 5, args: ["kvádr " + "1".repeat(pad)] });
-      for (let i = 0; i < n; i++) rb.code("feature.failed", { line: 10 + i, doc: `959-01-00-0${i} Deska ${i}`, args: [`Úkos ${i}`, "plocha pro úkos nenalezena – zkontrolujte výběr ploch a směr vytažení prvku"] });
-      rb.code("feature.failed", { line: 30, doc: "959-01-00-09 Střižnice", args: ["Zaoblení 7", "poloměr zaoblení 6 mm je větší než nejkratší sousední hrana; zmenšete poloměr nebo vyberte jiné hrany, jinak se těleso nepostaví a sestava zůstane bez střižnice"] });
+      for (let i = 0; i < n; i++) rb.code("feature.failed", { line: 10 + i, doc: `900-01-00-0${i} Deska ${i}`, args: [`Úkos ${i}`, "plocha pro úkos nenalezena – zkontrolujte výběr ploch a směr vytažení prvku"] });
+      rb.code("feature.failed", { line: 30, doc: "900-01-00-09 Střižnice", args: ["Zaoblení 7", "poloměr zaoblení 6 mm je větší než nejkratší sousední hrana; zmenšete poloměr nebo vyberte jiné hrany, jinak se těleso nepostaví a sestava zůstane bez střižnice"] });
       rb.code("parse.unknown", { line: 31, args: ["vložit2"] });
       rb.code("op.failed", { line: 32, args: ["sestava hotovo bez upravit"] });
       rb.code("select.ambiguous", { line: 120 });
@@ -411,7 +411,7 @@ describe("protokol – tvrdý rozpočet a priority (4.1)", () => {
   it("regrese: O se vypíše, když se vejde, i když se delší F nevešel (nález recenze, rozpočet 219)", () => {
     const rb = new ReportBuilder({ lang: "cs", lines: 9, now: () => 0 });
     const r = rb.finish({
-      files: [{ name: "Velmi dlouhý název souboru výkresu sestavy střižného nástroje 959-01-00 včetně všech listů a kusovníku.pdf", format: "pdf", bytes: 831488, sha256: "", doc: "d", sheets: 4 }],
+      files: [{ name: "Velmi dlouhý název souboru výkresu sestavy střižného nástroje 900-01-00 včetně všech listů a kusovníku.pdf", format: "pdf", bytes: 831488, sha256: "", doc: "d", sheets: 4 }],
       share: { url: "https://www.mnastrojarna.cz/cad#q=XW830bNW7w.UmyMkW-xoYRPXawojuAAqw", mode: "store", bytes: 61, exp: "2026-11-23" },
     });
     const s = shortProtocol(r, { budget: 219 });

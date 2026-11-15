@@ -31,7 +31,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => (args.includes(f) ? args[args.indexOf(f) + 1] : d);
 const SELF = fileURLToPath(import.meta.url);
-const defaultScript = path.join(HARNESS, "synth-959.txt");
+const defaultScript = path.join(HARNESS, "synth-tool.txt");
 const expected = () => JSON.parse(fs.readFileSync(path.join(HARNESS, "expected.json"), "utf8"));
 
 /* ───────────── child (loopback) ───────────── */

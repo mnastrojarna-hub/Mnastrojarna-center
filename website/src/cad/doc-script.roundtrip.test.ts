@@ -18,7 +18,7 @@ import type { AsmComponent, BuildResult, CadDoc, Feature } from "./types";
 const WEB = path.resolve(__dirname, "../..");
 // soubor zákazníka: website/.local/fixtures (mimo git); CAD_FIXTURES_DIR = jiná složka (pracovní strom bez .local)
 const REAL = path.join(process.env.CAD_FIXTURES_DIR ?? path.join(WEB, ".local", "fixtures"), "959-dokument.json");
-const SYNTH = path.join(WEB, "scripts", "cad-harness", "synth-959.txt");
+const SYNTH = path.join(WEB, "scripts", "cad-harness", "synth-tool.txt");
 const REPORT = process.env.DOC2TEXT_REPORT;
 const report: Record<string, unknown> = {};
 

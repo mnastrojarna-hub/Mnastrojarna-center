@@ -135,14 +135,14 @@ export function verdict({ col, motion, peakRssMB, stepRss = [], exp = {}, target
 /** expectations: --expect FILE, else expected.json when the script is the synthetic tool, else none (foreign script) */
 export function loadExpect(scriptPath, expectPath) {
   if (expectPath) return JSON.parse(fs.readFileSync(expectPath, "utf8"));
-  if (path.resolve(scriptPath) === path.join(HARNESS, "synth-959.txt")) return JSON.parse(fs.readFileSync(path.join(HARNESS, "expected.json"), "utf8"));
+  if (path.resolve(scriptPath) === path.join(HARNESS, "synth-tool.txt")) return JSON.parse(fs.readFileSync(path.join(HARNESS, "expected.json"), "utf8"));
   return {};
 }
 
 /* ───────────── child: run in the loopback and report ───────────── */
 async function child() {
   exitWithParent(); // never outlive the watching parent (SIGKILL / OOM of the bench)
-  const scriptPath = opt("--script", path.join(HARNESS, "synth-959.txt"));
+  const scriptPath = opt("--script", path.join(HARNESS, "synth-tool.txt"));
   const exp = loadExpect(scriptPath, opt("--expect"));
   const parts = splitScript(fs.readFileSync(scriptPath, "utf8"), Number(opt("--steps", 0)) || null);
   const lb = await load("loopback.ts", { quiet: true });
@@ -171,7 +171,7 @@ async function child() {
 
 /* ───────────── parent: watchdog + report ───────────── */
 async function parent() {
-  const script = opt("--script", path.join(HARNESS, "synth-959.txt"));
+  const script = opt("--script", path.join(HARNESS, "synth-tool.txt"));
   const childArgs = ["--steps", opt("--steps", "40"), "--script", script, ...(opt("--expect") ? ["--expect", opt("--expect")] : [])];
   if (flag("--no-collisions")) childArgs.push("--no-collisions");
   const r = await runWatched(["--max-old-space-size=2048", fileURLToPath(import.meta.url), "--child", ...childArgs], {

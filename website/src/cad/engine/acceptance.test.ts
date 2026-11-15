@@ -17,10 +17,10 @@ import type { DocSummary } from "./protocol-types";
 
 afterEach(() => setLang("cs"));
 
-const PART = "959-01-00-03 Stírací deska";
+const PART = "900-01-00-03 Stírací deska";
 const MSG = "Výsledek má neplatnou geometrii (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat.";
 const NAMES = ["Rotace 1", "Vysunutí 2", "Rotace 3", "Vysunutí 4", "Vysunutí 5", "Rotace 6", "Vysunutí 7", "Rotace 8"];
-const ASM: DocSummary = { ref: "a", name: "959-01-00 Střižný nástroj", kind: "assembly", main: true, components: 70, parts: 19, mates: { total: 53, ok: 53, conflict: 0, missing: 0, suppressed: 0 }, volume_mm3: 8375264.2, volume_union_mm3: 8363690.1, mass_kg: 65.746, bbox: [[-2.5, -10, 0], [317.5, 210, 304]], clashes: { total: 30, thread: 30, real: 0, undetermined: 0 }, sheets: 1 };
+const ASM: DocSummary = { ref: "a", name: "900-01-00 Střižný nástroj", kind: "assembly", main: true, components: 70, parts: 19, mates: { total: 53, ok: 53, conflict: 0, missing: 0, suppressed: 0 }, volume_mm3: 8375264.2, volume_union_mm3: 8363690.1, mass_kg: 65.746, bbox: [[-2.5, -10, 0], [317.5, 210, 304]], clashes: { total: 30, thread: 30, real: 0, undetermined: 0 }, sheets: 1 };
 
 /** běh jako skutečný nástroj: 8 ⚠ prvků dílu (stejná hláška), 2 skutečné kolize pohybu, souhrn pohybu, výpisy */
 function report(lang: CadLang = "cs") {
@@ -28,8 +28,8 @@ function report(lang: CadLang = "cs") {
   const rb = new ReportBuilder({ lang, lines: 397, now: () => 0 });
   NAMES.forEach((n, i) => rb.code("feature.warning", { line: 76 + 2 * i, doc: PART, args: [n, MSG] }));
   rb.code("feature.warning", { line: 120, doc: PART, args: ["Díra 3", "jiná hláška"] });
-  rb.code("clash.real", { line: 390, doc: ASM.name, text: "v pohybu „959-01-00-06 Horní deska“ × „Pružina 2,5×20×38,5“ od kroku 3 (t = 0,15 s): kroků 38, dvojic komponent 4, největší průnik 120,5 mm³" });
-  rb.code("clash.real", { line: 390, doc: ASM.name, text: "v pohybu „959-01-00-03 Stírací deska“ × „959-01-00-11 Střižník“ od kroku 40 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 12,25 mm³" });
+  rb.code("clash.real", { line: 390, doc: ASM.name, text: "v pohybu „900-01-00-06 Horní deska“ × „Pružina 2,5×20×38,5“ od kroku 3 (t = 0,15 s): kroků 38, dvojic komponent 4, největší průnik 120,5 mm³" });
+  rb.code("clash.real", { line: 390, doc: ASM.name, text: "v pohybu „900-01-00-03 Stírací deska“ × „900-01-00-11 Střižník“ od kroku 40 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 12,25 mm³" });
   rb.measure(389, "clash", "total=30 thread=30 underhead=0 real=0 undetermined=0", { doc: ASM.name });
   rb.measure(390, "asm", "motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 clash.steps=41/41 thread=30 real=2 first.real=3", { doc: ASM.name, detail: "Pohybová studie: 40 kroků …" });
   rb.measure(392, "asm", ["lines=28", ...Array.from({ length: 27 }, (_, i) => `${i + 1} | díl ${i + 1} | 1 | ocel | 1,000`)].join("\n"), { doc: ASM.name });
@@ -45,11 +45,11 @@ describe("stručný protokol: hlášky prvků jednoho dílu se stejnou hláškou
     for (const l of lines) expect(grammarKind(l), l).not.toBeNull();
     const merged = lines.filter((l) => l.startsWith("⚠") && l.includes(`feature.warning "${PART}"`));
     expect(merged).toHaveLength(2);
-    expect(merged[0]).toMatch(/^⚠ L76-L90 ×8 feature\.warning "959-01-00-03 Stírací deska": 8 prvků: Výsledek má neplatnou geometrii/);
-    expect(merged[1]).toMatch(/^⚠ L120 feature\.warning "959-01-00-03 Stírací deska": prvek „Díra 3“: jiná hláška$/);
+    expect(merged[0]).toMatch(/^⚠ L76-L90 ×8 feature\.warning "900-01-00-03 Stírací deska": 8 prvků: Výsledek má neplatnou geometrii/);
+    expect(merged[1]).toMatch(/^⚠ L120 feature\.warning "900-01-00-03 Stírací deska": prvek „Díra 3“: jiná hláška$/);
     // obě skutečné kolize pohybu, souhrn pohybu na jednom řádku, řádek D, odkaz – nic z toho nevytlačily ⚠ prvků
     expect(lines.filter((l) => l.includes(" clash.real "))).toHaveLength(2);
-    expect(lines.some((l) => /^= L390 asm "959-01-00 Střižný nástroj" motion steps=40 .*travel=50mm:36,20mm:1 static=33/.test(l))).toBe(true);
+    expect(lines.some((l) => /^= L390 asm "900-01-00 Střižný nástroj" motion steps=40 .*travel=50mm:36,20mm:1 static=33/.test(l))).toBe(true);
     expect(lines.some((l) => l.startsWith(`D "${ASM.name}" asm `) && l.includes(" m=65.75kg bbox=320x220x304 "))).toBe(true);
     expect(lines.some((l) => l.startsWith("O http://127.0.0.1:3471/cad#q="))).toBe(true);
   });
@@ -124,7 +124,7 @@ describe("codeArgs", () => {
 
 describe("řádek D sestavy", () => {
   it("nese obálku bbox= za hmotností", () => {
-    expect(docLine(ASM)).toBe('D "959-01-00 Střižný nástroj" asm comp=70 parts=19 mates=53/53 V.sum=8375.26cm3 V.union=8363.69cm3 m=65.75kg bbox=320x220x304 clash=30(thread=30,real=0) sheets=1');
+    expect(docLine(ASM)).toBe('D "900-01-00 Střižný nástroj" asm comp=70 parts=19 mates=53/53 V.sum=8375.26cm3 V.union=8363.69cm3 m=65.75kg bbox=320x220x304 clash=30(thread=30,real=0) sheets=1');
   });
 });
 
