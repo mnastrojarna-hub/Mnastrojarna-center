@@ -338,7 +338,7 @@ Zadání majitele: „Online CAD neumí pružiny a to ani pro simulaci pohybu.�
   síly pružin, tlumení, dorazy) s grafem a CSV; příklad: stírací deska střihadla na pružinách.
 - [x] H1. (hotovo 15. 11. 01:15) Počkej na `wf_1e1ed70b-b6a` (obnova `resumeFromRunId`), přečti zprávy.
 - [x] H2. (workflow `wf_60b96c19-df2` hotov 15. 11. 03:40, `S/w21/int.patch` nanesen 03:43) Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
-- [x] H3. (hotovo 15. 11. 04:05, 14/14: `S/w21/own-probe.cjs`; prohlížeč = CLI: 107 N v 0,24 s, návrat 0,375 s) Vlastní zkouška v prohlížeči: tabulka → tlačná pružina d 2 De 20 L0 50 n 8 broušená (L0 a De změřit na tělese,
+- [x] H3. (hotovo 15. 11. 03:50, 14/14: `S/w21/own-probe.cjs`; prohlížeč = CLI: 107 N v 0,24 s, návrat 0,375 s) Vlastní zkouška v prohlížeči: tabulka → tlačná pružina d 2 De 20 L0 50 n 8 broušená (L0 a De změřit na tělese,
       tuhost ručně ověřit); sestava se 4 pružinami pod stírací deskou → dynamika → deska se vrátí na doraz, graf, CSV.
 - [ ] H4. Dokumentace (kapitola Prvky – pružiny, Sestavy – pohyb a dynamika, FAQ „Jak udělám pružinu?“), PR, sloučit,
       smazat `w21-*`.
