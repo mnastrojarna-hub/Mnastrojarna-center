@@ -27,6 +27,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 23:50 | Fáze B dokončena agenty i po opravách 3 nálezů kontroly (`w14-int2` commit `5ca5da6`, 25 e2e sad zelených). **Nanesena na větev bez konfliktů** jako commit `e0b08dd` (patch `S/w14/int2/int2.patch`; kontrola NDA čistá; typy, lint 5, překlady 0/0). GitHub Actions `cad-acceptance.yml` omezen na PR do main + ruční spuštění (šetří minuty). BĚŽÍ: testy + build + 14 e2e sad na :3199 (`S/vitest-b-main.log`, `S/build-b-main.log`, pak `S/e2e/*.log`). Po zelené: PR „CAD bez prohlížeče – fáze B“ (zmínit i PR #99 aplikace Sales OS, který je na větvi) → sloučit → smazat `w14-*`. Pružiny: oba balíky v opravách po kontrole. |
 | 15. 11. 00:45 | **Úkol B HOTOV: fáze B sloučena do `main` (PR #100, `e27ff86`)** – s ní i PR #99 aplikace Sales OS, který byl na větvi. Po nanesení: 520 testů, build, 14 e2e sad 0 FAIL. Worktree `w14-*` smazány. Dál: pružiny (H) dobíhají opravy; pak E1 (NDA přejmenování zkušebního nástroje – teď je to možné), D1/D3 dokumentace a PDF příručka, G a F obnovit. |
 | 15. 11. 00:55 | E1 hotov: zkušební nástroj přejmenován na „900-01-00“ (číslo zákazníka z dílů i ze souborů pryč), `synth-959.txt` → `synth-tool.txt`, `expected.json` přegenerován jádrem (gravírovaný text se změnil: objem −0,001 cm³). |
+| 15. 11. 01:00 | Úkol G (výběr oknem) obnoven na novém základu `69f3f58` (main s fází B): workflow `wf_533a7c7c-a4a`, zadání `S/w20/brief.md` s poznámkou o obnovení. Pozor – chyba integrátora: při smazání starých worktree `w20-3d`/`w20-2d` se ztratily rozpracované soubory agenta (`box-select-3d.ts`, `box-select-2d.ts`, test) – agent je napíše znovu. Pravidlo: před `git worktree remove` vždy zálohovat `git status --short` soubory. Běží 2 workflow (H pružiny, G výběr oknem); F kola čeká. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -101,7 +102,9 @@ postupuj podle kapitoly 9.
 10. Zastav server (pravidlo 8), smaž `.next`, commit (česká zpráva, co a proč), push, PR přes
     `mcp__github__create_pull_request` (tabulka kontrol v těle), sloučení `mcp__github__merge_pull_request`
     (`merge_method: "merge"`), `git pull -q origin main`, `git push`.
-11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`.
+11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`. U NEsloučeného worktree nejdřív zálohuj
+    rozpracované soubory (`git -C <wt> add -A && git -C <wt> diff --cached --binary <základ> > S/<…>-wip.patch`) – `remove --force`
+    smaže i nesledované soubory.
 
 Poučení z vlny 15: před sloučením VŽDY pusť i `src/cad/cli/*.test.ts` (hlídá, že jádro pro příkazovou řádku zná každou
 operaci klienta) a e2e sady, které sahají na změněné GUI / texty, i když nejsou v patchi (`grep -l "<starý text>" e2e/`).
@@ -307,7 +310,7 @@ v měření, v sestavě (komponenty), bez WebGL; ve skice (mazání, vazby na v�
 Workflow `wf_533a7c7c-a4a` (skript `…/workflows/scripts/cad-wave20-box-select-wf_533a7c7c-a4a.js`): balíky `3d`
 (worktree `w20-3d`, patch `S/w20/3d.patch`) a `2d` (`w20-2d`, `S/w20/2d.patch`), oba proti `210a1e8`.
 
-- [ ] G1. Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
+- [ ] G1. (obnoveno 15. 11. 01:00 na základu `69f3f58`) Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
 - [ ] G2. Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
       – malé kusy; je-li B už sloučen, nanes na nový `main`).
 - [ ] G3. Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
