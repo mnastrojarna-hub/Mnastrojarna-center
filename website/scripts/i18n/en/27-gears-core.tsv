@@ -1,0 +1,581 @@
+# Kola a ozubení (vlna 19, balík core): tabulky druhů kol, kontrola zadání, tabulka ozubení, soukolí, jádro
+ pero	keyway
+„{0}“ není prvek ozubení.	„{0}“ is not a gearing feature.
+{0}: jádro nevrátilo objemové těleso – zkuste jiné rozměry.	{0}: the kernel did not return a solid – try other dimensions.
+{0}: musí být celé číslo.	{0}: must be a whole number.
+{0}: nejmenší hodnota je {1}.	{0}: the smallest value is {1}.
+{0}: největší hodnota je {1}.	{0}: the largest value is {1}.
+{0}: zadejte číslo.	{0}: enter a number.
+0 = automaticky (11 + 0,06·z₂)·m	0 = automatic (11 + 0.06·z₂)·m
+0 = automaticky 0,15·d_e2	0 = automatic 0.15·d_e2
+0 = automaticky 0,35 × rozteč na vnějším průměru	0 = automatic 0.35 × pitch at the outside diameter
+0 = automaticky 14·m; DIN 3975 doporučuje aspoň (11 + 0,06·z₂)·m	0 = automatic 14·m; DIN 3975 recommends at least (11 + 0.06·z₂)·m
+0 = automaticky 2·m·(0,5 + √(q + 1))	0 = automatic 2·m·(0.5 + √(q + 1))
+0 = automaticky asi 40 roztečí; skutečná vzdálenost se upraví na sudý počet článků řetězu	0 = automatic, about 40 pitches; the actual distance is adjusted to an even number of chain links
+0 = automaticky asi čtvrtina roztečného průměru	0 = automatic, about a quarter of the pitch diameter
+0 = automaticky asi čtvrtina roztečného průměru (řada 5, 6, 8, 10, 12, 16, 20, 25, 30…)	0 = automatic, about a quarter of the pitch diameter (series 5, 6, 8, 10, 12, 16, 20, 25, 30…)
+0 = automaticky atan(u / k), k = 1 až 1,2 podle přesazení (počáteční odhad ISO 23509)	0 = automatic atan(u / k), k = 1 to 1.2 depending on the offset (initial estimate of ISO 23509)
+0 = automaticky čtvrtina roztečného průměru (radiální přímé boky pat)	0 = automatic, a quarter of the pitch diameter (radial straight dedendum flanks)
+0 = automaticky D_p + 3·d_p	0 = automatic D_p + 3·d_p
+0 = automaticky m·z_protikola / 4 (protikolo pak má radiální boky pat)	0 = automatic m·z_mate / 4 (the mating wheel then has radial dedendum flanks)
+0 = automaticky menší z R_e/3 a 10·m	0 = automatic, the smaller of R_e/3 and 10·m
+0 = automaticky patní průměr + 2·max(2,5·m; 8 mm)	0 = automatic root diameter + 2·max(2.5·m; 8 mm)
+0 = automaticky; skutečná vzdálenost se upraví na celý počet zubů řemene	0 = automatic; the actual distance is adjusted to a whole number of belt teeth
+0 = plný disk; jinak vybrání z obou stran mezi nábojem a věncem (věnec 3·m pod patou zubu)	0 = solid disc; otherwise a recess on both sides between hub and rim (rim 3·m below the tooth root)
+0 = přímé zuby	0 = straight teeth
+0 = přímé zuby; šikmé vnitřní ozubení má stejný smysl stoupání jako pastorek	0 = straight teeth; a helical internal gear has the same hand as the pinion
+0 = přímé zuby; šikmý hřeben zabírá se šikmým kolem stejného úhlu a opačného smyslu	0 = straight teeth; a helical rack meshes with a helical gear of the same angle and opposite hand
+0 = přímé zuby; zakřivené (spirální) zuby mívají 35° (Gleason). Tvar boku zakřivených zubů je jmenovitý, ne obálkový – pro zástavbu, hmotnost a výkres	0 = straight teeth; curved (spiral) teeth usually have 35° (Gleason). The flank form of curved teeth is nominal, not generated – for installation, mass and drawings
+0 = přímé zuby; zakřivené zuby mívají 35°	0 = straight teeth; curved teeth usually have 35°
+0 = spočítat z posunutí; zadaná hodnota → součet posunutí Σx se dopočítá a rozdělí na obě kola	0 = compute from the profile shifts; a given value → the sum of shifts Σx is computed and split between both wheels
+0 = uprostřed mezi středovou dírou a patou laloků	0 = midway between the centre hole and the lobe roots
+0 = z·p; jinak se z délky dopočítá počet zubů z = round(L / p)	0 = z·p; otherwise the number of teeth is computed from the length z = round(L / p)
+automaticky: kolo epicykloida, pastorek kruhové oblouky; lze vynutit	automatic: wheel epicycloid, pinion circular arcs; can be forced
+Boční vůle	Backlash
+Boční vůle – podíl kola	Backlash – this wheel's share
+Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.	Backlash {0} mm is larger than 0.3·m – the tooth would be too thin.
+Boční vůle celkem	Total backlash
+bod, do kterého přijde počátek kola (střed spodního čela)	point where the wheel origin goes (centre of the bottom face)
+Boky hypoidních zubů jsou jmenovité (nejsou sdružené) – mimo střední bod záběru čekejte několik setin mm mezery nebo přesahu.	Hypoid tooth flanks are nominal (not conjugate) – away from the mean contact point expect a few hundredths of a mm of gap or overlap.
+Boky zubů se sejdou pod hlavovou kružnicí – hlavový průměr vychází Ø{0}.	The tooth flanks meet below the tip circle – the tip diameter is Ø{0}.
+cykloidní	cycloidal
+Cykloidní (hodinové) kolo	Cycloidal (clock) wheel
+Cykloidní kolo m{0} z{1}	Cycloidal wheel m{0} z{1}
+Cykloidní pastorek m{0} z{1}	Cycloidal pinion m{0} z{1}
+Cykloidní reduktor N{0}	Cycloidal reducer N{0}
+Cykloidní soukolí m{0} z{1}/z{2}	Cycloidal gear pair m{0} z{1}/z{2}
+cyklokotouč	cyclo disc
+čelní	spur
+Čelní kolo s přímými zuby	Spur gear with straight teeth
+Čelní kolo se šikmými zuby	Helical spur gear
+Čelní kolo se šípovými zuby	Herringbone spur gear
+čelní modul kola = osový modul šneku (DIN 3975); d₂ = m·z	transverse module of the wheel = axial module of the worm (DIN 3975); d₂ = m·z
+Čep hřídele Ø{0} je větší než hlavový průměr šneku Ø{1}.	Shaft journal Ø{0} is larger than the worm tip diameter Ø{1}.
+Čep hřídele Ø{0} musí být větší než díra.	Shaft journal Ø{0} must be larger than the bore.
+Čep Ø{0} je příliš velký – profil kotouče by se podřezal (největší možný Ø{1}). Zmenšete čep nebo výstřednost.	Pin Ø{0} is too large – the disc profile would be undercut (largest possible Ø{1}). Reduce the pin or the eccentricity.
+Čepy hřídele délka	Shaft journal length
+Čepy hřídele Ø	Shaft journal Ø
+Čepy hřídele potřebují průměr i délku – doplňte obojí, nebo obojí nechte nulové.	Shaft journals need both a diameter and a length – fill in both or leave both at zero.
+Čepy Ø{0} se na roztečné kružnici překrývají – zmenšete průměr čepu nebo počet čepů.	Pins Ø{0} overlap on the pin circle – reduce the pin diameter or the number of pins.
+Čepy se nedotýkají vnitřního průměru věnce Ø{0} – zvětšete čep nebo zmenšete výstřednost.	The pins do not touch the inner diameter of the ring Ø{0} – enlarge the pin or reduce the eccentricity.
+Čepy věnce	Ring pins
+Člen	Member
+Délka hřebene	Rack length
+délka každého konce hřídele; 0 = bez čepů	length of each shaft end; 0 = no journals
+Délka ozubení	Toothed length
+Délka površky kužele	Cone distance
+Délka řemene	Belt length
+Délka řetězu	Chain length
+Délka se zaokrouhlí na celý počet zubů: {0} zubů = {1} mm.	The length is rounded to a whole number of teeth: {0} teeth = {1} mm.
+Délka závitu šneku	Worm thread length
+díra {0}{1}	bore {0}{1}
+Díra kola	Wheel bore
+Díra kola 1	Bore of wheel 1
+Díra kola 2	Bore of wheel 2
+Díra Ø{0} (s drážkou) zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.	Bore Ø{0} (with keyway) reaches into the teeth – the root diameter is Ø{1}. Reduce the bore or enlarge the wheel.
+Díra Ø{0} se do malého konce kola nevejde (přední čelo má Ø{1}).	Bore Ø{0} does not fit into the small end of the wheel (front face Ø{1}).
+díry {0}×Ø{1}	holes {0}×Ø{1}
+Díry pro čepy	Holes for pins
+díry pro čepy výstupního unašeče; 0 = žádné	holes for the pins of the output carrier; 0 = none
+Drážka pro pero se bez díry nevytvoří – zadejte průměr díry.	A keyway is not created without a bore – enter the bore diameter.
+Drážka uprostřed	Centre groove
+Drážka uprostřed smí být nejvýš třetina šířky kola ({0} mm).	The centre groove may be at most a third of the face width ({0} mm).
+drážka v díře podle DIN 6885-1	keyway in the bore according to DIN 6885-1
+drážka v náboji podle DIN 6885-1 (šířka a hloubka podle průměru díry)	keyway in the hub according to DIN 6885-1 (width and depth from the bore diameter)
+Epicykloida (lomený oblouk)	Epicycloid (pointed arch)
+Hlava {0} mm je vyšší než průměr tvořicí kružnice ({1} mm).	Addendum {0} mm is higher than the rolling circle diameter ({1} mm).
+Hlava {0} mm je vyšší než špička zubu ({1} mm) – boky se sejdou dřív.	Addendum {0} mm is higher than the tooth point ({1} mm) – the flanks meet earlier.
+Hlavová kružnice věnce je zvětšena na Ø{0} (základní kružnice + 0,1·m), aby zuby končily na evolventě.	The tip circle of the ring is enlarged to Ø{0} (base circle + 0.1·m) so that the teeth end on the involute.
+Hlavová vůle	Tip clearance
+Hlavová vůle {0} mm je menší než 0,15·m.	Tip clearance {0} mm is smaller than 0.15·m.
+Hlavový průměr	Tip diameter
+Hlavový průměr (v hrdle)	Tip diameter (at the throat)
+Hlavový průměr kotouče	Tip diameter of the disc
+Hotové kolo	Finished wheel
+hotové kolo, jen soustružený polotovar bez zubů, nebo jen zubové mezery vyříznuté do aktivního tělesa	finished wheel, only the turned blank without teeth, or only the tooth spaces cut into the active body
+hřeben	rack
+Hřeben s {0} zuby se bude stavět dlouho – zvažte kratší díl.	A rack with {0} teeth will take long to build – consider a shorter part.
+HTD 3M–14M (ISO 13050, obloukový zub) nebo T5 / T10 (DIN 7721, lichoběžníkový zub); AT a GT2 zde nejsou – tvar drážky je firemní	HTD 3M–14M (ISO 13050, curvilinear tooth) or T5 / T10 (DIN 7721, trapezoidal tooth); AT and GT2 are not included – their groove form is proprietary
+HTD 3M–14M nebo T5 / T10	HTD 3M–14M or T5 / T10
+Hypocykloida s tvořicí kružnicí {0} mm nedosáhne na patní kružnici – zmenšete výšku paty.	A hypocycloid with a rolling circle of {0} mm does not reach the root circle – reduce the dedendum.
+hypoidní	hypoid
+Hypoidní kolo	Hypoid gear
+Hypoidní pastorek z{0}/{1}	Hypoid pinion z{0}/{1}
+Hypoidní soukolí z{0}/z{1}	Hypoid gear pair z{0}/z{1}
+Hypoidní talířové kolo z{0}/{1}	Hypoid ring gear z{0}/{1}
+ISO 53 A (DIN 867): ρ 0,38, pata 1,25	ISO 53 A (DIN 867): ρ 0.38, dedendum 1.25
+ISO 53 B: ρ 0,30, pata 1,25	ISO 53 B: ρ 0.30, dedendum 1.25
+ISO 53 C: ρ 0,25, pata 1,25	ISO 53 C: ρ 0.25, dedendum 1.25
+ISO 53 D: ρ 0,39, pata 1,40	ISO 53 D: ρ 0.39, dedendum 1.40
+ISO 606 dává nejmenší a největší tvar mezery (r_i, r_e, úhel lůžka); střední je uprostřed	ISO 606 gives the smallest and largest tooth gap form (r_i, r_e, seating angle); medium is in between
+ISO 606: typ A = bez náboje (délka 0), typ B = náboj na jedné straně, typ C = na obou stranách	ISO 606: type A = no hub (length 0), type B = hub on one side, type C = on both sides
+jen pro tabulku ozubení; vyplní režim Soukolí (0 = neuvádět)	only for the gearing data table; filled in by pair mode (0 = omit)
+jen vlastní profil: poloměr zaoblení hlavy nástroje v modulech	custom profile only: tool tip radius in modules
+jen vlastní profil: poloměr zaoblení paty v modulech	custom profile only: root radius in modules
+jen vlastní profil: výška hlavy zubu v modulech	custom profile only: addendum in modules
+jen vlastní profil: výška paty zubu v modulech	custom profile only: dedendum in modules
+když není zadané z₂: z₂ = zaokrouhlené i·z₁ (0 = použít z₂)	when z₂ is not given: z₂ = rounded i·z₁ (0 = use z₂)
+kladné = silnější pata a větší hlavový průměr (odstraní podřezání); režim Soukolí ho dopočítá z osové vzdálenosti	positive = thicker root and larger tip diameter (removes undercut); pair mode computes it from the centre distance
+kladné = zuby věnce dál od osy (větší patní i hlavový průměr)	positive = ring teeth further from the axis (larger root and tip diameter)
+kolo	wheel
+Kolo	Wheel
+kolo (hnací, hlava z epicykloidy) nebo pastorek s lístky (hlava z kruhových oblouků podle BS 978-2)	wheel (driver, epicycloidal addendum) or leaf pinion (circular-arc addendum according to BS 978-2)
+Kolo {0}: {1}	Wheel {0}: {1}
+Kolo {0}: hlava protikola zasahuje pod začátek evolventy (Ø{1} < Ø{2}) – hrozí kolize v patě. Zvětšete posunutí tohoto kola.	Wheel {0}: the tip of the mating wheel reaches below the start of the involute (Ø{1} < Ø{2}) – risk of root interference. Increase the profile shift of this wheel.
+Kolo 1 musí mít aspoň 5 zubů.	Wheel 1 must have at least 5 teeth.
+Kolo 2 musí mít aspoň 5 zubů (zadejte z₂ nebo převod i).	Wheel 2 must have at least 5 teeth (enter z₂ or the ratio i).
+Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.	The wheel has no bore – the gear mate needs a cylindrical face (bore); enter the bore diameter.
+Kolo s {0} zuby běží neklidně (mnohoúhelníkový efekt) – doporučuje se aspoň 9, pro rychlý chod 17 zubů.	A sprocket with {0} teeth runs unevenly (polygon effect) – at least 9 teeth are recommended, 17 for high speed.
+Kotouč	Disc
+Kotouč cykloidního reduktoru	Cycloidal reducer disc
+Kotouč cykloreduktoru N{0}	Cycloidal reducer disc N{0}
+Kotouč je vložen posunutý o výstřednost e; výstředníkový hřídel a unašeč doplňte jako další díly a spojte je vazbami sami.	The disc is inserted offset by the eccentricity e; add the eccentric shaft and output carrier as further parts and connect them with mates yourself.
+kotouč s laloky, nebo věnec s čepy (počátek ve středu roztečné kružnice čepů)	disc with lobes, or ring with pins (origin at the centre of the pin circle)
+Kruhové oblouky	Circular arcs
+který člen hypoidního páru se staví: pastorek, nebo talířové kolo (oba se zadávají stejnou tabulkou)	which member of the hypoid pair is built: pinion or ring gear (both are entered with the same table)
+kterým směrem se rohatka volně otáčí (západka drží opačný směr)	direction in which the ratchet turns freely (the pawl holds the opposite direction)
+kuželové	bevel
+Kuželové kolo	Bevel gear
+Kuželové soukolí m{0} z{1}/z{2}	Bevel gear pair m{0} z{1}/z{2}
+Levé	Left
+Malá řemenice	Small pulley
+Malé kolo	Small sprocket
+Malý konec kola vychází příliš tenký (přední čelo Ø{0}) – zmenšete šířku ozubení.	The small end of the wheel is too thin (front face Ø{0}) – reduce the face width.
+mění osovou vzdálenost: a = m·(q + z + 2x)/2	changes the centre distance: a = m·(q + z + 2x)/2
+Mezera závitu je u dna užší než zaoblení – zmenšete úhel profilu.	The thread space at the bottom is narrower than the fillet – reduce the profile angle.
+Modul	Module
+modul (ISO 54); roztečný průměr d = m·z	module (ISO 54); pitch diameter d = m·z
+modul hodinového ozubení (BS 978-2)	module of the clock gearing (BS 978-2)
+Modul mₙ	Module mₙ
+Modul musí být kladný.	The module must be positive.
+modul na velkém konci (ISO 23509)	module at the large end (ISO 23509)
+modul na velkém konci (ISO 23509): vnější roztečný průměr d_e = m·z	module at the large end (ISO 23509): outer pitch diameter d_e = m·z
+modul; roztečný průměr d = m·z (hodinové ozubení podle BS 978-2)	module; pitch diameter d = m·z (clock gearing according to BS 978-2)
+Montážní vzdálenost (průsečík os – zadní čelo)	Mounting distance (axis crossing – back face)
+Montážní vzdálenost (vrchol – zadní čelo)	Mounting distance (apex – back face)
+musí odpovídat šneku – určuje úhel sklonu zubů kola	must match the worm – determines the helix angle of the wheel teeth
+musí odpovídat šneku: střední průměr šneku d_m1 = q·m	must match the worm: mean worm diameter d_m1 = q·m
+náboj {0}×{1}	hub {0}×{1}
+Náboj délka	Hub length
+Náboj na straně	Hub on side
+Náboj Ø{0} je příliš velký – musí být menší než patní průměr zmenšený o 2·m (Ø{1}).	Hub Ø{0} is too large – it must be smaller than the root diameter minus 2·m (Ø{1}).
+Náboj Ø{0} je větší než největší dovolený průměr vedle zubů d_g = {1} mm (ISO 606) – destičky řetězu by o něj dřely.	Hub Ø{0} is larger than the largest diameter allowed next to the teeth d_g = {1} mm (ISO 606) – the chain plates would rub on it.
+Náboj Ø{0} je větší než zadní čelo kola (Ø{1}).	Hub Ø{0} is larger than the back face of the wheel (Ø{1}).
+Náboj Ø{0} musí být větší než díra s drážkou (Ø{1}).	Hub Ø{0} must be larger than the bore with keyway (Ø{1}).
+Náboj potřebuje průměr i délku – doplňte obojí, nebo obojí nechte nulové.	The hub needs both a diameter and a length – fill in both or leave both at zero.
+nahoře = ve směru osy kola, dole = proti směru, nebo na obou stranách	top = along the wheel axis, bottom = against it, or on both sides
+Nejmenší mezera	Smallest gap
+Největší mezera	Largest gap
+Největší průměr náboje	Largest hub diameter
+Není do čeho řezat zuby – nejdřív vytvořte polotovar.	There is nothing to cut the teeth into – create the blank first.
+Neznámý druh soukolí „{0}“.	Unknown gear pair kind „{0}“.
+normálná boční vůle soukolí; 0 = automaticky 0,04·mₙ (polovina na každé kolo)	normal backlash of the gear pair; 0 = automatic 0.04·mₙ (half for each wheel)
+Normálný modul	Normal module
+normálný modul (ISO 54)	normal module (ISO 54)
+normálný modul (ISO 54), společný oběma kolům	normal module (ISO 54), common to both wheels
+normálný modul (ISO 54); rozteč podél hřebene p = π·mₙ / cos β	normal module (ISO 54); pitch along the rack p = π·mₙ / cos β
+normálný modul (ISO 54); roztečný průměr d = mₙ·z / cos β	normal module (ISO 54); pitch diameter d = mₙ·z / cos β
+normálný úhel záběru (běžně 20°)	normal pressure angle (usually 20°)
+nové těleso, přidat k aktivnímu tělesu, nebo od něj odebrat	new body, add to the active body, or subtract from it
+Ø čepu d_p	Pin Ø d_p
+Ø díry pro ložisko	Bearing bore Ø
+Obě strany	Both sides
+od dna hřebene po hlavu zubu	from the bottom of the rack to the tooth tip
+Odlehčovací díry – počet	Lightening holes – count
+Odlehčovací díry – roztečná Ø	Lightening holes – pitch circle Ø
+Odlehčovací díry Ø	Lightening holes Ø
+Odlehčovací díry Ø{0} na roztečné Ø{1} se nevejdou mezi náboj a věnec (volný pás je Ø{2} až Ø{3}).	Lightening holes Ø{0} on pitch circle Ø{1} do not fit between hub and rim (the free band is Ø{2} to Ø{3}).
+Odlehčovací díry se na roztečné kružnici překrývají – uberte počet nebo průměr.	The lightening holes overlap on the pitch circle – reduce their number or diameter.
+Osová rozteč	Axial pitch
+Osová tloušťka závitu	Axial thread thickness
+Osová vzdálenost	Centre distance
+Osová vzdálenost {0} mm je příliš daleko od jmenovité {1} mm – posunutím profilu lze upravit nejvýš asi ±1,5·m.	Centre distance {0} mm is too far from the nominal {1} mm – profile shift can adjust at most about ±1.5·m.
+Osová vzdálenost {0} mm je příliš malá – kola by se dotýkala.	Centre distance {0} mm is too small – the wheels would touch.
+Osová vzdálenost a	Centre distance a
+Osová vzdálenost bez posunutí	Centre distance without shift
+Osový modul	Axial module
+Osový modul mₓ	Axial module mₓ
+osový modul šneku = čelní modul kola (DIN 3975)	axial module of the worm = transverse module of the wheel (DIN 3975)
+osový modul šneku = čelní modul šnekového kola (DIN 3975); osová rozteč pₓ = π·m	axial module of the worm = transverse module of the worm wheel (DIN 3975); axial pitch pₓ = π·m
+ozubená část je o 2 mm (od rozteče 8 mm o 3 mm) širší než řemen	the toothed part is 2 mm (from pitch 8 mm: 3 mm) wider than the belt
+Ozubená řemenice	Timing pulley
+Ozubený hřeben m{0} z{1}	Gear rack m{0} z{1}
+pastorek	pinion
+Pastorek	Pinion
+Pastorek (lístky)	Pinion (leaves)
+Pastorek s hřebenem m{0} z{1}	Pinion with rack m{0} z{1}
+Patní průměr	Root diameter
+Patní průměr kotouče	Root diameter of the disc
+Patní průměr kotouče vychází záporný.	The root diameter of the disc comes out negative.
+Patní průměr šneku vychází záporný – zvětšete q.	The worm root diameter comes out negative – increase q.
+Patní průměr vychází záporný – zvětšete počet zubů nebo posunutí x.	The root diameter comes out negative – increase the number of teeth or the profile shift x.
+Patní průměr vychází záporný – zvětšete počet zubů nebo zmenšete výšku paty.	The root diameter comes out negative – increase the number of teeth or reduce the dedendum.
+Plášť ozubení se nepodařilo uzavřít ({0} volných hran) – zkuste mírně změnit rozměry.	The gear shell could not be closed ({0} free edges) – try slightly different dimensions.
+Plné čepy	Solid pins
+plné čepy (jeden kus s věncem), nebo jen díry, do kterých se čepy vloží	solid pins (one piece with the ring), or only holes into which the pins are inserted
+po površce kužele; 0 = automaticky menší z R_e/3 a 10·m	along the cone generator; 0 = automatic, the smaller of R_e/3 and 10·m
+Počet čepů	Number of pins
+Počet čepů N	Number of pins N
+počet čepů věnce; kotouč má o jeden lalok méně a převod je N − 1	number of ring pins; the disc has one lobe less and the ratio is N − 1
+počet čepů věnce; převod je N − 1	number of ring pins; the ratio is N − 1
+Počet článků řetězu	Number of chain links
+počet chodů (závitů) šneku; stoupání p_z = z₁·pₓ	number of worm starts (threads); lead p_z = z₁·pₓ
+počet chodů šneku	number of worm starts
+Počet chodů šneku	Number of worm starts
+Počet chodů šneku z₁	Number of worm starts z₁
+Počet chodů z₁	Number of starts z₁
+Počet laloků kotouče	Number of disc lobes
+Počet lístků	Number of leaves
+počet lístků pastorku	number of pinion leaves
+Počet měřených zubů	Number of teeth spanned
+počet odlehčovacích děr v disku; 0 = žádné	number of lightening holes in the disc; 0 = none
+Počet řad	Number of strands
+počet zubů hřebene	number of rack teeth
+počet zubů kola	number of wheel teeth
+počet zubů kola, nebo počet lístků pastorku	number of wheel teeth, or number of pinion leaves
+počet zubů malé řemenice	number of teeth of the small pulley
+počet zubů malého kola	number of teeth of the small sprocket
+počet zubů pastorku	number of pinion teeth
+počet zubů pastorku (menšího kola)	number of pinion teeth (smaller wheel)
+Počet zubů protikola	Number of teeth of the mating wheel
+počet zubů rohatky	number of ratchet teeth
+Počet zubů řemene	Number of belt teeth
+počet zubů řemenice; roztečný průměr d_0 = z·p / π	number of pulley teeth; pitch diameter d_0 = z·p / π
+počet zubů spoluzabírajícího kola – určuje tvořicí kružnici hlavy (polovina roztečné kružnice protikola → radiální boky protikola)	number of teeth of the mating wheel – sets the addendum rolling circle (half the pitch circle of the mate → radial flanks on the mate)
+počet zubů šnekového kola; převod i = z / z₁	number of worm wheel teeth; ratio i = z / z₁
+počet zubů šnekového kola; převod i = z₂/z₁	number of worm wheel teeth; ratio i = z₂/z₁
+počet zubů talířového kola	number of ring gear teeth
+počet zubů tohoto kola	number of teeth of this wheel
+počet zubů velké řemenice	number of teeth of the large pulley
+počet zubů velkého kola	number of teeth of the large wheel
+počet zubů věnce s vnitřním ozubením	number of teeth of the internal ring gear
+počet zubů věnce; pastorek by měl mít aspoň o 10 zubů méně	number of ring teeth; the pinion should have at least 10 teeth fewer
+počet zubů; délka hřebene L = z·p (nebo zadejte délku níže)	number of teeth; rack length L = z·p (or enter the length below)
+počet zubů; pod 9 zubů běží řetěz neklidně, pro rychlý chod aspoň 17	number of teeth; below 9 teeth the chain runs unevenly, for high speed at least 17
+pod 17 zubů se zuby bez posunutí profilu podřezávají – tabulka nabídne potřebné x	below 17 teeth, teeth without profile shift are undercut – the table offers the necessary x
+Pod patou zubu zbývá nad dírou jen {0} mm materiálu – věnec bývá aspoň 2·m.	Only {0} mm of material is left between the bore and the tooth root – the rim is usually at least 2·m.
+Podříznutí čela	Face undercut
+Poloha odkazem	Position by reference
+poloměr frézovací hlavy (oblouk stopy zubu); 0 = automaticky střední délka površky kola	cutter head radius (arc of the tooth trace); 0 = automatic, mean cone distance of the wheel
+poloměr frézovací hlavy, který určuje oblouk stopy zubu; 0 = automaticky střední délka površky R_m	cutter head radius that sets the arc of the tooth trace; 0 = automatic, mean cone distance R_m
+Poloměr hrdla	Throat radius
+Poloměr hrdla vychází {0} mm – zvětšete q.	The throat radius comes out as {0} mm – increase q.
+Poloměr nástroje r_c0	Cutter radius r_c0
+Poloměr oblouku hlavy	Addendum arc radius
+Poloměr tvořicí kružnice hlavy	Addendum rolling circle radius
+Poloměr tvořicí kružnice paty	Dedendum rolling circle radius
+poloměr zaoblení mezi čelem a hřbetem zubu	fillet radius between tooth face and tooth back
+Polotovar (bez zubů)	Blank (no teeth)
+pootočení zubů kolem osy kola (pro nastavení záběru)	rotation of the teeth about the wheel axis (for setting the mesh)
+Posunutí kola 1	Profile shift of wheel 1
+Posunutí kola 2	Profile shift of wheel 2
+posunutí kola: a = m·(q + z₂ + 2x)/2	wheel profile shift: a = m·(q + z₂ + 2x)/2
+Posunutí profilu	Profile shift
+posunutí profilu kola 1 (při automatickém rozdělení se přepíše)	profile shift of wheel 1 (overwritten by automatic distribution)
+posunutí profilu kola 2 (při automatickém rozdělení se přepíše)	profile shift of wheel 2 (overwritten by automatic distribution)
+posunutí profilu pastorku – zvedne osu pastorku nad hřeben o x·m	pinion profile shift – lifts the pinion axis above the rack by x·m
+Posunutí profilu x	Profile shift x
+Posunutí rozdělit automaticky	Distribute the shifts automatically
+Posunutí x₁	Shift x₁
+Posunutí x₂	Shift x₂
+Posuv hřebene na otáčku	Rack travel per revolution
+Pravé	Right
+Pro toto přesazení a úhel sklonu se roztečné kužely nepodařilo najít – zmenšete přesazení E nebo úhel sklonu pastorku, případně zadejte úhel kužele kola.	No pitch cones were found for this offset and spiral angle – reduce the offset E or the pinion spiral angle, or enter the wheel pitch cone angle.
+Provozní úhel záběru	Working pressure angle
+průchozí díra (nástrčný šnek); 0 = plný	through bore (shell worm); 0 = solid
+Průměr bočnic	Flange diameter
+Průměr čepu	Pin diameter
+průměr čepu (válečku) věnce	diameter of the ring pin (roller)
+průměr čepu věnce	diameter of the ring pin
+průměr díry = průměr válečku unašeče + 2·e	hole diameter = carrier roller diameter + 2·e
+průměr díry pro hřídel; 0 = bez díry	shaft bore diameter; 0 = no bore
+průměr konců hřídele po obou stranách závitu; 0 = bez čepů	diameter of the shaft ends on both sides of the thread; 0 = no journals
+průměr kružnice os čepů	diameter of the circle through the pin axes
+průměr kružnice, na které leží osy čepů věnce	diameter of the circle on which the ring pin axes lie
+Průměr kuliček D_M	Ball diameter D_M
+Průměr kuličky	Ball diameter
+Průměr měřicího válečku	Measuring pin diameter
+průměr měřicího válečku v mezeře; 0 = automaticky 1,728·mₙ zaokrouhleno na 0,25 mm	diameter of the measuring pin in the space; 0 = automatic 1.728·mₙ rounded to 0.25 mm
+průměr měřicích kuliček / válečků pro rozměr M; 0 = automaticky 1,728·mₙ zaokrouhleno na 0,25 mm	diameter of the measuring balls / pins for dimension M; 0 = automatic 1.728·mₙ rounded to 0.25 mm
+průměr náboje; 0 = bez náboje (musí být menší než patní průměr)	hub diameter; 0 = no hub (must be smaller than the root diameter)
+průměr odlehčovacích děr	diameter of the lightening holes
+průměr přes hroty zubů	diameter over the tooth tips
+průměr roztečné kružnice děr; 0 = uprostřed mezi nábojem a věncem	pitch circle diameter of the holes; 0 = midway between hub and rim
+Průměr válečku	Roller diameter
+Průměr válečku D_M	Pin diameter D_M
+přesah náboje přes čelo kola; 0 = bez náboje	hub projection beyond the wheel face; 0 = no hub
+Přesazení {0} mm je menší než 0,02·d_e2 ({1} mm) – použijte kuželové kolo se zakřivenými zuby.	Offset {0} mm is smaller than 0.02·d_e2 ({1} mm) – use a spiral bevel gear.
+Přesazení nad 0,25·d_e2 ({0} mm) je neobvyklé – skluz v záběru bude velký.	An offset above 0.25·d_e2 ({0} mm) is unusual – sliding in the mesh will be high.
+Přesazení os	Axis offset
+Přesazení os E	Axis offset E
+Přesně: celý profil (úsečky a oblouky). Rozměry zubu nejsou normalizované – volí se podle západky.	Exact: the whole profile (lines and arcs). The tooth dimensions are not standardised – they are chosen to suit the pawl.
+Přesně: celý profil základního hřebene ISO 53 (rovinné boky, kruhové zaoblení paty), i u šikmého hřebene.	Exact: the whole ISO 53 basic rack profile (planar flanks, circular root fillet), also for a helical rack.
+Přesně: epicykloida hlavy a hypocykloida / radiální bok paty. Poměry zubu (tloušťka, výšky) jsou výchozí hodnoty podle BS 978-2 – ověřte je podle normy nebo protikola a případně přepište.	Exact: addendum epicycloid and dedendum hypocycloid / radial flank. Tooth proportions (thickness, heights) are defaults according to BS 978-2 – check them against the standard or the mating wheel and overwrite if needed.
+Přesně: evolventa, přechodová křivka paty (trochoida základního hřebene se zaoblením ρ), podřezání, kružnice. Nemodeluje se: modifikace hlavy a podélná modifikace zubu.	Exact: involute, root fillet (trochoid of the basic rack with radius ρ), undercut, circles. Not modelled: tip relief and lead crowning.
+Přesně: evolventa, přechodová křivka paty, podřezání a šroubová plocha boku (proložená, odchylka pod 0,0002 mm). Nemodeluje se: modifikace zubu; u šípového ozubení výběh nástroje ve hrotu.	Exact: involute, root fillet, undercut and the helical flank surface (interpolated, deviation below 0.0002 mm). Not modelled: tooth modifications; the tool run-out at the apex of herringbone teeth.
+Přesně: evolventní boky a průměry. Přibližně: zaoblení paty (oblouk 0,3·m – skutečné závisí na obrážecím noži); kontrola kolize hlav se spoluzabírajícím pastorkem je jen orientační.	Exact: involute flanks and diameters. Approximate: root fillet (arc 0.3·m – the real one depends on the shaper cutter); the tip interference check with the mating pinion is only indicative.
+Přesně: křivka kotouče (ekvidistanta epitrochoidy, proložená 12 body na půl laloku) a kružnice věnce. Vůle mezi kotoučem a čepy se nemodeluje – přidejte ji zmenšením Ø čepu v tabulce kotouče.	Exact: the disc curve (equidistant of the epitrochoid, interpolated with 12 points per half lobe) and the ring circles. The clearance between disc and pins is not modelled – add it by reducing the pin Ø in the disc table.
+Přesně: profil ve střední rovině (evolventa sdružená s osovým profilem šneku ZA), hrdlo a průměry. Přibližně: boky mimo střední rovinu jsou evolventní šroubová plocha, ne obálka šneku – pro zástavbu a výkres, ne pro výrobu ozubení.	Exact: the mid-plane profile (involute conjugate to the axial profile of the ZA worm), throat and diameters. Approximate: flanks away from the mid-plane are an involute helicoid, not the worm envelope – for installation and drawings, not for cutting the teeth.
+Přesně: rozteč, roztečný a hlavový průměr. Přibližně: tvar drážky (HTD jeden oblouk se zaoblenou hranou, T lichoběžník bez zaoblení) – pro výrobu ozubení použijte profil nástroje podle normy.	Exact: pitch, pitch and tip diameter. Approximate: the groove form (HTD one arc with a rounded edge, T trapezoid without rounding) – to cut the teeth use the tool profile according to the standard.
+Přesně: roztečný, patní a hlavový průměr a oblouky zubové mezery podle ISO 606. Zjednodušeně: boční odlehčení zubu (oblouk r_x = p začínající 0,44·p pod hlavou).	Exact: pitch, root and tip diameter and the tooth gap arcs according to ISO 606. Simplified: the tooth side relief (arc r_x = p starting 0.44·p below the tip).
+Přesně: šroubová plocha boku tvaru ZA (přímkový osový profil) a průměry. Nenabízí se: tvary ZN / ZI / ZK a globoidní šnek; závit končí rovným čelem bez výběhu.	Exact: the ZA flank helicoid (straight axial profile) and the diameters. Not offered: ZN / ZI / ZK forms and the globoid worm; the thread ends with a plane face without run-out.
+Převod	Ratio
+Převod (věnec stojí)	Ratio (ring fixed)
+převod {0}	ratio {0}
+Převod i	Ratio i
+Příčná rozteč řad	Transverse pitch of strands
+Přímé zuby – přesně: sférická evolventa a úhly kuželů; přibližně: přechod do paty. Zakřivené zuby – přesně: roztečný kužel, střední úhel sklonu a oblouk stopy zubu; přibližně: tvar boku (jmenovitý, ne obálkový Gleason / Klingelnberg, bez podélné modifikace) a stálá výška zubu.	Straight teeth – exact: spherical involute and cone angles; approximate: transition to the root. Curved teeth – exact: pitch cone, mean spiral angle and the arc of the tooth trace; approximate: flank form (nominal, not generated Gleason / Klingelnberg, no lengthwise crowning) and constant tooth depth.
+radiální díra pro závit v polovině délky náboje nad drážkou pro pero (vrtá se průměr vrtáku pro závit); potřebuje náboj	radial tapped hole at mid hub length above the keyway (the tap drill diameter is drilled); needs a hub
+rohatka	ratchet
+Rohatka	Ratchet wheel
+Rohatka z{0} Ø{1}	Ratchet wheel z{0} Ø{1}
+rozdělí Σx podle DIN 3992 a u malých počtů zubů odstraní podřezání	splits Σx according to DIN 3992 and removes undercut for small numbers of teeth
+Rozdíl počtů zubů věnce a pastorku je menší než 10 – hrozí kolize hlav zubů (přesně se nekontroluje).	The difference in teeth between ring and pinion is less than 10 – tip interference is possible (not checked exactly).
+Rozdíl posunutí x₂ − x₁	Shift difference x₂ − x₁
+Rozměr mezi kuličkami	Dimension between balls
+Rozměr přes kuličky	Dimension over balls
+Rozměr přes váleček	Dimension over pin
+Rozměr přes válečky	Dimension over pins
+Rozměr přes zuby	Span measurement
+Rozměr přes zuby W{0} nelze na takto úzkém šikmém kole změřit (potřebná šířka {1} mm) – použijte rozměr přes kuličky.	Span W{0} cannot be measured on such a narrow helical gear (required width {1} mm) – use the dimension over balls.
+Rozteč na vnějším průměru	Pitch at the outside diameter
+Rozteč podél hřebene	Pitch along the rack
+Roztečný Ø čepů D_p	Pin circle Ø D_p
+Roztečný průměr	Pitch diameter
+Roztečný průměr čepů	Pin circle diameter
+Roztečný průměr pastorku	Pinion pitch diameter
+řemen	belt
+řemenice	pulley
+Řemenice {0} z{1}	Pulley {0} z{1}
+Řemenový převod {0} z{1}/z{2}	Belt drive {0} z{1}/z{2}
+řešení neexistuje	no solution exists
+Řetěz „{0}“ v tabulce není – vyberte: {1}.	Chain „{0}“ is not in the table – choose: {1}.
+Řetěz ISO 606	ISO 606 chain
+řetězové	sprocket
+Řetězové kolo	Chain sprocket
+Řetězové kolo {0} z{1}	Sprocket {0} z{1}
+Řetězový převod {0} z{1}/z{2}	Chain drive {0} z{1}/z{2}
+simplex 1, duplex 2, triplex 3	simplex 1, duplex 2, triplex 3
+simplex 1, duplex 2, triplex 3 – řady jsou od sebe o příčnou rozteč řetězu p_t	simplex 1, duplex 2, triplex 3 – the strands are spaced by the chain transverse pitch p_t
+směr osy kola: X / Y / Z, vektor čísly, nebo odkazem (osa válcové plochy, hrana, normála plochy)	direction of the wheel axis: X / Y / Z, a vector in numbers, or by reference (axis of a cylindrical face, edge, face normal)
+Smysl	Hand
+smysl sklonu zubů šikmého hřebene	hand of the helical rack teeth
+smysl stoupání (šnek i kolo stejný)	hand (worm and wheel the same)
+smysl stoupání kola 1	hand of wheel 1
+smysl stoupání pastorku (hřeben má opačný)	hand of the pinion (the rack has the opposite)
+smysl stoupání pastorku (kolo má opačný)	hand of the pinion (the wheel has the opposite)
+smysl stoupání pastorku; talířové kolo má opačný	hand of the pinion; the ring gear has the opposite
+smysl stoupání zakřivených zubů; spoluzabírající kolo má opačný	hand of the curved teeth; the mating wheel has the opposite
+Součet posunutí	Sum of shifts
+Součinitel průměru	Diameter factor
+Součinitel průměru šneku	Worm diameter factor
+Součinitel průměru šneku q	Worm diameter factor q
+Součinitel výšky hlavy	Addendum factor
+Součinitel výšky paty	Dedendum factor
+Součinitel záběru krokem	Overlap ratio
+Součinitel záběru profilu	Transverse contact ratio
+Součinitel záběru profilu ε_α = {0} je menší než 1 – zuby by ztrácely záběr. Zvětšete počty zubů nebo zmenšete posunutí.	Transverse contact ratio ε_α = {0} is below 1 – the teeth would lose contact. Increase the numbers of teeth or reduce the shifts.
+Součinitel záběru profilu ε_α = {0} je menší než 1,2 – chod bude hlučnější.	Transverse contact ratio ε_α = {0} is below 1.2 – the drive will be noisier.
+Soukolí m{0} z{1}/z{2}	Gear pair m{0} z{1}/z{2}
+spoluzabírající vnější kola mají opačný smysl stoupání	mating external gears have opposite hands
+Sražení {0} mm je větší než výška zubu nebo polovina šířky kola.	Chamfer {0} mm is larger than the tooth depth or half the face width.
+sražení c×45° hlavového válce na obou čelech (soustruží se před ozubením)	chamfer c×45° of the tip cylinder on both faces (turned before cutting the teeth)
+Sražení hlav na čelech	Tip chamfer on the faces
+Stavěcí šroub	Set screw
+Stavěcí šroub {0} se do náboje délky {1} mm nevejde.	Set screw {0} does not fit into a hub of length {1} mm.
+Stavěcí šroub potřebuje náboj – zadejte průměr a délku náboje.	The set screw needs a hub – enter the hub diameter and length.
+Stojina tloušťky {0} mm není tenčí než kolo – vybrání se nevytvoří.	A web of {0} mm is not thinner than the wheel – no recess is created.
+Stopu zubu s tímto úhlem sklonu a poloměrem nástroje nelze přes celou šířku postavit – zmenšete šířku nebo úhel sklonu, nebo zvětšete poloměr nástroje.	The tooth trace with this spiral angle and cutter radius cannot be built over the whole face width – reduce the face width or the spiral angle, or enlarge the cutter radius.
+Stoupání šroubovice	Helix lead
+Střední normálný modul	Mean normal module
+Střední průměr	Mean diameter
+střední průměr šneku d_m1 = q·m	mean worm diameter d_m1 = q·m
+střední průměr šneku d_m1 = q·m (řada DIN 3976: 6,3 až 17, běžně 10)	mean worm diameter d_m1 = q·m (DIN 3976 series: 6.3 to 17, usually 10)
+Střední úhel sklonu	Mean spiral angle
+Střední úhel sklonu kola	Mean spiral angle of the wheel
+Střední úhel sklonu pastorku	Mean spiral angle of the pinion
+Střední úhel sklonu β_m	Mean spiral angle β_m
+středová díra kotouče pro výstředníkové ložisko; 0 = bez díry	centre hole of the disc for the eccentric bearing; 0 = no hole
+středová díra kotouče; 0 = automaticky třetina patního průměru	centre hole of the disc; 0 = automatic, a third of the root diameter
+Středová díra Ø{0} se do kotouče (patní Ø{1}) nevejde.	Centre hole Ø{0} does not fit into the disc (root Ø{1}).
+šikmé	helical
+šípové	herringbone
+Šířka {0} mm je větší než průměr šneku – boky daleko od střední roviny se šnekem nezabírají.	Face width {0} mm is larger than the worm diameter – flanks far from the mid-plane do not mesh with the worm.
+šířka hřebene (délka zubu)	rack width (tooth length)
+šířka hřebene; pastorek je o 0,5·m širší	rack width; the pinion is 0.5·m wider
+šířka kola 2; pastorek je o 0,5·m širší	width of wheel 2; the pinion is 0.5·m wider
+Šířka kola musí být kladná.	The face width must be positive.
+šířka kola; pastorek je dvakrát širší	wheel width; the pinion is twice as wide
+šířka odlehčovací drážky mezi oběma polovinami šípového ozubení; 0 = bez drážky (ostrý hrot)	width of the relief groove between the two halves of the herringbone teeth; 0 = no groove (sharp apex)
+šířka ozubeného věnce	width of the toothed rim
+Šířka ozubení	Face width
+Šířka ozubení {0} mm je příliš velká – smí být nejvýš 0,7 délky površky kužele ({1} mm).	Face width {0} mm is too large – it may be at most 0.7 of the cone distance ({1} mm).
+Šířka ozubení bývá nejvýš třetina délky površky kužele ({0} mm).	The face width is usually at most a third of the cone distance ({0} mm).
+Šířka ozubení kola b	Face width of the wheel b
+šířka ozubení talířového kola; 0 = automaticky 0,15·d_e2 (pastorek vyjde o něco širší)	face width of the ring gear; 0 = automatic 0.15·d_e2 (the pinion comes out somewhat wider)
+Šířka přes řady	Width over strands
+šířka rohatky	ratchet width
+šířka řemene	belt width
+Šířka zubu	Tooth width
+šnek	worm
+Šnek	Worm
+šnek i šnekové kolo mají stejný smysl stoupání	worm and worm wheel have the same hand
+Šnek m{0} q{1} z{2}	Worm m{0} q{1} z{2}
+šnekové	worm wheel
+Šnekové soukolí m{0} z{1}/z{2}	Worm gear pair m{0} z{1}/z{2}
+Tabulka ozubení	Gearing data table
+Tabulka ozubení – {0} ({1})	Gearing data table – {0} ({1})
+talířové kolo	ring gear
+Talířové kolo	Ring gear
+Talířové kolo musí mít víc zubů než pastorek.	The ring gear must have more teeth than the pinion.
+tloušťka kotouče / věnce	thickness of disc / ring
+tloušťka kotouče a věnce	thickness of disc and ring
+Tloušťka stojiny	Web thickness
+Tloušťka těla pod patou	Body thickness below the root
+tloušťka těla pod patou zubu na velkém konci – určuje polohu zadního čela (montážní vzdálenost); 0 = automaticky 1,5·m	body thickness below the tooth root at the large end – sets the position of the back face (mounting distance); 0 = automatic 1.5·m
+tloušťka těla pod patou zubu na velkém konci – určuje polohu zadního čela; 0 = automaticky 1,5·m	body thickness below the tooth root at the large end – sets the position of the back face; 0 = automatic 1.5·m
+Tloušťka zubu	Tooth thickness
+Tloušťka zubu {0} mm je větší než rozteč – zmenšete ji.	Tooth thickness {0} mm is larger than the pitch – reduce it.
+Tloušťka zubu na hlavě je jen {0} mm (méně než 0,2·m).	The tooth thickness at the tip is only {0} mm (less than 0.2·m).
+Tloušťka zubu na hlavě je jen {0} mm (méně než 0,25·m) – hlava se může vylomit; zmenšete x nebo zkraťte hlavu (k).	The tooth thickness at the tip is only {0} mm (less than 0.25·m) – the tip may break off; reduce x or shorten the tip (k).
+tloušťka zubu na roztečné kružnici; 0 = automaticky (kolo 1,57·m, pastorek 1,05·m, od 10 lístků 1,25·m)	tooth thickness on the pitch circle; 0 = automatic (wheel 1.57·m, pinion 1.05·m, from 10 leaves 1.25·m)
+Tloušťka zubu na tětivě (vnější)	Chordal tooth thickness (outer)
+Tvar boku	Flank form
+Tvar hlavy	Tip form
+Tvar zubové mezery	Tooth gap form
+Tvar zubů je přibližný – pro zástavbu, hmotnost a výkres, ne pro výrobu ozubení. Přesně: roztečné kužely, úhly sklonu a normálná rozteč ve středním bodě. Přibližně: boky (jmenovité, nejsou sdružené – mimo střední bod čekejte několik setin mm mezery nebo přesahu), stálá výška zubu.	The tooth form is approximate – for installation, mass and drawings, not for cutting the teeth. Exact: pitch cones, spiral angles and normal pitch at the mean point. Approximate: flanks (nominal, not conjugate – away from the mean point expect a few hundredths of a mm of gap or overlap), constant tooth depth.
+Tvořicí kružnice hlavy	Addendum rolling circle
+Tvořicí kružnice paty	Dedendum rolling circle
+Typ B – dole	Type B – bottom
+Typ B – nahoře	Type B – top
+Typ C – obě strany	Type C – both sides
+u vnitřního soukolí mají věnec i pastorek stejný smysl stoupání	in an internal gear pair the ring and the pinion have the same hand
+úhel boku šneku v osovém řezu (= čelní úhel záběru kola)	flank angle of the worm in the axial section (= transverse pressure angle of the wheel)
+úhel boku v osovém řezu (tvar ZA); jiné tvary boku (ZN, ZI, ZK) ani globoidní šnek se nenabízejí	flank angle in the axial section (form ZA); other flank forms (ZN, ZI, ZK) and the globoid worm are not offered
+Úhel hlavového kužele	Tip cone angle
+Úhel os	Shaft angle
+Úhel os Σ	Shaft angle Σ
+Úhel patního kužele	Root cone angle
+Úhel profilu	Profile angle
+úhel profilu šneku v osovém řezu	profile angle of the worm in the axial section
+Úhel profilu αₓ	Profile angle αₓ
+Úhel roztečného kužele	Pitch cone angle
+Úhel roztečného kužele kola	Pitch cone angle of the wheel
+Úhel roztečného kužele pastorku	Pitch cone angle of the pinion
+Úhel sklonu	Helix angle
+Úhel sklonu zubů	Tooth helix angle
+úhel sklonu zubů na roztečném válci; stoupání šroubovice p_z = π·d / tan β	helix angle of the teeth on the pitch cylinder; helix lead p_z = π·d / tan β
+úhel sklonu zubů pastorku ve středu šířky	spiral angle of the pinion teeth at mid face width
+úhel sklonu zubů pastorku ve středu šířky; úhel kola vyjde menší	spiral angle of the pinion teeth at mid face width; the wheel angle comes out smaller
+úhel sklonu zubů; vnější kola mají opačný smysl stoupání, vnitřní soukolí stejný	helix angle of the teeth; external gears have opposite hands, internal pairs the same
+Úhel stoupání	Lead angle
+Úhel stoupání {0}° je větší než 45° – zmenšete počet chodů nebo zvětšete q.	Lead angle {0}° is larger than 45° – reduce the number of starts or increase q.
+úhel záběru základního profilu; ISO 53 a DIN 867: 20°	pressure angle of the basic rack; ISO 53 and DIN 867: 20°
+Úhel záběru αₙ	Pressure angle αₙ
+úhel, který svírají osy obou kol	angle between the axes of both wheels
+úhel, který svírají osy obou kol (běžně 90°)	angle between the axes of both wheels (usually 90°)
+úhel, o který je strmé čelo zubu skloněné pod hrot – západka se pak do zubu vtahuje (0–15°)	angle by which the steep tooth face leans under the tip – the pawl is then drawn into the tooth (0–15°)
+určuje úhel roztečného kužele: tan δ = sin Σ / (z₂/z₁ + cos Σ); stejný počet = převod 1 : 1 (δ = 45°)	sets the pitch cone angle: tan δ = sin Σ / (z₂/z₁ + cos Σ); equal numbers = ratio 1 : 1 (δ = 45°)
+válečkový řetěz podle ISO 606	roller chain according to ISO 606
+válečkový řetěz podle ISO 606: řada B (evropská) nebo ANSI 35–80; určuje rozteč, průměr válečku a šířku zubu	roller chain according to ISO 606: series B (European) or ANSI 35–80; sets the pitch, roller diameter and tooth width
+Valivý průměr kola 1	Working pitch diameter of wheel 1
+Valivý průměr kola 2	Working pitch diameter of wheel 2
+Velká řemenice	Large pulley
+Velké kolo	Large sprocket
+věnec cykloreduktoru	cycloidal reducer ring
+Věnec cykloreduktoru N{0}	Cycloidal reducer ring N{0}
+Věnec musí mít víc zubů než pastorek.	The ring must have more teeth than the pinion.
+věnec Ø{0}	ring Ø{0}
+Věnec s čepy	Ring with pins
+Virtuální počet zubů	Virtual number of teeth
+Vlastní (řádky níže)	Custom (rows below)
+Vnější čelní modul	Outer transverse module
+Vnější čelní modul m	Outer transverse module m
+Vnější hlavový průměr	Outer tip diameter
+Vnější Ø věnce	Ring outer Ø
+Vnější průměr	Outside diameter
+Vnější průměr dₐ	Outside diameter dₐ
+Vnější průměr věnce	Ring outer diameter
+Vnější průměr věnce Ø{0} je malý – čepy na roztečné Ø{1} se do něj nevejdou.	The ring outer diameter Ø{0} is small – pins on pin circle Ø{1} do not fit into it.
+Vnější průměr věnce Ø{0} musí být větší než patní průměr Ø{1} aspoň o 1·m.	The ring outer diameter Ø{0} must exceed the root diameter Ø{1} by at least 1·m.
+Vnější roztečný Ø kola	Outer pitch Ø of the wheel
+Vnější roztečný průměr	Outer pitch diameter
+vnější roztečný průměr talířového kola	outer pitch diameter of the ring gear
+vnější roztečný průměr talířového kola d_e2 (ISO 23509)	outer pitch diameter of the ring gear d_e2 (ISO 23509)
+Vnitřní ozubení (věnec)	Internal gear (ring)
+Vnitřní ozubení m{0} z{1}	Internal gear m{0} z{1}
+Vnitřní průměr věnce	Ring inner diameter
+vodicí bočnice po obou stranách (aspoň jedna řemenice v převodu je má mít)	guide flanges on both sides (at least one pulley of the drive should have them)
+Volně po směru hodin	Free clockwise
+Volně proti směru hodin	Free counter-clockwise
+Vrchol kužele za průsečíkem os	Cone apex beyond the axis crossing
+Vybrání stojiny se nevejde mezi náboj a věnec – zmenšete náboj nebo stojinu zrušte.	The web recess does not fit between hub and rim – reduce the hub or remove the web.
+vypíše tabulku ozubení všech kol dílu (modul, počet zubů, průměry, rozměr přes zuby a přes kuličky)	prints the gearing data table of all wheels of the part (module, number of teeth, diameters, span and dimension over balls)
+Výstřednost	Eccentricity
+Výstřednost e	Eccentricity e
+výstřednost hřídele (kotouč je posunutý o e)	shaft eccentricity (the disc is offset by e)
+výstřednost hřídele; musí být menší než D_p / (2·N), jinak by měl profil smyčky	shaft eccentricity; must be smaller than D_p / (2·N), otherwise the profile would have loops
+Výstřednost je příliš velká – profil by měl smyčky. Pro D_p = {0} a N = {1} musí být e menší než {2} mm.	The eccentricity is too large – the profile would have loops. For D_p = {0} and N = {1}, e must be smaller than {2} mm.
+Výstupní díry – počet	Output holes – count
+Výstupní díry – roztečná Ø	Output holes – pitch circle Ø
+Výstupní díry Ø	Output holes Ø
+Výstupní díry Ø{0} na roztečné Ø{1} se nevejdou mezi středovou díru a patu laloků.	Output holes Ø{0} on pitch circle Ø{1} do not fit between the centre hole and the lobe roots.
+Výstupní díry se překrývají – uberte počet nebo průměr.	The output holes overlap – reduce their number or diameter.
+Výška celkem	Total height
+Výška celkem h	Total height h
+Výška hlavy (vnější)	Addendum (outer)
+Výška hlavy h_aP*	Addendum h_aP*
+Výška hlavy nad tětivou	Chordal addendum
+výška hlavy v modulech; 0 = automaticky (kolo 0,95 × výška špičky, nejvýš 1,40; pastorek 0,855 / 0,67 / 0,525 podle počtu lístků)	addendum in modules; 0 = automatic (wheel 0.95 × point height, at most 1.40; pinion 0.855 / 0.67 / 0.525 by number of leaves)
+Výška hřebene {0} mm je menší než výška zubu s tělem ({1} mm).	Rack height {0} mm is smaller than the tooth depth with body ({1} mm).
+Výška hřebene h	Rack height h
+Výška osy pastorku nade dnem hřebene	Height of the pinion axis above the rack bottom
+Výška paty (vnější)	Dedendum (outer)
+Výška paty h_fP*	Dedendum h_fP*
+výška paty v modulech; 0 = automaticky (kolo 1,57; pastorek = hlava kola + vůle 0,4)	dedendum in modules; 0 = automatic (wheel 1.57; pinion = wheel addendum + clearance 0.4)
+Výška roztečné přímky	Pitch line height
+Výška zubu	Tooth depth
+Výška zubu {0} mm je příliš velká pro průměr {1} mm.	Tooth depth {0} mm is too large for diameter {1} mm.
+Výška zubu h	Tooth depth h
+výškové posunutí pastorku (kolo má stejné záporné)	height shift of the pinion (the wheel has the same negative)
+výškové posunutí pastorku; kolo dostane stejné záporné	height shift of the pinion; the wheel gets the same negative
+výškové posunutí: pastorek kladné, kolo stejné záporné	height shift: pinion positive, wheel the same negative
+vzdálenost mimoběžných os	distance between the skew axes
+vzdálenost mimoběžných os pastorku a kola; pod 0,02·d_e2 použijte kuželové kolo se zakřivenými zuby	distance between the skew axes of pinion and wheel; below 0.02·d_e2 use a spiral bevel gear
+Z evolventního boku skoro nic nezbylo (začíná na Ø{0}, hlava je Ø{1}) – zvětšete posunutí x nebo počet zubů.	Almost nothing of the involute flank is left (it starts at Ø{0}, the tip is Ø{1}) – increase the profile shift x or the number of teeth.
+Zadejte kladný modul a aspoň 5 zubů pastorku.	Enter a positive module and at least 5 pinion teeth.
+Zadejte průměr odlehčovacích děr.	Enter the diameter of the lightening holes.
+Zadejte průměr výstupních děr.	Enter the diameter of the output holes.
+základní hřeben ISO 53 (typ A = DIN 867): výška paty a zaoblení paty	ISO 53 basic rack (type A = DIN 867): dedendum and root fillet
+základní hřeben ISO 53 (typ A = DIN 867): výška paty a zaoblení paty nástroje	ISO 53 basic rack (type A = DIN 867): dedendum and tool tip radius
+Základní profil	Basic rack profile
+Základní průměr	Base diameter
+Zaoblení paty	Root fillet
+Zaoblení paty ρ = {0}·m se do základního profilu s úhlem {1}° a patou {2}·m nevejde (nejvýš {3}·m).	Root fillet ρ = {0}·m does not fit into a basic rack with angle {1}° and dedendum {2}·m (at most {3}·m).
+Zaoblení paty ρ_fP*	Root fillet ρ_fP*
+Závit delší než 400·m se nepostaví – zkraťte šnek.	A thread longer than 400·m is not built – shorten the worm.
+Závit šneku je na hlavě špičatý – zmenšete úhel profilu nebo boční vůli.	The worm thread is pointed at the tip – reduce the profile angle or the backlash.
+Zkrácení hlavy	Tip shortening
+Zkrácení hlavy k	Tip shortening k
+zkrácení hlavy zubu v modulech; režim Soukolí jím drží hlavovou vůli 0,25·m	tip shortening in modules; pair mode uses it to keep the tip clearance at 0.25·m
+ztenčení zubu: boční vůle po normále, kterou do soukolí přinese toto kolo (0 = jmenovitý zub)	tooth thinning: the normal backlash this wheel contributes to the pair (0 = nominal tooth)
+Zub hřebene je špičatý – zmenšete úhel záběru nebo výšku hlavy.	The rack tooth is pointed – reduce the pressure angle or the addendum.
+Zub je na vnějším průměru Ø{0} špičatý (boky se sejdou na Ø{1}) – zmenšete posunutí x nebo zvětšete počet zubů.	The tooth is pointed at the outside diameter Ø{0} (the flanks meet at Ø{1}) – reduce the profile shift x or increase the number of teeth.
+Zub je špičatý – hlavová kružnice Ø{0} leží nad průsečíkem boků (Ø{1}). Zmenšete posunutí x nebo zvětšete zkrácení hlavy k.	The tooth is pointed – the tip circle Ø{0} lies above the intersection of the flanks (Ø{1}). Reduce the profile shift x or increase the tip shortening k.
+Zub je špičatý – zmenšete posunutí x nebo úhel záběru.	The tooth is pointed – reduce the profile shift x or the pressure angle.
+Zub věnce je špičatý – zmenšete posunutí x.	The ring tooth is pointed – reduce the profile shift x.
+Zub věnce vychází příliš nízký ({0} mm) – zmenšete posunutí x nebo zvětšete počet zubů.	The ring tooth comes out too low ({0} mm) – reduce the profile shift x or increase the number of teeth.
+Zubová mezera je u paty příliš úzká – zvětšete počet zubů nebo zmenšete posunutí x.	The tooth space is too narrow at the root – increase the number of teeth or reduce the profile shift x.
+Zubová mezera je u paty širší než rozteč – zmenšete boční vůli.	The tooth space at the root is wider than the pitch – reduce the backlash.
+Zuby by se při výrobě podřezaly (virtuální počet zubů {0}): použijte posunutí x ≥ {1}. Model podřezání nezobrazuje.	The teeth would be undercut in manufacture (virtual number of teeth {0}): use a profile shift x ≥ {1}. The model does not show the undercut.
+zuby do tělesa	teeth into body
+Zuby do tělesa	Teeth into the body
+Zuby jsou podřezané (z = {0}): bez podřezání je potřeba posunutí x ≥ {1}. Model podřezání obsahuje tak, jak ho nástroj vyrobí.	The teeth are undercut (z = {0}): without undercut a profile shift x ≥ {1} is needed. The model contains the undercut as the tool produces it.
+Zuby kola	Wheel teeth
+Zuby kola 1 (z₁)	Teeth of wheel 1 (z₁)
+Zuby kola 2 (z₂)	Teeth of wheel 2 (z₂)
+Zuby kola z₂	Wheel teeth z₂
+Zuby pastorku	Pinion teeth
+Zuby pastorku z₁	Pinion teeth z₁
+Zuby protikola	Mate teeth
+Zuby spoluzabírajícího kola	Teeth of the mating wheel

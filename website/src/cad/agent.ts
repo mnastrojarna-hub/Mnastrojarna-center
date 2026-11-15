@@ -22,6 +22,7 @@ import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type S
 import { parseMeasure, type MeasureApiResult, type MeasureCmd } from "./agent-measure";
 import { parseSheetLine, sheetSummary, SHEET_COMMANDS } from "./agent-sheet";
 import { parseWeldLine, weldSummary, WELD_COMMANDS } from "./agent-welds";
+import { gearSummary } from "./gears/data";
 import { paramStatusLines, parseEditLine, type EditOp } from "./agent-edit";
 import { toAxisDef, toDirection } from "./ext/place";
 import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
@@ -1508,7 +1509,7 @@ export function featureSummary(f: Feature, doc?: CadDoc): string {
     case "combine":
       return tr("{0} „{1}“ {2} „{3}“{4}", f.op === "cut" ? tr("odebrat od") : f.op === "intersect" ? tr("průnik") : tr("sjednotit"), f.target || tr("aktivní"), f.op === "cut" ? "−" : f.op === "intersect" ? "∩" : "+", f.tool, f.keepTool ? tr(", nástroj ponechán") : "");
     default:
-      return sheetSummary(f) || weldSummary(f);
+      return sheetSummary(f) || weldSummary(f) || gearSummary(f);
   }
 }
 /** Stav sestavy pro textový stav (počítá aplikace z načtených komponent). */

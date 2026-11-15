@@ -5,5 +5,6 @@ import "./sheetmetal-ui";
 import "./advanced-ui";
 import "./weld-ui";
 import "./sheetmetal-form-ui";
+import "./gears-ui";
 export * from "./registry";
 export { EXTRA_ICONS, registerIcon } from "./icons";

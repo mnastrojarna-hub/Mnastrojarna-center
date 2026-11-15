@@ -1,0 +1,581 @@
+# Kola a ozubení (vlna 19, balík core): tabulky druhů kol, kontrola zadání, tabulka ozubení, soukolí, jádro
+ pero	Passfedernut
+„{0}“ není prvek ozubení.	„{0}“ ist kein Verzahnungselement.
+{0}: jádro nevrátilo objemové těleso – zkuste jiné rozměry.	{0}: Der Kern hat keinen Volumenkörper geliefert – andere Maße versuchen.
+{0}: musí být celé číslo.	{0}: muss eine ganze Zahl sein.
+{0}: nejmenší hodnota je {1}.	{0}: kleinster Wert ist {1}.
+{0}: největší hodnota je {1}.	{0}: größter Wert ist {1}.
+{0}: zadejte číslo.	{0}: Zahl eingeben.
+0 = automaticky (11 + 0,06·z₂)·m	0 = automatisch (11 + 0,06·z₂)·m
+0 = automaticky 0,15·d_e2	0 = automatisch 0,15·d_e2
+0 = automaticky 0,35 × rozteč na vnějším průměru	0 = automatisch 0,35 × Teilung am Außendurchmesser
+0 = automaticky 14·m; DIN 3975 doporučuje aspoň (11 + 0,06·z₂)·m	0 = automatisch 14·m; DIN 3975 empfiehlt mindestens (11 + 0,06·z₂)·m
+0 = automaticky 2·m·(0,5 + √(q + 1))	0 = automatisch 2·m·(0,5 + √(q + 1))
+0 = automaticky asi 40 roztečí; skutečná vzdálenost se upraví na sudý počet článků řetězu	0 = automatisch etwa 40 Teilungen; der tatsächliche Abstand wird auf eine gerade Gliederzahl angepasst
+0 = automaticky asi čtvrtina roztečného průměru	0 = automatisch etwa ein Viertel des Teilkreisdurchmessers
+0 = automaticky asi čtvrtina roztečného průměru (řada 5, 6, 8, 10, 12, 16, 20, 25, 30…)	0 = automatisch etwa ein Viertel des Teilkreisdurchmessers (Reihe 5, 6, 8, 10, 12, 16, 20, 25, 30…)
+0 = automaticky atan(u / k), k = 1 až 1,2 podle přesazení (počáteční odhad ISO 23509)	0 = automatisch atan(u / k), k = 1 bis 1,2 je nach Achsversatz (Anfangsschätzung nach ISO 23509)
+0 = automaticky čtvrtina roztečného průměru (radiální přímé boky pat)	0 = automatisch ein Viertel des Teilkreisdurchmessers (radiale gerade Fußflanken)
+0 = automaticky D_p + 3·d_p	0 = automatisch D_p + 3·d_p
+0 = automaticky m·z_protikola / 4 (protikolo pak má radiální boky pat)	0 = automatisch m·z_Gegenrad / 4 (das Gegenrad hat dann radiale Fußflanken)
+0 = automaticky menší z R_e/3 a 10·m	0 = automatisch der kleinere Wert aus R_e/3 und 10·m
+0 = automaticky patní průměr + 2·max(2,5·m; 8 mm)	0 = automatisch Fußkreisdurchmesser + 2·max(2,5·m; 8 mm)
+0 = automaticky; skutečná vzdálenost se upraví na celý počet zubů řemene	0 = automatisch; der tatsächliche Abstand wird auf eine ganze Zahl von Riemenzähnen angepasst
+0 = plný disk; jinak vybrání z obou stran mezi nábojem a věncem (věnec 3·m pod patou zubu)	0 = volle Scheibe; sonst beidseitige Aussparung zwischen Nabe und Kranz (Kranz 3·m unter dem Zahnfuß)
+0 = přímé zuby	0 = gerade Zähne
+0 = přímé zuby; šikmé vnitřní ozubení má stejný smysl stoupání jako pastorek	0 = gerade Zähne; ein schrägverzahntes Hohlrad hat dieselbe Steigungsrichtung wie das Ritzel
+0 = přímé zuby; šikmý hřeben zabírá se šikmým kolem stejného úhlu a opačného smyslu	0 = gerade Zähne; eine schrägverzahnte Zahnstange kämmt mit einem Schrägrad gleichen Winkels und entgegengesetzter Steigung
+0 = přímé zuby; zakřivené (spirální) zuby mívají 35° (Gleason). Tvar boku zakřivených zubů je jmenovitý, ne obálkový – pro zástavbu, hmotnost a výkres	0 = gerade Zähne; bogenverzahnte (Spiral-)Zähne haben meist 35° (Gleason). Die Flankenform der Bogenzähne ist nominell, nicht erzeugt – für Einbau, Masse und Zeichnung
+0 = přímé zuby; zakřivené zuby mívají 35°	0 = gerade Zähne; Bogenzähne haben meist 35°
+0 = spočítat z posunutí; zadaná hodnota → součet posunutí Σx se dopočítá a rozdělí na obě kola	0 = aus den Profilverschiebungen berechnen; ein eingegebener Wert → die Summe Σx wird berechnet und auf beide Räder aufgeteilt
+0 = uprostřed mezi středovou dírou a patou laloků	0 = mittig zwischen Mittelbohrung und Fuß der Kurvenbögen
+0 = z·p; jinak se z délky dopočítá počet zubů z = round(L / p)	0 = z·p; sonst wird die Zähnezahl aus der Länge berechnet z = round(L / p)
+automaticky: kolo epicykloida, pastorek kruhové oblouky; lze vynutit	automatisch: Rad Epizykloide, Ritzel Kreisbögen; erzwingbar
+Boční vůle	Flankenspiel
+Boční vůle – podíl kola	Flankenspiel – Anteil des Rades
+Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.	Flankenspiel {0} mm ist größer als 0,3·m – der Zahn wäre zu dünn.
+Boční vůle celkem	Flankenspiel gesamt
+bod, do kterého přijde počátek kola (střed spodního čela)	Punkt, an den der Ursprung des Rades kommt (Mitte der unteren Stirnfläche)
+Boky hypoidních zubů jsou jmenovité (nejsou sdružené) – mimo střední bod záběru čekejte několik setin mm mezery nebo přesahu.	Die Flanken der Hypoidzähne sind nominell (nicht konjugiert) – abseits des mittleren Eingriffspunkts einige Hundertstel mm Spalt oder Überdeckung erwarten.
+Boky zubů se sejdou pod hlavovou kružnicí – hlavový průměr vychází Ø{0}.	Die Zahnflanken treffen sich unterhalb des Kopfkreises – Kopfkreisdurchmesser Ø{0}.
+cykloidní	Zykloiden
+Cykloidní (hodinové) kolo	Zykloidenrad (Uhrenverzahnung)
+Cykloidní kolo m{0} z{1}	Zykloidenrad m{0} z{1}
+Cykloidní pastorek m{0} z{1}	Zykloidenritzel m{0} z{1}
+Cykloidní reduktor N{0}	Zykloidgetriebe N{0}
+Cykloidní soukolí m{0} z{1}/z{2}	Zykloidenradpaar m{0} z{1}/z{2}
+cyklokotouč	Kurvenscheibe
+čelní	Stirnrad
+Čelní kolo s přímými zuby	Geradverzahntes Stirnrad
+Čelní kolo se šikmými zuby	Schrägverzahntes Stirnrad
+Čelní kolo se šípovými zuby	Pfeilverzahntes Stirnrad
+čelní modul kola = osový modul šneku (DIN 3975); d₂ = m·z	Stirnmodul des Rades = Axialmodul der Schnecke (DIN 3975); d₂ = m·z
+Čep hřídele Ø{0} je větší než hlavový průměr šneku Ø{1}.	Wellenzapfen Ø{0} ist größer als der Kopfkreisdurchmesser der Schnecke Ø{1}.
+Čep hřídele Ø{0} musí být větší než díra.	Wellenzapfen Ø{0} muss größer als die Bohrung sein.
+Čep Ø{0} je příliš velký – profil kotouče by se podřezal (největší možný Ø{1}). Zmenšete čep nebo výstřednost.	Bolzen Ø{0} ist zu groß – das Scheibenprofil würde unterschnitten (größtmöglich Ø{1}). Bolzen oder Exzentrizität verkleinern.
+Čepy hřídele délka	Wellenzapfen Länge
+Čepy hřídele Ø	Wellenzapfen Ø
+Čepy hřídele potřebují průměr i délku – doplňte obojí, nebo obojí nechte nulové.	Wellenzapfen brauchen Durchmesser und Länge – beides ausfüllen oder beides auf null lassen.
+Čepy Ø{0} se na roztečné kružnici překrývají – zmenšete průměr čepu nebo počet čepů.	Bolzen Ø{0} überlappen sich auf dem Teilkreis – Bolzendurchmesser oder Bolzenzahl verkleinern.
+Čepy se nedotýkají vnitřního průměru věnce Ø{0} – zvětšete čep nebo zmenšete výstřednost.	Die Bolzen berühren den Innendurchmesser des Rings Ø{0} nicht – Bolzen vergrößern oder Exzentrizität verkleinern.
+Čepy věnce	Bolzen des Rings
+Člen	Glied
+Délka hřebene	Zahnstangenlänge
+délka každého konce hřídele; 0 = bez čepů	Länge jedes Wellenendes; 0 = ohne Zapfen
+Délka ozubení	Verzahnungslänge
+Délka površky kužele	Kegelmantellänge
+Délka řemene	Riemenlänge
+Délka řetězu	Kettenlänge
+Délka se zaokrouhlí na celý počet zubů: {0} zubů = {1} mm.	Die Länge wird auf eine ganze Zähnezahl gerundet: {0} Zähne = {1} mm.
+Délka závitu šneku	Gewindelänge der Schnecke
+díra {0}{1}	Bohrung {0}{1}
+Díra kola	Bohrung Rad
+Díra kola 1	Bohrung Rad 1
+Díra kola 2	Bohrung Rad 2
+Díra Ø{0} (s drážkou) zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.	Bohrung Ø{0} (mit Nut) reicht in die Verzahnung – Fußkreisdurchmesser Ø{1}. Bohrung verkleinern oder Rad vergrößern.
+Díra Ø{0} se do malého konce kola nevejde (přední čelo má Ø{1}).	Bohrung Ø{0} passt nicht in das kleine Ende des Rades (vordere Stirnfläche Ø{1}).
+díry {0}×Ø{1}	Bohrungen {0}×Ø{1}
+Díry pro čepy	Bohrungen für Bolzen
+díry pro čepy výstupního unašeče; 0 = žádné	Bohrungen für die Bolzen des Abtriebsmitnehmers; 0 = keine
+Drážka pro pero se bez díry nevytvoří – zadejte průměr díry.	Ohne Bohrung entsteht keine Passfedernut – Bohrungsdurchmesser eingeben.
+Drážka uprostřed	Mittelnut
+Drážka uprostřed smí být nejvýš třetina šířky kola ({0} mm).	Die Mittelnut darf höchstens ein Drittel der Zahnbreite betragen ({0} mm).
+drážka v díře podle DIN 6885-1	Passfedernut in der Bohrung nach DIN 6885-1
+drážka v náboji podle DIN 6885-1 (šířka a hloubka podle průměru díry)	Passfedernut in der Nabe nach DIN 6885-1 (Breite und Tiefe nach Bohrungsdurchmesser)
+Epicykloida (lomený oblouk)	Epizykloide (Spitzbogen)
+Hlava {0} mm je vyšší než průměr tvořicí kružnice ({1} mm).	Kopfhöhe {0} mm ist größer als der Durchmesser des Rollkreises ({1} mm).
+Hlava {0} mm je vyšší než špička zubu ({1} mm) – boky se sejdou dřív.	Kopfhöhe {0} mm ist größer als die Zahnspitze ({1} mm) – die Flanken treffen sich früher.
+Hlavová kružnice věnce je zvětšena na Ø{0} (základní kružnice + 0,1·m), aby zuby končily na evolventě.	Der Kopfkreis des Hohlrads ist auf Ø{0} vergrößert (Grundkreis + 0,1·m), damit die Zähne auf der Evolvente enden.
+Hlavová vůle	Kopfspiel
+Hlavová vůle {0} mm je menší než 0,15·m.	Kopfspiel {0} mm ist kleiner als 0,15·m.
+Hlavový průměr	Kopfkreisdurchmesser
+Hlavový průměr (v hrdle)	Kopfkreisdurchmesser (in der Kehle)
+Hlavový průměr kotouče	Kopfkreisdurchmesser der Scheibe
+Hotové kolo	Fertiges Rad
+hotové kolo, jen soustružený polotovar bez zubů, nebo jen zubové mezery vyříznuté do aktivního tělesa	fertiges Rad, nur der gedrehte Rohling ohne Zähne, oder nur die Zahnlücken in den aktiven Körper geschnitten
+hřeben	Zahnstange
+Hřeben s {0} zuby se bude stavět dlouho – zvažte kratší díl.	Eine Zahnstange mit {0} Zähnen braucht lange – ein kürzeres Teil erwägen.
+HTD 3M–14M (ISO 13050, obloukový zub) nebo T5 / T10 (DIN 7721, lichoběžníkový zub); AT a GT2 zde nejsou – tvar drážky je firemní	HTD 3M–14M (ISO 13050, Bogenzahn) oder T5 / T10 (DIN 7721, Trapezzahn); AT und GT2 fehlen – deren Lückenform ist herstellerspezifisch
+HTD 3M–14M nebo T5 / T10	HTD 3M–14M oder T5 / T10
+Hypocykloida s tvořicí kružnicí {0} mm nedosáhne na patní kružnici – zmenšete výšku paty.	Eine Hypozykloide mit Rollkreis {0} mm erreicht den Fußkreis nicht – Fußhöhe verkleinern.
+hypoidní	Hypoid
+Hypoidní kolo	Hypoidrad
+Hypoidní pastorek z{0}/{1}	Hypoidritzel z{0}/{1}
+Hypoidní soukolí z{0}/z{1}	Hypoidradpaar z{0}/z{1}
+Hypoidní talířové kolo z{0}/{1}	Hypoid-Tellerrad z{0}/{1}
+ISO 53 A (DIN 867): ρ 0,38, pata 1,25	ISO 53 A (DIN 867): ρ 0,38, Fuß 1,25
+ISO 53 B: ρ 0,30, pata 1,25	ISO 53 B: ρ 0,30, Fuß 1,25
+ISO 53 C: ρ 0,25, pata 1,25	ISO 53 C: ρ 0,25, Fuß 1,25
+ISO 53 D: ρ 0,39, pata 1,40	ISO 53 D: ρ 0,39, Fuß 1,40
+ISO 606 dává nejmenší a největší tvar mezery (r_i, r_e, úhel lůžka); střední je uprostřed	ISO 606 gibt die kleinste und größte Zahnlückenform an (r_i, r_e, Rollensitzwinkel); mittel liegt dazwischen
+ISO 606: typ A = bez náboje (délka 0), typ B = náboj na jedné straně, typ C = na obou stranách	ISO 606: Form A = ohne Nabe (Länge 0), Form B = Nabe einseitig, Form C = beidseitig
+jen pro tabulku ozubení; vyplní režim Soukolí (0 = neuvádět)	nur für die Verzahnungstabelle; wird vom Radpaar-Modus ausgefüllt (0 = nicht angeben)
+jen vlastní profil: poloměr zaoblení hlavy nástroje v modulech	nur eigenes Profil: Kopfrundungsradius des Werkzeugs in Moduln
+jen vlastní profil: poloměr zaoblení paty v modulech	nur eigenes Profil: Fußrundungsradius in Moduln
+jen vlastní profil: výška hlavy zubu v modulech	nur eigenes Profil: Zahnkopfhöhe in Moduln
+jen vlastní profil: výška paty zubu v modulech	nur eigenes Profil: Zahnfußhöhe in Moduln
+když není zadané z₂: z₂ = zaokrouhlené i·z₁ (0 = použít z₂)	wenn z₂ nicht angegeben: z₂ = gerundetes i·z₁ (0 = z₂ verwenden)
+kladné = silnější pata a větší hlavový průměr (odstraní podřezání); režim Soukolí ho dopočítá z osové vzdálenosti	positiv = dickerer Zahnfuß und größerer Kopfkreis (beseitigt Unterschnitt); der Radpaar-Modus berechnet ihn aus dem Achsabstand
+kladné = zuby věnce dál od osy (větší patní i hlavový průměr)	positiv = Zähne des Hohlrads weiter von der Achse (größerer Fuß- und Kopfkreis)
+kolo	Rad
+Kolo	Rad
+kolo (hnací, hlava z epicykloidy) nebo pastorek s lístky (hlava z kruhových oblouků podle BS 978-2)	Rad (treibend, Epizykloidenkopf) oder Triebling (Kreisbogenkopf nach BS 978-2)
+Kolo {0}: {1}	Rad {0}: {1}
+Kolo {0}: hlava protikola zasahuje pod začátek evolventy (Ø{1} < Ø{2}) – hrozí kolize v patě. Zvětšete posunutí tohoto kola.	Rad {0}: Der Kopf des Gegenrads reicht unter den Evolventenbeginn (Ø{1} < Ø{2}) – Fußeingriffsstörung droht. Profilverschiebung dieses Rades vergrößern.
+Kolo 1 musí mít aspoň 5 zubů.	Rad 1 muss mindestens 5 Zähne haben.
+Kolo 2 musí mít aspoň 5 zubů (zadejte z₂ nebo převod i).	Rad 2 muss mindestens 5 Zähne haben (z₂ oder Übersetzung i eingeben).
+Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.	Das Rad hat keine Bohrung – die Zahnradverknüpfung braucht eine Zylinderfläche (Bohrung); Bohrungsdurchmesser eingeben.
+Kolo s {0} zuby běží neklidně (mnohoúhelníkový efekt) – doporučuje se aspoň 9, pro rychlý chod 17 zubů.	Ein Kettenrad mit {0} Zähnen läuft unruhig (Polygoneffekt) – mindestens 9 Zähne empfohlen, für schnellen Lauf 17.
+Kotouč	Scheibe
+Kotouč cykloidního reduktoru	Kurvenscheibe des Zykloidgetriebes
+Kotouč cykloreduktoru N{0}	Kurvenscheibe Zykloidgetriebe N{0}
+Kotouč je vložen posunutý o výstřednost e; výstředníkový hřídel a unašeč doplňte jako další díly a spojte je vazbami sami.	Die Scheibe wird um die Exzentrizität e versetzt eingefügt; Exzenterwelle und Mitnehmer als weitere Teile ergänzen und selbst mit Verknüpfungen verbinden.
+kotouč s laloky, nebo věnec s čepy (počátek ve středu roztečné kružnice čepů)	Scheibe mit Kurvenbögen oder Ring mit Bolzen (Ursprung im Mittelpunkt des Bolzenteilkreises)
+Kruhové oblouky	Kreisbögen
+který člen hypoidního páru se staví: pastorek, nebo talířové kolo (oba se zadávají stejnou tabulkou)	welches Glied des Hypoidpaars gebaut wird: Ritzel oder Tellerrad (beide mit derselben Tabelle)
+kterým směrem se rohatka volně otáčí (západka drží opačný směr)	Richtung, in der sich das Sperrrad frei dreht (die Sperrklinke hält die Gegenrichtung)
+kuželové	Kegelrad
+Kuželové kolo	Kegelrad
+Kuželové soukolí m{0} z{1}/z{2}	Kegelradpaar m{0} z{1}/z{2}
+Levé	Links
+Malá řemenice	Kleine Riemenscheibe
+Malé kolo	Kleines Kettenrad
+Malý konec kola vychází příliš tenký (přední čelo Ø{0}) – zmenšete šířku ozubení.	Das kleine Ende des Rades ist zu dünn (vordere Stirnfläche Ø{0}) – Zahnbreite verkleinern.
+mění osovou vzdálenost: a = m·(q + z + 2x)/2	ändert den Achsabstand: a = m·(q + z + 2x)/2
+Mezera závitu je u dna užší než zaoblení – zmenšete úhel profilu.	Die Gewindelücke ist am Grund schmaler als die Rundung – Profilwinkel verkleinern.
+Modul	Modul
+modul (ISO 54); roztečný průměr d = m·z	Modul (ISO 54); Teilkreisdurchmesser d = m·z
+modul hodinového ozubení (BS 978-2)	Modul der Uhrenverzahnung (BS 978-2)
+Modul mₙ	Modul mₙ
+Modul musí být kladný.	Der Modul muss positiv sein.
+modul na velkém konci (ISO 23509)	Modul am großen Ende (ISO 23509)
+modul na velkém konci (ISO 23509): vnější roztečný průměr d_e = m·z	Modul am großen Ende (ISO 23509): äußerer Teilkreisdurchmesser d_e = m·z
+modul; roztečný průměr d = m·z (hodinové ozubení podle BS 978-2)	Modul; Teilkreisdurchmesser d = m·z (Uhrenverzahnung nach BS 978-2)
+Montážní vzdálenost (průsečík os – zadní čelo)	Einbaumaß (Achskreuzung – Rückenfläche)
+Montážní vzdálenost (vrchol – zadní čelo)	Einbaumaß (Spitze – Rückenfläche)
+musí odpovídat šneku – určuje úhel sklonu zubů kola	muss zur Schnecke passen – bestimmt den Schrägungswinkel der Radzähne
+musí odpovídat šneku: střední průměr šneku d_m1 = q·m	muss zur Schnecke passen: mittlerer Schneckendurchmesser d_m1 = q·m
+náboj {0}×{1}	Nabe {0}×{1}
+Náboj délka	Nabenlänge
+Náboj na straně	Nabe auf Seite
+Náboj Ø{0} je příliš velký – musí být menší než patní průměr zmenšený o 2·m (Ø{1}).	Nabe Ø{0} ist zu groß – sie muss kleiner sein als der Fußkreis minus 2·m (Ø{1}).
+Náboj Ø{0} je větší než největší dovolený průměr vedle zubů d_g = {1} mm (ISO 606) – destičky řetězu by o něj dřely.	Nabe Ø{0} ist größer als der größte zulässige Durchmesser neben den Zähnen d_g = {1} mm (ISO 606) – die Kettenlaschen würden daran reiben.
+Náboj Ø{0} je větší než zadní čelo kola (Ø{1}).	Nabe Ø{0} ist größer als die Rückenfläche des Rades (Ø{1}).
+Náboj Ø{0} musí být větší než díra s drážkou (Ø{1}).	Nabe Ø{0} muss größer als die Bohrung mit Nut sein (Ø{1}).
+Náboj potřebuje průměr i délku – doplňte obojí, nebo obojí nechte nulové.	Die Nabe braucht Durchmesser und Länge – beides ausfüllen oder beides auf null lassen.
+nahoře = ve směru osy kola, dole = proti směru, nebo na obou stranách	oben = in Richtung der Radachse, unten = entgegen, oder beidseitig
+Nejmenší mezera	Kleinste Lücke
+Největší mezera	Größte Lücke
+Největší průměr náboje	Größter Nabendurchmesser
+Není do čeho řezat zuby – nejdřív vytvořte polotovar.	Kein Körper zum Einschneiden der Zähne – zuerst den Rohling erstellen.
+Neznámý druh soukolí „{0}“.	Unbekannte Radpaarart „{0}“.
+normálná boční vůle soukolí; 0 = automaticky 0,04·mₙ (polovina na každé kolo)	Normalflankenspiel des Radpaars; 0 = automatisch 0,04·mₙ (je Rad die Hälfte)
+Normálný modul	Normalmodul
+normálný modul (ISO 54)	Normalmodul (ISO 54)
+normálný modul (ISO 54), společný oběma kolům	Normalmodul (ISO 54), für beide Räder gemeinsam
+normálný modul (ISO 54); rozteč podél hřebene p = π·mₙ / cos β	Normalmodul (ISO 54); Teilung entlang der Zahnstange p = π·mₙ / cos β
+normálný modul (ISO 54); roztečný průměr d = mₙ·z / cos β	Normalmodul (ISO 54); Teilkreisdurchmesser d = mₙ·z / cos β
+normálný úhel záběru (běžně 20°)	Normaleingriffswinkel (meist 20°)
+nové těleso, přidat k aktivnímu tělesu, nebo od něj odebrat	neuer Körper, zum aktiven Körper hinzufügen oder davon abziehen
+Ø čepu d_p	Bolzen-Ø d_p
+Ø díry pro ložisko	Lagerbohrung Ø
+Obě strany	Beide Seiten
+od dna hřebene po hlavu zubu	vom Boden der Zahnstange bis zum Zahnkopf
+Odlehčovací díry – počet	Erleichterungsbohrungen – Anzahl
+Odlehčovací díry – roztečná Ø	Erleichterungsbohrungen – Teilkreis-Ø
+Odlehčovací díry Ø	Erleichterungsbohrungen Ø
+Odlehčovací díry Ø{0} na roztečné Ø{1} se nevejdou mezi náboj a věnec (volný pás je Ø{2} až Ø{3}).	Erleichterungsbohrungen Ø{0} auf Teilkreis Ø{1} passen nicht zwischen Nabe und Kranz (freier Bereich Ø{2} bis Ø{3}).
+Odlehčovací díry se na roztečné kružnici překrývají – uberte počet nebo průměr.	Die Erleichterungsbohrungen überlappen sich auf dem Teilkreis – Anzahl oder Durchmesser verringern.
+Osová rozteč	Axialteilung
+Osová tloušťka závitu	Axiale Zahndicke der Schnecke
+Osová vzdálenost	Achsabstand
+Osová vzdálenost {0} mm je příliš daleko od jmenovité {1} mm – posunutím profilu lze upravit nejvýš asi ±1,5·m.	Achsabstand {0} mm ist zu weit vom Nennwert {1} mm entfernt – Profilverschiebung gleicht höchstens etwa ±1,5·m aus.
+Osová vzdálenost {0} mm je příliš malá – kola by se dotýkala.	Achsabstand {0} mm ist zu klein – die Räder würden sich berühren.
+Osová vzdálenost a	Achsabstand a
+Osová vzdálenost bez posunutí	Achsabstand ohne Verschiebung
+Osový modul	Axialmodul
+Osový modul mₓ	Axialmodul mₓ
+osový modul šneku = čelní modul kola (DIN 3975)	Axialmodul der Schnecke = Stirnmodul des Rades (DIN 3975)
+osový modul šneku = čelní modul šnekového kola (DIN 3975); osová rozteč pₓ = π·m	Axialmodul der Schnecke = Stirnmodul des Schneckenrads (DIN 3975); Axialteilung pₓ = π·m
+ozubená část je o 2 mm (od rozteče 8 mm o 3 mm) širší než řemen	der verzahnte Teil ist 2 mm (ab Teilung 8 mm: 3 mm) breiter als der Riemen
+Ozubená řemenice	Zahnriemenscheibe
+Ozubený hřeben m{0} z{1}	Zahnstange m{0} z{1}
+pastorek	Ritzel
+Pastorek	Ritzel
+Pastorek (lístky)	Triebling (Triebstöcke)
+Pastorek s hřebenem m{0} z{1}	Ritzel mit Zahnstange m{0} z{1}
+Patní průměr	Fußkreisdurchmesser
+Patní průměr kotouče	Fußkreisdurchmesser der Scheibe
+Patní průměr kotouče vychází záporný.	Der Fußkreisdurchmesser der Scheibe ist negativ.
+Patní průměr šneku vychází záporný – zvětšete q.	Der Fußkreisdurchmesser der Schnecke ist negativ – q vergrößern.
+Patní průměr vychází záporný – zvětšete počet zubů nebo posunutí x.	Der Fußkreisdurchmesser ist negativ – Zähnezahl oder Profilverschiebung x vergrößern.
+Patní průměr vychází záporný – zvětšete počet zubů nebo zmenšete výšku paty.	Der Fußkreisdurchmesser ist negativ – Zähnezahl vergrößern oder Fußhöhe verkleinern.
+Plášť ozubení se nepodařilo uzavřít ({0} volných hran) – zkuste mírně změnit rozměry.	Die Verzahnungshülle ließ sich nicht schließen ({0} freie Kanten) – Maße leicht ändern.
+Plné čepy	Volle Bolzen
+plné čepy (jeden kus s věncem), nebo jen díry, do kterých se čepy vloží	volle Bolzen (ein Stück mit dem Ring) oder nur Bohrungen, in die die Bolzen eingesetzt werden
+po površce kužele; 0 = automaticky menší z R_e/3 a 10·m	entlang der Kegelmantellinie; 0 = automatisch der kleinere Wert aus R_e/3 und 10·m
+Počet čepů	Bolzenzahl
+Počet čepů N	Bolzenzahl N
+počet čepů věnce; kotouč má o jeden lalok méně a převod je N − 1	Bolzenzahl des Rings; die Scheibe hat einen Kurvenbogen weniger, die Übersetzung ist N − 1
+počet čepů věnce; převod je N − 1	Bolzenzahl des Rings; Übersetzung N − 1
+Počet článků řetězu	Anzahl Kettenglieder
+počet chodů (závitů) šneku; stoupání p_z = z₁·pₓ	Gangzahl der Schnecke; Steigungshöhe p_z = z₁·pₓ
+počet chodů šneku	Gangzahl der Schnecke
+Počet chodů šneku	Gangzahl der Schnecke
+Počet chodů šneku z₁	Gangzahl der Schnecke z₁
+Počet chodů z₁	Gangzahl z₁
+Počet laloků kotouče	Anzahl Kurvenbögen der Scheibe
+Počet lístků	Anzahl Triebstöcke
+počet lístků pastorku	Anzahl Triebstöcke des Ritzels
+Počet měřených zubů	Messzähnezahl
+počet odlehčovacích děr v disku; 0 = žádné	Anzahl Erleichterungsbohrungen in der Scheibe; 0 = keine
+Počet řad	Anzahl Reihen
+počet zubů hřebene	Zähnezahl der Zahnstange
+počet zubů kola	Zähnezahl des Rades
+počet zubů kola, nebo počet lístků pastorku	Zähnezahl des Rades oder Anzahl Triebstöcke des Ritzels
+počet zubů malé řemenice	Zähnezahl der kleinen Riemenscheibe
+počet zubů malého kola	Zähnezahl des kleinen Kettenrads
+počet zubů pastorku	Zähnezahl des Ritzels
+počet zubů pastorku (menšího kola)	Zähnezahl des Ritzels (kleineres Rad)
+Počet zubů protikola	Zähnezahl des Gegenrads
+počet zubů rohatky	Zähnezahl des Sperrrads
+Počet zubů řemene	Zähnezahl des Riemens
+počet zubů řemenice; roztečný průměr d_0 = z·p / π	Zähnezahl der Riemenscheibe; Teilkreisdurchmesser d_0 = z·p / π
+počet zubů spoluzabírajícího kola – určuje tvořicí kružnici hlavy (polovina roztečné kružnice protikola → radiální boky protikola)	Zähnezahl des Gegenrads – bestimmt den Rollkreis des Kopfes (halber Teilkreis des Gegenrads → radiale Flanken am Gegenrad)
+počet zubů šnekového kola; převod i = z / z₁	Zähnezahl des Schneckenrads; Übersetzung i = z / z₁
+počet zubů šnekového kola; převod i = z₂/z₁	Zähnezahl des Schneckenrads; Übersetzung i = z₂/z₁
+počet zubů talířového kola	Zähnezahl des Tellerrads
+počet zubů tohoto kola	Zähnezahl dieses Rades
+počet zubů velké řemenice	Zähnezahl der großen Riemenscheibe
+počet zubů velkého kola	Zähnezahl des großen Rades
+počet zubů věnce s vnitřním ozubením	Zähnezahl des innenverzahnten Hohlrads
+počet zubů věnce; pastorek by měl mít aspoň o 10 zubů méně	Zähnezahl des Hohlrads; das Ritzel sollte mindestens 10 Zähne weniger haben
+počet zubů; délka hřebene L = z·p (nebo zadejte délku níže)	Zähnezahl; Zahnstangenlänge L = z·p (oder unten die Länge eingeben)
+počet zubů; pod 9 zubů běží řetěz neklidně, pro rychlý chod aspoň 17	Zähnezahl; unter 9 Zähnen läuft die Kette unruhig, für schnellen Lauf mindestens 17
+pod 17 zubů se zuby bez posunutí profilu podřezávají – tabulka nabídne potřebné x	unter 17 Zähnen werden Zähne ohne Profilverschiebung unterschnitten – die Tabelle bietet das nötige x an
+Pod patou zubu zbývá nad dírou jen {0} mm materiálu – věnec bývá aspoň 2·m.	Zwischen Bohrung und Zahnfuß bleiben nur {0} mm Material – der Kranz beträgt meist mindestens 2·m.
+Podříznutí čela	Hinterschnitt der Zahnbrust
+Poloha odkazem	Position über Bezug
+poloměr frézovací hlavy (oblouk stopy zubu); 0 = automaticky střední délka površky kola	Messerkopfradius (Bogen der Flankenlinie); 0 = automatisch mittlere Kegelmantellänge des Rades
+poloměr frézovací hlavy, který určuje oblouk stopy zubu; 0 = automaticky střední délka površky R_m	Messerkopfradius, der den Bogen der Flankenlinie bestimmt; 0 = automatisch mittlere Kegelmantellänge R_m
+Poloměr hrdla	Kehlradius
+Poloměr hrdla vychází {0} mm – zvětšete q.	Der Kehlradius beträgt {0} mm – q vergrößern.
+Poloměr nástroje r_c0	Messerkopfradius r_c0
+Poloměr oblouku hlavy	Radius des Kopfbogens
+Poloměr tvořicí kružnice hlavy	Rollkreisradius Kopf
+Poloměr tvořicí kružnice paty	Rollkreisradius Fuß
+poloměr zaoblení mezi čelem a hřbetem zubu	Rundungsradius zwischen Zahnbrust und Zahnrücken
+Polotovar (bez zubů)	Rohling (ohne Zähne)
+pootočení zubů kolem osy kola (pro nastavení záběru)	Verdrehung der Zähne um die Radachse (zum Einstellen des Eingriffs)
+Posunutí kola 1	Profilverschiebung Rad 1
+Posunutí kola 2	Profilverschiebung Rad 2
+posunutí kola: a = m·(q + z₂ + 2x)/2	Profilverschiebung des Rades: a = m·(q + z₂ + 2x)/2
+Posunutí profilu	Profilverschiebung
+posunutí profilu kola 1 (při automatickém rozdělení se přepíše)	Profilverschiebung Rad 1 (wird bei automatischer Aufteilung überschrieben)
+posunutí profilu kola 2 (při automatickém rozdělení se přepíše)	Profilverschiebung Rad 2 (wird bei automatischer Aufteilung überschrieben)
+posunutí profilu pastorku – zvedne osu pastorku nad hřeben o x·m	Profilverschiebung des Ritzels – hebt die Ritzelachse um x·m über die Zahnstange
+Posunutí profilu x	Profilverschiebung x
+Posunutí rozdělit automaticky	Profilverschiebung automatisch aufteilen
+Posunutí x₁	Verschiebung x₁
+Posunutí x₂	Verschiebung x₂
+Posuv hřebene na otáčku	Zahnstangenweg je Umdrehung
+Pravé	Rechts
+Pro toto přesazení a úhel sklonu se roztečné kužely nepodařilo najít – zmenšete přesazení E nebo úhel sklonu pastorku, případně zadejte úhel kužele kola.	Für diesen Achsversatz und Spiralwinkel wurden keine Teilkegel gefunden – Achsversatz E oder Spiralwinkel des Ritzels verkleinern oder den Teilkegelwinkel des Rades eingeben.
+Provozní úhel záběru	Betriebseingriffswinkel
+průchozí díra (nástrčný šnek); 0 = plný	Durchgangsbohrung (Aufsteckschnecke); 0 = voll
+Průměr bočnic	Bordscheibendurchmesser
+Průměr čepu	Bolzendurchmesser
+průměr čepu (válečku) věnce	Durchmesser des Ringbolzens (Rolle)
+průměr čepu věnce	Durchmesser des Ringbolzens
+průměr díry = průměr válečku unašeče + 2·e	Bohrungsdurchmesser = Rollendurchmesser des Mitnehmers + 2·e
+průměr díry pro hřídel; 0 = bez díry	Durchmesser der Wellenbohrung; 0 = ohne Bohrung
+průměr konců hřídele po obou stranách závitu; 0 = bez čepů	Durchmesser der Wellenenden beidseits des Gewindes; 0 = ohne Zapfen
+průměr kružnice os čepů	Durchmesser des Kreises durch die Bolzenachsen
+průměr kružnice, na které leží osy čepů věnce	Durchmesser des Kreises, auf dem die Achsen der Ringbolzen liegen
+Průměr kuliček D_M	Kugeldurchmesser D_M
+Průměr kuličky	Kugeldurchmesser
+Průměr měřicího válečku	Messrollendurchmesser
+průměr měřicího válečku v mezeře; 0 = automaticky 1,728·mₙ zaokrouhleno na 0,25 mm	Durchmesser der Messrolle in der Lücke; 0 = automatisch 1,728·mₙ auf 0,25 mm gerundet
+průměr měřicích kuliček / válečků pro rozměr M; 0 = automaticky 1,728·mₙ zaokrouhleno na 0,25 mm	Durchmesser der Messkugeln / Messrollen für das Maß M; 0 = automatisch 1,728·mₙ auf 0,25 mm gerundet
+průměr náboje; 0 = bez náboje (musí být menší než patní průměr)	Nabendurchmesser; 0 = ohne Nabe (muss kleiner als der Fußkreis sein)
+průměr odlehčovacích děr	Durchmesser der Erleichterungsbohrungen
+průměr přes hroty zubů	Durchmesser über die Zahnspitzen
+průměr roztečné kružnice děr; 0 = uprostřed mezi nábojem a věncem	Teilkreisdurchmesser der Bohrungen; 0 = mittig zwischen Nabe und Kranz
+Průměr válečku	Rollendurchmesser
+Průměr válečku D_M	Rollendurchmesser D_M
+přesah náboje přes čelo kola; 0 = bez náboje	Überstand der Nabe über die Stirnfläche; 0 = ohne Nabe
+Přesazení {0} mm je menší než 0,02·d_e2 ({1} mm) – použijte kuželové kolo se zakřivenými zuby.	Achsversatz {0} mm ist kleiner als 0,02·d_e2 ({1} mm) – ein bogenverzahntes Kegelrad verwenden.
+Přesazení nad 0,25·d_e2 ({0} mm) je neobvyklé – skluz v záběru bude velký.	Ein Achsversatz über 0,25·d_e2 ({0} mm) ist ungewöhnlich – das Gleiten im Eingriff wird groß.
+Přesazení os	Achsversatz
+Přesazení os E	Achsversatz E
+Přesně: celý profil (úsečky a oblouky). Rozměry zubu nejsou normalizované – volí se podle západky.	Exakt: das ganze Profil (Strecken und Bögen). Die Zahnmaße sind nicht genormt – sie werden passend zur Sperrklinke gewählt.
+Přesně: celý profil základního hřebene ISO 53 (rovinné boky, kruhové zaoblení paty), i u šikmého hřebene.	Exakt: das ganze Bezugsprofil ISO 53 (ebene Flanken, kreisförmige Fußrundung), auch bei schrägverzahnter Zahnstange.
+Přesně: epicykloida hlavy a hypocykloida / radiální bok paty. Poměry zubu (tloušťka, výšky) jsou výchozí hodnoty podle BS 978-2 – ověřte je podle normy nebo protikola a případně přepište.	Exakt: Kopf-Epizykloide und Fuß-Hypozykloide / radiale Fußflanke. Die Zahnproportionen (Dicke, Höhen) sind Vorgabewerte nach BS 978-2 – mit der Norm oder dem Gegenrad prüfen und ggf. überschreiben.
+Přesně: evolventa, přechodová křivka paty (trochoida základního hřebene se zaoblením ρ), podřezání, kružnice. Nemodeluje se: modifikace hlavy a podélná modifikace zubu.	Exakt: Evolvente, Fußübergangskurve (Trochoide des Bezugsprofils mit Rundung ρ), Unterschnitt, Kreise. Nicht modelliert: Kopfrücknahme und Breitenballigkeit.
+Přesně: evolventa, přechodová křivka paty, podřezání a šroubová plocha boku (proložená, odchylka pod 0,0002 mm). Nemodeluje se: modifikace zubu; u šípového ozubení výběh nástroje ve hrotu.	Exakt: Evolvente, Fußübergangskurve, Unterschnitt und Schraubenfläche der Flanke (interpoliert, Abweichung unter 0,0002 mm). Nicht modelliert: Flankenkorrekturen; der Werkzeugauslauf in der Pfeilspitze.
+Přesně: evolventní boky a průměry. Přibližně: zaoblení paty (oblouk 0,3·m – skutečné závisí na obrážecím noži); kontrola kolize hlav se spoluzabírajícím pastorkem je jen orientační.	Exakt: Evolventenflanken und Durchmesser. Näherung: Fußrundung (Bogen 0,3·m – die tatsächliche hängt vom Schneidrad ab); die Prüfung der Kopfkollision mit dem Ritzel ist nur ein Anhalt.
+Přesně: křivka kotouče (ekvidistanta epitrochoidy, proložená 12 body na půl laloku) a kružnice věnce. Vůle mezi kotoučem a čepy se nemodeluje – přidejte ji zmenšením Ø čepu v tabulce kotouče.	Exakt: die Scheibenkurve (Äquidistante der Epitrochoide, mit 12 Punkten je halbem Bogen interpoliert) und die Kreise des Rings. Das Spiel zwischen Scheibe und Bolzen wird nicht modelliert – durch kleineren Bolzen-Ø in der Scheibentabelle vorsehen.
+Přesně: profil ve střední rovině (evolventa sdružená s osovým profilem šneku ZA), hrdlo a průměry. Přibližně: boky mimo střední rovinu jsou evolventní šroubová plocha, ne obálka šneku – pro zástavbu a výkres, ne pro výrobu ozubení.	Exakt: Profil in der Mittelebene (Evolvente, konjugiert zum Axialprofil der ZA-Schnecke), Kehle und Durchmesser. Näherung: Flanken abseits der Mittelebene sind eine Evolventenschraubenfläche, nicht die Hüllfläche der Schnecke – für Einbau und Zeichnung, nicht zur Verzahnungsfertigung.
+Přesně: rozteč, roztečný a hlavový průměr. Přibližně: tvar drážky (HTD jeden oblouk se zaoblenou hranou, T lichoběžník bez zaoblení) – pro výrobu ozubení použijte profil nástroje podle normy.	Exakt: Teilung, Teilkreis- und Kopfkreisdurchmesser. Näherung: die Lückenform (HTD ein Bogen mit gerundeter Kante, T Trapez ohne Rundung) – für die Fertigung das Werkzeugprofil nach Norm verwenden.
+Přesně: roztečný, patní a hlavový průměr a oblouky zubové mezery podle ISO 606. Zjednodušeně: boční odlehčení zubu (oblouk r_x = p začínající 0,44·p pod hlavou).	Exakt: Teilkreis-, Fußkreis- und Kopfkreisdurchmesser und die Bögen der Zahnlücke nach ISO 606. Vereinfacht: die seitliche Zahnfase (Bogen r_x = p ab 0,44·p unter dem Kopf).
+Přesně: šroubová plocha boku tvaru ZA (přímkový osový profil) a průměry. Nenabízí se: tvary ZN / ZI / ZK a globoidní šnek; závit končí rovným čelem bez výběhu.	Exakt: Schraubenfläche der Flanke Form ZA (gerades Axialprofil) und die Durchmesser. Nicht angeboten: Formen ZN / ZI / ZK und Globoidschnecke; das Gewinde endet mit ebener Stirnfläche ohne Auslauf.
+Převod	Übersetzung
+Převod (věnec stojí)	Übersetzung (Ring steht)
+převod {0}	Übersetzung {0}
+Převod i	Übersetzung i
+Příčná rozteč řad	Querteilung der Reihen
+Přímé zuby – přesně: sférická evolventa a úhly kuželů; přibližně: přechod do paty. Zakřivené zuby – přesně: roztečný kužel, střední úhel sklonu a oblouk stopy zubu; přibližně: tvar boku (jmenovitý, ne obálkový Gleason / Klingelnberg, bez podélné modifikace) a stálá výška zubu.	Gerade Zähne – exakt: sphärische Evolvente und Kegelwinkel; Näherung: Übergang zum Fuß. Bogenzähne – exakt: Teilkegel, mittlerer Spiralwinkel und Bogen der Flankenlinie; Näherung: Flankenform (nominell, nicht erzeugt nach Gleason / Klingelnberg, ohne Breitenballigkeit) und konstante Zahnhöhe.
+radiální díra pro závit v polovině délky náboje nad drážkou pro pero (vrtá se průměr vrtáku pro závit); potřebuje náboj	radiale Gewindebohrung in der Mitte der Nabenlänge über der Passfedernut (gebohrt wird der Kernlochdurchmesser); braucht eine Nabe
+rohatka	Sperrrad
+Rohatka	Sperrrad
+Rohatka z{0} Ø{1}	Sperrrad z{0} Ø{1}
+rozdělí Σx podle DIN 3992 a u malých počtů zubů odstraní podřezání	teilt Σx nach DIN 3992 auf und beseitigt Unterschnitt bei kleinen Zähnezahlen
+Rozdíl počtů zubů věnce a pastorku je menší než 10 – hrozí kolize hlav zubů (přesně se nekontroluje).	Die Zähnezahldifferenz zwischen Hohlrad und Ritzel ist kleiner als 10 – Kopfkollision möglich (wird nicht genau geprüft).
+Rozdíl posunutí x₂ − x₁	Verschiebungsdifferenz x₂ − x₁
+Rozměr mezi kuličkami	Diametrales Innenmaß über Kugeln
+Rozměr přes kuličky	Diametrales Zweikugelmaß
+Rozměr přes váleček	Maß über Messrolle
+Rozměr přes válečky	Maß über Messrollen
+Rozměr přes zuby	Zahnweite
+Rozměr přes zuby W{0} nelze na takto úzkém šikmém kole změřit (potřebná šířka {1} mm) – použijte rozměr přes kuličky.	Die Zahnweite W{0} lässt sich an so einem schmalen Schrägrad nicht messen (nötige Breite {1} mm) – Zweikugelmaß verwenden.
+Rozteč na vnějším průměru	Teilung am Außendurchmesser
+Rozteč podél hřebene	Teilung entlang der Zahnstange
+Roztečný Ø čepů D_p	Bolzenteilkreis Ø D_p
+Roztečný průměr	Teilkreisdurchmesser
+Roztečný průměr čepů	Bolzenteilkreisdurchmesser
+Roztečný průměr pastorku	Teilkreisdurchmesser des Ritzels
+řemen	Riemen
+řemenice	Riemenscheibe
+Řemenice {0} z{1}	Riemenscheibe {0} z{1}
+Řemenový převod {0} z{1}/z{2}	Riementrieb {0} z{1}/z{2}
+řešení neexistuje	keine Lösung
+Řetěz „{0}“ v tabulce není – vyberte: {1}.	Kette „{0}“ ist nicht in der Tabelle – auswählen: {1}.
+Řetěz ISO 606	Kette ISO 606
+řetězové	Kettenrad
+Řetězové kolo	Kettenrad
+Řetězové kolo {0} z{1}	Kettenrad {0} z{1}
+Řetězový převod {0} z{1}/z{2}	Kettentrieb {0} z{1}/z{2}
+simplex 1, duplex 2, triplex 3	Simplex 1, Duplex 2, Triplex 3
+simplex 1, duplex 2, triplex 3 – řady jsou od sebe o příčnou rozteč řetězu p_t	Simplex 1, Duplex 2, Triplex 3 – die Reihen haben den Abstand der Querteilung p_t
+směr osy kola: X / Y / Z, vektor čísly, nebo odkazem (osa válcové plochy, hrana, normála plochy)	Richtung der Radachse: X / Y / Z, Vektor als Zahlen oder über Bezug (Achse einer Zylinderfläche, Kante, Flächennormale)
+Smysl	Steigungsrichtung
+smysl sklonu zubů šikmého hřebene	Steigungsrichtung der schrägen Zahnstangenzähne
+smysl stoupání (šnek i kolo stejný)	Steigungsrichtung (Schnecke und Rad gleich)
+smysl stoupání kola 1	Steigungsrichtung Rad 1
+smysl stoupání pastorku (hřeben má opačný)	Steigungsrichtung des Ritzels (Zahnstange entgegengesetzt)
+smysl stoupání pastorku (kolo má opačný)	Steigungsrichtung des Ritzels (Rad entgegengesetzt)
+smysl stoupání pastorku; talířové kolo má opačný	Steigungsrichtung des Ritzels; das Tellerrad entgegengesetzt
+smysl stoupání zakřivených zubů; spoluzabírající kolo má opačný	Steigungsrichtung der Bogenzähne; das Gegenrad entgegengesetzt
+Součet posunutí	Summe der Profilverschiebungen
+Součinitel průměru	Formzahl
+Součinitel průměru šneku	Formzahl der Schnecke
+Součinitel průměru šneku q	Formzahl der Schnecke q
+Součinitel výšky hlavy	Kopfhöhenfaktor
+Součinitel výšky paty	Fußhöhenfaktor
+Součinitel záběru krokem	Sprungüberdeckung
+Součinitel záběru profilu	Profilüberdeckung
+Součinitel záběru profilu ε_α = {0} je menší než 1 – zuby by ztrácely záběr. Zvětšete počty zubů nebo zmenšete posunutí.	Profilüberdeckung ε_α = {0} ist kleiner als 1 – die Zähne würden den Eingriff verlieren. Zähnezahlen vergrößern oder Verschiebungen verringern.
+Součinitel záběru profilu ε_α = {0} je menší než 1,2 – chod bude hlučnější.	Profilüberdeckung ε_α = {0} ist kleiner als 1,2 – der Lauf wird lauter.
+Soukolí m{0} z{1}/z{2}	Radpaar m{0} z{1}/z{2}
+spoluzabírající vnější kola mají opačný smysl stoupání	kämmende Außenräder haben entgegengesetzte Steigungsrichtung
+Sražení {0} mm je větší než výška zubu nebo polovina šířky kola.	Fase {0} mm ist größer als die Zahnhöhe oder die halbe Radbreite.
+sražení c×45° hlavového válce na obou čelech (soustruží se před ozubením)	Fase c×45° am Kopfzylinder auf beiden Stirnseiten (vor dem Verzahnen gedreht)
+Sražení hlav na čelech	Kopfkantenfase an den Stirnseiten
+Stavěcí šroub	Gewindestift
+Stavěcí šroub {0} se do náboje délky {1} mm nevejde.	Gewindestift {0} passt nicht in eine Nabe der Länge {1} mm.
+Stavěcí šroub potřebuje náboj – zadejte průměr a délku náboje.	Der Gewindestift braucht eine Nabe – Nabendurchmesser und -länge eingeben.
+Stojina tloušťky {0} mm není tenčí než kolo – vybrání se nevytvoří.	Ein Steg von {0} mm ist nicht dünner als das Rad – es entsteht keine Aussparung.
+Stopu zubu s tímto úhlem sklonu a poloměrem nástroje nelze přes celou šířku postavit – zmenšete šířku nebo úhel sklonu, nebo zvětšete poloměr nástroje.	Die Flankenlinie mit diesem Spiralwinkel und Messerkopfradius lässt sich nicht über die ganze Breite bilden – Zahnbreite oder Spiralwinkel verkleinern oder Messerkopfradius vergrößern.
+Stoupání šroubovice	Steigungshöhe der Schraubenlinie
+Střední normálný modul	Mittlerer Normalmodul
+Střední průměr	Mittenkreisdurchmesser
+střední průměr šneku d_m1 = q·m	Mittenkreisdurchmesser der Schnecke d_m1 = q·m
+střední průměr šneku d_m1 = q·m (řada DIN 3976: 6,3 až 17, běžně 10)	Mittenkreisdurchmesser der Schnecke d_m1 = q·m (Reihe DIN 3976: 6,3 bis 17, meist 10)
+Střední úhel sklonu	Mittlerer Spiralwinkel
+Střední úhel sklonu kola	Mittlerer Spiralwinkel des Rades
+Střední úhel sklonu pastorku	Mittlerer Spiralwinkel des Ritzels
+Střední úhel sklonu β_m	Mittlerer Spiralwinkel β_m
+středová díra kotouče pro výstředníkové ložisko; 0 = bez díry	Mittelbohrung der Scheibe für das Exzenterlager; 0 = ohne Bohrung
+středová díra kotouče; 0 = automaticky třetina patního průměru	Mittelbohrung der Scheibe; 0 = automatisch ein Drittel des Fußkreises
+Středová díra Ø{0} se do kotouče (patní Ø{1}) nevejde.	Mittelbohrung Ø{0} passt nicht in die Scheibe (Fußkreis Ø{1}).
+šikmé	Schrägrad
+šípové	Pfeilrad
+Šířka {0} mm je větší než průměr šneku – boky daleko od střední roviny se šnekem nezabírají.	Breite {0} mm ist größer als der Schneckendurchmesser – Flanken weit von der Mittelebene kämmen nicht mit der Schnecke.
+šířka hřebene (délka zubu)	Zahnstangenbreite (Zahnlänge)
+šířka hřebene; pastorek je o 0,5·m širší	Zahnstangenbreite; das Ritzel ist 0,5·m breiter
+šířka kola 2; pastorek je o 0,5·m širší	Breite von Rad 2; das Ritzel ist 0,5·m breiter
+Šířka kola musí být kladná.	Die Radbreite muss positiv sein.
+šířka kola; pastorek je dvakrát širší	Radbreite; das Ritzel ist doppelt so breit
+šířka odlehčovací drážky mezi oběma polovinami šípového ozubení; 0 = bez drážky (ostrý hrot)	Breite der Freistichnut zwischen beiden Hälften der Pfeilverzahnung; 0 = ohne Nut (spitze Pfeilspitze)
+šířka ozubeného věnce	Breite des Zahnkranzes
+Šířka ozubení	Zahnbreite
+Šířka ozubení {0} mm je příliš velká – smí být nejvýš 0,7 délky površky kužele ({1} mm).	Zahnbreite {0} mm ist zu groß – höchstens 0,7 der Kegelmantellänge ({1} mm).
+Šířka ozubení bývá nejvýš třetina délky površky kužele ({0} mm).	Die Zahnbreite beträgt meist höchstens ein Drittel der Kegelmantellänge ({0} mm).
+Šířka ozubení kola b	Zahnbreite des Rades b
+šířka ozubení talířového kola; 0 = automaticky 0,15·d_e2 (pastorek vyjde o něco širší)	Zahnbreite des Tellerrads; 0 = automatisch 0,15·d_e2 (das Ritzel wird etwas breiter)
+Šířka přes řady	Breite über die Reihen
+šířka rohatky	Breite des Sperrrads
+šířka řemene	Riemenbreite
+Šířka zubu	Zahnbreite
+šnek	Schnecke
+Šnek	Schnecke
+šnek i šnekové kolo mají stejný smysl stoupání	Schnecke und Schneckenrad haben dieselbe Steigungsrichtung
+Šnek m{0} q{1} z{2}	Schnecke m{0} q{1} z{2}
+šnekové	Schneckenrad
+Šnekové soukolí m{0} z{1}/z{2}	Schneckenradsatz m{0} z{1}/z{2}
+Tabulka ozubení	Verzahnungstabelle
+Tabulka ozubení – {0} ({1})	Verzahnungstabelle – {0} ({1})
+talířové kolo	Tellerrad
+Talířové kolo	Tellerrad
+Talířové kolo musí mít víc zubů než pastorek.	Das Tellerrad muss mehr Zähne haben als das Ritzel.
+tloušťka kotouče / věnce	Dicke der Scheibe / des Rings
+tloušťka kotouče a věnce	Dicke der Scheibe und des Rings
+Tloušťka stojiny	Stegdicke
+Tloušťka těla pod patou	Körperdicke unter dem Zahnfuß
+tloušťka těla pod patou zubu na velkém konci – určuje polohu zadního čela (montážní vzdálenost); 0 = automaticky 1,5·m	Körperdicke unter dem Zahnfuß am großen Ende – bestimmt die Lage der Rückenfläche (Einbaumaß); 0 = automatisch 1,5·m
+tloušťka těla pod patou zubu na velkém konci – určuje polohu zadního čela; 0 = automaticky 1,5·m	Körperdicke unter dem Zahnfuß am großen Ende – bestimmt die Lage der Rückenfläche; 0 = automatisch 1,5·m
+Tloušťka zubu	Zahndicke
+Tloušťka zubu {0} mm je větší než rozteč – zmenšete ji.	Zahndicke {0} mm ist größer als die Teilung – verkleinern.
+Tloušťka zubu na hlavě je jen {0} mm (méně než 0,2·m).	Die Zahndicke am Kopf beträgt nur {0} mm (weniger als 0,2·m).
+Tloušťka zubu na hlavě je jen {0} mm (méně než 0,25·m) – hlava se může vylomit; zmenšete x nebo zkraťte hlavu (k).	Die Zahndicke am Kopf beträgt nur {0} mm (weniger als 0,25·m) – der Kopf kann ausbrechen; x verkleinern oder Kopf kürzen (k).
+tloušťka zubu na roztečné kružnici; 0 = automaticky (kolo 1,57·m, pastorek 1,05·m, od 10 lístků 1,25·m)	Zahndicke am Teilkreis; 0 = automatisch (Rad 1,57·m, Ritzel 1,05·m, ab 10 Triebstöcken 1,25·m)
+Tloušťka zubu na tětivě (vnější)	Sehnenzahndicke (außen)
+Tvar boku	Flankenform
+Tvar hlavy	Kopfform
+Tvar zubové mezery	Zahnlückenform
+Tvar zubů je přibližný – pro zástavbu, hmotnost a výkres, ne pro výrobu ozubení. Přesně: roztečné kužely, úhly sklonu a normálná rozteč ve středním bodě. Přibližně: boky (jmenovité, nejsou sdružené – mimo střední bod čekejte několik setin mm mezery nebo přesahu), stálá výška zubu.	Die Zahnform ist eine Näherung – für Einbau, Masse und Zeichnung, nicht zur Verzahnungsfertigung. Exakt: Teilkegel, Spiralwinkel und Normalteilung im mittleren Punkt. Näherung: Flanken (nominell, nicht konjugiert – abseits des mittleren Punkts einige Hundertstel mm Spalt oder Überdeckung), konstante Zahnhöhe.
+Tvořicí kružnice hlavy	Rollkreis Kopf
+Tvořicí kružnice paty	Rollkreis Fuß
+Typ B – dole	Form B – unten
+Typ B – nahoře	Form B – oben
+Typ C – obě strany	Form C – beidseitig
+u vnitřního soukolí mají věnec i pastorek stejný smysl stoupání	beim Innenradpaar haben Hohlrad und Ritzel dieselbe Steigungsrichtung
+úhel boku šneku v osovém řezu (= čelní úhel záběru kola)	Flankenwinkel der Schnecke im Axialschnitt (= Stirneingriffswinkel des Rades)
+úhel boku v osovém řezu (tvar ZA); jiné tvary boku (ZN, ZI, ZK) ani globoidní šnek se nenabízejí	Flankenwinkel im Axialschnitt (Form ZA); andere Flankenformen (ZN, ZI, ZK) und die Globoidschnecke werden nicht angeboten
+Úhel hlavového kužele	Kopfkegelwinkel
+Úhel os	Achswinkel
+Úhel os Σ	Achswinkel Σ
+Úhel patního kužele	Fußkegelwinkel
+Úhel profilu	Profilwinkel
+úhel profilu šneku v osovém řezu	Profilwinkel der Schnecke im Axialschnitt
+Úhel profilu αₓ	Profilwinkel αₓ
+Úhel roztečného kužele	Teilkegelwinkel
+Úhel roztečného kužele kola	Teilkegelwinkel des Rades
+Úhel roztečného kužele pastorku	Teilkegelwinkel des Ritzels
+Úhel sklonu	Schrägungswinkel
+Úhel sklonu zubů	Schrägungswinkel der Zähne
+úhel sklonu zubů na roztečném válci; stoupání šroubovice p_z = π·d / tan β	Schrägungswinkel der Zähne am Teilzylinder; Steigungshöhe p_z = π·d / tan β
+úhel sklonu zubů pastorku ve středu šířky	Spiralwinkel der Ritzelzähne in Zahnbreitenmitte
+úhel sklonu zubů pastorku ve středu šířky; úhel kola vyjde menší	Spiralwinkel der Ritzelzähne in Zahnbreitenmitte; der Winkel des Rades wird kleiner
+úhel sklonu zubů; vnější kola mají opačný smysl stoupání, vnitřní soukolí stejný	Schrägungswinkel der Zähne; Außenräder haben entgegengesetzte Steigungsrichtung, Innenradpaare dieselbe
+Úhel stoupání	Steigungswinkel
+Úhel stoupání {0}° je větší než 45° – zmenšete počet chodů nebo zvětšete q.	Steigungswinkel {0}° ist größer als 45° – Gangzahl verkleinern oder q vergrößern.
+úhel záběru základního profilu; ISO 53 a DIN 867: 20°	Eingriffswinkel des Bezugsprofils; ISO 53 und DIN 867: 20°
+Úhel záběru αₙ	Eingriffswinkel αₙ
+úhel, který svírají osy obou kol	Winkel zwischen den Achsen beider Räder
+úhel, který svírají osy obou kol (běžně 90°)	Winkel zwischen den Achsen beider Räder (meist 90°)
+úhel, o který je strmé čelo zubu skloněné pod hrot – západka se pak do zubu vtahuje (0–15°)	Winkel, um den die steile Zahnbrust unter die Spitze geneigt ist – die Klinke wird dann in den Zahn gezogen (0–15°)
+určuje úhel roztečného kužele: tan δ = sin Σ / (z₂/z₁ + cos Σ); stejný počet = převod 1 : 1 (δ = 45°)	bestimmt den Teilkegelwinkel: tan δ = sin Σ / (z₂/z₁ + cos Σ); gleiche Zähnezahl = Übersetzung 1 : 1 (δ = 45°)
+válečkový řetěz podle ISO 606	Rollenkette nach ISO 606
+válečkový řetěz podle ISO 606: řada B (evropská) nebo ANSI 35–80; určuje rozteč, průměr válečku a šířku zubu	Rollenkette nach ISO 606: Reihe B (europäisch) oder ANSI 35–80; bestimmt Teilung, Rollendurchmesser und Zahnbreite
+Valivý průměr kola 1	Wälzkreisdurchmesser Rad 1
+Valivý průměr kola 2	Wälzkreisdurchmesser Rad 2
+Velká řemenice	Große Riemenscheibe
+Velké kolo	Großes Kettenrad
+věnec cykloreduktoru	Bolzenring des Zykloidgetriebes
+Věnec cykloreduktoru N{0}	Bolzenring Zykloidgetriebe N{0}
+Věnec musí mít víc zubů než pastorek.	Das Hohlrad muss mehr Zähne haben als das Ritzel.
+věnec Ø{0}	Hohlrad Ø{0}
+Věnec s čepy	Ring mit Bolzen
+Virtuální počet zubů	Ersatzzähnezahl
+Vlastní (řádky níže)	Eigenes (Zeilen unten)
+Vnější čelní modul	Äußerer Stirnmodul
+Vnější čelní modul m	Äußerer Stirnmodul m
+Vnější hlavový průměr	Äußerer Kopfkreisdurchmesser
+Vnější Ø věnce	Außen-Ø des Rings
+Vnější průměr	Außendurchmesser
+Vnější průměr dₐ	Außendurchmesser dₐ
+Vnější průměr věnce	Außendurchmesser des Hohlrads
+Vnější průměr věnce Ø{0} je malý – čepy na roztečné Ø{1} se do něj nevejdou.	Der Außendurchmesser des Rings Ø{0} ist klein – Bolzen auf Teilkreis Ø{1} passen nicht hinein.
+Vnější průměr věnce Ø{0} musí být větší než patní průměr Ø{1} aspoň o 1·m.	Der Außendurchmesser des Hohlrads Ø{0} muss den Fußkreis Ø{1} um mindestens 1·m übersteigen.
+Vnější roztečný Ø kola	Äußerer Teilkreis-Ø des Rades
+Vnější roztečný průměr	Äußerer Teilkreisdurchmesser
+vnější roztečný průměr talířového kola	äußerer Teilkreisdurchmesser des Tellerrads
+vnější roztečný průměr talířového kola d_e2 (ISO 23509)	äußerer Teilkreisdurchmesser des Tellerrads d_e2 (ISO 23509)
+Vnitřní ozubení (věnec)	Innenverzahnung (Hohlrad)
+Vnitřní ozubení m{0} z{1}	Innenverzahnung m{0} z{1}
+Vnitřní průměr věnce	Innendurchmesser des Rings
+vodicí bočnice po obou stranách (aspoň jedna řemenice v převodu je má mít)	Bordscheiben auf beiden Seiten (mindestens eine Riemenscheibe des Triebs sollte sie haben)
+Volně po směru hodin	Frei im Uhrzeigersinn
+Volně proti směru hodin	Frei gegen den Uhrzeigersinn
+Vrchol kužele za průsečíkem os	Kegelspitze hinter der Achskreuzung
+Vybrání stojiny se nevejde mezi náboj a věnec – zmenšete náboj nebo stojinu zrušte.	Die Stegaussparung passt nicht zwischen Nabe und Kranz – Nabe verkleinern oder Steg entfernen.
+vypíše tabulku ozubení všech kol dílu (modul, počet zubů, průměry, rozměr přes zuby a přes kuličky)	gibt die Verzahnungstabelle aller Räder des Teils aus (Modul, Zähnezahl, Durchmesser, Zahnweite und Zweikugelmaß)
+Výstřednost	Exzentrizität
+Výstřednost e	Exzentrizität e
+výstřednost hřídele (kotouč je posunutý o e)	Exzentrizität der Welle (die Scheibe ist um e versetzt)
+výstřednost hřídele; musí být menší než D_p / (2·N), jinak by měl profil smyčky	Exzentrizität der Welle; muss kleiner als D_p / (2·N) sein, sonst hätte das Profil Schleifen
+Výstřednost je příliš velká – profil by měl smyčky. Pro D_p = {0} a N = {1} musí být e menší než {2} mm.	Die Exzentrizität ist zu groß – das Profil hätte Schleifen. Für D_p = {0} und N = {1} muss e kleiner als {2} mm sein.
+Výstupní díry – počet	Abtriebsbohrungen – Anzahl
+Výstupní díry – roztečná Ø	Abtriebsbohrungen – Teilkreis-Ø
+Výstupní díry Ø	Abtriebsbohrungen Ø
+Výstupní díry Ø{0} na roztečné Ø{1} se nevejdou mezi středovou díru a patu laloků.	Abtriebsbohrungen Ø{0} auf Teilkreis Ø{1} passen nicht zwischen Mittelbohrung und Fuß der Kurvenbögen.
+Výstupní díry se překrývají – uberte počet nebo průměr.	Die Abtriebsbohrungen überlappen sich – Anzahl oder Durchmesser verringern.
+Výška celkem	Gesamthöhe
+Výška celkem h	Gesamthöhe h
+Výška hlavy (vnější)	Kopfhöhe (außen)
+Výška hlavy h_aP*	Kopfhöhe h_aP*
+Výška hlavy nad tětivou	Höhe über der Sehne
+výška hlavy v modulech; 0 = automaticky (kolo 0,95 × výška špičky, nejvýš 1,40; pastorek 0,855 / 0,67 / 0,525 podle počtu lístků)	Kopfhöhe in Moduln; 0 = automatisch (Rad 0,95 × Spitzenhöhe, höchstens 1,40; Ritzel 0,855 / 0,67 / 0,525 je nach Triebstockzahl)
+Výška hřebene {0} mm je menší než výška zubu s tělem ({1} mm).	Zahnstangenhöhe {0} mm ist kleiner als die Zahnhöhe mit Körper ({1} mm).
+Výška hřebene h	Zahnstangenhöhe h
+Výška osy pastorku nade dnem hřebene	Höhe der Ritzelachse über dem Zahnstangenboden
+Výška paty (vnější)	Fußhöhe (außen)
+Výška paty h_fP*	Fußhöhe h_fP*
+výška paty v modulech; 0 = automaticky (kolo 1,57; pastorek = hlava kola + vůle 0,4)	Fußhöhe in Moduln; 0 = automatisch (Rad 1,57; Ritzel = Kopfhöhe des Rades + Spiel 0,4)
+Výška roztečné přímky	Höhe der Teillinie
+Výška zubu	Zahnhöhe
+Výška zubu {0} mm je příliš velká pro průměr {1} mm.	Zahnhöhe {0} mm ist zu groß für den Durchmesser {1} mm.
+Výška zubu h	Zahnhöhe h
+výškové posunutí pastorku (kolo má stejné záporné)	Höhenverschiebung des Ritzels (Rad gleich negativ)
+výškové posunutí pastorku; kolo dostane stejné záporné	Höhenverschiebung des Ritzels; das Rad erhält dieselbe negative
+výškové posunutí: pastorek kladné, kolo stejné záporné	Höhenverschiebung: Ritzel positiv, Rad gleich negativ
+vzdálenost mimoběžných os	Abstand der windschiefen Achsen
+vzdálenost mimoběžných os pastorku a kola; pod 0,02·d_e2 použijte kuželové kolo se zakřivenými zuby	Abstand der windschiefen Achsen von Ritzel und Rad; unter 0,02·d_e2 ein bogenverzahntes Kegelrad verwenden
+Z evolventního boku skoro nic nezbylo (začíná na Ø{0}, hlava je Ø{1}) – zvětšete posunutí x nebo počet zubů.	Von der Evolventenflanke bleibt fast nichts (Beginn bei Ø{0}, Kopf Ø{1}) – Profilverschiebung x oder Zähnezahl vergrößern.
+Zadejte kladný modul a aspoň 5 zubů pastorku.	Positiven Modul und mindestens 5 Ritzelzähne eingeben.
+Zadejte průměr odlehčovacích děr.	Durchmesser der Erleichterungsbohrungen eingeben.
+Zadejte průměr výstupních děr.	Durchmesser der Abtriebsbohrungen eingeben.
+základní hřeben ISO 53 (typ A = DIN 867): výška paty a zaoblení paty	Bezugsprofil ISO 53 (Typ A = DIN 867): Fußhöhe und Fußrundung
+základní hřeben ISO 53 (typ A = DIN 867): výška paty a zaoblení paty nástroje	Bezugsprofil ISO 53 (Typ A = DIN 867): Fußhöhe und Kopfrundung des Werkzeugs
+Základní profil	Bezugsprofil
+Základní průměr	Grundkreisdurchmesser
+Zaoblení paty	Fußrundung
+Zaoblení paty ρ = {0}·m se do základního profilu s úhlem {1}° a patou {2}·m nevejde (nejvýš {3}·m).	Fußrundung ρ = {0}·m passt nicht in ein Bezugsprofil mit Winkel {1}° und Fuß {2}·m (höchstens {3}·m).
+Zaoblení paty ρ_fP*	Fußrundung ρ_fP*
+Závit delší než 400·m se nepostaví – zkraťte šnek.	Ein Gewinde länger als 400·m wird nicht gebaut – Schnecke kürzen.
+Závit šneku je na hlavě špičatý – zmenšete úhel profilu nebo boční vůli.	Das Schneckengewinde ist am Kopf spitz – Profilwinkel oder Flankenspiel verkleinern.
+Zkrácení hlavy	Kopfkürzung
+Zkrácení hlavy k	Kopfkürzung k
+zkrácení hlavy zubu v modulech; režim Soukolí jím drží hlavovou vůli 0,25·m	Kopfkürzung in Moduln; der Radpaar-Modus hält damit das Kopfspiel bei 0,25·m
+ztenčení zubu: boční vůle po normále, kterou do soukolí přinese toto kolo (0 = jmenovitý zub)	Zahndickenabmaß: das Normalflankenspiel, das dieses Rad zum Radpaar beiträgt (0 = Nennzahn)
+Zub hřebene je špičatý – zmenšete úhel záběru nebo výšku hlavy.	Der Zahnstangenzahn ist spitz – Eingriffswinkel oder Kopfhöhe verkleinern.
+Zub je na vnějším průměru Ø{0} špičatý (boky se sejdou na Ø{1}) – zmenšete posunutí x nebo zvětšete počet zubů.	Der Zahn ist am Außendurchmesser Ø{0} spitz (die Flanken treffen sich bei Ø{1}) – Profilverschiebung x verkleinern oder Zähnezahl vergrößern.
+Zub je špičatý – hlavová kružnice Ø{0} leží nad průsečíkem boků (Ø{1}). Zmenšete posunutí x nebo zvětšete zkrácení hlavy k.	Der Zahn ist spitz – der Kopfkreis Ø{0} liegt über dem Schnittpunkt der Flanken (Ø{1}). Profilverschiebung x verkleinern oder Kopfkürzung k vergrößern.
+Zub je špičatý – zmenšete posunutí x nebo úhel záběru.	Der Zahn ist spitz – Profilverschiebung x oder Eingriffswinkel verkleinern.
+Zub věnce je špičatý – zmenšete posunutí x.	Der Zahn des Hohlrads ist spitz – Profilverschiebung x verkleinern.
+Zub věnce vychází příliš nízký ({0} mm) – zmenšete posunutí x nebo zvětšete počet zubů.	Der Zahn des Hohlrads wird zu niedrig ({0} mm) – Profilverschiebung x verkleinern oder Zähnezahl vergrößern.
+Zubová mezera je u paty příliš úzká – zvětšete počet zubů nebo zmenšete posunutí x.	Die Zahnlücke ist am Fuß zu schmal – Zähnezahl vergrößern oder Profilverschiebung x verkleinern.
+Zubová mezera je u paty širší než rozteč – zmenšete boční vůli.	Die Zahnlücke ist am Fuß breiter als die Teilung – Flankenspiel verkleinern.
+Zuby by se při výrobě podřezaly (virtuální počet zubů {0}): použijte posunutí x ≥ {1}. Model podřezání nezobrazuje.	Die Zähne würden bei der Fertigung unterschnitten (Ersatzzähnezahl {0}): Profilverschiebung x ≥ {1} verwenden. Das Modell zeigt den Unterschnitt nicht.
+zuby do tělesa	Zähne in den Körper
+Zuby do tělesa	Zähne in den Körper
+Zuby jsou podřezané (z = {0}): bez podřezání je potřeba posunutí x ≥ {1}. Model podřezání obsahuje tak, jak ho nástroj vyrobí.	Die Zähne sind unterschnitten (z = {0}): ohne Unterschnitt ist eine Profilverschiebung x ≥ {1} nötig. Das Modell enthält den Unterschnitt so, wie ihn das Werkzeug erzeugt.
+Zuby kola	Zähne des Rades
+Zuby kola 1 (z₁)	Zähne Rad 1 (z₁)
+Zuby kola 2 (z₂)	Zähne Rad 2 (z₂)
+Zuby kola z₂	Zähne des Rades z₂
+Zuby pastorku	Zähne des Ritzels
+Zuby pastorku z₁	Zähne des Ritzels z₁
+Zuby protikola	Zähne des Gegenrads
+Zuby spoluzabírajícího kola	Zähne des kämmenden Rades

@@ -126,6 +126,11 @@ export type ExtDef = {
    */
   legacy?: string;
   /**
+   * Prvek je zaregistrovaný (staví se, má formulář, funguje obecný příkaz `prvek <id> …`), ale na pásu karet, v paletě příkazů
+   * ani mezi zkratkami se nenabízí – nabízí ho jiný vstupní bod (kola a ozubení: jedno tlačítko průvodce pro všech 14 druhů).
+   */
+  hidden?: boolean;
+  /**
    * Prvek ukládá své nástrojové těleso (`ctx.tools.set(featureId, …)`): lze ho vybrat v Zrcadlit prvky, Znovu použít nástroj
    * a v poli prvků. Formuláře nabízejí jen prvky rozšíření s tímto příznakem. Funkce = podle dat prvku (profil jako samostatná
    * tělesa nástroj neukládá) – ptejte se přes `hasExtTool(f)`.
@@ -142,8 +147,8 @@ export function registerExt(def: ExtDef) {
 }
 export const getExt = (ext: string) => defs.get(ext);
 export const allExt = () => [...defs.values()];
-/** prvky nabízené v UI (pás karet, paleta, zkratky, nápověda) – bez starších duplicit (`legacy`) */
-export const visibleExt = () => allExt().filter((d) => !d.legacy);
+/** prvky nabízené v UI (pás karet, paleta, zkratky, nápověda) – bez starších duplicit (`legacy`) a skrytých prvků (`hidden`) */
+export const visibleExt = () => allExt().filter((d) => !d.legacy && !d.hidden);
 export const extByTab = (tab: ExtTab) => visibleExt().filter((d) => d.tab === tab).sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 
 /** Uloží prvek nástrojové těleso (`toolBody`), které jde zrcadlit, opakovat v poli nebo znovu použít? Jen prvky rozšíření. */
