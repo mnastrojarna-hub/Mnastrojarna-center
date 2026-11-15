@@ -239,3 +239,31 @@ describe("prostředí sestavy nad ws (asm-env.ts)", () => {
     expect(missing).toEqual(["Díl F3"]);
   });
 });
+
+describe("2D výkres textem: soubor příkazu doručí hostitel", () => {
+  it("`2d export dxf` zapíše soubor přes FileSink (dřív ✓ bez souboru v CLI i v enginu prohlížeče)", async () => {
+    const ws = new MemoryWorkspace();
+    const host = hostOf(fakeKernel().kernel);
+    const r = await runScript(ws, "2d nový Obrys\n2d čára 0,0 100,0 @0,50\n2d export dxf verze R12", host);
+    expect(r.counts.errors).toBe(0);
+    const files = [...(host.files as ReturnType<typeof memoryFileSink>).files.values()];
+    expect(files.map((f) => f.file.format)).toEqual(["dxf"]);
+    expect(files[0].file.doc).toBe("Obrys");
+    const text = new TextDecoder().decode(files[0].data);
+    expect(text).toMatch(/SECTION/);
+    expect(text).toMatch(/LINE/);
+  });
+  it("výstup DXF / DWG 2D výkresu (`--formats dxf,dwg`) zapíše exportér 2D výkresu, PDF zůstává ✗ host.app-only", async () => {
+    const ws = new MemoryWorkspace();
+    const host = hostOf(fakeKernel().kernel);
+    await runScript(ws, "2d nový Obrys\n2d čára 0,0 100,0 @0,50", host);
+    const { writeDocFormat } = await import("./files");
+    const notes: string[] = [];
+    const d = ws.present();
+    const files = [...(await writeDocFormat({ ...host, files: host.files }, ws, d, "dxf", (n) => notes.push(n.code))), ...(await writeDocFormat({ ...host, files: host.files }, ws, d, "dwg", (n) => notes.push(n.code)))];
+    expect(files.map((f) => f.name)).toEqual(["Obrys.dxf", "Obrys.dwg"]);
+    expect(files.every((f) => f.bytes > 500)).toBe(true);
+    expect(await writeDocFormat({ ...host, files: host.files }, ws, d, "pdf", (n) => notes.push(n.code))).toEqual([]);
+    expect(notes).toEqual(["host.app-only"]);
+  });
+});

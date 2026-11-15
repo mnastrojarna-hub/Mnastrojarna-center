@@ -2206,7 +2206,8 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do `--out` (řádek `F 
   list sestavy dá `list 1`. DXF / DWG / SVG s `dokument` = ZIP `<základ>_<formát>.zip` se souborem na list (jeden list
   = `<základ>.dxf`); CSV = kusovník. `výkres export png` jen v aplikaci (CLI ✗ `host.app-only`). Dokument bez výkresu:
   ⚠ `drawing.default-sheet` a exportuje se výchozí list (stejně u `--formats pdf`; `--strict` ho zastaví). 2D výkres
-  (`2d nový …`) se exportuje příkazem `2d export dxf|dwg` – `výkres export` na něm dá ✗ s tímto důvodem.
+  (`2d nový …`) se exportuje příkazem `2d export dxf|dwg` (v CLI soubor do `--out` s řádkem F, stejně `2d tisk` = PDF
+  rozvržení a `--formats dxf,dwg`) – `výkres export` na něm dá ✗ s tímto důvodem.
 - **CLI `--formats auto`** (výchozí) = STEP hlavního dokumentu + `.mncad` + jedno PDF všech listů (jako `výkres export pdf
   dokument`, má-li výkres dokument nebo díl v jeho komponentách); `--formats pdf` totéž PDF, `dxf|dwg|svg` soubor na
   list, `csv` kusovník sestavy. Listy spočítané v běhu (`výkres export pdf dokument`) převezme `--formats pdf` téhož
