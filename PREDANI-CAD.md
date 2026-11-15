@@ -28,6 +28,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 15. 11. 00:45 | **Úkol B HOTOV: fáze B sloučena do `main` (PR #100, `e27ff86`)** – s ní i PR #99 aplikace Sales OS, který byl na větvi. Po nanesení: 520 testů, build, 14 e2e sad 0 FAIL. Worktree `w14-*` smazány. Dál: pružiny (H) dobíhají opravy; pak E1 (NDA přejmenování zkušebního nástroje – teď je to možné), D1/D3 dokumentace a PDF příručka, G a F obnovit. |
 | 15. 11. 00:55 | E1 hotov: zkušební nástroj přejmenován na „900-01-00“ (číslo zákazníka z dílů i ze souborů pryč), `synth-959.txt` → `synth-tool.txt`, `expected.json` přegenerován jádrem (gravírovaný text se změnil: objem −0,001 cm³). |
 | 15. 11. 01:00 | Úkol G (výběr oknem) obnoven na novém základu `69f3f58` (main s fází B): workflow `wf_533a7c7c-a4a`, zadání `S/w20/brief.md` s poznámkou o obnovení. Pozor – chyba integrátora: při smazání starých worktree `w20-3d`/`w20-2d` se ztratily rozpracované soubory agenta (`box-select-3d.ts`, `box-select-2d.ts`, test) – agent je napíše znovu. Pravidlo: před `git worktree remove` vždy zálohovat `git status --short` soubory. Běží 2 workflow (H pružiny, G výběr oknem); F kola čeká. |
+| 15. 11. 01:15 | Pružiny (H) hotové v obou balících i po opravách kontroly: `part` commit `bde7eb5` (`S/w21/part.patch`, 11 nálezů opraveno), `motion` commit `359f515` (`S/w21/motion.patch`, 8 nálezů opraveno – dynamika teď přesná na všech krocích, energie drží). Oba proti `fd8a05e` (bez fáze B). Spuštěna integrace na main s enginem: workflow `wf_60b96c19-df2`, zadání `S/w21/int-brief.md`, worktree `w21-int`, výstup `S/w21/int.patch` + `int-audit.md`. Běží: G (výběr oknem) + integrace H. F (kola) čeká. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -328,8 +329,8 @@ Zadání majitele: „Online CAD neumí pružiny a to ani pro simulaci pohybu.�
 - Balík `motion` (worktree `w21-motion`, patch `S/w21/motion.patch`): „Pružina mezi díly“ na klik (i do všech děr vzoru),
   skutečný tvar pružiny při přehrávání pohybu (drát zůstane kulatý), **dynamická pohybová studie** (hmotnosti, gravitace,
   síly pružin, tlumení, dorazy) s grafem a CSV; příklad: stírací deska střihadla na pružinách.
-- [ ] H1. Počkej na `wf_1e1ed70b-b6a` (obnova `resumeFromRunId`), přečti zprávy.
-- [ ] H2. Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
+- [x] H1. (hotovo 15. 11. 01:15) Počkej na `wf_1e1ed70b-b6a` (obnova `resumeFromRunId`), přečti zprávy.
+- [ ] H2. (BĚŽÍ workflow `wf_60b96c19-df2` → `S/w21/int.patch`) Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
 - [ ] H3. Vlastní zkouška v prohlížeči: tabulka → tlačná pružina d 2 De 20 L0 50 n 8 broušená (L0 a De změřit na tělese,
       tuhost ručně ověřit); sestava se 4 pružinami pod stírací deskou → dynamika → deska se vrátí na doraz, graf, CSV.
 - [ ] H4. Dokumentace (kapitola Prvky – pružiny, Sestavy – pohyb a dynamika, FAQ „Jak udělám pružinu?“), PR, sloučit,
