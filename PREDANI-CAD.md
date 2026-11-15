@@ -38,6 +38,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 15. 11. 03:45 | **H1/H2 – pružiny hotové i po opravě 5 nálezů kontroly integrace** (`w21-int` `8a31bd6`: falešná kolize pružiny z tabulky, vzpěr s ν, čísla v EN, rychlejší dynamika s kolizí, úklid serveru). `S/w21/int.patch` (102 souborů, základ `87ca363`) nanesen na větev (`7cc4055`) BEZ konfliktů, v indexu necommitnut; NDA čisté (shody jen „Kvádr 1“, „List 1“), překlady 0/0, typy, lint 5. BĚŽÍ: celý `src/cad`+`src/components` vitest (`S/w21/vitest-main.log`, končí `exit=`; po něm harness `S/w21/harness-main.log`) a build (`S/w21/build-main.log`). Pak e2e na :3199 + H3 vlastní zkouška. Kola: `wf_fe2fa9ab-38a` balík core běží. |
 | 15. 11. 04:27 | Pružiny na větvi zelené: vitest celý `src/cad`+`src/components` 3036 ok (2 selhání: `agent-more` – EN/DE seznam příkazů, OPRAVENO `0f25dde`; `ext/springs.test.ts` jen limit 60 s při zátěži, samostatně zelený), harness, build, e2e 18 sad 905/0, `cad-cli` 99/0, akceptační brána PASS 100/0 (nálezy beze změny), vlastní zkouška H3 14/14; dokumentace pružin (Prvky, Sestavy – dynamika, srovnání, FAQ, historie) = H4 text. **PR #102** založen, čeká na GitHub kontrolu `acceptance (22)`, pak sloučit, smazat `w21-*`. |
 | 15. 11. 04:31 | **Úkol H HOTOV: pružiny sloučeny do `main` (PR #102, `0451202`)** – s nimi i oprava zápisu souborů 2D výkresu v CLI a dokumentace CLI po fázi B (D1). GitHub `acceptance (22)` zelená. Worktree `w21-*` smazány (zbytek `w21-motion` v `S/w21/w21-motion-final-wip.patch`). Dál: E (zbývající body hlášení – nový workflow), F kola běží (`wf_fe2fa9ab-38a`), D2/D3 obrázky a PDF příručka až po F. |
+| 15. 11. 04:40 | Úkol E: E2 uzavřen (oba body `S/followups.md` hotové), E7 ověřen v CLI (`stav` ve stejném běhu dává přesnou obálku sestavy – prohlížeč ověří balík runs), z E3 už hotové odkazy/base64 výstupů a B1/B2 v enginu. Spuštěn workflow `wf_afc90a94-180` (skript `…/workflows/scripts/cad-wave-e-report-gaps-wf_afc90a94-180.js`, zadání `S/e/brief.md`): balíky `help` (hledání v nápovědě, tahák ≤ 5 kB, hledání na stránce dokumentace; worktree `e-help`, :3521), `runs` (opakovaný běh bez duplicit, řádky D s čísly u všech dokumentů – dnes `V=-`, stručný protokol v konzoli prohlížeče, ověření E7/B1/B2 v prohlížeči; `e-runs`, :3522), `export` (= E6: převodník zapíše razítko, tolerance podle desetinných míst, funkční kóty, režim děr, přezdívky, pružiny, dynamiku, genEdit, SHEET_UNSUPPORTED; `e-export`, :3523). Patche `S/e/<balík>.patch`. Běží současně s koly (F). |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -245,22 +246,22 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
       `expected.json`), `src/cad/engine/protocol.test.ts`, `host.test.ts` a e2e pojmenovává díly „959-01-00-NN …“ –
       to je číslo nástroje zákazníka. Přejmenuj na neutrální (např. „900-01-00-NN“; soubor `synth-959.txt` →
       `synth-tool.txt`) jedním commitem AŽ PO sloučení úkolu B (patch B sahá do stejných souborů). Geometrie je syntetická.
-- [ ] E2. Položky v `S/followups.md` (závod ve výběru 2D `window.mncad.draft` status.selection; přísný režim a
+- [x] E2. (uzavřeno 15. 11. 04:40 – obě položky hotové dřív) Položky v `S/followups.md` (závod ve výběru 2D `window.mncad.draft` status.selection; přísný režim a
       `section-legacy`).
-- [ ] E3. Z hlášení „Kde CAD stojí dnes“ zkontroluj, co fáze B nedodala, a doplň (každé jako malý balík s testy):
+- [ ] E3. (BĚŽÍ workflow `wf_afc90a94-180`, balíky help + runs; odkazy/base64 a B1/B2 už hotové) Z hlášení „Kde CAD stojí dnes“ zkontroluj, co fáze B nedodala, a doplň (každé jako malý balík s testy):
   - P2-10: hledání v nápovědě textem (`nápověda <slovo>`) a tahák pro agenty ≤ 5 kB (návrh `S/w14/tahak-navrh.md`),
   - odkazy na soubory pro agenty v cloudovém prohlížeči (`… odkaz` / `base64` u výstupních příkazů),
   - opakovaný běh téhož skriptu bez duplicit (idempotence: druhé spuštění nesmí založit „Díl 2“),
   - tichý (stručný) protokol i v konzoli prohlížeče,
   - vícedokumentové běhy: ✓ jen u dokumentů, které se skutečně postavily (dřív se stavěl jen poslední),
   - B1 / B2 z hlášení (prázdná sestava se počítá jako prázdná záložka; závod evidence záložek).
-- [ ] E6. Převodník dokument → skript nepřenáší nic z vlny 15 kromě třídy ISO 2768 a NEHLÁSÍ to: šablona a další pole
+- [ ] E6. (BĚŽÍ workflow `wf_afc90a94-180`, balík export) Převodník dokument → skript nepřenáší nic z vlny 15 kromě třídy ISO 2768 a NEHLÁSÍ to: šablona a další pole
       razítka (logo, zákazník, polotovar…), tabulka nepředepsaných tolerancí podle desetinných míst, funkční rozměry
       (`kótovat chytře funkční …`), režim poloh děr (`kótovat … díry tabulka|souřadnicově`), přezdívky komponent
       (`vložit … jako`), pružiny (`sestava pružina …`). Doplň vyhrazené příkazy do `src/cad/doc-script.ts` (a do
       ověření řádku), jinak aspoň poznámku ℹ; test tam a zpět pro každý bod (`doc-script.roundtrip.test.ts`). Po úkolu B
       (patch B na doc-script nesahá, ale ověř).
-- [ ] E7. `stav` ve stejném běhu `window.mncad.run`, který sestavu teprve založil, nevypíše přesnou obálku („tělesa
+- [ ] E7. (v CLI ověřeno 15. 11. 04:40 – obálka je; prohlížeč ověří balík runs) `stav` ve stejném běhu `window.mncad.run`, který sestavu teprve založil, nevypíše přesnou obálku („tělesa
       komponent se stavějí zvlášť“); samostatné `stav` ji vypíše. Po úkolu B ověř v enginu (asynchronní stav sestavy)
       a oprav, aby obálka byla i v témže běhu (nebo to jasně řekni v protokolu).
 - [ ] E4. Hostovaný koncový bod (HTTP služba pro agenty bez Node) je rozhodnutí majitele – nenasazuj, jen se v závěrečné
