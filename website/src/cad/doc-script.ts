@@ -1542,7 +1542,7 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
 /** řez v konvenci skici (starší uložený řez má v `offset` souřadnici na ose) – k porovnání uloženého řezu s přečteným řádkem */
 const secNorm = (v: unknown): unknown => (v && typeof v === "object" ? sectionToSketchConvention(v as SectionOpt) : v);
 /** volby listu, které textový příkaz `výkres …` nenastavuje a které nejsou výchozí */
-export const SHEET_UNSUPPORTED = ["details", "models", "aux", "cuts", "brokenOut", "breaks", "fitShow", "fitTable", "dimRoom", "dimRoomMin", "weldSymbols"];
+export const SHEET_UNSUPPORTED = ["details", "models", "aux", "cuts", "brokenOut", "breaks", "fitShow", "fitTable", "dimRoom", "dimRoomMin", "weldSymbols", "genEdit"];
 /** nastavené volby listu, které skript nepřenese (pohledy navíc, detaily, další modely…) – list pak po přečtení vypadá jinak */
 export const sheetUnsupported = (o: Record<string, unknown>): string[] => SHEET_UNSUPPORTED.filter((k) => o[k] !== undefined && !(Array.isArray(o[k]) && !(o[k] as unknown[]).length));
 function emitDrawings(c: Ctx, doc: CadDoc) {

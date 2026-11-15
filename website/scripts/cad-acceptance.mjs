@@ -7,7 +7,7 @@
 //
 // Cases (each run = `mncad run … --out <tmp> --formats step,pdf --share --share-store <php -S> --json`, wall time and the
 // peak RSS (VmHWM of /proc/<pid>/status – the CLI job runs in worker_threads of the same process) measured outside):
-//   synth      scripts/cad-harness/synth-959.txt + expected.json (generator check first: synth-tool.mjs --check), on every
+//   synth      scripts/cad-harness/synth-tool.txt + expected.json (generator check first: synth-tool.mjs --check), on every
 //              Node of --node: components, mates ok, Σ volume (V.sum or V.union, decision 15.1), clash classes (real 0),
 //              protocol ≤ 2048 B and every line in the grammar, < 120 s, ≤ 2048 MB, STEP check ok, PDF pages = sheets,
 //              short link (≤ 200 chars) that reopens in Node with the same components; then the strict run: exit 0, no STOP,
@@ -482,7 +482,7 @@ async function main() {
   try {
     // the generator: the committed synthetic script and expected.json match the spec (no kernel)
     const gen = spawnSync(process.execPath, [path.join(HARNESS, "synth-tool.mjs"), "--check"], { encoding: "utf8" });
-    check("generator", "synth-959.txt + expected.json = synth-spec.mjs (synth-tool.mjs --check)", gen.status === 0, gen.stdout.trim() || gen.stderr.trim());
+    check("generator", "synth-tool.txt + expected.json = synth-spec.mjs (synth-tool.mjs --check)", gen.status === 0, gen.stdout.trim() || gen.stderr.trim());
     const cli = await resolveCli();
     check("cli", "built CLI bundle", fs.existsSync(cli), path.relative(WEB, cli));
     if (!flag("--no-share")) {

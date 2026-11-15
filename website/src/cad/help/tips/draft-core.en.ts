@@ -125,6 +125,7 @@ export default {
     when: "When you want to start a command with a new selection.",
     steps: ["Click Clear selection or press Esc."],
     cmd: "2d select none",
+    note: "Window: drag left to right (fully inside) or right to left (also crossed); Ctrl/Shift adds, Ctrl+Shift removes.",
   },
   "draft/erase": {
     what: "Erases the selected objects; objects on locked layers are skipped.",

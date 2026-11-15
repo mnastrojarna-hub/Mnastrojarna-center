@@ -57,6 +57,8 @@ import { sketchToDxf } from "@/cad/sketch";
 import { loadSettings, type Settings } from "@/cad/settings";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type Feature, type SketchEntity, type Vec3 } from "@/cad/types";
 import { getExtUi, type ExtActionApi } from "./ext";
+import { isCrossingDrag } from "@/cad/box-select";
+import { applyBoxSel } from "./box-pick-3d";
 import { asmImportOutcome, partImportOutcome, subassemblyComponent, type PendingImport } from "./import-watch";
 import { flattenLeaves } from "./asm-flatten";
 import { compRef, leafByRef } from "./leaf-ref";
@@ -771,6 +773,23 @@ function select(host: ApiHost, ids: string[], o: { additive?: boolean } = {}, pa
   return next.length;
 }
 
+/** window.mncad.selectBox: výběr oknem / křížením jako tažení myší (obdélník v px 3D okna) – box-pick-3d.ts */
+function selectBox(host: ApiHost, o: { x0: number; y0: number; x1: number; y1: number; crossing?: boolean; mode?: "replace" | "add" | "remove" }): SelectionEntry[] {
+  if (!o || typeof o !== "object" || !["x0", "y0", "x1", "y1"].every((k) => Number.isFinite((o as Record<string, unknown>)[k])))
+    throw new Error(tr("selectBox potřebuje obdélník v px 3D okna, např. {0}", "{ x0: 40, y0: 60, x1: 700, y1: 500 }"));
+  const mode = o.mode ?? "replace";
+  if (mode !== "replace" && mode !== "add" && mode !== "remove") throw new Error(tr("selectBox: mode je replace | add | remove – zadáno {0}", JSON.stringify(o.mode)));
+  const pick = host.vp()?.boxPick;
+  const items = pick ? pick({ x0: o.x0, y0: o.y0, x1: o.x1, y1: o.y1 }, o.crossing ?? isCrossingDrag(o.x0, o.x1)) : null;
+  if (!items) throw new Error(tr("selectBox: v tomto režimu 3D okna se oknem nevybírá (otevřená skica, výkres nebo výběr plochy pro skicu)"));
+  const next = applyBoxSel(currentSel(host), items, mode);
+  setSel(host, next);
+  host.inspect(next[0] ?? null);
+  const top = [...next].reverse().find((x) => x.kind !== "feature" && "topId" in x && x.topId);
+  if (!isPartDoc(host.doc()) && top && "topId" in top && top.topId) host.setAsmSel(top.topId.split("/")[0]);
+  return selectionOf(host);
+}
+
 /**
  * Textové zaoblení / sražení bez `hrany` zpracuje všechny hrany – výběr (klik, `vyber`) textové příkazy nečtou. Je-li
  * vybraná nějaká hrana, protokol to řekne a ukáže zápis jen pro vybrané hrany (žádná tichá změna geometrie).
@@ -834,6 +853,7 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
     },
     selection: () => selectionOf(host()),
     select: (ids, opts) => select(host(), ids, opts),
+    selectBox: (box) => selectBox(host(), box),
     clearSelection: () => {
       const h = host();
       setSel(h, []);

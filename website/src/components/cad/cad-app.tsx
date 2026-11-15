@@ -90,6 +90,7 @@ import type { Workspace } from "@/cad/engine/workspace";
 import { isAutomation } from "@/lib/automation";
 import { ComputeChip, progressLabel } from "./compute-chip";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
+import { applyBoxIdx, applyBoxSel, boxHelpText, featureFacesOf, featureOwnerCache, measureMany, mouseHint, setBoxThrough, useBoxThrough, type BoxMode } from "./box-pick-3d";
 import { FEATURE_TONE, Manager, type ManagerTab } from "./manager";
 import { AsmMassDialog } from "./asm-mass-dialog";
 import { allColored, colorComponents, colorTargets } from "@/cad/asm-color";
@@ -186,6 +187,8 @@ export function CadApp() {
   // výběr entit, inspektor, měření
   const [selFilter, setSelFilter] = useState<SelFilter>("all");
   const [selection, setSelection] = useState<SelItem[]>([]);
+  const boxThroughOn = useBoxThrough(); // výběr oknem i skrytých entit (filtr výběru)
+  const boxOwners = useMemo(featureOwnerCache, []); // filtr Prvek: plocha → prvek pro počítadlo okna i výběr (cad.faceOwner)
   /** čekající výběr do pole odkazu ve formuláři prvku (bod / hrana / plocha…) */
   const [refPick, setRefPick] = useState<RefPickTarget | null>(null);
   /** kontextová mini lišta u kurzoru po výběru entity */
@@ -1604,6 +1607,40 @@ export function CadApp() {
     }
     if (next.length === 1) runInspect(next[0]);
   };
+  /** výběr oknem / křížením v 3D okně (box-pick-3d.ts): hrany / plochy formuláře, měření, filtr Prvek, jinak výběr */
+  const onPickMany = (items: SelItem[], mode: BoxMode) => {
+    if (pickMode === "edges" || pickMode === "faces") {
+      const idx = items.flatMap((x) => (x.kind === (pickMode === "edges" ? "edge" : "face") && !x.compId ? [x.index] : []));
+      const pk = active?.type === "ext" ? extPickOf(active) : null;
+      if (active?.type === "ext") {
+        if (pk?.kind === pickMode) updateFeature(active.id, { data: { ...active.data, [pk.key]: applyBoxIdx((active.data[pk.key] as number[] | undefined) ?? [], idx, mode) } } as Partial<Feature>);
+      } else if (active && (active.type === "fillet" || active.type === "chamfer") && active.edges !== "all") updateFeature(active.id, { edges: applyBoxIdx(active.edges, idx, mode) } as Partial<Feature>);
+      else if (active && FACE_PICK.has(active.type)) updateFeature(active.id, { faces: applyBoxIdx((active as { faces?: number[] }).faces ?? [], idx, mode) } as Partial<Feature>);
+      return;
+    }
+    if (measure) {
+      const next = applyBoxSel(measureSel, items, mode);
+      setMeasureSel(next);
+      if (next.length <= 2) return void runMeasure(next);
+      return void measureMany(next, (it) => cad.inspect(srcOf(it), refOf(it), densityOf(it))).then(setMeasureRes, (e: Error) => flash(e.message));
+    }
+    setHud(null);
+    if (selFilter === "feature" && !isAsm) {
+      void featureFacesOf(items, boxOwners.owner(result?.mesh, (f, pt) => cad.faceOwner(doc, f, pt))).then((found) => {
+        const base: Record<string, number[]> = mode === "replace" ? {} : { ...(featSel ?? {}) };
+        for (const [id, faces] of Object.entries(found)) if (mode === "remove") delete base[id]; else base[id] = faces;
+        setFeatSel(Object.keys(base).length ? base : null);
+        setSelection(Object.keys(base).map((id) => ({ kind: "feature", featureId: id })));
+      }, (e: Error) => flash(e.message));
+      return;
+    }
+    setFeatSel(null);
+    const next = applyBoxSel(selection, items, mode);
+    setSelection(next);
+    if (isAsm) setAsmSel([...next].reverse().flatMap((x) => (x.kind !== "feature" && x.topId ? [x.topId.split("/")[0]] : []))[0] ?? null);
+    if (next.length) void runInspect(next[0]);
+    else setInspect(null);
+  };
   /** filtr Prvek: klik na plochu vybere prvek, který ji vytvořil (jádro: face-owner.ts) – jeho plochy v modelu, řádek ve stromu */
   const pickFeature = async (face: number, point: Vec3 | undefined, additive: boolean) => {
     setHud(null);
@@ -2846,7 +2883,10 @@ export function CadApp() {
             label: tr("Filtr: {0}", tr(FILTER_LABEL[selFilter])),
             icon: "select",
             tone: "tool",
-            menu: (Object.keys(FILTER_LABEL) as SelFilter[]).filter((f) => (isAsm ? f !== "feature" : f !== "component" && f !== "subasm")).map((f) => ({ id: f, label: tr(FILTER_LABEL[f]), icon: "select" as CadIconName, active: selFilter === f, onClick: () => setSelFilter(f) })),
+            menu: [
+              ...(Object.keys(FILTER_LABEL) as SelFilter[]).filter((f) => (isAsm ? f !== "feature" : f !== "component" && f !== "subasm")).map((f) => ({ id: f, label: tr(FILTER_LABEL[f]), icon: "select" as CadIconName, active: selFilter === f, onClick: () => setSelFilter(f) })),
+              { id: "through", label: tr("Okno vybírá i skryté"), icon: "xray" as CadIconName, active: boxThroughOn, onClick: () => setBoxThrough(!boxThroughOn) },
+            ],
           },
           { id: "mass", label: tr("Hmotnost"), icon: "mass", tone: "tool", disabled: !hasBody, why: WHY_BODY, onClick: () => setMassOpen(true), hint: tr("objem, plocha, hmotnost") },
           { id: "section", label: tr("Řez"), icon: "section", tone: "tool", kbd: "X", active: !!section, disabled: !hasBody, why: WHY_BODY, onClick: toggleSection },
@@ -3443,6 +3483,9 @@ export function CadApp() {
                   snapPoints={measure || (!!refPick && (refPick.want === "point" || refPick.want === "vertex" || refPick.want === "any"))}
                   selection={measure ? measureSel : mate ? mateSelection(mate, mateHover) : featSel ? [...new Set(Object.values(featSel).flat())].map((index): SelItem => ({ kind: "face", index })) : selection}
                   onPick={onPick}
+                  onPickMany={!refPick && !mate && !boltPick && !planePick && active?.type !== "hole" && !(active?.type === "ext" && getExtUi(active.ext)?.onFacePick) ? onPickMany : undefined}
+                  leftDrag={prefs.leftDrag}
+                  boxResolve={selFilter === "feature" && !isAsm && !measure && pickMode !== "edges" && pickMode !== "faces" ? (items, changed) => boxOwners.resolve(result?.mesh, items, (f, pt) => cad.faceOwner(doc, f, pt), changed) : undefined}
                   measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
                   vertices={result?.vertices ?? null}
                   faceColors={weldFaceColors(doc, result?.bodies, doc.faceColors)}
@@ -3844,7 +3887,7 @@ export function CadApp() {
           {selection.length > 0 && <span className="rounded bg-brand/10 px-1.5 font-mono text-[10.5px] text-brand-600">{tr("vybráno")}{" "}{selection.length}</span>}
           {cursor && !sketch && <span className="hidden font-mono text-[10.5px] text-[#5b6776] md:inline">X {fmtNum(cursor[0], 2)} {tr("· Y")}{" "}{fmtNum(cursor[1], 2)} {tr("· Z")}{" "}{fmtNum(cursor[2], 2)}</span>}
           <span className="hidden font-mono text-[10.5px] text-[#5b6776] sm:inline">{tr("mm ·")}{" "}{prefs.ortho ? tr("pravoúhlá") : tr("perspektiva")}</span>
-          <span className="hidden text-[10.5px] text-[#5b6776] lg:inline">{prefs.mouse === "zw3d" ? tr("Otáčení: pravé tl. · Posun: prostřední") : prefs.mouse === "solidworks" ? tr("Otáčení: prostřední · Posun: Ctrl+prostřední") : tr("Otáčení: levé · Posun: pravé")}</span>
+          <span className="hidden text-[10.5px] text-[#5b6776] lg:inline" data-mouse-hint title={boxHelpText()}>{mouseHint(prefs.mouse, prefs.leftDrag)}</span>
         </footer>
 
         {ctx && <ContextMenu x={ctx.x} y={ctx.y} entries={ctx.entries} close={() => setCtx(null)} />}

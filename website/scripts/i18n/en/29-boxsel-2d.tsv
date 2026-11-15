@@ -1,0 +1,23 @@
+# W20 – výběr oknem ve 2D (skica, 2D výkres, výkres dílu / sestavy)
+{0} objektů	{0} objects
+{0} objekty	{0} objects
+1 objekt	1 object
+k – křížení: vybere objekty uvnitř i protnuté	c – crossing: selects objects inside and crossing
+Křížení	Crossing
+Křížení – klikněte na první roh	Crossing – click the first corner
+Křížení: první roh	Crossing: first corner
+o – okno: vybere objekty celé uvnitř dvou rohů	w – window: selects objects fully inside two corners
+odebrat	remove
+Okno	Window
+Okno – klikněte na první roh	Window – click the first corner
+Okno ⇢ celé uvnitř · ⇠ křížení · Ctrl/Shift přidá · Ctrl+Shift odebere	Window ⇢ fully inside · ⇠ crossing · Ctrl/Shift adds · Ctrl+Shift removes
+Okno ⇢ celé uvnitř · ⇠ křížení · Ctrl/Shift přidá · Ctrl+Shift odebere · posun listu: prostřední / pravé tlačítko	Window ⇢ fully inside · ⇠ crossing · Ctrl/Shift adds · Ctrl+Shift removes · pan the sheet: middle / right button
+Okno: první roh	Window: first corner
+přidat	add
+Výběr oknem: táhněte zleva doprava = celé uvnitř, zprava doleva = i protnuté; Ctrl/Shift přidá, Ctrl+Shift odebere, Esc okno zruší; ve výzvě výběru o / k = okno / křížení dvěma kliky	Window selection: drag left to right = fully inside, right to left = crossing too; Ctrl/Shift adds, Ctrl+Shift removes, Esc cancels the window; at a selection prompt w / c = window / crossing by two clicks
+Vyberte entity (klik nebo okno přidá, Ctrl+Shift odebere), pak Enter	Select entities (click or window adds, Ctrl+Shift removes), then Enter
+Vybráno {0} · Delete smaže · táhněte = posun · šipky posunou o 1 mm (Shift 10 mm) · Esc zruší výběr	{0} selected · Delete deletes · drag = move · arrow keys move by 1 mm (Shift 10 mm) · Esc clears the selection
+Vybrat (Ctrl+klik přidá)	Select (Ctrl+click adds)
+Smazat: nejdřív vyberte poznámky nebo kóty – klik, Ctrl+klik nebo okno	Delete: first select notes or dimensions – click, Ctrl+click or window
+Obnovit vygenerované kóty a pozice ({0})	Restore generated dimensions and balloons ({0})
+Vrátí vygenerované kóty celkových rozměrů a pozice na výchozí místo – i skryté klávesou Delete	Puts generated overall dimensions and balloons back in their default place – also those hidden with Delete

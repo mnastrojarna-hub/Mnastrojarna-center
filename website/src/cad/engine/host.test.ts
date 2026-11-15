@@ -20,7 +20,7 @@ describe("host – názvy souborů", () => {
   });
   it("dlouhý název: zkrácení po celých znacích, přípona zůstane, ≤ 120 znaků a ≤ 240 B UTF-8; osamělé náhradní znaky → _", () => {
     const lone = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
-    const long = "959-01-00 Nástroj – sestava střižného nástroje pro díl 959-01-00-12 s vodicími sloupky a pružinami (verze 3) final";
+    const long = "900-01-00 Nástroj – sestava střižného nástroje pro díl 900-01-00-12 s vodicími sloupky a pružinami (verze 3) final";
     const cases: [string, string][] = [
       ["a".repeat(119) + "😀.pdf", ".pdf"],
       ["x".repeat(200) + ".mncad", ".mncad"],

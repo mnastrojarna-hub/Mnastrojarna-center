@@ -17,6 +17,9 @@ import type { MeshData, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
 import { selKey, sameSel, type SelFilter, type SelItem } from "./selection";
 import { setSoftView, softView, type SoftPickProps, type SoftViewHandle } from "./soft-bridge";
+import { orthoBoxCamera, type BoxRect } from "@/cad/box-select";
+import { attachBoxDrag } from "./box-drag-3d";
+import { boxPreviewText, boxSpecFor, buildBoxScene, dragAction, queryBox, type BoxSceneOf, type DragAction } from "./box-pick-3d";
 import type { AsmView, DisplayMode, Section } from "./viewport";
 
 /** Co se má vykreslit – stejná data, jaká dostává 3D okno. */
@@ -153,6 +156,8 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   lhoverRef.current = lhover;
   const snaps = useRef<{ key: string; list: Snap[] }>({ key: "", list: [] });
   const pix = useRef<{ key: string; items: PickItem[]; ix: SoftPickIndex } | null>(null);
+  /** výběr oknem pro window.mncad.selectBox (nastaví obsluha myši) */
+  const boxApi = useRef<((r: BoxRect, crossing: boolean) => SelItem[] | null) | null>(null);
   const [hintList, setHintList] = useState<SoftHint[]>([]);
   /** popisky pro index snímku; `blocked` = zkoušená místa zakrytá jiným prvkem stránky (x, y po dvojicích) */
   const hintsRef = useRef<{ ix: SoftPickIndex | null; list: SoftHint[]; blocked: number[] }>({ ix: null, list: [], blocked: [] });
@@ -591,13 +596,16 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
     };
   }, [fit, schedule, stopHintJob]);
 
-  // myš a dotyk: tažení otáčí (Shift, prostřední nebo pravé tlačítko posouvá), kolečko a dva prsty přibližují;
-  // klik (bez tažení) vybírá, pravé tlačítko / dlouhý stisk prstem otevře kontextovou nabídku
+  // myš a dotyk: otáčení a posun podle schématu myši jako 3D okno (ZW3D: pravé tlačítko otáčí, prostřední nebo Shift +
+  // pravé posouvá), levé tlačítko táhne výběr oknem (box-drag-3d.ts), kolečko a dva prsty přibližují, jeden prst otáčí;
+  // klik (bez tažení) vybírá, pravý klik / dlouhý stisk prstem otevře kontextovou nabídku, dlouhý stisk a tažení = okno
   useEffect(() => {
     const cv = canvas.current;
     if (!cv) return;
     const pts = new Map<number, { x: number; y: number }>();
     let pan = false;
+    /** co dělá tažení stisknutým tlačítkem: otáčení / posun podle schématu myši, levé = výběr oknem (box-pick-3d.ts) */
+    let drag: DragAction = "orbit";
     let settle: ReturnType<typeof setTimeout> | null = null;
     let downAt: { x: number; y: number; button: number } | null = null;
     let longPress: ReturnType<typeof setTimeout> | null = null;
@@ -718,9 +726,79 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       if (longPress) clearTimeout(longPress);
       longPress = null;
     };
+    // ---- výběr oknem / křížením: levé tlačítko, dotyk = dlouhý stisk a tažení; dlouhý stisk bez tažení = nabídka ----
+    /** scéna výběru oknem pro pohled `key` (změna pohledu během tažení = nová scéna); `boxBusy` = gesto výběru oknem */
+    let boxScene: { sc: BoxSceneOf | null; key: string } | null = null;
+    let boxBusy = false;
+    const boxCamKey = () => {
+      const c = cam.current;
+      return JSON.stringify([c.angles, c.center, c.scale, box.current?.clientWidth, box.current?.clientHeight]);
+    };
+    const boxSceneNow = (): BoxSceneOf | null => {
+      const el = box.current;
+      if (!el) return null;
+      const c = cam.current;
+      const sc = sceneRef.current;
+      const camB = orthoBoxCamera({ ...basisOf(c.angles), center: c.center, scale: c.scale }, el.clientWidth, el.clientHeight);
+      const meshes = baseRef.current.map((it) => ({ mesh: it, points: it.points ?? null, matrix: it.matrix ?? null, meta: it.compId ? { compId: it.compId, topId: it.topId } : {}, occluder: !it.wire }));
+      return buildBoxScene(camB, meshes, sc.section ? sectionPlane(sc.section) : null, sc.display);
+    };
+    const isAsm = () => baseRef.current.some((it) => !!it.compId);
+    const boxSpec = () => {
+      const pp = pickRef.current;
+      return pp?.onPickMany ? boxSpecFor(pp.pickMode, effFilter() ?? pp.selFilter ?? "all", isAsm()) : null;
+    };
+    const boxRun = (r: BoxRect, crossing: boolean) => {
+      const spec = boxSpec();
+      if (!spec) return null;
+      const key = boxCamKey();
+      if (!boxScene || boxScene.key !== key) boxScene = { sc: boxSceneNow(), key };
+      return boxScene.sc ? queryBox(boxScene.sc, r, crossing, spec) : null;
+    };
+    const boxDrag = attachBoxDrag(box.current ?? cv, () => cv, {
+      accept: (e) => {
+        const pp = pickRef.current;
+        const lp = e.pointerType === "touch" && !!pp && pp.pickMode !== "none";
+        if (!boxSpec()) return { box: false, longPress: lp };
+        // volba „levé tlačítko otáčí“: okno jen z prázdného místa
+        if (e.pointerType !== "touch" && pp?.leftDrag === "orbit") {
+          const ix = pickIndex();
+          const p = local(e);
+          if (ix && surfaceAt(ix, p.x, p.y)) return { box: false, longPress: false };
+        }
+        return { box: true, longPress: lp };
+      },
+      preview: (r, crossing, mode) => {
+        const it = boxRun(r, crossing);
+        return it ? boxPreviewText(it, mode, pickRef.current?.boxResolve, () => boxDrag.refresh()) : null;
+      },
+      finish: (r, crossing, mode) => {
+        const it = boxRun(r, crossing);
+        if (it) pickRef.current?.onPickMany?.(it, mode);
+      },
+      longPress: (e) => pickRef.current?.onContext?.(e.clientX, e.clientY, pickSel(local(e), effFilter())),
+      busy: (on) => {
+        boxBusy = on;
+        if (on) {
+          pendingHover = null;
+          if (hoverRef.current) {
+            hoverRef.current = null;
+            setHover(null);
+          }
+        } else boxScene = null;
+      },
+    });
+    boxApi.current = (r, crossing) => {
+      const pp = pickRef.current;
+      const spec = pp ? boxSpecFor(pp.pickMode, effFilter() ?? pp.selFilter ?? "all", isAsm()) : null;
+      const sc = spec ? boxSceneNow() : null;
+      return spec && sc ? queryBox(sc, r, crossing, spec) : null;
+    };
     const onDown = (e: PointerEvent) => {
       pts.set(e.pointerId, local(e));
-      pan = e.shiftKey || e.button === 1 || e.button === 2;
+      const pp = pickRef.current;
+      drag = e.pointerType === "touch" ? "orbit" : dragAction(pp?.mouse, pp?.leftDrag, e.button, e.shiftKey || e.ctrlKey || e.metaKey);
+      pan = drag === "pan";
       downAt = pts.size === 1 ? { x: e.clientX, y: e.clientY, button: e.button } : null;
       try {
         cv.setPointerCapture?.(e.pointerId);
@@ -728,14 +806,6 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
         /* syntetická událost (klik na popisek) nemá aktivní ukazatel */
       }
       cancelLongPress();
-      if (e.pointerType === "touch" && pickRef.current && pickRef.current.pickMode !== "none") {
-        const p = local(e);
-        longPress = setTimeout(() => {
-          longPress = null;
-          downAt = null;
-          pickRef.current?.onContext?.(e.clientX, e.clientY, pickSel(p, effFilter()));
-        }, 550);
-      }
     };
     // prostřední tlačítko: bez automatického posouvání stránky
     const onMouseDown = (e: MouseEvent) => {
@@ -751,6 +821,11 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       }
       const p = local(e);
       if (downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 8) cancelLongPress();
+      // gesto patří výběru oknem (obdélník, dlouhý stisk) – pohled se nehýbe
+      if (boxDrag.owns(e.pointerId)) {
+        pts.set(e.pointerId, p);
+        return;
+      }
       const c = cam.current;
       if (pts.size >= 2) {
         // dva prsty: změna rozteče přibližuje, posun středu posouvá
@@ -771,14 +846,14 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       const dx = p.x - prev.x;
       const dy = p.y - prev.y;
       pts.set(e.pointerId, p);
-      if (!dx && !dy) return;
+      if ((!dx && !dy) || drag === "none") return;
       // tažení: zvýraznění pod kurzorem by po otočení / posunu ukazovalo jinam; kurzor „ruka“ (active:cursor-grabbing)
       const dragging = !downAt || Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 4;
       if (dragging && hoverRef.current) {
         hoverRef.current = null;
         setHover(null);
       }
-      if (dragging && cv.style.cursor) cv.style.cursor = "";
+      if (dragging) cv.style.cursor = e.buttons === 1 ? "" : "grabbing"; // levé tlačítko: active:cursor-grabbing
       if (pan) {
         const b = basisOf(c.angles);
         c.center = [c.center[0] - (b.right[0] * dx - b.up[0] * dy) / c.scale, c.center[1] - (b.right[1] * dx - b.up[1] * dy) / c.scale, c.center[2] - (b.right[2] * dx - b.up[2] * dy) / c.scale];
@@ -803,6 +878,8 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       }
       const d = downAt;
       downAt = null;
+      if (cv.style.cursor === "grabbing") cv.style.cursor = "";
+      if (boxDrag.consume(e)) return; // konec výběru oknem nebo dlouhý stisk – není to klik
       // klik = stisk a uvolnění téhož tlačítka bez tažení (do 4 px)
       if (!was || !d || pts.size || e.button !== d.button || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;
       const pp = pickRef.current;
@@ -829,6 +906,8 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
     };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      // během výběru oknem se pohled nemění (jako ve 3D okně, kde je otáčení i přiblížení vypnuté): obdélník platí pro pohled, ve kterém začal
+      if (boxBusy) return;
       const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1;
       moving();
       zoom(Math.exp(-e.deltaY * unit * 0.0015), local(e));
@@ -845,6 +924,8 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
     return () => {
       if (settle) clearTimeout(settle);
       cancelLongPress();
+      boxDrag.dispose();
+      boxApi.current = null;
       cv.removeEventListener("pointerdown", onDown);
       cv.removeEventListener("mousedown", onMouseDown);
       cv.removeEventListener("pointermove", onMove);
@@ -895,6 +976,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
         cv.dispatchEvent(new PointerEvent("pointerup", { ...init, buttons: 0 }));
         return true;
       },
+      boxPick: (r, crossing) => boxApi.current?.(r, crossing) ?? null,
     };
     setSoftView(handle);
     return () => {

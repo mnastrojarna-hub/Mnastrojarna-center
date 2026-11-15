@@ -20,6 +20,8 @@ export type Settings = {
   edgeWidth: 1 | 2;
   // ovládání
   mouse: MouseScheme;
+  /** levé tlačítko táhne ve 3D: výběr oknem (výchozí) | otáčení (okno pak jen z prázdného místa) – box-pick-3d.ts */
+  leftDrag: "window" | "orbit";
   invertZoom: boolean;
   zoomToCursor: boolean;
   confirmDelete: boolean;
@@ -144,6 +146,7 @@ export const DEFAULT_SETTINGS: Settings = {
   meshQuality: "normal",
   edgeWidth: 1,
   mouse: "zw3d",
+  leftDrag: "window",
   invertZoom: false,
   zoomToCursor: true,
   confirmDelete: false,

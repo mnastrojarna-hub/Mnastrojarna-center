@@ -60,6 +60,8 @@ import {
 } from "@/cad/sketch-tools";
 import { LINE_CHAIN_MAX, PASTE_FIX_LIMIT, PASTE_MAX_POINTS, anchorPoints, entitiesFromPoints, fitView, fixedPoint, isDynKey, maxShift, moveAnchors, parseCoordList, pointVisible, pruneRedundant, typedAnchor, type ChainKind, type CoordList } from "@/cad/sketch-kbd";
 import { LongPress, TOUCH_SLOP_PX, TouchTracker, canvasToMm, clickSlop, movedBeyond, pinchView } from "@/cad/sketch-touch";
+import { boxMode, clickMode, mergeSelection, sketchBoxIds, type BoxMods } from "@/cad/box-select-2d";
+import { BoxSelectSvg, boxLabel } from "./box-select-2d-ui";
 import { calibrateUnderlay, moveUnderlay, replaceBitmap, underlayCorners, underlayWidth } from "@/cad/sketch-underlay";
 import { uid, type Feature, type SketchConstraint, type SketchDim, type SketchEntity, type SketchRef, type SketchUnderlay, type Vec2 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -288,6 +290,8 @@ const sketchKey = (id: string): string | undefined => shortcutOf(currentShortcut
 
 /** Nástroje vyžadující nejdřív výběr entit. */
 const SEL_TOOLS = new Set<SketchTool>(["mirror", "move", "copy", "rotate", "scale", "patternLinear", "patternCircular", "explode", "construction"]);
+const boxModsOf = (e: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean }): BoxMods => ({ ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey });
+const boxModeLabel = (m: "replace" | "add" | "remove") => (m === "replace" ? undefined : m);
 
 // ======================= pás karet skici =======================
 
@@ -629,7 +633,8 @@ type DragS =
   | { kind: "pan"; from: Vec2; view: { cx: number; cy: number; scale: number } }
   | { kind: "handle"; id: string; key: string }
   | { kind: "move"; ids: string[]; from: Vec2; orig: SketchEntity[] }
-  | { kind: "box"; from: Vec2; to: Vec2 }
+  /** výběr oknem: modifikátory při stisku, `acc` = fáze výběru nástroje (bez modifikátoru přidává) */
+  | { kind: "box"; from: Vec2; to: Vec2; mods: BoxMods; acc?: boolean }
   | { kind: "dimLabel"; id: string; from: Vec2; orig: Vec2 }
   | { kind: "trimPath"; path: Vec2[] }
   | { kind: "underlay"; from: Vec2; orig: SketchUnderlay };
@@ -2001,7 +2006,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
   const selToolClick = (raw: Vec2, ev: React.PointerEvent) => {
     if (phase === 0) {
       const id = hitEntity(raw);
-      if (id) setSelection(sel.has(id) ? [...sel].filter((x) => x !== id) : [...sel, id]);
+      // fáze výběru nástroje: klik přepne entitu, Ctrl+Shift / Alt ji jen odebere
+      if (id) setSelection(mergeSelection([...sel], [id], clickMode(boxModsOf(ev)) === "remove" ? "remove" : "toggle"));
       return;
     }
     const ids = [...sel];
@@ -2249,6 +2255,11 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       drag.current = { kind: "trimPath", path: [raw] };
       return;
     }
+    if (SEL_TOOLS.has(tool) && phase === 0 && ev.button === 0) {
+      // výběr pro přesun / kopii / otočení…: klik přepne entitu (při puštění), tažení = okno (přidává)
+      drag.current = { kind: "box", from: raw, to: raw, mods: boxModsOf(ev), acc: true };
+      return;
+    }
     if (tool !== "select") return;
     const ann = hitAnn(ev.clientX, ev.clientY);
     if (ann) {
@@ -2259,27 +2270,32 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       if (d) drag.current = { kind: "dimLabel", id: d.id, from: raw, orig: d.offset ?? [0, 0] };
       return;
     }
+    // klik jako ve 2D výkresu (cad/box-select-2d.ts): bez modifikátoru vybere, Ctrl/Shift přepne, Ctrl+Shift / Alt odebere;
+    // s modifikátorem výběru se úchyty nechytají (stisk na koncovém bodě vybrané entity vybírá, nic neprotahuje)
+    const cm = clickMode(boxModsOf(ev));
     // úchyt vybrané entity
-    for (const id of sel) {
-      const e = entities.find((x) => x.id === id);
-      if (!e) continue;
-      const h = handlesOf(e).find((hh) => dist(hh.p, raw) * view.scale < ptrPx(8));
-      if (h) {
-        drag.current = { kind: "handle", id, key: h.key };
-        return;
+    if (cm === "replace")
+      for (const id of sel) {
+        const e = entities.find((x) => x.id === id);
+        if (!e) continue;
+        const h = handlesOf(e).find((hh) => dist(hh.p, raw) * view.scale < ptrPx(8));
+        if (h) {
+          drag.current = { kind: "handle", id, key: h.key };
+          return;
+        }
       }
-    }
     const id = hitEntity(raw);
     if (id) {
-      const multi = ev.shiftKey || ev.ctrlKey || ev.metaKey;
-      const ids = multi ? (sel.has(id) ? [...sel].filter((x) => x !== id) : [...sel, id]) : sel.has(id) ? [...sel] : [id];
+      const ids = cm === "replace" ? (sel.has(id) ? [...sel] : [id]) : mergeSelection([...sel], [id], cm);
       setSelection(ids);
       setSelAnn(null);
-      drag.current = { kind: "move", ids, from: raw, orig: entities.filter((e) => ids.includes(e.id)) };
+      // odebrání (Alt, Ctrl+Shift): tažení pak odebírá oknem; jinak tažení posune vybrané
+      if (cm === "remove") drag.current = { kind: "box", from: raw, to: raw, mods: boxModsOf(ev) };
+      else drag.current = { kind: "move", ids, from: raw, orig: entities.filter((e) => ids.includes(e.id)) };
       return;
     }
     setSelAnn(null);
-    drag.current = { kind: "box", from: raw, to: raw };
+    drag.current = { kind: "box", from: raw, to: raw, mods: boxModsOf(ev) };
   };
 
   const onPointerMove = (ev: React.PointerEvent) => {
@@ -2395,20 +2411,20 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
       }
     }
     if (d?.kind === "box") {
-      const [a, b] = [d.from, d.to];
-      if (dist(a, b) * view.scale > 4) {
-        const crossing = b[0] < a[0];
-        const [x0, x1, y0, y1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1])];
-        const inside = (p: Vec2) => p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1;
-        const ids = entities
-          .filter((e) => {
-            const p = paths.get(e.id)?.pts ?? [];
-            return crossing ? p.some(inside) : p.length > 0 && p.every(inside);
-          })
-          .map((e) => e.id);
-        setSelection(ev.shiftKey ? [...new Set([...sel, ...ids])] : ids);
-      } else if (!ev.shiftKey) setSelection([]);
+      // okno zleva doprava = celé uvnitř, zprava doleva = i protnuté; bez modifikátoru nahradí, Ctrl/Shift přidá,
+      // Ctrl+Shift / Alt odebere (cad/box-select-2d.ts)
+      const mods = [d.mods, boxModsOf(ev)];
       setCursor(null);
+      if (!clicked) {
+        setSelection(mergeSelection([...sel], sketchBoxIds(entities, paths, d.from, d.to), boxMode(mods, d.acc)));
+        return;
+      }
+      if (d.acc) {
+        // fáze výběru nástroje: klik bez tažení přepne entitu pod kurzorem (selToolClick níže)
+        if (dn && dn[2] === 0) editClick(toMm(ev.clientX, ev.clientY), ev);
+        return;
+      }
+      if (boxMode(mods) === "replace") setSelection([]);
       return;
     }
     if (d?.kind === "handle" || d?.kind === "move") {
@@ -2552,6 +2568,12 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest?.("input,textarea,select")) return;
       if (ask) return;
+      if (e.key === "Escape" && drag.current?.kind === "box") {
+        // Esc zruší jen rozpracované okno výběru (výběr i nástroj zůstanou); puštění tlačítka pak nic nevybere
+        drag.current = null;
+        setCursor(null);
+        return;
+      }
       if (e.key === "Escape" && ulMode) {
         setUlMode(null);
         setCalib([]);
@@ -3037,6 +3059,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         ref={svgRef}
         data-sketch-canvas
         data-tool={tool}
+        // automatizace / e2e: vybrané entity a pohled (x = w/2 + (X − cx)·scale, y = h/2 − (Y − cy)·scale)
+        data-sel={[...sel].join(" ")}
+        data-view={`${view.cx} ${view.cy} ${view.scale} ${size.w} ${size.h}`}
         className="h-full w-full"
         style={{ cursor: ulMode === "move" ? "move" : ulMode === "calib" ? "crosshair" : tool === "select" ? (hover || hoverAnn ? "pointer" : "default") : "crosshair", background: "#fbfcfd", touchAction: "none", userSelect: "none", WebkitUserSelect: "none", WebkitTouchCallout: "none" }}
         onPointerDown={onPointerDown}
@@ -3140,16 +3165,8 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
             ))}
           </g>
         )}
-        {box && (
-          <rect
-            x={Math.min(toPx(box.from)[0], toPx(box.to)[0])}
-            y={Math.min(toPx(box.from)[1], toPx(box.to)[1])}
-            width={Math.abs(toPx(box.to)[0] - toPx(box.from)[0])}
-            height={Math.abs(toPx(box.to)[1] - toPx(box.from)[1])}
-            fill={box.to[0] < box.from[0] ? "rgba(22,163,74,.08)" : "rgba(37,99,235,.08)"}
-            stroke={box.to[0] < box.from[0] ? "#16a34a" : "#2563eb"}
-            strokeDasharray={box.to[0] < box.from[0] ? "5 3" : undefined}
-          />
+        {box && dist(box.from, box.to) * view.scale >= 1 && (
+          <BoxSelectSvg a={toPx(box.from)} b={toPx(box.to)} crossing={box.to[0] < box.from[0]} label={boxLabel(sketchBoxIds(entities, paths, box.from, box.to).length, box.to[0] < box.from[0], box.acc ? undefined : boxModeLabel(boxMode(box.mods)))} />
         )}
       </svg>
 
@@ -3322,7 +3339,9 @@ export function Sketcher({ sketch, onChange, selected, onSelect, tool, setTool, 
         >
           {dofText}
         </span>
+        {sel.size > 1 && <span className="rounded border border-[#bfdbfe] bg-[#eff6ff] px-2 py-0.5 text-[#1d4ed8]" data-sketch-selcount>{tr("vybráno {0}", sel.size)}</span>}
         <span className="flex-1" />
+        {tool === "select" && !prompt && <span className="hidden rounded bg-white/80 px-2 py-0.5 font-sans text-[11px] text-[#6b7785] lg:inline" data-boxsel-hint>{tr("Okno ⇢ celé uvnitř · ⇠ křížení · Ctrl/Shift přidá · Ctrl+Shift odebere")}</span>}
         {prompt && <span className="rounded bg-[#2563eb] px-2.5 py-0.5 font-sans text-[11.5px] text-white shadow">{prompt}</span>}
       </div>
 
@@ -3448,7 +3467,7 @@ function CoordDialog({ init, close, insert }: { init: { text: string; kind: Chai
 const TYPE_LABEL: Record<SketchEntity["type"], string> = { line: "Úsečka", arc: "Oblouk", rect: "Obdélník", circle: "Kružnice", polygon: "Mnohoúhelník", slot: "Drážka", polyline: "Lomená čára", point: "Bod", ellipse: "Elipsa", spline: "Spline" };
 
 function promptFor(tool: SketchTool, n: number, picks: number, phase: number, selN: number): string {
-  if (SEL_TOOLS.has(tool) && phase === 0) return selN ? tr("Vybráno {0} – Enter / pravé tl. pokračuje", selN) : tr("Vyberte entity (Shift přidává), pak Enter");
+  if (SEL_TOOLS.has(tool) && phase === 0) return selN ? tr("Vybráno {0} – Enter / pravé tl. pokračuje", selN) : tr("Vyberte entity (klik nebo okno přidá, Ctrl+Shift odebere), pak Enter");
   switch (tool) {
     case "select":
       return "";

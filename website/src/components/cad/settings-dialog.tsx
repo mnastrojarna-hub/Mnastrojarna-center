@@ -220,7 +220,7 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
                     [
                       ["zw3d", "ZW3D", tr("pravé tlačítko otáčí · prostřední posouvá · kolečko zoom · pravý klik (bez tahu) = nabídka")],
                       ["solidworks", "SolidWorks / Inventor", tr("prostřední otáčí · Ctrl+prostřední posouvá · kolečko zoom")],
-                      ["simple", "Touchpad / jednoduché", tr("levé otáčí · pravé posouvá · kolečko zoom")],
+                      ["simple", "Touchpad / jednoduché", draft.leftDrag === "orbit" ? tr("levé otáčí · pravé posouvá · kolečko zoom") : tr("pravé otáčí · prostřední posouvá · kolečko zoom · levé = výběr oknem")],
                     ] as [MouseScheme, string, string][]
                   ).map(([v, l, d]) => (
                     <label key={v} className={cn("flex cursor-pointer items-start gap-3 rounded-md border p-2.5", draft.mouse === v ? "border-brand bg-brand/5" : "border-[#e3e8ee] hover:bg-[#f7f9fb]")}>
@@ -232,6 +232,9 @@ export function SettingsDialog({ settings, onChange, onClose, backgrounds }: { s
                     </label>
                   ))}
                 </div>
+              </Field>
+              <Field label={tr("Levé tlačítko táhne")} hint={tr("okno: zleva doprava celé uvnitř, zprava doleva i protnuté")}>
+                <Segmented value={draft.leftDrag ?? "window"} options={[{ v: "window", l: tr("Výběr oknem") }, { v: "orbit", l: tr("Otáčení") }]} onChange={(v) => set("leftDrag", v)} />
               </Field>
               <Toggle label={tr("Přiblížení ke kurzoru")} hint={tr("kolečko přibližuje k místu pod kurzorem, ne do středu")} checked={draft.zoomToCursor} onChange={(v) => set("zoomToCursor", v)} />
               <Toggle label={tr("Obrátit směr kolečka")} checked={draft.invertZoom} onChange={(v) => set("invertZoom", v)} />

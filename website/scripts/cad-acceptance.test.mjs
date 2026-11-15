@@ -31,7 +31,7 @@ function pdf(file, pages, textsPerPage) {
 }
 const step = (file) => (fs.writeFileSync(file, "ISO-10303-21;\nHEADER;\nENDSEC;\n"), file);
 
-const ASM = "959-01-00 Střižný nástroj";
+const ASM = "900-01-00 Střižný nástroj";
 function report() {
   const protocol = [
     "MNCAD/1 OK lines=398 ops=359 err=0 warn=1 note=245 t=37.2",

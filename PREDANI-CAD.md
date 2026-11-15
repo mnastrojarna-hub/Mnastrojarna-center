@@ -25,6 +25,13 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 20:25 | Majitel hlásí: „Online CAD neumí pružiny, ani pro simulaci pohybu.“ Živý web běží na STARÉ verzi (bez vlny 15 – pružina mezi díly tam není; `cad/share/?ping` vrací chybovou stránku = nenasazena ani vlna 16). V `main` pružiny jsou, ale jen jako šroubovice se stálým stoupáním, bez výpočtu a bez dynamiky. → vlna 21 (kapitola 7c), workflow `wf_1e1ed70b-b6a`. Obnoven workflow integrace fáze B `wf_d020a109-e6f` (do zadání doplněna poznámka o obnovení a o rozdílu akceptace `S/w14/acceptance-delta.patch`). G a F zatím pozastaveny (šetří se stroj: běží 2 workflow). |
 | 14. 11. 22:16 | Integrace fáze B na main HOTOVÁ (agent): commit `75e90ed` ve `w14-int2`, patch `S/w14/int2/int2.patch` (330 souborů), audit `S/w14/int2/audit.md` – všech 182 kusů main nalezeno. Kontroly agenta: celý `src/cad` 2862 testů zelených, build, 28 e2e sad zelených. **Akceptační brána na skutečném skriptu 959: PASS** – 70 komponent, 53/53 vazeb, Σ 5241,733 cm³, 27 kolizí jen závit, STEP ok, odkaz 35 znaků, protokol 1641 B, 29,9 s. Běží nezávislá kontrola `verify:int2`. Pružiny (vlna 21) dál rozpracované. |
 | 14. 11. 23:50 | Fáze B dokončena agenty i po opravách 3 nálezů kontroly (`w14-int2` commit `5ca5da6`, 25 e2e sad zelených). **Nanesena na větev bez konfliktů** jako commit `e0b08dd` (patch `S/w14/int2/int2.patch`; kontrola NDA čistá; typy, lint 5, překlady 0/0). GitHub Actions `cad-acceptance.yml` omezen na PR do main + ruční spuštění (šetří minuty). BĚŽÍ: testy + build + 14 e2e sad na :3199 (`S/vitest-b-main.log`, `S/build-b-main.log`, pak `S/e2e/*.log`). Po zelené: PR „CAD bez prohlížeče – fáze B“ (zmínit i PR #99 aplikace Sales OS, který je na větvi) → sloučit → smazat `w14-*`. Pružiny: oba balíky v opravách po kontrole. |
+| 15. 11. 00:45 | **Úkol B HOTOV: fáze B sloučena do `main` (PR #100, `e27ff86`)** – s ní i PR #99 aplikace Sales OS, který byl na větvi. Po nanesení: 520 testů, build, 14 e2e sad 0 FAIL. Worktree `w14-*` smazány. Dál: pružiny (H) dobíhají opravy; pak E1 (NDA přejmenování zkušebního nástroje – teď je to možné), D1/D3 dokumentace a PDF příručka, G a F obnovit. |
+| 15. 11. 00:55 | E1 hotov: zkušební nástroj přejmenován na „900-01-00“ (číslo zákazníka z dílů i ze souborů pryč), `synth-959.txt` → `synth-tool.txt`, `expected.json` přegenerován jádrem (gravírovaný text se změnil: objem −0,001 cm³). |
+| 15. 11. 01:00 | Úkol G (výběr oknem) obnoven na novém základu `69f3f58` (main s fází B): workflow `wf_533a7c7c-a4a`, zadání `S/w20/brief.md` s poznámkou o obnovení. Pozor – chyba integrátora: při smazání starých worktree `w20-3d`/`w20-2d` se ztratily rozpracované soubory agenta (`box-select-3d.ts`, `box-select-2d.ts`, test) – agent je napíše znovu. Pravidlo: před `git worktree remove` vždy zálohovat `git status --short` soubory. Běží 2 workflow (H pružiny, G výběr oknem); F kola čeká. |
+| 15. 11. 01:15 | Pružiny (H) hotové v obou balících i po opravách kontroly: `part` commit `bde7eb5` (`S/w21/part.patch`, 11 nálezů opraveno), `motion` commit `359f515` (`S/w21/motion.patch`, 8 nálezů opraveno – dynamika teď přesná na všech krocích, energie drží). Oba proti `fd8a05e` (bez fáze B). Spuštěna integrace na main s enginem: workflow `wf_60b96c19-df2`, zadání `S/w21/int-brief.md`, worktree `w21-int`, výstup `S/w21/int.patch` + `int-audit.md`. Běží: G (výběr oknem) + integrace H. F (kola) čeká. |
+| 15. 11. 02:56 | **G1 hotov**: výběr oknem dokončen v obou balících i po opravách kontroly (`w20-3d` `5812746`, 5 nálezů; `w20-2d` `c6cb7f5`, 4 nálezy). G2 BĚŽÍ: `S/w20/3d.patch` + `2d.patch` naneseny na větev bez konfliktů (index, necommitnuto), NDA čisté, překlady 0/0, typy, lint 5. Běží vitest (`S/w20/vitest-int.log`, končí `exit=`), pak build + e2e na :3199. Pružiny: workflow `wf_60b96c19-df2` je v kroku `fix:w21int` (5 nálezů kontroly). |
+| 15. 11. 03:01 | G2: na větvi (necommitnuto) vitest 55 souborů 849/849, produkční build prošel; dokumentace výběru oknem dopsána do `cad-docs.ts` (kap. 3, 5, 13, 14, 19, 21, 26 + FAQ) = G4 text hotový. BĚŽÍ e2e 16 sad na :3199 (`S/w20/int-e2e.summary`, končí `done`; logy `S/w20/int-e2e/`), pak vlastní zkouška `node S/w20/own-probe.cjs` (G3). Tělo PR připraveno `S/w20/pr-body.md` (doplnit tabulku e2e). |
+| 15. 11. 03:18 | **G2 + G3 + G4 (text) hotovo**: commit `851273d` na větvi. e2e 17 sad 872 ok / 0 FAIL (logy `S/w20/int-e2e/`), vlastní zkouška tažením 13/13 (`S/w20/own-probe.cjs` + `own-probe2.cjs`; pozor: s vybranými komponentami je uprostřed gizmo a okno na něm záměrně nezačne). Zakládám PR do `main` (tělo `S/w20/pr-body.md`), po sloučení smazat `w20-*`. Pružiny: `fix:w21int` stále běží. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -64,7 +71,7 @@ Hlášení majitele z jeho testování nasazené verze má přednost: každou ch
 
 | Co | Kde |
 | --- | --- |
-| `main` | `12e7108` (PR #98 dokumentace 2. kolo + e2e; PR #97 střižnice; PR #96 vlna 15; PR #95 převodník) |
+| `main` | `e27ff86` (PR #100 fáze B + PR #99 Sales OS; PR #98 dokumentace; PR #97 střižnice; PR #96 vlna 15; PR #95 převodník) |
 | pracovní větev | `claude/cnc-sales-os-ai-cbR2f` = `main` + rozdělaný úkol (viz Průběžný stav) |
 | scratchpad `S` | `/tmp/claude-0/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/scratchpad` |
 | worktree agentů | `/home/user/Mnastrojarna-center/.claude/worktrees/<název>` |
@@ -99,7 +106,9 @@ postupuj podle kapitoly 9.
 10. Zastav server (pravidlo 8), smaž `.next`, commit (česká zpráva, co a proč), push, PR přes
     `mcp__github__create_pull_request` (tabulka kontrol v těle), sloučení `mcp__github__merge_pull_request`
     (`merge_method: "merge"`), `git pull -q origin main`, `git push`.
-11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`.
+11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`. U NEsloučeného worktree nejdřív zálohuj
+    rozpracované soubory (`git -C <wt> add -A && git -C <wt> diff --cached --binary <základ> > S/<…>-wip.patch`) – `remove --force`
+    smaže i nesledované soubory.
 
 Poučení z vlny 15: před sloučením VŽDY pusť i `src/cad/cli/*.test.ts` (hlídá, že jádro pro příkazovou řádku zná každou
 operaci klienta) a e2e sady, které sahají na změněné GUI / texty, i když nejsou v patchi (`grep -l "<starý text>" e2e/`).
@@ -172,7 +181,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
       `vložit "Díl" jako "K1"`, `sestava pružina …`, `výkres … řez XZ odsazení N`, `export skript`, `předloha stav`.
       Žádný řádek nesmí skončit `host.app-only`, pokud ho návrh nevyhrazuje prohlížeči (seznam v
       `S/w14/CAD-HEADLESS-NAVRH.md`, kap. 15).
-- [ ] B4. Kontroly podle kapitoly 2. E2e navíc: `cad-cli cad-agent-out cad-agent-api cad-agent-journey cad-agent-asm
+- [x] B4. Kontroly podle kapitoly 2. E2e navíc: `cad-cli cad-agent-out cad-agent-api cad-agent-journey cad-agent-asm
       cad-w13-docs cad-w15-* cad-doc2text` a všechny nové sady z patche (`git diff --cached --name-only | grep e2e/`).
       Testy harness: `node --test scripts/cad-harness/harness.test.mjs` (s `CAD_HARNESS_KERNEL=1` i velký běh).
 - [x] B5. **Akceptační test na skutečném skriptu** (jen lokálně, nic z toho necommituj):
@@ -191,7 +200,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
 
       Řádek `výkres … řez XZ odsazení -57` má dát `⚠` (starší zápis), ne `✗`. Nesplněné kritérium = oprav příčinu
       (workflow: najít → opravit → protistranně ověřit), ne test.
-- [ ] B6. PR „CAD bez prohlížeče – fáze B“ → sloučit. Smaž worktree `w14-*`.
+- [x] B6. PR „CAD bez prohlížeče – fáze B“ → sloučit. Smaž worktree `w14-*`.
 
 ## 5. Úkol C – vlna 17, střižnice: neplatná geometrie a pozdní hlášení
 
@@ -226,7 +235,7 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 
 ## 7. Úkol E – úklid a zbývající body hlášení agenta
 
-- [ ] E1. NDA úklid: zkušební (syntetický) nástroj v `scripts/cad-harness/` (`synth-spec.mjs`, `synth-959.txt`,
+- [x] E1. (hotovo 15. 11. 00:55: díly „900-01-00-NN“, skript `synth-tool.txt`, podklady přegenerovány, testy harness 18/18, engine/cli 383/383) NDA úklid: zkušební (syntetický) nástroj v `scripts/cad-harness/` (`synth-spec.mjs`, `synth-959.txt`,
       `expected.json`), `src/cad/engine/protocol.test.ts`, `host.test.ts` a e2e pojmenovává díly „959-01-00-NN …“ –
       to je číslo nástroje zákazníka. Přejmenuj na neutrální (např. „900-01-00-NN“; soubor `synth-959.txt` →
       `synth-tool.txt`) jedním commitem AŽ PO sloučení úkolu B (patch B sahá do stejných souborů). Geometrie je syntetická.
@@ -305,10 +314,10 @@ v měření, v sestavě (komponenty), bez WebGL; ve skice (mazání, vazby na v�
 Workflow `wf_533a7c7c-a4a` (skript `…/workflows/scripts/cad-wave20-box-select-wf_533a7c7c-a4a.js`): balíky `3d`
 (worktree `w20-3d`, patch `S/w20/3d.patch`) a `2d` (`w20-2d`, `S/w20/2d.patch`), oba proti `210a1e8`.
 
-- [ ] G1. Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
-- [ ] G2. Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
+- [x] G1. (hotovo 15. 11. 02:56; obnoveno 01:00 na základu `69f3f58`) Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
+- [x] G2. (hotovo 15. 11. 03:18, commit `851273d`) Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
       – malé kusy; je-li B už sloučen, nanes na nový `main`).
-- [ ] G3. Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
+- [x] G3. (hotovo 15. 11. 03:18, 13/13) Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
       plochy vybere jen viditelné plochy; křížení vybere i dotčené; Ctrl přidá; zaoblení – hrany oknem; sestava –
       komponenty oknem; skica – smazat více entit; 2D – MOVE s výběrem oknem; výkres dílu – smazat více kót.
 - [ ] G4. Dokumentace (kapitola 3 Obrazovka, 5 Skica, 14 2D CAD, 13 Výkresy + mikronávody), PR, sloučení, smazat `w20-*`.
@@ -323,8 +332,8 @@ Zadání majitele: „Online CAD neumí pružiny a to ani pro simulaci pohybu.�
 - Balík `motion` (worktree `w21-motion`, patch `S/w21/motion.patch`): „Pružina mezi díly“ na klik (i do všech děr vzoru),
   skutečný tvar pružiny při přehrávání pohybu (drát zůstane kulatý), **dynamická pohybová studie** (hmotnosti, gravitace,
   síly pružin, tlumení, dorazy) s grafem a CSV; příklad: stírací deska střihadla na pružinách.
-- [ ] H1. Počkej na `wf_1e1ed70b-b6a` (obnova `resumeFromRunId`), přečti zprávy.
-- [ ] H2. Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
+- [x] H1. (hotovo 15. 11. 01:15) Počkej na `wf_1e1ed70b-b6a` (obnova `resumeFromRunId`), přečti zprávy.
+- [ ] H2. (BĚŽÍ workflow `wf_60b96c19-df2` → `S/w21/int.patch`) Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
 - [ ] H3. Vlastní zkouška v prohlížeči: tabulka → tlačná pružina d 2 De 20 L0 50 n 8 broušená (L0 a De změřit na tělese,
       tuhost ručně ověřit); sestava se 4 pružinami pod stírací deskou → dynamika → deska se vrátí na doraz, graf, CSV.
 - [ ] H4. Dokumentace (kapitola Prvky – pružiny, Sestavy – pohyb a dynamika, FAQ „Jak udělám pružinu?“), PR, sloučit,

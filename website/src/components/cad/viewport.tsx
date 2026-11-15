@@ -16,6 +16,9 @@ import { sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./select
 import { drawSurfOverlay } from "./viewport-surf-overlay";
 import type { SurfOverlay } from "./surf-overlay";
 import { softView, usePublishPickProps, useSoftViewActive } from "./soft-bridge";
+import type { BoxRect } from "@/cad/box-select";
+import { attachBoxDrag } from "./box-drag-3d";
+import { boxPreviewText, boxSpecFor, buildBoxScene, mouseButtons, queryBox, type BoxMode, type BoxResolve, type BoxSceneOf, type DragAction, type LeftDrag } from "./box-pick-3d";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -69,6 +72,8 @@ export type ViewportHandle = {
   /** stav kamery a jeho obnovení – snímek pro agenta (window.mncad.screenshot) vrátí dočasný pohled zpět */
   camera?: () => unknown;
   setCamera?: (c: unknown) => void;
+  /** výběr oknem / křížením v obdélníku (CSS px 3D okna) podle filtru výběru – bez změny výběru; null = v tomto režimu nejde */
+  boxPick?: (rect: BoxRect, crossing: boolean) => SelItem[] | null;
 };
 
 type Props = {
@@ -93,6 +98,12 @@ type Props = {
   onPickFace?: (i: number, point?: [number, number, number]) => void;
   /** obecný výběr (režim „select“) */
   onPick?: (item: SelItem | null, additive: boolean) => void;
+  /** výběr oknem / křížením (tažení levým tlačítkem, box-drag-3d.ts); bez něj se oknem nevybírá */
+  onPickMany?: (items: SelItem[], mode: BoxMode) => void;
+  /** levé tlačítko táhne: výběr oknem (výchozí) | otáčení (okno jen z prázdného místa) */
+  leftDrag?: LeftDrag;
+  /** počítadlo u obdélníku: co se po uvolnění opravdu vybere (filtr Prvek → prvky místo ploch) */
+  boxResolve?: BoxResolve;
   onContext?: (x: number, y: number, item: SelItem | null) => void;
   onCursor?: (p: Vec3 | null) => void;
   measure?: MeasureGfx | null;
@@ -178,6 +189,21 @@ const faceOfFrom = (m: MeshData) => {
 let uploadMark: { t0: number; tris: number; kind: string } | null = null;
 /** posunul se model mimo dosavadní pohled (nový model jinde, stejně velký)? → přizpůsobit pohled */
 const movedAway = (c: THREE.Vector3, r: number, prevC: THREE.Vector3, prevR: number) => c.distanceTo(prevC) > Math.max(r, prevR) * 0.5;
+/**
+ * Úchop gizma pod ukazatelem při stisku. TransformControls nastavuje `axis` až najetím (pointermove), dotyk ani myš
+ * stisknutá bez pohybu nad nově zobrazeným gizmem žádné najetí nemají – osu zjistí paprsek teď (stejně jako sám gizmo
+ * při stisku, `pointerHover` v NDC souřadnicích).
+ */
+function gizmoAxisAt(s: Pick<St, "tc" | "renderer">, e: PointerEvent): boolean {
+  const tc = s.tc;
+  if (!tc.object || !tc.enabled) return false;
+  if (!tc.dragging) {
+    const r = s.renderer.domElement.getBoundingClientRect();
+    const ndc = { x: ((e.clientX - r.left) / Math.max(1, r.width)) * 2 - 1, y: -((e.clientY - r.top) / Math.max(1, r.height)) * 2 + 1, button: e.button };
+    (tc as unknown as { pointerHover: (p: typeof ndc) => void }).pointerHover(ndc);
+  }
+  return !!tc.axis;
+}
 
 function geoInfo(m: MeshData): GeoInfo {
   const geo = new THREE.BufferGeometry();
@@ -208,6 +234,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   const triadRef = useRef<SVGSVGElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
   const S = useRef<St | null>(null);
+  const boxApi = useRef<ViewportHandle["boxPick"]>(undefined);
   const propsRef = useRef(props);
   propsRef.current = props;
   /** bez WebGL kreslí model softwarový náhled (viewport-soft.tsx) a přebírá pohledy, přizpůsobení i snímek */
@@ -824,38 +851,78 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         drawSnaps();
       }
     };
-    // dlouhý stisk prstem = kontextová nabídka (pravé tlačítko) na dotykových zařízeních
-    let longPress: ReturnType<typeof setTimeout> | null = null;
-    let swallowTouchEnd = false; // po dlouhém stisku potlačit náhradní mouse/click události (zavřely by nabídku)
-    const cancelLongPress = () => {
-      if (longPress) clearTimeout(longPress);
-      longPress = null;
+    // ---------- výběr oknem / křížením: tažení levým tlačítkem, dotyk = dlouhý stisk a tažení (box-drag-3d.ts) ----------
+    // dlouhý stisk prstem bez tažení = kontextová nabídka (pravé tlačítko) na dotykových zařízeních
+    let boxScene: { sc: BoxSceneOf; key: string } | null = null;
+    /** stav kamery a velikost plátna – scéna výběru oknem platí jen pro ně (změna pohledu během tažení = nová scéna) */
+    const boxCamKey = () => {
+      const s = S.current!;
+      s.camera.updateMatrixWorld();
+      return [...s.camera.matrixWorldInverse.elements, ...s.camera.projectionMatrix.elements, renderer.domElement.clientWidth, renderer.domElement.clientHeight].map((v) => v.toFixed(5)).join(",");
     };
-    const onTouchEnd = (e: TouchEvent) => {
-      if (swallowTouchEnd) {
-        swallowTouchEnd = false;
-        e.preventDefault();
-      }
+    const boxSceneCur = (): BoxSceneOf => {
+      const key = boxCamKey();
+      if (!boxScene || boxScene.key !== key) boxScene = { sc: boxSceneNow(), key };
+      return boxScene.sc;
+    };
+    const boxSceneNow = (): BoxSceneOf => {
+      const s = S.current!;
+      const p = propsRef.current;
+      s.camera.updateMatrixWorld();
+      const cam = { width: renderer.domElement.clientWidth, height: renderer.domElement.clientHeight, view: s.camera.matrixWorldInverse.elements, proj: s.camera.projectionMatrix.elements };
+      const meshes = isAsm()
+        ? meshTargets().flatMap((o) => {
+            const av = p.assembly?.find((a) => a.id === o.userData.id);
+            return av ? [{ mesh: av.mesh, points: av.vertices, matrix: o.matrix.elements, meta: { compId: av.id, topId: av.topId ?? av.id }, occluder: !av.dim && (av.opacity ?? 1) >= 1 }] : [];
+          })
+        : s.partGeo && meshTargets().length ? [{ mesh: s.partGeo.mesh, points: p.vertices, matrix: s.model.matrix.elements, meta: {} }] : [];
+      const sc = buildBoxScene(cam, meshes, p.section ? { normal: [s.clip.normal.x, s.clip.normal.y, s.clip.normal.z], constant: s.clip.constant } : null, p.display);
+      perfMark("ui.box.scene", sc.scene.ms, { meshes: meshes.length, triangles: sc.scene.totalTris });
+      return sc;
+    };
+    const boxSpec = () => (propsRef.current.onPickMany ? boxSpecFor(propsRef.current.pickMode, effFilter() ?? propsRef.current.selFilter ?? "all", isAsm()) : null);
+    const boxDrag = attachBoxDrag(el, () => renderer.domElement, {
+      accept: (e) => {
+        const s = S.current!;
+        const lp = e.pointerType === "touch" && propsRef.current.pickMode !== "none";
+        if (s.tc.object && gizmoAxisAt(s, e)) return { box: false, longPress: false }; // stisk na gizmu = jeho tažení
+        if (!boxSpec()) return { box: false, longPress: lp };
+        // volba „levé tlačítko otáčí“: okno jen z prázdného místa
+        if (e.pointerType !== "touch" && propsRef.current.leftDrag === "orbit" && hitMesh(e)) return { box: false, longPress: false };
+        return { box: true, longPress: lp };
+      },
+      preview: (r, crossing, mode) => {
+        const spec = boxSpec();
+        return spec ? boxPreviewText(queryBox(boxSceneCur(), r, crossing, spec), mode, propsRef.current.boxResolve, () => boxDrag.refresh()) : null;
+      },
+      finish: (r, crossing, mode) => {
+        const spec = boxSpec();
+        if (!spec) return;
+        const t0 = performance.now();
+        const items = queryBox(boxSceneCur(), r, crossing, spec);
+        perfMark("ui.box.select", performance.now() - t0, { n: items.length, crossing: crossing ? 1 : 0 });
+        propsRef.current.onPickMany?.(items, mode);
+      },
+      longPress: (e) => propsRef.current.onContext?.(e.clientX, e.clientY, pickSel(e, effFilter())),
+      busy: (on) => {
+        controls.enabled = !on;
+        if (!on) boxScene = null;
+      },
+    });
+    boxApi.current = (r, crossing) => {
+      const p = propsRef.current;
+      const spec = boxSpecFor(p.pickMode, effFilter() ?? p.selFilter ?? "all", isAsm());
+      return spec ? queryBox(boxSceneNow(), r, crossing, spec) : null;
     };
     const onDown = (e: PointerEvent) => {
       downAt = [e.clientX, e.clientY, e.button];
-      cancelLongPress();
-      if (e.pointerType === "touch" && propsRef.current.pickMode !== "none") {
-        longPress = setTimeout(() => {
-          longPress = null;
-          downAt = null;
-          swallowTouchEnd = true;
-          const it = pickSel(e, effFilter());
-          propsRef.current.onContext?.(e.clientX, e.clientY, it);
-        }, 550);
-      }
-    };
-    const onMoveCancel = (e: PointerEvent) => {
-      if (longPress && downAt && Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 8) cancelLongPress();
     };
     const onUp = (e: PointerEvent) => {
       const s = S.current!;
-      cancelLongPress();
+      if (boxDrag.consume(e)) {
+        downAt = null; // konec výběru oknem nebo dlouhý stisk – není to klik
+        return;
+      }
       if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4 || e.button !== downAt[2] || s.tc.dragging) {
         downAt = null;
         return;
@@ -886,9 +953,6 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       }
     };
     renderer.domElement.addEventListener("pointermove", onMove);
-    renderer.domElement.addEventListener("pointermove", onMoveCancel, { passive: true });
-    renderer.domElement.addEventListener("pointercancel", cancelLongPress);
-    renderer.domElement.addEventListener("touchend", onTouchEnd, { passive: false });
     renderer.domElement.addEventListener("pointerdown", onDown);
     renderer.domElement.addEventListener("pointerup", onUp);
     renderer.domElement.addEventListener("pointerleave", onLeave);
@@ -900,10 +964,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       ro.disconnect();
       controls.dispose();
       tc.dispose();
+      boxDrag.dispose();
+      boxApi.current = undefined;
       renderer.domElement.removeEventListener("pointermove", onMove);
-      renderer.domElement.removeEventListener("pointermove", onMoveCancel);
-      renderer.domElement.removeEventListener("pointercancel", cancelLongPress);
-      renderer.domElement.removeEventListener("touchend", onTouchEnd);
       renderer.domElement.removeEventListener("pointerdown", onDown);
       renderer.domElement.removeEventListener("pointerup", onUp);
       renderer.domElement.removeEventListener("pointerleave", onLeave);
@@ -936,16 +999,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
   function applyMouse() {
     const s = S.current;
     if (!s) return;
-    const scheme = propsRef.current.mouse ?? "zw3d";
+    // schéma myši + volba „Levé tlačítko táhne“ (výběr oknem: levé tlačítko OrbitControls nepoužívá – box-pick-3d.ts)
+    const b = mouseButtons(propsRef.current.mouse ?? "zw3d", propsRef.current.leftDrag);
     const NONE = -1 as unknown as THREE.MOUSE;
-    s.controls.mouseButtons =
-      scheme === "zw3d"
-        ? { LEFT: NONE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }
-        : scheme === "solidworks"
-          ? { LEFT: NONE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.PAN }
-          : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+    const m = (a: DragAction) => (a === "orbit" ? THREE.MOUSE.ROTATE : a === "pan" ? THREE.MOUSE.PAN : NONE);
+    s.controls.mouseButtons = { LEFT: m(b.left), MIDDLE: m(b.middle), RIGHT: m(b.right) };
   }
-  useEffect(applyMouse, [props.mouse]);
+  useEffect(applyMouse, [props.mouse, props.leftDrag]);
 
   // perspektiva / pravoúhlé promítání
   useEffect(() => {
@@ -1090,13 +1150,23 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       const gi = s.asmGeo.get(m.userData.key as string) ?? null;
       return { mesh: m, edges: null, gi, mtx: m.matrix };
     };
+    // plochy a hrany po skupinách (síť + barva): jeden průchod sítí na skupinu – i stovky entit z výběru oknem
+    const groups = new Map<string, { compId?: string; col: number; faces: Set<number>; edges: Set<number> }>();
     for (const [it, col] of items) {
-      if (it.kind === "face") {
-        const o = findObj(it.compId);
+      if (it.kind !== "face" && it.kind !== "edge") continue;
+      const k = `${it.compId ?? ""}|${col}`;
+      let g = groups.get(k);
+      if (!g) groups.set(k, (g = { compId: it.compId, col, faces: new Set(), edges: new Set() }));
+      (it.kind === "face" ? g.faces : g.edges).add(it.index);
+    }
+    for (const gr of groups.values()) {
+      const col = gr.col;
+      if (gr.faces.size) {
+        const o = findObj(gr.compId);
         if (!o?.gi) continue;
         const idx: number[] = [];
         const tri = o.gi.mesh.triangles;
-        for (let t = 0; t < o.gi.faceOf.length; t++) if (o.gi.faceOf[t] === it.index) idx.push(tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]);
+        for (let t = 0; t < o.gi.faceOf.length; t++) if (gr.faces.has(o.gi.faceOf[t])) idx.push(tri[t * 3], tri[t * 3 + 1], tri[t * 3 + 2]);
         const g = new THREE.BufferGeometry();
         g.setAttribute("position", o.gi.geo.getAttribute("position"));
         g.setAttribute("normal", o.gi.geo.getAttribute("normal"));
@@ -1108,12 +1178,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         }
         m.renderOrder = 6;
         s.hilite.add(m);
-      } else if (it.kind === "edge") {
-        const o = findObj(it.compId);
+      }
+      if (gr.edges.size) {
+        const o = findObj(gr.compId);
         if (!o?.gi) continue;
         const src = o.gi.mesh.lines;
         const pts: number[] = [];
-        for (let seg = 0; seg < o.gi.edgeOf.length; seg++) if (o.gi.edgeOf[seg] === it.index) pts.push(...src.slice(seg * 6, seg * 6 + 6));
+        for (let seg = 0; seg < o.gi.edgeOf.length; seg++) if (gr.edges.has(o.gi.edgeOf[seg])) for (let q = seg * 6; q < seg * 6 + 6; q++) pts.push(src[q]);
         const g = new THREE.BufferGeometry();
         g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
         const l = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: col, depthTest: false, transparent: true, clippingPlanes: clipping }));
@@ -1124,7 +1195,10 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         l.renderOrder = 7;
         s.hilite.add(l);
         // zesílení: druhá vrstva s mírným posunem není v WebGL možná → přidáme body na koncích
-      } else if (it.kind === "vertex") {
+      }
+    }
+    for (const [it, col] of items) {
+      if (it.kind === "vertex") {
         const dot = new THREE.Mesh(new THREE.SphereGeometry(s.radius / 120, 16, 12), new THREE.MeshBasicMaterial({ color: col, depthTest: false, transparent: true }));
         dot.position.set(...it.point);
         dot.renderOrder = 8;
@@ -1574,6 +1648,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.controls.update();
       s.render();
     },
+    boxPick: (r, crossing) => (softView.current?.boxPick ? softView.current.boxPick(r, crossing) : (boxApi.current?.(r, crossing) ?? null)),
     /** popisky entit na obrazovce (souřadnice vůči 3D oknu) – pro automatizaci */
     hintList: () => softView.current?.hintList?.() ?? hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
     /** „klikne“ na popisek (syntetické pointer události na plátně – stejná cesta jako myš) */

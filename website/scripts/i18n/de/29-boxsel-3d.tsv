@@ -1,0 +1,37 @@
+# W20 3D: Fensterauswahl / Kreuzen im 3D-Fenster und in der Vorschau ohne WebGL (box-pick-3d.ts, box-drag-3d.ts, agent-api-host selectBox)
+{0} · Okno: levé tl. (← křížení)	{0} · Fenster: linke Taste (← Kreuzen)
+{0} · Okno: levé tl. z prázdného místa	{0} · Fenster: linke Taste von leerer Stelle
+{0} bod	{0} Punkt
+{0} body	{0} Punkte
+{0} bodů	{0} Punkte
+{0} hrana	{0} Kante
+{0} hrany	{0} Kanten
+{0} hran	{0} Kanten
+{0} komponenta	{0} Komponente
+{0} komponenty	{0} Komponenten
+{0} komponent	{0} Komponenten
+{0} plocha	{0} Fläche
+{0} plochy	{0} Flächen
+{0} ploch	{0} Flächen
+{0} prvek	{0} Feature
+{0} prvky	{0} Features
+{0} prvků	{0} Features
+{0} těleso	{0} Körper
+{0} tělesa	{0} Körper
+Celková délka hran	Gesamtlänge der Kanten
+Celková plocha ploch	Gesamtfläche der Flächen
+Levé tlačítko táhne	Ziehen mit linker Taste
+Okno vybírá i skryté	Fenster wählt auch Verdecktes
+okno: zleva doprava celé uvnitř, zprava doleva i protnuté	Fenster: von links nach rechts ganz innen, von rechts nach links auch geschnitten
+Otáčení	Drehen
+Pozn.	Hinweis
+pravé otáčí · prostřední posouvá · kolečko zoom · levé = výběr oknem	rechte dreht · mittlere verschiebt · Rad zoomt · linke = Fensterauswahl
+sečteno prvních {0} entit	Summe der ersten {0} Elemente
+selectBox potřebuje obdélník v px 3D okna, např. {0}	selectBox braucht ein Rechteck in px des 3D-Fensters, z. B. {0}
+selectBox: mode je replace | add | remove – zadáno {0}	selectBox: mode ist replace | add | remove – angegeben {0}
+selectBox: v tomto režimu 3D okna se oknem nevybírá (otevřená skica, výkres nebo výběr plochy pro skicu)	selectBox: Fensterauswahl ist in diesem Modus des 3D-Fensters nicht möglich (offene Skizze, Zeichnung oder Flächenwahl für eine Skizze)
+Výběr oknem	Fensterauswahl
+Výběr oknem: zleva doprava = jen celé uvnitř, zprava doleva = i protnuté · Ctrl/Shift přidá · Ctrl+Shift/Alt odebere · Esc zruší	Fensterauswahl: von links nach rechts = nur ganz innen, von rechts nach links = auch geschnitten · Strg/Umschalt fügt hinzu · Strg+Umschalt/Alt entfernt · Esc bricht ab
+Vybráno oknem	Per Fenster gewählt
+hledám prvky…	suche Features…
+ – kreslí se softwarově: {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.	 – Software-Darstellung: {0}, Mausrad zoomt. Klick wählt Fläche, Kante oder Eckpunkt (Strg/Umschalt fügt hinzu), per Text „auswählen F3 E2“ oder window.mncad.select([…]). Volles 3D: Chrome mit --enable-unsafe-swiftshader ohne --disable-software-rasterizer.
