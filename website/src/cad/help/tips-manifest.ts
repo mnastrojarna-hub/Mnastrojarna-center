@@ -170,6 +170,7 @@ export const TIP_MANIFEST: Record<TipPackage, readonly ManifestRow[]> = {
     ["menu:sub/edit", "Upravit v kontextu", "Sestava › Přesun › Podsestava ▼"],
     ["menu:filter/component", "Komponenta", "Nástroje › Analýza › Filtr: Komponenta ▼"],
     ["menu:filter/subasm", "Podsestava", "Nástroje › Analýza › Filtr: Komponenta ▼"],
+    ["menu:filter/through", "Okno vybírá i skryté", "Nástroje › Analýza › Filtr: Komponenta ▼"],
     ["quick/fi", "Zaoblit hranu", "rychlá lišta u výběru (hrana)"],
     ["quick/ch", "Srazit hranu", "rychlá lišta u výběru (hrana)"],
     ["quick/meas", "Měřit (délku / odsud)", "rychlá lišta u výběru (hrana, vrchol, těleso, plocha v sestavě)"],

@@ -22,7 +22,7 @@ export default {
   filter: {
     what: "Sets what a click in the 3D window selects: anything, face, edge, point, body, in an assembly a component.",
     when: "When a click picks a different entity than you want – e.g. an edge instead of a face.",
-    steps: ["Open the Filter menu and choose the entity type.", "Click in the model; Ctrl+click adds or removes another entity."],
+    steps: ["Open the Filter menu and choose the entity type.", "Click in the model; Ctrl+click adds or removes another entity.", "Or drag a rectangle: left to right = fully inside, right to left = also crossed."],
     note: "The same filter is in the status bar at the bottom and in the right-click menu on empty space.",
   },
   "menu:filter/all": {
@@ -67,6 +67,12 @@ export default {
     when: "Moving, opening or dissolving a whole group of parts at once.",
     steps: ["Choose Sub-assembly.", "Click any part of the sub-assembly – the whole one is selected."],
     note: "Assembly only; a part outside a sub-assembly is selected on its own.",
+  },
+  "menu:filter/through": {
+    what: "Window selection also picks entities hidden behind other faces or components (otherwise visible only).",
+    when: "Window-select back edges and faces of a part or components hidden inside an assembly.",
+    steps: ["Turn on Window selects hidden too.", "Drag a rectangle with the left button over the model; Ctrl adds, Alt removes."],
+    note: "In Wireframe and Transparent styles the window always picks hidden entities; a click still picks visible ones.",
   },
   mass: {
     what: "Shows mass, volume, surface area and size of the part; in an assembly the sum of the parts by their materials and the centre of gravity.",

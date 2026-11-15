@@ -125,6 +125,7 @@ export default {
     when: "Když chcete spustit příkaz s novým výběrem.",
     steps: ["Klikněte Zrušit výběr nebo stiskněte Esc."],
     cmd: "2d vyber nic",
+    note: "Okno: táhněte zleva doprava (celé uvnitř) nebo zprava doleva (i protnuté); Ctrl/Shift přidá, Ctrl+Shift odebere.",
   },
   "draft/erase": {
     what: "Smaže vybrané objekty; objekty na zamčených hladinách přeskočí.",

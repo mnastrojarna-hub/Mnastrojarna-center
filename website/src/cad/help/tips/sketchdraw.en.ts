@@ -28,7 +28,7 @@ export default {
   select: {
     what: "Selects and edits sketch entities: click selects, dragging moves, handles reshape, Delete removes.",
     when: "Between drawing steps – selection for a constraint, an edit, a copy or deletion.",
-    steps: ["Click an entity; Shift or Ctrl adds more.", "Box left to right = only fully inside, right to left = also crossed.", "Double-click a dimension to change its value; the right button offers more actions."],
+    steps: ["Click selects, Shift/Ctrl adds; a window with Ctrl adds, with Ctrl+Shift removes.", "Window left to right = only fully inside, right to left = also crossed; Esc cancels it.", "Double-click a dimension to change its value; the right button offers more actions."],
     note: "Fully defined (black) geometry does not move when dragged – constraints and dimensions hold it.",
   },
   line: {
@@ -640,6 +640,7 @@ export default {
     what: "Fits the display so that the whole sheet is visible.",
     when: "After zooming into a detail, after changing the sheet format, when the sheet is lost from view.",
     steps: ["Click Whole sheet."],
+    note: "Pan with the middle or right button (left outside the paper); a left drag on the sheet window-selects notes and dimensions.",
   },
   "drawing-ws/bomCsv": {
     what: "Saves the assembly bill of materials as a CSV table: item, name, number, qty, material, mass.",

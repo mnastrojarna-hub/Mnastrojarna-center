@@ -19,6 +19,8 @@ import { DEFAULT_SNAPS, SNAP_KINDS } from "@/cad/draft/snap";
 import { normalizeDraftDoc, emptyDraftDoc } from "@/cad/draft/doc";
 import { displayHex } from "@/cad/draft/colors";
 import { DRAFT_IMPORT_ACCEPT, draftImport } from "@/cad/draft/io";
+import { windowWord } from "@/cad/draft/select";
+import { mergeSelection, type ClickMode } from "@/cad/box-select-2d";
 import type { CadDoc } from "@/cad/types";
 import { saveFile } from "@/lib/save-file";
 import { cn } from "@/lib/cn";
@@ -216,7 +218,13 @@ export function DraftWorkspace({ doc, onCommit, onUndo, onRedo, canUndo, canRedo
     if (!r || r.done) return;
     if (r.prompt?.k === "select") {
       if (!t.trim()) r.feed({ k: "sel", ids: [...session.sel] });
-      else {
+      else if (!/\s/.test(t.trim()) && windowWord(t.trim())) {
+        // o / k (Okno / Křížení) bez rohů: rohy se zadají dvěma kliky nebo tažením na plátně
+        const kind = windowWord(t.trim())!;
+        canvas.current?.windowMode(kind);
+        log({ text: kind === "crossing" ? tr("Křížení – klikněte na první roh") : tr("Okno – klikněte na první roh"), kind: "info" });
+        return;
+      } else {
         // zápis výběru textem během výzvy výběru
         void runLine(`vyber výběr ${t}`).then(() => setRunVer((v) => v + 1));
         return;
@@ -317,14 +325,8 @@ export function DraftWorkspace({ doc, onCommit, onUndo, onRedo, canUndo, canRedo
     r.feed({ k: "ent", id, p });
     afterStep();
   };
-  const onSelect = (ids: string[], mode: "add" | "remove") => {
-    const cur = new Set(session.sel);
-    for (const id of ids) {
-      if (mode === "remove") cur.delete(id);
-      else cur.add(id);
-    }
-    setSelection(session, [...cur]);
-  };
+  // klik / okno z plátna: nahradit, přidat, odebrat, přepnout (pravidla: cad/box-select-2d.ts)
+  const onSelect = (ids: string[], mode: ClickMode) => setSelection(session, mergeSelection(session.sel, ids, mode));
 
   // ---------------------------------------------------------------- klávesy (psaní kamkoli → příkazový řádek)
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => undefined);
@@ -650,7 +652,9 @@ export function DraftWorkspace({ doc, onCommit, onUndo, onRedo, canUndo, canRedo
         <button type="button" onClick={() => setPrefs({ dark: !prefs.dark })} className="shrink-0 rounded px-1.5 py-0.5 text-[#6b7785] hover:bg-white" title={tr("Tmavé / světlé pozadí")} data-toggle="dark">
           {prefs.dark ? tr("TMAVÉ") : tr("SVĚTLÉ")}
         </button>
-        <span className="flex-1" />
+        <span className="min-w-0 flex-1 truncate px-2 text-[#8a95a3]" data-boxsel-hint title={tr("Výběr oknem: táhněte zleva doprava = celé uvnitř, zprava doleva = i protnuté; Ctrl/Shift přidá, Ctrl+Shift odebere, Esc okno zruší; ve výzvě výběru o / k = okno / křížení dvěma kliky")}>
+          <span className="hidden xl:inline">{tr("Okno ⇢ celé uvnitř · ⇠ křížení · Ctrl/Shift přidá · Ctrl+Shift odebere")}</span>
+        </span>
         <span className="shrink-0 text-[#6b7785]" data-draft-count>
           {tr("{0} entit", list.length)}
           {session.sel.length ? ` · ${tr("vybráno {0}", session.sel.length)}` : ""} · {model0.vars.units}

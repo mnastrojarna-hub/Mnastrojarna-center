@@ -91,6 +91,14 @@ export type DrawingMeta = {
 };
 
 export type BalloonItem = { pos: number; name: string; bbox: [Vec3, Vec3] };
+/** úpravy vygenerovaných objektů listu (DrawingOptions.genEdit) */
+export type GenEdit = { off?: string[]; move?: Record<string, Vec2> };
+/** vygenerovaný objekt listu (DrawingResult.generated): klíč, druh, čáry a obdélníky textů [x0, y0, x1, y1] na listu */
+export type GenItem = { id: string; kind: "dim" | "balloon"; polys: Vec2[][]; rects: [number, number, number, number][] };
+/** čáry a texty přidané od indexů `np` / `nt` jako jeden vygenerovaný objekt */
+function genCapture(out: GenItem[], id: string, kind: GenItem["kind"], polys: Poly[], texts: DText[], np: number, nt: number) {
+  out.push({ id, kind, polys: polys.slice(np).filter((p) => !p.fill).map((p) => p.pts), rects: texts.slice(nt).map(textBox) });
+}
 export type RevisionItem = { rev: string; date: string; note: string; author?: string; /** false = trojúhelníky revize u změněných kót se nekreslí */ marks?: boolean };
 /** Detailní pohled: kruh v pohledu `view` (střed a poloměr v souřadnicích pohledu = mm modelu), měřítko detailu a umístění na listu. */
 export type DetailView = { id: string; label: string; view: string; cx: number; cy: number; r: number; scale: number; at?: Vec2 };
@@ -157,6 +165,11 @@ export type DrawingOptions = {
   dimPads?: Record<string, Partial<Record<"l" | "t" | "r" | "b", number>>>;
   /** pozice komponent (balónky) – jen sestavy s meta.components */
   balloons?: boolean;
+  /**
+   * vygenerované objekty listu upravené výběrem ve výkresu (klik / okno, Delete, posun – cad/drawing-boxsel.ts): skryté (`off`)
+   * a posunuté (`move`, mm listu) kóty celkových rozměrů `dim:<pohled>:<t|l>` a pozice (balónky) `pos:<číslo>`
+   */
+  genEdit?: GenEdit;
   /** kusovník nad razítkem (sestava; bez hodnoty = zobrazit, když je kusovník) – kusovník sám přichází v meta.bom */
   bomTable?: boolean;
   /** tabulka děr (souřadnice a průměry děr v půdorysu) */
@@ -237,6 +250,8 @@ export type DrawingResult = {
   details?: { id: string; label: string; x: number; y: number; w: number; h: number }[];
   /** pozice (balónky) – střed kroužku na listu */
   balloons?: { pos: number; x: number; y: number }[];
+  /** vygenerované objekty listu, které jdou vybrat a upravit (`genEdit`): kóty celkových rozměrů a pozice – čáry a texty (mm listu) */
+  generated?: GenItem[];
   /** pohledy dalších modelů: klíč pohledu, měřítko a obdélník na listu */
   models?: { id: string; key: string; scale: string; scaleValue: number; x: number; y: number; w: number; h: number }[];
   /** automatické kóty průměrů v řadě vedle pohledu (soustružené díly): pohled a strana, na které řada leží */
@@ -1826,15 +1841,24 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       if (p && x.m.view !== "iso") centerLines(p, circlesOf(x.shape), polys);
     }
   }
+  const generated: GenItem[] = [];
+  const gen = opts.genEdit;
   for (const o of overall) {
     const p = placed.get(o.key);
     if (!p || !(p.w > 0)) continue;
+    // kóta skrytá / posunutá výběrem ve výkresu: posun kolmo ke kótě mění odsazení od pohledu (nejméně 2 mm)
+    const id = `dim:${o.key}:${o.side}`;
+    if (gen?.off?.includes(id)) continue;
+    const mv = gen?.move?.[id];
+    const off = Math.max(2, 9 - (mv ? (o.side === "t" ? mv[1] : mv[0]) : 0));
+    const [np, nt] = [polys.length, texts.length];
     const b = { x: p.px, y: p.py, w: p.w * p.s, h: p.h * p.s };
     // přerušený pohled: kóta přes přerušení nese skutečný rozměr
     const tw = p.brk ? decompress1(p.x0 + p.w, p.brk, 0) - decompress1(p.x0, p.brk, 0) : p.w;
     const th = p.brk ? decompress1(p.y0 + p.h, p.brk, 1) - decompress1(p.y0, p.brk, 1) : p.h;
-    if (o.side === "t") linearDim(polys, texts, [b.x, b.y], [b.x + b.w, b.y], [0, -1], 9, tw);
-    else linearDim(polys, texts, [b.x, b.y + b.h], [b.x, b.y], [-1, 0], 9, th);
+    if (o.side === "t") linearDim(polys, texts, [b.x, b.y], [b.x + b.w, b.y], [0, -1], off, tw);
+    else linearDim(polys, texts, [b.x, b.y + b.h], [b.x, b.y], [-1, 0], off, th);
+    genCapture(generated, id, "dim", polys, texts, np, nt);
   }
   const stackOut: NonNullable<DrawingResult["stacks"]> = [];
   if (opts.dimensions === "auto") {
@@ -1880,7 +1904,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   const balloons: NonNullable<DrawingResult["balloons"]> = [];
   if (opts.balloons && meta.components?.length) {
     const mainView = centerView ? placed.get(centerView.key) : ortho[0];
-    if (mainView) balloonsFor(meta.components, mainView, polys, texts, balloons, { top: M + 3, bottom: SH - M - TBH - 3, left: M_LEFT + 3, right: SW - M - 3 });
+    if (mainView) balloonsFor(meta.components, mainView, polys, texts, balloons, { top: M + 3, bottom: SH - M - TBH - 3, left: M_LEFT + 3, right: SW - M - 3 }, { edit: gen, out: generated });
   }
 
   // značky svarů ISO 2553 z 3D svarů (drawing-welds.ts)
@@ -1933,6 +1957,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     holeTableInfo: holePick ? { view: holePick.view, other: holePick.other } : undefined,
     details: details.length ? details : undefined,
     balloons: balloons.length ? balloons : undefined,
+    generated: generated.length ? generated : undefined,
     models: modelOut.length ? modelOut : undefined,
     stacks: stackOut.length ? stackOut : undefined,
     extraViews: extraOut.length ? extraOut : undefined,
@@ -2994,7 +3019,7 @@ function detailView(d: DetailView, p: Placed, SW: number, SH: number, TBH: numbe
  * Balónky s čísly pozic u hlavního pohledu s odkazy na průmět středu komponenty.
  * Řady nad a pod pohledem se použijí jen tam, kde se vejdou do rámu (a mimo razítko); jinak sloupec vlevo od pohledu.
  */
-function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["balloons"]>, bounds: { top: number; bottom: number; left: number; right: number }) {
+function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DText[], out: NonNullable<DrawingResult["balloons"]>, bounds: { top: number; bottom: number; left: number; right: number }, gen?: { edit?: GenEdit; out: GenItem[] }) {
   const R = 4;
   const pts = items
     .map((it) => {
@@ -3010,7 +3035,16 @@ function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DTex
   const aboveY = v.py - 12 - R;
   const belowY = v.py + v.h * v.s + 12 + R;
   const rows = [aboveY, belowY].filter((y) => y - R >= bounds.top && y + R <= bounds.bottom);
-  const place = (b: { pos: number; q: Vec2 }, bx: number, by: number) => {
+  const seen = new Map<number, number>();
+  const place = (b: { pos: number; q: Vec2 }, bx0: number, by0: number) => {
+    // balónek skrytý / posunutý výběrem ve výkresu (odkazová čára vede dál k bodu komponenty)
+    const k = (seen.get(b.pos) ?? 0) + 1;
+    seen.set(b.pos, k);
+    const id = k > 1 ? `pos:${b.pos}#${k}` : `pos:${b.pos}`;
+    if (gen?.edit?.off?.includes(id)) return;
+    const mv = gen?.edit?.move?.[id];
+    const [bx, by] = [bx0 + (mv?.[0] ?? 0), by0 + (mv?.[1] ?? 0)];
+    const [np, nt] = [polys.length, texts.length];
     polys.push({ layer: "dim", pts: circlePts([bx, by], R, 32) });
     texts.push({ x: bx, y: by + 1.3, s: String(b.pos), size: 3.5, anchor: "middle", bold: true, layer: "dim" });
     // odkazová čára od okraje kroužku k bodu komponenty, zakončená tečkou
@@ -3020,6 +3054,8 @@ function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DTex
     polys.push({ layer: "dim", pts: [[bx + (dx / l) * R, by + (dy / l) * R], b.q] });
     polys.push({ layer: "dim", fill: true, pts: circlePts(b.q, 0.7, 10) });
     out.push({ pos: b.pos, x: bx, y: by });
+    // tvar pro výběr: kroužek s číslem (bez odkazové čáry – okno kolem balónku ho vybere)
+    if (gen) gen.out.push({ id, kind: "balloon", polys: [polys[np].pts], rects: texts.slice(nt).map(textBox) });
   };
   if (rows.length) {
     const perRow = Math.ceil(n / rows.length);

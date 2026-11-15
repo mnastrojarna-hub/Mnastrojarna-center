@@ -479,7 +479,7 @@ export function sectionReport(s: SectionState | null, bbox?: [Vec3, Vec3] | null
 }
 
 /* ───────────────────────── nastavení (window.mncad.setSettings) ───────────────────────── */
-export const AGENT_SETTINGS_KEYS = ["askWhereToSave", "meshQuality", "units", "decimals", "angleDecimals", "defaultMaterial", "author", "sheet", "projection", "tolerance", "confirmDelete", "autoExtrude", "autoConstraints", "snapGrid", "gridStep", "display", "ortho", "showGrid", "bg"] as const;
+export const AGENT_SETTINGS_KEYS = ["askWhereToSave", "meshQuality", "units", "decimals", "angleDecimals", "defaultMaterial", "author", "sheet", "projection", "tolerance", "confirmDelete", "autoExtrude", "autoConstraints", "snapGrid", "gridStep", "display", "ortho", "showGrid", "bg", "mouse", "leftDrag"] as const;
 export type AgentSettingsKey = (typeof AGENT_SETTINGS_KEYS)[number];
 export type AgentSettingsPatch = Partial<Pick<Settings, AgentSettingsKey>>;
 const ENUM_SETTINGS: Partial<Record<AgentSettingsKey, readonly (string | number)[]>> = {
@@ -491,6 +491,8 @@ const ENUM_SETTINGS: Partial<Record<AgentSettingsKey, readonly (string | number)
   projection: ["E", "A"],
   display: ["shadedEdges", "shaded", "wireframe", "hiddenLine", "xray"],
   bg: ["blue", "light", "dark", "white"],
+  mouse: ["zw3d", "solidworks", "simple"],
+  leftDrag: ["window", "orbit"],
 };
 const BOOL_SETTINGS = new Set<AgentSettingsKey>(["askWhereToSave", "confirmDelete", "autoExtrude", "autoConstraints", "snapGrid", "ortho", "showGrid"]);
 const TEXT_SETTINGS = new Set<AgentSettingsKey>(["author", "tolerance"]);
@@ -698,6 +700,12 @@ export type MncadApiExt = {
   select: (ids: string[], opts?: { additive?: boolean }) => number;
   /** zruší výběr (Esc) */
   clearSelection: () => void;
+  /**
+   * výběr oknem / křížením jako tažení myší ve 3D okně: obdélník v px 3D okna (jako `hints()`), `crossing` (výchozí
+   * podle směru: x1 < x0 = křížení), `mode` replace (výchozí) | add | remove; filtr výběru a volba „i skryté“ platí;
+   * vrátí nový výběr ve tvaru `selection()`
+   */
+  selectBox: (box: { x0: number; y0: number; x1: number; y1: number; crossing?: boolean; mode?: "replace" | "add" | "remove" }) => SelectionEntry[];
   /** spustí akci rozšíření (Rozvin → DXF, Tabulka ohybů, Kusovník řezů, Tloušťka stěn, export skici DXF…) a vrátí text a soubory */
   action: (id: string) => Promise<{ log: string; files: CapturedFile[] }>;
   /** předloha: `předloha …` (bez textu = stav), `porovnat předloha …`, `kontrola kót …` → protokol a strukturovaný výsledek (výtah, porovnání se SVG, kontrola kót) */

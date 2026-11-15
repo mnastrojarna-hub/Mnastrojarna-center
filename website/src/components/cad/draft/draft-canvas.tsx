@@ -3,7 +3,10 @@
 /**
  * Plátno 2D výkresu: dvě vrstvy canvasu (entity + mřížka; překryv s kurzorem, uchopením, gumovou čarou, oknem výběru),
  * kolečko = zoom ke kurzoru, prostřední tlačítko / dva prsty = posun, poklepání prostředním = rozsah,
- * levé = bod / výběr (zleva doprava okno, zprava doleva křížení, Shift = odebrat), pravé = kontextová nabídka.
+ * levé = bod / výběr: klik = jedna entita, tažení (i ze stisku na entitě) = okno (zleva doprava) / křížení (zprava doleva),
+ * klik do prázdna = okno dvěma kliky; bez modifikátoru nahradí (ve výzvě „Vyberte objekty“ přidá), Ctrl / Shift přidá
+ * (klik přepne), Ctrl+Shift / Alt odebere; Esc zruší jen okno (pravidla: cad/box-select-2d.ts). Dotyk: jeden prst = posun,
+ * dlouhý stisk a tažení = okno. Pravé tlačítko = kontextová nabídka.
  */
 import { tr } from "@/cad/i18n";
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
@@ -18,6 +21,8 @@ import { findSnap, orthoPoint, polarPoint, type SnapHit } from "@/cad/draft/snap
 import { spatialIndex } from "@/cad/draft/spatial";
 import { extents } from "@/cad/draft/status";
 import { perfMark } from "@/cad/perf-log";
+import { boxMode, CLICK_PX, clickMode, HOLD_MS, HOLD_SLOP_PX, holdPhase, isCrossing, isDrag, rectFrom, type BoxMods, type ClickMode } from "@/cad/box-select-2d";
+import { boxLabel, drawBoxSelect } from "../box-select-2d-ui";
 
 export type DraftPrefs = {
   dark: boolean;
@@ -38,6 +43,8 @@ export type DraftCanvasHandle = {
   redraw: () => void;
   /** poslední (uchopený) bod kurzoru a směr k němu od základního bodu výzvy – přímé zadání vzdálenosti */
   cursor: () => { p: Vec2 | null; dir: Vec2 | null };
+  /** volba Okno / Křížení (o / k) ve výzvě výběru: další dva kliky (nebo tažení) zadají rohy; null = zrušit */
+  windowMode: (kind: "window" | "crossing" | null) => void;
 };
 
 type Props = {
@@ -48,14 +55,14 @@ type Props = {
   prefs: DraftPrefs;
   onPoint: (p: Vec2) => void;
   onEntity: (id: string, p: Vec2) => void;
-  onSelect: (ids: string[], mode: "add" | "remove") => void;
+  onSelect: (ids: string[], mode: ClickMode) => void;
   onCursor: (p: Vec2 | null) => void;
   onContext: (x: number, y: number) => void;
   onDblClick: (id: string | null) => void;
   underlay?: (ctx: CanvasRenderingContext2D, v: View) => void;
   overlay?: (ctx: CanvasRenderingContext2D, v: View) => void;
   /** rozšíření (úchopy…): true = událost obsloužena, jádro ji přeskočí */
-  onPointerHook?: (ev: { kind: "down" | "move" | "up"; world: Vec2; snapped: Vec2; screen: Vec2; button: number; shift: boolean; ctrl: boolean }) => boolean;
+  onPointerHook?: (ev: { kind: "down" | "move" | "up"; world: Vec2; snapped: Vec2; screen: Vec2; button: number; shift: boolean; ctrl: boolean; alt?: boolean }) => boolean;
 };
 
 const SNAP_LABEL: Record<SnapKind, string> = {
@@ -75,6 +82,7 @@ const SNAP_LABEL: Record<SnapKind, string> = {
 export { SNAP_LABEL };
 
 const PICK = 5; // px – výběrový čtvereček
+const CLICK_PX_CTX = CLICK_PX; // px – pravý klik bez tažení = kontextová nabídka
 const APERTURE = 10; // px – okruh uchopení
 
 export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCanvas(props, ref) {
@@ -89,7 +97,19 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     world: null as Vec2 | null, // výsledný bod (uchopený / ortho)
     snap: null as SnapHit | null,
     hover: null as string | null,
-    win: null as { a: Vec2; b: Vec2; drag: boolean } | null,
+    /** okno výběru: rohy (px), tažené / dvěma kliky, modifikátory (stisk, puštění, poslední pohyb), vynucené o / k, dotykem */
+    win: null as { a: Vec2; b: Vec2; drag: boolean; mods: BoxMods[]; cur?: BoxMods; force?: "window" | "crossing"; touch?: boolean } | null,
+    /** stisk levého tlačítka ve výběru: klik (entita pod kurzorem), nebo po posunu ≥ 5 px okno */
+    press: null as { a: Vec2; hit: string | null; mods: BoxMods } | null,
+    /** čeká se na první roh okna zadaného volbou o / k */
+    force: null as "window" | "crossing" | null,
+    /** po Esc během okna: puštění tlačítka už nic nevybere */
+    swallowUp: false,
+    hold: 0,
+    /** živý počet entit v okně (klíč = rohy, čas posledního výpočtu) */
+    live: null as { key: string; ids: string[]; at: number; ms: number } | null,
+    /** konec okna – doba do vykreslení výběru (data-boxsel) */
+    boxT0: 0,
     pan: null as { x: number; y: number; cx: number; cy: number } | null,
     touches: new Map<number, Vec2>(),
     pinch: null as { d: number; scale: number; mid: Vec2; world: Vec2 } | null,
@@ -102,6 +122,27 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
   useEffect(() => installTextMeasure(), []);
 
   const idx = useCallback(() => spatialIndex(pr.current.list, { model: pr.current.model }), []);
+
+  /** výzva „Vyberte objekty“: klik i okno bez modifikátoru výběr doplňují (jako v AutoCADu), jinak ho nahrazují */
+  const accumulate = useCallback(() => pr.current.prompt?.k === "select", []);
+  /** id entit, které okno vybere (viditelné; ve výzvě výběru jen ty, které příkaz přijme) */
+  const winIds = useCallback(
+    (w: { a: Vec2; b: Vec2; force?: "window" | "crossing" }): string[] => {
+      const v = view.current;
+      const p = pr.current;
+      if (!v) return [];
+      const crossing = w.force ? w.force === "crossing" : isCrossing(w.a, w.b);
+      const r = rectFrom(toWorld(v, w.a), toWorld(v, w.b));
+      const ids = windowSelect(p.model, idx(), r, crossing);
+      const filt = p.prompt?.k === "select" ? p.prompt.filter : undefined;
+      if (!filt) return ids;
+      return ids.filter((id) => {
+        const e = entityById(p.list as DraftEntity[], id);
+        return !!e && filt(e);
+      });
+    },
+    [idx],
+  );
 
   // ---------------------------------------------------------------- vykreslení
   const drawBase = useCallback(() => {
@@ -126,6 +167,13 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     // pohled pro automatizaci (převod souřadnic výkresu na obrazovku): x = (X − cx)·scale + w/2, y = h/2 − (Y − cy)·scale
     host.current?.setAttribute("data-view", JSON.stringify({ cx: v.cx, cy: v.cy, scale: v.scale, w: v.w, h: v.h, ms: Math.round(r.ms * 10) / 10, drawn: r.drawn }));
     lastRender.current = { ms: r.ms, drawn: r.drawn };
+    const bs = st.current;
+    if (bs.boxT0) {
+      // výběr oknem: doba od puštění tlačítka po vykreslení zvýrazněného výběru (automatizace: data-boxsel)
+      const prev = JSON.parse(host.current?.getAttribute("data-boxsel") || "{}");
+      host.current?.setAttribute("data-boxsel", JSON.stringify({ ...prev, total: Math.round((performance.now() - bs.boxT0) * 10) / 10 }));
+      bs.boxT0 = 0;
+    }
   }, [idx]);
   const lastRender = useRef({ ms: 0, drawn: 0 });
 
@@ -153,17 +201,33 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
       }
     }
     if (s.win) {
-      const [a, b] = [s.win.a, s.win.b];
-      const crossing = b[0] < a[0];
+      const w = s.win;
+      const crossing = w.force ? w.force === "crossing" : isCrossing(w.a, w.b);
+      // živý náhled: entity, které okno právě vybere (u velkých výkresů se přepočítává nejvýš ~7× za s)
+      const key = `${w.a.join(",")}|${w.b.join(",")}|${crossing}`;
+      const now = performance.now();
+      if (!s.live || (s.live.key !== key && (s.live.ms < 25 || now - s.live.at > 150))) {
+        const t0 = performance.now();
+        const ids = winIds(w);
+        s.live = { key, ids, at: now, ms: performance.now() - t0 };
+      }
+      if (s.live.ids.length && s.live.ids.length <= 3000) {
+        const ents = s.live.ids.map((id) => entityById(p.list as DraftEntity[], id)).filter((e): e is DraftEntity => !!e);
+        drawHighlight(g, p.model, ents, v, { color: crossing ? "#22c55e" : "#3b82f6", width: 2 });
+      }
+      const mode = boxMode([...w.mods, ...(w.cur ? [w.cur] : [])], accumulate());
+      drawBoxSelect(g, w.a, w.b, crossing, v.dpr, boxLabel(s.live.ids.length, crossing, mode === "replace" ? undefined : accumulate() && mode === "add" ? undefined : mode));
+      host.current?.setAttribute("data-boxsel-live", String(s.live.ids.length));
+    } else if (s.force && s.cursor) {
+      // volba o / k: kurzor ukazuje, že se čeká na první roh
       g.save();
-      g.fillStyle = crossing ? "rgba(34,197,94,0.12)" : "rgba(59,130,246,0.12)";
-      g.strokeStyle = crossing ? "#22c55e" : "#3b82f6";
-      g.lineWidth = v.dpr;
-      g.setLineDash(crossing ? [6 * v.dpr, 4 * v.dpr] : []);
-      const x = Math.min(a[0], b[0]) * v.dpr;
-      const y = Math.min(a[1], b[1]) * v.dpr;
-      g.fillRect(x, y, Math.abs(b[0] - a[0]) * v.dpr, Math.abs(b[1] - a[1]) * v.dpr);
-      g.strokeRect(x, y, Math.abs(b[0] - a[0]) * v.dpr, Math.abs(b[1] - a[1]) * v.dpr);
+      g.font = `${11 * v.dpr}px sans-serif`;
+      const label = s.force === "crossing" ? tr("Křížení: první roh") : tr("Okno: první roh");
+      const tw = g.measureText(label).width;
+      g.fillStyle = "rgba(17,24,39,0.86)";
+      g.fillRect((s.cursor[0] + 14) * v.dpr, (s.cursor[1] + 18) * v.dpr, tw + 10 * v.dpr, 17 * v.dpr);
+      g.fillStyle = "#ffffff";
+      g.fillText(label, (s.cursor[0] + 19) * v.dpr, (s.cursor[1] + 30) * v.dpr);
       g.restore();
     }
     // kurzor: kříž + výběrový čtvereček
@@ -211,7 +275,7 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
         g.restore();
       }
     }
-  }, []);
+  }, [accumulate, winIds]);
 
   const schedule = useCallback(
     (which: "base" | "over" | "both") => {
@@ -292,6 +356,14 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
         const b = pr.current.prompt && "base" in pr.current.prompt ? pr.current.prompt.base : null;
         return { p: s.world, dir: s.world && b && dist(s.world, b) > 1e-12 ? unit(sub(s.world, b)) : null };
       },
+      windowMode: (kind) => {
+        const s = st.current;
+        s.force = kind;
+        s.win = null;
+        s.press = null;
+        s.live = null;
+        schedule("over");
+      },
     }),
     [zoomExtents, schedule],
   );
@@ -338,26 +410,47 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     s.hover = pickEntity(p.model, idx(), toWorld(v, scr), PICK / v.scale, filt)?.id ?? null;
   };
 
+  const modsOf = (e: { ctrlKey: boolean; metaKey: boolean; shiftKey: boolean; altKey: boolean }): BoxMods => ({ ctrlKey: e.ctrlKey, metaKey: e.metaKey, shiftKey: e.shiftKey, altKey: e.altKey });
+
+  /** dokončí okno: výběr podle směru (nebo volby o / k) a modifikátorů */
   const finishWindow = () => {
     const s = st.current;
-    const v = view.current!;
     const p = pr.current;
-    if (!s.win) return;
-    const a = toWorld(v, s.win.a);
-    const b = toWorld(v, s.win.b);
-    const crossing = s.win.b[0] < s.win.a[0];
-    const box: Box = { x0: Math.min(a[0], b[0]), y0: Math.min(a[1], b[1]), x1: Math.max(a[0], b[0]), y1: Math.max(a[1], b[1]) };
-    let ids = windowSelect(p.model, idx(), box, crossing);
-    if (p.prompt?.k === "select" && p.prompt.filter) ids = ids.filter((id) => { const e = entityById(p.list as DraftEntity[], id); return !!e && p.prompt!.k === "select" && (p.prompt as Extract<Prompt, { k: "select" }>).filter!(e); });
+    const w = s.win;
+    if (!w) return;
+    const t0 = performance.now();
+    const ids = winIds(w);
+    const mode = boxMode([...w.mods, ...(w.cur ? [w.cur] : [])], accumulate());
     s.win = null;
-    p.onSelect(ids, winRemove.current ? "remove" : "add");
+    s.live = null;
+    p.onSelect(ids, mode);
+    s.boxT0 = t0;
+    host.current?.setAttribute("data-boxsel", JSON.stringify({ n: ids.length, mode, crossing: w.force ? w.force === "crossing" : isCrossing(w.a, w.b), ms: Math.round((performance.now() - t0) * 10) / 10 }));
+    host.current?.removeAttribute("data-boxsel-live");
     schedule("both");
   };
-  const winRemove = useRef(false);
+  const cancelWindow = (): boolean => {
+    const s = st.current;
+    // stisk ve výběru, který se ještě nepohnul o 5 px (z něj by bylo okno): Esc zruší i ten – výběr zůstane
+    const pending = !!s.press && !!s.downAt;
+    if (!s.win && !s.force && !pending) return false;
+    const pressed = !!s.downAt;
+    s.win = null;
+    s.force = null;
+    s.live = null;
+    s.press = null;
+    s.swallowUp = pressed;
+    host.current?.removeAttribute("data-boxsel-live");
+    schedule("over");
+    return true;
+  };
+  const cancelWindowRef = useRef(cancelWindow);
+  cancelWindowRef.current = cancelWindow;
 
   const onPointerDown = (e: React.PointerEvent) => {
     const s = st.current;
     const scr = local(e);
+    s.swallowUp = false;
     if (e.pointerType === "touch") {
       s.touches.set(e.pointerId, scr);
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -368,6 +461,8 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
         s.pinch = { d: dist(a, b), scale: v.scale, mid: m, world: toWorld(v, m) };
         s.downAt = null;
         s.win = null;
+        s.press = null;
+        clearTimeout(s.hold);
         return;
       }
     }
@@ -386,17 +481,35 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     }
     if (e.button !== 0) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    if (e.pointerType !== "touch" && !pr.current.prompt && hook("down", scr, e)) {
+    if (e.pointerType !== "touch" && !pr.current.prompt && !s.win && !s.force && hook("down", scr, e)) {
       hooked.current = true;
       return;
     }
     if (e.pointerType === "touch") {
-      // jeden prst: posun, klepnutí = klik (vyhodnotí se při puštění)
+      // jeden prst: posun, klepnutí = klik (vyhodnotí se při puštění), dlouhý stisk na místě a tažení = okno výběru
       const v = view.current!;
       s.pan = { x: scr[0], y: scr[1], cx: v.cx, cy: v.cy };
+      clearTimeout(s.hold);
+      const down = scr;
+      const t = performance.now();
+      s.hold = window.setTimeout(() => {
+        const c = st.current;
+        const p = pr.current;
+        const last = c.touches.get(e.pointerId);
+        if (!c.downAt || c.pinch || c.touches.size !== 1 || !c.pan || !last) return;
+        if (holdPhase(down, t, last, performance.now()) !== "hold") return;
+        if (p.prompt && p.prompt.k !== "select") return;
+        // posun pohledu se zruší (prst stál), od místa stisku se táhne okno
+        view.current = { ...view.current!, cx: c.pan.cx, cy: c.pan.cy };
+        c.pan = null;
+        c.win = { a: down, b: last, drag: true, mods: [{}], touch: true };
+        c.hover = null;
+        if (typeof navigator !== "undefined") navigator.vibrate?.(15);
+        schedule("both");
+      }, HOLD_MS);
       return;
     }
-    click(scr, e.shiftKey, false);
+    press(scr, modsOf(e));
   };
 
   /** rozšíření mimo příkaz (úchopy): „down“ obsloužené rozšířením → i „move“ a „up“ jdou jen jemu */
@@ -407,11 +520,14 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     if (!h || !v) return false;
     const world = toWorld(v, scr);
     const snapped = resolvePoint(scr).p;
-    return h({ kind, world, snapped, screen: scr, button: e.button, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
+    return h({ kind, world, snapped, screen: scr, button: e.button, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, alt: e.altKey });
   };
 
-  /** klik (myš ihned, dotyk po klepnutí) */
-  const click = (scr: Vec2, shift: boolean, tap: boolean) => {
+  /**
+   * Stisk levého tlačítka (myš ihned, dotyk při klepnutí): bod / entita podle výzvy; ve výběru se rozhodne až při
+   * puštění (klik) nebo po posunu ≥ 5 px (okno – i když stisk padl na entitu).
+   */
+  const press = (scr: Vec2, mods: BoxMods) => {
     const s = st.current;
     const p = pr.current;
     const v = view.current!;
@@ -429,20 +545,52 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     }
     // výběr (bez příkazu nebo výzva výběru)
     if (s.win && !s.win.drag) {
+      // druhý roh okna zadaného dvěma kliky
       s.win.b = scr;
+      s.win.mods.push(mods);
       finishWindow();
       return;
     }
-    const w = toWorld(v, scr);
-    const filt = pmt?.k === "select" ? pmt.filter : undefined;
-    const hit = pickEntity(p.model, idx(), w, (tap ? 3 * PICK : PICK) / v.scale, filt);
-    if (hit) {
-      p.onSelect([hit.id], shift ? "remove" : "add");
+    if (s.force) {
+      // volba o / k: první roh (další klik nebo puštění po tažení zadá druhý)
+      s.win = { a: scr, b: scr, drag: false, mods: [mods], force: s.force };
+      s.force = null;
+      s.press = null;
+      schedule("over");
       return;
     }
-    winRemove.current = shift;
-    s.win = { a: scr, b: scr, drag: !tap };
+    const filt = pmt?.k === "select" ? pmt.filter : undefined;
+    s.press = { a: scr, hit: pickEntity(p.model, idx(), toWorld(v, scr), PICK / v.scale, filt)?.id ?? null, mods };
+  };
+
+  /** puštění bez tažení: klik na entitu vybere ji (podle modifikátorů), klik do prázdna začne okno dvěma kliky */
+  const release = (scr: Vec2, mods: BoxMods) => {
+    const s = st.current;
+    const pr0 = s.press;
+    s.press = null;
+    if (!pr0) return;
+    if (pr0.hit) {
+      pr.current.onSelect([pr0.hit], clickMode([pr0.mods, mods], accumulate()));
+      schedule("over");
+      return;
+    }
+    s.win = { a: pr0.a, b: scr, drag: false, mods: [pr0.mods] };
     schedule("over");
+  };
+
+  /** klepnutí prstem: jako klik s větším okruhem výběru */
+  const tap = (scr: Vec2) => {
+    const p = pr.current;
+    const v = view.current!;
+    const pmt = p.prompt;
+    if (pmt && pmt.k !== "select") return press(scr, {});
+    const s = st.current;
+    if (s.win && !s.win.drag) return press(scr, {});
+    if (s.force) return press(scr, {});
+    const filt = pmt?.k === "select" ? pmt.filter : undefined;
+    const hit = pickEntity(p.model, idx(), toWorld(v, scr), (3 * PICK) / v.scale, filt);
+    s.press = { a: scr, hit: hit?.id ?? null, mods: {} };
+    release(scr, {});
   };
 
   const onPointerMove = (e: React.PointerEvent) => {
@@ -466,7 +614,8 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     if (s.pan) {
       const dx = scr[0] - s.pan.x;
       const dy = scr[1] - s.pan.y;
-      if (s.downAt && e.pointerType === "touch" && Math.hypot(dx, dy) < 6) return;
+      if (s.downAt && e.pointerType === "touch" && Math.hypot(dx, dy) < HOLD_SLOP_PX) return;
+      if (e.pointerType === "touch") clearTimeout(s.hold);
       view.current = { ...v, cx: s.pan.cx - dx / v.scale, cy: s.pan.cy + dy / v.scale };
       schedule("both");
       return;
@@ -475,14 +624,21 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     const r = resolvePoint(scr);
     s.world = r.p;
     s.snap = r.snap;
-    if (e.pointerType !== "touch" && (hooked.current || !pr.current.prompt) && hook("move", scr, e) && hooked.current) {
+    if (e.pointerType !== "touch" && (hooked.current || (!pr.current.prompt && !s.win && !s.press && !s.force)) && hook("move", scr, e) && hooked.current) {
       pr.current.onCursor(r.p);
       schedule("over");
       return;
     }
+    // tažení ze stisku (i na entitě) o ≥ 5 px = okno výběru
+    if (s.press && s.downAt && isDrag(s.press.a, scr)) {
+      s.win = { a: s.press.a, b: scr, drag: true, mods: [s.press.mods] };
+      s.press = null;
+      s.hover = null;
+    }
     if (s.win) {
       s.win.b = scr;
-      if (s.downAt && Math.hypot(scr[0] - s.downAt.x, scr[1] - s.downAt.y) > 4) s.win.drag = true;
+      s.win.cur = modsOf(e);
+      if (s.downAt && isDrag([s.downAt.x, s.downAt.y], scr)) s.win.drag = true;
     } else updateHover(scr);
     pr.current.onCursor(r.p);
     schedule("over");
@@ -492,6 +648,7 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     const s = st.current;
     const scr = local(e);
     if (e.pointerType === "touch") {
+      clearTimeout(s.hold);
       s.touches.delete(e.pointerId);
       if (s.pinch) {
         if (s.touches.size < 2) s.pinch = null;
@@ -499,13 +656,26 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
         return;
       }
       const d = s.downAt;
+      s.downAt = null;
+      if (s.win?.touch) {
+        // okno dlouhým stiskem: zvednutí prstu ho dokončí (bez posunu se zruší)
+        if (isDrag(s.win.a, scr)) {
+          s.win.b = scr;
+          finishWindow();
+        } else {
+          s.win = null;
+          s.live = null;
+          schedule("over");
+        }
+        s.pan = null;
+        return;
+      }
       const moved = d ? Math.hypot(scr[0] - d.x, scr[1] - d.y) : 99;
       s.pan = null;
-      if (d && moved < 8 && Date.now() - d.t < 600) {
+      if (d && moved < HOLD_SLOP_PX && Date.now() - d.t < HOLD_MS + 100) {
         s.cursor = scr;
-        click(scr, false, true);
+        tap(scr);
       }
-      s.downAt = null;
       return;
     }
     if (s.pan) {
@@ -521,12 +691,20 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     }
     const d = s.downAt;
     s.downAt = null;
-    if (e.button === 2 && d && Math.hypot(scr[0] - d.x, scr[1] - d.y) < 5) {
+    if (e.button === 2 && d && Math.hypot(scr[0] - d.x, scr[1] - d.y) < CLICK_PX_CTX) {
       pr.current.onContext(e.clientX, e.clientY);
       return;
     }
-    if (s.win?.drag && d && Math.hypot(scr[0] - d.x, scr[1] - d.y) > 4) {
+    if (s.swallowUp) {
+      // Esc během okna: tlačítko se pouští bez výběru
+      s.swallowUp = false;
+      s.press = null;
+      return;
+    }
+    if (s.press) return release(scr, modsOf(e));
+    if (s.win?.drag && d && isDrag([d.x, d.y], scr)) {
       s.win.b = scr;
+      s.win.mods.push(modsOf(e));
       finishWindow();
     } else if (s.win) s.win.drag = false; // klik do prázdna → okno se dokončí druhým klikem
   };
@@ -561,17 +739,32 @@ export const DraftCanvas = forwardRef<DraftCanvasHandle, Props>(function DraftCa
     return () => el.removeEventListener("wheel", stop);
   }, []);
 
-  /** Esc: zrušit rozpracované okno výběru */
+  /**
+   * Esc: zruší jen rozpracované okno výběru (nebo čekání na roh po volbě o / k) – výběr i běžící příkaz zůstanou.
+   * Posluchač se registruje před pracovní plochou (efekt potomka běží dřív) a událost dál nepustí.
+   */
   useEffect(() => {
     const esc = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && st.current.win) {
-        st.current.win = null;
-        schedule("over");
+      if (e.key === "Escape" && cancelWindowRef.current()) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
       }
     };
     window.addEventListener("keydown", esc, true);
     return () => window.removeEventListener("keydown", esc, true);
-  }, [schedule]);
+  }, []);
+
+  // nová výzva, která nechce výběr (bod, entita, text): rozpracované okno a volba o / k se zahodí
+  useEffect(() => {
+    const s = st.current;
+    if (props.prompt && props.prompt.k === "select") return;
+    if (s.force || (s.win && !s.win.drag)) {
+      s.force = null;
+      s.win = null;
+      s.live = null;
+    }
+    if (!props.prompt) s.force = null;
+  }, [props.prompt]);
 
   return (
     <div

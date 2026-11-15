@@ -125,6 +125,7 @@ export default {
     when: "Wenn ein Befehl mit einer neuen Auswahl starten soll.",
     steps: ["Auswahl aufheben anklicken oder Esc drücken."],
     cmd: "2d wählen nichts",
+    note: "Fenster: links→rechts ziehen = ganz innen, rechts→links = auch geschnittene; Strg/Umschalt ergänzt, Strg+Umschalt entfernt.",
   },
   "draft/erase": {
     what: "Löscht die gewählten Objekte; Objekte auf gesperrten Layern werden übersprungen.",

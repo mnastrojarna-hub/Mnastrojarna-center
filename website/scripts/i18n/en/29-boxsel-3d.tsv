@@ -1,0 +1,37 @@
+# W20 3D: výběr oknem / křížením ve 3D okně a v náhledu bez WebGL (box-pick-3d.ts, box-drag-3d.ts, agent-api-host selectBox)
+{0} · Okno: levé tl. (← křížení)	{0} · Window: left button (← crossing)
+{0} · Okno: levé tl. z prázdného místa	{0} · Window: left button from empty space
+{0} bod	{0} point
+{0} body	{0} points
+{0} bodů	{0} points
+{0} hrana	{0} edge
+{0} hrany	{0} edges
+{0} hran	{0} edges
+{0} komponenta	{0} component
+{0} komponenty	{0} components
+{0} komponent	{0} components
+{0} plocha	{0} face
+{0} plochy	{0} faces
+{0} ploch	{0} faces
+{0} prvek	{0} feature
+{0} prvky	{0} features
+{0} prvků	{0} features
+{0} těleso	{0} body
+{0} tělesa	{0} bodies
+Celková délka hran	Total edge length
+Celková plocha ploch	Total face area
+Levé tlačítko táhne	Left button drag
+Okno vybírá i skryté	Window selects hidden too
+okno: zleva doprava celé uvnitř, zprava doleva i protnuté	window: left to right fully inside, right to left also crossed
+Otáčení	Rotate
+Pozn.	Note
+pravé otáčí · prostřední posouvá · kolečko zoom · levé = výběr oknem	right rotates · middle pans · wheel zooms · left = window selection
+sečteno prvních {0} entit	sum of the first {0} entities
+selectBox potřebuje obdélník v px 3D okna, např. {0}	selectBox needs a rectangle in px of the 3D view, e.g. {0}
+selectBox: mode je replace | add | remove – zadáno {0}	selectBox: mode is replace | add | remove – given {0}
+selectBox: v tomto režimu 3D okna se oknem nevybírá (otevřená skica, výkres nebo výběr plochy pro skicu)	selectBox: window selection is not available in this 3D view mode (open sketch, drawing or face pick for a sketch)
+Výběr oknem	Window selection
+Výběr oknem: zleva doprava = jen celé uvnitř, zprava doleva = i protnuté · Ctrl/Shift přidá · Ctrl+Shift/Alt odebere · Esc zruší	Window selection: left to right = fully inside only, right to left = also crossed · Ctrl/Shift adds · Ctrl+Shift/Alt removes · Esc cancels
+Vybráno oknem	Selected by window
+hledám prvky…	finding features…
+ – kreslí se softwarově: {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.	 – drawn in software: {0}, wheel zooms. A click selects a face, edge or vertex (Ctrl/Shift adds), by text “select F3 E2” or window.mncad.select([…]). Full 3D: Chrome with --enable-unsafe-swiftshader without --disable-software-rasterizer.

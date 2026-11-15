@@ -104,7 +104,8 @@ function onPointer(api: DraftUiApi, ev: DraftPointerEvent): boolean {
     return false;
   }
   if (ev.kind === "down") {
-    if (ev.button !== 0 || ev.shift || ev.ctrl) return false;
+    // s modifikátorem výběru (Shift / Ctrl přidá, Ctrl+Shift / Alt odebere) stisk na úchopu vybírá, úchop se nechytí
+    if (ev.button !== 0 || ev.shift || ev.ctrl || ev.alt) return false;
     const h = gripsNear(api, ev.world, 6 / v.scale);
     if (!h.length) return false;
     G.drag = { p0: h[0].p, s0: ev.screen, hot: h, cur: h[0].p, snap: null, moved: false };

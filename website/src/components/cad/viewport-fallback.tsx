@@ -6,6 +6,7 @@ import { explainRenderFailure, type RenderFailure } from "@/cad/diagnostics";
 import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
 import { softView, usePublishPickProps, useSoftPickProps, type SoftPickProps } from "./soft-bridge";
+import { mouseHint } from "./box-pick-3d";
 import type { ViewportHandle } from "./viewport";
 import { SOFT_BTN, SoftViewport, type SoftScene } from "./viewport-soft";
 
@@ -92,7 +93,8 @@ export function ViewportFallback({ failure, core, onRetry, onCopy, scene, hidden
       {note && (
         <div role="status" data-soft-note className="absolute bottom-10 left-[92px] right-3 z-10 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 py-2 pl-3 pr-7 text-[11.5px] leading-relaxed text-[#26303b] shadow lg:bottom-14 lg:left-[292px] lg:right-auto lg:w-[420px]">
           <strong className="font-semibold">{tr("Zjednodušený náhled bez WebGL.")}</strong> {title}
-          {tr(" – model se kreslí softwarově: tažení otáčí, Shift + tažení posouvá, kolečko přibližuje. Klik vybere plochu, hranu nebo vrchol (Ctrl / Shift + klik přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D pro automatizaci: Chrome s --enable-unsafe-swiftshader, bez --disable-software-rasterizer.")}
+          {/* tlačítka myši podle Nastavení (jako stavový řádek 3D okna): levé tlačítko táhne výběr oknem (box-pick-3d.ts); text nejvýš na 5 řádků (e2e cad-soft-pick) */}
+          {tr(" – kreslí se softwarově: {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.", mouseHint(pick?.mouse, pick?.leftDrag))}
           <button type="button" onClick={() => setNote(false)} aria-label={tr("Skrýt")} className="absolute right-1 top-1 rounded p-0.5 text-[#6b7785] hover:bg-white">
             <CadIcon name="x" className="h-3.5 w-3.5" />
           </button>

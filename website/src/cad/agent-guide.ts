@@ -1137,6 +1137,7 @@ bod dotyku tečny · \`nea(e3,x,y)\` nejbližší bod. Id entit (\`e12\`) vrací
 | vlastnosti · properties | \`2d vlastnosti e3 e5 hladina OSY barva 5 typčáry DASHED tloušťka 0.5 měřítkočáry 2\` (bez id = výběr; \`barva ByLayer\` vrátí výchozí) |
 | nastavit · set | geometrie jako panel vlastností: \`2d nastavit e3 r 25 c 10,10\` · \`nastavit e7 s "Nový text" h 5\` · \`nastavit e2 length=120\` |
 | vyber · select | \`2d vyber hladina OSY typ circle\` · \`okno x,y x,y\` · \`křížení x,y x,y\` · \`vše\` · \`poslední\` · \`předchozí\` · \`výběr odebrat e3\` · \`nic\` |
+| výběr oknem myší (GUI) | skica, 2D výkres i výkres dílu: tažení zleva doprava = okno (celé uvnitř), zprava doleva = křížení (i protnuté); bez modifikátoru nahradí (ve výzvě „Vyberte objekty“ přidá), Ctrl/Shift přidá, Ctrl+Shift/Alt odebere, Esc zruší jen okno; ve výkresu sestavy / dílu jdou vybrat i vygenerované kóty celkových rozměrů a pozice (Delete skryje, tažení posune – volba listu \`genEdit\`, „Obnovit vygenerované“ vrátí) · textem \`2d vyber o x,y x,y\` / \`k x,y x,y\` (en \`w\`/\`c\`, de \`f\`/\`k\`) · plátno 2D výkresu po okně nastaví \`data-boxsel\` = \`{n, mode, crossing, ms, total}\` |
 | smazat · erase (E) | \`2d smazat e3 e5\` · \`smazat hladina OSY\` · \`smazat\` (výběr) |
 | posun · move (M) | \`2d posun e3 e5 0,0 100,50\` (základní a cílový bod) · \`posun vše posunutí 10,0\` · \`posun 0,0 @25<45\` (vybrané) |
 | kopie · copy (CO) | \`2d kopie e3 0,0 50,0 100,0\` (více cílů) · \`kopie e3 0,0 pole 5 20,0\` (5 v řadě) · \`… pole 5 přizpůsobit 100,0\` |
@@ -1461,6 +1462,10 @@ v otevřeném formuláři prvku – **textové příkazy výběr nečtou**: \`za
 (je-li vybraná hrana, protokol na to upozorní řádkem „! … zpracují se všechny hrany …“).
 Vybrané entity v nich zadejte čísly: \`zaoblit 3 hrany E2;E5\`, \`srazit 1 hrany E2\`, \`skořepina 2 otevřít F3\`,
 \`skica plocha F3: …\` (čísla lze kombinovat s pravidlem: \`hrany E2;E5;E9 svislé\`).
+**Výběr oknem** (jako tažení levým tlačítkem ve 3D okně): \`window.mncad.selectBox({ x0, y0, x1, y1, crossing?, mode? })\`
+– obdélník v px 3D okna (jako \`hints()\`), zleva doprava = okno (jen celé uvnitř), zprava doleva nebo \`crossing: true\`
+= křížení (i protnuté), \`mode\` replace | add | remove; podle filtru výběru (Vše = plochy dílu / komponenty sestavy),
+jen viditelné entity (volba filtru „Okno vybírá i skryté“ i zakryté); vrátí výběr jako \`selection()\`.
 
 **Výstupy.** \`await window.mncad.action("sheet.dxf")\` spustí akci rozšíření (tlačítko bez prvku v historii) a vrátí
 \`{ log, files: [{ name, mime, bytes, base64 }] }\` – Rozvin → DXF / SVG, Tabulka ohybů, Kusovník řezů (+ CSV), Tabulka
