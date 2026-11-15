@@ -372,7 +372,7 @@ výkres balónky ano
 výkres razítko název="Střižný nástroj" číslo="959-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"
 kótovat celkově
 záložka "959-01-00-01 Základová deska"
-výkres A3 měřítko 1:2 pohledy přední,horní,iso
+výkres A2 měřítko 1:2 pohledy přední,horní,iso
 kótovat chytře
 výkres razítko název="Základová deska" číslo="959-01-00-01" kreslil="AI" nepředepsané="ISO 2768-mK"
 záložka "959-01-00-02 Matrice"
@@ -380,7 +380,7 @@ výkres A3 pohledy přední,horní,iso
 kótovat chytře
 výkres razítko název="Matrice" číslo="959-01-00-02" kreslil="AI" nepředepsané="ISO 2768-mK"
 záložka "959-01-00-04 Kotevní deska"
-výkres A3 pohledy přední,horní,iso
+výkres A3 pohledy přední,horní,spodní,iso
 kótovat chytře
 výkres razítko název="Kotevní deska" číslo="959-01-00-04" kreslil="AI" nepředepsané="ISO 2768-mK"
 

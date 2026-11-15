@@ -1,0 +1,12 @@
+# B2 engine (CAD-HEADLESS-NAVRH.md kap. 2.4): přesun smyčky textových příkazů do engine/run.ts + engine/ops/*
+✓ otevřeno „{0}“ – dokument „{1}“ v nové záložce	✓ „{0}“ geöffnet – Dokument „{1}“ in neuer Registerkarte
+otevřít: chybí název souboru – otevřít "díl.mncad"	öffnen: Dateiname fehlt – öffnen "teil.mncad"
+řádek {0}: {1}	Zeile {0}: {1}
+akce {0}	Aktion {0}
+barva plochy	Flächenfarbe
+zobrazení	Darstellung
+smrštění	Schwindung
+přehrání pohybu	Bewegung abspielen
+export snímků pohybu {0}	Export der Bewegungsbilder {0}
+písma se nečetla od hostitele	die Schriften wurden nicht vom Host gelesen
+otevře dokument ze vstupních souborů v nové záložce (CLI: --files a složka skriptu, HTTP: files, v prohlížeči přiložené soubory): .mncad / JSON, STEP (velká sestava se rozdělí na díly), BREP, STL, OBJ, 3MF, DXF jako skica; chybějící soubor = ✗ file.missing se seznamem dostupných	öffnet ein Dokument aus den Eingabedateien in einer neuen Registerkarte (CLI: --files und Skriptordner, HTTP: files, im Browser: angehängte Dateien): .mncad / JSON, STEP (große Baugruppe wird in Teile zerlegt), BREP, STL, OBJ, 3MF, DXF als Skizze; fehlende Datei = ✗ file.missing mit Liste der verfügbaren Dateien

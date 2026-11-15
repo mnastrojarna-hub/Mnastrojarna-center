@@ -1,0 +1,11 @@
+# anglické a německé příkazy ve stejném běhu
+new part English
+box 40 30 20
+cylinder 10 25 at 20 15 0 cut
+fillet 1 edges top
+#--- run
+neu teil Deutsch
+quader 30 30 30
+bohrung 8 durch bei 15 15
+fase 1
+status

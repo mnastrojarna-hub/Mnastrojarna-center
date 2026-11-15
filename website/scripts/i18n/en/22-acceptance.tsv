@@ -1,0 +1,4 @@
+# B6 acceptance gate (scripts/cad-acceptance.mjs): short protocol merges warnings of one part that differ only by the feature name
+#!dynamic – protocol.ts SIMILAR (tr(label) of the merged short-protocol line)
+{0} prvků: {1} – „{2}“	{0} features: {1} – “{2}”
+{0} listů: {1} – „{2}“	{0} sheets: {1} – “{2}”

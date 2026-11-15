@@ -1,0 +1,5 @@
+# Vlna 14 B1 – klient jádra, jádro in-process v CLI (kernel-inprocess.ts, cli/main.ts, cli/job.ts, cli/args.ts)
+Jádro CAD spadlo ({0}) a ve vlákně běhu se znovu nespouští.	The CAD kernel crashed ({0}) and is not restarted in the run thread.
+jádro CAD se nenačetlo (replicad_single.wasm patří vedle mncad.mjs, jinou cestu zadejte v MNCAD_WASM): {0}	the CAD kernel failed to load (replicad_single.wasm belongs next to mncad.mjs; set another path in MNCAD_WASM): {0}
+MNCAD_WASM: soubor jádra „{0}“ neexistuje	MNCAD_WASM: kernel file “{0}” does not exist
+Prostředí: MNCAD_LANG = jazyk · MNCAD_WASM = jádro replicad_single.wasm jinde než vedle mncad.mjs · MNCAD_FONTS = složka písem · MNCAD_ORIGIN = adresa odkazů	Environment: MNCAD_LANG = language · MNCAD_WASM = kernel replicad_single.wasm somewhere other than next to mncad.mjs · MNCAD_FONTS = font folder · MNCAD_ORIGIN = link address

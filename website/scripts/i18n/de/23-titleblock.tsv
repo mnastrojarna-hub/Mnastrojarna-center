@@ -83,7 +83,6 @@ nepodporované prokládání PNG {0}	nicht unterstütztes PNG-Interlacing {0}
 nepředepsané desetinná: u {0} chybí tolerance	allgemein dezimal: bei {0} fehlt die Toleranz
 revize v razítku „{0}“ není v tabulce revizí ({1}) – doplňte ji (výkres revize {0} "…") nebo pole vyprázdněte (výkres razítko revize="") a razítko vezme poslední revizi z tabulky	Index „{0}“ im Schriftfeld steht nicht in der Änderungstabelle ({1}) – ergänzen (zeichnung änderung {0} "…") oder das Feld leeren (zeichnung schriftfeld revision="") – das Schriftfeld nimmt dann den letzten Index aus der Tabelle
 Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo="{1}"	Angehängt: {0} – in Befehlen über den Namen, z. B. zeichnung schriftfeld logo="{1}"
-Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu	Hängt eine Datei an (Schriftfeldlogo, Vorlage …) – Befehle finden sie über den Namen
 Připojit soubor…	Datei anhängen…
 Razítko bez zkracování textu: {0}	Schriftfeld ohne gekürzten Text: {0}
 Razítko bez zkracování textu: všechna pole v nominální velikosti	Schriftfeld ohne gekürzten Text: alle Felder in Nenngröße

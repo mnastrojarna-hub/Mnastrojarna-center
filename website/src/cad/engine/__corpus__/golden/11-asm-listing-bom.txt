@@ -1,0 +1,46 @@
+=== run 1 ===
+✓ nový díl „Hřídel“ – nová záložka
+✓ materiál = Ocel (7.85 g/cm³)
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Kotouč“ – nová záložka
+✓ materiál = Hliník (2.7 g/cm³)
+→ Trubka 1 (tube) přidán – výsledek po výpočtu níže
+✓ Válec 1 (cylinder)
+✓ Trubka 1 (tube)
+
+Dokument: „Kotouč“ · díl · materiál Hliník (2.7 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 80 × 80 × 10 mm (X -40…40, Y -40…40, Z 0…10) · objem 47,12 cm³ · ploch 4 · hran 6
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Trubka 1 [tube, id #] ✓ – Ø80/Ø20 × 10 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Hřídel s kotoučem“ – nová záložka
+✓ komponenta „Hřídel“ vložena do sestavy (ukotvená)
+✓ komponenta „Kotouč“ vložena do sestavy
+✓ komponenta „Kotouč“ vložena do sestavy
+
+Dokument: „Hřídel s kotoučem“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Hřídel [0; 0; 0] ⚓ · Kotouč [0; 0; 40] · Kotouč [0; 0; 60]
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+=== run 3 ===
+Sestava „Hřídel s kotoučem“: komponent 3 · vazby 0
+ #1 Hřídel · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Kotouč · díl · poloha [0; 0; 40]
+ #3 Kotouč · díl · poloha [0; 0; 60]
+Kusovník „Hřídel s kotoučem“ (plochý): položek 2, kusů 3, hmotnost Σ 0,501 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+1 | Hřídel |  | 1 | Ocel | 0,247
+2 | Kotouč |  | 2 | Hliník | 0,127
+Kusovník „Hřídel s kotoučem“ (plochý): položek 2, kusů 3, hmotnost Σ 0,501 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+1 | Hřídel |  | 1 | Ocel | 0,247
+2 | Kotouč |  | 2 | Hliník | 0,127
+CSV (oddělovač ;):
+Pozice;Název;Číslo výkresu / norma;Ks;Materiál;Hmotnost 1 ks [kg];Hmotnost celkem [kg];Skupina
+1;Hřídel;;1;Ocel;0,247;0,247;
+2;Kotouč;;2;Hliník;0,127;0,254;
+
+Dokument: „Hřídel s kotoučem“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Hřídel [0; 0; 0] ⚓ · Kotouč [0; 0; 40] · Kotouč [0; 0; 60]
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 80 × 80 × 100 mm · objem Σ 125,66 cm³ · hmotnost Σ 0,501 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

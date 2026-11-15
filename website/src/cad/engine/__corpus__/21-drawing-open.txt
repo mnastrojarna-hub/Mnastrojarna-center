@@ -1,0 +1,5 @@
+# otevření výkresu (op drawing – v aplikaci záložka výkresu, bez okna ℹ ui.no-view)
+nový díl Otevřít výkres
+kvádr 30 20 10
+výkres
+stav

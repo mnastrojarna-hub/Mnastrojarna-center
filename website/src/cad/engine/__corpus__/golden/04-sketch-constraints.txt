@@ -1,0 +1,27 @@
+=== run 1 ===
+✓ nový díl „Skica s vazbami“ – nová záložka
+→ Skica 1 (sketch) přidán – výsledek po výpočtu níže
+✓ 4 entity do skici „Skica 1“ (e1–e4)
+✓ vazby ve skice „Skica 1“: vodorovně e1, svisle e2, vodorovně e3, svisle e4 → Nedourčeno (12 st. volnosti)
+✓ kóty ve skice „Skica 1“: délka e1 60, délka e2 40 → Nedourčeno (10 st. volnosti)
+→ Vysunutí 1 (extrude) přidán – výsledek po výpočtu níže
+✓ Skica 1 (sketch)
+✗ Vysunutí 1 (extrude): Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu). Profil skici „Skica 1“: mezera 1 mm mezi e1 [0; 1] a e4 [0; 0]; mezera 1 mm mezi e3 [0; 39] a e4 [0; 38]; mezera 1 mm mezi e1 [60; 1] a e2 [61; 1]; otevřený konec e2 v [61; 41]. (další viz stav)
+
+Dokument: „Skica s vazbami“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)
+Prvky:
+ 1. Skica 1 [sketch, id #] ✓ – rovina XY, 4 entit: line, line, line, line
+    entity: e1 úsečka [0; 1]→[60; 1] · e2 úsečka [61; 1]→[61; 41] · e3 úsečka [62; 39]→[0; 39] · e4 úsečka [0; 38]→[0; 0]
+    vazby 4, kóty 2 · Nedourčeno (10 st. volnosti)
+    vazby: v1 vodorovně e1 · v2 svisle e2 · v3 vodorovně e3 · v4 svisle e4
+    kóty: k1 délka e1 = 60 · k2 délka e2 = 40
+    profil: žádný uzavřený obrys · ⚠ problémů 7:
+      · mezera 1 mm mezi e1 [0; 1] a e4 [0; 0]
+      · mezera 1 mm mezi e3 [0; 39] a e4 [0; 38]
+      · mezera 1 mm mezi e1 [60; 1] a e2 [61; 1]
+      · otevřený konec e2 v [61; 41]
+      · otevřený konec e3 v [62; 39]
+      · e1 se dotýká e4 v [0; 1] – napojení musí být konec na konec
+      · e2 kříží e3 v [61; 39]
+ 2. Vysunutí 1 [extrude, id #] ✗ Skica neobsahuje uzavřený profil (pro otevřený profil zapněte Tenkou stěnu). Profil skici „Skica 1“: mezera 1 mm mezi e1 [0; 1] a e4 [0; 0]; mezera 1 mm mezi e3 [0; 39] a e4 [0; 38]; mezera 1 mm mezi e1 [60; 1] a e2 [61; 1]; otevřený konec e2 v [61; 41]. (další viz stav) – 8 mm, new

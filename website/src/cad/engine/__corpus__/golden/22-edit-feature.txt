@@ -1,0 +1,40 @@
+=== run 1 ===
+✓ nový díl „Úpravy“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+→ Zaoblení 1 (fillet) – 6 hran podle pravidla „svisle“ – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Díra 2 (hole)
+✓ Zaoblení 1 (fillet)
+
+Dokument: „Úpravy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (4 ✓, 0 ✗)
+Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 22,96 cm³ · ploch 12 · hran 30
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ – Ø8 skrz v [15; 20; 10], osa Z
+ 3. Díra 2 [hole, id #] ✓ – Ø8 skrz v [45; 20; 10], osa Z
+ 4. Zaoblení 1 [fillet, id #] ✓ – R2, hrany 6
+=== run 2 ===
+✓ Kvádr 1: size [60; 40; 10] → [70; 40; 10]
+✓ přejmenováno: Díra 1 → Levá díra
+✓ potlačeno: Díra 2
+✓ Levá díra duplikován jako „Kopie díry“ (pozice 3)
+✓ Kopie díry: position [15; 20; 10] → [35; 10; 10]
+✓ „Zaoblení 1“ přesunut před „Díra 2“ (pozice 5 → 4)
+✓ zapnuto: Díra 2
+✓ smazáno: Kopie díry
+✓ Kvádr 1 (box)
+✗ Zaoblení 1 (fillet): Hrana 18 se po změně modelu nenašla podle otisku a těleso ji už nemá (hran: 15) – vyberte ji znovu.
+✓ Díra 2 (hole)
+
+Dokument: „Úpravy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (3 ✓, 1 ✗)
+Rozměry: 70 × 40 × 10 mm (X 0…70, Y 0…40, Z 0…10) · objem 26,99 cm³ · ploch 8 · hran 18
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 70 × 40 × 10 mm, new, roh [0; 0; 0]
+ 2. Levá díra [hole, id #] ✓ – Ø8 skrz v [15; 20; 10], osa Z
+ 3. Zaoblení 1 [fillet, id #] ✗ Hrana 18 se po změně modelu nenašla podle otisku a těleso ji už nemá (hran: 15) – vyberte ji znovu. – R2, hrany 6
+ 4. Díra 2 [hole, id #] ✓ – Ø8 skrz v [45; 20; 10], osa Z

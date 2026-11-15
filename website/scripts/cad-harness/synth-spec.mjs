@@ -379,12 +379,16 @@ const LIMIT = { holder: [20, 60], die: [10, 200] };
 export const STRIPPER_TRAVEL = Math.max(0, STROKE.from - STROKE.to - (Z.holder[0] - Z.stripper[1] - LIMIT.holder[0]));
 
 /**
- * parts with their own drawing sheet (one A3 sheet each, in the part document). The base plate (320 × 220) gets the
- * scale 1:2 explicitly: with `auto` the kernel also picks 1:2 but leaves out the 220 dimension ("! vynecháno: 220:
- * nevešlo se čistě na list"), which a strict run would stop on; with 1:2 typed, all 18 dimensions fit (measured).
+ * parts with their own drawing sheet (one sheet each, in the part document). Every layout is chosen so that a strict run
+ * passes (B6 gate: no ⚠ on any sheet – measured through the built CLI after the phase-B integration):
+ * * base plate (320 × 220): A2 at 1:2 – on A3 (1:2 typed or chosen by `auto`) the 220 dimension is left out
+ *   ("⚠ drawing.warning … vynecháno: 220: nevešlo se čistě na list (horní)");
+ * * holder plate: the counterbores 4× Ø21 ↧20 are drilled from below – without a bottom view their callout is left out
+ *   ("vynecháno: 4× Ø21 ↧20: chybí pohled ve směru osy díry – zapněte pohled spodní"); the top view stays for the 12× M10.
  */
 export const PART_SHEETS = ["base", "die", "holder"];
-const SHEET_OPTS = { base: "A3 měřítko 1:2", die: "A3", holder: "A3" };
+export const SHEET_OPTS = { base: "A2 měřítko 1:2", die: "A3", holder: "A3" };
+export const SHEET_VIEWS = { base: "přední,horní,iso", die: "přední,horní,iso", holder: "přední,horní,spodní,iso" };
 const LIBRARY = ["pillar", "bush", "pin", "spring", "washer"];
 
 /* ───────────── script ───────────── */
@@ -424,7 +428,7 @@ export function restScript(faces) {
   // three orthographic views + iso, Chytré kóty generated from the features (holes, threads, chamfers)
   for (const k of PART_SHEETS) {
     const nm = N[k].replace(/^959-01-00-\d\d /, "");
-    L.push(`záložka "${N[k]}"`, `výkres ${SHEET_OPTS[k]} pohledy přední,horní,iso`, "kótovat chytře", `výkres razítko název="${nm}" číslo="${N[k].slice(0, 12)}" kreslil="AI" nepředepsané="ISO 2768-mK"`);
+    L.push(`záložka "${N[k]}"`, `výkres ${SHEET_OPTS[k]} pohledy ${SHEET_VIEWS[k]}`, "kótovat chytře", `výkres razítko název="${nm}" číslo="${N[k].slice(0, 12)}" kreslil="AI" nepředepsané="ISO 2768-mK"`);
   }
   L.push(...header("kontrola"), `záložka "${N.asm}"`, "kolize", "kontrola sestava");
   for (const k of ["base", "die", "holder"]) L.push(`záložka "${N[k]}"`, "měřit těleso");

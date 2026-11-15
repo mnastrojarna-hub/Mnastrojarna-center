@@ -1,0 +1,81 @@
+=== run 1 ===
+Díra (hole) – pole pro „prvek hole klíč=hodnota“ i „upravit <prvek> klíč=hodnota“:
+textový příkaz: díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrně]|k tělesu] v x y [z] [v x y [z] …] [osa Z] [směr vx vy vz | sklon úhel] [zahloubení D2 H2 | kuželové D2] [závit M8 [jádro | vrták [N]]]
+ • position – vektor x;y;z [mm], např. position=0;0;20 · povinné – bod začátku díry (text bez z = na povrchu tělesa) · text: v x y [z]
+ • axis – výčet X|Y|Z · výchozí Z – osa (globální X / Y / Z) · text: osa X|Y|Z
+ • flip – ano/ne, např. flip=ano · výchozí ne – vrtat ve směru osy (výchozí proti ose – shora dolů) · text: obráceně
+ • diameter – číslo [mm], např. diameter=12,5 · povinné – průměr (u závitové díry skutečný vrták – viz tapDrill) · text: díra D
+ • depth – číslo [mm], např. depth=12,5 · výchozí 0 – hloubka (0 = skrz) · text: hloubka H | skrz
+ • bothWays – ano/ne, např. bothWays=ano · nepovinné – „skrz“ na obě strany od bodu · text: obousměrně
+ • cbDiameter – číslo [mm], např. cbDiameter=12,5 · výchozí 0 – průměr válcového zahloubení (0 = bez) · text: zahloubení D2 H2
+ • cbDepth – číslo [mm], např. cbDepth=12,5 · výchozí 0 – hloubka válcového zahloubení · text: zahloubení D2 H2
+ • kind – výčet simple|counterbore|countersink|tapped · nepovinné – druh díry · text: zahloubení | kuželové | závit
+ • csDiameter – číslo [mm], např. csDiameter=12,5 · nepovinné – průměr kuželového zahloubení · text: kuželové D2
+ • csAngle – číslo [°], např. csAngle=12,5 · nepovinné – vrcholový úhel kuželového zahloubení (90) · text: kuželové D2 A
+ • thread – text, např. thread="…" · nepovinné – závit (M8, M18×1,5) · text: závit M8
+ • tapDrill – výčet table|minor|custom · nepovinné – vrták závitové díry: table = z tabulky (M8 → 6,8), minor = jádro D1 podle ISO 965-1 (M8 → 6,647), custom = vrtá se diameter · text: (bez volby) | jádro | vrták N | díra 6,647 závit M8
+ • threadDepth – číslo [mm], např. threadDepth=12,5 · nepovinné – užitečná délka závitu · text: hloubka-závitu T
+ • head – výčet counterbore|countersink · nepovinné – zahloubení závitové díry (kind=tapped): counterbore = válcové cbDiameter × cbDepth, countersink = kuželové csDiameter / csAngle – zahloubení + vrták + závit · text: zahloubení D2 H2 závit M8 | kuželové D2 závit M8
+ • end – JSON · nepovinné – ukončení: blind, throughAll, toNext, toFace, toVertex, offsetFromFace, toBody · text: k tělesu
+ • points – seznam odkazů (JSON Ref[]), např. points=[{"kind":"xyz","p":[0,0,10]}] · nepovinné – více poloh (odkazy na body) · text: v x1 y1 [z1] v x2 y2 [z2] (souřadnice; bez z = na povrchu tělesa)
+ • dirDef – směr (JSON Direction), např. dirDef={"kind":"vector","v":[0,0,-1]} · nepovinné – osa díry libovolným směrem – má přednost před axis · text: směr vx vy vz | sklon úhel
+ • tipAngle – číslo [°], např. tipAngle=12,5 · nepovinné – úhel špičky vrtáku slepé díry 60–170° (výchozí 118), 180 = ploché dno; jiná hodnota: text / prvek / upravit = chyba, starší JSON = varování a oříznutí · text: hrot N | dno ploché
+ • fit – výčet fine|medium|coarse · nepovinné – řada průchozích děr ISO 273 (informativní) · jen prvek / upravit / JSON
+společná pole: name (název), suppressed (potlačit ano/ne), body (cílové těleso)
+hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě
+příklad: prvek hole diameter=10 depth=12 position=20;30;20 tipAngle=180
+Pružina (spring) – pole pro „prvek spring klíč=hodnota“ i „upravit <prvek> klíč=hodnota“:
+textový příkaz: pružina D stoupání P závity N|délka L drát d [v x y z | na …] [osa …] [odebrat|průnik|nové]
+ • radius – číslo [mm], např. radius=12,5 · povinné – poloměr osy drátu (text zadává průměr D) · text: pružina D
+ • pitch – číslo [mm], např. pitch=12,5 · povinné – stoupání · text: stoupání P
+ • turns – číslo, např. turns=12,5 · povinné – počet závitů · text: závity N | délka L
+ • wire – číslo [mm], např. wire=12,5 · povinné – průměr drátu · text: drát d
+ • position – vektor x;y;z [mm], např. position=0;0;20 · povinné – začátek osy · text: v x y z
+ • axis – výčet X|Y|Z · povinné – osa (globální X / Y / Z) · text: osa X|Y|Z
+ • mode – výčet new|add|cut|intersect · povinné – booleovská operace: nové těleso / přidat / odebrat / průnik · text: přidat|odebrat|průnik|nové
+ • positionRef – odkaz na bod (JSON Ref), např. positionRef={"kind":"vertex","index":2} · nepovinné – poloha odkazem (vrchol, střed hrany, střed kružnice, střed plochy, pomocný bod…) – má přednost před position · text: na V3 | na střed hrany E2 | na střed kružnice E5 | na střed plochy F3 | na bod "Bod 1" | na mezi V1 V5
+ • dirDef – směr (JSON Direction), např. dirDef={"kind":"vector","v":[0,0,-1]} · nepovinné – osa libovolným směrem – má přednost před axis · text: osa -Z | osa 1 0 1 | osa hrana E3 | osa plocha F2 | osa "Osa 1" | osa body V1 V5
+společná pole: name (název), suppressed (potlačit ano/ne), body (cílové těleso)
+hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě
+prvek nápověda <typ> vypíše všechna pole typu pro „prvek <typ> klíč=hodnota“ (typ i slovem příkazu: díra, kužel, pružina; rozšíření id # popiskem). Přehled – textový příkaz · pole jen přes prvek / upravit / JSON:
+ • sketch (Skica): text ✓ · vše textem
+ • extrude (Vysunutí): text ✓ · jen prvek: extent2, from, thin, twist, endScale, outerOnly
+ • revolve (Rotace): text ✓ · jen prvek: angle2, thin
+ • box (Kvádr): text ✓ · vše textem
+ • cylinder (Válec): text ✓ · vše textem
+ • sphere (Koule): text ✓ · vše textem
+ • cone (Kužel): text ✓ · vše textem
+ • tube (Trubka): text ✓ · vše textem
+ • hole (Díra): text ✓ · jen prvek: fit
+ • fillet (Zaoblení): text ✓ · jen prvek: radii, radii2, faces, faces2, faceRefs, faceRefs2, faceRefsMid, tangentChain
+ • chamfer (Sražení): text ✓ · jen prvek: d3, vertices, vertexRefs, tangentChain
+ • shell (Skořepina): text ✓ · jen prvek: thicknesses, outward
+ • pattern (Pole): text ✓ · jen prvek: skip, spacingMode, stagger, geometryOnly, featureIds, symmetric, equalSpacing, radial, sketchId, align, margin, layout
+ • mirror (Zrcadlení): text ✓ · jen prvek: keepOriginal, featureIds
+ • import (Import): bez textového příkazu · jen prvek: fileName, format, data
+ • sweep (Tažení): bez textového příkazu · jen prvek: profileId, pathId, mode, frenet, guideId, twist, twistTurns, thin, circleRadius, keepNormal, transition, scaleEnd
+ • loft (Šablonování): bez textového příkazu · jen prvek: sketchIds, ruled, mode, guideIds, centerlineId, closed, smooth, startCond, endCond, startDir, endDir, startLen, endLen, thin, startPoint, endPoint
+ • draft (Úkos): text ✓ · jen prvek: planeDef, tangentChain
+ • split (Rozříznutí): bez textového příkazu · jen prvek: plane, offset, keep, planeDef, faceRef
+ • transform (Přesun): bez textového příkazu · jen prvek: translate, rotateAxis, rotateAngle, scale, translateRef, rotateAxisDef, centerRef
+ • datum (Rovina): bez textového příkazu · jen prvek: origin, normal, xDir, size, planeDef
+ • text (Text): text ✓ · jen prvek: positionRef, planeDef
+ • pushPull (Vytáhnout): bez textového příkazu · jen prvek: faces, distance, extent
+ • deleteFace (Odstranit plochu): bez textového příkazu · jen prvek: faces
+ • offsetFace (Odsadit plochu): bez textového příkazu · jen prvek: faces, distance
+ • rib (Žebro): bez textového příkazu · jen prvek: sketchId, thickness, direction, flip
+ • spring (Pružina): text ✓ · vše textem
+ • thicken (Zesílení): bez textového příkazu · jen prvek: faces, thickness, mode
+ • thread (Závit): text ✓ · vše textem
+ • ext (Prvek): text ✓ · vše textem
+ • combine (Sloučení): text ✓ · vše textem
+ • splitBodies (Rozdělení): text ✓ · jen prvek: planeDef
+ • copyBody (Kopie tělesa): text ✓ · vše textem
+ • datumAxis (Osa): bez textového příkazu · jen prvek: def, length
+ • datumPoint (Bod): bez textového příkazu · jen prvek: ref
+ • csys (Souřadný systém): bez textového příkazu · jen prvek: origin, xDir, zDir, size
+rozšíření (68): prvek nápověda <id> – např. prvek nápověda sheet.bend
+společná pole všech prvků: name, suppressed, body
+
+Dokument: „Nový díl“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)

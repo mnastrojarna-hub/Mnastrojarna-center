@@ -1,0 +1,8 @@
+# zpět v novém dokumentu a v dalším běhu
+nový díl Z
+kvádr 10 10 10
+zpět
+kvádr 3 3 3
+#--- run
+zpět
+stav

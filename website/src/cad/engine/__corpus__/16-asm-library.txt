@@ -1,0 +1,9 @@
+# normálie vložená do sestavy jako komponenta (op library v sestavě)
+nový díl Podložka
+trubka 30 10 3
+#--- run
+nová sestava Normálie
+vložit "Podložka" ukotvit
+normálie M8x30 v 0 0 3
+normálie ložisko 6204 v 50 0 0
+sestava

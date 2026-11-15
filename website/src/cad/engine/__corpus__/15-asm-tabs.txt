@@ -1,0 +1,14 @@
+# záložky (AsmEnv.tabs → ws.tabs / activate / close)
+nový díl Alfa
+kvádr 10 10 10
+nový díl Beta
+válec 10 10
+#--- run
+záložky
+záložka "Alfa"
+kvádr 5 5 5 v 0 0 10
+záložky
+#--- run
+zavřít záložku "Beta"
+záložky
+stav

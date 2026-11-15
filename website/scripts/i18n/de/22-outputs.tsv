@@ -1,0 +1,28 @@
+# Balík B3 outputs (vlna 14): výstupy textem v prohlížeči i v CLI – engine/files.ts, engine/ops/out.ts, engine/share-out.ts
+{0} kusovník	{0} Stückliste
+✓ {0}: {1} · {2} · {3} – jako base64 v protokolu ({4} znaků)	✓ {0}: {1} · {2} · {3} – als Base64 im Protokoll ({4} Zeichen)
+krátký odkaz se nepodařil – použit dlouhý odkaz ({0} znaků{1}): {2}	Kurzlink fehlgeschlagen – langer Link verwendet ({0} Zeichen{1}): {2}
+, prohlížeč agenta v cloudu přijme nejvýš {0}	, der Browser eines Cloud-Agenten akzeptiert höchstens {0}
+úložiště krátkých odkazů neodpovídá ({0})	der Kurzlink-Speicher antwortet nicht ({0})
+výkres export png	zeichnung export png
+„dokument“ = všechny listy všech výkresů a u sestavy i výkresy dílů z komponent (každý díl jednou) v jednom PDF, stejné jako --formats auto v CLI; „base64“ za uložit / export / výkres export / skica export = soubor se nestáhne, obsah jde do protokolu (řádek BASE64, nejvýš 2 MB); „odkaz“ = soubor zašifrovaný v úložišti odkazů, protokol vypíše odkaz na stránku ke stažení; „sdílet úložiště“ = jen krátký odkaz (nedostupné úložiště = ✗), „nebo odkaz“ = jinak dlouhý odkaz s ⚠	„dokument“ = alle Blätter aller Zeichnungen und bei einer Baugruppe auch die in den Komponenten gespeicherten Teilezeichnungen (jedes Teil einmal) in einem PDF, wie --formats auto in der CLI; „base64“ nach speichern / exportieren / zeichnung export / skizze export = die Datei wird nicht heruntergeladen, ihr Inhalt kommt ins Protokoll (Zeile BASE64, höchstens 2 MB); „link“ = die Datei verschlüsselt im Link-Speicher, das Protokoll gibt einen Link auf eine Download-Seite aus; „freigeben speicher“ = nur Kurzlink (Speicher nicht erreichbar = ✗), „oder link“ = sonst langer Link mit ⚠
+úložiště krátkých odkazů není nastavené	der Kurzlink-Speicher ist nicht eingerichtet
+✓ {0}: {1} · {2} · {3} – v úložišti, odkaz ke stažení platí do {4}	✓ {0}: {1} · {2} · {3} – im Speicher, Download-Link gültig bis {4}
+Soubor je pro úložiště odkazů příliš velký: {0} B po kompresi a zašifrování, limit {1} B.	Die Datei ist für den Link-Speicher zu groß: {0} B nach Komprimierung und Verschlüsselung, Grenze {1} B.
+Odkaz nevede na sdílený soubor.	Der Link führt nicht zu einer freigegebenen Datei.
+Sdílený soubor je poškozený (otisk nesouhlasí).	Die freigegebene Datei ist beschädigt (Prüfsumme stimmt nicht).
+#!dynamic – texty kódů protokolu balíku outputs (src/cad/engine/codes.ts, překlad za běhu tr(def.key))
+úložiště krátkých odkazů není dostupné: {0}	der Kurzlink-Speicher ist nicht verfügbar: {0}
+odkaz má {0} znaků – prohlížeč agenta v cloudu přijme nejvýš 4096; krátký odkaz dá „sdílet úložiště“	der Link hat {0} Zeichen – der Browser eines Cloud-Agenten akzeptiert höchstens 4096; „freigeben speicher“ ergibt einen Kurzlink
+kontrola souboru: {0}	Dateiprüfung: {0}
+výstup {0} není k dispozici: {1}	Ausgabe {0} ist nicht verfügbar: {1}
+soubor „{0}“ má {1} B – jako base64 do protokolu nejvýš {2} B (soubor zapište bez „base64“)	Datei „{0}“ hat {1} B – als Base64 ins Protokoll höchstens {2} B (Datei ohne „base64“ schreiben)
+projekt odkazuje na importované soubory bez dat: {0} – tyto prvky se nepostaví	das Projekt verweist auf importierte Dateien ohne Daten: {0} – diese Features werden nicht erstellt
+dokument zatím nemá výkres – exportuje se výchozí list (vlastní list: „výkres A3 …“ a „kótovat“)	das Dokument hat noch keine Zeichnung – das Standardblatt wird exportiert (eigenes Blatt: „zeichnung A3 …“ und „bemaßen“)
+# B3 – opravy po recenzi
+platnost odkazu zkrácena na {0} dní – úložiště dovolí nejvýš {0} (zadáno {1})	Gültigkeit des Links auf {0} Tage gekürzt – der Speicher erlaubt höchstens {0} (angefordert {1})
+odkaz v úložišti musí mít omezenou platnost 1–{0} dní – zadejte „dní N“, nebo dlouhý odkaz „sdílet odkazem bez omezení“	ein Link im Speicher braucht eine begrenzte Gültigkeit von 1–{0} Tagen – „tage N“ angeben, oder ein langer Link „freigeben inline unbegrenzt“
+Úložiště sdílení neodpovídá – nahrávání nedoběhlo do {0} s.	Der Freigabespeicher antwortet nicht – der Upload wurde nicht innerhalb von {0} s abgeschlossen.
+bez omezení platnosti nemůže být odkaz v úložišti	ein Link ohne Gültigkeitsgrenze kann nicht im Speicher liegen
+výkres export: „{0}“ je 2D výkres – exportuje se příkazem „2d export dxf“ nebo „2d export dwg“	Zeichnung Export: „{0}“ ist eine 2D-Zeichnung – Export mit „2d export dxf“ oder „2d export dwg“
+. Data opouštějí prohlížeč jen u „sdílet“ a výstupů „… odkaz“: dokument nebo soubor se v prohlížeči zašifruje a nahraje do úložiště odkazů, klíč je jen v odkazu.	. Daten verlassen den Browser nur bei „freigeben“ und Ausgaben „… link“: Dokument oder Datei werden im Browser verschlüsselt und in den Link-Speicher hochgeladen; der Schlüssel steht nur im Link.

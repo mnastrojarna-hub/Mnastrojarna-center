@@ -42,7 +42,7 @@ import type {
   DwgTextEntity,
   LibreDwgEx,
 } from "@mlightcad/libredwg-web";
-import { aciColor, insunitsToMm, plainText, trueColor, type DrawColor, type DrawEntity, type DrawLayer, type Drawing2D, type Pt } from "../drawing2d";
+import { aciColor, insunitsToMm, plainText, runGrouped, trueColor, type DrawGroup, type DrawColor, type DrawEntity, type DrawLayer, type Drawing2D, type Pt } from "../drawing2d";
 import { ModelImportError } from "../types";
 import {
   detectDecimalSeparator, dimFallbackGeometry, dimTextFrame, dimTextHeight, dimValueText, mergeDimStyle, readableAngle, resolveDimText,
@@ -547,7 +547,8 @@ export function dwgDatabaseToDrawing(db: DwgDatabase, opts: DwgConvertOptions = 
   const model = blocksUpper.get("*MODEL_SPACE");
   const modelEntities: DwgEntity[] = model ? model.entities ?? [] : (db.entities ?? []).filter((e) => !e.isInPaperSpace);
   if (model) noteDropped(ctx, model.name);
-  emitAll(ctx, modelEntities, root);
+  const groups: DrawGroup[] = [];
+  emitTop(ctx, modelEntities, root, groups);
 
   const warnings: string[] = [];
   if (ctx.out.length === 0 && !ctx.limitHit) {
@@ -556,7 +557,7 @@ export function dwgDatabaseToDrawing(db: DwgDatabase, opts: DwgConvertOptions = 
     const paperEntities = (paper?.entities ?? []).filter((e) => e.type !== "VIEWPORT");
     if (paperEntities.length) {
       if (paper) noteDropped(ctx, paper.name);
-      emitAll(ctx, paperEntities, root);
+      emitTop(ctx, paperEntities, root, groups);
       if (ctx.out.length) warnings.push("Modelový prostor je prázdný — zobrazuje se rozvržení (paper space) bez obsahu výřezů.");
     }
   }
@@ -589,7 +590,21 @@ export function dwgDatabaseToDrawing(db: DwgDatabase, opts: DwgConvertOptions = 
   for (const name of used) if (!layerColors.has(name)) layers.push({ name, color: "fg" });
 
   const version = opts.version || (typeof db.header?.ACADVER === "string" ? db.header.ACADVER : "");
-  return { layers, entities: ctx.out, format: version ? `DWG (${version})` : "DWG", warnings };
+  return { layers, entities: ctx.out, format: version ? `DWG (${version})` : "DWG", warnings, groups };
+}
+
+/** Prvky nejvyšší úrovně: blok / kóta / šrafa / odkaz = jedna skupina (výběr oknem). */
+function emitTop(ctx: Ctx, entities: DwgEntity[], env: Env, groups: DrawGroup[]): void {
+  for (const e of entities) {
+    if (ctx.limitHit) return;
+    const type = String(e?.type ?? "");
+    const name = type === "INSERT" ? String((e as DwgInsertEntity).name ?? "") || undefined : undefined;
+    try {
+      runGrouped(ctx, groups, type, name, () => emit(ctx, e, env));
+    } catch {
+      ctx.broken++;
+    }
+  }
 }
 
 function emitAll(ctx: Ctx, entities: DwgEntity[], env: Env): void {

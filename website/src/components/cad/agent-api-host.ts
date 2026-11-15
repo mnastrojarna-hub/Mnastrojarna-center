@@ -44,8 +44,8 @@ import { applyShrinkage, coolingCircuit, defaultCooling, draftAnalysis, ejectorH
 import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { ejectorPin, emptyAssembly, partComponent } from "@/cad/assembly";
 import { prepareImport } from "@/cad/formats/import";
-import { b64ToBytes, bytesToB64, dataBytes, internBlobs } from "@/cad/blobs";
-import { attachedFiles } from "@/cad/attached-files";
+import { b64ToBytes, dataBytes, internBlobs } from "@/cad/blobs";
+import { appAttachments, attachBytes, type AttachInput } from "@/cad/engine/attachments";
 import { referenceStore } from "@/cad/reference/store";
 import { parseReferenceLine } from "@/cad/reference/parse";
 import { createShareLink, shareMessage, SHARE_DEFAULT_DAYS } from "@/cad/share";
@@ -807,6 +807,23 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
     importFile: (file, opts) => importFile(host, file, opts),
     screenshot: (opts) => screenshot(host, opts),
     compare: (ref, opts) => compare(host(), ref, opts),
+    // připojené soubory textových příkazů (jedno úložiště engine/attachments.ts: porovnat, otevřít, předloha, logo razítka):
+    // attach({ name, base64 | text | data }) → seznam připojených; attach("název", base64 | data URL | bajty, mime?) → soubor
+    attach: ((a: AttachInput | string, data?: string | Uint8Array, mime?: string) => {
+      if (typeof a !== "string") {
+        appAttachments.add(a?.name, attachBytes(a), "base64" in a ? /^data:([^;,]+)/.exec(a.base64)?.[1] : undefined);
+        return appAttachments.entries();
+      }
+      const bytes = typeof data === "string" ? b64ToBytes(data.replace(/^data:[^,]*,/, "")) : (data ?? new Uint8Array(0));
+      const m = mime || (typeof data === "string" ? /^data:([^;,]+)/.exec(data)?.[1] : undefined) || "application/octet-stream";
+      return appAttachments.add(a, bytes, m);
+    }) as MncadApi["attach"],
+    attachments: () => appAttachments.entries(),
+    detach: (name) => {
+      if (name === undefined) appAttachments.clear();
+      else appAttachments.remove(name);
+      return appAttachments.entries();
+    },
     share: (opts) => share(host(), opts),
     // uložené nastavení (loadSettings drží poslední uložené hned, bez čekání na vykreslení; dočasný styl snímku se neuloží)
     settings: () => ({ ...loadSettings() }),
@@ -831,12 +848,6 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
       return saveProjectFile(h.doc(), name, h);
     },
     script: async (opts) => (await scriptOfDoc(host().doc(), opts)).text,
-    attach: (name, data, mime) => {
-      const bytes = typeof data === "string" ? b64ToBytes(data.replace(/^data:[^,]*,/, "")) : data;
-      const m = mime || (typeof data === "string" ? /^data:([^;,]+)/.exec(data)?.[1] : undefined) || "application/octet-stream";
-      const f = attachedFiles.add({ name, mime: m, dataUrl: `data:${m};base64,${bytesToB64(bytes)}`, bytes: bytes.length });
-      return { name: f.name, bytes: f.bytes };
-    },
     reference: async (cmd) => {
       const c = (cmd ?? "").trim();
       // celý příkaz předlohy (i „kontrola kót“, „porovnat s předlohou …“, „Maßprüfung“) beze změny, jinak za slovo předloha

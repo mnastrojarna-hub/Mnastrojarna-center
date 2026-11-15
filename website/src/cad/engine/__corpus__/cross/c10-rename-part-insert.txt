@@ -1,0 +1,11 @@
+# vložit díl podle nového názvu (záložka přejmenovaná v dřívějším běhu)
+nový díl A
+kvádr 1 1 1
+#--- run
+název "B"
+#--- run
+nová sestava S
+vložit "B"
+vložit "A"
+#--- run
+záložky

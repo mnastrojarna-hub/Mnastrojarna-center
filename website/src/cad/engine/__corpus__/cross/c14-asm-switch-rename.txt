@@ -1,0 +1,23 @@
+# dvě sestavy, kolize a vazby v každé zvlášť, přejmenování a přepínání záložek
+nový díl Deska
+kvádr 80 60 10
+díra 10,5 skrz v 40 30
+nový díl Čep
+válec 10 30
+nová sestava A
+vložit "Deska" ukotvit
+vložit "Čep" v 100 0 0
+sestava vazba souosost "Čep" Ø10 "Deska" Ø10,5
+kolize
+nová sestava B
+vložit "Deska" ukotvit
+vložit "Deska" v 40 0 0
+#--- run
+kolize
+název "B2"
+#--- run
+záložka "A"
+stav
+#--- run
+záložka "B2"
+stav

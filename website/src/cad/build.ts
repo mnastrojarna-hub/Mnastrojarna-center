@@ -3,6 +3,7 @@
  * Běží ve web workeru (prohlížeč) i v Node (testy). Předpokládá zavolané setOC().
  */
 import { tr } from "./i18n";
+import { hostFont } from "./host-assets";
 import * as r from "replicad";
 import { DEFAULT_BODY, isNewBodyMode, nextBodyName } from "./bodies";
 import "./fastbox";
@@ -350,6 +351,8 @@ export async function registerTextFont(data: ArrayBuffer | string) {
 function ensureFont(): Promise<void> {
   if (!fontReady) {
     fontReady = (async () => {
+      const own = hostFont("Roboto-Bold.ttf"); // písmo od hostitele (CLI), jinak z webu
+      if (own) return void (await r.loadFont(await own, FONT_FAMILY, true));
       if (typeof fetch !== "function" || typeof location === "undefined") throw new Error("no fetch");
       const res = await fetch(new URL("/fonts/Roboto-Bold.ttf", location.origin).toString());
       if (!res.ok) throw new Error("font");
@@ -1380,6 +1383,7 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
   for (let i = 2; i < edgeGroups.length; i += 3) edgeGroups[i] = edgeIndex.get(edgeGroups[i]) ?? -1;
   let volume = 0;
   let area = 0;
+  let volumeFailed = false;
   let bb: [Vec3, Vec3];
   if (big) {
     const mm = meshMetrics(m.vertices, m.triangles);
@@ -1391,7 +1395,7 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
       volume = r.measureVolume(body);
       area = r.measureArea(body);
     } catch {
-      /* otevřené těleso */
+      volumeFailed = true; // otevřené těleso – objem 0 se v protokolu ohlásí (⚠ geom.volume-failed)
     }
     bb = body.boundingBox.bounds as [Vec3, Vec3];
   }
@@ -1413,7 +1417,7 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
     body,
     ms: Date.now() - t0,
     mesh: { vertices: m.vertices, normals: m.normals, triangles: m.triangles, faceGroups, lines: m.lines, edgeGroups },
-    metrics: { volume, area, bbox: bb, faces: faces.length, edges: edges.length, valid, solids },
+    metrics: { volume, area, bbox: bb, faces: faces.length, edges: edges.length, valid, solids, ...(big ? { approx: true } : {}), ...(volumeFailed ? { volumeFailed: true } : {}) },
     vertices: safeVertices(body),
   };
 }

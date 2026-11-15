@@ -672,6 +672,20 @@ export type MncadApiExt = {
   screenshot: (opts?: ScreenshotOptions) => Promise<Screenshot>;
   /** porovnání s referenčním modelem (STEP / BREP / IGES / STL…) – text, CSV a seznam rozdílových oblastí */
   compare: (ref: { name: string; base64: string }, opts?: CompareApiOptions) => Promise<CompareApiResult>;
+  /**
+   * připojí soubor pro textové příkazy, které berou soubor podle názvu (`porovnat "ref.step"`, `otevřít "díl.mncad"`,
+   * `předloha "výkres.dwg"`, logo razítka) – jako tlačítko „Připojit soubor…“ v konzoli; stejný název nahradí předchozí.
+   * Jen paměť stránky (po obnovení připojit znovu). Dva zápisy: `attach({ name, base64 | text | data })` vrátí všechny
+   * připojené soubory; `attach("název", base64 | data URL | bajty, mime?)` vrátí připojený soubor.
+   */
+  attach: {
+    (file: { name: string; base64: string } | { name: string; text: string } | { name: string; data: Uint8Array | ArrayBuffer }): { name: string; bytes: number }[];
+    (name: string, data: string | Uint8Array, mime?: string): { name: string; bytes: number };
+  };
+  /** přiložené soubory (název, velikost) */
+  attachments: () => { name: string; bytes: number }[];
+  /** odebere přiložený soubor (bez názvu všechny); vrátí zbylé */
+  detach: (name?: string) => { name: string; bytes: number }[];
   /** sdílený odkaz (jako tlačítko Sdílet odkazem) */
   share: (opts?: ShareApiOptions) => Promise<ShareApiResult>;
   /** platné nastavení */
@@ -686,8 +700,6 @@ export type MncadApiExt = {
   clearSelection: () => void;
   /** spustí akci rozšíření (Rozvin → DXF, Tabulka ohybů, Kusovník řezů, Tloušťka stěn, export skici DXF…) a vrátí text a soubory */
   action: (id: string) => Promise<{ log: string; files: CapturedFile[] }>;
-  /** připojí soubor pro příkazy, které berou soubor podle názvu (předloha "výkres.dwg", logo razítka) – jako tlačítko konzole „Připojit soubor…“; data = base64, data URL nebo bajty */
-  attach: (name: string, data: string | Uint8Array, mime?: string) => { name: string; bytes: number };
   /** předloha: `předloha …` (bez textu = stav), `porovnat předloha …`, `kontrola kót …` → protokol a strukturovaný výsledek (výtah, porovnání se SVG, kontrola kót) */
   reference: (cmd?: string) => Promise<{ log: string; data: unknown }>;
 };

@@ -4,7 +4,6 @@
   ✓ kontrola: projekt jde znovu otevřít – „{0}“, {1} {2}	  ✓ Prüfung: Projekt lässt sich wieder öffnen – „{0}“, {1} {2}
 {0} – „{1}“ ({2}), platí do: {3}, {4}, {5} {6}	{0} – „{1}“ ({2}), gültig bis: {3}, {4}, {5} {6}
 {0}, {1} entit	{0}, {1} Elemente
-⚠ dokument zatím nemá výkres – exportuje se výchozí list (pro vlastní list nejdřív „výkres A3 …“ a „kótovat“)	⚠ das Dokument hat noch keine Zeichnung – das Standardblatt wird exportiert (für ein eigenes Blatt zuerst „zeichnung A3 …“ und „bemaßen“)
 ⚠ kontrola {0}: soubor se od modelu liší – {1}; zkontrolujte prvky s ⚠ / ✗ (stav) a export zopakujte	⚠ {0}-Prüfung: die Datei weicht vom Modell ab – {1}; Elemente mit ⚠ / ✗ prüfen (status) und Export wiederholen
 ✓ {0}: {1} · {2} · {3} – staženo (bez dialogu)	✓ {0}: {1} · {2} · {3} – heruntergeladen (ohne Dialog)
 ✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu	✓ {0}-Prüfung: Datei vom Kern neu eingelesen – {1}Volumen {2} (Differenz {3} %), Hüllquader {4} mm (Abweichung {5} mm) → originalgetreue Kopie des Modells

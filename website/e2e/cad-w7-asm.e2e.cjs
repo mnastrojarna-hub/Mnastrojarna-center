@@ -179,7 +179,8 @@ sestava vazba závěs "Kolo2" Ø8,2 "Držák" Ø8`);
   // ── 4. text / API: klikový mechanismus – motor, kolize, stopa; přesnost vůči vzorci ──
   log = await run(p, 'pohyb motor rotační "Klika" 0..360 krok 10 kolize stopa "Ojnice" bod 30 0 14');
   ok(!bad(log).length && /✓ motor 2: rotační motor · Závěs „Klika“ → „Rám“ · 0…360°/.test(log), 'text: pohyb motor rotační "Klika" 0..360 krok 10 kolize stopa – motor 2 na Závěsu klika → rám\n' + (bad(log).join('\n') || line(log, /^✓ motor[^\n]*/m)));
-  ok(/⚠ první kolize v kroku 14 \(t = 0,778 s\): „(Píst|Doraz)“ × „(Píst|Doraz)“/.test(log), 'kolize v krocích: první v kroku 14 (140°) píst × doraz\n' + line(log, /^.*kolize[^\n]*/m));
+  // kolize v pohybu podle tříd (balík B4): souhrn studie + ⚠ clash.real na každou dvojici dílů s prvním krokem
+  ok(/Kolize v pohybu: kroků s kolizí \d+ z 37 · .*skutečné: \d+ dvojic dílů v \d+ krocích, první v kroku 14/.test(log) && /⚠ řádek 1: v pohybu „(Doraz|Píst)“ × „(Doraz|Píst)“ od kroku 14 \(t = 0,778 s\)/.test(log), 'kolize v krocích: první v kroku 14 (140°) píst × doraz\n' + line(log, /^Kolize v pohybu[^\n]*/m) + '\n' + line(log, /^⚠ řádek 1: v pohybu[^\n]*/m));
   const api = await p.evaluate(() => window.mncad.motion());
   let worst = 0;
   for (const s of api.steps) worst = Math.max(worst, Math.abs(s.comps['Píst'].position[0] - slider(s.motors[1])), Math.abs(s.comps['Píst'].position[1]));

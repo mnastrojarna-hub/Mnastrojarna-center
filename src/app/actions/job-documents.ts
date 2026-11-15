@@ -821,10 +821,38 @@ export interface DocumentDraft {
   kind: DocumentEmailKind;
 }
 
+/**
+ * Komu by doklad šel (podle karty zákazníka a kontaktu zakázky) — dialog potvrzení to ukáže už před vystavením PDF
+ * („na vojcikova@… — Nákupní e-mail zákazníka (objednávky)"). Nic nevystaví ani neuloží.
+ */
+export async function previewDocumentRecipient(
+  jobId: string,
+  kind: "potvrzeni" | "nabidka" | "dodaci_list" | "faktura",
+): Promise<ActionResult<{ to: string; cc: string; reason: string }>> {
+  if (!isUuid(jobId)) return fail(NOT_FOUND);
+  if (!["potvrzeni", "nabidka", "dodaci_list", "faktura"].includes(kind)) return fail("Neznámý doklad.");
+  const c = await begin();
+  if ("error" in c) return fail(c.error);
+  try {
+    const job = await getJob(jobId);
+    if (!job) return fail(NOT_FOUND);
+    const pick = await recipientsFor(c.db, kind, { customerId: job.customer?.id ?? null }, {
+      email: job.customerContactEmail, name: job.customerContact,
+    });
+    const to = pick.to[0] ?? firstEmail(job.customerContactEmail, job.customerDetail?.email) ?? "";
+    const reason = pick.to.length ? pick.reason : to ? (job.customerContactEmail ? "Kontaktní osoba zakázky" : "E-mail zákazníka") : "";
+    return { ok: true, to, cc: pick.cc.filter((e) => e !== to).join(", "), reason };
+  } catch (err) {
+    return fail(err);
+  }
+}
+
 /** Výchozí předmět a text e-mailu k dokladu (zákazník, čísla, termín). */
 export async function draftJobDocumentEmail(
   jobId: string,
   fileId: string,
+  /** to: text pro jiného adresáta (uživatel změnil Komu) — jeho tykání / vykání a oslovení. */
+  opts: { to?: string | null } = {},
 ): Promise<ActionResult<DocumentDraft>> {
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   if (!isUuid(fileId)) return fail(FILE_NOT_FOUND);
@@ -841,7 +869,7 @@ export async function draftJobDocumentEmail(
     if (file.kind === "faktura" && file.issuer !== "dodavatel" && !(await canInvoice())) return fail(INVOICE_NO_RIGHT);
     if (file.locked === "price") return fail(FILE_PRICE_SEND);
     const kind: DocumentEmailKind = isDocumentEmailKind(file.kind) ? file.kind : "ostatni";
-    return await composeDocumentEmail(db, user, job, kind, file);
+    return await composeDocumentEmail(db, user, job, kind, file, undefined, opts?.to);
   } catch (err) {
     return fail(err);
   }
@@ -854,6 +882,8 @@ export async function draftJobDocumentEmail(
  */
 export async function draftInvoiceEmail(
   jobId: string,
+  /** to: text pro jiného adresáta (uživatel změnil Komu). */
+  opts: { to?: string | null } = {},
 ): Promise<ActionResult<{
   to: string; cc: string; recipientReason: string; subject: string; body: string; filename: string; kind: DocumentEmailKind; unpriced: number;
   existing: { fileId: string; filename: string; number: string } | null; code: "rights" | "delivery" | "invoiced";
@@ -873,7 +903,7 @@ export async function draftInvoiceEmail(
       const file = job.files.find((f) => f.id === plan.file.fileId);
       const draft = await composeDocumentEmail(c.db, c.user, job, "faktura", {
         filename: plan.file.filename, quoteId: null, createdAt: file?.createdAt ?? new Date().toISOString(),
-      });
+      }, undefined, opts?.to);
       if (!draft.ok) return draft;
       return { ...draft, unpriced: 0, existing: { fileId: plan.file.fileId, filename: plan.file.filename, number: plan.number } };
     }
@@ -884,7 +914,7 @@ export async function draftInvoiceEmail(
     const reserved = plan.reserved;
     const draft = await composeDocumentEmail(c.db, c.user, job, "faktura", {
       filename: pdfFileName("faktura", reserved ?? "FV"), quoteId: null, createdAt: new Date().toISOString(),
-    }, reserved ? undefined : { invoiceNumber: INVOICE_NUMBER_PLACEHOLDER, variableSymbol: INVOICE_VS_PLACEHOLDER });
+    }, reserved ? undefined : { invoiceNumber: INVOICE_NUMBER_PLACEHOLDER, variableSymbol: INVOICE_VS_PLACEHOLDER }, opts?.to);
     if (!draft.ok) return draft;
     // „PDF s QR": bez bankovního účtu / IBANu v Nastavení varovat PŘED vystavením (COMPANY načetl compose)
     const bankWarning = invoiceBankWarning({ accountNumber: COMPANY.bank.accountNumber, iban: COMPANY.bank.iban }, job.currency || "CZK");
@@ -904,6 +934,8 @@ export async function draftInvoiceEmail(
 export async function draftQuoteEmail(
   jobId: string,
   quoteId: string,
+  /** to: text pro jiného adresáta (uživatel změnil Komu). */
+  opts: { to?: string | null } = {},
 ): Promise<ActionResult<DocumentDraft>> {
   if (!isUuid(jobId)) return fail(NOT_FOUND);
   if (!isUuid(quoteId)) return fail("Nabídka nenalezena.");
@@ -916,7 +948,7 @@ export async function draftQuoteEmail(
     if (!quote) return fail("Nabídka k této zakázce nepatří.");
     return await composeDocumentEmail(c.db, c.user, job, "nabidka", {
       filename: pdfFileName("nabidka", quote.number), quoteId: quote.id, createdAt: new Date().toISOString(),
-    });
+    }, undefined, opts?.to);
   } catch (err) {
     return fail(err);
   }
@@ -952,6 +984,8 @@ async function composeDocumentEmail(
   file: { filename: string; quoteId: string | null; createdAt: string },
   /** Faktura před vystavením: značky místo čísla a VS (přidělí se až při vystavení). */
   invoicePending?: { invoiceNumber: string; variableSymbol: string },
+  /** Text pro adresáta, kterého uživatel vybral v Komu (jinak podle pravidel karty zákazníka). */
+  recipient?: string | null,
 ): Promise<ActionResult<DocumentDraft>> {
   await refreshCompanyFromSettings();
   const [{ data: me }, signatureText] = await Promise.all([
@@ -1034,6 +1068,9 @@ async function composeDocumentEmail(
   if (!to && !pick.to.length) reason = "";
   if (to && !pick.to.length) reason = job.customerContactEmail ? "Kontaktní osoba zakázky" : "E-mail zákazníka";
   to = to ?? null;
+  // uživatel změnil Komu → oslovení a tvary textu pro něj (Komu / Kopie / důvod dál podle pravidel)
+  const chosen = normEmail(recipient);
+  if (chosen) to = chosen;
 
   // tykání / vykání odesílatele s hlavním adresátem → oslovení a tvary textu
   const tone = await toneFor(db, user.id, to ? [to] : [], to && normEmail(job.customerContactEmail) === to ? job.customerContact : null).catch(() => null);

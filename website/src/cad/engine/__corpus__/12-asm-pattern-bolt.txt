@@ -1,0 +1,15 @@
+# pole komponent, komponenta (posun, barva, číslo), šroub do díry (op asm)
+nový díl Deska
+kvádr 80 60 10
+díra 9 skrz v 20 15
+nový díl Kolík
+válec 8 20
+#--- run
+nová sestava Spoj
+vložit "Deska" ukotvit
+vložit "Kolík" v 60 30 10
+#--- run
+sestava pole "Kolík" 3 rozteč 10 směr Y
+sestava komponenta "Kolík (3)" posun 0 0 5 barva #e03930 číslo "K-3"
+sestava šroub "Deska" Ø9 matice
+sestava

@@ -204,6 +204,34 @@ await test(`STEP sestava ${MB} MB: průběh po dílech, vykreslí se, počet dí
   expect(n === 2, `dva body s uchopením na velké sestavě (${n})`);
   await page.getByTestId("measure-item").first().waitFor({ timeout: 10_000 });
   expect(/mm/.test(await page.getByTestId("measure-item").first().innerText()), "měření na velké sestavě");
+  // výběr oknem (majitel 14. 11.) přes celé plátno: všechny výskyty, bez zdržení (promítnuté kvádry, ne trojúhelníky)
+  if (await page.getByTestId("viewer3d-tree").count()) await page.getByTestId("tool-tree").click();
+  await page.getByTestId("tool-box").click();
+  await page.keyboard.press("f");
+  await page.keyboard.press("-");
+  await page.waitForTimeout(500);
+  const t0 = Date.now();
+  await page.mouse.move(box.x + 4, box.y + box.height - 4);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 3 });
+  await page.mouse.move(box.x + box.width - 4, box.y + 4, { steps: 3 });
+  await page.mouse.up();
+  await page.getByTestId("viewer3d-part").waitFor({ timeout: 10_000 });
+  const sel = Number(await page.getByTestId("viewer3d-part").getAttribute("data-count"));
+  const tBox = Date.now() - t0;
+  console.log(`      výběr oknem: ${sel} dílů za ${tBox} ms`);
+  expect(sel === gen.instances, `výběr oknem přes celé plátno: ${sel} = ${gen.instances}`);
+  // křížení přes střed (zprava doleva) — upřesnění přes vrcholy jen u dílů na okraji okna
+  const t1 = Date.now();
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.4);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.5, { steps: 3 });
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.6, { steps: 3 });
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  const tCross = Date.now() - t1;
+  console.log(`      křížení uprostřed: ${await page.getByTestId("viewer3d-part").getAttribute("data-count").catch(() => "0")} dílů za ${tCross} ms`);
+  expect(tBox < 4000 && tCross < 4000, `výběr oknem rychle (${tBox} / ${tCross} ms)`);
 });
 
 await test("poškozený velký STEP: chyba se stažením místo nekonečného načítání", async () => {

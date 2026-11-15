@@ -1,0 +1,50 @@
+=== run 1 ===
+✓ nový díl „Odkazy“ – nová záložka
+→ Skica 1 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 1“ (e1)
+→ Skica 2 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 2“ (e1)
+→ Tažení 1 (sweep) přidán – výsledek po výpočtu níže
+→ Pole 1 (pattern) přidán – výsledek po výpočtu níže
+✗ řádek 7: prvek mirror: neznámý klíč „featureId“ – pole: name, suppressed, body, plane, offset, keepOriginal, planeDef, featureIds (popis: prvek nápověda mirror) ← „prvek mirror featureId="Neexistuje" plane=YZ“
+✓ Skica 1 (sketch)
+✓ Skica 2 (sketch)
+✗ Tažení 1 (sweep): Chybí skica dráhy – vyberte ji v parametrech.
+✗ Pole 1 (pattern): Není těleso.
+
+Dokument: „Odkazy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (2 ✓, 2 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)
+Prvky:
+ 1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: kružnice Ø10
+    entity: e1 kružnice Ø10 [0; 0]
+    profil: 1 uzavřený obrys (e1) ✓
+ 2. Skica 2 [sketch, id #] ✓ – rovina XZ, 1 entit: line
+    entity: e1 úsečka [0; 0]→[0; 50]
+    profil: žádný uzavřený obrys – otevřená křivka e1 (konce [0; 0] a [0; 50]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
+ 3. Tažení 1 [sweep, id #] ✗ Chybí skica dráhy – vyberte ji v parametrech. – 
+ 4. Pole 1 [pattern, id #] ✗ Není těleso. – lineární 2× po 30
+=== run 2 ===
+→ Skica 3 (sketch) přidán – výsledek po výpočtu níže
+✓ 1 entita do skici „Skica 3“ (e1)
+→ Vysunutí 1 (extrude) přidán – výsledek po výpočtu níže
+✓ Skica 3 (sketch)
+✓ Vysunutí 1 (extrude)
+✗ Tažení 1: Chybí skica dráhy – vyberte ji v parametrech.
+✗ Pole 1: Není těleso.
+
+Dokument: „Odkazy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 6 (4 ✓, 2 ✗)
+Rozměry: 10 × 10 × 5 mm (X 45…55, Y -5…5, Z 0…5) · objem 0,50 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: kružnice Ø10
+    entity: e1 kružnice Ø10 [0; 0]
+    profil: 1 uzavřený obrys (e1) ✓
+ 2. Skica 2 [sketch, id #] ✓ – rovina XZ, 1 entit: line
+    entity: e1 úsečka [0; 0]→[0; 50]
+    profil: žádný uzavřený obrys – otevřená křivka e1 (konce [0; 0] a [0; 50]); k vysunutí ji uzavřete, jako dráha nebo dělicí čára je v pořádku
+ 3. Tažení 1 [sweep, id #] ✗ Chybí skica dráhy – vyberte ji v parametrech. – 
+ 4. Pole 1 [pattern, id #] ✗ Není těleso. – lineární 2× po 30
+ 5. Skica 3 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 10×10
+    entity: e1 obdélník 10×10 [50; 0]
+    profil: 1 uzavřený obrys (e1) ✓
+ 6. Vysunutí 1 [extrude, id #] ✓ – 5 mm, add

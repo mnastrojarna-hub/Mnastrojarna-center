@@ -1,0 +1,19 @@
+=== run 1 ===
+✓ nový díl „Z“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ zpět o 1 krok(ů) (zbývá zpět 0, znovu 1)
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 2 (box)
+
+Dokument: „Nový díl“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 3 × 3 × 3 mm (X 0…3, Y 0…3, Z 0…3) · objem 0,03 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ – 3 × 3 × 3 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ zpět o 1 krok(ů) (zbývá zpět 0, znovu 1)
+
+Dokument: „Nový díl“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)
+=== tabs ===
+Nový díl

@@ -92,6 +92,21 @@ const isRefViewId = (s: string) => /^\d+\.\d+$/.test(s);
 /** příznaky vlastní předlohy na řádku (předloha / kontrola / kót / porovnat) – zbytek jsou volby */
 const isWord = (set: Set<string>) => (x: string | undefined) => set.has(fold(x ?? ""));
 
+/**
+ * Řádek patří předloze, ne kontrole / porovnání modelu (agent-check.ts): `kontrola kót …`, `porovnat [s] předlohou …`
+ * (EN `check dimensions`, `compare with reference`, DE `Maße prüfen`, `vergleichen mit Vorlage`).
+ */
+export function isReferenceLine(line: string): boolean {
+  const w = words(line.trim());
+  if (w.length < 2) return CHECK1.has(fold(w[0] ?? ""));
+  const h = fold(w[0]);
+  if (CHECK1.has(h) || (CHECK.has(h) && isWord(DIMS)(w[1])) || (DIMS.has(h) && isWord(CHECK)(w[1]))) return true;
+  if (!COMPARE.has(h)) return false;
+  let i = 1;
+  while (i < w.length && WITH.has(fold(w[i])) && !isWord(REF)(w[i])) i++;
+  return isWord(REF)(w[i]);
+}
+
 /** řádek příkazu předlohy → příkaz (null = jiný příkaz) */
 export function parseReferenceLine(line: string): RefCmd | null {
   const w = words(line.trim());

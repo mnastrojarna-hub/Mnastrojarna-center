@@ -7,8 +7,10 @@
  *    prohlížeč hledá obsah odkazu `#q=` v `<origin stránky>/cad/share/` (`selfStoreBase`).
  * 2. obal `fetch`: `/fonts/*` a `<origin>/fonts/*` čte ze složky písem vedle svazku (`pdf.ts`, `build.ts`,
  *    `feat/refs-more.ts`, `ext/advanced.ts`); vše ostatní jde na síť s hlavičkou `User-Agent: mncad/<verze>`.
- * 3. smyčka (loopback) jádra: falešný `self` pro NEZMĚNĚNÝ `cad.worker.ts` ve stejném vlákně a klient `KernelApi` se
- *    stejným protokolem zpráv jako `client.ts` (B1 ho nahradí `makeKernelClient(inProcessTransport)`).
+ * 3. paměť vlákna: velikost haldy WASM (háček `WebAssembly.Memory.prototype.grow` → sdílená paměť hlídače) a vzorek paměti.
+ *
+ * Jádro samo je od balíku B1 in-process klient `makeKernelClient(inProcessTransport())` (kernel-client.ts,
+ * kernel-inprocess.ts) – žádný falešný `self` ani worker.
  *
  * Nic dalšího se nepředstírá: `Worker`, `document` a `window` zůstávají nedefinované – co je potřebuje, skončí řádnou
  * chybou (smoke test příkladů v `mncad selftest`). Shim se instaluje jen ve vlákně běhu, nikdy v hlavním vlákně.
@@ -17,7 +19,6 @@ import fs from "node:fs";
 import path from "node:path";
 import * as r from "replicad";
 import { tr } from "../i18n";
-import type { KernelApi, KernelClient } from "../engine/kernel";
 
 export const DEFAULT_ORIGIN = "https://www.mnastrojarna.cz";
 
@@ -106,155 +107,6 @@ export function installNodeShims(o: ShimOptions): InstalledShims {
       else process.env.NEXT_PUBLIC_CAD_SHARE_SELF = prevStore;
     },
   };
-}
-
-/* ───────────────────────── smyčka jádra (loopback) ───────────────────────── */
-
-type WorkerMsg = { id?: number; ok?: boolean; result?: unknown; error?: string; progress?: unknown; perf?: unknown; fatal?: boolean; at?: number };
-type FakeSelf = { postMessage(m: WorkerMsg, transfer?: Transferable[]): void; onmessage: ((e: { data: unknown }) => unknown) | null };
-
-/** port smyčky: zprávy z `cad.worker.ts` (falešný `self.postMessage`) a doručení požadavku do `self.onmessage` */
-export type LoopbackPort = {
-  listeners: Set<(m: WorkerMsg) => void>;
-  deliver(msg: Record<string, unknown>): void;
-};
-
-/**
- * Falešný `self` (DedicatedWorkerGlobalScope) pro nezměněný `cad.worker.ts` – musí být nainstalovaný PŘED importem
- * workeru (ten při načtení nastaví `self.onmessage`). Zprávy obou směrů se kopírují `structuredClone` (s přenosem
- * bufferů) jako u skutečného `postMessage`, takže jádro a engine nesdílí objekty.
- */
-export function installLoopbackSelf(): LoopbackPort {
-  const listeners = new Set<(m: WorkerMsg) => void>();
-  const self: FakeSelf = {
-    postMessage(m, transfer) {
-      const copy = structuredClone(m, transfer?.length ? { transfer: transfer as Transferable[] } : undefined) as WorkerMsg;
-      for (const l of listeners) l(copy);
-    },
-    onmessage: null,
-  };
-  (globalThis as unknown as { self: FakeSelf }).self = self;
-  return {
-    listeners,
-    deliver(msg) {
-      if (!self.onmessage) throw new Error(tr("jádro CAD není načtené (cad.worker)"));
-      void self.onmessage({ data: structuredClone(msg) });
-    },
-  };
-}
-
-export type ProgressInfo = { op: string; phase?: string; index?: number; total?: number; name?: string };
-export type LoopbackKernel = KernelApi & {
-  /** odběr průběhu stavby (prvek k z n) */
-  onKernelProgress(fn: (p: ProgressInfo) => void): () => void;
-  /** odběr pádu jádra (WASM) – ve fázi A se jádro ve vlákně znovu spustit nedá, vlákno se ukončí (kód 4) */
-  onFatal(fn: (reason: string) => void): () => void;
-  /** názvy operací, které smyčka implementuje (test pokrytí proti `client.ts`) */
-  readonly implemented: readonly string[];
-};
-
-type Impl = { [K in keyof KernelApi]?: KernelApi[K] };
-
-/**
- * Klient jádra nad smyčkou: stejné zprávy `{ id, op, … }` jako `client.ts`, typově podle `KernelApi` (každá metoda
- * má podpis klienta). Data importů (`mnblob:`) se neposílají – jádro i engine sdílí ve vlákně jedno úložiště blobů.
- * Operace, kterou klient po sloučení vln 11–13 získá a smyčka ještě ne, vrátí srozumitelnou chybu (test `node-shims.test.ts`
- * na pokrytí hlídá rozdíl proti `client.ts`).
- */
-export function makeLoopbackKernel(port: LoopbackPort): LoopbackKernel {
-  let seq = 0;
-  let fatal: string | null = null;
-  const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; op: string }>();
-  const progressL = new Set<(p: ProgressInfo) => void>();
-  const fatalL = new Set<(reason: string) => void>();
-  port.listeners.add((m) => {
-    if (m.perf) return;
-    if (m.fatal) {
-      fatal ??= m.error || "fatal";
-      const waiting = [...pending.values()];
-      pending.clear();
-      for (const p of waiting) p.reject(new Error(fatal));
-      for (const l of fatalL) l(fatal);
-      return;
-    }
-    const p = m.id !== undefined ? pending.get(m.id) : undefined;
-    if (!p) return;
-    if (m.progress) {
-      const pr = m.progress as Omit<ProgressInfo, "op">;
-      for (const l of progressL) l({ ...pr, op: p.op });
-      return;
-    }
-    pending.delete(m.id!);
-    if (m.ok) p.resolve(m.result);
-    else p.reject(new Error(m.error || tr("Chyba CAD jádra.")));
-  });
-  function call<T>(msg: Record<string, unknown>): Promise<T> {
-    if (fatal) return Promise.reject(new Error(fatal));
-    const id = ++seq;
-    return new Promise<T>((resolve, reject) => {
-      pending.set(id, { resolve: resolve as (v: unknown) => void, reject, op: String(msg.op) });
-      try {
-        port.deliver({ id, ...msg });
-      } catch (e) {
-        pending.delete(id);
-        reject(e as Error);
-      }
-    });
-  }
-  type C = KernelClient;
-  const impl = {
-    init: () => call<void>({ op: "init" }),
-    // jádro ve vlákně počítá synchronně – zrušit ho umí jen hlídač (terminate vlákna), ne klient
-    cancel: () => false,
-    busy: () => pending.size > 0,
-    setLang: (lang) => call<void>({ op: "lang", lang }),
-    build: (doc) => call({ op: "build", doc }),
-    topology: (doc) => call({ op: "topology", doc }),
-    face: (index) => call({ op: "face", index }),
-    refInfo: (doc, ref) => call({ op: "refInfo", doc, ref }),
-    pickSigs: (doc, feature) => call({ op: "pickSigs", doc, feature }),
-    planeDef: (doc, def) => call({ op: "planeDef", doc, def }),
-    datumGfx: (doc) => call({ op: "datumGfx", doc }),
-    exportFile: (doc, format) => call({ op: "export", doc, format }),
-    exportStats: (doc, bytes, format) => call({ op: "exportStats", doc, bytes, format }),
-    faceOwner: (doc, index, point) => call({ op: "faceOwner", doc, index, point }),
-    asmEnvelope: (doc) => call({ op: "asmEnvelope", doc }),
-    asmParts: (parts, offset = 0, total = parts.length) => call({ op: "asmParts", parts, offset, total }),
-    stepSplit: ((bytes: Uint8Array, fileName: string) => call({ op: "stepSplit", bytes, fileName })) as C["stepSplit"],
-    // restart jádra ve vlákně neexistuje (pád = konec vlákna, kód 4) – odběr se přijme a nikdy nezavolá
-    onRestart: () => () => undefined,
-    asmFace: (key, index) => call({ op: "asmFace", key, index }),
-    interference: (doc) => call({ op: "interference", doc }),
-    compare: (doc, file, opts) => call({ op: "compare", doc, file, opts }),
-    mateFace: (key, index) => call({ op: "mateFace", key, index }),
-    mateEnt: (key, index, ent) => call({ op: "mateEnt", key, index, ent }),
-    cylFace: (key, radius) => call({ op: "cylFace", key, radius }),
-    inspect: (src, ref, density) => call({ op: "inspect", src, ref, density }),
-    measureEnt: (a, b) => call({ op: "measureEnt", a, b }),
-    measure: (q, o = {}) => call({ op: "measure", q, ...o }),
-    drawing: (doc, meta, opts) => call({ op: "drawing", doc, meta, opts }),
-    surfA: (q, doc) => call({ op: "surfA", q, doc }),
-    generation: () => 1,
-  } satisfies Impl;
-  const extra = {
-    onKernelProgress(fn: (p: ProgressInfo) => void) {
-      progressL.add(fn);
-      return () => void progressL.delete(fn);
-    },
-    onFatal(fn: (reason: string) => void) {
-      fatalL.add(fn);
-      return () => void fatalL.delete(fn);
-    },
-    implemented: Object.keys(impl),
-  };
-  const target = { ...impl, ...extra } as Record<string | symbol, unknown>;
-  return new Proxy(target, {
-    get(t, p) {
-      if (p in t) return t[p];
-      if (typeof p !== "string" || p === "then") return undefined;
-      return () => Promise.reject(new Error(tr("operace jádra „{0}“ ve vlákně běhu zatím chybí", p)));
-    },
-  }) as unknown as LoopbackKernel;
 }
 
 /**

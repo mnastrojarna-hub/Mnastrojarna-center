@@ -3,14 +3,16 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, FileDown, Loader2, X } from "lucide-react";
-import { convertDrawingToPdf } from "./convert-pdf";
+import { convertDrawingToPdf, type ConvertEdits } from "./convert-pdf";
 import { openFileViewer } from "./viewer-bus";
 
 /**
  * Hlavička prohlížeče u výkresu DXF / DWG zakázky: „Převést na PDF" → server vytvoří PDF (nový dokument
  * zakázky) a prohlížeč ho rovnou otevře; stránka pod prohlížečem se obnoví (nový řádek v Dokumentech).
+ * Upravený výkres (smazané prvky / skryté hladiny v prohlížeči) → „Uložit upravené PDF": samostatná kopie
+ * „… (upraveno).pdf", originál DXF / DWG zůstává beze změny.
  */
-export function ConvertPdfButton({ fileId }: { fileId: string }) {
+export function ConvertPdfButton({ fileId, edits }: { fileId: string; edits?: ConvertEdits | null }) {
   const router = useRouter();
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -19,7 +21,7 @@ export function ConvertPdfButton({ fileId }: { fileId: string }) {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const r = await convertDrawingToPdf(fileId);
+    const r = await convertDrawingToPdf(fileId, { edits });
     setBusy(false);
     if (!r.ok) {
       setError(r.error);
@@ -36,13 +38,16 @@ export function ConvertPdfButton({ fileId }: { fileId: string }) {
         onClick={() => void run()}
         disabled={busy}
         className="inline-flex h-11 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-sm font-medium hover:bg-accent disabled:opacity-60 sm:px-3"
-        title="Převést výkres na PDF (uloží se k zakázce jako nový dokument)"
-        aria-label="Převést na PDF"
+        title={edits
+          ? "Uložit upravený výkres (bez smazaných prvků a skrytých hladin) jako nové PDF k zakázce — originál výkresu se nemění"
+          : "Převést výkres na PDF (uloží se k zakázce jako nový dokument)"}
+        aria-label={edits ? "Uložit upravené PDF" : "Převést na PDF"}
         data-testid="viewer-convert-pdf"
+        data-edited={edits ? "1" : undefined}
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-        <span className="hidden sm:inline">{busy ? "Převádím…" : "Převést na PDF"}</span>
-        <span className="sm:hidden">PDF</span>
+        <span className="hidden sm:inline">{busy ? "Převádím…" : edits ? "Uložit upravené PDF" : "Převést na PDF"}</span>
+        <span className="sm:hidden">{edits ? "PDF*" : "PDF"}</span>
       </button>
       {error && (
         <div

@@ -1,0 +1,11 @@
+# výkres dílu: volby listu, kótování, tolerance, stav (op drawingCmd)
+nový díl Výkres dílu
+kvádr 80 50 20
+díra 10 skrz v 20 25
+díra 10 skrz v 60 25
+#--- run
+výkres A3 na šířku měřítko 1:1 pohledy přední,horní,iso
+kótovat chytře
+výkres tolerance 80 ±0,1
+výkres nepředepsané ISO 2768-mK
+výkres stav

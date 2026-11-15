@@ -1,0 +1,46 @@
+=== run 1 ===
+✓ nový díl „Základ“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Sloupek“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Válec 1 (cylinder)
+
+Dokument: „Sloupek“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 10 × 10 × 40 mm (X -5…5, Y -5…5, Z 0…40) · objem 3,14 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ – Ø10 × 40 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Stojan“ – nová záložka
+✓ komponenta „Základ“ vložena do sestavy (ukotvená)
+✓ komponenta „Sloupek“ vložena do sestavy
+
+Dokument: „Stojan“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Základ [0; 0; 0] ⚓ · Sloupek [30; 20; 10]
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+=== run 3 ===
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ výkres: A3, na šířku, pohledy přední, horní
+✓ výkres: kusovník nad razítkem
+✓ výkres: pozice komponent (balónky)
+Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední, horní · kóty: Chytré kóty (řetězově)
+Listy (1): 1 „List 1“ A3 (aktivní)
+Kóty a popisy (0, z toho vygenerovaných 0):
+Duplicity: žádné
+Kontrola kót: všech 3 očekávaných rozměrů je na listu
+U razítka: nepředepsané tolerance — · hrany — · poznámka —
+Razítko: název Stojan · číslo — · kreslil — · revize — · datum ?.?.???? · materiál dle kusovníku
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
+  přední (x = X, y = Z): x 0…60, y 0…50 mm · 1:1 · na listu x 185…245, y 187…237
+  horní (x = X, y = Y): x 0…60, y 0…40 mm · 1:1 · na listu x 185…245, y 123…163
+
+Dokument: „Stojan“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Základ [0; 0; 0] ⚓ · Sloupek [30; 20; 10]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 50 mm · objem Σ 27,14 cm³ · hmotnost Σ 0,213 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

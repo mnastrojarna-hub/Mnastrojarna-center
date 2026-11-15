@@ -1,0 +1,12 @@
+# příkazy jen pro 3D okno (op view, op api: zobrazení, řez, výběr) – v CLI ℹ ui.no-view / ✗ host.app-only
+nový díl Zobrazení
+kvádr 40 30 20
+#--- run
+zobraz iso
+zobraz hrany
+řez X 10
+řez vyp
+vyber F1 E2
+vyber
+vyber nic
+zobraz stínovaný

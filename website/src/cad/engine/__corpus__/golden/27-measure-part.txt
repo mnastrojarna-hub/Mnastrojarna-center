@@ -1,0 +1,36 @@
+=== run 1 ===
+✓ nový díl „Měření“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Díra 2 (hole)
+
+Dokument: „Měření“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45,97 cm³ · ploch 9 · hran 20
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ – Ø10 hloubka 12 v [15; 20; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ – Ø8 skrz v [45; 20; 20], osa Z
+=== run 2 ===
+Těleso: obálka 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45973,56 mm³ (45,974 cm³) · povrch 9592,202 mm² · hmotnost 0,3609 kg (7,85 g/cm³) · těžiště [30,005; 20; 9,923] · ploch 9 · hran 20 · vrcholů 13
+Díry: 2 – Ø 8 mm × 1, Ø 10 mm × 1
+Ø 8 mm × 1:
+  D1 Ø 8 mm: vstup [45; 20; 20] · skrz, délka 20 mm · osa +Z · plocha F8
+Ø 10 mm × 1:
+  D2 Ø 10 mm: vstup [15; 20; 20] · slepá, hloubka 12 mm · směr vrtání −Z · hrot 118° (ke špičce 15,004 mm) · plocha F7
+Válce: žádné vnější válcové plochy
+Plochy podle pravidla „horní“: 1
+F3: rovinná plocha · normála +Z · plocha 2271,195 mm² · těžiště plochy [30,187; 20; 20]
+F1 (rovina) ↔ F2 (rovina): vzdálenost 0 mm · ΔX 0 · ΔY 0 · ΔZ 0 · úhel normál 90° (kolmé)
+F1 (rovina) ↔ bod [0; 0; 50]: vzdálenost 30 mm · ΔX 0 · ΔY 0 · ΔZ 30 · nejbližší body [0; 0; 20] a [0; 0; 50]
+
+Dokument: „Měření“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45,97 cm³ · ploch 9 · hran 20
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ – Ø10 hloubka 12 v [15; 20; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ – Ø8 skrz v [45; 20; 20], osa Z

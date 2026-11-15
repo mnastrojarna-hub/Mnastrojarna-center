@@ -5,7 +5,9 @@
  *  - Shift / Ctrl + prostřední nebo levé, případně pravé tlačítko tažením = posun,
  *  - klik = výběr / měření, pravý klik = místní nabídka, dvojklik do prázdna = zobrazit vše,
  *  - dotyk: 1 prst otáčí, 2 prsty posun + přiblížení (pinch), ťuknutí = výběr, podržení = nabídka,
- *  - Ctrl + tažení dílu = přesun dílu (rozebrání sestavy); Shift při tom = jen po ose.
+ *  - Ctrl + tažení dílu = přesun dílu (rozebrání sestavy); Shift při tom = jen po ose,
+ *  - výběr oknem: v režimu „Oknem" levé tlačítko / jeden prst tažením (jinak Alt + levé tlačítko) kreslí
+ *    obdélník — doprava okno, doleva křížení; Shift při puštění = přidat, Ctrl = odebrat.
  */
 
 export interface ControlsHandlers {
@@ -24,6 +26,11 @@ export interface ControlsHandlers {
   moveStart?(x: number, y: number): void;
   moveTo?(x: number, y: number, info: { axisLock: boolean }): void;
   moveEnd?(): void;
+  /** Kreslí tažení levým tlačítkem / jedním prstem odsud obdélník výběru? */
+  boxQuery?(x: number, y: number, info: { alt: boolean; touch: boolean }): boolean;
+  boxMove?(sx: number, sy: number, x: number, y: number): void;
+  boxEnd?(sx: number, sy: number, x: number, y: number, mods: { shift: boolean; ctrl: boolean }): void;
+  boxCancel?(): void;
 }
 
 interface Ptr {
@@ -37,7 +44,7 @@ interface Ptr {
   t: number;
 }
 
-type DragMode = "rotate" | "pan" | "move" | null;
+type DragMode = "rotate" | "pan" | "move" | "box" | null;
 
 const DRAG_PX_MOUSE = 4;
 const DRAG_PX_TOUCH = 9;
@@ -117,6 +124,7 @@ export class CadControls {
       // druhý prst → pinch (zrušit otáčení / ťuknutí)
       this.clearLongPress();
       if (this.dragging && this.mode === "move") this.h.moveEnd?.();
+      if (this.mode === "box") this.h.boxCancel?.();
       if (this.dragging) this.h.endInteraction();
       this.dragging = true;
       this.mode = null;
@@ -130,7 +138,8 @@ export class CadControls {
     this.pinch = null;
     const panMod = e.shiftKey || e.ctrlKey || e.metaKey;
     this.mode = e.button === 2 ? "pan" : e.button === 0 || e.button === 1 ? (panMod ? "pan" : "rotate") : null;
-    if (e.button === 0 && this.h.canMove?.(x, y, { button: e.button, ctrl: e.ctrlKey || e.metaKey, touch })) this.mode = "move";
+    if (e.button === 0 && this.h.boxQuery?.(x, y, { alt: e.altKey, touch })) this.mode = "box";
+    else if (e.button === 0 && this.h.canMove?.(x, y, { button: e.button, ctrl: e.ctrlKey || e.metaKey, touch })) this.mode = "move";
     if (touch) {
       this.clearLongPress();
       this.longPress = window.setTimeout(() => {
@@ -177,6 +186,10 @@ export class CadControls {
       this.dragging = true;
       this.clearLongPress();
       if (this.mode === "rotate") this.h.beginRotate(p.sx, p.sy);
+      if (this.mode === "box") {
+        this.h.boxMove?.(p.sx, p.sy, x, y);
+        return;
+      }
       if (this.mode === "move") {
         this.h.moveStart?.(p.sx, p.sy);
         this.h.moveTo?.(x, y, { axisLock: e.shiftKey });
@@ -188,6 +201,10 @@ export class CadControls {
     }
     if (this.mode === "move") {
       this.h.moveTo?.(x, y, { axisLock: e.shiftKey });
+      return;
+    }
+    if (this.mode === "box") {
+      this.h.boxMove?.(p.sx, p.sy, x, y);
       return;
     }
     this.apply(x - lx, y - ly);
@@ -218,11 +235,13 @@ export class CadControls {
     }
     const wasDragging = this.dragging;
     const wasMove = this.mode === "move";
+    const wasBox = this.mode === "box";
     this.dragging = false;
     this.pinch = null;
     this.mode = null;
     if (wasDragging) {
       if (wasMove) this.h.moveEnd?.();
+      if (wasBox) this.h.boxEnd?.(p.sx, p.sy, p.x, p.y, { shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
       this.h.endInteraction();
       return;
     }
@@ -251,6 +270,7 @@ export class CadControls {
     this.clearLongPress();
     if (this.ptrs.size === 0) {
       if (this.dragging && this.mode === "move") this.h.moveEnd?.();
+      if (this.mode === "box") this.h.boxCancel?.();
       if (this.dragging) this.h.endInteraction();
       this.dragging = false;
       this.pinch = null;

@@ -52,8 +52,32 @@ describe("pickRecipients", () => {
     expect(b).toMatchObject({ to: ["nakup@bosch.test"], source: "fallback_role" });
     expect(b.reason).toContain("dodací listy nemají vlastní e-mail");
     expect(pickRecipients("dodaci_list", book, jc)).toMatchObject({ to: ["novak@bosch.test"], source: "job_contact" });
-    // potvrzení objednávky se dodacím listům nepřizpůsobuje: kontakt zakázky má přednost před nákupem
-    expect(pickRecipients("potvrzeni", buyOnly, jc)).toMatchObject({ to: ["novak@bosch.test"], source: "job_contact" });
+  });
+  it("potvrzení objednávky (14. 11.): e-mail „Objednávky / potvrzení“ v Komu, kontakt zakázky v Kopii", () => {
+    const jc = { email: "novak@bosch.test", name: "Pavel Novák" };
+    const withBuy: PartyAddressBook = {
+      ...book,
+      contacts: [...book.contacts, { id: "c3", name: "Natálie Vojčíková", email: "vojcikova@bosch.test", position: "nákup", phone: null, isPrimary: false }],
+      roles: [
+        ...book.roles,
+        entry({ role: "nakup", email: "objednavky@bosch.test" }),
+        entry({ role: "nakup", email: "vojcikova@bosch.test", contactId: "c3", contactName: "Natálie Vojčíková", isDefault: true }),
+      ],
+    };
+    const r = pickRecipients("potvrzeni", withBuy, jc);
+    expect(r).toMatchObject({ to: ["vojcikova@bosch.test"], cc: ["objednavky@bosch.test", "novak@bosch.test"], source: "role", role: "nakup" });
+    expect(r.reason).toBe("Nákupní e-mail zákazníka (objednávky): Natálie Vojčíková · v kopii kontakt zakázky (Pavel Novák)");
+    // kontakt zakázky = nákupní osoba → bez duplicity v kopii
+    const same = pickRecipients("potvrzeni", withBuy, { email: "Natálie <vojcikova@bosch.test>", name: "Natálie Vojčíková" });
+    expect(same).toMatchObject({ to: ["vojcikova@bosch.test"], cc: ["objednavky@bosch.test"], source: "role" });
+    expect(same.reason).toBe("Nákupní e-mail zákazníka (objednávky): Natálie Vojčíková · další v kopii");
+    // jediná nákupní adresa bez osoby, bez kontaktu zakázky
+    const plain = { ...book, roles: [...book.roles, entry({ role: "nakup", email: "nakup@bosch.test", isDefault: true })] };
+    expect(pickRecipients("potvrzeni", plain, null)).toMatchObject({ to: ["nakup@bosch.test"], cc: [], reason: "Nákupní e-mail zákazníka (objednávky)" });
+    // bez nákupní role zůstává kontakt zakázky
+    expect(pickRecipients("potvrzeni", book, jc)).toMatchObject({ to: ["novak@bosch.test"], cc: [], source: "job_contact" });
+    // nabídka zůstává na kontakt zakázky (kdo poptával), i když má zákazník nákupní e-mail
+    expect(pickRecipients("nabidka", withBuy, jc)).toMatchObject({ to: ["novak@bosch.test"], source: "job_contact" });
   });
   it("dodavatel: objednávka na e-mail pro objednávky", () => {
     const sup: PartyAddressBook = { kind: "supplier", partyEmail: "info@ocel.test", contacts: [], roles: [entry({ role: "nakup", email: "objednavky@ocel.test", isDefault: true })] };

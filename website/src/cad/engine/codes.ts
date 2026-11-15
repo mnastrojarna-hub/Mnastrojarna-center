@@ -35,6 +35,16 @@ export const CODES = [
   { code: "share.rejected", level: "error", key: "úložiště odkazů odmítlo zápis: {0}" },
   { code: "share.fallback-link", level: "warn", key: "krátký odkaz se nepodařil – použit dlouhý odkaz" },
   { code: "share.uncompressed", level: "note", key: "odkaz není komprimovaný (prostředí neumí deflate-raw)" },
+  // ── výstupy textem (balík B3 outputs) ──
+  { code: "share.store-unavailable", level: "error", key: "úložiště krátkých odkazů není dostupné: {0}" },
+  { code: "share.long-link", level: "warn", key: "odkaz má {0} znaků – prohlížeč agenta v cloudu přijme nejvýš 4096; krátký odkaz dá „sdílet úložiště“" },
+  { code: "share.days-clamped", level: "warn", key: "platnost odkazu zkrácena na {0} dní – úložiště dovolí nejvýš {0} (zadáno {1})" },
+  { code: "share.days-unlimited", level: "error", key: "odkaz v úložišti musí mít omezenou platnost 1–{0} dní – zadejte „dní N“, nebo dlouhý odkaz „sdílet odkazem bez omezení“" },
+  { code: "out.check-failed", level: "warn", key: "kontrola souboru: {0}" },
+  { code: "out.unsupported", level: "warn", key: "výstup {0} není k dispozici: {1}" },
+  { code: "out.too-big", level: "error", key: "soubor „{0}“ má {1} B – jako base64 do protokolu nejvýš {2} B (soubor zapište bez „base64“)" },
+  { code: "out.lost-imports", level: "warn", key: "projekt odkazuje na importované soubory bez dat: {0} – tyto prvky se nepostaví" },
+  { code: "drawing.default-sheet", level: "warn", key: "dokument zatím nemá výkres – exportuje se výchozí list (vlastní list: „výkres A3 …“ a „kótovat“)" },
   // ── rozbor (5.2 č. 1–4, 6, 9, 10) ──
   { code: "parse.error", level: "error", key: "chyba zápisu: {0}" },
   { code: "parse.unknown", level: "error", key: "neznámý příkaz „{0}“" },
@@ -47,6 +57,7 @@ export const CODES = [
   { code: "build.failed", level: "error", key: "stavba selhala: {0}" },
   { code: "feature.failed", level: "error", key: "prvek „{0}“ se nepostavil: {1}" },
   { code: "feature.warning", level: "warn", key: "prvek „{0}“: {1}" },
+  { code: "feature.unverified", level: "warn", key: "prvek „{0}“ nebyl ověřen stavbou" },
   { code: "geom.approx", level: "note", key: "objem a hmotnost jsou přibližné (ze sítě)" },
   { code: "geom.volume-failed", level: "warn", key: "objem se nepodařilo změřit – uvedena 0" },
   { code: "param.clamped", level: "warn", key: "hodnota {0} upravena na {1} ({2})" },
@@ -59,7 +70,7 @@ export const CODES = [
   // ── díry a výběr (5.2 č. 5, 7, 8, 12, 13, 18, 38) ──
   { code: "hole.depth-default", level: "warn", key: "díra bez hloubky – vrtá se skrz" },
   { code: "hole.conflict", level: "warn", key: "zahloubení a kuželové zahloubení zároveň – použito {0}" },
-  { code: "hole.cbore-dropped", level: "warn", key: "zahloubení Ø{0} je menší než závit {1}" },
+  { code: "hole.cbore-dropped", level: "warn", key: "zahloubení Ø{0} se u díry se závitem {1} nepostaví" },
   { code: "hole.no-surface", level: "warn", key: "díra neleží na povrchu – umístěna na obálku tělesa" },
   { code: "hole.tap-diameter", level: "warn", key: "zadaný průměr {0} nahrazen průměrem vrtáku {1} pro závit {2}" },
   { code: "select.fallback", level: "warn", key: "plocha podle pravidla nenalezena – použita nejkrajnější" },
@@ -77,16 +88,21 @@ export const CODES = [
   { code: "clash.underhead", level: "note", key: "prstenec pod hlavou šroubu „{0}“ × „{1}“" },
   { code: "clash.undetermined", level: "warn", key: "kolizi „{0}“ × „{1}“ nelze vyhodnotit" },
   { code: "clash.hidden", level: "note", key: "skryté komponenty se nekontrolují ({0})" },
+  { code: "clash.rechecked", level: "note", key: "kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila" },
   { code: "motion.conflict", level: "warn", key: "pohyb porušuje vazbu „{0}“ v kroku {1}" },
   // ── měření, kontrola, porovnání, materiál (5.2 č. 31, 37; kap. 6) ──
   { code: "measure.truncated", level: "note", key: "vypsáno {0} z {1}" },
   { code: "check.hole-missing", level: "warn", key: "prvek díry „{0}“ nemá v geometrii díru" },
+  { code: "check.invalid", level: "warn", key: "těleso dílu „{0}“ není platné (BRepCheck) – export STEP a výpočty mohou selhat" },
   { code: "compare.mismatch", level: "warn", key: "model se od reference liší: {0}" },
+  { code: "compare.inexact", level: "note", key: "rozdílová tělesa nejsou spolehlivá (kontrola booleovských operací nesedí o {0} mm³) – shoda podle objemu a mapy odchylek" },
   { code: "material.density-assumed", level: "warn", key: "materiál „{0}“ zadán jen označením – hustota {1} g/cm³ ({2})" },
   { code: "material.class", level: "note", key: "materiál „{0}“ zařazen jako {1}" },
   // ── výkresy a předloha (5.2 č. 32, 33; kap. 8) ──
   { code: "drawing.warning", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.section-miss", level: "warn", key: "rovina řezu neprotíná těleso: {0}" },
+  /** odsazení řezu ve starším zápisu (souřadnice na ose) vyloženo postaru – automatický výklad vstupu (přísný režim = ✗) */
+  { code: "drawing.section-legacy", level: "warn", key: "starší zápis odsazení řezu vyložen postaru: {0}" },
   { code: "drawing.overlap", level: "warn", key: "překryv na listu {0}: {1}" },
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
   { code: "reference.mismatch", level: "warn", key: "předloha se liší: {0}" },
@@ -107,9 +123,46 @@ export const isCode = (code: string): code is Code => BY_CODE.has(code);
 /** náhradní kód pro záznam úrovně bez vlastního kódu (protokol vyžaduje kód u každého ✗/⚠/ℹ) */
 export const fallbackCode = (level: CodeLevel): Code => (level === "error" ? "msg.error" : level === "warn" ? "msg.warn" : "msg.note");
 
+/**
+ * Výjimka s kódem protokolu: smyčka běhu ji zapíše jako ✗ s tímto kódem (ne `op.failed`) – např. ✗ `tab.settle-timeout`
+ * z hostitele aplikace, když se přepnutí záložky nepromítlo do 5 s (5.2 č. 22).
+ */
+export class CodedError extends Error {
+  constructor(
+    readonly code: Code,
+    readonly args: unknown[] = [],
+  ) {
+    super(tr(BY_CODE.get(code)!.key, ...args));
+  }
+}
+
 /** lokalizovaný text kódu v aktuálním jazyce (`setLang`) */
 export function codeText(code: Code, ...args: unknown[]): string {
   return tr(BY_CODE.get(code)!.key, ...args);
+}
+
+const escRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Argumenty `{0}`, `{1}`… zpět z textu záznamu podle textu kódu v aktuálním jazyce (`prvek „{0}“: {1}` → [název, hláška]);
+ * null, když text neodpovídá šabloně (vlastní text záznamu, jiný jazyk). Slouží stručnému protokolu ke sloučení hlášek,
+ * které se liší jen názvem prvku (protocol.ts `mergeSimilar`).
+ */
+export function codeArgs(code: string, text: string): string[] | null {
+  const def = BY_CODE.get(code);
+  if (!def) return null;
+  const tpl = tr(def.key);
+  const order: number[] = [];
+  const src = tpl.split(/(\{\d+\})/).map((p) => {
+    const m = /^\{(\d+)\}$/.exec(p);
+    if (!m) return escRe(p);
+    order.push(Number(m[1]));
+    return "([\\s\\S]*?)";
+  });
+  const m = new RegExp(`^${src.join("")}$`).exec(text);
+  if (!m) return null;
+  const out: string[] = [];
+  order.forEach((k, i) => (out[k] = m[i + 1]));
+  return out;
 }
 
 export type CodeEntryInit = {

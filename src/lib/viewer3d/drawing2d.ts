@@ -15,7 +15,11 @@ export interface DrawLayer {
 
 export type Pt = [number, number];
 
-export type DrawEntity =
+/**
+ * Prvek výkresu. `group` = index do Drawing2D.groups: entity jednoho vložení bloku (INSERT), kóty,
+ * šrafy nebo odkazu — při výběru oknem se vybírají jako jeden prvek.
+ */
+export type DrawEntity = (
   | { kind: "line"; layer: string; color: DrawColor; a: Pt; b: Pt }
   /** Lomená čára; bulge (DXF) = tan(úhel/4) oblouku k dalšímu vrcholu, 0 = rovně. */
   | { kind: "polyline"; layer: string; color: DrawColor; points: Pt[]; bulges?: number[]; closed: boolean }
@@ -34,7 +38,50 @@ export type DrawEntity =
     hAlign: "left" | "center" | "right"; vAlign: "baseline" | "bottom" | "middle" | "top";
     /** Šířka odstavce (MTEXT) — zalomení řádků. */
     width?: number;
-  };
+  }
+) & { group?: number };
+
+/** Skupina entit z jednoho prvku výkresu nejvyšší úrovně (blok, kóta, šrafa, odkaz). */
+export interface DrawGroup {
+  kind: "insert" | "dimension" | "hatch" | "leader";
+  /** Jméno bloku (u vložení). */
+  name?: string;
+}
+
+/** Druh skupiny podle typu entity nejvyšší úrovně (DXF / DWG), jinak null = samostatný prvek. */
+export function groupKindOf(type: string): DrawGroup["kind"] | null {
+  const t = type.toUpperCase();
+  if (t === "INSERT" || t === "MINSERT") return "insert";
+  if (t.startsWith("DIMENSION") || t === "ARC_DIMENSION" || t === "LARGE_RADIAL_DIMENSION") return "dimension";
+  if (t === "HATCH") return "hatch";
+  if (t === "LEADER" || t === "MULTILEADER" || t === "MLEADER") return "leader";
+  return null;
+}
+
+/**
+ * Vykreslí jeden prvek výkresu nejvyšší úrovně (`run`) a entity, které z něj vzejdou — i texty kót
+ * doplněné později přes `fixups` — označí jako jednu skupinu, když typ skupinu tvoří (blok, kóta…).
+ */
+export function runGrouped(
+  ctx: { out: DrawEntity[]; fixups: ((sep: string) => void)[] }, groups: DrawGroup[], type: string, name: string | undefined, run: () => void,
+): void {
+  const kind = groupKindOf(type);
+  const from = ctx.out.length;
+  const fx = ctx.fixups.length;
+  run();
+  if (!kind || ctx.out.length <= from) return;
+  const id = groups.length;
+  groups.push(name ? { kind, name } : { kind });
+  for (let i = from; i < ctx.out.length; i++) ctx.out[i].group = id;
+  for (let i = fx; i < ctx.fixups.length; i++) {
+    const f = ctx.fixups[i];
+    ctx.fixups[i] = (sep) => {
+      const n = ctx.out.length;
+      f(sep);
+      for (let j = n; j < ctx.out.length; j++) ctx.out[j].group = id;
+    };
+  }
+}
 
 export interface Drawing2D {
   layers: DrawLayer[];
@@ -42,6 +89,8 @@ export interface Drawing2D {
   /** Zdroj pro informace, např. „DXF (R2018)", „DWG (AC1032)". */
   format: string;
   warnings?: string[];
+  /** Skupiny entit (bloky, kóty…) — viz DrawEntity.group. */
+  groups?: DrawGroup[];
 }
 
 /** AutoCAD Color Index → RGB (0–1). 7 = barva popředí. Plná tabulka 256 barev. */

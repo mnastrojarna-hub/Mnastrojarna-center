@@ -9,7 +9,6 @@ export 2D výkresu do {0}	Export einer 2D-Zeichnung nach {0}
 export {0}	Export {0}
 fronta je plná ({0} čekajících požadavků)	die Warteschlange ist voll ({0} wartende Anfragen)
 hlavička Host „{0}“ není povolená (ochrana proti DNS rebinding)	Host-Header „{0}“ ist nicht erlaubt (Schutz vor DNS-Rebinding)
-jádro CAD není načtené (cad.worker)	der CAD-Kern ist nicht geladen (cad.worker)
 jádro CAD se nenačetlo: {0}	der CAD-Kern wurde nicht geladen: {0}
 jádro připraveno za {0} ms	Kern bereit in {0} ms
 jádro připraveno za {0} ms (WASM {1} MB, RSS {2} MB)	Kern bereit in {0} ms (WASM {1} MB, RSS {2} MB)
@@ -37,14 +36,11 @@ neznámý formát „{0}“ – {1}	unbekanntes Format „{0}“ – {1}
 neznámý jazyk „{0}“ – cs, en, de	unbekannte Sprache „{0}“ – cs, en, de
 neznámý příkaz „{0}“ – run, serve, help, version, selftest	unbekannter Befehl „{0}“ – run, serve, help, version, selftest
 název vstupního souboru „{0}“ není přípustný	Eingabedateiname „{0}“ ist nicht zulässig
-operace jádra „{0}“ ve vlákně běhu zatím chybí	Kernoperation „{0}“ fehlt im Ausführungsthread noch
 otevřeno „{0}“	geöffnet „{0}“
-otevřít „{0}“ (zatím jen .mncad)	„{0}“ öffnen (bisher nur .mncad)
 pole „{0}“ musí být {1}	Feld „{0}“ muss {1} sein
 Použití:	Aufruf:
 požadavky z prohlížeče (hlavička Origin) nejsou povolené	Anfragen aus einem Browser (Origin-Header) sind nicht erlaubt
 Protokol: stručný (≤ 2 048 B, přebytek v protocol-full.txt), --json = jeden JSON objekt, --full = celý protokol.	Protokoll: kurz (≤ 2.048 B, Überlauf in protocol-full.txt), --json = ein JSON-Objekt, --full = vollständiges Protokoll.
-písma se nečetla přes shim	die Schriften wurden nicht über den Shim gelesen
 písmo „{0}“ není ve složce písem	Schrift „{0}“ ist nicht im Schriftenordner
 relace „{0}“ neexistuje	Sitzung „{0}“ existiert nicht
 relaci nelze načíst: {0}	Sitzung kann nicht geladen werden: {0}

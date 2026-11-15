@@ -1,0 +1,34 @@
+# Vlna 14 B4 – žádné tiché změny a přísný režim (engine/strict.ts, lint.ts, verify.ts, sheet-eval.ts, clash-thread.ts)
+ (kroky {0})	 (steps {0})
+ (kromě {0})	 (except {0})
+ kolize šroub v závitu: {0}	 interference screw in thread: {0}
+{0} dvojic komponent nelze vyhodnotit – booleovská operace jádra selhala (dvojice se nehlásí jako kolize)	{0} component pairs cannot be evaluated – the kernel boolean operation failed (the pairs are not reported as interference)
+{0} ručních úprav kót se nepodařilo přiřadit – kóty se přegenerovaly bez nich (tolerance, uložení, přípony)	{0} manual dimension edits could not be matched – the dimensions were regenerated without them (tolerances, fits, suffixes)
+■ přísný režim: zastaveno na řádku {0} ({1}) – další řádky se neprovedly	■ strict mode: stopped at line {0} ({1}) – the following lines were not executed
+✓ materiál „{0}“ = označení do razítka, třída „{1}“ ({2} g/cm³)	✓ material “{0}” = designation for the title block, class “{1}” ({2} g/cm³)
+✓ přísný režim – první ⚠ nebo ✗ zastaví běh{0}	✓ strict mode – the first ⚠ or ✗ stops the run{0}
+✓ přísný režim vypnut	✓ strict mode off
+díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – tato změna se do sestavy nepromítne (vložit znovu, nebo sestava upravit)	part “{0}” was inserted into the assembly at line {1} as a copy – this change does not reach the assembly (insert it again, or assembly edit)
+hrot vrtáku 60–170° (180 = ploché dno)	drill point 60–170° (180 = flat bottom)
+Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}	Interference in motion: steps with interference {0} of {1} · screw in thread {2} pairs{3} · real: {4}
+kolize: {0} – šroub v závitu {1}, skutečné {2}	interference: {0} – screw in thread {1}, real {2}
+neznámá osa „{0}“ – osa X, Y nebo Z (šikmý směr: směr vx vy vz)	unknown axis “{0}” – axis X, Y or Z (oblique direction: direction vx vy vz)
+neznámá osa rotace „{0}“ – osa X | Y | Z (osa skici Y je výchozí; odkazem: osa body V1 V5, osa hrana E3)	unknown revolve axis “{0}” – axis X | Y | Z (the sketch Y axis is the default; by reference: axis points V1 V5, axis edge E3)
+přísně kromě: „{0}“ není kód protokolu (např. hole.depth-default, select.ambiguous, hole.)	strict except: “{0}” is not a protocol code (e.g. hole.depth-default, select.ambiguous, hole.)
+přísně vyp nemá výjimky – přísně kromě kód,kód zapne přísný režim s výjimkami	strict off takes no exceptions – strict except code,code turns strict mode on with exceptions
+přísně: neznámé slovo „{0}“ – přísně [vyp] [kromě kód,kód]	strict: unknown word “{0}” – strict [off] [except code,code]
+přísný režim od tohoto řádku: chyba nebo varování rozboru = nic se neprovede, za běhu první ⚠ / ✗ zastaví (model se staví po každé operaci, list výkresu po bloku příkazů výkres); výjimky kódem nebo předponou (hole.); ℹ nezastaví nikdy	strict mode from this line on: a parse error or warning = nothing is executed, at run time the first ⚠ / ✗ stops (the model is built after every operation, a drawing sheet after each block of drawing commands); exceptions by code or prefix (hole.); ℹ never stops
+šroub v závitu: {0} dvojic v krocích {1}	screw in thread: {0} pairs at steps {1}
+úhel kuželového zahloubení 30–170°	countersink angle 30–170°
+úhel rotace 0,01–360° (0 = celá otáčka)	revolve angle 0.01–360° (0 = full turn)
+úhel rotace plochy 0,1–360°	surface revolve angle 0.1–360°
+úhel stěny tvářecího nástroje 5–90°	forming tool wall angle 5–90°
+v místě [{0}; {1}] není povrch tělesa – díra začíná na obálce tělesa ({2})	there is no body surface at [{0}; {1}] – the hole starts at the body's bounding box ({2})
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+prvek „{0}“ nebyl ověřen stavbou	feature “{0}” was not verified by a build
+zahloubení Ø{0} se u díry se závitem {1} nepostaví	counterbore Ø{0} is not built on the tapped hole {1}
+{0} dvojic dílů v {1} krocích, první v kroku {2}	{0} part pairs in {1} steps, first at step {2}
+■ přísný režim: STOP – {0} na řádku {1} (všechny řádky skriptu se provedly)	■ strict mode: STOP – {0} at line {1} (all script lines were executed)
+v pohybu „{0}“ × „{1}“ od kroku {2} (t = {3} s): kroků {4}, dvojic komponent {5}, největší průnik {6} mm³	in motion “{0}” × “{1}” from step {2} (t = {3} s): steps {4}, component pairs {5}, largest overlap {6} mm³
+v pohybu další dvojice dílů s kolizí: {0} – pohyb krok N je vypíše	in motion further part pairs with interference: {0} – motion step N lists them
+vynecháno: {0}	skipped: {0}

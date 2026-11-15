@@ -1,0 +1,8 @@
+# název, materiál třídou a označením, barva (op meta)
+nový díl Meta
+kvádr 50 50 5
+materiál hliník
+materiál EN AW-6082
+název "Meta deska"
+barva #336699
+stav

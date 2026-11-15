@@ -11,6 +11,9 @@ export interface ToneChange {
   setting: ToneSetting;
   /** Uživatel právě změnil (ne jen načtení). */
   changed: boolean;
+  /** Pro koho nastavení platí (normalizovaná adresa) a jeho jméno — dialog pozná změnu adresáta. */
+  email: string;
+  name: string | null;
 }
 
 /**
@@ -47,7 +50,7 @@ export function ToneToggle({
       if (!alive || !r.ok || !r.tone) return;
       const tone = r.tone;
       setView(tone);
-      onChangeRef.current?.({ salutation: tone.salutation, setting: tone.setting, changed: false });
+      onChangeRef.current?.({ salutation: tone.salutation, setting: tone.setting, changed: false, email: tone.email, name: tone.name });
     }).catch(() => {});
     return () => { alive = false; };
   }, [target, nameHint]);
@@ -70,7 +73,7 @@ export function ToneToggle({
     const next: ToneView = { ...view, setting: res.setting, saved: true, salutation: res.salutation, suggestion: null };
     setView(next);
     setEditing(false);
-    onChangeRef.current?.({ salutation: res.salutation, setting: res.setting, changed: true });
+    onChangeRef.current?.({ salutation: res.salutation, setting: res.setting, changed: true, email: view.email, name: view.name });
   }
 
   const current = view?.setting.address ?? "vy";

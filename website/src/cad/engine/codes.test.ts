@@ -16,7 +16,7 @@ const REQUIRED: Record<string, "error" | "warn" | "note"> = {
   "hole.depth-default": "warn", // 5
   "parse.conflict": "warn", // 6, 9, 10
   "hole.conflict": "warn", // 7
-  "hole.cbore-dropped": "warn", // 8 (rozhodnutí 15.3: jen když je zahloubení menší než závit)
+  "hole.cbore-dropped": "warn", // 8 (do sloučení w15-hole; pak rozhodnutí 15.3: zahloubení + vrták + závit)
   "insert.name-ignored": "warn", // 11
   "select.fallback": "warn", // 12
   "select.ambiguous": "warn", // 13
@@ -53,6 +53,10 @@ const REQUIRED: Record<string, "error" | "warn" | "note"> = {
   "run.memory": "error",
   "out.path": "error",
   "share.rejected": "error",
+  "share.store-unavailable": "error",
+  "share.long-link": "warn",
+  "share.days-clamped": "warn",
+  "share.days-unlimited": "error",
   "session.history": "note",
   "clash.thread": "note",
   "clash.underhead": "note",

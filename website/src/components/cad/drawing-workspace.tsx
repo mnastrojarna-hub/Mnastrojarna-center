@@ -12,7 +12,7 @@ import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
-import { threadsOfDoc } from "@/cad/drawing-doc";
+import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
 import { SmartDimsExtra, TolCheckBlock } from "./drawing-smart-extra";
 import { dimCheck } from "@/cad/dim-check";
@@ -166,6 +166,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const [meta, setMeta] = useState<DrawingMeta>(freshMeta);
   /** závity: kružnice válce / jádra se kótuje označením („M6 hl. 12“, „M18×1,5 dl. 18“) – modelované šroubovice se na výkrese nekreslí (ISO 6410) */
   const threads = useMemo(() => threadsOfDoc(doc), [doc.features]);
+  /** pružiny (i v komponentách sestavy) se kreslí zjednodušeně podle ISO 2162-1 – volba „plným tvarem“ je jen u výkresu s pružinou */
+  const hasSprings = useMemo(() => hasDrawnSprings(doc), [doc]);
   const [repeatTool, setRepeatTool] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [dwgVer, setDwgVer] = useState<DwgVersion>(() => {
@@ -1314,6 +1316,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <Check checked={opts.centerLines} onChange={(v) => set("centerLines", v)}>
               {tr("Osy děr a válců")}
             </Check>
+            {hasSprings && (
+              <Check checked={opts.springs === "full"} onChange={(v) => set("springs", v ? "full" : "simple")}>
+                <span data-springs-full>{tr("Pružiny plným tvarem (pomalé – jinak zjednodušeně podle ISO 2162-1)")}</span>
+              </Check>
+            )}
             <Row label={tr("Kóty")}>
               <Seg value={opts.dimensions} onChange={(v) => set("dimensions", v)} options={[{ v: "smart", l: tr("Chytré kóty") }, { v: "none", l: tr("Žádné") }, { v: "overall", l: tr("Celkové") }, { v: "auto", l: tr("Auto + Ø") }]} />
             </Row>

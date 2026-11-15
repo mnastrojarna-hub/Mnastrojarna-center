@@ -5,6 +5,7 @@
  * Běží ve web workeru i v Node (testy). Vše se registruje přes `registerExt`.
  */
 import { extPlane, extPoint, hasPlaneDef } from "./place";
+import { hostFont } from "../host-assets";
 import { tr } from "../i18n";
 import * as r from "replicad";
 import { planeOf, sketchDrawing, sketchPathWire } from "../build";
@@ -614,6 +615,8 @@ export async function registerAdvFont(data: ArrayBuffer | string) {
 function ensureAdvFont(): Promise<void> {
   if (!advFont) {
     advFont = (async () => {
+      const own = hostFont("Roboto-Bold.ttf"); // písmo od hostitele (CLI), jinak z webu
+      if (own) return void (await r.loadFont(await own, ADV_FONT, true));
       if (typeof fetch !== "function" || typeof location === "undefined") throw new Error(tr("Písmo pro text není načteno."));
       const res = await fetch(new URL("/fonts/Roboto-Bold.ttf", location.origin).toString());
       if (!res.ok) throw new Error(tr("Písmo pro text se nepodařilo stáhnout."));

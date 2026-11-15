@@ -1,0 +1,10 @@
+=== run 1 ===
+✓ nový díl „Odebírání“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
+✓ odstraněn prvek „Zaoblení 1“
+✓ odstraněn prvek „Kvádr 1“
+✗ není co odstranit
+
+Dokument: „Odebírání“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)

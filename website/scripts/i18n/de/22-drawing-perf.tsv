@@ -1,0 +1,7 @@
+# w14 drawing-perf: zjednodušené pružiny na výkrese (ISO 2162-1)
+pružiny na listu (prvek Pružina, normálie, komponenty sestavy): zjednodušeně podle ISO 2162-1 = obrys vinutí, osa a čerchované osy drátu (výchozí, list se spočítá rychle), plně = skutečná šroubovice (skrytí hran trvá u každé pružiny desítky sekund)	Federn auf dem Blatt (Element Feder, Normteile, Baugruppenkomponenten): vereinfacht nach ISO 2162-1 = Windungsumriss, Achse und Strichpunktlinien durch die Drahtmitten (Standard, das Blatt rechnet schnell), vollständig = echte Schraubenlinie (die Verdeckte-Kanten-Berechnung dauert je Feder zehn Sekunden und mehr)
+pružiny plně (šroubovice)	Federn vollständig (Schraubenlinie)
+Pružiny plným tvarem (pomalé – jinak zjednodušeně podle ISO 2162-1)	Federn in voller Form (langsam – sonst vereinfacht nach ISO 2162-1)
+pružiny zjednodušeně (ISO 2162-1)	Federn vereinfacht (ISO 2162-1)
+pružiny zjednodušeně|plně	federn vereinfacht|vollständig
+pružiny: zjednodušeně (ISO 2162-1, rychlé) nebo plně (skutečná šroubovice, pomalé)	Federn: vereinfacht (ISO 2162-1, schnell) oder vollständig (echte Schraubenlinie, langsam)

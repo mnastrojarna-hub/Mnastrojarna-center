@@ -1,0 +1,55 @@
+name: CAD acceptance (mncad)
+
+# Brána hotovosti B6 (website/scripts/cad-acceptance.mjs, CAD-HEADLESS-NAVRH.md 10.2): sestavený CLI `mncad` jako podproces
+# na syntetickém nástroji (70 komponent, 53 vazeb, pohyb s kolizemi, A1 výkres) – čísla, protokol ≤ 2 048 B, < 120 s,
+# ≤ 2 GB, STEP s kontrolou, PDF stránek = listů, krátký odkaz přes skutečný public/cad/share/index.php (`php -S`, proto
+# PHP povinně), přísný běh projde s režií ≤ 25 %. V CI Node 22 (Node 24 lokálně). Skript a dokument agenta (NDA) v CI nejsou – ty případy
+# se přeskočí; pouští se lokálně s website/.local/fixtures (viz hlavička skriptu).
+
+# Spouští se jen u PR do main a ručně (Actions ▸ Run workflow) – ne při každém push do pracovní větve (šetří minuty Actions).
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "website/src/cad/**"
+      - "website/scripts/cad-*.mjs"
+      - "website/scripts/cad-harness/**"
+      - "website/public/cad/share/**"
+      - "website/package*.json"
+      - ".github/workflows/cad-acceptance.yml"
+  workflow_dispatch:
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22]
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          coverage: none
+      - run: npm ci
+      - name: CLI bundle (public/cad/cli/<verze>/)
+        run: npm run cad:cli
+      - name: Brána B6
+        run: npm run cad:acceptance -- --require-php --json cad-acceptance.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cad-acceptance-node${{ matrix.node }}
+          path: website/cad-acceptance.json
+          if-no-files-found: ignore

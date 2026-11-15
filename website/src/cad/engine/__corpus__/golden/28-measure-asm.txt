@@ -1,0 +1,30 @@
+=== run 1 ===
+✓ nový díl „Spodek“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Vršek“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+
+Dokument: „Vršek“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ – 20 × 20 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Měření sestavy“ – nová záložka
+✓ komponenta „Spodek“ vložena do sestavy (ukotvená)
+✓ komponenta „Vršek“ vložena do sestavy
+
+Dokument: „Měření sestavy“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Spodek [0; 0; 0] ⚓ · Vršek [10; 10; 30]
+Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+=== run 3 ===
+Spodek:F6 (rovina) ↔ Vršek:F5 (rovina): vzdálenost 20 mm · ΔX 0 · ΔY 0 · ΔZ 20 · nejbližší body [10; 30; 10] a [10; 30; 30] · úhel normál 180° (rovnoběžné) · vzdálenost rovin 20 mm
+Vršek: obálka 20 × 20 × 10 mm (X 10…30, Y 10…30, Z 30…40) · objem 4000 mm³ (4 cm³) · povrch 1600 mm² · hmotnost 0,0314 kg (7,85 g/cm³) · těžiště [20; 20; 35] · ploch 6 · hran 12 · vrcholů 8
+✗ řádek 3: v sestavě uveďte komponentu: měřit Hřídel:F3 Deska:F1 – komponenty: Spodek, Vršek
+
+Dokument: „Měření sestavy“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Spodek [0; 0; 0] ⚓ · Vršek [10; 10; 30]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 40 × 40 × 40 mm · objem Σ 20 cm³ · hmotnost Σ 0,157 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

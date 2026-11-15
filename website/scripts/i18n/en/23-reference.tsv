@@ -94,7 +94,6 @@ předloha výtah: neznámá volba „{0}“ – kóty, díry, kusovník, razítk
 předloha: neznámá volba „{0}“	reference: unknown option “{0}”
 připojeno	attached
 Připojeno: {0} – v příkazech podle názvu, např. výkres razítko logo="{1}"	Attached: {0} – use it in commands by name, e.g. drawing titleblock logo="{1}"
-Připojí soubor (logo do razítka, předlohu …) – příkazy ho najdou podle názvu	Attaches a file (title block logo, reference …) – commands find it by name
 Připojit soubor…	Attach file…
 slepá díra	blind hole
 Soubor „{0}“ se nepodařilo načíst.	The file “{0}” could not be loaded.

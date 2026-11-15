@@ -1,0 +1,7 @@
+# svar (rozšíření přes vlastní příkaz s výběrem hran pravidlem → obecný prvek) a obecný prvek s neznámým typem
+nový díl Svarek
+kvádr 100 10 50
+kvádr 10 60 50 v 0 10 0
+svar koutový 4 hrany svislé
+prvek neznámý-typ a=1
+stav

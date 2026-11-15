@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { tr } from "../i18n";
-import { MissingInputError, OutPathError, safeFileName, sha256Hex, uniqueFileName, type FileSink, type FileSource, type OutFile, type OutWrite } from "../engine/host";
+import { matchInputName, MissingInputError, OutPathError, safeFileName, sha256Hex, uniqueFileName, type FileSink, type FileSource, type OutFile, type OutWrite } from "../engine/host";
 
 export { OutPathError, MissingInputError };
 
@@ -165,8 +165,19 @@ export class CliFileSource implements FileSource {
     return [...out].sort();
   }
 
-  /** skutečná cesta souboru `name`, nebo null (mimo povolené složky / neexistuje) */
+  /**
+   * Skutečná cesta souboru `name`, nebo null (mimo povolené složky / neexistuje). Nenajde-li se přesná cesta, platí stejné
+   * pravidlo jako v prohlížeči a v HTTP (`matchInputName`): název bez cesty, pak bez ohledu na velikost písmen (jednoznačně)
+   * – vždy jen mezi soubory povolených složek a výslovně zadanými soubory.
+   */
   resolve(name: string): string | null {
+    const exact = this.resolveExact(name);
+    if (exact || !name || name.includes("\0")) return exact;
+    const hit = matchInputName(name, this.list());
+    return hit && hit !== name ? this.resolveExact(hit) : null;
+  }
+
+  private resolveExact(name: string): string | null {
     if (!name || name.includes("\0")) return null;
     // výslovně zadaný soubor: přesná cesta (relativně k pracovní složce) nebo jen název souboru
     const abs = path.resolve(name);

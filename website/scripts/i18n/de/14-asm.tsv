@@ -8,7 +8,6 @@
  (komponenta je B vazby – hodnoty s opačným znaménkem)	 (die Komponente ist B der Verknüpfung – Werte mit umgekehrtem Vorzeichen)
  (nepovinné)	 (optional)
  {0}: rozsah pohybu X {1} · Y {2} · Z {3} mm{4} · konec {5}	 {0}: Bewegungsbereich X {1} · Y {2} · Z {3} mm{4} · Ende {5}
- ⚠ kolize: {0}	 ⚠ Kollision: {0}
  ⚠ nesplněné vazby: {0}	 ⚠ nicht erfüllte Verknüpfungen: {0}
  dokola	 in Schleife
  stopa {0}	 Spur {0}

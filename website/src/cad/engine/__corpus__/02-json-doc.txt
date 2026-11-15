@@ -1,0 +1,2 @@
+# JSON dokument (op doc): prepare() s keepName, $last, režim $auto, duplicitní id → nové id
+{"app":"mnastrojarna-cad","version":2,"name":"Z JSON","material":"hlinik","features":[{"id":"a1","type":"sketch","name":"Skica 1","plane":{"kind":"base","name":"XY","offset":0},"entities":[{"type":"rect","cx":25,"cy":15,"w":50,"h":30,"r":0,"angle":0}]},{"id":"a1","type":"extrude","name":"Vysunutí 1","sketchId":"$last","distance":10,"symmetric":false,"reverse":false,"mode":"new"},{"type":"fillet","name":"Zaoblení 1","radius":2}]}

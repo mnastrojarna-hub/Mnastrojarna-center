@@ -1,0 +1,4 @@
+# nápověda polí prvku (op info)
+prvek nápověda díra
+nápověda pružina
+prvek nápověda

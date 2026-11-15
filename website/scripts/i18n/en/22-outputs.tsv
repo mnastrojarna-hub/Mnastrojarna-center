@@ -1,0 +1,28 @@
+# Balík B3 outputs (vlna 14): výstupy textem v prohlížeči i v CLI – engine/files.ts, engine/ops/out.ts, engine/share-out.ts
+{0} kusovník	{0} bill of materials
+✓ {0}: {1} · {2} · {3} – jako base64 v protokolu ({4} znaků)	✓ {0}: {1} · {2} · {3} – as base64 in the log ({4} characters)
+krátký odkaz se nepodařil – použit dlouhý odkaz ({0} znaků{1}): {2}	short link failed – long link used ({0} characters{1}): {2}
+, prohlížeč agenta v cloudu přijme nejvýš {0}	, a cloud agent's browser accepts at most {0}
+úložiště krátkých odkazů neodpovídá ({0})	the short-link store does not respond ({0})
+výkres export png	drawing export png
+„dokument“ = všechny listy všech výkresů a u sestavy i výkresy dílů z komponent (každý díl jednou) v jednom PDF, stejné jako --formats auto v CLI; „base64“ za uložit / export / výkres export / skica export = soubor se nestáhne, obsah jde do protokolu (řádek BASE64, nejvýš 2 MB); „odkaz“ = soubor zašifrovaný v úložišti odkazů, protokol vypíše odkaz na stránku ke stažení; „sdílet úložiště“ = jen krátký odkaz (nedostupné úložiště = ✗), „nebo odkaz“ = jinak dlouhý odkaz s ⚠	“document” = every sheet of every drawing and, in an assembly, also the part drawings stored in its components (each part once) in one PDF, the same as --formats auto in the CLI; “base64” after save / export / drawing export / sketch export = the file is not downloaded, its content goes into the log (BASE64 line, at most 2 MB); “link” = the file encrypted in the link store, the log prints a link to a download page; “share store” = short link only (store unavailable = ✗), “or link” = otherwise a long link with ⚠
+úložiště krátkých odkazů není nastavené	the short-link store is not configured
+✓ {0}: {1} · {2} · {3} – v úložišti, odkaz ke stažení platí do {4}	✓ {0}: {1} · {2} · {3} – in the store, download link valid until {4}
+Soubor je pro úložiště odkazů příliš velký: {0} B po kompresi a zašifrování, limit {1} B.	The file is too large for the link store: {0} B after compression and encryption, limit {1} B.
+Odkaz nevede na sdílený soubor.	The link does not lead to a shared file.
+Sdílený soubor je poškozený (otisk nesouhlasí).	The shared file is corrupted (checksum mismatch).
+#!dynamic – texty kódů protokolu balíku outputs (src/cad/engine/codes.ts, překlad za běhu tr(def.key))
+úložiště krátkých odkazů není dostupné: {0}	the short-link store is not available: {0}
+odkaz má {0} znaků – prohlížeč agenta v cloudu přijme nejvýš 4096; krátký odkaz dá „sdílet úložiště“	the link has {0} characters – a cloud agent's browser accepts at most 4096; “share store” gives a short link
+kontrola souboru: {0}	file check: {0}
+výstup {0} není k dispozici: {1}	output {0} is not available: {1}
+soubor „{0}“ má {1} B – jako base64 do protokolu nejvýš {2} B (soubor zapište bez „base64“)	file “{0}” has {1} B – at most {2} B as base64 in the log (write the file without “base64”)
+projekt odkazuje na importované soubory bez dat: {0} – tyto prvky se nepostaví	the project refers to imported files without data: {0} – these features will not be built
+dokument zatím nemá výkres – exportuje se výchozí list (vlastní list: „výkres A3 …“ a „kótovat“)	the document has no drawing yet – the default sheet is exported (your own sheet: “drawing A3 …” and “dimension”)
+# B3 – opravy po recenzi
+platnost odkazu zkrácena na {0} dní – úložiště dovolí nejvýš {0} (zadáno {1})	link validity shortened to {0} days – the store allows at most {0} (requested {1})
+odkaz v úložišti musí mít omezenou platnost 1–{0} dní – zadejte „dní N“, nebo dlouhý odkaz „sdílet odkazem bez omezení“	a link in the store needs a limited validity of 1–{0} days – give “days N”, or a long link “share inline unlimited”
+Úložiště sdílení neodpovídá – nahrávání nedoběhlo do {0} s.	The share store does not respond – the upload did not finish within {0} s.
+bez omezení platnosti nemůže být odkaz v úložišti	a link without a validity limit cannot be kept in the store
+výkres export: „{0}“ je 2D výkres – exportuje se příkazem „2d export dxf“ nebo „2d export dwg“	drawing export: “{0}” is a 2D drawing – export it with “2d export dxf” or “2d export dwg”
+. Data opouštějí prohlížeč jen u „sdílet“ a výstupů „… odkaz“: dokument nebo soubor se v prohlížeči zašifruje a nahraje do úložiště odkazů, klíč je jen v odkazu.	. Data leave this browser only with “share” and “… link” outputs: the document or file is encrypted in the browser and uploaded to the link store; the key is only in the link.

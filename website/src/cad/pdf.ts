@@ -3,6 +3,7 @@
  * Rozměr listu v mm, tloušťky a typy čar dle ISO 128, otočené texty.
  */
 import { tr } from "./i18n";
+import { hostFont } from "./host-assets";
 import { LAYER_STYLE, type DrawingResult } from "./drawing";
 
 export type PdfFonts = { regular: ArrayBuffer; bold?: ArrayBuffer };
@@ -12,7 +13,7 @@ let fontCache: Promise<PdfFonts> | null = null;
 /** Načte písma z /fonts (prohlížeč). */
 function loadFonts(): Promise<PdfFonts> {
   if (!fontCache) {
-    const get = (u: string) => fetch(u).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(tr("Písmo se nenačetlo.")))));
+    const get = (u: string) => hostFont(u.slice("/fonts/".length)) ?? fetch(u).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(tr("Písmo se nenačetlo."))))); // písma od hostitele (CLI), jinak z webu
     fontCache = Promise.all([get("/fonts/Roboto-Regular.ttf"), get("/fonts/Roboto-Bold.ttf").catch(() => undefined)]).then(([regular, bold]) => ({ regular, bold }));
     fontCache.catch(() => (fontCache = null));
   }

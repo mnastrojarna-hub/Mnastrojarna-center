@@ -1,0 +1,9 @@
+# díra bez z na povrch tělesa (fillTop podle sítě), díra mimo těleso (! na obálce), text na horní ploše
+nový díl Povrch
+kvádr 80 40 10
+kvádr 20 20 20 v 0 0 10
+díra 6 skrz v 10 10
+díra 5 hloubka 5 v 60 20
+díra 4 skrz v 200 200
+text "MN" výška 6 hloubka 1 v 40 20
+stav
