@@ -25,6 +25,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 20:25 | Majitel hlásí: „Online CAD neumí pružiny, ani pro simulaci pohybu.“ Živý web běží na STARÉ verzi (bez vlny 15 – pružina mezi díly tam není; `cad/share/?ping` vrací chybovou stránku = nenasazena ani vlna 16). V `main` pružiny jsou, ale jen jako šroubovice se stálým stoupáním, bez výpočtu a bez dynamiky. → vlna 21 (kapitola 7c), workflow `wf_1e1ed70b-b6a`. Obnoven workflow integrace fáze B `wf_d020a109-e6f` (do zadání doplněna poznámka o obnovení a o rozdílu akceptace `S/w14/acceptance-delta.patch`). G a F zatím pozastaveny (šetří se stroj: běží 2 workflow). |
 | 14. 11. 22:16 | Integrace fáze B na main HOTOVÁ (agent): commit `75e90ed` ve `w14-int2`, patch `S/w14/int2/int2.patch` (330 souborů), audit `S/w14/int2/audit.md` – všech 182 kusů main nalezeno. Kontroly agenta: celý `src/cad` 2862 testů zelených, build, 28 e2e sad zelených. **Akceptační brána na skutečném skriptu 959: PASS** – 70 komponent, 53/53 vazeb, Σ 5241,733 cm³, 27 kolizí jen závit, STEP ok, odkaz 35 znaků, protokol 1641 B, 29,9 s. Běží nezávislá kontrola `verify:int2`. Pružiny (vlna 21) dál rozpracované. |
 | 14. 11. 23:50 | Fáze B dokončena agenty i po opravách 3 nálezů kontroly (`w14-int2` commit `5ca5da6`, 25 e2e sad zelených). **Nanesena na větev bez konfliktů** jako commit `e0b08dd` (patch `S/w14/int2/int2.patch`; kontrola NDA čistá; typy, lint 5, překlady 0/0). GitHub Actions `cad-acceptance.yml` omezen na PR do main + ruční spuštění (šetří minuty). BĚŽÍ: testy + build + 14 e2e sad na :3199 (`S/vitest-b-main.log`, `S/build-b-main.log`, pak `S/e2e/*.log`). Po zelené: PR „CAD bez prohlížeče – fáze B“ (zmínit i PR #99 aplikace Sales OS, který je na větvi) → sloučit → smazat `w14-*`. Pružiny: oba balíky v opravách po kontrole. |
+| 15. 11. 00:45 | **Úkol B HOTOV: fáze B sloučena do `main` (PR #100, `e27ff86`)** – s ní i PR #99 aplikace Sales OS, který byl na větvi. Po nanesení: 520 testů, build, 14 e2e sad 0 FAIL. Worktree `w14-*` smazány. Dál: pružiny (H) dobíhají opravy; pak E1 (NDA přejmenování zkušebního nástroje – teď je to možné), D1/D3 dokumentace a PDF příručka, G a F obnovit. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -64,7 +65,7 @@ Hlášení majitele z jeho testování nasazené verze má přednost: každou ch
 
 | Co | Kde |
 | --- | --- |
-| `main` | `12e7108` (PR #98 dokumentace 2. kolo + e2e; PR #97 střižnice; PR #96 vlna 15; PR #95 převodník) |
+| `main` | `e27ff86` (PR #100 fáze B + PR #99 Sales OS; PR #98 dokumentace; PR #97 střižnice; PR #96 vlna 15; PR #95 převodník) |
 | pracovní větev | `claude/cnc-sales-os-ai-cbR2f` = `main` + rozdělaný úkol (viz Průběžný stav) |
 | scratchpad `S` | `/tmp/claude-0/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/scratchpad` |
 | worktree agentů | `/home/user/Mnastrojarna-center/.claude/worktrees/<název>` |
@@ -172,7 +173,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
       `vložit "Díl" jako "K1"`, `sestava pružina …`, `výkres … řez XZ odsazení N`, `export skript`, `předloha stav`.
       Žádný řádek nesmí skončit `host.app-only`, pokud ho návrh nevyhrazuje prohlížeči (seznam v
       `S/w14/CAD-HEADLESS-NAVRH.md`, kap. 15).
-- [ ] B4. Kontroly podle kapitoly 2. E2e navíc: `cad-cli cad-agent-out cad-agent-api cad-agent-journey cad-agent-asm
+- [x] B4. Kontroly podle kapitoly 2. E2e navíc: `cad-cli cad-agent-out cad-agent-api cad-agent-journey cad-agent-asm
       cad-w13-docs cad-w15-* cad-doc2text` a všechny nové sady z patche (`git diff --cached --name-only | grep e2e/`).
       Testy harness: `node --test scripts/cad-harness/harness.test.mjs` (s `CAD_HARNESS_KERNEL=1` i velký běh).
 - [x] B5. **Akceptační test na skutečném skriptu** (jen lokálně, nic z toho necommituj):
@@ -191,7 +192,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
 
       Řádek `výkres … řez XZ odsazení -57` má dát `⚠` (starší zápis), ne `✗`. Nesplněné kritérium = oprav příčinu
       (workflow: najít → opravit → protistranně ověřit), ne test.
-- [ ] B6. PR „CAD bez prohlížeče – fáze B“ → sloučit. Smaž worktree `w14-*`.
+- [x] B6. PR „CAD bez prohlížeče – fáze B“ → sloučit. Smaž worktree `w14-*`.
 
 ## 5. Úkol C – vlna 17, střižnice: neplatná geometrie a pozdní hlášení
 
