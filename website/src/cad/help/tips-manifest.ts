@@ -354,6 +354,7 @@ export const TIP_MANIFEST: Record<TipPackage, readonly ManifestRow[]> = {
     ["mAdv", "Pokročilé", "Sestava › Vazby"],
     ["mMech", "Mechanické", "Sestava › Vazby"],
     ["motion", "Pohybová studie", "Sestava › Pohyb"],
+    ["springBetween", "Pružina mezi díly", "Sestava › Pohyb"],
     ["clash", "Kolize", "Sestava › Analýza"],
     ["bom", "Kusovník", "Sestava › Analýza"],
     ["exp", "Rozložit", "Sestava › Analýza"],

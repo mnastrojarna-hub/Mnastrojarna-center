@@ -7,6 +7,7 @@ import { transformPoint, flattenAssembly, invertPlacement, type FlatComponent } 
 import { faceShort, findComp, fold, pickFace, SPRING_USE, type AsmCmd, type CompFaceRow } from "./agent-asm";
 import { compFaces, ensureBuilt, geoProvider, leafId, type AsmEnv, type AsmResult } from "./asm-agent";
 import { springGeom, springWorldAxis } from "./asm-spring-geom";
+import { isSpringExt } from "./springs";
 import { applySpringStates, instanceLines, springComps, springLine, springLines, springSeatMates, springState, springStates } from "./asm-spring";
 import { tr } from "./i18n";
 import { ensureMateRefs } from "./mate-geo";
@@ -206,6 +207,8 @@ export async function applySpringCmd(d: CadDoc, cmd: Extract<AsmCmd, { k: "sprin
   for (const c of list) {
     if (c.source.kind !== "part") throw new Error(tr("pružina: komponenta „{0}“ není díl (podsestava / import) – pružina potřebuje díl s prvkem Pružina", c.name));
     const g = springGeom(c.source.doc);
+    if (!g && c.source.doc.features.some((x) => !x.suppressed && x.type === "ext" && isSpringExt(x.ext) && x.ext !== "spring.compression"))
+      throw new Error(tr("komponenta „{0}“: pružinu mezi dosedacími plochami počítá sestava jen u tlačné pružiny (pružina tlačná …) – tažná, zkrutná a talířová pružina z tabulky zůstává dílem bez délky a síly v sestavě", c.name));
     if (!g) throw new Error(tr("komponenta „{0}“ není pružina – díl potřebuje prvek Pružina (normálie pružina d2 D20 L44 n8 · pružina D stoupání P závity N drát d) nebo trubku / válec po ose", c.name));
     if ((A && A.id === c.id) || (B && B.id === c.id)) throw new Error(tr("pružina: dosedací plocha nemůže být na samotné pružině „{0}“", c.name));
     const old = c.spring;
@@ -228,12 +231,14 @@ export async function applySpringCmd(d: CadDoc, cmd: Extract<AsmCmd, { k: "sprin
       b = ref(B, r.row);
       pick.b = { name: B.name, row: r.row, ...(r.holed ? { holed: r.holed } : {}) };
     }
-    const free = cmd.free ?? old?.free ?? g.length;
+    const free = cmd.free ?? old?.free ?? g.free ?? g.length;
     // 0 = zrušit dřív zadanou hodnotu (délka na doraz z modelu, síla se nepočítá) – pole panelu „0 = z modelu / neuvádět“
     const solid = cmd.solid === 0 ? undefined : (cmd.solid ?? old?.solid);
-    const rate = cmd.rate === 0 ? undefined : (cmd.rate ?? old?.rate);
+    // tlačná pružina z tabulky: tuhost R z výpočtu (Ln dává model – solidOf)
+    const rate = cmd.rate === 0 ? undefined : (cmd.rate ?? old?.rate ?? g.rate);
     if (solid !== undefined && solid >= free) throw new Error(tr("sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm", solid, free));
-    const def: SpringDef = { a: a!, b: b!, free, ...(solid !== undefined ? { solid } : {}), ...(rate !== undefined ? { rate } : {}) };
+    // vedení dírou / kapsou (Pružina mezi díly) zůstává při změně dosedacích ploch, L0, Ln nebo tuhosti
+    const def: SpringDef = { a: a!, b: b!, free, ...(solid !== undefined ? { solid } : {}), ...(rate !== undefined ? { rate } : {}), ...(old?.guided !== undefined ? { guided: old.guided } : {}) };
     doc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? { ...x, spring: def } : x)) };
     if (pick.a || pick.b) picks.push(pick);
   }

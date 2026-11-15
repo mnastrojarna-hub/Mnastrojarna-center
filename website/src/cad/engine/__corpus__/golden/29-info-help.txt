@@ -74,7 +74,7 @@ prvek nápověda <typ> vypíše všechna pole typu pro „prvek <typ> klíč=hod
  • datumAxis (Osa): bez textového příkazu · jen prvek: def, length
  • datumPoint (Bod): bez textového příkazu · jen prvek: ref
  • csys (Souřadný systém): bez textového příkazu · jen prvek: origin, xDir, zDir, size
-rozšíření (68): prvek nápověda <id> – např. prvek nápověda sheet.bend
+rozšíření (72): prvek nápověda <id> – např. prvek nápověda sheet.bend
 společná pole všech prvků: name, suppressed, body
 
 Dokument: „Nový díl“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)

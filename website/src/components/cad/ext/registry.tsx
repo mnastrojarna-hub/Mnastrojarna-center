@@ -25,6 +25,8 @@ export type ExtActionApi = {
   download: (name: string, data: BlobPart, type: string) => void;
   /** vyexportuje těleso/sestavu v daném formátu (volá worker) */
   exportModel: (format: string) => Promise<void>;
+  /** údaj z textového příkazu, který akci spustil (např. název pružiny u `pružina tabulka "Název"`) – jen z textu, jinak undefined */
+  arg?: string;
 };
 
 export type ExtUi = {

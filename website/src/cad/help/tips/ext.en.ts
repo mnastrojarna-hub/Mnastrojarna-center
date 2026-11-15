@@ -597,6 +597,14 @@ export default {
     cmd: 'motion motor rotary "Crank" 0..360 step 5',
     note: "Without a suitable mate you cannot add a motor – first create e.g. a Hinge or Concentric mate.",
   },
+  springBetween: {
+    what: "Inserts a spring between two parts: click a hole or face A and the opposite face B, the spring table is prefilled.",
+    when: "Stripper plate on springs, spring plunger, pressure pad – with one click into all holes of a pattern.",
+    select: "An assembly with two parts: hole / pocket or planar face in part A, opposite planar face in part B.",
+    steps: ["Click the pocket (cylindrical face) or plane A – in the model or the list.", "Click the opposite face B of another part.", "Adjust d, De, L0, n in the table and click Create."],
+    cmd: "assembly spring new between #1 Ø21 #2 top all holes",
+    note: "The spring is locked to part A; length and force follow the mates and the motion study (also Dynamics).",
+  },
 
   // ── Assembly › Analysis ──
   clash: {

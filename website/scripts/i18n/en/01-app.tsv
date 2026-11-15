@@ -542,7 +542,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 Šablonovat	Loft
 Šablonování potřebuje alespoň dvě skici v různých rovinách.	Loft needs at least two sketches in different planes.
 Šroub ISO 4762	ISO 4762 screw
-šroubovice s průřezem	helix with a cross-section
 šrouby, ložiska, ozubená kola, profily… – stačí napsat	screws, bearings, gears, profiles… – just type
 šrouby, ložiska, ozubená kola, profily… – stačí napsat „M8x30“	screws, bearings, gears, profiles… – just type “M8x30”
 štítky na plochách, hranách a vrcholech: klik na štítek = klik na entitu; pro AI agenty, automatizaci a dotyk	labels on faces, edges and vertices: clicking a label = clicking the entity; for AI agents, automation and touch

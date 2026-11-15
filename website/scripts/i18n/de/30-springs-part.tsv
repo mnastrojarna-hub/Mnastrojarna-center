@@ -1,0 +1,277 @@
+# vlna 21 – pružiny z tabulky (balík part): výpočet EN 13906 / DIN 2093, průvodce, text, výkres
+* povinné (z alternativ D | De | Di a n | nt stačí jedna); dále: v x y z · osa X|Y|Z|-Z · tvar L · přidat|odebrat|nové · název "…"	* Pflicht (von den Alternativen D | De | Di und n | nt genügt eine); außerdem: bei x y z · achse X|Y|Z|-Z · form L · hinzufügen|abziehen|neu · name "…"
+{0} – tabulka s výpočtem ({1})	{0} – Tabelle mit Berechnung ({1})
+{0} × za sebou, po {1} v sobě	{0} × wechselsinnig, je {1} gleichsinnig
+{0} otevřena jako nový díl.	{0} als neues Teil geöffnet.
+{0} přidána do historie.	{0} zur Historie hinzugefügt.
+{0} vložena do sestavy.	{0} in die Baugruppe eingefügt.
+A – tuhá (De/t ≈ 18)	A – hart (De/t ≈ 18)
+B – střední (De/t ≈ 28)	B – mittel (De/t ≈ 28)
+bez tabulky pružiny	ohne Federtabelle
+C – měkká (De/t ≈ 40)	C – weich (De/t ≈ 40)
+celé očko boční	ganze Öse seitlich
+celkový počet závitů nt	Gesamtwindungszahl nt
+činné závity n	federnde Windungen n
+délka drátu	Drahtlänge
+délka L{0} {1} mm je pod výškou naplocho {2} mm	Länge L{0} {1} mm liegt unter der Planlage {2} mm
+délka L{0} {1} mm je větší než volná výška sloupce L0 {2} mm	Länge L{0} {1} mm ist größer als die freie Säulenhöhe L0 {2} mm
+délka mezi vnitřními okraji oček v 1. poloze	Länge zwischen den Ösen-Innenkanten in Stellung 1
+délka na doraz Ln	Blocklänge Ln
+délka nezatížené pružiny (konce v 0 a L0)	Länge der unbelasteten Feder (Enden bei 0 und L0)
+délka ramen nesmí být záporná	Schenkellänge darf nicht negativ sein
+délka ramene 1	Länge Schenkel 1
+délka ramene 2	Länge Schenkel 2
+délka těla Lk	Körperlänge Lk
+délka těla Lk0	Körperlänge Lk0
+Délka tvaru (0 = volná)	Formlänge (0 = frei)
+Délka tvaru (stlačená)	Formlänge (gestaucht)
+DIN 2093 / EN 16983 – řada určuje poměr tloušťky a výšky kužele	DIN 2093 / EN 16983 – die Reihe bestimmt das Verhältnis von Dicke und Kegelhöhe
+DIN 2093 řada {0} nemá talíř De {1} mm – vyberte ze seznamu nebo zvolte vlastní rozměry	DIN 2093 Reihe {0} hat keinen Teller De {1} mm – aus der Liste wählen oder eigene Maße wählen
+do tohoto dílu	in dieses Teil
+Doplňte rozměry – náhled se ukáže tady.	Maße ergänzen – die Vorschau erscheint hier.
+dovolené napětí σzul = 0,7 · Rm	zulässige Spannung σzul = 0,7 · Rm
+dovolené napětí τzul = 0,45 · Rm	zulässige Spannung τzul = 0,45 · Rm
+dovolené napětí τzul = 0,5 · Rm	zulässige Spannung τzul = 0,5 · Rm
+Drát pružiny se nepodařilo vytáhnout po dráze.	Der Federdraht ließ sich nicht entlang der Bahn ziehen.
+Druh pružiny	Federart
+druhé očko	zweite Öse
+EN 10270 – běžné průměry 0,5 · 0,8 · 1 · 1,25 · 1,6 · 2 · 2,5 · 3 · 4 · 5 mm	EN 10270 – übliche Durchmesser 0,5 · 0,8 · 1 · 1,25 · 1,6 · 2 · 2,5 · 3 · 4 · 5 mm
+EN 13906-2: německé očko LH ≈ Di, poloviční ≈ 0,75·D − d, boční celé ≈ Di	EN 13906-2: deutsche Öse LH ≈ Di, halbe Öse ≈ 0,75·D − d, ganze Öse seitlich ≈ Di
+G a Rm podle EN 13906-1 a EN 10270-1/-2/-3; DH = pro dynamické zatížení	G und Rm nach EN 13906-1 und EN 10270-1/-2/-3; DH = für dynamische Belastung
+hmotnost	Masse
+index vinutí D/d = {0} je nad 20 – pružina je měkká a nestabilní při navíjení (EN 13906-1: 4…20)	Wickelverhältnis D/d = {0} über 20 – die Feder ist weich und beim Wickeln instabil (EN 13906-1: 4…20)
+index vinutí D/d = {0} je nad 20 (EN 13906-2: 4…20)	Wickelverhältnis D/d = {0} über 20 (EN 13906-2: 4…20)
+index vinutí D/d = {0} je nad 20 (EN 13906-3: 4…20)	Wickelverhältnis D/d = {0} über 20 (EN 13906-3: 4…20)
+index vinutí D/d = {0} je pod 4 – těžko vyrobitelné (EN 13906-2: 4…20)	Wickelverhältnis D/d = {0} unter 4 – schwer herstellbar (EN 13906-2: 4…20)
+index vinutí D/d = {0} je pod 4 – těžko vyrobitelné, vysoké napětí na vnitřní straně (EN 13906-1: 4…20)	Wickelverhältnis D/d = {0} unter 4 – schwer herstellbar, hohe Spannung an der Innenseite (EN 13906-1: 4…20)
+index vinutí D/d = {0} je pod 4 (EN 13906-3: 4…20)	Wickelverhältnis D/d = {0} unter 4 (EN 13906-3: 4…20)
+index vinutí w = D/d	Wickelverhältnis w = D/d
+jako nový díl	als neues Teil
+jeden vedený, druhý kloubově (0,7)	eines geführt, das andere gelenkig (0,7)
+jeden vetknutý, druhý volný (2)	eines eingespannt, das andere frei (2)
+jen u vlastních rozměrů	nur bei eigenen Maßen
+jen u vlastních rozměrů (h0/t < 1,3 – průběh síly bez poklesu)	nur bei eigenen Maßen (h0/t < 1,3 – Kraftverlauf ohne Abfall)
+konce	Enden
+Konce a uložení	Enden und Lagerung
+kritický zdvih vzpěru sK	Knickfederweg sK
+L1 by měla být delší než L2 (L1 = menší stlačení)	L1 sollte länger als L2 sein (L1 = geringere Stauchung)
+levé	links
+Materiál a vinutí	Werkstoff und Wicklung
+méně než 2 činné závity – EN 13906-1 doporučuje n ≥ 2	weniger als 2 federnde Windungen – EN 13906-1 empfiehlt n ≥ 2
+místo L1: požadovaná síla při L1	statt L1: geforderte Kraft bei L1
+místo L1: síla sloupce	statt L1: Säulenkraft
+místo L1: síla v 1. poloze	statt L1: Kraft in Stellung 1
+místo L2: největší pracovní síla	statt L2: größte Arbeitskraft
+místo L2: požadovaná síla při L2	statt L2: geforderte Kraft bei L2
+místo L2: síla sloupce	statt L2: Säulenkraft
+místo n: celkový počet závitů včetně závěrných	statt n: Gesamtwindungszahl einschließlich der Endwindungen
+místo α1: moment v N·mm	statt α1: Moment in N·mm
+místo α2: největší moment v N·mm	statt α2: größtes Moment in N·mm
+moment M1	Moment M1
+moment M1 při α1 {0}°	Moment M1 bei α1 {0}°
+moment M2	Moment M2
+moment M2 při α2 {0}°	Moment M2 bei α2 {0}°
+napětí σOM / σII / σIII při L2	Spannung σOM / σII / σIII bei L2
+napětí σq2 při α2	Spannung σq2 bei α2
+natočení oček	Ösenversatz
+natočení ramen z volné polohy ve stupních	Verdrehung der Schenkel aus der freien Lage in Grad
+nebo jiný z řádků	oder eine andere Zeile
+nejkratší pracovní délka (konec zdvihu) – musí být ≥ Ln + Sa	kürzeste Arbeitslänge (Hubende) – muss ≥ Ln + Sa sein
+nejmenší pracovní délka Ln + Sa	kleinste Arbeitslänge Ln + Sa
+nejmenší součet mezer Sa	Summe der Mindestabstände Sa
+největší pracovní délka (≤ Ln)	größte Arbeitslänge (≤ Ln)
+největší pracovní natočení ve stupních	größte Arbeitsverdrehung in Grad
+největší síla Fn	größte Kraft Fn
+největší úhel (σq = σzul)	größter Winkel (σq = σzul)
+německé očko (celé přes střed)	deutsche Öse (ganz, über Mitte)
+nerez 1.4310 (EN 10270-3)	Edelstahl 1.4310 (EN 10270-3)
+nevybočí	knicksicher
+Neznámý druh pružiny „{0}“.	Unbekannte Federart „{0}“.
+Nové těleso / přidat	Neuer Körper / hinzufügen
+oba konce kloubově (1)	beide Enden gelenkig (1)
+oba konce vedené, rovnoběžné (0,5)	beide Enden geführt, parallel (0,5)
+očka	Ösen
+olejem kalený VDSiCr (EN 10270-2)	ölschlussvergütet VDSiCr (EN 10270-2)
+Opravte řádky označené ✗	Mit ✗ markierte Zeilen korrigieren
+Osa je zadaná odkazem na geometrii.	Die Achse ist per Bezug auf Geometrie angegeben.
+Osa pružiny	Federachse
+osové	axial
+patentovaný drát DH (EN 10270-1)	patentierter Draht DH (EN 10270-1)
+patentovaný drát SH (EN 10270-1)	patentierter Draht SH (EN 10270-1)
+počáteční napětí τ0	Vorspannung τ0
+počáteční tuhost sloupce	Anfangsfederrate der Säule
+počet činných závitů musí být aspoň 1	die Zahl der federnden Windungen muss mindestens 1 sein
+počet závitů musí být aspoň 1	die Windungszahl muss mindestens 1 sein
+počet závitů těla; desetinná část určuje natočení oček (0,5 = 180°)	Windungszahl des Körpers; der Bruchteil bestimmt den Ösenversatz (0,5 = 180°)
+počet závitů; desetinná část = úhel ramen ve volném stavu (0,25 = 90°)	Windungszahl; der Bruchteil = Schenkelwinkel im freien Zustand (0,25 = 90°)
+Poloha (začátek osy) odkazem	Position (Achsanfang) per Bezug
+Poloha je zadaná odkazem na geometrii.	Die Position ist per Bezug auf Geometrie angegeben.
+poloviční očko	halbe Öse
+Pracovní body (nepovinné)	Arbeitspunkte (optional)
+pracovní délka L{0} {1} mm je delší než volná délka L0 – tlačná pružina by nebyla stlačena	Arbeitslänge L{0} {1} mm ist länger als die ungespannte Länge L0 – die Druckfeder wäre nicht gestaucht
+pracovní délka L{0} {1} mm je kratší než délka na doraz Ln {2} mm – pružinu nelze tolik stlačit	Arbeitslänge L{0} {1} mm ist kürzer als die Blocklänge Ln {2} mm – so weit lässt sich die Feder nicht stauchen
+pracovní délka L{0} {1} mm je kratší než volná délka L0 {2} mm – tažnou pružinu nelze stlačit	Arbeitslänge L{0} {1} mm ist kürzer als die ungespannte Länge L0 {2} mm – eine Zugfeder lässt sich nicht stauchen
+pracovní délka L{0} {1} mm je pod nejmenší přípustnou Ln + Sa = {2} mm – závity se budou dotýkat	Arbeitslänge L{0} {1} mm liegt unter der kleinsten zulässigen Ln + Sa = {2} mm – die Windungen berühren sich
+pracovní délka L1	Arbeitslänge L1
+pracovní délka L2	Arbeitslänge L2
+pravé	rechts
+pravé vinutí je obvyklé (EN 13906)	Rechtswicklung ist üblich (EN 13906)
+prázdné = volná délka; tvar stlačené pružiny (stoupání se zmenší, závěrné závity zůstanou)	leer = ungespannte Länge; Form der gestauchten Feder (die Steigung sinkt, die Endwindungen bleiben)
+průměr drátu d	Drahtdurchmesser d
+průměr vinutí je příliš malý vůči drátu (D/d = {0}) – drát se nedá navinout	der Windungsdurchmesser ist für den Draht zu klein (D/d = {0}) – der Draht lässt sich nicht wickeln
+pružící závity; celkem nt = n + 2 u přiložených konců (EN 13906-1)	federnde Windungen; gesamt nt = n + 2 bei angelegten Enden (EN 13906-1)
+Pružina – tabulka s výpočtem	Feder – Tabelle mit Berechnung
+Pružina „{0}“	Feder „{0}“
+pružina „{0}“ v dílu není – pružiny: {1}	Feder „{0}“ ist nicht im Teil – Federn: {1}
+pružina {0}: neznámé slovo „{1}“ – {2}	Feder {0}: unbekanntes Wort „{1}“ – {2}
+Pružina nemá dráhu drátu.	Die Feder hat keine Drahtbahn.
+pružina se vybočí – kritický zdvih sK = {0} mm je menší než zdvih {1} mm; použijte trn nebo vedení (pouzdro)	die Feder knickt aus – Knickfederweg sK = {0} mm ist kleiner als der Hub {1} mm; Dorn oder Führung (Hülse) verwenden
+Pružina z tabulky s výpočtem	Feder aus Tabelle mit Berechnung
+pružina: „{0}“ – hodnota {1}	Feder: „{0}“ – Wert {1}
+pružina: osa X | Y | Z | -Z nebo vektor x y z	Feder: achse X | Y | Z | -Z oder Vektor x y z
+pružina: poloha potřebuje tři čísla – v x y z	Feder: die Position braucht drei Zahlen – bei x y z
+pružina: ramena tečná | radiální | osová nebo délka ramen	Feder: schenkel tangential | radial | axial oder Schenkellänge
+pružina: text „{0}“ bez klíčového slova – název "…"	Feder: Text „{0}“ ohne Schlüsselwort – name "…"
+pružina: za „{0}“ chybí číslo – {1}	Feder: nach „{0}“ fehlt eine Zahl – {1}
+pružina: za „název“ chybí text	Feder: nach „name“ fehlt der Text
+Pružině chybí rozměry (d, D, L0, n).	Der Feder fehlen Maße (d, D, L0, n).
+pružinová ocel 51CrV4 (EN 10132-4)	Federstahl 51CrV4 (EN 10132-4)
+Pružiny	Federn
+předepnutá délka v nástroji (méně stlačená)	vorgespannte Länge im Werkzeug (weniger gestaucht)
+předpětí F0	Vorspannkraft F0
+předpětí F0 {0} N přesahuje dovolenou sílu {1} N	Vorspannkraft F0 {0} N übersteigt die zulässige Kraft {1} N
+předpětí F0 nesmí být záporné	Vorspannkraft F0 darf nicht negativ sein
+předpětí τ0 = {0} MPa je vysoké ({1} % τzul) – ověřte s výrobcem, obvykle do 20 %	Vorspannung τ0 = {0} MPa ist hoch ({1} % von τzul) – mit dem Hersteller prüfen, üblich bis 20 %
+při natočení o {0}° je napětí {1} % dovoleného (σq = {2} MPa) – největší úhel {3}°	bei Verdrehung um {0}° beträgt die Spannung {1} % der zulässigen (σq = {2} MPa) – größter Winkel {3}°
+při protažení na L{0} {1} mm je napětí {2} % dovoleného (největší délka Ln {3} mm)	bei Dehnung auf L{0} {1} mm beträgt die Spannung {2} % der zulässigen (größte Länge Ln {3} mm)
+při stlačení na doraz Ln je napětí {0} % dovoleného – pružina by sedla; omezte zdvih dorazem nad Ln	bei Stauchung auf Blocklänge Ln beträgt die Spannung {0} % der zulässigen – die Feder würde sich setzen; Hub mit Anschlag über Ln begrenzen
+přiložené a broušené	angelegt und geschliffen
+přiložené a broušené = rovné dosedací plochy kolmé na osu (výchozí pro střižné nástroje)	angelegt und geschliffen = ebene Auflageflächen senkrecht zur Achse (Standard für Schneidwerkzeuge)
+přiložené, neobroušené	angelegt, ungeschliffen
+přímá část ramene za ohybem	gerader Teil des Schenkels nach der Biegung
+radiální	radial
+ramena	Schenkel
+rameno 1	Schenkel 1
+rameno 2	Schenkel 2
+řada DIN 2093	DIN 2093 Reihe
+řádky tabulky pružiny se slovy CS / EN / DE, jednotkami a normou	Zeilen der Federtabelle mit Wörtern CS / EN / DE, Einheiten und Norm
+síla F{0} {1} N je větší než síla naplocho {2} N	Kraft F{0} {1} N ist größer als die Kraft in Planlage {2} N
+síla F1	Kraft F1
+síla F1 při L1 {0} mm	Kraft F1 bei L1 {0} mm
+síla F2	Kraft F2
+síla F2 při L2 {0} mm	Kraft F2 bei L2 {0} mm
+síla na doraz Fn	Kraft bei Blocklänge Fn
+síla naplocho Fc	Kraft in Planlage Fc
+síla při s = 0,75 h0	Kraft bei s = 0,75 h0
+sloupec	Säule
+Sloupec talířových pružin je prázdný.	Die Tellerfedersäule ist leer.
+smysl vinutí	Wickelsinn
+součinitel korekce napětí k	Spannungskorrekturfaktor k
+součinitel uložení ν pro kontrolu vzpěru (EN 13906-1 obr. 5)	Lagerungsbeiwert ν für den Knicknachweis (EN 13906-1 Bild 5)
+souhlasně vložené talíře – zvětší sílu	gleichsinnig geschichtete Teller – erhöhen die Kraft
+spočtené údaje pružin z tabulky v dílu	berechnete Daten der Tabellenfedern im Teil
+Spočteno	Berechnet
+stačí jeden průměr: vnější De (pro otvor), střední D nebo vnitřní Di (pro trn)	ein Durchmesser genügt: außen De (für eine Bohrung), mittel D oder innen Di (für einen Dorn)
+stoupání činných závitů	Steigung der federnden Windungen
+stoupání činných závitů {0} mm je menší než drát – závity by se ve volném stavu dotýkaly	Steigung der federnden Windungen {0} mm ist kleiner als der Draht – die Windungen würden sich im freien Zustand berühren
+střední průměr D	mittlerer Durchmesser D
+střídavě obrácené talíře – zvětší zdvih (sloupec)	wechselsinnig geschichtete Teller – erhöhen den Hub (Säule)
+Tabulka pružin	Federtabelle
+tabulka pružiny	Federtabelle
+tabulka pružiny ano|ne	federtabelle ja|nein
+Tabulka pružiny: {0}× nad razítkem (EN ISO 2162-2)	Federtabelle: {0}× über dem Schriftfeld (EN ISO 2162-2)
+Tabulka pružiny: v dílu není pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová)	Federtabelle: im Teil ist keine Tabellenfeder (feder druck | zug | dreh | teller)
+Tabulka údajů pružiny (EN ISO 2162-2)	Federdatentabelle (EN ISO 2162-2)
+talíř De × Di × t	Teller De × Di × t
+talířová {0} × {1} × {2} · h0 {3} · sloupec {4}×{5} · L0 {6} · F(0,75 h0) {7} N	Teller {0} × {1} × {2} · h0 {3} · Säule {4}×{5} · L0 {6} · F(0,75 h0) {7} N
+Talířová pružina {0} × {1} × {2}	Tellerfeder {0} × {1} × {2}
+talířová pružina DIN 2093 (řady A, B, C nebo vlastní De Di t h0), sloupec talířů za sebou × v sobě, síla podle Almena–László	Tellerfeder DIN 2093 (Reihen A, B, C oder eigene De Di t h0), Säule wechselsinnig × gleichsinnig, Kraft nach Almen–László
+Talířové pružině chybí rozměry (De, Di, t, h0).	Der Tellerfeder fehlen Maße (De, Di, t, h0).
+talířů v sobě (paralelně)	Teller gleichsinnig (parallel)
+talířů za sebou	Teller wechselsinnig
+tažná d {0} · De {1} · n {2} · L0 {3} · R {4} N/mm · F0 {5} N	Zug d {0} · De {1} · n {2} · L0 {3} · R {4} N/mm · F0 {5} N
+Tažná pružina	Zugfeder
+Tažná pružina {0} × {1} – n {2}	Zugfeder {0} × {1} – n {2}
+tažná pružina podle EN 13906-2: tělo s předpětím F0, očka (vnitřní okraje oček v 0 a L0), tuhost, síly, největší délka Ln	Zugfeder nach EN 13906-2: Körper mit Vorspannkraft F0, Ösen (Ösen-Innenkanten bei 0 und L0), Federrate, Kräfte, größte Länge Ln
+tečné	tangential
+tečné = pokračuje po tečně závitu, radiální = ven od osy, osové = podél osy	tangential = entlang der Windungstangente, radial = von der Achse nach außen, axial = entlang der Achse
+tlačná d {0} · De {1} · L0 {2} · n {3} · R {4} N/mm · Ln {5} mm{6}	Druck d {0} · De {1} · L0 {2} · n {3} · R {4} N/mm · Ln {5} mm{6}
+Tlačná pružina	Druckfeder
+Tlačná pružina {0} × {1} × {2}	Druckfeder {0} × {1} × {2}
+tlačná pružina podle EN 13906-1 z tabulky: tuhost, Ln, Sa, síly a napětí při L1 / L2, vzpěr, frekvence, hmotnost; tvar s přiloženými a broušenými konci (rovné dosedací plochy v 0 a L0), Ø = De; varování česky ve stavu prvku	Druckfeder nach EN 13906-1 aus Tabelle: Federrate, Ln, Sa, Kräfte und Spannung bei L1 / L2, Knickung, Frequenz, Masse; Form mit angelegten und geschliffenen Enden (ebene Auflageflächen bei 0 und L0), Ø = De; Warnungen im Elementstatus
+tlačná, tažná, zkrutná, talířová – tabulka s výpočtem	Druck-, Zug-, Dreh-, Tellerfeder – Tabelle mit Berechnung
+tloušťka t	Dicke t
+tuhost R	Federrate R
+tuhost, síly, napětí, vzpěr, broušené konce – EN 13906 / DIN 2093	Federrate, Kräfte, Spannung, Knickung, geschliffene Enden – EN 13906 / DIN 2093
+tvar stlačené / protažené pružiny – výpočet zůstává pro L0	Form der gestauchten / gedehnten Feder – die Berechnung bleibt für L0
+u řad A/B/C jen rozměry z DIN 2093: 8 · 10 · 12,5 · 14 · 16 · 18 · 20 · 22,5 · 25 · 28 · 31,5 · 35,5 · 40 · 45 · 50 · 56 · 63 · 71 · 80 · 90 · 100 · 112 · 125 … 250	bei Reihen A/B/C nur Maße nach DIN 2093: 8 · 10 · 12,5 · 14 · 16 · 18 · 20 · 22,5 · 25 · 28 · 31,5 · 35,5 · 40 · 45 · 50 · 56 · 63 · 71 · 80 · 90 · 100 · 112 · 125 … 250
+účinné závity (s rameny)	wirksame Windungen (mit Schenkeln)
+Údaje pružiny „{0}“ (EN ISO 2162-2)	Federdaten „{0}“ (EN ISO 2162-2)
+úhel natočení α1	Verdrehwinkel α1
+úhel natočení α2	Verdrehwinkel α2
+úhel ramen ve volném stavu	Schenkelwinkel im freien Zustand
+úhlová tuhost RM	Drehfederrate RM
+uložení konců (vzpěr)	Endlagerung (Knickung)
+Umístění	Platzierung
+V dílu není žádná pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová …).	Im Teil ist keine Tabellenfeder (feder druck | zug | dreh | teller …).
+vinutí	Wicklung
+vlastní frekvence fe	Eigenfrequenz fe
+vlastní rozměry	eigene Maße
+vložit do sestavy	in die Baugruppe einfügen
+vnější průměr De	Außendurchmesser De
+vnitřní průměr – volí se podle trnu	Innendurchmesser – nach dem Dorn gewählt
+vnitřní průměr Di	Innendurchmesser Di
+vnitřní průměr Di musí být menší než vnější De	der Innendurchmesser Di muss kleiner als der Außendurchmesser De sein
+vnitřní průměr při α2 (trn ≤ 0,9 ×)	Innendurchmesser bei α2 (Dorn ≤ 0,9 ×)
+vnitřní předpětí těsně vinutého těla – pod F0 se pružina neprotáhne	innere Vorspannung des eng gewickelten Körpers – unter F0 dehnt sich die Feder nicht
+volná délka L0	ungespannte Länge L0
+volná délka L0 (mezi očky)	ungespannte Länge L0 (zwischen den Ösen)
+volná délka L0 {0} mm není větší než délka na doraz Ln {1} mm – zvětšete L0 nebo zmenšete počet závitů	die ungespannte Länge L0 {0} mm ist nicht größer als die Blocklänge Ln {1} mm – L0 vergrößern oder Windungszahl verringern
+volná výška sloupce L0	freie Säulenhöhe L0
+volná výška talíře l0	freie Tellerhöhe l0
+vrchol, střed hrany nebo kružnice, bod skici… – má přednost před souřadnicemi	Eckpunkt, Kanten- oder Kreismitte, Skizzenpunkt… – hat Vorrang vor den Koordinaten
+výška kužele h0	Kegelhöhe h0
+výška naplocho Lc	Höhe in Planlage Lc
+výška oček LH	Ösenhöhe LH
+výška sloupce na konci zdvihu (zdvih talíře ≤ 0,75 h0)	Säulenhöhe am Hubende (Tellerfederweg ≤ 0,75 h0)
+výška sloupce v 1. poloze	Säulenhöhe in Stellung 1
+Vytvořit	Erstellen
+vzájemné natočení oček	gegenseitiger Ösenversatz
+vzájemné natočení oček – upraví desetinnou část počtu závitů	gegenseitiger Ösenversatz – passt den Bruchteil der Windungszahl an
+X / Y / Z, vektor, nebo odkazem: osa díry (válcové plochy), hrana, normála plochy	X / Y / Z, Vektor oder per Bezug: Bohrungsachse (Zylinderfläche), Kante, Flächennormale
+zadána délka L{0} i síla F{0} – platí délka (F{0} = {1} N)	Länge L{0} und Kraft F{0} angegeben – die Länge gilt (F{0} = {1} N)
+zadáno	vorgegeben
+Zadat souřadnicemi	Koordinaten eingeben
+zadejte Di, tloušťku t a výšku kužele h0	Di, Dicke t und Kegelhöhe h0 eingeben
+zadejte počet činných závitů n (nebo celkový nt)	Zahl der federnden Windungen n (oder gesamt nt) eingeben
+zadejte počet závitů n	Windungszahl n eingeben
+zadejte počet závitů těla n	Windungszahl des Körpers n eingeben
+zadejte průměr drátu d	Drahtdurchmesser d eingeben
+zadejte průměr vinutí – střední D, vnější De nebo vnitřní Di	Windungsdurchmesser eingeben – mittel D, außen De oder innen Di
+zadejte volnou délku L0	ungespannte Länge L0 eingeben
+zápis: pružina nápověda {0}	Syntax: feder hilfe {0}
+závity n	Windungen n
+závity těla n	Windungen des Körpers n
+zdvih talíře při L{0} je {1} % h0 – DIN 2093 doporučuje nejvýš 75 %	Tellerfederweg bei L{0} beträgt {1} % von h0 – DIN 2093 empfiehlt höchstens 75 %
+zkrutná d {0} · De {1} · n {2} · RM {3} N·mm/°	Dreh d {0} · De {1} · n {2} · RM {3} N·mm/°
+Zkrutná pružina	Drehfeder
+Zkrutná pružina {0} × {1} – n {2}	Drehfeder {0} × {1} – n {2}
+zkrutná pružina podle EN 13906-3: ramena tečná / radiální / osová, úhlová tuhost, moment a napětí při natočení, vnitřní průměr pro trn	Drehfeder nach EN 13906-3: Schenkel tangential / radial / axial, Drehfederrate, Moment und Spannung bei Verdrehung, Innendurchmesser für den Dorn
+zvětšení De při stlačení na doraz	Zunahme von De bei Blocklänge
+# recenze balíku part (vlna 21)
+  pružina tabulka ["Název"|vše] – spočtené údaje poslední / pojmenované / všech pružin dílu	  feder tabelle ["Name"|alle] – berechnete Daten der letzten / benannten / aller Federn des Teils
+komponenta „{0}“: pružinu mezi dosedacími plochami počítá sestava jen u tlačné pružiny (pružina tlačná …) – tažná, zkrutná a talířová pružina z tabulky zůstává dílem bez délky a síly v sestavě	Komponente „{0}“: Eine Feder zwischen Auflageflächen berechnet die Baugruppe nur für eine Druckfeder (feder druck …) – Zug-, Dreh- und Tellerfedern aus der Tabelle bleiben Teile ohne Länge und Kraft in der Baugruppe
+Lc {0} mm · F na dorazu {1} N · {2} g	Lc {0} mm · F bei Blocklänge {1} N · {2} g
+Lk {0} mm · největší délka Ln {1} mm · Fn {2} N · {3} g	Lk {0} mm · größte Länge Ln {1} mm · Fn {2} N · {3} g
+Lk0 {0} mm · α0 {1}° · největší úhel {2}° · {3} g	Lk0 {0} mm · α0 {1}° · größter Winkel {2}° · {3} g
+Ln + Sa {0} mm · Fn {1} N · τn {2} % τzul · vzpěr {3} · fe {4} Hz · {5} g	Ln + Sa {0} mm · Fn {1} N · τn {2} % τzul · Knickung {3} · fe {4} Hz · {5} g
+napětí τ2 při L2 (statická kontrola)	Spannung τ2 bei L2 (statischer Nachweis)
+napětí τk2 = k · τ2 (opakované zatížení)	Spannung τk2 = k · τ2 (wiederholte Belastung)
+napětí τkn = k · τn na dorazu	Spannung τkn = k · τn bei Blocklänge
+napětí τn na dorazu (statická kontrola)	Spannung τn bei Blocklänge (statischer Nachweis)
+největší délka Ln (τ = τzul)	größte Länge Ln (τ = τzul)
+při stlačení na L2 je napětí {0} % dovoleného (τ2 = {1} MPa, τzul = {2} MPa, statická kontrola EN 13906-1) – silnější drát, víc závitů nebo menší zdvih	bei Zusammendrückung auf L2 beträgt die Spannung {0} % der zulässigen (τ2 = {1} MPa, τzul = {2} MPa, statischer Nachweis EN 13906-1) – dickerer Draht, mehr Windungen oder kleinerer Hub
+při stlačení na L2 je napětí s korekcí k {0} % dovoleného (τk2 = {1} MPa) – staticky vyhoví (τ2 {2} %), při opakovaném zatížení (stírače, vyhazovače) volte silnější drát, víc závitů nebo menší zdvih	bei Zusammendrückung auf L2 beträgt die Spannung mit Korrektur k {0} % der zulässigen (τk2 = {1} MPa) – statisch ausreichend (τ2 {2} %), bei wiederholter Belastung (Abstreifer, Auswerfer) dickeren Draht, mehr Windungen oder kleineren Hub wählen
+síla F{0} {1} N je větší než síla na doraz Fn {2} N – pružina ji nepřenese (stlačí se nejvýš na Ln {3} mm); zvolte tužší pružinu nebo menší sílu	Kraft F{0} {1} N ist größer als die Kraft bei Blocklänge Fn {2} N – die Feder kann sie nicht aufnehmen (sie wird höchstens auf Ln {3} mm zusammengedrückt); steifere Feder oder kleinere Kraft wählen
+spočtené údaje pružiny z tabulky do protokolu: poslední v historii, pojmenovaná nebo všechny pružiny dílu	berechnete Daten einer Tabellenfeder ins Protokoll: die letzte im Verlauf, eine benannte oder alle Federn des Teils
+volná délka L0 {0} mm je kratší než nejmenší pracovní délka Ln + Sa = {1} mm – pružina nemá přípustný pracovní zdvih; zvětšete L0 nebo uberte závity	freie Länge L0 {0} mm ist kürzer als die kleinste Arbeitslänge Ln + Sa = {1} mm – die Feder hat keinen zulässigen Arbeitshub; L0 vergrößern oder Windungen entfernen

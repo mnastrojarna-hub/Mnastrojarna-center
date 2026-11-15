@@ -43,7 +43,7 @@ describe("rovina a bod prvků rozšíření zadané odkazem", () => {
     const withPlane = allExt().filter((d) => d.params?.some((p) => p.kind === "plane")).map((d) => d.ext).sort();
     expect(withPlane).toEqual(["adv.mirrorFeatures", "adv.partingDraft", "surf.section", "surf.split", "surf.trimPlane", "weld.plate", "weld.trim"]);
     const withPoint = allExt().filter((d) => d.params?.some((p) => p.kind === "point")).map((d) => d.ext).sort();
-    expect(withPoint).toEqual(["adv.scaleAbout", "sheet.relief", "surf.helix", "surf.helixSweep"]);
+    expect(withPoint).toEqual(["adv.scaleAbout", "sheet.relief", "spring.compression", "spring.disc", "spring.extension", "spring.torsion", "surf.helix", "surf.helixSweep"]);
   });
 });
 
@@ -176,7 +176,7 @@ describe("směr a osa prvků rozšíření zadané odkazem nebo čísly", () => 
 
   it("parametry „direction“ a „axis“ jsou v registru u prvků, které dřív uměly jen X / Y / Z; text `prvek` je převede", () => {
     const withDir = allExt().filter((d) => d.params?.some((p) => p.kind === "direction")).map((d) => d.ext).sort();
-    expect(withDir).toEqual(["sheet.relief", "surf.extrude", "surf.helix", "surf.helixSweep"]);
+    expect(withDir).toEqual(["sheet.relief", "spring.compression", "spring.disc", "spring.extension", "spring.torsion", "surf.extrude", "surf.helix", "surf.helixSweep"]);
     const withAxis = allExt().filter((d) => d.params?.some((p) => p.kind === "axis")).map((d) => d.ext).sort();
     expect(withAxis).toEqual(["surf.revolve"]);
     const data = (text: string) => {
@@ -207,7 +207,7 @@ describe("starší prvky rozšíření, které opakují vestavěné prvky", () =
       expect(visibleExt().some((d) => d.ext === id), id).toBe(false);
     }
     expect(extByTab("create").some((d) => d.ext === "adv.chainFillet")).toBe(true);
-    expect(visibleExt().length + LEGACY.length).toBe(allExt().length);
+    expect(visibleExt().length + LEGACY.length + allExt().filter((d) => d.hidden).length).toBe(allExt().length);
   });
   it("uložený dokument i obecný příkaz `prvek` je dál postaví", async () => {
     const { body } = await buildShape(doc(box));

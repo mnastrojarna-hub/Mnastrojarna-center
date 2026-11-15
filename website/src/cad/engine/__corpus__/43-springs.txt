@@ -1,0 +1,29 @@
+# pružiny vlny 21 (op feature spring.compression, api spring.table v enginu, asm pružina nová do děr vzoru, pohyb dynamika)
+nový díl Pružina z tabulky
+pružina tlačná d 2 De 20 L0 50 n 8 konce broušené
+pružina tabulka
+#--- run
+nový díl Spodní deska
+kvádr 200 120 30
+nový díl Horní deska
+kvádr 200 120 30
+válec 21 10 v 40 30 0 odebrat
+válec 21 10 v 160 30 0 odebrat
+válec 21 10 v 40 90 0 odebrat
+válec 21 10 v 160 90 0 odebrat
+nový díl Stírací deska
+kvádr 200 120 15
+#--- run
+nová sestava Střižník
+vložit "Spodní deska" ukotvit
+vložit "Stírací deska" v 0 0 45
+vložit "Horní deska" v 0 0 85
+sestava vazba vzdálenost "Horní deska" spodní "Spodní deska" horní hodnota 55 název "LIS"
+sestava vazba mez-vzdálenosti "Stírací deska" horní "Horní deska" spodní min 5 max 25 název "Doraz stírače"
+sestava vazba mez-vzdálenosti "Stírací deska" spodní "Spodní deska" horní min 0 max 500 název "Matrice"
+sestava pružina nová n 6 mezi "Horní deska" Ø21 "Stírací deska" horní do děr vzoru
+#--- run
+pohyb hmotnost "Stírací deska" 2,4
+pohyb dynamika čas 0,5 krok 0,0005 gravitace -Z tlumení 0,05 odraz 0,2
+pohyb motor lineární vazba "LIS" 55..25 tam a zpět
+pohyb stav

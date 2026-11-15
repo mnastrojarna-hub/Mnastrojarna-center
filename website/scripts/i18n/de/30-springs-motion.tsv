@@ -1,0 +1,149 @@
+# Vlna 21 – balík motion: pružina mezi díly, dynamická pohybová studie, síť pružiny při přehrávání
+  návrat na doraz v t = {0} s	  zurück am Anschlag bei t = {0} s
+  první dotyk v t = {0} s	  erster Kontakt bei t = {0} s
+ · do děr {0} Ø{1}	 · in Bohrungen {0} Ø{1}
+ · nárazy {0}	 · Stöße {0}
+ „{0}“ {1}: v klidu	 „{0}“ {1}: in Ruhe
+ (zámek k „{0}“)	 (gesperrt an „{0}“)
+ ⚠ žádná pohyblivá komponenta – dynamika potřebuje díly vedené vazbami (Souosost, Drážka, Závěs, Mez vzdálenosti…)	 ⚠ keine bewegliche Komponente – Dynamik braucht durch Verknüpfungen geführte Teile (Konzentrisch, Nut, Scharnier, Abstandsgrenze…)
+ doraz „{0}“ ({1} {2} {3}): dotyk {4}{5}	 Anschlag „{0}“ ({1} {2} {3}): Kontakt {4}{5}
+ Energie: na začátku {0} J, na konci {1} J (motor koná práci – bilance se nekontroluje)	 Energie: am Anfang {0} J, am Ende {1} J (der Antrieb leistet Arbeit – Bilanz wird nicht geprüft)
+ Největší síla pružiny: „{0}“ {1} N v t = {2} s	 Größte Federkraft: „{0}“ {1} N bei t = {2} s
+ tam a zpět	 hin und zurück
+{0} těžiště {1} [mm]	{0} Schwerpunkt {1} [mm]
+{0}: zadejte vazbu číslem nebo názvem – pohyb síla vazba 3 120	{0}: Verknüpfung per Nummer oder Name angeben – bewegung kraft verknüpfung 3 120
+✓ {0} na vazbě „{1}“ odebrána	✓ {0} an Verknüpfung „{1}“ entfernt
+✓ hmotnost „{0}“: {1} kg	✓ Masse „{0}“: {1} kg
+✓ hmotnost „{0}“: z objemu × hustoty	✓ Masse „{0}“: aus Volumen × Dichte
+✓ moment {0} N·m na vazbě „{1}“ (kladný zvětšuje natočení)	✓ Moment {0} N·m an Verknüpfung „{1}“ (positiv vergrößert die Drehung)
+✓ nová pružina „{0}“ {1}× · d {2} · De {3} · L0 {4} · n {5} · R {6} N/mm · Ln {7} mm{8} – zámek ke komponentě „{9}“	✓ neue Feder „{0}“ {1}× · d {2} · De {3} · L0 {4} · n {5} · R {6} N/mm · Ln {7} mm{8} – gesperrt an Komponente „{9}“
+✓ pohybová studie: kinematika (nastavení dynamiky zůstává pro „pohyb dynamika“)	✓ Bewegungsstudie: Kinematik (Dynamik-Einstellungen bleiben für „bewegung dynamik“)
+✓ pružina „{0}“ do děr vzoru {1} Ø{2} komponenty „{3}“: +{4} kopií{5}	✓ Feder „{0}“ in die Musterbohrungen {1} Ø{2} der Komponente „{3}“: +{4} Kopien{5}
+✓ síla {0} N na vazbě „{1}“ (kladná zvětšuje hodnotu vazby)	✓ Kraft {0} N an Verknüpfung „{1}“ (positiv vergrößert den Verknüpfungswert)
+1/2 Dosedací plocha A – díra / kapsa, ve které pružina sedí, nebo rovinná plocha. Klikněte do modelu nebo vyberte ze seznamu.	1/2 Auflagefläche A – Bohrung / Tasche, in der die Feder sitzt, oder ebene Fläche. Im Modell klicken oder aus der Liste wählen.
+2/2 Protější plocha B jiného dílu (pružinu stlačuje).	2/2 Gegenfläche B eines anderen Teils (drückt die Feder zusammen).
+A: „{0}“ {1} → B: „{2}“ {3} · vzdálenost dosedacích ploch {4} mm{5}	A: „{0}“ {1} → B: „{2}“ {3} · Abstand der Auflageflächen {4} mm{5}
+celkem závitů	Gesamtwindungen
+čas dynamické studie: 0 až 600 s	Zeit der dynamischen Studie: 0 bis 600 s
+činné závity	federnde Windungen
+činné závity n	federnde Windungen n
+délka nezatížené pružiny [mm]	Länge der unbelasteten Feder [mm]
+do děr vzoru: pružina „{0}“ nestojí v díře komponenty „{1}“ (osa pružiny neleží v ose žádné válcové plochy)	Musterbohrungen: Feder „{0}“ steht in keiner Bohrung der Komponente „{1}“ (die Federachse liegt auf keiner Zylinderachse)
+do děr vzoru: vyberte díru (válcovou plochu) na komponentě A nebo B	Musterbohrungen: Bohrung (Zylinderfläche) an Komponente A oder B wählen
+do děr vzoru: zadejte komponentu s dírami – {0}	Musterbohrungen: Komponente mit den Bohrungen angeben – {0}
+Do všech děr vzoru (stejný Ø a osa)	In alle Bohrungen des Musters (gleicher Ø und Achse)
+Dosedací roviny musí být protilehlé a rovnoběžné.	Die Auflageebenen müssen gegenüberliegen und parallel sein.
+drát	Draht
+Druh zatížení	Lastart
+dynamická pohybová studie: síly pružin (s tlumičem), gravitace a zadané síly / momenty hýbou díly po stupních volnosti vazeb, motory pohánějí jako v kinematice; meze vazeb a Ln pružin jsou dorazy s odrazem; hmotnosti z objemu × hustoty (ručně přepsatelné); protokol s největší silou pružiny, dotyky a nárazy na dorazech a kontrolou energie, CSV s polohou / rychlostí / zrychlením, graf v panelu; window.mncad.motion({ mode: "dynamic" })	dynamische Bewegungsstudie: Federkräfte (mit Dämpfer), Schwerkraft und äußere Kräfte / Momente bewegen Teile entlang der Freiheitsgrade der Verknüpfungen, Antriebe treiben wie in der Kinematik; Verknüpfungsgrenzen und Ln der Federn sind Anschläge mit Stoßzahl; Massen aus Volumen × Dichte (überschreibbar); Protokoll mit größter Federkraft, Kontakten und Stößen an Anschlägen und Energieprüfung, CSV mit Lage / Geschwindigkeit / Beschleunigung, Diagramm im Panel; window.mncad.motion({ mode: "dynamic" })
+Dynamika	Dynamik
+Dynamika: {0} s · krok {1} ms · {2} kroků · gravitace {3} · tlumení {4} N·s/mm · odraz {5} · výpočet {6} s	Dynamik: {0} s · Schritt {1} ms · {2} Schritte · Schwerkraft {3} · Dämpfung {4} N·s/mm · Stoßzahl {5} · Rechenzeit {6} s
+Dynamika: díly se hýbou silami pružin, gravitace a zadaných sil po stupních volnosti, které nechávají vazby. Meze vazeb a délka pružiny na doraz jsou dorazy. Motor není nutný.	Dynamik: Teile bewegen sich durch Federkräfte, Schwerkraft und äußere Kräfte entlang der Freiheitsgrade, die die Verknüpfungen lassen. Verknüpfungsgrenzen und Blocklänge der Feder sind Anschläge. Kein Antrieb nötig.
+Dynamika: krok {0} s · gravitace {1} · tlumení {2} N·s/mm · odraz {3}{4}	Dynamik: Schritt {0} s · Schwerkraft {1} · Dämpfung {2} N·s/mm · Stoßzahl {3}{4}
+gravitace	Schwerkraft
+Gravitace	Schwerkraft
+gravitace: směr -Z / +Y / X…, tři čísla, nebo vyp	Schwerkraft: Richtung -Z / +Y / X…, drei Zahlen, oder aus
+hmotnost	Masse
+hmotnost „{0}“ {1} kg	Masse „{0}“ {1} kg
+Hmotnost {0} [kg]	Masse {0} [kg]
+hmotnost musí být kladná [kg]	Masse muss positiv sein [kg]
+hmotnost: zadejte komponentu a kg – pohyb hmotnost "Stírací deska" 2,4	Masse: Komponente und kg angeben – bewegung masse "Abstreiferplatte" 2,4
+Hmotnosti	Massen
+Hodnota zatížení	Lastwert
+integrační krok: 0,000001 až 0,05 s (např. krok 0,0005)	Integrationsschritt: 0,000001 bis 0,05 s (z. B. schritt 0,0005)
+Kinematika	Kinematik
+klik na díru nebo plochu A a protější plochu B – tabulka pružiny, do všech děr vzoru	Bohrung oder Fläche A und Gegenfläche B anklicken – Federtabelle, in alle Bohrungen eines Musters
+Krok integrace	Integrationsschritt
+Měkká	Weich
+moment	Moment
+moment [N·m]	Moment [N·m]
+moment N·m	Moment N·m
+moment vazba {0}: {1} N·m	Moment Verknüpfung {0}: {1} N·m
+Načítám plochy…	Flächen werden geladen…
+Náhled pružiny	Federvorschau
+neznámá – náhradní 1 g	unbekannt – Ersatzwert 1 g
+nová pružina z tabulky	neue Feder aus der Tabelle
+nová pružina: dosedací roviny {0} a {1} nejsou protilehlé rovnoběžné plochy	neue Feder: die Auflageebenen {0} und {1} sind keine gegenüberliegenden parallelen Flächen
+nová pružina: osa díry {0} není kolmá na dosedací rovinu – vyberte protější rovinnou plochu	neue Feder: Bohrungsachse {0} steht nicht senkrecht zur Auflageebene – gegenüberliegende ebene Fläche wählen
+nová pružina: rozměry musí být kladné a De větší než d – {0}	neue Feder: Maße müssen positiv und De größer als d sein – {0}
+nová pružina: zadejte aspoň jednu plochu (díru A nebo dosedací rovinu) – {0}	neue Feder: mindestens eine Fläche angeben (Bohrung A oder Auflageebene) – {0}
+nová pružina: zadejte dosedací komponenty – {0}	neue Feder: Auflagekomponenten angeben – {0}
+Odebrat sílu	Kraft entfernen
+odraz	Stoßzahl
+Odraz na dorazech	Stoßzahl an Anschlägen
+odraz: součinitel 0 (bez odrazu) až 1 (pružný odraz)	Stoßzahl: Beiwert 0 (kein Rückprall) bis 1 (elastischer Rückprall)
+Osa díry není kolmá na dosedací rovinu – vyberte protější rovinnou plochu.	Die Bohrungsachse steht nicht senkrecht zur Auflageebene – gegenüberliegende ebene Fläche wählen.
+Plocha A: {0} – teď klikněte na protější plochu jiného dílu (B).	Fläche A: {0} – jetzt die Gegenfläche eines anderen Teils (B) anklicken.
+Plocha B musí být na jiném dílu než plocha A.	Fläche B muss auf einem anderen Teil liegen als Fläche A.
+Plocha B neleží ve směru pružiny od plochy A – vyberte protější plochu.	Fläche B liegt nicht in Federrichtung von Fläche A – Gegenfläche wählen.
+Plochy nejde spojit pružinou.	Diese Flächen lassen sich nicht mit einer Feder verbinden.
+počet činných závitů (+ 2 přiložené)	Anzahl federnder Windungen (+ 2 angelegte)
+pohyb dynamika [čas T] [krok dt] [gravitace -Z|vyp] [tlumení c] [odraz e] · pohyb kinematika · pohyb hmotnost "<komponenta>" <kg>|auto · pohyb síla vazba <N> <N>|smazat · pohyb moment vazba <N> <N·m>|smazat	bewegung dynamik [zeit T] [schritt dt] [schwerkraft -Z|aus] [dämpfung c] [stoßzahl e] · bewegung kinematik · bewegung masse "<Komponente>" <kg>|auto · bewegung kraft verknüpfung <N> <N>|löschen · bewegung moment verknüpfung <N> <N·m>|löschen
+pohyb dynamika: neznámá volba „{0}“ – {1}	bewegung dynamik: unbekannte Option „{0}“ – {1}
+poměr vinutí D/d = {0} je mimo doporučených 4 až 20	Wickelverhältnis D/d = {0} liegt außerhalb der empfohlenen 4 bis 20
+prázdné = spočtená tuhost	leer = berechnete Federrate
+Prázdné = z objemu × hustoty materiálu dílu (šedě).	Leer = aus Volumen × Dichte des Teilewerkstoffs (grau).
+průměr drátu [mm]	Drahtdurchmesser [mm]
+pružina „{0}“ na doraz Ln {1} mm	Feder „{0}“ auf Block Ln {1} mm
+Pružina dosedá na rovinnou plochu nebo do díry (válcová plocha) – klikněte na jinou plochu.	Eine Feder liegt auf einer ebenen Fläche oder in einer Bohrung (Zylinderfläche) – andere Fläche anklicken.
+Pružina mezi díly	Feder zwischen Teilen
+Pružina mezi díly: klikněte na dosedací plochu A – rovinu, nebo díru / kapsu, ve které pružina sedí · Esc zruší	Feder zwischen Teilen: Auflagefläche A anklicken – Ebene, oder Bohrung / Tasche, in der die Feder sitzt · Esc bricht ab
+Pružina mezi díly: klikněte na protější plochu B jiného dílu (pružinu stlačuje) · Esc zruší	Feder zwischen Teilen: Gegenfläche B eines anderen Teils anklicken (drückt die Feder zusammen) · Esc bricht ab
+Pružina mezi díly: vyplňte tabulku a Vytvořit · Esc zruší	Feder zwischen Teilen: Tabelle ausfüllen und Erstellen · Esc bricht ab
+pružina nedosedá – L0 {0} mm není větší než vzdálenost ploch {1} mm	die Feder liegt nicht an – L0 {0} mm ist nicht größer als der Flächenabstand {1} mm
+rezerva do dorazu	Reserve bis Block
+Rozměry jako	Maße wie
+Sestava nemá vazby.	Die Baugruppe hat keine Verknüpfungen.
+Sestava potřebuje aspoň dva díly.	Die Baugruppe braucht mindestens zwei Teile.
+sestava pružina nová [d 2] [De 20] [L0 35] [n 6] [tuhost c] [blok Ln] mezi "Horní deska" F12 "Stírací deska" F3 [v x y z] [do děr vzoru] [název "P"]	baugruppe feder neu [d 2] [De 20] [L0 35] [n 6] [steifigkeit c] [block Ln] zwischen "Oberplatte" F12 "Abstreiferplatte" F3 [bei x y z] [alle bohrungen] [name "P"]
+síla	Kraft
+síla [N]	Kraft [N]
+síla N	Kraft N
+síla na vazbě: vazba v sestavě není (smazaná nebo potlačená)	Kraft an Verknüpfung: die Verknüpfung ist nicht in der Baugruppe (gelöscht oder unterdrückt)
+Síla pružin	Federkraft
+síla při montáži (L = {0} mm)	Kraft im Einbau (L = {0} mm)
+síla vazba {0}: {1} N	Kraft Verknüpfung {0}: {1} N
+Síly na vazbách	Kräfte an Verknüpfungen
+Snímků záznamu	Aufgezeichnete Bilder
+snímky	Bilder
+snímky: 10 až 5000	Bilder: 10 bis 5000
+střední průměr	mittlerer Durchmesser
+Tam a zpět (sinusově, jako lis)	Hin und zurück (sinusförmig, wie eine Presse)
+Tlačná pružina	Druckfeder
+tlumení	Dämpfung
+tlumení musí být ≥ 0 [N·s/mm]	Dämpfung muss ≥ 0 sein [N·s/mm]
+Tlumení pružin	Federdämpfung
+Tuhá	Hart
+tuhost (EN 13906-1)	Federrate (EN 13906-1)
+tuhost (ručně)	Federrate (manuell)
+Vazba síly	Verknüpfung der Kraft
+vnější průměr De	Außendurchmesser De
+vnější průměr De musí být větší než drát d	Außendurchmesser De muss größer sein als der Draht d
+vnější průměr pružiny [mm] – v díře s vůlí	Außendurchmesser der Feder [mm] – mit Spiel in der Bohrung
+Vytvářím…	Wird erstellt…
+Vytvořit	Erstellen
+vzdálenost dosedacích ploch {0} mm je pod délkou na doraz Ln {1} mm – zmenšete n nebo d	Abstand der Auflageflächen {0} mm liegt unter der Blocklänge Ln {1} mm – n oder d verkleinern
+z objemu	aus Volumen
+z objemu × hustoty	aus Volumen × Dichte
+zadaná	vorgegeben
+Zámek pružiny	Federsperre
+Zrychlení	Beschleunigung
+# recenze vlny 21: kontrola pružin EN 13906-1, nápověda, dynamika (tuhost z geometrie, energie, a max)
+ „{0}“ {1}: zdvih {2} {3} mm · v max {4} m/s · a max {5} m/s²{6}	 „{0}“ {1}: Hub {2} {3} mm · v max {4} m/s · a max {5} m/s²{6}
+ (bez rázů na dorazech)	 (ohne Stöße an Anschlägen)
+ ⚠ pružina „{0}“ nemá tuhost a díl není drátová pružina – v dynamice nepůsobí silou; zadejte tuhost (sestava pružina "{0}" … tuhost c)	 ⚠ Feder „{0}“ hat keine Federrate und das Teil ist keine Drahtfeder – sie wirkt in der Dynamik mit keiner Kraft; Federrate eingeben (baugruppe feder "{0}" … steifigkeit c)
+ Kontrola energie: odchylka {0} % z {1} J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení {2} J, dotyky {3} J, zadané síly {4} J)	 Energieprüfung: Abweichung {0} % von {1} J (größte kinetische Energie oder Arbeit der Kräfte; außerhalb der Kontaktschritte; Dämpfung {2} J, Kontakte {3} J, äußere Kräfte {4} J)
+ pružina „{0}“: tuhost {1} N/mm z geometrie dílu (EN 13906-1 R = G·d⁴ / (8·D³·n)) – v definici pružiny chybí	 Feder „{0}“: Federrate {1} N/mm aus der Teilegeometrie (EN 13906-1 R = G·d⁴ / (8·D³·n)) – fehlt in der Federdefinition
+– nová pružina z tabulky: osa z díry / roviny, L0 = 1,15 × vzdálenost ploch; materiál SH | DH | VDSiCr | 1.4310	– neue Feder aus der Tabelle: Achse aus Bohrung / Ebene, L0 = 1,15 × Abstand der Flächen; Werkstoff SH | DH | VDSiCr | 1.4310
+nejmenší pracovní délka (mezery Sa {0} mm)	kleinste Arbeitslänge (Abstände Sa {0} mm)
+nevybočí	knickt nicht
+nová pružina: {0}	neue Feder: {0}
+Pohyb: pohyb motor … (kinematika) · pohyb dynamika čas 0,5 krok 0,0005 [gravitace -Z] [tlumení 0,05] [odraz 0,2] – síly pružin hýbou díly; pružina bez tuhosti dostane tuhost z geometrie dílu.	Bewegung: bewegung antrieb … (Kinematik) · bewegung dynamik zeit 0,5 schritt 0,0005 [schwerkraft -Z] [dämpfung 0,05] [stoß 0,2] – Federkräfte bewegen die Teile; eine Feder ohne Federrate erhält sie aus der Teilegeometrie.
+pracovní délka {0} mm je pod nejmenší přípustnou Ln + Sa = {1} mm (Ln {2} + mezery Sa {3}) – závity se dotýkají	Arbeitslänge {0} mm liegt unter der kleinsten zulässigen Ln + Sa = {1} mm (Ln {2} + Abstände Sa {3}) – die Windungen berühren sich
+pružina se může vybočit – zdvih {0} mm je větší než kritický sK = {1} mm (L0/D = {2}), není-li vedená v díře nebo na trnu	die Feder kann ausknicken – Hub {0} mm ist größer als der kritische sK = {1} mm (L0/D = {2}), sofern sie nicht in einer Bohrung oder auf einem Dorn geführt ist
+pružina se vybočí – zdvih {0} mm je větší než kritický sK = {1} mm (L0/D = {2}); použijte trn nebo vedení v díře	die Feder knickt aus – Hub {0} mm ist größer als der kritische sK = {1} mm (L0/D = {2}); Dorn oder Führung in einer Bohrung verwenden
+Pružina v sestavě – příkazy (GUI: Sestava › Pružina mezi díly):	Feder in der Baugruppe – Befehle (GUI: Baugruppe › Feder zwischen Teilen):
+sestava pružina "P" mezi "A" "B" do děr vzoru – kopie pružiny do ostatních děr vzoru komponenty A	baugruppe feder "P" zwischen "A" "B" alle bohrungen – kopiert die Feder in die übrigen Musterbohrungen der Komponente A
+vedená v díře	in Bohrung geführt
+volná délka L0 {0} mm není větší než délka na doraz Ln {1} mm (nt {2} × d {3}) – zvětšete L0 nebo zmenšete n či d	ungespannte Länge L0 {0} mm ist nicht größer als die Blocklänge Ln {1} mm (nt {2} × d {3}) – L0 vergrößern oder n bzw. d verkleinern
+vzpěr – kritický zdvih	Knickung – kritischer Hub

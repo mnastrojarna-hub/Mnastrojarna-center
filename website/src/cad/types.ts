@@ -369,6 +369,8 @@ export type SpringDef = {
   offset?: number;
   /** vzdálenost dosedacích ploch z posledního přepočtu (> L0 = nedosedá, < Ln = pod dorazem) */
   seat?: number;
+  /** pružina vedená dírou / kapsou (nebo trnem) – vzpěr se v protokolu pohybu nehlásí (Pružina mezi díly u díry, vlna 21) */
+  guided?: boolean;
 };
 
 /**
@@ -483,6 +485,13 @@ export type Mate = {
   c?: MateRef; d?: MateRef; min?: number; max?: number; phase?: number[]; rel?: Placement;
 };
 /** Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost). */
-export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost místo rozsahu: ot/min (rotační) / mm/s (lineární) */ speed?: number };
+export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost místo rozsahu: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean };
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic };
+/**
+ * Dynamika pohybové studie (cad/motion-dynamic.ts): integrační krok [s], gravitace (směr; null = vypnutá, chybí = −Z), viskózní tlumení
+ * pružin [N·s/mm], součinitel odrazu na dorazech (0–1), ručně zadané hmotnosti komponent [kg] a síly / momenty na vazbách.
+ */
+export type MotionDynamic = { dt: number; gravity?: Vec3 | null; damping?: number; restitution?: number; masses?: Record<string, number>; loads?: MotionLoad[]; /** počet zaznamenaných snímků (výchozí 400) */ frames?: number };
+/** Síla [N] / moment [N·m] na vazbě: kladná hodnota zvětšuje hodnotu vazby (vzdálenost, posuv, natočení A vůči B). */
+export type MotionLoad = { mate: string; kind: "force" | "torque"; value: number };

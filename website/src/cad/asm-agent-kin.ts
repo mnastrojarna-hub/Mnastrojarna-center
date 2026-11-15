@@ -16,8 +16,12 @@ import { KIN_SPEC, accepts, entKindOf, kinDefaults, kinHasValue, type EntKind, t
 import { MATE_LABEL, faceAreas, worldGeo, type FaceGeo, type KinMateType } from "./mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "./mates-kin";
 import { springSeatMates } from "./asm-spring";
-import { defaultStudy, motionCsv, motionGroups, motionSummary, motorProblem, motorText, poseDoc, runMotion, type MotionClashes, type MotionResult } from "./motion";
+import { defaultStudy, motionGroups, motorProblem, motorText, poseDoc, runMotion, type MotionClashes, type MotionResult } from "./motion";
 import { fmtNum } from "./engine/protocol";
+import { applyDynCmd, dynamicRun, dynStudyLine } from "./asm-agent-dyn";
+// kinematická studie beze změny (cad/motion.ts), dynamická navíc s řádky / sloupci dynamiky (vlna 21)
+import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "./motion-dynamic-report";
+import type { DynMotionStep } from "./motion-dynamic";
 import { uid, type AsmComponent, type CadDoc, type Mate, type MateRef, type MotionMotor, type MotionStudy, type Vec3 } from "./types";
 
 /** Pokyn pro panel pohybové studie v aplikaci. */
@@ -214,7 +218,8 @@ const studySig = (d: CadDoc) => JSON.stringify({ c: (d.components ?? []).map((c)
 /** Spočítá pohybovou studii sestavy (geometrie z jádra, volitelně kolize); výsledek se pamatuje pro stejnou sestavu a studii. */
 export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: number, n: number) => void; cancel?: () => boolean; force?: boolean } = {}): Promise<MotionResult> {
   const study = d.motion;
-  if (!study?.motors.length) throw new Error(tr("pohybová studie nemá žádný motor – pohyb motor rotační \"Klika\" 0..360"));
+  // dynamika (cad/motion-dynamic.ts) motor nepotřebuje – hýbou síly pružin, gravitace a zadané síly
+  if (!study?.motors.length && study?.mode !== "dynamic") throw new Error(tr("pohybová studie nemá žádný motor – pohyb motor rotační \"Klika\" 0..360"));
   const sig = studySig(d);
   if (!opts.force && last?.sig === sig) return last.res;
   const flat = flattenAssembly(d);
@@ -233,7 +238,7 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
         return out;
       }
     : undefined;
-  const res = await runMotion(doc, geoProvider(doc, env), study, { collide, onStep: opts.onStep, cancel: opts.cancel });
+  const res = study!.mode === "dynamic" ? await dynamicRun(doc, env, geoProvider(doc, env), study!, { collide, onStep: opts.onStep, cancel: opts.cancel }) : await runMotion(doc, geoProvider(doc, env), study!, { collide, onStep: opts.onStep, cancel: opts.cancel });
   if (!opts.cancel?.()) last = { sig, res };
   return res;
 }
@@ -254,6 +259,8 @@ export function motionTable(d: CadDoc, res: MotionResult) {
     ...(s.trace ? { trace: s.trace } : {}),
     ...(s.clashes ? { clashes: s.clashes.map((c) => `${name(c.a)} × ${name(c.b)}`) } : {}),
     ...(s.springs ? { springs: Object.fromEntries(Object.entries(s.springs).map(([id, x]) => [name(id), { length: x.length, seat: x.seat, ...(x.force !== undefined ? { force: x.force } : {}), level: x.level }])) } : {}),
+    // dynamika: těžiště, rychlost [mm/s] a zrychlení [mm/s²] pohyblivých těles
+    ...((s as DynMotionStep).dyn ? { dyn: Object.fromEntries(Object.entries((s as DynMotionStep).dyn!).map(([id, x]) => [name(id), x])) } : {}),
     conflicts: s.conflicts.length,
   }));
 }
@@ -304,7 +311,13 @@ export type MotionClashStats = { steps: number; of: number; thread: number; real
 export async function motionClashLines(res: MotionResult, d: CadDoc, env?: Pick<AsmEnv, "clashDetail">): Promise<{ lines: string[]; codes: NonNullable<AsmResult["codes"]>; stats: MotionClashStats }> {
   const name = (id: string) => d.components?.find((c) => c.id === id)?.name ?? id;
   const steps = res.steps.filter((s) => s.clashes?.length);
-  if (!steps.length) return { lines: [tr("Kolize: žádné ve všech krocích")], codes: [], stats: { steps: 0, of: res.steps.length, thread: 0, real: 0, firstReal: null } };
+  // dynamika kontroluje kolize jen v `kroky` snímcích (cad/motion-dynamic.ts clashEvery) – počet „z N“ = kontrolované snímky
+  const checked = res.steps.filter((s) => s.clashes !== undefined).length;
+  const of = checked || res.steps.length;
+  const every = isDyn(res) ? res.dynamic.clashEvery : undefined;
+  const sampled = of < res.steps.length && every !== undefined;
+  const sample = sampled ? tr(" kolize kontrolovány v {0} snímcích z {1} (každý {2}. a poslední) – hustotu určuje pohyb kroky N", of, res.steps.length, every) : null;
+  if (!steps.length) return { lines: [sampled ? tr("Kolize: žádné v kontrolovaných snímcích") : tr("Kolize: žádné ve všech krocích"), ...(sample ? [sample] : [])], codes: [], stats: { steps: 0, of, thread: 0, real: 0, firstReal: null } };
   const threadPairs = new Set<string>();
   const threadSteps: number[] = [];
   type Group = { code: "clash.real" | "clash.undetermined"; a: string; b: string; step: number; t: number; steps: Set<number>; pairs: Set<string>; volume: number };
@@ -334,7 +347,8 @@ export async function motionClashLines(res: MotionResult, d: CadDoc, env?: Pick<
   const list = [...groups.values()].sort((x, y) => x.step - y.step || x.a.localeCompare(y.a));
   const first = list[0];
   const lines = [
-    tr("Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}", steps.length, res.steps.length, threadPairs.size, range ? tr(" (kroky {0})", range) : "", first ? tr("{0} dvojic dílů v {1} krocích, první v kroku {2}", list.length, realSteps.size, first.step) : tr("žádné")),
+    tr("Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}", steps.length, of, threadPairs.size, range ? tr(" (kroky {0})", range) : "", first ? tr("{0} dvojic dílů v {1} krocích, první v kroku {2}", list.length, realSteps.size, first.step) : tr("žádné")),
+    ...(sample ? [sample] : []),
   ];
   const codes: NonNullable<AsmResult["codes"]> = [];
   if (threadPairs.size) codes.push({ code: "clash.thread", text: tr("šroub v závitu: {0} dvojic v krocích {1}", threadPairs.size, range) });
@@ -342,7 +356,7 @@ export async function motionClashLines(res: MotionResult, d: CadDoc, env?: Pick<
   for (const g of list.slice(0, MAX))
     codes.push({ code: g.code, text: tr("v pohybu „{0}“ × „{1}“ od kroku {2} (t = {3} s): kroků {4}, dvojic komponent {5}, největší průnik {6} mm³", g.a, g.b, g.step, n3(g.t), g.steps.size, g.pairs.size, n3(g.volume)) });
   if (list.length > MAX) codes.push({ code: "clash.real", text: tr("v pohybu další dvojice dílů s kolizí: {0} – pohyb krok N je vypíše", list.length - MAX) });
-  return { lines, codes, stats: { steps: steps.length, of: res.steps.length, thread: threadPairs.size, real: list.length, firstReal: first ? first.step : null } };
+  return { lines, codes, stats: { steps: steps.length, of, thread: threadPairs.size, real: list.length, firstReal: first ? first.step : null } };
 }
 
 /**
@@ -362,8 +376,27 @@ export function motionKv(res: MotionResult, cl: MotionClashStats | null): string
     `static=${g.still}`,
     ...(g.rotating ? [`rot=${g.rotating}`] : []),
     ...(cl ? [`clash.steps=${cl.steps}/${cl.of}`, `thread=${cl.thread}`, `real=${cl.real}`, ...(cl.firstReal !== null ? [`first.real=${cl.firstReal}`] : [])] : []),
+    ...(isDyn(res) ? dynKv(res) : []),
   ];
   return `motion ${parts.join(" ")}`;
+}
+
+/**
+ * Dynamika na strojovém řádku studie (vlna 21): `mode=dyn bodies=1 spring.max=85.9N@0.238s stops=2 return=0.375s
+ * [drift=0.01%]` – největší síla pružiny, počet dorazů s dotykem, první návrat na doraz a kontrola energie (bez motorů).
+ */
+function dynKv(res: import("./motion-dynamic").DynResult): string[] {
+  const d = res.dynamic;
+  const n = (v: number, k = 3) => fmtNum(v, k);
+  const back = d.contacts.map((c) => (c.intervals[0]?.[0] === 0 && c.intervals.length > 1 ? c.intervals[1][0] : null)).filter((t): t is number => t !== null);
+  return [
+    "mode=dyn",
+    `bodies=${d.bodies.length}`,
+    ...(d.springMax ? [`spring.max=${n(d.springMax.force, 1)}N@${n(d.springMax.t, 4)}s`] : []),
+    `stops=${d.contacts.filter((c) => c.intervals.length).length}`,
+    ...(back.length ? [`return=${n(Math.min(...back), 4)}s`] : []),
+    ...(d.energy.drift !== null ? [`drift=${n(d.energy.drift * 100, 3)}%`] : []),
+  ];
 }
 
 /** Provede příkaz „pohyb …“. */
@@ -384,9 +417,11 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
     const s = doc.motion;
     if (!s) return [tr("Pohybová studie: žádná – pohyb motor rotační \"Klika\" 0..360 [krok 5] [kolize]")];
     const tc = s.trace ? doc.components?.find((c) => c.id === s.trace!.compId) : null;
+    const dl = dynStudyLine(doc);
     return [
       tr("Pohybová studie: motorů {0} · kroků {1} · {2} s{3}{4}", s.motors.length, s.steps, fmt(s.duration, 3), s.collisions ? tr(" · kolize") : "", tc ? tr(" · stopa „{0}“ {1}", tc.name, pt(s.trace!.point)) : ""),
       ...s.motors.map((mo, i) => ` ${i + 1}. ${motorText(mo, doc)}`),
+      ...(dl ? [dl] : []),
     ];
   };
   const applyOpts = (o: { steps?: number; step?: number; duration?: number; collisions?: boolean; trace?: { comp: string; point?: Vec3 } | null }, span?: number) => {
@@ -403,7 +438,7 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
   switch (cmd.op) {
     case "status": {
       log.push(...studyLines(d));
-      if (d.motion?.motors.length) await runLog(d);
+      if (d.motion?.motors.length || d.motion?.mode === "dynamic") await runLog(d);
       return signal(d, log, false, undefined, codes, kv);
     }
     case "motor": {
@@ -414,7 +449,7 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       const p = motorProblem({ kind: cmd.kind, mate: mate.id }, d.mates ?? []);
       if (p) throw new Error(tr("motor: {0}", p));
       const k = invert ? -1 : 1;
-      const mo: MotionMotor = { id: uid(), kind: cmd.kind, mate: mate.id, from: k * cmd.from, to: k * cmd.to, ...(cmd.speed !== undefined ? { speed: k * cmd.speed } : {}) };
+      const mo: MotionMotor = { id: uid(), kind: cmd.kind, mate: mate.id, from: k * cmd.from, to: k * cmd.to, ...(cmd.speed !== undefined ? { speed: k * cmd.speed } : {}), ...(cmd.back ? { back: true } : {}) };
       const i = study.motors.findIndex((x) => x.mate === mate.id);
       if (i >= 0) study.motors[i] = { ...mo, id: study.motors[i].id };
       else study.motors.push(mo);
@@ -428,8 +463,13 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       applyOpts(cmd, study.motors[0] ? study.motors[0].to - study.motors[0].from : undefined);
       const doc = { ...d, motion: study };
       log.push(...studyLines(doc));
-      if (study.motors.length) await runLog(doc);
+      if (study.motors.length || study.mode === "dynamic") await runLog(doc);
       return signal(doc, log, true, { open: true }, codes, kv);
+    }
+    case "dyn": {
+      // dynamika, hmotnost, síla / moment (cad/asm-agent-dyn.ts); kódy kolizí a strojový řádek studie z `runLog` jako u ostatních
+      const r = await applyDynCmd(d, cmd.cmd, study, { runLog, lines: studyLines, log });
+      return signal(r.doc, r.log, r.changed, r.motion, codes, kv);
     }
     case "run":
       log.push(...studyLines(d));
@@ -457,6 +497,8 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       const list = await classifyStepClashes(env, poseDoc(d, s.place), s.clashes ?? []);
       const thrC = list.filter((c) => c.cls === "thread" || c.cls === "underhead").map((c) => `${nm(c.a)} × ${nm(c.b)}`);
       if (thrC.length) log.push(tr(" kolize šroub v závitu: {0}", thrC.join(", ")));
+      // dynamika kontroluje kolize jen v každém k-tém snímku (motion-dynamic.ts clashEvery)
+      if (res.collisionsChecked && s.clashes === undefined) log.push(tr(" kolize v tomto snímku nekontrolována (dynamika: každý {0}. snímek – pohyb kroky N)", isDyn(res) ? (res.dynamic.clashEvery ?? 1) : 1));
       const stepCodes: NonNullable<AsmResult["codes"]> = list
         .filter((c) => c.cls === "real" || c.cls === "undetermined")
         .map((c) => (c.cls === "real" ? { code: "clash.real", args: [nm(c.a), nm(c.b), fmt(c.volume, 1)] } : { code: "clash.undetermined", args: [nm(c.a), nm(c.b)] }));

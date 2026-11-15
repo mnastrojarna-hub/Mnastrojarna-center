@@ -63,9 +63,10 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
  * soubor `<sestava>-pohyb.csv` (stejný název jako tlačítko CSV panelu pohybu). Výpis CSV v protokolu zůstává.
  */
 async function writeMotionCsv(ctx: Parameters<OpHandler<"asm">>[1], d: CadDoc): Promise<void> {
-  const [{ motionCached }, { motionCsv }] = await Promise.all([import("../../asm-agent-kin"), import("../../motion")]);
+  // kinematika beze změny (cad/motion.ts motionCsv), dynamika navíc s těžištěm, rychlostí a zrychlením těles (vlna 21)
+  const [{ motionCached }, { studyCsv }] = await Promise.all([import("../../asm-agent-kin"), import("../../motion-dynamic-report")]);
   const res = motionCached(d);
   if (!res) return;
-  const data = new TextEncoder().encode(motionCsv(res, d));
+  const data = new TextEncoder().encode(studyCsv(res, d));
   await ctx.host.files.write({ name: `${d.name || tr("sestava")}-pohyb.csv`, mime: "text/csv;charset=utf-8", data, doc: d.name, format: "csv" });
 }

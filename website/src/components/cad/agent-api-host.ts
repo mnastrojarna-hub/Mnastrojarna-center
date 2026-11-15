@@ -182,7 +182,7 @@ function sketchDxf(host: ApiHost, doc: CadDoc, name?: string): CapturedFile & { 
 /* ───────────────────────── akce rozšíření ───────────────────────── */
 const FILE_ACTIONS = new Set(["sheet.dxf", "sheet.svg", "sketch.dxf"]);
 /** Spustí akci rozšíření se zachytávacím API (bez okna a bez stažení). `d` = dokument, se kterým pracuje agent. */
-async function runAction(host: ApiHost, id: string, d?: CadDoc): Promise<{ label: string; log: string; files: CapturedFile[] }> {
+async function runAction(host: ApiHost, id: string, d?: CadDoc, arg?: string): Promise<{ label: string; log: string; files: CapturedFile[] }> {
   const a = resolveAction(id);
   const doc = d ?? host.doc();
   if (a.id === "sketch.dxf") {
@@ -193,7 +193,7 @@ async function runAction(host: ApiHost, id: string, d?: CadDoc): Promise<{ label
   if (!ui?.action) throw new Error(tr("akce „{0}“ nemá v této verzi provedení", a.label));
   const result = isPartDoc(doc) ? (d ? await cad.build(doc).catch(() => null) : (host.result() ?? (await cad.build(doc).catch(() => null)))) : null;
   let notices = 0;
-  const cap = captureActionApi<Omit<ExtActionApi, "flash" | "notice" | "download">>({ doc, result, selection: host.selection(), commit: host.commit, exportModel: host.exportModel });
+  const cap = captureActionApi<Omit<ExtActionApi, "flash" | "notice" | "download">>({ doc, result, selection: host.selection(), commit: host.commit, exportModel: host.exportModel, arg });
   const notice = cap.api.notice;
   cap.api.notice = (t, b) => {
     notices++;
@@ -279,7 +279,7 @@ export async function runApiCmd(cmd: ApiCmd, d: CadDoc, host: ApiHost): Promise<
     }
     case "action": {
       if (!cmd.id) return { log: [tr("Akce: {0}", apiActions().map((a) => `${a.id} (${a.label})`).join(", "))] };
-      const r = await runAction(host, cmd.id, d);
+      const r = await runAction(host, cmd.id, d, cmd.arg);
       return { log: [tr("✓ akce {0}", r.label), ...(r.log ? r.log.split("\n") : []), ...r.files.map(fileLine)] };
     }
     case "analyze": {

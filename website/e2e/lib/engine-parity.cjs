@@ -55,6 +55,8 @@ function normalize(text) {
         .replace(/^(\s+entity: .*)$/, (x) => x.replace(/(entity: |· )([a-z0-9_]+)(?= )/g, (m, p, id) => (isTextId(id) ? m : p + '#')))
         .replace(/^(\s+profil: .*)$/, (x) => x.replace(/\(([^()]*)\)/g, (m, inner) => '(' + inner.split('; ').map((id) => (/^[a-z0-9]{5,9}$/.test(id) && !isTextId(id) ? '#' : id)).join('; ') + ')'))
         .replace(/ · [\d.,]+ s$/, '')
+        // doba výpočtu dynamické studie uprostřed řádku `Dynamika: … · výpočet 0,41 s` (vlna 21)
+        .replace(/ · výpočet [\d.,]+ s(?= |$)/, '')
         // nápověda k neznámému příkazu = seznam příkazů z AGENT_COMMANDS (s novým příkazem se prodlouží) – jen jeho začátek
         .replace(/^(✗ řádek \d+: neznámý příkaz „[^“]*“ – příkazy: )(.*?)( ← „.*“)?$/, '$1…$3')
         .replace(/\bid [a-z0-9]{1,9}\]/g, 'id #]')

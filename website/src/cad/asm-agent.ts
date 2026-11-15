@@ -54,6 +54,7 @@ import {
 import { tr } from "./i18n";
 import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin";
 import { applySpringCmd, refreshSprings } from "./asm-spring-agent";
+import { applySpringNew, applySpringPattern, springHelpLines } from "./asm-spring-between";
 import { springEffective } from "./asm-spring-geom";
 import { kinHasLimits, kinHasValue } from "./mate-spec";
 import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
@@ -427,6 +428,10 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
     }
     case "spring":
     case "springs":
+      // nová pružina z tabulky / kopie do děr vzoru (vlna 21, cad/asm-spring-between.ts)
+      if (cmd.k === "spring" && cmd.help) return { doc: d, log: springHelpLines(), changed: false };
+      if (cmd.k === "spring" && cmd.create) return applySpringNew(d, cmd, env);
+      if (cmd.k === "spring" && cmd.holes && !cmd.remove) return applySpringPattern(d, cmd, env);
       return applySpringCmd(d, cmd, env);
     case "comp": {
       asmOnly();

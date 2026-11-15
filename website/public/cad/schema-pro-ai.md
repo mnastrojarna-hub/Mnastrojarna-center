@@ -84,6 +84,8 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `sestava vazba ozubení|šroub|hřeben|vačka|kardan|kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez … "A" <F|E|V> "B" <F|E|V> [poměr|stoupání|min|max]` · `pohyb motor rotační "Klika" 0..360 krok 5 [kolize]` · `pohyb stav|krok N|přehrát|export csv` | pokročilé a mechanické vazby (23 druhů) a pohybová studie (viz „Pokročilé a mechanické vazby, pohybová studie“) |
 | `sestava komponenta "X" [v x y z] [otočení …] [posun …] [ukotvit|uvolnit] [skrýt|zobrazit] [barva #hex] [název "…"] [číslo "…"] [skupina "…"] [materiál …] [přezdívka "…"]` · `sestava odebrat|duplikovat|izolovat "X"` · `sestava zobrazit vše` | vlastnosti komponenty jako v panelu |
 | `sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c]` · `sestava pružina "P" odebrat` · `sestava pružiny` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
+| `sestava pružina nová [d 2] [De 20] [L0 35] [n 6] [tuhost c] [blok Ln] mezi "A" Ø21 "B" horní [v x y z] [do děr vzoru] [název "P"]` · `sestava pružina "P" mezi "A" "B" do děr vzoru` | nová pružina z tabulky mezi díly (osa z díry / roviny, zámek k A) a kopie do všech děr vzoru (viz „Pružina v sestavě“) |
+| `pohyb dynamika [čas T] [krok dt] [gravitace -Z|vyp] [tlumení c] [odraz e]` · `pohyb hmotnost "X" kg` · `pohyb síla vazba N F` · `pohyb kinematika` | dynamická pohybová studie: síly pružin, gravitace a zadané síly hýbou díly, dorazy s odrazem (viz „Dynamika“) |
 | `sestava pole "X" N rozteč P [směr Y]` · `sestava pole "X" kruhové N [osa Z] [v cx cy cz]` · `sestava zrcadlit "X" YZ` · `sestava šroub "Deska" Ø9 [matice] [bez podložky]` | pole, zrcadlení, šroubový spoj do díry |
 | `sestava podsestava "A" "B" [jako "…"]` · `sestava rozpustit "P"` · `sestava upravit "X"` … `sestava hotovo` · `sestava otevřít "X"` | podsestavy, úprava dílu v kontextu sestavy |
 | `kusovník [strukturovaně] [csv]` · `rám formy [šířka délka] [dutina X Y H] …` · `záložky` · `záložka "název"|N` · `zavřít záložku` | kusovník do protokolu, rám vstřikovací formy, záložky dokumentů |
@@ -798,10 +800,33 @@ pravidlem jako u vazeb. Polohu napříč (osu) určuje umístění pružiny (`vl
   `sestava pružina "P" odebrat` – definice pryč, tvar ve volné délce. `sestava odebrat "A"` (dosedací komponenta) odebere i
   definice pružin, které na ní dosedaly (`pružiny bez dosedací komponenty …`).
 - Tvar: v jádře (export STEP / BREP, kolize, objem, výkres, zobrazení po přepočtu) se díl pružiny staví **přesně v aktuální délce** –
-  mění se stoupání (počet závitů a drát zůstávají), u trubky / válce výška; při přehrávání pohybové studie v okně se síť volné
-  pružiny jen protáhne po ose (bez stavby v každém kroku). V kusovníku (`kusovník`, panel Kusovník, tabulka na výkrese) je pružina
+  mění se stoupání (počet závitů a drát zůstávají), u trubky / válce výška; při přehrávání pohybové studie v okně se síť drátu
+  spočítá v délce kroku (vlna 21: stoupání činných závitů se mění, drát zůstává kulatý, závěrné závity přiložené, broušené konce
+  rovinné v 0 a L; mezipaměť podle délky na 0,01 mm) – jen trubka / válec se protáhne po ose. V kusovníku (`kusovník`, panel Kusovník, tabulka na výkrese) je pružina
   jedna položka podle zdroje bez ohledu na délku; hmotnost = těleso v aktuální délce (stejně jako `stav`).
 - V aplikaci: panel komponenty › Pružina mezi komponentami (Dosedá na A, Stlačuje B, L0, Ln, c) – provede tentýž příkaz.
+- **Nová pružina mezi díly** (vlna 21; Sestava › Pohyb › Pružina mezi díly – klik / seznam ploch A a B, tabulka, Vytvořit):
+  `sestava pružina nová [d 2] [De 20] [L0 35] [n 6] [materiál SH|DH|VDSiCr|1.4310] [tuhost c] [blok Ln] mezi "A" <plocha> "B" <plocha>
+  [v x y z] [do děr vzoru] [název "P"]` (EN `assembly spring new … between … all holes`, DE `baugruppe feder neu … zwischen …
+  alle bohrungen`). Plocha A = díra / kapsa (válcová plocha, `Ø21`, `F12`) nebo rovina, B = protější rovina (`horní`, `F3`)
+  nebo díra. Osa = osa díry, u dvou rovin normála (bod osy `v x y z`, jinak střed roviny A). Začátek pružiny na dně kapsy (u díry
+  A konec dál od B, dosedací plochu pak najde pravidlo s materiálem pod pružinou), vzdálenost dosedacích ploch se změří. Chybějící
+  rozměry se předvyplní: De podle díry (vůle 5 %, nejméně 0,5 mm), d ≈ De/10, L0 = 1,15 × vzdálenost (předpětí 15 %), n ze stoupání
+  ≈ 0,29·D. Tuhost a Ln se spočtou podle EN 13906-1: `R = G·d⁴ / (8·D³·n)` (G: SH/DH 81 500, VDSiCr 79 500, 1.4310 70 000 N/mm²),
+  `nt = n + 2`, `Ln = nt·d`; tabulka a protokol navíc kontrolují (stejné vzorce jako tabulková pružina balíku part): nejmenší
+  pracovní délku `Ln + Sa`, `Sa = (0,0015·D²/d + 0,1·d)·n` (pod ní ⚠ „závity se dotýkají“), napětí `τ = 8·D·F/(π·d³)` při montáži
+  a na dorazu vůči `τzul = 0,5·Rm(d)` – statická kontrola EN 13906-1 bez korekce, stejně jako výpočet tabulkové pružiny
+  (⚠ „napětí 163 % dovoleného …“); korigované `τk = k·τ`, `k = (w + 0,5)/(w − 0,75)`, `w = D/d` nad τzul dá přísnější ⚠ „napětí
+  s korekcí k … – staticky vyhoví“ (opakované zatížení stírače) – a vzpěr (kritický zdvih sK, ν = 0,5; pružina v díře / kapse je vedená
+  a vzpěr se nehlásí ani v souhrnu pohybu). L0 ≤ Ln nebo De ≤ d = ✗, pružina se nevytvoří. Stejné kontroly dělá souhrn
+  pružin kinematické i dynamické studie při nejkratší dosažené délce (` ⚠ pružina „P“: délka … – pracovní délka 20 mm je pod
+  nejmenší přípustnou Ln + Sa = 22,22 mm …`) – jen u drátové pružiny, jejíž zadaná tuhost odpovídá geometrii dílu (±10 %; jinak
+  je díl jen náhradní tvar jiné pružiny). `sestava pružina nápověda` vypíše přehled příkazů. Díl pružiny = tabulková tlačná pružina `spring.compression` (broušené konce,
+  materiál drátu v datech prvku – `pružina tabulka` v dílu pružiny vypíše celý výpočet) v aplikaci i v příkazové řádce; komponenta dostane `zámek` ke komponentě A a definici pružiny tímtéž
+  výpočtem jako `sestava pružina`. `do děr vzoru` = do všech děr stejného Ø, osy a hloubky na stejném dílu (6 pružin stírače jedním
+  řádkem); u existující pružiny `sestava pružina "P" mezi "A" "B" do děr vzoru` zkopíruje pružinu (i se zámkem) do ostatních děr
+  vzoru díry, ve které stojí. Protokol: `✓ nová pružina „Pružina 2×19,5×41“ 4× · d 2 · De 19,5 · L0 41 · n 7,5 · R 4,055 N/mm ·
+  Ln 19 mm · do děr F7/F8/F9/F10 Ø21 – zámek ke komponentě „Horní deska“` a stav pružin `(4×)`.
 
 Příklad (sestava: „Vodicí deska“ dole, nad ní „Kotevní deska“ s otvory Ø20, kterými pružiny procházejí, nahoře „Opěrná deska“
 s vazbou Vzdálenost „ZDVIH“ 38 k vodicí desce; 2× „Pružina R20“ = trubka Ø20/Ø10 × 38 stojící na vodicí desce):
@@ -815,6 +840,87 @@ pohyb
 Protokol: `✓ pružina „Pružina R20“: délka 38 mm · L0 44 · Ln 20 · stlačení 6 mm · síla 150 N (c 25 N/mm) (2×)` a v souhrnu
 studie ` ✓ pružina „Pružina R20“: délka 38 → 32 mm (min 32 · L0 44 · Ln 20) · síla 150 → 300 N (max 300 N) (2×)`. Se „Kotevní
 deska“ místo „Opěrná deska“ skončí řádek ✗ (pružiny procházejí jejími otvory a na ní nedosedají).
+
+**Dynamika** (vlna 21; Pohybová studie › Dynamika, `pohyb dynamika`, EN `motion dynamics`, DE `bewegung dynamik`): díly se
+hýbou silami – pružiny (F = c·(L0 − L) jen při dosednutí, + tlumič `tlumení` [N·s/mm] paralelně k pružině), gravitace (výchozí
+−Z, 9,81 m/s²), zadaná síla / moment na vazbě – po stupních volnosti, které nechávají vazby (posuv po Souososti / Drážce / mezi
+rovinami, natočení na Závěsu; i několik nezávislých). Motory na jiných vazbách pohánějí jako v kinematice (předepsaný pohyb).
+Meze vazeb (Mez vzdálenosti min/max, Mez úhlu, konce Drážky) a délka pružiny na doraz Ln jsou **dorazy**: díl se zastaví,
+rychlost do dorazu se nahradí odrazem −e·v (`odraz e`, 0 = zůstane ležet). Tělesa = tuhé skupiny ze zámků; hmotnost = objem dílů ×
+hustota materiálu, těžiště a setrvačnost ze sítě (`pohyb hmotnost "X" 2,4` přepíše, `auto` vrátí). Integrace: rychlostní Verlet
+s projekcí na vazby (RATTLE), pevný krok `krok dt` [s]; záznam ≤ 400 snímků (`snímky N`). S `kolize` se kolize kontrolují
+jen v `kroky` rovnoměrně rozložených snímcích (+ poslední; výchozí 36 jako kinematika, `pohyb kroky N` zhustí) – souhrn
+`Kolize v pohybu: kroků s kolizí K z N` a ` kolize kontrolovány v N snímcích z 334 (každý 10. a poslední)`, `clash.steps=K/N`;
+ostatní snímky `pohyb krok` / CSV označí „nekontrolováno“. Kinematická studie zůstává výchozí –
+`pohyb kinematika` přepne zpět (nastavení dynamiky zůstane).
+
+- `pohyb dynamika čas 0,5 krok 0,0005 gravitace -Z tlumení 0,05 odraz 0,2` – zapne a spočítá; `gravitace vyp|+Y|0 0 -1`.
+- `pohyb hmotnost "Stírací deska" 2,4` · `pohyb síla vazba 3 120` [N] · `pohyb moment vazba "Klika" 5` [N·m] (kladná hodnota
+  zvětšuje hodnotu vazby: vzdálenost / posuv / natočení A vůči B) · `… smazat`.
+- Motor `tam a zpět` (EN `there and back`, DE `hin und zurück`): od → do → od sinusově (výstředníkový lis), i v kinematice.
+- Protokol (navíc k souhrnu studie): `Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · …`, tělesa ` „Stírací deska“
+  2,4 kg (zadaná): zdvih Z 15 mm · v max 0,19 m/s · a max … m/s²`, ` Největší síla pružiny: „P“ 85,9 N v t = 0,238 s`, dorazy
+  ` doraz „Matrice …“ (min 0 mm): dotyk 0,125–0,375 s · nárazy 0,188 m/s (t = 0,125 s)`, `  návrat na doraz v t = 0,375 s`,
+  energie (bez motorů `Kontrola energie: odchylka 0,01 % z 0,04 J (největší pohybová energie nebo práce sil; …)` – vztaženo
+  k největší kinetické energii, polohová energie tíže od výchozí polohy, takže výsledek nezávisí na umístění modelu; s motorem jen
+  začátek / konec). `v max` a `a max` jsou ze všech integračních kroků, `a max` bez rázu na dorazu (náraz = skok rychlosti,
+  hlásí řádek dorazu `nárazy … m/s`).
+- Pružina bez tuhosti (`sestava pružina "P" … ` bez `tuhost`, panel bez c) dostane v dynamice tuhost z geometrie dílu
+  (` pružina „P“: tuhost 4,974 N/mm z geometrie dílu (EN 13906-1 …)`); díl bez drátu (trubka / válec) bez tuhosti ⚠ nepůsobí.
+- Integrace RATTLE: polovina rázu s reakcemi vazeb, oprava polohy hmotnostně váženě ve směru reakce vazby (SHAKE) a stejná oprava
+  do rychlosti – i natočení na čepu se zatížením mimo těžiště (kyvadlo, páka na pružinách, moment na Závěsu) drží energii (kyvadlo
+  T/400: amplituda 8,7156 mm beze změny přes 10 kmitů) a poloha odpovídá rychlosti (moment 1 N·m: θ = τ·t²/(2·I) přesně).
+- `pohyb export csv` přidá sloupce `<těleso> těžiště Z [mm]; <těleso> vZ [mm/s]; <těleso> aZ [m/s²]` (hlavní osa pohybu);
+  `window.mncad.motion({ mode: "dynamic", duration: 0.5, dt: 0.0005, gravity: "-Z", damping: 0.05, restitution: 0.2,
+  masses: { "Stírací deska": 2.4 }, forces: [{ mate: 3, value: 120 }] })` vrátí kroky s `dyn: { "<těleso>": { p, v, a } }` (mm, mm/s,
+  mm/s²) a `dynamic: { bodies, springMax, contacts: [{ label, bound, limit, intervals, impacts }], energy }`. Panel: přepínač
+  Kinematika / Dynamika, nastavení, hmotnosti, síly, graf (poloha, rychlost, zrychlení, síla pružin) s ukazatelem kroku.
+- Stejně v aplikaci i v příkazové řádce (`mncad run`, HTTP): `sestava pružina nová … do děr vzoru`, `pohyb dynamika | hmotnost | síla |
+  moment`, motor `tam a zpět` a `pohyb stav` běží v enginu; stručný protokol má strojový řádek studie
+  `= … motion … mode=dyn bodies=2 spring.max=107N@0.24s stops=2 return=0.375s [drift=…%]`, `pohyb export csv` zapíše soubor se
+  sloupci dynamiky a STEP sestavy obsahuje pružiny jako skutečná tělesa v aktuální délce. Jen v aplikaci zůstává panel s grafem,
+  přehrání a snímky (`pohyb přehrát` ℹ `ui.no-view`, `pohyb export png|webm` ✗ `host.app-only`).
+
+Příklad 1 – střižník: horní deska se 4 kapsami Ø21 hl. 10 dolů 30 mm a zpět, stírací deska na 4 pružinách dosedne na matrici:
+
+```
+nová sestava Střižník
+vložit "Spodní deska" ukotvit
+vložit "Stírací deska" v 0 0 45
+vložit "Horní deska" v 0 0 85
+sestava vazba vzdálenost "Horní deska" spodní "Spodní deska" horní hodnota 55 název "LIS"
+sestava vazba mez-vzdálenosti "Stírací deska" horní "Horní deska" spodní min 5 max 25 název "Doraz stírače"
+sestava vazba mez-vzdálenosti "Stírací deska" spodní "Spodní deska" horní min 0 max 500 název "Matrice"
+sestava pružina nová mezi "Horní deska" Ø21 "Stírací deska" horní do děr vzoru
+pohyb motor lineární vazba "LIS" 55..25 tam a zpět
+pohyb hmotnost "Stírací deska" 2,4
+pohyb dynamika čas 0,5 krok 0,0005 gravitace -Z tlumení 0,05 odraz 0,2
+```
+
+Výsledek: 4 pružiny 2 × 19,5 × 41 (R 4,055 N/mm, Ln 19) v délce 35 mm; stírač dosedne na matrici v t = 0,125 s (LIS 40),
+pružiny se stlačí na 20 mm (největší síla ≈ 85 N na pružinu), návrat na doraz v t = 0,375 s. Souhrn pružin hlásí ⚠ „pracovní
+délka 20 mm je pod nejmenší přípustnou Ln + Sa = 22,22 mm … – závity se dotýkají“: předvyplněná pružina (n 7,5) na zdvih 15 mm
+nestačí. Se `sestava pružina nová n 6 mezi "Horní deska" Ø21 "Stírací deska" horní do děr vzoru` (Ln 16, Ln + Sa 18,58 mm,
+R 5,069 N/mm, 106 N na pružinu, τ 60 % dovoleného, τk 69 %) je souhrn ✓.
+
+Příklad 2 – pérový kolík zaskočí do díry (bez motoru): pouzdro s vývrtem Ø8,2 (dno z = 5), kolík Ø8 × 30 zatlačený 14 mm nad dnem
+(pružina stlačená na 14 mm), zdvih 13…24 mm:
+
+```
+nová sestava Západka
+vložit "Pouzdro" ukotvit
+vložit "Kolík" v 15 15 19
+sestava vazba souosost "Kolík" "Pouzdro"
+sestava vazba mez-vzdálenosti "Kolík" spodní "Pouzdro" nejmenší +Z min 13 max 24 název "Zdvih"
+sestava pružina nová d 0,8 De 7 L0 30 n 11 mezi "Pouzdro" nejmenší +Z "Kolík" spodní
+pohyb dynamika čas 0,02 krok 0,00002 gravitace -Z
+```
+
+Pružina 0,8 × 7 × 30, n 11 (SH): R = 81 500·0,8⁴ / (8·6,2³·11) = 1,592 N/mm, Ln = 13·0,8 = 10,4 mm, Ln + Sa = 12,07 mm < 14 mm,
+při montáži 25,5 N a τ = 786 MPa = 68 % τzul (Rm 2 310; τk = 926 MPa = 80 %), na dorazu Ln τn 83 % (τkn 98 %) – bez ⚠. Výsledek: kolík 11,8 g vystřelí z délky
+pružiny 14 mm na doraz 24 mm za 3,24 ms rychlostí ≈ 5,42 m/s (` doraz „Zdvih Kolík → Pouzdro“ (max 24 mm): dotyk … · nárazy
+5,42 m/s`); analyticky L(t) = 30 − 16·cos(ω·t), ω = √(R/m) = 367 rad/s → 3,24 ms, energie ½·R·(16² − 6²) − m·g·10 mm = ½·m·v²
+→ 5,42 m/s.
 
 ```
 nová sestava Klikový mechanismus
@@ -1037,6 +1143,65 @@ svar bodový Ø6 rozteč 40 počet 5 plocha F9 metoda 21
 - Omezení: tupý svar s úpravou jen po **rovné** spáře (čelo musí mít rovnou hranu), šikmý T spoj (≠ 90°) jen koutovým
   svarem; koutová housenka po rovných hranách a obloucích (ne po obecné křivce); bodové svary jsou značky (tenké
   terčíky Ø d na ploše, bez hmotnosti), čočka svaru uvnitř plechů se nemodeluje.
+
+### Pružiny z tabulky – tlačná, tažná, zkrutná, talířová (`pružina …`, EN `spring …`, DE `feder …`)
+
+Jeden řádek = jeden prvek historie `spring.compression` | `spring.extension` | `spring.torsion` | `spring.disc` se **stejnou
+tabulkou** jako průvodce Tvorba › Pružina (Ctrl+K „Pružina“, knihovna Pružiny): zadáte pár řádků, zbytek se dopočítá a vypíše.
+Značky jsou citlivé na velikost písmen (`d` drát ≠ `D` střední průměr); stačí jeden z průměrů `D | De | Di` a jeden z `n | nt`,
+místo délky `L1 / L2` lze sílu `F1 / F2` (poslední zadaná alternativa platí).
+
+- **Tlačná (EN 13906-1)**: `pružina tlačná d 2 De 20 L0 50 n 8 [konce broušené|přiložené|otevřené] [materiál SH|DH|VDSiCr|1.4310]
+  [L1 40] [L2 30] [uložení 0,5|0,7|1|2] [levé]`. Spočte tuhost R = G·d⁴/(8·D³·n), nt, Ln (broušené nt·d), nejmenší součet mezer Sa,
+  síly při L1 / L2 / Ln, napětí τ2 a τn proti τzul = 0,5·Rm(d) (statická kontrola EN 13906-1 bez korekce), korekci k
+  (Bergsträsser) a τk2 = k·τ2 (nad τzul přísnější ⚠ pro opakované zatížení – „staticky vyhoví“), vzpěr (uložení ν), vlastní frekvenci,
+  hmotnost a délku drátu. Tvar: přiložené závěrné závity s plynulým přechodem, **broušené konce = rovinné plochy kolmé na osu
+  v 0 a L0**, Ø tělesa = De – díl tedy měří jako skutečná pružina (`měřit těleso`).
+- **Tažná (EN 13906-2)**: `pružina tažná d 1,6 De 12 n 12 F0 5 [očka německé|poloviční|boční] [očko2 …] [natočení 90] [L2 50]` –
+  vnitřní okraje oček v 0 a L0 = Lk + LH1 + LH2 (německé očko LH = Di); síla F = F0 + R·(L − L0); největší délka Ln (τk = 0,45·Rm).
+- **Zkrutná (EN 13906-3)**: `pružina zkrutná d 2 De 20 n 6,25 [ramena tečná|radiální|osová] [ramena 25] [rameno1 … l1 …] [a2 60 | M2 450]`
+  – úhlová tuhost RM = E·d⁴/(3667·D·nef) [N·mm/°], napětí σq proti 0,7·Rm, vnitřní průměr při natočení (trn ≤ 0,9 ×).
+- **Talířová (DIN 2093)**: `pružina talířová řada A|B|C De 40 [sloupec 4 2] [L2 19,2]` (`řada vlastní De … Di … t … h0 …`) – sloupec
+  4 talíře za sebou × 2 v sobě, síla podle Almena–László, varování nad 75 % h0.
+- **Umístění** (všechny druhy): `v x y z`, `osa X|Y|Z|-Z` nebo vektor `osa 0 0 -1`, `tvar 35` = tvar stlačené tlačné pružiny
+  (stoupání činných závitů se zmenší, výpočet zůstává pro L0), `přidat|odebrat|průnik|nové`, `název "…"`.
+- **Výsledek**: protokol vypíše souhrn a varování česky (`⚠ při stlačení na L2 je napětí 112 % dovoleného`, `⚠ pružina se vybočí –
+  použijte trn nebo vedení`); stejná varování má prvek ve stromu (⚠) a `stav`. Chyba zadání (L0 pod Ln, L2 pod dorazem, chybí
+  drát…) je ✗ u řádku. `pružina tabulka` vypíše spočtené řádky poslední pružiny dílu (`pružina tabulka "Název"` pojmenované,
+  `pružina tabulka vše` všech), `pružina nápověda [druh]` řádky
+  tabulky se slovy CS / EN / DE. Na výkrese `výkres tabulka pružiny ano` přidá k razítku tabulku údajů podle EN ISO 2162-2.
+- Starý zápis `pružina D stoupání P závity N drát d` (stálé stoupání, otevřené konce) zůstává pro obecné šroubovice.
+
+### Příklad – stírací pružiny střižného nástroje (tlačná, broušené konce)
+
+```
+nový díl Stírací pružina
+pružina tlačná d 2,5 De 20 L0 45 n 7 konce broušené materiál DH L1 40 L2 33
+pružina tabulka
+měřit těleso
+```
+
+Protokol: `tlačná d 2,5 · De 20 · L0 45 · n 7 · R 10,608 N/mm · Ln 22,5 mm · F2 127,3 N`; `pružina tabulka` vypíše mimo jiné
+`nejmenší pracovní délka Ln + Sa: 25,54 mm`, `napětí τ2 při L2 (statická kontrola): 363 MPa (39 %)`,
+`napětí τk2 = k · τ2 (opakované zatížení): 436 MPa (46 %)` a `kritický zdvih vzpěru sK: nevybočí`.
+`měřit těleso` ukáže obálku 20 × 20 × 45 mm (Ø = De, délka = L0). Při L2 pod Ln + Sa nebo napětí nad τzul přijde ⚠ s konkrétním
+číslem – zvětšete L0, přidejte závity nebo silnější drát. Do sestavy: `nová sestava`, `vložit "Stírací pružina"` a
+`sestava pružina "Stírací pružina" mezi "Deska" "Stírač"` – volná délka L0, délka na doraz Ln a tuhost R se u tlačné pružiny
+z tabulky převezmou bez zadání (`volná / blok / tuhost` je přepíší); tažná, zkrutná a talířová pružina z tabulky zůstává v sestavě
+dílem bez délky a síly (`sestava pružina` to ohlásí).
+
+### Příklad – tažná pružina upínky a sloupec talířových pružin
+
+```
+nový díl Upínka – pružiny
+pružina tažná d 1,6 De 12 n 12,5 F0 5 očka německé L2 50 název "Tažná"
+pružina talířová řada A De 40 sloupec 4 1 L2 11,4 v 60 0 0 název "Talíře"
+pružina tabulka "Talíře"
+```
+
+Tažná: natočení oček 180° (n = 12,5), L0 = Lk + 2·Di = 21,6 + 2 · 8,8 = 39,2 mm, při 50 mm F2 = F0 + R·(50 − 39,2) = 56,3 N.
+Talíře A 40: L0 = 4·(h0 + t) = 12,6 mm, při 11,4 mm zdvih talíře 0,3 mm (33 % h0) a síla 3069 N; `L2 19` (víc než L0) by byl
+✗ „délka L2 19 mm je větší než volná výška sloupce L0 12,6 mm“.
 
 ### Příklad – příruba DN50 (6 řádků)
 
@@ -2122,7 +2287,8 @@ v hostiteli:
   stejně jako v aplikaci: soubor jde do `--out` (HTTP `files`), řádek F – viz „Výstupy textem – soubory, PDF všech
   listů, base64, odkazy“ na konci. Navíc volby `--formats step,pdf,…` a `--share` (HTTP `formats`, `share`).
 - **Akce jen pro aplikaci** (`akce …`, `barva plochy`, analýzy a formařské nástroje, `výkres export png`, export snímků
-  pohybu) dávají v CLI/HTTP ✗ `host.app-only` – nikdy tiše.
+  pohybu) dávají v CLI/HTTP ✗ `host.app-only` – nikdy tiše. Výjimka: `pružina tabulka …` (= `akce spring.table`) čte jen
+  dokument, provádí ji engine i v CLI/HTTP (řádek `= … api … springs=1 name=… R=…N/mm Ln=…mm …`).
 - **`otevřít "soubor"`** (EN `open`, DE `öffnen`) otevře dokument ze vstupních souborů v nové záložce: v CLI soubory
   ve složce `--files` a ve složce skriptu, v HTTP klíče `files`. Formáty .mncad / JSON, STEP (velká sestava se rozdělí na
   díly jádrem), BREP, STL, OBJ, 3MF, DXF jako skica. Chybějící soubor = ✗ `file.missing` se seznamem dostupných.

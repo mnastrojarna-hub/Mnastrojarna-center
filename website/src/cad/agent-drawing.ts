@@ -240,10 +240,25 @@ export const VOLBY: OptRow[] = [
     words: ["tabulka", "holetable", "bohrungstabelle"],
     help: () => tr("tabulka děr ano|ne"),
     read: (t, i, o, sum) => {
+      // tabulka údajů pružiny (EN ISO 2162-2): `tabulka pružiny ano|ne` (drawing-springtable.ts)
+      if (["pruziny", "pruzin", "pruzina", "springs", "spring", "federn", "feder"].includes(fold(t[i + 1] ?? ""))) {
+        o.springTable = bool(t[i + 2], tr("tabulka pružiny"));
+        sum.push(o.springTable ? tr("tabulka pružiny") : tr("bez tabulky pružiny"));
+        return 3;
+      }
       const two = ["der", "holes"].includes(fold(t[i + 1] ?? ""));
       o.holeTable = bool(t[i + (two ? 2 : 1)], tr("tabulka děr"));
       sum.push(o.holeTable ? tr("tabulka děr") : tr("bez tabulky děr"));
       return two ? 3 : 2;
+    },
+  },
+  {
+    words: ["springtable", "federtabelle"],
+    help: () => tr("tabulka pružiny ano|ne"),
+    read: (t, i, o, sum) => {
+      o.springTable = bool(t[i + 1], tr("tabulka pružiny"));
+      sum.push(o.springTable ? tr("tabulka pružiny") : tr("bez tabulky pružiny"));
+      return 2;
     },
   },
   {

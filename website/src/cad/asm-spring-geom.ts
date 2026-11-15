@@ -12,6 +12,7 @@
  * - SÍŤ (přehrávání pohybové studie v okně): síť volné pružiny se jen protáhne / stlačí po ose (měřítko L / L_modelu) – bez
  *   stavby v jádře v každém kroku.
  */
+import { springDataAt, springPartGeom } from "./springs";
 import type { AsmComponent, CadDoc, Feature, Vec3 } from "./types";
 
 /**
@@ -19,7 +20,19 @@ import type { AsmComponent, CadDoc, Feature, Vec3 } from "./types";
  * `ring` = poloměr kružnice, kterou pružina dosedá na plochu (střední poloměr závitu, u trubky střed stěny) – dosedací plocha
  * musí mít pod ní materiál (ne díru, kterou pružina prochází).
  */
-export type SpringGeom = { base: Vec3; axis: Vec3; length: number; solid?: number; ring: number; featureId: string; kind: "spring" | "tube" | "cylinder" };
+export type SpringGeom = {
+  base: Vec3;
+  axis: Vec3;
+  length: number;
+  solid?: number;
+  /** volná délka L0, liší-li se od délky modelu (tlačná pružina z tabulky postavená v jiné délce `tvar`) */
+  free?: number;
+  /** tuhost z výpočtu tlačné pružiny z tabulky [N/mm] (cad/springs) – výchozí tuhost `sestava pružina` */
+  rate?: number;
+  ring: number;
+  featureId: string;
+  kind: "spring" | "tube" | "cylinder";
+};
 
 const AX: Record<string, Vec3> = { X: [1, 0, 0], Y: [0, 1, 0], Z: [0, 0, 1] };
 const unit = (v: Vec3): Vec3 => {
@@ -28,6 +41,17 @@ const unit = (v: Vec3): Vec3 => {
 };
 /** zaokrouhlení délek pružiny: šum řešiče (1e-9 mm) nesmí vytvořit nový díl (nový klíč mezipaměti jádra) */
 export const springRound = (v: number) => Math.round(v * 1e4) / 1e4 || 0;
+/**
+ * Délka TVARU pružiny na mřížce 1e-4 mm (klíč mezipaměti jádra) zaokrouhlená DOLŮ s rezervou 1e-7 mm na šum řešiče: konec pružiny
+ * nikdy nepřesáhne dosedací plochu B. Zaokrouhlení k nejbližší hodnotě ho posunulo až o 5·10⁻⁵ mm do desky – broušený konec
+ * (rovinná plocha) pak dal falešnou ⚠ kolizi (recenze integrace vlny 21: 0,105 mm³ v krocích po 1/3 mm).
+ */
+export const springShapeLen = (v: number) => Math.floor(v * 1e4 + 1e-3) / 1e4 || 0;
+/**
+ * Posun začátku pružiny po ose (na dosedací plochu A) a poloha komponenty: mřížka 1e-7 mm jako vzájemná poloha v kontrole kolizí
+ * (asm-kernel relOf) – začátek leží na ploše A, ne o zaokrouhlení 1e-4 mm v desce.
+ */
+export const springPosRound = (v: number) => Math.round(v * 1e7) / 1e7 || 0;
 
 /** směr prvku (osa X/Y/Z nebo směr vektorem / osou); jiný odkaz (hrana, plocha) → null */
 function featureAxis(f: { axis?: string; dirDef?: unknown }): Vec3 | null {
@@ -51,6 +75,11 @@ export function springGeom(doc: CadDoc | undefined): SpringGeom | null {
     const h = sp.wire / 2;
     return { base: [sp.position[0] - axis[0] * h, sp.position[1] - axis[1] * h, sp.position[2] - axis[2] * h], axis, length: sp.pitch * sp.turns + sp.wire, solid: (sp.turns + 1) * sp.wire, ring: Math.max(sp.radius, sp.wire / 2), featureId: sp.id, kind: "spring" };
   }
+  // tlačná pružina z tabulky (prvek spring.compression, cad/springs): osa z bodu `at`, délka modelu (tvar / L0), Ln a tuhost
+  // R z výpočtu EN 13906-1 – `sestava pružina … mezi …` je převezme bez zadání (tažná / zkrutná / talířová sem nepatří)
+  const tab = springPartGeom(doc);
+  if (tab && tab.ext === "spring.compression")
+    return { base: tab.base, axis: tab.axis, length: tab.length, ...(tab.solid !== undefined ? { solid: tab.solid } : {}), free: tab.free, ...(tab.rate !== undefined ? { rate: tab.rate } : {}), ring: tab.ring, featureId: tab.featureId, kind: "spring" };
   const t = live.find((f) => f.type === "tube" || f.type === "cylinder") as (Feature & { type: "tube" | "cylinder" }) | undefined;
   if (t) {
     const axis = featureAxis(t);
@@ -75,6 +104,7 @@ export function springDocAt(doc: CadDoc, L: number): CadDoc {
       if (f.id !== g.featureId) return f;
       if (f.type === "spring") return { ...f, pitch: Math.max(f.wire * 1.0005, (L - f.wire) / f.turns) };
       if (f.type === "tube" || f.type === "cylinder") return { ...f, height: Math.max(0.01, L) };
+      if (f.type === "ext") return { ...f, data: springDataAt(f.data ?? {}, Math.max(0.01, L)) }; // tabulková pružina: délka tvaru
       return f;
     }),
   };
@@ -115,7 +145,7 @@ export function springEffective(c: AsmComponent): AsmComponent {
   const sameLen = Math.abs(L - g.length) < 1e-6;
   if (sameLen && Math.abs(off) < 1e-9) return c;
   const u = springWorldAxis(c, g);
-  const position = off ? (c.placement.position.map((v, k) => springRound(v + u[k] * off)) as Vec3) : c.placement.position;
+  const position = off ? (c.placement.position.map((v, k) => springPosRound(v + u[k] * off)) as Vec3) : c.placement.position;
   return { ...c, source: sameLen ? c.source : { kind: "part", doc: springDocAt(c.source.doc, L) }, placement: { position, rotation: c.placement.rotation } };
 }
 

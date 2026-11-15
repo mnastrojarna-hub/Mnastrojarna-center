@@ -189,11 +189,11 @@ export default {
     note: "Die Rippe läuft bis zum Material – die Linie muss den Körper nicht genau treffen.",
   },
   spring: {
-    what: "Erzeugt eine Schraubenfeder aus Runddraht.",
-    when: "Druckfeder für Baugruppe, Vorrichtung oder Form.",
-    steps: ["Federdurchmesser, Drahtdurchmesser, Steigung und Windungszahl eingeben.", "Achse und Position (Achsenanfang) wählen.", "Freie Länge prüfen und mit OK bestätigen."],
-    cmd: "element spring radius=10 wire=2 pitch=5 turns=8",
-    note: "Die Steigung muss größer als der Drahtdurchmesser sein, sonst schneiden sich die Windungen.",
+    what: "Druck-, Zug-, Dreh- oder Tellerfeder aus einer Tabelle – berechnet Federrate, Kräfte, Spannung und Knickung.",
+    when: "Abstreifer- und Auswerferfedern im Werkzeug, Spannkraft einer Vorrichtung, Schnellspanner, Tellerfedersäule.",
+    steps: ["Art wählen (Druck, Zug, Dreh, Teller).", "Fette Zeilen ausfüllen (Draht d, Durchmesser, L0, Windungen n); der Rest wird berechnet.", "Berechnete Zeilen und Warnungen prüfen, dann Erstellen."],
+    cmd: "feder druck d 2 De 20 L0 50 n 8 L2 30",
+    note: "Geschliffene Enden = ebene Auflageflächen bei 0 und L0; Bearbeiten öffnet dieselbe Tabelle.",
   },
 
   // ── Bearbeiten ──
