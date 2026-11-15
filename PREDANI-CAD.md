@@ -31,7 +31,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 15. 11. 01:15 | Pružiny (H) hotové v obou balících i po opravách kontroly: `part` commit `bde7eb5` (`S/w21/part.patch`, 11 nálezů opraveno), `motion` commit `359f515` (`S/w21/motion.patch`, 8 nálezů opraveno – dynamika teď přesná na všech krocích, energie drží). Oba proti `fd8a05e` (bez fáze B). Spuštěna integrace na main s enginem: workflow `wf_60b96c19-df2`, zadání `S/w21/int-brief.md`, worktree `w21-int`, výstup `S/w21/int.patch` + `int-audit.md`. Běží: G (výběr oknem) + integrace H. F (kola) čeká. |
 | 15. 11. 02:56 | **G1 hotov**: výběr oknem dokončen v obou balících i po opravách kontroly (`w20-3d` `5812746`, 5 nálezů; `w20-2d` `c6cb7f5`, 4 nálezy). G2 BĚŽÍ: `S/w20/3d.patch` + `2d.patch` naneseny na větev bez konfliktů (index, necommitnuto), NDA čisté, překlady 0/0, typy, lint 5. Běží vitest (`S/w20/vitest-int.log`, končí `exit=`), pak build + e2e na :3199. Pružiny: workflow `wf_60b96c19-df2` je v kroku `fix:w21int` (5 nálezů kontroly). |
 | 15. 11. 03:01 | G2: na větvi (necommitnuto) vitest 55 souborů 849/849, produkční build prošel; dokumentace výběru oknem dopsána do `cad-docs.ts` (kap. 3, 5, 13, 14, 19, 21, 26 + FAQ) = G4 text hotový. BĚŽÍ e2e 16 sad na :3199 (`S/w20/int-e2e.summary`, končí `done`; logy `S/w20/int-e2e/`), pak vlastní zkouška `node S/w20/own-probe.cjs` (G3). Tělo PR připraveno `S/w20/pr-body.md` (doplnit tabulku e2e). |
-| 15. 11. 03:30 | **G2 + G3 + G4 (text) hotovo**: commit `851273d` na větvi. e2e 17 sad 872 ok / 0 FAIL (logy `S/w20/int-e2e/`), vlastní zkouška tažením 13/13 (`S/w20/own-probe.cjs` + `own-probe2.cjs`; pozor: s vybranými komponentami je uprostřed gizmo a okno na něm záměrně nezačne). Zakládám PR do `main` (tělo `S/w20/pr-body.md`), po sloučení smazat `w20-*`. Pružiny: `fix:w21int` stále běží. |
+| 15. 11. 03:18 | **G2 + G3 + G4 (text) hotovo**: commit `851273d` na větvi. e2e 17 sad 872 ok / 0 FAIL (logy `S/w20/int-e2e/`), vlastní zkouška tažením 13/13 (`S/w20/own-probe.cjs` + `own-probe2.cjs`; pozor: s vybranými komponentami je uprostřed gizmo a okno na něm záměrně nezačne). Zakládám PR do `main` (tělo `S/w20/pr-body.md`), po sloučení smazat `w20-*`. Pružiny: `fix:w21int` stále běží. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -315,9 +315,9 @@ Workflow `wf_533a7c7c-a4a` (skript `…/workflows/scripts/cad-wave20-box-select-
 (worktree `w20-3d`, patch `S/w20/3d.patch`) a `2d` (`w20-2d`, `S/w20/2d.patch`), oba proti `210a1e8`.
 
 - [x] G1. (hotovo 15. 11. 02:56; obnoveno 01:00 na základu `69f3f58`) Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
-- [x] G2. (hotovo 15. 11. 03:30, commit `851273d`) Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
+- [x] G2. (hotovo 15. 11. 03:18, commit `851273d`) Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
       – malé kusy; je-li B už sloučen, nanes na nový `main`).
-- [x] G3. (hotovo 15. 11. 03:30, 13/13) Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
+- [x] G3. (hotovo 15. 11. 03:18, 13/13) Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
       plochy vybere jen viditelné plochy; křížení vybere i dotčené; Ctrl přidá; zaoblení – hrany oknem; sestava –
       komponenty oknem; skica – smazat více entit; 2D – MOVE s výběrem oknem; výkres dílu – smazat více kót.
 - [ ] G4. Dokumentace (kapitola 3 Obrazovka, 5 Skica, 14 2D CAD, 13 Výkresy + mikronávody), PR, sloučení, smazat `w20-*`.
