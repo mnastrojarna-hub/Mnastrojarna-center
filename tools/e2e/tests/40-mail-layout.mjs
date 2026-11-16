@@ -137,7 +137,7 @@ await T("200 vláken + dlouhé vlákno: složky, seznam a detail rolují každý
   expect(s.list.sh > s.list.ch + 500, `seznam roluje sám (${s.list.sh} / ${s.list.ch})`);
   expect(s.rows >= 50, `načteno ${s.rows} vláken`);
   // výchozí šířka: seznam ~42 % (Outlook, 16. 11.) (užší než dřív), detail širší
-  expect(Math.abs(s.listPane.w - Math.round((s.split.w - 12) * 0.42)) <= 4 || s.listPane.w === 260, `výchozí seznam 42 %: ${s.listPane.w} z ${s.split.w}`);
+  expect(Math.abs(s.listPane.w - Math.round(s.split.w * 0.42)) <= 4 || s.listPane.w === 260, `výchozí seznam 42 %: ${s.listPane.w} z ${s.split.w}`);
   expect(s.detail.w > s.listPane.w * 1.8, `detail širší než seznam (${s.detail.w} × ${s.listPane.w})`);
 
   // otevřít dlouhé vlákno (nejnovější)
@@ -255,7 +255,7 @@ await T("oddělovač: tažení → šířka hned v DB, po obnovení i v novém p
   await login(p3, USERS.admin);
   await openInbox(p3);
   const s3 = await panes(p3);
-  expect(Math.abs(s3.listPane.w - Math.max(260, Math.round((s3.split.w - 12) * 0.42))) <= 4, `admin výchozí šířka (${s3.listPane.w} z ${s3.split.w})`);
+  expect(Math.abs(s3.listPane.w - Math.max(260, Math.round(s3.split.w * 0.42))) <= 4, `admin výchozí šířka (${s3.listPane.w} z ${s3.split.w})`);
   expect(s3.folders.w > 120, "admin: složky rozbalené");
   expect(prefOf(adminId, "mail.listWidth") === "" && prefOf(adminId, "mail.foldersCollapsed") === "", "admin DB beze změny");
 
@@ -263,7 +263,7 @@ await T("oddělovač: tažení → šířka hned v DB, po obnovení i v novém p
   await div.dblclick();
   await eventually(() => prefOf(obchodId, "mail.listWidth") === "", "dvojklik smaže šířku v DB", 5_000);
   const back = await panes(page);
-  expect(Math.abs(back.listPane.w - Math.max(260, Math.round((back.split.w - 12) * 0.42))) <= 4, `po dvojkliku výchozí (${back.listPane.w})`);
+  expect(Math.abs(back.listPane.w - Math.max(260, Math.round(back.split.w * 0.42))) <= 4, `po dvojkliku výchozí (${back.listPane.w})`);
   await page.getByTestId("mail-folders-toggle").click();
   await eventually(() => prefOf(obchodId, "mail.foldersCollapsed") === "false", "rozbalené složky v DB", 5_000);
 });
