@@ -652,13 +652,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         {/* schránka: mobil / tablet samostatný řádek pod hlavičkou, počítač uvnitř lišty */}
         {scope === "all" ? (
           // počítač: výběr schránky v liště, chyby schránek jeden tenký řádek pod ní (celá šířka)
-          <div className="flex flex-col gap-3 sm:col-span-2 lg:contents">
+          <div className="flex w-full min-w-0 basis-full flex-col gap-3 sm:col-span-2 lg:contents">
             <MailboxSwitcher mailboxes={mailboxes} mailboxId={mailboxId} onSwitch={switchMailbox} />
             {/* neúplné nastavení ukazují jen dlaždice schránek (bez trvalého červeného řádku) */}
             <MailboxHealth mailboxes={mailboxes.filter((m) => !m.incomplete && m.lastSyncError)} className="lg:order-4 lg:basis-full" />
           </div>
         ) : noMailbox ? (
-          <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:col-span-2 lg:order-4 lg:basis-full lg:items-center lg:px-3 lg:py-2 dark:border-amber-500/30 dark:from-amber-500/10 dark:to-orange-500/10">
+          <div className="flex w-full basis-full flex-wrap items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:col-span-2 lg:order-4 lg:basis-full lg:items-center lg:px-3 lg:py-2 dark:border-amber-500/30 dark:from-amber-500/10 dark:to-orange-500/10">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white lg:h-8 lg:w-8"><Mail className="h-5 w-5 lg:h-4 lg:w-4" /></div>
             <div className="min-w-0 flex-1 text-sm">
               <p className="font-semibold text-amber-900 dark:text-amber-200">Zatím nemáš připojenou e-mailovou schránku.</p>
@@ -669,9 +669,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         ) : (
           <div
             className={cn(
-              "flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 px-3 py-2 sm:col-span-2 dark:border-blue-500/30 dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10",
+              "flex w-full basis-full flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 px-3 py-2 sm:col-span-2 dark:border-blue-500/30 dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10",
               // počítač: jen tenký text v liště (bez rámečku a podbarvení)
-              "lg:order-2 lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:rounded-none lg:border-0 lg:bg-none lg:p-0 lg:dark:bg-none",
+              "lg:order-2 lg:w-auto lg:basis-auto lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:rounded-none lg:border-0 lg:bg-none lg:p-0 lg:dark:bg-none",
             )}
             data-testid="own-mailbox-bar"
           >
