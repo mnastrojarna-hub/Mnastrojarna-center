@@ -59,6 +59,9 @@ const MODE_BEFORE = sql(`select mode from automation_settings where module = 'pu
 const setMode = (m) => sql(`insert into automation_settings (module, mode, enabled) values ('purchase_order', ${lit(m)}, true)
   on conflict (module) do update set mode = excluded.mode, enabled = true`);
 setMode("approval");
+// 16. 11.: přepínač nahoře je hlavní vypínač — test řídí režim modulem, nahoře proto plná automatika (na konci zpět)
+const GLOBAL_BEFORE = sql(`select mode from automation_global where id`) || "approval";
+sql(`update automation_global set mode = 'full' where id`);
 
 // ── Data ─────────────────────────────────────────────────────
 const tl = TAG.toLowerCase();
@@ -1072,5 +1075,6 @@ for (const [label, j, mobile] of [["desktop", OVJ, false], ["390 px", OVJM, true
 const ok = summary(errors.filter((e) => !/HTTP 5\d\d .*\/_next\/|favicon/.test(e)));
 if (!process.env.KEEP) await cleanup();
 if (MODE_BEFORE) setMode(MODE_BEFORE);
+sql(`update automation_global set mode = ${lit(GLOBAL_BEFORE)} where id`);
 await browser.close();
 process.exit(ok ? 0 : 1);
