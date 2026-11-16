@@ -497,7 +497,11 @@ function drawingPrompt(): string {
       "materiálu není krok TZ. heatTreatment / surfaceTreatment = doslovný text úprav z výkresu (prázdné, když nejsou).",
     "drawingNotes = VŠECHNY poznámky výkresu doslovně, každá zvlášť: technické požadavky, obecné tolerance (ISO 2768-mK), nekótované " +
       "hrany / sražení, drsnost neoznačených ploch, značení, normy, zkoušky. notes = krátké shrnutí poznámek. title = název / popis dílu.",
-    "quantity jen když je na výkresu (jinak 0).",
+    "RUČNĚ DOPSANÉ POZNÁMKY zákazníka na výkresu (propiska, fix, razítko, i na skenu / fotce) jsou platné zadání a čteš je vždy: " +
+      "počet kusů („25 ks“, „ks: 10“, „2x“, „Stk 5“, „qty 4“ i číslo v kroužku u razítka), povrchová úprava („Zn“, „černit“, „elox“), " +
+      "tepelné zpracování, materiál, termín. Ručně dopsaný údaj má PŘEDNOST před tištěným.",
+    "quantity = počet kusů z výkresu — tištěný v razítku NEBO ručně dopsaný (jinak 0). Ručně dopsané úpravy patří do heatSteps / " +
+      "surfaceSteps (status „uvedeno“) a doslovně do drawingNotes s předponou „ručně: “.",
     `customerName = firma z razítka, která výkres kreslila (projekce / konstrukce; je-li to ${COMPANY.name}, nech prázdné). ` +
       "Je to jen informace — NENÍ to zákazník, zákazník se páruje podle čísel výkresu a objednávky.",
     "Co nelze přečíst, nech prázdné / 0 a sniž confidence; co ověřit, napiš česky do needsClarification.",

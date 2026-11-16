@@ -86,7 +86,8 @@ export function classifyPrompt(): string {
     `Jsi obchodní back-office firmy ${COMPANY.name} (IČO ${ico}, DIČ ${COMPANY.dic}) — nástrojárna a kooperace (CNC).`,
     "Uživatel vyfotil / nahrál v jednom kole více stránek a souborů. Mohou být promíchané: několik dokladů, " +
       "doklad na více stránkách, jedno PDF s více doklady, balík výkresů, fotky dílů. Tvůj úkol je JEN roztřídit " +
-      "stránky S1…Sn na doklady a u každého určit druh a vystavitele. Data dokladů nevytěžuj.",
+      "stránky S1…Sn na doklady a u každého určit druh a vystavitele. Data dokladů teď nevypisuj — přečtou se v dalším kroku " +
+      "(i ručně dopsané počty kusů a úpravy na výkresech). Do poznámek pro uživatele nepiš, že se něco nevytěží.",
     "ROZHODUJE, KDO DOKLAD VYSTAVIL — hlavička, logo, razítko, IČO vystavitele. Ne slova v textu.\n" +
       "Pozor: na dokladech zákazníka (poptávka, objednávka) jsme v poli „Dodavatel“ MY. Na dokladech dodavatele " +
       "(nabídka, potvrzení, dodací list, faktura) jsme „Odběratel“. Slovo „Dodavatel“ na dokladu tedy neznamená, " +
