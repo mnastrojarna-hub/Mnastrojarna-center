@@ -36,7 +36,7 @@ import { sendReceiveText } from "@/lib/email/send-receive";
 import { backfillMailJobsAction, confirmJobSuggestionAction, rejectJobSuggestionAction } from "@/app/actions/mail-jobs";
 import { CATEGORY_STYLE, INBOX_CATEGORIES, NO_MAILBOX, categoryCodeFromLabel, type MailboxOption } from "@/lib/email/visibility";
 import {
-  EMPTY_COUNTS, FOLDER_LABEL, SORT_LABEL, isMailFolder, isMailSort, progressText, threadCountLabel, type FolderCounts, type MailFolder,
+  EMPTY_COUNTS, FOLDER_LABEL, SORT_LABEL, isMailFolder, isMailSort, progressText, messageCountLabel, type FolderCounts, type MailFolder,
   type MailSort, type ThreadPage, type ThreadSummary,
 } from "@/lib/email/mail-types";
 import type { EmailCategory } from "@/lib/data/types";
@@ -561,13 +561,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         Přijmout a odeslat · Nová zpráva · ozubené kolo · ⋯ (Import z Outlooku, hustota seznamu).
       */}
       <div
-        className="relative flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-3 sm:gap-y-4 lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-3 lg:gap-y-1.5"
+        className="relative flex flex-row flex-wrap items-center gap-2 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-3 sm:gap-y-4 lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-3 lg:gap-y-1.5"
         data-testid="mail-toolbar"
       >
         {/* mobil: stav živé pošty vpravo vedle nadpisu (bez dalšího řádku nad seznamem) */}
         {updatedLabel && (
           <span
-            className={cn("absolute right-0 top-1.5 text-[11px] sm:hidden", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
+            className={cn("hidden", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
             data-testid="mail-updated-mobile"
             suppressHydrationWarning
           >
@@ -580,12 +580,12 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           <p className="hidden text-sm text-muted-foreground sm:block lg:hidden">{description}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 lg:order-3 lg:ml-auto lg:flex-nowrap lg:gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:ml-0 sm:gap-2 lg:order-3 lg:ml-auto lg:flex-nowrap lg:gap-1.5">
           {/* stav: počet vláken (počítač) a „Aktualizováno před …" (od tabletu; telefon ho má vedle nadpisu) */}
           {/* (1024–1279 px: v liště není místo — počet je v seznamu složek, stav kontroluje živá pošta sama) */}
           <span className="hidden items-center gap-1.5 whitespace-nowrap text-[11px] text-muted-foreground sm:inline-flex lg:mr-1 lg:hidden xl:inline-flex">
             {loading && <Loader2 className="hidden h-3.5 w-3.5 animate-spin lg:block" aria-label="Načítám" />}
-            {page.total > 0 && <span className="hidden tabular-nums xl:inline">{threadCountLabel(page.total)}</span>}
+            {page.total > 0 && <span className="hidden tabular-nums xl:inline">{messageCountLabel(page.total)}</span>}
             {page.total > 0 && updatedLabel && <span className="hidden xl:inline" aria-hidden>·</span>}
             {updatedLabel && (
               <span
@@ -607,10 +607,10 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             className="lg:h-8 lg:px-2.5"
           >
             <RefreshCw className={cn("h-4 w-4", (progress.running || sendBusy) && "animate-spin")} />
-            {sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}
+            <span className="hidden sm:inline">{sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}</span>
           </Button>
           <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose" className="lg:h-8 lg:px-2.5">
-            <PenSquare className="h-4 w-4" /> Nová zpráva
+            <PenSquare className="h-4 w-4" /> <span className="hidden sm:inline">Nová zpráva</span>
           </Button>
           <Button
             size="sm" variant="outline" onClick={() => openSettings("schranka")}
@@ -881,7 +881,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             {/* mobil s čipy: řádek není (seznam začne výš) — stav živé pošty je vedle nadpisu; počítač: počet
                 vláken a stav jsou v liště nahoře (řádek navíc by ubral místo seznamu) */}
             <div className={cn("items-center justify-between gap-2 px-1 text-xs text-muted-foreground lg:hidden", chipCategories.length ? "hidden sm:flex" : "flex")}>
-              <span data-testid="mail-total">{page.total ? threadCountLabel(page.total) : ""}</span>
+              <span data-testid="mail-total">{page.total ? messageCountLabel(page.total) : ""}</span>
               <span className="ml-auto inline-flex items-center gap-1.5">
                 {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               </span>
