@@ -332,8 +332,8 @@ await T("odpověď na vlastní zprávu (podpis v citaci) → grafický podpis s 
   await search(page, TAG);
   await openThread(page, `Re: Poptávka ${TAG}`, TAG);
   const out = page.getByTestId("thread-message").filter({ hasText: `nabídku pošleme zítra. ${TAG}` }).last();
-  if (!(await out.getByTestId("message-reply").isVisible().catch(() => false))) await out.locator("button").first().click();
-  await out.getByTestId("message-reply").click();
+  await out.waitFor();
+  await page.getByTestId("btn-reply").click(); // odpověď na otevřenou zprávu (hlavička)
   const dlg = page.getByTestId("compose-dialog");
   await dlg.waitFor();
   await page.getByTestId("compose-from").filter({ hasText: BOX }).waitFor({ timeout: 20_000 });

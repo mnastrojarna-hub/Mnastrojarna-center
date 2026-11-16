@@ -121,9 +121,8 @@ await T("vlákno + odpověď z aplikace → odchozí ve vlákně, kopie v Odesla
   await openThread(page, "Posta: Poptávka hřídele 50 ks");
   // odpověď na PŮVODNÍ poptávku (vlákno může mít i starší odpovědi z dřívějších běhů testovacího serveru)
   const c0 = await page.getByTestId("thread-message").count();
-  const first = page.getByTestId("thread-message").first();
-  if (c0 > 1) await first.locator("button").first().click();
-  await first.getByRole("button", { name: "Odpovědět na tuto zprávu" }).click();
+  // Pošta po zprávách (16. 11.): otevřená je jen ta zpráva — Odpovědět je v hlavičce
+  await page.getByTestId("btn-reply").click();
   const dlg = page.getByTestId("compose-dialog");
   await dlg.waitFor();
   await dlg.getByTestId("compose-from").filter({ hasText: BOX }).waitFor({ timeout: 20_000 });

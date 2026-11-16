@@ -166,11 +166,16 @@ await T("200 vláken + dlouhé vlákno: složky, seznam a detail rolují každý
   s = await panes(page);
   expect(s.detail.top > 200, "detail odrolován");
   expect(Math.abs(s.list.top - listTop) < 2 && s.main.top === 0, "seznam ani stránka se s detailem nehnuly");
-  const lastAtt = await page.getByTestId("message-attachment").last().evaluate((el) => el.getBoundingClientRect().toJSON());
-  expect(lastAtt.bottom <= s.detail.rect.bottom + 1 && lastAtt.top >= s.detail.rect.top, `poslední příloha v zorném poli detailu (${lastAtt.top}–${lastAtt.bottom} v ${s.detail.rect.top}–${s.detail.rect.bottom})`);
   const head = await page.getByTestId("thread-header").evaluate((el) => el.getBoundingClientRect().toJSON());
   expect(Math.abs(head.top - s.detail.rect.top) <= 2, `hlavička vlákna drží nahoře (${head.top} × ${s.detail.rect.top})`);
   expect(await page.getByTestId("btn-reply").isVisible(), "Odpovědět vidět i po odrolování");
+  // 16. 11.: přílohy hned pod hlavičkou zprávy (nad textem) — po návratu nahoru v zorném poli
+  await page.getByTestId("thread-pane").evaluate((el) => { el.scrollTop = 0; });
+  await page.waitForTimeout(200);
+  const s2 = await panes(page);
+  const att = await page.getByTestId("message-attachment").first().evaluate((el) => el.getBoundingClientRect().toJSON());
+  const bodyTop = await page.getByTestId("message-body").first().evaluate((el) => el.getBoundingClientRect().top);
+  expect(att.top >= s2.detail.rect.top && att.bottom <= s2.detail.rect.bottom && att.top < bodyTop, `přílohy nahoře nad textem (${att.top} < ${bodyTop})`);
   // přílohy se zalamují (žádné vodorovné rolování detailu)
   expect(await page.getByTestId("thread-pane").evaluate((el) => el.scrollWidth <= el.clientWidth + 1), "detail bez vodorovného rolování");
   await snap(page, "40-02-detail-scrolled");
