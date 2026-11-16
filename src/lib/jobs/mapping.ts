@@ -1542,6 +1542,43 @@ export function searchNormalize(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+/** Hledání bez oddělovačů a mezer („Z-2026/026" → „z2026026"). */
+export function compactSearch(s: string): string {
+  return searchNormalize(s).replace(/[^a-z0-9]+/g, "");
+}
+
+/** Skóre relevance ze seznamu (záloha bez DB): číslo zakázky > čísla dokladů > výkresy > ostatní; přesná shoda navrch. */
+export function jobSearchScore(j: JobListItem, q: string): number {
+  const words = searchNormalize(q).split(/\s+/).filter(Boolean).map(compactSearch).filter(Boolean);
+  if (!words.length) return 0;
+  const fields: [number, (string | null | undefined)[]][] = [
+    [100, [j.number]],
+    [90, [j.customerOrderNumber, j.customerInquiryNumber, j.invoiceNumber]],
+    [60, j.drawingNumbers],
+    [40, [j.title, j.customer?.name]],
+  ];
+  let total = 0;
+  for (const w of words) {
+    let best = 0;
+    for (const [wt, vals] of fields) {
+      for (const v of vals) {
+        const c = compactSearch(v ?? "");
+        if (!c || !c.includes(w)) continue;
+        best = Math.max(best, wt + (c === w ? 30 : wt >= 90 && c.endsWith(w) ? 15 : 0));
+      }
+    }
+    total += best;
+  }
+  return total;
+}
+
+/** Při hledání nejrelevantnější nahoře (stabilně — jinak zůstává zvolené řazení). */
+export function rankBySearch(items: JobListItem[], hits: Map<string, number> | null | undefined, q: string | undefined): JobListItem[] {
+  if (!(q ?? "").trim()) return items;
+  const score = (j: JobListItem) => Math.max(hits?.get(j.id) ?? 0, jobSearchScore(j, q ?? ""));
+  return items.map((j, i) => ({ j, i, s: score(j) })).sort((a, b) => b.s - a.s || a.i - b.i).map((x) => x.j);
+}
+
 function haystack(j: JobListItem): string {
   return searchNormalize([
     j.number, j.title, j.customerOrderNumber, j.customerInquiryNumber,
@@ -1646,7 +1683,8 @@ export function matchesFlow(
 /** Fulltext (všechna slova musí sedět, bez diakritiky) + termín + výroba (operace, místo) + platba. */
 export function filterJobs(
   items: JobListItem[],
-  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer" | "paid" | "exception" | "lostReason" | "premium">,
+  filters: Pick<JobFilters, "q" | "deadline" | "step" | "location" | "payment" | "inquiry" | "order" | "delivery" | "deliveredToCustomer" | "paid" | "exception" | "lostReason" | "premium">
+    & { searchHits?: Map<string, number> | null },
   today: Date = pragueToday(),
 ): JobListItem[] {
   const exception = filters.exception && isExceptionFilter(filters.exception) ? filters.exception : null;
@@ -1666,9 +1704,11 @@ export function filterJobs(
     // výjimky v toku (Bez objednávky, Reklamace, Pozastaveno, Nová revize výkresu, Opraveno) a důvod prohry
     if (exception && !matchesException(j, exception)) return false;
     if (lostReason && (j.flow?.lostReason ?? "neuvedeno") !== lostReason) return false;
-    if (tokens.length) {
+    if (tokens.length && !(filters.searchHits?.has(j.id) ?? false)) {
+      // bez DB hledání (nebo mimo jeho výsledek) seznam sám: i bez mezer a oddělovačů („2026 026" ~ Z-2026-026)
       const h = haystack(j);
-      if (!tokens.every((t) => h.includes(t))) return false;
+      const hc = compactSearch(h);
+      if (!tokens.every((t) => h.includes(t) || (compactSearch(t).length > 0 && hc.includes(compactSearch(t))))) return false;
     }
     if (step && j.productionStep !== step) return false;
     if (location && searchNormalize((j.productionLocation ?? "").trim()) !== location) return false;

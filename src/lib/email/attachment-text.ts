@@ -4,7 +4,7 @@ import "server-only";
  * PDF s textovou vrstvou (pdfjs), textové soubory (txt, csv, eml, xml, json, html). Sken bez textu → null
  * (ten pokryje AI čtení dokumentu: job_files.ai_extracted, viz mail_messages). Best-effort, nic neblokuje.
  */
-import { openPdf } from "@/lib/anonymize/pdf-node";
+// pdfjs až při potřebě (dynamicky) — server actions nesmí staticky táhnout renderer (import-graph.test.ts)
 
 const MAX_CHARS = 20_000;
 const MAX_PAGES = 15;
@@ -22,6 +22,7 @@ export async function attachmentText(content: Uint8Array, mime: string | null | 
       return clean(t.replace(/<[^>]+>/g, " "));
     }
     if (m === "application/pdf" || n.endsWith(".pdf")) {
+      const { openPdf } = await import("@/lib/anonymize/pdf-node");
       const pdf = await openPdf(content, { requireFonts: false });
       try {
         const parts: string[] = [];
