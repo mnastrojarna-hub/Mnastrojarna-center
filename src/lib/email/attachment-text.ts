@@ -13,7 +13,9 @@ function textLike(mime: string, name: string): boolean {
   return /^text\//i.test(mime) || /(json|xml|csv|rfc822)/i.test(mime) || /\.(txt|csv|eml|xml|json|html?|md)$/i.test(name);
 }
 
-export async function attachmentText(content: Uint8Array, mime: string | null | undefined, filename: string | null | undefined): Promise<string | null> {
+export async function attachmentText(
+  content: Uint8Array, mime: string | null | undefined, filename: string | null | undefined, opts: { pdf?: boolean } = {},
+): Promise<string | null> {
   const m = (mime ?? "").toLowerCase();
   const n = (filename ?? "").toLowerCase();
   try {
@@ -21,7 +23,9 @@ export async function attachmentText(content: Uint8Array, mime: string | null | 
       const t = new TextDecoder("utf-8", { fatal: false }).decode(content.slice(0, MAX_CHARS * 4));
       return clean(t.replace(/<[^>]+>/g, " "));
     }
-    if (m === "application/pdf" || n.endsWith(".pdf")) {
+    // PDF jen mimo stahování pošty (otevření přílohy) — při synchronizaci by pdfjs držel spojení se
+    // serverem dlouho otevřené (hosting90: časový limit / blokace; 16. 11.)
+    if (opts.pdf !== false && (m === "application/pdf" || n.endsWith(".pdf"))) {
       const { openPdf } = await import("@/lib/anonymize/pdf-node");
       const pdf = await openPdf(content, { requireFonts: false });
       try {
