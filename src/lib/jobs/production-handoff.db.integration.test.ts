@@ -189,7 +189,7 @@ describe.skipIf(!LOCAL_ENABLED)("předání do výroby ↔ lokální Supabase (D
     expect(r).toMatchObject({ kind: "predani", stageFrom: "potvrzeno", stage: "ve_vyrobe", replayed: false });
     expect(r.operationIds).toHaveLength(2);
     expect(r.purchaseOrders).toHaveLength(1);
-    expect(r.purchaseOrders[0].number).toMatch(/^OV-\d{4}-\d{3,}$/);
+    expect(r.purchaseOrders[0].number).toMatch(/^OV\d{4}\/\d{3,}-\d+$|^OV.+-\d+$/);
     expect(r.purchaseOrders[0].queueId).toBeTruthy();
 
     const [po] = await pos(A.id);
@@ -572,7 +572,7 @@ describe.skipIf(!LOCAL_ENABLED)("předání do výroby ↔ lokální Supabase (D
     });
     expect(twice.error?.message).toBe("Dvě objednávky pro stejnou skupinu kroků.");
     const orphan = await apply(app, T.id, "plan", { purchaseOrders: [poOf("g", novak, T.items, [1, 1])], steps: [step({ supplierId: novak, poMode: "pri_predani" })] });
-    expect(orphan.error?.message).toMatch(/^Objednávka OV-\d{4}-\d+ nepatří k žádnému kroku\.$/);
+    expect(orphan.error?.message).toMatch(/^Objednávka OV\S+ nepatří k žádnému kroku\.$/);
     const foreignQuote = await newQuote(A.id, novak, [1, 1]);
     const fq = await apply(app, T.id, "plan", { steps: [step({ supplierId: novak, poMode: "pri_predani", supplierQuoteId: foreignQuote })] });
     expect(fq.error?.message).toBe("Nabídka dodavatele nepatří k této zakázce.");

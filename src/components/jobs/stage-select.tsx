@@ -13,6 +13,7 @@ import { useSettledRefresh } from "@/components/jobs/use-settled-refresh";
 import { useAccess } from "@/components/access-provider";
 import { moveJobStage } from "@/app/actions/flow-status";
 import { previewJobStage } from "@/app/actions/job-flow";
+import { startWithoutCustomerPo } from "@/app/actions/flow-exceptions";
 import { STAGE_ORDER, SIDE_STAGES, stageMeta } from "@/lib/jobs/stages";
 import { useRouter } from "next/navigation";
 import {
@@ -71,9 +72,11 @@ export function StageCorrectionDialog({
   const [openedFrom, setOpenedFrom] = React.useState<JobStage | null>(open ? from : null);
   // „Přesunout i tak" u zakázky bez objednávky zákazníka: korekce postaru (hlídání předání je zatím vypnuté)
   const [legacy, setLegacy] = React.useState(false);
+  // „Vyrábět bez objednávky" přímo z blokace: zakázka → Objednávka (čeká na objednávku zákazníka) → předání
+  const [skip, setSkip] = React.useState<{ busy: boolean; error?: string }>({ busy: false });
   React.useEffect(() => {
     if (open) setOpenedFrom((f) => f ?? from);
-    else { setOpenedFrom(null); setLegacy(false); }
+    else { setOpenedFrom(null); setLegacy(false); setSkip({ busy: false }); }
   }, [open, from]);
   const local = React.useMemo(() => {
     if (!to || !flow) return null;
@@ -112,7 +115,21 @@ export function StageCorrectionDialog({
                 ? "Zákazník ještě neobjednal — nejdřív zapiš objednávku zákazníka."
                 : "Uzavřenou zakázku nelze předat do výroby — nejdřív ji obnov."}
             </p>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            {skip.error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{skip.error}</p>}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+              {intent.code === "NO_CUSTOMER_ORDER" && (
+                <button type="button" disabled={skip.busy} data-testid="stage-skip-customer-po"
+                  onClick={async () => {
+                    setSkip({ busy: true });
+                    const r = await startWithoutCustomerPo(jobId).catch(() => ({ ok: false as const, error: "Nepodařilo se uložit." }));
+                    if (!r.ok) { setSkip({ busy: false, error: ("error" in r ? r.error : null) ?? "Nepodařilo se uložit." }); return; }
+                    setSkip({ busy: false });
+                    setOpenedFrom("objednavka"); // další krok = předání do výroby (kdo + termín)
+                  }}
+                  className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-60 sm:h-10">
+                  {skip.busy ? "Ukládám…" : "Vyrábět bez objednávky a předat"}
+                </button>
+              )}
               {/* hlídání předání je zatím vypnuté (majitel 29. 10.) — přesun postaru jde, zapíše se do historie */}
               <button type="button" onClick={() => setLegacy(true)} data-testid="stage-legacy-move"
                 className="inline-flex h-11 items-center justify-center rounded-md px-4 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground sm:h-10">

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { prepareProductionHandoff, submitProductionHandoff } from "@/app/actions/production-handoff";
 import { moveJobStage } from "@/app/actions/flow-status";
+import { startWithoutCustomerPo } from "@/app/actions/flow-exceptions";
 import { OPERATION_KINDS, type OperationKind } from "@/lib/jobs/operations";
 import { shortDay } from "@/lib/jobs/production-suggest";
 import { stageMeta, stageRank } from "@/lib/jobs/stages";
@@ -204,6 +205,8 @@ export function ProductionHandoffDialog({
   const [kindNow, setKindNow] = React.useState<HandoffKind | undefined>(kind);
   const [routeBusy, setRouteBusy] = React.useState<string | null>(null);
   const [plainNote, setPlainNote] = React.useState<{ on: boolean; text: string }>({ on: false, text: "" });
+  const [skipBusy, setSkipBusy] = React.useState(false);
+  const [skipError, setSkipError] = React.useState<string | null>(null);
   const descId = React.useId();
 
   const load = React.useCallback(async (k?: HandoffKind, route?: string) => {
@@ -368,12 +371,26 @@ export function ProductionHandoffDialog({
             <div role="alert" className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" /> {loadError?.message ?? "Předání se nepodařilo připravit."}
             </div>
+            {skipError && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{skipError}</p>}
             {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error.message}</p>}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button type="button" variant="ghost" className="h-11 sm:h-9" onClick={() => onOpenChange(false)} disabled={busy}>Zavřít</Button>
               {move && (
                 <Button type="button" variant="outline" className="h-11 sm:h-9" onClick={() => void movePlain()} disabled={busy} data-testid="handoff-plain-move">
                   {busy ? <Loader2 className="animate-spin" /> : null} {move.label}
+                </Button>
+              )}
+              {loadError?.code === "NO_CUSTOMER_ORDER" && (
+                <Button type="button" className="h-11 sm:h-9" disabled={busy || skipBusy} data-testid="handoff-skip-customer-po"
+                  onClick={async () => {
+                    setSkipBusy(true);
+                    const r = await startWithoutCustomerPo(jobId).catch(() => ({ ok: false as const, error: "Nepodařilo se uložit." }));
+                    setSkipBusy(false);
+                    if (!r.ok) { setSkipError(("error" in r ? r.error : null) ?? "Nepodařilo se uložit."); return; }
+                    setSkipError(null);
+                    void load(kindNow);
+                  }}>
+                  {skipBusy ? <Loader2 className="animate-spin" /> : null} Vyrábět bez objednávky a předat
                 </Button>
               )}
               {loadError?.code !== "NO_CUSTOMER_ORDER" && <Button type="button" variant="outline" className="h-11 sm:h-9" onClick={() => void load(kindNow)} disabled={busy}><RefreshCw /> Zkusit znovu</Button>}

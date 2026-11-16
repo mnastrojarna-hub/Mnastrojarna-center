@@ -538,7 +538,7 @@ export async function issuePurchaseOrder(
 
     const { data: number, error: numErr } = await db.rpc("next_purchase_order_number");
     if (numErr || !number) return fail(numErr?.message ?? "Nepodařilo se přidělit číslo objednávky.");
-    const poNumber = String(number);
+    let poNumber = String(number);
 
     const { data: created, error } = await db
       .from("purchase_orders")
@@ -558,10 +558,12 @@ export async function issuePurchaseOrder(
         note: v.note,
         created_by: user.id,
       } as never)
-      .select("id")
+      .select("id, number")
       .single();
     if (error || !created) return fail(error?.message ?? "Objednávku se nepodařilo uložit.");
     const id = (created as { id: string }).id;
+    // DB přečísluje podle zakázky (OV2026/026-1, trigger) — dál se používá skutečné číslo
+    poNumber = String((created as { number?: string | null }).number ?? poNumber);
     const itemErr = await replaceItems(db, "purchase_order_items", "purchase_order_id", id, v.items);
     if (itemErr) {
       await db.from("purchase_orders").delete().eq("id", id);
