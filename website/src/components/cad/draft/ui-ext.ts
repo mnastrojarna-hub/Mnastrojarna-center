@@ -55,6 +55,8 @@ export type DraftPointerEvent = {
   button: number;
   shift: boolean;
   ctrl: boolean;
+  /** Alt (odebrat z výběru) – stisk s ním patří výběru, ne úchopům */
+  alt?: boolean;
 };
 
 export type DraftPanelDef = { title: () => string; icon: CadIconName; render: (api: DraftUiApi) => ReactNode };

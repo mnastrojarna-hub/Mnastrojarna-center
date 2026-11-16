@@ -1,0 +1,25 @@
+=== run 1 ===
+✓ nový díl „Zobrazení“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+
+Dokument: „Zobrazení“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 20 mm (X 0…40, Y 0…30, Z 0…20) · objem 24 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 40 × 30 × 20 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ pohled iso
+✓ styl zobrazení: Stínovaný s hranami
+✓ řez kolmo na X v 10 mm (model X 0…40 mm)
+✓ řez vypnut
+✓ výběr: F1, E2 (2) – převezmou ho tlačítka Zaoblit / Sražení / Skica na pásu karet a „+ aktuální výběr“ ve formulářích; textové příkazy výběr nečtou – textem: zaoblit 2 hrany E2 · skica plocha F1
+Výběr: F1, E2
+✓ výběr zrušen
+✓ styl zobrazení: Stínovaný
+
+Dokument: „Zobrazení“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 20 mm (X 0…40, Y 0…30, Z 0…20) · objem 24 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 40 × 30 × 20 mm, new, roh [0; 0; 0]

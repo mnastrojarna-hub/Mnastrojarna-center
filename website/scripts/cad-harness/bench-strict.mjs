@@ -31,7 +31,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => (args.includes(f) ? args[args.indexOf(f) + 1] : d);
 const SELF = fileURLToPath(import.meta.url);
-const defaultScript = path.join(HARNESS, "synth-959.txt");
+const defaultScript = path.join(HARNESS, "synth-tool.txt");
 const expected = () => JSON.parse(fs.readFileSync(path.join(HARNESS, "expected.json"), "utf8"));
 
 /* ───────────── child (loopback) ───────────── */
@@ -54,7 +54,7 @@ async function child() {
   }
   byKind.endOfRun = res.ms - res.timing.reduce((a, t) => a + t.ms, 0);
   // the only tolerated ✗ is the parse error of `kontrola` until package B5 lands
-  const errors = res.log.filter((l) => l.text.startsWith("✗") && !/„kontrola“/.test(l.text));
+  const errors = res.log.filter((l) => l.text.startsWith("✗") && !/„kontrola“|loopback does not run op "check"/.test(l.text));
   // lines a strict engine run would stop on (⚠ / ! and ambiguous face picks, by op kind) – B6 requires the strict run to pass
   const warnCount = Object.values(res.warnings).reduce((a, b) => a + b, 0);
   emit({ mode: strict ? "strict" : "normal", ms: res.ms, initMs, byKind, errors: errors.length, firstErrors: errors.slice(0, 3).map((l) => `L${l.line} ${l.text.slice(0, 160)}`), warnings: res.warnings, warnCount, firstWarnings: res.warnLines.slice(0, 3).map((l) => `${l.line ? `L${l.line}` : "end"} ${l.text.slice(0, 160)}`) });

@@ -1,14 +1,11 @@
 "use client";
 
 /**
- * Provedení textových příkazů ploch (agent-surfaces.ts) v aplikaci: dotaz do jádra (cad.surfA), protokol a volitelně
- * zobrazení v 3D okně (obarvené hrany, hřebeny, CV). Překryvy se kreslí přes surf-overlay.ts.
+ * Zobrazení výsledků textových příkazů ploch (agent-surfaces.ts) ve 3D okně aplikace: obarvené hrany, hřebeny, CV.
+ * Dotaz do jádra a protokol jsou v enginu (engine/ops/surf.ts); překryvy se kreslí přes surf-overlay.ts.
  */
-import { cad } from "@/cad/client";
-import { combLines, continuityLines, cvLines, type SurfCmd } from "@/cad/agent-surfaces";
 import { CONT_COLOR, type CvInfo } from "@/cad/surf-a";
 import type { SurfQueryResult } from "@/cad/surf-query";
-import type { CadDoc } from "@/cad/types";
 import { setSurfOverlay, type SurfOverlay } from "./surf-overlay";
 
 /** hrany obarvené podle třídy návaznosti */
@@ -39,22 +36,8 @@ export function cvOverlay(info: CvInfo, sel?: [number, number] | null, moved?: S
   return { lines, points };
 }
 
-/** Provede příkaz a vrátí řádky protokolu. */
-export async function runSurfCmd(cmd: SurfCmd, doc: CadDoc): Promise<string[]> {
-  if (cmd.kind === "continuity") {
-    const res = await cad.surfA({ kind: "continuity", edges: cmd.edges }, doc);
-    if (res.kind !== "continuity") return [];
-    if (cmd.show) setSurfOverlay(continuityOverlay(res));
-    return continuityLines(res, cmd.show);
-  }
-  if (cmd.kind === "comb") {
-    const res = await cad.surfA({ kind: "comb", edges: cmd.edges, scale: cmd.scale }, doc);
-    if (res.kind !== "comb") return [];
-    if (cmd.show) setSurfOverlay(combOverlay(res));
-    return combLines(res, cmd.show);
-  }
-  const res = await cad.surfA({ kind: "cv", face: cmd.face, grid: cmd.grid }, doc);
-  if (res.kind !== "cv") return [];
-  return cvLines(res);
+/** Výsledek dotazu ploch s „zobrazit“ (engine/ops/surf.ts → háček `surfOverlay`): překryv ve 3D okně. */
+export function showSurfResult(res: SurfQueryResult): void {
+  if (res.kind === "continuity") setSurfOverlay(continuityOverlay(res));
+  else if (res.kind === "comb") setSurfOverlay(combOverlay(res));
 }
-

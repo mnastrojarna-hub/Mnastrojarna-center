@@ -1,0 +1,16 @@
+# další prvky: rotovat, pole, zrcadlit, skořepina, závit, pružina, kužel, koule, úkos
+nový díl Prvky
+skica XZ: obdélník 10 40 v 25 20
+rotovat 360 osa Z
+kvádr 20 20 10 v 40 -10 0
+pole 3 rozteč 30 směr Y
+zrcadlit YZ
+skořepina 2 otevřít +Z
+#--- run
+nový díl Šroubovice
+válec 16 30
+závit M16 délka 20
+pružina 20 stoupání 5 závity 4 drát 2 v 40 0 0 nové
+kužel 20 10 15 v -40 0 0 nové
+koule 10 v 0 40 0 nové
+stav

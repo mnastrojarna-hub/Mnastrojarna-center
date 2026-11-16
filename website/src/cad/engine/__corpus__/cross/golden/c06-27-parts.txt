@@ -1,0 +1,60 @@
+=== run 1 ===
+✓ nový díl „Nový díl 2“ – nová záložka
+✓ nový díl „Nový díl“ – nová záložka
+✓ nový díl „Nový díl 3“ – nová záložka
+✓ nový díl „Nový díl 4“ – nová záložka
+✓ nový díl „Nový díl 5“ – nová záložka
+✓ nový díl „Nový díl 6“ – nová záložka
+✓ nový díl „Nový díl 7“ – nová záložka
+✓ nový díl „Nový díl 8“ – nová záložka
+✓ nový díl „Nový díl 9“ – nová záložka
+✓ nový díl „Nový díl 10“ – nová záložka
+✓ nový díl „Nový díl 11“ – nová záložka
+✓ nový díl „Nový díl 12“ – nová záložka
+✓ nový díl „Nový díl 13“ – nová záložka
+✓ nový díl „Nový díl 14“ – nová záložka
+✓ nový díl „Nový díl 15“ – nová záložka
+✓ nový díl „Nový díl 16“ – nová záložka
+✓ nový díl „Nový díl 17“ – nová záložka
+✓ nový díl „Nový díl 18“ – nová záložka
+✓ nový díl „Nový díl 19“ – nová záložka
+✓ nový díl „Nový díl 20“ – nová záložka
+✓ nový díl „Nový díl 21“ – nová záložka
+✓ nový díl „Nový díl 22“ – nová záložka
+✓ nový díl „Nový díl 23“ – nová záložka
+✓ nový díl „Nový díl 24“ – nová záložka
+✓ nový díl „Nový díl 25“ – nová záložka
+✓ nový díl „Nový díl 26“ – nová záložka
+✓ nový díl „Nový díl 27“ – nová záložka
+Záložky (26):
+ 1. Nový díl 2 · díl
+ 2. Nový díl · díl
+ 3. Nový díl 3 · díl
+ 4. Nový díl 4 · díl
+ 5. Nový díl 5 · díl
+ 6. Nový díl 6 · díl
+ 7. Nový díl 7 · díl
+ 8. Nový díl 8 · díl
+ 9. Nový díl 9 · díl
+ 10. Nový díl 10 · díl
+ 11. Nový díl 11 · díl
+ 12. Nový díl 12 · díl
+ 13. Nový díl 13 · díl
+ 14. Nový díl 14 · díl
+ 15. Nový díl 15 · díl
+ 16. Nový díl 16 · díl
+ 17. Nový díl 17 · díl
+ 18. Nový díl 18 · díl
+ 19. Nový díl 19 · díl
+ 20. Nový díl 20 · díl
+ 21. Nový díl 21 · díl
+ 22. Nový díl 22 · díl
+ 23. Nový díl 23 · díl
+ 24. Nový díl 24 · díl
+ 25. Nový díl 25 · díl
+ 26. Nový díl 26 · díl · aktivní
+
+Dokument: „Nový díl 27“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)
+=== tabs ===
+Nový díl 2 | Nový díl | Nový díl 3 | Nový díl 4 | Nový díl 5 | Nový díl 6 | Nový díl 7 | Nový díl 8 | Nový díl 9 | Nový díl 10 | Nový díl 11 | Nový díl 12 | Nový díl 13 | Nový díl 14 | Nový díl 15 | Nový díl 16 | Nový díl 17 | Nový díl 18 | Nový díl 19 | Nový díl 20 | Nový díl 21 | Nový díl 22 | Nový díl 23 | Nový díl 24 | Nový díl 25 | Nový díl 26 | Nový díl 27

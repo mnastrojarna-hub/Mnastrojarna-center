@@ -1,0 +1,50 @@
+=== run 1 ===
+✓ nový díl „Výkres dílu“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Díra 2 (hole)
+
+Dokument: „Výkres dílu“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 80 × 50 × 20 mm (X 0…80, Y 0…50, Z 0…20) · objem 76,86 cm³ · ploch 8 · hran 18
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 80 × 50 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ – Ø10 skrz v [20; 25; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ – Ø10 skrz v [60; 25; 20], osa Z
+=== run 2 ===
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ výkres: A3, na šířku, měřítko 1:1, pohledy přední, horní, iso
+✓ Chytré kóty (řetězově): 5 kót a popisů – horní 4, přední 1 · očekávaných rozměrů 4
+✓ tolerance ±0,1 → 80±0,1 (horní)
+✓ nepředepsané tolerance ISO 2768-mK
+Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
+Listy (1): 1 „List 1“ A3 (aktivní)
+Kóty a popisy (5, z toho vygenerovaných 5):
+  horní: 40 · 2× Ø10 skrz · 80±0,1 · 50
+  přední: 20
+Poznámky a značky: osa souměrnosti · osa souměrnosti
+Id (výkres upravit / smazat / značka na <id>): a1 osa souměrnosti (horní) · a2 osa souměrnosti (horní) · a3 40 (horní) · a4 2× Ø10 skrz (horní) · a5 80±0,1 (horní) · a6 50 (horní) · a7 20 (přední)
+Duplicity: žádné
+Kontrola kót: všech 4 očekávaných rozměrů je na listu
+Polohy děr: kóty od hran (horní)
+U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
+Razítko: název Výkres dílu · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
+  přední (x = X, y = Z): x 0…80, y 0…20 mm · 1:1 · na listu x 44…124, y 243…263
+  horní (x = X, y = Y): x 0…80, y 0…50 mm · 1:1 · na listu x 44…124, y 159…209
+
+Dokument: „Výkres dílu“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
+Rozměry: 80 × 50 × 20 mm (X 0…80, Y 0…50, Z 0…20) · objem 76,86 cm³ · ploch 8 · hran 18
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 80 × 50 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ – Ø10 skrz v [20; 25; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ – Ø10 skrz v [60; 25; 20], osa Z

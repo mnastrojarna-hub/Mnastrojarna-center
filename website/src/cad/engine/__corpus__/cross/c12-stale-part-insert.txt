@@ -1,0 +1,10 @@
+# vložit díl změněný v dřívějším běhu: aktuální dokument (kvádr + válec), ne stav z otevření záložky
+nový díl A
+kvádr 10 10 10
+#--- run
+válec 5 30
+#--- run
+nová sestava S
+vložit "A"
+#--- run
+stav

@@ -20,8 +20,11 @@
  * na začátek `\`. Druh `=` má tvar kódu (`measure`, `clash`, `compare-2d`). Konce řádků všech druhů (i U+2028/U+2029/NEL)
  * a řídicí znaky jsou v textech a názvech nahrazené mezerou – každý řádek projde právě jedním regexem `GRAMMAR`.
  *
- * Priorita zařazení do rozpočtu: hlavička + Σ vždy > ✗ > ⚠ > F/O > jednořádkové `=` > D (hlavní dokument a dokumenty
- * s ✗/⚠) > víceřádkové výpisy > ℹ (jen `notes`). Pořadí tisku: hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku, Σ.
+ * Priorita zařazení do rozpočtu: hlavička + Σ + řádek O (odkaz; delší než 200 znaků zkrácený na začátek adresy a délku)
+ * vždy > ✗ > ⚠ > F a celý dlouhý řádek O > jednořádkové `=` > D (hlavní dokument a dokumenty s ✗/⚠) > víceřádkové
+ * výpisy > ℹ (jen `notes`). Pořadí tisku: hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku,
+ * Σ. Nevejdou-li se všechny řádky F (mnoho souborů), nahradí je jeden souhrnný `F <formát|mixed> "*" <bajty>B files=<n> …`
+ * (jednotlivé soubory jsou v `protocol-full.txt` a v JSON `files`).
  * Zařazuje se hladově v pořadí priority (v rámci priority v pořadí tisku): záznam se vypíše, když se vejde i se značkou
  * přebytku za všechno, co zatím vypsané není; jinak se přeskočí a zkouší se další. Proto (a) se nikdy nevypíše záznam
  * nižší priority místo záznamu vyšší priority, který by se po jeho vynechání vešel, a (b) žádný vynechaný záznam by se do
@@ -30,8 +33,10 @@
  * Slučují se jen opravdu stejné hlášky (úroveň, kód, dokument, text a data; s řádkem / bez řádku zvlášť), takže se nic
  * neztratí: dvě různé kolize, dva různé neznámé příkazy nebo `L-` a `L5` zůstanou samostatnými řádky.
  */
+import type { StrictState } from "./strict";
 import type { CadLang } from "../i18n";
-import { CODE_RE, codeEntry, fallbackCode, type Code, type CodeEntryInit } from "./codes";
+import { CODE_RE, codeArgs, codeEntry, fallbackCode, type Code, type CodeEntryInit } from "./codes";
+import { tr } from "../i18n";
 import type { DocSummary, Entry, Level, OpTiming, OutFile, Overflow, RunReport, ShareInfo } from "./protocol-types";
 
 export const PROTOCOL_HEAD = "MNCAD/1";
@@ -220,6 +225,68 @@ export function mergeEntries(entries: readonly Entry[]): Entry[] {
   });
 }
 
+/**
+ * Kódy hlášek o jedné položce dokumentu (prvek dílu `prvek „{0}“: {1}`, list výkresu `list {0}: {1}`): ve stručném protokolu
+ * se sloučí hlášky téhož dokumentu, které se liší jen položkou (`mergeSimilar`). `numbers`: hlášky se liší i čísly (počet
+ * kót na listu) – slučují se podle hlášky s čísly nahrazenými „N“, čísla každé položky jsou v seznamu položek.
+ */
+const SIMILAR: Readonly<Record<string, { label: string; numbers: boolean }>> = {
+  "feature.warning": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "feature.failed": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "drawing.warning": { label: "{0} listů: {1} – „{2}“", numbers: true },
+};
+const NUM_RE = /\d+(?:[.,]\d+)*/g;
+
+/**
+ * Jen pro stručný protokol (zkouška 959, B6): ⚠/✗ téhož kódu o položkách jednoho dokumentu se stejnou hláškou a jinou
+ * položkou (osm stejných „Výsledek má neplatnou geometrii…“ jednoho dílu zaplnilo 2 kB a vytlačilo skutečné kolize pohybu; 14 listů
+ * s „N ručních úprav kót se nepodařilo přiřadit“) → jeden řádek `⚠ L76-L90 ×8 feature.warning "<díl>": 8 prvků: <hláška> –
+ * „<prvky>“`. Plný protokol a JSON mají dál každou položku zvlášť. Slučuje se jen při aspoň dvou různých položkách; záznamy
+ * s řádkem a bez řádku (`L-`) zvlášť; text mimo šablonu kódu a záznamy s daty se neslučují. Pořadí podle prvního výskytu.
+ */
+export function mergeSimilar(entries: readonly Entry[]): Entry[] {
+  type Group = { members: Entry[]; items: Map<string, string[]>; msgs: Set<string>; msg: string; label: string };
+  const groupOf = new Map<Entry, Group>();
+  const at = new Map<string, Group>();
+  for (const e of entries) {
+    const cfg = e.code ? SIMILAR[e.code] : undefined;
+    const args = cfg && (e.level === "warn" || e.level === "error") && e.data === undefined ? codeArgs(e.code!, e.text) : null;
+    if (!cfg || !args || args.length !== 2) continue;
+    const msg = cfg.numbers ? args[1].replace(NUM_RE, "N") : args[1];
+    const key = [e.level, e.code, e.doc ?? "", entryLines(e).length ? "L" : "-", msg].join("\u0000");
+    let g = at.get(key);
+    if (!g) at.set(key, (g = { members: [], items: new Map(), msgs: new Set(), msg, label: cfg.label }));
+    g.members.push(e);
+    g.msgs.add(args[1]);
+    // položka (prvek, list) → čísla jejích hlášek (`list 07: 2`, víc hlášek téhož listu `List 1: 3; 4`)
+    const nums = cfg.numbers ? (args[1].match(NUM_RE) ?? []).join("/") : "";
+    const item = g.items.get(args[0]) ?? [];
+    if (nums && !item.includes(nums)) item.push(nums);
+    g.items.set(args[0], item);
+    groupOf.set(e, g);
+  }
+  const out: Entry[] = [];
+  const done = new Set<Group>();
+  for (const e of entries) {
+    const g = groupOf.get(e);
+    if (!g || g.items.size < 2) {
+      out.push(e);
+      continue;
+    }
+    if (done.has(g)) continue;
+    done.add(g);
+    const lines = [...new Set(g.members.flatMap((m) => entryLines(m)))].sort((a, b) => a - b);
+    const count = g.members.reduce((a, m) => a + (m.count ?? 1), 0);
+    const { lines: _old, ...first } = g.members[0];
+    void _old;
+    // jedna podoba hlášky = celá hláška; víc podob (jiná čísla) = hláška s „N“ a čísla u položek
+    const msg = g.msgs.size === 1 ? [...g.msgs][0] : g.msg;
+    const names = [...g.items].map(([name, nums]) => (g.msgs.size > 1 && nums.length ? `${name}: ${nums.join("; ")}` : name));
+    out.push({ ...first, line: lines[0] ?? null, ...(lines.length ? { lines } : {}), count, text: tr(g.label, g.items.size, msg, names.join(", ")) });
+  }
+  return out;
+}
+
 /* ───────────────────────── řádky protokolu ───────────────────────── */
 
 /** řádek hlášky ✗/⚠/ℹ (a ✓ v plném protokolu) */
@@ -237,16 +304,19 @@ function msgLine(e: Entry, full: boolean): string {
   return doc ? `${head} ${code}${doc}: ${text}` : `${head} ${code} ${text}`;
 }
 
-/** řádek(y) vyžádané hodnoty `=`: druh = kód záznamu (`measureKind`), strojová část = text; další řádky textu = výpis */
-function measureText(e: Entry): string {
+/**
+ * Řádek(y) vyžádané hodnoty `=`: druh = kód záznamu (`measureKind`), strojová část = první řádek textu, další řádky textu =
+ * výpis (odsazené 2 mezerami). V plném protokolu (`full`) za nimi lokalizovaný text výpisu (`detail`), také odsazený.
+ */
+function measureText(e: Entry, full = false): string {
   const lines = entryLines(e);
   const loc = lines.length ? `L${lines[0]}` : "L-";
   const rows = String(e.text ?? "").split(/\r\n|[\n\r\u2028\u2029]/);
   const first = oneLine(rows[0] ?? "");
   const hasDoc = e.doc !== undefined && e.doc !== "";
   const payload = (hasDoc ? [quote(e.doc!), first].filter(Boolean).join(" ") : unquoted(first)) || "-";
-  const cont = rows
-    .slice(1)
+  const more = full && e.detail ? String(e.detail).split(/\r\n|[\n\r\u2028\u2029]/) : [];
+  const cont = [...rows.slice(1), ...more]
     .map((r) => oneLine(r))
     .filter(Boolean)
     .map((r) => `  ${r}`);
@@ -263,11 +333,11 @@ function matesStr(m: NonNullable<DocSummary["mates"]>): string {
   const extra = (["conflict", "missing", "suppressed"] as const).filter((k) => m[k] > 0).map((k) => `${k}=${m[k]}`);
   return `${m.ok}/${m.total}${extra.length ? `(${extra.join(",")})` : ""}`;
 }
-const clashD = (c: NonNullable<DocSummary["clashes"]>) => `${c.total}(thread=${c.thread},real=${c.real}${c.undetermined ? `,undetermined=${c.undetermined}` : ""})`;
-const clashSigma = (c: NonNullable<DocSummary["clashes"]>) => `thread:${c.thread},real:${c.real}${c.undetermined ? `,undetermined:${c.undetermined}` : ""}`;
+const clashD = (c: NonNullable<DocSummary["clashes"]>) => `${c.total}(thread=${c.thread}${c.underhead ? `,underhead=${c.underhead}` : ""},real=${c.real}${c.undetermined ? `,undetermined=${c.undetermined}` : ""})`;
+const clashSigma = (c: NonNullable<DocSummary["clashes"]>) => `thread:${c.thread}${c.underhead ? `,underhead:${c.underhead}` : ""},real:${c.real}${c.undetermined ? `,undetermined:${c.undetermined}` : ""}`;
 
-/** řádek `D` souhrnu dokumentu */
-export function docLine(d: DocSummary): string {
+/** strojová část souhrnu dokumentu: `<part|asm|draft> <klíč=hodnota …>` (řádek D, výpis `= … status`) */
+export function docKv(d: DocSummary): string {
   const kind = d.kind === "assembly" ? "asm" : d.kind === "draft" ? "draft" : "part";
   const kv: string[] = [];
   if (d.kind === "assembly") {
@@ -277,6 +347,7 @@ export function docLine(d: DocSummary): string {
     kv.push(`V.sum=${volCm3(d.volume_mm3)}`);
     if (d.volume_union_mm3 !== undefined) kv.push(`V.union=${volCm3(d.volume_union_mm3)}`);
     if (d.mass_kg !== undefined) kv.push(`m=${fmtNum(d.mass_kg, 2)}kg`);
+    if (d.bbox) kv.push(`bbox=${bboxSize(d.bbox)}`);
     if (d.clashes) kv.push(`clash=${clashD(d.clashes)}`);
   } else if (d.kind === "part") {
     if (d.features) kv.push(`feat=${d.features.ok}/${d.features.warn}/${d.features.error}`);
@@ -287,8 +358,11 @@ export function docLine(d: DocSummary): string {
   if (d.densityAssumed) kv.push(`rho=${fmtNum(d.density, 3)}`, "rho.assumed=1");
   if (d.exact === false) kv.push("exact=0");
   if (d.sheets) kv.push(`sheets=${d.sheets}`);
-  return `D ${quote(d.name)} ${kind} ${kv.join(" ") || "-"}`;
+  return `${kind} ${kv.join(" ") || "-"}`;
 }
+
+/** řádek `D` souhrnu dokumentu */
+export const docLine = (d: DocSummary): string => `D ${quote(d.name)} ${docKv(d)}`;
 
 /** řádek `F` zapsaného souboru */
 export function fileLine(f: OutFile): string {
@@ -302,10 +376,25 @@ export function fileLine(f: OutFile): string {
 
 const shareMode = (s: ShareInfo) => (s.mode === "store" || s.mode === "self" || s.mode === "link" ? s.mode : "link");
 
+const linkUrl = (s: ShareInfo) => String(s.url ?? "").replace(/[\s\u0000-\u001f\u007f-\u009f]/g, (c) => encodeURIComponent(c)) || "-";
+
 /** řádek `O` sdíleného odkazu */
 export function linkLine(s: ShareInfo): string {
-  const url = String(s.url ?? "").replace(/[\s\u0000-\u001f\u007f-\u009f]/g, (c) => encodeURIComponent(c)) || "-";
-  return `O ${url} exp=${isoDate(s.exp) ?? "none"} mode=${shareMode(s)}`;
+  return `O ${linkUrl(s)} exp=${isoDate(s.exp) ?? "none"} mode=${shareMode(s)}`;
+}
+
+/** odkaz do této délky (znaků) je ve stručném protokolu vždy celý – krátké odkazy úložiště mají ~40–80 znaků */
+export const LINK_SHORT_MAX = 200;
+/**
+ * Zkrácený řádek `O` pro stručný protokol, když se dlouhý odkaz (`#s=`, celý dokument v adrese) nevejde do rozpočtu vedle
+ * ✗ a ⚠: začátek adresy, „…“ a délka – `O https://…#s=1d.VVld…(4156chars) exp=… mode=link`. Celý odkaz je v plném
+ * protokolu (`protocol-full.txt`, počítá se do značky přebytku) a v JSON `share.url`. Odkaz do `LINK_SHORT_MAX` znaků
+ * vrací beze změny (`linkLine`).
+ */
+export function linkLineShort(s: ShareInfo): string {
+  const url = linkUrl(s);
+  if (url.length <= LINK_SHORT_MAX) return linkLine(s);
+  return `O ${url.slice(0, 64)}…(${url.length}chars) exp=${isoDate(s.exp) ?? "none"} mode=${shareMode(s)}`;
 }
 
 /** hlavní dokument: označený `main`, jinak poslední sestava, jinak poslední dokument */
@@ -363,7 +452,26 @@ export type ShortProtocol = { text: string; bytes: number; budget: number; overf
 const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, note: 6 } as const;
 /** skupina tisku (pořadí řádků) */
 const GROUP = { error: 0, warn: 1, note: 2, measure: 3, doc: 4, file: 5, link: 6 } as const;
-type Item = { prio: number; group: number; order: number; text: string; bytes: number };
+/** `over` = bajty v přebytku, když se záznam nevypíše (jinak `bytes`) – celý řádek O místo zkráceného */
+type Item = { prio: number; group: number; order: number; text: string; bytes: number; over?: number };
+type Extra = { n: number; b: number };
+
+/**
+ * Data souborů `… base64` (záznam `= … file` s `data.base64`): ve stručném protokolu je jen řádek `=` s délkou, data jsou
+ * v plném protokolu – počítají se do přebytku vždy, takže stručný protokol má značku `… in protocol-full.txt` a CLI soubor
+ * zapíše (bez přebytku by data v CLI bez `--json` / `--full` nebyla nikde).
+ */
+function payloadOverflow(entries: readonly Entry[]): Extra {
+  let n = 0;
+  let b = 0;
+  for (const e of entries) {
+    const b64 = e.level === "measure" && e.code === "file" ? (e.data as { base64?: unknown } | undefined)?.base64 : undefined;
+    if (typeof b64 !== "string" || !b64) continue;
+    n++;
+    b += b64.length + 3; // odsazení 2 mezerami + konec řádku v plném protokolu
+  }
+  return { n, b };
+}
 
 /** pořadí v rámci skupiny: záznamy bez řádku (běh, hostitel) první, pak podle řádku a vzniku */
 const lineKey = (e: Entry) => {
@@ -375,7 +483,7 @@ const lineKey = (e: Entry) => {
 function candidates(r: RunReport, notes: boolean): Item[] {
   const items: Item[] = [];
   const add = (prio: number, group: number, order: number, text: string) => items.push({ prio, group, order, text, bytes: utf8Bytes(text) + 1 });
-  const entries = mergeEntries(r.entries);
+  const entries = mergeSimilar(mergeEntries(r.entries));
   const seq = new Map(entries.map((e, i) => [e, i]));
   const sorted = [...entries].sort((a, b) => lineKey(a) - lineKey(b) || seq.get(a)! - seq.get(b)!);
   sorted.forEach((e, i) => {
@@ -395,8 +503,18 @@ function candidates(r: RunReport, notes: boolean): Item[] {
     if (d === main || bad) add(PRIO.doc, GROUP.doc, d === main ? -1 : i, docLine(d));
   });
   r.files.forEach((f, i) => add(PRIO.out, GROUP.file, i, fileLine(f)));
-  if (r.share) add(PRIO.out, GROUP.link, 0, linkLine(r.share));
-  return items;
+  return items; // řádek O (odkaz) je pevný jako hlavička a Σ (shortProtocol)
+}
+
+/** souhrnný řádek F místo jednotlivých souborů: `F <formát|mixed> "*" <bajty>B files=<n> formats=… [check=…] [run=fail]` */
+export function filesSummaryLine(files: readonly OutFile[]): string {
+  const fmts = [...new Set(files.map((f) => token(f.format, "bin")))];
+  const bytes = files.reduce((s, f) => s + (Number.isFinite(f.bytes) ? Math.max(0, Math.round(f.bytes)) : 0), 0);
+  const kv = [`files=${files.length}`, `formats=${fmts.join(",")}`];
+  const checked = files.filter((f) => f.check);
+  if (checked.length) kv.push(`check=${checked.every((f) => f.check!.ok) ? "ok" : "fail"}`);
+  if (files.some((f) => f.run === "fail")) kv.push("run=fail");
+  return `F ${fmts.length === 1 ? fmts[0] : "mixed"} "*" ${bytes}B ${kv.join(" ")}`;
 }
 
 /** požadovaný rozpočet: chybějící, NaN nebo ne-číslo → výchozí; `Infinity` → bez omezení; jinak celé číslo */
@@ -407,40 +525,73 @@ function askedBudget(b: unknown): number {
 }
 
 /**
- * Stručný protokol s tvrdým rozpočtem `budget` bajtů UTF-8 (každý řádek včetně `\n`; výchozí 2048). Hlavička a Σ jsou vždy;
- * ostatní řádky hladově podle priority (viz záhlaví modulu); co se nevejde, je jen v plném protokolu a stručný protokol
- * končí řádkem `… <n> entries <bajty>B in protocol-full.txt` před Σ. Když se všechno nevejde a rozpočet je menší než
- * hlavička + Σ + značka, zvýší se na toto minimum (vrací se jako `budget`).
+ * Stručný protokol s tvrdým rozpočtem `budget` bajtů UTF-8 (každý řádek včetně `\n`; výchozí 2048). Hlavička, Σ a řádek O
+ * (dlouhý odkaz zkrácený – `linkLineShort`) jsou vždy; ostatní řádky hladově podle priority (viz záhlaví modulu); co se
+ * nevejde, je jen v plném protokolu a stručný protokol končí řádkem `… <n> entries <bajty>B in protocol-full.txt` před Σ
+ * (také vždy, když běh vrátil data `… base64` – ta jsou jen v plném protokolu). Když se všechno nevejde a rozpočet je
+ * menší než hlavička + Σ + zkrácený O + značka, zvýší se na toto minimum (vrací se jako `budget`).
  */
 export function shortProtocol(r: RunReport, o: ShortOptions = {}): ShortProtocol {
   const head = headerLine(r);
   const sigma = sigmaLine(r);
+  /*
+   * Odkaz se vypíše vždy (jako hlavička a Σ) – bez něj by agent výsledek sdílení neměl (zpráva 959, bod 5). Dlouhý odkaz
+   * (celý dokument v adrese, 3–15 kB) ale nesmí vytlačit ✗ a ⚠ (priorita ✗ > ⚠ > F/O): pevná je jen zkrácená podoba
+   * (`linkLineShort`), celý řádek O je kandidát s prioritou F/O, který ji nahradí, když se vejde.
+   */
+  const link = r.share ? linkLineShort(r.share) : null;
+  const fullLink = r.share ? linkLine(r.share) : null;
   const items = candidates(r, !!o.notes);
-  const fixed = utf8Bytes(head) + 1 + utf8Bytes(sigma) + 1;
+  let linkUp: Item | null = null;
+  if (link && fullLink && link !== fullLink) {
+    linkUp = { prio: PRIO.out, group: GROUP.link, order: 0, text: fullLink, bytes: utf8Bytes(fullLink) - utf8Bytes(link), over: utf8Bytes(fullLink) + 1 };
+    items.push(linkUp);
+  }
+  const payload = payloadOverflow(r.entries);
+  const fixed = utf8Bytes(head) + 1 + utf8Bytes(sigma) + 1 + (link ? utf8Bytes(link) + 1 : 0);
   const total = items.reduce((s, x) => s + x.bytes, 0);
   const marker = (n: number, bytes: number) => (n > 0 ? utf8Bytes(overflowLine(n, bytes)) + 1 : 0);
+  const overOf = (x: Item) => x.over ?? x.bytes;
   let budget = askedBudget(o.budget);
-  const kept = new Set<Item>();
-  if (fixed + total <= budget) for (const it of items) kept.add(it);
-  else {
-    budget = Math.max(budget, fixed + marker(items.length, total));
-    // hladově v pořadí priority: záznam se vejde i se značkou za všechno, co by po něm zůstalo nevypsané (invariant
-    // used + značka ≤ budget platí po každém kroku, takže na konci se značka vejde vždy)
+  /**
+   * hladově v pořadí priority: záznam se vejde i se značkou za všechno, co by po něm zůstalo nevypsané (invariant
+   * used + značka ≤ budget platí po každém kroku, takže na konci se značka vejde vždy); `extra` = záznamy, které jsou
+   * v přebytku vždy (data `… base64`, jednotlivé řádky F zastoupené souhrnným řádkem)
+   */
+  const select = (list: Item[], extra: Extra) => {
+    const kept = new Set<Item>();
     let used = fixed;
-    let restN = items.length;
-    let restB = total;
-    for (const it of [...items].sort((a, b) => a.prio - b.prio || a.group - b.group || a.order - b.order)) {
-      if (used + it.bytes + marker(restN - 1, restB - it.bytes) > budget) continue;
+    let restN = list.length + extra.n;
+    let restB = list.reduce((s, x) => s + overOf(x), 0) + extra.b;
+    for (const it of [...list].sort((a, b) => a.prio - b.prio || a.group - b.group || a.order - b.order)) {
+      if (used + it.bytes + marker(restN - 1, restB - overOf(it)) > budget) continue;
       kept.add(it);
       used += it.bytes;
       restN--;
-      restB -= it.bytes;
+      restB -= overOf(it);
+    }
+    return kept;
+  };
+  let kept = new Set<Item>();
+  if (fixed + total + marker(payload.n, payload.b) <= budget) for (const it of items) kept.add(it);
+  else {
+    budget = Math.max(budget, fixed + marker(items.length + payload.n, items.reduce((s, x) => s + overOf(x), 0) + payload.b));
+    kept = select(items, payload);
+    // nevešly se všechny soubory: jeden souhrnný řádek F místo nich (jednotlivé soubory jsou v plném protokolu a v JSON)
+    const fileItems = items.filter((x) => x.group === GROUP.file);
+    if (fileItems.length > 1 && fileItems.some((x) => !kept.has(x))) {
+      const text = filesSummaryLine(r.files);
+      const sum: Item = { prio: PRIO.out, group: GROUP.file, order: -1, text, bytes: utf8Bytes(text) + 1 };
+      const alt = select([...items.filter((x) => x.group !== GROUP.file), sum], { n: fileItems.length + payload.n, b: fileItems.reduce((s, x) => s + x.bytes, 0) + payload.b });
+      if (alt.has(sum)) kept = alt;
     }
   }
   const over = items.filter((x) => !kept.has(x));
-  const body = [...kept].sort((a, b) => a.group - b.group || a.order - b.order).map((x) => x.text);
-  const overflow: Overflow | undefined = over.length ? { entries: over.length, bytes: over.reduce((s, x) => s + x.bytes, 0), file: OVERFLOW_FILE } : undefined;
-  const lines = [head, ...body, ...(overflow ? [overflowLine(overflow.entries, overflow.bytes)] : []), sigma];
+  const body = [...kept].filter((x) => x !== linkUp).sort((a, b) => a.group - b.group || a.order - b.order).map((x) => x.text);
+  const overN = over.length + payload.n;
+  const overflow: Overflow | undefined = overN ? { entries: overN, bytes: over.reduce((s, x) => s + overOf(x), 0) + payload.b, file: OVERFLOW_FILE } : undefined;
+  const linkText = linkUp && kept.has(linkUp) ? fullLink : link;
+  const lines = [head, ...body, ...(linkText ? [linkText] : []), ...(overflow ? [overflowLine(overflow.entries, overflow.bytes)] : []), sigma];
   const text = lines.join("\n");
   return { text, bytes: utf8Bytes(text) + 1, budget, ...(overflow ? { overflow } : {}) };
 }
@@ -459,7 +610,7 @@ export function formatFull(r: RunReport): string {
   const seq = new Map(entries.map((e, i) => [e, i]));
   const sorted = [...entries].sort((a, b) => lineKey(a) - lineKey(b) || seq.get(a)! - seq.get(b)!);
   const out = [headerLine(r)];
-  for (const e of sorted) out.push(e.level === "measure" ? measureText(e) : msgLine(e, true));
+  for (const e of sorted) out.push(e.level === "measure" ? measureText(e, true) : msgLine(e, true));
   for (const d of r.docs) out.push(docLine(d));
   for (const f of r.files) out.push(fileLine(f));
   if (r.share) out.push(linkLine(r.share));
@@ -467,11 +618,20 @@ export function formatFull(r: RunReport): string {
   return out.join("\n");
 }
 
+/**
+ * Protokol konzole prohlížeče (kap. 4.1 „v konzoli prohlížeče plný – dnešní text“): text, který vrací `runAgentText` /
+ * `window.mncad.run` – řádky operací podle řádků skriptu, výsledky prvků po stavbě a stav dokumentu (`report.console`
+ * z `runScript`). Report bez textu konzole (CLI, HTTP) → plný protokol `formatFull`.
+ */
+export const formatConsole = (r: RunReport): string => r.console ?? formatFull(r);
+
 export type FinalizeOptions = ShortOptions & { full?: boolean };
 
 /** Report s vyplněným stručným protokolem (`protocol`, `overflow`), sloučenými záznamy a na vyžádání plným protokolem. */
 export function finalizeReport(r: RunReport, o: FinalizeOptions = {}): RunReport {
-  const merged: RunReport = { ...r, entries: mergeEntries(r.entries) };
+  const { console: _console, ...rest } = r; // text konzole prohlížeče se do JSON / HTTP nepřenáší
+  void _console;
+  const merged: RunReport = { ...rest, entries: mergeEntries(r.entries) };
   const s = shortProtocol(merged, o);
   const out: RunReport = { ...merged, protocol: s.text };
   if (s.overflow) out.overflow = s.overflow;
@@ -496,6 +656,10 @@ export class ReportBuilder {
   private ops = 0;
   private peak = 0;
   private stoppedAt?: { line: number | null; code: string };
+  /** odkaz vytvořený během běhu (text `sdílet` / `odkaz`) – řádek O, pokud ho `finish` nepřepíše (`--share`) */
+  private sharedLink?: ShareInfo;
+  /** přísný režim běhu (volba + řádky `přísně`) – CLI podle něj zastaví i závěrečnou stavbu a výstupy (engine/strict.ts) */
+  strictMode?: StrictState;
   private readonly t0: number;
   private readonly now: () => number;
 
@@ -517,8 +681,8 @@ export class ReportBuilder {
     return this.add({ line, level: "ok", text, ...(doc !== undefined ? { doc } : {}) });
   }
   /** vyžádaná hodnota `=` (druh `[a-z]+`, strojová část `klíč=hodnota …`; víc řádků = výpis) */
-  measure(line: number | null, kind: string, payload: string, o: { doc?: string; data?: unknown } = {}): Entry {
-    return this.add({ line, level: "measure", code: kind, text: payload, ...(o.doc !== undefined ? { doc: o.doc } : {}), ...(o.data !== undefined ? { data: o.data } : {}) });
+  measure(line: number | null, kind: string, payload: string, o: { doc?: string; data?: unknown; detail?: string } = {}): Entry {
+    return this.add({ line, level: "measure", code: kind, text: payload, ...(o.doc !== undefined ? { doc: o.doc } : {}), ...(o.data !== undefined ? { data: o.data } : {}), ...(o.detail ? { detail: o.detail } : {}) });
   }
   /** provedená operace a její čas */
   op(line: number, op: string, ms: number): void {
@@ -528,6 +692,10 @@ export class ReportBuilder {
   /** hlášená paměť (MB) – drží se maximum */
   memory(mb: number): void {
     if (Number.isFinite(mb) && mb > this.peak) this.peak = mb;
+  }
+  /** sdílený odkaz z běhu (poslední vyhrává; `finish({ share })` má přednost) */
+  setShare(s: ShareInfo): void {
+    this.sharedLink = s;
   }
   /** přísný režim zastavil běh */
   stop(line: number | null, code: string): void {
@@ -554,7 +722,7 @@ export class ReportBuilder {
     const r: RunReport = {
       v: 1,
       ok: errors === 0 && !this.stoppedAt,
-      strict: !!this.o.strict,
+      strict: this.strictMode ? this.strictMode.used : !!this.o.strict,
       ms: this.elapsed(o.ms),
       lang: this.o.lang,
       counts: { lines: this.o.lines, ops: this.ops, ok: this.count("ok"), notes: this.count("note"), warnings: this.count("warn"), errors },
@@ -566,7 +734,8 @@ export class ReportBuilder {
       protocol: "",
     };
     if (this.stoppedAt) r.stopped = this.stoppedAt;
-    if (o.share) r.share = o.share;
+    const share = o.share ?? this.sharedLink;
+    if (share) r.share = share;
     return r;
   }
 }

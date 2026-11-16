@@ -9,6 +9,7 @@
  */
 import { tr } from "./i18n";
 import { AsmCursor, asmIsNum, asmNum, asmTokens, asmWords as W } from "./agent-asm";
+import { backArg, parseDynText, type DynCmd } from "./agent-motion-dyn";
 import type { Vec3 } from "./types";
 
 export type MotionCmd =
@@ -28,7 +29,10 @@ export type MotionCmd =
       duration?: number;
       collisions?: boolean;
       trace?: { comp: string; point?: Vec3 } | null;
+      /** tam a zpět (cad/agent-motion-dyn.ts) */
+      back?: boolean;
     }
+  | { op: "dyn"; cmd: DynCmd }
   | { op: "set"; steps?: number; step?: number; duration?: number; collisions?: boolean; trace?: { comp: string; point?: Vec3 } | null }
   | { op: "run" }
   | { op: "play"; loop?: boolean }
@@ -138,6 +142,9 @@ function studyOpt(c: AsmCursor, o: { steps?: number; step?: number; duration?: n
 export function parseMotionText(line: string): MotionCmd {
   const c = new AsmCursor(asmTokens(line).slice(1));
   if (c.done || c.is(K.status)) return { op: "status" };
+  // dynamika, hmotnost, síla / moment na vazbě (cad/agent-motion-dyn.ts)
+  const dyn = parseDynText(c);
+  if (dyn) return { op: "dyn", cmd: dyn };
   if (c.is(K.motor)) {
     c.i++;
     if (c.is(K.del)) {
@@ -170,7 +177,8 @@ export function parseMotionText(line: string): MotionCmd {
       } else if (c.is(K.rpm) || c.is(K.speed)) {
         c.i++;
         out.speed = c.num(tr("rychlost"));
-      } else if (!studyOpt(c, out)) throw new Error(tr("pohyb motor: neznámá volba „{0}“ – {1}", c.peek()!.t, MOTION_USE()));
+      } else if (backArg(c)) out.back = true;
+      else if (!studyOpt(c, out)) throw new Error(tr("pohyb motor: neznámá volba „{0}“ – {1}", c.peek()!.t, MOTION_USE()));
     }
     if (out.speed === undefined && out.from === out.to) throw new Error(tr("motor: rozsah od–do je nulový – např. 0..360"));
     return out;

@@ -183,7 +183,8 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   log = await run('výkres revize A "první vydání"\nvýkres revize B "změna díry"\nvýkres razítko revize=""\nvýkres razítko\nvýkres razítko revize=C');
   fs.writeFileSync(S + 'log7c.txt', log);
   ok(/Razítko: .* revize B \(z tabulky revizí\) · /.test(log), 'prázdné pole revize: protokol uvádí „revize B (z tabulky revizí)“ (dřív „revize —“)');
-  ok(/! revize v razítku „C“ není v tabulce revizí \(A, B\)/.test(log), 'revize C mimo tabulku → ! upozornění');
+  // engine (fáze B): nález příkazu výkresu = řádek ⚠ s kódem drawing.warning („⚠ řádek N: list …: …“), dřív „! …“
+  ok(/(! |⚠ (řádek \d+: )?(list [^:\n]+: )?)revize v razítku „C“ není v tabulce revizí \(A, B\)/.test(log), 'revize C mimo tabulku → ⚠ upozornění');
   log = await run('výkres razítko revize=""\nvýkres razítko materiál="1.2379 (X153CrMoV12) kalené a popuštěné na 58–60 HRC, nitridováno 0,1 mm"\nvýkres razítko');
   ok(/Razítko bez zkracování textu: .*Materiál \d řádky \d,\d mm/.test(log), 'stav razítka hlásí i zalomený materiál – ' + first(log, /Razítko bez zkracování textu: .*$/m));
   log = await run('výkres nepředepsané X. ±0,1 · X.X ±0,1 · X.XX ±0,01 · X.XXX ±0,005\nvýkres razítko');

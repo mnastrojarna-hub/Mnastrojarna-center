@@ -74,12 +74,12 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   let log = await consoleRun('nový díl Hranol\nskica XZ: obdélník 40 30 v 0 15\nvysunout 60\nvýkres A3 pohledy přední,horní řez XZ odsazení -80');
   fs.writeFileSync(S + 'b5-miss.txt', log);
   ok(/✓ výkres: A3, pohledy přední, horní, řez XZ odsazení -80 \(rovina Y = 80\)/.test(log), 'B5: protokol ukáže rovinu řezu (odsazení -80 = rovina Y = 80)');
-  ok(/✗ rovina řezu Y = 80 leží mimo těleso \(Y -60…0\) – odsazení -80 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než 0 a menší než 60 \(krajní hodnoty leží na ploše tělesa\), např\. 30/.test(log), 'B5: rovina mimo těleso = řádek ✗ s otevřeným rozsahem odsazení 0…60 a příkladem');
+  ok(/✗ (řádek \d+: rovina řezu neprotíná těleso: [^\n]* – )?rovina řezu Y = 80 leží mimo těleso \(Y -60…0\) – odsazení -80 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než 0 a menší než 60 \(krajní hodnoty leží na ploše tělesa\), např\. 30/.test(log), 'B5: rovina mimo těleso = řádek ✗ s otevřeným rozsahem odsazení 0…60 a příkladem');
   // starší zápis (číslo jako souřadnice osy): dnešní výklad těleso mine, starý ho protne → vyloží se postaru s ⚠, bez ✗
   await closeDrawing();
   log = await consoleRun('výkres řez XZ odsazení -20');
   fs.writeFileSync(S + 'b5-legacy.txt', log);
-  ok(/✓ výkres: řez XZ odsazení 20 \(rovina Y = -20\)/.test(log) && /⚠ řez XZ odsazení -20: rovina Y = 20 těleso míjí – číslo vyloženo postaru jako souřadnice Y = -20 .*dnes pište: výkres řez XZ odsazení 20/.test(log) && !/✗ rovina řezu/.test(log.split('\n').slice(-5).join('\n')), 'B5: starší zápis odsazení -20 = ⚠ s dnešním zápisem, řez uložen jako odsazení 20, bez ✗');
+  ok(/✓ výkres: řez XZ odsazení 20 \(rovina Y = -20\)/.test(log) && /⚠ (řádek \d+: )?řez XZ odsazení -20: rovina Y = 20 těleso míjí – číslo vyloženo postaru jako souřadnice Y = -20 .*dnes pište: výkres řez XZ odsazení 20/.test(log) && !/✗ rovina řezu/.test(log.split('\n').slice(-5).join('\n')), 'B5: starší zápis odsazení -20 = ⚠ s dnešním zápisem, řez uložen jako odsazení 20, bez ✗');
   await closeDrawing();
   log = await consoleRun('výkres řez XZ odsazení 20');
   fs.writeFileSync(S + 'b5-ok.txt', log);
@@ -95,7 +95,7 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   // ── B6: nevejde se na list ──
   log = await consoleRun('nový díl Velky\nkvádr 800 600 300\nvýkres A2 měřítko 1:2 pohledy přední,horní,levý,iso');
   fs.writeFileSync(S + 'b6.txt', log);
-  ok(/⚠ Pohledy se v měřítku 1:2 nevejdou na list A2\./.test(log), 'B6: „nevejdou se na list A2“ jako řádek ⚠ v protokolu příkazu');
+  ok(/⚠ (řádek \d+: list [^:\n]+: )?Pohledy se v měřítku 1:2 nevejdou na list A2\./.test(log), 'B6: „nevejdou se na list A2“ jako řádek ⚠ v protokolu příkazu');
   await closeDrawing();
 
   // ── B7: desetinná místa a tolerance hodnotou / id ──
@@ -123,7 +123,7 @@ const SHAFT = 'nový díl Hřídel\nskica XZ: čára 0 0 0 10 30 10 30 8,5 33 8,
   log = await consoleRun('výkres tolerance 50 -0,1\nvýkres kontrola tolerancí\nvýkres');
   fs.writeFileSync(S + 'tolcheck.txt', log);
   ok(/⚠ kontrola tolerancí: bez tolerance 1 z 3 funkčních rozměrů \(předloha není připojena/.test(log), '5.3: výkres kontrola tolerancí – 1 ze 3 funkčních bez tolerance');
-  ok(/⚠ 30 \(funkční\): kóta bez tolerance a\d+ 30 \(přední\) – výkres tolerance a\d+ …/.test(log), '5.3: řádek s kótou 30 bez tolerance a radou s id');
+  ok(/⚠ (řádek \d+: )?30 \(funkční\): kóta bez tolerance a\d+ 30 \(přední\) – výkres tolerance a\d+ …/.test(log), '5.3: řádek s kótou 30 bez tolerance a radou s id');
   await waitSheetText('42±0,05');
   const side = p.locator('[data-drawing-workspace] aside');
   const fun = await side.locator('[data-functional]').inputValue().catch(() => '');

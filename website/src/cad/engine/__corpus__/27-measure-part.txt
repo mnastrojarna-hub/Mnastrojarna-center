@@ -1,0 +1,12 @@
+# měření v dílu (op measure): těleso, díry, válce, plocha pravidlem, dvě entity, bod
+nový díl Měření
+kvádr 60 40 20
+díra 10 hloubka 12 v 15 20
+díra 8 skrz v 45 20
+#--- run
+měřit těleso
+měřit díry
+měřit válce
+měřit plocha horní
+měřit F1 F2
+měřit F1 0 0 50

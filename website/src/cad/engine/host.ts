@@ -10,7 +10,8 @@ import type { MotionSignal } from "../asm-agent-kin";
 import { tr } from "../i18n";
 import type { PdfFonts } from "../pdf";
 import type { PdfJs } from "../pdfjs";
-import type { CadDoc } from "../types";
+import type { SurfQueryResult } from "../surf-query";
+import type { CadDoc, Feature } from "../types";
 import type { KernelApi } from "./kernel";
 import type { OutFile } from "./protocol-types";
 
@@ -23,23 +24,38 @@ export type FileSink = { write(f: OutWrite): Promise<OutFile> };
 /** vstupy: CLI = `--files DIR` a složka skriptu, serve = jen klíče `body.files`, prohlížeč = přiložené soubory */
 export type FileSource = { read(name: string): Promise<{ name: string; data: Uint8Array }>; list(): string[] };
 
+/** výsledek příkazu `api` provedeného aplikací (agent-api-host.ts `runApiCmd`) */
+export type UiApiResult = { log: string[]; doc?: CadDoc; added?: Feature[]; open?: CadDoc };
+
 /** háčky aplikace v prohlížeči – v CLI chybí a příkazy, které je potřebují, dají ℹ `ui.no-view` nebo ✗ `host.app-only` */
 export type UiHooks = {
   /** id skici otevřené v editoru skici (příkazy skici bez názvu pracují s ní) */
   openSketchId?(): string | null;
   /** otevřít výkres aktivního dokumentu v záložce */
   openDrawing?(): void;
-  /** zásobník úprav v kontextu sestavy se změnil */
-  asmStack?(stack: { asm: CadDoc; key: string }[]): void;
+  /** zásobník úprav v kontextu sestavy se změnil (`doc` = dokument, se kterým běh pokračuje) */
+  asmStack?(stack: { asm: CadDoc; key: string }[], doc: CadDoc): void;
   /** pokyn panelu pohybové studie (přehrát, zastavit, krok, export snímků) */
   motion?(sig: MotionSignal): void;
   /** pohled 3D okna (iso, zepředu, …) */
   view?(v: string): void;
-  /** překryv ploch třídy A (návaznost, hřebeny) – typ vlastní aplikace */
-  surfOverlay?(overlay: unknown): void;
-  /** zobrazení výsledku příkazu `api` (řez, styl, analýzy) – výpočet je v engine, zobrazení v aplikaci (B2) */
-  api?(cmd: ApiCmd, doc: CadDoc): Promise<unknown>;
-  /** po běhu (statistika, zavření úvodní obrazovky) */
+  /** překryv ploch třídy A (návaznost, hřebeny) ve 3D okně – výsledek dotazu do jádra */
+  surfOverlay?(res: SurfQueryResult): void;
+  /** příkaz pro 3D okno a stav aplikace (řez, styl, výběr, barva ploch, akce, analýzy) – agent-api-host.ts */
+  api?(cmd: ApiCmd, doc: CadDoc): Promise<UiApiResult>;
+  /** zkopírovat text (sdílený odkaz) do schránky; false = nešlo (výstupy engine/ops/out.ts na schránku nikdy nečekají) */
+  clipboard?(text: string): Promise<boolean>;
+  /** projekt dokumentu byl uložen příkazem `uložit` (aplikace: žádné neuložené změny) */
+  saved?(doc: CadDoc): void;
+  /** poznámka k prvku podle výběru ve 3D okně („zaoblit 3“ při vybraných hranách zpracuje všechny hrany) */
+  selectionNote?(f: Feature): string | null;
+  /** nové díly sestavy v mezipaměti (`ws.asm.cache`) – překreslit 3D okno */
+  partsLoaded?(): void;
+  /** kusovník výkresu plochý (výchozí) / strukturovaný – přepínač aplikace */
+  bomFlat?(): boolean;
+  /** po zrušeném výpočtu znovu připravit jádro nad dokumentem aplikace */
+  restoreKernel?(): void;
+  /** po běhu, který změnil dokument (statistika, zavření úvodní obrazovky) */
   afterRun?(): void;
 };
 
@@ -51,8 +67,11 @@ export type EngineHost = {
   fonts?: () => Promise<PdfFonts>;
   /** písmo textu modelu (prvek text, rytina) */
   textFont?: () => Promise<ArrayBuffer>;
-  /** pdf.js – v Node `pdfjs-dist/legacy/build/pdf.mjs` */
-  pdfjs?: () => Promise<PdfJs>;
+  /**
+   * pdf.js a volby `getDocument` (písma, tabulky znaků) – předloha PDF (`předloha "výkres.pdf"`); v aplikaci z /public/vendor,
+   * v CLI zatím chybí (předloha PDF = ✗ host.app-only, DWG / DXF funguje i bez prohlížeče)
+   */
+  pdfjs?: () => Promise<{ lib: PdfJs; docOptions?: Record<string, unknown> }>;
   /** sdílení: základ odkazu a úložiště krátkých odkazů (`null` = jen dlouhý odkaz) */
   share?: { base: string; store: string | null };
   ui?: UiHooks;
@@ -156,15 +175,32 @@ export class MissingInputError extends Error {
   }
 }
 
+/**
+ * Název vstupního souboru ze skriptu → jeden z dostupných, stejně v prohlížeči (přiložené soubory), v CLI (`--files`,
+ * složka skriptu) i v HTTP (`body.files`): přesný název, jinak název bez cesty (`refs/deska.step` → `deska.step`), jinak
+ * bez ohledu na velikost písmen (`DESKA.STEP`) – jen jednoznačná shoda. null = nenalezeno nebo nejednoznačné.
+ */
+export function matchInputName(name: string, available: readonly string[]): string | null {
+  if (available.includes(name)) return name;
+  const baseOf = (n: string) => String(n ?? "").replace(/^.*[\\/]/, "").trim();
+  const base = baseOf(name);
+  if (!base) return null;
+  if (available.includes(base)) return base;
+  const lo = base.toLowerCase();
+  const hits = available.filter((n) => baseOf(n).toLowerCase() === lo);
+  return hits.length === 1 ? hits[0] : null;
+}
+
 /** FileSource z mapy název → data (`mncad serve`: jen `body.files`; testy). Jiné názvy než klíče mapy se nečtou. */
 export function memoryFileSource(map: Record<string, Uint8Array> | Map<string, Uint8Array>): FileSource {
   const m = map instanceof Map ? new Map(map) : new Map(Object.entries(map));
   return {
     list: () => [...m.keys()].sort(),
     async read(name: string) {
-      const data = m.get(name);
-      if (!data) throw new MissingInputError(name, [...m.keys()].sort());
-      return { name, data };
+      const hit = m.has(name) ? name : matchInputName(name, [...m.keys()]);
+      const data = hit !== null ? m.get(hit) : undefined;
+      if (!data || hit === null) throw new MissingInputError(name, [...m.keys()].sort());
+      return { name: hit, data };
     },
   };
 }

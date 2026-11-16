@@ -7,35 +7,55 @@
  * `terminate()` složil protokol z posledního známého stavu a doplnil ✗ `run.timeout` / `run.memory` na řádek rozpracované
  * operace. Jazyk (`setLang`) je modulový stav, tedy na vlákno – souběžné úlohy `mncad serve` s různým jazykem se nemíchají.
  *
- * Jádro je ve fázi A nezměněný `cad.worker.ts` přes smyčku (`node-shims.ts`); od balíku B1 in-process `handleKernel`.
- * Smyčka běhu skriptu je ve fázi A `interimRun`: rozbor (`parseAgentText`), operace z registru enginu (`runEngineOp`);
- * operace, které registr ještě nemá (dnes všechny – obsluhy přesune balík B2 z `cad-app.tsx`), dají ✗ `host.app-only`.
- * B2 nahradí `interimRun` voláním `runScript` (stejný podpis `JobRunner`), B3 výstupy `writeOutputs` souborem `engine/files.ts`.
+ * Jádro je in-process (balík B1): klient `makeKernelClient` (kernel-client.ts, stejný jako v prohlížeči) nad transportem
+ * `inProcessTransport` (kernel-inprocess.ts → `handleKernel` z kernel-ops.ts) ve stejném vlákně. Pád WASM = konec vlákna (kód 4):
+ * nová instance OCCT se ve vlákně nespouští (`restart: false`). WASM jádra hledá hostitel (`main.ts` `wasmFile`) a cestu
+ * předá v `JobInit.wasm` → `locateFile` (soubor může mít obsahový hash v názvu nebo ležet jinde – `MNCAD_WASM`).
+ * Smyčka běhu skriptu je engine (balík B2): `engineRun` otevře `--open` dokumenty (FileSource, STEP přes jádro) a pak
+ * `runInto` z engine/run.ts – tatáž smyčka a tytéž obsluhy operací (`engine/ops/*`) jako `runAgentText` v aplikaci.
+ * Písma a sdílení dává engine hostitel (`setHostAssets`), Node shim zůstává jen jako záloha. Výstupy `--formats` zapisuje
+ * `engine/files.ts` (`writeDocFormat`: STEP s kontrolou znovunačtením, jedno PDF všech listů včetně výkresů dílů
+ * z komponent sestavy, .mncad), odkaz `--share` `engine/share-out.ts` (stejná pravidla jako text `sdílet`).
  */
+import fs from "node:fs";
+import path from "node:path";
 import { isMainThread, parentPort, workerData } from "node:worker_threads";
 import { parseAgentText, AGENT_COMMANDS, type AgentOp } from "../agent";
+import type { PdfFonts } from "../pdf";
 import { AGENT_GUIDE } from "../agent-guide";
-import { embedBlobs } from "../blobs";
 import { docHasContent } from "../draft/doc";
-import { exportDrawing, type DrawingExportFormat } from "../drawing-export";
+import { exportDrawing } from "../drawing-export";
 import type { DrawingCompute } from "../drawing-agent";
 import { setLang, tr, type CadLang } from "../i18n";
 import { MATERIALS } from "@/lib/mesh-metrics";
-import { emptyDoc, type CadDoc, type ExportFormat, type Feature } from "../types";
+import { emptyDoc, type CadDoc, type Feature } from "../types";
 import { sourceKey } from "../assembly";
-import { CODE_RE } from "../engine/codes";
+import { flattenLeaves } from "../asm-flatten";
+import { CODE_RE, codeEntry, type Code, type CodeEntryInit } from "../engine/codes";
+import { clashStale } from "../clash-class";
+import { checkClashes, clashFindings } from "../engine/ops/clash";
 import { memoryFileSink, memoryFileSource, MissingInputError, OutPathError, safeFileName, type EngineHost, type FileSink, type MemoryFiles, type OutWrite } from "../engine/host";
 import { MemoryWorkspace, loadWorkspace } from "../engine/memory-workspace";
-import { runEngineOp, type OpCtx, type RunState } from "../engine/ops/registry";
+import { asmStatus } from "../engine/asm-status";
+import { matesCount } from "../engine/kv";
+import { readDocument } from "../engine/open-file";
 import { ReportBuilder } from "../engine/protocol";
+import { opLabel, runInto } from "../engine/run";
+import { verifyKeyOf } from "../engine/verify";
+import { hostAssets, setHostAssets } from "../host-assets";
+import { selfStoreBase } from "../share";
+import { hasDrawings, sheetCacheScope, writeDocFormat } from "../engine/files";
+import { shareInfo, shareWithPolicy } from "../engine/share-out";
 import type { DocSummary, Entry, OutFile, RunReport, ShareInfo } from "../engine/protocol-types";
 import type { Workspace } from "../engine/workspace";
 import type { Formats, OutFormat, ShareView, StrictOpt } from "./args";
 import { CliFileSink, CliFileSource } from "./file-sink";
 import { scriptLines, strictStopper } from "./watchdog";
-import { installLoopbackSelf, installNodeShims, installWasmGrowHook, makeLoopbackKernel, memorySample, publishWasmHeap, type InstalledShims, type LoopbackKernel, type LoopbackPort } from "./node-shims";
+import { installNodeShims, installWasmGrowHook, memorySample, publishWasmHeap, type InstalledShims } from "./node-shims";
+import { makeKernelClient, type KernelClient } from "../kernel-client";
+import { inProcessTransport, type InProcessTransport } from "../kernel-inprocess";
 
-export { strictStopper };
+export { strictStopper, opLabel };
 
 /* ───────────────────────── zprávy hlídač ↔ vlákno ───────────────────────── */
 
@@ -50,6 +70,8 @@ export type JobInit = {
   /** základ sdílení (location.origin) */
   origin?: string;
   fontsDir: string | null;
+  /** WASM jádra (`replicad_single.wasm`, i s hashem v názvu) od hostitele → `locateFile`; bez něj hledá emscripten vedle svazku */
+  wasm?: string;
   shareStore?: string;
   /** jen testy (`MNCAD_TEST_FAULT`): throw | exit | fatal | busy:<ms> | grow:<MB> */
   fault?: string;
@@ -105,54 +127,44 @@ export type RunHooks = {
   opEnd(line: number | null, op: string, ms: number): void;
 };
 export type JobRunOptions = { strict: StrictOpt; open: string[]; allowEmpty?: boolean };
-/** podpis smyčky běhu: fáze A `interimRun`, od B2 `runScript` (engine/run.ts) se stejnými porty */
+/** podpis smyčky běhu CLI / HTTP (`engineRun` = `--open` + engine `runInto`) */
 export type JobRunner = (ws: Workspace, text: string, host: EngineHost, rb: ReportBuilder, o: JobRunOptions, hooks: RunHooks) => Promise<void>;
 
-/** popis operace pro hlášky (`feature:box`, `asm:mate`, `drawingCmd:sheet`) */
-export function opLabel(op: AgentOp): string {
-  const o = op as { k: string; feature?: Feature; cmd?: { k?: string; kind?: string } };
-  const sub = op.k === "feature" ? o.feature?.type : (o.cmd?.k ?? o.cmd?.kind);
-  return sub ? `${op.k}:${sub}` : op.k;
-}
-
-/** přísný režim: první ⚠/✗ mezi záznamy `entries` zastaví běh (STOP); vrací true, když se běh zastavil */
+/**
+ * přísný režim: první ⚠/✗ mezi záznamy `entries` zastaví běh (STOP); vrací true, když se běh zastavil. Po skriptu
+ * rozhoduje stav přísného režimu na řádku záznamu (`rb.strictMode.hit` – úseky `přísně` / `přísně vyp`, předpony výjimek;
+ * záznam bez řádku = stav na konci skriptu), stejně jako smyčka enginu v prohlížeči; před skriptem (`--open`) volba běhu.
+ */
 function strictStop(rb: ReportBuilder, entries: readonly Entry[], strict: StrictOpt, line: number | null = null): boolean {
   if (rb.stopped) return true;
-  const s = strictStopper(entries, strict);
+  const s = rb.strictMode ? rb.strictMode.hit(entries, line) : strictStopper(entries, strict);
   if (!s) return false;
   rb.stop(s.line ?? line, s.code ?? "msg.error");
   return true;
 }
 
-const isDocJson = (v: unknown): v is CadDoc => !!v && typeof v === "object" && typeof (v as CadDoc).name === "string" && Array.isArray((v as CadDoc).features);
-
 /** chybová hláška výjimky pro protokol */
 export const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /**
- * Smyčka fáze A: otevře `--open` dokumenty (.mncad/.json přes FileSource), rozebere skript a operace pošle do registru
- * enginu. Operace bez obsluhy = ✗ `host.app-only` (příkaz zatím funguje jen v aplikaci v prohlížeči – B2 přesune
- * obsluhy do `engine/ops/*`). Žádná obsluha se zde nekopíruje.
+ * Smyčka běhu CLI / HTTP: otevře `--open` dokumenty přes FileSource (.mncad/.json; STEP – sestava rozdělená jádrem
+ * hostitele –, BREP, STL, DXF přes `readDocument`), pak provede skript enginem (`runInto`, engine/run.ts) – tatáž smyčka
+ * a tytéž obsluhy jako `runAgentText` v aplikaci. Přísný režim: chyba rozboru zastaví běh před provedením, jinak první
+ * ⚠/✗ operace (kromě výjimek) zastaví (STOP).
  */
-export const interimRun: JobRunner = async (ws, text, host, rb, o, hooks) => {
+export const engineRun: JobRunner = async (ws, text, host, rb, o, hooks) => {
+  /** dokumenty `--open`: engine je ověří stavbou jako JSON na řádku skriptu (✗/⚠ prvků, i když skript přejde jinam) */
+  const preloaded: { key: string; doc: CadDoc }[] = [];
   for (const name of o.open) {
     hooks.opStart(null, "open");
     const t0 = Date.now();
     const before = rb.entries.length;
     try {
-      const f = await host.inputs.read(name);
-      if (!/\.(mncad|json)$/i.test(f.name)) rb.code("host.app-only", { args: [tr("otevřít „{0}“ (zatím jen .mncad)", name)] });
-      else {
-        let doc: unknown;
-        try {
-          doc = JSON.parse(new TextDecoder().decode(f.data));
-        } catch (e) {
-          throw new Error(tr("„{0}“ není platný JSON dokumentu: {1}", name, errText(e)));
-        }
-        if (!isDocJson(doc)) throw new Error(tr("„{0}“ není dokument MN CAD (chybí název nebo prvky)", name));
-        await ws.openInTab(doc);
-        rb.ok(null, tr("otevřeno „{0}“", f.name), doc.name);
-      }
+      const f = await readDocument(host, name);
+      await ws.openInTab(f.doc);
+      preloaded.push({ key: verifyKeyOf(ws.docKey(), f.doc), doc: ws.present() });
+      rb.ok(null, tr("otevřeno „{0}“", f.file), f.doc.name);
+      if (f.note) rb.code("msg.note", { text: f.note, doc: f.doc.name });
     } catch (e) {
       if (e instanceof MissingInputError) rb.code("file.missing", { text: e.message });
       else rb.code("op.failed", { args: [errText(e)] });
@@ -161,45 +173,26 @@ export const interimRun: JobRunner = async (ws, text, host, rb, o, hooks) => {
     // přísný režim: chybějící / neplatný `--open` zastaví běh dřív, než se provede skript (kap. 5.3)
     if (strictStop(rb, rb.entries.slice(before), o.strict)) return;
   }
-  ws.beginRun?.();
-  if (!text.trim()) {
+  if (!text.trim() && !preloaded.length) {
+    ws.beginRun?.();
     if (!o.open.length && !o.allowEmpty) rb.code("parse.error", { args: [tr("Prázdný vstup.")] });
     return;
   }
-  const prog = parseAgentText(text);
-  for (const e of prog.errors) rb.code("parse.error", { line: e.line > 0 ? e.line : null, args: [e.text ? `${e.message} ← „${e.text.slice(0, 80)}“` : e.message] });
-  if (o.strict && prog.errors.length) {
-    const first = strictStopper(rb.entries, o.strict);
-    if (first) {
-      rb.stop(first.line, first.code ?? "parse.error");
-      return;
-    }
-  }
-  const run: RunState = { doc: ws.present(), changed: false, openNew: false };
-  const ctx: OpCtx = { ws, host, opts: { strict: o.strict }, report: rb, run, line: 0 };
-  for (const op of prog.ops) {
-    const label = opLabel(op);
-    const before = rb.entries.length;
-    hooks.opStart(op.line, label);
-    const t0 = Date.now();
-    try {
-      if (!(await runEngineOp(op, ctx))) {
-        rb.code("host.app-only", { line: op.line, args: [label] });
-        rb.op(op.line, label, Date.now() - t0);
-      }
-    } catch (e) {
-      if (e instanceof OutPathError) rb.code("out.path", { line: op.line, args: [e.fileName] });
-      else if (e instanceof MissingInputError) rb.code("file.missing", { line: op.line, text: e.message });
-      else rb.code("op.failed", { line: op.line, args: [errText(e)] });
-    }
-    hooks.opEnd(op.line, label, Date.now() - t0);
-    if (strictStop(rb, rb.entries.slice(before), o.strict, op.line)) return;
-  }
+  // přísný režim (volba i řádky `přísně` ve skriptu) zastavuje smyčka enginu sama (engine/strict.ts) – i v prohlížeči;
+  // samotné `--open` bez skriptu = prázdný skript: otevřené dokumenty se i tak ověří stavbou
+  await runInto(ws, text, host, rb, {
+    strict: o.strict,
+    preloaded,
+    hooks: {
+      opStart: (line, op) => hooks.opStart(line, op),
+      opEnd: (line, op, ms) => hooks.opEnd(line, op, ms),
+    },
+  });
 };
 
 /* ───────────────────────── dokumenty, výstupy, sdílení ───────────────────────── */
 
-type DocItem = { id: string; doc: CadDoc };
+type DocItem = { id: string; doc: CadDoc; key?: string };
 const docKind = (d: CadDoc): DocSummary["kind"] => (d.kind === "assembly" ? "assembly" : d.kind === "draft" ? "draft" : "part");
 
 /** dokumenty všech záložek (aktivní záložka se obnoví) */
@@ -207,7 +200,7 @@ export async function workspaceDocs(ws: Workspace): Promise<{ items: DocItem[]; 
   const tabs = ws.tabs();
   const activeId = tabs.find((t) => t.active)?.id ?? null;
   const items: DocItem[] = [];
-  for (const t of tabs) items.push({ id: t.id, doc: await ws.activate(t.id) });
+  for (const t of tabs) items.push({ id: t.id, doc: await ws.activate(t.id), key: ws.docKey(t.id) });
   if (activeId) await ws.activate(activeId);
   return { items, activeId };
 }
@@ -221,36 +214,64 @@ export function pickMain(items: DocItem[], activeId: string | null, name?: strin
   return [...items].reverse().find((x) => x.doc.kind === "assembly" && docHasContent(x.doc)) ?? items.find((x) => x.id === activeId) ?? items[items.length - 1] ?? null;
 }
 
-/** formáty k zápisu pro dokument (`auto` = STEP dílu/sestavy + .mncad + PDF listů, je-li výkres; rozhodnutí 15.7) */
+/**
+ * formáty k zápisu pro dokument (rozhodnutí 15.7): `auto` = STEP dílu/sestavy + .mncad + jedno PDF všech listů, má-li
+ * výkres dokument nebo díl v jeho komponentách (engine/files.ts `hasDrawings`)
+ */
 export function formatsFor(d: CadDoc, f: Formats): OutFormat[] {
   if (f === "none") return [];
   if (f !== "auto") return f;
   if (d.kind === "draft") return ["mncad"];
-  return ["step", "mncad", ...(d.drawings?.length ? (["pdf"] as const) : [])];
+  return ["step", "mncad", ...(hasDrawings(d) ? (["pdf"] as const) : [])];
 }
 
-const MIME: Record<OutFormat, string> = {
-  step: "model/step",
-  stl: "model/stl",
-  mncad: "application/json",
-  pdf: "application/pdf",
-  dxf: "application/dxf",
-  dwg: "application/acad",
-  svg: "image/svg+xml",
-  csv: "text/csv;charset=utf-8",
-};
-const DRAWING_FMT = new Set<OutFormat>(["pdf", "dxf", "dwg", "svg"]);
 const b64 = (s: string) => new Uint8Array(Buffer.from(s, "base64"));
 
 type BuildOutcome = { summary: DocSummary; built: boolean };
 
-/** Závěrečná stavba a souhrn dokumentu (řádek D). Díl se postaví v jádře; sestava a 2D výkres se jen spočítají (B2: asm-status). */
-export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: ReportBuilder, build: boolean): Promise<BuildOutcome> {
+/**
+ * Závěrečná stavba a souhrn dokumentu (řádek D). Díl se postaví v jádře; u sestavy se díly komponent postaví před
+ * souhrnem (`asmStatus` → `ensureLeaves`, engine/asm-status.ts): objem Σ (V.sum), hmotnost, obálka a stav vazeb z běhu.
+ */
+export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: ReportBuilder, build: boolean, ws?: Workspace, key?: string): Promise<BuildOutcome> {
   const s: DocSummary = { ref: d.name, name: d.name, kind: docKind(d) };
   if (d.drawings?.length) s.sheets = d.drawings.length;
   if (s.kind === "assembly") {
     s.components = d.components?.length ?? 0;
     s.parts = new Set((d.components ?? []).map((c) => sourceKey(c.source))).size;
+    if (ws && s.components > 0)
+      try {
+        // stav vazeb a kolize pod klíčem dokumentu záložky (přejmenování ho nezmění); chybějící stav vazeb se přepočítá
+        const st = await asmStatus(ws, kernel, d, key !== undefined ? { key } : {});
+        if (st?.volume != null) s.volume_mm3 = st.volume;
+        if (st?.massKg != null) s.mass_kg = st.massKg;
+        // obálka přesně z jádra (asmStatus → engine/asm-box.ts; zkouška 959: rohy lokálních obálek natočených dílů ji zvětšily o 3 mm)
+        if (st?.bbox) s.bbox = st.bbox;
+        reportLeafParts(d, ws, rb);
+        const m = matesCount(d, st?.mates);
+        if (m) s.mates = m;
+        // třídy kolizí z poslední kontroly kolizí sestavy (`kolize`, `kontrola sestava`) – řádek D i Σ; objem sjednocení
+        // V.union = V.sum − průniky dvojic (rozhodnutí 15.1; přesné, nepřekrývají-li se v jednom místě tři komponenty).
+        // Změnila-li se sestava po kontrole (vložená / posunutá komponenta…), výsledek se pro konečný stav přepočítá
+        // (mezipaměť dvojic v jádře – počítají se jen změněné dvojice) a jeho ⚠ jdou do protokolu: D, Σ i --strict tak
+        // vždy odpovídají odevzdávané sestavě (ℹ clash.rechecked s řádkem původní kontroly).
+        const ckey = key ?? ws.docKey();
+        let ck = ws.asm.clash.get(ckey);
+        if (ck && clashStale(ck, d)) {
+          const was = ck.line;
+          const { list, res } = await checkClashes(ws, kernel, d, ckey, was ?? null);
+          rb.code("clash.rechecked", { doc: d.name, args: [was ? `L${was}` : "-"] });
+          const emit = (c: Code, o: CodeEntryInit) => void rb.code(c, { ...o, doc: d.name });
+          clashFindings({ coded: emit, quiet: emit }, d, list, res);
+          ck = ws.asm.clash.get(ckey);
+        }
+        const cl = ck?.classes;
+        if (cl) s.clashes = { total: cl.total, thread: cl.thread, underhead: cl.underhead, real: cl.real, undetermined: cl.undetermined };
+        if (cl && s.volume_mm3 !== undefined) s.volume_union_mm3 = s.volume_mm3 - ck!.res.reduce((a, x) => a + x.volume, 0);
+      } catch (e) {
+        rb.code("build.failed", { doc: d.name, args: [errText(e)] });
+        return { summary: s, built: false };
+      }
     return { summary: s, built: true };
   }
   if (s.kind === "draft" || !build) return { summary: s, built: s.kind === "draft" };
@@ -261,16 +282,22 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
   try {
     const res = await kernel.build(d);
     const names = new Map(d.features.map((f) => [f.id, f.name]));
+    // výsledek prvku, který už ohlásil běh skriptu (s řádkem prvku), se ze závěrečné stavby neopakuje
+    const seen = new Set(rb.entries.map((e) => `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`));
+    const report = (code: "feature.failed" | "feature.warning", args: string[]) => {
+      const e = codeEntry(code, { doc: d.name, args });
+      if (!seen.has(`${e.code}\u0000${e.doc}\u0000${e.text}`)) rb.add(e);
+    };
     let ok = 0;
     let warn = 0;
     let error = 0;
     for (const st of res.status) {
       if (!st.ok) {
         error++;
-        rb.code("feature.failed", { doc: d.name, args: [names.get(st.id) ?? st.id, st.error ?? ""] });
+        report("feature.failed", [names.get(st.id) ?? st.id, st.error ?? ""]);
       } else if (st.warning) {
         warn++;
-        rb.code("feature.warning", { doc: d.name, args: [names.get(st.id) ?? st.id, st.warning] });
+        report("feature.warning", [names.get(st.id) ?? st.id, st.warning]);
       } else ok++;
     }
     for (const pe of res.paramErrors ?? []) rb.code("build.failed", { doc: d.name, args: [pe] });
@@ -293,38 +320,31 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
   }
 }
 
-/** jeden soubor dokumentu v daném formátu (fáze A; B3 přesune do engine/files.ts včetně vícestránkového PDF a ověření STEP) */
-async function produce(d: CadDoc, fmt: OutFormat, host: EngineHost, rb: ReportBuilder): Promise<OutFile[]> {
-  const base = d.name.trim() || "model";
-  if (fmt === "mncad") {
-    const data = new TextEncoder().encode(JSON.stringify(embedBlobs(d)));
-    return [await host.files.write({ name: `${base}.mncad`, mime: MIME.mncad, data, doc: d.name, format: "mncad" })];
-  }
-  if (fmt === "step" || fmt === "stl") {
-    if (d.kind === "draft") throw new Error(tr("2D výkres nemá 3D model pro {0}", fmt.toUpperCase()));
-    const buf = await host.kernel.exportFile(d, fmt as ExportFormat);
-    return [await host.files.write({ name: `${base}.${fmt}`, mime: MIME[fmt], data: new Uint8Array(buf), doc: d.name, format: fmt })];
-  }
-  if (DRAWING_FMT.has(fmt)) {
-    if (d.kind === "draft") {
-      rb.code("host.app-only", { doc: d.name, args: [tr("export 2D výkresu do {0}", fmt.toUpperCase())] });
-      return [];
+/**
+ * ⚠/✗ prvků dílů komponent sestavy ze stavby listů (`ensureLeaves` → `ws.asm.cache`): sestava otevřená z JSON / `--open`
+ * nebo relace jinak své díly jen sečte (zkouška 959: osmkrát „neplatná geometrie“ u jednoho dílu, přesto --strict prošel).
+ * Jeden záznam na prvek a díl (stejný díl ve více komponentách jednou); co už ohlásil běh skriptu na řádku prvku, se
+ * neopakuje. Stručný protokol hlášky dílu se stejným textem sloučí (protocol.ts `mergeSimilar`).
+ */
+function reportLeafParts(d: CadDoc, ws: Workspace, rb: ReportBuilder): void {
+  const seen = new Set(rb.entries.map((e) => `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`));
+  const done = new Set<string>();
+  for (const l of flattenLeaves(d)) {
+    if (done.has(l.key) || l.comp.source.kind !== "part") continue;
+    done.add(l.key);
+    const pd = l.comp.source.doc;
+    const status = ws.asm.cache.get(l.key)?.status ?? [];
+    const names = new Map(pd.features.map((f) => [f.id, f.name]));
+    for (const st of status) {
+      if (st.ok !== false && !st.warning) continue;
+      const failed = st.ok === false;
+      const e = codeEntry(failed ? "feature.failed" : "feature.warning", { doc: pd.name || l.comp.name, args: [names.get(st.id) ?? st.id, (failed ? st.error : st.warning) ?? ""] });
+      const k = `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      rb.add(e);
     }
-    const sheets = d.drawings?.length ? d.drawings.map((_, i) => i + 1) : [1];
-    const compute = host.kernel.drawing as unknown as DrawingCompute;
-    const out: OutFile[] = [];
-    for (const n of sheets) {
-      const res = await exportDrawing(d, fmt as DrawingExportFormat, { sheet: n }, compute);
-      for (const w of res.warnings ?? []) rb.code("drawing.warning", { doc: d.name, args: [n, w] });
-      const name = sheets.length > 1 ? tr("{0} výkres {1}", base, n) : tr("{0} výkres", base);
-      const f = await host.files.write({ name: `${name}.${fmt}`, mime: res.mime, data: b64(res.base64), doc: d.name, format: fmt });
-      f.sheets = 1;
-      out.push(f);
-    }
-    return out;
   }
-  rb.code("host.app-only", { doc: d.name, args: [tr("export {0}", fmt.toUpperCase())] });
-  return [];
 }
 
 export type OutputPolicy = { formats: Formats; allDocs: boolean; doc?: string; noOutputOnError: boolean; share: JobRequest["share"]; strict?: StrictOpt };
@@ -380,10 +400,12 @@ function emptyWanted(d: CadDoc, p: OutputPolicy, isMain: boolean): { what: strin
  * * jinak se zapíší soubory dokumentů, jejichž závěrečná stavba prošla; jsou-li v běhu ✗, každý soubor má `run=fail`.
  */
 export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuilder, p: OutputPolicy, hooks: RunHooks): Promise<{ docs: DocSummary[]; share?: ShareInfo }> {
-  const strict = p.strict ?? false;
+  // přísný režim podle stavu na konci skriptu (volba běhu + řádky `přísně` / `přísně vyp`)
+  const strict = rb.strictMode ? rb.strictMode.opt : (p.strict ?? false);
   const { items, activeId } = await workspaceDocs(ws);
   const main = pickMain(items, activeId, p.doc);
-  const beforeBuild = rb.entries.length;
+  // všechny dosavadní záznamy: ⚠/✗ v přísném úseku, které smyčka nezastavila, zastaví běh dřív, než se cokoli zapíše
+  // (rozhodnutí 15.2 – STOP = žádné výstupy); záznamy závěru bez řádku posoudí stav přísného režimu na konci skriptu
   if (main === "missing") rb.code("op.failed", { args: [tr("dokument „{0}“ (--doc) není otevřený – otevřené: {1}", p.doc, items.map((x) => x.doc.name).join(", ") || "—")] });
   const mainItem = main === "missing" ? null : main;
   const wanted = p.allDocs ? items : mainItem ? [mainItem] : [];
@@ -395,7 +417,7 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
   const t0 = Date.now();
   for (const it of items) {
     if (!docHasContent(it.doc) && it.id !== mainItem?.id) continue; // prázdný úvodní díl relace se nehlásí
-    const o = await summarize(it.doc, host.kernel, rb, targetIds.has(it.id));
+    const o = await summarize(it.doc, host.kernel, rb, targetIds.has(it.id), ws, it.key);
     if (it.id === mainItem?.id) o.summary.main = true;
     built.set(it.id, o.built);
     docs.push(o.summary);
@@ -410,7 +432,7 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
       rb.code("out.empty", { doc: it.doc.name, args: [w.what.join(", ")], level: !isMain ? "note" : w.explicit ? "error" : "warn" });
     }
   hooks.opEnd(null, "build", Date.now() - t0);
-  if (strictStop(rb, rb.entries.slice(beforeBuild), strict)) return { docs };
+  if (strictStop(rb, rb.entries, strict)) return { docs };
   if (p.noOutputOnError && rb.count("error") > 0) return { docs };
   const staging = strict ? new StagingSink(host.files) : null;
   const outHost: EngineHost = staging ? { ...host, files: staging } : host;
@@ -421,9 +443,16 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
       const t1 = Date.now();
       hooks.opStart(null, `out:${fmt}`);
       try {
-        await produce(it.doc, fmt, outHost, rb);
+        // STEP s kontrolou znovunačtením, PDF všech listů (i výkresy dílů z komponent) s kusovníkem, balónky a hmotností;
+        // varování listu, které běh už ohlásil (vyhodnocení listu na řádku bloku – engine/drawing-track.ts), se neopakuje
+        await writeDocFormat(outHost, ws, it.doc, fmt, (n) => {
+          const e = codeEntry(n.code, { doc: it.doc.name, ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}), ...(n.level ? { level: n.level } : {}) });
+          if (!rb.entries.some((x) => x.code === e.code && x.doc === e.doc && x.text === e.text)) rb.add(e);
+        });
       } catch (e) {
         if (e instanceof OutPathError) rb.code("out.path", { doc: it.doc.name, args: [e.fileName] });
+        // chybějící písma PDF / textu modelu (hostitel bez složky fonts) – ✗ host.fonts, ne obecná chyba (5.2 č. 36)
+        else if (/Písmo se nenačetlo|font|fonts\//i.test(errText(e))) rb.code("host.fonts", { doc: it.doc.name });
         else rb.code("op.failed", { doc: it.doc.name, args: [`${fmt}: ${errText(e)}`] });
       }
       hooks.opEnd(null, `out:${fmt}`, Date.now() - t1);
@@ -439,9 +468,10 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
     const beforeShare = rb.entries.length;
     hooks.opStart(null, "share");
     try {
-      const { createShareLink } = await import("../share");
-      const res = await createShareLink(mainItem.doc, { days: p.share.days, view: p.share.view });
-      share = { url: res.url, mode: res.mode, bytes: res.bytes, exp: res.exp ? new Date(res.exp).toISOString().slice(0, 10) : null, ...(res.note ? { note: res.note } : {}) };
+      // krátký odkaz přes úložiště; odmítnutí → ✗ share.rejected + ⚠ share.fallback-link s dlouhým odkazem (kap. 3.4)
+      const doc = mainItem.doc.name;
+      const res = await shareWithPolicy(mainItem.doc, { days: p.share.days, view: p.share.view, want: "auto" }, (n) => rb.code(n.code, { doc, ...(n.args ? { args: n.args } : {}), ...(n.text ? { text: n.text } : {}) }));
+      if (res) share = shareInfo({ ...res, ...(res.note ? { note: res.note } : {}) });
     } catch (e) {
       rb.code("share.rejected", { doc: mainItem.doc.name, args: [errText(e)] });
     }
@@ -463,9 +493,52 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
   return { docs, ...(share ? { share } : {}) };
 }
 
+/* ───────────────────────── písma a sdílení od hostitele ───────────────────────── */
+
+/**
+ * Písma ze složky vedle svazku a sdílení (stránka odkazu, vlastní úložiště) jako zdroje hostitele enginu
+ * (`setHostAssets`): `pdf.ts`, písmo textu modelu a `share.ts` je berou odsud, ne přes shim `fetch` / `location`.
+ * Stránka a úložiště se spočtou stejně jako dřív ze shimu (`--share-store`, `MNCAD_ORIGIN`); shim zůstává jako záloha.
+ */
+export function installHostAssets(shims: InstalledShims): void {
+  const loc = (globalThis as { location?: { origin: string; pathname: string } }).location;
+  const page = loc ? loc.origin + loc.pathname.replace(/\/$/, "") : null;
+  const store = selfStoreBase();
+  const fontCache = new Map<string, Promise<ArrayBuffer>>();
+  setHostAssets({
+    font: (name) => {
+      let p = fontCache.get(name);
+      if (!p) {
+        p = (async () => {
+          if (!/^[\w.-]+$/.test(name) || name.startsWith(".")) throw new Error(tr("písmo „{0}“ není ve složce písem", name));
+          const file = shims.fontsDir ? path.join(shims.fontsDir, name) : null;
+          if (!file || !fs.existsSync(file)) throw new Error(tr("písmo „{0}“ není ve složce písem", name));
+          shims.fontsRead.push(name);
+          const b = fs.readFileSync(file);
+          return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
+        })();
+        p.catch(() => fontCache.delete(name));
+        fontCache.set(name, p);
+      }
+      return p;
+    },
+    ...(page ? { share: { page, store } } : {}),
+  });
+}
+
+/** písma pro `EngineHost` (fonts / textFont) ze zdrojů hostitele */
+function hostFonts(): Pick<EngineHost, "fonts" | "textFont"> {
+  const font = hostAssets().font;
+  if (!font) return {};
+  return {
+    fonts: async (): Promise<PdfFonts> => ({ regular: await font("Roboto-Regular.ttf"), bold: await font("Roboto-Bold.ttf").catch(() => undefined) }),
+    textFont: () => font("Roboto-Bold.ttf"),
+  };
+}
+
 /* ───────────────────────── vlákno ───────────────────────── */
 
-type JobState = { kernel: LoopbackKernel; port: LoopbackPort; shims: InstalledShims; ws: MemoryWorkspace | null; init: JobInit };
+type JobState = { kernel: KernelClient; transport: InProcessTransport; shims: InstalledShims; ws: MemoryWorkspace | null; init: JobInit };
 
 function post(m: FromJob, transfer?: ArrayBuffer[]) {
   parentPort!.postMessage(m, transfer);
@@ -480,7 +553,7 @@ function applyFault(st: JobState, when: "op" | "ready") {
       throw new Error("MNCAD_TEST_FAULT=throw");
     });
   if (when === "op" && f === "exit") process.exit(7);
-  if (when === "op" && f === "fatal") for (const l of st.port.listeners) l({ fatal: true, error: "Aborted(MNCAD_TEST_FAULT)" });
+  if (when === "op" && f === "fatal") st.transport.inject({ fatal: true, error: "Aborted(MNCAD_TEST_FAULT)" });
   const grow = /^grow:(\d+)$/.exec(f);
   if (when === "op" && grow) {
     // jedno dlouhé volání, během kterého roste paměť WebAssembly (jako stavba v OCCT) – hlídač ji vidí přes háček grow
@@ -522,7 +595,7 @@ async function handleRun(st: JobState, id: number, req: JobRequest): Promise<voi
   }
   const writtenList = () => (mem ? [...mem.files.values()].map((x) => x.file) : ((sink as CliFileSink).written ?? []));
   const inputs = req.inputs.kind === "dirs" ? new CliFileSource(req.inputs.roots, req.inputs.explicit) : memoryFileSource(req.inputs.files);
-  const host: EngineHost = { kernel: st.kernel, files: sink, inputs, now: () => Date.now() };
+  const host: EngineHost = { kernel: st.kernel, files: sink, inputs, ...hostFonts(), now: () => Date.now() };
   const rb = new ReportBuilder({ lang: req.lang, lines: scriptLines(req.script), strict: !!req.strict });
   if (req.resume) rb.code("session.history");
   let sentEntries = 0;
@@ -541,12 +614,18 @@ async function handleRun(st: JobState, id: number, req: JobRequest): Promise<voi
       sentFiles = files.length;
     },
   };
-  const stopProgress = st.kernel.onKernelProgress((p) => post({ t: "progress", id, op: p.op, index: p.index, total: p.total, name: p.name }));
+  // průběh po prvcích z jádra (ne „start“ – ten klient hlásí sám u každé dlouhé operace)
+  const stopProgress = st.kernel.onProgress((p) => {
+    if (p && p.phase !== "start") post({ t: "progress", id, op: p.op, index: p.index, total: p.total, name: p.name });
+  });
+  // listy výkresů spočítané v běhu (`výkres export pdf dokument`) převezme `--formats pdf` téhož dokumentu (jen v tomto běhu)
+  const closeSheets = sheetCacheScope();
   try {
-    await interimRun(ws, req.script, host, rb, { strict: req.strict, open: req.open, allowEmpty: req.allowEmpty || !!req.resume }, hooks);
+    await engineRun(ws, req.script, host, rb, { strict: req.strict, open: req.open, allowEmpty: req.allowEmpty || !!req.resume }, hooks);
     const fin = await finishRun(ws, host, rb, { formats: req.formats, allDocs: req.allDocs, doc: req.doc, noOutputOnError: req.noOutputOnError, share: req.share, strict: req.strict }, hooks);
     if (sink instanceof CliFileSink) for (const rn of sink.renamed) rb.code("out.renamed", { args: [rn.from, rn.to] });
-    // pojistka přísného režimu: ⚠/✗ z jakékoli cesty, kterou smyčka nezastavila, je STOP (hlavička, JSON `stopped`, kód 2)
+    // pojistka přísného režimu: ⚠/✗ v přísném úseku z jakékoli cesty, kterou smyčka nezastavila, je STOP (hlavička, JSON
+    // `stopped`, kód 2) – podle stavu na řádku záznamu jako smyčka enginu (úseky za `přísně vyp` / před `přísně` nevadí)
     strictStop(rb, rb.entries, req.strict);
     const files = writtenList();
     if (rb.count("error") > 0) for (const f of files) f.run = "fail";
@@ -557,6 +636,7 @@ async function handleRun(st: JobState, id: number, req: JobRequest): Promise<voi
     const session = req.saveSession ? ws.save() : undefined;
     post({ t: "done", id, report, files: done, ...(session ? { session } : {}), mem: m });
   } finally {
+    closeSheets();
     stopProgress();
   }
 }
@@ -622,7 +702,7 @@ async function selftest(st: JobState): Promise<SelftestResult> {
     const res = await exportDrawing(doc, "pdf", {}, st.kernel.drawing as unknown as DrawingCompute);
     const data = b64(res.base64);
     if (new TextDecoder().decode(data.slice(0, 5)) !== "%PDF-") throw new Error("not a PDF");
-    if (!st.shims.fontsRead.some((f) => /Roboto-Regular/.test(f))) throw new Error(tr("písma se nečetla přes shim"));
+    if (!st.shims.fontsRead.some((f) => /Roboto-Regular/.test(f))) throw new Error(tr("písma se nečetla od hostitele"));
     return `${data.length}B fonts=${[...new Set(st.shims.fontsRead)].join(",")}`;
   });
   await check("text.font", async () => {
@@ -646,11 +726,13 @@ async function selftest(st: JobState): Promise<SelftestResult> {
     const bad: string[] = [];
     for (const ex of examples) {
       const ws = new MemoryWorkspace();
-      const host: EngineHost = { kernel: st.kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() };
+      // sdílení bez úložiště (store: null): příklad `sdílet` z nápovědy nesmí nahrávat do úložiště webu – jen dlouhý odkaz s ⚠
+      const share = { base: hostAssets().share?.page ?? "https://www.mnastrojarna.cz/cad", store: null };
+      const host: EngineHost = { kernel: st.kernel, files: memoryFileSink(), inputs: memoryFileSource({}), ...hostFonts(), share, now: () => Date.now() };
       const rb = new ReportBuilder({ lang: "cs", lines: ex.text.split("\n").length });
       const noop: RunHooks = { opStart: () => undefined, opEnd: () => undefined };
       try {
-        await interimRun(ws, ex.text, host, rb, { strict: false, open: [] }, noop);
+        await engineRun(ws, ex.text, host, rb, { strict: false, open: [] }, noop);
       } catch (e) {
         bad.push(`${ex.src}: uncaught ${errText(e)}`);
         continue;
@@ -667,6 +749,17 @@ async function selftest(st: JobState): Promise<SelftestResult> {
   return { ok: checks.every((c) => c.ok), checks, examples: examples.length, entries, mem: memorySample() };
 }
 
+/** `locateFile` emscriptenu: WASM jádra z cesty hostitele (`JobInit.wasm`), ostatní soubory beze změny */
+export const wasmLocator =
+  (wasm: string) =>
+  (file: string, prefix: string): string =>
+    file.endsWith(".wasm") ? wasm : prefix + file;
+
+/** jádro se nenačetlo – bez WASM od hostitele s nápovědou, kam soubor patří (před původní chybou: řádek protokolu se zkracuje) */
+export function loadError(raw: string, wasm: string | undefined): string {
+  return wasm ? tr("jádro CAD se nenačetlo: {0}", raw) : tr("jádro CAD se nenačetlo (replicad_single.wasm patří vedle mncad.mjs, jinou cestu zadejte v MNCAD_WASM): {0}", raw);
+}
+
 /** vstup vlákna běhu (volá ho `main.ts`, když běží ve `worker_threads` s `workerData.mncad === JOB_TAG`) */
 export async function jobMain(): Promise<void> {
   if (isMainThread || !parentPort) throw new Error("jobMain: not in a worker thread");
@@ -674,18 +767,22 @@ export async function jobMain(): Promise<void> {
   setLang(init.lang);
   const t0 = Date.now();
   const shims = installNodeShims({ origin: init.origin, fontsDir: init.fontsDir, version: init.version, shareStore: init.shareStore });
+  installHostAssets(shims);
   installWasmGrowHook(init.memSab);
-  const port = installLoopbackSelf();
-  await import("../cad.worker");
-  const kernel = makeLoopbackKernel(port);
-  const st: JobState = { kernel, port, shims, ws: null, init };
-  kernel.onFatal((reason) => post({ t: "fatal", error: reason }));
+  const transport = inProcessTransport({ ...(init.wasm ? { locateFile: wasmLocator(init.wasm) } : {}), restart: false });
+  const kernel = makeKernelClient(transport);
+  const st: JobState = { kernel, transport, shims, ws: null, init };
+  let loading = true;
+  // pád WASM: hlídač ukončí vlákno (kód 4, ✗ run.crash s původní chybou); nové jádro ve vlákně se nespouští (`restart: false`
+  // – požadavky do ukončení vlákna hned skončí chybou pádu)
+  kernel.onRestart((_reason, raw) => post({ t: "fatal", error: loading ? loadError(raw, init.wasm) : raw }));
   try {
     await kernel.init();
   } catch (e) {
-    post({ t: "fatal", error: tr("jádro CAD se nenačetlo: {0}", errText(e)) });
+    post({ t: "fatal", error: loadError(errText(e), init.wasm) });
     return;
   }
+  loading = false;
   if (init.lang !== "cs") await kernel.setLang(init.lang);
   const mem0 = memorySample();
   publishWasmHeap(init.memSab, mem0.heapMB);

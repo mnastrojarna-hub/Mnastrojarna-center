@@ -1,0 +1,14 @@
+# další běh nad existující záložkou (commit, ne nová záložka); sestava v záložce – stav s obálkou a objemem
+nový díl Kus
+kvádr 25 25 25
+#--- run
+nová sestava Dvojice
+vložit "Kus" ukotvit
+vložit "Kus" v 40 0 0
+#--- run
+sestava komponenta "#2" posun 0 10 0
+stav
+#--- run
+záložka "Kus"
+zaoblit 2
+stav

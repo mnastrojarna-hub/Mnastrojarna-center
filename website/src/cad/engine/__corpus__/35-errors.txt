@@ -1,0 +1,10 @@
+# chyby: neznámý příkaz, špatné číslo, příkaz mimo kontext (vložit / kolize v dílu), pořadí ✗ rozboru a výsledků
+nový díl Chyby
+kvádr 10 10 10
+blabla 5
+kvádr deset 10 10
+vložit "Něco"
+kolize
+zaoblit 50
+válec 5 20 v 5 5 10
+stav

@@ -44,8 +44,8 @@ import { applyShrinkage, coolingCircuit, defaultCooling, draftAnalysis, ejectorH
 import { curvatureColors, wallThickness } from "@/cad/analysis";
 import { ejectorPin, emptyAssembly, partComponent } from "@/cad/assembly";
 import { prepareImport } from "@/cad/formats/import";
-import { b64ToBytes, bytesToB64, dataBytes, internBlobs } from "@/cad/blobs";
-import { attachedFiles } from "@/cad/attached-files";
+import { b64ToBytes, dataBytes, internBlobs } from "@/cad/blobs";
+import { appAttachments, attachBytes, type AttachInput } from "@/cad/engine/attachments";
 import { referenceStore } from "@/cad/reference/store";
 import { parseReferenceLine } from "@/cad/reference/parse";
 import { createShareLink, shareMessage, SHARE_DEFAULT_DAYS } from "@/cad/share";
@@ -57,6 +57,8 @@ import { sketchToDxf } from "@/cad/sketch";
 import { loadSettings, type Settings } from "@/cad/settings";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type Feature, type SketchEntity, type Vec3 } from "@/cad/types";
 import { getExtUi, type ExtActionApi } from "./ext";
+import { isCrossingDrag } from "@/cad/box-select";
+import { applyBoxSel } from "./box-pick-3d";
 import { asmImportOutcome, partImportOutcome, subassemblyComponent, type PendingImport } from "./import-watch";
 import { flattenLeaves } from "./asm-flatten";
 import { compRef, leafByRef } from "./leaf-ref";
@@ -180,7 +182,7 @@ function sketchDxf(host: ApiHost, doc: CadDoc, name?: string): CapturedFile & { 
 /* ───────────────────────── akce rozšíření ───────────────────────── */
 const FILE_ACTIONS = new Set(["sheet.dxf", "sheet.svg", "sketch.dxf"]);
 /** Spustí akci rozšíření se zachytávacím API (bez okna a bez stažení). `d` = dokument, se kterým pracuje agent. */
-async function runAction(host: ApiHost, id: string, d?: CadDoc): Promise<{ label: string; log: string; files: CapturedFile[] }> {
+async function runAction(host: ApiHost, id: string, d?: CadDoc, arg?: string): Promise<{ label: string; log: string; files: CapturedFile[] }> {
   const a = resolveAction(id);
   const doc = d ?? host.doc();
   if (a.id === "sketch.dxf") {
@@ -191,7 +193,7 @@ async function runAction(host: ApiHost, id: string, d?: CadDoc): Promise<{ label
   if (!ui?.action) throw new Error(tr("akce „{0}“ nemá v této verzi provedení", a.label));
   const result = isPartDoc(doc) ? (d ? await cad.build(doc).catch(() => null) : (host.result() ?? (await cad.build(doc).catch(() => null)))) : null;
   let notices = 0;
-  const cap = captureActionApi<Omit<ExtActionApi, "flash" | "notice" | "download">>({ doc, result, selection: host.selection(), commit: host.commit, exportModel: host.exportModel });
+  const cap = captureActionApi<Omit<ExtActionApi, "flash" | "notice" | "download">>({ doc, result, selection: host.selection(), commit: host.commit, exportModel: host.exportModel, arg });
   const notice = cap.api.notice;
   cap.api.notice = (t, b) => {
     notices++;
@@ -277,7 +279,7 @@ export async function runApiCmd(cmd: ApiCmd, d: CadDoc, host: ApiHost): Promise<
     }
     case "action": {
       if (!cmd.id) return { log: [tr("Akce: {0}", apiActions().map((a) => `${a.id} (${a.label})`).join(", "))] };
-      const r = await runAction(host, cmd.id, d);
+      const r = await runAction(host, cmd.id, d, cmd.arg);
       return { log: [tr("✓ akce {0}", r.label), ...(r.log ? r.log.split("\n") : []), ...r.files.map(fileLine)] };
     }
     case "analyze": {
@@ -771,6 +773,23 @@ function select(host: ApiHost, ids: string[], o: { additive?: boolean } = {}, pa
   return next.length;
 }
 
+/** window.mncad.selectBox: výběr oknem / křížením jako tažení myší (obdélník v px 3D okna) – box-pick-3d.ts */
+function selectBox(host: ApiHost, o: { x0: number; y0: number; x1: number; y1: number; crossing?: boolean; mode?: "replace" | "add" | "remove" }): SelectionEntry[] {
+  if (!o || typeof o !== "object" || !["x0", "y0", "x1", "y1"].every((k) => Number.isFinite((o as Record<string, unknown>)[k])))
+    throw new Error(tr("selectBox potřebuje obdélník v px 3D okna, např. {0}", "{ x0: 40, y0: 60, x1: 700, y1: 500 }"));
+  const mode = o.mode ?? "replace";
+  if (mode !== "replace" && mode !== "add" && mode !== "remove") throw new Error(tr("selectBox: mode je replace | add | remove – zadáno {0}", JSON.stringify(o.mode)));
+  const pick = host.vp()?.boxPick;
+  const items = pick ? pick({ x0: o.x0, y0: o.y0, x1: o.x1, y1: o.y1 }, o.crossing ?? isCrossingDrag(o.x0, o.x1)) : null;
+  if (!items) throw new Error(tr("selectBox: v tomto režimu 3D okna se oknem nevybírá (otevřená skica, výkres nebo výběr plochy pro skicu)"));
+  const next = applyBoxSel(currentSel(host), items, mode);
+  setSel(host, next);
+  host.inspect(next[0] ?? null);
+  const top = [...next].reverse().find((x) => x.kind !== "feature" && "topId" in x && x.topId);
+  if (!isPartDoc(host.doc()) && top && "topId" in top && top.topId) host.setAsmSel(top.topId.split("/")[0]);
+  return selectionOf(host);
+}
+
 /**
  * Textové zaoblení / sražení bez `hrany` zpracuje všechny hrany – výběr (klik, `vyber`) textové příkazy nečtou. Je-li
  * vybraná nějaká hrana, protokol to řekne a ukáže zápis jen pro vybrané hrany (žádná tichá změna geometrie).
@@ -807,6 +826,23 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
     importFile: (file, opts) => importFile(host, file, opts),
     screenshot: (opts) => screenshot(host, opts),
     compare: (ref, opts) => compare(host(), ref, opts),
+    // připojené soubory textových příkazů (jedno úložiště engine/attachments.ts: porovnat, otevřít, předloha, logo razítka):
+    // attach({ name, base64 | text | data }) → seznam připojených; attach("název", base64 | data URL | bajty, mime?) → soubor
+    attach: ((a: AttachInput | string, data?: string | Uint8Array, mime?: string) => {
+      if (typeof a !== "string") {
+        appAttachments.add(a?.name, attachBytes(a), "base64" in a ? /^data:([^;,]+)/.exec(a.base64)?.[1] : undefined);
+        return appAttachments.entries();
+      }
+      const bytes = typeof data === "string" ? b64ToBytes(data.replace(/^data:[^,]*,/, "")) : (data ?? new Uint8Array(0));
+      const m = mime || (typeof data === "string" ? /^data:([^;,]+)/.exec(data)?.[1] : undefined) || "application/octet-stream";
+      return appAttachments.add(a, bytes, m);
+    }) as MncadApi["attach"],
+    attachments: () => appAttachments.entries(),
+    detach: (name) => {
+      if (name === undefined) appAttachments.clear();
+      else appAttachments.remove(name);
+      return appAttachments.entries();
+    },
     share: (opts) => share(host(), opts),
     // uložené nastavení (loadSettings drží poslední uložené hned, bez čekání na vykreslení; dočasný styl snímku se neuloží)
     settings: () => ({ ...loadSettings() }),
@@ -817,6 +853,7 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
     },
     selection: () => selectionOf(host()),
     select: (ids, opts) => select(host(), ids, opts),
+    selectBox: (box) => selectBox(host(), box),
     clearSelection: () => {
       const h = host();
       setSel(h, []);
@@ -831,12 +868,6 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
       return saveProjectFile(h.doc(), name, h);
     },
     script: async (opts) => (await scriptOfDoc(host().doc(), opts)).text,
-    attach: (name, data, mime) => {
-      const bytes = typeof data === "string" ? b64ToBytes(data.replace(/^data:[^,]*,/, "")) : data;
-      const m = mime || (typeof data === "string" ? /^data:([^;,]+)/.exec(data)?.[1] : undefined) || "application/octet-stream";
-      const f = attachedFiles.add({ name, mime: m, dataUrl: `data:${m};base64,${bytesToB64(bytes)}`, bytes: bytes.length });
-      return { name: f.name, bytes: f.bytes };
-    },
     reference: async (cmd) => {
       const c = (cmd ?? "").trim();
       // celý příkaz předlohy (i „kontrola kót“, „porovnat s předlohou …“, „Maßprüfung“) beze změny, jinak za slovo předloha

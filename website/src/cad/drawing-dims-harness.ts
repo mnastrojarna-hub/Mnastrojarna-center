@@ -6,7 +6,9 @@ import { parseAgentText, selectEdges, selectFaces, topAt, type EdgeLite, type Fa
 import { applySketchOp } from "./agent-sketch";
 import { fillHoleTops } from "./agent-hole";
 import { buildDoc } from "./build";
-import { drawingDoc, threadsOfDoc } from "./drawing-doc";
+import { drawingDoc, springMarksOf, threadsOfDoc } from "./drawing-doc";
+import { realPartGeom } from "./drawing-models";
+import { shapeOfDoc } from "./asm-kernel";
 import { makeDrawing, type DrawingMeta, type DrawingOptions } from "./drawing";
 import { makeSmartDrawing } from "./drawing-dims";
 import { applyDrawingCmd } from "./drawing-agent";
@@ -77,17 +79,23 @@ export async function runText(text: string): Promise<{ doc: CadDoc; log: string[
 
 /** Dokument → výkres (bez zapečených kót, s místem pro kóty) + Chytré kóty – stejně jako jádro (worker). */
 export async function smartDrawing(doc: CadDoc, opts: Partial<DrawingOptions> = {}) {
-  const dd = drawingDoc(doc);
+  const springs = opts.springs === "full" ? "full" : "simple";
+  const dd = drawingDoc(doc, springs);
   const res = await buildDoc(dd);
   if (!res.body) throw new Error("model je prázdný");
-  const meta = { name: doc.name, material: "", threads: threadsOfDoc(doc) };
-  const d = makeSmartDrawing(res.body, doc, meta, { ...opts, dimensions: "smart" });
+  const marks = springs === "simple" ? springMarksOf(dd) : [];
+  const meta = { name: doc.name, material: "", threads: threadsOfDoc(doc), ...(marks.length ? { springs: marks } : {}) };
+  const d = makeSmartDrawing(res.body, doc, meta, { ...opts, dimensions: "smart" }, {}, await realPartGeom(doc, springs, shapeOfDoc));
   return { doc, drawing: d, smart: d.smart, bbox: res.metrics!.bbox };
 }
 
 /** Výpočet výkresu jako jádro (worker, op „drawing“) – pro testy příkazů výkresu a jeho stavu. */
 export async function computeDrawing(doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions>) {
-  const res = await buildDoc(drawingDoc(doc));
+  const springs = opts.springs === "full" ? "full" : "simple";
+  const dd = drawingDoc(doc, springs);
+  const res = await buildDoc(dd);
   if (!res.body) throw new Error("model je prázdný");
-  return opts.dimensions === "smart" ? makeSmartDrawing(res.body, doc, meta, opts) : makeDrawing(res.body, meta, opts);
+  const marks = springs === "simple" && !meta.springs ? springMarksOf(dd) : [];
+  const m2 = marks.length ? { ...meta, springs: marks } : meta;
+  return opts.dimensions === "smart" ? makeSmartDrawing(res.body, doc, m2, opts, {}, await realPartGeom(doc, springs, shapeOfDoc)) : makeDrawing(res.body, m2, opts);
 }

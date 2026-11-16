@@ -22,7 +22,7 @@ export default {
   filter: {
     what: "Určí, co kliknutí v 3D okně vybere: vše, plochu, hranu, bod, těleso, v sestavě komponentu.",
     when: "Když klik bere jinou entitu, než chcete – např. hranu místo plochy.",
-    steps: ["Otevřete nabídku Filtr a zvolte druh entity.", "Klikejte v modelu; Ctrl+klik přidá nebo odebere další entitu."],
+    steps: ["Otevřete nabídku Filtr a zvolte druh entity.", "Klikejte v modelu; Ctrl+klik přidá nebo odebere další entitu.", "Nebo táhněte obdélník: zleva doprava = celé uvnitř, zprava doleva = i protnuté."],
     note: "Stejný filtr je i ve stavovém řádku dole a v nabídce pravého tlačítka na prázdném místě.",
   },
   "menu:filter/all": {
@@ -67,6 +67,12 @@ export default {
     when: "Přesun, otevření nebo rozpuštění celé skupiny dílů najednou.",
     steps: ["Zvolte Podsestava.", "Klikněte na kterýkoli díl podsestavy – vybere se celá."],
     note: "Jen v sestavě; díl mimo podsestavu se vybere sám.",
+  },
+  "menu:filter/through": {
+    what: "Výběr oknem vybere i entity zakryté jinými plochami nebo komponentami (jinak jen viditelné).",
+    when: "Vybrat oknem i zadní hrany a plochy dílu nebo komponenty schované uvnitř sestavy.",
+    steps: ["Zapněte Okno vybírá i skryté.", "Táhněte levým tlačítkem obdélník přes model; Ctrl přidá, Alt odebere."],
+    note: "Ve stylu Drátový a Průhledný vybírá okno zakryté entity vždy; klik vybírá dál jen viditelné.",
   },
   mass: {
     what: "Ukáže hmotnost, objem, povrch a rozměry dílu; v sestavě součet dílů podle jejich materiálů a těžiště.",

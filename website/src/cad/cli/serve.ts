@@ -173,6 +173,7 @@ export type ServerHandle = { url: string; port: number; tokenFile: string; close
 /** Spustí server; vrací ovladač (testy) – `serveMain` na něm čeká do SIGINT/SIGTERM. */
 export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
   validateBind(a.host, a.allowRemote, a.tokenFile);
+  const init0 = jobInit(io, "cs"); // jednou při startu: špatné MNCAD_WASM = chyba použití (kód 3), ne pád každého požadavku
   const tok = loadOrCreateToken(a.tokenFile, io.env);
   if (tok.created) io.stderr(tr("mncad serve: vygenerován token do „{0}“ (práva 0600)", tok.file));
   const outRoot = a.out !== undefined ? prepareOutDir(path.resolve(io.cwd, a.out)) : null;
@@ -187,7 +188,7 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
   const handlers = new Set<Promise<unknown>>();
 
   const spawn = (lang: CadLang): Slot => {
-    const thread = new JobThread({ entry: io.entry, init: jobInit(io, lang), maxMemMB: a.maxMem, rssGuard: false });
+    const thread = new JobThread({ entry: io.entry, init: { ...init0, lang }, maxMemMB: a.maxMem, rssGuard: false });
     const slot: Slot = { thread, lang, session: null, busy: false, lastUsed: Date.now() };
     slots.push(slot);
     void thread.ready.catch(() => undefined);

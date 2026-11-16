@@ -1,8 +1,8 @@
-# 959-01-00 Střižný nástroj – syntetický nástroj pro zkoušku hotovosti MN CAD (scripts/cad-harness/synth-tool.mjs)
+# 900-01-00 Střižný nástroj – syntetický nástroj pro zkoušku hotovosti MN CAD (scripts/cad-harness/synth-tool.mjs)
 # 19 dílů · 70 komponent · 53 vazeb · pohyb 40 kroků s kolizemi · 4 listy výkresu
 
-# ── 959-01-00-01 Základová deska
-nový díl "959-01-00-01 Základová deska"
+# ── 900-01-00-01 Základová deska
+nový díl "900-01-00-01 Základová deska"
 kvádr 320 220 40
 srazit 2 hrany svislé
 válec 32,1 8 v 30 30 32 odebrat
@@ -36,8 +36,8 @@ díra 8,02 hloubka 12 v 235 110 40
 díra 6,8 hloubka 12 v 70 197 40 závit M8 hloubka-závitu 10
 díra 6,8 hloubka 12 v 130 197 40 závit M8 hloubka-závitu 10
 
-# ── 959-01-00-02 Matrice
-nový díl "959-01-00-02 Matrice"
+# ── 900-01-00-02 Matrice
+nový díl "900-01-00-02 Matrice"
 kvádr 200 120 30
 srazit 1 hrany svislé
 díra 11 skrz v 15 30 30 zahloubení 17,5 10,5
@@ -69,8 +69,8 @@ díra 6,8 hloubka 15 v 160 10 30 závit M8 hloubka-závitu 14
 díra 6,8 hloubka 15 v 40 110 30 závit M8 hloubka-závitu 14
 díra 6,8 hloubka 15 v 160 110 30 závit M8 hloubka-závitu 14
 
-# ── 959-01-00-03 Stírací deska
-nový díl "959-01-00-03 Stírací deska"
+# ── 900-01-00-03 Stírací deska
+nový díl "900-01-00-03 Stírací deska"
 kvádr 320 220 16
 srazit 2 hrany svislé
 díra 24,5 skrz v 30 30 16
@@ -88,8 +88,8 @@ díra 20,4 skrz v 160 125 16
 díra 20,4 skrz v 190 125 16
 díra 20,4 skrz v 220 125 16
 
-# ── 959-01-00-04 Kotevní deska
-nový díl "959-01-00-04 Kotevní deska"
+# ── 900-01-00-04 Kotevní deska
+nový díl "900-01-00-04 Kotevní deska"
 kvádr 200 140 25
 srazit 1 hrany svislé
 díra 20,05 skrz v 40 55 25 zahloubení 26,1 5
@@ -121,8 +121,8 @@ díra 8,5 hloubka 20 v 185 130 25 závit M10 hloubka-závitu 16
 díra 8,02 skrz v 10 70 25
 díra 8,02 skrz v 190 70 25
 
-# ── 959-01-00-05 Opěrná deska
-nový díl "959-01-00-05 Opěrná deska"
+# ── 900-01-00-05 Opěrná deska
+nový díl "900-01-00-05 Opěrná deska"
 kvádr 200 140 10
 srazit 1 hrany svislé
 díra 11 skrz v 15 10 10
@@ -140,8 +140,8 @@ díra 11 skrz v 185 130 10
 díra 8,02 skrz v 10 70 10
 díra 8,02 skrz v 190 70 10
 
-# ── 959-01-00-06 Horní deska
-nový díl "959-01-00-06 Horní deska"
+# ── 900-01-00-06 Horní deska
+nový díl "900-01-00-06 Horní deska"
 kvádr 320 220 35
 srazit 2 hrany svislé
 díra 32,1 skrz v 30 30 35 zahloubení 40,1 8
@@ -163,34 +163,34 @@ díra 11 skrz v 245 170 35 zahloubení 17,5 10,5
 díra 8,02 skrz v 70 110 35
 díra 8,02 skrz v 250 110 35
 
-# ── 959-01-00-07 Vodicí lišta
-nový díl "959-01-00-07 Vodicí lišta"
+# ── 900-01-00-07 Vodicí lišta
+nový díl "900-01-00-07 Vodicí lišta"
 kvádr 200 20 12
 srazit 1 hrany svislé
 díra 9 skrz v 40 10 12 zahloubení 14 8,5
 díra 9 skrz v 160 10 12 zahloubení 14 8,5
 
-# ── 959-01-00-08 Doraz
-nový díl "959-01-00-08 Doraz"
+# ── 900-01-00-08 Doraz
+nový díl "900-01-00-08 Doraz"
 válec 30 40
 srazit 1 hrany horní
 
-# ── 959-01-00-09 Štítek
-nový díl "959-01-00-09 Štítek"
+# ── 900-01-00-09 Štítek
+nový díl "900-01-00-09 Štítek"
 kvádr 80 30 5
 srazit 0,5 hrany svislé
 díra 9 skrz v 10 15 5
 díra 9 skrz v 70 15 5
-text "959-01-00" výška 6 hloubka 0,3 v 40 15 5 gravírovat
+text "900-01-00" výška 6 hloubka 0,3 v 40 15 5 gravírovat
 
-# ── 959-01-00-10 Stopka
-nový díl "959-01-00-10 Stopka"
+# ── 900-01-00-10 Stopka
+nový díl "900-01-00-10 Stopka"
 válec 80 12
 válec 40 50 v 0 0 12
 srazit 2 hrany horní
 
-# ── 959-01-00-11 Střižník
-nový díl "959-01-00-11 Střižník"
+# ── 900-01-00-11 Střižník
+nový díl "900-01-00-11 Střižník"
 válec 20 75
 válec 26 5 v 0 0 75
 srazit 0,5 hrany spodní
@@ -233,18 +233,18 @@ normálie pružina d2,5 D20 L38,5 n6
 normálie podložka M8 ISO 7089
 
 # ── sestava
-nová sestava "959-01-00 Střižný nástroj"
-vložit "959-01-00-01 Základová deska" v 0 0 0 ukotvit
-vložit "959-01-00-02 Matrice" v 60 50 40
+nová sestava "900-01-00 Střižný nástroj"
+vložit "900-01-00-01 Základová deska" v 0 0 0 ukotvit
+vložit "900-01-00-02 Matrice" v 60 50 40
 vložit "Vodicí sloupek Ø24×150" v 30 30 32
 vložit "Vodicí sloupek Ø24×150" v 290 30 32
 vložit "Vodicí sloupek Ø24×150" v 30 190 32
 vložit "Vodicí sloupek Ø24×150" v 290 190 32
-vložit "959-01-00-07 Vodicí lišta" v 60 50 70
-vložit "959-01-00-07 Vodicí lišta" v 60 150 70
-vložit "959-01-00-08 Doraz" v 160 24 40
-vložit "959-01-00-08 Doraz" v 160 196 40
-vložit "959-01-00-09 Štítek" v 60 182 40
+vložit "900-01-00-07 Vodicí lišta" v 60 50 70
+vložit "900-01-00-07 Vodicí lišta" v 60 150 70
+vložit "900-01-00-08 Doraz" v 160 24 40
+vložit "900-01-00-08 Doraz" v 160 196 40
+vložit "900-01-00-09 Štítek" v 60 182 40
 vložit "Kolík Ø8×40 ISO 8734" v 85 110 30
 vložit "Kolík Ø8×40 ISO 8734" v 235 110 30
 vložit "Šroub M10x45 ISO 4762" v 75 80 59,5
@@ -267,25 +267,25 @@ vložit "Podložka 8 ISO 7089" v 70 197 45
 vložit "Podložka 8 ISO 7089" v 130 197 45
 vložit "Šroub M8x16 ISO 4762" v 70 197 46,6
 vložit "Šroub M8x16 ISO 4762" v 130 197 46,6
-vložit "959-01-00-03 Stírací deska" v 0 0 106
-vložit "959-01-00-04 Kotevní deska" v 60 40 172
-vložit "959-01-00-05 Opěrná deska" v 60 40 197
-vložit "959-01-00-06 Horní deska" v 0 0 207
-vložit "959-01-00-10 Stopka" v 160 110 242
+vložit "900-01-00-03 Stírací deska" v 0 0 106
+vložit "900-01-00-04 Kotevní deska" v 60 40 172
+vložit "900-01-00-05 Opěrná deska" v 60 40 197
+vložit "900-01-00-06 Horní deska" v 0 0 207
+vložit "900-01-00-10 Stopka" v 160 110 242
 vložit "Vodicí pouzdro Ø24×56" v 30 30 186
 vložit "Vodicí pouzdro Ø24×56" v 290 30 186
 vložit "Vodicí pouzdro Ø24×56" v 30 190 186
 vložit "Vodicí pouzdro Ø24×56" v 290 190 186
-vložit "959-01-00-11 Střižník" v 100 95 117
-vložit "959-01-00-11 Střižník" v 130 95 117
-vložit "959-01-00-11 Střižník" v 160 95 117
-vložit "959-01-00-11 Střižník" v 190 95 117
-vložit "959-01-00-11 Střižník" v 220 95 117
-vložit "959-01-00-11 Střižník" v 100 125 117
-vložit "959-01-00-11 Střižník" v 130 125 117
-vložit "959-01-00-11 Střižník" v 160 125 117
-vložit "959-01-00-11 Střižník" v 190 125 117
-vložit "959-01-00-11 Střižník" v 220 125 117
+vložit "900-01-00-11 Střižník" v 100 95 117
+vložit "900-01-00-11 Střižník" v 130 95 117
+vložit "900-01-00-11 Střižník" v 160 95 117
+vložit "900-01-00-11 Střižník" v 190 95 117
+vložit "900-01-00-11 Střižník" v 220 95 117
+vložit "900-01-00-11 Střižník" v 100 125 117
+vložit "900-01-00-11 Střižník" v 130 125 117
+vložit "900-01-00-11 Střižník" v 160 125 117
+vložit "900-01-00-11 Střižník" v 190 125 117
+vložit "900-01-00-11 Střižník" v 220 125 117
 vložit "Pružina 2,5×20×38,5" v 90 60 154,25
 vložit "Pružina 2,5×20×38,5" v 230 60 154,25
 vložit "Pružina 2,5×20×38,5" v 90 160 154,25
@@ -306,59 +306,59 @@ vložit "Kolík Ø8×40 ISO 8734" v 70 110 172
 vložit "Kolík Ø8×40 ISO 8734" v 250 110 172
 
 # ── vazby (zámek skupiny, souosost na sloupky, 2× mez vzdálenosti)
-sestava vazba zámek "959-01-00-02 Matrice" "959-01-00-01 Základová deska"
-sestava vazba souosost "#3" Ø24 "959-01-00-01 Základová deska" F11
-sestava vazba souosost "#4" Ø24 "959-01-00-01 Základová deska" F18
-sestava vazba souosost "#5" Ø24 "959-01-00-01 Základová deska" F31
-sestava vazba souosost "#6" Ø24 "959-01-00-01 Základová deska" F40
-sestava vazba kontakt "#3" F9 "959-01-00-01 Základová deska" F41
-sestava vazba kontakt "#4" F9 "959-01-00-01 Základová deska" F46
-sestava vazba kontakt "#5" F9 "959-01-00-01 Základová deska" F54
-sestava vazba kontakt "#6" F9 "959-01-00-01 Základová deska" F60
-sestava vazba souosost "959-01-00-06 Horní deska" F29 "#3" Ø24
-sestava vazba souosost "959-01-00-06 Horní deska" F44 "#6" Ø24
-sestava vazba vzdálenost "959-01-00-06 Horní deska" F5 "959-01-00-01 Základová deska" F2 167
-sestava vazba zámek "959-01-00-05 Opěrná deska" "959-01-00-06 Horní deska"
-sestava vazba zámek "959-01-00-04 Kotevní deska" "959-01-00-06 Horní deska"
-sestava vazba zámek "959-01-00-10 Stopka" "959-01-00-06 Horní deska"
-sestava vazba zámek "#39" "959-01-00-06 Horní deska"
-sestava vazba zámek "#40" "959-01-00-06 Horní deska"
-sestava vazba zámek "#41" "959-01-00-06 Horní deska"
-sestava vazba zámek "#42" "959-01-00-06 Horní deska"
-sestava vazba zámek "#43" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#44" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#45" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#46" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#47" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#48" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#49" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#50" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#51" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#52" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#53" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#54" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#55" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#56" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#57" "959-01-00-06 Horní deska"
-sestava vazba zámek "#58" "959-01-00-06 Horní deska"
-sestava vazba zámek "#59" "959-01-00-06 Horní deska"
-sestava vazba zámek "#60" "959-01-00-06 Horní deska"
-sestava vazba zámek "#61" "959-01-00-06 Horní deska"
-sestava vazba zámek "#62" "959-01-00-06 Horní deska"
-sestava vazba zámek "#63" "959-01-00-06 Horní deska"
-sestava vazba zámek "#64" "959-01-00-06 Horní deska"
-sestava vazba zámek "#65" "959-01-00-06 Horní deska"
-sestava vazba zámek "#66" "959-01-00-06 Horní deska"
-sestava vazba zámek "#67" "959-01-00-06 Horní deska"
-sestava vazba zámek "#68" "959-01-00-06 Horní deska"
-sestava vazba zámek "#69" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#70" "959-01-00-04 Kotevní deska"
-sestava vazba zámek "#30" "959-01-00-01 Základová deska"
-sestava vazba zámek "#31" "959-01-00-01 Základová deska"
-sestava vazba souosost "959-01-00-03 Stírací deska" F11 "#3" Ø24
-sestava vazba souosost "959-01-00-03 Stírací deska" F24 "#6" Ø24
-sestava vazba mez vzdálenosti "959-01-00-03 Stírací deska" F2 "959-01-00-04 Kotevní deska" F5 20..60
-sestava vazba mez vzdálenosti "959-01-00-03 Stírací deska" F5 "959-01-00-02 Matrice" F2 10..200
+sestava vazba zámek "900-01-00-02 Matrice" "900-01-00-01 Základová deska"
+sestava vazba souosost "#3" Ø24 "900-01-00-01 Základová deska" F11
+sestava vazba souosost "#4" Ø24 "900-01-00-01 Základová deska" F18
+sestava vazba souosost "#5" Ø24 "900-01-00-01 Základová deska" F31
+sestava vazba souosost "#6" Ø24 "900-01-00-01 Základová deska" F40
+sestava vazba kontakt "#3" F9 "900-01-00-01 Základová deska" F41
+sestava vazba kontakt "#4" F9 "900-01-00-01 Základová deska" F46
+sestava vazba kontakt "#5" F9 "900-01-00-01 Základová deska" F54
+sestava vazba kontakt "#6" F9 "900-01-00-01 Základová deska" F60
+sestava vazba souosost "900-01-00-06 Horní deska" F29 "#3" Ø24
+sestava vazba souosost "900-01-00-06 Horní deska" F44 "#6" Ø24
+sestava vazba vzdálenost "900-01-00-06 Horní deska" F5 "900-01-00-01 Základová deska" F2 167
+sestava vazba zámek "900-01-00-05 Opěrná deska" "900-01-00-06 Horní deska"
+sestava vazba zámek "900-01-00-04 Kotevní deska" "900-01-00-06 Horní deska"
+sestava vazba zámek "900-01-00-10 Stopka" "900-01-00-06 Horní deska"
+sestava vazba zámek "#39" "900-01-00-06 Horní deska"
+sestava vazba zámek "#40" "900-01-00-06 Horní deska"
+sestava vazba zámek "#41" "900-01-00-06 Horní deska"
+sestava vazba zámek "#42" "900-01-00-06 Horní deska"
+sestava vazba zámek "#43" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#44" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#45" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#46" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#47" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#48" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#49" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#50" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#51" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#52" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#53" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#54" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#55" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#56" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#57" "900-01-00-06 Horní deska"
+sestava vazba zámek "#58" "900-01-00-06 Horní deska"
+sestava vazba zámek "#59" "900-01-00-06 Horní deska"
+sestava vazba zámek "#60" "900-01-00-06 Horní deska"
+sestava vazba zámek "#61" "900-01-00-06 Horní deska"
+sestava vazba zámek "#62" "900-01-00-06 Horní deska"
+sestava vazba zámek "#63" "900-01-00-06 Horní deska"
+sestava vazba zámek "#64" "900-01-00-06 Horní deska"
+sestava vazba zámek "#65" "900-01-00-06 Horní deska"
+sestava vazba zámek "#66" "900-01-00-06 Horní deska"
+sestava vazba zámek "#67" "900-01-00-06 Horní deska"
+sestava vazba zámek "#68" "900-01-00-06 Horní deska"
+sestava vazba zámek "#69" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#70" "900-01-00-04 Kotevní deska"
+sestava vazba zámek "#30" "900-01-00-01 Základová deska"
+sestava vazba zámek "#31" "900-01-00-01 Základová deska"
+sestava vazba souosost "900-01-00-03 Stírací deska" F11 "#3" Ø24
+sestava vazba souosost "900-01-00-03 Stírací deska" F24 "#6" Ø24
+sestava vazba mez vzdálenosti "900-01-00-03 Stírací deska" F2 "900-01-00-04 Kotevní deska" F5 20..60
+sestava vazba mez vzdálenosti "900-01-00-03 Stírací deska" F5 "900-01-00-02 Matrice" F2 10..200
 
 # ── pohyb: horní díl −50 mm, stírací deska dosedne až po 30 mm
 pohyb motor lineární vazba 12 167..117 kroky 40
@@ -369,30 +369,30 @@ výkres A1 pohledy přední,horní,iso
 výkres řez XZ odsazení -110 celý
 výkres kusovník ano
 výkres balónky ano
-výkres razítko název="Střižný nástroj" číslo="959-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"
+výkres razítko název="Střižný nástroj" číslo="900-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"
 kótovat celkově
-záložka "959-01-00-01 Základová deska"
-výkres A3 měřítko 1:2 pohledy přední,horní,iso
+záložka "900-01-00-01 Základová deska"
+výkres A2 měřítko 1:2 pohledy přední,horní,iso
 kótovat chytře
-výkres razítko název="Základová deska" číslo="959-01-00-01" kreslil="AI" nepředepsané="ISO 2768-mK"
-záložka "959-01-00-02 Matrice"
+výkres razítko název="Základová deska" číslo="900-01-00-01" kreslil="AI" nepředepsané="ISO 2768-mK"
+záložka "900-01-00-02 Matrice"
 výkres A3 pohledy přední,horní,iso
 kótovat chytře
-výkres razítko název="Matrice" číslo="959-01-00-02" kreslil="AI" nepředepsané="ISO 2768-mK"
-záložka "959-01-00-04 Kotevní deska"
-výkres A3 pohledy přední,horní,iso
+výkres razítko název="Matrice" číslo="900-01-00-02" kreslil="AI" nepředepsané="ISO 2768-mK"
+záložka "900-01-00-04 Kotevní deska"
+výkres A3 pohledy přední,horní,spodní,iso
 kótovat chytře
-výkres razítko název="Kotevní deska" číslo="959-01-00-04" kreslil="AI" nepředepsané="ISO 2768-mK"
+výkres razítko název="Kotevní deska" číslo="900-01-00-04" kreslil="AI" nepředepsané="ISO 2768-mK"
 
 # ── kontrola
-záložka "959-01-00 Střižný nástroj"
+záložka "900-01-00 Střižný nástroj"
 kolize
 kontrola sestava
-záložka "959-01-00-01 Základová deska"
+záložka "900-01-00-01 Základová deska"
 měřit těleso
-záložka "959-01-00-02 Matrice"
+záložka "900-01-00-02 Matrice"
 měřit těleso
-záložka "959-01-00-04 Kotevní deska"
+záložka "900-01-00-04 Kotevní deska"
 měřit těleso
-záložka "959-01-00 Střižný nástroj"
+záložka "900-01-00 Střižný nástroj"
 stav

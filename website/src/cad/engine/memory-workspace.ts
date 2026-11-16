@@ -157,6 +157,25 @@ export class MemoryWorkspace implements Workspace {
     return { moved };
   }
 
+  history(): { undo: number; redo: number } {
+    return this.historyDepth();
+  }
+
+  /** záložky vzniklé v tomto běhu (od nejstarší) */
+  private runTabs(): Tab[] {
+    return this.runNo > 0 ? this.list.filter((t) => t.run === this.runNo).sort((a, b) => a.seq - b.seq) : [];
+  }
+
+  partNames(): string[] {
+    const names = [...this.runTabs(), ...this.list].filter((t) => isPartDoc(t.hist.present)).map((t) => t.hist.present.name);
+    return [...new Set(names)];
+  }
+
+  listDocs(): { title: string; doc: CadDoc }[] {
+    const run = this.runTabs().filter((t) => isPartDoc(t.hist.present));
+    return [...run, ...this.list].map((t) => ({ title: t.hist.present.name, doc: t.hist.present }));
+  }
+
   findPart(name: string): CadDoc | null {
     const key = fold(name);
     const match = (t: Tab) => isPartDoc(t.hist.present) && fold(t.hist.present.name) === key;
@@ -165,6 +184,10 @@ export class MemoryWorkspace implements Workspace {
       if (made) return made.hist.present;
     }
     return this.list.find(match)?.hist.present ?? null;
+  }
+
+  docKey(id?: DocKey): string {
+    return (id === undefined ? this.active() : this.list.find((t) => t.id === id))?.docId ?? "";
   }
 
   freshName(base: string): string {

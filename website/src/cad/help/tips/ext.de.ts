@@ -597,6 +597,14 @@ export default {
     cmd: 'bewegung antrieb dreh "Kurbel" 0..360 schritt 5',
     note: "Ohne passende Verknüpfung kein Antrieb – erst z. B. ein Scharnier oder Konzentrisch anlegen.",
   },
+  springBetween: {
+    what: "Setzt eine Feder zwischen zwei Teile: Bohrung oder Fläche A und Gegenfläche B anklicken, Federtabelle vorbelegt.",
+    when: "Abstreiferplatte auf Federn, Federbolzen, Druckplatte – mit einem Klick in alle Bohrungen eines Musters.",
+    select: "Baugruppe mit zwei Teilen: Bohrung / Tasche oder ebene Fläche in Teil A, Gegenfläche in Teil B.",
+    steps: ["Tasche (Zylinderfläche) oder Ebene A anklicken – im Modell oder in der Liste.", "Gegenfläche B eines anderen Teils anklicken.", "d, De, L0, n in der Tabelle anpassen und Erstellen klicken."],
+    cmd: "baugruppe feder neu zwischen #1 Ø21 #2 oben alle bohrungen",
+    note: "Die Feder wird an Teil A gesperrt; Länge und Kraft folgen den Verknüpfungen und der Bewegungsstudie (auch Dynamik).",
+  },
 
   // ── Baugruppe › Analyse ──
   clash: {

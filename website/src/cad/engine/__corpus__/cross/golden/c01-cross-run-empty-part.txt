@@ -1,0 +1,23 @@
+=== run 1 ===
+✓ nový díl „A“ – nová záložka
+
+Dokument: „A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)
+=== run 2 ===
+✓ nová sestava „S“ – nová záložka
+
+Dokument: „S“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: žádné
+Sestava: 0 komponent (0 dílů po rozložení podsestav)
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 3 ===
+Záložky (2):
+ 1. A · díl
+ 2. S · sestava · aktivní
+
+Dokument: „S“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: žádné
+Sestava: 0 komponent (0 dílů po rozložení podsestav)
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== tabs ===
+A | S

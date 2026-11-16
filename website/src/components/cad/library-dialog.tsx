@@ -19,7 +19,11 @@ type Props = {
   isAssembly: boolean;
   /** předvyplněný dotaz (např. z palety příkazů) */
   initialQuery?: string;
+  /** pružiny: otevřít tabulku s výpočtem (průvodce Pružina) s hodnotami z knihovny */
+  onOpenSprings?: (family: string, values: Values) => void;
 };
+/** rodiny knihovny, které umí průvodce Pružina (tabulka s výpočtem EN 13906 / DIN 2093) */
+const SPRING_FAMILIES = new Set(["spring", "springExt", "springTorsion", "din2093"]);
 
 const GROUP_ICON: Record<string, CadIconName> = {
   "Spojovací materiál": "thread",
@@ -34,7 +38,7 @@ const GROUP_ICON: Record<string, CadIconName> = {
 };
 
 /** Knihovna normálií – vyhledávání textem („M8x30“), kategorie, parametry, náhled a vložení. */
-export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAssembly, initialQuery = "" }: Props) {
+export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAssembly, initialQuery = "", onOpenSprings }: Props) {
   const [q, setQ] = useState(initialQuery);
   const [group, setGroup] = useState<string | "fav" | "recent" | null>(null);
   const [famId, setFamId] = useState<string>(LIBRARY[0].id);
@@ -245,6 +249,12 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
                 <p className="text-[11px] text-[#6b7785]">{family.standards.join(" · ")}</p>
               </div>
             </div>
+            {onOpenSprings && SPRING_FAMILIES.has(family.id) && (
+              <button type="button" data-lib-spring-table onClick={() => onOpenSprings(family.id, values)} className="mb-3 w-full rounded border border-brand/40 bg-brand/5 px-2 py-1.5 text-left text-[12px] text-[#26303b] hover:bg-brand/10">
+                <span className="font-semibold text-brand">{tr("Pružina z tabulky s výpočtem")}</span>
+                <span className="block text-[11px] text-[#6b7785]">{tr("tuhost, síly, napětí, vzpěr, broušené konce – EN 13906 / DIN 2093")}</span>
+              </button>
+            )}
             <div className="space-y-2.5">
               {family.params.map((p) => (
                 <ParamField key={p.key} p={p} value={values[p.key]} onChange={(v) => setValues({ ...values, [p.key]: v })} />

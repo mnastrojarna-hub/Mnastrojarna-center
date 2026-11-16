@@ -31,6 +31,7 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
+import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
 import { resolveDatumNames } from "./agent-prim";
 import { applySketchOp, type SketchOp } from "./agent-sketch";
@@ -210,6 +211,18 @@ const WORDS = {
   trace: ["stopa", "trace", "spur"],
   rpm: ["ot/min", "rpm", "u/min"],
   speed: ["rychlost", "speed", "geschwindigkeit"],
+  // dynamika pohybové studie (vlna 21, cad/agent-motion-dyn.ts)
+  back: ["tam a zpět", "there and back", "hin und zurück"],
+  dynamics: ["dynamika", "dynamics", "dynamik"],
+  dtStep: ["krok", "step", "schritt"],
+  gravity: ["gravitace", "gravity", "schwerkraft"],
+  gOff: ["vyp", "off", "aus"],
+  damping: ["tlumení", "damping", "dämpfung"],
+  restitution: ["odraz", "restitution", "stoßzahl"],
+  frames: ["snímky", "frames", "bilder"],
+  mass: ["hmotnost", "mass", "masse"],
+  force: ["síla", "force", "kraft"],
+  torque: ["moment", "torque", "moment"],
   drawing: ["výkres", "drawing", "zeichnung"],
   format: ["formát", "format", "format"],
   portrait: ["na výšku", "portrait", "hoch"],
@@ -221,6 +234,7 @@ const WORDS = {
   hidden: ["skryté", "hidden", "verdeckt"],
   axes: ["osy", "axes", "achsen"],
   holeTable: ["tabulka děr", "holetable", "bohrungstabelle"],
+  springTable: ["tabulka pružiny", "springtable", "federtabelle"],
   bom: ["kusovník", "bom", "stückliste"],
   balloons: ["balónky", "balloons", "positionsnummern"],
   projection: ["promítání", "projection", "projektion"],
@@ -892,6 +906,9 @@ function dedicated(p: PartCtx, f: Feature): string[] {
       const at = placePart(p, f);
       return one(ax === null || at === null ? null : `${c.w("spring")} ${n(2 * f.radius)} ${c.w("pitch")} ${n(f.pitch)} ${c.w("turns")} ${n(f.turns)} ${c.w("wire")} ${n(f.wire)}${at}${ax}${primMode(p, f)}${bodyPart(p, f)}`);
     }
+    case "ext":
+      // pružiny z tabulky: `pružina tlačná d 2 De 20 L0 50 n 8 …` (agent-springs.ts); ostatní rozšíření obecným `prvek`
+      return one(springScriptLine(f, c.lang));
     case "thread": {
       const ax = axisPart(p, f);
       const at = placePart(p, f);
@@ -1524,6 +1541,10 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
   flag("hidden", "hidden");
   flag("centerLines", "axes");
   flag("holeTable", "holeTable");
+  if (o.springTable === true) {
+    parts.push(`${c.w("springTable")} ${c.yn(true)}`);
+    keys.push("springTable");
+  }
   if (diff("rotation") && typeof o.rotation === "number") {
     parts.push(`${c.w("rotation")} ${n(o.rotation)}`);
     keys.push("rotation");
@@ -1542,7 +1563,7 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
 /** řez v konvenci skici (starší uložený řez má v `offset` souřadnici na ose) – k porovnání uloženého řezu s přečteným řádkem */
 const secNorm = (v: unknown): unknown => (v && typeof v === "object" ? sectionToSketchConvention(v as SectionOpt) : v);
 /** volby listu, které textový příkaz `výkres …` nenastavuje a které nejsou výchozí */
-export const SHEET_UNSUPPORTED = ["details", "models", "aux", "cuts", "brokenOut", "breaks", "fitShow", "fitTable", "dimRoom", "dimRoomMin", "weldSymbols"];
+export const SHEET_UNSUPPORTED = ["details", "models", "aux", "cuts", "brokenOut", "breaks", "fitShow", "fitTable", "dimRoom", "dimRoomMin", "weldSymbols", "genEdit"];
 /** nastavené volby listu, které skript nepřenese (pohledy navíc, detaily, další modely…) – list pak po přečtení vypadá jinak */
 export const sheetUnsupported = (o: Record<string, unknown>): string[] => SHEET_UNSUPPORTED.filter((k) => o[k] !== undefined && !(Array.isArray(o[k]) && !(o[k] as unknown[]).length));
 function emitDrawings(c: Ctx, doc: CadDoc) {
@@ -1987,6 +2008,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       }
       let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${n(m.from)}..${n(m.to)}`;
       if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
+      else if (m.back) l += ` ${c.w("back")}`;
       if (i === 0) {
         l += ` ${c.w("steps")} ${n(mo.steps)} ${c.w("time")} ${n(mo.duration)}`;
         if (mo.collisions) l += ` ${c.w("clash")}`;
@@ -1998,6 +2020,23 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       c.line(l);
     });
     if (mo.loop) c.note(tr("přehrávání pohybové studie ve smyčce se do skriptu nepřenáší"));
+  }
+  // dynamika: ruční hmotnosti, síly na vazbách, zapnutí s nastavením (cad/motion-dynamic.ts)
+  if (mo?.dyn && (mo.mode === "dynamic" || Object.keys(mo.dyn.masses ?? {}).length || mo.dyn.loads?.length)) {
+    if (!mo.motors.length) c.comment(c.w("cMotion"));
+    for (const [id, kg] of Object.entries(mo.dyn.masses ?? {})) {
+      const k = idx.get(id);
+      if (k !== undefined) c.line(`${c.w("motion")} ${c.w("mass")} #${k} ${n(kg)}`);
+    }
+    for (const ld of mo.dyn.loads ?? []) {
+      const no = mateNo.get(ld.mate);
+      if (no !== undefined) c.line(`${c.w("motion")} ${c.w(ld.kind === "force" ? "force" : "torque")} ${c.w("mate")} ${no} ${n(ld.value)}`);
+    }
+    if (mo.mode === "dynamic") {
+      const g = mo.dyn.gravity;
+      const gw = g === null ? c.w("gOff") : g ? (g.map((v, k) => (Math.abs(v) > 0.999 ? `${v < 0 ? "-" : "+"}${"XYZ"[k]}` : "")).join("") || g.map(n).join(" ")) : "";
+      c.line(`${c.w("motion")} ${c.w("dynamics")} ${c.w("time")} ${n(mo.duration)} ${c.w("dtStep")} ${n(mo.dyn.dt)}${gw ? ` ${c.w("gravity")} ${gw}` : ""}${mo.dyn.damping ? ` ${c.w("damping")} ${n(mo.dyn.damping)}` : ""}${mo.dyn.restitution ? ` ${c.w("restitution")} ${n(mo.dyn.restitution)}` : ""}${mo.dyn.frames ? ` ${c.w("frames")} ${n(mo.dyn.frames)}` : ""}`);
+    }
   }
   emitDrawings(c, doc);
 }

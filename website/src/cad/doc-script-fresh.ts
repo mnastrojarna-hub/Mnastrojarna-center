@@ -12,10 +12,10 @@
  *
  * Bez prohlížeče: jádro se předává jako rozhraní (`cad.pickSigs`, `cad.drawing` v aplikaci; zkušební stroj v testech).
  */
-import { sheetUnsupported } from "./doc-script";
+import { docToScript, sheetUnsupported, type DocScript, type DocScriptOptions, type ScriptLang } from "./doc-script";
 import { sheetMeta, sheetOptions } from "./drawing-agent";
 import type { DrawingMeta, DrawingOptions } from "./drawing";
-import { tr } from "./i18n";
+import { getLang, tr } from "./i18n";
 import { getPath, pickFieldsOf, pickSigs, withPath } from "./pick-fields";
 import type { Sig } from "./refs";
 import type { CadDoc, Feature } from "./types";
@@ -177,4 +177,22 @@ export async function freshScriptDoc(doc: CadDoc, k: ScriptKernel): Promise<Fres
   out.notes = [...new Set(out.notes)];
   out.stats.ms = Date.now() - t0;
   return out;
+}
+
+/** volby převodu dokumentu na skript (`window.mncad.script(opts)`, `export skript`); `sigs: "keep"` = otisky výběru beze změny */
+export type ScriptOfDocOptions = { lang?: ScriptLang; names?: "auto" | "all"; sigs?: "drop" | "keep"; comments?: boolean };
+
+/**
+ * Dokument → textový skript s ověřením jádrem (aplikace i CLI – jádro hostitele): před převodem (doc-script.ts) jádro ověří
+ * čísla vybraných hran a ploch podle otisků a určí id smazaných vygenerovaných kót – skript pak nese platná čísla ve vlastních
+ * příkazech a po přečtení dá stejný model. `sigs: "keep"` jádro vynechá a otisky zapíše tak, jak jsou uložené. `fresh` = co
+ * ověřilo jádro (prvky s otisky výběru, přečíslované, nenalezené, listy se smazanými kótami).
+ */
+export async function scriptOfDocWith(k: ScriptKernel, doc: CadDoc, opts: ScriptOfDocOptions = {}): Promise<DocScript & { fresh?: FreshScriptDoc["stats"] }> {
+  const base: DocScriptOptions = { lang: opts.lang ?? getLang(), ...(opts.names ? { names: opts.names } : {}), ...(opts.comments !== undefined ? { comments: opts.comments } : {}) };
+  if (opts.sigs === "keep") return docToScript(doc, { ...base, sigs: "keep" });
+  const fresh = await freshScriptDoc(doc, k);
+  // ověřené výběry jsou v kopii dokumentu bez otisků; co jádro nenašlo, si otisky nechalo a zapíše se s nimi
+  const r = docToScript(fresh.doc, { ...base, sigs: "keep", deletedDims: fresh.deletedDims });
+  return { ...r, notes: [...r.notes, ...fresh.notes], fresh: fresh.stats };
 }

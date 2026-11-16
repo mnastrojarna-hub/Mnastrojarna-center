@@ -17,12 +17,12 @@ import { verdict } from "./bench-strict.mjs";
 import { runWatched, median, alive } from "./proc.mjs";
 import { restLineOffset, sheetSummary, pickFace } from "./synth-tool.mjs";
 
-const SCRIPT = fs.readFileSync(path.join(HARNESS, "synth-959.txt"), "utf8");
+const SCRIPT = fs.readFileSync(path.join(HARNESS, "synth-tool.txt"), "utf8");
 const EXP = JSON.parse(fs.readFileSync(path.join(HARNESS, "expected.json"), "utf8"));
 const lines = SCRIPT.trimEnd().split("\n");
 const count = (re) => lines.filter((l) => re.test(l)).length;
 
-test("synth-959.txt has the content of design 10.1", () => {
+test("synth-tool.txt has the content of design 10.1", () => {
   assert.ok(lines.length >= 380 && lines.length <= 420, `~400 lines, got ${lines.length}`);
   assert.equal(count(/^nový díl /) + count(/^normálie /), 19, "19 parts");
   assert.equal(count(/^normálie /), 5, "pillar, bush, pin, spring, washer from the library");
@@ -39,11 +39,14 @@ test("synth-959.txt has the content of design 10.1", () => {
   // A1 assembly sheet + 3 part sheets IN THE PART DOCUMENTS (a sheet of the assembly document always projects the assembly)
   assert.equal(count(/^výkres list nový /), 0);
   assert.equal(count(/^výkres model /), 0);
-  assert.equal(count(/^výkres A3( měřítko 1:2)? pohledy přední,horní,iso$/), 3);
+  // part sheets: layouts on which a strict run passes (synth-spec.mjs SHEET_OPTS / SHEET_VIEWS – B6 gate)
+  assert.equal(count(/^výkres A3 pohledy přední,horní,iso$/), 1, "die plate");
+  assert.equal(count(/^výkres A2 měřítko 1:2 pohledy přední,horní,iso$/), 1, "base plate: the 220 dimension needs A2 at 1:2");
+  assert.equal(count(/^výkres A3 pohledy přední,horní,spodní,iso$/), 1, "holder plate: counterbores from below need the bottom view");
   assert.equal(count(/^kótovat chytře$/), 3, "Chytré kóty on every part sheet");
   for (const k of spec.PART_SHEETS) {
     const i = lines.indexOf(`záložka "${spec.NAMES[k]}"`);
-    assert.ok(i > lines.indexOf("výkres A1 pohledy přední,horní,iso") && lines[i + 1].startsWith("výkres A3 ") && lines[i + 2] === "kótovat chytře", spec.NAMES[k]);
+    assert.ok(i > lines.indexOf("výkres A1 pohledy přední,horní,iso") && /^výkres A[23] /.test(lines[i + 1]) && lines[i + 2] === "kótovat chytře", spec.NAMES[k]);
   }
   assert.equal(lines[lines.indexOf("kolize") - 1], `záložka "${spec.NAMES.asm}"`, "kolize runs on the assembly tab");
   assert.equal(count(/^výkres řez /), 1);
@@ -60,7 +63,7 @@ test("synth-959.txt has the content of design 10.1", () => {
   assert.deepEqual([...new Set(lines.filter((l) => /^nový díl "Šroub /.test(l)).map((l) => /M\d+/.exec(l)[0]))].sort(), ["M10", "M8"]);
   assert.ok(!/\bM6\b/.test(SCRIPT));
   assert.ok(count(/^srazit .* hrany svislé$/) >= 8, "chamfered plates");
-  assert.equal(count(/^text "959-01-00" /), 1, "text plate");
+  assert.equal(count(/^text "900-01-00" /), 1, "text plate");
   // hole face numbers are literal (first kernel pass), no placeholder left
   assert.ok(!/\{F:/.test(SCRIPT));
   assert.equal(count(/^sestava vazba .* F\d+/), 15);
@@ -107,7 +110,7 @@ test("every screw ends inside the thread of its tapped hole (thread depth, not o
   assert.equal(EXP.threadPairs.reduce((a, t) => a + t.n, 0), EXP.clashes.thread);
 });
 
-test("verify report lines are lines of synth-959.txt", () => {
+test("verify report lines are lines of synth-tool.txt", () => {
   const off = restLineOffset(EXP.faces);
   // the CAD parser trims the text: parsed line j of the rest = file line off + j
   const parsed = spec.restScript(EXP.faces).trim().split("\n");
@@ -226,10 +229,11 @@ test("text area: exact Bézier integral = densely flattened outline", async () =
   assert.ok(flat > 20 && flat < 200);
 });
 
-test("every line parses with the CAD parser; only `kontrola` waits for package B5", async () => {
+test("every line parses with the CAD parser (`kontrola sestava` = package B5 check-compare)", async () => {
   const file = await bundle("parse-check.ts", { quiet: true });
-  const out = JSON.parse(execFileSync(process.execPath, [file, path.join(HARNESS, "synth-959.txt")], { encoding: "utf8" }));
-  assert.deepEqual(out.errors.map((e) => e.text), ["kontrola sestava"]);
+  const out = JSON.parse(execFileSync(process.execPath, [file, path.join(HARNESS, "synth-tool.txt")], { encoding: "utf8" }));
+  assert.deepEqual(out.errors.map((e) => e.text), []);
+  assert.equal(out.kinds.check, 1);
   assert.equal(out.kinds.insert, 70);
   assert.equal(out.kinds.library, 5);
   assert.equal(out.kinds.measure, 3);
@@ -275,7 +279,7 @@ test("bench-motion: script split and motion analysis", () => {
   const vf = motionVerdict({ col: { ms: 1000, calls: 41, ...f }, peakRssMB: 500, exp: {} });
   assert.deepEqual([vf.verdict.noDrift, vf.verdict.strokeOk, vf.verdict.onlyThreadClashes, vf.pass], [null, null, null, true]);
   assert.deepEqual(loadExpect(path.join(os.tmpdir(), "foreign.txt")), {});
-  assert.equal(loadExpect(path.join(HARNESS, "synth-959.txt")).components, 70);
+  assert.equal(loadExpect(path.join(HARNESS, "synth-tool.txt")).components, 70);
 });
 
 test("bench-motion verdict: extrapolation to 41 interference calls (time and memory), --no-collisions", () => {

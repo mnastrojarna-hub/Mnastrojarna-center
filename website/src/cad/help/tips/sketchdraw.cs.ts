@@ -28,7 +28,7 @@ export default {
   select: {
     what: "Výběr a úprava entit skici: klik vybere, tažení posouvá, úchyty mění tvar, Delete maže.",
     when: "Mezi kreslením – výběr pro vazbu, úpravu, kopii nebo smazání.",
-    steps: ["Klikněte na entitu, Shift nebo Ctrl přidá další.", "Rámeček zleva doprava = jen celé uvnitř, zprava doleva = i protnuté.", "Dvojklik na kótu změní hodnotu; pravé tlačítko nabídne další akce."],
+    steps: ["Klik vybere, Shift/Ctrl přidá; okno s Ctrl přidá, s Ctrl+Shift odebere.", "Okno zleva doprava = jen celé uvnitř, zprava doleva = i protnuté; Esc ho zruší.", "Dvojklik na kótu změní hodnotu; pravé tlačítko nabídne další akce."],
     note: "Plně určená (černá) geometrie se tažením nepohne – drží ji vazby a kóty.",
   },
   line: {
@@ -640,6 +640,7 @@ export default {
     what: "Přizpůsobí zobrazení tak, aby byl vidět celý list.",
     when: "Po přiblížení detailu, po změně formátu listu, když se list ztratí z okna.",
     steps: ["Klikněte na Celý list."],
+    note: "List posunete prostředním nebo pravým tlačítkem (levým mimo papír); levé tažení na listu vybírá poznámky a kóty oknem.",
   },
   "drawing-ws/bomCsv": {
     what: "Uloží kusovník sestavy jako tabulku CSV: pozice, název, číslo, ks, materiál, hmotnost.",

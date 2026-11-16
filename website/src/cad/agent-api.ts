@@ -35,8 +35,8 @@ export type ApiCmd =
   | { kind: "fit" }
   /** barva ploch: čísla (0…) nebo pravidlo jako u skořepiny; `color` null = výchozí barva tělesa */
   | { kind: "faceColor"; faces: number[]; rule: string[]; color: string | null }
-  /** akce rozšíření (id z registru) nebo „sketch.dxf“ (export skici); prázdné id = seznam akcí */
-  | { kind: "action"; id: string }
+  /** akce rozšíření (id z registru) nebo „sketch.dxf“ (export skici); prázdné id = seznam akcí; `arg` = údaj z textu příkazu (název pružiny…) */
+  | { kind: "action"; id: string; arg?: string }
   | { kind: "analyze"; what: "draft"; dir: Vec3; min: number; show: boolean }
   | { kind: "analyze"; what: "thickness"; limit: number; show: boolean }
   | { kind: "analyze"; what: "curvature"; show: boolean }
@@ -479,7 +479,7 @@ export function sectionReport(s: SectionState | null, bbox?: [Vec3, Vec3] | null
 }
 
 /* ───────────────────────── nastavení (window.mncad.setSettings) ───────────────────────── */
-export const AGENT_SETTINGS_KEYS = ["askWhereToSave", "meshQuality", "units", "decimals", "angleDecimals", "defaultMaterial", "author", "sheet", "projection", "tolerance", "confirmDelete", "autoExtrude", "autoConstraints", "snapGrid", "gridStep", "display", "ortho", "showGrid", "bg"] as const;
+export const AGENT_SETTINGS_KEYS = ["askWhereToSave", "meshQuality", "units", "decimals", "angleDecimals", "defaultMaterial", "author", "sheet", "projection", "tolerance", "confirmDelete", "autoExtrude", "autoConstraints", "snapGrid", "gridStep", "display", "ortho", "showGrid", "bg", "mouse", "leftDrag"] as const;
 export type AgentSettingsKey = (typeof AGENT_SETTINGS_KEYS)[number];
 export type AgentSettingsPatch = Partial<Pick<Settings, AgentSettingsKey>>;
 const ENUM_SETTINGS: Partial<Record<AgentSettingsKey, readonly (string | number)[]>> = {
@@ -491,6 +491,8 @@ const ENUM_SETTINGS: Partial<Record<AgentSettingsKey, readonly (string | number)
   projection: ["E", "A"],
   display: ["shadedEdges", "shaded", "wireframe", "hiddenLine", "xray"],
   bg: ["blue", "light", "dark", "white"],
+  mouse: ["zw3d", "solidworks", "simple"],
+  leftDrag: ["window", "orbit"],
 };
 const BOOL_SETTINGS = new Set<AgentSettingsKey>(["askWhereToSave", "confirmDelete", "autoExtrude", "autoConstraints", "snapGrid", "ortho", "showGrid"]);
 const TEXT_SETTINGS = new Set<AgentSettingsKey>(["author", "tolerance"]);
@@ -672,6 +674,20 @@ export type MncadApiExt = {
   screenshot: (opts?: ScreenshotOptions) => Promise<Screenshot>;
   /** porovnání s referenčním modelem (STEP / BREP / IGES / STL…) – text, CSV a seznam rozdílových oblastí */
   compare: (ref: { name: string; base64: string }, opts?: CompareApiOptions) => Promise<CompareApiResult>;
+  /**
+   * připojí soubor pro textové příkazy, které berou soubor podle názvu (`porovnat "ref.step"`, `otevřít "díl.mncad"`,
+   * `předloha "výkres.dwg"`, logo razítka) – jako tlačítko „Připojit soubor…“ v konzoli; stejný název nahradí předchozí.
+   * Jen paměť stránky (po obnovení připojit znovu). Dva zápisy: `attach({ name, base64 | text | data })` vrátí všechny
+   * připojené soubory; `attach("název", base64 | data URL | bajty, mime?)` vrátí připojený soubor.
+   */
+  attach: {
+    (file: { name: string; base64: string } | { name: string; text: string } | { name: string; data: Uint8Array | ArrayBuffer }): { name: string; bytes: number }[];
+    (name: string, data: string | Uint8Array, mime?: string): { name: string; bytes: number };
+  };
+  /** přiložené soubory (název, velikost) */
+  attachments: () => { name: string; bytes: number }[];
+  /** odebere přiložený soubor (bez názvu všechny); vrátí zbylé */
+  detach: (name?: string) => { name: string; bytes: number }[];
   /** sdílený odkaz (jako tlačítko Sdílet odkazem) */
   share: (opts?: ShareApiOptions) => Promise<ShareApiResult>;
   /** platné nastavení */
@@ -684,10 +700,14 @@ export type MncadApiExt = {
   select: (ids: string[], opts?: { additive?: boolean }) => number;
   /** zruší výběr (Esc) */
   clearSelection: () => void;
+  /**
+   * výběr oknem / křížením jako tažení myší ve 3D okně: obdélník v px 3D okna (jako `hints()`), `crossing` (výchozí
+   * podle směru: x1 < x0 = křížení), `mode` replace (výchozí) | add | remove; filtr výběru a volba „i skryté“ platí;
+   * vrátí nový výběr ve tvaru `selection()`
+   */
+  selectBox: (box: { x0: number; y0: number; x1: number; y1: number; crossing?: boolean; mode?: "replace" | "add" | "remove" }) => SelectionEntry[];
   /** spustí akci rozšíření (Rozvin → DXF, Tabulka ohybů, Kusovník řezů, Tloušťka stěn, export skici DXF…) a vrátí text a soubory */
   action: (id: string) => Promise<{ log: string; files: CapturedFile[] }>;
-  /** připojí soubor pro příkazy, které berou soubor podle názvu (předloha "výkres.dwg", logo razítka) – jako tlačítko konzole „Připojit soubor…“; data = base64, data URL nebo bajty */
-  attach: (name: string, data: string | Uint8Array, mime?: string) => { name: string; bytes: number };
   /** předloha: `předloha …` (bez textu = stav), `porovnat předloha …`, `kontrola kót …` → protokol a strukturovaný výsledek (výtah, porovnání se SVG, kontrola kót) */
   reference: (cmd?: string) => Promise<{ log: string; data: unknown }>;
 };

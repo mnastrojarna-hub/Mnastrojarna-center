@@ -1,0 +1,58 @@
+=== run 1 ===
+✓ nový díl „Listy“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Válec 1 (cylinder)
+
+Dokument: „Listy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 40 × 60 mm (X -20…20, Y -20…20, Z 0…60) · objem 75,40 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ – Ø40 × 60 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ výkres: A4, na výšku
+✓ razítko: název „Čep“, číslo „MN-001“, kreslil „AI“, revize „A“
+✓ nový list 2 „Detail“ (Chytré kóty) – další příkazy výkresu pracují s ním
+✓ výkres: A4, měřítko 2:1, pohledy přední · list 2 „Detail“
+✓ poznámka: Kalit 58 HRC · list 2 „Detail“
+Listy (2): 1 „List 1“ A4 · 2 „Detail“ A4 (aktivní)
+Výkres „List 1“ (list 1/2): list A4 na výšku · měřítko 1:1 · pohledy: přední, horní, levý, izometrie · kóty: Chytré kóty (řetězově)
+Listy (2): 1 „List 1“ A4 · 2 „Detail“ A4 (aktivní)
+Kóty a popisy (2, z toho vygenerovaných 2):
+  přední: Ø40 · 60
+Id (výkres upravit / smazat / značka na <id>): a1 Ø40 (přední) · a2 60 (přední)
+Duplicity: žádné
+Kontrola kót: všech 3 očekávaných rozměrů je na listu
+U razítka: nepředepsané tolerance — · hrany — · poznámka —
+Razítko: název Čep · číslo MN-001 · kreslil AI · revize A · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 210 × 297):
+  přední (x = X, y = Z): x −20…20, y 0…60 mm · 1:1 · na listu x 44…84, y 203…263
+  horní (x = X, y = Y): x −20…20, y −20…20 mm · 1:1 · na listu x 44…84, y 129…169
+  levý (x = −Y, y = Z): x −20…20, y 0…60 mm · 1:1 · na listu x 118…158, y 203…263
+
+Výkres „Detail“ (list 2/2): list A4 na šířku · měřítko 2:1 · pohledy: přední · kóty: Chytré kóty (řetězově)
+Kóty a popisy (2, z toho vygenerovaných 2):
+  přední: Ø40 · 60
+Id (výkres upravit / smazat / značka na <id>): a1 Ø40 (přední) · a2 60 (přední)
+Duplicity: žádné
+Kontrola kót: všech 3 očekávaných rozměrů je na listu
+U razítka: nepředepsané tolerance — · hrany — · poznámka Kalit 58 HRC
+Razítko: název Čep · číslo MN-001 · kreslil AI · revize A · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
+  přední (x = X, y = Z): x −20…20, y 0…60 mm · 2:1 · na listu x 34…114, y 66…186
+
+Dokument: „Listy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 40 × 60 mm (X -20…20, Y -20…20, Z 0…60) · objem 75,40 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ – Ø40 × 60 mm, new, podstava [0; 0; 0], osa Z

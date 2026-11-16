@@ -22,7 +22,7 @@ export default {
   filter: {
     what: "Legt fest, was ein Klick im 3D-Fenster wählt: alles, Fläche, Kante, Punkt, Körper, in der Baugruppe Komponente.",
     when: "Wenn ein Klick ein anderes Objekt trifft als gewünscht – z. B. Kante statt Fläche.",
-    steps: ["Menü Filter öffnen und die Objektart wählen.", "Im Modell klicken; Strg+Klick fügt ein weiteres Objekt hinzu oder entfernt es."],
+    steps: ["Menü Filter öffnen und die Objektart wählen.", "Im Modell klicken; Strg+Klick fügt ein weiteres Objekt hinzu oder entfernt es.", "Oder ein Rechteck ziehen: nach rechts = ganz innen, nach links = auch geschnitten."],
     note: "Derselbe Filter ist auch in der Statusleiste unten und im Rechtsklickmenü auf leerer Stelle.",
   },
   "menu:filter/all": {
@@ -67,6 +67,12 @@ export default {
     when: "Eine ganze Gruppe von Teilen auf einmal verschieben, öffnen oder auflösen.",
     steps: ["Unterbaugruppe wählen.", "Ein beliebiges Teil der Unterbaugruppe anklicken – die ganze wird gewählt."],
     note: "Nur in der Baugruppe; ein Teil außerhalb einer Unterbaugruppe wird allein gewählt.",
+  },
+  "menu:filter/through": {
+    what: "Die Fensterauswahl wählt auch Objekte, die von anderen Flächen oder Komponenten verdeckt sind (sonst nur sichtbare).",
+    when: "Hintere Kanten und Flächen eines Teils oder in der Baugruppe verdeckte Komponenten per Fenster wählen.",
+    steps: ["Fenster wählt auch Verdecktes einschalten.", "Mit der linken Taste ein Rechteck über das Modell ziehen; Strg fügt hinzu, Alt entfernt."],
+    note: "In den Stilen Drahtmodell und Transparent wählt das Fenster Verdecktes immer; ein Klick wählt weiterhin nur Sichtbares.",
   },
   mass: {
     what: "Zeigt Masse, Volumen, Oberfläche und Abmessungen des Teils; in der Baugruppe die Summe der Teile nach Werkstoff und den Schwerpunkt.",

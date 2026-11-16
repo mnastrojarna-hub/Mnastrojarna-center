@@ -85,6 +85,16 @@ const W = {
   none: ["nic", "none", "nichts"],
 };
 const is = (t: string, k: keyof typeof W) => W[k].includes(fold(t));
+/** zkratky AutoCADu: O / W / F = okno, K / C = křížení (platí jen se dvěma rohy za sebou – samotné písmeno může patřit další výzvě) */
+const SHORT: Record<string, "window" | "crossing"> = { o: "window", w: "window", f: "window", k: "crossing", c: "crossing" };
+
+/** slovo (i zkratka o / k / w / c / f, s podtržítkem volby `_window`) přepíná výzvu výběru na okno / křížení dvěma rohy */
+export function windowWord(t: string): "window" | "crossing" | null {
+  const f = fold(t.replace(/^_/, ""));
+  if (W.window.includes(f)) return "window";
+  if (W.crossing.includes(f)) return "crossing";
+  return SHORT[f] ?? null;
+}
 
 /** druh entity ze slova (line / úsečka / Linie…) */
 export function typeFromWord(t: string): string | null {
@@ -133,11 +143,11 @@ export function parseSelection(tokens: string[], i: number, c: SelParseCtx, star
     } else if (is(t, "sel")) {
       apply(c.session.sel.filter((id) => entityById(c.list as DraftEntity[], id)));
       i++;
-    } else if (is(t, "window") || is(t, "crossing")) {
-      const a = c.parsePoint(tokens[i + 1] ?? "");
-      const b = c.parsePoint(tokens[i + 2] ?? "");
+    } else if (is(t, "window") || is(t, "crossing") || (SHORT[fold(t)] && pointOr(c, tokens[i + 1]) && pointOr(c, tokens[i + 2]))) {
+      const a = pointOr(c, tokens[i + 1]);
+      const b = pointOr(c, tokens[i + 2]);
       if (!a || !b) throw new Error(tr("výběr {0}: zadejte dva rohy x,y x,y", t));
-      apply(windowSelect(c.model, c.idx, { x0: Math.min(a[0], b[0]), y0: Math.min(a[1], b[1]), x1: Math.max(a[0], b[0]), y1: Math.max(a[1], b[1]) }, is(t, "crossing")));
+      apply(windowSelect(c.model, c.idx, { x0: Math.min(a[0], b[0]), y0: Math.min(a[1], b[1]), x1: Math.max(a[0], b[0]), y1: Math.max(a[1], b[1]) }, windowWord(t) === "crossing"));
       i += 3;
     } else if (is(t, "layer")) {
       const name = tokens[i + 1];
@@ -169,6 +179,16 @@ export function parseSelection(tokens: string[], i: number, c: SelParseCtx, star
     } else break;
   }
   return { ids: [...set], next: i };
+}
+
+/** bod z tokenu, nebo null (i při chybném zápisu bodu) */
+function pointOr(c: SelParseCtx, t: string | undefined): Vec2 | null {
+  if (!t) return null;
+  try {
+    return c.parsePoint(t);
+  } catch {
+    return null;
+  }
 }
 
 /** slovo je začátkem zápisu výběru */

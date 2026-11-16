@@ -338,15 +338,16 @@ const near = (a, b, tol) => Math.abs(a - b) <= tol;
   ok(hl.length >= 7 && wrongSec.length === 0, `řez Z 10, izometrie: ${hl.length} popisků, klik zaokrouhlený na pixel vybere popsanou entitu (chybně ${wrongSec.join(' ')})`);
   await run('řez vyp');
   await p.waitForTimeout(400);
-  // kurzor: tažení začaté na modelu ukazuje „ruku“ (grabbing), ne „pointer“ z najetí
+  // kurzor: otáčení (pravé tlačítko, ZW3D) začaté na modelu ukazuje „ruku“ (grabbing), ne „pointer“ z najetí;
+  // levé tlačítko táhne výběr oknem (vlna 20) – kurzor kříž
   bb = await canvasBox();
   await p.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
   await p.waitForTimeout(250);
   const curHover = await p.locator('[data-soft-canvas]').evaluate((c) => getComputedStyle(c).cursor);
-  await p.mouse.down();
+  await p.mouse.down({ button: 'right' });
   for (let i = 1; i <= 6; i++) await p.mouse.move(bb.x + bb.width / 2 + i * 10, bb.y + bb.height / 2 + i * 3);
   const curDrag = await p.locator('[data-soft-canvas]').evaluate((c) => getComputedStyle(c).cursor);
-  await p.mouse.up();
+  await p.mouse.up({ button: 'right' });
   ok(curHover === 'pointer' && curDrag === 'grabbing', `kurzor: najetí na model ${curHover}, tažení z modelu ${curDrag}`);
   await view('iso');
 

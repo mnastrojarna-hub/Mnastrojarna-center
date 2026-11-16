@@ -1,8 +1,10 @@
 // E2E: CLI `mncad` a `mncad serve` (CAD-HEADLESS-NAVRH.md kap. 3.1, 3.2, 3.6) na SESTAVENÉM svazku v izolované složce
 // (jen mncad.mjs + replicad_single.wasm + fonts/ + package.json, žádné node_modules): verze, nápověda, chyby použití (3),
-// selftest se smoke testem příkladů (Worker/document/window nedefinované), běh s výstupy, výstupy při ✗ (run=fail),
+// selftest se smoke testem příkladů (Worker/document/window nedefinované), běh s výstupy, DXF ve svazku (předloha s porovnáním,
+// 2d import, vlastní výkres DXF zpět jako předloha), výstupy při ✗ (run=fail),
 // --no-output-on-error, přísný STOP (2), hlídač: časový limit uprostřed volání OCCT (5 do 1 s), pád (4), paměť (6),
 // SIGINT (130), relace --resume, únik cesty z --out, rozpočet a protocol-full.txt, --share (odkaz; php -S = vlastní úložiště),
+// WASM jádra od hostitele (locateFile: obsahový hash v názvu, MNCAD_WASM, chybějící soubor),
 // serve: 401/403/415/400/429/504, vstupy jen z body.files, relace
 // připnuté k vláknu a obnovené po nečinnosti.
 //
@@ -19,7 +21,7 @@ const crypto = require('crypto');
 const WEB = path.resolve(__dirname, '..');
 const WORK = path.resolve(process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), 'mncad-e2e-')));
 // opakovaný běh ve stejné složce: zbytky výstupů minulého běhu by změnily názvy souborů („Deska 1 (2).step“) – uklidit vlastní podsložky
-if (fs.existsSync(WORK)) for (const n of fs.readdirSync(WORK)) if (/^(o\d+|o-.+|iso|in)$/.test(n)) fs.rmSync(path.join(WORK, n), { recursive: true, force: true });
+if (fs.existsSync(WORK)) for (const n of fs.readdirSync(WORK)) if (/^(o\d+|ow\d+|o-.+|iso|in)$/.test(n)) fs.rmSync(path.join(WORK, n), { recursive: true, force: true });
 const NODE = process.env.MNCAD_NODE || process.execPath;
 fs.mkdirSync(WORK, { recursive: true });
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -79,7 +81,7 @@ fs.writeFileSync(path.join(IN, 'empty.txt'), '');
 function cli(args, o = {}) {
   return new Promise((resolve) => {
     const t0 = Date.now();
-    const p = spawn(NODE, ['--max-old-space-size=2048', BIN, ...args], { cwd: o.cwd || WORK, env: { ...process.env, MNCAD_LANG: '', ...(o.env || {}) } });
+    const p = spawn(NODE, ['--max-old-space-size=2048', o.bin || BIN, ...args], { cwd: o.cwd || WORK, env: { ...process.env, MNCAD_LANG: '', MNCAD_WASM: '', ...(o.env || {}) } });
     let out = '';
     let err = '';
     let killedAt = 0;
@@ -134,6 +136,7 @@ const stop = (s) => new Promise((res) => { s.p.removeAllListeners('exit'); s.p.o
 const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/proc/meminfo', 'utf8')); return m ? Math.round(Number(m[1]) / 1024) : 99999; };
 
 (async () => {
+  let j0;
   console.log(`# Node pro CLI: ${execFileSync(NODE, ['--version']).toString().trim()} · svazek ${DIST} · volná paměť ${mem()} MB`);
   // ── základní příkazy ──
   let r = await cli(['version', '--json']);
@@ -159,11 +162,17 @@ const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/pro
   // ── běh: chyby skriptu s řádky, gramatika, rozpočet ──
   r = await cli(['run', path.join(IN, 'bad.txt'), '--out', path.join(WORK, 'o1')]);
   const lines = r.out.trim().split('\n');
-  ok(r.code === 1 && /^MNCAD\/1 FAIL lines=3 ops=2 err=3/.test(lines[0]), `skript s ✗ → 1: ${lines[0]}`);
+  ok(r.code === 1 && /^MNCAD\/1 FAIL lines=3 ops=2 err=1/.test(lines[0]), `skript s ✗ → 1: ${lines[0]}`);
   ok(grammarOk(r.out) && bytes(r.out.trim()) <= 2048, `každý řádek projde gramatikou 4.2, ${bytes(r.out.trim())} B ≤ 2048`);
-  ok(/✗ L3 parse\.error/.test(r.out) && /✗ L1 host\.app-only/.test(r.out), 'chyba rozboru L3 parse.error, příkazy bez obsluhy L1/L2 host.app-only');
-  r = await cli(['run', '-', '--lang', 'en', '--out', path.join(WORK, 'o1')], { input: 'kvádr 1 1 1\n' });
-  ok(r.code === 1 && /✗ L1 host\.app-only the command works only in the browser app: feature:box/.test(r.out), 'stdin + --lang en: anglický text za kódem');
+  ok(/✗ L3 parse\.error/.test(r.out) && !/host\.app-only/.test(r.out) && /^D "A" part feat=1\/0\/0 /m.test(r.out), 'chyba rozboru L3 parse.error; příkazy L1/L2 provede engine (B2) – D "A" s 1 prvkem');
+  r = await cli(['run', '-', '--lang', 'en', '--out', path.join(WORK, 'o1')], { input: 'vložit "X"\n' });
+  ok(r.code === 1 && /✗ L1 op\.failed "[^"]+": command failed: insert: the open document is not an assembly/.test(r.out), 'stdin + --lang en: anglický text za kódem (✗ op.failed z obsluhy enginu)');
+  r = await cli(['run', '-', '--out', path.join(WORK, 'o1'), '--formats', 'none'], { input: 'nový díl Kostka\nkvádr 10 20 30\nzobraz iso\n' });
+  ok(r.code === 0 && /^MNCAD\/1 OK lines=3 ops=3 err=0 /.test(r.out) && /^D "Kostka" part feat=1\/0\/0 V=6cm3 /m.test(r.out), `engine v CLI: kvádr postaven (V=6 cm³), \`zobraz\` bez 3D okna jen ℹ ui.no-view: ${r.out.split('\n')[0]}`);
+  // sestava enginem v CLI: díly z běhu, vložit, vazba, kolize; D sestavy s objemem Σ z dílů postavených před souhrnem
+  r = await cli(['run', '-', '--out', path.join(WORK, 'o1'), '--formats', 'none', '--json'], { input: 'nový díl Deska\nkvádr 80 60 10\ndíra 10,5 skrz v 40 30\nnový díl Čep\nválec 10 30\nnová sestava S\nvložit "Deska" ukotvit\nvložit "Čep" v 100 0 0\nsestava vazba souosost "Čep" Ø10 "Deska" Ø10,5\nkolize\n' });
+  j0 = json(r);
+  ok(r.code === 0 && /^D "S" asm comp=2 parts=2 mates=1\/1 V\.sum=49\.49cm3 /m.test(j0?.protocol || ''), `sestava v CLI: D ${(j0?.protocol || '').split('\n').find((l) => l.startsWith('D "S"')) || '(chybí)'}`);
   r = await cli(['run', path.join(IN, 'empty.txt'), '--out', path.join(WORK, 'o1')]);
   ok(r.code === 1 && /parse\.error/.test(r.out), 'prázdný skript → ✗ parse.error, 1');
   // tvrdý rozpočet: 300 různých ✗ → stručný protokol ≤ 2048 B, přebytek do <out>/protocol-full.txt a jeden řádek značky
@@ -183,13 +192,29 @@ const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/pro
   ok(j?.files?.every((f) => f.path.startsWith(fs.realpathSync(o2) + path.sep) && /^[0-9a-f]{64}$/.test(f.sha256)), 'files[].path uvnitř --out, sha256');
   ok(fs.existsSync(path.join(o2, 'session.mncad-ws')), 'relace zapsána do <out>/session.mncad-ws');
 
+  // ── DXF ve svazku: předloha, 2d import a vlastní výkres DXF zpět (acad-ts hledá mapu DXF podle názvu třídy – svazek
+  //    s přejmenovanými třídami přečetl jen kostru: list 20×20, pohledy 0, „Nepřevedeno: VERTEX, SEQEND“; recenze int2, nález 1) ──
+  const FIX_DXF = path.join(WEB, 'src/cad/reference/__fixtures__/deska-predloha.dxf');
+  fs.copyFileSync(FIX_DXF, path.join(IN, 'deska-predloha.dxf'));
+  const ownDxf = (j?.files || []).find((f) => f.format === 'dxf');
+  if (ownDxf) fs.copyFileSync(ownDxf.path, path.join(IN, 'vlastni.dxf'));
+  r = await cli(['run', '-', '--files', IN, '--out', path.join(WORK, 'o-ref'), '--formats', 'none', '--full'], { input: 'nový díl Deska\nkvádr 120 80 20 střed\npředloha "deska-predloha.dxf"\nporovnat předloha pohled horní\nkontrola kót\n' });
+  ok(/^✓ L3 připojeno: předloha „deska-predloha\.dxf“ .*listy 1 \(1× A3\), pohledy 2, kóty 7/m.test(r.out) && /^[✓✗] L4 (?:msg\.error "Deska": )?porovnání pohled horní × předloha 1\.1 .*pokryta modelem \d+ %/m.test(r.out) && !/op\.failed|nejsou pohledy|VERTEX|SEQEND/.test(r.out), `předloha DXF v CLI: A3, 2 pohledy, 7 kót; porovnání proběhne (deska bez děr = rozdíl) – ${(r.out.match(/^✓ L3 .*$/m) || [''])[0].slice(0, 140)}`);
+  ok(/rozpor: pozice 1/.test(r.out) && /text kóty ≠ geometrie: 1/.test(r.out), 'předloha DXF v CLI: rozpory výtahu (pozice, text kóty) jako v prohlížeči');
+  r = await cli(['run', '-', '--out', path.join(WORK, 'o-ref'), '--formats', 'none'], { input: `2d nový\n2d import "deska.dxf" ${fs.readFileSync(FIX_DXF).toString('base64')}\n2d stav\n` });
+  ok(r.code === 0 && /jednotky mm/.test(r.out) && /Kóta 7/.test(r.out) && /\(420\.0000 × 297\.0000\)/.test(r.out), `2d import DXF v CLI: jednotky, kóty, rozsah A3 – ${(r.out.match(/Rozsah: .*$/m) || [''])[0]}`);
+  if (ownDxf) {
+    r = await cli(['run', '-', '--files', IN, '--out', path.join(WORK, 'o-ref'), '--formats', 'none', '--full'], { input: 'nový díl Deska\nkvádr 100 50 10\npředloha "vlastni.dxf"\n' });
+    ok(/^✓ L3 připojeno: předloha „vlastni\.dxf“ \(DXF R12 \(AC1009\).*pohledy [1-9]/m.test(r.out) && !/VERTEX|SEQEND/.test(r.out), `vlastní výkres DXF (R12 z --formats dxf) jako předloha v CLI: pohledy, bez „Nepřevedeno: VERTEX“ – ${(r.out.match(/^✓ L3 .*$/m) || [''])[0].slice(0, 140)}`);
+  } else ok(false, 'výstup --formats dxf chybí – vlastní DXF zpět nelze ověřit');
+
   // ── výstupy při ✗ (run=fail) a --no-output-on-error ──
   const o3 = path.join(WORK, 'o3');
   r = await cli(['run', path.join(IN, 'bad.txt'), '--open', path.join(IN, 'plate.mncad'), '--out', o3, '--formats', 'step']);
-  ok(r.code === 1 && /^F step "Deska 1\.step" \d+B run=fail$/m.test(r.out) && fs.existsSync(path.join(o3, 'Deska 1.step')), 'nepřísný běh s ✗ zapíše postavený dokument, F … run=fail');
+  ok(r.code === 1 && /^F step "A\.step" \d+B check=ok run=fail$/m.test(r.out) && fs.existsSync(path.join(o3, 'A.step')), 'nepřísný běh s ✗ zapíše postavený hlavní dokument (díl „A“ ze skriptu), F … check=ok run=fail (STEP znovu načten – B3)');
   const o4 = path.join(WORK, 'o4');
   r = await cli(['run', path.join(IN, 'bad.txt'), '--open', path.join(IN, 'plate.mncad'), '--out', o4, '--formats', 'step', '--no-output-on-error']);
-  ok(r.code === 1 && !/^F /m.test(r.out) && !fs.existsSync(path.join(o4, 'Deska 1.step')), '--no-output-on-error: nic se nezapíše');
+  ok(r.code === 1 && !/^F /m.test(r.out) && !fs.existsSync(path.join(o4, 'A.step')) && !fs.existsSync(path.join(o4, 'Deska 1.step')), '--no-output-on-error: nic se nezapíše');
   // ── přísný režim ──
   const o5 = path.join(WORK, 'o5');
   r = await cli(['run', path.join(IN, 'bad.txt'), '--open', path.join(IN, 'plate.mncad'), '--out', o5, '--strict']);
@@ -283,6 +308,24 @@ const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/pro
   ok(r.code === 130 && /✗ L- run\.interrupted/.test(r.out) && r.afterKill < 1000, `SIGINT během stavby → 130, ✗ run.interrupted (${r.afterKill} ms po signálu)`);
   r = await cli(['run', path.join(IN, 'empty.txt'), '--open', path.join(IN, 'heavy.mncad'), '--out', path.join(WORK, 'o8'), '--formats', 'none', '--progress'], { kill: { after: 'ready', delay: 800, signal: 'SIGTERM' } });
   ok(r.code === 130, `SIGTERM → 130 (${r.afterKill} ms)`);
+  // ── WASM jádra od hostitele (B1, kap. 3.6): hash v názvu vedle svazku, MNCAD_WASM jinde, chybějící soubor ──
+  const ISO_W = path.join(WORK, 'iso-wasm');
+  fs.rmSync(ISO_W, { recursive: true, force: true });
+  fs.mkdirSync(path.join(ISO_W, 'k'), { recursive: true });
+  for (const f of ['mncad.mjs', 'package.json']) fs.copyFileSync(path.join(DIST, f), path.join(ISO_W, f));
+  const runW = (out, env = {}) => cli(['run', path.join(IN, 'empty.txt'), '--open', path.join(IN, 'plate.mncad'), '--out', path.join(WORK, out), '--formats', 'step'], { env, bin: path.join(ISO_W, 'mncad.mjs') });
+  const hashed = path.join(ISO_W, 'replicad_single.0c88f94d.wasm');
+  fs.copyFileSync(path.join(DIST, 'replicad_single.wasm'), hashed);
+  r = await runW('ow1');
+  ok(r.code === 0 && /^F step "Deska 1\.step"/m.test(r.out), `WASM s obsahovým hashem v názvu vedle svazku → 0, STEP (${r.code} ${r.out.split('\n')[1] || ''})`);
+  const moved = path.join(ISO_W, 'k', 'jadro.wasm');
+  fs.renameSync(hashed, moved);
+  r = await runW('ow2', { MNCAD_WASM: moved });
+  ok(r.code === 0 && /^F step "Deska 1\.step"/m.test(r.out), `MNCAD_WASM jinde než vedle svazku → 0, STEP (${r.code})`);
+  r = await runW('ow3', { MNCAD_WASM: path.join(ISO_W, 'k', 'chybi.wasm') });
+  ok(r.code === 3 && /MNCAD_WASM: soubor jádra „.*chybi\.wasm“ neexistuje/.test(r.err) && !fs.existsSync(path.join(WORK, 'ow3')), `MNCAD_WASM na neexistující soubor → 3, bez výstupní složky (${r.code}: ${r.err.trim().slice(0, 80)})`);
+  r = await runW('ow4');
+  ok(r.code === 4 && /^✗ L- run\.crash .*replicad_single\.wasm patří vedle mncad\.mjs, jinou cestu zadejte v MNCAD_WASM/m.test(r.out), `bez WASM → 4, ✗ run.crash s nápovědou MNCAD_WASM (${r.out.split('\n')[1]?.slice(0, 120)})`);
   // selftest: stejné kódy zásahu jako run (nález 6)
   r = await cli(['selftest'], { kill: { after: 900, signal: 'SIGINT' } });
   ok(r.code === 130, `selftest + SIGINT → 130 (${r.code})`);

@@ -136,11 +136,11 @@ const setPos = async (p, text) => {
     s = await soft(p);
     ok(s.hash === iso.hash, 'A: Přizpůsobit vrátí model na celé plátno');
 
-    // otáčení tažením
+    // otáčení tažením pravým tlačítkem (schéma ZW3D; levé tlačítko táhne výběr oknem – vlna 20)
     await p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await p.mouse.down();
+    await p.mouse.down({ button: 'right' });
     await p.mouse.move(box.x + box.width / 2 + 120, box.y + box.height / 2 + 40, { steps: 6 });
-    await p.mouse.up();
+    await p.mouse.up({ button: 'right' });
     await p.waitForTimeout(450);
     s = await soft(p);
     ok(s.view === 'free' && s.hash !== iso.hash && s.n > 20000, 'A: tažení myší model otočí (volný pohled)');

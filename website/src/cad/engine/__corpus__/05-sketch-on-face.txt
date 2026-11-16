@@ -1,0 +1,8 @@
+# skica na ploše modelu (op sketchOn) pravidlem a číslem, odebrání
+nový díl Skica na ploše
+kvádr 80 50 20
+skica plocha horní: kružnice 20 v 40 25
+vysunout 5 odebrat
+skica plocha +X: obdélník 10 6 v 25 10
+vysunout 3
+stav

@@ -8,7 +8,6 @@
  (komponenta je B vazby – hodnoty s opačným znaménkem)	 (the component is B of the mate – values with opposite sign)
  (nepovinné)	 (optional)
  {0}: rozsah pohybu X {1} · Y {2} · Z {3} mm{4} · konec {5}	 {0}: range of motion X {1} · Y {2} · Z {3} mm{4} · end {5}
- ⚠ kolize: {0}	 ⚠ interference: {0}
  ⚠ nesplněné vazby: {0}	 ⚠ unsatisfied mates: {0}
  dokola	 in a loop
  stopa {0}	 trace {0}

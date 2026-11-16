@@ -3,6 +3,7 @@
  * vytáhnout/zatlačit plochu, odsadit plochu, odstranit plochu, zesílit plochy, žebro, pružina.
  * Běží ve workeru i v Node (testy).
  */
+import { springEnvelopeDims } from "./drawing-doc";
 import { subShapes } from "./fastbox";
 import { tr } from "./i18n";
 import * as r from "replicad";
@@ -310,12 +311,18 @@ function ribSide(body: Shape, sk: SketchF, segs: Seg[], plane: r.Plane, thicknes
 }
 
 /** Šroubovice s kruhovým průřezem (pružina, závitový drát). */
-export function springSolid(f: { radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis }): Shape {
+type SpringDef = { radius: number; pitch: number; turns: number; wire: number; position: Vec3; axis: Axis };
+const axisDir = (a: Axis): Vec3 => (a === "X" ? [1, 0, 0] : a === "Y" ? [0, 1, 0] : [0, 0, 1]);
+function checkSpring(f: SpringDef) {
   if (!(f.radius > 0 && f.pitch > 0 && f.turns > 0 && f.wire > 0)) throw new Error(tr("Rozměry pružiny musí být kladné."));
   if (f.wire >= f.pitch) throw new Error(tr("Průměr drátu musí být menší než stoupání (závity by se protínaly)."));
   if (f.wire / 2 >= f.radius) throw new Error(tr("Průměr drátu musí být menší než průměr pružiny."));
   if (f.turns > 200) throw new Error(tr("Pružina může mít nejvýš 200 závitů."));
-  const dir: Vec3 = f.axis === "X" ? [1, 0, 0] : f.axis === "Y" ? [0, 1, 0] : [0, 0, 1];
+}
+
+export function springSolid(f: SpringDef): Shape {
+  checkSpring(f);
+  const dir = axisDir(f.axis);
   const helix = r.makeHelix(f.pitch, f.pitch * f.turns, f.radius, f.position, dir);
   const start = vec(helix.startPoint);
   const tangent = norm(vec(helix.tangentAt(0)));
@@ -323,6 +330,19 @@ export function springSolid(f: { radius: number; pitch: number; turns: number; w
   const s = r.genericSweep(profile, helix, { frenet: true }, false) as Shape;
   if (!(r.measureVolume(s) > 0)) throw new Error(tr("Pružinu se nepodařilo vytvořit."));
   return s;
+}
+
+/**
+ * Obal pružiny pro výkres (zjednodušené zobrazení ISO 2162-1, drawing-doc.ts): trubka přes vnější a vnitřní průměr vinutí
+ * po celé volné délce – přesně tam, kam sahá skutečná šroubovice (`springEnvelopeDims`). Jen roviny a válce: skrytí hran
+ * (HLR) trvá zlomek sekundy místo minut u plochy tažené po šroubovici. Kontroluje stejné rozměry jako `springSolid`.
+ */
+export function springEnvelope(f: SpringDef): Shape {
+  checkSpring(f);
+  const dir = axisDir(f.axis);
+  const e = springEnvelopeDims(f);
+  const at = add(f.position, dir, e.from);
+  return r.makeCylinder(e.ro, e.len, at, dir).cut(r.makeCylinder(e.ri, e.len, at, dir)) as Shape;
 }
 
 /** Polohy topologických vrcholů tělesa (x, y, z po trojicích). */

@@ -20,7 +20,7 @@ describe("host – názvy souborů", () => {
   });
   it("dlouhý název: zkrácení po celých znacích, přípona zůstane, ≤ 120 znaků a ≤ 240 B UTF-8; osamělé náhradní znaky → _", () => {
     const lone = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
-    const long = "959-01-00 Nástroj – sestava střižného nástroje pro díl 959-01-00-12 s vodicími sloupky a pružinami (verze 3) final";
+    const long = "900-01-00 Nástroj – sestava střižného nástroje pro díl 900-01-00-12 s vodicími sloupky a pružinami (verze 3) final";
     const cases: [string, string][] = [
       ["a".repeat(119) + "😀.pdf", ".pdf"],
       ["x".repeat(200) + ".mncad", ".mncad"],
@@ -73,14 +73,17 @@ describe("host – soubory v paměti", () => {
     expect([...sink.files.keys()]).toEqual(["_Díl.step", "_Díl (2).step"]);
     await expect(sink.write({ name: "..", mime: "x", data, doc: "D", format: "step" })).rejects.toThrow(OutPathError);
   });
-  it("memoryFileSource čte jen klíče mapy, chybějící = seznam dostupných", async () => {
+  it("memoryFileSource čte jen klíče mapy (název i s cestou / jinou velikostí písmen = tentýž klíč), chybějící = seznam dostupných", async () => {
     const src = memoryFileSource({ "ref.step": new Uint8Array([1, 2]), "b.mncad": new Uint8Array([3]) });
     expect(src.list()).toEqual(["b.mncad", "ref.step"]);
     expect((await src.read("ref.step")).data).toEqual(new Uint8Array([1, 2]));
-    const err = await src.read("../ref.step").catch((e: unknown) => e);
+    // stejné pravidlo jako přiložené soubory v prohlížeči a CLI: bez cesty, bez ohledu na velikost písmen – jen klíče mapy
+    expect(await src.read("../ref.step")).toEqual({ name: "ref.step", data: new Uint8Array([1, 2]) });
+    expect((await src.read("REF.STEP")).name).toBe("ref.step");
+    const err = await src.read("../jiny.step").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(MissingInputError);
     expect((err as MissingInputError).available).toEqual(["b.mncad", "ref.step"]);
-    expect((err as Error).message).toBe("soubor „../ref.step“ není k dispozici – dostupné: b.mncad, ref.step");
+    expect((err as Error).message).toBe("soubor „../jiny.step“ není k dispozici – dostupné: b.mncad, ref.step");
   });
   it("sha256Hex = node:crypto", async () => {
     for (const s of ["", "abc", "ž".repeat(10000)]) {

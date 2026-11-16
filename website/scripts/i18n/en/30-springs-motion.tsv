@@ -1,0 +1,149 @@
+# Vlna 21 – balík motion: pružina mezi díly, dynamická pohybová studie, síť pružiny při přehrávání
+  návrat na doraz v t = {0} s	  back on the stop at t = {0} s
+  první dotyk v t = {0} s	  first contact at t = {0} s
+ · do děr {0} Ø{1}	 · into holes {0} Ø{1}
+ · nárazy {0}	 · impacts {0}
+ „{0}“ {1}: v klidu	 “{0}” {1}: at rest
+ (zámek k „{0}“)	 (locked to “{0}”)
+ ⚠ žádná pohyblivá komponenta – dynamika potřebuje díly vedené vazbami (Souosost, Drážka, Závěs, Mez vzdálenosti…)	 ⚠ no moving component – dynamics needs parts guided by mates (Concentric, Slot, Hinge, Limit distance…)
+ doraz „{0}“ ({1} {2} {3}): dotyk {4}{5}	 stop “{0}” ({1} {2} {3}): contact {4}{5}
+ Energie: na začátku {0} J, na konci {1} J (motor koná práci – bilance se nekontroluje)	 Energy: at start {0} J, at end {1} J (the motor does work – balance not checked)
+ Největší síla pružiny: „{0}“ {1} N v t = {2} s	 Maximum spring force: “{0}” {1} N at t = {2} s
+ tam a zpět	 there and back
+{0} těžiště {1} [mm]	{0} centre of mass {1} [mm]
+{0}: zadejte vazbu číslem nebo názvem – pohyb síla vazba 3 120	{0}: give the mate by number or name – motion force mate 3 120
+✓ {0} na vazbě „{1}“ odebrána	✓ {0} on mate “{1}” removed
+✓ hmotnost „{0}“: {1} kg	✓ mass “{0}”: {1} kg
+✓ hmotnost „{0}“: z objemu × hustoty	✓ mass “{0}”: from volume × density
+✓ moment {0} N·m na vazbě „{1}“ (kladný zvětšuje natočení)	✓ torque {0} N·m on mate “{1}” (positive increases the rotation)
+✓ nová pružina „{0}“ {1}× · d {2} · De {3} · L0 {4} · n {5} · R {6} N/mm · Ln {7} mm{8} – zámek ke komponentě „{9}“	✓ new spring “{0}” {1}× · d {2} · De {3} · L0 {4} · n {5} · R {6} N/mm · Ln {7} mm{8} – locked to component “{9}”
+✓ pohybová studie: kinematika (nastavení dynamiky zůstává pro „pohyb dynamika“)	✓ motion study: kinematics (dynamics settings are kept for “motion dynamics”)
+✓ pružina „{0}“ do děr vzoru {1} Ø{2} komponenty „{3}“: +{4} kopií{5}	✓ spring “{0}” into the pattern holes {1} Ø{2} of component “{3}”: +{4} copies{5}
+✓ síla {0} N na vazbě „{1}“ (kladná zvětšuje hodnotu vazby)	✓ force {0} N on mate “{1}” (positive increases the mate value)
+1/2 Dosedací plocha A – díra / kapsa, ve které pružina sedí, nebo rovinná plocha. Klikněte do modelu nebo vyberte ze seznamu.	1/2 Seat face A – hole / pocket the spring sits in, or a planar face. Click in the model or pick from the list.
+2/2 Protější plocha B jiného dílu (pružinu stlačuje).	2/2 Opposite face B of another part (it compresses the spring).
+A: „{0}“ {1} → B: „{2}“ {3} · vzdálenost dosedacích ploch {4} mm{5}	A: “{0}” {1} → B: “{2}” {3} · seat distance {4} mm{5}
+celkem závitů	total coils
+čas dynamické studie: 0 až 600 s	dynamic study time: 0 to 600 s
+činné závity	active coils
+činné závity n	active coils n
+délka nezatížené pružiny [mm]	length of the unloaded spring [mm]
+do děr vzoru: pružina „{0}“ nestojí v díře komponenty „{1}“ (osa pružiny neleží v ose žádné válcové plochy)	pattern holes: spring “{0}” does not stand in a hole of component “{1}” (the spring axis is not the axis of any cylindrical face)
+do děr vzoru: vyberte díru (válcovou plochu) na komponentě A nebo B	pattern holes: pick a hole (cylindrical face) on component A or B
+do děr vzoru: zadejte komponentu s dírami – {0}	pattern holes: give the component with the holes – {0}
+Do všech děr vzoru (stejný Ø a osa)	Into all holes of the pattern (same Ø and axis)
+Dosedací roviny musí být protilehlé a rovnoběžné.	The seat planes must face each other and be parallel.
+drát	wire
+Druh zatížení	Load type
+dynamická pohybová studie: síly pružin (s tlumičem), gravitace a zadané síly / momenty hýbou díly po stupních volnosti vazeb, motory pohánějí jako v kinematice; meze vazeb a Ln pružin jsou dorazy s odrazem; hmotnosti z objemu × hustoty (ručně přepsatelné); protokol s největší silou pružiny, dotyky a nárazy na dorazech a kontrolou energie, CSV s polohou / rychlostí / zrychlením, graf v panelu; window.mncad.motion({ mode: "dynamic" })	dynamic motion study: spring forces (with damper), gravity and applied forces / torques move parts along the degrees of freedom of the mates, motors drive as in kinematics; mate limits and spring Ln are stops with restitution; masses from volume × density (can be overridden); protocol with the maximum spring force, contacts and impacts at stops and an energy check, CSV with position / velocity / acceleration, chart in the panel; window.mncad.motion({ mode: "dynamic" })
+Dynamika	Dynamics
+Dynamika: {0} s · krok {1} ms · {2} kroků · gravitace {3} · tlumení {4} N·s/mm · odraz {5} · výpočet {6} s	Dynamics: {0} s · step {1} ms · {2} steps · gravity {3} · damping {4} N·s/mm · restitution {5} · computed in {6} s
+Dynamika: díly se hýbou silami pružin, gravitace a zadaných sil po stupních volnosti, které nechávají vazby. Meze vazeb a délka pružiny na doraz jsou dorazy. Motor není nutný.	Dynamics: parts move under spring forces, gravity and applied forces along the degrees of freedom left by the mates. Mate limits and the spring solid length are stops. No motor needed.
+Dynamika: krok {0} s · gravitace {1} · tlumení {2} N·s/mm · odraz {3}{4}	Dynamics: step {0} s · gravity {1} · damping {2} N·s/mm · restitution {3}{4}
+gravitace	gravity
+Gravitace	Gravity
+gravitace: směr -Z / +Y / X…, tři čísla, nebo vyp	gravity: direction -Z / +Y / X…, three numbers, or off
+hmotnost	mass
+hmotnost „{0}“ {1} kg	mass “{0}” {1} kg
+Hmotnost {0} [kg]	Mass {0} [kg]
+hmotnost musí být kladná [kg]	mass must be positive [kg]
+hmotnost: zadejte komponentu a kg – pohyb hmotnost "Stírací deska" 2,4	mass: give the component and kg – motion mass "Stripper plate" 2.4
+Hmotnosti	Masses
+Hodnota zatížení	Load value
+integrační krok: 0,000001 až 0,05 s (např. krok 0,0005)	integration step: 0.000001 to 0.05 s (e.g. step 0.0005)
+Kinematika	Kinematics
+klik na díru nebo plochu A a protější plochu B – tabulka pružiny, do všech děr vzoru	click a hole or face A and the opposite face B – spring table, into all holes of a pattern
+Krok integrace	Integration step
+Měkká	Soft
+moment	torque
+moment [N·m]	torque [N·m]
+moment N·m	torque N·m
+moment vazba {0}: {1} N·m	torque mate {0}: {1} N·m
+Načítám plochy…	Loading faces…
+Náhled pružiny	Spring preview
+neznámá – náhradní 1 g	unknown – substitute 1 g
+nová pružina z tabulky	new spring from the table
+nová pružina: dosedací roviny {0} a {1} nejsou protilehlé rovnoběžné plochy	new spring: the seat planes {0} and {1} are not opposite parallel faces
+nová pružina: osa díry {0} není kolmá na dosedací rovinu – vyberte protější rovinnou plochu	new spring: hole axis {0} is not perpendicular to the seat plane – pick the opposite planar face
+nová pružina: rozměry musí být kladné a De větší než d – {0}	new spring: dimensions must be positive and De larger than d – {0}
+nová pružina: zadejte aspoň jednu plochu (díru A nebo dosedací rovinu) – {0}	new spring: give at least one face (hole A or seat plane) – {0}
+nová pružina: zadejte dosedací komponenty – {0}	new spring: give the seat components – {0}
+Odebrat sílu	Remove force
+odraz	restitution
+Odraz na dorazech	Restitution at stops
+odraz: součinitel 0 (bez odrazu) až 1 (pružný odraz)	restitution: coefficient 0 (no bounce) to 1 (elastic bounce)
+Osa díry není kolmá na dosedací rovinu – vyberte protější rovinnou plochu.	The hole axis is not perpendicular to the seat plane – pick the opposite planar face.
+Plocha A: {0} – teď klikněte na protější plochu jiného dílu (B).	Face A: {0} – now click the opposite face of another part (B).
+Plocha B musí být na jiném dílu než plocha A.	Face B must be on a different part than face A.
+Plocha B neleží ve směru pružiny od plochy A – vyberte protější plochu.	Face B is not in the spring direction from face A – pick the opposite face.
+Plochy nejde spojit pružinou.	These faces cannot be joined by a spring.
+počet činných závitů (+ 2 přiložené)	number of active coils (+ 2 closed)
+pohyb dynamika [čas T] [krok dt] [gravitace -Z|vyp] [tlumení c] [odraz e] · pohyb kinematika · pohyb hmotnost "<komponenta>" <kg>|auto · pohyb síla vazba <N> <N>|smazat · pohyb moment vazba <N> <N·m>|smazat	motion dynamics [time T] [step dt] [gravity -Z|off] [damping c] [restitution e] · motion kinematics · motion mass "<component>" <kg>|auto · motion force mate <N> <N>|delete · motion torque mate <N> <N·m>|delete
+pohyb dynamika: neznámá volba „{0}“ – {1}	motion dynamics: unknown option “{0}” – {1}
+poměr vinutí D/d = {0} je mimo doporučených 4 až 20	spring index D/d = {0} is outside the recommended 4 to 20
+prázdné = spočtená tuhost	empty = computed rate
+Prázdné = z objemu × hustoty materiálu dílu (šedě).	Empty = from the volume × density of the part material (grey).
+průměr drátu [mm]	wire diameter [mm]
+pružina „{0}“ na doraz Ln {1} mm	spring “{0}” at solid length Ln {1} mm
+Pružina dosedá na rovinnou plochu nebo do díry (válcová plocha) – klikněte na jinou plochu.	A spring seats on a planar face or in a hole (cylindrical face) – click another face.
+Pružina mezi díly	Spring between parts
+Pružina mezi díly: klikněte na dosedací plochu A – rovinu, nebo díru / kapsu, ve které pružina sedí · Esc zruší	Spring between parts: click seat face A – a plane, or the hole / pocket the spring sits in · Esc cancels
+Pružina mezi díly: klikněte na protější plochu B jiného dílu (pružinu stlačuje) · Esc zruší	Spring between parts: click the opposite face B of another part (it compresses the spring) · Esc cancels
+Pružina mezi díly: vyplňte tabulku a Vytvořit · Esc zruší	Spring between parts: fill in the table and Create · Esc cancels
+pružina nedosedá – L0 {0} mm není větší než vzdálenost ploch {1} mm	the spring does not seat – L0 {0} mm is not larger than the face distance {1} mm
+rezerva do dorazu	reserve to solid
+Rozměry jako	Dimensions as
+Sestava nemá vazby.	The assembly has no mates.
+Sestava potřebuje aspoň dva díly.	The assembly needs at least two parts.
+sestava pružina nová [d 2] [De 20] [L0 35] [n 6] [tuhost c] [blok Ln] mezi "Horní deska" F12 "Stírací deska" F3 [v x y z] [do děr vzoru] [název "P"]	assembly spring new [d 2] [De 20] [L0 35] [n 6] [rate c] [solid Ln] between "Upper plate" F12 "Stripper plate" F3 [at x y z] [all holes] [name "P"]
+síla	force
+síla [N]	force [N]
+síla N	force N
+síla na vazbě: vazba v sestavě není (smazaná nebo potlačená)	force on mate: the mate is not in the assembly (deleted or suppressed)
+Síla pružin	Spring force
+síla při montáži (L = {0} mm)	force at installation (L = {0} mm)
+síla vazba {0}: {1} N	force mate {0}: {1} N
+Síly na vazbách	Forces on mates
+Snímků záznamu	Recorded frames
+snímky	frames
+snímky: 10 až 5000	frames: 10 to 5000
+střední průměr	mean diameter
+Tam a zpět (sinusově, jako lis)	There and back (sinusoidal, like a press)
+Tlačná pružina	Compression spring
+tlumení	damping
+tlumení musí být ≥ 0 [N·s/mm]	damping must be ≥ 0 [N·s/mm]
+Tlumení pružin	Spring damping
+Tuhá	Stiff
+tuhost (EN 13906-1)	rate (EN 13906-1)
+tuhost (ručně)	rate (manual)
+Vazba síly	Force mate
+vnější průměr De	outer diameter De
+vnější průměr De musí být větší než drát d	outer diameter De must be larger than the wire d
+vnější průměr pružiny [mm] – v díře s vůlí	outer spring diameter [mm] – with clearance in the hole
+Vytvářím…	Creating…
+Vytvořit	Create
+vzdálenost dosedacích ploch {0} mm je pod délkou na doraz Ln {1} mm – zmenšete n nebo d	seat distance {0} mm is below the solid length Ln {1} mm – reduce n or d
+z objemu	from volume
+z objemu × hustoty	from volume × density
+zadaná	given
+Zámek pružiny	Spring lock
+Zrychlení	Acceleration
+# recenze vlny 21: kontrola pružin EN 13906-1, nápověda, dynamika (tuhost z geometrie, energie, a max)
+ „{0}“ {1}: zdvih {2} {3} mm · v max {4} m/s · a max {5} m/s²{6}	 “{0}” {1}: stroke {2} {3} mm · v max {4} m/s · a max {5} m/s²{6}
+ (bez rázů na dorazech)	 (without impacts on stops)
+ ⚠ pružina „{0}“ nemá tuhost a díl není drátová pružina – v dynamice nepůsobí silou; zadejte tuhost (sestava pružina "{0}" … tuhost c)	 ⚠ spring “{0}” has no rate and the part is not a wire spring – it applies no force in dynamics; enter a rate (assembly spring "{0}" … rate c)
+ Kontrola energie: odchylka {0} % z {1} J (největší pohybová energie nebo práce sil; mimo kroky s dotykem; tlumení {2} J, dotyky {3} J, zadané síly {4} J)	 Energy check: deviation {0} % of {1} J (largest kinetic energy or work of forces; outside contact steps; damping {2} J, contacts {3} J, applied forces {4} J)
+ pružina „{0}“: tuhost {1} N/mm z geometrie dílu (EN 13906-1 R = G·d⁴ / (8·D³·n)) – v definici pružiny chybí	 spring “{0}”: rate {1} N/mm from the part geometry (EN 13906-1 R = G·d⁴ / (8·D³·n)) – missing in the spring definition
+– nová pružina z tabulky: osa z díry / roviny, L0 = 1,15 × vzdálenost ploch; materiál SH | DH | VDSiCr | 1.4310	– new spring from the table: axis from the hole / plane, L0 = 1.15 × seat distance; material SH | DH | VDSiCr | 1.4310
+nejmenší pracovní délka (mezery Sa {0} mm)	minimum working length (gaps Sa {0} mm)
+nevybočí	no buckling
+nová pružina: {0}	new spring: {0}
+Pohyb: pohyb motor … (kinematika) · pohyb dynamika čas 0,5 krok 0,0005 [gravitace -Z] [tlumení 0,05] [odraz 0,2] – síly pružin hýbou díly; pružina bez tuhosti dostane tuhost z geometrie dílu.	Motion: motion motor … (kinematics) · motion dynamics time 0.5 step 0.0005 [gravity -Z] [damping 0.05] [restitution 0.2] – spring forces move the parts; a spring without a rate gets the rate from the part geometry.
+pracovní délka {0} mm je pod nejmenší přípustnou Ln + Sa = {1} mm (Ln {2} + mezery Sa {3}) – závity se dotýkají	working length {0} mm is below the minimum permissible Ln + Sa = {1} mm (Ln {2} + gaps Sa {3}) – the coils touch
+pružina se může vybočit – zdvih {0} mm je větší než kritický sK = {1} mm (L0/D = {2}), není-li vedená v díře nebo na trnu	the spring may buckle – stroke {0} mm is larger than the critical sK = {1} mm (L0/D = {2}) unless it is guided in a hole or on a mandrel
+pružina se vybočí – zdvih {0} mm je větší než kritický sK = {1} mm (L0/D = {2}); použijte trn nebo vedení v díře	the spring will buckle – stroke {0} mm is larger than the critical sK = {1} mm (L0/D = {2}); use a mandrel or guide it in a hole
+Pružina v sestavě – příkazy (GUI: Sestava › Pružina mezi díly):	Spring in an assembly – commands (GUI: Assembly › Spring between parts):
+sestava pružina "P" mezi "A" "B" do děr vzoru – kopie pružiny do ostatních děr vzoru komponenty A	assembly spring "P" between "A" "B" all holes – copies the spring into the other pattern holes of component A
+vedená v díře	guided in a hole
+volná délka L0 {0} mm není větší než délka na doraz Ln {1} mm (nt {2} × d {3}) – zvětšete L0 nebo zmenšete n či d	free length L0 {0} mm is not larger than the solid length Ln {1} mm (nt {2} × d {3}) – increase L0 or reduce n or d
+vzpěr – kritický zdvih	buckling – critical stroke

@@ -1,0 +1,11 @@
+# proměnné a konfigurace (op edit), vazby parametrů výrazem
+nový díl Parametry
+proměnná L = 80
+proměnná H = L / 4 poznámka "výška"
+kvádr 80 40 20
+upravit "Kvádr 1" x==L z==H
+konfigurace "Krátká" L=50
+konfigurace aktivní "Krátká"
+proměnné
+konfigurace
+stav

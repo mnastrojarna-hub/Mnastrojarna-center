@@ -55,14 +55,54 @@ export function fontsDir(entry: string, env: Record<string, string | undefined>)
   return cands.find((d) => d && ok(d)) ?? null;
 }
 
-/** společné `workerData` vlákna běhu */
+/** název WASM jádra v distribuci; vedle svazku smí mít i obsahový hash v názvu (`replicad_single.<hash>.wasm`) */
+export const WASM_NAME = "replicad_single.wasm";
+const HASHED_WASM = /^replicad_single\.[\w-]+\.wasm$/;
+const isFile = (p: string) => {
+  try {
+    return fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * WASM jádra pro vlákno běhu (`JobInit.wasm` → `locateFile`, CAD-HEADLESS-NAVRH.md kap. 3.6): `MNCAD_WASM` (soubor; když
+ * neexistuje, je to chyba použití), `replicad_single.wasm` vedle svazku, jinak `replicad_single.<hash>.wasm` vedle svazku
+ * (nejnovější). `undefined` = nic nenalezeno: emscripten hledá sám vedle svazku a vlákno při chybě napíše, kam soubor patří.
+ */
+export function wasmFile(entry: string, env: Record<string, string | undefined>, cwd: string): string | undefined {
+  const own = env.MNCAD_WASM?.trim();
+  if (own) {
+    const p = path.resolve(cwd, own);
+    if (!isFile(p)) throw new UsageError(tr("MNCAD_WASM: soubor jádra „{0}“ neexistuje", p));
+    return p;
+  }
+  const dir = entryDir(entry);
+  if (isFile(path.join(dir, WASM_NAME))) return path.join(dir, WASM_NAME);
+  let names: string[] = [];
+  try {
+    names = fs.readdirSync(dir).filter((f) => HASHED_WASM.test(f));
+  } catch {
+    /* složku svazku nejde číst – hledá emscripten */
+  }
+  const mtime = (p: string) => fs.statSync(p).mtimeMs;
+  return names
+    .map((f) => path.join(dir, f))
+    .filter(isFile)
+    .sort((a, b) => mtime(b) - mtime(a) || a.localeCompare(b))[0];
+}
+
+/** společné `workerData` vlákna běhu; špatná cesta v `MNCAD_WASM` = `UsageError` (kód 3) */
 export function jobInit(io: Io, lang: JobInit["lang"], shareStore?: string): Omit<JobInit, "mncad"> {
   const fault = io.env.MNCAD_TEST_FAULT;
+  const wasm = wasmFile(io.entry, io.env, io.cwd);
   return {
     lang,
     version: cliVersion(io.entry),
     origin: io.env.MNCAD_ORIGIN || undefined,
     fontsDir: fontsDir(io.entry, io.env),
+    ...(wasm ? { wasm } : {}),
     ...(shareStore !== undefined ? { shareStore } : {}),
     ...(fault ? { fault } : {}),
   };
@@ -107,6 +147,7 @@ export function finishOutput(o: Outcome & { report: RunReport }, a: Pick<RunArgs
 }
 
 async function cmdRun(a: RunArgs, io: Io): Promise<number> {
+  const init = jobInit(io, a.lang, a.shareStore); // dřív než výstupní složka: špatné MNCAD_WASM = kód 3 bez zápisu
   let script: string;
   let scriptDir: string | null = null;
   try {
@@ -172,7 +213,7 @@ async function cmdRun(a: RunArgs, io: Io): Promise<number> {
     const s = fmtEvent(e);
     if (s) io.stderr(s);
   };
-  const thread = new JobThread({ entry: io.entry, init: jobInit(io, a.lang, a.shareStore), maxMemMB: a.maxMem, rssGuard: true, onEvent, ...(a.progress ? { onConsole: (t: string) => io.stderr(t.replace(/\n$/, "")) } : {}) });
+  const thread = new JobThread({ entry: io.entry, init, maxMemMB: a.maxMem, rssGuard: true, onEvent, ...(a.progress ? { onConsole: (t: string) => io.stderr(t.replace(/\n$/, "")) } : {}) });
   if (a.progress)
     ticker = setInterval(() => {
       if (inFlight && Date.now() - inFlight.at >= 5000) io.stderr(`${inFlight.line === null ? "L-" : `L${inFlight.line}`} ${inFlight.op} … ${Math.round((Date.now() - inFlight.at) / 1000)} s`);
@@ -192,11 +233,12 @@ async function cmdRun(a: RunArgs, io: Io): Promise<number> {
     return 3;
   }
   io.stdout(finishOutput(outcome, a, sink, io, outcome.kind === "done" ? outcome.session : undefined));
-  return exitCodeFor(outcome, a.strict);
+  return exitCodeFor(outcome);
 }
 
 async function cmdSelftest(a: SelftestArgs, io: Io): Promise<number> {
-  const thread = new JobThread({ entry: io.entry, init: jobInit(io, a.lang), maxMemMB: a.maxMem, rssGuard: true });
+  const init = jobInit(io, a.lang);
+  const thread = new JobThread({ entry: io.entry, init, maxMemMB: a.maxMem, rssGuard: true });
   const off = io.onSignal?.(() => void thread.interrupt());
   try {
     const ready = await thread.ready;

@@ -1,7 +1,6 @@
 # Deutsche Übersetzungen der CAD-Oberfläche – Schlüssel = tschechischer Quelltext (Tab) Übersetzung. Erzeugt src/cad/i18n/de.ts (scripts/cad-i18n-build.mjs).
 # agent-console
 (run, getDocument, setDocument, status, guide). Úplný návod a schéma:	(run, getDocument, setDocument, status, guide). Vollständige Anleitung und Schema:
-. Nic z toho neodesílá data mimo tento prohlížeč.	. Nichts davon sendet Daten aus diesem Browser hinaus.
 Ctrl+Shift+K otevře konzoli kdykoli · Ctrl+Enter provede · příkazy se připojují k otevřenému dokumentu	Strg+Umschalt+K öffnet die Konsole jederzeit · Strg+Enter führt aus · Befehle werden an das geöffnete Dokument angehängt
 Dokument (JSON) zkopírován.	Dokument (JSON) kopiert.
 Kopírovat dokument (JSON)	Dokument kopieren (JSON)
@@ -102,7 +101,6 @@ ks ·	Stk. ·
 Šířka rozpěrek	Breite der Zwischenleisten
 # cad-app
  (úroveň {0})	 (Ebene {0})
-! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})	! Zeile {0}: an [{1}; {2}] gibt es keine Körperoberfläche – die Bohrung beginnt am Hüllquader des Körpers ({3})
 .mncad díl nebo STEP/IGES/STL… jako komponenta	.mncad-Teil oder STEP/IGES/STL… als Komponente
 103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“.	103 Familien: Schrauben, Lager, Zahnräder, Profile, Formnormalien… Einfach „M8x30“ eingeben.
 24 kapitol, postupy krok za krokem, FAQ – otevře se v nové záložce	24 Kapitel, Schritt-für-Schritt-Anleitungen, FAQ – öffnet sich in einem neuen Tab
@@ -544,7 +542,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 Šablonovat	Ausformen
 Šablonování potřebuje alespoň dvě skici v různých rovinách.	Ausformung braucht mindestens zwei Skizzen in verschiedenen Ebenen.
 Šroub ISO 4762	Schraube ISO 4762
-šroubovice s průřezem	Schraubenlinie mit Querschnitt
 šrouby, ložiska, ozubená kola, profily… – stačí napsat	Schrauben, Lager, Zahnräder, Profile… – einfach eingeben
 šrouby, ložiska, ozubená kola, profily… – stačí napsat „M8x30“	Schrauben, Lager, Zahnräder, Profile… – einfach „M8x30“ eingeben
 štítky na plochách, hranách a vrcholech: klik na štítek = klik na entitu; pro AI agenty, automatizaci a dotyk	Beschriftungen auf Flächen, Kanten und Eckpunkten: Klick auf die Beschriftung = Klick auf das Element; für KI-Agenten, Automatisierung und Touch
@@ -558,7 +555,6 @@ zeptá se, kam a pod jakým názvem; další Ctrl+S ukládá do téhož souboru	
 → {0} (shell) – otevřeno ploch: {1} – výsledek po výpočtu níže	→ {0} (shell) – geöffnete Flächen: {1} – Ergebnis nach der Berechnung unten
 → {0} ({1}) přidán – výsledek po výpočtu níže	→ {0} ({1}) hinzugefügt – Ergebnis nach der Berechnung unten
 → {0} ({1}) – {2} hran podle pravidla „{3}“ – výsledek po výpočtu níže	→ {0} ({1}) – {2} Kanten nach Regel „{3}“ – Ergebnis nach der Berechnung unten
-⚠ kolize: {0} – {1}	⚠ Kollisionen: {0} – {1}
 ✓ dokument „{0}“ ({1} prvků) – otevře se v nové záložce	✓ Dokument „{0}“ ({1} Features) – öffnet sich in einem neuen Tab
 ✓ kolize: žádné ({0} komponent)	✓ Kollisionen: keine ({0} Komponenten)
 ✓ materiál = {0}	✓ Werkstoff = {0}

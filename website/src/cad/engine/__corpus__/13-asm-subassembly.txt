@@ -1,0 +1,12 @@
+# pole komponent, podsestava a její rozpuštění (op asm)
+nový díl Kostka
+kvádr 20 20 20
+#--- run
+nová sestava Skupiny
+vložit "Kostka" ukotvit
+#--- run
+sestava pole "Kostka" 3 rozteč 30 směr X
+sestava podsestava "Kostka (2)" "Kostka (3)" jako "Dvojice"
+sestava
+sestava rozpustit "Dvojice"
+sestava

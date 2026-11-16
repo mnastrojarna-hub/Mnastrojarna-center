@@ -6,6 +6,8 @@
 import { useEffect, useSyncExternalStore } from "react";
 import type { SoftViewName } from "@/cad/soft-render";
 import type { Vec3 } from "@/cad/types";
+import type { BoxRect } from "@/cad/box-select";
+import type { SelItem } from "./selection";
 import type { Hint, ViewportProps } from "./viewport";
 
 export type SoftViewHandle = {
@@ -20,6 +22,8 @@ export type SoftViewHandle = {
   /** popisky entit (F1 / E2 / V3) a „klik“ na popisek – stejné jako u 3D okna (výběr bez trefování) */
   hintList?: () => Omit<Hint, "p">[];
   clickHint?: (id: string, additive?: boolean) => boolean;
+  /** výběr oknem / křížením (CSS px náhledu) podle filtru – bez změny výběru; null = v tomto režimu nejde */
+  boxPick?: (rect: BoxRect, crossing: boolean) => SelItem[] | null;
 };
 
 /** Aktivní softwarový náhled hlavního 3D okna; null = kreslí WebGL. */
@@ -56,7 +60,7 @@ export function useSoftViewActive(): boolean {
  */
 export type SoftPickProps = Pick<
   ViewportProps,
-  "pickMode" | "selFilter" | "snapPoints" | "selection" | "selectedEdges" | "selectedFaces" | "onPickEdge" | "onPickFace" | "onPick" | "onContext" | "onCursor" | "measure" | "vertices" | "hints"
+  "pickMode" | "selFilter" | "snapPoints" | "selection" | "selectedEdges" | "selectedFaces" | "onPickEdge" | "onPickFace" | "onPick" | "onContext" | "onCursor" | "measure" | "vertices" | "hints" | "onPickMany" | "mouse" | "leftDrag" | "boxResolve"
 >;
 
 let pickProps: SoftPickProps | null = null;

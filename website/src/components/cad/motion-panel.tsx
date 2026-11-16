@@ -13,7 +13,9 @@ import { writeZip } from "@/cad/formats/zip";
 import { tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "@/cad/mates-kin";
-import { defaultStudy, motionCsv, motionSummary, type MotionResult } from "@/cad/motion";
+import { defaultStudy, type MotionResult } from "@/cad/motion";
+import { studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
+import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
 import type { SpringStep } from "@/cad/asm-spring";
 import { uid, type CadDoc, type MotionMotor, type MotionStudy, type Placement, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -98,7 +100,7 @@ export function MotionPanel({
   const [loop, setLoop] = useState(!!study.loop);
   const [rec, setRec] = useState<string | null>(null);
   const cancel = useRef(false);
-  const [draft, setDraft] = useState<{ kind: "rotary" | "linear"; mate: string; from: number; to: number; speed?: number }>({ kind: "rotary", mate: "", from: 0, to: 360 });
+  const [draft, setDraft] = useState<{ kind: "rotary" | "linear"; mate: string; from: number; to: number; speed?: number; back?: boolean }>({ kind: "rotary", mate: "", from: 0, to: 360 });
   const setStudy = (s: Partial<MotionStudy>) => onDoc({ ...doc, motion: { ...study, ...s } });
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
   const mateName = (id: string) => {
@@ -237,7 +239,7 @@ export function MotionPanel({
   }, [doc]);
   const addMotor = () => {
     if (!draftMate) return;
-    const mo: MotionMotor = { id: uid(), kind: draft.kind, mate: draftMate, from: draft.from, to: draft.to, ...(draft.speed !== undefined ? { speed: draft.speed } : {}) };
+    const mo: MotionMotor = { id: uid(), kind: draft.kind, mate: draftMate, from: draft.from, to: draft.to, ...(draft.speed !== undefined ? { speed: draft.speed } : {}), ...(draft.back && draft.speed === undefined ? { back: true } : {}) };
     const i = study.motors.findIndex((x) => x.mate === draftMate);
     setStudy({ motors: i >= 0 ? study.motors.map((x, k) => (k === i ? { ...mo, id: x.id } : x)) : [...study.motors, mo] });
   };
@@ -246,6 +248,8 @@ export function MotionPanel({
   return (
     <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose}>
       <div data-motion-panel className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
+        {/* kinematika (motory) / dynamika (síly pružin, gravitace – cad/motion-dynamic.ts) */}
+        <MotionModeSwitch study={study} onStudy={setStudy} />
         <div>
           <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#4a5664]">{tr("Motory")}</p>
           {study.motors.length ? (
@@ -256,7 +260,7 @@ export function MotionPanel({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{mo.kind === "rotary" ? tr("Rotační") : tr("Lineární")} · {mateName(mo.mate)}</span>
                     <span className="block font-mono text-[10.5px] text-[#6b7785]">
-                      {mo.speed !== undefined ? (mo.kind === "rotary" ? tr("{0} ot/min", f(mo.speed, 3)) : tr("{0} mm/s", f(mo.speed, 3))) : `${f(mo.from)} … ${f(mo.to)} ${mo.kind === "rotary" ? "°" : "mm"}`}
+                      {mo.speed !== undefined ? (mo.kind === "rotary" ? tr("{0} ot/min", f(mo.speed, 3)) : tr("{0} mm/s", f(mo.speed, 3))) : `${f(mo.from)} … ${f(mo.to)} ${mo.kind === "rotary" ? "°" : "mm"}${mo.back ? tr(" tam a zpět") : ""}`}
                     </span>
                   </span>
                   <button type="button" title={tr("Odebrat motor")} onClick={() => setStudy({ motors: study.motors.filter((_, k) => k !== i) })} className="text-[#6b7785] hover:text-brand">
@@ -291,6 +295,12 @@ export function MotionPanel({
               <input type="checkbox" className="accent-[#E03930]" checked={draft.speed !== undefined} onChange={(e) => setDraft({ ...draft, speed: e.target.checked ? (draft.kind === "rotary" ? 60 : 10) : undefined })} />
               {draft.kind === "rotary" ? tr("Rychlost (ot/min) místo rozsahu") : tr("Rychlost (mm/s) místo rozsahu")}
             </label>
+            {draft.speed === undefined && (
+              <label className="flex items-center gap-2 text-[11.5px]">
+                <input type="checkbox" data-motor-back className="accent-[#E03930]" checked={!!draft.back} onChange={(e) => setDraft({ ...draft, back: e.target.checked })} />
+                {tr("Tam a zpět (sinusově, jako lis)")}
+              </label>
+            )}
             <div className="grid grid-cols-2 gap-2">
               <Num label={tr("Začátek")} value={draft.from} step={draft.kind === "rotary" ? 15 : 1} suffix={draft.kind === "rotary" ? "°" : "mm"} onChange={(v) => setDraft({ ...draft, from: v })} />
               {draft.speed !== undefined ? (
@@ -305,9 +315,10 @@ export function MotionPanel({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Num label={tr("Délka studie")} value={study.duration} step={0.5} min={0.01} suffix="s" onChange={(v) => v > 0 && setStudy({ duration: v })} />
-          <Num label={tr("Počet kroků")} value={study.steps} step={6} min={1} suffix="" onChange={(v) => setStudy({ steps: Math.max(1, Math.min(2000, Math.round(v))) })} />
+          <Num label={tr("Délka studie")} value={study.duration} step={study.mode === "dynamic" ? 0.1 : 0.5} min={0.01} suffix="s" onChange={(v) => v > 0 && setStudy({ duration: v })} />
+          {study.mode !== "dynamic" && <Num label={tr("Počet kroků")} value={study.steps} step={6} min={1} suffix="" onChange={(v) => setStudy({ steps: Math.max(1, Math.min(2000, Math.round(v))) })} />}
         </div>
+        {study.mode === "dynamic" && <DynamicSettings doc={doc} study={study} onStudy={setStudy} env={env} />}
         <label className="flex items-center gap-2">
           <input type="checkbox" data-motion-collisions className="accent-[#E03930]" checked={!!study.collisions} onChange={(e) => setStudy({ collisions: e.target.checked || undefined })} />
           {tr("Kontrolovat kolize v každém kroku (pomalejší)")}
@@ -331,7 +342,7 @@ export function MotionPanel({
           )}
         </div>
         <div className="flex gap-1.5">
-          <button type="button" data-motion-run disabled={!study.motors.length || !!busy} onClick={() => void compute()} className="flex-1 rounded bg-brand py-1.5 text-[12px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
+          <button type="button" data-motion-run disabled={(!study.motors.length && study.mode !== "dynamic") || !!busy} onClick={() => void compute()} className="flex-1 rounded bg-brand py-1.5 text-[12px] font-semibold text-white hover:bg-brand-600 disabled:opacity-50">
             {busy ? tr("Počítám krok {0} z {1}…", busy.k, busy.n) : tr("Vypočítat pohyb")}
           </button>
           {busy && (
@@ -358,6 +369,7 @@ export function MotionPanel({
               {cur.clashes?.length ? <span className="text-brand"> · {tr("kolize")}</span> : null}
               {cur.conflicts.length ? <span className="text-brand"> · {tr("nesplněno {0}", cur.conflicts.length)}</span> : null}
             </p>
+            <DynChart res={res} doc={doc} step={step} />
             <ul data-motion-summary className="space-y-0.5 text-[11px] leading-snug text-[#4a5664]">
               {summary.map((l, i) => (
                 <li key={i} className={cn(l.startsWith("⚠") && "text-brand-600")}>

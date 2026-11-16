@@ -1,0 +1,18 @@
+=== run 1 ===
+✓ nový 2D výkres „Půdorys“ (mm) – nová záložka
+✓ Úsečka: e1, e2
+✓ Kružnice: e3
+✓ hladina OSY: barva 1 (červená), Continuous, Výchozí
+2D výkres · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Úsečka 2, Kružnice 1)
+Rozsah: 0.0000,0.0000 – 100.0000,50.0000 (100.0000 × 50.0000)
+Hladiny (2), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 3
+  · OSY — barva 1 (červená), Continuous, Výchozí, zapnutá, entit 0
+
+2D výkres „Půdorys“ · jednotky mm · přesnost 4 · LTSCALE 1 · prostor model
+Entit: 3 (Úsečka 2, Kružnice 1)
+Rozsah: 0.0000,0.0000 – 100.0000,50.0000 (100.0000 × 50.0000)
+Hladiny (2), aktuální: 0
+  ✓ 0 — barva 7 (bílá), Continuous, Výchozí, zapnutá, entit 3
+  · OSY — barva 1 (červená), Continuous, Výchozí, zapnutá, entit 0

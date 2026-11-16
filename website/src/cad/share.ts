@@ -41,6 +41,7 @@
  * (hlavička je ověřená jako AAD). Kontejner = délka JSON (uint32 LE) | JSON {v, exp, from, view, doc (odkazy mnblob), bin: [[otisk, délka]…]} | data importů.
  */
 import { blobId, blobOf, docBlobRefs, embedBlobs, blobIdOf, putBlobAs } from "./blobs";
+import { hostAssets } from "./host-assets";
 import { cadLocale, tr } from "./i18n";
 import { SHARE_CODE_ALPHABET, SHARE_CODE_CLASS, SHARE_CODE_HASH_SRC, SHARE_CODE_LEN } from "./share-code";
 import { pruneUnderlays } from "./sketch-underlay";
@@ -259,6 +260,8 @@ export const SELF_STORE_PATH = "/cad/share/";
  * (https://… nebo /cesta/) ho přesměruje.
  */
 export function selfStoreBase(): string | null {
+  const host = hostAssets().share; // úložiště od hostitele (CLI --share-store), jinak z prostředí a location
+  if (host) return host.store;
   const env = (process.env.NEXT_PUBLIC_CAD_SHARE_SELF ?? "").trim();
   if (/^(0|off|false|no)$/i.test(env)) return null;
   if (/^https?:\/\//i.test(env)) return env.replace(/\/?$/, "/");
@@ -270,9 +273,9 @@ export function selfStoreBase(): string | null {
 const drain = (res: Response): Promise<void> => res.arrayBuffer().then(() => undefined).catch(() => undefined);
 export type SelfStoreInfo = { base: string; maxBytes: number; chunkBytes: number; maxDays: number; /** server přijme id odvozené z kódu (`?ping` v ≥ 2) → nejkratší odkaz */ clientId?: boolean };
 let probeCache: { base: string; until: number; p: Promise<SelfStoreInfo | null> } | null = null;
-/** Odpovídá vlastní úložiště (`?ping`)? Výsledek se pamatuje 5 min (nedostupnost 30 s). */
-export function probeSelfStore(force = false): Promise<SelfStoreInfo | null> {
-  const base = selfStoreBase();
+/** Odpovídá vlastní úložiště (`?ping`)? Výsledek se pamatuje 5 min (nedostupnost 30 s). `store` = adresa od volajícího (ShareOptions.store). */
+export function probeSelfStore(force = false, store?: string | null): Promise<SelfStoreInfo | null> {
+  const base = store !== undefined ? (store ? store.replace(/\/?$/, "/") : null) : selfStoreBase();
   if (!base) return Promise.resolve(null);
   if (!force && probeCache && probeCache.base === base && Date.now() < probeCache.until) return probeCache.p;
   const entry = { base, until: Date.now() + 300_000, p: Promise.resolve<SelfStoreInfo | null>(null) };
@@ -323,12 +326,15 @@ export type ShareOptions = {
   mode?: ShareMode;
   /** základ adresy (výchozí: aktuální stránka bez #) */
   base?: string;
+  /** vlastní úložiště krátkých odkazů (`https://…/cad/share/`); null = žádné; výchozí: hostitel / prostředí / stránka (`selfStoreBase`) */
+  store?: string | null;
   /** průběh nahrávání do úložiště (bajty) */
   onProgress?: (sent: number, total: number) => void;
 };
 
 function baseUrl(base?: string) {
   if (base) return base;
+  if (hostAssets().share) return hostAssets().share!.page; // stránka odkazu od hostitele (CLI)
   if (typeof location === "undefined") return "/cad";
   return location.origin + location.pathname.replace(/\/$/, "") + (location.pathname.endsWith("/") ? "/" : "");
 }
@@ -366,10 +372,22 @@ class ShareStoreError extends Error {
   constructor(
     message: string,
     readonly fallback: boolean,
+    /** úložiště neodpovídá (síť, časový limit) – ne odmítnutí serverem */
+    readonly unavailable = false,
   ) {
     super(message);
   }
 }
+/** Úložiště při nahrávání neodpovídá (síť, časový limit) – engine/share-out.ts pak hlásí ✗ share.store-unavailable, ne odmítnutí. */
+export const storeUnavailable = (e: unknown): boolean => e instanceof ShareStoreError && e.unavailable;
+
+let uploadBaseMs = 20_000;
+/** Časový limit jednoho požadavku nahrávání (ms): 20 s + 10 ms na kB – úložiště, které odpoví na ?ping, ale nahrávání nedokončí, nezastaví celý běh. */
+export const uploadTimeoutMs = (bytes: number) => uploadBaseMs + Math.ceil(bytes / 100);
+/** testy: jiný základ limitu nahrávání */
+export const setUploadTimeoutBase = (ms: number) => void (uploadBaseMs = ms);
+/** AbortSignal s časovým limitem (prostředí bez `AbortSignal.timeout` → bez limitu) */
+export const timeoutSignal = (ms: number): AbortSignal | undefined => (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(ms) : undefined);
 const mb = (n: number) => (n / 1024 / 1024).toLocaleString(cadLocale(), { maximumFractionDigits: 1 }) + " MB";
 const tooBig = (bytes: number, max: number) =>
   tr("Model je pro sdílení odkazem příliš velký: {0} po kompresi a zašifrování, limit úložiště je {1}. Uložte .mncad nebo STEP a pošlete soubor (např. přes úschovnu).", mb(bytes), mb(max));
@@ -431,10 +449,13 @@ const validPayload = (p: SharePayload | null | undefined): p is SharePayload => 
 async function uploadSelf(info: SelfStoreInfo, blob: Uint8Array, days: number, onProgress?: (sent: number, total: number) => void, clientId?: string): Promise<{ id: string; del: string; exp: number }> {
   const chunk = Math.max(65_536, Math.min(info.chunkBytes, blob.length));
   const post = async (url: string, body: Uint8Array, headers: Record<string, string> = {}) => {
+    const ms = uploadTimeoutMs(body.length);
+    const signal = timeoutSignal(ms);
     try {
-      return await fetch(url, { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/octet-stream", ...headers }, body: body as BodyInit });
+      return await fetch(url, { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/octet-stream", ...headers }, body: body as BodyInit, ...(signal ? { signal } : {}) });
     } catch {
-      throw new ShareStoreError(tr("Úložiště sdílení není dostupné (síť)."), true);
+      if (signal?.aborted) throw new ShareStoreError(tr("Úložiště sdílení neodpovídá – nahrávání nedoběhlo do {0} s.", Math.round(ms / 1000)), true, true);
+      throw new ShareStoreError(tr("Úložiště sdílení není dostupné (síť)."), true, true);
     }
   };
   const fail = async (res: Response): Promise<never> => {
@@ -579,9 +600,9 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
     }
   };
 
-  if (o.mode === "link") return linkOrThrow(undefined, async () => (store || (await probeSelfStore()) ? tr("Zvolte úložiště.") : undefined));
-  if (o.mode === "self") return asSelf(await probeSelfStore());
-  if (o.mode === "store") return store ? asStore() : asSelf(await probeSelfStore());
+  if (o.mode === "link") return linkOrThrow(undefined, async () => (store || (await probeSelfStore(false, o.store)) ? tr("Zvolte úložiště.") : undefined));
+  if (o.mode === "self") return asSelf(await probeSelfStore(false, o.store));
+  if (o.mode === "store") return store ? asStore() : asSelf(await probeSelfStore(false, o.store));
 
   // automaticky: krátký odkaz přes úložiště (Supabase → vlastní na webu); jinak celý dokument v odkazu s vysvětlením
   if (!o.days) return linkOrThrow(tr("Bez omezení platnosti nemůže být dokument v úložišti – celý je proto v odkazu. Pro krátký odkaz zvolte platnost 1–90 dní."), async () => tr("Zvolte omezenou platnost a úložiště."));
@@ -594,7 +615,7 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
       why.push((e as Error).message);
     }
   }
-  const info = await probeSelfStore();
+  const info = await probeSelfStore(false, o.store);
   if (info) {
     try {
       return await asSelf(info);

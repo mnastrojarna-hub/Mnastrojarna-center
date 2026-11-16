@@ -8,6 +8,7 @@
 import type { TabInfo } from "../agent-asm";
 import type { PartFaces } from "../asm-agent";
 import type { Interference } from "../asm-kernel";
+import type { ClashCounts } from "../clash-class";
 import type { MateStatus, PartFace } from "../mates";
 import type { BuildResult, CadDoc } from "../types";
 
@@ -26,10 +27,26 @@ export type AsmCaches = {
   faceLists: Map<string, PartFaces>;
   /** zásobník úprav dílu v kontextu sestavy (`sestava upravit` / `sestava hotovo`) */
   stack: { asm: CadDoc; key: string }[];
-  /** stav vazeb podle dokumentu */
+  /** stav vazeb podle klíče dokumentu (`Workspace.docKey` – nemění se přejmenováním) */
   mateStatus: Map<DocKey, Record<string, MateStatus>>;
-  /** poslední výsledek kontroly kolizí podle dokumentu */
-  clash: Map<DocKey, { res: Interference[]; at: string }>;
+  /**
+   * poslední výsledek kontroly kolizí podle klíče dokumentu (`at` = čas kontroly pro textový stav, `comps` = počet komponent);
+   * stav jedné sestavy se nikdy nepřenese na jinou (ani na sestavu téhož názvu)
+   */
+  clash: Map<
+    DocKey,
+    {
+      res: Interference[];
+      at: string;
+      comps?: number;
+      /** třídy kolizí (šroub × závit geometricky, clash-class.ts) */
+      classes?: ClashCounts;
+      /** otisk sestavy v době kontroly (`clashSig`) – jiný otisk = výsledek neplatí (sestava se mezitím změnila) */
+      sig?: string;
+      /** řádek skriptu kontroly (CLI: ℹ `clash.rechecked` na konci běhu) */
+      line?: number | null;
+    }
+  >;
 };
 
 export interface Workspace {
@@ -47,15 +64,33 @@ export interface Workspace {
   close(id: DocKey): Promise<CadDoc>;
   undo(n: number): { moved: number };
   redo(n: number): { moved: number };
+  /** počet kroků zpět / znovu aktivní záložky (protokol `zpět` / `znovu`) */
+  history(): { undo: number; redo: number };
   /** díl podle názvu (bez ohledu na velikost písmen): nejdřív dokumenty vzniklé v tomto běhu (nejnovější), pak záložky */
   findPart(name: string): CadDoc | null;
+  /** názvy dílů pro hlášku „díl … není mezi otevřenými záložkami“: dokumenty běhu, pak díly záložek (bez opakování) */
+  partNames(): string[];
+  /** dokumenty pro odkazy výkresu (`výkres model "záložka"`): dokumenty běhu, pak záložky (bez záložek výkresu) */
+  listDocs(): { title: string; doc: CadDoc }[];
   /** výchozí název, který ještě žádná záložka nemá: „Nový díl“, „Nový díl 2“… */
   freshName(base: string): string;
+  /**
+   * Stálý klíč dokumentu v záložce `id` (výchozí aktivní záložka): id dokumentu (`docId` z `openInTab`). Nemění se
+   * přejmenováním, krokem historie ani přepnutím záložky; dokument otevřený do znovu použité záložky dostane nový klíč.
+   * Klíč stavu vazeb a kolizí (`asm.mateStatus`, `asm.clash`). Neznámá záložka → "".
+   */
+  docKey(id?: DocKey): string;
   asm: AsmCaches;
   /** relace `{ v: 1, tabs, active }` s daty importů (`embedBlobs`), bez historie zpět/znovu */
   save(): Uint8Array;
   /** začátek běhu skriptu – od teď vzniklé dokumenty jsou „dokumenty běhu“ (`findPart`) */
   beginRun?(): void;
+  /**
+   * Konec běhu po zápisu (`commit` / `openInTab`): počká, až hostitel zápis promítne – v aplikaci do stavu Reactu, aby další
+   * volání API hned za sebou (`window.mncad.run`, `reference`) vidělo tento dokument (vlna 15); paměťový prostor nic nečeká.
+   * Nepromítne-li se, vyhodí CodedError `tab.settle-timeout`.
+   */
+  settle?(): Promise<void>;
 }
 
 /** nejvíc kroků zpět na záložku (jako aplikace: cad-app.tsx `commit`) */

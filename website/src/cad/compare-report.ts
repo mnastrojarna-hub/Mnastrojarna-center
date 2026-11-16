@@ -26,6 +26,15 @@ export function regionList(res: Pick<CompareResult, "extra" | "missing">): Numbe
   return [...(res.extra?.regions ?? []), ...(res.missing?.regions ?? [])].sort((a, b) => b.volume - a.volume).map((g, i) => ({ ...g, n: i + 1 }));
 }
 
+/**
+ * Booleovské operace porovnání jsou na tomto páru nepřesné: objem navíc − objem chybí se nerovná rozdílu objemů (stejný práh
+ * jako upozornění compare.ts). Bývá to u složeného tělesa sestavy, jehož tělesa se navzájem překrývají (šroub v závitové
+ * díře) – rozdílové oblasti pak nejsou skutečné rozdíly a o shodě rozhodne objem a mapa odchylek.
+ */
+export function booleansInexact(res: Pick<CompareResult, "residual" | "model">): boolean {
+  return res.residual != null && Math.abs(res.residual) > Math.max(1, 1e-5 * Math.abs(res.model.volume));
+}
+
 const num = (v: number, digits: number, comma: boolean) => {
   if (!Number.isFinite(v)) return "";
   const s = v.toFixed(digits);

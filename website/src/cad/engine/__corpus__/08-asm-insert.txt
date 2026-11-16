@@ -1,0 +1,13 @@
+# sestava: díly z běhu, vložit, ukotvit, stav nové sestavy
+nový díl Deska
+kvádr 80 60 10
+díra 10,5 skrz v 40 30
+nový díl Čep
+válec 10 30
+válec 16 5 v 0 0 30
+#--- run
+nová sestava Čep v desce
+vložit "Deska" ukotvit
+vložit "Čep" v 100 0 0
+vložit "Neexistuje"
+stav

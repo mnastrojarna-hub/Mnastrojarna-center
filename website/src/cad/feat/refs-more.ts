@@ -8,10 +8,12 @@
  * Vše přes `registerFeatureBuilder`; stavitel nástrojového prvku uloží nástroj do `ctx.tools` (pro pole / zrcadlení).
  */
 import { tr } from "../i18n";
+import { hostFont } from "../host-assets";
 import * as r from "replicad";
 import { applyMode, planeOf, threadProfile, THREAD_HINT } from "../build";
 import { planeBasis, threadByName } from "../defaults";
-import { pushPull, springSolid } from "../direct";
+import { pushPull, springEnvelope, springSolid } from "../direct";
+import { isSpringEnvelope } from "../drawing-doc";
 import { axisVec, csysBasis, entityIndex, planeDefToSketchPlane, planeOfRef, pointOf, resolveAxis, resolveDirection, sigOf, V, type ResolveCtx } from "../ref-resolve";
 import { planeDefLabel, type AxisDef, type Direction, type Extent, type Ref } from "../refs";
 import type { Axis, BoolMode, Feature, SketchPlane, Vec2, Vec3 } from "../types";
@@ -138,8 +140,9 @@ toolBuilder("tube", (f, ctx) => {
 
 toolBuilder("spring", (f, ctx) => {
   const p = placed(f, ctx, "polohu");
-  if (!f.dirDef) return springSolid({ ...f, position: p.at });
-  return alignZ(springSolid({ ...f, position: [0, 0, 0], axis: "Z" }), p.dir).translate(p.at);
+  const make = isSpringEnvelope(f) ? springEnvelope : springSolid; // obal = zjednodušená pružina jen v kopii pro výkres (drawing-doc.ts)
+  if (!f.dirDef) return make({ ...f, position: p.at });
+  return alignZ(make({ ...f, position: [0, 0, 0], axis: "Z" }), p.dir).translate(p.at);
 });
 
 toolBuilder("thread", (f, ctx) => {
@@ -160,6 +163,8 @@ async function ensureFont() {
   if (r.getFont(FONT_FAMILY)) return;
   if (!fontLoading) {
     fontLoading = (async () => {
+      const own = hostFont("Roboto-Bold.ttf"); // písmo od hostitele (CLI), jinak z webu
+      if (own) return void (await r.loadFont(await own, FONT_FAMILY, true));
       if (typeof fetch !== "function" || typeof location === "undefined") throw new Error("no fetch");
       const res = await fetch(new URL("/fonts/Roboto-Bold.ttf", location.origin).toString());
       if (!res.ok) throw new Error("font");

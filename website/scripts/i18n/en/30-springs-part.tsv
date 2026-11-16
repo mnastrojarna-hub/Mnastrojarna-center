@@ -1,0 +1,277 @@
+# vlna 21 – pružiny z tabulky (balík part): výpočet EN 13906 / DIN 2093, průvodce, text, výkres
+* povinné (z alternativ D | De | Di a n | nt stačí jedna); dále: v x y z · osa X|Y|Z|-Z · tvar L · přidat|odebrat|nové · název "…"	* required (one of the alternatives D | De | Di and n | nt is enough); also: at x y z · axis X|Y|Z|-Z · shape L · add|cut|new · name "…"
+{0} – tabulka s výpočtem ({1})	{0} – table with calculation ({1})
+{0} × za sebou, po {1} v sobě	{0} × in series, {1} nested each
+{0} otevřena jako nový díl.	{0} opened as a new part.
+{0} přidána do historie.	{0} added to the history.
+{0} vložena do sestavy.	{0} inserted into the assembly.
+A – tuhá (De/t ≈ 18)	A – stiff (De/t ≈ 18)
+B – střední (De/t ≈ 28)	B – medium (De/t ≈ 28)
+bez tabulky pružiny	no spring table
+C – měkká (De/t ≈ 40)	C – soft (De/t ≈ 40)
+celé očko boční	full side loop
+celkový počet závitů nt	total number of coils nt
+činné závity n	active coils n
+délka drátu	wire length
+délka L{0} {1} mm je pod výškou naplocho {2} mm	length L{0} {1} mm is below the flat height {2} mm
+délka L{0} {1} mm je větší než volná výška sloupce L0 {2} mm	length L{0} {1} mm is greater than the free stack height L0 {2} mm
+délka mezi vnitřními okraji oček v 1. poloze	length between the inner edges of the loops in position 1
+délka na doraz Ln	solid length Ln
+délka nezatížené pružiny (konce v 0 a L0)	length of the unloaded spring (ends at 0 and L0)
+délka ramen nesmí být záporná	leg length must not be negative
+délka ramene 1	length of leg 1
+délka ramene 2	length of leg 2
+délka těla Lk	body length Lk
+délka těla Lk0	body length Lk0
+Délka tvaru (0 = volná)	Shape length (0 = free)
+Délka tvaru (stlačená)	Shape length (compressed)
+DIN 2093 / EN 16983 – řada určuje poměr tloušťky a výšky kužele	DIN 2093 / EN 16983 – the series sets the ratio of thickness and cone height
+DIN 2093 řada {0} nemá talíř De {1} mm – vyberte ze seznamu nebo zvolte vlastní rozměry	DIN 2093 series {0} has no disc De {1} mm – pick one from the list or choose custom dimensions
+do tohoto dílu	into this part
+Doplňte rozměry – náhled se ukáže tady.	Fill in the dimensions – the preview appears here.
+dovolené napětí σzul = 0,7 · Rm	permissible stress σzul = 0.7 · Rm
+dovolené napětí τzul = 0,45 · Rm	permissible stress τzul = 0.45 · Rm
+dovolené napětí τzul = 0,5 · Rm	permissible stress τzul = 0.5 · Rm
+Drát pružiny se nepodařilo vytáhnout po dráze.	The spring wire could not be swept along its path.
+Druh pružiny	Spring kind
+druhé očko	second loop
+EN 10270 – běžné průměry 0,5 · 0,8 · 1 · 1,25 · 1,6 · 2 · 2,5 · 3 · 4 · 5 mm	EN 10270 – common diameters 0.5 · 0.8 · 1 · 1.25 · 1.6 · 2 · 2.5 · 3 · 4 · 5 mm
+EN 13906-2: německé očko LH ≈ Di, poloviční ≈ 0,75·D − d, boční celé ≈ Di	EN 13906-2: German loop LH ≈ Di, half loop ≈ 0.75·D − d, full side loop ≈ Di
+G a Rm podle EN 13906-1 a EN 10270-1/-2/-3; DH = pro dynamické zatížení	G and Rm per EN 13906-1 and EN 10270-1/-2/-3; DH = for dynamic loading
+hmotnost	mass
+index vinutí D/d = {0} je nad 20 – pružina je měkká a nestabilní při navíjení (EN 13906-1: 4…20)	spring index D/d = {0} is above 20 – the spring is soft and unstable when coiling (EN 13906-1: 4…20)
+index vinutí D/d = {0} je nad 20 (EN 13906-2: 4…20)	spring index D/d = {0} is above 20 (EN 13906-2: 4…20)
+index vinutí D/d = {0} je nad 20 (EN 13906-3: 4…20)	spring index D/d = {0} is above 20 (EN 13906-3: 4…20)
+index vinutí D/d = {0} je pod 4 – těžko vyrobitelné (EN 13906-2: 4…20)	spring index D/d = {0} is below 4 – hard to manufacture (EN 13906-2: 4…20)
+index vinutí D/d = {0} je pod 4 – těžko vyrobitelné, vysoké napětí na vnitřní straně (EN 13906-1: 4…20)	spring index D/d = {0} is below 4 – hard to manufacture, high stress on the inner side (EN 13906-1: 4…20)
+index vinutí D/d = {0} je pod 4 (EN 13906-3: 4…20)	spring index D/d = {0} is below 4 (EN 13906-3: 4…20)
+index vinutí w = D/d	spring index w = D/d
+jako nový díl	as a new part
+jeden vedený, druhý kloubově (0,7)	one guided, other pinned (0.7)
+jeden vetknutý, druhý volný (2)	one fixed, other free (2)
+jen u vlastních rozměrů	custom dimensions only
+jen u vlastních rozměrů (h0/t < 1,3 – průběh síly bez poklesu)	custom dimensions only (h0/t < 1.3 – force curve without a drop)
+konce	ends
+Konce a uložení	Ends and seating
+kritický zdvih vzpěru sK	critical buckling deflection sK
+L1 by měla být delší než L2 (L1 = menší stlačení)	L1 should be longer than L2 (L1 = smaller compression)
+levé	left-hand
+Materiál a vinutí	Material and winding
+méně než 2 činné závity – EN 13906-1 doporučuje n ≥ 2	fewer than 2 active coils – EN 13906-1 recommends n ≥ 2
+místo L1: požadovaná síla při L1	instead of L1: required force at L1
+místo L1: síla sloupce	instead of L1: stack force
+místo L1: síla v 1. poloze	instead of L1: force in position 1
+místo L2: největší pracovní síla	instead of L2: largest working force
+místo L2: požadovaná síla při L2	instead of L2: required force at L2
+místo L2: síla sloupce	instead of L2: stack force
+místo n: celkový počet závitů včetně závěrných	instead of n: total number of coils including the end coils
+místo α1: moment v N·mm	instead of α1: torque in N·mm
+místo α2: největší moment v N·mm	instead of α2: largest torque in N·mm
+moment M1	torque M1
+moment M1 při α1 {0}°	torque M1 at α1 {0}°
+moment M2	torque M2
+moment M2 při α2 {0}°	torque M2 at α2 {0}°
+napětí σOM / σII / σIII při L2	stress σOM / σII / σIII at L2
+napětí σq2 při α2	stress σq2 at α2
+natočení oček	loop orientation
+natočení ramen z volné polohy ve stupních	rotation of the legs from the free position in degrees
+nebo jiný z řádků	or another of the rows
+nejkratší pracovní délka (konec zdvihu) – musí být ≥ Ln + Sa	shortest working length (end of stroke) – must be ≥ Ln + Sa
+nejmenší pracovní délka Ln + Sa	smallest working length Ln + Sa
+nejmenší součet mezer Sa	minimum sum of coil gaps Sa
+největší pracovní délka (≤ Ln)	largest working length (≤ Ln)
+největší pracovní natočení ve stupních	largest working rotation in degrees
+největší síla Fn	largest force Fn
+největší úhel (σq = σzul)	largest angle (σq = σzul)
+německé očko (celé přes střed)	German loop (full, over the centre)
+nerez 1.4310 (EN 10270-3)	stainless 1.4310 (EN 10270-3)
+nevybočí	does not buckle
+Neznámý druh pružiny „{0}“.	Unknown spring kind “{0}”.
+Nové těleso / přidat	New body / add
+oba konce kloubově (1)	both ends pinned (1)
+oba konce vedené, rovnoběžné (0,5)	both ends guided, parallel (0.5)
+očka	loops
+olejem kalený VDSiCr (EN 10270-2)	oil-tempered VDSiCr (EN 10270-2)
+Opravte řádky označené ✗	Fix the rows marked ✗
+Osa je zadaná odkazem na geometrii.	The axis is given by a reference to geometry.
+Osa pružiny	Spring axis
+osové	axial
+patentovaný drát DH (EN 10270-1)	patented wire DH (EN 10270-1)
+patentovaný drát SH (EN 10270-1)	patented wire SH (EN 10270-1)
+počáteční napětí τ0	initial stress τ0
+počáteční tuhost sloupce	initial stack rate
+počet činných závitů musí být aspoň 1	the number of active coils must be at least 1
+počet závitů musí být aspoň 1	the number of coils must be at least 1
+počet závitů těla; desetinná část určuje natočení oček (0,5 = 180°)	number of body coils; the fraction sets the loop orientation (0.5 = 180°)
+počet závitů; desetinná část = úhel ramen ve volném stavu (0,25 = 90°)	number of coils; the fraction = leg angle in the free state (0.25 = 90°)
+Poloha (začátek osy) odkazem	Position (axis start) by reference
+Poloha je zadaná odkazem na geometrii.	The position is given by a reference to geometry.
+poloviční očko	half loop
+Pracovní body (nepovinné)	Working points (optional)
+pracovní délka L{0} {1} mm je delší než volná délka L0 – tlačná pružina by nebyla stlačena	working length L{0} {1} mm is longer than the free length L0 – the compression spring would not be compressed
+pracovní délka L{0} {1} mm je kratší než délka na doraz Ln {2} mm – pružinu nelze tolik stlačit	working length L{0} {1} mm is shorter than the solid length Ln {2} mm – the spring cannot be compressed that far
+pracovní délka L{0} {1} mm je kratší než volná délka L0 {2} mm – tažnou pružinu nelze stlačit	working length L{0} {1} mm is shorter than the free length L0 {2} mm – an extension spring cannot be compressed
+pracovní délka L{0} {1} mm je pod nejmenší přípustnou Ln + Sa = {2} mm – závity se budou dotýkat	working length L{0} {1} mm is below the smallest permissible Ln + Sa = {2} mm – the coils will touch
+pracovní délka L1	working length L1
+pracovní délka L2	working length L2
+pravé	right-hand
+pravé vinutí je obvyklé (EN 13906)	right-hand winding is usual (EN 13906)
+prázdné = volná délka; tvar stlačené pružiny (stoupání se zmenší, závěrné závity zůstanou)	empty = free length; shape of the compressed spring (the pitch decreases, the end coils stay)
+průměr drátu d	wire diameter d
+průměr vinutí je příliš malý vůči drátu (D/d = {0}) – drát se nedá navinout	the coil diameter is too small for the wire (D/d = {0}) – the wire cannot be coiled
+pružící závity; celkem nt = n + 2 u přiložených konců (EN 13906-1)	working coils; in total nt = n + 2 with closed ends (EN 13906-1)
+Pružina – tabulka s výpočtem	Spring – table with calculation
+Pružina „{0}“	Spring “{0}”
+pružina „{0}“ v dílu není – pružiny: {1}	spring “{0}” is not in the part – springs: {1}
+pružina {0}: neznámé slovo „{1}“ – {2}	spring {0}: unknown word “{1}” – {2}
+Pružina nemá dráhu drátu.	The spring has no wire path.
+pružina se vybočí – kritický zdvih sK = {0} mm je menší než zdvih {1} mm; použijte trn nebo vedení (pouzdro)	the spring will buckle – the critical deflection sK = {0} mm is smaller than the stroke {1} mm; use a mandrel or a guide (sleeve)
+Pružina z tabulky s výpočtem	Spring from a table with calculation
+pružina: „{0}“ – hodnota {1}	spring: “{0}” – value {1}
+pružina: osa X | Y | Z | -Z nebo vektor x y z	spring: axis X | Y | Z | -Z or vector x y z
+pružina: poloha potřebuje tři čísla – v x y z	spring: the position needs three numbers – at x y z
+pružina: ramena tečná | radiální | osová nebo délka ramen	spring: legs tangential | radial | axial or the leg length
+pružina: text „{0}“ bez klíčového slova – název "…"	spring: text “{0}” without a keyword – name "…"
+pružina: za „{0}“ chybí číslo – {1}	spring: number missing after “{0}” – {1}
+pružina: za „název“ chybí text	spring: text missing after “name”
+Pružině chybí rozměry (d, D, L0, n).	The spring is missing dimensions (d, D, L0, n).
+pružinová ocel 51CrV4 (EN 10132-4)	spring steel 51CrV4 (EN 10132-4)
+Pružiny	Springs
+předepnutá délka v nástroji (méně stlačená)	preloaded length in the tool (less compressed)
+předpětí F0	initial tension F0
+předpětí F0 {0} N přesahuje dovolenou sílu {1} N	initial tension F0 {0} N exceeds the permissible force {1} N
+předpětí F0 nesmí být záporné	initial tension F0 must not be negative
+předpětí τ0 = {0} MPa je vysoké ({1} % τzul) – ověřte s výrobcem, obvykle do 20 %	initial stress τ0 = {0} MPa is high ({1} % of τzul) – check with the manufacturer, usually up to 20 %
+při natočení o {0}° je napětí {1} % dovoleného (σq = {2} MPa) – největší úhel {3}°	at a rotation of {0}° the stress is {1} % of the permissible (σq = {2} MPa) – largest angle {3}°
+při protažení na L{0} {1} mm je napětí {2} % dovoleného (největší délka Ln {3} mm)	when extended to L{0} {1} mm the stress is {2} % of the permissible (largest length Ln {3} mm)
+při stlačení na doraz Ln je napětí {0} % dovoleného – pružina by sedla; omezte zdvih dorazem nad Ln	compressed to solid length Ln the stress is {0} % of the permissible – the spring would set; limit the stroke with a stop above Ln
+přiložené a broušené	closed and ground
+přiložené a broušené = rovné dosedací plochy kolmé na osu (výchozí pro střižné nástroje)	closed and ground = flat seating faces square to the axis (default for cutting dies)
+přiložené, neobroušené	closed, not ground
+přímá část ramene za ohybem	straight part of the leg after the bend
+radiální	radial
+ramena	legs
+rameno 1	leg 1
+rameno 2	leg 2
+řada DIN 2093	DIN 2093 series
+řádky tabulky pružiny se slovy CS / EN / DE, jednotkami a normou	rows of the spring table with CS / EN / DE words, units and the standard
+síla F{0} {1} N je větší než síla naplocho {2} N	force F{0} {1} N is greater than the flat force {2} N
+síla F1	force F1
+síla F1 při L1 {0} mm	force F1 at L1 {0} mm
+síla F2	force F2
+síla F2 při L2 {0} mm	force F2 at L2 {0} mm
+síla na doraz Fn	force at solid length Fn
+síla naplocho Fc	flat force Fc
+síla při s = 0,75 h0	force at s = 0.75 h0
+sloupec	stack
+Sloupec talířových pružin je prázdný.	The disc spring stack is empty.
+smysl vinutí	winding direction
+součinitel korekce napětí k	stress correction factor k
+součinitel uložení ν pro kontrolu vzpěru (EN 13906-1 obr. 5)	seating coefficient ν for the buckling check (EN 13906-1 fig. 5)
+souhlasně vložené talíře – zvětší sílu	nested discs in the same direction – increase the force
+spočtené údaje pružin z tabulky v dílu	computed data of the table springs in the part
+Spočteno	Computed
+stačí jeden průměr: vnější De (pro otvor), střední D nebo vnitřní Di (pro trn)	one diameter is enough: outer De (for a bore), mean D or inner Di (for a mandrel)
+stoupání činných závitů	pitch of the active coils
+stoupání činných závitů {0} mm je menší než drát – závity by se ve volném stavu dotýkaly	pitch of the active coils {0} mm is smaller than the wire – the coils would touch in the free state
+střední průměr D	mean diameter D
+střídavě obrácené talíře – zvětší zdvih (sloupec)	alternately reversed discs – increase the stroke (stack)
+Tabulka pružin	Spring table
+tabulka pružiny	spring table
+tabulka pružiny ano|ne	springtable yes|no
+Tabulka pružiny: {0}× nad razítkem (EN ISO 2162-2)	Spring table: {0}× above the title block (EN ISO 2162-2)
+Tabulka pružiny: v dílu není pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová)	Spring table: the part has no table spring (spring compression | extension | torsion | disc)
+Tabulka údajů pružiny (EN ISO 2162-2)	Spring data table (EN ISO 2162-2)
+talíř De × Di × t	disc De × Di × t
+talířová {0} × {1} × {2} · h0 {3} · sloupec {4}×{5} · L0 {6} · F(0,75 h0) {7} N	disc {0} × {1} × {2} · h0 {3} · stack {4}×{5} · L0 {6} · F(0.75 h0) {7} N
+Talířová pružina {0} × {1} × {2}	Disc spring {0} × {1} × {2}
+talířová pružina DIN 2093 (řady A, B, C nebo vlastní De Di t h0), sloupec talířů za sebou × v sobě, síla podle Almena–László	disc spring DIN 2093 (series A, B, C or custom De Di t h0), stack of discs in series × nested, force per Almen–László
+Talířové pružině chybí rozměry (De, Di, t, h0).	The disc spring is missing dimensions (De, Di, t, h0).
+talířů v sobě (paralelně)	discs nested (parallel)
+talířů za sebou	discs in series
+tažná d {0} · De {1} · n {2} · L0 {3} · R {4} N/mm · F0 {5} N	extension d {0} · De {1} · n {2} · L0 {3} · R {4} N/mm · F0 {5} N
+Tažná pružina	Extension spring
+Tažná pružina {0} × {1} – n {2}	Extension spring {0} × {1} – n {2}
+tažná pružina podle EN 13906-2: tělo s předpětím F0, očka (vnitřní okraje oček v 0 a L0), tuhost, síly, největší délka Ln	extension spring per EN 13906-2: body with initial tension F0, loops (inner loop edges at 0 and L0), rate, forces, largest length Ln
+tečné	tangential
+tečné = pokračuje po tečně závitu, radiální = ven od osy, osové = podél osy	tangential = continues along the coil tangent, radial = outwards from the axis, axial = along the axis
+tlačná d {0} · De {1} · L0 {2} · n {3} · R {4} N/mm · Ln {5} mm{6}	compression d {0} · De {1} · L0 {2} · n {3} · R {4} N/mm · Ln {5} mm{6}
+Tlačná pružina	Compression spring
+Tlačná pružina {0} × {1} × {2}	Compression spring {0} × {1} × {2}
+tlačná pružina podle EN 13906-1 z tabulky: tuhost, Ln, Sa, síly a napětí při L1 / L2, vzpěr, frekvence, hmotnost; tvar s přiloženými a broušenými konci (rovné dosedací plochy v 0 a L0), Ø = De; varování česky ve stavu prvku	compression spring per EN 13906-1 from a table: rate, Ln, Sa, forces and stress at L1 / L2, buckling, frequency, mass; shape with closed and ground ends (flat seating faces at 0 and L0), Ø = De; warnings in the feature status
+tlačná, tažná, zkrutná, talířová – tabulka s výpočtem	compression, extension, torsion, disc – table with calculation
+tloušťka t	thickness t
+tuhost R	spring rate R
+tuhost, síly, napětí, vzpěr, broušené konce – EN 13906 / DIN 2093	rate, forces, stress, buckling, ground ends – EN 13906 / DIN 2093
+tvar stlačené / protažené pružiny – výpočet zůstává pro L0	shape of the compressed / extended spring – the calculation stays for L0
+u řad A/B/C jen rozměry z DIN 2093: 8 · 10 · 12,5 · 14 · 16 · 18 · 20 · 22,5 · 25 · 28 · 31,5 · 35,5 · 40 · 45 · 50 · 56 · 63 · 71 · 80 · 90 · 100 · 112 · 125 … 250	for series A/B/C only DIN 2093 sizes: 8 · 10 · 12.5 · 14 · 16 · 18 · 20 · 22.5 · 25 · 28 · 31.5 · 35.5 · 40 · 45 · 50 · 56 · 63 · 71 · 80 · 90 · 100 · 112 · 125 … 250
+účinné závity (s rameny)	effective coils (with legs)
+Údaje pružiny „{0}“ (EN ISO 2162-2)	Spring data “{0}” (EN ISO 2162-2)
+úhel natočení α1	rotation angle α1
+úhel natočení α2	rotation angle α2
+úhel ramen ve volném stavu	leg angle in the free state
+úhlová tuhost RM	angular rate RM
+uložení konců (vzpěr)	end seating (buckling)
+Umístění	Placement
+V dílu není žádná pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová …).	The part has no table spring (spring compression | extension | torsion | disc …).
+vinutí	winding
+vlastní frekvence fe	natural frequency fe
+vlastní rozměry	custom dimensions
+vložit do sestavy	insert into the assembly
+vnější průměr De	outer diameter De
+vnitřní průměr – volí se podle trnu	inner diameter – chosen for the mandrel
+vnitřní průměr Di	inner diameter Di
+vnitřní průměr Di musí být menší než vnější De	the inner diameter Di must be smaller than the outer De
+vnitřní průměr při α2 (trn ≤ 0,9 ×)	inner diameter at α2 (mandrel ≤ 0.9 ×)
+vnitřní předpětí těsně vinutého těla – pod F0 se pružina neprotáhne	initial tension of the close-wound body – below F0 the spring does not extend
+volná délka L0	free length L0
+volná délka L0 (mezi očky)	free length L0 (between loops)
+volná délka L0 {0} mm není větší než délka na doraz Ln {1} mm – zvětšete L0 nebo zmenšete počet závitů	the free length L0 {0} mm is not greater than the solid length Ln {1} mm – increase L0 or reduce the number of coils
+volná výška sloupce L0	free stack height L0
+volná výška talíře l0	free disc height l0
+vrchol, střed hrany nebo kružnice, bod skici… – má přednost před souřadnicemi	vertex, edge or circle midpoint, sketch point… – takes precedence over the coordinates
+výška kužele h0	cone height h0
+výška naplocho Lc	flat height Lc
+výška oček LH	loop height LH
+výška sloupce na konci zdvihu (zdvih talíře ≤ 0,75 h0)	stack height at the end of stroke (disc deflection ≤ 0.75 h0)
+výška sloupce v 1. poloze	stack height in position 1
+Vytvořit	Create
+vzájemné natočení oček	relative loop orientation
+vzájemné natočení oček – upraví desetinnou část počtu závitů	relative loop orientation – adjusts the fraction of the number of coils
+X / Y / Z, vektor, nebo odkazem: osa díry (válcové plochy), hrana, normála plochy	X / Y / Z, vector, or by reference: hole axis (cylindrical face), edge, face normal
+zadána délka L{0} i síla F{0} – platí délka (F{0} = {1} N)	both length L{0} and force F{0} given – the length applies (F{0} = {1} N)
+zadáno	given
+Zadat souřadnicemi	Enter coordinates
+zadejte Di, tloušťku t a výšku kužele h0	enter Di, thickness t and cone height h0
+zadejte počet činných závitů n (nebo celkový nt)	enter the number of active coils n (or the total nt)
+zadejte počet závitů n	enter the number of coils n
+zadejte počet závitů těla n	enter the number of body coils n
+zadejte průměr drátu d	enter the wire diameter d
+zadejte průměr vinutí – střední D, vnější De nebo vnitřní Di	enter the coil diameter – mean D, outer De or inner Di
+zadejte volnou délku L0	enter the free length L0
+zápis: pružina nápověda {0}	syntax: spring help {0}
+závity n	coils n
+závity těla n	body coils n
+zdvih talíře při L{0} je {1} % h0 – DIN 2093 doporučuje nejvýš 75 %	disc deflection at L{0} is {1} % of h0 – DIN 2093 recommends at most 75 %
+zkrutná d {0} · De {1} · n {2} · RM {3} N·mm/°	torsion d {0} · De {1} · n {2} · RM {3} N·mm/°
+Zkrutná pružina	Torsion spring
+Zkrutná pružina {0} × {1} – n {2}	Torsion spring {0} × {1} – n {2}
+zkrutná pružina podle EN 13906-3: ramena tečná / radiální / osová, úhlová tuhost, moment a napětí při natočení, vnitřní průměr pro trn	torsion spring per EN 13906-3: tangential / radial / axial legs, angular rate, torque and stress at rotation, inner diameter for the mandrel
+zvětšení De při stlačení na doraz	increase of De at solid length
+# recenze balíku part (vlna 21)
+  pružina tabulka ["Název"|vše] – spočtené údaje poslední / pojmenované / všech pružin dílu	  spring table ["Name"|all] – computed data of the last / named / all springs of the part
+komponenta „{0}“: pružinu mezi dosedacími plochami počítá sestava jen u tlačné pružiny (pružina tlačná …) – tažná, zkrutná a talířová pružina z tabulky zůstává dílem bez délky a síly v sestavě	component “{0}”: the assembly computes a spring between seat faces only for a compression spring (spring compression …) – an extension, torsion or disc spring from the table stays a part without length and force in the assembly
+Lc {0} mm · F na dorazu {1} N · {2} g	Lc {0} mm · F at solid {1} N · {2} g
+Lk {0} mm · největší délka Ln {1} mm · Fn {2} N · {3} g	Lk {0} mm · largest length Ln {1} mm · Fn {2} N · {3} g
+Lk0 {0} mm · α0 {1}° · největší úhel {2}° · {3} g	Lk0 {0} mm · α0 {1}° · largest angle {2}° · {3} g
+Ln + Sa {0} mm · Fn {1} N · τn {2} % τzul · vzpěr {3} · fe {4} Hz · {5} g	Ln + Sa {0} mm · Fn {1} N · τn {2} % τzul · buckling {3} · fe {4} Hz · {5} g
+napětí τ2 při L2 (statická kontrola)	stress τ2 at L2 (static check)
+napětí τk2 = k · τ2 (opakované zatížení)	stress τk2 = k · τ2 (repeated loading)
+napětí τkn = k · τn na dorazu	stress τkn = k · τn at solid length
+napětí τn na dorazu (statická kontrola)	stress τn at solid length (static check)
+největší délka Ln (τ = τzul)	largest length Ln (τ = τzul)
+při stlačení na L2 je napětí {0} % dovoleného (τ2 = {1} MPa, τzul = {2} MPa, statická kontrola EN 13906-1) – silnější drát, víc závitů nebo menší zdvih	compressed to L2 the stress is {0} % of the permissible (τ2 = {1} MPa, τzul = {2} MPa, static check EN 13906-1) – thicker wire, more coils or a smaller stroke
+při stlačení na L2 je napětí s korekcí k {0} % dovoleného (τk2 = {1} MPa) – staticky vyhoví (τ2 {2} %), při opakovaném zatížení (stírače, vyhazovače) volte silnější drát, víc závitů nebo menší zdvih	compressed to L2 the stress with the correction k is {0} % of the permissible (τk2 = {1} MPa) – passes statically (τ2 {2} %); for repeated loading (strippers, ejectors) choose a thicker wire, more coils or a smaller stroke
+síla F{0} {1} N je větší než síla na doraz Fn {2} N – pružina ji nepřenese (stlačí se nejvýš na Ln {3} mm); zvolte tužší pružinu nebo menší sílu	force F{0} {1} N is larger than the force at solid length Fn {2} N – the spring cannot carry it (it compresses at most to Ln {3} mm); choose a stiffer spring or a smaller force
+spočtené údaje pružiny z tabulky do protokolu: poslední v historii, pojmenovaná nebo všechny pružiny dílu	computed data of a table spring to the log: the last in the history, a named one or all springs of the part
+volná délka L0 {0} mm je kratší než nejmenší pracovní délka Ln + Sa = {1} mm – pružina nemá přípustný pracovní zdvih; zvětšete L0 nebo uberte závity	free length L0 {0} mm is shorter than the smallest working length Ln + Sa = {1} mm – the spring has no permissible working stroke; increase L0 or remove coils

@@ -1,0 +1,21 @@
+=== run 1 ===
+✓ nový díl „Prvky JSON“ – nová záložka
+→ Skica 1 (sketch) přidán – výsledek po výpočtu níže
+→ Vysunutí 1 (extrude) přidán – výsledek po výpočtu níže
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ Skica 1 (sketch)
+✓ Vysunutí 1 (extrude)
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+
+Dokument: „Prvky JSON“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (4 ✓, 0 ✗)
+Rozměry: 40 × 40 × 30 mm (X -20…20, Y -20…20, Z 0…30) · objem 16,29 cm³ · ploch 9 · hran 18
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: kružnice Ø40
+    entity: e1_1 kružnice Ø40 [0; 0]
+    profil: 1 uzavřený obrys (e1_1) ✓
+ 2. Vysunutí 1 [extrude, id #] ✓ – 12 mm, new
+ 3. Kvádr 1 [box, id #] ✓ – 10 × 10 × 30 mm, add, roh [-5; -5; 0]
+ 4. Díra 1 [hole, id #] ✓ – Ø5 skrz v [0; 0; 30], osa Z

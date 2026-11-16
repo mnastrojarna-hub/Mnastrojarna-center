@@ -156,6 +156,20 @@ export const DraftCmdLine = forwardRef<CmdLineHandle, Props>(function DraftCmdLi
                   {"]"}
                 </>
               ) : null}
+              {prompt.k === "select" ? (
+                <>
+                  {/* výběr oknem / křížením dvěma kliky (jako volby O / K v AutoCADu); tažení myší funguje vždy */}
+                  {" ["}
+                  <button type="button" className="text-[#60a5fa] underline decoration-dotted underline-offset-2 hover:text-brand" onClick={() => onKeyword("window")} data-kw="window" title={tr("o – okno: vybere objekty celé uvnitř dvou rohů")}>
+                    {tr("Okno")}
+                  </button>
+                  {"/"}
+                  <button type="button" className="text-[#60a5fa] underline decoration-dotted underline-offset-2 hover:text-brand" onClick={() => onKeyword("crossing")} data-kw="crossing" title={tr("k – křížení: vybere objekty uvnitř i protnuté")}>
+                    {tr("Křížení")}
+                  </button>
+                  {"]"}
+                </>
+              ) : null}
               {promptDefault(prompt) ? ` <${promptDefault(prompt)}>` : ""}:
             </>
           ) : (

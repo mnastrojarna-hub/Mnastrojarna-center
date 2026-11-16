@@ -538,7 +538,7 @@ export type EditKernel = {
   topology?: (doc: CadDoc) => Promise<Topo | null>;
   selectFaces?: (rule: string[], faces: FaceLite[], bbox: [Vec3, Vec3]) => number[];
   selectEdges?: (rule: string[], edges: EdgeLite[], bbox: [Vec3, Vec3]) => number[];
-  /** otisky výběru prvku nad dokumentem PŘED ním (`stampFeature` z use-pick-sigs.ts) */
+  /** otisky výběru prvku nad dokumentem PŘED ním (`stampFeature` z engine/stamp.ts) */
   stamp?: (before: CadDoc, f: Feature) => Promise<Feature>;
   /** stavba dokumentu (hrany modelu pro průmět do skici) – `cad.build` */
   build?: (doc: CadDoc) => Promise<{ mesh: { lines: ArrayLike<number>; edgeGroups: ArrayLike<number> } | null }>;

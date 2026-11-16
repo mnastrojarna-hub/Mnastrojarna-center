@@ -28,7 +28,7 @@ export default {
   select: {
     what: "Wählt Skizzenelemente aus und bearbeitet sie: Klick wählt, Ziehen verschiebt, Griffe formen um, Entf löscht.",
     when: "Zwischen Zeichenschritten – Auswahl für eine Beziehung, Änderung, Kopie oder zum Löschen.",
-    steps: ["Element anklicken; Umschalt oder Strg fügt weitere hinzu.", "Rahmen von links nach rechts = nur ganz innen, von rechts nach links = auch geschnittene.", "Doppelklick auf ein Maß ändert den Wert; die rechte Taste bietet weitere Aktionen."],
+    steps: ["Klick wählt, Umschalt/Strg ergänzt; Fenster mit Strg ergänzt, mit Strg+Umschalt entfernt.", "Fenster links→rechts = nur ganz innen, rechts→links = auch geschnittene; Esc bricht ab.", "Doppelklick auf ein Maß ändert den Wert; die rechte Taste bietet weitere Aktionen."],
     note: "Vollständig bestimmte (schwarze) Geometrie bewegt sich beim Ziehen nicht – Beziehungen und Maße halten sie.",
   },
   line: {
@@ -640,6 +640,7 @@ export default {
     what: "Passt die Anzeige so an, dass das ganze Blatt sichtbar ist.",
     when: "Nach dem Zoomen in ein Detail, nach Änderung des Blattformats, wenn das Blatt aus dem Fenster gerät.",
     steps: ["Auf Ganzes Blatt klicken."],
+    note: "Verschieben mit mittlerer/rechter Taste (links außerhalb des Papiers); linkes Ziehen auf dem Blatt wählt Notizen per Fenster.",
   },
   "drawing-ws/bomCsv": {
     what: "Speichert die Baugruppenstückliste als CSV-Tabelle: Position, Name, Nummer, Stück, Werkstoff, Masse.",

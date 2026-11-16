@@ -9,12 +9,13 @@
 import type { InterferenceStats } from "./asm-kernel";
 import { instanceKey, rotMatrix } from "./assembly";
 import { springComps, springMotionLines, springSteps, type SpringStep } from "./asm-spring";
-import { tr } from "./i18n";
+import { getLang, tr } from "./i18n";
 import { kinCluster, kinCtx, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
 import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, rigidGroups, solvePoses, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
-export type MotionCollision = { a: string; b: string; volume: number };
+/** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách – zařazení šroub × závit) */
+export type MotionCollision = { a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] };
 /** Výsledek kontroly kolizí v kroku; `stats` = počty přesných / znovupoužitých / odfiltrovaných dvojic z jádra (přírůstková kontrola). */
 export type MotionClashes = MotionCollision[] & { stats?: InterferenceStats };
 /** Časy výpočtu studie [ms] pro protokol (Σ slow=, JSON timing) a průběh. */
@@ -77,6 +78,8 @@ export const defaultStudy = (): MotionStudy => ({ motors: [], duration: 2, steps
 export function motorValue(mo: MotionMotor, k: number, n: number, duration: number): number {
   const t = n > 0 ? (duration * k) / n : 0;
   if (mo.speed !== undefined && Number.isFinite(mo.speed)) return mo.from + (mo.kind === "rotary" ? (mo.speed * 360 * t) / 60 : mo.speed * t);
+  // tam a zpět (výstředníkový lis): od → do → od sinusově, rychlost na koncích nulová
+  if (mo.back) return mo.from + ((mo.to - mo.from) * (1 - Math.cos((2 * Math.PI * k) / Math.max(1, n)))) / 2;
   return mo.from + (n > 0 ? ((mo.to - mo.from) * k) / n : 0);
 }
 
@@ -250,14 +253,20 @@ export function poseDoc(doc: CadDoc, place: Record<string, Placement>, springs?:
   };
 }
 
+/** číslo do CSV (středník, desetinná čárka pro Excel) */
 const num = (v: number, d = 4) => (Math.round(v * 10 ** d) / 10 ** d || 0).toString().replace(".", ",");
+/** číslo do protokolu a popisu motoru: desetinná tečka v EN, čárka v CS / DE (souhrn dynamiky motion-dynamic-report.ts stejně) */
+const txt = (v: number, d = 4) => {
+  const s = (Math.round(v * 10 ** d) / 10 ** d || 0).toString();
+  return getLang() === "en" ? s : s.replace(".", ",");
+};
 
 /** Popis motoru: „rotační · Závěs „Klika“ · 0…360°“. */
 export function motorText(mo: MotionMotor, doc: CadDoc): string {
   const m = doc.mates?.find((x) => x.id === mo.mate);
   const comp = (id?: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
   const unit = mo.kind === "rotary" ? "°" : " mm";
-  const range = mo.speed !== undefined ? `${mo.kind === "rotary" ? tr("{0} ot/min", num(mo.speed, 3)) : tr("{0} mm/s", num(mo.speed, 3))}${mo.from ? tr(" od {0}{1}", num(mo.from), unit) : ""}` : `${num(mo.from)}…${num(mo.to)}${unit}`;
+  const range = mo.speed !== undefined ? `${mo.kind === "rotary" ? tr("{0} ot/min", txt(mo.speed, 3)) : tr("{0} mm/s", txt(mo.speed, 3))}${mo.from ? tr(" od {0}{1}", txt(mo.from), unit) : ""}` : `${txt(mo.from)}…${txt(mo.to)}${unit}${mo.back ? tr(" tam a zpět") : ""}`;
   return `${mo.kind === "rotary" ? tr("rotační motor") : tr("lineární motor")} · ${m ? `${m.name ?? tr(MATE_LABEL[m.type])} „${comp(m.a.compId)}“ → „${comp(m.b.compId)}“` : tr("(vazba chybí)")} · ${range}`;
 }
 
@@ -283,7 +292,8 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
       row.push(...(p ? [...p.position, ...p.rotation].map((v) => num(v, 6)) : ["", "", "", "", "", ""]));
     }
     if (hasTrace) row.push(...(s.trace ? s.trace.map((v) => num(v, 6)) : ["", "", ""]));
-    if (res.collisionsChecked) row.push((s.clashes ?? []).map((x) => `${name(x.a)} × ${name(x.b)}`).join(", "));
+    // dynamika kontroluje kolize jen v každém k-tém snímku – ostatní „nekontrolováno“ (prázdná buňka = bez kolize)
+    if (res.collisionsChecked) row.push(s.clashes ? s.clashes.map((x) => `${name(x.a)} × ${name(x.b)}`).join(", ") : tr("nekontrolováno"));
     row.push(String(s.conflicts.length));
     for (const id of springIds) {
       const sp = s.springs?.[id];
@@ -309,11 +319,12 @@ export function rotationAngleDeg(a: Vec3, b: Vec3): number {
 }
 
 /** Souhrn výsledku do protokolu: kroky, rozsah pohybu komponent, kolize, nesplněné vazby. */
-export function motionSummary(res: MotionResult, doc: CadDoc): string[] {
+/** `o.collisionLines`: řádky kolizí podle tříd (clash-thread.ts, asm-agent-kin.ts) místo řádku „první kolize“ */
+export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLines?: string[] } = {}): string[] {
   const out: string[] = [];
   const last = res.steps[res.steps.length - 1];
   const first = res.steps[0];
-  out.push(tr("Pohybová studie: {0} kroků · {1} s · motory: {2}", res.steps.length - 1, num(last?.t ?? 0, 3), res.motors.map((m) => motorText(m, doc)).join("; ")));
+  out.push(tr("Pohybová studie: {0} kroků · {1} s · motory: {2}", res.steps.length - 1, txt(last?.t ?? 0, 3), res.motors.map((m) => motorText(m, doc)).join("; ")));
   if (first && last)
     for (const c of res.comps) {
       const pts = res.steps.map((s) => s.place[c.id]?.position).filter((p): p is Vec3 => !!p);
@@ -325,11 +336,12 @@ export function motionSummary(res: MotionResult, doc: CadDoc): string[] {
       const turn = init ? Math.max(0, ...res.steps.map((s) => (s.place[c.id] ? rotationAngleDeg(init, s.place[c.id].rotation) : 0))) : 0;
       const rot = turn > ROT_EPS_DEG;
       if (span.every((v) => v < 1e-6) && !rot) continue;
-      out.push(tr(" {0}: rozsah pohybu X {1} · Y {2} · Z {3} mm{4} · konec {5}", c.name, num(span[0], 3), num(span[1], 3), num(span[2], 3), rot ? `${tr(" · natáčí se")} ${num(turn, 3)}°` : "", `[${last.place[c.id].position.map((v) => num(v, 3)).join("; ")}]`));
+      out.push(tr(" {0}: rozsah pohybu X {1} · Y {2} · Z {3} mm{4} · konec {5}", c.name, txt(span[0], 3), txt(span[1], 3), txt(span[2], 3), rot ? `${tr(" · natáčí se")} ${txt(turn, 3)}°` : "", `[${last.place[c.id].position.map((v) => txt(v, 3)).join("; ")}]`));
     }
-  if (res.collisionsChecked) {
+  if (res.collisionsChecked && o.collisionLines) out.push(...o.collisionLines);
+  else if (res.collisionsChecked) {
     const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
-    out.push(res.collision ? tr("⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)", res.collision.step, num(res.collision.t, 3), nm(res.collision.a), nm(res.collision.b), num(res.collision.volume, 3)) : tr("Kolize: žádné ve všech krocích"));
+    out.push(res.collision ? tr("⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)", res.collision.step, txt(res.collision.t, 3), nm(res.collision.a), nm(res.collision.b), txt(res.collision.volume, 3)) : tr("Kolize: žádné ve všech krocích"));
   }
   out.push(res.conflictSteps ? tr("⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)", res.conflictSteps) : tr("Vazby splněny ve všech krocích"));
   if (res.steps.some((s) => s.springs)) out.push(...springMotionLines(doc, res.steps).map((l) => ` ${l}`)); // pružiny: délka, síla, doraz
@@ -337,6 +349,46 @@ export function motionSummary(res: MotionResult, doc: CadDoc): string[] {
   for (const x of issues.slice(0, 4)) out.push(` ⚠ ${x.code} ${x.text}`);
   if (issues.length > 4) out.push(tr(" … a další úseky s nesplněnými vazbami: {0}", issues.length - 4));
   return out;
+}
+
+/**
+ * Tuhé skupiny pohybu pro jeden souhrnný řádek studie (zkouška 959, B6: „36 komp. 50 mm · 1 komp. 20 mm · 33 stojí“
+ * místo rozsahu každé komponenty): komponenty se stejným posunutím ve všech krocích (zaokrouhleno na 0,001 mm) a bez
+ * natočení tvoří skupinu; `travel` = největší vzdálenost od výchozí polohy. Natáčející se komponenty se počítají zvlášť
+ * (`rotating`). Skupiny podle počtu komponent sestupně, pak podle zdvihu.
+ */
+export function motionGroups(res: MotionResult): { moving: { n: number; travel: number }[]; still: number; rotating: number } {
+  const first = res.steps[0];
+  const groups = new Map<string, { n: number; travel: number }>();
+  let still = 0;
+  let rotating = 0;
+  if (!first) return { moving: [], still: res.comps.length, rotating: 0 };
+  for (const c of res.comps) {
+    const p0 = first.place[c.id];
+    if (!p0) continue;
+    let travel = 0;
+    let rot = false;
+    const sig: string[] = [];
+    for (const s of res.steps) {
+      const p = s.place[c.id];
+      if (!p) continue;
+      const d = [0, 1, 2].map((k) => p.position[k] - p0.position[k]);
+      travel = Math.max(travel, Math.hypot(d[0], d[1], d[2]));
+      // natočení vůči výchozímu kroku jako úhel mezi maticemi (B11, `rotationAngleDeg` – jako souhrn studie výše), ne po složkách
+      // Eulerových úhlů: [180, 0, 0] a [-180, 0, 0] je tatáž poloha
+      if (!rot && rotationAngleDeg(p0.rotation, p.rotation) > ROT_EPS_DEG) rot = true;
+      sig.push(d.map((v) => Math.round(v * 1000)).join(","));
+    }
+    if (rot) rotating++;
+    else if (travel < 1e-3) still++;
+    else {
+      const key = sig.join(";");
+      const g = groups.get(key) ?? { n: 0, travel };
+      g.n++;
+      groups.set(key, g);
+    }
+  }
+  return { moving: [...groups.values()].sort((a, b) => b.n - a.n || b.travel - a.travel), still, rotating };
 }
 
 /** Popis vazby pro hlášení (uvnitř uvozovek klíče): „Mez vzdálenosti Stírací deska → Kotevní deska“; motor: „motor 1: Vzdálenost …“. */

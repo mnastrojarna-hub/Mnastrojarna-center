@@ -122,12 +122,12 @@ type OC = {
   BRepBuilderAPI_MakeVertex: new (p: unknown) => { Vertex(): { delete(): void }; delete(): void };
   BRepExtrema_DistShapeShape: new (a: unknown, b: unknown) => { IsDone(): boolean; Value(): number; InnerSolution(): boolean; NbSolution(): number; PointOnShape2(n: number): { X(): number; Y(): number; Z(): number; delete(): void }; delete(): void };
 };
-let ocRef: OC | null = null;
+/**
+ * Aktuální modul OCCT – vždy znovu z `getOC()`, nikdy v proměnné modulu: po pádu WASM ve vlákně (in-process transport,
+ * `kernel-ops.ts` `resetKernel`) se načte nová instance OCCT a tělesa nové instance by stará třída `TopoDS_Shape` odmítla.
+ */
 async function oc(): Promise<OC> {
-  if (ocRef) return ocRef;
-  const r = await rep();
-  ocRef = r.getOC() as unknown as OC;
-  return ocRef;
+  return (await rep()).getOC() as unknown as OC;
 }
 
 /** vzdálenost bodu od tvaru; `inner` = bod uvnitř tělesa (jen u solidu); `q` = nejbližší bod tvaru */

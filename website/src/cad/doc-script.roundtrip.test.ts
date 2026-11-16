@@ -18,7 +18,7 @@ import type { AsmComponent, BuildResult, CadDoc, Feature } from "./types";
 const WEB = path.resolve(__dirname, "../..");
 // soubor zákazníka: website/.local/fixtures (mimo git); CAD_FIXTURES_DIR = jiná složka (pracovní strom bez .local)
 const REAL = path.join(process.env.CAD_FIXTURES_DIR ?? path.join(WEB, ".local", "fixtures"), "959-dokument.json");
-const SYNTH = path.join(WEB, "scripts", "cad-harness", "synth-959.txt");
+const SYNTH = path.join(WEB, "scripts", "cad-harness", "synth-tool.txt");
 const REPORT = process.env.DOC2TEXT_REPORT;
 const report: Record<string, unknown> = {};
 
@@ -185,8 +185,9 @@ describe("tam a zpět: díly z fixtures", () => {
 describe("tam a zpět: zkušební nástroj scripts/cad-harness (70 komponent, 53 vazeb)", () => {
   it("dokument sestavy → skript → stejná sestava", async () => {
     const built = await replay(fs.readFileSync(SYNTH, "utf8"), { skipMotion: true });
-    // `kontrola sestava` je ve zkušebním skriptu zatím nečitelný řádek (balík B5) – jiná chyba být nesmí
-    expect(built.errors.filter((e) => !/kontrola/.test(e))).toEqual([]);
+    // `kontrola sestava` (balík B5) smyčka zkušebního stroje neprovádí (není to engine – ✗ „loopback does not run op "check"“,
+    // jako synth-tool.mjs); kontrolu sestavy ověřuje brána B6 přes sestavené CLI. Jiná chyba být nesmí
+    expect(built.errors.filter((e) => !/kontrola|loopback does not run op "check"/.test(e))).toEqual([]);
     const orig = JSON.parse(JSON.stringify(built.s.assembly()!)) as CadDoc;
     expect(orig.components?.length).toBe(70);
     expect(orig.mates?.length).toBe(53);

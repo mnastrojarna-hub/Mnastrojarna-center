@@ -158,7 +158,7 @@ describe("řez lomenou čarou (ISO 128-44)", () => {
     expect(cs.view.cam.d[1]).toBeCloseTo(-1, 9);
     expect(cs.arrow[1]).toBeCloseTo(-1, 9);
     const yMid = cs.view.y0 + cs.view.h / 2;
-    const spans = rowSpans(cs.loops, yMid);
+    const spans = rowSpans(cs.loops.flat(), yMid);
     const lens = spans.map(([a, b]) => Math.round((b - a) * 1000) / 1000).sort((a, b) => a - b);
     expect(lens).toEqual([15, 16, 29, 30]);
     const gaps = spans.slice(1).map((s, i) => Math.round((s[0] - spans[i][1]) * 1000) / 1000);
@@ -187,7 +187,7 @@ describe("řez lomenou čarou (ISO 128-44)", () => {
     const top = projectView(shape, "top", { d: [0, 0, 1], x: [1, 0, 0] }, false);
     const a120: Vec2 = [60 * Math.cos((2 * Math.PI) / 3), -60 * Math.sin((2 * Math.PI) / 3)];
     const cs = cutSection(shape, { id: "c", label: "C", parent: "top", kind: "aligned", pts: [[60, 0], [0, 0], a120] }, top, false, projectView);
-    const spans = rowSpans(cs.loops, cs.view.y0 + cs.view.h / 2);
+    const spans = rowSpans(cs.loops.flat(), cs.view.y0 + cs.view.h / 2);
     const lens = spans.map(([a, b]) => Math.round((b - a) * 1000) / 1000).sort((a, b) => a - b);
     expect(lens).toEqual([11, 11, 21, 21]);
     const gaps = spans.slice(1).map((s, i) => Math.round((s[0] - spans[i][1]) * 1000) / 1000);

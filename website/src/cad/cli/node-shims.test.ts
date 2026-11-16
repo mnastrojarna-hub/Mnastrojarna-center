@@ -1,9 +1,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import ts from "typescript";
 import { afterEach, describe, expect, it } from "vitest";
-import { fontNameOf, installLoopbackSelf, installNodeShims, installWasmGrowHook, makeLocation, makeLoopbackKernel, publishWasmHeap, sharePageFor, DEFAULT_ORIGIN, type InstalledShims } from "./node-shims";
+import { fontNameOf, installNodeShims, installWasmGrowHook, makeLocation, publishWasmHeap, sharePageFor, DEFAULT_ORIGIN, type InstalledShims } from "./node-shims";
 
 let shims: InstalledShims | null = null;
 afterEach(() => {
@@ -84,65 +83,5 @@ describe("location a fetch /fonts/* (Node shim)", () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
     expect(typeof (globalThis as { location?: unknown }).location).toBe("undefined");
-  });
-});
-
-/** názvy vlastností objektu `cad` v client.ts – ze zdrojového textu (klient se v CLI nesmí importovat, ani v testu) */
-function clientOps(): string[] {
-  const file = path.resolve(__dirname, "../client.ts");
-  const sf = ts.createSourceFile(file, fs.readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
-  const out: string[] = [];
-  const visit = (n: ts.Node) => {
-    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === "cad" && n.initializer && ts.isObjectLiteralExpression(n.initializer))
-      for (const p of n.initializer.properties) if (p.name && (ts.isIdentifier(p.name) || ts.isStringLiteral(p.name))) out.push(p.name.text);
-    ts.forEachChild(n, visit);
-  };
-  visit(sf);
-  return out;
-}
-
-describe("smyčka jádra (loopback) – protokol zpráv client.ts", () => {
-  it("implementuje každou operaci klienta jádra (kromě odběru průběhu) – hlídá drift po sloučení vln 11–13", () => {
-    const port = installLoopbackSelf();
-    const k = makeLoopbackKernel(port);
-    const client = clientOps().filter((x) => x !== "onProgress" && x !== "progress");
-    expect(client.length).toBeGreaterThanOrEqual(25);
-    expect(client.filter((x) => !k.implemented.includes(x))).toEqual([]);
-    expect(k.implemented).toContain("generation");
-    expect(k.generation()).toBe(1);
-  });
-  it("požadavek → structuredClone → odpověď; průběh; pád jádra odmítne čekající a ohlásí se; neznámá operace = chyba", async () => {
-    const port = installLoopbackSelf();
-    const self = (globalThis as unknown as { self: { onmessage: ((e: { data: Record<string, unknown> }) => void) | null; postMessage: (m: unknown, t?: Transferable[]) => void } }).self;
-    const got: Record<string, unknown>[] = [];
-    const doc = { name: "D", features: [] } as never;
-    self.onmessage = (e) => {
-      got.push(e.data);
-      const id = e.data.id as number;
-      if (e.data.op === "build") {
-        self.postMessage({ id, progress: { phase: "feature", index: 0, total: 1, name: "Kvádr 1" } });
-        const buf = new Float32Array([1, 2, 3]);
-        self.postMessage({ id, ok: true, result: { mesh: buf } }, [buf.buffer]);
-      } else if (e.data.op === "export") self.postMessage({ id, ok: false, error: "Model je prázdný." });
-    };
-    const k = makeLoopbackKernel(port);
-    const prog: unknown[] = [];
-    k.onKernelProgress((p) => prog.push(p));
-    const res = (await k.build(doc)) as unknown as { mesh: Float32Array };
-    expect([...res.mesh]).toEqual([1, 2, 3]);
-    expect(got[0]).toMatchObject({ op: "build", doc: { name: "D" } });
-    expect(got[0].doc).not.toBe(doc); // kopie, ne sdílený objekt
-    expect(prog).toEqual([{ phase: "feature", index: 0, total: 1, name: "Kvádr 1", op: "build" }]);
-    await expect(k.exportFile(doc, "step")).rejects.toThrow("Model je prázdný.");
-    const fatal: string[] = [];
-    k.onFatal((r) => fatal.push(r));
-    self.onmessage = () => undefined;
-    const p = k.topology(doc);
-    self.postMessage({ fatal: true, error: "Aborted(oom)" });
-    await expect(p).rejects.toThrow("Aborted(oom)");
-    expect(fatal).toEqual(["Aborted(oom)"]);
-    await expect(k.build(doc)).rejects.toThrow("Aborted(oom)");
-    await expect((k as unknown as { zadnaTakovaOperace: () => Promise<unknown> }).zadnaTakovaOperace()).rejects.toThrow(/zadnaTakovaOperace/);
-    expect(k.cancel()).toBe(false);
   });
 });

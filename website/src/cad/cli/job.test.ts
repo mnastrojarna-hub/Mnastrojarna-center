@@ -1,15 +1,15 @@
 /**
- * Smyčka fáze A a závěr běhu (job.ts) bez jádra: falešné `KernelApi`, MemoryWorkspace a soubory v paměti.
+ * Smyčka běhu CLI (engine + --open) a závěr běhu (job.ts) bez jádra: falešné `KernelApi`, MemoryWorkspace a soubory v paměti.
  * Celé vlákno s jádrem OCCT ověřuje e2e/cad-cli.e2e.cjs na sestaveném svazku.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "../engine/host";
 import type { KernelApi } from "../engine/kernel";
 import { MemoryWorkspace } from "../engine/memory-workspace";
-import { registerOp, unregisterOp } from "../engine/ops/registry";
+import { registerOp } from "../engine/ops/registry";
 import { ReportBuilder } from "../engine/protocol";
 import { emptyDoc, type CadDoc } from "../types";
-import { agentExamples, finishRun, formatsFor, interimRun, opLabel, pickMain, StagingSink, strictStopper, type OutputPolicy, type RunHooks } from "./job";
+import { agentExamples, engineRun, finishRun, formatsFor, loadError, opLabel, pickMain, StagingSink, strictStopper, wasmLocator, type OutputPolicy, type RunHooks } from "./job";
 import { parseAgentText } from "../agent";
 
 const plate: CadDoc = {
@@ -31,9 +31,16 @@ function fakeKernel(o: { failBuild?: string; featureError?: boolean; featureWarn
       if (o.failBuild) throw new Error(o.failBuild);
       return { status: d.features.map((f, i) => ({ id: f.id, ok: !(o.featureError && i === 1), ...(o.featureError && i === 1 ? { error: "díra mimo těleso" } : {}), ...(o.featureWarning && i === 1 ? { warning: "Prvek těleso nezměnil" } : {}) })), mesh: null, metrics: { volume: 49497.3, area: 1, bbox: [[0, 0, 0], [100, 50, 10]], faces: 7, edges: 15 }, ms: 1 };
     },
+    // díly jako komponenty (ověření dokumentu z --open, ze kterého běh odešel / přísný běh – engine/verify.ts)
+    asmParts: async (parts: { key: string; source: { kind: string; doc: CadDoc } }[]) => Promise.all(parts.map(async (p) => ({ key: p.key, result: await k.build(p.source.doc) }))),
     exportFile: async (d: CadDoc, f: string) => {
       calls.push(`export:${f}:${d.name}`);
       return new TextEncoder().encode("ISO-10303-21;").buffer;
+    },
+    // kontrola STEP znovunačtením (B3, engine/files.ts verifyExport): soubor = model
+    exportStats: async () => {
+      const st = { solids: 1, volume: 49497.3, bbox: [[0, 0, 0], [100, 50, 10]] as [[number, number, number], [number, number, number]] };
+      return { model: st, file: st };
     },
   };
   return { kernel: k as unknown as KernelApi, calls };
@@ -52,65 +59,70 @@ const setup = (files: Record<string, Uint8Array> = {}, kernelOpts = {}) => {
 };
 const codes = (rb: ReportBuilder) => rb.entries.map((e) => `${e.line ?? "-"} ${e.level} ${e.code}`);
 
-afterEach(() => void unregisterOp("meta"));
-
-describe("interimRun – smyčka fáze A (rozbor + registr enginu)", () => {
-  it("operace bez obsluhy v registru = ✗ host.app-only s řádkem; chyba rozboru = ✗ parse.error; počet operací", async () => {
+describe("engineRun – --open + smyčka enginu (engine/run.ts)", () => {
+  it("operace se provedou obsluhami enginu; chyba rozboru = ✗ parse.error; výsledek prvku po stavbě s řádkem prvku", async () => {
     const s = setup();
     const script = 'nový díl "A"\nkvádr 10 10 10\nblbost\n';
     const rb = s.rb(script);
     const { log, hooks } = hooksLog();
-    await interimRun(s.ws, script, s.host, rb, { strict: false, open: [] }, hooks);
-    expect(codes(rb)).toEqual(["3 error parse.error", "1 error host.app-only", "2 error host.app-only"]);
-    expect(rb.entries[1].text).toBe("příkaz funguje jen v aplikaci v prohlížeči: new");
-    expect(rb.entries[2].text).toMatch(/feature:box$/);
-    expect(log).toEqual(["start 1 new", "end 1 new", "start 2 feature:box", "end 2 feature:box"]);
+    await engineRun(s.ws, script, s.host, rb, { strict: false, open: [] }, hooks);
+    expect(codes(rb)).toEqual(["3 error parse.error", "1 ok undefined", "2 note msg.note", "2 ok undefined"]);
+    expect(rb.entries[1].text).toBe("nový díl „A“ – nová záložka");
+    expect(rb.entries[3].text).toBe("Kvádr 1 (box)");
+    // závěrečná ověřovací stavba enginu = operace „build“ bez řádku (hlídač CLI ji zná při --timeout)
+    expect(log).toEqual(["start 1 new", "end 1 new", "start 2 feature:box", "end 2 feature:box", "start - build", "end - build"]);
+    expect(s.ws.present()).toMatchObject({ name: "A", features: [{ type: "box", size: [10, 10, 10] }] });
+    expect(s.ws.tabs()).toHaveLength(1); // úvodní prázdný díl relace se znovu použil
     const r = rb.finish();
-    expect(r.counts).toMatchObject({ ops: 2, errors: 3 });
+    expect(r.counts).toMatchObject({ ops: 2, errors: 1 });
   });
-  it("zaregistrovaná obsluha se použije místo ✗ host.app-only (B2 sem přidá obsluhy)", async () => {
-    registerOp("meta", async (op, ctx) => {
-      ctx.ws.commit({ ...ctx.ws.present(), ...op.patch });
-    });
+  it("chyba operace = ✗ op.failed na řádku operace; jiný vlastník téhož druhu operace v registru = chyba", async () => {
     const s = setup();
     const rb = s.rb();
-    await interimRun(s.ws, "název Nový název\nkvádr 1 1 1", s.host, rb, { strict: false, open: [] }, hooksLog().hooks);
-    expect(codes(rb)).toEqual(["2 error host.app-only"]);
-    expect(s.ws.present().name).toBe("Nový název");
-    expect(rb.finish().counts.ops).toBe(2);
+    await engineRun(s.ws, 'název Nový název\nvložit "X"\nkvádr 1 1 1', s.host, rb, { strict: false, open: [] }, hooksLog().hooks);
+    expect(codes(rb)).toContain("2 error op.failed");
+    expect(rb.entries.find((e) => e.code === "op.failed")!.text).toMatch(/vložit: otevřený dokument není sestava/);
+    expect(s.ws.present()).toMatchObject({ name: "Nový název", features: [{ type: "box" }] });
+    expect(() => registerOp("meta", async () => undefined)).toThrow(/meta/);
+    expect(() => registerOp("meta", async () => undefined, "jiný vlastník")).toThrow(/meta/);
   });
   it("přísný režim: chyba rozboru zastaví běh před provedením; jinak první ⚠/✗ (kromě výjimek) zastaví", async () => {
     const s = setup();
     const rb1 = s.rb("", true);
-    await interimRun(s.ws, "kvádr 1 1 1\nblbost", s.host, rb1, { strict: true, open: [] }, hooksLog().hooks);
+    await engineRun(s.ws, "kvádr 1 1 1\nblbost", s.host, rb1, { strict: true, open: [] }, hooksLog().hooks);
     expect(rb1.stopped).toEqual({ line: 2, code: "parse.error" });
     expect(codes(rb1)).toEqual(["2 error parse.error"]);
     const rb2 = s.rb("", true);
-    await interimRun(s.ws, "kvádr 1 1 1\nválec 5 5", s.host, rb2, { strict: true, open: [] }, hooksLog().hooks);
-    expect(rb2.stopped).toEqual({ line: 1, code: "host.app-only" });
-    expect(codes(rb2)).toEqual(["1 error host.app-only"]);
+    const h2 = hooksLog();
+    await engineRun(s.ws, 'kvádr 1 1 1\nvložit "X"\nválec 5 5', s.host, rb2, { strict: true, open: [] }, h2.hooks);
+    expect(rb2.stopped).toEqual({ line: 2, code: "op.failed" });
+    expect(h2.log.some((l) => l.startsWith("start 3"))).toBe(false); // řádek 3 se po STOP neprovedl
     const rb3 = s.rb("", true);
-    await interimRun(s.ws, "kvádr 1 1 1\nválec 5 5", s.host, rb3, { strict: { except: ["host.app-only"] }, open: [] }, hooksLog().hooks);
+    const h3 = hooksLog();
+    await engineRun(s.ws, 'kvádr 1 1 1\nvložit "X"\nválec 5 5', s.host, rb3, { strict: { except: ["op.failed"] }, open: [] }, h3.hooks);
     expect(rb3.stopped).toBeUndefined();
+    expect(h3.log).toContain("start 3 feature:cylinder");
     expect(strictStopper([{ line: 1, level: "note", code: "clash.thread", text: "" }], true)).toBeUndefined();
     expect(strictStopper([{ line: 1, level: "warn", code: "a.b", text: "" }], false)).toBeUndefined();
   });
-  it("--open: .mncad přes FileSource do záložky; chybějící soubor, jiný formát a neplatný JSON = řádné ✗ s kódem", async () => {
+  it("--open: .mncad přes FileSource do záložky; chybějící soubor, neplatný STEP a neplatný JSON = řádné ✗ s kódem", async () => {
     const s = setup({ "deska.mncad": enc(plate), "bad.mncad": enc("{nope"), "x.step": enc("ISO"), "nodoc.mncad": enc({ a: 1 }) });
     const rb = s.rb();
     const { log, hooks } = hooksLog();
-    await interimRun(s.ws, "", s.host, rb, { strict: false, open: ["deska.mncad", "chybí.mncad", "x.step", "bad.mncad", "nodoc.mncad", "../../etc/passwd"] }, hooks);
-    expect(codes(rb)).toEqual(["- ok undefined", "- error file.missing", "- error host.app-only", "- error op.failed", "- error op.failed", "- error file.missing"]);
+    await engineRun(s.ws, "", s.host, rb, { strict: false, open: ["deska.mncad", "chybí.mncad", "x.step", "bad.mncad", "nodoc.mncad", "../../etc/passwd"] }, hooks);
+    expect(codes(rb)).toEqual(["- ok undefined", "- error file.missing", "- error op.failed", "- error op.failed", "- error op.failed", "- error file.missing"]);
     expect(rb.entries[1].text).toMatch(/chybí\.mncad.*bad\.mncad, deska\.mncad, nodoc\.mncad, x\.step/);
+    expect(rb.entries[2].text).toMatch(/STEP/);
     expect(s.ws.present().name).toBe("Deska 1");
     expect(s.ws.tabs()).toHaveLength(1); // úvodní prázdný díl relace se znovu použil
-    expect(log.filter((l) => l.startsWith("start"))).toHaveLength(6);
+    expect(log.filter((l) => l.startsWith("start"))).toHaveLength(7); // 6× open + závěrečná stavba („build“)
+    expect(log.filter((l) => l.startsWith("start")).at(-1)).toBe("start - build");
   });
   it("přísně: chybějící --open zastaví běh hned (STOP file.missing), skript ani další --open se neprovedou", async () => {
     const s = setup({ "deska.mncad": enc(plate) });
     const rb = s.rb("kvádr 1 1 1", true);
     const { log, hooks } = hooksLog();
-    await interimRun(s.ws, "kvádr 1 1 1", s.host, rb, { strict: true, open: ["chybí.mncad", "deska.mncad"] }, hooks);
+    await engineRun(s.ws, "kvádr 1 1 1", s.host, rb, { strict: true, open: ["chybí.mncad", "deska.mncad"] }, hooks);
     expect(rb.stopped).toEqual({ line: null, code: "file.missing" });
     expect(codes(rb)).toEqual(["- error file.missing"]);
     expect(rb.entries[0].text).toBe("soubor „chybí.mncad“ není k dispozici – dostupné: deska.mncad");
@@ -118,23 +130,24 @@ describe("interimRun – smyčka fáze A (rozbor + registr enginu)", () => {
     expect(s.ws.present().features).toHaveLength(0);
     // výjimka kódu: běh pokračuje
     const rb2 = s.rb("", true);
-    await interimRun(s.ws, "", s.host, rb2, { strict: { except: ["file.missing"] }, open: ["chybí.mncad", "deska.mncad"] }, hooksLog().hooks);
+    await engineRun(s.ws, "", s.host, rb2, { strict: { except: ["file.missing"] }, open: ["chybí.mncad", "deska.mncad"] }, hooksLog().hooks);
     expect(rb2.stopped).toBeUndefined();
     expect(s.ws.present().name).toBe("Deska 1");
   });
   it("prázdný skript bez --open = ✗ parse.error", async () => {
     const s = setup();
     const rb = s.rb();
-    await interimRun(s.ws, "  \n", s.host, rb, { strict: false, open: [] }, hooksLog().hooks);
+    await engineRun(s.ws, "  \n", s.host, rb, { strict: false, open: [] }, hooksLog().hooks);
     expect(codes(rb)).toEqual(["- error parse.error"]);
   });
 });
 
 describe("finishRun – souhrny, výstupy při ✗, přísný STOP", () => {
-  const opened = async (kernelOpts = {}) => {
+  // volba přísného režimu jako v handleRun: tatáž pro smyčku (engineRun) i závěr (finishRun)
+  const opened = async (kernelOpts = {}, strict: OutputPolicy["strict"] = false) => {
     const s = setup({ "deska.mncad": enc(plate) }, kernelOpts);
-    const rb = s.rb();
-    await interimRun(s.ws, "", s.host, rb, { strict: false, open: ["deska.mncad"] }, hooksLog().hooks);
+    const rb = s.rb("", !!strict);
+    await engineRun(s.ws, "", s.host, rb, { strict: strict ?? false, open: ["deska.mncad"] }, hooksLog().hooks);
     return { ...s, rb2: rb };
   };
   it("hlavní dokument se postaví; D se souhrnem; --formats auto = STEP + .mncad", async () => {
@@ -145,7 +158,8 @@ describe("finishRun – souhrny, výstupy při ✗, přísný STOP", () => {
     expect(fin.docs[0].mass_kg).toBeCloseTo(0.3885, 3);
     expect([...s.sink.files.keys()]).toEqual(["Deska 1.step", "Deska 1.mncad"]);
     expect(JSON.parse(new TextDecoder().decode(s.sink.files.get("Deska 1.mncad")!.data)).name).toBe("Deska 1");
-    expect(s.calls).toEqual(["build:Deska 1", "export:step:Deska 1"]);
+    // 1. stavba = ověření dokumentu z --open enginem (B4: načtený dokument se vždy ověří), 2. = souhrn D (v jádře z mezipaměti)
+    expect(s.calls).toEqual(["build:Deska 1", "build:Deska 1", "export:step:Deska 1"]);
     expect(log).toEqual(["start - build", "end - build", "start - out:step", "end - out:step", "start - out:mncad", "end - out:mncad"]);
   });
   it("✗ ve skriptu: soubory se zapíší (run=fail značí handleRun); --no-output-on-error nezapíše nic", async () => {
@@ -181,7 +195,7 @@ describe("finishRun – souhrny, výstupy při ✗, přísný STOP", () => {
       [{ featureError: true }, "feature.failed", "error"],
       [{ failBuild: "OCCT" }, "build.failed", "error"],
     ] as const) {
-      const s = await opened(ko);
+      const s = await opened(ko, true);
       const fin = await finishRun(s.ws, s.host, s.rb2, pol({ formats: ["step"], strict: true }), hooksLog().hooks);
       expect(s.rb2.stopped, code).toEqual({ line: null, code });
       expect(s.sink.files.size, code).toBe(0);
@@ -194,25 +208,25 @@ describe("finishRun – souhrny, výstupy při ✗, přísný STOP", () => {
     expect(n.rb2.stopped).toBeUndefined();
     expect([...n.sink.files.keys()]).toEqual(["Deska 1.step"]);
     // výjimka kódu v přísném režimu
-    const e = await opened({ featureWarning: true });
+    const e = await opened({ featureWarning: true }, { except: ["feature.warning"] });
     await finishRun(e.ws, e.host, e.rb2, pol({ formats: ["step"], strict: { except: ["feature.warning"] } }), hooksLog().hooks);
     expect(e.rb2.stopped).toBeUndefined();
     expect(e.sink.files.size).toBe(1);
   });
   it("přísně: ✗ při výrobě výstupů = STOP a nezapíše se ani výstup, který vznikl dřív (zápis nanečisto)", async () => {
-    const s = await opened();
+    const s = await opened({}, true);
     const { log, hooks } = hooksLog();
     await finishRun(s.ws, s.host, s.rb2, pol({ formats: ["step", "csv"], strict: true }), hooks);
-    expect(s.rb2.stopped).toEqual({ line: null, code: "host.app-only" });
+    expect(s.rb2.stopped).toEqual({ line: null, code: "out.unsupported" }); // CSV = kusovník jen u sestavy (B3)
     expect(s.sink.files.size).toBe(0);
     expect(s.calls).toContain("export:step:Deska 1"); // STEP vznikl, ale do paměti relace / na disk nešel
     expect(log).not.toContain("start - out:write");
     const n = await opened();
     await finishRun(n.ws, n.host, n.rb2, pol({ formats: ["step", "csv"] }), hooksLog().hooks);
     expect([...n.sink.files.keys()]).toEqual(["Deska 1.step"]);
-    expect(codes(n.rb2)).toContain("- error host.app-only");
+    expect(codes(n.rb2)).toContain("- error out.unsupported");
     // přísně bez ⚠/✗: odložené soubory se zapíší (pořadí, SHA-256)
-    const ok = await opened();
+    const ok = await opened({}, true);
     const h2 = hooksLog();
     await finishRun(ok.ws, ok.host, ok.rb2, pol({ strict: true }), h2.hooks);
     expect([...ok.sink.files.keys()]).toEqual(["Deska 1.step", "Deska 1.mncad"]);
@@ -225,7 +239,7 @@ describe("finishRun – souhrny, výstupy při ✗, přísný STOP", () => {
     const run = async (doc: CadDoc, p: Partial<OutputPolicy>, strict = false) => {
       const s = setup({ "e.mncad": enc(doc) });
       const rb = s.rb("", strict);
-      await interimRun(s.ws, "", s.host, rb, { strict, open: ["e.mncad"] }, hooksLog().hooks);
+      await engineRun(s.ws, "", s.host, rb, { strict, open: ["e.mncad"] }, hooksLog().hooks);
       const fin = await finishRun(s.ws, s.host, rb, pol({ ...p, strict }), hooksLog().hooks);
       return { rb, fin, s, e: rb.entries.filter((x) => x.code === "out.empty") };
     };
@@ -247,7 +261,7 @@ describe("finishRun – souhrny, výstupy při ✗, přísný STOP", () => {
     // --all-docs: další prázdný dokument = ℹ, hlavní s obsahem se zapíše
     const s = setup({ "e.mncad": enc(emptyAsm), "deska.mncad": enc(plate) });
     const rb = s.rb();
-    await interimRun(s.ws, "", s.host, rb, { strict: false, open: ["e.mncad", "deska.mncad"] }, hooksLog().hooks);
+    await engineRun(s.ws, "", s.host, rb, { strict: false, open: ["e.mncad", "deska.mncad"] }, hooksLog().hooks);
     await finishRun(s.ws, s.host, rb, pol({ formats: ["step"], allDocs: true }), hooksLog().hooks);
     expect(rb.entries.filter((x) => x.code === "out.empty").map((x) => [x.level, x.doc])).toEqual([["note", "Prázdná sestava"]]);
     expect([...s.sink.files.keys()]).toEqual(["Deska 1.step"]);
@@ -295,5 +309,15 @@ describe("příklady pro smoke test", () => {
     expect(ex.filter((e) => e.src.startsWith("AGENT_GUIDE")).length).toBeGreaterThanOrEqual(20);
     expect(opLabel(parseAgentText("kvádr 1 2 3").ops[0])).toBe("feature:box");
     expect(opLabel(parseAgentText("kolize").ops[0])).toBe("clash");
+  });
+});
+
+describe("jádro z cesty hostitele (JobInit.wasm → locateFile)", () => {
+  it("wasmLocator: WASM z cesty hostitele (i s hashem v názvu), ostatní soubory beze změny; loadError s nápovědou jen bez cesty", () => {
+    const loc = wasmLocator("/opt/mncad/replicad_single.0c88f94d.wasm");
+    expect(loc("replicad_single.wasm", "/b/")).toBe("/opt/mncad/replicad_single.0c88f94d.wasm");
+    expect(loc("replicad_single.data", "/b/")).toBe("/b/replicad_single.data");
+    expect(loadError("Aborted(Error: ENOENT)", undefined)).toBe("jádro CAD se nenačetlo (replicad_single.wasm patří vedle mncad.mjs, jinou cestu zadejte v MNCAD_WASM): Aborted(Error: ENOENT)");
+    expect(loadError("Aborted(x)", "/opt/k.wasm")).toBe("jádro CAD se nenačetlo: Aborted(x)");
   });
 });

@@ -1,0 +1,47 @@
+=== run 1 ===
+✓ nový díl „Deska“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Čep“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nová sestava „Uložení“ – nová záložka
+✓ komponenta „Deska“ vložena do sestavy (ukotvená)
+✓ komponenta „Čep“ vložena do sestavy
+✓ vazba Souosost „Čep“ F1 → „Deska“ F7: ok · „Čep“ poloha [40; 30; 0]
+✓ vazba Kontakt „Čep“ F3 → „Deska“ F3: ok · „Čep“ poloha [40; 30; 10]
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Válec 1 (cylinder)
+
+Dokument: „Uložení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]
+Vazby: 2 (2 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 2 ===
+
+Dokument: „Uložení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]
+Vazby: 2 (2 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 3 ===
+✓ nový díl „Další“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+
+Dokument: „Další“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 5 × 5 × 5 mm (X 0…5, Y 0…5, Z 0…5) · objem 0,12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 5 × 5 × 5 mm, new, roh [0; 0; 0]
+=== run 4 ===
+✓ záložka „Uložení“ (sestava) je aktivní – další příkazy pracují s ní
+
+Dokument: „Uložení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]
+Vazby: 2 (2 ok)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== tabs ===
+Deska | Čep | Uložení | Další

@@ -189,11 +189,11 @@ export default {
     note: "Žebro se protáhne až k materiálu – čára nemusí těleso přesně dosahovat.",
   },
   spring: {
-    what: "Vytvoří šroubovitou pružinu z kruhového drátu.",
-    when: "Tlačná pružina do sestavy, přípravku nebo formy.",
-    steps: ["Zadejte Průměr pružiny, Průměr drátu, Stoupání a Počet závitů.", "Zvolte osu a Poloha (začátek osy).", "Zkontrolujte Volná délka a potvrďte OK."],
-    cmd: "prvek spring radius=10 wire=2 pitch=5 turns=8",
-    note: "Stoupání musí být větší než průměr drátu, jinak se závity protnou.",
+    what: "Tlačná, tažná, zkrutná nebo talířová pružina z tabulky – spočte tuhost, síly, napětí a vzpěr.",
+    when: "Stírací a vyhazovací pružiny nástroje, přítlak přípravku, upínka, sloupec talířových pružin.",
+    steps: ["Vyberte druh (Tlačná, Tažná, Zkrutná, Talířová).", "Vyplňte tučné řádky (drát d, průměr, L0, závity n); zbytek se dopočítá.", "Zkontrolujte řádky Spočteno a varování, pak Vytvořit."],
+    cmd: "pružina tlačná d 2 De 20 L0 50 n 8 L2 30",
+    note: "Broušené konce = rovné dosedací plochy v 0 a L0; úprava prvku otevře stejnou tabulku.",
   },
 
   // ── Úpravy ──

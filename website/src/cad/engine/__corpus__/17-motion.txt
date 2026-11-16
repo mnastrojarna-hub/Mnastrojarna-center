@@ -1,0 +1,15 @@
+# pohybová studie (op asm motion): vazba, motor, stav, krok, export csv
+nový díl Vodítko
+kvádr 100 20 10
+nový díl Jezdec
+kvádr 20 20 10
+#--- run
+nová sestava Pohyb
+vložit "Vodítko" ukotvit
+vložit "Jezdec" v 0 0 10
+#--- run
+sestava vazba vzdálenost "Jezdec" -X "Vodítko" -X hodnota 10
+pohyb motor lineární vazba 1 10..50 kroky 4
+pohyb stav
+pohyb krok 2
+pohyb export csv

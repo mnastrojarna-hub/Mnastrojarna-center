@@ -1,0 +1,14 @@
+# zpět / znovu přes běhy (ws.undo / ws.redo, jeden běh = jeden krok historie)
+nový díl Historie
+kvádr 30 30 30
+#--- run
+zaoblit 3
+#--- run
+srazit 1
+#--- run
+zpět
+stav
+#--- run
+zpět 5
+znovu 1
+stav

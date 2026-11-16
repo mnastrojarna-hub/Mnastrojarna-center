@@ -19,6 +19,7 @@ import type { Code } from "../engine/codes";
 import { ReportBuilder } from "../engine/protocol";
 import type { Entry, OutFile, RunReport } from "../engine/protocol-types";
 import type { StrictOpt } from "./args";
+import { stopEntry } from "../engine/strict";
 import type { DoneFile, FromJob, JobInit, JobRequest, Mem, SelftestResult, ToJob } from "./job";
 
 /** počet řádků skriptu (koncový konec řádku netvoří další řádek) */
@@ -38,22 +39,24 @@ export const INTERRUPTION_CODE: Record<Interruption, Code> = { timeout: "run.tim
 /** kód ukončení zásahu hlídače (i `mncad selftest`) */
 export const INTERRUPTION_EXIT: Record<Interruption, number> = { crash: 4, timeout: 5, memory: 6, interrupted: 130 };
 
-/** první záznam, který v přísném režimu zastaví běh (⚠/✗ s kódem mimo výjimky; ℹ nikdy) */
+/**
+ * první záznam, který v přísném režimu (volba běhu `strict`, bez řádků `přísně`) zastaví běh: ⚠/✗ s kódem mimo výjimky
+ * (kód nebo předpona `hole.` – engine/strict.ts `excepted`); ℹ nikdy. Po skriptu rozhoduje `StrictState.hit` (úseky řádků).
+ */
 export function strictStopper(entries: readonly Entry[], strict: StrictOpt): Entry | undefined {
   if (!strict) return undefined;
-  const except = typeof strict === "object" ? new Set(strict.except) : new Set<string>();
-  return entries.find((e) => (e.level === "error" || e.level === "warn") && !(e.code && except.has(e.code)));
+  return stopEntry(entries, typeof strict === "object" ? strict.except : []);
 }
 
 /**
  * Kód ukončení (kap. 3.1): 0 OK (v přísném režimu i bez ⚠) · 1 ✗ · 2 přísný STOP · 3 použití/soubor · 4 pád · 5 limit
- * času · 6 limit paměti · 130 přerušeno. `strict` = volba běhu: ⚠/✗ mimo výjimky v přísném běhu je vždy 2, i kdyby ho
- * vlákno nezastavilo (pojistka).
+ * času · 6 limit paměti · 130 přerušeno. O STOP rozhoduje vlákno běhu (`report.stopped`) – zná úseky `přísně` /
+ * `přísně vyp` skriptu; hlavní vlákno záznamy znovu neposuzuje (stejný skript = stejný výsledek v CLI i v prohlížeči).
  */
-export function exitCodeFor(o: Outcome, strict: StrictOpt = false): number {
+export function exitCodeFor(o: Outcome): number {
   switch (o.kind) {
     case "done":
-      if (o.report.stopped || strictStopper(o.report.entries, strict)) return 2;
+      if (o.report.stopped) return 2;
       return o.report.counts.errors > 0 ? 1 : 0;
     case "failed":
       return 3;

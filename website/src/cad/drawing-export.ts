@@ -5,7 +5,7 @@
  * SVG / DXF R12 / PDF (jsPDF) / DWG (acad-ts) / PNG (rastr SVG v prohlížeči).
  */
 import { annotationStatus, bomToCsv, withAnnotations, type DrawingMeta, type DrawingResult } from "./drawing";
-import { activeSheetIndex, mergeSmart, newSheet, resolveSheet, sheetMeta, sheetOptions, type DrawingCompute, type DrawingExtras } from "./drawing-agent";
+import { activeSheetIndex, lostEditsText, mergeSmart, newSheet, resolveSheet, sheetMeta, sheetOptions, type DrawingCompute, type DrawingExtras } from "./drawing-agent";
 import { drawingKey, drawingLabel, drawingSets, setSheets } from "./drawing-sets";
 import type { DwgVersion } from "./formats/dwg-versions";
 import { DWG_VERSIONS } from "./formats/dwg-versions";
@@ -109,19 +109,23 @@ export function toBase64(u8: Uint8Array): string {
 /** Hotový list výkresu (výpočet jako výkresové prostředí včetně Chytrých kót, které ještě nejsou na listu). */
 export type SheetOut = { out: DrawingResult; meta: DrawingMeta; name: string; lost: number; warnings: string[] };
 
-async function renderSheet(doc: CadDoc, idx: number, compute: DrawingCompute, extras?: DrawingExtras): Promise<SheetOut> {
+/** list `idx` dokumentu (index v doc.drawings) – výpočet jako výkresové prostředí; engine/files.ts z něj skládá listy celého dokumentu */
+export async function renderSheet(doc: CadDoc, idx: number, compute: DrawingCompute, extras?: DrawingExtras): Promise<SheetOut> {
   const has = !!doc.drawings?.length;
   const s = has ? doc.drawings![idx] : newSheet(doc);
   const o = sheetOptions(s);
   const meta = sheetMeta(doc, s, idx, extras);
   const res = await compute(doc, meta, o);
   let anns = s.annotations;
+  let userLost = 0;
   if (o.dimensions === "smart" && res.smart) {
     const m = mergeSmart(anns, o, res.smart);
     if (m) anns = m.annotations;
+    userLost = m?.userLost ?? 0;
   }
   const st = annotationStatus(res, anns);
-  return { out: withAnnotations(res, anns), meta, name: s.name, lost: Object.values(st).filter((x) => x !== "ok").length, warnings: res.warnings };
+  // ruční úpravy kót, které se při přegenerování ztratily, nikdy tiše (zkouška 959, nález 8)
+  return { out: withAnnotations(res, anns), meta, name: s.name, lost: Object.values(st).filter((x) => x !== "ok").length, warnings: userLost ? [...res.warnings, lostEditsText(userLost)] : res.warnings };
 }
 
 /**

@@ -1,0 +1,6 @@
+# Integrace fáze B (vlna 14) na vlny 15–17: díra „v x y“ mimo povrch (agent-hole.ts), předloha PDF bez prohlížeče, jedno tlačítko připojených souborů
+! řádek {0}: v místě [{1}; {2}] není povrch tělesa – díra začíná na obálce tělesa ({3})	! Zeile {0}: an [{1}; {2}] gibt es keine Körperoberfläche – die Bohrung beginnt am Hüllquader des Körpers ({3})
+předloha PDF (pdf.js) – DWG / DXF předlohu lze připojit i bez prohlížeče	Vorlage PDF (pdf.js) – eine DWG / DXF-Vorlage lässt sich auch ohne Browser anhängen
+Připojí soubor (logo do razítka, předlohu DWG / PDF, referenci pro porovnat "ref.step", dokument pro otevřít "díl.mncad") – příkazy ho najdou podle názvu; zůstane do obnovení stránky	Hängt eine Datei an (Logo im Schriftfeld, DWG / PDF-Vorlage, Referenzmodell für vergleichen "ref.step", Dokument für öffnen "teil.mncad") – Befehle finden sie über den Namen; sie bleibt bis zum Neuladen der Seite
+#!dynamic – kód protokolu drawing.section-legacy (src/cad/engine/codes.ts)
+starší zápis odsazení řezu vyložen postaru: {0}	alte Schreibweise des Schnittversatzes wie früher gelesen: {0}

@@ -212,13 +212,16 @@ function langOpt(p: Parsed): CadLang {
   return s;
 }
 
-/** `--strict`, `--strict=kód,kód` nebo `--strict=kromě kód,kód` (EN except, DE außer) – kódy, které běh nezastaví */
+/**
+ * `--strict`, `--strict=kód,kód` nebo `--strict=kromě kód,kód` (EN except, DE außer) – kódy, které běh nezastaví; kód
+ * s tečkou na konci (`hole.`) = předpona, jako řádek `přísně kromě hole.`
+ */
 export function parseStrict(v: string | true | undefined): StrictOpt {
   if (v === undefined) return false;
   if (v === true) return true;
   const s = v.trim().replace(/^(kromě|krome|except|außer|ausser)[\s:=]*/i, "");
   const except = s.split(/[\s,;]+/).filter(Boolean);
-  for (const c of except) if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)*$/.test(c)) throw new UsageError(tr("„{0}“ není kód hlášky (např. select.ambiguous)", c));
+  for (const c of except) if (!/^[a-z0-9]+(?:[.-][a-z0-9]+)*\.?$/.test(c)) throw new UsageError(tr("„{0}“ není kód hlášky (např. select.ambiguous)", c));
   return except.length ? { except } : true;
 }
 
@@ -344,5 +347,6 @@ export function usageText(): string {
     tr("Výstupy: --out (výchozí ./mncad-out); --formats auto = STEP + .mncad hlavního dokumentu a PDF listů výkresu."),
     tr("Protokol: stručný (≤ 2 048 B, přebytek v protocol-full.txt), --json = jeden JSON objekt, --full = celý protokol."),
     tr("mncad help guide = celý návod pro AI agenty · mncad help commands = seznam textových příkazů"),
+    tr("Prostředí: MNCAD_LANG = jazyk · MNCAD_WASM = jádro replicad_single.wasm jinde než vedle mncad.mjs · MNCAD_FONTS = složka písem · MNCAD_ORIGIN = adresa odkazů"),
   ].join("\n");
 }

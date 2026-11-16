@@ -1,0 +1,6 @@
+# výstupy z konzole (op out) – v aplikaci stažení bez dialogu, v CLI / Node (od B3) soubor přes FileSink; stejné řádky
+nový díl Výstupy
+kvádr 30 20 10
+#--- run
+uložit
+export step

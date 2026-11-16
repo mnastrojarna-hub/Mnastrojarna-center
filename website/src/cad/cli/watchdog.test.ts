@@ -147,10 +147,9 @@ describe("hlídač vlákna běhu", () => {
     expect(exitCodeFor({ kind: "done", report: { ...r, counts: { ...r.counts, errors: 1 } }, files: [] })).toBe(1);
     expect(exitCodeFor({ kind: "done", report: { ...r, stopped: { line: 3, code: "select.ambiguous" } }, files: [] })).toBe(2);
     expect(exitCodeFor({ kind: "failed", error: "x" })).toBe(3);
-    // přísný běh: ⚠ mimo výjimky je vždy 2 (pojistka i bez `stopped`); výjimka kódu → 0; nepřísně ⚠ → 0
-    expect(exitCodeFor(o, true)).toBe(2);
-    expect(exitCodeFor(o, { except: ["select.ambiguous"] })).toBe(0);
-    expect(exitCodeFor(o, false)).toBe(0);
+    // o STOP rozhoduje vlákno běhu (`stopped` – zná úseky `přísně` / `přísně vyp`); ⚠ bez `stopped` není 2 (B4, nález 1)
+    expect(r.entries.some((e) => e.level === "warn")).toBe(true);
+    expect(exitCodeFor(o)).toBe(0);
     await t.close();
     expect(t.dead).toBe(true);
   });

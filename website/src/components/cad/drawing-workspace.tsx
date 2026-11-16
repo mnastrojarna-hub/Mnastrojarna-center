@@ -12,7 +12,7 @@ import { flushSync } from "react-dom";
 import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
-import { threadsOfDoc } from "@/cad/drawing-doc";
+import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
 import { SmartDimsExtra, TolCheckBlock } from "./drawing-smart-extra";
 import { dimCheck } from "@/cad/dim-check";
@@ -26,6 +26,8 @@ import { cn } from "@/lib/cn";
 import { ShareCta } from "./share-cta";
 import { TipBox, microTipsEnabled, type TipSpec } from "./micro-tip";
 import { AnnFitRev, FitsSection, useViewTools, ViewToolsOverlay, ViewToolsSection } from "./drawing-views-panel";
+import { useDrawingSelection } from "./drawing-select";
+import { genEditCount } from "@/cad/drawing-boxsel";
 import { TitleBlockSection } from "./drawing-title-panel";
 import { inheritTitle } from "@/cad/title-block";
 import { generalTolWarnings } from "@/cad/drawing-export";
@@ -143,7 +145,7 @@ function loadOpts(): DrawingOptions {
       // v1 ukládala i dřívější výchozí „skryté hrany zapnuté“ – nový výkres je má vypnuté
       if (old) delete o.hidden;
       // řez, otočení a další modely patří ke konkrétnímu modelu – nový výkres začíná bez nich
-      return { ...defaultDrawingOptions, ...o, views: { ...defaultDrawingOptions.views, ...(o.views ?? {}) }, section: null, rotation: 0, models: [], dimensions: NEW_DRAWING_OPTIONS.dimensions, smartGen: undefined, smartOff: undefined };
+      return { ...defaultDrawingOptions, ...o, views: { ...defaultDrawingOptions.views, ...(o.views ?? {}) }, section: null, rotation: 0, models: [], dimensions: NEW_DRAWING_OPTIONS.dimensions, smartGen: undefined, smartOff: undefined, genEdit: undefined };
     }
   } catch {
     /* nedostupné úložiště */
@@ -166,6 +168,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const [meta, setMeta] = useState<DrawingMeta>(freshMeta);
   /** závity: kružnice válce / jádra se kótuje označením („M6 hl. 12“, „M18×1,5 dl. 18“) – modelované šroubovice se na výkrese nekreslí (ISO 6410) */
   const threads = useMemo(() => threadsOfDoc(doc), [doc.features]);
+  /** pružiny (i v komponentách sestavy) se kreslí zjednodušeně podle ISO 2162-1 – volba „plným tvarem“ je jen u výkresu s pružinou */
+  const hasSprings = useMemo(() => hasDrawnSprings(doc), [doc]);
   const [repeatTool, setRepeatTool] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [dwgVer, setDwgVer] = useState<DwgVersion>(() => {
@@ -430,7 +434,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   };
   useEffect(() => {
     try {
-      localStorage.setItem(OPTS_KEY, JSON.stringify({ ...opts, section: undefined, rotation: undefined, models: undefined }));
+      localStorage.setItem(OPTS_KEY, JSON.stringify({ ...opts, section: undefined, rotation: undefined, models: undefined, genEdit: undefined }));
     } catch {
       /* nedostupné úložiště */
     }
@@ -637,6 +641,23 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     };
   }, []);
   const drag = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
+  // výběr poznámek a kót kliknutím / oknem, posun a smazání více najednou (drawing-select.tsx)
+  const bsel = useDrawingSelection({
+    res,
+    ann,
+    setAnn,
+    onSmartOff: (keys) => setOpts((o) => ({ ...o, smartOff: [...(o.smartOff ?? []), ...keys] })),
+    onGenEdit: (f) => setOpts((o) => ({ ...o, genEdit: f(o.genEdit) })),
+    markDirty,
+    view,
+    host: canvas,
+    enabled: !annTool && !vt.tool && !prompt,
+    cancelPan: () => {
+      const d = drag.current;
+      drag.current = null;
+      if (d) setViewTf((v) => ({ ...v, x: d.vx, y: d.vy }));
+    },
+  });
 
   // Klávesy: posluchač se registruje jednou a aktuální stav čte přes ref. Kdyby se při každé změně stavu registroval znovu,
   // ztratil by se stisk klávesy, během jehož zpracování se výkres překreslí (překreslení vyvolá posluchač kláves aplikace,
@@ -649,6 +670,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       return; // při otevřeném formuláři poznámky nepřepínat nástroje
     }
     if (vt.tool && (e.key === "Escape" ? vt.cancel() : e.key === "Enter" && vt.finish())) return;
+    if (bsel.key(e)) return; // výběr poznámek: Esc, Delete, Ctrl+A, šipky
     if (e.key === "Escape") {
       if (dimBox) {
         // pole kóty zavřít, kóta zůstane s výchozími hodnotami
@@ -670,10 +692,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       setAnnTool((cur) => (cur === t.id ? null : t.id));
       setAnnPts([]);
     }
-    if ((e.key === "Delete" || e.key === "Backspace") && ann.length && !annTool) {
-      setAnn((a) => a.slice(0, -1));
-      markDirty();
-    }
+    // bez výběru Delete nic nesmaže (dřív mazal poslední poznámku) – výběr: klik, Ctrl+klik, okno (drawing-select.tsx)
+    if ((e.key === "Delete" || e.key === "Backspace") && ann.length && !annTool) flash(tr("Smazat: nejdřív vyberte poznámky nebo kóty – klik, Ctrl+klik nebo okno"));
   };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => onKeyRef.current(e);
@@ -1152,9 +1172,9 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             {ann.length > 0 && (
               <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto">
                 {ann.map((a, i) => (
-                  <li key={a.id} className="flex items-center gap-2 rounded px-1.5 py-0.5 text-[11.5px] hover:bg-steel-100">
-                    <span className="w-16 shrink-0 text-ink-700/50">{tr(ANN_LABEL[a.type])}</span>
-                    <span className="min-w-0 flex-1 truncate">{a.type === "dim" ? `${dimSymbol(a)} ${a.view}` : a.type === "note" || a.type === "text" ? a.text : a.type === "roughness" ? a.ra : a.type === "gdt" ? `${GDT_LABEL[a.symbol]} ${a.value}${a.datum ? " " + a.datum : ""}` : a.type === "callout" ? a.lines.join(" · ") : a.type === "centerline" ? tr("osa souměrnosti") : a.label}</span>
+                  <li key={a.id} data-ann-row={a.id} data-ann-selected={bsel.sel.includes(a.id) ? "1" : undefined} className={cn("flex items-center gap-2 rounded px-1.5 py-0.5 text-[11.5px] hover:bg-steel-100", bsel.sel.includes(a.id) && "bg-blue-50 ring-1 ring-blue-300")}>
+                    <span className="w-16 shrink-0 cursor-pointer text-ink-700/50" onClick={(e) => bsel.rowClick(a.id, e)} title={tr("Vybrat (Ctrl+klik přidá)")}>{tr(ANN_LABEL[a.type])}</span>
+                    <span className="min-w-0 flex-1 cursor-pointer truncate" onClick={(e) => bsel.rowClick(a.id, e)}>{a.type === "dim" ? `${dimSymbol(a)} ${a.view}` : a.type === "note" || a.type === "text" ? a.text : a.type === "roughness" ? a.ra : a.type === "gdt" ? `${GDT_LABEL[a.symbol]} ${a.value}${a.datum ? " " + a.datum : ""}` : a.type === "callout" ? a.lines.join(" · ") : a.type === "centerline" ? tr("osa souměrnosti") : a.label}</span>
                     {(annState[a.id] ?? "ok") !== "ok" && (
                       <span data-ann-flag={annState[a.id]} className="shrink-0 cursor-help text-amber-600" title={annState[a.id] === "noView" ? (a.type === "dim" ? tr("Pohled kóty není na listu – kóta se nekreslí.") : tr("Pohled, ke kterému se poznámka váže, není na listu.")) : tr("Hrana nebo kružnice, ke které se kóta váže, v pohledu není (model se změnil) – kreslí se podle uložených údajů. Zkontrolujte ji nebo ji vložte znovu.")}>
                         ⚠
@@ -1314,6 +1334,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <Check checked={opts.centerLines} onChange={(v) => set("centerLines", v)}>
               {tr("Osy děr a válců")}
             </Check>
+            {hasSprings && (
+              <Check checked={opts.springs === "full"} onChange={(v) => set("springs", v ? "full" : "simple")}>
+                <span data-springs-full>{tr("Pružiny plným tvarem (pomalé – jinak zjednodušeně podle ISO 2162-1)")}</span>
+              </Check>
+            )}
             <Row label={tr("Kóty")}>
               <Seg value={opts.dimensions} onChange={(v) => set("dimensions", v)} options={[{ v: "smart", l: tr("Chytré kóty") }, { v: "none", l: tr("Žádné") }, { v: "overall", l: tr("Celkové") }, { v: "auto", l: tr("Auto + Ø") }]} />
             </Row>
@@ -1337,8 +1362,17 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 {tr("Pozice komponent – balónky (")}{balloons.length})
               </Check>
             ) : null}
+            {genEditCount(opts.genEdit) > 0 && (
+              // vygenerované kóty celkových rozměrů a pozice skryté (Delete) nebo posunuté výběrem na listu
+              <button type="button" data-gen-restore onClick={() => set("genEdit", undefined)} title={tr("Vrátí vygenerované kóty celkových rozměrů a pozice na výchozí místo – i skryté klávesou Delete")} className="mb-1.5 rounded-md border border-ink-700/15 px-2 py-1 text-[11px] hover:bg-steel-100">
+                {tr("Obnovit vygenerované kóty a pozice ({0})", genEditCount(opts.genEdit))}
+              </button>
+            )}
             <Check checked={!!opts.holeTable} onChange={(v) => set("holeTable", v)}>
               {tr("Tabulka děr (X, Y, Ø v půdorysu)")}
+            </Check>
+            <Check checked={!!opts.springTable} onChange={(v) => set("springTable", v)}>
+              {tr("Tabulka údajů pružiny (EN ISO 2162-2)")}
             </Check>
           </Section>
 
@@ -1428,7 +1462,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           data-views={viewsAttr}
           data-sheet-format={res ? `${res.sheet.name} ${res.scale}` : undefined}
           data-stacks={res?.stacks ? JSON.stringify(res.stacks) : undefined}
-          className={cn("relative min-w-0 flex-1 touch-none overflow-hidden", annTool || vt.tool ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing")}
+          className={cn("relative min-w-0 flex-1 touch-none select-none overflow-hidden", annTool || vt.tool ? "cursor-crosshair" : "cursor-default")}
           onPointerDown={(e) => {
             if (vt.tool && e.button === 0) {
               e.preventDefault();
@@ -1441,10 +1475,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               void onCanvasClick(e);
               return;
             }
+            if (bsel.down(e)) return; // levé tlačítko na papíře: výběr / okno / posun poznámek
             (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
             drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y };
           }}
           onPointerMove={(e) => {
+            if (bsel.move(e)) return;
             const d = drag.current;
             if (d) setViewTf((v) => ({ ...v, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y }));
             if (vt.tool) vt.move(toSheet(e));
@@ -1461,7 +1497,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             setHover(null);
             setCursor(null);
           }}
-          onPointerUp={() => (drag.current = null)}
+          onPointerUp={(e) => {
+            drag.current = null;
+            bsel.up(e);
+          }}
+          onContextMenu={(e) => e.preventDefault()}
           onDoubleClick={annTool || vt.tool ? undefined : fit}
         >
           <div className="absolute inset-0 opacity-[0.18]" style={{ backgroundImage: "radial-gradient(circle,#fff 1px,transparent 1px)", backgroundSize: "22px 22px" }} />
@@ -1483,6 +1523,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             </svg>
           )}
           {res && <ViewToolsOverlay vt={vt} res={res} tf={view} />}
+          {bsel.overlay}
+          {bsel.hint}
           {res && lostGeom && (
             <svg data-dim-lost className="pointer-events-none absolute left-0 top-0 overflow-visible" width={res.sheet.w * view.z} height={res.sheet.h * view.z} style={{ transform: `translate(${view.x}px,${view.y}px)` }} viewBox={`0 0 ${res.sheet.w} ${res.sheet.h}`} fontFamily="Roboto, Arial, Helvetica, sans-serif">
               <GeomOverlay g={lostGeom} color="#d97706" width={Math.max(0.35, 1.5 / view.z)} />

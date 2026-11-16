@@ -1,0 +1,4 @@
+# normálie v dílu (op library → nová záložka) a neznámá normálie
+normálie M8x30
+normálie nesmysl 12
+stav

@@ -1,0 +1,10 @@
+# více těles (op body), $new, rozdělení a sloučení
+nový díl Dvě tělesa
+kvádr 40 40 10
+válec 20 30 v 60 0 0 nové
+těleso 1
+díra 6 skrz v 20 20
+těleso 2
+srazit 1
+těleso 9
+stav

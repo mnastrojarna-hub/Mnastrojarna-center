@@ -1,0 +1,7 @@
+# w14 drawing-perf: zjednodušené pružiny na výkrese (ISO 2162-1)
+pružiny na listu (prvek Pružina, normálie, komponenty sestavy): zjednodušeně podle ISO 2162-1 = obrys vinutí, osa a čerchované osy drátu (výchozí, list se spočítá rychle), plně = skutečná šroubovice (skrytí hran trvá u každé pružiny desítky sekund)	springs on the sheet (Spring feature, standard parts, assembly components): simplified per ISO 2162-1 = coil outline, axis and chain lines through the wire centres (default, the sheet computes fast), full = the real helix (hidden-line removal takes tens of seconds per spring)
+pružiny plně (šroubovice)	springs full (helix)
+Pružiny plným tvarem (pomalé – jinak zjednodušeně podle ISO 2162-1)	Springs in full form (slow – otherwise simplified per ISO 2162-1)
+pružiny zjednodušeně (ISO 2162-1)	springs simplified (ISO 2162-1)
+pružiny zjednodušeně|plně	springs simplified|full
+pružiny: zjednodušeně (ISO 2162-1, rychlé) nebo plně (skutečná šroubovice, pomalé)	springs: simplified (ISO 2162-1, fast) or full (the real helix, slow)

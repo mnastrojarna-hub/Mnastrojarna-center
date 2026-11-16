@@ -2,7 +2,7 @@
 // Synthetic acceptance tool generator (design CAD-HEADLESS-NAVRH.md 10.1, package A4 harness-gen).
 //
 //   node scripts/cad-harness/synth-tool.mjs [--out DIR]   first kernel pass (parts + placement through the loopback worker),
-//                                                         hole face numbers via compFaces → DIR/synth-959.txt + DIR/expected.json
+//                                                         hole face numbers via compFaces → DIR/synth-tool.txt + DIR/expected.json
 //   node scripts/cad-harness/synth-tool.mjs --check       no kernel: re-compose the script from the face numbers stored in the
 //                                                         committed expected.json and compare both files byte by byte (exit 1)
 //   node scripts/cad-harness/synth-tool.mjs --verify      generate in memory, then run the rest of the script (mates, drawings,
@@ -12,7 +12,7 @@
 //                                                         stop on (⚠, !, ambiguous face pick), sheets per document; every sheet
 //                                                         is then evaluated like an export (`výkres stav`) and timed, and each
 //                                                         part sheet must show the part only with Chytré kóty > 0. Line numbers
-//                                                         in the report are lines of synth-959.txt. JSON report on stdout.
+//                                                         in the report are lines of synth-tool.txt. JSON report on stdout.
 //   --json FILE  also write the verify report to FILE · --no-drawings  skip the `výkres` ops and the sheet evaluation (the
 //   A1 assembly sheet costs minutes of hidden-line projection, almost all of it in the 4 helical springs – measured)
 //
@@ -27,7 +27,7 @@ const args = process.argv.slice(2);
 const flag = (f) => args.includes(f);
 const opt = (f, d) => (args.includes(f) ? args[args.indexOf(f) + 1] : d);
 const OUT = path.resolve(opt("--out", HARNESS));
-const SCRIPT = "synth-959.txt";
+const SCRIPT = "synth-tool.txt";
 const EXPECTED = "expected.json";
 const json = (o) => `${JSON.stringify(o, null, 2)}\n`;
 
@@ -90,8 +90,9 @@ async function verify(lb, session, faces) {
   const rest = await session.run(spec.restScript(faces), { skipMotion: true, skipDrawings: flag("--no-drawings"), onOp: (t) => (peak.heap = Math.max(peak.heap, t.heapMB)) });
   report.timing.restMs = Date.now() - t0;
   const errs = rest.log.filter((l) => l.text.startsWith("✗"));
-  // `kontrola sestava` is a parse error until package B5 (check-compare) lands – the only tolerated one
-  const unexpected = errs.filter((l) => !/„kontrola“/.test(l.text));
+  // `kontrola sestava` (package B5) is the only tolerated ✗: a parse error before B5, after B5 an op the loopback does not
+  // run (it is not the engine) – the built CLI checks it in the B6 gate (scripts/cad-acceptance.mjs)
+  const unexpected = errs.filter((l) => !/„kontrola“|loopback does not run op "check"/.test(l.text));
   check("script runs without ✗ (kontrola is B5)", unexpected.length === 0, { errors: unexpected.slice(0, 8).map((l) => `${at(l)} ${l.text.slice(0, 200)}`), kontrolaPending: errs.length - unexpected.length });
   // lines a strict engine run (B4) would stop on: ⚠ / ! lines and ambiguous rule-based face picks (design 5.2 #13)
   report.warnings = rest.warnings;
@@ -159,7 +160,7 @@ async function verify(lb, session, faces) {
   report.timing.totalMs = Date.now() - T0;
   report.peakRssMB = Math.round(procMem()?.hwm ?? 0); // VmHWM: exact peak even across long synchronous OCCT calls
   report.peakWasmMB = Math.round(peak.heap);
-  // line = line of synth-959.txt
+  // line = line of synth-tool.txt
   report.slowOps = rest.timing.sort((a, b) => b.ms - a.ms).slice(0, 6).map((t) => ({ line: t.line + off, op: t.op, ms: t.ms }));
   return report;
 }

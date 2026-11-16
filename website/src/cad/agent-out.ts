@@ -22,21 +22,35 @@ import type { Vec3 } from "./types";
 export type Export3dFormat = "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad";
 export type OutDrawingFormat = "pdf" | "dxf" | "dwg" | "svg" | "csv" | "png";
 
+/**
+ * Doručení souboru (balík B3): bez volby se soubor stáhne / zapíše hostitelem (prohlížeč: Stažené, CLI: `--out`);
+ * „base64“ = soubor se nezapíše, jeho obsah jde do protokolu (řádek `BASE64 …` konzole, `= … file` s `detail` v plném
+ * protokolu a JSON); „link“ (`… odkaz`) = soubor se zašifruje a nahraje do úložiště odkazů, protokol vypíše odkaz na
+ * stránku, která ho dešifruje a nabídne ke stažení (share-file.ts) – obojí pro agenta v prohlížeči v cloudu, který ke
+ * staženým souborům nedosáhne.
+ */
+export type OutDelivery = "base64" | "link";
 export type OutCmd =
   /** projekt .mncad */
-  | { kind: "save"; name?: string }
+  | { kind: "save"; name?: string; deliver?: OutDelivery }
   /** 3D model (mncad = projekt jako u „uložit“); check false = bez kontroly znovunačtením (STEP / BREP) */
-  | { kind: "export"; format: Export3dFormat; name?: string; check?: false }
-  /** výkres: list číslem / názvem, „all“ = každý list zvlášť; bez listu aktivní list */
-  | { kind: "drawing"; format: OutDrawingFormat; sheet?: number | string | "all"; name?: string }
+  | { kind: "export"; format: Export3dFormat; name?: string; check?: false; deliver?: OutDelivery }
+  /**
+   * výkres: list číslem / názvem, „all“ = všechny listy aktivního výkresu jedním souborem, „doc“ = všechny listy všech
+   * výkresů dokumentu a u sestavy i výkresy dílů uložené v komponentách (každý zdrojový díl jednou); bez listu aktivní list
+   */
+  | { kind: "drawing"; format: OutDrawingFormat; sheet?: number | string | "all" | "doc"; name?: string; deliver?: OutDelivery }
   /** skica jako DXF (bez názvu otevřená, jinak poslední skica) */
-  | { kind: "sketch"; sketch?: string; name?: string }
-  /** sdílený odkaz; days null = bez omezení */
-  | { kind: "share"; view?: "model" | "drawing"; days?: number | null; password?: string; from?: string; mode?: "link" | "store" }
+  | { kind: "sketch"; sketch?: string; name?: string; deliver?: OutDelivery }
+  /**
+   * sdílený odkaz; days null = bez omezení; mode „store“ = jen krátký odkaz přes úložiště (nedostupné úložiště = ✗),
+   * `orLink` = při selhání úložiště dlouhý odkaz s ⚠ (`sdílet úložiště nebo odkaz`)
+   */
+  | { kind: "share"; view?: "model" | "drawing"; days?: number | null; password?: string; from?: string; mode?: "link" | "store"; orLink?: true }
   /** znovu vypsat poslední odkaz */
   | { kind: "link" }
   /** dokument jako textový skript `.mncad.txt` (cad/doc-script.ts); lang = jazyk klíčových slov (bez hodnoty jazyk rozhraní) */
-  | { kind: "script"; name?: string; lang?: "cs" | "en" | "de" };
+  | { kind: "script"; name?: string; lang?: "cs" | "en" | "de"; deliver?: OutDelivery };
 export type OutOp = { k: "out"; cmd: OutCmd; line: number };
 
 /* ───────────────────────── slova (CS / EN / DE) ───────────────────────── */
@@ -63,6 +77,11 @@ const PASSWORD = W("heslo", "heslem", "password", "passwort", "kennwort");
 const FROM = W("od", "odesílatel", "from", "sender", "von", "absender");
 const STORE = W("úložiště", "úložišti", "store", "storage", "speicher");
 const LINK_MODE = W("odkazem", "inline");
+/** „sdílet úložiště nebo odkaz“ */
+const OR = W("nebo", "or", "oder");
+/** `výkres export pdf dokument` – všechny listy dokumentu i výkresy dílů z komponent sestavy */
+const DOC_SCOPE = W("dokument", "document");
+const BASE64 = W("base64", "b64");
 /** „bez kontroly“ u exportu STEP / BREP (dvě slova: NO + CHECK, nebo jedno NOCHECK) */
 const CHECK = W("kontroly", "kontrola", "ověření", "check", "verification", "prüfung", "pruefung", "kontrolle");
 const NOCHECK = W("nocheck", "bezkontroly", "ohneprüfung");
@@ -98,60 +117,109 @@ function sheetNo(v: string): number {
   return n;
 }
 
-/** „bez kontroly“ na začátku nebo na konci zbytku řádku (ne uprostřed názvu souboru) → odebere a vrátí true */
-function takeNoCheck(rest: string[]): boolean {
+/**
+ * Slova řádku (stejně jako `tokenize` v agent.ts: "…", „…“, '…' nebo bez mezer) a příznak, které byly v uvozovkách –
+ * slovo v uvozovkách je vždy název (soubor „base64“, „odkaz“), nikdy klíčové slovo.
+ */
+export function outTokens(line: string): [string[], boolean[]] {
+  const tokens: string[] = [];
+  const quoted: boolean[] = [];
+  const re = /"([^"]*)"|„([^“]*)“|'([^']*)'|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(line))) {
+    tokens.push(m[1] ?? m[2] ?? m[3] ?? m[4]);
+    quoted.push(m[4] === undefined);
+  }
+  return [tokens, quoted];
+}
+
+/** zbytek řádku a příznaky uvozovek jeho slov (stejná délka, mění se spolu) */
+type Rest = { w: string[]; q: boolean[] };
+const restOf = (t: string[], tq: boolean[], from: number): Rest => ({ w: t.slice(from), q: tq.slice(from) });
+const cut = (r: Rest, start: number, n: number) => {
+  r.w.splice(start, n);
+  r.q.splice(start, n);
+};
+
+/** „bez kontroly“ na začátku nebo na konci zbytku řádku (ne uprostřed názvu souboru, ne v uvozovkách) → odebere a vrátí true */
+function takeNoCheck(r: Rest): boolean {
   let hit = false;
-  const at = (i: number) => fold(rest[i] ?? "");
+  const at = (i: number) => (r.q[i] ? "" : fold(r.w[i] ?? ""));
   for (;;) {
-    if (NOCHECK.has(at(0))) rest.splice(0, 1);
-    else if (NO.has(at(0)) && CHECK.has(at(1))) rest.splice(0, 2);
-    else if (NOCHECK.has(at(rest.length - 1))) rest.splice(-1, 1);
-    else if (rest.length >= 2 && NO.has(at(rest.length - 2)) && CHECK.has(at(rest.length - 1))) rest.splice(-2, 2);
+    const n = r.w.length;
+    if (NOCHECK.has(at(0))) cut(r, 0, 1);
+    else if (NO.has(at(0)) && CHECK.has(at(1))) cut(r, 0, 2);
+    else if (NOCHECK.has(at(n - 1))) cut(r, n - 1, 1);
+    else if (n >= 2 && NO.has(at(n - 2)) && CHECK.has(at(n - 1))) cut(r, n - 2, 2);
     else return hit;
     hit = true;
   }
 }
 
-/** zbytek řádku jako název souboru (bez úvodního „jako“ / „název“) */
-function nameOf(rest: string[]): string | undefined {
-  const r = rest.length && NAME_KW.has(fold(rest[0])) ? rest.slice(1) : rest;
+/**
+ * „base64“ / „odkaz“ (EN, DE „link“) bez uvozovek na konci zbytku řádku → odebere a vrátí doručení; před ním nesmí stát
+ * „jako“ (`jako base64`, `jako odkaz` = název souboru) a v uvozovkách je to vždy název (`uložit "base64"`)
+ */
+function takeDelivery(r: Rest): OutDelivery | undefined {
+  const n = r.w.length;
+  if (!n || r.q[n - 1]) return undefined;
+  const last = fold(r.w[n - 1]);
+  const before = r.q[n - 2] ? "" : fold(r.w[n - 2] ?? "");
+  if (NAME_KW.has(before)) return undefined;
+  const d: OutDelivery | undefined = BASE64.has(last) ? "base64" : LINK.has(last) ? "link" : undefined;
+  if (d) cut(r, n - 1, 1);
+  return d;
+}
+
+/** zbytek řádku jako název souboru (bez úvodního „jako“ / „název“ mimo uvozovky) */
+function nameOf(rest: Rest): string | undefined {
+  const r = rest.w.length && !rest.q[0] && NAME_KW.has(fold(rest.w[0])) ? rest.w.slice(1) : rest.w;
   const s = r.join(" ").trim();
   return s || undefined;
 }
 
 /**
- * Rozbor řádku (všechna slova včetně prvního; uvozovky už odstraněné). Vrací null, když řádek není výstupním
- * příkazem; chybný zápis výstupního příkazu vyhodí chybu se správným zápisem.
+ * Rozbor řádku (všechna slova včetně prvního; uvozovky už odstraněné, `quoted[i]` = slovo i bylo v uvozovkách –
+ * `outTokens`). Vrací null, když řádek není výstupním příkazem; chybný zápis výstupního příkazu vyhodí chybu se
+ * správným zápisem.
  */
-export function parseOutLine(tokens: string[]): OutCmd | null {
-  const t = tokens.filter((x) => x !== "");
+export function parseOutLine(tokens: string[], quoted: readonly boolean[] = []): OutCmd | null {
+  const keep = tokens.map((_, i) => i).filter((i) => tokens[i] !== "");
+  const t = keep.map((i) => tokens[i]);
+  const tq = keep.map((i) => !!quoted[i]);
   if (!t.length) return null;
   const h = fold(t[0]);
   const second = fold(t[1] ?? "");
 
   if (SAVE.has(h)) {
-    const name = nameOf(t.slice(1));
-    return { kind: "save", ...(name ? { name } : {}) };
+    const rest = restOf(t, tq, 1);
+    const deliver = takeDelivery(rest);
+    const name = nameOf(rest);
+    return { kind: "save", ...(name ? { name } : {}), ...(deliver ? { deliver } : {}) };
   }
 
   if (EXPORT.has(h)) {
     const raw = t[1];
     if (!raw) throw new Error(tr("export potřebuje formát: {0}", outUsage.export()));
     if (SCRIPT.has(fold(raw))) {
-      // export skript [cs|en|de] [název] – dokument jako textové příkazy (cad/doc-script.ts)
-      const rest = t.slice(2);
-      const lang = /^(cs|en|de)$/i.test(rest[0] ?? "") ? (rest.shift()!.toLowerCase() as "cs" | "en" | "de") : undefined;
+      // export skript [cs|en|de] [název] [base64|odkaz] – dokument jako textové příkazy (cad/doc-script.ts)
+      const rest = restOf(t, tq, 2);
+      const lang = rest.w.length && !rest.q[0] && /^(cs|en|de)$/i.test(rest.w[0]) ? (rest.w[0].toLowerCase() as "cs" | "en" | "de") : undefined;
+      if (lang) cut(rest, 0, 1);
+      const deliver = takeDelivery(rest);
       const name = nameOf(rest);
-      return { kind: "script", ...(name ? { name } : {}), ...(lang ? { lang } : {}) };
+      return { kind: "script", ...(name ? { name } : {}), ...(lang ? { lang } : {}), ...(deliver ? { deliver } : {}) };
     }
     const f = FORMAT_ALIAS[fold(raw).replace(/^\./, "")];
     if (f === "dxf") throw new Error(tr("export dxf: výkres → „výkres export dxf“, skica → „skica export dxf“"));
     if (f && (OUT_DRAWING as string[]).includes(f)) throw new Error(tr("export {0}: výkres se exportuje příkazem „výkres export {0}“ (nejdřív „výkres A3 …“)", f));
     if (!f) throw new Error(tr("export: neznámý formát „{0}“ – {1}", raw, outUsage.export()));
-    const rest = t.slice(2);
+    const rest = restOf(t, tq, 2);
+    let deliver = takeDelivery(rest);
     const noCheck = takeNoCheck(rest);
+    deliver ??= takeDelivery(rest);
     const name = nameOf(rest);
-    return { kind: "export", format: f as Export3dFormat, ...(name ? { name } : {}), ...(noCheck ? { check: false as const } : {}) };
+    return { kind: "export", format: f as Export3dFormat, ...(name ? { name } : {}), ...(noCheck ? { check: false as const } : {}), ...(deliver ? { deliver } : {}) };
   }
 
   if (DRAWING.has(h) && EXPORT.has(second)) {
@@ -159,35 +227,39 @@ export function parseOutLine(tokens: string[]): OutCmd | null {
     if (!raw) throw new Error(tr("výkres export potřebuje formát: {0}", outUsage.drawing()));
     const f = FORMAT_ALIAS[fold(raw).replace(/^\./, "")];
     if (!f || !(OUT_DRAWING as string[]).includes(f)) throw new Error(tr("výkres export: neznámý formát „{0}“ – {1}", raw, outUsage.drawing()));
-    let sheet: number | string | "all" | undefined;
-    const rest: string[] = [];
+    let sheet: number | string | "all" | "doc" | undefined;
+    const rest: Rest = { w: [], q: [] };
     for (let i = 3; i < t.length; i++) {
-      const w = fold(t[i]);
+      const w = tq[i] ? "" : fold(t[i]); // v uvozovkách = název, ne klíčové slovo
       if (SHEET_KW.has(w)) {
         const v = t[i + 1];
         if (!v) throw new Error(tr("výkres export: za „{0}“ chybí číslo nebo název listu – {1}", t[i], outUsage.drawing()));
         sheet = ALL.has(fold(v)) ? "all" : isNum(v) ? sheetNo(v) : v;
         i++;
       } else if (ALL.has(w)) sheet = "all";
+      else if (DOC_SCOPE.has(w)) sheet = "doc";
       // holé číslo před názvem = číslo listu („výkres export pdf 2“); číselný název souboru: „jako 2“
-      else if (sheet === undefined && isNum(t[i])) sheet = sheetNo(t[i]);
+      else if (sheet === undefined && !tq[i] && isNum(t[i])) sheet = sheetNo(t[i]);
       else {
-        rest.push(...t.slice(i));
+        rest.w.push(...t.slice(i));
+        rest.q.push(...tq.slice(i));
         break;
       }
     }
+    const deliver = takeDelivery(rest);
     const name = nameOf(rest);
-    return { kind: "drawing", format: f as OutDrawingFormat, ...(sheet !== undefined ? { sheet } : {}), ...(name ? { name } : {}) };
+    return { kind: "drawing", format: f as OutDrawingFormat, ...(sheet !== undefined ? { sheet } : {}), ...(name ? { name } : {}), ...(deliver ? { deliver } : {}) };
   }
 
   if (SKETCH.has(h) && EXPORT.has(second)) {
     const raw = t[2];
     if (!raw || fold(raw).replace(/^\./, "") !== "dxf") throw new Error(tr("skica se exportuje jen do DXF: {0}", outUsage.sketch()));
-    const rest = t.slice(3);
-    const k = rest.findIndex((x) => NAME_KW.has(fold(x)));
-    const sk = (k >= 0 ? rest.slice(0, k) : rest).join(" ").trim();
-    const name = k >= 0 ? nameOf(rest.slice(k)) : undefined;
-    return { kind: "sketch", ...(sk ? { sketch: sk } : {}), ...(name ? { name } : {}) };
+    const rest = restOf(t, tq, 3);
+    const deliver = takeDelivery(rest);
+    const k = rest.w.findIndex((x, i) => !rest.q[i] && NAME_KW.has(fold(x)));
+    const sk = (k >= 0 ? rest.w.slice(0, k) : rest.w).join(" ").trim();
+    const name = k >= 0 ? nameOf({ w: rest.w.slice(k), q: rest.q.slice(k) }) : undefined;
+    return { kind: "sketch", ...(sk ? { sketch: sk } : {}), ...(name ? { name } : {}), ...(deliver ? { deliver } : {}) };
   }
 
   if (SHARE.has(h)) {
@@ -216,9 +288,13 @@ export function parseOutLine(tokens: string[]): OutCmd | null {
         cmd.from = next;
         i++;
       } else if (STORE.has(w)) cmd.mode = "store";
-      else if (LINK_MODE.has(w)) cmd.mode = "link";
+      else if (OR.has(w) && next && (LINK.has(fold(next)) || LINK_MODE.has(fold(next)))) {
+        cmd.orLink = true; // úložiště, a když selže, dlouhý odkaz s ⚠
+        i++;
+      } else if (LINK_MODE.has(w)) cmd.mode = "link";
       else throw new Error(tr("sdílet: neznámé slovo „{0}“ – {1}", t[i], outUsage.share()));
     }
+    if (cmd.orLink && cmd.mode === "link") delete cmd.orLink; // „odkazem nebo odkaz“ – už je to odkaz
     if (typeof cmd.days === "number" && !(cmd.days > 0 && cmd.days <= 3650)) throw new Error(tr("sdílet: platnost je 1 až 3650 dní, nebo „bez omezení“ – {0}", outUsage.share()));
     return cmd;
   }
@@ -391,5 +467,11 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     en: "share, link",
     de: "freigeben, link",
     desc: tr("sdílený odkaz (jako tlačítko Sdílet odkazem): ADRESA SE VYPÍŠE DO PROTOKOLU (a zkopíruje do schránky, když to prohlížeč dovolí); výchozí platnost 10 dní; „odkaz“ vypíše poslední odkaz znovu"),
+  },
+  {
+    cmd: "výkres export pdf dokument · export step base64 · export step odkaz · sdílet úložiště nebo odkaz",
+    en: "drawing export pdf document · export step base64 · export step link · share store or link",
+    de: "zeichnung export pdf dokument · exportieren step base64 · exportieren step link · freigeben speicher oder link",
+    desc: tr("„dokument“ = všechny listy všech výkresů a u sestavy i výkresy dílů z komponent (každý díl jednou) v jednom PDF, stejné jako --formats auto v CLI; „base64“ za uložit / export / výkres export / skica export = soubor se nestáhne, obsah jde do protokolu (řádek BASE64, nejvýš 2 MB); „odkaz“ = soubor zašifrovaný v úložišti odkazů, protokol vypíše odkaz na stránku ke stažení; „sdílet úložiště“ = jen krátký odkaz (nedostupné úložiště = ✗), „nebo odkaz“ = jinak dlouhý odkaz s ⚠"),
   },
 ];

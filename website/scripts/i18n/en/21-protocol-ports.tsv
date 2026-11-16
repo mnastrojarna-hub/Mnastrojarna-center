@@ -45,7 +45,6 @@ prázdná záložka „{0}“ nahrazena dokumentem „{1}“	empty tab “{0}”
 přepnutí záložky nedoběhlo do {0} s	switching tabs did not finish within {0} s
 díra bez hloubky – vrtá se skrz	hole without depth – drilled through
 zahloubení a kuželové zahloubení zároveň – použito {0}	counterbore and countersink together – {0} used
-zahloubení Ø{0} je menší než závit {1}	counterbore Ø{0} is smaller than thread {1}
 díra neleží na povrchu – umístěna na obálku tělesa	the hole is not on the surface – placed on the body's bounding box
 zadaný průměr {0} nahrazen průměrem vrtáku {1} pro závit {2}	given diameter {0} replaced by tap drill diameter {1} for thread {2}
 plocha podle pravidla nenalezena – použita nejkrajnější	no face matches the rule – the outermost one is used

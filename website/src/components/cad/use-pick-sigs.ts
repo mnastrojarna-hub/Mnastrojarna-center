@@ -5,7 +5,7 @@
  * Upravovaný prvek: po každé změně výběru (klik v modelu, seznam / pravidlo, „+ aktuální výběr“) jádro ve workeru doplní otisky nově
  * vybraných entit z tělesa PŘED prvkem; přečísloval-li změna dřívějšího prvku hrany/plochy, přepíše indexy prvku na znovunalezené entity,
  * takže zvýraznění v modelu i další klikání sedí na skutečné entity. Úprava nemění geometrii, proto jde mimo historii Zpět.
- * Textové příkazy (výběr pravidlem) razítkují přes `stampFeature` ještě před přidáním prvku.
+ * Textové příkazy (výběr pravidlem) razítkují přes `stampFeature` z `cad/engine/stamp.ts` ještě před přidáním prvku.
  */
 import { useEffect } from "react";
 import { cad } from "@/cad/client";
@@ -28,17 +28,6 @@ function beforeKey(d: CadDoc, f: Feature): string {
   return JSON.stringify([prev.map(idOf), d.variables ?? null, d.bindings ?? null, d.configs ?? null, d.activeConfig ?? null, d.activeBody ?? null, f.body ?? null]);
 }
 const stateKey = (d: CadDoc, f: Feature) => `${beforeKey(d, f)}|${picksKey(f)}`;
-
-/** Prvek s otisky výběru spočtenými nad dokumentem `before` (prvek do něj teprve přibude). Při chybě jádra vrátí prvek beze změny. */
-export async function stampFeature(before: CadDoc, f: Feature): Promise<Feature> {
-  if (!hasPicks(f)) return f;
-  try {
-    const res = await cad.pickSigs(before, f);
-    return res?.changed ? res.feature : f;
-  } catch {
-    return f;
-  }
-}
 
 /**
  * Hlídá výběr upravovaného prvku `activeId` a doplňuje / opravuje otisky. `update` = změna dokumentu mimo historii (funkčně nad

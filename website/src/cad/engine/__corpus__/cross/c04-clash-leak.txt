@@ -1,0 +1,15 @@
+# kolize sestavy A se nepřenese do stavu sestavy B
+nový díl Blok
+kvádr 40 40 40
+nová sestava A
+vložit "Blok" ukotvit
+vložit "Blok" v 30 0 0
+nová sestava B
+vložit "Blok" ukotvit
+vložit "Blok" v 100 0 0
+#--- run
+záložka "A"
+kolize
+#--- run
+záložka "B"
+stav

@@ -19,6 +19,41 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 14. 11. 19:20 | Úkol D1 částečně rozjet dřív (nezávisí na B): agent dokumentace dopisuje vlnu 15, převodník a vlnu 17 do `cad-docs.ts` ve worktree `w18-docs2`, výstup `S/w18/docs2.patch` (zdroje `S/w18/docs-round2-sources.md`). Místa o fázi A nechává beze změny – přepíšou se až po B. |
 | 14. 11. 19:30 | Úkol B2 rozjet souběžně s akceptací: zkušební nanesení `bint.patch` na dnešní větev = 15 souborů s konflikty (největší `cad-app.tsx` – stará smyčka 378 řádků vs. volání enginu). Spuštěn workflow `wf_d020a109-e6f` (integrace → nezávislá kontrola ztracených změn → opravy), worktree `w14-int2` ze `4ceb0e7`, zadání `S/w14/int2/brief.md`, výstup `S/w14/int2/int2.patch` + `audit.md`. Až doběhne i akceptace (`w14-b6`), přenes její rozdíl `git -C .claude/worktrees/w14-b6 diff 7b86184 HEAD` na `w14-int2` (nebo do hlavní větve po int2). |
 | 14. 11. 19:45 | Dokumentace 2. kolo hotová a nanesena na větev (vlna 15, převodník, vlna 17; `S/w18/docs2.patch`). Do PR půjde spolu s opravami e2e po doběhnutí průchodu a ověření na novém buildu. Agent dokumentace zjistil 2 mezery → úkol E6 a E7. |
+| 14. 11. 19:55 | NOVÝ požadavek majitele: výběr myší oknem (více prvků naráz) ve 3D i 2D → vlna 20 (kapitola 7b). Spuštěn workflow `wf_533a7c7c-a4a` (balíky `3d` a `2d` souběžně, každý implementace → kontrola → opravy), základ `210a1e8`, zadání `S/w20/brief.md`. Průchod e2e: 35/49, dosud jen zastaralá očekávání (`cad-big-step` – vkládání do sestavy přes vstup Vložit – opraveno). |
+| 14. 11. 19:49 | **Sloučeno PR #98** (`12e7108`): dokumentace 2. kolo + oprava 6 zastaralých e2e + návod „Příklad F“. Úplný průchod 49 e2e sad hotov: žádná chyba v CADu; po opravě všech 6 sad zelených, `cad-w9-core` 2× zelený (závod výběru ve 2D se neopakuje – follow-up uzavřen, pravděpodobně vyřešeno čekáním na usazení UI z vlny 15). Běží workflow: B akceptace (`w14-b6`), B integrace (`w14-int2`), kola (`w19:core`), výběr oknem (`w20-3d`, `w20-2d`). |
+| 14. 11. 19:58 | **POZASTAVENO na přání majitele** (šetří se limit; majitel teď sám nasadí `main` a testuje). Zastaveny všechny 4 workflow a jejich procesy. Statický export `npm run build:ftp` na `main` (`12e7108`) ověřen: prošel. Postup obnovení viz kapitola 0a. |
+| 14. 11. 20:25 | Majitel hlásí: „Online CAD neumí pružiny, ani pro simulaci pohybu.“ Živý web běží na STARÉ verzi (bez vlny 15 – pružina mezi díly tam není; `cad/share/?ping` vrací chybovou stránku = nenasazena ani vlna 16). V `main` pružiny jsou, ale jen jako šroubovice se stálým stoupáním, bez výpočtu a bez dynamiky. → vlna 21 (kapitola 7c), workflow `wf_1e1ed70b-b6a`. Obnoven workflow integrace fáze B `wf_d020a109-e6f` (do zadání doplněna poznámka o obnovení a o rozdílu akceptace `S/w14/acceptance-delta.patch`). G a F zatím pozastaveny (šetří se stroj: běží 2 workflow). |
+| 14. 11. 22:16 | Integrace fáze B na main HOTOVÁ (agent): commit `75e90ed` ve `w14-int2`, patch `S/w14/int2/int2.patch` (330 souborů), audit `S/w14/int2/audit.md` – všech 182 kusů main nalezeno. Kontroly agenta: celý `src/cad` 2862 testů zelených, build, 28 e2e sad zelených. **Akceptační brána na skutečném skriptu 959: PASS** – 70 komponent, 53/53 vazeb, Σ 5241,733 cm³, 27 kolizí jen závit, STEP ok, odkaz 35 znaků, protokol 1641 B, 29,9 s. Běží nezávislá kontrola `verify:int2`. Pružiny (vlna 21) dál rozpracované. |
+| 14. 11. 23:50 | Fáze B dokončena agenty i po opravách 3 nálezů kontroly (`w14-int2` commit `5ca5da6`, 25 e2e sad zelených). **Nanesena na větev bez konfliktů** jako commit `e0b08dd` (patch `S/w14/int2/int2.patch`; kontrola NDA čistá; typy, lint 5, překlady 0/0). GitHub Actions `cad-acceptance.yml` omezen na PR do main + ruční spuštění (šetří minuty). BĚŽÍ: testy + build + 14 e2e sad na :3199 (`S/vitest-b-main.log`, `S/build-b-main.log`, pak `S/e2e/*.log`). Po zelené: PR „CAD bez prohlížeče – fáze B“ (zmínit i PR #99 aplikace Sales OS, který je na větvi) → sloučit → smazat `w14-*`. Pružiny: oba balíky v opravách po kontrole. |
+| 15. 11. 00:45 | **Úkol B HOTOV: fáze B sloučena do `main` (PR #100, `e27ff86`)** – s ní i PR #99 aplikace Sales OS, který byl na větvi. Po nanesení: 520 testů, build, 14 e2e sad 0 FAIL. Worktree `w14-*` smazány. Dál: pružiny (H) dobíhají opravy; pak E1 (NDA přejmenování zkušebního nástroje – teď je to možné), D1/D3 dokumentace a PDF příručka, G a F obnovit. |
+| 15. 11. 00:55 | E1 hotov: zkušební nástroj přejmenován na „900-01-00“ (číslo zákazníka z dílů i ze souborů pryč), `synth-959.txt` → `synth-tool.txt`, `expected.json` přegenerován jádrem (gravírovaný text se změnil: objem −0,001 cm³). |
+| 15. 11. 01:00 | Úkol G (výběr oknem) obnoven na novém základu `69f3f58` (main s fází B): workflow `wf_533a7c7c-a4a`, zadání `S/w20/brief.md` s poznámkou o obnovení. Pozor – chyba integrátora: při smazání starých worktree `w20-3d`/`w20-2d` se ztratily rozpracované soubory agenta (`box-select-3d.ts`, `box-select-2d.ts`, test) – agent je napíše znovu. Pravidlo: před `git worktree remove` vždy zálohovat `git status --short` soubory. Běží 2 workflow (H pružiny, G výběr oknem); F kola čeká. |
+| 15. 11. 01:15 | Pružiny (H) hotové v obou balících i po opravách kontroly: `part` commit `bde7eb5` (`S/w21/part.patch`, 11 nálezů opraveno), `motion` commit `359f515` (`S/w21/motion.patch`, 8 nálezů opraveno – dynamika teď přesná na všech krocích, energie drží). Oba proti `fd8a05e` (bez fáze B). Spuštěna integrace na main s enginem: workflow `wf_60b96c19-df2`, zadání `S/w21/int-brief.md`, worktree `w21-int`, výstup `S/w21/int.patch` + `int-audit.md`. Běží: G (výběr oknem) + integrace H. F (kola) čeká. |
+| 15. 11. 02:56 | **G1 hotov**: výběr oknem dokončen v obou balících i po opravách kontroly (`w20-3d` `5812746`, 5 nálezů; `w20-2d` `c6cb7f5`, 4 nálezy). G2 BĚŽÍ: `S/w20/3d.patch` + `2d.patch` naneseny na větev bez konfliktů (index, necommitnuto), NDA čisté, překlady 0/0, typy, lint 5. Běží vitest (`S/w20/vitest-int.log`, končí `exit=`), pak build + e2e na :3199. Pružiny: workflow `wf_60b96c19-df2` je v kroku `fix:w21int` (5 nálezů kontroly). |
+| 15. 11. 03:01 | G2: na větvi (necommitnuto) vitest 55 souborů 849/849, produkční build prošel; dokumentace výběru oknem dopsána do `cad-docs.ts` (kap. 3, 5, 13, 14, 19, 21, 26 + FAQ) = G4 text hotový. BĚŽÍ e2e 16 sad na :3199 (`S/w20/int-e2e.summary`, končí `done`; logy `S/w20/int-e2e/`), pak vlastní zkouška `node S/w20/own-probe.cjs` (G3). Tělo PR připraveno `S/w20/pr-body.md` (doplnit tabulku e2e). |
+| 15. 11. 03:18 | **G2 + G3 + G4 (text) hotovo**: commit `851273d` na větvi. e2e 17 sad 872 ok / 0 FAIL (logy `S/w20/int-e2e/`), vlastní zkouška tažením 13/13 (`S/w20/own-probe.cjs` + `own-probe2.cjs`; pozor: s vybranými komponentami je uprostřed gizmo a okno na něm záměrně nezačne). Zakládám PR do `main` (tělo `S/w20/pr-body.md`), po sloučení smazat `w20-*`. Pružiny: `fix:w21int` stále běží. |
+| 15. 11. 03:23 | **Úkol G HOTOV: výběr oknem sloučen do `main` (PR #101, `31bf0c7`)**; GitHub kontrola `acceptance (22)` zelená, lokální akceptační brána PASS (100 ok, 0 FAIL, 178 s; 4 nálezy ke třídění = známé ⚠ ze skriptu 959: kolize pružina × deska v pohybu, starší zápis řezu, ruční úprava kóty – řeší vlna 21 / E6). Worktree `w20-*` smazány (zbytky `S/w20/w20-*-final-wip.patch`). Dál: H2 – až doběhne `fix:w21int`, nanést `S/w21/int.patch` (základ `87ca363`) na nový `main`; překryv s vlnou 20 v 9 souborech (`cad-app.tsx`, `agent-guide.ts`, `agent-api.ts`, `agent-api-host.ts`, `doc-script.ts`, `drawing.ts`, `drawing-workspace.tsx`, `tips-manifest.ts`, `schema-pro-ai.md`). |
+| 15. 11. 03:27 | Úkol F (kola) OBNOVEN na základu `3814b85` (main + vlna 20): nový workflow `wf_fe2fa9ab-38a` (skript `…/workflows/scripts/cad-wave19-gears-resume-wf_fe2fa9ab-38a.js`), návrh `S/w19/NAVRH.md` hotový se nepřepisuje; balík core ve worktree `w19-core2` začne nanesením `S/w19/core-wip-snapshot.patch`, pak `w19-ui2` + `w19-text2`; patche `S/w19/{core,ui,text}.patch`. Do zadání `S/w19/brief.md` doplněna kapitola RESUME NOTE (engine, CLI, pružiny). Starý worktree `w19-core` je jen záloha – smazat až po sloučení F. Původní workflow `wf_a5f62aa9-09a` NEobnovovat. |
+| 15. 11. 03:33 | **D1 hotov (část CLI)**: dokumentace (`cad-docs.ts` kap. 22 + historie verzí + `cad-docs-intl.tsx` EN/DE + návod pro AI) přepsána podle skutečného CLI po fázi B – ověřeno během `mncad run` (modelování, sestava, kusovník CSV, kontrola, vícestránkové PDF, 2D). Při ověřování nalezena a opravena CHYBA: `2d export dwg|dxf`, `2d tisk` aj. v CLI (i přes `window.mncad.run`/`draft` v prohlížeči) hlásily ✓, ale soubor se nikam nezapsal → engine `ops/draft.ts` teď doručí soubor přes FileSink (řádek F); `--formats dxf,dwg` u 2D výkresu už není ✗ host.app-only (`engine/files.ts`). Testy: engine+cli+draft 45 souborů 700/700, nové 2 regresní testy v `engine/run.test.ts`, `cad-cli` e2e 99/0, tsc, lint 5, i18n 0/0. Zbývá z D: vlna 15/17 doplňky (většinou už v D0), D2 obrázky, D3 PDF příručka. |
+| 15. 11. 03:45 | **H1/H2 – pružiny hotové i po opravě 5 nálezů kontroly integrace** (`w21-int` `8a31bd6`: falešná kolize pružiny z tabulky, vzpěr s ν, čísla v EN, rychlejší dynamika s kolizí, úklid serveru). `S/w21/int.patch` (102 souborů, základ `87ca363`) nanesen na větev (`7cc4055`) BEZ konfliktů, v indexu necommitnut; NDA čisté (shody jen „Kvádr 1“, „List 1“), překlady 0/0, typy, lint 5. BĚŽÍ: celý `src/cad`+`src/components` vitest (`S/w21/vitest-main.log`, končí `exit=`; po něm harness `S/w21/harness-main.log`) a build (`S/w21/build-main.log`). Pak e2e na :3199 + H3 vlastní zkouška. Kola: `wf_fe2fa9ab-38a` balík core běží. |
+| 15. 11. 04:27 | Pružiny na větvi zelené: vitest celý `src/cad`+`src/components` 3036 ok (2 selhání: `agent-more` – EN/DE seznam příkazů, OPRAVENO `0f25dde`; `ext/springs.test.ts` jen limit 60 s při zátěži, samostatně zelený), harness, build, e2e 18 sad 905/0, `cad-cli` 99/0, akceptační brána PASS 100/0 (nálezy beze změny), vlastní zkouška H3 14/14; dokumentace pružin (Prvky, Sestavy – dynamika, srovnání, FAQ, historie) = H4 text. **PR #102** založen, čeká na GitHub kontrolu `acceptance (22)`, pak sloučit, smazat `w21-*`. |
+| 15. 11. 04:31 | **Úkol H HOTOV: pružiny sloučeny do `main` (PR #102, `0451202`)** – s nimi i oprava zápisu souborů 2D výkresu v CLI a dokumentace CLI po fázi B (D1). GitHub `acceptance (22)` zelená. Worktree `w21-*` smazány (zbytek `w21-motion` v `S/w21/w21-motion-final-wip.patch`). Dál: E (zbývající body hlášení – nový workflow), F kola běží (`wf_fe2fa9ab-38a`), D2/D3 obrázky a PDF příručka až po F. |
+| 15. 11. 04:33 | Úkol E: E2 uzavřen (oba body `S/followups.md` hotové), E7 ověřen v CLI (`stav` ve stejném běhu dává přesnou obálku sestavy – prohlížeč ověří balík runs), z E3 už hotové odkazy/base64 výstupů a B1/B2 v enginu. Spuštěn workflow `wf_afc90a94-180` (skript `…/workflows/scripts/cad-wave-e-report-gaps-wf_afc90a94-180.js`, zadání `S/e/brief.md`): balíky `help` (hledání v nápovědě, tahák ≤ 5 kB, hledání na stránce dokumentace; worktree `e-help`, :3521), `runs` (opakovaný běh bez duplicit, řádky D s čísly u všech dokumentů – dnes `V=-`, stručný protokol v konzoli prohlížeče, ověření E7/B1/B2 v prohlížeči; `e-runs`, :3522), `export` (= E6: převodník zapíše razítko, tolerance podle desetinných míst, funkční kóty, režim děr, přezdívky, pružiny, dynamiku, genEdit, SHEET_UNSUPPORTED; `e-export`, :3523). Patche `S/e/<balík>.patch`. Běží současně s koly (F). |
+| 15. 11. 05:03 | Kola (F): balík core HOTOV (`w19-core2` `1bf6525`, `S/w19/core.patch` 43 souborů proti `3814b85`): 14 druhů kol (čelní/šikmé/šípové/vnitřní, hřeben, kuželové přímé i spirální, hypoidní, šnek + šnekové kolo, cykloidní, kotouč reduktoru, řetězové ISO 606, řemenice HTD/T, rohatka), prvky `gear.*`, výstup kolo/polotovar/zuby, soukolí přes existující příkazy, CLI ověřeno; e2e 20/20. Omezení: šnekové kolo 8,6 s, hypoid/spirální jen nominální boky, některé tabulkové hodnoty ISO 606/BS 978/DIN 7721 z paměti (ověří kontrola). BĚŽÍ `verify:w19r-core`, pak ui + text. E: balíky help a runs v implementaci (export čeká na volný slot). D2 obrázky + D3 PDF příručka až po F (úvodní obrazovka dostane Kola). |
+
+## 0a. Obnovení po pozastavení (14. 11. 19:58)
+
+Stav zastavené práce (nic není ztraceno – rozpracované soubory zůstaly ve worktree a jsou zálohované ve scratchpadu):
+
+| Úkol | Workflow | Kde to stojí | Obnovení |
+| --- | --- | --- | --- |
+| B – fáze B, akceptace | `wf_0a444c37-b25` | `w14-b6` commit `7a77f53` (brána hotovosti hotová); stála kontrola `verify:acceptance` | `Workflow({ scriptPath: ".../cad-wave14-phase-b-wf_0a444c37-b25.js", resumeFromRunId: "wf_0a444c37-b25" })` – hotoví agenti se vrátí z mezipaměti, znovu poběží jen kontrola a opravy |
+| B – převzetí na main | `wf_d020a109-e6f` | `w14-int2`: patch nanesen, konflikty bez značek, NEcommitnuto, testy neproběhly; záloha `S/w14/int2/wip-snapshot.patch` (proti `4ceb0e7`) | obnov `resumeFromRunId: "wf_d020a109-e6f"`; agent integrace začne znovu – řekni mu (do zadání `S/w14/int2/brief.md` přidej odstavec), že worktree už existuje a rozpracovaný stav je v něm / v záloze |
+| F – kola | `wf_a5f62aa9-09a` | návrh `S/w19/NAVRH.md` hotový; `w19-core` jen začátek (9 souborů), záloha `S/w19/core-wip-snapshot.patch` | `resumeFromRunId: "wf_a5f62aa9-09a"` (návrh z mezipaměti) |
+| G – výběr oknem | `wf_533a7c7c-a4a` | `w20-3d`, `w20-2d`: hotový jen rozbor dnešních chyb (`S/w20/repro-3d-base.txt`, `S/w20/2d-repro-notes.txt`) | `resumeFromRunId: "wf_533a7c7c-a4a"` |
+
+Před obnovením: zkontroluj paměť a disk (pravidlo 7), spouštěj nejvýš 2 workflow naráz (stroj má 4 CPU) – pořadí B → G → F.
+Hlášení majitele z jeho testování nasazené verze má přednost: každou chybu nejdřív zopakuj, pak oprav (malá vlna s testem).
 
 ## 0. Pevná pravidla (platí pořád)
 
@@ -44,7 +79,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 
 | Co | Kde |
 | --- | --- |
-| `main` | `aa4300e` (PR #97 střižnice; PR #96 vlna 15; PR #95 převodník a dokumentace) |
+| `main` | `e27ff86` (PR #100 fáze B + PR #99 Sales OS; PR #98 dokumentace; PR #97 střižnice; PR #96 vlna 15; PR #95 převodník) |
 | pracovní větev | `claude/cnc-sales-os-ai-cbR2f` = `main` + rozdělaný úkol (viz Průběžný stav) |
 | scratchpad `S` | `/tmp/claude-0/-home-user-Mnastrojarna-center/44f60c59-94c0-5e2a-b8ba-b2db005ec964/scratchpad` |
 | worktree agentů | `/home/user/Mnastrojarna-center/.claude/worktrees/<název>` |
@@ -58,7 +93,9 @@ postupuj podle kapitoly 9.
 
 ## 2. Jednotný postup převzetí patche (každá vlna stejně)
 
-1. `cd /home/user/Mnastrojarna-center && git status --short` (čisto) `&& git pull -q origin main`.
+1. `cd /home/user/Mnastrojarna-center && git status --short` (čisto) `&& git pull -q origin main && git pull -q --no-rebase origin claude/cnc-sales-os-ai-cbR2f`.
+   Pozor: do této větve slučuje i JINÉ sezení (aplikace CNC Sales OS v kořeni `src/`, např. PR #99 – kontakty, prohlížeč
+   výkresů). Před každým push si větev stáhni; jejich změny nech být a v PR do `main` je zmiň jedním řádkem.
 2. `git apply -3 --index <patch>`; konflikty vyřeš ručně – zásada: **ponechat obě strany** (importy, větve `switch`,
    členy union typů – hlídej středníky). Stejná funkce dvakrát = sjednotit na jednu implementaci.
 3. Kontrola NDA nad patchem (nesmí nic vypsat kromě obecných slov jako „stopka“, „zdvih“):
@@ -77,7 +114,9 @@ postupuj podle kapitoly 9.
 10. Zastav server (pravidlo 8), smaž `.next`, commit (česká zpráva, co a proč), push, PR přes
     `mcp__github__create_pull_request` (tabulka kontrol v těle), sloučení `mcp__github__merge_pull_request`
     (`merge_method: "merge"`), `git pull -q origin main`, `git push`.
-11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`.
+11. Smaž sloučené worktree: `git worktree remove --force .claude/worktrees/<název>`. U NEsloučeného worktree nejdřív zálohuj
+    rozpracované soubory (`git -C <wt> add -A && git -C <wt> diff --cached --binary <základ> > S/<…>-wip.patch`) – `remove --force`
+    smaže i nesledované soubory.
 
 Poučení z vlny 15: před sloučením VŽDY pusť i `src/cad/cli/*.test.ts` (hlídá, že jádro pro příkazovou řádku zná každou
 operaci klienta) a e2e sady, které sahají na změněné GUI / texty, i když nejsou v patchi (`grep -l "<starý text>" e2e/`).
@@ -87,7 +126,6 @@ Známé nestabilní testy (nejsou chybou vlny, při selhání pusť znovu samost
 - `e2e/cad-impeller`: „Zrušit během přepočtu … do 2 s“ při zátěži stroje (samostatně prochází).
 - `e2e/cad-cli`: 2 časové kontroly hlídacího psa při zátěži stroje.
 - `e2e/cad-w15-asm`: při zátěži občas vyprší 300 s u výkresu sestavy.
-- `e2e/cad-w9-core` řádek 128 (výběr v 2D, 1 ze 4 běhů) – viz `S/followups.md`.
 - `src/cad/soft-render.test.ts`, `share-self.test.ts`, `drawing.test.ts` „výkon“ – citlivé na zátěž.
 
 ## 3. Úkol A – dokončit a sloučit vlnu 15 (test 959: díry, výkres, sestava, razítko, předloha)
@@ -125,10 +163,10 @@ Hotové a ověřené balíky (základ `0bd472e`): kernel-client, engine (smyčka
 `src/cad/engine/`), outputs, strict-silent, check-compare, drawing-perf – každý prošel protistrannou kontrolou a opravami.
 Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff proti `0bd472e`), po něm akceptace `w14-b6`.
 
-- [ ] B1. Počkej na oznámení o dokončení workflow. Kdyby workflow neběželo (restart), obnov ho:
+- [x] B1. Počkej na oznámení o dokončení workflow. Kdyby workflow neběželo (restart), obnov ho:
       `Workflow({ scriptPath: "<cesta ke skriptu výše>", resumeFromRunId: "wf_0a444c37-b25" })` – hotoví agenti se vrátí
       z mezipaměti. Zprávu integrace najdeš v deníku (`journal.jsonl`, záznam `result` se štítkem `w14:integrate`).
-- [ ] B2. (BĚŽÍ jako workflow `wf_d020a109-e6f`, viz Průběžný stav) Aplikuj `S/w14/bint.patch` na aktuální `main` (po úkolu A). Čekej konflikty v `src/components/cad/cad-app.tsx`,
+- [x] B2. (BĚŽÍ jako workflow `wf_d020a109-e6f`, viz Průběžný stav) Aplikuj `S/w14/bint.patch` na aktuální `main` (po úkolu A). Čekej konflikty v `src/components/cad/cad-app.tsx`,
       `src/cad/agent.ts`, `src/cad/agent-out.ts`, `src/components/cad/agent-out-host.ts`, `agent-api-host.ts`,
       `agent-guide.ts`, `scripts/cad-harness/*`, `e2e/cad-cli.e2e.cjs`. Zásada: **smyčka operací žije v enginu**
       (`src/cad/engine/ops/*`), `cad-app.tsx` ji jen volá. Co mezitím přibylo do staré smyčky v `cad-app.tsx`, přenes
@@ -146,15 +184,15 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
     položka nabídky Data ▸ Export ▸ Textový skript (`exportScript` v `cad-app.tsx`), `stripLineComment` v `parseAgentText`,
   - z integrace vlny 15: hlášení výkresu druhu `section-legacy` – v přísném režimu ho ber jako chybu (automatický
     výklad vstupu) a doplň o tom větu do návodu pro AI u odsazení řezu (hledej „dnes pište“ v `agent-guide.ts`).
-- [ ] B3. Ověř, že každý z těch přenesených příkazů běží v prohlížeči i v CLI: po buildu
+- [x] B3. Ověř, že každý z těch přenesených příkazů běží v prohlížeči i v CLI: po buildu
       `node public/cad/cli/<verze>/mncad.mjs run <skript> --out <složka>` se skriptem, který obsahuje `díra … v x y`,
       `vložit "Díl" jako "K1"`, `sestava pružina …`, `výkres … řez XZ odsazení N`, `export skript`, `předloha stav`.
       Žádný řádek nesmí skončit `host.app-only`, pokud ho návrh nevyhrazuje prohlížeči (seznam v
       `S/w14/CAD-HEADLESS-NAVRH.md`, kap. 15).
-- [ ] B4. Kontroly podle kapitoly 2. E2e navíc: `cad-cli cad-agent-out cad-agent-api cad-agent-journey cad-agent-asm
+- [x] B4. Kontroly podle kapitoly 2. E2e navíc: `cad-cli cad-agent-out cad-agent-api cad-agent-journey cad-agent-asm
       cad-w13-docs cad-w15-* cad-doc2text` a všechny nové sady z patche (`git diff --cached --name-only | grep e2e/`).
       Testy harness: `node --test scripts/cad-harness/harness.test.mjs` (s `CAD_HARNESS_KERNEL=1` i velký běh).
-- [ ] B5. **Akceptační test na skutečném skriptu** (jen lokálně, nic z toho necommituj):
+- [x] B5. **Akceptační test na skutečném skriptu** (jen lokálně, nic z toho necommituj):
       `node public/cad/cli/<verze>/mncad.mjs run website/.local/fixtures/959-skript.txt --out S/accept --formats step,pdf`
       (+ přepínač sdílení podle nápovědy CLI). Musí platit:
 
@@ -170,7 +208,7 @@ Běží: `w14:integrate` (worktree `w14-bint`, výstup `S/w14/bint.patch` = diff
 
       Řádek `výkres … řez XZ odsazení -57` má dát `⚠` (starší zápis), ne `✗`. Nesplněné kritérium = oprav příčinu
       (workflow: najít → opravit → protistranně ověřit), ne test.
-- [ ] B6. PR „CAD bez prohlížeče – fáze B“ → sloučit. Smaž worktree `w14-*`.
+- [x] B6. PR „CAD bez prohlížeče – fáze B“ → sloučit. Smaž worktree `w14-*`.
 
 ## 5. Úkol C – vlna 17, střižnice: neplatná geometrie a pozdní hlášení
 
@@ -191,7 +229,7 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 
 - [x] D0. (naneseno 19:45, PR spolu s opravami e2e) Převzít `S/w18/docs2.patch` (vlna 15, převodník, vlna 17 – agent dokumentace, worktree `w18-docs2`) podle
       kapitoly 2 (stačí tsc, lint, `docs:text`), commit, PR, sloučit.
-- [ ] D1. `website/src/content/cad-docs.ts`: přepiš místa o fázi A (hledej „fáze A“, „host.app-only“; v
+- [x] D1. (hotovo 15. 11. 03:33 – místa o fázi A přepsána, ověřeno spuštěním CLI) `website/src/content/cad-docs.ts`: přepiš místa o fázi A (hledej „fáze A“, „host.app-only“; v
       `src/views/cad-docs-intl.tsx` „phase A“ / „Phase A“) podle toho, co CLI po fázi B skutečně umí (ověř spuštěním).
       Doplň: vlna 15 (odstavec je v deníku `wf_5f997da2-2d8`, `w15:integrate`, pole `docs_cs`), převodník `export skript`,
       vlna 17, `kontrola`, `porovnat`, přísný režim. Řádky do historie verzí, FAQ, slovníček, `CAD_DOCS_META.updated`.
@@ -205,26 +243,26 @@ Stav: běh `wf_1fd5cfa9-922` (skript `…/workflows/scripts/` – soubor s `wf_1
 
 ## 7. Úkol E – úklid a zbývající body hlášení agenta
 
-- [ ] E1. NDA úklid: zkušební (syntetický) nástroj v `scripts/cad-harness/` (`synth-spec.mjs`, `synth-959.txt`,
+- [x] E1. (hotovo 15. 11. 00:55: díly „900-01-00-NN“, skript `synth-tool.txt`, podklady přegenerovány, testy harness 18/18, engine/cli 383/383) NDA úklid: zkušební (syntetický) nástroj v `scripts/cad-harness/` (`synth-spec.mjs`, `synth-959.txt`,
       `expected.json`), `src/cad/engine/protocol.test.ts`, `host.test.ts` a e2e pojmenovává díly „959-01-00-NN …“ –
       to je číslo nástroje zákazníka. Přejmenuj na neutrální (např. „900-01-00-NN“; soubor `synth-959.txt` →
       `synth-tool.txt`) jedním commitem AŽ PO sloučení úkolu B (patch B sahá do stejných souborů). Geometrie je syntetická.
-- [ ] E2. Položky v `S/followups.md` (závod ve výběru 2D `window.mncad.draft` status.selection; přísný režim a
+- [x] E2. (uzavřeno 15. 11. 04:33 – obě položky hotové dřív) Položky v `S/followups.md` (závod ve výběru 2D `window.mncad.draft` status.selection; přísný režim a
       `section-legacy`).
-- [ ] E3. Z hlášení „Kde CAD stojí dnes“ zkontroluj, co fáze B nedodala, a doplň (každé jako malý balík s testy):
+- [ ] E3. (BĚŽÍ workflow `wf_afc90a94-180`, balíky help + runs; odkazy/base64 a B1/B2 už hotové) Z hlášení „Kde CAD stojí dnes“ zkontroluj, co fáze B nedodala, a doplň (každé jako malý balík s testy):
   - P2-10: hledání v nápovědě textem (`nápověda <slovo>`) a tahák pro agenty ≤ 5 kB (návrh `S/w14/tahak-navrh.md`),
   - odkazy na soubory pro agenty v cloudovém prohlížeči (`… odkaz` / `base64` u výstupních příkazů),
   - opakovaný běh téhož skriptu bez duplicit (idempotence: druhé spuštění nesmí založit „Díl 2“),
   - tichý (stručný) protokol i v konzoli prohlížeče,
   - vícedokumentové běhy: ✓ jen u dokumentů, které se skutečně postavily (dřív se stavěl jen poslední),
   - B1 / B2 z hlášení (prázdná sestava se počítá jako prázdná záložka; závod evidence záložek).
-- [ ] E6. Převodník dokument → skript nepřenáší nic z vlny 15 kromě třídy ISO 2768 a NEHLÁSÍ to: šablona a další pole
+- [ ] E6. (BĚŽÍ workflow `wf_afc90a94-180`, balík export) Převodník dokument → skript nepřenáší nic z vlny 15 kromě třídy ISO 2768 a NEHLÁSÍ to: šablona a další pole
       razítka (logo, zákazník, polotovar…), tabulka nepředepsaných tolerancí podle desetinných míst, funkční rozměry
       (`kótovat chytře funkční …`), režim poloh děr (`kótovat … díry tabulka|souřadnicově`), přezdívky komponent
       (`vložit … jako`), pružiny (`sestava pružina …`). Doplň vyhrazené příkazy do `src/cad/doc-script.ts` (a do
       ověření řádku), jinak aspoň poznámku ℹ; test tam a zpět pro každý bod (`doc-script.roundtrip.test.ts`). Po úkolu B
       (patch B na doc-script nesahá, ale ověř).
-- [ ] E7. `stav` ve stejném běhu `window.mncad.run`, který sestavu teprve založil, nevypíše přesnou obálku („tělesa
+- [ ] E7. (v CLI ověřeno 15. 11. 04:33 – obálka je; prohlížeč ověří balík runs) `stav` ve stejném běhu `window.mncad.run`, který sestavu teprve založil, nevypíše přesnou obálku („tělesa
       komponent se stavějí zvlášť“); samostatné `stav` ji vypíše. Po úkolu B ověř v enginu (asynchronní stav sestavy)
       a oprav, aby obálka byla i v témže běhu (nebo to jasně řekni v protokolu).
 - [ ] E4. Hostovaný koncový bod (HTTP služba pro agenty bez Node) je rozhodnutí majitele – nenasazuj, jen se v závěrečné
@@ -260,7 +298,7 @@ Workflow `wf_a5f62aa9-09a` (skript `…/workflows/scripts/cad-wave19-gears-wf_a5
 (worktree `w19-core`, patch `S/w19/core.patch` proti `3bb04d9`) → souběžně `ui` (`w19-ui`) a `text` (`w19-text`), jejich
 patche jsou proti poslednímu commitu `w19-core`. Každý balík: implementace → protistranná kontrola → opravy.
 
-- [ ] F1. Počkej na dokončení workflow (při restartu obnov `resumeFromRunId: "wf_a5f62aa9-09a"`). Přečti zprávy v deníku.
+- [ ] F1. (BĚŽÍ od 15. 11. 03:27 nový workflow `wf_fe2fa9ab-38a`, worktree `w19-core2`/`w19-ui2`/`w19-text2`, základ `3814b85`) Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_fe2fa9ab-38a"` se skriptem výše). Přečti zprávy v deníku.
 - [ ] F2. Aplikuj postupně `core.patch`, `ui.patch`, `text.patch` na `main` podle kapitoly 2 (po úkolech A–C; s úkolem B
       se potká jen v `agent.ts`, `agent-guide.ts`, `cad-app.tsx` – malé kusy). Kontrola NDA není potřeba (žádná data
       zákazníka), ale zkontroluj, že patch neobsahuje nic z `website/.local/`.
@@ -270,6 +308,44 @@ patche jsou proti poslednímu commitu `w19-core`. Každý balík: implementace �
       textem v CLI (`mncad run`), až bude sloučen úkol B.
 - [ ] F4. Dokumentace (nová podkapitola v kapitole Prvky / Knihovna + FAQ „Jak udělám ozubené kolo?“), PR, sloučení,
       smazat worktree `w19-*`.
+
+## 7b. Úkol G – vlna 20: výběr oknem (tažením obdélníku) ve 3D, ve skice, ve 2D výkresu a ve výkresu dílu
+
+Zadání majitele: „Mnástrojárna CAD 3D a 2D neumí vybrat jednoduše myší oknem, tedy více prvků naráz.“
+Očekávání (jako AutoCAD / SolidWorks): tažení levým tlačítkem = obdélník; zleva doprava = okno (jen celé uvnitř),
+zprava doleva = křížení (i dotčené); bez klávesy nahradí výběr, Ctrl/Shift přidá, Ctrl+Shift/Alt ubere; Esc zruší;
+ve 3D jen viditelné (volba „i skryté“), podle filtru výběru; funguje i ve výběrech formulářů (hrany zaoblení),
+v měření, v sestavě (komponenty), bez WebGL; ve skice (mazání, vazby na vícenásobném výběru), ve 2D výkresu
+(i uvnitř příkazů „Vyberte objekty“) a ve výkresu dílu (kóty, poznámky). Pro agenty `window.mncad.selectBox(...)`.
+Úplné zadání `S/w20/brief.md`.
+
+Workflow `wf_533a7c7c-a4a` (skript `…/workflows/scripts/cad-wave20-box-select-wf_533a7c7c-a4a.js`): balíky `3d`
+(worktree `w20-3d`, patch `S/w20/3d.patch`) a `2d` (`w20-2d`, `S/w20/2d.patch`), oba proti `210a1e8`.
+
+- [x] G1. (hotovo 15. 11. 02:56; obnoveno 01:00 na základu `69f3f58`) Počkej na dokončení (při restartu obnov `resumeFromRunId: "wf_533a7c7c-a4a"`), přečti zprávy v deníku.
+- [x] G2. (hotovo 15. 11. 03:18, commit `851273d`) Aplikuj `3d.patch` a `2d.patch` podle kapitoly 2 (s úkolem B se potkají v `cad-app.tsx`, `agent-api-host.ts`
+      – malé kusy; je-li B už sloučen, nanes na nový `main`).
+- [x] G3. (hotovo 15. 11. 03:18, 13/13) Vlastní zkouška v prohlížeči (Playwright, produkční build, skutečné tažení myší): 3D díl – okno přes horní
+      plochy vybere jen viditelné plochy; křížení vybere i dotčené; Ctrl přidá; zaoblení – hrany oknem; sestava –
+      komponenty oknem; skica – smazat více entit; 2D – MOVE s výběrem oknem; výkres dílu – smazat více kót.
+- [x] G4. (hotovo 15. 11. 03:23, PR #101) Dokumentace (kapitola 3 Obrazovka, 5 Skica, 14 2D CAD, 13 Výkresy + mikronávody), PR, sloučení, smazat `w20-*`.
+
+## 7c. Úkol H – vlna 21: pružiny (tabulka → správná pružina; pružiny v pohybu i v dynamické simulaci)
+
+Zadání majitele: „Online CAD neumí pružiny a to ani pro simulaci pohybu.“ Úplné zadání `S/w21/brief.md`.
+- Balík `part` (worktree `w21-part`, patch `S/w21/part.patch`): jeden vstup „Pružina“ → galerie → tabulka (tlačná, tažná,
+  zkrutná, talířová) s výpočtem podle EN 13906-1 (tuhost, délka na doraz, napětí s korekcí, vzpěr, frekvence, hmotnost),
+  skutečná geometrie (přiložené a broušené konce, očka, ramena), jeden parametrický prvek historie, text `pružina tlačná …`,
+  `pružina tabulka`, tabulka pružiny na výkrese, převodník dokument → skript.
+- Balík `motion` (worktree `w21-motion`, patch `S/w21/motion.patch`): „Pružina mezi díly“ na klik (i do všech děr vzoru),
+  skutečný tvar pružiny při přehrávání pohybu (drát zůstane kulatý), **dynamická pohybová studie** (hmotnosti, gravitace,
+  síly pružin, tlumení, dorazy) s grafem a CSV; příklad: stírací deska střihadla na pružinách.
+- [x] H1. (hotovo 15. 11. 01:15) Počkej na `wf_1e1ed70b-b6a` (obnova `resumeFromRunId`), přečti zprávy.
+- [x] H2. (workflow `wf_60b96c19-df2` hotov 15. 11. 03:40, `S/w21/int.patch` nanesen 03:43) Převzít `part.patch` a pak `motion.patch` podle kapitoly 2 (oba proti `fd8a05e`).
+- [x] H3. (hotovo 15. 11. 03:50, 14/14: `S/w21/own-probe.cjs`; prohlížeč = CLI: 107 N v 0,24 s, návrat 0,375 s) Vlastní zkouška v prohlížeči: tabulka → tlačná pružina d 2 De 20 L0 50 n 8 broušená (L0 a De změřit na tělese,
+      tuhost ručně ověřit); sestava se 4 pružinami pod stírací deskou → dynamika → deska se vrátí na doraz, graf, CSV.
+- [x] H4. (hotovo 15. 11. 04:31, PR #102) Dokumentace (kapitola Prvky – pružiny, Sestavy – pohyb a dynamika, FAQ „Jak udělám pružinu?“), PR, sloučit,
+      smazat `w21-*`.
 
 ## 8. Co říct majiteli o nasazení (po každém sloučení)
 

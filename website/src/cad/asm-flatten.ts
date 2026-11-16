@@ -1,0 +1,164 @@
+/** Podsestavy v UI: zploštění stromu komponent na listové díly se světovými maticemi, vytváření a rozpouštění podsestav. */
+import { tr } from "@/cad/i18n";
+import { computeBom, emptyAssembly, eulerXYZ, placementMatrix, sourceKey, type BomRow, type Mat3 } from "@/cad/assembly";
+import { springEffective, springMeshMatrix } from "@/cad/asm-spring-geom";
+import { springCoilView } from "@/cad/spring-coil-mesh";
+import type { MeshData } from "@/cad/types";
+import { uid, type AsmComponent, type CadDoc, type Placement } from "@/cad/types";
+
+export type Leaf = {
+  /** jedinečné id listu: cesta id komponent „top/…/leaf“ */
+  id: string;
+  /** komponenta nejvyšší úrovně */
+  topId: string;
+  comp: AsmComponent;
+  key: string;
+  /** světová matice (po sloupcích) */
+  matrix: number[];
+  /** cesta názvů (pro strom) */
+  path: string[];
+  hidden: boolean;
+  /** pružina v kroku pohybové studie: síť drátu v aktuální délce (cad/spring-coil-mesh.ts) místo sítě dílu, `key` pro zobrazení */
+  coil?: { key: string; mesh: MeshData };
+};
+
+export function mul4(a: number[], b: number[]): number[] {
+  const r = new Array(16).fill(0);
+  for (let c = 0; c < 4; c++) for (let rr = 0; rr < 4; rr++) for (let k = 0; k < 4; k++) r[c * 4 + rr] += a[k * 4 + rr] * b[c * 4 + k];
+  return r;
+}
+
+export function matrixToPlacement(m: number[]): Placement {
+  const R: Mat3 = [m[0], m[4], m[8], m[1], m[5], m[9], m[2], m[6], m[10]];
+  const round = (v: number) => Math.round(v * 1e6) / 1e6;
+  return { position: [round(m[12]), round(m[13]), round(m[14])], rotation: eulerXYZ(R) };
+}
+
+const IDENT = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+/**
+ * Všechny listové díly sestavy (včetně dílů ve vnořených podsestavách). Pružina (cad/asm-spring-geom.ts) má díl v aktuální délce;
+ * `springMesh` (přehrávání pohybové studie) místo toho protáhne síť volné pružiny po ose – bez stavby v jádře v každém kroku.
+ */
+export function flattenLeaves(doc: CadDoc, o: { springMesh?: boolean } = {}): Leaf[] {
+  const out: Leaf[] = [];
+  const walk = (comps: AsmComponent[], parent: number[], prefix: string, top: string | null, names: string[], hidden: boolean) => {
+    for (const c0 of comps) {
+      // přehrávání studie: síť drátu v aktuální délce (stoupání se mění, drát zůstává kulatý); jen trubka / válec se protáhne po ose
+      const coil = o.springMesh && c0.source.kind === "part" && c0.spring ? springCoilView(c0, sourceKey(c0.source)) : null;
+      const sm = o.springMesh ? (coil?.matrix ?? springMeshMatrix(c0)) : null;
+      const c = o.springMesh ? c0 : springEffective(c0);
+      const m = mul4(parent, sm ? mul4(placementMatrix(c.placement), sm) : placementMatrix(c.placement));
+      const id = prefix ? `${prefix}/${c.id}` : c.id;
+      const topId = top ?? c.id;
+      const h = hidden || !!c.hidden;
+      if (c.source.kind === "asm") walk(c.source.doc.components ?? [], m, id, topId, [...names, c.name], h);
+      else out.push({ id, topId, comp: c, key: sourceKey(c.source), matrix: m, path: [...names, c.name], hidden: h, ...(coil ? { coil: { key: coil.key, mesh: coil.mesh } } : {}) });
+    }
+  };
+  walk(doc.components ?? [], IDENT, "", null, [], false);
+  return out;
+}
+
+/** Vytvoří podsestavu z vybraných komponent nejvyšší úrovně (zachová jejich polohu). */
+export function makeSubassembly(doc: CadDoc, ids: string[], name = "Podsestava"): CadDoc {
+  const set = new Set(ids);
+  const picked = (doc.components ?? []).filter((c) => set.has(c.id));
+  if (!picked.length) return doc;
+  const sub: AsmComponent = {
+    id: uid(),
+    name,
+    source: { kind: "asm", doc: { ...emptyAssembly(name), components: picked } },
+    placement: { position: [0, 0, 0], rotation: [0, 0, 0] },
+    group: "Podsestavy",
+  };
+  const rest = (doc.components ?? []).filter((c) => !set.has(c.id));
+  const at = (doc.components ?? []).findIndex((c) => set.has(c.id));
+  rest.splice(Math.max(0, at), 0, sub);
+  return { ...doc, components: rest };
+}
+
+/** položka výběru (selection.ts SelItem) → id komponenty nejvyšší úrovně („“ = prvek dílu) */
+type SelLike = { kind: string; compId?: string; topId?: string };
+const selTop = (x: SelLike) => (x.kind === "feature" ? "" : ((x.topId ?? x.compId) ?? "").split("/")[0]);
+
+/**
+ * Komponenty nejvyšší úrovně pro „Vytvořit podsestavu z vybraných“: výběr ve 3D okně (komponenta, těleso, plocha… –
+ * vždy jeho komponenta nejvyšší úrovně) a komponenta vybraná ve stromu (`treeSel`), bez duplicit a jen existující.
+ * `why` = důvod, proč příkaz nejde (pro neaktivní položku nabídky).
+ */
+export function subassemblyPick(doc: CadDoc, sel: readonly SelLike[], treeSel: string | null): { ids: string[]; why?: string } {
+  const comps = doc.components ?? [];
+  const tops = sel.map(selTop);
+  const ids = [...new Set([...tops, ...(treeSel ? [treeSel] : [])])].filter((id) => comps.some((c) => c.id === id));
+  if (!comps.length) return { ids, why: tr("Sestava zatím nemá komponenty.") };
+  if (!ids.length) return { ids, why: tr("Vyberte komponenty ve stromu nebo v modelu (Ctrl+klik přidá další).") };
+  return { ids };
+}
+
+/**
+ * Komponenta vybraná ve stromu (`asmSel`) po kliku v modelu: klik nebo přidání = komponenta kliknuté položky;
+ * Ctrl/Shift+klik, který položku z výběru ubral = poslední zbylá komponenta (nic nezbylo = null) – odebraná komponenta
+ * nesmí zůstat ve stromu vybraná, jinak by ji subassemblyPick vzal zpět. undefined = beze změny.
+ */
+export function treeSelAfterPick(prev: readonly SelLike[], next: readonly SelLike[], it: SelLike): string | null | undefined {
+  if (next.length < prev.length) {
+    const rest = next.map(selTop).filter(Boolean);
+    return rest.length ? rest[rest.length - 1] : null;
+  }
+  return selTop(it) || undefined;
+}
+
+/** Rozpustí podsestavu: její komponenty se přesunou o úroveň výš se složeným umístěním. */
+export function dissolveSubassembly(doc: CadDoc, id: string): CadDoc {
+  const comps = doc.components ?? [];
+  const i = comps.findIndex((c) => c.id === id);
+  const sub = comps[i];
+  if (!sub || sub.source.kind !== "asm") return doc;
+  const pm = placementMatrix(sub.placement);
+  const children = (sub.source.doc.components ?? []).map((c) => ({ ...c, placement: matrixToPlacement(mul4(pm, placementMatrix(c.placement))) }));
+  const next = [...comps];
+  next.splice(i, 1, ...children);
+  return { ...doc, components: next };
+}
+
+/**
+ * Kusovník: plochý (všechny díly) nebo strukturovaný (první úroveň, podsestavy jako položky). Řádky podle ZDROJE komponent
+ * (pružina je jedna položka v jakékoli délce – dřív se zdroj pružiny nahradil dílem v aktuální délce a řádky se rozdělily podle
+ * délky); hmotnost z tělesa v sestavě (`info` dostane komponentu v aktuální délce pružiny – jako stav sestavy).
+ */
+export function bomOf(doc: CadDoc, flat: boolean, info0: (c: AsmComponent) => { material?: string; massKg?: number }): BomRow[] {
+  const info = (c: AsmComponent) => info0(springEffective(c));
+  if (flat) return computeBom(doc, info);
+  const top = doc.components ?? [];
+  const parts = computeBom({ ...doc, components: top.filter((c) => c.source.kind !== "asm") }, info);
+  const subs = new Map<string, BomRow>();
+  for (const c of top) {
+    if (c.source.kind !== "asm") continue;
+    const k = `${sourceKey(c.source)}|${c.source.doc.name}|${c.number ?? ""}`; // podle zdroje jako díly – přejmenovaná instance řádek nerozdělí
+    const r = subs.get(k);
+    if (r) {
+      r.qty++;
+      r.ids.push(c.id);
+      continue;
+    }
+    const leaves = flattenLeaves({ ...doc, components: [c] });
+    const mass = leaves.reduce((s, l) => s + (info(l.comp).massKg ?? 0), 0);
+    subs.set(k, { pos: 0, name: tr("{0} (podsestava, {1} dílů)", c.name, leaves.length), number: c.number, qty: 1, material: "—", massKg: mass, group: "Podsestavy", ids: [c.id] });
+  }
+  const rows = [...subs.values(), ...parts];
+  rows.forEach((r, i) => (r.pos = i + 1));
+  return rows;
+}
+
+/** Inverze tuhé transformace umístění (po sloupcích). */
+export function invPlacementMatrix(p: Placement): number[] {
+  const m = placementMatrix(p);
+  // R^T a -R^T t
+  const r = [m[0], m[4], m[8], 0, m[1], m[5], m[9], 0, m[2], m[6], m[10], 0, 0, 0, 0, 1];
+  const t = [m[12], m[13], m[14]];
+  r[12] = -(r[0] * t[0] + r[4] * t[1] + r[8] * t[2]);
+  r[13] = -(r[1] * t[0] + r[5] * t[1] + r[9] * t[2]);
+  r[14] = -(r[2] * t[0] + r[6] * t[1] + r[10] * t[2]);
+  return r;
+}
