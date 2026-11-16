@@ -85,3 +85,11 @@ export async function setModuleMode(module: string, mode: AutomationMode): Promi
     return { ok: false, error: err instanceof Error ? err.message : "Chyba" };
   }
 }
+
+/** Skutečný režim přepínače nahoře z databáze (16. 11.: přepínač dřív ukazoval jen paměť prohlížeče). */
+export async function getGlobalModeAction(): Promise<{ ok: boolean; mode: AutomationMode; canChange: boolean }> {
+  const { getGlobalMode } = await import("@/lib/automation");
+  const mode = await getGlobalMode();
+  const auth = await begin();
+  return { ok: true, mode, canChange: !("error" in auth) };
+}

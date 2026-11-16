@@ -163,6 +163,8 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
   }
   async function setMode(mode: "full" | "approval") {
     await svc.from("automation_settings").upsert({ module: "purchase_order", mode, enabled: true }, { onConflict: "module" });
+    // 16. 11.: přepínač nahoře (automation_global) je hlavní vypínač — modul „full“ platí jen při globální plné automatice
+    await svc.from("automation_global").update({ mode: "full" }).eq("id", true);
   }
 
   async function plan(jid: string, opts: Parameters<Actions["prepareProductionHandoff"]>[1] = {}): Promise<HandoffPlan> {
@@ -223,6 +225,7 @@ describe.skipIf(!ENABLED)("předání do výroby — server (WP2) ↔ lokální 
   }, 60_000);
 
   afterAll(async () => {
+    await svc.from("automation_global").update({ mode: "approval" }).eq("id", true); // 16. 11.: zpět na výchozí
     if (!svc) return;
     if (modeBefore) await setMode(modeBefore as "full" | "approval");
     if (jobs.length) {

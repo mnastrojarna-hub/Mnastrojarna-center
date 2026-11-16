@@ -1,26 +1,23 @@
 import "server-only";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
 import type { AutomationMode } from "@/lib/supabase/database.types";
+import { effectiveAutomationMode } from "@/lib/automation-mode";
 
 /**
- * Efektivní režim automatizace pro modul: per-modul nastavení → globální → default 'approval'.
+ * Efektivní režim automatizace pro modul: přepínač nahoře (globální) je hlavní vypínač; při plné automatice
+ * platí nastavení modulu. Výchozí 'approval'.
  * Čte z DB (automation_settings / automation_global) přes operátorský klient.
  */
 export async function getModuleMode(module: string): Promise<AutomationMode> {
   if (!isSupabaseConfigured()) return "approval";
   try {
     const db = await createOperatorClient();
-    const { data: m } = await db
-      .from("automation_settings")
-      .select("mode, enabled")
-      .eq("module", module)
-      .maybeSingle();
-    const row = m as { mode: AutomationMode; enabled: boolean } | null;
-    if (row && row.enabled === false) return "approval"; // vypnuto = jen schválení
-    if (row?.mode) return row.mode;
-
-    const { data: g } = await db.from("automation_global").select("mode").maybeSingle();
-    return ((g as { mode: AutomationMode } | null)?.mode) ?? "approval";
+    const [{ data: m }, { data: g }] = await Promise.all([
+      db.from("automation_settings").select("mode, enabled").eq("module", module).maybeSingle(),
+      db.from("automation_global").select("mode").maybeSingle(),
+    ]);
+    // přepínač nahoře je hlavní vypínač (16. 11.) — viz automation-mode.ts
+    return effectiveAutomationMode((g as { mode: AutomationMode } | null)?.mode, m as { mode: AutomationMode; enabled: boolean } | null);
   } catch {
     return "approval";
   }
