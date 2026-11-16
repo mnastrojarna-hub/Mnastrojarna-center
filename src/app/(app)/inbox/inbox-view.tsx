@@ -375,7 +375,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     if (stale) void sync({ auto: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const patch = React.useCallback((threadId: string, p: ThreadPatch) => {
+  const patch = React.useCallback((threadId: string, p: ThreadPatch, emailId?: string) => {
     setPage((pg) => ({
       ...pg,
       items: pg.items.map((t) => (t.threadId === threadId ? {
@@ -383,8 +383,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         ...(p.flagged !== undefined ? { flagged: p.flagged } : {}),
         ...(p.priority !== undefined ? { priority: p.priority } : {}),
         ...(p.priorityManual !== undefined ? { priorityManual: p.priorityManual } : {}),
-        ...(p.unreadCount !== undefined ? { unreadCount: p.unreadCount } : {}),
-        ...(p.category ? { category: p.category } : {}),
+        // po zprávách: přečtení a kategorie jen u otevřené zprávy (vlaječka, priorita, zakázka platí pro vlákno)
+        ...(p.unreadCount !== undefined && (!emailId || t.emailId === emailId) ? { unreadCount: p.unreadCount } : {}),
+        ...(p.category && (!emailId || t.emailId === emailId) ? { category: p.category } : {}),
         ...(p.jobId ? { jobId: p.jobId, jobNumber: p.jobNumber } : {}),
         ...(p.jobCleared ? { jobId: undefined, jobNumber: undefined, jobTitle: undefined, jobLinkSource: undefined, jobLinkActor: undefined } : {}),
         ...(p.suggestionDone ? { suggestion: undefined } : {}),
@@ -994,7 +995,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                 canAi={canAi}
                 version={threadVersion}
                 onBack={closeDetail}
-                onPatch={patch}
+                onPatch={(tid, p) => patch(tid, p, selected.emailId)}
                 onCompose={setCompose}
                 onSplit={() => void reload({ keep: page.items.length })}
               />
