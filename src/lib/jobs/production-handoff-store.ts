@@ -1,4 +1,5 @@
 import "server-only";
+import { effectiveAutomationMode } from "@/lib/automation-mode";
 import { randomUUID } from "node:crypto";
 import { logAudit } from "@/lib/audit";
 import type { SmtpPreference } from "@/lib/email/send";
@@ -1356,11 +1357,9 @@ export async function buildApplyPayload(db: JobsDb, ctx: HandoffContext, input: 
 export async function purchaseOrderMode(db: JobsDb): Promise<AutomationMode> {
   try {
     const { data } = await db.from("automation_settings").select("mode, enabled").eq("module", "purchase_order").maybeSingle();
-    const row = data as { mode: AutomationMode; enabled: boolean | null } | null;
-    if (row && row.enabled === false) return "approval";
-    if (row?.mode) return row.mode;
     const { data: g } = await db.from("automation_global").select("mode").maybeSingle();
-    return ((g as { mode: AutomationMode } | null)?.mode) ?? "approval";
+    // přepínač nahoře je hlavní vypínač (16. 11.)
+    return effectiveAutomationMode((g as { mode: AutomationMode } | null)?.mode, data as { mode: AutomationMode; enabled: boolean | null } | null);
   } catch {
     return "approval";
   }

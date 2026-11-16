@@ -9,7 +9,7 @@ import { CorrectionsList } from "@/components/corrections-list";
 import { getAllAgentRules } from "@/lib/ai/rules";
 import { getRecentCorrections } from "@/lib/ai/corrections";
 import { getIntegrationSettingsMeta } from "@/lib/data/settings-data";
-import { getAllModuleModes } from "@/lib/automation";
+import { getAllModuleModes, getGlobalMode } from "@/lib/automation";
 import { requireFeature } from "@/lib/auth/session";
 import { cn } from "@/lib/utils";
 
@@ -26,11 +26,12 @@ function SectionIcon({ tone, children }: { tone: string; children: React.ReactNo
  */
 export default async function TuningPage() {
   await requireFeature("ai_tuning");
-  const [agentRules, settings, moduleModes, corrections] = await Promise.all([
+  const [agentRules, settings, moduleModes, corrections, globalMode] = await Promise.all([
     getAllAgentRules(),
     getIntegrationSettingsMeta(),
     getAllModuleModes(),
     getRecentCorrections(),
+    getGlobalMode(),
   ]);
   const pricingParams = settings.filter((s) => s.category === "pricing");
 
@@ -116,7 +117,7 @@ export default async function TuningPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AutomationSettings initial={moduleModes} />
+          <AutomationSettings initial={moduleModes} globalMode={globalMode} />
         </CardContent>
       </Card>
     </div>

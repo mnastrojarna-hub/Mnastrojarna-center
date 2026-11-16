@@ -76,6 +76,7 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
   let itemId = "";
   let poNumber = "";
 
+  let globalBefore: string | null = null;
   beforeAll(async () => {
     const env = loadLocalEnv();
     process.env.NEXT_PUBLIC_SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -110,9 +111,13 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
     await svc.from("mailboxes").delete().eq("email", USER);
     // výchozí režimy Pošty B (plná automatika — migrace je zakládá; test je nezávislý na ručních změnách)
     await svc.from("automation_settings").upsert([{ module: "mail_job_link", mode: "full", enabled: true }, { module: "mail_job_changes", mode: "full", enabled: true }]);
+    // 16. 11.: přepínač nahoře (automation_global) je hlavní vypínač — modul „full“ platí jen při globální plné automatice
+    globalBefore = ((await svc.from("automation_global").select("mode").eq("id", true).maybeSingle()).data as { mode: string } | null)?.mode ?? null;
+    await svc.from("automation_global").update({ mode: "full" }).eq("id", true);
   }, 60_000);
 
   afterAll(async () => {
+    if (globalBefore) await svc.from("automation_global").update({ mode: globalBefore }).eq("id", true);
     for (const j of jobs) {
       await svc.from("quotes").delete().eq("job_id", j.id);
       await svc.from("job_mail_changes").delete().eq("job_id", j.id);
