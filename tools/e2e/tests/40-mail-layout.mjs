@@ -138,7 +138,7 @@ await T("200 vláken + dlouhé vlákno: složky, seznam a detail rolují každý
   expect(s.rows >= 50, `načteno ${s.rows} vláken`);
   // výchozí šířka: seznam ~42 % (Outlook, 16. 11.) (užší než dřív), detail širší
   expect(Math.abs(s.listPane.w - Math.round(s.split.w * 0.42)) <= 4 || s.listPane.w === 260, `výchozí seznam 42 %: ${s.listPane.w} z ${s.split.w}`);
-  expect(s.detail.w > s.listPane.w * 1.8, `detail širší než seznam (${s.detail.w} × ${s.listPane.w})`);
+  expect(s.detail.w > s.listPane.w * 1.2, `detail širší než seznam (${s.detail.w} × ${s.listPane.w})`);
 
   // otevřít dlouhé vlákno (nejnovější)
   await page.locator('[data-testid="thread-row"]', { hasText: `${TAG} DLOUHÉ` }).first().locator("button").first().click();
