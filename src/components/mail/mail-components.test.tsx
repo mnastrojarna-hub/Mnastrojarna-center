@@ -120,7 +120,8 @@ describe("detail vlákna", () => {
     expect(h).toContain('data-testid="thread-more"');
     expect(h).toContain('aria-label="Odpovědět všem"');
     expect(h).toContain('data-testid="thread-flag"');
-    expect(h.match(/role="radio"/g)).toHaveLength(5);
+    // 16. 11.: priorita kompaktně (jeden výběr P1–P5 místo pěti tlačítek) — hlavička menší, text zprávy větší
+    expect(h).toContain('data-testid="thread-priority"');
     expect(h).toContain("Načítám vlákno");
   });
 });

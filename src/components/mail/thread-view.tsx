@@ -203,14 +203,14 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
       <div className={cn("h-1.5 w-full", st.bar)} aria-hidden />
       <CardContent className="space-y-4 p-4 sm:p-5">
         {/* počítač: předmět + akce zůstávají nahoře, zprávy rolují pod nimi */}
-        <div className="space-y-4 lg:sticky lg:top-0 lg:z-10 lg:-mx-5 lg:-mt-5 lg:border-b lg:bg-card lg:px-5 lg:pb-3 lg:pt-4" data-testid="thread-header">
+        <div className="space-y-1.5 lg:sticky lg:top-0 lg:z-10 lg:-mx-5 lg:-mt-5 lg:border-b lg:bg-card lg:px-5 lg:pb-2 lg:pt-2.5" data-testid="thread-header">
         <div className="flex items-start gap-2">
           <Button size="icon-sm" variant="ghost" onClick={onBack} className="lg:hidden" aria-label="Zpět na seznam">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h2 className="break-words text-base font-semibold leading-snug sm:text-lg" data-testid="thread-subject">{detail?.subject || summary.subject || "(bez předmětu)"}</h2>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <h2 className="break-words text-[15px] font-semibold leading-snug" data-testid="thread-subject">{detail?.subject || summary.subject || "(bez předmětu)"}</h2>
+            <div className="mt-1 flex flex-wrap items-center gap-1">
               {asking
                 ? <AskingCategoryPill />
                 : target
@@ -222,15 +222,14 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
                 </span>
               )}
               {messages.length > 1 && <span className="text-xs text-muted-foreground">{messageCountLabel(messages.length)}</span>}
-              <span className="inline-flex items-center gap-1.5" data-testid="thread-priority">
-                <span className="text-xs font-medium text-muted-foreground">Priorita</span>
-                <PrioritySelect inline value={priority.value} manual={priority.manual} onChange={changePriority} />
+              <span className="inline-flex items-center" data-testid="thread-priority" title="Priorita">
+                <PrioritySelect value={priority.value} manual={priority.manual} onChange={changePriority} />
               </span>
             </div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-full text-muted-foreground" aria-label="Další akce" title="Další akce" data-testid="thread-more" disabled={busy !== null}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 rounded-full text-muted-foreground" aria-label="Další akce" title="Další akce" data-testid="thread-more" disabled={busy !== null}>
                 {busy === "ai" || busy === "unread" || busy === "split" ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
               </Button>
             </DropdownMenuTrigger>
@@ -258,14 +257,15 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
             aria-pressed={flagged}
             aria-label={flagged ? "Zrušit vlaječku" : "Označit vlaječkou"}
             title={flagged ? "Zrušit vlaječku" : "Označit vlaječkou"}
-            className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition-colors", flagged ? "bg-red-50 text-red-600 dark:bg-red-500/15" : "text-muted-foreground hover:bg-accent")}
+            className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors", flagged ? "bg-red-50 text-red-600 dark:bg-red-500/15" : "text-muted-foreground hover:bg-accent")}
             data-testid="thread-flag"
           >
-            <Flag className={cn("h-5 w-5", flagged && "fill-current")} />
+            <Flag className={cn("h-4 w-4", flagged && "fill-current")} />
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        {/* akce: malé, jedna řada (Outlook — text zprávy má přednost) */}
+        <div className="flex flex-wrap items-center gap-1 [&_button]:h-7 [&_button]:px-2 [&_button]:text-xs [&_svg]:h-3.5 [&_svg]:w-3.5">
           <Button size="sm" variant="send" onClick={() => compose("reply")} disabled={!target} data-testid="btn-reply">
             <Reply className="h-4 w-4" /> Odpovědět
           </Button>
@@ -321,6 +321,7 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
                 key={m.id}
                 m={m}
                 open={only.length > 0 || expanded.has(m.id)}
+                single={only.length > 0}
                 onToggle={() => setExpanded((s) => { const n = new Set(s); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })}
                 onReply={() => compose("reply", m)}
                 onForward={() => compose("forward", m)}
@@ -385,17 +386,19 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
   );
 }
 
-function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCategoryError }: {
+function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCategoryError, single }: {
   m: ThreadMessage; open: boolean; onToggle: () => void; onReply: () => void; onForward: () => void;
   onCategory: (c: EmailCategory) => void; onCategoryError: (text: string) => void;
+  /** Jediná otevřená zpráva (Pošta po zprávách): kategorie je v hlavičce — bez dvojího štítku. */
+  single?: boolean;
 }) {
   const out = m.direction === "out";
   const [asSent, setAsSent] = React.useState(false);
   const who = out ? (m.senderName || m.fromName || m.fromEmail || "Já") : (m.fromName || m.fromEmail || "—");
   return (
     <li className={cn("rounded-xl border", out ? "border-cyan-200 bg-cyan-50/40 dark:border-cyan-500/20 dark:bg-cyan-500/5" : "bg-card")} data-testid="thread-message" data-direction={m.direction}>
-      <button type="button" onClick={onToggle} className="flex w-full items-start gap-3 p-3 text-left" aria-expanded={open}>
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white", out ? "bg-cyan-600" : categoryStyle(m.category).dot)}>
+      <button type="button" onClick={onToggle} className="flex w-full items-start gap-2.5 px-3 py-2 text-left" aria-expanded={open}>
+        <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white", out ? "bg-cyan-600" : categoryStyle(m.category).dot)}>
           {out ? <Send className="h-4 w-4" /> : initials(who)}
         </span>
         <span className="min-w-0 flex-1">
@@ -415,7 +418,7 @@ function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCate
       {open && (
         <div className="space-y-2 px-3 pb-3">
           <div className="flex flex-wrap items-center gap-2" data-testid="message-meta">
-            <CategoryPicker emailId={m.id} category={m.category} direction={m.direction} onChange={onCategory} onError={onCategoryError} />
+            {!single && <CategoryPicker emailId={m.id} category={m.category} direction={m.direction} onChange={onCategory} onError={onCategoryError} />}
             {out && m.signedHtml && (
               <button
                 type="button"
@@ -453,7 +456,7 @@ function MessageItem({ m, open, onToggle, onReply, onForward, onCategory, onCate
           {out && m.sentCopy && (
             <p className={cn("text-xs", m.sentCopy === "failed" ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>{sentCopyLabel(m.sentCopy, m.sentCopyError)}</p>
           )}
-          <div className="flex flex-wrap justify-end gap-1">
+          <div className="flex flex-wrap justify-end gap-1 [&_button]:h-7 [&_button]:px-2 [&_button]:text-xs [&_svg]:h-3.5 [&_svg]:w-3.5">
             <Button size="sm" variant="ghost" onClick={onReply} data-testid="message-reply"><Reply className="h-4 w-4" /> Odpovědět na tuto zprávu</Button>
             <Button size="sm" variant="ghost" onClick={onForward} data-testid="message-forward"><Forward className="h-4 w-4" /> Přeposlat</Button>
           </div>
@@ -471,7 +474,7 @@ function MessageBody({ body }: { body: string }) {
   const { main, quoted, quotedLines } = React.useMemo(() => splitQuoted(body), [body]);
   const [showQuoted, setShowQuoted] = React.useState(false);
   return (
-    <div className="max-h-[60vh] overflow-y-auto whitespace-pre-wrap break-words rounded-lg bg-muted/40 p-3 text-sm leading-relaxed scrollbar-thin [overflow-wrap:anywhere] lg:max-h-none lg:overflow-visible" data-testid="message-body">
+    <div className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap break-words px-1 py-2 text-[15px] leading-7 text-foreground scrollbar-thin [overflow-wrap:anywhere] lg:max-h-none lg:overflow-visible" data-testid="message-body">
       {main.trim() || "(prázdný e-mail)"}
       {quoted && (
         <>
