@@ -604,12 +604,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           <Button
             variant="outline" size="sm" onClick={() => void sendReceive()} disabled={progress.running || sendBusy}
             title="Přijme novou poštu ze všech tvých schránek a odešle, co čeká na odeslání" data-testid="btn-send-receive"
+            aria-label="Přijmout a odeslat"
             className="lg:h-8 lg:px-2.5"
           >
             <RefreshCw className={cn("h-4 w-4", (progress.running || sendBusy) && "animate-spin")} />
             <span className="hidden sm:inline">{sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}</span>
           </Button>
-          <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose" className="lg:h-8 lg:px-2.5">
+          <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose" aria-label="Nová zpráva" title="Nová zpráva" className="lg:h-8 lg:px-2.5">
             <PenSquare className="h-4 w-4" /> <span className="hidden sm:inline">Nová zpráva</span>
           </Button>
           <Button
