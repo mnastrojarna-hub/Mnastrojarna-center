@@ -157,7 +157,7 @@ export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPri
             </span>
           )}
           {t.hasAttachments && <Paperclip className="h-3.5 w-3.5 text-muted-foreground" aria-label="Přílohy" />}
-          {showMailbox && t.mailboxEmail && <span className={cn("truncate text-[11px] text-muted-foreground", c("lg:hidden"))}>→ {t.mailboxEmail}</span>}
+          {showMailbox && t.mailboxEmail && <span className="hidden truncate text-[11px] text-muted-foreground sm:inline lg:hidden">→ {t.mailboxEmail}</span>}
           {canAi && t.hasDraft && (
             <span className={cn("inline-flex items-center gap-1 rounded-full bg-secondary px-2 py-0.5 text-[11px]", c("lg:px-1 lg:py-0.5"))} title="Návrh odpovědi připraven">
               <Sparkles className="h-3 w-3" /> <span className={c("lg:hidden")}>Návrh připraven</span>
@@ -220,7 +220,10 @@ export function ThreadRow({ t, active, canAi, showMailbox, onOpen, onFlag, onPri
         </button>
         <PrioritySelect
           value={t.priority} manual={t.priorityManual} onChange={onPriority}
-          className={c("lg:col-start-3 lg:row-start-2 lg:mr-1 lg:min-h-0 lg:self-center lg:justify-self-center lg:[&>span]:px-1.5 lg:[&>span]:py-0 lg:[&>span]:text-[10px] lg:[&>span]:leading-4")}
+          className={cn(
+            // mobil: běžná priorita (P3) se neukazuje — řádek je nižší; jiná priorita ano
+            t.priority === 3 && !t.priorityManual && "max-lg:hidden",
+            c("lg:col-start-3 lg:row-start-2 lg:mr-1 lg:min-h-0 lg:self-center lg:justify-self-center lg:[&>span]:px-1.5 lg:[&>span]:py-0 lg:[&>span]:text-[10px] lg:[&>span]:leading-4"))}
         />
       </div>
     </div>

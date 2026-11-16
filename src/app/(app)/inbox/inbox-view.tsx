@@ -36,7 +36,7 @@ import { sendReceiveText } from "@/lib/email/send-receive";
 import { backfillMailJobsAction, confirmJobSuggestionAction, rejectJobSuggestionAction } from "@/app/actions/mail-jobs";
 import { CATEGORY_STYLE, INBOX_CATEGORIES, NO_MAILBOX, categoryCodeFromLabel, type MailboxOption } from "@/lib/email/visibility";
 import {
-  EMPTY_COUNTS, FOLDER_LABEL, SORT_LABEL, isMailFolder, isMailSort, progressText, threadCountLabel, type FolderCounts, type MailFolder,
+  EMPTY_COUNTS, FOLDER_LABEL, SORT_LABEL, isMailFolder, isMailSort, progressText, messageCountLabel, type FolderCounts, type MailFolder,
   type MailSort, type ThreadPage, type ThreadSummary,
 } from "@/lib/email/mail-types";
 import type { EmailCategory } from "@/lib/data/types";
@@ -375,7 +375,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     if (stale) void sync({ auto: true });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const patch = React.useCallback((threadId: string, p: ThreadPatch) => {
+  const patch = React.useCallback((threadId: string, p: ThreadPatch, emailId?: string) => {
     setPage((pg) => ({
       ...pg,
       items: pg.items.map((t) => (t.threadId === threadId ? {
@@ -383,8 +383,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         ...(p.flagged !== undefined ? { flagged: p.flagged } : {}),
         ...(p.priority !== undefined ? { priority: p.priority } : {}),
         ...(p.priorityManual !== undefined ? { priorityManual: p.priorityManual } : {}),
-        ...(p.unreadCount !== undefined ? { unreadCount: p.unreadCount } : {}),
-        ...(p.category ? { category: p.category } : {}),
+        // po zprávách: přečtení a kategorie jen u otevřené zprávy (vlaječka, priorita, zakázka platí pro vlákno)
+        ...(p.unreadCount !== undefined && (!emailId || t.emailId === emailId) ? { unreadCount: p.unreadCount } : {}),
+        ...(p.category && (!emailId || t.emailId === emailId) ? { category: p.category } : {}),
         ...(p.jobId ? { jobId: p.jobId, jobNumber: p.jobNumber } : {}),
         ...(p.jobCleared ? { jobId: undefined, jobNumber: undefined, jobTitle: undefined, jobLinkSource: undefined, jobLinkActor: undefined } : {}),
         ...(p.suggestionDone ? { suggestion: undefined } : {}),
@@ -560,13 +561,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         Přijmout a odeslat · Nová zpráva · ozubené kolo · ⋯ (Import z Outlooku, hustota seznamu).
       */}
       <div
-        className="relative flex flex-col gap-3 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-3 sm:gap-y-4 lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-3 lg:gap-y-1.5"
+        className="relative flex flex-row flex-wrap items-center gap-2 sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:gap-x-3 sm:gap-y-4 lg:flex lg:flex-row lg:flex-wrap lg:items-center lg:gap-x-3 lg:gap-y-1.5"
         data-testid="mail-toolbar"
       >
         {/* mobil: stav živé pošty vpravo vedle nadpisu (bez dalšího řádku nad seznamem) */}
         {updatedLabel && (
           <span
-            className={cn("absolute right-0 top-1.5 text-[11px] sm:hidden", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
+            className={cn("hidden", live.error ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground/80")}
             data-testid="mail-updated-mobile"
             suppressHydrationWarning
           >
@@ -579,12 +580,12 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           <p className="hidden text-sm text-muted-foreground sm:block lg:hidden">{description}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 lg:order-3 lg:ml-auto lg:flex-nowrap lg:gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5 sm:ml-0 sm:gap-2 lg:order-3 lg:ml-auto lg:flex-nowrap lg:gap-1.5">
           {/* stav: počet vláken (počítač) a „Aktualizováno před …" (od tabletu; telefon ho má vedle nadpisu) */}
           {/* (1024–1279 px: v liště není místo — počet je v seznamu složek, stav kontroluje živá pošta sama) */}
           <span className="hidden items-center gap-1.5 whitespace-nowrap text-[11px] text-muted-foreground sm:inline-flex lg:mr-1 lg:hidden xl:inline-flex">
             {loading && <Loader2 className="hidden h-3.5 w-3.5 animate-spin lg:block" aria-label="Načítám" />}
-            {page.total > 0 && <span className="hidden tabular-nums xl:inline">{threadCountLabel(page.total)}</span>}
+            {page.total > 0 && <span className="hidden tabular-nums xl:inline">{messageCountLabel(page.total)}</span>}
             {page.total > 0 && updatedLabel && <span className="hidden xl:inline" aria-hidden>·</span>}
             {updatedLabel && (
               <span
@@ -603,13 +604,14 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           <Button
             variant="outline" size="sm" onClick={() => void sendReceive()} disabled={progress.running || sendBusy}
             title="Přijme novou poštu ze všech tvých schránek a odešle, co čeká na odeslání" data-testid="btn-send-receive"
+            aria-label="Přijmout a odeslat"
             className="lg:h-8 lg:px-2.5"
           >
             <RefreshCw className={cn("h-4 w-4", (progress.running || sendBusy) && "animate-spin")} />
-            {sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}
+            <span className="hidden sm:inline">{sendBusy ? "Odesílám…" : progress.running ? "Přijímám…" : "Přijmout a odeslat"}</span>
           </Button>
-          <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose" className="lg:h-8 lg:px-2.5">
-            <PenSquare className="h-4 w-4" /> Nová zpráva
+          <Button size="sm" variant="send" onClick={() => setCompose({ mode: "new" })} data-testid="btn-compose" aria-label="Nová zpráva" title="Nová zpráva" className="lg:h-8 lg:px-2.5">
+            <PenSquare className="h-4 w-4" /> <span className="hidden sm:inline">Nová zpráva</span>
           </Button>
           <Button
             size="sm" variant="outline" onClick={() => openSettings("schranka")}
@@ -650,13 +652,13 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         {/* schránka: mobil / tablet samostatný řádek pod hlavičkou, počítač uvnitř lišty */}
         {scope === "all" ? (
           // počítač: výběr schránky v liště, chyby schránek jeden tenký řádek pod ní (celá šířka)
-          <div className="flex flex-col gap-3 sm:col-span-2 lg:contents">
+          <div className="flex w-full min-w-0 basis-full flex-col gap-3 sm:col-span-2 lg:contents">
             <MailboxSwitcher mailboxes={mailboxes} mailboxId={mailboxId} onSwitch={switchMailbox} />
             {/* neúplné nastavení ukazují jen dlaždice schránek (bez trvalého červeného řádku) */}
             <MailboxHealth mailboxes={mailboxes.filter((m) => !m.incomplete && m.lastSyncError)} className="lg:order-4 lg:basis-full" />
           </div>
         ) : noMailbox ? (
-          <div className="flex flex-wrap items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:col-span-2 lg:order-4 lg:basis-full lg:items-center lg:px-3 lg:py-2 dark:border-amber-500/30 dark:from-amber-500/10 dark:to-orange-500/10">
+          <div className="flex w-full basis-full flex-wrap items-start gap-3 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4 sm:col-span-2 lg:order-4 lg:basis-full lg:items-center lg:px-3 lg:py-2 dark:border-amber-500/30 dark:from-amber-500/10 dark:to-orange-500/10">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white lg:h-8 lg:w-8"><Mail className="h-5 w-5 lg:h-4 lg:w-4" /></div>
             <div className="min-w-0 flex-1 text-sm">
               <p className="font-semibold text-amber-900 dark:text-amber-200">Zatím nemáš připojenou e-mailovou schránku.</p>
@@ -667,9 +669,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
         ) : (
           <div
             className={cn(
-              "flex flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 px-3 py-2 sm:col-span-2 dark:border-blue-500/30 dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10",
+              "flex w-full basis-full flex-wrap items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 px-3 py-2 sm:col-span-2 dark:border-blue-500/30 dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10",
               // počítač: jen tenký text v liště (bez rámečku a podbarvení)
-              "lg:order-2 lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:rounded-none lg:border-0 lg:bg-none lg:p-0 lg:dark:bg-none",
+              "lg:order-2 lg:w-auto lg:basis-auto lg:min-w-0 lg:flex-1 lg:flex-nowrap lg:rounded-none lg:border-0 lg:bg-none lg:p-0 lg:dark:bg-none",
             )}
             data-testid="own-mailbox-bar"
           >
@@ -880,7 +882,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
             {/* mobil s čipy: řádek není (seznam začne výš) — stav živé pošty je vedle nadpisu; počítač: počet
                 vláken a stav jsou v liště nahoře (řádek navíc by ubral místo seznamu) */}
             <div className={cn("items-center justify-between gap-2 px-1 text-xs text-muted-foreground lg:hidden", chipCategories.length ? "hidden sm:flex" : "flex")}>
-              <span data-testid="mail-total">{page.total ? threadCountLabel(page.total) : ""}</span>
+              <span data-testid="mail-total">{page.total ? messageCountLabel(page.total) : ""}</span>
               <span className="ml-auto inline-flex items-center gap-1.5">
                 {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               </span>
@@ -994,7 +996,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                 canAi={canAi}
                 version={threadVersion}
                 onBack={closeDetail}
-                onPatch={patch}
+                onPatch={(tid, p) => patch(tid, p, selected.emailId)}
                 onCompose={setCompose}
                 onSplit={() => void reload({ keep: page.items.length })}
               />

@@ -22,8 +22,8 @@ describe("předvolby vzhledu (Pošta: šířka seznamu, sbalené složky)", () =
     expect(normalizeUiPrefs([1, 2])).toEqual({});
   });
 
-  it("skutečná šířka: výchozí 30 %, min seznamu 260, detail min 480 — na úzké obrazovce vyhraje minimum seznamu", () => {
-    expect(clampListWidth(undefined, 1400)).toBe(420);
+  it("skutečná šířka: výchozí 42 %, min seznamu 260, detail min 480 — na úzké obrazovce vyhraje minimum seznamu", () => {
+    expect(clampListWidth(undefined, 1400)).toBe(588);
     expect(clampListWidth(undefined, 700)).toBe(MAIL_LIST_MIN);
     expect(clampListWidth(900, 1400)).toBe(900);
     expect(clampListWidth(1000, 1400)).toBe(1400 - MAIL_DETAIL_MIN);

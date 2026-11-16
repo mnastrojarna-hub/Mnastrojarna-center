@@ -108,7 +108,7 @@ describe("Přijatá pošta — render", () => {
     // review #2: žádné vlákno se neotevře samo (otevření = přečteno) — až po kliknutí
     expect(html).toContain("Vyber e-mail vlevo.");
     expect(html).not.toContain('data-testid="thread-view"');
-    expect(html).toContain("2 vlákna");
+    expect(html).toContain("2 zprávy");
     expect(html).not.toContain("Co AI zjistila");
     expect(html).not.toContain("Návrh připraven");
     expect(html).not.toContain("% AI");

@@ -92,7 +92,7 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
 
   React.useEffect(() => {
     let alive = true;
-    void openThreadAction(threadId).then((d) => {
+    void openThreadAction(threadId, onlyEmailId ? { onlyEmailId } : {}).then((d) => {
       if (!alive) return;
       setDetail(d);
       if (d.ok && d.messages?.length) {
