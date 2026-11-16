@@ -207,7 +207,7 @@ export async function setJobFileArchived(fileId: string, archived: boolean): Pro
 
 export async function updateJobFile(
   fileId: string,
-  patch: { kind?: JobFileKind; title?: string; note?: string },
+  patch: { kind?: JobFileKind; title?: string; note?: string; orderItemId?: string | null },
 ): Promise<ActionResult> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -230,6 +230,22 @@ export async function updateJobFile(
     }
     if (patch.title !== undefined && cleanText(patch.title, 300) !== (file.title ?? null)) update.title = cleanText(patch.title, 300);
     if (patch.note !== undefined && cleanText(patch.note, 2000) !== (file.note ?? null)) update.note = cleanText(patch.note, 2000);
+    // ruční přiřazení výkresu / modelu k položce zakázky (páruje přílohy objednávek dodavatelům; 16. 11.)
+    let itemLabel: string | null = null;
+    if (patch.orderItemId !== undefined) {
+      const next = patch.orderItemId === null || patch.orderItemId === "" ? null : String(patch.orderItemId);
+      if (next !== null && !isUuid(next)) return fail("Položka nenalezena.");
+      const cur = ((file as unknown as { order_item_id?: string | null }).order_item_id) ?? null;
+      if (next !== cur) {
+        if (next) {
+          const { data: it } = await c.db.from("order_items").select("id, order_id, drawing_number, name").eq("id", next).maybeSingle();
+          const row = it as { order_id: string; drawing_number: string | null; name: string | null } | null;
+          if (!row || row.order_id !== file.job_id) return fail("Položka nepatří k této zakázce.");
+          itemLabel = (row.drawing_number ?? "").trim() || (row.name ?? "").trim() || "položka";
+        }
+        update.order_item_id = next;
+      }
+    }
     if (!Object.keys(update).length) return { ok: true };
     const { error } = await c.db.from("job_files").update(update as never).eq("id", fileId);
     if (error) return fail(error.message);
@@ -241,6 +257,7 @@ export async function updateJobFile(
     }
     if ("title" in update) parts.push("název");
     if ("note" in update) parts.push("poznámka");
+    if ("order_item_id" in update) parts.push(update.order_item_id ? `přiřazen k položce ${itemLabel}` : "bez položky");
     await logJobEvent(c.db, {
       jobId: file.job_id, type: "file",
       message: `Dokument ${file.filename} upraven: ${parts.join(", ")}`,

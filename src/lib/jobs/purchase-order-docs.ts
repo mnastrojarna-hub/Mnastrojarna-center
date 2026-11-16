@@ -396,10 +396,12 @@ export async function sendPurchaseOrderCore(
 
   const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
   if (kind === "issue" || kind === "change") {
-    if (!po.fileId) {
-      const stored = await storePurchaseOrderPdfCore(db, sender, po, { onlyIfMissing: true });
+    // první odeslání: PDF vždy znovu z aktuálních dat (ceny položek, poznámka) — neodejde starý náhled (16. 11.)
+    const refresh = kind === "issue" && !po.sentAt && Boolean(po.fileId);
+    if (!po.fileId || refresh) {
+      const stored = await storePurchaseOrderPdfCore(db, sender, po, refresh ? { replaceFileId: po.fileId } : { onlyIfMissing: true });
       if ("error" in stored) return { ok: false, error: stored.error };
-      po = { ...po, fileId: stored.fileId };
+      po = { ...po, fileId: stored.fileId ?? po.fileId };
     }
     const { data: file } = await db.from("job_files").select("id, filename, storage_path").eq("id", po.fileId as string).maybeSingle();
     const f = file as { filename: string; storage_path: string | null } | null;
@@ -411,7 +413,7 @@ export async function sendPurchaseOrderCore(
     // výkresy (anonymizované) a 3D modely dílů objednávky — jen soubory položek této objednávky
     if (opts.attachmentIds !== false) {
       const plan = await loadPoAttachmentPlan(db, po, { focusSince: kind === "change" ? po.sentAt ?? null : null });
-      const files = await collectPoAttachments(db, plan.plan, opts.attachmentIds ?? null);
+      const files = await collectPoAttachments(db, plan.plan, opts.attachmentIds ?? null, { jobId: po.jobId });
       if (files.blocked.length && opts.attachmentIds) return { ok: false, error: `Výkres nejde poslat: ${files.blocked[0].message}` };
       const total = attachments[0].content.length + files.ready.reduce((s, x) => s + x.content.length, 0);
       if (total > MAX_MAIL_BYTES) return { ok: false, error: "Přílohy se nevejdou do e-mailu (> 20 MB) — odškrtni některé výkresy nebo modely." };
@@ -425,6 +427,7 @@ export async function sendPurchaseOrderCore(
             ...("mailboxId" in opts.from && opts.from.mailboxId ? { fromMailboxId: opts.from.mailboxId } : {}),
             recipientLabel: `dodavateli ${po.supplier?.name ?? ""} (objednávka ${po.number})`.replace(/\s+/g, " "),
             neutralNames: { ...files.names, [po.fileId as string]: f.filename || purchaseOrderFileName(po.number) },
+            ...(Object.keys(files.stamps).length ? { stamps: files.stamps } : {}),
           },
           fileIds: [...files.ready.map((x) => x.fileId), ...files.pending],
         });

@@ -1,4 +1,5 @@
 import "server-only";
+import { jobStampText, stampJobNumber } from "@/lib/anonymize/job-stamp";
 import type { JobsDb } from "@/lib/jobs/events";
 import { isUuid, one } from "@/lib/jobs/mapping";
 import { customerLeakGuard, findLeaks, redactCustomer, type LeakGuard } from "@/lib/rfq/model";
@@ -24,7 +25,7 @@ const BUCKET = "job-files";
 
 export interface DeviationContext {
   jobId: string;
-  items: (ItemSource & { quantity: number | null })[];
+  items: (ItemSource & { quantity: number | null; drawing_id?: string | null })[];
   sources: DeviationSources;
   guard: LeakGuard;
 }
@@ -35,7 +36,7 @@ export async function loadDeviationContext(db: JobsDb, jobId: string): Promise<D
     db.from("orders")
       .select("id, title, customer_order_number, customer_inquiry_number, customer_contact, customer_contact_email, customer:customers!customer_id(name, ico, dic, email)")
       .eq("id", jobId).maybeSingle(),
-    db.from("order_items").select("id, drawing_number, revision, supplier_note, unit, quantity").eq("order_id", jobId).order("position"),
+    db.from("order_items").select("id, drawing_number, revision, supplier_note, unit, quantity, drawing_id").eq("order_id", jobId).order("position"),
     db.from("job_mail_changes").select("id, order_item_id, field, status, kind, value_new, drawing_value, created_at")
       .eq("job_id", jobId).eq("kind", "change").eq("status", "applied"),
     db.from("job_events").select("data, created_at").eq("job_id", jobId).eq("data->>exception", "correction").order("created_at"),
@@ -58,6 +59,7 @@ export async function loadDeviationContext(db: JobsDb, jobId: string): Promise<D
       id: String(r.id), drawing_number: (r.drawing_number as string | null) ?? null, revision: (r.revision as string | null) ?? null,
       supplier_note: (r.supplier_note as string | null) ?? null, unit: (r.unit as string | null) ?? null,
       quantity: r.quantity === null || r.quantity === undefined ? null : Number(r.quantity),
+      drawing_id: (r.drawing_id as string | null) ?? null,
     })),
     sources: {
       // chyba čtení (chybějící tabulka ve starší DB) = bez zdroje, nikdy pád objednávky
@@ -128,7 +130,7 @@ export function deviationRefs(lines: LineDeviations[], items: Pick<PurchaseItem,
 }
 
 // ── Přílohy ─────────────────────────────────────────────────
-type FileRow = FileRowWithAnon & { order_item_id: string | null; archived: boolean; replaced_by: string | null; created_at: string; size_bytes: number | null; anon_size: number | null };
+type FileRow = FileRowWithAnon & { drawing_id?: string | null; read_drawing_no?: string | null; order_item_id: string | null; archived: boolean; replaced_by: string | null; created_at: string; size_bytes: number | null; anon_size: number | null };
 
 export interface PoAttachmentData {
   plan: PoAttachmentPlan;
@@ -152,10 +154,11 @@ export async function loadPoAttachmentPlan(
     return {
       index, orderItemId: itemId, drawingNumber: it.drawingNumber ?? item?.drawing_number ?? null, revision: item?.revision ?? null,
       label: (it.drawingNumber ?? "").trim() || (it.name ?? "").trim() || `položka ${index + 1}`,
+      drawingId: item?.drawing_id ?? null,
     };
   });
   const { data, error } = await db.from("job_files")
-    .select(`${SHARE_FILE_SELECT}, order_item_id, archived, replaced_by, created_at, size_bytes, anon_size`)
+    .select(`${SHARE_FILE_SELECT}, order_item_id, archived, replaced_by, created_at, size_bytes, anon_size, drawing_id, read_drawing_no:ai_extracted->>drawingNumber`)
     .eq("job_id", po.jobId).in("kind", ["vykres", "model_3d"]).order("created_at");
   if (error) throw new Error(error.message);
   const rows = (data ?? []) as FileRow[];
@@ -170,6 +173,7 @@ export async function loadPoAttachmentPlan(
       status: dec.ok ? "ready" : dec.reason === "pending" ? "pending" : "blocked",
       message: dec.ok ? null : dec.message,
       ext: (dec.ok ? fromName(dec.filename) : "") || fromName(f.filename) || "pdf",
+      drawing_id: f.drawing_id ?? null, drawingNumber: f.read_drawing_no ?? null,
     };
   });
   let focusItems: string[] | null = null;
@@ -204,6 +208,8 @@ export function poAttachmentMailLines(
 }
 
 export interface CollectedPoAttachments {
+  /** fileId → text razítka „Zakázka 2026/026 · pol. 1" (PDF výkresy; i pro frontu odeslání). */
+  stamps: Record<string, string>;
   ready: { fileId: string; filename: string; content: Buffer; contentType: string }[];
   pending: string[];
   blocked: { fileId: string; message: string }[];
@@ -215,9 +221,20 @@ export interface CollectedPoAttachments {
  * Bajty příloh (pickShareFile + verifyShareBytes — anonymizovaná kopie s kontrolou sha256, 3D model
  * originál). Výběr jen z plánu (cizí soubor neprojde); pending = čeká na anonymizaci → fronta odeslání.
  */
-export async function collectPoAttachments(db: JobsDb, plan: PoAttachmentPlan, chosen: string[] | null | undefined): Promise<CollectedPoAttachments> {
+export async function collectPoAttachments(
+  db: JobsDb, plan: PoAttachmentPlan, chosen: string[] | null | undefined, opts: { jobId?: string | null } = {},
+): Promise<CollectedPoAttachments> {
   const picked = pickPoAttachments(plan, chosen);
-  const out: CollectedPoAttachments = { ready: [], pending: [], blocked: [], names: {} };
+  const out: CollectedPoAttachments = { ready: [], pending: [], blocked: [], names: {}, stamps: {} };
+  // naše číslo zakázky nad razítko výkresu (jen kopie pro dodavatele; 16. 11.)
+  let jobNumber = "";
+  if (opts.jobId && picked.length) {
+    const { data: j } = await db.from("orders").select("number").eq("id", opts.jobId).maybeSingle();
+    jobNumber = String((j as { number?: string | null } | null)?.number ?? "").trim();
+  }
+  for (const p of picked) {
+    if (jobNumber && p.role !== "model") out.stamps[p.fileId] = jobStampText(jobNumber, p.lines.length === 1 ? p.lines[0] + 1 : null);
+  }
   if (!picked.length) return out;
   const ids = picked.map((p) => p.fileId);
   const { data, error } = await db.from("job_files").select(SHARE_FILE_SELECT).in("id", ids);
@@ -234,7 +251,8 @@ export async function collectPoAttachments(db: JobsDb, plan: PoAttachmentPlan, c
       else out.blocked.push({ fileId: p.fileId, message: dec.message });
       continue;
     }
-    const bytes = await verifyShareBytes(db as never, dec, f);
+    let bytes = await verifyShareBytes(db as never, dec, f);
+    if (out.stamps[p.fileId] && dec.mime === "application/pdf") bytes = await stampJobNumber(bytes, out.stamps[p.fileId]);
     out.ready.push({ fileId: p.fileId, filename: p.name, content: Buffer.from(bytes), contentType: dec.mime });
   }
   return out;

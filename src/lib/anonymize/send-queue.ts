@@ -5,6 +5,7 @@ import { logAudit } from "@/lib/audit";
 import { userActor } from "@/lib/supabase/actor-headers";
 import type { EmailCategory } from "@/lib/supabase/database.types";
 import { pickShareFile, SHARE_FILE_SELECT, sharePriceDocIds, verifyShareBytes, type FileRowWithAnon } from "./share";
+import { stampJobNumber } from "./job-stamp";
 
 /**
  * Fronta odeslání čekajících na anonymizaci (spec §5.5, M15). Server action NIKDY nevykresluje:
@@ -43,6 +44,8 @@ export interface SendPayload {
    * nikdy původní název (často nese jméno zákazníka). Jen bezpečné znaky, přípona zůstane z odesílaného souboru.
    */
   neutralNames?: Record<string, string>;
+  /** fileId → razítko „Zakázka 2026/026 · pol. 1" do PDF výkresu (objednávka dodavateli). */
+  stamps?: Record<string, string>;
   /**
    * 9. 11. „Odeslat z" super admina — při odeslání z fronty se znovu ověří (sender-rules.ts: platí jen, je-li
    * tvůrce řádku super admin; ostatní posílají vždy ze své schránky).
@@ -93,6 +96,11 @@ function cleanPayload(p: SendPayload): SendPayload {
       neutralNames: Object.fromEntries(Object.entries(p.neutralNames)
         .filter(([k]) => /^[0-9a-f-]{36}$/i.test(k)).slice(0, 80)
         .map(([k, v]) => [k.toLowerCase(), safeAttachmentName(v)]).filter((e): e is [string, string] => Boolean(e[1]))),
+    } : {}),
+    ...(p.stamps && typeof p.stamps === "object" ? {
+      stamps: Object.fromEntries(Object.entries(p.stamps)
+        .filter(([k, v]) => /^[0-9a-f-]{36}$/i.test(k) && typeof v === "string" && v.trim()).slice(0, 80)
+        .map(([k, v]) => [k.toLowerCase(), String(v).replace(/[\u0000-\u001f]/g, " ").slice(0, 80)])),
     } : {}),
   };
 }
@@ -270,7 +278,10 @@ async function sendRow(db: AnonDb, row: SendQueueRow, sender: Sender): Promise<{
     const asOriginal = row.file_ids.includes(id) ? originalOpts(confirmed, f) : {};
     const d = pickShareFile(f, { reviewedByCaller: reviewed.has(id), priceDocument: price.has(id.toLowerCase()), ...asOriginal });
     if (!d.ok) return { status: d.reason === "pending" ? "waiting" : "blocked", reason: d.message };
-    const bytes = await verifyShareBytes(db as never, d, f);
+    let bytes = await verifyShareBytes(db as never, d, f);
+    // naše číslo zakázky nad razítko výkresu (objednávka dodavateli; jen kopie, 16. 11.)
+    const stamp = p.stamps?.[id] ?? p.stamps?.[id.toLowerCase()];
+    if (stamp && d.mime === "application/pdf") bytes = await stampJobNumber(bytes, stamp);
     if (d.audit) originals.push(id);
     total += bytes.length;
     // originál bez anonymizace (super admin) bez původního názvu — ten často nese jméno zákazníka
