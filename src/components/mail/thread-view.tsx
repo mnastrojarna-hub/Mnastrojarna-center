@@ -209,7 +209,7 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <h2 className="break-words text-[15px] font-semibold leading-snug" data-testid="thread-subject">{detail?.subject || summary.subject || "(bez předmětu)"}</h2>
+            <h2 className="break-words text-[15px] font-semibold leading-snug" data-testid="thread-subject">{(only.length ? only[0].subject : "") || detail?.subject || summary.subject || "(bez předmětu)"}</h2>
             <div className="mt-1 flex flex-wrap items-center gap-1">
               {asking
                 ? <AskingCategoryPill />
