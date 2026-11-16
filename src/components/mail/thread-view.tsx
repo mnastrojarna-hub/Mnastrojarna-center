@@ -63,8 +63,10 @@ export interface ThreadPatch {
   suggestionDone?: boolean;
 }
 
-export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version, onSplit }: {
+export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version, onSplit, onlyEmailId }: {
   summary: ThreadSummary;
+  /** Pošta po zprávách: ukázat jen tuto zprávu (bez konverzace; majitel 16. 11.). */
+  onlyEmailId?: string | null;
   canAi: boolean;
   onBack: () => void;
   onPatch: (threadId: string, patch: ThreadPatch) => void;
@@ -103,7 +105,9 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
     };
   }, [threadId, version]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const messages = detail?.messages ?? [];
+  const allMessages = detail?.messages ?? [];
+  const only = onlyEmailId ? allMessages.filter((m) => m.id === onlyEmailId) : [];
+  const messages = only.length ? only : allMessages;
   const last = messages[messages.length - 1];
   const lastIn = [...messages].reverse().find((m) => m.direction === "in");
   const target = lastIn ?? last;
@@ -302,14 +306,8 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
           </ul>
         )}
 
-        {canAi && (target?.aiSummary ?? summary.aiSummary) && (
-          <div className="rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-sm dark:border-violet-500/30 dark:from-violet-500/10 dark:to-fuchsia-500/10">
-            <div className="flex items-center gap-2 font-semibold text-violet-700 dark:text-violet-300"><Sparkles className="h-4 w-4" /> Co AI zjistila</div>
-            <p className="mt-1 text-muted-foreground">{target?.aiSummary ?? summary.aiSummary}</p>
-            {(target?.hasDraft ?? summary.hasDraft) && (
-              <p className="mt-1 text-xs">Návrh odpovědi čeká ve frontě ke schválení — <Link href="/dashboard" className="text-primary underline-offset-4 hover:underline">zkontrolovat a odeslat</Link>.</p>
-            )}
-          </div>
+        {(target?.hasDraft ?? summary.hasDraft) && (
+          <p className="text-xs text-muted-foreground">Návrh odpovědi čeká ve frontě ke schválení — <Link href="/dashboard" className="text-primary underline-offset-4 hover:underline">zkontrolovat a odeslat</Link>.</p>
         )}
 
         {detail === null ? (
@@ -322,7 +320,7 @@ export function ThreadView({ summary, canAi, onBack, onPatch, onCompose, version
               <MessageItem
                 key={m.id}
                 m={m}
-                open={expanded.has(m.id)}
+                open={only.length > 0 || expanded.has(m.id)}
                 onToggle={() => setExpanded((s) => { const n = new Set(s); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })}
                 onReply={() => compose("reply", m)}
                 onForward={() => compose("forward", m)}

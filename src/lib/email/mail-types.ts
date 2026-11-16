@@ -42,6 +42,8 @@ export interface ThreadQuery {
   sort?: MailSort;
   offset?: number;
   limit?: number;
+  /** Seznam po zprávách (Pošta jako Outlook — každá zpráva samostatně, bez konverzací; 16. 11.). */
+  perMessage?: boolean;
 }
 
 export interface ThreadSummary {

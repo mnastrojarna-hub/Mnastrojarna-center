@@ -1,4 +1,5 @@
 import "server-only";
+import { attachmentText } from "@/lib/email/attachment-text";
 import { randomUUID } from "node:crypto";
 import { categorizeEmail, draftReply, type EmailAnalysis } from "@/lib/ai/claude";
 import { getAgentInstructions } from "@/lib/ai/corrections";
@@ -322,10 +323,13 @@ async function saveAttachments(db: AdminDb, emailId: string, e: RawEmail): Promi
   const rows: Record<string, unknown>[] = [];
   for (const a of list.slice(0, 50)) {
     let storagePath: string | null = null;
+    let contentText: string | null = null;
     const leaf = leaves.find((l) => l.partId === a.partId);
     if (leaf) {
       try {
         const content = decodePart(leaf);
+        // text přílohy pro hledání v Poště (PDF s textem, txt/csv…; 16. 11.)
+        if (content.length <= MAX_STORED_ATTACHMENT) contentText = await attachmentText(content, a.contentType, a.filename);
         if (content.length <= MAX_STORED_ATTACHMENT) {
           const path = `mail/in/${emailId}/${randomUUID()}-${a.filename.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_").slice(0, 150)}`;
           const { error } = await db.storage.from(ATTACHMENT_BUCKET).upload(path, content, { contentType: a.contentType || "application/octet-stream", upsert: false });
@@ -338,6 +342,7 @@ async function saveAttachments(db: AdminDb, emailId: string, e: RawEmail): Promi
     rows.push({
       email_id: emailId, filename: a.filename, mime_type: a.contentType || null, size_bytes: a.size ?? null,
       storage_path: storagePath, imap_part: e.imapUid ? a.partId : null,
+      content_text: contentText,
     });
   }
   const { error } = await db.from("email_attachments").insert(rows as never);

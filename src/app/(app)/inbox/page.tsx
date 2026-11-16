@@ -21,7 +21,7 @@ export default async function InboxPage({
   // bez ?schranka= nezávisí vlákna na seznamu schránek → vše najednou (dřív schránky → stav → vlákna za sebou)
   const unscoped = raw
     ? null
-    : Promise.all([listThreads({ folder, mailboxId: null, limit: 50 }), getFolderCounts(null)]);
+    : Promise.all([listThreads({ folder, mailboxId: null, limit: 50, perMessage: true }), getFolderCounts(null)]);
   const [{ can }, mailboxes] = await Promise.all([getAccess(), getMailboxesForUser()]);
   const all = can("mail_all");
   const mailboxId =
@@ -29,7 +29,7 @@ export default async function InboxPage({
   const [initial, counts] = unscoped && !mailboxId
     ? await unscoped
     : await Promise.all([
-      listThreads({ folder, mailboxId: mailboxId ?? null, limit: 50 }),
+      listThreads({ folder, mailboxId: mailboxId ?? null, limit: 50, perMessage: true }),
       getFolderCounts(mailboxId ?? null),
     ]);
 
