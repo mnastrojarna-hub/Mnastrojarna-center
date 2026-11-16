@@ -43,6 +43,7 @@ import type { EmailCategory } from "@/lib/data/types";
 import { debug } from "@/lib/debug/logger";
 import { emailCategoryLabel } from "@/lib/data/labels";
 import { useUrlState } from "@/components/nav/use-url-state";
+import { MAIL_TIME_GROUP_LABEL, mailTimeGroup } from "@/lib/email/time-groups";
 import { cn, relativeTime } from "@/lib/utils";
 
 interface InboxViewProps {
@@ -246,7 +247,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     const my = ++seq.current;
     setLoading(true);
     try {
-      const res = await listThreadsAction({ ...params, offset: 0, limit: Math.min(200, Math.max(50, opts.keep ?? 50)) });
+      const res = await listThreadsAction({ ...params, perMessage: true, offset: 0, limit: Math.min(200, Math.max(50, opts.keep ?? 50)) });
       if (my !== seq.current) return;
       if (res.error) setSyncMsg({ ok: false, text: res.error });
       setPage({ items: res.items, total: res.total, offset: 0, hasMore: res.hasMore });
@@ -285,11 +286,11 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     setLoadingMore(true);
     const my = seq.current;
     try {
-      const res = await listThreadsAction({ ...params, offset: page.items.length, limit: 50 });
+      const res = await listThreadsAction({ ...params, perMessage: true, offset: page.items.length, limit: 50 });
       if (my !== seq.current) return;
       setPage((p) => {
-        const seen = new Set(p.items.map((t) => t.threadId));
-        const items = [...p.items, ...res.items.filter((t) => !seen.has(t.threadId))];
+        const seen = new Set(p.items.map((t) => t.emailId));
+        const items = [...p.items, ...res.items.filter((t) => !seen.has(t.emailId))];
         return { items, total: res.total || p.total, offset: 0, hasMore: res.hasMore };
       });
     } finally {
@@ -450,9 +451,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
   // by se jinak „přečetla" sama, i na mobilu se skrytým panelem). Po živém obnovení zůstane otevřené
   // i když ze stránky seznamu vypadne (poslední známá verze).
   const [openedSummary, setOpenedSummary] = React.useState<ThreadSummary | null>(null);
-  const selected = selectedId ? items.find((t) => t.threadId === selectedId) ?? (openedSummary?.threadId === selectedId ? openedSummary : undefined) : undefined;
+  const selected = selectedId ? items.find((t) => t.emailId === selectedId || t.threadId === selectedId) ?? (openedSummary && (openedSummary.emailId === selectedId || openedSummary.threadId === selectedId) ? openedSummary : undefined) : undefined;
   React.useEffect(() => {
-    const fresh = selectedId ? items.find((t) => t.threadId === selectedId) : undefined;
+    const fresh = selectedId ? items.find((t) => t.emailId === selectedId || t.threadId === selectedId) : undefined;
     if (fresh) setOpenedSummary(fresh);
   }, [items, selectedId]);
   const isDesktop = isDesktopEarly;
@@ -466,7 +467,7 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
     // telefon: nová položka historie (Zpět = zavřít vlákno); počítač: jen přepis adresy
     const push = !isDesktop && !mobileDetail;
     if (push) pushedDetail.current = true;
-    url.set({ vlakno: t.threadId, detail: "1" }, { push });
+    url.set({ vlakno: t.emailId, detail: "1" }, { push });
   };
   // Pošta E: hlavní akce zprávy přímo z řádku (Vytvořit nabídku, Zpracovat objednávku, Zapsat fakturu …)
   const rowActions = useMailActionRunner({
@@ -904,13 +905,19 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
                 <EmptyList scope={scope} noMailbox={noMailbox} folder={folder} filtered={Boolean(debounced) || filtersOn || category !== null} onConnect={() => openSettings("schranka")} />
               ) : (
                 // kompaktní seznam na počítači: řádky těsně pod sebou (oddělené čarou) jako v Outlooku
-                <div className={cn("space-y-2", compact && "lg:space-y-0 lg:overflow-hidden lg:rounded-lg lg:border lg:bg-card")} data-testid="thread-list">
+                <div className={cn("space-y-1", compact && "lg:space-y-0 lg:overflow-hidden lg:rounded-lg lg:border lg:bg-card")} data-testid="thread-list">
                   {items.map((t, i) => (
-                    <React.Fragment key={t.threadId}>
+                    <React.Fragment key={t.emailId}>
                       {folder === "jobs" && (i === 0 || groupKey(items[i - 1]) !== groupKey(t)) && <JobGroupHeader t={t} />}
+                      {/* Outlook: Dnes / Včera / Tento týden / Minulý týden / Starší (řazení podle data) */}
+                      {folder !== "jobs" && sort === "date" && (i === 0 || mailTimeGroup(items[i - 1].lastAt) !== mailTimeGroup(t.lastAt)) && (
+                        <div className="sticky top-0 z-[1] bg-muted/80 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur" data-testid="mail-time-group" suppressHydrationWarning>
+                          {MAIL_TIME_GROUP_LABEL[mailTimeGroup(t.lastAt)]}
+                        </div>
+                      )}
                       <ThreadRow
                         t={t}
-                        active={t.threadId === selected?.threadId}
+                        active={t.emailId === selected?.emailId}
                         canAi={canAi}
                         showMailbox={scope === "all" && !mailboxId}
                         hideJob={folder === "jobs"}
@@ -981,8 +988,9 @@ export function InboxView({ initial, counts: initialCounts, mailboxes, scope, ma
           >
             {selected && paneVisible ? (
               <ThreadView
-                key={selected.threadId}
+                key={selected.emailId}
                 summary={selected}
+                onlyEmailId={selected.emailId}
                 canAi={canAi}
                 version={threadVersion}
                 onBack={closeDetail}

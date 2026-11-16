@@ -38,6 +38,7 @@ export async function listThreadsAction(q: ThreadQuery): Promise<ThreadPage & { 
     sort: isMailSort(q?.sort) ? q.sort : "date",
     offset: Number(q?.offset) || 0,
     limit: Number(q?.limit) || 50,
+    perMessage: q?.perMessage === true,
   };
   const [page, counts] = await Promise.all([listThreads(query), query.offset ? Promise.resolve(undefined) : getFolderCounts(query.mailboxId)]);
   return { ...page, ...(counts ? { counts } : {}) };

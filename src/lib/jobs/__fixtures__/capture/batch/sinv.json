@@ -13,7 +13,7 @@
   "totalVat": 6615,
   "totalGross": 38115,
   "items": [
-    { "text": "Výroba přírub dle Vaší obj. OV-2099-901", "code": "", "quantity": 1, "unit": "kpl", "unitPrice": 30000, "amount": 30000, "vatRate": 21, "refs": ["OV-2099-901"] },
+    { "text": "Výroba přírub dle Vaší obj. OV2099/901-1", "code": "", "quantity": 1, "unit": "kpl", "unitPrice": 30000, "amount": 30000, "vatRate": 21, "refs": ["OV2099/901-1"] },
     { "text": "Kalení — sdružené zakázky", "code": "", "quantity": 1, "unit": "kpl", "unitPrice": 1000, "amount": 1000, "vatRate": 21, "refs": [] },
     { "text": "Doprava", "code": "", "quantity": 1, "unit": "ks", "unitPrice": 500, "amount": 500, "vatRate": 21, "refs": [] }
   ],

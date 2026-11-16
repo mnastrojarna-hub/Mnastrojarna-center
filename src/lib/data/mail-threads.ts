@@ -126,7 +126,7 @@ export async function listThreads(q: ThreadQuery): Promise<ThreadPage> {
   const limit = Math.min(Math.max(Math.trunc(q.limit ?? PAGE) || PAGE, 1), 200);
   const offset = Math.max(0, Math.trunc(q.offset ?? 0) || 0);
   const words = searchWords(q.query);
-  const { data, error } = await db.rpc("mail_threads", {
+  const { data, error } = await db.rpc(q.perMessage ? "mail_messages" : "mail_threads", {
     ...scopeArgs(scope, q.mailboxId),
     p_folder: q.folder,
     p_words: words.length ? words : null,

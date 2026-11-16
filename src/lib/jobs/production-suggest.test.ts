@@ -440,14 +440,23 @@ describe("objednávka dodavateli pro krok", () => {
     expect(out.items.map((i) => [i.orderItemId, i.unitPrice])).toEqual([[PRIRUBA.id, 35]]);
     expect(out.uncovered).toEqual([POUZDRO.id]);
     const all = purchaseItemsForStep({ step: { kind: "vyroba" }, items: ITEMS, quote: half, includeUncovered: true });
-    expect(all.items.map((i) => [i.orderItemId, i.unitPrice, i.note?.startsWith("mimo nabídku")])).toEqual([[PRIRUBA.id, 35, false], [POUZDRO.id, null, true]]);
+    expect(all.items.map((i) => [i.orderItemId, i.unitPrice, i.note?.startsWith("mimo nabídku")])).toEqual([[PRIRUBA.id, 35, false], [POUZDRO.id, 35, false]]); // Pouzdro: uložená nákupní cena položky
   });
 
-  it("bez nabídky: položky zakázky; nákupní cena jen u jediného výrobního kroku; upravené množství", () => {
+  it("bez nabídky: položky zakázky; uložená nákupní cena u výroby vždy (i víc kroků), u kooperace ne; upravené množství", () => {
     const single = purchaseItemsForStep({ step: { kind: "vyroba" }, items: ITEMS, singleStepRoute: true, quantities: { [POUZDRO.id]: 120 } });
     expect(single.items.map((i) => [i.name, i.quantity, i.unitPrice])).toEqual([["Příruba", 200, null], ["Pouzdro", 120, 35]]);
     const multi = purchaseItemsForStep({ step: { kind: "vyroba" }, items: ITEMS, singleStepRoute: false });
-    expect(multi.items.every((i) => i.unitPrice === null)).toBe(true);
+    expect(multi.items.map((i) => i.unitPrice)).toEqual([null, 35]);
+    const heat = purchaseItemsForStep({ step: { kind: "tepelne_zpracovani" }, items: ITEMS });
+    expect(heat.items.every((i) => i.unitPrice === null)).toBe(true);
+  });
+
+  it("uložená nákupní cena doplní díl, který nabídka nenacení; cena z nabídky má přednost (16. 11.)", () => {
+    const q = quote({ id: "p", supplierName: "P", items: [{ drawingNumber: "PR-7075-21", name: "Pouzdro", quantity: 100, unit: "ks", unitPrice: null, note: null }] });
+    expect(purchaseItemsForStep({ step: { kind: "vyroba", orderItemIds: [POUZDRO.id] }, items: ITEMS, quote: q }).items.map((i) => i.unitPrice)).toEqual([35]);
+    const q2 = quote({ id: "p2", supplierName: "P", items: [{ drawingNumber: "PR-7075-21", name: "Pouzdro", quantity: 100, unit: "ks", unitPrice: 50, note: null }] });
+    expect(purchaseItemsForStep({ step: { kind: "vyroba", orderItemIds: [POUZDRO.id] }, items: ITEMS, quote: q2 }).items.map((i) => i.unitPrice)).toEqual([50]);
   });
 
   it("nabídka jen s celkovou cenou: jeden díl → cena/ks, víc dílů → bez cen s upozorněním", () => {
@@ -542,7 +551,7 @@ describe("review WP3: spotřebovaná nabídka a objednávka podle návrhu", () =
       { drawingNumber: "PR-7075-21", name: "Pouzdro", quantity: 100, unit: "ks", unitPrice: null, note: null },
     ] });
     const r = suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [total], ctx: CTX, canSeePrices: true });
-    expect(r.primary).toMatchObject({ supplierQuoteId: "tel", price: 9_800, order: { itemCount: 2, unpriced: 2, total: null } });
+    expect(r.primary).toMatchObject({ supplierQuoteId: "tel", price: 9_800, order: { itemCount: 2, unpriced: 1, total: 3_500 } }); // Pouzdro má uloženou nákupní cenu
     const n = suggestWhoForStep({ step: { kind: "vyroba" }, quotes: [NOVAK], ctx: CTX, canSeePrices: true });
     expect(n.primary?.order).toEqual({ itemCount: 2, unpriced: 0, total: 12_200 });
     // bez práva na ceny bez částky

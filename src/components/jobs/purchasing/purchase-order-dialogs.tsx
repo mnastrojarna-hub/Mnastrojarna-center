@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import {
-  Send, Loader2, Paperclip, FileText, ExternalLink, BadgeCheck, CalendarCheck, Hash, Pencil, Box, PencilRuler, AlertTriangle,
+  Send, Loader2, Paperclip, FileText, ExternalLink, BadgeCheck, CalendarCheck, Hash, Pencil, Box, PencilRuler, AlertTriangle, StickyNote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -26,6 +26,7 @@ import {
   purchaseDraftsToInput, purchaseOrderFormFromView, validatePurchaseOrderForm, type PurchaseOrderFormState,
 } from "./purchasing-model";
 import { PrintButton } from "@/components/print/print-button";
+import { updateJobFile } from "@/app/actions/job-files";
 
 type Step = "preparing" | "form" | "sending";
 
@@ -34,6 +35,16 @@ function sizeText(n: number | null): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${Math.round(n / 1024)} kB`;
   return `${(n / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+}
+
+/** Poznámka do textu e-mailu (před pozdrav), pokud tam ještě není. */
+export function withNote(body: string, note: string): string {
+  const n = note.trim();
+  if (!n || body.includes(n)) return body;
+  const line = `Poznámka: ${n}`;
+  const m = /\n\s*(S pozdravem|S přáním|Děkuji|Díky|Hezký den)/i.exec(body);
+  if (m) return `${body.slice(0, m.index)}\n\n${line}${body.slice(m.index)}`;
+  return `${body.trimEnd()}\n\n${line}\n`;
 }
 
 const ROLE_LABEL: Record<PoMailAttachmentView["role"], string> = {
@@ -47,18 +58,27 @@ const ROLE_LABEL: Record<PoMailAttachmentView["role"], string> = {
  * model každé položky; starší revize nezaškrtnuté). Výkres, který se ještě anonymizuje, počká — e-mail
  * pak odejde sám. Položka bez výkresu = varování.
  */
-export function PoMailAttachments({ files, picked, onToggle, missing }: {
+export function PoMailAttachments({ files, picked, onToggle, missing, items, onAssign, assigning }: {
   files: PoMailAttachmentView[];
   picked: Set<string>;
   onToggle: (fileId: string, on: boolean) => void;
   missing: string[];
+  /** Položky objednávky (díly zakázky) — ruční přiřazení výkresu k položce. */
+  items?: { orderItemId: string; label: string }[];
+  onAssign?: (fileId: string, orderItemId: string | null) => void;
+  assigning?: string | null;
 }) {
   const total = files.filter((f) => picked.has(f.fileId)).reduce((s, f) => s + (f.size ?? 0), 0);
+  const [showExtra, setShowExtra] = React.useState(false);
+  const main = files.filter((f) => !f.extra);
+  const extra = files.filter((f) => f.extra);
+  const shown = showExtra || extra.some((f) => picked.has(f.fileId)) ? [...main, ...extra] : main;
+  const assignTo = (f: PoMailAttachmentView) => items?.find((i) => f.refs.includes(i.label))?.orderItemId ?? "";
   return (
     <div className="space-y-1.5" data-testid="po-mail-attachments">
-      {files.length > 0 && (
+      {shown.length > 0 && (
         <ul className="divide-y rounded-lg border">
-          {files.map((f) => (
+          {shown.map((f) => (
             <li key={f.fileId} className={cn("flex items-center gap-2.5 px-3 py-2 text-sm", f.status === "blocked" && "opacity-60")}>
               <input
                 type="checkbox"
@@ -72,14 +92,33 @@ export function PoMailAttachments({ files, picked, onToggle, missing }: {
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{f.name}</span>
                 <span className="block truncate text-[11px] text-muted-foreground">
-                  {ROLE_LABEL[f.role]} · {f.refs.join(", ")}{f.size ? ` · ${sizeText(f.size)}` : ""}
+                  {ROLE_LABEL[f.role]} · {f.extra ? "bez položky této objednávky" : f.refs.join(", ")}{f.sourceName ? ` · ${f.sourceName}` : ""}{f.size ? ` · ${sizeText(f.size)}` : ""}
                   {f.status === "pending" ? " · anonymizuje se — e-mail počká" : ""}
                   {f.status === "blocked" && f.message ? ` · ${f.message}` : ""}
                 </span>
               </span>
+              {onAssign && items && items.length > 0 && f.role !== "old" && (
+                <select
+                  className="h-8 max-w-[9.5rem] shrink-0 rounded-md border bg-background px-1.5 text-xs"
+                  value={assignTo(f)}
+                  disabled={assigning === f.fileId}
+                  onChange={(e) => onAssign(f.fileId, e.target.value || null)}
+                  aria-label={`Položka pro ${f.name}`}
+                  title="Ke které položce výkres patří (opraví párování)"
+                  data-testid="po-mail-assign"
+                >
+                  <option value="">{f.extra ? "Přiřadit k položce…" : "— bez položky —"}</option>
+                  {items.map((i) => <option key={i.orderItemId} value={i.orderItemId}>{i.label}</option>)}
+                </select>
+              )}
             </li>
           ))}
         </ul>
+      )}
+      {extra.length > 0 && !shown.some((f) => f.extra) && (
+        <button type="button" onClick={() => setShowExtra(true)} className="text-xs font-medium text-blue-700 hover:underline dark:text-blue-300" data-testid="po-mail-show-extra">
+          + Přidat další výkres / model zakázky ({extra.length})
+        </button>
       )}
       {missing.length > 0 && (
         <p className="flex items-start gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-100" data-testid="po-mail-missing-drawing">
@@ -118,6 +157,11 @@ export function SendPurchaseOrderDialog({
   const [missing, setMissing] = React.useState<string[]>([]);
   const [deviations, setDeviations] = React.useState<{ ref: string; lines: string[] }[]>([]);
   const [mode, setMode] = React.useState<"issue" | "change">("issue");
+  const [items, setItems] = React.useState<{ orderItemId: string; label: string }[]>([]);
+  const [assigning, setAssigning] = React.useState<string | null>(null);
+  /** Poznámka k objednávce — do PDF i do textu e-mailu (16. 11.). */
+  const [note, setNote] = React.useState("");
+  const [noteBefore, setNoteBefore] = React.useState("");
   /** „Odeslat z" (jen super admin; null = moje schránka). */
   const [fromMailboxId, setFromMailboxId] = React.useState<string | null>(null);
   const run = React.useRef(0);
@@ -158,6 +202,9 @@ export function SendPurchaseOrderDialog({
           setMissing(res.missingDrawing ?? []);
           setDeviations(res.deviations ?? []);
           setMode(res.mode ?? "issue");
+          setItems(res.items ?? []);
+          setNote(res.poNote ?? "");
+          setNoteBefore(res.poNote ?? "");
         }
       } catch {
         if (token === run.current) setError("Spojení se nepovedlo — zkus to znovu.");
@@ -165,6 +212,29 @@ export function SendPurchaseOrderDialog({
       if (token === run.current) setStep("form");
     })();
   }, [open, orderId, drawingChange]);
+
+  /** Ruční přiřazení výkresu k položce → znovu jen přílohy (text e-mailu zůstane, jak je). */
+  async function assign(fileId: string, orderItemId: string | null) {
+    if (!orderId) return;
+    setAssigning(fileId);
+    setError(null);
+    try {
+      const r = await updateJobFile(fileId, { orderItemId });
+      if (!r.ok) { setError(r.error ?? "Přiřazení se nepovedlo."); return; }
+      const res = await draftPurchaseOrderEmail(orderId, drawingChange ? { drawingChange: true } : {});
+      if (res.ok) {
+        const was = picked;
+        setFiles(res.attachments ?? []);
+        setPicked(new Set((res.attachments ?? []).filter((a) => (orderItemId && a.fileId === fileId) || a.checked || (was.has(a.fileId) && !a.extra)).map((a) => a.fileId)));
+        setMissing(res.missingDrawing ?? []);
+        setItems(res.items ?? []);
+      }
+    } catch {
+      setError("Spojení se nepovedlo — zkus to znovu.");
+    } finally {
+      setAssigning(null);
+    }
+  }
 
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -177,8 +247,16 @@ export function SendPurchaseOrderDialog({
     setStep("sending");
     setError(null);
     try {
+      // poznámka k objednávce: uložit (PDF se při odeslání vystaví znovu) a dát i do textu e-mailu
+      const noteText = note.trim();
+      if (noteText !== noteBefore.trim() && mode === "issue") {
+        const u = await updatePurchaseOrder(order.id, { note: noteText });
+        if (!u.ok) { setError(u.error ?? "Poznámku se nepodařilo uložit."); setStep("form"); return; }
+        setNoteBefore(noteText);
+      }
+      const body = withNote(mail.body, noteText);
       const res = await sendPurchaseOrder(
-        order.id, { to: mail.to, cc: mail.cc || undefined, subject: mail.subject, body: mail.body },
+        order.id, { to: mail.to, cc: mail.cc || undefined, subject: mail.subject, body },
         {
           attachmentIds: files.filter((f) => picked.has(f.fileId)).map((f) => f.fileId), ...(drawingChange ? { drawingChange: true } : {}),
           ...(fromMailboxId ? { fromMailboxId } : {}),
@@ -238,7 +316,13 @@ export function SendPurchaseOrderDialog({
                 const n = new Set(s);
                 if (on) n.add(id); else n.delete(id);
                 return n;
-              })} missing={missing} />
+              })} missing={missing} items={items} onAssign={(id, item) => void assign(id, item)} assigning={assigning} />
+              {mode === "issue" && (
+                <Field label="Poznámka k objednávce (v PDF i v e-mailu)" icon={StickyNote} iconClass="text-amber-600">
+                  <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} maxLength={2000}
+                    placeholder="např. dodat s atestem 3.1, balit jednotlivě…" data-testid="po-mail-note" />
+                </Field>
+              )}
               {deviations.length > 0 && (
                 <div className="space-y-1 rounded-lg border border-rose-300 bg-rose-50/70 px-3 py-2 text-xs text-rose-950 dark:border-rose-500/40 dark:bg-rose-500/10 dark:text-rose-100" data-testid="po-mail-deviations">
                   <p className="font-semibold">Odchylky od výkresu (v PDF u položky i v e-mailu):</p>

@@ -39,6 +39,7 @@ import { AnonymizeEditor } from "@/components/anonymize/anonymize-editor";
 import { PrintButton, PrintMenuItem } from "@/components/print/print-button";
 import { convertDrawingToPdf } from "@/components/file-viewer/convert-pdf";
 import { convertNote, isCadDrawingName } from "@/lib/jobs/drawing-convert-names";
+import { ComposeDialog, type ComposeRequest } from "@/components/mail/compose-dialog";
 
 /** Doklady, které jde z karty poslat zákazníkovi e-mailem (PDF v příloze). */
 const SENDABLE: Partial<Record<JobFileKind, { kind: JobDocumentKind; what: string }>> = {
@@ -112,8 +113,10 @@ function Thumb({ file, onOpen }: { file: JobFile; onOpen?: () => void }) {
 }
 
 function FileRow({
-  file, all, quotes, onEdit, onDelete, onPreview, onSend, onAnonEdit, onAnonAction, onReviewDownload, anonStalled, onConvertPdf, converting,
+  file, all, quotes, onEdit, onDelete, onPreview, onSend, onMail, onAnonEdit, onAnonAction, onReviewDownload, anonStalled, onConvertPdf, converting,
 }: {
+  /** Poslat e-mailem komukoli (zákazník / dodavatel / jiný adresát) — e-mail z karty, bez odchodu z Dokumentů. */
+  onMail?: (f: JobFile) => void;
   /** Výkres DXF / DWG → PDF (nový dokument zakázky). */
   onConvertPdf?: (f: JobFile) => void;
   /** Právě se převádí na PDF. */
@@ -245,6 +248,11 @@ function FileRow({
             {onSend && !file.archived && SENDABLE[file.kind] && (
               <DropdownMenuItem onSelect={() => onSend(file)}>
                 <Send /> Poslat zákazníkovi e-mailem…
+              </DropdownMenuItem>
+            )}
+            {onMail && !file.archived && (
+              <DropdownMenuItem onSelect={() => onMail(file)} data-testid="file-mail">
+                <Send /> {SENDABLE[file.kind] ? "Poslat e-mailem jinam…" : "Poslat e-mailem…"}
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator />
@@ -476,6 +484,11 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
   // oprávnění dorazí na klient po načtení layoutu; server akce je hlídá znovu
   const canSend = features.length === 0 || can("documents");
   const [sending, setSending] = React.useState<JobFile | null>(null);
+  /** „Poslat e-mailem…" — nová zpráva s dokumentem v příloze (zákazníkovi i dodavateli; výkres dodavateli anonymizovaný). */
+  const [mailing, setMailing] = React.useState<ComposeRequest | null>(null);
+  const mailFile = React.useCallback((f: JobFile) => setMailing({
+    mode: "new", jobId, subject: f.title || f.filename, jobAttachments: [{ id: f.id, filename: f.filename }],
+  }), [jobId]);
   // rozbalený archiv starších verzí v adrese karty (Zpět / obnovení ho zachová)
   const url = useUrlState({ archiv: "" }, { remember: false });
   const showArchive = url.values.archiv === "1";
@@ -669,7 +682,7 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
                     f.locked ? <LockedFileRow key={f.id} file={f} /> : (
                       <FileRow
                         key={f.id} file={f} all={files} quotes={quotes} onEdit={setEditing} onDelete={setDeleting} onPreview={openPreview}
-                        onSend={canSend ? setSending : undefined} onAnonEdit={setAnonEditing} onAnonAction={(x, a) => void anonAction(x, a)} onReviewDownload={setReviewDl}
+                        onSend={canSend ? setSending : undefined} onMail={canSend ? mailFile : undefined} onAnonEdit={setAnonEditing} onAnonAction={(x, a) => void anonAction(x, a)} onReviewDownload={setReviewDl}
                         anonStalled={anonStalled && anonInFlight(f)}
                         onConvertPdf={(x) => void convertOne(x)} converting={convertingIds.has(f.id)}
                       />
@@ -710,6 +723,15 @@ export function DocumentsTab({ files, quotes }: { files: JobFile[]; quotes: Quot
           }}
         />
       )}
+      <ComposeDialog
+        request={mailing}
+        onClose={() => setMailing(null)}
+        onSent={(r) => {
+          setMailing(null);
+          notify(r.sentCopy === "failed" ? "error" : "success", `Odesláno${r.fromAddress ? ` z ${r.fromAddress}` : ""}. ${r.sentCopyText ?? ""}`.trim());
+          refresh();
+        }}
+      />
       {deleting && (
         <ConfirmDialog
           open

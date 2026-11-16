@@ -201,7 +201,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
 
     const res = await a.issuePurchaseOrder(JOB, d);
     expect(res.ok, res.error).toBe(true);
-    expect(res.number).toMatch(/^OV-\d{4}-\d{3,}$/);
+    expect(res.number).toMatch(/^OV\d{4}\/\d{3,}-\d+$/);
     expect(res.pdfError).toBeUndefined();
     expect(res.fileId).toBeTruthy();
     poId = res.id!;
@@ -213,7 +213,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     const { data: po } = await db.from("purchase_orders").select("*, items:purchase_order_items(*)").eq("id", poId).single();
     expect(po).toMatchObject({ status: "vystavena", total: 24000, supplier_id: HRUBY, file_id: res.fileId, created_by: OWNER });
     const { data: file } = await db.from("job_files").select("kind, filename, storage_path, version").eq("id", res.fileId!).single();
-    expect(file).toMatchObject({ kind: "objednavka_vydana", filename: `Objednavka_${res.number}.pdf`, version: 1 });
+    expect(file).toMatchObject({ kind: "objednavka_vydana", filename: `Objednavka_${String(res.number).replace(/\//g, "-")}.pdf`, version: 1 });
     const { data: blob } = await db.storage.from("job-files").download((file as { storage_path: string }).storage_path);
     const buf = Buffer.from(await blob!.arrayBuffer());
     expect(buf.subarray(0, 4).toString("latin1")).toBe("%PDF");
@@ -243,7 +243,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     const res = await route.GET(new Request(`http://localhost/api/pdf/purchase-order/${poId}`), { params: Promise.resolve({ id: poId }) });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/pdf");
-    expect(res.headers.get("content-disposition")).toMatch(/^inline; filename="Objednavka_OV-/);
+    expect(res.headers.get("content-disposition")).toMatch(/^inline; filename="Objednavka_OV\d{4}-/);
     const buf = Buffer.from(await res.arrayBuffer());
     expect(buf.subarray(0, 4).toString("latin1")).toBe("%PDF");
     if (process.env.PDF_PREVIEW === "1") writeFileSync("/tmp/claude-0/pdf-preview/objednavka-vydana-e2e.pdf", buf);
@@ -272,7 +272,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     const m = await a.draftPurchaseOrderEmail(poId);
     expect(m.ok).toBe(true);
     expect(m.to).toBe("objednavky@hruby-cnc.cz");
-    expect(m.subject).toMatch(/^Objednávka OV-\d{4}-\d+ — /);
+    expect(m.subject).toMatch(/^Objednávka OV\d{4}\/\d+-\d+ — /);
     expect(m.body).toContain("Petr Obchodník");
 
     expect((await a.sendPurchaseOrder(poId, { to: "spatna-adresa", subject: "x", body: "y" })).error).toBe("Zadej platný e-mail dodavatele.");
@@ -284,7 +284,7 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
     expect(msg.subject).toBe(m.subject);
     // PDF + logo grafického podpisu (Pošta D: podpis z návrhu → HTML s vloženým logem, jednou)
     expect(msg.attachments).toEqual(expect.arrayContaining([
-      expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Objednavka_OV-/) }),
+      expect.objectContaining({ contentType: "application/pdf", filename: expect.stringMatching(/^Objednavka_OV\d{4}-/) }),
       expect.objectContaining({ contentType: "image/png", filename: "mnastrojarna-logo.png" }),
     ]));
     expect(msg.attachments).toHaveLength(2);
@@ -341,6 +341,6 @@ describe.skipIf(!ENABLED)("akce nákupu ↔ lokální Supabase (E2E)", () => {
       expect(e.message).not.toMatch(/Kč|24 000|25 000|28 800/);
       expect(numbersIn(e.data).filter((n) => prices.includes(n))).toEqual([]);
     }
-    expect(events.map((e) => e.message).join("\n")).toMatch(/Vystavena objednávka OV-\d{4}-\d+ dodavateli Kovoobrábění Hrubý s\.r\.o\./);
+    expect(events.map((e) => e.message).join("\n")).toMatch(/Vystavena objednávka OV\d{4}\/\d+-\d+ dodavateli Kovoobrábění Hrubý s\.r\.o\./);
   }, 60_000);
 });

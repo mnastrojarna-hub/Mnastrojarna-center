@@ -61,6 +61,9 @@ const addMsg = (m) => ctl(`/message?user=${encodeURIComponent(BOX)}`, { method: 
 const sentRaw = async () => (await ctl("/sent?full=1")).map((s) => s.raw);
 // režimy Pošty B = plná automatika (výchozí z migrace; nezávisle na ručních změnách v lokální DB)
 sql(`insert into automation_settings (module, mode, enabled) values ('mail_job_link', 'full', true), ('mail_job_changes', 'full', true) on conflict (module) do update set mode = 'full', enabled = true`);
+// 16. 11.: přepínač nahoře je hlavní vypínač — moduly „full“ platí jen při plné automatice nahoře (na konci zpět)
+const GLOBAL_BEFORE = sql(`select mode from automation_global where id`) || "approval";
+sql(`update automation_global set mode = 'full' where id`);
 
 console.log(`20 · komunikace k zakázce (testovací server IMAP ${SRV.ports.imaps}, SMTP ${SRV.ports.smtps}, ovládání ${SRV.ports.control})`);
 
@@ -332,5 +335,6 @@ await test("úklid", async () => {
 });
 
 await browser.close();
+sql(`update automation_global set mode = '${GLOBAL_BEFORE}' where id`);
 const ok = summary(errors);
 process.exit(ok ? 0 : 1);

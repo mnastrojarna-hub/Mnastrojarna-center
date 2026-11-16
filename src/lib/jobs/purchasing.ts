@@ -438,15 +438,20 @@ function textOrUndef(v: string | null | undefined): string | undefined {
 /** Položky z nabídky dodavatele (materiál doplní ze zakázky podle čísla výkresu). */
 export function itemsFromSupplierQuote(quote: Pick<SupplierQuoteView, "items">, job: Pick<DraftJob, "items">): PurchaseItemInput[] {
   return quote.items.map((it) => {
-    const match = it.drawingNumber ? job.items.find((j) => j.drawingNumber === it.drawingNumber) : undefined;
+    const match = (isUuid(it.orderItemId) ? job.items.find((j) => j.id === it.orderItemId) : undefined)
+      ?? (it.drawingNumber ? job.items.find((j) => j.drawingNumber === it.drawingNumber) : undefined);
     const matchId = match?.id;
+    // nabídka díl nenacenila → uložená nákupní cena položky (i ručně zadaná v Marže a nákup; 16. 11.)
+    const saved = match?.purchaseUnitPrice;
+    const fallback = typeof saved === "number" && Number.isFinite(saved) && saved > 0
+      && /^(ks|kus[uy]?|pcs?)?$/i.test((it.unit ?? "").trim()) ? saved : null;
     return {
       drawingNumber: textOrUndef(it.drawingNumber),
       name: textOrUndef(it.name) ?? textOrUndef(match?.name) ?? textOrUndef(match?.description),
       material: textOrUndef(it.material) ?? textOrUndef(match?.material),
       quantity: it.quantity,
       unit: textOrUndef(it.unit) ?? "ks",
-      unitPrice: it.unitPrice,
+      unitPrice: it.unitPrice ?? fallback,
       // poznámka pro dodavatele z Technologie (podle čísla výkresu) — v PDF zvýrazněná „Pozor: …"
       note: joinNote(supplierNoteSegment(match?.tech?.supplierNote), splitItemNote(it.note).rest),
       // vazba na díl zakázky (výkresy a odchylky položky v objednávce / e-mailu)
