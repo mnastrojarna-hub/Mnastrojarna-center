@@ -412,10 +412,10 @@ await T("mobil 390 px: horní lišta nepřetéká, Menu nese Můj účet / motiv
   await page.keyboard.press("Escape");
   await panel.waitFor({ state: "detached" }).catch(() => undefined);
 
-  // odeslaná zpráva na telefonu (vlákno teď končí druhou odpovědí „Re: Doplnění …")
+  // odeslaná zpráva na telefonu — Pošta po zprávách (16. 11.): otevře se přímo ta zpráva (hledání podle jejího textu)
   await page.getByTestId("folder-sent").click();
-  await search(page, TAG);
-  await openThread(page, TAG, TAG);
+  await search(page, `pošleme zítra ${TAG}`);
+  await openThread(page, TAG, `nabídku pošleme zítra. ${TAG}`);
   const out = page.getByTestId("thread-message").filter({ hasText: `nabídku pošleme zítra. ${TAG}` }).first();
   if (!(await out.getByTestId("message-as-sent").isVisible().catch(() => false))) await out.locator("button").first().click();
   await out.getByTestId("message-as-sent").click();
