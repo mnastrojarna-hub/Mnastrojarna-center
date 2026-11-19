@@ -211,6 +211,7 @@ const WORDS = {
   trace: ["stopa", "trace", "spur"],
   rpm: ["ot/min", "rpm", "u/min"],
   speed: ["rychlost", "speed", "geschwindigkeit"],
+  motorFrom: ["od", "from", "von"],
   // dynamika pohybové studie (vlna 21, cad/agent-motion-dyn.ts)
   back: ["tam a zpět", "there and back", "hin und zurück"],
   dynamics: ["dynamika", "dynamics", "dynamik"],
@@ -2000,17 +2001,21 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   const mo = doc.motion;
   if (mo?.motors.length) {
     c.comment(c.w("cMotion"));
+    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined);
     mo.motors.forEach((m, i) => {
       const no = mateNo.get(m.mate);
       if (no === undefined) {
         c.note(tr("motor pohybové studie č. {0} odkazuje na vazbu, která ve skriptu není", i + 1));
         return;
       }
-      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${n(m.from)}..${n(m.to)}`;
+      // rychlost bez `ranged` = od začátku bez konce (`od A rychlost V`); `A..B rychlost V` je rozsah × rychlost (cad/motor-model.ts)
+      const open = m.speed !== undefined && !m.ranged;
+      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
       if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
       else if (m.back) l += ` ${c.w("back")}`;
       if (i === 0) {
-        l += ` ${c.w("steps")} ${n(mo.steps)} ${c.w("time")} ${n(mo.duration)}`;
+        // délku studie u rozsahu × rychlost určuje motor (|do − od| / rychlost) – uložená délka jde zvlášť řádkem „pohyb čas“ níže
+        l += ` ${c.w("steps")} ${n(mo.steps)}${ranged ? "" : ` ${c.w("time")} ${n(mo.duration)}`}`;
         if (mo.collisions) l += ` ${c.w("clash")}`;
         if (mo.trace) {
           const tk = idx.get(mo.trace.compId);
@@ -2019,6 +2024,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       }
       c.line(l);
     });
+    if (ranged) c.line(`${c.w("motion")} ${c.w("time")} ${n(mo.duration)}`);
     if (mo.loop) c.note(tr("přehrávání pohybové studie ve smyčce se do skriptu nepřenáší"));
   }
   // dynamika: ruční hmotnosti, síly na vazbách, zapnutí s nastavením (cad/motion-dynamic.ts)

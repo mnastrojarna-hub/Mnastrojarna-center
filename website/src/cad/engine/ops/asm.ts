@@ -3,6 +3,7 @@
  * v kontextu, kusovník, rám formy, záložky, pohybová studie. Prostředí sestavy nad `ws` a jádrem (`engine/asm-env.ts`).
  */
 import { tr } from "../../i18n";
+import type { AsmEnv } from "../../asm-agent";
 import type { CadDoc } from "../../types";
 import { makeAsmEnv } from "../asm-env";
 import { isCode } from "../codes";
@@ -20,7 +21,7 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
     r.tabbed = false;
   }
   const stack = [...ctx.ws.asm.stack];
-  const env = makeAsmEnv(ctx.ws, ctx.host.kernel, { stack, ...asmHooks(ctx) });
+  const env = makeAsmEnv(ctx.ws, ctx.host.kernel, { stack, docKey: docKeyOf(ctx), ...asmHooks(ctx) });
   const res = await applyAsmCmd(r.doc, op.cmd, env);
   if (res.newTab) {
     await flush(ctx);
@@ -42,7 +43,7 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
     // soubor (FileSink → řádek F), přehrání ℹ ui.no-view, snímky PNG / video ✗ host.app-only
     const ui = ctx.host.ui?.motion;
     if (ui) ui(res.motion);
-    else if (res.motion.export === "csv") await writeMotionCsv(ctx, r.doc);
+    else if (res.motion.export === "csv") await writeMotionCsv(ctx, r.doc, env);
     else if (res.motion.play || res.motion.export === "png" || res.motion.export === "webm") coded(ctx, res.motion.play ? "ui.no-view" : "host.app-only", { args: [res.motion.play ? tr("přehrání pohybu") : tr("export snímků pohybu {0}", res.motion.export!.toUpperCase())] });
   }
   if (res.stackChanged) {
@@ -62,10 +63,10 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
  * `pohyb export csv` bez aplikace: tabulka pohybové studie (výsledek, který příkaz právě spočítal – `motionCached`) jako
  * soubor `<sestava>-pohyb.csv` (stejný název jako tlačítko CSV panelu pohybu). Výpis CSV v protokolu zůstává.
  */
-async function writeMotionCsv(ctx: Parameters<OpHandler<"asm">>[1], d: CadDoc): Promise<void> {
+async function writeMotionCsv(ctx: Parameters<OpHandler<"asm">>[1], d: CadDoc, env: Pick<AsmEnv, "motion" | "geo">): Promise<void> {
   // kinematika beze změny (cad/motion.ts motionCsv), dynamika navíc s těžištěm, rychlostí a zrychlením těles (vlna 21)
   const [{ motionCached }, { studyCsv }] = await Promise.all([import("../../asm-agent-kin"), import("../../motion-dynamic-report")]);
-  const res = motionCached(d);
+  const res = motionCached(d, env);
   if (!res) return;
   const data = new TextEncoder().encode(studyCsv(res, d));
   await ctx.host.files.write({ name: `${d.name || tr("sestava")}-pohyb.csv`, mime: "text/csv;charset=utf-8", data, doc: d.name, format: "csv" });

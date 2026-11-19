@@ -18,16 +18,17 @@ Prvky:
 
 Dokument: „Pohyb“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Vodítko [0; 0; 0] ⚓ · Jezdec [0; 0; 10]
-Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 20 × 20 mm · objem Σ 24 cm³ · hmotnost Σ 0,188 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 3 ===
 ✓ vazba Vzdálenost „Jezdec“ F1 → „Vodítko“ F1 · 10 mm · obráceně: ok · „Jezdec“ poloha [-10; 0; 10]
-✓ motor 1: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · 10…50 mm
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · 10…50 mm
+✓ motor 1: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
  Jezdec: rozsah pohybu X 40 · Y 0 · Z 0 mm · konec [-50; 0; 10]
 Vazby splněny ve všech krocích
 Pohybová studie: motorů 1 · kroků 4
- 1. lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · 10…50 mm
-Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · 10…50 mm
+ 1. lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Jezdec“ → „Vodítko“ · hodnota vazby 10 → 50 mm ↑ zdvih 40 mm
  Jezdec: rozsah pohybu X 40 · Y 0 · Z 0 mm · konec [-50; 0; 10]
 Vazby splněny ve všech krocích
 Krok 2 (t = 1 s, motory 30):
@@ -47,3 +48,4 @@ Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 110 × 20 × 20 mm · objem Σ 24 cm³ · hmotnost Σ 0,188 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

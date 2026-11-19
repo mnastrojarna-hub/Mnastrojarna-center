@@ -139,7 +139,8 @@ const num = (s) => Number(String(s).replace(',', '.'));
 
   // ── kinematika zůstává výchozí ──
   log = await run('pohyb motor lineární vazba "LIS" 55..25 tam a zpět kroky 20');
-  ok(/lineární motor · LIS .* 55…25 mm tam a zpět/.test(log) && /Pohybová studie: 20 kroků/.test(log) && !/Dynamika:/.test(log), 'kinematická studie (výchozí) s motorem tam a zpět: ' + line(log, /^Pohybová studie: 20/));
+  // vlna 22: popis motoru uvádí význam hodnot, zdvih a směr („55…25 mm tam a zpět“ → „hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět“)
+  ok(/lineární motor · LIS .* hodnota vazby 55 → 25 → 55 mm ↓↑ zdvih 30 mm tam a zpět/.test(log) && /Pohybová studie: 20 kroků/.test(log) && !/Dynamika:/.test(log), 'kinematická studie (výchozí) s motorem tam a zpět: ' + line(log, /^Pohybová studie: 20/));
   ok(/„Horní deska“|Horní deska: rozsah pohybu X 0 · Y 0 · Z 30 mm/.test(log), 'kinematika: horní deska zdvih 30 mm – ' + line(log, /Horní deska: rozsah/));
 
   // ── dynamika textem ──

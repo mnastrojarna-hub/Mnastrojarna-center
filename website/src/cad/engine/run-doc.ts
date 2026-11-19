@@ -8,6 +8,7 @@ import { resolveDatumNames } from "../agent-prim";
 import { freeName } from "../agent-edit";
 import { getExt } from "../ext/registry";
 import { tr } from "../i18n";
+import { dropMotion, motionStoreOf } from "../motion-cache";
 import { uid, type CadDoc, type Feature, type FeatureType } from "../types";
 import type { OpCtx, RunState } from "./ops/registry";
 import { codeDef, type Code, type CodeEntryInit } from "./codes";
@@ -73,6 +74,7 @@ export function startDoc(ctx: OpCtx, d: CadDoc, o: { openNew?: boolean } = {}): 
     const k = ctx.ws.docKey();
     ctx.ws.asm.mateStatus.delete(k);
     ctx.ws.asm.clash.delete(k);
+    dropMotion(motionStoreOf(ctx.ws.asm), k); // výsledek pohybové studie patřil nahrazenému dokumentu
   }
 }
 

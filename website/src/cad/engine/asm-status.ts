@@ -7,6 +7,7 @@
  */
 import { docStatusText, type AsmStatus } from "../agent";
 import { bomOf, flattenLeaves, matrixToPlacement, type Leaf } from "../asm-flatten";
+import { motionStatusOf, motionStoreOf } from "../motion-cache";
 import { sourceKey, transformPoint } from "../assembly";
 import { clashStale } from "../clash-class";
 import type { DrawingExtras } from "../drawing-agent";
@@ -129,6 +130,8 @@ export function asmStatusOf(ws: Workspace, doc: CadDoc, key: string, all: Leaf[]
     massKg: known ? mass : undefined,
     clash: clash ? { count: clash.res.length, pairs: clash.res.map((x) => `${compName(x.a)} × ${compName(x.b)} (${fmtNum(x.volume, 1)} mm³)`), at: clash.at, ...(clashStale(clash, doc) ? { stale: true } : {}) } : null,
     mates: ws.asm.mateStatus.get(key),
+    // výsledek pohybové studie pro nynější stav sestavy: platí / NEPLATÍ (co se změnilo) / nespočítáno (cad/motion-cache.ts)
+    motion: motionStatusOf(motionStoreOf(ws.asm), key, doc),
   };
 }
 

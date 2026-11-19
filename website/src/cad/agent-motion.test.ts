@@ -63,7 +63,8 @@ describe("rozbor: pohyb …", () => {
   it("motor rotační / lineární, rozsah, krok, kolize, stopa; přehrát, krok, export, smazat (CS / EN / DE)", () => {
     expect(op('pohyb motor rotační "Klika" 0..360 krok 5 kolize')).toEqual({ k: "motion", cmd: { op: "motor", kind: "rotary", comp: "Klika", from: 0, to: 360, step: 5, collisions: true } });
     expect(op('motion motor linear mate 3 from 10 to 40 steps 30 time 3')).toEqual({ k: "motion", cmd: { op: "motor", kind: "linear", mate: "3", from: 10, to: 40, steps: 30, duration: 3 } });
-    expect(op('bewegung antrieb dreh "Kurbel" 0 720 u/min 60 spur "Pleuel" punkt 10 0 0')).toEqual({ k: "motion", cmd: { op: "motor", kind: "rotary", comp: "Kurbel", from: 0, to: 720, speed: 60, trace: { comp: "Pleuel", point: [10, 0, 0] } } });
+    // vlna 22, bod 9: rozsah SPOLU s rychlostí = rozsah × rychlost (`ranged`) – dojede na 720° rychlostí 60 ot/min a stojí; dřív se konec potichu zahodil
+    expect(op('bewegung antrieb dreh "Kurbel" 0 720 u/min 60 spur "Pleuel" punkt 10 0 0')).toEqual({ k: "motion", cmd: { op: "motor", kind: "rotary", comp: "Kurbel", from: 0, to: 720, speed: 60, ranged: true, trace: { comp: "Pleuel", point: [10, 0, 0] } } });
     expect(op("pohyb přehrát smyčka")).toEqual({ k: "motion", cmd: { op: "play", loop: true } });
     expect(op("pohyb stav")).toEqual({ k: "motion", cmd: { op: "status" } });
     expect(op("motion export csv")).toEqual({ k: "motion", cmd: { op: "export", format: "csv" } });
@@ -74,6 +75,30 @@ describe("rozbor: pohyb …", () => {
     expect(op("pohyb smazat")).toEqual({ k: "motion", cmd: { op: "clear" } });
     expect(err('pohyb motor rotační "X" 5..5')).toMatch(/rozsah od–do je nulový/);
     expect(err("pohyb tancuj")).toMatch(/neznámý podpříkaz „tancuj“/);
+  });
+  it("vlna 22 (body 9 a 11): zdvih místo konce, začátek bez konce, rozsah / zdvih + rychlost = ranged; rozpory jsou chyby (CS / EN / DE)", () => {
+    // zdvih = relativní posun od začátku; bez „od“ začíná motor na aktuální hodnotě vazby (`start: "current"`, doplní provedení)
+    expect(op('pohyb motor lineární vazba "ZDVIH" zdvih -30,35 kroky 2')).toMatchObject({ k: "motion", cmd: { op: "motor", kind: "linear", mate: "ZDVIH", start: "current", stroke: -30.35, steps: 2 } });
+    expect(op("motion motor linear mate 1 stroke -30.35")).toMatchObject({ cmd: { start: "current", stroke: -30.35 } });
+    expect(op("bewegung antrieb linear verknüpfung 1 von 57,5 hub -30,35")).toMatchObject({ cmd: { from: 57.5, stroke: -30.35 } });
+    expect((op("bewegung antrieb linear verknüpfung 1 von 57,5 hub -30,35") as { cmd: { start?: string } }).cmd.start).toBeUndefined();
+    expect(op('pohyb motor rotační "Klika" otočení 90')).toMatchObject({ cmd: { kind: "rotary", start: "current", stroke: 90 } });
+    expect(op('motion motor rotary "Crank" turn 90 rpm 30')).toMatchObject({ cmd: { stroke: 90, speed: 30, ranged: true } });
+    // rozsah + rychlost = rozsah × rychlost (přesný příkaz ze zprávy, CS / EN / DE)
+    for (const t of ["pohyb motor lineární vazba 1 57.5..27.15 rychlost 15.175", "motion motor linear mate 1 57.5..27.15 speed 15.175", "bewegung antrieb linear verknüpfung 1 57.5..27.15 geschwindigkeit 15.175"])
+      expect(op(t), t).toEqual({ k: "motion", cmd: { op: "motor", kind: "linear", mate: "1", from: 57.5, to: 27.15, speed: 15.175, ranged: true } });
+    // jen rychlost (bez konce): není ranged, konec si provedení nedomýšlí; „od A rychlost V“ = výslovný začátek
+    const open = (op("pohyb motor lineární vazba 1 rychlost -10") as { cmd: Record<string, unknown> }).cmd;
+    expect(open).toMatchObject({ start: "current", auto: true, speed: -10 });
+    expect(open.ranged).toBeUndefined();
+    const from = (op("pohyb motor lineární vazba 1 od 40 rychlost 5") as { cmd: Record<string, unknown> }).cmd;
+    expect(from).toMatchObject({ from: 40, auto: true, speed: 5 });
+    expect(from.start).toBeUndefined();
+    expect(from.ranged).toBeUndefined();
+    // rozpory hned při rozboru
+    expect(err("pohyb motor lineární vazba 1 57,5..27,15 zdvih 5")).toMatch(/zadejte konec \(od\.\.do\), nebo zdvih – ne obojí/);
+    expect(err("pohyb motor lineární vazba 1 zdvih 0")).toMatch(/zdvih je nulový/);
+    expect(err("pohyb motor lineární vazba 1 57,5..27,15 rychlost 0")).toMatch(/rychlost musí být nenulová/);
   });
 });
 
