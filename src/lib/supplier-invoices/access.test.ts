@@ -15,11 +15,10 @@ describe("viditelnost faktur dodavatelů — jeden přepínač", () => {
     // chybějící nastavení = jen super admin
     expect(can(who("obchodnik"), "supplier_invoices", { aiEnabled: true, aiCaptureForAll: true, aiConfigured: true })).toBe(false);
   });
-  it("režim „všichni“: faktury vidí všichni, zaplaceno jen super admin, částky jen s nákupními cenami", () => {
+  it("režim „všichni“ (19. 11.): všichni zadávají a rozdělují (i s částkami), stav platby jen super admin", () => {
     expect(perms("super_admin", true)).toEqual({ upload: true, view: true, amounts: true, edit: true, paid: true });
-    // obchodník fakturu vidí i s částkami, ale NEUPRAVUJE (rozdělení mění náklady a provize zakázek ostatních)
-    expect(perms("obchodnik", true)).toEqual({ upload: true, view: true, amounts: true, edit: false, paid: false });
-    expect(perms("zamestnanec", true)).toEqual({ upload: true, view: true, amounts: false, edit: false, paid: false });
+    expect(perms("obchodnik", true)).toEqual({ upload: true, view: true, amounts: true, edit: true, paid: false });
+    expect(perms("zamestnanec", true)).toEqual({ upload: true, view: true, amounts: true, edit: true, paid: false });
   });
   it("neaktivní účet nesmí ani nahrát", () => {
     expect(supplierInvoicePerms((f) => can({ ...who("super_admin"), active: false }, f, ctx(true))).upload).toBe(false);
@@ -32,7 +31,10 @@ describe("viditelnost faktur dodavatelů — jeden přepínač", () => {
   });
   it("redakce seznamu a detailu (RSC nenese, co uživatel nesmí)", () => {
     const item = { totalNet: 1, totalGross: 2, unallocated: 3, paymentStatus: "zaplaceno", paidAt: "2026-10-01", overdue: false } as unknown as SupplierInvoiceListItem;
-    expect(redactListItem(item, perms("zamestnanec", true))).toMatchObject({ totalNet: null, totalGross: null, unallocated: null, paymentStatus: null, paidAt: null, overdue: null });
+    const noAmounts = { ...perms("zamestnanec", true), amounts: false };
+    expect(redactListItem(item, noAmounts)).toMatchObject({ totalNet: null, totalGross: null, unallocated: null, paymentStatus: null, paidAt: null, overdue: null });
+    // 19. 11.: zaměstnanec v režimu „všichni" vidí částky, stav platby ne
+    expect(redactListItem(item, perms("zamestnanec", true))).toMatchObject({ totalNet: 1, paymentStatus: null, paidAt: null });
     expect(redactListItem(item, perms("obchodnik", true))).toMatchObject({ totalNet: 1, paymentStatus: null });
     const d = {
       totalNet: 1, totalVat: 1, totalGross: 2, exchangeRate: 25, paymentStatus: "zaplaceno", paidAt: "2026-10-01", paidAmount: null, paidByName: "A", overdue: false,
@@ -41,7 +43,7 @@ describe("viditelnost faktur dodavatelů — jeden přepínač", () => {
       files: [{ id: "f", href: "/api/supplier-invoices/files/f" }],
       aiSummary: "x", needsClarification: ["y"], perms: perms("super_admin", false),
     } as unknown as SupplierInvoiceDetail;
-    const w = redactDetail(d, perms("zamestnanec", true));
+    const w = redactDetail(d, noAmounts);
     expect(w).toMatchObject({ totalNet: null, totalGross: null, paymentStatus: null, paidByName: null, aiSummary: null });
     // soubor faktury nese částky → bez práva na částky ani odkaz
     expect(w.files).toEqual([]);

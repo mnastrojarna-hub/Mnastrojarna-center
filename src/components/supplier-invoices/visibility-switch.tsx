@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Jediný přepínač viditelnosti faktur dodavatelů (jen super admin): „jen super admin" (výchozí) nebo
- * „všichni vidí faktury" — zaplaceno / nezaplaceno vidí vždy jen super admin, částky jen kdo vidí nákupní ceny.
+ * „všichni vidí faktury" — zadávají a rozdělují všichni (i s částkami), zaplaceno / nezaplaceno vidí vždy jen super admin (19. 11.).
  */
 export function VisibilitySwitch({ value }: { value: SupplierInvoiceVisibility }) {
   const router = useRouter();
@@ -29,7 +29,7 @@ export function VisibilitySwitch({ value }: { value: SupplierInvoiceVisibility }
   };
   const opts: { key: SupplierInvoiceVisibility; title: string; desc: string; icon: typeof Lock }[] = [
     { key: "super_admin", title: "Jen super admin", desc: "Ostatní fakturu jen nahrají („Děkujeme, nahráno“).", icon: Lock },
-    { key: "all", title: "Všichni vidí faktury", desc: "Zaplaceno / nezaplaceno jen super admin, částky jen kdo vidí nákupní ceny.", icon: Eye },
+    { key: "all", title: "Všichni zadávají a rozdělují", desc: "Faktury vidí a třídí na zakázky všichni; zaplaceno / nezaplaceno jen super admin.", icon: Eye },
   ];
   return (
     <section className="rounded-2xl border bg-card p-3 shadow-sm" aria-label="Kdo vidí faktury dodavatelů" data-testid="invoice-visibility">

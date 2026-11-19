@@ -16,17 +16,16 @@ export function parseVisibility(v: string | null | undefined): SupplierInvoiceVi
  * Práva k fakturám dodavatelů z oprávnění uživatele:
  *  - nahrát smí každý aktivní účet,
  *  - vidět: super admin; v režimu „all" všichni,
- *  - částky a soubor faktury (na něm jsou částky): kdo vidí faktury a zároveň nákupní ceny (super admin,
- *    obchodník) — zaměstnanec nikdy (stejně jako RLS / storage: supplier_invoices_readable),
- *  - upravovat (rozdělení, položky, hlavička, dodavatel, zamítnutí, AI znovu): JEN super admin v obou režimech —
- *    rozdělení mění náklady a provize zakázek ostatních obchodníků,
+ *  - částky, soubor a úpravy (rozdělení na zakázky, položky, hlavička, dodavatel, zamítnutí, AI znovu):
+ *    každý, kdo faktury vidí (19. 11.: zadávají a třídí všichni),
  *  - zaplaceno / nezaplaceno: jen super admin (v obou režimech).
  */
 export function supplierInvoicePerms(can: (f: Feature) => boolean): SupplierInvoicePerms {
   const view = can("supplier_invoices");
   const admin = can("supplier_invoices_paid");
-  const amounts = view && (admin || can("margins"));
-  return { upload: can("supplier_invoices_upload"), view, amounts, edit: view && admin, paid: view && admin };
+  // 19. 11. (majitel): „všichni je můžou zadávat a rozstřizovat, abych to nemusel třídit já" — kdo faktury
+  // vidí, vidí i částky (bez nich nejde rozdělit na zakázky) a smí upravovat; stav platby jen super admin
+  return { upload: can("supplier_invoices_upload"), view, amounts: view, edit: view, paid: view && admin };
 }
 
 const hideItem = (i: SupplierInvoiceItemView): SupplierInvoiceItemView => ({ ...i, amount: null, unitPrice: null });
