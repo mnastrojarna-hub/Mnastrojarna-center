@@ -41,6 +41,8 @@ import { COMMON_FIELDS, fieldsOf } from "./feature-fields";
 import { gapSummary, parseGapLine } from "./agent-gaps";
 import { OUT_COMMANDS, outTokens, parseOutLine, type MncadOutApi, type OutOp } from "./agent-out";
 import { stripLineComment } from "./agent-comment";
+import { newDocTail, type NewDocMode } from "./agent-runs";
+import type { RunApiOptions } from "./engine/run-protocol";
 import { parseReferenceLine, REFERENCE_COMMANDS, type RefCmd } from "./reference/parse";
 import { parseOpenLine, type OpenOp } from "./agent-open";
 import { CHECK_COMMANDS, parseCheckLine, type CheckOp } from "./agent-check";
@@ -88,7 +90,7 @@ export type AgentOp =
   | OpenOp
   /** kontrola (tabulka dílu / sestavy) a porovnat (se souborem reference) – agent-check.ts, provedení engine/check.ts, compare-text.ts */
   | CheckOp
-  | { k: "new"; name: string; assembly: boolean; line: number }
+  | { k: "new"; name: string; assembly: boolean; line: number; /** `znovu` / `nový` za názvem (agent-runs.ts) */ reuse?: NewDocMode }
   | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string }; line: number }
   /**
    * prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text); `fillPoints` = u díry
@@ -854,8 +856,8 @@ export function parseAgentText(text: string): AgentProgram {
       switch (cmd) {
         case "new": {
           const what = canon(tokens[0] ?? "part");
-          const name = tokens.slice(1).join(" ").trim();
-          ops.push({ k: "new", name: name || (what === "assembly" ? tr("Nová sestava") : tr("Nový díl")), assembly: what === "assembly", line: no });
+          const { name, mode } = newDocTail(line); // opakovaný běh: `nový díl "A" znovu|nový` (agent-runs.ts)
+          ops.push({ k: "new", name: name || (what === "assembly" ? tr("Nová sestava") : tr("Nový díl")), assembly: what === "assembly", line: no, ...(mode ? { reuse: mode } : {}) });
           return;
         }
         case "name":
@@ -1580,7 +1582,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
 
 /** Seznam příkazů (pro nápovědu v konzoli a paletu). */
 export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string }[] = [
-  { cmd: "nový díl [název] / nová sestava [název]", en: "new part / new assembly", de: "neu teil / neu baugruppe", desc: tr("nový dokument v nové záložce") },
+  { cmd: "nový díl [název] [znovu|nový] / nová sestava [název] [znovu|nový]", en: "new part / new assembly", de: "neu teil / neu baugruppe", desc: `${tr("nový dokument v nové záložce")}; ${tr("opakovaný běh téhož skriptu použije záložku stejného názvu z dřívějšího běhu (ℹ doc.reused, obsah nahrazen) – „nový“ = vždy nová záložka, „znovu“ = i záložka otevřená mimo běh")}` },
   { cmd: "název …, materiál …, barva #hex", en: "name, material, color", de: "name, werkstoff, farbe", desc: tr("materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)") },
   { cmd: "kvádr X Y Z [střed] [v x y z | na …] [osa …] [přidat|odebrat|průnik|nové] [těleso \"Název\"]", en: "box", de: "quader", desc: tr("kvádr; výchozí roh v poloze (počátek); „střed“ = poloha je střed kvádru („střed F1“ / „střed V3“ = střed v odkazu, „na střed plochy F1“ = roh); „osa“ = rozměr Z po ose, nejkratší otočení kolem polohy (osa -Z: Y a Z záporně; osa X: X 0…Z, Z −X…0; osa Y: Y 0…Z, Z −Y…0)") },
   { cmd: "válec D H [v x y z | na …] [osa …] [obráceně] [přidat|odebrat|průnik|nové]", en: "cylinder", de: "zylinder", desc: tr("válec průměr × výška; poloha = střed podstavy, válec roste ve směru osy (výchozí +Z); „odebrat“ = válcový otvor po libovolné ose (na výkrese popis díry Ø ↧ hloubka / skrz)") },
@@ -1724,8 +1726,11 @@ export type MncadApi = MncadApiExt & MncadOutApi & {
   guide: () => string;
   /** seznam textových příkazů */
   commands: () => string[];
-  /** provede textové příkazy nebo JSON; vrátí protokol + stav dokumentu */
-  run: (text: string) => Promise<string>;
+  /**
+   * provede textové příkazy nebo JSON; vrátí protokol + stav dokumentu (výchozí text konzole); `protocol: "short"` = stručný
+   * protokol MNCAD/1 jako `mncad run` (řádky D, Σ; `budget` B, `notes` = i ℹ), `"full"` = plný protokol, `"json"` = RunReport
+   */
+  run: (text: string, opts?: RunApiOptions) => Promise<string>;
   /** kopie otevřeného dokumentu (formát .mncad) */
   getDocument: () => CadDoc;
   /**

@@ -67,6 +67,9 @@ export const CODES = [
   { code: "name.renamed-auto", level: "note", key: "výchozí název očíslován: „{0}“" },
   { code: "tab.empty-replaced", level: "warn", key: "prázdná záložka „{0}“ nahrazena dokumentem „{1}“" },
   { code: "tab.settle-timeout", level: "error", key: "přepnutí záložky nedoběhlo do {0} s" },
+  // ── opakovaný běh (vlna E, balík runs – agent-runs.ts, engine/ops/new.ts) ──
+  { code: "doc.reused", level: "note", key: "záložka „{0}“ z dřívějšího běhu použita znovu – obsah nahrazen (vlastní záložku dá volba „nový“)" },
+  { code: "doc.name-taken", level: "note", key: "záložka „{0}“ je otevřená mimo textový běh – dokument je v nové záložce (volba „znovu“ použije otevřenou)" },
   // ── díry a výběr (5.2 č. 5, 7, 8, 12, 13, 18, 38) ──
   { code: "hole.depth-default", level: "warn", key: "díra bez hloubky – vrtá se skrz" },
   { code: "hole.conflict", level: "warn", key: "zahloubení a kuželové zahloubení zároveň – použito {0}" },

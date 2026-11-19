@@ -1,0 +1,9 @@
+# Vlna E, balík runs: opakovaný běh (nový díl "A" znovu|nový), řádky D dokumentů běhu, stručný protokol v prohlížeči
+✓ {0} „{1}“ – znovu použitá záložka z dřívějšího běhu	✓ {0} „{1}“ – Tab aus einem früheren Lauf wiederverwendet
+opakovaný běh téhož skriptu použije záložku stejného názvu z dřívějšího běhu (ℹ doc.reused, obsah nahrazen) – „nový“ = vždy nová záložka, „znovu“ = i záložka otevřená mimo běh	ein erneuter Lauf desselben Skripts verwendet den gleichnamigen Tab aus einem früheren Lauf wieder (ℹ doc.reused, Inhalt ersetzt) – „neu“ = immer ein neuer Tab, „erneut“ = auch ein außerhalb eines Laufs geöffneter Tab
+run: neznámý protokol „{0}“ – console, short, full, json	run: unbekanntes Protokoll „{0}“ – console, short, full, json
+Stručný protokol	Kurzprotokoll
+Výstup jako stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB	Ausgabe als Kurzprotokoll MNCAD/1 (wie mncad run in der Kommandozeile): Kopfzeile, ✗ / ⚠, D-Zeilen der Dokumente und Σ – bis 2 kB
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+záložka „{0}“ z dřívějšího běhu použita znovu – obsah nahrazen (vlastní záložku dá volba „nový“)	Tab „{0}“ aus einem früheren Lauf wiederverwendet – Inhalt ersetzt (eigener Tab mit der Option „neu“)
+záložka „{0}“ je otevřená mimo textový běh – dokument je v nové záložce (volba „znovu“ použije otevřenou)	Tab „{0}“ ist außerhalb eines Textlaufs geöffnet – das Dokument steht in einem neuen Tab (Option „erneut“ verwendet den geöffneten)

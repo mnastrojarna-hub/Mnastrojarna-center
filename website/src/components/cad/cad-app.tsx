@@ -85,6 +85,7 @@ import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps } fro
 import { runScript } from "@/cad/engine/run";
 import { stableStep } from "@/cad/engine/files";
 import { formatConsole } from "@/cad/engine/protocol";
+import { checkProtocol, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
 import { makeAsmEnv } from "@/cad/engine/asm-env";
 import { presentStatusText } from "@/cad/engine/asm-status";
 import type { EngineHost } from "@/cad/engine/host";
@@ -677,10 +678,13 @@ export function CadApp() {
    * Textové rozhraní (AI agenti, automatizace): provede příkazy / JSON nad otevřeným dokumentem a vrátí protokol
    * + textový stav – smyčka je engine (cad/engine/run.ts), stejná jako v CLI `mncad` a `mncad serve`.
    */
-  const runAgentText = async (text: string, opts: { inPlace?: boolean } = {}): Promise<string> => {
+  const runAgentText = async (text: string, opts: { inPlace?: boolean } & RunApiOptions = {}): Promise<string> => {
     engineBusy.current++;
     try {
-      return formatConsole(await runScript(engineRef.current!.ws, text, engineRef.current!.host, { inPlace: opts.inPlace }));
+      const { ws, host } = engineRef.current!;
+      // protokol jako CLI (`protocol: "short" | "full" | "json"`, engine/run-protocol.ts); výchozí = text konzole beze změny
+      if (checkProtocol(opts.protocol) !== "console") return formatRun(await runReport(ws, text, host, { inPlace: opts.inPlace }), opts);
+      return formatConsole(await runScript(ws, text, host, { inPlace: opts.inPlace }));
     } finally {
       engineBusy.current--;
     }
@@ -852,7 +856,7 @@ export function CadApp() {
       missing: () => missingKeys(),
       guide: () => AGENT_GUIDE,
       commands: () => AGENT_COMMANDS.map((c) => c.cmd),
-      run: (text) => runAgentRef.current(text),
+      run: (text, o) => runAgentRef.current(text, o ? { protocol: o.protocol, budget: o.budget, notes: o.notes } : {}),
       getDocument: () => JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc,
       setDocument: (doc, o) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc), o?.inPlace ? { inPlace: true } : undefined),
       undo: (n) => runAgentRef.current(`zpět ${Math.max(1, Math.floor(Number(n) || 1))}`),
@@ -4027,7 +4031,7 @@ export function CadApp() {
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
         {shareOpen && <ShareDialog doc={doc} view={drawingOpen ? "drawing" : "model"} onClose={() => setShareOpen(false)} onFlash={flash} />}
         {shareAsk && <ShareCodeDialog key={`${shareAsk.value}|${shareAsk.error ?? ""}`} initial={shareAsk.value} error={shareAsk.error} onOpen={openShareInput} onClose={() => setShareAsk(null)} />}
-        {agentOpen && <AgentConsole onClose={() => setAgentOpen(false)} run={(t) => runAgentRef.current(t)} getDocJson={() => JSON.stringify(histRef.current.present, null, 1)} status={agentStatus} />}
+        {agentOpen && <AgentConsole onClose={() => setAgentOpen(false)} run={(t, o) => runAgentRef.current(t, o)} getDocJson={() => JSON.stringify(histRef.current.present, null, 1)} status={agentStatus} />}
         {sharePass && (
           <UiModal
             title={tr("Sdílený dokument je chráněný heslem")}

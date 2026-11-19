@@ -15,7 +15,8 @@ do 3D okna (výběr hran a ploch pravidlem).
    Otevřít, nebo přetažený do okna. Dává přístup ke **všem 36 typům prvků** včetně těch, které nemají textový příkaz
    (tažení, šablonování, úkos, plochy, plech, sestavy…).
 3. **JavaScript API `window.mncad`** (pro Playwright, Selenium, rozšíření prohlížeče, Claude in Chrome…):
-   `await window.mncad.run(text)` provede příkazy / JSON a vrátí protokol; `window.mncad.getDocument()` vrátí
+   `await window.mncad.run(text)` provede příkazy / JSON a vrátí protokol (`{ protocol: "short" }` = stručný protokol
+   MNCAD/1 jako CLI); `window.mncad.getDocument()` vrátí
    dokument; `await window.mncad.setDocument(docOrJson)` ho otevře v nové záložce (`{ inPlace: true }` = nahradí otevřený
    dokument jako jeden krok historie); `await window.mncad.undo(n)` / `redo(n)` / `history()` = historie Zpět / Znovu;
    `await window.mncad.status()` vrátí stav
@@ -41,7 +42,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 
 | Příkaz | Význam |
 | --- | --- |
-| `nový díl [název]` / `nová sestava [název]` | nový dokument v nové záložce |
+| `nový díl [název] [znovu|nový]` / `nová sestava [název] [znovu|nový]` | nový dokument v nové záložce; opakovaný běh použije záložku stejného názvu z dřívějšího běhu (ℹ `doc.reused`), `nový` = vždy nová záložka |
 | `název …`, `materiál …`, `barva #hex` | popis dokumentu |
 | `kvádr X Y Z [střed] [v x y z] [osa …] [odebrat|průnik|nové]` | kvádr; roh v poloze, „střed“ = poloha je střed kvádru; `osa` natočí osu Z kvádru |
 | `válec D H [v x y z] [osa X|Y|Z|-Z|x y z|hrana E3|plocha F2|"Osa 1"] [odebrat|průnik|nové]` | válec průměr × výška; poloha = střed podstavy, roste ve směru osy |
@@ -2306,6 +2307,22 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
 - Dokument vytvořený během (`nový díl`, `nová sestava`, JSON, normálie, `otevřít`) dostane **vlastní záložku** a nikdy
   nepřepíše jiný dokument – ani prázdnou sestavu z dřívějšího běhu konzole (prázdnou záložku znovu použije jen úvodní
   prázdný díl, do kterého žádný běh nezapsal). Skript lze tedy posílat po částech.
+- **Opakovaný běh téhož skriptu** (`window.mncad.run` dvakrát, konzole, CLI `--resume relace`) nezaloží druhou sadu
+  záložek: `nový díl "A"` / `nová sestava "A"` vezme záložku „A“ stejného druhu, kterou založil **dřívější běh**, nahradí
+  její obsah prázdným dokumentem (jeden krok historie – `zpět` ho vrátí) a ohlásí to (✓ „… – znovu použitá záložka“ a
+  ℹ `doc.reused`); stejné záložky, stejné objemy, žádné „Kvádr 2“. Záložka „A“, kterou běh nezaložil (otevřený soubor,
+  ruční práce, `--open`, jiná karta prohlížeče), zůstane beze změny – dokument jde do nové záložky (ℹ `doc.name-taken`). Volba na konci řádku:
+  `nový díl "A" nový` (EN `new`, DE `neu`) = vždy nová záložka, `nový díl "A" znovu` (EN `again`, DE `erneut`) =
+  převzít i záložku otevřenou mimo běh. V prohlížeči si aplikace záložky běhů pamatuje i po obnovení stránky v téže
+  kartě (jen jejich id v sessionStorage). Bez názvu (`nový díl`) je to vždy nový číslovaný dokument – pro opakovatelné skripty
+  **pojmenujte každý dokument** a začněte jím každý blok (příkazy bez `nový díl` se přidají do otevřeného dokumentu).
+- Každý dokument, který běh založil nebo změnil, má v CLI / HTTP i ve stručném protokolu prohlížeče řádek `D` s čísly
+  (`feat=`, `V=`, `m=`, `bbox=`) – díl se znovu nestaví, výsledek je z ověření dílu během; prázdný dokument běhu
+  (prázdná sestava) má řádek `D` také. Dokumenty dřívějších běhů relace beze změny se nestaví (`V=-`).
+- **Stručný protokol i v prohlížeči:** `await window.mncad.run(text, { protocol: "short" })` vrátí tentýž protokol MNCAD/1
+  jako `mncad run … --formats none` (≤ 2 kB, řádky D, Σ; liší se jen `t=`, `slow=`, `mem=`); `"full"` = plný protokol,
+  `"json"` = RunReport (s `full`), `budget` / `notes` jako `--budget` / `--notes`, výchozí (`"console"`) = text konzole.
+  Konzole Textové příkazy má přepínač **Stručný protokol** (pamatuje si ho).
 - `vložit "Díl"` a `výkres model "Díl"` berou **aktuální** dokument záložky (i změněný v dřívějším běhu) pod jeho
   aktuálním názvem; po `název "B"` už starý název neplatí.
 - Stav sestavy (řádek „Sestava: … obálka, objem Σ, hmotnost Σ“), stav vazeb, kusovník a kolize se počítají z dílů

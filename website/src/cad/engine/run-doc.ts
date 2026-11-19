@@ -51,7 +51,7 @@ export async function flush(ctx: OpCtx): Promise<void> {
   const r = runOf(ctx);
   if (!r.changed) return;
   if (r.openNew && !r.tabbed) {
-    await ctx.ws.openInTab(r.doc, r.docId ? { docId: r.docId } : {});
+    await ctx.ws.openInTab(r.doc, { ...(r.docId ? { docId: r.docId } : {}), made: true }); // záložka běhu – opakovaný běh ji použije znovu (engine/runs.ts)
     r.tabbed = true;
   } else ctx.ws.commit(r.doc);
   r.changed = false;
