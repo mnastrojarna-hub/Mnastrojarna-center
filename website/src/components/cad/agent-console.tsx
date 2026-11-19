@@ -13,6 +13,15 @@ import { Btn, Modal } from "./ui";
 /** poslední text a protokol přežijí zavření konzole (v rámci karty) */
 let lastText = "";
 let lastOutput = "";
+/** přepínač „Stručný protokol“ (MNCAD/1 jako CLI – engine/run-protocol.ts) – trvale v prohlížeči */
+const SHORT_KEY = "mn-cad-console-short";
+const loadShort = () => {
+  try {
+    return localStorage.getItem(SHORT_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
 
 const PLACEHOLDER = `Příkazy (jeden na řádek) nebo JSON dokumentu – například:
 nový díl Příruba DN50
@@ -28,8 +37,9 @@ stav`;
  * Konzole „Textové příkazy“: stejný CAD ovládaný textem – pro AI agenty, automatizaci i lidi.
  * Vstup = řádkové příkazy nebo JSON; výstup = protokol (✓/✗ s důvodem) a textový stav dokumentu.
  */
-export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: () => void; run: (text: string) => Promise<string>; getDocJson: () => string; status: () => Promise<string> }) {
+export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: () => void; run: (text: string, opts?: { protocol?: "short" }) => Promise<string>; getDocJson: () => string; status: () => Promise<string> }) {
   const [text, setText] = useState(lastText);
+  const [short, setShort] = useState(loadShort);
   const [out, setOut] = useState(lastOutput);
   const [busy, setBusy] = useState(false);
   const [help, setHelp] = useState(false);
@@ -48,7 +58,7 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
     setBusy(true);
     setNote(null);
     try {
-      const log = await run(t);
+      const log = await run(t, short ? { protocol: "short" } : undefined);
       setOut(log);
     } catch (e) {
       setOut(`✗ ${(e as Error).message}`);
@@ -168,6 +178,22 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
           >
             {out || tr("Zatím nic. Po „Provést“ se tu objeví řádek ✓ / ✗ pro každý příkaz a textový stav dokumentu (rozměry, objem, prvky) – zpětná vazba pro agenta bez obrázku.")}
           </pre>
+          <label className="mt-2 flex items-center gap-1.5 text-[12px] text-[#4a5664]" title={tr("Výstup jako stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB")}>
+            <input
+              type="checkbox"
+              data-agent-short
+              checked={short}
+              onChange={(e) => {
+                setShort(e.target.checked);
+                try {
+                  localStorage.setItem(SHORT_KEY, e.target.checked ? "1" : "0");
+                } catch {
+                  /* soukromé okno – přepínač platí jen do zavření */
+                }
+              }}
+            />
+            {tr("Stručný protokol")}
+          </label>
           <div className="mt-2 flex flex-wrap gap-2">
             <Btn disabled={!out} onClick={() => void copyText(out).then((ok) => flash(ok ? tr("Protokol zkopírován.") : tr("Kopírování se nezdařilo.")))}>
               {tr("Kopírovat protokol")}

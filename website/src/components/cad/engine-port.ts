@@ -11,7 +11,8 @@
  * Kolize) a tlačítko Kolize / přepočet vazeb v aplikaci zapisují pod klíčem zobrazeného dokumentu (cad-app.tsx).
  *
  * Nový dokument běhu použije prázdnou záložku jen tehdy, je-li to prázdný díl, do kterého žádný běh nezapsal (jako úvodní
- * prázdný díl `MemoryWorkspace`) – dokument dřívějšího běhu (i prázdná sestava) se nikdy nepřepíše (5.2 č. 14).
+ * prázdný díl `MemoryWorkspace`) – dokument dřívějšího běhu (i prázdná sestava) se nikdy nepřepíše (5.2 č. 14). Výjimkou je
+ * opakovaný běh `nový díl "A"`: záložku „A“, kterou založil běh, převezme (`namedTabs` / `claimTab`, engine/runs.ts).
  */
 import type { TabInfo } from "@/cad/agent-asm";
 import type { PartFaces } from "@/cad/asm-agent";
@@ -102,9 +103,15 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
    * (5.2 č. 14; prázdná sestava z dřívějšího běhu konzole zůstane)
    */
   const runTabs = new Set<string>();
+  /** záložky, které běh založil (`openInTab({ made })`) – opakovaný běh `nový díl "A"` je použije znovu (engine/runs.ts) */
+  const madeTabs = new Set<string>();
+  /** záložky tohoto běhu (založené nebo převzaté `claimTab`) a záložky, do kterých tento běh zapsal (řádky D) */
+  let claimed = new Set<string>();
+  let wrote = new Set<string>();
   let generation = 0;
   const remember = (d: CadDoc, tab: string) => {
     runTabs.add(tab);
+    wrote.add(tab);
     if (d.kind !== "assembly") made.set(d.name.toLowerCase(), d);
   };
   const asm: AsmCaches = {
@@ -134,11 +141,18 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
     mateStatus: new MirrorMap<Record<string, MateStatus>>((m) => get().asm.setMateStatus(m ?? {})),
     clash: new MirrorMap<{ res: Interference[]; at: string; comps?: number }>((c) => get().asm.setClash(c ? { res: c.res, at: c.at, comps: c.comps ?? 0 } : null)),
   };
+  const activate = async (id: string): Promise<CadDoc> => {
+    get().activateTab(id);
+    settled(await get().settle(() => get().tabId() === id));
+    return get().hist().present;
+  };
   return {
     asm,
     beginRun() {
       made = new Map();
       committed = null;
+      claimed = new Set();
+      wrote = new Set();
     },
     present: () => get().hist().present,
     commit(d) {
@@ -160,6 +174,9 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
       const reuse = o.reuseEmpty !== false && !runTabs.has(before) && isPartDoc(g.hist().present);
       const id = g.openDocInTab(d, { reuse, ...(o.docId ? { docId: o.docId } : {}) });
       remember(d, id);
+      claimed.add(id);
+      if (o.made) madeTabs.add(id);
+      else madeTabs.delete(id); // prázdná úvodní záložka znovu použitá dokumentem, který běh nezaložil
       settled(
         await get().settle(() => {
           const n = get();
@@ -169,11 +186,7 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
       return { id, reused: id === before };
     },
     tabs: () => get().tabList(),
-    async activate(id) {
-      get().activateTab(id);
-      settled(await get().settle(() => get().tabId() === id));
-      return get().hist().present;
-    },
+    activate,
     async close(id) {
       get().closeTab(id);
       settled(await get().settle(() => get().tabId() !== id && !get().docTabs().some((t) => t.id === id)));
@@ -193,6 +206,19 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
     listDocs: () => [...[...made.values()].map((x) => ({ title: x.name, doc: x })), ...get().docTabs().filter((t) => t.kind !== "drawing").map((t) => ({ title: t.title, doc: t.hist.present }))],
     freshName: (base) => get().freshName(base),
     docKey: (id) => get().docKey(id),
+    docOf: (id) => get().docTabs().find((t) => t.id === id && t.kind !== "drawing")?.hist.present ?? null,
+    namedTabs(name, kind) {
+      const key = name.trim().toLowerCase();
+      return get()
+        .docTabs()
+        .filter((t) => (kind === "assembly" ? t.kind === "assembly" : isPart(t)) && t.title.trim().toLowerCase() === key)
+        .map((t) => ({ id: t.id, made: madeTabs.has(t.id), claimed: claimed.has(t.id) }));
+    },
+    async claimTab(id) {
+      claimed.add(id);
+      return activate(id);
+    },
+    runDocKeys: () => [...wrote].map((t) => get().docKey(t)).filter(Boolean),
     save() {
       const tabs = get().docTabs().filter((t) => t.kind !== "drawing");
       const active = Math.max(0, tabs.findIndex((t) => t.id === get().tabId()));

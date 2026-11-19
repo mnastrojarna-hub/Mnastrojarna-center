@@ -194,3 +194,81 @@ describe("přepnutí záložky, které se nepromítne (5.2 č. 22, balík B4)", 
     expect(r.entries.filter((e) => e.level === "error").map((e) => `${e.line} ${e.code}`), JSON.stringify(r.entries)).toContain("3 tab.settle-timeout");
   });
 });
+
+/* ───────── vlna E, balík runs: opakovaný běh a stručný protokol v aplikaci (engine/runs.ts, engine/run-protocol.ts) ───────── */
+const THREE = 'nový díl "Deska"\nkvádr 100 50 10\nnový díl "Čep"\nválec 5 30\nnová sestava "S"\nvložit "Deska" v 0 0 0\nvložit "Čep" v 20 20 10';
+
+describe("aplikace: opakovaný běh téhož skriptu = stejné záložky (jako MemoryWorkspace)", () => {
+  it("3 dokumenty dvakrát → Deska, Čep, S; ℹ doc.reused v konzoli; aplikace = MemoryWorkspace", async () => {
+    const r = await both([THREE, THREE]);
+    expect(titles(r.aws)).toEqual(["Deska", "Čep", "S"]);
+    expect(titles(r.mws)).toEqual(["Deska", "Čep", "S"]);
+    expect(r.a[1]).toMatch(/✓ nová sestava „S“ – znovu použitá záložka z dřívějšího běhu\nℹ řádek 5: záložka „S“ z dřívějšího běhu použita znovu/);
+    expect(r.a).toEqual(r.m);
+    // sestava 2. běhu: dvě komponenty z dílů 2. běhu (findPart bere převzatou záložku jako dokument běhu)
+    expect(r.aws.present().components?.map((c) => c.name)).toEqual(["Deska", "Čep"]);
+  });
+  it("záložka otevřená mimo běh se nepřepíše (nová záložka + ℹ doc.name-taken); `znovu` ji převezme; `nový` = nová záložka", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(app.deps);
+    app.openDocInTab({ ...emptyDoc("U"), features: [{ id: "u1", name: "Kvádr 1", type: "box", size: [5, 5, 5], position: [0, 0, 0], centered: false, mode: "new" }] as CadDoc["features"] }, {});
+    const r1 = await runScript(ws, 'nový díl "U"\nkvádr 1 1 1', host);
+    expect(titles(ws)).toEqual(["U", "U"]);
+    expect(r1.entries.filter((e) => e.code === "doc.name-taken")).toHaveLength(1);
+    await runScript(ws, 'nový díl "U" nový\nkvádr 1 1 1', host);
+    expect(titles(ws)).toEqual(["U", "U", "U"]);
+    const app2 = new FakeApp();
+    const ws2 = makeAppWorkspace(app2.deps);
+    app2.openDocInTab({ ...emptyDoc("V"), features: [{ id: "v1", name: "Kvádr 1", type: "box", size: [5, 5, 5], position: [0, 0, 0], centered: false, mode: "new" }] as CadDoc["features"] }, {});
+    const r2 = await runScript(ws2, 'nový díl "V" znovu\nkvádr 1 1 1', host);
+    expect(titles(ws2)).toEqual(["V"]);
+    expect(r2.entries.filter((e) => e.code === "doc.reused")).toHaveLength(1);
+    expect(ws2.present().features.map((f) => f.id)).not.toContain("v1");
+  });
+});
+
+describe("aplikace: stručný protokol (window.mncad.run protocol short) = CLI --formats none", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { setHostAssets } = await import("@/cad/host-assets");
+  const { makeKernelClient } = await import("@/cad/kernel-client");
+  const { inProcessTransport } = await import("@/cad/kernel-inprocess");
+  const { engineRun, finishRun } = await import("@/cad/cli/job");
+  const { scriptLines } = await import("@/cad/cli/watchdog");
+  const { ReportBuilder, finalizeReport } = await import("@/cad/engine/protocol");
+  const { formatRun, runReport } = await import("@/cad/engine/run-protocol");
+  const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
+  setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.resolve(__dirname, "../../../public/fonts", name))).buffer });
+  const real = makeKernelClient(inProcessTransport({ locateFile: (file) => (file.endsWith(".wasm") ? WASM : file) }));
+  await real.init();
+  const realHost = (): EngineHost => ({ kernel: real, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
+  const noHooks = { opStart: () => undefined, opEnd: () => undefined };
+  const cli = async (script: string) => {
+    const ws = new MemoryWorkspace();
+    const h = realHost();
+    const rb = new ReportBuilder({ lang: "cs", lines: scriptLines(script), strict: false });
+    await engineRun(ws, script, h, rb, { strict: false, open: [] }, noHooks);
+    const fin = await finishRun(ws, h, rb, { formats: "none", allDocs: false, noOutputOnError: false, share: false, strict: false }, noHooks);
+    return finalizeReport(rb.finish({ docs: fin.docs, files: [] })).protocol;
+  };
+  const strip = (s: string) => s.replace(/ t=[\d.]+/g, "").replace(/ slow=\S+/g, "").replace(/ mem=\d+MB/g, "");
+  it("skripty 1–3 dokumentů, s chybou, se stavem a kolizemi, prázdná sestava, přísný režim: protokol prohlížeče = CLI", async () => {
+    const scripts = [THREE, `${THREE}\nkolize\nstav`, "nový díl A\nkvádr 10 10 10\nzaoblit 50 hrany svislé\nnový díl B\nválec 5 10", 'nová sestava "E"', 'přísně\nnový díl P\nkvádr 10 10 10\ndíra 3 hloubka 2 v 5 5\nblbost'];
+    for (const script of scripts) {
+      const app = new FakeApp();
+      const web = formatRun(await runReport(makeAppWorkspace(app.deps), script, realHost()), { protocol: "short" });
+      expect(strip(web), script).toBe(strip(await cli(script)));
+      expect(web.length).toBeLessThanOrEqual(2048);
+    }
+  }, 600_000);
+  it("opakovaný běh v aplikaci: řádky D a objemy obou běhů stejné", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(app.deps);
+    const d1 = formatRun(await runReport(ws, THREE, realHost()), { protocol: "full" }).split("\n").filter((l) => l.startsWith("D "));
+    const d2 = formatRun(await runReport(ws, THREE, realHost()), { protocol: "full" }).split("\n").filter((l) => l.startsWith("D "));
+    expect(d1).toHaveLength(3);
+    expect(d1[0]).toBe('D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10');
+    expect(d2).toEqual(d1);
+    expect(titles(ws)).toEqual(["Deska", "Čep", "S"]);
+  }, 240_000);
+});

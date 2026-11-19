@@ -27,20 +27,14 @@ import { docHasContent } from "../draft/doc";
 import { exportDrawing } from "../drawing-export";
 import type { DrawingCompute } from "../drawing-agent";
 import { setLang, tr, type CadLang } from "../i18n";
-import { MATERIALS } from "@/lib/mesh-metrics";
 import { emptyDoc, type CadDoc, type Feature } from "../types";
-import { sourceKey } from "../assembly";
-import { flattenLeaves } from "../asm-flatten";
-import { CODE_RE, codeEntry, type Code, type CodeEntryInit } from "../engine/codes";
-import { clashStale } from "../clash-class";
-import { checkClashes, clashFindings } from "../engine/ops/clash";
+import { CODE_RE, codeEntry } from "../engine/codes";
 import { memoryFileSink, memoryFileSource, MissingInputError, OutPathError, safeFileName, type EngineHost, type FileSink, type MemoryFiles, type OutWrite } from "../engine/host";
 import { MemoryWorkspace, loadWorkspace } from "../engine/memory-workspace";
-import { asmStatus } from "../engine/asm-status";
-import { matesCount } from "../engine/kv";
 import { readDocument } from "../engine/open-file";
 import { ReportBuilder } from "../engine/protocol";
 import { opLabel, runInto } from "../engine/run";
+import { docSummaries, pickMain, summarize, workspaceDocs, type DocItem } from "../engine/run-summary";
 import { verifyKeyOf } from "../engine/verify";
 import { hostAssets, setHostAssets } from "../host-assets";
 import { selfStoreBase } from "../share";
@@ -56,6 +50,8 @@ import { makeKernelClient, type KernelClient } from "../kernel-client";
 import { inProcessTransport, type InProcessTransport } from "../kernel-inprocess";
 
 export { strictStopper, opLabel };
+// souhrny dokumentů (řádky D) jsou od vlny E v enginu – sdílí je prohlížeč (engine/run-summary.ts)
+export { pickMain, summarize, workspaceDocs, type DocItem };
 
 /* ───────────────────────── zprávy hlídač ↔ vlákno ───────────────────────── */
 
@@ -192,28 +188,6 @@ export const engineRun: JobRunner = async (ws, text, host, rb, o, hooks) => {
 
 /* ───────────────────────── dokumenty, výstupy, sdílení ───────────────────────── */
 
-type DocItem = { id: string; doc: CadDoc; key?: string };
-const docKind = (d: CadDoc): DocSummary["kind"] => (d.kind === "assembly" ? "assembly" : d.kind === "draft" ? "draft" : "part");
-
-/** dokumenty všech záložek (aktivní záložka se obnoví) */
-export async function workspaceDocs(ws: Workspace): Promise<{ items: DocItem[]; activeId: string | null }> {
-  const tabs = ws.tabs();
-  const activeId = tabs.find((t) => t.active)?.id ?? null;
-  const items: DocItem[] = [];
-  for (const t of tabs) items.push({ id: t.id, doc: await ws.activate(t.id), key: ws.docKey(t.id) });
-  if (activeId) await ws.activate(activeId);
-  return { items, activeId };
-}
-
-/** hlavní dokument (kap. 3.1): `--doc`, jinak poslední sestava, jinak aktivní dokument */
-export function pickMain(items: DocItem[], activeId: string | null, name?: string): DocItem | null | "missing" {
-  if (name) {
-    const f = name.trim().toLowerCase();
-    return items.find((x) => x.doc.name.trim().toLowerCase() === f) ?? "missing";
-  }
-  return [...items].reverse().find((x) => x.doc.kind === "assembly" && docHasContent(x.doc)) ?? items.find((x) => x.id === activeId) ?? items[items.length - 1] ?? null;
-}
-
 /**
  * formáty k zápisu pro dokument (rozhodnutí 15.7): `auto` = STEP dílu/sestavy + .mncad + jedno PDF všech listů, má-li
  * výkres dokument nebo díl v jeho komponentách (engine/files.ts `hasDrawings`)
@@ -227,125 +201,6 @@ export function formatsFor(d: CadDoc, f: Formats): OutFormat[] {
 
 const b64 = (s: string) => new Uint8Array(Buffer.from(s, "base64"));
 
-type BuildOutcome = { summary: DocSummary; built: boolean };
-
-/**
- * Závěrečná stavba a souhrn dokumentu (řádek D). Díl se postaví v jádře; u sestavy se díly komponent postaví před
- * souhrnem (`asmStatus` → `ensureLeaves`, engine/asm-status.ts): objem Σ (V.sum), hmotnost, obálka a stav vazeb z běhu.
- */
-export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: ReportBuilder, build: boolean, ws?: Workspace, key?: string): Promise<BuildOutcome> {
-  const s: DocSummary = { ref: d.name, name: d.name, kind: docKind(d) };
-  if (d.drawings?.length) s.sheets = d.drawings.length;
-  if (s.kind === "assembly") {
-    s.components = d.components?.length ?? 0;
-    s.parts = new Set((d.components ?? []).map((c) => sourceKey(c.source))).size;
-    if (ws && s.components > 0)
-      try {
-        // stav vazeb a kolize pod klíčem dokumentu záložky (přejmenování ho nezmění); chybějící stav vazeb se přepočítá
-        const st = await asmStatus(ws, kernel, d, key !== undefined ? { key } : {});
-        if (st?.volume != null) s.volume_mm3 = st.volume;
-        if (st?.massKg != null) s.mass_kg = st.massKg;
-        // obálka přesně z jádra (asmStatus → engine/asm-box.ts; zkouška 959: rohy lokálních obálek natočených dílů ji zvětšily o 3 mm)
-        if (st?.bbox) s.bbox = st.bbox;
-        reportLeafParts(d, ws, rb);
-        const m = matesCount(d, st?.mates);
-        if (m) s.mates = m;
-        // třídy kolizí z poslední kontroly kolizí sestavy (`kolize`, `kontrola sestava`) – řádek D i Σ; objem sjednocení
-        // V.union = V.sum − průniky dvojic (rozhodnutí 15.1; přesné, nepřekrývají-li se v jednom místě tři komponenty).
-        // Změnila-li se sestava po kontrole (vložená / posunutá komponenta…), výsledek se pro konečný stav přepočítá
-        // (mezipaměť dvojic v jádře – počítají se jen změněné dvojice) a jeho ⚠ jdou do protokolu: D, Σ i --strict tak
-        // vždy odpovídají odevzdávané sestavě (ℹ clash.rechecked s řádkem původní kontroly).
-        const ckey = key ?? ws.docKey();
-        let ck = ws.asm.clash.get(ckey);
-        if (ck && clashStale(ck, d)) {
-          const was = ck.line;
-          const { list, res } = await checkClashes(ws, kernel, d, ckey, was ?? null);
-          rb.code("clash.rechecked", { doc: d.name, args: [was ? `L${was}` : "-"] });
-          const emit = (c: Code, o: CodeEntryInit) => void rb.code(c, { ...o, doc: d.name });
-          clashFindings({ coded: emit, quiet: emit }, d, list, res);
-          ck = ws.asm.clash.get(ckey);
-        }
-        const cl = ck?.classes;
-        if (cl) s.clashes = { total: cl.total, thread: cl.thread, underhead: cl.underhead, real: cl.real, undetermined: cl.undetermined };
-        if (cl && s.volume_mm3 !== undefined) s.volume_union_mm3 = s.volume_mm3 - ck!.res.reduce((a, x) => a + x.volume, 0);
-      } catch (e) {
-        rb.code("build.failed", { doc: d.name, args: [errText(e)] });
-        return { summary: s, built: false };
-      }
-    return { summary: s, built: true };
-  }
-  if (s.kind === "draft" || !build) return { summary: s, built: s.kind === "draft" };
-  if (!d.features.length) {
-    s.features = { ok: 0, warn: 0, error: 0 };
-    return { summary: s, built: false };
-  }
-  try {
-    const res = await kernel.build(d);
-    const names = new Map(d.features.map((f) => [f.id, f.name]));
-    // výsledek prvku, který už ohlásil běh skriptu (s řádkem prvku), se ze závěrečné stavby neopakuje
-    const seen = new Set(rb.entries.map((e) => `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`));
-    const report = (code: "feature.failed" | "feature.warning", args: string[]) => {
-      const e = codeEntry(code, { doc: d.name, args });
-      if (!seen.has(`${e.code}\u0000${e.doc}\u0000${e.text}`)) rb.add(e);
-    };
-    let ok = 0;
-    let warn = 0;
-    let error = 0;
-    for (const st of res.status) {
-      if (!st.ok) {
-        error++;
-        report("feature.failed", [names.get(st.id) ?? st.id, st.error ?? ""]);
-      } else if (st.warning) {
-        warn++;
-        report("feature.warning", [names.get(st.id) ?? st.id, st.warning]);
-      } else ok++;
-    }
-    for (const pe of res.paramErrors ?? []) rb.code("build.failed", { doc: d.name, args: [pe] });
-    s.features = { ok, warn, error };
-    if (res.metrics) {
-      s.volume_mm3 = res.metrics.volume;
-      s.bbox = res.metrics.bbox;
-      const mt = MATERIALS.find((m) => m.id === d.material);
-      if (mt) {
-        s.density = mt.density;
-        s.mass_kg = (res.metrics.volume / 1e6) * mt.density;
-      }
-    }
-    const built = !!res.metrics && error === 0 && !(res.paramErrors?.length);
-    if (!built && !error) rb.code("build.failed", { doc: d.name, args: [tr("model nemá těleso")] });
-    return { summary: s, built };
-  } catch (e) {
-    rb.code("build.failed", { doc: d.name, args: [errText(e)] });
-    return { summary: s, built: false };
-  }
-}
-
-/**
- * ⚠/✗ prvků dílů komponent sestavy ze stavby listů (`ensureLeaves` → `ws.asm.cache`): sestava otevřená z JSON / `--open`
- * nebo relace jinak své díly jen sečte (zkouška 959: osmkrát „neplatná geometrie“ u jednoho dílu, přesto --strict prošel).
- * Jeden záznam na prvek a díl (stejný díl ve více komponentách jednou); co už ohlásil běh skriptu na řádku prvku, se
- * neopakuje. Stručný protokol hlášky dílu se stejným textem sloučí (protocol.ts `mergeSimilar`).
- */
-function reportLeafParts(d: CadDoc, ws: Workspace, rb: ReportBuilder): void {
-  const seen = new Set(rb.entries.map((e) => `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`));
-  const done = new Set<string>();
-  for (const l of flattenLeaves(d)) {
-    if (done.has(l.key) || l.comp.source.kind !== "part") continue;
-    done.add(l.key);
-    const pd = l.comp.source.doc;
-    const status = ws.asm.cache.get(l.key)?.status ?? [];
-    const names = new Map(pd.features.map((f) => [f.id, f.name]));
-    for (const st of status) {
-      if (st.ok !== false && !st.warning) continue;
-      const failed = st.ok === false;
-      const e = codeEntry(failed ? "feature.failed" : "feature.warning", { doc: pd.name || l.comp.name, args: [names.get(st.id) ?? st.id, (failed ? st.error : st.warning) ?? ""] });
-      const k = `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      rb.add(e);
-    }
-  }
-}
 
 export type OutputPolicy = { formats: Formats; allDocs: boolean; doc?: string; noOutputOnError: boolean; share: JobRequest["share"]; strict?: StrictOpt };
 
@@ -411,17 +266,10 @@ export async function finishRun(ws: Workspace, host: EngineHost, rb: ReportBuild
   const wanted = p.allDocs ? items : mainItem ? [mainItem] : [];
   const targets = wanted.filter((x) => docHasContent(x.doc));
   const targetIds = new Set(targets.map((x) => x.id));
-  const docs: DocSummary[] = [];
-  const built = new Map<string, boolean>();
   hooks.opStart(null, "build");
   const t0 = Date.now();
-  for (const it of items) {
-    if (!docHasContent(it.doc) && it.id !== mainItem?.id) continue; // prázdný úvodní díl relace se nehlásí
-    const o = await summarize(it.doc, host.kernel, rb, targetIds.has(it.id), ws, it.key);
-    if (it.id === mainItem?.id) o.summary.main = true;
-    built.set(it.id, o.built);
-    docs.push(o.summary);
-  }
+  // řádky D: hlavní dokument, --all-docs a každý dokument, který běh založil nebo změnil (engine/run-summary.ts)
+  const { docs, built } = await docSummaries(ws, host.kernel, rb, items, mainItem, targetIds);
   // vyžádané výstupy prázdného dokumentu: nikdy tiše (zpráva agenta, bod 3 „tiše zahodí prázdnou sestavu“)
   if (!rb.stopped)
     for (const it of wanted) {

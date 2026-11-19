@@ -58,7 +58,7 @@ export interface Workspace {
    * Otevře dokument – vždy `normalizeDraftDoc(internBlobs(d))`. Prázdná záložka se znovu použije jen pro úvodní prázdný díl
    * relace (`reuseEmpty`, výchozí true), nikdy pro dokument vytvořený během (5.2 č. 14).
    */
-  openInTab(d: CadDoc, o?: { docId?: string; reuseEmpty?: boolean }): Promise<{ id: DocKey; reused: boolean }>;
+  openInTab(d: CadDoc, o?: { docId?: string; reuseEmpty?: boolean; /** dokument založil běh skriptu (`flush`) – opakovaný běh záložku použije znovu */ made?: boolean }): Promise<{ id: DocKey; reused: boolean }>;
   tabs(): TabInfo[];
   activate(id: DocKey): Promise<CadDoc>;
   close(id: DocKey): Promise<CadDoc>;
@@ -91,6 +91,18 @@ export interface Workspace {
    * Nepromítne-li se, vyhodí CodedError `tab.settle-timeout`.
    */
   settle?(): Promise<void>;
+  /* ── opakovaný běh (balík runs – engine/runs.ts): záložky běhů, dokumenty běhu bez přepnutí záložky ── */
+  /** dokument záložky `id` bez přepnutí záložky (souhrny dokumentů – řádky D); neznámá záložka → null */
+  docOf?(id: DocKey): CadDoc | null;
+  /**
+   * záložky dílu / sestavy s názvem `name` (bez ohledu na velikost písmen) v pořadí záložek: `made` = založil ji běh skriptu
+   * (`openInTab({ made })`, i v dřívější relaci), `claimed` = patří už tomuto běhu (založil ji nebo převzal `claimTab`)
+   */
+  namedTabs?(name: string, kind: "part" | "assembly"): { id: DocKey; made: boolean; claimed: boolean }[];
+  /** záložku `id` převezme tento běh (`nový díl "A"` podruhé): aktivuje ji; `findPart` ji pak bere jako dokument běhu */
+  claimTab?(id: DocKey): Promise<CadDoc>;
+  /** klíče dokumentů (`docKey`), které tento běh založil nebo změnil (`openInTab` / `commit` od `beginRun`) */
+  runDocKeys?(): DocKey[];
 }
 
 /** nejvíc kroků zpět na záložku (jako aplikace: cad-app.tsx `commit`) */
