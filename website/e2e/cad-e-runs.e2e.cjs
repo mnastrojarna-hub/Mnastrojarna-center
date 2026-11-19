@@ -101,6 +101,17 @@ const start = async (p, url) => {
   const k2 = await tabs();
   ok(JSON.stringify(k1) === JSON.stringify(k2) && k2.length === 5, `1: konzole Provést dvakrát → stejné záložky (${k2.join(', ')})`);
   ok(/znovu použitá záložka/.test(ko2) && !/^✗/m.test(ko2), '1: konzole ohlásí převzetí záložky, žádné ✗');
+  // změněný obsah se do převzaté záložky opravdu zapíše, i když hned následuje další dokument (zápis před přepnutím záložky)
+  const kst = await run('záložka "Konzolový"\nstav');
+  ok(/Rozměry: 30 × 20 × 11 mm/.test(kst), `1: převzatá záložka „Konzolový“ má nový obsah 30 × 20 × 11 (${(/Rozměry: [^(]+/.exec(kst) || [''])[0]})`);
+  await run('nový díl "R1"\nkvádr 10 10 10\nnový díl "R2"\nkvádr 5 5 5');
+  const rr = await run('nový díl "R1"\nkvádr 20 20 20\nválec 3 30 v 10 10 0\nnový díl "R2"\nkvádr 6 6 6', { protocol: 'full' });
+  const r1 = await run('záložka "R1"\nstav');
+  ok(!/^✗/m.test(rr) && /prvků 2 /.test(r1) && /Rozměry: 20 × 20 × 30 mm/.test(r1), `1: opakovaný běh se změněným obsahem → R1 má 2 prvky 20 × 20 × 30 (${(/Rozměry: [^(]+/.exec(r1) || [''])[0]})`);
+  const ab = await run('záložka "R1"\nválec 2 40 v 5 5 0\nzáložka "R2"');
+  const r1b = await run('záložka "R1"\nstav');
+  ok(!/^✗/m.test(ab) && /prvků 3 /.test(r1b), `1: úprava dílu a hned \`záložka\` jinam → úprava zůstane (${(/prvků \d+/.exec(r1b) || [''])[0]})`);
+  await run('zavřít záložku "R1"\nzavřít záložku "R2"');
 
   // ════════════ 3) stručný protokol: přepínač konzole ════════════
   const sw = p.locator('[data-agent-short]');

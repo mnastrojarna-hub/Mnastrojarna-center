@@ -170,7 +170,18 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
     mateStatus: new MirrorMap<Record<string, MateStatus>>((m) => get().asm.setMateStatus(m ?? {}), background),
     clash: new MirrorMap<{ res: Interference[]; at: string; comps?: number }>((c) => get().asm.setClash(c ? { res: c.res, at: c.at, comps: c.comps ?? 0 } : null), background),
   };
+  /**
+   * Poslední zápis do historie aktivní záložky se promítne až po vykreslení. Přepnutí nebo otevření záložky bere snímek
+   * záložek ze stavu PŘED vykreslením – bez počkání by zápis do opuštěné záložky zahodilo (`záložka "B"` hned po úpravě
+   * dílu A, opakovaný běh `nový díl "A"` → další dokument), proto se před každým přepnutím počká na jeho promítnutí.
+   */
+  const settlePending = async () => {
+    const d = committed;
+    committed = null;
+    if (d) settled(await get().settle(() => get().hist().present === d));
+  };
   const activate = async (id: string): Promise<CadDoc> => {
+    await settlePending();
     get().activateTab(id);
     settled(await get().settle(() => get().tabId() === id));
     return get().hist().present;
@@ -190,13 +201,10 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
       remember(d, g.tabId());
       committed = d;
     },
-    async settle() {
-      // poslední zápis do historie aktivní záložky se promítne až po vykreslení (openInTab čeká sám)
-      const d = committed;
-      committed = null;
-      if (d) settled(await get().settle(() => get().hist().present === d));
-    },
+    // konec běhu: další volání API hned za sebou musí vidět poslední zápis (openInTab na svou záložku čeká sám)
+    settle: settlePending,
     async openInTab(d, o = {}) {
+      await settlePending(); // zápis do opouštěné záložky nejdřív do stavu aplikace (viz `settlePending`)
       const g = get();
       const before = g.tabId();
       // prázdná aktivní záložka jen tehdy, je-li to prázdný díl, do kterého žádný běh nezapsal (úvodní díl aplikace)
@@ -218,6 +226,7 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
     tabs: () => get().tabList(),
     activate,
     async close(id) {
+      await settlePending();
       get().closeTab(id);
       settled(await get().settle(() => get().tabId() !== id && !get().docTabs().some((t) => t.id === id)));
       return get().hist().present;

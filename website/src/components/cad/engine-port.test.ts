@@ -307,3 +307,59 @@ describe("aplikace: stručný protokol (window.mncad.run protocol short) = CLI -
     expect(titles(ws)).toEqual(["Deska", "Čep", "S"]);
   }, 240_000);
 });
+
+/* ───────── zápis se promítne až po vykreslení (React): přepnutí záložky hned po zápisu ho nesmí zahodit ───────── */
+/**
+ * Aplikace jako React: `commit` (setHist s funkcí) a přepnutí záložky (`activateTab`) se ve stavu projeví až „vykreslením“
+ * (`settle`); přepnutí si ale snímek záložek bere hned ze stavu před vykreslením – jako cad-app.tsx `snapshotTabs(histRef)`.
+ */
+function lazyDeps(app: FakeApp): () => AppPortDeps {
+  const queue: (() => void)[] = [];
+  const render = () => {
+    for (const f of queue.splice(0)) f();
+  };
+  return () => ({
+    ...app.deps(),
+    commit: (d) => void queue.push(() => app.commit(d)),
+    activateTab: (id) => {
+      const snap = app.snapshot(); // snímek ze stavu před vykreslením (aktivní záložka s historií z posledního vykreslení)
+      queue.push(() => {
+        const t = snap.find((x) => x.id === id);
+        if (!t) return;
+        app.list = snap;
+        app.hist = t.hist;
+        app.docId = t.docId;
+        app.tabId = id;
+      });
+    },
+    settle: async (ok) => {
+      render();
+      return ok();
+    },
+  });
+}
+const featsOf = (app: FakeApp, title: string) => app.snapshot().find((t) => t.title === title)?.hist.present.features.map((f) => f.type);
+
+describe("zápis do záložky před přepnutím (aplikace vykresluje až po běhu operace)", () => {
+  it("`záložka \"B1\"` hned po úpravě dílu A1 – úprava A1 zůstane (dřív se tiše zahodila)", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(lazyDeps(app));
+    await runScript(ws, 'nový díl "A1"\nkvádr 10 10 10\nnový díl "B1"\nkvádr 5 5 5', host);
+    const r = await runScript(ws, 'záložka "A1"\nválec 5 30\nzáložka "B1"', host);
+    expect(r.counts.errors).toBe(0);
+    expect(featsOf(app, "A1")).toEqual(["box", "cylinder"]);
+    expect(app.hist.present.name).toBe("B1");
+  });
+  it("opakovaný běh se změněným obsahem: převzatá záložka R1 má nový obsah, i když hned následuje další dokument", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(lazyDeps(app));
+    await runScript(ws, 'nový díl "R1"\nkvádr 10 10 10\nnový díl "R2"\nkvádr 5 5 5', host);
+    const r = await runScript(ws, 'nový díl "R1"\nkvádr 20 20 20\nválec 3 30\nnový díl "R2"\nkvádr 6 6 6\nnová sestava "S"\nvložit "R1"\nvložit "R2"', host);
+    expect(r.counts.errors).toBe(0);
+    expect(titles(ws)).toEqual(["R1", "R2", "S"]);
+    expect(featsOf(app, "R1")).toEqual(["box", "cylinder"]);
+    const box = app.snapshot().find((t) => t.title === "R1")!.hist.present.features[0] as { size: number[] };
+    expect(box.size).toEqual([20, 20, 20]);
+    expect((app.snapshot().find((t) => t.title === "R2")!.hist.present.features[0] as { size: number[] }).size).toEqual([6, 6, 6]);
+  });
+});
