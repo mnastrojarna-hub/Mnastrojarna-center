@@ -1,0 +1,34 @@
+=== run 1 ===
+# Tahák pro AI agenty – Mnástrojárna CAD
+Celý návod: https://www.mnastrojarna.cz/cad/schema-pro-ai.md · hledání: `nápověda hledat záložky` · pole prvku: `prvek nápověda díra`
+Bez prohlížeče: `mncad run skript.txt --out out` (`--strict`, `--formats step,pdf`, `--json`; Node 22, /cad/cli/) · v prohlížeči `await window.mncad.run(text)`
+Protokol MNCAD/1: ✗ chyba · ⚠ varování · ℹ poznámka · = výpis · D dokument · F soubor · O odkaz. mm a °, Z nahoru, `#` komentář, řádky a JSON lze míchat.
+## Dokumenty a záložky
+`nový díl "Deska"` · `nová sestava "Nástroj"` · `záložky` · `záložka "Deska"` · `zavřít záložku` – každý díl = záložka; sestava vkládá jen otevřené záložky (další vložení = další instance).
+Velká sestava: všechny díly jako bloky `nový díl "…"` → `nová sestava "…"` → `vložit "Deska" v 100 0 0` pro každou instanci → `sestava` (výpis komponent, počet) → `kusovník` (kusy podle zdroje).
+## Díl
+`kvádr 100 60 12` · `válec 20 30 v 50 30 12` · `skica XY: obdélník 60 40; kružnice 20 v 10 5` → `vysunout 10 odebrat` · `rotovat 360 osa Y`
+`zaoblit 2 hrany svislé` · `srazit 1 hrany horní` · `pole 4 rozteč 25 směr X` · `pole kruhové 6 osa Z` · `zrcadlit YZ` · `materiál ocel` · `normálie M8x30`
+Skica: `vazba vodorovně e1; kolmo e1 e2` · `kóta délka e1 50` · úpravy: `upravit "Kvádr 1" size=120;60;12` · `potlačit "Zaoblení 1"` · `smazat poslední` · `proměnná t = 12` · `zpět`
+## Díry a závity
+`díra 8,5 skrz v 20 30` · `díra závit M8 hloubka 20 v 50 30` · `díra 6,8 skrz v 10 10 zahloubení 11 6,5` · `díra 10 hloubka 12 dno ploché v 40 20` · `závit M18×1,5 délka 20 v 0 0 12 vnitřní`
+## Sestava
+`vložit "Deska" v 0 0 0 ukotvit jako "D1"` · `vložit "Čep" v 20 30 12 jako "K48"` · `sestava plochy "K48"` · `sestava vazba souosost "K48" Ø10 "D1" Ø10` · `sestava vazba kontakt "K48" -Z "D1" horní` · `sestava vazby` · `sestava komponenta "K48" přezdívka "Čep A"` · `kolize` · `kusovník`
+## Pružiny
+`pružina tlačná d 2 De 20 L0 50 n 8` (díl z tabulky) · `sestava pružina nová d 2 De 20 L0 35 n 6 mezi "D1" Ø21 "K48" spodní` (na konci „do děr vzoru“ = do všech děr vzoru) · `sestava pružiny` · `sestava šroub "D1" Ø9`
+## Pohyb
+`pohyb motor lineární vazba 2 0..40 krok 2 kolize` · `pohyb motor rotační "K48" 0..360 krok 5` · `pohyb dynamika čas 0,5 gravitace -Z` · `pohyb hmotnost "K48" 2,5` · `pohyb stav`
+## Výkres
+`výkres A3 měřítko 1:2 pohledy přední,horní,iso` · `výkres řez XZ` · `kótovat chytře funkční 26,5` · `výkres tolerance 26,5 h7` · `výkres razítko šablona=iso7200 číslo="MN-1"` · `výkres nepředepsané ISO 2768-mK` · `výkres kusovník ano` · `výkres detail přední v 45 10 poloměr 5` · `výkres stav` · `výkres export pdf vše`
+## 2D výkres
+`2d nový "Profil"` · `2d čára 0,0 100,0 @0,50` · `2d kružnice 50,25 20` · `2d export dwg`
+## Výstupy a odkazy
+`uložit` · `export step` · `export step odkaz` · `export skript` · `sdílet dní 30` · `odkaz` (adresa znovu) · v CLI `--formats step,pdf,dxf` a `--share`
+## Kontrola
+`stav` · `měřit těleso` · `měřit díry` · `kontrola sestava` · `porovnat "ref.step" tolerance 0,05` · `předloha "zakaznik.dwg"` · `předloha kontrola kót`
+## Přísný režim a nápověda
+`přísně` (každé ⚠ zastaví běh; CLI `--strict`) · `přísně vyp` · `nápověda hledat pružina mezi díly` · `nápověda tahák` · `prvek nápověda díra` · `zpět`
+Hledání „qqqxxyzz“: nic nenalezeno – zkuste jiné nebo kratší slovo, „nápověda tahák“ (nejčastější příkazy) nebo „prvek nápověda“ (typy prvků).
+
+Dokument: „Nový díl“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Rozměry: žádné těleso (jen skici / pomocná geometrie)

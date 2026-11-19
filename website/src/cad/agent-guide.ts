@@ -5,6 +5,11 @@
  */
 export const AGENT_GUIDE = `# Mnástrojárna CAD – rozhraní pro AI agenty a automatizaci
 
+> **Začněte tahákem (≤ 5 kB):** https://www.mnastrojarna.cz/cad/tahak.md (EN tahak.en.md, DE tahak.de.md), v konzoli
+> \`nápověda tahák\` (EN \`help cheatsheet\`, DE \`hilfe spickzettel\`), v CLI \`mncad help cheat\`. **Hledání v tomto návodu,
+> v tabulce příkazů a v příručce:** \`nápověda hledat záložky\` (EN \`help search tabs\`, DE \`hilfe suchen registerkarten\`;
+> také \`nápověda <slova>\`), v CLI \`mncad help search <slova>\` – 5–8 nejlepších oddílů s příkazy, bez diakritiky i s překlepem.
+
 Mnástrojárna CAD (https://www.mnastrojarna.cz/cad) je parametrický 3D/2D CAD v prohlížeči. Kromě myši ho lze
 kompletně ovládat **textem** – to je určeno pro AI agenty (ChatGPT Agent, Claude, vlastní skripty) i pro lidi, kteří
 raději píší. Vše, co jde udělat myší, jde udělat textem; textem navíc jde zadat i to, co by vyžadovalo přesné klikání
@@ -38,7 +43,10 @@ do 3D okna (výběr hran a ploch pravidlem).
 DE \`element hilfe\`; typ i slovem příkazu – \`nápověda díra\`, \`nápověda kužel\`, u rozšíření id: \`prvek nápověda sheet.bend\`):
 název, druh hodnoty a ukázka zápisu, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem
 („jen prvek / upravit / JSON“ = vlastní zápis nemá). \`prvek nápověda\` bez typu vypíše přehled všech typů a polí, která jdou
-zadat jen přes \`prvek\` / \`upravit\`.
+zadat jen přes \`prvek\` / \`upravit\`. **Hledání:** \`nápověda hledat <slova>\` (i \`nápověda <slova>\`, když slovo není typ prvku)
+prohledá tento návod, tabulku příkazů i příručku /cad/dokumentace a vypíše 5–8 nejlepších oddílů (název + příkazy + věta,
+≤ 1,5 kB; ve stručném protokolu \`= L3 help hits=6 q="záložky"\` a výsledky na pokračovacích řádcích); \`nápověda tahák\` vypíše
+tahák nejčastějších příkazů.
 
 Všechny rozměry jsou v **milimetrech**, úhly ve stupních, desetinná čárka i tečka jsou povolené, „Ø“ před číslem
 se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu kvádru (bez „střed“) nebo ve středu válce.

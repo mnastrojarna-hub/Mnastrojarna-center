@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CtaBand, FaqList, SectionHeading } from "@/components/blocks";
+import { DocsSearch } from "@/components/docs-search";
 import { JsonLd } from "@/components/json-ld";
 import { CAD_DOCS, CAD_DOCS_META, CAD_FAQ, CAD_FEATURES, CAD_HOWTO, type DocBlock } from "@/content/cad-docs";
 import { SITE } from "@/content/site";
@@ -204,9 +205,11 @@ export function CadDocsView() {
 
       <section className="section">
         <div className="container grid gap-12 lg:grid-cols-[260px_minmax(0,1fr)]">
-          <aside className="lg:sticky lg:top-28 lg:self-start">
+          {/* hledání v dokumentaci (jen v prohlížeči, components/docs-search.tsx) – přes oba sloupce, lepí se pod hlavičkou */}
+          <DocsSearch locale="cs" toc="[data-docs-toc]" className="sticky top-[76px] z-30 -mx-2 -mb-6 rounded-2xl bg-white/95 px-2 py-2 shadow-[0_1px_0_rgba(39,36,37,0.08)] backdrop-blur lg:col-span-2" />
+          <aside className="lg:sticky lg:top-44 lg:max-h-[calc(100vh-12rem)] lg:self-start lg:overflow-y-auto">
             <p className="eyebrow">Obsah</p>
-            <ol className="mt-4 space-y-1.5 text-[14px] leading-snug">
+            <ol className="mt-4 space-y-1.5 text-[14px] leading-snug" data-docs-toc>
               {CAD_DOCS.map((s) => (
                 <li key={s.id}>
                   <a href={`#${s.id}`} className="text-ink-700/75 hover:text-brand">

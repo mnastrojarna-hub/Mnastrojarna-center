@@ -1,0 +1,4 @@
+# tahák a hledání v nápovědě (op info s help, help/answer.ts) – prohlížeč = Node; výsledky hledání závisí na obsahu návodu,
+# proto jen dotaz bez výsledků (výsledky hledání porovnává e2e cad-e-help: prohlížeč = CLI)
+nápověda tahák
+nápověda hledat qqqxxyzz

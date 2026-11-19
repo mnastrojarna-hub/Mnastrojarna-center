@@ -36,7 +36,7 @@ import type { DraftApiResult } from "./draft/agent";
 import type { DraftStatus } from "./draft/status";
 import { extrudeFromText, extrudeOptTokens, extrudeSummary } from "./agent-extr";
 import { parsePrimLine, primSummary } from "./agent-prim";
-import { parseFeatureHelp } from "./agent-help";
+import { parseFeatureHelp, type HelpRequest } from "./agent-help";
 import { COMMON_FIELDS, fieldsOf } from "./feature-fields";
 import { gapSummary, parseGapLine } from "./agent-gaps";
 import { OUT_COMMANDS, outTokens, parseOutLine, type MncadOutApi, type OutOp } from "./agent-out";
@@ -130,8 +130,8 @@ export type AgentOp =
   | { k: "surf"; cmd: SurfCmd; line: number }
   /** 2D výkres: řádek za předponou `2d` (cad/draft/agent.ts) */
   | { k: "draft"; text: string; line: number }
-  /** jen text do protokolu (nápověda polí prvku – agent-help.ts) */
-  | { k: "info"; lines: string[]; line: number }
+  /** jen text do protokolu (nápověda polí prvku – agent-help.ts); `help` = hledání v nápovědě / tahák, vypíše engine (help/answer.ts) */
+  | { k: "info"; lines: string[]; line: number; help?: HelpRequest }
   /** předloha DWG / DXF / PDF: připojení, stav, výtah, porovnání s modelem, kontrola kót (cad/reference) */
   | { k: "reference"; cmd: RefCmd; line: number }
   /** přísný režim od tohoto řádku: `přísně [vyp] [kromě kód,…]` (agent-strict.ts, engine/strict.ts) */
@@ -802,10 +802,10 @@ export function parseAgentText(text: string): AgentProgram {
         blk.last = undefined;
         return;
       }
-      // nápověda polí: prvek nápověda <typ> · nápověda <typ> · help · hilfe (agent-help.ts)
+      // nápověda polí: prvek nápověda <typ> · nápověda <typ> · help · hilfe; hledání a tahák: nápověda hledat … · nápověda tahák (agent-help.ts)
       const help = parseFeatureHelp(cmd, line.replace(/^\s*\S+/, ""), { types: FEATURE_TYPES, labels: FEATURE_LABEL, canon, defaults: featureDefaults });
       if (help) {
-        ops.push({ k: "info", lines: help, line: no });
+        ops.push(Array.isArray(help) ? { k: "info", lines: help, line: no } : { k: "info", lines: [], help, line: no });
         return;
       }
       if (cmd === "feature") {
@@ -1628,6 +1628,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "prvek <typ|rozšíření> klíč=hodnota …", en: "feature", de: "element", desc: tr("kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId=\"Skica 1\" pathId=$last · prvek draft angle=3 faces=boční · prvek \"Ohyb plechu\" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem") },
   { cmd: "rotovat [úhel] osa hrana E3|plocha F7|\"Osa 1\"|body V1 V5 [symetricky] · pole N rozteč P směr hrana E3|body V1 V5 · pole kruhové N osa hrana E3|plocha F7|\"Osa 1\" · zrcadlit plocha F3|rovina \"Rovina 1\" [odsazení N] · srazit D úhel A plocha F3 [hrany …] · srazit D1 D2 plocha F3 · zaoblit R hrany E3 E7 · skořepina T otevřít F3 F5", en: "revolve, pattern, mirror, chamfer, fillet, shell", de: "rotieren, muster, spiegeln, fase, verrunden, schale", desc: tr("odkazy místo čísel: osa rotace a kruhového pole hranou, osou válcové plochy, pomocnou osou nebo dvěma body; směr řady pole hranou / dvěma body; rovina zrcadlení plochou nebo pomocnou rovinou; sražení vzdálenost + úhel nebo dvě vzdálenosti od referenční plochy; hrany a plochy čísly (E, F jako popisky pro výběr) místo pravidla") },
   { cmd: "prvek nápověda <typ|rozšíření> · nápověda <typ> · prvek nápověda", en: "feature help, help", de: "element hilfe, hilfe", desc: tr("všechna pole typu prvku pro „prvek <typ> klíč=hodnota“ a „upravit“: název, druh hodnoty, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem (typ i slovem příkazu: díra, kužel, pružina; u rozšíření jeho parametry); bez typu = přehled typů a polí, která jdou zadat jen přes prvek") },
+  { cmd: "nápověda hledat <slova> · nápověda <slova> · nápověda tahák", en: "help search, help cheatsheet", de: "hilfe suchen, hilfe spickzettel", desc: tr("hledání v návodu pro AI, v tabulce příkazů a v příručce (bez diakritiky, začátek slova i překlep, česky / anglicky / německy): 5–8 nejlepších oddílů s příkazy a větou, ≤ 1,5 kB, výpis „= L3 help hits=6 q=…“; „nápověda <slova>“ hledá, když slovo není typ prvku; tahák = nejčastější příkazy (≤ 5 kB, /cad/tahak.md, mncad help cheat); v CLI také mncad help search <slova>") },
   { cmd: "normálie <označení> [v x y z]", en: "library", de: "normteil", desc: tr("díl z knihovny podle textu (M8x30, ložisko 6204, pero 8x7x40): v dílu nová záložka, v sestavě komponenta") },
   { cmd: "otevřít \"díl.mncad\" · otevřít \"sestava.step\"", en: "open \"part.mncad\"", de: "öffnen \"teil.mncad\"", desc: tr("otevře dokument ze vstupních souborů v nové záložce (CLI: --files a složka skriptu, HTTP: files, v prohlížeči přiložené soubory): .mncad / JSON, STEP (velká sestava se rozdělí na díly), BREP, STL, OBJ, 3MF, DXF jako skica; chybějící soubor = ✗ file.missing se seznamem dostupných") },
   { cmd: "vložit \"název záložky\" [v x y z] [otočení rx ry rz] [ukotvit] [jako \"přezdívka\"]", en: "insert … as", de: "einfügen … als", desc: tr("sestava: vloží díl z otevřené záložky jako komponentu (vazby textem: sestava vazba …, viz níže); „jako \"K48\"“ = přezdívka instance – odkaz ve vazbách místo #k, ve stromu v [ ], kusovník ji nepoužívá") },
