@@ -11,6 +11,8 @@ import { CadIcon, type CadIconName } from "./cad-icons";
 import { MiniViewport } from "./mini-viewport";
 import { Num } from "./props";
 import { Btn, Kbd, Modal, Row, Toggle, inputCls } from "./ui";
+import { libraryToGear } from "./gears/wizard-state";
+import type { GearData, GearKind } from "@/cad/gears";
 
 type Props = {
   onInsertPart: (doc: CadDoc) => void;
@@ -19,6 +21,8 @@ type Props = {
   isAssembly: boolean;
   /** předvyplněný dotaz (např. z palety příkazů) */
   initialQuery?: string;
+  /** ozubení: otevřít stejnou rodinu v průvodci Kola a ozubení (tabulka, výpočet, soukolí) */
+  onOpenGears?: (o: { kind: GearKind; data: GearData }) => void;
 };
 
 const GROUP_ICON: Record<string, CadIconName> = {
@@ -34,7 +38,7 @@ const GROUP_ICON: Record<string, CadIconName> = {
 };
 
 /** Knihovna normálií – vyhledávání textem („M8x30“), kategorie, parametry, náhled a vložení. */
-export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAssembly, initialQuery = "" }: Props) {
+export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAssembly, initialQuery = "", onOpenGears }: Props) {
   const [q, setQ] = useState(initialQuery);
   const [group, setGroup] = useState<string | "fav" | "recent" | null>(null);
   const [famId, setFamId] = useState<string>(LIBRARY[0].id);
@@ -245,6 +249,14 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
                 <p className="text-[11px] text-[#6b7785]">{family.standards.join(" · ")}</p>
               </div>
             </div>
+            {onOpenGears && libraryToGear(family.id, values) && (
+              <div className="mb-3 rounded border border-brand/30 bg-brand/5 p-2 text-[11.5px] leading-snug text-[#26303b]" data-lib-gears>
+                <p>{tr("Nově: kola z tabulky s výpočtem (posunutí, rozměr přes zuby, soukolí) – parametrický prvek, který jde později upravit.")}</p>
+                <button type="button" data-lib-gears-open onClick={() => onOpenGears(libraryToGear(family.id, values)!)} className="mt-1 font-semibold text-brand underline-offset-2 hover:underline">
+                  {tr("Otevřít v tabulce Kola a ozubení")} →
+                </button>
+              </div>
+            )}
             <div className="space-y-2.5">
               {family.params.map((p) => (
                 <ParamField key={p.key} p={p} value={values[p.key]} onChange={(v) => setValues({ ...values, [p.key]: v })} />

@@ -1,0 +1,82 @@
+# Kola a ozubení (vlna 19, balík ui): průvodce (galerie, tabulka, náhled, soukolí), formulář úprav, vstupní body
+{0} – dva díly a sestava s vazbou.	{0} – zwei Teile und eine Baugruppe mit Bedingung.
+{0} – otevřeno jako nový díl.	{0} – als neues Teil geöffnet.
+{0} – přidáno do historie.	{0} – zum Verlauf hinzugefügt.
+{0} – přidáno do historie. Zadejte další kolo.	{0} – zum Verlauf hinzugefügt. Nächstes Rad eingeben.
+3D náhled	3D-Vorschau
+Cykloidní	Zykloidisch
+Cykloidní (hodinové)	Zykloidisch (Uhrenverzahnung)
+Cykloidní reduktor (kotouč a věnec)	Zykloidgetriebe (Kurvenscheibe und Bolzenring)
+Čelní a hřeben	Stirnräder und Zahnstange
+Čelní s přímými zuby	Stirnrad geradverzahnt
+Čelní se šikmými zuby	Stirnrad schrägverzahnt
+Další	Weitere
+Detail zubu	Zahndetail
+detail zubu (pata a hlava)	Zahndetail (Fuß und Kopf)
+Do tohoto dílu	In dieses Teil
+Druh soukolí	Art der Radpaarung
+Druhy: {0}	Arten: {0}
+Dvě kola v záběru	Zwei kämmende Räder
+dvě kola v záběru: z₁, z₂, modul, osová vzdálenost → díly a sestava s vazbou ozubení	zwei kämmende Räder: z₁, z₂, Modul, Achsabstand → Teile und Baugruppe mit Zahnradbedingung
+hlavová	Kopfkreis
+Hypoidní	Hypoid
+Jako nový díl	Als neues Teil
+Kam:	Wohin:
+Kola a ozubení	Zahnräder
+Kola a ozubení – {0}	Zahnräder – {0}
+Kola a ozubení – soukolí	Zahnräder – Radpaarung
+Kolo bude prvním tělesem dílu.	Das Rad wird der erste Körper des Teils.
+Kolo se otevře jako nový díl v nové záložce.	Das Rad öffnet sich als neues Teil in einem neuen Tab.
+Kolo se přidá na konec historie otevřeného dílu.	Das Rad wird am Ende des Verlaufs des geöffneten Teils hinzugefügt.
+Kuželová a šneková	Kegel- und Schneckenräder
+Náhled kola	Radvorschau
+Náhled se ukáže po opravě řádků označených ✗.	Die Vorschau erscheint, sobald die mit ✗ markierten Zeilen korrigiert sind.
+Náhled soukolí	Vorschau der Radpaarung
+Nově: kola z tabulky s výpočtem (posunutí, rozměr přes zuby, soukolí) – parametrický prvek, který jde později upravit.	Neu: Zahnräder aus einer Tabelle mit Berechnung (Profilverschiebung, Zahnweite, Radpaarung) – ein parametrisches Element, das sich später bearbeiten lässt.
+Nový díl z průvodce tady nejde založit – otevřete díl, nebo použijte textový příkaz:	Ein neues Teil lässt sich hier nicht aus dem Assistenten anlegen – öffnen Sie ein Teil oder verwenden Sie den Textbefehl:
+Obě kola jako díly a sestava s vazbou ozubení (v pohybové studii se otáčejí v převodu).	Beide Räder als Teile und eine Baugruppe mit Zahnradbedingung (in der Bewegungsstudie drehen sie im Übersetzungsverhältnis).
+Obnovit 3D náhled	3D-Vorschau aktualisieren
+Operace:	Operation:
+Opravte řádky označené ✗	Korrigieren Sie die mit ✗ markierten Zeilen
+oranžově přímka záběru (tečna k základním kružnicím přes valivý bod)	orange: Eingriffslinie (Tangente an die Grundkreise durch den Wälzpunkt)
+Otevřený dokument není díl – kolo se otevře jako nový díl v nové záložce.	Das geöffnete Dokument ist kein Teil – das Rad öffnet sich als neues Teil in einem neuen Tab.
+Otevřít v tabulce Kola a ozubení	In der Zahnrad-Tabelle öffnen
+ozubené kolo z tabulky: čelní, šikmé, šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, cykloidní, řetězové kolo, řemenice, rohatka	Zahnrad aus einer Tabelle: Stirnrad, schräg, Pfeil, innen, Zahnstange, Kegelrad, Hypoid, Schnecke, Zykloide, Kettenrad, Zahnriemenscheibe, Sperrrad
+Ozubené kolo, hřeben, řetězové kolo, řemenice, soukolí – vyplníte tabulku a máte díl.	Zahnrad, Zahnstange, Kettenrad, Zahnriemenscheibe, Radpaarung – Tabelle ausfüllen und das Teil ist fertig.
+Pastorek a hřeben	Ritzel und Zahnstange
+patní	Fußkreis
+Podle tabulky: {0} (název prvku se nemění – přejmenujte ho v historii).	Laut Tabelle: {0} (der Elementname ändert sich nicht – benennen Sie es im Verlauf um).
+Průvodce Kola a ozubení je okno pro práci myší. Textem se kolo zadá obecným příkazem prvku:	Der Zahnrad-Assistent ist ein Fenster für die Arbeit mit der Maus. Als Text wird ein Rad mit dem allgemeinen Elementbefehl eingegeben:
+Přesnost:	Genauigkeit:
+roztečná	Teilkreis
+Řemenový převod	Riementrieb
+Řetěz, řemen, rohatka	Kette, Riemen, Sperrrad
+Řetězový převod	Kettentrieb
+Skrýt 3D náhled	3D-Vorschau ausblenden
+Skrýt textové příkazy	Textbefehle ausblenden
+Soukolí	Radpaarung
+Soukolí nejde vytvořit – opravte řádky označené ✗.	Die Radpaarung lässt sich nicht erstellen – korrigieren Sie die mit ✗ markierten Zeilen.
+Soukolí s tímto kolem…	Radpaarung mit diesem Rad…
+Soukolí tady nejde vytvořit – spusťte tyto textové příkazy v konzoli:	Die Radpaarung lässt sich hier nicht erstellen – führen Sie diese Textbefehle in der Konsole aus:
+Šípové	Pfeilverzahnt
+Šnek a šnekové kolo	Schnecke und Schneckenrad
+Tělo kola	Radkörper
+Ukázat textové příkazy (stejné jako pro AI agenty)	Textbefehle anzeigen (dieselben wie für KI-Agenten)
+Umístění a výstup	Platzierung und Ausgabe
+Vnitřní (pastorek ve věnci)	Innen (Ritzel im Hohlrad)
+Všechny druhy	Alle Arten
+Všechny řádky tabulky druhu (klíč, jednotka, výchozí hodnota, nápověda): prvek nápověda gear.spur	Alle Tabellenzeilen einer Art (Schlüssel, Einheit, Vorgabe, Hinweis): element hilfe gear.spur
+Vyberte druh kola – otevře se jedna tabulka s výchozími hodnotami. Stačí vyplnit modul a počet zubů a kliknout na Vytvořit.	Wählen Sie die Art des Rades – es öffnet sich eine Tabelle mit Vorgabewerten. Modul und Zähnezahl eingeben und auf Erstellen klicken.
+Vypočteno	Berechnet
+Výsledek soukolí	Ergebnis der Radpaarung
+Vytvářím…	Wird erstellt…
+Vytvořit	Erstellen
+Vytvořit a další	Erstellen und weiter
+Vytvořit soukolí	Radpaarung erstellen
+z₁, z₂ (nebo převod), modul, osová vzdálenost → obě kola a sestava s vazbou ozubení	z₁, z₂ (oder Übersetzung), Modul, Achsabstand → beide Räder und eine Baugruppe mit Zahnradbedingung
+základní	Grundkreis
+Základní	Grundlegend
+Zubové mezery se vyříznou do aktivního tělesa (polotovaru).	Die Zahnlücken werden in den aktiven Körper (das Rohteil) geschnitten.
+Zuby do tělesa jdou jen do otevřeného dílu s tělesem.	Zähne in den Körper gehen nur in einem geöffneten Teil mit Körper.
+Zuby do tělesa potřebují těleso – nejdřív vytvořte polotovar (výstup Polotovar) nebo jiný tvar.	Zähne in den Körper brauchen einen Körper – erstellen Sie zuerst das Rohteil (Ausgabe Rohteil) oder eine andere Form.
+Zuby se řežou do tělesa otevřeného dílu – nejdřív vytvořte polotovar.	Die Zähne werden in den Körper des geöffneten Teils geschnitten – erstellen Sie zuerst das Rohteil.

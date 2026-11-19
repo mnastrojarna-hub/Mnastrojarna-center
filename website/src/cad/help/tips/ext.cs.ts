@@ -76,6 +76,21 @@ export default {
     note: "Sleduje jen vnější obrys plochy; otvory v ploše se neberou v úvahu.",
   },
 
+  // ── Tvorba › Kola a ozubení ──
+  "gear.wizard": {
+    what: "Ozubené kolo, hřeben, řetězové kolo nebo řemenice z jedné tabulky – s výpočtem a živým náhledem.",
+    when: "Kdykoli potřebujete kolo: stačí modul a počet zubů, ostatní řádky mají rozumnou výchozí hodnotu.",
+    steps: ["Klikněte na druh kola v galerii (čelní, šikmé, řetězové…).", "Vyplňte Modul mₙ a Počet zubů z – spočtené rozměry se ukazují hned pod tabulkou.", "Zvolte Hotové kolo / Polotovar / Zuby do tělesa a klikněte na Vytvořit."],
+    cmd: "prvek gear.spur m=2 z=24 b=20 bore=20",
+    note: "Kolo je jeden prvek historie – klikem na něj ho upravíte ve stejné tabulce; staré normálie zůstaly v knihovně.",
+  },
+  "gear.pair": {
+    what: "Dvě kola v záběru: spočte osovou vzdálenost a posunutí profilu, vytvoří oba díly a sestavu s vazbou.",
+    when: "Převod mezi hřídeli – čelní, šikmé, vnitřní, hřeben, kuželové, šnekové, řetězové nebo řemenové.",
+    steps: ["Zvolte Druh soukolí a vyplňte z₁, z₂ (nebo převod i) a modul.", "Osovou vzdálenost nechte 0, nebo ji zadejte – posunutí x₁, x₂ se rozdělí samo.", "Zkontrolujte výsledek a varování, klikněte na Vytvořit soukolí."],
+    note: "Sestava nemá rám – obě kola jsou volná, spojená vazbou ozubení; v pohybové studii se točí v převodu.",
+  },
+
   // ── Plochy › Plochy ──
   "surf.extrude": {
     what: "Vysune křivku skici (i otevřenou) do plochy bez tloušťky.",

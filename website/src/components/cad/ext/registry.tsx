@@ -25,6 +25,8 @@ export type ExtActionApi = {
   download: (name: string, data: BlobPart, type: string) => void;
   /** vyexportuje těleso/sestavu v daném formátu (volá worker) */
   exportModel: (format: string) => Promise<void>;
+  /** spustí textové příkazy jako konzole (nový díl, sestava…) a vrátí protokol; jen v okně aplikace (kola a ozubení) */
+  runText?: (text: string) => Promise<string>;
 };
 
 export type ExtUi = {

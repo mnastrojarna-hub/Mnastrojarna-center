@@ -76,6 +76,21 @@ export default {
     note: "Folgt nur der Außenkontur der Fläche; Öffnungen in der Fläche werden nicht berücksichtigt.",
   },
 
+  // ── Erstellen › Zahnräder ──
+  "gear.wizard": {
+    what: "Zahnrad, Zahnstange, Kettenrad oder Zahnriemenscheibe aus einer Tabelle – mit Berechnung und Live-Vorschau.",
+    when: "Immer wenn Sie ein Zahnrad brauchen: Modul und Zähnezahl genügen, alle anderen Zeilen haben sinnvolle Vorgaben.",
+    steps: ["Art des Rades in der Galerie anklicken (Stirnrad, schrägverzahnt, Kettenrad…).", "Modul mₙ und Zähnezahl z eingeben – berechnete Maße erscheinen direkt unter der Tabelle.", "Fertiges Rad / Rohteil / Zähne in den Körper wählen und auf Erstellen klicken."],
+    cmd: "element gear.spur m=2 z=24 b=20 bore=20",
+    note: "Das Rad ist ein Verlaufselement – ein Klick darauf bearbeitet es in derselben Tabelle; alte Normteile bleiben in der Bibliothek.",
+  },
+  "gear.pair": {
+    what: "Zwei kämmende Räder: berechnet Achsabstand und Profilverschiebung, erstellt beide Teile und eine Baugruppe mit Bedingung.",
+    when: "Getriebe zwischen Wellen – Stirnrad, schräg, innen, Zahnstange, Kegelrad, Schnecke, Kette oder Riemen.",
+    steps: ["Art der Radpaarung wählen und z₁, z₂ (oder Übersetzung i) und Modul eingeben.", "Achsabstand auf 0 lassen oder eingeben – Verschiebungen x₁, x₂ werden selbst verteilt.", "Ergebnis und Warnungen prüfen, auf Radpaar erstellen klicken."],
+    note: "Die Baugruppe hat keinen Rahmen – beide Räder sind frei und durch eine Zahnradbedingung verbunden; in der Bewegungsstudie drehen sie im Verhältnis.",
+  },
+
   // ── Flächen › Flächen ──
   "surf.extrude": {
     what: "Extrudiert eine Skizzenkurve (auch offen) zu einer Fläche ohne Dicke.",

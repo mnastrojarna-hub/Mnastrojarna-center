@@ -65,6 +65,9 @@ async function open(b, path = '/cad') {
   await p.getByText(fname, { exact: true }).first().click(); await p.waitForTimeout(700);
   if (!(await param('z').isVisible().catch(() => false))) { await p.getByText(fname, { exact: true }).first().dblclick(); await p.waitForTimeout(900); }
   // automatický formulář (ext-params.tsx): řádek = <label><span>popisek + nápověda</span>pole</label>; směr osy má data-ext-param
+  // s balíkem ui je formulářem tabulka kola (components/cad/gears): řádky jsou také <label>, sbalené skupiny se rozbalí
+  const closed = p.locator('[data-gear-group] > button[aria-expanded="false"]');
+  for (let i = 0; i < 8 && (await closed.count()); i++) await closed.first().click().catch(() => {});
   const field = (label) => p.locator('label').filter({ hasText: label }).first();
   const labels = ['Modul mₙ', 'Počet zubů z', 'Šířka b', 'Úhel záběru αₙ', 'Posunutí profilu x', 'Základní profil', 'Díra d', 'Drážka pro pero', 'Náboj Ø', 'Výstup', 'Natočení kolem osy'];
   const vis = [];

@@ -397,7 +397,9 @@ describe("popisy druhů (tabulka = formulář = text)", () => {
       expect(ext.hidden).toBe(true);
       expect(ext.make({} as never)).toEqual(def.defaults());
     }
-    expect(allExt().filter((d) => d.ext.startsWith("gear.")).map((d) => d.ext).sort()).toEqual([...GEAR_KINDS.map((k) => `gear.${k}`), "gear.table"].sort());
+    // + vstupní body balíku ui (ext/gears-entry.ts): viditelné akce průvodce a soukolí
+    expect(allExt().filter((d) => d.ext.startsWith("gear.")).map((d) => d.ext).sort()).toEqual([...GEAR_KINDS.map((k) => `gear.${k}`), "gear.table", "gear.wizard", "gear.pair"].sort());
+    for (const id of ["gear.wizard", "gear.pair"]) expect(getExt(id)?.action && !getExt(id)?.hidden, id).toBe(true);
   });
   it("slova textové gramatiky jsou v rámci druhu a jazyka jednoznačná (řádky, příznaky, složené zápisy)", () => {
     for (const k of GEAR_KINDS) {
