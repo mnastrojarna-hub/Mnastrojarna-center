@@ -17,6 +17,7 @@ import {
   PackageCheck,
   UserCog,
   ShoppingBag,
+  Truck,
   ScrollText,
   Receipt,
   FileUp,
@@ -77,6 +78,7 @@ export const navSections: NavSection[] = [
       { title: "Potvrzení objednávek", href: "/confirmations", icon: PackageCheck, feature: "workflow", badgeKey: "confirmations", description: "Objednávky k potvrzení", color: "text-orange-500" },
       // #25: pro všechny — „moje" a bez práva na nákupní ceny maskované (bez cen, PDF a akcí)
       { title: "Objednávky dodavatelům", href: "/purchasing", icon: ShoppingBag, feature: "workflow", color: "text-lime-600", description: "Naše objednávky u dodavatelů" },
+      { title: "Dodací listy dodavatelů", href: "/supplier-delivery-notes", icon: Truck, feature: "workflow", color: "text-sky-600", description: "Dodací listy od dodavatelů — číslo, dodavatel, objednávka, zakázka" },
       // 10. 11.: naše vydané faktury po měsících — součty, export PDF / CSV pro účetní (zatím jen super admin)
       { title: "Faktury vydané", href: "/issued-invoices", icon: FileSpreadsheet, feature: "issued_invoices", description: "Naše faktury po měsících, součty, export pro účetní", color: "text-teal-600" },
       // faktury dodavatelů: zatím jen super admin (přepínač viditelnosti); nahrát smí každý
