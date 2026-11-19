@@ -31,10 +31,11 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
+import { gearAutoName, gearScriptLines } from "./agent-gears";
 import { freeName, parseValue } from "./agent-edit";
 import { resolveDatumNames } from "./agent-prim";
 import { applySketchOp, type SketchOp } from "./agent-sketch";
-import { bodiesAt, nextBodyName } from "./bodies";
+import { bodiesAt, isNewBodyMode, nextBodyName } from "./bodies";
 import { getExt } from "./ext/registry";
 import type { SectionOpt } from "./drawing";
 import { sectionToSketchConvention } from "./drawing-section";
@@ -221,6 +222,7 @@ const WORDS = {
   hidden: ["skryté", "hidden", "verdeckt"],
   axes: ["osy", "axes", "achsen"],
   holeTable: ["tabulka děr", "holetable", "bohrungstabelle"],
+  gearTable: ["tabulka ozubení", "geartable", "verzahnungstabelle"],
   bom: ["kusovník", "bom", "stückliste"],
   balloons: ["balónky", "balloons", "positionsnummern"],
   projection: ["promítání", "projection", "projektion"],
@@ -1082,6 +1084,10 @@ function dedicated(p: PartCtx, f: Feature): string[] {
       const b = scriptQuote(f.tool, true);
       return one(!a || !b || !f.target || !f.tool ? null : `${c.w("combine")} ${a} ${b}${f.op === "cut" ? ` ${c.w("cut")}` : f.op === "intersect" ? ` ${c.w("intersect")}` : ""}${f.keepTool ? ` ${c.w("keep")}` : ""}`);
     }
+    // kola a ozubení: kolo <druh> … (agent-gears.ts); „nové“ kolo dostane další volné těleso samo – jiné těleso jen obecně / JSON
+    case "ext":
+      if (!f.ext.startsWith("gear.") || (f.body && !(isNewBodyMode(f) && hasSolid(p.feats) && f.body === nextBodyName(bodiesAt({ features: p.feats }).names)))) return [];
+      return gearScriptLines(f, c.lang, n);
     default:
       return [];
   }
@@ -1143,7 +1149,10 @@ function generic(p: PartCtx, f0: Feature): string | null {
 }
 
 /** automatický název, který by prvku přidělila textová cesta v rozhraní jazyka skriptu (čítač rozboru + volný název v dílu) */
-function autoName(p: PartCtx, f: Feature): string {
+function autoName(p: PartCtx, f: Feature, how: ScriptHow = "generic"): string {
+  // kolo vlastním příkazem dostane název podle tabulky („Ozubené kolo m2 z24“) – stejně jako v průvodci
+  const gear = how === "dedicated" ? gearAutoName(f) : null;
+  if (gear !== null) return freeName(p.replay, { ...f, id: "\u0001", name: gear } as Feature);
   const label = trIn(p.c.lang, FEATURE_LABEL[f.type] ?? f.type);
   return freeName(p.replay, { ...f, id: "\u0001", name: `${label} ${(p.c.counts[f.type] ?? 0) + 1}` } as Feature);
 }
@@ -1218,7 +1227,7 @@ function emitFeature(p: PartCtx, f: Feature) {
   const tryLine = (base: string | null, how: ScriptHow, nameKey: string, renaming: boolean): boolean => {
     if (base === null || !lineSafe(base)) return false;
     if (!renaming) {
-      const auto = c.names === "auto" && !p.byName.has(f.id) && autoName(p, f) === f.name;
+      const auto = c.names === "auto" && !p.byName.has(f.id) && autoName(p, f, how) === f.name;
       if (auto && verify(p, f, base, false, drop)) {
         c.line(base);
         c.counts[f.type] = (c.counts[f.type] ?? 0) + 1;
@@ -1236,7 +1245,7 @@ function emitFeature(p: PartCtx, f: Feature) {
     }
     if (!verify(p, f, base, false, drop)) return false;
     // název při vzniku nejde dát (stejný název už v dílu je, nebo ho nejde zapsat) → automatický název a přejmenování
-    c.expect.push({ type: f.type, name: autoName(p, f) });
+    c.expect.push({ type: f.type, name: autoName(p, f, how) });
     c.line(base);
     c.counts[f.type] = (c.counts[f.type] ?? 0) + 1;
     c.count(f.type, how);
@@ -1524,6 +1533,11 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
   flag("hidden", "hidden");
   flag("centerLines", "axes");
   flag("holeTable", "holeTable");
+  // tabulka ozubení (vlna 19): jen zapnutá – vypnutá = výchozí stav nového listu
+  if (o.gearTable === true) {
+    parts.push(`${c.w("gearTable")} ${c.yn(true)}`);
+    keys.push("gearTable");
+  }
   if (diff("rotation") && typeof o.rotation === "number") {
     parts.push(`${c.w("rotation")} ${n(o.rotation)}`);
     keys.push("rotation");

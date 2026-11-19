@@ -4,6 +4,7 @@
  * nemají účinek (ℹ `ui.no-view`), ostatní je ✗ `host.app-only` – nikdy tiše.
  */
 import type { ApiCmd } from "../../agent-api";
+import { getExt } from "../../ext/registry";
 import { tr } from "../../i18n";
 import { flush, runOf, startDoc } from "../run-doc";
 import { coded, say, type OpHandler } from "./util";
@@ -44,6 +45,9 @@ const VIEW_ONLY = new Set<ApiCmd["kind"]>(["section", "sectionOff", "display", "
 
 export const apiOp: OpHandler<"api"> = async (op, ctx) => {
   const r = runOf(ctx);
+  // akce s čistým textovým výstupem (tabulka ozubení): engine ji provede sám – stejně v aplikaci i v CLI
+  const report = op.cmd.kind === "action" ? getExt(op.cmd.id)?.report : undefined;
+  if (report && op.cmd.kind === "action") return say(ctx, ...report(r.doc, op.cmd.arg));
   const ui = ctx.host.ui?.api;
   if (!ui) return coded(ctx, VIEW_ONLY.has(op.cmd.kind) ? "ui.no-view" : "host.app-only", { args: [apiLabel(op.cmd)] });
   const res = await ui(op.cmd, r.doc);

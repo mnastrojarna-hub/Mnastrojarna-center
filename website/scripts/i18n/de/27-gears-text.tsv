@@ -1,0 +1,56 @@
+# DE – Kola a ozubení textem (vlna 19, balík text): agent-gears.ts, agent-gears-table.ts, drawing-geartable.ts, výkres, gears-text-ui.ts
+  ⚠ sestava vznikla bez vazby ozubení – spojte kola vazbou ručně (sestava vazba ozubení …)	  ⚠ die Baugruppe hat keine Zahnrad-Verknüpfung – verbinden Sie die Räder selbst (baugruppe verknüpfung zahnrad …)
+(v dílu je {0} kol – všechna: kolo tabulka vše)	(das Teil hat {0} Räder – alle: rad tabelle alle)
+, nejméně {0}	, mindestens {0}
+, povinné	, Pflicht
+, rozsah {0} až {1}	, Bereich {0} bis {1}
+; příznaky: {0}	; Schalter: {0}
+Kola a ozubení – jedna tabulka na druh (stejná jako průvodce „Kola a ozubení“ a obecný příkaz prvek gear.*):	Räder und Verzahnungen – eine Tabelle je Art (dieselbe wie im Assistenten „Räder und Verzahnungen“ und im allgemeinen Befehl element gear.*):
+Příklad: {0}	Beispiel: {0}
+Složené zápisy:	Zusammengesetzte Angaben:
+Soukolí (dva díly + sestava s vazbou): {0} <druh> …; druhy: {1}	Radpaar (zwei Teile + Baugruppe mit Verknüpfung): {0} <Art> …; Arten: {1}
+Soukolí – {0}: řádky tabulky (slovo, význam, výchozí hodnota):	Radpaar – {0}: Tabellenzeilen (Wort, Bedeutung, Standardwert):
+Soukolí „{0}“: {1}	Radpaar „{0}“: {1}
+Tabulka ozubení (modul, z, průměry, W, M)	Verzahnungstabelle (Modul, z, Durchmesser, W, M)
+Tabulka ozubení překrývá pohled {0} – zvolte větší list nebo menší měřítko.	Die Verzahnungstabelle überdeckt die Ansicht {0} – wählen Sie ein größeres Blatt oder einen kleineren Maßstab.
+Tabulka ozubení – {0}	Verzahnungsdaten – {0}
+Tabulka ozubení: v dílu je {0} kol, na list se vejdou tabulky prvních {1} – další vypište příkazem kolo tabulka vše.	Verzahnungstabelle: das Teil hat {0} Räder, auf das Blatt passen die Tabellen der ersten {1} – die übrigen listet rad tabelle alle auf.
+Tabulka ozubení: v dílu není žádné kolo – tabulka se nekreslí	Verzahnungstabelle: das Teil hat kein Rad – keine Tabelle gezeichnet
+Tabulka ozubení: {0} {1} [vše | "název"] · popis druhu: {0} {2} <druh> · soukolí: {3} {2} <druh>	Verzahnungsdaten: {0} {1} [alle | "Name"] · Beschreibung der Art: {0} {2} <Art> · Radpaar: {3} {2} <Art>
+Tabulka ozubení: {0} – {1}	Verzahnungstabelle: {0} – {1}
+Volné slovo za druhem: {0}	Freies Wort nach der Art: {0}
+bez tabulky ozubení	ohne Verzahnungstabelle
+další druhy: šikmé kolo (β, smysl stoupání), hřeben (lineární ozubení, h = výška celkem), řetězové kolo ISO 606 (08B…24B, ANSI 35–80, 1–3 řady, náboj B/C), cykloidní (hodinové kolo / pastorek), hypoidní (člen pastorek | talířové, přesazení E; tvar zubů je přibližný)	weitere Arten: Schrägstirnrad (β, Steigungsrichtung), Zahnstange (lineare Verzahnung, h = Gesamthöhe), Kettenrad ISO 606 (08B…24B, ANSI 35–80, 1–3 Reihen, Nabe B/C), Zykloidenrad (Uhrenrad / Trieb), Hypoidrad (Glied Ritzel | Tellerrad, Achsversatz E; Zahnform ist angenähert)
+jen prvek gear.* {0}=…	nur element gear.* {0}=…
+kolo: neznámý druh „{0}“ – druhy: {1}	rad: unbekannte Art „{0}“ – Arten: {1}
+nezadáno, použita výchozí hodnota: {0}	nicht angegeben, Standardwert verwendet: {0}
+neznámé slovo „{0}“ – řádky: {1}; popis: {2}	unbekanntes Wort „{0}“ – Zeilen: {1}; Beschreibung: {2}
+ozubené kolo z tabulky (jeden prvek „Ozubené kolo …“, úprava = stejná tabulka): čelní, šikmé (beta 15 pravé|levé), šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, šnekové, cykloidní, cyklodisk, řetězové, řemenice, rohatka; polotovar = jen soustružené tělo, zuby = zubové mezery do aktivního tělesa; slova řádků: kolo nápověda <druh>	Zahnrad aus einer Tabelle (ein Element „Zahnrad …“, Bearbeiten = dieselbe Tabelle): stirnrad, schräg (beta 15 rechts|links), pfeil, innen, zahnstange, kegelrad, hypoid, schnecke, schneckenrad, zykloid, kurvenscheibe, kettenrad, zahnriemenscheibe, sperrrad; rohling = nur gedrehter Körper, verzahnung = Zahnlücken in den aktiven Körper; Zeilenwörter: rad hilfe <Art>
+soukolí se nepodařilo vyřešit	das Radpaar ließ sich nicht lösen
+soukolí: neznámý druh „{0}“ – druhy: {1}	Radpaar: unbekannte Art „{0}“ – Arten: {1}
+soukolí: oba díly s koly, nová sestava, vložení ve správném záběru a vazba ozubení / hřeben; zadaná osová vzdálenost a → posunutí x1/x2 se dopočítá a rozdělí (DIN 3992); protokol vypíše převod, a_w, ε_α a varování (podřezání, špičatý zub, interference); druhy: čelní, šikmé, šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, cykloidní, cyklodisk, řetězové, řemenice	Radpaar: beide Teile mit Rädern, neue Baugruppe, Einfügen im richtigen Eingriff und Zahnrad- / Zahnstangen-Verknüpfung; ein vorgegebener Achsabstand a → Profilverschiebungen x1/x2 werden berechnet und aufgeteilt (DIN 3992); das Protokoll zeigt Übersetzung, a_w, ε_α und Warnungen (Unterschnitt, spitzer Zahn, Eingriffsstörung); Arten: stirnrad, schräg, pfeil, innen, zahnstange, kegelrad, hypoid, schnecke, zykloid, kurvenscheibe, kettenrad, zahnriemenscheibe
+tabulka děr ano|ne · tabulka ozubení ano|ne	bohrungstabelle ja|nein · verzahnungstabelle ja|nein
+tabulka ozubení	Verzahnungstabelle
+tabulka ozubení ano|ne	verzahnungstabelle ja|nein
+tabulka ozubení posledního (všech / pojmenovaného) kola aktivního dílu: modul, z, α, β, x, průměry d / dₐ / d_f / d_b, rozměr přes zuby W_k, přes kuličky M_dK, osová vzdálenost; nápověda = řádky tabulky druhu se slovy, jednotkami, výchozími hodnotami a příkladem; na výkres: výkres tabulka ozubení ano	Verzahnungsdaten des letzten (aller / des benannten) Rades des aktiven Teils: Modul, z, α, β, x, Durchmesser d / dₐ / d_f / d_b, Zahnweite W_k, Maß über Kugeln M_dK, Achsabstand; Hilfe = Tabellenzeilen der Art mit Wörtern, Einheiten, Standardwerten und Beispiel; auf die Zeichnung: zeichnung verzahnungstabelle ja
+tabulka ozubení: kola v dílu „{0}“ mají neplatné zadání – opravte je (stav prvku)	Verzahnungsdaten: die Räder im Teil „{0}“ haben ungültige Eingaben – korrigieren Sie sie (Elementstatus)
+tabulka ozubení: kolo „{0}“ v dílu není – kola: {1}	Verzahnungsdaten: Rad „{0}“ ist nicht im Teil – Räder: {1}
+tabulka ozubení: v dílu „{0}“ není žádné kolo – vytvořte ho příkazem kolo <druh> …	Verzahnungsdaten: Teil „{0}“ hat kein Rad – erstellen Sie eines mit rad <Art> …
+tabulka ozubení: „{0}“ není díl – přepněte na záložku dílu s kolem	Verzahnungsdaten: „{0}“ ist kein Teil – wechseln Sie auf den Reiter des Teils mit dem Rad
+výchozí	Standard
+za „{0}“ chybí hodnota	nach „{0}“ fehlt ein Wert
+za „{0}“ chybí souřadnice: {0} x y [z]	nach „{0}“ fehlen Koordinaten: {0} x y [z]
+za „{0}“ chybí číslo ({1})	nach „{0}“ fehlt eine Zahl ({1})
+{0} [ano|ne]	{0} [ja|nein]
+{0} potřebuje druh: {0} <druh> m 2 z1 20 z2 60 [a 81] – druhy: {1}; popis: {0} {2} <druh>	{0} braucht eine Art: {0} <Art> m 2 z1 20 z2 60 [a 81] – Arten: {1}; Beschreibung: {0} {2} <Art>
+{0} potřebuje druh: {0} <druh> … – druhy: {1}; také {0} {2}, {0} {3} [druh]	{0} braucht eine Art: {0} <Art> … – Arten: {1}; außerdem {0} {2}, {0} {3} [Art]
+{0} {1} [druh] – jen jeden druh	{0} {1} [Art] – nur eine Art
+{0} {1} [vše | "název"] – nic dalšího	{0} {1} [alle | "Name"] – sonst nichts
+{0}: neznámý druh „{1}“ – druhy: {2}	{0}: unbekannte Art „{1}“ – Arten: {2}
+{0}: neznámý druh „{1}“ – druhy: {2} (popis: {0} {3})	{0}: unbekannte Art „{1}“ – Arten: {2} (Beschreibung: {0} {3})
+číslo {0} bez slova řádku – napište např. „m 2“, „z 24“ (řádky: {1})	Zahl {0} ohne Zeilenwort – schreiben Sie z. B. „m 2“, „z 24“ (Zeilen: {1})
+Řádky tabulky (slovo, význam, výchozí hodnota, rozsah):	Tabellenzeilen (Wort, Bedeutung, Standardwert, Bereich):
+„{0}“ (odkaz na bod) jde zadat jen obecným příkazem: prvek {1} {2}=…	„{0}“ (Punktbezug) lässt sich nur mit dem allgemeinen Befehl eingeben: element {1} {2}=…
+„{0}“ je celé číslo, ne {1}	„{0}“ ist eine ganze Zahl, nicht {1}
+„{0}“ je směr: X | Y | Z | -Z | tři čísla	„{0}“ ist eine Richtung: X | Y | Z | -Z | drei Zahlen
+„{0}“ má hodnoty {1}	„{0}“ hat die Werte {1}

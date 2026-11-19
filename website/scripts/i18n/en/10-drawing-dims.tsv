@@ -77,7 +77,6 @@ skryté ano|ne	hidden yes|no
 skryté hrany	hidden edges
 skrz	thru
 tabulka děr	hole table
-tabulka děr ano|ne	holetable yes|no
 U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}	At the title block: general tolerances {0} · edges {1} · note {2}
 Varování výkresu: {0}	Drawing warnings: {0}
 vnitřní {0}: v pohledech jen skrytě – zapněte řez osou (výkres řez …)	internal {0}: only hidden in the views – turn on a section through the axis (drawing section …)

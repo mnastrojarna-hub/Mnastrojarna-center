@@ -27,6 +27,8 @@ export type DrawingIssueKind =
   | "view-lost"
   /** tabulka děr (dlouhá, na plném listu) překrývá pohledy (`data`: rows, views) */
   | "hole-table-overlap"
+  /** tabulka ozubení překrývá pohledy (`data`: tables, views) – drawing-geartable.ts */
+  | "gear-table-overlap"
   /** Chytré kóty: co se nepodařilo umístit nebo okótovat */
   | "dims-skipped"
   /** kontrola tolerancí: funkční / předlohou tolerovaný rozměr bez tolerance */

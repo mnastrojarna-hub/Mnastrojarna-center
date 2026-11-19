@@ -22,6 +22,7 @@ import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type S
 import { parseMeasure, type MeasureApiResult, type MeasureCmd } from "./agent-measure";
 import { parseSheetLine, sheetSummary, SHEET_COMMANDS } from "./agent-sheet";
 import { parseWeldLine, weldSummary, WELD_COMMANDS } from "./agent-welds";
+import { GEAR_COMMANDS, parseGearLine } from "./agent-gears";
 import { gearSummary } from "./gears/data";
 import { paramStatusLines, parseEditLine, type EditOp } from "./agent-edit";
 import { toAxisDef, toDirection } from "./ext/place";
@@ -737,6 +738,12 @@ export function parseAgentText(text: string): AgentProgram {
       const weldOp = parseWeldLine(line, no, (l) => `${l} ${(counts[`ext:${l}`] = (counts[`ext:${l}`] ?? 0) + 1)}`);
       if (weldOp) {
         ops.push(weldOp);
+        return;
+      }
+      // kola a ozubení (agent-gears.ts): kolo <druh> … / soukolí … / kolo tabulka / kolo nápověda – null = jiný příkaz
+      const gearOps = parseGearLine(line, no, { sub: parseAgentText });
+      if (gearOps) {
+        ops.push(...gearOps);
         return;
       }
       if (cmd === "sketch") {
@@ -1615,6 +1622,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "těleso N · rozdělit XY|XZ|YZ [odsazení N] [jako Název] · kopie [těleso N] [posun dx dy dz] [jako Název] · sloučit <cíl> <nástroj> [odebrat|průnik] [ponechat]", en: "body, splitbodies, copybody, combine", de: "körper, teilen, kopieren, kombinieren", desc: tr("více těles v dílu: „těleso 2“ přepne další prvky na Těleso 2; rozdělit = dvě tělesa rovinou; kopie = další těleso; sloučit = sjednotit / odebrat / průnik dvou těles. U prvků: „… nové [těleso Název]“ založí nové těleso, „… těleso 2“ pracuje se zvoleným") },
   ...SHEET_COMMANDS,
   ...WELD_COMMANDS,
+  ...GEAR_COMMANDS,
   { cmd: "prvek <typ|rozšíření> klíč=hodnota …", en: "feature", de: "element", desc: tr("kterýkoli typ prvku i prvek rozšíření bez JSON: prvek sweep profileId=\"Skica 1\" pathId=$last · prvek draft angle=3 faces=boční · prvek \"Ohyb plechu\" úhel=90; hodnoty: číslo, ano/ne, seznam a;b;c, text v uvozovkách; skici a prvky názvem nebo $last; plochy a hrany čísly nebo pravidlem") },
   { cmd: "rotovat [úhel] osa hrana E3|plocha F7|\"Osa 1\"|body V1 V5 [symetricky] · pole N rozteč P směr hrana E3|body V1 V5 · pole kruhové N osa hrana E3|plocha F7|\"Osa 1\" · zrcadlit plocha F3|rovina \"Rovina 1\" [odsazení N] · srazit D úhel A plocha F3 [hrany …] · srazit D1 D2 plocha F3 · zaoblit R hrany E3 E7 · skořepina T otevřít F3 F5", en: "revolve, pattern, mirror, chamfer, fillet, shell", de: "rotieren, muster, spiegeln, fase, verrunden, schale", desc: tr("odkazy místo čísel: osa rotace a kruhového pole hranou, osou válcové plochy, pomocnou osou nebo dvěma body; směr řady pole hranou / dvěma body; rovina zrcadlení plochou nebo pomocnou rovinou; sražení vzdálenost + úhel nebo dvě vzdálenosti od referenční plochy; hrany a plochy čísly (E, F jako popisky pro výběr) místo pravidla") },
   { cmd: "prvek nápověda <typ|rozšíření> · nápověda <typ> · prvek nápověda", en: "feature help, help", de: "element hilfe, hilfe", desc: tr("všechna pole typu prvku pro „prvek <typ> klíč=hodnota“ a „upravit“: název, druh hodnoty, jednotka, povolené hodnoty, výchozí / povinné, význam a zápis vlastním textovým příkazem (typ i slovem příkazu: díra, kužel, pružina; u rozšíření jeho parametry); bez typu = přehled typů a polí, která jdou zadat jen přes prvek") },

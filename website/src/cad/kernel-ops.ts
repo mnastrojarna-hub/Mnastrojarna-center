@@ -29,6 +29,7 @@ import { blobId, missingBlobs, putBlobAs } from "./blobs";
 import { perfMark } from "./perf-log";
 import { formNotesOfDoc, springMarksOf } from "./drawing-doc";
 import { hasWelds, weldMarksOf } from "./drawing-welds";
+import { gearTablesOf } from "./gears/data";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 import { exportStats } from "./export-verify";
@@ -376,6 +377,8 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         let meta: DrawingMeta = m.meta.formNotes ? m.meta : { ...m.meta, formNotes: formNotesOfDoc(m.doc) };
         // značky svarů ISO 2553 z 3D svarů (stav prvků po stavbě – mezipaměť stavby) – drawing-welds.ts
         if (!meta.welds && hasWelds(dd)) meta = { ...meta, welds: weldMarksOf(dd, (await buildShape(dd)).status) };
+        // tabulka ozubení kol dílu (čistá data z tabulek kol, bez jádra) – drawing-geartable.ts
+        if (!meta.gears && m.opts?.gearTable && dd.kind !== "assembly") meta = { ...meta, gears: gearTablesOf(m.doc) };
         // osy drátu zjednodušených pružin (poloha odkazem je známá ze stavby výše)
         if (!meta.springs && springs === "simple") {
           const marks = springMarksOf(dd);

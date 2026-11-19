@@ -1,7 +1,7 @@
 /**
  * Textové příkazy výkresu (čistý parser – bez jádra, testovatelný v Node):
  * - `výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,iso] [řez XZ [odsazení N]|ne]
- *   [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]` – volby listu (tabulka VOLBY, další volba = řádek);
+ *   [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [tabulka ozubení ano|ne] [promítání E|A]` – volby listu (tabulka VOLBY, další volba = řádek);
  * - `kótovat [chytře|celkově|nic] [řetězově|od základny]` – (pře)generuje Chytré kóty;
  * - `výkres tolerance <kóta> <tolerance>`, `výkres poznámka "…"`, `výkres nepředepsané ISO 2768-mK`, `výkres hrany …`,
  *   `výkres drsnost Ra 3,2`, `výkres stav [list N|vše]`;
@@ -137,6 +137,16 @@ const ORIENT = ["na", "sirku", "sirka", "landscape", "quer", "querformat", "vysk
 /** slovo, kterým začíná další volba (konec výčtu pohledů) */
 const isOptWord = (w: string, next?: string) => VOLBY.some((r) => r.words.includes(fold(w)) && (!r.needs || r.needs(next))) || ORIENT.includes(fold(w)) || /^a[0-4]$/i.test(w);
 
+/** slova tabulky ozubení za „tabulka“ / samostatně */
+const GEAR_WORDS = ["ozubeni", "gear", "gears", "gearing", "verzahnung", "geartable", "verzahnungstabelle"];
+/** `ozubení [ano|ne]` / `gear [table] yes|no` od pozice slova ozubení `i` → počet přečtených slov */
+function gearTableOpt(t: string[], i: number, o: Partial<DrawingOptions>, sum: string[]): number {
+  const table = ["table", "tabelle", "tabulka"].includes(fold(t[i + 1] ?? "")) ? 1 : 0;
+  o.gearTable = bool(t[i + 1 + table], tr("tabulka ozubení"));
+  sum.push(o.gearTable ? tr("tabulka ozubení") : tr("bez tabulky ozubení"));
+  return 2 + table;
+}
+
 /** Volby příkazu „výkres“ – nová volba (např. natočení pohledu, poloviční řez) = nový řádek. */
 export const VOLBY: OptRow[] = [
   {
@@ -238,13 +248,22 @@ export const VOLBY: OptRow[] = [
   },
   {
     words: ["tabulka", "holetable", "bohrungstabelle"],
-    help: () => tr("tabulka děr ano|ne"),
+    help: () => tr("tabulka děr ano|ne · tabulka ozubení ano|ne"),
     read: (t, i, o, sum) => {
+      // tabulka ozubení (kola a ozubení, drawing-geartable.ts): „tabulka ozubení ano“
+      if (GEAR_WORDS.includes(fold(t[i + 1] ?? ""))) return gearTableOpt(t, i + 1, o, sum) + 1;
       const two = ["der", "holes"].includes(fold(t[i + 1] ?? ""));
       o.holeTable = bool(t[i + (two ? 2 : 1)], tr("tabulka děr"));
       sum.push(o.holeTable ? tr("tabulka děr") : tr("bez tabulky děr"));
       return two ? 3 : 2;
     },
+  },
+  {
+    // EN „gear table yes“, DE „verzahnungstabelle ja“, jedno slovo „geartable“
+    words: ["geartable", "verzahnungstabelle", "gear", "gears", "gearing", "verzahnung"],
+    help: () => tr("tabulka ozubení ano|ne"),
+    read: (t, i, o, sum) => gearTableOpt(t, i, o, sum),
+    needs: (next) => YES.has(fold(next ?? "")) || NO.has(fold(next ?? "")) || ["table", "tabelle", "tabulka"].includes(fold(next ?? "")),
   },
   {
     words: ["otoceni", "rotation", "drehung", "natoceni", "rotate"],
