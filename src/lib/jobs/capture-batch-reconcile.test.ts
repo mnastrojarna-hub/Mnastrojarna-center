@@ -585,6 +585,19 @@ describe("text e-mailu jako doklad bez souboru", () => {
   const mail = (over: Partial<ExtractedBusinessDoc> = {}) => rd("poptavka_zakaznik", { id: "mail", doc: mailDoc(over), source: "mail", aiUsed: false, bundleKey: "mail:1" });
   const stud = () => rd("vykres", { extract: { kind: "drawing", drawing: { ...drawing("SDF000637.4", "A"), title: "Stud bolt M42" } }, aiUsed: true });
 
+  it("zakázka 098 (16. 11.): poptávka z e-mailu s 1 položkou z textu + 3 výkresy s počty → každý výkres svou položku s počtem", () => {
+    const ds = ["300799154", "300799155", "300799156"].map((n, i) =>
+      rd("vykres", { extract: { kind: "drawing", drawing: { ...drawing(n, "A"), title: `Díl ${i + 1}`, quantity: 5 + i } }, aiUsed: true }));
+    const res = reconcile([mail({ items: [item("", { quantity: 1, name: "Obrábění dle výkresů FR30.224" })] }), ...ds]);
+    for (const d of ds) {
+      const st = res.docStates[d.id];
+      expect(st.kind === "drawing" && st.state.link.mode).toBe("docItem");
+    }
+    const byNo = new Map(res.state.job.items.map((i) => [i.drawingNumber, i.quantity]));
+    expect([byNo.get("300799154"), byNo.get("300799155"), byNo.get("300799156")]).toEqual(["5", "6", "7"]);
+    expect(res.warnings.some((w) => w.code === "unlinked_drawing")).toBe(false);
+  });
+
   it("e-mail + výkres bez objednávky: text je primární — zákazník z podpisu (nový), kontakt, položka z textu s počtem, výkres na ni míří, název z výkresu", () => {
     const v = stud();
     const res = reconcile([mail(), v]);

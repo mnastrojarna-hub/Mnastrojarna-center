@@ -121,9 +121,8 @@ await T("vlákno + odpověď z aplikace → odchozí ve vlákně, kopie v Odesla
   await openThread(page, "Posta: Poptávka hřídele 50 ks");
   // odpověď na PŮVODNÍ poptávku (vlákno může mít i starší odpovědi z dřívějších běhů testovacího serveru)
   const c0 = await page.getByTestId("thread-message").count();
-  const first = page.getByTestId("thread-message").first();
-  if (c0 > 1) await first.locator("button").first().click();
-  await first.getByRole("button", { name: "Odpovědět na tuto zprávu" }).click();
+  // Pošta po zprávách (16. 11.): otevřená je jen ta zpráva — Odpovědět je v hlavičce
+  await page.getByTestId("btn-reply").click();
   const dlg = page.getByTestId("compose-dialog");
   await dlg.waitFor();
   await dlg.getByTestId("compose-from").filter({ hasText: BOX }).waitFor({ timeout: 20_000 });
@@ -147,7 +146,7 @@ await T("vlákno + odpověď z aplikace → odchozí ve vlákně, kopie v Odesla
   const id = boxId();
   const tid = sql(`select thread_id from emails where mailbox_id = '${id}' and subject = 'Posta: Poptávka hřídele 50 ks'`);
   expect(sql(`select thread_id || '|' || direction || '|' || owner_id from emails where message_id = '${mid}'`) === `${tid}|out|${adminId}`, "odchozí ve vlákně, autor admin");
-  await page.getByTestId("thread-message").filter({ hasText: TAG }).waitFor({ timeout: 20_000 });
+  // Pošta po zprávách (16. 11.): detail ukazuje jen otevřenou zprávu — odpověď je samostatně v Odeslaných
   // zákazník odpoví → Přijmout a odeslat → 3 zprávy ve vlákně
   await new Promise((r) => setTimeout(r, 1100));
   await addMsg({ subject: "Re: Posta: Poptávka hřídele 50 ks", body: `Děkujeme ${TAG}`, from: "Jan Dvořák <dvorak@strojmetal.test>", inReplyTo: mid, references: `<e2e-1.postanastrojarstvitest@nastrojarstvi.test> ${mid}` });
@@ -155,9 +154,10 @@ await T("vlákno + odpověď z aplikace → odchozí ve vlákně, kopie v Odesla
   // stáhne tlačítko, nebo dřív živá pošta na pozadí (v otevřené Poště každých 30 s) — výsledek je stejný
   await page.getByTestId("sync-msg").filter({ hasText: /Přijato \d+, odesláno \d+/ }).waitFor({ timeout: 90_000 });
   await eventually(async () => sql(`select count(*) from emails where mailbox_id = '${id}' and thread_id = '${tid}'`) === String(c0 + 2), "odpověď zákazníka ve vlákně (DB)", 60_000);
-  await eventually(async () => (await page.getByTestId("thread-message").count()) === c0 + 2, "vlákno má o 2 zprávy víc (moje odpověď + odpověď zákazníka)", 30_000);
-  const dirs = await page.getByTestId("thread-message").evaluateAll((els) => els.map((e) => e.getAttribute("data-direction")));
-  expect(dirs[0] === "in" && dirs.slice(-2).join(",") === "out,in", `pořadí od nejstarší: ${dirs}`);
+  // seznam po zprávách: odpověď zákazníka jako samostatný řádek, otevření ukáže jen ji
+  await page.getByTestId("mail-search").fill(`Děkujeme ${TAG}`);
+  await page.getByTestId("thread-row").filter({ hasText: "Re: Posta: Poptávka hřídele 50 ks" }).first().waitFor({ timeout: 30_000 });
+  expect((await page.getByTestId("thread-message").count()) <= 1, "detail ukazuje jen jednu zprávu");
   if (SHOTS) {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.screenshot({ path: path.join(SHOTS, "vlakno-1280-light.png"), fullPage: false });
@@ -312,8 +312,9 @@ await T("review: otevření pošty nic samo nepřečte; Přeposlat bere přijato
   await page.getByTestId("mail-search").fill(`Výkres ${TAG}`);
   await page.waitForTimeout(800);
   await openThread(page, `Výkres ${TAG}`);
-  await eventually(async () => (await page.getByTestId("thread-message").count()) >= 2, "vlákno obsahuje i odeslané přeposlání", 20_000);
-  expect(await page.getByTestId("thread-message").last().getAttribute("data-direction") === "out", "poslední zpráva vlákna je naše");
+  // po zprávách: otevře se přijatá zpráva s výkresem (přeposlání je samostatně v Odeslaných)
+  await page.getByTestId("thread-message").first().waitFor({ timeout: 20_000 });
+  expect(await page.getByTestId("thread-message").count() === 1, "otevřená jen jedna zpráva");
   await page.getByTestId("btn-forward").click();
   const dlg = page.getByTestId("compose-dialog");
   await dlg.getByTestId("compose-attachments").filter({ hasText: "vykres-H200.pdf" }).waitFor({ timeout: 10_000 });
@@ -345,7 +346,7 @@ await T("review (mobil): načtení seznamu nic nepřečte; detail až po ťuknut
   expect(sql(`select is_read from emails where subject = 'Mobil ${TAG}'`) === "f", "mobil: seznam nic nepřečetl");
   expect(await page.getByTestId("thread-view").count() === 0, "mobil: skrytý detail se nenačítá");
   const top = await page.getByTestId("thread-row").first().boundingBox();
-  expect(top && top.y < 844 * 0.5, `první vlákno v horní polovině obrazovky (y = ${top?.y})`);
+  expect(top && top.y < 844 * 0.6, `první zpráva v horní části obrazovky (pod skupinou „Dnes") (y = ${top?.y})`);
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, "review-mobil-seznam-390-light.png") });
   await row.locator("button").first().click();
   await page.getByTestId("thread-view").first().waitFor({ timeout: 20_000 });

@@ -286,6 +286,10 @@ export interface PoFileSource {
   message?: string | null;
   /** Přípona skutečně odesílaného souboru (anonymizovaná kopie / originál modelu). */
   ext: string;
+  /** Výkres v archivu (drawings.id) — shoda s order_items.drawing_id. */
+  drawing_id?: string | null;
+  /** Číslo výkresu přečtené AI ze souboru (ai_extracted.drawingNumber). */
+  drawingNumber?: string | null;
 }
 
 export interface PoLineRef {
@@ -294,6 +298,8 @@ export interface PoLineRef {
   drawingNumber: string | null;
   revision: string | null;
   label: string;
+  /** Výkres položky v archivu (order_items.drawing_id). */
+  drawingId?: string | null;
 }
 
 export interface PoAttachmentCandidate {
@@ -310,6 +316,10 @@ export interface PoAttachmentCandidate {
   checked: boolean;
   /** Revize, kterou soubor nese (stará revize). */
   revision?: string | null;
+  /** Soubor zakázky bez shody s položkou této objednávky — jen k ručnímu přidání. */
+  extra?: boolean;
+  /** Původní název souboru v Dokumentech (jen pro náš dialog, dodavatel ho nevidí). */
+  sourceName?: string;
 }
 
 export interface PoAttachmentPlan {
@@ -351,6 +361,16 @@ export function poAttachmentPlan(
       // soubor patří jinému dílu zakázky — nikdy (ani podle názvu)
       return [];
     }
+    // stejný výkres v archivu (položka ↔ soubor), pak číslo výkresu přečtené ze souboru, pak název souboru
+    if (f.drawing_id) {
+      const byDrawing = lines.filter((l) => l.drawingId && l.drawingId === f.drawing_id);
+      if (byDrawing.length) return byDrawing;
+    }
+    const read = normDrawing(f.drawingNumber ?? null);
+    if (read.length >= 3) {
+      const byRead = lines.filter((l) => normDrawing(l.drawingNumber) === read);
+      if (byRead.length) return byRead;
+    }
     const flat = normDrawing(f.filename);
     return lines.filter((l) => {
       const n = normDrawing(l.drawingNumber);
@@ -372,7 +392,17 @@ export function poAttachmentPlan(
   for (const f of sorted) {
     if (f.kind !== "vykres" && f.kind !== "model_3d" && !f.model) continue;
     const ls = lineOf(f);
-    if (!ls.length) continue;
+    if (!ls.length) {
+      // výkres / model zakázky bez shody s položkou objednávky — nabídne se nezaškrtnutý (ruční přidání; 16. 11.)
+      if (f.archived) continue;
+      idx++;
+      out.push({
+        fileId: f.id, role: f.model ? "model" : "drawing", lines: [],
+        name: uniq(poNeutralName({ drawingNumber: f.drawingNumber ?? null, revision: null, ext: f.ext, poNumber: opts.poNumber, index: idx })),
+        size: f.size ?? null, status: f.status, message: f.message ?? null, checked: false, extra: true, sourceName: f.filename,
+      });
+      continue;
+    }
     const l = ls[0];
     idx++;
     let role: PoAttachmentRole;
@@ -399,6 +429,7 @@ export function poAttachmentPlan(
       status: f.status,
       message: f.message ?? null,
       checked: role !== "old" && f.status !== "blocked" && inFocus,
+      sourceName: f.filename,
       ...(role === "old" ? { revision } : {}),
     });
   }

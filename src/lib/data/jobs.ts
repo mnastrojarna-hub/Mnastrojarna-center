@@ -16,7 +16,7 @@ import {
   JOB_LIST_SELECT, JOB_DETAIL_SELECT, JOB_QUOTE_SELECT, QUOTE_LIST_SELECT, JOB_FILE_SELECT,
   JOB_FILE_LIST_SELECT, JOB_EVENT_SELECT, JOB_COUNT_SELECT, MATCH_JOB_SELECT, MATCH_CUSTOMER_SELECT,
   rowToJobListItem, rowToJobDetail, rowToJobQuote, rowToJobFile, resolveStageFilter, filterJobs,
-  sortJobs, countJobStages, emptyStageCounts, isUuid, one, searchNormalize, isQuoteStatus, fetchPaged,
+  sortJobs, rankBySearch, countJobStages, emptyStageCounts, isUuid, one, searchNormalize, isQuoteStatus, fetchPaged,
   OVERDUE_INVOICE_SELECT, isOverdueInvoiceRow, isPremiumCustomer,
   type JobRow, type QuoteRow, type FileRow, type EventRow, type JobStageCounts, type ViewOptions,
 } from "@/lib/jobs/mapping";
@@ -208,6 +208,23 @@ async function loadJobItemsByIds(ids: string[]): Promise<JobListItem[] | null> {
   return ids.map((id) => byId.get(id)).filter((j): j is JobListItem => Boolean(j));
 }
 
+/** Výsledky hledání z DB (job_search): id zakázky → skóre; null = bez hledání nebo DB hledání nejde (pak jen seznam). */
+async function searchJobHits(db: Awaited<ReturnType<typeof createOperatorClient>>, q: string | undefined): Promise<Map<string, number> | null> {
+  const words = (q ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 8);
+  if (!words.length) return null;
+  try {
+    const { data, error } = await db.rpc("job_search" as never, { p_words: words, p_limit: 2000 } as never);
+    if (error) {
+      console.error(`[data:jobs:search] ${error.message}`);
+      return null;
+    }
+    return new Map(((data ?? []) as { job_id: string; score: number }[]).map((r) => [r.job_id, Number(r.score) || 0]));
+  } catch (err) {
+    console.error(`[data:jobs:search] ${err instanceof Error ? err.message : String(err)}`);
+    return null;
+  }
+}
+
 /** Zakázky Knihy; s opts.scope jen „moje" obchodního toku (stránky toku), bez něj všechny (Kniha). */
 export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}): Promise<JobListItem[]> {
   const narrowed = narrowScope(opts);
@@ -229,12 +246,14 @@ export async function listJobs(filters: JobFilters = {}, opts: ScopeOptions = {}
       narrowed, light,
     );
     if (!items) return [];
+    // hledání (16. 11.): DB prohledá i položky, doklady, poznámky a obsah dokumentů; skóre = relevance
+    const hits = await searchJobHits(s.db, filters.q);
     const filtered = filterJobs(items, {
-      q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
+      searchHits: hits, q: filters.q, deadline: filters.deadline, step: filters.step, location: filters.location, payment: filters.payment,
       inquiry: filters.inquiry, order: filters.order, delivery: filters.delivery, deliveredToCustomer: filters.deliveredToCustomer,
       paid: filters.paid, exception: filters.exception, lostReason: filters.lostReason, premium: filters.premium,
     });
-    const sorted = sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc");
+    const sorted = rankBySearch(sortJobs(filtered, filters.sort ?? "created", filters.dir ?? "desc"), hits, filters.q);
     const limit = filters.limit && filters.limit > 0 ? Math.floor(filters.limit) : undefined;
     const top = limit ? sorted.slice(0, limit) : sorted;
     if (!light) return top;

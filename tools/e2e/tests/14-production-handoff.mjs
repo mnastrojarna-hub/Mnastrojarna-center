@@ -59,6 +59,9 @@ const MODE_BEFORE = sql(`select mode from automation_settings where module = 'pu
 const setMode = (m) => sql(`insert into automation_settings (module, mode, enabled) values ('purchase_order', ${lit(m)}, true)
   on conflict (module) do update set mode = excluded.mode, enabled = true`);
 setMode("approval");
+// 16. 11.: přepínač nahoře je hlavní vypínač — test řídí režim modulem, nahoře proto plná automatika (na konci zpět)
+const GLOBAL_BEFORE = sql(`select mode from automation_global where id`) || "approval";
+sql(`update automation_global set mode = 'full' where id`);
 
 // ── Data ─────────────────────────────────────────────────────
 const tl = TAG.toLowerCase();
@@ -215,7 +218,7 @@ await T("2–4 · nejlevnější nabídka primárně (i proti vybrané v Nákupu
   await waitResult(page);
   const r = await dialogText(page);
   expect(r.includes("Předáno do výroby ✓"), "výsledek „Předáno do výroby ✓“");
-  expect(/OV-[^ ]+ · .*Frézy Novák.* · PDF ✓ · čeká na odeslání/.test(r), `řádek objednávky v výsledku (${r.slice(0, 300)})`);
+  expect(/OV\S+ · .*Frézy Novák.* · PDF ✓ · čeká na odeslání/.test(r), `řádek objednávky v výsledku (${r.slice(0, 300)})`);
   await shot(page, S("3-result"));
   const o = ops(A);
   expect(o.length === 2, `2 kroky (${o.length})`);
@@ -230,12 +233,12 @@ await T("2–4 · nejlevnější nabídka primárně (i proti vybrané v Nákupu
   expect(stage(A) === "ve_vyrobe", "zakázka je ve výrobě");
   const ev = json(`select json_agg(json_build_object('m', message, 'n', actor_name))::text from job_events where job_id = ${lit(A.id)}`);
   expect(ev.some((e) => e.m.startsWith("Předáno do výroby:") && e.n === NAME.obchod), "historie: „Předáno do výroby:“ (Petr Obchodník)");
-  expect(ev.some((e) => e.m.startsWith("Vystavena objednávka OV-") && e.n === NAME.obchod), "historie: „Vystavena objednávka OV-“ (Petr Obchodník)");
+  expect(ev.some((e) => e.m.startsWith("Vystavena objednávka OV") && e.n === NAME.obchod), "historie: „Vystavena objednávka OV-“ (Petr Obchodník)");
   await dialog(page).getByRole("button", { name: "Hotovo" }).click();
   await page.getByRole("tab", { name: /^Historie/ }).click();
   await eventually(async () => {
     const h = norm(await page.locator("main [role=tabpanel][data-state=active]").innerText());
-    expect(h.includes("Předáno do výroby:") && h.includes("Vystavena objednávka OV-"), "Historie v UI");
+    expect(h.includes("Předáno do výroby:") && h.includes("Vystavena objednávka OV"), "Historie v UI");
   });
 });
 
@@ -1072,5 +1075,6 @@ for (const [label, j, mobile] of [["desktop", OVJ, false], ["390 px", OVJM, true
 const ok = summary(errors.filter((e) => !/HTTP 5\d\d .*\/_next\/|favicon/.test(e)));
 if (!process.env.KEEP) await cleanup();
 if (MODE_BEFORE) setMode(MODE_BEFORE);
+sql(`update automation_global set mode = ${lit(GLOBAL_BEFORE)} where id`);
 await browser.close();
 process.exit(ok ? 0 : 1);

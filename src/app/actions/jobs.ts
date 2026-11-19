@@ -33,6 +33,9 @@ import {
 import { applyJobValueToItems, loadJobMoneyContext, type JobMoneyContext } from "@/lib/jobs/consistency-store";
 import { syncJobFromQuote } from "@/lib/jobs/quote-job-sync-store";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { syncSavedPurchasePrices } from "@/lib/jobs/po-price-sync";
+import { fetchPurchaseOrder } from "@/lib/data/purchasing";
+import { storePurchaseOrderPdfCore } from "@/lib/jobs/purchase-order-docs";
 
 /**
  * Akce Knihy zakázek: zakázka, položky, stav, komentáře a nabídky.
@@ -690,6 +693,21 @@ export async function saveJobItems(jobId: string, items: JobItemInput[]): Promis
     if (Object.keys(update).length) {
       const { error: upErr } = await db.from("orders").update(update as never).eq("id", jobId);
       if (upErr) return fail(upErr.message);
+    }
+    // nová / změněná nákupní cena → do neodeslaných objednávek dodavatelům (+ PDF), ať neodejde stará (16. 11.)
+    if (margins) {
+      const priceChanges = existing.map((e) => ({
+        orderItemId: e.id, before: cleanNumber(old.get(e.id)?.purchase_unit_price), after: cleanNumber(e.row.purchase_unit_price),
+      }));
+      try {
+        const touched = await syncSavedPurchasePrices(db, jobId, priceChanges);
+        for (const poId of touched) {
+          const po = await fetchPurchaseOrder(db, poId);
+          if (po?.fileId) await storePurchaseOrderPdfCore(db, { id: user.id, fullName: user.fullName }, po, { replaceFileId: po.fileId });
+        }
+      } catch (err) {
+        console.error(`[jobs] Nákupní ceny do objednávek zakázky ${jobId}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
     if (update.value !== undefined && cleanNumber(job.value) !== cleanNumber(update.value)) {
       const ctx = await loadJobMoneyContext(db, jobId, { margins: false });

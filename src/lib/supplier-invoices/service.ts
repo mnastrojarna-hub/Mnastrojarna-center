@@ -519,7 +519,12 @@ async function proposeFor(db: JobsDb, id: string, ex: SupplierInvoiceExtract, co
   }
   if (poNumbers.length) {
     // čísla OV porovnává matching (normalizace) — načíst kandidáty podle číslic čísla
-    const ors = poNumbers.map((n) => `number.ilike.%${n.replace(/[^0-9]/g, "").slice(-3)}%`).join(",");
+    // OV2026/026-1 → „026" (číslo zakázky), starší OV-2026-015 → posledních 3 číslic
+    const key = (n: string) => {
+      const g = n.match(/\d+/g) ?? [];
+      return g.length >= 3 ? g[g.length - 2] : n.replace(/[^0-9]/g, "").slice(-3);
+    };
+    const ors = [...new Set(poNumbers.map(key).filter(Boolean))].map((k) => `number.ilike.%${k}%`).join(",");
     const { data } = await db.from("purchase_orders").select(PO_SELECT).or(ors).limit(200);
     for (const r of (data ?? []) as Row[]) pos.set(r.id as string, r);
   }

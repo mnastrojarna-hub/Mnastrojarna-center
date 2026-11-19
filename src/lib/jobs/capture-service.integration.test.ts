@@ -344,6 +344,9 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
     const { data: before } = await db.from("automation_settings").select("module").eq("module", "capture").maybeSingle();
     expect(before).toBeNull(); // výchozí stav = kontrola člověkem
     await db.from("automation_settings").insert({ module: "capture", mode: "full", enabled: true });
+    // 16. 11.: přepínač nahoře (automation_global) je hlavní vypínač — modul „full“ platí jen při globální plné automatice
+    const globalBefore = ((await db.from("automation_global").select("mode").eq("id", true).maybeSingle()).data as { mode: string } | null)?.mode ?? "approval";
+    await db.from("automation_global").update({ mode: "full" }).eq("id", true);
     try {
       const page = await upload("dl-auto.jpg");
       const res = await s.analyzeCapture({ files: [page], jobId: manualJobId });
@@ -358,6 +361,7 @@ describe.skipIf(!ENABLED)("Vyfotit doklad ↔ lokální Supabase (E2E)", () => {
       expect(await exists(r.captureSessionPath(admin.id, single(res).model.captureId))).toBe(false);
     } finally {
       await db.from("automation_settings").delete().eq("module", "capture");
+      await db.from("automation_global").update({ mode: globalBefore }).eq("id", true);
     }
   }, 60_000);
 

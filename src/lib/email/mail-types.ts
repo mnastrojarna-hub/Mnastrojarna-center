@@ -42,6 +42,8 @@ export interface ThreadQuery {
   sort?: MailSort;
   offset?: number;
   limit?: number;
+  /** Seznam po zprávách (Pošta jako Outlook — každá zpráva samostatně, bez konverzací; 16. 11.). */
+  perMessage?: boolean;
 }
 
 export interface ThreadSummary {
@@ -200,6 +202,12 @@ export function progressText(total: number, remaining: number): string {
 }
 
 /** „1 vlákno", „2 vlákna", „5 vláken" (počet v hlavičce seznamu). */
+/** „297 zpráv" (Pošta po zprávách). */
+export function messageCountLabel(n: number): string {
+  const f = n.toLocaleString("cs-CZ");
+  return `${f} ${n === 1 ? "zpráva" : n >= 2 && n <= 4 ? "zprávy" : "zpráv"}`;
+}
+
 export function threadCountLabel(n: number): string {
   const f = n.toLocaleString("cs-CZ");
   return `${f} ${n === 1 ? "vlákno" : n >= 2 && n <= 4 ? "vlákna" : "vláken"}`;

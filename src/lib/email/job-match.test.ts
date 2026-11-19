@@ -14,6 +14,8 @@ describe("signály z textu", () => {
       expect.arrayContaining(["NAB-2026-031", "Z-2026-013", "OV-2026-005"]),
     );
     expect(extractOurNumbers("k Vaší nabídce č. 31/2026 a zakázce 7/2026")).toEqual([]);
+    // objednávka podle zakázky (16. 11.)
+    expect(extractOurNumbers("Potvrzení objednávky OV2026/026-1", "dle obj. OV 2026/26 - 2")).toEqual(["OV2026/026-1", "OV2026/026-2"]);
     expect(extractWordNumbers("k Vaší nabídce č. 31/2026 a zakázce 7/2026")).toEqual(["NAB-2026-031", "Z-2026-007"]);
     expect(extractOurNumbers("OV-2026-005")).toEqual(["OV-2026-005"]);
     expect(extractOurNumbers("bez čísel 2026")).toEqual([]);

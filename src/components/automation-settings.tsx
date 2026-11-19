@@ -24,7 +24,7 @@ const modules = [
   { key: "mail_job_stage", label: "Speciální stav zakázky z pošty", desc: "Reklamace, nerealizováno (jiný dodavatel, cena), storno objednávky, pozastavení a pokračování podle e-mailu zákazníka — přepnout hned (vrátit / změnit jedním ťuknutím); jinak návrh ve frontě a ve vlákně", recommended: "approval" },
 ] as const;
 
-export function AutomationSettings({ initial }: { initial?: Record<string, Mode> }) {
+export function AutomationSettings({ initial, globalMode }: { initial?: Record<string, Mode>; globalMode?: Mode }) {
   const [state, setState] = React.useState<Record<string, Mode>>(() =>
     Object.fromEntries(modules.map((m) => [m.key, (initial?.[m.key] ?? m.recommended) as Mode])),
   );
@@ -45,6 +45,12 @@ export function AutomationSettings({ initial }: { initial?: Record<string, Mode>
 
   return (
     <div className="divide-y">
+      {globalMode !== "full" && (
+        <p className="mb-3 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs" data-testid="automation-master-off">
+          Hlavní přepínač nahoře je <b>Se schválením</b> — všechny moduly teď čekají na schválení, nastavení níže platí
+          až po přepnutí nahoře na <b>Plná automatika</b>.
+        </p>
+      )}
       {error && <p className="pb-2 text-sm text-destructive">{error}</p>}
       {modules.map((m) => (
         <div key={m.key} className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0">

@@ -38,13 +38,14 @@ export async function listThreadsAction(q: ThreadQuery): Promise<ThreadPage & { 
     sort: isMailSort(q?.sort) ? q.sort : "date",
     offset: Number(q?.offset) || 0,
     limit: Number(q?.limit) || 50,
+    perMessage: q?.perMessage === true,
   };
   const [page, counts] = await Promise.all([listThreads(query), query.offset ? Promise.resolve(undefined) : getFolderCounts(query.mailboxId)]);
   return { ...page, ...(counts ? { counts } : {}) };
 }
 
 /** Detail vlákna; otevřením se příchozí zprávy označí jako přečtené a předání jako přečtené. */
-export async function openThreadAction(threadId: string, opts: { markRead?: boolean } = {}): Promise<ThreadDetail> {
+export async function openThreadAction(threadId: string, opts: { markRead?: boolean; onlyEmailId?: string | null } = {}): Promise<ThreadDetail> {
   const access = await checkFeature("mail");
   if ("error" in access) return { ok: false, error: access.error };
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase není nakonfigurováno." };
@@ -55,7 +56,9 @@ export async function openThreadAction(threadId: string, opts: { markRead?: bool
     // přečteno jen u zpráv, které jsou moje vlastním právem — kolega, kterému bylo vlákno předáno,
     // majiteli schránky nepřečtenou poštu „nepřečte" (jeho stav je email_shares.read_at)
     const scope = await getMailScope();
-    const candidates = (detail.messages ?? []).filter((m) => m.direction === "in" && !m.isRead).map((m) => m.id);
+    // Pošta po zprávách (16. 11.): přečtená je jen otevřená zpráva, ne celé vlákno
+    const candidates = (detail.messages ?? [])
+      .filter((m) => m.direction === "in" && !m.isRead && (!opts.onlyEmailId || m.id === opts.onlyEmailId)).map((m) => m.id);
     let unread: string[] = [];
     if (scope && candidates.length) {
       const { data: own } = await c.from("emails").select("id, owner_id, mailbox_id").in("id", candidates);

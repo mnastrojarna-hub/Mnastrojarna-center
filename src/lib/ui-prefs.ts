@@ -28,7 +28,7 @@ export const MAIL_LIST_MAX = 1600;
 /** Detail zprávy nejméně (px) — na úzké obrazovce (1024) ustoupí seznamu jeho minimu. */
 export const MAIL_DETAIL_MIN = 480;
 /** Výchozí podíl seznamu ze šířky seznam + detail. */
-export const MAIL_LIST_DEFAULT_RATIO = 0.3;
+export const MAIL_LIST_DEFAULT_RATIO = 0.42; // Outlook: širší seznam (odesílatel, předmět, náhled)
 /** Krok klávesnice (šipky), se Shiftem větší. */
 export const MAIL_LIST_STEP = 16;
 export const MAIL_LIST_STEP_BIG = 64;

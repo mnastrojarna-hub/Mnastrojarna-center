@@ -1,6 +1,6 @@
 // E2E: Faktury dodavatelů. Zaměstnanec na mobilu (390 px) zanese fakturu → „Faktura zapsána ✓" s hlavičkou
 // (31. 10.) a seznam ani detail faktur nevidí. Super admin ji otevře (AI už navrhla rozdělení podle
-// OV-2099-901 a dopravu do režie), položku „Kalení — sdružené zakázky" rozdělí 600 / 400 na dvě zakázky
+// OV2099/901-1 a dopravu do režie), položku „Kalení — sdružené zakázky" rozdělí 600 / 400 na dvě zakázky
 // (Rozdělit → částka → zbytek se dopočítá), uloží a potvrdí, označí zaplaceno. Zakázka v Nákupu ukáže
 // skutečný náklad z faktury. Režim „všichni vidí faktury" — obchodník vidí, zaplaceno nemění.
 // Dodavatelé → „Přiložit fakturu" založí dodavatele z hlavičky.
@@ -17,7 +17,7 @@ const SHOTS = process.env.SINV_SHOTS || path.join(os.tmpdir(), "inv-shots");
 fs.mkdirSync(SHOTS, { recursive: true });
 const STAMP = Date.now().toString(36).toUpperCase();
 const PREFIX = "Z-E2E-SINV-";
-const PO_NUMBER = "OV-2099-901";
+const PO_NUMBER = "OV2099/901-1";
 const HRUBY = "d4000000-0000-0000-0000-000000000001";
 const lit = (v) => (v === null || v === undefined ? "null" : `'${String(v).replace(/'/g, "''")}'`);
 const INVOICE_WHERE = "(supplier_key = '25874411' and number_norm = 'FA20260815') or supplier_key = '27999990' or number like 'E2E-SINV-%'";
@@ -186,7 +186,7 @@ await test("zaměstnanec (390 px): Zanést fakturu → „Faktura zapsána ✓�
   }
 });
 
-await test("AI přečetla fakturu: dodavatel Hrubý, 3 položky, návrhy (OV-2099-901 → zakázka A, doprava → režie), ke kontrole", async () => {
+await test("AI přečetla fakturu: dodavatel Hrubý, 3 položky, návrhy (OV2099/901-1 → zakázka A, doprava → režie), ke kontrole", async () => {
   expect(invoiceId, "chybí faktura z předchozího kroku");
   const row = await eventually(() => {
     const r = sql(`select status || '|' || coalesce(supplier_id::text, '') || '|' || (select count(*) from supplier_invoice_items where invoice_id = ${lit(invoiceId)}) from supplier_invoices where id = ${lit(invoiceId)}`);
@@ -199,7 +199,7 @@ await test("AI přečetla fakturu: dodavatel Hrubý, 3 položky, návrhy (OV-209
   const allocs = sql(`select a.target || ':' || coalesce(o.number, a.overhead_category) || ':' || a.amount::numeric(12,2) || ':' || a.ai_suggested || ':' || (a.confirmed_at is not null)
     from supplier_invoice_allocations a join supplier_invoice_items i on i.id = a.item_id left join orders o on o.id = a.job_id
     where a.invoice_id = ${lit(invoiceId)} order by i.position, a.amount desc`).split("\n").filter(Boolean);
-  expect(allocs.includes(`job:${numA}:30000.00:true:false`), `návrh pro OV-2099-901: ${allocs.join(", ")}`);
+  expect(allocs.includes(`job:${numA}:30000.00:true:false`), `návrh pro OV2099/901-1: ${allocs.join(", ")}`);
   expect(allocs.includes("rezie:doprava:500.00:true:false"), `návrh dopravy: ${allocs.join(", ")}`);
   const queue = sql(`select count(*) from approval_queue where type::text = 'supplier_invoice' and payload->>'invoiceId' = ${lit(invoiceId)} and status = 'pending'`);
   expect(queue === "1", `fronta ke schválení: ${queue}`);
@@ -455,10 +455,10 @@ await test("faktura v EUR bez kurzu: banner „Chybí kurz“, náklad zakázky 
 
 await test("dílčí faktura na objednávku 30 000: náklad zůstane 30 000; „Faktura konečná“ → skutečnost 10 000 (i provize)", async () => {
   const job = mkJob("PO", "Příruby — dílčí faktura (E2E)");
-  const po = sql(`insert into purchase_orders (job_id, supplier_id, number, status, total) values (${lit(job)}, ${lit(HRUBY)}, 'OV-2099-977', 'potvrzena', 30000) returning id`).split("\n")[0].trim();
+  const po = sql(`insert into purchase_orders (job_id, supplier_id, number, status, total) values (${lit(job)}, ${lit(HRUBY)}, 'OV2099/977-1', 'potvrzena', 30000) returning id`).split("\n")[0].trim();
   const inv = sql(`insert into supplier_invoices (supplier_id, supplier_ico, supplier_name, number, currency, total_net, total_vat, total_gross, status, source, issue_date)
     values (${lit(HRUBY)}, '25874411', 'Kovoobrábění Hrubý s.r.o.', ${lit(`E2E-SINV-PART-${STAMP}`)}, 'CZK', 10000, 2100, 12100, 'ke_kontrole', 'upload', '2026-10-25') returning id`).split("\n")[0].trim();
-  const item = sql(`insert into supplier_invoice_items (invoice_id, position, text, amount) values (${lit(inv)}, 0, 'Soustružení — 1. část dle obj. OV-2099-977', 10000) returning id`).split("\n")[0].trim();
+  const item = sql(`insert into supplier_invoice_items (invoice_id, position, text, amount) values (${lit(inv)}, 0, 'Soustružení — 1. část dle obj. OV2099/977-1', 10000) returning id`).split("\n")[0].trim();
   sql(`insert into supplier_invoice_allocations (invoice_id, item_id, target, job_id, purchase_order_id, amount, confirmed_at) values (${lit(inv)}, ${lit(item)}, 'job', ${lit(job)}, ${lit(po)}, 10000, now())`);
   const cost = () => sql(`select cost::numeric(12,2) || '|' || known from job_cost(${lit(job)})`);
   const commission = () => sql(`select coalesce(cost::numeric(12,2)::text, '-') from commission_entries where order_id = ${lit(job)}`);
