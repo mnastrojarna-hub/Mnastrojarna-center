@@ -42,6 +42,7 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 15. 11. 05:03 | Kola (F): balík core HOTOV (`w19-core2` `1bf6525`, `S/w19/core.patch` 43 souborů proti `3814b85`): 14 druhů kol (čelní/šikmé/šípové/vnitřní, hřeben, kuželové přímé i spirální, hypoidní, šnek + šnekové kolo, cykloidní, kotouč reduktoru, řetězové ISO 606, řemenice HTD/T, rohatka), prvky `gear.*`, výstup kolo/polotovar/zuby, soukolí přes existující příkazy, CLI ověřeno; e2e 20/20. Omezení: šnekové kolo 8,6 s, hypoid/spirální jen nominální boky, některé tabulkové hodnoty ISO 606/BS 978/DIN 7721 z paměti (ověří kontrola). BĚŽÍ `verify:w19r-core`, pak ui + text. E: balíky help a runs v implementaci (export čeká na volný slot). D2 obrázky + D3 PDF příručka až po F (úvodní obrazovka dostane Kola). |
 | 19. 11. 18:10 | Oba workflow (F kola `wf_fe2fa9ab-38a`, E `wf_afc90a94-180`) mezitím spadly na týdenní limit; po obnovení limitu znovu rozjety s `resumeFromRunId` (běží: kola `verify:w19r-core` → ui + text; E balíky help a runs, export čeká). Zálohy rozpracovaných souborů E: `S/e/e-help-wip-11191817.patch`, `S/e/e-runs-wip-11191817.patch`. |
 | 19. 11. 18:21 | **Majitel: „krátký odkaz musí fungovat“** – živý `https://www.mnastrojarna.cz/cad/share/?ping` vracel HTTP 500 s prázdným tělem (fatální chyba PHP na hostingu; reprodukováno zakázanou funkcí PHP). OPRAVA **sloučena do `main` (PR #110, `39fbddd`)**: `cad/share/index.php` je teď zavaděč pro PHP 7.0–8.x (vrací čitelný JSON `php_too_old` / `php_functions_disabled` / `php_fatal`), logika je v novém `store.php` (náhrady volitelných funkcí, `?diag`), CAD ukáže skutečný důvod. Testy share-php (25 zakázaných funkcí), share-self, e2e sdílení zelené; GitHub `acceptance (22)` zelená. **Čeká na ruční nasazení majitelem** (`npm run build:ftp`, nahrát celý `out/` – nově i `out/cad/share/store.php`); pak ověřit `curl …/cad/share/?ping` a `?diag`. Před nasazením živý web pořád 500 a `store.php` 404 (ověřeno 18:21). |
+| 19. 11. 19:05 | **NOVÁ zpráva majitele: „Podklad pro opravy“ z testu M1 (24 bodů) → vlna 22, kapitola 7d, priorita před F a E.** Spuštěn rozbor `wf_d8049a90-ec6` (bez buildu, CLI `0.1.0-e69e3305`, jen čtení repozitáře). Kola (F) a E dál běží; stroj má jen 4 jádra → každý workflow 2 agenty naráz. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -348,6 +349,26 @@ Zadání majitele: „Online CAD neumí pružiny a to ani pro simulaci pohybu.�
       tuhost ručně ověřit); sestava se 4 pružinami pod stírací deskou → dynamika → deska se vrátí na doraz, graf, CSV.
 - [x] H4. (hotovo 15. 11. 04:31, PR #102) Dokumentace (kapitola Prvky – pružiny, Sestavy – pohyb a dynamika, FAQ „Jak udělám pružinu?“), PR, sloučit,
       smazat `w21-*`.
+
+## 7d. Úkol I – vlna 22: podklad pro opravy z testu M1 (24 bodů, PRIORITA před F a E)
+
+Zpráva majitele z 19. 11. doslova v `S/w22/report.md` (kdyby zmizel scratchpad: zpráva je v konverzaci 19. 11. ~18:50).
+Hlavní požadavek: **žádné falešné zelené stavy** – výsledek analýzy patří jen k dokumentu a revizi, pro které vznikl;
+přijetí příkazu ≠ geometrický úspěch; „bez kolizí“ ≠ dostatečná vůle. Pořadí oprav podle majitele:
+1 zneplatnění starých výsledků · 2 validace geometrie a objemových exportů · 3 přidržovač/předpětí/kontakty/konflikty vazeb ·
+4 jedna studie s fázemi + editace motorů · 5 klasifikace kolizí + minimální vůle · 6 procesní střih/otisk s označením úrovně
+simulace · 7 ukládání parametrů + izolace souběžných výpočtů · 8 výkresy, kusovník, revize · 9 video, krátké odkazy, protokoly.
+Ke KAŽDÉMU bodu odevzdat: malý reprodukční soubor, očekávaný výsledek, regresní test, verzi (commit + verze CLI), ve které
+byla oprava ověřena. Názvy dílů ze zprávy (M1) do repozitáře nekopírovat – v testech neutrální názvy.
+- [ ] I1. Rozbor (workflow `wf_d8049a90-ec6`, skript `…/workflows/scripts/cad-w22-triage-wf_d8049a90-ec6.js`): 7 skupin
+      (`stale` 1/12/20/22i, `geom` 22a–d/h, `mech` 2/7/8/9, `study` 3/4/10/11/14, `clash` 5/6, `docs` 17–20/22f/g/j,
+      `out` 13/15/16/21/22e) → `S/w22/triage/<skupina>.md`, reprodukce `S/w22/repro/<bod>/`, oponent ke každému FIXED,
+      kontrola úplnosti `S/w22/triage/critic.md`.
+- [ ] I2. Z rozboru navrhnout balíky oprav (worktree `w22-<balík>`, patche `S/w22/<balík>.patch`), každý implementace →
+      nezávislá kontrola → opravy; pořadí podle majitele. Překryv s rozpracovaným E (`e-runs`: stručný protokol, opakovatelné
+      běhy) řešit tak, že E se sloučí dřív a balíky vlny 22 staví na něm.
+- [ ] I3. Integrace podle kapitoly 2, e2e, vlastní zkouška, PR, sloučení; odpověď majiteli po bodech (tabulka bod → stav →
+      reprodukce → test → verze).
 
 ## 8. Co říct majiteli o nasazení (po každém sloučení)
 
