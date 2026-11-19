@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CtaBand, PageHero, SectionHeading } from "@/components/blocks";
+import { DocsSearch } from "@/components/docs-search";
 import { JsonLd } from "@/components/json-ld";
 import { CAD_LINKS, cadAppHref, cadDocsHref } from "@/content/cad-links";
 import { SITE } from "@/content/site";
@@ -235,19 +236,26 @@ export function CadDocsIntlView({ locale }: { locale: L }) {
           </a>
         </div>
       </PageHero>
-      <section className="section">
+      {/* hledání na stránce (jen v prohlížeči, components/docs-search.tsx): oddíly [data-doc-search] uvnitř [data-docs-search-scope] */}
+      <div data-docs-search-scope>
+      <div className="sticky top-[76px] z-30 pt-4">
+        <div className="container max-w-4xl">
+          <DocsSearch locale={locale} root="[data-docs-search-scope]" sections="[data-doc-search]" className="rounded-2xl bg-white/95 px-2 py-2 shadow-[0_1px_0_rgba(39,36,37,0.08)] backdrop-blur" />
+        </div>
+      </div>
+      <section id="start" className="section" data-doc-search>
         <div className="container max-w-4xl">
           <SectionHeading title={t.start.h} />
           <Li items={t.start.items} />
         </div>
       </section>
-      <section className="section bg-steel-100">
+      <section id="tools" className="section bg-steel-100" data-doc-search>
         <div className="container max-w-4xl">
           <SectionHeading title={t.tools.h} />
           <Li items={t.tools.items} />
         </div>
       </section>
-      <section className="section">
+      <section id="text" className="section" data-doc-search>
         <div className="container max-w-4xl">
           <SectionHeading title={t.text.h} lead={rich(t.text.lead)} />
           <pre className="mt-6 overflow-x-auto rounded-2xl bg-ink-700 p-5 font-mono text-[14px] leading-relaxed text-white">{t.text.sample.join("\n")}</pre>
@@ -255,7 +263,7 @@ export function CadDocsIntlView({ locale }: { locale: L }) {
           <Li items={t.text.more} />
         </div>
       </section>
-      <section className="section bg-steel-100">
+      <section id="keys" className="section bg-steel-100" data-doc-search>
         <div className="container max-w-4xl">
           <SectionHeading title={t.keys.h} />
           <div className="mt-6 overflow-x-auto rounded-2xl border border-ink-700/10 bg-white">
@@ -274,8 +282,8 @@ export function CadDocsIntlView({ locale }: { locale: L }) {
       </section>
       <section className="section">
         <div className="container grid max-w-5xl gap-8 md:grid-cols-3">
-          {[t.lang, t.docs, t.privacy].map((b) => (
-            <div key={b.h} className="rounded-2xl border border-ink-700/10 bg-white p-6">
+          {[t.lang, t.docs, t.privacy].map((b, i) => (
+            <div key={b.h} id={["lang", "docs", "privacy"][i]} className="rounded-2xl border border-ink-700/10 bg-white p-6" data-doc-search>
               <h2 className="font-display text-xl font-bold uppercase text-ink-700">{b.h}</h2>
               <p className="mt-3 text-[15px] leading-relaxed text-ink-700/75">{rich(b.text)}</p>
               {"links" in b && (
@@ -293,6 +301,7 @@ export function CadDocsIntlView({ locale }: { locale: L }) {
           ))}
         </div>
       </section>
+      </div>
       <CtaBand locale={locale} />
       <JsonLd data={breadcrumbJsonLd(crumbs)} />
     </>

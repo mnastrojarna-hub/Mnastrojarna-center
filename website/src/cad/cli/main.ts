@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMainThread, workerData } from "node:worker_threads";
-import { setLang, tr } from "../i18n";
+import { getLang, setLang, tr } from "../i18n";
 import { finalizeReport, formatFull, OVERFLOW_FILE } from "../engine/protocol";
 import type { RunReport } from "../engine/protocol-types";
 import { parseArgs, usageText, UsageError, type CliArgs, type RunArgs, type SelftestArgs } from "./args";
@@ -277,7 +277,12 @@ async function cmdHelp(topic: string[], io: Io): Promise<number> {
     io.stdout(AGENT_COMMANDS.map((c) => `${c.cmd}\n    ${c.en} · ${c.de} – ${c.desc}`).join("\n"));
     return 0;
   }
-  throw new UsageError(tr("neznámé téma nápovědy „{0}“ – guide, commands", topic.join(" ")));
+  // tahák a hledání v nápovědě (help/answer.ts – totéž co `nápověda tahák` / `nápověda hledat …` v běhu)
+  const { cliHelpTopic } = await import("../help/cli-help");
+  const out = cliHelpTopic(topic, getLang());
+  if (out === null) throw new UsageError(tr("neznámé téma nápovědy „{0}“ – guide, commands", topic.join(" ")) + tr(", cheat, search <slova>"));
+  io.stdout(out);
+  return 0;
 }
 
 /** Celý příkaz `mncad …`; vrací kód ukončení (volající ho nastaví do `process.exitCode`). */

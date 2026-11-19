@@ -8,7 +8,7 @@
  *           [--timeout 300] [--max-mem 2048] [--progress] [--no-output-on-error]
  * mncad serve [--port 8787] [--host 127.0.0.1] [--token-file F] [--jobs 1] [--max-mem 2048] [--timeout 300] [--allow-remote]
  *             [--allow-host jméno,…] [--out DIR] [--idle-timeout 900] [--lang cs|en|de]
- * mncad help [guide|commands] · mncad version · mncad selftest [--json] [--lang cs|en|de]
+ * mncad help [guide|commands|cheat|search <slova>] · mncad version · mncad selftest [--json] [--lang cs|en|de]
  * ```
  *
  * Volby jsou anglicky (zvyk příkazové řádky), texty chyb v jazyce `--lang` (jinak `MNCAD_LANG`, jinak čeština). Chyba použití
@@ -341,12 +341,13 @@ export function usageText(): string {
     "            [--timeout 300] [--max-mem 2048] [--progress] [--no-output-on-error]",
     "  mncad serve [--port 8787] [--host 127.0.0.1] [--token-file F] [--jobs 1] [--max-mem 2048] [--timeout 300]",
     "              [--allow-remote --allow-host name,…] [--out DIR] [--idle-timeout 900]",
-    "  mncad help [guide|commands] · mncad version · mncad selftest [--json]",
+    "  mncad help [guide|commands|cheat|search <slova>] · mncad version · mncad selftest [--json]",
     "",
     tr("Kódy ukončení: 0 bez chyb · 1 chyby ✗ · 2 přísný režim zastaven · 3 chyba použití nebo souboru · 4 pád výpočtu · 5 časový limit · 6 limit paměti · 130 přerušeno"),
     tr("Výstupy: --out (výchozí ./mncad-out); --formats auto = STEP + .mncad hlavního dokumentu a PDF listů výkresu."),
     tr("Protokol: stručný (≤ 2 048 B, přebytek v protocol-full.txt), --json = jeden JSON objekt, --full = celý protokol."),
     tr("mncad help guide = celý návod pro AI agenty · mncad help commands = seznam textových příkazů"),
+    tr("mncad help cheat = tahák pro agenty (≤ 5 kB) · mncad help search <slova> = hledání v návodu, příkazech a příručce"),
     tr("Prostředí: MNCAD_LANG = jazyk · MNCAD_WASM = jádro replicad_single.wasm jinde než vedle mncad.mjs · MNCAD_FONTS = složka písem · MNCAD_ORIGIN = adresa odkazů"),
   ].join("\n");
 }
