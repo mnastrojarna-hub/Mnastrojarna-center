@@ -47,21 +47,26 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * z hlavičky X-Test-Addr – jen pro zkoušky počítadel podle adresy (IPv6 nejde na smyčce jinak napodobit). Skript úložiště
  * sám žádné takové hlavičce nevěří.
  */
-async function startPhp(env: Record<string, string> = {}, script?: Buffer, fakeAddr = false): Promise<Srv> {
+async function startPhp(env: Record<string, string> = {}, script?: Buffer, fakeAddr = false, phpArgs: string[] = []): Promise<Srv> {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "mn-share-php-"));
   const docroot = path.join(root, "www");
   fs.mkdirSync(path.join(docroot, "cad", "share"), { recursive: true });
   if (script) fs.writeFileSync(path.join(docroot, "cad", "share", "index.php"), script);
-  else fs.copyFileSync(SCRIPT, path.join(docroot, "cad", "share", "index.php"));
+  else {
+    // zavaděč index.php + logika store.php (od 19. 11.: zavaděč hlásí staré PHP, zakázané funkce a pády jako JSON)
+    fs.copyFileSync(SCRIPT, path.join(docroot, "cad", "share", "index.php"));
+    fs.copyFileSync(path.join(path.dirname(SCRIPT), "store.php"), path.join(docroot, "cad", "share", "store.php"));
+  }
   const router = path.join(root, "router.php");
   if (fakeAddr) fs.writeFileSync(router, "<?php\nif (isset($_SERVER['HTTP_X_TEST_ADDR'])) $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_TEST_ADDR'];\nrequire $_SERVER['DOCUMENT_ROOT'] . '/cad/share/index.php';\n");
   const port = await freePort();
-  const proc = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", docroot, ...(fakeAddr ? [router] : [])], { env: { ...process.env, ...env }, stdio: "ignore" });
+  const proc = spawn("php", [...phpArgs, "-S", `127.0.0.1:${port}`, "-t", docroot, ...(fakeAddr ? [router] : [])], { env: { ...process.env, ...env }, stdio: "ignore" });
   const origin = `http://127.0.0.1:${port}`;
   const base = `${origin}/cad/share/`;
   for (let i = 0; i < 200; i++) {
     try {
-      if ((await fetch(base + "?ping")).ok) break;
+      const r = await fetch(base + "?ping");
+      if (r.ok || r.status === 500) break;
     } catch {
       /* ještě neběží */
     }
@@ -911,5 +916,44 @@ describe.skipIf(!PHP_OK || !OLD_SCRIPT)("nová aplikace ↔ STARŠÍ skript úlo
     vi.stubGlobal("location", { origin: O.origin, pathname: "/cad" });
     const o = await openShareLink({ kind: "code", code: "Ab3kZ9xQ2m" });
     expect(!o.ok && o.reason).toBe("notfound");
+  }, T);
+});
+
+describe.skipIf(!PHP_OK)("hosting se zakázanými funkcemi PHP (disable_functions) – dřív prázdná chyba 500, „úložiště neodpovídá“", () => {
+  const up = (s: Srv, body: Uint8Array) =>
+    fetch(s.base + `?days=1&total=${body.length}`, { method: "POST", headers: { Origin: s.origin, "Content-Type": "application/octet-stream" }, body: body as BodyInit });
+  it("zakázané volitelné funkce: ping, nahrání, stažení beze změny a smazání fungují, ?diag je vyjmenuje", async () => {
+    const off = "ini_set,ini_get,getenv,realpath,flock,header_remove,inet_pton,inet_ntop,microtime,touch,filemtime,opendir,readdir,closedir,fflush,ftruncate,fstat,stream_get_contents,readfile,hash_equals,ctype_digit,parse_url,random_bytes,clearstatcache,is_writable";
+    const s = await startPhp({}, undefined, false, ["-d", `disable_functions=${off}`]);
+    const ping = await fetch(s.base + "?ping");
+    expect(ping.status).toBe(200);
+    expect(((await ping.json()) as { ok: boolean; v: number }).ok).toBe(true);
+    const body = rnd(200_000);
+    const r = await up(s, body);
+    expect(r.status).toBe(201);
+    const j = (await r.json()) as { id: string; del: string };
+    const dl = await fetch(s.base + `?id=${j.id}`, { headers: { Origin: s.origin } });
+    expect(dl.status).toBe(200);
+    expect(Buffer.from(await dl.arrayBuffer()).equals(Buffer.from(body))).toBe(true);
+    const del = await fetch(s.base + `?id=${j.id}`, { method: "DELETE", headers: { Origin: s.origin, "X-Delete-Token": j.del } });
+    expect(del.status).toBe(200);
+    const diag = (await (await fetch(s.base + "?diag")).json()) as { ok: boolean; disabled: string[]; random: string; php: string };
+    expect(diag.ok).toBe(true);
+    expect(diag.disabled).toEqual(expect.arrayContaining(["ini_set", "getenv", "flock", "random_bytes"]));
+    expect(diag.random).toBe("openssl");
+  }, T);
+  it("zakázaná nezbytná funkce nebo pád PHP → JSON s důvodem (ne prázdná 500), přímý store.php → 404", async () => {
+    const a = await startPhp({}, undefined, false, ["-d", "disable_functions=fwrite,rename"]);
+    const p = await fetch(a.base + "?ping");
+    expect(p.status).toBe(500);
+    expect(await p.json()).toMatchObject({ ok: false, error: "php_functions_disabled", missing: ["fwrite", "rename"] });
+    const b = await startPhp({}, undefined, false, ["-d", "disable_functions=str_split"]);
+    const r = await up(b, rnd(1000));
+    expect(r.status).toBe(500);
+    const j = (await r.json()) as { error: string; detail: string };
+    expect(j.error).toBe("php_fatal");
+    expect(j.detail).toMatch(/^store\.php:\d+ Error: Call to undefined function .*str_split\(\)/);
+    expect(j.detail).not.toMatch(/\/tmp\//); // bez cest na serveru
+    expect((await fetch(b.base + "store.php")).status).toBe(404);
   }, T);
 });

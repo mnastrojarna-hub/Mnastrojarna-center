@@ -990,6 +990,25 @@ function matchItem<T extends MatchRow>(list: T[], row: MatchRow): T | null {
 }
 
 /** Vazba výkresu / modelu na položku pro daný cíl — podle kteréhokoli z jeho čísel. */
+/**
+ * Je mezi položkami (zakázky / dokladů skupiny) taková s číslem výkresu, ke které v dávce ŽÁDNÝ výkres není?
+ * Jen tehdy může výkres bez shodné položky patřit k ní (jiné číslo dílu) a rozhodne člověk. Jinak je výkres
+ * s vlastním číslem samostatný díl → nová položka (majitel 16. 11.: zakázka 098, 25 výkresů v jednom PDF,
+ * 1 položka z textu e-mailu → 24 výkresů zůstalo bez položky).
+ */
+function hasOrphanNumberedItem(target: ReviewTarget, jobItems: JobItem[], docs: ReconcileDoc[]): boolean {
+  const drawingNums = docs
+    .filter((d) => BATCH_TYPES[d.type].form === "drawing" || BATCH_TYPES[d.type].form === "model")
+    .flatMap((d) => ownDrawingNumbers(d)).filter(Boolean);
+  const covered = (n: string) => drawingNums.some((k) => docNumbersEqual(n, k));
+  const fromDrawing = (key: string) => key.startsWith("draw-") || key.startsWith("model-");
+  // objednávka zákazníka s položkami určuje, co se vyrábí — výkres navíc se sám položkou nestane
+  const orderWithItems = docs.some((d) => d.type === "objednavka_zakaznik" && (businessDoc(d)?.items.length ?? 0) > 0);
+  return orderWithItems
+    || jobItems.some((i) => i.drawingNumber && !covered(i.drawingNumber))
+    || target.newItems.some((i) => !fromDrawing(i.key) && i.drawingNumber && !covered(i.drawingNumber));
+}
+
 function defaultLink(numbers: string[], target: ReviewTarget, jobItems: JobItem[], groupHasItems: boolean): ItemLinkChoice {
   for (const number of numbers.filter(Boolean)) {
     const ex = jobItems.find((i) => i.drawingNumber && docNumbersEqual(i.drawingNumber, number));
@@ -1816,7 +1835,8 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
     const key = rowKeyOf(d);
     let added = false;
     for (const t of targets) {
-      const link = defaultLink(numbers, t, jobItemsByTarget[t.key] ?? [], hadItems.get(t.key) ?? false);
+      const link = defaultLink(numbers, t, jobItemsByTarget[t.key] ?? [],
+        (hadItems.get(t.key) ?? false) && (!numbers.some(Boolean) || hasOrphanNumberedItem(t, jobItemsByTarget[t.key] ?? [], docs)));
       if (link.mode !== "add") continue;
       t.newItems.push({
         key, drawingNumber: number, revision: dr?.revision || m?.revision || "", name: info.title, material: dr?.material ?? "",
@@ -1949,7 +1969,8 @@ export function reconcileGroup(input: ReconcileGroupInput): GroupReconcile {
       const numbers = ownDrawingNumbers(d);
       const number = dr?.drawingNumber || d.documentNumber || d.drawingNumbers[0] || "";
       const revision = dr?.revision || "";
-      let link = defaultLink(numbers, initTarget, jobItemsByTarget[initTarget.key] ?? [], groupHasItems);
+      let link = defaultLink(numbers, initTarget, jobItemsByTarget[initTarget.key] ?? [],
+        groupHasItems && (!numbers.some(Boolean) || hasOrphanNumberedItem(initTarget, jobItemsByTarget[initTarget.key] ?? [], docs)));
       const rowKey = rowKeyOf(d);
       if (link.mode === "add" && initTarget.newItems.some((i) => i.key === rowKey)) link = { mode: "docItem", itemKey: rowKey };
       // počet kusů a název: položka skupiny (objednávka > nabídka > poptávka > text e-mailu > výkres), jinak

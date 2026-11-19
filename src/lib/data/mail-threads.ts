@@ -126,9 +126,10 @@ export async function listThreads(q: ThreadQuery): Promise<ThreadPage> {
   const limit = Math.min(Math.max(Math.trunc(q.limit ?? PAGE) || PAGE, 1), 200);
   const offset = Math.max(0, Math.trunc(q.offset ?? 0) || 0);
   const words = searchWords(q.query);
-  const { data, error } = await db.rpc("mail_threads", {
+  const { data, error } = await db.rpc(q.perMessage ? "mail_messages" : "mail_threads", {
     ...scopeArgs(scope, q.mailboxId),
-    p_folder: q.folder,
+    // hledání po zprávách: přijatá i odeslaná pošta najednou (majitel 16. 11.), spam zvlášť
+    p_folder: q.perMessage && words.length && (q.folder === "inbox" || q.folder === "sent") ? "all" : q.folder,
     p_words: words.length ? words : null,
     p_priority_max: q.priorityMax && q.priorityMax >= 1 && q.priorityMax <= 5 ? Math.trunc(q.priorityMax) : null,
     p_unread_only: Boolean(q.unreadOnly),

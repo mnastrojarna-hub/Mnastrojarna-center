@@ -76,6 +76,7 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
   let itemId = "";
   let poNumber = "";
 
+  let globalBefore: string | null = null;
   beforeAll(async () => {
     const env = loadLocalEnv();
     process.env.NEXT_PUBLIC_SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
@@ -110,9 +111,13 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
     await svc.from("mailboxes").delete().eq("email", USER);
     // výchozí režimy Pošty B (plná automatika — migrace je zakládá; test je nezávislý na ručních změnách)
     await svc.from("automation_settings").upsert([{ module: "mail_job_link", mode: "full", enabled: true }, { module: "mail_job_changes", mode: "full", enabled: true }]);
+    // 16. 11.: přepínač nahoře (automation_global) je hlavní vypínač — modul „full“ platí jen při globální plné automatice
+    globalBefore = ((await svc.from("automation_global").select("mode").eq("id", true).maybeSingle()).data as { mode: string } | null)?.mode ?? null;
+    await svc.from("automation_global").update({ mode: "full" }).eq("id", true);
   }, 60_000);
 
   afterAll(async () => {
+    if (globalBefore) await svc.from("automation_global").update({ mode: globalBefore }).eq("id", true);
     for (const j of jobs) {
       await svc.from("quotes").delete().eq("job_id", j.id);
       await svc.from("job_mail_changes").delete().eq("job_id", j.id);
@@ -271,9 +276,10 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
 
   it("dodavatel s číslem naší objednávky OV-… → zakázka přes objednávku; cena dodavatele jen s maržemi", async () => {
     asA();
-    poNumber = localSql("select next_doc_number('OV')");
-    const { error } = await svc.from("purchase_orders").insert({ job_id: job1.id, supplier_id: supplierId, number: poNumber, status: "odeslana" });
+    // číslo přidělí DB podle zakázky (OV2026/026-1; trigger 20261116100000)
+    const { data: ins, error } = await svc.from("purchase_orders").insert({ job_id: job1.id, supplier_id: supplierId, number: localSql("select next_doc_number('OV')"), status: "odeslana" }).select("number").single();
     expect(error).toBeNull();
+    poNumber = String((ins as { number: string }).number);
     srv.addMessage(USER, {
       subject: `Potvrzení objednávky ${poNumber}`, from: `Ocel ${TAG} <obchod@${SUP}>`,
       body: "Dobrý den, potvrzujeme Vaši objednávku. Kalení dodáme do 15. 11. 2026. Cena kalení 1 200 Kč/ks.\n\nS pozdravem Ocel",
@@ -455,9 +461,9 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
     const { data: oc } = await svc.from("customers").insert({ name: `Cizí ${TAG}`, email: `x@cizi-${TAG}.test` }).select("id").single();
     const otherCust = (oc as { id: string }).id;
     const other = await newJob(`Cizí ${TAG}`, [{ drawing: `C-1-${TAG}`, qty: 20 }], { customer_id: otherCust });
-    const po = localSql("select next_doc_number('OV')");
-    await svc.from("purchase_orders").insert({ job_id: other.id, supplier_id: supplierId, number: po, status: "odeslana" });
-    const [, year, n] = /^OV-(\d{4})-(\d+)$/.exec(po)!;
+    const { data: insPo } = await svc.from("purchase_orders").insert({ job_id: other.id, supplier_id: supplierId, number: localSql("select next_doc_number('OV')"), status: "odeslana" }).select("number").single();
+    const po = String((insPo as { number: string }).number);
+    const [, year, n] = /^OV-?(\d{4})[-/](\d+)/.exec(po)!;
     const own = await rawMail({ subject: "Objednávka", category: "objednavka", body_text: `Dobrý den,\nposíláme naši objednávku č. ${Number(n)}/${year}, potřebujeme celkem 35 ks.\n\nJan` });
     await proc(own.id);
     expect(mailRow(own.id).order_id).toBeNull();
@@ -544,8 +550,8 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta B ↔ lokální Supabase + testovací IM
   it("review #4 (B5): faktura dodavatele z e-mailu → Faktury dodavatelů, ne dokumenty zakázky; zaměstnanec ani obchodník ji nevidí", async () => {
     asA();
     const j = await newJob(`Faktura ${TAG}`, [{ drawing: `F-1-${TAG}`, qty: 5 }]);
-    const po = localSql("select next_doc_number('OV')");
-    await svc.from("purchase_orders").insert({ job_id: j.id, supplier_id: supplierId, number: po, status: "odeslana" });
+    const { data: insJ } = await svc.from("purchase_orders").insert({ job_id: j.id, supplier_id: supplierId, number: localSql("select next_doc_number('OV')"), status: "odeslana" }).select("number").single();
+    const po = String((insJ as { number: string }).number);
     const path = `mail-b/${TAG}/faktura.pdf`;
     const pdf = Buffer.from(`%PDF-1.4\n% faktura ${TAG} 12 345 Kč\n`);
     expect((await svc.storage.from("documents").upload(path, pdf, { contentType: "application/pdf" })).error).toBeNull();

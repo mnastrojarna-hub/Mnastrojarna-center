@@ -19,7 +19,7 @@ import type { AllocationInput } from "@/lib/supplier-invoices/types";
 const ENABLED = process.env.LOCAL_SUPABASE === "1";
 const FIXTURES = path.resolve(process.cwd(), "src/lib/jobs/__fixtures__/capture");
 const HRUBY = "d4000000-0000-0000-0000-000000000001";
-const PO_NUMBER = "OV-2099-901";
+const PO_NUMBER = "OV2099/901-1";
 
 function loadEnv(): Record<string, string> {
   const file = path.resolve(process.cwd(), ".local-supabase/env");
@@ -191,7 +191,7 @@ describe.skipIf(!ENABLED)("Faktury dodavatelů ↔ lokální Supabase", () => {
     localSql(`delete from purchase_orders where number = '${PO_NUMBER}'`);
     localSql(`update integration_settings set value = 'super_admin' where key = 'supplier_invoices_visibility'`);
     localSql(`update automation_settings set mode = 'approval' where module = 'supplier_invoice'`);
-    // dvě zakázky obchodníka (sdružená faktura) a objednávka dodavateli OV-2099-901 u zakázky A
+    // dvě zakázky obchodníka (sdružená faktura) a objednávka dodavateli OV2099/901-1 u zakázky A
     const mk = async (suffix: string, value: number, planned: number | null) => {
       const { data: j, error } = await db.from("orders").insert({
         number: `${TAG}-${suffix}`, title: `Faktury dodavatelů ${suffix}`, status: "potvrzeno", value, purchase_cost: planned,
@@ -352,7 +352,7 @@ describe.skipIf(!ENABLED)("Faktury dodavatelů ↔ lokální Supabase", () => {
     const byItem = (n: number) => d.allocations.filter((a) => a.itemId === d.items[n].id);
     expect(byItem(0)).toEqual([expect.objectContaining({ target: "job", amount: 30_000, purchaseOrderId: poA, aiSuggested: true, confirmed: false })]);
     expect(byItem(0)[0].job?.id).toBe(jobA);
-    expect(byItem(0)[0].aiReason).toMatch(/OV-2099-901/);
+    expect(byItem(0)[0].aiReason).toMatch(/OV2099\/901-1/);
     expect(byItem(2)).toEqual([expect.objectContaining({ target: "rezie", category: "doprava", amount: 500 })]);
     const q = localSql(`select status::text from approval_queue where type::text = 'supplier_invoice' and payload->>'invoiceId' = '${invoiceId}'`);
     expect(q).toBe("pending");
@@ -467,7 +467,7 @@ describe.skipIf(!ENABLED)("Faktury dodavatelů ↔ lokální Supabase", () => {
   it("dílčí faktury na objednávku: druhá dílčí faktura ji doplní na celou (Σ ≥ 99,5 %) → náklad = Σ faktur", async () => {
     h.user = admin;
     expect(await jobCost(jobA)).toBe("30000.00|true");
-    const second = await seedInvoice({ number: `${TAG}-PART2`, items: [{ text: "Zbytek dle OV-2099-901", amount: 19_900 }], allocs: [{ item: 0, jobId: jobA, poId: poA, amount: 19_900 }] });
+    const second = await seedInvoice({ number: `${TAG}-PART2`, items: [{ text: "Zbytek dle OV2099/901-1", amount: 19_900 }], allocs: [{ item: 0, jobId: jobA, poId: poA, amount: 19_900 }] });
     expect(await jobCost(jobA)).toBe("29900.00|true");      // 10 000 + 19 900 = 99,7 % → celá
     expect(await commissionCost(jobA)).toBe(29_900);
     // smazání druhé faktury → zase dílčí → 30 000

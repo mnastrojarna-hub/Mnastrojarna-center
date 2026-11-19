@@ -75,9 +75,27 @@ function numbersIn(text: string, re: RegExp, prefix: string): string[] {
   return [...out];
 }
 
-/** Čísla našich objednávek dodavateli (OV-2026-014) v textu — vždy ve tvaru OV-RRRR-NNN. */
+/** 16. 11.: nová řada podle zakázky — OV2026/026-1 (i „OV 2026-026-1", „OV2026/026 - 1"). */
+const OV_JOB_RE = /\bOV[\s\-]?(\d{4})[\s\-/._]?(\d{1,5})\s?-\s?(\d{1,3})\b/gi;
+
+/**
+ * Čísla našich objednávek dodavateli v textu: nová řada podle zakázky (OV2026/026-1) i starší OV-RRRR-NNN.
+ * Pozor: „OV2026/026-1" se nesmí přečíst zároveň jako stará řada (OV-2026-026) — ta by ukazovala jinam.
+ */
 export function purchaseOrderNumbersIn(text: string): string[] {
-  return numbersIn(text, OV_RE, "OV");
+  const t = String(text ?? "");
+  const out = new Set<string>();
+  const spans: [number, number][] = [];
+  for (const m of t.matchAll(OV_JOB_RE)) {
+    out.add(`OV${m[1]}/${m[2]}-${Number(m[3])}`);
+    spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  }
+  for (const m of t.matchAll(OV_RE)) {
+    const at = m.index ?? 0;
+    if (spans.some(([s, e]) => at >= s && at < e)) continue;
+    out.add(`OV-${m[1]}-${m[2]}`);
+  }
+  return [...out];
 }
 
 /** Čísla našich zakázek (Z-2026-014) v textu. */

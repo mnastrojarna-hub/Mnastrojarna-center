@@ -415,7 +415,7 @@ const volumeOf = (status) => { const m = /objem ([\d\s  ]+,\d+) cm³/.exec(statu
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'mn-out-share-'));
     const docroot = path.join(root, 'www');
     fs.mkdirSync(path.join(docroot, 'cad', 'share'), { recursive: true });
-    fs.copyFileSync(path.join(__dirname, '..', 'public', 'cad', 'share', 'index.php'), path.join(docroot, 'cad', 'share', 'index.php'));
+    for (const f of ['index.php', 'store.php']) fs.copyFileSync(path.join(__dirname, '..', 'public', 'cad', 'share', f), path.join(docroot, 'cad', 'share', f));
     const port = await new Promise((resolve, reject) => { const s = net.createServer(); s.once('error', reject); s.listen(0, '127.0.0.1', () => { const n = s.address().port; s.close(() => resolve(n)); }); });
     const php = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', docroot], { stdio: 'ignore' });
     const phpOrigin = `http://127.0.0.1:${port}`;

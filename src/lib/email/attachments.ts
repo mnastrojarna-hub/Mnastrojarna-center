@@ -1,4 +1,5 @@
 import "server-only";
+import { attachmentText } from "@/lib/email/attachment-text";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/server";
 import { fetchImapMessage, isSyntheticMessageId } from "@/lib/email/mail-fetch";
@@ -67,6 +68,13 @@ export async function loadEmailAttachment(attachmentId: string): Promise<{ ok: t
     const part = extractPart(res.source, att.imap_part);
     if (!part) return { ok: false, error: "Příloha ve zprávě nenalezena." };
     if (part.content.length > MAX_ATTACHMENT_BYTES) return { ok: false, error: "Příloha je příliš velká (max. 20 MB)." };
+    // stažená příloha (IMAP) → text pro hledání v Poště, jednou (16. 11.)
+    try {
+      const text = await attachmentText(part.content, att.mime_type || part.contentType, att.filename);
+      if (text) await db.from("email_attachments").update({ content_text: text } as never).eq("id", att.id).is("content_text", null);
+    } catch {
+      // jen hledání — stažení nebrzdí
+    }
     return { ok: true, emailId: att.email_id, file: { filename: part.filename?.trim() || filename, contentType: att.mime_type || part.contentType || "application/octet-stream", content: part.content } };
   } catch (err) {
     return { ok: false, error: `Přílohu se nepodařilo stáhnout ze serveru (${err instanceof Error ? err.message : "chyba"}).` };

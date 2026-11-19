@@ -129,20 +129,24 @@ describe("přílohy e-mailu objednávky", () => {
     f({ id: "pend", filename: "VK 2291 detail.dxf", ext: "dxf", status: "pending", created_at: "7" }),
   ];
 
-  it("jen soubory dílů objednávky: aktuální výkres + model zaškrtnuté, stará revize nabídnutá, cizí díl ani doklad zákazníka nikdy", () => {
+  it("soubory dílů objednávky zaškrtnuté, stará revize nabídnutá, cizí díl jen k ručnímu přidání, doklad zákazníka nikdy", () => {
     const plan = poAttachmentPlan(lines, files, { poNumber: "OV-2026-010", drawingChanges: [{ id: "c", order_item_id: IT, rev_from: "B", rev_to: "C", old_file_id: "old", created_at: "x" }] });
     expect(plan.candidates.map((c) => [c.fileId, c.role, c.name, c.checked])).toEqual([
       ["cur", "drawing", "VK-2291_C.pdf", true],
       ["pend", "drawing", "VK-2291_C.dxf", true],
       ["step", "model", "VK-2291_C.step", true],
       ["old", "old", "VK-2291_B-neplatna.pdf", false],
+      // výkresy jiných dílů zakázky: jen nabídnuté k ručnímu přidání (16. 11.), nikdy zaškrtnuté samy
+      ["other", "drawing", "OV-2026-010-V4.pdf", false],
+      ["byname", "drawing", "OV-2026-010-V5.pdf", false],
     ]);
+    expect(plan.candidates.filter((c) => c.extra).map((c) => c.fileId)).toEqual(["other", "byname"]);
     expect(plan.missingDrawing).toEqual([]);
     // názvy nikdy původní (nesou zákazníka)
     expect(plan.candidates.some((c) => /Strojmetal/i.test(c.name))).toBe(false);
     expect(pickPoAttachments(plan, null).map((c) => c.fileId)).toEqual(["cur", "pend", "step"]);
-    // výběr z klienta: cizí id neprojde
-    expect(pickPoAttachments(plan, ["old", "other", "zak"]).map((c) => c.fileId)).toEqual(["old"]);
+    // výběr z klienta: jen soubory z plánu (doklad zákazníka neprojde); ručně přidaný výkres jiného dílu ano
+    expect(pickPoAttachments(plan, ["old", "other", "zak"]).map((c) => c.fileId)).toEqual(["old", "other"]);
   });
 
   it("položka bez výkresu → varování; změna po nové revizi zaškrtne jen díly se změnou", () => {

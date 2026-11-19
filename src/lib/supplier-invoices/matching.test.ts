@@ -21,6 +21,8 @@ const inv = (items: { id: string; text: string; code?: string; amount: number; r
 describe("čísla v textu", () => {
   it("naše objednávky a zakázky", () => {
     expect(purchaseOrderNumbersIn("Výroba dle obj. OV-2026-014 a OV 2026/15")).toEqual(["OV-2026-014", "OV-2026-15"]);
+    // 16. 11.: nová řada podle zakázky
+    expect(purchaseOrderNumbersIn("dle vaší obj. OV2026/026-2 a OV 2026-026 - 3")).toEqual(["OV2026/026-2", "OV2026/026-3"]);
     expect(jobNumbersIn("k zakázce Z-2026-101")).toEqual(["Z-2026-101"]);
   });
   it("režie podle klíčových slov", () => {

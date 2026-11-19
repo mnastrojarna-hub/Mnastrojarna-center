@@ -272,7 +272,7 @@ const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/pro
   if (php) {
     const www = path.join(WORK, 'www', 'cad', 'share');
     fs.mkdirSync(www, { recursive: true });
-    for (const f of ['index.php', '.htaccess', '.user.ini']) fs.copyFileSync(path.join(WEB, 'public/cad/share', f), path.join(www, f));
+    for (const f of ['index.php', 'store.php', '.htaccess', '.user.ini']) fs.copyFileSync(path.join(WEB, 'public/cad/share', f), path.join(www, f));
     const port = 18000 + Math.floor(Math.random() * 2000);
     const ps = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', path.join(WORK, 'www')], { stdio: 'ignore' });
     await new Promise((res) => setTimeout(res, 700));

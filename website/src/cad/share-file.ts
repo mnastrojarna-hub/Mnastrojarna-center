@@ -10,7 +10,7 @@
  * Obsah v úložišti: "MNQ" 0x01 | příznaky (2 = deflate, 8 = soubor) | iv 12 B | AES-GCM(kontejner), hlavička = AAD;
  * kontejner = délka JSON (uint32 LE) | JSON {v:1, name, mime, bytes, sha256, exp} | data souboru.
  */
-import { b64u, deflate, inflate, probeSelfStore, selfStoreBase, timeoutSignal, unb64u, uploadTimeoutMs, type SelfStoreInfo } from "./share";
+import { b64u, deflate, inflate, probeSelfStore, selfStoreBase, selfStoreProbeError, timeoutSignal, unb64u, uploadTimeoutMs, type SelfStoreInfo } from "./share";
 import { tr } from "./i18n";
 
 /** cesta stránky, která soubor z odkazu dešifruje a nabídne ke stažení (vedle /cad/share/) */
@@ -94,7 +94,7 @@ export async function shareFile(f: { name: string; mime: string; data: Uint8Arra
   const base = o.store !== undefined ? o.store : selfStoreBase();
   if (!base) throw new FileStoreError(tr("úložiště krátkých odkazů není nastavené"), true);
   const info = await probeSelfStore(false, base);
-  if (!info) throw new FileStoreError(tr("úložiště krátkých odkazů neodpovídá ({0})", base), true);
+  if (!info) throw new FileStoreError(tr("úložiště krátkých odkazů neodpovídá ({0})", base) + (selfStoreProbeError() ? ` – ${selfStoreProbeError()}` : ""), true);
   const days = Math.min(info.maxDays, Math.max(1, Math.round(o.days ?? 10)));
   const exp = Date.now() + days * 86_400_000;
   const meta: SharedFileMeta = { v: 1, name: f.name, mime: f.mime, bytes: f.data.length, sha256: hex(await crypto.subtle.digest("SHA-256", f.data as BufferSource)), exp };

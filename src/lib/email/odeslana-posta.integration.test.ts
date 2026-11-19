@@ -186,6 +186,7 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
   }, 120_000);
 
   afterAll(async () => {
+    localSql("update automation_global set mode = 'approval' where id"); // 16. 11.: zpět na výchozí
     if (quoteModeBefore) localSql(`update automation_settings set mode = '${quoteModeBefore}' where module = 'quote'`);
     if (db && jobId) {
       localSql(`delete from approval_queue where order_id = '${jobId}' or title like '%${TAG}%'`);
@@ -353,6 +354,8 @@ describe.skipIf(!LOCAL_ENABLED)("Pošta → Odeslané: každý odeslaný doklad 
 
   it("AI nabídka (plná automatika) → odejde s PDF a je v Odeslaných obchodníka", async () => {
     localSql("update automation_settings set mode = 'full' where module = 'quote'");
+    // 16. 11.: přepínač nahoře (automation_global) je hlavní vypínač — modul „full“ platí jen při globální plné automatice
+    localSql("update automation_global set mode = 'full' where id");
     localSql(`update profiles set quote_needs_approval = false where id = '${users.a.id}'`);
     as("a");
     const { submitAiQuote } = await import("@/app/actions/ai-quote");

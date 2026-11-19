@@ -93,6 +93,8 @@ describe.skipIf(!ENABLED)("pošta → speciální stav zakázky ↔ lokální Su
   }
   async function mode(m: "full" | "approval") {
     await svc.from("automation_settings").upsert({ module: "mail_job_stage", mode: m, enabled: true });
+    // 16. 11.: přepínač nahoře (automation_global) je hlavní vypínač — modul „full“ platí jen při globální plné automatice
+    await svc.from("automation_global").update({ mode: "full" }).eq("id", true);
   }
   async function signals(jobId: string): Promise<Row[]> {
     return ((await svc.from("job_mail_stage_signals").select("*").eq("job_id", jobId).order("created_at")).data ?? []) as Row[];
@@ -123,6 +125,7 @@ describe.skipIf(!ENABLED)("pošta → speciální stav zakázky ↔ lokální Su
   }, 60_000);
 
   afterAll(async () => {
+    await svc.from("automation_global").update({ mode: "approval" }).eq("id", true); // 16. 11.: zpět na výchozí
     await mode("approval").catch(() => undefined);
     if (!svc) return;
     if (jobs.length) {

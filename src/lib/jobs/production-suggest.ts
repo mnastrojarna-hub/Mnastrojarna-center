@@ -1066,9 +1066,18 @@ export function purchaseItemsForStep(input: {
     orderItemId: it.id,
   });
 
+  // uložená nákupní cena položky (Marže a nákup, i ručně bez nabídky) platí pro hlavní krok (výroba / kompletní
+  // dodávka) i u víc kroků — vždy, kde cenu nedá nabídka dodavatele (bez nabídky, díl mimo nabídku, nabídka
+  // bez ceny dílu; majitel 16. 11.). Cena z vybrané nabídky má přednost (je to cena toho dodavatele).
+  // Kooperace (tepelné zpracování, povrch…) dál jen podle nabídky.
+  const mainStep = step.kind === "vyroba" || step.kind === "kompletni_dodavka";
+  const saved = (it: SuggestItem): number | null => {
+    const p = it.purchaseUnitPrice;
+    return mainStep && typeof p === "number" && Number.isFinite(p) && p > 0 ? p : null;
+  };
+
   if (!quote) {
-    const usePurchase = Boolean(input.singleStepRoute) && (step.kind === "vyroba" || step.kind === "kompletni_dodavka");
-    return { items: scope.map((it) => baseItem(it, usePurchase ? (it.purchaseUnitPrice ?? null) : null)), uncovered: [], warnings };
+    return { items: scope.map((it) => baseItem(it, saved(it))), uncovered: [], warnings };
   }
 
   if (!quote.items.length) {
@@ -1098,13 +1107,13 @@ export function purchaseItemsForStep(input: {
   for (const line of value.lines) {
     const it = scope.find((s) => s.id === line.orderItemId) as SuggestItem;
     if (line.quoteItem === null) {
-      if (input.includeUncovered) out.push(baseItem(it, null, "mimo nabídku — prosíme o nacenění"));
+      if (input.includeUncovered) out.push(saved(it) !== null ? baseItem(it, saved(it)) : baseItem(it, null, "mimo nabídku — prosíme o nacenění"));
       else uncovered.push(it.id);
       continue;
     }
     const qi = quote.items[line.quoteItem];
     const cls = unitClass(qi.unit);
-    if (qi.unitPrice === null) { out.push(baseItem(it, null)); continue; }
+    if (qi.unitPrice === null) { out.push(baseItem(it, saved(it))); continue; }
     if (cls === "weight") {
       if (it.weightKg && it.weightKg > 0) {
         const kg = Math.round(it.weightKg * qty(it) * 1000) / 1000;

@@ -273,6 +273,28 @@ export function selfStoreBase(): string | null {
 const drain = (res: Response): Promise<void> => res.arrayBuffer().then(() => undefined).catch(() => undefined);
 export type SelfStoreInfo = { base: string; maxBytes: number; chunkBytes: number; maxDays: number; /** server přijme id odvozené z kódu (`?ping` v ≥ 2) → nejkratší odkaz */ clientId?: boolean };
 let probeCache: { base: string; until: number; p: Promise<SelfStoreInfo | null> } | null = null;
+/** proč poslední `?ping` selhal (text pro uživatele – stav HTTP a chyba hlášená serverem), `""` = neselhal */
+let probeError = "";
+/** Důvod poslední nedostupnosti vlastního úložiště (pro hlášku „krátký odkaz není k dispozici“), `""` = žádný. */
+export const selfStoreProbeError = (): string => probeError;
+/** „… neodpovídá.“ + důvod z posledního `?ping` → „… neodpovídá (HTTP 500: …).“ */
+const withReason = (msg: string): string => (probeError ? `${msg.replace(/\.$/, "")} (${probeError}).` : msg);
+/** Text chyby z odpovědi úložiště (zavaděč index.php vrací JSON i při chybě PHP – stará verze, zakázané funkce, pád). */
+function storeErrorText(status: number, j: { error?: unknown; php?: unknown; need?: unknown; missing?: unknown; detail?: unknown } | null): string {
+  const php = j && typeof j.php === "string" ? j.php : "";
+  switch (j?.error) {
+    case "php_too_old":
+      return tr("HTTP {0}: PHP {1} na serveru je příliš staré, úložiště potřebuje PHP {2} nebo novější (nastavení hostingu)", status, php, String(j.need ?? "7.0"));
+    case "php_functions_disabled":
+      return tr("HTTP {0}: hosting zakázal funkce PHP, bez kterých úložiště nejde provozovat: {1}", status, Array.isArray(j.missing) ? j.missing.join(", ") : "?");
+    case "php_fatal":
+      return tr("HTTP {0}: chyba PHP {1} – {2}", status, php, String(j.detail ?? "").slice(0, 200));
+    case "storage_unavailable":
+      return tr("HTTP {0}: server nemůže zapisovat data úložiště (práva ke složce)", status);
+  }
+  if (j && typeof j.error === "string") return tr("HTTP {0}: {1}", status, j.error);
+  return status ? tr("HTTP {0} bez odpovědi úložiště (PHP skript na serveru selhal nebo chybí)", status) : tr("server nedostupný (síť nebo časový limit)");
+}
 /** Odpovídá vlastní úložiště (`?ping`)? Výsledek se pamatuje 5 min (nedostupnost 30 s). `store` = adresa od volajícího (ShareOptions.store). */
 export function probeSelfStore(force = false, store?: string | null): Promise<SelfStoreInfo | null> {
   const base = store !== undefined ? (store ? store.replace(/\/?$/, "/") : null) : selfStoreBase();
@@ -283,17 +305,25 @@ export function probeSelfStore(force = false, store?: string | null): Promise<Se
     const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
     const timer = ctl ? setTimeout(() => ctl.abort(), 6000) : null;
     try {
-      const res = await fetch(base + "?ping", { cache: "no-store", credentials: "same-origin", ...(ctl ? { signal: ctl.signal } : {}) });
-      if (!res.ok || !/json/i.test(res.headers.get("content-type") ?? "")) {
-        await drain(res); // např. stránka 404 hostingu bez PHP
-        throw new Error("ping");
+      let res: Response;
+      try {
+        res = await fetch(base + "?ping", { cache: "no-store", credentials: "same-origin", ...(ctl ? { signal: ctl.signal } : {}) });
+      } catch {
+        throw new Error(storeErrorText(0, null));
       }
-      const j = (await res.json()) as { ok?: unknown; v?: unknown; max_bytes?: unknown; chunk_bytes?: unknown; max_days?: unknown };
-      const max = Number(j.max_bytes);
-      if (j.ok !== true || !(max > 0)) throw new Error("ping");
+      const json = /json/i.test(res.headers.get("content-type") ?? "");
+      if (!json) {
+        await drain(res); // např. stránka 404 hostingu bez PHP nebo prázdná chyba 500
+        throw new Error(res.status === 404 ? tr("HTTP 404: na serveru chybí skript úložiště (/cad/share/index.php nebyl nahrán)") : storeErrorText(res.status, null));
+      }
+      const j = (await res.json().catch(() => null)) as { ok?: unknown; v?: unknown; max_bytes?: unknown; chunk_bytes?: unknown; max_days?: unknown; error?: unknown } | null;
+      const max = Number(j?.max_bytes);
+      if (!res.ok || !j || j.ok !== true || !(max > 0)) throw new Error(storeErrorText(res.status, j));
       const chunk = Number(j.chunk_bytes);
+      probeError = "";
       return { base, maxBytes: max, chunkBytes: chunk >= 65_536 ? chunk : max, maxDays: Number(j.max_days) > 0 ? Number(j.max_days) : 90, clientId: Number(j.v) >= 2 };
-    } catch {
+    } catch (e) {
+      probeError = e instanceof Error && e.message ? e.message : storeErrorText(0, null);
       entry.until = Date.now() + 30_000;
       return null;
     } finally {
@@ -306,6 +336,7 @@ export function probeSelfStore(force = false, store?: string | null): Promise<Se
 /** zapomene výsledek `?ping` (testy, nový pokus) */
 export function resetShareProbe() {
   probeCache = null;
+  probeError = "";
   selfCache.clear();
   kdfCache.clear();
 }
@@ -561,7 +592,7 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
 
   // vlastní úložiště na webu (/cad/share/): nejkratší odkaz <základ>/s#<KÓD> – id i klíč se odvodí z kódu
   const asSelf = async (info: SelfStoreInfo | null): Promise<ShareResult> => {
-    if (!info) throw new ShareStoreError(tr("Úložiště sdílení na serveru ({0}) neodpovídá.", SELF_STORE_PATH), true);
+    if (!info) throw new ShareStoreError(withReason(tr("Úložiště sdílení na serveru ({0}) neodpovídá.", SELF_STORE_PATH)), true);
     const days = storeDays(info.maxDays);
     if (!days) throw new Error(tr("V úložišti musí mít odkaz omezenou platnost (max. {0} dní).", info.maxDays));
     const exp = expOf(days);
@@ -624,7 +655,7 @@ export async function createShareLink(doc: CadDoc, o: ShareOptions): Promise<Sha
       if (!(e instanceof ShareStoreError)) throw e;
       why.push(e.message);
     }
-  } else if (!store) why.push(tr("Krátký odkaz není k dispozici: úložiště sdílení na serveru ({0}) neodpovídá.", SELF_STORE_PATH));
+  } else if (!store) why.push(withReason(tr("Krátký odkaz není k dispozici: úložiště sdílení na serveru ({0}) neodpovídá.", SELF_STORE_PATH)));
   return linkOrThrow(`${why.join(" ")} ${tr("Celý dokument je proto v odkazu (dlouhý odkaz).")}`);
 }
 

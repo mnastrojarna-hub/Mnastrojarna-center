@@ -105,7 +105,7 @@ async function startStore(root) {
   if (spawnSync("php", ["-v"], { stdio: "ignore" }).status !== 0) return null;
   const www = path.join(root, "www");
   fs.mkdirSync(path.join(www, "cad", "share"), { recursive: true });
-  fs.copyFileSync(path.join(WEB, "public", "cad", "share", "index.php"), path.join(www, "cad", "share", "index.php"));
+  for (const f of ["index.php", "store.php"]) fs.copyFileSync(path.join(WEB, "public", "cad", "share", f), path.join(www, "cad", "share", f));
   const port = await freePort();
   const proc = spawn("php", ["-S", `127.0.0.1:${port}`, "-t", www], { stdio: "ignore" });
   const base = `http://127.0.0.1:${port}/cad/share/`;

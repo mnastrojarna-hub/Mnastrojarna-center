@@ -538,7 +538,7 @@ export async function issuePurchaseOrder(
 
     const { data: number, error: numErr } = await db.rpc("next_purchase_order_number");
     if (numErr || !number) return fail(numErr?.message ?? "Nepodařilo se přidělit číslo objednávky.");
-    const poNumber = String(number);
+    let poNumber = String(number);
 
     const { data: created, error } = await db
       .from("purchase_orders")
@@ -558,10 +558,12 @@ export async function issuePurchaseOrder(
         note: v.note,
         created_by: user.id,
       } as never)
-      .select("id")
+      .select("id, number")
       .single();
     if (error || !created) return fail(error?.message ?? "Objednávku se nepodařilo uložit.");
     const id = (created as { id: string }).id;
+    // DB přečísluje podle zakázky (OV2026/026-1, trigger) — dál se používá skutečné číslo
+    poNumber = String((created as { number?: string | null }).number ?? poNumber);
     const itemErr = await replaceItems(db, "purchase_order_items", "purchase_order_id", id, v.items);
     if (itemErr) {
       await db.from("purchase_orders").delete().eq("id", id);
@@ -992,6 +994,10 @@ export interface PoMailAttachmentView {
   checked: boolean;
   /** Položky objednávky, ke kterým soubor patří („VK-2291"). */
   refs: string[];
+  /** Soubor zakázky bez shody s položkou — nabídnutý k ručnímu přidání. */
+  extra?: boolean;
+  /** Původní název v Dokumentech zakázky. */
+  sourceName?: string;
 }
 
 /** Odeslaná / potvrzená objednávka po „Aktualizaci výkresu" → změna objednávky s novou revizí. */
@@ -1011,6 +1017,7 @@ export async function draftPurchaseOrderEmail(
 ): Promise<ActionResult<{
   to: string; cc: string; recipientReason: string; supplierId: string | null; subject: string; body: string; attachmentName: string;
   mode: "issue" | "change"; attachments: PoMailAttachmentView[]; missingDrawing: string[]; deviations: { ref: string; lines: string[] }[];
+  items: { orderItemId: string; label: string }[]; poNote: string;
 }>> {
   const c = await begin();
   if ("error" in c) return fail(c.error);
@@ -1066,7 +1073,11 @@ export async function draftPurchaseOrderEmail(
       mode: change ? "change" : "issue",
       attachments: (extras.attachments?.plan.candidates ?? []).map((a) => ({
         fileId: a.fileId, role: a.role, name: a.name, size: a.size, status: a.status, message: a.message, checked: a.checked, refs: a.lines.map(refOf),
+        ...(a.extra ? { extra: true } : {}), ...(a.sourceName ? { sourceName: a.sourceName } : {}),
       })),
+      // položky objednávky navázané na díl zakázky — ruční přiřazení výkresu k položce v dialogu
+      items: lines.filter((l) => l.orderItemId).map((l) => ({ orderItemId: l.orderItemId as string, label: l.label })),
+      poNote: po.note ?? "",
       missingDrawing: (extras.attachments?.plan.missingDrawing ?? []).map((m) => m.label),
       deviations: extras.deviations,
     };

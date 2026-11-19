@@ -136,9 +136,9 @@ await T("200 vláken + dlouhé vlákno: složky, seznam a detail rolují každý
   expect(s.main.sh <= s.main.ch + 2, `stránka (main) neroluje: ${s.main.sh} > ${s.main.ch}`);
   expect(s.list.sh > s.list.ch + 500, `seznam roluje sám (${s.list.sh} / ${s.list.ch})`);
   expect(s.rows >= 50, `načteno ${s.rows} vláken`);
-  // výchozí šířka: seznam ~30 % (užší než dřív), detail širší
-  expect(Math.abs(s.listPane.w - Math.round((s.split.w - 12) * 0.3)) <= 4 || s.listPane.w === 260, `výchozí seznam 30 %: ${s.listPane.w} z ${s.split.w}`);
-  expect(s.detail.w > s.listPane.w * 1.8, `detail širší než seznam (${s.detail.w} × ${s.listPane.w})`);
+  // výchozí šířka: seznam ~42 % (Outlook, 16. 11.) (užší než dřív), detail širší
+  expect(Math.abs(s.listPane.w - Math.round(s.split.w * 0.42)) <= 4 || s.listPane.w === 260, `výchozí seznam 42 %: ${s.listPane.w} z ${s.split.w}`);
+  expect(s.detail.w > s.listPane.w * 1.2, `detail širší než seznam (${s.detail.w} × ${s.listPane.w})`);
 
   // otevřít dlouhé vlákno (nejnovější)
   await page.locator('[data-testid="thread-row"]', { hasText: `${TAG} DLOUHÉ` }).first().locator("button").first().click();
@@ -166,11 +166,16 @@ await T("200 vláken + dlouhé vlákno: složky, seznam a detail rolují každý
   s = await panes(page);
   expect(s.detail.top > 200, "detail odrolován");
   expect(Math.abs(s.list.top - listTop) < 2 && s.main.top === 0, "seznam ani stránka se s detailem nehnuly");
-  const lastAtt = await page.getByTestId("message-attachment").last().evaluate((el) => el.getBoundingClientRect().toJSON());
-  expect(lastAtt.bottom <= s.detail.rect.bottom + 1 && lastAtt.top >= s.detail.rect.top, `poslední příloha v zorném poli detailu (${lastAtt.top}–${lastAtt.bottom} v ${s.detail.rect.top}–${s.detail.rect.bottom})`);
   const head = await page.getByTestId("thread-header").evaluate((el) => el.getBoundingClientRect().toJSON());
   expect(Math.abs(head.top - s.detail.rect.top) <= 2, `hlavička vlákna drží nahoře (${head.top} × ${s.detail.rect.top})`);
   expect(await page.getByTestId("btn-reply").isVisible(), "Odpovědět vidět i po odrolování");
+  // 16. 11.: přílohy hned pod hlavičkou zprávy (nad textem) — po návratu nahoru v zorném poli
+  await page.getByTestId("thread-pane").evaluate((el) => { el.scrollTop = 0; });
+  await page.waitForTimeout(200);
+  const s2 = await panes(page);
+  const att = await page.getByTestId("message-attachment").first().evaluate((el) => el.getBoundingClientRect().toJSON());
+  const bodyTop = await page.getByTestId("message-body").first().evaluate((el) => el.getBoundingClientRect().top);
+  expect(att.top >= s2.detail.rect.top && att.bottom <= s2.detail.rect.bottom && att.top < bodyTop, `přílohy nahoře nad textem (${att.top} < ${bodyTop})`);
   // přílohy se zalamují (žádné vodorovné rolování detailu)
   expect(await page.getByTestId("thread-pane").evaluate((el) => el.scrollWidth <= el.clientWidth + 1), "detail bez vodorovného rolování");
   await snap(page, "40-02-detail-scrolled");
@@ -207,10 +212,11 @@ await T("oddělovač: tažení → šířka hned v DB, po obnovení i v novém p
   const box = await div.boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + 200);
   await page.mouse.down();
-  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width / 2 + i * 9, box.y + 200);
+  // výchozí seznam je široký (42 %) → tažením doleva zúžit (doprava brání minimum detailu)
+  for (let i = 1; i <= 10; i++) await page.mouse.move(box.x + box.width / 2 - i * 7, box.y + 200);
   await page.mouse.up();
   const s1 = await panes(page);
-  expect(s1.listPane.w >= s0.listPane.w + 85, `seznam se roztáhl (${s0.listPane.w} → ${s1.listPane.w})`);
+  expect(s1.listPane.w <= s0.listPane.w - 60, `seznam se zúžil (${s0.listPane.w} → ${s1.listPane.w})`);
   draggedWidth = s1.listPane.w;
   await eventually(() => Math.abs(Number(prefOf(obchodId, "mail.listWidth")) - draggedWidth) <= 1, `šířka ${draggedWidth} uložena v DB bez potvrzení`, 5_000);
   expect(prefOf(adminId, "mail.listWidth") === "", "admin (jiný uživatel) nedotčen");
@@ -254,7 +260,7 @@ await T("oddělovač: tažení → šířka hned v DB, po obnovení i v novém p
   await login(p3, USERS.admin);
   await openInbox(p3);
   const s3 = await panes(p3);
-  expect(Math.abs(s3.listPane.w - Math.max(260, Math.round((s3.split.w - 12) * 0.3))) <= 4, `admin výchozí šířka (${s3.listPane.w} z ${s3.split.w})`);
+  expect(Math.abs(s3.listPane.w - Math.max(260, Math.round(s3.split.w * 0.42))) <= 4, `admin výchozí šířka (${s3.listPane.w} z ${s3.split.w})`);
   expect(s3.folders.w > 120, "admin: složky rozbalené");
   expect(prefOf(adminId, "mail.listWidth") === "" && prefOf(adminId, "mail.foldersCollapsed") === "", "admin DB beze změny");
 
@@ -262,7 +268,7 @@ await T("oddělovač: tažení → šířka hned v DB, po obnovení i v novém p
   await div.dblclick();
   await eventually(() => prefOf(obchodId, "mail.listWidth") === "", "dvojklik smaže šířku v DB", 5_000);
   const back = await panes(page);
-  expect(Math.abs(back.listPane.w - Math.max(260, Math.round((back.split.w - 12) * 0.3))) <= 4, `po dvojkliku výchozí (${back.listPane.w})`);
+  expect(Math.abs(back.listPane.w - Math.max(260, Math.round(back.split.w * 0.42))) <= 4, `po dvojkliku výchozí (${back.listPane.w})`);
   await page.getByTestId("mail-folders-toggle").click();
   await eventually(() => prefOf(obchodId, "mail.foldersCollapsed") === "false", "rozbalené složky v DB", 5_000);
 });

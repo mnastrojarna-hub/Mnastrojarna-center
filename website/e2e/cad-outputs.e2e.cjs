@@ -89,7 +89,7 @@ async function cliPart() {
   if (php) {
     const www = path.join(WORK, 'www', 'cad', 'share');
     fs.mkdirSync(www, { recursive: true });
-    for (const f of ['index.php', '.htaccess', '.user.ini']) if (fs.existsSync(path.join(WEB, 'public/cad/share', f))) fs.copyFileSync(path.join(WEB, 'public/cad/share', f), path.join(www, f));
+    for (const f of ['index.php', 'store.php', '.htaccess', '.user.ini']) if (fs.existsSync(path.join(WEB, 'public/cad/share', f))) fs.copyFileSync(path.join(WEB, 'public/cad/share', f), path.join(www, f));
     // stránka odkazu na soubor (… odkaz) vedle úložiště – jako na webu
     fs.mkdirSync(path.join(WORK, 'www', 'cad', 'soubor'), { recursive: true });
     fs.copyFileSync(path.join(WEB, 'public/cad/soubor/index.html'), path.join(WORK, 'www', 'cad', 'soubor', 'index.html'));
@@ -216,7 +216,7 @@ async function browserPart(BASE) {
   const apiSha = [api1, api2].map((x) => sha(Buffer.from(x.base64, 'base64')));
   ok(got['Ulozeni.step'] && apiSha[0] === apiSha[1] && apiSha[0] === sha(got['Ulozeni.step']) && /FILE_NAME\('[^']*','2000-01-01T00:00:00'/.test(Buffer.from(api1.base64, 'base64').toString('latin1')), `window.mncad.exportFile('step') 2× = SHA textového export step (${apiSha[0].slice(0, 12)}…)`);
   // text nedostupného úložiště uvádí adresu, na kterou se šlo (recenze B3)
-  const storeRe = /^✗ úložiště krátkých odkazů neodpovídá \(https?:\/\/[^)\s]+\/cad\/share\/\)$/m;
+  const storeRe = /^✗ úložiště krátkých odkazů neodpovídá \(https?:\/\/[^)\s]+\/cad\/share\/\)(?: – .+)?$/m; // od 19. 11. i s důvodem (HTTP 404: …)
   log = await run('export step odkaz');
   ok(storeRe.test(log) && !/URL: /.test(log), `export step odkaz bez úložiště → ✗ s adresou úložiště, nic se nestáhne (${(log.split('\n').find((l) => l.startsWith('✗')) || '').slice(0, 90)})`);
   log = await run('sdílet úložiště');
