@@ -87,7 +87,7 @@ export type AsmCmd =
   /** pohybová studie (`pohyb …`, cad/agent-motion.ts) */
   | { k: "motion"; cmd: MotionCmd }
   /** pružina mezi dvěma komponentami (cad/asm-spring-agent.ts): dosedací plochy A / B (bez plochy = nejbližší kolmá rovina), L0, Ln, c */
-  | { k: "spring"; comp: string; a?: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; free?: number; solid?: number; rate?: number; remove?: boolean; /** nová pružina z tabulky (cad/asm-spring-between.ts) */ create?: { d?: number; De?: number; n?: number; at?: Vec3; name?: string; material?: string }; /** do všech děr vzoru (stejný Ø a osa) */ holes?: boolean; /** `sestava pružina nápověda` */ help?: boolean }
+  | { k: "spring"; comp: string; a?: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; free?: number; solid?: number; rate?: number; remove?: boolean; /** vedená dírou / kapsou nebo trnem (`vedená ano|ne` – vzpěr se pak nehlásí) */ guided?: boolean; /** nová pružina z tabulky (cad/asm-spring-between.ts) */ create?: { d?: number; De?: number; n?: number; at?: Vec3; name?: string; material?: string }; /** do všech děr vzoru (stejný Ø a osa) */ holes?: boolean; /** `sestava pružina nápověda` */ help?: boolean }
   | { k: "springs" };
 
 /* ───────────────────────── tokeny a slova ───────────────────────── */
@@ -584,6 +584,10 @@ const SP = {
   holes: W("do", "díry", "diry", "všechny", "vsechny", "all", "alle", "pattern", "vzor"),
   holeWords: W("děr", "der", "díry", "diry", "vzoru", "vzor", "všech", "vsech", "holes", "hole", "of", "pattern", "bohrungen", "bohrung", "des", "musters", "muster"),
   help: W("nápověda", "napoveda", "help", "hilfe", "?"),
+  // vedení pružiny dírou / kapsou (SpringDef.guided – dřív jen „Pružina mezi díly“, vlna E: i textem a v exportu skriptu)
+  guided: W("vedená", "vedena", "vedený", "vedeny", "guided", "geführt", "gefuehrt", "gefuhrt"),
+  yes: W("ano", "yes", "ja", "true"),
+  no: W("ne", "no", "nein", "false"),
 };
 export const SPRING_USE = () => tr("sestava pružina \"Pružina\" mezi \"Deska A\" [F3] \"Deska B\" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina \"Pružina\" odebrat · sestava pružiny");
 function parseSpring(c: Cur): AsmCmd {
@@ -638,6 +642,11 @@ function parseSpring(c: Cur): AsmCmd {
     } else if (c.is(O.del)) {
       c.i++;
       out.remove = true;
+    } else if (c.is(SP.guided)) {
+      // „vedená“ = ano; „vedená ne“ = výslovně nevedená (vzpěr se hlásí i u pružiny v díře)
+      c.i++;
+      out.guided = !c.is(SP.no);
+      if (c.is(SP.yes) || c.is(SP.no)) c.i++;
     } else throw new Error(tr("sestava pružina: neznámá volba „{0}“ – {1}", c.peek()!.t, SPRING_USE()));
   }
   if (out.free !== undefined && !(out.free > 0)) throw new Error(tr("sestava pružina: {0} musí být kladná", tr("volná délka")));

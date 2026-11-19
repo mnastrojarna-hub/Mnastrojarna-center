@@ -13,6 +13,7 @@
  * Bez prohlížeče: jádro se předává jako rozhraní (`cad.pickSigs`, `cad.drawing` v aplikaci; zkušební stroj v testech).
  */
 import { docToScript, sheetUnsupported, type DocScript, type DocScriptOptions, type ScriptLang } from "./doc-script";
+import { sheetHeight } from "./doc-script-sheet";
 import { sheetMeta, sheetOptions } from "./drawing-agent";
 import type { DrawingMeta, DrawingOptions } from "./drawing";
 import { getLang, tr } from "./i18n";
@@ -31,6 +32,8 @@ export type FreshScriptDoc = {
   doc: CadDoc;
   /** id listu → id smazaných vygenerovaných kót po „kótovat chytře“ (volba `deletedDims` převodníku) */
   deletedDims: Record<string, string[]>;
+  /** id listu s automatickým formátem a umístěnými pohledy → výška listu (mm) – převod „umístit x y“ (volba `sheetHeights`) */
+  sheetHeights: Record<string, number>;
   /** co se ověřit nepodařilo */
   notes: string[];
   stats: { /** prvky s otisky */ checked: number; /** prvky, kterým se čísla změnila */ renumbered: number; /** prvky s nenalezenou entitou */ lost: number; /** listy se smazanými kótami */ sheets: number; ms: number };
@@ -114,6 +117,16 @@ async function freshPart(doc: CadDoc, k: ScriptKernel, out: FreshScriptDoc): Pro
     for (let si = 0; si < sheets.length; si++) {
       const s = sheets[si];
       const o = (s.options ?? {}) as Rec;
+      // automatický formát s umístěnými pohledy / detaily: výšku listu zná jen výpočet (umístění se píše od levého dolního rohu)
+      const placed = ["aux", "cuts", "details"].some((k) => Array.isArray(o[k]) && (o[k] as { at?: unknown }[]).some((x) => x?.at));
+      if (placed && sheetHeight(o) === undefined) {
+        try {
+          const res = (await k.drawing(doc, sheetMeta(doc, s, si), sheetOptions(s))) as { sheet?: { h?: number } };
+          if (typeof res.sheet?.h === "number") out.sheetHeights[s.id] = res.sheet.h;
+        } catch {
+          // bez výšky převodník umístění vynechá a ohlásí
+        }
+      }
       const off = Array.isArray(o.smartOff) ? (o.smartOff as unknown[]).filter((x): x is string => typeof x === "string") : [];
       // list s volbami, které skript nepřenese (pomocné pohledy, detaily…), by po přečtení vygeneroval jiný seznam kót → id by neseděla
       if (!off.length || o.dimensions !== "smart" || sheetUnsupported(o).length) continue;
@@ -150,7 +163,7 @@ function refIndices(f: Feature): number[] {
  */
 export async function freshScriptDoc(doc: CadDoc, k: ScriptKernel): Promise<FreshScriptDoc> {
   const t0 = Date.now();
-  const out: FreshScriptDoc = { doc, deletedDims: {}, notes: [], stats: { checked: 0, renumbered: 0, lost: 0, sheets: 0, ms: 0 } };
+  const out: FreshScriptDoc = { doc, deletedDims: {}, sheetHeights: {}, notes: [], stats: { checked: 0, renumbered: 0, lost: 0, sheets: 0, ms: 0 } };
   const kind = doc.kind ?? "part";
   if (kind === "part") out.doc = await freshPart(doc, k, out);
   else if (kind === "assembly") {
@@ -193,6 +206,6 @@ export async function scriptOfDocWith(k: ScriptKernel, doc: CadDoc, opts: Script
   if (opts.sigs === "keep") return docToScript(doc, { ...base, sigs: "keep" });
   const fresh = await freshScriptDoc(doc, k);
   // ověřené výběry jsou v kopii dokumentu bez otisků; co jádro nenašlo, si otisky nechalo a zapíše se s nimi
-  const r = docToScript(fresh.doc, { ...base, sigs: "keep", deletedDims: fresh.deletedDims });
-  return { ...r, notes: [...r.notes, ...fresh.notes], fresh: fresh.stats };
+  const r = docToScript(fresh.doc, { ...base, sigs: "keep", deletedDims: fresh.deletedDims, sheetHeights: fresh.sheetHeights, notes: fresh.notes });
+  return { ...r, fresh: fresh.stats };
 }

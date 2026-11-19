@@ -237,8 +237,9 @@ export async function applySpringCmd(d: CadDoc, cmd: Extract<AsmCmd, { k: "sprin
     // tlačná pružina z tabulky: tuhost R z výpočtu (Ln dává model – solidOf)
     const rate = cmd.rate === 0 ? undefined : (cmd.rate ?? old?.rate ?? g.rate);
     if (solid !== undefined && solid >= free) throw new Error(tr("sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm", solid, free));
-    // vedení dírou / kapsou (Pružina mezi díly) zůstává při změně dosedacích ploch, L0, Ln nebo tuhosti
-    const def: SpringDef = { a: a!, b: b!, free, ...(solid !== undefined ? { solid } : {}), ...(rate !== undefined ? { rate } : {}), ...(old?.guided !== undefined ? { guided: old.guided } : {}) };
+    // vedení dírou / kapsou (Pružina mezi díly) zůstává při změně dosedacích ploch, L0, Ln nebo tuhosti; `vedená ano|ne` ho nastaví
+    const guided = cmd.guided ?? old?.guided;
+    const def: SpringDef = { a: a!, b: b!, free, ...(solid !== undefined ? { solid } : {}), ...(rate !== undefined ? { rate } : {}), ...(guided !== undefined ? { guided } : {}) };
     doc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? { ...x, spring: def } : x)) };
     if (pick.a || pick.b) picks.push(pick);
   }

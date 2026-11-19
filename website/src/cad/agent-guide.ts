@@ -1555,6 +1555,16 @@ Data ▸ Export ▸ Textový skript (.txt).
   vlastními příkazy, výkresy), u sestavy pak \`nová sestava "…"\`, \`vložit "díl" v x y z otočení rx ry rz [ukotvit]\` pro každou
   komponentu (stejný díl se zapíše jednou a vloží N×), vazby \`sestava vazba … #1 F3 #2 F7\` (komponenty pořadím \`#k\`;
   závěs / šířka / drážka i s druhými plochami, symetricky s \`rovina #1 F1\`), pohybovou studii a listy výkresu.
+  Zapíše vše, co jde napsat textem (vlna E): přezdívky komponent (\`vložit "Šroub" … jako "K48"\`), pružiny mezi díly
+  (\`sestava pružina #4 mezi #3 F9 #2 F6 volná 41 blok 16 tuhost 5.069 vedená ano\` – i z „Pružiny mezi díly“ do děr vzoru),
+  dynamiku pohybu (\`pohyb hmotnost\`, \`pohyb síla|moment\`, \`pohyb dynamika čas … krok … gravitace 0 -0.6 -0.8 …\`, u kinematické
+  studie s nastavením dynamiky ještě \`pohyb kinematika\`), celé razítko (šablona, logo jako data URL, firma, zákazník,
+  projekt, kontroloval, schválil, polotovar, počet, tepelné, povrch, úhly, sražení, nepředepsané i tabulkou podle desetinných
+  míst), tabulku revizí (\`výkres revize A "…" datum=… kreslil=…\`, \`výkres revize A značky ne\`), funkční kóty a polohy děr
+  (\`kótovat chytře funkční 80 díry tabulka\`), \`pružiny plně\`, další modely, pomocné pohledy, řezy lomenou čarou a detaily
+  (v pořadí, ve kterém dostanou stejná písmena; umístění \`umístit x y\` převede výška listu – u automatického formátu ji
+  spočítá jádro), částečné řezy, přerušení, \`výkres uložení zobrazení … / tabulka ano\` a upravené vygenerované kóty
+  celkových rozměrů a pozice (\`výkres vygenerované skrýt dim:front:t\`, \`výkres vygenerované posun pos:1 5 -3\`).
 - **Přesnost:** každý řádek prvku se před zápisem přečte stejným rozborem jako konzole, doplní nad prvky tak, jak budou
   v dokumentu PO PŘEČTENÍ skriptu (nová id), a porovná s původním prvkem. Co vlastní příkaz neumí, zapíše se obecným
   \`prvek <typ> klíč=hodnota\`, a co ani ten, jako jednořádkový JSON – protokol napíše pokrytí („183 prvků: 183 vlastním
@@ -1579,10 +1589,29 @@ Data ▸ Export ▸ Textový skript (.txt).
 - **Kontrola tam a zpět (doporučený postup):** \`const t = await window.mncad.script()\` → \`await window.mncad.run(t)\` (nová
   záložka) → \`měřit těleso\` / \`stav\` v obou záložkách: objem a obálka každého dílu, počet komponent a „Vazby: N splněno“
   musí být stejné.
-- **Co se nepřenáší** (protokol to vypíše řádky ℹ): vygenerované kóty výkresu vznikají znovu příkazem \`kótovat chytře\`
+- **Co se nepřenáší** (protokol to vypíše řádky ℹ a skript totéž v komentářích \`# ℹ …\` za hlavičkou): volby listu bez
+  textového příkazu (\`dimRoom\`, \`weldSymbols\` – jen JSON), model na listu ze záložky (jiného dokumentu), pružina nebo
+  vazba s plochou v podsestavě; vygenerované kóty výkresu vznikají znovu příkazem \`kótovat chytře\`
   (nová id; kóty, které jste smazali, smaže skript znovu – \`výkres smazat a3 a8\`), jejich ruční úpravy (tolerance)
   a ruční kóty / značky je třeba doplnit (\`výkres tolerance …\`); komponenty z importovaných souborů a podsestavy; barvy
   těles a ploch, podklady skic; 2D výkres se zapíše jako jeden řádek JSON.
+
+### Vygenerované kóty celkových rozměrů a pozice textem
+
+Kóty celkových rozměrů pohledů (\`kótovat celkově\` / \`základní\`) a pozice (balónky) sestavy, které jde ve výkresu vybrat
+myší (Delete skryje, tažení posune), jdou upravit i textem – klíč \`dim:<pohled>:t\` (kóta nahoře), \`dim:<pohled>:l\` (vlevo),
+\`pos:<číslo>\` (pozice):
+
+\`\`\`
+výkres vygenerované                       # klíče listu a dosavadní úpravy
+výkres vygenerované skrýt dim:front:t pos:3
+výkres vygenerované zobrazit pos:3
+výkres vygenerované posun pos:1 5 -3      # mm listu, y nahoru; kóta se posouvá jen kolmo k sobě
+výkres vygenerované obnovit               # vše na výchozí místo (s klíči jen ty)
+\`\`\`
+
+EN \`drawing generated hide|show|move|restore\`, DE \`zeichnung generiert ausblenden|einblenden|verschieben|wiederherstellen\`.
+\`výkres stav\` vypíše řádek „Vygenerované kóty a pozice upravené: …“.
 
 ## Soubory, obraz, výstupy a analýzy – API pro agenty
 

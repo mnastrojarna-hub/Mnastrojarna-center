@@ -14,6 +14,7 @@ import { tr } from "./i18n";
 import type { FitShow } from "./drawing-fits";
 import type { RawTok, ViewRef } from "./agent-drawing";
 import type { Vec2, Vec3 } from "./types";
+import { parseGenText, type GenCmd } from "./agent-drawing-gen";
 
 export type ViewsCmd =
   | { op: "aux"; parent?: ViewRef; edge?: [Vec2, Vec2]; mode?: "normal" | "along"; face?: number; dir?: Vec3; flip?: boolean; place?: Vec2 }
@@ -32,7 +33,9 @@ export type ViewsCmd =
   | { op: "rev-mark"; rev: string; targets: string[] }
   | { op: "rev-unmark"; targets: string[] }
   | { op: "rev-marks"; rev: string; on: boolean }
-  | { op: "zones"; on: boolean };
+  | { op: "zones"; on: boolean }
+  /** vygenerované kóty celkových rozměrů a pozice: skrýt, zobrazit, posunout, obnovit (cad/agent-drawing-gen.ts) */
+  | GenCmd;
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
 const W = (...w: string[]) => new Set(w);
@@ -136,6 +139,8 @@ export function parseDrawingViews(rt: RawTok[]): ViewsCmd | null {
   const h = rt[0];
   if (!h || h.q || h.key) return null;
   const f = fold(h.s);
+  const gen = parseGenText(rt);
+  if (gen) return gen;
   // výkres pohled pomocný … (výkres pohledy přední,horní = volba pohledů – zůstává)
   if (VIEW_W.has(f) && kw(rt[1], AUX_W)) return parseAux(rt.slice(2));
   if (AUX_W.has(f)) return parseAux(rt.slice(1));
