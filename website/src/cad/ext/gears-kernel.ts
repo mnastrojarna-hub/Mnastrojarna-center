@@ -57,10 +57,30 @@ function moveSeg(s: Seg2, a: number, d: Vec2): Seg2 {
   return { ...s, pts: s.pts.map(mv), d0: a ? rot2(s.d0, a) : s.d0, d1: a ? rot2(s.d1, a) : s.d1 };
 }
 
-/** hrany uzavřeného obrysu (všechny zuby) */
+/**
+ * Profil se sloučeným obloukem na rozhraní roztečí: rozteč začíná i končí půlkou téhož oblouku (pata zubu kola, hlava zubu
+ * věnce) – po sloučení je to jeden oblouk na zub, tj. o plochu na zub méně (čelní kolo z 60: 364 místo 424 ploch, sestava
+ * načte pro vazby celé kolo). Obrys zůstává přesně stejný; profil bez takového rozhraní se vrací beze změny.
+ */
+export function seamMerged(p: Profile2D): Profile2D {
+  if (p.pitch || p.count < 2 || p.tooth.length < 3) return p;
+  const f = p.tooth[0];
+  const l = p.tooth[p.tooth.length - 1];
+  if (f.t !== "arc" || l.t !== "arc" || f.ccw !== l.ccw) return p;
+  if (Math.hypot(f.c[0], f.c[1]) > 1e-9 || Math.hypot(l.c[0], l.c[1]) > 1e-9 || Math.abs(f.r - l.r) > 1e-9 * Math.max(1, f.r)) return p;
+  // konec posledního oblouku = začátek prvního oblouku v další rozteči
+  const d = (((l.a0 + arcSweep(l) - f.a0 - TAU / p.count) % TAU) + TAU) % TAU;
+  if (Math.min(d, TAU - d) > 1e-9) return p;
+  const sw = arcSweep(l) + arcSweep(f);
+  if (Math.abs(sw) >= Math.PI) return p;
+  return { ...p, tooth: [...p.tooth.slice(1, -1), { ...l, a1: l.a0 + sw }] };
+}
+
+/** hrany uzavřeného obrysu (všechny zuby; oblouk na rozhraní roztečí sloučený – `seamMerged`) */
 export function profileEdges(p: Profile2D, lift: Lift): r.Edge[] {
   const out: r.Edge[] = [];
-  for (let k = 0; k < p.count; k++) for (const s of toothSegs(p, k)) out.push(segEdge(s, lift));
+  const q = seamMerged(p);
+  for (let k = 0; k < q.count; k++) for (const s of toothSegs(q, k)) out.push(segEdge(s, lift));
   return out;
 }
 /** uzavřený drát celého profilu (kolo: všech z zubů) */
@@ -210,10 +230,13 @@ export function sectorPattern(p: Profile2D, b: number, rIn: number, coreHoles: r
 }
 
 /**
- * Pořadí ploch kola: nejdřív souosé válce (díra, náboj, čepy hřídele, pak paty a hlavy zubů) od nejmenšího poloměru, potom
- * rovinné plochy, nakonec boky zubů. Plochy, hrany i jejich orientace zůstávají (stejná topologie, jen jiné pořadí v plášti).
+ * Pořadí ploch kola: nejdřív CELÉ souosé válce (díra, náboj, čepy hřídele, vnější plášť věnce – úhel plochy aspoň 120°)
+ * od nejmenšího poloměru, potom ostatní souosé válce (paty a hlavy zubů), rovinné plochy, nakonec boky zubů. Plochy, hrany
+ * i jejich orientace zůstávají (stejná topologie, jen jiné pořadí v plášti).
  * Proč: sestava čte pro vazby jen prvních 400 ploch dílu (asm-agent.ts FACE_LIMIT) a kolo z 60 má 360 boků před dírou –
- * vazba ozubení „Ø30“ by díru nenašla. Těleso s více plášti nebo více tělesy se vrací beze změny.
+ * vazba ozubení „Ø30“ by díru nenašla; u věnce s vnitřním ozubením jsou hlavy a paty zubů (2–3 válcové plošky na zub) menší
+ * než vnější plášť, podle samotného poloměru by plášť věnce z 140 skončil za 400. plochou. Těleso s více plášti nebo více
+ * tělesy se vrací beze změny.
  */
 export function boreFacesFirst(s: Shape): Shape {
   const oc = r.getOC() as any; // eslint-disable-line @typescript-eslint/no-explicit-any -- přímé API OCCT
@@ -242,7 +265,8 @@ export function boreFacesFirst(s: Shape): Shape {
         const d = ax.Direction();
         const l = ax.Location();
         if (Math.abs(Math.abs(d.Z()) - 1) < 1e-9 && Math.hypot(l.X(), l.Y()) < 1e-7) {
-          key = 0;
+          // celý válec (díra, náboj, plášť věnce) má přednost před ploškami zubů na stejné ose
+          key = Math.abs(ad.LastUParameter() - ad.FirstUParameter()) >= (2 * Math.PI) / 3 ? 0 : 0.5;
           rad = cy.Radius();
         }
         cy.delete();
@@ -292,8 +316,39 @@ export function placeShape(s: Shape, at: Vec3, axis: Vec3, turn: number): Shape 
   return out;
 }
 
-/** objem tělesa (kontrola, že stavba vrátila objemové těleso) */
+/** nezávislá kopie tělesa (nové plochy, hrany, vrcholy i geometrie) – na rozdíl od `clone()` nesdílí topologii s originálem */
+export function deepCopy(s: Shape): Shape {
+  const oc = r.getOC();
+  const t = new oc.gp_Trsf();
+  const b = new oc.BRepBuilderAPI_Transform(s.wrapped, t, true);
+  try {
+    return r.cast(b.Shape()) as Shape;
+  } finally {
+    b.delete();
+    t.delete();
+  }
+}
+
+/**
+ * Je to objemové těleso? Aspoň jeden SOLID s plochami – levná náhrada výpočtu objemu (integrace přes B-splinové boky šikmého
+ * kola z 24 trvá ~0,5 s, optimální obálka šroubové plochy šneku sekundy; uzavřenost pláště hlídá sešití, orientaci `sewSolid`).
+ */
+export function hasSolid(s: Shape): boolean {
+  const o = r.getOC() as any; // eslint-disable-line @typescript-eslint/no-explicit-any -- přímé API OCCT
+  const E = o.TopAbs_ShapeEnum;
+  const ex = new o.TopExp_Explorer(s.wrapped, E.TopAbs_SOLID, E.TopAbs_SHAPE);
+  try {
+    if (!ex.More()) return false;
+    const fx = new o.TopExp_Explorer(ex.Current(), E.TopAbs_FACE, E.TopAbs_SHAPE);
+    const some = !!fx.More(); // prázdný SOLID z nepovedené operace nemá žádnou plochu (soustružený kotouč jich má jen 3)
+    fx.delete();
+    return some;
+  } finally {
+    ex.delete();
+  }
+}
+/** kontrola, že stavba vrátila objemové těleso (`hasSolid`) */
 export function needSolid(s: Shape, what: string): Shape {
-  if (!(Math.abs(r.measureVolume(s)) > 1e-9)) throw new Error(tr("{0}: jádro nevrátilo objemové těleso – zkuste jiné rozměry.", what));
+  if (!hasSolid(s)) throw new Error(tr("{0}: jádro nevrátilo objemové těleso – zkuste jiné rozměry.", what));
   return s;
 }

@@ -3,7 +3,7 @@
  * a vnitřní ozubení (`gear.internal`). Řádky tabulky, kontrola zadání, výpočet a tabulka ozubení; geometrie v `involute.ts`.
  */
 import { tr } from "../i18n";
-import { bodyIssues, bodyPhrases, bodyRows, bool, defaultsOf, discSection, fix, fmt, loc, mateRows, num, int, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyIssues, bodyPhrases, bodyRows, bool, defaultsOf, discSection, fix, fmt, int, loc, mateRows, nf, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { cylGeom, cylProfile, pointedRadius, type CylGeom, type CylInput } from "./involute";
 import { ballAuto, overBalls, spanMeasurable, spanTeeth, spanW } from "./measure";
 import { DEG } from "./num";
@@ -149,30 +149,30 @@ function validate(def: { rows: GearRow[] }, i: CylIn): ReturnType<typeof validat
   const warn = (key: string, code: string, text: string) => out.push({ level: "warn", code, key, text });
   const rhoMax = rackRhoMax(i.rack.hf, i.alpha);
   if (i.rack.rho > rhoMax + 1e-9) {
-    err(i.rackType === "custom" ? "rho" : "alpha", "rho-max", tr("Zaoblení paty ρ = {0}·m se do základního profilu s úhlem {1}° a patou {2}·m nevejde (nejvýš {3}·m).", fmt(i.rack.rho), fmt(i.alpha), fmt(i.rack.hf), fmt(rhoMax, 3)));
+    err(i.rackType === "custom" ? "rho" : "alpha", "rho-max", tr("Zaoblení paty ρ = {0}·m se do základního profilu s úhlem {1}° a patou {2}·m nevejde (nejvýš {3}·m).", nf(i.rack.rho), nf(i.alpha), nf(i.rack.hf), nf(rhoMax, 3)));
     return validation(out);
   }
-  if (i.jn > 0.3 * i.m) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", fmt(i.jn)));
+  if (i.jn > 0.3 * i.m) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", nf(i.jn)));
   const g = compute(i);
   if (i.internal) {
-    if (g.tipLimited) out.push({ level: "info", code: "tip-limited", key: "z", text: tr("Hlavová kružnice věnce je zvětšena na Ø{0} (základní kružnice + 0,1·m), aby zuby končily na evolventě.", fmt(g.da, 3)) });
-    if (!(g.rf - g.ra > 0.5 * i.m)) err("x", "int-depth", tr("Zub věnce vychází příliš nízký ({0} mm) – zmenšete posunutí x nebo zvětšete počet zubů.", fmt(g.rf - g.ra, 2)));
+    if (g.tipLimited) out.push({ level: "info", code: "tip-limited", key: "z", text: tr("Hlavová kružnice věnce je zvětšena na Ø{0} (základní kružnice + 0,1·m), aby zuby končily na evolventě.", nf(g.da, 3)) });
+    if (!(g.rf - g.ra > 0.5 * i.m)) err("x", "int-depth", tr("Zub věnce vychází příliš nízký ({0} mm) – zmenšete posunutí x nebo zvětšete počet zubů.", nf(g.rf - g.ra, 2)));
     if (!(g.san > 0)) err("x", "pointed", tr("Zub věnce je špičatý – zmenšete posunutí x."));
-    if (!(g.rimD / 2 > g.rf + 0.5 * i.m)) err("rimD", "rim", tr("Vnější průměr věnce Ø{0} musí být větší než patní průměr Ø{1} aspoň o 1·m.", fmt(g.rimD), fmt(g.df, 2)));
+    if (!(g.rimD / 2 > g.rf + 0.5 * i.m)) err("rimD", "rim", tr("Vnější průměr věnce Ø{0} musí být větší než patní průměr Ø{1} aspoň o 1·m.", nf(g.rimD), nf(g.df, 2)));
     if (!(i.body.b > 0)) err("b", "b", tr("Šířka kola musí být kladná."));
     return validation(out);
   }
   if (!(g.xiC > -1e-9)) err("jn", "space", tr("Zubová mezera je u paty širší než rozteč – zmenšete boční vůli."));
   if (!(g.rf > 0.2 * i.m)) err("z", "root", tr("Patní průměr vychází záporný – zvětšete počet zubů nebo posunutí x."));
   const rp = pointedRadius(g);
-  if (!(g.thetaA > 0)) err("x", "pointed", tr("Zub je špičatý – hlavová kružnice Ø{0} leží nad průsečíkem boků (Ø{1}). Zmenšete posunutí x nebo zvětšete zkrácení hlavy k.", fmt(g.da, 3), fmt(2 * rp, 3)));
-  else if (g.san < 0.25 * i.m) warn("x", "thin-tip", tr("Tloušťka zubu na hlavě je jen {0} mm (méně než 0,25·m) – hlava se může vylomit; zmenšete x nebo zkraťte hlavu (k).", fmt(g.san, 3)));
-  if (g.ra - g.rFf < 0.3 * i.m && g.thetaA > 0) err("x", "no-flank", tr("Z evolventního boku skoro nic nezbylo (začíná na Ø{0}, hlava je Ø{1}) – zvětšete posunutí x nebo počet zubů.", fmt(g.dFf, 3), fmt(g.da, 3)));
-  if (g.undercut) warn("z", "undercut", tr("Zuby jsou podřezané (z = {0}): bez podřezání je potřeba posunutí x ≥ {1}. Model podřezání obsahuje tak, jak ho nástroj vyrobí.", i.z, fmt(Math.ceil(g.xMin * 100) / 100, 2)));
+  if (!(g.thetaA > 0)) err("x", "pointed", tr("Zub je špičatý – hlavová kružnice Ø{0} leží nad průsečíkem boků (Ø{1}). Zmenšete posunutí x nebo zvětšete zkrácení hlavy k.", nf(g.da, 3), nf(2 * rp, 3)));
+  else if (g.san < 0.25 * i.m) warn("x", "thin-tip", tr("Tloušťka zubu na hlavě je jen {0} mm (méně než 0,25·m) – hlava se může vylomit; zmenšete x nebo zkraťte hlavu (k).", nf(g.san, 3)));
+  if (g.ra - g.rFf < 0.3 * i.m && g.thetaA > 0) err("x", "no-flank", tr("Z evolventního boku skoro nic nezbylo (začíná na Ø{0}, hlava je Ø{1}) – zvětšete posunutí x nebo počet zubů.", nf(g.dFf, 3), nf(g.da, 3)));
+  if (g.undercut) warn("z", "undercut", tr("Zuby jsou podřezané (z = {0}): bez podřezání je potřeba posunutí x ≥ {1}. Model podřezání obsahuje tak, jak ho nástroj vyrobí.", i.z, nf(Math.ceil(g.xMin * 100) / 100, 2)));
   if (i.kind === "herringbone") {
-    if (i.gap > i.body.b / 3) err("gap", "gap", tr("Drážka uprostřed smí být nejvýš třetina šířky kola ({0} mm).", fmt(i.body.b / 3, 2)));
+    if (i.gap > i.body.b / 3) err("gap", "gap", tr("Drážka uprostřed smí být nejvýš třetina šířky kola ({0} mm).", nf(i.body.b / 3, 2)));
   }
-  if (g.be > 1e-9 && !g.Wok && Number.isFinite(g.W)) out.push({ level: "info", code: "wk-width", key: "b", text: tr("Rozměr přes zuby W{0} nelze na takto úzkém šikmém kole změřit (potřebná šířka {1} mm) – použijte rozměr přes kuličky.", g.k, fmt(g.W * Math.sin(g.bb) + 1.2 * i.m, 1)) });
+  if (g.be > 1e-9 && !g.Wok && Number.isFinite(g.W)) out.push({ level: "info", code: "wk-width", key: "b", text: tr("Rozměr přes zuby W{0} nelze na takto úzkém šikmém kole změřit (potřebná šířka {1} mm) – použijte rozměr přes kuličky.", g.k, nf(g.W * Math.sin(g.bb) + 1.2 * i.m, 1)) });
   out.push(...bodyIssues(i.body, { rootR: g.rf, tipR: g.ra, m: i.m }));
   return validation(out);
 }
@@ -187,7 +187,7 @@ function dataRows(i: CylIn, c: CylC): GearDataRow[] {
     R("rack", tr("Základní profil"), "", rackName(i.rackType), "", "basic"),
     R("alpha", tr("Úhel záběru"), "αₙ", fix(i.alpha, 2), "°", "basic"),
   ];
-  if (i.beta > 0) out.push(R("beta", tr("Úhel sklonu"), "β", `${fix(i.beta, 3)} ${handLabel(i.hand)}`, "°", "basic"));
+  if (i.beta > 0) out.push(R("beta", tr("Úhel sklonu"), "β", fix(i.beta, 3), "°", "basic"), R("hand", tr("Smysl stoupání"), "", handLabel(i.hand), "", "basic"));
   out.push(R("x", tr("Posunutí profilu"), "x", fix(i.x, 4), "", "basic"));
   if (i.k > 0) out.push(R("k", tr("Zkrácení hlavy"), "k", fix(i.k, 4), "", "basic"));
   out.push(
@@ -212,9 +212,9 @@ function dataRows(i: CylIn, c: CylC): GearDataRow[] {
 /** popis těla pro souhrn (`díra 20 pero`, `náboj 40×15`) a způsobu výstupu */
 export function bodySummary(o: BodyOpts, p: Place): string {
   const parts: string[] = [];
-  if (o.bore > 0) parts.push(tr("díra {0}{1}", fmt(o.bore), o.keyway ? tr(" pero") : ""));
-  if (o.hubD > 0 && o.hubL > 0) parts.push(tr("náboj {0}×{1}", fmt(o.hubD), fmt(o.hubL)));
-  if (o.holesN > 0) parts.push(tr("díry {0}×Ø{1}", o.holesN, fmt(o.holesD)));
+  if (o.bore > 0) parts.push(tr("díra {0}{1}", nf(o.bore), o.keyway ? tr(" pero") : ""));
+  if (o.hubD > 0 && o.hubL > 0) parts.push(tr("náboj {0}×{1}", nf(o.hubD), nf(o.hubL)));
+  if (o.holesN > 0) parts.push(tr("díry {0}×Ø{1}", o.holesN, nf(o.holesD)));
   parts.push(p.out === "blank" ? tr("polotovar") : p.out === "teeth" ? tr("zuby do tělesa") : tr("kolo"));
   return parts.join(" · ");
 }
@@ -255,11 +255,11 @@ function make(kind: CylKind): KindDef<CylIn, CylC> {
     dataRows,
     summary: (i, c) =>
       [
-        `${SHORT[kind]()} m${fmt(i.m)} z${i.z}${i.beta > 0 ? ` β${fmt(i.beta)}° ${handLabel(i.hand)}` : ""} x${fmt(i.x, 4)} b${fmt(i.body.b)}`,
-        `d ${fmt(c.d, 3)}`,
-        `dₐ ${fmt(c.da, 3)}`,
+        `${SHORT[kind]()} m${nf(i.m)} z${i.z}${i.beta > 0 ? ` β${nf(i.beta)}° ${handLabel(i.hand)}` : ""} x${nf(i.x, 4)} b${nf(i.body.b)}`,
+        `d ${nf(c.d, 3)}`,
+        `dₐ ${nf(c.da, 3)}`,
         i.internal ? `M ${fix(c.M)}` : `W${c.k} ${fix(c.W)}`,
-        i.internal ? tr("věnec Ø{0}", fmt(c.rimD, 2)) + (i.place.out === "wheel" ? "" : ` · ${i.place.out === "blank" ? tr("polotovar") : tr("zuby do tělesa")}`) : bodySummary(i.body, i.place),
+        i.internal ? tr("věnec Ø{0}", nf(c.rimD, 2)) + (i.place.out === "wheel" ? "" : ` · ${i.place.out === "blank" ? tr("polotovar") : tr("zuby do tělesa")}`) : bodySummary(i.body, i.place),
       ].join(" · "),
     name: (i) => (kind === "internal" ? tr("Vnitřní ozubení m{0} z{1}", fmt(i.m), i.z) : tr("Ozubené kolo m{0} z{1}", fmt(i.m), i.z)),
   };

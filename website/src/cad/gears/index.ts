@@ -46,7 +46,12 @@
  *   gearTablesOf(doc) → GearTable[]   tabulky všech nepotlačených kol dílu (výkres)
  *   solvePair({ kind, values }) → PairResult   soukolí: řádky `PAIR_ROWS[kind]`; chybějící řádky doplní `pairDefaults(kind)`;
  *     zadaný převod `i` > 0 má přednost před `z2`; `jn` = celková boční vůle (0 = automaticky 0,04·mₙ); data kol obsahují
- *     jen klíče, které druh zná (každé kolo jde zapsat `prvek gear.* klíč=hodnota`)
+ *     jen klíče, které druh zná (každé kolo jde zapsat `prvek gear.* klíč=hodnota`). Šípové soukolí: obě kola stejně
+ *     široká (vrcholy šípů v jedné rovině), ostatní pastorky o 0,5·m širší. Vnitřní soukolí: 2D kontrola záběru ve 24
+ *     polohách jedné rozteče (mesh2d.ts); s automatickým posunutím (`xAuto`) se hlava věnce zkrátí (`k` věnce, řádek `k` =
+ *     k₂), dokud všude nezůstane aspoň 0,9 boční vůle, jinak ⚠ `interference` / `tip-gap`. Výchozí díra `autoBore` z řady
+ *     od 1 mm podle skutečné paty; když se nevejde ani ta, má kolo `bore` 0, plochy vazby jsou "" a `pairScript` vazbu
+ *     vynechá (⚠ `no-bore`) – nikdy nevznikne příkaz vazby, který by skončil chybou.
  *   pairScript(result) → string[]   existující příkazy: nový díl · prvek gear.* · nová sestava · vložit · sestava vazba
  *   gearKeyValues(ext, data) → "klíč=hodnota …" jen pro klíče odlišné od výchozích (zápis `prvek gear.*`)
  *
@@ -57,8 +62,9 @@
  *
  * TĚLESO V JÁDŘE (cad/ext/gears*.ts): hranolová kola = jedna plocha → jeden hranol; šroubová, kuželová a šneková kola =
  *   záplaty boků sešité do pláště (bez booleovských operací na zubech); boční odlehčení řetězového kola = jedna výseč + kruhové
- *   pole; plochy kola mají souosé válce (díra, náboj, čepy) jako první – vazba ozubení v sestavě najde díru i u kol s více
- *   než 400 plochami.
+ *   pole; plochy kola mají CELÉ souosé válce (díra, náboj, čepy, plášť věnce) jako první – vazba ozubení v sestavě najde
+ *   díru i u kol s více než 400 plochami; oblouk paty na rozhraní roztečí je sloučený (čelní kolo z 60 má 364 ploch).
+ *   Mezipaměť těles vydává nezávislé kopie (pozdější booleovská operace s kolem nesmí změnit uložené těleso).
  *
  * PŘESNOST: evolventa, trochoida paty i cykloidy jsou kubické B-spliny proložené přesnými body v přirozeném parametru
  *   křivky se zadanými derivacemi na koncích (odchylka ≤ 4·10⁻⁵ mm u m = 10); co je u kterého druhu přiblížené, říká

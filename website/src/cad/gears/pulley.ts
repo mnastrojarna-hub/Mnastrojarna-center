@@ -4,7 +4,7 @@
  * bez zaoblení – rozteč a průměry jsou přesné, tvar drážky ne.
  */
 import { tr } from "../i18n";
-import { bodyIssues, bodyPhrases, bodyRows, bool, defaultsOf, discSection, fix, fmt, int, loc, num, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyIssues, bodyPhrases, bodyRows, bool, defaultsOf, discSection, fix, fmt, int, loc, nf, num, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { bodySummary, teethRow } from "./cylindrical";
 import { ang, circleX, DEG, polar, segMirrorRev, tiledArea } from "./num";
 import { BELT_NAMES, HTD, TBELTS } from "./tables";
@@ -143,6 +143,6 @@ export const PULLEY: KindDef<PulleyIn, PulleyC> = {
       ...(i.flanges ? [R("fd", tr("Průměr bočnic"), "d_B", fix(c.fd, 1), "mm", "geometry")] : []),
     ];
   },
-  summary: (i, c) => [`${tr("řemenice")} ${c.htd ? "HTD " : ""}${i.profile} z${i.z} ${tr("řemen")} ${fmt(i.w)}`, `d₀ ${fmt(c.d0, 3)}`, `dₐ ${fmt(c.da, 3)}`, bodySummary(i.body, i.place)].join(" · "),
+  summary: (i, c) => [`${tr("řemenice")} ${c.htd ? "HTD " : ""}${i.profile} z${i.z} ${tr("řemen")} ${nf(i.w)}`, `d₀ ${nf(c.d0, 3)}`, `dₐ ${nf(c.da, 3)}`, bodySummary(i.body, i.place)].join(" · "),
   name: (i) => tr("Řemenice {0} z{1}", HTD[i.profile] ? `HTD ${i.profile}` : i.profile, i.z),
 };

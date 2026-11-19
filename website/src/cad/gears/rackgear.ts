@@ -5,7 +5,7 @@
  */
 import { tr } from "../i18n";
 import { alphaRow, handLabel, handRow, moduleRow, widthRow } from "./cylindrical";
-import { defaultsOf, fix, fmt, int, loc, num, oneOf, placeRows, rangeIssues, readPlace, row, validation, W, type Place } from "./common";
+import { defaultsOf, fix, fmt, int, loc, nf, num, oneOf, placeRows, rangeIssues, readPlace, row, validation, W, type Place } from "./common";
 import { ballAuto, rackPin } from "./measure";
 import { DEG, segGreen, segMove } from "./num";
 import { RACK_OPTIONS, rackName, rackOf, rackRhoMax, type RackSpec } from "./rack";
@@ -106,12 +106,12 @@ function validate(def: { rows: GearRow[] }, i: RackIn) {
   const out: Issue[] = rangeIssues(def.rows, i.raw);
   if (out.some((x) => x.level === "error")) return validation(out);
   const rhoMax = rackRhoMax(i.rack.hf, i.alpha);
-  if (i.rack.rho > rhoMax + 1e-9) out.push({ level: "error", code: "rho-max", key: i.rackType === "custom" ? "rho" : "alpha", text: tr("Zaoblení paty ρ = {0}·m se do základního profilu s úhlem {1}° a patou {2}·m nevejde (nejvýš {3}·m).", fmt(i.rack.rho), fmt(i.alpha), fmt(i.rack.hf), fmt(rhoMax, 3)) });
+  if (i.rack.rho > rhoMax + 1e-9) out.push({ level: "error", code: "rho-max", key: i.rackType === "custom" ? "rho" : "alpha", text: tr("Zaoblení paty ρ = {0}·m se do základního profilu s úhlem {1}° a patou {2}·m nevejde (nejvýš {3}·m).", nf(i.rack.rho), nf(i.alpha), nf(i.rack.hf), nf(rhoMax, 3)) });
   const c = compute(i);
-  if (i.h < c.ha + c.hf + 0.5 * i.m) out.push({ level: "error", code: "h", key: "h", text: tr("Výška hřebene {0} mm je menší než výška zubu s tělem ({1} mm).", fmt(i.h), fmt(c.ha + c.hf + 0.5 * i.m, 2)) });
-  if (i.jn > 0.3 * i.m) out.push({ level: "error", code: "jn-max", key: "jn", text: tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", fmt(i.jn)) });
+  if (i.h < c.ha + c.hf + 0.5 * i.m) out.push({ level: "error", code: "h", key: "h", text: tr("Výška hřebene {0} mm je menší než výška zubu s tělem ({1} mm).", nf(i.h), nf(c.ha + c.hf + 0.5 * i.m, 2)) });
+  if (i.jn > 0.3 * i.m) out.push({ level: "error", code: "jn-max", key: "jn", text: tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", nf(i.jn)) });
   if (c.sn / 2 - c.ha * Math.tan(i.alpha * DEG) <= 0) out.push({ level: "error", code: "pointed", key: "alpha", text: tr("Zub hřebene je špičatý – zmenšete úhel záběru nebo výšku hlavy.") });
-  if (i.len > 0 && Math.abs(i.len - c.L) > 1e-6) out.push({ level: "info", code: "len", key: "len", text: tr("Délka se zaokrouhlí na celý počet zubů: {0} zubů = {1} mm.", c.n, fmt(c.L, 3)) });
+  if (i.len > 0 && Math.abs(i.len - c.L) > 1e-6) out.push({ level: "info", code: "len", key: "len", text: tr("Délka se zaokrouhlí na celý počet zubů: {0} zubů = {1} mm.", c.n, nf(c.L, 3)) });
   if (c.n > 400) out.push({ level: "warn", code: "many", key: "z", text: tr("Hřeben s {0} zuby se bude stavět dlouho – zvažte kratší díl.", c.n) });
   return validation(out);
 }
@@ -119,7 +119,7 @@ function validate(def: { rows: GearRow[] }, i: RackIn) {
 function dataRows(i: RackIn, c: RackC): GearDataRow[] {
   const R = (key: string, label: string, symbol: string, value: string, unit: string, group: GearDataRow["group"]): GearDataRow => ({ key, label, ...(symbol ? { symbol } : {}), value, ...(unit ? { unit } : {}), group });
   const out = [R("m", tr("Modul"), "mₙ", loc(fmt(i.m, 4)), "mm", "basic"), R("z", tr("Počet zubů"), "z", String(c.n), "", "basic"), R("rack", tr("Základní profil"), "", rackName(i.rackType), "", "basic"), R("alpha", tr("Úhel záběru"), "αₙ", fix(i.alpha, 2), "°", "basic")];
-  if (i.beta > 0) out.push(R("beta", tr("Úhel sklonu"), "β", `${fix(i.beta, 3)} ${handLabel(i.hand)}`, "°", "basic"));
+  if (i.beta > 0) out.push(R("beta", tr("Úhel sklonu"), "β", fix(i.beta, 3), "°", "basic"), R("hand", tr("Smysl stoupání"), "", handLabel(i.hand), "", "basic"));
   out.push(
     R("p", tr("Rozteč podél hřebene"), "p", fix(c.p, 4), "mm", "geometry"),
     R("L", tr("Délka ozubení"), "L", fix(c.L), "mm", "geometry"),
@@ -170,6 +170,6 @@ export const RACK: KindDef<RackIn, RackC> = {
   /** boční pohled polotovaru: tyč L × h (šířka b) */
   blank: (i, c) => [[0, 0], [c.L, 0], [c.L, i.h], [0, i.h]],
   dataRows,
-  summary: (i, c) => [`${tr("hřeben")} m${fmt(i.m)} z${c.n}${i.beta > 0 ? ` β${fmt(i.beta)}° ${handLabel(i.hand)}` : ""} b${fmt(i.b)} h${fmt(i.h)}`, `L ${fmt(c.L, 3)}`, `p ${fmt(c.p, 4)}`, `M ${fix(c.M)}`, i.place.out === "blank" ? tr("polotovar") : i.place.out === "teeth" ? tr("zuby do tělesa") : tr("hřeben")].join(" · "),
+  summary: (i, c) => [`${tr("hřeben")} m${nf(i.m)} z${c.n}${i.beta > 0 ? ` β${nf(i.beta)}° ${handLabel(i.hand)}` : ""} b${nf(i.b)} h${nf(i.h)}`, `L ${nf(c.L, 3)}`, `p ${nf(c.p, 4)}`, `M ${fix(c.M)}`, i.place.out === "blank" ? tr("polotovar") : i.place.out === "teeth" ? tr("zuby do tělesa") : tr("hřeben")].join(" · "),
   name: (i) => tr("Ozubený hřeben m{0} z{1}", fmt(i.m), i.len > 0 ? Math.max(1, Math.round(i.len / ((Math.PI * i.m) / Math.cos(i.beta * DEG)))) : i.z),
 };

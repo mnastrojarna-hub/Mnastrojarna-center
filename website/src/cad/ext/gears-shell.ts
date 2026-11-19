@@ -10,6 +10,7 @@ import { tr } from "../i18n";
 import { interpolateCurve } from "../spline-occ";
 import { bsplineSurface, curveData, faceOf, interpCurve } from "../surf-geom";
 import type { Vec3 } from "../types";
+import { seamMerged } from "./gears-kernel";
 import type { Shape } from "./registry";
 
 type OC = any;
@@ -78,6 +79,30 @@ const rotZ = (a: number) => {
   return (p: Vec3): Vec3 => [c * p[0] - s * p[1], s * p[0] + c * p[1], p[2]];
 };
 
+/**
+ * Je těleso obrácené (normály dovnitř)? Rovinné víko na nejvyšší rovině z musí mít vnější normálu +Z – levná náhrada
+ * znaménka objemu (integrace přes B-splinové boky trvá stovky ms). Bez rovinného horního víka rozhodne objem.
+ */
+function insideOut(solid: Shape): boolean {
+  const o = oc();
+  let best = -Infinity;
+  let up = 0;
+  for (const f of solid.faces) {
+    if (f.geomType !== "PLANE") continue;
+    const ad = new o.BRepAdaptor_Surface(f.wrapped, true);
+    try {
+      const ax = ad.Plane().Axis();
+      const z = ax.Location().Z();
+      if (Math.abs(Math.abs(ax.Direction().Z()) - 1) > 1e-9 || z <= best) continue;
+      best = z;
+      up = f.normalAt().z; // BRepGProp_Face: normála s ohledem na orientaci plochy
+    } finally {
+      ad.delete();
+    }
+  }
+  return up === 0 ? r.measureVolume(solid) < 0 : up < 0;
+}
+
 /** sešije plochy do uzavřeného pláště a vrátí těleso; hodí chybu, když zůstanou volné hrany */
 export function sewSolid(faces: { wrapped: unknown }[], tol = 1e-5): Shape {
   const o = oc();
@@ -90,7 +115,7 @@ export function sewSolid(faces: { wrapped: unknown }[], tol = 1e-5): Shape {
     if (free > 0) throw new Error(tr("Plášť ozubení se nepodařilo uzavřít ({0} volných hran) – zkuste mírně změnit rozměry.", free));
     const sewn = r.downcast(s.SewedShape());
     let solid = r.cast(fix.SolidFromShell(sewn)) as Shape;
-    if (r.measureVolume(solid) < 0) solid = r.cast(solid.wrapped.Reversed()) as Shape;
+    if (insideOut(solid)) solid = r.cast(solid.wrapped.Reversed()) as Shape;
     return solid;
   } finally {
     s.delete();
@@ -186,7 +211,8 @@ export function helixStations(z0: number, z1: number, tau: number, zRef: number,
   });
 }
 
-/** těleso šroubově (nebo přímo) taženého profilu mezi rovinami řezů; `groups` řezů = pásy (šípové: dva se společným středem) */
+/** těleso šroubově (nebo přímo) taženého profilu mezi rovinami řezů; `groups` řezů = pásy (šípové: dva se společným středem); oblouk na rozhraní roztečí sloučený (`seamMerged`) */
 export function sweptProfileSolid(p: Profile2D, groups: Station[][], opts: VolumeOpts = {}): Shape {
-  return toothVolume(groups.map((st) => ({ grids: sweepGrids(p.tooth, st), tv: st.map((s) => s.z) })), p.count, opts);
+  const q = seamMerged(p);
+  return toothVolume(groups.map((st) => ({ grids: sweepGrids(q.tooth, st), tv: st.map((s) => s.z) })), q.count, opts);
 }

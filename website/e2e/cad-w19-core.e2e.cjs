@@ -4,6 +4,7 @@
 //  – srozumitelná chyba u nesmyslného zadání (z = 3), skryté prvky nejsou na pásu karet,
 //  – řetězové kolo 08B z 19 duplex, šikmé kolo → export STEP → import STEP = platné těleso se stejným objemem,
 //  – soukolí jako existující příkazy (nový díl · prvek gear.* · nová sestava · vložit · sestava vazba ozubení) → vazba ok,
+//  – nálezy revize: výchozí cykloidní soukolí s vazbou, řádek z brífu s nábojem Ø40, stejné kolo po sjednocení a odebrání,
 //  – anglické rozhraní: souhrn `stav` přeložený (spur …).
 // Spuštění (produkční build): E2E_BASE=http://localhost:3461 node e2e/cad-w19-core.e2e.cjs <složka pro snímky>
 const { chromium } = require('playwright');
@@ -95,7 +96,7 @@ async function open(b, path = '/cad') {
   await run('nový díl Řetězka\nprvek gear.sprocket chain=08B z=19 rows=2 bore=20 keyway=true');
   await idle();
   st = await status();
-  ok(/prvků 1 \(1 ✓, 0 ✗\)/.test(st) && /Geometrie: platná/.test(st) && /řetězové 08B-2 z19 · d 77\.159 · dₐ 82\.402 · M_R 85,406/.test(st), `řetězové kolo 08B z 19 duplex: d = p / sin(180°/z) = 77,159, M_R 85,406 (${Date.now() - t0} ms)`);
+  ok(/prvků 1 \(1 ✓, 0 ✗\)/.test(st) && /Geometrie: platná/.test(st) && /řetězové 08B-2 z19 · d 77,159 · dₐ 82,402 · M_R 85,406/.test(st), `řetězové kolo 08B z 19 duplex: d = p / sin(180°/z) = 77,159, M_R 85,406 (${Date.now() - t0} ms)`);
 
   // ── 6. šikmé kolo → STEP → import ──
   t0 = Date.now();
@@ -129,6 +130,32 @@ async function open(b, path = '/cad') {
   ok(/Vazby: 1 \(1 ok\)/.test(st) && /2 komponent/.test(st), `soukolí z 20/60 s posunutím (a_w 81): sestava se 2 komponentami a vazbou ozubení ok (${Date.now() - t0} ms)`);
   ok(/vazba Ozubená kola .* Ø10 .* Ø30|F0|poměr 3/.test(String(out)) || /Vazby: 1 \(1 ok\)/.test(st), 'vazba našla díry Ø10 a Ø30 (díra je první plochou kola – sestava čte prvních 400 ploch)');
   await p.screenshot({ path: S + 'w19-core-pair.png' });
+
+  // ── 7b. nálezy revize: výchozí cykloidní soukolí (díra pastorku Ø1 podle skutečné paty – dřív „Ø0“ a vazba selhala),
+  //        řádek z brífu s nábojem Ø40 na patě Ø43,8 (dřív chyba „náboj příliš velký“), mezipaměť těles (kolo přidané na
+  //        hřídel a pak stejné kolo odebrané z desky – dřív neplatná geometrie)
+  t0 = Date.now();
+  out = await run([
+    'nový díl "Pastorek m1 z8"',
+    'prvek gear.cycloid z=8 zMate=60 b=6 type=pinion bore=1 name="Cykloidní pastorek m1 z8"',
+    'nový díl "Kolo m1 z60"',
+    'prvek gear.cycloid z=60 bore=15 name="Cykloidní kolo m1 z60"',
+    'nová sestava "Cykloidní soukolí m1 z8/z60"',
+    'vložit "Pastorek m1 z8" v 0 0 -1.5',
+    'vložit "Kolo m1 z60" v 34 0 0 otočení 0 0 177',
+    'sestava vazba ozubení "Pastorek m1 z8" Ø1 "Kolo m1 z60" Ø15 zuby 8 60',
+  ].join('\n'));
+  await idle();
+  st = await status();
+  ok(/Vazby: 1 \(1 ok\)/.test(st) && !/^\s*✗/m.test(String(out)), `výchozí cykloidní soukolí m 1 z 8/60: vazba ozubení na díry Ø1 / Ø15 ok (${Date.now() - t0} ms)`);
+  out = await run('nový díl "brief"\nprvek gear.spur m=2 z=24 b=20 x=0.2 alpha=20 bore=20 keyway=ano hubD=40 hubL=15');
+  await idle();
+  st = await status();
+  ok(/prvků 1 \(1 ✓, 0 ✗\)/.test(st) && /Geometrie: platná/.test(st) && !/^\s*[⚠✗]/m.test(String(out)), 'řádek z brífu (díra 20 pero, náboj 40 15, x 0,2) se postaví bez chyby i varování');
+  out = await run('nový díl "add"\nválec 10 60 v 0 0 -20\nprvek gear.spur m=2 z=25 b=10 mode=add\nnový díl "cut"\nválec 80 10\nprvek gear.spur m=2 z=25 b=10 mode=cut');
+  await idle();
+  st = await status();
+  ok(/Geometrie: platná/.test(st) && !/neplatnou geometrii/.test(String(out)), 'stejné kolo po sjednocení s hřídelí a pak odebrané z desky: platná geometrie (mezipaměť vydává nezávislé kopie)');
 
   ok(errs.length === 0, `bez chyb stránky (${errs.slice(0, 3).join(' | ')})`);
 

@@ -8,7 +8,7 @@
  * 10 a více r = 0,525·m.
  */
 import { tr } from "../i18n";
-import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, loc, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, loc, nf, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { bodySummary, moduleRow, teethRow, widthRow } from "./cylindrical";
 import { ang, bisect, circleX, curveSeg, polar, rot2, segMirrorRev, tiledArea } from "./num";
 import type { BodyOpts, GearData, GearDataRow, GearRow, Issue, KindDef, Profile2D, Seg2, Vec2 } from "./types";
@@ -200,11 +200,11 @@ export const CYCLOID: KindDef<CycloidIn, CycloidC> = {
     if (out.some((x) => x.level === "error")) return validation(out);
     const c = compute(i);
     const err = (key: string, code: string, text: string) => out.push({ level: "error", code, key, text });
-    if (!(c.s < 0.9 * Math.PI * i.m)) err("sw", "s", tr("Tloušťka zubu {0} mm je větší než rozteč – zmenšete ji.", fmt(c.s, 3)));
+    if (!(c.s < 0.9 * Math.PI * i.m)) err("sw", "s", tr("Tloušťka zubu {0} mm je větší než rozteč – zmenšete ji.", nf(c.s, 3)));
     if (!(c.df > 0.2 * i.m)) err("ff", "root", tr("Patní průměr vychází záporný – zvětšete počet zubů nebo zmenšete výšku paty."));
-    if (c.ha > c.hPointed + 1e-9) err("fa", "pointed", tr("Hlava {0} mm je vyšší než špička zubu ({1} mm) – boky se sejdou dřív.", fmt(c.ha, 3), fmt(c.hPointed, 3)));
-    if (c.arcR === 0 && c.ha >= 2 * c.rhoA) err("rollA", "roll", tr("Hlava {0} mm je vyšší než průměr tvořicí kružnice ({1} mm).", fmt(c.ha, 3), fmt(2 * c.rhoA, 3)));
-    if (Math.abs(c.rhoF - c.R / 2) > 1e-9 && c.R - c.hf < Math.abs(c.R - 2 * c.rhoF) + 1e-9) err("rollF", "roll-f", tr("Hypocykloida s tvořicí kružnicí {0} mm nedosáhne na patní kružnici – zmenšete výšku paty.", fmt(c.rhoF, 3)));
+    if (c.ha > c.hPointed + 1e-9) err("fa", "pointed", tr("Hlava {0} mm je vyšší než špička zubu ({1} mm) – boky se sejdou dřív.", nf(c.ha, 3), nf(c.hPointed, 3)));
+    if (c.arcR === 0 && c.ha >= 2 * c.rhoA) err("rollA", "roll", tr("Hlava {0} mm je vyšší než průměr tvořicí kružnice ({1} mm).", nf(c.ha, 3), nf(2 * c.rhoA, 3)));
+    if (Math.abs(c.rhoF - c.R / 2) > 1e-9 && c.R - c.hf < Math.abs(c.R - 2 * c.rhoF) + 1e-9) err("rollF", "roll-f", tr("Hypocykloida s tvořicí kružnicí {0} mm nedosáhne na patní kružnici – zmenšete výšku paty.", nf(c.rhoF, 3)));
     if (!out.some((x) => x.level === "error")) out.push(...bodyIssues(i.body, { rootR: c.df / 2, tipR: c.da / 2, m: i.m }));
     return validation(out);
   },
@@ -226,6 +226,6 @@ export const CYCLOID: KindDef<CycloidIn, CycloidC> = {
       R("rhoF", tr("Tvořicí kružnice paty"), "ρ_f", fix(c.rhoF), "mm", "geometry"),
     ];
   },
-  summary: (i, c) => [`${tr("cykloidní")} ${i.type === "pinion" ? tr("pastorek") : tr("kolo")} m${fmt(i.m)} z${i.z}/${i.zMate} b${fmt(i.body.b)}`, `d ${fmt(c.d, 3)}`, `dₐ ${fmt(c.da, 3)}`, bodySummary(i.body, i.place)].join(" · "),
+  summary: (i, c) => [`${tr("cykloidní")} ${i.type === "pinion" ? tr("pastorek") : tr("kolo")} m${nf(i.m)} z${i.z}/${i.zMate} b${nf(i.body.b)}`, `d ${nf(c.d, 3)}`, `dₐ ${nf(c.da, 3)}`, bodySummary(i.body, i.place)].join(" · "),
   name: (i) => (i.type === "pinion" ? tr("Cykloidní pastorek m{0} z{1}", fmt(i.m), i.z) : tr("Cykloidní kolo m{0} z{1}", fmt(i.m), i.z)),
 };

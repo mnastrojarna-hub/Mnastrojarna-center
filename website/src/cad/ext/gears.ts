@@ -32,7 +32,7 @@ import type { WormWheelC, WormWheelIn } from "../gears/wormwheel";
 import { tr } from "../i18n";
 import type { Vec3 } from "../types";
 import "./gears-entry";
-import { applyBody, bodyHoleTools, boreFacesFirst, bodyHoleWires, circleWire, liftXY, placeShape, prism, profileWire, revolveSection, revolveSegs, segEdge, sectorPattern, segsWire } from "./gears-kernel";
+import { applyBody, bodyHoleTools, boreFacesFirst, bodyHoleWires, circleWire, deepCopy, liftXY, needSolid, placeShape, prism, profileWire, revolveSection, revolveSegs, segEdge, sectorPattern, segsWire } from "./gears-kernel";
 import { helixStations, lateralFaces, reversedWire, sweptProfileSolid, toothVolume, type Station, type VolumeOpts } from "./gears-shell";
 import { extDirection, extPoint } from "./place";
 import { registerExt, setExtTool, type ExtBuildCtx, type Shape } from "./registry";
@@ -384,7 +384,12 @@ function builders(def: AnyKind, i: unknown, c: unknown): Built {
   }
 }
 
-/** malá mezipaměť těles v místní soustavě: posun kola nebo úprava pozdějšího prvku nestaví zuby znovu */
+/**
+ * Malá mezipaměť těles v místní soustavě: posun kola nebo úprava pozdějšího prvku nestaví zuby znovu.
+ * Ukládá se i vydává NEZÁVISLÁ KOPIE (nové plochy, hrany, vrcholy): replicad `clone()` sdílí topologii (TShape) a booleovská
+ * operace s vydaným tělesem (náboj na hřídeli, sjednocení s jiným tělesem) mění tolerance a křivky sdílených hran – další
+ * stavba se stejnými daty by pak z mezipaměti dostala porušené těleso (neplatná geometrie).
+ */
 const cache = new Map<string, Shape>();
 const CACHE_MAX = 4;
 const PLACE_KEYS = new Set(["position", "positionRef", "axis", "turn", "mode"]);
@@ -395,13 +400,13 @@ function localTool(def: AnyKind, data: Data, out: OutMode, build: () => Shape): 
     try {
       cache.delete(key);
       cache.set(key, hit);
-      return hit.clone() as Shape;
+      return deepCopy(hit);
     } catch {
       cache.delete(key); // těleso uvolnilo jádro (nové spuštění) – postavit znovu
     }
   }
   const s = build();
-  cache.set(key, s.clone() as Shape);
+  cache.set(key, deepCopy(s));
   while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
   return s;
 }
@@ -421,7 +426,7 @@ export function buildGear(def: AnyKind, raw: Data, ctx: ExtBuildCtx): Shape {
   const local = localTool(def, data, out, () => {
     const b = builders(def, i, def.compute(i));
     const s = out === "blank" ? b.blank() : out === "teeth" ? b.teeth() : b.wheel();
-    if (!(Math.abs(r.measureVolume(s)) > 1e-9)) throw new Error(tr("{0}: jádro nevrátilo objemové těleso – zkuste jiné rozměry.", def.label));
+    needSolid(s, def.label);
     // díra a náboj mezi prvními plochami (vazby sestavy čtou jen prvních 400 ploch dílu)
     return out === "teeth" ? s : boreFacesFirst(s);
   });

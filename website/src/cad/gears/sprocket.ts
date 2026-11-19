@@ -4,7 +4,7 @@
  * Všechny oblouky profilu jsou přesné kružnice; boční odlehčení zubu je oblouk r_x = p (viz jádro).
  */
 import { tr } from "../i18n";
-import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, loc, mateRows, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, loc, mateRows, nf, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { bodySummary, teethRow } from "./cylindrical";
 import { sprocketOverPins } from "./measure";
 import { ang, circleX, DEG, polar, segMirrorRev, tiledArea } from "./num";
@@ -147,9 +147,9 @@ export const SPROCKET: KindDef<SprocketIn, SprocketC> = {
     if (out.some((x) => x.level === "error")) return validation(out);
     const c = compute(i);
     if (i.z < 9) out.push({ level: "warn", code: "few", key: "z", text: tr("Kolo s {0} zuby běží neklidně (mnohoúhelníkový efekt) – doporučuje se aspoň 9, pro rychlý chod 17 zubů.", i.z) });
-    if (c.pointed) out.push({ level: "info", code: "pointed", key: "form", text: tr("Boky zubů se sejdou pod hlavovou kružnicí – hlavový průměr vychází Ø{0}.", fmt(c.da, 3)) });
+    if (c.pointed) out.push({ level: "info", code: "pointed", key: "form", text: tr("Boky zubů se sejdou pod hlavovou kružnicí – hlavový průměr vychází Ø{0}.", nf(c.da, 3)) });
     out.push(...bodyIssues(i.body, { rootR: c.df / 2, tipR: c.da / 2, m: i.ch.p / Math.PI }).filter((x) => x.code !== "b"));
-    if (i.body.hubD > c.dg + 1e-9 && i.body.hubL > 0) out.push({ level: "warn", code: "hub-dg", key: "hubD", text: tr("Náboj Ø{0} je větší než největší dovolený průměr vedle zubů d_g = {1} mm (ISO 606) – destičky řetězu by o něj dřely.", fmt(i.body.hubD), fmt(c.dg, 2)) });
+    if (i.body.hubD > c.dg + 1e-9 && i.body.hubL > 0) out.push({ level: "warn", code: "hub-dg", key: "hubD", text: tr("Náboj Ø{0} je větší než největší dovolený průměr vedle zubů d_g = {1} mm (ISO 606) – destičky řetězu by o něj dřely.", nf(i.body.hubD), nf(c.dg, 2)) });
     return validation(out);
   },
   compute,
@@ -173,6 +173,6 @@ export const SPROCKET: KindDef<SprocketIn, SprocketC> = {
     if (i.aw > 0) out.push(R("aw", tr("Osová vzdálenost"), "a", fix(i.aw), "mm", "pair"));
     return out;
   },
-  summary: (i, c) => [`${tr("řetězové")} ${i.chain}${i.rows > 1 ? `-${i.rows}` : ""} z${i.z}`, `d ${fmt(c.d, 3)}`, `dₐ ${fmt(c.da, 3)}`, `M_R ${fix(c.MR)}`, bodySummary(i.body, i.place)].join(" · "),
+  summary: (i, c) => [`${tr("řetězové")} ${i.chain}${i.rows > 1 ? `-${i.rows}` : ""} z${i.z}`, `d ${nf(c.d, 3)}`, `dₐ ${nf(c.da, 3)}`, `M_R ${fix(c.MR)}`, bodySummary(i.body, i.place)].join(" · "),
   name: (i) => tr("Řetězové kolo {0} z{1}", `${i.chain}${i.rows > 1 ? `-${i.rows}` : ""}`, i.z),
 };

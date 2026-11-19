@@ -521,3 +521,110 @@ describe("soukolí všech druhů → existující příkazy", () => {
     expect(pairScript(bad)).toEqual([]);
   });
 });
+
+describe("nálezy revize – soukolí, kontrola zadání a formát výpisů", () => {
+  const issueCodes = (r: { issues: { code: string }[] }) => r.issues.map((x) => x.code);
+  it("výchozí cykloidní soukolí (m 1, z 8/60) i m 2 z 10/40: díra pastorku podle skutečné paty, vazba bez „Ø0“", () => {
+    for (const values of [{}, { m: 2, z1: 10, z2: 40 }]) {
+      const r = solvePair({ kind: "cycloid", values });
+      expect(r.ok).toBe(true);
+      expect(issueCodes(r)).not.toContain("no-bore");
+      const bore1 = Number(r.wheels[0].data.bore);
+      expect(bore1).toBeGreaterThan(0);
+      // díra projde kontrolou těla pastorku bez chyby i varování (pod patou zůstane ≥ 1,5·m)
+      expect(gearValidate(r.wheels[0].ext, r.wheels[0].data).issues.filter((x) => x.level !== "info")).toEqual([]);
+      const mate = pairScript(r).find((l) => l.startsWith("sestava vazba"));
+      expect(mate).toBeDefined();
+      expect(mate).not.toMatch(/Ø0(?![,.\d])/);
+    }
+    // kolo, do kterého se díra nevejde vůbec: sestava bez vazby (žádný příkaz, který by skončil chybou) a srozumitelné varování
+    const tiny = solvePair({ kind: "cycloid", values: { m: 0.3, z1: 6, z2: 40 } });
+    expect(Number(tiny.wheels[0].data.bore)).toBe(0);
+    expect(tiny.issues.find((x) => x.code === "no-bore")).toMatchObject({ level: "warn", key: "bore1" });
+    expect(pairScript(tiny).some((l) => l.startsWith("sestava vazba"))).toBe(false);
+    expect(pairScript(tiny).some((l) => l.startsWith("nová sestava"))).toBe(true);
+  });
+  it("šípové soukolí: pastorek stejně široký jako kolo (vrcholy šípů v jedné rovině), čelní a šikmé o 0,5·m širší", () => {
+    const h = solvePair({ kind: "herringbone", values: { b: 8 } });
+    expect(h.wheels[0].data.b).toBe(8);
+    expect(h.wheels[1].data.b).toBe(8);
+    expect(h.placement[0].at[2]).toBe(h.placement[1].at[2]);
+    for (const kind of ["spur", "helical"] as const) expect(solvePair({ kind, values: { b: 8 } }).wheels[0].data.b).toBe(9);
+  });
+  it("vnitřní soukolí: hlavová vůle c = min(r_f2 − a_w − r_a1, r_a2 − a_w − r_f1) z kol, jak se postaví (výchozí +0,5; a 41: +0,587; m 3: +0,75)", () => {
+    for (const [values, c] of [[{}, 0.5], [{ z1: 20, z2: 60, m: 2, a: 41 }, 0.587], [{ z1: 18, z2: 54, m: 3 }, 0.75]] as const) {
+      const r = solvePair({ kind: "internal", values });
+      const g1 = gearCompute(r.wheels[0].ext, r.wheels[0].data);
+      const g2 = gearCompute(r.wheels[1].ext, r.wheels[1].data);
+      const aw = r.placement[0].at[0];
+      const real = Math.min(g2.rf - aw - g1.ra, g2.ra - aw - g1.rf);
+      expect(real).toBeCloseTo(c, 3);
+      expect(Number(r.rows.find((x) => x.key === "c")!.value.replace(",", "."))).toBeCloseTo(real, 3);
+      expect(issueCodes(r)).not.toContain("clearance");
+    }
+  });
+  it("vnitřní soukolí: 2D kontrola záběru ve 24 polohách – automatika zkrátí hlavu věnce, ruční zadání s kolizí dostane varování", async () => {
+    const { meshScan, meshWheel } = await import("./mesh2d");
+    for (const values of [{}, { z1: 30, z2: 50 }, { z1: 25, z2: 40 }, { z1: 18, z2: 30 }, { beta: 15, b: 6 }]) {
+      const r = solvePair({ kind: "internal", values });
+      expect(r.ok, JSON.stringify(values)).toBe(true);
+      expect(issueCodes(r).filter((c) => c === "interference" || c === "tip-gap"), JSON.stringify(values)).toEqual([]);
+      // nezávislé ověření: nejmenší vzdálenost obrysů ≥ 0,9·jₙ/(2·cos β_b), žádný průnik
+      const m = Number(r.wheels[0].data.m);
+      const [z1, z2] = r.mate.teeth!;
+      const jn = Number(r.rows.find((x) => x.key === "jn")!.value.replace(",", "."));
+      const beta = Number(r.wheels[1].data.beta ?? 0) * DEG;
+      const gap0 = jn / 2 / Math.cos(Math.atan(Math.tan(beta) * Math.cos(Math.atan(Math.tan(20 * DEG) / Math.cos(beta)))));
+      const A = meshWheel(gearProfile(r.wheels[0].ext, r.wheels[0].data), 0.0005 * m);
+      const B = meshWheel(gearProfile(r.wheels[1].ext, r.wheels[1].data), 0.0005 * m);
+      const s = meshScan(A, B, { center: [r.placement[0].at[0], 0], rot: 0 }, { center: [0, 0], rot: 0 }, { ratio: z1 / z2, steps: 36, margin: 0.3 * m });
+      expect(s.cross, JSON.stringify(values)).toBe(false);
+      expect(s.minGap, JSON.stringify(values)).toBeGreaterThan(0.88 * gap0);
+    }
+    // ruční zadání bez automatiky: 25/40 se protíná, 20/60 má u paty pastorku méně než boční vůli
+    const bad = solvePair({ kind: "internal", values: { z1: 25, z2: 40, xAuto: false } });
+    expect(bad.issues.find((x) => x.code === "interference")).toMatchObject({ level: "warn", key: "x2" });
+    expect(issueCodes(solvePair({ kind: "internal", values: { xAuto: false } }))).toContain("tip-gap");
+    // a 41 (x₂ = 0,54) je čisté i bez zkrácení hlavy
+    expect(solvePair({ kind: "internal", values: { a: 41 } }).rows.find((x) => x.key === "k")!.value).toBe("0,0000");
+  });
+  it("2D kontrola záběru najde průnik i vzdálenost u vnějšího soukolí (kontrola modulu mesh2d)", async () => {
+    const { meshScan, meshWheel } = await import("./mesh2d");
+    const r = solvePair({ kind: "spur", values: { z1: 17, z2: 25, jn: 0.08 } });
+    const A = meshWheel(gearProfile(r.wheels[0].ext, r.wheels[0].data), 0.001);
+    const B = meshWheel(gearProfile(r.wheels[1].ext, r.wheels[1].data), 0.001);
+    const pose = (aw: number) => meshScan(A, B, { center: [0, 0], rot: 0 }, { center: [aw, 0], rot: Math.PI - Math.PI / 25 }, { ratio: -17 / 25, steps: 12, margin: 0.6 });
+    const ok = pose(r.placement[1].at[0]);
+    expect(ok.cross).toBe(false);
+    expect(ok.minGap).toBeGreaterThan(0.036);
+    expect(ok.minGap).toBeLessThan(0.0405);
+    expect(pose(r.placement[1].at[0] - 0.2).cross).toBe(true);
+  });
+  it("náboj blízko paty: chyba jen když zasahuje do zubů, jinak nejvýš varování (příklad z brífu: m 2 z 24 x 0,2 díra 20 pero náboj 40 15)", () => {
+    const brief = { m: 2, z: 24, b: 20, x: 0.2, alpha: 20, bore: 20, keyway: true, hubD: 40, hubL: 15 };
+    for (const out of ["wheel", "blank"]) expect(gearValidate("gear.spur", { ...brief, out }).issues).toEqual([]);
+    expect(gearValidate("gear.spur", { ...brief, hubD: 43 }).issues.map((x) => [x.code, x.level])).toEqual([["hub-runout", "warn"]]);
+    expect(gearValidate("gear.spur", { ...brief, hubD: 44 }).issues.map((x) => [x.code, x.level])).toEqual([["hub-root", "error"]]);
+  });
+  it("automatická šířka kuželového kola nepřesáhne R_e/3 (žádné varování na vlastní výchozí hodnotu)", () => {
+    for (const v of [{ m: 2, z: 20, zMate: 30, sigma: 120 }, { m: 2, z: 20, zMate: 30, sigma: 60, betaM: 35 }, { m: 2, z: 10, zMate: 50 }]) {
+      expect(gearValidate("gear.bevel", v).issues.map((x) => x.code)).not.toContain("b-third");
+      const c = gearCompute("gear.bevel", v);
+      expect(c.b).toBeLessThanOrEqual(c.Re / 3 + 1e-9);
+    }
+  });
+  it("formát: smysl stoupání vlastním řádkem, desetinná čárka v souhrnu i v hláškách podle jazyka, díra bez pera bez „s drážkou“", () => {
+    const helRows = gearDataRows("gear.helical", { beta: 15, hand: "left" });
+    expect(helRows.find((x) => x.key === "beta")).toMatchObject({ value: "15,000", unit: "°" });
+    expect(helRows.find((x) => x.key === "hand")!.value).toBe("levý");
+    expect(gearDataRows("gear.worm", {}).find((x) => x.key === "gamma")!.value).toBe("5,7106");
+    expect(gearTableText("Kolo", "gear.helical", { beta: 15, hand: "left" }).join("\n")).not.toMatch(/(levý|pravý) °/);
+    const sum = gearSummary({ id: "x", name: "K", type: "ext", ext: "gear.helical", data: { z: 30, beta: 20 } } as unknown as Feature);
+    expect(sum).toContain("d 63,851 · dₐ 67,851 · W4 21,668");
+    expect(gearValidate("gear.spur", { z: 12 }).issues.find((x) => x.code === "undercut")!.text).toContain("x ≥ 0,3");
+    const noKey = gearValidate("gear.spur", { m: 2, z: 24, bore: 45 }).issues.find((x) => x.code === "bore-root")!.text;
+    expect(noKey).not.toMatch(/drážk/);
+    expect(gearValidate("gear.spur", { m: 2, z: 24, bore: 40, keyway: true }).issues.find((x) => x.code === "bore-root")!.text).toMatch(/s drážkou/);
+    expect(gearValidate("gear.worm", { bore: 30 }).issues.find((x) => x.code === "bore-root")!.text).not.toMatch(/drážk/);
+  });
+});

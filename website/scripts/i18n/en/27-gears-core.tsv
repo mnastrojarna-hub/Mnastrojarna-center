@@ -124,7 +124,6 @@ Kolo {0}: {1}	Wheel {0}: {1}
 Kolo {0}: hlava protikola zasahuje pod začátek evolventy (Ø{1} < Ø{2}) – hrozí kolize v patě. Zvětšete posunutí tohoto kola.	Wheel {0}: the tip of the mating wheel reaches below the start of the involute (Ø{1} < Ø{2}) – risk of root interference. Increase the profile shift of this wheel.
 Kolo 1 musí mít aspoň 5 zubů.	Wheel 1 must have at least 5 teeth.
 Kolo 2 musí mít aspoň 5 zubů (zadejte z₂ nebo převod i).	Wheel 2 must have at least 5 teeth (enter z₂ or the ratio i).
-Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.	The wheel has no bore – the gear mate needs a cylindrical face (bore); enter the bore diameter.
 Kolo s {0} zuby běží neklidně (mnohoúhelníkový efekt) – doporučuje se aspoň 9, pro rychlý chod 17 zubů.	A sprocket with {0} teeth runs unevenly (polygon effect) – at least 9 teeth are recommended, 17 for high speed.
 Kotouč	Disc
 Kotouč cykloidního reduktoru	Cycloidal reducer disc
@@ -158,7 +157,6 @@ musí odpovídat šneku: střední průměr šneku d_m1 = q·m	must match the wo
 náboj {0}×{1}	hub {0}×{1}
 Náboj délka	Hub length
 Náboj na straně	Hub on side
-Náboj Ø{0} je příliš velký – musí být menší než patní průměr zmenšený o 2·m (Ø{1}).	Hub Ø{0} is too large – it must be smaller than the root diameter minus 2·m (Ø{1}).
 Náboj Ø{0} je větší než největší dovolený průměr vedle zubů d_g = {1} mm (ISO 606) – destičky řetězu by o něj dřely.	Hub Ø{0} is larger than the largest diameter allowed next to the teeth d_g = {1} mm (ISO 606) – the chain plates would rub on it.
 Náboj Ø{0} je větší než zadní čelo kola (Ø{1}).	Hub Ø{0} is larger than the back face of the wheel (Ø{1}).
 Náboj Ø{0} musí být větší než díra s drážkou (Ø{1}).	Hub Ø{0} must be larger than the bore with keyway (Ø{1}).
@@ -330,7 +328,6 @@ rohatka	ratchet
 Rohatka	Ratchet wheel
 Rohatka z{0} Ø{1}	Ratchet wheel z{0} Ø{1}
 rozdělí Σx podle DIN 3992 a u malých počtů zubů odstraní podřezání	splits Σx according to DIN 3992 and removes undercut for small numbers of teeth
-Rozdíl počtů zubů věnce a pastorku je menší než 10 – hrozí kolize hlav zubů (přesně se nekontroluje).	The difference in teeth between ring and pinion is less than 10 – tip interference is possible (not checked exactly).
 Rozdíl posunutí x₂ − x₁	Shift difference x₂ − x₁
 Rozměr mezi kuličkami	Dimension between balls
 Rozměr přes kuličky	Dimension over balls
@@ -579,3 +576,14 @@ Zuby pastorku	Pinion teeth
 Zuby pastorku z₁	Pinion teeth z₁
 Zuby protikola	Mate teeth
 Zuby spoluzabírajícího kola	Teeth of the mating wheel
+Díra Ø{0} zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.	Bore Ø{0} reaches into the teeth – the root diameter is Ø{1}. Reduce the bore or enlarge the wheel.
+Kolo {0} je na díru příliš malé – sestava vznikne bez vazby ozubení (vazba potřebuje díru). Zadejte průměr díry, nebo kola spojte vazbou ručně.	Wheel {0} is too small for a bore – the assembly is created without a gear mate (the mate needs a bore). Enter a bore diameter, or connect the wheels with a mate yourself.
+Kontrola záběru ve 24 polohách jedné rozteče: zuby se přiblíží na {0} mm (na Ø{1} pastorku) – méně než boční vůle na boku {2} mm. Zvětšete posunutí věnce nebo zkraťte jeho hlavu.	Mesh check at 24 positions of one pitch: the teeth come within {0} mm (at Ø{1} of the pinion) – less than the flank backlash of {2} mm. Increase the ring's profile shift or shorten its addendum.
+Kontrola záběru ve 24 polohách jedné rozteče: zuby věnce a pastorku se protínají (nejblíž na Ø{0} pastorku). Zvětšete posunutí věnce (osovou vzdálenost) nebo zkraťte hlavu věnce, případně zvětšete rozdíl počtů zubů.	Mesh check at 24 positions of one pitch: the teeth of the ring and the pinion intersect (closest at Ø{0} of the pinion). Increase the ring's profile shift (centre distance), shorten the ring's addendum, or increase the difference in tooth numbers.
+Náboj Ø{0} končí jen {1} mm pod patou zubu – nástroj na ozubení nebude mít kam vyjet; nechte mezi nábojem a patou aspoň 0,5·m.	Hub Ø{0} ends only {1} mm below the tooth root – the gear cutting tool will have no run-out; leave at least 0.5·m between hub and root.
+Náboj Ø{0} musí být větší než díra (Ø{1}).	Hub Ø{0} must be larger than the bore (Ø{1}).
+Náboj Ø{0} zasahuje do zubů – musí být menší než patní průměr Ø{1}.	Hub Ø{0} reaches into the teeth – it must be smaller than the root diameter Ø{1}.
+Smysl stoupání kola	Hand of helix of the wheel
+Smysl stoupání pastorku	Hand of helix of the pinion
+šířka obou kol – šípová kola jsou stejně široká, aby se vrcholy šípů kryly	width of both wheels – herringbone wheels are equally wide so that the apexes coincide
+Zkrácení hlavy věnce	Ring addendum reduction

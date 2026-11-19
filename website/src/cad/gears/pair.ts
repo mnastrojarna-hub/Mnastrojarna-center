@@ -5,14 +5,18 @@
  * a_w = a·cos α_t / cos α_wt; zadaná a_w → Σx = (z₁ + z₂)·(inv α_wt − inv α_t)/(2·tan α_n). Rozdělení Σx podle DIN 3992
  * (jak ho uvádí Roloff/Matek): x₁ = Σx/2 + (0,5 − Σx/2)·lg(u)/lg(z₁·z₂/100), u = z₂/z₁. Zkrácení hlavy k = Σx − (a_w − a)/mₙ
  * drží hlavovou vůli 0,25·m. ε_α = [√(r_a1² − r_b1²) + √(r_a2² − r_b2²) − a_w·sin α_wt] / p_bt, ε_β = b·sin β/(π·mₙ).
- * Vnitřní soukolí: (z₂ − z₁) a (x₂ − x₁) místo součtů.
+ * Vnitřní soukolí: (z₂ − z₁) a (x₂ − x₁) místo součtů; hlavová vůle c = min(r_f2 − a_w − r_a1, r_a2 − a_w − r_f1). Kolize hlav
+ * a hlavy věnce s patou pastorku se ověří 2D kontrolou záběru (mesh2d.ts, 24 poloh jedné rozteče); při automatickém posunutí
+ * se hlava věnce zkrátí (k₂), dokud všude nezůstane aspoň boční vůle.
  */
 import { eulerXYZ, type Mat3 } from "../assembly";
 import { tr } from "../i18n";
 import type { Vec3 } from "../types";
-import { fix, fmt, int, loc, num, oneOf, row, W } from "./common";
+import { fix, fmt, int, loc, nf, num, oneOf, row, W } from "./common";
+import { gearProfile } from "./data";
 import { alphaRow, handRow, moduleRow, widthRow } from "./cylindrical";
 import { cylGeom, type CylInput } from "./involute";
+import { meshScan, meshWheel, type MeshScan, type MeshWheel } from "./mesh2d";
 import { DEG, inv, invInverse } from "./num";
 import { RACKS } from "./rack";
 import { KINDS, type AnyKind } from "./registry";
@@ -41,7 +45,7 @@ const cylRows = (kind: "spur" | "helical" | "herringbone" | "internal"): GearRow
   row("xAuto", tr("Posunutí rozdělit automaticky"), "bool", true, tr("rozdělí Σx podle DIN 3992 a u malých počtů zubů odstraní podřezání"), "teeth", W(["auto", "xauto"], ["auto", "xauto"], ["auto", "xauto"])),
   alphaRow(),
   jnRow(),
-  widthRow(20, tr("šířka kola 2; pastorek je o 0,5·m širší")),
+  widthRow(20, kind === "herringbone" ? tr("šířka obou kol – šípová kola jsou stejně široká, aby se vrcholy šípů kryly") : tr("šířka kola 2; pastorek je o 0,5·m širší")),
   ...boreRows(),
 ];
 
@@ -116,13 +120,23 @@ export const PAIR_ROWS: Record<PairKind, GearRow[]> = {
   ],
 };
 
-const BORES = [3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 25, 30, 35, 40, 50, 60, 70, 80, 100, 120, 140, 160];
-/** výchozí díra: největší z řady nepřesahující čtvrtinu roztečného průměru (a s rezervou pod patou zubu) */
+const BORES = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10, 12, 15, 16, 20, 25, 30, 35, 40, 50, 60, 70, 80, 100, 120, 140, 160];
+/**
+ * Výchozí díra: největší z řady nepřesahující čtvrtinu roztečného průměru, nad níž zůstane pod patou zubu věnec 2,5·m;
+ * u malých kol (hodinová, jemný modul) aspoň 1,5·m (mez varování kontroly těla kola). 0 = díra se nevejde.
+ */
 export function autoBore(d: number, rootD: number, m: number): number {
-  const lim = Math.min(0.25 * d + 1e-9, rootD - 5 * m);
-  const ok = BORES.filter((b) => b <= lim);
-  return ok.length ? ok[ok.length - 1] : 0;
+  for (const rim of [2.5, 1.5]) {
+    const lim = Math.min(0.25 * d, rootD - 2 * rim * m) + 1e-9;
+    const ok = BORES.filter((b) => b <= lim);
+    if (ok.length) return ok[ok.length - 1];
+  }
+  return 0;
 }
+/** plocha vazby ozubení v sestavě: díra „Ø20“; bez díry "" (vazba se nevytvoří) */
+const boreFace = (bore: number) => (bore > 0 ? `Ø${loc(fmt(bore, 3))}` : "");
+/** hláška: kolo bez díry – sestava vznikne bez vazby ozubení */
+const noBore = (n: 1 | 2): Issue => warn(n === 1 ? "bore1" : "bore2", "no-bore", tr("Kolo {0} je na díru příliš malé – sestava vznikne bez vazby ozubení (vazba potřebuje díru). Zadejte průměr díry, nebo kola spojte vazbou ručně.", n));
 
 const R = (key: string, label: string, symbol: string, value: string, unit: string, group: GearDataRow["group"] = "pair"): GearDataRow => ({ key, label, ...(symbol ? { symbol } : {}), value, ...(unit ? { unit } : {}), group });
 const rotOf = (cols: [Vec3, Vec3, Vec3]): Vec3 => {
@@ -164,6 +178,8 @@ export type CylPair = {
   x1: number;
   x2: number;
   k: number;
+  /** vnitřní soukolí: zkrácení hlavy věnce (v modulech; zvětší hlavový průměr věnce) */
+  k2: number;
   y: number;
   dw1: number;
   dw2: number;
@@ -179,7 +195,7 @@ const xMinOf = (z: number, an: number, be: number) => {
 };
 
 /** Výpočet válcového soukolí (vnější i vnitřní). `aw` > 0 = zadaná osová vzdálenost. */
-export function cylPair(o: { z1: number; z2: number; m: number; alpha: number; beta: number; internal: boolean; aw: number; x1: number; x2: number; auto: boolean; b: number }): CylPair {
+export function cylPair(o: { z1: number; z2: number; m: number; alpha: number; beta: number; internal: boolean; aw: number; x1: number; x2: number; auto: boolean; b: number; k2?: number }): CylPair {
   const an = o.alpha * DEG;
   const be = o.beta * DEG;
   const at = Math.atan(Math.tan(an) / Math.cos(be));
@@ -219,14 +235,27 @@ export function cylPair(o: { z1: number; z2: number; m: number; alpha: number; b
   }
   const y = (aw - a0) / o.m;
   const k = o.internal ? 0 : Math.max(0, sumX - y);
+  const k2 = o.internal ? Math.max(0, o.k2 ?? 0) : k;
   const g1 = cylGeom({ m: o.m, z: o.z1, alpha: o.alpha, x: x1, beta: o.beta, rack: RACKS.A, k, jn: 0, internal: false });
-  const g2 = cylGeom({ m: o.m, z: o.z2, alpha: o.alpha, x: x2, beta: o.beta, rack: RACKS.A, k: 0, jn: 0, internal: o.internal });
+  const g2 = cylGeom({ m: o.m, z: o.z2, alpha: o.alpha, x: x2, beta: o.beta, rack: RACKS.A, k: o.internal ? k2 : 0, jn: 0, internal: o.internal });
   const ra2 = o.internal ? g2.ra : g2.ra - k * o.m;
   const t1 = Math.sqrt(Math.max(0, g1.ra ** 2 - g1.rb ** 2));
   const t2 = Math.sqrt(Math.max(0, ra2 ** 2 - g2.rb ** 2));
   const epsA = (o.internal ? t1 - t2 + aw * Math.sin(awt) : t1 + t2 - aw * Math.sin(awt)) / g1.pbt;
-  const c = o.internal ? Math.min(g2.rf - aw - g1.ra, aw + g1.rf - ra2) : Math.min(aw - g1.ra - g2.rf, aw - ra2 - g1.rf);
-  return { a0, aw, alphaWt: awt, sumX, x1, x2, k, y, dw1: o.internal ? (2 * aw * o.z1) / zs : (2 * aw * o.z1) / zs, dw2: (2 * aw * o.z2) / zs, epsA, epsB: (o.b * Math.sin(be)) / (Math.PI * o.m), c };
+  // vnitřní: pata věnce − (a_w + hlava pastorku) a hlava věnce − (a_w + pata pastorku)
+  const c = o.internal ? Math.min(g2.rf - aw - g1.ra, ra2 - aw - g1.rf) : Math.min(aw - g1.ra - g2.rf, aw - ra2 - g1.rf);
+  return { a0, aw, alphaWt: awt, sumX, x1, x2, k, k2, y, dw1: o.internal ? (2 * aw * o.z1) / zs : (2 * aw * o.z1) / zs, dw2: (2 * aw * o.z2) / zs, epsA, epsB: (o.b * Math.sin(be)) / (Math.PI * o.m), c };
+}
+
+/**
+ * 2D kontrola záběru válcového soukolí v poloze sestavy (mesh2d.ts): vnější – pastorek v počátku, kolo v (a_w, 0) pootočené
+ * o 180° − 180°/z₂, točí se opačně; vnitřní – věnec v počátku, pastorek v (a_w, 0), točí se stejným směrem.
+ */
+function cylMeshScan(w1: MeshWheel, w2: PairWheel, aw: number, internal: boolean, z1: number, z2: number, m: number, steps: number): MeshScan {
+  const p2 = meshWheel(gearProfile(w2.ext, w2.data), 0.001 * m);
+  return internal
+    ? meshScan(w1, p2, { center: [aw, 0], rot: 0 }, { center: [0, 0], rot: 0 }, { ratio: z1 / z2, steps, margin: 0.3 * m })
+    : meshScan(w1, p2, { center: [0, 0], rot: 0 }, { center: [aw, 0], rot: Math.PI - Math.PI / z2 }, { ratio: -z1 / z2, steps, margin: 0.3 * m });
 }
 
 function solveCyl(kind: "spur" | "helical" | "herringbone" | "internal", v: GearData): PairResult {
@@ -247,9 +276,11 @@ function solveCyl(kind: "spur" | "helical" | "herringbone" | "internal", v: Gear
   if (!(b > 0)) issues.push(err("b", "b", tr("Šířka kola musí být kladná.")));
   const a0 = ((m / Math.cos(beta * DEG)) * (internal ? z2 - z1 : z1 + z2)) / 2;
   const awIn = num(v.a);
-  if (awIn > 0 && Math.abs(awIn - a0) > 1.5 * m) issues.push(err("a", "a-range", tr("Osová vzdálenost {0} mm je příliš daleko od jmenovité {1} mm – posunutím profilu lze upravit nejvýš asi ±1,5·m.", fmt(awIn, 3), fmt(a0, 3))));
+  if (awIn > 0 && Math.abs(awIn - a0) > 1.5 * m) issues.push(err("a", "a-range", tr("Osová vzdálenost {0} mm je příliš daleko od jmenovité {1} mm – posunutím profilu lze upravit nejvýš asi ±1,5·m.", nf(awIn, 3), nf(a0, 3))));
   if (issues.length) return fail(issues, asmName);
-  const p = cylPair({ z1, z2, m, alpha, beta, internal, aw: awIn, x1: num(v.x1), x2: num(v.x2), auto: v.xAuto === undefined ? true : v.xAuto === true || v.xAuto === "true", b });
+  const auto = v.xAuto === undefined ? true : v.xAuto === true || v.xAuto === "true";
+  const pIn = { z1, z2, m, alpha, beta, internal, aw: awIn, x1: num(v.x1), x2: num(v.x2), auto, b };
+  let p = cylPair(pIn);
   const jn = num(v.jn) > 0 ? num(v.jn) : 0.04 * m;
   const K1 = KINDS[internal ? "spur" : kind];
   const K2 = KINDS[kind];
@@ -263,13 +294,44 @@ function solveCyl(kind: "spur" | "helical" | "herringbone" | "internal", v: Gear
   const bore2 = internal ? 0 : num(v.bore2) > 0 ? num(v.bore2) : autoBore(d2, g2.df, m);
   // vnitřní pastorek je čelní kolo (u šikmého vnitřního soukolí šikmé se stejným smyslem)
   const Kp = internal && beta > 0 ? KINDS.helical : K1;
-  const w1 = wheel(Kp, { ...common, ...(internal && beta > 0 ? { beta } : {}), z: z1, x: r4(p.x1), k: r4(p.k), b: b + 0.5 * m, bore: bore1, mateZ: z2, ...(Kp.kind !== "spur" ? { hand } : {}) }, tr("Pastorek"));
-  const w2 = wheel(K2, { ...common, z: z2, x: r4(p.x2), k: internal ? 0 : r4(p.k), b, ...(internal ? {} : { bore: bore2 }), mateZ: z1, ...(kind === "spur" ? {} : { hand: hand2 }) }, internal ? tr("Věnec") : tr("Kolo"));
+  // šípová kola stejně široká: širší pastorek by měl vrchol šípu o 0,25·m výš než kolo a zuby by se v celé šířce protínaly
+  const w1 = wheel(Kp, { ...common, ...(internal && beta > 0 ? { beta } : {}), z: z1, x: r4(p.x1), k: r4(p.k), b: kind === "herringbone" ? b : b + 0.5 * m, bore: bore1, mateZ: z2, ...(Kp.kind !== "spur" ? { hand } : {}) }, tr("Pastorek"));
+  const ring = (k2: number) => wheel(K2, { ...common, z: z2, x: r4(p.x2), k: r4(k2), b, ...(internal ? {} : { bore: bore2 }), mateZ: z1, ...(kind === "spur" ? {} : { hand: hand2 }) }, internal ? tr("Věnec") : tr("Kolo"));
+  let w2 = ring(p.k2);
+  // 2D kontrola záběru v poloze sestavy; v čelní rovině je boční vůle na stranu jₙ / (2·cos β_b)
+  const gap0 = jn / 2 / Math.cos(Math.atan(Math.tan(beta * DEG) * Math.cos(Math.atan(Math.tan(alpha * DEG) / Math.cos(beta * DEG)))));
+  let mw1: MeshWheel | null = null; // pastorek se při hledání k₂ nemění – body stačí jednou
+  const scan = (w: PairWheel, steps: number) => cylMeshScan((mw1 ??= meshWheel(gearProfile(w1.ext, w1.data), 0.001 * m)), w, p.aw, internal, z1, z2, m, steps);
+  const clean = (s: MeshScan) => !s.cross && s.minGap >= 0.9 * gap0;
+  let mesh = internal ? scan(w2, 24) : null;
+  if (internal && auto && mesh && !clean(mesh)) {
+    // hlava věnce u paty pastorku: zkrátit hlavu věnce (k₂ ≤ 0,3 – mez řádku tabulky), dokud všude nezůstane boční vůle;
+    // půlení intervalu po 8 polohách, výsledek se ověří ve 24 polohách (případně o setinu dál)
+    const K2MAX = 0.3;
+    if (clean(scan(ring(K2MAX), 8))) {
+      let lo = 0;
+      let hi = K2MAX;
+      for (let it = 0; it < 4; it++) {
+        const mid = (lo + hi) / 2;
+        if (clean(scan(ring(mid), 8))) hi = mid;
+        else lo = mid;
+      }
+      for (let k2 = Math.ceil(hi * 100) / 100; k2 <= K2MAX + 1e-9; k2 = Math.round((k2 + 0.01) * 100) / 100) {
+        const s = scan(ring(k2), 24);
+        if (!clean(s) && k2 < K2MAX - 1e-9) continue;
+        p = cylPair({ ...pIn, k2 });
+        w2 = ring(p.k2);
+        mesh = s;
+        break;
+      }
+    }
+  }
   issues.push(...wheelIssues(Kp, w1, 1, { x: "x1", z: "z1", bore: "bore1", k: "x1" }), ...wheelIssues(K2, w2, 2, { x: "x2", z: "z2", bore: "bore2", k: "x2" }));
   if (p.epsA < 1) issues.push(err("z1", "eps", tr("Součinitel záběru profilu ε_α = {0} je menší než 1 – zuby by ztrácely záběr. Zvětšete počty zubů nebo zmenšete posunutí.", fix(p.epsA, 3))));
   else if (p.epsA < 1.2) issues.push(warn("z1", "eps-low", tr("Součinitel záběru profilu ε_α = {0} je menší než 1,2 – chod bude hlučnější.", fix(p.epsA, 3))));
   if (p.c < 0.15 * m - 1e-9) issues.push(warn("a", "clearance", tr("Hlavová vůle {0} mm je menší než 0,15·m.", fix(p.c, 3))));
-  if (internal && z2 - z1 < 10) issues.push(warn("z2", "int-diff", tr("Rozdíl počtů zubů věnce a pastorku je menší než 10 – hrozí kolize hlav zubů (přesně se nekontroluje).")));
+  if (mesh?.cross) issues.push(warn("x2", "interference", tr("Kontrola záběru ve 24 polohách jedné rozteče: zuby věnce a pastorku se protínají (nejblíž na Ø{0} pastorku). Zvětšete posunutí věnce (osovou vzdálenost) nebo zkraťte hlavu věnce, případně zvětšete rozdíl počtů zubů.", fix(2 * mesh.rA, 2))));
+  else if (mesh && mesh.minGap < 0.9 * gap0) issues.push(warn("x2", "tip-gap", tr("Kontrola záběru ve 24 polohách jedné rozteče: zuby se přiblíží na {0} mm (na Ø{1} pastorku) – méně než boční vůle na boku {2} mm. Zvětšete posunutí věnce nebo zkraťte jeho hlavu.", fix(mesh.minGap, 4), fix(2 * mesh.rA, 2), fix(gap0, 4))));
   if (!internal) {
     // kolize hlavy jednoho kola s přechodovou křivkou druhého: začátek činného profilu d_A ≥ d_Ff
     const awt = p.alphaWt;
@@ -289,7 +351,7 @@ function solveCyl(kind: "spur" | "helical" | "herringbone" | "internal", v: Gear
     R("sumX", internal ? tr("Rozdíl posunutí x₂ − x₁") : tr("Součet posunutí"), "Σx", fix(p.sumX, 4), ""),
     R("x1", tr("Posunutí kola 1"), "x₁", fix(p.x1, 4), ""),
     R("x2", tr("Posunutí kola 2"), "x₂", fix(p.x2, 4), ""),
-    R("k", tr("Zkrácení hlavy"), "k", fix(p.k, 4), ""),
+    internal ? R("k", tr("Zkrácení hlavy věnce"), "k₂", fix(p.k2, 4), "") : R("k", tr("Zkrácení hlavy"), "k", fix(p.k, 4), ""),
     R("dw1", tr("Valivý průměr kola 1"), "d_w1", fix(p.dw1), "mm"),
     R("dw2", tr("Valivý průměr kola 2"), "d_w2", fix(p.dw2), "mm"),
     R("epsA", tr("Součinitel záběru profilu"), "ε_α", fix(p.epsA, 4), "", "check"),
@@ -297,10 +359,11 @@ function solveCyl(kind: "spur" | "helical" | "herringbone" | "internal", v: Gear
     R("c", tr("Hlavová vůle"), "c", fix(p.c), "mm", "check"),
     R("jn", tr("Boční vůle"), "jₙ", fix(jn), "mm", "check"),
   ];
-  const mate = { kind: "gear" as const, teeth: [z1, z2] as [number, number], flip: internal, faceA: `Ø${loc(fmt(bore1, 3))}`, faceB: internal ? `Ø${loc(fmt(num(w2.data.rimD) || (g2.df + 2 * Math.max(2.5 * m, 8)), 3))}` : `Ø${loc(fmt(bore2, 3))}` };
+  const mate = { kind: "gear" as const, teeth: [z1, z2] as [number, number], flip: internal, faceA: boreFace(bore1), faceB: internal ? `Ø${loc(fmt(num(w2.data.rimD) || (g2.df + 2 * Math.max(2.5 * m, 8)), 3))}` : boreFace(bore2) };
   // vnější: zub 0 kola 1 míří na +X, kolo 2 v (a_w, 0, 0) otočené tak, aby na −X mířila mezera; vnitřní: věnec v počátku, pastorek v (a_w, 0, 0)
   const placement: PairResult["placement"] = internal ? [{ at: [r4(p.aw), 0, 0], rot: [0, 0, 0] }, { at: [0, 0, 0], rot: [0, 0, 0] }] : [{ at: [0, 0, 0], rot: [0, 0, 0] }, { at: [r4(p.aw), 0, 0], rot: [0, 0, r4(180 - 180 / z2)] }];
-  if (!bore1 || (!internal && !bore2)) issues.push(warn(!bore1 ? "bore1" : "bore2", "no-bore", tr("Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.")));
+  if (!bore1) issues.push(noBore(1));
+  if (!internal && !bore2) issues.push(noBore(2));
   return done(issues, rows, [w1, w2], placement, mate, asmName);
 }
 
@@ -336,8 +399,8 @@ function solveRack(v: GearData): PairResult {
   // pastorek: osa (místní +Z) → +Y, zub 0 (místní +X) → −Z (dolů do mezery hřebene)
   const rot = rotOf([[0, 0, -1], [-1, 0, 0], [0, 1, 0]]);
   const rows = [R("i", tr("Posuv hřebene na otáčku"), "", fix(Math.PI * d1), "mm"), R("d1", tr("Roztečný průměr pastorku"), "d", fix(d1), "mm"), R("p", tr("Rozteč podél hřebene"), "p", fix(pt, 4), "mm"), R("ah", tr("Výška osy pastorku nade dnem hřebene"), "", fix(at[2]), "mm"), R("L", tr("Délka hřebene"), "L", fix(n * pt), "mm"), R("jn", tr("Boční vůle"), "jₙ", fix(jn), "mm", "check")];
-  if (!bore1) issues.push(warn("bore1", "no-bore", tr("Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.")));
-  return done(issues, rows, [w1, w2], [{ at, rot }, { at: [0, 0, 0], rot: [0, 0, 0] }], { kind: "rack", module: r4(m / Math.cos(beta * DEG)), teeth: [z1, n], flip: false, faceA: `Ø${loc(fmt(bore1, 3))}`, faceB: tr("spodní") }, asmName);
+  if (!bore1) issues.push(noBore(1));
+  return done(issues, rows, [w1, w2], [{ at, rot }, { at: [0, 0, 0], rot: [0, 0, 0] }], { kind: "rack", module: r4(m / Math.cos(beta * DEG)), teeth: [z1, n], flip: false, faceA: boreFace(bore1), faceB: tr("spodní") }, asmName);
 }
 
 // ---------------- kuželové, hypoidní, šnekové ----------------
@@ -372,8 +435,9 @@ function solveBevel(v: GearData): PairResult {
   const placement: PairResult["placement"] = [{ at: [0, 0, 0], rot: [0, 0, 0] }, { at: [0, 0, 0], rot: [0, r4(-sigma), r4(180 - 180 / z2)] }];
   const b1 = num(w1.data.bore);
   const b2 = num(w2.data.bore);
-  if (!b1 || !b2) issues.push(warn(!b1 ? "bore1" : "bore2", "no-bore", tr("Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.")));
-  return done(issues, rows, [w1, w2], placement, { kind: "gear", teeth: [z1, z2], flip: false, faceA: `Ø${loc(fmt(b1, 3))}`, faceB: `Ø${loc(fmt(b2, 3))}` }, asmName);
+  if (!b1) issues.push(noBore(1));
+  if (!b2) issues.push(noBore(2));
+  return done(issues, rows, [w1, w2], placement, { kind: "gear", teeth: [z1, z2], flip: false, faceA: boreFace(b1), faceB: boreFace(b2) }, asmName);
 }
 
 function solveHypoid(v: GearData): PairResult {
@@ -413,8 +477,9 @@ function solveHypoid(v: GearData): PairResult {
   issues.push({ level: "info", code: "hypoid-approx", text: tr("Boky hypoidních zubů jsou jmenovité (nejsou sdružené) – mimo střední bod záběru čekejte několik setin mm mezery nebo přesahu.") });
   const b1 = num(w1.data.bore);
   const b2 = num(w2.data.bore);
-  if (!b1 || !b2) issues.push(warn(!b1 ? "bore1" : "bore2", "no-bore", tr("Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.")));
-  return done(issues, rows, [w1, w2], [{ at: [0, r4(base.E), 0], rot: rotOf([xl, yl, zl]) }, { at: [0, 0, 0], rot: rotW }], { kind: "gear", teeth: [z1, z2], flip: false, faceA: `Ø${loc(fmt(b1, 3))}`, faceB: `Ø${loc(fmt(b2, 3))}` }, asmName);
+  if (!b1) issues.push(noBore(1));
+  if (!b2) issues.push(noBore(2));
+  return done(issues, rows, [w1, w2], [{ at: [0, r4(base.E), 0], rot: rotOf([xl, yl, zl]) }, { at: [0, 0, 0], rot: rotW }], { kind: "gear", teeth: [z1, z2], flip: false, faceA: boreFace(b1), faceB: boreFace(b2) }, asmName);
 }
 
 function solveWorm(v: GearData): PairResult {
@@ -441,8 +506,8 @@ function solveWorm(v: GearData): PairResult {
   // šnek: osa (místní +Z) → +Y, mezera závitu ve středu délky (místní +X) → −X, ke kolu
   const rot = rotOf([[-1, 0, 0], [0, 0, 1], [0, 1, 0]]);
   const rows = [R("i", tr("Převod"), "i", fix(z2 / z1, 3), ""), R("a", tr("Osová vzdálenost"), "a", fix(a), "mm"), R("gamma", tr("Úhel stoupání"), "γ_m", fix(Math.atan(z1 / q) / DEG, 4), "°"), R("L", tr("Délka závitu šneku"), "L", fix(L, 1), "mm"), R("jn", tr("Boční vůle"), "jₙ", fix(jn), "mm", "check")];
-  if (!bore2) issues.push(warn("bore2", "no-bore", tr("Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.")));
-  return done(issues, rows, [w1, w2], [{ at: [r4(a), r4(-L / 2), r4(bw / 2)], rot }, { at: [0, 0, 0], rot: [0, 0, 0] }], { kind: "gear", teeth: [z1, z2], flip: false, faceA: `Ø${loc(fmt(shaftD, 3))}`, faceB: `Ø${loc(fmt(bore2, 3))}` }, asmName);
+  if (!bore2) issues.push(noBore(2));
+  return done(issues, rows, [w1, w2], [{ at: [r4(a), r4(-L / 2), r4(bw / 2)], rot }, { at: [0, 0, 0], rot: [0, 0, 0] }], { kind: "gear", teeth: [z1, z2], flip: false, faceA: boreFace(shaftD), faceB: boreFace(bore2) }, asmName);
 }
 
 // ---------------- cykloidní, řetěz, řemen ----------------
@@ -456,15 +521,20 @@ function solveCycloid(v: GearData): PairResult {
   const asmName = tr("Cykloidní soukolí m{0} z{1}/z{2}", fmt(m), zp, zw);
   const dp = m * zp;
   const dw = m * zw;
-  const w1 = wheel(K, { m, z: zp, zMate: zw, type: "pinion", b: 2 * b, bore: num(v.bore1) > 0 ? num(v.bore1) : autoBore(dp, dp - 4 * m, m) }, tr("Pastorek"));
-  const w2 = wheel(K, { m, z: zw, zMate: zp, type: "wheel", b, bore: num(v.bore2) > 0 ? num(v.bore2) : autoBore(dw, dw - 4 * m, m) }, tr("Kolo"));
+  // výchozí díra podle skutečného patního průměru (pastorek s lístky má hlubokou patu – hlava kola + 0,4·m)
+  const rootOf = (d: GearData) => num((K.compute(K.read({ ...K.defaults(), ...d })) as { df?: number }).df);
+  const d1: GearData = { m, z: zp, zMate: zw, type: "pinion", b: 2 * b };
+  const d2: GearData = { m, z: zw, zMate: zp, type: "wheel", b };
+  const w1 = wheel(K, { ...d1, bore: num(v.bore1) > 0 ? num(v.bore1) : autoBore(dp, rootOf(d1), m) }, tr("Pastorek"));
+  const w2 = wheel(K, { ...d2, bore: num(v.bore2) > 0 ? num(v.bore2) : autoBore(dw, rootOf(d2), m) }, tr("Kolo"));
   const issues = [...wheelIssues(K, w1, 1, { z: "z1", bore: "bore1" }), ...wheelIssues(K, w2, 2, { z: "z2", bore: "bore2" })];
   const a = (dp + dw) / 2;
   const rows = [R("i", tr("Převod"), "i", fix(zw / zp, 4), ""), R("a", tr("Osová vzdálenost"), "a", fix(a), "mm")];
   const b1 = num(w1.data.bore);
   const b2 = num(w2.data.bore);
-  if (!b1 || !b2) issues.push(warn(!b1 ? "bore1" : "bore2", "no-bore", tr("Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.")));
-  return done(issues, rows, [w1, w2], [{ at: [0, 0, r4(-b / 2)], rot: [0, 0, 0] }, { at: [r4(a), 0, 0], rot: [0, 0, r4(180 - 180 / zw)] }], { kind: "gear", teeth: [zp, zw], flip: false, faceA: `Ø${loc(fmt(b1, 3))}`, faceB: `Ø${loc(fmt(b2, 3))}` }, asmName);
+  if (!b1) issues.push(noBore(1));
+  if (!b2) issues.push(noBore(2));
+  return done(issues, rows, [w1, w2], [{ at: [0, 0, r4(-b / 2)], rot: [0, 0, 0] }, { at: [r4(a), 0, 0], rot: [0, 0, r4(180 - 180 / zw)] }], { kind: "gear", teeth: [zp, zw], flip: false, faceA: boreFace(b1), faceB: boreFace(b2) }, asmName);
 }
 
 function solveCycloDisc(v: GearData): PairResult {
@@ -513,8 +583,9 @@ function solveFlex(kind: "sprocket" | "pulley", v: GearData): PairResult {
   const rows = [R("i", tr("Převod"), "i", fix(z2 / z1, 4), ""), R("a", tr("Osová vzdálenost"), "a", fix(a), "mm"), R("X", kind === "sprocket" ? tr("Počet článků řetězu") : tr("Počet zubů řemene"), "X", String(X), ""), R("Lp", kind === "sprocket" ? tr("Délka řetězu") : tr("Délka řemene"), "L", fix(X * p, 2), "mm")];
   const b1 = num(w1.data.bore);
   const b2 = num(w2.data.bore);
-  if (!b1 || !b2) issues.push(warn(!b1 ? "bore1" : "bore2", "no-bore", tr("Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.")));
-  return done(issues, rows, [w1, w2], [{ at: [0, 0, 0], rot: [0, 0, 0] }, { at: [r4(a), 0, 0], rot: [0, 0, 0] }], { kind: "gear", teeth: [z1, z2], flip: true, faceA: `Ø${loc(fmt(b1, 3))}`, faceB: `Ø${loc(fmt(b2, 3))}` }, asmName);
+  if (!b1) issues.push(noBore(1));
+  if (!b2) issues.push(noBore(2));
+  return done(issues, rows, [w1, w2], [{ at: [0, 0, 0], rot: [0, 0, 0] }, { at: [r4(a), 0, 0], rot: [0, 0, 0] }], { kind: "gear", teeth: [z1, z2], flip: true, faceA: boreFace(b1), faceB: boreFace(b2) }, asmName);
 }
 
 /** Vyřeší soukolí: kontrola, výsledné řádky, data obou kol, poloha v sestavě a vazba. */

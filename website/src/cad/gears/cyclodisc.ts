@@ -6,7 +6,7 @@
  * převod i = n (věnec stojí). Hlavový průměr D_p + 2e − d_p, patní D_p − 2e − d_p.
  */
 import { tr } from "../i18n";
-import { defaultsOf, fix, fmt, int, num, oneOf, placeRows, rangeIssues, readPlace, row, validation, W, type Place } from "./common";
+import { defaultsOf, fix, fmt, int, nf, num, oneOf, placeRows, rangeIssues, readPlace, row, validation, W, type Place } from "./common";
 import { widthRow } from "./cylindrical";
 import { ang, circleX, curveSeg, mirrorX, polar, TAU, tiledArea } from "./num";
 import type { GearData, GearDataRow, GearRow, Issue, KindDef, Profile2D, Seg2, Vec2 } from "./types";
@@ -137,24 +137,24 @@ export const CYCLODISC: KindDef<CycloDiscIn, CycloDiscC> = {
     if (out.some((x) => x.level === "error")) return validation(out);
     const err = (key: string, code: string, text: string) => out.push({ level: "error", code, key, text });
     if (!(i.e < i.pinCircle / (2 * i.N))) {
-      err("e", "e-max", tr("Výstřednost je příliš velká – profil by měl smyčky. Pro D_p = {0} a N = {1} musí být e menší než {2} mm.", fmt(i.pinCircle), i.N, fmt(i.pinCircle / (2 * i.N), 3)));
+      err("e", "e-max", tr("Výstřednost je příliš velká – profil by měl smyčky. Pro D_p = {0} a N = {1} musí být e menší než {2} mm.", nf(i.pinCircle), i.N, nf(i.pinCircle / (2 * i.N), 3)));
       return validation(out);
     }
     const c = compute(i);
-    if (!(i.pinD < (Math.PI * i.pinCircle) / i.N)) err("pinD", "pins-overlap", tr("Čepy Ø{0} se na roztečné kružnici překrývají – zmenšete průměr čepu nebo počet čepů.", fmt(i.pinD)));
-    else if (!(c.rp < c.rhoMin)) err("pinD", "pin-curv", tr("Čep Ø{0} je příliš velký – profil kotouče by se podřezal (největší možný Ø{1}). Zmenšete čep nebo výstřednost.", fmt(i.pinD), fmt(2 * c.rhoMin, 2)));
+    if (!(i.pinD < (Math.PI * i.pinCircle) / i.N)) err("pinD", "pins-overlap", tr("Čepy Ø{0} se na roztečné kružnici překrývají – zmenšete průměr čepu nebo počet čepů.", nf(i.pinD)));
+    else if (!(c.rp < c.rhoMin)) err("pinD", "pin-curv", tr("Čep Ø{0} je příliš velký – profil kotouče by se podřezal (největší možný Ø{1}). Zmenšete čep nebo výstřednost.", nf(i.pinD), nf(2 * c.rhoMin, 2)));
     if (!(c.df > 0)) err("pinCircle", "root", tr("Patní průměr kotouče vychází záporný."));
     if (!(i.b > 0)) err("b", "b", tr("Šířka kola musí být kladná."));
     if (i.part === "disc") {
-      if (i.centerD >= c.df - 1) err("centerD", "center", tr("Středová díra Ø{0} se do kotouče (patní Ø{1}) nevejde.", fmt(i.centerD), fmt(c.df, 2)));
+      if (i.centerD >= c.df - 1) err("centerD", "center", tr("Středová díra Ø{0} se do kotouče (patní Ø{1}) nevejde.", nf(i.centerD), nf(c.df, 2)));
       if (i.outN > 0) {
         if (!(i.outD > 0)) err("outD", "out-d", tr("Zadejte průměr výstupních děr."));
-        else if (c.outPcd / 2 - i.outD / 2 < i.centerD / 2 + 0.5 || c.outPcd / 2 + i.outD / 2 > c.df / 2 - 0.5) err(i.outPcd > 0 ? "outPcd" : "outD", "out-fit", tr("Výstupní díry Ø{0} na roztečné Ø{1} se nevejdou mezi středovou díru a patu laloků.", fmt(i.outD), fmt(c.outPcd, 1)));
+        else if (c.outPcd / 2 - i.outD / 2 < i.centerD / 2 + 0.5 || c.outPcd / 2 + i.outD / 2 > c.df / 2 - 0.5) err(i.outPcd > 0 ? "outPcd" : "outD", "out-fit", tr("Výstupní díry Ø{0} na roztečné Ø{1} se nevejdou mezi středovou díru a patu laloků.", nf(i.outD), nf(c.outPcd, 1)));
         else if (i.outN * i.outD > 0.92 * Math.PI * c.outPcd) err("outN", "out-overlap", tr("Výstupní díry se překrývají – uberte počet nebo průměr."));
       }
     } else {
-      if (!(c.ringD > c.ringIn + 2 * c.rp + 1)) err("ringD", "ring", tr("Vnější průměr věnce Ø{0} je malý – čepy na roztečné Ø{1} se do něj nevejdou.", fmt(c.ringD), fmt(i.pinCircle)));
-      if (!ringInner(i, c)) err("pinD", "ring-pins", tr("Čepy se nedotýkají vnitřního průměru věnce Ø{0} – zvětšete čep nebo zmenšete výstřednost.", fmt(c.ringIn, 2)));
+      if (!(c.ringD > c.ringIn + 2 * c.rp + 1)) err("ringD", "ring", tr("Vnější průměr věnce Ø{0} je malý – čepy na roztečné Ø{1} se do něj nevejdou.", nf(c.ringD), nf(i.pinCircle)));
+      if (!ringInner(i, c)) err("pinD", "ring-pins", tr("Čepy se nedotýkají vnitřního průměru věnce Ø{0} – zvětšete čep nebo zmenšete výstřednost.", nf(c.ringIn, 2)));
     }
     return validation(out);
   },
@@ -175,6 +175,6 @@ export const CYCLODISC: KindDef<CycloDiscIn, CycloDiscC> = {
       ...(i.part === "ring" ? [R("ringD", tr("Vnější průměr věnce"), "D", fix(c.ringD), "mm", "geometry"), R("ringIn", tr("Vnitřní průměr věnce"), "D_i", fix(c.ringIn), "mm", "geometry")] : []),
     ];
   },
-  summary: (i, c) => [`${i.part === "ring" ? tr("věnec cykloreduktoru") : tr("cyklokotouč")} N${i.N} D_p ${fmt(i.pinCircle)} d_p ${fmt(i.pinD)} e ${fmt(i.e)} b${fmt(i.b)}`, tr("převod {0}", c.ratio), i.part === "ring" ? `D ${fmt(c.ringD, 2)}` : `dₐ ${fmt(c.da, 3)}`].join(" · "),
+  summary: (i, c) => [`${i.part === "ring" ? tr("věnec cykloreduktoru") : tr("cyklokotouč")} N${i.N} D_p ${nf(i.pinCircle)} d_p ${nf(i.pinD)} e ${nf(i.e)} b${nf(i.b)}`, tr("převod {0}", c.ratio), i.part === "ring" ? `D ${nf(c.ringD, 2)}` : `dₐ ${nf(c.da, 3)}`].join(" · "),
   name: (i) => (i.part === "ring" ? tr("Věnec cykloreduktoru N{0}", i.N) : tr("Kotouč cykloreduktoru N{0}", i.N)),
 };

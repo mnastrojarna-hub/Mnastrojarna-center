@@ -51,7 +51,9 @@ export function pairScript(res: PairResult, lang: Lang = "cs"): string[] {
     lines.push(`vložit ${q(w.name)} v ${p.at.map(n6).join(" ")}${rot}`);
   });
   const m = res.mate;
-  if (m.faceA && m.faceB) {
+  // bez díry („Ø0“ nebo prázdná plocha) by vazba skončila chybou „nic neodpovídá“ – sestava pak zůstane bez vazby
+  const usable = (f: string) => !!f && !/^Ø0(?:[.,]0*)?$/.test(f);
+  if (usable(m.faceA) && usable(m.faceB)) {
     if (m.kind === "rack") lines.push(`sestava vazba hřeben ${q(a.name)} ${m.faceA} ${q(b.name)} ${m.faceB} modul ${n6(m.module ?? 1)} zuby ${m.teeth?.[0] ?? 1}`);
     else lines.push(`sestava vazba ozubení ${q(a.name)} ${m.faceA} ${q(b.name)} ${m.faceB} ${m.teeth ? `zuby ${m.teeth[0]} ${m.teeth[1]}` : `poměr ${n6(m.ratio ?? 1)}`}${m.flip ? " vnitřní" : ""}`);
   }

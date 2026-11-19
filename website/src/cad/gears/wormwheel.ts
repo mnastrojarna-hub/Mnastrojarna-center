@@ -5,7 +5,7 @@
  * evolventní šroubová plocha, NE obálka šneku – přiblížení.
  */
 import { tr } from "../i18n";
-import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, loc, mateRows, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, loc, mateRows, nf, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { bodySummary, handLabel, handRow, teethRow } from "./cylindrical";
 import { cylGeom, cylProfile, pointedRadius, type CylGeom, type CylInput } from "./involute";
 import { DEG } from "./num";
@@ -86,15 +86,15 @@ export const WORMWHEEL: KindDef<WormWheelIn, WormWheelC> = {
     if (out.some((x) => x.level === "error")) return validation(out);
     const c = compute(i);
     const err = (key: string, code: string, text: string) => out.push({ level: "error", code, key, text });
-    if (c.gamma / DEG > 45) err("z1", "gamma", tr("Úhel stoupání {0}° je větší než 45° – zmenšete počet chodů nebo zvětšete q.", fmt(c.gamma / DEG, 1)));
+    if (c.gamma / DEG > 45) err("z1", "gamma", tr("Úhel stoupání {0}° je větší než 45° – zmenšete počet chodů nebo zvětšete q.", nf(c.gamma / DEG, 1)));
     else {
-      if (!(c.gE.thetaA > 0)) err("x", "pointed", tr("Zub je na vnějším průměru Ø{0} špičatý (boky se sejdou na Ø{1}) – zmenšete posunutí x nebo zvětšete počet zubů.", fmt(c.de2, 3), fmt(2 * pointedRadius(c.gE), 3)));
-      if (!(c.rk > 0.5 * i.m)) err("q", "throat", tr("Poloměr hrdla vychází {0} mm – zvětšete q.", fmt(c.rk, 2)));
-      if (c.g.undercut) out.push({ level: "warn", code: "undercut", key: "z", text: tr("Zuby jsou podřezané (z = {0}): bez podřezání je potřeba posunutí x ≥ {1}. Model podřezání obsahuje tak, jak ho nástroj vyrobí.", i.z, fmt(Math.ceil(c.g.xMin * Math.cos(c.gamma) * 100) / 100, 2)) });
-      if (i.body.b > 2 * c.rk + i.m) out.push({ level: "warn", code: "wide", key: "b", text: tr("Šířka {0} mm je větší než průměr šneku – boky daleko od střední roviny se šnekem nezabírají.", fmt(i.body.b)) });
+      if (!(c.gE.thetaA > 0)) err("x", "pointed", tr("Zub je na vnějším průměru Ø{0} špičatý (boky se sejdou na Ø{1}) – zmenšete posunutí x nebo zvětšete počet zubů.", nf(c.de2, 3), nf(2 * pointedRadius(c.gE), 3)));
+      if (!(c.rk > 0.5 * i.m)) err("q", "throat", tr("Poloměr hrdla vychází {0} mm – zvětšete q.", nf(c.rk, 2)));
+      if (c.g.undercut) out.push({ level: "warn", code: "undercut", key: "z", text: tr("Zuby jsou podřezané (z = {0}): bez podřezání je potřeba posunutí x ≥ {1}. Model podřezání obsahuje tak, jak ho nástroj vyrobí.", i.z, nf(Math.ceil(c.g.xMin * Math.cos(c.gamma) * 100) / 100, 2)) });
+      if (i.body.b > 2 * c.rk + i.m) out.push({ level: "warn", code: "wide", key: "b", text: tr("Šířka {0} mm je větší než průměr šneku – boky daleko od střední roviny se šnekem nezabírají.", nf(i.body.b)) });
       out.push(...bodyIssues(i.body, { rootR: c.df2 / 2, tipR: c.de2 / 2, m: i.m }));
     }
-    if (i.jn > 0.3 * i.m) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", fmt(i.jn)));
+    if (i.jn > 0.3 * i.m) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", nf(i.jn)));
     return validation(out);
   },
   compute,
@@ -122,7 +122,8 @@ export const WORMWHEEL: KindDef<WormWheelIn, WormWheelC> = {
       R("q", tr("Součinitel průměru šneku"), "q", loc(fmt(i.q, 3)), "", "pair"),
       R("ratio", tr("Převod"), "i", fix(i.z / i.z1, 3), "", "pair"),
       R("alpha", tr("Úhel profilu"), "αₓ", fix(i.alpha, 2), "°", "basic"),
-      R("gamma", tr("Úhel sklonu zubů"), "γ_m", `${fix(c.gamma / DEG, 4)} ${handLabel(i.hand)}`, "°", "basic"),
+      R("gamma", tr("Úhel sklonu zubů"), "γ_m", fix(c.gamma / DEG, 4), "°", "basic"),
+      R("hand", tr("Smysl stoupání"), "", handLabel(i.hand), "", "basic"),
       R("x", tr("Posunutí profilu"), "x", fix(i.x, 4), "", "basic"),
       R("d2", tr("Roztečný průměr"), "d₂", fix(c.d2), "mm", "geometry"),
       R("da2", tr("Hlavový průměr (v hrdle)"), "d_a2", fix(c.da2), "mm", "geometry"),
@@ -132,6 +133,6 @@ export const WORMWHEEL: KindDef<WormWheelIn, WormWheelC> = {
       R("a", tr("Osová vzdálenost"), "a", fix(c.a), "mm", "pair"),
     ];
   },
-  summary: (i, c) => [`${tr("šnekové")} m${fmt(i.m)} z${i.z} q${fmt(i.q)} z₁${i.z1} ${handLabel(i.hand)} b${fmt(i.body.b)}`, `d₂ ${fmt(c.d2, 3)}`, `d_e ${fmt(c.de2, 3)}`, `a ${fmt(c.a, 3)}`, bodySummary(i.body, i.place)].join(" · "),
+  summary: (i, c) => [`${tr("šnekové")} m${nf(i.m)} z${i.z} q${nf(i.q)} z₁${i.z1} ${handLabel(i.hand)} b${nf(i.body.b)}`, `d₂ ${nf(c.d2, 3)}`, `d_e ${nf(c.de2, 3)}`, `a ${nf(c.a, 3)}`, bodySummary(i.body, i.place)].join(" · "),
   name: (i) => tr("Šnekové kolo m{0} z{1}", fmt(i.m), i.z),
 };

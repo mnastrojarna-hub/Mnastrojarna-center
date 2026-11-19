@@ -211,8 +211,19 @@ describe("jeden zub + kruhové pole (sectorPattern)", () => {
 });
 
 describe("pořadí ploch a čepy šneku", () => {
-  it("díra je první plochou kola (sestava čte pro vazby jen prvních 400 ploch) – čelní z 60, šikmé z 80 s nábojem", async () => {
-    for (const [k, d] of [["spur", { z: 60, bore: 30 }], ["helical", { z: 80, bore: 30, hubD: 60, hubL: 10 }]] as const) {
+  it("kola výchozího soukolí z 20/60 mají pod 400 ploch (pata zubu = jeden oblouk na zub) – sestava načte celé kolo bez ⚠ asm.faces-truncated", async () => {
+    // nález revize: kolo z 60 mělo 424 ploch (pata rozdělená na rozhraní roztečí) → ⚠ v každém skriptu soukolí a STOP v přísném režimu
+    for (const k of ["spur", "helical"] as const) {
+      const s = await wheel(k, { z: 60, bore: 15 });
+      expect(s.faces.length, k).toBeLessThanOrEqual(400);
+      expect(isValidShape(s)).toBe(true);
+      // obrys beze změny: objem = plocha profilu × b (bez díry)
+      const A = gearProfile(`gear.${k}`, { z: 60 }).area;
+      expect(rel(vol(s), (A - Math.PI * 7.5 ** 2) * 20)).toBeLessThan(2e-5);
+    }
+  }, 120_000);
+  it("díra je první plochou kola (sestava čte pro vazby jen prvních 400 ploch) – čelní z 80, šikmé z 80 s nábojem", async () => {
+    for (const [k, d] of [["spur", { z: 80, bore: 30 }], ["helical", { z: 80, bore: 30, hubD: 60, hubL: 10 }]] as const) {
       const s = await wheel(k, d);
       expect(s.faces.length).toBeGreaterThan(400);
       const f0 = s.faces[0];
@@ -221,6 +232,21 @@ describe("pořadí ploch a čepy šneku", () => {
       expect(x1 - x0).toBeCloseTo(30, 3);
       expect(isValidShape(s)).toBe(true);
     }
+  }, 120_000);
+  it("věnec s vnitřním ozubením z 140: vnější plášť (plocha vazby soukolí) je první plochou, ne za 400. plochou", async () => {
+    // nález revize: hlavy a paty zubů věnce jsou souosé válce menší než plášť – řazení jen podle poloměru dalo plášť na F421
+    const data = { z: 140, m: 1 };
+    const s = await wheel("internal", data);
+    expect(s.faces.length).toBeGreaterThan(400);
+    const rimD = gearCompute("gear.internal", data).rimD;
+    const f0 = s.faces[0];
+    expect(f0.geomType).toBe("CYLINDRE");
+    const [[x0], [x1]] = f0.boundingBox.bounds;
+    expect(x1 - x0).toBeCloseTo(rimD, 3);
+    expect(isValidShape(s)).toBe(true);
+    // vazba soukolí míří právě na tento průměr
+    const pair = solvePair({ kind: "internal", values: { z1: 30, z2: 140, m: 1 } });
+    expect(pair.mate.faceB).toBe(`Ø${String(Math.round(rimD * 1000) / 1000).replace(".", ",")}`);
   }, 120_000);
   it("čepy hřídele šneku přišité do pláště: objem = závit + 2·π·r²·l, platné, i s dírou a perem", async () => {
     const plain = vol(await wheel("worm"));
@@ -281,6 +307,22 @@ describe("výstupy a volby těla", () => {
     expect(x1).toBeCloseTo(120, 4);
     expect(y1 - y0).toBeGreaterThan(51.5);
   }, 60_000);
+  it("mezipaměť těles vydává nezávislé kopie: kolo přidané na hřídel a pak stejné kolo odebrané z jiného tělesa je platné", async () => {
+    // nález revize: clone() sdílel topologii s mezipamětí, sjednocení s hřídelí ji porušilo a další díl se stejným kolem
+    // (tentýž klíč mezipaměti) dostal neplatné těleso
+    const shaft: Feature = { id: "s2", name: "Hřídel", type: "cylinder", radius: 10, height: 60, position: [0, 0, -20], axis: "Z", mode: "new" } as unknown as Feature;
+    const plate: Feature = { id: "p2", name: "Deska", type: "cylinder", radius: 40, height: 10, position: [0, 0, 0], axis: "Z", mode: "new" } as unknown as Feature;
+    const data = { m: 2, z: 23, b: 10 };
+    const added = await build(shaft, gear("gear.spur", { ...data, mode: "add" }));
+    expect(isValidShape(added.body)).toBe(true);
+    const cut = await build(plate, gear("gear.spur", { ...data, mode: "cut" }));
+    expect(isValidShape(cut.body)).toBe(true);
+    const fresh = await build(gear("gear.spur", { ...data, b: 10.0001 }));
+    expect(rel(vol(cut.body), Math.PI * 40 * 40 * 10 - vol(fresh.body) / 1.00001)).toBeLessThan(1e-4);
+    // tentýž dokument: kolo na hřídeli, pak stejné kolo odebrané z druhého tělesa
+    const same = await build(shaft, gear("gear.spur", { ...data, z: 27, mode: "add" }), { ...plate, id: "p3", position: [0, 0, 40] } as unknown as Feature, gear("gear.spur", { ...data, z: 27, position: [0, 0, 40], mode: "cut" }));
+    expect(isValidShape(same.body)).toBe(true);
+  }, 120_000);
 });
 
 describe("záběr soukolí – vazba ve 12 polohách jedné rozteče", () => {
@@ -323,6 +365,29 @@ describe("záběr soukolí – vazba ve 12 polohách jedné rozteče", () => {
         const b = placed(shapes[1].clone().rotate(t2, [0, 0, 0], [0, 0, 1]) as Shape, { at: [res.placement[1].at[0] + shift[0], res.placement[1].at[1], res.placement[1].at[2]], rot: res.placement[1].rot });
         expect(overlap(a, b), `${c.kind} poloha ${k}`).toBeLessThan(1e-4);
       }
+    }
+  }, 300_000);
+  it("šípové soukolí b 8: pastorek i kolo stejně široké, žádný průnik ve 3 polohách, vůle na boku jₙ/2 (dřív 2–3 mm³ přesahu)", async () => {
+    const { res, shapes } = await pairShapes("herringbone", { b: 8 });
+    const [z1, z2] = res.mate.teeth!;
+    for (let k = 0; k < 3; k++) {
+      const ph = (360 / z1) * (k / 3);
+      const a = placed(shapes[0].clone().rotate(ph, [0, 0, 0], [0, 0, 1]) as Shape, res.placement[0]);
+      const b = placed(shapes[1].clone().rotate((-ph * z1) / z2, [0, 0, 0], [0, 0, 1]) as Shape, res.placement[1]);
+      expect(overlap(a, b), `poloha ${k}`).toBeLessThan(1e-6);
+      const d = distance(a, b);
+      expect(d, `poloha ${k}`).toBeGreaterThan(0.9 * 0.04);
+      expect(d, `poloha ${k}`).toBeLessThan(1.1 * 0.04);
+    }
+  }, 600_000);
+  it("vnitřní soukolí z 25/40 (rozdíl 15 zubů): automaticky zkrácená hlava věnce – žádný průnik v 6 polohách (dřív přesah ve 11 z 12)", async () => {
+    const { res, shapes } = await pairShapes("internal", { z1: 25, z2: 40, b: 4 });
+    for (let k = 0; k < 6; k++) {
+      const ph = (360 / 25) * (k / 6);
+      const a = placed(shapes[0].clone().rotate(ph, [0, 0, 0], [0, 0, 1]) as Shape, res.placement[0]);
+      const b = placed(shapes[1].clone().rotate((ph * 25) / 40, [0, 0, 0], [0, 0, 1]) as Shape, res.placement[1]);
+      expect(overlap(a, b), `poloha ${k}`).toBeLessThan(1e-7);
+      expect(distance(a, b), `poloha ${k}`).toBeGreaterThan(0.85 * 0.04);
     }
   }, 300_000);
   it("kuželové soukolí 1 : 1 (z 20/20) bez průniku; hypoidní pár – jen zpráva o mezeře / přesahu (boky nejsou sdružené)", async () => {

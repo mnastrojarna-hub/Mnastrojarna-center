@@ -124,7 +124,6 @@ Kolo {0}: {1}	Rad {0}: {1}
 Kolo {0}: hlava protikola zasahuje pod začátek evolventy (Ø{1} < Ø{2}) – hrozí kolize v patě. Zvětšete posunutí tohoto kola.	Rad {0}: Der Kopf des Gegenrads reicht unter den Evolventenbeginn (Ø{1} < Ø{2}) – Fußeingriffsstörung droht. Profilverschiebung dieses Rades vergrößern.
 Kolo 1 musí mít aspoň 5 zubů.	Rad 1 muss mindestens 5 Zähne haben.
 Kolo 2 musí mít aspoň 5 zubů (zadejte z₂ nebo převod i).	Rad 2 muss mindestens 5 Zähne haben (z₂ oder Übersetzung i eingeben).
-Kolo je bez díry – vazba ozubení potřebuje válcovou plochu (díru); zadejte průměr díry.	Das Rad hat keine Bohrung – die Zahnradverknüpfung braucht eine Zylinderfläche (Bohrung); Bohrungsdurchmesser eingeben.
 Kolo s {0} zuby běží neklidně (mnohoúhelníkový efekt) – doporučuje se aspoň 9, pro rychlý chod 17 zubů.	Ein Kettenrad mit {0} Zähnen läuft unruhig (Polygoneffekt) – mindestens 9 Zähne empfohlen, für schnellen Lauf 17.
 Kotouč	Scheibe
 Kotouč cykloidního reduktoru	Kurvenscheibe des Zykloidgetriebes
@@ -158,7 +157,6 @@ musí odpovídat šneku: střední průměr šneku d_m1 = q·m	muss zur Schnecke
 náboj {0}×{1}	Nabe {0}×{1}
 Náboj délka	Nabenlänge
 Náboj na straně	Nabe auf Seite
-Náboj Ø{0} je příliš velký – musí být menší než patní průměr zmenšený o 2·m (Ø{1}).	Nabe Ø{0} ist zu groß – sie muss kleiner sein als der Fußkreis minus 2·m (Ø{1}).
 Náboj Ø{0} je větší než největší dovolený průměr vedle zubů d_g = {1} mm (ISO 606) – destičky řetězu by o něj dřely.	Nabe Ø{0} ist größer als der größte zulässige Durchmesser neben den Zähnen d_g = {1} mm (ISO 606) – die Kettenlaschen würden daran reiben.
 Náboj Ø{0} je větší než zadní čelo kola (Ø{1}).	Nabe Ø{0} ist größer als die Rückenfläche des Rades (Ø{1}).
 Náboj Ø{0} musí být větší než díra s drážkou (Ø{1}).	Nabe Ø{0} muss größer als die Bohrung mit Nut sein (Ø{1}).
@@ -330,7 +328,6 @@ rohatka	Sperrrad
 Rohatka	Sperrrad
 Rohatka z{0} Ø{1}	Sperrrad z{0} Ø{1}
 rozdělí Σx podle DIN 3992 a u malých počtů zubů odstraní podřezání	teilt Σx nach DIN 3992 auf und beseitigt Unterschnitt bei kleinen Zähnezahlen
-Rozdíl počtů zubů věnce a pastorku je menší než 10 – hrozí kolize hlav zubů (přesně se nekontroluje).	Die Zähnezahldifferenz zwischen Hohlrad und Ritzel ist kleiner als 10 – Kopfkollision möglich (wird nicht genau geprüft).
 Rozdíl posunutí x₂ − x₁	Verschiebungsdifferenz x₂ − x₁
 Rozměr mezi kuličkami	Diametrales Innenmaß über Kugeln
 Rozměr přes kuličky	Diametrales Zweikugelmaß
@@ -579,3 +576,14 @@ Zuby pastorku	Zähne des Ritzels
 Zuby pastorku z₁	Zähne des Ritzels z₁
 Zuby protikola	Zähne des Gegenrads
 Zuby spoluzabírajícího kola	Zähne des kämmenden Rades
+Díra Ø{0} zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.	Bohrung Ø{0} reicht in die Verzahnung – Fußkreisdurchmesser Ø{1}. Bohrung verkleinern oder Rad vergrößern.
+Kolo {0} je na díru příliš malé – sestava vznikne bez vazby ozubení (vazba potřebuje díru). Zadejte průměr díry, nebo kola spojte vazbou ručně.	Rad {0} ist für eine Bohrung zu klein – die Baugruppe entsteht ohne Zahnradverknüpfung (die Verknüpfung braucht eine Bohrung). Bohrungsdurchmesser eingeben oder die Räder selbst verknüpfen.
+Kontrola záběru ve 24 polohách jedné rozteče: zuby se přiblíží na {0} mm (na Ø{1} pastorku) – méně než boční vůle na boku {2} mm. Zvětšete posunutí věnce nebo zkraťte jeho hlavu.	Eingriffsprüfung in 24 Stellungen einer Teilung: Die Zähne nähern sich bis auf {0} mm (bei Ø{1} des Ritzels) – weniger als das Flankenspiel von {2} mm. Profilverschiebung des Hohlrads vergrößern oder seinen Kopf kürzen.
+Kontrola záběru ve 24 polohách jedné rozteče: zuby věnce a pastorku se protínají (nejblíž na Ø{0} pastorku). Zvětšete posunutí věnce (osovou vzdálenost) nebo zkraťte hlavu věnce, případně zvětšete rozdíl počtů zubů.	Eingriffsprüfung in 24 Stellungen einer Teilung: Die Zähne von Hohlrad und Ritzel durchdringen sich (am nächsten bei Ø{0} des Ritzels). Profilverschiebung des Hohlrads (Achsabstand) vergrößern, Kopf des Hohlrads kürzen oder die Zähnezahldifferenz vergrößern.
+Náboj Ø{0} končí jen {1} mm pod patou zubu – nástroj na ozubení nebude mít kam vyjet; nechte mezi nábojem a patou aspoň 0,5·m.	Nabe Ø{0} endet nur {1} mm unter dem Zahnfuß – das Verzahnungswerkzeug hat keinen Auslauf; zwischen Nabe und Fuß mindestens 0,5·m lassen.
+Náboj Ø{0} musí být větší než díra (Ø{1}).	Nabe Ø{0} muss größer sein als die Bohrung (Ø{1}).
+Náboj Ø{0} zasahuje do zubů – musí být menší než patní průměr Ø{1}.	Nabe Ø{0} reicht in die Zähne – sie muss kleiner sein als der Fußkreisdurchmesser Ø{1}.
+Smysl stoupání kola	Steigungsrichtung des Rades
+Smysl stoupání pastorku	Steigungsrichtung des Ritzels
+šířka obou kol – šípová kola jsou stejně široká, aby se vrcholy šípů kryly	Breite beider Räder – Pfeilräder sind gleich breit, damit die Pfeilspitzen übereinanderliegen
+Zkrácení hlavy věnce	Kopfkürzung des Hohlrads

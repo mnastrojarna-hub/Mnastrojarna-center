@@ -10,7 +10,7 @@
  * Přibližné: vše mimo střední bod – boky jsou jmenovité, NE sdružené (obálkové).
  */
 import { tr } from "../i18n";
-import { bodyPhrases, bodyRows, defaultsOf, fix, fmt, int, loc, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyPhrases, bodyRows, defaultsOf, fix, fmt, int, loc, nf, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { coneSection, coneIssues, virtualProfile } from "./bevel";
 import { coneGeom, type ConeGeom, type ConeMember } from "./conic";
 import { alphaRow, bodySummary, handLabel, handRow } from "./cylindrical";
@@ -216,7 +216,7 @@ export const HYPOID: KindDef<HypoidIn, HypoidC> = {
     if (out.some((x) => x.level === "error")) return validation(out);
     const err = (key: string, code: string, text: string) => out.push({ level: "error", code, key, text });
     if (i.E < 0.02 * i.de2) {
-      err("E", "e-min", tr("Přesazení {0} mm je menší než 0,02·d_e2 ({1} mm) – použijte kuželové kolo se zakřivenými zuby.", fmt(i.E), fmt(0.02 * i.de2, 2)));
+      err("E", "e-min", tr("Přesazení {0} mm je menší než 0,02·d_e2 ({1} mm) – použijte kuželové kolo se zakřivenými zuby.", nf(i.E), nf(0.02 * i.de2, 2)));
       return validation(out);
     }
     if (i.z2 <= i.z1) err("z2", "ratio", tr("Talířové kolo musí mít víc zubů než pastorek."));
@@ -225,9 +225,9 @@ export const HYPOID: KindDef<HypoidIn, HypoidC> = {
       err("E", "no-solution", tr("Pro toto přesazení a úhel sklonu se roztečné kužely nepodařilo najít – zmenšete přesazení E nebo úhel sklonu pastorku, případně zadejte úhel kužele kola."));
       return validation(out);
     }
-    if (i.E > 0.25 * i.de2) out.push({ level: "warn", code: "e-max", key: "E", text: tr("Přesazení nad 0,25·d_e2 ({0} mm) je neobvyklé – skluz v záběru bude velký.", fmt(0.25 * i.de2, 2)) });
+    if (i.E > 0.25 * i.de2) out.push({ level: "warn", code: "e-max", key: "E", text: tr("Přesazení nad 0,25·d_e2 ({0} mm) je neobvyklé – skluz v záběru bude velký.", nf(0.25 * i.de2, 2)) });
     out.push(...coneIssues(c.cone, c.geom, i.body, c.mean.mmn, { b: "b", x: "x", beta: "betaM1" }));
-    if (i.jn > 0.3 * c.mean.mmn) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", fmt(i.jn)));
+    if (i.jn > 0.3 * c.mean.mmn) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", nf(i.jn)));
     return validation(out);
   },
   compute,
@@ -250,8 +250,10 @@ export const HYPOID: KindDef<HypoidIn, HypoidC> = {
       R("mmn", tr("Střední normálný modul"), "m_mn", fix(c.mean.mmn, 4), "mm", "basic"),
       R("delta1", tr("Úhel roztečného kužele pastorku"), "δ₁", fix(c.mean.delta1 / DEG, 4), "°", "geometry"),
       R("delta2", tr("Úhel roztečného kužele kola"), "δ₂", fix(c.mean.delta2 / DEG, 4), "°", "geometry"),
-      R("beta1", tr("Střední úhel sklonu pastorku"), "β_m1", `${fix(c.mean.beta1 / DEG, 3)} ${handLabel(hs)}`, "°", "geometry"),
-      R("beta2", tr("Střední úhel sklonu kola"), "β_m2", `${fix(c.mean.beta2 / DEG, 3)} ${handLabel(other)}`, "°", "geometry"),
+      R("beta1", tr("Střední úhel sklonu pastorku"), "β_m1", fix(c.mean.beta1 / DEG, 3), "°", "geometry"),
+      R("hand1", tr("Smysl stoupání pastorku"), "", handLabel(hs), "", "geometry"),
+      R("beta2", tr("Střední úhel sklonu kola"), "β_m2", fix(c.mean.beta2 / DEG, 3), "°", "geometry"),
+      R("hand2", tr("Smysl stoupání kola"), "", handLabel(other), "", "geometry"),
       R("de", tr("Vnější roztečný průměr"), "d_e", fix(c.geom.de), "mm", "geometry"),
       R("dae", tr("Vnější hlavový průměr"), "d_ae", fix(c.geom.dae), "mm", "geometry"),
       R("b", tr("Šířka ozubení"), "b", fix(c.b, 2), "mm", "geometry"),
@@ -262,8 +264,8 @@ export const HYPOID: KindDef<HypoidIn, HypoidC> = {
   },
   summary: (i, c) =>
     [
-      `${tr("hypoidní")} ${i.member === "pinion" ? tr("pastorek") : tr("talířové kolo")} z${i.z1}/${i.z2} d_e2 ${fmt(i.de2)} E ${fmt(i.E)} β₁ ${fmt(i.betaM1)}° ${handLabel(i.hand)}`,
-      c.mean && c.geom ? `m_mn ${fix(c.mean.mmn, 3)} · δ ${fix((i.member === "pinion" ? c.mean.delta1 : c.mean.delta2) / DEG, 2)}° · d_ae ${fmt(c.geom.dae, 3)}` : tr("řešení neexistuje"),
+      `${tr("hypoidní")} ${i.member === "pinion" ? tr("pastorek") : tr("talířové kolo")} z${i.z1}/${i.z2} d_e2 ${nf(i.de2)} E ${nf(i.E)} β₁ ${nf(i.betaM1)}° ${handLabel(i.hand)}`,
+      c.mean && c.geom ? `m_mn ${fix(c.mean.mmn, 3)} · δ ${fix((i.member === "pinion" ? c.mean.delta1 : c.mean.delta2) / DEG, 2)}° · d_ae ${nf(c.geom.dae, 3)}` : tr("řešení neexistuje"),
       bodySummary(i.body, i.place),
     ].join(" · "),
   name: (i) => (i.member === "pinion" ? tr("Hypoidní pastorek z{0}/{1}", i.z1, i.z2) : tr("Hypoidní talířové kolo z{0}/{1}", i.z2, i.z1)),

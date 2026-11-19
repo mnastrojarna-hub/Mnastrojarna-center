@@ -3,7 +3,7 @@
  * Profil jsou úsečky a oblouky (přesně).
  */
 import { tr } from "../i18n";
-import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyIssues, bodyPhrases, bodyRows, defaultsOf, discSection, fix, fmt, int, nf, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { bodySummary, teethRow, widthRow } from "./cylindrical";
 import { DEG, dist, filletCorner, mirrorX, polar, rot2, segMirrorRev, TAU, tiledArea } from "./num";
 import type { BodyOpts, GearData, GearDataRow, GearRow, Issue, KindDef, Profile2D, Seg2, Vec2 } from "./types";
@@ -73,7 +73,7 @@ export const RATCHET: KindDef<RatchetIn, RatchetC> = {
     const out: Issue[] = rangeIssues(rws, i.raw);
     if (out.some((x) => x.level === "error")) return validation(out);
     const c = compute(i);
-    if (!(c.h < 0.4 * i.da)) out.push({ level: "error", code: "h", key: "h", text: tr("Výška zubu {0} mm je příliš velká pro průměr {1} mm.", fmt(c.h, 2), fmt(i.da)) });
+    if (!(c.h < 0.4 * i.da)) out.push({ level: "error", code: "h", key: "h", text: tr("Výška zubu {0} mm je příliš velká pro průměr {1} mm.", nf(c.h, 2), nf(i.da)) });
     else out.push(...bodyIssues(i.body, { rootR: c.df / 2, tipR: i.da / 2, m: c.p / Math.PI }));
     return validation(out);
   },
@@ -87,7 +87,7 @@ export const RATCHET: KindDef<RatchetIn, RatchetC> = {
     const R = (key: string, label: string, symbol: string, value: string, unit: string, group: GearDataRow["group"]): GearDataRow => ({ key, label, ...(symbol ? { symbol } : {}), value, ...(unit ? { unit } : {}), group });
     return [R("z", tr("Počet zubů"), "z", String(i.z), "", "basic"), R("da", tr("Vnější průměr"), "dₐ", fix(i.da), "mm", "geometry"), R("df", tr("Patní průměr"), "d_f", fix(c.df), "mm", "geometry"), R("h", tr("Výška zubu"), "h", fix(c.h), "mm", "geometry"), R("p", tr("Rozteč na vnějším průměru"), "p", fix(c.p), "mm", "geometry"), R("rake", tr("Podříznutí čela"), "", fix(i.rake, 1), "°", "geometry")];
   },
-  summary: (i, c) => [`${tr("rohatka")} z${i.z} dₐ ${fmt(i.da)} h ${fmt(c.h, 2)} b${fmt(i.body.b)}`, bodySummary(i.body, i.place)].join(" · "),
+  summary: (i, c) => [`${tr("rohatka")} z${i.z} dₐ ${nf(i.da)} h ${nf(c.h, 2)} b${nf(i.body.b)}`, bodySummary(i.body, i.place)].join(" · "),
   name: (i) => tr("Rohatka z{0} Ø{1}", i.z, fmt(i.da)),
 };
 export { mirrorX };

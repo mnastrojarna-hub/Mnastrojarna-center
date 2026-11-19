@@ -35,6 +35,8 @@ export const fix = (v: number, d = 3) => (Number.isFinite(v) ? (getLang() === "e
 
 /** desetinná čárka podle jazyka (cs, de čárka; en tečka) */
 export const loc = (s: string) => (getLang() === "en" ? s : s.replace(".", ","));
+/** číslo jako `fmt` (bez koncových nul) s desetinnou čárkou podle jazyka – hlášky a souhrn `stav` (stejně jako tabulka) */
+export const nf = (v: number, d = 3) => loc(fmt(v, d));
 
 export type OutMode = "wheel" | "blank" | "teeth";
 export type Place = { out: OutMode; mode: "new" | "add" | "cut"; turn: number };
@@ -162,6 +164,13 @@ export const holesPcd = (o: BodyOpts, rootR: number, m: number) => {
 export const webOuterR = (rootR: number, m: number) => rootR - 3 * m;
 export const hasWeb = (o: BodyOpts) => o.webT > 0 && o.webT < o.b - 1e-9;
 
+/** hláška „díra zasahuje do ozubení“ – s drážkou pro pero, nebo bez ní (podle zadání) */
+export const boreRootText = (o: BodyOpts, rootD: string) =>
+  keyOf(o).b > 0 ? tr("Díra Ø{0} (s drážkou) zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.", nf(o.bore), rootD) : tr("Díra Ø{0} zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.", nf(o.bore), rootD);
+/** hláška „náboj musí být větší než díra“ – s drážkou pro pero, nebo bez ní */
+export const hubBoreText = (o: BodyOpts, reach: number) =>
+  keyOf(o).b > 0 ? tr("Náboj Ø{0} musí být větší než díra s drážkou (Ø{1}).", nf(o.hubD), nf(2 * reach, 1)) : tr("Náboj Ø{0} musí být větší než díra (Ø{1}).", nf(o.hubD), nf(2 * reach, 1));
+
 /**
  * Kontrola těla kola. `rootR` = patní poloměr (vnější mez pro díru, náboj a díry), `m` = modul (měřítko mezí),
  * `tipR` = hlavový poloměr (sražení).
@@ -173,30 +182,33 @@ export function bodyIssues(o: BodyOpts, g: { rootR: number; tipR: number; m: num
   if (!(o.b > 0)) err("b", "b", tr("Šířka kola musí být kladná."));
   const reach = boreReach(o);
   if (o.bore > 0) {
-    if (reach >= g.rootR - 0.25 * g.m) err("bore", "bore-root", tr("Díra Ø{0} (s drážkou) zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.", fmt(o.bore), fmt(2 * g.rootR)));
-    else if (g.rootR - reach < 1.5 * g.m) warn("bore", "bore-rim", tr("Pod patou zubu zbývá nad dírou jen {0} mm materiálu – věnec bývá aspoň 2·m.", fmt(g.rootR - reach, 2)));
+    if (reach >= g.rootR - 0.25 * g.m) err("bore", "bore-root", boreRootText(o, nf(2 * g.rootR)));
+    else if (g.rootR - reach < 1.5 * g.m) warn("bore", "bore-rim", tr("Pod patou zubu zbývá nad dírou jen {0} mm materiálu – věnec bývá aspoň 2·m.", nf(g.rootR - reach, 2)));
   } else if (o.keyway) warn("keyway", "key-nobore", tr("Drážka pro pero se bez díry nevytvoří – zadejte průměr díry."));
   if ((o.hubD > 0) !== (o.hubL > 0)) err(o.hubD > 0 ? "hubL" : "hubD", "hub-half", tr("Náboj potřebuje průměr i délku – doplňte obojí, nebo obojí nechte nulové."));
   if (hasHub(o)) {
-    if (o.hubD / 2 <= reach + 0.5) err("hubD", "hub-bore", tr("Náboj Ø{0} musí být větší než díra s drážkou (Ø{1}).", fmt(o.hubD), fmt(2 * reach, 1)));
-    if (o.hubD / 2 >= g.rootR - g.m) err("hubD", "hub-root", tr("Náboj Ø{0} je příliš velký – musí být menší než patní průměr zmenšený o 2·m (Ø{1}).", fmt(o.hubD), fmt(2 * (g.rootR - g.m), 2)));
+    if (o.hubD / 2 <= reach + 0.5) err("hubD", "hub-bore", hubBoreText(o, reach));
+    // náboj musí zůstat pod patou zubu (jinak zakryje paty zubů); blízko paty jen varování – nástroj na ozubení (odvalovací
+    // fréza, obrážecí nůž) potřebuje za čelem místo pro výběh
+    if (o.hubD / 2 > g.rootR - 1e-6) err("hubD", "hub-root", tr("Náboj Ø{0} zasahuje do zubů – musí být menší než patní průměr Ø{1}.", nf(o.hubD), nf(2 * g.rootR, 2)));
+    else if (g.rootR - o.hubD / 2 < 0.5 * g.m) warn("hubD", "hub-runout", tr("Náboj Ø{0} končí jen {1} mm pod patou zubu – nástroj na ozubení nebude mít kam vyjet; nechte mezi nábojem a patou aspoň 0,5·m.", nf(o.hubD), nf(g.rootR - o.hubD / 2, 2)));
   }
   if (o.setScrew && !hasHub(o)) err("setScrew", "screw-hub", tr("Stavěcí šroub potřebuje náboj – zadejte průměr a délku náboje."));
-  if (o.setScrew && hasHub(o) && SET_SCREWS[o.setScrew] > 0.6 * o.hubL) err("setScrew", "screw-len", tr("Stavěcí šroub {0} se do náboje délky {1} mm nevejde.", o.setScrew, fmt(o.hubL)));
+  if (o.setScrew && hasHub(o) && SET_SCREWS[o.setScrew] > 0.6 * o.hubL) err("setScrew", "screw-len", tr("Stavěcí šroub {0} se do náboje délky {1} mm nevejde.", o.setScrew, nf(o.hubL)));
   if (o.holesN > 0) {
     if (!(o.holesD > 0)) err("holesD", "holes-d", tr("Zadejte průměr odlehčovacích děr."));
     else {
       const pr = holesPcd(o, g.rootR, g.m) / 2;
       const [lo, hi] = holesBand(o, g.rootR, g.m);
-      if (pr - o.holesD / 2 < lo || pr + o.holesD / 2 > hi) err(o.holesPcd > 0 ? "holesPcd" : "holesD", "holes-fit", tr("Odlehčovací díry Ø{0} na roztečné Ø{1} se nevejdou mezi náboj a věnec (volný pás je Ø{2} až Ø{3}).", fmt(o.holesD), fmt(2 * pr, 1), fmt(2 * lo, 1), fmt(2 * hi, 1)));
+      if (pr - o.holesD / 2 < lo || pr + o.holesD / 2 > hi) err(o.holesPcd > 0 ? "holesPcd" : "holesD", "holes-fit", tr("Odlehčovací díry Ø{0} na roztečné Ø{1} se nevejdou mezi náboj a věnec (volný pás je Ø{2} až Ø{3}).", nf(o.holesD), nf(2 * pr, 1), nf(2 * lo, 1), nf(2 * hi, 1)));
       else if (o.holesN * o.holesD > 0.92 * Math.PI * 2 * pr) err("holesN", "holes-overlap", tr("Odlehčovací díry se na roztečné kružnici překrývají – uberte počet nebo průměr."));
     }
   }
   if (o.webT > 0) {
-    if (o.webT >= o.b) warn("webT", "web-full", tr("Stojina tloušťky {0} mm není tenčí než kolo – vybrání se nevytvoří.", fmt(o.webT)));
+    if (o.webT >= o.b) warn("webT", "web-full", tr("Stojina tloušťky {0} mm není tenčí než kolo – vybrání se nevytvoří.", nf(o.webT)));
     else if (webOuterR(g.rootR, g.m) - innerR(o) < 1) err("webT", "web-fit", tr("Vybrání stojiny se nevejde mezi náboj a věnec – zmenšete náboj nebo stojinu zrušte."));
   }
-  if (o.chamfer > 0 && o.chamfer > Math.min(o.b / 2 - 1e-6, g.tipR - g.rootR)) err("chamfer", "chamfer", tr("Sražení {0} mm je větší než výška zubu nebo polovina šířky kola.", fmt(o.chamfer)));
+  if (o.chamfer > 0 && o.chamfer > Math.min(o.b / 2 - 1e-6, g.tipR - g.rootR)) err("chamfer", "chamfer", tr("Sražení {0} mm je větší než výška zubu nebo polovina šířky kola.", nf(o.chamfer)));
   return out;
 }
 
@@ -312,8 +324,8 @@ export function rangeIssues(rows: GearRow[], d: GearData): Issue[] {
       continue;
     }
     if (r.kind === "int" && Math.abs(v - Math.round(v)) > 1e-9) out.push({ level: "error", code: "int", key: r.key, text: tr("{0}: musí být celé číslo.", r.label) });
-    if (r.min !== undefined && v < r.min) out.push({ level: "error", code: "min", key: r.key, text: tr("{0}: nejmenší hodnota je {1}.", r.label, fmt(r.min)) });
-    if (r.max !== undefined && v > r.max) out.push({ level: "error", code: "max", key: r.key, text: tr("{0}: největší hodnota je {1}.", r.label, fmt(r.max)) });
+    if (r.min !== undefined && v < r.min) out.push({ level: "error", code: "min", key: r.key, text: tr("{0}: nejmenší hodnota je {1}.", r.label, nf(r.min)) });
+    if (r.max !== undefined && v > r.max) out.push({ level: "error", code: "max", key: r.key, text: tr("{0}: největší hodnota je {1}.", r.label, nf(r.max)) });
   }
   return out;
 }

@@ -5,7 +5,7 @@
  * v čelní rovině na úhlu θ = ∓2π·x/p_z).
  */
 import { tr } from "../i18n";
-import { bodyPhrases, boreReach, defaultsOf, fix, fmt, int, loc, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
+import { bodyPhrases, boreReach, boreRootText, defaultsOf, fix, fmt, int, loc, nf, num, oneOf, placeRows, rangeIssues, readBody, readPlace, row, validation, W, type Place } from "./common";
 import { handLabel, handRow } from "./cylindrical";
 import { arcSweep, curveSeg, DEG, polar, segGreen, segMove, segReverse, TAU } from "./num";
 import { MODULES } from "./tables";
@@ -130,17 +130,17 @@ export const WORM: KindDef<WormIn, WormC> = {
     if (out.some((x) => x.level === "error")) return validation(out);
     const c = compute(i);
     const err = (key: string, code: string, text: string) => out.push({ level: "error", code, key, text });
-    if (c.gamma / DEG > 45) err("z1", "gamma", tr("Úhel stoupání {0}° je větší než 45° – zmenšete počet chodů nebo zvětšete q.", fmt(c.gamma / DEG, 1)));
+    if (c.gamma / DEG > 45) err("z1", "gamma", tr("Úhel stoupání {0}° je větší než 45° – zmenšete počet chodů nebo zvětšete q.", nf(c.gamma / DEG, 1)));
     if (!(c.rootHalf > -1e-9)) err("alpha", "space", tr("Mezera závitu je u dna užší než zaoblení – zmenšete úhel profilu."));
     if (c.sx / 2 - c.ha * Math.tan(i.alpha * DEG) <= 0.05 * i.m) err("alpha", "pointed", tr("Závit šneku je na hlavě špičatý – zmenšete úhel profilu nebo boční vůli."));
     if (!(c.df > 0)) err("q", "root", tr("Patní průměr šneku vychází záporný – zvětšete q."));
     const reach = boreReach(i.body);
-    if (i.body.bore > 0 && reach >= c.df / 2 - 0.5 * i.m) err("bore", "bore-root", tr("Díra Ø{0} (s drážkou) zasahuje do ozubení – patní průměr je Ø{1}. Zmenšete díru, nebo zvětšete kolo.", fmt(i.body.bore), fmt(c.df, 3)));
+    if (i.body.bore > 0 && reach >= c.df / 2 - 0.5 * i.m) err("bore", "bore-root", boreRootText(i.body, nf(c.df, 3)));
     if ((i.shaftD > 0) !== (i.shaftL > 0)) err(i.shaftD > 0 ? "shaftL" : "shaftD", "shaft-half", tr("Čepy hřídele potřebují průměr i délku – doplňte obojí, nebo obojí nechte nulové."));
-    else if (i.shaftD > 0 && i.shaftD / 2 <= reach) err("shaftD", "shaft-bore", tr("Čep hřídele Ø{0} musí být větší než díra.", fmt(i.shaftD)));
-    else if (i.shaftD > c.da) err("shaftD", "shaft-da", tr("Čep hřídele Ø{0} je větší než hlavový průměr šneku Ø{1}.", fmt(i.shaftD), fmt(c.da, 2)));
+    else if (i.shaftD > 0 && i.shaftD / 2 <= reach) err("shaftD", "shaft-bore", tr("Čep hřídele Ø{0} musí být větší než díra.", nf(i.shaftD)));
+    else if (i.shaftD > c.da) err("shaftD", "shaft-da", tr("Čep hřídele Ø{0} je větší než hlavový průměr šneku Ø{1}.", nf(i.shaftD), nf(c.da, 2)));
     if (c.L > 400 * i.m) err("L", "long", tr("Závit delší než 400·m se nepostaví – zkraťte šnek."));
-    if (i.jn > 0.3 * i.m) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", fmt(i.jn)));
+    if (i.jn > 0.3 * i.m) err("jn", "jn-max", tr("Boční vůle {0} mm je větší než 0,3·m – zub by byl příliš tenký.", nf(i.jn)));
     return validation(out);
   },
   compute,
@@ -164,7 +164,8 @@ export const WORM: KindDef<WormIn, WormC> = {
       R("q", tr("Součinitel průměru"), "q", loc(fmt(i.q, 3)), "", "basic"),
       R("form", tr("Tvar boku"), "", "ZA (DIN 3975)", "", "basic"),
       R("alpha", tr("Úhel profilu"), "αₓ", fix(i.alpha, 2), "°", "basic"),
-      R("gamma", tr("Úhel stoupání"), "γ_m", `${fix(c.gamma / DEG, 4)} ${handLabel(i.hand)}`, "°", "basic"),
+      R("gamma", tr("Úhel stoupání"), "γ_m", fix(c.gamma / DEG, 4), "°", "basic"),
+      R("hand", tr("Smysl stoupání"), "", handLabel(i.hand), "", "basic"),
       R("dm", tr("Střední průměr"), "d_m1", fix(c.dm), "mm", "geometry"),
       R("da", tr("Hlavový průměr"), "d_a1", fix(c.da), "mm", "geometry"),
       R("df", tr("Patní průměr"), "d_f1", fix(c.df), "mm", "geometry"),
@@ -175,6 +176,6 @@ export const WORM: KindDef<WormIn, WormC> = {
       R("sx", tr("Osová tloušťka závitu"), "sₓ", fix(c.sx), "mm", "check"),
     ];
   },
-  summary: (i, c) => [`${tr("šnek")} m${fmt(i.m)} q${fmt(i.q)} z₁${i.z1} ${handLabel(i.hand)}`, `d_m ${fmt(c.dm, 3)}`, `dₐ ${fmt(c.da, 3)}`, `γ ${fix(c.gamma / DEG, 2)}°`, `L ${fmt(c.L, 2)}`, i.place.out === "blank" ? tr("polotovar") : i.place.out === "teeth" ? tr("zuby do tělesa") : tr("šnek")].join(" · "),
+  summary: (i, c) => [`${tr("šnek")} m${nf(i.m)} q${nf(i.q)} z₁${i.z1} ${handLabel(i.hand)}`, `d_m ${nf(c.dm, 3)}`, `dₐ ${nf(c.da, 3)}`, `γ ${fix(c.gamma / DEG, 2)}°`, `L ${nf(c.L, 2)}`, i.place.out === "blank" ? tr("polotovar") : i.place.out === "teeth" ? tr("zuby do tělesa") : tr("šnek")].join(" · "),
   name: (i) => tr("Šnek m{0} q{1} z{2}", fmt(i.m), fmt(i.q), i.z1),
 };
