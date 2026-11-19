@@ -72,19 +72,25 @@ export type AppPortDeps = {
   };
 };
 
-/** stav podle klíče dokumentu; zápis a smazání se zrcadlí do stavu aplikace (zobrazení) */
+/**
+ * stav podle klíče dokumentu; zápis a smazání se zrcadlí do stavu aplikace (zobrazení) – kromě dokumentu jiné, nezobrazené
+ * záložky (`hidden`: souhrny dokumentů běhu – řádky D, run-summary.ts – počítají stav vazeb a kolizí i sestav v pozadí)
+ */
 class MirrorMap<V> extends Map<DocKey, V> {
-  constructor(private readonly mirror: (v: V | null) => void) {
+  constructor(
+    private readonly mirror: (v: V | null) => void,
+    private readonly hidden: (k: DocKey) => boolean = () => false,
+  ) {
     super();
   }
   override set(k: DocKey, v: V): this {
     super.set(k, v);
-    this.mirror?.(v);
+    if (!this.hidden?.(k)) this.mirror?.(v);
     return this;
   }
   override delete(k: DocKey): boolean {
     const had = super.delete(k);
-    if (had) this.mirror?.(null);
+    if (had && !this.hidden?.(k)) this.mirror?.(null);
     return had;
   }
 }
@@ -130,6 +136,8 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
   let claimed = new Set<string>();
   let wrote = new Set<string>();
   let generation = 0;
+  /** klíč dokumentu jiné otevřené záložky než zobrazené (nový dokument běhu bez záložky mezi nimi není) */
+  const background = (k: DocKey) => k !== get().docKey() && get().docTabs().some((t) => t.kind !== "drawing" && get().docKey(t.id) === k);
   const remember = (d: CadDoc, tab: string) => {
     runTabs.add(tab);
     wrote.add(tab);
@@ -159,8 +167,8 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
     set stack(s) {
       get().asm.setStack(s);
     },
-    mateStatus: new MirrorMap<Record<string, MateStatus>>((m) => get().asm.setMateStatus(m ?? {})),
-    clash: new MirrorMap<{ res: Interference[]; at: string; comps?: number }>((c) => get().asm.setClash(c ? { res: c.res, at: c.at, comps: c.comps ?? 0 } : null)),
+    mateStatus: new MirrorMap<Record<string, MateStatus>>((m) => get().asm.setMateStatus(m ?? {}), background),
+    clash: new MirrorMap<{ res: Interference[]; at: string; comps?: number }>((c) => get().asm.setClash(c ? { res: c.res, at: c.at, comps: c.comps ?? 0 } : null), background),
   };
   const activate = async (id: string): Promise<CadDoc> => {
     get().activateTab(id);

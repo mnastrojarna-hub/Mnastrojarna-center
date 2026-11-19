@@ -183,6 +183,21 @@ describe("engine-port: stav vazeb a kolizí podle id dokumentu (zrcadlo do zobra
     expect(app.shown.clash).toBeNull();
     expect(ws.asm.mateStatus.get("jiný dokument")).toBeUndefined();
   });
+  it("stav dokumentu jiné (nezobrazené) záložky se do zobrazení nezrcadlí – souhrny běhu (řádky D) počítají i sestavy v pozadí", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(app.deps);
+    await runScript(ws, ASM2, host); // zobrazená je sestava B
+    const keyA = ws.docKey(ws.tabs().find((t) => t.title === "A")!.id);
+    app.shown = {};
+    ws.asm.clash.set(keyA, { res: [], at: "10:00", comps: 2 });
+    ws.asm.mateStatus.set(keyA, { m1: "ok" });
+    expect(app.shown).toEqual({}); // panel Kolize a seznam vazeb sestavy B beze změny
+    expect(ws.asm.clash.get(keyA)).toMatchObject({ comps: 2 }); // stav pod klíčem A uložen
+    ws.asm.clash.set(ws.docKey(), { res: [], at: "11:00", comps: 2 }); // zobrazený dokument se zrcadlí dál
+    expect(app.shown.clash).toEqual({ res: [], at: "11:00", comps: 2 });
+    ws.asm.clash.set("nový dokument běhu bez záložky", { res: [], at: "12:00", comps: 1 }); // záložka teprve vznikne → zrcadlí se
+    expect(app.shown.clash).toEqual({ res: [], at: "12:00", comps: 1 });
+  });
 });
 
 describe("přepnutí záložky, které se nepromítne (5.2 č. 22, balík B4)", () => {
