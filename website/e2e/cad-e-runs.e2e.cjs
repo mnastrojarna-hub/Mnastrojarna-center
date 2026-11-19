@@ -135,10 +135,11 @@ const start = async (p, url) => {
     const cli = cliShort(sc);
     ok(cli.code !== null && cli.text.startsWith('MNCAD/1'), `3: CLI ${latest.version} proběhl (skript ${i + 1}, kód ${cli.code})`);
     ok(strip(web) === strip(cli.text), `3: skript ${i + 1}: stručný protokol prohlížeče = CLI kromě t=/slow=/mem=${strip(web) === strip(cli.text) ? '' : `\n--- web\n${web}\n--- cli\n${cli.text}`}`);
+    if (i === 3) ok(/^D "Jen sestava" asm comp=0 parts=0 V\.sum=-$/m.test(web), '4b B1: prázdná sestava (čerstvá stránka) má řádek D i ve stručném protokolu');
     ok(grammarOk(web) && Buffer.byteLength(web, 'utf8') + 1 <= 2048, `3: skript ${i + 1}: gramatika MNCAD/1, ${Buffer.byteLength(web, 'utf8') + 1} B ≤ 2048`);
   }
   const js = JSON.parse(await run('nový díl "J"\nkvádr 10 10 10', { protocol: 'json' }));
-  ok(js.v === 1 && js.docs.some((d) => d.name === 'J' && d.volume_mm3 === 1000) && /^MNCAD\/1 OK/.test(js.protocol) && typeof js.full === 'string' && !('console' in js), '3: protocol "json" = RunReport (docs, protocol, full, bez console)');
+  ok(js.v === 1 && js.docs.some((d) => d.name === 'J' && Math.abs(d.volume_mm3 - 1000) < 1e-6) && /^MNCAD\/1 OK/.test(js.protocol) && typeof js.full === 'string' && !('console' in js), '3: protocol "json" = RunReport (docs, protocol, full, bez console)');
   const err = await p.evaluate(() => window.mncad.run('stav', { protocol: 'brief' }).then(() => '', (e) => String(e.message || e)));
   ok(/neznámý protokol „brief“ – console, short, full, json/.test(err), `3: neznámý protokol = chyba (${err})`);
   const def = await run('stav');
@@ -153,7 +154,8 @@ const start = async (p, url) => {
   const sep2 = await p.evaluate(() => window.mncad.status());
   ok(!/se stavějí zvlášť/.test(st2) && !!env(st2) && env(st2) === env(sep2), `4a: stav jako poslední řádek téhož běhu = tatáž obálka jako samostatné status() (${env(st2)} / ${env(sep2)})`);
   const before = (await tabs()).length;
-  const e1 = await run('nová sestava "Prázdná"', { protocol: 'short' });
+  // plný protokol: ve stručném je řádek D jen u hlavního dokumentu (zde je hlavní starší sestava s komponentami) a u ✗/⚠
+  const e1 = await run('nová sestava "Prázdná"', { protocol: 'full' });
   const e2 = await run('nový díl "Po prázdné"\nkvádr 1 1 1');
   const tb = await tabs();
   ok(tb.includes('Prázdná:assembly') && tb.includes('Po prázdné:part') && tb.length === before + 2, `4b B1: prázdná sestava běhu zůstává vlastní záložkou (${tb.slice(-2).join(', ')})`);

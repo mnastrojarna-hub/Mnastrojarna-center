@@ -92,6 +92,27 @@ class MirrorMap<V> extends Map<DocKey, V> {
 const isPart = (t: { kind: string }) => t.kind === "part";
 const isPartDoc = (d: CadDoc) => d.kind !== "assembly" && d.kind !== "draft";
 
+/**
+ * Záložky založené během (opakovaný běh `nový díl "A"`, engine/runs.ts) přežijí obnovení stránky: obnova záložek ze
+ * šifrovaného úložiště (cad-app.tsx) jim nechá id, tady se pamatují jen ta id (žádná data dokumentu) v sessionStorage karty.
+ */
+const RUN_TABS_KEY = "mn-cad-run-tabs";
+const loadRunTabs = (): string[] => {
+  try {
+    const v: unknown = JSON.parse(globalThis.sessionStorage?.getItem(RUN_TABS_KEY) ?? "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+const saveRunTabs = (s: Set<string>) => {
+  try {
+    globalThis.sessionStorage?.setItem(RUN_TABS_KEY, JSON.stringify([...s].slice(-500)));
+  } catch {
+    /* soukromé okno / plné úložiště – platí do obnovení stránky */
+  }
+};
+
 /** React `Workspace` nad funkcemi cad-app.tsx (`commit`, `openDocInTab`, `activateTab` + čekání, `closeTab`, `histStep`). */
 export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
   /** dokumenty tohoto běhu podle názvu (zápis do záložky se do stavu aplikace propíše až po vykreslení) */
@@ -104,7 +125,7 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
    */
   const runTabs = new Set<string>();
   /** záložky, které běh založil (`openInTab({ made })`) – opakovaný běh `nový díl "A"` je použije znovu (engine/runs.ts) */
-  const madeTabs = new Set<string>();
+  const madeTabs = new Set<string>(loadRunTabs());
   /** záložky tohoto běhu (založené nebo převzaté `claimTab`) a záložky, do kterých tento běh zapsal (řádky D) */
   let claimed = new Set<string>();
   let wrote = new Set<string>();
@@ -177,6 +198,7 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
       claimed.add(id);
       if (o.made) madeTabs.add(id);
       else madeTabs.delete(id); // prázdná úvodní záložka znovu použitá dokumentem, který běh nezaložil
+      saveRunTabs(madeTabs);
       settled(
         await get().settle(() => {
           const n = get();

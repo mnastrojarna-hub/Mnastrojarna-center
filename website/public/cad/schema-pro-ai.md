@@ -2311,9 +2311,10 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
   záložek: `nový díl "A"` / `nová sestava "A"` vezme záložku „A“ stejného druhu, kterou založil **dřívější běh**, nahradí
   její obsah prázdným dokumentem (jeden krok historie – `zpět` ho vrátí) a ohlásí to (✓ „… – znovu použitá záložka“ a
   ℹ `doc.reused`); stejné záložky, stejné objemy, žádné „Kvádr 2“. Záložka „A“, kterou běh nezaložil (otevřený soubor,
-  ruční práce, `--open`), zůstane beze změny – dokument jde do nové záložky (ℹ `doc.name-taken`). Volba na konci řádku:
+  ruční práce, `--open`, jiná karta prohlížeče), zůstane beze změny – dokument jde do nové záložky (ℹ `doc.name-taken`). Volba na konci řádku:
   `nový díl "A" nový` (EN `new`, DE `neu`) = vždy nová záložka, `nový díl "A" znovu` (EN `again`, DE `erneut`) =
-  převzít i záložku otevřenou mimo běh. Bez názvu (`nový díl`) je to vždy nový číslovaný dokument – pro opakovatelné skripty
+  převzít i záložku otevřenou mimo běh. V prohlížeči si aplikace záložky běhů pamatuje i po obnovení stránky v téže
+  kartě (jen jejich id v sessionStorage). Bez názvu (`nový díl`) je to vždy nový číslovaný dokument – pro opakovatelné skripty
   **pojmenujte každý dokument** a začněte jím každý blok (příkazy bez `nový díl` se přidají do otevřeného dokumentu).
 - Každý dokument, který běh založil nebo změnil, má v CLI / HTTP i ve stručném protokolu prohlížeče řádek `D` s čísly
   (`feat=`, `V=`, `m=`, `bbox=`) – díl se znovu nestaví, výsledek je z ověření dílu během; prázdný dokument běhu

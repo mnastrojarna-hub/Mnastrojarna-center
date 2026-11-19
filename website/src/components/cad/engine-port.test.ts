@@ -208,6 +208,26 @@ describe("aplikace: opakovaný běh téhož skriptu = stejné záložky (jako Me
     // sestava 2. běhu: dvě komponenty z dílů 2. běhu (findPart bere převzatou záložku jako dokument běhu)
     expect(r.aws.present().components?.map((c) => c.name)).toEqual(["Deska", "Čep"]);
   });
+  it("obnovení stránky (nový port nad obnovenými záložkami se stejnými id): záložky běhů z sessionStorage → pořád 3 záložky", async () => {
+    const store = new Map<string, string>();
+    const g = globalThis as { sessionStorage?: unknown };
+    const had = g.sessionStorage;
+    g.sessionStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    try {
+      const app = new FakeApp();
+      await runScript(makeAppWorkspace(app.deps), THREE, host);
+      expect(JSON.parse(store.get("mn-cad-run-tabs") ?? "[]")).toHaveLength(3); // jen id záložek, žádná data dokumentu
+      const r = await runScript(makeAppWorkspace(app.deps), THREE, host); // „po obnovení“: nový port, stejné záložky
+      expect(titles(makeAppWorkspace(app.deps))).toEqual(["Deska", "Čep", "S"]);
+      expect(r.entries.filter((e) => e.code === "doc.reused")).toHaveLength(3);
+      // bez sessionStorage (jiná karta prohlížeče): záložky se nepřevezmou – nová záložka a ℹ doc.name-taken, nikdy tiše
+      store.clear();
+      const r2 = await runScript(makeAppWorkspace(app.deps), 'nový díl "Deska"\nkvádr 1 1 1', host);
+      expect(r2.entries.filter((e) => e.code === "doc.name-taken")).toHaveLength(1);
+    } finally {
+      g.sessionStorage = had;
+    }
+  });
   it("záložka otevřená mimo běh se nepřepíše (nová záložka + ℹ doc.name-taken); `znovu` ji převezme; `nový` = nová záložka", async () => {
     const app = new FakeApp();
     const ws = makeAppWorkspace(app.deps);
