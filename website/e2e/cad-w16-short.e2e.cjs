@@ -77,7 +77,10 @@ async function startPhp(script, env = {}) {
   const docroot = path.join(root, 'www');
   fs.mkdirSync(path.join(docroot, 'cad', 'share'), { recursive: true });
   if (Buffer.isBuffer(script)) fs.writeFileSync(path.join(docroot, 'cad', 'share', 'index.php'), script);
-  else fs.copyFileSync(script, path.join(docroot, 'cad', 'share', 'index.php'));
+  else {
+    fs.copyFileSync(script, path.join(docroot, 'cad', 'share', 'index.php'));
+    fs.copyFileSync(path.join(path.dirname(script), 'store.php'), path.join(docroot, 'cad', 'share', 'store.php'));
+  }
   const port = await freePort();
   const proc = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', docroot], { env: { ...process.env, ...env }, stdio: 'ignore' });
   const origin = `http://127.0.0.1:${port}`;
@@ -95,7 +98,7 @@ function generateHtaccess() {
   fs.mkdirSync(path.join(dir, 'public', 'cad', 'share'), { recursive: true });
   fs.copyFileSync(path.join(WEB, 'next.config.mjs'), path.join(dir, 'next.config.mjs'));
   fs.copyFileSync(path.join(WEB, 'scripts', 'gen-htaccess.mjs'), path.join(dir, 'scripts', 'gen-htaccess.mjs'));
-  for (const f of ['index.php', '.htaccess', '.user.ini']) if (fs.existsSync(path.join(WEB, 'public', 'cad', 'share', f))) fs.copyFileSync(path.join(WEB, 'public', 'cad', 'share', f), path.join(dir, 'public', 'cad', 'share', f));
+  for (const f of ['index.php', 'store.php', '.htaccess', '.user.ini']) if (fs.existsSync(path.join(WEB, 'public', 'cad', 'share', f))) fs.copyFileSync(path.join(WEB, 'public', 'cad', 'share', f), path.join(dir, 'public', 'cad', 'share', f));
   execFileSync(process.execPath, ['scripts/gen-htaccess.mjs'], { cwd: dir, stdio: 'ignore' });
   return { text: fs.readFileSync(path.join(dir, 'out', '.htaccess'), 'utf8'), dir };
 }

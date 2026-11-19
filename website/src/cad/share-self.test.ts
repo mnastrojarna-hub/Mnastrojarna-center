@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { blobOf, embedBlobs, putBlob } from "./blobs";
-import { createShareLink, deflate, deriveShareCode, openErrorText, openShareLink, parseShareHash, probeSelfStore, resetShareProbe, revokeShare, shareCryptoOk, shareMessage } from "./share";
+import { createShareLink, deflate, deriveShareCode, openErrorText, openShareLink, parseShareHash, probeSelfStore, resetShareProbe, revokeShare, selfStoreProbeError, shareCryptoOk, shareMessage } from "./share";
 import { emptyDoc, type CadDoc } from "./types";
 
 /**
@@ -466,6 +466,38 @@ describe("výběr úložiště a návrat k odkazu", () => {
     expect(r.url).toContain("#s=1d.");
     expect(r.note).toMatch(/úložiště sdílení na serveru \(\/cad\/share\/\) neodpovídá/);
     expect(await probeSelfStore()).toBeNull();
+  });
+
+  it("úložiště spadne v PHP (hosting) → poznámka i chyba nesou skutečný důvod ze zavaděče, ne jen „neodpovídá“", async () => {
+    const reply = (status: number, body: unknown, ct = "application/json") => vi.stubGlobal("fetch", vi.fn(async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status, headers: { "content-type": ct } })));
+    // prázdná 500 (starý index.php na hostingu se zakázanou funkcí)
+    reply(500, "", "text/html; charset=UTF-8");
+    let r = await createShareLink(sample(), { days: 10, base: BASE });
+    expect(r.mode).toBe("link");
+    expect(r.note).toMatch(/neodpovídá \(HTTP 500 bez odpovědi úložiště/);
+    // zavaděč: fatální chyba PHP s detailem
+    resetShareProbe();
+    reply(500, { ok: false, error: "php_fatal", php: "8.1.2", detail: "store.php:42 Error: Call to undefined function Mn\\Share\\str_split()" });
+    r = await createShareLink(sample(), { days: 10, base: BASE });
+    expect(r.note).toMatch(/HTTP 500: chyba PHP 8\.1\.2 – store\.php:42 Error: Call to undefined function/);
+    // zavaděč: staré PHP / zakázané nezbytné funkce
+    resetShareProbe();
+    reply(500, { ok: false, error: "php_too_old", php: "5.6.40", need: "7.0" });
+    await expect(createShareLink(sample(), { days: 10, base: BASE, mode: "self" })).rejects.toThrow(/PHP 5\.6\.40 na serveru je příliš staré, úložiště potřebuje PHP 7\.0/);
+    resetShareProbe();
+    reply(500, { ok: false, error: "php_functions_disabled", php: "8.2.0", missing: ["fwrite", "rename"] });
+    r = await createShareLink(sample(), { days: 10, base: BASE });
+    expect(r.note).toMatch(/hosting zakázal funkce PHP, bez kterých úložiště nejde provozovat: fwrite, rename/);
+    // skript chybí (404 stránka webu)
+    resetShareProbe();
+    reply(404, "<html>404</html>", "text/html");
+    r = await createShareLink(sample(), { days: 10, base: BASE });
+    expect(r.note).toMatch(/HTTP 404: na serveru chybí skript úložiště/);
+    // po opravě serveru důvod zmizí
+    resetShareProbe();
+    mockServer();
+    expect((await createShareLink(sample(), { days: 10, base: BASE })).mode).toBe("self");
+    expect(selfStoreProbeError()).toBe("");
   });
 
   it("síťová chyba nebo limit požadavků při nahrání → odkaz s důvodem; bez omezení platnosti → odkaz s důvodem", async () => {

@@ -89,7 +89,7 @@ async function cliPart() {
   if (php) {
     const www = path.join(WORK, 'www', 'cad', 'share');
     fs.mkdirSync(www, { recursive: true });
-    for (const f of ['index.php', '.htaccess', '.user.ini']) if (fs.existsSync(path.join(WEB, 'public/cad/share', f))) fs.copyFileSync(path.join(WEB, 'public/cad/share', f), path.join(www, f));
+    for (const f of ['index.php', 'store.php', '.htaccess', '.user.ini']) if (fs.existsSync(path.join(WEB, 'public/cad/share', f))) fs.copyFileSync(path.join(WEB, 'public/cad/share', f), path.join(www, f));
     // stránka odkazu na soubor (… odkaz) vedle úložiště – jako na webu
     fs.mkdirSync(path.join(WORK, 'www', 'cad', 'soubor'), { recursive: true });
     fs.copyFileSync(path.join(WEB, 'public/cad/soubor/index.html'), path.join(WORK, 'www', 'cad', 'soubor', 'index.html'));
