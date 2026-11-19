@@ -43,7 +43,7 @@ export function JobSupplierInvoices({ jobId, currency = "CZK", refreshKey }: { j
           <h3 className="flex items-center gap-2 font-semibold">Faktury dodavatelů <span className="rounded-full bg-muted px-2 text-xs tabular-nums">{rows.length}</span></h3>
           <p className="text-xs text-muted-foreground">
             Skutečný nákup z faktur — objednávka vyfakturovaná celá se počítá fakturou, dílčí faktura částku objednávky nesníží.
-            {visibility === "all" ? " Vidí všichni s nákupními cenami, upravuje super admin." : " Vidí jen super admin."}
+            {visibility === "all" ? " Zadávají a rozdělují všichni, stav platby vidí jen super admin." : " Vidí jen super admin."}
           </p>
         </div>
         <Link href={`/supplier-invoices?zakazka=${jobId}`} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">Všechny <ArrowRight className="h-3.5 w-3.5" /></Link>
