@@ -67,6 +67,8 @@ import { weldFaceColors } from "@/cad/ext/weld-colors";
 import { extendMncad, runApiCmd, textSelectionNote, type ApiHost } from "./agent-api-host";
 import { LibraryDialog } from "./library-dialog";
 import { libraryToSpring, springFromTable } from "./springs/create";
+import { openGears } from "./gears/register";
+import { gearWizardBusy } from "./gears/gear-wizard";
 import { MoldPanel, type DraftSetup, type SurfaceSetup } from "./mold-panel";
 import { CompareDialog, type CompareView } from "./compare-dialog";
 import { curvatureColors, wallThickness } from "@/cad/analysis";
@@ -2342,6 +2344,7 @@ export function CadApp() {
     notice: (title, body) => setNotice({ title, body }),
     download,
     exportModel: (format) => exportModel(format as ExportFormat),
+    runText: (t) => runAgentRef.current(t),
   });
   const addExt = (def: ExtDef) => {
     if (def.action) {
@@ -2846,7 +2849,7 @@ export function CadApp() {
   // obsluha s aktuálním stavem: v layout efektu, tj. hned při zápisu vykreslení – platí i pro překreslení během téže klávesy
   useLayoutEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (askBusy()) return; // otevřený dotaz na stránce (potvrzení…) blokuje zkratky jako systémové okno – druhé Delete nepoloží druhý dotaz
+      if (askBusy() || gearWizardBusy()) return; // otevřený dotaz na stránce (potvrzení…) blokuje zkratky jako systémové okno – druhé Delete nepoloží druhý dotaz
       const field = (e.target as HTMLElement)?.closest?.("input,textarea,select") as HTMLElement | null;
       if (field) {
         if (e.key === "Escape") field.blur(); // Esc opustí textové pole, další Esc už ruší výběr
@@ -4487,6 +4490,10 @@ export function CadApp() {
               setLibraryOpen(null);
               void springFromTable({ doc, isAsm, commit, openDocInTab, insertPart, flash }, libraryToSpring(fam, v));
             }}
+            onOpenGears={(o) => {
+              setLibraryOpen(null);
+              void openGears(extActionApi(), o);
+            }}
           />
         )}
         <ComputeChip onCancel={cancelCompute} />
@@ -4547,6 +4554,7 @@ export function CadApp() {
             ]}
             secondary={[
               { id: "open", label: tr("Otevřít / importovat"), desc: tr("STEP, IGES, BREP, STL, OBJ, 3MF, glTF, DXF, .mncad"), icon: "open", tone: "file", kbd: "Ctrl+O", run: () => { setStartOpen(false); fileInput.current?.click(); } },
+              { id: "gears", label: tr("Kola a ozubení"), desc: tr("Ozubené kolo, hřeben, řetězové kolo, řemenice, soukolí – vyplníte tabulku a máte díl."), icon: "gear", tone: "create", run: () => { setStartOpen(false); void openGears(extActionApi()); } },
               { id: "lib", label: tr("Knihovna normálií"), desc: tr("103 rodin: šrouby, ložiska, ozubená kola, profily, normálie forem… Stačí napsat „M8x30“."), icon: "table", tone: "pattern", kbd: "Ctrl+L", run: () => { setStartOpen(false); setLibraryOpen({}); } },
               { id: "palette", label: tr("Paleta příkazů"), desc: tr("Napište, co chcete udělat – „díra“, „výkres“, „zaoblit“…"), icon: "measure", tone: "tool", kbd: "Ctrl+K", run: () => { setStartOpen(false); setPaletteOpen(true); } },
               { id: "settings", label: tr("Nastavení"), desc: tr("Myš jako ZW3D/SolidWorks, jednotky, zkratky, výkresy."), icon: "settings", tone: "view", run: () => { setStartOpen(false); setSettingsOpen(true); } },

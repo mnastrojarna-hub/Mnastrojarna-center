@@ -9,4 +9,5 @@ import "./advanced";
 import "./weld";
 import "./sheetmetal-form";
 import "./springs";
+import "./gears";
 export * from "./registry";
