@@ -208,6 +208,9 @@ const motion = (d) => {
   const d = dl[n0];
   const text = d ? fs.readFileSync(await d.path(), 'utf8') : '';
   ok(/^# ℹ co skript nepřenese \(\d+\):$/m.test(text) && /^# ℹ volby listu bez textového příkazu \(dimRoom\)/m.test(text), `D: stažený skript ${d ? d.suggestedFilename() : '—'} nese komentář # ℹ`);
+  // konzole (dialog se souhrnem běhu, vlna 22 A4) zůstává otevřená nad oknem výkresu – zavřít, jinak klik v E3 padne do konzole
+  await p.getByRole('button', { name: 'Zavřít', exact: true }).first().click().catch(() => {});
+  await p.waitForFunction(() => !document.querySelector('[data-console-summary]'), null, { timeout: 10000 }).catch(() => {});
 
   // ════════════ E) nálezy kontroly: skript se píše proti stavu při čtení ════════════
   /** postaví dokument v p, převede window.mncad.script() a skript přečte v novém sezení q */
