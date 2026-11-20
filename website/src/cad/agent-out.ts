@@ -399,7 +399,7 @@ export function fileLogLine(what: string, name: string, bytes: number, format: s
  * `free` = plochy mimo tělesa, `freeShells` / `freeFaces` / `shells` / `closedShells` = složení (export-verify.ts),
  * `valid` = BRepCheck tvaru (rychlá metoda; null / chybí = nezkontrolováno).
  */
-export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null };
+export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null };
 /**
  * Výsledek kontroly: `ok` = věrná kopie objemového modelu; `level` / `code` = jak ji hlásit (✗ out.no-solid – soubor bez
  * tělesa, ⚠ out.free-surfaces – volné plochy vedle tělesa, ⚠ / ✗ out.check-failed – soubor se od modelu liší / nenačetl se).
@@ -431,7 +431,7 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
   // 22c: soubor bez objemového tělesa není objemový export – bez ohledu na to, že odpovídá modelu z ploch
   if (file.solids === 0) {
     const v = solidVerdict(statsOf(file), label, "file", parts)!;
-    return { ...base, ok: false, level: "error", code: "out.no-solid", line: `✗ ${tr("kontrola {0}", v.text)}` };
+    return { ...base, ok: false, level: "error", code: "out.no-solid", line: `✗ ${tr("kontrola {0}: {1}", label, v.body)}` };
   }
   const freeM = model.free ?? (model.freeShells !== undefined || model.freeFaces !== undefined ? (model.freeShells ?? 0) + (model.freeFaces ?? 0) : undefined);
   const freeF = file.free ?? (file.freeShells !== undefined || file.freeFaces !== undefined ? (file.freeShells ?? 0) + (file.freeFaces ?? 0) : undefined);
@@ -451,7 +451,7 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
   }
   // odpovídá modelu, ale volné skořepiny / plochy vedle těles nejsou objemový model → ⚠ s počty (a jmény komponent)
   const fv = solidVerdict(statsOf(file), label, "file", parts);
-  if (fv) return { ...base, ok: false, level: "warn", code: "out.free-surfaces", line: `⚠ ${tr("kontrola {0}", fv.text)}` };
+  if (fv) return { ...base, ok: false, level: "warn", code: "out.free-surfaces", line: `⚠ ${tr("kontrola {0}: {1}", label, fv.body)}` };
   return {
     ...base,
     ok: true,
@@ -461,7 +461,7 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
 }
 
 /** složení souboru / modelu pro `solidVerdict` */
-const statsOf = (s: ShapeStats): SolidStats => ({ solids: s.solids ?? 0, ...(s.free !== undefined ? { free: s.free } : {}), ...(s.freeShells !== undefined ? { freeShells: s.freeShells } : {}), ...(s.freeFaces !== undefined ? { freeFaces: s.freeFaces } : {}), ...(s.shells !== undefined ? { shells: s.shells } : {}), ...(s.closedShells !== undefined ? { closedShells: s.closedShells } : {}) });
+const statsOf = (s: ShapeStats): SolidStats => ({ solids: s.solids ?? 0, ...(s.free !== undefined ? { free: s.free } : {}), ...(s.freeShells !== undefined ? { freeShells: s.freeShells } : {}), ...(s.freeFaces !== undefined ? { freeFaces: s.freeFaces } : {}), ...(s.shells !== undefined ? { shells: s.shells } : {}), ...(s.closedShells !== undefined ? { closedShells: s.closedShells } : {}), ...(s.closedFree !== undefined ? { closedFree: s.closedFree } : {}) });
 
 /** kontrola, kterou nešlo provést (soubor se nenačetl) */
 export function checkFailed(label: string, why: string): ExportCheck {
@@ -496,7 +496,7 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     cmd: "export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]",
     en: "export",
     de: "exportieren",
-    desc: tr("3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) → „věrná kopie modelu“; „bez kontroly“ ji vynechá"),
+    desc: tr("3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem, obálka) → „věrná kopie modelu“ jen s objemovým tělesem; bez tělesa ✗ out.no-solid, volné plochy vedle tělesa ⚠ out.free-surfaces (i u STL / 3MF a „bez kontroly“ podle modelu); „bez kontroly“ vynechá zpětné čtení"),
   },
   {
     cmd: "export skript [cs|en|de] [název]",

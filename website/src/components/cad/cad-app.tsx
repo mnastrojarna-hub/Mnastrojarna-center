@@ -4241,7 +4241,9 @@ export function CadApp() {
                     <Chip dark={bg.dark}>
                       {fmtNum(m.bbox[1][0] - m.bbox[0][0], 1)} × {fmtNum(m.bbox[1][1] - m.bbox[0][1], 1)} × {fmtNum(m.bbox[1][2] - m.bbox[0][2], 1)} mm
                     </Chip>
-                    <Chip dark={bg.dark}>V {m.solids === 0 ? "–" : `${fmtNum(m.volume / 1000, 1)} cm³`}</Chip>
+                    <Chip dark={bg.dark}>
+                      <span data-volume-chip={m.solids === 0 ? "none" : "solid"}>V {m.solids === 0 ? "–" : `${fmtNum(m.volume / 1000, 1)} cm³`}</span>
+                    </Chip>
                     <Chip dark={bg.dark}>
                       {mat.label} {m.solids === 0 ? "–" : `${fmtNum(massKg(m.volume, mat.density), 3)} kg`}
                     </Chip>

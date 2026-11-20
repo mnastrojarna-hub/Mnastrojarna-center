@@ -1,0 +1,23 @@
+# Vlna 22 G3 – objemový export bez tělesa (22c): ✗ out.no-solid, ⚠ out.free-surfaces, objem a hmotnost jen z těles, export z menu
+kontrola {0}: {1}	{0} check: {1}
+soubor neobsahuje objemové těleso (těles 0{0}) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě	the file contains no solid (solids 0{0}) – faces have no volume or mass; close the faces into a solid (Surfaces → Close to solid, feature surf.close), or export them as surfaces on purpose
+soubor obsahuje vedle těles ({0}) i plochy mimo tělesa ({1}) – nejsou objemem, objem a hmotnost jsou jen z těles	besides the solids ({0}) the file also contains faces outside the solids ({1}) – they are not volume, volume and mass come from the solids only
+model nemá objemové těleso (těles 0{0}) – soubor nebude objemový model; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close)	the model has no solid (solids 0{0}) – the file will not be a volume model; close the faces into a solid (Surfaces → Close to solid, feature surf.close)
+model má vedle těles ({0}) i plochy mimo tělesa ({1}) – nejsou objemem, objem a hmotnost jsou jen z těles	besides the solids ({0}) the model also has faces outside the solids ({1}) – they are not volume, volume and mass come from the solids only
+komponenty bez tělesa: {0}	components without a solid: {0}
+komponenty s volnými plochami: {0}	components with free faces: {0}
+volných skořepin {0}	free shells {0}
+volných skořepin {0} (uzavřených {1})	free shells {0} (closed {1})
+volných ploch {0}	free faces {0}
+ploch mimo tělesa {0}	faces outside solids {0}
+ploch mimo tělesa {0} (model {1})	faces outside solids {0} (model {1})
+ploch mimo tělesa {0} (objem jen z těles)	faces outside solids {0} (volume from the solids only)
+po načtení neplatné (BRepCheck), model platný	invalid after reading (BRepCheck), the model is valid
+jádro v souboru nenašlo těleso ani plochy	the kernel found neither a solid nor faces in the file
+chyba jádra	kernel error
+Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem – (žádné těleso) · ploch {9} · hran {10}	Size: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · volume – (no solid) · faces {9} · edges {10}
+ · ŽÁDNÉ objemové těleso – objem a hmotnost se z ploch nepočítají	 · NO solid – volume and mass are not computed from faces
+– (žádné objemové těleso)	– (no solid)
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
+objemový export bez tělesa: {0}	volume export without a solid: {0}
+objemový export s plochami mimo tělesa: {0}	volume export with faces outside the solids: {0}

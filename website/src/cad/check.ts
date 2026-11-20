@@ -68,7 +68,7 @@ export function compositionOf(shape: r.AnyShape): { solids: number; free: number
  * Složení tvaru pro objemový export (vlna 22, bod 22c): objemová tělesa, skořepiny (uzavřené), skořepiny mimo tělesa
  * (volné – i uzavřená skořepina bez „Uzavřít do tělesa“ je volná) a plochy mimo skořepiny. Jen průchod topologií (levné).
  */
-export type SolidComposition = { solids: number; shells: number; closedShells: number; freeShells: number; freeFaces: number; faces: number };
+export type SolidComposition = { solids: number; shells: number; closedShells: number; freeShells: number; closedFree: number; freeFaces: number; faces: number };
 
 export function solidComposition(shape: r.AnyShape): SolidComposition {
   const o = oc() as OC & { BRep_Tool: { IsClosed(s: unknown): boolean } };
@@ -87,19 +87,23 @@ export function solidComposition(shape: r.AnyShape): SolidComposition {
     }
     return n;
   };
-  let closedShells = 0;
-  const shells = walk(E.TopAbs_SHELL, E.TopAbs_SHAPE, (s) => {
+  const closed = (s: unknown) => {
     try {
-      if (o.BRep_Tool.IsClosed(s)) closedShells++;
+      return o.BRep_Tool.IsClosed(s);
     } catch {
-      /* bez informace o uzavřenosti */
+      return false; // bez informace o uzavřenosti
     }
-  });
+  };
+  let closedShells = 0;
+  let closedFree = 0;
+  const shells = walk(E.TopAbs_SHELL, E.TopAbs_SHAPE, (s) => void (closed(s) && closedShells++));
+  const freeShells = walk(E.TopAbs_SHELL, E.TopAbs_SOLID, (s) => void (closed(s) && closedFree++));
   return {
     solids: walk(E.TopAbs_SOLID, E.TopAbs_SHAPE),
     shells,
     closedShells,
-    freeShells: walk(E.TopAbs_SHELL, E.TopAbs_SOLID),
+    freeShells,
+    closedFree,
     freeFaces: walk(E.TopAbs_FACE, E.TopAbs_SHELL),
     faces: walk(E.TopAbs_FACE, E.TopAbs_SHAPE),
   };

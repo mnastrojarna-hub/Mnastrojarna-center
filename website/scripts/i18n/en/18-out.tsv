@@ -10,7 +10,7 @@
 ✓ poslední sdílený odkaz	✓ last shared link
 ✓ sdílený odkaz vytvořen	✓ shared link created
 ✗ kontrola {0}: soubor se nepodařilo znovu načíst – {1}	✗ {0} check: the file could not be read again – {1}
-3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, objem, obálka) → „věrná kopie modelu“; „bez kontroly“ ji vynechá	the 3D model is downloaded without a dialog; for STEP and BREP a check: the file is re-read by the kernel and compared with the model (bodies, volume, bounding box) → “faithful copy of the model”; “no check” skips it
+3D model se stáhne bez dialogu; u STEP a BREP kontrola: soubor se znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem, obálka) → „věrná kopie modelu“ jen s objemovým tělesem; bez tělesa ✗ out.no-solid, volné plochy vedle tělesa ⚠ out.free-surfaces (i u STL / 3MF a „bez kontroly“ podle modelu); „bez kontroly“ vynechá zpětné čtení	the 3D model is downloaded without a dialog; for STEP and BREP a check: the file is re-read by the kernel and compared with the model (solids, faces outside solids, validity, volume, bounding box) → “faithful copy of the model” only with a solid; no solid ✗ out.no-solid, free faces next to a solid ⚠ out.free-surfaces (also for STL / 3MF and “no check”, from the model); “no check” skips the re-read
 3MF (síť)	3MF (mesh)
 export {0}	export {0}
 export {0}: výkres se exportuje příkazem „výkres export {0}“ (nejdřív „výkres A3 …“)	export {0}: a drawing is exported with “drawing export {0}” (first “drawing A3 …”)
@@ -21,7 +21,6 @@ export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]	export step|s
 export: model je prázdný – nejdřív vymodelujte díl	export: the model is empty – model a part first
 export: neznámý formát „{0}“ – {1}	export: unknown format “{0}” – {1}
 glTF binární (síť)	glTF binary (mesh)
-jádro v souboru nenašlo těleso	the kernel found no body in the file
 komponent	components
 kusovník CSV	BOM CSV
 list výkresu jako soubor bez dialogu (bez listu aktivní, „vše“ = každý list zvlášť); výkres nejdřív „výkres A3 …“ a „kótovat“	drawing sheet as a file without a dialog (without a sheet the active one, “all” = each sheet separately); first “drawing A3 …” and “dimension”

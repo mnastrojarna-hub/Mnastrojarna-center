@@ -16,14 +16,16 @@ export const isVolumeFormat = (f: string): f is VolumeFormat => (VOLUME_FORMATS 
 
 /**
  * Složení modelu nebo souboru: `free` = plochy mimo objemová tělesa (jako řádek D `free=`), `freeShells` / `freeFaces` =
- * skořepiny mimo tělesa / plochy mimo skořepiny (jen když je jádro spočítalo), `closedShells` = uzavřené skořepiny.
+ * skořepiny mimo tělesa / plochy mimo skořepiny (jen když je jádro spočítalo), `closedShells` = uzavřené skořepiny
+ * (i pláště těles), `closedFree` = uzavřené z volných skořepin (uzavřená skořepina bez „Uzavřít do tělesa“).
  */
-export type SolidStats = { solids: number; free?: number; freeShells?: number; freeFaces?: number; shells?: number; closedShells?: number };
+export type SolidStats = { solids: number; free?: number; freeShells?: number; closedFree?: number; freeFaces?: number; shells?: number; closedShells?: number };
 
 /** komponenty sestavy bez tělesa / s volnými plochami (jména pro hlášku) */
 export type SolidParts = { noSolid: string[]; free: string[] };
 
-export type SolidVerdict = { level: "error" | "warn"; code: "out.no-solid" | "out.free-surfaces"; text: string };
+/** `text` = „STEP: …“ (štítek formátu + `body`); `body` = věta bez štítku (do „kontrola STEP: …“) */
+export type SolidVerdict = { level: "error" | "warn"; code: "out.no-solid" | "out.free-surfaces"; text: string; body: string };
 
 /** kolik ploch je mimo tělesa (ze `free`, jinak z počtů skořepin / ploch) */
 export function freeCount(s: SolidStats): number {
@@ -34,7 +36,7 @@ export function freeCount(s: SolidStats): number {
 /** „skořepin 1 (uzavřených 1), volných ploch 0“ – co místo tělesa v modelu / souboru je */
 export function compositionText(s: SolidStats): string {
   const parts: string[] = [];
-  if (s.freeShells !== undefined) parts.push(s.closedShells ? tr("volných skořepin {0} (uzavřených {1})", s.freeShells, Math.min(s.closedShells, s.freeShells)) : tr("volných skořepin {0}", s.freeShells));
+  if (s.freeShells !== undefined) parts.push(s.closedFree ? tr("volných skořepin {0} (uzavřených {1})", s.freeShells, s.closedFree) : tr("volných skořepin {0}", s.freeShells));
   if (s.freeFaces !== undefined) parts.push(tr("volných ploch {0}", s.freeFaces));
   if (!parts.length && s.free !== undefined) parts.push(tr("ploch mimo tělesa {0}", s.free));
   return parts.join(", ");
@@ -58,25 +60,24 @@ export function partsText(p?: SolidParts): string {
  */
 export function solidVerdict(s: SolidStats, label: string, where: "file" | "model", parts?: SolidParts): SolidVerdict | null {
   const comp = compositionText(s);
+  const out = (level: SolidVerdict["level"], code: SolidVerdict["code"], body: string): SolidVerdict => ({ level, code, body: body + partsText(parts), text: `${label}: ${body}${partsText(parts)}` });
   if (s.solids === 0)
-    return {
-      level: "error",
-      code: "out.no-solid",
-      text:
-        (where === "file"
-          ? tr("{0}: soubor neobsahuje objemové těleso (těles 0{1}) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě", label, comp ? `, ${comp}` : "")
-          : tr("{0}: model nemá objemové těleso (těles 0{1}) – soubor nebude objemový model; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close)", label, comp ? `, ${comp}` : "")) + partsText(parts),
-    };
+    return out(
+      "error",
+      "out.no-solid",
+      where === "file"
+        ? tr("soubor neobsahuje objemové těleso (těles 0{0}) – objem ani hmotnost z ploch nejsou; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close), nebo exportujte jako plochy vědomě", comp ? `, ${comp}` : "")
+        : tr("model nemá objemové těleso (těles 0{0}) – soubor nebude objemový model; plochy uzavřete do tělesa (Plochy → Uzavřít do tělesa, prvek surf.close)", comp ? `, ${comp}` : ""),
+    );
   const free = freeCount(s);
   if (free > 0 || (parts && (parts.free.length || parts.noSolid.length)))
-    return {
-      level: "warn",
-      code: "out.free-surfaces",
-      text:
-        (where === "file"
-          ? tr("{0}: soubor obsahuje vedle {1} těles i plochy mimo tělesa ({2}) – nejsou objemem, objem a hmotnost jsou jen z těles", label, s.solids, comp || tr("ploch mimo tělesa {0}", free))
-          : tr("{0}: model má vedle {1} těles i plochy mimo tělesa ({2}) – nejsou objemem, objem a hmotnost jsou jen z těles", label, s.solids, comp || tr("ploch mimo tělesa {0}", free))) + partsText(parts),
-    };
+    return out(
+      "warn",
+      "out.free-surfaces",
+      where === "file"
+        ? tr("soubor obsahuje vedle těles ({0}) i plochy mimo tělesa ({1}) – nejsou objemem, objem a hmotnost jsou jen z těles", s.solids, comp || tr("ploch mimo tělesa {0}", free))
+        : tr("model má vedle těles ({0}) i plochy mimo tělesa ({1}) – nejsou objemem, objem a hmotnost jsou jen z těles", s.solids, comp || tr("ploch mimo tělesa {0}", free)),
+    );
   return null;
 }
 

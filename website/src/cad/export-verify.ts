@@ -15,10 +15,10 @@ import type { CadDoc, Vec3 } from "./types";
 
 /**
  * Míry tvaru pro kontrolu exportu: `volume` jen z objemových těles (22c – pseudoobjem skořepin a ploch se nepočítá),
- * složení (tělesa, skořepiny, uzavřené, volné skořepiny, plochy mimo skořepiny, plochy mimo tělesa) a platnost BRepCheck
+ * složení (tělesa, skořepiny, uzavřené, volné skořepiny a z nich uzavřené, plochy mimo skořepiny, plochy mimo tělesa) a platnost BRepCheck
  * (rychlá metoda – přesná vzniká až čtečkou STEP i u platného modelu, viz 22a; přesně jen `kontrola přesně`).
  */
-export type KernelShapeStats = { solids: number; volume: number; bbox: [Vec3, Vec3]; shells: number; closedShells: number; freeShells: number; freeFaces: number; free: number; valid: boolean | null };
+export type KernelShapeStats = { solids: number; volume: number; bbox: [Vec3, Vec3]; shells: number; closedShells: number; freeShells: number; closedFree: number; freeFaces: number; free: number; valid: boolean | null };
 
 /** nad kolik ploch se platnost souboru při kontrole exportu nekontroluje (drahé) – `valid: null` */
 export const EXPORT_VALID_FACES = 3000;
@@ -43,7 +43,7 @@ export function shapeStats(s: r.AnyShape): KernelShapeStats {
   const c = solidComposition(s);
   const free = compositionOf(s).free;
   const valid = c.faces <= EXPORT_VALID_FACES ? isValidShape(s) : null;
-  return { solids: c.solids, volume, bbox: [[b[0][0], b[0][1], b[0][2]], [b[1][0], b[1][1], b[1][2]]], shells: c.shells, closedShells: c.closedShells, freeShells: c.freeShells, freeFaces: c.freeFaces, free, valid };
+  return { solids: c.solids, volume, bbox: [[b[0][0], b[0][1], b[0][2]], [b[1][0], b[1][1], b[1][2]]], shells: c.shells, closedShells: c.closedShells, freeShells: c.freeShells, closedFree: c.closedFree, freeFaces: c.freeFaces, free, valid };
 }
 
 /** Model (díl / sestava) a znovu načtený soubor STEP / BREP – míry pro porovnání (`exportCheck` v agent-out.ts). */
