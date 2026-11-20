@@ -66,7 +66,7 @@ describe("bod 2 – kvazistatika: předpětí drží přidržovač u meze, dokud
     const sum = motionSummary(res, d);
     expect(sum[1]).toBe(levelLine(res.level!));
     expect(sum[1]).toMatch(/^Úroveň simulace: kvazistatika – .*zvoleno automaticky: sestava má pružinu „Pružina“/);
-    expect(motionKv(res, null, 2)).toMatch(/ level=quasi$/);
+    expect(motionKv(res, null, 2)).toMatch(/ level=quasi groups=\S+$/);
   });
 
   it("stejný výsledek nahoru i dolů (akceptace zprávy): krok se stejnou hodnotou motoru = stejná poloha", async () => {
@@ -97,7 +97,7 @@ describe("bod 2 – kvazistatika: předpětí drží přidržovač u meze, dokud
     expect(sum.join("\n")).toMatch(/⚠ vazby splněny ve všech krocích, ale polohu „H“ neurčují/);
     const u = motionFindings(res, d).find((x) => x.code === "motion.undetermined")!;
     expect(u.text).toMatch(/poloha „H“ není vazbami určena \(volná v mezi „Mez“ ⟨5; 25⟩ \(vazba 2\), „Dosed“ ⟨0; 500⟩ \(vazba 3\)\) – kinematika ji nechává, kde byla .* pružina „Pružina“ by ji tlačila: fyzikální poloha = pohyb kvazistatika/);
-    expect(motionKv(res, null, 2)).toMatch(/ undetermined=1 level=kin$/);
+    expect(motionKv(res, null, 2)).toMatch(/ undetermined=1 level=kin groups=\S+$/);
   });
 
   it("kinematika s preferovanou stranou meze: stejné polohy jako kvazistatika, nahoru i dolů", async () => {

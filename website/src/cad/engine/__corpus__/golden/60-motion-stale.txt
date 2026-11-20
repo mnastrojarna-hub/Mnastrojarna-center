@@ -17,9 +17,11 @@ Prvky:
 ✓ komponenta „Přidržovač“ vložena do sestavy
 ✓ vazba Vzdálenost „Přidržovač“ F5 → „Deska A“ F6 · 20 mm: ok · poloha beze změny
 ✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 25 mm · konec [40; 10; 5]
+ „Přidržovač“: ΔZ −25 mm
+ stojí: 1 („Deska A“)
 Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 5
 Vazby splněny ve všech krocích
 ⚠ řádek 5: v pohybu „Deska A“ × „Přidržovač“ od kroku 5 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 500 mm³
@@ -49,7 +51,8 @@ Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
  1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 25 mm · konec [40; 10; 5]
+ „Přidržovač“: ΔZ −25 mm
+ stojí: 1 („Deska A“)
 Kolize: žádné ve všech krocích
 Vazby splněny ve všech krocích
 ℹ řádek 6: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: geometrie dílu „Deska A“
@@ -61,7 +64,8 @@ Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
  1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 25 mm · konec [40; 10; 5]
+ „Přidržovač“: ΔZ −25 mm
+ stojí: 1 („Deska A“)
 Kolize: žádné ve všech krocích
 Vazby splněny ve všech krocích
 ✓ Kvádr 1 (box)

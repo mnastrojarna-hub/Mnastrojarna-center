@@ -75,7 +75,7 @@ describe("brána B6: obálka, díly komponent, pohyb (jádro)", async () => {
     expect(mo).toHaveLength(1);
     // vlna 22, bod 9: motor (průběh, začátek > konec, směr) na konci řádku
     // vlna 22, bod 2: úroveň simulace na konci řádku (sestava bez pružiny → automaticky kinematika)
-    expect(mo[0]).toMatch(/^= L9 asm "Pohyb" motion steps=4 t=2 motors=1 conflicts=0 travel=40mm:1 static=1 m1=range:10>50:\+ level=kin$/);
-    expect(formatConsole(r)).toMatch(/Jezdec: rozsah pohybu X 40 · Y 0 · Z 0 mm/);
+    expect(mo[0]).toMatch(/^= L9 asm "Pohyb" motion steps=4 t=2 motors=1 conflicts=0 travel=40mm:1 static=1 m1=range:10>50:\+ level=kin groups=1:x-40$/); // vlna 22, M3: tuhé skupiny na konci
+    expect(formatConsole(r)).toMatch(/ „Jezdec“: ΔX −40 mm/); // vlna 22, M3: výchozí souhrn po tuhých skupinách (po dílech: pohyb detail)
   }, 240_000);
 });

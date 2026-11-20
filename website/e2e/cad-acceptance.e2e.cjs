@@ -40,7 +40,7 @@ const coreReady = (page) => page.waitForFunction(() => document.body.innerText.i
   log = await run('nový díl Vodítko\nkvádr 100 20 10\nnový díl Jezdec\nkvádr 20 20 10\nnová sestava Pohyb\nvložit "Vodítko" ukotvit\nvložit "Jezdec" v 0 0 10\nsestava vazba vzdálenost "Jezdec" -X "Vodítko" -X hodnota 10\npohyb motor lineární vazba 1 10..50 kroky 4\npohyb stav');
   fs.writeFileSync(S + 'pohyb.txt', log);
   ok(!bad(log).length && /Pohybová studie: 4 kroků · 2 s/.test(log), 'pohyb motor + pohyb stav bez ✗');
-  ok((log.match(/ Jezdec: rozsah pohybu X 40 · Y 0 · Z 0 mm/g) || []).length === 2, 'konzole: rozsah pohybu komponenty u motoru i u pohyb stav (beze změny)');
+  ok((log.match(/ „Jezdec“: ΔX −40 mm/g) || []).length === 2, 'konzole: pohyb tuhé skupiny u motoru i u pohyb stav (vlna 22, M3: výchozí souhrn po skupinách)');
   ok(!/motion steps=/.test(log), 'strojový souhrn `motion …` jen v protokolu CLI/HTTP, ne v konzoli');
 
   ok(!errs.length, 'bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));

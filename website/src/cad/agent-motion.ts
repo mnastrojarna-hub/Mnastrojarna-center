@@ -12,6 +12,8 @@
 import { tr } from "./i18n";
 import { AsmCursor, asmIsNum, asmNum, asmTokens, asmWords as W } from "./agent-asm";
 import { backArg, parseDynText, type DynCmd } from "./agent-motion-dyn";
+import { parsePhaseText, type PhaseCmd } from "./agent-motion-phases";
+import type { MotorLeg } from "./motor-model";
 import type { Vec3 } from "./types";
 
 export type MotionCmd =
@@ -43,7 +45,23 @@ export type MotionCmd =
       back?: boolean;
       /** chování na mezi (vlna 22, bod 8): `na mezi stop` (výchozí – motor stojí) | `na mezi chyba` (krok neplatný) */
       atLimit?: "stop" | "error";
+      /** vlna 22, bod 3: mezipolohy rozsahu „57,5..40..27,15“ (hodnoty za začátkem, poslední = konec) */
+      points?: number[];
+      /** další úseky `pak A..B [čas T | rychlost V]`, `prodleva T` (to = NaN → drží předchozí hodnotu) */
+      extra?: MotorLeg[];
+      /** klíčové polohy `klíče 0:57,5 0,3:40 …` (čas od začátku motoru) */
+      keys?: { t: number; v: number }[];
+      /** časové okno `okno 0,2..0,6` / `od 0,2 s do 0,6 s` */
+      window?: { t0?: number; t1?: number };
+      /** motor začne s fází (číslo nebo název) */
+      phase?: string;
+      /** `navázat`: úseky se připojí za motor, který už na vazbě je (jinak ho motor nahradí – s ℹ, nikdy potichu) */
+      append?: true;
     }
+  /** fáze studie (vlna 22, bod 3; cad/motion-phases.ts): přidat / upravit / smazat / posunout / vypsat */
+  | { op: "phase"; cmd: PhaseCmd }
+  /** souhrn studie po dílech místo tuhých skupin (`pohyb detail`, `pohyb stav detail`) */
+  | { op: "detail" }
   /** režim studie (vlna 22, bod 2): `pohyb kvazistatika` | `pohyb automaticky` (null); `pohyb kinematika` = dynamika vypnuta → kinematika */
   | { op: "mode"; mode: "quasistatic" | null }
   | { op: "dyn"; cmd: DynCmd }
@@ -88,11 +106,47 @@ const K = {
   limit: W("mezi", "limit", "grenze"),
   stopL: W("stop", "stát", "stat", "zastavit", "stopp", "halt"),
   error: W("chyba", "neplatný", "neplatny", "error", "invalid", "fehler", "ungültig", "ungueltig"),
+  // vlna 22, bod 3: úseky, klíčové polohy, okno, fáze, navázání
+  then: W("pak", "potom", "then", "dann", "danach"),
+  dwell: W("prodleva", "výdrž", "vydrz", "dwell", "hold", "pause", "verweilen", "haltezeit"),
+  keys: W("klíče", "klice", "klíčové", "klicove", "keys", "keyframes", "schlüssel", "schluessel", "stützpunkte", "stuetzpunkte"),
+  window: W("okno", "window", "fenster", "zeitfenster"),
+  sec: W("s", "sec", "sek", "sekund", "seconds"),
+  phase: W("fáze", "faze", "fázi", "fazi", "phase"),
+  event: W("událost", "udalost", "event", "ereignis"),
+  append: W("navázat", "navazat", "připojit", "pripojit", "append", "anhängen", "anhaengen"),
+  detail: W("detail", "podrobně", "podrobne", "detailně", "detailne", "details", "ausführlich", "ausfuehrlich"),
 };
+const MULTI = /^([+-]?\d+(?:[.,]\d+)?)((?:(?:\.\.|…)[+-]?\d+(?:[.,]\d+)?){2,})(°|mm)?$/;
+/** „57,5..40..27,15“ → [57,5; 40; 27,15] (aspoň tři hodnoty) */
+function multiRange(c: AsmCursor): number[] | null {
+  const t = c.peek();
+  if (!t || t.q) return null;
+  const m = MULTI.exec(t.t);
+  if (!m) return null;
+  c.i++;
+  return [m[1], ...m[2].split(/\.\.|…/).filter(Boolean)].map(asmNum);
+}
+/** hodnoty úseku za „pak“: „27,15..57,5“, „40..27,15..57,5“ nebo jedno číslo (konec) – první hodnota rozsahu = začátek úseku */
+function thenValues(c: AsmCursor): number[] {
+  const multi = multiRange(c);
+  if (multi) return multi;
+  const t = c.peek();
+  if (t && !t.q) {
+    const m = /^([+-]?\d+(?:[.,]\d+)?)(?:\.\.|…)([+-]?\d+(?:[.,]\d+)?)(°|mm)?$/.exec(t.t);
+    if (m) {
+      c.i++;
+      return [asmNum(m[1]), asmNum(m[2])];
+    }
+  }
+  return [c.num(tr("pak"))];
+}
+/** „0:57,5“ / „0,3:40“ → klíč */
+const KEY_RE = /^([+-]?\d+(?:[.,]\d+)?):([+-]?\d+(?:[.,]\d+)?)$/;
 const FORMATS: Record<string, "csv" | "png" | "webm"> = { csv: "csv", tabulka: "csv", table: "csv", tabelle: "csv", png: "png", snímky: "png", snimky: "png", frames: "png", bilder: "png", webm: "webm", video: "webm", animace: "webm", animation: "webm" };
 
 export const MOTION_USE = () =>
-  tr("pohyb motor rotační|lineární \"<komponenta>\"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa \"<X>\" [bod x y z]] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat");
+  tr("pohyb motor rotační|lineární \"<komponenta>\"|vazba <N> <od>..<do> | <A>..<B>..<C> | [od <A>] zdvih <Δ> | klíče t:v … [pak <B> [čas T | rychlost V]] [prodleva T] [okno T0..T1] [fáze N] [navázat] [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa \"<X>\" [bod x y z]] · pohyb fáze \"<název>\" [při vazba N <=|>= v | od T s] [zapnout|potlačit vazba N] [kinematika|kvazistatika] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav [detail]|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat");
 
 /** rozsah „0..360“, „0…360“, „od 0 do 360“ nebo dvě čísla „0 360“; „od 57,5“ bez konce = jen začátek (konec dá zdvih / rychlost) */
 function range(c: AsmCursor): { from: number; to?: number } | null {
@@ -167,6 +221,7 @@ function studyOpt(c: AsmCursor, o: { steps?: number; step?: number; duration?: n
 /** Rozbor řádku „pohyb …“ (včetně prvního slova). */
 export function parseMotionText(line: string): MotionCmd {
   const c = new AsmCursor(asmTokens(line).slice(1));
+  if (c.is(K.detail) || (c.is(K.status) && c.is(K.detail, 1))) return { op: "detail" };
   if (c.done || c.is(K.status)) return { op: "status" };
   // režim: kvazistatika / automaticky (kinematika a dynamika – cad/agent-motion-dyn.ts)
   if (c.is(K.quasi) && c.peek(1) === undefined) return { op: "mode", mode: "quasistatic" };
@@ -199,6 +254,7 @@ export function parseMotionText(line: string): MotionCmd {
     }
     // rozsah (od..do | od A), zdvih Δ, rychlost – každé nejvýš jednou; co chybí, doplní provedení (cad/motor-model.ts buildMotor)
     let rng: { from: number; to?: number } | null = null;
+    let r2: number[] | null = null;
     while (!c.done) {
       const r: { from: number; to?: number } | null = !rng ? range(c) : null;
       if (r) rng = r;
@@ -208,6 +264,80 @@ export function parseMotionText(line: string): MotionCmd {
       } else if (c.is(K.rpm) || c.is(K.speed)) {
         c.i++;
         out.speed = c.num(tr("rychlost"));
+      } else if (!rng && !out.keys && (r2 = multiRange(c))) {
+        rng = { from: r2[0], to: r2[r2.length - 1] };
+        out.points = r2.slice(1);
+      } else if (c.is(K.keys)) {
+        // klíčové polohy: klíče 0:57,5 0,3:40 0,6:27,15 (čas od začátku motoru : hodnota)
+        c.i++;
+        const keys: { t: number; v: number }[] = [];
+        while (!c.done && !c.peek()!.q && KEY_RE.test(c.peek()!.t)) {
+          const m = KEY_RE.exec(c.next()!.t)!;
+          keys.push({ t: asmNum(m[1]), v: asmNum(m[2]) });
+        }
+        if (keys.length < 2) throw new Error(tr("motor: klíče čas:hodnota aspoň dva – klíče 0:57,5 0,3:40 0,6:27,15"));
+        out.keys = keys;
+      } else if (c.is(K.then)) {
+        // další úsek: pak 27,15..57,5 [čas 0,3 | rychlost 20] – začátek úseku musí navazovat na konec předchozího
+        c.i++;
+        const vals = thenValues(c);
+        const prev = out.extra?.length ? out.extra[out.extra.length - 1].to : out.points?.length ? out.points[out.points.length - 1] : (rng?.to ?? rng?.from);
+        const tos = vals.length > 1 ? vals.slice(1) : vals;
+        if (vals.length > 1 && prev !== undefined && Number.isFinite(prev) && Math.abs(vals[0] - prev) > 1e-9)
+          throw new Error(tr("motor: úsek „pak {0}..“ nenavazuje na konec předchozího úseku {1} – zapište pak {1}..{2}", vals[0], prev, vals[vals.length - 1]));
+        const legs: MotorLeg[] = tos.map((to) => ({ to }));
+        if (c.is(K.time)) {
+          c.i++;
+          const T = c.num(tr("čas úseku"));
+          if (!(T > 0)) throw new Error(tr("motor: čas úseku musí být kladný [s]"));
+          // čas platí pro celý úsek „pak …“ (víc mezipoloh: rozdělí se úměrně zdvihu)
+          let v0 = prev ?? 0;
+          const d = tos.map((to) => {
+            const x = Math.abs(to - v0);
+            v0 = to;
+            return x;
+          });
+          const sum = d.reduce((a, b) => a + b, 0);
+          legs.forEach((g, i) => (g.time = sum > 1e-12 ? (T * d[i]) / sum : T / legs.length));
+        } else if (c.is(K.speed) || c.is(K.rpm)) {
+          c.i++;
+          const V = c.num(tr("rychlost úseku"));
+          legs.forEach((g) => (g.speed = V));
+        }
+        (out.extra ??= []).push(...legs);
+      } else if (c.is(K.dwell)) {
+        c.i++;
+        const T = c.num(tr("prodleva"));
+        if (!(T > 0)) throw new Error(tr("motor: prodleva musí být kladná [s]"));
+        if (c.is(K.sec)) c.i++;
+        (out.extra ??= []).push({ to: NaN, time: T });
+      } else if (c.is(K.window)) {
+        // časové okno: okno 0,2..0,6 (s)
+        c.i++;
+        const t = c.peek();
+        const m = t && !t.q ? /^([+-]?\d+(?:[.,]\d+)?)(?:\.\.|…)([+-]?\d+(?:[.,]\d+)?)s?$/.exec(t.t) : null;
+        if (m) {
+          c.i++;
+          out.window = { t0: asmNum(m[1]), t1: asmNum(m[2]) };
+        } else out.window = { t0: c.num(tr("okno")) };
+        if (c.is(K.sec)) c.i++;
+      } else if (rng && c.is(K.from) && asmIsNum(c.peek(1)?.t ?? "") && c.is(K.sec, 2)) {
+        // časové okno slovy: od 0,2 s [do 0,6 s]
+        c.i++;
+        const t0 = c.num(tr("od"));
+        c.i++;
+        out.window = { t0 };
+        if (c.is(K.to)) {
+          c.i++;
+          out.window.t1 = c.num(tr("do"));
+          if (c.is(K.sec)) c.i++;
+        }
+      } else if (c.is(K.phase)) {
+        c.i++;
+        out.phase = c.str(tr("fáze"));
+      } else if (c.is(K.append)) {
+        c.i++;
+        out.append = true;
       } else if (backArg(c)) out.back = true;
       else if (c.is(K.at) && c.is(K.limit, 1)) {
         // na mezi stop | chyba (EN at limit stop | error, DE an grenze stopp | fehler)
@@ -225,11 +355,34 @@ export function parseMotionText(line: string): MotionCmd {
     if (out.stroke === 0) throw new Error(tr("motor: zdvih je nulový"));
     if (rng?.to !== undefined && out.from === out.to) throw new Error(tr("motor: rozsah od–do je nulový – např. 0..360 (jen rychlost od hodnoty: od 5 rychlost 3)"));
     if (out.speed === 0) throw new Error(tr("motor: rychlost musí být nenulová"));
+    if (out.window && (!(out.window.t0! >= 0) || (out.window.t1 !== undefined && !(out.window.t1 > out.window.t0!))))
+      throw new Error(tr("motor: časové okno od–do [s] musí začít v čase ≥ 0 a skončit později – okno 0,2..0,6"));
+    if (out.keys && (rng || out.extra?.length || out.stroke !== undefined)) throw new Error(tr("motor: klíče čas:hodnota zadávají celý průběh – bez rozsahu, zdvihu a pak"));
+    if (out.keys) {
+      out.from = out.keys[0].v;
+      out.to = out.keys[out.keys.length - 1].v;
+      delete out.start;
+      return out;
+    }
+    if (out.window && out.speed !== undefined && !rng?.to && out.stroke === undefined) throw new Error(tr("motor: časové okno potřebuje rozsah nebo zdvih – okno 0,2..0,6 s rychlostí bez konce nejde"));
     const hasEnd = rng?.to !== undefined || out.stroke !== undefined;
     if (!hasEnd) out.auto = true;
     // rozsah / zdvih + rychlost = rozsah × rychlost (dojede na konec a stojí) – dřív se konec potichu zahodil (bod 9 zprávy)
-    if (hasEnd && out.speed !== undefined) out.ranged = true;
+    if (hasEnd && out.speed !== undefined && !out.points && !out.extra) out.ranged = true;
+    if (out.points || out.extra) {
+      if (!hasEnd && !((rng || out.append) && out.extra?.some((g) => Number.isFinite(g.to)))) throw new Error(tr("motor: úseky „pak“ / „prodleva“ navazují na rozsah – zadejte nejdřív konec prvního úseku (57,5..27,15 pak 57,5) nebo začátek (od 57,5 pak 27,15 čas 0,4)"));
+      if (out.back) throw new Error(tr("motor: „tam a zpět“ nejde spojit s úseky – návrat zapište jako další úsek: … pak <začátek>"));
+    }
     return out;
+  }
+  if (c.is(K.phase)) {
+    c.i++;
+    return { op: "phase", cmd: parsePhaseText(c) };
+  }
+  // událost = fáze bez vlastního názvu („pohyb událost při vazba "ZDVIH" <= 30 zapnout vazba 2“) – název doplní provedení
+  if (c.is(K.event)) {
+    c.i++;
+    return { op: "phase", cmd: parsePhaseText(c, { event: true }) };
   }
   if (c.is(K.run)) return { op: "run" };
   if (c.is(K.play)) {

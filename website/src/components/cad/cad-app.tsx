@@ -79,7 +79,7 @@ import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSuba
 import { measureApi } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
 import { kinPickFromModel } from "./asm-mates-kin";
-import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
+import { MotionPanel, pushMotionSignal, useMotionView, useMotorHighlight } from "./motion-panel";
 import { useSpringBetween } from "./springs/spring-between";
 import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
 import { AskHost, askBusy, askConfirm, askNumber } from "./ask-dialog";
@@ -273,6 +273,8 @@ export function CadApp() {
   const [dxfImp, setDxfImp] = useState<{ name: string; text: string } | null>(null);
   const [motionOpen, setMotionOpen] = useState(false); // pohybová studie sestavy (motion-panel.tsx)
   const motionShow = useMotionView();
+  // motor ve formuláři studie (vlna 22, bod 10): poháněné díly zvýrazněné, osa a šipka směru v překryvu (WebGL i bez WebGL)
+  const motorHl = useMotorHighlight();
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
   // nastavení, paleta, úvodní obrazovka, formařské nástroje
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1284,13 +1286,13 @@ export function CadApp() {
         vertices: l.coil ? undefined : r?.vertices,
         matrix: m,
         color: l.comp.color ?? top?.color ?? "#b9c2cc",
-        selected: l.topId === asmSel || l.topId === mate?.compId,
+        selected: l.topId === asmSel || l.topId === mate?.compId || !!motorHl?.comps.includes(l.topId),
         clash: clashIds.has(l.topId) || clashIds.has(l.id),
       });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid]);
+  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid, motorHl]);
 
   const asmPartInfo = useCallback(
     (c: AsmComponent) => {
@@ -3682,6 +3684,8 @@ export function CadApp() {
           <main
             className="relative min-w-0 flex-1 overflow-hidden"
             data-doc-key={docKeyNow}
+            data-motor-highlight={isAsm && motorHl ? motorHl.comps.length : undefined}
+            data-motor-axis={isAsm && motorHl?.label ? motorHl.label.text : undefined}
             data-compare-map={cmpShown?.colors ? docKeyNow : undefined}
             onPointerDownCapture={(e) => {
               lastPtr.current = { x: e.clientX, y: e.clientY };
@@ -3718,7 +3722,7 @@ export function CadApp() {
                   onPickMany={!refPick && !mate && !boltPick && !planePick && active?.type !== "hole" && !(active?.type === "ext" && getExtUi(active.ext)?.onFacePick) ? onPickMany : undefined}
                   leftDrag={prefs.leftDrag}
                   boxResolve={selFilter === "feature" && !isAsm && !measure && pickMode !== "edges" && pickMode !== "faces" ? (items, changed) => boxOwners.resolve(result?.mesh, items, (f, pt) => cad.faceOwner(doc, f, pt), changed) : undefined}
-                  measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
+                  measure={measureGfx ?? motionOverlay(isAsm ? motionShow.trace : null, isAsm ? motorHl : null)}
                   vertices={result?.vertices ?? null}
                   faceColors={weldFaceColors(doc, result?.bodies, doc.faceColors)}
                   bodyHidden={bodyHidden}
@@ -4508,3 +4512,13 @@ function thumbnail(dataUrl: string): Promise<string> {
   });
 }
 
+/**
+ * Překryv 3D okna pohybové studie: stopa bodu a osa motoru se šipkou směru a popiskem (vlna 22, bod 10) – stejná data dostane
+ * WebGL i softwarový náhled (měřicí překryv), takže osa je vidět i bez WebGL.
+ */
+function motionOverlay(trace: Vec3[] | null, hl: { lines: [Vec3, Vec3][]; label: { pos: Vec3; text: string } | null } | null) {
+  if (!trace && !hl) return null;
+  const lines: [Vec3, Vec3][] = [...(trace ? trace.slice(1).map((p, i) => [trace[i], p] as [Vec3, Vec3]) : []), ...(hl?.lines ?? [])];
+  const points: Vec3[] = trace ? [trace[trace.length - 1]] : [];
+  return { points, lines, labels: hl?.label ? [hl.label] : [] };
+}
