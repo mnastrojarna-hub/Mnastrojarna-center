@@ -158,6 +158,28 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     expect(a.codes.map((c) => c.code)).toContain("motion.motor-limit");
     expect(a.kv).toMatch(/ stopped=\d+ level=kin groups=\S+$/); // M3: tuhé skupiny na konci řádku
   });
+  it("„Vazby splněny…“ jen s polohou, která neujela: preference meze, kterou pevná vazba nedovolí splnit, neposune díly v X/Y (fáze 2)", async () => {
+    // dřív: preference min|max proti pevné vazbě → penalizační optimum ujelo o ~5,6–7,9 m v X/Y s natočením kolem Z a souhrn hlásil
+    // „Vazby splněny ve všech krocích“ (tvrdé vazby po úklidu splněné) – falešná zelená
+    const env = fakeEnv();
+    for (const prefer of ["min", "max"]) {
+      // repro bodu 8: Přidržovač 60 × 60 × 8 na Z 34,5 (PEVNÁ 24,5 k rámu), Mez ⟨5; 25⟩ k Desce A, motor 57,5 → 40
+      const h = press({ holder: true });
+      const holder = resizePart({ ...h, components: h.components!.map((c) => (c.id === "přidržovač" ? { ...c, placement: { ...c.placement, position: [0, 0, 34.5] as [number, number, number] } } : c)) }, "Přidržovač", [60, 60, 8]);
+      const a = await runLines(holder, env, MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 24.5 název "PEVNÁ"', 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 25 název "Mez"', `sestava vazba "Mez" preferovat ${prefer}`, "pohyb kinematika", "pohyb motor lineární vazba 1 57,5..40 kroky 4");
+      const res = await motionRun(a.doc, env); // tentýž výsledek (mezipaměť pohybu) jako protokol výše
+      for (const s of res.steps)
+        for (const id of ["deska-a", "přidržovač"]) {
+          const p = s.place[id];
+          const p0 = holder.components!.find((c) => c.id === id)!.placement;
+          expect(Math.hypot(p.position[0] - p0.position[0], p.position[1] - p0.position[1]), `${prefer} krok ${s.i} ${id} XY`).toBeLessThan(1e-6);
+          expect(Math.max(...p.rotation.map(Math.abs)), `${prefer} krok ${s.i} ${id} ∠`).toBeLessThan(1e-6);
+        }
+      // zelená věta smí být jen s neujetou polohou: celkový posuv = jen motor (17,5 mm desky)
+      expect(a.log, prefer).toContain(GREEN_MATES);
+      expect(a.kv, prefer).toMatch(/ travel=17\.5mm:1 /);
+    }
+  });
   it("„✓ vazba … hodnota“ ne, když úpravu nejde splnit: ⚠, polohy beze změny, ⚠ mate.conflict s nejbližší dosažitelnou hodnotou", async () => {
     const env = fakeEnv();
     const a = await runLines(press({ holder: true }), env, MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 20', 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40');
