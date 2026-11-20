@@ -21,6 +21,8 @@ import { drawingKv } from "../kv";
 import { drawingMemo, sheetIssue, sheetIssueText, sheetLabel } from "../sheet-eval";
 import { asmHooks, coded, sayKv, type OpHandler } from "./util";
 import { reportStaleCopies } from "../bom-notes";
+import { modelId } from "../../doc-outputs";
+import { staleData } from "../outputs-ops";
 
 export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const r = runOf(ctx);
@@ -47,6 +49,11 @@ export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
     if (x.computed && !observe) continue; // výpočet listu po příkazu: vyhodnocení listu na konci bloku / běhu
     if (x.kind === "section-legacy") {
       coded(ctx, "drawing.section-legacy", { text: x.text, ...(x.data ? { data: x.data } : {}), ...(ctx.strict?.escalates("drawing.section-legacy", ctx.line) ? { level: "error" as const } : {}) });
+      continue;
+    }
+    if (x.kind === "stale") {
+      // vydaný list ze starší revize modelu (vlna 22, bod 20): ⚠; nové vydání se stejným písmenem po změně v přísném režimu ✗
+      coded(ctx, "drawing.stale", { args: [x.text], data: staleData(x.sheetId ?? "", modelId(r.doc)), ...(op.cmd.k === "issue" && ctx.strict?.escalates("drawing.stale", ctx.line) ? { level: "error" as const } : {}) });
       continue;
     }
     if (x.kind === "tolerance-missing") {

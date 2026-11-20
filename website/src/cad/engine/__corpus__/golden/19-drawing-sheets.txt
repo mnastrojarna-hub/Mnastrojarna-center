@@ -30,6 +30,7 @@ Revize: žádné
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 210 × 297):
   přední (x = X, y = Z): x −20…20, y 0…60 mm · 1:1 · na listu x 44…84, y 203…263
   horní (x = X, y = Y): x −20…20, y −20…20 mm · 1:1 · na listu x 44…84, y 129…169
@@ -48,6 +49,7 @@ Revize: žádné
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
 Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
   přední (x = X, y = Z): x −20…20, y 0…60 mm · 2:1 · na listu x 34…114, y 66…186
 

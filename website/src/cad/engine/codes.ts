@@ -119,6 +119,8 @@ export const CODES = [
   { code: "drawing.section-legacy", level: "warn", key: "starší zápis odsazení řezu vyložen postaru: {0}" },
   { code: "drawing.overlap", level: "warn", key: "překryv na listu {0}: {1}" },
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
+  // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
+  { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },
   { code: "reference.mismatch", level: "warn", key: "předloha se liší: {0}" },
   // ── náhradní kódy pro hlášky bez vlastního kódu (do přiřazení v balíku B4) ──
   { code: "msg.error", level: "error", key: "chyba: {0}" },

@@ -277,6 +277,8 @@ export type CadDoc = {
   faceColors?: Record<number, string>;
   /** výkresy uložené v dokumentu (volby listu, razítko, uživatelské kóty a poznámky) – asociativní s modelem */
   drawings?: DrawingDoc[];
+  /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
+  outputs?: ExportRecord[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
@@ -474,6 +476,29 @@ export type DrawingDoc = {
   annotations: DrawingAnnotation[];
   /** název výkresu, ke kterému list patří (více výkresů jednoho dílu); chybí = první výkres (cad/drawing-sets.ts) */
   drawing?: string;
+  /** vydání listu (`výkres vydat`): písmeno revize, revize modelu, čas – po změně modelu je list zastaralý (cad/doc-outputs.ts) */
+  issued?: IssuedSheet;
+};
+
+/** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */
+export type IssuedSheet = { rev: string; modelRev: string; sig: string; at: string; note?: string };
+/**
+ * Záznam exportu v dokumentu (bod 20): co (3D model / výkres / skica), formát, název souboru, revize modelu a otisk, čas ISO;
+ * výkres navíc listy (id) a písmeno revize listu v době exportu. `job` = stav úlohy exportu (balík A3, RunTracker).
+ */
+export type ExportRecord = {
+  id: string;
+  what: "model" | "drawing" | "sketch";
+  format: string;
+  file: string;
+  modelRev: string;
+  sig: string;
+  at: string;
+  sheets?: string[];
+  rev?: string;
+  /** soubor nese písmeno revize listu vydaného z jiné revize modelu (export zastaralého vydaného listu) */
+  revStale?: boolean;
+  job?: { id?: string; state?: string };
 };
 
 // ---------------- vazby sestavy ----------------

@@ -6,7 +6,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { clashSig } from "@/cad/clash-class";
-import { clashStateOf, dropResults, leavesSig, mateSig, mateSigOf, noteResult, resultId, resultIdOf, resultState, setMateStatus as stampMateStatus, stampResult, type ClashState, type ResultKind, type ResultState } from "@/cad/engine/result-key";
+import { clashStateOf, dropResults, leavesSig, mateSig, mateSigOf, noteResult, resultId, resultIdOf, resultState, setMateStatus as stampMateStatus, staleResults, stampResult, type ClashState, type ResultKind, type ResultState } from "@/cad/engine/result-key";
+import { recordExport } from "@/cad/doc-outputs";
+import { staleCopies, staleCopyText } from "@/cad/asm-refresh";
+import { OutputsPanel } from "./outputs-panel";
 import { apply3, boltStack, bomCsv, componentCopy, emptyAssembly, ejectorPin, eulerXYZ, explodeOffset, guideBush, guidePillar, locatingRing, mirrorComponent, moldBase, partComponent, patternComponent, placementMatrix, removeComponents, rotMatrix, rotationBetween, screwISO4762, sourceKey, transformPoint } from "@/cad/assembly";
 import { groupKey } from "@/cad/asm-groups";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
@@ -1203,6 +1206,9 @@ export function CadApp() {
   const hasMates = isAsm && !!doc.mates?.length;
   const mateSigNow = useMemo(() => (hasMates ? mateSigOf(doc, docAsmSig) : ""), [hasMates, doc, docAsmSig]);
   const mateRec = hasMates ? engineRef.current!.ws.asm.mateStatus.get(docKeyNow) : undefined;
+  /** zastaralé výstupy pro panel „Zastaralé výstupy“ (vlna 22, bod 20): uložené analýzy (A1 `staleResults`) a kopie dílů (D1) */
+  const staleNow = useMemo(() => (doc.kind === "draft" ? [] : staleResults(engineRef.current!.ws, docKeyNow, doc)), [doc, docKeyNow, clashEntry, mateRec, resVer]);
+  const copiesNow = useMemo(() => (isAsm ? staleCopies(doc, (n) => engineRef.current?.ws.findPart(n) ?? null).map((c) => ({ name: c.comp.alias ?? c.comp.name, why: staleCopyText(c) })) : []), [isAsm, doc, asmVer]);
   const mateState: ResultState = mateRec ? resultState(mateRec, { doc: docKeyNow, sig: mateSigNow }) : "unchecked";
   const mateStatus = mateState === "ok" && mateRec ? mateRec : NO_MATES;
   /** otisk toho, co je teď v 3D okně k měření / mapě / dělicí rovině: díl = naposledy postavená geometrie, sestava = listy a polohy */
@@ -2371,7 +2377,10 @@ export function CadApp() {
           window.clearInterval(tick);
         }
       }, meta.mime);
-      if (saved) flash(tr("Export {0} hotov: {1} ({2})", meta.label, saved.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`));
+      if (saved) {
+        flash(tr("Export {0} hotov: {1} ({2})", meta.label, saved.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`));
+        liveWith((cur) => recordExport(cur, { what: "model", format, file: saved.name }).doc); // záznam exportu s revizí modelu (bod 20)
+      }
       else flash(tr("Export {0} zrušen.", meta.label));
       track("cad_export", { format });
     } catch (e) {
@@ -3894,6 +3903,7 @@ export function CadApp() {
               </div>
             )}
             {toast && <div className="absolute bottom-14 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md bg-[#1f2933] px-4 py-2 text-[12.5px] text-white shadow-xl">{toast}</div>}
+            {!sketch && <OutputsPanel doc={doc} analyses={staleNow} copies={copiesNow} onRecompute={() => runAgentRef.current("přepočítat vše")} />}
 
             {!sketch && (
               <div className={cn("pointer-events-none absolute bottom-2 left-24 right-24 flex flex-wrap justify-center gap-1.5 font-mono text-[10.5px]", bg.dark ? "text-white/80" : "text-[#26303b]")}>
@@ -4300,6 +4310,8 @@ export function CadApp() {
             balloons={balloonItems}
             onDrawingsChange={(d) => liveWith((cur) => ({ ...cur, drawings: d }))}
             onDrawingsCommit={(d) => commitWith((cur) => ({ ...cur, drawings: d }))}
+            onExported={(e) => liveWith((cur) => recordExport(cur, e).doc)}
+            onRecomputeAll={() => void runAgentRef.current("přepočítat vše").then((t) => flash(t.split("\n").find((l) => l.includes("Zbývá")) ?? tr("Přepočteno")))}
             onPropsChange={(p) => commit({ ...doc, props: p })}
             onClose={() => {
               const t = docTabs.find((x) => x.id === tabId);

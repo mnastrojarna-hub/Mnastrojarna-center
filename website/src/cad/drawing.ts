@@ -62,6 +62,8 @@ export type DrawingMeta = {
   components?: BalloonItem[];
   /** tabulka revizí (vpravo nahoře) */
   revisions?: RevisionItem[];
+  /** revize modelu, ze které se list počítá (`r·a1b2c3` – cad/doc-outputs.ts `modelId`): patička razítka „Model r·…“, metadata PDF / DXF */
+  modelRev?: string;
   /** číslo listu / počet listů (razítko „List i/n“) */
   sheetIndex?: number;
   sheetCount?: number;

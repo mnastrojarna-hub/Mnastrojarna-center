@@ -9,6 +9,10 @@
  *  4. kusovník bez ⚠ bom.make-incomplete             – jen když vyráběné díly mají číslo i označení materiálu
  *  5. ℹ `bom.docs` „vyráběné N“ bez „(bez výkresu …)“ – jen když všechny vyráběné díly mají výkres
  *  6. `✓ druh dílu …`                                  – jen po přečteném druhu (neznámé slovo = ✗, druh se nezmění)
+ *  Etapa D2 (bod 20 – výkresy a výstupy):
+ *  7. `✓ list „X“ vydán jako rev. A …`                 – jen když se vydání opravdu zapsalo (opakování beze změny = „→ … beze změny“)
+ *  8. „Vydání: … – odpovídá modelu“ / „Výkres: … odpovídá modelu“ – jen pro revizi modelu, ze které byl list vydán
+ *  9. „Zastaralé výstupy: žádné“                       – jen když žádný vydaný list ani export neodpovídá starší revizi
  *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
  *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
  */
@@ -95,5 +99,35 @@ describe("greens D1 – kusovník a kopie dílu", () => {
     expect(txt(r)).not.toMatch(/✓ druh dílu/);
     expect(txt(r)).toMatch(/druh: čekám vyráběný \| normálie \| nakupovaný \| auto, ne „levný“/);
     expect(ws.present().supply).toBeUndefined();
+  });
+});
+
+describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", () => {
+  const PART = 'nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4';
+  it("7: opakované vydání téhož listu z téhož modelu není nové ✓ vydání", async () => {
+    const ws = new MemoryWorkspace();
+    const r1 = await run(ws, `${PART}\nvýkres vydat`);
+    expect(txt(r1)).toMatch(/✓ list „List 1“ vydán jako rev\. A/);
+    const r2 = await run(ws, 'záložka "Deska A"\nvýkres vydat A');
+    expect(txt(r2)).not.toMatch(/✓ list „List 1“ vydán/);
+    expect(txt(r2)).toMatch(/list „List 1“ už je vydán jako rev\. A z modelu r·\w{6} – beze změny/);
+  });
+
+  it("8 + 9: po změně modelu ani stav, ani výstupy netvrdí „odpovídá modelu“ / „žádné“ – ⚠ drawing.stale", async () => {
+    const ws = new MemoryWorkspace();
+    await run(ws, `${PART}\nvýkres vydat`);
+    const r = await run(ws, 'záložka "Deska A"\nupravit "Kvádr 1" size=30;40;10\nstav\nvýstupy zastaralé');
+    const t = txt(r);
+    expect(t).not.toMatch(/– odpovídá modelu/);
+    expect(t).not.toMatch(/Zastaralé výstupy: žádné/);
+    expect(t).toMatch(/Zastaralé výstupy \(1\)/);
+    expect(has(r, "drawing.stale")).toBe(true);
+  });
+
+  it("9: „Zastaralé výstupy: žádné“ jen bez změny modelu po vydání", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await run(ws, `${PART}\nvýkres vydat\nvýstupy zastaralé`);
+    expect(txt(r)).toMatch(/Zastaralé výstupy: žádné/);
+    expect(has(r, "drawing.stale")).toBe(false);
   });
 });

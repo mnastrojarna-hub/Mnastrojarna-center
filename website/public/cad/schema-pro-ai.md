@@ -1572,6 +1572,9 @@ je na jejich řádku.
 | `skica export dxf ["Skica 1"] [jako název]` (`sketch export dxf` · `skizze export dxf`) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
 | `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` (`share` · `freigeben` – německé `teilen` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v protokolu na řádku `URL: …`** a zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
 | `odkaz` (`link`) | vypíše poslední sdílený odkaz znovu |
+| `exporty [vymazat]` (`exports [clear]` · `exporte [löschen]`) | **záznamy exportů v dokumentu** (vlna 22, bod 20): každý `export …`, `výkres export …`, `skica export dxf` i export tlačítkem zapíše formát, soubor, revizi modelu `r·a1b2c3` a čas; po změně modelu je záznam „⚠ ZASTARALÝ“ s příkazem, který export zopakuje (soubor na disku se sám nepřepisuje); záznamy se ukládají s dokumentem (.mncad, sdílení) |
+| `výstupy [zastaralé]` (`outputs [stale]` · `ausgaben [veraltet]`) · `zastaralé` | přehled výstupů dokumentu: vydání každého listu, exporty a **seznam zastaralých výstupů** – vydané listy ze starší revize modelu, exporty ze starší revize, uložené analýzy, které pro nynější stav neplatí (kolize, stav vazeb, pohyb, měření, porovnání), kopie dílů v sestavě starší než díl; u každé položky příkaz, který ji opraví |
+| `přepočítat vše` (`recompute all` · `alles neu berechnen`) | přepočítá, co jde bez člověka: kopie dílů v sestavě (`sestava obnovit vše` – list sestavy s kusovníkem pak ukáže obnovené údaje), stav vazeb, `kolize`, `pohyb spustit`, všechny listy; vypíše, co **musí udělat člověk**: vydaný list ze starší revize (`výkres vydat B`), nový export, zopakovat měření / porovnání. Nikdy sám nevydává revizi ani nepřepisuje soubory. GUI: panel „Zastaralé výstupy“ v rohu 3D okna s tlačítkem „Přepočítat vše“ (týž příkaz) |
 
 ```
 uložit
@@ -2056,6 +2059,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | `výkres razítko logo="firma.png"` · `… logo="data:image/png;base64,…"` · `… logo=ne` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek, DXF/DWG jako vyplněný obrys (SOLID) |
 | `výkres nepředepsané ISO 2768-mK` · `… mK` · `… f H` · `… desetinná` · `… desetinná ±0,1 ±0,1 ±0,01 ±0,005` · `… X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005` · `… X.XX=±0,02` · `… ne` | nepředepsané tolerance: třída ISO 2768-1 (f/m/c/v, platí i pro úhly a sražení) + ISO 2768-2 (H/K/L), nebo tabulka podle počtu desetinných míst (X. / X.X / X.XX / X.XXX; hodnoty oddělené mezerou, „/“, „·“ nebo „;“, s popisky i bez – i jak je CAD sám vypisuje); `ne` = zrušit. Export výkresu **dílu** bez nich vrátí ⚠ „Výkres nemá nepředepsané tolerance …“ |
 | `výkres revize B "Přidána díra Ø8" [datum …] [kreslil …]` · `výkres revize smazat B` | tabulka revizí; poslední revize se zapíše do razítka |
+| `výkres vydat [B] ["popis změny"] [datum …] [vše]` · `výkres vydat zrušit [vše]` (`drawing issue` · `zeichnung freigeben`) | **vydání listu** (vlna 22, bod 20): písmeno revize + revize modelu `r·a1b2c3` + datum; chybí-li revize v tabulce, přidá se („první vydání“ / „změna modelu r·… → r·…“); bez písmena = revize z razítka, u zastaralého vydaného listu další písmeno. Po změně modelu je vydaný list **zastaralý**: `výkres stav` („⚠ Vydání: rev. A z modelu r·… – model je teď r·…“), `stav`, konec běhu, řádek D (`stale=drawing`) a GUI (odznak na záložce listu, pruh „Vydat novou revizi“) to hlásí ⚠ `drawing.stale`; export listu se starým písmenem po změně = ⚠ (přísný režim ✗ a soubor se nezapíše). Vydání je rozhodnutí člověka – export ani `přepočítat vše` list nevydává. Patička razítka nese „Model r·…“, PDF předmět „Model r·… · rev. A“, DXF komentář 999 |
 | `výkres otočení 0|90|180|270` · `výkres řez XZ odsazení 0 poloviční|celý` · `výkres kusovník ano|ne` · `výkres balónky ano|ne` | otočení hlavního pohledu, poloviční řez, kusovník nad razítkem a pozice komponent (sestava) |
 | `výkres pružiny zjednodušeně|plně` | pružiny se na výkrese kreslí zjednodušeně podle ISO 2162-1: obrys vinutí (vnější a vnitřní průměr přes volnou délku), osa a čerchované osy drátu na středním průměru jen tam, kde je obrys vidět; v řezu se obal nešrafuje (jen obrys a osy drátu). Pružina = prvek Pružina nebo Tažení po šroubovici s profilem Kruh, který je **prvním materiálem svého tělesa** (normálie pružin, `pružina …` jako první prvek dílu, `… nové těleso "Pružina"`, i jako komponenty sestavy); těleso pak smí už jen odebírat (zabroušené konce) nebo přidat jiný tvar (očka, ramena). Šroubovice přidaná na existující těleso (chod šneku, oblý závit na hřídeli, pružina přidaná do pouzdra) se kreslí vždy přesně, stejně jako šroubovicová drážka (odebrání) – samostatnou pružinu proto zakládejte jako `nové těleso`. Chytré kóty čtou skutečný tvar (obal pružiny nekótují jako díru). `plně` = skutečná šroubovice – skrytí hran trvá u každé pružiny desítky sekund (A1 sestava se 4 pružinami: minuty). Stav listu (`výkres stav`) uvádí ve Volbách, jak se pružiny kreslí, jen když list nějakou pružinu má. |
 | `kótovat základní` | kóty „Auto + Ø“ zapečené do pohledů (jen pomocný základ – místo Chytrých kót) |
@@ -2283,6 +2287,7 @@ třídí. Nejčastější:
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
 | `drawing.section-legacy` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (`dnes pište: …` v hlášce) |
 | `drawing.tolerance-missing` ⚠ | `výkres kontrola tolerancí`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | `výkres tolerance aN …` |
+| `drawing.stale` ⚠ | vydaný list (`výkres vydat`) neodpovídá nynější revizi modelu: `výkres stav`, `stav`, konec běhu, který model změnil; export listu se starým písmenem revize a nové vydání se stejným písmenem po změně (v přísném režimu ✗, export se nezapíše) | `výkres vydat B` (nová revize), přehled `výstupy zastaralé` |
 | `param.clamped` ⚠ | hodnota mimo rozsah ořezána (úhel kuželového zahloubení 30–170°, hrot 60–170°, úhel stěny 5–90°) | |
 | `geom.approx` ℹ / `geom.volume-failed` ⚠ | objem ze sítě (velké těleso) / objem se nepodařilo změřit (0) | |
 | `tab.settle-timeout` ✗ | aplikace nepřepnula záložku do 5 s | zopakovat |
@@ -2662,6 +2667,10 @@ v dokumentu vazbám neodpovídají (typicky ručně psaný JSON) – uvedený st
 měření a porovnání provedené před poslední změnou. Výsledek bez `stale` (`✓ kolize: žádné`, `ok=1`, `mates=N/N`) tedy
 popisuje právě odevzdávaný stav. V aplikaci totéž: panel Kolize má stavy ok / kolize / neplatí / nezkontrolováno
 (`data-clash-state`) a u výsledku uvádí název sestavy, počet komponent, čas, revizi `r·…` a polohu.
+Výstupy (vlna 22, bod 20): dokument s výkresy nebo záznamy exportů má v řádku `D` revizi modelu `rev=r·a1b2c3` (JSON
+`docs[].rev`) a `stale=` navíc `drawing` (vydaný list ze starší revize modelu – `výkres vydat`) a `export` (záznam exportu ze
+starší revize – `exporty`); `stav` pak má řádky „Revize modelu“, „Výkres: …“, „Exporty: …“ a strojově `drawing.stale=N
+export.stale=N`. Přehled a opravy: `výstupy zastaralé`, `přepočítat vše`.
 
 **`porovnat "ref.step" [tolerance 0,05] [zarovnat auto|střed|ne] [díl "A" | sestava] [mapa ne] [přísně]`** (EN `compare`,
 DE `vergleichen`) porovná model se souborem reference (STEP, BREP, STL; sestava STEP jako jedno těleso) – stejný výpočet jako
@@ -2951,6 +2960,8 @@ export type CadDoc = {
   faceColors?: Record<number, string>;
   /** výkresy uložené v dokumentu (volby listu, razítko, uživatelské kóty a poznámky) – asociativní s modelem */
   drawings?: DrawingDoc[];
+  /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
+  outputs?: ExportRecord[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */

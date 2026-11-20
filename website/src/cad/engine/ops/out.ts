@@ -22,6 +22,8 @@ import type { OutFile } from "../protocol-types";
 import { runOf } from "../run-doc";
 import { lastShareLink, rememberLink, shareInfo, shareWithPolicy, type LastLink } from "../share-out";
 import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
+import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
+import { modelId } from "../../doc-outputs";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
 
@@ -117,6 +119,7 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   const data = await modelBytes(ctx.host.kernel, d, fmt);
   const name = outFileName(cmd.name, plainName(d.name), FORMAT_EXT[fmt]);
   const f = await deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file");
+  if (f) recordOutput(ctx, { what: "model", format: fmt, file: f.name }); // záznam exportu s revizí modelu (bod 20)
   if (!f || (fmt !== "step" && fmt !== "brep")) return;
   if (cmd.check === false) {
     e.console(tr("  – kontrola {0} vynechána („bez kontroly“)", fmt.toUpperCase()));
@@ -143,6 +146,11 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   if (!d.drawings?.length && !(scope === "doc" && hasDrawings(d))) e.code("drawing.default-sheet");
   const env: DrawEnv = { kernel: ctx.host.kernel, ws: ctx.ws, flat: ctx.host.ui?.bomFlat?.() ?? true, hooks: asmHooks(ctx), ...(ctx.host.fonts ? { fonts: ctx.host.fonts } : {}) };
   const p = await drawingOutput(env, d, cmd.format, cmd.sheet, cmd.name);
+  // vydaný list ze starší revize modelu: soubor by nesl staré písmeno revize s jiným obsahem → ⚠ drawing.stale, přísně ✗ bez zápisu (bod 20)
+  const ids = await exportedSheetIds(d, scope);
+  const before = ctx.report.entries.length;
+  warnStaleExport(ctx, d, ids);
+  if (ctx.report.entries.slice(before).some((x) => x.code === "drawing.stale" && x.level === "error")) return;
   const FMT = cmd.format.toUpperCase();
   const many = scope === "doc" || (scope === "all" && !!d.drawings?.length) || (p.sheets ?? 1) > 1;
   const one = typeof cmd.sheet === "number" || (typeof cmd.sheet === "string" && cmd.sheet !== "all" && cmd.sheet !== "doc");
@@ -150,14 +158,35 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
   const label = formatLabel(cmd.format) + (p.files ? ` · ZIP: ${p.files.join(", ")}` : "") + (p.width ? ` ${p.width} × ${p.height} px` : "");
   const f = await deliver(ctx, e, p, what, label, cmd.deliver ?? "file");
   if (f) f.sheets = p.sheets ?? 1;
+  if (f) {
+    const rev = ids.length === 1 ? ((d.drawings?.find((s) => s.id === ids[0])?.meta as { revision?: string } | undefined)?.revision ?? "") : "";
+    // soubor zastaralého vydaného listu nese staré písmeno revize s jiným obsahem – záznam to nese (bod 20)
+    const sig = modelId(d).sig;
+    const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && s.issued.sig !== sig; });
+    recordOutput(ctx, { what: "drawing", format: cmd.format, file: f.name, ...(ids.length ? { sheets: ids } : {}), ...(rev ? { rev } : {}), ...(revStale ? { revStale } : {}) });
+  }
   for (const w of p.warnings) e.code("drawing.warning", { text: w.sheet ? `${w.sheet}: ${w.text}` : w.text, indent: "  " });
+}
+
+/** id listů dokumentu `d` v rozsahu exportu (bez uloženého výkresu žádné; „doc“ = listy dokumentu, výkresy dílů z komponent ne) */
+async function exportedSheetIds(d: CadDoc, scope: number | string | "all" | "doc" | undefined): Promise<string[]> {
+  const list = d.drawings ?? [];
+  if (!list.length) return [];
+  if (scope === "doc") return list.map((s) => s.id);
+  try {
+    const { exportSheets } = await import("../../drawing-export");
+    return exportSheets(d, scope).map((i) => list[i]?.id).filter((x): x is string => !!x);
+  } catch {
+    return [];
+  }
 }
 
 async function exportSketch(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "sketch" }>): Promise<void> {
   const d = runOf(ctx).doc;
   const { sketch, data } = sketchDxf(d, cmd.sketch, ctx.host.ui?.openSketchId?.());
   const name = outFileName(cmd.name, plainName(sketch.name), ["dxf"]);
-  await deliver(ctx, e, { name, mime: OUT_MIME.dxf, data, format: "dxf" }, tr("skica „{0}“", sketch.name), tr("{0}, {1} entit", formatLabel("sketch-dxf"), sketch.entities.length), cmd.deliver ?? "file");
+  const f = await deliver(ctx, e, { name, mime: OUT_MIME.dxf, data, format: "dxf" }, tr("skica „{0}“", sketch.name), tr("{0}, {1} entit", formatLabel("sketch-dxf"), sketch.entities.length), cmd.deliver ?? "file");
+  if (f) recordOutput(ctx, { what: "sketch", format: "dxf", file: f.name });
 }
 
 /* ───────────────────────── textový skript ───────────────────────── */
@@ -245,6 +274,11 @@ export const outOp: OpHandler<"out"> = async (op, ctx) => {
   const e = emitter(ctx);
   const cmd = op.cmd;
   switch (cmd.kind) {
+    // exporty · výstupy [zastaralé] · přepočítat vše (vlna 22, bod 20 – engine/outputs-ops.ts)
+    case "exports":
+    case "outputs":
+    case "recompute":
+      return outputsCmd(ctx, cmd);
     case "save":
       return saveProject(ctx, e, cmd, tr("uloženo"));
     case "export":

@@ -31,6 +31,8 @@ import { genEditCount } from "@/cad/drawing-boxsel";
 import { TitleBlockSection } from "./drawing-title-panel";
 import { inheritTitle } from "@/cad/title-block";
 import { generalTolWarnings } from "@/cad/drawing-export";
+import { issueSheet, modelId, staleExportText, withdrawIssue, type ExportInput } from "@/cad/doc-outputs";
+import { IssueBadge, IssueSection, StaleSheetBanner } from "./drawing-issue";
 
 type Props = {
   doc: CadDoc;
@@ -54,6 +56,10 @@ type Props = {
   onDrawingsCommit?: (d: DrawingDoc[]) => void;
   /** komponenty sestavy pro pozice (balónky): světové obalové kvádry */
   balloons?: BalloonItem[];
+  /** export listu do souboru proběhl – záznam exportu do dokumentu (revize modelu, čas; vlna 22, bod 20) */
+  onExported?: (e: ExportInput) => void;
+  /** „Přepočítat“ u zastaralého vydaného listu = text `přepočítat vše` (engine/outputs-ops.ts) */
+  onRecomputeAll?: () => void;
 };
 
 type AnnTool = "dim" | "note" | "roughness" | "gdt" | "datum" | "text" | "detail";
@@ -153,7 +159,9 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons, onExported, onRecomputeAll }: Props) {
+  /** revize modelu, ze které se list počítá (patička razítka, odznak vydání – cad/doc-outputs.ts) */
+  const mid = useMemo(() => (doc.kind !== "draft" ? modelId(doc) : null), [doc]);
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
   const freshMeta = (): DrawingMeta => ({
     name: doc.name,
@@ -338,7 +346,29 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     void _c;
     void _si;
     void _sc;
-    return inDrawing({ id: saved?.id ?? uid(), name: sheetName, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann }, group);
+    return inDrawing({ id: saved?.id ?? uid(), name: sheetName, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann, ...(saved?.issued ? { issued: saved.issued } : {}) }, group);
+  };
+  /** vydání aktivního listu (`výkres vydat`): písmeno revize + revize modelu + datum, krok historie */
+  const issueNow = (rev?: string) => {
+    const r = issueSheet(doc, sheetDoc(), rev ? { rev } : {});
+    const next = sheets.length ? [...sheets] : [];
+    next[sheetIdx] = r.sheet;
+    const m = r.sheet.meta as Partial<DrawingMeta>;
+    setMeta((x) => ({ ...x, revisions: m.revisions, revision: m.revision }));
+    dirty.current = false;
+    const out = withGroup(next);
+    wrote.current = JSON.stringify(out);
+    (onDrawingsCommit ?? onDrawingsChange)?.(out);
+    flash(r.unchanged ? tr("List už je vydán jako rev. {0} z modelu {1}", r.rev, r.id.rev) : tr("List vydán jako rev. {0} z modelu {1}", r.rev, r.id.rev));
+  };
+  const withdrawNow = () => {
+    const next = sheets.length ? [...sheets] : [];
+    next[sheetIdx] = withdrawIssue(sheetDoc());
+    dirty.current = false;
+    const out = withGroup(next);
+    wrote.current = JSON.stringify(out);
+    (onDrawingsCommit ?? onDrawingsChange)?.(out);
+    flash(tr("Vydání listu zrušeno – list je rozpracovaný"));
   };
   const persistNow = () => {
     if (!onDrawingsChange) return;
@@ -453,7 +483,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const t = setTimeout(async () => {
       const t0 = performance.now();
       try {
-        const d = await cad.drawing(doc, { ...meta, threads, bom: showBom ? bom : undefined, components: balloons, sheetIndex: sheetIdx + 1, sheetCount: Math.max(1, sheets.length) }, opts);
+        const d = await cad.drawing(doc, { ...meta, threads, bom: showBom ? bom : undefined, components: balloons, sheetIndex: sheetIdx + 1, sheetCount: Math.max(1, sheets.length), ...(mid ? { modelRev: mid.rev } : {}) }, opts);
         if (id !== seq.current) return;
         setRes(d);
         setError(null);
@@ -538,9 +568,23 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
    * se uloží a listy výkresu se spočítají v jádře (PDF vícestránkové, DXF / DWG / SVG ZIP s jedním souborem na list)
    */
   const fileOf = async (f: DrawingExportFormat) => {
-    if (!exportAll || f === "csv") return drawingFile(out!, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
+    const revs = { ...(mid ? { modelRev: mid.rev } : {}), ...(meta.revision ? { rev: meta.revision } : {}) };
+    if (!exportAll || f === "csv") return drawingFile(out!, f, { base, title: meta.name, dwgVersion: dwgVer, bom, ...revs });
     const outs = await allSheetsOut();
-    return drawingFileSheets(outs, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
+    return drawingFileSheets(outs, f, { base, title: meta.name, dwgVersion: dwgVer, bom, ...revs });
+  };
+  /** listy exportu (id) */
+  const exportedIds = () => (exportAll ? sheets.map((x) => x.id) : [saved?.id ?? ""]).filter(Boolean);
+  /** záznam exportu do dokumentu (revize modelu, čas) – vlna 22, bod 20 */
+  const noteExport = (format: DrawingExportFormat, file: string) => {
+    const revStale = !!mid && (exportAll ? sheets : saved ? [saved] : []).some((x) => x.issued && x.issued.sig !== mid.sig);
+    onExported?.({ what: "drawing", format, file, sheets: exportedIds(), ...(meta.revision ? { rev: meta.revision } : {}), ...(revStale ? { revStale } : {}) });
+  };
+  /** vydaný list ze starší revize modelu: soubor by nesl staré písmeno revize s jiným obsahem → upozornění u exportu */
+  const staleNote = () => {
+    if (!mid) return "";
+    const st = (exportAll ? sheets : saved ? [saved] : []).filter((x) => x.issued && x.issued.sig !== mid.sig);
+    return st.length ? ` · ⚠ ${staleExportText(st[0].name, st[0].issued!, mid)}` : "";
   };
   /** hotové listy aktivního výkresu (aktivní list s rozpracovanými změnami) */
   const allSheetsOut = async () => {
@@ -565,7 +609,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         flash(exportAll ? tr("Generuji PDF (listů: {0})…", sheets.length) : tr("Generuji PDF…"));
         return new Blob([(await fileOf("pdf")).data as BlobPart], { type: "application/pdf" });
       }, "application/pdf");
-      if (saved) flash(tr("PDF uloženo: {0}", saved.name) + tolNote());
+      if (saved) {
+        flash(tr("PDF uloženo: {0}", saved.name) + tolNote() + staleNote());
+        noteExport("pdf", saved.name);
+      }
     } catch (e) {
       flash((e as Error).message || tr("PDF se nepodařilo vytvořit."));
     }
@@ -579,7 +626,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         const f = await fileOf("dwg");
         return new Blob([f.data as BlobPart], { type: f.mime });
       }, exportAll ? "application/zip" : "application/acad");
-      if (saved) flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name) + tolNote());
+      if (saved) {
+        flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name) + tolNote() + staleNote());
+        noteExport("dwg", saved.name);
+      }
     } catch (e) {
       flash((e as Error).message || tr("DWG se nepodařilo vytvořit."));
     }
@@ -587,7 +637,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   /** DXF / SVG / kusovník CSV (textové soubory) */
   const exportText = (f: DrawingExportFormat) => {
     if (!out && f !== "csv") return;
-    void fileOf(f).then((x) => (download(x.name, new Blob([x.data as BlobPart], { type: x.mime }), x.mime), f !== "csv" && tolNote() && flash(tolNote().replace(/^ · /, "")))).catch((e) => flash((e as Error).message));
+    void fileOf(f)
+      .then((x) => {
+        download(x.name, new Blob([x.data as BlobPart], { type: x.mime }), x.mime);
+        noteExport(f, x.name);
+        const note = f !== "csv" ? tolNote() + staleNote() : "";
+        if (note) flash(note.replace(/^ · /, ""));
+      })
+      .catch((e) => flash((e as Error).message));
   };
   /** export dílu bez nepředepsaných tolerancí – upozornění jako u window.mncad.exportDrawing (drawing-export.ts) */
   const tolNote = () => (generalTolWarnings(doc, (exportAll ? sheets.map((x, k) => ({ name: x.name, meta: (k === sheetIdx ? meta : x.meta) as unknown as DrawingMeta })) : [{ name: sheetName, meta }])).length ? tr(" · ⚠ výkres nemá nepředepsané tolerance") : "");
@@ -1064,6 +1121,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 {i === sheetIdx ? sheetName : sh.name}
               </button>
             )}
+            <IssueBadge doc={doc} sheet={"issued" in sh ? sh : undefined} mid={mid} />
             {sheets.length > 1 && (
               <button type="button" title={tr("Odstranit list")} onClick={() => removeSheet(i)} className="hidden text-ink-700/40 hover:text-brand group-hover:inline">
                 ×
@@ -1083,8 +1141,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         </TipBox>
         <span className="ml-auto pb-1 text-[11px] text-ink-700/45">
           {tr("List")}{" "}{sheetIdx + 1}/{Math.max(1, sheets.length)}
+          {mid ? <span data-model-rev={mid.rev}>{" · "}{tr("model {0}", mid.rev)}</span> : null}
         </span>
       </div>
+      {/* vydaný list ze starší revize modelu (vlna 22, bod 20) */}
+      <StaleSheetBanner doc={doc} sheet={saved} mid={mid} onIssue={onDrawingsChange ? issueNow : undefined} onRecompute={onRecomputeAll} />
 
       <div className="flex min-h-0 flex-1">
         {/* nastavení */}
@@ -1448,6 +1509,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             >
               {tr("+ Přidat revizi")}
             </button>
+            {/* vydání listu: písmeno revize + revize modelu (text `výkres vydat`) */}
+            <IssueSection doc={doc} sheet={sheetDoc()} mid={mid} onIssue={onDrawingsChange ? issueNow : undefined} onWithdraw={onDrawingsChange ? withdrawNow : undefined} />
           </Section>
           <FitsSection opts={opts} set={set} meta={meta} setMeta={setM} />
           <p className="px-4 pb-5 text-[11px] leading-relaxed text-ink-700/45">

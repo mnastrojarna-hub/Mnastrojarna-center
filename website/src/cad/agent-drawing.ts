@@ -83,6 +83,11 @@ export type DrawingCmd =
   /** tabulka revizí */
   | { k: "rev"; op: "set"; rev: string; note: string; date?: string; author?: string }
   | { k: "rev"; op: "delete"; rev: string }
+  /**
+   * vydání listu (vlna 22, bod 20 – cad/doc-outputs.ts): `výkres vydat [B] ["popis"] [vše]` zapíše písmeno revize, revizi modelu
+   * a datum; po změně modelu je vydaný list zastaralý (⚠ drawing.stale); `výkres vydat zrušit` vydání zruší
+   */
+  | { k: "issue"; op: "issue" | "withdraw"; rev?: string; note?: string; date?: string; all?: boolean }
   /** značka s odkazem (poznámka, drsnost, GD&T, základna, text); `shift` = posun popisku [mm listu, y nahoru] */
   | { k: "mark"; mark: MarkSpec; target: MarkTarget; shift?: Vec2 }
   /** ruční kóta; `offset` [mm listu], `text` = vlastní text místo hodnoty */
@@ -543,11 +548,12 @@ const PATCH_W: Record<string, keyof AnnPatch> = {
   vyska: "height", height: "height", hohe: "height", hoehe: "height",
   posun: "shift", shift: "shift", move: "shift", verschiebung: "shift", verschieben: "shift",
 };
-const SUBS_MORE: Record<string, "sheet" | "sheets" | "title" | "rev" | "mark" | "mdim" | "edit" | "del" | "detail" | "model"> = {
+const SUBS_MORE: Record<string, "sheet" | "sheets" | "title" | "rev" | "mark" | "mdim" | "edit" | "del" | "detail" | "model" | "issue"> = {
   ...Object.fromEntries([...SHEET_W].map((w) => [w, "sheet" as const])),
   ...Object.fromEntries([...SHEETS_W].map((w) => [w, "sheets" as const])),
   razitko: "title", titleblock: "title", title: "title", schriftfeld: "title",
   revize: "rev", revision: "rev", revisions: "rev", anderung: "rev", aenderung: "rev", anderungen: "rev", revisionen: "rev",
+  vydat: "issue", vydej: "issue", vydani: "issue", issue: "issue", release: "issue", freigeben: "issue", freigabe: "issue",
   znacka: "mark", znacky: "mark", mark: "mark", symbol: "mark", zeichen: "mark",
   kota: "mdim", dim: "mdim", mass: "mdim", bemassung: "mdim",
   upravit: "edit", edit: "edit", bearbeiten: "edit", andern: "edit", aendern: "edit",
@@ -598,6 +604,8 @@ function parseDrawingMore(rt: RawTok[]): DrawingCmd | null {
       return parseTitle(rest);
     case "rev":
       return parseRev(rest);
+    case "issue":
+      return parseIssue(rest);
     case "mark":
       return parseMark(rest);
     case "mdim":
@@ -727,6 +735,29 @@ function parseRev(rt: RawTok[]): DrawingCmd {
     } else note.push(t.s);
   }
   return { k: "rev", op: "set", rev: rev.toUpperCase(), note: note.join(" "), ...(date ? { date } : {}), ...(author ? { author } : {}) };
+}
+
+const WITHDRAW_W = W("zrusit", "zruseni", "cancel", "withdraw", "revoke", "zuruckziehen", "zurueckziehen", "aufheben", "widerrufen");
+/** písmeno / číslo revize (A, B, AB, A1, 01) – ne slovo popisu */
+const REV_RE = /^(?:[A-Za-z]{1,2}\d{0,2}|\d{1,3})$/;
+
+/** `výkres vydat [<revize>] ["popis"] [datum 20.11.2026] [vše] · výkres vydat zrušit [vše]` (EN drawing issue, DE zeichnung freigeben) */
+function parseIssue(rt: RawTok[]): DrawingCmd {
+  const cmd: Extract<DrawingCmd, { k: "issue" }> = { k: "issue", op: "issue" };
+  const note: string[] = [];
+  for (let i = 0; i < rt.length; i++) {
+    const t = rt[i];
+    const k = fold(t.key ?? (t.q ? "" : t.s));
+    if (t.key && (k === "datum" || k === "date")) cmd.date = t.s;
+    else if (!t.q && !t.key && (k === "datum" || k === "date") && rt[i + 1]) cmd.date = rt[++i].s;
+    else if (isKw(t, WITHDRAW_W)) cmd.op = "withdraw";
+    else if (isKw(t, ALL_W)) cmd.all = true;
+    else if (!t.q && !t.key && cmd.rev === undefined && !note.length && REV_RE.test(t.s) && !isKw(t, SHEET_W)) cmd.rev = t.s.toUpperCase();
+    else if (t.key) throw new Error(tr("výkres vydat [<revize>] [\"popis změny\"] [datum 20.11.2026] [vše] · výkres vydat zrušit [vše] – neznámé „{0}=“", t.key));
+    else note.push(t.s);
+  }
+  if (note.length) cmd.note = note.join(" ");
+  return cmd;
 }
 
 /** odkaz na pohled za slovem „pohled“: přední…, iso, řez, detail A, "název modelu"; vrátí pohled a počet tokenů */
