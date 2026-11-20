@@ -261,7 +261,7 @@ const ready = async (p, url = CAD) => {
   // ════════ 6) výkres: list, Chytré kóty, kontrola ════════
   r = await consoleRun('výkres A3 na šířku pohledy přední,horní,iso\nkótovat\nvýkres stav');
   const dup = /Duplicity: žádné/.test(r.log);
-  const allDims = /Kontrola kót: všech \d+ (?:rozměrů )?je na listu/.test(r.log) || /Kontrola kót: všech/.test(r.log);
+  const allDims = /Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/.test(r.log); // vlna 22, bod 18: nikdy „všech N“ – velikosti i polohy n/n bez „chybí“
   const missing = (/Kontrola kót: [^\n]*/.exec(r.log) || ['?'])[0];
   const dimsLine = (/→ Chytré kóty[^\n]*/.exec(r.log) || ['?'])[0];
   step('6 výkres A3 + kótovat + výkres stav', dup && allDims && !/^✗/m.test(r.log), `${dimsLine}; ${missing}; Duplicity žádné: ${dup}; ${r.ms} ms`);

@@ -311,7 +311,7 @@ describe("textové příkazy výkresu nad modelem: kótovat, tolerance, výkres 
     const st = log.find((l) => l.startsWith("Výkres „List 1“"))!;
     expect(st).toContain("list A3 na šířku");
     expect(st).toContain("Duplicity: žádné");
-    expect(st).toMatch(/Kontrola kót: všech \d+ očekávaných rozměrů je na listu/);
+    expect(st).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/);
     expect(st).toContain("přední: ");
     expect(st).toContain("Ø30h6");
     expect(st).toContain("nepředepsané tolerance ISO 2768-mK");
@@ -333,7 +333,7 @@ describe("textové příkazy výkresu nad modelem: kótovat, tolerance, výkres 
     const d2: CadDoc = { ...doc, drawings: [{ ...sheet, annotations: anns, options: { ...sheet.options, smartOff: ["pos:top:1:s-10.000"] } }] };
     const st = (await drawingStatus(d2, computeDrawing)).text;
     expect(st).toMatch(/Duplicity \(1\): 120 \(horní\) = 120 \(horní\)/);
-    expect(st).toMatch(/Kontrola kót: chybí 1 z \d+: 60 \(rozteč\)/);
+    expect(st).toMatch(/Kontrola kót: velikosti \d+\/\d+ · polohy \d+\/\d+ – chybí: [^·]*60 \(rozteč\)/);
     expect(st).toContain("120 *");
     void res;
     void linMeaning;

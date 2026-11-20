@@ -8,6 +8,11 @@
 //    po změně modelu odznak ⚠ (data-sheet-stale) a pruh „Model se změnil po vydání rev. A“ (data-drawing-stale-banner)
 //    s tlačítkem „Vydat novou revizi B“ (data-issue-new); panel „Zastaralé výstupy“ v rohu 3D okna (data-outputs-chip,
 //    data-outputs-item) a „Přepočítat vše“ (data-recompute-all) = text `přepočítat vše`; patička listu „Model r·…“.
+//  - D3 (bod 18, kontrola kót pro výrobu): repro „okno vyříznuté pomocným tělesem“ – panel Kontrola kót (data-dim-check,
+//    data-dim-size / data-dim-pos) bez výšky nástroje 40, pomocné těleso šedě (data-dim-aux); po smazání kót polohy 0/6
+//    (data-dim-incomplete="1"), tlačítko „Přidat kótu“ (data-dim-add) u polohy díry přidá kótu (polohy 1/6), „Přidat všechny
+//    navržené kóty“ (data-dim-add-all) → nic nechybí; funkční díra textem i pravým tlačítkem na plochu (Označit jako funkční)
+//    → položka data-dim-functional="missing" (bez tolerance); text v konzoli dává totéž (⚠ drawing.dims-incomplete).
 // Spuštění (fáze 2): bin/e2e-run <worktree>/website 3534 <out> cad-w22-d   (E2E_BASE nastaví e2e-run)
 const { chromium } = require('playwright');
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -154,6 +159,65 @@ async function scenario(args, label) {
   log = await run('záložka "Deska V"\nvýstupy');
   ok(/List 1: Vydání: rev\. B z modelu r·\w{6} .* – odpovídá modelu/.test(log) && /Zastaralé výstupy \(1\)/.test(log), `${label}: výstupy – list rev. B odpovídá, zbývá jen STEP`);
   await closeConsole();
+
+  // ── D3 (bod 18): kontrola kót pro výrobu ──
+  await openConsole();
+  log = await run('nový díl "Deska K"\nkvádr 100 60 20\nkvádr 30 20 40 v 35 20 -10 nové těleso Nástroj\nsloučit 1 Nástroj odebrat\ndíra 8 skrz v 15 15 20 těleso 1\ndíra 8 skrz v 85 45 20 těleso 1\nvýkres A3 na šířku pohledy přední,horní\nvýkres nepředepsané ISO 2768-mK\nkótovat\nvýkres stav');
+  ok(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2 · pomocná tělesa \(nekótují se\): Nástroj/.test(log) && !/40 \(Kvádr 2\)/.test(log) && !/všech \d+ očekávaných/.test(log), `${label}: výkres stav – okno a polohy, bez výšky nástroje 40, bez „všech“`);
+  await run('výkres');
+  await closeConsole();
+  const checkBtn = p.getByRole('button', { name: /Kontrola kót/ }).first();
+  await checkBtn.waitFor({ timeout: 60000 }).catch(() => {});
+  await checkBtn.click().catch(() => {});
+  const dc = p.locator('[data-dim-check]').first();
+  await dc.waitFor({ timeout: 30000 }).catch(() => {});
+  const sz = await dc.getAttribute('data-dim-size').catch(() => '');
+  const ps = await dc.getAttribute('data-dim-pos').catch(() => '');
+  ok(/^(\d+)\/\1$/.test(sz || '') && /^(\d+)\/\1$/.test(ps || '') && (await dc.getAttribute('data-dim-incomplete')) === '0', `${label}: panel Kontrola kót – velikosti ${sz}, polohy ${ps}, nic nechybí`);
+  ok(/Nástroj/.test(await p.locator('[data-dim-aux]').first().innerText().catch(() => '')), `${label}: panel – pomocné těleso Nástroj se nekótuje`);
+  ok(!/\b40\b/.test(await p.locator('[data-dim-sizes]').first().innerText().catch(() => '')), `${label}: panel – velikost 40 (nástroj) se neočekává`);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska K"\nvýkres smazat vše\nvýkres kóta vodorovně pohled horní 0 0 100 0\nvýkres kóta svisle pohled horní 0 0 0 60\nvýkres kóta svisle pohled přední 0 0 0 20\nvýkres kóta vodorovně pohled horní 35 20 65 20\nvýkres kóta průměr pohled horní střed 15 15 r 4\nvýkres stav');
+  ok(/drawing\.dims-incomplete|kóty neúplné/.test(log) && /polohy 0\/6/.test(log) && /na listu 1× z 2×/.test(log), `${label}: text – ⚠ kóty neúplné, polohy 0/6, Ø8 1× z 2×`);
+  await run('výkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Kontrola kót/ }).first().click().catch(() => {});
+  const dc2 = p.locator('[data-dim-check]').first();
+  await dc2.waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await dc2.getAttribute('data-dim-incomplete').catch(() => '')) === '1' && (await dc2.getAttribute('data-dim-pos').catch(() => '')) === '0/6', `${label}: panel – chybí polohy (0/6)`);
+  const addHole = p.locator('[data-dim-add^="holepos:"]').first();
+  await addHole.click().catch(() => {});
+  await p.waitForTimeout(1200);
+  ok((await p.locator('[data-dim-check]').first().getAttribute('data-dim-pos').catch(() => '')) === '1/6', `${label}: Přidat kótu u polohy díry → polohy 1/6`);
+  await p.locator('[data-dim-add-all]').first().click().catch(() => {});
+  await p.waitForTimeout(1500);
+  ok((await p.locator('[data-dim-check]').first().getAttribute('data-dim-incomplete').catch(() => '')) === '0', `${label}: Přidat všechny navržené kóty → nic nechybí`);
+  await p.keyboard.press('Escape').catch(() => {});
+  // funkční díra textem → v panelu funkční položka bez tolerance
+  await openConsole();
+  log = await run('záložka "Deska K"\nfunkční "Díra 1" H7\nvýkres stav');
+  ok(/✓ funkční Díra 1 · tolerance H7/.test(log) && /funkční prvky: tolerance 0\/\d+/.test(log), `${label}: funkční „Díra 1“ H7 → tolerance 0/n ve výkres stav`);
+  await run('výkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Kontrola kót/ }).first().click().catch(() => {});
+  await p.locator('[data-dim-check]').first().waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await p.locator('[data-dim-functional="missing"]').count()) >= 1 && /Díra 1/.test(await p.locator('[data-dim-functional-marks]').first().innerText().catch(() => '')), `${label}: panel – funkční Díra 1 bez tolerance`);
+  await p.keyboard.press('Escape').catch(() => {});
+  // pravé tlačítko na plochu modelu → Označit jako funkční (text přes engine)
+  const vpBox = await p.locator('main canvas, [data-soft-view-canvas], [data-soft]').first().boundingBox().catch(() => null);
+  if (vpBox) {
+    await p.mouse.click(vpBox.x + vpBox.width / 2, vpBox.y + vpBox.height / 2, { button: 'right' });
+    await p.waitForTimeout(500);
+    const mark = p.getByRole('button', { name: 'Označit jako funkční' }).first();
+    const has = await mark.isVisible().catch(() => false);
+    if (has) await mark.click();
+    await p.waitForTimeout(1500);
+    await openConsole();
+    log = await run('záložka "Deska K"\nfunkční');
+    ok(has && /Funkční prvky a základny \(2\):/.test(log), `${label}: pravé tlačítko na plochu → Označit jako funkční (funkční prvky 2)`);
+    await closeConsole();
+  } else ok(false, `${label}: 3D okno pro pravé tlačítko nenalezeno`);
 
   ok(errs.length === 0, `${label}: bez chyb stránky ${errs.slice(0, 2).join(' | ')}`);
   await b.close();

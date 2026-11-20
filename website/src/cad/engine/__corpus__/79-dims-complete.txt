@@ -1,0 +1,32 @@
+# vlna 22, bod 18: kontrola kót pro výrobu – pomocné (nástrojové) těleso se nekótuje, výsledný tvar (okno) a polohy prvků
+# podle geometrie kót, skupina děr s počtem 2×, ⚠ drawing.dims-incomplete (výkres stav, export), výkres doplnit kóty,
+# funkční prvek a základna (tolerance ⚠ drawing.tolerance-missing, přesná tolerance na nefunkčním rozměru ℹ)
+nový díl "Deska A"
+kvádr 100 60 20
+kvádr 30 20 40 v 35 20 -10 nové těleso Nástroj
+sloučit 1 Nástroj odebrat
+díra 8 skrz v 15 15 20 těleso 1
+díra 8 skrz v 85 45 20 těleso 1
+výkres A3 na šířku pohledy přední,horní
+výkres nepředepsané ISO 2768-mK
+kótovat
+výkres stav
+#--- run
+# všechny kóty pryč, ručně jen velikosti – bez jediné polohy
+výkres smazat vše
+výkres kóta vodorovně pohled horní 0 0 100 0
+výkres kóta svisle pohled horní 0 0 0 60
+výkres kóta svisle pohled přední 0 0 0 20
+výkres kóta vodorovně pohled horní 35 20 65 20
+výkres kóta průměr pohled horní střed 15 15 r 4
+výkres stav
+výkres export pdf
+#--- run
+výkres doplnit kóty
+výkres kontrola kót
+#--- run
+funkční "Díra 1" H7
+základna A F1
+funkční
+výkres tolerance 100 ±0,01
+výkres kontrola kót

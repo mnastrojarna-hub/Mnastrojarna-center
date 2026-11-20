@@ -92,6 +92,7 @@ základna {0}: plocha F{1} není rovinná – základnou může být jen rovinn�
 základna: písmeno a rovinná plocha, např. základna A F3 – {0}	Bezug: Buchstabe und ebene Fläche, z. B. bezug A F3 – {0}
 základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu	Bezug {0} des Teils „{1}“ lässt sich nicht als Skriptzeile schreiben
 žádné polohy k ověření	keine Lagen zu prüfen
+podle textu kóty – poloha popisu neověřena	nach dem Maßtext – Lage der Beschriftung nicht geprüft
 #!dynamic – texty kódů (src/cad/engine/codes.ts) a klíč varování (drawing-issues.ts DIMS_INCOMPLETE_KEY) se překládají za běhu
 kóty neúplné – {0}	Maße unvollständig – {0}
 list {0}: přesná tolerance na rozměru, který není funkční – {1}	Blatt {0}: enge Toleranz an einem Maß, das nicht funktional ist – {1}

@@ -86,7 +86,7 @@ const near = (a, b, tol = 0.01) => Number.isFinite(a) && Math.abs(a - b) <= tol;
     ok(/✗ řádek 1: díra: „zahloubení“ a „kuželové“ najednou nejde/.test(log), 'B4: zahloubení + kuželové → ✗ řádku');
     log = await run('výkres A3 pohledy přední,horní\nvýkres stav');
     ok(/M8 skrz \/ Ø6,8 skrz \/ ⌴ Ø20 ↧7/.test(log), 'B4: výkres stav – popis „M8 skrz / Ø6,8 skrz / ⌴ Ø20 ↧7“');
-    ok(!/Kontrola kót: chybí [^\n]*(zahloubení|vrták závitu)/.test(log), 'B4: kontrola kót nehlásí chybějící zahloubení / vrták');
+    ok(!/Kontrola kót: [^\n]*chybí: [^\n]*(zahloubení|vrták závitu)/.test(log), 'B4: kontrola kót nehlásí chybějící zahloubení / vrták');
 
     // ── formulář závitové díry: Zahloubení závitové díry ──
     log = await run('nový díl W15 B4 form\nkvádr 40 40 30 v -20 -20 0\ndíra závit M8 skrz v 0 0 30');

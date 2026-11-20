@@ -13,6 +13,11 @@
  *  7. `✓ list „X“ vydán jako rev. A …`                 – jen když se vydání opravdu zapsalo (opakování beze změny = „→ … beze změny“)
  *  8. „Vydání: … – odpovídá modelu“ / „Výkres: … odpovídá modelu“ – jen pro revizi modelu, ze které byl list vydán
  *  9. „Zastaralé výstupy: žádné“                       – jen když žádný vydaný list ani export neodpovídá starší revizi
+ *  Etapa D3 (bod 18 – kontrola kót pro výrobu, čisté funkce cad/dim-complete.ts):
+ * 10. „Kontrola kót: všech N očekávaných rozměrů je na listu“ – už nikdy; ani úplná kontrola neříká „všech“ / „kompletní“
+ * 11. bez ⚠ drawing.dims-incomplete jen když na listu nechybí ani POLOHA prvku (dřív stačily velikosti)
+ * 12. „funkční prvky: tolerance n/n“ – jen s vyznačenými funkčními prvky a předepsanou tolerancí na kótě; jinak „neověřeny“
+ * 13. poloha „✓“ nikdy u kót zapečených v pohledu (nezkontrolováno)
  *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
  *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
  */
@@ -25,7 +30,9 @@ import { MemoryWorkspace } from "../engine/memory-workspace";
 import { formatConsole } from "../engine/protocol";
 import type { RunReport } from "../engine/protocol-types";
 import { runScript } from "../engine/run";
-import { emptyDoc, type BuildResult, type CadDoc, type ComponentSource } from "../types";
+import { emptyDoc, type BuildResult, type CadDoc, type ComponentSource, type DrawingAnnotation, type Feature, type FunctionalMark } from "../types";
+import { checkSheet, dimCheckLine, type CheckView } from "../dim-complete";
+import { dimCheckIssues } from "../drawing-dimcheck";
 
 const result = (d: CadDoc): BuildResult =>
   ({ status: d.features.map((f) => ({ id: f.id, ok: true })), mesh: null, metrics: d.features.length ? { volume: 20000, area: 600, bbox: [[0, 0, 0], [10, 10, 10]], faces: 6, edges: 12, valid: true, solids: 1 } : null, ms: 1 }) as unknown as BuildResult;
@@ -129,5 +136,51 @@ describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", () => {
     const r = await run(ws, `${PART}\nvýkres vydat\nvýstupy zastaralé`);
     expect(txt(r)).toMatch(/Zastaralé výstupy: žádné/);
     expect(has(r, "drawing.stale")).toBe(false);
+  });
+});
+
+// ───────────────────────── D3 (bod 18): kontrola kót – čisté funkce, ručně složené pohledy a kóty ─────────────────────────
+describe("greens D3 – kontrola kót pro výrobu (bod 18)", () => {
+  const TOP: CheckView = { key: "top", x0: 0, y0: -60, w: 100, h: 60, cam: { d: [0, 0, 1], x: [1, 0, 0] } };
+  const FRONT: CheckView = { key: "front", x0: 0, y0: -20, w: 100, h: 20, cam: { d: [0, -1, 0], x: [1, 0, 0] } };
+  let k = 0;
+  const F = (f: Record<string, unknown>) => ({ id: `g${++k}`, ...f }) as unknown as Feature;
+  const dim = (view: string, kind: "horizontal" | "vertical", a: [number, number], b: [number, number], suffix?: string): DrawingAnnotation => ({ id: `d${++k}`, view, type: "dim", kind, a, b, offset: 10, ...(suffix ? { suffix } : {}) });
+  const plate = (): CadDoc => ({
+    ...emptyDoc("Deska A"),
+    features: [F({ name: "Kvádr 1", type: "box", size: [100, 60, 20], position: [0, 0, 0], centered: false, mode: "new" }), F({ name: "Díra 1", type: "hole", position: [15, 15, 20], axis: "Z", flip: false, diameter: 8, depth: 0, cbDiameter: 0, cbDepth: 0 })],
+  });
+  const sizes = (): DrawingAnnotation[] => [dim("top", "horizontal", [0, 0], [100, 0]), dim("top", "vertical", [0, 0], [0, -60]), dim("front", "vertical", [0, 0], [0, -20]), { id: "c1", view: "top", type: "dim", kind: "diameter", c: [15, -15], r: 4, ang: 45, offset: 8 }];
+  const positions = (sx?: string): DrawingAnnotation[] => [dim("top", "horizontal", [0, -5], [15, -5], sx), dim("top", "vertical", [-5, 0], [-5, -15], sx)];
+
+  it("10: ani úplná kontrola neříká „všech“ ani „kompletní“ – jen co zkontrolovala", () => {
+    const r = checkSheet({ doc: plate(), views: [FRONT, TOP], annotations: [...sizes(), ...positions()], dimensions: "smart" });
+    expect(dimCheckLine(r)).toMatch(/^Kontrola kót: velikosti 4\/4 · polohy 2\/2 · tolerance neověřeny \(funkční prvky nevyznačeny\)$/);
+    expect(dimCheckLine(r)).not.toMatch(/všech|kompletní/);
+  });
+  it("11: všechny velikosti na listu, ale bez polohy díry → ⚠ drawing.dims-incomplete (dřív „všech … je na listu“)", () => {
+    const r = checkSheet({ doc: plate(), views: [FRONT, TOP], annotations: sizes(), dimensions: "smart" });
+    expect(r.size).toEqual({ ok: 4, total: 4 });
+    expect(dimCheckIssues(r).map((i) => i.code)).toEqual(["drawing.dims-incomplete"]);
+    const ok = checkSheet({ doc: plate(), views: [FRONT, TOP], annotations: [...sizes(), ...positions()], dimensions: "smart" });
+    expect(dimCheckIssues(ok)).toEqual([]);
+  });
+  it("12: tolerance funkčních prvků „n/n“ jen s tolerancí na kótě (velikost = předepsaná H7); bez vyznačení „neověřeny“", () => {
+    const d = plate();
+    const marks: FunctionalMark[] = [{ id: "f1", kind: "functional", feature: d.features[1].id, tol: "H7" }];
+    const diaT = (sx: string): DrawingAnnotation => ({ id: "c2", view: "top", type: "dim", kind: "diameter", c: [15, -15], r: 4, ang: 45, offset: 8, suffix: sx });
+    const none = checkSheet({ doc: { ...d, functional: marks }, views: [FRONT, TOP], annotations: [...sizes(), ...positions()], dimensions: "smart" });
+    expect(dimCheckLine(none)).toMatch(/funkční prvky: tolerance 0\/3/);
+    // jiná tolerance průměru než předepsaná H7 → průměr nesplněný („liší se“), polohy s tolerancí ano
+    const wrong = checkSheet({ doc: { ...d, functional: marks }, views: [FRONT, TOP], annotations: [...sizes().slice(0, 3), diaT("H9"), ...positions("±0,02")], dimensions: "smart" });
+    expect(dimCheckLine(wrong)).toMatch(/funkční prvky: tolerance 2\/3/);
+    const right = checkSheet({ doc: { ...d, functional: marks }, views: [FRONT, TOP], annotations: [...sizes().slice(0, 3), diaT("H7"), ...positions("±0,02")], dimensions: "smart" });
+    expect(dimCheckLine(right)).toMatch(/funkční prvky: tolerance 3\/3/);
+    expect(dimCheckLine(checkSheet({ doc: d, views: [FRONT, TOP], annotations: [...sizes().slice(0, 3), diaT("H7"), ...positions("±0,02")], dimensions: "smart" }))).toContain("tolerance neověřeny");
+  });
+  it("13: kóty zapečené v pohledu – poloha nikdy ✓, jen nezkontrolováno", () => {
+    const r = checkSheet({ doc: plate(), views: [FRONT, TOP], annotations: [], dimensions: "overall", texts: [{ s: "100", layer: "dim" }, { s: "60", layer: "dim" }, { s: "20", layer: "dim" }] });
+    expect(r.items.filter((q) => q.kind === "pos").map((q) => q.status)).toEqual(["unchecked", "unchecked"]);
+    expect(dimCheckLine(r)).toContain("polohy nezkontrolovány");
   });
 });

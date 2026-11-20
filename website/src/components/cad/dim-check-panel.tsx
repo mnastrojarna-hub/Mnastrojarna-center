@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { isMissing, markLabel, type DimReq } from "@/cad/dim-complete";
 import type { DrawingOptions, DrawingResult } from "@/cad/drawing";
-import { sheetDimCheck, suggestionsFor } from "@/cad/drawing-dimcheck";
+import { sheetDimCheck, suggestionsFor, withGroupCount } from "@/cad/drawing-dimcheck";
 import { makeManualDim } from "@/cad/drawing-marks";
 import { tr } from "@/cad/i18n";
 import type { CadDoc, DrawingAnnotation } from "@/cad/types";
@@ -55,7 +55,7 @@ export function DimCheckPanel({ doc, out, ann, opts, onAdd, flash, children }: P
         const k = `${dim.view}:${dim.kind}`;
         const n = per.get(k) ?? 0;
         per.set(k, n + 1);
-        made.push(makeManualDim(out, opts, dim, dim.kind === "diameter" ? 8 : 10 + 7 * n).ann);
+        made.push(withGroupCount(item, makeManualDim(out, opts, dim, dim.kind === "diameter" ? 8 : 10 + 7 * n).ann));
       } catch (e) {
         failed.push(`${item.label} – ${e instanceof Error ? e.message : String(e)}`);
       }

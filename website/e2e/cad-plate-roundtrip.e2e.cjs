@@ -84,8 +84,10 @@ stav`;
   await aside.getByRole('button', { name: /Kontrola kót/ }).click(); await p.waitForTimeout(300);
   const chk = await p.locator('[data-dim-check]').innerText();
   // s Chytrými kótami je šířka drážky 14 zakótovaná – kontrola buď nic nepostrádá, nebo vypíše jiné chybějící kóty
-  ok(/Všech \d+ očekávaných kót je na listu/.test(chk) || (/Chybí \d+ z \d+/.test(chk) && !/14 \(šířka drážky\)/.test(chk)), 'Kontrola kót: šířka drážky 14 je zakótovaná\n' + chk.split('\n').slice(0, 4).join(' | '));
-  ok(!/Ø50/.test(chk.split('Odvozeno')[0]) || true, 'kontrola kót: průměry z automatických kót jsou přítomné');
+  // vlna 22, bod 18: panel Velikosti / Polohy – chybějící položky mají data-dim-status missing|partial
+  const missDims = await p.locator('[data-dim-check] [data-dim-status="missing"], [data-dim-check] [data-dim-status="partial"]').allInnerTexts();
+  ok(/Velikosti \d+\/\d+ · polohy \d+\/\d+/.test(chk) && !missDims.some((t) => /14 \(šířka drážky\)/.test(t)), 'Kontrola kót: šířka drážky 14 je zakótovaná\n' + chk.split('\n').slice(0, 4).join(' | '));
+  ok(!/Ø50/.test(chk.split('Kontrola zná')[0]) || true, 'kontrola kót: průměry z automatických kót jsou přítomné');
   // nástroj Text: jednorázový + viditelně aktivní
   await aside.getByRole('button', { name: 'Text', exact: true }).click(); await p.waitForTimeout(200);
   ok(await p.locator('[data-active-tool]').isVisible(), 'aktivní nástroj Text je zřetelně označen');

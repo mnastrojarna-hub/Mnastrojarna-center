@@ -16,7 +16,7 @@ import { gearTablesOf } from "./gears/data";
 import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
 import { dimCheckDetail, dimCheckLine } from "./dim-complete";
-import { dimCheckIssues, sheetDimCheck, suggestionsFor } from "./drawing-dimcheck";
+import { dimCheckIssues, sheetDimCheck, suggestionsFor, withGroupCount } from "./drawing-dimcheck";
 import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
 import { applyViewsCmd, viewsStatusLines } from "./drawing-views-agent";
 import { cadLocale, getLang, tr } from "./i18n";
@@ -535,7 +535,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
         try {
           const n = per.get(`${dim.view}:${dim.kind}`) ?? 0;
           per.set(`${dim.view}:${dim.kind}`, n + 1);
-          const { ann } = makeManualDim(res, o, dim, dim.kind === "diameter" ? 8 : 10 + 7 * n);
+          const ann = withGroupCount(item, makeManualDim(res, o, dim, dim.kind === "diameter" ? 8 : 10 + 7 * n).ann);
           anns = [...anns, ann];
           added.push(`${shortId(anns.length - 1)} ${annLabel(res.views, ann)} (${item.label})`);
         } catch (e) {

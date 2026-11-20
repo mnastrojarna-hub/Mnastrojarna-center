@@ -64,6 +64,25 @@ async function faceGeom(ctx: Parameters<OpHandler<"functional">>[1], d: CadDoc, 
   return { t: "other", c: e.center ?? [0, 0, 0] };
 }
 
+/** díra (prvek historie) se stejnou osou a poloměrem jako válcová plocha */
+function holeOfCylinder(d: CadDoc, g: Extract<NonNullable<FunctionalMark["geom"]>, { t: "cyl" }>): Feature | undefined {
+  const l = Math.hypot(...g.axis) || 1;
+  const a: Vec3 = [g.axis[0] / l, g.axis[1] / l, g.axis[2] / l];
+  return d.features.find((f) => {
+    if (f.type !== "hole" || f.suppressed) return false;
+    const ax: Vec3 = f.axis === "X" ? [1, 0, 0] : f.axis === "Y" ? [0, 1, 0] : [0, 0, 1];
+    if (f.dirDef || Math.abs(Math.abs(ax[0] * a[0] + ax[1] * a[1] + ax[2] * a[2]) - 1) > 1e-3) return false;
+    const r = (f.kind === "tapped" && f.thread ? 0 : f.diameter / 2) || g.r;
+    if (Math.abs(r - g.r) > 0.01 && !(f.cbDiameter > 0 && Math.abs(f.cbDiameter / 2 - g.r) < 0.01)) return false;
+    const pts = f.points?.length ? f.points.flatMap((p) => (p.kind === "xyz" ? [p.p as Vec3] : [])) : [f.position];
+    return pts.some((p) => {
+      const w: Vec3 = [p[0] - g.c[0], p[1] - g.c[1], p[2] - g.c[2]];
+      const c: Vec3 = [w[1] * a[2] - w[2] * a[1], w[2] * a[0] - w[0] * a[2], w[0] * a[1] - w[1] * a[0]];
+      return Math.hypot(...c) < 0.05;
+    });
+  });
+}
+
 export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
   const r = runOf(ctx);
   const d = r.doc;
@@ -110,7 +129,11 @@ export const functionalOp: OpHandler<"functional"> = async (op, ctx) => {
         mark = { id: "", kind: "functional", feature: t.feature.id, ...(t.tol ? { tol: t.tol } : {}) };
       } else {
         const geom = await faceGeom(ctx, d, t.face!);
-        mark = { id: "", kind: "functional", face: { index: t.face! }, ...(geom ? { geom } : {}), ...(t.tol ? { tol: t.tol } : {}) };
+        // válcová plocha díry = ta díra (prvek historie – poloha i velikost skupiny děr se kontrolují jako prvek)
+        const hole = geom?.t === "cyl" ? holeOfCylinder(d, geom) : undefined;
+        mark = hole
+          ? { id: "", kind: "functional", feature: hole.id, ...(t.tol ? { tol: t.tol } : {}) }
+          : { id: "", kind: "functional", face: { index: t.face! }, ...(geom ? { geom } : {}), ...(t.tol ? { tol: t.tol } : {}) };
       }
       const same = (m: FunctionalMark) => m.kind === "functional" && ((mark.feature && m.feature === mark.feature) || (mark.face && m.face?.index === mark.face.index));
       const next = ms.filter((m) => !same(m));
