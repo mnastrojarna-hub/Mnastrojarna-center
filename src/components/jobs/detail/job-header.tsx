@@ -6,7 +6,7 @@ import { RememberedLink } from "@/components/nav/remembered-link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Building2, Sparkles, Camera, Mail, Trash2, MoreHorizontal, Banknote, Package, FileText, Paperclip,
-  Hash, Loader2, Import, Bot, Flag, Combine,
+  Hash, Loader2, Import, Bot, Flag, Combine, StickyNote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +21,7 @@ import type { PriorityLevel } from "@/lib/supabase/database.types";
 import type { JobDetail } from "@/lib/jobs/types";
 import { cn } from "@/lib/utils";
 import { useJobDetail } from "./detail-context";
-import { InlineEditor, PersonChip, useOptimisticValue } from "./inline-field";
+import { InlineEditor, JobField, PersonChip, useOptimisticValue } from "./inline-field";
 import { UploadButton } from "./upload-controls";
 import { DocumentsMenu } from "./documents-menu";
 import { currentDeliveryNotes } from "@/lib/jobs/delivery-notes";
@@ -310,6 +310,18 @@ export function JobHeader({ job }: { job: JobDetail }) {
               )}
               {job.owner && <PersonChip name={job.owner.name} className="text-xs text-muted-foreground" />}
             </div>
+            {/* poznámka k zakázce (majitel 20. 11.) — stejné pole jako „Interní poznámka" v Přehledu, vidět i v Knize */}
+            <JobField
+              field="note"
+              kind="textarea"
+              label="Poznámka k zakázce"
+              hideLabel
+              value={job.note}
+              icon={StickyNote}
+              iconClass="text-amber-500"
+              placeholder="Přidat poznámku k zakázce"
+              className="max-w-2xl"
+            />
           </div>
 
           <div className="flex flex-col items-start gap-2 lg:items-end">

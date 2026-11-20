@@ -15,7 +15,7 @@ import { JOB_PERSON_COLUMNS, formatFieldValue } from "@/lib/jobs/field-labels";
 import {
   jobInputToRow, validateJobInput, validateItems, jobItemToRow, quoteItemToRow, quoteInputToRow,
   computeItemTotals, diffJob, describeChanges, fieldEventMessage, stageEventMessage, aiFilledColumns,
-  quoteRevisionNumber, quoteItemsFromJobItems, quoteRevisionValidUntil, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
+  quoteRevisionNumber, isJobQuoteNumber, quoteItemsFromJobItems, quoteRevisionValidUntil, isUuid, isJobSource, isQuoteStatus, cleanText, cleanDate, cleanNumber, todayIso,
   translateDbError, cleanNewContact, defaultCustomerContact, rowsToCustomerContacts, type JobChange,
 } from "@/lib/jobs/mapping";
 import type { JobStage, JobSource } from "@/lib/supabase/database.types";
@@ -850,7 +850,8 @@ export async function createJobQuote(
     if (!job) return fail(NOT_FOUND);
 
     const revision = (await maxRevision(db, jobId)) + 1;
-    const { data: number, error: numErr } = await db.rpc("next_doc_number", { p_prefix: "NAB" });
+    // číslo podle zakázky: N2026/025-V1, -V2 … (20. 11.; bez čitelného čísla zakázky dosavadní NAB-…)
+    const { data: number, error: numErr } = await db.rpc("next_job_quote_number" as never, { p_job: jobId } as never);
     if (numErr || typeof number !== "string" || !number) return fail(numErr?.message ?? "Nepodařilo se přidělit číslo nabídky.");
 
     const itemRows = input.items.map((it, i) => {
@@ -1205,10 +1206,13 @@ export async function newJobQuoteRevision(quoteId: string): Promise<ActionResult
     let createdId: string | null = null;
     let number = "";
     for (let attempt = 0; attempt < 5 && !createdId; attempt++, rev++) {
-      if (quote.number) {
+      if (quote.number && !isJobQuoteNumber(quote.number)) {
         number = quoteRevisionNumber(quote.number, rev);
       } else {
-        const { data: n, error: nErr } = await db.rpc("next_doc_number", { p_prefix: "NAB" });
+        // nová verze nabídky zakázky: další V (N2026/025-V2 …); bez zakázky dosavadní řada
+        const { data: n, error: nErr } = quote.job_id
+          ? await db.rpc("next_job_quote_number" as never, { p_job: quote.job_id } as never)
+          : await db.rpc("next_doc_number", { p_prefix: "NAB" });
         if (nErr || typeof n !== "string") return fail(nErr?.message ?? "Nepodařilo se přidělit číslo nabídky.");
         number = n;
       }

@@ -2456,6 +2456,7 @@ třídí. Nejčastější:
 | \`feature.warning\` ⚠ / \`feature.failed\` ✗ / \`feature.unverified\` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
 | \`thread.tip-tangent\` / \`thread.no-reach\` / \`thread.wrong-side\` / \`thread.pitch-nonstandard\` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | \`přísně kromě thread.pitch-nonstandard\` |
 | \`geom.exact-invalid\` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
+| \`out.no-solid\` ✗ / \`out.free-surfaces\` ⚠ | objemový export (STEP, BREP, STL, 3MF) modelu bez objemového tělesa (jen plochy / skořepina – i uzavřená skořepina bez „Uzavřít do tělesa“) / s volnými skořepinami či plochami vedle těles (u sestavy se jmény komponent); soubor se zapíše, ale „věrná kopie modelu“ se nenapíše, řádek F \`check=fail\`, \`--strict\` zastaví | \`prvek surf.close\` (Plochy → Uzavřít do tělesa), \`prvek surf.thicken\`, volnou plochu smazat / potlačit |
 | \`op.accepted\` ℹ / \`op.superseded\` ℹ / \`feature.unchecked\`, \`doc.unchecked\` ℹ / \`feature.built\` ℹ / \`feature.suppressed\` ℹ | příkaz přijat – výsledek přijde až po stavbě modelu / vyhodnocení listu výkresu; stav modelu po příkazu se samostatně nestavěl (následovala další změna – ověřen je až stav po uvedeném řádku); prvek (načtený dokument) vznikl, ale platnost tělesa se po něm nekontrolovala (důvod v textu); prvek vznikl, ale týž příkaz má ⚠/✗ jiného prvku; prvek je potlačený (přímo nebo konfigurací) a nestavěl se – **nic z toho není ✓** | u \`feature.unchecked\` zkontrolovat díl jinak (menší těleso, export STEP s kontrolou) |
 | \`drawing.section-miss\` ✗ / \`drawing.warning\`, \`drawing.overlap\` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů \`výkres …\` (opravený v témže bloku \`výkres upravit … posun=\` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, \`výkres upravit aN posun="dx dy"\` |
 | \`drawing.section-legacy\` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (\`dnes pište: …\` v hlášce) |
@@ -2744,8 +2745,12 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do \`--out\` (řádek \
 \`files[]\` s cestou a SHA-256), v HTTP do \`files\` odpovědi (\`return: "base64"\`). Názvy jsou bez diakritiky
 (\`Deska.step\`, \`Deska_vykres.pdf\`); existující soubor v \`--out\` se nepřepíše – nový dostane „ (2)“ (ℹ \`out.renamed\`).
 
-- **STEP / BREP** se po zápisu znovu načte jádrem a porovná s modelem (tělesa, objem, obálka): řádek F \`check=ok|fail\`,
-  při rozdílu ⚠ \`out.check-failed\` (soubor nejde načíst = ✗). STEP má **stejné bajty při stejném modelu** (pevný čas
+- **STEP / BREP** se po zápisu znovu načte jádrem a porovná s modelem (tělesa, plochy mimo tělesa, platnost, objem
+  těles, obálka): řádek F \`check=ok|fail\`, při rozdílu ⚠ \`out.check-failed\` (soubor nejde načíst = ✗). „→ věrná kopie
+  modelu“ je **jen** soubor s ≥ 1 objemovým tělesem a bez volných ploch: soubor bez tělesa = ✗ \`out.no-solid\` (i když
+  odpovídá modelu z ploch), volné skořepiny / plochy vedle tělesa = ⚠ \`out.free-surfaces\` s počty (u sestavy jména
+  komponent). STL / 3MF a \`export step bez kontroly\` soubor zpětně nečtou – posoudí složení modelu (stejné kódy). Objem a
+  hmotnost (\`stav\`, řádek D, JSON, \`měřit těleso\`) jsou jen z těles: díl bez tělesa má \`V=- m=-\` a „objem –“. STEP má **stejné bajty při stejném modelu** (pevný čas
   \`2000-01-01T00:00:00\` v hlavičce, výchozí názvy produktů a výskytů sestavy bez pořadí exportu) – \`files[].sha256\`
   lze porovnávat mezi běhy.
 - **\`výkres export pdf dokument\`** (EN \`drawing export pdf document\`, DE \`zeichnung export pdf dokument\`) = **jedno PDF**:

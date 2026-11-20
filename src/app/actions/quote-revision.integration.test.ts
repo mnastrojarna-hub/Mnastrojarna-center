@@ -137,7 +137,7 @@ describe.skipIf(!ENABLED)("nová verze nabídky ↔ aktuální zakázka (lokáln
     const rev = await jobs.newJobQuoteRevision(first.id);
     expect(rev.ok, rev.error).toBe(true);
     if (!rev.ok || !rev.id) return;
-    expect(rev.number).toBe(`${first.number}-R2`);
+    expect(rev.number).toBe(`${first.number}-R2`); // zakázka s vlastním (nestandardním) číslem → NAB-…-R2
 
     const { quote, items } = await quoteWithItems(rev.id);
     expect(quote.revision).toBe(2);
@@ -160,6 +160,24 @@ describe.skipIf(!ENABLED)("nová verze nabídky ↔ aktuální zakázka (lokáln
     expect(e?.message).toContain("podle aktuálních položek zakázky");
     expect(e?.data?.itemsFromJob).toBe(true);
   }, 60_000);
+
+  it("číslo nabídky = N + číslo zakázky, další nabídka i nová verze V2, V3 (majitel 20. 11.)", async () => {
+    const today = isoToday();
+    const jobId = await newJob([{ drawing_number: "QN-1", name: "Čep", quantity: 2, unit_price: 100 }]);
+    const base = `2099/${String(10000 + Math.floor(Math.random() * 89999))}`;
+    const { error } = await svc.from("orders").update({ number: `Z-${base.replace("/", "-")}` }).eq("id", jobId);
+    expect(error?.message).toBeUndefined();
+    const items = [{ drawingNumber: "QN-1", name: "Čep", quantity: 2, unitPrice: 100, vatRate: 21 }];
+    const first = await jobs.createJobQuote(jobId, { validUntil: plusDays(today, 5), leadTimeDays: 7, items });
+    expect(first.ok, first.error).toBe(true);
+    expect(first.number).toBe(`N${base}-V1`);
+    const second = await jobs.createJobQuote(jobId, { validUntil: plusDays(today, 5), leadTimeDays: 7, items });
+    expect(second.number).toBe(`N${base}-V2`);
+    if (!first.ok || !first.id) return;
+    const rev = await jobs.newJobQuoteRevision(first.id);
+    expect(rev.ok, rev.error).toBe(true);
+    expect(rev.number).toBe(`N${base}-V3`);
+  });
 
   it("zakázka bez položek: nová verze opíše položky předchozí verze, platnost přesto ode dneška", async () => {
     const today = isoToday();

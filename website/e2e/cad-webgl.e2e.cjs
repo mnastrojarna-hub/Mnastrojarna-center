@@ -33,7 +33,9 @@ const CAD = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, '')
   ok(/neposkytl WebGL/.test(txt) && /grafickou akceleraci/.test(txt), 'příčina a postup: grafická akcelerace prohlížeče');
   ok(/vzdálenou plochu/.test(txt) && /jiný prohlížeč/.test(txt) && /jiné zařízení/.test(txt), 'postup: vzdálená plocha, jiný prohlížeč, jiné zařízení');
   ok(/nabídky, nápověda/.test(txt), 'upozornění, že zbytek programu funguje');
-  ok(/3D okno: nedostupné/.test(await p.locator('header').first().innerText()), 'stav v horní liště: 3D okno nedostupné');
+  // vlna 22, bod 21: stav prostředí neutrálně („Softwarové zobrazení – WebGL není dostupné“), stav jádra zůstává vedle
+  const hdr = await p.locator('header').first().innerText();
+  ok(/Softwarové zobrazení – WebGL není dostupné/.test(hdr) && !/3D okno: nedostupné/.test(hdr) && (await p.locator('[data-core-status]').count()) === 1, 'stav v horní liště: Softwarové zobrazení – WebGL není dostupné, stav jádra vedle');
   await p.screenshot({ path: S + 'webgl-fallback.png' });
   // zbytek aplikace funguje: pás karet, nápověda, nabídka Soubor, načtení dílu (jádro OCCT počítá bez 3D)
   ok(await p.getByRole('button', { name: 'Tvorba', exact: true }).first().isVisible(), 'pás karet je dostupný');

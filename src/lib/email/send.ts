@@ -1,4 +1,5 @@
 import "server-only";
+import { safeStorageName } from "@/lib/jobs/mapping";
 import { randomUUID } from "node:crypto";
 import nodemailer from "nodemailer";
 import MailComposer from "nodemailer/lib/mail-composer";
@@ -385,8 +386,9 @@ function addresses(value: string | undefined): string[] {
 
 const ATTACHMENT_BUCKET = "documents";
 
+/** Klíč v úložišti jen ASCII (diakritika / mezery = „Invalid key"); název přílohy zůstává v email_attachments.filename. */
 function safeName(name: string): string {
-  return (name || "priloha").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_").slice(0, 150) || "priloha";
+  return safeStorageName(name || "priloha") || "priloha";
 }
 
 /** Přílohy odeslaného e-mailu do úložiště (přeposlání, náhled) — best-effort. */
