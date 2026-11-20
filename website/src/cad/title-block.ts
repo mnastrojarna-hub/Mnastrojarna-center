@@ -32,11 +32,16 @@ export type TitleLogo = {
   name?: string;
   /** obrys pro DXF / DWG: mřížka `cols × rows`, obdélníky [c0, r0, c1, r1] (v buňkách mřížky, r dolů), barva inkoustu */
   trace?: LogoTrace;
+  /**
+   * logo nahrané jako SVG (vlna 22, bod 22j): očištěné SVG jako data URL `data:image/svg+xml;base64,…` – vektor do SVG a PDF
+   * výkresu (`src` je PNG náhled, `trace` obrys pro DXF / DWG); jde do dokumentu, sdílení i skriptu
+   */
+  svg?: string;
 };
 export type LogoTrace = { cols: number; rows: number; color: string; rects: number[] };
 
 /** Obrázek na listu (logo): obdélník v mm listu, zdroj a obrys. */
-export type SheetImage = { x: number; y: number; w: number; h: number; src: string; trace?: LogoTrace };
+export type SheetImage = { x: number; y: number; w: number; h: number; src: string; trace?: LogoTrace; /** vektorové logo (data URL SVG) – SVG / PDF výkresu ho vloží místo bitmapy */ svg?: string };
 
 /** Nepředepsané tolerance: třída ISO 2768-1 (délky f/m/c/v) + ISO 2768-2 (geometrie H/K/L), tabulka podle desetinných míst, nebo volný text. */
 export type GeneralTol =
@@ -651,7 +656,7 @@ function brandCell(cx: number, cy: number, w: number, h: number, meta: DrawingMe
   const ih = logo.h * k;
   const ix = cx + pad + (bw - iw) / 2;
   const iy = cy + pad + (bh - ih) / 2;
-  polys.push({ layer: "title", pts: [[ix, iy], [ix + iw, iy], [ix + iw, iy + ih], [ix, iy + ih], [ix, iy]], img: { x: ix, y: iy, w: iw, h: ih, src: logo.src, ...(logo.trace ? { trace: logo.trace } : {}) } });
+  polys.push({ layer: "title", pts: [[ix, iy], [ix + iw, iy], [ix + iw, iy + ih], [ix, iy + ih], [ix, iy]], img: { x: ix, y: iy, w: iw, h: ih, src: logo.src, ...(logo.trace ? { trace: logo.trace } : {}), ...(logo.svg ? { svg: logo.svg } : {}) } });
   return { x: round2(ix), y: round2(iy), w: round2(iw), h: round2(ih), ...(logo.name ? { name: logo.name } : {}) };
 }
 

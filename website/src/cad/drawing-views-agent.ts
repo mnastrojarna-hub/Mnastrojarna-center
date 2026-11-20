@@ -70,7 +70,8 @@ export async function applyViewsCmd(ctx: ViewsCtx, cmd: ViewsCmd): Promise<{ log
     case "pos":
       return applyPosCmd(ctx, cmd);
     case "bomsheet":
-      throw new Error("bomsheet"); // provede cad/drawing-agent.ts (přidává list)
+    case "tpl":
+      throw new Error(cmd.op); // provede cad/drawing-agent.ts (přidává list / mění dokument a Nastavení)
     case "aux": {
       const res = await ctx.compute();
       const H = res.sheet.h;

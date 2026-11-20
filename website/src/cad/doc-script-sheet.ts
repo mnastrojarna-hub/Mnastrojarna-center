@@ -27,6 +27,7 @@ import type { DrawingOptions, DetailView, ModelView, RevisionItem, GenEdit, Draw
 import type { AuxViewOpt, CutSectionOpt, ViewBreakOpt } from "./drawing-views";
 import { tr } from "./i18n";
 import { rangesText } from "./drawing-balloons";
+import { applyTemplate, sameName, TEMPLATE_FIELDS } from "./title-templates";
 import type { CadDoc, DrawingDoc, Vec2 } from "./types";
 
 /** výstup převodníku, do kterého se zapisuje (doc-script.ts Ctx) */
@@ -97,6 +98,10 @@ const WD = {
   lock: L("zamknout", "lock", "sperren"),
   bom: L("kusovník", "bom", "stückliste"),
   bomSheet: L("list", "sheet", "blatt"),
+  // pojmenované šablony hlavičky (vlna 22, bod 22j – cad/agent-title-tpl.ts)
+  tpl: L("hlavička", "title-template", "kopfvorlage"),
+  tplSave: L("uložit", "save", "speichern"),
+  tplUse: L("použít", "use", "verwenden"),
 };
 type WK = keyof typeof WD;
 const VIEW_W: Record<string, W3> = {
@@ -275,6 +280,18 @@ export function emitTitle(o: SheetOut, doc: CadDoc, s: DrawingDoc, st: TitleStat
       if (sameCmd(ml, { k: "views", cmd: { op: "rev-marks", rev, on: r.marks } })) o.line(ml);
       else o.note(tr("skrytí trojúhelníků revize „{0}“ listu „{1}“ nejde zapsat", rev, s.name));
     }
+  }
+  // šablony hlavičky dokumentu (vlna 22, bod 22j) před prvním razítkem; list podle šablony = `výkres hlavička použít "…"`
+  if (!st.sheets.length) emitTitleTemplates(o, doc);
+  const tplName = str(meta.titleTpl);
+  const tplRec = tplName ? doc.titleTemplates?.find((t) => sameName(t.name, tplName)) : undefined;
+  if (tplRec) {
+    const q = o.q(tplRec.name, true);
+    const l = `${head(o)} ${w(o, "tpl")} ${w(o, "tplUse")} ${q ?? ""}`;
+    if (q && sameCmd(l, { k: "views", cmd: { op: "tpl", act: "use", name: tplRec.name } })) {
+      o.line(l);
+      applyTemplate(M, tplRec);
+    } else o.note(tr("šablonu hlavičky „{0}“ listu „{1}“ nejde zapsat", tplRec.name, s.name));
   }
   // razítko: pole, která se liší od stavu listu při čtení (zděděné pole i vyprázdnit), šablona, nepředepsané tolerance (i tabulka)
   const parts: string[] = [];
@@ -707,5 +724,48 @@ export function emitPositions(o: SheetOut, doc: CadDoc, s: DrawingDoc, valid?: r
     const l = `${head(o)} ${w(o, "bom")} ${w(o, "bomSheet")}`;
     if (sameCmd(l, { k: "views", cmd: { op: "bomsheet" } })) o.line(l);
     else fail(tr("kusovník na samostatném listu"));
+  }
+}
+
+/**
+ * Pojmenované šablony hlavičky dokumentu (vlna 22, bod 22j): `výkres hlavička uložit "Firma" šablona=… logo="data:…" firma=…`.
+ * Logo SVG se zapíše jako SVG (vektor zůstane), jinak PNG; logo přes limit řádku → poznámka (šablona se zapíše bez loga).
+ */
+export function emitTitleTemplates(o: SheetOut, doc: CadDoc): void {
+  for (const rec of doc.titleTemplates ?? []) {
+    const q = o.q(rec.name, true);
+    if (!q) {
+      o.note(tr("šablonu hlavičky „{0}“ nejde zapsat", rec.name));
+      continue;
+    }
+    const parts: string[] = [];
+    const fields: Rec = {};
+    const word = (k: string) => TITLE_FIELDS.find(([key]) => key === k)?.[1][o.li] ?? k;
+    if (rec.template && rec.template !== "iso7200" && TEMPLATE_W[rec.template]) {
+      parts.push(`${word("template")}=${TEMPLATE_W[rec.template][o.li]}`);
+      fields.template = TEMPLATE_W[rec.template][o.li];
+    }
+    for (const k of TEMPLATE_FIELDS) {
+      const v = rec.fields?.[k];
+      if (v === undefined) continue;
+      const vq = o.q(v, true);
+      if (vq === null || !TITLE_FIELDS.some(([key]) => key === k)) {
+        o.note(tr("pole „{0}“ šablony hlavičky „{1}“ nejde zapsat", k, rec.name));
+        continue;
+      }
+      parts.push(`${word(k)}=${vq}`);
+      fields[k] = v;
+    }
+    if (rec.tolTable?.length) o.note(tr("tabulka nepředepsaných tolerancí šablony hlavičky „{0}“ se do skriptu nepřenáší – po přečtení ji zadejte výkres hlavička uložit \"{0}\" nepředepsané=\"desetinná …\"", rec.name));
+    const logo = rec.logo?.svg ?? rec.logo?.src;
+    if (logo) {
+      if (logo.length <= LOGO_MAX) {
+        parts.push(`logo=${o.q(logo, true) ?? ""}`);
+        fields.logo = logo;
+      } else o.note(tr("logo šablony hlavičky „{0}“ nejde zapsat na řádek skriptu (data URL přes {1} kB) – vložte ho znovu: výkres hlavička uložit \"{0}\" logo=\"soubor.svg\"", rec.name, Math.round(LOGO_MAX / 1024)));
+    }
+    const l = `${head(o)} ${w(o, "tpl")} ${w(o, "tplSave")} ${q}${parts.length ? " " + parts.join(" ") : ""}`;
+    if (sameCmd(l, { k: "views", cmd: { op: "tpl", act: "save", name: rec.name, setDefault: false, fields } })) o.line(l);
+    else o.note(tr("šablonu hlavičky „{0}“ nejde zapsat", rec.name));
   }
 }

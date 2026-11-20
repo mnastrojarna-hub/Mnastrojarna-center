@@ -23,6 +23,7 @@ import { asmHooks, coded, sayKv, type OpHandler } from "./util";
 import { reportStaleCopies } from "../bom-notes";
 import { modelId } from "../../doc-outputs";
 import { staleData } from "../outputs-ops";
+import { inputFile } from "./reference";
 
 export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const r = runOf(ctx);
@@ -30,7 +31,7 @@ export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const kernel = ctx.host.kernel;
   const extras = await drawExtras(ctx.ws, kernel, r.doc, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
   const compute: DrawingCompute = drawingMemo(kernel); // tentýž list se v bloku příkazů / při vyhodnocení bloku nepočítá znovu
-  const res = await applyDrawingCmd(r.doc, op.cmd, compute, { extras: () => extras, tabs: () => ctx.ws.listDocs() });
+  const res = await applyDrawingCmd(r.doc, op.cmd, compute, { extras: () => extras, tabs: () => ctx.ws.listDocs(), input: (n) => inputFile(ctx.host.inputs, n) });
   r.doc = res.doc;
   r.changed = r.changed || res.changed;
   r.openDrawingAfter = r.openDrawingAfter || res.open;

@@ -78,6 +78,8 @@ export type DrawingMeta = {
   template?: TitleTemplate;
   /** logo firmy v razítku (data URL PNG / JPEG, rozměr v px, obrys pro DXF / DWG) */
   logo?: TitleLogo;
+  /** název pojmenované šablony hlavičky, ze které list vzal razítko (vlna 22, bod 22j – cad/title-templates.ts) */
+  titleTpl?: string;
   company?: string;
   customer?: string;
   project?: string;
@@ -3370,7 +3372,8 @@ export function toSvg(W: number, H: number, polys: Poly[], texts: DText[]) {
   for (const p of polys) {
     const st = STYLE[p.layer];
     if (p.img) {
-      out.push(`<image x="${f(p.img.x)}" y="${f(p.img.y)}" width="${f(p.img.w)}" height="${f(p.img.h)}" preserveAspectRatio="xMidYMid meet" href="${esc(p.img.src)}"/>`);
+      // logo SVG zůstává vektorem (vlna 22, bod 22j), jinak bitmapa PNG / JPEG
+      out.push(`<image x="${f(p.img.x)}" y="${f(p.img.y)}" width="${f(p.img.w)}" height="${f(p.img.h)}" preserveAspectRatio="xMidYMid meet" href="${esc(p.img.svg ?? p.img.src)}"/>`);
       continue;
     }
     const pts = p.pts.map(([x, y]) => `${f(x)},${f(y)}`).join(" ");

@@ -281,6 +281,11 @@ export type CadDoc = {
   outputs?: ExportRecord[];
   /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
   functional?: FunctionalMark[];
+  /**
+   * pojmenované šablony hlavičky (razítka) s logem použité v dokumentu (vlna 22, bod 22j – cad/title-templates.ts): jdou
+   * s dokumentem do .mncad, sdíleného odkazu i skriptu (`výkres hlavička uložit …`)
+   */
+  titleTemplates?: import("./title-templates").TitleTemplateRec[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */

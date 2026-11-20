@@ -4324,6 +4324,7 @@ export function CadApp() {
             onExported={(e) => liveWith((cur) => recordExport(cur, e).doc)}
             onRecomputeAll={() => void runAgentRef.current("přepočítat vše").then((t) => flash(t.split("\n").find((l) => l.includes("Zbývá")) ?? tr("Přepočteno")))}
             onPropsChange={(p) => commit({ ...doc, props: p })}
+            onTitleTemplates={(t) => commitWith((cur) => ({ ...cur, titleTemplates: t?.length ? t : undefined }))}
             onClose={() => {
               const t = docTabs.find((x) => x.id === tabId);
               if (t?.kind === "drawing") closeTab(t.id);
