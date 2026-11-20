@@ -204,6 +204,7 @@ srazit 0,5 hrany horní kruhové
 skica XY odsazení 10: mnohoúhelník 6 9,2376
 vysunout 5 odebrat obráceně
 závit M10 délka 26 v 0 0 -45
+druh normálie
 
 # ── Šroub M10x50 ISO 4762
 nový díl "Šroub M10x50 ISO 4762"
@@ -214,6 +215,7 @@ srazit 0,5 hrany horní kruhové
 skica XY odsazení 10: mnohoúhelník 6 9,2376
 vysunout 5 odebrat obráceně
 závit M10 délka 26 v 0 0 -50
+druh normálie
 
 # ── Šroub M8x16 ISO 4762
 nový díl "Šroub M8x16 ISO 4762"
@@ -224,6 +226,21 @@ srazit 0,5 hrany horní kruhové
 skica XY odsazení 8: mnohoúhelník 6 6,9282
 vysunout 4 odebrat obráceně
 závit M8 délka 16 v 0 0 -16
+druh normálie
+
+# ── výkresy dílů
+záložka "900-01-00-01 Základová deska"
+výkres A2 měřítko 1:2 pohledy přední,horní,iso
+kótovat chytře
+výkres razítko název="Základová deska" číslo="900-01-00-01" kreslil="AI" nepředepsané="ISO 2768-mK"
+záložka "900-01-00-02 Matrice"
+výkres A3 pohledy přední,horní,iso
+kótovat chytře
+výkres razítko název="Matrice" číslo="900-01-00-02" kreslil="AI" nepředepsané="ISO 2768-mK"
+záložka "900-01-00-04 Kotevní deska"
+výkres A3 pohledy přední,horní,spodní,iso
+kótovat chytře
+výkres razítko název="Kotevní deska" číslo="900-01-00-04" kreslil="AI" nepředepsané="ISO 2768-mK"
 
 # ── normálie
 normálie vodicí sloupek 24x150
@@ -365,25 +382,13 @@ sestava vazba 52 preferovat max
 pohyb motor lineární vazba 12 167..117 kroky 40
 pohyb kolize
 
-# ── výkresy: A1 sestava + 3 listy dílů
+# ── výkres sestavy A1 (listy dílů jsou výše)
 výkres A1 pohledy přední,horní,iso
 výkres řez XZ odsazení -110 celý
 výkres kusovník ano
 výkres balónky ano
 výkres razítko název="Střižný nástroj" číslo="900-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"
 kótovat celkově
-záložka "900-01-00-01 Základová deska"
-výkres A2 měřítko 1:2 pohledy přední,horní,iso
-kótovat chytře
-výkres razítko název="Základová deska" číslo="900-01-00-01" kreslil="AI" nepředepsané="ISO 2768-mK"
-záložka "900-01-00-02 Matrice"
-výkres A3 pohledy přední,horní,iso
-kótovat chytře
-výkres razítko název="Matrice" číslo="900-01-00-02" kreslil="AI" nepředepsané="ISO 2768-mK"
-záložka "900-01-00-04 Kotevní deska"
-výkres A3 pohledy přední,horní,spodní,iso
-kótovat chytře
-výkres razítko název="Kotevní deska" číslo="900-01-00-04" kreslil="AI" nepředepsané="ISO 2768-mK"
 
 # ── kontrola
 záložka "900-01-00 Střižný nástroj"

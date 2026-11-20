@@ -11,7 +11,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import { load } from "./cad-harness/bundle.mjs";
-import { checkMotion, checkRun, checkStrict, pdfInfo, REAL_SCRIPT, results } from "./cad-acceptance.mjs";
+import { checkMotion, checkRun, checkStrict, isDocGap, pdfInfo, REAL_SCRIPT, results } from "./cad-acceptance.mjs";
 
 const require = createRequire(import.meta.url);
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "cad-acceptance-test-"));
@@ -115,6 +115,22 @@ test("strict consistency: ⚠ in the normal run → the strict run must stop on 
   checkStrict("t", normal, run(report(), { exit: 0 })); // passes despite ⚠ – the gate must fail it
   const st = results.slice(before).map((x) => x.status);
   assert.deepEqual(st, ["ok", "ok", "ok", "fail"]);
+});
+
+test("declared documentation gaps (vlna 22, bod 19): exactly the listed parts; strict exception only for the declared code", () => {
+  const gaps = ["Díl A", "Díl B"];
+  const w = (text, code = "bom.make-incomplete") => ({ line: null, level: "warn", code, doc: ASM, text });
+  assert.equal(isDocGap(w("vyráběnému dílu chybí výkres, číslo nebo označení materiálu: Díl A (bez výkresu, bez čísla), Díl B (bez výkresu, bez čísla)"), gaps), true);
+  assert.equal(isDocGap(w("…: Díl A (bez výkresu, bez čísla)"), gaps), false); // chybí Díl B
+  assert.equal(isDocGap(w("…: Díl A (bez výkresu), Díl B (bez výkresu), Díl C (bez výkresu)"), gaps), false); // navíc Díl C
+  assert.equal(isDocGap(w("…: Díl A (bez výkresu), Díl B (bez výkresu)", "drawing.warning"), gaps), false); // jiný kód
+  assert.equal(isDocGap(w("…: Díl A (bez výkresu), Díl B (bez výkresu)"), []), false); // nic deklarováno
+  const before = results.length;
+  const normal = run({ ...report(), entries: [w("…: Díl A (bez výkresu), Díl B (bez výkresu)")], counts: { ...report().counts, warnings: 1 } });
+  checkStrict("t", normal, run(report(), { exit: 0 }), true, ["bom.make-incomplete"]); // výjimka: přísný běh projde
+  checkStrict("t", normal, run(report(), { exit: 0 }), true); // bez výjimky: ⚠ v normálním běhu = přísný musí zastavit
+  // s výjimkou: zpráva, normální běh čistý, přísný projde; bez ní: zpráva ok, „normální běh bez ⚠“ fail, „přísný zastaví“ fail
+  assert.deepEqual(results.slice(before).map((x) => x.status), ["ok", "ok", "ok", "ok", "fail", "fail"]);
 });
 
 test("motion: the one-line summary with rigid-group travel", () => {

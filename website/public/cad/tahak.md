@@ -11,7 +11,7 @@ Velká sestava: všechny díly jako bloky `nový díl "…"`, pak v záložce se
 
 ## Díl (záložka „Deska“)
 `kvádr 100 60 12` · `skica XY: obdélník 30 18 roh 60 36` · `vazba pevně e1.c0` · `kóta délka e1.s0 30` → `vysunout 4 odebrat`
-`zaoblit 2 hrany svislé` · `srazit 1 hrany horní` · `materiál ocel` · `proměnná t = 12` · úpravy: `upravit "Zaoblení 1" radius=3` · `potlačit "Sražení 1"` · `smazat poslední`
+`zaoblit 2 hrany svislé` · `srazit 1 hrany horní` · `materiál 1.2379` · `proměnná t = 12` · úpravy: `upravit "Zaoblení 1" radius=3` · `potlačit "Sražení 1"` · `smazat poslední`
 Jinde: `válec 20 30 v 50 30 12` · `skica XZ: obdélník 10 30 roh 0 0` → `rotovat 360 osa Z` · `pole kruhové 6 osa Z v 50 30 0` · `zrcadlit YZ` · `normálie M8x30` · `pružina tlačná d 2 De 20 L0 50 n 8` (díl z tabulky) · `zpět` (jen mezi běhy – vrací celý běh, ne řádek)
 
 ## Díry a závity
@@ -19,7 +19,7 @@ Jinde: `válec 20 30 v 50 30 12` · `skica XZ: obdélník 10 30 roh 0 0` → `ro
 Kontrola dílu: `stav` · `měřit těleso` · `měřit díry` · `kontrola`
 
 ## Sestava (záložka „Nástroj“)
-`nový díl "Čep"` · `válec 20 30` · `záložka "Nástroj"` · `vložit "Deska" v 0 0 0 ukotvit jako "D1"` · `vložit "Čep" v 25 30 40` · `sestava komponenta #2 přezdívka "K48"` · `sestava` (komponenty, počet) · `sestava plochy "K48"`
+`nový díl "Čep"` · `válec 20 30` · `materiál 1.0503` · `záložka "Nástroj"` · `vložit "Deska" v 0 0 0 ukotvit jako "D1"` · `vložit "Čep" v 25 30 40` · `sestava komponenta #2 přezdívka "K48" číslo "MN-2"` · `sestava komponenta "D1" číslo "MN-1"` · `sestava` (komponenty, počet) · `sestava plochy "K48"`
 `sestava vazba souosost "K48" Ø20 "D1" Ø21` · `sestava vazba vzdálenost "K48" -Z "D1" horní hodnota 20` · `sestava vazby` · `kolize` · `kusovník` · `kontrola sestava`. Jinde: `sestava vazba kontakt "K48" -Z "D1" horní`
 
 ## Pružiny a pohyb
@@ -29,7 +29,7 @@ Kontrola dílu: `stav` · `měřit těleso` · `měřit díry` · `kontrola`
 
 ## Výkres (záložka dílu)
 `záložka "Deska"` · `výkres A3 měřítko 1:1 pohledy přední,horní,iso` · `výkres řez XZ odsazení -30` (rovina Y = 30; bez odsazení leží na stěně) · `kótovat chytře funkční 100` · `výkres tolerance 100 ±0,05` · `výkres tolerance Ø21 H7`
-`výkres razítko šablona=iso7200 číslo="MN-1"` · `výkres nepředepsané ISO 2768-mK` · `výkres list nový "Detail"` · `kótovat nic` · `výkres detail přední v 25 8 poloměr 6` · `výkres stav vše` · `výkres export pdf vše`. Jinde (výkres sestavy): `výkres kusovník ano`
+`výkres razítko šablona=iso7200` · `výkres nepředepsané ISO 2768-mK` · `výkres list nový "Detail"` · `kótovat nic` · `výkres detail přední v 25 8 poloměr 6` · `výkres stav vše` · `výkres export pdf vše`. Jinde (výkres sestavy): `výkres kusovník ano`
 
 ## Výstupy a odkazy
 `uložit` · `export step` · `export skript` · `sdílet` · `odkaz` (adresa znovu) · v CLI `--formats step,pdf,dxf` a `--share`. Jinde (úložiště): `sdílet dní 30` · `export step odkaz`

@@ -1,34 +1,35 @@
 === run 1 ===
 ✓ nový díl „Deska A“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ nový list výkresu „List 1“ (Chytré kóty)
-✓ výkres: A4
-✓ nepředepsané tolerance ISO 2768-mK
-✓ list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4 – výsledek po vyhodnocení listu níže
+→ nepředepsané tolerance ISO 2768-mK – výsledek po vyhodnocení listu níže
+→ list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
 ✓ výkres PDF: Deska_A_vykres.pdf · 77 kB · výkres PDF – staženo (bez dialogu)
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Revize modelu: r·?
 Výkres: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) – odpovídá modelu
 Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 ⚠ vydaný výkres neodpovídá modelu: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
-✓ Kvádr 1: size [60; 40; 10] → [30; 40; 10]
-✓ Kvádr 1 (box)
+→ Kvádr 1: size [60; 40; 10] → [30; 40; 10] – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 12000 mm³ · těleso platné
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 40 × 10 mm (X 0…30, Y 0…40, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Revize modelu: r·?
 ⚠ Výkres: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
 ⚠ Exporty: 1 z 1 ze starší revize modelu – PDF „Deska_A_vykres.pdf“ r·? (výpis: exporty)
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 40 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 30 × 40 × 10 mm, new, roh [0; 0; 0]
 === run 3 ===
 Výkres „List 1“: list A4 na šířku · měřítko 1:1 · pohledy: přední, horní, levý, izometrie · kóty: Chytré kóty (řetězově)
 Listy (1): 1 „List 1“ A4 (aktivní)
@@ -54,12 +55,12 @@ Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y 
 ⚠ řádek 1: vydaný výkres neodpovídá modelu: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 40 × 10 mm (X 0…30, Y 0…40, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Revize modelu: r·?
 ⚠ Výkres: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
 ⚠ Exporty: 1 z 1 ze starší revize modelu – PDF „Deska_A_vykres.pdf“ r·? (výpis: exporty)
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 40 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 30 × 40 × 10 mm, new, roh [0; 0; 0]
 Exporty (1, zastaralých 1) · model je teď r·?:
   1. ⚠ PDF „Deska_A_vykres.pdf“ · list List 1 · rev. A · z modelu r·? (?.?.????) – ZASTARALÝ: model je teď r·?, exportujte znovu: výkres export pdf
 ⚠ řádek 4: vydaný výkres neodpovídá modelu: list „List 1“ se exportuje s revizí A, ale rev. A byla vydána z modelu r·? a model je teď r·? – soubor má jiný obsah pod stejným písmenem; nejdřív vydejte novou revizi: výkres vydat B
@@ -67,14 +68,14 @@ Exporty (1, zastaralých 1) · model je teď r·?:
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 40 × 10 mm (X 0…30, Y 0…40, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Revize modelu: r·?
 ⚠ Výkres: list „List 1“ vydán jako rev. A z modelu r·? (?.?.????), model je teď r·? – vydejte novou revizi: výkres vydat B
 ⚠ Exporty: 2 z 2 ze starší revize modelu – PDF „Deska_A_vykres.pdf“ r·?, PDF „Deska A znovu.pdf“ r·? (výpis: exporty)
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 40 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 30 × 40 × 10 mm, new, roh [0; 0; 0]
 === run 4 ===
-✓ list „List 1“ vydán jako rev. B z modelu r·? (?.?.????) · do tabulky revizí přidána revize B „změna modelu r·? → r·?“
+→ list „List 1“ vydán jako rev. B z modelu r·? (?.?.????) · do tabulky revizí přidána revize B „změna modelu r·? → r·?“ – výsledek po vyhodnocení listu níže
 Výkres „List 1“: list A4 na šířku · měřítko 1:1 · pohledy: přední, horní, levý, izometrie · kóty: Chytré kóty (řetězově)
 Listy (1): 1 „List 1“ A4 (aktivní)
 Kóty a popisy (3, z toho vygenerovaných 3):
@@ -96,6 +97,7 @@ Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y 
   přední (x = X, y = Z): x 0…30, y 0…10 mm · 1:1 · na listu x 44…74, y 166…176
   horní (x = X, y = Y): x 0…30, y 0…40 mm · 1:1 · na listu x 44…74, y 92…132
   levý (x = −Y, y = Z): x −40…0, y 0…10 mm · 1:1 · na listu x 108…148, y 166…176
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
 Výstupy dokumentu „Deska A“ · revize modelu r·?
 Listy (1):
   List 1: Vydání: rev. B z modelu r·? (?.?.????) – odpovídá modelu
@@ -108,9 +110,9 @@ Zastaralé výstupy (2) · model je teď r·?:
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 40 × 10 mm (X 0…30, Y 0…40, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Revize modelu: r·?
 Výkres: list „List 1“ vydán jako rev. B z modelu r·? (?.?.????) – odpovídá modelu
 ⚠ Exporty: 2 z 2 ze starší revize modelu – PDF „Deska_A_vykres.pdf“ r·?, PDF „Deska A znovu.pdf“ r·? (výpis: exporty)
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 40 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 12000 mm³ · těleso platné – 30 × 40 × 10 mm, new, roh [0; 0; 0]

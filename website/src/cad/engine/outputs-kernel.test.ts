@@ -136,7 +136,10 @@ describe("výstupy textem se skutečným jádrem (B3)", async () => {
     expect(out[1].sheets).toBe(3);
     expect(pdfPages(sink.files.get("Uložení výkres.pdf")!.data)).toBe(3);
     expect(new TextDecoder().decode(sink.files.get("Uložení kusovník.csv")!.data)).toMatch(/Čep;[^;]*;2;/);
-    expect(notes.filter((n) => n.code !== "drawing.warning")).toEqual([]);
+    // vlna 22, bod 19 (D1): výstup výkresu i kusovníku sestavy shrne výrobní dokumentaci (ℹ bom.docs) a vyráběné díly bez čísla
+    // výkresu (⚠ bom.make-incomplete) – Deska a Čep tu číslo nemají; nic jiného (STEP, .mncad) hlášku nepřidá
+    const docNotes = [{ code: "bom.docs", args: ["vyráběné 2, normálie 0, nakupované 0"] }, { code: "bom.make-incomplete", args: ["Deska (bez čísla), Čep (bez čísla)"] }];
+    expect(notes.filter((n) => n.code !== "drawing.warning")).toEqual([...docNotes, ...docNotes]);
     // opakovaný STEP sestavy: stejné bajty
     const again = await writeDocFormat({ kernel, files: sink }, ws, asm, "step", () => undefined);
     if (process.env.MNCAD_PROBE_DIR) {

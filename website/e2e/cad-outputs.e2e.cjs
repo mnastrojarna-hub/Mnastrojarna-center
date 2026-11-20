@@ -40,9 +40,11 @@ const grammarOk = (text) => text.trim().split('\n').every((l) => G.some((re) => 
 const bytes = (s) => Buffer.byteLength(s, 'utf8') + 1;
 
 const SCRIPT = [
-  // nepředepsané tolerance v razítku dílů – bez nich export listu dílu hlásí ⚠ drawing.warning (vlna 15, razítko)
-  'nový díl Deska', 'kvádr 80 60 10', 'díra 10,5 skrz v 40 30', 'výkres A4', 'výkres nepředepsané ISO 2768-mK',
-  'nový díl Čep', 'válec 10 30', 'výkres A4', 'výkres nepředepsané ISO 2768-mK',
+  // nepředepsané tolerance v razítku dílů – bez nich export listu dílu hlásí ⚠ drawing.warning (vlna 15, razítko); číslo výkresu
+  // vyráběného dílu PŘED vložením do sestavy – bez něj výstup sestavy hlásí ⚠ bom.make-incomplete (vlna 22, bod 19), po vložení
+  // ⚠ asm.stale-copy (bod 22g). Stejný počet řádků jako dřív (čísla řádků L18 / L20 níže)
+  'nový díl Deska', 'kvádr 80 60 10', 'díra 10,5 skrz v 40 30', 'výkres A4', 'výkres razítko číslo="D-1" nepředepsané="ISO 2768-mK"',
+  'nový díl Čep', 'válec 10 30', 'výkres A4', 'výkres razítko číslo="D-2" nepředepsané="ISO 2768-mK"',
   'nová sestava Uložení', 'vložit "Deska" ukotvit', 'vložit "Čep" v 100 0 0', 'vložit "Čep" v 150 0 0', 'výkres A3 na šířku',
 ].join('\n');
 const OUTS = ['uložit', 'export step', 'výkres export pdf dokument', 'export step base64'];

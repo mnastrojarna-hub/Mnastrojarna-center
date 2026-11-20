@@ -96,3 +96,4 @@ podle textu kóty – poloha popisu neověřena	nach dem Maßtext – Lage der B
 #!dynamic – texty kódů (src/cad/engine/codes.ts) a klíč varování (drawing-issues.ts DIMS_INCOMPLETE_KEY) se překládají za běhu
 kóty neúplné – {0}	Maße unvollständig – {0}
 list {0}: přesná tolerance na rozměru, který není funkční – {1}	Blatt {0}: enge Toleranz an einem Maß, das nicht funktional ist – {1}
+list bez kót – rozměry dílu nese list „{0}“	Blatt ohne Maße – die Maße des Teils stehen auf Blatt „{0}“
