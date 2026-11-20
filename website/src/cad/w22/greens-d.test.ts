@@ -191,6 +191,16 @@ describe("greens D3 – kontrola kót pro výrobu (bod 18)", () => {
     const ok = checkSheet({ doc: plate(), views: [FRONT, TOP], annotations: [...sizes(), ...positions()], dimensions: "smart" });
     expect(dimCheckIssues(ok)).toEqual([]);
   });
+  it("12b (fáze 2): hloubka závitové díry z popisu „M8 ↧10“ s odkazem na kružnici vrtáku – splněno; bez ↧ dál chybí", () => {
+    const d: CadDoc = { ...emptyDoc("Deska Z"), features: [F({ name: "Kvádr 1", type: "box", size: [100, 60, 20], position: [0, 0, 0], centered: false, mode: "new" }), F({ name: "Díra Z", type: "hole", kind: "tapped", thread: "M8", position: [50, 30, 20], axis: "Z", flip: false, diameter: 6.8, depth: 10, cbDiameter: 0, cbDepth: 0 })] };
+    const k1 = 3.4 * Math.SQRT1_2; // odkaz končí na kružnici vrtáku Ø6,8 (ne na jmenovitém M8)
+    const call = (lines: string[]): DrawingAnnotation => ({ id: "cz", view: "top", type: "callout", tip: [50 + k1, -30 - k1], at: [70, -10], lines });
+    const base = [dim("top", "horizontal", [0, 0], [100, 0]), dim("top", "vertical", [0, 0], [0, -60]), dim("front", "vertical", [0, 0], [0, -20]), dim("top", "horizontal", [0, -5], [50, -5]), dim("top", "vertical", [-5, 0], [-5, -30])];
+    const ok = checkSheet({ doc: d, views: [FRONT, TOP], annotations: [...base, call(["M8 ↧10"])], dimensions: "smart" });
+    expect(dimCheckLine(ok)).not.toMatch(/hloubka díry/);
+    const no = checkSheet({ doc: d, views: [FRONT, TOP], annotations: [...base, call(["M8"])], dimensions: "smart" });
+    expect(dimCheckLine(no)).toMatch(/chybí: .*10 \(hloubka díry\)/);
+  });
   it("12: tolerance funkčních prvků „n/n“ jen s tolerancí na kótě (velikost = předepsaná H7); bez vyznačení „neověřeny“", () => {
     const d = plate();
     const marks: FunctionalMark[] = [{ id: "f1", kind: "functional", feature: d.features[1].id, tol: "H7" }];

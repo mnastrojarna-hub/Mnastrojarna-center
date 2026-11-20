@@ -4181,6 +4181,7 @@ export const EN: Record<string, string> = {
  "list {0}{1}: {2}": "sheet {0}{1}: {2}",
  "List {0}/{1}": "Sheet {0}/{1}",
  "List 1": "Sheet 1",
+ "list bez kót – rozměry dílu nese list „{0}“": "sheet without dimensions – the part dimensions are on sheet “{0}”",
  "List byl vydán z modelu {0} ({1}), model je teď {2}. List ukazuje nynější model – soubor s písmenem {3} by měl jiný obsah než vydaný papír.": "The sheet was issued from model {0} ({1}), the model is now {2}. The sheet shows the current model – a file with letter {3} would differ from the issued paper.",
  "List jen s kusovníkem – pohledy ani kóty nemá": "Sheet with the parts list only – it has no views or dimensions",
  "list jen s kusovníkem „{0}“ vzniká příkazem výkres kusovník list u listu sestavy – zde se zapíše jako běžný list": "the parts-list-only sheet “{0}” is created by drawing bom sheet on the assembly sheet – written here as a normal sheet",

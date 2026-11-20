@@ -4181,6 +4181,7 @@ export const DE: Record<string, string> = {
  "list {0}{1}: {2}": "Blatt {0}{1}: {2}",
  "List {0}/{1}": "Blatt {0}/{1}",
  "List 1": "Blatt 1",
+ "list bez kót – rozměry dílu nese list „{0}“": "Blatt ohne Maße – die Maße des Teils stehen auf Blatt „{0}“",
  "List byl vydán z modelu {0} ({1}), model je teď {2}. List ukazuje nynější model – soubor s písmenem {3} by měl jiný obsah než vydaný papír.": "Das Blatt wurde aus Modell {0} freigegeben ({1}), das Modell ist jetzt {2}. Das Blatt zeigt das aktuelle Modell – eine Datei mit Buchstabe {3} hätte einen anderen Inhalt als das freigegebene Papier.",
  "List jen s kusovníkem – pohledy ani kóty nemá": "Blatt nur mit Stückliste – ohne Ansichten und Maße",
  "list jen s kusovníkem „{0}“ vzniká příkazem výkres kusovník list u listu sestavy – zde se zapíše jako běžný list": "das reine Stücklistenblatt „{0}“ entsteht mit zeichnung stückliste blatt am Baugruppenblatt – hier als normales Blatt geschrieben",

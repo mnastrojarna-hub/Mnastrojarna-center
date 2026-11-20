@@ -455,7 +455,11 @@ function onHole(x: CircFact, q: DimReq): boolean {
   const tol = Math.max(0.05, h.r * 0.05);
   return h.centers.some((p) => {
     const c = projQ(x.cam, p);
-    return near2(x.c, c, tol) || !!x.tags?.some((t) => near2(t.c, c, tol)) || (!!x.tip && Math.abs(Math.hypot(x.tip[0] - c[0], x.tip[1] - c[1]) - h.r) <= Math.max(tol, 0.5));
+    if (near2(x.c, c, tol) || !!x.tags?.some((t) => near2(t.c, c, tol))) return true;
+    if (!x.tip) return false;
+    // odkaz popisu končí na kružnici díry; u závitu (r = jmenovitý průměr / 2) i na kružnici vrtáku (≈ 0,8 r) – „M8 ↧10“ (fáze 2)
+    const dist = Math.hypot(x.tip[0] - c[0], x.tip[1] - c[1]);
+    return Math.abs(dist - h.r) <= Math.max(tol, 0.5) || (dist >= 0.75 * h.r && dist <= h.r);
   });
 }
 /** … a má hodnotu skupiny (Ø, závit M, poloměr) */

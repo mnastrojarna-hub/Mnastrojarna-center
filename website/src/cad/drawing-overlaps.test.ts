@@ -102,3 +102,20 @@ describe("hlášení listu neopakuje překryv poznámky, který už ohlásil př
     expect(withoutKnownTexts(all, [])).toBe(all);
   });
 });
+
+describe("značky skupin děr nevedou přes hrany pohledu (fáze 2 – akceptační nástroj: „A“ přes sousední díru)", () => {
+  it("značka u díry se přesune do volného rohu, když první roh křižuje hrana pohledu; bez hrany zůstane vpravo nahoře", async () => {
+    const { annotationGeometry, textBox, boxHitsSegs } = await import("./drawing");
+    // pohled 1:1 na listu od [100, 100]; díra r 4 ve [20, 20]; svislá hrana x = 24 vpravo od díry (přes první roh značky)
+    const view = { key: "top", px: 100, py: 100, s: 1, x0: 0, y0: 0, w: 60, h: 60, ents: [{ t: "line" as const, a: [24, 0] as [number, number], b: [24, 60] as [number, number] }] };
+    const ann = { id: "c1", view: "top", type: "callout" as const, tip: [20, 20] as [number, number], at: [40, 40] as [number, number], lines: ["2× Ø8 (A)"], tag: "A", tags: [{ c: [20, 20] as [number, number], r: 4 }] };
+    const g = annotationGeometry({ views: [view], scaleValue: 1 }, [ann as never]);
+    const tag = g.texts.find((t) => t.s === "A")!;
+    const segs: [[number, number], [number, number]][] = [[[124, 100], [124, 160]]];
+    expect(boxHitsSegs(textBox(tag), segs)).toBe(false);
+    expect(tag.anchor).toBe("end"); // vlevo od díry
+    const free = annotationGeometry({ views: [{ ...view, ents: [] }], scaleValue: 1 }, [ann as never]).texts.find((t) => t.s === "A")!;
+    expect(free.anchor).toBeUndefined();
+    expect(free.x).toBeGreaterThan(120);
+  });
+});

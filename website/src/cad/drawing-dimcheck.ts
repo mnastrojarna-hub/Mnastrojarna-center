@@ -14,6 +14,14 @@ import type { CadDoc, DrawingAnnotation } from "./types";
 /** kontrola listu; sestava, 2D výkres a prázdný díl → null (kontrola zná jen díly z historie prvků) */
 export function sheetDimCheck(doc: CadDoc, res: Pick<DrawingResult, "views" | "texts" | "holes">, anns: readonly DrawingAnnotation[], o: Partial<DrawingOptions>): DimCompleteResult | null {
   if (doc.kind === "assembly" || doc.kind === "draft" || !doc.features.length) return null;
+  // list záměrně bez kót (`kótovat nic`, žádná kóta ani popis díry) u dílu, jehož kóty nese jiný list (detaily, řezy na 2. listu):
+  // tady se úplnost nekontroluje – řekne to „nezkontrolováno“ s listem, který kóty nese; úplnost hlásí ten list. Jediný list
+  // dílu bez kót se kontroluje dál (⚠ kóty neúplné).
+  const dimmed = (x: { options?: unknown; annotations?: readonly DrawingAnnotation[] }) => ((x.options as Partial<DrawingOptions> | undefined)?.dimensions ?? "auto") !== "none" || (x.annotations ?? []).some((a) => a.type === "dim" || a.type === "callout");
+  if (o.dimensions === "none" && !anns.some((a) => a.type === "dim" || a.type === "callout")) {
+    const other = (doc.drawings ?? []).find((x) => dimmed(x));
+    if (other) return { items: [], size: { ok: 0, total: 0 }, pos: { ok: 0, total: 0 }, aux: [], unchecked: [tr("list bez kót – rozměry dílu nese list „{0}“", other.name || tr("list {0}", (doc.drawings ?? []).indexOf(other) + 1))], baked: false, tol: { marked: 0, ok: 0, missing: [], over: [] } };
+  }
   return checkSheet({
     doc,
     views: res.views,
