@@ -98,6 +98,13 @@ export const CODES = [
   { code: "clash.hidden", level: "note", key: "skryté komponenty se nekontrolují ({0})" },
   { code: "clash.rechecked", level: "note", key: "kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila" },
   { code: "motion.conflict", level: "warn", key: "pohyb porušuje vazbu „{0}“ v kroku {1}" },
+  // priorita tvrdých podmínek, motor na mezi, neplatné kroky, neurčená poloha, statický konflikt (vlna 22, body 2 a 8) – cad/motion-quasi.ts
+  { code: "motion.motor-limit", level: "warn", key: "motor {0} stojí na mezi v krocích {1} – brání: {2}" },
+  { code: "motion.invalid", level: "warn", key: "neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}); konflikt: {2}" },
+  { code: "motion.undetermined", level: "warn", key: "poloha „{0}“ není vazbami určena (volná v mezi {1})" },
+  { code: "mate.conflict", level: "warn", key: "vazby nelze splnit spolu – polohy komponent beze změny; {0}" },
+  // pružina po načtení dokumentu (vlna 22, bod 7): délka se odvozuje z dosedacích ploch – cad/asm-spring.ts springDrift
+  { code: "spring.stale", level: "warn", key: "pružina „{0}“: uložená délka {1} neodpovídá dosedacím plochám ({2}) – délka odvozena z ploch" },
   // výsledek studie jen pro stav sestavy, pro který vznikl (vlna 22, bod 1); motory: rozsah × rychlost a začátek (body 9, 11) – cad/motor-model.ts
   { code: "motion.stale", level: "warn", key: "výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“" },
   { code: "motion.recomputed", level: "note", key: "pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}" },
@@ -105,6 +112,8 @@ export const CODES = [
   { code: "motion.motor-short", level: "warn", key: "motor {0} nedojede na konec: jízda trvá {1} s, studie má {2} s" },
   { code: "motion.gap-negative", level: "warn", key: "motor {0}: hodnota vazby „{1}“ klesne pod nulu ({2} mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)" },
   { code: "motion.duration-extended", level: "warn", key: "délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)" },
+  { code: "motion.duration-set", level: "note", key: "délka studie změněna z {1} s na {2} s – určuje ji doba jízdy jediného motoru {0} (rozsah × rychlost)" },
+  { code: "motion.end-unused", level: "warn", key: "motor {0}: uložený konec {1} se nepoužívá – motor jede bez koncové hodnoty, na konci studie je na {2}" },
   // ── měření, kontrola, porovnání, materiál (5.2 č. 31, 37; kap. 6) ──
   { code: "measure.truncated", level: "note", key: "vypsáno {0} z {1}" },
   { code: "check.hole-missing", level: "warn", key: "prvek díry „{0}“ nemá v geometrii díru" },

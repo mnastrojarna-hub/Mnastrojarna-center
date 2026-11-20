@@ -41,7 +41,11 @@ export type MotionCmd =
       trace?: { comp: string; point?: Vec3 } | null;
       /** tam a zpět (cad/agent-motion-dyn.ts) */
       back?: boolean;
+      /** chování na mezi (vlna 22, bod 8): `na mezi stop` (výchozí – motor stojí) | `na mezi chyba` (krok neplatný) */
+      atLimit?: "stop" | "error";
     }
+  /** režim studie (vlna 22, bod 2): `pohyb kvazistatika` | `pohyb automaticky` (null); `pohyb kinematika` = dynamika vypnuta → kinematika */
+  | { op: "mode"; mode: "quasistatic" | null }
   | { op: "dyn"; cmd: DynCmd }
   | { op: "set"; steps?: number; step?: number; duration?: number; collisions?: boolean; trace?: { comp: string; point?: Vec3 } | null }
   | { op: "run" }
@@ -77,11 +81,18 @@ const K = {
   stop: W("zastavit", "stop", "pause", "pauza", "anhalten"),
   export: W("export", "exportovat", "uložit", "exportieren"),
   del: W("smazat", "zrušit", "odstranit", "delete", "remove", "clear", "löschen", "loeschen", "entfernen"),
+  // režim studie a chování motoru na mezi (vlna 22, body 2 a 8)
+  quasi: W("kvazistatika", "kvazistatiku", "kvazistatický", "kvazistaticky", "quasistatic", "quasi-static", "quasistatics", "quasistatik", "quasistatisch"),
+  auto: W("automaticky", "automatický", "auto", "automatic", "automatisch"),
+  at: W("na", "at", "an"),
+  limit: W("mezi", "limit", "grenze"),
+  stopL: W("stop", "stát", "stat", "zastavit", "stopp", "halt"),
+  error: W("chyba", "neplatný", "neplatny", "error", "invalid", "fehler", "ungültig", "ungueltig"),
 };
 const FORMATS: Record<string, "csv" | "png" | "webm"> = { csv: "csv", tabulka: "csv", table: "csv", tabelle: "csv", png: "png", snímky: "png", snimky: "png", frames: "png", bilder: "png", webm: "webm", video: "webm", animace: "webm", animation: "webm" };
 
 export const MOTION_USE = () =>
-  tr("pohyb motor rotační|lineární \"<komponenta>\"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa \"<X>\" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat");
+  tr("pohyb motor rotační|lineární \"<komponenta>\"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa \"<X>\" [bod x y z]] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat");
 
 /** rozsah „0..360“, „0…360“, „od 0 do 360“ nebo dvě čísla „0 360“; „od 57,5“ bez konce = jen začátek (konec dá zdvih / rychlost) */
 function range(c: AsmCursor): { from: number; to?: number } | null {
@@ -157,6 +168,9 @@ function studyOpt(c: AsmCursor, o: { steps?: number; step?: number; duration?: n
 export function parseMotionText(line: string): MotionCmd {
   const c = new AsmCursor(asmTokens(line).slice(1));
   if (c.done || c.is(K.status)) return { op: "status" };
+  // režim: kvazistatika / automaticky (kinematika a dynamika – cad/agent-motion-dyn.ts)
+  if (c.is(K.quasi) && c.peek(1) === undefined) return { op: "mode", mode: "quasistatic" };
+  if (c.is(K.auto) && c.peek(1) === undefined) return { op: "mode", mode: null };
   // dynamika, hmotnost, síla / moment na vazbě (cad/agent-motion-dyn.ts)
   const dyn = parseDynText(c);
   if (dyn) return { op: "dyn", cmd: dyn };
@@ -195,7 +209,14 @@ export function parseMotionText(line: string): MotionCmd {
         c.i++;
         out.speed = c.num(tr("rychlost"));
       } else if (backArg(c)) out.back = true;
-      else if (!studyOpt(c, out)) throw new Error(tr("pohyb motor: neznámá volba „{0}“ – {1}", c.peek()!.t, MOTION_USE()));
+      else if (c.is(K.at) && c.is(K.limit, 1)) {
+        // na mezi stop | chyba (EN at limit stop | error, DE an grenze stopp | fehler)
+        c.i += 2;
+        if (c.is(K.stopL)) out.atLimit = "stop";
+        else if (c.is(K.error)) out.atLimit = "error";
+        else throw new Error(tr("motor: na mezi stop | chyba – stop = motor stojí na poslední dosažitelné hodnotě, chyba = kroky za mezí jsou neplatné"));
+        c.i++;
+      } else if (!studyOpt(c, out)) throw new Error(tr("pohyb motor: neznámá volba „{0}“ – {1}", c.peek()!.t, MOTION_USE()));
     }
     if (rng) out.from = rng.from;
     else out.start = "current";

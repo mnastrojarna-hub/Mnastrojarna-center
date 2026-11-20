@@ -59,10 +59,13 @@ import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin
 import { applySpringCmd, refreshSprings } from "./asm-spring-agent";
 import { applySpringNew, applySpringPattern, springHelpLines } from "./asm-spring-between";
 import { springEffective } from "./asm-spring-geom";
+import { springSeatMates } from "./asm-spring";
 import { kinHasLimits, kinHasValue } from "./mate-spec";
 import { ensureMateRefs, entKey, refGeo } from "./mate-geo";
 import { entPrint, facePrint, markLost, matchEnt, matchFace, matchLost, withFace, type EntCand, type RefPrint } from "./mate-remap";
 import { isKinMate } from "./mates-kin";
+import { conflictText, solveStatic, type StaticConflict } from "./mates-static";
+import { isLimitMate } from "./motion-quasi";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import {
   MATE_LABEL,
@@ -432,8 +435,11 @@ export function geoProvider(doc: CadDoc, env: AsmEnv): GeoProvider {
 /**
  * Přepočet vazeb (jako „Přepočítat vazby“): doplní geometrii ploch (a indexy válcových ploch normálií podle poloměru),
  * vyřeší vazby a vrátí sestavu s novými polohami pohnutých komponent. `anchorId` = komponenta, kterou uživatel právě přesunul.
+ * Řešič je společný s aplikací (cad/mates-static.ts `solveStatic`): při konfliktu se kompromis NEZAPÍŠE (`conflict` – vazby, odchylky,
+ * nejbližší dosažitelná hodnota upravené vazby `o.focus`); `o.equilibrium` (úpravy, ne zjišťování stavu) = díly volné v mezi do
+ * rovnováhy pružin a preferovaných stran mezí (`eqMoved`).
  */
-export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | null): Promise<{ doc: CadDoc; status: Record<string, MateStatus>; moved: string[] }> {
+export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | null, o: { equilibrium?: boolean; focus?: string } = {}): Promise<{ doc: CadDoc; status: Record<string, MateStatus>; moved: string[]; conflict?: StaticConflict; eqMoved?: string[] }> {
   if (doc.kind !== "assembly") return { doc, status: {}, moved: [] };
   // bez vazeb: jen délky pružin podle aktuálních poloh (přesun dosedací komponenty)
   if (!doc.mates?.length) return { doc: await refreshSprings(doc, env), status: {}, moved: [] };
@@ -448,13 +454,41 @@ export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | nul
   // plochy, hrany, vrcholy, sítě vaček a indexy válcových ploch normálií (cad/mate-geo.ts – stejně jako v aplikaci)
   const mates = await ensureMateRefs(doc.mates, (ref) => byLeaf.get(ref.leaf ?? ref.compId)?.key ?? null, env.geo, { face: env.mateFace, ent: env.mateEnt, cylFace: env.cylFace });
   let withMates = { ...doc, mates };
-  const r = solveMates(withMates, geoProvider(withMates, env), anchorId);
+  // rovnováha pružin potřebuje i geometrii dosedacích ploch
+  if (o.equilibrium && springSeatMates(withMates).length) await ensureSeatGeoOf(withMates, env);
+  const r = solveStatic(withMates, geoProvider(withMates, env), anchorId, { equilibrium: o.equilibrium, ...(o.focus ? { focus: o.focus } : {}) });
   if (r.mates) withMates = { ...withMates, mates: r.mates }; // zachycený výchozí stav pokročilých vazeb
   const byId = new Map(r.components.map((c) => [c.id, c.placement]));
   const solved = { ...withMates, components: (doc.components ?? []).map((c) => (r.moved.includes(c.id) && byId.has(c.id) ? { ...c, placement: byId.get(c.id)! } : c)) };
   // pružiny: délka podle nových poloh dosedacích ploch (cad/asm-spring-agent.ts)
-  return { doc: await refreshSprings(solved, env), status: r.status, moved: r.moved };
+  return { doc: await refreshSprings(solved, env), status: r.status, moved: r.moved, ...(r.conflict ? { conflict: r.conflict } : {}), ...(r.eqMoved.length ? { eqMoved: r.eqMoved } : {}) };
 }
+
+/** geometrie dosedacích ploch pružin (pomocné „vazby“, do dokumentu se nevrací) – rovnováha pružin ve statickém přepočtu */
+async function ensureSeatGeoOf(doc: CadDoc, env: AsmEnv): Promise<void> {
+  const seats = springSeatMates(doc);
+  const flat = flattenAssembly(doc);
+  const byLeaf = new Map(flat.map((l) => [leafId(l), l]));
+  const used = new Map<string, FlatComponent>();
+  for (const m of seats) for (const r of [m.a, m.b]) {
+    const l = byLeaf.get(r.leaf ?? r.compId);
+    if (l) used.set(leafId(l), l);
+  }
+  await ensureBuilt(env, [...used.values()]);
+  await ensureMateRefs(seats, (ref) => byLeaf.get(ref.leaf ?? ref.compId)?.key ?? null, env.geo, { face: env.mateFace, ent: env.mateEnt, cylFace: env.cylFace });
+}
+
+/**
+ * Řádky protokolu statického přepočtu: konflikt (vazby, odchylky, nejbližší dosažitelná hodnota – polohy beze změny, žádný
+ * kompromis) a díly, které posunula rovnováha pružin / preference.
+ */
+export function solveNotes(doc: CadDoc, s: { conflict?: StaticConflict; eqMoved?: string[] }): string[] {
+  const out: string[] = [];
+  if (s.eqMoved?.length) out.push(tr("  rovnováha pružin a preferovaných stran mezí posunula: {0}", movedText(doc, s.eqMoved)));
+  return out;
+}
+/** záznam s kódem ⚠ mate.conflict (polohy beze změny) – AsmResult.codes */
+export const conflictCode = (c: StaticConflict) => ({ code: "mate.conflict", args: [conflictText(c)], text: tr("vazby nelze splnit spolu – polohy komponent zůstaly beze změny (žádný kompromis); {0}", conflictText(c)) });
 
 /* ───────────────────────── provedení ───────────────────────── */
 
@@ -507,7 +541,10 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
   const asmOnly = () => {
     if (d.kind !== "assembly") throw new Error(tr("otevřený dokument „{0}“ není sestava – nejdřív „nová sestava“, „záložka \"…\"“ nebo „sestava hotovo“ (při úpravě dílu v kontextu)", d.name));
   };
+  // zjišťování stavu (výpis vazeb / komponent): jen vazby; úpravy: navíc rovnováha pružin a preferencí (deterministický dokument,
+  // vlna 22, bod 2) a u upravené vazby nejbližší dosažitelná hodnota při konfliktu (bod 8)
   const resolve = (doc: CadDoc, anchorId?: string | null) => solveAsm(doc, env, anchorId);
+  const resolveEdit = (doc: CadDoc, anchorId?: string | null, focus?: string) => solveAsm(doc, env, anchorId, { equilibrium: true, ...(focus ? { focus } : {}) });
   switch (cmd.k) {
     case "list": {
       asmOnly();
@@ -540,9 +577,10 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
           log.push(tr("✓ „{0}“ už má vazbu Ukotvit – beze změny", A.name));
           return done(d, false);
         }
-        const s = await resolve(toggleFixedMate(d, A.id, uid()));
+        const s = await resolveEdit(toggleFixedMate(d, A.id, uid()));
         log.push(tr("✓ vazba Ukotvit „{0}“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou", A.name));
-        return done(s.doc, true, { mateStatus: s.status });
+        log.push(...solveNotes(s.doc, s));
+        return done(s.doc, true, { mateStatus: s.status, ...(s.conflict ? { codes: [conflictCode(s.conflict)] } : {}) });
       }
       const B = findComp(d, cmd.b!);
       if (A.id === B.id) throw new Error(tr("vazba potřebuje dvě různé komponenty – „{0}“ je A i B", A.name));
@@ -563,7 +601,7 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       }
       const m = mateFromPending({ mode, compId: A.id, a, b, value, flip }, uid())!;
       if (cmd.name) m.name = cmd.name;
-      const s = await resolve({ ...d, mates: [...(d.mates ?? []), m] });
+      const s = await resolveEdit({ ...d, mates: [...(d.mates ?? []), m] }, null, m.id);
       const st = s.status[m.id];
       const picks = [fa.note, fb.note].filter(Boolean);
       log.push(
@@ -571,7 +609,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       );
       if (st === "conflict") log.push(tr("⚠ vazbu nelze splnit spolu s ostatními – sestava vazby (výpis), sestava vazba {0} potlačit|smazat|obráceně", s.doc.mates!.length));
       if (st === "missing") log.push(tr("⚠ plochu vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá"));
-      return done(s.doc, true, { mateStatus: s.status });
+      log.push(...solveNotes(s.doc, s));
+      return done(s.doc, true, { mateStatus: s.status, ...(s.conflict ? { codes: [conflictCode(s.conflict)] } : {}) });
     }
     case "mates": {
       asmOnly();
@@ -618,16 +657,35 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         }
         next = patchMate(d, m.id, patch);
         if (cmd.face) next = await repickMateRef(next, m, no, cmd.face, env, what);
+        if (cmd.prefer !== undefined) {
+          // preferovaná strana meze (vlna 22, bod 2): drží díl u meze, když ho vazby neurčují – nikdy proti pevné vazbě či motoru
+          if (!isLimitMate(m)) throw new Error(tr("vazba {0} ({1}) není mez – preferovanou stranu má Mez vzdálenosti, Mez úhlu a Drážka bez polohy", no, tr(MATE_LABEL[m.type])));
+          const pref = cmd.prefer;
+          next = {
+            ...next,
+            mates: (next.mates ?? []).map((x) => {
+              if (x.id !== m.id) return x;
+              const y = { ...x };
+              if (pref) y.prefer = pref;
+              else delete y.prefer;
+              return y;
+            }),
+          };
+          what.push(cmd.prefer ? tr("preferovaná strana {0}", cmd.prefer) : tr("bez preferované strany"));
+        }
       }
-      const s = await resolve(next);
+      const s = await resolveEdit(next, null, cmd.del ? undefined : m.id);
       const after = s.doc.mates?.find((x) => x.id === m.id);
-      // ✓ jen pro vazbu, která po změně platí (ztracená reference / konflikt = výsledek bez ✓ – vlna 22, bod 20 a 22i)
-      const okNow = !after || s.status[m.id] === "ok" || s.status[m.id] === "suppressed";
+      // ✓ jen pro vazbu, která po změně platí v geometrii (ztracená reference / konflikt = výsledek bez ✓ – vlna 22, bod 20 a 22i);
+      // konflikt = ⚠ a polohy beze změny (žádný kompromis v dokumentu – bod 8)
+      const okNow = !s.conflict && (!after || s.status[m.id] === "ok" || s.status[m.id] === "suppressed");
       const args = [no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""] as const;
       log.push(okNow ? tr("✓ vazba {0} ({1}): {2}{3}", ...args) : tr("⚠ vazba {0} ({1}): {2}{3}", ...args));
       if (s.moved.length) log.push(tr("  pohnuto: {0}", movedText(s.doc, s.moved)));
+      else if (s.conflict) log.push(tr("  polohy komponent beze změny – vazby nelze splnit spolu (kompromis se nezapisuje)"));
+      log.push(...solveNotes(s.doc, s));
       if (Object.values(s.status).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
-      return done(s.doc, true, { mateStatus: s.status });
+      return done(s.doc, true, { mateStatus: s.status, ...(s.conflict ? { codes: [conflictCode(s.conflict)] } : {}) });
     }
     case "spring":
     case "springs":
@@ -714,17 +772,19 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       doc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? c : x)) };
       let st: Record<string, MateStatus> | undefined;
       let movedOthers: string[] = [];
+      let conflict: StaticConflict | undefined;
       if (moved && doc.mates?.length) {
         // jako v panelu: přesunutá komponenta je pro řešič pevná, vazby dorovnají ostatní
-        const s = await resolve(doc, c.id);
+        const s = await resolveEdit(doc, c.id);
         doc = s.doc;
         st = s.status;
         movedOthers = s.moved.filter((id) => id !== c.id);
+        conflict = s.conflict;
       } else if (moved) doc = await refreshSprings(doc, env); // bez vazeb: délka pružin podle nové polohy dosedací komponenty
       log.push(tr("✓ komponenta „{0}“: {1}", c0.name, what.join(" · ")));
       if (movedOthers.length) log.push(tr("  vazby pohnuly: {0}", movedText(doc, movedOthers)));
       if (st && Object.values(st).some((x) => x === "conflict")) log.push(tr("⚠ v sestavě je konflikt vazeb – sestava vazby"));
-      return done(doc, true, st ? { mateStatus: st } : {});
+      return done(doc, true, { ...(st ? { mateStatus: st } : {}), ...(conflict ? { codes: [conflictCode(conflict)] } : {}) });
     }
     case "remove": {
       asmOnly();

@@ -209,7 +209,9 @@ describe("pružina – délka z dosedacích ploch (přepočet), síla, doraz", (
     off.doc.components![2] = { ...off.doc.components![2], placement: P([30, 30, 22]) };
     expect(springState(off.doc, off.doc.components![2], off.geo)).toMatchObject({ offset: -1, seat: 38 });
   });
-  it("pohybová studie: deska B sjíždí 58 → 36 (motor na Vzdálenosti) – délka sleduje plochy, síla roste, ✗ od kroku pod dorazem", async () => {
+  // vlna 22, body 2 a 8 (VĚDOMÁ změna): délka pružiny na doraz Ln je tvrdý doraz – motor, který by pružinu stlačil pod Ln, se na
+  // dorazu zastaví (⚠ motion.motor-limit, krok „stopped“); dřív deska prošla pod doraz a jen řádek pružiny byl ✗
+  it("pohybová studie: deska B sjíždí 58 → 36 (motor na Vzdálenosti) – délka sleduje plochy, síla roste, na dorazu Ln motor stojí", async () => {
     const { doc, geo } = springRig(58);
     const mates: Mate[] = [
       { id: "c", type: "concentric", a: f("B", 1), b: f("A", 1) },
@@ -220,12 +222,16 @@ describe("pružina – délka z dosedacích ploch (přepočet), síla, doraz", (
     const res = await runMotion(d, geo, { motors: [{ id: "m", kind: "linear", mate: "d", from: 38, to: 16 }], duration: 1, steps: 11 });
     const L = res.steps.map((s) => s.springs!.S.length);
     expect(L[0]).toBeCloseTo(38, 6);
-    expect(L[11]).toBeCloseTo(16, 6);
-    // 18 mm (krok 10) = přesně na dorazu ✓, 16 mm (krok 11) ✗
-    expect(res.steps.map((s) => s.springs!.S.level)).toEqual([...Array(11).fill("ok"), "error"]);
+    // 18 mm (krok 10) = přesně na dorazu ✓; krok 11 (žádáno 16 mm) – motor stojí na dorazu 18 mm, pružina pod Ln nikdy
+    expect(L[11]).toBeCloseTo(18, 4);
+    expect(res.steps[11]).toMatchObject({ status: "stopped", cause: "motor" });
+    expect(res.steps[11].reached![0]).toBeCloseTo(18, 4);
+    expect(res.steps[11].conflicts).toEqual(expect.arrayContaining(["d", "spring:S"]));
+    expect(res.steps.map((s) => s.springs!.S.level)).toEqual(Array(12).fill("ok"));
     expect(res.steps[5].springs!.S.force).toBeCloseTo(25 * (44 - 28), 6);
     const sum = motionSummary(res, d);
-    expect(sum.find((l) => l.includes("pružina „S“"))).toBe(" ✗ pružina „S“: délka 38 → 16 mm (min 16 · L0 44 · Ln 18) · síla 150 → 700 N (max 700 N) – pod délkou na doraz v krocích 11 (vzdálenost ploch min 16 mm)");
+    expect(sum.find((l) => l.includes("pružina „S“"))).toBe(" ✓ pružina „S“: délka 38 → 18 mm (min 18 · L0 44 · Ln 18) · síla 150 → 650 N (max 650 N)");
+    expect(sum.find((l) => l.includes("motion.motor-limit"))).toMatch(/motor 1 stojí na mezi v krocích 11 \(t = 1 s\): žádáno 16 mm, dosaženo 18 mm – brání: pružina „S“ 18 mm – na délce na doraz Ln 18 mm/);
     // krok jako dokument: délka pružiny z kroku (zobrazení / export / „pohyb krok“)
     expect(poseDoc(d, res.steps[5].place, res.steps[5].springs).components![2].spring).toMatchObject({ length: 28 });
     // CSV: sloupce délky a síly na konci řádku

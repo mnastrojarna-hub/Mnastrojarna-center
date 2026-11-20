@@ -1,24 +1,31 @@
 /**
  * Výsledky pohybové studie podle dokumentu a jeho stavu (vlna 22, bod 1 a 12 zprávy – „žádné falešně zelené“):
  *
- * * **otisk vstupu** `motionSig(doc)`: komponenty (poloha, ukotvení, skrytí, pružina), **geometrie listových dílů** (`sourceKey` –
- *   prvky, proměnné, vazby parametrů a konfigurace dílu; i dílů v podsestavách), vazby a definice studie. Výsledek platí jen pro
- *   otisk, pro který vznikl – po změně dílu, polohy, vazby nebo studie je `stale`, v jiném dokumentu `unchecked`;
+ * * **otisk vstupu** `motionSig(doc)`: komponenty (poloha, ukotvení, skrytí, pružina), **obsah podsestav** (polohy, ukotvení, skrytí,
+ *   pružiny a vazby vnořených komponent do libovolné hloubky), **geometrie listových dílů** (`sourceKey` – prvky, proměnné, vazby
+ *   parametrů a konfigurace dílu; i dílů v podsestavách), vazby a definice studie; u dynamiky navíc **materiál každého listového
+ *   dílu** (hmotnost = objem × hustota). Výsledek platí jen pro otisk, pro který vznikl – po změně dílu, polohy (i uvnitř
+ *   podsestavy), vazby, studie nebo materiálu (dynamika) je `stale`, v jiném dokumentu `unchecked`;
  * * **úložiště podle pracovního prostoru a dokumentu** (`motionStoreOf(ws.asm)` → klíč dokumentu `Workspace.docKey`): výsledek
  *   jedné sestavy se nikdy neukáže u jiné (ani u sestavy téhož názvu nebo se stejnými id komponent);
- * * **jeden výpočet na dokument**: nový výpočet předchozí ruší (`MotionSuperseded`), výsledek se uloží jen pod otiskem SVÉHO
- *   vstupu a nikdy přes novější záznam – opožděná odpověď staršího výpočtu nic nepřepíše.
+ * * **jeden výpočet na dokument**: výpočet JINÉHO vstupu předchozí ruší (`MotionSuperseded`); druhé volání se STEJNÝM vstupem
+ *   (panel + textový příkaz, dvakrát `window.mncad.motion()`) se k běžícímu výpočtu připojí a dostane tentýž výsledek. Výsledek se
+ *   uloží jen pod otiskem SVÉHO vstupu a nikdy přes novější záznam – opožděná odpověď staršího výpočtu nic nepřepíše.
  *
  * Panel studie, příkazy `pohyb …`, `stav` i `window.mncad.motion()` čtou stav odtud (`motionState`). Otisk je místní funkce –
  * společná identita výsledků (engine/result-key.ts, balík A) ji může nahradit beze změny volajících.
  */
-import { flattenAssembly } from "./assembly";
+import { flattenAssembly, MAX_DEPTH } from "./assembly";
 import { tr } from "./i18n";
-import type { MotionResult } from "./motion";
+import { motionMotorNotes, type MotionResult } from "./motion";
+import { massMaterialId } from "./motion-mass";
 import type { CadDoc, MotionStudy } from "./types";
 
-/** části otisku (pro hlášení, CO se od výpočtu změnilo) */
-export type MotionSigParts = { study: string; mates: string; place: string; geo: [path: string, key: string, hidden: 0 | 1][] };
+/**
+ * části otisku (pro hlášení, CO se od výpočtu změnilo): `nested` = obsah podsestav nejvyšší úrovně (id komponenty → klíč obsahu),
+ * `mass` = materiál listových dílů (jen dynamika – kinematika na hmotnosti nezávisí)
+ */
+export type MotionSigParts = { study: string; mates: string; place: string; geo: [path: string, key: string, hidden: 0 | 1][]; nested: [id: string, key: string][]; mass: [path: string, material: string][] };
 export type MotionEntry = {
   sig: string;
   parts: MotionSigParts;
@@ -31,7 +38,11 @@ export type MotionEntry = {
   doc: string;
   comps: number;
 };
-type Running = { sig: string; seq: number; superseded: boolean };
+/**
+ * běžící výpočet: `waiters` = dotazy na zrušení všech volajících (výpočet se zruší, až když ho zruší všichni), `listeners` = průběh
+ * pro všechny připojené volající, `promise` = sdílený výsledek
+ */
+type Running = { sig: string; seq: number; superseded: boolean; waiters: ((() => boolean) | null)[]; listeners: Set<(k: number, n: number) => void>; promise: Promise<MotionResult> };
 export type MotionStore = { byDoc: Map<string, MotionEntry>; running: Map<string, Running>; seq: number };
 /** přístup k úložišti z prostředí sestavy (`AsmEnv.motion`): úložiště pracovního prostoru a klíč dokumentu */
 export type MotionSlot = { key: string; store: MotionStore };
@@ -39,6 +50,7 @@ export type MotionSlot = { key: string; store: MotionStore };
 /** výpočet nahradil novější výpočet téže sestavy (jiný vstup) – jeho výsledek se zahazuje */
 export class MotionSuperseded extends Error {
   constructor() {
+    // jen výpočet JINÉHO vstupu (nebo zahozený dokument) – stejný vstup se k běžícímu výpočtu připojí (`runStored`)
     super(tr("výpočet pohybové studie nahradil novější výpočet (sestava nebo studie se mezitím změnila)"));
     this.name = "MotionSuperseded";
   }
@@ -78,16 +90,32 @@ function studyKey(s: MotionStudy | undefined): string {
   void _loop;
   return JSON.stringify(s.mode === "dynamic" ? { ...rest, dyn } : rest);
 }
+/**
+ * Klíč obsahu podsestavy: polohy, ukotvení, skrytí a pružiny vnořených komponent, vazby podsestavy, rekurzivně (posun dílu UVNITŘ
+ * podsestavy změní polohu listu v sestavě – dřív otisk znal jen polohy komponent nejvyšší úrovně a výsledek dál „platil“).
+ * Geometrii listových dílů nese `geo` (`sourceKey`).
+ */
+function subKey(d: CadDoc, depth: number): string {
+  if (depth > MAX_DEPTH) return "cycle";
+  return JSON.stringify({
+    c: (d.components ?? []).map((c) => [c.id, c.placement, c.fixed ?? null, c.hidden ?? null, c.spring ?? null, c.source.kind === "asm" ? subKey(c.source.doc, depth + 1) : null]),
+    m: d.mates ?? [],
+  });
+}
 const memo = new WeakMap<CadDoc, { sig: string; parts: MotionSigParts }>();
 /** otisk a jeho části pro dokument (pamatuje se podle objektu dokumentu – dokumenty se nemění na místě) */
 export function motionSigParts(d: CadDoc): { sig: string; parts: MotionSigParts } {
   const hit = memo.get(d);
   if (hit) return hit;
+  const flat = flattenAssembly(d);
   const parts: MotionSigParts = {
     study: studyKey(d.motion),
     mates: JSON.stringify(d.mates ?? []),
     place: JSON.stringify((d.components ?? []).map((c) => [c.id, c.placement, c.fixed, c.hidden, c.spring ?? null])),
-    geo: flattenAssembly(d).map((l) => [l.path.join("/"), l.key, l.hidden ? 1 : 0]),
+    geo: flat.map((l) => [l.path.join("/"), l.key, l.hidden ? 1 : 0]),
+    nested: (d.components ?? []).flatMap((c): [string, string][] => (c.source.kind === "asm" ? [[c.id, subKey(c.source.doc, 1)]] : [])),
+    // dynamika: hmotnost listu = objem × hustota materiálu (motion-mass.ts massMaterialId – táž definice jako výpočet hmotností)
+    mass: d.motion?.mode === "dynamic" ? flat.map((l): [string, string] => [l.path.join("/"), massMaterialId(l.comp)]) : [],
   };
   const out = { sig: JSON.stringify(parts), parts };
   memo.set(d, out);
@@ -114,10 +142,21 @@ export function motionChanges(before: MotionSigParts, d: CadDoc): string[] {
     }
     return n;
   };
-  const changed = [...new Set([...cur].filter(([p, k]) => old.has(p) && old.get(p) !== k).map(([p]) => name(p)))];
-  if (changed.length) out.push(tr("geometrie dílu {0}", changed.slice(0, 4).map((n) => `„${n}“`).join(", ") + (changed.length > 4 ? tr(" a dalších {0}", changed.length - 4) : "")));
+  const list = (names: string[]) => names.slice(0, 4).map((n) => `„${n}“`).join(", ") + (names.length > 4 ? tr(" a dalších {0}", names.length - 4) : "");
+  /** cesty, jejichž hodnota se změnila (jen ty, které jsou před i po) */
+  const diff = (a: [string, string][], b: [string, string][]) => {
+    const was = new Map(a);
+    return [...new Set(b.filter(([p, v]) => was.has(p) && was.get(p) !== v).map(([p]) => name(p)))];
+  };
+  const changed = diff([...old], [...cur]);
+  if (changed.length) out.push(tr("geometrie dílu {0}", list(changed)));
   if (cur.size !== old.size || [...cur.keys()].some((p) => !old.has(p))) out.push(tr("počet dílů ({0} → {1})", old.size, cur.size));
   if (before.place !== now.place) out.push(tr("poloha, ukotvení nebo skrytí komponent"));
+  // starší záznam bez nových částí otisku (stejný běh aplikace – jen pro jistotu) se bere jako prázdný
+  const subs = diff(before.nested ?? [], now.nested);
+  if (subs.length) out.push(tr("poloha, ukotvení, skrytí nebo vazby komponent v podsestavě {0}", list(subs)));
+  const mats = diff(before.mass ?? [], now.mass);
+  if (mats.length) out.push(tr("materiál dílu {0} (hmotnost v dynamice)", list(mats)));
   if (before.mates !== now.mates) out.push(tr("vazby"));
   if (before.study !== now.study) out.push(tr("definice studie (motory, délka, kroky)"));
   return out.length ? out : [tr("stav sestavy")];
@@ -152,48 +191,90 @@ export function dropMotion(store: MotionStore, key: string): void {
 }
 
 /**
- * Jeden výpočet studie dokumentu: `compute(cancel)` dostane dotaz na zrušení (uživatel nebo novější výpočet). Výsledek se uloží
- * pod otiskem vstupu `d`, jen když výpočet doběhl celý, nebyl nahrazen a v úložišti není novější záznam. Nahrazený výpočet
- * skončí chybou `MotionSuperseded`.
+ * Jeden výpočet studie dokumentu: `compute(cancel, onStep)` dostane dotaz na zrušení (novější výpočet jiného vstupu, nebo zrušení
+ * všemi volajícími) a hlášení průběhu (rozešle se všem připojeným volajícím). Běží-li už výpočet TÉHOŽ vstupu (stejný otisk),
+ * volání se k němu připojí a dostane jeho výsledek – druhý výpočet téhož vstupu nikoho neruší (dřív starší volající dostal
+ * nepravdivé „sestava nebo studie se mezitím změnila“). Výpočet jiného vstupu běžící výpočet nahradí (`MotionSuperseded`).
+ * Výsledek se uloží pod otiskem vstupu `d`, jen když výpočet doběhl celý (nezrušili ho všichni volající), nebyl nahrazen a v úložišti
+ * není novější záznam.
  */
-export async function runStored(slot: MotionSlot, d: CadDoc, compute: (cancel: () => boolean) => Promise<MotionResult>, userCancel?: () => boolean): Promise<MotionResult> {
+export async function runStored(
+  slot: MotionSlot,
+  d: CadDoc,
+  compute: (cancel: () => boolean, onStep: (k: number, n: number) => void) => Promise<MotionResult>,
+  userCancel?: () => boolean,
+  onStep?: (k: number, n: number) => void,
+): Promise<MotionResult> {
   const { store, key } = slot;
   const { sig, parts } = motionSigParts(d);
   const prev = store.running.get(key);
-  if (prev) prev.superseded = true; // nový výpočet ruší předchozí
-  const me: Running = { sig, seq: ++store.seq, superseded: false };
+  if (prev && prev.sig === sig && !prev.superseded) {
+    // stejný vstup: připojit se (vlastní dotaz na zrušení se přidá – výpočet se zruší, až když ho zruší všichni)
+    prev.waiters.push(userCancel ?? null);
+    if (onStep) prev.listeners.add(onStep);
+    try {
+      return await prev.promise;
+    } finally {
+      if (onStep) prev.listeners.delete(onStep);
+    }
+  }
+  if (prev) prev.superseded = true; // nový výpočet jiného vstupu ruší předchozí
+  const me: Running = { sig, seq: ++store.seq, superseded: false, waiters: [userCancel ?? null], listeners: new Set(onStep ? [onStep] : []), promise: null! };
+  /** zrušení: novější výpočet, nebo všichni připojení volající (volající bez možnosti zrušení výpočet nikdy nezruší) */
+  const cancelled = () => me.waiters.every((w) => !!w?.());
   store.running.set(key, me);
   bump();
-  try {
-    const res = await compute(() => me.superseded || !!userCancel?.());
-    if (me.superseded) throw new MotionSuperseded();
-    if (!userCancel?.()) {
-      const cur = store.byDoc.get(key);
-      if (!cur || cur.seq < me.seq) {
-        store.byDoc.set(key, { sig, parts, res, seq: me.seq, at: Date.now(), doc: d.name, comps: (d.components ?? []).length });
-        // zavřené záložky se z úložiště neodhlašují – držet jen několik posledních dokumentů (výsledek velké sestavy má megabajty)
-        while (store.byDoc.size > MAX_DOCS) {
-          const oldest = [...store.byDoc].reduce((a, b) => (a[1].seq <= b[1].seq ? a : b));
-          store.byDoc.delete(oldest[0]);
+  me.promise = (async () => {
+    try {
+      const res = await compute(
+        () => me.superseded || cancelled(),
+        (k, n) => me.listeners.forEach((f) => f(k, n)),
+      );
+      if (me.superseded) throw new MotionSuperseded();
+      if (!cancelled()) {
+        const cur = store.byDoc.get(key);
+        if (!cur || cur.seq < me.seq) {
+          store.byDoc.set(key, { sig, parts, res, seq: me.seq, at: Date.now(), doc: d.name, comps: (d.components ?? []).length });
+          // zavřené záložky se z úložiště neodhlašují – držet jen několik posledních dokumentů (výsledek velké sestavy má megabajty)
+          while (store.byDoc.size > MAX_DOCS) {
+            const oldest = [...store.byDoc].reduce((a, b) => (a[1].seq <= b[1].seq ? a : b));
+            store.byDoc.delete(oldest[0]);
+          }
         }
       }
+      return res;
+    } finally {
+      if (store.running.get(key) === me) store.running.delete(key);
+      bump();
     }
-    return res;
-  } finally {
-    if (store.running.get(key) === me) store.running.delete(key);
-    bump();
-  }
+  })();
+  return me.promise;
 }
 
 /* ───────── stav pro `stav` (textový stav dokumentu a strojový řádek) ───────── */
 
-export type MotionStatus = { state: "ok" | "conflict" | "clash" | "stale" | "unchecked"; line: string };
+/**
+ * Verdikt platného výsledku (strojové pole `motion=` příkazu `stav`, panel `data-motion-verdict`) – „ok“ jen tehdy, když se
+ * opravdu všechno zkontrolovalo a nic nevadí:
+ * `conflict` nesplněné vazby v některém kroku > `clash` průnik těles v některém kroku > `warn` upozornění k motorům (⚠ začátek ≠
+ * aktuální hodnota, motor nedojede, mezera pod nulou, nepoužitý uložený konec) > `mates-ok` vazby splněny, ale kolize se
+ * nekontrolovaly > `ok` vazby splněny a kolize zkontrolovány bez průniku.
+ */
+export type MotionVerdict = "ok" | "mates-ok" | "warn" | "conflict" | "clash";
+export function motionVerdict(res: MotionResult, d: CadDoc): { state: MotionVerdict; hit: number; notes: number } {
+  const hit = res.steps.filter((x) => x.clashes?.length).length;
+  const notes = motionMotorNotes(res, d).length;
+  const state: MotionVerdict = res.conflictSteps ? "conflict" : hit ? "clash" : notes ? "warn" : !res.collisionsChecked ? "mates-ok" : "ok";
+  return { state, hit, notes };
+}
+
+export type MotionStatus = { state: MotionVerdict | "stale" | "unchecked"; line: string };
 
 /**
  * Řádek „Pohyb: …“ textového stavu sestavy se studií a hodnota `motion=` strojového řádku: platný výsledek (kroky, vazby, průniky
- * těles v krocích – nebo výslovně, že se kolize nekontrolovaly), výsledek, který pro nynější stav sestavy NEPLATÍ (a co se změnilo),
- * nebo nespočítáno. Stav: `conflict` = nesplněné vazby, `clash` = průnik těles v některém kroku (nezařazený – podrobně `pohyb stav`),
- * `ok` jen bez obojího. Sestava bez studie → undefined.
+ * těles v krocích – nebo výslovně, že se kolize nekontrolovaly – a počet upozornění k motorům), výsledek, který pro nynější stav
+ * sestavy NEPLATÍ (a co se změnilo), nebo nespočítáno. Stav platného výsledku = `motionVerdict` (`ok` jen po skutečné kontrole
+ * kolizí bez průniku, bez nesplněných vazeb a bez upozornění). Sestava bez studie → undefined.
  */
 export function motionStatusOf(store: MotionStore, key: string, d: CadDoc): MotionStatus | undefined {
   if (d.kind !== "assembly" || !(d.motion?.motors.length || d.motion?.mode === "dynamic")) return undefined;
@@ -201,9 +282,10 @@ export function motionStatusOf(store: MotionStore, key: string, d: CadDoc): Moti
   if (st.state === "unchecked") return { state: "unchecked", line: tr("Pohyb: nespočítáno – „pohyb spustit“ nebo Vypočítat pohyb v panelu studie") };
   if (st.state === "stale") return { state: "stale", line: tr("Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: {0}; přepočítá „pohyb spustit“", st.changed.join("; ")) };
   const r = st.entry.res;
+  const v = motionVerdict(r, d);
   const steps = Math.max(0, r.steps.length - 1);
-  const hit = r.steps.filter((x) => x.clashes?.length).length;
   const mates = r.conflictSteps ? tr("nesplněné vazby v {0} krocích", r.conflictSteps) : tr("vazby splněny");
-  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : hit ? tr("průnik těles v {0} krocích", hit) : tr("bez průniku těles v kontrolovaných krocích");
-  return { state: r.conflictSteps ? "conflict" : hit ? "clash" : "ok", line: tr("Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)", steps, mates, clash) };
+  const clash = !r.collisionsChecked ? tr("kolize nekontrolovány") : v.hit ? tr("průnik těles v {0} krocích", v.hit) : tr("bez průniku těles v kontrolovaných krocích");
+  const warn = v.notes ? tr(", ⚠ upozornění k motorům: {0}", v.notes) : "";
+  return { state: v.state, line: tr("Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)", steps, mates, clash + warn) };
 }

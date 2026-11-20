@@ -483,10 +483,16 @@ export function removeMate(doc: CadDoc, mateId: string): CadDoc {
 }
 
 /** Úprava existující vazby (hodnota, otočení, potlačení, název); potlačení / zapnutí vazby Ukotvit komponentu uvolní / ukotví. */
-export function patchMate(doc: CadDoc, mateId: string, patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name" | "min" | "max">>): CadDoc {
+export function patchMate(doc: CadDoc, mateId: string, patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name" | "min" | "max" | "prefer">>): CadDoc {
   const m = (doc.mates ?? []).find((x) => x.id === mateId);
   if (!m) return doc;
-  const next = { ...doc, mates: (doc.mates ?? []).map((x) => (x.id === mateId ? { ...x, ...patch } : x)) };
+  // `prefer: undefined` = bez preferované strany (klíč se odebere, ne uloží jako undefined)
+  const merged = (x: Mate): Mate => {
+    const y = { ...x, ...patch };
+    if ("prefer" in patch && !patch.prefer) delete y.prefer;
+    return y;
+  };
+  const next = { ...doc, mates: (doc.mates ?? []).map((x) => (x.id === mateId ? merged(x) : x)) };
   return m.type === "fixed" && "suppressed" in patch ? syncFixed(next, m.a.compId) : next;
 }
 

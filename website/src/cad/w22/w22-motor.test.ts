@@ -1,5 +1,5 @@
 /**
- * Vlna 22, balík M, etapa M1 – regresní zkoušky bodů 9 a 11 zprávy na úrovni textových příkazů (bez jádra, syntetické plochy):
+ * Vlna 22, balík M, etapa 1 – regresní zkoušky bodů 9 a 11 zprávy na úrovni textových příkazů (bez jádra, syntetické plochy):
  * rozsah × rychlost (dojede na konec a stojí, směr a konec v protokolu, rozpor s délkou studie nikdy potichu), význam začátku
  * a konce podle druhu vazby, zdvih od aktuální hodnoty, skok začátku, motor zadaný komponentou B vazby Vzdálenost.
  * Na kódu před opravou tyto zkoušky selhávají (motor 57,5 → 87,85, díl v Z −47,5, žádné ⚠).
@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { motionCached, motionRun } from "../asm-agent-kin";
 import { setLang } from "../i18n";
-import { fakeEnv, press, resizePart, runLines } from "./m1-fixture";
+import { fakeEnv, press, resizePart, runLines } from "./w22-motion-fixture";
 
 afterEach(() => setLang("cs"));
 const MATE = 'sestava vazba vzdálenost "Deska A" F1 "Rám" F2 hodnota 57.5 název "ZDVIH"';

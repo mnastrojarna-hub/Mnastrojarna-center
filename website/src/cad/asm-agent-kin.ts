@@ -9,7 +9,7 @@
 import { flattenAssembly, instanceKey, transformPoint } from "./assembly";
 import { F_CIRCLE, F_LINE, F_POINT, F_SPHERE, faceArgWords, findComp, findMate, fmt, mateText, pt, type AsmCmd, type FaceSpec } from "./agent-asm";
 import type { MotionCmd } from "./agent-motion";
-import { ensureBuilt, faceInfo, geoProvider, leafId, movedText, partFaces, pathNames, solveAsm, STATUS_WORD, type AsmEnv, type AsmResult } from "./asm-agent";
+import { conflictCode, ensureBuilt, faceInfo, geoProvider, leafId, movedText, partFaces, pathNames, solveAsm, solveNotes, STATUS_WORD, type AsmEnv, type AsmResult } from "./asm-agent";
 import { tr } from "./i18n";
 import { classifyClashes as classifyGeo, type ClashClass, type ClashPair } from "./clash-class";
 import { classifyClashes as estimateClashes } from "./clash-thread";
@@ -18,7 +18,9 @@ import { KIN_SPEC, accepts, entKindOf, kinDefaults, kinHasValue, type EntKind, t
 import { MATE_LABEL, faceAreas, worldGeo, type FaceGeo, type KinMateType } from "./mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "./mates-kin";
 import { springSeatMates } from "./asm-spring";
-import { defaultStudy, motionGroups, motionMotorNotes, motorProblem, motorText, poseDoc, runMotion, type MotionClashes, type MotionResult } from "./motion";
+import { defaultStudy, motionFindings, motionGroups, motionMotorNotes, motorProblem, motorText, poseDoc, runMotion, type MotionClashes, type MotionResult } from "./motion";
+import { levelKv, levelLine, levelOf, studyMode } from "./motion-mode";
+import { devText } from "./motion-quasi";
 import { motionSlot, motionState, motionStateOf, runStored } from "./motion-cache";
 import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorSpan } from "./motor-model";
 import { fmtNum } from "./engine/protocol";
@@ -203,7 +205,7 @@ export async function applyKinMate(d: CadDoc, cmd: MateCmd, env: AsmEnv): Promis
   if (cmd.max !== undefined) m.max = cmd.max;
   if (cmd.flip) m.flip = true;
   if (cmd.name) m.name = cmd.name;
-  const s = await solveAsm({ ...d, mates: [...(d.mates ?? []), m] }, env);
+  const s = await solveAsm({ ...d, mates: [...(d.mates ?? []), m] }, env, null, { equilibrium: true, focus: m.id });
   const st = s.status[m.id];
   const made = s.doc.mates!.find((x) => x.id === m.id)!;
   log.push(tr("{0} vazba {1}: {2} · {3}", st === "ok" ? "✓" : "⚠", mateText(s.doc, made), STATUS_WORD(st), s.moved.length ? movedText(s.doc, s.moved) : tr("poloha beze změny")));
@@ -211,15 +213,17 @@ export async function applyKinMate(d: CadDoc, cmd: MateCmd, env: AsmEnv): Promis
   if (cmd.value === undefined && kinHasValue(kind)) log.push(tr("  hodnota z geometrie: {0} – změna: sestava vazba {1} hodnota=N", fmt(m.value ?? 0, 4), s.doc.mates!.length));
   if (st === "conflict") log.push(tr("⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně", label, s.doc.mates!.length));
   if (st === "missing") log.push(tr("⚠ geometrii vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá"));
-  return { doc: s.doc, log, changed: true, mateStatus: s.status };
+  log.push(...solveNotes(s.doc, s));
+  return { doc: s.doc, log, changed: true, mateStatus: s.status, ...(s.conflict ? { codes: [conflictCode(s.conflict)] } : {}) };
 }
 
 /* ───────────────────────── pohybová studie ───────────────────────── */
 
 /**
  * Spočítá pohybovou studii sestavy (geometrie z jádra, volitelně kolize). Výsledek se pamatuje pro dokument prostředí
- * (`env.motion`) a otisk jeho stavu – stejný stav = uložený výsledek, jiný stav (i jen změněná geometrie dílu) = nový výpočet.
- * Nový výpočet téhož dokumentu předchozí ruší; zrušený / nahrazený výpočet se neukládá.
+ * (`env.motion`) a otisk jeho stavu – stejný stav = uložený výsledek, jiný stav (i jen změněná geometrie dílu, poloha uvnitř
+ * podsestavy, u dynamiky materiál) = nový výpočet. Běží-li výpočet téhož stavu, volání se k němu připojí (motion-cache.ts
+ * `runStored`); výpočet jiného stavu téhož dokumentu předchozí ruší; zrušený / nahrazený výpočet se neukládá.
  */
 export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: number, n: number) => void; cancel?: () => boolean; force?: boolean } = {}): Promise<MotionResult> {
   const study = d.motion;
@@ -233,7 +237,7 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
   return runStored(
     slot,
     d,
-    async (cancel) => {
+    async (cancel, onStep) => {
       const flat = flattenAssembly(d);
       const byLeaf = new Map(flat.map((l) => [leafId(l), l]));
       await ensureBuilt(env, flat);
@@ -250,9 +254,10 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
             return out;
           }
         : undefined;
-      return study!.mode === "dynamic" ? await dynamicRun(doc, env, geoProvider(doc, env), study!, { collide, onStep: opts.onStep, cancel }) : await runMotion(doc, geoProvider(doc, env), study!, { collide, onStep: opts.onStep, cancel });
+      return study!.mode === "dynamic" ? await dynamicRun(doc, env, geoProvider(doc, env), study!, { collide, onStep, cancel }) : await runMotion(doc, geoProvider(doc, env), study!, { collide, onStep, cancel });
     },
     opts.cancel,
+    opts.onStep,
   );
 }
 /**
@@ -379,11 +384,29 @@ export async function motionClashLines(res: MotionResult, d: CadDoc, env?: Pick<
 }
 
 /**
- * Strojový souhrn studie na JEDEN řádek (zkouška 959, B6 – protokol místo rozsahu každé komponenty):
- * `motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 [rot=N] [clash.steps=41/41 thread=30 real=1 first.real=3]`
- * – `travel` = zdvih tuhých skupin (`motionGroups`) s počtem komponent; lokalizovaný výpis zůstává v plném protokolu.
+ * Motory studie na strojovém řádku (vlna 22, bod 9 – směr a konec i ve stručném protokolu): `m<i>=<průběh>:<začátek>><konec>:<směr>`
+ * na KONCI řádku, jedno pole na motor. Průběh `range` (rozsah za dobu studie) | `back` (tam a zpět: `začátek>konec>začátek`) |
+ * `ranged` (rozsah × rychlost: dojede a stojí) | `open` (jen rychlost: konec = hodnota na konci studie); hodnoty v jednotkách motoru
+ * (mm / °, desetinná tečka); směr `+` hodnota roste, `-` klesá, `0` stojí, tam a zpět `+-` / `-+`. Např. přesný příkaz zprávy
+ * `57,5..27,15 rychlost 15,175` → `m1=ranged:57.5>27.15:-` (dřív jel opačně na 87,85 a řádek to nijak neukázal).
  */
-export function motionKv(res: MotionResult, cl: MotionClashStats | null): string {
+export function motorKv(motors: readonly MotionMotor[], duration: number): string[] {
+  return motors.map((mo, i) => {
+    const s = motorSpan(mo, duration);
+    const n = (v: number) => fmtNum(v, 4);
+    const d = s.dir > 0 ? "+" : s.dir < 0 ? "-" : "0";
+    const vals = s.mode === "back" ? `${n(s.start)}>${n(s.end!)}>${n(s.start)}` : `${n(s.start)}>${n(s.mode === "open" ? s.endAt : s.end!)}`;
+    return `m${i + 1}=${s.mode}:${vals}:${s.mode === "back" && s.dir ? d + (s.dir > 0 ? "-" : "+") : d}`;
+  });
+}
+
+/**
+ * Strojový souhrn studie na JEDEN řádek (zkouška 959, B6 – protokol místo rozsahu každé komponenty):
+ * `motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 [rot=N] [clash.steps=41/41 thread=30 real=1 first.real=3]
+ * [mode=dyn …] m1=range:0>50:+` – `travel` = zdvih tuhých skupin (`motionGroups`) s počtem komponent; motory (`motorKv`: průběh,
+ * začátek > konec, směr) vždy na konci; lokalizovaný výpis zůstává v plném protokolu.
+ */
+export function motionKv(res: MotionResult, cl: MotionClashStats | null, duration = res.steps[res.steps.length - 1]?.t ?? 0): string {
   const g = motionGroups(res);
   const n = (v: number) => fmtNum(v, 3);
   const parts = [
@@ -396,9 +419,17 @@ export function motionKv(res: MotionResult, cl: MotionClashStats | null): string
     ...(g.rotating ? [`rot=${g.rotating}`] : []),
     ...(cl ? [`clash.steps=${cl.steps}/${cl.of}`, `thread=${cl.thread}`, `real=${cl.real}`, ...(cl.firstReal !== null ? [`first.real=${cl.firstReal}`] : [])] : []),
     ...(isDyn(res) ? dynKv(res) : []),
+    ...motorKv(res.motors, duration),
+    // vlna 22, body 2 a 8 – nová pole na KONEC řádku: kroky s motorem na mezi, neplatné kroky, díly volné v mezi, úroveň simulace
+    ...(stopped(res) ? [`stopped=${stopped(res)}`] : []),
+    ...(invalid(res) ? [`invalid=${invalid(res)}`] : []),
+    ...(res.undetermined?.length ? [`undetermined=${res.undetermined.length}`] : []),
+    levelKv(res.level ?? { level: isDyn(res) ? "dynamic" : "kinematic" }),
   ];
   return `motion ${parts.join(" ")}`;
 }
+const stopped = (res: MotionResult) => res.steps.filter((s) => s.status === "stopped").length;
+const invalid = (res: MotionResult) => res.steps.filter((s) => s.status === "invalid").length;
 
 /**
  * Dynamika na strojovém řádku studie (vlna 21): `mode=dyn bodies=1 spring.max=85.9N@0.238s stops=2 return=0.375s
@@ -431,7 +462,9 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
     log.push(...motionSummary(res, doc, { ...(cl ? { collisionLines: cl.lines } : {}), notes: false }));
     if (cl) codes.push(...cl.codes);
     for (const x of motionMotorNotes(res, doc)) codes.push({ code: x.code, args: x.args, text: x.text });
-    kv = motionKv(res, cl?.stats ?? null);
+    // motor na mezi, neplatné kroky, vazbami neurčená poloha (body 2 a 8) – záznamy s kódem a celou větou
+    for (const x of motionFindings(res, doc)) codes.push({ code: x.code, args: x.args, text: x.text });
+    kv = motionKv(res, cl?.stats ?? null, doc.motion?.duration);
     return res;
   };
   /**
@@ -473,7 +506,7 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
         const st = motionState(d, env);
         if (st.state === "stale") {
           codes.push({ code: "motion.stale", args: [st.changed.join("; ")] });
-          kv = `motion steps=${d.motion.steps} t=${fmtNum(d.motion.duration, 3)} motors=${d.motion.motors.length} motion.stale=1`;
+          kv = [`motion steps=${d.motion.steps} t=${fmtNum(d.motion.duration, 3)} motors=${d.motion.motors.length} motion.stale=1`, ...motorKv(d.motion.motors, d.motion.duration)].join(" ");
         } else await runLog(d);
       }
       return signal(d, log, false, undefined, codes, kv);
@@ -493,6 +526,8 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
         { kind: cmd.kind, ...(cmd.start === "current" ? {} : { from: cmd.from }), ...(cmd.stroke !== undefined ? { stroke: cmd.stroke } : cmd.auto ? {} : { to: cmd.to }), ...(cmd.speed !== undefined ? { speed: cmd.speed } : {}), ...(cmd.back ? { back: true } : {}) },
         { id: i >= 0 ? study.motors[i].id : uid(), mate: mate.id, abs, current: motorCurrent({ kind: cmd.kind }, mate), sign: invert ? -1 : 1 },
       );
+      // chování na mezi (bod 8): výchozí stop se neukládá; „chyba“ = kroky za mezí neplatné (poslední platná poloha)
+      if (cmd.atLimit === "error") mo.atLimit = "error";
       if (i >= 0) study.motors[i] = mo;
       else study.motors.push(mo);
       const idx = i >= 0 ? i : study.motors.length - 1;
@@ -513,6 +548,15 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       const doc = { ...d, motion: study };
       log.push(...studyLines(doc));
       if (study.motors.length || study.mode === "dynamic") await runLog(doc);
+      return signal(doc, log, true, { open: true }, codes, kv);
+    }
+    case "mode": {
+      // režim studie (bod 2): kvazistatika = rovnováha pružin a kontaktů v každém kroku; automaticky = podle pružin v sestavě
+      if (cmd.mode) study.mode = cmd.mode;
+      else delete study.mode;
+      const doc = { ...d, motion: study };
+      log.push(tr("✓ pohybová studie: {0}", levelLine(levelOf(studyMode(doc, study)))));
+      if (study.motors.length) await runLog(doc);
       return signal(doc, log, true, { open: true }, codes, kv);
     }
     case "dyn": {
@@ -555,6 +599,11 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
         .filter((c) => c.cls === "real" || c.cls === "undetermined")
         .map((c) => (c.cls === "real" ? { code: "clash.real", args: [nm(c.a), nm(c.b), fmt(c.volume, 1)] } : { code: "clash.undetermined", args: [nm(c.a), nm(c.b)] }));
       if (s.conflicts.length) log.push(tr(" ⚠ nesplněné vazby: {0}", s.conflicts.length));
+      // detail konfliktu kroku (bod 8): stav, dosažené hodnoty motorů a VŠECHNY odchylky konfliktní množiny
+      if (s.status === "stopped") log.push(tr(" ⚠ motor stojí na mezi: dosaženo {0} (žádáno {1})", (s.reached ?? []).map((v) => fmt(v, 4)).join("; "), s.motors.map((v) => fmt(v, 4)).join("; ")));
+      if (s.status === "invalid") log.push(tr(" ⚠ NEŘEŠITELNÝ krok – zobrazena poslední platná poloha (krok {0}), žádný kompromis", s.shows ?? 0));
+      for (const x of s.devs ?? []) log.push(`  ${tr("konflikt:")} ${devText(x)}`);
+      if (res.level) log.push(` ${levelLine(res.level)}`);
       return signal(d, log, false, { open: true, step: s.i }, [...codes, ...stepCodes]);
     }
     case "export": {

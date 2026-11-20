@@ -118,7 +118,9 @@ describe("zadání motoru: buildMotor a délka studie", () => {
   });
   it("délka studie: jediný motor = doba jízdy; výslovný kratší čas = chyba; víc motorů = prodloužení s ⚠, delší studie zůstane", () => {
     const r = mo({ id: "a", from: 57.5, to: 27.15, speed: 15.175, ranged: true });
-    expect(fitDuration({ motors: [r], duration: 7, steps: 36 }, 0)).toEqual({ duration: 2 });
+    // jediný motor určuje délku; změna dřív nastavené (jiné než výchozí) délky se ohlásí ℹ (oprava po kontrole – dřív potichu)
+    expect(fitDuration({ motors: [r], duration: 7, steps: 36 }, 0)).toMatchObject({ duration: 2, note: { code: "motion.duration-set", args: [1, "7", "2"] } });
+    expect(fitDuration({ motors: [r], duration: 2, steps: 36 }, 0)).toEqual({ duration: 2 });
     expect(fitDuration({ motors: [r], duration: 7, steps: 36 }, 0, 3)).toEqual({ duration: 3 });
     expect(() => fitDuration({ motors: [r], duration: 7, steps: 36 }, 0, 1)).toThrow(/trvá 2 s, zadaný čas 1 s nestačí/);
     const other = mo({ id: "b", mate: "y" });

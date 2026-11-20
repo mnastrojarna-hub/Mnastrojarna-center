@@ -49,6 +49,7 @@ Krok;Čas [s];Motor 1 [mm];Rám X;Rám Y;Rám Z;Rám RX;Rám RY;Rám RZ;Deska A 
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
  Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
 Vazby splněny ve všech krocích
+ℹ řádek 4: délka studie změněna z 3 s na 2 s – určuje ji doba jízdy jediného motoru 1 (rozsah × rychlost); jinou délku zadejte pohyb čas T (motor po dojetí stojí)
 
 Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]
@@ -58,7 +59,7 @@ Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 �
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 4 ===
-✗ řádek 2: motor: rozsah 30,35 mm rychlostí 15,175 mm/s trvá 2 s, zadaný čas 1 s nestačí – vynechte čas (délka studie bude 2 s), nebo rychlost (motor projede rozsah za 1 s)
+✗ řádek 2: motor: rozsah 30,35 mm rychlostí 15,175 mm/s trvá 2 s, zadaný čas 1 s nestačí – vynechte čas (délka studie bude 2 s), nebo rychlost (motor projede rozsah za 1 s) (skript ze starší verze: dřívější význam – jet od začátku rychlostí bez konce – zapíšete „od A rychlost V“)
 
 Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]

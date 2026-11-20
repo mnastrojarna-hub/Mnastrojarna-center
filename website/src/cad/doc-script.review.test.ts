@@ -419,7 +419,8 @@ describe("7 · vazby sestavy s dalšími odkazy (závěs, symetricky, šířka, 
     // výslovně „od 0 ot/min 10“; zápis „0..180 ot/min 10“ dnes znamená rozsah × rychlost (dojet na 180° a stát)
     expect(l).toContain("pohyb motor rotační vazba 1 od 0 ot/min 10 kroky 6 čas 2");
     expect(r.stats).toMatchObject({ mates: 5, matesText: 5 });
-    expect(r.notes).toEqual([]);
+    // uložený konec 180 se nikdy nepoužil – skript ho nezapisuje, ale ne potichu (oprava po kontrole: dřív `notes: []`)
+    expect(r.notes).toEqual(["motor pohybové studie č. 1: uložený konec 180 se nepoužíval (motor jede od začátku rychlostí bez konce) – skript ho nezapisuje; dojet na konec a stát = 0..180 s rychlostí (rozsah × rychlost)"]);
   });
   it("řádky přečtené konzolí dávají stejné plochy (česky, anglicky, německy)", () => {
     for (const lang of ["cs", "en", "de"] as const) {

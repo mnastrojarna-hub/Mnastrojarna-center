@@ -58,7 +58,6 @@
 ✓ pole „{0}“: {1} ks ({2}) – kopie {3}	✓ pattern „{0}“: {1} pcs ({2}) – copies {3}
 ✓ rám formy „{0}“ – nová záložka: komponent {1}, {2}×{3} mm, výška {4} mm (se středicím kroužkem), dutina {5}, materiál {6}	✓ mould base „{0}“ – new tab: components {1}, {2}×{3} mm, height {4} mm (with locating ring), cavity {5}, material {6}
 ✓ úprava {0} „{1}“ v kontextu sestavy „{2}“{3} – další příkazy pracují s ním; návrat: sestava hotovo	✓ editing {0} „{1}“ in the context of assembly „{2}“{3} – the following commands work on it; back: assembly done
-✓ vazba {0} ({1}): {2}{3}	✓ mate {0} ({1}): {2}{3}
 ✓ vazba Ukotvit „{0}“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou	✓ Fix mate „{0}“ – the component is fixed, other mates move the other component
 ✓ záložka „{0}“ ({1}) je aktivní – další příkazy pracují s ní	✓ tab „{0}“ ({1}) is active – the following commands work on it
 ✓ záložka „{0}“ už je aktivní	✓ tab „{0}“ is already active

@@ -358,6 +358,9 @@ export type AsmComponent = {
  * `a` (začátek pružiny – strana jejího počátku) a `b` (konec). Délka pružiny = vzdálenost obou rovin podél osy pružiny; mění se
  * při přepočtu vazeb i v pohybové studii. `free` = volná délka L0, `solid` = délka na doraz Ln, `rate` = tuhost c [N/mm]
  * (síla F = c·(L0 − L)). `length`, `offset` (posun začátku pružiny po ose k dosedací ploše A) a `seat` zapíše poslední přepočet.
+ * Řídicí × odvozené (vlna 22, bod 7): ŘÍDÍ polohy komponent, dosedací plochy `a`/`b` a `free`/`solid`/`rate`; `length`, `offset` a `seat`
+ * jsou jen ODVOZENÁ mezipaměť z ploch – po načtení dokumentu (JSON, .mncad, `--open`, otevřít v aplikaci) se odvodí znovu a rozpor
+ * s uloženou hodnotou se ohlásí ⚠ `spring.stale` (cad/asm-spring.ts `springDrift`). Zápisem jiné `length` pružinu natáhnout nelze.
  */
 export type SpringDef = {
   a: MateRef;
@@ -490,6 +493,11 @@ export type LostRef = { kind: string; origin: Vec3; normal: Vec3; radius?: numbe
 export type Mate = {
   id: string; type: MateType; a: MateRef; b: MateRef; value?: number; flip?: boolean; center?: boolean; suppressed?: boolean; name?: string;
   c?: MateRef; d?: MateRef; min?: number; max?: number; phase?: number[]; rel?: Placement;
+  /**
+   * preferovaná strana meze (Mez vzdálenosti, Mez úhlu, Drážka bez polohy; vlna 22, bod 2): kinematika i statický přepočet drží díl
+   * u této meze, když ho vazby neurčují – nikdy proti pevné vazbě, ukotvení, kontaktu ani pohonu motoru (cad/motion-quasi.ts)
+   */
+  prefer?: "min" | "max";
 };
 /**
  * Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost).
@@ -497,9 +505,9 @@ export type Mate = {
  * `ranged` = od `from` rychlostí bez konce (znaménko = směr, `to` se nepoužije); s `ranged` (vlna 22) = rozsah × rychlost: z `from`
  * na `to` rychlostí |speed|, tam motor stojí (doba |to − from| / rychlost). Jediný výklad všech tvarů: cad/motor-model.ts `motorKeys`.
  */
-export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
+export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean; /** chování, když hodnotě brání mez / doraz / pevná vazba (vlna 22, bod 8): „stop“ (výchozí) = motor stojí na poslední dosažitelné hodnotě, „error“ = krok je neplatný a zůstává poslední platná poloha */ atLimit?: "stop" | "error" };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic };
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic };
 /**
  * Dynamika pohybové studie (cad/motion-dynamic.ts): integrační krok [s], gravitace (směr; null = vypnutá, chybí = −Z), viskózní tlumení
  * pružin [N·s/mm], součinitel odrazu na dorazech (0–1), ručně zadané hmotnosti komponent [kg] a síly / momenty na vazbách.

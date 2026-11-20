@@ -13,7 +13,7 @@
  * | **rozsah × rychlost** (`ranged`) | do rychlostí |v| | 0: od · T: do, T = |do − od| / |rychlost| | **stojí na `do`** |
  * | začátek + zdvih | ukládá se jako od / do = od + Δ → řádky výše | | |
  *
- * D = délka studie. Rozšíření dalších etap bez přepisu (plán S/w22/m/M1-plan.md §1):
+ * D = délka studie. Rozšíření dalších etap bez přepisu (plán etapy 1 balíku M, oddíl 1):
  * * **chování na mezi vazby** (bod 8, etapa M2) = vlastnost profilu `atLimit`: profil dává POŽADOVANOU hodnotu v čase, řešič podle
  *   `atLimit` při zablokovaném kroku buď drží poslední dosažitelnou hodnotu („stop“ – motor stojí na mezi), nebo dál žádá
  *   požadovanou („continue“ – dnešní chování: kompromis řešiče a ⚠ motion.conflict). M2 doplní `MotionMotor.atLimit` a čtení v řešiči;
@@ -44,7 +44,7 @@ export type MotorProfile = {
   after: { mode: "hold" } | { mode: "run"; speed: number; rotary: boolean };
   /**
    * chování, když požadované hodnotě brání mez vazby / doraz: „continue“ = řešič dál žádá požadovanou hodnotu (dnešní chování –
-   * kompromis poloh a ⚠ motion.conflict), „stop“ = motor stojí na poslední dosažitelné hodnotě. Etapa M1 vždy „continue“; „stop“
+   * kompromis poloh a ⚠ motion.conflict), „stop“ = motor stojí na poslední dosažitelné hodnotě. Etapa 1 balíku M vždy „continue“; „stop“
    * a jeho čtení v řešiči doplní M2 (bod 8) z `MotionMotor.atLimit` – profil je na to připravený, vyhodnocení se nemění.
    */
   atLimit: "continue" | "stop";
@@ -59,6 +59,15 @@ export const motorRate = (mo: Pick<MotionMotor, "kind" | "speed">): number => (m
 const hasSpeed = (mo: MotionMotor) => mo.speed !== undefined && Number.isFinite(mo.speed);
 /** rozsah × rychlost: motor dojede z `from` na `to` rychlostí |speed| a stojí */
 export const isRanged = (mo: MotionMotor): boolean => !!mo.ranged && hasSpeed(mo) && mo.speed !== 0 && mo.to !== mo.from;
+/** výchozí délka pohybové studie [s] (cad/motion.ts `defaultStudy`) – změnu jiné než výchozí délky motor ohlásí */
+export const DEFAULT_STUDY_DURATION = 2;
+/**
+ * Uložený konec, který se nepoužívá: motor s rychlostí BEZ `ranged` (dokument ze starší verze, nebo dřívější „Rychlost místo
+ * rozsahu“ v panelu) jede od začátku rychlostí bez konce a `to` vedle rychlosti se nikdy nepoužilo. Výchozí konec starého
+ * zadání bez rozsahu (±10 mm / ±360°) se nepočítá. Jediné pravidlo pro protokol (`motorRangeText`), upozornění (`motorNotes`,
+ * ⚠ `motion.end-unused`), načtení dokumentu (engine/verify.ts) i převod do skriptu (doc-script.ts). null = nic nepoužitého.
+ */
+export const unusedEnd = (mo: MotionMotor): number | null => (hasSpeed(mo) && !isRanged(mo) && mo.to !== mo.from && Math.abs(mo.to) !== (mo.kind === "rotary" ? 360 : 10) ? mo.to : null);
 
 /**
  * Klíče z úseků zadání: začátek + úseky „kam za jak dlouho / jak rychle“ → (čas, hodnota). Úsek s rychlostí trvá |Δ| / rychlost,
@@ -216,8 +225,9 @@ export function motorRangeText(mo: MotionMotor, duration: number): string {
     const txt = rot
       ? tr("od {0}° {1} rychlostí {2} (bez koncové hodnoty – za {3} s na {4}°)", n(s.start), motorArrow(mo, s.dir), speedText(s.speed), motorNum(duration, 3), n(s.endAt))
       : tr("od {0} mm {1} rychlostí {2} (bez koncové hodnoty – za {3} s na {4} mm)", n(s.start), motorArrow(mo, s.dir), speedText(s.speed), motorNum(duration, 3), n(s.endAt));
-    // starší dokument: konec uložený vedle rychlosti se nikdy nepoužíval – říct to, ne ho potichu zahodit
-    const unused = mo.to !== mo.from && mo.to !== (rot ? 360 : 10) ? tr(" · uložený konec {0} se nepoužívá", `${n(mo.to)}${rot ? "°" : " mm"}`) : "";
+    // starší dokument: konec uložený vedle rychlosti se nikdy nepoužíval – říct to, ne ho potichu zahodit (⚠ motion.end-unused v motorNotes)
+    const end = unusedEnd(mo);
+    const unused = end !== null ? tr(" · uložený konec {0} se nepoužívá", `${n(end)}${rot ? "°" : " mm"}`) : "";
     return txt + unused;
   }
   const arrow = motorArrow(mo, s.dir, s.mode === "back");
@@ -284,13 +294,14 @@ export function buildMotor(inp: MotorInput, o: { id: string; mate: string; abs: 
  * Upozornění k motoru: kód registru (engine/codes.ts), `args` = argumenty krátkého textu registru (nejvýš tři), `text` = celá věta
  * v aktuálním jazyce (s návodem, jak zadání opravit) – protokol i panel vypisují `text`.
  */
-export type MotorNote = { code: "motion.duration-extended" | "motion.motor-short" | "motion.start-jump" | "motion.gap-negative"; args: (string | number)[]; text: string };
+export type MotorNote = { code: "motion.duration-extended" | "motion.duration-set" | "motion.motor-short" | "motion.start-jump" | "motion.gap-negative" | "motion.end-unused"; args: (string | number)[]; text: string };
 
 /**
  * Délka studie po zadání motoru `mo` (už vloženého do `study.motors` na pozici `index`). Rozsah × rychlost: doba jízdy
- * T = |do − od| / rychlost. Bez výslovně zadané délky (`explicit`): jediný motor → délka = T; víc motorů → délka se prodlouží na T,
- * je-li kratší (⚠ `motion.duration-extended`), delší zůstane (motor po dojetí stojí). Výslovná délka kratší než T je rozpor –
- * chyba s vysvětlením, nic se nezahodí potichu.
+ * T = |do − od| / rychlost. Bez výslovně zadané délky (`explicit`): jediný motor kinematické studie → délka = T, a mění-li se tím
+ * dřív nastavená (jiná než výchozí) délka, řekne to ℹ `motion.duration-set` (nikdy potichu); dynamika se nezkracuje (motor po
+ * dojetí stojí, simulace běží dál); víc motorů / dynamika → délka se prodlouží na T, je-li kratší (⚠ `motion.duration-extended`),
+ * delší zůstane (motor po dojetí stojí). Výslovná délka kratší než T je rozpor – chyba s vysvětlením, nic se nezahodí potichu.
  */
 export function fitDuration(study: MotionStudy, index: number, explicit?: number): { duration: number; note?: MotorNote } {
   const mo = study.motors[index];
@@ -301,10 +312,22 @@ export function fitDuration(study: MotionStudy, index: number, explicit?: number
   const speedText = mo.kind === "rotary" ? tr("{0} ot/min", motorNum(Math.abs(mo.speed!), 3)) : tr("{0} mm/s", motorNum(Math.abs(mo.speed!), 3));
   if (explicit !== undefined) {
     if (s.time > explicit + 1e-9)
-      throw new Error(tr("motor: rozsah {0}{1} rychlostí {2} trvá {3} s, zadaný čas {4} s nestačí – vynechte čas (délka studie bude {3} s), nebo rychlost (motor projede rozsah za {4} s)", motorNum(s.stroke), unit, speedText, motorNum(s.time, 3), motorNum(explicit, 3)));
+      throw new Error(
+        tr("motor: rozsah {0}{1} rychlostí {2} trvá {3} s, zadaný čas {4} s nestačí – vynechte čas (délka studie bude {3} s), nebo rychlost (motor projede rozsah za {4} s)", motorNum(s.stroke), unit, speedText, motorNum(s.time, 3), motorNum(explicit, 3)) +
+          // skripty starších verzí: „A..B rychlost V“ dřív znamenalo jízdu od A bez konce (B se nepoužilo) – dnes rozsah × rychlost
+          tr(" (skript ze starší verze: dřívější význam – jet od začátku rychlostí bez konce – zapíšete „od A rychlost V“)"),
+      );
     return { duration: explicit };
   }
-  if (study.motors.length === 1) return { duration: s.time };
+  if (study.motors.length === 1 && study.mode !== "dynamic") {
+    const prev = study.duration;
+    if (Math.abs(s.time - prev) > 1e-9 && Math.abs(prev - DEFAULT_STUDY_DURATION) > 1e-9)
+      return {
+        duration: s.time,
+        note: { code: "motion.duration-set", args: [index + 1, motorNum(prev, 3), motorNum(s.time, 3)], text: tr("délka studie změněna z {1} s na {2} s – určuje ji doba jízdy jediného motoru {0} (rozsah × rychlost); jinou délku zadejte pohyb čas T (motor po dojetí stojí)", index + 1, motorNum(prev, 3), motorNum(s.time, 3)) },
+      };
+    return { duration: s.time };
+  }
   if (s.time > study.duration + 1e-9)
     return { duration: s.time, note: { code: "motion.duration-extended", args: [index + 1, motorNum(study.duration, 3), motorNum(s.time, 3)], text: tr("délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)", index + 1, motorNum(study.duration, 3), motorNum(s.time, 3)) } };
   return { duration: study.duration };
@@ -324,6 +347,25 @@ export function motorNotes(study: Pick<MotionStudy, "motors" | "duration" | "col
   const out: MotorNote[] = [];
   study.motors.forEach((mo, i) => {
     const m = mates.find((x) => x.id === mo.mate);
+    // starší dokument: rychlost bez `ranged` a vedle ní uložený konec – motor jede bez konce (i opačným směrem), konec se nepoužije
+    const end = unusedEnd(mo);
+    if (end !== null) {
+      const rot = mo.kind === "rotary";
+      const u = (v: number) => `${motorNum(v)}${rot ? "°" : " mm"}`;
+      const sp = motorSpan(mo, study.duration);
+      const speed = rot ? tr("{0} ot/min", motorNum(mo.speed!, 3)) : tr("{0} mm/s", motorNum(mo.speed!, 3));
+      const away = Math.sign(end - mo.from) !== 0 && Math.sign(mo.speed!) !== Math.sign(end - mo.from);
+      const no = m ? mates.indexOf(m) + 1 : "?";
+      const cmd = rot ? tr("pohyb motor rotační vazba {0} {1}..{2} ot/min {3}", no, motorNum(mo.from), motorNum(end), motorNum(Math.abs(mo.speed!), 3)) : tr("pohyb motor lineární vazba {0} {1}..{2} rychlost {3}", no, motorNum(mo.from), motorNum(end), motorNum(Math.abs(mo.speed!), 3));
+      out.push({
+        code: "motion.end-unused",
+        args: [i + 1, u(end), u(sp.endAt)],
+        text:
+          tr("motor {0}: uložený konec {1} se nepoužívá – motor jede od {2} rychlostí {3} bez koncové hodnoty, na konci studie je na {4}", i + 1, u(end), u(mo.from), speed, u(sp.endAt)) +
+          (away ? tr(" (opačným směrem, než leží konec)") : "") +
+          tr("; dokument ze starší verze – dojet na konec a stát: {0} (v panelu Převést na rozsah × rychlost)", cmd),
+      });
+    }
     if (!m) return;
     const abs = info?.[i]?.abs ?? motorIsAbsolute(mo, m);
     const cur = info?.[i]?.current ?? motorCurrent(mo, m);

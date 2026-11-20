@@ -147,6 +147,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `sestava pružina "P" mezi "A" [F3] "B" [F7] [volná L0] [blok Ln] [tuhost c] [vedená ano|ne]` · `sestava pružina "P" odebrat` · `sestava pružiny` | pružina mezi komponentami: délka podle dosedacích ploch při přepočtu vazeb i v pohybové studii, síla, kontrola dorazu (viz „Pružina v sestavě“) |
 | `sestava pružina nová [d 2] [De 20] [L0 35] [n 6] [tuhost c] [blok Ln] mezi "A" Ø21 "B" horní [v x y z] [do děr vzoru] [název "P"]` · `sestava pružina "P" mezi "A" "B" do děr vzoru` | nová pružina z tabulky mezi díly (osa z díry / roviny, zámek k A) a kopie do všech děr vzoru (viz „Pružina v sestavě“) |
 | `pohyb dynamika [čas T] [krok dt] [gravitace -Z|vyp] [tlumení c] [odraz e]` · `pohyb hmotnost "X" kg` · `pohyb síla vazba N F` · `pohyb kinematika` | dynamická pohybová studie: síly pružin, gravitace a zadané síly hýbou díly, dorazy s odrazem (viz „Dynamika“) |
+| `pohyb kvazistatika` · `pohyb kinematika` · `pohyb automaticky` · `pohyb motor … na mezi stop|chyba` · `sestava vazba N preferovat min|max|ne` | režim a úroveň studie, motor na mezi, preferovaná strana meze (viz „Režim studie, priorita podmínek“) |
 | `sestava pole "X" N rozteč P [směr Y]` · `sestava pole "X" kruhové N [osa Z] [v cx cy cz]` · `sestava zrcadlit "X" YZ` · `sestava šroub "Deska" Ø9 [matice] [bez podložky]` | pole, zrcadlení, šroubový spoj do díry |
 | `sestava podsestava "A" "B" [jako "…"]` · `sestava rozpustit "P"` · `sestava upravit "X"` … `sestava hotovo` · `sestava otevřít "X"` | podsestavy, úprava dílu v kontextu sestavy |
 | `kusovník [strukturovaně] [csv]` · `rám formy [šířka délka] [dutina X Y H] …` · `záložky` · `záložka "název"|N` · `zavřít záložku` | kusovník do protokolu, rám vstřikovací formy, záložky dokumentů |
@@ -838,9 +839,43 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   rychlostí 15,175 mm/s, **na konci motor stojí**; délka studie = |do − od| / rychlost (2 s). Rychlost je velikost – směr dává
   rozsah (`27..57 rychlost -5` je chyba). Se zadaným `čas T`: kratší než jízda = chyba s vysvětlením, delší = motor po dojetí
   stojí. Později zkrácená studie = ⚠ `motion.motor-short`; druhý motor s delší jízdou studii prodlouží (⚠
-  `motion.duration-extended`). **Jen rychlost** (`rychlost 5`, `od 40 rychlost -5`, `ot/min 60`) = od začátku bez konce,
+  `motion.duration-extended`); jediný motor bez `čas` změní dřív zadanou délku studie jen s ℹ `motion.duration-set` a dynamickou
+  studii nezkracuje. **Jen rychlost** (`rychlost 5`, `od 40 rychlost -5`, `ot/min 60`) = od začátku bez konce,
   znaménko = směr. Popis motoru: `hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s` (↓ hodnota klesá, ↑ roste,
   ↺ / ↻ natočení). Mezera Vzdálenosti pod nulou bez kontroly kolizí = ⚠ `motion.gap-negative` (plochy se prostoupí).
+- **Starší dokumenty a skripty:** zápis `A..B rychlost V` dřív znamenal jízdu od A bez konce (B se nepoužilo); dnes je to rozsah ×
+  rychlost. Dřívější význam zapíšete `od A rychlost V`. Uložený motor s rychlostí a nepoužitým koncem (dokument starší verze) dá
+  ⚠ `motion.end-unused` při načtení i při výpočtu (kam motor opravdu dojede, i opačným směrem); převod na rozsah × rychlost =
+  znovu zadat `pohyb motor … A..B rychlost V` (v panelu tlačítko „Převést na rozsah × rychlost“), převod do skriptu to uvede v poznámce.
+- **Motory na strojovém řádku** (i ve stručném protokolu): na konci `= … motion …` jedno pole na motor
+  `m<i>=<průběh>:<začátek>><konec>:<směr>` – průběh `range` | `back` (`55>25>55`) | `ranged` | `open` (konec = hodnota na konci
+  studie), směr `+` roste / `-` klesá / `+-` `-+` tam a zpět; např. `m1=ranged:57.5>27.15:-`.
+- **Režim studie a úroveň simulace (vlna 22, bod 2):** `pohyb kinematika` = polohy jen z vazeb a motorů (pružiny se měří, netlačí);
+  díl, kterého polohu vazby neurčují (volný v mezi – stírací deska, přidržovač), zůstává, kde byl, a posune ho jen doraz meze → ⚠
+  `motion.undetermined` a souhrn místo „Vazby splněny ve všech krocích“ napíše „⚠ vazby splněny …, ale polohu „X“ neurčují“.
+  `pohyb kvazistatika` = v každém kroku **rovnováha** pružin (energie ½·c·(L0 − L)², pružina jen tlačí) a jednostranných kontaktů
+  (meze vazeb, délka pružiny na doraz Ln) – nezávisle na předchozím kroku, směru přehrávání i historii úprav (přidržovač s předpětím
+  na horní mezi, dokud nedosedne: Z = max(10; Z_deska − 33)). `pohyb dynamika` = přechodový děj. `pohyb automaticky` (výchozí) =
+  kvazistatika, když na pohyblivou komponentu dosedá pružina, jinak kinematika. Každý protokol studie má řádek `Úroveň simulace:
+  kvazistatika – … (zvoleno automaticky: …)` a strojový řádek končí `level=kin|quasi|dyn` (`anim`, `+geo` doplní fáze / procesní
+  vrstva). JSON: `motion.mode: "kinematic" | "quasistatic" | "dynamic"` (chybí = automaticky).
+- **Priorita podmínek a motor na mezi (bod 8):** tvrdé podmínky (ukotvení, zámky, kontakty, zarovnání, souosost, pevné vzdálenosti,
+  meze, Ln pružin) > hodnota motoru > preference. Nesplnitelný krok se nikdy nevyřeší kompromisem (ujetí a naklopení desek):
+  `na mezi stop` (výchozí; EN `at limit stop`, DE `an grenze stopp`) = motor stojí na poslední dosažitelné hodnotě, krok má
+  fyzikální polohu → ⚠ `motion.motor-limit` „motor 1 stojí na mezi v krocích 8–12: žádáno 37,267 → 27,15 mm, dosaženo 37,5 mm –
+  brání: „Mez“ 5 mm – na mezi min 5 mm (doraz); „PEVNÁ“ 24,5 mm (splněno); příčina: …“; `na mezi chyba` (EN `error`, DE
+  `fehler`; JSON motoru `atLimit: "error"`) = kroky neplatné, `place` = poslední platný krok, ⚠ `motion.invalid`. Vazby, které si
+  odporují i bez motoru = neplatné kroky s příčinou „vazby si odporují“. Kód `motion.conflict` po vazbách a úsecích zůstává; souhrn
+  vypíše nejvýš tři odchylky, `pohyb krok N` všechny („konflikt: …“). Strojově `stopped=N invalid=N undetermined=N` před `level=`.
+  Panel: krok „motor stojí na mezi“ / „NEŘEŠITELNÝ krok – zobrazen krok 7“, 3D okno neplatného kroku červeně orámované
+  (`data-motion-invalid`). Délka pružiny na doraz Ln je doraz i v kinematice (dřív pružina „prošla“ a jen řádek pružiny byl ✗).
+- **Preferovaná strana meze:** `sestava vazba "Mez" preferovat max` (EN `prefer`, DE `bevorzugen`; `ne` = zrušit; JSON
+  `prefer: "min" | "max"`) u Meze vzdálenosti / úhlu a Drážky bez polohy: kinematika i přepočet vazeb drží díl u této meze, když ho
+  ostatní vazby neurčují; pevnou vazbu, ukotvení, kontakt ani motor nepřebije. Výpis vazby končí „· preferuje max“.
+- **Statický přepočet (úpravy vazeb a poloh):** díly volné v mezi se posunou do rovnováhy pružin a preferovaných stran (stejný
+  dokument nezávisle na historii – ZDVIH 27,15 a zpět 57,5 = výchozí poloha; řádek „rovnováha pružin … posunula: …“); při načtení
+  a zjišťování stavu se dokument nehýbe. Úprava, kterou nelze splnit, **nezapíše kompromis**: polohy zůstanou, řádek začíná ⚠ (ne ✓)
+  a ⚠ `mate.conflict` uvede „nejbližší dosažitelná hodnota 37,5 mm (zadáno 37,15 mm) – brání: …“.
 - `pohyb` / `pohyb stav` – definice a souhrn (rozsah pohybu komponent, první kolize, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
@@ -851,12 +886,16 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   každá komponenta má svůj záznam (stejně sloupce CSV).
 - Studie se ukládá do sestavy (`motion` v JSON; rozsah × rychlost má u motoru `ranged: true`) a v `stav` je řádek
   „Pohybová studie: …“.
-- **Výsledek platí jen pro stav sestavy, pro který vznikl** (dokument + geometrie a konfigurace dílů + polohy + vazby + studie).
-  Po změně čehokoli z toho: `stav` píše „Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: geometrie dílu „Deska A““
-  (strojově `motion=stale motion.stale=1`; platný `motion=ok|conflict|clash`, nespočítáno `motion=-`), `pohyb stav` dá
-  ⚠ `motion.stale` bez souhrnu (řádek `= … motion steps=5 t=2 motors=1 motion.stale=1`) a nepřepočítává; `pohyb spustit`,
+- **Výsledek platí jen pro stav sestavy, pro který vznikl** (dokument + geometrie a konfigurace dílů + polohy, i komponent uvnitř
+  podsestav + vazby + studie; u dynamiky i materiál dílů). Po změně čehokoli z toho: `stav` píše „Pohyb: výsledek NEPLATÍ – od
+  výpočtu se změnilo: geometrie dílu „Deska A““ (strojově `motion=stale motion.stale=1`, nespočítáno `motion=-`), `pohyb stav` dá
+  ⚠ `motion.stale` bez souhrnu (řádek `= … motion steps=5 t=2 motors=1 motion.stale=1 m1=…`) a nepřepočítává; `pohyb spustit`,
   `pohyb krok N`, `pohyb export`, `pohyb přehrát` a `window.mncad.motion()` přepočítají (ℹ `motion.recomputed` řekne, co se
-  změnilo) – starý výsledek se nikdy nevrací jako platný. Panel studie má stav `data-motion-state="ok|stale|unchecked|running"`.
+  změnilo) – starý výsledek se nikdy nevrací jako platný. Platný výsledek: `motion=ok` JEN když se kolize v krocích opravdu
+  kontrolovaly bez průniku a k motorům není upozornění; `motion=mates-ok` = vazby splněny, kolize nekontrolovány; `warn` = ⚠ k motorům
+  (skok začátku, motor nedojede, mezera pod nulou, nepoužitý konec); `conflict` / `clash` = nesplněné vazby / průnik. Dva výpočty
+  téhož stavu (panel + text, dvakrát API) se spojí v jeden. Panel studie má stav `data-motion-state="ok|stale|unchecked|running"` a
+  verdikt `data-motion-verdict`.
 - Natočení v souhrnu (` · natáčí se 30°`) = největší úhel mezi natočením v kroku a výchozím natočením (krok 0) – porovnávají se
   matice, ne Eulerovy úhly: komponenta vložená s `otočení 180 0 0`, která se jen posouvá, „natáčí se“ nehlásí.
 
@@ -886,6 +925,13 @@ pravidlem jako u vazeb. Polohu napříč (osu) určuje umístění pružiny (`vl
   `pohyb export csv` přidá sloupce `<pružina> L [mm]` a `<pružina> F [N]`, `window.mncad.motion()` vrátí v kroku
   `springs: { "<pružina>": { length, seat, force, level } }`. Klíče `springs` i `comps` jsou podle **instance**: název, u
   stejných názvů `"P #3"` (pořadí) nebo `"P [P2]"` (přezdívka). Kolize v kroku počítají s pružinou v délce kroku.
+- **Řídicí × odvozené (vlna 22, bod 7):** ŘÍDÍ polohy komponent, dosedací plochy A/B a L0 / Ln / tuhost; `length`, `offset` a
+  `seat` v JSON jsou jen odvozená mezipaměť. Po načtení dokumentu (řádek JSON, `otevřít`, CLI `--open`, `window.mncad.setDocument`,
+  Soubor › Otevřít v aplikaci) se délka odvodí z ploch v nynějších polohách; rozpor nad 0,01 mm = ⚠ `spring.stale` „pružina „P“:
+  uložená délka 25 mm neodpovídá dosedacím plochám (15 mm) – délka odvozena z ploch“ a oprava jedním krokem historie (zpět ji vrátí).
+  `stav` ověří délku proti plochám: `Pružiny: „P“ 15 mm (L0 32 · Ln 14) · F 340 N ✓ – délka odvozená z dosedacích ploch (řídí
+  polohy komponent)`, rozpor ⚠ s oběma délkami, bez geometrie „uložená délka, s dosedacími plochami nezkontrolováno“ (bez ✓).
+  Kolize, STEP, výkres i 3D pracují s délkou z ploch.
 - `sestava pružiny` – stav všech pružin; `stav` má řádek `Pružiny: „P“ 38 mm (L0 44 · Ln 20) · F 150 N ✓ (6×)`;
   `sestava pružina "P" odebrat` – definice pryč, tvar ve volné délce. `sestava odebrat "A"` (dosedací komponenta) odebere i
   definice pružin, které na ní dosedaly (`pružiny bez dosedací komponenty …`).
@@ -2519,10 +2565,10 @@ Výpisy `=` stručného protokolu CLI/HTTP mají strojovou část **stejnou v cs
 
 Pohybová studie (`pohyb motor …`, `pohyb stav`, `pohyb spustit`) má ve stručném protokolu **jeden** řádek – kroky, zdvih
 tuhých skupin (komponenty, které se pohybují spolu: `<zdvih>mm:<počet komponent>`), stojící a natáčející se komponenty
-a třídy kolizí v krocích; rozsah pohybu každé komponenty je v plném protokolu:
+a třídy kolizí v krocích, na konci motory (průběh, začátek > konec, směr); rozsah pohybu každé komponenty je v plném protokolu:
 
 ```
-= L364 asm "Střižný nástroj" motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 clash.steps=41/41 thread=30 real=1 first.real=3
+= L364 asm "Střižný nástroj" motion steps=40 t=2 motors=1 conflicts=0 travel=50mm:36,20mm:1 static=33 clash.steps=41/41 thread=30 real=1 first.real=3 m1=range:0>-50:-
 ⚠ L364 clash.real "Střižný nástroj": v pohybu „Horní deska“ × „Pružina“ od kroku 3 (t = 0,15 s): kroků 38, dvojic komponent 4, …
 ```
 

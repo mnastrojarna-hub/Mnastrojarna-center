@@ -19,10 +19,12 @@ import { writeZip } from "@/cad/formats/zip";
 import { cadLocale, tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "@/cad/mates-kin";
-import { defaultStudy, motionMotorNotes, type MotionResult } from "@/cad/motion";
-import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
+import { defaultStudy, motionFindings, motionMotorNotes, type MotionResult } from "@/cad/motion";
+import { levelLine, levelOf, studyMode } from "@/cad/motion-mode";
+import { devText } from "@/cad/motion-quasi";
+import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, motionVerdict, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
 import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, type MotorInput } from "@/cad/motor-model";
-import { studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
+import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
 import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
 import type { SpringStep } from "@/cad/asm-spring";
 import { uid, type CadDoc, type MotionStudy, type Placement, type Vec3 } from "@/cad/types";
@@ -34,7 +36,7 @@ import { FloatPanel } from "./ui";
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
 /** `springs` = délky pružin v kroku (cad/asm-spring.ts) – zobrazení protáhne síť volné pružiny */
-type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null; springs?: Record<string, SpringStep> | null };
+type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null; springs?: Record<string, SpringStep> | null; /** neplatný krok (bod 8): zobrazená poloha je poslední platného kroku `shows` – 3D okno ho výrazně označí */ invalid?: { step: number; shows: number } | null };
 let view: View = { pose: null, trace: null };
 const subs = new Set<() => void>();
 const EMPTY: View = { pose: null, trace: null };
@@ -111,7 +113,8 @@ export function MotionPanel({
   const study: MotionStudy = doc.motion ?? defaultStudy();
   const mates = useMemo(() => (doc.mates ?? []).filter((m) => !m.suppressed && (ROTARY_MOTOR_TYPES.has(m.type) || LINEAR_MOTOR_TYPES.has(m.type))), [doc.mates]);
   const [busy, setBusy] = useState<{ k: number; n: number } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  /** chyba výpočtu i s dokumentem a stavem, pro který vznikla (klíč dokumentu + otisk) – u jiného dokumentu / stavu se neukáže */
+  const [err, setErr] = useState<{ key: string; sig: string; text: string } | null>(null);
   const [loop, setLoop] = useState(!!study.loop);
   const [rec, setRec] = useState<string | null>(null);
   const cancel = useRef(false);
@@ -171,21 +174,24 @@ export function MotionPanel({
     }
     const s = res.steps[step];
     const trace = res.steps.slice(0, step + 1).flatMap((x) => (x.trace ? [x.trace] : []));
-    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null, springs: s?.springs ?? null });
+    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null, springs: s?.springs ?? null, invalid: s?.status === "invalid" ? { step: s.i, shows: s.shows ?? 0 } : null });
   }, [res, step]);
   useEffect(() => () => motionView.set({ pose: null, trace: null }), []);
   const compute = useCallback(async (): Promise<MotionResult | null> => {
     const d = docRef.current;
     const n = (d.motion ?? defaultStudy()).steps;
+    const e0 = envRef.current();
+    const at = { key: motionSlot(e0).key, sig: motionSig(d) };
     setErr(null);
     cancel.current = false;
-    computing.current = motionSig(d);
+    computing.current = at.sig;
     setBusy({ k: 0, n });
     try {
       // výsledek se uloží pod otiskem `d`; platí-li pak pro zobrazený dokument, panel ho ukáže sám (stav z úložiště)
-      return await motionRun(d, envRef.current(), { onStep: (k, nn) => setBusy({ k, n: nn }), cancel: () => cancel.current });
+      return await motionRun(d, e0, { onStep: (k, nn) => setBusy({ k, n: nn }), cancel: () => cancel.current });
     } catch (e) {
-      if (!(e instanceof MotionSuperseded)) setErr((e as Error).message);
+      // chyba patří dokumentu a stavu, pro který se počítalo – nad jinou sestavou / po změně se neukáže
+      if (!(e instanceof MotionSuperseded)) setErr({ ...at, text: (e as Error).message });
       return null;
     } finally {
       computing.current = null;
@@ -361,15 +367,42 @@ export function MotionPanel({
   const cur = res?.steps[step];
   // upozornění k motorům zvlášť (i bez výpočtu – níže), v souhrnu výsledku by byla podruhé
   const summary = res ? motionSummary(res, doc, { notes: false }) : [];
+  // motor na mezi, neplatné kroky, vazbami neurčená poloha (vlna 22, body 2 a 8) – v panelu jako upozornění s kódem
+  const findings = res && !isDyn(res) ? motionFindings(res, doc) : [];
+  // úroveň simulace: z výsledku, jinak co by zvolil výpočet (studie bez výslovného režimu = automaticky)
+  const levelNow = res?.level ?? levelOf(studyMode(doc, study));
   const notes = res ? motionMotorNotes(res, doc) : motorNotes(study, doc.mates ?? [], (m) => m.name ?? tr(MATE_LABEL[m.type]));
+  // verdikt platného výsledku (jako pole `motion=` příkazu `stav`): ok jen po kontrole kolizí bez průniku a bez upozornění
+  const verdict = res ? motionVerdict(res, doc).state : "";
+  const errText = err && err.sig === sig && err.key === (live?.key ?? err.key) ? err.text : null;
+  /**
+   * starší dokument: motor s rychlostí a nepoužitým uloženým koncem (⚠ motion.end-unused) → rozsah × rychlost (dojede na uložený
+   * konec a stojí); délka studie podle doby jízdy jako u textového `pohyb motor … A..B rychlost V`
+   */
+  const toRanged = (i: number) => {
+    const mo = study.motors[i];
+    if (!mo || mo.speed === undefined) return;
+    const motors = study.motors.map((x, k) => (k === i ? { ...x, speed: Math.abs(mo.speed!), ranged: true as const } : x));
+    try {
+      const fit = fitDuration({ ...study, motors }, i);
+      setStudy({ motors, duration: fit.duration });
+      if (fit.note) flash(fit.note.text);
+    } catch (e) {
+      flash((e as Error).message);
+    }
+  };
   const fromLabel = dAbs ? tr("Začátek – hodnota vazby") : rot ? tr("Začátek – natočení od výchozí polohy") : tr("Začátek – posuv od výchozí polohy");
   const toLabel = dAbs ? tr("Konec – hodnota vazby") : rot ? tr("Konec – natočení od výchozí polohy") : tr("Konec – posuv od výchozí polohy");
   const time = (ms: number) => new Date(ms).toLocaleTimeString(cadLocale(), { hour: "2-digit", minute: "2-digit" });
   return (
     <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose}>
-      <div data-motion-panel data-motion-state={state} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
+      <div data-motion-panel data-motion-state={state} data-motion-verdict={verdict} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
         {/* kinematika (motory) / dynamika (síly pružin, gravitace – cad/motion-dynamic.ts) */}
-        <MotionModeSwitch study={study} onStudy={setStudy} />
+        <MotionModeSwitch study={study} onStudy={setStudy} doc={doc} />
+        {/* úroveň simulace: kinematika × kvazistatika × dynamika (vlna 22, bod 2) – co výpočet počítá a proč */}
+        <p data-motion-level={levelNow.level} data-motion-level-auto={levelNow.auto ? "1" : "0"} className="rounded bg-[#f3f6f9] px-2 py-1 text-[11px] leading-snug text-[#4a5664]">
+          {levelLine(levelNow)}
+        </p>
         <div>
           <p className="mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#4a5664]">{tr("Motory")}</p>
           {study.motors.length ? (
@@ -387,6 +420,11 @@ export function MotionPanel({
                         {motorMeaningText(mo, abs, study.duration)}
                       </span>
                     </span>
+                    {/* chování na mezi (bod 8): stop = motor stojí na poslední dosažitelné hodnotě, chyba = kroky za mezí neplatné */}
+                    <select data-motor-atlimit={mo.id} aria-label={tr("Motor na mezi")} title={tr("Motor na mezi: stop = stojí na poslední dosažitelné hodnotě · neplatný krok = kroky za mezí se neřeší, zůstane poslední platná poloha")} value={mo.atLimit ?? "stop"} onChange={(e) => setStudy({ motors: study.motors.map((x, k) => (k === i ? (e.target.value === "error" ? { ...x, atLimit: "error" as const } : withoutAtLimit(x)) : x)) })} className="w-[74px] shrink-0 rounded border border-[#cfd6de] bg-white px-1 py-0.5 text-[10.5px]">
+                      <option value="stop">{tr("na mezi: stop")}</option>
+                      <option value="error">{tr("na mezi: chyba")}</option>
+                    </select>
                     <button type="button" title={tr("Odebrat motor")} onClick={() => setStudy({ motors: study.motors.filter((_, k) => k !== i) })} className="text-[#6b7785] hover:text-brand">
                       <CadIcon name="trash" className="h-3.5 w-3.5" />
                     </button>
@@ -512,6 +550,11 @@ export function MotionPanel({
         {notes.map((x, i) => (
           <p key={i} data-motion-note={x.code} className="rounded bg-[#fff4e5] px-2 py-1 text-[11px] leading-snug text-[#8a5300]">
             ⚠ {x.text}
+            {x.code === "motion.end-unused" && (
+              <button type="button" data-motor-to-ranged={Number(x.args[0])} onClick={() => toRanged(Number(x.args[0]) - 1)} className="ml-1 underline">
+                {tr("Převést na rozsah × rychlost")}
+              </button>
+            )}
           </p>
         ))}
         {study.mode === "dynamic" && <DynamicSettings doc={doc} study={study} onStudy={setStudy} env={env} />}
@@ -547,7 +590,11 @@ export function MotionPanel({
             </button>
           )}
         </div>
-        {err && <p className="rounded bg-brand/10 p-2 text-[11.5px] text-brand-600">{err}</p>}
+        {errText && (
+          <p data-motion-error className="rounded bg-brand/10 p-2 text-[11.5px] text-brand-600">
+            {errText}
+          </p>
+        )}
         {/* stav výsledku: pro který dokument a stav platí – nebo že neplatí / nepočítalo se (nikdy starý souhrn) */}
         <p data-motion-status className={cn("rounded px-2 py-1 text-[11px] leading-snug", state === "ok" ? "bg-[#eef7ee] text-[#2f6b35]" : state === "stale" ? "bg-[#fff4e5] text-[#8a5300]" : "bg-[#f3f6f9] text-[#4a5664]")}>
           {state === "running"
@@ -576,8 +623,30 @@ export function MotionPanel({
               {tr("krok {0}/{1} · t = {2} s · motory {3}", cur.i, res.steps.length - 1, f(cur.t, 3), cur.motors.map((v, i) => `${f(v)}${res.motors[i]?.kind === "rotary" ? "°" : " mm"}`).join(", "))}
               {cur.clashes?.length ? <span className="text-brand"> · {tr("kolize")}</span> : null}
               {cur.conflicts.length ? <span className="text-brand"> · {tr("nesplněno {0}", cur.conflicts.length)}</span> : null}
+              {/* krok s konfliktem (bod 8): motor stojí na mezi / neřešitelný krok s poslední platnou polohou */}
+              {cur.status === "stopped" ? (
+                <span data-motion-step-status="stopped" className="text-brand">
+                  {" "}· {tr("motor stojí na mezi: {0}", (cur.reached ?? []).map((v, i) => `${f(v)}${res.motors[i]?.kind === "rotary" ? "°" : " mm"}`).join(", "))}
+                </span>
+              ) : cur.status === "invalid" ? (
+                <span data-motion-step-status="invalid" className="font-semibold text-brand">
+                  {" "}· {tr("NEŘEŠITELNÝ krok – zobrazen krok {0}", cur.shows ?? 0)}
+                </span>
+              ) : null}
             </p>
+            {cur.devs?.length ? (
+              <ul data-motion-step-devs className="space-y-0.5 rounded bg-[#fff4e5] px-2 py-1 text-[10.5px] leading-snug text-[#8a5300]">
+                {cur.devs.map((x) => (
+                  <li key={x.id}>{devText(x)}</li>
+                ))}
+              </ul>
+            ) : null}
             <DynChart res={res} doc={doc} step={step} />
+            {findings.map((x, i) => (
+              <p key={i} data-motion-finding={x.code} data-motion-finding-steps={x.steps ? `${x.steps[0]}-${x.steps[1]}` : ""} className="rounded bg-[#fff4e5] px-2 py-1 text-[11px] leading-snug text-[#8a5300]">
+                ⚠ {x.text}
+              </p>
+            ))}
             <ul data-motion-summary className="space-y-0.5 text-[11px] leading-snug text-[#4a5664]">
               {summary.map((l, i) => (
                 <li key={i} className={cn((l.startsWith("⚠") || l.startsWith(" ⚠")) && "text-brand-600")}>
@@ -601,4 +670,11 @@ export function MotionPanel({
       </div>
     </FloatPanel>
   );
+}
+
+/** motor bez volby „na mezi“ (výchozí stop se neukládá) */
+function withoutAtLimit<T extends { atLimit?: unknown }>(x: T): Omit<T, "atLimit"> {
+  const y = { ...x };
+  delete y.atLimit;
+  return y;
 }

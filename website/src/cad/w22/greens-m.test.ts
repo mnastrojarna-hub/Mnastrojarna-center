@@ -1,13 +1,13 @@
 /**
  * Vlna 22, balík M – „žádné falešně zelené“ u pohybové studie (hlavní zásada zprávy). Pro každý text úspěchu, kterého se body
- * etapy M1 týkají, je tu případ, kdy se NESMÍ vypsat: kontrola neproběhla, proběhla pro jiný vstup (jiný dokument, změněný díl,
+ * etapy 1 balíku M týkají, je tu případ, kdy se NESMÍ vypsat: kontrola neproběhla, proběhla pro jiný vstup (jiný dokument, změněný díl,
  * změněná studie), nebo dopadla špatně.
  *
  * | text úspěchu | kde | nesmí se vypsat, když |
  * |---|---|---|
  * | „Vazby splněny ve všech krocích“ | souhrn studie (protokol, panel, API) | výsledek pro nynější stav neplatí (`pohyb stav`), vazby v některém kroku splněné nejsou |
  * | „Kolize: žádné ve všech krocích“ | souhrn studie | kolize se nepočítaly (vypnuté, nebo je jádro nespočítalo), výsledek neplatí |
- * | „Pohyb: výsledek platí … vazby splněny“, `motion=ok` | `stav` | jiný dokument, změněný díl / poloha / studie, nespočítáno, nesplněné vazby |
+ * | „Pohyb: výsledek platí … vazby splněny“, `motion=ok` | `stav` | jiný dokument, změněný díl / poloha / studie, nespočítáno, nesplněné vazby, kolize nekontrolované (`mates-ok`), ⚠ k motorům (`warn`) |
  * | „bez průniku těles v kontrolovaných krocích“ | `stav` | kolize nekontrolovány → „kolize nekontrolovány“ |
  * | platný výsledek z `motionCached` (panel „Výsledek platí“, export, `window.mncad.motion`) | panel / API | jiný dokument, jiný otisk |
  * | ✓ motor … bez varování | `pohyb motor` | začátek ≠ aktuální hodnota, motor nedojede, záporná mezera bez kontroly kolizí |
@@ -20,7 +20,7 @@ import { statusKv } from "../engine/kv";
 import { motionStatusOf, motionStoreOf, type MotionSlot } from "../motion-cache";
 import { motionSummary } from "../motion";
 import type { CadDoc } from "../types";
-import { fakeEnv, press, resizePart, runLines } from "./m1-fixture";
+import { fakeEnv, press, resizePart, runLines } from "./w22-motion-fixture";
 
 const MATE = 'sestava vazba vzdálenost "Deska A" F1 "Rám" F2 hodnota 57.5 název "ZDVIH"';
 const GREEN_MATES = "Vazby splněny ve všech krocích";
@@ -36,11 +36,11 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     expect(st.log.join("\n")).not.toContain(GREEN_MATES);
     expect(st.log.join("\n")).not.toMatch(/rozsah pohybu|konec \[/); // žádný starý souhrn
     expect(st.codes.map((c) => c.code)).toEqual(["motion.stale"]);
-    expect(st.kv).toBe("motion steps=4 t=2 motors=1 motion.stale=1"); // strojový řádek bez výsledkových polí (conflicts=, travel=)
+    expect(st.kv).toBe("motion steps=4 t=2 motors=1 motion.stale=1 m1=range:57.5>27.15:-"); // bez výsledkových polí (conflicts=, travel=); motory = definice
     const run = await runLines(changed, env, "pohyb spustit");
     expect(run.log).toContain(GREEN_MATES);
     expect(run.codes.map((c) => c.code)).toEqual(["motion.recomputed"]);
-    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1");
+    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=range:57.5>27.15:-");
     // krok, export i přehrání po další změně také nejdřív přepočítají (ℹ motion.recomputed) – nikdy starý krok
     const again = resizePart(changed, "Rám", [100, 100, 20]);
     const step = await runLines(again, env, "pohyb krok 4");
@@ -81,7 +81,9 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     const kvOf = (d: CadDoc, key: string) => statusKv(d, null, { components: 2, parts: 2, motion: motionStatusOf(slot(key).store, key, d) });
     const okLine = motionStatusOf(slot("A").store, "A", a.doc)!;
     expect(okLine.line).toBe("Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)");
-    expect(kvOf(a.doc, "A")).toMatch(/ motion=ok$/);
+    // kolize se v této studii nekontrolovaly: vazby splněny, ale `motion=ok` to není (oprava po kontrole – dřív `motion=ok`)
+    expect(kvOf(a.doc, "A")).toMatch(/ motion=mates-ok$/);
+    expect(kvOf(a.doc, "A")).not.toMatch(/ motion=ok\b/);
     // jiný dokument se stejným obsahem (druhá záložka): nespočítáno
     expect(motionStatusOf(slot("B").store, "B", a.doc)!.line).toMatch(/^Pohyb: nespočítáno/);
     expect(kvOf(a.doc, "B")).toMatch(/ motion=-$/);

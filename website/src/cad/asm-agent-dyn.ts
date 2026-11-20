@@ -12,7 +12,7 @@ import { tr } from "./i18n";
 import type { GeoProvider } from "./mates";
 import { MATE_LABEL } from "./mates";
 import { defaultDyn, runDynamic, type DynResult } from "./motion-dynamic";
-import { partMassProps, sumMass, transformMass, withMass, type CompInertia, type MassProps } from "./motion-mass";
+import { massMaterialId, partMassProps, sumMass, transformMass, withMass, type CompInertia, type MassProps } from "./motion-mass";
 import type { MotionClashes } from "./motion";
 import type { CadDoc, MotionDynamic, MotionStudy, Vec3 } from "./types";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -26,7 +26,7 @@ export async function compInertias(doc: CadDoc, env: AsmEnv, masses: Record<stri
     const r = built.get(l.key);
     const top = doc.components?.find((c) => c.id === l.path[0]);
     if (!r?.metrics || !top) continue;
-    const matId = l.comp.source.kind === "part" ? l.comp.source.doc.material : (l.comp.material ?? "ocel");
+    const matId = massMaterialId(l.comp); // jedna definice s otiskem vstupu studie (motion-cache.ts)
     const density = (MATERIALS.find((m) => m.id === matId) ?? MATERIALS[0]).density;
     const mp = partMassProps({ volume: r.metrics.volume, density, bbox: r.metrics.bbox, vertices: r.mesh?.vertices, triangles: r.mesh?.triangles });
     if (!mp) continue;
@@ -95,8 +95,8 @@ export async function applyDynCmd(d: CadDoc, cmd: DynCmd, study: MotionStudy, ct
       return done(next, true);
     }
     case "off": {
-      const next: MotionStudy = { ...study };
-      delete next.mode;
+      // výslovná kinematika (vlna 22, bod 2: režim studie – cad/motion-mode.ts); automatický režim = pohyb automaticky
+      const next: MotionStudy = { ...study, mode: "kinematic" };
       log.push(tr("✓ pohybová studie: kinematika (nastavení dynamiky zůstává pro „pohyb dynamika“)"));
       return done(next, !!next.motors.length);
     }

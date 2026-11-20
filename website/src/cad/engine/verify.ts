@@ -12,6 +12,7 @@
 import { sourceKey } from "../assembly";
 import { tr } from "../i18n";
 import { isCancelled } from "../kernel-client";
+import { motorNotes } from "../motor-model";
 import type { CadDoc, ComponentSource, Feature, FeatureStatus } from "../types";
 import { fmtNum } from "@/lib/mesh-metrics";
 import { makeAsmEnv } from "./asm-env";
@@ -54,11 +55,20 @@ export class RunVerifier {
 
   constructor(private readonly ctx: OpCtx) {}
 
-  /** dokument načtený celý (JSON, `--open`): jeho prvky se ověří stavbou (✗/⚠ na řádku načtení, ✓ se nevypisují) */
+  /**
+   * dokument načtený celý (JSON, `--open`): jeho prvky se ověří stavbou (✗/⚠ na řádku načtení, ✓ se nevypisují); motor pohybové
+   * studie ze starší verze s nepoužitým uloženým koncem dá ⚠ `motion.end-unused` hned na řádku načtení (cad/motor-model.ts)
+   */
   loaded(key: string, doc: CadDoc, line: number | null): void {
     this.loadedAt.set(key, line);
     this.docs.set(key, doc);
     this.verifiedSig.delete(key);
+    if (doc.kind === "assembly" && doc.motion?.motors.length) {
+      for (const n of motorNotes(doc.motion, doc.mates ?? [], (m) => m.name ?? m.type).filter((x) => x.code === "motion.end-unused")) {
+        if (this.ctx.log) this.ctx.log.coded(line, n.code, { doc: doc.name, args: n.args, text: n.text });
+        else this.ctx.report.code(n.code, { line, doc: doc.name, args: n.args, text: n.text });
+      }
+    }
   }
   /** řádek načtení dokumentu `key` (null = bez řádku nebo nenačtený) */
   loadedLine(key: string): number | null {
