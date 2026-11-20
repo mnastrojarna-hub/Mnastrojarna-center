@@ -966,6 +966,7 @@ hustota materiálu, těžiště a setrvačnost ze sítě (\`pohyb hmotnost "X" 2
 s projekcí na vazby (RATTLE), pevný krok \`krok dt\` [s]; záznam ≤ 400 snímků (\`snímky N\`). S \`kolize\` se kolize kontrolují
 jen v \`kroky\` rovnoměrně rozložených snímcích (+ poslední; výchozí 36 jako kinematika, \`pohyb kroky N\` zhustí) – souhrn
 \`Kolize v pohybu: kroků s kolizí K z N\` (jen kroky se skutečnou kolizí) a \` kolize kontrolovány v N snímcích z 334 (každý 10. a poslední)\`, \`clash.steps=K/N\`;
+mezi kontrolovanými snímky se kontroluje spojitě přes zaznamenané snímky (viz „Vůle a spojitá kontrola v pohybu“);
 ostatní snímky \`pohyb krok\` / CSV označí „nekontrolováno“. Kinematická studie zůstává výchozí –
 \`pohyb kinematika\` přepne zpět (nastavení dynamiky zůstane).
 
@@ -2451,6 +2452,7 @@ třídí. Nejčastější:
 | \`clash.thread\` ℹ, \`clash.underhead\` ℹ / \`clash.real\` ⚠ | \`kolize\`, \`kontrola sestava\` i \`pohyb … kolize\` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen \`clash.real\` řešit; \`pohyb krok N\` vypíše kolize kroku |
 | \`clash.undetermined\` ⚠ / \`clash.hidden\` ℹ | dvojici jádro nevyhodnotilo (booleovská operace selhala) nebo závit má neznámé označení (G 1/4, UNC…) / skryté komponenty se nekontrolují | závit zadat metricky (\`závit M10\`) |
 | \`clash.touch\` ℹ / \`clash.work\` ℹ / \`clash.stale\` ⚠ | dotyk – průnik tenčí než \`kolize tolerance\` (výchozí 0,01 mm) / pracovní kontakt podle pravidla \`kolize pravidlo pracovní …\` v okně operace / \`kolize seznam\` nad kontrolou z dřívějšího stavu sestavy | dotyk a pracovní kontakt nejsou závada; \`clash.stale\` → \`kolize\` znovu; jádrová díra bez závitu = \`clash.undetermined\` s nápovědou (\`díra … závit M12\` nebo \`kolize pravidlo závit\`) |
+| \`clash.clearance\` ⚠ / \`clash.uncertain\` ⚠ / \`clash.discrete\` ℹ | vůle sledované dvojice pod limitem \`pohyb vůle … min L\` / kolize mezi polohami nepotvrzeny (dotyk bez objemu při natáčení, mez zjemnění) / kolize kontrolovány jen v polohách (\`pohyb kolize diskrétně\`) | vůle: místo a kroky v textu, \`pohyb krok N\`; nepotvrzeno: jemnější kroky \`pohyb kroky N\`; diskrétně: \`pohyb kolize spojitě\` |
 | \`feature.warning\` ⚠ / \`feature.failed\` ✗ / \`feature.unverified\` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
 | \`thread.tip-tangent\` / \`thread.no-reach\` / \`thread.wrong-side\` / \`thread.pitch-nonstandard\` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | \`přísně kromě thread.pitch-nonstandard\` |
 | \`geom.exact-invalid\` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
@@ -2897,6 +2899,34 @@ počítá jen kroky se skutečnou (nebo nevyhodnotitelnou) kolizí, šrouby v z�
 \`work=\` (jen nenulové). Panel Kolize: přepínače tříd s počty (\`data-clash-filter\`), skupiny (\`data-clash-group\`,
 \`data-clash-cls\`), u závady „Pracovní kontakt…“ / „Je to závit“, pravidla a tolerance dotyku; ve 3D svítí jen listy se závadou.
 
+**Vůle a spojitá kontrola v pohybu** (vlna 22, bod 6): **žádný průnik není „bez kolizí“ ani „nic nedře“.** Statická \`kolize\` bez
+průniku hlásí \`kolize: žádný průnik (objem nad 0,001 mm³) – N komponent · vůle nekontrolována\` (žádné ✓), panel Kolize „Bez průniku ·
+vůle nekontrolována“, \`stav\` „Kolize: žádný průnik · vůle nekontrolována“. **Kolize v pohybu se kontrolují i mezi kroky** (výchozí,
+\`pohyb kolize spojitě\`): úsek mezi dvěma polohami se dokáže mezí posunu (díly se nemohou dotknout), u čistého posuvu přesnou
+dráhou z jádra (těleso B ∪ hranoly ploch B – nůž 1 mm přes kolík Ø2 mezi kroky 5 mm od sebe se najde), jinak se půlí
+(mezipoloha z řešiče; v dynamice zaznamenané snímky). Kontakt mezi kroky = ⚠ \`clash.real "S": v pohybu „Kolík“ × „Nůž“ mezi kroky
+17 a 18 (zjemněno: poloha 17,5, t = 0,972 s, motory 99,5): průnik 19,132 mm³ – v krocích samotných není\`. Souhrn vždy říká, JAK
+se kontrolovalo: \` kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; …)\` / \` spojitě jen částečně: …
+nepotvrzeno v N úsecích (od kroku …; dotyk bez objemu v poloze …) – tam jen v polohách\` (⚠ \`clash.uncertain\`) / \` kontrolováno
+jen v 37 polohách (diskrétně, posun mezi polohami až 5 mm) – mezi polohami nekontrolováno\` (ℹ \`clash.discrete\`, po \`pohyb kolize
+diskrétně\`). Díl klouzající po ploše (dotyk bez objemu) se u posuvu potvrdí objemem průniku s dráhou; při natáčení zůstane
+„nepotvrzeno“. Strojový řádek \`= … motion …\` končí \`clash.mode=continuous|partial|discrete clash.poses=37 clash.refined=36
+clash.maxstep=5mm [clash.unproven=N] [clash.between=1 first.between=17.5]\`.
+**Sledovaná vůle** (\`MotionStudy.clearance\`): \`pohyb vůle "Střižník" "Vodítko" min 0,05\` (další dvojice dalším příkazem; EN
+\`motion clearance … min 0.05\`, DE \`bewegung spiel … min 0,05\`), \`pohyb vůle pohyblivé min 0,1\` (všechny pohyblivé díly vůči
+ostatním blíž než limit + rezerva), \`pohyb vůle bez zjemnění\`, \`pohyb vůle\` (nastavení a výsledek), \`pohyb vůle seznam\`, \`pohyb vůle
+"A" "B" smazat\`, \`pohyb vůle smazat\`. Vzdálenost (BRepExtrema) v každé poloze, zjemnění tam, kde by mezi polohami mohla být menší;
+souhrn \`Vůle „Střižník“ × „Vodítko“: nejmenší 0,01 mm v kroku 0 (t = 0 s) – místo [25; 20; 10] ↔ [25,01; 20; 10] · ⚠ pod limitem
+0,05 mm v 11 z 11 poloh (kroky 0–10)\` + ⚠ \`clash.clearance\`; nad limitem „limit … dodržen v celém pohybu (spojitě i mezi polohami)“
+jen se zjemněním bez nepotvrzených úseků, jinak „dodržen v N polohách (mezi polohami nepotvrzeno)“. Strojová pole na konci řádku
+pohybu: \`clear.min=0.01 clear.limit=0.05 clear.below=11/11 clear.at=0 clear.pairs=1\` (\`clear.min=2.5+\` = jen dolní mez z obálek,
+\`clear.at=17-18\` = mezi kroky). \`pohyb krok N\` vypíše vůli kroku s body, CSV má sloupce \`Vůle A × B [mm]\`, \`window.mncad.motion()\`
+vrací \`clearance\` (limit, min s dvojicí, polohou a body, dvojice s řadou po krocích), \`sweep\` (režim, polohy, zjemnění, největší
+posun) a \`between\` (kontakty mezi kroky). V aplikaci: Pohybová studie › „Vůle a spojitost kontroly“ (dvojice / pohyblivé díly,
+limit, „Kolize i mezi kroky“), výsledek s tlačítkem „Na minimum“ a grafem vůle po krocích (\`data-clearance-chart\`), úsečka
+nejbližších bodů v aktuálním kroku ve 3D i v náhledu bez WebGL (\`data-gap-label\`, pod limitem červená). Pružiny se mezi kroky
+spojitě nekontrolují (mění tvar).
+
 **Platnost výsledků (žádné falešné zelené):** každý uložený výsledek platí jen pro dokument + revizi geometrie + konfiguraci +
 polohu mechanismu, pro které vznikl – na jinou záložku se nikdy nepřenese. Ve \`stav\` (řádek \`= … status\`): \`clash=-\` =
 sestava kontrolována nebyla, \`clash.stale=1\` = kontrola je z jiného stavu sestavy; \`mates=N/M\` je vždy pro nynější stav (po
@@ -2905,7 +2935,7 @@ v dokumentu vazbám neodpovídají (typicky ručně psaný JSON) – uvedený st
 \`measure.stale=1\` / \`compare.stale=1\` + „Měření: výsledek L12 je pro revizi r·a1b2c3 – NEPLATÍ“ = poslední \`měřit\` /
 \`porovnat\` tohoto dokumentu je z dřívější revize, příkaz zopakujte. Řádek \`D\` končí \`stale=clash,mates,motion,measure,compare\`
 (jen druhy, které konečnému stavu neodpovídají; JSON \`docs[].stale\`) – kolize a vazby se před tím přepočítají, zůstává hlavně
-měření a porovnání provedené před poslední změnou. Výsledek bez \`stale\` (\`✓ kolize: žádné\`, \`ok=1\`, \`mates=N/N\`) tedy
+měření a porovnání provedené před poslední změnou. Výsledek bez \`stale\` (\`kolize: žádný průnik\`, \`ok=1\`, \`mates=N/N\`) tedy
 popisuje právě odevzdávaný stav. V aplikaci totéž: panel Kolize má stavy ok / kolize / neplatí / nezkontrolováno
 (\`data-clash-state\`) a u výsledku uvádí název sestavy, počet komponent, čas, revizi \`r·…\` a polohu.
 Výstupy (vlna 22, bod 20): dokument s výkresy nebo záznamy exportů má v řádku \`D\` revizi modelu \`rev=r·a1b2c3\` (JSON

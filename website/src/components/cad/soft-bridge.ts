@@ -65,7 +65,7 @@ export function useSoftViewActive(): boolean {
  */
 export type SoftPickProps = Pick<
   ViewportProps,
-  "pickMode" | "selFilter" | "snapPoints" | "selection" | "selectedEdges" | "selectedFaces" | "onPickEdge" | "onPickFace" | "onPick" | "onContext" | "onCursor" | "measure" | "vertices" | "hints" | "onPickMany" | "mouse" | "leftDrag" | "boxResolve"
+  "pickMode" | "selFilter" | "snapPoints" | "selection" | "selectedEdges" | "selectedFaces" | "onPickEdge" | "onPickFace" | "onPick" | "onContext" | "onCursor" | "measure" | "vertices" | "hints" | "onPickMany" | "mouse" | "leftDrag" | "boxResolve" | "gap"
 >;
 
 let pickProps: SoftPickProps | null = null;

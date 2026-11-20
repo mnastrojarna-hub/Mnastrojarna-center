@@ -26,6 +26,7 @@ import { stepHasFault } from "@/cad/clash-report"; // štítek kroku jen u skute
 import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, type MotorInput } from "@/cad/motor-model";
 import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
 import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
+import { ClearanceResult, ClearanceSettings } from "./motion-clearance-panel"; // vůle a spojitá kontrola (vlna 22, bod 6)
 import type { SpringStep } from "@/cad/asm-spring";
 import { uid, type CadDoc, type MotionStudy, type Placement, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -616,8 +617,9 @@ export function MotionPanel({
         {study.mode === "dynamic" && <DynamicSettings doc={doc} study={study} onStudy={setStudy} env={env} />}
         <label className="flex items-center gap-2">
           <input type="checkbox" data-motion-collisions className="accent-[#E03930]" checked={!!study.collisions} onChange={(e) => setStudy({ collisions: e.target.checked || undefined })} />
-          {tr("Kontrolovat kolize v každém kroku (pomalejší)")}
+          {tr("Kontrolovat kolize v pohybu (pomalejší)")}
         </label>
+        <ClearanceSettings doc={doc} study={study} onStudy={setStudy} />
         <div>
           <label className="flex items-center gap-2">
             <input type="checkbox" data-motion-trace className="accent-[#E03930]" checked={!!study.trace} onChange={(e) => setStudy({ trace: e.target.checked ? { compId: doc.components?.find((c) => !c.fixed)?.id ?? doc.components?.[0]?.id ?? "", point: [0, 0, 0] } : undefined })} />
@@ -703,6 +705,7 @@ export function MotionPanel({
                 ⚠ {x.text}
               </p>
             ))}
+            <ClearanceResult res={res} doc={doc} step={step} onStep={(i) => (setPlay(null), setPos({ res, i: Math.max(0, Math.min(res.steps.length - 1, i)) }))} />
             <ul data-motion-summary className="space-y-0.5 text-[11px] leading-snug text-[#4a5664]">
               {summary.map((l, i) => (
                 <li key={i} className={cn((l.startsWith("⚠") || l.startsWith(" ⚠")) && "text-brand-600")}>

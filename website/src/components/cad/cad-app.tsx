@@ -91,6 +91,7 @@ import { bomNotesOf } from "./asm-supply";
 import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
+import { useClearanceGap } from "./motion-clearance-panel"; // úsečka vůle pohybové studie (vlna 22, bod 6)
 import { useSpringBetween } from "./springs/spring-between";
 import { useMateRepick } from "./mate-repick";
 import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
@@ -299,6 +300,7 @@ export function CadApp() {
   const [dxfImp, setDxfImp] = useState<{ name: string; text: string } | null>(null);
   const [motionOpen, setMotionOpen] = useState(false); // pohybová studie sestavy (motion-panel.tsx)
   const motionShow = useMotionView();
+  const clearanceGapShow = useClearanceGap();
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
   // nastavení, paleta, úvodní obrazovka, formařské nástroje
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -989,7 +991,7 @@ export function CadApp() {
           const bad = out.split("\n").find((l) => l.startsWith("✗"));
           if (bad) throw new Error(bad);
           // změněná studie se do dokumentu promítne až po vykreslení
-          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft|pohled|view|ansicht|video|anotace|annotations|anmerkungen)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
+          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft|pohled|view|ansicht|video|anotace|annotations|anmerkungen|vůle|vule|clearance|spiel|kollision)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
         }
         const d = histRef.current.present;
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
@@ -1002,7 +1004,9 @@ export function CadApp() {
         const cr = await import("@/cad/clash-report");
         const steps = k.motionTable(d, res).map((row, i) => (res.steps[i]?.clashes ? { ...row, clashList: cr.apiStepClashes(d, res.steps[i]) } : row));
         const cl = res.collisionsChecked ? cr.motionClashSummary(res, d).stats : null;
-        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}) };
+        // vůle sledovaných dvojic, spojitost kontroly kolizí a kolize nalezené mezi kroky (vlna 22, bod 6)
+        const clr = (await import("@/cad/clearance-report")).clearanceApi(res, d);
+        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -2323,7 +2327,7 @@ export function CadApp() {
       // potvrzení jen když výsledek patří tomu, co je právě vidět; jinak bez ✓ a s názvem sestavy (nic zeleného nad jiným dokumentem)
       const shown = shownAsmRef.current;
       const here = docId.current === key && !!shown && clashSig(shown) === sig;
-      flash(!here ? tr("Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.", name) : res.length ? tr("Kolize: {0}", countsText(classes)) : tr("Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu"));
+      flash(!here ? tr("Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.", name) : res.length ? tr("Kolize: {0}", countsText(classes)) : tr("Bez průniku těles (vůle nekontrolována) – výsledek je v panelu Kolize i ve stavu dokumentu"));
     } catch (e) {
       flash((e as Error).message);
     } finally {
@@ -3963,6 +3967,7 @@ export function CadApp() {
                   leftDrag={prefs.leftDrag}
                   boxResolve={selFilter === "feature" && !isAsm && !measure && pickMode !== "edges" && pickMode !== "faces" ? (items, changed) => boxOwners.resolve(result?.mesh, items, (f, pt) => cad.faceOwner(doc, f, pt), changed) : undefined}
                   measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
+                  gap={isAsm && motionShow.pose ? clearanceGapShow : null}
                   vertices={result?.vertices ?? null}
                   faceColors={weldFaceColors(doc, result?.bodies, doc.faceColors)}
                   bodyHidden={bodyHidden}

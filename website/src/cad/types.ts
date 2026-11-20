@@ -556,8 +556,15 @@ export type Mate = {
  * na `to` rychlostí |speed|, tam motor stojí (doba |to − from| / rychlost). Jediný výklad všech tvarů: cad/motor-model.ts `motorKeys`.
  */
 export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean; /** chování, když hodnotě brání mez / doraz / pevná vazba (vlna 22, bod 8): „stop“ (výchozí) = motor stojí na poslední dosažitelné hodnotě, „error“ = krok je neplatný a zůstává poslední platná poloha */ atLimit?: "stop" | "error" };
+/**
+ * Vůle a spojitost kontroly v pohybové studii (vlna 22, bod 6 – cad/motion-clearance.ts): `pairs` = sledované dvojice komponent
+ * nejvyšší úrovně (id) nebo „moving“ = pohyblivé vůči ostatním; `limit` [mm] = nejmenší přípustná vůle (pod ní ⚠ clash.clearance);
+ * `refine` = zjemnění kroků u kontaktu a spojitá kontrola kolizí mezi kroky (výchozí zapnuto; false = jen diskrétně v krocích,
+ * výsledek to výslovně uvádí).
+ */
+export type MotionClearance = { pairs?: { a: string; b: string }[] | "moving"; limit?: number; refine?: boolean };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic } & MotionStudyViews;
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic; /** vůle a spojitá kontrola (vlna 22, bod 6) */ clearance?: MotionClearance } & MotionStudyViews;
 /**
  * Pracovní prostředí přehrávání (vlna 22, bod 14 – cad/motion-views.ts): uložené pohledy studie (kamera + rovina řezu), aktivní
  * pohled, nastavení posledního exportu videa (bod 13 – cad/motion-video.ts) a anotací. Jen zobrazení – výsledek studie neovlivní.

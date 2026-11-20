@@ -17,6 +17,7 @@ import { makeSmartDrawing } from "./drawing-dims";
 import { asmEnvelope, cachedBody, clearInterferenceCache, clearPartCache, findCylFace, interference, mateEdgeInfo, mateFaceInfo, mateFaceMesh, mateVertexInfo, partEntry, shapeOfDoc } from "./asm-kernel";
 import { clearCompareCache, compareTransferables, compareWithReference } from "./compare";
 import { clashDetail, clearClashDetailCache } from "./clash-detail";
+import { clearance, clearClearanceCache } from "./clearance-kernel";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type ShapeSrc } from "./inspect";
 import { measureQuery } from "./measure";
@@ -79,6 +80,7 @@ export function resetKernel(): void {
   clearPartCache();
   clearInterferenceCache();
   clearClashDetailCache();
+  clearClearanceCache();
   clearDrawingModels();
   try {
     clearCompareCache();
@@ -328,6 +330,9 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         break;
       case "clashDetail":
         reply(post, m, await clashDetail(m.doc, m.pairs));
+        break;
+      case "clearance":
+        reply(post, m, await clearance(m.req));
         break;
       case "compare": {
         // porovnání s referenčním modelem: těleso dokumentu (z mezipaměti stavby) proti souboru STEP / BREP / STL;

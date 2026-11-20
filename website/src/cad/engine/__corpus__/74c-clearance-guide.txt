@@ -1,0 +1,20 @@
+# vlna 22, bod 6: střižník Ø10 ve vedení Ø10,02 (vůle 0,01 mm na stranu) – nulový průnik není „nic nedře“:
+# `kolize` bez ✓ („vůle nekontrolována“), sledovaná vůle s limitem 0,05 mm → ⚠ clash.clearance s místem a kroky,
+# dráha posuvu potvrdí vůli i mezi polohami; limit 0,005 mm je dodržen v celém pohybu (spojitě).
+nový díl Vodítko
+kvádr 40 40 10
+díra 10,02 skrz v 20 20
+nový díl Střižník
+válec 10 40
+nová sestava Sestava 6b
+vložit "Vodítko" ukotvit
+vložit "Střižník" v 20 20 -10
+sestava vazba souosost "Střižník" "Vodítko"
+kolize
+pohyb motor lineární vazba 1 0..20 kroky 10 kolize
+pohyb vůle "Střižník" "Vodítko" min 0,05
+pohyb krok 4
+pohyb vůle
+stav
+pohyb vůle min 0,005
+pohyb vůle smazat

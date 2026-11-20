@@ -24,7 +24,8 @@ import { fakeEnv, press, resizePart, runLines } from "./w22-motion-fixture";
 
 const MATE = 'sestava vazba vzdálenost "Deska A" F1 "Rám" F2 hodnota 57.5 název "ZDVIH"';
 const GREEN_MATES = "Vazby splněny ve všech krocích";
-const GREEN_CLASH = "Kolize: žádné ve všech krocích";
+// vlna 22, bod 6 (C2): dřív „Kolize: žádné ve všech krocích“ – teď počet poloh a dál věta, JAK se kontrolovalo (diskrétně / spojitě)
+const GREEN_CLASH = "Kolize: žádný průnik v 3 polohách";
 
 describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
   it("„Vazby splněny ve všech krocích“: po změně dílu ji `pohyb stav` nevypíše (výsledek neplatí), až `pohyb spustit` po novém výpočtu", async () => {

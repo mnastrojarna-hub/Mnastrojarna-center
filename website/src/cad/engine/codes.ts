@@ -128,6 +128,10 @@ export const CODES = [
   // vlna 22, bod 5 (clash-rules.ts): numerický dotyk pod tolerancí a pracovní kontakt podle pravidla operace – počítají se, nejsou závadou
   { code: "clash.touch", level: "note", key: "dotyk „{0}“ × „{1}“ (průnik tenčí než tolerance dotyku)" },
   { code: "clash.work", level: "note", key: "pracovní kontakt „{0}“ × „{1}“ podle pravidla kolizí" },
+  // vlna 22, bod 6 (motion-clearance.ts): vůle pod limitem v pohybu, kolize mezi polohami nepotvrzené, kontrola jen v polohách
+  { code: "clash.clearance", level: "warn", key: "vůle „{0}“ × „{1}“ {2} mm < {3} mm" },
+  { code: "clash.uncertain", level: "warn", key: "kolize mezi polohami nepotvrzeny v {0} úsecích – tam jen v polohách" },
+  { code: "clash.discrete", level: "note", key: "kolize kontrolovány jen v {0} polohách (diskrétně) – mezi polohami nekontrolováno" },
   { code: "clash.stale", level: "warn", key: "výpis kolizí platí pro dřívější stav sestavy (zkontrolováno {0}) – spusťte „kolize“ znovu" },
   { code: "clash.hidden", level: "note", key: "skryté komponenty se nekontrolují ({0})" },
   { code: "clash.rechecked", level: "note", key: "kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila" },
