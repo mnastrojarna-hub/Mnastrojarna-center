@@ -1,6 +1,9 @@
 {
   "root": true,
   "extends": "next/core-web-vitals",
+  "rules": {
+    "no-duplicate-case": "error"
+  },
   "overrides": [
     {
       "files": ["src/cad/engine/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}", "src/cad/cli/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],

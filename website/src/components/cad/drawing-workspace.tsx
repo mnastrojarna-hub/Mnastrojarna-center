@@ -538,7 +538,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       }
     }, 220);
     return () => clearTimeout(t);
-  }, [doc, meta, threads, opts, bom, showBom, balloons, sheetIdx, sheets.length]);
+  }, [doc, mid, meta, threads, opts, bom, showBom, balloons, sheetIdx, sheets.length]);
 
   const set = <K extends keyof DrawingOptions>(k: K, v: DrawingOptions[K]) => {
     markDirty();

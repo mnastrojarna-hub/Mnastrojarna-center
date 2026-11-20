@@ -51,7 +51,10 @@ describe("bod 20 (výkresy a výstupy) – engine se skutečným jádrem", async
     const r1 = await runScript(ws, `${PART}\nvýkres vydat\nvýkres stav`, host);
     expect(codes(r1, "drawing.stale")).toEqual([]);
     const c1 = formatConsole(r1);
-    expect(c1).toMatch(/✓ list „List 1“ vydán jako rev\. A z modelu r·[0-9a-f]{6} \(.+\) · do tabulky revizí přidána revize A „první vydání“/);
+    // vydání = příkaz výkresu: přijato (→, 22i), list se pak vyhodnotí (✓ listu); ✗ žádné
+    expect(c1).toMatch(/→ list „List 1“ vydán jako rev\. A z modelu r·[0-9a-f]{6} \(.+\) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže/);
+    expect(c1).toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
+    expect(r1.entries.filter((e) => e.level === "error")).toEqual([]);
     expect(c1).toMatch(/Vydání: rev\. A z modelu r·[0-9a-f]{6} \(.+\) – odpovídá modelu/);
     const d1 = docOf(ws, "Deska A");
     expect(d1.drawings![0].issued).toMatchObject({ rev: "A", modelRev: modelId(d1).rev });
@@ -69,7 +72,8 @@ describe("bod 20 (výkresy a výstupy) – engine se skutečným jádrem", async
     expect(d.stale).toEqual(["drawing"]);
     // nová revize B: nic zastaralého, stav bez ⚠
     const r4 = await runReport(ws, 'záložka "Deska A"\nvýkres vydat\nstav', host);
-    expect(r4.console).toMatch(/✓ list „List 1“ vydán jako rev\. B z modelu r·\w{6} .* revize B „změna modelu r·\w{6} → r·\w{6}“/);
+    expect(r4.console).toMatch(/→ list „List 1“ vydán jako rev\. B z modelu r·\w{6} .* revize B „změna modelu r·\w{6} → r·\w{6}“ – výsledek po vyhodnocení listu níže/);
+    expect(r4.console).toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
     expect(codes(r4, "drawing.stale")).toEqual([]);
     expect(r4.docs.find((x) => x.name === "Deska A")!.stale).toBeUndefined();
   }, 240_000);
@@ -157,14 +161,15 @@ describe("bod 20 (výkresy a výstupy) – engine se skutečným jádrem", async
     const host = hostOf();
     const r = await runScript(ws, 'new part "Plate A"\nbox 60 40 10\ndrawing A4\ndrawing issue\nedit "Box 1" size=30;40;10\noutputs stale\nrecompute all', host);
     const c = formatConsole(r);
-    expect(c).toMatch(/✓ sheet “Sheet 1” issued as rev\. A from model r·\w{6}/);
+    expect(c).toMatch(/→ sheet “Sheet 1” issued as rev\. A from model r·\w{6}.* – result after the sheet is evaluated below/);
     expect(c).toMatch(/Outdated outputs \(1\) · the model is now r·\w{6}:/);
     expect(c).toMatch(/Recompute all – document “Plate A”, model revision r·\w{6}:/);
     setLang("de");
     const ws2 = new MemoryWorkspace();
     const r2 = await runScript(ws2, 'neu teil "Platte A"\nquader 60 40 10\nzeichnung A4\nzeichnung freigeben\nausgaben veraltet\nalles neu berechnen', host);
     const c2 = formatConsole(r2);
-    expect(c2).toMatch(/✓ Blatt „Blatt 1“ als Rev\. A aus Modell r·\w{6} freigegeben/);
+    expect(c2).toMatch(/→ Blatt „Blatt 1“ als Rev\. A aus Modell r·\w{6} freigegeben.* – Ergebnis nach der Auswertung des Blatts unten/);
+    expect(c2).toMatch(/✓ Zeichnung: Blatt „Blatt 1“ ohne Befund ausgewertet/);
     expect(c2).toMatch(/Veraltete Ausgaben: keine/);
   }, 240_000);
 });

@@ -437,15 +437,19 @@ describe("recenze int2, nález 2: drawing.section-legacy v přísném režimu re
 
 describe("recenze B4: výkres – mezistav bloku, list v normálním běhu, kódy nezávislé na jazyce", () => {
   const T7 = 'nový díl A\nkvádr 20 20 10\nvýkres A4\nvýkres značka text "KALIT 58 HRC KALIT" v 240 20 výška 5';
+  // List kvádru bez úplných kót hlásí i kontrolu kót (vlna 22, bod 18 – ⚠ drawing.dims-incomplete); tyto případy zkoumají
+  // překryv, proto přísný běh výjimkou `kromě drawing.dims-incomplete` a výpis kódů bez ní (její přítomnost se ověří zvlášť).
+  const overlapCodes = (r: RunReport) => coded(r).filter((c) => c.includes("drawing.") && !c.includes("drawing.dims-incomplete"));
   it("nález 3: překryv opravený dalším příkazem bloku nezastaví ani nehlásí ⚠; trvající překryv = ⚠ drawing.overlap na řádku značky", async () => {
-    const fixed = await runReal(`přísně\n${T7}\nvýkres upravit a4 posun="-150 120"\nválec 2 2`);
+    const fixed = await runReal(`přísně kromě drawing.dims-incomplete\n${T7}\nvýkres upravit a4 posun="-150 120"\nválec 2 2`);
     expect(fixed.stopped).toBeUndefined();
-    expect(coded(fixed).filter((c) => c.includes("drawing."))).toEqual([]);
+    expect(overlapCodes(fixed)).toEqual([]);
+    expect(coded(fixed)).toContain("L6 warn drawing.dims-incomplete");
     const normal = await runReal(`${T7}\nvýkres upravit a4 posun="-150 120"\nválec 2 2`);
-    expect(coded(normal).filter((c) => c.includes("drawing."))).toEqual([]);
+    expect(overlapCodes(normal)).toEqual([]);
     const kept = await runReal(`${T7}\nválec 2 2`);
-    expect(coded(kept).filter((c) => c.includes("drawing."))).toEqual(["L4 warn drawing.overlap", "L4 warn drawing.overlap"]);
-    const strict = await runReal(`přísně\n${T7}\nválec 2 2`);
+    expect(overlapCodes(kept)).toEqual(["L4 warn drawing.overlap", "L4 warn drawing.overlap"]);
+    const strict = await runReal(`přísně kromě drawing.dims-incomplete\n${T7}\nválec 2 2`);
     expect(strict.stopped).toEqual({ line: 5, code: "drawing.overlap" });
   }, 240_000);
   it("nález 6: kód překryvu je stejný v cs / en / de", async () => {
@@ -454,7 +458,7 @@ describe("recenze B4: výkres – mezistav bloku, list v normálním běhu, kód
       setLang(lang);
       try {
         const r = await runReal(`${T7}\nválec 2 2`, { lang });
-        out.push(coded(r).filter((c) => c.includes("drawing.")));
+        out.push(overlapCodes(r));
       } finally {
         setLang("cs");
       }

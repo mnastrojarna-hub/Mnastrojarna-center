@@ -18,7 +18,7 @@ Velká sestava: všechny díly jako bloky `nový díl "…"`, pak v záložce se
 
 ### Díl (záložka „Deska“)
 `kvádr 100 60 12` · `skica XY: obdélník 30 18 roh 60 36` · `vazba pevně e1.c0` · `kóta délka e1.s0 30` → `vysunout 4 odebrat`
-`zaoblit 2 hrany svislé` · `srazit 1 hrany horní` · `materiál ocel` · `proměnná t = 12` · úpravy: `upravit "Zaoblení 1" radius=3` · `potlačit "Sražení 1"` · `smazat poslední`
+`zaoblit 2 hrany svislé` · `srazit 1 hrany horní` · `materiál 1.2379` · `proměnná t = 12` · úpravy: `upravit "Zaoblení 1" radius=3` · `potlačit "Sražení 1"` · `smazat poslední`
 Jinde: `válec 20 30 v 50 30 12` · `skica XZ: obdélník 10 30 roh 0 0` → `rotovat 360 osa Z` · `pole kruhové 6 osa Z v 50 30 0` · `zrcadlit YZ` · `normálie M8x30` · `pružina tlačná d 2 De 20 L0 50 n 8` (díl z tabulky) · `zpět` (jen mezi běhy – vrací celý běh, ne řádek)
 
 ### Díry a závity
@@ -26,17 +26,17 @@ Jinde: `válec 20 30 v 50 30 12` · `skica XZ: obdélník 10 30 roh 0 0` → `ro
 Kontrola dílu: `stav` · `měřit těleso` · `měřit díry` · `kontrola`
 
 ### Sestava (záložka „Nástroj“)
-`nový díl "Čep"` · `válec 20 30` · `záložka "Nástroj"` · `vložit "Deska" v 0 0 0 ukotvit jako "D1"` · `vložit "Čep" v 25 30 40` · `sestava komponenta #2 přezdívka "K48"` · `sestava` (komponenty, počet) · `sestava plochy "K48"`
+`nový díl "Čep"` · `válec 20 30` · `materiál 1.0503` · `záložka "Nástroj"` · `vložit "Deska" v 0 0 0 ukotvit jako "D1"` · `vložit "Čep" v 25 30 40` · `sestava komponenta #2 přezdívka "K48" číslo "MN-2"` · `sestava komponenta "D1" číslo "MN-1"` · `sestava` (komponenty, počet) · `sestava plochy "K48"`
 `sestava vazba souosost "K48" Ø20 "D1" Ø21` · `sestava vazba vzdálenost "K48" -Z "D1" horní hodnota 20` · `sestava vazby` · `kolize` · `kusovník` · `kontrola sestava`. Jinde: `sestava vazba kontakt "K48" -Z "D1" horní`
 
 ### Pružiny a pohyb
 `sestava pružina nová d 2 De 20 L0 35 n 6 mezi "D1" Ø21 "K48" spodní` (na konci „do děr vzoru“ = do všech děr vzoru) · `sestava pružiny`
-`pohyb motor lineární vazba 2 12..20 krok 4 kolize` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · `pohyb stav` · `pohyb dynamika čas 0,1 gravitace -Z` · `pohyb hmotnost "K48" 2,5` · `pohyb kinematika`
+`pohyb motor lineární vazba 2 20..12 krok 4 kolize` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · `pohyb stav` · `pohyb dynamika čas 0,1 gravitace -Z` · `pohyb hmotnost "K48" 2,5` · `pohyb kinematika`
 Šroub do díry až po dynamice (volný díl by v gravitaci spadl): `sestava šroub "D1" Ø9`. Jinde: `pohyb motor rotační "K48" 0..360 krok 5`
 
 ### Výkres (záložka dílu)
 `záložka "Deska"` · `výkres A3 měřítko 1:1 pohledy přední,horní,iso` · `výkres řez XZ odsazení -30` (rovina Y = 30; bez odsazení leží na stěně) · `kótovat chytře funkční 100` · `výkres tolerance 100 ±0,05` · `výkres tolerance Ø21 H7`
-`výkres razítko šablona=iso7200 číslo="MN-1"` · `výkres nepředepsané ISO 2768-mK` · `výkres list nový "Detail"` · `kótovat nic` · `výkres detail přední v 25 8 poloměr 6` · `výkres stav vše` · `výkres export pdf vše`. Jinde (výkres sestavy): `výkres kusovník ano`
+`výkres razítko šablona=iso7200` · `výkres nepředepsané ISO 2768-mK` · `výkres list nový "Detail"` · `kótovat nic` · `výkres detail přední v 25 8 poloměr 6` · `výkres stav vše` · `výkres export pdf vše`. Jinde (výkres sestavy): `výkres kusovník ano`
 
 ### Výstupy a odkazy
 `uložit` · `export step` · `export skript` · `sdílet` · `odkaz` (adresa znovu) · v CLI `--formats step,pdf,dxf` a `--share`. Jinde (úložiště): `sdílet dní 30` · `export step odkaz`
@@ -2991,7 +2991,7 @@ MNCAD/1 OK lines=5 ops=5 err=0 warn=0 note=2 t=0.1
 = L3 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9LboQwEAWvEr11RzIwJKSvMEd…(288chars) mode=link exp=2026-11-30 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
 = L4 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) mode=link exp=2026-12-20 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
 = L5 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) ok=1 mode=link exp=2026-12-20 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
-D "Konzola" part feat=1/0/0 V=48cm3 m=0.377kg bbox=80x50x12
+D "Konzola" part feat=1/0/0 V=48cm3 m=0.377kg bbox=80x50x12 solids=1 valid=1
 O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb77JRHsNb-BhKLlxL6ir1hgpuCHqP4KZ_7fuX9tJ1Qz8QqtMbGGuwuoBgwwzeIDEe0EsuKXxK8vI8iwWhasoueHBL8LIqGG_BP8IiIKxSNDlZwAjzqbuqlK-kGTxucPZw6sXW4QP_8_r7Y9NTA0L5jgd5D3cQsnsoeBwMdYaadiLEkF0546MhQ2YizOqLJrXgqyxZ6fwBhtcb9mnf_wA exp=2026-12-20 mode=link
 Σ docs=1 V=48cm3 m=0.377kg files=0 share=link t=0.1
 ```

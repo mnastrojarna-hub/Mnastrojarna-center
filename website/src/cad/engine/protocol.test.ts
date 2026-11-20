@@ -137,8 +137,11 @@ function bodyItems(text: string): string[] {
   }
   return out;
 }
-/** priorita podle kap. 4.1 z tvaru řádku: ✗ > ⚠ > F/O > jednořádkové = > D > výpis > ℹ */
-const prioOf = (t: string) => (t.startsWith("✗") ? 0 : t.startsWith("⚠") ? 1 : /^[FO] /.test(t) ? 2 : t.startsWith("= ") ? (t.includes("\n") ? 5 : 3) : t.startsWith("D ") ? 4 : t.startsWith("ℹ") ? 6 : 99);
+/**
+ * priorita podle kap. 4.1 z tvaru řádku: ✗ > ⚠ > F/O > jednořádkové = > D > výpis > ℹ; ℹ share.store-off (vypnuté úložiště
+ * odkazů, vlna 22 bod 16) má prioritu F/O – nesmí se ztratit v přebytku za výpisy odkazů
+ */
+const prioOf = (t: string) => (t.startsWith("✗") ? 0 : t.startsWith("⚠") ? 1 : /^[FO] /.test(t) || /^ℹ \S+(?: ×\d+)? share\.store-off\b/.test(t) ? 2 : t.startsWith("= ") ? (t.includes("\n") ? 5 : 3) : t.startsWith("D ") ? 4 : t.startsWith("ℹ") ? 6 : 99);
 const markerB = (n: number, bytes: number) => (n > 0 ? B(`… ${n} entries ${bytes}B in protocol-full.txt`) + 1 : 0);
 
 /**

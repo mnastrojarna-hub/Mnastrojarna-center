@@ -12,7 +12,7 @@ import { writeZip } from "@/cad/formats/zip";
 import { tr } from "@/cad/i18n";
 import type { MotionResult } from "@/cad/motion";
 import { annotRows, cameraDir, type AnnotRow } from "@/cad/motion-views";
-import { checkFrames, checkText, frameSig, planText, poseAt, poseKey, sigChanged, stepPlan, studySpan, videoPlan, type FrameCheck, type FrameRecord, type PoseAt, type VideoPlan } from "@/cad/motion-video";
+import { checkFrames, checkText, combineChecks, frameSig, planText, poseAt, poseKey, sigChanged, stepPlan, studySpan, videoPlan, type FrameCheck, type FrameRecord, type PoseAt, type VideoPlan } from "@/cad/motion-video";
 import type { CadDoc, MotionAnnotSettings, MotionView, StudySection, Vec3 } from "@/cad/types";
 import { checkWebm, muxWebm, readWebm, webpVp8, type WebmFrame } from "@/cad/webm-mux";
 import type { NeutralCam } from "./viewport";
@@ -303,9 +303,8 @@ export async function exportMotion(res: MotionResult, doc: CadDoc, o: ExportOpts
       prevKey = key;
     }
     void prevKey;
-    // kontrola obrazu: nejhorší dlaždice rozhoduje
-    const checks = records.map(checkFrames);
-    const check = checks.find((c) => c.verdict === "dead") ?? checks.find((c) => c.verdict === "partial") ?? checks[0];
+    // kontrola obrazu: všechny dlaždice nehybné = okno se nepřekreslilo (✗); jen některé = v tom pohledu pohyb není vidět (⚠ s názvem)
+    const check = combineChecks(records.map(checkFrames), views.map((v, j) => v?.name ?? String(j + 1)));
     if (check.verdict === "dead") return { ...fail(`✗ ${tr("Video neuloženo")}: ${checkText(check)}`, plan), encoder: enc.kind, check };
     const out = await enc.finish();
     if (!out) return { ...fail(tr("✗ kodér nevrátil žádný snímek – nic se neuložilo"), plan), encoder: enc.kind, check };

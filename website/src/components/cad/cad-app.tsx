@@ -1375,8 +1375,16 @@ export function CadApp() {
   const mateSigNow = useMemo(() => (hasMates ? mateSigOf(doc, docAsmSig) : ""), [hasMates, doc, docAsmSig]);
   const mateRec = hasMates ? engineRef.current!.ws.asm.mateStatus.get(docKeyNow) : undefined;
   /** zastaralé výstupy pro panel „Zastaralé výstupy“ (vlna 22, bod 20): uložené analýzy (A1 `staleResults`) a kopie dílů (D1) */
-  const staleNow = useMemo(() => (doc.kind === "draft" ? [] : staleResults(engineRef.current!.ws, docKeyNow, doc)), [doc, docKeyNow, clashEntry, mateRec, resVer]);
-  const copiesNow = useMemo(() => (isAsm ? staleCopies(doc, (n) => engineRef.current?.ws.findPart(n) ?? null).map((c) => ({ name: c.comp.alias ?? c.comp.name, why: staleCopyText(c) })) : []), [isAsm, doc, asmVer]);
+  // výsledky a díly čte z pracovního prostoru (měnitelný ref) – přepočet spouští změna uloženého výsledku kolizí / vazeb
+  // (`clashEntry`, `mateRec`), čítač výsledků `resVer` a verze sestavy `asmVer`, proto jsou v závislostech i v těle
+  const staleNow = useMemo(() => {
+    void [clashEntry, mateRec, resVer];
+    return doc.kind === "draft" ? [] : staleResults(engineRef.current!.ws, docKeyNow, doc);
+  }, [doc, docKeyNow, clashEntry, mateRec, resVer]);
+  const copiesNow = useMemo(() => {
+    void asmVer;
+    return isAsm ? staleCopies(doc, (n) => engineRef.current?.ws.findPart(n) ?? null).map((c) => ({ name: c.comp.alias ?? c.comp.name, why: staleCopyText(c) })) : [];
+  }, [isAsm, doc, asmVer]);
   const mateState: ResultState = mateRec ? resultState(mateRec, { doc: docKeyNow, sig: mateSigNow }) : "unchecked";
   const mateStatus = mateState === "ok" && mateRec ? mateRec : NO_MATES;
   /** otisk toho, co je teď v 3D okně k měření / mapě / dělicí rovině: díl = naposledy postavená geometrie, sestava = listy a polohy */
@@ -2662,8 +2670,10 @@ export function CadApp() {
       else flash((e as Error).message);
     }
   };
-  // výsledek kontroly exportu platí jen pro model, ze kterého export vznikl – po změně dokumentu / záložky zmizí
-  useEffect(() => setExportChk(null), [doc]);
+  // výsledek kontroly exportu platí jen pro model, ze kterého export vznikl – po změně modelu / záložky zmizí. Klíčem jsou části
+  // dokumentu, které určují exportovanou geometrii, ne celý dokument: záznam exportu (recordExport, doc.outputs – bod 20) mění
+  // dokument hned po exportu a lišta s výsledkem kontroly by jinak zmizela dřív, než ji uživatel uvidí.
+  useEffect(() => setExportChk(null), [doc.features, doc.components, doc.variables, doc.bindings, doc.configs, doc.activeConfig]);
   /** Data ▸ Export ▸ Textový skript: dokument jako textové příkazy `.mncad.txt` (cad/doc-script.ts) */
   const exportScript = async () => {
     if (!(await waitOutputs(tr("export skriptu")))) return flash(tr("Export skriptu zrušen."));

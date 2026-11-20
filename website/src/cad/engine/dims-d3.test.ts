@@ -108,7 +108,9 @@ describe("bod 18 (kontrola kót pro výrobu) – engine se skutečným jádrem",
     const ws = new MemoryWorkspace();
     const r = await runScript(ws, `${REPRO_A}\nvýkres smazat vše\nvýkres doplnit kóty\nvýkres kontrola kót`, hostOf());
     const txt = formatConsole(r);
-    expect(txt).toMatch(/✓ doplněno kót: \d+ – /);
+    // příkaz výkresu je přijatý (→, vlna 22 – 22i), výsledek dá vyhodnocení listu a kontrola kót níže; žádné ✗
+    expect(txt).toMatch(/→ doplněno kót: \d+ – .* – výsledek po vyhodnocení listu níže/);
+    expect(r.entries.filter((e) => e.level === "error")).toEqual([]);
     const chk = txt.split("\n").filter((l) => l.includes("Kontrola kót:")).pop()!;
     expect(chk).not.toContain("chybí");
     expect(chk).toMatch(/velikosti (\d+)\/\1 · polohy (\d+)\/\2/);

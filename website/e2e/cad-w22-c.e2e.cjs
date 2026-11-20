@@ -24,7 +24,7 @@
 // Etapa C3 – bod 4 (procesní vrstva: střih a otisk během pohybu), s WebGL i bez něj:
 // 12) razník Ø20 × plech 1 mm (korpus 74d): `pohyb proces střih` → panel pohybu oddíl Procesní vrstva s operací, věta „geometrická
 //     aproximace … ne simulace materiálu“; krok 0 = data-process-state=full (plný plech, žádná náhrada sítě), krok 19 = engaged
-//     (157 mm³), krok 21 = pierced, data-process-scrap=1, data-process-removed≈314,159; 3D okno / softwarový náhled ukazuje plech
+//     (157 mm³), krok 21 = pierced, data-process-scrapped=1, data-process-removed≈314,159; 3D okno / softwarový náhled ukazuje plech
 //     po střihu a odpad (main[data-process-view] ≥ 2, síť „proc:…“); úroveň „kinematika + geometrická aproximace“; window.mncad
 //     .motion().process (stav po krocích, removed); pracovní záběr bez štítku „· kolize“; přidání operace otisk v GUI zapíše
 //     doc.motion.process; export PNG snímků obsahuje plech po operaci (snímek kroku 21 se liší od kroku 0)
@@ -220,7 +220,7 @@ async function processFlow(p, tag, soft) {
   const state = () => p.evaluate(() => {
     const el = document.querySelector('[data-process-state]');
     const main = document.querySelector('main[data-process-view]') || document.querySelector('[data-process-view]');
-    return el ? { state: el.getAttribute('data-process-state'), removed: Number(el.getAttribute('data-process-removed')), scrap: Number(el.getAttribute('data-process-scrap')), view: main ? Number(main.getAttribute('data-process-view')) : 0 } : null;
+    return el ? { state: el.getAttribute('data-process-state'), removed: Number(el.getAttribute('data-process-removed')), scrap: Number(el.getAttribute('data-process-scrapped')), view: main ? Number(main.getAttribute('data-process-view')) : 0 } : null;
   });
   const step = async (n) => {
     await run(`pohyb krok ${n}`);
@@ -318,8 +318,11 @@ async function processFlow(p, tag, soft) {
   await p.waitForFunction(() => document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-work') === '1', null, { timeout: 30000 }).catch(() => {});
   const w1 = await panel();
   ok(w1 && w1.work === '1' && w1.real === '0' && w1.hl.length === 0, `5: pracovní kontakt v okně hodnoty vazby 26–24 → ℹ, nic nesvítí (${w1 && [w1.work, w1.real, w1.hl.length].join('/')})`);
-  ok(w1 && /pracovní kontakt/.test(w1.text) && /ZDVIH/.test(w1.text), '5: pravidlo vypsané v panelu (ZDVIH)');
+  // seznam pravidel je ve sbaleném oddílu „Pravidla kolizí (N)“ – souhrn ukáže počet, po rozbalení text pravidla
+  ok(w1 && /Pravidla kolizí \(1\)/.test(w1.text), '5: souhrn „Pravidla kolizí (1)“ v panelu');
   await p.locator('[data-clash-rules] summary').click().catch(() => {});
+  const ruleTxt = (await p.locator('[data-clash-rule]').first().innerText().catch(() => '')) || '';
+  ok(/pracovní kontakt/.test(ruleTxt) && /ZDVIH/.test(ruleTxt), `5: pravidlo vypsané v panelu (ZDVIH) – ${ruleTxt}`);
   await p.locator('[data-clash-rule-del]').first().click();
   await p.waitForFunction(() => document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-real') === '1', null, { timeout: 30000 }).catch(() => {});
   const w2 = await panel();
@@ -339,7 +342,8 @@ async function processFlow(p, tag, soft) {
   await run(corpus('73-clash-motion-sub').split('#--- run')[0] + '\n' + corpus('73-clash-motion-sub').split('#--- run')[2]);
   await idle();
   const api2 = await p.evaluate(() => window.mncad.motion());
-  ok(api2 && api2.collision && api2.collision.step === 9 && api2.collision.b === 'Šroub M12 [S2]' && api2.collision.cls === 'real' && Array.isArray(api2.collision.at), `6: collision = první skutečná (krok 9, S2, místo) ${api2 && JSON.stringify(api2.collision)}`);
+  // dvojice je neuspořádaná (pořadí a/b dává pořadí listů v jádře) – musí to být doraz × šroub S2
+  ok(api2 && api2.collision && api2.collision.step === 9 && [api2.collision.a, api2.collision.b].sort().join(' × ') === 'Doraz × Šroub M12 [S2]' && api2.collision.cls === 'real' && api2.collision.volume > 0 && Array.isArray(api2.collision.at), `6: collision = první skutečná (krok 9, S2, místo) ${api2 && JSON.stringify(api2.collision)}`);
   ok(api2 && api2.collisions.steps === 7 && api2.collisions.of === 16, `6: kroků s kolizí 7 z 16 (${api2 && JSON.stringify(api2.collisions)})`);
   await p.screenshot({ path: `${S}w22c-6-motion.png` });
   ok(errs.length === 0, 'žádná chyba stránky: ' + errs.slice(0, 3).join(' | '));

@@ -112,11 +112,25 @@ describe("bod 17 + 22j (čitelný výkres sestavy, šablona hlavičky s logem) �
     expect(dim?.placed).toBe("user");
   }, 600_000);
 
+  it("fáze 2: list detailů bez kót – písmeno detailu mimo vlastní kroužek (žádný překryv) a kontrola kót „nezkontrolováno“ s listem, který kóty nese; M8 ↧10 = hloubka díry", async () => {
+    const ws = new MemoryWorkspace();
+    const r = await runScript(ws, 'nový díl "Deska D"\nkvádr 100 60 12\ndíra 21 hloubka 8 dno ploché v 25 30\ndíra 9 skrz v 50 10\ndíra závit M8 hloubka 10 v 50 50\nvýkres A3 měřítko 1:1 pohledy přední,horní,iso\nkótovat chytře funkční 100\nvýkres list nový "Detail"\nkótovat nic\nvýkres detail přední v 25 8 poloměr 6\nvýkres stav vše', hostOf());
+    const st = formatConsole(r);
+    expect(codes(r, "drawing.overlap")).toEqual([]);
+    expect(codes(r, "drawing.dims-incomplete")).toEqual([]);
+    expect(st).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2/);
+    expect(st).toMatch(/nezkontrolováno: list bez kót – rozměry dílu nese list „List 1“/);
+    expect(r.entries.filter((e) => e.level === "error")).toEqual([]);
+  }, 600_000);
+
   it("kusovník na samostatném listu (list jen s kusovníkem) a ve sloupcích; skript z dokumentu je zapíše", async () => {
     const ws = new MemoryWorkspace();
     const r = await runScript(ws, `${grid(12, "A3")}\nvýkres pozice pohled horní 1-2\nvýkres vygenerované zamknout pos:4\nvýkres kusovník list\nvýkres listy\nvýkres list 2\nvýkres stav`, hostOf());
     const st = formatConsole(r);
-    expect(st).toMatch(/✓ kusovník na samostatném listu 2 „Kusovník“/);
+    // příkaz výkresu přijatý (→, 22i) – výsledek dá vyhodnocení obou listů (✓ bez nálezů)
+    expect(st).toMatch(/→ kusovník na samostatném listu 2 „Kusovník“ .* – výsledek po vyhodnocení listu níže/);
+    expect(st).toMatch(/✓ výkres: list „Kusovník“ vyhodnocen bez nálezů/);
+    expect(r.entries.filter((e) => e.level === "error")).toEqual([]);
     expect(st).toMatch(/Kusovník: 12 řádků · list jen s kusovníkem \(1 sloupců\)/);
     expect(st).toMatch(/List jen s kusovníkem – pohledy ani kóty nemá/);
     const d = docOf(ws, "Nástroj");
@@ -146,8 +160,10 @@ describe("bod 17 + 22j (čitelný výkres sestavy, šablona hlavičky s logem) �
     const host = hostOf({ "logo.png": png, "znak.svg": svg });
     const r = await runScript(ws, 'nový díl "Deska L"\nkvádr 100 60 20\nvýkres A4 na šířku pohledy přední,horní\nvýkres razítko logo="logo.png"\nvýkres hlavička uložit "Firma" logo="znak.svg" firma="F s.r.o."\nvýkres hlavička použít "Firma"\nvýkres export svg\nexport mncad "L"', host);
     const txt = formatConsole(r);
-    expect(txt).toMatch(/✓ razítko: logo „logo\.png“/);
-    expect(txt).toMatch(/✓ šablona hlavičky „Firma“ .*logo SVG/);
+    expect(txt).toMatch(/→ razítko: logo „logo\.png“ .* – výsledek po vyhodnocení listu níže/);
+    expect(txt).toMatch(/→ šablona hlavičky „Firma“ .*logo SVG.* – výsledek po vyhodnocení listu níže/);
+    expect(txt).toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
+    expect(r.entries.filter((e) => e.level === "error")).toEqual([]);
     const svgOut = [...host.files.files.values()].find((f) => f.file.name.endsWith(".svg"));
     expect(new TextDecoder().decode(svgOut!.data)).toContain("data:image/svg+xml");
     const mnc = [...host.files.files.values()].find((f) => f.file.name.endsWith(".mncad"));

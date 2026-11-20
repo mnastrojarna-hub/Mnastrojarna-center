@@ -1831,8 +1831,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
           </div>
         ))}
       </div>
-      {/* popisek úsečky vůle pohybové studie (vlna 22, bod 6) */}
-      {props.gap && (
+      {/* popisek úsečky vůle pohybové studie (vlna 22, bod 6); v softwarovém náhledu ho kreslí viewport-soft.tsx – tady by byl
+          druhý, neviditelný [data-gap-label] (3D okno je pod náhledem „invisible“) */}
+      {props.gap && !softOn && (
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div ref={gapLabelRef} data-gap-label data-gap-below={props.gap.below ? "1" : "0"} className={`absolute left-0 top-0 whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-[11px] font-semibold shadow ${props.gap.below ? "border-brand/50 bg-white/95 text-brand-600" : "border-[#16a34a]/50 bg-white/95 text-[#166534]"}`}>
             {props.gap.label}

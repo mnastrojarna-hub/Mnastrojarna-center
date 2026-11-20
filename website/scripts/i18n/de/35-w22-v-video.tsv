@@ -11,6 +11,7 @@
 {0}: čekám číslo, ne „{1}“	{0}: Zahl erwartet, nicht „{1}“
 {0}: čekám tři čísla	{0}: drei Zahlen erwartet
 ⚠ obraz se změnil v {0} z {1} snímků s pohybem (zbytek: pohyblivý díl mimo záběr nebo schovaný řezem?)	⚠ das Bild hat sich in {0} von {1} Bildern mit Bewegung geändert (Rest: bewegtes Teil außerhalb des Bildes oder vom Schnitt verdeckt?)
+⚠ v pohledu {0} se obraz nezměnil v žádném snímku s pohybem (pohyb ve směru pohledu, nebo pohyblivý díl mimo záběr či schovaný řezem?) – ostatní pohledy pohyb ukazují	⚠ in der Ansicht {0} hat sich das Bild in keinem Bild mit Bewegung geändert (Bewegung in Blickrichtung, oder bewegtes Teil außerhalb des Bildes bzw. vom Schnitt verdeckt?) – die anderen Ansichten zeigen die Bewegung
 ✓ aktivní pohled studie „{0}“: {1} · {2} (použije se při přehrávání a exportu)	✓ aktive Studienansicht „{0}“: {1} · {2} (für Wiedergabe und Export verwendet)
 ✓ anotace polohy vypnuté	✓ Positionsanmerkungen aus
 ✓ anotace polohy zapnuté (čas, krok, motory{0}) – v okně i v exportu PNG / WebM	✓ Positionsanmerkungen ein (Zeit, Schritt, Antriebe{0}) – im Fenster und im PNG-/WebM-Export

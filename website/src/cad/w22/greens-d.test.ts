@@ -27,6 +27,8 @@
  *  (GUI: panel komponenty bez žlutého „Kopie je starší než díl“ a Kusovník bez upozornění – stejné funkce asm-refresh.ts /
  *  bom-model.ts, scénář e2e/cad-w22-d.e2e.cjs.)
  */
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { partComponent, screwISO4762 } from "../assembly";
 import { asmDocNotes } from "../engine/files";
@@ -36,10 +38,14 @@ import { MemoryWorkspace } from "../engine/memory-workspace";
 import { formatConsole } from "../engine/protocol";
 import type { RunReport } from "../engine/protocol-types";
 import { runScript } from "../engine/run";
+import { setHostAssets } from "../host-assets";
+import { makeKernelClient } from "../kernel-client";
 import { emptyDoc, type BuildResult, type CadDoc, type ComponentSource, type DrawingAnnotation, type Feature, type FunctionalMark } from "../types";
 import { checkSheet, dimCheckLine, type CheckView } from "../dim-complete";
 import { dimCheckIssues } from "../drawing-dimcheck";
 
+const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
+const FONTS = path.resolve(__dirname, "../../../public/fonts");
 const result = (d: CadDoc): BuildResult =>
   ({ status: d.features.map((f) => ({ id: f.id, ok: true })), mesh: null, metrics: d.features.length ? { volume: 20000, area: 600, bbox: [[0, 0, 0], [10, 10, 10]], faces: 6, edges: 12, valid: true, solids: 1 } : null, ms: 1 }) as unknown as BuildResult;
 const kernel = {
@@ -115,21 +121,34 @@ describe("greens D1 – kusovník a kopie dílu", () => {
   });
 });
 
-describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", () => {
+describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", async () => {
+  // Skutečné jádro: list se po příkazech výkresu vyhodnotí (vlna 22, 22i – „→ … výsledek po vyhodnocení listu níže“, pak ✓ / ✗
+  // listu). Falešné jádro výkres neumí – běh by skončil ✗ a „greens“ by tvrdil úspěch nad nevyhodnoceným listem.
+  setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.join(FONTS, name))).buffer });
+  const { inProcessTransport } = await import("../kernel-inprocess");
+  const real = makeKernelClient(inProcessTransport({ locateFile: (file) => (file.endsWith(".wasm") ? WASM : file) }));
+  await real.init();
+  const run = (ws: MemoryWorkspace, t: string) => runScript(ws, t, { kernel: real as unknown as KernelApi, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
+  const clean = (r: RunReport) => expect(r.entries.filter((e) => e.level === "error").map((e) => `L${e.line} ${e.code}: ${e.text}`)).toEqual([]);
   const PART = 'nový díl "Deska A"\nkvádr 60 40 10\nvýkres A4';
-  it("7: opakované vydání téhož listu z téhož modelu není nové ✓ vydání", async () => {
+  it("7: opakované vydání téhož listu z téhož modelu není nové vydání", async () => {
     const ws = new MemoryWorkspace();
     const r1 = await run(ws, `${PART}\nvýkres vydat`);
-    expect(txt(r1)).toMatch(/✓ list „List 1“ vydán jako rev\. A/);
+    clean(r1);
+    // vydání je příkaz výkresu: přijato (→), list se pak vyhodnotí (✓ listu) – 22i
+    expect(txt(r1)).toMatch(/→ list „List 1“ vydán jako rev\. A z modelu r·[0-9a-f]{6} .* – výsledek po vyhodnocení listu níže/);
+    expect(txt(r1)).toMatch(/✓ výkres: list „List 1“ vyhodnocen bez nálezů/);
     const r2 = await run(ws, 'záložka "Deska A"\nvýkres vydat A');
-    expect(txt(r2)).not.toMatch(/✓ list „List 1“ vydán/);
+    clean(r2);
+    expect(txt(r2)).not.toMatch(/[✓→] list „List 1“ vydán/);
     expect(txt(r2)).toMatch(/list „List 1“ už je vydán jako rev\. A z modelu r·\w{6} – beze změny/);
   });
 
   it("8 + 9: po změně modelu ani stav, ani výstupy netvrdí „odpovídá modelu“ / „žádné“ – ⚠ drawing.stale", async () => {
     const ws = new MemoryWorkspace();
-    await run(ws, `${PART}\nvýkres vydat`);
+    clean(await run(ws, `${PART}\nvýkres vydat`));
     const r = await run(ws, 'záložka "Deska A"\nupravit "Kvádr 1" size=30;40;10\nstav\nvýstupy zastaralé');
+    clean(r);
     const t = txt(r);
     expect(t).not.toMatch(/– odpovídá modelu/);
     expect(t).not.toMatch(/Zastaralé výstupy: žádné/);
@@ -140,6 +159,7 @@ describe("greens D2 – vydání listu a zastaralé výstupy (bod 20)", () => {
   it("9: „Zastaralé výstupy: žádné“ jen bez změny modelu po vydání", async () => {
     const ws = new MemoryWorkspace();
     const r = await run(ws, `${PART}\nvýkres vydat\nvýstupy zastaralé`);
+    clean(r);
     expect(txt(r)).toMatch(/Zastaralé výstupy: žádné/);
     expect(has(r, "drawing.stale")).toBe(false);
   });
@@ -170,6 +190,16 @@ describe("greens D3 – kontrola kót pro výrobu (bod 18)", () => {
     expect(dimCheckIssues(r).map((i) => i.code)).toEqual(["drawing.dims-incomplete"]);
     const ok = checkSheet({ doc: plate(), views: [FRONT, TOP], annotations: [...sizes(), ...positions()], dimensions: "smart" });
     expect(dimCheckIssues(ok)).toEqual([]);
+  });
+  it("12b (fáze 2): hloubka závitové díry z popisu „M8 ↧10“ s odkazem na kružnici vrtáku – splněno; bez ↧ dál chybí", () => {
+    const d: CadDoc = { ...emptyDoc("Deska Z"), features: [F({ name: "Kvádr 1", type: "box", size: [100, 60, 20], position: [0, 0, 0], centered: false, mode: "new" }), F({ name: "Díra Z", type: "hole", kind: "tapped", thread: "M8", position: [50, 30, 20], axis: "Z", flip: false, diameter: 6.8, depth: 10, cbDiameter: 0, cbDepth: 0 })] };
+    const k1 = 3.4 * Math.SQRT1_2; // odkaz končí na kružnici vrtáku Ø6,8 (ne na jmenovitém M8)
+    const call = (lines: string[]): DrawingAnnotation => ({ id: "cz", view: "top", type: "callout", tip: [50 + k1, -30 - k1], at: [70, -10], lines });
+    const base = [dim("top", "horizontal", [0, 0], [100, 0]), dim("top", "vertical", [0, 0], [0, -60]), dim("front", "vertical", [0, 0], [0, -20]), dim("top", "horizontal", [0, -5], [50, -5]), dim("top", "vertical", [-5, 0], [-5, -30])];
+    const ok = checkSheet({ doc: d, views: [FRONT, TOP], annotations: [...base, call(["M8 ↧10"])], dimensions: "smart" });
+    expect(dimCheckLine(ok)).not.toMatch(/hloubka díry/);
+    const no = checkSheet({ doc: d, views: [FRONT, TOP], annotations: [...base, call(["M8"])], dimensions: "smart" });
+    expect(dimCheckLine(no)).toMatch(/chybí: .*10 \(hloubka díry\)/);
   });
   it("12: tolerance funkčních prvků „n/n“ jen s tolerancí na kótě (velikost = předepsaná H7); bez vyznačení „neověřeny“", () => {
     const d = plate();

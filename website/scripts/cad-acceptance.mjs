@@ -179,6 +179,15 @@ async function mncad(node, cli, argv) {
 
 const mainDoc = (r) => r?.docs?.find((d) => d.main) ?? [...(r?.docs ?? [])].reverse().find((d) => d.kind === "assembly");
 const problems = (r) => (r?.entries ?? []).filter((e) => e.level === "warn" || e.level === "error");
+/**
+ * ⚠ bom.make-incomplete, který jmenuje PŘESNĚ deklarované vyráběné díly bez výkresu (expected.json docGaps) – každý díl
+ * „(bez výkresu…)“ a žádný jiný; jiné texty / kódy nejsou známá mezera
+ */
+export function isDocGap(e, gaps) {
+  if (!gaps?.length || e.level !== "warn" || e.code !== "bom.make-incomplete") return false;
+  const t = String(e.text ?? "");
+  return gaps.every((n) => t.includes(`${n} (bez výkresu`)) && (t.match(/\(bez výkresu/g) ?? []).length === gaps.length;
+}
 const protoLines = (r) => String(r?.protocol ?? "").split("\n");
 
 /** ⚠/✗ of a run grouped by code and document (triage list) */
@@ -297,10 +306,11 @@ async function checkLink(cs, r, main, ctx) {
 }
 
 /** strict mode passes ⇔ the normal run has no ⚠/✗; otherwise STOP on one of the normal run's codes, no --formats files */
-export function checkStrict(cs, normal, strict, expectClean) {
+export function checkStrict(cs, normal, strict, expectClean, except = []) {
   const r = strict.report;
   if (!check(cs, "strict run finished with a JSON report", !!r && !strict.aborted, { exit: strict.exit, aborted: strict.aborted })) return;
-  const dirty = problems(normal.report);
+  // výjimky přísného běhu (`--strict=kromě …`) – ⚠ s těmito kódy běh nezastaví
+  const dirty = problems(normal.report).filter((e) => e.level === "error" || !except.includes(e.code));
   if (expectClean !== undefined) check(cs, expectClean ? "normal run has no ⚠/✗ (a strict run must pass)" : "normal run has ⚠/✗", (dirty.length === 0) === expectClean, { problems: dirty.length });
   if (!dirty.length) check(cs, "strict run passes: exit 0, no STOP", strict.exit === 0 && !r.stopped && r.ok === true, { exit: strict.exit, stopped: r.stopped });
   else {
@@ -338,7 +348,9 @@ async function synthCase(node, cli, ctx) {
     for (const mode of i % 2 ? ["strict", "normal"] : ["normal", "strict"]) {
       if (mode === "strict" && flag("--no-strict")) continue;
       const out = path.join(ctx.tmp, `${cs.replace(/\W+/g, "-")}-${mode}-${i}`);
-      const run = await mncad(node, cli, ["run", script, ...OUT_ARGS(out, ctx), ...(mode === "strict" ? ["--strict"] : [])]);
+      // přísný běh: výjimky jen pro kódy, které expected.json deklaruje jako známé mezery (dokumentace – vlna 22, bod 19)
+      const strictArg = exp.strictExcept?.length ? `--strict=kromě ${exp.strictExcept.join(",")}` : "--strict";
+      const run = await mncad(node, cli, ["run", script, ...OUT_ARGS(out, ctx), ...(mode === "strict" ? [strictArg] : [])]);
       run.out = out;
       say(`# [${cs}] ${mode} #${i + 1}: exit ${run.exit}, ${(run.wallMs / 1000).toFixed(1)} s, peak ${run.peakMB} MB`);
       (mode === "strict" ? strict : normal).push(run);
@@ -347,11 +359,14 @@ async function synthCase(node, cli, ctx) {
   }
   const n0 = normal[0];
   if (!(await checkRun(cs, n0, exp, ctx))) return null;
-  check(cs, "no ⚠ in the synthetic run (expected.json: a strict run passes)", n0.report.counts.warnings === 0, problems(n0.report).slice(0, 3).map((e) => `L${e.line} ${e.code} ${e.text}`.slice(0, 200)));
+  // známé mezery výrobní dokumentace (expected.json docGaps): ⚠ bom.make-incomplete se PŘESNĚ těmito díly „bez výkresu“
+  const gap = (e) => isDocGap(e, exp.docGaps);
+  check(cs, "no ⚠ in the synthetic run except the declared documentation gaps (expected.json: a strict run passes)", problems(n0.report).filter((e) => !gap(e)).length === 0, problems(n0.report).filter((e) => !gap(e)).slice(0, 3).map((e) => `L${e.line} ${e.code} ${e.text}`.slice(0, 200)));
+  if (exp.docGaps?.length) check(cs, `documentation gaps reported exactly: ⚠ bom.make-incomplete with the ${exp.docGaps.length} manufactured parts without a drawing`, problems(n0.report).some(gap), problems(n0.report).filter((e) => e.code === "bom.make-incomplete").map((e) => e.text.slice(0, 200)));
   checkMotion(cs, n0.report, { travel_mm: [exp.motion.stroke_mm, exp.motion.stripperTravel_mm] });
   triage(cs, n0.report);
   if (strict.length) {
-    checkStrict(cs, n0, strict[0], true);
+    checkStrict(cs, n0, strict[0], true, exp.strictExcept ?? []);
     const nMs = median(normal.map((x) => x.wallMs));
     const sMs = median(strict.map((x) => x.wallMs));
     const over = sMs / nMs - 1;

@@ -284,6 +284,11 @@ export type FrameCheck = {
   distinct: number;
   /** ok = obraz sleduje pohyb; partial = část snímků se nezměnila; dead = poloha se mění, obraz nikdy; static = studie se nehýbe */
   verdict: "ok" | "partial" | "dead" | "static";
+  /**
+   * víc pohledů (dlaždic): názvy pohledů, jejichž obraz se v žádném snímku s pohybem nezměnil, zatímco jiný pohled pohyb
+   * ukazuje – okno se tedy překresluje, jen v tomto pohledu pohyb není vidět (pohyb ve směru pohledu, díl mimo záběr / pod řezem)
+   */
+  still?: string[];
 };
 
 /** Vyhodnocení snímků exportu: mění se obraz tam, kde se mění poloha? */
@@ -305,10 +310,29 @@ export function checkFrames(list: FrameRecord[]): FrameCheck {
   return { frames: list.length, moving, changed, stuck, distinct: seen.size, verdict };
 }
 
+/**
+ * Kontrola víc dlaždic (synchronní pohledy) jedním výrokem. Všechny dlaždice „dead“ → dead (okno se nepřekreslilo). Jen
+ * některé „dead“ → okno se překresluje (jiný pohled se mění), v těch pohledech jen pohyb není vidět: ⚠ partial s jejich názvy,
+ * nikdy „ok“. Jinak rozhoduje nejhorší dlaždice (partial před ok, static jen když jsou static všechny).
+ */
+export function combineChecks(checks: FrameCheck[], names: string[] = []): FrameCheck {
+  if (!checks.length) return { frames: 0, moving: 0, changed: 0, stuck: 0, distinct: 0, verdict: "static" };
+  const live = checks.filter((c) => c.verdict !== "dead");
+  if (!live.length) return checks[0];
+  const deadIdx = checks.map((c, i) => (c.verdict === "dead" ? i : -1)).filter((i) => i >= 0);
+  const worst = live.find((c) => c.verdict === "partial") ?? live.find((c) => c.verdict === "ok") ?? live[0];
+  if (!deadIdx.length) return worst;
+  return { ...worst, verdict: "partial", still: deadIdx.map((i) => names[i] ?? String(i + 1)) };
+}
+
 /** Text kontroly obrazu do hlášky exportu (nikdy „ok“, když kontrola neproběhla nebo obraz stál). */
 export function checkText(c: FrameCheck): string {
   if (c.verdict === "dead") return tr("✗ obraz se mezi snímky nezměnil, přestože se poloha měnila v {0} snímcích – 3D okno se nepřekreslilo, video by bylo nehybné", c.moving);
   if (c.verdict === "static") return tr("ℹ poloha se ve studii nemění – všechny snímky ukazují totéž");
+  if (c.verdict === "partial" && c.still?.length) {
+    const head = tr("⚠ v pohledu {0} se obraz nezměnil v žádném snímku s pohybem (pohyb ve směru pohledu, nebo pohyblivý díl mimo záběr či schovaný řezem?) – ostatní pohledy pohyb ukazují", c.still.map((n) => `„${n}“`).join(", "));
+    return c.stuck > 0 ? `${head}; ${tr("⚠ obraz se změnil v {0} z {1} snímků s pohybem (zbytek: pohyblivý díl mimo záběr nebo schovaný řezem?)", c.moving - c.stuck, c.moving)}` : head;
+  }
   if (c.verdict === "partial") return tr("⚠ obraz se změnil v {0} z {1} snímků s pohybem (zbytek: pohyblivý díl mimo záběr nebo schovaný řezem?)", c.moving - c.stuck, c.moving);
   return tr("obraz se mění ve všech {0} snímcích s pohybem ({1} různých snímků)", c.moving, c.distinct);
 }

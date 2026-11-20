@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { DrawingResult, DText, Poly } from "./drawing";
-import { overlapIssueText, overlapSummary, sheetOverlaps } from "./drawing-overlaps";
+import { overlapIssueText, overlapSummary, sheetOverlaps, withoutKnownTexts } from "./drawing-overlaps";
 
 type Sheet = Pick<DrawingResult, "polys" | "texts" | "balloons" | "tables" | "frameRect" | "zones">;
 /** list 420 × 297 s rámem, razítkem, obdélníkem pohledu (viditelné hrany) a kótou nad ním */
@@ -84,5 +84,38 @@ describe("kontrola překryvů listu (bod 17)", () => {
     s.texts.push({ x: 60, y: 6, s: "1", size: 3, anchor: "middle", layer: "text" }); // zóna celá v okraji
     const o = sheetOverlaps(s);
     expect(o.total).toBe(0);
+  });
+});
+
+describe("hlášení listu neopakuje překryv poznámky, který už ohlásil příkaz výkresu (fáze 2, duplicitní ⚠)", () => {
+  it("text přes rám ohlášený u poznámky se z hlášení listu vynechá, jiný zůstane; počet listu je úplný", () => {
+    const s = base();
+    s.texts.push({ x: 405, y: 150, s: "KALIT 58 HRC", size: 5, anchor: "start", layer: "text" }); // přes pravý rám
+    s.texts.push({ x: 15, y: 150, s: "JINÝ", size: 5, anchor: "start", layer: "text" }); // přes levý rám
+    const all = sheetOverlaps(s);
+    expect(all.byKind["text-frame"]).toBe(2);
+    const rest = withoutKnownTexts(all, ["KALIT 58 HRC"]);
+    expect(rest.byKind["text-frame"]).toBe(1);
+    expect(rest.hits.map((h) => h.what)).toEqual(["„JINÝ“"]);
+    expect(overlapIssueText(rest)).toMatch(/^1 překryvů – text × rám 1; např\. „JINÝ“/);
+    expect(overlapIssueText(withoutKnownTexts(all, ["KALIT 58 HRC", "JINÝ"]))).toBeNull();
+    expect(withoutKnownTexts(all, [])).toBe(all);
+  });
+});
+
+describe("značky skupin děr nevedou přes hrany pohledu (fáze 2 – akceptační nástroj: „A“ přes sousední díru)", () => {
+  it("značka u díry se přesune do volného rohu, když první roh křižuje hrana pohledu; bez hrany zůstane vpravo nahoře", async () => {
+    const { annotationGeometry, textBox, boxHitsSegs } = await import("./drawing");
+    // pohled 1:1 na listu od [100, 100]; díra r 4 ve [20, 20]; svislá hrana x = 24 vpravo od díry (přes první roh značky)
+    const view = { key: "top", px: 100, py: 100, s: 1, x0: 0, y0: 0, w: 60, h: 60, ents: [{ t: "line" as const, a: [24, 0] as [number, number], b: [24, 60] as [number, number] }] };
+    const ann = { id: "c1", view: "top", type: "callout" as const, tip: [20, 20] as [number, number], at: [40, 40] as [number, number], lines: ["2× Ø8 (A)"], tag: "A", tags: [{ c: [20, 20] as [number, number], r: 4 }] };
+    const g = annotationGeometry({ views: [view], scaleValue: 1 }, [ann as never]);
+    const tag = g.texts.find((t) => t.s === "A")!;
+    const segs: [[number, number], [number, number]][] = [[[124, 100], [124, 160]]];
+    expect(boxHitsSegs(textBox(tag), segs)).toBe(false);
+    expect(tag.anchor).toBe("end"); // vlevo od díry
+    const free = annotationGeometry({ views: [{ ...view, ents: [] }], scaleValue: 1 }, [ann as never]).texts.find((t) => t.s === "A")!;
+    expect(free.anchor).toBeUndefined();
+    expect(free.x).toBeGreaterThan(120);
   });
 });

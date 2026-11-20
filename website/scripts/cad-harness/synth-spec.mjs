@@ -272,7 +272,8 @@ export function parts() {
   // ISO 4762 socket head cap screws (text-modeled, see the header)
   for (const [key, size, l] of [["m10x45", "M10", 45], ["m10x50", "M10", 50], ["m8x16", "M8", 16]]) {
     const s = screw(size, l);
-    P[key] = { lines: s.lines, volume: s.volume, screw: s };
+    // šroub ISO 4762 je normálie (vlna 22, bod 19): do kusovníku jako normálie, výrobní výkres nepotřebuje
+    P[key] = { lines: [...s.lines, "druh normálie"], volume: s.volume, screw: s };
   }
   // library parts (normálie)
   P.pillar = { library: "vodicí sloupek 24x150", volume: cyl(24, 150) + (cyl(32, 8) - cyl(24, 8)) - 2 * ring(16, 1) - ring(12, 1) + ring(12, 1, true) };
@@ -373,10 +374,18 @@ export function mates() {
 }
 export const DRIVE_MATE = 12;
 export const STROKE = { from: Z.backing - Z.base, to: Z.backing - Z.base - 50, steps: 40 };
-/** distance limits of the stripper: to the holder bottom (it is pushed down once the gap reaches the minimum) and to the die */
-const LIMIT = { holder: [20, 60], die: [10, 200] };
-/** stripper travel during the stroke: the gap stripper top ↔ holder bottom closes freely down to the limit, then pushes */
-export const STRIPPER_TRAVEL = Math.max(0, STROKE.from - STROKE.to - (Z.holder[0] - Z.stripper[1] - LIMIT.holder[0]));
+/**
+ * distance limits of the stripper: to the holder bottom and to the die. The stripper hangs on the holder at the maximum gap
+ * (`preferovat max` – the stripper springs push it away from the holder, like stripper bolts; wave 22, point 2): a stripper
+ * that is only "free inside the limit" is not determined by the mates (⚠ motion.undetermined – a strict run would stop). The
+ * maximum is the gap of the placement, so the preference moves nothing at the static solve. The die limit (15 mm) keeps the stripper
+ * above the guide rails on the die (rail height 12 mm) – it stops before them, no real clash in the motion.
+ */
+const LIMIT = { holder: [20, Z.holder[0] - Z.stripper[1]], die: [15, 200] };
+/** the holder-limit mate (1-based number in `sestava vazby`): the last but one mate */
+export const STRIPPER_HOLDER_MATE = () => mates().length - 1;
+/** stripper travel during the stroke: it goes down with the holder until its gap to the die reaches the die limit, then stays */
+export const STRIPPER_TRAVEL = Math.max(0, Math.min(STROKE.from - STROKE.to, Z.stripper[0] - Z.die - LIMIT.die[0]));
 
 /**
  * parts with their own drawing sheet (one sheet each, in the part document). Every layout is chosen so that a strict run
@@ -387,6 +396,8 @@ export const STRIPPER_TRAVEL = Math.max(0, STROKE.from - STROKE.to - (Z.holder[0
  *   ("vynecháno: 4× Ø21 ↧20: chybí pohled ve směru osy díry – zapněte pohled spodní"); the top view stays for the 12× M10.
  */
 export const PART_SHEETS = ["base", "die", "holder"];
+/** vyráběné díly (vlastní díly kromě šroubů – ty jsou `druh normálie`) */
+export const MAKE_PARTS = ["base", "die", "stripper", "holder", "backing", "top", "rail", "stop", "plate", "shank", "punch"];
 export const SHEET_OPTS = { base: "A2 měřítko 1:2", die: "A3", holder: "A3" };
 export const SHEET_VIEWS = { base: "přední,horní,iso", die: "přední,horní,iso", holder: "přední,horní,spodní,iso" };
 const LIBRARY = ["pillar", "bush", "pin", "spring", "washer"];
@@ -399,6 +410,14 @@ export function partsScript() {
   const L = [`# ${NAMES.asm} – syntetický nástroj pro zkoušku hotovosti MN CAD (scripts/cad-harness/synth-tool.mjs)`, "# 19 dílů · 70 komponent · 53 vazeb · pohyb 40 kroků s kolizemi · 4 listy výkresu"];
   const order = ["base", "die", "stripper", "holder", "backing", "top", "rail", "stop", "plate", "shank", "punch", "m10x45", "m10x50", "m8x16"];
   for (const k of order) L.push(...header(P[k].name), `nový díl "${P[k].name}"`, ...P[k].lines);
+  // výkresy dílů PŘED vložením do sestavy (vlna 22, bod 22g): číslo z razítka je pak i v kopii dílu v sestavě – změna dílu po
+  // vložení by byla ⚠ asm.stale-copy (kopie se sama neobnoví). Listy jsou v dokumentech DÍLŮ (list sestavy promítá celou
+  // sestavu): tři pravoúhlé pohledy + izometrie, Chytré kóty z prvků (díry, závity, sražení)
+  L.push(...header("výkresy dílů"));
+  for (const k of PART_SHEETS) {
+    const nm = NAMES[k].replace(/^900-01-00-\d\d /, "");
+    L.push(`záložka "${NAMES[k]}"`, `výkres ${SHEET_OPTS[k]} pohledy ${SHEET_VIEWS[k]}`, "kótovat chytře", `výkres razítko název="${nm}" číslo="${NAMES[k].slice(0, 12)}" kreslil="AI" nepředepsané="ISO 2768-mK"`);
+  }
   L.push(...header("normálie"));
   for (const k of LIBRARY) L.push(`normálie ${P[k].library}`);
   L.push(...header("sestava"), `nová sestava "${NAMES.asm}"`);
@@ -414,9 +433,10 @@ export function restScript(faces) {
     });
   const N = NAMES;
   const L = [...header("vazby (zámek skupiny, souosost na sloupky, 2× mez vzdálenosti)"), ...mates().map(sub)];
-  L.push(...header("pohyb: horní díl −50 mm, stírací deska dosedne až po 30 mm"), `pohyb motor lineární vazba ${DRIVE_MATE} ${STROKE.from}..${STROKE.to} kroky ${STROKE.steps}`, "pohyb kolize");
+  L.push(`sestava vazba ${STRIPPER_HOLDER_MATE()} preferovat max`);
+  L.push(...header(`pohyb: horní díl −50 mm, stírací deska jde s kotevní deskou a dosedne na matrici po ${STRIPPER_TRAVEL} mm`), `pohyb motor lineární vazba ${DRIVE_MATE} ${STROKE.from}..${STROKE.to} kroky ${STROKE.steps}`, "pohyb kolize");
   L.push(
-    ...header("výkresy: A1 sestava + 3 listy dílů"),
+    ...header("výkres sestavy A1 (listy dílů jsou výše)"),
     "výkres A1 pohledy přední,horní,iso",
     "výkres řez XZ odsazení -110 celý", // odsazení jako u skici: rovina XZ má normálu −Y, −110 = rovina Y = 110 (střed nástroje)
     "výkres kusovník ano",
@@ -424,12 +444,6 @@ export function restScript(faces) {
     `výkres razítko název="Střižný nástroj" číslo="900-01-00" kreslil="AI" nepředepsané="ISO 2768-mK"`,
     "kótovat celkově",
   );
-  // part sheets live in the PART documents (a sheet of the assembly document always projects the whole assembly):
-  // three orthographic views + iso, Chytré kóty generated from the features (holes, threads, chamfers)
-  for (const k of PART_SHEETS) {
-    const nm = N[k].replace(/^900-01-00-\d\d /, "");
-    L.push(`záložka "${N[k]}"`, `výkres ${SHEET_OPTS[k]} pohledy ${SHEET_VIEWS[k]}`, "kótovat chytře", `výkres razítko název="${nm}" číslo="${N[k].slice(0, 12)}" kreslil="AI" nepředepsané="ISO 2768-mK"`);
-  }
   L.push(...header("kontrola"), `záložka "${N.asm}"`, "kolize", "kontrola sestava");
   for (const k of ["base", "die", "holder"]) L.push(`záložka "${N[k]}"`, "měřit těleso");
   L.push(`záložka "${N.asm}"`, "stav");
@@ -480,6 +494,10 @@ export function expected(faces) {
     volume_tol_cm3: 0.01,
     clashes: { total: thread, thread, real: 0, undetermined: 0 },
     sheets: 1 + PART_SHEETS.length,
+    // výrobní dokumentace (vlna 22, bod 19): vyráběné díly bez výkresu – nástroj má výkresy jen 3 dílů. Výstup sestavy (PDF)
+    // to MUSÍ ohlásit přesně (⚠ bom.make-incomplete s těmito díly) – jiné ⚠ ne; přísný běh je povolí výjimkou
+    docGaps: MAKE_PARTS.filter((k) => !PART_SHEETS.includes(k)).map((k) => NAMES[k]),
+    strictExcept: ["bom.make-incomplete"],
     // the A1 assembly sheet lives in the assembly document, every part sheet in its part document (Chytré kóty > 0)
     sheetsByDoc: { [NAMES.asm]: 1, ...Object.fromEntries(PART_SHEETS.map((k) => [NAMES[k], 1])) },
     motion: {

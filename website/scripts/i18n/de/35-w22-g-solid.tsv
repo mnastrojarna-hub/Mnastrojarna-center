@@ -21,3 +21,6 @@ Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem 
 #!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
 objemový export bez tělesa: {0}	Volumenexport ohne Volumenkörper: {0}
 objemový export s plochami mimo tělesa: {0}	Volumenexport mit Flächen außerhalb der Körper: {0}
+# fáze 2: kontrola exportu s neznámým počtem těles (agent-out.ts exportCheck)
+objem 0 mm³	Volumen 0 mm³
+kontrola {0}: počet těles v souboru nezjištěn a {1} – objemový model nepotvrzen; export zkontrolujte (stav)	{0}-Prüfung: Anzahl der Körper in der Datei nicht ermittelt und {1} – Volumenmodell nicht bestätigt; Export prüfen (status)

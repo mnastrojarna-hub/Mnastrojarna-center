@@ -952,6 +952,11 @@ function dedicated(p: PartCtx, f: Feature): string[] {
       return one(ax === null || at === null ? null : `${c.w("spring")} ${n(2 * f.radius)} ${c.w("pitch")} ${n(f.pitch)} ${c.w("turns")} ${n(f.turns)} ${c.w("wire")} ${n(f.wire)}${at}${ax}${primMode(p, f)}${bodyPart(p, f)}`);
     }
     case "ext":
+      // kola a ozubení: kolo <druh> … (agent-gears.ts); „nové“ kolo dostane další volné těleso samo – jiné těleso jen obecně / JSON
+      if (f.ext.startsWith("gear.")) {
+        if (f.body && !(isNewBodyMode(f) && hasSolid(p.feats) && f.body === nextBodyName(bodiesAt({ features: p.feats }).names))) return [];
+        return gearScriptLines(f, c.lang, n);
+      }
       // pružiny z tabulky: `pružina tlačná d 2 De 20 L0 50 n 8 …` (agent-springs.ts); ostatní rozšíření obecným `prvek`
       return one(springScriptLine(f, c.lang));
     case "thread": {
@@ -1144,10 +1149,6 @@ function dedicated(p: PartCtx, f: Feature): string[] {
       const b = scriptQuote(f.tool, true);
       return one(!a || !b || !f.target || !f.tool ? null : `${c.w("combine")} ${a} ${b}${f.op === "cut" ? ` ${c.w("cut")}` : f.op === "intersect" ? ` ${c.w("intersect")}` : ""}${f.keepTool ? ` ${c.w("keep")}` : ""}`);
     }
-    // kola a ozubení: kolo <druh> … (agent-gears.ts); „nové“ kolo dostane další volné těleso samo – jiné těleso jen obecně / JSON
-    case "ext":
-      if (!f.ext.startsWith("gear.") || (f.body && !(isNewBodyMode(f) && hasSolid(p.feats) && f.body === nextBodyName(bodiesAt({ features: p.feats }).names)))) return [];
-      return gearScriptLines(f, c.lang, n);
     default:
       return [];
   }

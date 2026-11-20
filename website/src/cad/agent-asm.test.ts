@@ -321,10 +321,15 @@ describe("provedení: plochy, vazby, komponenty (náhradní jádro)", () => {
     expect(r.log[0]).toMatch(/Vzdálenost „Čep“ F5 → „Deska“ F2 · 5 mm · obráceně: ok · poloha beze změny/);
     d = r.doc;
     r = await run(d, "sestava vazba 3 hodnota=8", env);
-    // vzdálenost 8 mm odporuje kontaktu (hlava na desce) → vazba 3 splněna, kontakt v konfliktu
-    expect(r.log[0]).toMatch(/^✓ vazba 3 \(Vzdálenost .* 8 mm .*\): hodnota 8 mm · ok/);
+    // vzdálenost 8 mm odporuje kontaktu (hlava na desce). Vlna 22, bod 8: žádný kompromis – polohy beze změny (čep zůstane na
+    // desce, kontakt dál splněn), upravená vazba je v konfliktu bez ✓ a ⚠ mate.conflict uvede nejbližší dosažitelnou hodnotu
+    expect(r.log[0]).toMatch(/^⚠ vazba 3 \(Vzdálenost .* 8 mm .*\): hodnota 8 mm · konflikt$/);
+    expect(r.log).toContain("  polohy komponent beze změny – vazby nelze splnit spolu (kompromis se nezapisuje)");
     expect(r.log).toContain("⚠ v sestavě je konflikt vazeb – sestava vazby");
-    expect(Object.values(r.mateStatus!)).toEqual(["ok", "conflict", "ok"]);
+    expect(Object.values(r.mateStatus!)).toEqual(["ok", "ok", "conflict"]);
+    expect(posOf(r.doc, "Čep")).toEqual([40, 30, -20]);
+    expect(r.codes?.map((c) => c.code)).toEqual(["mate.conflict"]);
+    expect(r.codes![0].text).toMatch(/nejbližší dosažitelná hodnota 5 mm \(zadáno 8 mm\) – brání: „Kontakt Čep → Deska“/);
     r = await run(r.doc, "sestava vazba 3 smazat", env);
     expect(r.log[0]).toMatch(/^✓ vazba 3 \(Vzdálenost\): smazána/);
     expect(r.doc.mates).toHaveLength(2);

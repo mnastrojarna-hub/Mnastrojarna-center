@@ -2470,6 +2470,37 @@ function rectOfPts(pts: Vec2[], pad = 0): { x: number; y: number; w: number; h: 
   const y = Math.min(...ys) - pad;
   return { x, y, w: Math.max(...xs) + pad - x, h: Math.max(...ys) + pad - y };
 }
+/** protíná některá úsečka obdélník [x0, y0, x1, y1] (zmenšený o 0,2 mm – dotyk okrajem se nepočítá)? (Liang–Barsky) */
+export function boxHitsSegs(b: [number, number, number, number], segs: readonly [Vec2, Vec2][]): boolean {
+  const [x0, y0, x1, y1] = [b[0] + 0.2, b[1] + 0.2, b[2] - 0.2, b[3] - 0.2];
+  for (const [p, q] of segs) {
+    if (Math.max(p[0], q[0]) < x0 || Math.min(p[0], q[0]) > x1 || Math.max(p[1], q[1]) < y0 || Math.min(p[1], q[1]) > y1) continue;
+    const dx = q[0] - p[0];
+    const dy = q[1] - p[1];
+    let t0 = 0;
+    let t1 = 1;
+    let hit = true;
+    for (const [pp, qq] of [[-dx, p[0] - x0], [dx, x1 - p[0]], [-dy, p[1] - y0], [dy, y1 - p[1]]] as [number, number][]) {
+      if (Math.abs(pp) < 1e-12) {
+        if (qq < 0) {
+          hit = false;
+          break;
+        }
+        continue;
+      }
+      const r = qq / pp;
+      if (pp < 0) t0 = Math.max(t0, r);
+      else t1 = Math.min(t1, r);
+      if (t0 > t1) {
+        hit = false;
+        break;
+      }
+    }
+    if (hit) return true;
+  }
+  return false;
+}
+
 export function textBox(t: DText): [number, number, number, number] {
   const w = t.s.length * t.size * CHAR_W;
   const x0 = t.anchor === "middle" ? -w / 2 : t.anchor === "end" ? -w : 0;
@@ -3244,7 +3275,10 @@ function detailView(d: DetailView, p: Placed, SW: number, SH: number, TBH: numbe
   const cs = toSheet(p, [d.cx, d.cy]);
   const rs = d.r * p.s;
   polys.push({ layer: "thin", pts: circlePts(cs, rs, 48) });
-  texts.push({ x: cs[0] + rs * 0.75, y: cs[1] - rs * 0.75, s: d.label, size: 5, bold: true, layer: "text" });
+  // písmeno vpravo nahoře VNĚ kroužku: nejbližší roh rámečku textu (vlevo dole) leží ≥ 0,6 mm za kružnicí – dřív ležel uvnitř
+  // a písmeno křížilo vlastní kroužek (kontrola překryvů listu, vlna 22 bod 17 – fáze 2)
+  const k = (rs + 0.6) * Math.SQRT1_2 + 1;
+  texts.push({ x: cs[0] + k, y: cs[1] - k, s: d.label, size: 5, bold: true, layer: "text" });
   const clipped: { layer: Layer; pts: Vec2[] }[] = [];
   for (const pl of p.polys) for (const part of clipPolylineToCircle(pl.pts, [d.cx, d.cy], d.r)) clipped.push({ layer: pl.layer, pts: part });
   if (!clipped.length) return false;
@@ -4102,6 +4136,30 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
     return fitSuffix(value, code, a.tolShow ?? d.fitShow ?? "dev");
   };
   const S = (view: string, q: Vec2) => annToSheet(d.views, view, q);
+  /** viditelné hrany a kružnice pohledu v mm listu (úsečky; oblouky po 15°) – volné místo pro značky skupin děr */
+  const segCache = new Map<string, [Vec2, Vec2][]>();
+  const viewSegs = (view: string): [Vec2, Vec2][] => {
+    let l = segCache.get(view);
+    if (l) return l;
+    l = [];
+    for (const e of d.views.find((v) => v.key === view)?.ents ?? []) {
+      if (e.hidden) continue;
+      if (e.t === "line") {
+        l.push([S(view, e.a), S(view, e.b)]);
+        continue;
+      }
+      const n = Math.max(4, Math.ceil(Math.abs(e.da) / (Math.PI / 12)));
+      let p = S(view, [e.c[0] + e.r * Math.cos(e.a0), e.c[1] + e.r * Math.sin(e.a0)]);
+      for (let i = 1; i <= n; i++) {
+        const t = e.a0 + (e.da * i) / n;
+        const q = S(view, [e.c[0] + e.r * Math.cos(t), e.c[1] + e.r * Math.sin(t)]);
+        l.push([p, q]);
+        p = q;
+      }
+    }
+    segCache.set(view, l);
+    return l;
+  };
   const modelLen = (view: string, a: Vec2, b: Vec2) => {
     const dx = b[0] - a[0];
     const dy = b[1] - a[1];
@@ -4263,10 +4321,19 @@ export function annotationGeometry(d: Pick<DrawingResult, "views" | "scaleValue"
         // značka skupiny děr u každé díry (souřadnicové kóty – který popis patří ke které díře)
         if (a.tag && a.tags?.length) {
           const pv = d.views.find((v) => v.key === a.view);
+          const segs = viewSegs(a.view);
           for (const g of a.tags) {
             const q = S(a.view, g.c);
-            const rr = g.r * (pv?.s ?? 1) * Math.SQRT1_2;
-            texts.push({ x: q[0] + rr + 0.4, y: q[1] - rr - 0.4, s: a.tag, size: 2.5, layer: "dim" });
+            const rr = g.r * (pv?.s ?? 1) * Math.SQRT1_2 + 0.4;
+            // značka šikmo vedle díry; vadí-li tam hrana pohledu (sousední díra, obrys), zkusí se další tři rohy (vlna 22, bod 17 –
+            // vygenerovaný popis nemá ležet přes geometrii); když jsou všechny obsazené, zůstane první (kontrola překryvů to ohlásí)
+            const cands: DText[] = [
+              { x: q[0] + rr, y: q[1] - rr, s: a.tag, size: 2.5, layer: "dim" },
+              { x: q[0] + rr, y: q[1] + rr + 2, s: a.tag, size: 2.5, layer: "dim" },
+              { x: q[0] - rr, y: q[1] - rr, s: a.tag, size: 2.5, layer: "dim", anchor: "end" },
+              { x: q[0] - rr, y: q[1] + rr + 2, s: a.tag, size: 2.5, layer: "dim", anchor: "end" },
+            ];
+            texts.push(cands.find((t) => !boxHitsSegs(textBox(t), segs)) ?? cands[0]);
           }
         }
         // popis díry s polem tolerance (Ø12H7 skrz): úchylky za prvním řádkem

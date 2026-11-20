@@ -33,7 +33,6 @@ lineární {0}× po {1}{2}	linear {0}× every {1}{2}
 materiál = třída hustoty (ocel, nerez, hliník, mosaz, měď, plast, titan, litina, bronz) nebo libovolné označení do razítka (ČSN 11 423, 1.0503)	material = density class (steel, stainless, aluminium, brass, copper, plastic, titanium, cast iron, bronze) or any designation for the title block (ČSN 11 423, 1.0503)
 mnohoúhelník potřebuje počet stran a průměr opsané kružnice: mnohoúhelník 6 30 [v x y]	polygon needs the number of sides and the circumscribed diameter: polygon 6 30 [at x y]
 neznámý závit „{0}“ – M2 až M48, hrubé nebo jemné stoupání (M18×1,5)	unknown thread “{0}” – M2 to M48, coarse or fine pitch (M18×1,5)
-nový dokument v nové záložce	new document in a new tab
 nápis vystouplý / gravírovaný	raised / engraved lettering
 obdélník potřebuje šířku a výšku: obdélník 60 40 [v x y] (střed) nebo roh x y	rectangle needs a width and a height: rect 60 40 [at x y] (centre) or corner x y
 obdélník se středem (výchozí počátek) nebo rohem	rectangle by centre (origin by default) or by corner

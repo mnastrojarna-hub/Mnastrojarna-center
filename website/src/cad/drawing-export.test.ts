@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { parseAgentText } from "./agent";
 import { activeSheet, applyDrawingCmd } from "./drawing-agent";
+import { partComponent } from "./assembly";
 import { drawingFile, exportDrawing, safeName, toBase64 } from "./drawing-export";
 import { fixtureCalls, fixtureCompute, plateDoc } from "./drawing-fixture";
 import type { CadDoc } from "./types";
@@ -69,14 +70,16 @@ describe("exportDrawing – list podle čísla / názvu, Chytré kóty a značky
     expect(fixtureCalls.last?.meta.bom).toBeUndefined();
   });
   it("kusovník CSV sestavy (z doplňků aplikace) a varování výkresu", async () => {
-    const asm: CadDoc = { ...plateDoc("Sestava"), kind: "assembly", features: [], components: [{ id: "c1", name: "Hřídel" } as never] };
+    // platná komponenta (díl + umístění): list sestavy počítá revizi modelu z poloh komponent (vlna 22, D2)
+    const asm: CadDoc = { ...plateDoc("Sestava"), kind: "assembly", features: [], components: [{ ...partComponent(plateDoc("Hřídel")), id: "c1" }] };
     const r = await exportDrawing(asm, "csv", {}, fixtureCompute, { bom: [{ pos: 1, name: "Hřídel", qty: 2, material: "Ocel" }] });
     expect(r).toMatchObject({ name: "Sestava_kusovnik.csv", mime: "text/csv;charset=utf-8" });
     expect(Buffer.from(r.base64, "base64").toString("utf8")).toContain("1;Hřídel;;2;Ocel");
     const d = await run(plateDoc(), "výkres detail přední v 0 10 poloměr 3");
     const w = await exportDrawing({ ...d, drawings: [{ ...d.drawings![0], options: { ...d.drawings![0].options, details: [{ id: "x", label: "Z", view: "left", cx: 0, cy: 0, r: 1, scale: 2 }] } }] }, "svg", {}, fixtureCompute);
     // díl bez nepředepsaných tolerancí: export to ohlásí (w15 – razítko 5.4)
-    expect(w.warnings).toEqual(["Detail Z: pohled left není na listu.", expect.stringMatching(/^Výkres nemá nepředepsané tolerance – zadejte je: výkres nepředepsané ISO 2768-mK/)]);
+    // + kontrola kót (vlna 22, bod 18): fixture list nemá výšku 20 ani polohu díry (osy souměrnosti fixture nekreslí)
+    expect(w.warnings).toEqual(["Detail Z: pohled left není na listu.", "kóty neúplné – chybí 3 (velikosti 4/5, polohy 0/2): 20 (Kvádr 1); poloha Díra 1 – X 0; poloha Díra 1 – Y 0", expect.stringMatching(/^Výkres nemá nepředepsané tolerance – zadejte je: výkres nepředepsané ISO 2768-mK/)]);
   });
   it("dokument bez výkresu: výchozí list s Chytrými kótami; prázdný model = chyba", async () => {
     const r = await exportDrawing(plateDoc(), "svg", {}, fixtureCompute);

@@ -21,7 +21,8 @@ const GL = ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'];
 const NOGL = process.env.E2E_NOGL === '1';
 const SHOTS = process.argv[2] ? process.argv[2].replace(/\/?$/, '/shots/') : null;
 const line = (log, re) => (String(log).split('\n').find((l) => re.test(l)) || '').trim();
-const GREEN = /Vazby splněny ve všech krocích|Kolize: žádné|Kolize v pohybu|rozsah pohybu/;
+// vlna 22 C2: souhrn bez průniku teď zní „Kolize: žádný průnik v N polohách“ – musí ho chytit i tento negativní test
+const GREEN = /Vazby splněny ve všech krocích|Kolize: žádné|Kolize: žádný průnik|Kolize v pohybu|rozsah pohybu/;
 
 async function open(b, path) {
   const ctx = await b.newContext({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
@@ -164,7 +165,8 @@ async function open(b, path) {
   api = await p.evaluate(() => window.mncad.motion());
   ok(api.collision === null && !api.summary.some((l) => /Kolize v pohybu/.test(l)), `bod 1: mncad.motion() po změně dílu = nový výpočet bez kolize (dřív starý výsledek 500 mm³) – ${JSON.stringify(api.collision)}`);
   ok(await waitState('ok', 8000), 'po novém výpočtu (API) panel zase „ok“');
-  ok(/Kolize: žádné ve všech krocích/.test(await txt('[data-motion-summary]')), `nový souhrn patří zkrácené desce – ${line(await txt('[data-motion-summary]'), /Kolize/)}`);
+  // vlna 22 C2: souhrn říká, kolik poloh se kontrolovalo („žádný průnik v 11 polohách“), ne „žádné ve všech krocích“
+  ok(/Kolize: žádný průnik v 11 polohách/.test(await txt('[data-motion-summary]')), `nový souhrn patří zkrácené desce – ${line(await txt('[data-motion-summary]'), /Kolize/)}`);
 
   // přepnutí na jinou sestavu: nezkontrolováno; zpět: výsledek A platí
   await tab('Sestava B');
@@ -282,9 +284,14 @@ async function open(b, path) {
   ok((await mp.locator('[data-motion-error]').count()) === 0 && (await mp.getAttribute('data-motion-doc')) === 'Sestava A', 'bod 12: chyba sestavy B se nad sestavou A neukáže (dřív zůstala viset)');
   await tab('Sestava B');
   await openPanel();
-  await run('pohyb kroky 6');
+  // `pohyb kroky 6` studii přepočítá – s motorem na potlačené vazbě ✗ a dokument se NEZMĚNÍ: chyba dál patří témuž stavu (fáze 2)
+  log = await run('pohyb kroky 6');
   await p.waitForTimeout(400);
-  ok((await mp.locator('[data-motion-error]').count()) === 0, 'po změně studie sestavy B stará chyba zmizí (patřila jinému stavu)');
+  ok(/^✗ .*motor 1: vazba motoru je potlačená/m.test(log) && (await mp.locator('[data-motion-error]').count()) === 1, `pohyb kroky 6 s motorem na potlačené vazbě: ✗, studie beze změny, chyba platí dál – ${line(log, /^✗/)}`);
+  // změna sestavy (vazba zapnuta) = jiný stav: stará chyba zmizí
+  await run('sestava vazba 1 zapnout');
+  await p.waitForTimeout(400);
+  ok((await mp.locator('[data-motion-error]').count()) === 0, 'po změně sestavy B (vazba zapnuta) stará chyba zmizí (patřila jinému stavu)');
   // b) verdikt: kolize nekontrolovány → „mates-ok“, ne „ok“; s kontrolou kolizí bez průniku → „ok“
   await tab('Mechanika');
   await openPanel();

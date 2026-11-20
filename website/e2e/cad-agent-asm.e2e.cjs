@@ -57,7 +57,9 @@ vložit "Čep" v 100 0 0`);
   log = await run('sestava');
   ok(/#2 Čep · díl · poloha \[40; 30; -20\]/.test(log) && /#1 Deska · díl · poloha \[0; 0; 0\] · ukotvená ⚓/.test(log), 'sestava: výpis komponent s polohou a ukotvením');
   log = await run('kolize');
-  ok(/✓ kolize: žádné/.test(log), 'kolize = 0 (čep Ø10 v díře Ø10,5, hlava na desce)' + (/✓ kolize: žádné/.test(log) ? '' : '\n' + show(log, /^.*kolize[^\n]*/m)));
+  // vlna 22 C2: bez průniku se hlásí bez ✓ a s „vůle nekontrolována“ (čep Ø10 v díře Ø10,5 – vůle se tu nekontroluje)
+  const noHit = /^kolize: žádný průnik \(objem nad 0,001 mm³\) – 2 komponent · vůle nekontrolována/m.test(log) && !/✓ kolize/.test(log);
+  ok(noHit, 'kolize = 0 (čep Ø10 v díře Ø10,5, hlava na desce)' + (noHit ? '' : '\n' + show(log, /^.*kolize[^\n]*/m)));
   log = await run('sestava vazby');
   ok(/Vazby sestavy „Čep v desce“: 2 \(2 ok\)/.test(log) && / 1\. Souosost „Čep“ F\d+ → „Deska“ F\d+ – ok/.test(log), 'sestava vazby: číslovaný výpis se stavem');
   log = await run('sestava vazba 2 obráceně');

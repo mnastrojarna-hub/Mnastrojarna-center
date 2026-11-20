@@ -227,7 +227,9 @@ export async function applySpringPattern(d: CadDoc, cmd: SpringCmd, env: AsmEnv)
   // všechny instance se stejným názvem (původní + kopie) jedním příkazem
   // kopie převezmou L0, Ln a tuhost původní pružiny (nezadané v příkazu)
   const def = c.spring;
-  const r = await applySpringCmd(doc0, { ...cmd, holes: undefined, comp: c.name, ...(cmd.free === undefined && def ? { free: def.free } : {}), ...(cmd.solid === undefined && def?.solid !== undefined ? { solid: def.solid } : {}), ...(cmd.rate === undefined && def?.rate !== undefined ? { rate: def.rate } : {}) }, env);
+  // kopie v dírách vzoru jsou vedené už v protokolu (dřív je označil až markGuided po výpisu – řádek původní pružiny „· vedená“,
+  // kopií bez toho, a souhrn „(6×)“ se rozpadl; fáze 2 vlny 22)
+  const r = await applySpringCmd(doc0, { ...cmd, holes: undefined, comp: c.name, guided: cmd.guided ?? true, ...(cmd.free === undefined && def ? { free: def.free } : {}), ...(cmd.solid === undefined && def?.solid !== undefined ? { solid: def.solid } : {}), ...(cmd.rate === undefined && def?.rate !== undefined ? { rate: def.rate } : {}) }, env);
   // kopie stojí v dírách vzoru – jsou vedené (jako pružina, ze které vznikly, stojí-li v díře)
   return {
     ...r,

@@ -34,6 +34,8 @@ async function run(doc: CadDoc, text: string) {
   return { doc: d, log: log.join("\n") };
 }
 const meta = (d: CadDoc, i = 0) => d.drawings![i].meta as Partial<DrawingMeta>;
+/** ⚠ kontroly kót (vlna 22, bod 18) na listu fixture: chybí výška 20 a poloha díry (fixture nekreslí osy souměrnosti) */
+const DIMS_WARN = "kóty neúplné – chybí 3 (velikosti 4/5, polohy 0/2): 20 (Kvádr 1); poloha Díra 1 – X 0; poloha Díra 1 – Y 0";
 /** logo 60 × 20 px: červený pruh na bílém */
 async function logoUrl() {
   const w = 60;
@@ -107,7 +109,7 @@ describe("logo: připojený soubor nebo data URL", () => {
     // fixtureCompute razítko nekreslí – export z jádra ověřuje drawing-titleblock.test.ts; zde stačí data listu
     expect(meta(doc).logo?.trace?.rects.length).toBeGreaterThan(0);
     const r = await exportDrawing(doc, "svg", {}, fixtureCompute);
-    expect(r.warnings ?? []).toEqual([]);
+    expect(r.warnings ?? []).toEqual([DIMS_WARN]); // logo samo žádné varování nepřidá
   });
 });
 
@@ -134,12 +136,12 @@ describe("nepředepsané tolerance textem a ⚠ při exportu", () => {
   it("export dílu bez nepředepsaných tolerancí → varování (i u více listů s jejich názvy); s nimi a u sestavy bez varování", async () => {
     let { doc } = await run(plateDoc(), "výkres A3");
     const r = await exportDrawing(doc, "svg", {}, fixtureCompute);
-    expect(r.warnings).toEqual([expect.stringMatching(/^Výkres nemá nepředepsané tolerance – zadejte je: výkres nepředepsané ISO 2768-mK/)]);
+    expect(r.warnings).toEqual([DIMS_WARN, expect.stringMatching(/^Výkres nemá nepředepsané tolerance – zadejte je: výkres nepředepsané ISO 2768-mK/)]);
     ({ doc } = await run(doc, 'výkres nepředepsané mK\nvýkres list nový "Detail"\nvýkres nepředepsané ne'));
     const all = await exportDrawing(doc, "svg", { sheet: "all" }, fixtureCompute);
     expect(all.warnings?.some((w) => /^Výkres nemá nepředepsané tolerance \(listy: „Detail“\)/.test(w))).toBe(true);
     ({ doc } = await run(doc, "výkres nepředepsané desetinná"));
-    expect((await exportDrawing(doc, "svg", {}, fixtureCompute)).warnings ?? []).toEqual([]);
+    expect((await exportDrawing(doc, "svg", {}, fixtureCompute)).warnings ?? []).toEqual([DIMS_WARN]); // s nimi už bez varování tolerancí
     expect(generalTolWarnings({ ...doc, kind: "assembly" }, [{ name: "L", meta: { name: "S", material: "" } }])).toEqual([]);
   });
   it("nový list převezme šablonu, logo, zákazníka i nepředepsané tolerance", async () => {

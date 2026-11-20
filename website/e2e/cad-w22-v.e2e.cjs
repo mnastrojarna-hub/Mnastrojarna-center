@@ -211,7 +211,16 @@ async function v1(b) {
   if (r.file) {
     const w = readWebm(fs.readFileSync(r.file));
     ok(w.width > w.height * 1.2 && w.blocks.length === 20, `dvě dlaždice vedle sebe: ${w.width}×${w.height}, ${w.blocks.length} snímků`);
-  } else ok(false, 'dva pohledy: soubor nestažen');
+    // pohled „Shora“ při svislém zdvihu: obraz dlaždice se smí nezměnit vůbec (pravoúhlé promítání bez WebGL – pak ⚠ s názvem
+    // pohledu) nebo jen v části snímků (perspektiva WebGL – ⚠ „změnil v N z M“); video se uloží (druhá dlaždice dokazuje, že se
+    // okno překresluje); ✓ jen s kontrolou „ok“, nikdy ✓ ani „mění ve všech“ při nehybné dlaždici
+    const rep = r.rep || {};
+    const still = rep.videoStill || '';
+    const repOk = rep.videoLevel === 'ok'
+      ? rep.videoVerdict === 'ok' && !still && /^✓/.test(rep.text)
+      : rep.videoLevel === 'warn' && rep.videoVerdict === 'partial' && /^⚠/.test(rep.text) && !/mění ve všech/.test(rep.text) && (!still || (still === 'Shora' && /v pohledu „Shora“/.test(rep.text)));
+    ok(repOk, `dva pohledy – zpráva (${rep.videoLevel}/${rep.videoVerdict}, nehybný pohled: ${still || 'žádný'}): ${rep.text}`);
+  } else ok(false, `dva pohledy: soubor nestažen – ${(r.rep && r.rep.text) || r.log.trim().split('\n').pop()}`);
   await run('pohyb video pohledy vyp');
 
   // ── PNG s anotací (vypálená do obrazu) ──

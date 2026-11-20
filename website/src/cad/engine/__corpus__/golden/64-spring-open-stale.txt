@@ -7,11 +7,11 @@ Vazby: 3 (3 ok)
 Pružiny: „Pružina“ 15 mm (L0 32 · Ln 14) · F 340 N ✓ – délka odvozená z dosedacích ploch (řídí polohy komponent)
 Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 67,5 mm · objem Σ 229,87 cm³ · hmotnost Σ 1,804 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
-✓ kolize: žádné (4 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 4 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 
 Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 57,5] · Přidržovač [20; 20; 34,5] · Pružina [50; 50; 42,5]
 Vazby: 3 (3 ok)
 Pružiny: „Pružina“ 15 mm (L0 32 · Ln 14) · F 340 N ✓ – délka odvozená z dosedacích ploch (řídí polohy komponent)
 Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 67,5 mm · objem Σ 229,87 cm³ · hmotnost Σ 1,804 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)

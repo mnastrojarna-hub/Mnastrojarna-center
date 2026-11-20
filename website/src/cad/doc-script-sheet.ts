@@ -151,7 +151,7 @@ const DETAIL_LETTERS = "ABCDEFGHJKLMNPRSTUVWXYZ".split("");
 export const SHEET_JSON_ONLY = ["dimRoom", "dimRoomMin", "weldSymbols"];
 /** volby listu, které zapisuje převodník (doc-script.ts + tento modul) nebo počítá aplikace sama */
 const SHEET_KNOWN = new Set([
-  ...["sheet", "orientation", "scale", "projection", "views", "hidden", "section", "centerLines", "dimensions", "dimStyle", "balloons", "bomTable", "holeTable", "springTable", "rotation", "zones"],
+  ...["sheet", "orientation", "scale", "projection", "views", "hidden", "section", "centerLines", "dimensions", "dimStyle", "balloons", "bomTable", "holeTable", "springTable", "gearTable", "rotation", "zones"],
   ...["springs", "dimFunctional", "dimHoles", "details", "models", "aux", "cuts", "brokenOut", "breaks", "fitShow", "fitTable", "genEdit", "smartOff"],
   // pozice po pohledech, umístění kusovníku, list jen s kusovníkem (vlna 22, bod 17 – emitPositions)
   ...["balloonViews", "bomPlace", "bomOnly"],

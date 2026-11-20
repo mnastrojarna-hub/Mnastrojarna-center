@@ -133,14 +133,25 @@ describe("pružina mezi deskami nad jádrem", () => {
     // přepočet vazeb po změně vzdálenosti → délka pružiny sleduje desku B
     const moved = await run(d, 'sestava vazba "ZDVIH" hodnota=30', e);
     expect(moved.doc.components![2].spring).toMatchObject({ length: 30 });
-    // pohybová studie: ZDVIH 38 → 16 (pod doraz 18) s kolizemi; pružina se zkracuje, pod dorazem ✗
+    // pohybová studie: ZDVIH 38 → 16 (pod doraz 18) s kolizemi; pružina se zkracuje. Vlna 22, body 2 a 8 (VĚDOMÁ změna, stejně jako
+    // asm-w15.test.ts): délka na doraz Ln je tvrdý doraz – v kroku 11 motor stojí na 18 mm (⚠ motion.motor-limit), pružina pod Ln nikdy
     d = { ...d, motion: { motors: [{ id: "m", kind: "linear", mate: d.mates!.find((m) => m.name === "ZDVIH")!.id, from: 38, to: 16 }], duration: 1, steps: 11, collisions: true } };
     const mr = await motionRun(d, e, { force: true });
-    expect(mr.steps.map((s) => s.springs!.P.length)).toEqual([38, 36, 34, 32, 30, 28, 26, 24, 22, 20, 18, 16]);
+    expect(mr.steps.map((s) => s.springs!.P.length)).toEqual([38, 36, 34, 32, 30, 28, 26, 24, 22, 20, 18, 18]);
+    expect(mr.steps[11]).toMatchObject({ status: "stopped", cause: "motor" });
+    // fáze 2 vlny 22 (regrese): deska B bez vedení (jen vzdálenost) se na dorazu nesmí „rozjet“ v rovině ani naklonit – dřív rovnováha
+    // pružiny (650 N) proti penalizaci tvrdých členů posunula desku o ~22 m a naklonila ji (pružina pak „19,59 mm“)
+    for (const s of mr.steps) {
+      const B = s.place.B;
+      expect(Math.hypot(B.position[0], B.position[1]), `krok ${s.i}: posuv desky B v rovině`).toBeLessThan(1e-3);
+      expect(Math.max(...B.rotation.map(Math.abs)), `krok ${s.i}: natočení desky B`).toBeLessThan(1e-6);
+    }
+    expect(mr.steps[11].place.B.position[2]).toBeCloseTo(38, 4);
     const sum = motionSummary(mr, d).join("\n");
-    expect(sum).toContain("✗ pružina „Pružina R20“: délka 38 → 16 mm (min 16 · L0 44 · Ln 18) · síla 150 → 700 N (max 700 N) – pod délkou na doraz v krocích 11");
-    // dosednutí bez průniku do desek nad dorazem (kroky 0–9); ve 11. kroku (pod dorazem) tvar zůstane na dorazu a desku B protne
-    for (const s of mr.steps.slice(0, 10)) expect(s.clashes, `krok ${s.i}`).toEqual([]);
-    expect(mr.steps[11].clashes!.some((c) => [c.a, c.b].includes("P"))).toBe(true);
+    expect(sum).toContain("✓ pružina „Pružina R20“: délka 38 → 18 mm (min 18 · L0 44 · Ln 18) · síla 150 → 650 N (max 650 N)");
+    expect(sum).toMatch(/⚠ motion\.motor-limit motor 1 stojí na mezi v krocích 11 \(t = 1 s\): žádáno 16 mm, dosaženo 18 mm – brání: pružina „Pružina R20“ 18 mm/);
+    expect(sum).toContain(" „Kotevní deska“: ΔZ −20 mm");
+    // dosednutí bez průniku do desek ve všech krocích (motor stojí na dorazu, pružina pod Ln nejde)
+    for (const s of mr.steps) expect(s.clashes, `krok ${s.i}`).toEqual([]);
   }, 300_000);
 });

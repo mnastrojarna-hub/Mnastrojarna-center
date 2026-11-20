@@ -5,15 +5,15 @@
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Přidržovač“ – nová záložka
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
-✓ Kvádr 3 (box)
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 28800 mm³ · těleso platné
 
 Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 60 × 60 × 8 mm (X 0…60, Y 0…60, Z 0…8) · objem 28,80 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 3 [box, id #] ✓ – 60 × 60 × 8 mm, new, roh [0; 0; 0]
+ 1. Kvádr 3 [box, id #] ✓ přidáno 28800 mm³ · těleso platné – 60 × 60 × 8 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Mechanika“ – nová záložka
 ✓ komponenta „Rám“ vložena do sestavy (ukotvená)

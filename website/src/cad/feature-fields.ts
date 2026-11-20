@@ -408,7 +408,7 @@ export function featureFields(): FieldTable {
         axis: AXIS(),
         length: N(tr("délka závitu"), "mm", tr("délka L")),
         modeled: B(tr("modelované drážky (jinak kosmetický – jen výkres)"), tr("modelovat")),
-        helix: B(tr("skutečná šroubovice z označení (s modelovat; jinak soustružené drážky)"), tr("šroubovice")),
+        helix: B(tr("skutečná šroubovice z označení (s modelovat; jinak soustružené drážky)"), tr("šroubovice"), true),
         internal: B(tr("vnitřní závit (v díře)"), tr("vnitřní"), true),
         positionRef: POSREF(),
         dirDef: DIRDEF(),

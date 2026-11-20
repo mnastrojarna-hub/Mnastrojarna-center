@@ -28,7 +28,9 @@ test("synth-tool.txt has the content of design 10.1", () => {
   assert.equal(count(/^normálie /), 5, "pillar, bush, pin, spring, washer from the library");
   assert.equal(count(/^normálie podložka M8 ISO 7089$/), 1, "washers (design 10.1: podložky)");
   assert.equal(count(/^vložit /), 70);
-  assert.equal(count(/^sestava vazba /), 53);
+  assert.equal(count(/^sestava vazba (?!\d)/), 53);
+  // vlna 22, bod 2: stírací deska visí na kotevní desce (preferovaná strana meze) – jinak by ji vazby neurčovaly (⚠ motion.undetermined)
+  assert.equal(count(/^sestava vazba 52 preferovat max$/), 1, "stripper hangs on the holder");
   assert.equal(count(/^sestava vazba zámek /), 38, "rigid lock groups");
   assert.equal(count(/^sestava vazba mez vzdálenosti /), 2);
   assert.equal(count(/^sestava vazba souosost /), 8);
@@ -77,7 +79,7 @@ test("the 12th mate is the motor's distance mate", () => {
 test("every mate face is a resolved F-number or a diameter – no side rule a strict run would flag as ambiguous", () => {
   // design 5.2 row 13: `horní` among several upward faces picks the extreme one with "F2 z 5 vyhovujících" → ⚠ select.ambiguous
   const words = /^(zámek|souosost|kontakt|vzdálenost|mez|vzdálenosti|F\d+|Ø\d+(,\d+)?|\d+(,\d+)?(\.\.\d+(,\d+)?)?)$/;
-  for (const l of lines.filter((x) => x.startsWith("sestava vazba "))) {
+  for (const l of lines.filter((x) => x.startsWith("sestava vazba ") && !/^sestava vazba \d+ preferovat (min|max)$/.test(x))) {
     const rest = l.slice("sestava vazba ".length).replace(/"[^"]*"/g, " ").trim().split(/\s+/);
     assert.ok(rest.every((w) => words.test(w)), l);
   }
@@ -247,7 +249,9 @@ test("bench-motion: script split and motion analysis", () => {
   assert.ok(!sp.before.split("\n").some((l) => l.startsWith("pohyb ")) && sp.before.split("\n").length === sp.motionLine - 1);
   assert.deepEqual(EXP.motion.guided, [spec.NAMES.top, spec.NAMES.stripper]);
   assert.equal(EXP.motion.stroke_mm, 50);
-  assert.equal(EXP.motion.stripperTravel_mm, 20);
+  // vlna 22 (bod 2): stírací deska visí na kotevní desce (mez 20..50, preferovat max) a dosedne nad vodicí lišty matrice (mez 15) po
+  // 21 mm (dřív „volná v mezi“ – poloha neurčená vazbami, ⚠ motion.undetermined)
+  assert.equal(EXP.motion.stripperTravel_mm, 21);
   assert.equal(EXP.motion.clashesPerStep, 30);
   const asm = { components: [{ id: "t", name: "T", placement: { position: [0, 0, 207], rotation: [0, 0, 0] } }, { id: "s", name: "S", placement: { position: [0, 0, 106], rotation: [0, 0, 0] } }, { id: "b", name: "B" }, { id: "x", name: "X" }] };
   const exp = { motion: { guided: ["T", "S"], stroke_mm: 25, stripperTravel_mm: 6, clashesPerStep: 1 }, threadPairs: [{ screw: "X", part: "B" }] };

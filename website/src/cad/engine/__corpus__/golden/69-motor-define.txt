@@ -37,12 +37,12 @@ Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Přidr
  ⚠ motion.conflict pohyb porušuje vazbu „motor 2: VEDENÍ Přidržovač → Vodítko“ v kroku 1–4 (t = 0.5–2 s)
 ⚠ řádek 26: motor 2 (VEDENÍ) pohání stejný stupeň volnosti „Přidržovač“ jako motor 1 (ZDVIH) – díl nemůže splnit oba motory najednou a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo je rozdělte do fází / časových oken
 ⚠ řádek 26: motor 1 stojí na mezi v krocích 1–4 (t = 0.5–2 s): žádáno 49,913 → 27,15 mm, dosaženo 52,456 mm – brání: (nezjištěno); příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly zůstávají fyzikálně (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Kvádr 2 (box)
-✓ Díra 2 (hole)
-✓ Válec 1 (cylinder)
-✓ Válec 2 (cylinder)
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 3204,7 mm³ (3 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 28800 mm³ · těleso platné
+✓ Díra 2 (hole) · úběr 2513,3 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 37699,1 mm³ · těleso platné
+✓ Válec 2 (cylinder) · přidáno 2261,9 mm³ · těleso platné
 
 Dokument: „S1“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Vodítko [50; 50; -20] ⚓ · Přidržovač [20; 20; 67,5] · Šroub M12 [70; 70; 75,5]

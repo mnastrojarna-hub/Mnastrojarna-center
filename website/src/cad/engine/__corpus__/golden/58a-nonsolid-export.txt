@@ -101,6 +101,8 @@ Prvky:
 Dokument: „Deska C“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 120 × 100 × 40 mm (X -60…60, Y -50…50, Z 0…40) · objem 476,36 cm³ · ploch 9 · hran 21
 Geometrie: platná · 1 těleso · přesná kontrola
+Revize modelu: r·?
+Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 480000 mm³ · těleso platné – 120 × 100 × 40 mm, new, roh [-60; -50; 0]
  2. Skica 6 [sketch, id #] ✓ – rovina XY +35, 1 entit: spline
