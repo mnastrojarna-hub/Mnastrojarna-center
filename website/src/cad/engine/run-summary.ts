@@ -14,6 +14,7 @@ import { flattenLeaves } from "../asm-flatten";
 import { sourceKey } from "../assembly";
 import { clashStale } from "../clash-class";
 import { docHasContent } from "../draft/doc";
+import { featureCounts } from "../feature-levels";
 import { tr } from "../i18n";
 import type { BuildResult, CadDoc } from "../types";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -129,29 +130,26 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
       const e = codeEntry(code, { doc: d.name, args });
       if (!seen.has(`${e.code}\u0000${e.doc}\u0000${e.text}`)) rb.add(e);
     };
-    let ok = 0;
-    let warn = 0;
-    let error = 0;
     for (const st of res.status) {
-      if (!st.ok) {
-        error++;
-        report("feature.failed", [names.get(st.id) ?? st.id, st.error ?? ""]);
-      } else if (st.warning) {
-        warn++;
-        report("feature.warning", [names.get(st.id) ?? st.id, st.warning]);
-      } else ok++;
+      if (!st.ok) report("feature.failed", [names.get(st.id) ?? st.id, st.error ?? ""]);
+      else if (st.warning) report("feature.warning", [names.get(st.id) ?? st.id, st.warning]);
     }
     for (const pe of res.paramErrors ?? []) rb.code("build.failed", { doc: d.name, args: [pe] });
-    s.features = { ok, warn, error };
+    // prvek bez kontroly platnosti tělesa se mezi ✓ nepočítá (vlastní počet `unchecked`, feature-levels.ts)
+    s.features = featureCounts(res.status);
     if (res.metrics) {
       s.volume_mm3 = res.metrics.volume;
       s.bbox = res.metrics.bbox;
+      if (res.metrics.solids !== undefined) s.solids = res.metrics.solids;
+      if (res.metrics.free) s.free = res.metrics.free;
+      s.valid = res.metrics.valid ?? null;
       const mt = MATERIALS.find((m) => m.id === d.material);
       if (mt) {
         s.density = mt.density;
         s.mass_kg = (res.metrics.volume / 1e6) * mt.density;
       }
     }
+    const error = s.features.error;
     const built = !!res.metrics && error === 0 && !(res.paramErrors?.length);
     if (!built && !error && !(o.cached && !res.metrics && !res.paramErrors?.length)) rb.code("build.failed", { doc: d.name, args: [tr("model nemá těleso")] });
     if (ws && key !== undefined) markStale(s, ws, key, d);

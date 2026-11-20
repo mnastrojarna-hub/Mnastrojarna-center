@@ -378,7 +378,11 @@ export type SpringDef = {
  * (operace těleso nezměnila, geometrie po opravě stále není platná…) – v UI ⚠, v protokolu „⚠“.
  */
 /** `ms` = doba výpočtu prvku (jen prvky, které se skutečně počítaly) */
-export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown> };
+/**
+ * Úrovně stavu (vlna 22, feature-levels.ts): `ok` = prvek vznikl · `effect` = účinek booleovské operace (změna objemu proti
+ * nástroji) · `body` = konečné těleso po prvku (počet těles, volné plochy, platnost; `valid: null` = nezkontrolováno).
+ */
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown>; effect?: import("./feature-levels").FeatureEffect; body?: import("./feature-levels").BodyCheck; /** prvek je potlačený (přímo nebo aktivní konfigurací) – nestavěl se, nemá výsledek (vlna 22: nikdy ✓) */ suppressed?: boolean };
 
 export type MeshData = {
   vertices: Float32Array;
@@ -406,6 +410,8 @@ export type BuildResult = {
     valid?: boolean;
     /** počet objemových těles (0 = jen pláště / plochy) */
     solids?: number;
+    /** počet ploch mimo objemová tělesa (volné plochy, pláště vedle těles) – vlna 22, řádek D `free=N` */
+    free?: number;
     /** objem a plocha ze sítě (velké těleso, lehká komponenta) – ℹ geom.approx (5.2 č. 27) */
     approx?: boolean;
     /** měření objemu selhalo – objem je 0 (⚠ geom.volume-failed, 5.2 č. 28) */

@@ -7,14 +7,14 @@
 ✗ řádek 7: kolize: otevřený dokument není sestava
 → Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
 ✗ Zaoblení 1 (fillet): Zaoblení R50 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
-✓ Válec 1 (cylinder)
+✓ Válec 1 (cylinder) · přidáno 392,7 mm³ (celý nástroj) · těleso platné
 
 Dokument: „Chyby“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ✗)
 Rozměry: 10 × 10 × 30 mm (X 0…10, Y 0…10, Z 0…30) · objem 1,39 cm³ · ploch 8 · hran 15
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
  2. Zaoblení 1 [fillet, id #] ✗ Zaoblení R50 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R50, hrany vše
- 3. Válec 1 [cylinder, id #] ✓ – Ø5 × 20 mm, add, podstava [5; 5; 10], osa Z
+ 3. Válec 1 [cylinder, id #] ✓ přidáno 392,7 mm³ (celý nástroj) · těleso platné – Ø5 × 20 mm, add, podstava [5; 5; 10], osa Z

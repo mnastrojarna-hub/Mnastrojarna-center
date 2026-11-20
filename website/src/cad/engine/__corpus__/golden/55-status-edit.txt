@@ -1,0 +1,91 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
+✓ nový díl „Plech“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Zaoblení 2 (fillet) – 4 hran podle pravidla „svisle“ – výsledek po výpočtu níže
+ℹ řádek 8: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 9
+→ Zaoblení 2: radius 1 → 15 – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 4000 mm³ · těleso platné
+✗ Zaoblení 1 (fillet): Zaoblení R15 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
+✓ Kvádr 2 (box) · přidáno 4000 mm³ · těleso platné
+✗ Zaoblení 2 (fillet): Zaoblení R15 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
+
+Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
+Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 2 [fillet, id #] ✗ Zaoblení R15 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R15, hrany 4
+=== run 2 ===
+→ Zaoblení 2: radius 15 → 30 – výsledek po výpočtu níže
+✗ Zaoblení 2 (fillet): Zaoblení R30 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
+
+Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
+Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 2 [fillet, id #] ✗ Zaoblení R30 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R30, hrany 4
+=== run 3 ===
+→ Zaoblení 2: radius 30 → 2 – výsledek po výpočtu níže
+✓ přejmenováno: Zaoblení 2 → Rohy
+✓ Rohy (fillet) · úběr 34,34 mm³ · těleso platné
+
+Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 3,97 cm³ · ploch 10 · hran 24
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
+ 2. Rohy [fillet, id #] ✓ úběr 34,34 mm³ · těleso platné – R2, hrany 4
+=== run 4 ===
+→ Kvádr 2: size [20; 20; 10] → [3; 3; 10] – výsledek po výpočtu níže
+ℹ Kvádr 2 (box) · přidáno 90 mm³ · těleso platné
+✗ Rohy: Zaoblení R2 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
+
+Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
+Rozměry: 3 × 3 × 10 mm (X 0…3, Y 0…3, Z 0…10) · objem 0,09 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 90 mm³ · těleso platné – 3 × 3 × 10 mm, new, roh [0; 0; 0]
+ 2. Rohy [fillet, id #] ✗ Zaoblení R2 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R2, hrany 4
+=== run 5 ===
+✓ smazáno: Rohy
+
+Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 3 × 3 × 10 mm (X 0…3, Y 0…3, Z 0…10) · objem 0,09 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 90 mm³ · těleso platné – 3 × 3 × 10 mm, new, roh [0; 0; 0]
+=== run 6 ===
+✓ nový díl „Deska K“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ konfigurace „Bez výstupku“ založena: potlačeno: Kvádr 2 – aktivujete: konfigurace aktivní "Bez výstupku" – výsledek po výpočtu níže
+ℹ řádek 5: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 6
+→ aktivní konfigurace „Bez výstupku“: potlačeno: Kvádr 2 – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+ℹ Kvádr 2 (box) · potlačen – nestaví se
+✓ dokument „Deska K“ postaven: prvků 2, bez ⚠ a ✗ · těleso platné
+
+Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ℹ potlačeno, 0 ✗)
+Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ℹ (potlačen) – 10 × 10 × 30 mm, add, roh [40; 10; 10]
+Konfigurace: Bez výstupku (aktivní)
+=== run 7 ===
+✓ záložka „Deska K“ už je aktivní
+→ aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací) – výsledek po výpočtu níže
+✓ nový díl „Jiný“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ dokument „Deska K“ postaven: prvků 2, bez ⚠ a ✗ · těleso platné
+✓ Kvádr 1 (box) · přidáno 125 mm³ · těleso platné
+
+Dokument: „Jiný“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 5 × 5 × 5 mm (X 0…5, Y 0…5, Z 0…5) · objem 0,12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 125 mm³ · těleso platné – 5 × 5 × 5 mm, new, roh [0; 0; 0]

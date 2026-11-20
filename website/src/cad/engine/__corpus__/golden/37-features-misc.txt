@@ -8,10 +8,10 @@
 → Zrcadlení 1 (mirror) přidán – výsledek po výpočtu níže
 → Skořepina 1 (shell) – otevřeno ploch: 1 – výsledek po výpočtu níže
 ✓ Skica 1 (sketch)
-✓ Rotace 1 (revolve)
-✓ Kvádr 1 (box)
-✓ Pole 1 (pattern)
-✓ Zrcadlení 1 (mirror)
+✓ Rotace 1 (revolve) · přidáno 62831,9 mm³ · těleso platné
+✓ Kvádr 1 (box) · přidáno 4000 mm³ (celý nástroj) · 2 těles, platná
+✓ Pole 1 (pattern) · přidáno 8000 mm³ (celý nástroj) · 4 těles, platná
+✓ Zrcadlení 1 (mirror) · přidáno 12000 mm³ (16 % nástroje) · 7 těles, platná
 ✗ Skořepina 1 (shell): Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie).
 
 Dokument: „Prvky“ · díl · materiál Ocel (7.85 g/cm³) · prvků 6 (5 ✓, 1 ✗)
@@ -21,10 +21,10 @@ Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XZ, 1 entit: obdélník 10×40
     entity: e1 obdélník 10×40 [25; 20]
     profil: 1 uzavřený obrys (e1) ✓
- 2. Rotace 1 [revolve, id #] ✓ – 360°, new, osa Z
- 3. Kvádr 1 [box, id #] ✓ – 20 × 20 × 10 mm, add, roh [40; -10; 0]
- 4. Pole 1 [pattern, id #] ✓ – lineární 3× po 30
- 5. Zrcadlení 1 [mirror, id #] ✓ – rovina YZ
+ 2. Rotace 1 [revolve, id #] ✓ přidáno 62831,9 mm³ · těleso platné – 360°, new, osa Z
+ 3. Kvádr 1 [box, id #] ✓ přidáno 4000 mm³ (celý nástroj) · 2 těles, platná – 20 × 20 × 10 mm, add, roh [40; -10; 0]
+ 4. Pole 1 [pattern, id #] ✓ přidáno 8000 mm³ (celý nástroj) · 4 těles, platná – lineární 3× po 30
+ 5. Zrcadlení 1 [mirror, id #] ✓ přidáno 12000 mm³ (16 % nástroje) · 7 těles, platná – rovina YZ
  6. Skořepina 1 [shell, id #] ✗ Operaci nelze provést s těmito parametry (např. příliš velký poloměr zaoblení nebo neplatná geometrie). – 2 mm, otevřených ploch 1
 === run 2 ===
 ✓ nový díl „Šroubovice“ – nová záložka
@@ -33,19 +33,19 @@ Prvky:
 → Pružina 1 (spring) přidán – výsledek po výpočtu níže
 → Kužel 1 (cone) přidán – výsledek po výpočtu níže
 → Koule 1 (sphere) přidán – výsledek po výpočtu níže
-✓ Válec 1 (cylinder)
+✓ Válec 1 (cylinder) · přidáno 6031,9 mm³ · těleso platné
 ✓ Závit 1 (thread)
-✓ Pružina 1 (spring)
-✓ Kužel 1 (cone)
-✓ Koule 1 (sphere)
+✓ Pružina 1 (spring) · přidáno 792,1 mm³ · těleso platné
+✓ Kužel 1 (cone) · přidáno 2748,9 mm³ · těleso platné
+✓ Koule 1 (sphere) · přidáno 523,6 mm³ · těleso platné
 
 Dokument: „Šroubovice“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗) · těles 4
 Tělesa: Těleso 4 (aktivní) 0,52 cm³ · Těleso 1 6,03 cm³ · Těleso 2 0,79 cm³ · Těleso 3 2,75 cm³
 Rozměry: 101 × 56 × 35 mm (X -50…51, Y -11…45, Z -5…30) · objem 10,10 cm³ · ploch 10 · hran 12
 Geometrie: platná · 4 těles
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø16 × 30 mm, new, podstava [0; 0; 0], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 6031,9 mm³ · těleso platné – Ø16 × 30 mm, new, podstava [0; 0; 0], osa Z
  2. Závit 1 [thread, id #] ✓ – M16 délka 20 mm, vnější (na válci), kosmetický (jen výkres), začátek [0; 0; 0], osa Z
- 3. Pružina 1 [spring, id #] ✓ – Ø20, stoupání 5, závitů 4, drát Ø2 (délka 20 mm), new, začátek [40; 0; 0], osa Z
- 4. Kužel 1 [cone, id #] ✓ – Ø20→Ø10 × 15 mm, new, podstava [-40; 0; 0], osa Z
- 5. Koule 1 [sphere, id #] ✓ – Ø10 mm, new, střed [0; 40; 0]
+ 3. Pružina 1 [spring, id #] ✓ přidáno 792,1 mm³ · těleso platné – Ø20, stoupání 5, závitů 4, drát Ø2 (délka 20 mm), new, začátek [40; 0; 0], osa Z
+ 4. Kužel 1 [cone, id #] ✓ přidáno 2748,9 mm³ · těleso platné – Ø20→Ø10 × 15 mm, new, podstava [-40; 0; 0], osa Z
+ 5. Koule 1 [sphere, id #] ✓ přidáno 523,6 mm³ · těleso platné – Ø10 mm, new, střed [0; 40; 0]

@@ -7,17 +7,17 @@
 ✓ Skica 2 na ploše F3 (+x) – rovina: počátek [80; 25; 10], normála +X, osa X skici +Y
 ✓ 1 entita do skici „Skica 2“ (e1)
 → Vysunutí 2 (extrude) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 80000 mm³ · těleso platné
 ✓ Skica 1 (sketch)
 ⚠ Vysunutí 1 (extrude): Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.
 ✓ Skica 2 (sketch)
-✓ Vysunutí 2 (extrude)
+✓ Vysunutí 2 (extrude) · přidáno 180 mm³ (celý nástroj) · těleso platné
 
 Dokument: „Skica na ploše“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (4 ✓, 1 ⚠, 0 ✗)
 Rozměry: 83 × 55 × 23 mm (X 0…83, Y 0…55, Z 0…23) · objem 80,18 cm³ · ploch 12 · hran 28
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 80 × 50 × 20 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 80000 mm³ · těleso platné – 80 × 50 × 20 mm, new, roh [0; 0; 0]
  2. Skica 1 [sketch, id #] ✓ – rovina Plocha 6, 1 entit: kružnice Ø20
     entity: e1 kružnice Ø20 [40; 25]
     profil: 1 uzavřený obrys (e1) ✓
@@ -25,4 +25,4 @@ Prvky:
  4. Skica 2 [sketch, id #] ✓ – rovina Plocha 3, 1 entit: obdélník 10×6
     entity: e1 obdélník 10×6 [25; 10]
     profil: 1 uzavřený obrys (e1) ✓
- 5. Vysunutí 2 [extrude, id #] ✓ – 3 mm, add
+ 5. Vysunutí 2 [extrude, id #] ✓ přidáno 180 mm³ (celý nástroj) · těleso platné – 3 mm, add

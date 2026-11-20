@@ -2,10 +2,10 @@
 ✓ nový díl „Otevřít výkres“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 ✓ výkres dokumentu se otevře v záložce
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 6000 mm³ · těleso platné
 
 Dokument: „Otevřít výkres“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 20 × 10 mm (X 0…30, Y 0…20, Z 0…10) · objem 6 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 20 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 6000 mm³ · těleso platné – 30 × 20 × 10 mm, new, roh [0; 0; 0]

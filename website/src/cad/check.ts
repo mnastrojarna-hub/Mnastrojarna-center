@@ -44,6 +44,26 @@ export function countSub(shape: r.AnyShape, kind: "SOLID" | "SHELL" | "FACE" | "
   return n;
 }
 
+/**
+ * Složení tvaru pro očekávaný typ výsledku prvku (feature-levels.ts): objemová tělesa, plochy mimo ně (volné plochy,
+ * pláště – průzkum s vynecháním těles) a všechny plochy. Levné i u velkých těles (jen průchod topologií).
+ */
+export function compositionOf(shape: r.AnyShape): { solids: number; free: number; faces: number } {
+  const o = oc();
+  const ex = new o.TopExp_Explorer();
+  let free = 0;
+  try {
+    ex.Init(shape.wrapped, o.TopAbs_ShapeEnum.TopAbs_FACE, o.TopAbs_ShapeEnum.TopAbs_SOLID);
+    while (ex.More()) {
+      free++;
+      ex.Next();
+    }
+  } finally {
+    ex.delete();
+  }
+  return { solids: countSub(shape, "SOLID"), free, faces: countSub(shape, "FACE") };
+}
+
 /** Platnost tvaru podle BRepCheck_Analyzer (včetně geometrických kontrol: sebeprotínající dráty, neorientovatelné plochy). */
 export function isValidShape(shape: r.AnyShape): boolean {
   const o = oc();

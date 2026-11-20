@@ -1,0 +1,37 @@
+# Vlna 22 G1 – úrovně stavu prvku (přijato → vznik → účinek → konečné těleso), přijetí úprav a příkazů výkresu
+{0} ({1} % nástroje)	{0} ({1} % of the tool)
+{0} (celý nástroj)	{0} (the whole tool)
+{0} ploch > {1}	{0} faces > {1}
+{0} ploch > {1} – platnost se ověří na konci stavby	{0} faces > {1} – validity is checked at the end of the build
+{0} těles, NEPLATNÁ geometrie	{0} bodies, INVALID geometry
+{0} těles, platná	{0} bodies, valid
+{0} těles, platnost nezkontrolována ({1})	{0} bodies, validity not checked ({1})
+{0} volných ploch	{0} free faces
+1 volná plocha	1 free face
+kontrola se neprovedla	the check did not run
+nezkontrolováno	not checked
+nezkontrolováno ({0})	not checked ({0})
+objem beze změny	volume unchanged
+Platnost tělesa po tomto prvku nebyla zkontrolována ({0}).	The validity of the body after this feature was not checked ({0}).
+po tomto prvku se platnost nekontroluje – ověří se na konci stavby	validity is not checked after this feature – it is checked at the end of the build
+Prvek má dát objemové těleso, ale vedle tělesa zůstaly volné plochy ({0} navíc) – výsledek není uzavřený; zkontrolujte profil, dráhu a parametry.	The feature should give a solid body, but free faces were left beside the body ({0} extra) – the result is not closed; check the profile, the path and the parameters.
+Prvek má dát objemové těleso, ale výsledek je jen plocha / plášť ({0}, žádné těleso) – uzavřete profil nebo dráhu, zkontrolujte parametry; plochy uzavře Plochy → Uzavřít do tělesa.	The feature should give a solid body, but the result is only a surface / shell ({0}, no body) – close the profile or the path, check the parameters; surfaces are closed by Surfaces → Close into a body.
+přidáno {0} mm³	added {0} mm³
+těleso NEPLATNÉ	body INVALID
+těleso nezkontrolováno ({0})	body not checked ({0})
+těleso platné	body valid
+úběr {0} mm³	removed {0} mm³
+výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)	drawing: sheet “{0}” evaluated with no findings (views, sections, Smart dimensions)
+výsledek po vyhodnocení listu níže	result after the sheet is evaluated below
+výsledek po výpočtu níže	result after computation below
+velké těleso, {0} ploch – měřeno ze sítě, platnost se nekontroluje	large body, {0} faces – measured from the mesh, validity is not checked
+dokument „{0}“ postaven: prvků {1}, bez ⚠ a ✗{2}	document “{0}” built: {1} features, no ⚠ or ✗{2}
+platnost nezkontrolována	validity not checked
+potlačen – nestaví se	suppressed – not built
+Prvek je potlačený – nestaví se a nemá výsledek.	The feature is suppressed – it is not built and has no result.
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
+dokument „{0}“ postaven: prvků {1}, bez ⚠ a ✗ – {2}	document “{0}” built: {1} features, no ⚠ or ✗ – {2}
+příkaz přijat: {0}	command accepted: {0}
+prvek „{0}“ vznikl ({1}) – týž příkaz má ⚠/✗ jiného prvku	feature “{0}” was built ({1}) – the same command has a ⚠/✗ of another feature
+stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku {0}	the model state after this command was not built on its own (another change followed) – only the state after line {0} is verified
+prvek „{0}“ je potlačený – nestaví se (bez výsledku)	feature “{0}” is suppressed – not built (no result)

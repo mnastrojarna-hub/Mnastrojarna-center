@@ -55,10 +55,23 @@ export const CODES = [
   { code: "parse.conflict", level: "warn", key: "odporující si volby – použito „{0}“, zahozeno „{1}“" },
   // ── provedení a stavba (5.2 č. 15–17, 21, 22, 24–28) ──
   { code: "op.failed", level: "error", key: "příkaz selhal: {0}" },
+  // přijetí příkazu, který mění model nebo list – výsledek ✓/⚠/✗ přijde až po stavbě / vyhodnocení listu (vlna 22, bod 22i)
+  { code: "op.accepted", level: "note", key: "příkaz přijat: {0}" },
+  // stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – výsledek „postaven“ smí nést jen řádek
+  // poslední změny; mezistav je nezkontrolovaný, nikdy ✓
+  { code: "op.superseded", level: "note", key: "stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku {0}" },
   { code: "build.failed", level: "error", key: "stavba selhala: {0}" },
   { code: "feature.failed", level: "error", key: "prvek „{0}“ se nepostavil: {1}" },
   { code: "feature.warning", level: "warn", key: "prvek „{0}“: {1}" },
   { code: "feature.unverified", level: "warn", key: "prvek „{0}“ nebyl ověřen stavbou" },
+  // prvek vznikl, ale platnost tělesa se po něm nekontrolovala (velké těleso) – nikdy ✓ (vlna 22, úrovně stavu prvku)
+  { code: "feature.unchecked", level: "note", key: "prvek „{0}“: {1}" },
+  // prvek je potlačený (přímo nebo aktivní konfigurací) – nestavěl se, nemá výsledek; nikdy ✓ (vlna 22, úrovně stavu prvku)
+  { code: "feature.suppressed", level: "note", key: "prvek „{0}“ je potlačený – nestaví se (bez výsledku)" },
+  // prvek sám je v pořádku, ale týž řádek (příkaz) má ⚠/✗ jiného prvku – řádek není zelený, proto ℹ místo ✓
+  { code: "feature.built", level: "note", key: "prvek „{0}“ vznikl ({1}) – týž příkaz má ⚠/✗ jiného prvku" },
+  // načtený dokument (JSON, otevřít, --open) se postavil bez ⚠/✗, ale platnost tělesa se nekontrolovala – nikdy ✓
+  { code: "doc.unchecked", level: "note", key: "dokument „{0}“ postaven: prvků {1}, bez ⚠ a ✗ – {2}" },
   { code: "geom.approx", level: "note", key: "objem a hmotnost jsou přibližné (ze sítě)" },
   { code: "geom.volume-failed", level: "warn", key: "objem se nepodařilo změřit – uvedena 0" },
   { code: "param.clamped", level: "warn", key: "hodnota {0} upravena na {1} ({2})" },

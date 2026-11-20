@@ -1,6 +1,7 @@
 "use client";
 
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
+import { geometryText } from "@/cad/feature-levels";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -2760,6 +2761,8 @@ export function CadApp() {
   const errors = result?.status.filter((s) => !s.ok) ?? [];
   const warnings = result?.status.filter((s) => s.ok && s.warning) ?? [];
   const geomBad = !isAsm && result?.metrics && (result.metrics.valid === false || result.metrics.solids === 0);
+  // vlna 22: platnost tělesa, která se nekontrolovala (velké těleso), se ukáže – neprovedená kontrola není „v pořádku“
+  const geomUnchecked = !isAsm && !!result?.metrics && !geomBad && result.metrics.valid === undefined;
   const bg = BACKGROUNDS[prefs.bg] ?? BACKGROUNDS.blue;
   const hasBody = isAsm ? asmViews.length > 0 : !!result?.mesh;
   // okno hmotnosti dílu bez tělesa (Ctrl+Z při otevřeném okně) se zavře – příznak nesmí zůstat a otevřít ho později
@@ -3926,6 +3929,11 @@ export function CadApp() {
                     <span data-warn-chip title={warnings.map((w) => w.warning).join("\n")}>
                       {warnings.length} {warnings.length === 1 ? tr("prvek s upozorněním") : tr("prvky s upozorněním")}
                     </span>
+                  </Chip>
+                )}
+                {geomUnchecked && (
+                  <Chip dark={bg.dark}>
+                    <span data-geom-unchecked title={tr("Geometrie: {0}{1}", geometryText(result!.metrics!), "")}>{tr("platnost nezkontrolována")}</span>
                   </Chip>
                 )}
                 {geomBad && (

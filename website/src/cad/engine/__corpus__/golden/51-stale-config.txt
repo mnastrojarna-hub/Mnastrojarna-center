@@ -2,18 +2,20 @@
 ✓ nový díl „Deska K“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
-✓ konfigurace „Bez výstupku“ založena: potlačeno: Kvádr 2 – aktivujete: konfigurace aktivní "Bez výstupku"
-✓ aktivní konfigurace „Bez výstupku“: potlačeno: Kvádr 2
+→ konfigurace „Bez výstupku“ založena: potlačeno: Kvádr 2 – aktivujete: konfigurace aktivní "Bez výstupku" – výsledek po výpočtu níže
+ℹ řádek 5: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 6
+→ aktivní konfigurace „Bez výstupku“: potlačeno: Kvádr 2 – výsledek po výpočtu níže
 Těleso: obálka 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24000 mm³ (24 cm³) · povrch 6800 mm² · hmotnost 0,1884 kg (7,85 g/cm³) · těžiště [30; 20; 5] · ploch 6 · hran 12 · vrcholů 8
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+ℹ Kvádr 2 (box) · potlačen – nestaví se
+✓ dokument „Deska K“ postaven: prvků 2, bez ⚠ a ✗ · těleso platné
 
-Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ℹ potlačeno, 0 ✗)
 Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 10 mm, new, roh [0; 0; 0]
- 2. Kvádr 2 [box, id #] ✓ – 10 × 10 × 30 mm, add, roh [40; 10; 10]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ℹ (potlačen) – 10 × 10 × 30 mm, add, roh [40; 10; 10]
 Konfigurace: Bez výstupku (aktivní)
 === run 2 ===
 ✓ nový díl „Přidržovač“ – nová záložka
@@ -22,7 +24,7 @@ Konfigurace: Bez výstupku (aktivní)
 ✓ komponenta „Deska K“ vložena do sestavy (ukotvená)
 ✓ komponenta „Přidržovač“ vložena do sestavy
 ✓ kolize: žádné (2 komponent)
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
 
 Dokument: „Sestava K“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska K [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
@@ -30,8 +32,9 @@ Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 
 Kolize: žádné (zkontrolováno ?)
 === run 3 ===
 ✓ úprava dílu „Deska K“ v kontextu sestavy „Sestava K“ – další příkazy pracují s ním; návrat: sestava hotovo
-✓ aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací)
+→ aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací) – výsledek po výpočtu níže
 ✓ „Deska K“ vrácen do sestavy „Sestava K“ (změnu převzalo komponent: 1) · objem dílu 27 cm³
+✓ dokument „Deska K“ postaven: prvků 2, bez ⚠ a ✗ · těleso platné
 
 Dokument: „Sestava K“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska K [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
@@ -47,13 +50,14 @@ Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 
 Kolize: 1 – Deska K × Přidržovač (1 000,0 mm³) (zkontrolováno ?)
 === run 5 ===
 ✓ záložka „Deska K“ (díl) je aktivní – další příkazy pracují s ní
-✓ aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací)
+→ aktivní konfigurace: žádná (výchozí hodnoty proměnných, bez potlačení konfigurací) – výsledek po výpočtu níže
+✓ dokument „Deska K“ postaven: prvků 2, bez ⚠ a ✗ · těleso platné
 
 Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 60 × 40 × 40 mm (X 0…60, Y 0…40, Z 0…40) · objem 27 cm³ · ploch 11 · hran 24
 Geometrie: platná · 1 těleso
 Měření: výsledek L7 je pro revizi r·? – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 10 mm, new, roh [0; 0; 0]
- 2. Kvádr 2 [box, id #] ✓ – 10 × 10 × 30 mm, add, roh [40; 10; 10]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ přidáno 3000 mm³ (celý nástroj) · těleso platné – 10 × 10 × 30 mm, add, roh [40; 10; 10]
 Konfigurace: Bez výstupku

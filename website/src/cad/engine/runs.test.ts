@@ -132,7 +132,7 @@ describe("opakovaný běh – nový díl \"A\" použije záložku dřívějšíh
     const r = await cliRun(ws2, Array.from({ length: 27 }, (_, i) => `nový díl D${i + 1}\nkvádr 1 1 ${i + 1}`).join("\n"), hostOf());
     expect(ws2.tabs()).toHaveLength(27);
     expect(r.docs).toHaveLength(27);
-    for (const d of r.docs) expect(docLine(d), d.name).toMatch(/^D "D\d+" part feat=1\/0\/0 V=1cm3 m=0\.008kg bbox=10x10x10$/);
+    for (const d of r.docs) expect(docLine(d), d.name).toMatch(/^D "D\d+" part feat=1\/0\/0 V=1cm3 m=0\.008kg bbox=10x10x10 solids=1 valid=1$/);
   });
 });
 
@@ -144,7 +144,7 @@ describe("protokol v prohlížeči = CLI (engine/run-protocol.ts)", () => {
     expect(() => formatRun(r, { protocol: "brief" as never })).toThrow(/neznámý protokol „brief“ – console, short, full, json/);
     const short = formatRun(r, { protocol: "short" });
     for (const l of short.split("\n")) expect(Object.values(GRAMMAR).some((re) => re.test(l)), l).toBe(true);
-    expect(short).toMatch(/^MNCAD\/1 OK lines=2 ops=2 err=0 warn=0 note=\d+ t=[\d.]+\nD "P" part feat=1\/0\/0 V=1cm3 m=0\.008kg bbox=10x10x10\nΣ docs=1 V=1cm3 m=0\.008kg files=0 t=/);
+    expect(short).toMatch(/^MNCAD\/1 OK lines=2 ops=2 err=0 warn=0 note=\d+ t=[\d.]+\nD "P" part feat=1\/0\/0 V=1cm3 m=0\.008kg bbox=10x10x10 solids=1 valid=1\nΣ docs=1 V=1cm3 m=0\.008kg files=0 t=/);
     const j = JSON.parse(formatRun(r, { protocol: "json" })) as RunReport;
     expect(j.protocol).toBe(short);
     expect(j.full).toBe(formatRun(r, { protocol: "full" }));
@@ -191,7 +191,9 @@ describe("recenze (nález 2): opakovaný běh je idempotentní i pro normálie, 
     await runScript(wj, json, hostOf());
     const rj = await runScript(wj, json, hostOf());
     expect(titles(wj)).toEqual(["Agent:part"]);
-    expect(formatConsole(rj)).toContain("✓ dokument „Agent“ (1 prvků) – nahradí záložku téhož názvu z dřívějšího běhu");
+    // vlna 22 (22i): načtení dokumentu s prvky je přijetí (→ … výsledek po výpočtu), výsledek dá ověřovací stavba
+    expect(formatConsole(rj)).toContain("→ dokument „Agent“ (1 prvků) – nahradí záložku téhož názvu z dřívějšího běhu – výsledek po výpočtu níže");
+    expect(formatConsole(rj)).toContain("✓ dokument „Agent“ postaven: prvků 1, bez ⚠ a ✗");
   });
 
   it("dokument s výchozím názvem se nikdy nepřevezme (dva různé nepojmenované JSON dokumenty = dvě záložky)", async () => {
@@ -252,7 +254,7 @@ describe("recenze (nález 6): převzetí záložky je vidět i ve stručném pro
     const withNotes = shortProtocol(rep, { notes: true }).text;
     expect(withNotes).toMatch(/\nℹ L1 doc\.reused "Deska": záložka „Deska“ z dřívějšího běhu použita znovu/);
     expect(withNotes).toMatch(/\nℹ L5 doc\.reused "S": /);
-    expect(withNotes).toMatch(/\nℹ L2 msg\.note /);
+    expect(withNotes).toMatch(/\nℹ L2 op\.accepted /); // vlna 22 (22i): přijetí příkazu má vlastní kód (dřív msg.note)
     expect(rep.entries.filter((e) => e.code === "doc.reused")).toHaveLength(3);
     // jedna převzatá záložka = obyčejný řádek s názvem dokumentu
     const one = new MemoryWorkspace();
@@ -311,7 +313,7 @@ describe("se skutečným jádrem: řádky D všech dokumentů běhu, objemy po o
 
   it("díl + sestava: řádek D dílu má feat/V/m/bbox (dřív `V=- bbox=-`)", async () => {
     const r = await cliRun(new MemoryWorkspace(), 'nový díl Deska\nkvádr 100 50 10\nnová sestava S\nvložit "Deska" v 0 0 0\n', hostOf(kernel));
-    expect(r.docs.map(docLine)).toEqual(['D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10', 'D "S" asm comp=1 parts=1 V.sum=50cm3 m=0.39kg bbox=100x50x10']);
+    expect(r.docs.map(docLine)).toEqual(['D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10 solids=1 valid=1', 'D "S" asm comp=1 parts=1 V.sum=50cm3 m=0.39kg bbox=100x50x10']);
   }, 240_000);
 
   it("3 dokumenty dvakrát (CLI --resume): stejné řádky D a objemy", async () => {
@@ -319,8 +321,8 @@ describe("se skutečným jádrem: řádky D všech dokumentů běhu, objemy po o
     const r1 = await cliRun(ws, THREE, hostOf(kernel));
     const r2 = await cliRun(loadWorkspace(ws.save()), THREE, hostOf(kernel), { resume: true });
     const lines = r1.docs.map(docLine);
-    expect(lines[0]).toBe('D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10');
-    expect(lines[1]).toMatch(/^D "Čep" part feat=1\/0\/0 V=0\.59cm3 m=0\.005kg bbox=5x5x30$/);
+    expect(lines[0]).toBe('D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10 solids=1 valid=1');
+    expect(lines[1]).toMatch(/^D "Čep" part feat=1\/0\/0 V=0\.59cm3 m=0\.005kg bbox=5x5x30 solids=1 valid=1$/);
     expect(lines[2]).toBe('D "S" asm comp=2 parts=2 V.sum=50.59cm3 m=0.4kg bbox=100x50x40');
     expect(r2.docs.map(docLine)).toEqual(r1.docs.map(docLine));
   }, 240_000);
@@ -356,7 +358,8 @@ describe("se skutečným jádrem: řádky D všech dokumentů běhu, objemy po o
     expect(codes(r, "build.failed")).toEqual([]);
     expect(r.counts.errors).toBe(0);
     expect(finalizeReport(r).protocol).toMatch(/^MNCAD\/1 OK /);
-    expect(r.docs.map(docLine)).toEqual(['D "Profil" part feat=1/0/0 V=- bbox=-', 'D "Pevný" part feat=1/0/0 V=1cm3 m=0.008kg bbox=10x10x10']);
+    // vlna 22 (úrovně stavu): díl s tělesem nese solids= valid=, díl bez tělesa ne
+    expect(r.docs.map(docLine)).toEqual(['D "Profil" part feat=1/0/0 V=- bbox=-', 'D "Pevný" part feat=1/0/0 V=1cm3 m=0.008kg bbox=10x10x10 solids=1 valid=1']);
     const main = await cliRun(new MemoryWorkspace(), 'nový díl "Profil"\nskica XY\nobdélník 40 20\n', hostOf(kernel));
     expect(codes(main, "build.failed").map((e) => e.doc)).toEqual(["Profil"]);
   }, 240_000);

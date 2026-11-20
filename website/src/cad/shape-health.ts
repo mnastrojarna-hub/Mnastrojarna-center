@@ -231,9 +231,9 @@ type Doubt = { exact: number; other: number; by: "tolerance" | "overlap" };
  * Booleovská operace, kterou lze zopakovat: druh, původní těleso, nástroje a opakování s tolerancí (mm). Pamatuje si, co
  * už se o ní zjistilo – objem průniku tělesa s nástroji a výsledek hledání náhrady – aby se nic nepočítalo dvakrát.
  */
-export type BoolOp = { kind: BoolKind; a: Shape; tools: Shape[]; redo: (fuzzy: number) => Shape; overlap?: number; fix?: Checked | Doubt | null };
+export type BoolOp = { kind: BoolKind; a: Shape; tools: Shape[]; redo: (fuzzy: number) => Shape; overlap?: number; fix?: Checked | Doubt | null; /** objem nástrojů (měří se nejvýš jednou) */ vt?: number };
 
-const toolsVolume = (op: BoolOp) => op.tools.reduce((sum, t) => sum + Math.abs(volumeOf(t)), 0);
+const toolsVolume = (op: BoolOp) => (op.vt ??= op.tools.reduce((sum, t) => sum + Math.abs(volumeOf(t)), 0));
 
 /**
  * Patří každá hrana tělesa právě dvěma stranám ploch? Operace s tolerancí umí z téměř tečných ploch udělat těleso, které se
@@ -376,9 +376,12 @@ function overlapVolume(op: BoolOp): number {
  * průnik tělesa s nástroji (zůstává přesný výsledek a prvek dostane varování); jinak `null` – platí přesný výsledek.
  */
 function repair(op: BoolOp, exact: Shape | null): Checked | Doubt | null {
+  if (detectOnly) return op.fix ?? null;
   if (op.fix === undefined) op.fix = findRepair(op, exact);
   return op.fix;
 }
+/** jen zjistit vadu účinku, náhradu operací s tolerancí nehledat (velká tělesa – `verifyEffectOnly`) */
+let detectOnly = false;
 /** `exact` = `null`: přesná operace skončila chybou jádra (zjevné selhání – náhradu stačí potvrdit shodou dvou tolerancí) */
 function findRepair(op: BoolOp, exact: Shape | null): Checked | Doubt | null {
   const va = volumeOf(op.a);
@@ -469,8 +472,34 @@ setBooleanGuard((out, given) => {
     /* kontrola je navíc – platí přesný výsledek */
   }
   last = res ? Object.assign(op, { out: res }) : null;
+  if (last) journal.push(last);
   return res;
 });
+
+// ── booleovské operace jednoho prvku (úroveň „účinek“ – feature-levels.ts) ────────────────────────────────────────────
+/** operace od posledního `beginFeatureOps()` */
+let journal: (BoolOp & { out: Shape })[] = [];
+/** začátek stavby prvku: zapomenout operace předchozího prvku */
+export function beginFeatureOps(): void {
+  journal = [];
+}
+/**
+ * Řetěz booleovských operací prvku, jehož výsledkem je `result` (poslední operace vrátila `result`, předchozí vrátila její
+ * těleso …; zkušební operace mimo řetěz se nepočítají): druh operace (`null` = řetěz míchá druhy) a součet objemů nástrojů.
+ * `null` = výsledek prvku není výsledkem booleovské operace (zaoblení, složené těleso s volnými plochami, první těleso).
+ */
+export function opChainOf(result: Shape): { kind: BoolKind | null; tool: number } | null {
+  const chain: BoolOp[] = [];
+  let cur: Shape = result;
+  for (let i = journal.length - 1; i >= 0; i--)
+    if (journal[i].out === cur) {
+      chain.push(journal[i]);
+      cur = journal[i].a;
+    }
+  if (!chain.length) return null;
+  const kind = chain.every((o) => o.kind === chain[0].kind) ? chain[0].kind : null;
+  return { kind, tool: chain.reduce((sum, o) => sum + toolsVolume(o), 0) };
+}
 
 /**
  * Zasíťuje těleso stejně jako zobrazení – kontrola platnosti pak vidí totéž co kontrola na konci stavby. Síť může výsledek
@@ -497,6 +526,8 @@ const point = (p: Vec3) => `[${p.map((v) => num(v, 3)).join("; ")}]`;
 
 /** začátek varování o neplatné geometrii – podle něj se pozná, že prvek už vadu hlásí */
 const invalidLead = () => tr("Výsledek má neplatnou geometrii");
+/** začátek varování „neplatná geometrie“ (podle něj se pozná prvek, od kterého je těleso neplatné) */
+export const invalidLeadText = invalidLead;
 
 /** Které plochy a hrany kontrola jádra označila (nejvýš `max` od každého druhu, číslované jako ve výběru F1 / E1). */
 function badParts(shape: Shape, max = 4): string[] {
@@ -560,6 +591,8 @@ function displayCheck(s: Shape): ShapeCheck {
 
 export type Verified = Checked & {
   warning?: string;
+  /** změna objemu podle přesného průniku tělesa s nástroji (mm³, se znaménkem) – jen když se průnik počítal */
+  expected?: number;
   /** varování „objem se nezměnil“ (ne neplatná geometrie) */
   noEffect?: boolean;
   /** těleso je po prvku neplatné */
@@ -696,27 +729,62 @@ export function verifyResult(input: Shape, f: Pick<Feature, "name" | "type">, vo
     boolStats.repaired++;
     return { shape, check }; // náhradní výsledek už prošel i kontrolou objemu
   }
+  return verifyEffect(op, shape, check, volumes);
+}
+
+/** změna objemu podle průniku tělesa s nástroji, pokud se u operace počítal (se znaménkem: odebrání záporně) */
+function expectedOf(op: BoolOp | null): number | undefined {
+  if (!op || op.kind === "Common" || op.overlap === undefined || !Number.isFinite(op.overlap)) return undefined;
+  return op.kind === "Cut" ? -op.overlap : toolsVolume(op) - op.overlap;
+}
+
+/**
+ * Účinek poslední booleovské operace prvku proti nástroji (příznaky c a d v záhlaví): běžná změna objemu projde bez dalšího
+ * počítání; žádná / podezřele malá (pod tisícinu nástroje) / větší než nástroj se ověří přesným průnikem tělesa s nástroji.
+ */
+function verifyEffect(op: BoolOp | null, shape: Shape, check: ShapeCheck, volumes?: [before: number, after: number]): Verified {
   const doubt = op?.fix && !("shape" in op.fix) ? op.fix : null;
   const kept: Verified = doubt ? { shape, check, warning: doubtMessage(doubt) } : { shape, check };
   if (!op || op.kind === "Common" || !volumes || !Number.isFinite(volumes[0]) || !Number.isFinite(volumes[1])) return kept;
   const sign = op.kind === "Cut" ? -1 : 1;
   const d0 = (volumes[1] - volumes[0]) * sign;
-  // běžný prvek (operace bez příznaku vady, změna objemu zřetelná a nejvýš polovina tělesa): objem nástrojů, u šroubových
-  // ploch drahý, se nepočítá
+  // běžný prvek (operace bez příznaku vady, změna objemu zřetelná a nejvýš polovina tělesa): je-li objem nástrojů už změřený
+  // (úroveň „účinek“), stačí porovnat – jinak se objem nástrojů, u šroubových ploch drahý, nepočítá
   const size = Math.max(1, Math.abs(volumes[0]));
-  if (doubt || (op.fix === undefined && d0 > 1e-6 * size && d0 <= 0.5 * size)) return kept;
+  if (doubt) return kept;
+  if (op.fix === undefined && d0 > 1e-6 * size && d0 <= 0.5 * size && (op.vt === undefined || (d0 > NO_EFFECT * op.vt && d0 <= op.vt + boundsSlack(volumes[0], op.vt)))) return kept;
   const vt = toolsVolume(op);
   if (!(vt > 0) || (d0 >= 0 && d0 <= vt && d0 > NO_EFFECT * vt)) return kept;
   // podezřelá změna objemu za celý prvek; prvek z více operací se posoudí podle tělesa, do kterého šla poslední z nich
   const va = volumeOf(op.a);
   if (!Number.isFinite(va)) return kept;
   const found = checkEffect(op, shape, (volumes[1] - va) * sign, vt, va);
-  if (!found) return kept;
+  const expected = expectedOf(op);
+  if (!found) return expected === undefined ? kept : { ...kept, expected };
   if ("shape" in found) {
     boolStats.repaired++;
     return found;
   }
-  return { shape, check, ...found };
+  return { shape, check, ...found, ...(expected === undefined ? {} : { expected }) };
+}
+
+/**
+ * Kontrola účinku booleovské operace BEZ kontroly platnosti – tělesa nad limit ploch kontroly po prvku (platnost se ověří až
+ * na konci stavby). Stejná pravidla jako u menších těles; náhrada operací s tolerancí se u velkých těles nehledá (jen ⚠).
+ */
+export function verifyEffectOnly(input: Shape, volumes?: [before: number, after: number], since?: string): Pick<Verified, "warning" | "noEffect" | "expected"> {
+  const op = last && last.out === input && !since ? last : null;
+  last = null;
+  if (!op) return {};
+  detectOnly = true;
+  try {
+    const v = verifyEffect(op, input, { valid: true, solids: 1, shells: 1, faces: 0 }, volumes);
+    return { ...(v.warning ? { warning: v.warning } : {}), ...(v.noEffect ? { noEffect: true } : {}), ...(v.expected !== undefined ? { expected: v.expected } : {}) };
+  } catch {
+    return {}; // kontrola je navíc – platí výsledek operace
+  } finally {
+    detectOnly = false;
+  }
 }
 
 /** platnost tělesa tak, jak ji vidí kontrola na konci stavby (se sítí) */

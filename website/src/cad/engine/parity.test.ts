@@ -20,6 +20,7 @@ import { setHostAssets } from "../host-assets";
 import { makeKernelClient } from "../kernel-client";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "./host";
 import { MemoryWorkspace } from "./memory-workspace";
+import { greenThenRed } from "./accept";
 import { formatConsole } from "./protocol";
 import { runScript } from "./run";
 
@@ -50,6 +51,12 @@ const APP_ONLY: Record<string, number> = {
   "32-ui-view-api": 8,
 };
 
+/**
+ * Řádky skriptů korpusu, které dnes smějí mít ✓ i ✗ – dva nezávislé výsledky jednoho příkazu, ne přijetí a pak selhání
+ * (každá výjimka je vyjmenovaná, aby nová nepřibyla bez povšimnutí).
+ */
+const RED_GREEN: Record<string, number[]> = {};
+
 describe("parita enginu v Node (korpus vs. zlaté snímky z prohlížeče)", async () => {
   setLang("cs");
   setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.join(FONTS, name))).buffer });
@@ -64,7 +71,12 @@ describe("parita enginu v Node (korpus vs. zlaté snímky z prohlížeče)", asy
       const ws = new MemoryWorkspace();
       const host: EngineHost = { kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() };
       const outs: string[] = [];
-      for (const text of sc.runs) outs.push(formatConsole(await runScript(ws, text, host)));
+      for (const text of sc.runs) {
+        const r = await runScript(ws, text, host);
+        // vlna 22 (22i): žádný řádek žádného skriptu korpusu nemá ✓ a zároveň ✗ (přijetí příkazu je ℹ, výsledek až po výpočtu)
+        expect(greenThenRed(r.entries), `${sc.name}: řádky s ✓ i ✗`).toEqual(RED_GREEN[sc.name] ?? []);
+        outs.push(formatConsole(r));
+      }
       const norm = P.normalize(P.joinRuns(outs));
       if (out) fs.writeFileSync(path.join(out, `${sc.name}.node.txt`), norm + "\n");
       const golden = P.readGolden(sc.name);

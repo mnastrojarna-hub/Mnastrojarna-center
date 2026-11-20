@@ -1,0 +1,54 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4 – výsledek po vyhodnocení listu níže
+→ výkres: řez XZ odsazení 500 (rovina Y = -500) – výsledek po vyhodnocení listu níže
+✗ řádek 6: rovina řezu neprotíná těleso: List 1 – rovina řezu Y = -500 leží mimo těleso (Y 0…40) – odsazení 500 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než -40 a menší než 0 (krajní hodnoty leží na ploše tělesa), např. -20
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+→ výkres: řez XZ odsazení -20 (rovina Y = 20) – výsledek po vyhodnocení listu níže
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
+=== run 3 ===
+→ výkres: řez XZ odsazení 500 (rovina Y = -500) – výsledek po vyhodnocení listu níže
+Výkres „List 1“: list A4 na šířku · měřítko 1:1 · pohledy: přední, horní, levý, izometrie · kóty: Chytré kóty (řetězově)
+Listy (1): 1 „List 1“ A4 (aktivní)
+Volby: řez XZ odsazení 500 (rovina Y = -500) celý
+Kóty a popisy (3, z toho vygenerovaných 3):
+  přední: 60 · 10
+  horní: 40
+Id (výkres upravit / smazat / značka na <id>): a1 60 (přední) · a2 40 (horní) · a3 10 (přední)
+Duplicity: žádné
+Kontrola kót: všech 3 očekávaných rozměrů je na listu
+U razítka: nepředepsané tolerance — · hrany — · poznámka —
+Razítko: název Deska A · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
+  přední (x = X, y = Z): x 0…60, y 0…10 mm · 1:1 · na listu x 44…104, y 166…176
+  horní (x = X, y = Y): x 0…60, y 0…40 mm · 1:1 · na listu x 44…104, y 92…132
+  levý (x = −Y, y = Z): x −40…0, y 0…10 mm · 1:1 · na listu x 138…178, y 166…176
+Varování výkresu: Rovina řezu neprotíná těleso – upravte odsazení.
+✗ rovina řezu Y = -500 leží mimo těleso (Y 0…40) – odsazení 500 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než -40 a menší než 0 (krajní hodnoty leží na ploše tělesa), např. -20
+✗ řádek 2: rovina řezu neprotíná těleso: List 1 – rovina řezu Y = -500 leží mimo těleso (Y 0…40) – odsazení 500 se měří podél normály roviny XZ jako u skici; řez protne těleso pro odsazení větší než -40 a menší než 0 (krajní hodnoty leží na ploše tělesa), např. -20
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]

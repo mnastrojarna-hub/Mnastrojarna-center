@@ -4,15 +4,15 @@
 → Díra 1 (hole) přidán – výsledek po výpočtu níže
 ✓ nový díl „Kolík“ – nová záložka
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Válec 1 (cylinder)
+✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 636,2 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 1005,3 mm³ · těleso platné
 
 Dokument: „Kolík“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 8 × 8 × 20 mm (X -4…4, Y -4…4, Z 0…20) · objem 1,01 cm³ · ploch 3 · hran 3
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø8 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 1005,3 mm³ · těleso platné – Ø8 × 20 mm, new, podstava [0; 0; 0], osa Z
 === run 2 ===
 ✓ nová sestava „Spoj“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)

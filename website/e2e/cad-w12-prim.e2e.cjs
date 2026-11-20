@@ -77,7 +77,7 @@ const BASE = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, ''
   log = await run('nový díl W12 odkazy\nkvádr 40 60 20\nprvek datum origin=50;0;0 normal=1;0;0 xDir=0;1;0 size=50 název="Rovina Z"\nzrcadlit rovina "Rovina Z"');
   await idle();
   ok(!/(^|\n)✗/.test(log) && near(await vol(), 2 * 40 * 60 * 20 / 1000), 'zrcadlit rovina "Rovina Z" → objem 2×');
-  ok(/Zrcadlení 1 \[mirror, id \w+\] ✓ – pomocná rovina „Rovina Z“/.test(log), 'stav zrcadlení ukáže pomocnou rovinu názvem');
+  ok(/Zrcadlení 1 \[mirror, id \w+\] ✓ [^–\n]*– pomocná rovina „Rovina Z“/.test(log), 'stav zrcadlení ukáže pomocnou rovinu názvem');
   log = await run('srazit 2 úhel 45 plocha F6\nzaoblit 1 hrany E1');
   await idle();
   const fs = (await doc()).features;

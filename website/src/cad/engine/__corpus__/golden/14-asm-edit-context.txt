@@ -1,13 +1,13 @@
 === run 1 ===
 ✓ nový díl „Deska“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 25000 mm³ · těleso platné
 
 Dokument: „Deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 50 × 50 × 10 mm (X 0…50, Y 0…50, Z 0…10) · objem 25 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 50 × 50 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 25000 mm³ · těleso platné – 50 × 50 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Kontext“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)
@@ -21,7 +21,7 @@ Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovní
 ✓ „Deska“ vrácen do sestavy „Kontext“ (změnu převzalo komponent: 1) · objem dílu 24 cm³
 Sestava „Kontext“: komponent 1 · vazby 0
  #1 Deska · díl · poloha [0; 0; 0] · ukotvená ⚓
-✓ Kvádr 2 (box)
+✓ Kvádr 2 (box) · úběr 1000 mm³ (celý nástroj) · těleso platné
 
 Dokument: „Kontext“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓
@@ -34,12 +34,12 @@ Dokument: „Deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓
 Rozměry: 50 × 50 × 10 mm (X 0…50, Y 0…50, Z 0…10) · objem 24 cm³ · ploch 10 · hran 24
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 50 × 50 × 10 mm, new, roh [0; 0; 0]
- 2. Kvádr 2 [box, id #] ✓ – 10 × 10 × 10 mm, cut, roh [20; 20; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 25000 mm³ · těleso platné – 50 × 50 × 10 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ úběr 1000 mm³ (celý nástroj) · těleso platné – 10 × 10 × 10 mm, cut, roh [20; 20; 0]
 === run 5 ===
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
 ✓ „Deska“ vrácen do sestavy „Kontext“ (změnu převzalo komponent: 1) · objem dílu 24,14 cm³
-✓ Válec 1 (cylinder)
+✓ Válec 1 (cylinder) · přidáno 141,4 mm³ (celý nástroj) · těleso platné
 
 Dokument: „Kontext“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓

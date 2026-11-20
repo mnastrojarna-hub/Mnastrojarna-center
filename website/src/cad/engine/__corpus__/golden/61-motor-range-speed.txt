@@ -3,14 +3,14 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Deska A“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 100000 mm³ · těleso platné
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 100 × 100 × 10 mm (X 0…100, Y 0…100, Z 0…10) · objem 100 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 2 [box, id #] ✓ – 100 × 100 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 2 [box, id #] ✓ přidáno 100000 mm³ · těleso platné – 100 × 100 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Mechanika“ – nová záložka
 ✓ komponenta „Rám“ vložena do sestavy (ukotvená)

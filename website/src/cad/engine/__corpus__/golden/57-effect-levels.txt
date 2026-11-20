@@ -1,0 +1,55 @@
+=== run 1 ===
+✓ nový díl „Deska M“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Zaoblení 1 (fillet) – 9 hran podle pravidla „svisle“ – výsledek po výpočtu níže
+Dokument: „Deska M“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (4 ✓, 1 ⚠, 0 ✗)
+Rozměry: 100 × 50 × 10 mm (X 0…100, Y 0…50, Z 0…10) · objem 47,48 cm³ · ploch 20 · hran 51
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 50000 mm³ · těleso platné – 100 × 50 × 10 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ⚠ Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry. – 20 × 20 × 5 mm, cut, roh [40; 15; 10]
+ 3. Kvádr 3 [box, id #] ✓ úběr 2000 mm³ (celý nástroj) · těleso platné – 20 × 20 × 5 mm, cut, roh [60; 15; 5]
+ 4. Díra 1 [hole, id #] ✓ úběr 502,7 mm³ (3 % nástroje) · těleso platné – Ø8 skrz v [20; 25; 10], osa Z
+ 5. Zaoblení 1 [fillet, id #] ✓ úběr 17,17 mm³ · těleso platné – R2, hrany 9
+✓ nový díl „Deska E“ – nová záložka
+→ Trubka 1 (tube) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+Dokument: „Deska E“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 30 × 30 × 20 mm (X -15…15, Y -15…15, Z 0…20) · objem 9,56 cm³ · ploch 21 · hran 54
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Trubka 1 [tube, id #] ✓ přidáno 9912,4 mm³ · těleso platné – Ø30/Ø16,4 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 2. Tažení po šroubovici [ext, id #] ✓ úběr 352,1 mm³ (>99 % nástroje) · těleso platné – 
+✓ nový díl „Deska G“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+Dokument: „Deska G“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ⚠, 0 ✗)
+Rozměry: 18 × 18 × 20 mm (X -9…9, Y -9…9, Z 0…20) · objem 5,09 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 5089,4 mm³ · těleso platné – Ø18 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 2. Tažení po šroubovici [ext, id #] ⚠ Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry. – 
+✓ nový díl „Deska H“ – nová záložka
+→ Trubka 2 (tube) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 50000 mm³ · těleso platné
+⚠ Kvádr 2 (box): Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.
+✓ Kvádr 3 (box) · úběr 2000 mm³ (celý nástroj) · těleso platné
+✓ Díra 1 (hole) · úběr 502,7 mm³ (3 % nástroje) · těleso platné
+✓ Zaoblení 1 (fillet) · úběr 17,17 mm³ · těleso platné
+✓ Trubka 1 (tube) · přidáno 9912,4 mm³ · těleso platné
+✓ Tažení po šroubovici (ext) · úběr 352,1 mm³ (>99 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 5089,4 mm³ · těleso platné
+⚠ Tažení po šroubovici (ext): Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.
+✓ Trubka 2 (tube) · přidáno 9912,4 mm³ · těleso platné
+✓ Tažení po šroubovici (ext) · úběr 350,8 mm³ (>99 % nástroje) · těleso platné
+
+Dokument: „Deska H“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 30 × 30 × 20 mm (X -15…15, Y -15…15, Z 0…20) · objem 9,56 cm³ · ploch 9 · hran 17
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Trubka 2 [tube, id #] ✓ přidáno 9912,4 mm³ · těleso platné – Ø30/Ø16,4 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 2. Tažení po šroubovici [ext, id #] ✓ úběr 350,8 mm³ (>99 % nástroje) · těleso platné –

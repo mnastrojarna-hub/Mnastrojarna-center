@@ -4,14 +4,14 @@
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
 → Koutový svar 1 (weld.bead) – 6 hran podle pravidla „svisle“ – výsledek po výpočtu níže
 ✗ řádek 6: neznámý typ prvku „neznámý-typ“ – typy: sketch, extrude, revolve, box, cylinder, sphere, cone, tube, hole, fillet, chamfer, shell, pattern, mirror, import, sweep, loft, draft, split, transform, datum, text, pushPull, deleteFace, offsetFace, rib, spring, thicken, thread, ext, combine, splitBodies, copyBody, datumAxis, datumPoint, csys; rozšíření: surf.extrude, surf.revolve, surf.planar, surf.sweep, surf.loft, surf.offset, surf.extend, surf.trimPlane, surf.trimSketch, surf.sew, surf.close, surf.thicken, surf.split, surf.replaceFace, surf.patch, surf.section, surf.project, surf.helix, surf.helixSweep, surf.fill, surf.blend, surf.extendEdge, surf.cv, surf.analysis, sheet.params, sheet.base, sheet.flange, sheet.hem, sheet.bend, sheet.cut, sheet.relief, sheet.rib, sheet.unfold, sheet.dxf, sheet.svg, sheet.table, adv.varFillet, adv.fullRound, adv.chainFillet, adv.chamfer2, adv.mirrorFeatures, adv.curvePattern, adv.fillPattern, adv.twist, adv.dome, adv.textOnCyl, adv.partingDraft, adv.lipGroove, adv.scaleAbout, adv.holesAtPoints, adv.combineTool, adv.check, adv.simplify, adv.wallThickness, weld.member, weld.frame, weld.plate, weld.trim, weld.endCap, weld.gusset, weld.bead, weld.groove, weld.plug, weld.spot, weld.symbol, weld.cutList, weld.weldTable, sheet.louvre, sheet.dimple, sheet.bead, sheet.lance, sheet.bridge, sheet.collar, sheet.cardguide, sheet.crossbreak, spring.compression, spring.extension, spring.torsion, spring.disc, spring.table ← „prvek neznámý-typ a=1“
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
+✓ Kvádr 1 (box) · přidáno 50000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 30000 mm³ (celý nástroj) · těleso platné
 ✗ Koutový svar 1 (ext): Hrana není vnitřní (konkávní) a nedotýká se jiného dílu – housenka se dělá do koutu mezi dvěma plochami nebo dvěma díly.
 
 Dokument: „Svarek“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ✗)
 Rozměry: 100 × 70 × 50 mm (X 0…100, Y 0…70, Z 0…50) · objem 80 cm³ · ploch 8 · hran 18
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 100 × 10 × 50 mm, new, roh [0; 0; 0]
- 2. Kvádr 2 [box, id #] ✓ – 10 × 60 × 50 mm, add, roh [0; 10; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 50000 mm³ · těleso platné – 100 × 10 × 50 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ přidáno 30000 mm³ (celý nástroj) · těleso platné – 10 × 60 × 50 mm, add, roh [0; 10; 0]
  3. Koutový svar 1 [ext, id #] ✗ Hrana není vnitřní (konkávní) a nedotýká se jiného dílu – housenka se dělá do koutu mezi dvěma plochami nebo dvěma díly. – koutový a4 · E1;E3;E10;E11;E14;E15 · těleso

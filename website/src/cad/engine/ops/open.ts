@@ -3,6 +3,7 @@ import { tr } from "../../i18n";
 import { readDocument } from "../open-file";
 import { flush, runOf } from "../run-doc";
 import { startRunDoc } from "../runs";
+import { acceptLine, loadsModel } from "../accept";
 import { say, type OpHandler } from "./util";
 
 export const openOp: OpHandler<"open"> = async (op, ctx) => {
@@ -11,7 +12,9 @@ export const openOp: OpHandler<"open"> = async (op, ctx) => {
   runOf(ctx).currentBody = null;
   // opakovaný běh: záložka téhož dokumentu otevřeného dřívějším během (ne `nový díl` téhož názvu – engine/runs.ts)
   const st = await startRunDoc(ctx, res.doc, { origin: "open" });
-  say(ctx, st.reused ? tr("✓ otevřeno „{0}“ – dokument „{1}“ ve znovu použité záložce z dřívějšího běhu", res.file, res.doc.name) : tr("✓ otevřeno „{0}“ – dokument „{1}“ v nové záložce", res.file, res.doc.name));
+  const text = st.reused ? tr("✓ otevřeno „{0}“ – dokument „{1}“ ve znovu použité záložce z dřívějšího běhu", res.file, res.doc.name) : tr("✓ otevřeno „{0}“ – dokument „{1}“ v nové záložce", res.file, res.doc.name);
+  // dokument s prvky se teprve postaví: otevření je přijetí (ℹ), výsledek dá ověřovací stavba na tomto řádku (22i)
+  say(ctx, loadsModel(res.doc) ? acceptLine(text) : text);
   if (res.note) say(ctx, `  ${res.note}`);
   st.report();
 };

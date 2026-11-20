@@ -90,7 +90,7 @@ stav`);
 
   // ── JSON dokument + anglické příkazy + palette ──
   log = await run(JSON.stringify({ app: 'mnastrojarna-cad', version: 2, name: 'Z JSON', material: 'hlinik', features: [{ type: 'sketch', plane: { kind: 'base', name: 'XY', offset: 0 }, entities: [{ type: 'rect', cx: 25, cy: 15, w: 50, h: 30, r: 0, angle: 0 }] }, { type: 'extrude', sketchId: '$last', distance: 10, symmetric: false, reverse: false, mode: 'new' }, { type: 'fillet', radius: 2 }] }));
-  ok(/✓ dokument „Z JSON“ \(3 prvků\)/.test(log) && /Rozměry: 50 × 30 × 10 mm/.test(log), 'JSON dokument: otevřen v nové záložce, \\$last a výchozí pole doplněny');
+  ok(/→ dokument „Z JSON“ \(3 prvků\)/.test(log) && /Rozměry: 50 × 30 × 10 mm/.test(log), 'JSON dokument: otevřen v nové záložce, \\$last a výchozí pole doplněny');
   log = await run(`cylinder 12 30 axis Z at 25 15 0 cut
 status`);
   ok(/✓ Válec 1 \(cylinder\)/.test(log) && /Z -?0…10/.test(log) && /objem 1[0-4],\d+ cm³/.test(log), 'anglický příkaz cut: válec odečten od desky (objem klesl pod 15 cm³)' + '\n' + (log.match(/Rozměry[^\n]*/) || [''])[0]);
@@ -115,7 +115,7 @@ status`);
   ok(/✓ Kostka \(box\)/.test(api.log) && /✓ Zaoblení \d+ \(fillet\)/.test(api.log), 'window.mncad.run provede příkazy a vrátí protokol');
   ok(api.n >= 2 && /Prvky:/.test(api.st) && /Geometrie: platná/.test(api.st), 'window.mncad.getDocument / status (včetně řádku Geometrie)');
   const setLog = await p.evaluate(() => window.mncad.setDocument({ app: 'mnastrojarna-cad', version: 2, name: 'API díl', material: 'ocel', features: [{ type: 'sphere', radius: 10 }] }));
-  ok(/✓ dokument „API díl“/.test(setLog) && /Rozměry: 20 × 20 × 20 mm/.test(setLog), 'window.mncad.setDocument otevře dokument z objektu');
+  ok(/→ dokument „API díl“/.test(setLog) && /Rozměry: 20 × 20 × 20 mm/.test(setLog), 'window.mncad.setDocument otevře dokument z objektu');
 
   // ── paleta: platný příkaz nabídne Provést ──
   await p.keyboard.press('Control+K'); await p.waitForTimeout(400);

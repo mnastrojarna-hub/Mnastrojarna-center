@@ -3,14 +3,14 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Přidržovač“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 1000 mm³ · těleso platné
 
 Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 10 × 10 × 10 mm (X 0…10, Y 0…10, Z 0…10) · objem 1 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 2 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 2 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Sestava A“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)

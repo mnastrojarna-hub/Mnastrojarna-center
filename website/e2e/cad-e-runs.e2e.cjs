@@ -68,7 +68,7 @@ const start = async (p, url) => {
   const t1 = await tabs();
   ok(JSON.stringify(t1) === JSON.stringify(['Deska:part', 'Čep:part', 'S:assembly']), `1: první běh → ${t1.join(', ')}`);
   const d1 = dLines(f1);
-  ok(d1.length === 3 && d1[0] === 'D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10' && /^D "Čep" part feat=1\/0\/0 V=0\.59cm3 /.test(d1[1]) && /^D "S" asm comp=2 parts=2 V\.sum=50\.59cm3 /.test(d1[2]), `2: řádek D každého dokumentu s čísly (${d1.join(' | ')})`);
+  ok(d1.length === 3 && d1[0] === 'D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10 solids=1 valid=1' && /^D "Čep" part feat=1\/0\/0 V=0\.59cm3 /.test(d1[1]) && /^D "S" asm comp=2 parts=2 V\.sum=50\.59cm3 /.test(d1[2]), `2: řádek D každého dokumentu s čísly (${d1.join(' | ')})`);
   const f2 = await run(THREE, { protocol: 'full' });
   const t2 = await tabs();
   ok(JSON.stringify(t2) === JSON.stringify(t1), `1: druhý běh → stejné záložky (${t2.join(', ')})`);

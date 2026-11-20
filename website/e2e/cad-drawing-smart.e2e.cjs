@@ -61,8 +61,8 @@ const example = (guide, title) => {
   const log = await run(A);
   fs.writeFileSync(S + 'smart-shaft-log.txt', log);
   ok(!/^✗/m.test(log), 'příklad A proběhl bez chyb' + (/^✗.*$/m.exec(log)?.[0] ? ' – ' + /^✗.*$/m.exec(log)[0] : ''));
-  ok(/✓ výkres: A3, na šířku, pohledy přední, levý, iso/.test(log), 'výkres A3 na šířku s pohledy přední, levý, iso');
-  ok(/✓ Chytré kóty \(řetězově\): 14 kót a popisů – přední 14/.test(log), 'kótovat: 14 kót v předním pohledu');
+  ok(/→ výkres: A3, na šířku, pohledy přední, levý, iso/.test(log), 'výkres A3 na šířku s pohledy přední, levý, iso');
+  ok(/→ Chytré kóty \(řetězově\): 14 kót a popisů – přední 14/.test(log), 'kótovat: 14 kót v předním pohledu');
   ok(/Duplicity: žádné/.test(log), 'výkres stav: žádné duplicity');
   ok(/Kontrola kót: všech \d+ očekávaných rozměrů je na listu/.test(log), 'výkres stav: Kontrola kót bez chybějících rozměrů');
   const want = ['M20×1,5', 'Ø30h6', 'Ø40', 'Ø25', 'Ø17', '30', '3', '(50)', '15', '42', '140', '25', '1,5×45°', '2× R1'];

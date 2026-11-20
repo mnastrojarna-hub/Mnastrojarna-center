@@ -1,23 +1,23 @@
 === run 1 ===
 ✓ nový díl „A“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
 
 Dokument: „A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 10 × 10 × 10 mm (X 0…10, Y 0…10, Z 0…10) · objem 1 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Válec 1 (cylinder)
+✓ Válec 1 (cylinder) · přidáno 540 mm³ (92 % nástroje) · těleso platné
 
 Dokument: „A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 12,5 × 12,5 × 30 mm (X -2,5…10, Y -2,5…10, Z 0…30) · objem 1,54 cm³ · ploch 8 · hran 17
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
- 2. Válec 1 [cylinder, id #] ✓ – Ø5 × 30 mm, add, podstava [0; 0; 0], osa Z
+ 1. Kvádr 1 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+ 2. Válec 1 [cylinder, id #] ✓ přidáno 540 mm³ (92 % nástroje) · těleso platné – Ø5 × 30 mm, add, podstava [0; 0; 0], osa Z
 === run 3 ===
 ✓ nová sestava „S“ – nová záložka
 ✓ komponenta „A“ vložena do sestavy

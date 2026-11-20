@@ -1310,7 +1310,7 @@ Stručný protokol MNCAD/1 má pevnou stavbu, stejnou v češtině, angličtině
 | --- | --- |
 | MNCAD/1 OK lines=0 ops=0 err=0 warn=0 note=0 t=2.6 | hlavička: výsledek OK / FAIL / STOP, počet řádků skriptu, operací, chyb, varování a čas v sekundách |
 | ✗ L2 parse.error chyba zápisu: … | chyba (⚠ = varování) s číslem řádku skriptu a kódem hlášky; L- = bez řádku |
-| D "Deska 1" part feat=2/0/0 V=49.5cm3 m=0.389kg bbox=100x50x10 | dokument: díl / sestava / 2D výkres, prvky v pořádku / s varováním / s chybou, objem, hmotnost a obálka |
+| D "Deska 1" part feat=2/0/0 V=49.5cm3 m=0.389kg bbox=100x50x10 solids=1 valid=1 | dokument: díl / sestava / 2D výkres, prvky v pořádku / s varováním / s chybou, objem, hmotnost a obálka; u dílu počet objemových těles a výsledek kontroly platnosti (valid=1, 0, nebo unchecked = kontrola neproběhla; pak i unchecked=N prvků, které se mezi prvky v pořádku nepočítají), free=N = plochy mimo tělesa, off=N = potlačené prvky (nestavěly se, nejsou mezi prvky v pořádku) |
 | F step "Deska 1.step" 20233B | zapsaný soubor s formátem a velikostí |
 | O https://… exp=2026-11-24 mode=self | sdílený odkaz s datem konce platnosti |
 | Σ docs=1 V=49.5cm3 m=0.389kg files=5 t=2.6 mem=383MB | součet: dokumenty, soubory, čas a paměť |
@@ -1518,7 +1518,7 @@ Nabídka Materiál určuje třídu (hustotu) pro hmotnost. Pod ní je pole „Oz
 
 **Prvek je zelený, ale model se nezměnil / STEP se nedá uložit. Proč?**
 
-To už nenastává: po každém prvku program porovná objem a topologii tělesa a zkontroluje platnost geometrie (BRepCheck). Prvek, který těleso nezměnil (nástroj mimo těleso), nebo jehož výsledek má sebeprotínající plochy, dostane oranžové ⚠ s vysvětlením v historii, ve formuláři i ve stavovém řádku; operace, kterou jádro neprovede (např. skořepina přes zaoblené plochy), skončí červeně a těleso zůstane. Varování o neplatné geometrii stojí u prvního prvku, který ji způsobil, a jmenuje vadnou hranu nebo plochu; prvky za ním odkazují na něj („Těleso je neplatné už od prvku …“). Stav dokumentu (konzole „stav“) má řádek Geometrie: platná / neplatná / bez objemového tělesa.
+Stav prvku má oddělené úrovně: přijetí příkazu (šedé → „… – výsledek po výpočtu níže“, to ještě není výsledek), vznik prvku, účinek operace proti nástroji (např. „úběr 352,1 mm³ (>99 % nástroje)“) a konečné těleso („těleso platné“ / „těleso nezkontrolováno (důvod)“). Úprava, smazání nebo změna proměnné je nejdřív jen přijatá; ✓ / ⚠ / ✗ přijde po přepočtu na řádku té úpravy a řádek s chybou nikdy nemá zároveň ✓. Velké těleso, jehož platnost se nekontrolovala, není zelené – ve stromu prvků má šedý otazník a v protokolu ℹ. Načtený dokument (soubor, JSON) je také nejdřív jen přijatý; „dokument … postaven: prvků N, bez ⚠ a ✗“ se vypíše až po ověřovací stavbě. Po každém prvku program porovná objem a topologii tělesa a zkontroluje platnost geometrie (BRepCheck); prvek, který má dát objemové těleso a dá jen plochu nebo plášť, skončí červeně. Prvek, který těleso nezměnil (nástroj mimo těleso), nebo jehož výsledek má sebeprotínající plochy, dostane oranžové ⚠ s vysvětlením v historii, ve formuláři i ve stavovém řádku; operace, kterou jádro neprovede (např. skořepina přes zaoblené plochy), skončí červeně a těleso zůstane. Varování o neplatné geometrii stojí u prvního prvku, který ji způsobil, a jmenuje vadnou hranu nebo plochu; prvky za ním odkazují na něj („Těleso je neplatné už od prvku …“). Stav dokumentu (konzole „stav“) má řádek Geometrie: platná / neplatná / bez objemového tělesa.
 
 **Jak udělám jemný závit M18×1,5 nebo závit v díře?**
 

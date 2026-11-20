@@ -19,6 +19,7 @@ import { drawExtras } from "../asm-status";
 import { runOf } from "../run-doc";
 import { drawingKv } from "../kv";
 import { drawingMemo, sheetIssue, sheetIssueText, sheetLabel } from "../sheet-eval";
+import { acceptLine, noteLine, sheetTail } from "../accept";
 import { asmHooks, coded, sayKv, type OpHandler } from "./util";
 
 export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
@@ -34,8 +35,14 @@ export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const issues = res.issues ?? [];
   // řádky hlášení (✗ / ⚠ výpočtu listu, ⚠ kontroly tolerancí po rozměrech) – v konzoli je nahradí řádek s kódem níže / na konci bloku
   const issueLines = new Set(issues.map(issueLine));
-  sayKv(ctx, drawingKv(r.doc, activeSheetIndex(r.doc)), ...res.log.filter((l) => !l.startsWith("! ") && !issueLines.has(l.trimStart())));
   const observe = op.cmd.k === "status" || op.cmd.k === "export";
+  // 22i: příkaz, který list mění, je jen přijatý (ℹ „… – výsledek po vyhodnocení listu níže“) – ✓ listu nebo jeho ✗/⚠ přijde
+  // po vyhodnocení (engine/drawing-track.ts). Pozorování (stav, export, kontrola tolerancí) hlásí výsledek hned; má-li na
+  // témže řádku ✗ (řez mimo těleso), jeho ✓ se nepíše.
+  const checks = observe || op.cmd.k === "tolcheck";
+  const failsNow = observe && issues.some((x) => !deferredIssue(x) && x.kind === "section-miss");
+  const shown = res.log.filter((l) => !l.startsWith("! ") && !issueLines.has(l.trimStart()));
+  sayKv(ctx, drawingKv(r.doc, activeSheetIndex(r.doc)), ...(checks ? (failsNow ? shown.map(noteLine) : shown) : shown.map((l) => (res.changed ? acceptLine(l, sheetTail()) : noteLine(l)))));
   for (const x of issues) {
     if (deferredIssue(x)) {
       (r.drawIssues ??= []).push({ line: ctx.line, issue: x });

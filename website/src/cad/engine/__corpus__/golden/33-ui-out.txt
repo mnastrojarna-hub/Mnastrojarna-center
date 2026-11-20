@@ -1,13 +1,13 @@
 === run 1 ===
 ✓ nový díl „Výstupy“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 6000 mm³ · těleso platné
 
 Dokument: „Výstupy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 20 × 10 mm (X 0…30, Y 0…20, Z 0…10) · objem 6 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 20 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 6000 mm³ · těleso platné – 30 × 20 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ uloženo: Vystupy.mncad · 299 B · projekt Mnástrojárna CAD (.mncad) – staženo (bez dialogu)
   ✓ kontrola: projekt jde znovu otevřít – „Výstupy“, 1 prvků
@@ -18,4 +18,4 @@ Dokument: „Výstupy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 
 Rozměry: 30 × 20 × 10 mm (X 0…30, Y 0…20, Z 0…10) · objem 6 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 20 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 6000 mm³ · těleso platné – 30 × 20 × 10 mm, new, roh [0; 0; 0]

@@ -1,13 +1,13 @@
 === run 1 ===
 ✓ nový díl „Kus“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 15625 mm³ · těleso platné
 
 Dokument: „Kus“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 25 × 25 × 25 mm (X 0…25, Y 0…25, Z 0…25) · objem 15,62 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 25 × 25 × 25 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 15625 mm³ · těleso platné – 25 × 25 × 25 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Dvojice“ – nová záložka
 ✓ komponenta „Kus“ vložena do sestavy (ukotvená)
@@ -26,11 +26,11 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 === run 4 ===
 ✓ záložka „Kus“ (díl) je aktivní – další příkazy pracují s ní
 → Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
-✓ Zaoblení 1 (fillet)
+✓ Zaoblení 1 (fillet) · úběr 246,8 mm³ · těleso platné
 
 Dokument: „Kus“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 25 × 25 × 25 mm (X 0…25, Y 0…25, Z 0…25) · objem 15,38 cm³ · ploch 26 · hran 56
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 25 × 25 × 25 mm, new, roh [0; 0; 0]
- 2. Zaoblení 1 [fillet, id #] ✓ – R2, hrany vše
+ 1. Kvádr 1 [box, id #] ✓ přidáno 15625 mm³ · těleso platné – 25 × 25 × 25 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✓ úběr 246,8 mm³ · těleso platné – R2, hrany vše

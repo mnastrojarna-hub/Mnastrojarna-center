@@ -9,6 +9,7 @@
  * Čisté funkce bez prohlížeče (testovatelné v Node). Operace, které potřebují topologii tělesa
  * (výběr hran/ploch pravidlem, poloha díry „na horní ploše“), nechávají doplnění na aplikaci.
  */
+import { featureState, geometryText, levelsText } from "./feature-levels";
 import { getLang, tr } from "./i18n";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { threadByName, threadLabel } from "./defaults";
@@ -1558,16 +1559,21 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
   const st = new Map((res?.status ?? []).map((s) => [s.id, s]));
   const okCount = doc.features.filter((f) => st.get(f.id)?.ok !== false).length;
   const warnCount = doc.features.filter((f) => st.get(f.id)?.ok !== false && st.get(f.id)?.warning).length;
+  // prvky, po kterých se platnost tělesa nekontrolovala (velké těleso) – nejsou ✓, ale ℹ (feature-levels.ts)
+  const uncheckedCount = doc.features.filter((f) => featureState(st.get(f.id)) === "unchecked").length;
+  // potlačené prvky (přímo i konfigurací) se nestavěly – nejsou ✓, ale ℹ potlačeno
+  const offCount = doc.features.filter((f) => featureState(st.get(f.id)) === "off").length;
   const lines: string[] = [];
   const matClass = MATERIALS.find((x) => x.id === doc.material);
   const matText = doc.materialName?.trim() ? tr("{0} (hustota podle: {1})", doc.materialName.trim(), matClass?.label ?? doc.material) : (matClass ? `${matClass.label} (${matClass.density} g/cm³)` : doc.material || "–");
-  lines.push(tr("Dokument: „{0}“ · {1} · materiál {2} · prvků {3} ({4} ✓{5}, {6} ✗){7}", doc.name, doc.kind === "assembly" ? tr("sestava") : tr("díl"), matText, doc.features.length, okCount - warnCount, warnCount ? `, ${warnCount} ⚠` : "", doc.features.length - okCount, res?.bodies && res.bodies.length > 1 ? tr(" · těles {0}", res.bodies.length) : ""));
+  lines.push(tr("Dokument: „{0}“ · {1} · materiál {2} · prvků {3} ({4} ✓{5}, {6} ✗){7}", doc.name, doc.kind === "assembly" ? tr("sestava") : tr("díl"), matText, doc.features.length, okCount - warnCount - uncheckedCount - offCount, `${uncheckedCount ? `, ${uncheckedCount} ℹ ${tr("nezkontrolováno")}` : ""}${offCount ? `, ${offCount} ℹ ${tr("potlačeno")}` : ""}${warnCount ? `, ${warnCount} ⚠` : ""}`, doc.features.length - okCount, res?.bodies && res.bodies.length > 1 ? tr(" · těles {0}", res.bodies.length) : ""));
   if (res?.bodies && res.bodies.length > 1) lines.push(tr("Tělesa: {0}", res.bodies.map((b) => `${b.name}${b.active ? tr(" (aktivní)") : ""} ${fmt(b.volume / 1000, 2)} cm³`).join(" · ")));
   if (res?.metrics) {
     const [a, b] = res.metrics.bbox;
     lines.push(tr("Rozměry: {0} × {1} × {2} mm (X {3}…{4}, Y {5}…{6}, Z {7}…{8}) · objem {9} cm³ · ploch {10} · hran {11}", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2]), fmt(a[0]), fmt(b[0]), fmt(a[1]), fmt(b[1]), fmt(a[2]), fmt(b[2]), fmt(res.metrics.volume / 1000, 2), res.metrics.faces, res.metrics.edges));
     const m = res.metrics;
-    if (m.valid !== undefined || m.solids !== undefined) lines.push(tr("Geometrie: {0}{1}", m.solids === 0 ? tr("ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid") : m.valid === false ? tr("NEPLATNÁ (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat; opravte prvek označený ⚠") : tr("platná"), m.solids ? ` · ${m.solids === 1 ? tr("1 těleso") : tr("{0} těles", m.solids)}` : ""));
+    // kontrola, která se neprovedla (velké těleso), se vypíše jako „nezkontrolováno“ s důvodem – nikdy tiše jako platná
+    if (m.valid !== undefined || m.solids !== undefined) lines.push(tr("Geometrie: {0}{1}", geometryText(m), ""));
   } else if (res && doc.kind !== "assembly") lines.push(tr("Rozměry: žádné těleso (jen skici / pomocná geometrie)"));
   if (doc.kind === "assembly") {
     lines.push(...asmStatusLines(doc, asm?.mates, asm?.matesStale)); // komponenty s polohou (⚓ = ukotvená) a souhrn vazeb
@@ -1591,7 +1597,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
     lines.push(tr("Prvky:"));
     doc.features.forEach((f, i) => {
       const s = st.get(f.id);
-      lines.push(tr(" {0}. {1} [{2}, id {3}] {4}{5} – {6}", i + 1, f.name, f.type, f.id, s?.ok === false ? "✗ " + (s.error ?? tr("chyba")) : s?.warning ? "⚠ " + s.warning : "✓", f.suppressed ? " (potlačen)" : "", featureSummary(f, doc)));
+      lines.push(tr(" {0}. {1} [{2}, id {3}] {4}{5} – {6}", i + 1, f.name, f.type, f.id, s?.ok === false ? "✗ " + (s.error ?? tr("chyba")) : s?.warning ? "⚠ " + s.warning : [featureState(s) === "unchecked" || featureState(s) === "off" ? "ℹ" : "✓", featureState(s) === "off" ? "" : levelsText(s)].filter(Boolean).join(" "), f.suppressed || featureState(s) === "off" ? " (potlačen)" : "", featureSummary(f, doc)));
       if (s?.ok !== false && s?.info) lines.push(`    → ${s.info}`); // výsledek prvku (svarový kov…)
       if (f.type === "sketch") lines.push(...sketchStatusLines(f)); // entity s id (e1, e2…) pro vazby a kóty textem, stav určenosti
     });

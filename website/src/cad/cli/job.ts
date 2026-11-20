@@ -28,6 +28,7 @@ import { exportDrawing } from "../drawing-export";
 import type { DrawingCompute } from "../drawing-agent";
 import { setLang, tr, type CadLang } from "../i18n";
 import { emptyDoc, type CadDoc, type Feature } from "../types";
+import { loadsModel, modelTail } from "../engine/accept";
 import { CODE_RE, codeEntry } from "../engine/codes";
 import { memoryFileSink, memoryFileSource, MissingInputError, OutPathError, safeFileName, type EngineHost, type FileSink, type MemoryFiles, type OutWrite } from "../engine/host";
 import { MemoryWorkspace, loadWorkspace } from "../engine/memory-workspace";
@@ -159,7 +160,9 @@ export const engineRun: JobRunner = async (ws, text, host, rb, o, hooks) => {
       const f = await readDocument(host, name);
       await ws.openInTab(f.doc);
       preloaded.push({ key: verifyKeyOf(ws.docKey(), f.doc), doc: ws.present() });
-      rb.ok(null, tr("otevřeno „{0}“", f.file), f.doc.name);
+      // dokument s prvky se teprve postaví: otevření je přijetí (ℹ op.accepted), výsledek dá ověřovací stavba enginu
+      if (loadsModel(f.doc)) rb.code("op.accepted", { text: `${tr("otevřeno „{0}“", f.file)} – ${modelTail()}`, doc: f.doc.name });
+      else rb.ok(null, tr("otevřeno „{0}“", f.file), f.doc.name);
       if (f.note) rb.code("msg.note", { text: f.note, doc: f.doc.name });
     } catch (e) {
       if (e instanceof MissingInputError) rb.code("file.missing", { text: e.message });

@@ -6,12 +6,12 @@ Dokument: „Šroub M8×30 ISO 4762“ · díl · materiál Ocel (7.85 g/cm³) �
 Rozměry: 13 × 13 × 38 mm (X -6,5…6,5, Y -6,5…6,5, Z -30…8) · objem 2,43 cm³ · ploch 45 · hran 96
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Hlava [cylinder, id #] ✓ – Ø13 × 8 mm, new, podstava [0; 0; 0], osa Z
+ 1. Hlava [cylinder, id #] ✓ přidáno 1061,9 mm³ · těleso platné – Ø13 × 8 mm, new, podstava [0; 0; 0], osa Z
  2. Vnitřní šestihran – profil [sketch, id #] ✓ – rovina XY +4, 1 entit: 6-úhelník
     entity: # 6-úhelník Ø6,928 [0; 0]
     profil: 1 uzavřený obrys (#) ✓
- 3. Vnitřní šestihran [extrude, id #] ✓ – 4 mm, cut
- 4. Sražení [chamfer, id #] ✓ – 0,64 mm, hrany vše
- 5. Dřík [cylinder, id #] ✓ – Ø8 × 29,36 mm, add, podstava [0; 0; -29,36], osa Z
- 6. Sražení konce [cone, id #] ✓ – Ø6,72→Ø8 × 0,64 mm, add, podstava [0; 0; -30], osa Z
+ 3. Vnitřní šestihran [extrude, id #] ✓ úběr 124,7 mm³ (celý nástroj) · těleso platné – 4 mm, cut
+ 4. Sražení [chamfer, id #] ✓ úběr 12,38 mm³ · těleso platné – 0,64 mm, hrany vše
+ 5. Dřík [cylinder, id #] ✓ přidáno 1475,8 mm³ (celý nástroj) · těleso platné – Ø8 × 29,36 mm, add, podstava [0; 0; -29,36], osa Z
+ 6. Sražení konce [cone, id #] ✓ přidáno 27,3 mm³ (celý nástroj) · těleso platné – Ø6,72→Ø8 × 0,64 mm, add, podstava [0; 0; -30], osa Z
  7. Závit M8 [thread, id #] ✓ – M8 délka 22 mm, vnější (na válci), kosmetický (jen výkres), začátek [0; 0; -30], osa Z

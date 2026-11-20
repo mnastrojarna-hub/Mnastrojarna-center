@@ -1,0 +1,9 @@
+# vlna 22, úroveň „konečné těleso“: kontrola platnosti, která se neprovedla, se nikdy nevypíše jako ✓ / platná.
+# 180 kvádrů = 1085 ploch: nad 400 ploch se platnost po prvku nekontroluje, nad 1000 ploch ani na konci stavby (těleso se měří
+# ze sítě) → prvky ℹ „platnost nezkontrolována (důvod)“, Geometrie: nezkontrolováno; účinek operace se posoudí i tak (22b)
+nový díl Mřížka
+kvádr 2 2 2
+pole 180 rozteč 4 směr X
+kvádr 1 1 1 v 0.5 0.5 1.5 odebrat
+kvádr 1 1 1 v 2.5 0.5 1.5 odebrat
+stav

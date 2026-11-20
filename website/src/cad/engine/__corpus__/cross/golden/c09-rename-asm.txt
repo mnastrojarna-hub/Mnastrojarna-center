@@ -9,9 +9,9 @@
 ✓ komponenta „Čep“ vložena do sestavy
 ✓ vazba Souosost „Čep“ F1 → „Deska“ F7: ok · „Čep“ poloha [40; 30; 0]
 ✓ vazba Kontakt „Čep“ F3 → „Deska“ F3: ok · „Čep“ poloha [40; 30; 10]
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Válec 1 (cylinder)
+✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 865,9 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2356,2 mm³ · těleso platné
 
 Dokument: „Uložení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]

@@ -1,0 +1,25 @@
+# vlna 22, bod 22b zprávy majitele (tichý nulový účinek) a úrovně stavu prvku: vznik prvku → účinek booleovské operace proti
+# nástroji (žádný = ⚠ / část nástroje / celý nástroj, vždy s čísly) → konečné těleso (platné / nezkontrolováno)
+nový díl Deska M
+kvádr 100 50 10
+kvádr 20 20 5 v 40 15 10 odebrat
+kvádr 20 20 5 v 60 15 5 odebrat
+díra 8 skrz v 20 25
+zaoblit 2 hrany svislé
+stav
+# E) případ z 3. 11.: trubka Ø16,4 + závit thread60 r=9 h=0,82 – úběr je vidět číslem (dřív jen ✓)
+nový díl Deska E
+trubka 30 16.4 20
+prvek surf.helixSweep profile=thread60 radius=9 depth=0.82 pitch=1.5 turns=12 mode=cut
+stav
+# G) šroubovice mimo těleso: ⚠ žádný účinek
+nový díl Deska G
+válec 18 20
+prvek surf.helixSweep profile=thread60 radius=20 depth=0.82 pitch=1.5 turns=12 mode=cut
+stav
+# H) ČEKÁ NA ETAPU G2 (22a): side=internal, r=9 v díře Ø16,4 – drážka celá ve stěně. Dnes ✓ „(celý nástroj)“ = nástroj celý
+# v materiálu; po G2 tu musí být ⚠ thread.no-reach, ne ✓ (viz src/cad/w22/greens-g.test.ts, čekající případ)
+nový díl Deska H
+trubka 30 16.4 20
+prvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 side=internal mode=cut
+stav

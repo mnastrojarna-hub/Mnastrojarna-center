@@ -10,12 +10,12 @@
 → Zaoblení 1 (fillet) – 7 hran podle pravidla „svisle“ – výsledek po výpočtu níže
 → Sražení 1 (chamfer) – 2 hran podle pravidla „horni kruhove“ – výsledek po výpočtu níže
 ✓ Skica 1 (sketch)
-✓ Vysunutí 1 (extrude)
-✓ Trubka 1 (tube)
-✓ Díra 1 (hole)
-✓ Pole 1 (pattern)
+✓ Vysunutí 1 (extrude) · přidáno 169646 mm³ · těleso platné
+✓ Trubka 1 (tube) · přidáno 39269,9 mm³ (celý nástroj) · těleso platné
+✓ Díra 1 (hole) · úběr 1696,5 mm³ (3 % nástroje) · těleso platné
+✓ Pole 1 (pattern) · úběr 5089,4 mm³ (3 % nástroje) · těleso platné
 ✗ Zaoblení 1 (fillet): Zaoblení R2 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
-✓ Sražení 1 (chamfer)
+✓ Sražení 1 (chamfer) · úběr 157,1 mm³ · těleso platné
 
 Dokument: „Příruba“ · díl · materiál Nerez (7.95 g/cm³) · prvků 7 (6 ✓, 1 ✗)
 Rozměry: 120 × 120 × 40 mm (X -60…60, Y -60…60, Z 0…40) · objem 201,97 cm³ · ploch 13 · hran 25
@@ -24,9 +24,9 @@ Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: kružnice Ø120
     entity: e1 kružnice Ø120 [0; 0]
     profil: 1 uzavřený obrys (e1) ✓
- 2. Vysunutí 1 [extrude, id #] ✓ – 15 mm, new
- 3. Trubka 1 [tube, id #] ✓ – Ø60/Ø40 × 25 mm, add, podstava [0; 0; 15], osa Z
- 4. Díra 1 [hole, id #] ✓ – Ø12 skrz v [45; 0; 15], osa Z
- 5. Pole 1 [pattern, id #] ✓ – kruhové 4× / 360°
+ 2. Vysunutí 1 [extrude, id #] ✓ přidáno 169646 mm³ · těleso platné – 15 mm, new
+ 3. Trubka 1 [tube, id #] ✓ přidáno 39269,9 mm³ (celý nástroj) · těleso platné – Ø60/Ø40 × 25 mm, add, podstava [0; 0; 15], osa Z
+ 4. Díra 1 [hole, id #] ✓ úběr 1696,5 mm³ (3 % nástroje) · těleso platné – Ø12 skrz v [45; 0; 15], osa Z
+ 5. Pole 1 [pattern, id #] ✓ úběr 5089,4 mm³ (3 % nástroje) · těleso platné – kruhové 4× / 360°
  6. Zaoblení 1 [fillet, id #] ✗ Zaoblení R2 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R2, hrany 7
- 7. Sražení 1 [chamfer, id #] ✓ – 1 mm, hrany 2
+ 7. Sražení 1 [chamfer, id #] ✓ úběr 157,1 mm³ · těleso platné – 1 mm, hrany 2

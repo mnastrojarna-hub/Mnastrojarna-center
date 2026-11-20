@@ -303,7 +303,7 @@ describe("aplikace: stručný protokol (window.mncad.run protocol short) = CLI -
     const d1 = formatRun(await runReport(ws, THREE, realHost()), { protocol: "full" }).split("\n").filter((l) => l.startsWith("D "));
     const d2 = formatRun(await runReport(ws, THREE, realHost()), { protocol: "full" }).split("\n").filter((l) => l.startsWith("D "));
     expect(d1).toHaveLength(3);
-    expect(d1[0]).toBe('D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10');
+    expect(d1[0]).toBe('D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10 solids=1 valid=1');
     expect(d2).toEqual(d1);
     expect(titles(ws)).toEqual(["Deska", "Čep", "S"]);
   }, 240_000);

@@ -3,14 +3,14 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Beta“ – nová záložka
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Válec 1 (cylinder)
+✓ Kvádr 1 (box) · přidáno 1000 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 785,4 mm³ · těleso platné
 
 Dokument: „Beta“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 10 × 10 × 10 mm (X -5…5, Y -5…5, Z 0…10) · objem 0,79 cm³ · ploch 3 · hran 3
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø10 × 10 mm, new, podstava [0; 0; 0], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 785,4 mm³ · těleso platné – Ø10 × 10 mm, new, podstava [0; 0; 0], osa Z
 === run 2 ===
 Záložky (2):
  1. Alfa · díl
@@ -20,14 +20,14 @@ Záložky (2):
 Záložky (2):
  1. Alfa · díl · aktivní
  2. Beta · díl
-✓ Kvádr 2 (box)
+✓ Kvádr 2 (box) · přidáno 125 mm³ (celý nástroj) · těleso platné
 
 Dokument: „Alfa“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 10 × 10 × 15 mm (X 0…10, Y 0…10, Z 0…15) · objem 1,13 cm³ · ploch 9 · hran 21
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
- 2. Kvádr 2 [box, id #] ✓ – 5 × 5 × 5 mm, add, roh [0; 0; 10]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ přidáno 125 mm³ (celý nástroj) · těleso platné – 5 × 5 × 5 mm, add, roh [0; 0; 10]
 === run 3 ===
 ✓ záložka „Beta“ zavřena – aktivní je „Alfa“
 Záložky (1):
@@ -37,5 +37,5 @@ Dokument: „Alfa“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓,
 Rozměry: 10 × 10 × 15 mm (X 0…10, Y 0…10, Z 0…15) · objem 1,13 cm³ · ploch 9 · hran 21
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
- 2. Kvádr 2 [box, id #] ✓ – 5 × 5 × 5 mm, add, roh [0; 0; 10]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ přidáno 125 mm³ (celý nástroj) · těleso platné – 5 × 5 × 5 mm, add, roh [0; 0; 10]

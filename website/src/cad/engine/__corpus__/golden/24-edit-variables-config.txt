@@ -4,17 +4,19 @@
 ✓ proměnná H = L / 4 → 20
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 ✗ řádek 6: „x“ není parametr prvku „Kvádr 1“ (box) – parametry: size, position, centered, mode
-✓ konfigurace „Krátká“ založena: L = 50 – aktivujete: konfigurace aktivní "Krátká"
-✓ aktivní konfigurace „Krátká“: L = 50
+→ konfigurace „Krátká“ založena: L = 50 – aktivujete: konfigurace aktivní "Krátká" – výsledek po výpočtu níže
+ℹ řádek 7: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 8
+→ aktivní konfigurace „Krátká“: L = 50 – výsledek po výpočtu níže
 Proměnné (2): L = 80 → 50 · H = L / 4 → 12,5 („výška“)
 Konfigurace: Krátká (aktivní)
 Konfigurace (1): Krátká (aktivní): L = 50
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 64000 mm³ · těleso platné
+✓ dokument „Parametry“ postaven: prvků 1, bez ⚠ a ✗ · těleso platné
 
 Dokument: „Parametry“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 80 × 40 × 20 mm (X 0…80, Y 0…40, Z 0…20) · objem 64 cm³ · ploch 6 · hran 12
 Geometrie: platná · 1 těleso
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 80 × 40 × 20 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 64000 mm³ · těleso platné – 80 × 40 × 20 mm, new, roh [0; 0; 0]
 Proměnné: L = 80; H = L / 4
 Konfigurace: Krátká (aktivní)
