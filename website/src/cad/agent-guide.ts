@@ -1684,7 +1684,9 @@ poslední skica).
 vynutí 3D okno). Volby: \`view\` iso | front | top | right | back | bottom | left | current, \`display\` shadedEdges |
 shaded | wireframe | hiddenLine | xray, \`fit\`, \`hints\` (popisky F1 / E2 / V3 do obrázku), \`section: { axis: "X", offset:
 25, flip: true }\` (\`null\` = bez řezu), \`explode\` (sestava 0–3), \`background\` white | current. Dočasný pohled, styl
-i řez se po snímku vrátí. Funguje i bez WebGL (zjednodušený náhled). Trvale textem:
+i řez se po snímku vrátí. Funguje i bez WebGL (zjednodušený náhled). V sestavě má v řezu každá komponenta s objemem
+čelo řezu (barva komponenty + šrafy, sousední díly se liší; i bez WebGL, ve snímku a ve videu studie; čelo se nevybírá),
+odpověď \`řez\` to uvádí. Trvale textem:
 
 \`\`\`
 zobraz drátový            # stínovaný | hrany | skryté | průhledný (EN view wireframe, DE ansicht drahtmodell)

@@ -21,6 +21,7 @@ import { orthoBoxCamera, type BoxRect } from "@/cad/box-select";
 import { attachBoxDrag } from "./box-drag-3d";
 import { boxPreviewText, boxSpecFor, buildBoxScene, dragAction, queryBox, type BoxSceneOf, type DragAction } from "./box-pick-3d";
 import type { AsmView, DisplayMode, Section } from "./viewport";
+import { softCapStyles } from "@/cad/section-cap";
 
 /** Co se má vykreslit – stejná data, jaká dostává 3D okno. */
 export type SoftScene = {
@@ -61,8 +62,11 @@ const LEGACY = new Set(["edges", "faces", "face-plane"]);
 /** Sítě k vykreslení a výběru: díl (jedna síť s barvami ploch) nebo komponenty sestavy s maticemi umístění. */
 export function sceneItems(sc: SoftScene, points?: Float32Array | null): PickItem[] {
   if (sc.assembly) {
-    return sc.assembly.map((c) => {
+    // vlna 22: čelo řezu každé komponenty – barva komponenty a šrafy jako ve 3D okně (`@/cad/section-cap`); kreslí se jen v řezu
+    const caps = softCapStyles(sc.assembly, sc.display);
+    return sc.assembly.map((c, i) => {
       const base = hexToRgb(c.clash ? "#ff3b30" : c.color);
+      const cap = caps[i];
       return {
         vertices: c.mesh.vertices,
         triangles: c.mesh.triangles,
@@ -77,6 +81,8 @@ export function sceneItems(sc: SoftScene, points?: Float32Array | null): PickIte
         wire: !!c.dim,
         compId: c.id,
         topId: c.topId ?? c.id,
+        capColor: cap ? cap.fill : null,
+        capHatch: cap ? { nx: cap.hatch.nx, ny: cap.hatch.ny, step: cap.hatch.step, width: cap.hatch.width, color: cap.hatch.color } : null,
       };
     });
   }
@@ -167,7 +173,14 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   const fcKey = JSON.stringify(scene.faceColors ?? {});
   const points = pick?.vertices ?? null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const baseItems = useMemo(() => sceneItems(scene, points), [scene.mesh, scene.assembly, scene.color, fcKey, scene.hidden, points]);
+  const baseItems = useMemo(() => sceneItems(scene, points), [scene.mesh, scene.assembly, scene.color, fcKey, scene.hidden, points, scene.display]);
+  /** čela řezu komponent sestavy (vlna 22) – stav pro e2e a diagnostiku: počet a barvy výplně v pořadí komponent */
+  const capInfo = useMemo(() => {
+    if (!scene.assembly || !scene.section || scene.display === "wireframe") return null;
+    const hex = (c: RGB) => "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+    const caps = baseItems.filter((it) => it.capColor);
+    return { n: caps.length, colors: caps.map((it) => hex(it.capColor!)).join(","), hatch: caps.map((it) => (it.capHatch ? hex(it.capHatch.color) : "")).join(",") };
+  }, [baseItems, scene.assembly, scene.section, scene.display]);
   const baseRef = useRef(baseItems);
   baseRef.current = baseItems;
   const pickMode = pick?.pickMode ?? "none";
@@ -482,6 +495,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       flatColor: display === "hiddenLine" ? [255, 255, 255] : null,
       edgeWidth: ratio >= 1.5 ? 2 : 1,
       clip: sc.section ? sectionPlane(sc.section) : null,
+      capScale: ratio,
     });
     ctx.putImageData(image, 0, 0);
     if (quality.current === 1) fullMs.current = r.ms;
@@ -1022,7 +1036,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   const btn = SOFT_BTN;
   const measureLabels = pick?.measure?.labels ?? [];
   return (
-    <div ref={box} data-soft-viewport data-soft-pick={pickMode} className="absolute inset-0 overflow-hidden">
+    <div ref={box} data-soft-viewport data-soft-pick={pickMode} data-section-caps={capInfo ? capInfo.n : undefined} data-section-cap-colors={capInfo ? capInfo.colors : undefined} data-section-cap-hatch={capInfo ? capInfo.hatch : undefined} className="absolute inset-0 overflow-hidden">
       <canvas ref={canvas} data-soft-canvas className="absolute inset-0 h-full w-full cursor-grab touch-none select-none active:cursor-grabbing" aria-label={tr("Náhled modelu bez WebGL")} role="img" />
       <canvas ref={overlay} data-soft-overlay className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden />
       {/* popisky kót měření (polohu nastavuje překryvná vrstva) */}

@@ -19,6 +19,8 @@ import { softView, usePublishPickProps, useSoftViewActive } from "./soft-bridge"
 import type { BoxRect } from "@/cad/box-select";
 import { attachBoxDrag } from "./box-drag-3d";
 import { boxPreviewText, boxSpecFor, buildBoxScene, mouseButtons, queryBox, type BoxMode, type BoxResolve, type BoxSceneOf, type DragAction, type LeftDrag } from "./box-pick-3d";
+import { bodyOpacity, capStyles } from "@/cad/section-cap";
+import { capMesh, isCapObject } from "./section-cap-gl";
 
 /**
  * Režim výběru: „select“ = obecný výběr entit podle filtru; ostatní režimy slouží formulářům prvků
@@ -51,6 +53,8 @@ export type AsmView = {
   dim?: boolean;
   clash?: boolean;
   opacity?: number;
+  /** vlna 22: false = komponenta nemá objem (jen plochy) – v řezu bez čela; jinak čelo řezu (`@/cad/section-cap`) */
+  solid?: boolean;
 };
 /** Průhledné pomocné těleso jen k zobrazení (referenční model, rozdílová oblast při porovnání) – nejde vybrat; `xray` = kreslí se i skrz model. */
 export type Ghost = { key: string; vertices: Float32Array; normals?: Float32Array | null; triangles: Uint32Array; color: string; opacity: number; xray?: boolean };
@@ -618,17 +622,32 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const isAsm = () => !!propsRef.current.assembly?.length;
     const meshTargets = (): THREE.Mesh[] => {
       const s = S.current!;
-      if (isAsm()) return s.asmGroup.children.filter((o) => (o as THREE.Mesh).isMesh && o.visible) as THREE.Mesh[];
+      if (isAsm()) return s.asmGroup.children.filter((o) => (o as THREE.Mesh).isMesh && o.visible && !isCapObject(o)) as THREE.Mesh[];
       return s.mesh && !propsRef.current.bodyHidden ? [s.mesh] : [];
+    };
+    /** neprůhledná čela řezu sestavy: nevybírají se, jen zakrývají to, co je za nimi (vlna 22) */
+    const capTargets = (): THREE.Mesh[] => {
+      const s = S.current!;
+      if (!isAsm() || !propsRef.current.section) return [];
+      return s.asmGroup.children.filter((o) => isCapObject(o) && o.visible && !((o as THREE.Mesh).material as THREE.Material).transparent) as THREE.Mesh[];
     };
     const edgeTargets = (): THREE.LineSegments[] => {
       const s = S.current!;
       if (isAsm()) return s.asmGroup.children.filter((o) => (o as THREE.LineSegments).isLineSegments && o.visible) as THREE.LineSegments[];
       return s.edges && !propsRef.current.bodyHidden ? [s.edges] : [];
     };
-    const hitMesh = (e: PointerEvent | MouseEvent) => {
+    /** nejbližší zásah tělesa NEBO čela řezu; u čela je vzdálenost = rovina řezu (čelo leží v ní, ne na zadní stěně) */
+    const hitAny = (e: PointerEvent | MouseEvent): THREE.Intersection | null => {
       setRay(e);
-      return ray.intersectObjects(meshTargets(), false).find((h) => clipOk(h.point)) ?? null;
+      const caps = capTargets();
+      const h = ray.intersectObjects(caps.length ? [...meshTargets(), ...caps] : meshTargets(), false).find((x) => clipOk(x.point)) ?? null;
+      if (!h || !isCapObject(h.object)) return h;
+      const d = ray.ray.distanceToPlane(S.current!.clip);
+      return { ...h, distance: d !== null && d < h.distance ? d : h.distance };
+    };
+    const hitMesh = (e: PointerEvent | MouseEvent) => {
+      const h = hitAny(e);
+      return h && !isCapObject(h.object) ? h : null;
     };
     const ids = (o: THREE.Object3D) => (isAsm() ? { compId: o.userData.id as string, topId: o.userData.topId as string } : {});
     const toScreen = (p: THREE.Vector3) => {
@@ -777,14 +796,16 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         const snap = pickSnap(e);
         if (snap) return snap;
       }
-      const h = hitMesh(e);
+      // čelo řezu (vlna 22) se nevybírá, ale zakrývá hrany a vrcholy za sebou (mez hloubky = rovina řezu)
+      const hc = hitAny(e);
+      const h = hc && !isCapObject(hc.object) ? hc : null;
       const pt = h ? ([h.point.x, h.point.y, h.point.z] as Vec3) : undefined;
       const faceIdx = h && h.faceIndex != null ? ((h.object as THREE.Mesh).geometry.userData.faceOf as Int32Array | undefined)?.[h.faceIndex] ?? -1 : -1;
       switch (filter) {
         case "vertex":
-          return pickVertex(e, h);
+          return pickVertex(e, hc);
         case "edge":
-          return pickEdge(e, h);
+          return pickEdge(e, hc);
         case "face":
           return h && faceIdx >= 0 ? { kind: "face", index: faceIdx, point: pt, ...ids(h.object) } : null;
         case "body":
@@ -797,9 +818,9 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
           // plocha pod kurzorem – který prvek ji vytvořil, dohledá aplikace (cad.faceOwner); v sestavě jako Těleso
           return h && faceIdx >= 0 && !isAsm() ? { kind: "face", index: faceIdx, point: pt, ...ids(h.object) } : h ? { kind: "body", point: pt, ...ids(h.object) } : null;
         default: {
-          const v = pickVertex(e, h);
+          const v = pickVertex(e, hc);
           if (v) return v;
-          const ed = pickEdge(e, h);
+          const ed = pickEdge(e, hc);
           if (ed) return ed;
           return h && faceIdx >= 0 ? { kind: "face", index: faceIdx, point: pt, ...ids(h.object) } : null;
         }
@@ -895,7 +916,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         if (s.tc.object && gizmoAxisAt(s, e)) return { box: false, longPress: false }; // stisk na gizmu = jeho tažení
         if (!boxSpec()) return { box: false, longPress: lp };
         // volba „levé tlačítko otáčí“: okno jen z prázdného místa
-        if (e.pointerType !== "touch" && propsRef.current.leftDrag === "orbit" && hitMesh(e)) return { box: false, longPress: false };
+        if (e.pointerType !== "touch" && propsRef.current.leftDrag === "orbit" && hitAny(e)) return { box: false, longPress: false }; // čelo řezu není prázdné místo
         return { box: true, longPress: lp };
       },
       preview: (r, crossing, mode) => {
@@ -1152,7 +1173,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     // plochy, hrany, body
     const findObj = (compId?: string) => {
       if (!asm) return s.mesh ? { mesh: s.mesh, edges: s.edges ?? null, gi: s.partGeo ?? null, mtx: null as THREE.Matrix4 | null } : null;
-      const m = s.asmGroup.children.find((o) => (o as THREE.Mesh).isMesh && o.userData.id === compId) as THREE.Mesh | undefined;
+      const m = s.asmGroup.children.find((o) => (o as THREE.Mesh).isMesh && !isCapObject(o) && o.userData.id === compId) as THREE.Mesh | undefined;
       if (!m) return null;
       const gi = s.asmGeo.get(m.userData.key as string) ?? null;
       return { mesh: m, edges: null, gi, mtx: m.matrix };
@@ -1502,7 +1523,13 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
     const display = props.display ?? "shadedEdges";
     const clipping = props.section ? [s.clip] : [];
     applyClip();
-    for (const c of list) {
+    // vlna 22 (zpráva 20. 11.): čelo řezu pro každou komponentu – barva komponenty, šrafy, stejná průhlednost jako tělo
+    const caps = props.section ? capStyles(list, display) : null;
+    const pr = s.renderer.getPixelRatio();
+    let capCount = 0;
+    const capHex: string[] = [];
+    const capHatch: string[] = [];
+    for (const [ci, c] of list.entries()) {
       let g = s.asmGeo.get(c.key);
       if (!g || g.mesh !== c.mesh) {
         if (g) {
@@ -1519,7 +1546,7 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
         display === "hiddenLine"
           ? new THREE.MeshBasicMaterial({ color: 0xffffff, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, clippingPlanes: clipping })
           : new THREE.MeshStandardMaterial({ color: col, metalness: 0.4, roughness: 0.45, envMapIntensity: 0.9, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1, clippingPlanes: clipping });
-      const op = c.dim ? 0.18 : display === "xray" ? 0.3 : (c.opacity ?? 1);
+      const op = bodyOpacity(c, display);
       if (op < 1) {
         mat.transparent = true;
         mat.opacity = op;
@@ -1538,12 +1565,33 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       e.matrix.copy(mtx);
       e.userData = { id: c.id, topId: c.topId ?? c.id, key: c.key };
       s.asmGroup.add(e);
+      const st = caps?.[ci];
+      if (st) {
+        // nese id komponenty (gizmo ho posune s tělem), ale `cap: true` ho vyřadí z výběru, najetí myší, okna a rozměru scény
+        s.asmGroup.add(capMesh(g.geo, st, s.clip, mtx, { id: c.id, topId: c.topId ?? c.id, key: c.key }, pr));
+        capCount++;
+        capHex.push(st.hex);
+        capHatch.push(st.hatch.hex);
+      }
+    }
+    // stav pro e2e a diagnostiku: počet čel a jejich barvy (stejné pořadí jako komponenty)
+    const hostEl = s.renderer.domElement.parentElement;
+    if (hostEl) {
+      if (props.section && list.length) {
+        hostEl.dataset.sectionCaps = String(capCount);
+        hostEl.dataset.sectionCapColors = capHex.join(",");
+        hostEl.dataset.sectionCapHatch = capHatch.join(",");
+      } else {
+        delete hostEl.dataset.sectionCaps;
+        delete hostEl.dataset.sectionCapColors;
+        delete hostEl.dataset.sectionCapHatch;
+      }
     }
     if (list.length) {
       const box = new THREE.Box3();
       for (const o of s.asmGroup.children) {
         const gg = (o as THREE.Mesh).geometry;
-        if (!(o as THREE.Mesh).isMesh || !gg.boundingSphere) continue;
+        if (!(o as THREE.Mesh).isMesh || isCapObject(o) || !gg.boundingSphere) continue;
         const sp = gg.boundingSphere.clone().applyMatrix4(o.matrix);
         box.expandByPoint(sp.center.clone().addScalar(sp.radius));
         box.expandByPoint(sp.center.clone().addScalar(-sp.radius));

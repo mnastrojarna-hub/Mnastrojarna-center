@@ -1289,6 +1289,7 @@ export function CadApp() {
         color: l.comp.color ?? top?.color ?? "#b9c2cc",
         selected: l.topId === asmSel || l.topId === mate?.compId,
         clash: clashIds.has(l.topId) || clashIds.has(l.id),
+        solid: !!l.coil || r?.metrics?.solids !== 0, // vlna 22: plochy bez objemu = v řezu bez čela
       });
     }
     return out;
