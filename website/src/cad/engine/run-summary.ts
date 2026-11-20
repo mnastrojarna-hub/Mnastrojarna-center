@@ -13,6 +13,7 @@
 import { flattenLeaves } from "../asm-flatten";
 import { sourceKey } from "../assembly";
 import { clashStale } from "../clash-class";
+import { entryCounts } from "../clash-report";
 import { docHasContent } from "../draft/doc";
 import { featureCounts } from "../feature-levels";
 import { tr } from "../i18n";
@@ -110,8 +111,9 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
           clashFindings({ coded: emit, quiet: emit }, d, list, res);
           ck = ws.asm.clash.get(ckey);
         }
-        const cl = ck?.classes;
-        if (cl) s.clashes = { total: cl.total, thread: cl.thread, underhead: cl.underhead, real: cl.real, undetermined: cl.undetermined };
+        // třídy po pravidlech KONEČNÉHO dokumentu (pracovní kontakt, dotyk – vlna 22, bod 5; clash-report.ts), bez seznamu uložené počty
+        const cl = ck ? (ck.list ? entryCounts(ck, d) : ck.classes) : undefined;
+        if (cl) s.clashes = { total: cl.total, thread: cl.thread, underhead: cl.underhead, real: cl.real, undetermined: cl.undetermined, ...(cl.touch ? { touch: cl.touch } : {}), ...(cl.work ? { work: cl.work } : {}) };
         if (cl && s.volume_mm3 !== undefined) s.volume_union_mm3 = s.volume_mm3 - ck!.res.reduce((a, x) => a + x.volume, 0);
         markStale(s, ws, ckey, d);
       } catch (e) {

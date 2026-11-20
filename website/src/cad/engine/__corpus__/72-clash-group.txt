@@ -1,0 +1,22 @@
+# vlna 22, bod 5: opakované nálezy jednou – 4 stejné šrouby, hlavy zapuštěné 3 mm do přidržovače → jedna skupina 4× s instancemi
+nový díl Deska A
+kvádr 120 60 20
+díra závit M12 hloubka 18 v 15 30 v 45 30 v 75 30 v 105 30
+nový díl Přidržovač
+kvádr 120 60 10
+díra 13 skrz v 15 30 v 45 30 v 75 30 v 105 30
+nový díl Šroub M12
+válec 12 18
+válec 18 12 v 0 0 18
+#--- run
+nová sestava Sestava 5G
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 0 0 20
+vložit "Šroub M12" v 15 30 9
+vložit "Šroub M12" v 45 30 9
+vložit "Šroub M12" v 75 30 9
+vložit "Šroub M12" v 105 30 9
+kolize
+clash list real
+kollision liste gewinde
+stav

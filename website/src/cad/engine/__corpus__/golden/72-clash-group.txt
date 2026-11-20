@@ -1,0 +1,42 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Šroub M12“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Kvádr 2 (box)
+✓ Díra 2 (hole)
+✓ Válec 1 (cylinder)
+✓ Válec 2 (cylinder)
+
+Dokument: „Šroub M12“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 18 × 18 × 30 mm (X -9…9, Y -9…9, Z 0…30) · objem 5,09 cm³ · ploch 5 · hran 6
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ – Ø12 × 18 mm, new, podstava [0; 0; 0], osa Z
+ 2. Válec 2 [cylinder, id #] ✓ – Ø18 × 12 mm, add, podstava [0; 0; 18], osa Z
+=== run 2 ===
+✓ nová sestava „Sestava 5G“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ komponenta „Šroub M12“ vložena do sestavy
+✓ komponenta „Šroub M12“ vložena do sestavy
+✓ komponenta „Šroub M12“ vložena do sestavy
+✓ komponenta „Šroub M12“ vložena do sestavy
+kolize: 8 – šroub v závitu 4, skutečné 4
+⚠ řádek 8: 4× kolize „Přidržovač“ × „Šroub M12“ [#3, #4, #5, #6] (365,2 mm³) – místo [15; 30; 28,5] · obálka 18 × 18 × 3 mm; [45; 30; 28,5]; [75; 30; 28,5]; …
+Kolize (zkontrolováno ?): skutečné 4 · šroub v závitu 4 · zobrazeno 1 skupin (skutečná kolize)
+ ! skutečná kolize: 4× kolize „Přidržovač“ × „Šroub M12“ [#3, #4, #5, #6] (365,2 mm³) – místo [15; 30; 28,5] · obálka 18 × 18 × 3 mm; [45; 30; 28,5]; [75; 30; 28,5]; …
+Kolize (zkontrolováno ?): skutečné 4 · šroub v závitu 4 · zobrazeno 1 skupin (šroub v závitu)
+ · šroub v závitu: 4× šroub v závitu „Deska A“ × „Šroub M12“ [#3, #4, #5, #6]
+
+Dokument: „Sestava 5G“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [0; 0; 20] · Šroub M12 [15; 30; 9] · Šroub M12 [45; 30; 9] · Šroub M12 [75; 30; 9] · Šroub M12 [105; 30; 9]
+Sestava: 6 komponent (6 dílů po rozložení podsestav) · obálka 120 × 60 × 39 mm · objem Σ 224,85 cm³ · hmotnost Σ 1,765 kg
+Kolize: 8 – skutečné 4: 4× Přidržovač × Šroub M12 [#3, #4, #5, #6] (365,2 mm³) v místě [15; 30; 28,5]; šroub v závitu 4 (zkontrolováno ?)

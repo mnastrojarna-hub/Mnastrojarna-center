@@ -30,6 +30,7 @@
  * Čistý modul bez prohlížeče a bez jádra; stejný dokument a volby dají vždy stejný text.
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
+import { clashRulesScript } from "./agent-clash";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
@@ -2131,6 +2132,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   // pohledy studie (kamera, řez), aktivní pohled, volby videa, anotace – vlna 22 (doc-script-motion-view.ts)
   if (mo?.motors.length || mo?.dyn) emitMotionViews(c.sheetOut, mo);
   else if (mo?.views?.length) c.note(tr("pohledy pohybové studie bez motoru se do skriptu nepřenáší"));
+  // pravidla kolizí (pracovní kontakt, závit bez prvku) a tolerance dotyku – vlna 22, bod 5 (cad/agent-clash.ts)
+  const cr = clashRulesScript(doc, c.li, (p) => (p.length === 1 && idx.has(p[0]) ? `#${idx.get(p[0])}` : null), (id) => mateNo.get(id));
+  for (const l of cr.lines) c.line(l);
+  if (cr.skipped) c.note(tr("pravidla kolizí s komponentou v podsestavě nebo s vazbou mimo skript se do skriptu nepřenášejí ({0})", cr.skipped));
   emitDrawings(c, doc);
 }
 

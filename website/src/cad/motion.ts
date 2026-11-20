@@ -7,6 +7,8 @@
  * Čisté funkce bez jádra (geometrii ploch dodá volající jako v řešiči vazeb).
  */
 import type { InterferenceStats } from "./asm-kernel";
+import { clashCsvCell, motionClashSummary } from "./clash-report";
+import { isFault, type MaybeClassified } from "./clash-rules";
 import { instanceKey, rotMatrix } from "./assembly";
 import { springComps, springMotionLines, springSteps, type SpringStep } from "./asm-spring";
 import { getLang, tr } from "./i18n";
@@ -17,8 +19,8 @@ import { levelLine, levelOf, studyMode, type LevelInfo } from "./motion-mode";
 import { devText, eqResidual, freeLimits, isLimitMate, limitGap, mateDev, mateName, mateTerm, preferTerms, solveStep, springDev, springEnergyTerm, springStopTerm, springTerms, type MateDev, type Term } from "./motion-quasi";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
-/** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách – zařazení šroub × závit) */
-export type MotionCollision = { a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] };
+/** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách, místo průniku, třída – clash-rules.ts) */
+export type MotionCollision = MaybeClassified;
 /** Výsledek kontroly kolizí v kroku; `stats` = počty přesných / znovupoužitých / odfiltrovaných dvojic z jádra (přírůstková kontrola). */
 export type MotionClashes = MotionCollision[] & { stats?: InterferenceStats };
 /** Časy výpočtu studie [ms] pro protokol (Σ slow=, JSON timing) a průběh. */
@@ -313,8 +315,9 @@ export async function runMotion(
         const a = (timing.clash ??= { pairs: 0, culled: 0, exact: 0, reused: 0, undetermined: 0 });
         for (const k2 of ["pairs", "culled", "exact", "reused", "undetermined"] as const) a[k2] += clashes.stats[k2] ?? 0;
       }
-      row.clashes = clashes.map((c) => ({ a: c.a, b: c.b, volume: c.volume }));
-      if (row.clashes.length && !collision) collision = { ...row.clashes[0], step: k, t };
+      row.clashes = clashes.map((c) => ({ ...c })); // i cesty listů (podsestavy), místo a třída (vlna 22, bod 5)
+      const hit = row.clashes.find((c) => isFault(c.cls)); // první SKUTEČNÁ kolize (šroub v závitu není kolize)
+      if (hit && !collision) collision = { ...hit, step: k, t };
     }
     steps.push(row);
     const stepMs = now() - tStep;
@@ -415,7 +418,6 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
   // pružiny na konci řádku (dřívější sloupce zůstávají na svých místech): délka a síla
   const springIds = [...new Set(res.steps.flatMap((s) => Object.keys(s.springs ?? {})))];
   for (const id of springIds) head.push(`${key(id, id)} L [mm]`, `${key(id, id)} F [N]`);
-  const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
   const lines = res.steps.map((s) => {
     const row = [String(s.i), num(s.t, 6), ...s.motors.map((v) => num(v, 6))];
     for (const c of res.comps) {
@@ -424,7 +426,7 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
     }
     if (hasTrace) row.push(...(s.trace ? s.trace.map((v) => num(v, 6)) : ["", "", ""]));
     // dynamika kontroluje kolize jen v každém k-tém snímku – ostatní „nekontrolováno“ (prázdná buňka = bez kolize)
-    if (res.collisionsChecked) row.push(s.clashes ? s.clashes.map((x) => `${name(x.a)} × ${name(x.b)}`).join(", ") : tr("nekontrolováno"));
+    if (res.collisionsChecked) row.push(clashCsvCell(doc, s)); // dvojice s instancí a třídou (clash-report.ts)
     row.push(String(s.conflicts.length));
     for (const id of springIds) {
       const sp = s.springs?.[id];
@@ -475,10 +477,8 @@ export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLine
       out.push(tr(" {0}: rozsah pohybu X {1} · Y {2} · Z {3} mm{4} · konec {5}", c.name, txt(span[0], 3), txt(span[1], 3), txt(span[2], 3), rot ? `${tr(" · natáčí se")} ${txt(turn, 3)}°` : "", `[${last.place[c.id].position.map((v) => txt(v, 3)).join("; ")}]`));
     }
   if (res.collisionsChecked && o.collisionLines) out.push(...o.collisionLines);
-  else if (res.collisionsChecked) {
-    const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
-    out.push(res.collision ? tr("⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)", res.collision.step, txt(res.collision.t, 3), nm(res.collision.a), nm(res.collision.b), txt(res.collision.volume, 3)) : tr("Kolize: žádné ve všech krocích"));
-  }
+  // bez řádků od volajícího (panel pohybu): kolize podle tříd z výsledku (dvojice zařazené při výpočtu – clash-motion.ts)
+  else if (res.collisionsChecked) out.push(...motionClashSummary(res, doc, { every: (res as { dynamic?: { clashEvery?: number } }).dynamic?.clashEvery }).lines);
   // „Vazby splněny“ jen tam, kde vazby polohu určují: díl volný v mezi (kinematika ho nechává, kde byl) = ⚠, ne výsledek (bod 2)
   const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
   out.push(

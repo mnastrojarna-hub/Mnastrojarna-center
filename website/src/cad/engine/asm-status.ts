@@ -9,11 +9,12 @@ import { docStatusText, type AsmStatus, type StaleNote } from "../agent";
 import { bomOf, flattenLeaves, matrixToPlacement, type Leaf } from "../asm-flatten";
 import { motionStatusOf, motionStoreOf } from "../motion-cache";
 import { sourceKey, transformPoint } from "../assembly";
-import { clashStale } from "../clash-class";
+import { clashStale, countClasses } from "../clash-class";
+import { entryClashes, statusPairs } from "../clash-report";
 import type { DrawingExtras } from "../drawing-agent";
 import type { MateStatus } from "../mates";
 import type { AsmComponent, BuildResult, CadDoc, Vec3 } from "../types";
-import { fmtNum, MATERIALS, massKg } from "@/lib/mesh-metrics";
+import { MATERIALS, massKg } from "@/lib/mesh-metrics";
 import { bomPartInfo, type BomPartInfo } from "../bom-model";
 import { asmWorldBox } from "./asm-box";
 import { springCheck } from "./spring-fresh";
@@ -126,14 +127,15 @@ export function asmStatusOf(ws: Workspace, doc: CadDoc, key: string, all: Leaf[]
     mass += partInfo(cache, l.comp).massKg ?? 0;
   }
   const clash = ws.asm.clash.get(key);
-  const compName = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  // zařazené dvojice po pravidlech dokumentu (vlna 22, bod 5): závady s instancí a místem, šrouby v závitu jen počtem
+  const cls = clash ? entryClashes(clash, doc) : [];
   return {
     components: (doc.components ?? []).length,
     parts: vis.length,
     bbox: leavesBox(cache, vis),
     volume: known ? volume : undefined,
     massKg: known ? mass : undefined,
-    clash: clash ? { count: clash.res.length, pairs: clash.res.map((x) => `${compName(x.a)} × ${compName(x.b)} (${fmtNum(x.volume, 1)} mm³)`), at: clash.at, ...(clashStale(clash, doc) ? { stale: true } : {}) } : null,
+    clash: clash ? { count: clash.res.length, pairs: statusPairs(cls, doc), classes: countClasses(cls), at: clash.at, ...(clashStale(clash, doc) ? { stale: true } : {}) } : null,
     mates: ws.asm.mateStatus.get(key),
     // stav vazeb spočítaný pro jiný stav sestavy (nebo pro polohy po přepočtu, které dokument nemá) – nikdy jako platný
     ...((doc.mates ?? []).length && mateStatusState(ws, key, doc).state === "stale" ? { matesStale: true } : {}),

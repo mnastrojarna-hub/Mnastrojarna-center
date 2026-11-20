@@ -49,7 +49,7 @@ export type DocSummary = {
   components?: number;
   parts?: number;
   mates?: { total: number; ok: number; conflict: number; missing: number; suppressed: number; /** ztracené reference (vlna 22, bod 20) */ lost?: number };
-  clashes?: { total: number; thread: number; real: number; undetermined: number; /** prstenec pod hlavou šroubu (ℹ clash.underhead) */ underhead?: number };
+  clashes?: { total: number; thread: number; real: number; undetermined: number; /** prstenec pod hlavou šroubu (ℹ clash.underhead) */ underhead?: number; /** dotyk pod tolerancí a pracovní kontakt podle pravidla (vlna 22, bod 5) */ touch?: number; work?: number };
   sheets?: number;
   /** díl: počet objemových těles (vlna 22 – úroveň „konečné těleso“) */
   solids?: number;

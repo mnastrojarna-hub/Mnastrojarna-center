@@ -1,0 +1,87 @@
+=== run 1 ===
+✓ nový díl „Základ“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Šroub M12“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Doraz“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Díra 1 (hole)
+✓ Díra 2 (hole)
+✓ Válec 1 (cylinder)
+✓ Válec 2 (cylinder)
+✓ Kvádr 3 (box)
+
+Dokument: „Doraz“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 10 × 20 × 10 mm (X 0…10, Y 0…20, Z 0…10) · objem 2 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 3 [box, id #] ✓ – 10 × 20 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Sestava 5S“ – nová záložka
+✓ komponenta „Základ“ vložena do sestavy (ukotvená)
+✓ komponenta „Deska A“ vložena do sestavy
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S1“
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S2“
+✓ vazba ZDVIH „Deska A“ F5 → „Základ“ F6 · 40 mm: ok · poloha beze změny
+✓ podsestava „Horní skupina“: „Deska A“, „Šroub M12“, „Šroub M12“
+kolize: 2 – šroub v závitu 2, skutečné 0
+✓ motor 1: lineární motor · ZDVIH „Horní skupina“ → „Základ“ · hodnota vazby 40 → 45 mm ↑ zdvih 5 mm
+Pohybová studie: 5 kroků · 2 s · motory: lineární motor · ZDVIH „Horní skupina“ → „Základ“ · hodnota vazby 40 → 45 mm ↑ zdvih 5 mm
+ Horní skupina: rozsah pohybu X 0 · Y 0 · Z 5 mm · konec [0; 0; 5]
+Kolize v pohybu: kroků s kolizí 0 z 6 · šroub v závitu 2 dvojic (kroky 0–5) · skutečné: žádné
+Vazby splněny ve všech krocích
+ℹ řádek 9: šroub v závitu: 2 dvojic v krocích 0–5
+Krok 2 (t = 0,8 s, motory 42):
+ Základ [0; 0; 0]
+ Horní skupina [0; 0; 2]
+ kolize šroub v závitu: Horní skupina › Deska A × Horní skupina › Šroub M12 [S1], Horní skupina › Deska A × Horní skupina › Šroub M12 [S2]
+
+Dokument: „Sestava 5S“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Základ [0; 0; 0] ⚓ · Horní skupina [0; 0; 0] (podsestava)
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
+Sestava: 2 komponent (4 dílů po rozložení podsestav) · obálka 120 × 60 × 92 mm · objem Σ 199,08 cm³ · hmotnost Σ 1,563 kg
+Kolize: 2 – šroub v závitu 2 (zkontrolováno ?)
+Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt) (podrobně pohyb stav)
+=== run 3 ===
+✓ nová sestava „Sestava 5M“ – nová záložka
+✓ komponenta „Základ“ vložena do sestavy (ukotvená)
+✓ komponenta „Deska A“ vložena do sestavy
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S1“
+✓ komponenta „Šroub M12“ vložena do sestavy · přezdívka „S2“
+✓ komponenta „Doraz“ vložena do sestavy (ukotvená)
+✓ vazba Zámek „Šroub M12“ [S1] → „Deska A“: ok · poloha beze změny
+✓ vazba Zámek „Šroub M12“ [S2] → „Deska A“: ok · poloha beze změny
+✓ vazba ZDVIH „Deska A“ F5 → „Základ“ F6 · 40 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Základ“ · hodnota vazby 40 → 55 mm ↑ zdvih 15 mm
+Pohybová studie: 15 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Základ“ · hodnota vazby 40 → 55 mm ↑ zdvih 15 mm
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [0; 0; 65]
+ Šroub M12: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [20; 30; 77]
+ Šroub M12: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [80; 30; 77]
+Kolize v pohybu: kroků s kolizí 7 z 16 · šroub v závitu 2 dvojic (kroky 0–15) · skutečné: 1 dvojic dílů v 7 krocích, první v kroku 9
+Vazby splněny ve všech krocích
+ℹ řádek 10: šroub v závitu: 2 dvojic v krocích 0–15
+⚠ řádek 10: v pohybu „Doraz“ × „Šroub M12 [S2]“ od kroku 9 (t = 1,2 s): kroků 7, dvojic komponent 1, největší průnik 1191,793 mm³ – místo [80; 30; 100,5] v kroku 9
+Krok 12 (t = 1,6 s, motory 52):
+ Základ [0; 0; 0]
+ Deska A [0; 0; 62]
+ Šroub M12 [20; 30; 74]
+ Šroub M12 [80; 30; 74]
+ Doraz [75; 20; 100]
+ kolize šroub v závitu: Deska A × Šroub M12 [S1], Deska A × Šroub M12 [S2]
+⚠ řádek 11: kolize „Šroub M12 [S2]“ × „Doraz“ (681,0 mm³) – místo [80; 30; 102] · obálka 10 × 18 × 4 mm
+
+Dokument: „Sestava 5M“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Základ [0; 0; 0] ⚓ · Deska A [0; 0; 50] · Šroub M12 [S1] [20; 30; 62] · Šroub M12 [S2] [80; 30; 62] · Doraz [75; 20; 100] ⚓
+Vazby: 3 (3 ok)
+Pohybová studie: motorů 1 · kroků 15 · 2 s · kolize – pohyb stav
+Sestava: 5 komponent (5 dílů po rozložení podsestav) · obálka 120 × 60 × 110 mm · objem Σ 201,08 cm³ · hmotnost Σ 1,578 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 15 kroků, vazby splněny, průnik těles v 7 krocích (podrobně pohyb stav)

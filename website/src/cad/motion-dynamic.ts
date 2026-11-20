@@ -28,6 +28,7 @@
  * Jednotky uvnitř: mm, s, kg (síla kg·mm/s² = 10⁻³ N, energie 10⁻⁶ J). Čisté funkce bez jádra (geometrii a hmotnosti dodá volající).
  */
 import { apply3, mul3, type Mat3 } from "./assembly";
+import { isFault } from "./clash-rules";
 import { springComps, springSteps, solidOf } from "./asm-spring";
 import { springRateOf } from "./asm-spring-check";
 import { springGeom, type SpringGeom } from "./asm-spring-geom";
@@ -759,8 +760,9 @@ export async function runDynamic(
         const a = (timing.clash ??= { pairs: 0, culled: 0, exact: 0, reused: 0, undetermined: 0 });
         for (const k2 of ["pairs", "culled", "exact", "reused", "undetermined"] as const) a[k2] += clashes.stats[k2] ?? 0;
       }
-      row.clashes = clashes.map((c) => ({ a: c.a, b: c.b, volume: c.volume }));
-      if (row.clashes.length && !collision) collision = { ...row.clashes[0], step: row.i, t };
+      row.clashes = clashes.map((c) => ({ ...c })); // i cesty listů (podsestavy), místo a třída (vlna 22, bod 5)
+      const hit = row.clashes.find((c) => isFault(c.cls)); // první SKUTEČNÁ kolize
+      if (hit && !collision) collision = { ...hit, step: row.i, t };
     }
     steps.push(row);
     if (!timing.slowStep || stepMs > timing.slowStep.ms) timing.slowStep = { i: row.i, ms: stepMs };

@@ -1,0 +1,65 @@
+=== run 1 ===
+✓ nový díl „Matrice“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Plech“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Razník“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Rám“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Díra 1 (hole)
+✓ Kvádr 2 (box)
+✓ Válec 1 (cylinder)
+✓ Kvádr 3 (box)
+
+Dokument: „Rám“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 60 × 60 × 5 mm (X 0…60, Y 0…60, Z 0…5) · objem 18 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 3 [box, id #] ✓ – 60 × 60 × 5 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Střih“ – nová záložka
+✓ komponenta „Rám“ vložena do sestavy (ukotvená)
+✓ komponenta „Matrice“ vložena do sestavy (ukotvená)
+✓ komponenta „Plech“ vložena do sestavy (ukotvená)
+✓ komponenta „Razník“ vložena do sestavy
+✓ vazba ZDVIH „Razník“ F3 → „Rám“ F6 · 26 mm: ok · poloha beze změny
+kolize: 1 – šroub v závitu 0, skutečné 1
+⚠ řádek 7: kolize „Plech“ × „Razník“ (78,5 mm³) – místo [30; 30; 11,5] · obálka 10 × 10 × 1 mm
+✓ pravidlo kolizí r1 pracovní kontakt „Razník“ × „Plech“ v krocích 0–2
+kolize po pravidlech: skutečné 1
+✓ motor 1: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
+ Razník: rozsah pohybu X 0 · Y 0 · Z 4 mm · konec [30; 30; 7]
+Kolize v pohybu: kroků s kolizí 2 z 5 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 3 · pracovní kontakt 1 dvojic
+Vazby splněny ve všech krocích
+⚠ řádek 9: v pohybu „Plech“ × „Razník“ od kroku 3 (t = 1,5 s): kroků 2, dvojic komponent 1, největší průnik 157,08 mm³ – místo [30; 30; 11] v kroku 3
+ℹ řádek 9: pracovní kontakt „Plech“ × „Razník“ v krocích 0–2 (pravidlo r1), největší průnik 157,08 mm³
+✓ odebráno pravidel kolizí: 1
+kolize po pravidlech: skutečné 1
+✓ pravidlo kolizí r1 pracovní kontakt „Razník“ × „Plech“ při hodnotě vazby „ZDVIH“ 26–24 (střih)
+kolize po pravidlech: pracovní kontakt 1
+Kolize (zkontrolováno ?): pracovní kontakt 1 · zobrazeno 1 skupin (vše)
+ · pracovní kontakt: pracovní kontakt „Plech“ × „Razník“ (78,5 mm³) – pravidlo r1 pracovní kontakt „Razník“ × „Plech“ při hodnotě vazby „ZDVIH“ 26–24 (střih) – místo [30; 30; 11,5] · obálka 10 × 10 × 1 mm
+Pohybová studie: motorů 1 · kroků 4 · 2 s · kolize
+ 1. lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Rám“ · hodnota vazby 26 → 22 mm ↓ zdvih 4 mm
+ Razník: rozsah pohybu X 0 · Y 0 · Z 4 mm · konec [30; 30; 7]
+Kolize v pohybu: kroků s kolizí 2 z 5 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 3 · pracovní kontakt 1 dvojic
+Vazby splněny ve všech krocích
+⚠ řádek 13: v pohybu „Plech“ × „Razník“ od kroku 3 (t = 1,5 s): kroků 2, dvojic komponent 1, největší průnik 157,08 mm³ – místo [30; 30; 11] v kroku 3
+ℹ řádek 13: pracovní kontakt „Plech“ × „Razník“ v krocích 0–2 (pravidlo r1), největší průnik 157,08 mm³
+Pravidla kolizí (1) · tolerance dotyku 0,01 mm:
+ 1. r1 pracovní kontakt „Razník“ × „Plech“ při hodnotě vazby „ZDVIH“ 26–24 (střih)
+✓ odebráno pravidel kolizí: 1
+kolize po pravidlech: skutečné 1
+
+Dokument: „Střih“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; -20] ⚓ · Matrice [0; 0; 0] ⚓ · Plech [0; 0; 10] ⚓ · Razník [30; 30; 11]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 2 s · kolize – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 60 × 60 × 61 mm · objem Σ 62,43 cm³ · hmotnost Σ 0,490 kg
+Kolize: 1 – skutečné 1: Plech × Razník (78,5 mm³) v místě [30; 30; 11,5] (zkontrolováno ?)
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, průnik těles v 5 krocích (podrobně pohyb stav)

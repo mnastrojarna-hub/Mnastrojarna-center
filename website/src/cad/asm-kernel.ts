@@ -153,7 +153,11 @@ export async function shapeOfDoc(doc: CadDoc): Promise<Shape | null> {
 }
 
 /** Kolize dvou listových dílů. `a`/`b` = id komponent nejvyšší úrovně (pro zvýraznění), `aPath`/`bPath` = celé cesty. */
-export type Interference = { a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] };
+/**
+ * Dvojice kolize: komponenty nejvyšší úrovně, objem průniku, cesty listů; místo průniku ve světových souřadnicích (vlna 22, bod 5):
+ * `at` = těžiště, `box` = obálka, `depth` = tloušťka průniku 2·V/S nejtlustšího kusu (tenký plátek pod tolerancí = dotyk).
+ */
+export type Interference = { a: string; b: string; volume: number; aPath?: string[]; bPath?: string[]; at?: Vec3; box?: [Vec3, Vec3]; depth?: number };
 /**
  * Počty jedné kontroly: dvojice listů, odfiltrované obálkou, přesné průniky, znovupoužité z mezipaměti dvojic, nevyhodnotitelné
  * (booleovská operace selhala – dvojice se jako dřív nehlásí).
@@ -199,8 +203,10 @@ function worldBox([lo, hi]: [Vec3, Vec3], m: Rt): [Vec3, Vec3] {
 
 /** lokální obálky dílů (klíč dílu = obsah, takže platí trvale) */
 const boxCache = new Map<string, [Vec3, Vec3]>();
-/** (díl A, díl B, vzájemná poloha) → objem průniku (NaN = nevyhodnotitelné) */
-const pairCache = new Map<string, number>();
+/** průnik dvojice v souřadnicích dílu A: objem (NaN = nevyhodnotitelné), těžiště, obálka a tloušťka (vlna 22, bod 5) */
+type PairHit = { v: number; c?: Vec3; b?: [Vec3, Vec3]; d?: number };
+/** (díl A, díl B, vzájemná poloha) → průnik */
+const pairCache = new Map<string, PairHit>();
 const PAIR_MAX = 20000;
 const BOX_MAX = 4000;
 let lastStats: InterferenceStats = { pairs: 0, culled: 0, exact: 0, reused: 0, undetermined: 0 };
@@ -223,18 +229,94 @@ function localBox(key: string, body: Shape): [Vec3, Vec3] {
  * se hned mažou (replicad `intersect` nechává `BRepAlgoAPI_Common` na úklid GC, nevolá Clear() a staví průnik dvakrát – konstruktor
  * se dvěma tělesy už staví a pak ještě Build()).
  */
-function pairVolume(a: Shape, b: Shape, m: number[]): number {
-  return pairCommon(a, b, m, (res) => {
-    const oc = r.getOC() as Oc;
-    const props = new oc.GProp_GProps();
-    try {
-      oc.BRepGProp.VolumeProperties(res, props, false, false, false);
-      return props.Mass() as number;
-    } finally {
-      props.delete();
-    }
-  }) ?? NaN;
+function pairVolume(a: Shape, b: Shape, m: number[], tolerance = 1e-3): PairHit {
+  return (
+    pairCommon(a, b, m, (res) => {
+      const oc = r.getOC() as Oc;
+      const props = new oc.GProp_GProps();
+      let v: number;
+      let c: Vec3 | undefined;
+      try {
+        oc.BRepGProp.VolumeProperties(res, props, false, false, false);
+        v = props.Mass() as number;
+        if (v > tolerance) {
+          const g = props.CentreOfMass();
+          c = [g.X(), g.Y(), g.Z()];
+          g.delete();
+        }
+      } finally {
+        props.delete();
+      }
+      if (!(v > tolerance) || !c) return { v };
+      // místo průniku: obálka a tloušťka (jen u hlášené kolize – dvojice pod prahem se nepočítají)
+      return { v, c, ...pieceGeometry(res) };
+    }) ?? { v: NaN }
+  );
 }
+
+/**
+ * Obálka průniku a jeho tloušťka (vlna 22, bod 5): tloušťka kusu = 2·V/S (plátek tloušťky t a plochy A: 2·A·t / 2·A = t;
+ * krychle a: a/3), z kusů se bere NEJTLUSTŠÍ – dvojice je numerický dotyk, jen když je tenký každý kus průniku (tenký plátek
+ * vedle skutečného nárazu ho neschová). Selhání měření = bez údaje (dvojice se pak jako dotyk nikdy nezařadí).
+ */
+function pieceGeometry(res: unknown): { b?: [Vec3, Vec3]; d?: number } {
+  const oc = r.getOC() as Oc;
+  const out: { b?: [Vec3, Vec3]; d?: number } = {};
+  try {
+    const box = new oc.Bnd_Box();
+    try {
+      oc.BRepBndLib.Add(res, box, false);
+      if (!box.IsVoid()) {
+        const lo = box.CornerMin();
+        const hi = box.CornerMax();
+        out.b = [
+          [lo.X(), lo.Y(), lo.Z()],
+          [hi.X(), hi.Y(), hi.Z()],
+        ];
+        lo.delete();
+        hi.delete();
+      }
+    } finally {
+      box.delete();
+    }
+  } catch {
+    /* obálka je jen údaj o místě */
+  }
+  try {
+    const exp = new oc.TopExp_Explorer(res, oc.TopAbs_ShapeEnum.TopAbs_SOLID, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+    let d = 0;
+    let n = 0;
+    try {
+      for (; exp.More(); exp.Next()) {
+        const s = exp.Current();
+        const vp = new oc.GProp_GProps();
+        const sp = new oc.GProp_GProps();
+        try {
+          oc.BRepGProp.VolumeProperties(s, vp, false, false, false);
+          oc.BRepGProp.SurfaceProperties(s, sp, false, false);
+          const v = vp.Mass() as number;
+          const a = sp.Mass() as number;
+          if (v > 1e-9 && a > 1e-9) {
+            d = Math.max(d, (2 * v) / a);
+            n++;
+          }
+        } finally {
+          vp.delete();
+          sp.delete();
+        }
+      }
+    } finally {
+      exp.delete();
+    }
+    if (n) out.d = d;
+  } catch {
+    /* bez tloušťky = nikdy dotyk */
+  }
+  return out;
+}
+
+/** bod z lokálních souřadnic listu do světa (R po řádcích, posun) */
+const toWorldPt = (m: Rt, p: Vec3): Vec3 => [0, 1, 2].map((i) => m.R[i * 3] * p[0] + m.R[i * 3 + 1] * p[1] + m.R[i * 3 + 2] * p[2] + m.t[i]) as Vec3;
 
 /**
  * Průnik A ∩ B jako těleso v souřadnicích A (`m` = zaokrouhlená A⁻¹·B z `relOf`) – stejný výpočet jako objem kolize, pro
@@ -323,15 +405,27 @@ export async function interference(doc: CadDoc, tolerance = 1e-3, opts: { full?:
         }
         const rel = relOf(items[i].m, items[j].m);
         const key = `${items[i].key}|${items[j].key}|${rel.key}`;
-        let v = opts.full ? undefined : pairCache.get(key);
-        if (v === undefined) {
-          v = pairVolume(items[i].body, items[j].body, rel.m);
+        let hit = opts.full ? undefined : pairCache.get(key);
+        if (hit === undefined) {
+          hit = pairVolume(items[i].body, items[j].body, rel.m, tolerance);
           st.exact++;
           if (pairCache.size >= PAIR_MAX) pairCache.delete(pairCache.keys().next().value!);
-          pairCache.set(key, v);
+          pairCache.set(key, hit);
         } else st.reused++;
+        const v = hit.v;
         if (Number.isNaN(v)) st.undetermined++;
-        else if (v > tolerance) out.push({ a: items[i].path[0], b: items[j].path[0], volume: v, aPath: items[i].path, bPath: items[j].path });
+        else if (v > tolerance)
+          out.push({
+            a: items[i].path[0],
+            b: items[j].path[0],
+            volume: v,
+            aPath: items[i].path,
+            bPath: items[j].path,
+            // místo průniku ve světě (průnik je v souřadnicích listu A): těžiště, obálka, tloušťka
+            ...(hit.c ? { at: toWorldPt(items[i].m, hit.c) } : {}),
+            ...(hit.b ? { box: worldBox(hit.b, items[i].m) } : {}),
+            ...(hit.d !== undefined ? { depth: hit.d } : {}),
+          });
       }
   } finally {
     for (const b of held.values()) b.delete();

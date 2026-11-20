@@ -22,6 +22,7 @@ import { defaultStudy, motionFindings, motionMotorNotes, type MotionResult } fro
 import { levelLine, levelOf, studyMode } from "@/cad/motion-mode";
 import { devText } from "@/cad/motion-quasi";
 import { MotionSuperseded, motionRunning, motionSig, motionSlot, motionState, motionVerdict, subscribeMotionStore, type MotionState } from "@/cad/motion-cache";
+import { stepHasFault } from "@/cad/clash-report"; // štítek kroku jen u skutečné kolize (vlna 22, bod 5)
 import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorMeaningText, motorNotes, motorRangeText, type MotorInput } from "@/cad/motor-model";
 import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "@/cad/motion-dynamic-report";
 import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
@@ -676,7 +677,7 @@ export function MotionPanel({
             </div>
             <p data-motion-step className="font-mono text-[11px] text-[#4a5664]">
               {tr("krok {0}/{1} · t = {2} s · motory {3}", cur.i, res.steps.length - 1, f(cur.t, 3), cur.motors.map((v, i) => `${f(v)}${res.motors[i]?.kind === "rotary" ? "°" : " mm"}`).join(", "))}
-              {cur.clashes?.length ? <span className="text-brand"> · {tr("kolize")}</span> : null}
+              {stepHasFault(doc, cur) ? <span className="text-brand"> · {tr("kolize")}</span> : null}
               {cur.conflicts.length ? <span className="text-brand"> · {tr("nesplněno {0}", cur.conflicts.length)}</span> : null}
               {/* krok s konfliktem (bod 8): motor stojí na mezi / neřešitelný krok s poslední platnou polohou */}
               {cur.status === "stopped" ? (

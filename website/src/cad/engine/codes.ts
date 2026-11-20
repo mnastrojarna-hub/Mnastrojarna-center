@@ -119,6 +119,10 @@ export const CODES = [
   { code: "clash.thread", level: "note", key: "šroub v závitu „{0}“ × „{1}“" },
   { code: "clash.underhead", level: "note", key: "prstenec pod hlavou šroubu „{0}“ × „{1}“" },
   { code: "clash.undetermined", level: "warn", key: "kolizi „{0}“ × „{1}“ nelze vyhodnotit" },
+  // vlna 22, bod 5 (clash-rules.ts): numerický dotyk pod tolerancí a pracovní kontakt podle pravidla operace – počítají se, nejsou závadou
+  { code: "clash.touch", level: "note", key: "dotyk „{0}“ × „{1}“ (průnik tenčí než tolerance dotyku)" },
+  { code: "clash.work", level: "note", key: "pracovní kontakt „{0}“ × „{1}“ podle pravidla kolizí" },
+  { code: "clash.stale", level: "warn", key: "výpis kolizí platí pro dřívější stav sestavy (zkontrolováno {0}) – spusťte „kolize“ znovu" },
   { code: "clash.hidden", level: "note", key: "skryté komponenty se nekontrolují ({0})" },
   { code: "clash.rechecked", level: "note", key: "kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila" },
   { code: "motion.conflict", level: "warn", key: "pohyb porušuje vazbu „{0}“ v kroku {1}" },

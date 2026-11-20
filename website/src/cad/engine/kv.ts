@@ -9,6 +9,7 @@
  */
 import type { AsmStatus, StaleNote } from "../agent";
 import { outputsKv } from "../doc-outputs";
+import { clashCountsKv } from "../clash-report";
 import { sourceKey } from "../assembly";
 import { mateLost } from "../mates";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
@@ -202,7 +203,9 @@ export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, 
   // vydané listy a záznamy exportů ze starší revize modelu: `drawing.stale=N export.stale=N` (vlna 22, bod 20)
   const tail = [old, outputsKv(doc)].filter(Boolean).map((x) => ` ${x}`).join("");
   // obálku sestavy má už řádek D (`docKv`); bez obálky `bbox=-`
-  if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined], ["motion", asm?.motion ? (asm.motion.state === "unchecked" ? "-" : asm.motion.state) : undefined], ["motion.stale", asm?.motion?.state === "stale" ? true : undefined]])}${tail}`;
+  // třídy kolizí jako v řádku D (`clash=5(thread=3,real=2)`, vlna 22 bod 5) – bez uvozovek, stejný tvar pro parser
+  const clashTok = asm?.clash?.classes?.total ? `clash=${clashCountsKv(asm.clash.classes)}` : kv([["clash", asm?.clash ? asm.clash.count : "-"]]);
+  if (doc.kind === "assembly") return `${base} ${[kv([["bbox", asm?.bbox ? undefined : "-"]]), clashTok, kv([["clash.stale", asm?.clash?.stale ? true : undefined], ["motion", asm?.motion ? (asm.motion.state === "unchecked" ? "-" : asm.motion.state) : undefined], ["motion.stale", asm?.motion?.state === "stale" ? true : undefined]])].filter(Boolean).join(" ")}${tail}`;
   if (doc.kind === "draft" || !res?.metrics) return `${base}${tail}`;
   // `solids=` a `valid=` (i `valid=unchecked`) nese už strojová část souhrnu dokumentu (`docKv`)
   return `${`${base} ${kv([["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd()}${tail}`;

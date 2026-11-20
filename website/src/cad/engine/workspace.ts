@@ -8,7 +8,7 @@
 import type { TabInfo } from "../agent-asm";
 import type { PartFaces } from "../asm-agent";
 import type { Interference } from "../asm-kernel";
-import type { ClashCounts } from "../clash-class";
+import type { ClashCounts, ClashDetail } from "../clash-class";
 import type { MateStatus, PartFace } from "../mates";
 import type { BuildResult, CadDoc } from "../types";
 
@@ -48,8 +48,13 @@ export type AsmCaches = {
       res: Interference[];
       at: string;
       comps?: number;
-      /** třídy kolizí (šroub × závit geometricky, clash-class.ts) */
+      /** třídy kolizí (šroub × závit geometricky, clash-class.ts) – počty po pravidlech dokumentu v době kontroly */
       classes?: ClashCounts;
+      /**
+       * geometrické zařazení dvojic z jádra (pořadí jako `res`; vlna 22, bod 5): panel Kolize, zvýraznění, `stav` a řádek D z něj
+       * počítají výsledné třídy po NYNĚJŠÍCH pravidlech dokumentu (clash-report.ts `entryClashes`); bez něj = nezařazeno
+       */
+      list?: ClashDetail[];
       /** otisk sestavy v době kontroly (`clashSig`) – jiný otisk = výsledek neplatí (sestava se mezitím změnila) */
       sig?: string;
       /** řádek skriptu kontroly (CLI: ℹ `clash.rechecked` na konci běhu) */

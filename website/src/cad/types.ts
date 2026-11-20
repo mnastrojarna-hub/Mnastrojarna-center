@@ -283,6 +283,10 @@ export type CadDoc = {
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
   motion?: MotionStudy;
+  /** pravidla kontroly kolizí sestavy (pracovní kontakt operace, závit bez prvku) – cad/clash-rules.ts (vlna 22, bod 5) */
+  clashRules?: ClashRule[];
+  /** tolerance dotyku kontroly kolizí [mm]: průnik tenčí než tolerance = ℹ dotyk, ne kolize (výchozí 0,01) */
+  clashTol?: number;
   /** metadata těles dílu (barva, skrytí) – název = klíč tělesa z historie */
   bodies?: BodyMeta[];
   /** těleso, do kterého mají nové prvky směřovat (bez hodnoty = naposledy upravené) */
@@ -573,4 +577,19 @@ export type MotionAnnotSettings = { off?: boolean; hide?: ("t" | "step" | "motor
  */
 export type MotionDynamic = { dt: number; gravity?: Vec3 | null; damping?: number; restitution?: number; masses?: Record<string, number>; loads?: MotionLoad[]; /** počet zaznamenaných snímků (výchozí 400) */ frames?: number };
 /** Síla [N] / moment [N·m] na vazbě: kladná hodnota zvětšuje hodnotu vazby (vzdálenost, posuv, natočení A vůči B). */
+/**
+ * Pravidlo kontroly kolizí (vlna 22, bod 5 – jeden model pro pracovní kontakt i pro procesní vrstvu): `a` / `b` = cesty id
+ * komponent (komponenta nejvyšší úrovně nebo díl v podsestavě; bez `b` = s čímkoli). `work` = pracovní kontakt (nástroj × plech)
+ * v okně operace → ℹ `clash.work` místo ⚠; `thread` = šroub v jádrové díře bez prvku závitu je závitový záběr. Okno `when`:
+ * kroky pohybové studie `steps`, nebo hodnota motoru vazby `mate` v rozsahu `from`–`to` (staticky hodnota vazby v dokumentu);
+ * bez okna platí vždy.
+ */
+export type ClashRule = {
+  id: string;
+  kind: "work" | "thread";
+  a: string[];
+  b?: string[];
+  when?: { steps?: [number, number]; mate?: string; from?: number; to?: number };
+  note?: string;
+};
 export type MotionLoad = { mate: string; kind: "force" | "torque"; value: number };

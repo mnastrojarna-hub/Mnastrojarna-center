@@ -7,7 +7,9 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { clashSig } from "@/cad/clash-class";
+import { classifyClashes, clashSig } from "@/cad/clash-class";
+import { countsText, entryClashes, entryCounts, faultLeafIds } from "@/cad/clash-report";
+import { withRule, withoutRule } from "@/cad/clash-rules";
 import { clashStateOf, dropResults, leavesSig, mateSig, mateSigOf, noteResult, resultId, resultIdOf, resultState, setMateStatus as stampMateStatus, staleResults, stampResult, type ClashState, type ResultKind, type ResultState } from "@/cad/engine/result-key";
 import { recordExport } from "@/cad/doc-outputs";
 import { staleCopies, staleCopyText } from "@/cad/asm-refresh";
@@ -988,10 +990,13 @@ export function CadApp() {
         const k = await import("@/cad/asm-agent-kin");
         const { studyCsv, studySummary, dynApi } = await import("@/cad/motion-dynamic-report");
         const res = await k.motionRun(d, asmEnvRef.current());
-        const nm = (id: string) => d.components?.find((c) => c.id === id)?.name ?? id;
         // časový plán videa s uloženými volbami studie (vlna 22, bod 13 – cad/motion-video.ts)
         const video = await import("@/cad/motion-video").then((m) => m.videoApi(res, d.motion)).catch(() => null);
-        return { steps: k.motionTable(d, res), summary: studySummary(res, d), collision: res.collision ? { ...res.collision, a: nm(res.collision.a), b: nm(res.collision.b) } : null, csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}) };
+        // první SKUTEČNÁ kolize (šroub v závitu, dotyk ani pracovní kontakt ne) s popisem instance a místem; kroky s třídami dvojic
+        const cr = await import("@/cad/clash-report");
+        const steps = k.motionTable(d, res).map((row, i) => (res.steps[i]?.clashes ? { ...row, clashList: cr.apiStepClashes(d, res.steps[i]) } : row));
+        const cl = res.collisionsChecked ? cr.motionClashSummary(res, d).stats : null;
+        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -1413,7 +1418,8 @@ export function CadApp() {
     const all = [...centers.values()];
     const mid: Vec3 = all.length ? ([0, 1, 2].map((k) => all.reduce((s, v) => s + v[k], 0) / all.length) as Vec3) : [0, 0, 0];
     // zvýraznění kolidujících dílů jen pro PLATNÝ záznam aktivního dokumentu (jiná záložka / změněná sestava = nic)
-    const clashIds = new Set((clashValid && clashEntry ? clashEntry.res : []).flatMap((x) => [x.a, x.b]));
+    // jen závady (skutečné / nevyhodnotitelné) a jen jejich LISTY – šroub v závitu ani celá podsestava nesvítí (vlna 22, bod 5)
+    const clashIds = clashValid && clashEntry ? faultLeafIds(entryClashes(clashEntry, doc)) : new Set<string>();
     const out: AsmView[] = [];
     for (const l of comps) {
       const r = asmCache.current.get(l.key);
@@ -1435,13 +1441,13 @@ export function CadApp() {
         matrix: m,
         color: l.comp.color ?? top?.color ?? "#b9c2cc",
         selected: l.topId === asmSel || l.topId === mate?.compId,
-        clash: clashIds.has(l.topId) || clashIds.has(l.id),
+        clash: clashIds.has(l.id),
         solid: !!l.coil || r?.metrics?.solids !== 0, // vlna 22: plochy bez objemu = v řezu bez čela
       });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid]);
+  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid, doc.clashRules, doc.clashTol]);
 
   const asmPartInfo = useCallback(
     // jedna funkce materiálu a hmotnosti pro aplikaci, text i CLI (bom-model.ts – označení, třída v jazyce, normálie = třída pevnosti)
@@ -2300,13 +2306,18 @@ export function CadApp() {
     try {
       const res = await cad.interference(target);
       if (!ticket.current()) return; // mezitím spuštěna novější kontrola – tento výsledek je nahrazen
+      // třídy dvojic geometricky v jádře jako příkaz „kolize“ (vlna 22, bod 5): šroub v závitu / pod hlavou / skutečná… – panel,
+      // zvýraznění i stav pak čtou zařazený seznam, ne surové průniky
+      const { list } = await classifyClashes(cad, target, res);
+      const classes = entryCounts({ res, list }, target);
+      if (!ticket.current()) return; // mezitím spuštěna novější kontrola – tento výsledek je nahrazen
       const at = new Date().toLocaleTimeString(cadLocale());
       const comps = flattenLeaves(target).filter((l) => !l.hidden).length;
-      ws.asm.clash.set(key, stampResult({ res, at, comps, sig }, resultId("clash", key, target, { sig, comps, at, pose: step ? "step" : "doc" })));
+      ws.asm.clash.set(key, stampResult({ res, list, at, comps, sig, classes }, resultId("clash", key, target, { sig, comps, at, pose: step ? "step" : "doc" })));
       // potvrzení jen když výsledek patří tomu, co je právě vidět; jinak bez ✓ a s názvem sestavy (nic zeleného nad jiným dokumentem)
       const shown = shownAsmRef.current;
       const here = docId.current === key && !!shown && clashSig(shown) === sig;
-      flash(!here ? tr("Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.", name) : res.length ? tr("Kolize: {0}", res.length) : tr("Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu"));
+      flash(!here ? tr("Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.", name) : res.length ? tr("Kolize: {0}", countsText(classes)) : tr("Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu"));
     } catch (e) {
       flash((e as Error).message);
     } finally {
@@ -4154,7 +4165,7 @@ export function CadApp() {
               </FloatPanel>
             )}
             {isAsm && clashOpen && (
-              <ClashPanel key={docKeyNow} doc={doc} docKey={docKeyNow} state={clashState} entry={clashEntry} id={resultIdOf(clashEntry)} busy={clashBusy === docKeyNow} top={explode > 0 ? 150 : 12} onRecheck={() => void runInterference()} onClose={() => setClashOpen(false)} onSelect={setAsmSel} />
+              <ClashPanel key={docKeyNow} doc={doc} docKey={docKeyNow} state={clashState} entry={clashEntry} id={resultIdOf(clashEntry)} busy={clashBusy === docKeyNow} top={explode > 0 ? 150 : 12} onRecheck={() => void runInterference()} onClose={() => setClashOpen(false)} onSelect={setAsmSel} onRules={(add, del) => commit(add.reduce((d, r) => withRule(d, r), del ? withoutRule(doc, del) : doc))} onTol={(mm) => commit({ ...doc, clashTol: mm })} />
             )}
             {shared && (tabId === shared.tabId || tabStrip.find((t) => t.id === tabId)?.srcTabId === shared.tabId) && (
               <div role="status" className="absolute left-1/2 top-2 z-30 flex max-w-[94%] -translate-x-1/2 items-center gap-3 rounded-md border border-[#f3c6c2] bg-[#fff7f6]/95 px-3 py-1.5 text-[12px] text-[#26303b] shadow">

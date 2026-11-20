@@ -1,0 +1,28 @@
+# vlna 22, bod 5: pracovní kontakt razník × plech podle pravidla operace (jeden model doc.clashRules), ne vypnutím kolizí:
+# v okně operace ℹ clash.work, mimo okno ⚠ skutečná kolize; okno kroky studie i hodnota motoru vazby; EN / DE příkazy
+nový díl Matrice
+kvádr 60 60 10
+díra 12 skrz v 30 30
+nový díl Plech
+kvádr 60 60 2
+nový díl Razník
+válec 10 30
+nový díl Rám
+kvádr 60 60 5
+#--- run
+nová sestava Střih
+vložit "Rám" v 0 0 -20 ukotvit
+vložit "Matrice" ukotvit
+vložit "Plech" v 0 0 10 ukotvit
+vložit "Razník" v 30 30 11
+sestava vazba vzdálenost "Razník" spodní "Rám" horní hodnota 26 název "ZDVIH"
+kolize
+kolize pravidlo pracovní "Razník" "Plech" kroky 0..2
+pohyb motor lineární vazba "ZDVIH" 26..22 kroky 4 kolize
+kolize pravidlo 1 smazat
+kolize pravidlo pracovní "Razník" "Plech" pohyb "ZDVIH" 26..24 pozn střih
+kolize seznam
+pohyb stav
+kollision regeln
+clash rule 1 delete
+stav

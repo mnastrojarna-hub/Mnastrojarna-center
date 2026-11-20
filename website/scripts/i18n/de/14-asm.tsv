@@ -22,7 +22,6 @@
 ▶ přehrávání {0} kroků ({1} s){2}	▶ Wiedergabe von {0} Schritten ({1} s){2}
 ⚠ geometrii vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ Geometrie der Verknüpfung konnte nicht aus dem Kern geladen werden – baugruppe verknüpfungen rechnet sie nach dem Aufbau der Teile neu
 ⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)	⚠ nicht erfüllte Verknüpfungen in {0} Schritten (Mechanismus blockiert oder Antrieb über eine Grenze hinaus)
-⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)	⚠ erste Kollision in Schritt {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)
 ⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně	⚠ Verknüpfung {0} lässt sich nicht zusammen mit den anderen erfüllen – baugruppe verknüpfungen, baugruppe verknüpfung {1} unterdrücken|löschen|umkehren
 ✓ motor {0} odebrán	✓ Antrieb {0} entfernt
 ✓ motor {0}: {1}{2}	✓ Antrieb {0}: {1}{2}
