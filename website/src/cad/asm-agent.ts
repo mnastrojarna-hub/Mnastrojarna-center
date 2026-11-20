@@ -471,8 +471,6 @@ export async function solveAsm(doc: CadDoc, env: AsmEnv, anchorId?: string | nul
   // pružiny: délka podle nových poloh dosedacích ploch (cad/asm-spring-agent.ts)
   return { doc: await refreshSprings(solved, env), status: r.status, moved: r.moved, ...(r.conflict ? { conflict: r.conflict } : {}), ...(r.eqMoved.length ? { eqMoved: r.eqMoved } : {}) };
 }
-/** záznam s kódem ⚠ mate.conflict (polohy beze změny) – AsmResult.codes */
-export const conflictCode = (c: StaticConflict) => ({ code: "mate.conflict", args: [conflictText(c)], text: tr("vazby nelze splnit spolu – polohy komponent zůstaly beze změny (žádný kompromis); {0}", conflictText(c)) });
 
 /** geometrie dosedacích ploch pružin (pomocné „vazby“, do dokumentu se nevrací) – rovnováha pružin ve statickém přepočtu */
 async function ensureSeatGeoOf(doc: CadDoc, env: AsmEnv): Promise<void> {

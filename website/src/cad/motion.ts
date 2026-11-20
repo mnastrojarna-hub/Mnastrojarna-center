@@ -279,9 +279,9 @@ export async function runMotion(
       for (const [id, pl] of Object.entries(seed)) if (poses.has(id)) poses.set(id, poseOf(pl));
       const vals = motors.map((x) => profileAt(x.prof, tm, { k: (tm / duration) * n, n }));
       motors.forEach((x, i) => (x.target = vals[i]));
-      const ms = active().filter((m) => !groups.tree.has(m.id));
-      solvePoses(poses, vars, () => [...ms.flatMap((m) => kinResidual(m, ctx) ?? []), ...driveRes()], { maxIter: 60, groups });
-      if (ms.some((m) => m.type !== "fixed" && resNorm(kinResidual(m, ctx)) > 1e-3) || driveRes().some((r) => Math.abs(r) > 1e-3)) return null;
+      // týž krok s prioritou jako krok studie (motion-quasi.ts solveStep, vlna 22 bod 8); mezipoloha jen ze splněného kroku
+      const out = solveStep(poses, vars, terms, { groups, maxIter: 60, atLimit: "error" });
+      if (out.status !== "ok") return null;
       const place: Record<string, Placement> = {};
       for (const c of comps) {
         const P = poses.get(c.id);
