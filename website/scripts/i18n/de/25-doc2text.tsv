@@ -29,7 +29,6 @@ razítko listu „{0}“ se nepodařilo zapsat	das Schriftfeld des Blatts „{0}
 ruční kóty a značky výkresu se do skriptu nepřenášejí: {0} na {1} listech	manuelle Maße und Symbole der Zeichnung werden nicht ins Skript übernommen: {0} auf {1} Blättern
 skica na ploše / pomocné rovině: rovinu při přečtení znovu spočítá jádro z plochy F (číslo plochy tělesa před skicou)	Skizze auf Fläche / Hilfsebene: beim Lesen berechnet der Kern die Ebene neu aus der Fläche F (Flächennummer des Körpers vor der Skizze)
 skript se nepřečetl bez chyb ({0}): {1}	das Skript ließ sich nicht fehlerfrei zurücklesen ({0}): {1}
-tabulka revizí listu „{0}“ se do skriptu nepřenáší	die Änderungstabelle des Blatts „{0}“ wird nicht ins Skript übernommen
 textové příkazy, {0} řádků	Textbefehle, {0} Zeilen
 textový skript	Textskript
 Textový skript (.txt)	Textskript (.txt)
@@ -38,7 +37,6 @@ Textový skript uložen: {0} ({1} řádků){2}	Textskript gespeichert: {0} ({1} 
 údaj razítka „{0}“ listu „{1}“ nejde zapsat na řádek	das Schriftfeld-Feld „{0}“ des Blatts „{1}“ lässt sich nicht in eine Zeile schreiben
 úpravy vygenerovaných kót (tolerance, vlastní text, revize) se do skriptu nepřenášejí: {0} na {1} listech – doplňte je příkazem výkres tolerance <kóta> <tolerance>	Änderungen erzeugter Maße (Toleranz, eigener Text, Revision) werden nicht ins Skript übernommen: {0} auf {1} Blättern – mit dem Befehl zeichnung toleranz <Maß> <Toleranz> ergänzen
 volby listu „{0}“ se nepodařilo zapsat příkazem výkres – list vznikne s výchozími volbami	die Optionen des Blatts „{0}“ konnten nicht mit dem Befehl zeichnung geschrieben werden – das Blatt entsteht mit Standardoptionen
-volby listu bez zápisu ve skriptu ({0}) – list „{1}“ dokumentu „{2}“	Blattoptionen ohne Schreibweise im Skript ({0}) – Blatt „{1}“ des Dokuments „{2}“
 vygenerované kóty výkresů (Chytré kóty, {0}) se nezapisují jednotlivě – „kótovat chytře“ je při přečtení vygeneruje znovu (nová id, poloha podle generátoru)	erzeugte Zeichnungsmaße (Intelligente Maße, {0}) werden nicht einzeln geschrieben – „bemaßen intelligent“ erzeugt sie beim Lesen neu (neue Ids, Lage laut Generator)
 # kontrola (nálezy): odkazy názvem, otisky výběru a čísla hran ověřená jádrem, proměnné, smazané kóty
 list „{0}“ dílu „{1}“: smazané vygenerované kóty se nepodařilo určit ({2}) – po přečtení skriptu se vrátí	Blatt „{0}“ des Teils „{1}“: die gelöschten generierten Maße ließen sich nicht bestimmen ({2}) – nach dem Einlesen des Skripts kommen sie zurück

@@ -1,0 +1,88 @@
+# Vlna E – balík help: názvy oddílů návodu pro AI a kapitol příručky ve výsledcích „nápověda hledat …“ (tr(název) za běhu)
+#!dynamic
+Tři cesty, jak CAD ovládat textem	Drei Wege, das CAD per Text zu steuern
+Řádkové příkazy (česky i anglicky, jeden příkaz na řádek, # = komentář)	Zeilenbefehle (Deutsch, Englisch oder Tschechisch, ein Befehl pro Zeile, # = Kommentar)
+Vstup: řádky a JSON lze míchat	Eingabe: Zeilen und JSON lassen sich mischen
+Souřadnice skici ve 3D	Skizzenkoordinaten in 3D
+Profil ze skici textem – uzavřené obrysy	Profil aus einer Textskizze – geschlossene Konturen
+Vazby a kóty ve skice textem	Skizzenbeziehungen und Bemaßungen per Text
+Šikmé vysunutí, úkos dovnitř / ven a břit – vysunout …	Schräges Extrudieren, Schräge innen / außen und Steg – extrudieren …
+Měření – měřit (EN measure, DE messen)	Messen – messen (EN measure, CS měřit)
+Primitiva – poloha a osa odkazem, pružina	Grundkörper – Lage und Achse per Referenz, Feder
+Odkazy u rotace, pole, zrcadlení a sražení; hrany a plochy čísly	Referenzen bei Drehen, Muster, Spiegeln und Fase; Kanten und Flächen per Nummer
+Více těles v dílu	Mehrere Körper in einem Teil
+Obecný příkaz prvek – všechny typy bez JSON	Allgemeiner Befehl element – alle Typen ohne JSON
+Zaoblení se setbackem, eliptické zaoblení a úkos s dělicí křivkou	Verrundung mit Rückversatz, elliptische Verrundung und Schräge mit Trennlinie
+Úpravy existujícího modelu – upravit, potlačit, smazat, přesunout, zpět / znovu, proměnné, konfigurace	Bearbeiten eines vorhandenen Modells – bearbeiten, unterdrücken, löschen, verschieben, rückgängig / wiederherstellen, Variablen, Konfigurationen
+Sestava textem – plochy, vazby, komponenty, kusovník, záložky	Baugruppe per Text – Flächen, Verknüpfungen, Komponenten, Stückliste, Registerkarten
+Pokročilé a mechanické vazby, pohybová studie – sestava vazba …, pohyb …	Erweiterte und mechanische Verknüpfungen, Bewegungsstudie – baugruppe verknüpfung …, bewegung …
+Spline s tečnami, hladké uzavřené šablonování a plochy třídy A	Splines mit Tangenten, glatte geschlossene Ausformung und Class-A-Flächen
+Průběh a zrušení výpočtu	Fortschritt und Abbruch einer Berechnung
+Plech – tvářecí nástroje a křížový zlom (plech …, EN sheet …, DE blech …)	Blech – Umformwerkzeuge und Kreuzbruch (blech …, EN sheet …, CS plech …)
+Svary – koutové, tupé s úpravou, děrové, bodové (svar …, EN weld …, DE schweißnaht … / naht …)	Schweißnähte – Kehl-, Stumpfnaht mit Nahtvorbereitung, Loch-, Punktnaht (schweißnaht … / naht …, EN weld …, CS svar …)
+Pružiny z tabulky – tlačná, tažná, zkrutná, talířová (pružina …, EN spring …, DE feder …)	Federn aus der Tabelle – Druck-, Zug-, Dreh-, Tellerfeder (feder …, EN spring …, CS pružina …)
+Příklad – stírací pružiny střižného nástroje (tlačná, broušené konce)	Beispiel – Abstreiferfedern eines Schneidwerkzeugs (Druckfeder, geschliffene Enden)
+Příklad – tažná pružina upínky a sloupec talířových pružin	Beispiel – Zugfeder einer Spannvorrichtung und eine Tellerfedersäule
+Příklad – příruba DN50 (6 řádků)	Beispiel – Flansch DN50 (6 Zeilen)
+Příklad – sedlo pružiny (ploché dno) a závit s vrtákem z výkresu	Beispiel – Federsitz (flacher Grund) und Gewinde mit dem Bohrer aus der Zeichnung
+Příklad – deska s drážkou a zahloubenými dírami	Beispiel – Platte mit Nut und Senkbohrungen
+2D výkres (2D CAD jako AutoCAD) – 2d …, window.mncad.draft()	2D-Zeichnung (2D-CAD wie AutoCAD) – 2d …, window.mncad.draft()
+JSON (formát .mncad) – přístup ke všemu	JSON (Format .mncad) – Zugriff auf alles
+Výstupy z konzole bez dialogů – uložit, export, výkres, sdílet	Ausgaben aus der Konsole ohne Dialoge – speichern, exportieren, Zeichnung, freigeben
+Prohlížeč ovládaný automatizací – žádná systémová okna	Per Automatisierung gesteuerter Browser – keine Systemdialoge
+Dokument → textový skript, kontrola tam a zpět	Dokument → Textskript, Hin- und Rückprüfung
+Soubory, obraz, výstupy a analýzy – API pro agenty	Dateien, Bilder, Ausgaben und Analysen – API für Agenten
+Modelování myší jako člověk (pro agenty s ovládáním prohlížeče)	Modellieren mit der Maus wie ein Mensch (für Agenten, die einen Browser steuern)
+Materiál, výkres a export – co je dobré vědět	Werkstoff, Zeichnung und Export – gut zu wissen
+Výkres a kóty – postup a pravidla pro AI	Zeichnung und Bemaßung – Vorgehen und Regeln für KI
+Postup (vždy v tomto pořadí)	Vorgehen (immer in dieser Reihenfolge)
+Pravidla Chytrých kót (ČSN EN ISO 129-1) – kontrolní seznam	Regeln der intelligenten Bemaßung (ISO 129-1) – Checkliste
+Čemu se vyhnout (anti-vzory)	Was zu vermeiden ist (Anti-Muster)
+Příklad A – hřídel s osazením, závitem, sražením, zápichem a zaoblením	Beispiel A – Welle mit Absatz, Gewinde, Fase, Einstich und Verrundung
+Příklad B – příruba s roztečnou kružnicí zahloubených děr a středovým otvorem	Beispiel B – Flansch mit Lochkreis aus Senkbohrungen und Mittelbohrung
+Příklad C – deska se slepými závitovými dírami, průchozími dírami a kapsou	Beispiel C – Platte mit Sackgewindebohrungen, Durchgangsbohrungen und Tasche
+Příklad F – funkční rozměry, tolerance hodnotou a kontrola tolerancí	Beispiel F – Funktionsmaße, Toleranz per Wert und Toleranzprüfung
+Výkres textem: listy, značky, kóty, export	Zeichnung per Text: Blätter, Symbole, Maße, Export
+Příklad D – druhý list, značky, razítko a export	Beispiel D – zweites Blatt, Symbole, Schriftfeld und Export
+Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize	Hilfsansichten, abgesetzte Schnitte, Unterbrechungen, Passungen und Änderungen
+Příklad E – zalomený řez, uložení, revize se zónou	Beispiel E – abgesetzter Schnitt, Passung, Änderung mit Zone
+Model nebo výkres podle předlohy – kontrola 1:1 (povinné)	Modell oder Zeichnung nach Vorlage – 1:1-Prüfung (Pflicht)
+1. Před modelováním – soupis kót předlohy	1. Vor dem Modellieren – Maße der Vorlage auflisten
+2. Chybí kóta? Zeptejte se	2. Fehlt ein Maß? Fragen Sie nach
+3. Po dokončení – kontrola 1:1 (vždy, i když vše hlásí ✓)	3. Nach Abschluss – 1:1-Prüfung (immer, auch wenn alles ✓ meldet)
+4. Závěrečná zpráva	4. Abschlussbericht
+Předloha v dokumentu: DWG / DXF / PDF zákazníka – výtah a kontrola 1:1 textem	Vorlage im Dokument: DWG / DXF / PDF des Kunden – Auszug und 1:1-Prüfung per Text
+Žádné tiché změny a přísný režim (přísně, EN strict, DE streng)	Keine stillen Änderungen und strenger Modus (streng, EN strict, CS přísně)
+Stav prvku: ✓ / ⚠ / ✗ – co znamená	Feature-Status: ✓ / ⚠ / ✗ – was er bedeutet
+Závity – jak je zadat správně	Gewinde – wie man sie richtig eingibt
+Zpětná vazba a doporučený postup pro agenta	Rückmeldung und empfohlenes Vorgehen für einen Agenten
+Omezení	Einschränkungen
+Jeden engine v prohlížeči i bez něj (CLI mncad, HTTP mncad serve)	Eine Engine im Browser und ohne ihn (CLI mncad, HTTP mncad serve)
+Výstupy textem – soubory, PDF všech listů, base64, odkazy (aplikace, CLI, HTTP)	Ausgaben per Text – Dateien, PDF aller Blätter, base64, Links (App, CLI, HTTP)
+Kontrola modelu, porovnání s referencí a třídy kolizí (kontrola, porovnat, kolize)	Modellprüfung, Vergleich mit einer Referenz und Kollisionsklassen (prüfen, vergleichen, kollision)
+1. Co je Mnástrojárna CAD	1. Was Mnástrojárna CAD ist
+2. Rychlý start – první díl za pět minut	2. Schnellstart – das erste Teil in fünf Minuten
+3. Obrazovka a ovládání	3. Bildschirm und Bedienung
+4. Zadávání hodnot a odkazů na geometrii	4. Eingabe von Werten und Referenzen auf Geometrie
+5. Skica	5. Skizze
+6. Tvorba těles – prvky a jejich možnosti	6. Körper erstellen – Features und ihre Optionen
+7. Plochy (plošné modelování)	7. Flächen (Flächenmodellierung)
+8. Plech	8. Blech
+9. Svařence a ocelové konstrukce	9. Schweißkonstruktionen und Stahlbau
+10. Knihovna normálií	10. Normteilbibliothek
+11. Sestavy	11. Baugruppen
+12. Formařské nástroje	12. Formenbau-Werkzeuge
+13. Výkresy	13. Zeichnungen
+14. 2D CAD – 2D výkres (DWG / DXF)	14. 2D-CAD – 2D-Zeichnung (DWG / DXF)
+15. Analýza a měření	15. Analyse und Messen
+16. Proměnné, rovnice a stavy dílu	16. Variablen, Gleichungen und Teilekonfigurationen
+17. Soubory, import a export	17. Dateien, Import und Export
+18. Sdílení odkazem	18. Freigabe per Link
+19. Nastavení	19. Einstellungen
+20. Klávesové zkratky	20. Tastenkürzel
+21. Mobil a dotykové ovládání	21. Mobil und Touch-Bedienung
+22. Pro AI agenty a automatizaci	22. Für KI-Agenten und Automatisierung
+23. Omezení a poctivé srovnání s desktopovými CADy	23. Einschränkungen und ein ehrlicher Vergleich mit Desktop-CADs
+24. Vaše data a soukromí	24. Ihre Daten und Datenschutz
+25. Slovníček pojmů	25. Glossar
+26. Historie verzí	26. Versionsgeschichte

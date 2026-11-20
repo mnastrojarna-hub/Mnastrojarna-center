@@ -3,13 +3,16 @@
  * chování): zápis rozpracovaného dokumentu (`flush`), příprava prvku (`prepare` – výchozí název, odkazy názvem a `$last`,
  * tělesa, režim, duplicitní id), stavba a topologie přes jádro hostitele.
  */
+import { dropResults } from "./result-key";
 import { bodiesAt, isNewBodyMode, nextBodyName } from "../bodies";
 import { resolveDatumNames } from "../agent-prim";
 import { freeName } from "../agent-edit";
 import { getExt } from "../ext/registry";
 import { tr } from "../i18n";
+import { dropMotion, motionStoreOf } from "../motion-cache";
 import { uid, type CadDoc, type Feature, type FeatureType } from "../types";
 import type { OpCtx, RunState } from "./ops/registry";
+import type { RunOrigin } from "./workspace";
 import { codeDef, type Code, type CodeEntryInit } from "./codes";
 import { canon, FEATURE_LABEL } from "../agent";
 
@@ -51,7 +54,7 @@ export async function flush(ctx: OpCtx): Promise<void> {
   const r = runOf(ctx);
   if (!r.changed) return;
   if (r.openNew && !r.tabbed) {
-    await ctx.ws.openInTab(r.doc, r.docId ? { docId: r.docId } : {});
+    await ctx.ws.openInTab(r.doc, { ...(r.docId ? { docId: r.docId } : {}), origin: r.origin ?? "new" }); // záložka běhu – opakovaný běh ji převezme (engine/runs.ts)
     r.tabbed = true;
   } else ctx.ws.commit(r.doc);
   r.changed = false;
@@ -59,13 +62,15 @@ export async function flush(ctx: OpCtx): Promise<void> {
 
 /**
  * Nový dokument běhu (nový díl / sestava, JSON, normálie, rám formy, 2D výkres): zatím bez záložky, s vlastním klíčem
- * (`docId`). `openNew: false` (JSON s `inPlace`) nahradí dokument aktivní záložky – stav vazeb a kolizí původního
+ * (`docId`) a původem (`origin`, engine/runs.ts – operace ho zakládají přes `startRunDoc`). `openNew: false` (JSON
+ * s `inPlace`, záložka převzatá opakovaným během) nahradí dokument aktivní záložky – stav vazeb a kolizí původního
  * dokumentu pod klíčem záložky se zahodí (patřil jinému dokumentu).
  */
-export function startDoc(ctx: OpCtx, d: CadDoc, o: { openNew?: boolean } = {}): void {
+export function startDoc(ctx: OpCtx, d: CadDoc, o: { openNew?: boolean; origin?: RunOrigin } = {}): void {
   const r = runOf(ctx);
   r.doc = d;
   r.openNew = o.openNew ?? true;
+  r.origin = o.origin ?? "new";
   r.tabbed = false;
   r.changed = true;
   r.docId = r.openNew ? uid() : undefined;
@@ -73,6 +78,8 @@ export function startDoc(ctx: OpCtx, d: CadDoc, o: { openNew?: boolean } = {}): 
     const k = ctx.ws.docKey();
     ctx.ws.asm.mateStatus.delete(k);
     ctx.ws.asm.clash.delete(k);
+    dropResults(ctx.ws, k); // měření / porovnání původního dokumentu (engine/result-key.ts)
+    dropMotion(motionStoreOf(ctx.ws.asm), k); // výsledek pohybové studie patřil nahrazenému dokumentu
   }
 }
 

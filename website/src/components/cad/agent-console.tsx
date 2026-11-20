@@ -1,7 +1,10 @@
 "use client";
 
 import { tr } from "@/cad/i18n";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { isFinal, runStateText } from "@/cad/engine/run-queue";
+import { appRuns, consoleRuns } from "./run-host";
+import { useRuns } from "./run-chip";
 import { AGENT_COMMANDS } from "@/cad/agent";
 import { AGENT_GUIDE } from "@/cad/agent-guide";
 import { attachedFiles } from "@/cad/attached-files";
@@ -13,6 +16,21 @@ import { Btn, Modal } from "./ui";
 /** poslední text a protokol přežijí zavření konzole (v rámci karty) */
 let lastText = "";
 let lastOutput = "";
+/**
+ * běh spuštěný konzolí (vlna 22, bod 12): id a id běhu, ke kterému patří zobrazený protokol – přežijí zavření konzole;
+ * znovu otevřená konzole ukáže stav běžícího běhu a po doběhnutí jeho výsledek (run-host.ts `consoleRuns`)
+ */
+let consoleRunId: string | null = null;
+let outputRunId: string | null = null;
+/** přepínač „Stručný protokol“ (MNCAD/1 jako CLI – engine/run-protocol.ts) – trvale v prohlížeči */
+const SHORT_KEY = "mn-cad-console-short";
+const loadShort = () => {
+  try {
+    return localStorage.getItem(SHORT_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
 
 const PLACEHOLDER = `Příkazy (jeden na řádek) nebo JSON dokumentu – například:
 nový díl Příruba DN50
@@ -28,10 +46,35 @@ stav`;
  * Konzole „Textové příkazy“: stejný CAD ovládaný textem – pro AI agenty, automatizaci i lidi.
  * Vstup = řádkové příkazy nebo JSON; výstup = protokol (✓/✗ s důvodem) a textový stav dokumentu.
  */
-export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: () => void; run: (text: string) => Promise<string>; getDocJson: () => string; status: () => Promise<string> }) {
+export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: () => void; run: (text: string, opts?: { protocol?: "short"; source?: "console"; onQueued?: (id: string) => void }) => Promise<string>; getDocJson: () => string; status: () => Promise<string> }) {
   const [text, setText] = useState(lastText);
-  const [out, setOut] = useState(lastOutput);
-  const [busy, setBusy] = useState(false);
+  const [short, setShort] = useState(loadShort);
+  const [out, setOutRaw] = useState(lastOutput);
+  /** id běhu, ke kterému patří zobrazený protokol (null = stav dokumentu / nic) */
+  const [outRun, setOutRun] = useState<string | null>(outputRunId);
+  const setOut = (t: string, id: string | null = null) => {
+    setOutRaw(t);
+    setOutRun(id);
+    outputRunId = id;
+  };
+  const [runId, setRunId] = useState<string | null>(consoleRunId);
+  const [statusBusy, setStatusBusy] = useState(false);
+  useRuns();
+  useSyncExternalStore(
+    (f) => consoleRuns.subscribe(f),
+    () => consoleRuns.get(runId) ?? null,
+    () => null,
+  );
+  const entry = runId ? appRuns.get(runId) : undefined;
+  /** běh konzole čeká nebo počítá (i po zavření a novém otevření konzole) */
+  const running = !!entry && !isFinal(entry.state);
+  const busy = running || statusBusy;
+  // výsledek běhu, který doběhl, když byla konzole zavřená (nebo než se stihl zobrazit) – podle id běhu, ne podle instance
+  const done = runId && !running ? consoleRuns.get(runId) : undefined;
+  useEffect(() => {
+    if (done !== undefined && outRun !== runId) setOut(done, runId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done, runId]);
   const [help, setHelp] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const ta = useRef<HTMLTextAreaElement>(null);
@@ -45,15 +88,21 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
 
   const exec = async (t = text) => {
     if (!t.trim() || busy) return;
-    setBusy(true);
     setNote(null);
+    let id: string | null = null;
     try {
-      const log = await run(t);
-      setOut(log);
+      const log = await run(t, {
+        ...(short ? { protocol: "short" as const } : {}),
+        source: "console",
+        onQueued: (rid) => {
+          id = rid;
+          consoleRunId = rid;
+          setRunId(rid);
+        },
+      });
+      if (id) setOut(log, id);
     } catch (e) {
-      setOut(`✗ ${(e as Error).message}`);
-    } finally {
-      setBusy(false);
+      setOut(`✗ ${(e as Error).message}`, id);
     }
   };
   const flash = (m: string) => {
@@ -114,19 +163,24 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
           />
           <div className="mt-2 flex flex-wrap gap-2">
             <Btn primary disabled={busy || !text.trim()} onClick={() => void exec()} title={tr("Provede příkazy (Ctrl+Enter)")}>
-              {busy ? tr("Provádím…") : tr("Provést")}
+              {running ? tr("Provádím…") : tr("Provést")}
             </Btn>
+            {running && entry && (
+              <Btn onClick={() => appRuns.cancel(entry.id)} title={tr("Zruší běh: čekající se neprovede, běžící se zastaví a dokument zůstane beze změny")}>
+                <span data-run-cancel={entry.id}>{tr("Zrušit běh")}</span>
+              </Btn>
+            )}
             <Btn disabled={busy} onClick={() => void fromClipboard()} title={tr("Vloží text ze schránky a hned ho provede")}>
               {tr("Vložit ze schránky a provést")}
             </Btn>
             <Btn
               disabled={busy}
               onClick={async () => {
-                setBusy(true);
+                setStatusBusy(true);
                 try {
                   setOut(await status());
                 } finally {
-                  setBusy(false);
+                  setStatusBusy(false);
                 }
               }}
               title={tr("Vypíše rozměry, objem a seznam prvků se stavem")}
@@ -159,20 +213,58 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
           )}
         </div>
         <div className="min-w-0">
-          <p className="mb-1 font-semibold">{tr("Protokol a stav dokumentu")}</p>
+          <p className="mb-1 flex items-center justify-between gap-2 font-semibold">
+            <span>{tr("Protokol a stav dokumentu")}</span>
+            {/* stav a id běhu (vlna 22, bod 12): protokol níže patří vždy uvedenému běhu */}
+            {(entry || outRun) && (
+              <span className="text-[11.5px] font-normal text-[#4a5664]" data-run-status={entry?.state ?? "done"} data-run-status-id={entry?.id ?? outRun ?? ""}>
+                {entry ? tr("Běh {0}: {1}", entry.id, runStateText(entry.state)) : tr("Běh {0}", outRun ?? "")}
+                {entry?.state === "queued" ? ` · ${tr("čeká na dokončení dřívějšího běhu")}` : ""}
+              </span>
+            )}
+          </p>
           <pre
             data-agent-output
+            data-run-id={running ? entry!.id : (outRun ?? "")}
+            data-run-state={running ? entry!.state : outRun ? (appRuns.get(outRun)?.state ?? "done") : ""}
             aria-label={tr("Protokol")}
             aria-live="polite"
-            className={cn("h-[calc(14*1.35em+2.5rem)] min-h-[200px] overflow-auto whitespace-pre-wrap break-words rounded border border-[#cfd6de] bg-[#1f2933] p-2 font-mono text-[11.5px] leading-[1.35] text-[#e6edf3]", !out && "text-[#8a95a3]")}
+            className={cn("h-[calc(14*1.35em+2.5rem)] min-h-[200px] overflow-auto whitespace-pre-wrap break-words rounded border border-[#cfd6de] bg-[#1f2933] p-2 font-mono text-[11.5px] leading-[1.35] text-[#e6edf3]", (!out || running) && "text-[#8a95a3]")}
           >
-            {out || tr("Zatím nic. Po „Provést“ se tu objeví řádek ✓ / ✗ pro každý příkaz a textový stav dokumentu (rozměry, objem, prvky) – zpětná vazba pro agenta bez obrázku.")}
+            {running
+              ? entry!.state === "queued"
+                ? tr("Běh {0} čeká ve frontě – začne, až doběhne dřívější běh. Protokol se ukáže po jeho dokončení.", entry!.id)
+                : tr("Probíhá běh {0}… Protokol se ukáže po jeho dokončení.", entry!.id)
+              : out || tr("Zatím nic. Po „Provést“ se tu objeví řádek ✓ / ✗ pro každý příkaz a textový stav dokumentu (rozměry, objem, prvky) – zpětná vazba pro agenta bez obrázku.")}
           </pre>
+          {running && out && (
+            // předchozí protokol jasně označený jako předchozí – nikdy se nečte jako výsledek běžícího běhu
+            <details className="mt-1 text-[11.5px] text-[#4a5664]" data-run-prev={outRun ?? ""}>
+              <summary className="cursor-pointer">{outRun ? tr("Předchozí běh {0} – protokol (nepatří běžícímu běhu)", outRun) : tr("Předchozí výstup (nepatří běžícímu běhu)")}</summary>
+              <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words rounded bg-[#f3f5f8] p-1.5 font-mono text-[11px]">{out}</pre>
+            </details>
+          )}
+          <label className="mt-2 flex items-center gap-1.5 text-[12px] text-[#4a5664]" title={tr("Výstup jako stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB")}>
+            <input
+              type="checkbox"
+              data-agent-short
+              checked={short}
+              onChange={(e) => {
+                setShort(e.target.checked);
+                try {
+                  localStorage.setItem(SHORT_KEY, e.target.checked ? "1" : "0");
+                } catch {
+                  /* soukromé okno – přepínač platí jen do zavření */
+                }
+              }}
+            />
+            {tr("Stručný protokol")}
+          </label>
           <div className="mt-2 flex flex-wrap gap-2">
-            <Btn disabled={!out} onClick={() => void copyText(out).then((ok) => flash(ok ? tr("Protokol zkopírován.") : tr("Kopírování se nezdařilo.")))}>
+            <Btn disabled={!out || running} onClick={() => void copyText(out).then((ok) => flash(ok ? tr("Protokol zkopírován.") : tr("Kopírování se nezdařilo.")))}>
               {tr("Kopírovat protokol")}
             </Btn>
-            <Btn disabled={!out} onClick={() => setOut("")}>
+            <Btn disabled={!out || running} onClick={() => setOut("")}>
               {tr("Vymazat")}
             </Btn>
           </div>

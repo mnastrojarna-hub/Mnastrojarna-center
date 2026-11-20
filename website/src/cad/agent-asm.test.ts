@@ -553,7 +553,10 @@ describe("čisté pomocné: komponenty, vazby, stav", () => {
       { face: 2, info: P([40, 30, 0], [0, 0, -1]) },
       { face: 3, info: P([70, 0, 10], [0, 0, 1]) },
     ];
-    expect(sameFace(P([40, 30, 10], [0, 0, 1]), faces)).toBe(0); // horní plocha s kapsou: střed se posunul, rovina stejná
+    // vlna 22, bod 20 (vědomá změna): dvě plochy v téže rovině (F1 a F4) a žádná přesná shoda = nejednoznačné → null
+    // (ztracená reference), dřív se vzala „nejbližší“ F1 = tiché připojení; jediná plocha v rovině se dál najde i po posunu středu
+    expect(sameFace(P([40, 30, 10], [0, 0, 1]), faces)).toBeNull();
+    expect(sameFace(P([40, 30, 10], [0, 0, 1]), faces.slice(0, 3))).toBe(0); // horní plocha s kapsou: střed se posunul, rovina stejná
     expect(sameFace(C([40, 30, 0], [0, 0, 1], 5.25, [0, 10]), faces)).toBe(1);
     expect(sameFace(P([40, 30, 0], [0, 0, -1]), faces)).toBe(2);
     expect(sameFace(C([20, 15, 0], [0, 0, 1], 4.5, [0, 10]), faces)).toBeNull();

@@ -11,16 +11,17 @@
  * Kolize) a tlačítko Kolize / přepočet vazeb v aplikaci zapisují pod klíčem zobrazeného dokumentu (cad-app.tsx).
  *
  * Nový dokument běhu použije prázdnou záložku jen tehdy, je-li to prázdný díl, do kterého žádný běh nezapsal (jako úvodní
- * prázdný díl `MemoryWorkspace`) – dokument dřívějšího běhu (i prázdná sestava) se nikdy nepřepíše (5.2 č. 14).
+ * prázdný díl `MemoryWorkspace`) – dokument dřívějšího běhu (i prázdná sestava) se nikdy nepřepíše (5.2 č. 14). Výjimkou je
+ * opakovaný běh: záložku „A“, kterou založil běh dokumentem téhož původu, převezme (`namedTabs` / `claimTab`, engine/runs.ts).
  */
 import type { TabInfo } from "@/cad/agent-asm";
 import type { PartFaces } from "@/cad/asm-agent";
 import type { MotionSignal } from "@/cad/asm-agent-kin";
 import type { Interference } from "@/cad/asm-kernel";
 import { embedBlobs } from "@/cad/blobs";
-import type { DocKey, Workspace, AsmCaches } from "@/cad/engine/workspace";
+import type { DocKey, Workspace, AsmCaches, RunOrigin } from "@/cad/engine/workspace";
 import { CodedError } from "@/cad/engine/codes";
-import { safeFileName, type EngineHost, type FileSink, type UiHooks } from "@/cad/engine/host";
+import { safeFileName, sha256Hex, type EngineHost, type FileSink, type UiHooks } from "@/cad/engine/host";
 import { appAttachments } from "@/cad/engine/attachments";
 import type { KernelApi } from "@/cad/engine/kernel";
 import type { MateStatus, PartFace } from "@/cad/mates";
@@ -71,25 +72,54 @@ export type AppPortDeps = {
   };
 };
 
-/** stav podle klíče dokumentu; zápis a smazání se zrcadlí do stavu aplikace (zobrazení) */
+/**
+ * stav podle klíče dokumentu; zápis a smazání se zrcadlí do stavu aplikace (zobrazení) – kromě dokumentu jiné, nezobrazené
+ * záložky (`hidden`: souhrny dokumentů běhu – řádky D, run-summary.ts – počítají stav vazeb a kolizí i sestav v pozadí)
+ */
 class MirrorMap<V> extends Map<DocKey, V> {
-  constructor(private readonly mirror: (v: V | null) => void) {
+  constructor(
+    private readonly mirror: (v: V | null) => void,
+    private readonly hidden: (k: DocKey) => boolean = () => false,
+  ) {
     super();
   }
   override set(k: DocKey, v: V): this {
     super.set(k, v);
-    this.mirror?.(v);
+    if (!this.hidden?.(k)) this.mirror?.(v);
     return this;
   }
   override delete(k: DocKey): boolean {
     const had = super.delete(k);
-    if (had) this.mirror?.(null);
+    if (had && !this.hidden?.(k)) this.mirror?.(null);
     return had;
   }
 }
 
 const isPart = (t: { kind: string }) => t.kind === "part";
 const isPartDoc = (d: CadDoc) => d.kind !== "assembly" && d.kind !== "draft";
+
+/**
+ * Záložky založené během (opakovaný běh `nový díl "A"`, engine/runs.ts) přežijí obnovení stránky: obnova záložek ze
+ * šifrovaného úložiště (cad-app.tsx) jim nechá id, tady se pamatují jen ta id (žádná data dokumentu) v sessionStorage karty.
+ */
+const RUN_TABS_KEY = "mn-cad-run-tabs";
+/** `[[id, původ]]` (dřívější zápis jen `[id]` = původ `new`) */
+const loadRunTabs = (): [string, RunOrigin][] => {
+  try {
+    const v: unknown = JSON.parse(globalThis.sessionStorage?.getItem(RUN_TABS_KEY) ?? "[]");
+    if (!Array.isArray(v)) return [];
+    return v.flatMap((x): [string, RunOrigin][] => (typeof x === "string" ? [[x, "new"]] : Array.isArray(x) && typeof x[0] === "string" && (x[1] === "new" || x[1] === "open") ? [[x[0], x[1]]] : []));
+  } catch {
+    return [];
+  }
+};
+const saveRunTabs = (m: Map<string, RunOrigin>) => {
+  try {
+    globalThis.sessionStorage?.setItem(RUN_TABS_KEY, JSON.stringify([...m].slice(-500)));
+  } catch {
+    /* soukromé okno / plné úložiště – platí do obnovení stránky */
+  }
+};
 
 /** React `Workspace` nad funkcemi cad-app.tsx (`commit`, `openDocInTab`, `activateTab` + čekání, `closeTab`, `histStep`). */
 export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
@@ -102,9 +132,17 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
    * (5.2 č. 14; prázdná sestava z dřívějšího běhu konzole zůstane)
    */
   const runTabs = new Set<string>();
+  /** záložky, které běh založil, a jejich původ (`openInTab({ origin })`) – opakovaný běh je převezme (engine/runs.ts) */
+  const madeTabs = new Map<string, RunOrigin>(loadRunTabs());
+  /** záložky tohoto běhu (založené nebo převzaté `claimTab`) a záložky, do kterých tento běh zapsal (řádky D) */
+  let claimed = new Set<string>();
+  let wrote = new Set<string>();
   let generation = 0;
+  /** klíč dokumentu jiné otevřené záložky než zobrazené (nový dokument běhu bez záložky mezi nimi není) */
+  const background = (k: DocKey) => k !== get().docKey() && get().docTabs().some((t) => t.kind !== "drawing" && get().docKey(t.id) === k);
   const remember = (d: CadDoc, tab: string) => {
     runTabs.add(tab);
+    wrote.add(tab);
     if (d.kind !== "assembly") made.set(d.name.toLowerCase(), d);
   };
   const asm: AsmCaches = {
@@ -131,14 +169,43 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
     set stack(s) {
       get().asm.setStack(s);
     },
-    mateStatus: new MirrorMap<Record<string, MateStatus>>((m) => get().asm.setMateStatus(m ?? {})),
-    clash: new MirrorMap<{ res: Interference[]; at: string; comps?: number }>((c) => get().asm.setClash(c ? { res: c.res, at: c.at, comps: c.comps ?? 0 } : null)),
+    mateStatus: new MirrorMap<Record<string, MateStatus>>((m) => get().asm.setMateStatus(m ?? {}), background),
+    clash: new MirrorMap<{ res: Interference[]; at: string; comps?: number }>((c) => get().asm.setClash(c ? { res: c.res, at: c.at, comps: c.comps ?? 0 } : null), background),
+  };
+  /**
+   * Poslední zápis do historie aktivní záložky se promítne až po vykreslení. Přepnutí nebo otevření záložky bere snímek
+   * záložek ze stavu PŘED vykreslením – bez počkání by zápis do opuštěné záložky zahodilo (`záložka "B"` hned po úpravě
+   * dílu A, opakovaný běh `nový díl "A"` → další dokument), proto se před každým přepnutím počká na jeho promítnutí.
+   */
+  const settlePending = async () => {
+    const d = committed;
+    committed = null;
+    if (d) settled(await get().settle(() => get().hist().present === d));
+  };
+  /**
+   * `zpět` / `znovu`: krok historie se v aplikaci provede synchronně (`flushSync` v cad-app.tsx – promítne i čekající zápis
+   * běhu), takže poslední zápis už nečeká na promítnutí. Bez vynulování by další přepnutí záložky čekalo na dokument, který
+   * krok historie právě odvolal, a skončilo ✗ tab.settle-timeout (záložka by se nepřepnula a další příkazy by šly do jiného
+   * dokumentu).
+   */
+  const histMove = (dir: "undo" | "redo", n: number) => {
+    const moved = get().histStep(dir, n);
+    committed = null;
+    return { moved };
+  };
+  const activate = async (id: string): Promise<CadDoc> => {
+    await settlePending();
+    get().activateTab(id);
+    settled(await get().settle(() => get().tabId() === id));
+    return get().hist().present;
   };
   return {
     asm,
     beginRun() {
       made = new Map();
       committed = null;
+      claimed = new Set();
+      wrote = new Set();
     },
     present: () => get().hist().present,
     commit(d) {
@@ -147,19 +214,20 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
       remember(d, g.tabId());
       committed = d;
     },
-    async settle() {
-      // poslední zápis do historie aktivní záložky se promítne až po vykreslení (openInTab čeká sám)
-      const d = committed;
-      committed = null;
-      if (d) settled(await get().settle(() => get().hist().present === d));
-    },
+    // konec běhu: další volání API hned za sebou musí vidět poslední zápis (openInTab na svou záložku čeká sám)
+    settle: settlePending,
     async openInTab(d, o = {}) {
+      await settlePending(); // zápis do opouštěné záložky nejdřív do stavu aplikace (viz `settlePending`)
       const g = get();
       const before = g.tabId();
       // prázdná aktivní záložka jen tehdy, je-li to prázdný díl, do kterého žádný běh nezapsal (úvodní díl aplikace)
       const reuse = o.reuseEmpty !== false && !runTabs.has(before) && isPartDoc(g.hist().present);
       const id = g.openDocInTab(d, { reuse, ...(o.docId ? { docId: o.docId } : {}) });
       remember(d, id);
+      claimed.add(id);
+      if (o.origin) madeTabs.set(id, o.origin);
+      else madeTabs.delete(id); // prázdná úvodní záložka znovu použitá dokumentem, který běh nezaložil
+      saveRunTabs(madeTabs);
       settled(
         await get().settle(() => {
           const n = get();
@@ -169,18 +237,15 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
       return { id, reused: id === before };
     },
     tabs: () => get().tabList(),
-    async activate(id) {
-      get().activateTab(id);
-      settled(await get().settle(() => get().tabId() === id));
-      return get().hist().present;
-    },
+    activate,
     async close(id) {
+      await settlePending();
       get().closeTab(id);
       settled(await get().settle(() => get().tabId() !== id && !get().docTabs().some((t) => t.id === id)));
       return get().hist().present;
     },
-    undo: (n) => ({ moved: get().histStep("undo", n) }),
-    redo: (n) => ({ moved: get().histStep("redo", n) }),
+    undo: (n) => histMove("undo", n),
+    redo: (n) => histMove("redo", n),
     history() {
       const h = get().hist();
       return { undo: h.past.length, redo: h.future.length };
@@ -193,6 +258,24 @@ export function makeAppWorkspace(get: () => AppPortDeps): Workspace {
     listDocs: () => [...[...made.values()].map((x) => ({ title: x.name, doc: x })), ...get().docTabs().filter((t) => t.kind !== "drawing").map((t) => ({ title: t.title, doc: t.hist.present }))],
     freshName: (base) => get().freshName(base),
     docKey: (id) => get().docKey(id),
+    docOf: (id) => get().docTabs().find((t) => t.id === id && t.kind !== "drawing")?.hist.present ?? null,
+    namedTabs(name, kind) {
+      const key = name.trim().toLowerCase();
+      return get()
+        .docTabs()
+        .filter((t) => t.kind === kind && t.title.trim().toLowerCase() === key)
+        .map((t) => {
+          const origin = madeTabs.get(t.id);
+          return { id: t.id, ...(origin ? { origin } : {}), claimed: claimed.has(t.id) };
+        });
+    },
+    async claimTab(id, origin) {
+      claimed.add(id);
+      madeTabs.set(id, origin);
+      saveRunTabs(madeTabs);
+      return activate(id);
+    },
+    runDocKeys: () => [...wrote].map((t) => get().docKey(t)).filter(Boolean),
     save() {
       const tabs = get().docTabs().filter((t) => t.kind !== "drawing");
       const active = Math.max(0, tabs.findIndex((t) => t.id === get().tabId()));
@@ -215,7 +298,10 @@ export function makeAppHost(kernel: KernelApi, get: () => AppHostDeps): EngineHo
     async write(f) {
       const name = safeFileName(f.name);
       await get().download(name, f.data, f.mime);
-      return { name, format: f.format, bytes: f.data.length, sha256: "", doc: f.doc };
+      // SHA-256 jako CLI (JSON `files[].sha256` protokolu prohlížeče – engine/run-protocol.ts); stránka bez šifrování
+      // (http mimo localhost nemá `crypto.subtle`) soubor stáhne dál, jen bez otisku
+      const sha256 = await sha256Hex(f.data).catch(() => "");
+      return { name, format: f.format, bytes: f.data.length, sha256, doc: f.doc };
     },
   };
   const ui: UiHooks = {

@@ -7,8 +7,9 @@
  * Výpisy bez strojových údajů (nápověda, seznam záložek, kusovník…) mají v prvním řádku jen `lines=<n>` a jejich řádky
  * jsou pokračovací řádky výpisu (volný text v jazyce běhu, jako text za kódem u ✗/⚠).
  */
-import type { AsmStatus } from "../agent";
+import type { AsmStatus, StaleNote } from "../agent";
 import { sourceKey } from "../assembly";
+import { mateLost } from "../mates";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
 import type { BuildResult, CadDoc, Vec3 } from "../types";
 import { MATERIALS } from "@/lib/mesh-metrics";
@@ -138,8 +139,10 @@ export function measureKv(rep: MeasureReport, comp?: string): string {
 export function matesCount(doc: CadDoc, st: AsmStatus["mates"]): DocSummary["mates"] {
   const mates = doc.mates ?? [];
   if (!mates.length || !st) return undefined;
-  const n = (k: string) => mates.filter((m) => (st[m.id] ?? (m.suppressed ? "suppressed" : undefined)) === k).length;
-  return { total: mates.length, ok: n("ok"), conflict: n("conflict"), missing: n("missing"), suppressed: n("suppressed") };
+  // ztracená reference (vlna 22, bod 20) je vlastnost dokumentu – počítá se i bez stavu řešiče a nikdy jako „ok“
+  const n = (k: string) => mates.filter((m) => (m.suppressed ? "suppressed" : mateLost(m) ? "lost" : st[m.id]) === k).length;
+  const lost = n("lost");
+  return { total: mates.length, ok: n("ok"), conflict: n("conflict"), missing: n("missing"), suppressed: n("suppressed"), ...(lost ? { lost } : {}) };
 }
 
 /**
@@ -178,14 +181,18 @@ export function docSummaryOf(doc: CadDoc, res: BuildResult | null, asm?: AsmStat
 /**
  * Strojová část `stav` (`= Ln status "dokument" …`): tytéž klíče jako řádek D (`docKv`), u dílu navíc `solids` / `valid`,
  * u sestavy obálka a výsledek poslední kontroly kolizí (`clash=<počet>`, nezkontrolováno `clash=-`, sestava se od kontroly
- * změnila `clash.stale=1`).
+ * změnila `clash.stale=1`); sestava s pohybovou studií navíc `motion=ok|conflict|clash|stale|-` (nesplněné vazby / průnik těles v některém kroku) a u výsledku, který pro nynější stav
+ * sestavy neplatí, `motion.stale=1`.
  */
-export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus): string {
+export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, stale: readonly StaleNote[] = []): string {
   const base = docKv(docSummaryOf(doc, res, asm));
+  // uložené výsledky z jiné revize dokumentu (engine/result-key.ts): `mates.stale=1`, `measure.stale=1`, `compare.stale=1`
+  const old = kv([["mates.stale", asm?.matesStale ? true : undefined], ...[...new Set(stale.map((n) => n.kind))].map((k): [string, true] => [`${k}.stale`, true])]);
+  const tail = old ? ` ${old}` : "";
   // obálku sestavy má už řádek D (`docKv`); bez obálky `bbox=-`
-  if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined]])}`;
-  if (doc.kind === "draft" || !res?.metrics) return base;
-  return `${base} ${kv([["solids", res.metrics.solids], ["valid", res.metrics.valid], ["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd();
+  if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined], ["motion", asm?.motion ? (asm.motion.state === "unchecked" ? "-" : asm.motion.state) : undefined], ["motion.stale", asm?.motion?.state === "stale" ? true : undefined]])}${tail}`;
+  if (doc.kind === "draft" || !res?.metrics) return `${base}${tail}`;
+  return `${`${base} ${kv([["solids", res.metrics.solids], ["valid", res.metrics.valid], ["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd()}${tail}`;
 }
 
 /** Strojová část výpisů výkresu (`= Ln drawing …`): aktivní list / počet listů, formát, orientace, měřítko. */

@@ -1,0 +1,21 @@
+# Vlna E, balík runs: opakovaný běh (nový díl "A" znovu|nový), řádky D dokumentů běhu, stručný protokol v prohlížeči
+✓ {0} „{1}“ – znovu použitá záložka z dřívějšího běhu	✓ {0} “{1}” – reused the tab from an earlier run
+opakovaný běh téhož skriptu použije záložku stejného názvu, kterou založil dřívější běh (ℹ doc.reused, obsah nahrazen; platí i pro normálie, otevřít a JSON) – „nový“ = vždy nová záložka, „znovu“ = i otevřený soubor nebo ruční záložka téhož názvu	running the same script again reuses the tab of the same name that an earlier run created (ℹ doc.reused, content replaced; also for standard parts, open and JSON) – “new” = always a new tab, “again” = also an opened file or a manual tab of the same name
+run: neznámý protokol „{0}“ – console, short, full, json	run: unknown protocol “{0}” – console, short, full, json
+Stručný protokol	Short protocol
+Výstup jako stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB	Output as the short MNCAD/1 protocol (the same as mncad run on the command line): header, ✗ / ⚠, D lines of the documents and Σ – up to 2 kB
+# recenze: opakovaný běh normálií, otevřít a JSON; volby window.mncad.run
+✓ normálie „{0}“ – znovu použitá záložka z dřívějšího běhu	✓ standard part “{0}” – reused the tab from an earlier run
+✓ otevřeno „{0}“ – dokument „{1}“ ve znovu použité záložce z dřívějšího běhu	✓ opened “{0}” – document “{1}” in the reused tab from an earlier run
+✓ dokument „{0}“ ({1} prvků) – nahradí záložku téhož názvu z dřívějšího běhu	✓ document “{0}” ({1} features) – replaces the tab of the same name from an earlier run
+run: volby musí být objekt {0} nebo název protokolu – dostal jsem {1}	run: options must be an object {0} or a protocol name – got {1}
+run: budget musí být celé číslo {0}–{1} (bajty) – dostal jsem {2}	run: budget must be an integer {0}–{1} (bytes) – got {2}
+run: budget platí jen pro protokol short (a json) – zvolený protokol: {0}	run: budget applies only to the short protocol (and json) – chosen protocol: {0}
+run: notes musí být true nebo false – dostal jsem {0}	run: notes must be true or false – got {0}
+run: notes platí jen pro protokol short, full a json – výchozí text konzole ℹ vypisuje vždy	run: notes applies only to the short, full and json protocols – the default console text always lists ℹ
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+záložka „{0}“ z dřívějšího běhu použita znovu – obsah nahrazen (novou záložku dá u nový díl / nová sestava volba „nový“)	the tab “{0}” from an earlier run was reused – content replaced (for new part / new assembly the option “new” gives a new tab)
+záložka „{0}“ už je otevřená, ale nezaložil ji stejný druh příkazu běhu (otevřený soubor, JSON, ruční práce) – dokument je v nové záložce (u nový díl / nová sestava ji převezme volba „znovu“)	the tab “{0}” is already open but was not created by the same kind of run command (opened file, JSON, manual work) – the document is in a new tab (for new part / new assembly the option “again” takes it over)
+# souhrnný řádek převzetí záložek ve stručném protokolu (engine/protocol.ts mergeTakeovers)
+záložky z dřívějšího běhu použité znovu – obsah nahrazen (volba „nový“ = nová záložka): {0}	tabs from an earlier run reused – content replaced (option “new” = a new tab): {0}
+dokumenty v nové záložce vedle otevřené záložky téhož názvu, kterou nezaložil stejný druh příkazu běhu (volba „znovu“ ji převezme): {0}	documents put in a new tab next to an open tab of the same name that was not created by the same kind of run command (option “again” takes it over): {0}

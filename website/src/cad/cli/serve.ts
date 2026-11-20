@@ -10,7 +10,14 @@
  *   400 špatný požadavek · 401 token · 403 původ/Host · 404 · 405 · 413 tělo > 64 MB · 415 jiný Content-Type
  *   429 fronta plná · 504 časový limit · 507 limit paměti · 500 pád vlákna
  * GET /health · GET /help · DELETE /session/<id>
+ * GET /runs · GET /run/<id> · DELETE /run/<id>       (vlna 22, bod 12: úlohy – id, stav, zrušení)
  * ```
+ *
+ * Úlohy (vlna 22, bod 12 – engine/run-queue.ts, týž model jako běhy v prohlížeči): každý `POST /run` je úloha s id
+ * (`j<n>`, nebo vlastní `id` z těla), stavem čeká / počítá / dokončeno / zrušeno / chyba a revizí vstupu; id je v hlavičce
+ * odpovědi `x-mncad-run` a v `report.run`. `GET /runs` vypíše úlohy (i čekající ve frontě relace), `DELETE /run/<id>` úlohu
+ * zruší: čekající se vyřadí (odpověď jejího `POST /run` = protokol ✗ run.cancelled, nic se neprovedlo), běžící se přeruší
+ * ukončením vlákna (✗ run.cancelled; relace zůstane ve stavu před touto úlohou).
  *
  * Relace a vlákna: každá relace je připnutá k jednomu vláknu (MemoryWorkspace i mezipaměti jádra žijí tam); požadavky
  * jedné relace běží za sebou. Bez `session` = jednorázové vlákno. `--jobs N` = nejvýš N živých vláken; další požadavky čekají
@@ -29,7 +36,7 @@ import crypto from "node:crypto";
 import http from "node:http";
 import path from "node:path";
 import { CAD_LANGS, setLang, tr, type CadLang } from "../i18n";
-import { finalizeReport, formatFull, OVERFLOW_FILE } from "../engine/protocol";
+import { finalizeReport, formatFull, OVERFLOW_FILE, ReportBuilder } from "../engine/protocol";
 import { safeFileName, sha256Hex } from "../engine/host";
 import type { OutFile, RunReport } from "../engine/protocol-types";
 import { parseFormats, parseStrict, UsageError, type ServeArgs, type StrictOpt } from "./args";
@@ -38,7 +45,11 @@ import type { JobRequest } from "./job";
 import type { Io } from "./main";
 import { cliVersion, jobInit } from "./main";
 import { BODY_MAX, checkBody, checkRequest, loadOrCreateToken, validateBind, type SecurityConfig } from "./serve-security";
-import { httpStatusFor, JobThread, type Outcome } from "./watchdog";
+import { httpStatusFor, JobThread, scriptLines, type Outcome } from "./watchdog";
+import { isFinal, RunTracker } from "../engine/run-queue";
+
+/** první neprázdný řádek skriptu (popis úlohy v `GET /runs`) */
+const firstLine = (s: string) => (s.split(/\r?\n/).find((l) => l.trim()) ?? "").trim().slice(0, 80);
 
 /** nejvíc čekajících požadavků (pak 429) */
 export const QUEUE_MAX = 8;
@@ -49,6 +60,8 @@ type Session = { id: string; saved: Uint8Array | null; slot: Slot | null; chain:
 
 export type RunBody = {
   script: string;
+  /** vlastní id úlohy (pro `DELETE /run/<id>` ještě před odpovědí) – jinak `j<n>` */
+  id?: string;
   strict?: boolean | string[];
   formats?: string[] | "auto" | "none";
   share?: false | { view?: "model" | "drawing"; days?: number };
@@ -69,13 +82,27 @@ export type RunBody = {
 class BadRequest extends Error {}
 /** server se ukončuje – požadavek ve frontě dostane 503 */
 class ShuttingDown extends Error {}
+/** úloha zrušená dřív, než začala počítat (`DELETE /run/<id>`) */
+class JobCancelled extends Error {}
+
+/** řízení úlohy serveru: zrušení čekající / běžící úlohy */
+type JobCtl = { cancelled: boolean; slot: Slot | null; cancel: () => void; cancelledP: Promise<void> };
+
+/** protokol úlohy zrušené před startem: ✗ run.cancelled, nic se neprovedlo */
+export function cancelledReport(id: string, lang: CadLang, script: string, strict: boolean): RunReport {
+  setLang(lang);
+  const rb = new ReportBuilder({ lang, lines: scriptLines(script), strict });
+  rb.code("run.cancelled", { line: null });
+  rb.run = { id, inputRev: "-", state: "cancelled" };
+  return rb.finish({});
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 /** Kontrola a převod těla `POST /run` (400 při chybě). */
 export function parseRunBody(raw: unknown): { body: RunBody; strict: StrictOpt; files: Record<string, Uint8Array> } {
   if (!isObj(raw)) throw new BadRequest(tr("tělo musí být objekt JSON"));
-  const known = new Set(["script", "strict", "formats", "share", "files", "open", "return", "full", "notes", "lang", "session", "timeoutSec", "budget", "doc", "allDocs", "noOutputOnError"]);
+  const known = new Set(["script", "id", "strict", "formats", "share", "files", "open", "return", "full", "notes", "lang", "session", "timeoutSec", "budget", "doc", "allDocs", "noOutputOnError"]);
   for (const k of Object.keys(raw)) if (!known.has(k)) throw new BadRequest(tr("neznámé pole „{0}“", k));
   const b = raw as RunBody;
   if (typeof b.script !== "string") throw new BadRequest(tr("pole „{0}“ musí být {1}", "script", "string"));
@@ -103,6 +130,7 @@ export function parseRunBody(raw: unknown): { body: RunBody; strict: StrictOpt; 
   if (b.return !== undefined && b.return !== "base64" && b.return !== "paths") throw new BadRequest(tr("pole „{0}“ musí být {1}", "return", "base64 | paths"));
   if (b.lang !== undefined && !CAD_LANGS.some((l) => l.id === b.lang)) throw new BadRequest(tr("neznámý jazyk „{0}“ – cs, en, de", String(b.lang)));
   if (b.session !== undefined && !(typeof b.session === "string" && SESSION_RE.test(b.session))) throw new BadRequest(tr("pole „{0}“ musí být {1}", "session", "[A-Za-z0-9_-]{1,64}"));
+  if (b.id !== undefined && !(typeof b.id === "string" && SESSION_RE.test(b.id))) throw new BadRequest(tr("pole „{0}“ musí být {1}", "id", "[A-Za-z0-9_-]{1,64}"));
   if (b.timeoutSec !== undefined && !(Number.isInteger(b.timeoutSec) && b.timeoutSec >= 1 && b.timeoutSec <= 86_400)) throw new BadRequest(tr("pole „{0}“ musí být {1}", "timeoutSec", "1–86400"));
   if (b.budget !== undefined && !(Number.isInteger(b.budget) && b.budget >= 1)) throw new BadRequest(tr("pole „{0}“ musí být {1}", "budget", "integer ≥ 1"));
   if (b.doc !== undefined && typeof b.doc !== "string") throw new BadRequest(tr("pole „{0}“ musí být {1}", "doc", "string"));
@@ -186,6 +214,9 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
   const cfg: SecurityConfig = { token: tok.token, port: a.port, bind: a.host, ...(a.allowRemote ? { remote: { bind: a.host, hosts: a.allowHosts } } : {}) };
   let closing = false;
   const handlers = new Set<Promise<unknown>>();
+  /** úlohy serveru (vlna 22, bod 12): identita a stav – týž RunTracker jako běhy prohlížeče, pořadí řídí relace a vlákna */
+  const runs = new RunTracker({ prefix: "j", keep: 200 });
+  const jobs = new Map<string, JobCtl>();
 
   const spawn = (lang: CadLang): Slot => {
     const thread = new JobThread({ entry: io.entry, init: { ...init0, lang }, maxMemMB: a.maxMem, rssGuard: false });
@@ -269,6 +300,11 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
     if (body.return === "paths" && !outRoot) return fail(res, 400, "bad-request", tr("return: \"paths\" vyžaduje server spuštěný s --out"));
     if (inflight - running >= QUEUE_MAX) return fail(res, 429, "queue-full", tr("fronta je plná ({0} čekajících požadavků)", QUEUE_MAX), { "retry-after": "5" });
     const lang = body.lang ?? a.lang;
+    // úloha: id + stav od přijetí (čeká ve frontě relace / na vlákno)
+    const job = runs.begin({ kind: "script", source: "http", label: firstLine(body.script), ...(body.id ? { id: body.id } : {}), ...(body.session ? { docKey: `session-${body.session}` } : {}) });
+    let cancelNow!: () => void;
+    const ctl: JobCtl = { cancelled: false, slot: null, cancel: () => cancelNow(), cancelledP: new Promise<void>((r) => (cancelNow = r)) };
+    jobs.set(job.id, ctl);
     inflight++;
     let session: Session | null = null;
     if (body.session) {
@@ -276,7 +312,14 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
       sessions.set(session.id, session);
     }
     const work = async () => {
+      if (ctl.cancelled) throw new JobCancelled();
       const { slot, fresh } = await acquire(session, lang);
+      if (ctl.cancelled) {
+        release(slot, !!session);
+        throw new JobCancelled();
+      }
+      ctl.slot = slot;
+      runs.start(job.id);
       running++;
       const sub = session ? `session-${session.id}` : `run-${Date.now().toString(36)}-${crypto.randomBytes(3).toString("hex")}`;
       let outDir: string | null = null;
@@ -305,13 +348,18 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
         resume: fresh && session ? session.saved : null,
         saveSession: !!session,
         allowEmpty: !!session,
+        runId: job.id,
       };
       let outcome: Outcome;
       try {
         outcome = await slot.thread.run(jr, { deadline: Date.now() + timeoutSec * 1000, timeoutSec, lang });
       } finally {
         running--;
+        ctl.slot = null;
       }
+      const inputRev = outcome.kind === "failed" ? undefined : outcome.report.run?.inputRev;
+      if (inputRev) runs.update(job.id, { inputRev });
+      runs.end(job.id, outcome.kind === "done" ? "done" : outcome.kind === "cancelled" || outcome.kind === "interrupted" ? "cancelled" : "error", outcome.kind === "failed" ? outcome.error : outcome.kind !== "done" ? outcome.detail : undefined);
       if (outcome.kind === "done" && session && outcome.session) session.saved = outcome.session;
       if (session) session.lastUsed = Date.now();
       release(slot, outcome.kind === "done" && !!session);
@@ -319,14 +367,25 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
     };
     const p = session ? session.chain.then(work, work) : work();
     if (session) session.chain = p.catch(() => undefined);
+    void p.catch(() => undefined); // zrušená čekající úloha: odpověď odešla dřív, práce jen doběhne naprázdno
+    const runHeader = { "x-mncad-run": job.id };
     try {
-      let got: Awaited<typeof p>;
+      let got: Awaited<typeof p> | "cancelled";
       try {
-        got = await p;
+        got = await Promise.race([p, ctl.cancelledP.then(() => "cancelled" as const)]);
       } catch (e) {
-        if (e instanceof ShuttingDown) return fail(res, 503, "shutting-down", tr("server se ukončuje"));
-        if (e instanceof BadRequest) return fail(res, 400, "bad-request", e.message);
-        throw e;
+        if (e instanceof JobCancelled) got = "cancelled";
+        else {
+          runs.end(job.id, "error", (e as Error).message);
+          if (e instanceof ShuttingDown) return fail(res, 503, "shutting-down", tr("server se ukončuje"));
+          if (e instanceof BadRequest) return fail(res, 400, "bad-request", e.message);
+          throw e;
+        }
+      }
+      if (got === "cancelled") {
+        runs.end(job.id, "cancelled");
+        const fin = finalizeReport(cancelledReport(job.id, lang, body.script, !!strict), { budget: body.budget, notes: body.notes, full: body.full });
+        return send(res, 200, fin, runHeader);
       }
       const { outcome, outDir } = got;
       setLang(lang);
@@ -352,10 +411,27 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
         outFiles.push(o);
       }
       const report: RunReport = { ...fin, files: outFiles };
-      send(res, httpStatusFor(outcome), report);
+      send(res, httpStatusFor(outcome), report, runHeader);
     } finally {
       inflight--;
+      jobs.delete(job.id);
+      if (!isFinal(runs.get(job.id)?.state ?? "done")) runs.end(job.id, "error");
     }
+  }
+
+  /** `DELETE /run/<id>`: čekající úloha se vyřadí, běžící přeruší (vlákno skončí, ✗ run.cancelled) */
+  async function cancelJob(id: string): Promise<{ status: number; body: unknown }> {
+    const e = runs.get(id);
+    if (!e) return { status: 404, body: { error: "not-found", message: tr("úloha „{0}“ neexistuje", id) } };
+    const ctl = jobs.get(id);
+    if (isFinal(e.state) || !ctl) return { status: 409, body: { error: "finished", message: tr("úloha „{0}“ už skončila ({1})", id, e.state), run: runs.snapshot(e) } };
+    ctl.cancelled = true;
+    if (e.state === "queued") {
+      runs.end(id, "cancelled");
+      ctl.cancel();
+    } else if (ctl.slot) await ctl.slot.thread.cancel();
+    else ctl.cancel();
+    return { status: 200, body: { run: runs.snapshot(runs.get(id) ?? e) } };
   }
 
   const server = http.createServer((req, res) => {
@@ -378,6 +454,26 @@ export async function startServer(a: ServeArgs, io: Io): Promise<ServerHandle> {
         if (req.method !== "GET") return fail(res, 405, "method", tr("metoda {0} není povolená", req.method ?? "?"), { allow: "GET" });
         const { AGENT_GUIDE } = await import("../agent-guide");
         return send(res, 200, AGENT_GUIDE);
+      }
+      if (p === "/runs") {
+        if (req.method !== "GET") return fail(res, 405, "method", tr("metoda {0} není povolená", req.method ?? "?"), { allow: "GET" });
+        return send(res, 200, { runs: runs.list().map((e) => runs.snapshot(e)) });
+      }
+      const rm = /^\/run\/([^/]+)$/.exec(p);
+      if (rm) {
+        let id: string;
+        try {
+          id = decodeURIComponent(rm[1]);
+        } catch {
+          return fail(res, 400, "bad-request", tr("neplatné kódování adresy „{0}“", rm[1].slice(0, 80)));
+        }
+        if (req.method === "GET") {
+          const e = runs.get(id);
+          return e ? send(res, 200, { run: runs.snapshot(e) }) : fail(res, 404, "not-found", tr("úloha „{0}“ neexistuje", id));
+        }
+        if (req.method !== "DELETE") return fail(res, 405, "method", tr("metoda {0} není povolená", req.method ?? "?"), { allow: "GET, DELETE" });
+        const r = await cancelJob(id);
+        return send(res, r.status, r.body);
       }
       const sm = /^\/session\/([^/]+)$/.exec(p);
       if (sm) {

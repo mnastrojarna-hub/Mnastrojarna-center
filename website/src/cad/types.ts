@@ -473,7 +473,14 @@ export type MateType = "mate" | "flush" | "concentric" | "distance" | "angle" | 
  * Odkaz na plochu komponenty nejvyšší úrovně; `leaf` = cesta listu („a/b“) u podsestav, `face` = index plochy v dílu (−1 = doplní se automaticky podle `radius`).
  * `ent` = druh entity: bez hodnoty plocha, „edge“ = hrana (index hrany), „vertex“ = vrchol (index vrcholu).
  */
-export type MateRef = { compId: string; leaf?: string; face: number; radius?: number; ent?: "edge" | "vertex" };
+export type MateRef = { compId: string; leaf?: string; face: number; radius?: number; ent?: "edge" | "vertex"; lost?: LostRef };
+/**
+ * Ztracená reference vazby (vlna 22, bod 20): plocha / hrana / vrchol, který po změně historie dílu v dílu není, nebo odpovídá víc
+ * entitám – otisk původní entity v souřadnicích dílu (`why`: none = nic, ambiguous = víc kandidátů, unknown = původní geometrie
+ * není známa, gone = díl v podsestavě zmizel). Vazba s ní se neřeší (komponenta se nehýbe, stav „lost“), dokud uživatel entitu
+ * nevybere znovu (`sestava vazba N plocha …`, panel Vazby); `face` drží původní číslo jen pro text. cad/mate-remap.ts
+ */
+export type LostRef = { kind: string; origin: Vec3; normal: Vec3; radius?: number; area?: number; length?: number; pts?: Vec3[]; why: "none" | "ambiguous" | "unknown" | "gone" };
 /**
  * Trvalá vazba sestavy – řeší se postupně při každé změně (viz cad/mates.ts). `a` = pohyblivá komponenta, `b` = cíl.
  * `c`, `d` = další odkazy (Symetricky: rovina souměrnosti; Šířka: druhá plocha jazýčku / drážky; Drážka: druhý konec; Závěs: dosedací roviny).
@@ -484,8 +491,13 @@ export type Mate = {
   id: string; type: MateType; a: MateRef; b: MateRef; value?: number; flip?: boolean; center?: boolean; suppressed?: boolean; name?: string;
   c?: MateRef; d?: MateRef; min?: number; max?: number; phase?: number[]; rel?: Placement;
 };
-/** Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost). */
-export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost místo rozsahu: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
+/**
+ * Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost).
+ * `from` / `to`: u vazby Vzdálenost a Drážky s polohou hodnota vazby (absolutní), jinak posuv / natočení od výchozí polohy. `speed` bez
+ * `ranged` = od `from` rychlostí bez konce (znaménko = směr, `to` se nepoužije); s `ranged` (vlna 22) = rozsah × rychlost: z `from`
+ * na `to` rychlostí |speed|, tam motor stojí (doba |to − from| / rychlost). Jediný výklad všech tvarů: cad/motor-model.ts `motorKeys`.
+ */
+export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
 export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic };
 /**

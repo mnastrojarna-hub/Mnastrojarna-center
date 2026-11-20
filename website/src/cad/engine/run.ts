@@ -10,10 +10,10 @@
 import { docStatusText, parseAgentText, type AgentOp } from "../agent";
 import { stripLineComment } from "../agent-comment";
 import { getLang, tr } from "../i18n";
-import { isCancelled } from "../kernel-client";
+import { CadCancelled, isCancelled } from "../kernel-client";
 import type { CadDoc, Feature } from "../types";
 import { fmtNum } from "@/lib/mesh-metrics";
-import { asmStatus, asmStatusOf } from "./asm-status";
+import { asmStatus, asmStatusOf, staleNotes } from "./asm-status";
 import { CodedError, codeDef, codeText, isCode, type Code } from "./codes";
 import { lintOp } from "./lint";
 import { DrawingTracker } from "./drawing-track";
@@ -42,7 +42,15 @@ export type RunHooks = {
  * `preloaded` = dokumenty, které volající otevřel před skriptem (CLI `--open`): klíč ověření (`<docKey>#part|asm`) a
  * dokument – ověří se stavbou jako JSON na řádku skriptu (✗/⚠ prvků bez řádku), i když běh přejde na jiný dokument.
  */
-export type EngineRunOptions = RunOptions & { hooks?: RunHooks; preloaded?: { key: string; doc: CadDoc }[] };
+export type EngineRunOptions = RunOptions & {
+  hooks?: RunHooks;
+  preloaded?: { key: string; doc: CadDoc }[];
+  /**
+   * zrušení běhu (vlna 22, bod 12 – RunTracker: tlačítko Zrušit konzole, `window.mncad.cancelRun`, `run(text, { signal })`):
+   * kontroluje se před každou operací a před závěrečnou stavbou; zrušený běh skončí jako po Zrušit u výpočtu (✗ run.cancelled)
+   */
+  signal?: AbortSignal;
+};
 
 /** popis operace pro hlášky a časy (`feature:box`, `asm:mate`, `drawingCmd:sheet`) */
 export function opLabel(op: AgentOp): string {
@@ -145,6 +153,7 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
       /* STOP před během – nic se neprovede */
     } else if (!(prog.errors.length && hooks.stopAfter?.(rb.entries, 0))) {
       for (const op of prog.ops) {
+        if (o.signal?.aborted) throw new CadCancelled(); // zrušený běh: další řádky se neprovedou
         // konec bloku příkazů výkresu (jiný příkaz nebo přepnutí listu): nálezy bloku na jeho řádky
         if (draw.open && (op.k !== "drawingCmd" || op.cmd.k === "sheet") && (await closeBlock())) break;
         const label = opLabel(op);
@@ -187,6 +196,7 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
         if (stopOn(fresh, op.line)) break;
         if (hooks.stopAfter?.(fresh, op.line)) break;
       }
+      if (o.signal?.aborted) throw new CadCancelled();
       if (draw.open && !rb.stopped) await closeBlock();
       // listy, které běh měnil, v konečném stavu (normální režim jednou na konci, přísný doplní změny po bloku)
       if (!rb.stopped) stopOn(await draw.finish((k) => verify.docOf(k)), null);
@@ -236,6 +246,7 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   const curKey = verifyKey(ctx);
   // závěrečné stavby jsou operace „build“ bez řádku (CLI: hlídač zná operaci, na které vypršel --timeout – ✗ L- run.timeout)
   const hooks = (ctx.opts as EngineRunOptions).hooks ?? {};
+  if ((ctx.opts as EngineRunOptions).signal?.aborted) throw new CadCancelled(); // zrušeno před závěrečnou stavbou
   const tFinal = now();
   hooks.opStart?.(null, "build");
   for (const k of verify.pendingKeys()) if (k !== curKey) await verify.verifyDoc(k);
@@ -307,10 +318,11 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   };
   // obálka sestavy přesně (engine/asm-box.ts) – stejně jako `stav` uprostřed skriptu a řádek D v CLI
   const asm = await asmStatus(ws, host.kernel, d, { key: docKeyOf(ctx), onRestart: restarted, onParts: () => host.ui?.partsLoaded?.() });
-  const status = docStatusText(d, res, asm);
+  const stale = staleNotes(ws, d, docKeyOf(ctx)); // měření / porovnání z dřívější revize dokumentu (engine/result-key.ts)
+  const status = docStatusText(d, res, asm, stale);
   log.tailLine("", status);
   // „stav“ jako poslední příkaz: vyžádaný výpis = závěrečný stav (strojová část stejná v cs/en/de, text v `detail`);
   // po STOP přísného režimu se poslední řádek neprovedl – výpis „=“ se nepíše (konzole stav dokumentu ukáže dál)
-  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, res, asm), { doc: d.name, detail: status });
+  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, res, asm, stale), { doc: d.name, detail: status });
   return log.text();
 }

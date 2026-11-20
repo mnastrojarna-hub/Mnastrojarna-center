@@ -12,7 +12,8 @@ import { tr } from "../i18n";
 import type { Entry } from "./protocol-types";
 
 export type CodeLevel = "error" | "warn" | "note";
-export type CodeDef = { code: string; level: CodeLevel; key: string };
+/** `short` = ℹ, které stručný protokol vypíše i bez volby `notes` (převzetí záložky opakovaným během – protocol.ts) */
+export type CodeDef = { code: string; level: CodeLevel; key: string; short?: true };
 
 /** tvar kódu – shodně s gramatikou protokolu (kap. 4.2) */
 export const CODE_RE = /^[a-z0-9]+(?:[.-][a-z0-9]+)*$/;
@@ -67,6 +68,9 @@ export const CODES = [
   { code: "name.renamed-auto", level: "note", key: "výchozí název očíslován: „{0}“" },
   { code: "tab.empty-replaced", level: "warn", key: "prázdná záložka „{0}“ nahrazena dokumentem „{1}“" },
   { code: "tab.settle-timeout", level: "error", key: "přepnutí záložky nedoběhlo do {0} s" },
+  // ── opakovaný běh (vlna E, balík runs – agent-runs.ts, engine/ops/new.ts) ──
+  { code: "doc.reused", level: "note", short: true, key: "záložka „{0}“ z dřívějšího běhu použita znovu – obsah nahrazen (novou záložku dá u nový díl / nová sestava volba „nový“)" },
+  { code: "doc.name-taken", level: "note", short: true, key: "záložka „{0}“ už je otevřená, ale nezaložil ji stejný druh příkazu běhu (otevřený soubor, JSON, ruční práce) – dokument je v nové záložce (u nový díl / nová sestava ji převezme volba „znovu“)" },
   // ── díry a výběr (5.2 č. 5, 7, 8, 12, 13, 18, 38) ──
   { code: "hole.depth-default", level: "warn", key: "díra bez hloubky – vrtá se skrz" },
   { code: "hole.conflict", level: "warn", key: "zahloubení a kuželové zahloubení zároveň – použito {0}" },
@@ -82,6 +86,10 @@ export const CODES = [
   { code: "asm.faces-truncated", level: "warn", key: "díl „{0}“ má víc než {1} ploch – načteno jen prvních {1}" },
   { code: "asm.kernel-restarted", level: "note", key: "jádro se restartovalo – mezipaměti sestavy vyprázdněny" },
   { code: "asm.face-missing", level: "error", key: "plocha F{0} dílu „{1}“ není k dispozici" },
+  // reference vazeb po změně historie dílu (vlna 22, bod 20 – cad/mate-remap.ts): ztracená = mimo řešení, nikdy tiché připojení jinam
+  { code: "mate.lost", level: "error", key: "vazba {0} – ztracená reference {1}: vazba je mimo řešení a komponenty se kvůli ní nehýbou; {2}" },
+  { code: "mate.renumbered", level: "note", key: "vazba {0}: {1} po úpravě dílu ({2})" },
+  { code: "mate.restored", level: "note", key: "vazba {0}: ztracená reference {1} znovu nalezena jako {2} – vazba se zase řeší" },
   { code: "asm.instance-duplicate", level: "warn", key: "instance „{0}“ už v sestavě je" },
   { code: "clash.real", level: "warn", key: "kolize „{0}“ × „{1}“ ({2} mm³)" },
   { code: "clash.thread", level: "note", key: "šroub v závitu „{0}“ × „{1}“" },
@@ -90,6 +98,13 @@ export const CODES = [
   { code: "clash.hidden", level: "note", key: "skryté komponenty se nekontrolují ({0})" },
   { code: "clash.rechecked", level: "note", key: "kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila" },
   { code: "motion.conflict", level: "warn", key: "pohyb porušuje vazbu „{0}“ v kroku {1}" },
+  // výsledek studie jen pro stav sestavy, pro který vznikl (vlna 22, bod 1); motory: rozsah × rychlost a začátek (body 9, 11) – cad/motor-model.ts
+  { code: "motion.stale", level: "warn", key: "výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“" },
+  { code: "motion.recomputed", level: "note", key: "pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}" },
+  { code: "motion.start-jump", level: "warn", key: "motor {0}: začátek {1} neodpovídá aktuální hodnotě vazby {2} – v kroku 0 díl přeskočí" },
+  { code: "motion.motor-short", level: "warn", key: "motor {0} nedojede na konec: jízda trvá {1} s, studie má {2} s" },
+  { code: "motion.gap-negative", level: "warn", key: "motor {0}: hodnota vazby „{1}“ klesne pod nulu ({2} mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)" },
+  { code: "motion.duration-extended", level: "warn", key: "délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)" },
   // ── měření, kontrola, porovnání, materiál (5.2 č. 31, 37; kap. 6) ──
   { code: "measure.truncated", level: "note", key: "vypsáno {0} z {1}" },
   { code: "check.hole-missing", level: "warn", key: "prvek díry „{0}“ nemá v geometrii díru" },

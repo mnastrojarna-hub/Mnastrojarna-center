@@ -178,7 +178,7 @@ sestava vazba závěs "Kolo2" Ø8,2 "Držák" Ø8`);
 
   // ── 4. text / API: klikový mechanismus – motor, kolize, stopa; přesnost vůči vzorci ──
   log = await run(p, 'pohyb motor rotační "Klika" 0..360 krok 10 kolize stopa "Ojnice" bod 30 0 14');
-  ok(!bad(log).length && /✓ motor 2: rotační motor · Závěs „Klika“ → „Rám“ · 0…360°/.test(log), 'text: pohyb motor rotační "Klika" 0..360 krok 10 kolize stopa – motor 2 na Závěsu klika → rám\n' + (bad(log).join('\n') || line(log, /^✓ motor[^\n]*/m)));
+  ok(!bad(log).length && /✓ motor 2: rotační motor · Závěs „Klika“ → „Rám“ · natočení od výchozí polohy 0 → 360° ↺ otočení 360°/.test(log), 'text: pohyb motor rotační "Klika" 0..360 krok 10 kolize stopa – motor 2 na Závěsu klika → rám\n' + (bad(log).join('\n') || line(log, /^✓ motor[^\n]*/m)));
   // kolize v pohybu podle tříd (balík B4): souhrn studie + ⚠ clash.real na každou dvojici dílů s prvním krokem
   ok(/Kolize v pohybu: kroků s kolizí \d+ z 37 · .*skutečné: \d+ dvojic dílů v \d+ krocích, první v kroku 14/.test(log) && /⚠ řádek 1: v pohybu „(Doraz|Píst)“ × „(Doraz|Píst)“ od kroku 14 \(t = 0,778 s\)/.test(log), 'kolize v krocích: první v kroku 14 (140°) píst × doraz\n' + line(log, /^Kolize v pohybu[^\n]*/m) + '\n' + line(log, /^⚠ řádek 1: v pohybu[^\n]*/m));
   const api = await p.evaluate(() => window.mncad.motion());
@@ -203,8 +203,12 @@ sestava vazba závěs "Kolo2" Ø8,2 "Držák" Ø8`);
   // ── 5. angličtina a mechanické vazby textem ──
   log = await run(p, 'assembly mate gear "Kolo2" "Kolo1" teeth 40 20');
   ok(/✓ vazba Ozubená kola „Kolo2“ F\d+ → „Kolo1“ F\d+ · poměr 0,5: ok/.test(log), 'EN: assembly mate gear … teeth 40 20 → poměr 0,5 (shodný s první vazbou, bez konfliktu) ' + line(log, /^.*vazba Ozubená[^\n]*/m));
+  // vlna 22 (bod 1 zprávy): přidaná vazba změnila sestavu → uložený výsledek studie pro nynější stav neplatí. „motion status“ to
+  // hlásí (⚠ motion.stale, žádný starý souhrn) a nic potichu nepřepočítává; nový výsledek dá „motion run“ (dřív stav přepočítal sám)
   log = await run(p, 'motion status');
-  ok(/Pohybová studie: motorů 2/.test(log) && /Vazby splněny ve všech krocích/.test(log), 'EN: motion status');
+  ok(/Pohybová studie: motorů 2/.test(log) && /výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: vazby/.test(log) && !/Vazby splněny ve všech krocích|rozsah pohybu/.test(log), 'EN: motion status po změně vazby – ⚠ výsledek neplatí (vazby), žádný starý souhrn ' + line(log, /^⚠[^\n]*/m));
+  log = await run(p, 'motion run');
+  ok(/Pohybová studie: motorů 2/.test(log) && /pohybová studie přepočítána/.test(log) && /Vazby splněny ve všech krocích/.test(log), 'EN: motion run přepočítá (ℹ) – vazby splněny ve všech krocích');
 
   // ── 6. vačka s rovinným zdvihátkem (síť plochy vačky z jádra), dráha po hraně a vrchol na rovinu ──
   const CAM = { app: 'mnastrojarna-cad', version: 2, name: 'Vačkový mechanismus', kind: 'assembly', material: 'ocel', features: [], components: [

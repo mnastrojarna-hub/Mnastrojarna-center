@@ -304,11 +304,13 @@ describe("výkresy", () => {
     expect(l).toContain("kótovat nic");
     expect(r.stats.sheets).toBe(2);
     expect(r.notes.join(" ")).toContain("úpravy vygenerovaných kót");
+    // list 2 s prázdným razítkem: „výkres list nový“ by převzal razítko listu 1 – skript zděděná pole vyprázdní (vlna E)
+    expect(l).toContain('výkres razítko číslo="" kreslil="" datum="" nepředepsané=""');
     const cmds = reparse(r.text).ops.filter((o) => o.k === "drawingCmd").map((o) => (o as { cmd: { k: string } }).cmd.k);
-    expect(cmds).toEqual(["set", "title", "dim", "sheet", "set", "dim"]);
+    expect(cmds).toEqual(["set", "title", "dim", "sheet", "set", "title", "dim"]);
     // pro německé / anglické rozhraní navíc přejmenování prvního listu („List 1“ by se tam jmenoval „Blatt 1“ / „Sheet 1“)
     expect(body(docToScript(d, { lang: "de" }).text)).toContain('zeichnung blatt umbenennen "List 1"');
-    expect(reparse(docToScript(d, { lang: "de" }).text).ops.filter((o) => o.k === "drawingCmd").length).toBe(7);
-    expect(reparse(docToScript(d, { lang: "en" }).text).ops.filter((o) => o.k === "drawingCmd").length).toBe(7);
+    expect(reparse(docToScript(d, { lang: "de" }).text).ops.filter((o) => o.k === "drawingCmd").length).toBe(8);
+    expect(reparse(docToScript(d, { lang: "en" }).text).ops.filter((o) => o.k === "drawingCmd").length).toBe(8);
   });
 });

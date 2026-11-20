@@ -24,6 +24,7 @@ textový příkaz: díra D [hloubka H [dno ploché | hrot 118]|skrz [obousměrn�
 společná pole: name (název), suppressed (potlačit ano/ne), body (cílové těleso)
 hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě
 příklad: prvek hole diameter=10 depth=12 position=20;30;20 tipAngle=180
+v návodu: nápověda hledat díra · tahák: nápověda tahák
 Pružina (spring) – pole pro „prvek spring klíč=hodnota“ i „upravit <prvek> klíč=hodnota“:
 textový příkaz: pružina D stoupání P závity N|délka L drát d [v x y z | na …] [osa …] [odebrat|průnik|nové]
  • radius – číslo [mm], např. radius=12,5 · povinné – poloměr osy drátu (text zadává průměr D) · text: pružina D
@@ -37,6 +38,7 @@ textový příkaz: pružina D stoupání P závity N|délka L drát d [v x y z |
  • dirDef – směr (JSON Direction), např. dirDef={"kind":"vector","v":[0,0,-1]} · nepovinné – osa libovolným směrem – má přednost před axis · text: osa -Z | osa 1 0 1 | osa hrana E3 | osa plocha F2 | osa "Osa 1" | osa body V1 V5
 společná pole: name (název), suppressed (potlačit ano/ne), body (cílové těleso)
 hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě
+v návodu: nápověda hledat pružina · tahák: nápověda tahák
 prvek nápověda <typ> vypíše všechna pole typu pro „prvek <typ> klíč=hodnota“ (typ i slovem příkazu: díra, kužel, pružina; rozšíření id # popiskem). Přehled – textový příkaz · pole jen přes prvek / upravit / JSON:
  • sketch (Skica): text ✓ · vše textem
  • extrude (Vysunutí): text ✓ · jen prvek: extent2, from, thin, twist, endScale, outerOnly
@@ -76,6 +78,7 @@ prvek nápověda <typ> vypíše všechna pole typu pro „prvek <typ> klíč=hod
  • csys (Souřadný systém): bez textového příkazu · jen prvek: origin, xDir, zDir, size
 rozšíření (72): prvek nápověda <id> – např. prvek nápověda sheet.bend
 společná pole všech prvků: name, suppressed, body
+hledání v návodu, příkazech a příručce: nápověda hledat <slova> (např. nápověda hledat záložky) · tahák pro agenty: nápověda tahák
 
 Dokument: „Nový díl“ · díl · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Rozměry: žádné těleso (jen skici / pomocná geometrie)

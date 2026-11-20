@@ -94,7 +94,6 @@ počet zubů musí být kladný	die Zähnezahl muss positiv sein
 Počítám krok {0} z {1}…	Berechne Schritt {0} von {1}…
 Pohyb	Bewegung
 pohyb export: csv | png | webm	bewegung export: csv | png | webm
-pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa "<X>" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	bewegung antrieb dreh|linear "<Komponente>"|verknüpfung <N> <von>..<bis> [schritt S | schritte N] [zeit T] [u/min R | geschwindigkeit V] [kollisionen] [spur "<X>" [punkt x y z]] · bewegung status|starten|abspielen|stop|schritt N|export csv|png|webm|löschen
 pohyb motor: neznámá volba „{0}“ – {1}	bewegung antrieb: unbekannte Option „{0}“ – {1}
 pohyb: neznámý podpříkaz „{0}“ – {1}	bewegung: unbekannter Unterbefehl „{0}“ – {1}
 pohyb: otevřený dokument „{0}“ není sestava	bewegung: das geöffnete Dokument „{0}“ ist keine Baugruppe
@@ -121,8 +120,6 @@ rovina souměrnosti: chybí komponenta	Symmetrieebene: Komponente fehlt
 rovina souměrnosti: zadejte rovinnou plochu (F12, +X…) – rovina "Rám" F3, nebo rovina F3 (plocha komponenty B)	Symmetrieebene: ebene Fläche angeben (F12, +X…) – um "Rahmen" F3, oder um F3 (Fläche der Komponente B)
 rychlost	Geschwindigkeit
 Rychlost	Geschwindigkeit
-Rychlost (mm/s) místo rozsahu	Geschwindigkeit (mm/s) statt Bereich
-Rychlost (ot/min) místo rozsahu	Geschwindigkeit (U/min) statt Bereich
 Sestava nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub.	Die Baugruppe hat keine Verknüpfung Abstand, Langloch, Pfad, Konzentrisch oder Schraube.
 Sestava nemá vazbu Závěs, Souosost ani Šroub.	Die Baugruppe hat keine Verknüpfung Scharnier, Konzentrisch oder Schraube.
 sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu|ozubení|hřeben|šroub|vačka|kardan "A" <plocha|E5|V3> [2. plocha] "B" <plocha> [2. plocha] [rovina "C" <plocha>] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [min N] [max N] [poloha N] [obráceně|levý|vnitřní] [název "…"]	baugruppe verknüpfung senkrecht|tangential|koinzident|symmetrisch|breite|pfad|langloch|scharnier|sperren|abstandsgrenze|winkelgrenze|zahnrad|zahnstange|schraube|nocken|kardangelenk "A" <Fläche|E5|V3> [2. Fläche] "B" <Fläche> [2. Fläche] [um "C" <Fläche>] [übersetzung N | zähne z1 z2 | steigung P | weg mm/U | modul m zähne z] [min N] [max N] [lage N] [umkehren|links|innen] [name "…"]

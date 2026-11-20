@@ -15,11 +15,11 @@
 import { getLang, tr } from "./i18n";
 import { MATERIALS, massKg } from "@/lib/mesh-metrics";
 import { defaultMoldBase, type BomRow, type CompPattern, type MoldBaseParams } from "./assembly";
-import { MATE_LABEL, axisLabel, dirLabel, sortFaceRows, type FaceRow, type KinMateType, type MateStatus } from "./mates";
+import { MATE_LABEL, axisLabel, dirLabel, lostSides, mateLost, sortFaceRows, type FaceRow, type KinMateType, type MateStatus } from "./mates";
 import { isKinMate } from "./mates-kin";
 import { springStatusLine } from "./asm-spring";
 import type { MotionCmd } from "./agent-motion";
-import type { AsmComponent, BuildResult, CadDoc, Mate, Vec3 } from "./types";
+import type { AsmComponent, BuildResult, CadDoc, LostRef, Mate, MateRef, Vec3 } from "./types";
 
 /* ───────────────────────── typy ───────────────────────── */
 
@@ -65,7 +65,7 @@ export type AsmCmd =
       max?: number;
     }
   | { k: "mates" }
-  | { k: "mateEdit"; ref: string; value?: number; flip?: boolean; suppress?: boolean; del?: boolean; name?: string; min?: number; max?: number }
+  | { k: "mateEdit"; ref: string; value?: number; flip?: boolean; suppress?: boolean; del?: boolean; name?: string; min?: number; max?: number; /** nový výběr plochy strany (ztracená reference – vlna 22, bod 20) */ face?: { side?: "a" | "b" | "c" | "d"; spec: FaceSpec } }
   | { k: "comp"; comp: string; patch: CompPatch }
   | { k: "remove"; comps: string[] }
   | { k: "duplicate"; comp: string; offset: Vec3 }
@@ -87,7 +87,7 @@ export type AsmCmd =
   /** pohybová studie (`pohyb …`, cad/agent-motion.ts) */
   | { k: "motion"; cmd: MotionCmd }
   /** pružina mezi dvěma komponentami (cad/asm-spring-agent.ts): dosedací plochy A / B (bez plochy = nejbližší kolmá rovina), L0, Ln, c */
-  | { k: "spring"; comp: string; a?: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; free?: number; solid?: number; rate?: number; remove?: boolean; /** nová pružina z tabulky (cad/asm-spring-between.ts) */ create?: { d?: number; De?: number; n?: number; at?: Vec3; name?: string; material?: string }; /** do všech děr vzoru (stejný Ø a osa) */ holes?: boolean; /** `sestava pružina nápověda` */ help?: boolean }
+  | { k: "spring"; comp: string; a?: string; faceA?: FaceSpec; b?: string; faceB?: FaceSpec; free?: number; solid?: number; rate?: number; remove?: boolean; /** vedená dírou / kapsou nebo trnem (`vedená ano|ne` – vzpěr se pak nehlásí) */ guided?: boolean; /** nová pružina z tabulky (cad/asm-spring-between.ts) */ create?: { d?: number; De?: number; n?: number; at?: Vec3; name?: string; material?: string }; /** do všech děr vzoru (stejný Ø a osa) */ holes?: boolean; /** `sestava pružina nápověda` */ help?: boolean }
   | { k: "springs" };
 
 /* ───────────────────────── tokeny a slova ───────────────────────── */
@@ -211,6 +211,8 @@ const O = {
   csv: W("csv"),
   tabWord: W("záložka", "záložku", "záložky", "tab", "tabs", "registerkarte", "registerkarten"),
   close: W("zavřít", "uzavřít", "close", "closed", "schließen", "schliessen"),
+  /** `sestava vazba N plocha [a|b] <plocha>` – znovu vybrat plochu (ztracená reference) */
+  face: W("plocha", "plochu", "face", "fläche", "flaeche"),
 };
 
 /** pravidlo plochy: slova (bez diakritiky) a jejich význam */
@@ -584,8 +586,12 @@ const SP = {
   holes: W("do", "díry", "diry", "všechny", "vsechny", "all", "alle", "pattern", "vzor"),
   holeWords: W("děr", "der", "díry", "diry", "vzoru", "vzor", "všech", "vsech", "holes", "hole", "of", "pattern", "bohrungen", "bohrung", "des", "musters", "muster"),
   help: W("nápověda", "napoveda", "help", "hilfe", "?"),
+  // vedení pružiny dírou / kapsou (SpringDef.guided – dřív jen „Pružina mezi díly“, vlna E: i textem a v exportu skriptu)
+  guided: W("vedená", "vedena", "vedený", "vedeny", "guided", "geführt", "gefuehrt", "gefuhrt"),
+  yes: W("ano", "yes", "ja", "true"),
+  no: W("ne", "no", "nein", "false"),
 };
-export const SPRING_USE = () => tr("sestava pružina \"Pružina\" mezi \"Deska A\" [F3] \"Deska B\" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina \"Pružina\" odebrat · sestava pružiny");
+export const SPRING_USE = () => tr("sestava pružina \"Pružina\" mezi \"Deska A\" [F3] \"Deska B\" [F7] [volná L0] [blok Ln] [tuhost c] [vedená ano|ne] · sestava pružina \"Pružina\" odebrat · sestava pružiny");
 function parseSpring(c: Cur): AsmCmd {
   // „sestava pružina nápověda“ (bez uvozovek – komponenta „nápověda“ v uvozovkách zůstává komponentou)
   if (c.is(SP.help) && c.i + 1 >= c.tk.length) return { k: "spring", comp: "", help: true };
@@ -638,6 +644,11 @@ function parseSpring(c: Cur): AsmCmd {
     } else if (c.is(O.del)) {
       c.i++;
       out.remove = true;
+    } else if (c.is(SP.guided)) {
+      // „vedená“ = ano; „vedená ne“ = výslovně nevedená (vzpěr se hlásí i u pružiny v díře)
+      c.i++;
+      out.guided = !c.is(SP.no);
+      if (c.is(SP.yes) || c.is(SP.no)) c.i++;
     } else throw new Error(tr("sestava pružina: neznámá volba „{0}“ – {1}", c.peek()!.t, SPRING_USE()));
   }
   if (out.free !== undefined && !(out.free > 0)) throw new Error(tr("sestava pružina: {0} musí být kladná", tr("volná délka")));
@@ -775,7 +786,7 @@ function parsePattern(c: Cur): AsmCmd {
   return { k: "pattern", comp, pattern: { kind: "linear", count, spacing, direction: d } };
 }
 
-const MATE_ACTION = (c: Cur, k = 0) => c.is(O.value, k) || c.is(O.flip, k) || c.is(O.suppress, k) || c.is(O.unsuppress, k) || c.is(O.del, k) || c.is(O.name, k);
+const MATE_ACTION = (c: Cur, k = 0) => c.is(O.value, k) || c.is(O.flip, k) || c.is(O.suppress, k) || c.is(O.unsuppress, k) || c.is(O.del, k) || c.is(O.name, k) || c.is(O.face, k);
 
 function parseMate(c: Cur): AsmCmd {
   const MATE_USE = tr("sestava vazba kontakt|zarovnat|vystředit|souosost|vzdálenost|úhel|rovnoběžně \"A\" <plocha A> \"B\" <plocha B> [hodnota N] [obráceně] [název \"…\"] · sestava vazba ukotvit \"A\" · sestava vazba <č.|\"název\"> hodnota=N|obráceně|potlačit|zapnout|smazat");
@@ -853,9 +864,17 @@ function parseMate(c: Cur): AsmCmd {
     } else if (c.is(KO.ratio) || c.is(KO.pitch) || c.is(KO.travel) || c.is(KO.pos)) {
       c.i++;
       out.value = c.num(tr("hodnota"));
-    } else throw new Error(tr("vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)", ref.t, c.peek()!.t));
+    } else if (c.is(O.face)) {
+      // znovu vybrat plochu strany vazby (ztracená reference): „plocha b F6“, „plocha +Z“ (strana = ztracená)
+      c.i++;
+      const w = c.word();
+      const side = w === "a" || w === "b" || w === "c" || w === "d" ? (c.i++, w) : undefined;
+      const spec = faceArg(c);
+      if (!spec) throw new Error(tr("vazba „{0}“: plocha – zadejte stranu a plochu: plocha b F6 | plocha +Z (výpis ploch: sestava plochy \"…\")", ref.t));
+      out.face = { ...(side ? { side } : {}), spec };
+    } else throw new Error(tr("vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\" | plocha a|b <plocha> (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)", ref.t, c.peek()!.t));
   }
-  if (out.value === undefined && out.flip === undefined && out.suppress === undefined && !out.del && out.name === undefined && out.min === undefined && out.max === undefined) throw new Error(tr("vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\"", ref.t));
+  if (out.value === undefined && out.flip === undefined && out.suppress === undefined && !out.del && out.name === undefined && out.min === undefined && out.max === undefined && !out.face) throw new Error(tr("vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\" | plocha a|b <plocha>", ref.t));
   return out;
 }
 
@@ -1117,7 +1136,57 @@ export function pickFace(spec: FaceSpec | undefined, rows: CompFaceRow[], need: 
   return { row, ...(list.length > 1 ? { note: tr("{0} z {1} vyhovujících", faceRefText(row), list.length) } : {}) };
 }
 
-const STATUS_TEXT = (s: MateStatus | undefined): string => (s === "ok" ? "ok" : s === "conflict" ? tr("konflikt") : s === "missing" ? tr("chybí plocha") : s === "suppressed" ? tr("potlačeno") : tr("nepřepočteno"));
+const STATUS_TEXT = (s: MateStatus | undefined): string => (s === "ok" ? "ok" : s === "conflict" ? tr("konflikt") : s === "missing" ? tr("chybí plocha") : s === "suppressed" ? tr("potlačeno") : s === "lost" ? tr("ztracená reference") : tr("nepřepočteno"));
+
+/* ── ztracené reference vazeb (vlna 22, bod 20 – cad/mate-remap.ts) ── */
+/** „F3“ / „E2“ / „V1“ – entita odkazu vazby */
+export const refEntText = (r: MateRef): string => `${r.ent === "edge" ? "E" : r.ent === "vertex" ? "V" : "F"}${r.face + 1}`;
+const LOST_KIND: Record<string, string> = { plane: "rovinná", cylinder: "válcová", cone: "kuželová", sphere: "kulová", line: "hrana – úsečka", circle: "hrana – kružnice", curve: "hrana – křivka", point: "vrchol" };
+/** Otisk ztracené entity (souřadnice dílu): „rovinná +Z · střed [10; 20; 5] · 800 mm²“. */
+export function lostPrintText(p: LostRef): string {
+  if (p.why === "unknown") return tr("původní geometrie neznámá");
+  const kind = tr(LOST_KIND[p.kind] ?? "plocha");
+  const parts = [p.kind === "plane" ? `${kind} ${dirLabel(p.normal)}` : p.kind === "cylinder" || p.kind === "cone" ? `${kind} Ø${fmt((p.radius ?? 0) * 2)} · ${tr("osa {0}", axisLabel(p.normal))}` : p.kind === "circle" || p.kind === "sphere" ? `${kind} R${fmt(p.radius ?? 0)}` : kind];
+  parts.push(p.kind === "line" && p.pts?.length === 2 ? `${pt(p.pts[0])}–${pt(p.pts[1])}` : tr("střed {0}", pt(p.origin)));
+  if (p.area !== undefined && (p.kind === "plane" || p.kind === "cylinder" || p.kind === "cone")) parts.push(`${fmt(p.area, 1)} mm²`);
+  return parts.join(" · ");
+}
+const LOST_WHY: Record<LostRef["why"], string> = {
+  none: "po úpravě dílu neexistuje",
+  ambiguous: "po úpravě dílu odpovídá více plochám – nejde jednoznačně určit",
+  unknown: "po úpravě dílu nejde ověřit (původní geometrie není k dispozici)",
+  gone: "díl v podsestavě už není",
+};
+/** Strany vazby se ztracenou referencí: „B F3 dílu „Deska A“ (rovinná +Z · střed [10; 20; 5] · 800 mm²) po úpravě dílu neexistuje“. */
+export function lostRefsText(doc: CadDoc, m: Mate): string {
+  const comp = (id: string) => doc.components?.find((x) => x.id === id)?.name ?? "?";
+  return (["a", "b", "c", "d"] as const)
+    .filter((k) => m[k]?.lost)
+    .map((k) => {
+      const r = m[k]!;
+      const part = r.leaf ? leafNames(doc, r.leaf.split("/")) : comp(r.compId);
+      return tr("{0} {1} dílu „{2}“ ({3}) {4}", k.toUpperCase(), refEntText(r), part, lostPrintText(r.lost!), tr(LOST_WHY[r.lost!.why]));
+    })
+    .join("; ");
+}
+/** názvy komponent na cestě listu podsestavy („Podsestava › Díl“) */
+function leafNames(doc: CadDoc, path: string[]): string {
+  const out: string[] = [];
+  let comps = doc.components ?? [];
+  for (const id of path) {
+    const c = comps.find((x) => x.id === id);
+    if (!c) break;
+    out.push(c.name);
+    comps = c.source.kind === "asm" ? (c.source.doc.components ?? []) : [];
+  }
+  return out.join(" › ") || "?";
+}
+/** Argumenty kódu `mate.lost` (engine/codes.ts) pro vazbu `m`: číslo + text vazby, ztracené strany, oprava (nový výběr / smazání). */
+export function mateLostArgs(doc: CadDoc, m: Mate): [string, string, string] {
+  const no = (doc.mates ?? []).indexOf(m) + 1;
+  const side = (["a", "b", "c", "d"] as const).find((k) => m[k]?.lost) ?? "a";
+  return [`${no} ${mateText(doc, m)}`, lostRefsText(doc, m), tr("vyberte plochu znovu (sestava vazba {0} plocha {1} …), nebo vazbu smažte (sestava vazba {0} smazat)", no, side)];
+}
 
 /** Souhrn vazeb: „3 (2 ok, 1 konflikt)“. */
 export function matesSummary(doc: CadDoc, status?: Record<string, MateStatus>): string {
@@ -1175,7 +1244,8 @@ function kinMateParts(m: Mate, face: (r: Mate["a"]) => string, name: (id: string
 export function mateLines(doc: CadDoc, status?: Record<string, MateStatus>): string[] {
   const mates = doc.mates ?? [];
   const out = [tr("Vazby sestavy „{0}“: {1}", doc.name, matesSummary(doc, status))];
-  mates.forEach((m, i) => out.push(` ${i + 1}. ${mateText(doc, m)} – ${STATUS_TEXT(status?.[m.id] ?? (m.suppressed ? "suppressed" : undefined))}`));
+  // ztracená reference je vlastnost dokumentu (ne výsledek řešení): vždy „ztracená reference“ s otiskem a opravou
+  mates.forEach((m, i) => out.push(` ${i + 1}. ${mateText(doc, m)} – ${mateLost(m) ? `${STATUS_TEXT("lost")}: ${lostRefsText(doc, m)} – ${tr("sestava vazba {0} plocha {1} <plocha> | smazat", i + 1, lostSides(m)[0])}` : STATUS_TEXT(status?.[m.id] ?? (m.suppressed ? "suppressed" : undefined))}`));
   if (!mates.length) out.push(tr(" (žádné – sestava vazba kontakt|souosost … \"A\" <plocha> \"B\" <plocha>)"));
   return out;
 }
@@ -1214,12 +1284,13 @@ export function componentLines(doc: CadDoc, status?: Record<string, MateStatus>)
 }
 
 /** Řádky stavu sestavy pro `docStatusText`: komponenty s polohou (⚓ = ukotvená) a souhrn vazeb. */
-export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>): string[] {
+export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>, matesStale = false): string[] {
   const comps = doc.components ?? [];
   const MAX = 60;
   const items = comps.slice(0, MAX).map((c) => `${c.name}${c.alias ? ` [${c.alias}]` : ""} ${pt(c.placement.position)}${rotText(c.placement.rotation)}${isFixed(doc, c) ? " ⚓" : ""}${c.hidden ? tr(" (skrytá)") : ""}${c.source.kind === "asm" ? tr(" (podsestava)") : ""}`);
   const out = [tr("Komponenty: {0}", items.join(" · ") || tr("žádné")) + (comps.length > MAX ? tr(" … a dalších {0} (sestava)", comps.length - MAX) : "")];
-  if (doc.mates?.length) out.push(tr("Vazby: {0}", matesSummary(doc, status)));
+  // stav vazeb pro jiné polohy, než má dokument (přepočet by komponenty posunul) – nikdy mlčky „ok“ (engine/result-key.ts)
+  if (doc.mates?.length) out.push(tr("Vazby: {0}", matesSummary(doc, status)) + (matesStale ? ` – ${tr("NEPLATÍ pro polohy v dokumentu: stav je až po přepočtu vazeb, který by komponenty posunul (sestava vazby)")}` : ""));
   const sp = springStatusLine(doc); // pružiny: uložená délka, L0, Ln, síla, ✓/⚠/✗
   if (sp) out.push(sp);
   const ms = doc.motion;

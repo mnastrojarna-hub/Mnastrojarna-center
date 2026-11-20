@@ -1,0 +1,48 @@
+# Vlna 22, balík A, etapa A3 (body 12, 22e, 22f, 22h): fronta a identita běhů, zrušení, čekání výstupů, export jako úloha
+{0}: neprovedeno – čekání na dokončení výpočtu bylo zrušeno	{0}: not done – waiting for the computation to finish was cancelled
+✗ Běh {0} zrušen dřív, než začal – nic se neprovedlo, dokument zůstal beze změny.	✗ Run {0} cancelled before it started – nothing was done, the document is unchanged.
+Akce se neprovede; výpočet poběží dál	The action is not carried out; the computation keeps running
+běh {0}	run {0}
+Běh {0}	Run {0}
+Běh {0} čeká ve frontě – začne, až doběhne dřívější běh. Protokol se ukáže po jeho dokončení.	Run {0} is queued – it starts when the earlier run finishes. The protocol appears when it is done.
+běh {0} zrušen	run {0} cancelled
+Běh {0}: {1}	Run {0}: {1}
+čeká	queued
+čeká na dokončení dřívějšího běhu	waiting for an earlier run to finish
+Čekám na dokončení výpočtu…	Waiting for the computation to finish…
+dokončeno	done
+dokument JSON	JSON document
+Export {0} zrušen – soubor nebyl zapsán.	Export {0} cancelled – no file was written.
+Export {0}: úloha {1} – průběh a výsledek v seznamu Exporty	Export {0}: job {1} – progress and result in the Exports list
+export skriptu	script export
+Exporty	Exports
+fáze	phase
+kontrola zpětným načtením	read-back check
+nahrazeno	superseded
+počítá	running
+prázdný soubor z dialogu odstraněn	empty file from the dialog removed
+Probíhá běh {0}… Protokol se ukáže po jeho dokončení.	Run {0} in progress… The protocol appears when it is done.
+Předchozí běh {0} – protokol (nepatří běžícímu běhu)	Previous run {0} – protocol (does not belong to the running run)
+Předchozí výstup (nepatří běžícímu běhu)	Previous output (does not belong to the running run)
+přestavba modelu	model rebuild
+převod	conversion
+převod do {0}	conversion to {0}
+run: neznámá volba „{0}“ – protocol, budget, notes, signal	run: unknown option “{0}” – protocol, budget, notes, signal
+run: signal musí být AbortSignal (new AbortController().signal)	run: signal must be an AbortSignal (new AbortController().signal)
+sdílení	sharing
+Sdílení zrušeno.	Sharing cancelled.
+síť modelu	model mesh
+Skrýt dokončené exporty	Hide finished exports
+soubor nebyl zapsán	no file was written
+soubor nebyl zapsán (0 B) – prázdný soubor z dialogu smažte ručně	no file was written (0 B) – delete the empty file from the dialog by hand
+soubor nebyl zapsán ani stažen	no file was written or downloaded
+úloha „{0}“ neexistuje	job “{0}” does not exist
+úloha „{0}“ už skončila ({1})	job “{0}” has already finished ({1})
+uložení	saving
+Uložení zrušeno – soubor nebyl zapsán.	Saving cancelled – no file was written.
+Uložení zrušeno.	Saving cancelled.
+ve frontě {0}	queued {0}
+zápis souboru	file write
+zrušeno	cancelled
+Zruší běh: čekající se neprovede, běžící se zastaví a dokument zůstane beze změny	Cancels the run: a queued run is not carried out, a running one stops and the document stays unchanged
+Zrušit běh	Cancel run

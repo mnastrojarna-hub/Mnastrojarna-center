@@ -12,7 +12,7 @@
  */
 import { tr } from "./i18n";
 import type { DrawingOptions, ViewKey, ViewRotation } from "./drawing";
-import { parseDrawingViews, type ViewsCmd } from "./agent-drawing-views";
+import { isPlaceTop, parseDrawingViews, type ViewsCmd } from "./agent-drawing-views";
 import type { FitShow } from "./drawing-fits";
 import { sectionText } from "./drawing-section";
 import type { GdtSymbol, PlaneName, Vec2 } from "./types";
@@ -92,8 +92,9 @@ export type DrawingCmd =
   /** smazání kót / značek: id nebo popisky, „vlastní“ = všechny vlastní, „vše“ = všechny */
   | { k: "del"; targets: string[] | "custom" | "all" }
   /** detailní pohled: nový (střed v mm modelu v rovině pohledu, poloměr, měřítko, umístění středu na listu), úprava, smazání */
-  | { k: "detail"; op: "add"; view: ViewRef; at: Vec2; r: number; scale?: number; place?: Vec2 }
-  | { k: "detail"; op: "edit"; label: string; scale?: number; place?: Vec2 }
+  /** `placeTop` = umístění od levého horního rohu listu (`umístit x y odshora` – agent-drawing-views.ts) */
+  | { k: "detail"; op: "add"; view: ViewRef; at: Vec2; r: number; scale?: number; place?: Vec2; placeTop?: boolean }
+  | { k: "detail"; op: "edit"; label: string; scale?: number; place?: Vec2; placeTop?: boolean }
   | { k: "detail"; op: "delete"; label: string }
   /** další model na listu (komponenta sestavy / otevřená záložka) */
   | { k: "model"; op: "add"; name: string; view?: ViewKey | "iso"; scale?: number | "auto" }
@@ -917,6 +918,7 @@ function parseDetail(rt: RawTok[]): DrawingCmd {
   }
   let scale: number | undefined;
   let place: Vec2 | undefined;
+  let placeTop = false;
   let at: Vec2 | undefined;
   let r: number | undefined;
   const opts = (from: number) => {
@@ -929,6 +931,10 @@ function parseDetail(rt: RawTok[]): DrawingCmd {
       } else if (isKw(t, PLACE_W)) {
         place = two(rt, i + 1, tr("umístit"));
         i += 2;
+        if (isPlaceTop(rt[i + 1])) {
+          placeTop = true;
+          i++;
+        }
       } else if (isKw(t, AT_W)) {
         at = two(rt, i + 1, tr("střed detailu"));
         i += 2;
@@ -940,13 +946,13 @@ function parseDetail(rt: RawTok[]): DrawingCmd {
   if (/^[a-z]$/i.test(rt[0].s) && !rt[0].q && !VIEW_WORDS[fold(rt[0].s)]) {
     opts(1);
     if (scale === undefined && !place) throw new Error(usage);
-    return { k: "detail", op: "edit", label: rt[0].s.toUpperCase(), ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}) };
+    return { k: "detail", op: "edit", label: rt[0].s.toUpperCase(), ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}), ...(place && placeTop ? { placeTop } : {}) };
   }
   const [view, n] = viewRef(rt, 0);
   opts(n);
   if (!at) throw new Error(tr("detail: zadejte střed – v x y (mm modelu v rovině pohledu)"));
   if (!(r !== undefined && r > 0)) throw new Error(tr("detail: zadejte poloměr kruhu detailu – poloměr r (mm modelu)"));
-  return { k: "detail", op: "add", view, at, r, ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}) };
+  return { k: "detail", op: "add", view, at, r, ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}), ...(place && placeTop ? { placeTop } : {}) };
 }
 
 function parseModel(rt: RawTok[]): DrawingCmd {

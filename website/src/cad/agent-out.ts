@@ -416,7 +416,7 @@ export function checkFailed(label: string, why: string): ExportCheck {
 
 /* ───────────────────────── window.mncad ───────────────────────── */
 /** stažený soubor: název, MIME, velikost, formát, řádky protokolu (jako v konzoli), kontrola STEP / BREP */
-export type OutFileInfo = { name: string; mime: string; bytes: number; format: string; log: string[]; check?: ExportCheck; warning?: string };
+export type OutFileInfo = { name: string; mime: string; bytes: number; format: string; log: string[]; check?: ExportCheck; warning?: string; /** revize modelu souboru (vlna 22, bod 12) */ modelRev?: string };
 export type MncadOutApi = {
   /** uloží projekt .mncad přímo do Stažených (bez dialogu, jako příkaz „uložit [název]“); vrátí název, velikost a protokol */
   save: (name?: string) => Promise<OutFileInfo>;

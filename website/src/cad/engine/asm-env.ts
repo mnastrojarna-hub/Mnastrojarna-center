@@ -11,6 +11,7 @@
  * * Záložky (`záložky`, `záložka`, `zavřít záložku`) přes `ws.tabs` / `ws.activate` / `ws.close`.
  */
 import type { AsmEnv } from "../asm-agent";
+import { motionStoreOf } from "../motion-cache";
 import type { CadDoc, ComponentSource } from "../types";
 import type { KernelApi } from "./kernel";
 import { syncKernelGeneration, type Workspace } from "./workspace";
@@ -29,6 +30,8 @@ export type AsmEnvOptions = {
   onParts?: () => void;
   /** díl má víc ploch, než se pro vazby načte (engine zapíše ⚠ `asm.faces-truncated`) */
   onFacesTruncated?: (name: string, limit: number) => void;
+  /** klíč dokumentu, se kterým prostředí pracuje (výsledky pohybové studie podle dokumentu); výchozí = aktivní záložka */
+  docKey?: string;
 };
 
 /** Porovná generaci mezipamětí s jádrem; true = jádro se restartovalo a mezipaměti s daty se vyprázdnily. */
@@ -89,6 +92,8 @@ export function makeAsmEnv(ws: Workspace, kernel: KernelApi, o: AsmEnvOptions = 
     geo: asm.geo,
     faceLists: asm.faceLists,
     stack: o.stack,
+    // výsledky pohybové studie: úložiště tohoto pracovního prostoru, klíč dokumentu (nový dokument běhu má svůj – run-doc.ts docKeyOf)
+    motion: { key: o.docKey ?? ws.docKey(), store: motionStoreOf(asm) },
     ...(o.onFacesTruncated ? { onFacesTruncated: (key: string, limit: number) => o.onFacesTruncated!(sourceName(sources.get(key), key), limit) } : {}),
     tabs: {
       list: () => ws.tabs(),

@@ -1,5 +1,4 @@
 # Sestava textem pro AI agenty: plochy, vazby, komponenty, pole, šroub, podsestavy, kusovník, rám formy, záložky (balík asm)
-  plochy vazeb přečíslovány podle geometrie: {0}	  mate faces renumbered by geometry: {0}
   pohnuto: {0}	  moved: {0}
   vazby pohnuly: {0}	  mates moved: {0}
  – vypsány {0}	 – listed: {0}
@@ -44,7 +43,6 @@
 {0}plocha {1} komponenty „{2}“ je {3} – vazba potřebuje {4} plochu; {5}	{0}face {1} of component „{2}“ is {3} – the mate needs a {4} face; {5}
 ⚠ díl se nepostavil (bez ploch): {0}	⚠ part failed to build (no faces): {0}
 ⚠ plochu vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ the mate face could not be loaded from the kernel – assembly mates recomputes the mate once the parts are built
-⚠ plochy vazeb, které po úpravě dílu nejde najít: {0} – sestava vazby	⚠ mate faces that cannot be found after editing the part: {0} – assembly mates
 ⚠ v sestavě je konflikt vazeb – sestava vazby	⚠ the assembly has conflicting mates – assembly mates
 ⚠ vazbu nelze splnit spolu s ostatními – sestava vazby (výpis), sestava vazba {0} potlačit|smazat|obráceně	⚠ the mate cannot be satisfied together with the others – assembly mates (list), assembly mate {0} suppress|delete|flip
 ✓ „{0}“ už má vazbu Ukotvit – beze změny	✓ „{0}“ already has a Fix mate – unchanged
@@ -178,8 +176,6 @@ válcové	cylindrical
 válcové plochy: {0}	cylindrical faces: {0}
 vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	mate „{0}“ is in the assembly {1}× – give its number: {2}
 vazba „{0}“ v sestavě není – vazby: {1}	mate „{0}“ is not in the assembly – mates: {1}
-vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…"	mate „{0}“: what to do? value=N | flip | suppress | unsuppress | delete | name "…"
-vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	mate „{0}“: unknown change „{1}“ – value=N | flip | suppress | unsuppress | delete | name "…" (start a new mate with its type: contact, flush, center, concentric, distance, angle, parallel, fixed)
 vazba {0} v sestavě není – vazby: {1}	mate {0} is not in the assembly – mates: {1}
 vazba {0}: chybí cílová komponenta B – {1}	mate {0}: target component B missing – {1}
 vazba {0}: chybí komponenta A – {1}	mate {0}: component A missing – {1}

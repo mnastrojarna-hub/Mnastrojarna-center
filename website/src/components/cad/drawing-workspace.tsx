@@ -31,6 +31,7 @@ import { genEditCount } from "@/cad/drawing-boxsel";
 import { TitleBlockSection } from "./drawing-title-panel";
 import { inheritTitle } from "@/cad/title-block";
 import { generalTolWarnings } from "@/cad/drawing-export";
+import { registerFlush } from "./flush-barrier";
 
 type Props = {
   doc: CadDoc;
@@ -49,7 +50,13 @@ type Props = {
   onPropsChange?: (p: NonNullable<CadDoc["props"]>) => void;
   /** výkresy uložené v dokumentu (volby, razítko, kóty a poznámky) */
   drawings?: DrawingDoc[];
-  onDrawingsChange?: (d: DrawingDoc[]) => void;
+  /**
+   * zápis listů do dokumentu (vlna 22, 22f): `key` = klíč dokumentu, ke kterému změna patří (aplikace ji nikdy nezapíše do
+   * jiného dokumentu), `record: false` = bez kroku historie (první list nového výkresu); jinak je zápis krok Zpět
+   */
+  onDrawingsChange?: (d: DrawingDoc[], o?: { key?: string; record?: boolean }) => void;
+  /** klíč dokumentu (id záložky), jehož výkres se upravuje – rozepsaná změna se zapíše vždy do něj */
+  docKey?: string;
   /** zápis výkresů jako krok historie (založení výkresu – Ctrl+Z ho vrátí); bez zadání onDrawingsChange */
   onDrawingsCommit?: (d: DrawingDoc[]) => void;
   /** komponenty sestavy pro pozice (balónky): světové obalové kvádry */
@@ -153,7 +160,7 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey }: Props) {
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
   const freshMeta = (): DrawingMeta => ({
     name: doc.name,
@@ -211,11 +218,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (!placed) out.push(...tagged);
     return out;
   };
-  /** zápis listů aktivního výkresu do dokumentu */
-  const emit = (next: DrawingDoc[]) => {
+  /** zápis listů aktivního výkresu do dokumentu – do dokumentu, ve kterém změna vznikla (`dirtyKey`), jako krok Zpět */
+  const emit = (next: DrawingDoc[], record = true) => {
     const out = withGroup(next);
     wrote.current = JSON.stringify(out);
-    onDrawingsChange?.(out);
+    const key = dirtyKey.current ?? docKeyRef.current;
+    dirtyKey.current = null;
+    onDrawingsChange?.(out, { ...(key ? { key } : {}), record });
     return out;
   };
   // aktivní list sdílí výkres s textovými příkazy („výkres list 2“ → výkres se otevře / přepne na list 2)
@@ -250,6 +259,16 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     setRename(r);
   };
   const dirty = useRef(false);
+  // rozepsaná změna listu (vlna 22, 22f): dokument, ve kterém vznikla, a registrace v bariéře (flush-barrier.ts) – přepnutí
+  // záložky, otevření jiného dokumentu, uložení, export, sdílení i window.mncad ji nejdřív zapíšou
+  const docKeyRef = useRef(docKey);
+  docKeyRef.current = docKey;
+  const dirtyKey = useRef<string | null>(null);
+  const barrierOff = useRef<(() => void) | null>(null);
+  const unregister = () => {
+    barrierOff.current?.();
+    barrierOff.current = null;
+  };
 
   // načtení listu (při otevření a při přepnutí listu; po změně listu zvenku – textové příkazy „výkres …“, „kótovat“)
   const wrote = useRef(JSON.stringify(drawings ?? null));
@@ -261,9 +280,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       const o = loadOpts();
       setOpts(o);
       // dokument bez výkresu: první list se uloží hned – výkres existuje, jakmile je otevřený (Otevřít výkres ▼, další
-      // Nový výkres = „Výkres 2“), i když se na něm nic nezmění (sestava bez Chytrých kót)
-      if (!all.length && onDrawingsChange) emit([{ ...sheetDoc(), options: o as unknown as Record<string, unknown> }]);
+      // Nový výkres = „Výkres 2“), i když se na něm nic nezmění (sestava bez Chytrých kót); bez kroku historie (Zpět by ho
+      // jen smazal a výkres by ho hned založil znovu)
+      if (!all.length && onDrawingsChange) emit([{ ...sheetDoc(), options: o as unknown as Record<string, unknown> }], false);
     }
+    unregister();
+    dirtyKey.current = null;
     // údaje razítka listu od výchozích – pole předchozího listu (logo, šablona, zákazník …) se do jiného listu nepřenesou
     if (sv?.meta) setMeta(() => ({ ...freshMeta(), ...(sv.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
     setAnn(sv?.annotations ?? []);
@@ -345,6 +367,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = sheetDoc();
     dirty.current = false;
+    unregister();
     return emit(next);
   };
   const persistRef = useRef(persistNow);
@@ -366,7 +389,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ann, opts, meta, sheetName]);
-  const markDirty = () => (dirty.current = true);
+  const markDirty = () => {
+    dirty.current = true;
+    dirtyKey.current ??= docKeyRef.current ?? null;
+    // bariéra: rozepsaný list se zapíše dřív, než se přepne záložka / uloží / exportuje (zápis do `dirtyKey`, nikdy jinam)
+    barrierOff.current ??= registerFlush(
+      () => {
+        barrierOff.current = null;
+        if (dirty.current) persistRef.current(); // bariéra sama běží ve flushSync
+      },
+      dirtyKey.current,
+      "drawing",
+    );
+  };
   const addSheet = () => {
     if (!onDrawingsChange) return;
     const cur = sheets.length ? [...sheets] : [];
@@ -471,7 +506,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     markDirty();
     setOpts((o) => ({ ...o, [k]: v }));
   };
-  const setView = (k: ViewKey | "iso", v: boolean) => setOpts((o) => ({ ...o, views: { ...o.views, [k]: v } }));
+  // zaškrtnutí pohledu je změna listu jako formát (dřív bez markDirty – u listu bez Chytrých kót se neuložilo vůbec; 22f)
+  const setView = (k: ViewKey | "iso", v: boolean) => {
+    markDirty();
+    setOpts((o) => ({ ...o, views: { ...o.views, [k]: v } }));
+  };
   const setM = (patch: Partial<DrawingMeta>) => {
     markDirty();
     setMeta((m) => ({ ...m, ...patch }));
@@ -1273,7 +1312,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           <Section title={tr("Pohledy")}>
             <div className="grid grid-cols-2 gap-1">
               {(["front", "top", "left", "right", "back", "bottom", "iso"] as (ViewKey | "iso")[]).map((k) => (
-                <Check key={k} checked={opts.views[k]} onChange={(v) => setView(k, v)} disabled={k === "front"}>
+                <Check key={k} checked={opts.views[k]} onChange={(v) => setView(k, v)} disabled={k === "front"} data={k}>
                   {tr(VIEW_LABEL[k])}
                 </Check>
               ))}
@@ -1874,10 +1913,10 @@ function Seg<T extends string>({ value, options, onChange }: { value: T; options
   );
 }
 
-function Check({ checked, onChange, children, disabled }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean }) {
+function Check({ checked, onChange, children, disabled, data }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean; /** `data-view-toggle` (e2e) */ data?: string }) {
   return (
     <label className={cn("flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-steel-100", disabled && "cursor-default opacity-60 hover:bg-transparent")}>
-      <input type="checkbox" className="h-3.5 w-3.5 accent-[#E03930]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" className="h-3.5 w-3.5 accent-[#E03930]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} {...(data ? { "data-view-toggle": data } : {})} />
       <span className="text-[12px]">{children}</span>
     </label>
   );

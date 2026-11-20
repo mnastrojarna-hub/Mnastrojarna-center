@@ -27,5 +27,5 @@ export async function saveProjectFile(d: CadDoc, name: string | undefined, host?
   const log = [fileLogLine(what, p.name, p.data.length, formatLabel("mncad")), tr("  ✓ kontrola: projekt jde znovu otevřít – „{0}“, {1} {2}", p.docName, p.count, p.asm ? tr("komponent") : tr("prvků"))];
   const warning = p.lost.length ? codeText("out.lost-imports", p.lost.join(", ")) : undefined;
   if (warning) log.push(`⚠ ${warning}`);
-  return { name: p.name, mime: p.mime, bytes: p.data.length, format: "mncad", log, ...(warning ? { warning } : {}) };
+  return { name: p.name, mime: p.mime, bytes: p.data.length, format: "mncad", log, modelRev: p.modelRev, ...(warning ? { warning } : {}) };
 }

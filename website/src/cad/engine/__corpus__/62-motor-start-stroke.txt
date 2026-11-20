@@ -1,0 +1,49 @@
+# vlna 22, bod 11: začátek / konec motoru = hodnota vazby (Vzdálenost) nebo posuv od výchozí polohy (Souosost); zdvih a směr
+# vždy v protokolu; zadání zdvihem; ⚠ když začátek neodpovídá aktuální hodnotě; motor zadaný komponentou B vazby Vzdálenost
+nový díl "Deska A"
+kvádr 100 100 10
+díra 20,2 skrz v 50 50
+nový díl "Přidržovač"
+kvádr 60 60 8
+díra 20 skrz v 30 30
+nový díl "Vodítko"
+válec 20 120
+#--- run
+nová sestava "S1"
+vložit "Deska A" ukotvit
+vložit "Vodítko" v 50 50 -20
+sestava vazba souosost "Vodítko" válcová "Deska A" Ø20,2
+sestava vazba ukotvit "Vodítko"
+vložit "Přidržovač" v 20 20 67,5
+sestava vazba souosost "Přidržovač" Ø20 "Vodítko" válcová název "VEDENÍ"
+sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 57,5 název "ZDVIH"
+#--- run
+# a) hodnoty vazby 57,5 → 27,15: zdvih 30,35 dolů
+pohyb motor lineární vazba "ZDVIH" 57,5..27,15 kroky 2
+# zdvih od aktuální hodnoty (CS, EN, DE)
+pohyb motor lineární vazba "ZDVIH" zdvih -30,35 kroky 2
+motion motor linear mate "ZDVIH" stroke -30.35 steps 2
+bewegung antrieb linear verknüpfung "ZDVIH" hub -30,35 schritte 2
+pohyb krok 2
+#--- run
+# b) zdvih zadaný jako konec (0 → 30,35): ⚠ začátek 0 ≠ aktuální hodnota 57,5 (díl v kroku 0 přeskočí)
+pohyb motor lineární vazba "ZDVIH" 0..30,35 kroky 2
+pohyb krok 0
+#--- run
+# c) Souosost: hodnoty jsou posuv od výchozí polohy – stejná čísla 57,5..27,15 dají ⚠, 0..-30,35 je bez skoku
+pohyb motor smazat 1
+sestava vazba "ZDVIH" potlačit
+pohyb motor lineární vazba "VEDENÍ" 57,5..27,15 kroky 2
+pohyb motor lineární vazba "VEDENÍ" 0..-30,35 kroky 2
+pohyb krok 2
+#--- run
+# d) motor zadaný komponentou, která je B vazby Vzdálenost: mezera je absolutní, znaménko se neobrací (dřív Z −47,5 skrz desku)
+nová sestava "S2"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 20 20 67,5
+sestava vazba vzdálenost "Deska A" horní "Přidržovač" spodní hodnota 57,5 název "ZDVIH"
+sestava vazba zarovnat "Přidržovač" +X "Deska A" +X
+sestava vazba zarovnat "Přidržovač" +Y "Deska A" +Y
+pohyb motor lineární "Přidržovač" 57,5..27,15 kroky 2
+pohyb krok 0
+pohyb krok 2

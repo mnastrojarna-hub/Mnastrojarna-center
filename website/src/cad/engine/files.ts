@@ -11,7 +11,7 @@
 import { checkFailed, exportCheck, FORMAT_EXT, outFileName, type ExportCheck, type Export3dFormat, type OutDrawingFormat } from "../agent-out";
 import type { DrawingResult } from "../drawing";
 import { sourceKey } from "../assembly";
-import { embedBlobs, missingBlobFiles } from "../blobs";
+import { missingBlobFiles } from "../blobs";
 import { docHasContent } from "../draft/doc";
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
 import { getLang, tr } from "../i18n";
@@ -24,6 +24,7 @@ import { drawingMemo, issueArgs, sheetLabel, sheetWarningCode } from "./sheet-ev
 import type { EngineHost, FileSink } from "./host";
 import type { KernelApi } from "./kernel";
 import type { OutFile } from "./protocol-types";
+import { projectJson } from "./project-json";
 import type { Workspace } from "./workspace";
 
 /* ───────────────────────── formáty a názvy ───────────────────────── */
@@ -100,13 +101,14 @@ export type Produced = {
 /* ───────────────────────── projekt .mncad ───────────────────────── */
 
 /** projekt .mncad: data, kontrola zpětného čtení (počet prvků / komponent) a importy bez dat */
-export function projectFile(d: CadDoc, name: string): Produced & { count: number; asm: boolean; docName: string; lost: string[] } {
+export function projectFile(d: CadDoc, name: string): Produced & { count: number; asm: boolean; docName: string; lost: string[]; modelRev: string } {
   const lost = missingBlobFiles(d);
-  const json = JSON.stringify(embedBlobs(d), null, 1);
+  // revize modelu v souboru (vlna 22, bod 12 – engine/project-json.ts)
+  const { json, modelRev } = projectJson(d);
   const data = new TextEncoder().encode(json);
   const back = JSON.parse(json) as CadDoc;
   const asm = back.kind === "assembly";
-  return { name, mime: OUT_MIME.mncad, data, format: "mncad", warnings: [], count: asm ? (back.components?.length ?? 0) : back.features.length, asm, docName: back.name, lost };
+  return { name, mime: OUT_MIME.mncad, data, format: "mncad", warnings: [], count: asm ? (back.components?.length ?? 0) : back.features.length, asm, docName: back.name, lost, modelRev };
 }
 
 /* ───────────────────────── 3D model a kontrola ───────────────────────── */
@@ -440,15 +442,24 @@ export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "draw
  * DXF / DWG / SVG soubor na list), CSV = kusovník sestavy. Názvy podle dokumentu (`Deska 1.step`, `Deska 1 výkres.pdf`).
  * Vrací zapsané soubory; hlášky (varování listů, kontrola STEP, formát jen v aplikaci) předá `note`.
  */
-export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> & { files: FileSink }, ws: Workspace, d: CadDoc, fmt: DocFormat, note: (n: OutNote) => void, o: { flat?: boolean; hooks?: AsmEnvOptions } = {}): Promise<OutFile[]> {
+export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" | "phase"> & { files: FileSink }, ws: Workspace, d: CadDoc, fmt: DocFormat, note: (n: OutNote) => void, o: { flat?: boolean; hooks?: AsmEnvOptions } = {}): Promise<OutFile[]> {
   const base = d.name.trim() || "model";
   const write = (name: string, mime: string, data: Uint8Array, format: string) => host.files.write({ name, mime, data, doc: d.name, format });
-  if (fmt === "mncad") return [await write(`${base}.mncad`, OUT_MIME.mncad, projectFile(d, "").data, "mncad")];
+  if (fmt === "mncad") {
+    const p = projectFile(d, "");
+    const f = await write(`${base}.mncad`, OUT_MIME.mncad, p.data, "mncad");
+    f.modelRev = p.modelRev; // revize modelu v souboru i v řádku F (vlna 22, bod 12)
+    return [f];
+  }
   if (fmt === "step" || fmt === "stl") {
-    const data = await modelBytes(host.kernel, d, fmt);
-    const f = await write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt);
-    if (fmt === "step") {
-      const c = await verifyExport(host.kernel, d, data, "step");
+    // export jako úloha s fázemi (vlna 22, bod 22h): přestavba, převod, zápis, kontrola STEP zpětným načtením
+    const { runExportJob } = await import("./export-job");
+    const job = await runExportJob(d, fmt, { kernel: host.kernel, phase: (p) => host.phase?.(`out:${fmt}`, p), write: (data) => write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt) }, { check: fmt === "step", verifyFirst: false });
+    const f = job.out;
+    f.modelRev = job.modelRev;
+    f.phases = job.phases;
+    if (job.check) {
+      const c = job.check;
       f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") };
       if (!c.ok) note({ code: "out.check-failed", text: f.check.text, level: Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
     }

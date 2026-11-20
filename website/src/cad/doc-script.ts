@@ -31,6 +31,8 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
+import { aliasScript, emitAsmSprings, emitDynamics } from "./doc-script-asm";
+import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
 import { resolveDatumNames } from "./agent-prim";
@@ -41,6 +43,7 @@ import type { SectionOpt } from "./drawing";
 import { sectionToSketchConvention } from "./drawing-section";
 import { dictOf, getLang, setLang, tr } from "./i18n";
 import { KIN_SPEC } from "./mate-spec";
+import { mateLost } from "./mates";
 import { exprRefs, resolveVariables, VAR_NAME } from "./params";
 import { pickFieldsOf } from "./pick-fields";
 import type { Direction, Ref } from "./refs";
@@ -69,6 +72,14 @@ export type DocScriptOptions = {
    * (`freshScriptDoc`); bez nich skript jen upozorní, že se smazané kóty po přečtení vrátí.
    */
   deletedDims?: Record<string, string[]>;
+  /**
+   * klíče vygenerovaných kót celkových rozměrů a pozic, které na listu jsou (id listu → ["dim:front:t", "pos:1"]) – spočítá je
+   * jádro (`freshScriptDoc`) pro listy s upravenými vygenerovanými objekty; úprava objektu, který na listu není, se nezapíše.
+   * Bez nich převodník vynechá jen klíče, které na listu podle voleb být nemohou, a ohlásí, že zbytek jádrem ověřený není.
+   */
+  genKeys?: Record<string, string[]>;
+  /** poznámky volajícího (co ověřilo jádro) – přidají se k poznámkám převodníku i do komentáře skriptu */
+  notes?: string[];
 };
 export type ScriptHow = "dedicated" | "generic" | "json";
 export type ScriptStats = {
@@ -211,6 +222,7 @@ const WORDS = {
   trace: ["stopa", "trace", "spur"],
   rpm: ["ot/min", "rpm", "u/min"],
   speed: ["rychlost", "speed", "geschwindigkeit"],
+  motorFrom: ["od", "from", "von"],
   // dynamika pohybové studie (vlna 21, cad/agent-motion-dyn.ts)
   back: ["tam a zpět", "there and back", "hin und zurück"],
   dynamics: ["dynamika", "dynamics", "dynamik"],
@@ -461,6 +473,7 @@ class Ctx {
   sigs: "drop" | "keep";
   comments: boolean;
   deletedDims: Record<string, string[]>;
+  genKeys: Record<string, string[]>;
   out: string[] = [];
   notes: string[] = [];
   noteSet = new Set<string>();
@@ -476,6 +489,11 @@ class Ctx {
     this.sigs = o.sigs === "drop" ? "drop" : "keep";
     this.comments = o.comments !== false;
     this.deletedDims = o.deletedDims ?? {};
+    this.genKeys = o.genKeys ?? {};
+  }
+  /** výstup pro část výkresu (doc-script-sheet.ts) */
+  get sheetOut(): SheetOut {
+    return { li: this.li, line: (s) => this.line(s), note: (s) => this.note(s), n: scriptNum, q: scriptQuote };
   }
   w(k: WordKey): string {
     return WORDS[k][this.li];
@@ -1558,15 +1576,20 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
     parts.push(`${c.w("projection")} ${o.projection}`);
     keys.push("projection");
   }
+  // pružiny plně / zjednodušeně (doc-script-sheet.ts)
+  const extra = sheetLineExtra(c.sheetOut, o);
+  parts.push(...extra.parts);
+  keys.push(...extra.keys);
   return { line: `${c.w("drawing")} ${parts.join(" ")}`, keys };
 }
 /** řez v konvenci skici (starší uložený řez má v `offset` souřadnici na ose) – k porovnání uloženého řezu s přečteným řádkem */
 const secNorm = (v: unknown): unknown => (v && typeof v === "object" ? sectionToSketchConvention(v as SectionOpt) : v);
-/** volby listu, které textový příkaz `výkres …` nenastavuje a které nejsou výchozí */
-export const SHEET_UNSUPPORTED = ["details", "models", "aux", "cuts", "brokenOut", "breaks", "fitShow", "fitTable", "dimRoom", "dimRoomMin", "weldSymbols", "genEdit"];
-/** nastavené volby listu, které skript nepřenese (pohledy navíc, detaily, další modely…) – list pak po přečtení vypadá jinak */
-export const sheetUnsupported = (o: Record<string, unknown>): string[] => SHEET_UNSUPPORTED.filter((k) => o[k] !== undefined && !(Array.isArray(o[k]) && !(o[k] as unknown[]).length));
-function emitDrawings(c: Ctx, doc: CadDoc) {
+/** volby listu bez textového příkazu (jen JSON dokumentu) – ostatní zapisuje doc-script-sheet.ts */
+export const SHEET_UNSUPPORTED = SHEET_JSON_ONLY;
+/** nastavené volby listu, které skript nepřenese (jen JSON, neznámé) – list pak po přečtení vypadá jinak */
+export const sheetUnsupported = (o: Record<string, unknown>): string[] => sheetUnwritable(o);
+/** `name` = název dokumentu ve skriptu (záložka – díl sestavy se může jmenovat jinak než v dokumentu) */
+function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
   const list = doc.drawings ?? [];
   if (!list.length) {
     const pr = doc.props;
@@ -1574,9 +1597,10 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
     return;
   }
   let setName: string | undefined;
+  // stav razítek při čtení skriptu (nový list převezme údaje aktivního, popisové údaje dokumentu) – doc-script-sheet.ts
+  const title = titleState(name);
   list.forEach((s: DrawingDoc, i: number) => {
     const o = (s.options ?? {}) as Rec;
-    const meta = (s.meta ?? {}) as Rec;
     c.stats.sheets++;
     c.comment(`${c.w("cDrawing")}: ${s.name}`);
     const check = (line: string, ok: (cmd: Rec) => boolean): boolean => {
@@ -1588,17 +1612,26 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
         return false;
       }
     };
+    // jak list při čtení vznikne: první list výkresu (údaje razítka z dokumentu), další list (převezme údaje aktivního listu)
+    let how: "new" | "sheet" | "same" = "new";
     if (i > 0) {
       const q = scriptQuote(s.name, true);
       if (s.drawing && s.drawing !== setName) {
         const dq = scriptQuote(s.drawing, true);
         const l = `${c.w("drawing")} ${c.w("drawingNew")} ${dq ?? ""}`.trim();
         if (dq && check(l, (cmd) => cmd.k === "drawings" && cmd.op === "new")) c.line(l);
-        else c.note(tr("další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu", String(s.drawing)));
+        else {
+          how = "same";
+          c.note(tr("další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu", String(s.drawing)));
+        }
       } else {
+        how = "sheet";
         const l = `${c.w("drawing")} ${c.w("sheetNew")} ${q ?? ""}`.trim();
         if (check(l, (cmd) => cmd.k === "sheet" && cmd.op === "new")) c.line(l);
-        else c.note(tr("list „{0}“ se nepodařilo zapsat jako nový list", s.name));
+        else {
+          how = "same";
+          c.note(tr("list „{0}“ se nepodařilo zapsat jako nový list", s.name));
+        }
       }
     }
     setName = s.drawing;
@@ -1616,32 +1649,27 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
       if (q && check(l, (cmd) => cmd.k === "sheet" && cmd.op === "rename" && cmd.name === s.name)) c.line(l);
       else c.note(tr("název listu „{0}“ se nepodařilo zapsat", s.name));
     }
-    // razítko
-    const fields: [WordKey, string][] = [["tName", "name"], ["tNumber", "number"], ["tAuthor", "author"], ["tRevision", "revision"], ["tDate", "date"], ["tTol", "tolerance"], ["tEdges", "edges"], ["tNote", "note"]];
-    const tp: string[] = [];
-    for (const [word, key] of fields) {
-      const v = meta[key];
-      if (typeof v !== "string" || !v || (key === "name" && v === doc.name)) continue;
-      const q = scriptQuote(v, true);
-      if (q) tp.push(`${c.w(word)}=${q}`);
-      else c.note(tr("údaj razítka „{0}“ listu „{1}“ nejde zapsat na řádek", key, s.name));
-    }
-    if (tp.length) {
-      const l = `${c.w("drawing")} ${c.w("title")} ${tp.join(" ")}`;
-      if (check(l, (cmd) => cmd.k === "title")) c.line(l);
-      else c.note(tr("razítko listu „{0}“ se nepodařilo zapsat", s.name));
-    }
-    if (o.zones === true) c.line(`${c.w("drawing")} ${c.w("zones")} ${c.yn(true)}`);
-    // kóty
+    // tabulka revizí a razítko se všemi poli, šablonou a logem – rozdíl proti stavu listu při čtení (doc-script-sheet.ts)
+    emitTitle(c.sheetOut, doc, s, title, how);
+    if (typeof o.zones === "boolean") c.line(`${c.w("drawing")} ${c.w("zones")} ${c.yn(o.zones)}`);
+    // pohledy navíc (modely, pomocné pohledy, řezy, detaily, částečné řezy, přerušení, uložení) – před kótami, aby je
+    // Chytré kóty při přečtení vygenerovaly nad stejným listem jako jádro při exportu (id smazaných kót)
+    emitSheetViews(c.sheetOut, doc, s);
+    // kóty (funkční rozměry a polohy děr Chytrých kót – doc-script-sheet.ts)
     const ann = Array.isArray(s.annotations) ? s.annotations : [];
     const auto = ann.filter((a) => a.auto).length;
     const mode = o.dimensions;
     const style = o.dimStyle === "baseline" ? ` ${c.w("baseline")}` : "";
+    const tail = dimTail(c.sheetOut, o);
+    const dimLine = (l: string) => {
+      if (!tail || dimTailOk(l, o)) c.line(l);
+      else c.note(tr("funkční rozměry / polohy děr Chytrých kót listu „{0}“ nejde zapsat příkazem kótovat", s.name));
+    };
     if (mode === "smart") {
-      if (auto && doc.kind !== "assembly") c.line(`${c.w("dimension")} ${c.w("smart")}${style}`);
-    } else if (mode === "overall") c.line(`${c.w("dimension")} ${c.w("overall")}`);
-    else if (mode === "none") c.line(`${c.w("dimension")} ${c.w("none")}`);
-    else if (mode === "auto") c.line(`${c.w("dimension")} ${c.w("basic")}`);
+      if ((auto || tail) && doc.kind !== "assembly") dimLine(`${c.w("dimension")} ${c.w("smart")}${style}${tail}`);
+    } else if (mode === "overall") dimLine(`${c.w("dimension")} ${c.w("overall")}${tail}`);
+    else if (mode === "none") dimLine(`${c.w("dimension")} ${c.w("none")}${tail}`);
+    else if (mode === "auto") dimLine(`${c.w("dimension")} ${c.w("basic")}${tail}`);
     if (auto) c.sum("autoDims", auto);
     // vygenerované kóty, které uživatel smazal (smartOff): po „kótovat chytře“ by se vrátily → smazat je znovu podle id (spočítá jádro)
     const off = Array.isArray(o.smartOff) ? (o.smartOff as unknown[]).length : 0;
@@ -1654,6 +1682,8 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
         c.sum("smartOffSheets");
       }
     }
+    // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách) – jen ty, které na listu jsou
+    emitGenEdit(c.sheetOut, doc, s, c.genKeys[s.id]);
     const edited = ann.filter((a) => a.auto && ((a.type === "dim" && (a.text !== undefined || /[±+\-]\d|[A-Za-z]\d/.test(a.suffix ?? ""))) || (a.type === "callout" && a.tol) || a.rev || a.tolShow)).length;
     if (edited) {
       c.sum("editedDims", edited);
@@ -1663,10 +1693,11 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
       c.sum("manualAnn", ann.length - auto);
       c.sum("manualSheets");
     }
-    const extra = sheetUnsupported(o);
-    if (extra.length) c.note(tr("volby listu bez zápisu ve skriptu ({0}) – list „{1}“ dokumentu „{2}“", extra.join(", "), s.name, doc.name));
-    if (Array.isArray(meta.revisions) && meta.revisions.length) c.note(tr("tabulka revizí listu „{0}“ se do skriptu nepřenáší", s.name));
+    const extra = sheetUnwritable(o);
+    if (extra.length) c.note(tr("volby listu bez textového příkazu ({0}) – nastavují se jen v JSON dokumentu, skript je nepřenese – list „{1}“ dokumentu „{2}“", extra.join(", "), s.name, doc.name));
   });
+  // popisové údaje dokumentu (číslo, kreslil, revize), které řádky razítek nenastavily stejně jako v dokumentu
+  emitDocProps(c.sheetOut, doc, title);
 }
 
 /* ───────────────────────── díl ───────────────────────── */
@@ -1766,7 +1797,7 @@ function emitPart(c: Ctx, doc: CadDoc, name: string) {
   if (doc.bodies?.some((b) => b.color || b.hidden)) c.note(tr("barvy a skrytí těles dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.faceColors && Object.keys(doc.faceColors).length) c.note(tr("barvy ploch dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.underlays && Object.keys(doc.underlays).length) c.note(tr("podklady skic (obrázky / PDF) dílu „{0}“ se do skriptu nepřenášejí", doc.name));
-  emitDrawings(c, doc);
+  emitDrawings(c, doc, name);
 }
 
 /* ───────────────────────── sestava ───────────────────────── */
@@ -1962,7 +1993,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     idx.set(cp.id, k);
     c.stats.components++;
     const rot = cp.placement.rotation.some((v) => v !== 0) ? ` ${c.w("rotation")} ${vec(cp.placement.rotation)}` : "";
-    c.line(`${c.w("insert")} ${scriptQuote(pt.tab, true) ?? `"${pt.tab}"`}${atPart(c, cp.placement.position)}${rot}${cp.fixed ? ` ${c.w("fixed")}` : ""}`);
+    const ins = `${c.w("insert")} ${scriptQuote(pt.tab, true) ?? `"${pt.tab}"`}${atPart(c, cp.placement.position)}${rot}${cp.fixed ? ` ${c.w("fixed")}` : ""}`;
+    // přezdívka instance (vložit … jako "K48", jinak sestava komponenta #k přezdívka "…") – doc-script-asm.ts
+    const al = aliasScript(c.sheetOut, cp, ins, k);
+    c.line(`${ins}${al.tail}`);
     const patch: string[] = [];
     const qv = (word: WordKey, v: string | undefined) => {
       if (!v) return;
@@ -1976,6 +2010,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     qv("group", cp.group);
     if (cp.color && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(cp.color)) patch.push(`${c.w("color")} ${cp.color.toLowerCase()}`);
     if (cp.hidden) patch.push(c.w("hide"));
+    if (al.patch) patch.push(al.patch);
     if (patch.length) c.line(`${c.w("asm")} ${c.w("comp")} #${k} ${patch.join(" ")}`);
   }
   const mates = doc.mates ?? [];
@@ -1984,6 +2019,11 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   let mk = 0;
   const suppressed: number[] = [];
   for (const m of mates) {
+    // ztracená reference (vlna 22, bod 20): F-číslo už patří jiné ploše – do skriptu by se tiše přichytila jinam
+    if (mateLost(m)) {
+      c.note(tr("vazba sestavy č. {0} má ztracenou referenci plochy (po úpravě dílu) – do skriptu se nezapisuje; vyberte plochu znovu (sestava vazba {0} plocha …) a export zopakujte", mates.indexOf(m) + 1));
+      continue;
+    }
     const ml = mateLine(c, m, idx);
     if (!ml || !lineSafe(ml.line) || !mateLineOk(ml.line, ml.expect)) {
       c.note(tr("vazbu sestavy č. {0} ({1}) nejde zapsat textem (plocha v podsestavě, odkaz na komponentu mimo skript nebo název) – doplňte ji ručně", mates.indexOf(m) + 1, m.type));
@@ -1997,20 +2037,26 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     if ((m.type === "distance" || m.type === "angle") && m.flip) c.note(tr("orientaci vazeb Vzdálenost / Úhel („obráceně“) určuje aplikace měřením při vložení vazby – skript ji nezapisuje (komponenty stojí ve splněné poloze)"));
   }
   for (const s of suppressed) c.line(`${c.w("asm")} ${c.w("mate")} ${s} ${c.w("suppress")}`);
+  // pružiny mezi díly (dosedací plochy, L0, Ln, tuhost, vedení) – po vazbách, komponenty už stojí (doc-script-asm.ts)
+  emitAsmSprings(c.sheetOut, comps, idx);
   const mo = doc.motion;
   if (mo?.motors.length) {
     c.comment(c.w("cMotion"));
+    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined);
     mo.motors.forEach((m, i) => {
       const no = mateNo.get(m.mate);
       if (no === undefined) {
         c.note(tr("motor pohybové studie č. {0} odkazuje na vazbu, která ve skriptu není", i + 1));
         return;
       }
-      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${n(m.from)}..${n(m.to)}`;
+      // rychlost bez `ranged` = od začátku bez konce (`od A rychlost V`); `A..B rychlost V` je rozsah × rychlost (cad/motor-model.ts)
+      const open = m.speed !== undefined && !m.ranged;
+      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
       if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
       else if (m.back) l += ` ${c.w("back")}`;
       if (i === 0) {
-        l += ` ${c.w("steps")} ${n(mo.steps)} ${c.w("time")} ${n(mo.duration)}`;
+        // délku studie u rozsahu × rychlost určuje motor (|do − od| / rychlost) – uložená délka jde zvlášť řádkem „pohyb čas“ níže
+        l += ` ${c.w("steps")} ${n(mo.steps)}${ranged ? "" : ` ${c.w("time")} ${n(mo.duration)}`}`;
         if (mo.collisions) l += ` ${c.w("clash")}`;
         if (mo.trace) {
           const tk = idx.get(mo.trace.compId);
@@ -2019,24 +2065,24 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       }
       c.line(l);
     });
+    if (ranged) c.line(`${c.w("motion")} ${c.w("time")} ${n(mo.duration)}`);
     if (mo.loop) c.note(tr("přehrávání pohybové studie ve smyčce se do skriptu nepřenáší"));
   }
   // dynamika: ruční hmotnosti, síly na vazbách, zapnutí s nastavením (cad/motion-dynamic.ts)
-  if (mo?.dyn && (mo.mode === "dynamic" || Object.keys(mo.dyn.masses ?? {}).length || mo.dyn.loads?.length)) {
+  if (mo?.dyn) {
     if (!mo.motors.length) c.comment(c.w("cMotion"));
     for (const [id, kg] of Object.entries(mo.dyn.masses ?? {})) {
       const k = idx.get(id);
       if (k !== undefined) c.line(`${c.w("motion")} ${c.w("mass")} #${k} ${n(kg)}`);
+      else c.note(tr("ruční hmotnost komponenty mimo skript (podsestava / import) se do skriptu nepřenáší"));
     }
     for (const ld of mo.dyn.loads ?? []) {
       const no = mateNo.get(ld.mate);
       if (no !== undefined) c.line(`${c.w("motion")} ${c.w(ld.kind === "force" ? "force" : "torque")} ${c.w("mate")} ${no} ${n(ld.value)}`);
+      else c.note(tr("síla / moment na vazbě, která ve skriptu není, se do skriptu nepřenáší"));
     }
-    if (mo.mode === "dynamic") {
-      const g = mo.dyn.gravity;
-      const gw = g === null ? c.w("gOff") : g ? (g.map((v, k) => (Math.abs(v) > 0.999 ? `${v < 0 ? "-" : "+"}${"XYZ"[k]}` : "")).join("") || g.map(n).join(" ")) : "";
-      c.line(`${c.w("motion")} ${c.w("dynamics")} ${c.w("time")} ${n(mo.duration)} ${c.w("dtStep")} ${n(mo.dyn.dt)}${gw ? ` ${c.w("gravity")} ${gw}` : ""}${mo.dyn.damping ? ` ${c.w("damping")} ${n(mo.dyn.damping)}` : ""}${mo.dyn.restitution ? ` ${c.w("restitution")} ${n(mo.dyn.restitution)}` : ""}${mo.dyn.frames ? ` ${c.w("frames")} ${n(mo.dyn.frames)}` : ""}`);
-    }
+    // čas, krok, gravitace, tlumení, odraz, snímky (i nastavení uložené u kinematické studie) – doc-script-asm.ts
+    emitDynamics(c.sheetOut, mo);
   }
   emitDrawings(c, doc);
 }
@@ -2121,6 +2167,15 @@ export function docToScript(doc: CadDoc, opts: DocScriptOptions = {}): DocScript
   if (S.propsLost) c.note(tr("popisové údaje (číslo, autor, revize) se nastavují razítkem výkresu – {0} dokumentů bez výkresu je do skriptu nepřenese (číslo dílu se v sestavě zapíše jako číslo komponenty)", S.propsLost));
   if (fin.errors.length) c.note(tr("skript se nepřečetl bez chyb ({0}): {1}", fin.errors.length, fin.errors.slice(0, 3).join(" · ")));
   if (!fin.namesOk) c.note(tr("názvy některých prvků se po přečtení skriptu mohou lišit (stejné názvy v jednom dílu)"));
+  for (const x of opts.notes ?? []) c.note(x);
+  // co skript nepřenese, říká i komentář ve skriptu (za hlavičkou) – nejen protokol převodu
+  if (c.comments && c.notes.length) {
+    const lines = text.split("\n");
+    const at = lines.findIndex((l) => !l.startsWith("#"));
+    const block = [`# ℹ ${tr("co skript nepřenese ({0}):", c.notes.length)}`, ...c.notes.map((x) => `# ℹ ${x.replace(/[\r\n]+/g, " ")}`)];
+    lines.splice(at < 0 ? lines.length : at, 0, ...block);
+    text = lines.join("\n");
+  }
   c.stats.lines = text.split("\n").length - 1;
   c.stats.bytes = new TextEncoder().encode(text).length;
   return { text, notes: c.notes, stats: c.stats };

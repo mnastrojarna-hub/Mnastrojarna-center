@@ -104,7 +104,8 @@ export type ApiHost = {
   setDraft: Dispatch<SetStateAction<DraftSetup>>;
   setSurface: Dispatch<SetStateAction<SurfaceSetup>>;
   setPartingZ: (p: { z: number; perimeter: number } | null) => void;
-  setCmpView: (v: CompareView | null) => void;
+  /** mapa porovnání do 3D okna; `src` = dokument (klíč záložky + dokument), pro který porovnání vzniklo – jinde se nekreslí */
+  setCmpView: (v: CompareView | null, src?: { key: string; doc: CadDoc }) => void;
   commit: (d: CadDoc) => void;
   openDocInTab: (d: CadDoc) => string;
   insertComponent: (c: AsmComponent) => void;
@@ -651,13 +652,14 @@ async function compare(host: ApiHost, ref: { name: string; base64: string }, o: 
   if (r.kind !== "body") throw new Error(r.kind === "unsupported" ? r.message : tr("{0}: soubor obsahuje jen 2D výkres – jako referenci použijte 3D model (STEP).", ref.name));
   const file: ReferenceFile = { data: dataBytes(r.data, ref.name), format: r.format, fileName: ref.name };
   const opts: CompareOptions = { align: { mode: o.align ?? "none", rotate: o.rotate, offset: o.offset }, tolerance: tol, booleans: o.booleans ?? "auto", map: o.map ?? true };
+  const src = { key: host.docId(), doc }; // mapa patří tomuto dokumentu a geometrii – po přepnutí záložky / změně modelu se nekreslí
   const res = await cad.compare(doc, file, opts);
   const meta = { model: doc.name, tolerance: tol, date: new Date().toLocaleString(cadLocale()) };
   const list = regionList(res);
   if (o.show && res.map) {
     const c = distanceColors(res.map.distances, tol, Math.max(1, tol * 1.0001));
     for (let i = 0; i < c.length; i++) c[i] = c[i] ** 2.2; // sRGB → lineární (jako dialog)
-    host.setCmpView({ mesh: res.map.mesh, colors: c, ghosts: [] });
+    host.setCmpView({ mesh: res.map.mesh, colors: c, ghosts: [] }, src);
   } else if (o.show === false) host.setCmpView(null);
   const mapOk = res.map ? res.map.stats.max <= tol + res.map.accuracy : null;
   const ok = !list.length && (mapOk ?? !!(res.extra || res.missing));
@@ -867,7 +869,7 @@ export function extendMncad(core: Omit<MncadApi, keyof MncadApiExt | keyof Mncad
       const h = host();
       return saveProjectFile(h.doc(), name, h);
     },
-    script: async (opts) => (await scriptOfDoc(host().doc(), opts)).text,
+    script: async (opts) => (await scriptOfDoc(host().doc(), opts, host().drawEnv?.())).text,
     reference: async (cmd) => {
       const c = (cmd ?? "").trim();
       // celý příkaz předlohy (i „kontrola kót“, „porovnat s předlohou …“, „Maßprüfung“) beze změny, jinak za slovo předloha

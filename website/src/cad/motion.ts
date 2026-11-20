@@ -10,8 +10,9 @@ import type { InterferenceStats } from "./asm-kernel";
 import { instanceKey, rotMatrix } from "./assembly";
 import { springComps, springMotionLines, springSteps, type SpringStep } from "./asm-spring";
 import { getLang, tr } from "./i18n";
-import { kinCluster, kinCtx, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
+import { kinCluster, kinCtx, mateLost, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
 import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, rigidGroups, solvePoses, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
+import { motorIsAbsolute, motorKeys, motorMeaningText, motorNotes, profileAt, type MotorInfo, type MotorNote } from "./motor-model";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách – zařazení šroub × závit) */
@@ -70,17 +71,22 @@ export type MotionResult = {
   mates?: Mate[];
   /** časy výpočtu (protokol, průběh) */
   timing?: MotionTiming;
+  /**
+   * motory ve výchozí poloze studie (pořadí `motors`): je hodnota motoru hodnotou vazby (`abs`) a kolik vazba měří před pohybem
+   * (`current`; u posuvu / natočení od výchozí polohy 0) – z toho ⚠ `motion.start-jump`, když začátek motoru neodpovídá (bod 11)
+   */
+  motorInfo?: MotorInfo[];
 };
 
 export const defaultStudy = (): MotionStudy => ({ motors: [], duration: 2, steps: 36 });
 
-/** Hodnota motoru v kroku `k` z `n`: rozsah „od–do“, nebo rychlost (ot/min → °, mm/s → mm) od hodnoty „od“. */
+/**
+ * Hodnota motoru v kroku `k` z `n`: profil motoru (cad/motor-model.ts `motorKeys` – rozsah „od–do“, tam a zpět, rychlost od hodnoty
+ * „od“ bez konce, rozsah × rychlost se zastavením na „do“) v čase kroku.
+ */
 export function motorValue(mo: MotionMotor, k: number, n: number, duration: number): number {
   const t = n > 0 ? (duration * k) / n : 0;
-  if (mo.speed !== undefined && Number.isFinite(mo.speed)) return mo.from + (mo.kind === "rotary" ? (mo.speed * 360 * t) / 60 : mo.speed * t);
-  // tam a zpět (výstředníkový lis): od → do → od sinusově, rychlost na koncích nulová
-  if (mo.back) return mo.from + ((mo.to - mo.from) * (1 - Math.cos((2 * Math.PI * k) / Math.max(1, n)))) / 2;
-  return mo.from + (n > 0 ? ((mo.to - mo.from) * k) / n : 0);
+  return profileAt(motorKeys(mo, duration), t, { k, n });
 }
 
 /** Proč motor nejde použít s danou vazbou (null = jde). */
@@ -88,6 +94,7 @@ export function motorProblem(mo: Pick<MotionMotor, "kind" | "mate">, mates: Mate
   const m = mates.find((x) => x.id === mo.mate);
   if (!m) return tr("vazba motoru v sestavě není");
   if (m.suppressed) return tr("vazba motoru je potlačená");
+  if (mateLost(m)) return tr("vazba motoru má ztracenou referenci plochy (díl se změnil) – vyberte plochu znovu: sestava vazby");
   const ok = mo.kind === "rotary" ? ROTARY_MOTOR_TYPES.has(m.type) : LINEAR_MOTOR_TYPES.has(m.type);
   if (!ok)
     return mo.kind === "rotary"
@@ -122,9 +129,9 @@ export async function runMotion(
   const duration = study.duration > 0 ? study.duration : 1;
   // 1) výchozí stav: vyřešená sestava (zachytí i výchozí stav mechanických vazeb)
   const s0 = solveMates(doc, geo);
-  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed);
+  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed && !mateLost(m)); // ztracená reference = mimo pohyb (bod 20)
   for (const mo of study.motors) {
-    const p = motorProblem(mo, mates);
+    const p = motorProblem(mo, s0.mates ?? doc.mates ?? []);
     if (p) throw new Error(tr("motor {0}: {1}", study.motors.indexOf(mo) + 1, p));
   }
   if (!study.motors.length) throw new Error(tr("pohybová studie nemá žádný motor – přidejte rotační nebo lineární motor"));
@@ -143,10 +150,10 @@ export async function runMotion(
   // motory: výchozí hodnota stupně volnosti (natočení vůči začátku, posuv) a vazba, kterou pohánějí
   const motors = study.motors.map((mo) => {
     const m = mates.find((x) => x.id === mo.mate)!;
-    const abs = mo.kind === "linear" && (m.type === "distance" || (m.type === "slot" && m.value !== undefined));
+    const abs = motorIsAbsolute(mo, m);
     const v0 = dofValue(m, mo.kind, ctx);
     if (v0 === null) throw new Error(tr("motor {0}: chybí geometrie vazby „{1}“", study.motors.indexOf(mo) + 1, m.name ?? tr(MATE_LABEL[m.type])));
-    return { mo, m, abs, v0, key: `motor:${mo.id}`, target: 0 };
+    return { mo, m, abs, v0, key: `motor:${mo.id}`, target: 0, prof: motorKeys(mo, duration) };
   });
   // vazby, jejichž hodnotu motor přepisuje (Vzdálenost, Drážka s polohou) – motor nahradí jejich hodnotu
   const valueOf = new Map<string, () => number>();
@@ -183,7 +190,7 @@ export async function runMotion(
   for (let k = 0; k <= n; k++) {
     if (opts.cancel?.()) break;
     const t = (duration * k) / n;
-    const vals = motors.map((x) => motorValue(x.mo, k, n, duration));
+    const vals = motors.map((x) => profileAt(x.prof, t, { k, n }));
     motors.forEach((x, i) => (x.target = vals[i]));
     const tStep = now();
     const ms = active();
@@ -238,6 +245,7 @@ export async function runMotion(
     conflictSteps,
     ...(s0.mates ? { mates: s0.mates } : {}),
     timing,
+    motorInfo: motors.map((x) => ({ abs: x.abs, current: x.abs ? x.v0 : 0 })),
   };
 }
 
@@ -261,13 +269,26 @@ const txt = (v: number, d = 4) => {
   return getLang() === "en" ? s : s.replace(".", ",");
 };
 
-/** Popis motoru: „rotační · Závěs „Klika“ · 0…360°“. */
-export function motorText(mo: MotionMotor, doc: CadDoc): string {
+/**
+ * Popis motoru: „lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s“ –
+ * vždy začátek, konec (nebo výslovně „bez koncové hodnoty“), zdvih, směr a význam hodnot (hodnota vazby × posuv / natočení od
+ * výchozí polohy); cad/motor-model.ts `motorMeaningText`. `duration` = délka studie (výchozí ze studie dokumentu).
+ */
+export function motorText(mo: MotionMotor, doc: CadDoc, duration = doc.motion?.duration ?? defaultStudy().duration): string {
   const m = doc.mates?.find((x) => x.id === mo.mate);
   const comp = (id?: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
-  const unit = mo.kind === "rotary" ? "°" : " mm";
-  const range = mo.speed !== undefined ? `${mo.kind === "rotary" ? tr("{0} ot/min", txt(mo.speed, 3)) : tr("{0} mm/s", txt(mo.speed, 3))}${mo.from ? tr(" od {0}{1}", txt(mo.from), unit) : ""}` : `${txt(mo.from)}…${txt(mo.to)}${unit}${mo.back ? tr(" tam a zpět") : ""}`;
-  return `${mo.kind === "rotary" ? tr("rotační motor") : tr("lineární motor")} · ${m ? `${m.name ?? tr(MATE_LABEL[m.type])} „${comp(m.a.compId)}“ → „${comp(m.b.compId)}“` : tr("(vazba chybí)")} · ${range}`;
+  return `${mo.kind === "rotary" ? tr("rotační motor") : tr("lineární motor")} · ${m ? `${m.name ?? tr(MATE_LABEL[m.type])} „${comp(m.a.compId)}“ → „${comp(m.b.compId)}“` : tr("(vazba chybí)")} · ${motorMeaningText(mo, motorIsAbsolute(mo, m), duration)}`;
+}
+
+/**
+ * Upozornění k motorům výsledku (⚠ s kódem – cad/motor-model.ts `motorNotes`): začátek jiný než aktuální hodnota vazby, motor
+ * s rozsahem × rychlostí nedojede, mezera vazby pod nulou bez kontroly kolizí. Protokol je vypíše jako záznamy s kódem, panel
+ * a `window.mncad.motion().summary` jako řádky souhrnu.
+ */
+export function motionMotorNotes(res: MotionResult, doc: CadDoc): MotorNote[] {
+  const mates = res.mates ?? doc.mates ?? [];
+  const duration = doc.motion?.duration ?? res.steps[res.steps.length - 1]?.t ?? 0;
+  return motorNotes({ motors: res.motors, duration, collisions: res.collisionsChecked }, mates, (m) => m.name ?? tr(MATE_LABEL[m.type]), res.motorInfo);
 }
 
 /** Tabulka studie jako CSV (středník, desetinná čárka, BOM pro Excel): krok, čas, motory, poloha a natočení komponent, stopa, kolize. */
@@ -319,8 +340,11 @@ export function rotationAngleDeg(a: Vec3, b: Vec3): number {
 }
 
 /** Souhrn výsledku do protokolu: kroky, rozsah pohybu komponent, kolize, nesplněné vazby. */
-/** `o.collisionLines`: řádky kolizí podle tříd (clash-thread.ts, asm-agent-kin.ts) místo řádku „první kolize“ */
-export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLines?: string[] } = {}): string[] {
+/**
+ * `o.collisionLines`: řádky kolizí podle tříd (clash-thread.ts, asm-agent-kin.ts) místo řádku „první kolize“; `o.notes: false` =
+ * bez řádků upozornění k motorům (protokol textových příkazů je vypíše jako záznamy s kódem – ne dvakrát)
+ */
+export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLines?: string[]; notes?: boolean } = {}): string[] {
   const out: string[] = [];
   const last = res.steps[res.steps.length - 1];
   const first = res.steps[0];
@@ -348,6 +372,7 @@ export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLine
   const issues = motionIssues(res, doc);
   for (const x of issues.slice(0, 4)) out.push(` ⚠ ${x.code} ${x.text}`);
   if (issues.length > 4) out.push(tr(" … a další úseky s nesplněnými vazbami: {0}", issues.length - 4));
+  if (o.notes !== false) for (const x of motionMotorNotes(res, doc)) out.push(` ⚠ ${x.code} ${x.text}`);
   return out;
 }
 
