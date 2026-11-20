@@ -697,58 +697,40 @@ describe.skipIf(!ENABLED)("Faktury dodavatelů ↔ lokální Supabase", () => {
     expect(localSql(`select count(*) || '|' || min(supplier_id::text) from supplier_invoices where supplier_key = '27999990'`)).toBe(`1|${first.supplier.id}`);
   }, 60_000);
 
-  it("přepínač „všichni“: faktury vidí všichni, zaplaceno jen super admin, částky jen s nákupními cenami", async () => {
+  it("přepínač „všichni“ (19. 11.): všichni vidí, zadávají a rozdělují (i s částkami), stav platby jen super admin", async () => {
     h.user = admin;
     expect((await act.setSupplierInvoiceVisibility("all")).ok).toBe(true);
     expect(localSql(`select value from integration_settings where key = 'supplier_invoices_visibility'`)).toBe("all");
     h.forAll = true;
     try {
-      h.user = sales;
-      const ls = (await data.listSupplierInvoices())!;
-      const it = ls.items.find((x) => x.id === invoiceId)!;
-      expect(it.totalNet).toBe(31_500);
-      expect(it.paymentStatus).toBeNull();
-      expect(ls.totals.unpaid).toBeNull();
-      const ds = (await data.getSupplierInvoice(invoiceId))!;
-      expect(ds).toMatchObject({ paymentStatus: null, paidAt: null, perms: { view: true, amounts: true, edit: false, paid: false } });
-      expect(ds.files).toHaveLength(1);
-      expect((await act.setSupplierInvoicePayment(invoiceId, { status: "zaplaceno" })).ok).toBe(false);
-      // obchodník fakturu vidí, ale NEMĚNÍ (rozdělení = náklady a provize zakázek ostatních) — akce i route
-      const kept = ds.allocations.map((a) => ({ id: a.id, itemId: a.itemId, target: a.target, jobId: a.job?.id ?? null, category: a.category, amount: a.amount!, confirmed: true }));
-      const before = localSql(`select string_agg(id::text || amount::text || coalesce(job_id::text, ''), ',' order by id) from supplier_invoice_allocations where invoice_id = '${invoiceId}'`);
-      for (const r of [
-        await act.saveSupplierInvoiceAllocations(invoiceId, kept.map((k) => ({ ...k, jobId: jobA }))), await act.setSupplierInvoiceRejected(invoiceId, true),
-        await act.confirmSupplierInvoiceAi(invoiceId), await act.updateSupplierInvoiceHeader(invoiceId, { number: "X" }),
-        await act.saveSupplierInvoiceItems(invoiceId, []), await act.supplierFromInvoiceHeader(invoiceId), await act.markSupplierInvoiceNotDuplicate(invoiceId),
-        await act.setSupplierInvoiceFinalPo(invoiceId, poA, true), await act.fillSupplierInvoiceRate(invoiceId),
-      ]) {
-        expect(r).toEqual({ ok: false, error: "K této akci nemáš oprávnění." });
+      for (const u of [sales, worker]) {
+        h.user = u;
+        const ls = (await data.listSupplierInvoices())!;
+        const it = ls.items.find((x) => x.id === invoiceId)!;
+        expect(it.totalNet).toBe(31_500);
+        expect(it.paymentStatus).toBeNull();
+        expect(ls.totals.unpaid).toBeNull();
+        const ds = (await data.getSupplierInvoice(invoiceId))!;
+        expect(ds).toMatchObject({ paymentStatus: null, paidAt: null, perms: { view: true, amounts: true, edit: true, paid: false } });
+        expect(ds.files).toHaveLength(1);
+        // stav platby mění jen super admin (akce i DB trigger)
+        expect((await act.setSupplierInvoicePayment(invoiceId, { status: "zaplaceno" })).ok).toBe(false);
+        // rozdělení uloží (beze změny dat — stejné řádky)
+        const kept = ds.allocations.map((a) => ({ id: a.id, itemId: a.itemId, target: a.target, jobId: a.job?.id ?? null, category: a.category, amount: a.amount!, confirmed: true }));
+        const before = localSql(`select string_agg(item_id::text || amount::text || coalesce(job_id::text, ''), ',' order by item_id, amount) from supplier_invoice_allocations where invoice_id = '${invoiceId}'`);
+        const saved = await act.saveSupplierInvoiceAllocations(invoiceId, kept);
+        expect(saved.ok).toBe(true);
+        expect(localSql(`select string_agg(item_id::text || amount::text || coalesce(job_id::text, ''), ',' order by item_id, amount) from supplier_invoice_allocations where invoice_id = '${invoiceId}'`)).toBe(before);
+        const { GET } = await import("@/app/api/supplier-invoices/files/[id]/route");
+        expect((await GET(new Request("http://localhost/x"), { params: Promise.resolve({ id: ds.files[0].id }) })).status).toBe(302);
       }
-      expect(localSql(`select string_agg(id::text || amount::text || coalesce(job_id::text, ''), ',' order by id) from supplier_invoice_allocations where invoice_id = '${invoiceId}'`)).toBe(before);
-      expect(localSql(`select status from supplier_invoices where id = '${invoiceId}'`)).not.toBe("zamitnuto");
-      const { POST } = await import("@/app/api/supplier-invoices/[id]/process/route");
-      const pr = await POST(new Request("http://localhost/x", { method: "POST", body: "{}", headers: { "content-type": "application/json" } }), { params: Promise.resolve({ id: invoiceId }) });
-      expect(((await pr.json()) as { ok?: boolean }).ok).not.toBe(true);
-      const { GET } = await import("@/app/api/supplier-invoices/files/[id]/route");
-      const fileId = ds.files[0].id;
-      expect((await GET(new Request("http://localhost/x"), { params: Promise.resolve({ id: fileId }) })).status).toBe(302);
-      h.user = worker;
-      // zaměstnanec: soubor faktury (s cenami) ne — ani odkaz v detailu
-      expect((await GET(new Request("http://localhost/x"), { params: Promise.resolve({ id: fileId }) })).status).toBe(403);
-      expect((await data.getSupplierInvoice(invoiceId))!.files).toEqual([]);
-      const lw = (await data.listSupplierInvoices())!;
-      expect(lw.items.find((x) => x.id === invoiceId)).toMatchObject({ totalNet: null, totalGross: null, paymentStatus: null, unallocated: null });
-      const dw = (await data.getSupplierInvoice(invoiceId))!;
-      expect(dw.items.every((i) => i.amount === null)).toBe(true);
-      expect(dw.allocations.every((a) => a.amount === null)).toBe(true);
-      expect((await act.saveSupplierInvoiceAllocations(invoiceId, [])).ok).toBe(false);
-      expect(await data.getJobInvoiceCosts(jobA)).toBeNull();
-      // REST: obchodník vidí řádky (bez zaplaceno), zaměstnanec nic
-      const sl = await localSession(DEMO.sales.email, DEMO.sales.password);
-      expect((await sl.from("supplier_invoices").select("id, total_net").eq("id", invoiceId)).data).toHaveLength(1);
-      expect((await sl.from("supplier_invoices").select("paid_at").eq("id", invoiceId)).error).not.toBeNull();
-      const w = await localSession(DEMO.worker.email, DEMO.worker.password);
-      expect((await w.from("supplier_invoices").select("id").eq("id", invoiceId)).data ?? []).toEqual([]);
+      expect(localSql(`select payment_status from supplier_invoices where id = '${invoiceId}'`)).not.toBe("zaplaceno");
+      // REST: obchodník i zaměstnanec vidí řádky, platbu ne
+      for (const who of [DEMO.sales, DEMO.worker]) {
+        const sess = await localSession(who.email, who.password);
+        expect((await sess.from("supplier_invoices").select("id, total_net").eq("id", invoiceId)).data).toHaveLength(1);
+        expect((await sess.from("supplier_invoices").select("paid_at").eq("id", invoiceId)).error).not.toBeNull();
+      }
     } finally {
       h.user = admin;
       expect((await act.setSupplierInvoiceVisibility("super_admin")).ok).toBe(true);

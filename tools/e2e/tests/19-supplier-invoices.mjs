@@ -326,7 +326,7 @@ async function setVisibility(mode, shotName) {
     await page.goto(`${BASE}/supplier-invoices`);
     const sw = page.locator("main").getByTestId("invoice-visibility");
     await sw.waitFor({ timeout: 20_000 });
-    const btn = sw.getByRole("button", { name: mode === "all" ? /Všichni vidí faktury/ : /Jen super admin/ });
+    const btn = sw.getByRole("button", { name: mode === "all" ? /Všichni zadávají a rozdělují/ : /Jen super admin/ });
     await btn.click();
     await expectPressed(btn);
     const v = await eventually(() => (sql(`select value from integration_settings where key = 'supplier_invoices_visibility'`) === mode ? mode : null), 10_000);
@@ -345,7 +345,7 @@ async function expectPressed(btn) {
   throw new Error("přepínač se nepřepnul");
 }
 
-await test("režim „všichni vidí faktury“: obchodník vidí seznam i detail, zaplaceno nemění; zpět jen super admin", async () => {
+await test("režim „všichni zadávají a rozdělují“: obchodník vidí seznam i detail, rozděluje, zaplaceno nemění; zpět jen super admin", async () => {
   await setVisibility("all", "13-visibility-all-desktop-light");
   try {
     const { context, page } = await ctx(USERS.obchod);
@@ -362,16 +362,9 @@ await test("režim „všichni vidí faktury“: obchodník vidí seznam i detai
       await page.locator("main").getByTestId("invoice-title").waitFor({ timeout: 20_000 });
       expect((await page.locator("main").getByTestId("invoice-paid-card").count()) === 0, "obchodník vidí kartu Úhrada");
       expect((await page.locator("main").getByTestId("pay-zaplaceno").count()) === 0, "obchodník může měnit zaplaceno");
-      // vidí, ale neupravuje (rozdělení mění náklady a provize zakázek ostatních) — jen super admin
+      // 19. 11.: v režimu „všichni" zadává a rozděluje i obchodník (tlačítko Rozdělit), stav platby ne
       await page.locator("main").getByTestId("invoice-item").first().waitFor({ timeout: 10_000 });
-      for (const id of ["item-split", "item-overhead", "invoice-savebar", "invoice-confirm-ai", "invoice-po-final"]) {
-        const n = await page.locator("main").getByTestId(id).count();
-        const off = id === "invoice-po-final" ? await page.locator("main").getByTestId(id).evaluateAll((els) => els.every((e) => e.disabled)) : n === 0;
-        expect(off, `obchodník v režimu „všichni“ může upravovat (${id})`);
-      }
-      for (const label of ["Upravit položky", "Zamítnout", "Přečíst znovu (AI)"]) {
-        expect((await page.locator("main").getByRole("button", { name: label }).count()) === 0, `obchodník má tlačítko ${label}`);
-      }
+      expect((await page.locator("main").getByTestId("item-split").count()) > 0, "obchodník v režimu „všichni“ nemůže rozdělit");
       await snap(page, "14b-sales-detail-all-mode-desktop-light");
     } finally {
       await context.close();

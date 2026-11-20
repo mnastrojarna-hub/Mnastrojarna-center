@@ -40,6 +40,13 @@ Po dokončení každého úkolu ho zde odškrtni (`[x]`) a commitni. Až bude v�
 | 15. 11. 04:31 | **Úkol H HOTOV: pružiny sloučeny do `main` (PR #102, `0451202`)** – s nimi i oprava zápisu souborů 2D výkresu v CLI a dokumentace CLI po fázi B (D1). GitHub `acceptance (22)` zelená. Worktree `w21-*` smazány (zbytek `w21-motion` v `S/w21/w21-motion-final-wip.patch`). Dál: E (zbývající body hlášení – nový workflow), F kola běží (`wf_fe2fa9ab-38a`), D2/D3 obrázky a PDF příručka až po F. |
 | 15. 11. 04:33 | Úkol E: E2 uzavřen (oba body `S/followups.md` hotové), E7 ověřen v CLI (`stav` ve stejném běhu dává přesnou obálku sestavy – prohlížeč ověří balík runs), z E3 už hotové odkazy/base64 výstupů a B1/B2 v enginu. Spuštěn workflow `wf_afc90a94-180` (skript `…/workflows/scripts/cad-wave-e-report-gaps-wf_afc90a94-180.js`, zadání `S/e/brief.md`): balíky `help` (hledání v nápovědě, tahák ≤ 5 kB, hledání na stránce dokumentace; worktree `e-help`, :3521), `runs` (opakovaný běh bez duplicit, řádky D s čísly u všech dokumentů – dnes `V=-`, stručný protokol v konzoli prohlížeče, ověření E7/B1/B2 v prohlížeči; `e-runs`, :3522), `export` (= E6: převodník zapíše razítko, tolerance podle desetinných míst, funkční kóty, režim děr, přezdívky, pružiny, dynamiku, genEdit, SHEET_UNSUPPORTED; `e-export`, :3523). Patche `S/e/<balík>.patch`. Běží současně s koly (F). |
 | 15. 11. 05:03 | Kola (F): balík core HOTOV (`w19-core2` `1bf6525`, `S/w19/core.patch` 43 souborů proti `3814b85`): 14 druhů kol (čelní/šikmé/šípové/vnitřní, hřeben, kuželové přímé i spirální, hypoidní, šnek + šnekové kolo, cykloidní, kotouč reduktoru, řetězové ISO 606, řemenice HTD/T, rohatka), prvky `gear.*`, výstup kolo/polotovar/zuby, soukolí přes existující příkazy, CLI ověřeno; e2e 20/20. Omezení: šnekové kolo 8,6 s, hypoid/spirální jen nominální boky, některé tabulkové hodnoty ISO 606/BS 978/DIN 7721 z paměti (ověří kontrola). BĚŽÍ `verify:w19r-core`, pak ui + text. E: balíky help a runs v implementaci (export čeká na volný slot). D2 obrázky + D3 PDF příručka až po F (úvodní obrazovka dostane Kola). |
+| 19. 11. 18:10 | Oba workflow (F kola `wf_fe2fa9ab-38a`, E `wf_afc90a94-180`) mezitím spadly na týdenní limit; po obnovení limitu znovu rozjety s `resumeFromRunId` (běží: kola `verify:w19r-core` → ui + text; E balíky help a runs, export čeká). Zálohy rozpracovaných souborů E: `S/e/e-help-wip-11191817.patch`, `S/e/e-runs-wip-11191817.patch`. |
+| 19. 11. 18:21 | **Majitel: „krátký odkaz musí fungovat“** – živý `https://www.mnastrojarna.cz/cad/share/?ping` vracel HTTP 500 s prázdným tělem (fatální chyba PHP na hostingu; reprodukováno zakázanou funkcí PHP). OPRAVA **sloučena do `main` (PR #110, `39fbddd`)**: `cad/share/index.php` je teď zavaděč pro PHP 7.0–8.x (vrací čitelný JSON `php_too_old` / `php_functions_disabled` / `php_fatal`), logika je v novém `store.php` (náhrady volitelných funkcí, `?diag`), CAD ukáže skutečný důvod. Testy share-php (25 zakázaných funkcí), share-self, e2e sdílení zelené; GitHub `acceptance (22)` zelená. **Čeká na ruční nasazení majitelem** (`npm run build:ftp`, nahrát celý `out/` – nově i `out/cad/share/store.php`); pak ověřit `curl …/cad/share/?ping` a `?diag`. Před nasazením živý web pořád 500 a `store.php` 404 (ověřeno 18:21). |
+| 19. 11. 19:05 | **NOVÁ zpráva majitele: „Podklad pro opravy“ z testu M1 (24 bodů) → vlna 22, kapitola 7d, priorita před F a E.** Spuštěn rozbor `wf_d8049a90-ec6` (bez buildu, CLI `0.1.0-e69e3305`, jen čtení repozitáře). Kola (F) a E dál běží; stroj má jen 4 jádra → každý workflow 2 agenty naráz. |
+| 19. 11. 20:30 | **Vlna 22: rozbor hotov – žádný z 24 bodů není opraven (31 položek BROKEN/PARTIAL/MISSING).** Spuštěny balíky oprav A (`wf_e3c300a5-6c7`, falešné zelené stavy), G (`wf_af30f8c5-855`, geometrie a STEP), M (`wf_916aff0d-896`, mechanika) na místní větvi `w22-base` f806b2f (main + e-runs + e-help). D čeká na e-export, C a V na M. Kola (`wf_fe2fa9ab-38a`: oprava jádra, UI a text) a E (`wf_afc90a94-180`: kontrola runs, export X3) dál běží. Podrobnosti v kapitole 7d. |
+| 19. 11. 22:35 | **Restart kontejneru ve 22:15** (pravděpodobně souběh několika buildů a e2e; všech 5 workflow zastaveno, soubory na disku přežily). Záloha rozpracovaného: `S/w22/w22-{a,g,m}-wip-11192220.patch`, `S/e/e-runs-wip-11192220.patch`. **Nové pravidlo stroje:** těžké kroky jen přes `S/bin/heavy` (nejvýš 2 naráz, hlídá paměť), e2e jen přes `S/bin/e2e-run` – zapsáno ve všech třech zadáních (`S/w22/brief.md`, `S/e/brief.md`, `S/w19/brief.md`) spolu s poznámkou o obnově. Znovu spuštěno: A `wf_20939827-450`, G `wf_461e5cc5-2cd`, M `wf_37ab426c-b3d` (skripty s vloženými argumenty `S/w22/wf/track-{a,g,m}.js`, generuje `S/w22/wf/gen.cjs`), E obnoveno `wf_afc90a94-180` (oprava runs, kontrola help a export). **Kola (`wf_fe2fa9ab-38a`) zatím stojí** – jádro hotové a opravené (w19-core2 7f87dd0), UI (w19-ui2 913748f) a text (w19-text2 dbdcc09) hotové, chybí jejich kontrola a opravy; obnovit `Workflow({scriptPath: …/cad-wave19-gears-resume-wf_fe2fa9ab-38a.js, resumeFromRunId: "wf_fe2fa9ab-38a"})`, až doběhne E. |
+| 20. 11. 08:35 | **Druhé přerušení: ~01:15 vyčerpán limit předchozího modelu, pak nečinný kontejner restartován.** Stav: A1 téměř hotové (WIP 3f08297, e2e `cad-w22-a` 98 ok / 0 FAIL), G1 rozpracované (WIP 5dc7a30), M1 hotové (df50559, oponent našel 2 blokující nálezy), E: runs opraveno (557d331), help a export v opravě (WIP). Majitel: „Dokonči to, co Fable nedodělal“ → přepnuto na Opus, obnoveny A `wf_20939827-450`, G `wf_461e5cc5-2cd`, M `wf_37ab426c-b3d`, E `wf_afc90a94-180` (zadání doplněna o RESUME NOTE 2/3). Kola, D, C, V spustit postupně, až se uvolní výkon. |
+| 20. 11. 09:20 | **Pokyn majitele: „napřed vše najdi, vyřeš a oprav a pushni, a až pak testuj a opravuj.“** Zastaveny workflow s kontrolou po etapách. **FÁZE 1 (jen implementace + napsané testy, bez buildu/e2e/oponentů):** pravidlo „PHASE 1 RULE“ v `S/w22/brief.md`; skripty `S/w22/p1/impl-{a,g,m,d,c,v}.js` (šablona `template.js`, konfigurace `<balík>.json`, generátor `gen.cjs`). Společný základ **místní větev `w22-base2` = ee4c657** (main c2c498f + e-runs 557d331 + e-help 6c66921 + e-export 33e01a3 + A1 dd92983 + M1 df50559; konflikty vyřešeny, tsc čistý, i18n 0/0). Kola NEJSOU v základu (konflikty s main v registrech rozšíření) → sloučí integrace. Běží: A (A2–A4) `wf_183c4df5-a39`, G (G1F dokončení + sloučení w22-base2, G2, G3) `wf_9edf0175-10e`, M (M1F = 11 nálezů oponenta, M2, M3) `wf_c621df1a-9ac`, D (D1–D4) `wf_ff5e704b-23d`, C (C1, C2) `wf_178ad9c7-744`, V (V1) `wf_798179e9-bdf`. Potom: integrace všech worktree + kola + C3 (procesní vrstva, bod 4) → push na větev → FÁZE 2 testy a opravy → PR. Větve s tipy worktree: `tip-*`. |
 
 ## 0a. Obnovení po pozastavení (14. 11. 19:58)
 
@@ -346,6 +353,47 @@ Zadání majitele: „Online CAD neumí pružiny a to ani pro simulaci pohybu.�
       tuhost ručně ověřit); sestava se 4 pružinami pod stírací deskou → dynamika → deska se vrátí na doraz, graf, CSV.
 - [x] H4. (hotovo 15. 11. 04:31, PR #102) Dokumentace (kapitola Prvky – pružiny, Sestavy – pohyb a dynamika, FAQ „Jak udělám pružinu?“), PR, sloučit,
       smazat `w21-*`.
+
+## 7d. Úkol I – vlna 22: podklad pro opravy z testu M1 (24 bodů, PRIORITA před F a E)
+
+Zpráva majitele z 19. 11. doslova v `S/w22/report.md` (kdyby zmizel scratchpad: zpráva je v konverzaci 19. 11. ~18:50).
+Hlavní požadavek: **žádné falešné zelené stavy** – výsledek analýzy patří jen k dokumentu a revizi, pro které vznikl;
+přijetí příkazu ≠ geometrický úspěch; „bez kolizí“ ≠ dostatečná vůle. Pořadí oprav podle majitele:
+1 zneplatnění starých výsledků · 2 validace geometrie a objemových exportů · 3 přidržovač/předpětí/kontakty/konflikty vazeb ·
+4 jedna studie s fázemi + editace motorů · 5 klasifikace kolizí + minimální vůle · 6 procesní střih/otisk s označením úrovně
+simulace · 7 ukládání parametrů + izolace souběžných výpočtů · 8 výkresy, kusovník, revize · 9 video, krátké odkazy, protokoly.
+Ke KAŽDÉMU bodu odevzdat: malý reprodukční soubor, očekávaný výsledek, regresní test, verzi (commit + verze CLI), ve které
+byla oprava ověřena. Názvy dílů ze zprávy (M1) do repozitáře nekopírovat – v testech neutrální názvy.
+- [x] I1. Rozbor hotov (19. 11. 20:12, `wf_d8049a90-ec6`): **žádný bod není hotový** – 31 položek, všechny BROKEN /
+      PARTIAL / MISSING; žádné „opraveno“ k oponentuře. Výstupy: `S/w22/triage/<skupina>.md` (stale, geom, mech, study,
+      clash, docs, out), reprodukce `S/w22/repro/<bod>/` (+ `stepcheck.mjs`), kontrola úplnosti `S/w22/triage/critic.md`
+      (16 nepokrytých požadavků, 23 rozporů mezi plány, 11 regresí k zachování – ZÁVAZNÉ pro balíky).
+- [ ] I2. Balíky oprav. Společné zadání `S/w22/brief.md` (vlastníci sdílených modelů, čísla korpusu, pravidla, co majitel
+      chce ke každému bodu). Jeden skript pro všechny balíky: `…/workflows/scripts/cad-w22-track-wf_e3c300a5-6c7.js`
+      (etapy po sobě; každá: implementace → 2 oponenti „reprodukce“ a „regrese“ → oprava → potvrzení, max 2 kola);
+      argumenty balíků v `S/w22/args/<balík>.json` (obnova: `Workflow({scriptPath, resumeFromRunId, args: <obsah souboru>})`).
+      Základ balíků A, G, M: místní větev **`w22-base` = f806b2f** (main c2c498f + e-runs 63514b7 + e-help 4eb3be6; jen
+      místně, neposílá se). Každý balík píše ke každému bodu `S/w22/ledger/<bod>.md` (požadavek → stav → repro soubor v
+      repozitáři → očekávaný výsledek → test → příkaz a výstup → commit) a zprávy `S/w22/<balík>/<etapa>-report.md`.
+      | Balík | Worktree / port | Etapy (body) | Workflow | Stav |
+      |---|---|---|---|---|
+      | A stav | `w22-a` / 3531 | A1 = 1 · A2 = 20 (vazby) + 22i (sestava hotovo) · A3 = 12 + 22e + 22f + 22h · A4 = 15 (konzole) + 16 + 21 | `wf_20939827-450` (skript `S/w22/wf/track-a.js`) | běží znovu od 22:30, A1 rozpracováno |
+      | G geom | `w22-g` / 3532 | G1 = 22i (úpravy, výkres) + 22b + úrovně stavu · G2 = 22a + 22d · G3 = 22c | `wf_461e5cc5-2cd` (skript `S/w22/wf/track-g.js`) | běží znovu od 22:30, G1 rozpracováno |
+      | M mech | `w22-m` / 3533 | M1 = mezipaměť pohybu (část 1, 12) + 9 + 11 · M2 = 7 + 2 + 8 · M3 = 3 + 10 + tuhé skupiny (část 15) | `wf_37ab426c-b3d` (skript `S/w22/wf/track-m.js`) | běží znovu od 22:30, M1 rozpracováno |
+      | D docs | `w22-d` / 3534 | D1 = 22g + 19 · D2 = 20 (výkresy) + záznam exportů + seznam zastaralých výstupů · D3 = 18 · D4 = 17 + 22j | – | čeká na dokončení e-export (základ = w22-base + e-export) |
+      | C kolize | `w22-c` / 3535 | C1 = 5 · C2 = 6 · C3 = 4 | – | čeká na M (základ = po integraci A + M) |
+      | V video | `w22-v` / 3536 | V1 = 14 + 13 | – | čeká na M |
+      Vlastníci sdílených modelů (podle kritika, podrobně v `brief.md`): identita výsledku a panel kolizí A1 · mezipaměť a
+      panel pohybu jen M · identita běhu a jedna bariéra zápisu rozepsaných polí A3 · model motoru `motorKeys()` M1 · režim
+      a úroveň studie M2 · tuhé skupiny a strojový řádek `= … motion …` M3 · pravidla kolizí C1, vůle C2 · revize modelu a
+      trvalé záznamy v dokumentu D2 · kusovník D1 · úrovně stavu prvku G1 · řádek D jen přidávat pole na konec.
+- [ ] I3. Integrace po částech podle kapitoly 2 (nejdřív E help + runs, pak A + G, pak M + D, pak C + V; každá část vlastní
+      PR): patche `S/w22/<balík>.patch` se berou proti `w22-base`, takže po sloučení E jdou přes `git apply -3`. Při
+      integraci propojit: záznam exportu z A3 (relace) s trvalým záznamem z D2; háček pro pozdní výsledky z A3 v panelu
+      pohybu (soubor M); sjednotit hash revize modelu A × D; přepočítat rozpočet řádku D (≤ 2048 B) se všemi poli.
+      Majiteli odpovědět tabulkou bod → stav → reprodukční soubor → očekávaný výsledek → test → verze (commit + verze CLI);
+      tabulku uložit do repozitáře jako `CAD-M1-OPRAVY.md` (sestavit z `S/w22/ledger/*.md`). Co se nestihne nebo se vědomě
+      odkládá (např. více synchronních pohledů u bodu 14), napsat výslovně.
 
 ## 8. Co říct majiteli o nasazení (po každém sloučení)
 
