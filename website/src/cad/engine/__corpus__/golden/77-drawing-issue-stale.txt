@@ -6,7 +6,7 @@
 → nepředepsané tolerance ISO 2768-mK – výsledek po vyhodnocení listu níže
 → list „List 1“ vydán jako rev. A z modelu r·? (?.?.????) · do tabulky revizí přidána revize A „první vydání“ – výsledek po vyhodnocení listu níže
 ✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
-✓ výkres PDF: Deska_A_vykres.pdf · 77 kB · výkres PDF – staženo (bez dialogu)
+✓ výkres PDF: Deska_A_vykres.pdf · 78 kB · výkres PDF – staženo (bez dialogu)
 ✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
 
 Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)

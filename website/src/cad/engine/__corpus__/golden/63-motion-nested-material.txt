@@ -31,7 +31,8 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  „Přidržovač“: ΔZ −15 mm
  stojí: 2 („Deska A“, „Skupina“)
-Kolize: žádné ve všech krocích
+Kolize: žádný průnik v 6 polohách
+ kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
@@ -55,9 +56,10 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
  „Přidržovač“: ΔZ −15 mm
  stojí: 2 („Deska A“, „Skupina“)
 Kolize v pohybu: kroků s kolizí 4 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 4 krocích, první v kroku 2
+ kontrolováno spojitě i mezi polohami (6 poloh + 1 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 4)
 Vazby splněny ve všech krocích
 ℹ řádek 6: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: poloha, ukotvení, skrytí nebo vazby komponent v podsestavě „Skupina“
-⚠ řádek 6: v pohybu „Přidržovač“ × „Skupina“ od kroku 2 (t = 0,8 s): kroků 4, dvojic komponent 1, největší průnik 500 mm³
+⚠ řádek 6: v pohybu „Přidržovač“ × „Skupina › Doraz“ od kroku 2 (t = 0,8 s): kroků 4, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 25,5] v kroku 2
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30] · Skupina [0; 0; 0] (podsestava)
