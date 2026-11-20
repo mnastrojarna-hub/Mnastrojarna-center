@@ -32,6 +32,7 @@
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { clashRulesScript } from "./agent-clash";
 import { clearanceScript } from "./agent-clearance";
+import { processScript } from "./agent-process";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords, emitPhases, motorIsPiecewise, motorPieceWords, windowWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
@@ -2202,6 +2203,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   const clr = clearanceScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null));
   for (const l of clr.lines) c.line(l);
   if (clr.skipped) c.note(tr("sledovaná vůle dvojice s komponentou mimo skript se do skriptu nepřenáší ({0})", clr.skipped));
+  // procesní vrstva pohybové studie (střih / otisk) – vlna 22, bod 4 (cad/agent-process.ts)
+  const pr = processScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null), (id) => mateNo.get(id));
+  for (const l of pr.lines) c.line(l);
+  if (pr.skipped) c.note(tr("procesní operace s komponentou mimo skript se do skriptu nepřenáší ({0})", pr.skipped));
   // pravidla kolizí (pracovní kontakt, závit bez prvku) a tolerance dotyku – vlna 22, bod 5 (cad/agent-clash.ts)
   const cr = clashRulesScript(doc, c.li, (p) => (p.length === 1 && idx.has(p[0]) ? `#${idx.get(p[0])}` : null), (id) => mateNo.get(id));
   for (const l of cr.lines) c.line(l);

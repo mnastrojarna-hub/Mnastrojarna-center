@@ -36,6 +36,8 @@ import { applyMotionViewCmd, type MotionVideoSignal } from "./agent-motion-view"
 import { clearancePost, clearanceTracker } from "./motion-clearance";
 import { clearanceCodes, clearanceKv, clearanceStepLines } from "./clearance-report";
 import { applyClearanceCmd } from "./agent-clearance";
+import { applyProcessCmd, processListLines } from "./agent-process";
+import { processCodes, processKv, processLines, processRun, productLines, type MotionStepCut } from "./motion-process";
 // kinematická studie beze změny (cad/motion.ts), dynamická navíc s řádky / sloupci dynamiky (vlna 21)
 import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "./motion-dynamic-report";
 import type { DynMotionStep } from "./motion-dynamic";
@@ -257,10 +259,11 @@ export async function motionRun(d: CadDoc, env: AsmEnv, opts: { onStep?: (k: num
       const tracker = clearanceTracker(doc, study!, { ...(env.clearance ? { clearance: env.clearance } : {}), ...(collide ? { collide } : {}) }, { collisions: !!(study!.collisions && collide), cancel, steps: study!.steps });
       if (study!.mode === "dynamic") {
         const r = await dynamicRun(doc, env, geoProvider(doc, env), study!, { collide, onStep, cancel });
-        return tracker ? await clearancePost(r, tracker) : r;
+        // procesní vrstva (vlna 22, bod 4): střih / otisk nad polohami kroků – odvozený výsledek, uloží se s výsledkem studie
+        return processRun(doc, tracker ? await clearancePost(r, tracker) : r, env);
       }
       const r = await runMotion(doc, geoProvider(doc, env), study!, { collide, onStep, cancel, ...(tracker ? { between: (row, prev, poseAt) => tracker.step(row, prev, poseAt) } : {}) });
-      return tracker ? tracker.finish(r) : r;
+      return processRun(doc, tracker ? tracker.finish(r) : r, env);
     },
     opts.cancel,
     opts.onStep,
@@ -395,6 +398,8 @@ export function motionKv(res: MotionResult, cl: MotionClashStats | null, duratio
     // vlna 22, bod 15 a 3 – nová pole na KONEC řádku: tuhé skupiny s posuvem (počet:osy±Δ) a fáze (nastalé/všechny)
     ...groupsKv(rigidMotionGroups(res, doc)),
     ...phaseKv(res.phases),
+    // vlna 22, bod 4 – nová pole na KONEC řádku: procesní vrstva (operace, odebraný objem, odpad, krok prostřižení)
+    ...processKv(res),
   ];
   return `motion ${parts.join(" ")}`;
 }
@@ -449,7 +454,9 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
     // upozornění k motorům jdou do protokolu jako záznamy s kódem (stručný protokol nemá výpis) – ve výpisu by byla podruhé;
     // pohyb dílů po tuhých skupinách, po dílech jen `pohyb detail` (vlna 22, bod 15)
     log.push(...motionSummary(res, doc, { ...(cl ? { collisionLines: cl.lines } : {}), notes: false, detail }));
+    log.push(...processLines(res, doc)); // procesní vrstva: úroveň, operace, stav výrobku (vlna 22, bod 4)
     if (cl) codes.push(...cl.codes);
+    codes.push(...processCodes(res, doc));
     codes.push(...clearanceCodes(res, doc)); // ⚠ vůle pod limitem, ⚠ nepotvrzené úseky, ℹ jen diskrétně (vlna 22, bod 6)
     for (const x of motionMotorNotes(res, doc)) codes.push({ code: x.code, args: x.args, text: x.text });
     // motor na mezi, neplatné kroky, vazbami neurčená poloha (body 2 a 8) – záznamy s kódem a celou větou
@@ -475,6 +482,7 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       ...s.motors.map((mo, i) => ` ${i + 1}. ${motorText(mo, doc)}`),
       // fáze (vlna 22, bod 3): pořadí, podmínka začátku, zapnuté / potlačené vazby, režim, motory fáze
       ...(s.phases?.length ? [tr("Fáze studie: {0}", s.phases.length), ...s.phases.map((ph, i) => `  ${phaseText(ph, i, doc, s)}`)] : []),
+      ...(s.process?.length ? processListLines(doc) : []),
       ...(dl ? [dl] : []),
     ];
   };
@@ -653,6 +661,11 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       const r = await applyClearanceCmd(d, cmd.cmd, study, { runLog, lines: studyLines, cached: (x) => motionCached(x, env), log });
       return signal(r.doc, r.log, r.changed, r.open ? { open: true } : undefined, codes, kv);
     }
+    case "process": {
+      // procesní vrstva: střih / otisk řízený pohybem (vlna 22, bod 4 – cad/agent-process.ts); souhrn a kódy z `runLog`
+      const r = await applyProcessCmd(d, cmd.cmd, study, { runLog, cached: (x) => motionCached(x, env), log });
+      return signal(r.doc, log, r.changed, r.open ? { open: true } : undefined, codes, kv);
+    }
     case "dyn": {
       // dynamika, hmotnost, síla / moment (cad/asm-agent-dyn.ts); kódy kolizí a strojový řádek studie z `runLog` jako u ostatních
       const r = await applyDynCmd(d, cmd.cmd, study, { runLog, lines: studyLines, log });
@@ -678,7 +691,8 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
     case "step": {
       noteRecompute(d);
       const res = await motionRun(d, env);
-      const s = res.steps[Math.max(0, Math.min(res.steps.length - 1, cmd.n))];
+      const si = Math.max(0, Math.min(res.steps.length - 1, cmd.n));
+      const s = res.steps[si];
       log.push(tr("Krok {0} (t = {1} s, motory {2}):", s.i, fmt(s.t, 4), s.motors.map((v) => fmt(v, 3)).join("; ")));
       for (const c of d.components ?? []) {
         const pl = s.place[c.id];
@@ -689,6 +703,9 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       const sc = await stepClashLines(s, d, env);
       log.push(...sc.lines);
       log.push(...clearanceStepLines(res, d, s.i)); // vůle sledovaných dvojic v kroku (vlna 22, bod 6)
+      // stav výrobku a hloubka zásahu v kroku (procesní vrstva, vlna 22 bod 4) – vždy z kroku, dokument se nemění
+      log.push(...productLines(res, d, si));
+      for (const c of (s as MotionStepCut).cut ?? []) log.push(tr(" zásah {0}: {1} mm (geometrická aproximace)", c.label, fmt(c.depth, 4)));
       // dynamika kontroluje kolize jen v každém k-tém snímku (motion-dynamic.ts clashEvery)
       if (res.collisionsChecked && s.clashes === undefined) log.push(tr(" kolize v tomto snímku nekontrolována (dynamika: každý {0}. snímek – pohyb kroky N)", isDyn(res) ? (res.dynamic.clashEvery ?? 1) : 1));
       const stepCodes: NonNullable<AsmResult["codes"]> = sc.codes;
