@@ -34,4 +34,3 @@ Výběr oknem	Window selection
 Výběr oknem: zleva doprava = jen celé uvnitř, zprava doleva = i protnuté · Ctrl/Shift přidá · Ctrl+Shift/Alt odebere · Esc zruší	Window selection: left to right = fully inside only, right to left = also crossed · Ctrl/Shift adds · Ctrl+Shift/Alt removes · Esc cancels
 Vybráno oknem	Selected by window
 hledám prvky…	finding features…
- – kreslí se softwarově: {0}, kolečko zoom. Klik vybere plochu, hranu nebo vrchol (Ctrl/Shift přidá), textem „vyber F3 E2“ nebo window.mncad.select([…]). Plné 3D: Chrome s --enable-unsafe-swiftshader bez --disable-software-rasterizer.	 – drawn in software: {0}, wheel zooms. A click selects a face, edge or vertex (Ctrl/Shift adds), by text “select F3 E2” or window.mncad.select([…]). Full 3D: Chrome with --enable-unsafe-swiftshader without --disable-software-rasterizer.

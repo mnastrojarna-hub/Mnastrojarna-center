@@ -347,9 +347,10 @@ describe("se skutečným jádrem: řádky D všech dokumentů běhu, objemy po o
       expect(web).toMatch(/ files=1 /);
     }
     const w = formatRun(await runReport(new MemoryWorkspace(), 'nový díl "E"\nkvádr 10 10 10\nexport step', hostOf(kernel)), { protocol: "short" });
-    expect(w).toMatch(/\nF step "E\.step" \d+B check=ok\n/);
+    // řádek F nese revizi modelu, ze které soubor vznikl (vlna 22, A3 – bod 12/22h); stejná v prohlížeči i v CLI (fáze 2)
+    expect(w).toMatch(/\nF step "E\.step" \d+B check=ok rev=r·[0-9a-f]{6}\n/);
     const j = JSON.parse(formatRun(await runReport(new MemoryWorkspace(), 'nový díl "E"\nkvádr 10 10 10\nexport step', hostOf(kernel)), { protocol: "json" })) as RunReport;
-    expect(j.files[0]).toMatchObject({ name: "E.step", format: "step", check: { ok: true } });
+    expect(j.files[0]).toMatchObject({ name: "E.step", format: "step", check: { ok: true }, modelRev: expect.stringMatching(/^r·[0-9a-f]{6}$/) });
     expect(j.files[0].sha256).toMatch(/^[0-9a-f]{64}$/);
   }, 480_000);
 

@@ -18,7 +18,7 @@
  *
  * Modul nemá stav dokumentů ani závislost na Reactu – stejný v prohlížeči i v CLI.
  */
-import type { Leaf } from "../asm-flatten";
+import { flattenLeaves, type Leaf } from "../asm-flatten";
 import { hashPair, sourceKey } from "../assembly";
 import { clashSig } from "../clash-class";
 import type { MateStatus } from "../mates";
@@ -74,9 +74,80 @@ export function geometrySig(doc: CadDoc): string {
   return sourceKey({ kind: "part", doc });
 }
 
-/** krátká revize modelu k zobrazení: `r·` + 6 šestnáctkových znaků otisku geometrie (`geometrySig`) */
+/* ───────── revize nezávislá na náhodných id (fáze 2: stejný skript = stejná revize v prohlížeči, CLI i při opakování) ───────── */
+
+/**
+ * Id prvků, komponent, entit skici… vznikají náhodně (`uid()`), takže stejný skript dá v každém běhu jiná id. Otisk pro
+ * revizi proto nahradí každé id (hodnotu klíče `id` kdekoli ve stromu) pořadovým `#n` podle prvního výskytu – i v odkazech
+ * na ně (hodnoty jiných polí, klíče map, cesty `a/b`), takže odkaz zůstane odkazem na tentýž prvek. Stejná geometrie a stejné
+ * odkazy = stejný text bez ohledu na náhodná id; jiný parametr / jiný odkaz = jiný text.
+ */
+function collectIds(root: unknown, out: Map<string, string>): Map<string, string> {
+  const walk = (x: unknown): void => {
+    if (Array.isArray(x)) {
+      for (const y of x) walk(y);
+      return;
+    }
+    if (!x || typeof x !== "object") return;
+    for (const [k, y] of Object.entries(x)) {
+      if (k === "id" && typeof y === "string" && y && !out.has(y)) out.set(y, `#${out.size}`);
+      walk(y);
+    }
+  };
+  walk(root);
+  return out;
+}
+/**
+ * JSON s id nahrazenými podle `ids`: celé slovo z [A-Za-z0-9_-] (id z `uid()` i id s pomlčkou; odkazy skládají id s `/ : . |`
+ * a mezerou, nikdy s písmenem) – jiný text beze změny
+ */
+function canonJson(v: unknown, ids: Map<string, string>): string {
+  const s = JSON.stringify(v) ?? "";
+  return ids.size ? s.replace(/[A-Za-z0-9_-]+/g, (m) => ids.get(m) ?? m) : s;
+}
+const partRevMemo = new WeakMap<object, string>();
+/** otisk obsahu dílu pro revizi (prvky, proměnné, vazby parametrů, konfigurace – jako `sourceKey`, bez náhodných id) */
+function partRevSig(d: CadDoc): string {
+  let r = partRevMemo.get(d);
+  if (r === undefined) {
+    const o = { f: d.features, v: d.variables, b: d.bindings, c: d.activeConfig, cf: d.configs };
+    r = hashPair(canonJson(o, collectIds(o, new Map()))).map((h) => h.toString(36)).join("");
+    partRevMemo.set(d, r);
+  }
+  return r;
+}
+/** id komponent sestavy (i podsestav) v pořadí stromu – listy sestavy mají cestu z těchto id */
+function compIds(comps: readonly { id: string; source: { kind: string; doc?: CadDoc } }[] | undefined, out: Map<string, string>): Map<string, string> {
+  for (const c of comps ?? []) {
+    if (c.id && !out.has(c.id)) out.set(c.id, `#${out.size}`);
+    if (c.source.kind === "asm") compIds(c.source.doc?.components, out);
+  }
+  return out;
+}
+
+/**
+ * Otisk, ze kterého vzniká revize modelu `r·xxxxxx` (`modelRev`): týž obsah jako `geometrySig` (díl = obsah dílu, sestava =
+ * listy, jejich díly, skrytí a světové matice, 2D výkres = entity), ale bez náhodných id. Shodu výsledku s dokumentem dál určuje
+ * `geometrySig` (s id – přísnější: jiná id = „neplatí“, slabší tvrzení), revize je jen k zobrazení a záznamům (soubor, export,
+ * řádky F a D, PDF), kde musí být stejná pro tentýž model v prohlížeči i v CLI.
+ */
+export function revisionSig(doc: CadDoc): string {
+  if (doc.kind === "assembly") {
+    const ids = compIds(doc.components, new Map());
+    const q = (v: number) => Math.round(v * 1e6) / 1e6 + 0;
+    const leaves = flattenLeaves(doc).map((l) => [l.id, l.comp.source.kind === "part" ? partRevSig(l.comp.source.doc) : l.key, l.hidden ? 1 : 0, l.matrix.map(q)]);
+    return `asm:${canonJson(leaves, ids)}`;
+  }
+  if (doc.kind === "draft") {
+    const dr = doc.draft ?? null;
+    return `draft:${canonJson(dr, collectIds(dr, new Map()))}`;
+  }
+  return `part:${partRevSig(doc)}`;
+}
+
+/** krátká revize modelu k zobrazení: `r·` + 6 šestnáctkových znaků otisku `revisionSig` (stejný model = stejná revize všude) */
 export function modelRev(doc: CadDoc): string {
-  return revOf(geometrySig(doc));
+  return revOf(revisionSig(doc));
 }
 /** krátká revize z hotového otisku (když ho volající už má) */
 export const revOf = (sig: string): string => `r·${shortHash(sig)}`;
@@ -113,12 +184,11 @@ export function resultKey(kind: ResultKind, docKey: DocKey, doc: CadDoc, extra =
 
 /** identita výsledku pro dokument `doc` pod klíčem `docKey`; `sig` výchozí = otisk geometrie (`geometrySig`) */
 export function resultId(kind: ResultKind, docKey: DocKey, doc: CadDoc, o: Partial<Pick<ResultId, "sig" | "comps" | "pose" | "at" | "line">> = {}): ResultId {
-  const geo = geometrySig(doc);
   return {
     kind,
     doc: docKey,
-    sig: o.sig ?? geo,
-    rev: revOf(geo),
+    sig: o.sig ?? geometrySig(doc),
+    rev: modelRev(doc),
     name: doc.name,
     pose: o.pose ?? "doc",
     ...(o.comps !== undefined ? { comps: o.comps } : {}),

@@ -98,16 +98,30 @@ async function exports(p, tag) {
   await p.evaluate((t) => window.mncad.run(t), THREAD('Export A', 12));
   const r = await p.evaluate(() => window.mncad.exportFile('step'));
   ok(r.job && r.job.state === 'done' && r.job.phases.map((x) => x.phase).join() === 'model,convert,verify,write' && r.check?.ok === true && /^r·[0-9a-f]{6}$/.test(r.modelRev), `${tag}22h: exportFile = úloha s fázemi, kontrola ✓, revize (${r.job?.phases.map((x) => `${x.phase}:${x.ms}`).join(' ')})`);
-  // zrušení exportu přes API
+  // zrušení exportu přes API: model se nejdřív změní (30 závitů – export pak trvá sekundy), úloha exportu se počká ve frontě
+  // a zruší se, až v seznamu Exporty skutečně je (fáze 2: dřív pevných 200 ms a „upravit“ na neexistující název prvku –
+  // export nezměněného modelu doběhl dřív, než přišlo zrušení)
   const c = await p.evaluate(async () => {
-    window.mncad.run('upravit "Tažení po šroubovici 1" turns=30');
+    const helix = window.mncad.getDocument().features.find((f) => f.type === 'ext' && f.ext === 'surf.helixSweep') || window.mncad.getDocument().features.slice(-1)[0];
+    const before = new Set(window.mncad.exports().map((x) => x.id));
+    const edit = window.mncad.run(`upravit "${helix.name}" turns=30`);
     const pr = window.mncad.exportFile('step').then(() => 'done', (e) => String(e.message || e));
-    await new Promise((r) => setTimeout(r, 200));
-    const job = window.mncad.exports().slice(-1)[0];
-    window.mncad.cancelRun(job.id);
-    return { res: await pr, job: window.mncad.exports().slice(-1)[0] };
+    let job = null;
+    for (let t0 = Date.now(); Date.now() - t0 < 120000; ) {
+      job = window.mncad.exports().find((x) => !before.has(x.id) && (x.state === 'queued' || x.state === 'running')) || null;
+      const fin = window.mncad.exports().find((x) => !before.has(x.id) && x.state !== 'queued' && x.state !== 'running');
+      if (job || fin) break;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    const at = job ? job.state : 'none';
+    const hit = job ? window.mncad.cancelRun(job.id) : false;
+    const res = await pr;
+    const editLog = await edit;
+    const after = job ? window.mncad.exports().find((x) => x.id === job.id) : window.mncad.exports().slice(-1)[0];
+    return { res, job: after, at, hit, edit: editLog.split('\n').filter((l) => /^[✗⚠]/.test(l)).join(' | ') };
   });
-  ok(c.res !== 'done' && c.job.state === 'cancelled' && c.job.result?.written === false, `${tag}22h: zrušený export (${c.job.id}) – stav zrušeno, nic nezapsáno`);
+  // diagnostika (fáze 2): stav úlohy při zrušení a výsledek cancelRun
+  ok(c.res !== 'done' && c.job && c.job.state === 'cancelled' && c.job.result?.written === false && c.hit, `${tag}22h: zrušený export (${c.job?.id}) – stav zrušeno, nic nezapsáno (stav při zrušení ${c.at}; cancelRun=${c.hit}; výsledek ${c.res}${c.edit ? '; úprava: ' + c.edit : ''})`);
   ok((await p.locator('[data-export-list] [data-export-job]').count()) >= 2 && (await p.locator('[data-export-state="cancelled"]').count()) >= 1, `${tag}22h: seznam Exporty drží dokončené i zrušené úlohy`);
 }
 
@@ -127,7 +141,7 @@ async function fields(p, tag, lang) {
   await p.evaluate(([fn, dec, name]) => {
     const setV = eval(fn);
     const d = [...document.querySelectorAll('input')].find((i) => i.getAttribute('aria-label') === name);
-    const n = [...document.querySelectorAll('input')].find((i) => /^Tažení po šroubovici|^Helix sweep|^Helix/.test(i.value));
+    const n = [...document.querySelectorAll('input')].find((i) => /^Tažení po šroubovici|^Helical sweep|^Austragung entlang Helix/.test(i.value));
     setV(d, dec);
     n.focus(); setV(n, 'Závit M20'); // ve stejném tiku: název
   }, [setVal, L.dec, L.depth]);
@@ -226,8 +240,10 @@ async function menuExport(b, tag) {
   await ctx.close();
 }
 
+const browsers = [];
+const launch = async (o) => { const x = await chromium.launch(o); browsers.push(x); return x; };
 (async () => {
-  const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
+  const b = await launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] });
   for (const [tag, url, lang, args] of [
     ['', `${BASE}/cad`, 'cs', null],
     ['[en] ', `${BASE}/en/cad`, 'en', null],
@@ -246,7 +262,7 @@ async function menuExport(b, tag) {
   await menuExport(b, '');
   await b.close();
   // bez WebGL (majitel testoval bez WebGL): fronta a formuláře / výkres
-  const nogl = await chromium.launch({ args: ['--disable-gpu', '--disable-webgl', '--disable-3d-apis'] });
+  const nogl = await launch({ args: ['--disable-gpu', '--disable-webgl', '--disable-3d-apis'] });
   const ctx = await nogl.newContext({ viewport: { width: 1500, height: 900 } });
   const p = await ctx.newPage();
   await start(p, `${BASE}/cad`);
@@ -254,4 +270,7 @@ async function menuExport(b, tag) {
   await fields(p, '[bez WebGL] ', 'cs');
   await drawing(p, '[bez WebGL] ', 'cs');
   await nogl.close();
-})().catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; });
+})()
+  .catch((e) => { console.log('FAIL: výjimka ' + (e && e.stack || e)); process.exitCode = 1; })
+  // výjimka nesmí nechat prohlížeč běžet (proces by visel do časového limitu sady)
+  .finally(() => Promise.all(browsers.map((x) => x.close().catch(() => {}))));

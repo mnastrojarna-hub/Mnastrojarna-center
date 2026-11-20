@@ -63,6 +63,10 @@ export function AgentConsole({ onClose, run, getDocJson, status }: { onClose: ()
   const setOut = (t: string, id: string | null = null) => {
     setOutRaw(t);
     setOutRun(id);
+    // text i id běhu se zapíší do paměti modulu SPOLU: běh, který doběhne při zavřené konzoli, volá setOut na odpojené
+    // instanci (stav Reactu se nezmění) – znovu otevřená konzole by jinak ukázala id nového běhu s protokolem předchozího
+    // (fáze 2, e2e cad-w22-a3 „znovu otevřená konzole“)
+    lastOutput = t;
     outputRunId = id;
   };
   const [runId, setRunId] = useState<string | null>(consoleRunId);

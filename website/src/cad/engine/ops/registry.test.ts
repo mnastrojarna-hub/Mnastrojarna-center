@@ -36,7 +36,8 @@ describe("registr operací", () => {
     const r = c.report.finish();
     expect(r.timing).toEqual([{ line: 7, op: "meta", ms: 250 }]);
     expect(r.counts.ops).toBe(1);
-    expect(r.entries).toEqual([{ line: 7, level: "ok", text: "název Deska" }]);
+    // id záznamu = odkaz na řádek protokolu (vlna 22, bod 15: engine/entry-ids.ts)
+    expect(r.entries).toEqual([{ id: "L7.ok", line: 7, level: "ok", text: "název Deska" }]);
   });
   it("neregistrovaný druh = false a nic se nezapíše", async () => {
     const c = ctx({ t: 0 });
