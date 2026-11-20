@@ -209,6 +209,13 @@ describe("hodnocení na otázkách agenta", () => {
     // anglický / německý běh: první výsledek je v jazyce běhu (tabulka příkazů nebo tahák), ne český odstavec návodu
     expect(first("linear motor with collisions", "en")).toMatch(/\[(command table|cheat sheet)\]: `motion motor/);
     expect(first("feder zwischen teilen", "de")).toMatch(/\[(Befehlstabelle|Spickzettel)\]/);
+    // český návod a příručka jsou v anglickém / německém běhu označené – agent ví, že věta řádku je česky
+    setLang("en");
+    const en = searchAnswer("strict mode warnings", "en").lines.slice(1);
+    expect(en.filter((l) => /\[guide|\[manual/.test(l)).every((l) => /\[(guide|manual #[\w-]+), Czech\]/.test(l))).toBe(true);
+    expect(en.some((l) => /\[(command table|cheat sheet)\]/.test(l))).toBe(true);
+    setLang("cs");
+    expect(searchAnswer("přísný režim", "cs").lines.join("\n")).not.toMatch(/česky\]/);
   });
   it("recenze: řádek výsledku ukazuje příkazy, které odpovídají dotazu; tahák i větu; věta neopakuje vypsaný příkaz", () => {
     const lines = (q: string) => searchAnswer(q, "cs").lines.slice(1);

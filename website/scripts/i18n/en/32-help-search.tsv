@@ -17,3 +17,4 @@ hledání v návodu pro AI, v tabulce příkazů a v příručce (bez diakritiky
 Hledání „{0}“ – 1 nejlepší výsledek (návod pro AI, příkazy, příručka):	Search “{0}” – 1 best result (AI guide, commands, manual):
 Hledání „{0}“ – {1} nejlepší výsledky (návod pro AI, příkazy, příručka):	Search “{0}” – {1} best results (AI guide, commands, manual):
 mncad help search: chybí slova – např. mncad help search záložky (hledá v návodu pro AI, v příkazech a v příručce); témata: guide, commands, cheat, search <slova>	mncad help search: words missing – e.g. mncad help search tabs (searches the AI guide, the commands and the manual); topics: guide, commands, cheat, search <words>
+česky	Czech

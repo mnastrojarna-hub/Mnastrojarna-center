@@ -7,6 +7,11 @@
  * Výsledky = oddíly (kapitola › podnadpis) s úryvkem; Enter / klik skočí na nejlepší místo oddílu, nalezená slova se
  * zvýrazní, obsah vlevo ztlumí kapitoly bez výsledku a „Jen nalezené kapitoly“ skryje ostatní. Klávesy: `/` nebo Ctrl+K
  * (⌘K) = do pole, šipky, Enter, Esc. Odkaz `?q=slovo` otevře stránku s hledáním.
+ *
+ * Seznam ukazuje nejlepších 8 oddílů, ale ztlumení obsahu, filtr kapitol i zvýraznění se řídí VŠEMI shodami – kapitola,
+ * která slovo obsahuje, se nikdy neztlumí ani neskryje. Pole je na stránce v obalu, který se lepí pod hlavičkou od začátku
+ * stránky (je vidět hned po načtení i u konce dokumentace); kotvy míří pod něj (`scroll-margin-top`, čte ho i plynulý
+ * posun webu v components/motion.tsx).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HELP_GLOSSARY } from "@/cad/help/glossary";
@@ -19,7 +24,7 @@ const L = {
     aria: "Hledat v dokumentaci",
     keys: "/ nebo Ctrl+K",
     none: "Nic nenalezeno – zkuste jiné nebo kratší slovo.",
-    found: (n: number) => `${n} ${n === 1 ? "oddíl" : n < 5 ? "oddíly" : "oddílů"}`,
+    found: (n: number, shown: number) => (n > shown ? `${shown} z ${n} oddílů` : `${n} ${n === 1 ? "oddíl" : n < 5 ? "oddíly" : "oddílů"}`),
     only: "Jen nalezené kapitoly",
     clear: "Vymazat",
   },
@@ -28,7 +33,7 @@ const L = {
     aria: "Search the documentation",
     keys: "/ or Ctrl+K",
     none: "Nothing found on this page – the complete manual (Czech) has more.",
-    found: (n: number) => `${n} section${n === 1 ? "" : "s"}`,
+    found: (n: number, shown: number) => (n > shown ? `${shown} of ${n} sections` : `${n} section${n === 1 ? "" : "s"}`),
     only: "Matching sections only",
     clear: "Clear",
   },
@@ -37,7 +42,7 @@ const L = {
     aria: "Dokumentation durchsuchen",
     keys: "/ oder Strg+K",
     none: "Auf dieser Seite nichts gefunden – das vollständige Handbuch (Tschechisch) enthält mehr.",
-    found: (n: number) => `${n} Abschnitt${n === 1 ? "" : "e"}`,
+    found: (n: number, shown: number) => (n > shown ? `${shown} von ${n} Abschnitten` : `${n} Abschnitt${n === 1 ? "" : "e"}`),
     only: "Nur Abschnitte mit Treffern",
     clear: "Löschen",
   },
@@ -47,10 +52,15 @@ const L = {
 type Block = { el: HTMLElement; section: HTMLElement; id: string; title: string; sub: string; text: string };
 /** výsledek = oddíl (kapitola › podnadpis) s nejlepším úsekem */
 type Result = { key: string; block: Block; score: number; terms: Set<string>; snippet: string; count: number };
+/** všechny shody dotazu: kapitoly (kotvy) se shodou, nalezené kmeny slov a počet oddílů – řídí obsah, filtr a zvýraznění */
+type Found = { ids: Set<string>; terms: Set<string>; total: number };
 
 const BLOCKS = "p, li, tr, pre, figcaption, aside, h3, dt, dd, summary";
 const MARK = "rounded-sm bg-amber-200/80 px-0.5 text-inherit";
 const MAX_RESULTS = 8;
+/** nejvýš značek zvýraznění na stránce a nejméně na jednu kapitolu se shodou (každá kapitola se shodou dostane zvýraznění) */
+const MARK_BUDGET = 1500;
+const MARK_PER_SECTION = 40;
 
 /** úseky textu stránky (blok = nejmenší prvek s textem, který není uvnitř jiného bloku; h3 = podnadpis následujících) */
 function collect(root: Element, sectionSel: string): Block[] {
@@ -135,25 +145,44 @@ function clearMarks(root: Element) {
   });
 }
 
-const STICKY = "sticky top-[76px] z-30 -mx-2 mb-8 rounded-2xl bg-white/95 px-2 py-2 shadow-[0_1px_0_rgba(39,36,37,0.08)] backdrop-blur";
+const BAR = "rounded-2xl bg-white/95 px-2 py-2 shadow-[0_1px_0_rgba(39,36,37,0.08)] backdrop-blur";
+/** svislá poloha (px od horního okraje okna), pod kterou začíná text pod hlavičkou a polem hledání */
+const BELOW_BAR = 170;
+
+/**
+ * Obal pole hledání, který se lepí pod hlavičkou webu po celé výšce svého rodiče a nezabírá v toku místo (výška 0) – dá se
+ * proto položit na začátek obalu celé stránky dokumentace (úvod + kapitoly): pole je vidět hned po načtení i hluboko v textu.
+ */
+export function DocsSearchBar({ children, width = "container" }: { children: React.ReactNode; width?: string }) {
+  return (
+    <div className="sticky top-[76px] z-30 h-0" data-docs-search-bar>
+      <div className={width}>{children}</div>
+    </div>
+  );
+}
 
 /**
  * Pole hledání nad stránkou dokumentace. `root` = obal stránky, `sections` = oddíly uvnitř (id = kotva, první h2 = název),
  * `toc` = seznam odkazů obsahu (`a[href="#id"]`), který se podle výsledků ztlumí.
  */
-export function DocsSearch({ locale = "cs", root = "article.doc", sections = "section.doc-section[id]", toc, className = STICKY }: { locale?: Locale; root?: string; sections?: string; toc?: string; className?: string }) {
+export function DocsSearch({ locale = "cs", root = "article.doc", sections = "section.doc-section[id]", toc, className = BAR }: { locale?: Locale; root?: string; sections?: string; toc?: string; className?: string }) {
   const t = L[locale];
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Result[] | null>(null);
+  const [found, setFound] = useState<Found | null>(null);
   const [sel, setSel] = useState(0);
   const [open, setOpen] = useState(false);
   const [only, setOnly] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLDivElement>(null);
-  /** pole hledání nahoru (pod hlavičku), ať je seznam výsledků vidět – po `/`, Ctrl+K a zaměření pole níž na stránce */
+  /**
+   * pole do okna pod hlavičku, ať je vidět i se seznamem výsledků – po `/`, Ctrl+K a zaměření pole. Pole se lepí pod
+   * hlavičkou, mimo okno je jen za koncem svého obalu (výzva a patička pod dokumentací) – tam se stránka vrátí ke konci
+   * dokumentace.
+   */
   const bringUp = useCallback(() => {
     const top = box.current?.getBoundingClientRect().top ?? 0;
-    if (top > window.innerHeight * 0.35) window.scrollTo({ top: window.scrollY + top - 90, behavior: "instant" }); // web má scroll-behavior: smooth
+    if (top < 60 || top > window.innerHeight * 0.35) window.scrollTo({ top: Math.max(0, window.scrollY + top - 90), behavior: "instant" }); // web má scroll-behavior: smooth
   }, []);
   /** zavření seznamu po opuštění pole (zpožděné kvůli kliku do seznamu); nové zaměření nebo psaní ho zruší */
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -167,18 +196,27 @@ export function DocsSearch({ locale = "cs", root = "article.doc", sections = "se
     if (index.current) return index.current;
     const r = document.querySelector(root);
     const blocks = r ? collect(r, sections) : [];
-    index.current = { blocks, ix: new SearchIndex(blocks.map((b) => ({ fields: { title: `${b.title} ${b.sub}`, body: b.text }, data: b })), HELP_GLOSSARY) };
+    index.current = { blocks, ix: new SearchIndex(blocks.map((b) => ({ fields: { title: `${b.title} ${b.sub}`, body: b.text }, data: b })), HELP_GLOSSARY, { lang: locale }) };
     return index.current;
-  }, [root, sections]);
+  }, [root, sections, locale]);
 
-  // výsledky: oddíly (kapitola › podnadpis), nejlepší úsek oddílu
+  // výsledky: oddíly (kapitola › podnadpis), nejlepší úsek oddílu; seznam = nejlepších 8, `found` = všechny shody
   const run = useCallback(
     (query: string) => {
-      if (!query.trim()) return setResults(null);
-      const hits: SearchHit<Block>[] = ensureIndex().ix.search(query, 300);
+      if (!query.trim()) {
+        setResults(null);
+        setFound(null);
+        setOnly(false); // nové hledání začíná bez filtru kapitol (přepínač je vidět jen u výsledků)
+        return;
+      }
+      const hits: SearchHit<Block>[] = ensureIndex().ix.search(query, Infinity);
       const by = new Map<string, Result>();
+      const ids = new Set<string>();
+      const terms = new Set<string>();
       for (const h of hits) {
         const b = h.doc.data;
+        ids.add(b.id);
+        for (const x of h.terms) terms.add(x);
         const key = `${b.id}|${b.sub}`;
         const g = by.get(key);
         if (g) {
@@ -187,6 +225,7 @@ export function DocsSearch({ locale = "cs", root = "article.doc", sections = "se
         } else by.set(key, { key, block: b, score: h.score, terms: new Set(h.terms), snippet: snippetOf(b.text, h.terms), count: 1 });
       }
       setResults([...by.values()].sort((a, b) => b.score - a.score).slice(0, MAX_RESULTS));
+      setFound({ ids, terms, total: by.size });
       setSel(0);
     },
     [ensureIndex],
@@ -197,39 +236,67 @@ export function DocsSearch({ locale = "cs", root = "article.doc", sections = "se
     return () => clearTimeout(id);
   }, [q, run]);
 
-  // zvýraznění, obsah a filtr kapitol podle výsledků
-  const hitSections = useMemo(() => new Set((results ?? []).map((r) => r.block.id)), [results]);
+  // zvýraznění, obsah a filtr kapitol podle VŠECH shod (ne jen podle vypsaných výsledků)
   useEffect(() => {
     const r = document.querySelector(root);
     if (!r) return;
+    const secs = [...r.querySelectorAll<HTMLElement>(sections)];
+    const idOf = (s: HTMLElement, i: number) => s.id || `sekce-${i + 1}`;
+    const hidden = (s: HTMLElement) => s.style.display === "none";
+    // kotva pohledu před změnou: kapitola pod polem hledání (filtr mění výšku stránky – bez kotvy by pohled skončil v patičce)
+    const anchor = secs.find((s) => !hidden(s) && s.getBoundingClientRect().bottom > BELOW_BAR) ?? null;
+    const before = anchor?.getBoundingClientRect().top ?? 0;
+    const hiddenBefore = secs.filter(hidden).length;
     clearMarks(r);
-    if (results?.length) {
-      const all = new Set<string>();
-      for (const x of results) for (const s of x.terms) all.add(s);
-      let budget = 400;
+    if (found?.ids.size) {
+      const perSection = Math.max(MARK_PER_SECTION, Math.floor(MARK_BUDGET / found.ids.size));
+      const used = new Map<string, number>();
       for (const b of index.current?.blocks ?? []) {
-        if (budget <= 0) break;
-        if (hitSections.has(b.id) && SearchIndex.matchesIn(b.text, all) > 0) budget -= markTerms(b.el, all, budget);
+        if (!found.ids.has(b.id)) continue;
+        const n = used.get(b.id) ?? 0;
+        if (n >= perSection || SearchIndex.matchesIn(b.text, found.terms) === 0) continue;
+        used.set(b.id, n + markTerms(b.el, found.terms, perSection - n));
       }
     }
-    r.querySelectorAll<HTMLElement>(sections).forEach((s, i) => {
-      const id = s.id || `sekce-${i + 1}`;
-      s.style.display = results && only && !hitSections.has(id) ? "none" : "";
-      s.dataset.searchHit = results ? (hitSections.has(id) ? "1" : "0") : "";
+    secs.forEach((s, i) => {
+      const hit = !!found && found.ids.has(idOf(s, i));
+      s.style.display = found && only && !hit ? "none" : "";
+      s.dataset.searchHit = found ? (hit ? "1" : "0") : "";
     });
     if (toc)
       document.querySelectorAll<HTMLAnchorElement>(`${toc} a[href^="#"]`).forEach((a) => {
-        const miss = !!results && !hitSections.has(a.getAttribute("href")!.slice(1));
+        const miss = !!found && !found.ids.has(a.getAttribute("href")!.slice(1));
         a.style.opacity = miss ? "0.3" : "";
-        a.dataset.searchHit = results && !miss ? "1" : "";
+        a.dataset.searchHit = found && !miss ? "1" : "";
       });
-  }, [results, only, hitSections, root, sections, toc]);
+    // filtr se změnil: pohled zůstane na téže kapitole; když ji filtr skryl, na první nalezené (pod polem hledání)
+    if (secs.filter(hidden).length !== hiddenBefore) {
+      const keep = !!anchor && !hidden(anchor);
+      const target = keep ? anchor : secs.find((s) => !hidden(s));
+      if (target) window.scrollTo({ top: Math.max(0, window.scrollY + target.getBoundingClientRect().top - (keep ? before : BELOW_BAR)), behavior: "instant" });
+    }
+  }, [found, only, root, sections, toc]);
+
+  // odkaz (#kotva) na kapitolu skrytou filtrem: filtr se vypne, ať je kam skočit – dřív než kotvu obslouží plynulý posun webu
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href^='#']");
+      const id = a?.getAttribute("href")?.slice(1);
+      const target = id ? document.getElementById(id) : null;
+      const sec = target?.closest<HTMLElement>(`${root} ${sections}`) ?? null;
+      if (!sec || sec.style.display !== "none") return;
+      document.querySelectorAll<HTMLElement>(`${root} ${sections}`).forEach((s) => (s.style.display = ""));
+      setOnly(false);
+    };
+    document.addEventListener("click", onClick, true);
+    return () => document.removeEventListener("click", onClick, true);
+  }, [root, sections]);
 
   const jump = useCallback((res: Result | undefined) => {
     if (!res) return;
     const el = res.block.el;
     el.closest("details")?.setAttribute("open", ""); // odpověď FAQ ve sbaleném <details>
-    const top = el.getBoundingClientRect().top + window.scrollY - 200; // pod lepící hlavičkou a polem hledání
+    const top = el.getBoundingClientRect().top + window.scrollY - BELOW_BAR - 30; // pod lepící hlavičkou a polem hledání
     // plynule jen na krátkou vzdálenost (dlouhý plynulý posun přeruší psaní / zaměření pole a nedojede); „instant“ i přes
     // scroll-behavior: smooth webu
     window.scrollTo({ top: Math.max(0, top), behavior: Math.abs(top - window.scrollY) > 2 * window.innerHeight ? "instant" : "smooth" });
@@ -293,8 +360,8 @@ export function DocsSearch({ locale = "cs", root = "article.doc", sections = "se
   const showList = open && !!results;
   return (
     <div role="search" ref={box} className={className} data-docs-search>
-      {/* nadpisy pod lepícím polem hledání (skok z obsahu i z výsledků) */}
-      <style>{`${root} h2, ${root} h3 { scroll-margin-top: 10rem; }`}</style>
+      {/* kotvy pod lepícím polem hledání: kapitoly (klik v obsahu, odkaz #kotva v adrese) i nadpisy */}
+      <style>{`${root} ${sections}, ${root} h2, ${root} h3 { scroll-margin-top: ${BELOW_BAR}px; }`}</style>
       <div className="relative">
         <div className="flex items-center gap-2 rounded-xl border border-ink-700/15 bg-white px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
           <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ink-700/45" fill="none" stroke="currentColor" strokeWidth="2">
@@ -329,8 +396,8 @@ export function DocsSearch({ locale = "cs", root = "article.doc", sections = "se
             className="h-11 min-w-0 flex-1 bg-transparent text-[15px] text-ink-700 outline-none placeholder:text-ink-700/40 [&::-webkit-search-cancel-button]:hidden"
           />
           {results && (
-            <span className="shrink-0 text-[12px] text-ink-700/55" data-docs-search-count>
-              {results.length ? t.found(results.length) : "0"}
+            <span className="shrink-0 text-[12px] text-ink-700/55" data-docs-search-count data-docs-search-total={found?.total ?? 0}>
+              {results.length ? t.found(found?.total ?? results.length, results.length) : "0"}
             </span>
           )}
           {q ? (
@@ -361,7 +428,8 @@ export function DocsSearch({ locale = "cs", root = "article.doc", sections = "se
                   e.preventDefault();
                   jump(r);
                 }}
-                onMouseEnter={() => setSel(i)}
+                // výběr mění jen skutečný pohyb myši – ukazatel, který na místě seznamu jen stojí, výběr klávesnicí nepřebírá
+                onMouseMove={() => setSel(i)}
                 className={`cursor-pointer rounded-lg px-3 py-2 ${i === sel ? "bg-brand/10" : "hover:bg-ink-700/5"}`}
               >
                 <p className="text-[13px] font-semibold text-ink-700">

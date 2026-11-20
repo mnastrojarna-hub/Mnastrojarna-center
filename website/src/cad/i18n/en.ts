@@ -1669,6 +1669,7 @@ export const EN: Record<string, string> = {
  "červená": "red",
  "Červená": "Red",
  "Červená od mm": "Red from mm",
+ "česky": "Czech",
  "činné závity": "active coils",
  "činné závity n": "active coils n",
  "čísla hran (E3 E7) nelze míchat s pravidlem – zadejte jen čísla, nebo jen pravidlo": "edge numbers (E3 E7) cannot be mixed with a rule – give only numbers or only a rule",

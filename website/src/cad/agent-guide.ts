@@ -44,8 +44,10 @@ název, druh hodnoty a ukázka zápisu, jednotka, povolené hodnoty, výchozí /
 („jen prvek / upravit / JSON“ = vlastní zápis nemá). \`prvek nápověda\` bez typu vypíše přehled všech typů a polí, která jdou
 zadat jen přes \`prvek\` / \`upravit\`. **Hledání:** \`nápověda hledat <slova>\` (i \`nápověda <slova>\`, když slovo není typ prvku)
 prohledá tento návod, tabulku příkazů i příručku /cad/dokumentace a vypíše 5–8 nejlepších oddílů (název + příkazy + věta,
-≤ 1,5 kB; ve stručném protokolu \`= L3 help hits=6 q="záložky"\` a výsledky na pokračovacích řádcích); \`nápověda tahák\` vypíše
-tahák nejčastějších příkazů.
+≤ 1,5 kB; ve stručném protokolu \`= L3 help hits=6 q="záložky"\` a výsledky na pokračovacích řádcích – stejný řádek je
+i na začátku výpisu v konzoli prohlížeče). Víc hledání v jednom běhu si stručný protokol dělí: každé má svůj řádek
+\`= L<n> help hits=3 of=8 q="…"\` s méně výsledky (všechny jsou v plném protokolu); dlouhý dotaz je v \`q\` zkrácený na 80 B.
+\`nápověda tahák\` vypíše tahák nejčastějších příkazů – jeho příkazy jdou za sebou jako jeden skript.
 
 Všechny rozměry jsou v **milimetrech**, úhly ve stupních, desetinná čárka i tečka jsou povolené, „Ø“ před číslem
 se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu kvádru (bez „střed“) nebo ve středu válce.

@@ -1669,6 +1669,7 @@ export const DE: Record<string, string> = {
  "červená": "rot",
  "Červená": "Rot",
  "Červená od mm": "Rot ab mm",
+ "česky": "Tschechisch",
  "činné závity": "federnde Windungen",
  "činné závity n": "federnde Windungen n",
  "čísla hran (E3 E7) nelze míchat s pravidlem – zadejte jen čísla, nebo jen pravidlo": "Kantennummern (E3 E7) lassen sich nicht mit einer Regel mischen – nur Nummern oder nur eine Regel angeben",

@@ -64,7 +64,14 @@ export function searchSections(q: string, lang: CadLang, limit = MAX_HITS): Help
   return out;
 }
 
-const SRC_TAG = (c: HelpChunk): string => (c.src === "guide" ? tr("návod") : c.src === "cmd" ? tr("tabulka příkazů") : c.src === "docs" ? `${tr("příručka")} #${c.anchor}` : tr("tahák"));
+/**
+ * druh zdroje; návod pro AI a příručka jsou jen česky – v anglickém / německém běhu to řádek výsledku říká („[guide, Czech]“),
+ * tabulka příkazů a tahák jsou v jazyce běhu (a mají v pořadí přednost – search-corpus.ts BOOST_INTL)
+ */
+const SRC_TAG = (c: HelpChunk, lang: CadLang): string => {
+  const cz = lang === "cs" ? "" : `, ${tr("česky")}`;
+  return c.src === "guide" ? tr("návod") + cz : c.src === "cmd" ? tr("tabulka příkazů") : c.src === "docs" ? `${tr("příručka")} #${c.anchor}${cz}` : tr("tahák");
+};
 
 /** příkazy úseku, které odpovídají dotazu (nejvýš `max`, v pořadí úseku); když žádný neodpovídá, první příkazy úseku */
 function pickCmds(c: HelpChunk, terms: Set<string>, max: number): string[] {
@@ -110,7 +117,7 @@ function hitLine(i: number, s: HelpSection, lang: CadLang, cap: number): string 
   let cmds = picked.map((x) => `\`${clipBytes(x, cmdCap)}\``);
   if (c.src === "cmd" && lang !== "cs" && c.words) cmds = [`\`${clipBytes(c.words[lang], cmdCap)}\``, ...cmds.slice(0, 1)];
   const title = sectionTitle(c, lang);
-  const head = `${i}. ${title ? `${title} ` : ""}[${SRC_TAG(c)}]${cmds.length ? ": " : ""}${cmds.join(" · ")}`;
+  const head = `${i}. ${title ? `${title} ` : ""}[${SRC_TAG(c, lang)}]${cmds.length ? ": " : ""}${cmds.join(" · ")}`;
   // věta tahák jen tehdy, když sama odpovídá dotazu („další vložení = další instance“); jinde vždy
   let sent = pickSentence(c.text, s.terms);
   if (c.src === "cheat" && !SearchIndex.matchesIn(sent, s.terms)) sent = "";

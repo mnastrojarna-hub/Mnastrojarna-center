@@ -46,7 +46,9 @@ export function Motion() {
       const el = document.querySelector(a.getAttribute("href")!);
       if (el) {
         e.preventDefault();
-        lenis.scrollTo(el as HTMLElement, { offset: -80 });
+        // pod hlavičku (80 px); cíl s větším scroll-margin-top (dokumentace s lepícím polem hledání) dostane svůj odstup
+        const margin = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+        lenis.scrollTo(el as HTMLElement, { offset: -Math.max(80, margin) });
       }
     };
     document.addEventListener("click", onClick);
