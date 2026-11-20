@@ -684,8 +684,7 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       // ✓ jen pro vazbu, která po změně platí v geometrii (ztracená reference / konflikt = výsledek bez ✓ – vlna 22, bod 20 a 22i);
       // konflikt = ⚠ a polohy beze změny (žádný kompromis v dokumentu – bod 8)
       const okNow = !s.conflict && (!after || s.status[m.id] === "ok" || s.status[m.id] === "suppressed");
-      const args = [no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""] as const;
-      log.push(okNow ? tr("✓ vazba {0} ({1}): {2}{3}", ...args) : tr("⚠ vazba {0} ({1}): {2}{3}", ...args));
+      log.push(tr("{0} vazba {1} ({2}): {3}{4}", okNow ? "✓" : "⚠", no, after ? mateText(s.doc, after) : tr(MATE_LABEL[m.type]), what.join(", "), after ? ` · ${STATUS_WORD(s.status[m.id])}` : ""));
       if (s.moved.length) log.push(tr("  pohnuto: {0}", movedText(s.doc, s.moved)));
       else if (s.conflict) log.push(tr("  polohy komponent beze změny – vazby nelze splnit spolu (kompromis se nezapisuje)"));
       log.push(...solveNotes(s.doc, s));

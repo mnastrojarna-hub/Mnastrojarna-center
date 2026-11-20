@@ -163,6 +163,8 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `výkres razítko číslo="MN-1" kreslil="AI" …` · `výkres revize B "popis"` · `výkres otočení 90` · `výkres řez XZ poloviční` · `výkres kusovník ano` · `výkres balónky ne` · `kótovat základní` | razítko, revize a další volby listu |
 | `výkres pohled pomocný přední hrana x1 y1 x2 y2` · `výkres řez zalomený|natočený|částečný …` · `výkres přerušení přední x od 50 do 250` · `výkres uložení Ø40 H7` · `výkres revize značka B na Ø40` · `výkres zóny ano` | pomocný pohled, řezy lomenou čarou, částečný řez, přerušený pohled, uložení ISO 286 s Tabulkou uložení, trojúhelníky revizí a zóny (viz „Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize“) |
 | `výkres značka drsnost Ra 1,6 na Ø40` · `výkres kóta vodorovně pohled přední x1 y1 x2 y2` · `výkres upravit a3 odsazení=8` · `výkres smazat a3` · `výkres detail přední v x y poloměr r` · `výkres model "Hřídel"` | značky, ruční kóty, úpravy, detaily a další modely – vše, co jde ve výkrese myší; export `window.mncad.exportDrawing("pdf")` |
+| `kolo čelní|šikmé|šípové|vnitřní|hřeben|kuželové|hypoidní|šnek|šnekové|cykloidní|cyklodisk|řetězové|řemenice|rohatka m 2 z 24 … [díra 20 pero] [náboj 40 15] [polotovar|zuby]` · `kolo tabulka [vše|"název"]` · `kolo nápověda [druh]` | ozubené kolo z tabulky (jeden prvek „Ozubené kolo …“), tabulka ozubení do protokolu, řádky tabulky druhu (viz „Kola a ozubení“) |
+| `soukolí čelní m 2 z1 20 z2 60 [a 81] [x1 …] [x2 …] [vůle 0,05] [díra1 12] [díra2 20]` · `výkres tabulka ozubení ano|ne` | soukolí: dva díly + sestava s vazbou ozubení ve správném záběru, posunutí z osové vzdálenosti; tabulka ozubení na výkrese |
 | `smazat poslední` · `stav` · `zobraz iso|přední|horní…` · `kolize` · `kolize seznam [třída]` · `kolize pravidlo pracovní "A" "B" [kroky 10..20]` · `kolize tolerance 0,01` | správa; kolize = kontrola průniků komponent sestavy po třídách (viz „Třídy, místo a pravidla kolizí“) |
 | `uložit [název]` · `export step|stl|brep|obj|glb|3mf|wrl|mncad [název]` · `výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]` · `skica export dxf ["Skica 1"]` | výstupy **bez dialogu** – soubor se rovnou stáhne, protokol napíše název, velikost a formát; u STEP / BREP kontrolu „věrná kopie modelu“ (viz „Výstupy z konzole bez dialogů“) |
 | `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` · `odkaz` | sdílený odkaz – adresa se vypíše do protokolu na řádek `URL: …`; `odkaz` ji vypíše znovu |
@@ -1389,6 +1391,109 @@ pružina tabulka "Talíře"
 Tažná: natočení oček 180° (n = 12,5), L0 = Lk + 2·Di = 21,6 + 2 · 8,8 = 39,2 mm, při 50 mm F2 = F0 + R·(50 − 39,2) = 56,3 N.
 Talíře A 40: L0 = 4·(h0 + t) = 12,6 mm, při 11,4 mm zdvih talíře 0,3 mm (33 % h0) a síla 3069 N; `L2 19` (víc než L0) by byl
 ✗ „délka L2 19 mm je větší než volná výška sloupce L0 12,6 mm“.
+
+### Kola a ozubení – `kolo …`, `soukolí …` (EN `gear …` / `gearpair …`, DE `rad …` / `radpaar …`)
+
+Každé kolo je **jeden prvek historie** „Ozubené kolo m2 z24“ (rozšíření `gear.<druh>`), jehož data jsou **jedna tabulka** –
+stejná jako v průvodci „Kola a ozubení“ a ve formuláři úprav (změna z nebo m → model se přestaví). Text čte slova řádků
+tabulky; co nezadáte, má rozumnou výchozí hodnotu (protokol napíše, které povinné řádky zůstaly výchozí). Popis všech řádků
+druhu (slovo, jednotka, výchozí hodnota, rozsah, norma) vypíše `kolo nápověda <druh>`, přehled druhů `kolo nápověda`.
+
+| Druh (`kolo <druh>`) | Prvek | Povinné řádky (výchozí) | Norma |
+|---|---|---|---|
+| `čelní` (přímé zuby) · `šikmé` (`beta 15 pravé|levé`) · `šípové` (`drážka 6`) | gear.spur / helical / herringbone | `m 2 z 24 b 20` | ISO 53, ISO 54, ISO 21771, DIN 3960 |
+| `vnitřní` (věnec) | gear.internal | `m 2 z 60 věnec 0` (0 = auto) | ISO 21771 |
+| `hřeben` (lineární ozubení, i šikmý `beta`) | gear.rack | `m 2 z 40 h 20` (h = výška celkem) | ISO 53 |
+| `kuželové` (`beta 35` = zakřivené zuby) · `hypoidní` (`pastorek|talíř`, `z1 z2 de2 e`) | gear.bevel / hypoid | `m 2 z 20 protikolo 20` · `z1 11 z2 41 de2 200 e 25` | ISO 23509 |
+| `šnek` (ZA) · `šnekové` (kolo) | gear.worm / wormwheel | `m 2 q 10 l 0` · `m 2 z 30 q 10` | DIN 3975 |
+| `cykloidní` (hodinové kolo / `pastorek` s lístky) · `cyklodisk` (kotouč reduktoru / `věnec` s čepy) | gear.cycloid / cyclodisc | `m 1 z 30 protikolo 8` · `n 10 dp 60 čep 6 e 1,5` | BS 978-2 |
+| `řetězové` (`08B`, `10B` … `24B`, ANSI `40` … `80`) | gear.sprocket | `08B z 19`, `řady 1–3` | ISO 606 |
+| `řemenice` (HTD `3M`…`14M`, `T5`, `T10`) · `rohatka` | gear.pulley / ratchet | `5M z 32` · `z 24 da 60` | ISO 13050, DIN 7721 |
+
+**Zápis:** `slovo hodnota` (`m 2`, `z 24`, `úhel 20`, `x 0,2`), zkráceně `m2 z24 b20` i `m=2 z=24`, desetinná čárka i tečka,
+`°` a `mm` za číslem nevadí. Složené zápisy těla kola: `díra 20 [pero]` (drážka DIN 6885-1), `náboj 40 15 [obě strany|dole]`
+(řetězové kolo typ `B` / `C`), `díry 6 12 [80]` (odlehčovací: počet, Ø, roztečná Ø), `stojina 6`, `sražení 0,5`, `šroub M5`.
+Výstup: `polotovar` = jen soustružené tělo Ø dₐ × b s nábojem a dírou (bez zubů), `zuby` = zubové mezery vyříznuté do
+aktivního tělesa (operace Odebrat). Operace: v dílu, který už těleso má, vznikne kolo jako **nové těleso**; `přidat` = sloučit
+s aktivním tělesem. Poloha `v x y z`, osa `osa X|Y|Z|x y z`, natočení zubů `natočení 7,5`, název `název "Pastorek"`.
+
+**Soukolí** `soukolí <druh> …` (druhy čelní, šikmé, šípové, vnitřní, hřeben, kuželové, hypoidní, šnek, cykloidní, cyklodisk,
+řetězové, řemenice) založí **dva díly s koly, novou sestavu, vloží obě kola ve správném záběru a spojí je vazbou ozubení**
+(hřeben: vazba hřeben) – stejnými existujícími příkazy, jaké vypíše průvodce (`nový díl`, `prvek gear.*`, `nová sestava`,
+`vložit`, `sestava vazba ozubení`). Zadaná osová vzdálenost `a` → součet posunutí Σx se dopočítá a rozdělí podle DIN 3992
+(`x1`, `x2` přepíšou, `auto ne` vypne dělení), hlava se zkrátí na hlavovou vůli 0,25·m; `vůle` = celková boční vůle
+(výchozí 0,04·m), `díra1` / `díra2` (výchozí asi čtvrtina roztečného průměru). Protokol vypíše převod, a_w, α_w, Σx, x1/x2,
+ε_α, ε_β a varování (podřezání, špičatý zub, interference, malé ε_α). Sestava nemá rám – kola jsou volná, drží je jen vazba
+ozubení; pro pohybovou studii vložte rám a vazby závěs (příklad 2).
+
+**Tabulka ozubení:** `kolo tabulka` vypíše tabulku posledního kola aktivního dílu (`vše` = všech kol, `"název"` = jednoho):
+modul, z, základní profil, α, β a smysl, x, průměry d / dₐ / d_f / d_b, výšku zubu, tloušťku zubu, rozměr přes zuby W_k (k),
+rozměr přes kuličky M_dK (D_M), u soukolí z protikola a osovou vzdálenost; řetězové kolo p, d₁, d, dₐ, d_f, M_R. Funguje i bez
+prohlížeče (CLI `mncad run`). V sestavě je to ✗ – přepněte na záložku dílu. `stav` má u každého kola jeden řádek
+(`čelní m2 z24 x0 b20 · d 48 · dₐ 52 · W3 15,433 · díra 20 pero · kolo`). **Na výkres:** `výkres tabulka ozubení ano`
+(EN `drawing gear table yes`, DE `zeichnung verzahnungstabelle ja`; ve výkrese přepínač „Tabulka ozubení“) – tabulka nad
+razítkem (nad kusovníkem a tabulkou děr), 110 mm na kolo, nejvýš dvě kola vedle sebe; v SVG, PDF, DXF i DWG; `výkres stav`
+ji vypíše řádkem „Tabulka ozubení: …“. Překryv s pohledy = ⚠ (větší list nebo menší měřítko). Umístění se odchyluje od
+ISO 1340 (pravý horní roh drží tabulka revizí); zjednodušené zobrazení ozubení podle ISO 2203 výkres nekreslí (pohledy
+ukazují skutečné zuby).
+
+#### Příklad 1 – čelní kolo s nábojem, tabulka ozubení a výkres
+```
+nový díl "Kolo z24"
+kolo čelní m 2 z 24 b 20 díra 20 pero náboj 40 15     # d 48 · dₐ 52 · W3 15,433 · M_dK 52,951
+kolo tabulka
+výkres A3 tabulka ozubení ano
+výkres stav
+výkres export pdf
+```
+
+#### Příklad 2 – soukolí s posunutím na osovou vzdálenost 81 a pohybová studie
+```
+nový díl Rám
+kvádr 140 60 10 v -30 -30 -10                     # deska pod koly
+díra 10 skrz v 0 0                                 # osa pastorku (Ø díry kola 1)
+díra 30 skrz v 81 0                                # osa kola (a = 81)
+soukolí čelní m 2 z1 20 z2 60 a 81 b 20           # → x1 0,3668 · x2 0,1558 · ε_α 1,52 + sestava „Soukolí m2 z20/z60“
+vložit "Rám" ukotvit
+sestava vazba závěs "Pastorek m2 z20" Ø10 "Rám" Ø10
+sestava vazba závěs "Kolo m2 z60" Ø30 "Rám" Ø30
+pohyb motor rotační "Pastorek m2 z20" 0..360 krok 10
+pohyb stav
+```
+
+#### Příklad 3 – řetězové kolo 08B duplex a kotouč cykloidního reduktoru s věncem
+```
+nový díl Řetězka
+kolo řetězové 08B z 19 řady 2 díra 25 pero náboj 50 25 B
+kolo tabulka
+nový díl "Kotouč reduktoru"
+kolo cyklodisk n 10 dp 60 čep 6 e 1,5 b 8 ložisko 20
+nový díl "Věnec reduktoru"
+kolo cyklodisk n 10 dp 60 čep 6 e 1,5 b 8 věnec
+```
+
+- EN: `gear spur m 2 z 24 b 20 bore 20 keyway hub 40 15 both sides`, `gear helical m 2 z 30 beta 15 left`, `gear sprocket 08B z 19
+  strands 2`, `gear table all`, `gear help spur`, `gearpair spur m 2 z1 20 z2 60 a 81`. DE: `rad stirnrad m 2 z 24 bohrung 20 nut
+  nabe 40 15 beide seiten`, `rad schräg … beta 15 links`, `rad kettenrad 08B z 19 reihen 2`, `rad tabelle alle`,
+  `radpaar stirnrad m 2 z1 20 z2 60 a 81`. Česká slova platí v každém jazyce rozhraní.
+- Obecný příkaz: `prvek gear.spur m=2 z=24 b=20 bore=20 keyway=ano hubD=40 hubL=15` dává stejná data (klíče řádků tabulky,
+  `prvek nápověda gear.spur`). Dokument → skript zapisuje kola zpět příkazem `kolo …` (jen hodnoty odlišné od výchozích
+  a povinné řádky); kolo s polohou odkazem nebo jiným tělesem zapíše obecným `prvek gear.*`.
+
+| Druh | Přesně | Přibližně / nemodeluje se |
+|---|---|---|
+| čelní, šikmé, šípové | evolventa (B-spline ≤ 4·10⁻⁵ mm), trochoida paty z nástroje se zaoblením 0,38·m, podřezání, šroubovice | vrchol šípu ostrý, bez modifikace hlavy a podélné modifikace |
+| vnitřní | evolventa | zaoblení paty oblouk 0,3·m (skutečné dává obrážecí nůž), kolize hlav pravidlem a 2D kontrolou |
+| hřeben | celý profil ISO 53 | – |
+| kuželové přímé | sférická evolventa, úhly kuželů | zaoblení paty |
+| kuželové zakřivené, hypoidní | roztečné kužele, střední úhly sklonu, oblouk stopy zubu | tvar boku jmenovitý (ne obálkový, ne sdružený) – pro zástavbu, hmotnost a výkres, ne pro výrobu ozubení |
+| šnek (ZA) / šnekové kolo | šroubová plocha, osový profil / profil ve střední rovině, hrdlo | boky kola mimo střední rovinu (bez obálky šneku); jiné tvary boku a globoidní šnek se nenabízejí |
+| cykloidní, cyklodisk | epicykloida, hypocykloida, ekvidistanta epitrochoidy | proporce BS 978-2 jen jako výchozí hodnoty |
+| řetězové | oblouky ISO 606, průměry | boční sražení zubu zjednodušené |
+| řemenice | rozteč, průměry | tvar drážky HTD (oblouk + zaoblení) |
+
+Mimo rozsah: pevnostní výpočet (ISO 6336), stupně přesnosti (ISO 1328) kromě jmenovité boční vůle, modifikace boků, planetové
+soukolí jedním příkazem, rám soukolí, zjednodušené zobrazení ISO 2203 na výkrese.
 
 ### Příklad – příruba DN50 (6 řádků)
 
