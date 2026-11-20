@@ -1,4 +1,5 @@
 import "server-only";
+import { safeStorageName } from "@/lib/jobs/mapping";
 import { attachmentText } from "@/lib/email/attachment-text";
 import { randomUUID } from "node:crypto";
 import { categorizeEmail, draftReply, type EmailAnalysis } from "@/lib/ai/claude";
@@ -331,7 +332,7 @@ async function saveAttachments(db: AdminDb, emailId: string, e: RawEmail): Promi
         // text přílohy pro hledání v Poště (PDF s textem, txt/csv…; 16. 11.)
         if (content.length <= MAX_STORED_ATTACHMENT) contentText = await attachmentText(content, a.contentType, a.filename, { pdf: false });
         if (content.length <= MAX_STORED_ATTACHMENT) {
-          const path = `mail/in/${emailId}/${randomUUID()}-${a.filename.replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_").slice(0, 150)}`;
+          const path = `mail/in/${emailId}/${randomUUID()}-${safeStorageName(a.filename) || "priloha"}`;
           const { error } = await db.storage.from(ATTACHMENT_BUCKET).upload(path, content, { contentType: a.contentType || "application/octet-stream", upsert: false });
           if (!error) storagePath = path;
         }

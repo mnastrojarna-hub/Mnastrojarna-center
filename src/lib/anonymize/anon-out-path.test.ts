@@ -45,3 +45,12 @@ describe("12. 11.: nález přes chráněné pole se vypálí kolem něj", () => 
     expect(companyLeakWarning(1, ["DEL"], "leží přes číslo výkresu / materiál (chráněné pole)")).toBe(`${COMPANY_LEAK_WARNING} „DEL“ (strana 1; leží přes číslo výkresu / materiál (chráněné pole)).`);
   });
 });
+
+describe("20. 11.: příloha pošty s diakritikou a mezerami → platný klíč úložiště", () => {
+  it("Průběžná deska První pravá.Z3PRT", async () => {
+    const { safeStorageName } = await import("@/lib/jobs/mapping");
+    const k = safeStorageName("Průběžná deska První pravá.Z3PRT");
+    expect(k).toBe("Prubezna-deska-Prvni-prava.Z3PRT");
+    expect(k).toMatch(/^[A-Za-z0-9._-]+$/);
+  });
+});
