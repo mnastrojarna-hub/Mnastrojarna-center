@@ -139,7 +139,8 @@ export function viewsBbox(views: readonly CheckView[]): [Vec3, Vec3] | null {
 
 /* ───────────────────────── kóty na listu jako fakta ───────────────────────── */
 
-type LinFact = { i: number; k: 0 | 1 | 2; c1: number; c2: number; tol: string; label: string; value: number; dia: boolean; ord: boolean };
+/** délková kóta: osa modelu `k`, souřadnice konců `c1`, `c2`; `ko` = druhá osa v rovině pohledu a souřadnice konců na ní (`o1`, `o2`) – kde kóta leží */
+type LinFact = { i: number; k: 0 | 1 | 2; c1: number; c2: number; ko: 0 | 1 | 2 | null; o1: number; o2: number; tol: string; label: string; value: number; dia: boolean; ord: boolean };
 type CircFact = { i: number; view: string; cam: { d: Vec3; x: Vec3 }; c: Vec2; r?: number; tip?: Vec2; value: number; kind: DimKind; count: number; depth: number[]; tol: string; label: string; tags?: { c: Vec2; r: number }[] };
 type CenterFact = { k: 0 | 1 | 2; c: number };
 type Facts = { lin: LinFact[]; circ: CircFact[]; centers: CenterFact[]; table: { c: Vec2; view: string; d: number }[]; texts: { kind: DimKind; value: number; text: string; count: number }[] };
@@ -180,10 +181,12 @@ export function sheetFacts(views: readonly CheckView[], anns: readonly DrawingAn
       if (!dir || !A) return;
       // souřadnice modelu: vodorovně a[0] = s·p[k]; svisle a[1] = −s·p[k]
       const w = (q: Vec2) => (dir === "h" ? q[0] * A.s : -q[1] * A.s);
+      const O = dir === "h" ? up : ax;
+      const wo = (q: Vec2) => (!O ? NaN : dir === "h" ? -q[1] * O.s : q[0] * O.s);
       const c1 = w(a.a);
       const c2 = w(a.b);
       const value = Math.abs(c2 - c1);
-      f.lin.push({ i, k: A.k, c1, c2, tol: annTolerance(a), label: factLabel(a, value), value, dia: /^[ØM⌀]/.test(a.prefix ?? "") || /^[ØM⌀]/.test(a.text ?? ""), ord: !!a.ord });
+      f.lin.push({ i, k: A.k, c1, c2, ko: O?.k ?? null, o1: wo(a.a), o2: wo(a.b), tol: annTolerance(a), label: factLabel(a, value), value, dia: /^[ØM⌀]/.test(a.prefix ?? "") || /^[ØM⌀]/.test(a.text ?? ""), ord: !!a.ord });
       return;
     }
     if (a.type === "dim" && (a.kind === "diameter" || a.kind === "radius")) {
@@ -492,7 +495,10 @@ function matchReq(q: DimReq, f: Facts, views: readonly CheckView[], baked: boole
       take(hit.i, hit.tol);
       return done("ok");
     }
-    const lf = q.axis !== undefined ? f.lin.find((x) => x.k === q.axis && eq(x.value, q.value) && (q.holes!.entry ?? []).some((e) => eq(x.c1, e) || eq(x.c2, e))) : undefined;
+    // kóta podél osy díry od vstupu, která leží NA díře (konec v obrysu díry v pohledu) – ne libovolná „10“ jinde na listu
+    const h = q.holes;
+    const onIt = (x: LinFact) => x.ko !== null && h.centers.some((p) => [x.o1, x.o2].some((o) => Math.abs(o - p[x.ko!]) <= h.r + 0.05));
+    const lf = q.axis !== undefined ? f.lin.find((x) => x.k === q.axis && eq(x.value, q.value) && (h.entry ?? []).some((e) => eq(x.c1, e) || eq(x.c2, e)) && onIt(x)) : undefined;
     if (lf) {
       take(lf.i, lf.tol);
       return done("ok");
@@ -719,7 +725,10 @@ export function checkSheet(inp: SheetInput): DimCompleteResult {
 }
 
 /** položky, které na listu chybí (nebo jsou jen zčásti) */
-export const missingItems = (r: DimCompleteResult) => r.items.filter((q) => q.status === "missing" || q.status === "partial");
+export const missingItems = (r: DimCompleteResult) => {
+  const m = r.items.filter((q) => q.status === "missing" || q.status === "partial");
+  return [...m.filter((q) => q.kind === "size"), ...m.filter((q) => q.kind === "pos")];
+};
 /** list není okótovaný ani podle toho, co kontrola zná (⚠ drawing.dims-incomplete) */
 export const dimsIncomplete = (r: DimCompleteResult) => missingItems(r).length > 0;
 

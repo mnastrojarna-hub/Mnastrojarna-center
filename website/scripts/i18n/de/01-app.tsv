@@ -588,7 +588,6 @@ Automaticky	Automatisch
 Celkové	Gesamt
 Celý list	Ganzes Blatt
 Charakteristika	Merkmal
-Chybí {0} z {1} očekávaných kót	{0} von {1} erwarteten Maßen fehlen
 DWG se nepodařilo vytvořit.	Die DWG konnte nicht erstellt werden.
 DWG se ukládá přímo v prohlížeči (vrstvy OBRYS/SKRYTE/OSY/KOTY, typy a tloušťky čar, verze AutoCAD 2000–2018+). DXF je ve formátu AutoCAD R12 pro starší a open-source programy (LibreCAD, QCAD).	DWG wird direkt im Browser geschrieben (Layer OBRYS/SKRYTE/OSY/KOTY, Linientypen und -stärken, Versionen AutoCAD 2000–2018+). DXF liegt im Format AutoCAD R12 für ältere und Open-Source-Programme vor (LibreCAD, QCAD).
 DWG {0} uloženo: {1}	DWG {0} gespeichert: {1}
@@ -626,7 +625,6 @@ Nepředepsané tolerance	Allgemeintoleranzen
 Nástroj „Detail“ (L): střed, poloměr, umístění.	Werkzeug „Detail“ (L): Mitte, Radius, Platzierung.
 Název listu	Blattname
 Odstranit list	Blatt entfernen
-Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.	Aus der Feature-Historie abgeleitet – eine Hilfsliste, kein Ersatz für die Prüfung durch den Konstrukteur. Ein fehlendes Maß fügen Sie mit dem Werkzeug Maß hinzu (2 Punkte + Abstand); die Toleranz (H8, ±0,1) tragen Sie beim Maß in der Liste im Feld „Suffix“ ein.
 Opracování hran	Kantenbearbeitung
 Osy děr a válců	Achsen von Bohrungen und Zylindern
 PDF se nepodařilo vytvořit.	Die PDF konnte nicht erstellt werden.
@@ -660,7 +658,6 @@ Verze DWG	DWG-Version
 Verze souboru DWG	DWG-Dateiversion
 Výrobní požadavky ani poznámky se na výkres nedoplňují automaticky – uvedou se jen vyplněné.	Fertigungsanforderungen und Anmerkungen werden nicht automatisch in die Zeichnung übernommen – nur ausgefüllte erscheinen.
 Výška písma [mm]	Schrifthöhe [mm]
-Všech {0} očekávaných kót je na listu	Alle {0} erwarteten Maße sind auf dem Blatt
 XY (vodor.)	XY (horiz.)
 XZ (čelní)	XZ (Vorderansicht)
 YZ (boční)	YZ (Seitenansicht)
