@@ -235,10 +235,16 @@ export function mergeEntries(entries: readonly Entry[]): Entry[] {
  */
 const SIMILAR: Readonly<Record<string, { label: string; numbers: boolean }>> = {
   "feature.warning": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.tip-tangent": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.no-reach": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.wrong-side": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.pitch-nonstandard": { label: "{0} prvků: {1} – „{2}“", numbers: false },
   "feature.failed": { label: "{0} prvků: {1} – „{2}“", numbers: false },
   "drawing.warning": { label: "{0} listů: {1} – „{2}“", numbers: true },
 };
 const NUM_RE = /\d+(?:[.,]\d+)*/g;
+/** data záznamu jsou jen úrovně stavu prvku (`data.levels`, engine/verify.ts) – podobné hlášky se slučují i s nimi */
+const onlyLevels = (d: unknown): boolean => !!d && typeof d === "object" && Object.keys(d as object).every((k) => k === "levels");
 
 /**
  * Jen pro stručný protokol (zkouška 959, B6): ⚠/✗ téhož kódu o položkách jednoho dokumentu se stejnou hláškou a jinou
@@ -253,7 +259,7 @@ export function mergeSimilar(entries: readonly Entry[]): Entry[] {
   const at = new Map<string, Group>();
   for (const e of entries) {
     const cfg = e.code ? SIMILAR[e.code] : undefined;
-    const args = cfg && (e.level === "warn" || e.level === "error") && e.data === undefined ? codeArgs(e.code!, e.text) : null;
+    const args = cfg && (e.level === "warn" || e.level === "error") && (e.data === undefined || onlyLevels(e.data)) ? codeArgs(e.code!, e.text) : null;
     if (!cfg || !args || args.length !== 2) continue;
     const msg = cfg.numbers ? args[1].replace(NUM_RE, "N") : args[1];
     const key = [e.level, e.code, e.doc ?? "", entryLines(e).length ? "L" : "-", msg].join("\u0000");
@@ -403,6 +409,13 @@ export function docKv(d: DocSummary): string {
   if (d.densityAssumed) kv.push(`rho=${fmtNum(d.density, 3)}`, "rho.assumed=1");
   if (d.exact === false) kv.push("exact=0");
   if (d.sheets) kv.push(`sheets=${d.sheets}`);
+  // konečné těleso dílu (vlna 22): počet těles a výsledek kontroly platnosti – neprovedená kontrola je `unchecked`, ne 1
+  if (d.kind === "part" && d.solids !== undefined) kv.push(`solids=${d.solids}`);
+  if (d.kind === "part" && d.valid !== undefined) kv.push(`valid=${d.valid === null ? "unchecked" : d.valid ? 1 : 0}`);
+  if (d.kind === "part" && typeof d.valid === "boolean" && d.validCheck === "exact") kv.push("vcheck=exact"); // přesná kontrola (bez klíče = rychlá)
+  if (d.kind === "part" && d.free) kv.push(`free=${d.free}`);
+  if (d.features?.unchecked) kv.push(`unchecked=${d.features.unchecked}`);
+  if (d.features?.off) kv.push(`off=${d.features.off}`); // potlačené prvky – nejsou ve `feat=` mezi ✓
   if (d.stale?.length) kv.push(`stale=${d.stale.join(",")}`); // uložené výsledky, které konečnému stavu neodpovídají (vlna 22 – vždy na konci)
   return `${kind} ${kv.join(" ") || "-"}`;
 }

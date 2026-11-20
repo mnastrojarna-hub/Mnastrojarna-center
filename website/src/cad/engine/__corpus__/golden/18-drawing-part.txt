@@ -3,23 +3,23 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 → Díra 1 (hole) přidán – výsledek po výpočtu níže
 → Díra 2 (hole) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Díra 2 (hole)
+✓ Kvádr 1 (box) · přidáno 80000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 1570,8 mm³ (8 % nástroje) · těleso platné
+✓ Díra 2 (hole) · úběr 1570,8 mm³ (8 % nástroje) · těleso platné
 
 Dokument: „Výkres dílu“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 80 × 50 × 20 mm (X 0…80, Y 0…50, Z 0…20) · objem 76,86 cm³ · ploch 8 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 80 × 50 × 20 mm, new, roh [0; 0; 0]
- 2. Díra 1 [hole, id #] ✓ – Ø10 skrz v [20; 25; 20], osa Z
- 3. Díra 2 [hole, id #] ✓ – Ø10 skrz v [60; 25; 20], osa Z
+ 1. Kvádr 1 [box, id #] ✓ přidáno 80000 mm³ · těleso platné – 80 × 50 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 1570,8 mm³ (8 % nástroje) · těleso platné – Ø10 skrz v [20; 25; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ úběr 1570,8 mm³ (8 % nástroje) · těleso platné – Ø10 skrz v [60; 25; 20], osa Z
 === run 2 ===
-✓ nový list výkresu „List 1“ (Chytré kóty)
-✓ výkres: A3, na šířku, měřítko 1:1, pohledy přední, horní, iso
-✓ Chytré kóty (řetězově): 5 kót a popisů – horní 4, přední 1 · očekávaných rozměrů 4
-✓ tolerance ±0,1 → 80±0,1 (horní)
-✓ nepředepsané tolerance ISO 2768-mK
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A3, na šířku, měřítko 1:1, pohledy přední, horní, iso – výsledek po vyhodnocení listu níže
+→ Chytré kóty (řetězově): 5 kót a popisů – horní 4, přední 1 · očekávaných rozměrů 4 – výsledek po vyhodnocení listu níže
+→ tolerance ±0,1 → 80±0,1 (horní) – výsledek po vyhodnocení listu níže
+→ nepředepsané tolerance ISO 2768-mK – výsledek po vyhodnocení listu níže
 Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední, horní, izometrie · kóty: Chytré kóty (řetězově)
 Listy (1): 1 „List 1“ A3 (aktivní)
 Kóty a popisy (5, z toho vygenerovaných 5):
@@ -40,11 +40,12 @@ Razítko bez zkracování textu: všechna pole v nominální velikosti
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…80, y 0…20 mm · 1:1 · na listu x 44…124, y 243…263
   horní (x = X, y = Y): x 0…80, y 0…50 mm · 1:1 · na listu x 44…124, y 159…209
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
 
 Dokument: „Výkres dílu“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 80 × 50 × 20 mm (X 0…80, Y 0…50, Z 0…20) · objem 76,86 cm³ · ploch 8 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 80 × 50 × 20 mm, new, roh [0; 0; 0]
- 2. Díra 1 [hole, id #] ✓ – Ø10 skrz v [20; 25; 20], osa Z
- 3. Díra 2 [hole, id #] ✓ – Ø10 skrz v [60; 25; 20], osa Z
+ 1. Kvádr 1 [box, id #] ✓ přidáno 80000 mm³ · těleso platné – 80 × 50 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 1570,8 mm³ (8 % nástroje) · těleso platné – Ø10 skrz v [20; 25; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ úběr 1570,8 mm³ (8 % nástroje) · těleso platné – Ø10 skrz v [60; 25; 20], osa Z

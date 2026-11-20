@@ -59,7 +59,7 @@ export type KernelTransport = {
  */
 export type CadProgress = Omit<BuildProgress, "phase"> & { phase: BuildProgress["phase"] | "start"; op: string; startedAt: number; featureAt: number };
 /** operace, které mohou trvat dlouho – ukazuje se u nich průběh a jdou zrušit */
-export const LONG_OPS: ReadonlySet<string> = new Set(["build", "check", "topology", "measure", "export", "exportStats", "drawing", "interference", "clashDetail", "asmParts", "compare", "stepSplit"]);
+export const LONG_OPS: ReadonlySet<string> = new Set(["build", "check", "topology", "measure", "export", "exportStats", "validity", "drawing", "interference", "clashDetail", "asmParts", "compare", "stepSplit"]);
 
 /** Výpočet zrušený uživatelem (tlačítko Zrušit) – volající ho nemá hlásit jako chybu jádra. */
 export class CadCancelled extends Error {
@@ -230,6 +230,8 @@ export function makeKernelClient(t: KernelTransport) {
     exportFile: (doc: CadDoc, format: ExportFormat) => call({ op: "export", doc, format }),
     /** exportovaný STEP / BREP znovu načtený jádrem a model: tělesa, objem, obálka (bez sítě – export-verify.ts) */
     exportStats: (doc: CadDoc, bytes: Uint8Array, format: "step" | "brep") => call({ op: "exportStats", doc, bytes, format }),
+    /** přesná kontrola platnosti tělesa (BRepCheck přesnou metodou) – `maxFaces` = nad tolik ploch se neprovede */
+    validity: (doc: CadDoc, maxFaces?: number) => call({ op: "validity", doc, ...(maxFaces !== undefined ? { maxFaces } : {}) }),
     /** díly sestavy; `offset`/`total` = pořadí dávky v celém načítání (pro průběh „díl k z n“) */
     asmParts: (parts: { key: string; source: ComponentSource }[], offset = 0, total = parts.length) => call({ op: "asmParts", parts, offset, total }),
     /**

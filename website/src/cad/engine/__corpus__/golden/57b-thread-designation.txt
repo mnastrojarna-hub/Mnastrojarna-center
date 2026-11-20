@@ -1,0 +1,53 @@
+=== run 1 ===
+✓ nový díl „Čep A“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Závit 1 (thread) přidán – výsledek po výpočtu níže
+Dokument: „Čep A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 18 × 18 × 30 mm (X -9…9, Y -9…9, Z 0…30) · objem 7,31 cm³ · ploch 19 · hran 49
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 7634,1 mm³ · těleso platné – Ø18 × 30 mm, new, podstava [0; 0; 0], osa Z
+ 2. Závit 1 [thread, id #] ✓ úběr 328,1 mm³ (73 % nástroje) · těleso platné – M18×1,5 délka 20 mm, vnější (na válci), skutečná šroubovice, začátek [0; 0; 10], osa Z
+✓ nový díl „Matice A“ – nová záložka
+→ Trubka 1 (tube) přidán – výsledek po výpočtu níže
+→ Závit 2 (thread) přidán – výsledek po výpočtu níže
+✓ nový díl „Matice B“ – nová záložka
+→ Trubka 2 (tube) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+Dokument: „Matice B“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 30 × 30 × 20 mm (X -15…15, Y -15…15, Z 0…20) · objem 9,66 cm³ · ploch 20 · hran 50
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Trubka 2 [tube, id #] ✓ přidáno 9860,7 mm³ · těleso platné – Ø30/Ø16,5 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 2. Tažení po šroubovici [ext, id #] ✓ úběr 203 mm³ (62 % nástroje) · těleso platné – 
+✓ nový díl „Deska B“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Čep B“ – nová záložka
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+→ Závit 3 (thread) přidán – výsledek po výpočtu níže
+→ Závit 4 (thread) přidán – výsledek po výpočtu níže
+→ Závit 5 (thread) přidán – výsledek po výpočtu níže
+✓ Válec 1 (cylinder) · přidáno 7634,1 mm³ · těleso platné
+✓ Závit 1 (thread) · úběr 328,1 mm³ (73 % nástroje) · těleso platné
+✓ Trubka 1 (tube) · přidáno 9860,7 mm³ · těleso platné
+✓ Závit 2 (thread) · úběr 191,5 mm³ (62 % nástroje) · těleso platné
+✓ Trubka 2 (tube) · přidáno 9860,7 mm³ · těleso platné
+✓ Tažení po šroubovici (ext) · úběr 203 mm³ (62 % nástroje) · těleso platné
+✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 3560,7 mm³ (67 % nástroje) · těleso platné
+⚠ Díra 2 (hole): stoupání 3 mm není pro M18 v ISO 261 (řada: 2,5 / 2 / 1,5 / 1) – závit M18×3 se postaví, ale je nestandardní (nástroj, kalibr a protikus nejsou běžné).
+✓ Válec 2 (cylinder) · přidáno 10178,8 mm³ · těleso platné
+⚠ Závit 3 (thread): stoupání 3 mm není pro M18 v ISO 261 (řada: 2,5 / 2 / 1,5 / 1) – závit M18×3 se postaví, ale je nestandardní (nástroj, kalibr a protikus nejsou běžné).
+⚠ Závit 4 (thread): stoupání 1,25 mm není pro M18 v ISO 261 (řada: 2,5 / 2 / 1,5 / 1) – závit M18×1,25 se postaví, ale je nestandardní (nástroj, kalibr a protikus nejsou běžné).
+✓ Závit 5 (thread) · úběr 251,3 mm³ (14 % nástroje) · těleso platné
+
+Dokument: „Čep B“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (2 ✓, 2 ⚠, 0 ✗)
+Rozměry: 18 × 18 × 40 mm (X -9…9, Y -9…9, Z 0…40) · objem 9,93 cm³ · ploch 18 · hran 33
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 2 [cylinder, id #] ✓ přidáno 10178,8 mm³ · těleso platné – Ø18 × 40 mm, new, podstava [0; 0; 0], osa Z
+ 2. Závit 3 [thread, id #] ⚠ stoupání 3 mm není pro M18 v ISO 261 (řada: 2,5 / 2 / 1,5 / 1) – závit M18×3 se postaví, ale je nestandardní (nástroj, kalibr a protikus nejsou běžné). – M18×3 délka 10 mm, vnější (na válci), kosmetický (jen výkres), začátek [0; 0; 0], osa Z
+ 3. Závit 4 [thread, id #] ⚠ stoupání 1,25 mm není pro M18 v ISO 261 (řada: 2,5 / 2 / 1,5 / 1) – závit M18×1,25 se postaví, ale je nestandardní (nástroj, kalibr a protikus nejsou běžné). – M18×1,25 délka 10 mm, vnější (na válci), kosmetický (jen výkres), začátek [0; 0; 15], osa Z
+ 4. Závit 5 [thread, id #] ✓ úběr 251,3 mm³ (14 % nástroje) · těleso platné – M18×1,5 délka 10 mm, vnější (na válci), modelované drážky, začátek [0; 0; 28], osa Z

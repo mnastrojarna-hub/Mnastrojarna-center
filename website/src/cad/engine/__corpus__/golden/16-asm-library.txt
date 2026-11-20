@@ -1,13 +1,13 @@
 === run 1 ===
 ✓ nový díl „Podložka“ – nová záložka
 → Trubka 1 (tube) přidán – výsledek po výpočtu níže
-✓ Trubka 1 (tube)
+✓ Trubka 1 (tube) · přidáno 1885 mm³ · těleso platné
 
 Dokument: „Podložka“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 30 × 3 mm (X -15…15, Y -15…15, Z 0…3) · objem 1,88 cm³ · ploch 4 · hran 6
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Trubka 1 [tube, id #] ✓ – Ø30/Ø10 × 3 mm, new, podstava [0; 0; 0], osa Z
+ 1. Trubka 1 [tube, id #] ✓ přidáno 1885 mm³ · těleso platné – Ø30/Ø10 × 3 mm, new, podstava [0; 0; 0], osa Z
 === run 2 ===
 ✓ nová sestava „Normálie“ – nová záložka
 ✓ komponenta „Podložka“ vložena do sestavy (ukotvená)

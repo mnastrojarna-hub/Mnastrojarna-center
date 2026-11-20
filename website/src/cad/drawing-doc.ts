@@ -15,6 +15,7 @@
 import { flattenAssembly, transformPoint } from "./assembly";
 import { DEFAULT_BODY, isNewBodyMode } from "./bodies";
 import { threadByName } from "./defaults";
+import { threadOfFeature } from "./thread-spec";
 import { holeDrillD } from "./hole-spec";
 import { tr } from "./i18n";
 import { placementOf } from "./placements";
@@ -301,9 +302,10 @@ export function threadsOfDoc(doc: CadDoc): { r: number; label: string }[] {
   const out: { r: number; label: string; derived?: boolean }[] = [];
   for (const f of doc.features) {
     if (f.suppressed) continue;
-    if (f.type === "thread") {
-      const t = threadByName(f.designation);
-      if (t) out.push({ r: (f.internal ? t.tap : t.d) / 2, label: `${t.name}${f.length > 0 ? ` dl. ${fmt(f.length)}` : ""}` });
+    // katalogový závit: prvek Závit (kosmetický, drážky, šroubovice) i Tažení po šroubovici s označením `thread=` – stejně (22d)
+    const th = threadOfFeature(f);
+    if (th) {
+      out.push({ r: (th.internal ? th.t.tap : th.t.d) / 2, label: `${th.designation}${th.length > 0 ? ` dl. ${fmt(th.length)}` : ""}` });
     } else if (f.type === "hole" && f.kind === "tapped" && f.thread) {
       const t = threadByName(f.thread);
       if (t) out.push({ r: holeDrillD(f) / 2, label: `${t.name}${f.depth > 0 ? ` hl. ${fmt(f.depth)}` : ""}` }); // vrták podle volby (hole-spec.ts)

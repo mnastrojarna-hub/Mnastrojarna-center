@@ -3,17 +3,17 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 → Díra 1 (hole) přidán – výsledek po výpočtu níže
 → Díra 2 (hole) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Díra 2 (hole)
+✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 1021,1 mm³ (72 % nástroje) · těleso platné
+✓ Díra 2 (hole) · úběr 1005,3 mm³ (10 % nástroje) · těleso platné
 
 Dokument: „Měření“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45,97 cm³ · ploch 9 · hran 20
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 20 mm, new, roh [0; 0; 0]
- 2. Díra 1 [hole, id #] ✓ – Ø10 hloubka 12 v [15; 20; 20], osa Z
- 3. Díra 2 [hole, id #] ✓ – Ø8 skrz v [45; 20; 20], osa Z
+ 1. Kvádr 1 [box, id #] ✓ přidáno 48000 mm³ · těleso platné – 60 × 40 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 1021,1 mm³ (72 % nástroje) · těleso platné – Ø10 hloubka 12 v [15; 20; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ úběr 1005,3 mm³ (10 % nástroje) · těleso platné – Ø8 skrz v [45; 20; 20], osa Z
 === run 2 ===
 Těleso: obálka 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45973,56 mm³ (45,974 cm³) · povrch 9592,202 mm² · hmotnost 0,3609 kg (7,85 g/cm³) · těžiště [30,005; 20; 9,923] · ploch 9 · hran 20 · vrcholů 13
 Díry: 2 – Ø 8 mm × 1, Ø 10 mm × 1
@@ -29,8 +29,8 @@ F1 (rovina) ↔ bod [0; 0; 50]: vzdálenost 30 mm · ΔX 0 · ΔY 0 · ΔZ 30 ·
 
 Dokument: „Měření“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45,97 cm³ · ploch 9 · hran 20
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 60 × 40 × 20 mm, new, roh [0; 0; 0]
- 2. Díra 1 [hole, id #] ✓ – Ø10 hloubka 12 v [15; 20; 20], osa Z
- 3. Díra 2 [hole, id #] ✓ – Ø8 skrz v [45; 20; 20], osa Z
+ 1. Kvádr 1 [box, id #] ✓ přidáno 48000 mm³ · těleso platné – 60 × 40 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 1 [hole, id #] ✓ úběr 1021,1 mm³ (72 % nástroje) · těleso platné – Ø10 hloubka 12 v [15; 20; 20], osa Z
+ 3. Díra 2 [hole, id #] ✓ úběr 1005,3 mm³ (10 % nástroje) · těleso platné – Ø8 skrz v [45; 20; 20], osa Z

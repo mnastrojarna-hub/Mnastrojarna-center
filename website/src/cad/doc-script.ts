@@ -152,6 +152,7 @@ const WORDS = {
   length: ["délka", "length", "länge"],
   internal: ["vnitřní", "internal", "innen"],
   modeled: ["modelovat", "modeled", "modelliert"],
+  helix: ["šroubovice", "helix", "schraubenlinie"],
   axis: ["osa", "axis", "achse"],
   add: ["přidat", "add", "hinzufügen"],
   cut: ["odebrat", "cut", "abziehen"],
@@ -931,7 +932,7 @@ function dedicated(p: PartCtx, f: Feature): string[] {
     case "thread": {
       const ax = axisPart(p, f);
       const at = placePart(p, f);
-      return one(ax === null || at === null ? null : `${c.w("thread")} ${f.designation.replace(/\s+/g, "")} ${c.w("length")} ${n(f.length)}${at}${ax}${f.internal ? ` ${c.w("internal")}` : ""}${f.modeled ? ` ${c.w("modeled")}` : ""}`);
+      return one(ax === null || at === null ? null : `${c.w("thread")} ${f.designation.replace(/\s+/g, "")} ${c.w("length")} ${n(f.length)}${at}${ax}${f.internal ? ` ${c.w("internal")}` : ""}${f.modeled && f.helix ? ` ${c.w("helix")}` : f.modeled ? ` ${c.w("modeled")}` : ""}`);
     }
     case "extrude": {
       if (!last || f.sketchId !== last.id) return [];

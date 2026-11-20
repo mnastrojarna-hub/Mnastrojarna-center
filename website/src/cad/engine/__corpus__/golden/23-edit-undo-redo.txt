@@ -1,49 +1,50 @@
 === run 1 ===
 ✓ nový díl „Historie“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 27000 mm³ · těleso platné
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 27 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 30 × 30 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
 === run 2 ===
 → Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
-✓ Zaoblení 1 (fillet)
+✓ Zaoblení 1 (fillet) · úběr 659,2 mm³ · těleso platné
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 26,34 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 30 × 30 mm, new, roh [0; 0; 0]
- 2. Zaoblení 1 [fillet, id #] ✓ – R3, hrany vše
+ 1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✓ úběr 659,2 mm³ · těleso platné – R3, hrany vše
 === run 3 ===
 → Sražení 1 (chamfer) přidán – výsledek po výpočtu níže
 ✗ Sražení 1 (chamfer): Sražení 1 mm nelze provést – vzdálenost je pro vybrané hrany příliš velká nebo se sražení kříží.
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 26,34 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 30 × 30 mm, new, roh [0; 0; 0]
- 2. Zaoblení 1 [fillet, id #] ✓ – R3, hrany vše
+ 1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✓ úběr 659,2 mm³ · těleso platné – R3, hrany vše
  3. Sražení 1 [chamfer, id #] ✗ Sražení 1 mm nelze provést – vzdálenost je pro vybrané hrany příliš velká nebo se sražení kříží. – 1 mm, hrany vše
 === run 4 ===
 ✓ zpět o 1 krok(ů) (zbývá zpět 2, znovu 1)
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 26,34 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 30 × 30 mm, new, roh [0; 0; 0]
- 2. Zaoblení 1 [fillet, id #] ✓ – R3, hrany vše
+ 1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✓ úběr 659,2 mm³ · těleso platné – R3, hrany vše
 === run 5 ===
 ✓ zpět o 2 krok(ů) – víc kroků v historii není (zbývá zpět 0, znovu 3)
-✓ znovu 1 krok(ů) (zbývá zpět 1, znovu 2)
+→ znovu 1 krok(ů) (zbývá zpět 1, znovu 2) – výsledek po výpočtu níže
+✓ dokument „Historie“ postaven: prvků 1, bez ⚠ a ✗ · těleso platné
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 27 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 30 × 30 × 30 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]

@@ -1,21 +1,21 @@
 === run 1 ===
 ✓ nový díl „A“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 1 mm³ · těleso platné
 
 Dokument: „A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 1 × 1 × 1 mm (X 0…1, Y 0…1, Z 0…1) · objem 0 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 1 × 1 × 1 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 1 mm³ · těleso platné – 1 × 1 × 1 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ název = B
 
 Dokument: „B“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 1 × 1 × 1 mm (X 0…1, Y 0…1, Z 0…1) · objem 0 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 1 × 1 × 1 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 1 mm³ · těleso platné – 1 × 1 × 1 mm, new, roh [0; 0; 0]
 === run 3 ===
 ✓ nová sestava „S“ – nová záložka
 ✓ komponenta „B“ vložena do sestavy

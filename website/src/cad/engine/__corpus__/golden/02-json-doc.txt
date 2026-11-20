@@ -1,12 +1,13 @@
 === run 1 ===
-✓ dokument „Z JSON“ (3 prvků) – otevře se v nové záložce
+→ dokument „Z JSON“ (3 prvků) – otevře se v nové záložce – výsledek po výpočtu níže
+✓ dokument „Z JSON“ postaven: prvků 3, bez ⚠ a ✗ · těleso platné
 
 Dokument: „Z JSON“ · díl · materiál Hliník (2.7 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 50 × 30 × 10 mm (X 0…50, Y 0…30, Z 0…10) · objem 14,70 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 50×30
     entity: e1_1 obdélník 50×30 [25; 15]
     profil: 1 uzavřený obrys (e1_1) ✓
- 2. Vysunutí 1 [extrude, id #] ✓ – 10 mm, new
- 3. Zaoblení 1 [fillet, id #] ✓ – R2, hrany vše
+ 2. Vysunutí 1 [extrude, id #] ✓ přidáno 15000 mm³ · těleso platné – 10 mm, new
+ 3. Zaoblení 1 [fillet, id #] ✓ úběr 298,3 mm³ · těleso platné – R2, hrany vše

@@ -22,12 +22,14 @@ import { RunVerifier, verifyKey } from "./verify";
 import { freshenRunDoc } from "./spring-fresh";
 import { statusKv } from "./kv";
 import { ConsoleLog } from "./console";
+import { changedFrom, modelSig } from "./accept";
 import { MissingInputError, OutPathError, type EngineHost } from "./host";
 import "./ops";
 import { runEngineOp, type OpCtx } from "./ops/registry";
 import { ReportBuilder } from "./protocol";
 import type { Entry, RunOptions, RunReport } from "./protocol-types";
 import { docKeyOf, flush, runOf, type EngineRun } from "./run-doc";
+import { withValidity } from "./validity-store";
 import { MAX_DEPTH } from "../assembly";
 import type { Workspace } from "./workspace";
 
@@ -163,8 +165,14 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
         const label = opLabel(op);
         const before = rb.entries.length;
         const addedBefore = run.added.length;
+        const docBefore = run.doc;
+        const keyBefore = verifyKey(ctx);
+        // otisk modelu před operací: pozná i změnu na místě (stavba ověřuje jen stav po POSLEDNÍ změně – engine/verify.ts)
+        const sigBefore = GEOMETRY_OPS.has(op.k) ? modelSig(run.doc) : null;
+        run.touched = [];
         hooks.opStart?.(op.line, label);
         const t0 = now();
+        let failed = false;
         try {
           if (!(await runEngineOp(op, ctx))) {
             log.coded(op.line, "host.app-only", { args: [label], doc: run.doc.name });
@@ -172,6 +180,7 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
           }
         } catch (e) {
           if (isCancelled(e)) throw e;
+          failed = true;
           log.error(op.line, errMessage(e), { code: errorCode(e), doc: runOf(ctx).doc.name });
         }
         const added = run.added.slice(addedBefore);
@@ -182,9 +191,14 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
           log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – tato změna se do sestavy nepromítne (vložit znovu, nebo sestava upravit)", run.doc.name, ins) });
           run.inserted!.delete(run.doc.name.trim().toLowerCase());
         }
-        verify.note(added, op.line);
+        // přímo upravené prvky (i ty, které běh sám přidal) a místo v historii, od kterého operace model změnila: výsledek
+        // prvku pak jde na řádek poslední operace, která změnila jeho nebo cokoli před ním (22i)
+        const touched = run.touched?.length ? run.doc.features.filter((f) => run.touched!.includes(f.id) && !added.some((x) => x.id === f.id)) : [];
+        const sameDoc = verifyKey(ctx) === keyBefore;
+        verify.note([...added, ...touched], op.line, sameDoc ? changedFrom(docBefore, run.doc, { names: false }) : null, sameDoc && sigBefore !== null && modelSig(run.doc) !== sigBefore);
         // dokument, ze kterého běh odešel (nový díl, záložka, normálie), se postaví hned – jeho prvky se neohlásí bez stavby
-        if (op.k === "doc") verify.loaded(verifyKey(ctx), run.doc, op.line); // JSON dokument: ověří se jako celek (prvky bez ✓)
+        // JSON dokument / otevřený soubor: ověří se jako celek (prvky bez ✓) a výsledek jde na řádek načtení
+        if (op.k === "doc" || (op.k === "open" && !failed)) verify.loaded(verifyKey(ctx), run.doc, op.line);
         const left = verify.switched();
         if (left) await verify.verifyDoc(left);
         // prvky dílu upraveného v kontextu, které selhaly při `sestava hotovo`: ohlásilo je ověření dílu, jinak řádek operace
@@ -282,25 +296,11 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   if (res) {
     // výsledek až po výpočtu: ✓ = platné těleso a operace se projevila, ⚠ = zpracováno s výhradou, ✗ = selhalo; u delších prvků
     // čas výpočtu; prvek bez výsledku stavby = ⚠ feature.unverified (nikdy ✓); prvky jiných dokumentů běhu ohlásil `verify` výš
+    // (prvky, které běh nepřidal – načtený JSON / --open, relace – hlásí jen ⚠/✗: na řádku poslední úpravy, jinak načtení)
     verify.report(curKey, d, res.status, { final: true, took: true });
     if (res.metrics?.approx) log.coded(null, "geom.approx", { doc: d.name });
     if (d.kind === "assembly" && asmDepth(d) > MAX_DEPTH) log.coded(null, "asm.depth", { doc: d.name, args: [MAX_DEPTH] });
     if (res.metrics?.volumeFailed) log.coded(null, "geom.volume-failed", { doc: d.name });
-    const st = new Map(res.status.map((s) => [s.id, s]));
-    const addedIds = new Set(r.added.map((f) => f.id));
-    const bad = d.features.filter((f) => !addedIds.has(f.id) && !verify.isFlagged(f.id) && st.get(f.id)?.ok === false);
-    // prvky, které běh nepřidal (načtený JSON / --open: na řádku načtení, prvky relace bez řádku)
-    const at = verify.loadedLine(curKey);
-    for (const f of bad) {
-      log.tailLine(`✗ ${f.name}: ${st.get(f.id)?.error ?? "chyba stavby"}`);
-      rb.code("feature.failed", { line: at, doc: d.name, args: [f.name, st.get(f.id)?.error ?? ""] });
-    }
-    for (const f of d.features) {
-      const w = st.get(f.id)?.warning;
-      if (at === null || !w || addedIds.has(f.id) || verify.isFlagged(f.id) || st.get(f.id)?.ok === false) continue;
-      log.tailLine(`⚠ ${f.name}: ${w}`);
-      rb.code("feature.warning", { line: at, doc: d.name, args: [f.name, w] });
-    }
     const total = now() - tBuild;
     if (total >= 2000) log.tailLine(tr("Výpočet modelu: {0} s", fmtNum(total / 1000, 1)));
   } else if (verify.pending(curKey).length) {
@@ -323,10 +323,11 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   // obálka sestavy přesně (engine/asm-box.ts) – stejně jako `stav` uprostřed skriptu a řádek D v CLI
   const asm = await asmStatus(ws, host.kernel, d, { key: docKeyOf(ctx), onRestart: restarted, onParts: () => host.ui?.partsLoaded?.() });
   const stale = staleNotes(ws, d, docKeyOf(ctx)); // měření / porovnání z dřívější revize dokumentu (engine/result-key.ts)
-  const status = docStatusText(d, res, asm, stale);
+  const shown = withValidity(ws, docKeyOf(ctx), d, res); // přesná kontrola téže geometrie (kontrola přesně / export – 22a)
+  const status = docStatusText(d, shown, asm, stale);
   log.tailLine("", status);
   // „stav“ jako poslední příkaz: vyžádaný výpis = závěrečný stav (strojová část stejná v cs/en/de, text v `detail`);
   // po STOP přísného režimu se poslední řádek neprovedl – výpis „=“ se nepíše (konzole stav dokumentu ukáže dál)
-  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, res, asm, stale), { doc: d.name, detail: status });
+  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, shown, asm, stale), { doc: d.name, detail: status });
   return log.text();
 }

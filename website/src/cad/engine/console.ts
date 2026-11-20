@@ -13,6 +13,7 @@
  * Přesné kódy podle soupisu 5.2 doplní balík B4 (strict-silent); výjimky obsluh mají kód podle třídy chyby.
  */
 import { tr } from "../i18n";
+import { isAcceptance } from "./accept";
 import type { Code, CodeEntryInit } from "./codes";
 import { codeText } from "./codes";
 import type { ReportBuilder } from "./protocol";
@@ -60,7 +61,8 @@ export class ConsoleLog {
         this.rb.code("msg.error", { line, text: s.slice(1).trim(), ...(doc !== undefined ? { doc } : {}) });
       } else if (lead === "→" || (t.startsWith("  ") && !listing.length)) {
         flushListing();
-        this.rb.code("msg.note", { line, text: s.replace(/^→\s*/, ""), ...(doc !== undefined ? { doc } : {}) });
+        // „→ … – výsledek po výpočtu níže“ = přijetí příkazu (ℹ op.accepted), jiná „→“ / odsazená poznámka = ℹ msg.note
+        this.rb.code(isAcceptance(s) ? "op.accepted" : "msg.note", { line, text: s.replace(/^→\s*/, ""), ...(doc !== undefined ? { doc } : {}) });
       } else listing.push(t);
     }
     flushListing(); // `kv` patří k výpisu – operace jen s ✓/⚠/✗ (výkres bez výpisu) žádný záznam `=` nepřidá

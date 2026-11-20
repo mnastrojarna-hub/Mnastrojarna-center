@@ -16,7 +16,8 @@ import type { OpCtx } from "./ops/registry";
 import { asmHooks } from "./ops/util";
 import type { Entry } from "./protocol-types";
 import { runOf } from "./run-doc";
-import { drawingMemo, evaluateSheet, recheckIssue, sameSheetFinding, sheetIssueText, type SheetIssue } from "./sheet-eval";
+import { drawingMemo, evaluateSheet, recheckIssue, sameSheetFinding, sheetIssueText, sheetLabel, type SheetIssue } from "./sheet-eval";
+import { tr } from "../i18n";
 import { verifyKey } from "./verify";
 
 type Pending = NonNullable<ReturnType<typeof runOf>["drawIssues"]>[number];
@@ -104,12 +105,29 @@ export class DrawingTracker {
       try {
         const extras = () => drawExtras(ctx.ws, ctx.host.kernel, d, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
         for (const x of await evaluateSheet(d, idx, compute, extras)) this.addSheet(line, x, d.name, t.lines);
+        // 22i: výsledek listu až po vyhodnocení – ✓ jen když list (v konečném stavu) nemá žádný nález na řádcích svého bloku
+        if (!rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) this.sheetOk(line, d.name, sheetLabel(d, idx), t.lines);
       } catch (e) {
         if (isCancelled(e)) throw e;
         this.add1(line, "op.failed", d.name, codeText("op.failed", errMessage(e)), t.lines);
       }
     }
     return rb.entries.slice(before);
+  }
+
+  /** ✗ / ⚠ výkresu (nebo chyba příkazu) dokumentu `doc` na některém z řádků bloku */
+  private findingOf(e: Entry, doc: string, lines: number[]): boolean {
+    if (e.level !== "error" && !(e.level === "warn" && e.code?.startsWith("drawing."))) return false;
+    if (e.doc !== undefined && e.doc !== doc) return false;
+    const at = [...(e.lines ?? []), ...(e.line !== null ? [e.line] : []), ...(((e.data as { lines?: number[] } | undefined)?.lines ?? []) as number[])];
+    return at.some((l) => lines.includes(l));
+  }
+
+  /** ✓ listu po vyhodnocení (řádek posledního příkazu bloku): pohledy, řezy a Chytré kóty bez hlášení */
+  private sheetOk(line: number, doc: string, sheet: string, lines: number[]): void {
+    const text = tr("výkres: list „{0}“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)", sheet);
+    if (this.ctx.log) this.ctx.log.body.push({ line, text: `✓ ${text}` });
+    this.ctx.report.add({ line, level: "ok", text, doc, data: { lines } });
   }
 
   /** nález listu (hlášení jádra výkresu) na řádku – text s přesným důvodem, úroveň z hlášení (řez mimo těleso = ✗) */

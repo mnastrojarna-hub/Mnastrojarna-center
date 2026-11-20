@@ -3,14 +3,14 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Přidržovač“ – nová záložka
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
+✓ Kvádr 1 (box) · přidáno 24000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 1000 mm³ · těleso platné
 
 Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 10 × 10 × 10 mm (X 0…10, Y 0…10, Z 0…10) · objem 1 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 2 [box, id #] ✓ – 10 × 10 × 10 mm, new, roh [0; 0; 0]
+ 1. Kvádr 2 [box, id #] ✓ přidáno 1000 mm³ · těleso platné – 10 × 10 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Sestava A“ – nová záložka
 ✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
@@ -32,7 +32,7 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, průnik těles v 1 krocích (podrobně pohyb stav)
 === run 3 ===
 ✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
-✓ Kvádr 1: size [60; 40; 10] → [30; 40; 10]
+→ Kvádr 1: size [60; 40; 10] → [30; 40; 10] – výsledek po výpočtu níže
 ✓ „Deska A“ vrácen do sestavy „Sestava A“ (změnu převzalo komponent: 1) · objem dílu 12 cm³ · vazby 1/1 ok
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
@@ -61,7 +61,7 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
  Přidržovač: rozsah pohybu X 0 · Y 0 · Z 25 mm · konec [40; 10; 5]
 Kolize: žádné ve všech krocích
 Vazby splněny ve všech krocích
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 12000 mm³ · těleso platné
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]

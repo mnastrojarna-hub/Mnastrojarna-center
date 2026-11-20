@@ -19,6 +19,9 @@ import { planeDefLabel, type AxisDef, type Direction, type Extent, type Ref } fr
 import type { Axis, BoolMode, Feature, SketchPlane, Vec2, Vec3 } from "../types";
 import { registerFeatureBuilder, type FeatCtx } from "./registry";
 import { recordPlacement } from "../placements";
+import { noteFeatureWarning } from "../feature-notes";
+import { pitchNote } from "../thread-spec";
+import { threadHelixTool } from "./thread-helix";
 
 type Shape = r.Shape3D;
 type F<T extends Feature["type"]> = Extract<Feature, { type: T }>;
@@ -149,10 +152,14 @@ toolBuilder("thread", (f, ctx) => {
   if (!ctx.body) throw new Error(tr("Závit potřebuje těleso (válcovou plochu nebo díru)."));
   // poloha a osa se řeší i u kosmetického závitu: chybný odkaz = chyba prvku (dřív ✓), výkres kreslí závit tam, kde skutečně je
   const p = placed(f, ctx, tr("začátek závitu"));
-  if (!f.modeled) return null; // kosmetický závit – jen ve výkrese
   const t = threadByName(f.designation);
+  const pn = pitchNote(t); // stoupání mimo ISO 261 (M18×3) – ⚠ i u kosmetického závitu, ne ticho (vlna 22, bod 22d)
+  if (pn) noteFeatureWarning(pn, "thread.pitch-nonstandard");
+  if (!f.modeled) return null; // kosmetický závit – jen ve výkrese
   if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.designation, tr(THREAD_HINT)));
   if (!(f.length > 0)) throw new Error(tr("Délka závitu musí být kladná."));
+  // skutečná šroubovice z označení (sdílené jádro s Tažením po šroubovici, kontrola, že drážka řeže povrch – 22a/22d)
+  if (f.helix) return threadHelixTool(f, t, ctx.body, p.at, p.dir);
   return alignZ(revolvedZ(threadProfile(t, f.length, f.internal)), p.dir).translate(p.at);
 });
 

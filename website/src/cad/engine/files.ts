@@ -26,6 +26,7 @@ import type { KernelApi } from "./kernel";
 import type { OutFile } from "./protocol-types";
 import { projectJson } from "./project-json";
 import type { Workspace } from "./workspace";
+import { exactBeforeExport } from "./validity-store";
 
 /* ───────────────────────── formáty a názvy ───────────────────────── */
 
@@ -434,7 +435,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "geom.exact-invalid" | "msg.note"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Jeden výstup `--formats` dokumentu `d` (kap. 3.1, rozhodnutí 15.7): `.mncad`, STEP (znovu načtený a změřený –
@@ -452,12 +453,16 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" |
     return [f];
   }
   if (fmt === "step" || fmt === "stl") {
+    // STEP: přesná kontrola platnosti před exportem (do 400 ploch, vlna 22 bod 22a) – nález ⚠, neproběhlá ℹ
+    const pre = fmt === "step" && "validity" in host.kernel ? await exactBeforeExport(host.kernel, null, undefined, d).catch(() => null) : null;
     // export jako úloha s fázemi (vlna 22, bod 22h): přestavba, převod, zápis, kontrola STEP zpětným načtením
     const { runExportJob } = await import("./export-job");
     const job = await runExportJob(d, fmt, { kernel: host.kernel, phase: (p) => host.phase?.(`out:${fmt}`, p), write: (data) => write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt) }, { check: fmt === "step", verifyFirst: false });
     const f = job.out;
     f.modelRev = job.modelRev;
     f.phases = job.phases;
+    if (pre && pre.level === "warn") note({ code: "geom.exact-invalid", args: [d.name, pre.text] });
+    else if (pre && pre.level === "note") note({ code: "msg.note", text: pre.text, level: "note" });
     if (job.check) {
       const c = job.check;
       f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") };

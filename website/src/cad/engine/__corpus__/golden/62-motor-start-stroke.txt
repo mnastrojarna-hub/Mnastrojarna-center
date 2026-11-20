@@ -7,17 +7,17 @@
 → Díra 2 (hole) přidán – výsledek po výpočtu níže
 ✓ nový díl „Vodítko“ – nová záložka
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Kvádr 2 (box)
-✓ Díra 2 (hole)
-✓ Válec 1 (cylinder)
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 3204,7 mm³ (3 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 28800 mm³ · těleso platné
+✓ Díra 2 (hole) · úběr 2513,3 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 37699,1 mm³ · těleso platné
 
 Dokument: „Vodítko“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 20 × 20 × 120 mm (X -10…10, Y -10…10, Z 0…120) · objem 37,70 cm³ · ploch 3 · hran 3
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø20 × 120 mm, new, podstava [0; 0; 0], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 37699,1 mm³ · těleso platné – Ø20 × 120 mm, new, podstava [0; 0; 0], osa Z
 === run 2 ===
 ✓ nová sestava „S1“ – nová záložka
 ✓ komponenta „Deska A“ vložena do sestavy (ukotvená)

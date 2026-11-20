@@ -1,0 +1,11 @@
+# vlna 22, bod 22i: příkazy výkresu – přijetí (→ … výsledek po vyhodnocení listu níže), výsledek až po vyhodnocení listu:
+# ✗ řez mimo těleso na řádku příkazu, nebo ✓ „list … vyhodnocen bez nálezů“ na posledním řádku bloku
+nový díl Deska A
+kvádr 60 40 10
+výkres A4
+výkres řez XZ odsazení 500
+#--- run
+výkres řez XZ odsazení -20
+#--- run
+výkres řez XZ odsazení 500
+výkres stav

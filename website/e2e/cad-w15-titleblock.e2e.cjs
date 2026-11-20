@@ -121,7 +121,7 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   ].join('\n'));
   fs.writeFileSync(S + 'log3.txt', log);
   ok(!/^✗/m.test(log), 'výkres razítko s novými poli bez ✗' + (first(log, /^✗.*$/m) ? ' – ' + first(log, /^✗.*$/m) : ''));
-  ok(/✓ razítko: šablona nástrojářská \(všechna pole\) \(180×64 mm\), logo „firma\.png“ 120×40 px, obrys pro DXF\/DWG \d+ ploch, firma „Mnástrojárna s\.r\.o\.“, kreslil „Claude dle Vojtěchova zadání“, kontroloval „Ing\. Kontrolor“/.test(log), '✓ razítko: šablona, logo z připojeného souboru, firma, kreslil, kontroloval');
+  ok(/→ razítko: šablona nástrojářská \(všechna pole\) \(180×64 mm\), logo „firma\.png“ 120×40 px, obrys pro DXF\/DWG \d+ ploch, firma „Mnástrojárna s\.r\.o\.“, kreslil „Claude dle Vojtěchova zadání“, kontroloval „Ing\. Kontrolor“/.test(log), '✓ razítko: šablona, logo z připojeného souboru, firma, kreslil, kontroloval');
   ok(/Šablona razítka: nástrojářská \(všechna pole\) 180×64 mm · promítání ISO E – značka ISO 5456-2 \(1\. kvadrant, kružnice vpravo\) · logo „firma\.png“ 120×40 px/.test(log), 'stav: šablona, promítání značkou, logo');
   ok(/Další pole razítka: firma „Mnástrojárna s\.r\.o\.“ · zákazník „ACME a\.s\.“ · projekt „100 NASTROJ-A“ · kontroloval „Ing\. Kontrolor“ · schválil „Ing\. Schvalovatel“ · polotovar „plech 40×160×185“ · počet kusů „4“ · tepelné zpracování „kalit 58–60 HRC“ · povrchová úprava „černit“ · tolerance úhlů „±0°30′“ · tolerance sražení „±0,2“/.test(log), 'stav: všechna další pole razítka');
   ok(/Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí/.test(log), 'stav: nepředepsané tolerance nezadané');
@@ -141,7 +141,7 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   // 5. nepředepsané tolerance tabulkou podle desetinných míst → export DXF bez ⚠ tolerancí; logo jako SOLID
   log = await run('výkres nepředepsané desetinná ±0,1 ±0,1 ±0,01 ±0,005\nvýkres export dxf');
   fs.writeFileSync(S + 'log5.txt', log);
-  ok(/✓ nepředepsané tolerance X\. ±0,1 \/ X\.X ±0,1 \/ X\.XX ±0,01 \/ X\.XXX ±0,005/.test(log), 'výkres nepředepsané desetinná → tabulka X. / X.X / X.XX / X.XXX');
+  ok(/→ nepředepsané tolerance X\. ±0,1 \/ X\.X ±0,1 \/ X\.XX ±0,01 \/ X\.XXX ±0,005/.test(log), 'výkres nepředepsané desetinná → tabulka X. / X.X / X.XX / X.XXX');
   ok(!/nemá nepředepsané tolerance/.test(log), 'export s nepředepsanými tolerancemi bez ⚠');
   const fdxf = await nextDownload(2);
   const dxf = fdxf ? fdxf.data.toString('latin1') : '';
@@ -162,8 +162,8 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   // 7. anglicky a německy; ISO 2768 třída; kompaktní šablona: pole mimo šablonu v patičce
   log = await run('drawing titleblock template=compact checked="EN check"\nzeichnung schriftfeld genehmigt="DE Freigabe" kunde="Kunde GmbH"\ndrawing general f H\nvýkres razítko');
   fs.writeFileSync(S + 'log7.txt', log);
-  ok(/✓ razítko: šablona kompaktní \(180×27 mm\), kontroloval „EN check“/.test(log) && /✓ razítko: schválil „DE Freigabe“, zákazník „Kunde GmbH“/.test(log), 'EN / DE klíče razítka');
-  ok(/✓ nepředepsané tolerance ISO 2768-fH/.test(log) && /Nepředepsané tolerance: ISO 2768-fH \(délky, úhly a sražení třída f – jemná, geometrie H\)/.test(log), 'drawing general f H → ISO 2768-fH');
+  ok(/→ razítko: šablona kompaktní \(180×27 mm\), kontroloval „EN check“/.test(log) && /→ razítko: schválil „DE Freigabe“, zákazník „Kunde GmbH“/.test(log), 'EN / DE klíče razítka');
+  ok(/→ nepředepsané tolerance ISO 2768-fH/.test(log) && /Nepředepsané tolerance: ISO 2768-fH \(délky, úhly a sražení třída f – jemná, geometrie H\)/.test(log), 'drawing general f H → ISO 2768-fH');
   ok(/zákazník „Kunde GmbH“ \(v patičce\)/.test(log), 'kompaktní šablona: zákazník v patičce');
   ok(/✗.*šablona razítka „obří“ neexistuje/.test(await run('výkres razítko šablona=obří')), 'neznámá šablona → ✗ s nabídkou šablon');
   ok(/✗.*logo „chybi\.png“: soubor není připojený.*připojené: firma\.png/.test(await run('výkres razítko logo="chybi.png"')), 'nepřipojený soubor loga → ✗ s nápovědou a seznamem připojených');
@@ -177,7 +177,7 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   }
   log = await run('výkres razítko logo="inter.png"\nvýkres razítko');
   fs.writeFileSync(S + 'log7b.txt', log);
-  ok(/✓ razítko: logo „inter\.png“ 241×83 px, obrys pro DXF\/DWG \d+ ploch/.test(log) && !/Adam7/.test(log), 'prokládané PNG (Adam7) z konzole → ✓ logo 241×83 px (dřív ✗ prokládané PNG)');
+  ok(/→ razítko: logo „inter\.png“ 241×83 px, obrys pro DXF\/DWG \d+ ploch/.test(log) && !/Adam7/.test(log), 'prokládané PNG (Adam7) z konzole → ✓ logo 241×83 px (dřív ✗ prokládané PNG)');
   log = await run('výkres razítko logo="LOGO"');
   ok(/✗.*logo „LOGO“: název odpovídá více připojeným souborům \(logo\.png, logo\.jpg\) – zadejte celý název s příponou/.test(log), 'nejednoznačný název loga → ✗ se seznamem (dřív „soubor není připojený“) – ' + first(log, /✗.*$/m).slice(0, 160));
   log = await run('výkres revize A "první vydání"\nvýkres revize B "změna díry"\nvýkres razítko revize=""\nvýkres razítko\nvýkres razítko revize=C');
@@ -190,7 +190,7 @@ const INTER = pngAdam7(241, 83, (x, y) => (x > 20 && x < 220 && y > 15 && y < 65
   log = await run('výkres nepředepsané X. ±0,1 · X.X ±0,1 · X.XX ±0,01 · X.XXX ±0,005\nvýkres razítko');
   ok(/Nepředepsané tolerance: tabulka podle desetinných míst: X\. ±0,1 \/ X\.X ±0,1 \/ X\.XX ±0,01 \/ X\.XXX ±0,005/.test(log), 'výkres nepředepsané X. ±0,1 · X.X ±0,1 · … → tabulka (dřív text)');
   log = await run('výkres nepředepsané X. ±0,1 / X.X ±0,1 / X.XX ±0,02 / X.XXX ±0,005\nvýkres nepředepsané desetinná ±0,1 / ±0,1 / ±0,01 / ±0,005\ndrawing general f H\nvýkres razítko materiál=""');
-  ok(!/^✗/m.test(log) && /✓ nepředepsané tolerance X\. ±0,1 \/ X\.X ±0,1 \/ X\.XX ±0,02/.test(log), 'ozvěna CADu „X. … / …“ a „desetinná ±0,1 / ±0,1 …“ bez ✗' + (first(log, /^✗.*$/m) ? ' – ' + first(log, /^✗.*$/m) : ''));
+  ok(!/^✗/m.test(log) && /→ nepředepsané tolerance X\. ±0,1 \/ X\.X ±0,1 \/ X\.XX ±0,02/.test(log), 'ozvěna CADu „X. … / …“ a „desetinná ±0,1 / ±0,1 …“ bez ✗' + (first(log, /^✗.*$/m) ? ' – ' + first(log, /^✗.*$/m) : ''));
   // druhý list bez nepředepsaných tolerancí (pro kontrolu panelu při přepnutí listu)
   log = await run('výkres list nový "Detail"\nvýkres nepředepsané ne\nvýkres list 1');
   ok(!/^✗/m.test(log), 'druhý list „Detail“ bez nepředepsaných tolerancí');

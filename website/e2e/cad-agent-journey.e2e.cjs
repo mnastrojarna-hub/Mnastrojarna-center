@@ -226,7 +226,7 @@ const ready = async (p, url = CAD) => {
   const tOk = Date.now() - t;
   r = await consoleRun('stav');
   const filletLine = (/Zaoblení 1 \[fillet[^\n]*/.exec(r.log) || [''])[0];
-  step('3b Zaoblit převezme kliknutou hranu → OK', fForm.type === 'fillet' && fForm.radius === FILLET_R && JSON.stringify(fForm.edges) === `[${Number(edge.id.slice(1)) - 1}]` && /✓ – R2, hrany 1/.test(filletLine) && !/^\s*[⚠✗]/m.test(r.log), `formulář: hrany ${JSON.stringify(fForm.edges)} (= ${edge.id}), R${fForm.radius}; ${filletLine.replace(/, id \w+/, '')}; formulář ${sec(tForm)}, OK → hotovo ${sec(tOk)}`);
+  step('3b Zaoblit převezme kliknutou hranu → OK', fForm.type === 'fillet' && fForm.radius === FILLET_R && JSON.stringify(fForm.edges) === `[${Number(edge.id.slice(1)) - 1}]` && /✓ [^–\n]*– R2, hrany 1/.test(filletLine) && !/^\s*[⚠✗]/m.test(r.log), `formulář: hrany ${JSON.stringify(fForm.edges)} (= ${edge.id}), R${fForm.radius}; ${filletLine.replace(/, id \w+/, '')}; formulář ${sec(tForm)}, OK → hotovo ${sec(tOk)}`);
   await p.screenshot({ path: S + 'j3-fillet.png' });
 
   // ════════ 4) ověření 1 : 1 měřením proti hodnotám z výkresu ════════
@@ -263,7 +263,7 @@ const ready = async (p, url = CAD) => {
   const dup = /Duplicity: žádné/.test(r.log);
   const allDims = /Kontrola kót: všech \d+ (?:rozměrů )?je na listu/.test(r.log) || /Kontrola kót: všech/.test(r.log);
   const missing = (/Kontrola kót: [^\n]*/.exec(r.log) || ['?'])[0];
-  const dimsLine = (/✓ Chytré kóty[^\n]*/.exec(r.log) || ['?'])[0];
+  const dimsLine = (/→ Chytré kóty[^\n]*/.exec(r.log) || ['?'])[0];
   step('6 výkres A3 + kótovat + výkres stav', dup && allDims && !/^✗/m.test(r.log), `${dimsLine}; ${missing}; Duplicity žádné: ${dup}; ${r.ms} ms`);
   await p.screenshot({ path: S + 'j6-drawing.png' });
 

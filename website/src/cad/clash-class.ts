@@ -22,6 +22,7 @@
  */
 import { flattenLeaves } from "./asm-flatten";
 import { holeDrillD } from "./hole-spec";
+import { threadOfFeature } from "./thread-spec";
 import type { CadDoc, Feature, Vec3 } from "./types";
 
 export type ClashClass = "thread" | "underhead" | "real" | "undetermined";
@@ -124,6 +125,12 @@ export function tappedFeatures(doc: CadDoc | null | undefined): TapFeature[] {
     } else if (f.type === "thread" && (f as ThreadF).internal) {
       const t = f as ThreadF;
       out.push({ id: f.id, name: f.name, designation: t.designation, D: nominalDiameter(t.designation), drillR: null, dir: t.dirDef?.kind === "vector" ? unit(t.dirDef.v) : AXV[t.axis] ?? AXV.Z, points: repeated(f) ? null : [t.position] });
+    } else {
+      // vnitřní závit Tažením po šroubovici s označením (thread=M18×1,5) – stejně jako prvek Závit (thread-spec.ts, vlna 22 bod 22d)
+      const th = threadOfFeature(f);
+      if (!th || th.source !== "helixSweep" || !th.internal) continue;
+      const dir = !th.dirDef ? AXV.Z : th.dirDef.kind === "vector" ? unit(th.dirDef.v) : th.dirDef.kind === "axis" ? AXV[th.dirDef.axis] : null;
+      out.push({ id: f.id, name: f.name, designation: th.designation, D: nominalDiameter(th.designation), drillR: null, dir, points: repeated(f) || th.positionRef ? null : [th.position] });
     }
   }
   return out;

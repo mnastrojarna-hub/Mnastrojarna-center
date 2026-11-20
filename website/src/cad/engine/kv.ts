@@ -11,6 +11,7 @@ import type { AsmStatus, StaleNote } from "../agent";
 import { sourceKey } from "../assembly";
 import { mateLost } from "../mates";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
+import { featureCounts } from "../feature-levels";
 import type { BuildResult, CadDoc, Vec3 } from "../types";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { docKv, fmtNum, quote } from "./protocol";
@@ -165,10 +166,14 @@ export function docSummaryOf(doc: CadDoc, res: BuildResult | null, asm?: AsmStat
   }
   if (s.kind === "draft") return s;
   const st = res?.status ?? [];
-  if (res) s.features = { ok: st.filter((x) => x.ok && !x.warning).length, warn: st.filter((x) => x.ok && x.warning).length, error: st.filter((x) => !x.ok).length };
+  if (res) s.features = featureCounts(st);
   if (res?.metrics) {
     s.volume_mm3 = res.metrics.volume;
     s.bbox = res.metrics.bbox;
+    if (res.metrics.solids !== undefined) s.solids = res.metrics.solids;
+    if (res.metrics.free) s.free = res.metrics.free;
+    s.valid = res.metrics.valid ?? null;
+    if (typeof s.valid === "boolean") s.validCheck = res.metrics.validCheck ?? "fast";
     const mt = MATERIALS.find((m) => m.id === doc.material);
     if (mt) {
       s.density = mt.density;
@@ -197,7 +202,8 @@ export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, 
   // obálku sestavy má už řádek D (`docKv`); bez obálky `bbox=-`
   if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined], ["motion", asm?.motion ? (asm.motion.state === "unchecked" ? "-" : asm.motion.state) : undefined], ["motion.stale", asm?.motion?.state === "stale" ? true : undefined]])}${tail}`;
   if (doc.kind === "draft" || !res?.metrics) return `${base}${tail}`;
-  return `${`${base} ${kv([["solids", res.metrics.solids], ["valid", res.metrics.valid], ["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd()}${tail}`;
+  // `solids=` a `valid=` (i `valid=unchecked`) nese už strojová část souhrnu dokumentu (`docKv`)
+  return `${`${base} ${kv([["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd()}${tail}`;
 }
 
 /** Strojová část výpisů výkresu (`= Ln drawing …`): aktivní list / počet listů, formát, orientace, měřítko. */

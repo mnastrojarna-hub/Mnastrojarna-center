@@ -1,7 +1,9 @@
 === run 1 ===
 ✓ nový díl „Odebírání“ – nová záložka
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
+ℹ řádek 3: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 6
 → Zaoblení 1 (fillet) přidán – výsledek po výpočtu níže
+ℹ řádek 4: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 6
 ✓ odstraněn prvek „Zaoblení 1“
 ✓ odstraněn prvek „Kvádr 1“
 ✗ není co odstranit

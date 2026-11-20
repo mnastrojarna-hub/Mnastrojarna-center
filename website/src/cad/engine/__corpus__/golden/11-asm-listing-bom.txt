@@ -5,14 +5,14 @@
 ✓ nový díl „Kotouč“ – nová záložka
 ✓ materiál = Hliník (2.7 g/cm³)
 → Trubka 1 (tube) přidán – výsledek po výpočtu níže
-✓ Válec 1 (cylinder)
-✓ Trubka 1 (tube)
+✓ Válec 1 (cylinder) · přidáno 31415,9 mm³ · těleso platné
+✓ Trubka 1 (tube) · přidáno 47123,9 mm³ · těleso platné
 
 Dokument: „Kotouč“ · díl · materiál Hliník (2.7 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 80 × 80 × 10 mm (X -40…40, Y -40…40, Z 0…10) · objem 47,12 cm³ · ploch 4 · hran 6
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Trubka 1 [tube, id #] ✓ – Ø80/Ø20 × 10 mm, new, podstava [0; 0; 0], osa Z
+ 1. Trubka 1 [tube, id #] ✓ přidáno 47123,9 mm³ · těleso platné – Ø80/Ø20 × 10 mm, new, podstava [0; 0; 0], osa Z
 === run 2 ===
 ✓ nová sestava „Hřídel s kotoučem“ – nová záložka
 ✓ komponenta „Hřídel“ vložena do sestavy (ukotvená)

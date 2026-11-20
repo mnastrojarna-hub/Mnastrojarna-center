@@ -26,13 +26,13 @@ Pružina „Tlačná pružina 1“ – Tlačná pružina (EN 13906-1) · Tlačn�
   hmotnost: 13,9 g
   materiál: patentovaný drát SH (EN 10270-1) · G 81500 MPa
   konce: přiložené a broušené
-✓ Tlačná pružina 1 (ext)
+✓ Tlačná pružina 1 (ext) · přidáno 1706,6 mm³ · těleso platné
 
 Dokument: „Pružina z tabulky“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 20 × 20 × 50 mm (X -10…10, Y -10…10, Z 0…50) · objem 1,71 cm³ · ploch 9 · hran 19
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Tlačná pružina 1 [ext, id #] ✓ – tlačná d 2 · De 20 · L0 50 · n 8 · R 3,494 N/mm · Ln 20 mm
+ 1. Tlačná pružina 1 [ext, id #] ✓ přidáno 1706,6 mm³ · těleso platné – tlačná d 2 · De 20 · L0 50 · n 8 · R 3,494 N/mm · Ln 20 mm
     → Ln + Sa 23,54 mm · Fn 104,8 N · τn 61 % τzul · vzpěr nevybočí · fe 280 Hz · 13,9 g
 === run 2 ===
 ✓ nový díl „Spodní deska“ – nová záložka
@@ -45,19 +45,19 @@ Prvky:
 → Válec 4 (cylinder) přidán – výsledek po výpočtu níže
 ✓ nový díl „Stírací deska“ – nová záložka
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
-✓ Válec 1 (cylinder)
-✓ Válec 2 (cylinder)
-✓ Válec 3 (cylinder)
-✓ Válec 4 (cylinder)
-✓ Kvádr 3 (box)
+✓ Kvádr 1 (box) · přidáno 720000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 720000 mm³ · těleso platné
+✓ Válec 1 (cylinder) · úběr 3463,6 mm³ (celý nástroj) · těleso platné
+✓ Válec 2 (cylinder) · úběr 3463,6 mm³ (celý nástroj) · těleso platné
+✓ Válec 3 (cylinder) · úběr 3463,6 mm³ (celý nástroj) · těleso platné
+✓ Válec 4 (cylinder) · úběr 3463,6 mm³ (celý nástroj) · těleso platné
+✓ Kvádr 3 (box) · přidáno 360000 mm³ · těleso platné
 
 Dokument: „Stírací deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 200 × 120 × 15 mm (X 0…200, Y 0…120, Z 0…15) · objem 360 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 3 [box, id #] ✓ – 200 × 120 × 15 mm, new, roh [0; 0; 0]
+ 1. Kvádr 3 [box, id #] ✓ přidáno 360000 mm³ · těleso platné – 200 × 120 × 15 mm, new, roh [0; 0; 0]
 === run 3 ===
 ✓ nová sestava „Střižník“ – nová záložka
 ✓ komponenta „Spodní deska“ vložena do sestavy (ukotvená)

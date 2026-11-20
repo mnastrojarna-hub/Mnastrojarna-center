@@ -4,6 +4,7 @@ import { asmStatus, staleNotes } from "../asm-status";
 import { buildDoc, docKeyOf, runOf } from "../run-doc";
 import { statusKv } from "../kv";
 import { asmHooks, sayKv, type OpHandler } from "./util";
+import { withValidity } from "../validity-store";
 
 export const statusOp: OpHandler<"status"> = async (op, ctx) => {
   const r = runOf(ctx);
@@ -13,5 +14,6 @@ export const statusOp: OpHandler<"status"> = async (op, ctx) => {
   // obálka sestavy přesně (engine/asm-box.ts) – stejně jako řádek D a `kontrola sestava`
   const asm = await asmStatus(ctx.ws, ctx.host.kernel, r.doc, { ...asmHooks(ctx), key: docKeyOf(ctx) });
   const stale = staleNotes(ctx.ws, r.doc, docKeyOf(ctx)); // měření / porovnání z dřívější revize dokumentu (engine/result-key.ts)
-  sayKv(ctx, statusKv(r.doc, res, asm, stale), docStatusText(r.doc, res, asm, stale));
+  const shown = withValidity(ctx.ws, docKeyOf(ctx), r.doc, res); // přesná kontrola téže geometrie (kontrola přesně / export)
+  sayKv(ctx, statusKv(r.doc, shown, asm, stale), docStatusText(r.doc, shown, asm, stale));
 };

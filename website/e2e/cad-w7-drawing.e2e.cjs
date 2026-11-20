@@ -145,7 +145,7 @@ const start = async (page) => { const c = page.getByText('Pokračovat v práci')
   const log1 = await run('výkres řez natočený horní body 100 30 50 30 70 15 otočit\nvýkres uložení dotaz 40 H7/g6\nvýkres stav');
   fs.writeFileSync(S + 'w7-drawing-log.txt', log1);
   ok(!/^✗/m.test(log1), 'textové příkazy bez chyb' + (/^✗.*$/m.exec(log1)?.[0] ? ' – ' + /^✗.*$/m.exec(log1)[0] : ''));
-  ok(/✓ řez E–E natočený \(pohled horní, 3 bodů\)/.test(log1), 'výkres řez natočený … otočit → ŘEZ E–E');
+  ok(/→ řez E–E natočený \(pohled horní, 3 bodů\)/.test(log1), 'výkres řez natočený … otočit → ŘEZ E–E');
   ok(/Ø40 H7\/g6: díra \+0,025\/0, hřídel −0,009\/−0,025/.test(log1), 'výkres uložení dotaz 40 H7/g6');
   ok(/Pomocné pohledy: B \(horní, hrana/.test(log1) && /Řezy lomenou čarou: C–C zalomený .* D–D natočený .* E–E natočený/.test(log1), 'stav: pomocný pohled a řezy lomenou čarou');
   ok(/Přerušení: 1 přední x 30…70|Přerušení: 1 přední x [\d,]+…[\d,]+/.test(log1) && /Částečné řezy: 1 přední hloubka 10/.test(log1), 'stav: přerušení a částečný řez');
@@ -158,7 +158,7 @@ const start = async (page) => { const c = page.getByText('Pokračovat v práci')
   await p.locator('[data-aux-row="B"] button[title="Smazat pohled"]').click();
   ok(await waitNoText('POHLED B'), 'smazání pomocného pohledu v panelu');
   const log2 = await run('výkres přerušení smazat vše\nvýkres řez smazat E\nvýkres zóny ne');
-  ok(/✓ smazána všechna přerušení \(1\)/.test(log2) && /✓ řez E–E smazán/.test(log2) && /✓ zóny listu vypnuty/.test(log2), 'smazání přerušení, řezu a vypnutí zón textem');
+  ok(/→ smazána všechna přerušení \(1\)/.test(log2) && /→ řez E–E smazán/.test(log2) && /→ zóny listu vypnuty/.test(log2), 'smazání přerušení, řezu a vypnutí zón textem');
   ok(await waitNoText('ŘEZ E–E'), 'ŘEZ E–E zmizel z listu');
 
   ok(errs.length === 0, 'bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));

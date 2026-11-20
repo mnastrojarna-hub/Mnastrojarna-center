@@ -643,8 +643,14 @@ JSON → \`setDocument()\`. Prvek se zadává názvem v uvozovkách (\`"Díra 1"
 | \`konfigurace "Krátká" t=10 [potlačit "Díra 1";"Pole 1"]\` · \`konfigurace aktivní "Krátká"|žádná\` · \`konfigurace smazat "Krátká"\` · \`konfigurace\` (EN \`config … suppress\`, \`config active\`, \`config delete\`; DE \`konfiguration … unterdrücken\`, \`konfiguration aktiv\`, \`konfiguration löschen\`; také \`varianta\`) | stavy dílu (varianty): hodnoty proměnných a potlačené prvky; založení konfiguraci neaktivuje |
 
 \`stav\` vypíše navíc řádky \`Vazby parametrů: Vysunutí 1.distance = h*2 (= 40)\` a \`Konfigurace: Krátká (aktivní), Dlouhá\`.
-Protokol úpravy: \`✓ Díra 1: diameter 8,5 → 10, depth 0 → 12\` a po výpočtu ✓ / ⚠ / ✗ upraveného prvku i prvků, které na
-něm závisejí. Neznámý klíč skončí chybou s výčtem parametrů prvku (\`„diametr“ není parametr prvku „Díra 1“ (hole) – parametry: …\`).
+Protokol úpravy: \`→ Díra 1: diameter 8,5 → 10, depth 0 → 12 – výsledek po výpočtu níže\` (ℹ \`op.accepted\` = příkaz
+přijat, to ještě není výsledek) a po výpočtu ✓ / ⚠ / ✗ upraveného prvku **na řádku úpravy**. ⚠ / ✗ prvků, které úprava
+(smazání, přesun, proměnná, konfigurace, entita nebo kóta skici, zpět) rozbila, jdou také na řádek té úpravy; řádek, který
+má ⚠ / ✗, nedostane žádné ✓ (prvek, který je sám v pořádku, je tam ℹ \`feature.built\`). Poslední úprava běhu, po které
+žádný prvek nezměnil stav (smazání, proměnná, konfigurace, zpět), dostane na svém řádku výsledek přepočtu celého
+dokumentu: \`✓ dokument „Deska“ postaven: prvků 4, bez ⚠ a ✗ · těleso platné\`; dřívější úpravy bez vlastního výsledku
+mají ℹ \`op.superseded\` (jejich mezistav se nestavěl). Příkaz, po kterém se nic nepřepočítává
+(přejmenování, smazání posledního prvku, proměnná v dílu bez prvků, zpět o právě přidaný prvek), je hned ✓. Neznámý klíč skončí chybou s výčtem parametrů prvku (\`„diametr“ není parametr prvku „Díra 1“ (hole) – parametry: …\`).
 
 **Úprava existující skici.** \`skica "Skica 1"\` (EN \`sketch "…"\`, DE \`skizze "…"\`; bez roviny, jen název v uvozovkách) znovu
 otevře hotovou skicu jako cíl dalších řádků – entity, \`vazba\`, \`kóta\` i níže uvedené úpravy jdou do ní (i na jednom řádku:
@@ -2311,6 +2317,9 @@ třídí. Nejčastější:
 | \`clash.thread\` ℹ, \`clash.underhead\` ℹ / \`clash.real\` ⚠ | \`kolize\`, \`kontrola sestava\` i \`pohyb … kolize\` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen \`clash.real\` řešit; \`pohyb krok N\` vypíše kolize kroku |
 | \`clash.undetermined\` ⚠ / \`clash.hidden\` ℹ | dvojici jádro nevyhodnotilo (booleovská operace selhala) nebo závit má neznámé označení (G 1/4, UNC…) / skryté komponenty se nekontrolují | závit zadat metricky (\`závit M10\`) |
 | \`feature.warning\` ⚠ / \`feature.failed\` ✗ / \`feature.unverified\` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
+| \`thread.tip-tangent\` / \`thread.no-reach\` / \`thread.wrong-side\` / \`thread.pitch-nonstandard\` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | \`přísně kromě thread.pitch-nonstandard\` |
+| \`geom.exact-invalid\` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
+| \`op.accepted\` ℹ / \`op.superseded\` ℹ / \`feature.unchecked\`, \`doc.unchecked\` ℹ / \`feature.built\` ℹ / \`feature.suppressed\` ℹ | příkaz přijat – výsledek přijde až po stavbě modelu / vyhodnocení listu výkresu; stav modelu po příkazu se samostatně nestavěl (následovala další změna – ověřen je až stav po uvedeném řádku); prvek (načtený dokument) vznikl, ale platnost tělesa se po něm nekontrolovala (důvod v textu); prvek vznikl, ale týž příkaz má ⚠/✗ jiného prvku; prvek je potlačený (přímo nebo konfigurací) a nestavěl se – **nic z toho není ✓** | u \`feature.unchecked\` zkontrolovat díl jinak (menší těleso, export STEP s kontrolou) |
 | \`drawing.section-miss\` ✗ / \`drawing.warning\`, \`drawing.overlap\` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů \`výkres …\` (opravený v témže bloku \`výkres upravit … posun=\` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, \`výkres upravit aN posun="dx dy"\` |
 | \`drawing.section-legacy\` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (\`dnes pište: …\` v hlášce) |
 | \`drawing.tolerance-missing\` ⚠ | \`výkres kontrola tolerancí\`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | \`výkres tolerance aN …\` |
@@ -2354,7 +2363,39 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
 
 ## Stav prvku: ✓ / ⚠ / ✗ – co znamená
 
-- Výsledek prvku se v protokolu vypíše **až po výpočtu** (řádek „→ … přidán“ jen potvrzuje zařazení do historie).
+- Výsledek prvku se v protokolu vypíše **až po výpočtu**. Řádek „→ … – výsledek po výpočtu níže“ (ℹ \`op.accepted\`) jen
+  potvrzuje přijetí příkazu – u nového prvku, u úpravy (\`upravit\`, \`smazat\`, \`přesunout\`, \`proměnná\`, \`konfigurace\`,
+  entita / kóta skici, \`zpět\`), u příkazů výkresu („… – výsledek po vyhodnocení listu níže“; pak ✓ „list … vyhodnocen bez
+  nálezů“ nebo ✗ / ⚠ listu) i u načtení dokumentu s prvky (JSON na řádku, \`otevřít\`, \`--open\`: po ověřovací stavbě na
+  řádku načtení ✗ / ⚠ vadného prvku, nebo ✓ „dokument … postaven: prvků N, bez ⚠ a ✗ · těleso platné“; ℹ \`doc.unchecked\`,
+  když se platnost tělesa nekontrolovala). Běžný (ne přísný) běh staví model jednou na konci – ověřen je tedy stav po
+  POSLEDNÍ změně. Řádek, po kterém přišla další změna a který nemá výsledek žádného prvku, dostane ℹ \`op.superseded\`
+  („stav modelu po tomto příkazu se samostatně nestavěl – ověřen je až stav po řádku N“): mezistav není ✓ ani ✗, jen
+  nezkontrolovaný. Kdo chce výsledek po každém řádku, pustí běh \`přísně\` (staví po každé operaci). **Žádný řádek
+  nedostane ✓ a později ✗.**
+- Stav má čtyři oddělené úrovně: **přijato** (ℹ) → **vznik prvku** (✗ \`feature.failed\`, když stavitel selže) → **účinek
+  booleovské operace** proti nástroji („úběr 352,1 mm³ (>99 % nástroje)“, „přidáno 2000 mm³ (celý nástroj)“; žádný účinek =
+  ⚠) → **konečné těleso** („těleso platné“, „2 těles, platná“, „žádné objemové těleso“, nebo „těleso nezkontrolováno (důvod)“).
+  Řádek výsledku je nese všechny: \`✓ Díra 1 (hole) · úběr 125,7 mm³ (12 % nástroje) · těleso platné\`; JSON má totéž
+  strojově v \`entries[].data.levels\` (\`built\`, \`effect {op, level: none|partial|full|changed, dV_mm3, tool_mm3}\`,
+  \`body {solids, free, valid: true|false|"unchecked"}\`).
+- Platnost tělesa se po prvku kontroluje do 400 ploch, větší těleso až na konci stavby (do 1000 ploch); nad to se
+  nekontroluje vůbec (těleso se měří ze sítě). Prvek bez kontroly **není ✓**, ale ℹ \`feature.unchecked\` s důvodem; řádek D
+  a \`= status\` pak mají \`valid=unchecked\` (jinak \`solids=N valid=1|0\`) a prvek se nepočítá do prvního čísla \`feat=\`
+  (✓), ale do \`unchecked=N\`. Plochy mimo objemová tělesa (volné plochy, pláště vedle tělesa) hlásí \`free=N\`.
+- Po stavbě proběhne **rychlá** kontrola platnosti (BRepCheck; odchylka hran od ploch jen v několika bodech) – řádek Geometrie
+  ve \`stav\` končí „· rychlá kontrola“. **Přesnou** kontrolu (odchylka počítaná přesně) spustí \`kontrola přesně\` (EN \`check
+  exact\`, DE \`prüfen genau\`; v aplikaci čip „platné · rychlá kontrola“ ve stavovém řádku) a sama proběhne před exportem
+  STEP / BREP do 400 ploch („✓ těleso: přesná kontrola platnosti … – platné“, vada = ⚠ \`geom.exact-invalid\`, nad limit ℹ
+  s důvodem). Výsledek platí pro tutéž geometrii: Geometrie pak končí „· přesná kontrola“, řádek D nese \`vcheck=exact\`
+  (bez klíče = rychlá kontrola), JSON \`docs[].validCheck\` = \`exact\` | \`fast\`. Model se kvůli exportu neupravuje
+  (žádné „opravy tolerancí“) – STEP je přesně model.
+- Potlačený prvek (\`potlačit\`, nebo potlačený aktivní konfigurací) se nestaví: má ℹ \`feature.suppressed\` („potlačen – nestaví
+  se“), nikdy ✓; ve výpisu \`stav\` „ℹ (potlačen)“ a počet „N ℹ potlačeno“, v řádku D \`off=N\` (nepočítá se do \`feat=\` mezi ✓).
+- Prvek objemového typu (primitiva, vysunutí, díra, zaoblení, pole, prvky rozšíření s operací přidat / odebrat a všechny
+  prvky rozšíření mimo kartu Plochy – plech, svařence, pružiny, pokročilé prvky), po kterém nezůstalo objemové těleso
+  nebo přibyly volné plochy, je ✗ u toho prvku („má dát objemové těleso, ale výsledek je jen plocha / plášť“) a těleso
+  zůstane jako před ním. Prvky ploch (\`surf.*\` bez operace) plochu dát smějí – jejich stav říká „žádné objemové těleso“.
 - **✓** = výsledek je platné objemové těleso a operace se projevila (objem nebo topologie se změnily).
 - **⚠** = prvek se zpracoval, ale výsledek si žádá pozornost:
   - *„Prvek těleso nezměnil“* / *„Prvek objem tělesa nezměnil (jen rozdělil plochy)“* – nástroj leží mimo těleso, jen se
@@ -2382,14 +2423,20 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
 - Skoro-dotyk se nikdy „nezaokrouhluje“: dvě díry, které se překrývají o 0,00001 mm, kanál, který prorazí plochu
   o 0,00001 mm, nebo nálitek s mezerou 0,00001 mm se postaví přesně tak, jak jsou zadané.
 - **✗** = operace selhala, těleso zůstalo jako před prvkem (např. skořepina, kterou jádro neumí, tažení bez objemu).
-- Řádek **Geometrie:** ve \`stav\` říká „platná · 1 těleso“, nebo „NEPLATNÁ“ / „ŽÁDNÉ objemové těleso (jen plochy)“.
+- Řádek **Geometrie:** ve \`stav\` říká „platná · 1 těleso“, „NEPLATNÁ“ / „ŽÁDNÉ objemové těleso (jen plochy)“, nebo
+  „nezkontrolováno (důvod)“ – kontrola, která neproběhla, se nikdy nevypíše jako platná.
   Pokles objemu ani „1 těleso“ samy o sobě správnost nedokazují – rozhoduje tento řádek a nepřítomnost ⚠.
 
 ## Závity – jak je zadat správně
 
-- Katalogový závit: \`závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]\` – hrubé i jemné stoupání
-  (M18×1,5, M10×1,25; jiné stoupání se dopočítá). Bez \`modelovat\` je kosmetický: geometrie se nemění, na výkrese
-  se kružnice válce (nebo jádra díry u \`vnitřní\`) kótuje označením. S \`modelovat\` vzniknou zjednodušené drážky.
+- Katalogový závit: \`závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat | šroubovice]\` – hrubé i jemné stoupání
+  (M18×1,5, M10×1,25; označení i s mezerami „m18 x 1,5“, × / x / X, čárka i tečka; CS / EN \`thread\` / DE \`gewinde\`).
+  Bez volby je kosmetický: geometrie se nemění, na výkrese se kružnice válce (nebo jádra díry u \`vnitřní\`) kótuje
+  označením. \`modelovat\` = zjednodušené soustružené drážky (bez stoupání), \`šroubovice\` (EN \`helix\`, DE \`schraubenlinie\`)
+  = **skutečná šroubovice** z označení – stejné jádro i čísla jako Tažení po šroubovici níže (vnější: povrch Ø d, hloubka
+  0,6134·P; vnitřní: povrch D1/2, hloubka 0,5413·P do stěny, špička na d/2 – díra vrtaná vrtákem závitu Ø16,5 u M18×1,5).
+  Jemné stoupání CAD umí v obou cestách; stoupání mimo řadu ISO 261 (např. M18×3 nebo M18×1,25 – řada M18 je 2,5 / 2 /
+  1,5 / 1) se postaví, ale dostane ⚠ \`thread.pitch-nonstandard\` (i u díry se závitem a u kosmetického závitu).
 - Díra se závitem: \`díra závit M18×1,5 hloubka 20 v x y\` – vrták (Ø16,5) se dopočítá z označení; zadaný průměr
   (\`díra 16,4 závit M18×1,5 …\`) má přednost, \`jádro\` = D1 podle ISO 965-1 (16,376).
 - Skutečná šroubovice (Plochy → Tažení po šroubovici, JSON \`{"type":"ext","ext":"surf.helixSweep","data":{…}}\`):
@@ -2398,8 +2445,14 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
   volitelně \`leadIn\` (náběh jako u závitového kalibru: hřbet prvního závitu je od začátku vybroušený až na dno drážky
   a během N otáček se zvedá do plného profilu – drážka sama je plná od začátku).
   Příklad matice M18×1,5 s jádrem Ø16,4: \`radius: 8.2, depth: 0.8, pitch: 1.5, turns: 12, side: "internal"\`.
+  Závit z katalogu místo čísel: \`prvek surf.helixSweep profile=thread60 thread=M18×1,5 side=internal turns=12 mode=cut\`
+  (\`thread\` vyplní poloměr, stoupání a hloubku podle strany – zadané radius / pitch / depth se pak nepoužijí).
   JSON prvku na jednom řádku lze míchat s textovými příkazy (\`trubka 42 16,4 30\`, další řádek \`{"type":"ext",…}\`, \`stav\`).
-  Špička profilu nesmí být tečná k povrchu (např. radius 9 + depth 0,8 u díry Ø16,4) – takový výsledek je ⚠.
+  Program ověří, že drážka řeže povrch, na kterém závit vzniká (body profilu ve 12 místech šroubovice proti tělesu před
+  prvkem): špička tečná k povrchu (radius 9 + depth 0,8 u díry Ø16,4) = ⚠ \`thread.tip-tangent\`; drážka celá v materiálu
+  (side=internal s radius 9 v díře Ø16,4 – skrytý kanál) = ⚠ \`thread.no-reach\`; drážka ústí do povrchu jen špičkou
+  (obrácená strana, radius 9 + depth 0,82 u díry Ø16,4) = ⚠ \`thread.wrong-side\`. Hláška radí side a radius podle nalezeného
+  povrchu. Drážka, která odebrala celý nástroj (žádná část profilu ve vzduchu), je ⚠ \`thread.no-reach\` vždy.
 - Na **výkrese** se modelované závity kreslí zjednodušeně (ISO 6410): hladký válec / díra s označením „M18×1,5 dl. 18“;
   skutečná šroubovice je jen v 3D a ve STEP (přesná projekce šroubovice by trvala minuty).
 
@@ -2540,7 +2593,8 @@ prvkem do jednoho řádku (\`⚠ L76-L90 ×8 feature.warning "Matrice": 8 prvků
 „Rotace 1, Vysunutí 2, …“\`) a stejně varování listů výkresu (\`… drawing.warning "Sestava": 5 listů: N ručních úprav kót
 se nepodařilo přiřadit … – „01 Deska: 1, …“\`); plný protokol a JSON mají každý prvek / list zvlášť.
 
-\`status\` má tytéž klíče jako řádek \`D\` (u dílu \`feat=✓/⚠/✗ V= m= bbox= solids= valid=\`). Výpis bez strojových údajů
+\`status\` má tytéž klíče jako řádek \`D\` (u dílu \`feat=✓/⚠/✗ V= m= bbox= solids= valid=1|0|unchecked\`, podle stavu
+\`free=N\` – plochy mimo tělesa – a \`unchecked=N\` – prvky bez kontroly platnosti, které nejsou v \`feat\` mezi ✓; \`off=N\` – potlačené prvky). Výpis bez strojových údajů
 (nápověda, záložky, kusovník, vazby, CSV) má v prvním řádku jen \`lines=<n>\` a jeho řádky jsou odsazené pod ním – to je
 volný text v jazyce běhu. Lokalizovaný text měření a stavu (jako v konzoli) je v \`--full\` / \`protocol-full.txt\` a v JSON
 \`entries[].detail\`; \`entries[].text\` je strojová část.

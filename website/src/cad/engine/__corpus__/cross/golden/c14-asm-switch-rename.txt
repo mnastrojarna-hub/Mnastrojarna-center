@@ -12,9 +12,9 @@
 ✓ nová sestava „B“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)
 ✓ komponenta „Deska“ vložena do sestavy
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Válec 1 (cylinder)
+✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 865,9 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2356,2 mm³ · těleso platné
 
 Dokument: „B“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Deska [40; 0; 0]

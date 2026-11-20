@@ -4,29 +4,30 @@
 ✓ 2 entity do skici „Skica 1“ (e1, e2)
 → Vysunutí 1 (extrude) přidán – výsledek po výpočtu níže
 ✓ Skica 1 (sketch)
-✓ Vysunutí 1 (extrude)
+✓ Vysunutí 1 (extrude) · přidáno 3858,6 mm³ · těleso platné
 
 Dokument: „Úprava skici“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 40 × 20 × 5 mm (X -20…20, Y -10…10, Z 0…5) · objem 3,86 cm³ · ploch 8 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 2 entit: obdélník 40×20, kružnice Ø6
     entity: e1 obdélník 40×20 [0; 0] · e2 kružnice Ø6 [10; 0]
     profil: 2 uzavřené obrysy (e1; e2) ✓
- 2. Vysunutí 1 [extrude, id #] ✓ – 5 mm, new
+ 2. Vysunutí 1 [extrude, id #] ✓ přidáno 3858,6 mm³ · těleso platné – 5 mm, new
 === run 2 ===
 ✓ skica „Skica 1“ je cílem dalších řádků (entity, vazby, kóty, entita, smazat e…, kóta k…) – entity: e1, e2; vazby: —; kóty: —
-✓ entita e1 ve skice „Skica 1“: w 40 → 60 = e1 obdélník 60×20 [0; 0]
+→ entita e1 ve skice „Skica 1“: w 40 → 60 = e1 obdélník 60×20 [0; 0] – výsledek po výpočtu níže
+ℹ řádek 2: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 4
 ✓ kóty ve skice „Skica 1“: průměr e2 8 → Nedourčeno (7 st. volnosti)
-✓ ze skici „Skica 1“ smazáno: e2 kružnice Ø8 [10; 0] (s entitami i vazby 0 a kóty 1)
+→ ze skici „Skica 1“ smazáno: e2 kružnice Ø8 [10; 0] (s entitami i vazby 0 a kóty 1) – výsledek po výpočtu níže
 ✓ Skica 1 (sketch)
-✓ Vysunutí 1 (extrude)
+✓ Vysunutí 1 (extrude) · přidáno 6000 mm³ · těleso platné
 
 Dokument: „Úprava skici“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 60 × 20 × 5 mm (X -30…30, Y -10…10, Z 0…5) · objem 6 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 60×20
     entity: e1 obdélník 60×20 [0; 0]
     profil: 1 uzavřený obrys (e1) ✓
- 2. Vysunutí 1 [extrude, id #] ✓ – 5 mm, new
+ 2. Vysunutí 1 [extrude, id #] ✓ přidáno 6000 mm³ · těleso platné – 5 mm, new

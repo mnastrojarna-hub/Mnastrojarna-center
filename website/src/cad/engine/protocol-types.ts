@@ -34,7 +34,8 @@ export type DocSummary = {
   kind: "part" | "assembly" | "draft";
   /** hlavní dokument běhu (`--doc`, jinak poslední sestava, jinak aktivní) – jeho řádek D je ve stručném protokolu vždy */
   main?: boolean;
-  features?: { ok: number; warn: number; error: number };
+  /** `unchecked` = prvky, po kterých se platnost tělesa nekontrolovala, `off` = potlačené prvky (nestavěly se) – nejsou v `ok` (vlna 22) */
+  features?: { ok: number; warn: number; error: number; unchecked?: number; off?: number };
   /** objem dílu; u sestavy součet objemů komponent (V.sum, rozhodnutí 15.1) */
   volume_mm3?: number;
   /** u sestavy objem sjednocení komponent bez překryvů (V.union, rozhodnutí 15.1) – když se počítal */
@@ -50,6 +51,14 @@ export type DocSummary = {
   mates?: { total: number; ok: number; conflict: number; missing: number; suppressed: number; /** ztracené reference (vlna 22, bod 20) */ lost?: number };
   clashes?: { total: number; thread: number; real: number; undetermined: number; /** prstenec pod hlavou šroubu (ℹ clash.underhead) */ underhead?: number };
   sheets?: number;
+  /** díl: počet objemových těles (vlna 22 – úroveň „konečné těleso“) */
+  solids?: number;
+  /** díl: plochy mimo objemová tělesa (volné plochy, pláště) – jen když nějaké jsou (řádek D `free=N`) */
+  free?: number;
+  /** díl: platnost tělesa (BRepCheck); `null` = nezkontrolováno (řádek D `valid=unchecked`) */
+  valid?: boolean | null;
+  /** díl: kterou kontrolou platnost vznikla – rychlá BRepCheck po stavbě, nebo přesná (řádek D `vcheck=exact`; vlna 22, bod 22a) */
+  validCheck?: "fast" | "exact";
   /**
    * druhy uložených výsledků dokumentu, které pro jeho konečný stav neplatí (řádek D `stale=clash,mates,motion,measure,compare`;
    * engine/result-key.ts `staleResults`) – výsledek vznikl pro jinou revizi geometrie, konfiguraci nebo polohu

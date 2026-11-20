@@ -1,0 +1,20 @@
+=== run 1 ===
+ℹ objem a hmotnost jsou přibližné (ze sítě)
+✓ nový díl „Mřížka“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Pole 1 (pattern) přidán – výsledek po výpočtu níže
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 8 mm³ · těleso platné
+ℹ Pole 1 (pattern) · přidáno 1432 mm³ (celý nástroj) · 180 těles, platnost nezkontrolována (velké těleso, 1085 ploch – měřeno ze sítě, platnost se nekontroluje)
+ℹ Kvádr 2 (box) · úběr 0,5 mm³ (50 % nástroje) · 180 těles, platnost nezkontrolována (velké těleso, 1085 ploch – měřeno ze sítě, platnost se nekontroluje)
+⚠ Kvádr 3 (box): Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.
+
+Dokument: „Mřížka“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (1 ✓, 2 ℹ nezkontrolováno, 1 ⚠, 0 ✗)
+Rozměry: 718 × 2 × 2 mm (X 0…718, Y 0…2, Z 0…2) · objem 1,44 cm³ · ploch 1085 · hran 2172
+Geometrie: nezkontrolováno (velké těleso, 1085 ploch – měřeno ze sítě, platnost se nekontroluje) · 180 těles
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 8 mm³ · těleso platné – 2 × 2 × 2 mm, new, roh [0; 0; 0]
+ 2. Pole 1 [pattern, id #] ℹ přidáno 1432 mm³ (celý nástroj) · 180 těles, platnost nezkontrolována (velké těleso, 1085 ploch – měřeno ze sítě, platnost se nekontroluje) – lineární 180× po 4
+ 3. Kvádr 2 [box, id #] ℹ úběr 0,5 mm³ (50 % nástroje) · 180 těles, platnost nezkontrolována (velké těleso, 1085 ploch – měřeno ze sítě, platnost se nekontroluje) – 1 × 1 × 1 mm, cut, roh [0,5; 0,5; 1,5]
+ 4. Kvádr 3 [box, id #] ⚠ Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry. – 1 × 1 × 1 mm, cut, roh [2,5; 0,5; 1,5]

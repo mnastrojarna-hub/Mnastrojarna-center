@@ -19,7 +19,8 @@ import { assertDrawable, bytesToBase64, drawingOutput, hasDrawings, isEmptyDoc, 
 import { sha256Hex } from "../host";
 import { quote } from "../protocol";
 import type { OutFile } from "../protocol-types";
-import { runOf } from "../run-doc";
+import { docKeyOf, runOf } from "../run-doc";
+import { exactBeforeExport } from "../validity-store";
 import { lastShareLink, rememberLink, shareInfo, shareWithPolicy, type LastLink } from "../share-out";
 import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
 import { runExportJob } from "../export-job";
@@ -116,6 +117,8 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   if (cmd.format === "mncad") return saveProject(ctx, e, cmd, tr("export MNCAD"));
   const d = runOf(ctx).doc;
   const fmt = cmd.format;
+  // objemový formát: přesná kontrola platnosti před exportem (do 400 ploch sama, jinak řekne, že proběhla jen rychlá – 22a)
+  const pre = (fmt === "step" || fmt === "brep") && cmd.check !== false ? await exactBeforeExport(ctx.host.kernel, ctx.ws, docKeyOf(ctx), d) : null;
   const name = outFileName(cmd.name, plainName(d.name), FORMAT_EXT[fmt]);
   // export jako úloha s fázemi (vlna 22, bod 22h – engine/export-job.ts): přestavba modelu, převod, zápis, kontrola
   // zpětným načtením; pořadí řádků protokolu jako dřív (soubor, pak kontrola); fáze hlásí hostitel (CLI --progress, běh v GUI)
@@ -133,6 +136,13 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   if (!f) return;
   f.modelRev = job.modelRev;
   f.phases = job.phases;
+  if (pre) {
+    if (pre.level === "ok") {
+      e.console(`  ✓ ${pre.text}`);
+      e.ok(pre.text);
+    } else if (pre.level === "warn") e.code("geom.exact-invalid", { args: [d.name, pre.text], indent: "  " });
+    else e.code("msg.note", { text: pre.text, indent: "  " });
+  }
   if (fmt !== "step" && fmt !== "brep") return;
   if (cmd.check === false) {
     e.console(tr("  – kontrola {0} vynechána („bez kontroly“)", fmt.toUpperCase()));
