@@ -118,6 +118,8 @@ export const CODES = [
   /** odsazení řezu ve starším zápisu (souřadnice na ose) vyloženo postaru – automatický výklad vstupu (přísný režim = ✗) */
   { code: "drawing.section-legacy", level: "warn", key: "starší zápis odsazení řezu vyložen postaru: {0}" },
   { code: "drawing.overlap", level: "warn", key: "překryv na listu {0}: {1}" },
+  // kusovník se na list nevejde ani ve sloupcích (vlna 22, bod 17) – rada: větší formát / kusovník na samostatném listu
+  { code: "drawing.bom-overflow", level: "warn", key: "list {0}: {1}" },
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
   // kontrola kót pro výrobní úplnost (vlna 22, bod 18 – cad/dim-complete.ts): chybí velikost / poloha prvku; přetolerování (ℹ)
   { code: "drawing.dims-incomplete", level: "warn", key: "list {0}: {1}" },
