@@ -4,6 +4,10 @@
 //    příkaz `sestava obnovit` – pak kusovník i CSV nesou DA-001 / 1.2379 a upozornění zmizí;
 //  - 19: výběr „Druh v kusovníku“ (data-supply-select) → nakupovaný; Katalogové číslo; Kusovník v oddílech
 //    (data-bom-section make/standard/buy), normálie s třídou 12.9 a kolík s m6; text v konzoli dává totéž.
+//  - D2 (bod 20, výkresy a výstupy): vydaný list nese revizi modelu (odznak rev. A na záložce listu, data-sheet-issued),
+//    po změně modelu odznak ⚠ (data-sheet-stale) a pruh „Model se změnil po vydání rev. A“ (data-drawing-stale-banner)
+//    s tlačítkem „Vydat novou revizi B“ (data-issue-new); panel „Zastaralé výstupy“ v rohu 3D okna (data-outputs-chip,
+//    data-outputs-item) a „Přepočítat vše“ (data-recompute-all) = text `přepočítat vše`; patička listu „Model r·…“.
 // Spuštění (fáze 2): bin/e2e-run <worktree>/website 3534 <out> cad-w22-d   (E2E_BASE nastaví e2e-run)
 const { chromium } = require('playwright');
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -107,6 +111,49 @@ async function scenario(args, label) {
   const sections = await p.locator('[data-bom-section]').evaluateAll((els) => els.map((e) => e.getAttribute('data-bom-section')));
   ok(JSON.stringify(sections) === JSON.stringify(['make', 'standard', 'buy']), `${label}: okno Kusovník – oddíly ${JSON.stringify(sections)}`);
   await closeModal();
+
+  // ── D2 (bod 20): vydání listu, zastaralý list, panel Zastaralé výstupy ──
+  await openConsole();
+  log = await run('nový díl "Deska V"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres vydat\nexport step');
+  ok(/✓ list „List 1“ vydán jako rev\. A z modelu r·[0-9a-f]{6}/.test(log), `${label}: výkres vydat → rev. A z modelu r·…`);
+  await closeConsole();
+  await p.waitForTimeout(1500);
+  const issued = p.locator('[data-sheet-issued="A"]').first();
+  await issued.waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await issued.count()) === 1 && (await issued.getAttribute('data-sheet-stale')) === null, `${label}: záložka listu – odznak rev. A bez ⚠`);
+  ok(/model r·[0-9a-f]{6}/.test(await p.locator('[data-model-rev]').first().innerText().catch(() => '')), `${label}: lišta listů ukazuje revizi modelu`);
+  // změna modelu textem → list zastaralý: odznak ⚠, pruh s tlačítky
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska V"\nupravit "Kvádr 1" size=30;40;10\nvýkres stav');
+  ok(/⚠ Vydání: rev\. A z modelu r·\w{6} .* list je ZASTARALÝ/.test(log) && /drawing\.stale|vydaný výkres neodpovídá modelu/.test(log), `${label}: výkres stav po změně – ⚠ zastaralý list`);
+  await closeConsole();
+  const chip = p.locator('[data-outputs-chip]').first();
+  await chip.waitFor({ timeout: 20000 }).catch(() => {});
+  ok(Number(await chip.getAttribute('data-outputs-chip').catch(() => '0')) >= 2, `${label}: odznak Zastaralé výstupy (list + STEP)`);
+  await chip.click().catch(() => {});
+  const kinds = await p.locator('[data-outputs-item]').evaluateAll((els) => els.map((e) => e.getAttribute('data-outputs-item')));
+  ok(kinds.includes('sheet') && kinds.includes('export'), `${label}: panel – položky ${JSON.stringify(kinds)}`);
+  await p.locator('[data-recompute-all]').first().click().catch(() => {});
+  const res = p.locator('[data-recompute-result]').first();
+  await res.waitFor({ timeout: 120000 }).catch(() => {});
+  const resText = await res.innerText().catch(() => '');
+  ok(/Zbývá udělat ručně \(2\)/.test(resText) && /výkres vydat B/.test(resText) && /export step/.test(resText), `${label}: Přepočítat vše – vypíše, co musí udělat člověk`);
+  // výkres: pruh + nová revize tlačítkem
+  await openConsole();
+  await run('výkres');
+  await closeConsole();
+  const banner = p.locator('[data-drawing-stale-banner="A"]').first();
+  await banner.waitFor({ timeout: 30000 }).catch(() => {});
+  ok((await banner.count()) === 1 && (await p.locator('[data-sheet-stale="1"]').count()) >= 1, `${label}: výkres – pruh „Model se změnil po vydání rev. A“ a odznak ⚠`);
+  await p.locator('[data-issue-new="B"]').first().click().catch(() => {});
+  await p.waitForTimeout(1500);
+  ok((await p.locator('[data-sheet-issued="B"]').count()) === 1 && (await p.locator('[data-drawing-stale-banner]').count()) === 0, `${label}: Vydat novou revizi B → odznak rev. B, pruh zmizel`);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska V"\nvýstupy');
+  ok(/List 1: Vydání: rev\. B z modelu r·\w{6} .* – odpovídá modelu/.test(log) && /Zastaralé výstupy \(1\)/.test(log), `${label}: výstupy – list rev. B odpovídá, zbývá jen STEP`);
+  await closeConsole();
 
   ok(errs.length === 0, `${label}: bez chyb stránky ${errs.slice(0, 2).join(' | ')}`);
   await b.close();

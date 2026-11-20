@@ -223,6 +223,32 @@ describe("softwarový náhled – čela řezu komponent sestavy", () => {
     expect([rp.data[o], rp.data[o + 1], rp.data[o + 2]]).toEqual(DEFAULT_CAP);
   });
 
+  it("díl s více tělesy jako jedna komponenta (i list podsestavy): čelo dostane každé těleso", () => {
+    // dvě tělesa jedné komponenty v jedné síti (jak je posílá jádro), vedle druhé komponenty
+    const b1 = box([0, 0, 0], [15, 30, 20], [185, 194, 204]);
+    const b2 = box([25, 0, 0], [40, 30, 20], [185, 194, 204]);
+    const nv = b1.vertices.length / 3;
+    const multi: SoftItem = {
+      vertices: new Float32Array([...b1.vertices, ...b2.vertices]),
+      triangles: new Uint32Array([...b1.triangles, ...[...b2.triangles].map((i) => i + nv)]),
+      color: [185, 194, 204],
+    };
+    const st = softCapStyles([{ id: "podsestava/deska-a", color: "#b9c2cc" }, comps[1]], "shadedEdges");
+    const its: SoftItem[] = [
+      { ...multi, capColor: st[0]!.fill, capHatch: null },
+      { ...items[1], capColor: st[1]!.fill, capHatch: null },
+    ];
+    const r = softRender({ width: W, height: H, items: its, camera, clip, edges: false });
+    for (const x of [7, 32]) {
+      const [px, py] = toScreen(camera, [x, 15, 10]);
+      const o = (py * W + px) * 4;
+      expect([r.data[o], r.data[o + 1], r.data[o + 2]]).toEqual(st[0]!.fill);
+    }
+    // mezera mezi tělesy (x 15…25) čelo nemá – je za ní vidět jen pozadí
+    const [gx, gy] = toScreen(camera, [20, 15, 10]);
+    expect(r.data[(gy * W + gx) * 4 + 3]).toBe(0);
+  });
+
   it("zobrazení „skryté hrany“: čela bílá s antracitovými šrafami (ne bílá jako povrch bez šraf)", () => {
     const hl = asmItems(comps, "hiddenLine");
     const r = softRender({ width: W, height: H, items: hl, camera, clip, flatColor: [255, 255, 255] });

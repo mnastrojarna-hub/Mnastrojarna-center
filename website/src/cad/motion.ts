@@ -17,6 +17,8 @@ import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, 
 import { DEFAULT_STUDY_DURATION, motorIsAbsolute, motorKeys, motorMeaningText, motorNotes, profileAt, type MotorInfo, type MotorNote } from "./motor-model";
 import { levelLine, levelOf, studyMode, type LevelInfo } from "./motion-mode";
 import { devText, eqResidual, freeLimits, isLimitMate, limitGap, mateDev, mateName, mateTerm, preferTerms, solveStep, springDev, springEnergyTerm, springStopTerm, springTerms, type MateDev, type Term } from "./motion-quasi";
+import type { PoseAt } from "./motion-clearance";
+import { clearanceCsvCells, clearanceCsvHead, clearanceSummaryLines } from "./clearance-report";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách, místo průniku, třída – clash-rules.ts) */
@@ -143,7 +145,13 @@ export async function runMotion(
   doc: CadDoc,
   geo: GeoProvider,
   study: MotionStudy,
-  opts: { collide?: (d: CadDoc) => Promise<MotionClashes>; onStep?: (k: number, n: number, info?: { ms: number; solveMs: number; collideMs: number }) => void; cancel?: () => boolean } = {},
+  opts: {
+    collide?: (d: CadDoc) => Promise<MotionClashes>;
+    onStep?: (k: number, n: number, info?: { ms: number; solveMs: number; collideMs: number }) => void;
+    cancel?: () => boolean;
+    /** po každém kroku: vůle a spojitá kontrola úseku (předchozí krok → tento) s mezipolohami z řešiče (vlna 22, bod 6 – motion-clearance.ts) */
+    between?: (row: MotionStep, prev: MotionStep | null, poseAt: PoseAt) => Promise<void>;
+  } = {},
 ): Promise<MotionResult> {
   const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
   const tStart = now();
@@ -260,6 +268,32 @@ export async function runMotion(
   const trace = study.trace && poses.has(study.trace.compId) ? study.trace : undefined;
   const hasSprings = springComps(doc).length > 0;
   let undetermined: MotionUndetermined[] = [];
+  /**
+   * mezipoloha v čase `tm` pro zjemnění úseku (vlna 22, bod 6): řešič z polohy `seed` (předchozí krok) s motory v čase `tm`, úhly
+   * se rozbalují vůči stavu posledního kroku; stav řešiče (polohy, cíle motorů) se pak obnoví. Nesplněné vazby → null.
+   */
+  const solveAt = (tm: number, seed: Record<string, Placement>): ReturnType<PoseAt> => {
+    const keep = new Map(poses);
+    const targets = motors.map((x) => x.target);
+    try {
+      for (const [id, pl] of Object.entries(seed)) if (poses.has(id)) poses.set(id, poseOf(pl));
+      const vals = motors.map((x) => profileAt(x.prof, tm, { k: (tm / duration) * n, n }));
+      motors.forEach((x, i) => (x.target = vals[i]));
+      // týž krok s prioritou jako krok studie (motion-quasi.ts solveStep, vlna 22 bod 8); mezipoloha jen ze splněného kroku
+      const out = solveStep(poses, vars, terms, { groups, maxIter: 60, atLimit: "error" });
+      if (out.status !== "ok") return null;
+      const place: Record<string, Placement> = {};
+      for (const c of comps) {
+        const P = poses.get(c.id);
+        if (P) place[c.id] = placementOf(P);
+      }
+      return { place, motors: vals, t: tm };
+    } finally {
+      poses.clear();
+      for (const [id, P] of keep) poses.set(id, P);
+      motors.forEach((x, i) => (x.target = targets[i]));
+    }
+  };
   for (let k = 0; k <= n; k++) {
     if (opts.cancel?.()) break;
     const t = (duration * k) / n;
@@ -276,8 +310,11 @@ export async function runMotion(
     timing.solveMs += now() - tStep;
     // díly volné v mezi (vazby jejich polohu neurčují): jednou na studii v poloze kroku 0
     if (k === 0) undetermined = findUndetermined();
-    // záznam kroku: rozbalené úhly → stav pro další krok
+    // záznam kroku: rozbalené úhly → stav pro další krok (vyhodnocení všech členů v poloze kroku zapíše rozbalené úhly motorů
+    // a mechanických vazeb – Ozubení, Šroub, Hřeben – jako dřívější kontrola zbytků)
     rec = new Map();
+    for (const t of terms.hard) t.r();
+    for (const t of terms.drive) t.r();
     const conflicts = out.status === "ok" ? [] : [...new Set([...out.short.map((id) => (motorOfTerm(id)?.abs ? id : `motor:${motorOfTerm(id)?.mo.id ?? id}`)), ...out.blocking.filter((id) => mateById.get(id)?.type !== "fixed")])];
     const reached = out.status === "stopped" ? motors.map((x) => {
       const v = dofValue(x.m, x.mo.kind, ctx);
@@ -318,6 +355,11 @@ export async function runMotion(
       row.clashes = clashes.map((c) => ({ ...c })); // i cesty listů (podsestavy), místo a třída (vlna 22, bod 5)
       const hit = row.clashes.find((c) => isFault(c.cls)); // první SKUTEČNÁ kolize (šroub v závitu není kolize)
       if (hit && !collision) collision = { ...hit, step: k, t };
+    }
+    // vůle a spojitá kontrola úseku (k−1, k) – mezipolohy řešičem (vlna 22, bod 6)
+    if (opts.between) {
+      const prev = steps[steps.length - 1] ?? null;
+      await opts.between(row, prev, (tm) => solveAt(tm, prev?.place ?? place));
     }
     steps.push(row);
     const stepMs = now() - tStep;
@@ -418,6 +460,8 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
   // pružiny na konci řádku (dřívější sloupce zůstávají na svých místech): délka a síla
   const springIds = [...new Set(res.steps.flatMap((s) => Object.keys(s.springs ?? {})))];
   for (const id of springIds) head.push(`${key(id, id)} L [mm]`, `${key(id, id)} F [N]`);
+  const clrHead = clearanceCsvHead(res, doc); // vůle sledovaných dvojic na konci řádku (vlna 22, bod 6)
+  head.push(...clrHead);
   const lines = res.steps.map((s) => {
     const row = [String(s.i), num(s.t, 6), ...s.motors.map((v) => num(v, 6))];
     for (const c of res.comps) {
@@ -432,6 +476,7 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
       const sp = s.springs?.[id];
       row.push(sp ? num(sp.length, 6) : "", sp?.force !== undefined ? num(sp.force, 3) : "");
     }
+    if (clrHead.length) row.push(...clearanceCsvCells(res, s.i));
     return row.map(esc).join(";");
   });
   return "﻿" + [head.map(esc).join(";"), ...lines].join("\r\n") + "\r\n";
@@ -481,6 +526,7 @@ export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLine
   else if (res.collisionsChecked) out.push(...motionClashSummary(res, doc, { every: (res as { dynamic?: { clashEvery?: number } }).dynamic?.clashEvery }).lines);
   // „Vazby splněny“ jen tam, kde vazby polohu určují: díl volný v mezi (kinematika ho nechává, kde byl) = ⚠, ne výsledek (bod 2)
   const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  out.push(...clearanceSummaryLines(res, doc)); // vůle sledovaných dvojic (vlna 22, bod 6 – clearance-report.ts)
   out.push(
     res.conflictSteps
       ? tr("⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)", res.conflictSteps)

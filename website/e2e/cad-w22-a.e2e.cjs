@@ -67,7 +67,7 @@ async function clashFlow(p, tag) {
   await kolize();
   ok(await waitState('ok'), `[${tag}] Kolize na sestavě A: panel ve stavu ok`);
   const a = await panel();
-  ok(a && /Bez kolizí ✓/.test(a.text) && a.name === 'Sestava A', `[${tag}] A: titulek „Bez kolizí ✓“ patří sestavě A (${a && a.name})`);
+  ok(a && /Bez průniku · vůle nekontrolována/.test(a.text) && !/✓/.test(a.text.split('\n')[0]) && a.name === 'Sestava A', `[${tag}] A: titulek „Bez průniku · vůle nekontrolována“ (vlna 22 C2, dřív „Bez kolizí ✓“) patří sestavě A (${a && a.name})`);
   ok(a && /„Sestava A“ · 2 komponent · [^·]+ · r·[0-9a-f]{6} · poloha z dokumentu/.test(a.text), `[${tag}] A: hlavička výsledku = dokument · komponenty · čas · revize · poloha\n   ${a && a.text.split('\n').find((l) => l.includes('zkontrolováno'))}`);
   ok(a && /^r·[0-9a-f]{6}$/.test(a.rev) && a.pose === 'doc' && !!a.doc, `[${tag}] A: data-clash-rev / pose / doc vyplněné (${a && [a.rev, a.pose].join(', ')})`);
   await p.screenshot({ path: `${S}w22a-${tag}-1-A-ok.png` });
@@ -77,7 +77,7 @@ async function clashFlow(p, tag) {
   const b0 = await panel();
   ok(b0 && b0.state === 'unchecked', `[${tag}] po přepnutí na B je panel „nezkontrolováno“ (stav ${b0 && b0.state})`);
   ok((await p.locator('[data-clash-state="ok"]').count()) === 0, `[${tag}] B: žádný prvek s data-clash-state=ok`);
-  ok(b0 && !/Bez kolizí|✓/.test(b0.text) && /Nezkontrolováno – pro tuto sestavu kontrola kolizí neproběhla/.test(b0.text), `[${tag}] B: text „Nezkontrolováno…“, žádné „Bez kolizí ✓“\n   ${b0 && b0.text.replace(/\n/g, ' | ')}`);
+  ok(b0 && !/Bez kolizí|Bez průniku|✓/.test(b0.text) && /Nezkontrolováno – pro tuto sestavu kontrola kolizí neproběhla/.test(b0.text), `[${tag}] B: text „Nezkontrolováno…“, žádné „Bez kolizí ✓“\n   ${b0 && b0.text.replace(/\n/g, ' | ')}`);
   ok(b0 && b0.doc !== a.doc && b0.name === 'Sestava B' && b0.rev === '', `[${tag}] B: panel patří dokumentu B (jiný klíč), bez revize výsledku`);
   ok(!/2 komponent/.test(b0.text), `[${tag}] B: počet komponent z kontroly A (2) se nad B neukazuje`);
   ok(/Kolize: nezkontrolováno/.test(await status()), `[${tag}] B: textový stav „Kolize: nezkontrolováno“`);
@@ -101,7 +101,7 @@ async function clashFlow(p, tag) {
   await z.press('Enter');
   ok(await waitState('stale'), `[${tag}] A po posunu přidržovače do desky: panel „neplatí“`);
   const a3 = await panel();
-  ok(a3 && /Neplatí – sestava se od kontroly změnila/.test(a3.text) && /Zkontrolovat znovu/.test(a3.text) && !/Bez kolizí|✓/.test(a3.text), `[${tag}] A: „Neplatí – sestava se od kontroly změnila“ + „Zkontrolovat znovu“, žádná zelená\n   ${a3 && a3.text.replace(/\n/g, ' | ')}`);
+  ok(a3 && /Neplatí – sestava se od kontroly změnila/.test(a3.text) && /Zkontrolovat znovu/.test(a3.text) && !/Bez kolizí|Bez průniku|✓/.test(a3.text), `[${tag}] A: „Neplatí – sestava se od kontroly změnila“ + „Zkontrolovat znovu“, žádná zelená\n   ${a3 && a3.text.replace(/\n/g, ' | ')}`);
   ok((await p.locator('[data-clash-state="ok"]').count()) === 0, `[${tag}] A po změně: žádné data-clash-state=ok`);
   const st = await status();
   ok(/NEPLATÍ: sestava se od kontroly změnila/.test(st), `[${tag}] A po změně: textový stav „NEPLATÍ…“`);
@@ -121,7 +121,7 @@ async function clashFlow(p, tag) {
   ok((await zNow()) === 30, `[${tag}] krok zpět vrátil přidržovač na Z = 30`);
   ok(await waitState('stale'), `[${tag}] A po kroku zpět: výsledek kontroly pro jiný stav sestavy „neplatí“`);
   const a5 = await panel();
-  ok(a5 && !/Bez kolizí|✓/.test(a5.text), `[${tag}] A po kroku zpět: žádná zelená (stav ${a5 && a5.state})`);
+  ok(a5 && !/Bez kolizí|Bez průniku|✓/.test(a5.text), `[${tag}] A po kroku zpět: žádná zelená (stav ${a5 && a5.state})`);
   return { tab, run, status, idle, panel, waitState, kolize };
 }
 
@@ -151,7 +151,7 @@ const browsers = [];
   const toast = await p.waitForFunction(() => { const t = document.body.innerText; return /Kontrola kolizí sestavy „Sestava C“ doběhla/.test(t) ? t : null; }, null, { timeout: 60000 }).then((h) => h.jsonValue(), () => '');
   ok(/Kontrola kolizí sestavy „Sestava C“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není/.test(toast), 'pozdní výsledek kontroly sestavy C: oznámení bez ✓ jmenuje sestavu C');
   const body = await p.evaluate(() => document.body.innerText);
-  ok(!/Bez kolizí ✓/.test(body), 'nad sestavou B se po doběhnutí kontroly C neukáže žádné „Bez kolizí ✓“ (panel ani oznámení)');
+  ok(!/Bez kolizí|Bez průniku/.test(body), 'nad sestavou B se po doběhnutí kontroly C neukáže žádné „Bez kolizí ✓“ (panel ani oznámení)');
   const bLate = await panel();
   ok(bLate && bLate.name === 'Sestava B' && bLate.state === 'clash' && bLate.doc !== keyC, `B si drží vlastní výsledek (stav ${bLate && bLate.state}, dokument ${bLate && bLate.name})`);
   ok((await p.locator('[data-clash-state="ok"]').count()) === 0, 'B: žádné data-clash-state=ok po pozdním výsledku jiné sestavy');
@@ -266,7 +266,7 @@ const browsers = [];
   await mp.locator('[data-motion-scrub]').fill('5');
   ok(await waitState('stale'), 'P: po posunu mechanismu na krok 5 (razník v desce) panel Kolize „neplatí“');
   const p5 = await panel();
-  ok(p5 && !/Bez kolizí|✓/.test(p5.text) && (await p.locator('[data-clash-state="ok"]').count()) === 0, 'P krok 5: žádné „Bez kolizí ✓“ ani data-clash-state=ok nad jinou polohou mechanismu');
+  ok(p5 && !/Bez kolizí|Bez průniku|✓/.test(p5.text) && (await p.locator('[data-clash-state="ok"]').count()) === 0, 'P krok 5: žádné „Bez kolizí ✓“ ani data-clash-state=ok nad jinou polohou mechanismu');
   await p.locator('[data-clash-recheck]').click();
   ok(await waitState('clash'), 'P krok 5: „Zkontrolovat znovu“ zkontroluje ZOBRAZENOU polohu → kolize razníku s deskou');
   const p5b = await panel();
@@ -291,7 +291,7 @@ const browsers = [];
   await idle();
   ok(await waitState('stale'), 'K po změně konfigurace dílu (bez posunu komponent): panel Kolize „neplatí“');
   const k1 = await panel();
-  ok(k1 && !/Bez kolizí|✓/.test(k1.text) && /Zkontrolovat znovu/.test(k1.text), 'K: žádná zelená z dřívější konfigurace, nabídnuto „Zkontrolovat znovu“');
+  ok(k1 && !/Bez kolizí|Bez průniku|✓/.test(k1.text) && /Zkontrolovat znovu/.test(k1.text), 'K: žádná zelená z dřívější konfigurace, nabídnuto „Zkontrolovat znovu“');
   await p.locator('[data-clash-recheck]').click();
   ok(await waitState('clash'), 'K: nová kontrola → kolize výstupku s přidržovačem');
   const k2 = await panel();

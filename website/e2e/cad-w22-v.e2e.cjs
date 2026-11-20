@@ -6,7 +6,13 @@
 //     Řez modelem nepadne pod panel studie, „Uložit pohled“ uloží kameru a řez do studie (window.mncad.getDocument), výběr pohledu
 //     ho použije, anotace v okně (data-motion-hud) a vypálené v PNG (tmavý podklad anotace v levém horním rohu snímku), dva pohledy
 //     ve videu = dlaždice vedle sebe (šířka videa ≈ 2 × výška dlaždice).
-// Spuštění: E2E_BASE=http://localhost:3536 node e2e/cad-w22-v.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL)
+//  3. V2 (zpráva 20. 11. „v sestavě, když dám řez ručně, nevidím čela samotných těles, jen povrchy“): sestava dvou kvádrů,
+//     `řez Y` → každá komponenta má čelo v rovině řezu (vzorek pixelu = barva čela / šrafa z data-section-cap-*, ne pozadí, ne
+//     vnitřek tělesa), čela sousedních komponent se liší, čelo je i ve snímku window.mncad.screenshot a v PNG snímcích pohybové
+//     studie (uložený pohled studie s řezem) a hýbe se s komponentou; najetí myší na čelo nic nezvýrazní (kurzor) a klik na čelo
+//     nic nevybere (kontrola: bez řezu tentýž klik vybere komponentu); text `řez` v sestavě uvádí čela řezu.
+// Spuštění: E2E_BASE=http://localhost:3536 node e2e/cad-w22-v.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL;
+//           E2E_ONLY=v1 | v2 = jen jedna část)
 const { chromium } = require('playwright');
 const fs = require('fs');
 const path = require('path');
@@ -102,8 +108,7 @@ async function open(b, p0) {
   return { ctx, p };
 }
 
-(async () => {
-  const b = await chromium.launch({ args: NOGL ? NO_GL : GL });
+async function v1(b) {
   const { p } = await open(b, '/cad');
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
@@ -227,6 +232,171 @@ async function open(b, p0) {
   const api = await p.evaluate(() => window.mncad.motion().then((m) => m.video));
   ok(api && Math.abs(api.seconds - 0.6667) < 0.001 && api.frames === 20, `window.mncad.motion().video = ${JSON.stringify(api)}`);
   ok(errs.length === 0, `bez chyb stránky ${errs.slice(0, 3).join(' | ')}`);
+  await p.context().close();
+}
+
+/* ───────────── V2: čela řezu v sestavě ───────────── */
+const hexRgb = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+/** vzdálenost barvy od úsečky dvou barev (pixel na rozhraní výplně a šrafy) */
+function segDist(p, a, b) {
+  const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const l2 = ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2 || 1;
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1] + (p[2] - a[2]) * ab[2]) / l2));
+  return dist(p, [a[0] + ab[0] * t, a[1] + ab[1] * t, a[2] + ab[2] * t]);
+}
+/** pixely čela komponenty: výplň / šrafa (± tol) – těžiště a počet; jen střed obrazu (okraje = lišty, anotace, ikony) */
+function capPixels(im, fill, hatch, tol = 10) {
+  let n = 0, nf = 0, sx = 0, sy = 0;
+  for (let y = Math.floor(im.h * 0.08); y < Math.ceil(im.h * 0.95); y++)
+    for (let x = Math.floor(im.w * 0.15); x < Math.ceil(im.w * 0.85); x++) {
+      const o = (y * im.w + x) * 4;
+      const px = [im.px[o], im.px[o + 1], im.px[o + 2]];
+      const isF = dist(px, fill) <= tol;
+      if (isF || dist(px, hatch) <= tol) {
+        n++;
+        if (isF) nf++;
+        sx += x;
+        sy += y;
+      }
+    }
+  return { n, nf, x: n ? sx / n : -1, y: n ? sy / n : -1 };
+}
+/** okolí bodu: podíl pixelů čela (výplň, šrafa, rozhraní mezi nimi) a pixelů pozadí */
+function capPatch(im, cx, cy, fill, hatch, bg, r = 6, tol = 10) {
+  let cap = 0, back = 0, all = 0;
+  for (let y = Math.round(cy) - r; y <= Math.round(cy) + r; y++)
+    for (let x = Math.round(cx) - r; x <= Math.round(cx) + r; x++) {
+      if (x < 0 || y < 0 || x >= im.w || y >= im.h) continue;
+      const o = (y * im.w + x) * 4;
+      const px = [im.px[o], im.px[o + 1], im.px[o + 2]];
+      all++;
+      if (segDist(px, fill, hatch) <= tol) cap++;
+      else if (bg && dist(px, bg) <= 12) back++;
+    }
+  return { cap: all ? cap / all : 0, back: all ? back / all : 0 };
+}
+
+async function v2(b) {
+  const { p } = await open(b, '/cad');
+  const errs = [];
+  p.on('pageerror', (e) => errs.push(e.message));
+  const run = async (text) => String(await p.evaluate((t) => window.mncad.run(t), text));
+  // dvě desky nad sebou (B se při studii zvedá), řez Y = 15 prochází oběma; B má vlastní barvu
+  let log = await run(['nový díl "Deska A"', 'kvádr 40 30 20', 'nový díl "Deska B"', 'kvádr 40 30 20'].join('\n'));
+  log += await run(['nová sestava "Řez V2"', 'vložit "Deska A" ukotvit', 'vložit "Deska B" v 0 0 30', 'sestava komponenta "Deska B" barva #4678c8', 'sestava vazba vzdálenost "Deska B" spodní "Deska A" horní hodnota 10 název "ZDVIH"', 'sestava vazba rovnoběžně "Deska B" +X "Deska A" +X', 'sestava vazba rovnoběžně "Deska B" +Y "Deska A" +Y'].join('\n'));
+  ok(!/^✗/m.test(log), `V2: sestava dvou desek${tag}`);
+  await run('zobraz hrany');
+  await p.waitForTimeout(400);
+  // řez potřebuje sítě komponent v okně – po vložení se ještě staví (✗ „v okně není žádný model“ = zkusit znovu)
+  for (let i = 0; i < 30; i++) {
+    log = await run('řez Y');
+    if (!/^✗/m.test(log)) break;
+    await p.waitForTimeout(500);
+  }
+  await run('zobraz přední');
+  await run('zobraz přizpůsobit');
+  ok(/řez kolmo na Y v 15/.test(log) && /čela řezu: každá komponenta s objemem/.test(log), `V2: text řez v sestavě uvádí čela – ${log.trim().split('\n').pop()}`);
+  await p.waitForTimeout(900);
+  const host = p.locator(NOGL ? '[data-soft-viewport][data-section-caps]' : '[data-section-caps]').first();
+  await host.waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+  const caps = await host.evaluate((el) => ({ n: Number(el.dataset.sectionCaps), fill: (el.dataset.sectionCapColors || '').split(','), hatch: (el.dataset.sectionCapHatch || '').split(',') })).catch(() => null);
+  ok(!!caps && caps.n === 2 && caps.fill.length === 2 && caps.fill[0] !== caps.fill[1], `V2: dvě čela řezu, sousední se liší barvou: ${JSON.stringify(caps)}`);
+  if (!caps || caps.n !== 2) return void (await p.context().close());
+  const F = caps.fill.map(hexRgb);
+  const Hh = caps.hatch.map(hexRgb);
+
+  // ── 1) snímek pro agenta (PNG) – čela v rovině řezu ──
+  const shot = await p.evaluate(() => window.mncad.screenshot({ view: 'front', background: 'white' }));
+  const im = readPng(Buffer.from(shot.base64, 'base64'));
+  fs.writeFileSync(OUT + `v2-screenshot${NOGL ? '-nogl' : ''}.png`, Buffer.from(shot.base64, 'base64'));
+  for (const k of [0, 1]) {
+    const c = capPixels(im, F[k], Hh[k]);
+    const patch = c.n ? capPatch(im, c.x, c.y, F[k], Hh[k], [255, 255, 255]) : { cap: 0, back: 1 };
+    ok(c.n > 400 && c.nf > c.n * 0.5 && patch.cap >= 0.9 && patch.back === 0, `V2 snímek: čelo ${k ? 'B' : 'A'} – ${c.n} px barvy čela (výplň ${c.nf}), okolí těžiště ${Math.round(patch.cap * 100)} % čelo, ${Math.round(patch.back * 100)} % pozadí`);
+  }
+  const ca = capPixels(im, F[0], Hh[0]);
+  const cb = capPixels(im, F[1], Hh[1]);
+  ok(ca.n && cb.n && cb.y < ca.y - 10, `V2 snímek: čelo B nad čelem A (y ${Math.round(cb.y)} < ${Math.round(ca.y)})`);
+
+  // ── 2) živé okno: najetí myší a klik na čelo nic nevybere ──
+  const cv = p.locator(NOGL ? '[data-soft-canvas]' : '[data-section-caps] canvas').first();
+  const box = await cv.boundingBox();
+  const live = readPng(await p.screenshot({ clip: box }));
+  const la = capPixels(live, F[0], Hh[0]);
+  ok(la.n > 200, `V2 okno: čelo A v živém obraze (${la.n} px)`);
+  if (la.n > 200) {
+    const bg = [live.px[(5 * live.w + 5) * 4], live.px[(5 * live.w + 5) * 4 + 1], live.px[(5 * live.w + 5) * 4 + 2]];
+    const pa = capPatch(live, la.x, la.y, F[0], Hh[0], bg);
+    ok(pa.cap >= 0.9 && pa.back === 0, `V2 okno: v rovině řezu je čelo, ne pozadí ani vnitřek tělesa (${Math.round(pa.cap * 100)} % čelo)`);
+    const X = box.x + la.x, Y = box.y + la.y;
+    await p.evaluate(() => window.mncad.clearSelection());
+    await p.mouse.move(X, Y);
+    await p.waitForTimeout(400);
+    const cursor = await cv.evaluate((el) => el.style.cursor);
+    ok(cursor !== 'pointer', `V2 okno: najetí myší na čelo nic nezvýrazní (kurzor „${cursor}“)`);
+    await p.mouse.click(X, Y);
+    await p.waitForTimeout(500);
+    const sel = await p.evaluate(() => window.mncad.selection());
+    ok(sel.length === 0, `V2 okno: klik na čelo nic nevybere (${JSON.stringify(sel)})`);
+    // kontrola: bez řezu tentýž klik trefí přední plochu komponenty A
+    await run('řez vyp');
+    await p.waitForTimeout(700);
+    await p.mouse.click(X, Y);
+    await p.waitForTimeout(500);
+    const sel2 = await p.evaluate(() => window.mncad.selection());
+    ok(sel2.length > 0, `V2 okno (kontrola): bez řezu tentýž klik vybere ${JSON.stringify(sel2.map((x) => x.id || x.kind))}`);
+    await p.evaluate(() => window.mncad.clearSelection());
+    await run('řez Y');
+    await p.waitForTimeout(700);
+  }
+
+  // ── 3) pohybová studie: uložený pohled s řezem, PNG snímky – čela jsou ve snímcích a hýbou se s komponentou ──
+  log = await run(['pohyb motor lineární vazba "ZDVIH" 10..30 kroky 10 čas 0,5', 'pohyb spustit', 'pohyb pohled uložit "Řez Y" řez Y 15 kamera přední', 'pohyb pohled "Řez Y"'].join('\n'));
+  ok(!/^✗/m.test(log), 'V2: studie a uložený pohled „Řez Y“ s řezem');
+  await p.waitForFunction(() => document.querySelector('[data-motion-player]')?.getAttribute('data-player-state') === 'ok', null, { timeout: 60000 }).catch(() => {});
+  const dl = p.waitForEvent('download', { timeout: 240000 }).catch(() => null);
+  await run('pohyb export png');
+  const f = await dl;
+  if (f) {
+    const file = path.join(OUT, `v2-snimky${NOGL ? '-nogl' : ''}.zip`);
+    await f.saveAs(file);
+    const z = fs.readFileSync(file);
+    const first = zipFile(z, /krok-0000\.png$/);
+    const last = zipFile(z, /krok-0009\.png$/) || zipFile(z, /krok-0010\.png$/);
+    if (first && last) {
+      const i0 = readPng(first), i1 = readPng(last);
+      const a0 = capPixels(i0, F[0], Hh[0]), b0 = capPixels(i0, F[1], Hh[1]);
+      const a1 = capPixels(i1, F[0], Hh[0]), b1 = capPixels(i1, F[1], Hh[1]);
+      ok(a0.n > 200 && b0.n > 200 && a1.n > 200 && b1.n > 200, `V2 PNG studie: čela A i B ve snímku prvního i posledního kroku (${a0.n}/${b0.n} → ${a1.n}/${b1.n} px)`);
+      ok(Math.abs(a1.y - a0.y) <= 3 && b1.y < b0.y - 5, `V2 PNG studie: čelo B se zvedá s komponentou (y ${Math.round(b0.y)} → ${Math.round(b1.y)}), čelo A stojí (${Math.round(a0.y)} → ${Math.round(a1.y)})`);
+    } else ok(false, 'V2 PNG studie: snímky krok-0000 / poslední v ZIP chybí');
+  } else ok(false, 'V2 PNG studie: soubor nestažen');
+
+  // ── 4) drátový model: čela se nekreslí (a text to řekne) ──
+  await run('zobraz drátový');
+  await p.waitForTimeout(500);
+  log = await run('řez Y');
+  await p.waitForTimeout(600);
+  const capsW = await p.locator(NOGL ? '[data-soft-viewport]' : '[data-section-caps], [data-soft-viewport]').first().evaluate((el) => el.dataset.sectionCaps ?? null).catch(() => null);
+  ok(/nekreslí/.test(log) && (capsW === null || capsW === '0'), `V2: drátový model bez čel (${capsW}) – ${log.trim().split('\n').pop()}`);
+  await run('zobraz hrany');
+  ok(errs.length === 0, `V2: bez chyb stránky ${errs.slice(0, 3).join(' | ')}`);
+  await p.context().close();
+}
+
+(async () => {
+  const only = process.env.E2E_ONLY || '';
+  const b = await chromium.launch({ args: NOGL ? NO_GL : GL });
+  for (const [name, fn] of [['v1', v1], ['v2', v2]]) {
+    if (only && only !== name) continue;
+    try {
+      await fn(b);
+    } catch (e) {
+      console.log(`FAIL: ${name}: ` + (e && e.stack ? e.stack : e));
+      process.exitCode = 1;
+    }
+  }
   await b.close();
 })().catch((e) => {
   console.log('FAIL: ' + (e && e.stack ? e.stack : e));

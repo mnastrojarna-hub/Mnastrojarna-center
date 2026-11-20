@@ -46,12 +46,10 @@ hřeben: za modulem čekám „zuby z“ (počet zubů pastorku)	rack: after the
 hřeben: zadejte „modul m zuby z“ (dráha na otáčku = π·m·z) nebo „dráha N“	rack: give “module m teeth z” (travel per revolution = π·m·z) or “travel N”
 Klikněte na plochu vybrané (pohyblivé) komponenty.	Click a face of the selected (moving) component.
 kolize	interference
-Kolize: žádné ve všech krocích	Interference: none in any step
 komponenta „{0}“ nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub – lineární motor potřebuje posuvnou vazbu	component “{0}” has no Distance, Slot, Path, Concentric or Screw mate – a linear motor needs a sliding mate
 komponenta „{0}“ nemá vazbu Závěs, Souosost ani Šroub – rotační motor potřebuje osu (sestava vazba závěs "{0}" … "Rám" …)	component “{0}” has no Hinge, Concentric or Screw mate – a rotary motor needs an axis (assembly mate hinge "{0}" … "Frame" …)
 Komponenta nemá vhodnou entitu ({0}).	The component has no suitable entity ({0}).
 Komponenta stopy	Trace component
-Kontrolovat kolize v každém kroku (pomalejší)	Check interference in every step (slower)
 krok	step
 Krok	Step
 Krok „{0}“ potřebuje: {1}	Step “{0}” needs: {1}

@@ -230,8 +230,9 @@ export function settleBodyChecks(status: readonly FeatureStatus[], final: FinalC
 }
 
 /** řádek „Geometrie“ textového stavu – kontrola, která se neprovedla, se vypíše jako „nezkontrolováno“ s důvodem */
-export function geometryText(m: { valid?: boolean; solids?: number; faces: number; approx?: boolean; validCheck?: "fast" | "exact" }): string {
-  const bodies = m.solids ? ` · ${m.solids === 1 ? tr("1 těleso") : tr("{0} těles", m.solids)}` : "";
+export function geometryText(m: { valid?: boolean; solids?: number; faces: number; approx?: boolean; validCheck?: "fast" | "exact"; free?: number }): string {
+  // plochy mimo tělesa vedle tělesa (22c): objem a hmotnost jsou jen z těles, objemový export je ohlásí ⚠ out.free-surfaces
+  const bodies = m.solids ? ` · ${m.solids === 1 ? tr("1 těleso") : tr("{0} těles", m.solids)}${m.free ? ` · ${tr("ploch mimo tělesa {0} (objem jen z těles)", m.free)}` : ""}` : "";
   // která kontrola platnost určila (vlna 22, bod 22a): rychlá po stavbě, nebo přesná (kontrola přesně, export) – na konci řádku
   const how = ` · ${m.validCheck === "exact" ? tr("přesná kontrola") : tr("rychlá kontrola")}`;
   if (m.solids === 0) return tr("ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid");

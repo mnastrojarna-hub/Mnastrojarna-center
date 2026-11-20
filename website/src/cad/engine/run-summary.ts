@@ -144,7 +144,9 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
     // prvek bez kontroly platnosti tělesa se mezi ✓ nepočítá (vlastní počet `unchecked`, feature-levels.ts)
     s.features = featureCounts(res.status);
     if (res.metrics) {
-      s.volume_mm3 = res.metrics.volume;
+      // bez objemového tělesa (22c) objem ani hmotnost nejsou – řádek D `V=- m=-`, JSON bez `volume_mm3` / `mass_kg`
+      const noSolid = res.metrics.solids === 0;
+      if (!noSolid) s.volume_mm3 = res.metrics.volume;
       s.bbox = res.metrics.bbox;
       if (res.metrics.solids !== undefined) s.solids = res.metrics.solids;
       if (res.metrics.free) s.free = res.metrics.free;
@@ -159,7 +161,7 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
       const mt = MATERIALS.find((m) => m.id === d.material);
       if (mt) {
         s.density = mt.density;
-        s.mass_kg = (res.metrics.volume / 1e6) * mt.density;
+        if (!noSolid) s.mass_kg = (res.metrics.volume / 1e6) * mt.density;
       }
     }
     const error = s.features.error;

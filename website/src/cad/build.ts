@@ -8,7 +8,7 @@ import * as r from "replicad";
 import { DEFAULT_BODY, isNewBodyMode, nextBodyName } from "./bodies";
 import "./fastbox";
 import { MESH_ANGULAR, meshTolerance } from "./fastbool";
-import { compositionOf, describeCheck, isValidShape, sameSignature, signatureOf, type ShapeSignature } from "./check";
+import { compositionOf, describeCheck, isValidShape, sameSignature, signatureOf, solidsVolume, type ShapeSignature } from "./check";
 import { beginFeatureOps, carryHealth, flagInvalidBody, invalidLeadText, invalidSince, opChainOf, verifyEffectOnly, verifyResult } from "./shape-health";
 import { FEATURE_CHECK_FACES, FINAL_CHECK_FACES, effectOf, resultTypeError, settleBodyChecks, type Composition, type EffectOp } from "./feature-levels";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
@@ -1486,6 +1486,17 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
   } catch {
     /* bez kontroly */
   }
+  // 22c: objem (a z něj hmotnost) jen z objemových těles – otevřená plocha ani skořepina bez „Uzavřít do tělesa“ objem
+  // nemá (dřív „objem 5 cm³“ u plochy a 29 cm³ místo 24 u tělesa s volnou plochou); 0 těles → 0 a vrstvy nad tím ukážou „–“
+  if (solids === 0) {
+    volume = 0;
+    volumeFailed = false; // bez tělesa není co měřit (objem „–“, ne ⚠ geom.volume-failed)
+  } else if (free && !big && !volumeFailed)
+    try {
+      volume = solidsVolume(body);
+    } catch {
+      /* zůstane objem celého tvaru */
+    }
   return {
     status,
     paramErrors,

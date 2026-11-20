@@ -328,7 +328,10 @@ describe("dynamika: kontrola kolizí v `kroky` snímcích (jako kinematická stu
     expect(res.steps.length).toBe(21);
     expect(res.dynamic.clashEvery).toBe(1);
     expect(calls).toBe(21);
-    expect((await motionClashLines(res, doc)).lines).toEqual(["Kolize: žádné ve všech krocích"]);
+    // vlna 22, bod 6 (C2): bez „ve všech krocích“ – počet kontrolovaných poloh a výslovně, že mezi nimi se nekontrolovalo
+    const lines = (await motionClashLines(res, doc)).lines;
+    expect(lines[0]).toBe("Kolize: žádný průnik v 21 polohách");
+    expect(lines[1]).toMatch(/^ kontrolováno jen v 21 polohách \(diskrétně, .*\) – mezi polohami nekontrolováno$/);
   });
 });
 

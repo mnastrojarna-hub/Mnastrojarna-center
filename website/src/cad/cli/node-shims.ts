@@ -67,7 +67,14 @@ export type ShimOptions = {
   shareStore?: string;
 };
 
-export type InstalledShims = { origin: string; fontsDir: string | null; fontsRead: string[]; restore(): void };
+export type InstalledShims = {
+  origin: string;
+  fontsDir: string | null;
+  fontsRead: string[];
+  /** stránka dlouhého odkazu (`#s=`): `MNCAD_ORIGIN` / výchozí web CADu – nikdy web úložiště z `--share-store` (bod 16) */
+  linkPage: string;
+  restore(): void;
+};
 
 /** Nainstaluje `location` a obal `fetch` do tohoto vlákna. Vrací `restore` (testy). */
 export function installNodeShims(o: ShimOptions): InstalledShims {
@@ -97,6 +104,7 @@ export function installNodeShims(o: ShimOptions): InstalledShims {
   g.fetch = wrapped;
   return {
     origin: loc.origin,
+    linkPage: makeLocation(o.origin ?? DEFAULT_ORIGIN).href,
     fontsDir: o.fontsDir,
     fontsRead,
     restore() {

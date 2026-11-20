@@ -62,7 +62,7 @@ describe("engine se skutečným jádrem (recenze B2)", async () => {
   it("nová sestava v témže běhu: `= status` a řádek D CLI mají stejné vazby, objem Σ a hmotnost; konzole stav s vazbami a Σ", async () => {
     const ws = new MemoryWorkspace();
     const r = await runScript(ws, `${ASM}\nkolize\nstav`, hostOf());
-    expect(formatConsole(r)).toMatch(/^Vazby: 2 \(2 ok\)\nSestava: 2 komponent \(2 dílů po rozložení podsestav\) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg\nKolize: žádné/m);
+    expect(formatConsole(r)).toMatch(/^Vazby: 2 \(2 ok\)\nSestava: 2 komponent \(2 dílů po rozložení podsestav\) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg\nKolize: žádný průnik · vůle nekontrolována/m); // vlna 22, bod 6: bez „žádné“ (vůle se nekontroluje)
     const st = r.entries.find((e) => e.code === "status")!;
     const d = await summarize(ws.present(), kernel, new ReportBuilder({ lang: "cs", lines: 1 }), true, ws, ws.docKey());
     // po `kolize` nese řádek D i třídy kolizí (balík B5); stav má počet kolizí `clash=N` za obálkou

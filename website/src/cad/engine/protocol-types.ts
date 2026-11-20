@@ -25,7 +25,22 @@ export type Level = "ok" | "note" | "warn" | "error" | "measure";
  * Záznam protokolu. U výpisu `=` (`level: "measure"`) je `text` strojová část (`klíč=hodnota …`, kap. 4.2; další řádky =
  * pokračovací řádky výpisu) a `detail` lokalizovaný text výpisu, jak ho ukazuje konzole prohlížeče (plný protokol, JSON).
  */
-export type Entry = { line: number | null; lines?: number[]; level: Level; code?: string; text: string; doc?: string; data?: unknown; count?: number; detail?: string };
+export type Entry = {
+  line: number | null;
+  lines?: number[];
+  level: Level;
+  code?: string;
+  text: string;
+  doc?: string;
+  data?: unknown;
+  count?: number;
+  detail?: string;
+  /**
+   * stabilní identifikátor záznamu (vlna 22, bod 15 – engine/entry-ids.ts): `L36.motion`, `L-.share.rejected`, druhý
+   * stejný na řádku `L12.ok#2`; opakovaný běh téhož skriptu dá tatáž id. Úplná reference = `<run.id>:<id>` (`r3:L36.motion`).
+   */
+  id?: string;
+};
 
 /** souhrn jednoho dokumentu běhu (řádek `D`, JSON `docs[]`) */
 export type DocSummary = {
@@ -90,7 +105,19 @@ export type OutFile = {
 
 export type ShareMode = "self" | "store" | "link";
 /** sdílený odkaz (řádek `O`); `exp` = ISO datum `YYYY-MM-DD` nebo `null` (bez platnosti) */
-export type ShareInfo = { url: string; mode: ShareMode; bytes: number; exp: string | null; note?: string };
+export type ShareInfo = {
+  url: string;
+  mode: ShareMode;
+  bytes: number;
+  exp: string | null;
+  note?: string;
+  /** řádek skriptu, který odkaz vytvořil (`sdílet` / `odkaz`; CLI `--share` = null) – vlna 22, bod 16 */
+  line?: number | null;
+  view?: "model" | "drawing";
+  password?: boolean;
+  /** co odkaz obsahuje (engine/share-content.ts) */
+  content?: import("./share-content").ShareContent;
+};
 
 /** přebytek stručného protokolu – celý protokol je v souboru `file` (`protocol-full.txt`) */
 export type Overflow = { entries: number; bytes: number; file: string };
@@ -111,6 +138,11 @@ export type RunReport = {
   docs: DocSummary[];
   files: OutFile[];
   share?: ShareInfo;
+  /**
+   * všechny odkazy běhu v pořadí vzniku (vlna 22, bod 16: tři `sdílet` = tři adresy); `share` = poslední (řádek O,
+   * kompatibilita). Chybí, když běh žádný odkaz nevytvořil.
+   */
+  shares?: ShareInfo[];
   /** 5 nejpomalejších operací */
   timing: OpTiming[];
   /** nejvyšší hlášená paměť běhu (WASM halda + RSS), MB */

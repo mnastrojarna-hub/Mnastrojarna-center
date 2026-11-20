@@ -1,0 +1,22 @@
+# vlna 22, bod 6: nůž tloušťky 1 mm přejede přes kolík Ø2 mezi kroky 5 mm od sebe – dřív „Kolize: žádné ve všech krocích“
+# (36 kroků: nůž v kroku 17 na x = 97..98, v kroku 18 na x = 102..103, kolík x = 99..101). Spojitá kontrola (výchozí) najde
+# průchod mezi kroky 17 a 18; `pohyb kolize diskrétně` výslovně řekne, že mezi polohami nekontroluje; 180 kroků ho najde v krocích.
+nový díl Rám
+kvádr 200 40 10
+nový díl Doraz
+kvádr 10 40 10
+nový díl Kolík
+válec 2 20
+nový díl Nůž
+kvádr 1 40 10
+nová sestava Sestava 6
+vložit "Rám" ukotvit
+vložit "Doraz" v -10 0 10 ukotvit
+vložit "Kolík" v 100 20 10 ukotvit
+vložit "Nůž" v 12 0 10
+sestava vazba vzdálenost "Nůž" -X "Doraz" +X hodnota 12 název "POSUV"
+pohyb motor lineární vazba "POSUV" 12..192 kroky 36 kolize
+pohyb stav
+pohyb kolize diskrétně
+pohyb kolize spojitě
+pohyb kroky 180

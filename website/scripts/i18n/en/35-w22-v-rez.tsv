@@ -1,0 +1,4 @@
+# vlna 22, balík V, etapa V2 (zpráva 20. 11.): čela řezu v sestavě
+čela řezu se v drátovém zobrazení nekreslí	section caps are not drawn in the wireframe display
+čela řezu: každá komponenta s objemem (barva komponenty, šrafy)	section caps: every component with volume (component colour, hatching)
+; v sestavě má každá komponenta s objemem čelo řezu v rovině řezu (barva komponenty a šrafy – sousední díly se liší; kolize červeně), i bez WebGL, při přehrávání studie a ve snímcích / videu; čelo se nevybírá; v drátovém zobrazení čela nejsou	; in an assembly every component with volume gets a section cap in the section plane (component colour and hatching – neighbouring parts differ; clashes in red), also without WebGL, during study playback and in images / video; a cap cannot be selected; the wireframe display draws no caps

@@ -19,6 +19,7 @@
 import { cadLocale, tr } from "./i18n";
 import type { Vec3 } from "./types";
 import { parseOutputsLine, type OutputsCmd } from "./agent-outputs";
+import { partsText, solidVerdict, type SolidParts, type SolidStats } from "./solid-export";
 
 export type Export3dFormat = "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad";
 export type OutDrawingFormat = "pdf" | "dxf" | "dwg" | "svg" | "csv" | "png";
@@ -48,8 +49,11 @@ export type OutCmd =
    * `orLink` = při selhání úložiště dlouhý odkaz s ⚠ (`sdílet úložiště nebo odkaz`)
    */
   | { kind: "share"; view?: "model" | "drawing"; days?: number | null; password?: string; from?: string; mode?: "link" | "store"; orLink?: true }
-  /** znovu vypsat poslední odkaz */
-  | { kind: "link" }
+  /**
+   * znovu vypsat poslední odkaz; `verify` (vlna 22, bod 16: `odkaz ověřit [<odkaz|kód>] [heslo X]`) = odkaz otevřít jako
+   * příjemce a vypsat režim, platnost a obsah, nebo důvod, proč se neotevře (useknutý / poškozený / heslo / platnost…)
+   */
+  | { kind: "link"; verify?: { url?: string; password?: string } }
   /** dokument jako textový skript `.mncad.txt` (cad/doc-script.ts); lang = jazyk klíčových slov (bez hodnoty jazyk rozhraní) */
   | { kind: "script"; name?: string; lang?: "cs" | "en" | "de"; deliver?: OutDelivery }
   /** výstupy dokumentu: záznamy exportů, zastaralé výstupy, přepočítat vše (vlna 22, bod 20 – agent-outputs.ts) */
@@ -64,6 +68,8 @@ const EXPORT = W("export", "exportovat", "exportuj", "exportieren", "exportiere"
 // DE „teilen“ NE: je to rozdělit tělesa (splitbodies, agent.ts) – sdílení je „freigeben“
 const SHARE = W("sdílet", "sdílej", "sdílení", "share", "freigeben");
 const LINK = W("odkaz", "link");
+/** `odkaz ověřit` (EN `link verify`, DE `link prüfen`) */
+const VERIFY = W("ověřit", "ověř", "zkontrolovat", "verify", "check", "prüfen", "pruefen", "überprüfen", "ueberpruefen");
 const SCRIPT = W("skript", "skriptu", "script", "textový-skript");
 const DRAWING = W("výkres", "drawing", "zeichnung");
 const SKETCH = W("skica", "skicu", "náčrt", "sketch", "skizze");
@@ -306,7 +312,18 @@ export function parseOutLine(tokens: string[], quoted: readonly boolean[] = []):
   }
 
   if (LINK.has(h)) {
-    if (t.length > 1) throw new Error(tr("odkaz nemá další volby – vypíše poslední sdílený odkaz; nový vytvoří „sdílet“"));
+    if (t.length > 1 && VERIFY.has(fold(t[1]))) {
+      const v: { url?: string; password?: string } = {};
+      for (let i = 2; i < t.length; i++) {
+        if (!tq[i] && PASSWORD.has(fold(t[i]))) {
+          if (!t[i + 1]) throw new Error(tr("odkaz ověřit: za „{0}“ chybí heslo", t[i]));
+          v.password = t[++i];
+        } else if (v.url === undefined) v.url = t[i];
+        else v.url += ` ${t[i]}`; // kód po skupinách „Ab3k Z9xQ 2m“
+      }
+      return { kind: "link", verify: v };
+    }
+    if (t.length > 1) throw new Error(tr("odkaz nemá další volby – vypíše poslední sdílený odkaz („odkaz ověřit [odkaz] [heslo X]“ ho ověří); nový vytvoří „sdílet“"));
     return { kind: "link" };
   }
   return null;
@@ -377,47 +394,78 @@ export function fileLogLine(what: string, name: string, bytes: number, format: s
 }
 
 /* ───────────────────────── kontrola exportu (STEP / BREP) ───────────────────────── */
-export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3] };
-export type ExportCheck = { ok: boolean; line: string; volumeDiffPct: number; bboxDiff: number; solidsOk: boolean };
+/**
+ * Míry modelu / znovu načteného souboru. `volume` = objem jen objemových těles (22c – skořepiny a plochy objem nemají);
+ * `free` = plochy mimo tělesa, `freeShells` / `freeFaces` / `shells` / `closedShells` = složení (export-verify.ts),
+ * `valid` = BRepCheck tvaru (rychlá metoda; null / chybí = nezkontrolováno).
+ */
+export type ShapeStats = { solids?: number; volume: number; bbox: [Vec3, Vec3]; free?: number; freeShells?: number; freeFaces?: number; shells?: number; closedShells?: number; valid?: boolean | null };
+/**
+ * Výsledek kontroly: `ok` = věrná kopie objemového modelu; `level` / `code` = jak ji hlásit (✗ out.no-solid – soubor bez
+ * tělesa, ⚠ out.free-surfaces – volné plochy vedle tělesa, ⚠ / ✗ out.check-failed – soubor se od modelu liší / nenačetl se).
+ */
+export type ExportCheck = { ok: boolean; line: string; volumeDiffPct: number; bboxDiff: number; solidsOk: boolean; level?: "ok" | "warn" | "error"; code?: "out.no-solid" | "out.free-surfaces" | "out.check-failed" };
 
 /** povolená relativní odchylka objemu (B-rep se přenáší přesně, rozdíl je jen numerický) */
 export const CHECK_VOLUME_REL = 1e-3;
 
 /**
- * Porovná model se souborem znovu načteným jádrem: počet objemových těles, objem a obálku. Jedna věta do protokolu
- * (✓ věrná kopie / ⚠ v čem se liší), aby agent bez prohlížeče souboru věděl, že soubor odpovídá modelu.
+ * Porovná model se souborem znovu načteným jádrem: počet objemových těles, plochy mimo tělesa, platnost, objem těles a
+ * obálku. Jedna věta do protokolu, aby agent bez prohlížeče souboru věděl, co soubor obsahuje:
+ *  - soubor bez objemového tělesa → ✗ `out.no-solid` (nikdy „věrná kopie“, ani když model je stejně jen plochy – 22c);
+ *  - soubor se od modelu liší (tělesa, plochy mimo tělesa, platnost, objem, obálka) → ⚠ `out.check-failed`;
+ *  - soubor odpovídá modelu, ale vedle těles nese volné skořepiny / plochy → ⚠ `out.free-surfaces` s počty;
+ *  - jinak ✓ „… → věrná kopie modelu“.
+ * `parts` = komponenty sestavy bez tělesa / s volnými plochami (jména do hlášky).
  */
-export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP"): ExportCheck {
+export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP", parts?: SolidParts): ExportCheck {
   const size = (b: [Vec3, Vec3]) => [0, 1, 2].map((i) => b[1][i] - b[0][i]);
   const diag = Math.hypot(...size(model.bbox));
   const bboxDiff = Math.max(...[0, 1].flatMap((k) => [0, 1, 2].map((i) => Math.abs(model.bbox[k][i] - file.bbox[k][i]))));
   const bboxTol = Math.max(0.01, diag * 1e-5);
   const volumeDiffPct = model.volume > 0 ? (Math.abs(file.volume - model.volume) / model.volume) * 100 : file.volume > 0 ? 100 : 0;
   const solidsOk = model.solids === undefined || file.solids === undefined || model.solids === file.solids;
-  const volOk = volumeDiffPct <= CHECK_VOLUME_REL * 100;
-  const boxOk = bboxDiff <= bboxTol;
-  const ok = solidsOk && volOk && boxOk;
   const vol = (v: number) => `${num(v, v >= 1000 ? 0 : 2)} mm³`;
   const dims = size(file.bbox).map((v) => num(v, 2)).join(" × ");
+  const base = { volumeDiffPct, bboxDiff, solidsOk };
+  // 22c: soubor bez objemového tělesa není objemový export – bez ohledu na to, že odpovídá modelu z ploch
+  if (file.solids === 0) {
+    const v = solidVerdict(statsOf(file), label, "file", parts)!;
+    return { ...base, ok: false, level: "error", code: "out.no-solid", line: `✗ ${tr("kontrola {0}", v.text)}` };
+  }
+  const freeM = model.free ?? (model.freeShells !== undefined || model.freeFaces !== undefined ? (model.freeShells ?? 0) + (model.freeFaces ?? 0) : undefined);
+  const freeF = file.free ?? (file.freeShells !== undefined || file.freeFaces !== undefined ? (file.freeShells ?? 0) + (file.freeFaces ?? 0) : undefined);
+  const freeOk = freeM === undefined || freeF === undefined || freeM === freeF;
+  const validOk = file.valid !== false || model.valid === false;
+  const volOk = volumeDiffPct <= CHECK_VOLUME_REL * 100;
+  const boxOk = bboxDiff <= bboxTol;
   const solids = file.solids === undefined ? "" : tr("těles: {0}, ", file.solids);
-  if (ok)
-    return {
-      ok,
-      volumeDiffPct,
-      bboxDiff,
-      solidsOk,
-      line: tr("✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu", label, solids, vol(file.volume), num(volumeDiffPct, 4), dims, num(bboxDiff, 4)),
-    };
-  const why: string[] = [];
-  if (!solidsOk) why.push(tr("těles {0} (model {1})", file.solids ?? 0, model.solids ?? 0));
-  if (!volOk) why.push(tr("objem {0} (model {1}, rozdíl {2} %)", vol(file.volume), vol(model.volume), num(volumeDiffPct, 3)));
-  if (!boxOk) why.push(tr("obálka {0} mm (model {1} mm, odchylka {2} mm)", dims, size(model.bbox).map((v) => num(v, 2)).join(" × "), num(bboxDiff, 3)));
-  return { ok, volumeDiffPct, bboxDiff, solidsOk, line: tr("⚠ kontrola {0}: soubor se od modelu liší – {1}; zkontrolujte prvky s ⚠ / ✗ (stav) a export zopakujte", label, why.join(", ")) };
+  if (!(solidsOk && freeOk && validOk && volOk && boxOk)) {
+    const why: string[] = [];
+    if (!solidsOk) why.push(tr("těles {0} (model {1})", file.solids ?? 0, model.solids ?? 0));
+    if (!freeOk) why.push(tr("ploch mimo tělesa {0} (model {1})", freeF ?? 0, freeM ?? 0));
+    if (!validOk) why.push(tr("po načtení neplatné (BRepCheck), model platný"));
+    if (!volOk) why.push(tr("objem {0} (model {1}, rozdíl {2} %)", vol(file.volume), vol(model.volume), num(volumeDiffPct, 3)));
+    if (!boxOk) why.push(tr("obálka {0} mm (model {1} mm, odchylka {2} mm)", dims, size(model.bbox).map((v) => num(v, 2)).join(" × "), num(bboxDiff, 3)));
+    return { ...base, ok: false, level: "warn", code: "out.check-failed", line: tr("⚠ kontrola {0}: soubor se od modelu liší – {1}; zkontrolujte prvky s ⚠ / ✗ (stav) a export zopakujte", label, why.join(", ")) + partsText(parts) };
+  }
+  // odpovídá modelu, ale volné skořepiny / plochy vedle těles nejsou objemový model → ⚠ s počty (a jmény komponent)
+  const fv = solidVerdict(statsOf(file), label, "file", parts);
+  if (fv) return { ...base, ok: false, level: "warn", code: "out.free-surfaces", line: `⚠ ${tr("kontrola {0}", fv.text)}` };
+  return {
+    ...base,
+    ok: true,
+    level: "ok",
+    line: tr("✓ kontrola {0}: soubor znovu načten jádrem – {1}objem {2} (rozdíl {3} %), obálka {4} mm (odchylka {5} mm) → věrná kopie modelu", label, solids, vol(file.volume), num(volumeDiffPct, 4), dims, num(bboxDiff, 4)),
+  };
 }
+
+/** složení souboru / modelu pro `solidVerdict` */
+const statsOf = (s: ShapeStats): SolidStats => ({ solids: s.solids ?? 0, ...(s.free !== undefined ? { free: s.free } : {}), ...(s.freeShells !== undefined ? { freeShells: s.freeShells } : {}), ...(s.freeFaces !== undefined ? { freeFaces: s.freeFaces } : {}), ...(s.shells !== undefined ? { shells: s.shells } : {}), ...(s.closedShells !== undefined ? { closedShells: s.closedShells } : {}) });
 
 /** kontrola, kterou nešlo provést (soubor se nenačetl) */
 export function checkFailed(label: string, why: string): ExportCheck {
-  return { ok: false, volumeDiffPct: NaN, bboxDiff: NaN, solidsOk: false, line: tr("✗ kontrola {0}: soubor se nepodařilo znovu načíst – {1}", label, why) };
+  return { ok: false, volumeDiffPct: NaN, bboxDiff: NaN, solidsOk: false, level: "error", code: "out.check-failed", line: tr("✗ kontrola {0}: soubor se nepodařilo znovu načíst – {1}", label, why) };
 }
 
 /* ───────────────────────── window.mncad ───────────────────────── */

@@ -18,6 +18,7 @@ Prvky:
 ✓ vazba ZDVIH „Deska A“ F5 → „Rám“ F6 · 57,5 mm: ok · poloha beze změny
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
 Pohybová studie: 36 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
 Vazby splněny ve všech krocích
 Krok 36 (t = 2 s, motory 27,15):
@@ -34,6 +35,7 @@ Pohyb: výsledek platí pro tento stav sestavy – 36 kroků, vazby splněny, ko
 === run 3 ===
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s (pak stojí do konce studie 3 s)
 Pohybová studie: 6 kroků · 3 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s (pak stojí do konce studie 3 s)
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
 Vazby splněny ve všech krocích
 CSV pohybové studie (7 řádků):
@@ -47,6 +49,7 @@ Krok;Čas [s];Motor 1 [mm];Rám X;Rám Y;Rám Z;Rám RX;Rám RY;Rám RZ;Deska A 
 6;3;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
 Vazby splněny ve všech krocích
 ℹ řádek 4: délka studie změněna z 3 s na 2 s – určuje ji doba jízdy jediného motoru 1 (rozsah × rychlost); jinou délku zadejte pohyb čas T (motor po dojetí stojí)
@@ -82,6 +85,7 @@ Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kol
 Pohybová studie: motorů 1 · kroků 4
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
 Pohybová studie: 4 kroků · 1 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Deska A: rozsah pohybu X 0 · Y 0 · Z 15,175 mm · konec [0; 0; 52,325]
 Vazby splněny ve všech krocích
 ⚠ řádek 1: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
@@ -90,6 +94,7 @@ Krok 4 (t = 1 s, motory 42,325):
  Deska A [0; 0; 52,325]
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby od 57,5 mm ↓ rychlostí 10 mm/s (bez koncové hodnoty – za 2 s na 37,5 mm)
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby od 57,5 mm ↓ rychlostí 10 mm/s (bez koncové hodnoty – za 2 s na 37,5 mm)
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Deska A: rozsah pohybu X 0 · Y 0 · Z 20 mm · konec [0; 0; 47,5]
 Vazby splněny ve všech krocích
 

@@ -91,12 +91,15 @@ import { bomNotesOf } from "./asm-supply";
 import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
+import { useClearanceGap } from "./motion-clearance-panel"; // úsečka vůle pohybové studie (vlna 22, bod 6)
 import { useSpringBetween } from "./springs/spring-between";
 import { useMateRepick } from "./mate-repick";
 import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
 import { AskHost, askBusy, askConfirm, askNumber } from "./ask-dialog";
 import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps } from "./engine-port";
 import { runScript } from "@/cad/engine/run";
+import { solidsOfLeaves } from "@/cad/solid-export";
+import { guiExportCheck, type GuiExportCheck } from "./export-solid-check";
 import { formatConsole } from "@/cad/engine/protocol";
 import { checkProtocol, checkRunOptions, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
 import { makeAsmEnv } from "@/cad/engine/asm-env";
@@ -205,6 +208,8 @@ export function CadApp() {
   const [core, setCore] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /** výsledek kontroly posledního objemového exportu z menu (22c: ✗ bez tělesa, ⚠ volné plochy, ✓ věrná kopie) – do změny dokumentu */
+  const [exportChk, setExportChk] = useState<GuiExportCheck | null>(null);
   const [notice, setNotice] = useState<{ title: string; body: string } | null>(null);
   const [panels, setPanels] = useState(false);
   const [prefs, setPrefs] = useState<Settings>(loadSettings);
@@ -295,6 +300,7 @@ export function CadApp() {
   const [dxfImp, setDxfImp] = useState<{ name: string; text: string } | null>(null);
   const [motionOpen, setMotionOpen] = useState(false); // pohybová studie sestavy (motion-panel.tsx)
   const motionShow = useMotionView();
+  const clearanceGapShow = useClearanceGap();
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
   // nastavení, paleta, úvodní obrazovka, formařské nástroje
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -985,7 +991,7 @@ export function CadApp() {
           const bad = out.split("\n").find((l) => l.startsWith("✗"));
           if (bad) throw new Error(bad);
           // změněná studie se do dokumentu promítne až po vykreslení
-          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft|pohled|view|ansicht|video|anotace|annotations|anmerkungen)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
+          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft|pohled|view|ansicht|video|anotace|annotations|anmerkungen|vůle|vule|clearance|spiel|kollision)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
         }
         const d = histRef.current.present;
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
@@ -998,7 +1004,9 @@ export function CadApp() {
         const cr = await import("@/cad/clash-report");
         const steps = k.motionTable(d, res).map((row, i) => (res.steps[i]?.clashes ? { ...row, clashList: cr.apiStepClashes(d, res.steps[i]) } : row));
         const cl = res.collisionsChecked ? cr.motionClashSummary(res, d).stats : null;
-        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}) };
+        // vůle sledovaných dvojic, spojitost kontroly kolizí a kolize nalezené mezi kroky (vlna 22, bod 6)
+        const clr = (await import("@/cad/clearance-report")).clearanceApi(res, d);
+        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -1073,7 +1081,7 @@ export function CadApp() {
         const name = `${safeName(d.name)}.${meta.ext}`;
         const h = exportRun(appRuns, { format: meta.f as ExportFormat3d, label: `${meta.label} · ${name}`, source: "api", target: null }, exportDepsRef.current());
         const r = await h.done;
-        return { name, mime: meta.mime, bytes: r.data.byteLength, base64: toB64(r.data), modelRev: r.modelRev, ...(r.check ? { check: { ok: r.check.ok, text: r.check.line.replace(/^[✓⚠✗]\s*/, "") } } : {}), job: appRuns.snapshot(h.entry) };
+        return { name, mime: meta.mime, bytes: r.data.byteLength, base64: toB64(r.data), modelRev: r.modelRev, ...(r.check ? { check: { ok: r.check.ok, text: r.check.line.replace(/^[✓⚠✗]\s*/, "") } } : {}), ...(r.check && !r.check.ok ? { warning: r.check.line } : {}), job: appRuns.snapshot(h.entry) };
       },
     }, () => apiHostRef.current);
     // každé volání nejdřív zapíše rozepsané změny (22e, 22f); výstupy počkají na dokončený stav (12) – run-host.ts guardApi
@@ -2319,7 +2327,7 @@ export function CadApp() {
       // potvrzení jen když výsledek patří tomu, co je právě vidět; jinak bez ✓ a s názvem sestavy (nic zeleného nad jiným dokumentem)
       const shown = shownAsmRef.current;
       const here = docId.current === key && !!shown && clashSig(shown) === sig;
-      flash(!here ? tr("Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.", name) : res.length ? tr("Kolize: {0}", countsText(classes)) : tr("Bez kolizí ✓ – výsledek je v panelu Kolize i ve stavu dokumentu"));
+      flash(!here ? tr("Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.", name) : res.length ? tr("Kolize: {0}", countsText(classes)) : tr("Bez průniku těles (vůle nekontrolována) – výsledek je v panelu Kolize i ve stavu dokumentu"));
     } catch (e) {
       flash((e as Error).message);
     } finally {
@@ -2611,9 +2619,15 @@ export function CadApp() {
       }
       const h = exportRun(appRuns, { format: format as ExportFormat3d, label: `${meta.label} · ${target.name}`, source: "menu", target }, exportDeps(meta.mime));
       flash(tr("Export {0}: úloha {1} – průběh a výsledek v seznamu Exporty", meta.label, h.id));
+      setExportChk(null);
       const r = await h.done;
       const bytes = r.data.byteLength;
       const check = r.check ? (r.check.ok ? " · ✓" : " · ⚠ " + r.check.line.replace(/^[✓⚠✗]\s*/, "")) : "";
+      // objemový formát (22c): STEP / BREP – kontrola úlohy (zpětné načtení, ✗ bez tělesa, ⚠ volné plochy); STL / 3MF – složení modelu
+      const chk: GuiExportCheck | null = r.check
+        ? { level: r.check.level ?? (r.check.ok ? "ok" : "warn"), text: r.check.line, format }
+        : await guiExportCheck(cad, histRef.current.present, format, r.data, isAsm ? solidsOfLeaves(leaves, (k) => asmCache.current.get(k)?.metrics) : result?.metrics?.solids !== undefined ? { solids: result.metrics.solids, free: result.metrics.free ?? 0 } : null);
+      setExportChk(chk);
       flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check);
       liveWith((cur) => recordExport(cur, { what: "model", format, file: target.name }).doc); // záznam exportu s revizí modelu (bod 20)
       track("cad_export", { format });
@@ -2622,6 +2636,8 @@ export function CadApp() {
       else flash((e as Error).message);
     }
   };
+  // výsledek kontroly exportu platí jen pro model, ze kterého export vznikl – po změně dokumentu / záložky zmizí
+  useEffect(() => setExportChk(null), [doc]);
   /** Data ▸ Export ▸ Textový skript: dokument jako textové příkazy `.mncad.txt` (cad/doc-script.ts) */
   const exportScript = async () => {
     if (!(await waitOutputs(tr("export skriptu")))) return flash(tr("Export skriptu zrušen."));
@@ -3951,6 +3967,7 @@ export function CadApp() {
                   leftDrag={prefs.leftDrag}
                   boxResolve={selFilter === "feature" && !isAsm && !measure && pickMode !== "edges" && pickMode !== "faces" ? (items, changed) => boxOwners.resolve(result?.mesh, items, (f, pt) => cad.faceOwner(doc, f, pt), changed) : undefined}
                   measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
+                  gap={isAsm && motionShow.pose ? clearanceGapShow : null}
                   vertices={result?.vertices ?? null}
                   faceColors={weldFaceColors(doc, result?.bodies, doc.faceColors)}
                   bodyHidden={bodyHidden}
@@ -4187,6 +4204,12 @@ export function CadApp() {
             )}
             {toast && <div className="absolute bottom-14 left-1/2 z-30 max-w-[90%] -translate-x-1/2 rounded-md bg-[#1f2933] px-4 py-2 text-[12.5px] text-white shadow-xl">{toast}</div>}
             {!sketch && <OutputsPanel doc={doc} analyses={staleNow} copies={copiesNow} onRecompute={() => runAgentRef.current("přepočítat vše")} />}
+            {exportChk && (
+              <div data-export-check={exportChk.level} data-export-format={exportChk.format} role={exportChk.level === "ok" ? "status" : "alert"} className={`absolute bottom-24 left-1/2 z-30 flex max-w-[90%] -translate-x-1/2 items-start gap-2 rounded-md border px-3 py-2 text-[12px] shadow-xl ${exportChk.level === "error" ? "border-red-300 bg-red-50 text-red-900" : exportChk.level === "warn" ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`}>
+                <span>{exportChk.text}</span>
+                <button type="button" aria-label={tr("Zavřít")} className="ml-1 shrink-0 opacity-60 hover:opacity-100" onClick={() => setExportChk(null)}>×</button>
+              </div>
+            )}
 
             {!sketch && (
               <div className={cn("pointer-events-none absolute bottom-2 left-24 right-24 flex flex-wrap justify-center gap-1.5 font-mono text-[10.5px]", bg.dark ? "text-white/80" : "text-[#26303b]")}>
@@ -4201,9 +4224,9 @@ export function CadApp() {
                     <Chip dark={bg.dark}>
                       {fmtNum(m.bbox[1][0] - m.bbox[0][0], 1)} × {fmtNum(m.bbox[1][1] - m.bbox[0][1], 1)} × {fmtNum(m.bbox[1][2] - m.bbox[0][2], 1)} mm
                     </Chip>
-                    <Chip dark={bg.dark}>V {fmtNum(m.volume / 1000, 1)} cm³</Chip>
+                    <Chip dark={bg.dark}>V {m.solids === 0 ? "–" : `${fmtNum(m.volume / 1000, 1)} cm³`}</Chip>
                     <Chip dark={bg.dark}>
-                      {mat.label} {fmtNum(massKg(m.volume, mat.density), 3)} kg
+                      {mat.label} {m.solids === 0 ? "–" : `${fmtNum(massKg(m.volume, mat.density), 3)} kg`}
                     </Chip>
                   </>
                 ) : (
@@ -4420,8 +4443,8 @@ export function CadApp() {
                 className="w-full rounded border border-[#cfd6de] bg-white px-2 py-1.5 text-[12.5px] outline-none focus:border-brand"
               />
             </label>
-            <Row k={tr("Hmotnost")} v={`${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
-            <Row k={tr("Objem")} v={`${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
+            <Row k={tr("Hmotnost")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(massKg(m.volume, mat.density), 4)} kg`} strong />
+            <Row k={tr("Objem")} v={m.solids === 0 ? tr("– (žádné objemové těleso)") : `${fmtNum(m.volume, 2)} mm³ (${fmtNum(m.volume / 1000, 3)} cm³)`} />
             <Row k={tr("Povrch")} v={`${fmtNum(m.area, 2)} mm² (${fmtNum(m.area / 100, 2)} cm²)`} />
             <Row k={tr("Hustota")} v={`${mat.density} g/cm³`} />
             <Row k={tr("Rozměry (X × Y × Z)")} v={`${fmtNum(m.bbox[1][0] - m.bbox[0][0], 3)} × ${fmtNum(m.bbox[1][1] - m.bbox[0][1], 3)} × ${fmtNum(m.bbox[1][2] - m.bbox[0][2], 3)} mm`} />

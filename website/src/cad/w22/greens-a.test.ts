@@ -5,7 +5,8 @@
  *
  * Inventář zelených textů etapy A1 (bod 1) a podmínka, za které smějí být vidět:
  *  1. panel Kolize „Bez kolizí ✓“                – jen stav `ok`: záznam aktivního dokumentu, otisk = zobrazený stav sestavy
- *  2. `stav` „Kolize: žádné (zkontrolováno …)“   – bez dovětku „NEPLATÍ“ jen při shodném otisku; jiná sestava „nezkontrolováno“
+ *  2. `stav` „Kolize: žádný průnik · vůle nekontrolována (zkontrolováno …)“ (do vlny 22 C2 „Kolize: žádné“) – bez dovětku
+ *     „NEPLATÍ“ jen při shodném otisku; jiná sestava „nezkontrolováno“
  *  3. `= … status … clash=0`                     – bez `clash.stale=1` jen při shodném otisku; jiná sestava `clash=-`
  *  4. řádek D `clash=0(…)`                       – vždy pro konečný stav sestavy (přepočet ℹ clash.rechecked)
  *  5. `stav` „Vazby: N (N ok)“ / `mates=N/N`     – jen pro nynější stav sestavy; jinak přepočet, a neodpovídají-li polohy
@@ -69,9 +70,10 @@ describe("vlna 22 A: žádné falešné zelené (bod 1 – zastaralé výsledky)
   it("1. panel Kolize: zelený titulek jen pro stav ok – nezkontrolováno / neplatí / kolize ho nikdy nemají", async () => {
     const { clashHeader, clashNote, clashTitle } = await import("../../components/cad/clash-view");
     const { clashStateOf } = await import("../engine/result-key");
-    expect(clashTitle("ok", 0)).toBe("Bez kolizí ✓");
+    // vlna 22, bod 6 (C2): stav ok = bez průniku, ne „bez kolizí ✓“ (vůle se nekontroluje) – text vědomě změněn
+    expect(clashTitle("ok", 0)).toBe("Bez průniku · vůle nekontrolována");
     for (const st of ["unchecked", "stale", "clash"] as const) {
-      expect(clashTitle(st, 2)).not.toMatch(/✓|Bez kolizí/);
+      expect(clashTitle(st, 2)).not.toMatch(/✓|Bez kolizí|Bez průniku/);
     }
     expect(clashTitle("unchecked", 0)).toBe("Kolize: nezkontrolováno");
     expect(clashTitle("stale", 0)).toBe("Kolize: neplatí");
@@ -108,7 +110,7 @@ stav`,
     const st = statusLines(out);
     // A zkontrolována bez kolizí → zelený výsledek smí být u A
     expect(st[0]).toMatch(/status "Sestava A" .* clash=0$/);
-    expect(con).toMatch(/Kolize: žádné \(zkontrolováno [^)]+\)$/m);
+    expect(con).toMatch(/Kolize: žádný průnik · vůle nekontrolována \(zkontrolováno [^)]+\)$/m);
     // B (kde přidržovač do desky zasahuje) nikdy kontrolována nebyla → žádné clash=0, žádné „Kolize: žádné“
     expect(st[1]).toMatch(/status "Sestava B" .* clash=-$/);
     expect(con).toMatch(/Kolize: nezkontrolováno/);
@@ -116,8 +118,8 @@ stav`,
     expect(st[2]).toMatch(/status "Sestava A" .* clash=0 clash\.stale=1$/);
     // poslední výpis stavu v konzoli (závěrečný stav sestavy A)
     const lastStatus = con.slice(con.lastIndexOf("Dokument: „Sestava A“"));
-    expect(lastStatus).toMatch(/Kolize: žádné \(zkontrolováno [^)]+\) – NEPLATÍ: sestava se od kontroly změnila/);
-    expect(lastStatus).not.toMatch(/Kolize: žádné \(zkontrolováno [^)]+\)$/m);
+    expect(lastStatus).toMatch(/Kolize: žádný průnik · vůle nekontrolována \(zkontrolováno [^)]+\) – NEPLATÍ: sestava se od kontroly změnila/);
+    expect(lastStatus).not.toMatch(/Kolize: žádný průnik · vůle nekontrolována \(zkontrolováno [^)]+\)$/m);
     // řádek D: kolize přepočítány pro konečný stav – ne clash=0 z dřívější kontroly
     expect(dLine(out, "Sestava A")).toMatch(/ clash=1\(thread=0,real=1\)$/);
     expect(dLine(out, "Sestava A")).not.toMatch(/stale=/); // po přepočtu už nic zastaralého
@@ -152,7 +154,7 @@ stav`,
     // jiná konfigurace téhož dílu (výstupek zasahuje do přidržovače), polohy komponent beze změny → žádné platné clash=0
     expect(st[1]).toMatch(/status "Sestava K" .* clash=0 clash\.stale=1$/);
     const lastStatus = con.slice(con.lastIndexOf("Dokument: „Sestava K“"));
-    expect(lastStatus).toMatch(/Kolize: žádné \(zkontrolováno [^)]+\) – NEPLATÍ: sestava se od kontroly změnila/);
+    expect(lastStatus).toMatch(/Kolize: žádný průnik · vůle nekontrolována \(zkontrolováno [^)]+\) – NEPLATÍ: sestava se od kontroly změnila/);
     expect(dLine(out, "Sestava K")).toMatch(/ clash=1\(thread=0,real=1\)$/);
     expect(out).toMatch(/^ℹ L- clash\.rechecked "Sestava K"/m);
   }, 240_000);

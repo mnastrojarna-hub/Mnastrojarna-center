@@ -135,8 +135,9 @@ async function recomputeAll(ctx: OpCtx): Promise<void> {
   const first = staleItems(ctx, r.doc);
   // 1) kopie dílů v sestavě – D1 (jedna funkce obnovy: `sestava obnovit vše`, přečíslování ploch vazeb a přepočet vazeb)
   if (first.some((x) => x.kind === "copy") && (await runFix(ctx, "sestava obnovit vše"))) done.push(tr("kopie dílů v sestavě obnoveny z dílů (sestava obnovit vše)"));
-  // 2) uložené analýzy: stav vazeb, kolize, pohyb (měření a porovnání zopakovat nejde – chybí původní zadání)
-  const kinds = new Set(first.filter((x) => x.kind === "analysis").map((x) => x.fix));
+  // 2) uložené analýzy: stav vazeb, kolize, pohyb (měření a porovnání zopakovat nejde – chybí původní zadání) – až po obnově
+  //    kopií: obnovená geometrie zneplatní i kontrolu kolizí, která předtím platila
+  const kinds = new Set(staleItems(ctx, r.doc).filter((x) => x.kind === "analysis").map((x) => x.fix));
   if (r.doc.kind === "assembly" && kinds.has("sestava vazby")) {
     await ensureMateStatus(ctx.ws, ctx.host.kernel, r.doc, docKeyOf(ctx), asmHooks(ctx));
     done.push(tr("stav vazeb přepočítán"));

@@ -31,6 +31,7 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { clashRulesScript } from "./agent-clash";
+import { clearanceScript } from "./agent-clearance";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
@@ -2146,6 +2147,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   // pohledy studie (kamera, řez), aktivní pohled, volby videa, anotace – vlna 22 (doc-script-motion-view.ts)
   if (mo?.motors.length || mo?.dyn) emitMotionViews(c.sheetOut, mo);
   else if (mo?.views?.length) c.note(tr("pohledy pohybové studie bez motoru se do skriptu nepřenáší"));
+  // sledovaná vůle a spojitost kontroly kolizí pohybové studie – vlna 22, bod 6 (cad/agent-clearance.ts)
+  const clr = clearanceScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null));
+  for (const l of clr.lines) c.line(l);
+  if (clr.skipped) c.note(tr("sledovaná vůle dvojice s komponentou mimo skript se do skriptu nepřenáší ({0})", clr.skipped));
   // pravidla kolizí (pracovní kontakt, závit bez prvku) a tolerance dotyku – vlna 22, bod 5 (cad/agent-clash.ts)
   const cr = clashRulesScript(doc, c.li, (p) => (p.length === 1 && idx.has(p[0]) ? `#${idx.get(p[0])}` : null), (id) => mateNo.get(id));
   for (const l of cr.lines) c.line(l);
