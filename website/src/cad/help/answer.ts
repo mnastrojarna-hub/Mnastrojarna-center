@@ -81,8 +81,9 @@ function pickCmds(c: HelpChunk, terms: Set<string>, max: number): string[] {
   return pick.map((s) => s.x);
 }
 
-function pickSentence(text: string, terms: Set<string>): string {
-  const parts = text.split(/(?<=[.;!?])\s+|\s+·\s+/).filter((p) => p.trim());
+/** věta úseku s nejvíc nalezenými slovy; `whole` = dělit jen na úseky „ · “ (tahák: poznámka v závorce se středníkem zůstane celá) */
+function pickSentence(text: string, terms: Set<string>, whole = false): string {
+  const parts = text.split(whole ? /\s+·\s+/ : /(?<=[.;!?])\s+|\s+·\s+/).filter((p) => p.trim());
   if (!parts.length) return "";
   let best = 0;
   let bestN = -1;
@@ -119,7 +120,7 @@ function hitLine(i: number, s: HelpSection, lang: CadLang, cap: number): string 
   const title = sectionTitle(c, lang);
   const head = `${i}. ${title ? `${title} ` : ""}[${SRC_TAG(c, lang)}]${cmds.length ? ": " : ""}${cmds.join(" · ")}`;
   // věta tahák jen tehdy, když sama odpovídá dotazu („další vložení = další instance“); jinde vždy
-  let sent = pickSentence(c.text, s.terms);
+  let sent = pickSentence(c.text, s.terms, c.src === "cheat");
   if (c.src === "cheat" && !SearchIndex.matchesIn(sent, s.terms)) sent = "";
   // věta, která začíná vypsaným příkazem („`kusovník [csv]` – kusovník [csv] – tabulka…“), ho neopakuje
   for (const x of picked) if (sent.startsWith(x)) sent = sent.slice(x.length).replace(/^[\s–·:;,-]+/, "");

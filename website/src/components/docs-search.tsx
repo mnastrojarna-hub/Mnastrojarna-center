@@ -315,15 +315,21 @@ export function DocsSearch({ locale = "cs", root = "article.doc", sections = "se
     const onKey = (e: KeyboardEvent) => {
       const tg = e.target as HTMLElement | null;
       const typing = !!tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName));
+      // pole může být zaměřené už z dřívějška (po skoku na výsledek) – seznam se proto otevře výslovně, ne jen událostí focus
+      const reopen = () => {
+        clearTimeout(closeTimer.current);
+        setOpen(true);
+        bringUp();
+      };
       if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey) && !e.altKey) {
         e.preventDefault();
         input.current?.focus({ preventScroll: true });
         input.current?.select();
-        bringUp();
+        reopen();
       } else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         input.current?.focus({ preventScroll: true });
-        bringUp();
+        reopen();
       }
     };
     window.addEventListener("keydown", onKey);

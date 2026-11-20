@@ -307,7 +307,8 @@ let b;
     // 5c. myš, která jen stojí nad místem seznamu, nepřebírá výběr: Enter po psaní = první výsledek
     for (const y of [300, 400]) {
       await p.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-      await p.mouse.click(683, y);
+      await p.waitForTimeout(200);
+      await p.mouse.move(683, y); // ukazatel zůstane stát tam, kde se za chvíli otevře seznam výsledků
       await p.keyboard.press('/');
       await p.keyboard.type('kusovnik', { delay: 15 });
       await p.waitForTimeout(600);
@@ -410,6 +411,32 @@ let b;
     ok(s3.checked === false && s3.hidden === 0, `5g po Esc a novém hledání je filtr vypnutý (${JSON.stringify(s3)})`);
     ok(errs.length === 0, '5 dokumentace: bez JS chyb ' + errs.join(' | '));
     await p.close();
+
+    // 5i. Zpět po klientské navigaci přes domovskou stránku (celý web): připnutá sekce úvodu (GSAP pin-spacer) nesmí shodit
+    //     React při odchodu ze stránky – ani po kliknutí na odkaz, ani po Zpět na dokumentaci s hledáním v adrese
+    {
+      const q = await b.newPage({ viewport: { width: 1366, height: 860 } });
+      const e2 = [];
+      q.on('pageerror', (e) => e2.push(e.message));
+      const crashed = () => q.evaluate(() => /Application error/.test(document.body.innerText));
+      const pinned = () => q.waitForFunction(() => document.querySelector('[data-hscroll]')?.closest('.pin-spacer'), null, { timeout: 15000 }).then(() => true, () => false);
+      await q.goto(BASE + '/', { waitUntil: 'networkidle', timeout: 120000 });
+      ok(await pinned(), '5i úvodní stránka: sekce Archiv zakázek je připnutá (pin-spacer) – stav, ve kterém web dřív padal');
+      await q.evaluate(() => [...document.querySelectorAll('a')].find((x) => x.getAttribute('href') === '/sluzby')?.click());
+      await q.waitForTimeout(2500);
+      ok(!(await crashed()) && /\/sluzby$/.test(q.url()), `5i úvod → odkaz Služby: stránka se otevře bez pádu (${q.url().replace(BASE, '')})`);
+      await q.goto(BASE + '/cad/dokumentace?q=kusovn%C3%ADk', { waitUntil: 'networkidle', timeout: 120000 });
+      await q.waitForTimeout(800);
+      await q.evaluate(() => [...document.querySelectorAll('header a')].find((x) => x.getAttribute('href') === '/')?.click());
+      await q.waitForTimeout(1500);
+      await pinned();
+      await q.goBack();
+      await q.waitForTimeout(3000);
+      const back = await q.evaluate(() => ({ url: location.pathname + location.search, results: document.querySelectorAll('[data-docs-search-result]').length, value: document.querySelector('[data-docs-search] input[type=search]')?.value ?? null }));
+      ok(!(await crashed()) && /^\/cad\/dokumentace\?q=/.test(back.url) && back.value === 'kusovník', `5i dokumentace?q=kusovník → úvod → Zpět: bez pádu, hledání zpět (${JSON.stringify(back)})`);
+      ok(e2.length === 0, '5i bez JS chyb ' + [...new Set(e2)].join(' | ').slice(0, 200));
+      await q.close();
+    }
 
     // 5h. CLI: víc hledání v jednom běhu, dlouhý dotaz, překlep, anglický tahák, mncad help search bez slov
     const multi = cli(['run', '-', '--formats', 'none', '--out', path.join(S, 'cli-out-multi')], 'nápověda hledat záložky\nnápověda hledat pružina mezi díly\nnápověda hledat kusovník\n');

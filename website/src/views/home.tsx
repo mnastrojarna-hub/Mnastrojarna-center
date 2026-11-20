@@ -104,6 +104,9 @@ export function HomeView({ locale }: { locale: Locale }) {
       </section>
 
       {/* ================= ARCHIV ZAKÁZEK (vodorovně) ================= */}
+      {/* obal: GSAP při připnutí vloží sekci do vlastního <div class="pin-spacer">; bez obalu by React při odchodu ze stránky
+          mazal sekci z <main>, kde už není (removeChild → „Application error“ po kliknutí na odkaz i po Zpět) */}
+      <div>
       <section data-hscroll className="relative overflow-hidden bg-steel-100 py-20 md:flex md:h-screen md:flex-col md:justify-center md:pb-0 md:pt-24">
         <div className="container flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div className="max-w-2xl">
@@ -164,6 +167,7 @@ export function HomeView({ locale }: { locale: Locale }) {
           </div>
         </div>
       </section>
+      </div>
 
       {/* ================= KLIENTI ================= */}
       <section className="overflow-hidden py-24 md:py-32">
