@@ -21,7 +21,7 @@
  * a řídicí znaky jsou v textech a názvech nahrazené mezerou – každý řádek projde právě jedním regexem `GRAMMAR`.
  *
  * Priorita zařazení do rozpočtu: hlavička + Σ + řádek O (odkaz; delší než 200 znaků zkrácený na začátek adresy a délku)
- * vždy > ✗ > ⚠ > F a celý dlouhý řádek O > jednořádkové `=` > D (hlavní dokument a dokumenty s ✗/⚠) > víceřádkové
+ * vždy > ✗ > ⚠ > F a celý dlouhý řádek O > D hlavního dokumentu > jednořádkové `=` > D dokumentů s ✗/⚠ > víceřádkové
  * výpisy > ℹ převzetí záložky (`doc.reused`, `doc.name-taken` – i bez `notes`, víc dokumentů jedním řádkem `×N` –
  * `mergeTakeovers`) > ostatní ℹ (jen `notes`). Pořadí tisku:
  * hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku,
@@ -525,7 +525,7 @@ export type ShortOptions = { budget?: number; notes?: boolean };
 export type ShortProtocol = { text: string; bytes: number; budget: number; overflow?: Overflow };
 
 /** priorita zařazení (menší = dřív); `shownNote` = ℹ s `short` v registru kódů (převzetí záložky) – i bez volby `notes` */
-const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, shownNote: 6, note: 7 } as const;
+const PRIO = { error: 0, warn: 1, out: 2, mainDoc: 3, req: 4, doc: 5, listing: 6, shownNote: 7, note: 8 } as const;
 /** skupina tisku (pořadí řádků) */
 const GROUP = { error: 0, warn: 1, note: 2, measure: 3, doc: 4, file: 5, link: 6 } as const;
 /**
@@ -590,7 +590,9 @@ function candidates(r: RunReport, notes: boolean): Item[] {
   const flagged = new Set(entries.filter((e) => (e.level === "error" || e.level === "warn") && e.doc).map((e) => e.doc as string));
   r.docs.forEach((d, i) => {
     const bad = (d.features?.error ?? 0) > 0 || (d.features?.warn ?? 0) > 0 || flagged.has(d.name) || flagged.has(d.ref);
-    if (d === main || bad) add(PRIO.doc, GROUP.doc, d === main ? -1 : i, docLine(d));
+    // řádek D hlavního dokumentu (co běh postavil: komponenty, vazby, objemy, hmotnost, obálka, kolize, revize) má přednost
+    // před výpisy `=` – skript jich může vyžádat libovolně mnoho a hlavní souhrn by vytlačily do přebytku (vlna 22, brána synth)
+    if (d === main || bad) add(d === main ? PRIO.mainDoc : PRIO.doc, GROUP.doc, d === main ? -1 : i, docLine(d));
   });
   r.files.forEach((f, i) => add(PRIO.out, GROUP.file, i, fileLine(f)));
   return items; // řádek O (odkaz) je pevný jako hlavička a Σ (shortProtocol)

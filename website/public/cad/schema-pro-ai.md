@@ -2823,7 +2823,8 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
   dílu během) a má řádek `D` s čísly (`feat=`, `V=`, `m=`, `bbox=`) v **plném** protokolu (`--full`,
   `protocol: "full"`) a v JSON (`docs`); prázdný dokument běhu (prázdná sestava) také. **Stručný** protokol (CLI výchozí,
   `protocol: "short"`) vypíše řádek `D` jen hlavního dokumentu a dokumentů s ✗ / ⚠ – čísla jiného dílu tedy čtěte z plného
-  protokolu nebo JSON. Dokumenty dřívějších běhů relace beze změny se nestaví (`V=-`). Vedlejší dokument běhu bez tělesa
+  protokolu nebo JSON. Řádek `D` hlavního dokumentu má v rozpočtu 2 kB přednost před výpisy `=` (ustoupí jen ✗, ⚠ a `F`/`O`),
+  takže ho mnoho měření nevytlačí do `protocol-full.txt`. Dokumenty dřívějších běhů relace beze změny se nestaví (`V=-`). Vedlejší dokument běhu bez tělesa
   (jen skica – profil, dráha) není chyba (`V=-`); ✗ `build.failed` „model nemá těleso“ dostane jen hlavní dokument.
 - **Stručný protokol i v prohlížeči:** `await window.mncad.run(text, { protocol: "short" })` (nebo jen
   `run(text, "short")`) vrátí tentýž protokol MNCAD/1 jako `mncad run … --formats none` (≤ 2 kB, řádky D, F souborů, které
