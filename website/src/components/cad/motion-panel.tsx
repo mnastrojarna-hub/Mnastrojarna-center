@@ -29,6 +29,9 @@ import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "@/c
 import { DynChart, DynamicSettings, MotionModeSwitch } from "./motion-dynamic-panel";
 import { MotionPhases, PhaseTimeline } from "./motion-phases-panel";
 import { ClearanceResult, ClearanceSettings } from "./motion-clearance-panel"; // vůle a spojitá kontrola (vlna 22, bod 6)
+import { ProcessSettings, ProcessState } from "./motion-process-panel"; // procesní vrstva: střih / otisk (vlna 22, bod 4)
+import { ensureProcessMeshes } from "./process-meshes";
+import { processOf } from "@/cad/motion-process";
 import type { SpringStep } from "@/cad/asm-spring";
 import { uid, type CadDoc, type MotionMotor, type MotionStudy, type Placement, type Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -44,7 +47,7 @@ import { MotionPlayer, type PlayerHost } from "./motion-player";
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
 /** `springs` = délky pružin v kroku (cad/asm-spring.ts) – zobrazení protáhne síť volné pružiny */
-type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null; springs?: Record<string, SpringStep> | null; /** neplatný krok (bod 8): zobrazená poloha je poslední platného kroku `shows` – 3D okno ho výrazně označí */ invalid?: { step: number; shows: number } | null };
+type View = { pose: Record<string, Placement> | null; trace: Vec3[] | null; springs?: Record<string, SpringStep> | null; /** neplatný krok (bod 8): zobrazená poloha je poslední platného kroku `shows` – 3D okno ho výrazně označí */ invalid?: { step: number; shows: number } | null; /** procesní vrstva (vlna 22, bod 4): výsledek a krok (index do `res.steps`), jehož stav obrobku a odpad 3D okno ukáže */ proc?: { res: MotionResult; k: number } | null };
 let view: View = { pose: null, trace: null };
 const subs = new Set<() => void>();
 const EMPTY: View = { pose: null, trace: null };
@@ -277,8 +280,12 @@ export function MotionPanel({
     }
     const s = res.steps[step];
     const trace = res.steps.slice(0, step + 1).flatMap((x) => (x.trace ? [x.trace] : []));
-    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null, springs: s?.springs ?? null, invalid: s?.status === "invalid" ? { step: s.i, shows: s.shows ?? 0 } : null });
+    motionView.set({ pose: s?.place ?? null, trace: trace.length > 1 ? trace : null, springs: s?.springs ?? null, invalid: s?.status === "invalid" ? { step: s.i, shows: s.shows ?? 0 } : null, proc: processOf(res) ? { res, k: step } : null });
   }, [res, step]);
+  // sítě procesní vrstvy (obrobek po operaci, odpad) – načtou se jednou po výsledku; 3D okno je pak čte synchronně
+  useEffect(() => {
+    if (res && processOf(res)) void ensureProcessMeshes(res, docRef.current, envRef.current().process);
+  }, [res]);
   useEffect(() => () => motionView.set({ pose: null, trace: null }), []);
   const compute = useCallback(async (): Promise<MotionResult | null> => {
     const d = docRef.current;
@@ -358,7 +365,7 @@ export function MotionPanel({
   const showStep = (r: MotionResult, i: number) => {
     const st = r.steps[i];
     const trace = r.steps.slice(0, i + 1).flatMap((x) => (x.trace ? [x.trace] : []));
-    motionView.set({ pose: st?.place ?? null, trace: trace.length > 1 ? trace : null, springs: st?.springs ?? null });
+    motionView.set({ pose: st?.place ?? null, trace: trace.length > 1 ? trace : null, springs: st?.springs ?? null, proc: processOf(r) ? { res: r, k: i } : null });
   };
   /**
    * Snímky PNG / video WebM s pevným časováním (motion-export.ts): bez záznamu obrazovky, délka = délka studie / rychlost
@@ -377,13 +384,15 @@ export function MotionPanel({
     });
     const host: ExportHost = {
       ...player,
-      setPose: (p) => motionView.set({ pose: p.place, trace: p.trace, springs: p.springs }),
+      // procesní vrstva: stav obrobku a odpad podle kroku před zobrazeným časem (sítě musí být načtené – viz níže)
+      setPose: (p) => motionView.set({ pose: p.place, trace: p.trace, springs: p.springs, proc: processOf(r) ? { res: r, k: p.k } : null }),
       save,
       progress: (t) => setRec(t),
       cancelled: () => exportCancel.current,
     };
     exportCancel.current = false;
     setRec(tr("Připravuji snímky…"));
+    await ensureProcessMeshes(r, d, envRef.current().process); // exportované snímky obsahují obrobek po střihu / otisku
     try {
       const rep = await exportMotion(r, d, { kind, speed: v.speed, fps: v.fps, seconds: v.seconds, perStep: kind === "png" && (sig ? !!sig.perStep : true), views, annot: v.annot !== false && !st.annot?.off, annotSettings: st.annot, name: d.name, csv: motionCsv(r, d) }, host);
       setReport(rep);
@@ -845,6 +854,7 @@ export function MotionPanel({
           {tr("Kontrolovat kolize v pohybu (pomalejší)")}
         </label>
         <ClearanceSettings doc={doc} study={study} onStudy={setStudy} />
+        <ProcessSettings doc={doc} study={study} onStudy={setStudy} />
         <div>
           <label className="flex items-center gap-2">
             <input type="checkbox" data-motion-trace className="accent-[#E03930]" checked={!!study.trace} onChange={(e) => setStudy({ trace: e.target.checked ? { compId: doc.components?.find((c) => !c.fixed)?.id ?? doc.components?.[0]?.id ?? "", point: [0, 0, 0] } : undefined })} />
@@ -934,6 +944,7 @@ export function MotionPanel({
               </p>
             ))}
             <ClearanceResult res={res} doc={doc} step={step} onStep={(i) => (setPlay(null), setPos({ res, i: Math.max(0, Math.min(res.steps.length - 1, i)) }))} />
+            <ProcessState res={res} doc={doc} step={step} />
             <label className="flex items-center gap-1.5 text-[11px] text-[#4a5664]">
               <input type="checkbox" data-motion-detail className="accent-[#E03930]" checked={detail} onChange={(e) => setDetail(e.target.checked)} />
               {tr("Detail po dílech (jinak tuhé skupiny)")}

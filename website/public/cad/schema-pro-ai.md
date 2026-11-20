@@ -913,6 +913,22 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   nenastala = ⚠ `motion.phase-unreached`; motor fáze, jehož začátek nesedí na hodnotu vazby v okamžiku začátku = ⚠ `motion.start-jump`.
   Strojově na konci řádku `phases=<nastalé>/<všechny>`, motor s úseky `m1=keys:80>50>40>37>80:---+`. Dynamika po fázích zatím není.
   Restart = vždy z dokumentu (studie dokument nemění); fáze a úseky jdou i do převodu dokument → skript.
+- **Procesní vrstva – střih a otisk řízený pohybem (vlna 22, bod 4):** `pohyb proces střih "Razník" "Plech"` (EN `motion process cut`,
+  DE `bewegung prozess schnitt`) – v každém kroku se PŮVODNÍ obrobek protne s nástrojem v poloze kroku, průniky se sčítají (postupný
+  střih), po prostřižení se odebraný materiál oddělí jako **odpad** (`odpad padá` – s nástrojem, pak volný pád, výchozí | `s nástrojem` |
+  `zůstane`); `pohyb proces ražení "Razník" "Plech" hloubka 0,3` (EN `imprint … depth 0.3`, DE `prägen … tiefe 0,3`) = otisk s řízenou
+  hloubkou; `hloubka` u střihu = nástřih. Začátek: bez podmínky od dotyku (poloha), `od 0,5 s`, `při motor 1 <= 1`, `při vazba "ZDVIH" <= 1`
+  (vazba poháněná motorem) nebo `fáze "Střih"`. `pohyb proces` = seznam a výsledek, `pohyb proces 2 smazat`, `pohyb proces smazat`.
+  Protokol: `Procesní vrstva: geometrická aproximace – booleovské odebrání …; není to simulace materiálu (žádné síly, otřep, odpružení ani
+  tok materiálu)`, `střih 1 „Razník“ → „Plech“: záběr od kroku 19 … · prostřiženo v kroku 21 … · odebráno 314,159 mm³ · hloubka 1 mm · odpad
+  1 ks`, `Stav výrobku „Plech“: plný (kroky 0–18) → v záběru (kroky 19–20) → děrovaný (kroky 21–48)`; úroveň `kinematika + geometrická
+  aproximace`, strojově `level=kin+geo … proc=1 removed=314.159 scrap=1 through=21` na konci řádku. Pracovní záběr nástroje do obrobku od
+  začátku operace = ℹ `clash.work` (pravidlo „proces střih 1“, jeden model s `kolize pravidlo pracovní`), nikdy ⚠ clash.real; nástroj,
+  který obrobek nezasáhne = ⚠ `motion.process-miss`; neprostřiženo = ℹ `motion.process-partial`; strop 48 booleovských operací na
+  operaci = ℹ `motion.process-approx`. `pohyb krok N` vypíše stav výrobku a hloubku zásahu; `stav` stav na konci. Dokument se NEMĚNÍ:
+  krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava).
+  Zápis události `pohyb událost při vazba "ZDVIH" <= 1 odeber "Razník" z "Plech"` = totéž jako střih s podmínkou. `pohyb úroveň`
+  (EN `motion level`) vypíše úroveň; úroveň se příkazem nevolí (geometrická aproximace = procesní operace).
 - **Motory při definici (bod 10):** po `pohyb motor …` řádek `pohání: „Přidržovač“ + 1 díl – spolu s ním kvůli pevné vazbě (zámku):
   „Šroub M12“ · směr −Z` (zkušební posun řešičem); druhý motor na tomtéž stupni volnosti = ⚠ `motion.motor-conflict` hned při zadání
   (ne až ve výpočtu); motor, kterým nejde pohnout (stupeň volnosti drží vazby), také. Panel: „+ Nový motor“ × „Upravit motor N“
@@ -1942,6 +1958,37 @@ výkres vygenerované obnovit               # vše na výchozí místo (s klíč
 EN `drawing generated hide|show|move|restore`, DE `zeichnung generiert ausblenden|einblenden|verschieben|wiederherstellen`.
 `výkres stav` vypíše řádek „Vygenerované kóty a pozice upravené: …“.
 
+### Čitelný výkres sestavy – pozice po pohledech, kusovník, překryvy (vlna 22, bod 17)
+
+Pozice (balónky) se rozmístí po obvodu pohledů – nejdřív první řada kolem všech pohledů, pak další řady; pozice jde
+k pohledu, kde ji nezakrývají jiné komponenty (pole desek: půdorys), co se k jednomu pohledu nevejde, přejde k dalšímu.
+Balónek nikdy neleží přes jiný balónek, text, kótu, tabulku, razítko, jiný pohled ani rám a odkazová čára nevede přes
+cizí balónek; výměny dvojic snižují křížení odkazů. Kusovník: krátký nad razítkem, dlouhý ve sloupcích vlevo od razítka,
+nebo na samostatném listu – pohledy se kvůli němu nikdy tiše nezmenší (⚠ „Pohledy zmenšeny na … kvůli kusovníku“,
+⚠ `drawing.bom-overflow`, když se nevejde ani ve sloupcích).
+
+```
+výkres pozice                              # pozice po pohledech, ručně / zamčené, překryvy a křížení odkazů
+výkres pozice pohled horní 1-12,15         # pozice 1–12 a 15 k půdorysu (pohled auto = zpět automaticky)
+výkres pozice zamknout 7                   # poloha na listu zůstane i po změně modelu (= výkres vygenerované zamknout pos:7)
+výkres vygenerované posun pos:7 5 -3       # ruční posun (zamčená pozice se posune i se zámkem)
+výkres kusovník sloupce                    # nad | sloupce | auto; výkres kusovník list = samostatný list „Kusovník“
+```
+
+Kontrola překryvů celého listu (`výkres stav` řádek „Překryvy na listu“, konec běhu ⚠ `drawing.overlap` s počtem a radou,
+řádek D `overlaps=` jen po kontrole všech listů): balónek × balónek / text / tabulka / rám / geometrie pohledu, odkazová
+čára × balónek, text × text (kóty × kóty), text × geometrie, tabulka × pohled, text přes rám. „Překryvy 0“ znamená, že
+kontrola proběhla nad tímto listem; bez ní se píše „nezkontrolováno“. Ruční odsazení / posun vygenerované kóty
+(`výkres upravit "100" odsazení=30`, tažení myší) přežije přepočet po změně modelu.
+
+### Šablony hlavičky s logem (vlna 22, bod 22j)
+
+`výkres hlavička uložit "Firma" výchozí` uloží razítko aktivního listu (druh, logo, firma, kreslil / kontroloval / schválil,
+nepředepsané tolerance) jako pojmenovanou šablonu – do Nastavení i do dokumentu (jde s ním do .mncad, sdíleného odkazu a
+skriptu); s poli (`… šablona=nástrojářská logo="logo.svg" firma="…"`) vznikne šablona z polí. `výkres hlavička použít "Firma"`
+nebo `výkres razítko šablona="Firma"` dá razítko listu podle šablony, nové listy převezmou výchozí. Logo SVG zůstane vektorem
+(SVG / PDF výkresu), náhled a obrys pro DXF / DWG se spočítají i bez prohlížeče; v CLI se logo bere názvem souboru ze `--files`.
+
 ## Soubory, obraz, výstupy a analýzy – API pro agenty
 
 Vše z tohoto oddílu funguje bez dialogů a bez klikání; textové příkazy píší do protokolu jeden řádek ✓ / ✗ s výsledkem.
@@ -2315,7 +2362,7 @@ id dalších poznámek posunou – po změně si stav vypište znovu.
 | `výkres razítko název="…" číslo="MN-1" kreslil="AI" revize=A datum="13.11.2026" materiál="ČSN 11 523"` | razítko listu (+ `nepředepsané=`, `hrany=`, `poznámka=`); číslo, kreslil a revize se uloží i do dokumentu |
 | `výkres razítko kontroloval="…" schválil="…" zákazník="…" projekt="…" polotovar="…" počet=4 tepelné="kalit 58–60 HRC" povrch="černit" úhly="±0°30′" sražení="±0,2" firma="…"` | další pole razítka (en checked/approved/customer/project/stock/quantity/heat/surface/angles/chamfers/company, de geprüft/genehmigt/kunde/projekt/rohteil/menge/wärmebehandlung/oberflächenbehandlung/winkel/fasen/firma); pole, které šablona nemá, se vypíše v patičce nad razítkem |
 | `výkres razítko šablona=iso7200|kompaktní|nástrojářská` | šablona razítka listu: ISO 7200 (výchozí, 180×38), kompaktní (180×27), nástrojářská (180×64, všechna pole); výchozí pro nové listy v Nastavení → Výkres |
-| `výkres razítko logo="firma.png"` · `… logo="data:image/png;base64,…"` · `… logo=ne` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek, DXF/DWG jako vyplněný obrys (SOLID) |
+| `výkres razítko logo="firma.png"` · `… logo="data:image/png;base64,…"` · `… logo=ne` | logo do razítka: soubor připojený v konzoli (**Připojit soubor…**, název bez cesty; název bez přípony, který odpovídá více souborům, vrátí ✗ se seznamem) nebo data URL PNG/JPEG/SVG, v CLI soubor ze složky `--files`; zmenší se na nejvýš 600×300 px; SVG/PDF ho vloží jako obrázek (logo SVG jako vektor), DXF/DWG jako vyplněný obrys (SOLID) |
 | `výkres nepředepsané ISO 2768-mK` · `… mK` · `… f H` · `… desetinná` · `… desetinná ±0,1 ±0,1 ±0,01 ±0,005` · `… X. ±0,1 / X.X ±0,1 / X.XX ±0,01 / X.XXX ±0,005` · `… X.XX=±0,02` · `… ne` | nepředepsané tolerance: třída ISO 2768-1 (f/m/c/v, platí i pro úhly a sražení) + ISO 2768-2 (H/K/L), nebo tabulka podle počtu desetinných míst (X. / X.X / X.XX / X.XXX; hodnoty oddělené mezerou, „/“, „·“ nebo „;“, s popisky i bez – i jak je CAD sám vypisuje); `ne` = zrušit. Export výkresu **dílu** bez nich vrátí ⚠ „Výkres nemá nepředepsané tolerance …“ |
 | `výkres revize B "Přidána díra Ø8" [datum …] [kreslil …]` · `výkres revize smazat B` | tabulka revizí; poslední revize se zapíše do razítka |
 | `výkres vydat [B] ["popis změny"] [datum …] [vše]` · `výkres vydat zrušit [vše]` (`drawing issue` · `zeichnung freigeben`) | **vydání listu** (vlna 22, bod 20): písmeno revize + revize modelu `r·a1b2c3` + datum; chybí-li revize v tabulce, přidá se („první vydání“ / „změna modelu r·… → r·…“); bez písmena = revize z razítka, u zastaralého vydaného listu další písmeno. Po změně modelu je vydaný list **zastaralý**: `výkres stav` („⚠ Vydání: rev. A z modelu r·… – model je teď r·…“), `stav`, konec běhu, řádek D (`stale=drawing`) a GUI (odznak na záložce listu, pruh „Vydat novou revizi“) to hlásí ⚠ `drawing.stale`; export listu se starým písmenem po změně = ⚠ (přísný režim ✗ a soubor se nezapíše). Vydání je rozhodnutí člověka – export ani `přepočítat vše` list nevydává. Patička razítka nese „Model r·…“, PDF předmět „Model r·… · rev. A“, DXF komentář 999 |
@@ -2554,6 +2601,7 @@ třídí. Nejčastější:
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
 | `drawing.section-legacy` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (`dnes pište: …` v hlášce) |
 | `drawing.tolerance-missing` ⚠ | `výkres kontrola tolerancí`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | `výkres tolerance aN …` |
+| `drawing.bom-overflow` ⚠ | kusovník se na list nevejde ani ve sloupcích (počet chybějících řádků); `drawing.overlap` ⚠ navíc hlásí překryvy celého listu (balónky, odkazové čáry, texty, kóty, geometrie, tabulky, rám) s počtem po druzích | větší formát, `výkres kusovník list`, `výkres pozice pohled …`, `výkres pozice zamknout …` |
 | `drawing.dims-incomplete` ⚠ | kontrola kót (bod 18): na listu chybí velikost nebo poloha prvku výsledného dílu (díra, skupina děr s počtem, kapsa / okno, obrys skici) – `výkres stav`, konec běhu, export listu | `výkres doplnit kóty`, `výkres kóta …`, podrobně `výkres kontrola kót` |
 | `drawing.tol-nonfunctional` ℹ | přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na kótě, která nesplňuje žádný vyznačený funkční prvek (přetolerování) | vyznačit prvek `funkční …`, nebo toleranci uvolnit |
 | `drawing.stale` ⚠ | vydaný list (`výkres vydat`) neodpovídá nynější revizi modelu: `výkres stav`, `stav`, konec běhu, který model změnil; export listu se starým písmenem revize a nové vydání se stejným písmenem po změně (v přísném režimu ✗, export se nezapíše) | `výkres vydat B` (nová revize), přehled `výstupy zastaralé` |
@@ -3384,6 +3432,11 @@ export type CadDoc = {
   outputs?: ExportRecord[];
   /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
   functional?: FunctionalMark[];
+  /**
+   * pojmenované šablony hlavičky (razítka) s logem použité v dokumentu (vlna 22, bod 22j – cad/title-templates.ts): jdou
+   * s dokumentem do .mncad, sdíleného odkazu i skriptu (`výkres hlavička uložit …`)
+   */
+  titleTemplates?: import("./title-templates").TitleTemplateRec[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */

@@ -281,6 +281,11 @@ export type CadDoc = {
   outputs?: ExportRecord[];
   /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
   functional?: FunctionalMark[];
+  /**
+   * pojmenované šablony hlavičky (razítka) s logem použité v dokumentu (vlna 22, bod 22j – cad/title-templates.ts): jdou
+   * s dokumentem do .mncad, sdíleného odkazu i skriptu (`výkres hlavička uložit …`)
+   */
+  titleTemplates?: import("./title-templates").TitleTemplateRec[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
@@ -464,7 +469,7 @@ export const uid = () => Math.random().toString(36).slice(2, 9);
  * Uživatelská poznámka/kóta ve výkrese. Souřadnice jsou v souřadnicích promítnutého pohledu (`view` = klíč pohledu,
  * jednotky modelu, y dolů) – díky tomu po změně modelu zůstanou na stejném místě geometrie. `view: "sheet"` = mm listu.
  */
-export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string; /** revize, ve které se údaj změnil (trojúhelník s písmenem) */ rev?: string; /** kóta s polem tolerance ISO 286: jen značka / + úchylky / + mezní rozměry (jinak podle listu) */ tolShow?: "code" | "dev" | "limits" } & (
+export type DrawingAnnotation = { id: string; view: string; /** vygenerovala „Chytré kóty“ (klíč významu kóty) – přegenerování nahradí jen tyto */ auto?: string; /** ručně umístěná vygenerovaná kóta / popis (odsazení, posun) – přegenerování po změně modelu polohu zachová (vlna 22, bod 17) */ placed?: "user"; /** revize, ve které se údaj změnil (trojúhelník s písmenem) */ rev?: string; /** kóta s polem tolerance ISO 286: jen značka / + úchylky / + mezní rozměry (jinak podle listu) */ tolShow?: "code" | "dev" | "limits" } & (
   | { type: "dim"; a: Vec2; b: Vec2; kind: "aligned" | "horizontal" | "vertical"; offset: number; prefix?: string; suffix?: string; text?: string; /** kóta délky hrany – koncové body jsou konce hrany pohledu (dohledávají se v geometrii pohledu) */ edge?: boolean; /** souřadnicová kóta (ISO 129-1): `a` = počátek (základna), `b` = bod; kreslí se jen vynášecí čára z `b` a hodnota na jejím konci, `jog` = posun textu podél řady [mm listu] (cad/drawing-ordinate.ts) */ ord?: boolean; jog?: number }
   /** průměr / poloměr kružnice nebo oblouku pohledu: střed `c` a poloměr `r` v souřadnicích pohledu, odkaz ve směru `ang` [°] o délce `offset` [mm listu] od kružnice */
   | { type: "dim"; kind: "diameter" | "radius"; c: Vec2; r: number; ang: number; offset: number; prefix?: string; suffix?: string; text?: string }
@@ -591,8 +596,17 @@ export type MotionPhase = { id: string; name: string; start?: MotionCond; enable
  * výsledek to výslovně uvádí).
  */
 export type MotionClearance = { pairs?: { a: string; b: string }[] | "moving"; limit?: number; refine?: boolean };
+/**
+ * Procesní operace pohybové studie (vlna 22, bod 4 – cad/motion-process.ts, jádro cad/process-kernel.ts): nástroj `tool` při průchodu
+ * obrobkem `target` (id komponent nejvyšší úrovně; obrobek = díl) postupně odebírá objem – `cut` = střih / děrování (po prostřižení
+ * se oddělí odpad), `imprint` = otisk / ražení do hloubky `depth` [mm]. `depth` u střihu = nástřih jen do hloubky. Začátek `at`:
+ * podmínka studie (čas, hodnota motoru, hodnota vazby poháněné motorem) nebo začátek fáze (`phase` = id); bez podmínky = od dotyku.
+ * `scrap` = poloha odpadu: „fall“ (s nástrojem, pak volný pád – výchozí), „tool“ (drží na nástroji), „stay“ (zůstane, kde se oddělil).
+ * Geometrická aproximace (booleovské odebrání objemu), ne simulace materiálu – výsledek je odvozený výsledek studie.
+ */
+export type ProcessOp = { id: string; kind: "cut" | "imprint"; tool: string; target: string; depth?: number; at?: MotionCond | { phase: string }; scrap?: "fall" | "tool" | "stay"; name?: string };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic; /** fáze studie v pořadí (vlna 22, bod 3): nájezd, sevření, zdvih, návrat … v jedné časové ose */ phases?: MotionPhase[]; /** vůle a spojitá kontrola (vlna 22, bod 6) */ clearance?: MotionClearance } & MotionStudyViews;
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic; /** fáze studie v pořadí (vlna 22, bod 3): nájezd, sevření, zdvih, návrat … v jedné časové ose */ phases?: MotionPhase[]; /** vůle a spojitá kontrola (vlna 22, bod 6) */ clearance?: MotionClearance; /** procesní vrstva (vlna 22, bod 4 – cad/motion-process.ts): střih / otisk řízený pohybem, výsledek je odvozený (dokument se nemění) */ process?: ProcessOp[] } & MotionStudyViews;
 /**
  * Pracovní prostředí přehrávání (vlna 22, bod 14 – cad/motion-views.ts): uložené pohledy studie (kamera + rovina řezu), aktivní
  * pohled, nastavení posledního exportu videa (bod 13 – cad/motion-video.ts) a anotací. Jen zobrazení – výsledek studie neovlivní.

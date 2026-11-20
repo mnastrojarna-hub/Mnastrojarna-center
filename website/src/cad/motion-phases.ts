@@ -47,7 +47,7 @@ export type PhaseRun = {
   value?: number;
 };
 /** událost časové osy studie: začátek fáze (C3 přidá procesní události) */
-export type MotionEvent = { kind: "phase"; id: string; step: number; t: number };
+export type MotionEvent = { kind: "phase"; id: string; step: number; t: number } | { kind: "process"; id: string; what: "contact" | "through"; step: number; t: number };
 
 /** hodnoty, které podmínky čtou v poloze kroku (dodá výpočet studie) */
 export type CondProbe = { t: number; mate: (id: string) => number | null; motor: (id: string) => number | null };

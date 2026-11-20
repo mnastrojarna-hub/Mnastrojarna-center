@@ -15,6 +15,7 @@ import { backArg, parseDynText, type DynCmd } from "./agent-motion-dyn";
 import { parseMotionViewText, type MotionViewCmd } from "./agent-motion-view";
 import { parseClearanceText, type ClearanceCmd } from "./agent-clearance";
 import { parsePhaseText, type PhaseCmd } from "./agent-motion-phases";
+import { parseProcessAlias, parseProcessText, type ProcessCmd } from "./agent-process";
 import type { MotorLeg } from "./motor-model";
 import type { Vec3 } from "./types";
 
@@ -71,6 +72,8 @@ export type MotionCmd =
   | { op: "view"; cmd: MotionViewCmd }
   /** vůle a spojitost kontroly kolizí (vlna 22, bod 6 – cad/agent-clearance.ts) */
   | { op: "clearance"; cmd: ClearanceCmd }
+  /** procesní vrstva: střih / otisk řízený pohybem (vlna 22, bod 4 – cad/agent-process.ts) */
+  | { op: "process"; cmd: ProcessCmd }
   | { op: "set"; steps?: number; step?: number; duration?: number; collisions?: boolean; trace?: { comp: string; point?: Vec3 } | null }
   | { op: "run" }
   | { op: "play"; loop?: boolean }
@@ -240,6 +243,9 @@ export function parseMotionText(line: string): MotionCmd {
   // vůle, `kolize spojitě|diskrétně` (cad/agent-clearance.ts)
   const clr = parseClearanceText(c);
   if (clr) return { op: "clearance", cmd: clr };
+  // procesní vrstva (cad/agent-process.ts)
+  const proc = parseProcessText(c) ?? parseProcessAlias(c);
+  if (proc) return { op: "process", cmd: proc };
   if (c.is(K.motor)) {
     c.i++;
     if (c.is(K.del)) {

@@ -5,6 +5,8 @@
  * všechna pole razítka, nepředepsané tolerance (ISO 2768 třída nebo tabulka podle desetinných míst), tolerance úhlů
  * a sražení. Stejná data jako textový příkaz `výkres razítko pole=hodnota` (cad/agent-title.ts, cad/title-block.ts).
  */
+import { TitleTemplateRow } from "./title-template-row";
+import type { TitleTemplateRec } from "@/cad/title-templates";
 import { useRef, useState } from "react";
 import { tr } from "@/cad/i18n";
 import type { DrawingMeta } from "@/cad/drawing";
@@ -24,6 +26,9 @@ type Props = {
   flash: (m: string) => void;
   /** list, ke kterému patří `meta` (id listu) – volba „Vlastní text“ bez textu platí jen pro list, na kterém se zvolila */
   sheetKey?: string;
+  /** pojmenované šablony hlavičky dokumentu a jejich zápis do dokumentu (vlna 22, bod 22j) */
+  docTemplates?: TitleTemplateRec[];
+  onDocTemplates?: (list: TitleTemplateRec[] | undefined) => void;
 };
 
 const inputCls = "w-full rounded-md border border-ink-700/15 bg-white px-2 py-1 text-[12.5px] outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
@@ -54,7 +59,7 @@ const modeOf = (g: GeneralTol | null): TolMode => (g ? g.kind : "none");
 export const panelTolMode = (g: GeneralTol | null, textOn: string | null, sheetKey: string): TolMode => (g ? modeOf(g) : textOn !== null && textOn === sheetKey ? "text" : "none");
 
 /** Sekce „Razítko“ výkresového prostředí. */
-export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, assembly, flash, sheetKey = "" }: Props) {
+export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, assembly, flash, sheetKey = "", docTemplates, onDocTemplates }: Props) {
   const tpl = titleTemplateOf(meta);
   const g = generalTolOf(meta);
   // režim se odvozuje z údajů listu; jediný stav bez hodnoty je „Vlastní text“ s prázdným polem – zapamatuje se
@@ -71,9 +76,10 @@ export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, 
     setBusy(true);
     try {
       const url = await readFileAsDataUrl(f);
-      // libovolný obrázek prohlížeče (PNG, JPEG, SVG, WebP …) → PNG nejvýš 600 × 300 px + obrys pro DXF / DWG
-      const r = await rasterInBrowser(url);
-      const { logo, warnings } = await prepareLogo(toDataUrl("image/png", await encodePng(r)), f.name);
+      // SVG zůstává vektorem (+ PNG náhled a obrys pro DXF / DWG – vlna 22, bod 22j); ostatní obrázky prohlížeče (PNG, JPEG,
+      // WebP …) → PNG nejvýš 600 × 300 px + obrys pro DXF / DWG
+      const isSvg = /svg/i.test(f.type) || /\.svg$/i.test(f.name);
+      const { logo, warnings } = isSvg ? await prepareLogo(url, f.name) : await prepareLogo(toDataUrl("image/png", await encodePng(await rasterInBrowser(url))), f.name);
       attachedFiles.add({ name: f.name, mime: f.type || "image/png", dataUrl: url, bytes: f.size });
       setM({ logo });
       flash([tr("Logo „{0}“ {1}×{2} px vloženo do razítka", f.name, logo.w, logo.h), ...warnings].join(" · "));
@@ -87,6 +93,7 @@ export function TitleBlockSection({ meta, setM, persistProps, onMaterialChange, 
 
   return (
     <div className="space-y-2" data-title-panel>
+      <TitleTemplateRow meta={meta} setM={setM} docTemplates={docTemplates} onDocTemplates={onDocTemplates} flash={flash} />
       <Row label={tr("Šablona razítka")}>
         <select className={selectCls} aria-label={tr("Šablona razítka")} data-title-template value={tpl} onChange={(e) => setM({ template: e.target.value === "iso7200" ? undefined : (e.target.value as TitleTemplate) })}>
           {TITLE_TEMPLATES.map((t) => (

@@ -3,6 +3,8 @@
  * Rozměr listu v mm, tloušťky a typy čar dle ISO 128, otočené texty.
  */
 import { tr } from "./i18n";
+import { parseDataUrl } from "./title-logo";
+import { svgPdfPaths } from "./title-logo-svg";
 import { hostFont } from "./host-assets";
 import { LAYER_STYLE, type DrawingResult } from "./drawing";
 
@@ -79,6 +81,30 @@ function drawPage(pdf: JsPdf, d: PdfPage, f: PdfFonts) {
 
   for (const p of d.polys) {
     if (p.pts.length < 2) continue;
+    if (p.img?.svg) {
+      // logo SVG jako vektor (vlna 22, bod 22j): vyplněné tvary loga cestami PDF; nečitelné SVG → bitmapa níže
+      try {
+        const svg = new TextDecoder().decode(parseDataUrl(p.img.svg)?.bytes ?? new Uint8Array());
+        const paths = svgPdfPaths(svg, p.img.x, p.img.y, p.img.w, p.img.h);
+        if (paths.length) {
+          for (const sh of paths) {
+            const c = sh.fill;
+            pdf.setFillColor(parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16));
+            for (const pl of sh.polys) {
+              if (pl.length < 3) continue;
+              pdf.moveTo(pl[0][0], pl[0][1]);
+              for (let i = 1; i < pl.length; i++) pdf.lineTo(pl[i][0], pl[i][1]);
+              pdf.close();
+            }
+            if (sh.rule === "evenodd") pdf.fillEvenOdd();
+            else pdf.fill();
+          }
+          continue;
+        }
+      } catch {
+        /* bitmapa níže */
+      }
+    }
     if (p.img) {
       // logo razítka jako bitmapa (PNG / JPEG); nečitelný obrázek → jen rámeček
       try {

@@ -113,6 +113,11 @@ const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,
 const YES = new Set(["ano", "yes", "ja", "on", "true", "zapnout", "zap"]);
 const NO = new Set(["ne", "no", "nein", "off", "false", "vypnout", "vyp", "zadny", "zadne", "none", "keine", "kein", "aus"]);
 
+/** umístění kusovníku (cs / en / de) */
+const BOM_ABOVE = ["nad", "nadrazitkem", "above", "oben", "uber", "ueber"];
+const BOM_COLS = ["sloupce", "sloupcich", "vesloupcich", "columns", "cols", "spalten"];
+const BOM_AUTO = ["auto", "automaticky", "automatic", "automatisch"];
+
 const VIEW_WORDS: Record<string, ViewKey | "iso"> = {
   predni: "front", front: "front", vorne: "front", vorderansicht: "front", hlavni: "front",
   zadni: "back", back: "back", hinten: "back", rueckansicht: "back", ruckansicht: "back",
@@ -303,8 +308,16 @@ export const VOLBY: OptRow[] = [
   },
   {
     words: ["kusovnik", "bom", "stuckliste", "partslist"],
-    help: () => tr("kusovník ano|ne"),
+    help: () => tr("kusovník ano|ne|nad|sloupce|auto|list"),
     read: (t, i, o, sum) => {
+      // umístění kusovníku (vlna 22, bod 17): nad razítkem, ve sloupcích vlevo od razítka, automaticky (list = samostatný list – agent-drawing-pos.ts)
+      const v = fold(t[i + 1] ?? "");
+      if (BOM_ABOVE.includes(v) || BOM_COLS.includes(v) || BOM_AUTO.includes(v)) {
+        o.bomTable = true;
+        o.bomPlace = BOM_ABOVE.includes(v) ? "above" : BOM_COLS.includes(v) ? "columns" : "auto";
+        sum.push(o.bomPlace === "above" ? tr("kusovník nad razítkem") : o.bomPlace === "columns" ? tr("kusovník ve sloupcích vlevo od razítka") : tr("kusovník automaticky (nad razítkem, dlouhý ve sloupcích)"));
+        return 2;
+      }
       o.bomTable = bool(t[i + 1], tr("kusovník"));
       sum.push(o.bomTable ? tr("kusovník nad razítkem") : tr("bez kusovníku"));
       return 2;

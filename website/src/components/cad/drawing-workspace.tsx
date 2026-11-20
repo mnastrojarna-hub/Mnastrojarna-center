@@ -30,6 +30,7 @@ import { AnnFitRev, FitsSection, useViewTools, ViewToolsOverlay, ViewToolsSectio
 import { useDrawingSelection } from "./drawing-select";
 import { genEditCount } from "@/cad/drawing-boxsel";
 import { TitleBlockSection } from "./drawing-title-panel";
+import { OverlapMarkers, PositionsPanel } from "./drawing-positions-panel";
 import { inheritTitle } from "@/cad/title-block";
 import { generalTolWarnings } from "@/cad/drawing-export";
 import { registerFlush } from "./flush-barrier";
@@ -51,6 +52,8 @@ type Props = {
   bbox?: [Vec3, Vec3];
   /** uložení údajů razítka zpět do dokumentu */
   onPropsChange?: (p: NonNullable<CadDoc["props"]>) => void;
+  /** pojmenované šablony hlavičky dokumentu (vlna 22, bod 22j) */
+  onTitleTemplates?: (t: CadDoc["titleTemplates"]) => void;
   /** výkresy uložené v dokumentu (volby, razítko, kóty a poznámky) */
   drawings?: DrawingDoc[];
   /**
@@ -167,7 +170,7 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, onTitleTemplates, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll }: Props) {
   /** revize modelu, ze které se list počítá (patička razítka, odznak vydání – cad/doc-outputs.ts) */
   const mid = useMemo(() => (doc.kind !== "draft" ? modelId(doc) : null), [doc]);
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
@@ -199,6 +202,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     }
   });
   const [res, setRes] = useState<DrawingResult | null>(null);
+  // značky překryvů přes list (panel Pozice a překryvy – vlna 22, bod 17)
+  const [showOv, setShowOv] = useState(true);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ms, setMs] = useState(0);
@@ -1458,6 +1463,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 {tr("Pozice komponent – balónky (")}{balloons.length})
               </Check>
             ) : null}
+            {/* pozice po pohledech, zámek, umístění kusovníku, překryvy listu (vlna 22, bod 17) */}
+            {balloons?.length || bom?.length ? <PositionsPanel res={res} out={out} opts={opts} set={set} showMarkers={showOv} onShowMarkers={setShowOv} hasBom={!!bom?.length && showBom} /> : null}
             {genEditCount(opts.genEdit) > 0 && (
               // vygenerované kóty celkových rozměrů a pozice skryté (Delete) nebo posunuté výběrem na listu
               <button type="button" data-gen-restore onClick={() => set("genEdit", undefined)} title={tr("Vrátí vygenerované kóty celkových rozměrů a pozice na výchozí místo – i skryté klávesou Delete")} className="mb-1.5 rounded-md border border-ink-700/15 px-2 py-1 text-[11px] hover:bg-steel-100">
@@ -1505,7 +1512,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
 
           <Section title={tr("Razítko")}>
             {/* šablona, logo, firma, všechna pole a nepředepsané tolerance (drawing-title-panel.tsx – jako výkres razítko …) */}
-            <TitleBlockSection meta={meta} setM={setM} persistProps={persistProps} onMaterialChange={onMaterialChange} assembly={doc.kind === "assembly"} flash={flash} sheetKey={saved?.id ?? String(sheetIdx)} />
+            <TitleBlockSection meta={meta} setM={setM} persistProps={persistProps} onMaterialChange={onMaterialChange} assembly={doc.kind === "assembly"} flash={flash} sheetKey={saved?.id ?? String(sheetIdx)} docTemplates={doc.titleTemplates} onDocTemplates={onTitleTemplates} />
             <Row label={tr("Opracování hran")}>
               <TextInput value={meta.edges ?? ""} onChange={(v) => setM({ edges: v })} placeholder={tr("např. srazit 0,5×45°")} />
             </Row>
@@ -1626,6 +1633,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             </svg>
           )}
           {res && <ViewToolsOverlay vt={vt} res={res} tf={view} />}
+          {showOv && <OverlapMarkers out={out} tf={view} />}
           {bsel.overlay}
           {bsel.hint}
           {res && lostGeom && (

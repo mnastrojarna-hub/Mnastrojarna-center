@@ -78,6 +78,8 @@ export class DrawingTracker {
       const sheet = idx >= 0 ? d.drawings?.[idx] : undefined;
       if (sheet) {
         this.touched.set(`${verifyKey(ctx)}\u0000${sheet.id}`, { key: verifyKey(ctx), sheetId: sheet.id, lines, docName: d.name });
+        // list jen s kusovníkem (`výkres kusovník list`, vlna 22 bod 17) se mění s listem sestavy – vyhodnotí se na konci běhu taky
+        for (const s of d.drawings ?? []) if ((s.options as { bomOnly?: boolean } | undefined)?.bomOnly && s.id !== sheet.id) this.touched.set(`${verifyKey(ctx)}\u0000${s.id}`, { key: verifyKey(ctx), sheetId: s.id, lines, docName: d.name });
         if (strict) for (const x of await evaluateSheet(d, idx, compute, extras)) this.addSheet(line, x, d.name, lines);
       }
     } catch (e) {

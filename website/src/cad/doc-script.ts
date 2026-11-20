@@ -32,10 +32,11 @@
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { clashRulesScript } from "./agent-clash";
 import { clearanceScript } from "./agent-clearance";
+import { processScript } from "./agent-process";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords, emitPhases, motorIsPiecewise, motorPieceWords, windowWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
-import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
+import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitPositions, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { emitIssue } from "./doc-outputs";
 import { springScriptLine } from "./agent-springs";
 import { gearAutoName, gearScriptLines } from "./agent-gears";
@@ -270,6 +271,9 @@ const WORDS = {
   springTable: ["tabulka pružiny", "springtable", "federtabelle"],
   gearTable: ["tabulka ozubení", "geartable", "verzahnungstabelle"],
   bom: ["kusovník", "bom", "stückliste"],
+  bomAbove: ["nad", "above", "oben"],
+  bomColumns: ["sloupce", "columns", "spalten"],
+  bomAuto: ["auto", "auto", "auto"],
   balloons: ["balónky", "balloons", "positionsnummern"],
   projection: ["promítání", "projection", "projektion"],
   dimension: ["kótovat", "dimension", "bemaßen"],
@@ -280,6 +284,7 @@ const WORDS = {
   chain: ["řetězově", "chain", "kette"],
   baseline: ["od základny", "baseline", "basis"],
   sheetNew: ["list nový", "sheet new", "blatt neu"],
+  sheetSel: ["list", "sheet", "blatt"],
   sheetRename: ["list přejmenovat", "sheet rename", "blatt umbenennen"],
   drawingNew: ["nový", "new", "neu"],
   title: ["razítko", "titleblock", "schriftfeld"],
@@ -1601,7 +1606,11 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
     parts.push(`${c.w("rotation")} ${n(o.rotation)}`);
     keys.push("rotation");
   }
-  if (typeof o.bomTable === "boolean") {
+  if (o.bomTable !== false && (o.bomPlace === "above" || o.bomPlace === "columns" || o.bomPlace === "auto")) {
+    // umístění kusovníku (vlna 22, bod 17) – volba zapne i kusovník
+    parts.push(`${c.w("bom")} ${c.w(o.bomPlace === "above" ? "bomAbove" : o.bomPlace === "columns" ? "bomColumns" : "bomAuto")}`);
+    keys.push("bomPlace");
+  } else if (typeof o.bomTable === "boolean") {
     parts.push(`${c.w("bom")} ${c.yn(o.bomTable)}`);
     keys.push("bomTable");
   }
@@ -1658,6 +1667,16 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
           how = "same";
           c.note(tr("další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu", String(s.drawing)));
         }
+      } else if (o.bomOnly && list.slice(0, i).some((p) => p.drawing === s.drawing && (p.options as Rec | undefined)?.bomPlace === "sheet")) {
+        // list jen s kusovníkem vznikl příkazem `výkres kusovník list` u listu sestavy (vlna 22, bod 17): vybrat ho a přejmenovat
+        how = "sheet";
+        const auto = trIn(c.lang, "Kusovník");
+        const sel = `${c.w("drawing")} ${c.w("sheetSel")} ${scriptQuote(auto, true) ?? ""}`;
+        if (check(sel, (cmd) => cmd.k === "sheet" && cmd.op === "select")) c.line(sel);
+        if (s.name !== auto && q) {
+          const l = `${c.w("drawing")} ${c.w("sheetRename")} ${q}`;
+          if (check(l, (cmd) => cmd.k === "sheet" && cmd.op === "rename")) c.line(l);
+        }
       } else {
         how = "sheet";
         const l = `${c.w("drawing")} ${c.w("sheetNew")} ${q ?? ""}`.trim();
@@ -1666,6 +1685,7 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
           how = "same";
           c.note(tr("list „{0}“ se nepodařilo zapsat jako nový list", s.name));
         }
+        if (o.bomOnly) c.note(tr("list jen s kusovníkem „{0}“ vzniká příkazem výkres kusovník list u listu sestavy – zde se zapíše jako běžný list", s.name));
       }
     }
     setName = s.drawing;
@@ -1718,6 +1738,8 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
     }
     // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách) – jen ty, které na listu jsou
     emitGenEdit(c.sheetOut, doc, s, c.genKeys[s.id]);
+    // pozice po pohledech, zámky pozic, kusovník na samostatném listu (vlna 22, bod 17)
+    emitPositions(c.sheetOut, doc, s, c.genKeys[s.id]);
     emitIssue(c.sheetOut, doc, s); // vydání listu (vlna 22, bod 20 – doc-outputs.ts)
     const edited = ann.filter((a) => a.auto && ((a.type === "dim" && (a.text !== undefined || /[±+\-]\d|[A-Za-z]\d/.test(a.suffix ?? ""))) || (a.type === "callout" && a.tol) || a.rev || a.tolShow)).length;
     if (edited) {
@@ -2181,6 +2203,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   const clr = clearanceScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null));
   for (const l of clr.lines) c.line(l);
   if (clr.skipped) c.note(tr("sledovaná vůle dvojice s komponentou mimo skript se do skriptu nepřenáší ({0})", clr.skipped));
+  // procesní vrstva pohybové studie (střih / otisk) – vlna 22, bod 4 (cad/agent-process.ts)
+  const pr = processScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null), (id) => mateNo.get(id));
+  for (const l of pr.lines) c.line(l);
+  if (pr.skipped) c.note(tr("procesní operace s komponentou mimo skript se do skriptu nepřenáší ({0})", pr.skipped));
   // pravidla kolizí (pracovní kontakt, závit bez prvku) a tolerance dotyku – vlna 22, bod 5 (cad/agent-clash.ts)
   const cr = clashRulesScript(doc, c.li, (p) => (p.length === 1 && idx.has(p[0]) ? `#${idx.get(p[0])}` : null), (id) => mateNo.get(id));
   for (const l of cr.lines) c.line(l);

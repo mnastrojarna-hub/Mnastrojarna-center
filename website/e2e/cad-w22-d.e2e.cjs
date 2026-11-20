@@ -13,6 +13,12 @@
 //    (data-dim-incomplete="1"), tlačítko „Přidat kótu“ (data-dim-add) u polohy díry přidá kótu (polohy 1/6), „Přidat všechny
 //    navržené kóty“ (data-dim-add-all) → nic nechybí; funkční díra textem i pravým tlačítkem na plochu (Označit jako funkční)
 //    → položka data-dim-functional="missing" (bez tolerance); text v konzoli dává totéž (⚠ drawing.dims-incomplete).
+//  - D4 (bod 17, čitelný výkres sestavy): 12 dílů – panel „Pozice a překryvy“ (data-positions-panel) s počtem překryvů
+//    (data-overlap-count), pohled pozice výběrem (data-balloon-view-select → data-balloon-view), zámek (data-balloon-lock →
+//    data-balloon-mode="locked"), tažení balónku myší (posunutá pozice v textu), přesun přes geometrii → značky překryvů
+//    (data-overlap-marker), umístění kusovníku (data-bom-place → data-bom-layout); text `výkres pozice` dává totéž.
+//  - D4 (bod 22j): panel Razítko – „Uložit jako šablonu“ (data-title-tpl-name, data-title-tpl-save) → `výkres hlavička`
+//    vypíše šablonu; nový díl: výběr šablony (data-title-tpl-select) → razítko s firmou a nástrojářskou šablonou.
 // Spuštění (fáze 2): bin/e2e-run <worktree>/website 3534 <out> cad-w22-d   (E2E_BASE nastaví e2e-run)
 const { chromium } = require('playwright');
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -218,6 +224,81 @@ async function scenario(args, label) {
     ok(has && /Funkční prvky a základny \(2\):/.test(log), `${label}: pravé tlačítko na plochu → Označit jako funkční (funkční prvky 2)`);
     await closeConsole();
   } else ok(false, `${label}: 3D okno pro pravé tlačítko nenalezeno`);
+
+  // ── D4 (bod 17): pozice po pohledech, zámek, tažení, překryvy, kusovník ──
+  await openConsole();
+  {
+    const L = [];
+    for (let i = 1; i <= 12; i++) L.push(`nový díl Deska P${i}`, `kvádr 20 10 ${4 + (i % 4)}`);
+    L.push('nová sestava Sestava P');
+    for (let i = 1; i <= 12; i++) L.push(i === 1 ? 'vložit "Deska P1" ukotvit' : `vložit "Deska P${i}" v ${((i - 1) % 4) * 25} ${Math.floor((i - 1) / 4) * 15} ${(i % 3) * 8}`);
+    L.push('výkres A3 na šířku pohledy přední,horní', 'výkres kusovník ano', 'výkres balónky ano', 'výkres pozice');
+    log = await run(L.join('\n'), 600000);
+  }
+  ok(/Pozice: 12 \(/.test(log) && /Překryvy na listu: 0 \(zkontrolováno/.test(log), `${label}: výkres pozice – 12 pozic, překryvy 0 (zkontrolováno)`);
+  await run('výkres');
+  await closeConsole();
+  const panel = p.locator('[data-positions-panel]').first();
+  await panel.waitFor({ timeout: 60000 }).catch(() => {});
+  ok((await panel.locator('[data-overlap-count="0"]').count()) === 1, `${label}: panel Pozice a překryvy – odznak Překryvy: 0`);
+  ok((await p.locator('[data-balloon-row]').count()) === 12, `${label}: panel – 12 řádků pozic`);
+  await p.locator('[data-balloon-view-select="1"]').first().selectOption('top').catch(() => {});
+  await p.waitForFunction(() => document.querySelector('[data-balloon-row="1"]')?.getAttribute('data-balloon-view') === 'top', null, { timeout: 60000 }).catch(() => {});
+  ok((await p.locator('[data-balloon-row="1"]').getAttribute('data-balloon-view').catch(() => '')) === 'top', `${label}: pozice 1 → pohled horní (výběrem v panelu)`);
+  await p.locator('[data-balloon-lock="2"]').first().check().catch(() => {});
+  await p.waitForFunction(() => document.querySelector('[data-balloon-row="2"]')?.getAttribute('data-balloon-mode') === 'locked', null, { timeout: 60000 }).catch(() => {});
+  ok((await p.locator('[data-balloon-row="2"]').getAttribute('data-balloon-mode').catch(() => '')) === 'locked', `${label}: zámek pozice 2 v panelu`);
+  // tažení balónku 5 myší (výběr ve výkresu – genEdit move)
+  const b5 = p.locator('[data-sheet] svg text').filter({ hasText: /^5$/ }).first();
+  const bb5 = await b5.boundingBox().catch(() => null);
+  if (bb5) {
+    const cx = bb5.x + bb5.width / 2;
+    const cy = bb5.y + bb5.height / 2;
+    await p.mouse.move(cx, cy);
+    await p.mouse.down();
+    await p.mouse.move(cx + 15, cy + 25, { steps: 8 });
+    await p.mouse.up();
+    await p.waitForTimeout(1500);
+  }
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Sestava P"\nvýkres pozice');
+  ok(/zamčené 1/.test(log) && /horní: 1/.test(log), `${label}: text po GUI – pozice 1 u horního pohledu, zámek pozice 2`);
+  ok(!!bb5 && /posunuté [1-9]/.test(log), `${label}: tažení balónku myší → posunutá pozice`);
+  // přesun pozice do geometrie → překryv: odznak a značky na listu
+  log = await run('výkres vygenerované posun pos:7 0 -40\nvýkres pozice');
+  ok(/Překryvy na listu: [1-9]/.test(log), `${label}: přesun přes geometrii → překryv v textu`);
+  await run('výkres');
+  await closeConsole();
+  await p.waitForFunction(() => Number(document.querySelector('[data-overlap-count]')?.getAttribute('data-overlap-count') || '0') > 0, null, { timeout: 60000 }).catch(() => {});
+  ok(Number(await p.locator('[data-overlap-count]').first().getAttribute('data-overlap-count').catch(() => '0')) > 0 && (await p.locator('[data-overlap-marker]').count()) > 0, `${label}: odznak překryvů > 0 a červené značky na listu`);
+  await p.locator('[data-bom-place]').first().selectOption('columns').catch(() => {});
+  await p.waitForFunction(() => document.querySelector('[data-bom-layout]')?.getAttribute('data-bom-layout') === 'columns', null, { timeout: 60000 }).catch(() => {});
+  ok((await p.locator('[data-bom-layout]').first().getAttribute('data-bom-layout').catch(() => '')) === 'columns', `${label}: Kusovník ve sloupcích (výběr v panelu)`);
+
+  // ── D4 (bod 22j): šablona hlavičky z panelu Razítko ──
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  await run('nový díl "Deska H"\nkvádr 60 40 10\nvýkres A4\nvýkres razítko šablona=nástrojářská firma="Firma s.r.o."\nvýkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Razítko/ }).first().click().catch(() => {});
+  await p.locator('[data-title-tpl-name]').first().fill('Firma').catch(() => {});
+  await p.locator('[data-title-tpl-save]').first().click().catch(() => {});
+  await p.waitForTimeout(1000);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska H"\nvýkres hlavička');
+  ok(/Šablony hlavičky: v dokumentu „Firma“ \(nástrojářská/.test(log), `${label}: Uložit jako šablonu → výkres hlavička vypíše „Firma“`);
+  await run('nový díl "Deska H2"\nkvádr 30 20 10\nvýkres A4\nvýkres');
+  await closeConsole();
+  await p.getByRole('button', { name: /Razítko/ }).first().click().catch(() => {});
+  await p.locator('[data-title-tpl-select]').first().selectOption('Firma').catch(() => {});
+  await p.waitForTimeout(1000);
+  await p.keyboard.press('Escape').catch(() => {});
+  await openConsole();
+  log = await run('záložka "Deska H2"\nvýkres razítko');
+  ok(/nástrojářská/.test(log) && /firma „Firma s\.r\.o\.“/.test(log) && /šablona hlavičky „Firma“/.test(log), `${label}: výběr šablony hlavičky v panelu → razítko podle šablony`);
+  await closeConsole();
 
   ok(errs.length === 0, `${label}: bez chyb stránky ${errs.slice(0, 2).join(' | ')}`);
   await b.close();

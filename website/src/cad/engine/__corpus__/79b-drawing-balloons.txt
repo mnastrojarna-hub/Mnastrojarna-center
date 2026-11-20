@@ -1,0 +1,69 @@
+# vlna 22, bod 17: čitelný výkres sestavy – pozice po pohledech (auto i ručně), zámek pozice přes změnu modelu, posun,
+# kusovník nad razítkem / ve sloupcích / na samostatném listu, kontrola překryvů listu (výkres stav, ⚠ drawing.overlap),
+# ruční odsazení vygenerované kóty přežije změnu modelu; EN / DE příkazy
+nový díl Deska 1
+kvádr 20 10 5
+nový díl Deska 2
+kvádr 20 10 6
+nový díl Deska 3
+kvádr 20 10 7
+nový díl Deska 4
+kvádr 20 10 4
+nový díl Deska 5
+kvádr 20 10 5
+nový díl Deska 6
+kvádr 20 10 6
+nový díl Deska 7
+kvádr 20 10 7
+nový díl Deska 8
+kvádr 20 10 4
+nový díl Deska 9
+kvádr 20 10 5
+nový díl Deska 10
+kvádr 20 10 6
+nový díl Deska 11
+kvádr 20 10 7
+nový díl Deska 12
+kvádr 20 10 4
+nová sestava Nástroj
+vložit "Deska 1" ukotvit
+vložit "Deska 2" v 25 0 16
+vložit "Deska 3" v 50 0 0
+vložit "Deska 4" v 75 0 8
+vložit "Deska 5" v 0 15 16
+vložit "Deska 6" v 25 15 0
+vložit "Deska 7" v 50 15 8
+vložit "Deska 8" v 75 15 16
+vložit "Deska 9" v 0 30 0
+vložit "Deska 10" v 25 30 8
+vložit "Deska 11" v 50 30 16
+vložit "Deska 12" v 75 30 0
+výkres A3 na šířku pohledy přední,horní
+výkres kusovník ano
+výkres balónky ano
+výkres pozice
+výkres pozice pohled horní 1-4
+výkres pozice zamknout 6
+výkres vygenerované posun pos:7 0 6
+výkres stav
+#--- run
+# změna modelu: zamčená pozice zůstane na místě, přiřazení pohledu i posun zůstávají
+vložit "Deska 12" v 0 -30 0
+výkres pozice
+výkres kusovník sloupce
+výkres pozice odemknout 6
+výkres pozice pohled auto 1-4
+výkres pozice
+#--- run
+drawing positions view top 1-2
+zeichnung positionen sperren 3
+výkres kusovník list
+výkres listy
+#--- run
+# díl: ruční odsazení vygenerované kóty po změně modelu
+nový díl "Deska K"
+kvádr 100 60 20
+výkres A4 na šířku pohledy přední,horní
+výkres upravit "100" odsazení=30
+upravit "Kvádr 1" size.0=110
+výkres stav
