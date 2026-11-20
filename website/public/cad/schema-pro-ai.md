@@ -813,10 +813,22 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
 **Pohybová studie** (`pohyb`, EN `motion`, DE `bewegung`): motor na vazbě, kroky, výpočet poloh všech komponent v každém kroku.
 
 - `pohyb motor rotační "Klika" 0..360 krok 5 [kolize] [stopa "Ojnice" bod 60 0 0]` – rotační motor na vazbě Závěs / Souosost /
-  Šroub komponenty (vztaženo k protějšku vazby, ukotvený má přednost; motor na komponentě B vazby obrátí znaménko). `krok 5` =
-  73 kroků po 5°, `kroky N` = počet, `čas T` = délka [s], `ot/min 60` místo rozsahu = rychlost.
-- `pohyb motor lineární vazba 3 10..40` – lineární motor: Vzdálenost (absolutní hodnota mezery), Drážka / Dráha / Souosost / Šroub
-  (posuv od výchozí polohy, mm); `rychlost 5` = mm/s.
+  Šroub komponenty (vztaženo k protějšku vazby, ukotvený má přednost; motor na komponentě B vazby obrátí znaménko natočení /
+  posuvu, protokol to napíše). `krok 5` = 73 kroků po 5°, `kroky N` = počet, `čas T` = délka [s].
+- `pohyb motor lineární vazba 3 10..40` – lineární motor. **Význam hodnot podle vazby** (protokol i panel ho vždy píšou):
+  Vzdálenost a Drážka s polohou = **hodnota vazby** (absolutní mezera / poloha – `57,5..27,15` = z mezery 57,5 na 27,15, zdvih
+  30,35; znaménko se neobrací, ani když je motor zadán komponentou B vazby); Souosost / Dráha / Šroub / Drážka bez polohy a každý
+  rotační motor = **posuv / natočení od výchozí polohy** (0 = jak díl stojí; `0..-30,35` = o 30,35 mm proti směru osy).
+- **Zdvih místo konce:** `pohyb motor lineární vazba "ZDVIH" zdvih -30,35` (EN `stroke`, DE `hub`; rotační i `otočení 90`) = konec
+  o Δ od začátku; bez `od A` začíná motor na aktuální hodnotě vazby (Vzdálenost) / na 0 (posuv). `od 57,5 zdvih -30,35` = totéž
+  s výslovným začátkem. Zdvih není „konec“: `0..30,35` na vazbě s mezerou 57,5 znamená skok na mezeru 0 → ⚠ `motion.start-jump`.
+- **Rozsah × rychlost:** `pohyb motor lineární vazba 1 57,5..27,15 rychlost 15,175` (rotační `0..720 ot/min 60`) = z 57,5 na 27,15
+  rychlostí 15,175 mm/s, **na konci motor stojí**; délka studie = |do − od| / rychlost (2 s). Rychlost je velikost – směr dává
+  rozsah (`27..57 rychlost -5` je chyba). Se zadaným `čas T`: kratší než jízda = chyba s vysvětlením, delší = motor po dojetí
+  stojí. Později zkrácená studie = ⚠ `motion.motor-short`; druhý motor s delší jízdou studii prodlouží (⚠
+  `motion.duration-extended`). **Jen rychlost** (`rychlost 5`, `od 40 rychlost -5`, `ot/min 60`) = od začátku bez konce,
+  znaménko = směr. Popis motoru: `hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s` (↓ hodnota klesá, ↑ roste,
+  ↺ / ↻ natočení). Mezera Vzdálenosti pod nulou bez kontroly kolizí = ⚠ `motion.gap-negative` (plochy se prostoupí).
 - `pohyb` / `pohyb stav` – definice a souhrn (rozsah pohybu komponent, první kolize, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
@@ -825,7 +837,14 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   `{ steps: [{ step, t, motors, comps: { "Píst": { position, rotation } }, trace?, clashes?, conflicts }], summary, collision, csv }`;
   klíč v `comps` = instance: název, u stejně pojmenovaných komponent `"Šroub #12"` (pořadí) nebo `"Šroub [K48]"` (přezdívka) –
   každá komponenta má svůj záznam (stejně sloupce CSV).
-- Studie se ukládá do sestavy (`motion` v JSON) a v `stav` je řádek „Pohybová studie: …“.
+- Studie se ukládá do sestavy (`motion` v JSON; rozsah × rychlost má u motoru `ranged: true`) a v `stav` je řádek
+  „Pohybová studie: …“.
+- **Výsledek platí jen pro stav sestavy, pro který vznikl** (dokument + geometrie a konfigurace dílů + polohy + vazby + studie).
+  Po změně čehokoli z toho: `stav` píše „Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: geometrie dílu „Deska A““
+  (strojově `motion=stale motion.stale=1`; platný `motion=ok|conflict|clash`, nespočítáno `motion=-`), `pohyb stav` dá
+  ⚠ `motion.stale` bez souhrnu (řádek `= … motion steps=5 t=2 motors=1 motion.stale=1`) a nepřepočítává; `pohyb spustit`,
+  `pohyb krok N`, `pohyb export`, `pohyb přehrát` a `window.mncad.motion()` přepočítají (ℹ `motion.recomputed` řekne, co se
+  změnilo) – starý výsledek se nikdy nevrací jako platný. Panel studie má stav `data-motion-state="ok|stale|unchecked|running"`.
 - Natočení v souhrnu (` · natáčí se 30°`) = největší úhel mezi natočením v kroku a výchozím natočením (krok 0) – porovnávají se
   matice, ne Eulerovy úhly: komponenta vložená s `otočení 180 0 0`, která se jen posouvá, „natáčí se“ nehlásí.
 

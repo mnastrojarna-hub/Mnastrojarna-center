@@ -484,8 +484,13 @@ export type Mate = {
   id: string; type: MateType; a: MateRef; b: MateRef; value?: number; flip?: boolean; center?: boolean; suppressed?: boolean; name?: string;
   c?: MateRef; d?: MateRef; min?: number; max?: number; phase?: number[]; rel?: Placement;
 };
-/** Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost). */
-export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost místo rozsahu: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
+/**
+ * Motor pohybové studie: rotační (° na vazbě Souosost / Závěs / Šroub) nebo lineární (mm na vazbě Vzdálenost / Drážka / Dráha / Souosost).
+ * `from` / `to`: u vazby Vzdálenost a Drážky s polohou hodnota vazby (absolutní), jinak posuv / natočení od výchozí polohy. `speed` bez
+ * `ranged` = od `from` rychlostí bez konce (znaménko = směr, `to` se nepoužije); s `ranged` (vlna 22) = rozsah × rychlost: z `from`
+ * na `to` rychlostí |speed|, tam motor stojí (doba |to − from| / rychlost). Jediný výklad všech tvarů: cad/motor-model.ts `motorKeys`.
+ */
+export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
 export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic };
 /**

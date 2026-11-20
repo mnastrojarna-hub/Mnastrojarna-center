@@ -1,8 +1,10 @@
 /**
  * Pohybová studie textem (čistý parser – provedení cad/asm-agent-kin.ts):
  * - `pohyb` / `pohyb stav` – definice studie a výsledek;
- * - `pohyb motor rotační|lineární "<Komponenta>"|vazba <N|"název"> <od>..<do> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa "<X>" [bod x y z]]`
- *   – přidá / nahradí motor na vazbě a studii spočítá;
+ * - `pohyb motor rotační|lineární "<Komponenta>"|vazba <N|"název"> <od>..<do> | [od <A>] zdvih <Δ> | [od <A>] [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa "<X>" [bod x y z]]`
+ *   – přidá / nahradí motor na vazbě a studii spočítá. Význam (vlna 22, cad/motor-model.ts): rozsah nebo zdvih + rychlost = rozsah ×
+ *   rychlost (dojede na konec a stojí, doba = |do − od| / rychlost); jen rychlost = od začátku bez konce; `zdvih Δ` = konec o Δ od
+ *   začátku; bez `od` začíná na aktuální hodnotě vazby (Vzdálenost, Drážka s polohou), jinak na 0 (posuv od výchozí polohy);
  * - `pohyb kroky N`, `pohyb čas T`, `pohyb kolize [vyp]`, `pohyb stopa "<X>" [bod x y z] | vyp`, `pohyb spustit`, `pohyb přehrát|zastavit`,
  *   `pohyb krok N`, `pohyb export csv|png|webm`, `pohyb motor smazat N`, `pohyb smazat`.
  * Česky, anglicky (motion, motor, rotary, linear, play, export) i německy (bewegung, antrieb, dreh, linear, abspielen).
@@ -22,7 +24,15 @@ export type MotionCmd =
       mate?: string;
       from: number;
       to: number;
+      /** začátek nezadán → aktuální hodnota vazby (absolutní) / 0 (od výchozí polohy); `from` je pak jen výplň */
+      start?: "current";
+      /** relativní posun od začátku místo konce (`zdvih Δ`, EN stroke, DE hub) */
+      stroke?: number;
+      /** konec ani zdvih nezadán (jen rychlost, nebo výchozí zdvih +360° / +10 mm) – `to` je jen výplň */
+      auto?: true;
       speed?: number;
+      /** rozsah nebo zdvih SPOLU s rychlostí = rozsah × rychlost: motor dojede na konec rychlostí |speed| a stojí */
+      ranged?: true;
       /** krok v jednotkách motoru (° / mm) → počet kroků */
       step?: number;
       steps?: number;
@@ -53,6 +63,7 @@ const K = {
   time: W("čas", "doba", "time", "duration", "dauer", "zeit"),
   rpm: W("ot/min", "otáček", "otacek", "rpm", "u/min", "umdrehungen"),
   speed: W("rychlost", "speed", "velocity", "geschwindigkeit", "mm/s"),
+  stroke: W("zdvih", "posun", "otočení", "otoceni", "pootočení", "stroke", "offset", "turn", "hub", "versatz", "weg", "drehung"),
   from: W("od", "from", "von"),
   to: W("do", "to", "bis"),
   clash: W("kolize", "kolizí", "collisions", "collision", "interference", "kollision", "kollisionen"),
@@ -70,26 +81,30 @@ const K = {
 const FORMATS: Record<string, "csv" | "png" | "webm"> = { csv: "csv", tabulka: "csv", table: "csv", tabelle: "csv", png: "png", snímky: "png", snimky: "png", frames: "png", bilder: "png", webm: "webm", video: "webm", animace: "webm", animation: "webm" };
 
 export const MOTION_USE = () =>
-  tr("pohyb motor rotační|lineární \"<komponenta>\"|vazba <N> <od>..<do> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa \"<X>\" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat");
+  tr("pohyb motor rotační|lineární \"<komponenta>\"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa \"<X>\" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat");
 
-/** rozsah „0..360“, „0…360“, „od 0 do 360“ nebo dvě čísla „0 360“ */
-function range(c: AsmCursor): [number, number] | null {
+/** rozsah „0..360“, „0…360“, „od 0 do 360“ nebo dvě čísla „0 360“; „od 57,5“ bez konce = jen začátek (konec dá zdvih / rychlost) */
+function range(c: AsmCursor): { from: number; to?: number } | null {
   const t = c.peek();
   if (!t || t.q) return null;
   const m = /^([+-]?\d+(?:[.,]\d+)?)(?:\.\.|…|-(?=\d))([+-]?\d+(?:[.,]\d+)?)(°|mm)?$/.exec(t.t);
   if (m) {
     c.i++;
-    return [asmNum(m[1]), asmNum(m[2])];
+    return { from: asmNum(m[1]), to: asmNum(m[2]) };
   }
   if (c.is(K.from)) {
     c.i++;
     const a = c.num(tr("od"));
-    if (c.is(K.to)) c.i++;
-    return [a, c.num(tr("do"))];
+    if (c.is(K.to)) {
+      c.i++;
+      return { from: a, to: c.num(tr("do")) };
+    }
+    const n = c.peek();
+    return n && !n.q && asmIsNum(n.t) ? { from: a, to: c.num(tr("do")) } : { from: a };
   }
   if (asmIsNum(t.t) && asmIsNum(c.peek(1)?.t ?? "") && !c.peek(1)!.q) {
     const a = c.num(tr("od"));
-    return [a, c.num(tr("do"))];
+    return { from: a, to: c.num(tr("do")) };
   }
   return null;
 }
@@ -168,19 +183,31 @@ export function parseMotionText(line: string): MotionCmd {
       if (!t) throw new Error(tr("motor: chybí komponenta nebo vazba – {0}", MOTION_USE()));
       out.comp = t.t.trim();
     }
-    let ranged = false;
+    // rozsah (od..do | od A), zdvih Δ, rychlost – každé nejvýš jednou; co chybí, doplní provedení (cad/motor-model.ts buildMotor)
+    let rng: { from: number; to?: number } | null = null;
     while (!c.done) {
-      const r = !ranged ? range(c) : null;
-      if (r) {
-        [out.from, out.to] = r;
-        ranged = true;
+      const r: { from: number; to?: number } | null = !rng ? range(c) : null;
+      if (r) rng = r;
+      else if (c.is(K.stroke)) {
+        c.i++;
+        out.stroke = c.num(tr("zdvih"));
       } else if (c.is(K.rpm) || c.is(K.speed)) {
         c.i++;
         out.speed = c.num(tr("rychlost"));
       } else if (backArg(c)) out.back = true;
       else if (!studyOpt(c, out)) throw new Error(tr("pohyb motor: neznámá volba „{0}“ – {1}", c.peek()!.t, MOTION_USE()));
     }
-    if (out.speed === undefined && out.from === out.to) throw new Error(tr("motor: rozsah od–do je nulový – např. 0..360"));
+    if (rng) out.from = rng.from;
+    else out.start = "current";
+    if (rng?.to !== undefined) out.to = rng.to;
+    if (out.stroke !== undefined && rng?.to !== undefined) throw new Error(tr("motor: zadejte konec (od..do), nebo zdvih – ne obojí"));
+    if (out.stroke === 0) throw new Error(tr("motor: zdvih je nulový"));
+    if (rng?.to !== undefined && out.from === out.to) throw new Error(tr("motor: rozsah od–do je nulový – např. 0..360 (jen rychlost od hodnoty: od 5 rychlost 3)"));
+    if (out.speed === 0) throw new Error(tr("motor: rychlost musí být nenulová"));
+    const hasEnd = rng?.to !== undefined || out.stroke !== undefined;
+    if (!hasEnd) out.auto = true;
+    // rozsah / zdvih + rychlost = rozsah × rychlost (dojede na konec a stojí) – dřív se konec potichu zahodil (bod 9 zprávy)
+    if (hasEnd && out.speed !== undefined) out.ranged = true;
     return out;
   }
   if (c.is(K.run)) return { op: "run" };

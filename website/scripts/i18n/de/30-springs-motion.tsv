@@ -9,7 +9,6 @@
  doraz „{0}“ ({1} {2} {3}): dotyk {4}{5}	 Anschlag „{0}“ ({1} {2} {3}): Kontakt {4}{5}
  Energie: na začátku {0} J, na konci {1} J (motor koná práci – bilance se nekontroluje)	 Energie: am Anfang {0} J, am Ende {1} J (der Antrieb leistet Arbeit – Bilanz wird nicht geprüft)
  Největší síla pružiny: „{0}“ {1} N v t = {2} s	 Größte Federkraft: „{0}“ {1} N bei t = {2} s
- tam a zpět	 hin und zurück
 {0} těžiště {1} [mm]	{0} Schwerpunkt {1} [mm]
 {0}: zadejte vazbu číslem nebo názvem – pohyb síla vazba 3 120	{0}: Verknüpfung per Nummer oder Name angeben – bewegung kraft verknüpfung 3 120
 ✓ {0} na vazbě „{1}“ odebrána	✓ {0} an Verknüpfung „{1}“ entfernt

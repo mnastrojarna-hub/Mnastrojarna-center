@@ -52,6 +52,7 @@ import {
   type TabInfo,
 } from "./agent-asm";
 import { tr } from "./i18n";
+import type { MotionSlot } from "./motion-cache";
 import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin";
 import { applySpringCmd, refreshSprings } from "./asm-spring-agent";
 import { applySpringNew, applySpringPattern, springHelpLines } from "./asm-spring-between";
@@ -111,6 +112,8 @@ export type AsmEnv = {
   clashDetail?: (doc: CadDoc, pairs: ClashPair[]) => Promise<ClashDetail[]>;
   /** díl má víc ploch, než se načte (`FACE_LIMIT`) – plochy navíc nejdou vybrat pro vazbu (⚠ asm.faces-truncated, 5.2 č. 30) */
   onFacesTruncated?: (key: string, limit: number) => void;
+  /** výsledky pohybové studie podle dokumentu: úložiště pracovního prostoru a klíč dokumentu, se kterým prostředí pracuje (cad/motion-cache.ts) */
+  motion?: MotionSlot;
 };
 
 export type AsmResult = {

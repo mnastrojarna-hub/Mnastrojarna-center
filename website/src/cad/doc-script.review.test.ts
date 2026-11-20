@@ -415,7 +415,9 @@ describe("7 · vazby sestavy s dalšími odkazy (závěs, symetricky, šířka, 
     expect(l).toContain("sestava vazba šířka #3 F3 F4 #1 F2 F4");
     expect(l).toContain("sestava vazba drážka #2 F1 #1 F10 F11 hodnota 12.5");
     expect(l).toContain("sestava vazba šířka #2 F1 #1 F2 F4");
-    expect(l).toContain("pohyb motor rotační vazba 1 0..180 ot/min 10 kroky 6 čas 2");
+    // vlna 22, bod 9: uložený motor s rychlostí bez `ranged` jede od začátku bez konce (konec 180 se nikdy nepoužil) – skript to říká
+    // výslovně „od 0 ot/min 10“; zápis „0..180 ot/min 10“ dnes znamená rozsah × rychlost (dojet na 180° a stát)
+    expect(l).toContain("pohyb motor rotační vazba 1 od 0 ot/min 10 kroky 6 čas 2");
     expect(r.stats).toMatchObject({ mates: 5, matesText: 5 });
     expect(r.notes).toEqual([]);
   });

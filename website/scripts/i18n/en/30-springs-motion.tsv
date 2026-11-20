@@ -9,7 +9,6 @@
  doraz „{0}“ ({1} {2} {3}): dotyk {4}{5}	 stop “{0}” ({1} {2} {3}): contact {4}{5}
  Energie: na začátku {0} J, na konci {1} J (motor koná práci – bilance se nekontroluje)	 Energy: at start {0} J, at end {1} J (the motor does work – balance not checked)
  Největší síla pružiny: „{0}“ {1} N v t = {2} s	 Maximum spring force: “{0}” {1} N at t = {2} s
- tam a zpět	 there and back
 {0} těžiště {1} [mm]	{0} centre of mass {1} [mm]
 {0}: zadejte vazbu číslem nebo názvem – pohyb síla vazba 3 120	{0}: give the mate by number or name – motion force mate 3 120
 ✓ {0} na vazbě „{1}“ odebrána	✓ {0} on mate “{1}” removed

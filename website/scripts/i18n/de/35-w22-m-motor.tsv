@@ -1,0 +1,53 @@
+# vlna 22, balík M, etapa M1 – model motoru (body 9 a 11): rozsah × rychlost, začátek + zdvih, význam hodnot
+ · uložený konec {0} se nepoužívá	 · das gespeicherte Ende {0} wird nicht verwendet
+ (hodnota vazby je absolutní – nezáleží na tom, že komponenta je B vazby)	 (der Verknüpfungswert ist absolut – es spielt keine Rolle, dass die Komponente B der Verknüpfung ist)
+ (pak stojí do konce studie {0} s)	 (steht dann bis zum Ende der Studie bei {0} s)
+{0} → {1} → {0} mm {2} zdvih {3} mm tam a zpět	{0} → {1} → {0} mm {2} Hub {3} mm hin und zurück
+{0} → {1} → {0}° {2} otočení {3}° tam a zpět	{0} → {1} → {0}° {2} Drehung {3}° hin und zurück
+{0} → {1} mm {2} zdvih {3} mm	{0} → {1} mm {2} Hub {3} mm
+{0} → {1}° {2} otočení {3}°	{0} → {1}° {2} Drehung {3}°
+od {0} mm {1} rychlostí {2} (bez koncové hodnoty – za {3} s na {4} mm)	ab {0} mm {1} mit {2} (ohne Endwert – nach {3} s bei {4} mm)
+od {0}° {1} rychlostí {2} (bez koncové hodnoty – za {3} s na {4}°)	ab {0}° {1} mit {2} (ohne Endwert – nach {3} s bei {4}°)
+hodnota vazby {0}	Verknüpfungswert {0}
+posuv od výchozí polohy {0}	Verschiebung ab Ausgangslage {0}
+natočení od výchozí polohy {0}	Drehung ab Ausgangslage {0}
+zdvih	Hub
+motor: rychlost musí být nenulová	Antrieb: die Geschwindigkeit darf nicht null sein
+motor: zdvih je nulový	Antrieb: der Hub ist null
+motor: zadejte konec (od..do), nebo zdvih – ne obojí	Antrieb: Ende (von..bis) oder Hub angeben – nicht beides
+motor: rozsah od–do je nulový – např. 0..360 (jen rychlost od hodnoty: od 5 rychlost 3)	Antrieb: der Bereich von–bis ist null – z. B. 0..360 (nur Geschwindigkeit ab einem Wert: von 5 geschwindigkeit 3)
+motor: „tam a zpět“ jede sinusově přes celou studii – rychlost k němu nezadávejte (délku určuje pohyb čas T)	Antrieb: „hin und zurück“ läuft sinusförmig über die ganze Studie – keine Geschwindigkeit dazu angeben (die Länge bestimmt bewegung zeit T)
+motor: rychlost {0} je záporná, ale rozsah {1} → {2}{3} roste – zadejte kladnou rychlost (směr určuje rozsah), nebo rozsah otočte	Antrieb: die Geschwindigkeit {0} ist negativ, der Bereich {1} → {2}{3} steigt aber – positive Geschwindigkeit angeben (die Richtung bestimmt der Bereich) oder den Bereich umkehren
+motor: rozsah {0}{1} rychlostí {2} trvá {3} s, zadaný čas {4} s nestačí – vynechte čas (délka studie bude {3} s), nebo rychlost (motor projede rozsah za {4} s)	Antrieb: der Bereich {0}{1} mit {2} dauert {3} s, die angegebene Zeit {4} s reicht nicht – Zeit weglassen (die Studie dauert dann {3} s) oder Geschwindigkeit weglassen (der Antrieb durchfährt den Bereich in {4} s)
+délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)	Studiendauer von {1} s auf {2} s verlängert – Antrieb {0} braucht {2} s für seinen Bereich (andere Antriebe mit Bereich ohne Geschwindigkeit werden dadurch langsamer)
+motor {0} nedojede na konec: {1} rychlostí {2} trvá {3} s, studie má {4} s – skončí na {5}; pohyb čas {3}	Antrieb {0} erreicht sein Ende nicht: {1} mit {2} dauert {3} s, die Studie hat {4} s – er endet bei {5}; bewegung zeit {3}
+motor {0}: hodnota vazby „{1}“ klesne pod nulu ({2} mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)	Antrieb {0}: der Wert der Verknüpfung „{1}“ fällt unter null ({2} mm) – die Flächen der Verknüpfung durchdringen sich und die Teile können ineinander eindringen; Kollisionen werden in dieser Studie nicht geprüft (bewegung kollisionen)
+motor {0}: začátek {1} není 0 – u vazby „{2}“ je hodnota motoru posuv / natočení od výchozí polohy, v kroku 0 díl přeskočí o {3}; bez skoku: 0..Δ nebo zdvih Δ	Antrieb {0}: der Anfang {1} ist nicht 0 – bei der Verknüpfung „{2}“ ist der Antriebswert eine Verschiebung / Drehung ab Ausgangslage, in Schritt 0 springt das Teil um {3}; ohne Sprung: 0..Δ oder hub Δ
+motor {0}: začátek {1} se liší od aktuální hodnoty vazby „{2}“ {3} – v kroku 0 díl přeskočí o {4}; zdvih od aktuální hodnoty: pohyb motor … zdvih Δ	Antrieb {0}: der Anfang {1} weicht vom aktuellen Wert der Verknüpfung „{2}“ {3} ab – in Schritt 0 springt das Teil um {4}; Hub ab aktuellem Wert: bewegung antrieb … hub Δ
+pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [kolize] [stopa "<X>" [bod x y z]] · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	bewegung antrieb dreh|linear "<Komponente>"|verknüpfung <N> <von>..<bis> | [von <A>] hub <Δ> [schritt S | schritte N] [zeit T] [u/min R | geschwindigkeit V] [kollisionen] [spur "<X>" [punkt x y z]] · bewegung status|starten|abspielen|stop|schritt N|export csv|png|webm|löschen
+motor pohybové studie – význam zadání: u vazby Vzdálenost (a Drážky s polohou) jsou hodnoty hodnotou vazby, jinak posuv / natočení od výchozí polohy; zdvih Δ = konec o Δ od začátku (bez „od“ od aktuální hodnoty vazby); rozsah nebo zdvih + rychlost = dojede na konec a stojí, doba = zdvih / rychlost (kratší zadaný čas je chyba); jen rychlost = od začátku bez konce. Protokol vždy uvádí začátek → konec, zdvih, směr a dobu; ⚠ motion.start-jump, když začátek neodpovídá aktuální hodnotě. Výsledek studie platí jen pro stav sestavy, pro který vznikl: po změně dílu, polohy, vazby nebo studie stav hlásí motion.stale a pohyb spustit přepočítá	Antrieb der Bewegungsstudie – Bedeutung der Eingabe: bei der Verknüpfung Abstand (und Langloch mit Position) sind die Werte der Verknüpfungswert, sonst Verschiebung / Drehung ab Ausgangslage; hub Δ = das Ende liegt Δ vom Anfang (ohne „von“ ab dem aktuellen Verknüpfungswert); Bereich oder Hub + Geschwindigkeit = fährt bis zum Ende und bleibt stehen, Zeit = Hub / Geschwindigkeit (eine kürzere angegebene Zeit ist ein Fehler); nur Geschwindigkeit = ab Anfang ohne Ende. Das Protokoll nennt immer Anfang → Ende, Hub, Richtung und Zeit; ⚠ motion.start-jump, wenn der Anfang nicht dem aktuellen Wert entspricht. Das Ergebnis der Studie gilt nur für den Zustand der Baugruppe, für den es berechnet wurde: nach Änderung eines Teils, einer Lage, einer Verknüpfung oder der Studie meldet der Status motion.stale und bewegung starten berechnet neu
+# panel Pohybová studie – formulář motoru
+Začátek – hodnota vazby	Anfang – Verknüpfungswert
+Začátek – natočení od výchozí polohy	Anfang – Drehung ab Ausgangslage
+Začátek – posuv od výchozí polohy	Anfang – Verschiebung ab Ausgangslage
+Konec – hodnota vazby	Ende – Verknüpfungswert
+Konec – natočení od výchozí polohy	Ende – Drehung ab Ausgangslage
+Konec – posuv od výchozí polohy	Ende – Verschiebung ab Ausgangslage
+Začátek a konec jsou hodnoty vazby „{0}“ (teď {1} mm) – ne zdvih. Zdvih = konec − začátek.	Anfang und Ende sind Werte der Verknüpfung „{0}“ (jetzt {1} mm) – nicht der Hub. Hub = Ende − Anfang.
+Začátek a konec jsou natočení od výchozí polohy (0 = jak díl teď stojí).	Anfang und Ende sind Drehungen ab Ausgangslage (0 = so, wie das Teil jetzt steht).
+Začátek a konec jsou posuv od výchozí polohy (0 = jak díl teď stojí), ne hodnota vazby.	Anfang und Ende sind Verschiebungen ab Ausgangslage (0 = so, wie das Teil jetzt steht), nicht der Verknüpfungswert.
+Průběh motoru	Antriebsverlauf
+Rozsah za dobu studie	Bereich über die Studiendauer
+Rozsah rychlostí	Bereich mit Geschwindigkeit
+Rychlost bez konce	Geschwindigkeit ohne Ende
+Rychlost (± = směr)	Geschwindigkeit (± = Richtung)
+Otočení (od začátku, ±)	Drehung (ab Anfang, ±)
+Zdvih (od začátku, ±)	Hub (ab Anfang, ±)
+Zadat	Eingabe
+konec (hodnotu)	Ende (Wert)
+zdvih (relativní posun)	Hub (relative Verschiebung)
+délka studie bude {0} s	die Studie dauert dann {0} s
+Začít od aktuální hodnoty {0} {1}	Ab aktuellem Wert {0} {1} beginnen
+#!dynamic – texty kódů motorů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+motor {0}: začátek {1} neodpovídá aktuální hodnotě vazby {2} – v kroku 0 díl přeskočí	Antrieb {0}: der Anfang {1} entspricht nicht dem aktuellen Verknüpfungswert {2} – das Teil springt in Schritt 0
+motor {0} nedojede na konec: jízda trvá {1} s, studie má {2} s	Antrieb {0} erreicht sein Ende nicht: die Fahrt dauert {1} s, die Studie hat {2} s

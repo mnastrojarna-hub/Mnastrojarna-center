@@ -7,6 +7,7 @@
  */
 import { docStatusText, type AsmStatus, type StaleNote } from "../agent";
 import { bomOf, flattenLeaves, matrixToPlacement, type Leaf } from "../asm-flatten";
+import { motionStatusOf, motionStoreOf } from "../motion-cache";
 import { sourceKey, transformPoint } from "../assembly";
 import { clashStale } from "../clash-class";
 import type { DrawingExtras } from "../drawing-agent";
@@ -135,6 +136,8 @@ export function asmStatusOf(ws: Workspace, doc: CadDoc, key: string, all: Leaf[]
     mates: ws.asm.mateStatus.get(key),
     // stav vazeb spočítaný pro jiný stav sestavy (nebo pro polohy po přepočtu, které dokument nemá) – nikdy jako platný
     ...((doc.mates ?? []).length && mateStatusState(ws, key, doc).state === "stale" ? { matesStale: true } : {}),
+    // výsledek pohybové studie pro nynější stav sestavy: platí / NEPLATÍ (co se změnilo) / nespočítáno (cad/motion-cache.ts)
+    motion: motionStatusOf(motionStoreOf(ws.asm), key, doc),
   };
 }
 

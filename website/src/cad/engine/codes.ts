@@ -94,6 +94,13 @@ export const CODES = [
   { code: "clash.hidden", level: "note", key: "skryté komponenty se nekontrolují ({0})" },
   { code: "clash.rechecked", level: "note", key: "kolize přepočítány pro konečný stav sestavy – sestava se po kontrole kolizí ({0}) změnila" },
   { code: "motion.conflict", level: "warn", key: "pohyb porušuje vazbu „{0}“ v kroku {1}" },
+  // výsledek studie jen pro stav sestavy, pro který vznikl (vlna 22, bod 1); motory: rozsah × rychlost a začátek (body 9, 11) – cad/motor-model.ts
+  { code: "motion.stale", level: "warn", key: "výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“" },
+  { code: "motion.recomputed", level: "note", key: "pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}" },
+  { code: "motion.start-jump", level: "warn", key: "motor {0}: začátek {1} neodpovídá aktuální hodnotě vazby {2} – v kroku 0 díl přeskočí" },
+  { code: "motion.motor-short", level: "warn", key: "motor {0} nedojede na konec: jízda trvá {1} s, studie má {2} s" },
+  { code: "motion.gap-negative", level: "warn", key: "motor {0}: hodnota vazby „{1}“ klesne pod nulu ({2} mm) – plochy vazby se prostoupí a díly do sebe mohou vnikat; kolize se v této studii nekontrolují (pohyb kolize)" },
+  { code: "motion.duration-extended", level: "warn", key: "délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)" },
   // ── měření, kontrola, porovnání, materiál (5.2 č. 31, 37; kap. 6) ──
   { code: "measure.truncated", level: "note", key: "vypsáno {0} z {1}" },
   { code: "check.hole-missing", level: "warn", key: "prvek díry „{0}“ nemá v geometrii díru" },

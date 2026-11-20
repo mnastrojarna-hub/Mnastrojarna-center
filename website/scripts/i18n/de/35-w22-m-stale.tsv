@@ -1,0 +1,28 @@
+# vlna 22, balík M, etapa M1 – výsledek pohybové studie jen pro dokument a stav, pro který vznikl (body 1 a 12)
+geometrie dílu {0}	Geometrie des Teils {0}
+ a dalších {0}	 und {0} weitere
+počet dílů ({0} → {1})	Anzahl der Teile ({0} → {1})
+poloha, ukotvení nebo skrytí komponent	Lage, Fixierung oder Ausblenden von Komponenten
+vazby	Verknüpfungen
+definice studie (motory, délka, kroky)	Definition der Studie (Antriebe, Dauer, Schritte)
+stav sestavy	Zustand der Baugruppe
+výpočet pohybové studie nahradil novější výpočet (sestava nebo studie se mezitím změnila)	die Berechnung der Bewegungsstudie wurde durch eine neuere ersetzt (Baugruppe oder Studie haben sich inzwischen geändert)
+Pohyb: nespočítáno – „pohyb spustit“ nebo Vypočítat pohyb v panelu studie	Bewegung: nicht berechnet – „bewegung starten“ oder Bewegung berechnen im Studienfenster
+Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: {0}; přepočítá „pohyb spustit“	Bewegung: das Ergebnis GILT NICHT – seit der Berechnung geändert: {0}; „bewegung starten“ berechnet neu
+Pohyb: výsledek platí pro tento stav sestavy – {0} kroků, {1}, {2} (podrobně pohyb stav)	Bewegung: das Ergebnis gilt für diesen Zustand der Baugruppe – {0} Schritte, {1}, {2} (Einzelheiten: bewegung status)
+nesplněné vazby v {0} krocích	nicht erfüllte Verknüpfungen in {0} Schritten
+vazby splněny	Verknüpfungen erfüllt
+kolize nekontrolovány	Kollisionen nicht geprüft
+průnik těles v {0} krocích	Körperdurchdringung in {0} Schritten
+bez průniku těles v kontrolovaných krocích	keine Körperdurchdringung in den geprüften Schritten
+# panel Pohybová studie – stav výsledku
+Nezkontrolováno – pro sestavu „{0}“ v tomto stavu se pohyb ještě nepočítal.	Nicht geprüft – für die Baugruppe „{0}“ in diesem Zustand wurde die Bewegung noch nicht berechnet.
+Nezkontrolováno – studie nemá motor.	Nicht geprüft – die Studie hat keinen Antrieb.
+Počítám pohyb sestavy „{0}“…	Bewegung der Baugruppe „{0}“ wird berechnet…
+Probíhá běh textových příkazů – panel počká na jeho dokončení a pak počítá s dokumentem, který běh zapíše.	Ein Lauf von Textbefehlen ist im Gang – das Fenster wartet auf sein Ende und rechnet dann mit dem Dokument, das der Lauf schreibt.
+Vypočítat pohyb znovu	Bewegung neu berechnen
+Výsledek neplatí – od výpočtu se změnilo: {0}. Nezkontrolováno; spusťte Vypočítat pohyb znovu.	Das Ergebnis gilt nicht – seit der Berechnung geändert: {0}. Nicht geprüft; Bewegung neu berechnen ausführen.
+Výsledek platí pro „{0}“ v nynějším stavu · {1} komponent · {2} kroků · spočítáno {3}	Das Ergebnis gilt für „{0}“ im jetzigen Zustand · {1} Komponenten · {2} Schritte · berechnet {3}
+#!dynamic – texty kódů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+výsledek pohybové studie pro nynější stav sestavy neplatí – od výpočtu se změnilo: {0}; přepočítá ho „pohyb spustit“	das Ergebnis der Bewegungsstudie gilt für den jetzigen Zustand der Baugruppe nicht – seit der Berechnung geändert: {0}; „bewegung starten“ berechnet es neu
+pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: {0}	Bewegungsstudie neu berechnet – das gespeicherte Ergebnis galt nicht, seit der Berechnung geändert: {0}

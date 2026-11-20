@@ -1,0 +1,28 @@
+# vlna 22, bod 9: rozsah × rychlost – přesný příkaz ze zprávy (CS, EN, DE). Motor dojede z 57,5 na 27,15 rychlostí 15,175 mm/s
+# za 2 s a stojí; směr, konec a doba jsou v protokolu (dřív „15,175 mm/s od 57,5 mm“ a jízda na 87,85)
+nový díl "Rám"
+kvádr 100 100 10
+nový díl "Deska A"
+kvádr 100 100 10
+#--- run
+nová sestava "Mechanika"
+vložit "Rám" ukotvit
+vložit "Deska A" v 0 0 67.5
+sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"
+pohyb motor lineární vazba 1 57.5..27.15 rychlost 15.175
+pohyb krok 36
+#--- run
+# anglicky a německy totéž; delší studie = motor po dojetí stojí (krok 4 až 6 na 27,15)
+motion motor linear mate 1 57.5..27.15 speed 15.175 time 3 steps 6
+motion export csv
+bewegung antrieb linear verknüpfung 1 57.5..27.15 geschwindigkeit 15.175 schritte 4
+#--- run
+# rozpor nikdy potichu: kratší čas i záporná rychlost proti rozsahu = chyba s vysvětlením; později zkrácená studie = ⚠
+pohyb motor lineární vazba 1 57.5..27.15 rychlost 15.175 čas 1
+#--- run
+pohyb motor lineární vazba 1 27.15..57.5 rychlost -15.175
+#--- run
+pohyb čas 1
+pohyb krok 4
+# jen rychlost od hodnoty (bez konce) – výslovně řečeno
+pohyb motor lineární vazba 1 od 57.5 rychlost -10 kroky 4 čas 2

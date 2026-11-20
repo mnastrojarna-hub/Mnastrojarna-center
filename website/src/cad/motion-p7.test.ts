@@ -257,7 +257,7 @@ describe("P7 – střižný nástroj 57 komponent, pohyb 40 kroků s kolizemi", 
   it("pohyb bez kolizí: vedené desky jen podél osy, sloupky stojí; ⚠ motion.conflict kroky 27–40 v pořadí vazeb", async () => {
     log.length = 0;
     await run(`pohyb motor lineární vazba ${drive} 175..115 kroky 40`);
-    const res = motionCached(asmDoc())!;
+    const res = motionCached(asmDoc(), ENV)!;
     expect(res.steps.length).toBe(41);
     for (const name of ["Horní deska", "Kotevní deska", "Stírací deska", "Střižník", "Pružina 20×2,5×50", "Šroub M10×60 ISO 4762"]) {
       const sp = spanOf(res, name);
@@ -287,7 +287,7 @@ describe("P7 – střižný nástroj 57 komponent, pohyb 40 kroků s kolizemi", 
     const wall = (performance.now() - t0) / 1000;
     const c = process.cpuUsage(cpu0);
     const cpu = (c.user + c.system) / 1e6;
-    col = motionCached(asmDoc())!;
+    col = motionCached(asmDoc(), ENV)!;
     const peak = peakRssMB();
     console.log(`P7 pohyb 40 kroků s kolizemi: ${cpu.toFixed(1)} s CPU, ${wall.toFixed(1)} s zeď, špička RSS ${peak.toFixed(0)} MB, halda WASM ${h0.toFixed(0)} → ${heapMB().toFixed(0)} MB; ${JSON.stringify(col.timing?.clash)}`);
     expect(col.steps.length).toBe(41);

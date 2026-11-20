@@ -3871,7 +3871,7 @@ export function CadApp() {
             {compareOpen && !isAsm && <CompareDialog doc={buildDocView} vp={vp} onView={showCmpView} onClose={() => setCompareOpen(false)} />}
             {isAsm && springPick.dialog}
             {motionOpen && isAsm && (
-              <MotionPanel doc={doc} env={() => asmEnvRef.current()} onDoc={commit} onClose={() => setMotionOpen(false)} snapshot={() => vp.current?.snapshot() ?? null} canvas={() => document.querySelector<HTMLCanvasElement>("main canvas")} flash={flash} />
+              <MotionPanel doc={doc} env={() => asmEnvRef.current()} engineBusy={() => engineBusy.current > 0} onDoc={commit} onClose={() => setMotionOpen(false)} snapshot={() => vp.current?.snapshot() ?? null} canvas={() => document.querySelector<HTMLCanvasElement>("main canvas")} flash={flash} />
             )}
             {isAsm && explode > 0 && (
               <FloatPanel title={tr("Rozložený pohled")} icon="transform" onClose={() => setExplode(0)}>
