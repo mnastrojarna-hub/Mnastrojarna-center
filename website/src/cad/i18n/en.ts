@@ -1004,6 +1004,7 @@ export const EN: Record<string, string> = {
  "⚠ přerušení {0} uloženo, ale: {1}": "⚠ break {0} saved, but: {1}",
  "⚠ řez {0}–{0} uložen, ale na listu není: {1}": "⚠ section {0}–{0} saved but not on the sheet: {1}",
  "⚠ šířky křivek se rozložením ztratily": "⚠ polyline widths were lost by exploding",
+ "⚠ v pohledu {0} se obraz nezměnil v žádném snímku s pohybem (pohyb ve směru pohledu, nebo pohyblivý díl mimo záběr či schovaný řezem?) – ostatní pohledy pohyb ukazují": "⚠ in view {0} the picture did not change in any frame with motion (motion along the view direction, or the moving part out of view or hidden by the section?) – the other views show the motion",
  "⚠ v sestavě je konflikt vazeb – sestava vazby": "⚠ the assembly has conflicting mates – assembly mates",
  "⚠ varování": "⚠ warnings",
  "⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně": "⚠ the {0} mate cannot be satisfied together with the others – assembly mates, assembly mate {1} suppress|delete|flip",

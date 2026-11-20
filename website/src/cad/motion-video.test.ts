@@ -6,7 +6,7 @@
 import { describe, expect, it } from "vitest";
 import { setLang } from "./i18n";
 import { rotMatrix } from "./assembly";
-import { checkFrames, checkText, frameSig, planKv, planText, poseAt, poseKey, sigChanged, slerpRotation, stepPlan, studySpan, videoApi, videoPlan, VIDEO_MAX_FRAMES } from "./motion-video";
+import { checkFrames, checkText, combineChecks, frameSig, planKv, planText, poseAt, poseKey, sigChanged, slerpRotation, stepPlan, studySpan, videoApi, videoPlan, VIDEO_MAX_FRAMES } from "./motion-video";
 import type { MotionResult, MotionStep } from "./motion";
 import type { Vec3 } from "./types";
 
@@ -123,5 +123,21 @@ describe("kontrola obrazu: mrtvé plátno se pozná (bod 13, kritik 2a)", () => 
     const part = checkFrames([{ pose: "a", sig: s0 }, { pose: "b", sig: s1 }, { pose: "c", sig: s1 }]);
     expect(part.verdict).toBe("partial");
     expect(checkText(part).startsWith("⚠")).toBe(true);
+  });
+  it("víc pohledů: jeden pohled nehybný (pohyb ve směru pohledu), druhý se mění → ⚠ s názvem pohledu, video se uloží; všechny nehybné → ✗", () => {
+    // repro e2e cad-w22-v bez WebGL: dlaždice „Shora“ při svislém zdvihu v pravoúhlém promítání → dřív „dead“ celého videa (nic se neuložilo)
+    const s0 = frameSig(img(100), 64, 36);
+    const s1 = frameSig(img(140), 64, 36);
+    const moving = checkFrames([{ pose: "a", sig: s0 }, { pose: "b", sig: s1 }, { pose: "c", sig: s0 }]);
+    const still = checkFrames([{ pose: "a", sig: s0 }, { pose: "b", sig: s0 }, { pose: "c", sig: s0 }]);
+    const c = combineChecks([moving, still], ["Řez A", "Shora"]);
+    expect(c.verdict).toBe("partial");
+    expect(c.still).toEqual(["Shora"]);
+    expect(checkText(c)).toMatch(/^⚠ v pohledu „Shora“ se obraz nezměnil/);
+    expect(combineChecks([still, still], ["A", "B"]).verdict).toBe("dead");
+    expect(checkText(combineChecks([still, still], ["A", "B"]))).toMatch(/^✗/);
+    expect(combineChecks([moving, moving], ["A", "B"]).verdict).toBe("ok");
+    expect(combineChecks([moving]).verdict).toBe("ok");
+    expect(combineChecks([still]).verdict).toBe("dead");
   });
 });
