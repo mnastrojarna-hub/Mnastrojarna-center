@@ -155,7 +155,7 @@ async function recomputeAll(ctx: OpCtx): Promise<void> {
     L.push(tr("Zbývá udělat ručně ({0}) – program to sám neudělá:", left.length));
     for (const x of left) L.push(`  ⚠ ${x.label} – ${x.why} → ${x.fix}`);
   } else L.push(tr("Zbývá: nic – vydané listy, exporty a uložené analýzy odpovídají modelu {0}", modelId(r.doc).rev));
-  sayKv(ctx, `recomputed=${done.length} left=${left.length} ${kvOf(r.doc, left)}`, ...L);
+  sayKv(ctx, `recomputed=${done.length} left=${left.length} ${kvOf(r.doc, left)}`, L.join("\n"));
   // vydané listy ze starší revize zůstávají zastaralé, dokud člověk nevydá novou revizi – ⚠ (jednou za běh)
   reportStaleSheets(ctx, r.doc);
 }

@@ -767,7 +767,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
         const s = doc.drawings![i];
         if (cmd.op === "withdraw") {
           if (!s.issued) {
-            log.push(tr("ℹ list „{0}“ vydaný není – není co zrušit", s.name));
+            log.push(tr("→ list „{0}“ vydaný není – není co zrušit", s.name));
             continue;
           }
           doc.drawings![i] = withdrawIssue(s);
@@ -777,7 +777,7 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
         }
         const r = issueSheet(doc, s, { ...(cmd.rev ? { rev: cmd.rev } : {}), ...(cmd.note ? { note: cmd.note } : {}), ...(cmd.date ? { date: cmd.date } : {}) });
         if (r.unchanged) {
-          log.push(tr("ℹ list „{0}“ už je vydán jako rev. {1} z modelu {2} – beze změny", s.name, r.rev, r.id.rev));
+          log.push(tr("→ list „{0}“ už je vydán jako rev. {1} z modelu {2} – beze změny", s.name, r.rev, r.id.rev));
           continue;
         }
         doc.drawings![i] = r.sheet;

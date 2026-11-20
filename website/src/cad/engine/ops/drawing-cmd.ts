@@ -49,6 +49,11 @@ export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
       coded(ctx, "drawing.section-legacy", { text: x.text, ...(x.data ? { data: x.data } : {}), ...(ctx.strict?.escalates("drawing.section-legacy", ctx.line) ? { level: "error" as const } : {}) });
       continue;
     }
+    if (x.kind === "stale") {
+      // vydaný list ze starší revize modelu (vlna 22, bod 20): ⚠; nové vydání se stejným písmenem po změně v přísném režimu ✗
+      coded(ctx, "drawing.stale", { args: [x.text], ...(op.cmd.k === "issue" && ctx.strict?.escalates("drawing.stale", ctx.line) ? { level: "error" as const } : {}) });
+      continue;
+    }
     if (x.kind === "tolerance-missing") {
       coded(ctx, "drawing.tolerance-missing", { text: x.text, ...(x.data ? { data: x.data } : {}) });
       continue;
