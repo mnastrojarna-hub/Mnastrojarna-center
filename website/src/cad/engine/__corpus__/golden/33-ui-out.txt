@@ -9,7 +9,7 @@ Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 6000 mm³ · těleso platné – 30 × 20 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
-✓ uloženo: Vystupy.mncad · 299 B · projekt Mnástrojárna CAD (.mncad) – staženo (bez dialogu)
+✓ uloženo: Vystupy.mncad · 325 B · projekt Mnástrojárna CAD (.mncad) – staženo (bez dialogu)
   ✓ kontrola: projekt jde znovu otevřít – „Výstupy“, 1 prvků
 ✓ export STEP: Vystupy.step · 15 kB · STEP AP214 – staženo (bez dialogu)
   ✓ těleso: přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch 6

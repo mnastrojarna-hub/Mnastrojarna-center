@@ -2991,7 +2991,7 @@ MNCAD/1 OK lines=5 ops=5 err=0 warn=0 note=2 t=0.1
 = L3 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9LboQwEAWvEr11RzIwJKSvMEd…(288chars) mode=link exp=2026-11-30 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
 = L4 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) mode=link exp=2026-12-20 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
 = L5 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) ok=1 mode=link exp=2026-12-20 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
-D "Konzola" part feat=1/0/0 V=48cm3 m=0.377kg bbox=80x50x12
+D "Konzola" part feat=1/0/0 V=48cm3 m=0.377kg bbox=80x50x12 solids=1 valid=1
 O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb77JRHsNb-BhKLlxL6ir1hgpuCHqP4KZ_7fuX9tJ1Qz8QqtMbGGuwuoBgwwzeIDEe0EsuKXxK8vI8iwWhasoueHBL8LIqGG_BP8IiIKxSNDlZwAjzqbuqlK-kGTxucPZw6sXW4QP_8_r7Y9NTA0L5jgd5D3cQsnsoeBwMdYaadiLEkF0546MhQ2YizOqLJrXgqyxZ6fwBhtcb9mnf_wA exp=2026-12-20 mode=link
 Σ docs=1 V=48cm3 m=0.377kg files=0 share=link t=0.1
 ```

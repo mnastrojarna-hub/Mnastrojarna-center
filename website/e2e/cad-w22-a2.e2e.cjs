@@ -4,7 +4,7 @@
 //  2) GUI: strom → pravým na „Deska A“ → Upravit díl (v kontextu) → smazat schod (Kvádr 2) → tlačítko „← Zpět do sestavy“
 //     (dřív bez jakékoli kontroly – vazba se pak tiše přichytila na boční plochu −Y a Přidržovač se otočil o 90°)
 //  3) očekáváno: seznam vazeb data-mates-lost=1, vazba data-mate-status="lost" (červeně „ztracená reference“, nikdy zelená),
-//     Přidržovač stojí [40; 10; 5] bez natočení, oznámení „POZOR: ztracené reference vazeb: 1“ (bez ✓), panel Kolize „neplatí“,
+//     Přidržovač stojí [5; 10; 5] bez natočení, oznámení „POZOR: ztracené reference vazeb: 1“ (bez ✓), panel Kolize „neplatí“,
 //     textový stav „Vazby: 1 (1 ztracená reference)“ a `mates=0/1(lost=1)` – stejné jako `sestava hotovo` textem
 //  4) oprava v GUI: „Vybrat plochu znovu“ → výběr ze seznamu ploch (data-repick-face, funguje i bez WebGL) → vazba ok, Přidržovač
 //     dosedne na horní plochu (Z = 10); krok zpět → zase ztracená; „Smazat vazbu“ → vazba pryč
@@ -20,7 +20,7 @@ const BASE = (process.env.E2E_BASE || 'http://localhost:3531').replace(/\/$/, ''
 const SETUP = [
   'nový díl "Deska A"', 'kvádr 60 40 10', 'kvádr 20 40 5 v 0 0 5 odebrat',
   'nový díl "Přidržovač"', 'kvádr 10 10 10',
-  'nová sestava "Sestava A"', 'vložit "Deska A" ukotvit', 'vložit "Přidržovač" v 40 10 30',
+  'nová sestava "Sestava A"', 'vložit "Deska A" ukotvit', 'vložit "Přidržovač" v 5 10 30',
   'sestava vazba kontakt "Přidržovač" spodní "Deska A" F3',
 ].join('\n');
 
@@ -43,11 +43,13 @@ async function flow(p, tag, en = false) {
   const treeRow = (name) => p.locator('aside div.group').filter({ has: p.locator('span', { hasText: new RegExp(`^${name}$`) }) }).first();
 
   const log = await run(SETUP);
-  ok(/✓ vazba Kontakt „Přidržovač“ F5 → „Deska A“ F3: ok/.test(log) && !/^✗/m.test(log), `[${tag}] sestava s vazbou Kontakt na schod F3 založena textem`);
+  // fáze 2: Přidržovač stojí NA schodu (x 5–15 nad odebraným pásem x 0–20) – dřív x = 40 nad plnou deskou = skutečný průnik 500 mm³
+  const mateOk = en ? /✓ mate Contact „Přidržovač“ F5 → „Deska A“ F3: ok/ : /✓ vazba Kontakt „Přidržovač“ F5 → „Deska A“ F3: ok/;
+  ok(mateOk.test(log) && !/^✗/m.test(log), `[${tag}] sestava s vazbou Kontakt na schod F3 založena textem`);
   await idle();
   ok(await waitMate('ok'), `[${tag}] vazba v seznamu vazeb splněna`);
   const pos0 = await holder();
-  ok(JSON.stringify(pos0.position) === '[40,10,5]', `[${tag}] Přidržovač na schodu [40; 10; 5] (${JSON.stringify(pos0.position)})`);
+  ok(JSON.stringify(pos0.position) === '[5,10,5]', `[${tag}] Přidržovač na schodu [5; 10; 5] (${JSON.stringify(pos0.position)})`);
   await run('kolize');
   await idle();
   const c0 = await p.waitForFunction(() => document.querySelector('[data-clash-panel]')?.getAttribute('data-clash-state'), null, { timeout: 60000 }).then((h) => h.jsonValue(), () => null);
@@ -70,7 +72,7 @@ async function flow(p, tag, en = false) {
   ok((await p.locator('[data-mate-status="ok"]').count()) === 0, `[${tag}] žádná zelená „splněno“ u ztracené vazby`);
   ok(en ? /lost reference/i.test(m1.text) : /ztracená reference/.test(m1.text), `[${tag}] text seznamu vazeb hlásí ztracenou referenci\n   ${m1.text.replace(/\n/g, ' | ').slice(0, 300)}`);
   const pos1 = await holder();
-  ok(JSON.stringify(pos1.position) === '[40,10,5]' && pos1.rotation.every((x) => Math.abs(x) < 1e-9), `[${tag}] Přidržovač se nepohnul ani nenatočil (${JSON.stringify(pos1)}) – dřív [40; 0; 5] · natočení [90; 0; 0]`);
+  ok(JSON.stringify(pos1.position) === '[5,10,5]' && pos1.rotation.every((x) => Math.abs(x) < 1e-9), `[${tag}] Přidržovač se nepohnul ani nenatočil (${JSON.stringify(pos1)}) – dřív přichycen na boční plochu −Y a natočen o 90°`);
   const body = await p.evaluate(() => document.body.innerText);
   ok(en ? /WARNING: lost mate references: 1/.test(body) : /POZOR: ztracené reference vazeb: 1/.test(body), `[${tag}] oznámení po návratu hlásí ztracenou referenci (bez ✓)`);
   ok(!/vazby 1\/1 ok|mates 1\/1 ok/.test(body), `[${tag}] nikde „vazby 1/1 ok“`);
@@ -91,7 +93,7 @@ async function flow(p, tag, en = false) {
   if (top) await p.locator('[data-repick-face]').selectOption(top.v);
   ok(await waitMate('ok'), `[${tag}] po výběru F6 vazba zase splněna`);
   const pos2 = await holder();
-  ok(JSON.stringify(pos2.position) === '[40,10,10]', `[${tag}] Přidržovač dosedl na horní plochu Z = 10 (${JSON.stringify(pos2.position)})`);
+  ok(JSON.stringify(pos2.position) === '[5,10,10]', `[${tag}] Přidržovač dosedl na horní plochu Z = 10 (${JSON.stringify(pos2.position)})`);
   ok((await mates()).lost === '0', `[${tag}] data-mates-lost=0 po opravě`);
   // krok zpět → vazba zase ztracená; Smazat vazbu → vazba pryč
   await p.evaluate(() => window.mncad.undo(1));

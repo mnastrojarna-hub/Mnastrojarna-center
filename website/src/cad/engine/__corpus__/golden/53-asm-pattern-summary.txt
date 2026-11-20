@@ -1,0 +1,47 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Šroub“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 80000 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 565,5 mm³ · těleso platné
+
+Dokument: „Šroub“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 6 × 6 × 20 mm (X -3…3, Y -3…3, Z 0…20) · objem 0,57 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 565,5 mm³ · těleso platné – Ø6 × 20 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Pole A“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Šroub“ vložena do sestavy
+✓ pole „Šroub“: 19 ks (lineární, rozteč 9 mm, směr [1; 0; 0]) – kopie 18 kopií: první „Šroub (2)“ [19; 10; 10] … poslední „Šroub (19)“ [172; 10; 10] (polohy všech: sestava komponenty)
+✓ pole „Šroub (19)“: 3 ks (lineární, rozteč 10 mm, směr [0; 1; 0]) – kopie „Šroub (19) (2)“ [172; 20; 10], „Šroub (19) (3)“ [172; 30; 10]
+Sestava „Pole A“: komponent 22 · vazby 0
+ #1 Deska A · díl · poloha [0; 0; 0] · ukotvená ⚓
+ #2 Šroub · díl · poloha [10; 10; 10]
+ #3 Šroub (2) · díl · poloha [19; 10; 10]
+ #4 Šroub (3) · díl · poloha [28; 10; 10]
+ #5 Šroub (4) · díl · poloha [37; 10; 10]
+ #6 Šroub (5) · díl · poloha [46; 10; 10]
+ #7 Šroub (6) · díl · poloha [55; 10; 10]
+ #8 Šroub (7) · díl · poloha [64; 10; 10]
+ #9 Šroub (8) · díl · poloha [73; 10; 10]
+ #10 Šroub (9) · díl · poloha [82; 10; 10]
+ #11 Šroub (10) · díl · poloha [91; 10; 10]
+ #12 Šroub (11) · díl · poloha [100; 10; 10]
+ #13 Šroub (12) · díl · poloha [109; 10; 10]
+ #14 Šroub (13) · díl · poloha [118; 10; 10]
+ #15 Šroub (14) · díl · poloha [127; 10; 10]
+ #16 Šroub (15) · díl · poloha [136; 10; 10]
+ #17 Šroub (16) · díl · poloha [145; 10; 10]
+ #18 Šroub (17) · díl · poloha [154; 10; 10]
+ #19 Šroub (18) · díl · poloha [163; 10; 10]
+ #20 Šroub (19) · díl · poloha [172; 10; 10]
+ #21 Šroub (19) (2) · díl · poloha [172; 20; 10]
+ #22 Šroub (19) (3) · díl · poloha [172; 30; 10]
+
+Dokument: „Pole A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Šroub [10; 10; 10] · Šroub (2) [19; 10; 10] · Šroub (3) [28; 10; 10] · Šroub (4) [37; 10; 10] · Šroub (5) [46; 10; 10] · Šroub (6) [55; 10; 10] · Šroub (7) [64; 10; 10] · Šroub (8) [73; 10; 10] · Šroub (9) [82; 10; 10] · Šroub (10) [91; 10; 10] · Šroub (11) [100; 10; 10] · Šroub (12) [109; 10; 10] · Šroub (13) [118; 10; 10] · Šroub (14) [127; 10; 10] · Šroub (15) [136; 10; 10] · Šroub (16) [145; 10; 10] · Šroub (17) [154; 10; 10] · Šroub (18) [163; 10; 10] · Šroub (19) [172; 10; 10] · Šroub (19) (2) [172; 20; 10] · Šroub (19) (3) [172; 30; 10]
+Sestava: 22 komponent (22 dílů po rozložení podsestav) · obálka 200 × 40 × 30 mm · objem Σ 91,88 cm³ · hmotnost Σ 0,721 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

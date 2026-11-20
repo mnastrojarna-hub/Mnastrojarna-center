@@ -17,7 +17,7 @@
  * Čisté funkce bez jádra a Reactu – stejné v prohlížeči i v CLI.
  */
 import { hashPair } from "./assembly";
-import { geometrySig, revOf } from "./engine/result-key";
+import { geometrySig, modelRev } from "./engine/result-key";
 import { cadLocale, tr } from "./i18n";
 import type { RevisionItem } from "./drawing";
 import type { CadDoc, DrawingDoc, ExportRecord, IssuedSheet } from "./types";
@@ -34,7 +34,8 @@ export function modelId(doc: CadDoc): ModelId {
   if (!id) {
     const g = geometrySig(doc);
     const [a, b] = hashPair(g);
-    idMemo.set(doc, (id = { rev: revOf(g), sig: a.toString(36) + b.toString(36) }));
+    // rev = A1 modelRev (bez náhodných id – stejný model = stejná revize v prohlížeči i v CLI), sig = otisk s id (shoda záznamu)
+    idMemo.set(doc, (id = { rev: modelRev(doc), sig: a.toString(36) + b.toString(36) }));
   }
   return id;
 }

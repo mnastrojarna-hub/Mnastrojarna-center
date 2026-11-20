@@ -81,7 +81,7 @@ describe("výstupy z konzole – čtení zápisu", () => {
   });
 
   it("revize: slova z tabulky jiných příkazů výstupní parser nepřebírá", () => {
-    const outRows = new Set(["uložit", "export", "výkres export", "skica export", "sdílet"].flatMap((w) => AGENT_COMMANDS.filter((c) => c.cmd.startsWith(w)).map((c) => c.cmd)));
+    const outRows = new Set(["uložit", "export", "výkres export", "skica export", "sdílet", "odkaz"].flatMap((w) => AGENT_COMMANDS.filter((c) => c.cmd.startsWith(w)).map((c) => c.cmd)));
     const stolen: string[] = [];
     for (const row of AGENT_COMMANDS) {
       if (outRows.has(row.cmd)) continue;

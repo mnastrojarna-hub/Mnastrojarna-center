@@ -161,14 +161,21 @@ const V6 = Math.PI * 9 * 20; // díra Ø6 × 20
   });
   ok(labels.length > 0 && labels.every((l) => l.startsWith('compare | ')) && labels.some((l) => /Porovnání \d\/\d: |Porovnávám s referenčním modelem/.test(l)), 'průběh porovnání v ukazateli jádra: ' + labels.slice(0, 6).join(' · '));
   await idle();
-  const cancelled = await p.evaluate(async () => {
+  const cx = await p.evaluate(async () => {
+    const prog = () => { const x = window.mncad.progress(); return x ? x.op + ':' + x.label : '-'; };
+    // zrušit HNED po kliknutí ve stejné úloze JS: požadavek porovnání je už v jádře a odpověď jádra se nemůže zpracovat dřív
+    // (dřív 30 ms čekání – opakované porovnání s referencí v mezipaměti jádra někdy skončilo dřív, než přišlo Zrušit; fáze 2)
     document.querySelector('[data-compare-run]').closest('button').click();
+    const p0 = prog();
+    const cancelled = window.mncad.cancel();
     await new Promise((r) => setTimeout(r, 30));
-    return window.mncad.cancel();
+    return { cancelled, p0, p30: prog() };
   });
+  const cancelled = cx.cancelled;
   await dlg.locator('[data-compare-error]').waitFor({ timeout: 30000 }).catch(() => {});
   const cErr = await dlg.locator('[data-compare-error]').innerText().catch(() => '');
-  ok(cancelled && /Porovnání bylo zrušeno/.test(cErr), 'Zrušit ukončí porovnání: ' + cErr);
+  // diagnostika (fáze 2): průběh hned po kliknutí a před zrušením, výsledek window.mncad.cancel()
+  ok(cancelled && /Porovnání bylo zrušeno/.test(cErr), `Zrušit ukončí porovnání: ${cErr} (cancel=${cancelled}; průběh při zrušení ${cx.p0}; 30 ms po zrušení ${cx.p30})`);
   await p.waitForTimeout(1500); await idle();
   const st = await p.evaluate(() => window.mncad.status());
   ok(/objem 120/.test(st), 'po zrušení jádro znovu běží (stav modelu: objem 120 cm³)');
