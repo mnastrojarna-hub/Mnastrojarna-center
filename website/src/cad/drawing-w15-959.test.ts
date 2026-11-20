@@ -88,9 +88,13 @@ describe.skipIf(!src)("test 959 – skutečný dokument (důvěrná data, bez so
       const skipped = (st.find((l) => l.startsWith("Vynecháno")) ?? "").replace(/^[^:]*: /, "").split("; ").filter(Boolean);
       expect(skipped.filter((t) => t.startsWith("poloha díry"))).toEqual([]);
       const chk = st.find((l) => l.startsWith("Kontrola kót:"))!;
-      const m = /^Kontrola kót: chybí (\d+) z (\d+): (.*)$/.exec(chk);
-      const total = m ? Number(m[2]) : Number(/všech (\d+)/.exec(chk)?.[1] ?? 0);
-      const miss = m ? m[3].split("; ").map((x) => ({ label: x.replace(/ \(([^()]*)\)$/, ""), source: /\(([^()]*)\)$/.exec(x)?.[1] ?? "" })) : [];
+      // vlna 22, bod 18: „Kontrola kót: velikosti a/b · polohy c/d – chybí: … · …“ (nikdy „všech N“)
+      const m = /^Kontrola kót: velikosti (\d+)\/(\d+) · polohy (\d+)\/(\d+)(?: – chybí: (.*?))?(?: · |$)/.exec(chk);
+      const total = m ? Number(m[2]) + Number(m[4]) : 0;
+      const miss = (m?.[5] ? m[5].split("; ").filter((x) => !/^a dalších/.test(x)) : []).map((x) => {
+        const pos = /^poloha (.+?) – [XYZ] /.exec(x);
+        return pos ? { label: x, source: pos[1] } : { label: x.replace(/ \(([^()]*)\)$/, ""), source: /\(([^()]*)\)$/.exec(x)?.[1] ?? "" };
+      });
       // zdroj chybějícího rozměru (prvek / jeho skica) musí být jmenován v „vynecháno“
       const owner = (src: string) => {
         const sk = d.features.find((f) => f.name === src && f.type === "sketch");

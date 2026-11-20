@@ -37,7 +37,7 @@ Kóty a popisy (3, z toho vygenerovaných 3):
   horní: 40
 Id (výkres upravit / smazat / značka na <id>): a1 30 (přední) · a2 40 (horní) · a3 10 (přední)
 Duplicity: žádné
-Kontrola kót: všech 3 očekávaných rozměrů je na listu
+Kontrola kót: velikosti 3/3 · polohy 0/0 · tolerance neověřeny (funkční prvky nevyznačeny)
 U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
 Razítko: název Deska A · číslo — · kreslil — · revize A · datum ?.?.???? · materiál Ocel
 Revize (1): A ?.?.???? „první vydání“
@@ -81,7 +81,7 @@ Kóty a popisy (3, z toho vygenerovaných 3):
   horní: 40
 Id (výkres upravit / smazat / značka na <id>): a1 30 (přední) · a2 40 (horní) · a3 10 (přední)
 Duplicity: žádné
-Kontrola kót: všech 3 očekávaných rozměrů je na listu
+Kontrola kót: velikosti 3/3 · polohy 0/0 · tolerance neověřeny (funkční prvky nevyznačeny)
 U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
 Razítko: název Deska A · číslo — · kreslil — · revize B · datum ?.?.???? · materiál Ocel
 Revize (2): A ?.?.???? „první vydání“ · B ?.?.???? „změna modelu r·? → r·?“

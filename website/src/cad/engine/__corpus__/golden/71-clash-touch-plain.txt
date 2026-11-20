@@ -11,21 +11,21 @@
 ✓ nový díl „Deska C“ – nová záložka
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
 → Díra 3 (hole) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Díra 2 (hole)
-✓ Válec 1 (cylinder)
-✓ Válec 2 (cylinder)
-✓ Kvádr 2 (box)
-✓ Kvádr 3 (box)
-✓ Díra 3 (hole)
+✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 1550,8 mm³ (79 % nástroje) · těleso platné
+✓ Díra 2 (hole) · úběr 900,6 mm³ (68 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2035,8 mm³ · těleso platné
+✓ Válec 2 (cylinder) · přidáno 3053,6 mm³ (celý nástroj) · těleso platné
+✓ Kvádr 2 (box) · přidáno 60000 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 120000 mm³ · těleso platné
+✓ Díra 3 (hole) · úběr 1550,8 mm³ (79 % nástroje) · těleso platné
 
 Dokument: „Deska C“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 118,45 cm³ · ploch 8 · hran 17
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 3 [box, id #] ✓ – 100 × 60 × 20 mm, new, roh [0; 0; 0]
- 2. Díra 3 [hole, id #] ✓ – Ø10,20 hloubka 18 v [20; 30; 20], osa Z
+ 1. Kvádr 3 [box, id #] ✓ přidáno 120000 mm³ · těleso platné – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Díra 3 [hole, id #] ✓ úběr 1550,8 mm³ (79 % nástroje) · těleso platné – Ø10,20 hloubka 18 v [20; 30; 20], osa Z
 === run 2 ===
 ✓ nová sestava „Sestava 5b“ – nová záložka
 ✓ komponenta „Deska A“ vložena do sestavy (ukotvená)

@@ -87,6 +87,9 @@ async function open(b, path) {
 
   // ══ 1. formulář motoru (body 11 a 9) ══
   ok((await state()) === 'unchecked' && (await mp.getAttribute('data-motion-doc')) === 'Sestava A' && /Nezkontrolováno/.test(await txt('[data-motion-status]')), `panel bez výpočtu: stav „unchecked“ pro „Sestava A“ – ${await txt('[data-motion-status]')}`);
+  // vlna 22, M3 (bod 10): formulář motoru není trvale otevřený – „+ Nový motor“ ho otevře
+  ok((await mp.locator('[data-motion-add]').count()) === 0 && (await mp.locator('[data-motor-new]').count()) === 1, 'bod 10: bez otevřeného formuláře, tlačítko „+ Nový motor“');
+  await mp.locator('[data-motor-new]').click();
   await mp.locator('[data-motor-kind="linear"]').click();
   await p.waitForTimeout(200);
   ok((await val('from')) === 20, `bod 11: Začátek lineárního motoru předvyplněn aktuální hodnotou vazby 20 mm (dřív 0) – ${await val('from')}`);
@@ -119,6 +122,10 @@ async function open(b, path) {
   const m0 = d.motion && d.motion.motors[0];
   ok(!!m0 && m0.from === 20 && m0.to === 10 && m0.speed === 2 && m0.ranged === true && d.motion.duration === 5, `bod 9: Přidat motor → rozsah 20 → 10 rychlostí 2 mm/s, délka studie 5 s – ${JSON.stringify(d.motion && { m: d.motion.motors, t: d.motion.duration })}`);
   ok(/^hodnota vazby 20 → 10 mm ↓ zdvih 10 mm · 2 mm\/s · 5 s$/.test(await txt('[data-motor-range]')), `seznam motorů: význam, konec, směr, rychlost a doba – ${await txt('[data-motor-range]')}`);
+  // M3 (bod 10): po přidání se formulář zavře; klik na motor v seznamu = Upravit motor 1 (předvyplněný)
+  ok((await mp.locator('[data-motion-add]').count()) === 0, 'bod 10: po přidání formulář zavřený');
+  await mp.locator('[data-motor-edit="1"]').click();
+  ok((await mp.locator('[data-motor-form="edit"]').count()) === 1 && (await val('speed')) === 2, `bod 10: Upravit motor 1 – formulář předvyplněný (rychlost ${await val('speed')})`);
   await mp.locator('[data-motor-end="to"]').click().catch(() => {});
   await setField('to', 40);
   await setField('speed', -3);
@@ -239,6 +246,8 @@ async function open(b, path) {
   ok(!/^✗/m.test(log), 'model: sestava „Vedení“ s vazbou Souosost „VEDENÍ“');
   await openPanel();
   ok((await state()) === 'unchecked' && (await mp.getAttribute('data-motion-doc')) === 'Vedení', `nová sestava: panel „unchecked“ pro „Vedení“ (${await state()})`);
+  if (await mp.locator('[data-motor-cancel]').count()) await mp.locator('[data-motor-cancel]').click();
+  await mp.locator('[data-motor-new]').click();
   await mp.locator('[data-motor-kind="linear"]').click();
   await p.waitForTimeout(200);
   const relText = await txt('[data-motor-meaning-text]');
@@ -254,6 +263,7 @@ async function open(b, path) {
   await mp.locator('[data-motor-add]').click().catch(() => {});
   await p.waitForTimeout(500);
   ok(/^posuv od výchozí polohy 0 → -30 mm ↓ zdvih 30 mm$/.test(await txt('[data-motor-range]')) && (await mp.locator('[data-motor]').first().getAttribute('data-motor-meaning')) === 'relative', `bod 11: seznam motorů u Souososti říká „posuv od výchozí polohy“ – ${await txt('[data-motor-range]')}`);
+  await mp.locator('[data-motor-new]').click();
   await mp.locator('[data-motor-kind="rotary"]').click();
   await p.waitForTimeout(200);
   const rotLabel = await field('from').getAttribute('aria-label', { timeout: 1500 }).catch(() => '');
@@ -385,6 +395,92 @@ async function open(b, path) {
     ok((await getDoc()).mates.some((m) => m.prefer === 'max'), 'panel sestavy: Preferovaná strana max → mate.prefer');
   } else console.log('info: pole data-mate-prefer není vidět (vazba meze nerozbalená) – preferovaná strana ověřena textem v testech');
   ok(errs.length === 0, 'bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
+
+  // ── 8. etapa M3 (body 3, 10, 15): jedna studie s fázemi, motory v panelu (nový × upravit, dosah, osa, konflikt), tuhé skupiny ──
+  await run(['nový díl "Deska F"', 'kvádr 200 200 20', 'nový díl "Plech F"', 'kvádr 120 120 2', 'nový díl "Horní F"', 'kvádr 200 200 20', 'nový díl "Razník F"', 'válec 20 38', 'nový díl "Držák F"', 'kvádr 40 40 10'].join('\n'));
+  log = await run([
+    'nová sestava "Cyklus F"', 'vložit "Deska F" ukotvit', 'vložit "Plech F" v 40 40 20', 'sestava vazba ukotvit "Plech F"', 'vložit "Horní F" v 0 0 100', 'vložit "Razník F" v 100 100 62', 'vložit "Držák F" v 140 140 52',
+    'sestava vazba vzdálenost "Horní F" spodní "Deska F" horní hodnota 80 název "ZDVIH"', 'sestava vazba zarovnat "Horní F" +X "Deska F" +X', 'sestava vazba zarovnat "Horní F" +Y "Deska F" +Y',
+    'sestava vazba zámek "Razník F" "Horní F"', 'sestava vazba zámek "Držák F" "Horní F" název "NESENÍ"', 'sestava vazba vzdálenost "Držák F" spodní "Plech F" horní hodnota 30 název "MEZERA"', 'sestava vazba "MEZERA" potlačit',
+    'pohyb fáze "Nájezd"', 'pohyb fáze "Sevření" při vazba "MEZERA" <= 0 potlačit vazba "NESENÍ" zapnout vazba "MEZERA"', 'pohyb fáze "Střih" při vazba "ZDVIH" <= 40', 'pohyb fáze "Značení" při vazba "ZDVIH" <= 38', 'pohyb fáze "Návrat" při vazba "ZDVIH" >= 50 zapnout vazba "NESENÍ" potlačit vazba "MEZERA"',
+    'pohyb motor lineární vazba "ZDVIH" 80..50..40..37 rychlost 50 prodleva 0,1 pak 80 rychlost 100 kroky 70',
+  ].join('\n'));
+  ok(/Fáze 5 „Návrat“: kroky \d+–70 · t = 1,09–1,39 s/.test(log) && !/^✗/m.test(log), `bod 3: cyklus v jedné studii, 5 fází – ${line(log, /Fáze 5 „Návrat“/)}`);
+  await openPanel();
+  await waitState('ok', 60000);
+  const bands = mp.locator('[data-phase-band]');
+  ok((await bands.count()) === 5, `bod 3: pásy fází na časové ose – ${await bands.count()}`);
+  await bands.nth(1).click();
+  await p.waitForTimeout(300);
+  ok((await mp.locator('[data-motion-step-phase="2"]').count()) === 1, `bod 3: klik na pás „Sevření“ = první krok fáze 2 – ${await txt('[data-motion-step]')}`);
+  ok((await mp.locator('[data-phase-row]').count()) === 5, 'bod 3: seznam fází v panelu');
+  // pořadí: Střih o místo dolů a zpět (skutečné klíky)
+  await mp.locator('[data-phase-down="3"]').click();
+  await p.waitForTimeout(300);
+  let ph = ((await getDoc()).motion?.phases || []).map((x) => x.name).join(',');
+  ok(ph === 'Nájezd,Sevření,Značení,Střih,Návrat', `bod 3: posun fáze dolů – ${ph}`);
+  await mp.locator('[data-phase-up="4"]').click();
+  await p.waitForTimeout(300);
+  ph = ((await getDoc()).motion?.phases || []).map((x) => x.name).join(',');
+  ok(ph === 'Nájezd,Sevření,Střih,Značení,Návrat', `bod 3: posun zpět nahoru – ${ph}`);
+  // nová fáze formulářem: název, začátek v čase, uložit → v dokumentu; smazat
+  await mp.locator('[data-phase-new]').click();
+  await mp.locator('[data-phase-name]').fill('Kontrola');
+  await mp.locator('[data-phase-start]').selectOption('time');
+  const tIn = mp.locator('[data-phase-form] input[aria-label="Čas začátku"]');
+  await tIn.fill('1,3'); await tIn.press('Enter');
+  await mp.locator('[data-phase-save]').click();
+  await p.waitForTimeout(300);
+  const added = ((await getDoc()).motion?.phases || []).find((x) => x.name === 'Kontrola');
+  ok(!!added && added.start && Math.abs(added.start.t - 1.3) < 1e-9, `bod 3: nová fáze z panelu – ${JSON.stringify(added)}`);
+  await mp.locator('[data-phase-remove="6"]').click();
+  await p.waitForTimeout(300);
+  ok(((await getDoc()).motion?.phases || []).length === 5, 'bod 3: smazání fáze z panelu');
+  // motor: Upravit motor 1 – úseky v tabulce, zvýraznění poháněných dílů a osa se šipkou (WebGL i bez WebGL)
+  await mp.locator('[data-motor-edit="1"]').click();
+  ok((await mp.locator('[data-motor-form="edit"]').count()) === 1 && (await mp.locator('[data-motor-legs]').getAttribute('data-motor-legs')) === '5', `bod 3/10: Upravit motor 1 – ${await mp.locator('[data-motor-legs]').getAttribute('data-motor-legs').catch(() => '?')} úseků`);
+  const main = p.locator('main[data-doc-key]');
+  let hlN = null;
+  for (let i = 0; i < 60 && !hlN; i++) { hlN = await main.getAttribute('data-motor-highlight'); if (!hlN) await p.waitForTimeout(200); }
+  ok(hlN === '3' && /ZDVIH ↓/.test((await main.getAttribute('data-motor-axis')) || ''), `bod 10: zvýrazněno ${hlN} komponent (deska + razník + držák zámkem), osa „${await main.getAttribute('data-motor-axis')}“`);
+  ok(/pohání: „Horní F“ \+ 2 díly – spolu s ním kvůli pevné vazbě \(zámku\)/.test(await txt('[data-motor-reach]')), `bod 10: panel vysvětlí díly spojené zámkem – ${(await txt('[data-motor-reach]')).slice(0, 120)}`);
+  if (NOGL) {
+    const lab = p.locator('[data-soft-measure-label]');
+    ok((await lab.count()) >= 1 && /ZDVIH/.test((await lab.first().getAttribute('data-soft-measure-label')) || ''), `bod 10 bez WebGL: osa a popisek motoru v softwarovém náhledu – ${await lab.first().getAttribute('data-soft-measure-label').catch(() => '?')}`);
+  }
+  if (SHOTS) await p.screenshot({ path: SHOTS + `w22-m3-motor-axis${NOGL ? '-nogl' : ''}.png` });
+  await mp.locator('[data-motor-cancel]').click();
+  await p.waitForTimeout(300);
+  ok((await main.getAttribute('data-motor-highlight')) === null, 'bod 10: Zrušit = zvýraznění zmizí');
+  // nový motor na téže vazbě se stejným začátkem → ⚠ nahradí + „Navázat úsek“
+  await mp.locator('[data-motor-new]').click();
+  await mp.locator('[data-motor-kind="linear"]').click();
+  await mp.locator('[data-motor-mate]').selectOption({ index: 0 });
+  await p.waitForTimeout(300);
+  ok((await mp.locator('[data-motor-same="1"]').count()) === 1 && /Nahradit motor 1/.test(await txt('[data-motor-save]')), `bod 10: nový motor na vazbě s motorem = ⚠ nahradí (ne potichu) – ${(await txt('[data-motor-same]')).slice(0, 90)}`);
+  await mp.locator('[data-motor-append="1"]').click();
+  await p.waitForTimeout(200);
+  ok((await mp.locator('[data-motor-form="edit"]').count()) === 1 && (await mp.locator('[data-motor-legs]').getAttribute('data-motor-legs')) === '6', 'bod 3: Navázat úsek → úprava motoru 1 s dalším úsekem');
+  await mp.locator('[data-motor-cancel]').click();
+  // souhrn po tuhých skupinách, detail po dílech přepínačem
+  ok((await mp.locator('[data-motion-summary]').getAttribute('data-motion-summary-mode')) === 'groups' && /„Horní F“ \+ 1 díl \(tuhá skupina – zámek \/ pevné vazby\): ΔZ −43 mm/.test(await txt('[data-motion-summary]')) && !/rozsah pohybu/.test(await txt('[data-motion-summary]')), `bod 15: souhrn po skupinách – ${(await txt('[data-motion-summary]')).slice(0, 160)}`);
+  await mp.locator('[data-motion-detail]').check();
+  ok(/Razník F: rozsah pohybu/.test(await txt('[data-motion-summary]')), 'bod 15: Detail po dílech na vyžádání');
+  await mp.locator('[data-motion-detail]').uncheck();
+  // konflikt motorů při definici v panelu (VEDENÍ × ZDVIH)
+  log = await run(['nový díl "Vodítko G"', 'válec 20 120', 'nový díl "Držák G"', 'kvádr 60 60 8', 'díra 20 skrz v 30 30'].join('\n'));
+  log += await run(['nová sestava "Vedení G"', 'vložit "Deska F" ukotvit', 'vložit "Vodítko G" v 50 50 -20', 'sestava vazba ukotvit "Vodítko G"', 'vložit "Držák G" v 20 20 67,5',
+    'sestava vazba souosost "Držák G" Ø20 "Vodítko G" válcová název "VEDENÍ"', 'sestava vazba vzdálenost "Držák G" spodní "Deska F" horní hodnota 47,5 název "ZDVIH"', 'pohyb motor lineární vazba "ZDVIH" 47,5..27,15 kroky 4'].join('\n'));
+  await openPanel();
+  await mp.locator('[data-motor-new]').click();
+  await mp.locator('[data-motor-kind="linear"]').click();
+  const vOpt = (await mp.locator('[data-motor-mate] option').allInnerTexts()).find((o) => /VEDENÍ/.test(o));
+  if (vOpt) await mp.locator('[data-motor-mate]').selectOption({ label: vOpt });
+  let conf = 0;
+  for (let i = 0; i < 60 && !conf; i++) { conf = await mp.locator('[data-motor-conflict="same-dof"]').count(); if (!conf) await p.waitForTimeout(200); }
+  ok(conf === 1, `bod 10: ⚠ druhý motor na tomtéž stupni volnosti už ve formuláři – ${(await txt('[data-motor-conflict]')).slice(0, 120)}`);
+  await mp.locator('[data-motor-cancel]').click().catch(() => {});
+  ok(errs.length === 0, 'M3: bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
 
   // ── EN a DE: stejný příkaz, protokol i panel bez českých zlomků ──
   for (const [path, cmd, re] of [

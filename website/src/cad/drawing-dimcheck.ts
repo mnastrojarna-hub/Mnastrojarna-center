@@ -76,3 +76,8 @@ export function suggestionsFor(r: DimCompleteResult, doc: CadDoc, views: Drawing
     .filter((q) => which === "all" || q.kind === which)
     .map((item) => ({ item, dim: suggestDim(item, views, bbox, doc) }));
 }
+
+/** navržená kóta skupiny děr nese počet („2× Ø8“) – jedna kóta pak pokryje všechny díry skupiny */
+export function withGroupCount(item: DimReq, ann: DrawingAnnotation): DrawingAnnotation {
+  return ann.type === "dim" && ann.kind === "diameter" && item.holes && item.holes.n > 1 ? { ...ann, prefix: `${item.holes.n}× ` } : ann;
+}

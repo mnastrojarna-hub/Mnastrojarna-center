@@ -110,7 +110,8 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   ok(/✓ komponenta „Šroub M6x20“: název „Šroub M6x20 -1“/.test(log) && /\| Šroub M6x20 \|  \| 2 \|/.test(log) && !/\| Šroub M6x20 -1 \|/.test(log), 'B15 přejmenování instance řádek kusovníku nerozdělí: ' + line(log, /\| Šroub M6x20/));
 
   // ── pohybová studie: B11 + pružina v pohybu ──
-  log = await run('sestava vazba "ZDVIH" hodnota=38\npohyb motor lineární vazba "ZDVIH" 38..16 kroky 11 kolize\npohyb', 600000);
+  // vlna 22, M3: řádky po dílech jsou detail (pohyb detail); výchozí souhrn = tuhé skupiny
+  log = await run('sestava vazba "ZDVIH" hodnota=38\npohyb motor lineární vazba "ZDVIH" 38..16 kroky 11 kolize\npohyb detail', 600000);
   const sumLines = log.split('\n').filter((l) => /rozsah pohybu/.test(l));
   ok(sumLines.some((l) => /Šroub M6x20/.test(l) && /Z 22 mm/.test(l)) && !sumLines.some((l) => /Šroub M6x20/.test(l) && /natáčí se/.test(l)), 'B11 šrouby 180 0 0 se jen posouvají: ' + (sumLines.find((l) => /Šroub M6x20/.test(l)) || '').trim());
   ok(/✗ pružina „[^“]+“: délka 38 → 16 mm \(min 16 · L0 44 · Ln 18\) · síla 150 → 700 N \(max 700 N\) – pod délkou na doraz v krocích 11/.test(log), 'pružina v pohybu: ' + line(log, /pružina „[^“]+“: délka 38/));

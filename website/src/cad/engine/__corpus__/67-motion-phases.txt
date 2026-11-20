@@ -1,0 +1,41 @@
+# vlna 22, bod 3: celý pracovní cyklus v JEDNÉ studii – nájezd, sevření, střih, značení, návrat. Motor s úseky (80 → 50 → 40 → 37,
+# prodleva, zpět na 80), pět fází; sevření při MEZERA ≤ 0 potlačí nesení a zapne MEZERU (přidržovač zůstane na plechu), návrat při
+# ZDVIH ≥ 50 zapne nesení znovu – přidržovač se vrátí přesně do výchozí polohy (okamžik podmínky zpřesněný mezi kroky). Každá fáze
+# 0 nesplněných vazeb, strojově phases=5/5; druhý běh: výpis fází, detail po dílech, opakovaný výpočet = stejné polohy.
+nový díl "Deska A"
+kvádr 200 200 20
+nový díl "Plech"
+kvádr 120 120 2
+nový díl "Horní deska"
+kvádr 200 200 20
+nový díl "Razník"
+válec 20 38
+nový díl "Přidržovač"
+kvádr 40 40 10
+nová sestava "Cyklus"
+vložit "Deska A" ukotvit
+vložit "Plech" v 40 40 20
+sestava vazba ukotvit "Plech"
+vložit "Horní deska" v 0 0 100
+vložit "Razník" v 100 100 62
+vložit "Přidržovač" v 140 140 52
+sestava vazba vzdálenost "Horní deska" spodní "Deska A" horní hodnota 80 název "ZDVIH"
+sestava vazba zarovnat "Horní deska" +X "Deska A" +X
+sestava vazba zarovnat "Horní deska" +Y "Deska A" +Y
+sestava vazba zámek "Razník" "Horní deska"
+sestava vazba zámek "Přidržovač" "Horní deska" název "NESENÍ"
+sestava vazba vzdálenost "Přidržovač" spodní "Plech" horní hodnota 30 název "MEZERA"
+sestava vazba "MEZERA" potlačit
+pohyb fáze "Nájezd"
+pohyb fáze "Sevření" při vazba "MEZERA" <= 0 potlačit vazba "NESENÍ" zapnout vazba "MEZERA"
+pohyb fáze "Střih" při vazba "ZDVIH" <= 40
+pohyb fáze "Značení" při vazba "ZDVIH" <= 38
+pohyb fáze "Návrat" při vazba "ZDVIH" >= 50 zapnout vazba "NESENÍ" potlačit vazba "MEZERA"
+pohyb motor lineární vazba "ZDVIH" 80..50..40..37 rychlost 50 prodleva 0,1 pak 80 rychlost 100 kroky 70
+pohyb krok 40
+pohyb krok 70
+#--- run
+pohyb fáze
+pohyb stav detail
+pohyb spustit
+pohyb krok 70

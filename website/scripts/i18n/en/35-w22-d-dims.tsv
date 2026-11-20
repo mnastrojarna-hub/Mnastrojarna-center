@@ -92,6 +92,7 @@ základna {0}: plocha F{1} není rovinná – základnou může být jen rovinn�
 základna: písmeno a rovinná plocha, např. základna A F3 – {0}	datum: a letter and a planar face, e.g. functional datum A F3 – {0}
 základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu	datum {0} of part “{1}” cannot be written as a script line
 žádné polohy k ověření	no positions to verify
+podle textu kóty – poloha popisu neověřena	by the dimension text – position of the callout not verified
 #!dynamic – texty kódů (src/cad/engine/codes.ts) a klíč varování (drawing-issues.ts DIMS_INCOMPLETE_KEY) se překládají za běhu
 kóty neúplné – {0}	dimensions incomplete – {0}
 list {0}: přesná tolerance na rozměru, který není funkční – {1}	sheet {0}: tight tolerance on a size that is not functional – {1}

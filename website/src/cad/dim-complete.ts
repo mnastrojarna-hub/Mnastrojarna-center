@@ -52,7 +52,7 @@ export type DimReq = {
   /** bod prvku (pro návrh kóty „Přidat kótu“) */
   point?: Vec3;
   /** díry skupiny: středy (všechny výskyty), osa, poloměr, počet */
-  holes?: { centers: Vec3[]; dir: Vec3; r: number; n: number; depth?: number; entry?: number[] };
+  holes?: { centers: Vec3[]; dir: Vec3; r: number; n: number; depth?: number; entry?: number[]; /** všechny polohy děr skupiny jsou známé (čísla, ne odkazy) */ exact: boolean };
   /** jen hodnotou (bez geometrie) – dosavadní kontrola */
   byValue?: boolean;
   functional?: boolean;
@@ -134,7 +134,8 @@ export function viewsBbox(views: readonly CheckView[]): [Vec3, Vec3] | null {
     }
   }
   if (lo.some((x) => x === null)) return null;
-  return [lo as Vec3, hi as Vec3];
+  // −0 z převrácené osy obrazu → 0
+  return [lo.map((x) => (x as number) + 0) as Vec3, hi.map((x) => (x as number) + 0) as Vec3];
 }
 
 /* ───────────────────────── kóty na listu jako fakta ───────────────────────── */
@@ -264,8 +265,11 @@ function instances(doc: CadDoc, f: Feature, seeds: Vec3[]): Vec3[] {
       const ids = g.featureIds?.length ? g.featureIds : [g.featureId];
       if (!ids.includes(f.id)) continue;
       if (g.kind === "linear") {
-        const d1 = unit(g.direction ?? [1, 0, 0]);
-        const d2 = unit(g.direction2 ?? [0, 1, 0]);
+        // směr zadaný vektorem má přednost (jako drawing-dims.ts `featureInstances`)
+        const dd1 = (g as { dirDef?: { kind: string; v?: Vec3 } }).dirDef;
+        const dd2 = (g as { dirDef2?: { kind: string; v?: Vec3 } }).dirDef2;
+        const d1 = unit(dd1?.kind === "vector" && dd1.v ? dd1.v : (g.direction ?? [1, 0, 0]));
+        const d2 = unit(dd2?.kind === "vector" && dd2.v ? dd2.v : (g.direction2 ?? [0, 1, 0]));
         const n1 = Math.max(1, Math.round(g.count));
         const n2 = Math.max(1, Math.round(g.count2 ?? 1));
         const s1 = (g as { spacingMode?: string }).spacingMode === "total" && n1 > 1 ? g.spacing / (n1 - 1) : g.spacing;
@@ -309,14 +313,14 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
     for (const k of [0, 1, 2] as const) {
       const L = bbox[1][k] - bbox[0][k];
       const label = k === 0 ? tr("{0} (délka X)", fmt(L)) : k === 1 ? tr("{0} (šířka Y)", fmt(L)) : tr("{0} (výška Z)", fmt(L));
-      if (L > 1e-6) addReq(c, { id: `overall:${k}`, kind: "size", label, source: SRC_OVERALL(), dim: "lin", value: L, axis: k, span: [bbox[0][k], bbox[1][k]] });
+      if (L > 1e-6) addReq(c, { id: `overall:${k}`, kind: "size", label, source: SRC_OVERALL(), dim: "lin", value: L, axis: k, span: [bbox[0][k], bbox[1][k]], point: [...bbox[0]] as Vec3 });
     }
   }
   // ostatní velikosti z parametrů prvků (bez děr a kvádrů – ty níže geometricky; bez celkových – výše)
   const rest = expectedDims({ ...doc, features: doc.features.filter((f) => f.type !== "box") }, bbox, { aux, noHoles: true }).filter((e) => e.source !== SRC_OVERALL());
   rest.forEach((e, i) => addReq(c, { id: `v:${i}:${e.kind}:${e.value}`, kind: "size", label: e.label, source: e.source, featureId: doc.features.find((f) => f.name === e.source)?.id, dim: e.kind, value: e.value, byValue: true }));
 
-  const groups = new Map<string, { feats: HoleF[]; centers: Vec3[]; n: number; dir: Vec3 | null }>();
+  const groups = new Map<string, { feats: HoleF[]; centers: Vec3[]; n: number; dir: Vec3 | null; exact: boolean }>();
   for (const f0 of doc.features) {
     if (f0.suppressed || aux.skip.has(f0.id)) continue;
     const cutTool = aux.cut.has(f0.id);
@@ -361,7 +365,8 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
         const seeds = refs ? refs.flatMap((p) => (p.kind === "xyz" ? [p.p as Vec3] : [])) : [f.position];
         if (refs && seeds.length < refs.length) c.unchecked.push(tr("poloha {0} (body zadané odkazem na geometrii)", f.name));
         const key = holeSpec(f);
-        const g = groups.get(key) ?? { feats: [], centers: [], n: 0, dir };
+        const g = groups.get(key) ?? { feats: [], centers: [], n: 0, dir, exact: true };
+        if (refs && seeds.length < refs.length) g.exact = false;
         g.feats.push(f);
         g.centers.push(...instances(doc, f, seeds.length ? seeds : [f.position]));
         g.n += countOf(doc, f.id) * Math.max(1, refs ? refs.length : 1);
@@ -430,7 +435,7 @@ export function requirements(doc: CadDoc, bbox: [Vec3, Vec3] | null): { reqs: Di
     const dir = g.dir ?? [0, 0, 1];
     const ax = axisOf(dir);
     const entry = ax ? g.feats.map((x) => x.position[ax.k]) : undefined;
-    const holes = { centers: g.centers, dir, r, n: g.n, ...(f.depth > 0 ? { depth: f.depth } : {}), ...(entry ? { entry } : {}) };
+    const holes = { centers: g.centers, dir, r, n: g.n, exact: g.exact && !!g.dir, ...(f.depth > 0 ? { depth: f.depth } : {}), ...(entry ? { entry } : {}) };
     addReq(c, { id: `hole:${gi}`, kind: "size", label, source: names, featureId: f.id, dim: tapped ? "thread" : "dia", value, holes, point: g.centers[0] });
     if (f.depth > 0) addReq(c, { id: `holedepth:${gi}`, kind: "size", label: tr("{0} (hloubka díry)", fmt(f.depth)), source: names, featureId: f.id, dim: "lin", value: f.depth, holes, ...(ax ? { axis: ax.k } : {}), point: g.centers[0] });
     // zahloubení, vrták závitu…: dosavadní očekávání hodnotou (bez hlavního průměru a hloubky)
@@ -483,9 +488,15 @@ function matchReq(q: DimReq, f: Facts, views: readonly CheckView[], baked: boole
       take(x.i, x.tol);
     }
     have += new Set(h.centers.flatMap((p) => inTable(f, views, p))).size;
-    if (!have && baked) have = f.texts.filter((t) => (t.kind === q.dim || (q.dim === "dia" && t.kind === "thread")) && eq(t.value, q.value)).reduce((s, t) => s + t.count, 0);
+    // žádná kóta / popis na díře skupiny (kóty zapečené v pohledu, díry zadané odkazem, popis mimo kružnici): počet z textů
+    // kót „4× Ø10“ hodnotou – i tak se počet kusů hlídá, a výsledek to říká
+    let byText = false;
+    if (!have) {
+      have = f.texts.filter((t) => (t.kind === q.dim || (q.dim === "dia" && t.kind === "thread")) && eq(t.value, q.value)).reduce((s, t) => s + t.count, 0);
+      byText = have > 0 && !baked;
+    }
     q.have = have;
-    if (have >= h.n) return done("ok");
+    if (have >= h.n) return done("ok", byText ? tr("podle textu kóty – poloha popisu neověřena") : undefined);
     return done(have ? "partial" : "missing", have ? tr("na listu {0}× z {1}×", have, h.n) : undefined);
   }
   // hloubka díry: popis té díry s ↧ / hl. a touto hodnotou, nebo kóta podél osy díry od vstupu – ne libovolné číslo
@@ -520,7 +531,8 @@ function matchReq(q: DimReq, f: Facts, views: readonly CheckView[], baked: boole
       take(dia.i, dia.tol);
       return done("ok");
     }
-    if (baked && f.texts.some((t) => (t.kind === "lin" || (overall && t.kind === "dia")) && eq(t.value, q.value))) return done("ok");
+    // celkový rozměr kreslený mimo poznámky listu (vygenerované kóty celkových rozměrů, souřadnicové kóty) – hodnotou
+    if ((baked || overall) && f.texts.some((t) => (t.kind === "lin" || (overall && t.kind === "dia")) && eq(t.value, q.value))) return done("ok");
     return done("missing");
   }
   if (q.kind === "size") {
@@ -533,8 +545,8 @@ function matchReq(q: DimReq, f: Facts, views: readonly CheckView[], baked: boole
       take(hit.i, hit.tol);
       return done("ok");
     }
-    // text bez geometrie (zapečené kóty)
-    if (baked && f.texts.some((t) => same(t.kind) && eq(t.value, q.value))) return done("ok");
+    // dosavadní párování hodnotou (texty kót listu: popisy „⌴ Ø15“, „1×45°“, „M20×1,5“, zapečené kóty)
+    if (f.texts.some((t) => same(t.kind) && eq(t.value, q.value))) return done("ok");
     return done("missing");
   }
   // poloha: délková kóta téže osy končící na souřadnici prvku (ne jen jeho vlastní velikost), osa souměrnosti, tabulka děr
@@ -675,7 +687,8 @@ export function checkSheet(inp: SheetInput): DimCompleteResult {
   const baked = inp.dimensions === "auto" || inp.dimensions === "overall";
   const { reqs, aux, unchecked } = requirements(doc, bbox);
   const marked = applyMarks(doc, reqs, unchecked) + (inp.dimFunctional?.length ?? 0);
-  const facts = sheetFacts(inp.views, inp.annotations, inp.holeRows ?? [], baked ? (inp.texts ?? []) : []);
+  // texty kót listu (i vygenerované kóty mimo poznámky listu – celkové rozměry, popisy) pro položky párované hodnotou
+  const facts = sheetFacts(inp.views, inp.annotations, inp.holeRows ?? [], inp.texts ?? []);
   const used = new Map<number, string[]>();
   for (const q of reqs) matchReq(q, facts, inp.views, baked, used);
   // tolerance funkčních položek

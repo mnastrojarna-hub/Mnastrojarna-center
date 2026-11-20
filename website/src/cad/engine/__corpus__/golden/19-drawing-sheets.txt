@@ -23,7 +23,7 @@ Kóty a popisy (2, z toho vygenerovaných 2):
   přední: Ø40 · 60
 Id (výkres upravit / smazat / značka na <id>): a1 Ø40 (přední) · a2 60 (přední)
 Duplicity: žádné
-Kontrola kót: všech 3 očekávaných rozměrů je na listu
+Kontrola kót: velikosti 4/4 · polohy 0/0 · tolerance neověřeny (funkční prvky nevyznačeny)
 U razítka: nepředepsané tolerance — · hrany — · poznámka —
 Razítko: název Čep · číslo MN-001 · kreslil AI · revize A · datum ?.?.???? · materiál Ocel
 Revize: žádné
@@ -42,7 +42,7 @@ Kóty a popisy (2, z toho vygenerovaných 2):
   přední: Ø40 · 60
 Id (výkres upravit / smazat / značka na <id>): a1 Ø40 (přední) · a2 60 (přední)
 Duplicity: žádné
-Kontrola kót: všech 3 očekávaných rozměrů je na listu
+Kontrola kót: velikosti 2/2 · polohy 0/0 · tolerance neověřeny (funkční prvky nevyznačeny)
 U razítka: nepředepsané tolerance — · hrany — · poznámka Kalit 58 HRC
 Razítko: název Čep · číslo MN-001 · kreslil AI · revize A · datum ?.?.???? · materiál Ocel
 Revize: žádné

@@ -28,7 +28,7 @@ Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední
 Listy (1): 1 „List 1“ A3 (aktivní)
 Kóty a popisy (0, z toho vygenerovaných 0):
 Duplicity: žádné
-Kontrola kót: všech 3 očekávaných rozměrů je na listu
+Kontrola kót: celkové rozměry 3/3 (sestava – rozměry dílů se kontrolují na výkresech dílů)
 U razítka: nepředepsané tolerance — · hrany — · poznámka —
 Razítko: název Stojan · číslo — · kreslil — · revize — · datum ?.?.???? · materiál dle kusovníku
 Revize: žádné
