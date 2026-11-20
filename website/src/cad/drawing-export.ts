@@ -38,27 +38,38 @@ export const safeName = (s: string) => (s || "vykres").normalize("NFD").replace(
  */
 export const drawingBase = (name: string, doc: Pick<CadDoc, "drawings">, key: string) => safeName(name) + (drawingSets(doc as CadDoc).length > 1 ? `_${safeName(drawingLabel(key))}` : "");
 
+/** revize modelu a výkresu do metadat souboru (vlna 22, bod 20): `modelRev` = `r·a1b2c3`, `rev` = písmeno revize listu */
+export type FileRevs = { modelRev?: string; rev?: string };
+
+/** předmět PDF: „Model r·a1b2c3 · rev. A“ (prázdné = bez revize modelu) */
+export const pdfInfo = (r: FileRevs): { subject?: string; keywords?: string } =>
+  r.modelRev ? { subject: [tr("Model {0}", r.modelRev), r.rev ? tr("rev. {0}", r.rev) : ""].filter(Boolean).join(" · "), keywords: [`model=${r.modelRev}`, r.rev ? `rev=${r.rev}` : ""].filter(Boolean).join(" ") } : {};
+
+/** komentář DXF (skupina 999 před HEADER – čtečky ho přeskočí) s revizí modelu; ASCII (`r·` → `r-`) */
+export const dxfWithRevs = (dxf: string, r: FileRevs): string =>
+  r.modelRev ? `999\nMnastrojarna CAD model ${r.modelRev.replace("·", "-")}${r.rev ? ` rev ${r.rev}` : ""}\n${dxf}` : dxf;
+
 /**
  * Soubor výkresu z hotového listu (`out` = výkres včetně kót a značek). `base` = základ názvu souboru, `title` = název do PDF,
- * `bom` = kusovník pro CSV. PNG jen v prohlížeči (rastr SVG přes canvas).
+ * `bom` = kusovník pro CSV. PNG jen v prohlížeči (rastr SVG přes canvas). `modelRev` / `rev` = revize do metadat PDF / DXF.
  */
 export async function drawingFile(
   out: DrawingResult,
   format: DrawingExportFormat,
-  o: { base: string; title: string; dwgVersion?: DwgVersion; bom?: { pos: number; name: string; qty: number }[]; width?: number },
+  o: { base: string; title: string; dwgVersion?: DwgVersion; bom?: { pos: number; name: string; qty: number }[]; width?: number } & FileRevs,
 ): Promise<{ name: string; mime: string; data: Uint8Array; width?: number; height?: number }> {
   const enc = (s: string) => new TextEncoder().encode(s);
   switch (format) {
     case "svg":
       return { name: `${o.base}_vykres.svg`, mime: MIME.svg, data: enc(out.svg) };
     case "dxf":
-      return { name: `${o.base}_vykres.dxf`, mime: MIME.dxf, data: enc(out.dxf) };
+      return { name: `${o.base}_vykres.dxf`, mime: MIME.dxf, data: enc(dxfWithRevs(out.dxf, o)) };
     case "csv":
       if (!o.bom?.length) throw new Error(tr("Kusovník CSV je jen u sestavy s komponentami – díl kusovník nemá."));
       return { name: `${o.base}_kusovnik.csv`, mime: MIME.csv, data: enc(bomToCsv(o.bom as Parameters<typeof bomToCsv>[0])) };
     case "pdf": {
       const { drawingToPdf } = await import("./pdf");
-      const blob = await drawingToPdf({ ...out, title: o.title });
+      const blob = await drawingToPdf({ ...out, title: o.title, info: pdfInfo(o) });
       return { name: `${o.base}_vykres.pdf`, mime: MIME.pdf, data: new Uint8Array(await blob.arrayBuffer()) };
     }
     case "dwg": {
@@ -156,12 +167,12 @@ export async function drawingSheetsOut(doc: CadDoc, sheet: DrawingExportOptions[
 export async function drawingFileSheets(
   sheets: { out: DrawingResult; name: string }[],
   format: DrawingExportFormat,
-  o: { base: string; title: string; dwgVersion?: DwgVersion; bom?: { pos: number; name: string; qty: number }[]; width?: number },
+  o: { base: string; title: string; dwgVersion?: DwgVersion; bom?: { pos: number; name: string; qty: number }[]; width?: number } & FileRevs,
 ): Promise<{ name: string; mime: string; data: Uint8Array; files?: string[] }> {
   if (sheets.length === 1 || format === "csv") return drawingFile(sheets[0].out, format, o);
   if (format === "pdf") {
     const { drawingsToPdf } = await import("./pdf");
-    const blob = await drawingsToPdf(sheets.map((x) => x.out), o.title);
+    const blob = await drawingsToPdf(sheets.map((x) => x.out), o.title, undefined, pdfInfo(o));
     return { name: `${o.base}_vykres.pdf`, mime: MIME.pdf, data: new Uint8Array(await blob.arrayBuffer()) };
   }
   const files: { name: string; data: Uint8Array }[] = [];
@@ -197,7 +208,7 @@ export async function exportDrawing(doc: CadDoc, format: DrawingExportFormat, op
   const meta = sheets[0].meta;
   const sheet0 = doc.drawings?.[exportSheets(doc, opts.sheet)[0]];
   const base = drawingBase(meta.name || doc.name, doc, sheet0 ? drawingKey(sheet0) : "");
-  const f = await drawingFileSheets(sheets, format, { base, title: meta.name, dwgVersion: opts.dwgVersion, bom: meta.bom, width: opts.width });
+  const f = await drawingFileSheets(sheets, format, { base, title: meta.name, dwgVersion: opts.dwgVersion, bom: meta.bom, width: opts.width, modelRev: meta.modelRev, rev: meta.revision || undefined });
   const multi = sheets.length > 1;
   const lost = sheets.reduce((n, x) => n + x.lost, 0);
   const warnings = [...sheets.flatMap((x) => x.warnings.map((w) => (multi ? `${x.name}: ${w}` : w))), ...(lost ? [tr("Kóty a poznámky bez geometrie: {0}", lost)] : []), ...generalTolWarnings(doc, sheets)];

@@ -8,6 +8,7 @@
  * jsou pokračovací řádky výpisu (volný text v jazyce běhu, jako text za kódem u ✗/⚠).
  */
 import type { AsmStatus, StaleNote } from "../agent";
+import { outputsKv } from "../doc-outputs";
 import { sourceKey } from "../assembly";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
 import type { BuildResult, CadDoc, Vec3 } from "../types";
@@ -185,7 +186,8 @@ export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, 
   const base = docKv(docSummaryOf(doc, res, asm));
   // uložené výsledky z jiné revize dokumentu (engine/result-key.ts): `mates.stale=1`, `measure.stale=1`, `compare.stale=1`
   const old = kv([["mates.stale", asm?.matesStale ? true : undefined], ...[...new Set(stale.map((n) => n.kind))].map((k): [string, true] => [`${k}.stale`, true])]);
-  const tail = old ? ` ${old}` : "";
+  // vydané listy a záznamy exportů ze starší revize modelu: `drawing.stale=N export.stale=N` (vlna 22, bod 20)
+  const tail = [old, outputsKv(doc)].filter(Boolean).map((x) => ` ${x}`).join("");
   // obálku sestavy má už řádek D (`docKv`); bez obálky `bbox=-`
   if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined], ["motion", asm?.motion ? (asm.motion.state === "unchecked" ? "-" : asm.motion.state) : undefined], ["motion.stale", asm?.motion?.state === "stale" ? true : undefined]])}${tail}`;
   if (doc.kind === "draft" || !res?.metrics) return `${base}${tail}`;

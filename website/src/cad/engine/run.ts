@@ -17,6 +17,7 @@ import { asmStatus, asmStatusOf, staleNotes } from "./asm-status";
 import { CodedError, codeDef, codeText, isCode, type Code } from "./codes";
 import { lintOp } from "./lint";
 import { DrawingTracker } from "./drawing-track";
+import { reportStaleSheets } from "./outputs-ops";
 import { StrictState, type StrictMark } from "./strict";
 import { RunVerifier, verifyKey } from "./verify";
 import { statusKv } from "./kv";
@@ -302,6 +303,7 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
     log.tailLine(tr("✗ stavba selhala – prvky {0} nebyly ověřeny", names));
     rb.code("build.failed", { doc: d.name, args: [names] });
   }
+  reportStaleSheets(ctx, d, { end: true }); // vydaný list, který změna modelu v běhu zneplatnila – ⚠ drawing.stale (bod 20)
   // přísný režim i po posledním řádku: ✗/⚠ závěrečné stavby (bez řádku = stav na konci skriptu) zastaví – v konzoli
   // prohlížeče stejně jako v CLI (pojistka cli/job.ts se ptá téže funkce)
   if (ranAll) stopOn(rb.entries.slice(beforeFinal), null);

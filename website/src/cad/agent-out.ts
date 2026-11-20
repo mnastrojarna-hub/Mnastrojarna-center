@@ -18,6 +18,7 @@
  */
 import { cadLocale, tr } from "./i18n";
 import type { Vec3 } from "./types";
+import { parseOutputsLine, type OutputsCmd } from "./agent-outputs";
 
 export type Export3dFormat = "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad";
 export type OutDrawingFormat = "pdf" | "dxf" | "dwg" | "svg" | "csv" | "png";
@@ -50,7 +51,9 @@ export type OutCmd =
   /** znovu vypsat poslední odkaz */
   | { kind: "link" }
   /** dokument jako textový skript `.mncad.txt` (cad/doc-script.ts); lang = jazyk klíčových slov (bez hodnoty jazyk rozhraní) */
-  | { kind: "script"; name?: string; lang?: "cs" | "en" | "de"; deliver?: OutDelivery };
+  | { kind: "script"; name?: string; lang?: "cs" | "en" | "de"; deliver?: OutDelivery }
+  /** výstupy dokumentu: záznamy exportů, zastaralé výstupy, přepočítat vše (vlna 22, bod 20 – agent-outputs.ts) */
+  | OutputsCmd;
 export type OutOp = { k: "out"; cmd: OutCmd; line: number };
 
 /* ───────────────────────── slova (CS / EN / DE) ───────────────────────── */
@@ -190,6 +193,9 @@ export function parseOutLine(tokens: string[], quoted: readonly boolean[] = []):
   if (!t.length) return null;
   const h = fold(t[0]);
   const second = fold(t[1] ?? "");
+  // exporty · výstupy [zastaralé] · přepočítat vše (vlna 22, bod 20)
+  const oc = parseOutputsLine(t, tq);
+  if (oc) return oc;
 
   if (SAVE.has(h)) {
     const rest = restOf(t, tq, 1);

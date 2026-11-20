@@ -25,6 +25,7 @@ import { drawingKey, drawingSets, drawingsLine, inDrawing, nextDrawingName, reso
 import type { DrawingExportResult } from "./drawing-export";
 import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
+import { issueSheet, modelId, nextRev as nextRevOf, sheetIssueLine, sheetState, staleSheetText, withdrawIssue } from "./doc-outputs";
 
 export { annLabel, dimValue, findDims } from "./drawing-marks";
 
@@ -176,6 +177,8 @@ export function sheetMeta(doc: CadDoc, s: DrawingDoc, idx = 0, extras?: DrawingE
     ...(extras?.massKg !== undefined ? { massKg: extras.massKg } : {}),
     ...(extras?.bom?.length && o.bomTable !== false ? { bom: extras.bom } : {}),
     ...(extras?.balloons?.length ? { components: extras.balloons } : {}),
+    // revize modelu do patičky razítka a metadat PDF / DXF (vlna 22, bod 20 – cad/doc-outputs.ts); 2D výkres ji nemá
+    ...(doc.kind !== "draft" ? { modelRev: modelId(doc).rev } : {}),
   };
 }
 
@@ -756,6 +759,36 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       put({ ...sheet(), meta: { ...m, revisions: revs } as Record<string, unknown> });
       return done({ changed: true, open: false });
     }
+    case "issue": {
+      // vydání listu (vlna 22, bod 20): písmeno revize + revize modelu + datum; `vše` = všechny listy aktivního výkresu
+      const which = cmd.all ? setSheets(doc, idx) : [idx];
+      let changed = false;
+      for (const i of which) {
+        const s = doc.drawings![i];
+        if (cmd.op === "withdraw") {
+          if (!s.issued) {
+            log.push(tr("ℹ list „{0}“ vydaný není – není co zrušit", s.name));
+            continue;
+          }
+          doc.drawings![i] = withdrawIssue(s);
+          changed = true;
+          log.push(tr("✓ vydání listu „{0}“ (rev. {1} z modelu {2}) zrušeno – list je rozpracovaný", s.name, s.issued.rev, s.issued.modelRev));
+          continue;
+        }
+        const r = issueSheet(doc, s, { ...(cmd.rev ? { rev: cmd.rev } : {}), ...(cmd.note ? { note: cmd.note } : {}), ...(cmd.date ? { date: cmd.date } : {}) });
+        if (r.unchanged) {
+          log.push(tr("ℹ list „{0}“ už je vydán jako rev. {1} z modelu {2} – beze změny", s.name, r.rev, r.id.rev));
+          continue;
+        }
+        doc.drawings![i] = r.sheet;
+        changed = true;
+        const row = (r.sheet.meta as Partial<DrawingMeta>).revisions?.find((x) => x.rev.toUpperCase() === r.rev);
+        log.push(tr("✓ list „{0}“ vydán jako rev. {1} z modelu {2} ({3}){4}", s.name, r.rev, r.id.rev, row?.date || today(), r.added ? tr(" · do tabulky revizí přidána revize {0} „{1}“", r.rev, row?.note ?? "") : ""));
+        // totéž písmeno revize po změně modelu: papír rev. A a soubor rev. A by se lišily – ⚠ drawing.stale (přísný režim ✗)
+        if (r.sameRevChanged && r.prev) issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: tr("list „{0}“: rev. {1} už byla vydána z modelu {2} a znovu se vydává ze změněného modelu {3} se stejným písmenem – změnu označte novou revizí (výkres vydat {4})", s.name, r.rev, r.prev.modelRev, r.id.rev, nextRevOf(r.rev)), sheetId: s.id });
+      }
+      return done({ changed, open: false });
+    }
     case "mark": {
       const res = await computeSheet();
       const o = sheetOptions(sheet());
@@ -978,6 +1011,8 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const m = s.meta as Partial<DrawingMeta>;
   L.push(tr("U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}", m.tolerance?.trim() || "—", m.edges?.trim() || "—", m.note?.trim() || "—"));
   L.push(...titleLines(doc, doc.drawings![idx]));
+  // vydání listu a revize modelu, ze které list vznikl (vlna 22, bod 20 – cad/doc-outputs.ts)
+  L.push(sheetIssueLine(doc, doc.drawings![idx]));
   if (o.models?.length) L.push(tr("Další modely: {0}", o.models.map((x) => `„${x.name}“ (${VIEW_NAME(x.view)}, ${x.scale === "auto" ? tr("auto") : scaleLabel(x.scale)})`).join(" · ")));
   L.push(...viewsStatusLines(res, o, anns, s.meta as Partial<DrawingMeta>));
   L.push(...viewRangeLines(res, o));
@@ -985,6 +1020,9 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const issues = issuesOf(res);
   // řez mimo těleso: přesný důvod a rozsah odsazení (odznak ve výkresovém prostředí je stručný)
   for (const i of issues) if (i.level === "error") L.push(issueLine(i));
+  // vydaný list ze starší revize modelu → ⚠ drawing.stale na řádku `výkres stav` (bod 20)
+  const sh = doc.drawings![idx];
+  if (sheetState(doc, sh) === "stale") issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: staleSheetText(sh.name, sh.issued!, modelId(doc)) });
   return { text: L.join("\n"), changed, issues };
 }
 

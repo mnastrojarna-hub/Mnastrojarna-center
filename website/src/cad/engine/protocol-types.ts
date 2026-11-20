@@ -49,9 +49,12 @@ export type DocSummary = {
   mates?: { total: number; ok: number; conflict: number; missing: number; suppressed: number };
   clashes?: { total: number; thread: number; real: number; undetermined: number; /** prstenec pod hlavou šroubu (ℹ clash.underhead) */ underhead?: number };
   sheets?: number;
+  /** revize modelu `r·a1b2c3` (cad/doc-outputs.ts `modelId`) – u dokumentu s výkresy nebo záznamy exportů (vlna 22, bod 20) */
+  rev?: string;
   /**
    * druhy uložených výsledků dokumentu, které pro jeho konečný stav neplatí (řádek D `stale=clash,mates,motion,measure,compare`;
-   * engine/result-key.ts `staleResults`) – výsledek vznikl pro jinou revizi geometrie, konfiguraci nebo polohu
+   * engine/result-key.ts `staleResults`) – výsledek vznikl pro jinou revizi geometrie, konfiguraci nebo polohu; navíc
+   * `drawing` (vydaný list ze starší revize modelu) a `export` (záznam exportu ze starší revize) – cad/doc-outputs.ts
    */
   stale?: string[];
 };

@@ -50,6 +50,7 @@ import { polylineClose, takeCloseWords } from "./poly-close";
 import { CodedParseError, materialClass, parseStrictLine, trackOpts } from "./agent-strict";
 import { literalTokens } from "./agent-quoted";
 import { parseSupplyTokens } from "./bom-model";
+import { outputsStatusLines } from "./doc-outputs";
 
 export const AGENT_API_VERSION = 1;
 
@@ -1595,6 +1596,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
     const what = STALE_NOTE_TEXT[n.kind]?.() ?? n.kind;
     lines.push(tr("{0}: výsledek{1} je pro revizi {2} – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz", what, n.line ? ` L${n.line}` : n.at ? ` (${n.at})` : "", n.rev));
   }
+  lines.push(...outputsStatusLines(doc)); // vydané listy a exporty s revizí modelu – jen u dokumentu s výstupy (bod 20)
   if (doc.features.length) {
     lines.push(tr("Prvky:"));
     doc.features.forEach((f, i) => {
