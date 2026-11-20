@@ -1,5 +1,6 @@
 "use server";
 
+import { safeStorageName } from "@/lib/jobs/mapping";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import { createOperatorClient, isSupabaseConfigured } from "@/lib/supabase/server";
@@ -175,7 +176,9 @@ async function jobFilesFor(c: Db, jobId: string): Promise<{ id: string; filename
 export async function prepareMailUploadAction(input: { filename: string; size: number; contentType?: string }): Promise<{ ok: boolean; error?: string; path?: string; token?: string }> {
   const access = await checkFeature("mail");
   if ("error" in access) return { ok: false, error: access.error };
-  const name = (input?.filename ?? "").replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "_").trim().slice(0, 150) || "priloha";
+  // klíč v úložišti jen ASCII (Supabase: „Invalid key" u diakritiky / mezer — 20. 11. „Průběžná deska.Z3PRT");
+  // původní název jde příjemci z attachments[].filename
+  const name = safeStorageName(input?.filename ?? "") || "priloha";
   const size = Number(input?.size);
   if (!Number.isFinite(size) || size <= 0) return { ok: false, error: "Soubor je prázdný." };
   if (size > MAX_ATTACHMENT_BYTES) return { ok: false, error: "Příloha je příliš velká (max. 20 MB)." };
