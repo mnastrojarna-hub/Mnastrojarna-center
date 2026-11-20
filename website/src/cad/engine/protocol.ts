@@ -452,8 +452,11 @@ export type ShortProtocol = { text: string; bytes: number; budget: number; overf
 const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, note: 6 } as const;
 /** skupina tisku (pořadí řádků) */
 const GROUP = { error: 0, warn: 1, note: 2, measure: 3, doc: 4, file: 5, link: 6 } as const;
-/** `over` = bajty v přebytku, když se záznam nevypíše (jinak `bytes`) – celý řádek O místo zkráceného */
-type Item = { prio: number; group: number; order: number; text: string; bytes: number; over?: number };
+/**
+ * `over` = bajty v přebytku, když se záznam nevypíše (jinak `bytes`) – celý řádek O místo zkráceného; `after` = pokračovací
+ * řádky výpisu, které se smějí vypsat jen se svým řádkem `=`
+ */
+type Item = { prio: number; group: number; order: number; text: string; bytes: number; over?: number; after?: Item };
 type Extra = { n: number; b: number };
 
 /**
@@ -482,7 +485,11 @@ const lineKey = (e: Entry) => {
 /** kandidáti stručného protokolu (bez hlavičky a Σ) */
 function candidates(r: RunReport, notes: boolean): Item[] {
   const items: Item[] = [];
-  const add = (prio: number, group: number, order: number, text: string) => items.push({ prio, group, order, text, bytes: utf8Bytes(text) + 1 });
+  const add = (prio: number, group: number, order: number, text: string): Item => {
+    const it: Item = { prio, group, order, text, bytes: utf8Bytes(text) + 1 };
+    items.push(it);
+    return it;
+  };
   const entries = mergeSimilar(mergeEntries(r.entries));
   const seq = new Map(entries.map((e, i) => [e, i]));
   const sorted = [...entries].sort((a, b) => lineKey(a) - lineKey(b) || seq.get(a)! - seq.get(b)!);
@@ -492,7 +499,10 @@ function candidates(r: RunReport, notes: boolean): Item[] {
     else if (e.level === "note" && notes) add(PRIO.note, GROUP.note, i, msgLine(e, false));
     else if (e.level === "measure") {
       const t = measureText(e);
-      add(t.includes("\n") ? PRIO.listing : PRIO.req, GROUP.measure, i, t);
+      const nl = t.indexOf("\n");
+      // nápověda: strojový řádek `= L<n> help hits=… q="…"` vždy, řádky výsledků jen když se vejdou (víc hledání v běhu)
+      if (nl > 0 && e.code === "help") add(PRIO.listing, GROUP.measure, i + 0.5, t.slice(nl + 1)).after = add(PRIO.req, GROUP.measure, i, t.slice(0, nl));
+      else add(nl > 0 ? PRIO.listing : PRIO.req, GROUP.measure, i, t);
     }
   });
   // D: hlavní dokument vždy, ostatní jen s ✗/⚠ (z výsledků stavby nebo ze záznamů s tímto dokumentem)
@@ -564,6 +574,7 @@ export function shortProtocol(r: RunReport, o: ShortOptions = {}): ShortProtocol
     let restN = list.length + extra.n;
     let restB = list.reduce((s, x) => s + overOf(x), 0) + extra.b;
     for (const it of [...list].sort((a, b) => a.prio - b.prio || a.group - b.group || a.order - b.order)) {
+      if (it.after && !kept.has(it.after)) continue;
       if (used + it.bytes + marker(restN - 1, restB - overOf(it)) > budget) continue;
       kept.add(it);
       used += it.bytes;

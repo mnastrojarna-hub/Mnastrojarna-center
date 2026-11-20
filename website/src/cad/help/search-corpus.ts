@@ -15,6 +15,7 @@ import { AGENT_GUIDE } from "../agent-guide";
 import { dictOf, type CadLang } from "../i18n";
 import { CAD_DOCS } from "@/content/cad-docs";
 import { HELP_GLOSSARY } from "./glossary";
+import { COMMAND_HINTS } from "./hints";
 import { foldText, SearchIndex, type SearchDoc } from "./search-core";
 
 export type HelpSrc = "guide" | "cmd" | "docs" | "cheat";
@@ -34,6 +35,8 @@ export type HelpChunk = {
   text: string;
   /** řádek tabulky příkazů: slova v jazyce běhu */
   words?: { en: string; de: string };
+  /** řádek tabulky příkazů: slova, kterými se na příkaz agent ptá (help/hints.ts) – jen pro hledání */
+  hint?: string;
 };
 
 /** slug oddílu (bez diakritiky, a-z0-9 a pomlčky) */
@@ -189,31 +192,38 @@ export function textIn(text: string, lang: CadLang): string {
 
 /** úseky tabulky příkazů (popis v jazyce běhu) */
 export function commandChunks(lang: CadLang): HelpChunk[] {
-  return AGENT_COMMANDS.map((c, i) => ({ src: "cmd", key: `cmd:${i}`, title: "", cmds: c.cmd.split(" · ").map((x) => x.trim()), text: textIn(c.desc, lang), words: { en: c.en, de: c.de } }));
+  return AGENT_COMMANDS.map((c, i) => {
+    const hint = COMMAND_HINTS.filter((h) => c.cmd.startsWith(h.cmd))
+      .map((h) => h.kw)
+      .join(" ");
+    return { src: "cmd", key: `cmd:${i}`, title: "", cmds: c.cmd.split(" · ").map((x) => x.trim()), text: textIn(c.desc, lang), words: { en: c.en, de: c.de }, ...(hint ? { hint } : {}) };
+  });
 }
 
 /** úseky příručky /cad/dokumentace */
 export function docsChunks(): HelpChunk[] {
   const out: HelpChunk[] = [];
+  let row = 0;
   for (const s of CAD_DOCS) {
     let sub = "";
-    const push = (raw: string) => {
+    /** `own` = řádek tabulky: vlastní výsledek (klíč `…#r<n>`), ne jeden za celý oddíl – jinak by lepší řádek téže tabulky zapadl */
+    const push = (raw: string, own = false) => {
       if (!raw.trim()) return;
-      out.push({ src: "docs", key: `docs:${s.id}${sub ? `/${slug(sub)}` : ""}`, title: s.title, ...(sub ? { sub } : {}), anchor: s.id, cmds: spans(raw), text: plain(raw) });
+      out.push({ src: "docs", key: `docs:${s.id}${sub ? `/${slug(sub)}` : ""}${own ? `#r${++row}` : ""}`, title: s.title, ...(sub ? { sub } : {}), anchor: s.id, cmds: spans(raw), text: plain(raw) });
     };
     if (s.lead) push(s.lead);
     for (const b of s.blocks) {
       if (b.t === "h3") sub = b.text;
       else if (b.t === "p" || b.t === "note") push(b.text);
-      else if (b.t === "ul" || b.t === "ol") b.items.forEach(push);
-      else if (b.t === "table") b.rows.forEach((r) => push(r.join(" – ")));
-      else if (b.t === "kbd") b.rows.forEach(([k, v]) => push(`${k} – ${v}`));
+      else if (b.t === "ul" || b.t === "ol") b.items.forEach((x) => push(x));
+      else if (b.t === "table") b.rows.forEach((r) => push(r.join(" – "), true));
+      else if (b.t === "kbd") b.rows.forEach(([k, v]) => push(`${k} – ${v}`, true));
     }
   }
   return out;
 }
 
-/** úseky taháku v jazyce běhu */
+/** úseky taháku v jazyce běhu (řádek pod nadpisem; úvodní řádky před prvním nadpisem – příkazová řádka, protokol – bez názvu oddílu) */
 export function cheatChunks(lang: CadLang): HelpChunk[] {
   const out: HelpChunk[] = [];
   let h = "";
@@ -223,23 +233,51 @@ export function cheatChunks(lang: CadLang): HelpChunk[] {
       h = headingText(line);
       continue;
     }
-    if (!h) continue;
-    out.push({ src: "cheat", key: `cheat:${slug(h)}`, title: h, cmds: spans(line), text: plain(line.replace(/`[^`]*`/g, " ")) });
+    // text úseku = věty mimo `kód`, oddělené stejně jako na řádku („ · “), ať jde vybrat část, která odpovídá dotazu
+    // věty řádku bez příkazů: řada příkazů `a` · `b` → `c` zmizí, příkaz uvnitř věty nahradí „…“, slovo „Jinde:“ se vynechá
+    const text = plain(
+      line
+        .replace(/`[^`]*`(?:\s*[·→]\s*`[^`]*`)+/g, " ")
+        .replace(/`[^`]*`/g, "…")
+        .replace(/\b(?:Jinde|Elsewhere|Sonst)\b[^:·]*:/g, " "),
+    )
+      .replace(/(?:\s*[·→]\s*(?:…\s*)?)+/g, " · ")
+      .replace(/^(?:[\s·–.]|…)+/, "")
+      .replace(/[\s·–]+$/, "");
+    out.push({ src: "cheat", key: `cheat:${slug(h) || "uvod"}`, title: h, cmds: spans(line), text });
   }
   return out;
 }
 
 /** priorita zdroje (agent chce hlavně příkazy; příručka popisuje hlavně ovládání myší) */
 const BOOST: Record<HelpSrc, number> = { cmd: 1.15, guide: 1, cheat: 0.9, docs: 0.75 };
+/**
+ * anglický / německý běh: tabulka příkazů (popis a slova v jazyce běhu) a tahák v jazyce běhu mají přednost před návodem
+ * a příručkou, které jsou jen česky – první výsledky jsou pak v jazyce běhu
+ */
+const BOOST_INTL: Record<HelpSrc, number> = { cmd: 1.3, guide: 0.85, cheat: 1.15, docs: 0.6 };
 
 /** ukázky hledání v nápovědě („nápověda hledat záložky“) se nehledají – jinak by každý dotaz našel i sám sebe */
 const HELP_EXAMPLE = /(?:nápověda|napoveda|help|hilfe) (?:hledat|search|suchen) [^·;,)–]*/gi;
 
-function toDoc(c: HelpChunk): SearchDoc<HelpChunk> {
+/** první dvě slova příkazu („svar tupý V|Y|…“ → „svar tupý“; bez závorek volitelných částí a zástupných <…>) */
+const leadOf = (cmd: string) =>
+  cmd
+    .replace(/[[<{(].*$/, "")
+    .trim()
+    .split(/[\s|/,]+/)
+    .slice(0, 2)
+    .join(" ");
+
+function toDoc(c: HelpChunk, lang: CadLang): SearchDoc<HelpChunk> {
   const cmds = c.cmds.filter((x) => !new RegExp(HELP_EXAMPLE.source, "i").test(x));
+  // řádky se zápisem příkazu (tabulka příkazů, řádky tabulek návodu, tahák): začátky příkazů česky, anglicky a německy
+  const syntax = c.src === "cmd" || c.src === "cheat" || (c.src === "guide" && /#r\d+$/.test(c.key));
+  const lead = syntax ? [...cmds, ...(c.words ? [...c.words.en.split(/\s*[,/]\s*/), ...c.words.de.split(/\s*[,/]\s*/)] : [])].map(leadOf).join(" · ") : "";
   return {
-    fields: { title: [c.title, c.sub ?? ""].join(" "), cmd: cmds.join(" · "), body: c.text.replace(HELP_EXAMPLE, " "), ...(c.words ? { kw: `${c.words.en} ${c.words.de}` } : {}) },
-    boost: BOOST[c.src],
+    // název oddílu taháku bez závorky („Výkres (záložka dílu)“ není oddíl o záložkách)
+    fields: { title: [c.src === "cheat" ? c.title.replace(/\s*\([^)]*\)\s*$/, "") : c.title, c.sub ?? ""].join(" "), cmd: cmds.join(" · "), body: c.text.replace(HELP_EXAMPLE, " "), ...(c.words ? { kw: `${c.words.en} ${c.words.de} ${c.hint ?? ""}` } : {}), ...(lead ? { lead } : {}) },
+    boost: (lang === "cs" ? BOOST : BOOST_INTL)[c.src],
     data: c,
   };
 }
@@ -251,7 +289,11 @@ export function helpIndex(lang: CadLang): SearchIndex<HelpChunk> {
   let ix = cache.get(lang);
   if (!ix) {
     const chunks = [...commandChunks(lang), ...guideChunks(), ...cheatChunks(lang), ...docsChunks()];
-    ix = new SearchIndex(chunks.map(toDoc), HELP_GLOSSARY);
+    ix = new SearchIndex(
+      chunks.map((c) => toDoc(c, lang)),
+      HELP_GLOSSARY,
+      { lang },
+    );
     cache.set(lang, ix);
   }
   return ix;

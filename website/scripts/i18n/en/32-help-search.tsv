@@ -10,7 +10,10 @@ tabulka příkazů	command table
 příručka	manual
 tahák	cheat sheet
 Tahák	Cheat sheet
-, cheat, search <slova>	, cheat, search <words>
 mncad help cheat = tahák pro agenty (≤ 5 kB) · mncad help search <slova> = hledání v návodu, příkazech a příručce	mncad help cheat = cheat sheet for agents (≤ 5 kB) · mncad help search <words> = search the guide, commands and manual
 hledání v návodu pro AI, v tabulce příkazů a v příručce (bez diakritiky, začátek slova i překlep, česky / anglicky / německy): 5–8 nejlepších oddílů s příkazy a větou, ≤ 1,5 kB, výpis „= L3 help hits=6 q=…“; „nápověda <slova>“ hledá, když slovo není typ prvku; tahák = nejčastější příkazy (≤ 5 kB, /cad/tahak.md, mncad help cheat); v CLI také mncad help search <slova>	search in the AI guide, the command table and the manual (without diacritics, word beginnings and typos, Czech / English / German): the 5–8 best sections with commands and a sentence, ≤ 1.5 kB, listing “= L3 help hits=6 q=…”; “help <words>” searches when the word is not a feature type; cheat sheet = the most used commands (≤ 5 kB, /cad/tahak.en.md, mncad help cheat); on the CLI also mncad help search <words>
-… celý tahák ({0} B): mncad help cheat · https://www.mnastrojarna.cz/cad/{1} · plný protokol (--full, --json)	… full cheat sheet ({0} B): mncad help cheat · https://www.mnastrojarna.cz/cad/{1} · full protocol (--full, --json)
+… celý tahák ({0} B): mncad help cheat{2} · https://www.mnastrojarna.cz/cad/{1} · plný protokol (--full, --json)	… full cheat sheet ({0} B): mncad help cheat{2} · https://www.mnastrojarna.cz/cad/{1} · full protocol (--full, --json)
+# opravy po recenzi: množné číslo záhlaví, mncad help search bez slov
+Hledání „{0}“ – 1 nejlepší výsledek (návod pro AI, příkazy, příručka):	Search “{0}” – 1 best result (AI guide, commands, manual):
+Hledání „{0}“ – {1} nejlepší výsledky (návod pro AI, příkazy, příručka):	Search “{0}” – {1} best results (AI guide, commands, manual):
+mncad help search: chybí slova – např. mncad help search záložky (hledá v návodu pro AI, v příkazech a v příručce); témata: guide, commands, cheat, search <slova>	mncad help search: words missing – e.g. mncad help search tabs (searches the AI guide, the commands and the manual); topics: guide, commands, cheat, search <words>
