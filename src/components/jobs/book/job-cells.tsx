@@ -1,7 +1,7 @@
 import Link from "next/link";
 import {
   AlertTriangle, Camera, Flame, Mail, Paperclip, FileText, Sparkles, Upload, Truck, CalendarClock, CircleCheckBig,
-  Handshake, ReceiptText,
+  Handshake, ReceiptText, StickyNote,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { OPERATION_KINDS, isOperationKind, productionLabel } from "@/lib/jobs/operations";
@@ -336,5 +336,17 @@ export function CustomerNoteMark({ note }: { note: string | null | undefined }) 
         <Handshake className="h-4 w-4" />
       </span>
     </Tip>
+  );
+}
+
+/** Poznámka k zakázce v řádku Knihy (stejná jako v hlavičce detailu) — jeden řádek, celá v nápovědě. */
+export function JobNoteLine({ note, className }: { note: string | null | undefined; className?: string }) {
+  const text = (note ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  return (
+    <p className={cn("flex min-w-0 items-center gap-1 text-xs text-amber-700 dark:text-amber-400", className)} title={`Poznámka k zakázce: ${note}`}>
+      <StickyNote className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      <span className="truncate">{text}</span>
+    </p>
   );
 }

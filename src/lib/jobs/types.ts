@@ -101,6 +101,8 @@ export interface JobListItem {
   productionFinalEnd?: string | null;
   /** Domluvy se zákazníkem (co není v objednávce). */
   customerNote?: string | null;
+  /** Poznámka k zakázce (interní, z hlavičky detailu). */
+  note?: string | null;
   /** Datum vrácení potvrzeného dodacího listu. */
   deliveryNoteConfirmedAt?: string | null;
   invoiceNumber?: string | null;

@@ -77,7 +77,7 @@ function systemPrompt(): string {
       "jediný počet kusů v textu u jediné přílohy výkresu patří tomu výkresu. Nic nedomýšlej.",
 
     "ČÍSLA A TERMÍNY: customerOrderNumber = číslo objednávky zákazníka (z textu / předmětu), customerInquiryNumber = číslo poptávky / RFQ, ourQuoteNumber = číslo NAŠÍ nabídky, " +
-      "na kterou e-mail odkazuje („dle nabídky NAB-…“), ourJobNumber = naše číslo zakázky (Z-…). documentNumber = číslo objednávky u objednávky, číslo poptávky u poptávky, jinak prázdné. " +
+      "na kterou e-mail odkazuje („dle nabídky N2026/025-V1“, starší „NAB-…“), ourJobNumber = naše číslo zakázky (Z-…). documentNumber = číslo objednávky u objednávky, číslo poptávky u poptávky, jinak prázdné. " +
       "requiredDeliveryDate = požadovaný termín dodání RRRR-MM-DD (datum bez roku = nejbližší budoucí). documentDate prázdné (datum e-mailu doplní systém).",
 
     "note = ostatní obchodní / technické požadavky v textu, které nepatří k jedné položce (dodací adresa, balení, atest, platba, kontaktní pokyny). " +

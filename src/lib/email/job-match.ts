@@ -134,6 +134,8 @@ export function normToken(v: string | null | undefined): string | null {
 }
 
 /** Objednávka dodavateli podle zakázky (16. 11.): OV2026/026-1, „OV 2026/026 - 2", OV-2026-026-1. */
+/** Nabídka podle zakázky (20. 11.): N2026/025-V1 → číslo nabídky i zakázka Z-2026-025. */
+const N_JOB_RE = /\bN\s?(20\d{2})\s?\/\s?(\d{1,5})(?:\s?[-–]\s?V\s?(\d{1,3}))?\b/g;
 const OV_JOB_RE = /\bOV\s?[-–]?\s?(20\d{2})\s?[-–/]\s?(\d{1,5})\s?[-–]\s?(\d{1,3})\b/gi;
 const OUR_NUMBER_RE = /\b(Z|NAB|OV)\s?[-–]\s?(20\d{2})\s?[-–/]\s?(\d{1,5})(?:\s?-\s?R\d{1,3})?\b/gi;
 /** „objednávka (dodavateli) OV 5/2026" — jen s doslovným „OV" (vlastní „objednávka č. 1382/2026" zákazníka NE). */
@@ -155,6 +157,10 @@ export function extractOurNumbers(...texts: (string | null | undefined)[]): stri
     for (const m of t.matchAll(OUR_NUMBER_RE)) out.add(`${m[1].toUpperCase()}-${m[2]}-${pad(m[3])}`);
     for (const m of t.matchAll(PO_WORD_RE)) out.add(`OV-${m[2]}-${pad(m[1])}`);
     for (const m of t.matchAll(OV_JOB_RE)) out.add(`OV${m[1]}/${pad(m[2])}-${Number(m[3])}`);
+    for (const m of t.matchAll(N_JOB_RE)) {
+      if (m[3]) out.add(`N${m[1]}/${pad(m[2])}-V${Number(m[3])}`);
+      out.add(`Z-${m[1]}-${pad(m[2])}`);
+    }
   }
   return [...out].slice(0, 30);
 }
