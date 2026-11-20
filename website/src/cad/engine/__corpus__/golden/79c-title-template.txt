@@ -1,0 +1,47 @@
+=== run 1 ===
+✓ nový díl „Deska T“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ výkres: A4, na šířku, pohledy přední, horní
+✓ šablona hlavičky „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2) uložena do dokumentu i do Nastavení · výchozí pro nové listy
+✓ razítko podle šablony hlavičky „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2)
+✓ razítko: číslo „DT-001“
+Razítko: název Deska T · číslo DT-001 · kreslil — · revize — · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: nástrojářská (všechna pole) 180×64 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo) · logo „data URL“ 600×200 px · SVG (vektor v SVG a PDF) · šablona hlavičky „Firma“
+Další pole razítka: firma „Firma s.r.o.“ · kontroloval „Novák“
+Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Šablony hlavičky: v dokumentu „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2) [výchozí] · v Nastavení — · list: „Firma“
+✓ nový díl „Deska U“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ výkres: A4, na šířku, pohledy přední, horní
+Razítko: název Deska U · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: nástrojářská (všechna pole) 180×64 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo) · logo „data URL“ 600×200 px · SVG (vektor v SVG a PDF) · šablona hlavičky „Firma“
+Další pole razítka: firma „Firma s.r.o.“ · kontroloval „Novák“
+Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadejte výkres nepředepsané ISO 2768-mK nebo výkres nepředepsané desetinná
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+✓ razítko: šablona kompaktní (180×27 mm)
+✓ razítko: šablona hlavičky „Firma“ (nástrojářská (všechna pole), logo SVG, firma „Firma s.r.o.“, polí 2)
+✓ šablona hlavičky „Firma“ smazána z dokumentu i z Nastavení (razítka listů zůstávají)
+Šablony hlavičky: v dokumentu — · v Nastavení — · list: „Firma“
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+
+Dokument: „Deska U“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 50 × 40 × 10 mm (X 0…50, Y 0…40, Z 0…10) · objem 20 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ – 50 × 40 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ šablona hlavičky „Firma EN“ (ISO 7200 (výchozí), firma „X“, polí 1) uložena do dokumentu i do Nastavení
+✓ razítko podle šablony hlavičky „Firma EN“ (ISO 7200 (výchozí), firma „X“, polí 1)
+✗ řádek 3: šablona hlavičky „Neexistuje“ neexistuje – Šablony hlavičky: v dokumentu „Firma EN“ (ISO 7200 (výchozí), firma „X“, polí 1) · v Nastavení — · list: —
+
+Dokument: „Deska U“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 50 × 40 × 10 mm (X 0…50, Y 0…40, Z 0…10) · objem 20 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ – 50 × 40 × 10 mm, new, roh [0; 0; 0]

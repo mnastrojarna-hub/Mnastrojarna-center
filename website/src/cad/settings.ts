@@ -49,6 +49,9 @@ export type Settings = {
   tolerance: string;
   /** šablona razítka nových listů výkresu (cad/title-block.ts): iso7200 (výchozí), compact, toolmaker */
   titleTemplate?: "iso7200" | "compact" | "toolmaker";
+  /** pojmenované šablony hlavičky s logem (vlna 22, bod 22j – cad/title-templates.ts) a výchozí pro nové listy (název) */
+  titleTemplates?: import("./title-templates").TitleTemplateRec[];
+  titleTemplateDefault?: string;
   // zkratky (příkaz → klávesa)
   shortcuts: Record<string, string>;
 };

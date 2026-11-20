@@ -57,6 +57,11 @@ export type DocSummary = {
    * `drawing` (vydaný list ze starší revize modelu) a `export` (záznam exportu ze starší revize) – cad/doc-outputs.ts
    */
   stale?: string[];
+  /**
+   * překryvy na listech dokumentu (vlna 22, bod 17 – cad/drawing-overlaps.ts): součet za listy zkontrolované v tomto běhu;
+   * jen když byly zkontrolované všechny listy (jinak pole chybí – nikdy „0“ bez kontroly). Řádek D `overlaps=`.
+   */
+  overlaps?: number;
 };
 
 /** zapsaný soubor (řádek `F`, JSON `files[]`) */

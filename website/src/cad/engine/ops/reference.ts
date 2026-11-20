@@ -19,7 +19,7 @@ const isPdfName = (n: string) => /\.pdf$/i.test(n);
 const isPdfBytes = (u8: Uint8Array) => u8.length > 4 && u8[0] === 0x25 && u8[1] === 0x50 && u8[2] === 0x44 && u8[3] === 0x46;
 
 /** soubor vstupů hostitele podle názvu (přesně, bez přípony, začátkem názvu – jako logo razítka), jen jednoznačná shoda */
-async function inputFile(inputs: FileSource, name: string): Promise<{ name: string; bytes: Uint8Array } | null> {
+export async function inputFile(inputs: FileSource, name: string): Promise<{ name: string; bytes: Uint8Array } | null> {
   const hit = matchNames(inputs.list(), name, (n) => n);
   if (hit.length !== 1) return null;
   try {

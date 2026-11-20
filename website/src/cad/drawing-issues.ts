@@ -35,6 +35,13 @@ export type DrawingIssueKind =
   | "overlap"
   /** nová / upravená poznámka listu přesahuje rámeček listu (`ann`) – engine ji ověří znovu na konci bloku */
   | "frame"
+  /**
+   * kontrola překryvů celého listu (vlna 22, bod 17 – cad/drawing-overlaps.ts): balónky, odkazové čáry, texty, kóty, geometrie
+   * pohledů, tabulky a rám; `data` = počty po druzích a křížení odkazových čar
+   */
+  | "sheet-overlap"
+  /** kusovník se na list nevejde ani ve sloupcích (`data`: rows, hidden, sheet) – vlna 22, bod 17 */
+  | "bom-overflow"
   /** vydaný list ze starší revize modelu / vydání se stejným písmenem po změně modelu (vlna 22, bod 20 – cad/doc-outputs.ts) */
   | "stale"
   /** kontrola kót: na listu chybí velikost / poloha prvku výsledného dílu (vlna 22, bod 18 – cad/dim-complete.ts) */
@@ -47,7 +54,7 @@ export type DrawingIssueKind =
 export type DrawingIssue = {
   level: "error" | "warn" | "note";
   /** kód z registru protokolu (cad/engine/codes.ts) */
-  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.tolerance-missing" | "drawing.stale" | "drawing.dims-incomplete" | "drawing.tol-nonfunctional";
+  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.bom-overflow" | "drawing.tolerance-missing" | "drawing.stale" | "drawing.dims-incomplete" | "drawing.tol-nonfunctional";
   kind: DrawingIssueKind;
   /** text hlášky (přeložený) */
   text: string;
