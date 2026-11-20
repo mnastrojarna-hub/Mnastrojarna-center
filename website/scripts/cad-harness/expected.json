@@ -1,7 +1,7 @@
 {
   "v": 1,
   "script": "synth-tool.txt",
-  "lines": 398,
+  "lines": 403,
   "assembly": "900-01-00 Střižný nástroj",
   "components": 70,
   "parts": 19,
@@ -19,6 +19,19 @@
     "undetermined": 0
   },
   "sheets": 4,
+  "docGaps": [
+    "900-01-00-03 Stírací deska",
+    "900-01-00-05 Opěrná deska",
+    "900-01-00-06 Horní deska",
+    "900-01-00-07 Vodicí lišta",
+    "900-01-00-08 Doraz",
+    "900-01-00-09 Štítek",
+    "900-01-00-10 Stopka",
+    "900-01-00-11 Střižník"
+  ],
+  "strictExcept": [
+    "bom.make-incomplete"
+  ],
   "sheetsByDoc": {
     "900-01-00 Střižný nástroj": 1,
     "900-01-00-01 Základová deska": 1,
