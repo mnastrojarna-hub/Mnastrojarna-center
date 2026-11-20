@@ -30,7 +30,7 @@ import { perfEntries, perfMark } from "@/cad/perf-log";
 import { asmImportOutcome, fileComponentAsPart, importStartText, loadAsmParts, partImportOutcome, subassemblyComponent, type PendingImport } from "./import-watch";
 import { resolveDoc } from "@/cad/params";
 import { sketchToDxf } from "@/cad/sketch";
-import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
+import { emptyDoc, uid, type AsmComponent, type BuildResult, type CadDoc, type DrawingDoc, type ExportFormat, type Feature, type FeatureType, type Mate, type MateRef, type SketchEntity, type SketchPlane, type Vec3 } from "@/cad/types";
 import { AGENT_API_VERSION, AGENT_COMMANDS, parseAgentText } from "@/cad/agent";
 import { histStep } from "@/cad/agent-edit";
 import { resolveTab, type TabInfo } from "@/cad/agent-asm";
@@ -85,7 +85,6 @@ import { isKinMode, MECHANICAL, ADVANCED } from "@/cad/mate-spec";
 import { AskHost, askBusy, askConfirm, askNumber } from "./ask-dialog";
 import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps } from "./engine-port";
 import { runScript } from "@/cad/engine/run";
-import { stableStep } from "@/cad/engine/files";
 import { formatConsole } from "@/cad/engine/protocol";
 import { checkProtocol, checkRunOptions, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
 import { makeAsmEnv } from "@/cad/engine/asm-env";
@@ -94,6 +93,15 @@ import type { EngineHost } from "@/cad/engine/host";
 import type { Workspace } from "@/cad/engine/workspace";
 import { isAutomation } from "@/lib/automation";
 import { ComputeChip, progressLabel } from "./compute-chip";
+// vlna 22, body 12, 22e, 22f, 22h: fronta a identita běhů, bariéra rozepsaných změn, export jako úloha, čekání výstupů
+import { discardPending, flushPending, historyRule, pendingCount, setDocKeyGetter } from "./flush-barrier";
+import { appRuns, guardApi, motionSignalHold, outputGate, runsSnapshot, textRun } from "./run-host";
+import { discardTarget, exportRun, type ExportRunDeps } from "./export-run";
+import type { ExportFormat3d } from "@/cad/engine/export-job";
+import { ExportList, RunWaitChip } from "./run-chip";
+import { projectJson, stripModelRev } from "@/cad/engine/project-json";
+import { isRunCancelled, SeqGuard, type RunStamp } from "@/cad/engine/run-queue";
+import { modelRev } from "@/cad/engine/result-key";
 import { FILTER_LABEL, KIND_LABEL, sameSel, type MeasureGfx, type SelFilter, type SelItem } from "./selection";
 import { applyBoxIdx, applyBoxSel, boxHelpText, featureFacesOf, featureOwnerCache, measureMany, mouseHint, setBoxThrough, useBoxThrough, type BoxMode } from "./box-pick-3d";
 import { FEATURE_TONE, Manager, type ManagerTab } from "./manager";
@@ -287,6 +295,7 @@ export function CadApp() {
   const cvG = cvGizmoProps(surfSt);
   const [partingZ, setPartingZ] = useState<{ z: number; perimeter: number } | null>(null);
   const docId = useRef(uid());
+  setDocKeyGetter(() => docId.current); // bariéra rozepsaných změn zná dokument zobrazené záložky (flush-barrier.ts)
   const lastThumb = useRef(0);
   /** soubory, jejichž data se nevešla do úložiště prohlížeče (hlásí se jednou) */
   const blobWarned = useRef(new Set<string>());
@@ -328,14 +337,18 @@ export function CadApp() {
   const dirty = useRef(false);
   /** obsah naposled uloženého dokumentu (příkaz „uložit“ ukládá kopii běhu – shoda obsahu = nic neuloženého) */
   const savedJson = useRef<string | null>(null);
+  /** poslední krok historie a jeho klíč slučování (vlna 22, 22e: psaní názvu = jeden krok – flush-barrier.ts `historyRule`) */
+  const lastStep = useRef<{ key: string | null; at: number }>({ key: null, at: 0 });
   const commit = useCallback((next: CadDoc) => {
     dirty.current = true;
+    lastStep.current = { key: null, at: Date.now() };
     setHist((h) => ({ past: [...h.past.slice(-80), h.present], present: next, future: [] }));
   }, []);
   useEffect(() => {
     const h = (e: BeforeUnloadEvent) => {
-      const d = histRef.current.present;
       if (isAutomation()) return; // automatizace / AI agent: žádný systémový dotaz při zavření karty (uvízla by na něm)
+      flushPending("unload"); // rozepsané pole a list výkresu (i změna jen výkresu) se počítají jako neuložená změna
+      const d = histRef.current.present;
       if (persistMode() === "none" && dirty.current && docHasContent(d) && JSON.stringify(d) !== savedJson.current) {
         e.preventDefault();
         e.returnValue = "";
@@ -346,20 +359,38 @@ export function CadApp() {
   }, []);
   const live = useCallback((next: CadDoc) => setHist((h) => ({ ...h, present: next })), []);
   /** změna nad aktuálním stavem (funkčně) – bezpečné i pro dvě změny v jednom tiku (formulář: hloubka, hned nato název) */
-  const commitWith = useCallback((fn: (d: CadDoc) => CadDoc) => {
-    dirty.current = true;
+  /** `merge` = klíč slučování: souvislé změny téhož pole do 1,5 s = jeden krok Zpět (jedno pravidlo – `historyRule`) */
+  const commitWith = useCallback((fn: (d: CadDoc) => CadDoc, merge?: string) => {
+    const prev = lastStep.current;
+    const now = Date.now();
     setHist((h) => {
       const next = fn(h.present);
-      return next === h.present ? h : { past: [...h.past.slice(-80), h.present], present: next, future: [] };
+      if (next === h.present) return h;
+      const rule = historyRule({ changed: true, key: merge ?? null, lastKey: prev.key, lastAt: prev.at, now });
+      return rule === "merge" && h.past.length ? { ...h, present: next, future: [] } : { past: [...h.past.slice(-80), h.present], present: next, future: [] };
     });
+    dirty.current = true;
+    lastStep.current = { key: merge ?? null, at: now };
   }, []);
   const liveWith = useCallback((fn: (d: CadDoc) => CadDoc) => setHist((h) => ({ ...h, present: fn(h.present) })), []);
-  const undo = () => setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] } : h));
-  const redo = () => setHist((h) => (h.future.length ? { past: [...h.past, h.present], present: h.future[0], future: h.future.slice(1) } : h));
+  const undo = () => {
+    flushPending("undo"); // rozepsané pole / list výkresu nejdřív jako vlastní krok – Zpět pak vrátí právě je
+    lastStep.current = { key: null, at: 0 };
+    setHist((h) => (h.past.length ? { past: h.past.slice(0, -1), present: h.past[h.past.length - 1], future: [h.present, ...h.future] } : h));
+  };
+  const redo = () => {
+    flushPending("redo");
+    lastStep.current = { key: null, at: 0 };
+    setHist((h) => (h.future.length ? { past: [...h.past, h.present], present: h.future[0], future: h.future.slice(1) } : h));
+  };
 
   const updateFeature = (id: string, patch: FeaturePatch, record = true) => {
-    // funkčně nad aktuálním dokumentem: změna hloubky těsně následovaná změnou názvu se nepřepíše zastaralou kopií dokumentu
-    (record ? commitWith : liveWith)((d) => ({ ...d, features: d.features.map((f) => (f.id === id ? ({ ...f, ...(typeof patch === "function" ? patch(f) : patch) } as Feature) : f)) }));
+    // funkčně nad aktuálním dokumentem: změna hloubky těsně následovaná změnou názvu se nepřepíše zastaralou kopií dokumentu;
+    // psaní názvu prvku po znacích = jeden krok Zpět (klíč slučování)
+    const nameOnly = typeof patch === "object" && patch !== null && Object.keys(patch).length === 1 && "name" in patch;
+    const fn = (d: CadDoc): CadDoc => ({ ...d, features: d.features.map((f) => (f.id === id ? ({ ...f, ...(typeof patch === "function" ? patch(f) : patch) } as Feature) : f)) });
+    if (record) commitWith(fn, nameOnly ? `name:${id}` : undefined);
+    else liveWith(fn);
   };
 
   // ---------- záložky dokumentů ----------
@@ -412,7 +443,9 @@ export function CadApp() {
     setPartingZ(null);
     setSurfOverlay(null);
   };
-  const activateTab = (id: string, list: DocTab[] = docTabsRef.current) => {
+  const activateTab = (id: string, list0?: DocTab[]) => {
+    flushPending("tab"); // rozepsané pole / list výkresu do dokumentu, ze kterého se odchází (22e, 22f)
+    const list = list0 ?? docTabsRef.current; // až po bariéře – zápis do záložky jiného dokumentu už je v seznamu
     const snap = snapshotTabs(list);
     const target = snap.find((t) => t.id === id);
     if (!target) return;
@@ -430,6 +463,7 @@ export function CadApp() {
   };
   /** otevře dokument: do prázdné aktivní záložky, jinak do nové záložky */
   const openDocInTab = (d0: CadDoc, opts: { docId?: string; reuse?: boolean } = {}): string => {
+    flushPending("open");
     const d = normalizeDraftDoc(internBlobs(d0)); // velká data importů (base64) → odkazy do úložiště (blobs.ts); 2D výkres doplněný
     const kind: DocTab["kind"] = docTabKind(d);
     const curTabs = docTabsRef.current;
@@ -457,6 +491,7 @@ export function CadApp() {
     return openedId;
   };
   const closeTab = (id: string) => {
+    flushPending("close");
     if (shared && id === shared.tabId) {
       setShared(null);
       try {
@@ -483,8 +518,24 @@ export function CadApp() {
       setTab(entry.hist.present.kind === "assembly" ? "asm" : "create");
     }
   };
+  /**
+   * Zápis listů výkresu (vlna 22, 22f): do dokumentu, ke kterému změna patří (`key`), nikdy do jiného – je-li zobrazený jiný
+   * dokument (záložka se mezitím přepnula), zapíše se do historie záložky vlastního dokumentu. Zápis je krok Zpět (Ctrl+Z vrátí
+   * jen změnu listu) a neuložená změna (dotaz při zavření karty); `record: false` = založení prvního listu bez kroku.
+   */
+  const writeDrawings = (d: DrawingDoc[], o: { key?: string; record?: boolean } = {}) => {
+    const fn = (cur: CadDoc): CadDoc => ({ ...cur, drawings: d });
+    if (!o.key || o.key === docId.current) {
+      if (o.record === false) liveWith(fn);
+      else commitWith(fn);
+      return;
+    }
+    dirty.current = true;
+    setDocTabs((list) => list.map((t) => (t.docId === o.key && t.kind !== "drawing" ? { ...t, hist: o.record === false ? { ...t.hist, present: fn(t.hist.present) } : { past: [...t.hist.past.slice(-80), t.hist.present], present: fn(t.hist.present), future: [] } } : t)));
+  };
   /** výkres jako vlastní záložka (sdílí dokument se zdrojovou záložkou) */
   const openDrawingTab = () => {
+    flushPending("drawing");
     const curTabs = docTabsRef.current;
     const curId = tabIdRef.current;
     const cur = curTabs.find((t) => t.id === curId);
@@ -660,11 +711,13 @@ export function CadApp() {
       setAsmSel(null);
       setTab(d.kind === "assembly" ? "asm" : "create");
     },
-    motion: (sig) => {
-      // pohybová studie: panel se otevře a vyzvedne pokyn (přehrát, krok, export snímků)
-      if (sig.open || sig.play) setMotionOpen(true);
-      pushMotionSignal(sig);
-    },
+    motion: (sig) =>
+      // pohybová studie: panel se otevře a vyzvedne pokyn (přehrát, krok, export snímků) – z běhu až po zápisu jeho dokumentu
+      // (vlna 22, bod 12: dřív panel spočítal starou studii ze starého dokumentu), s razítkem běhu a revize (run-host.ts)
+      motionSignalHold.push(sig, (s) => {
+        if (s.open || s.play) setMotionOpen(true);
+        pushMotionSignal(s);
+      }),
     view: (v) => vp.current?.setView(v as ViewName),
     surfOverlay: (res) => showSurfResult(res),
     api: (cmd, d) => runApiCmd(cmd, d, apiHostRef.current!),
@@ -694,16 +747,41 @@ export function CadApp() {
    * Textové rozhraní (AI agenti, automatizace): provede příkazy / JSON nad otevřeným dokumentem a vrátí protokol
    * + textový stav – smyčka je engine (cad/engine/run.ts), stejná jako v CLI `mncad` a `mncad serve`.
    */
-  const runAgentText = async (text: string, opts: { inPlace?: boolean } & RunApiOptions = {}): Promise<string> => {
-    engineBusy.current++;
-    try {
-      const { ws, host } = engineRef.current!;
-      // protokol jako CLI (`protocol: "short" | "full" | "json"`, engine/run-protocol.ts); výchozí = text konzole beze změny
-      if (checkProtocol(opts.protocol) !== "console") return formatRun(await runReport(ws, text, host, { inPlace: opts.inPlace }), opts);
-      return formatConsole(await runScript(ws, text, host, { inPlace: opts.inPlace }));
-    } finally {
-      engineBusy.current--;
-    }
+  const runAgentText = async (text: string, opts: { inPlace?: boolean; source?: "console" | "api"; onQueued?: (id: string) => void } & RunApiOptions = {}): Promise<string> => {
+    flushPending("run"); // rozepsané pole / list výkresu patří do dokumentu PŘED během (22e, 22f)
+    const { ws, host } = engineRef.current!;
+    const protocol = checkProtocol(opts.protocol);
+    // fronta běhů (vlna 22, bod 12 – run-host.ts): nikdy dva běhy enginu najednou, každý má id a revizi vstupu, jde zrušit
+    return textRun(appRuns, text, { source: opts.source ?? "api", ...(opts.signal ? { signal: opts.signal } : {}), ...(opts.onQueued ? { onQueued: opts.onQueued } : {}), format: opts, lang: getLang() }, {
+      docKey: () => ws.docKey(),
+      present: () => ws.present(),
+      cancelKernel: () => cancelRef.current(),
+      exec: async (signal, stamp: RunStamp) => {
+        engineBusy.current++;
+        motionSignalHold.begin();
+        let cancelled = true; // výjimka / zrušení: pokyny běhu se zahodí (dokument běhu se nezapsal)
+        try {
+          // protokol jako CLI (`protocol: "short" | "full" | "json"`, engine/run-protocol.ts); výchozí = text konzole beze změny
+          const r = protocol !== "console" ? await runReport(ws, text, host, { inPlace: opts.inPlace, signal }) : await runScript(ws, text, host, { inPlace: opts.inPlace, signal });
+          cancelled = r.entries.some((e) => e.code === "run.cancelled");
+          r.run = { ...stamp, state: cancelled ? "cancelled" : "done" };
+          return { text: protocol !== "console" ? formatRun(r, opts) : formatConsole(r), cancelled };
+        } finally {
+          engineBusy.current--;
+          // pokyny pohybu až teď – dokument běhu je zapsaný a promítnutý (engine `flush` + `settle`); razítko = dokument po běhu
+          const d = ws.present();
+          motionSignalHold.end(
+            cancelled
+              ? () => undefined
+              : (sg) => {
+                  if (sg.open || sg.play) setMotionOpen(true);
+                  pushMotionSignal(sg);
+                },
+            cancelled ? undefined : { id: stamp.id, docKey: ws.docKey(), rev: modelRev(d) },
+          );
+        }
+      },
+    });
   };
   /** po zrušeném výpočtu mimo běžnou stavbu (konzole, export, výkres) znovu postaví otevřený dokument, aby jádro mělo těleso */
   const restoreKernelRef = useRef<() => void>(() => undefined);
@@ -866,7 +944,7 @@ export function CadApp() {
     }
     track("cad_open");
     // JavaScript API pro automatizaci a AI agenty (Playwright, rozšíření prohlížeče…)
-    window.mncad = extendMncad({
+    const api = extendMncad({
       version: AGENT_API_VERSION,
       lang: getLang(),
       missing: () => missingKeys(),
@@ -940,6 +1018,16 @@ export function CadApp() {
         cancelRef.current();
         return running;
       },
+      // běhy a úlohy (vlna 22, bod 12 a 22h – run-host.ts): seznam, zrušení, dokončený stav, rozepsané změny
+      runs: (kind) => runsSnapshot(kind),
+      cancelRun: (id) => appRuns.cancel(id),
+      idle: async () => {
+        flushPending("api:idle");
+        await appRuns.idle();
+        await buildIdleRef.current();
+      },
+      exports: () => runsSnapshot("export"),
+      pending: () => pendingCount(),
       hints: (on) => {
         if (on !== undefined) setHintsOn(on);
         return sk.current?.hintList() ?? vp.current?.hintList() ?? [];
@@ -955,16 +1043,22 @@ export function CadApp() {
         };
         if (format === "mncad") {
           const lost = missingBlobFiles(d);
-          const u8 = new TextEncoder().encode(JSON.stringify(embedBlobs(d), null, 1));
-          return { name: `${safeName(d.name)}.mncad`, mime: "application/json", bytes: u8.length, base64: toB64(u8), ...(lost.length ? { warning: lostImportsText(lost) } : {}) };
+          const p = projectJson(d); // revize modelu v souboru (vlna 22, bod 12)
+          const u8 = new TextEncoder().encode(p.json);
+          return { name: `${safeName(d.name)}.mncad`, mime: "application/json", bytes: u8.length, base64: toB64(u8), modelRev: p.modelRev, ...(lost.length ? { warning: lostImportsText(lost) } : {}) };
         }
         const meta = EXPORTS.find((e) => e.f === format);
         if (!meta) throw new Error(tr("Neznámý formát „{0}“ – step, stl, brep, obj, glb, 3mf, wrl, mncad.", format));
-        const raw = new Uint8Array(await cad.exportFile(d, meta.f));
-        const u8 = meta.f === "step" ? stableStep(raw) : raw; // stejné bajty (SHA-256) jako textový `export step` a CLI
-        return { name: `${safeName(d.name)}.${meta.ext}`, mime: meta.mime, bytes: u8.byteLength, base64: toB64(u8) };
+        // úloha exportu ve frontě (vlna 22, bod 22h): fáze, kontrola STEP zpětným načtením jako textové `export step`, zrušení
+        // `cancelRun(id)`; stejné bajty (SHA-256) jako textový `export step` a CLI (modelBytes = stableStep)
+        const name = `${safeName(d.name)}.${meta.ext}`;
+        const h = exportRun(appRuns, { format: meta.f as ExportFormat3d, label: `${meta.label} · ${name}`, source: "api", target: null }, exportDepsRef.current());
+        const r = await h.done;
+        return { name, mime: meta.mime, bytes: r.data.byteLength, base64: toB64(r.data), modelRev: r.modelRev, ...(r.check ? { check: { ok: r.check.ok, text: r.check.line.replace(/^[✓⚠✗]\s*/, "") } } : {}), job: appRuns.snapshot(h.entry) };
       },
     }, () => apiHostRef.current);
+    // každé volání nejdřív zapíše rozepsané změny (22e, 22f); výstupy počkají na dokončený stav (12) – run-host.ts guardApi
+    window.mncad = guardApi(api, { flush: (why) => flushPending(why), wait: (what) => waitOutputsRef.current(what) });
     return () => {
       window.removeEventListener(VAULT_EVENT, onVault);
       window.removeEventListener("hashchange", onHash);
@@ -1025,6 +1119,8 @@ export function CadApp() {
 
   const inflight = useRef(false);
   const queued = useRef<CadDoc | null>(null);
+  /** pro který dokument (klíč záložky + otisk geometrie) je zobrazený výsledek stavby `result` */
+  const resultFor = useRef<{ key: string; geo: string } | null>(null);
   /** klíč geometrie naposledy úspěšně postaveného dokumentu – podle něj se po zrušení výpočtu pozná, že čeká jen poslední změna */
   const builtKey = useRef<string | null>(null);
   /** model není přepočítaný (výpočet zrušen a nebylo co vrátit) – stavový řádek nabídne nový výpočet */
@@ -1059,9 +1155,15 @@ export function CadApp() {
     }
     inflight.current = true;
     setBusy(true);
+    const owner = docId.current; // vlna 22, bod 12: výsledek patří dokumentu, pro který se počítal
     try {
       const res = await cad.build(d);
-      setResult(res);
+      // pozdní odpověď: mezitím jiná záložka, nebo čeká novější stav téhož dokumentu → výsledek „nahrazen“, nezobrazí se
+      // (roviny skic z něj se nepromítnou do jiného dokumentu – efekt [result])
+      if (owner === docId.current && !queued.current) {
+        resultFor.current = { key: owner, geo: geoKey(d) };
+        setResult(res);
+      }
       setStale(false);
       builtKey.current = geoKey(d);
       settleImportRef.current(d, res, null);
@@ -1097,6 +1199,28 @@ export function CadApp() {
   restoreKernelRef.current = () => {
     if (buildDocView.kind !== "assembly") void runBuild(buildDocView);
   };
+  /** stavba čeká na spuštění (odložení 120 ms po změně) – uložit / export čekají i na ni (vlna 22, bod 12) */
+  const buildPending = useRef(false);
+  const buildBusy = () => inflight.current || !!queued.current || buildPending.current;
+  /** počká na dokončení stavby modelu (nejdéle 10 min; chip čekání ji jde zrušit) */
+  const buildIdle = async () => {
+    for (let i = 0; i < 12_000 && buildBusy(); i++) await new Promise((r) => setTimeout(r, 50));
+  };
+  const buildIdleRef = useRef(buildIdle);
+  buildIdleRef.current = buildIdle;
+  /**
+   * Uložit / export / sdílet z dokončeného stavu (vlna 22, bod 12): nejdřív bariéra rozepsaných změn, pak počkat na frontu
+   * běhů a stavbu (chip „Čekám na dokončení výpočtu…“ se Zrušit – run-chip.tsx). false = čekání zrušeno, akce se neprovede.
+   */
+  const waitOutputs = async (what: string): Promise<boolean> => {
+    flushPending(what);
+    return outputGate.wait(what, () => appRuns.busy() || buildBusy(), async () => {
+      await appRuns.idle();
+      await buildIdle();
+    });
+  };
+  const waitOutputsRef = useRef(waitOutputs);
+  waitOutputsRef.current = waitOutputs;
   /** tlačítko Zrušit u běžícího výpočtu: ukončí jádro; co se stane s dokumentem, řeší ten, kdo výpočet spustil */
   const cancelCompute = useCallback(() => {
     const wasBuild = inflight.current;
@@ -1112,8 +1236,15 @@ export function CadApp() {
       setResult(null);
       return;
     }
-    const t = setTimeout(() => runBuild(buildDocView), 120);
-    return () => clearTimeout(t);
+    buildPending.current = true;
+    const t = setTimeout(() => {
+      buildPending.current = false;
+      runBuild(buildDocView);
+    }, 120);
+    return () => {
+      clearTimeout(t);
+      buildPending.current = false;
+    };
   }, [buildDocView, core, runBuild]);
 
   const resolved = useMemo(() => resolveDoc(doc), [doc]);
@@ -1122,6 +1253,8 @@ export function CadApp() {
     const planes = result?.resolved?.planes;
     const dts = result?.resolved?.datums;
     if (!planes && !dts) return;
+    // jen výsledek stavby TOHOTO dokumentu (vlna 22, bod 12 – stráž pozdní odpovědi; id prvků jiného dokumentu se mohou shodovat)
+    if (resultFor.current && resultFor.current.key !== docId.current) return;
     const same = (a: number[], b: number[]) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-6);
     let changed = false;
     const features = doc.features.map((f) => {
@@ -1415,11 +1548,16 @@ export function CadApp() {
   const ensureMateGeo = (d: CadDoc): Promise<Mate[]> =>
     // i dosedací plochy pružin (pomocné „vazby“ se odříznou) – délka pružin po přepočtu (cad/asm-spring.ts)
     ensureMateRefs([...(d.mates ?? []), ...springSeatMates(d)], (ref) => leafOf(ref, d)?.key ?? null, mateGeo.current, { face: (k, i) => cad.mateFace(k, i), ent: (k, i, e) => cad.mateEnt(k, i, e), cylFace: (k, r) => cad.cylFace(k, r) }).then((m) => m.slice(0, d.mates?.length ?? 0));
+  /** stráže pozdních odpovědí (engine/run-queue.ts SeqGuard): přepočet vazeb, kontrola kolizí */
+  const mateGuard = useRef(new SeqGuard());
+  const clashGuard = useRef(new SeqGuard());
   const resolveMates = async (d: CadDoc, anchorId?: string | null) => {
     const springs = d.kind === "assembly" && springComps(d).length > 0; // pružiny: délka i bez vazeb a bez pohnutí řešičem
     if (d.kind !== "assembly" || (!d.mates?.length && !springs)) return;
     const key = docId.current; // výsledek patří dokumentu, pro který se počítá – do jiné záložky se nezapíše ani nezobrazí
+    const ticket = mateGuard.current.begin(); // vlna 22, bod 12: řešení staršího stavu nepřepíše novější (vzor seq)
     const mates = await ensureMateGeo(d);
+    if (!ticket.current()) return; // nahrazeno novějším přepočtem vazeb
     const withMates = { ...d, mates };
     const r = solveMates(withMates, geoProvider(withMates), anchorId);
     if (r.mates) mates.splice(0, mates.length, ...r.mates); // pokročilé vazby: výchozí stav stupňů volnosti se uloží do dokumentu
@@ -2108,6 +2246,7 @@ export function CadApp() {
   const runInterference = async () => {
     const target = shownAsmRef.current; // zobrazený stav: dokument, při zobrazeném kroku pohybové studie dokument v poloze kroku
     if (!target) return;
+    const ticket = clashGuard.current.begin(); // vlna 22, bod 12: pozdní výsledek starší kontroly nepřepíše novější
     const ws = engineRef.current!.ws;
     const key = ws.docKey(); // výsledek patří sestavě, pro kterou se počítá (i pro textový stav) – pod jiným klíčem se nikdy neukáže
     const sig = clashSig(target); // otisk kontrolovaného stavu: pozdější změna (posun, díl, konfigurace, krok) = výsledek neplatí
@@ -2119,6 +2258,7 @@ export function CadApp() {
     flash(tr("Kontroluji kolize…"));
     try {
       const res = await cad.interference(target);
+      if (!ticket.current()) return; // mezitím spuštěna novější kontrola – tento výsledek je nahrazen
       const at = new Date().toLocaleTimeString(cadLocale());
       const comps = flattenLeaves(target).filter((l) => !l.hidden).length;
       ws.asm.clash.set(key, stampResult({ res, at, comps, sig }, resultId("clash", key, target, { sig, comps, at, pose: step ? "step" : "doc" })));
@@ -2297,10 +2437,12 @@ export function CadApp() {
     else beginEdit(f.id, doc);
   };
   const okEdit = () => {
+    flushPending("ok"); // rozepsaná hodnota pole (< 450 ms, bez opuštění pole) patří k úpravě – zapsat před zavřením
     setActiveId(null);
     setEditBase(null);
   };
   const cancelEdit = () => {
+    discardPending("field", "cancel"); // Storno: rozepsaná hodnota se do vráceného dokumentu nezapíše
     if (editBase) commit(editBase);
     setActiveId(null);
     setEditBase(null);
@@ -2386,33 +2528,47 @@ export function CadApp() {
   };
 
   // ---------- soubory ----------
+  /** závislosti úlohy exportu (export-run.ts): jádro, dokument v okamžiku startu úlohy, zápis do cíle dialogu */
+  const exportDeps = (mime = "application/octet-stream"): ExportRunDeps => ({
+    kernel: cad,
+    doc: () => histRef.current.present,
+    docKey: () => docId.current,
+    write: (t, data) => writeSaved(t as SavedFile, data as BlobPart, mime),
+    cancelKernel: () => cancelRef.current(),
+    onProgress: (fn) => cad.onProgress((p) => fn(p && p.phase === "feature" ? { index: p.index, total: p.total, ...(p.name ? { name: p.name } : {}) } : null)),
+  });
+  const exportDepsRef = useRef(exportDeps);
+  exportDepsRef.current = exportDeps;
+  /**
+   * Soubor › Export 3D (vlna 22, bod 22h): dialog „Uložit jako“ hned (uživatelské gesto), pak úloha ve frontě běhů s fázemi
+   * (přestavba, převod, kontrola zpětným načtením – jako textové `export step` –, zápis); stav zůstane v seznamu Exporty;
+   * zrušená úloha nenechá prázdný soubor (export-run.ts).
+   */
   const exportModel = async (format: ExportFormat) => {
     const meta = EXPORTS.find((e) => e.f === format)!;
+    flushPending("export");
     try {
-      // nejdřív dialog „Uložit jako“ (uživatelské gesto), pak teprve výpočet exportu
-      let bytes = 0;
-      const saved = await saveFile(`${safeName(doc.name)}.${meta.ext}`, async () => {
-        flash(tr("Připravuji {0}…", meta.label));
-        const t0 = Date.now();
-        // dlouhý export (složitá / neplatná geometrie): průběžná zpráva s časem místo ticha
-        const tick = window.setInterval(() => flash(tr("Připravuji {0}… {1} s – složitá geometrie; prvky s ⚠ (neplatná geometrie) export výrazně zpomalují", meta.label, Math.round((Date.now() - t0) / 1000))), 4000);
-        try {
-          const buf = await cad.exportFile(doc, format);
-          bytes = buf.byteLength;
-          return buf;
-        } finally {
-          window.clearInterval(tick);
-        }
-      }, meta.mime);
-      if (saved) flash(tr("Export {0} hotov: {1} ({2})", meta.label, saved.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`));
-      else flash(tr("Export {0} zrušen.", meta.label));
+      const target = await pickSaveTarget(`${safeName(histRef.current.present.name)}.${meta.ext}`, meta.mime);
+      if (!target) return flash(tr("Export {0} zrušen.", meta.label));
+      if (!(await waitOutputs(tr("export {0}", meta.label)))) {
+        await discardTarget(target);
+        return flash(tr("Export {0} zrušen – soubor nebyl zapsán.", meta.label));
+      }
+      const h = exportRun(appRuns, { format: format as ExportFormat3d, label: `${meta.label} · ${target.name}`, source: "menu", target }, exportDeps(meta.mime));
+      flash(tr("Export {0}: úloha {1} – průběh a výsledek v seznamu Exporty", meta.label, h.id));
+      const r = await h.done;
+      const bytes = r.data.byteLength;
+      const check = r.check ? (r.check.ok ? " · ✓" : " · ⚠ " + r.check.line.replace(/^[✓⚠✗]\s*/, "")) : "";
+      flash(tr("Export {0} hotov: {1} ({2})", meta.label, target.name, bytes >= 1024 ? `${Math.round(bytes / 1024)} kB` : `${bytes} B`) + check);
       track("cad_export", { format });
     } catch (e) {
-      flash((e as Error).message);
+      if (isRunCancelled(e) || isCancelled(e)) flash(tr("Export {0} zrušen – soubor nebyl zapsán.", meta.label));
+      else flash((e as Error).message);
     }
   };
   /** Data ▸ Export ▸ Textový skript: dokument jako textové příkazy `.mncad.txt` (cad/doc-script.ts) */
   const exportScript = async () => {
+    if (!(await waitOutputs(tr("export skriptu")))) return flash(tr("Export skriptu zrušen."));
     try {
       const { scriptOfDoc } = await import("./doc-script-host");
       const r = await scriptOfDoc(doc, {}, drawEnvRef.current); // čísla vybraných hran / ploch a klíče vygenerovaných pozic ověří jádro
@@ -2429,21 +2585,37 @@ export function CadApp() {
     const lost = missingBlobFiles(doc);
     return lost.length ? tr("Uloženo: {0} – BEZ dat souborů {1} (nejsou v paměti). Otevřete je znovu a uložte projekt ještě jednou.", name, lost.join(", ")) : tr("Uloženo: {0}", name);
   };
+  /**
+   * Uložení z dokončeného stavu (vlna 22, bod 12): rozepsané změny se zapíšou, uložení počká na frontu běhů a stavbu
+   * (chip se Zrušit) a soubor nese revizi modelu (`modelRev`, engine/project-json.ts) – uloží se dokument po běhu, ne před ním.
+   */
   const saveProjectAs = async () => {
-    const t = await pickSaveTarget(`${safeName(doc.name)}.mncad`, "application/json");
+    flushPending("save");
+    const t = await pickSaveTarget(`${safeName(histRef.current.present.name)}.mncad`, "application/json");
     if (!t) return;
-    await writeSaved(t, JSON.stringify(embedBlobs(doc), null, 1), "application/json");
+    if (!(await waitOutputs(tr("uložení")))) {
+      await discardTarget(t);
+      return flash(tr("Uložení zrušeno – soubor nebyl zapsán."));
+    }
+    const d = histRef.current.present;
+    const p = projectJson(d);
+    await writeSaved(t, p.json, "application/json");
     projectTarget.current = t.handle ? t : null;
-    dirty.current = false;
-    flash(savedText(t.name));
+    if (d === histRef.current.present) dirty.current = false;
+    savedJson.current = JSON.stringify(d);
+    flash(`${savedText(t.name)} · ${tr("model")} ${p.modelRev}`);
   };
   const saveProject = async () => {
     const t = projectTarget.current;
     if (t?.handle) {
+      if (!(await waitOutputs(tr("uložení")))) return flash(tr("Uložení zrušeno."));
       try {
-        await writeSaved(t, JSON.stringify(embedBlobs(doc), null, 1), "application/json");
-        dirty.current = false;
-        flash(savedText(t.name));
+        const d = histRef.current.present;
+        const p = projectJson(d);
+        await writeSaved(t, p.json, "application/json");
+        if (d === histRef.current.present) dirty.current = false;
+        savedJson.current = JSON.stringify(d);
+        flash(`${savedText(t.name)} · ${tr("model")} ${p.modelRev}`);
         return;
       } catch {
         projectTarget.current = null; // soubor už není dostupný → zeptat se znovu
@@ -2451,6 +2623,8 @@ export function CadApp() {
     }
     await saveProjectAs();
   };
+  /** Sdílet: z dokončeného stavu (rozepsané změny zapsané, fronta a stavba doběhly) – jinak se dialog neotevře */
+  const openShare = () => void waitOutputs(tr("sdílení")).then((ok) => (ok ? setShareOpen(true) : flash(tr("Sdílení zrušeno."))));
   const newAssembly = (withCurrent = false) => {
     const a = emptyAssembly(withCurrent ? tr("Sestava – {0}", doc.name) : tr("Nová sestava"));
     if (withCurrent && !isAsm && doc.features.length) a.components = [partComponent(doc, {}, { group: "Díly", fixed: true, color: doc.color ?? "#b9c2cc" })];
@@ -2483,7 +2657,7 @@ export function CadApp() {
     }
     if (ext === "mncad" || ext === "json") {
       try {
-        const d = internBlobs(JSON.parse(await file.text()) as CadDoc); // data importů → úložiště (odkazy mnblob:)
+        const d = internBlobs(stripModelRev(JSON.parse(await file.text()) as CadDoc)); // data importů → úložiště (odkazy mnblob:); revize modelu patří souboru
         if (d.app !== "mnastrojarna-cad") throw new Error();
         if (toAsm && d.kind !== "assembly" && d.kind !== "draft") {
           insertPart(d, tr("Díly"));
@@ -3374,7 +3548,7 @@ export function CadApp() {
       { id: "p.help", label: tr("Klávesové zkratky a ovládání"), group: "Program", icon: "help", run: () => setNotice({ title: tr("Ovládání a zkratky"), body: helpText(prefs.shortcuts) }) },
       { id: "p.docs", label: tr("Dokumentace a návod k obsluze (web)"), group: "Program", icon: "info", run: () => window.open(langMeta().docs, "_blank", "noopener") },
       { id: "p.pdf", label: tr("Příručka PDF – stáhnout"), group: "Program", icon: "drawing", run: () => window.open(CAD_LINKS.pdf, "_blank", "noopener") },
-      { id: "p.share", label: tr("Sdílet odkazem (WhatsApp, e-mail, Teams…)"), group: "Program", icon: "share", run: () => setShareOpen(true) },
+      { id: "p.share", label: tr("Sdílet odkazem (WhatsApp, e-mail, Teams…)"), group: "Program", icon: "share", run: () => openShare() },
       { id: "p.sharecode", label: tr("Otevřít sdílený dokument – zadat kód nebo odkaz"), group: "Program", icon: "share", run: () => setShareAsk({ value: "" }) },
       { id: "p.agent", label: tr("Textové příkazy – pro AI agenty a automatizaci"), group: "Program", icon: "palette", kbd: "Ctrl+Shift+K", run: () => setAgentOpen(true) },
       { id: "p.hints", label: tr("Popisky pro výběr myší (F1 / E2 / V3) – {0}", hintsOn ? "vypnout" : "zapnout"), group: "Program", icon: "filterSel", kbd: "Ctrl+Shift+L", run: () => setHintsOn((v) => !v) },
@@ -3486,7 +3660,7 @@ export function CadApp() {
           <QBtn icon="settings" title={tr("Nastavení (Ctrl+,)")} onClick={() => setSettingsOpen(true)} />
           <ShareCta
             compact
-            onClick={() => setShareOpen(true)}
+            onClick={() => openShare()}
             disabled={!docHasContent(doc)}
             title={tr("Sdílet odkazem (WhatsApp, e-mail, Teams…) – příjemce otevře díl v prohlížeči")}
           />
@@ -3608,7 +3782,7 @@ export function CadApp() {
                     { id: "open", label: tr("Otevřít / importovat…"), icon: "open", tone: "file", kbd: "Ctrl+O", onClick: () => fileInput.current?.click() },
                     { id: "save", label: tr("Uložit projekt (.mncad)"), icon: "save", tone: "file", kbd: "Ctrl+S", onClick: () => void saveProject() },
                     { id: "saveAs", label: tr("Uložit jako…"), icon: "save", tone: "file", onClick: () => void saveProjectAs() },
-                    { id: "share", label: tr("Sdílet odkazem…"), icon: "share", tone: "file", disabled: !docHasContent(doc), hint: tr("WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní"), onClick: () => setShareOpen(true) },
+                    { id: "share", label: tr("Sdílet odkazem…"), icon: "share", tone: "file", disabled: !docHasContent(doc), hint: tr("WhatsApp, e-mail, Teams – příjemce otevře díl v prohlížeči, platnost např. 10 dní"), onClick: () => openShare() },
                     { id: "sharecode", label: tr("Otevřít sdílený dokument…"), icon: "share", tone: "file", hint: tr("Zadejte kód (10 znaků) nebo vložte odkaz, který vám někdo poslal"), onClick: () => setShareAsk({ value: "" }) },
                     { divider: true, label: tr("Export 3D") },
                     ...exportEntries,
@@ -4226,6 +4400,8 @@ export function CadApp() {
           />
         )}
         <ComputeChip onCancel={cancelCompute} />
+        <RunWaitChip />
+        <ExportList />
         <AskHost />
         {settingsOpen && <SettingsDialog settings={prefs} onChange={applySettings} onClose={() => setSettingsOpen(false)} backgrounds={BACKGROUNDS} />}
         {shareOpen && <ShareDialog doc={doc} view={drawingOpen ? "drawing" : "model"} onClose={() => setShareOpen(false)} onFlash={flash} />}
@@ -4315,12 +4491,12 @@ export function CadApp() {
         )}
 
         {isDraftDoc(doc) && !drawingOpen && (
-          <DraftWorkspace key={doc.draft.id} doc={doc} onCommit={commit} onUndo={undo} onRedo={redo} canUndo={hist.past.length > 0} canRedo={hist.future.length > 0} onOpenDoc={(d) => void openDocInTab(d)} onSave={() => void saveProject()} onShare={() => setShareOpen(true)} onFlash={flash} />
+          <DraftWorkspace key={doc.draft.id} doc={doc} onCommit={commit} onUndo={undo} onRedo={redo} canUndo={hist.past.length > 0} canRedo={hist.future.length > 0} onOpenDoc={(d) => void openDocInTab(d)} onSave={() => void saveProject()} onShare={() => openShare()} onFlash={flash} />
         )}
         {drawingOpen && (isAsm || result?.metrics) && (
           <DrawingWorkspace
             doc={doc}
-            onShare={() => setShareOpen(true)}
+            onShare={() => openShare()}
             onMaterialChange={(v) => {
               const t = v.trim();
               const next = t && t !== mat.label ? t : undefined;
@@ -4331,7 +4507,8 @@ export function CadApp() {
             bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
             drawings={doc.drawings}
             balloons={balloonItems}
-            onDrawingsChange={(d) => liveWith((cur) => ({ ...cur, drawings: d }))}
+            docKey={docId.current}
+            onDrawingsChange={(d, o) => writeDrawings(d, o)}
             onDrawingsCommit={(d) => commitWith((cur) => ({ ...cur, drawings: d }))}
             onPropsChange={(p) => commit({ ...doc, props: p })}
             onClose={() => {

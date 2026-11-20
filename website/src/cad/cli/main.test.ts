@@ -81,3 +81,23 @@ describe("wasmFile – WASM jádra od hostitele (locateFile; hash v názvu, MNCA
     expect(() => jobInit(io({ MNCAD_WASM: "k/chybi.wasm" }), "cs")).toThrow(UsageError);
   });
 });
+
+/**
+ * Vlna 22, bod 22h – `--progress` jmenuje fáze: síť modelu (dřív „build 3/2“ – index za posledním prvkem) a fáze exportu
+ * (přestavba modelu, převod, kontrola zpětným načtením, zápis souboru – engine/export-job.ts).
+ */
+describe("--progress: pojmenované fáze", () => {
+  it("fáze sítě a exportu jménem, nikdy „3/2“", async () => {
+    const { fmtEvent } = await import("./main");
+    const { setLang } = await import("../i18n");
+    setLang("cs");
+    expect(fmtEvent({ t: "progress", op: "build", index: 2, total: 2, phase: "mesh" })).toBe("  build: síť modelu");
+    expect(fmtEvent({ t: "progress", op: "build", index: 2, total: 2 })).toBe("  build 2/2"); // bez fáze: nikdy víc než celkem
+    expect(fmtEvent({ t: "progress", op: "build", index: 0, total: 2, name: "Trubka 1" })).toBe("  build 1/2 Trubka 1");
+    expect(fmtEvent({ t: "progress", op: "export", phase: "model" })).toBe("  export: přestavba modelu");
+    expect(fmtEvent({ t: "progress", op: "out:step", phase: "convert" })).toBe("  out:step: převod do STEP");
+    expect(fmtEvent({ t: "progress", op: "export:step", phase: "convert" })).toBe("  export:step: převod do STEP");
+    expect(fmtEvent({ t: "progress", op: "export", phase: "verify" })).toBe("  export: kontrola zpětným načtením");
+    expect(fmtEvent({ t: "progress", op: "export", phase: "write" })).toBe("  export: zápis souboru");
+  });
+});

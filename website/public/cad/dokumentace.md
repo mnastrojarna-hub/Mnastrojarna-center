@@ -182,6 +182,10 @@ Vlevo program říká, co očekává („Zaoblení: klikáním vyberte hrany v m
 
 Trvá-li výpočet déle než vteřinu, objeví se u spodního okraje ukazatel „Počítám prvek 5/11: Pole 1“ s časem tohoto kroku a celkovým časem. Tlačítko Zrušit výpočet okamžitě ukončí: čekala-li na výpočet jen poslední úprava, vrátí se zpět (Ctrl+Y ji obnoví); u právě otevřeného souboru zůstane dokument beze změny a stav jádra v horní liště nabídne „Výpočet zrušen · přepočítat“. Jádro si pamatuje stav po jednotlivých prvcích, takže přidaný prvek nebo úprava posledního prvku nepřepočítává celou historii.
 
+Běhy a čekání na dokončení. Textové příkazy (konzole, automatizace) i exporty běží jeden po druhém ve frontě; každý běh má číslo (r12) a stav čeká – počítá – dokončeno – zrušeno – chyba. Konzole ukazuje stav běhu, během běhu nikdy neukáže starý protokol (předchozí je jen sbalený pod nadpisem Předchozí běh) a tlačítkem Zrušit běh běh zastaví i po zavření a novém otevření konzole. Uložit, Export a Sdílet pracují s dokončeným stavem: hodnota napsaná do pole (i bez opuštění pole) a rozpracovaná změna výkresu se nejdřív zapíšou do svého dokumentu, a běží-li výpočet, objeví se „Čekám na dokončení výpočtu…“ s tlačítkem Zrušit. Uložený soubor .mncad nese revizi modelu (r·a1b2c3).
+
+Export 3D jako úloha. Po volbě Soubor → Export 3D se nejdřív zeptá na místo uložení, pak úloha ve frontě projde fázemi přestavba modelu → převod → kontrola zpětným načtením (STEP, BREP) → zápis souboru. Malý seznam Exporty vpravo dole ukazuje fázi a čas běhu a po konci stav, soubor, velikost, výsledek kontroly a revizi modelu – zůstane, dokud ho nezavřete. Export jde zrušit; soubor, který už založil dialog „Uložit jako“, se po zrušení odstraní (kde to prohlížeč neumí, seznam napíše „soubor nebyl zapsán (0 B)“).
+
 ### Paleta příkazů
 
 ![Paleta příkazů Ctrl+K s fulltextovým hledáním příkazů](https://www.mnastrojarna.cz/cad/docs/paleta.webp)

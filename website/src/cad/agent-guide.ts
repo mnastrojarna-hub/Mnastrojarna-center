@@ -37,7 +37,12 @@ do 3D okna (výběr hran a ploch pravidlem).
    \`{ name, mime, bytes, format, log }\`;
    \`await window.mncad.measure("F3", "F7")\` změří jako příkaz \`měřit\` a vrátí řádky + čísla (viz „Měření“);
    \`window.mncad.progress()\` vrátí průběh běžícího výpočtu (\`{ label, index, total, name, seconds }\` nebo \`null\`) a
-   \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem).
+   \`window.mncad.cancel()\` ho zruší (dokument zůstane ve stavu před výpočtem). **Běhy:** \`run\` se řadí do fronty (nikdy
+   dva běhy najednou), \`window.mncad.runs()\` vrátí běhy a úlohy exportu (\`{ id: "r12", kind, state, inputRev, phase,
+   phases, ms, result }\`, stav \`queued | running | done | cancelled | error\`), \`window.mncad.cancelRun(id?)\` běh zruší,
+   \`run(text, { signal })\` přijme \`AbortSignal\`, \`await window.mncad.idle()\` počká na dokončený stav. Každé volání
+   \`window.mncad\` nejdřív zapíše rozepsané pole a list výkresu; \`save\`, \`exportFile\`, \`exportDrawing\`, \`share\` počkají
+   na doběhnutí běhů a stavby (viz „Průběh a zrušení výpočtu“).
 
 **Když textový příkaz něco neumí, \`prvek nápověda <typ>\` ukáže všechna pole pro \`prvek <typ> …\`** (EN \`feature help\`,
 DE \`element hilfe\`; typ i slovem příkazu – \`nápověda díra\`, \`nápověda kužel\`, u rozšíření id: \`prvek nápověda sheet.bend\`):
@@ -1055,6 +1060,29 @@ Během delšího výpočtu ukazuje program u spodního okraje „Počítám prve
 vrací \`window.mncad.progress()\` a \`window.mncad.cancel()\`. Zrušený běh konzole dokument nezmění. Po výpočtu je
 v protokolu u delších prvků čas (\`✓ Pole 1 (pattern) · 7,9 s\`) a celkový čas. Jádro si pamatuje stav po prvcích:
 další příkaz přidaný na konec historie přepočítá jen nový prvek.
+
+**Běhy mají id a stav (vlna 22).** Každý běh textových příkazů (konzole, \`window.mncad.run\`, \`mncad run\`, \`POST /run\`)
+a každý export je běh s **id** (\`r12\`, serve \`j3\`) a **revizí vstupu** (\`<klíč dokumentu>@r·a1b2c3\`); stavy
+**čeká → počítá → dokončeno | zrušeno | chyba** (\`queued | running | done | cancelled | error\`). Běhy se řadí do jedné
+fronty – druhý \`run\` počká na první, nikdy neběží souběžně. Id je v JSON (\`run: { id, inputRev, state }\`), v HTTP
+hlavičce \`x-mncad-run\` a na konci řádku Σ (\`… run=r12\`); hlavička \`MNCAD/1 …\` se nemění. Konzole ukazuje „Běh r12:
+počítá“, během běhu místo protokolu „Probíhá běh r12…“ a předchozí protokol jen sbalený jako **Předchozí běh r11** – starý
+protokol se nikdy nečte jako výsledek nového běhu (atributy \`data-run-id\`, \`data-run-state\` u výstupu); tlačítko
+**Zrušit běh** (i po zavření a novém otevření konzole). Zrušený čekající běh se neprovede vůbec, běžící skončí
+✗ \`run.cancelled\` před dalším řádkem. Pozdní výsledek staršího výpočtu (stavba modelu, přepočet vazeb, kontrola kolizí,
+měření, pokyny pohybové studie z běhu) nikdy nepřepíše novější – pokyny \`pohyb přehrát\` se panelu doručí až po zápisu
+dokumentu běhu.
+
+**Uložit, export a sdílet pracují s dokončeným stavem:** nejdřív se zapíše rozepsané pole (napsaná hodnota bez opuštění pole)
+a rozepsaný list výkresu, pak se počká na běhy a stavbu modelu (u spodního okraje „Čekám na dokončení výpočtu…“ se
+**Zrušit**). Soubor .mncad nese \`modelRev\` (\`r·a1b2c3\`, revize modelu, ze které vznikl), řádek F exportu \`rev=r·a1b2c3\`.
+
+**Export je úloha s fázemi:** přestavba modelu → převod (STEP…) → **kontrola zpětným načtením** (STEP / BREP, stejná jako
+textové \`export step\` – i export z menu) → zápis souboru. Seznam **Exporty** vpravo dole drží stav, fázi, čas, soubor,
+velikost, kontrolu a revizi modelu i po konci (\`data-export-job\`, \`data-export-state\`); úlohu jde zrušit – soubor, který
+už založil dialog „Uložit jako“, se odstraní. \`window.mncad.exportFile\` vrací \`{ …, modelRev, check, job }\`, průběh
+ukazuje \`window.mncad.exports()\`. CLI \`--progress\` vypisuje fáze jménem (\`  export:step: převod do STEP\`,
+\`  build: síť modelu\`).
 
 ### Plech – tvářecí nástroje a křížový zlom (\`plech …\`, EN \`sheet …\`, DE \`blech …\`)
 
@@ -2372,6 +2400,10 @@ v hostiteli:
 - **Akce jen pro aplikaci** (\`akce …\`, \`barva plochy\`, analýzy a formařské nástroje, \`výkres export png\`, export snímků
   pohybu) dávají v CLI/HTTP ✗ \`host.app-only\` – nikdy tiše. Výjimka: \`pružina tabulka …\` (= \`akce spring.table\`) čte jen
   dokument, provádí ji engine i v CLI/HTTP (řádek \`= … api … springs=1 name=… R=…N/mm Ln=…mm …\`).
+- **Úlohy HTTP** (\`mncad serve\`): každý \`POST /run\` je úloha s id (\`j<n>\`, nebo vlastní \`"id": "…"\` v těle – pak ji lze
+  zrušit ještě před odpovědí); \`GET /runs\` a \`GET /run/<id>\` vrátí stav (čeká ve frontě relace / počítá / dokončeno /
+  zrušeno / chyba), \`DELETE /run/<id>\` úlohu zruší: čekající se neprovede, běžící se přeruší ukončením vlákna (odpověď
+  jejího \`POST /run\` = protokol ✗ \`run.cancelled\`, relace zůstane ve stavu před úlohou).
 - **\`otevřít "soubor"\`** (EN \`open\`, DE \`öffnen\`) otevře dokument ze vstupních souborů v nové záložce: v CLI soubory
   ve složce \`--files\` a ve složce skriptu, v HTTP klíče \`files\`. Formáty .mncad / JSON, STEP (velká sestava se rozdělí na
   díly jádrem), BREP, STL, OBJ, 3MF, DXF jako skica. Chybějící soubor = ✗ \`file.missing\` se seznamem dostupných.
@@ -2414,7 +2446,7 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
   (jen skica – profil, dráha) není chyba (\`V=-\`); ✗ \`build.failed\` „model nemá těleso“ dostane jen hlavní dokument.
 - **Stručný protokol i v prohlížeči:** \`await window.mncad.run(text, { protocol: "short" })\` (nebo jen
   \`run(text, "short")\`) vrátí tentýž protokol MNCAD/1 jako \`mncad run … --formats none\` (≤ 2 kB, řádky D, F souborů, které
-  skript zapsal – \`export step\` i s \`check=ok\`, Σ \`files=\`; liší se jen \`t=\`, \`slow=\`, \`mem=\`); \`"full"\` = plný
+  skript zapsal – \`export step\` i s \`check=ok\`, Σ \`files=\`; liší se jen \`t=\`, \`slow=\`, \`mem=\` a id běhu \`run=\`); \`"full"\` = plný
   protokol, \`"json"\` = RunReport (s \`full\`), \`budget\` (celé číslo 1–1048576, jen \`short\` / \`json\`) a \`notes\`
   (true / false, ne u \`console\`) jako \`--budget\` / \`--notes\`, výchozí (\`"console"\`) = text konzole. Neznámá volba nebo
   hodnota (\`protocoll\`, \`budget: -5\`) je chyba, ne tichý jiný výstup. Značka přebytku \`… in protocol-full.txt\` znamená

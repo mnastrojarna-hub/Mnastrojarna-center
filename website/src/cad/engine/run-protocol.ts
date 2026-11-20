@@ -29,7 +29,13 @@ import type { Workspace } from "./workspace";
 export const RUN_PROTOCOLS = ["console", "short", "full", "json"] as const;
 export type RunProtocol = (typeof RUN_PROTOCOLS)[number];
 /** volby `window.mncad.run(text, opts)`: druh protokolu, rozpočet stručného protokolu v bajtech, ℹ ve stručném protokolu */
-export type RunApiOptions = { protocol?: RunProtocol; budget?: number; notes?: boolean };
+export type RunApiOptions = {
+  protocol?: RunProtocol;
+  budget?: number;
+  notes?: boolean;
+  /** zrušení běhu (vlna 22, bod 12): `AbortController().signal` – čekající běh se vyřadí, běžící skončí ✗ run.cancelled */
+  signal?: AbortSignal;
+};
 
 /** počet řádků skriptu do hlavičky (`lines=`) – stejně jako CLI (`cli/watchdog.ts scriptLines`) */
 export const scriptLineCount = (text: string): number => (text ? text.replace(/\r?\n$/, "").split(/\r?\n/).length : 0);
@@ -44,7 +50,7 @@ export function checkProtocol(p: unknown): RunProtocol {
 /** rozpočet stručného protokolu – stejný rozsah jako CLI `--budget` (cli/args.ts) */
 export const BUDGET_MIN = 1;
 export const BUDGET_MAX = 1_048_576;
-const OPTION_KEYS = ["protocol", "budget", "notes"] as const;
+const OPTION_KEYS = ["protocol", "budget", "notes", "signal"] as const;
 
 /**
  * Volby `window.mncad.run(text, opts)` (a konzole) → `RunApiOptions`, nebo chyba s výčtem – žádná volba se tiše
@@ -57,7 +63,7 @@ export function checkRunOptions(o: unknown): RunApiOptions {
   if (typeof o !== "object" || Array.isArray(o)) throw new Error(tr("run: volby musí být objekt {0} nebo název protokolu – dostal jsem {1}", "{ protocol, budget, notes }", Array.isArray(o) ? "array" : typeof o));
   const rec = o as Record<string, unknown>;
   const unknown = Object.keys(rec).filter((k) => !(OPTION_KEYS as readonly string[]).includes(k));
-  if (unknown.length) throw new Error(tr("run: neznámá volba „{0}“ – protocol, budget, notes", unknown.join(", ")));
+  if (unknown.length) throw new Error(tr("run: neznámá volba „{0}“ – protocol, budget, notes, signal", unknown.join(", ")));
   const protocol = checkProtocol(rec.protocol);
   const out: RunApiOptions = rec.protocol !== undefined && rec.protocol !== null ? { protocol } : {};
   if (rec.budget !== undefined) {
@@ -70,6 +76,11 @@ export function checkRunOptions(o: unknown): RunApiOptions {
     if (typeof rec.notes !== "boolean") throw new Error(tr("run: notes musí být true nebo false – dostal jsem {0}", JSON.stringify(rec.notes) ?? String(rec.notes)));
     if (protocol === "console") throw new Error(tr("run: notes platí jen pro protokol short, full a json – výchozí text konzole ℹ vypisuje vždy"));
     out.notes = rec.notes;
+  }
+  if (rec.signal !== undefined) {
+    const sg = rec.signal as { aborted?: unknown; addEventListener?: unknown } | null;
+    if (!sg || typeof sg !== "object" || typeof sg.aborted !== "boolean" || typeof sg.addEventListener !== "function") throw new Error(tr("run: signal musí být AbortSignal (new AbortController().signal)"));
+    out.signal = rec.signal as AbortSignal;
   }
   return out;
 }

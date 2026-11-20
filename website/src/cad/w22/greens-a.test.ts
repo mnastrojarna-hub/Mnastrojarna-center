@@ -19,6 +19,12 @@
  *  9. `✓ „…“ vrácen do sestavy … · vazby N/N ok` – jen když se žádná reference neztratila, všechny vazby platí a díl se postavil;
  *     ztracená plocha = „→ … – stav vazeb níže“ + ✗ mate.lost, `sestava vazby` „ztracená reference“ (nikdy „– ok“),
  *     `mates=0/1(lost=1)` ve `stav` i v řádku D, komponenta stojí (GUI „Zpět do sestavy“ = táž funkce – e2e cad-w22-a2.e2e.cjs)
+ *
+ * Etapa A3 (bod 12 – identita a zrušení běhů, 22h – export jako úloha):
+ * 10. ✓ řádků skriptu / `MNCAD/1 OK` / stav běhu „dokončeno“ – nikdy u zrušeného běhu: zrušený běh = ✗ run.cancelled,
+ *     žádné ✓ za neprovedené řádky, `run.state` „cancelled“, dokument beze změny
+ * 11. `✓ kontrola STEP …` / F `check=ok` – jen když kontrola zpětným načtením opravdu proběhla nad TÍMTO souborem (export
+ *     `bez kontroly` = žádné ✓ kontroly ani `check=`); i export z menu ukazuje ✓ jen s výsledkem kontroly (export-run.test.ts)
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -288,4 +294,32 @@ sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20`,
       setLang("cs");
     }
   }, 240_000);
+
+  it("10. zrušený běh (signál po 1. řádku): žádné ✓ za další řádky, MNCAD/1 FAIL, run.state cancelled, dokument beze změny", async () => {
+    const ws = new MemoryWorkspace();
+    await runReport(ws, 'nový díl "Zrušený"\nkvádr 30 30 5', hostOf());
+    const before = JSON.stringify(ws.present());
+    const ac = new AbortController();
+    // (zrušení po řádku, který založil novou záložku – `nový díl` –, záložku nechá; proto tu dokument založí dřívější běh)
+    const rep = await runReport(ws, 'kvádr 20 10 10\nválec 5 10\nkvádr 1 1 1\nstav', hostOf(), { signal: ac.signal, hooks: { opEnd: () => ac.abort() } });
+    rep.run = { id: "r1", inputRev: "-@r·000000", state: rep.entries.some((e) => e.code === "run.cancelled") ? "cancelled" : "done" };
+    const out = formatShort(rep, { budget: Infinity, notes: true });
+    expect(out).toMatch(/^MNCAD\/1 FAIL /);
+    expect(out).toMatch(/^✗ L- run\.cancelled/m);
+    expect(out).not.toMatch(/^✓ L[234] /m);
+    expect(rep.run.state).toBe("cancelled");
+    expect(out).toMatch(/ run=r1$/);
+    expect(JSON.stringify(ws.present())).toBe(before);
+  }, 120_000);
+
+  it("11. ✓ kontrola STEP jen s kontrolou: `export step bez kontroly` = žádné ✓ kontroly ani check=, s kontrolou ✓ + check=ok + rev=", async () => {
+    const ws = new MemoryWorkspace();
+    await runReport(ws, 'nový díl "Export"\nkvádr 20 10 10', hostOf());
+    const without = await short(ws, "export step bez kontroly");
+    expect(con).not.toMatch(/✓ kontrola STEP/);
+    expect(without).not.toMatch(/check=/);
+    const withCheck = await short(ws, "export step");
+    expect(con).toMatch(/✓ kontrola STEP/);
+    expect(withCheck).toMatch(/^F step "Export\.step" \d+B check=ok rev=r·[0-9a-f]{6}/m);
+  }, 120_000);
 });

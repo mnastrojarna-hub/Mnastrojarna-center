@@ -7,6 +7,7 @@
  */
 import type { CadLang } from "../i18n";
 import type { Vec3 } from "../types";
+import type { RunStamp } from "./run-queue";
 
 /** úroveň záznamu: ✓ ok, ℹ note, ⚠ warn, ✗ error, `=` measure (vyžádaná hodnota / výpis) */
 export type Level = "ok" | "note" | "warn" | "error" | "measure";
@@ -69,6 +70,10 @@ export type OutFile = {
   sheets?: number;
   check?: { ok: boolean; text: string };
   run?: "fail";
+  /** revize modelu, ze které soubor vznikl (`r·a1b2c3` – řádek F `rev=`; vlna 22, bod 12) */
+  modelRev?: string;
+  /** časy fází exportu 3D modelu (model / convert / verify / write – engine/export-job.ts, bod 22h) */
+  phases?: { phase: string; ms: number }[];
 };
 
 export type ShareMode = "self" | "store" | "link";
@@ -98,6 +103,11 @@ export type RunReport = {
   timing: OpTiming[];
   /** nejvyšší hlášená paměť běhu (WASM halda + RSS), MB */
   peakMB: number;
+  /**
+   * identita běhu (vlna 22, bod 12 – engine/run-queue.ts): `id` běhu (`r12` prohlížeč, `r1` CLI, `j3` serve), `inputRev` =
+   * klíč dokumentu + revize modelu před během, `state` = dokončeno / zrušeno / chyba; Σ `run=<id>`
+   */
+  run?: RunStamp;
   /** stručný protokol (vyplní `finalizeReport` / `toJson`) */
   protocol: string;
   overflow?: Overflow;

@@ -15,13 +15,14 @@ import { groupShareCode, SHARE_DEFAULT_DAYS } from "../../share";
 import type { CadDoc } from "../../types";
 import { drawExtras } from "../asm-status";
 import type { Code, CodeEntryInit } from "../codes";
-import { assertDrawable, bytesToBase64, drawingOutput, hasDrawings, isEmptyDoc, modelBytes, OUT_BASE64_MAX, OUT_MIME, plainName, projectFile, sheetScope, sketchDxf, verifyExport, type DrawEnv } from "../files";
+import { assertDrawable, bytesToBase64, drawingOutput, hasDrawings, isEmptyDoc, OUT_BASE64_MAX, OUT_MIME, plainName, projectFile, sheetScope, sketchDxf, type DrawEnv } from "../files";
 import { sha256Hex } from "../host";
 import { quote } from "../protocol";
 import type { OutFile } from "../protocol-types";
 import { runOf } from "../run-doc";
 import { lastShareLink, rememberLink, shareInfo, shareWithPolicy, type LastLink } from "../share-out";
 import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
+import { runExportJob } from "../export-job";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
 
@@ -103,6 +104,7 @@ async function saveProject(ctx: OpCtx, e: Emit, cmd: { name?: string; deliver?: 
   const p = projectFile(d, outFileName(cmd.name, plainName(d.name), FORMAT_EXT.mncad));
   const f = await deliver(ctx, e, p, what, formatLabel("mncad"), cmd.deliver ?? "file");
   if (!f) return;
+  f.modelRev = p.modelRev; // revize modelu v souboru i v řádku F (vlna 22, bod 12)
   if (!cmd.deliver) ctx.host.ui?.saved?.(d);
   const check = tr("  ✓ kontrola: projekt jde znovu otevřít – „{0}“, {1} {2}", p.docName, p.count, p.asm ? tr("komponent") : tr("prvků"));
   e.console(check);
@@ -114,15 +116,29 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   if (cmd.format === "mncad") return saveProject(ctx, e, cmd, tr("export MNCAD"));
   const d = runOf(ctx).doc;
   const fmt = cmd.format;
-  const data = await modelBytes(ctx.host.kernel, d, fmt);
   const name = outFileName(cmd.name, plainName(d.name), FORMAT_EXT[fmt]);
-  const f = await deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file");
-  if (!f || (fmt !== "step" && fmt !== "brep")) return;
+  // export jako úloha s fázemi (vlna 22, bod 22h – engine/export-job.ts): přestavba modelu, převod, zápis, kontrola
+  // zpětným načtením; pořadí řádků protokolu jako dřív (soubor, pak kontrola); fáze hlásí hostitel (CLI --progress, běh v GUI)
+  const job = await runExportJob(
+    d,
+    fmt,
+    {
+      kernel: ctx.host.kernel,
+      phase: (p) => ctx.host.phase?.(`export:${fmt}`, p),
+      write: (data) => deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file"),
+    },
+    { check: cmd.check !== false, verifyFirst: false },
+  );
+  const f = job.out;
+  if (!f) return;
+  f.modelRev = job.modelRev;
+  f.phases = job.phases;
+  if (fmt !== "step" && fmt !== "brep") return;
   if (cmd.check === false) {
     e.console(tr("  – kontrola {0} vynechána („bez kontroly“)", fmt.toUpperCase()));
     return;
   }
-  const c = await verifyExport(ctx.host.kernel, d, data, fmt);
+  const c = job.check!;
   const text = c.line.replace(/^[✓⚠✗]\s*/, "");
   f.check = { ok: c.ok, text };
   if (c.ok) {

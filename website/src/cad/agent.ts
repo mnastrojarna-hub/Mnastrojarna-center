@@ -18,6 +18,7 @@ import { asmStatusLines, parseAsmText, type AsmCmd } from "./agent-asm";
 import { parseMotionText } from "./agent-motion";
 import type { MateStatus } from "./mates";
 import type { DrawingExportFormat, DrawingExportOptions, DrawingExportResult } from "./drawing-export";
+import type { RunSnapshot } from "./engine/run-queue";
 import { parseConstraints, parseDims, sketchStatusLines, type SketchOnOp, type SketchOp, type SketchTarget } from "./agent-sketch";
 import { parseMeasure, type MeasureApiResult, type MeasureCmd } from "./agent-measure";
 import { parseSheetLine, sheetSummary, SHEET_COMMANDS } from "./agent-sheet";
@@ -1802,6 +1803,19 @@ export type MncadApi = MncadApiExt & MncadOutApi & {
   /** zruší běžící výpočet (jako tlačítko Zrušit); vrací false, když nic neběželo */
   cancel: () => boolean;
   /**
+   * běhy stránky (vlna 22, bod 12 – engine/run-queue.ts): textové příkazy a úlohy exportu – id (`r12`), stav (queued | running |
+   * done | cancelled | error | superseded), revize vstupu, fáze, čas, výsledek; `kind` = jen jeden druh
+   */
+  runs?: (kind?: "script" | "export") => RunSnapshot[];
+  /** zruší běh `id` (bez id: běžící, jinak nejstarší čekající) – čekající se neprovede, běžící skončí ✗ run.cancelled */
+  cancelRun?: (id?: string) => boolean;
+  /** počká, až doběhnou všechny běhy a stavba modelu (dokončený stav – uložit / export / sdílet čekají samy) */
+  idle?: () => Promise<void>;
+  /** úlohy exportu této relace (= `runs("export")`): fáze, čas, soubor, velikost, kontrola, revize modelu */
+  exports?: () => RunSnapshot[];
+  /** počet rozepsaných změn (pole < 450 ms bez opuštění, list výkresu před uložením) – každé volání API je nejdřív zapíše */
+  pending?: () => number;
+  /**
    * popisky entit v 3D okně (F1 plocha, E2 hrana, V3 vrchol): zapne/vypne a vrátí seznam se souřadnicemi na obrazovce (vůči 3D oknu);
    * při otevřené skice vrací štítky bodů skici (O = počátek, P1… = body entit; kind "origin" / "point") se souřadnicemi vůči plátnu skici
    */
@@ -1809,7 +1823,19 @@ export type MncadApi = MncadApiExt & MncadOutApi & {
   /** klikne na entitu podle popisku stejnou cestou jako myš (additive = přidat k výběru) */
   clickHint: (id: string, additive?: boolean) => boolean;
   /** export bez dialogu: STEP, STL, BREP, OBJ, GLB, 3MF, WRL, projekt .mncad nebo skica DXF (`sketch` = název skici, výchozí otevřená / poslední) – vrátí název, MIME, velikost a base64 */
-  exportFile: (format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad" | "dxf", opts?: { sketch?: string }) => Promise<{ name: string; mime: string; bytes: number; base64: string; /** .mncad bez dat některých importů (nejsou v paměti) */ warning?: string }>;
+  exportFile: (
+    format: "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad" | "dxf",
+    opts?: { sketch?: string },
+  ) => Promise<{
+    name: string;
+    mime: string;
+    bytes: number;
+    base64: string;
+    /** .mncad bez dat některých importů (nejsou v paměti) */ warning?: string;
+    /** revize modelu souboru (`r·a1b2c3`) – vlna 22, bod 12 */ modelRev?: string;
+    /** kontrola STEP / BREP zpětným načtením (jako textové `export step`) */ check?: { ok: boolean; text: string };
+    /** úloha exportu (id, stav, fáze s časy) – vlna 22, bod 22h; zrušení `cancelRun(job.id)` */ job?: RunSnapshot;
+  }>;
   /**
    * 2D výkres: provede 2D příkazy (řádky / „;“, předpona `2d` se doplní) nad otevřeným 2D výkresem (`nový …` založí nový)
    * a vrátí protokol, strukturované výsledky příkazů (vytvořené / změněné / smazané id, data dotazů, soubor exportu) a stav výkresu

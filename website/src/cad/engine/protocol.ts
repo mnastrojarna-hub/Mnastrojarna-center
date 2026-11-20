@@ -40,6 +40,7 @@ import type { CadLang } from "../i18n";
 import { CODE_RE, codeArgs, codeDef, codeEntry, fallbackCode, type Code, type CodeEntryInit } from "./codes";
 import { tr } from "../i18n";
 import type { DocSummary, Entry, Level, OpTiming, OutFile, Overflow, RunReport, ShareInfo } from "./protocol-types";
+import type { RunStamp } from "./run-queue";
 
 export const PROTOCOL_HEAD = "MNCAD/1";
 export const OVERFLOW_FILE = "protocol-full.txt";
@@ -415,6 +416,7 @@ export function fileLine(f: OutFile): string {
   if (f.sheets) kv.push(`sheets=${f.sheets}`);
   if (f.check) kv.push(`check=${f.check.ok ? "ok" : "fail"}`);
   if (f.run === "fail") kv.push("run=fail");
+  if (f.modelRev) kv.push(`rev=${/^r·[0-9a-f]{6}$/.test(f.modelRev) ? f.modelRev : token(f.modelRev, "-")}`); // revize modelu souboru (vlna 22, bod 12)
   const bytes = Number.isFinite(f.bytes) ? Math.max(0, Math.round(f.bytes)) : 0;
   return `F ${token(f.format, "bin")} ${quote(f.name)} ${bytes}B${kv.length ? " " + kv.join(" ") : ""}`;
 }
@@ -489,6 +491,8 @@ export function sigmaLine(r: RunReport): string {
   const slow = [...(r.timing ?? [])].sort((a, b) => b.ms - a.ms)[0];
   if (slow && slow.ms >= 100) kv.push(`slow=L${nat(slow.line)}:${token(slow.op, "op")}:${secs(slow.ms)}`);
   if (r.peakMB > 0) kv.push(`mem=${Math.round(r.peakMB)}MB`);
+  // identita běhu (vlna 22, bod 12 – engine/run-queue.ts); revize vstupu je v JSON `run.inputRev`
+  if (r.run?.id) kv.push(`run=${/^[A-Za-z0-9_-]{1,64}$/.test(r.run.id) ? r.run.id : token(r.run.id, "-")}`); // id úlohy serve smí mít „-“ a „_“
   return `Σ ${kv.join(" ")}`;
 }
 
@@ -759,6 +763,8 @@ export class ReportBuilder {
   memory(mb: number): void {
     if (Number.isFinite(mb) && mb > this.peak) this.peak = mb;
   }
+  /** identita běhu (`RunReport.run`, Σ `run=`) – nastaví hostitel běhu (prohlížeč: RunTracker, CLI, serve) */
+  run?: RunStamp;
   /** sdílený odkaz z běhu (poslední vyhrává; `finish({ share })` má přednost) */
   setShare(s: ShareInfo): void {
     this.sharedLink = s;
@@ -800,6 +806,7 @@ export class ReportBuilder {
       protocol: "",
     };
     if (this.stoppedAt) r.stopped = this.stoppedAt;
+    if (this.run) r.run = { ...this.run };
     const share = o.share ?? this.sharedLink;
     if (share) r.share = share;
     return r;

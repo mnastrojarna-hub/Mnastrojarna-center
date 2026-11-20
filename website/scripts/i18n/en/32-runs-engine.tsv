@@ -9,7 +9,6 @@ Výstup jako stručný protokol MNCAD/1 (stejný jako mncad run v příkazové �
 ✓ otevřeno „{0}“ – dokument „{1}“ ve znovu použité záložce z dřívějšího běhu	✓ opened “{0}” – document “{1}” in the reused tab from an earlier run
 ✓ dokument „{0}“ ({1} prvků) – nahradí záložku téhož názvu z dřívějšího běhu	✓ document “{0}” ({1} features) – replaces the tab of the same name from an earlier run
 run: volby musí být objekt {0} nebo název protokolu – dostal jsem {1}	run: options must be an object {0} or a protocol name – got {1}
-run: neznámá volba „{0}“ – protocol, budget, notes	run: unknown option “{0}” – protocol, budget, notes
 run: budget musí být celé číslo {0}–{1} (bajty) – dostal jsem {2}	run: budget must be an integer {0}–{1} (bytes) – got {2}
 run: budget platí jen pro protokol short (a json) – zvolený protokol: {0}	run: budget applies only to the short protocol (and json) – chosen protocol: {0}
 run: notes musí být true nebo false – dostal jsem {0}	run: notes must be true or false – got {0}

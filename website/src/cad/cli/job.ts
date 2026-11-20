@@ -42,6 +42,7 @@ import { hasDrawings, sheetCacheScope, writeDocFormat } from "../engine/files";
 import { shareInfo, shareWithPolicy } from "../engine/share-out";
 import type { DocSummary, Entry, OutFile, RunReport, ShareInfo } from "../engine/protocol-types";
 import type { Workspace } from "../engine/workspace";
+import { inputRevOf, type RunStamp } from "../engine/run-queue";
 import type { Formats, OutFormat, ShareView, StrictOpt } from "./args";
 import { CliFileSink, CliFileSource } from "./file-sink";
 import { scriptLines, strictStopper } from "./watchdog";
@@ -100,6 +101,8 @@ export type JobRequest = {
   saveSession: boolean;
   /** prázdný skript není chyba (pokračování relace: `--resume`, HTTP `session`) */
   allowEmpty?: boolean;
+  /** id běhu (vlna 22, bod 12): `mncad run` = `r1`, `mncad serve` = id úlohy `j<n>` – `RunReport.run.id`, Σ `run=` */
+  runId?: string;
 };
 
 export type ToJob = { t: "run"; id: number; req: JobRequest } | { t: "selftest"; id: number } | { t: "close" };
@@ -109,7 +112,9 @@ export type FromJob =
   | { t: "ready"; ms: number; mem: Mem }
   | { t: "op-start"; id: number; line: number | null; op: string }
   | { t: "op-end"; id: number; line: number | null; op: string; ms: number; entries: Entry[]; files: OutFile[]; mem: Mem }
-  | { t: "progress"; id: number; op: string; index?: number; total?: number; name?: string }
+  | { t: "progress"; id: number; op: string; index?: number; total?: number; name?: string; phase?: string }
+  /** identita běhu (id + revize vstupu) – hlídač ji dá i do protokolu přerušeného běhu */
+  | { t: "run"; id: number; run: RunStamp }
   | { t: "done"; id: number; report: RunReport; files: DoneFile[]; session?: Uint8Array; mem: Mem }
   | { t: "failed"; id: number; error: string }
   | { t: "selftest"; id: number; result: SelftestResult }
@@ -443,8 +448,13 @@ async function handleRun(st: JobState, id: number, req: JobRequest): Promise<voi
   }
   const writtenList = () => (mem ? [...mem.files.values()].map((x) => x.file) : ((sink as CliFileSink).written ?? []));
   const inputs = req.inputs.kind === "dirs" ? new CliFileSource(req.inputs.roots, req.inputs.explicit) : memoryFileSource(req.inputs.files);
-  const host: EngineHost = { kernel: st.kernel, files: sink, inputs, ...hostFonts(), now: () => Date.now() };
+  // fáze výstupů (export: přestavba / převod / kontrola / zápis – engine/export-job.ts) → průběh hlídače (`--progress`)
+  const host: EngineHost = { kernel: st.kernel, files: sink, inputs, ...hostFonts(), now: () => Date.now(), phase: (op, phase) => post({ t: "progress", id, op, phase }) };
   const rb = new ReportBuilder({ lang: req.lang, lines: scriptLines(req.script), strict: !!req.strict });
+  // identita běhu (vlna 22, bod 12): id + revize vstupu (klíč dokumentu a revize modelu před během – relace / --resume)
+  const run: RunStamp = { id: req.runId ?? "r1", inputRev: inputRevOf(ws.docKey(), ws.present()) };
+  rb.run = run;
+  post({ t: "run", id, run });
   if (req.resume) rb.code("session.history");
   let sentEntries = 0;
   let sentFiles = 0;
@@ -464,7 +474,8 @@ async function handleRun(st: JobState, id: number, req: JobRequest): Promise<voi
   };
   // průběh po prvcích z jádra (ne „start“ – ten klient hlásí sám u každé dlouhé operace)
   const stopProgress = st.kernel.onProgress((p) => {
-    if (p && p.phase !== "start") post({ t: "progress", id, op: p.op, index: p.index, total: p.total, name: p.name });
+    // fáze sítě se jmenuje (dřív „build 3/2“ – index za posledním prvkem)
+    if (p && p.phase !== "start") post({ t: "progress", id, op: p.op, index: p.index, total: p.total, name: p.name, ...(p.phase === "mesh" ? { phase: "mesh" } : {}) });
   });
   // listy výkresů spočítané v běhu (`výkres export pdf dokument`) převezme `--formats pdf` téhož dokumentu (jen v tomto běhu)
   const closeSheets = sheetCacheScope();
@@ -479,6 +490,7 @@ async function handleRun(st: JobState, id: number, req: JobRequest): Promise<voi
     if (rb.count("error") > 0) for (const f of files) f.run = "fail";
     const m = memorySample();
     rb.memory(Math.max(m.rssMB, m.heapMB));
+    rb.run = { ...run, state: "done" };
     const report = rb.finish({ docs: fin.docs, files, ...(fin.share ? { share: fin.share } : {}) });
     const done: DoneFile[] = mem ? [...mem.files.values()].map((x) => ({ file: x.file, data: x.data, mime: x.mime })) : files.map((file) => ({ file }));
     const session = req.saveSession ? ws.save() : undefined;

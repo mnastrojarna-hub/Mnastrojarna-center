@@ -30,7 +30,8 @@ const G = [
   /^… \d+ entries \d+B in protocol-full\.txt$/, /^Σ (.*)$/,
 ];
 const grammarOk = (text) => text.trim().split('\n').every((l) => G.some((re) => re.test(l)));
-const strip = (s) => s.replace(/ t=[\d.]+/g, '').replace(/ slow=\S+/g, '').replace(/ mem=\d+MB/g, '').trim();
+// vlna 22 (bod 12): Σ nese id běhu (prohlížeč r<n>, CLI r1) – liší se jako čas, proto se porovnává bez něj
+const strip = (s) => s.replace(/ t=[\d.]+/g, '').replace(/ slow=\S+/g, '').replace(/ mem=\d+MB/g, '').replace(/ run=[a-z]+\d+/g, '').trim();
 const dLines = (full) => full.split('\n').filter((l) => l.startsWith('D '));
 
 // CLI ze svazku sestaveného s tímto buildem (prebuild → public/cad/cli/<verze>/mncad.mjs)
@@ -243,7 +244,7 @@ const start = async (p, url) => {
     ok(/^F (step|pdf) "E2?(_vykres)?\.(step|pdf)" \d+B/m.test(web) && / files=1 /.test(web), `6d: ${sc.split('\n').pop()}: řádek F a files=1 v prohlížeči (${fl(web)})`);
     const norm = (t) => strip(t).replace(/^(F \S+ "[^"]+") \d+B/m, '$1 #B');
     ok(norm(web) === norm(cli.text), `6d: ${sc.split('\n').pop()}: stručný protokol prohlížeče = CLI (F: web ${fl(web)} / cli ${fl(cli.text)})${norm(web) === norm(cli.text) ? '' : `\n--- web\n${web}\n--- cli\n${cli.text}`}`);
-    if (sc.endsWith('export step')) ok(/^F step "E\.step" \d+B check=ok$/m.test(web), '6d: STEP s kontrolou check=ok i v prohlížeči');
+    if (sc.endsWith('export step')) ok(/^F step "E\.step" \d+B check=ok rev=r·[0-9a-f]{6}$/m.test(web), '6d: STEP s kontrolou check=ok i v prohlížeči');
   }
 
   // ════════════ 5) anglické rozhraní ════════════
