@@ -223,7 +223,7 @@ export function systemPrompt(): string {
       "objednávky zákazníka, na kterou odkazuje („Vaše objednávka č.“, „Ihre Bestellung“); u dokladu od dodavatele a u naší " +
       "objednávky dodavateli číslo NAŠÍ objednávky u dodavatele.\n" +
       "- customerInquiryNumber = číslo poptávky zákazníka (RFQ, Anfrage).\n" +
-      "- ourQuoteNumber = číslo NAŠÍ nabídky (např. NAB-2026-031), na kterou doklad odkazuje („dle nabídky č.“, " +
+      "- ourQuoteNumber = číslo NAŠÍ nabídky (např. N2026/025-V1, starší NAB-2026-031), na kterou doklad odkazuje („dle nabídky č.“, " +
       "„Ihr Angebot“, „Your quotation“); u naší nabídky její vlastní číslo. Nabídka dodavatele sem NEPATŘÍ.\n" +
       "- ourJobNumber = naše číslo zakázky (Z-2026-014), je-li na dokladu (např. „Vaše značka“, „Ihr Zeichen“).\n" +
       "- ourOrderConfirmationNumber = číslo našeho potvrzení objednávky.\n" +

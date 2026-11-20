@@ -9,7 +9,7 @@ import { RowNextAction, RowProposal } from "@/components/jobs/book/row-flow";
 import { rowFlowView, type BookAccess, type RowFlowView } from "@/components/jobs/book/book-flow";
 import { actionPalette } from "@/components/flow/flow-state";
 import {
-  CustomerDocNumber, CustomerNoteMark, DeadlineBlock, DrawingChips, JobCounters, JobValue, PaymentMark, PeopleStack,
+  CustomerDocNumber, CustomerNoteMark, DeadlineBlock, DrawingChips, JobCounters, JobNoteLine, JobValue, PaymentMark, PeopleStack,
   PriorityMark, ProductionLine, SourceMark,
 } from "@/components/jobs/book/job-cells";
 import { PREMIUM_ROW, PREMIUM_STRIPE, PremiumBadge } from "@/components/customers/premium-badge";
@@ -167,6 +167,7 @@ function JobRow({ job, today, access }: { job: JobListItem; today: string; acces
             <span className="min-w-0 max-w-full truncate text-sm text-muted-foreground">{job.title || "Bez názvu"}</span>
             <DrawingChips numbers={job.drawingNumbers} />
           </div>
+          <JobNoteLine note={job.note} className="mt-0.5" />
           <CustomerDocNumber job={job} className="mt-1.5 lg:hidden" />
           <RowStateChip job={job} view={view} className="relative z-10 mt-1.5 lg:hidden" />
           {/* výjimky v toku: nová revize výkresu, bez objednávky, reklamace, opraveno */}

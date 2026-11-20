@@ -557,6 +557,11 @@ export function quoteItemsFromJobItems(
   });
 }
 
+/** Číslo nabídky podle zakázky (20. 11.): N2026/025-V1 — další verze dává DB (next_job_quote_number). */
+export function isJobQuoteNumber(number: string | null | undefined): boolean {
+  return /^N\d{4}\/\d+-V\d+$/i.test(String(number ?? "").trim());
+}
+
 export function quoteRevisionNumber(number: string, revision: number): string {
   const base = number.trim().replace(/-R\d+$/i, "");
   return `${base}-R${revision}`;
@@ -667,7 +672,7 @@ export const JOB_LIST_SELECT = [
   "owner_id, assignee_id, created_by, supplier_id, ai_filled, source, created_at, updated_at, stage_changed_at",
   "production_step, production_location, production_done, production_total, production_problem",
   PRODUCTION_LIST_COLUMNS,
-  "customer_note, delivery_note_confirmed_at, invoice_number, invoice_due_date, paid_at",
+  "note, customer_note, delivery_note_confirmed_at, invoice_number, invoice_due_date, paid_at",
   FLOW_LIST_COLUMNS,
   "customer:customers!customer_id(id, name, customer_number, ico, is_premium)",
   `owner:profiles!owner_id(${PERSON})`,
@@ -1223,6 +1228,7 @@ export function rowToJobListItem(row: JobRow, opts: ViewOptions): JobListItem {
     productionProblem: Boolean(row.production_problem),
     ...("production_step_no" in row ? productionSummaryOfRow(row) : {}),
     customerNote: cleanText(row.customer_note, 10_000),
+    note: cleanText(row.note, 10_000),
     deliveryNoteConfirmedAt: cleanDate(row.delivery_note_confirmed_at),
     invoiceNumber: cleanText(row.invoice_number, 120),
     invoiceDueDate: cleanDate(row.invoice_due_date),
