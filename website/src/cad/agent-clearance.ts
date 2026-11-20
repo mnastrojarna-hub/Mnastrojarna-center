@@ -15,7 +15,7 @@
  */
 import { AsmCursor, asmIsNum, asmNum, asmWords as W, findComp } from "./agent-asm";
 import { clearanceStepLines, clearanceSummaryLines } from "./clearance-report";
-import { leafLabel } from "./clash-report";
+import { leafLabel, nf } from "./clash-report";
 import { tr } from "./i18n";
 import type { MotionResult } from "./motion";
 import type { CadDoc, MotionClearance, MotionStudy } from "./types";
@@ -107,7 +107,7 @@ const mmText = (v: number) => String(Math.round(v * 1e6) / 1e6);
 /** popis nastavení vůle: „sledováno „A“ × „B“; limit 0,05 mm; zjemnění u kontaktu“ */
 export function clearanceSettingsText(doc: CadDoc, c: MotionClearance | undefined, collisions?: boolean): string {
   const pairs = !c?.pairs ? tr("nesleduje se") : c.pairs === "moving" ? tr("pohyblivé díly vůči ostatním") : c.pairs.map((p) => `„${compName(doc, p.a)}“ × „${compName(doc, p.b)}“`).join(", ") || tr("nesleduje se");
-  const lim = c?.limit !== undefined ? tr("limit {0} mm", mmText(c.limit).replace(".", tr(","))) : tr("bez limitu");
+  const lim = c?.limit !== undefined ? tr("limit {0} mm", nf(c.limit, 6)) : tr("bez limitu");
   const mode = c?.refine === false ? tr("jen v polohách kroků (diskrétně)") : tr("spojitě – zjemnění u kontaktu a kontrola mezi polohami");
   return tr("Vůle: {0} · {1} · kontrola {2}{3}", pairs, lim, mode, collisions ? "" : tr(" (kolize v pohybu vypnuté – pohyb kolize)"));
 }

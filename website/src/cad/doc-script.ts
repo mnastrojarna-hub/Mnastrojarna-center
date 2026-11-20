@@ -31,6 +31,7 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { clashRulesScript } from "./agent-clash";
+import { clearanceScript } from "./agent-clearance";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics } from "./doc-script-asm";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
@@ -2079,6 +2080,10 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     // čas, krok, gravitace, tlumení, odraz, snímky (i nastavení uložené u kinematické studie) – doc-script-asm.ts
     emitDynamics(c.sheetOut, mo);
   }
+  // sledovaná vůle a spojitost kontroly kolizí pohybové studie – vlna 22, bod 6 (cad/agent-clearance.ts)
+  const clr = clearanceScript(doc, c.li, (id) => (idx.has(id) ? `#${idx.get(id)}` : null));
+  for (const l of clr.lines) c.line(l);
+  if (clr.skipped) c.note(tr("sledovaná vůle dvojice s komponentou mimo skript se do skriptu nepřenáší ({0})", clr.skipped));
   // pravidla kolizí (pracovní kontakt, závit bez prvku) a tolerance dotyku – vlna 22, bod 5 (cad/agent-clash.ts)
   const cr = clashRulesScript(doc, c.li, (p) => (p.length === 1 && idx.has(p[0]) ? `#${idx.get(p[0])}` : null), (id) => mateNo.get(id));
   for (const l of cr.lines) c.line(l);

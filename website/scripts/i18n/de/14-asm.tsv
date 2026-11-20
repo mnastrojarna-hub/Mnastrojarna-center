@@ -46,12 +46,10 @@ hřeben: za modulem čekám „zuby z“ (počet zubů pastorku)	Zahnstange: nac
 hřeben: zadejte „modul m zuby z“ (dráha na otáčku = π·m·z) nebo „dráha N“	Zahnstange: „modul m zähne z“ (Weg pro Umdrehung = π·m·z) oder „weg N“ angeben
 Klikněte na plochu vybrané (pohyblivé) komponenty.	Klicken Sie auf eine Fläche der gewählten (beweglichen) Komponente.
 kolize	Kollisionen
-Kolize: žádné ve všech krocích	Kollisionen: keine in allen Schritten
 komponenta „{0}“ nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub – lineární motor potřebuje posuvnou vazbu	Komponente „{0}“ hat keine Verknüpfung Abstand, Langloch, Pfad, Konzentrisch oder Schraube – ein Linearantrieb braucht eine Schiebeverknüpfung
 komponenta „{0}“ nemá vazbu Závěs, Souosost ani Šroub – rotační motor potřebuje osu (sestava vazba závěs "{0}" … "Rám" …)	Komponente „{0}“ hat keine Verknüpfung Scharnier, Konzentrisch oder Schraube – ein Drehantrieb braucht eine Achse (baugruppe verknüpfung scharnier "{0}" … "Rahmen" …)
 Komponenta nemá vhodnou entitu ({0}).	Die Komponente hat keine passende Entität ({0}).
 Komponenta stopy	Komponente der Spur
-Kontrolovat kolize v každém kroku (pomalejší)	Kollisionen in jedem Schritt prüfen (langsamer)
 krok	Schritt
 Krok	Schritt
 Krok „{0}“ potřebuje: {1}	Schritt „{0}“ braucht: {1}

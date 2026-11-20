@@ -259,5 +259,5 @@ export function gapAt(res: Res | null | undefined, doc: CadDoc, i: number): GapG
   }
   if (!best) return null;
   const isMin = !!best.p.min && Math.round(best.p.min.pos) === i && !best.p.min.between && Math.abs(best.p.min.d - best.d) < 1e-9;
-  return { p1: best.pts[0], p2: best.pts[1], d: best.d, below: c.limit !== null && best.d < c.limit, min: isMin, label: `${isMin ? tr("min ") : ""}${mm(best.d)} mm` };
+  return { p1: best.pts[0], p2: best.pts[1], d: best.d, below: c.limit !== null && best.d < c.limit, min: isMin, label: `${isMin ? `${tr("min")} ` : ""}${mm(best.d)} mm` };
 }
