@@ -20,6 +20,9 @@ import { MemoryWorkspace } from "../engine/memory-workspace";
 import { formatConsole, formatShort } from "../engine/protocol";
 import { runReport } from "../engine/run-protocol";
 import type { RunReport } from "../engine/protocol-types";
+import { clearanceTracker, type PoseAt } from "../motion-clearance";
+import type { MotionResult, MotionStep } from "../motion";
+import type { CadDoc, Placement } from "../types";
 
 const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
 const FONTS = path.resolve(__dirname, "../../../public/fonts");
@@ -93,6 +96,32 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     expect(r.sweep![3]).toMatchObject({ ok: true, d: 0, pen: 0 });
     expect(r.local![id("Nůž")]!.r).toBeCloseTo(Math.hypot(0.5, 20, 5), 6);
   }, 120_000);
+
+  it("pouzdro klouže po sloupku bez vůle (Ø24 v Ø24): dráha posuvu úsek dokáže v OBOU pořadích dvojice – žádné „nepotvrzeno“", async () => {
+    // Fáze 2: syntetický nástroj hlásil ⚠ clash.uncertain „nepotvrzeny v 653 úsecích“ jen při jednom pořadí náhodných id
+    // (B = duté pouzdro: zmenšení k středu obálky zúží díru → dráha „zajede“ do sloupku → zbytečné půlení vyčerpalo rozpočet).
+    const ws = new MemoryWorkspace();
+    await runReport(ws, ["nový díl Sloupek", "válec 24 100", "nový díl Pouzdro", "kvádr 40 40 30", "díra 24 skrz v 20 20", "nová sestava Vedení", 'vložit "Pouzdro" v -20 -20 0', 'vložit "Sloupek" ukotvit v 0 0 -50'].join("\n"), host());
+    const d = ws.present();
+    const src = (n: string) => d.components!.find((c) => c.name === n)!;
+    for (const [sl, po] of [["a-sloupek", "z-pouzdro"], ["z-sloupek", "a-pouzdro"]] as const) {
+      const doc: CadDoc = { ...d, components: [{ ...src("Sloupek"), id: sl }, { ...src("Pouzdro"), id: po }], mates: [] };
+      const at = (t: number): Record<string, Placement> => ({ [po]: { ...src("Pouzdro").placement, position: [-20, -20, 20 * t] } });
+      const tr = clearanceTracker(doc, { motors: [], duration: 1, steps: 4 } as never, { clearance: (q) => kernel.clearance(q), collide: async () => [] }, { collisions: true, steps: 4 })!;
+      const steps: MotionStep[] = [];
+      for (let k = 0; k <= 4; k++) {
+        const row = { i: k, t: k / 4, motors: [k / 4], place: at(k / 4), conflicts: [], clashes: [] } as unknown as MotionStep;
+        const poseAt: PoseAt = (tm) => ({ place: at(tm), motors: [tm], t: tm });
+        await tr.step(row, steps[steps.length - 1] ?? null, poseAt);
+        steps.push(row);
+      }
+      const res = tr.finish({ steps, comps: [], motors: [], collision: null, collisionsChecked: true, conflictSteps: 0 } as unknown as MotionResult);
+      expect(res.sweep, `${sl} × ${po}`).toMatchObject({ mode: "continuous", unproven: 0 });
+      expect(res.sweep!.swept, `${sl} × ${po}`).toBe(4); // každý úsek dokázán dráhou posuvu
+      expect(res.sweep!.refined, `${sl} × ${po}`).toBeLessThanOrEqual(4); // bez půlení (jen mezipoloha úseku)
+      expect(res.between ?? []).toEqual([]);
+    }
+  }, 300_000);
 
   it("74c: střižník ve vedení – vůle 0,01 mm pod limitem 0,05 (⚠ s místem a kroky), `kolize` bez ✓", async () => {
     const { r, short, con } = await run("74c", corpus("74c-clearance-guide"));

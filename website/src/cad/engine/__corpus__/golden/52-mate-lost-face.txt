@@ -19,13 +19,13 @@ Prvky:
 ✓ komponenta „Přidržovač“ vložena do sestavy
 ✓ vazba Kontakt „Přidržovač“ F5 → „Deska A“ F3: ok · „Přidržovač“ poloha [5; 10; 5]
 ✓ vazba Zarovnat „Přidržovač“ F3 → „Deska A“ F2: ok · „Přidržovač“ poloha [5; 0; 5]
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 5]
 Vazby: 2 (2 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 21 cm³ · hmotnost Σ 0,165 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === run 3 ===
 ✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
 ✓ smazáno: Kvádr 2
@@ -43,7 +43,7 @@ Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 5]
 Vazby: 2 (1 ztracená reference, 1 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
-Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
 === run 4 ===
 ✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
 → Kvádr 2 (box) přidán – výsledek po výpočtu níže
@@ -59,7 +59,7 @@ Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 5]
 Vazby: 2 (2 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 15 mm · objem Σ 21 cm³ · hmotnost Σ 0,165 kg
-Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
 === run 5 ===
 ✓ úprava dílu „Deska A“ v kontextu sestavy „Sestava A“ – další příkazy pracují s ním; návrat: sestava hotovo
 ✓ smazáno: Kvádr 2
@@ -76,4 +76,4 @@ Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0
 Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [5; 0; 10]
 Vazby: 2 (2 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 60 × 40 × 20 mm · objem Σ 25 cm³ · hmotnost Σ 0,196 kg
-Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu

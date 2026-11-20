@@ -138,7 +138,7 @@ export function ProcessState({ res, doc, step }: { res: MotionResult; doc: CadDo
   return (
     <div data-process-result className="space-y-1 rounded border border-[#e3e8ee] bg-[#fbfcfd] p-2 text-[11px] leading-snug text-[#4a5664]">
       {states.map((p) => (
-        <p key={p.target} data-process-state={p.phase} data-process-target={name(p.target)} data-process-removed={Math.round(p.removed * 1000) / 1000} data-process-scrap={p.scrap}>
+        <p key={p.target} data-process-state={p.phase} data-process-for={name(p.target)} data-process-removed={Math.round(p.removed * 1000) / 1000} data-process-scrapped={p.scrap}>
           <b>{name(p.target)}</b>: {phaseWord(p.phase)}
           {p.removed > 0 ? ` · ${tr("odebráno {0} mm³", nf(p.removed, 3))}` : ""}
           {p.depth > 0 ? ` · ${tr("hloubka {0} mm", nf(p.depth, 3))}` : ""}

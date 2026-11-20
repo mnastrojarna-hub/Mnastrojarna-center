@@ -438,7 +438,20 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
         straight = angleBetween(r0.R, rm.R) < 1e-9 && dev <= Math.max(1e-6, 1e-4 * len(sub(r1.t, r0.t)));
       } else if (straight && !m && poseAt) straight = false; // přímost nejde ověřit – půlit
       if (straight) {
-        const sw = await sweepOf(s0, s1, x.a, x.b, x.clr && !moving ? Infinity : x.clr ? reach : 1e-6, touching);
+        const swCut = x.clr && !moving ? Infinity : x.clr ? reach : 1e-6;
+        let sw = await sweepOf(s0, s1, x.a, x.b, swCut, touching);
+        // Konce v dotyku: dráhu počítá jádro pro B zmenšené k středu obálky. U dutého B (pouzdro na sloupku, deska s dírou)
+        // zmenšení zúží díru a dráha „zajede“ do A i při čistém klouzání. Stejně platný důkaz klouzání je dráha zmenšeného A
+        // vůči B (obrácené pořadí dvojice) – stačí jeden z obou; skutečný průchod tělesem najdou oba. Bez toho výsledek závisel na
+        // pořadí id komponent (náhodné) a zbytečné půlení vyčerpalo rozpočet zjemnění (clash.uncertain v syntetickém nástroji).
+        if (touching && x.cc && sw?.ok && sw.d <= 1e-9 && (sw.pen ?? Infinity) > 1e-3) {
+          const rv = await sweepOf(s0, s1, x.b, x.a, swCut, true);
+          if (rv?.ok && Number.isFinite(rv.d) && !(rv.d <= 1e-9 && (rv.pen ?? Infinity) > 1e-3)) {
+            // body a cesty listů zpět do pořadí dvojice (a, b)
+            const { p1, p2, aPath, bPath, ...rest } = rv;
+            sw = { ...rest, ...(p2 ? { p1: p2 } : {}), ...(p1 ? { p2: p1 } : {}), ...(bPath ? { aPath: bPath } : {}), ...(aPath ? { bPath: aPath } : {}) };
+          }
+        }
         if (sw?.ok && Number.isFinite(sw.d)) {
           if (x.clr && sw.exact && sw.d < Math.min(d0.d, d1.d) - tolC) {
             // menší vůle uvnitř úseku (po přímé dráze): přesná hodnota a body, poloha v úseku neurčena
