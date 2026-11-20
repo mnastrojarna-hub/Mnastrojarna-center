@@ -28,6 +28,7 @@ export const DE: Record<string, string> = {
  "  kód k přečtení nebo opsání: {0} ({1} znaků odkazu)": "  Code zum Vorlesen oder Abtippen: {0} (Link hat {1} Zeichen)",
  "  návrat na doraz v t = {0} s": "  zurück am Anschlag bei t = {0} s",
  "  obsah odkazu: {0}": "  Inhalt des Links: {0}",
+ "  plochy vazeb přečíslovány podle geometrie: {0}": "  Verknüpfungsflächen nach Geometrie neu nummeriert: {0}",
  "  pohled: „{0}“": "  Ansicht: „{0}“",
  "  pohledy: {0}{1}": "  Ansichten: {0}{1}",
  "  pohnuto: {0}": "  bewegt: {0}",

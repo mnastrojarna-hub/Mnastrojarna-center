@@ -14,23 +14,23 @@
 → Válec 2 (cylinder) přidán – výsledek po výpočtu níže
 ✓ nový díl „Plech“ – nová záložka
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Díra 2 (hole)
-✓ Díra 3 (hole)
-✓ Kvádr 2 (box)
-✓ Díra 4 (hole)
-✓ Díra 5 (hole)
-✓ Díra 6 (hole)
-✓ Válec 1 (cylinder)
-✓ Válec 2 (cylinder)
-✓ Kvádr 3 (box)
+✓ Kvádr 1 (box) · přidáno 120000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 1550,8 mm³ (79 % nástroje) · těleso platné
+✓ Díra 2 (hole) · úběr 1550,8 mm³ (79 % nástroje) · těleso platné
+✓ Díra 3 (hole) · úběr 1550,8 mm³ (79 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 60000 mm³ · těleso platné
+✓ Díra 4 (hole) · úběr 1327,3 mm³ (3 % nástroje) · těleso platné
+✓ Díra 5 (hole) · úběr 1327,3 mm³ (4 % nástroje) · těleso platné
+✓ Díra 6 (hole) · úběr 1327,3 mm³ (3 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2035,8 mm³ · těleso platné
+✓ Válec 2 (cylinder) · přidáno 3053,6 mm³ (celý nástroj) · těleso platné
+✓ Kvádr 3 (box) · přidáno 6000 mm³ · těleso platné
 
 Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 20 × 60 × 5 mm (X 0…20, Y 0…60, Z 0…5) · objem 6 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 3 [box, id #] ✓ – 20 × 60 × 5 mm, new, roh [0; 0; 0]
+ 1. Kvádr 3 [box, id #] ✓ přidáno 6000 mm³ · těleso platné – 20 × 60 × 5 mm, new, roh [0; 0; 0]
 === run 2 ===
 ✓ nová sestava „Sestava 5“ – nová záložka
 ✓ komponenta „Deska A“ vložena do sestavy (ukotvená)

@@ -28,6 +28,7 @@ export const EN: Record<string, string> = {
  "  kód k přečtení nebo opsání: {0} ({1} znaků odkazu)": "  code to read aloud or retype: {0} (link is {1} characters)",
  "  návrat na doraz v t = {0} s": "  back on the stop at t = {0} s",
  "  obsah odkazu: {0}": "  link content: {0}",
+ "  plochy vazeb přečíslovány podle geometrie: {0}": "  mate faces renumbered by geometry: {0}",
  "  pohled: „{0}“": "  view: “{0}”",
  "  pohledy: {0}{1}": "  views: {0}{1}",
  "  pohnuto: {0}": "  moved: {0}",
