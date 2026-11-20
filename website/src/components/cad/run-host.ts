@@ -17,6 +17,7 @@ import { formatRun, scriptLineCount, type RunApiOptions } from "@/cad/engine/run
 import { inputRevOf, isRunCancelled, RunTracker, type RunEntry, type RunHandle, type RunSource, type RunStamp } from "@/cad/engine/run-queue";
 import { modelRev } from "@/cad/engine/result-key";
 import type { CadDoc } from "@/cad/types";
+import type { RunReport } from "@/cad/engine/protocol-types";
 import type { MotionSignal } from "@/cad/asm-agent-kin";
 
 /** fronta běhů stránky (prohlížeč: jedna na kartu) */
@@ -45,7 +46,7 @@ export type TextRunDeps = {
   /** zrušení výpočtu v jádře (tlačítko Zrušit) – běžící běh pak skončí ✗ run.cancelled */
   cancelKernel(): void;
   /** provedení skriptu (engine) se signálem zrušení a identitou běhu; vrací text a zda engine běh zrušil */
-  exec(signal: AbortSignal, stamp: RunStamp): Promise<{ text: string; cancelled: boolean }>;
+  exec(signal: AbortSignal, stamp: RunStamp): Promise<{ text: string; cancelled: boolean; /** report běhu (konzole: historie, filtr, JSON – bod 15) */ report?: RunReport }>;
 };
 
 /**
@@ -53,6 +54,8 @@ export type TextRunDeps = {
  * hned po zařazení (konzole si ho pamatuje). Vrací text protokolu (zrušený čekající běh = protokol ✗ run.cancelled).
  */
 export async function textRun(tracker: RunTracker, text: string, o: { source: RunSource; signal?: AbortSignal; onQueued?: (id: string) => void; format?: RunApiOptions; lang?: Parameters<typeof cancelledText>[3] }, deps: TextRunDeps): Promise<string> {
+  let report: RunReport | undefined;
+  const at = Date.now();
   const h: RunHandle<string> = tracker.enqueue({ kind: "script", source: o.source, label: runLabel(text), onCancel: () => deps.cancelKernel() }, async (ctl) => {
     const d = deps.present();
     const key = deps.docKey();
@@ -60,6 +63,7 @@ export async function textRun(tracker: RunTracker, text: string, o: { source: Ru
     ctl.set({ doc: d.name, docKey: key, inputRev: stamp.inputRev });
     const r = await deps.exec(ctl.signal, stamp);
     ctl.finish(r.cancelled ? "cancelled" : "done");
+    if (r.report) report = r.report;
     return r.text;
   });
   o.onQueued?.(h.id);
@@ -68,31 +72,54 @@ export async function textRun(tracker: RunTracker, text: string, o: { source: Ru
     if (ext.aborted) tracker.cancel(h.id);
     else ext.addEventListener("abort", () => tracker.cancel(h.id), { once: true });
   }
+  const meta = { input: text, label: runLabel(text), at, source: o.source };
   try {
     const out = await h.done;
-    consoleRuns.set(h.id, out);
+    consoleRuns.set(h.id, out, { ...meta, ...(report ? { report } : {}) });
     return out;
   } catch (e) {
     if (!isRunCancelled(e)) throw e;
     const out = cancelledText(h.id, text, o.format, o.lang);
-    consoleRuns.set(h.id, out);
+    consoleRuns.set(h.id, out, meta);
     return out;
   }
 }
 
 /* ───────────────────────── výsledky běhů pro konzoli ───────────────────────── */
 
-/** text výsledku běhu podle id (posledních 20) – konzole ho najde i po zavření a novém otevření */
+/**
+ * Výsledek běhu (vlna 22, bod 15 – historie běhů konzole): text, report (záznamy se stabilními id, dokumenty, odkazy),
+ * vstup, popis a čas. Nový běh předchozí protokol nepřepíše – drží se posledních `HISTORY_MAX` běhů v pořadí vzniku.
+ */
+export type RunRecord = { id: string; text: string; input?: string; label?: string; at: number; source?: RunSource; report?: RunReport };
+export const HISTORY_MAX = 20;
+
+/** výsledky běhů podle id (posledních 20) – konzole je najde i po zavření a novém otevření; `list()` = historie běhů */
 class RunOutputs {
-  private readonly m = new Map<string, string>();
+  private readonly m = new Map<string, RunRecord>();
   private readonly subs = new Set<() => void>();
-  set(id: string, text: string) {
-    this.m.set(id, text);
-    while (this.m.size > 20) this.m.delete(this.m.keys().next().value!);
+  private ver = 0;
+  set(id: string, text: string, meta: Omit<RunRecord, "id" | "text" | "at"> & { at?: number } = {}) {
+    this.m.delete(id);
+    this.m.set(id, { id, text, at: meta.at ?? Date.now(), ...meta });
+    while (this.m.size > HISTORY_MAX) this.m.delete(this.m.keys().next().value!);
+    this.ver++;
     this.subs.forEach((f) => f());
   }
   get(id: string | null | undefined): string | undefined {
+    return id ? this.m.get(id)?.text : undefined;
+  }
+  /** celý záznam běhu (report, vstup, čas) */
+  record(id: string | null | undefined): RunRecord | undefined {
     return id ? this.m.get(id) : undefined;
+  }
+  /** historie běhů, nejnovější první (`source` = jen konzole / jen API) */
+  list(source?: RunSource): RunRecord[] {
+    return [...this.m.values()].filter((r) => !source || r.source === source).reverse();
+  }
+  /** číslo verze (useSyncExternalStore) */
+  get version(): number {
+    return this.ver;
   }
   subscribe(f: () => void) {
     this.subs.add(f);
