@@ -618,7 +618,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   /** listy exportu (id) */
   const exportedIds = () => (exportAll ? sheets.map((x) => x.id) : [saved?.id ?? ""]).filter(Boolean);
   /** záznam exportu do dokumentu (revize modelu, čas) – vlna 22, bod 20 */
-  const noteExport = (format: DrawingExportFormat, file: string) => onExported?.({ what: "drawing", format, file, sheets: exportedIds(), ...(meta.revision ? { rev: meta.revision } : {}) });
+  const noteExport = (format: DrawingExportFormat, file: string) => {
+    const revStale = !!mid && (exportAll ? sheets : saved ? [saved] : []).some((x) => x.issued && x.issued.sig !== mid.sig);
+    onExported?.({ what: "drawing", format, file, sheets: exportedIds(), ...(meta.revision ? { rev: meta.revision } : {}), ...(revStale ? { revStale } : {}) });
+  };
   /** vydaný list ze starší revize modelu: soubor by nesl staré písmeno revize s jiným obsahem → upozornění u exportu */
   const staleNote = () => {
     if (!mid) return "";

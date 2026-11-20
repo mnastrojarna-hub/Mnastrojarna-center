@@ -37,6 +37,7 @@ Revize: žádné
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…80, y 0…20 mm · 1:1 · na listu x 44…124, y 243…263
   horní (x = X, y = Y): x 0…80, y 0…50 mm · 1:1 · na listu x 44…124, y 159…209

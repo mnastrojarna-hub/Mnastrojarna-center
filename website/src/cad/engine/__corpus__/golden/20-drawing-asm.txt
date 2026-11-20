@@ -36,6 +36,7 @@ Revize: žádné
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
 Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…60, y 0…50 mm · 1:1 · na listu x 185…245, y 187…237
   horní (x = X, y = Y): x 0…60, y 0…40 mm · 1:1 · na listu x 185…245, y 123…163

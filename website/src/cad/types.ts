@@ -511,6 +511,8 @@ export type ExportRecord = {
   at: string;
   sheets?: string[];
   rev?: string;
+  /** soubor nese písmeno revize listu vydaného z jiné revize modelu (export zastaralého vydaného listu) */
+  revStale?: boolean;
   job?: { id?: string; state?: string };
 };
 
