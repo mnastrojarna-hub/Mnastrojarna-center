@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { CtaBand, PageHero, SectionHeading } from "@/components/blocks";
-import { DocsSearch } from "@/components/docs-search";
+import { DocsSearch, DocsSearchBar } from "@/components/docs-search";
 import { JsonLd } from "@/components/json-ld";
 import { CAD_LINKS, cadAppHref, cadDocsHref } from "@/content/cad-links";
 import { SITE } from "@/content/site";
@@ -223,6 +223,12 @@ export function CadDocsIntlView({ locale }: { locale: L }) {
   );
   return (
     <>
+      {/* hledání na stránce (jen v prohlížeči, components/docs-search.tsx): oddíly [data-doc-search] uvnitř [data-docs-search-scope];
+          pole se lepí pod hlavičkou od začátku stránky (úvod + oddíly) */}
+      <div data-docs-search-scope>
+      <DocsSearchBar width="container max-w-4xl">
+        <DocsSearch locale={locale} root="[data-docs-search-scope]" sections="[data-doc-search]" />
+      </DocsSearchBar>
       <PageHero locale={locale} eyebrow={t.eyebrow} crumbs={crumbs} title={t.title} lead={t.lead} sheet="CAD">
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href={cadAppHref(locale)} className="inline-flex items-center rounded-full bg-brand px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-brand/90">
@@ -236,13 +242,6 @@ export function CadDocsIntlView({ locale }: { locale: L }) {
           </a>
         </div>
       </PageHero>
-      {/* hledání na stránce (jen v prohlížeči, components/docs-search.tsx): oddíly [data-doc-search] uvnitř [data-docs-search-scope] */}
-      <div data-docs-search-scope>
-      <div className="sticky top-[76px] z-30 pt-4">
-        <div className="container max-w-4xl">
-          <DocsSearch locale={locale} root="[data-docs-search-scope]" sections="[data-doc-search]" className="rounded-2xl bg-white/95 px-2 py-2 shadow-[0_1px_0_rgba(39,36,37,0.08)] backdrop-blur" />
-        </div>
-      </div>
       <section id="start" className="section" data-doc-search>
         <div className="container max-w-4xl">
           <SectionHeading title={t.start.h} />

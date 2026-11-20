@@ -46,7 +46,9 @@ export function Motion() {
       const el = document.querySelector(a.getAttribute("href")!);
       if (el) {
         e.preventDefault();
-        lenis.scrollTo(el as HTMLElement, { offset: -80 });
+        // pod hlavičku (80 px); cíl s větším scroll-margin-top (dokumentace s lepícím polem hledání) dostane svůj odstup
+        const margin = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+        lenis.scrollTo(el as HTMLElement, { offset: -Math.max(80, margin) });
       }
     };
     document.addEventListener("click", onClick);
@@ -61,7 +63,8 @@ export function Motion() {
   // efekty pro aktuální stránku
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    lenisRef.current?.scrollTo(0, { immediate: true });
+    // nová stránka začíná nahoře – kromě adresy s #kotvou (odkaz na kapitolu dokumentace): tam už posunul prohlížeč
+    if (!window.location.hash) lenisRef.current?.scrollTo(0, { immediate: true });
     // efekty se inicializují až po prvním vykreslení (LCP/TBT na mobilu)
     let ctx: ReturnType<typeof gsap.context> | null = null;
     type IdleWin = { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };

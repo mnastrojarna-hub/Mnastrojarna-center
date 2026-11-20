@@ -280,8 +280,8 @@ async function cmdHelp(topic: string[], io: Io): Promise<number> {
   // tahák a hledání v nápovědě (help/answer.ts – totéž co `nápověda tahák` / `nápověda hledat …` v běhu)
   const { cliHelpTopic } = await import("../help/cli-help");
   const out = cliHelpTopic(topic, getLang());
-  if (out === null) throw new UsageError(tr("neznámé téma nápovědy „{0}“ – guide, commands", topic.join(" ")) + tr(", cheat, search <slova>"));
-  io.stdout(out);
+  if ("error" in out) throw new UsageError(out.error);
+  io.stdout(out.text);
   return 0;
 }
 
