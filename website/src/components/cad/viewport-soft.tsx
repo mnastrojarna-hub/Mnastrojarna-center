@@ -1057,7 +1057,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       {/* popisky kót měření (polohu nastavuje překryvná vrstva) */}
       <div ref={labels} className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
         {measureLabels.map((l, i) => (
-          <div key={i} className="absolute left-0 top-0 whitespace-nowrap rounded border border-brand/40 bg-white/95 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-600 shadow">
+          <div key={i} data-soft-measure-label={l.text} className="absolute left-0 top-0 whitespace-nowrap rounded border border-brand/40 bg-white/95 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-brand-600 shadow">
             {l.text}
           </div>
         ))}

@@ -32,11 +32,12 @@ Prvky:
   dosedací plochy pružiny „Pružina“: „Přidržovač“ F6 rovinná +Z → „Deska A“ F5 rovinná −Z
 ✓ pružina „Pružina“: délka 25 mm · L0 32 · Ln 14 · stlačení 7 mm · síla 140 N (c 20 N/mm)
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Deska A“ · směr −Z
 Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kvazistatika – v každém kroku rovnováha pružin a kontaktů (meze vazeb, délka pružiny na doraz) – nezávisle na předchozím kroku a směru pohybu (zvoleno automaticky: sestava má pružinu „Pružina“ na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 24,5 mm · konec [20; 20; 10]
- Pružina: rozsah pohybu X 0 · Y 0 · Z 24,5 mm · konec [50; 50; 18]
+ „Přidržovač“ + 1 díl (tuhá skupina – zámek / pevné vazby): ΔZ −24,5 mm
+ „Deska A“: ΔZ −30,35 mm
+ stojí: 1 („Rám“)
 Vazby splněny ve všech krocích
  ✓ pružina „Pružina“: délka 25 → 19,15 mm (min 19,15 · L0 32 · Ln 14) · síla 140 → 257 N (max 257 N)
 Krok 6 (t = 1 s, motory 42,325):
@@ -85,9 +86,9 @@ Pohybová studie: motorů 1 · kroků 12
  1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl
- Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 19,35 mm · konec [20; 20; 15,15]
- Pružina: rozsah pohybu X 0 · Y 0 · Z 19,35 mm · konec [50; 50; 23,15]
+ „Přidržovač“ + 1 díl (tuhá skupina – zámek / pevné vazby): ΔZ −19,35 mm
+ „Deska A“: ΔZ −30,35 mm
+ stojí: 1 („Rám“)
 ⚠ vazby splněny ve všech krocích, ale polohu „Přidržovač“ neurčují – zobrazená poloha není fyzikální výsledek (motion.undetermined)
  ✓ pružina „Pružina“: délka 25 → 14 mm (min 14 · L0 32 · Ln 14) · síla 140 → 360 N (max 360 N)
 ⚠ řádek 2: poloha „Přidržovač“ není vazbami určena (volná v mezi „Mez“ ⟨5; 25⟩ (vazba 2), „Dosed“ ⟨0; 500⟩ (vazba 3)) – kinematika ji nechává, kde byla (posune ji jen doraz meze) – pružina „Pružina“ by ji tlačila: fyzikální poloha = pohyb kvazistatika (nebo sestava vazba 2 preferovat min|max)

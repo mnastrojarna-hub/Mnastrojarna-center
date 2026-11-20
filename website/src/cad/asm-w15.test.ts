@@ -39,13 +39,20 @@ describe("B11 – natočení v pohybové studii vůči výchozímu stavu", () =>
   const res = (steps: MotionResult["steps"]): MotionResult => ({ steps, comps: [{ id: "S", name: "Šroub M6x20" }, { id: "K", name: "Klika" }], motors: [], collision: null, collisionsChecked: false, conflictSteps: 0 });
 
   it("repro 959: Eulerovy úhly 180 ↔ −180 (dR 2,4e-16) – čistý posuv už není „natáčí se“", () => {
-    const lines = motionSummary(res([step(0, [180, 0, 0], [0, 0, 0]), step(1, [-180, 0, 0], [0, 0, 0]), step(2, [180, 1e-12, 0], [0, 0, 0])]), doc);
+    // vlna 22, M3: řádky po dílech jsou detail (výchozí = tuhé skupiny) – kontrola „natáčí se“ v obou podobách
+    const r1 = res([step(0, [180, 0, 0], [0, 0, 0]), step(1, [-180, 0, 0], [0, 0, 0]), step(2, [180, 1e-12, 0], [0, 0, 0])]);
+    expect(motionSummary(r1, doc).join("\n")).not.toContain("natáčí se");
+    const lines = motionSummary(r1, doc, { detail: true });
     const s = lines.find((l) => l.includes("Šroub M6"))!;
     expect(s).toContain("rozsah pohybu X 0 · Y 0 · Z 2 mm");
     expect(s).not.toContain("natáčí se");
   });
   it("skutečné natočení se hlásí i s úhlem; 0 180 180 = 180 0 0", () => {
-    const lines = motionSummary(res([step(0, [180, 0, 0], [0, 0, 0]), step(1, [0, 180, 180], [0, 0, 15]), step(2, [180, 0, 0], [0, 0, 30])]), doc);
+    const r2 = res([step(0, [180, 0, 0], [0, 0, 0]), step(1, [0, 180, 180], [0, 0, 15]), step(2, [180, 0, 0], [0, 0, 30])]);
+    // tuhé skupiny (názvy z dokumentu: „K“ = Klika, „S“ = šroub): skutečné natočení zůstává, čistý posuv bez „natáčí se“
+    expect(motionSummary(r2, doc).find((l) => l.includes("„K“"))).toContain("natáčí se 30°");
+    expect(motionSummary(r2, doc).find((l) => l.includes("„S“"))).not.toContain("natáčí se");
+    const lines = motionSummary(r2, doc, { detail: true });
     expect(lines.find((l) => l.includes("Klika"))).toContain("natáčí se 30°");
     expect(lines.find((l) => l.includes("Šroub M6"))).not.toContain("natáčí se");
     expect(rotationAngleDeg([180, 0, 0], [-180, 0, 0])).toBeLessThan(1e-9);

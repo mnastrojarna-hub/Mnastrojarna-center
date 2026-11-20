@@ -1,0 +1,159 @@
+# vlna 22, balík M, etapa 3: fáze studie (úseky motoru, okna, podmínky), motory v panelu (nový / upravit, dosah, konflikt), tuhé skupiny
+ (nejblíž {0})	 (closest {0})
+ (tuhá skupina – stejný pohyb)	 (rigid group – same motion)
+ (tuhá skupina – zámek / pevné vazby)	 (rigid group – lock / rigid mates)
+ a další	 and more
+ stojí: {0} ({1}{2})	 stationary: {0} ({1}{2})
+ · na konci zpět ve výchozí poloze	 · back in the initial position at the end
+ · na konci {0}	 · at the end {0}
+ · natáčí se {0}°	 · rotates {0}°
+ · okno {0}–{1} s	 · window {0}–{1} s
+ · začne s fází „{0}“	 · starts with phase “{0}”
+ – motorů, které s ní začínaly: {0} (začnou od začátku studie)	 – motors that started with it: {0} (they now start at the beginning of the study)
+ – spolu s ním kvůli pevné vazbě (zámku): {0}{1}	 – together with it because of a rigid mate (lock): {0}{1}
+(od začátku)	(from the start)
+(vyberte)	(select)
++ Nová fáze	+ New phase
++ Nový motor	+ New motor
++ další úsek / návratový zdvih (klíčové polohy)	+ next segment / return stroke (key positions)
++ návrat na začátek	+ return to start
++ {0} díl	+ {0} part
++ {0} díly	+ {0} parts
++ {0} dílů	+ {0} parts
++ úsek	+ segment
+Bez fází: jedna časová osa pro všechny motory. Fáze rozdělí cyklus (nájezd, sevření, střih, návrat) a od svého začátku zapnou / potlačí vazby nebo změní režim.	No phases: one timeline for all motors. Phases split the cycle (approach, clamp, cut, return) and from their start enable / suppress mates or change the mode.
+Detail po dílech (jinak tuhé skupiny)	Detail per part (otherwise rigid groups)
+Díly spojené pevnou vazbou (zámkem) se pohybují společně s řízeným dílem – motor nedávejte každému zvlášť.	Parts joined by a rigid mate (lock) move together with the driven part – do not give each of them its own motor.
+Fáze studie	Study phases
+Fáze studie: {0}	Study phases: {0}
+Fáze studie: žádné – pohyb fáze "Nájezd" · pohyb fáze "Sevření" při vazba "ZDVIH" <= 40 …	Study phases: none – motion phase "Approach" · motion phase "Clamp" when mate "STROKE" <= 40 …
+Fáze {0}	Phase {0}
+Fáze {0} „{1}“: kroky {2} · t = {3}–{4} s · začátek: {5} · {6} · {7}	Phase {0} “{1}”: steps {2} · t = {3}–{4} s · start: {5} · {6} · {7}
+Fáze {0} „{1}“: t = {2}–{3} s · kroky {4}–{5} – klik = první krok fáze	Phase {0} “{1}”: t = {2}–{3} s · steps {4}–{5} – click = first step of the phase
+Fáze „{0}“ smazána – motorů, které s ní začínaly: {1} (začnou od začátku studie).	Phase “{0}” deleted – motors that started with it: {1} (they now start at the beginning of the study).
+Fáze „{0}“ už ve studii je.	Phase “{0}” is already in the study.
+Konec okna [s]	Window end [s]
+Motor podmínky	Condition motor
+Motor {0} na vazbě „{1}“ nahrazen.	Motor {0} on mate “{1}” replaced.
+Nahradit motor {0}	Replace motor {0}
+Navázat úsek za motor {0}	Append a segment after motor {0}
+Nový motor	New motor
+Název fáze	Phase name
+Odebrat úsek	Remove segment
+Operátor podmínky	Condition operator
+Posunout dříve	Move earlier
+Posunout později	Move later
+Přidat fázi	Add phase
+Režim fáze	Phase mode
+Smazat fázi	Delete phase
+Událost {0}	Event {0}
+Uložit fázi	Save phase
+Uložit motor {0}	Save motor {0}
+Upravit motor {0}	Edit motor {0}
+Vazba podmínky	Condition mate
+Vazba „{0}“ už má motor {1} – uložením ho nahradíte. Další pohyb na téže vazbě zapište jako navazující úsek, nebo motoru dejte jiné časové okno / fázi.	Mate “{0}” already has motor {1} – saving replaces it. Write a further motion on the same mate as a consecutive segment, or give the motor another time window / phase.
+Vazby od začátku fáze (zapnout / potlačit)	Mates from the phase start (enable / suppress)
+Zapnutá vazba zachytí polohu dílů v okamžiku začátku fáze (zámek drží díly tak, jak právě jsou).	An enabled mate captures the part positions at the moment the phase starts (a lock holds the parts as they are).
+Začne s fází	Starts with phase
+Začátek [s]	Start [s]
+Začátek fáze	Phase start
+fáze	phase
+fáze {0} „{1}“	phase {0} “{1}”
+fáze {0} „{1}“: dynamika po fázích zatím není – fáze počítá kinematika nebo kvazistatika (dynamika = celá studie bez fází)	phase {0} “{1}”: dynamics per phase is not available yet – phases are computed kinematically or quasi-statically (dynamics = whole study without phases)
+fáze {0} „{1}“: motor podmínky ve studii není	phase {0} “{1}”: the condition motor is not in the study
+fáze {0} „{1}“: vazba podmínky v sestavě není	phase {0} “{1}”: the condition mate is not in the assembly
+fáze {0} „{1}“: vazba {2} v sestavě není	phase {0} “{1}”: mate {2} is not in the assembly
+fáze „{0}“ nenastala: podmínka {1} se do konce studie nesplnila (nejbližší hodnota {2}) – upravte podmínku (pohyb fáze N upravit při …) nebo prodlužte pohyb motoru	phase “{0}” did not occur: condition {1} was not met by the end of the study (closest value {2}) – adjust the condition (motion phase N edit when …) or extend the motor travel
+fáze „{0}“ už ve studii je – upravit: pohyb fáze "{0}" upravit …	phase “{0}” is already in the study – to edit: motion phase "{0}" edit …
+fáze „{0}“ ve studii není – fáze: {1}	phase “{0}” is not in the study – phases: {1}
+fáze „{0}“ zapíná / potlačuje vazbu, která ve skriptu není – ve skriptu chybí	phase “{0}” enables / suppresses a mate that is not in the script – missing in the script
+fáze: hodnota podmínky „{0}“ není číslo	phase: the condition value “{0}” is not a number
+fáze: podmínka potřebuje operátor <= nebo >= a hodnotu – při vazba "ZDVIH" <= 30	phase: the condition needs an operator <= or >= and a value – when mate "STROKE" <= 30
+fáze: podmínka potřebuje operátor <= nebo >= a hodnotu, ne „{0}“	phase: the condition needs an operator <= or >= and a value, not “{0}”
+fáze: podmínka – při vazba <N> <= hodnota | při motor <N> >= hodnota | od <T> s	phase: condition – when mate <N> <= value | when motor <N> >= value | from <T> s
+fáze: při motor <N> <= hodnota	phase: when motor <N> <= value
+fáze: při vazba <N|"název"> <= hodnota	phase: when mate <N|"name"> <= value
+fáze: za „vazba“ zadejte číslo nebo název vazby	phase: after “mate” give the mate number or name
+fáze: zapnout / potlačit vazba <N> – např. zapnout vazba 5	phase: enable / suppress mate <N> – e.g. enable mate 5
+fáze: čas začátku musí být ≥ 0 s	phase: the start time must be ≥ 0 s
+hodnota podmínky	condition value
+jako studie	as the study
+jedna pohybová studie s fázemi (vlna 22): úseky a klíčové polohy motoru, časové okno, motor začínající s fází, navázání úseků na motor téže vazby (nahrazení motoru jen s ℹ motion.motor-replaced); fáze v pořadí s podmínkou začátku (čas, hodnota vazby / motoru – okamžik zpřesněný mezi kroky), zapnutím / potlačením vazeb (zapnutá vazba zachytí polohu v tom okamžiku) a režimem; protokol po fázích (kroky, čas, úroveň, nesplněné vazby), ⚠ motion.phase-unreached, strojově phases=N/M	one motion study with phases (wave 22): motor segments and key positions, time window, motor starting with a phase, appending segments to the motor of the same mate (replacing a motor only with ℹ motion.motor-replaced); phases in order with a start condition (time, mate / motor value – moment refined between steps), enabling / suppressing mates (an enabled mate captures the position at that moment) and mode; protocol per phase (steps, time, level, unsatisfied mates), ⚠ motion.phase-unreached, machine field phases=N/M
+když hodnota motoru dosáhne	when the motor value reaches
+když hodnota vazby dosáhne	when the mate value reaches
+motor na mezi v {0} krocích	motor at a limit in {0} steps
+motor {0} ({1})	motor {0} ({1})
+motor {0} na vazbě „{1}“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N	motor {0} on mate “{1}” replaced by the new input – a further segment after it: motion motor … append (or … then …); a motor with another start: window T0..T1 / phase N
+motor {0} začíná v {1} s (krok {2}) na {3}, vazba je v tu chvíli na {4} – díl přeskočí o {5}; začátek motoru nastavte na hodnotu v okamžiku začátku	motor {0} starts at {1} s (step {2}) at {3}, the mate is at {4} at that moment – the part jumps by {5}; set the motor start to the value at the moment it starts
+motor {0} {1} {2}	motor {0} {1} {2}
+motor: chybí konec prvního úseku – 57,5..27,15 pak 57,5	motor: the end of the first segment is missing – 57.5..27.15 then 57.5
+motor: klíče čas:hodnota aspoň dva – klíče 0:57,5 0,3:40 0,6:27,15	motor: keys time:value, at least two – keys 0:57.5 0.3:40 0.6:27.15
+motor: klíče čas:hodnota zadávají celý průběh – bez rozsahu, zdvihu a pak	motor: keys time:value give the whole profile – without range, stroke and then
+motor: klíčové polohy potřebují aspoň dvě dvojice čas:hodnota – klíče 0:57,5 0,3:40	motor: key positions need at least two time:value pairs – keys 0:57.5 0.3:40
+motor: navázat jde za rozsah / úseky, ne za „tam a zpět“ ani jízdu bez konce – zadejte motor znovu s pak …	motor: append works after a range / segments, not after “there and back” or travel without end – enter the motor again with then …
+motor: navázat za klíčové polohy (klíče t:v) nejde – doplňte klíče	motor: append after key positions (keys t:v) is not possible – extend the keys
+motor: navázat – na vazbě „{0}“ zatím žádný motor není (zadejte ho bez slova navázat)	motor: append – there is no motor on mate “{0}” yet (enter it without the word append)
+motor: navázat – nový úsek začíná na {0}, dosavadní motor končí na {1}; zapište {1}..{2} navázat (nebo bez začátku)	motor: append – the new segment starts at {0}, the existing motor ends at {1}; write {1}..{2} append (or without a start)
+motor: prodleva musí být kladná [s]	motor: the dwell must be positive [s]
+motor: první klíčová poloha musí být v čase 0 (začátek motoru) – klíče 0:{0} …	motor: the first key position must be at time 0 (motor start) – keys 0:{0} …
+motor: všechny úseky končí na začátku {0} – motor by se nepohnul	motor: all segments end at the start {0} – the motor would not move
+motor: úsek „pak {0}..“ nenavazuje na konec předchozího úseku {1} – zapište pak {1}..{2}	motor: the segment “then {0}..” does not continue from the end of the previous segment {1} – write then {1}..{2}
+motor: úseky motoru {0} trvají do {1} s, zadaný čas studie {2} s nestačí – vynechte čas, nebo úseky zkraťte	motor: the segments of motor {0} last until {1} s, the given study time {2} s is not enough – omit the time or shorten the segments
+motor: úseky „pak“ / „prodleva“ navazují na rozsah – zadejte nejdřív konec prvního úseku (57,5..27,15 pak 57,5) nebo začátek (od 57,5 pak 27,15 čas 0,4)	motor: “then” / “dwell” segments continue a range – first give the end of the first segment (57.5..27.15 then 57.5) or the start (from 57.5 then 27.15 time 0.4)
+motor: čas úseku musí být kladný [s]	motor: the segment time must be positive [s]
+motor: časové okno od–do [s] musí začít v čase ≥ 0 a skončit později – okno 0,2..0,6	motor: the time window from–to [s] must start at a time ≥ 0 and end later – window 0.2..0.6
+motor: časové okno potřebuje rozsah nebo zdvih – okno 0,2..0,6 s rychlostí bez konce nejde	motor: a time window needs a range or a stroke – window 0.2..0.6 with a speed without end is not possible
+motor: časy klíčových poloh musí růst – {0} s je dvakrát nebo pozpátku	motor: the key position times must increase – {0} s is repeated or backwards
+motor: „tam a zpět“ nejde spojit s úseky – návrat zapište jako další úsek: … pak <začátek>	motor: “there and back” cannot be combined with segments – write the return as another segment: … then <start>
+motor: „tam a zpět“ nejde spojit s úseky – návrat zapište jako další úsek: … pak {0}	motor: “there and back” cannot be combined with segments – write the return as another segment: … then {0}
+motory: {0}	motors: {0}
+nenastaly: {0}	did not occur: {0}
+neplatné kroky {0}	invalid steps {0}
+nepohne se (stupeň volnosti drží vazby)	does not move (the degree of freedom is held by mates)
+nesplněné vazby 0	unsatisfied mates 0
+název fáze	phase name
+od začátku studie	from the start of the study
+okno	window
+osa otáčení {0}	rotation axis {0}
+pak	then
+po dojetí motorů předchozí fáze	after the motors of the previous phase finish
+podmínka fáze „{0}“ míří na vazbu, která ve skriptu není – fáze se zapíše bez podmínky	the condition of phase “{0}” refers to a mate that is not in the script – the phase is written without a condition
+pohyb fáze "<název>" [při vazba <N> <=|>= <hodnota> | při motor <N> <=|>= <hodnota> | od <T> s] [zapnout vazba <N>] [potlačit vazba <N>] [kinematika|kvazistatika|automaticky] · pohyb fáze <N> upravit|smazat|nahoru|dolů · pohyb fáze	motion phase "<name>" [when mate <N> <=|>= <value> | when motor <N> <=|>= <value> | from <T> s] [enable mate <N>] [suppress mate <N>] [kinematic|quasistatic|auto] · motion phase <N> edit|delete|up|down · motion phase
+pohyb fáze {0}: upravit | smazat | nahoru | dolů	motion phase {0}: edit | delete | up | down
+pohyb fáze: neznámá volba „{0}“ – {1}	motion phase: unknown option “{0}” – {1}
+pohyb fáze: zadejte název v uvozovkách – {0}	motion phase: give the name in quotes – {0}
+pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> | <A>..<B>..<C> | [od <A>] zdvih <Δ> | klíče t:v … [pak <B> [čas T | rychlost V]] [prodleva T] [okno T0..T1] [fáze N] [navázat] [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa "<X>" [bod x y z]] · pohyb fáze "<název>" [při vazba N <=|>= v | od T s] [zapnout|potlačit vazba N] [kinematika|kvazistatika] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav [detail]|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	motion motor rotary|linear "<component>"|mate <N> <from>..<to> | <A>..<B>..<C> | [from <A>] stroke <Δ> | keys t:v … [then <B> [time T | speed V]] [dwell T] [window T0..T1] [phase N] [append] [step S | steps N] [time T] [rpm R | speed V] [at limit stop|error] [collisions] [trace "<X>" [point x y z]] · motion phase "<name>" [when mate N <=|>= v | from T s] [enable|suppress mate N] [kinematic|quasistatic] · motion kinematic|quasistatic|dynamic|auto · motion status [detail]|run|play|stop|step N|export csv|png|webm|delete
+pohyb událost: zadejte podmínku – při vazba <N> <= hodnota | od <T> s	motion event: give a condition – when mate <N> <= value | from <T> s
+pohání: „{0}“{1}{2}{3}	drives: “{0}”{1}{2}{3}
+potlačit	suppress
+potlačit {0}	suppress {0}
+potlačit: {0}	suppress: {0}
+prodleva	dwell
+rychlost úseku	segment speed
+rychlostí	at speed
+souhrn pohybu po tuhých skupinách (díly se stále stejnou vzájemnou polohou, tolerance místo zaokrouhlení – jedna skupina se nerozpadne): „Horní deska“ + 20 dílů (tuhá skupina): ΔZ −30 mm, stojí N, nesplněné vazby; detail po dílech pohyb detail; strojově groups=21:z-30. Při zadání motoru řádek pohání (řízený díl + díly spojené zámkem, směr osy) a ⚠ motion.motor-conflict, když jiný motor pohání tentýž stupeň volnosti od stejného okamžiku	motion summary by rigid groups (parts with a constant relative position, tolerance instead of rounding – one group does not split): “Top plate” + 20 parts (rigid group): ΔZ −30 mm, stationary N, unsatisfied mates; per-part detail motion detail; machine field groups=21:z-30. When a motor is entered, a drives line (driven part + parts joined by a lock, axis direction) and ⚠ motion.motor-conflict when another motor drives the same degree of freedom from the same moment
+tentýž díl	the same part
+v čase	at time
+vazba „{0}“ {1} {2}	mate “{0}” {1} {2}
+za čas	in time
+zapnout	enable
+zapnout {0}	enable {0}
+zapnout: {0}	enable: {0}
+{0} a {1} pohánějí tutéž vazbu od stejného okamžiku – výpočet je nesplní oba; navazující úseky zapište jedním motorem (… pak …, navázat), nebo motoru dejte jiné časové okno / fázi	{0} and {1} drive the same mate from the same moment – the computation cannot satisfy both; write consecutive segments with one motor (… then …, append), or give the motor another time window / phase
+{0} pohání stejný stupeň volnosti {1} jako {2} – díl nemůže splnit oba motory najednou a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo je rozdělte do fází / časových oken	{0} drives the same degree of freedom of {1} as {2} – the part cannot satisfy both motors at once and the computation splits the difference (motor at a limit / unsatisfied mates); delete one motor or separate them into phases / time windows
+{0} se nemůže pohnout ani jedním směrem – jeho stupeň volnosti drží vazby (zámek, ukotvení, mez); potlačte blokující vazbu nebo zvolte jinou vazbu	{0} cannot move in either direction – its degree of freedom is held by mates (lock, fixing, limit); suppress the blocking mate or choose another mate
+{0}{1} {2} otočení {3}° · úseků {4}	{0}{1} {2} rotation {3}° · segments {4}
+{0}{1} {2} zdvih {3} mm · úseků {4}	{0}{1} {2} stroke {3} mm · segments {4}
+Úsek {0}: čas nebo rychlost	Segment {0}: time or speed
+Úseky (klíčové polohy)	Segments (key positions)
+Čas začátku	Start time
+čas fáze	phase time
+čas úseku	segment time
+⚠ fáze {0} „{1}“ nenastala – podmínka {2} do konce studie nesplněna{3}	⚠ phase {0} “{1}” did not occur – condition {2} not met by the end of the study{3}
+✓ fáze {0}	✓ phase {0}
+✓ fáze {0} „{1}“ smazána{2}	✓ phase {0} “{1}” deleted{2}
+✓ fáze „{0}“ je teď {1}. v pořadí	✓ phase “{0}” is now number {1} in the order
+#!dynamic – texty kódů registru (engine/codes.ts motion.phase-unreached, motion.motor-conflict, motion.motor-replaced)
+fáze „{0}“ nenastala: podmínka {1} se do konce studie nesplnila (nejbližší hodnota {2})	phase “{0}” did not occur: condition {1} was not met by the end of the study (closest value {2})
+motor {0} je v konfliktu s motorem {1} – pohánějí tentýž stupeň volnosti od stejného okamžiku	motor {0} conflicts with motor {1} – they drive the same degree of freedom from the same moment
+motor {0} na vazbě „{1}“ nahrazen novým zadáním	motor {0} on mate “{1}” replaced by the new input

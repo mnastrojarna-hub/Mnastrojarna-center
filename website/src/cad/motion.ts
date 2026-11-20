@@ -309,6 +309,8 @@ export async function runMotion(
   };
   /* ───── fáze (cad/motion-phases.ts): podmínky v poloze kroku, okamžik začátku, nastavení od začátku fáze ───── */
   const runs: PhaseRun[] = phases.map((ph, i) => ({ id: ph.id, name: ph.name, index: i, reached: false, mode: studyMode(doc, study, ph).mode, conflictSteps: 0, stopped: 0, invalid: 0 }));
+  /** podmínka hodnoty fáze je „nabitá“ (smí spustit fázi); první fáze vždy, další podle stavu v okamžiku začátku předchozí */
+  const armed = phases.map((_, i) => i === 0);
   const events: MotionEvent[] = [];
   let cur = -1;
   /** hodnota vazby podmínky: Vzdálenost / Drážka s polohou = hodnota vazby, jinak posuv / natočení od výchozí polohy */
@@ -369,6 +371,10 @@ export async function runMotion(
       x.prof = motorKeys(x.mo, duration, t);
     }
     M = build(studyMode(doc, study, ph));
+    // podmínka hodnoty další fáze je HRANA: platí-li už teď (např. „ZDVIH ≥ 50“ v okamžiku sevření při 50), další fáze čeká,
+    // až podmínka přestane platit a znovu začne – jinak by fáze nemohla trvat ani krok (návrat by začal hned se sevřením)
+    const nx = phases[i + 1]?.start;
+    if (nx && !("t" in nx)) armed[i + 1] = !condMet(nx, probe(t));
   };
   /** výpočet polohy v čase `t` z nynějších poloh (krok `frac` = bitově stejné hodnoty motorů jako dřív) */
   const solveAt = (t: number, frac?: { k: number; n: number }) => {
@@ -434,8 +440,10 @@ export async function runMotion(
       }
       if (!condMet(c, probe(t))) {
         if (v !== null) prevVal.set(i, { t, v });
+        armed[i] = true;
         break;
       }
+      if (!armed[i]) break; // platí už od začátku předchozí fáze – čeká na novou hranu
       let tau = t;
       const a0 = prevVal.get(i);
       if (a0 && v !== null && prevPoses && k > 0) {
@@ -509,6 +517,13 @@ export async function runMotion(
     const t = (duration * k) / n;
     const tStep = now();
     if (phases.length) timeAdvance(k, t);
+    // motor s časovým oknem, který začíná mezi kroky: poloha těsně před jeho začátkem (ještě se starým pohonem) – skok začátku
+    // (⚠ motion.start-jump) se pak měří v okamžiku začátku, ne v předchozím kroku
+    if (k > 0) {
+      const tPrevStep = (duration * (k - 1)) / n;
+      const due = motors.filter((x) => !x.started && x.start !== null && x.start > tPrevStep + 1e-9 && x.start < t - 1e-9).map((x) => x.start!);
+      if (due.length) solveAt(Math.min(...due) - 1e-6);
+    }
     let { out, vals } = solveAt(t, { k, n });
     // podmínky hodnot v poloze kroku: fáze začne v přesném okamžiku a krok se spočítá znovu s jejím nastavením
     if (phases.length && valueAdvance(k, t)) ({ out, vals } = solveAt(t, { k, n }));

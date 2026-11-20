@@ -120,8 +120,10 @@ export function phaseLines(runs: PhaseRun[], doc: CadDoc, study: Pick<MotionStud
       out.push(tr("⚠ fáze {0} „{1}“ nenastala – podmínka {2} do konce studie nesplněna{3}", r.index + 1, r.name, cond, r.value !== undefined ? tr(" (nejblíž {0})", motorNum(r.value)) : ""));
       continue;
     }
-    const steps = r.step === r.end ? String(r.step) : `${r.step}–${r.end}`;
-    const tEnd = stepT(r.end ?? r.step ?? 0);
+    // fáze bez vlastního kroku (začala i skončila mezi dvěma kroky): jen krok začátku
+    const end = r.end ?? r.step;
+    const steps = r.step === end ? String(r.step) : `${r.step}–${end}`;
+    const tEnd = r.end === undefined ? (r.t ?? 0) : stepT(r.end);
     const bad = r.conflictSteps ? tr("nesplněné vazby v {0} krocích", r.conflictSteps) : tr("nesplněné vazby 0");
     const extra = [r.stopped ? tr("motor na mezi v {0} krocích", r.stopped) : "", r.invalid ? tr("neplatné kroky {0}", r.invalid) : ""].filter(Boolean).join(" · ");
     out.push(

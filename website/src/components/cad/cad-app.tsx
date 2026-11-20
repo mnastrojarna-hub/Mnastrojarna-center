@@ -92,7 +92,7 @@ import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, typ
 import { bomNotesOf } from "./asm-supply";
 import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
-import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
+import { MotionPanel, pushMotionSignal, useMotionView, useMotorHighlight } from "./motion-panel";
 import { useClearanceGap } from "./motion-clearance-panel"; // úsečka vůle pohybové studie (vlna 22, bod 6)
 import { useSpringBetween } from "./springs/spring-between";
 import { useMateRepick } from "./mate-repick";
@@ -303,6 +303,8 @@ export function CadApp() {
   const [motionOpen, setMotionOpen] = useState(false); // pohybová studie sestavy (motion-panel.tsx)
   const motionShow = useMotionView();
   const clearanceGapShow = useClearanceGap();
+  // motor ve formuláři studie (vlna 22, bod 10): poháněné díly zvýrazněné, osa a šipka směru v překryvu (WebGL i bez WebGL)
+  const motorHl = useMotorHighlight();
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
   // nastavení, paleta, úvodní obrazovka, formařské nástroje
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -1454,14 +1456,14 @@ export function CadApp() {
         vertices: l.coil ? undefined : r?.vertices,
         matrix: m,
         color: l.comp.color ?? top?.color ?? "#b9c2cc",
-        selected: l.topId === asmSel || l.topId === mate?.compId,
+        selected: l.topId === asmSel || l.topId === mate?.compId || !!motorHl?.comps.includes(l.topId),
         clash: clashIds.has(l.id),
         solid: !!l.coil || r?.metrics?.solids !== 0, // vlna 22: plochy bez objemu = v řezu bez čela
       });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid, doc.clashRules, doc.clashTol]);
+  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid, doc.clashRules, doc.clashTol, motorHl]);
 
   const asmPartInfo = useCallback(
     // jedna funkce materiálu a hmotnosti pro aplikaci, text i CLI (bom-model.ts – označení, třída v jazyce, normálie = třída pevnosti)
@@ -3950,6 +3952,8 @@ export function CadApp() {
           <main
             className="relative min-w-0 flex-1 overflow-hidden"
             data-doc-key={docKeyNow}
+            data-motor-highlight={isAsm && motorHl ? motorHl.comps.length : undefined}
+            data-motor-axis={isAsm && motorHl?.label ? motorHl.label.text : undefined}
             data-compare-map={cmpShown?.colors ? docKeyNow : undefined}
             onPointerDownCapture={(e) => {
               lastPtr.current = { x: e.clientX, y: e.clientY };
@@ -3986,7 +3990,7 @@ export function CadApp() {
                   onPickMany={!refPick && !mate && !boltPick && !planePick && active?.type !== "hole" && !(active?.type === "ext" && getExtUi(active.ext)?.onFacePick) ? onPickMany : undefined}
                   leftDrag={prefs.leftDrag}
                   boxResolve={selFilter === "feature" && !isAsm && !measure && pickMode !== "edges" && pickMode !== "faces" ? (items, changed) => boxOwners.resolve(result?.mesh, items, (f, pt) => cad.faceOwner(doc, f, pt), changed) : undefined}
-                  measure={measureGfx ?? (isAsm && motionShow.trace ? { points: [motionShow.trace[motionShow.trace.length - 1]], lines: motionShow.trace.slice(1).map((p, i) => [motionShow.trace![i], p] as [Vec3, Vec3]), labels: [] } : null)}
+                  measure={measureGfx ?? motionOverlay(isAsm ? motionShow.trace : null, isAsm ? motorHl : null)}
                   gap={isAsm && motionShow.pose ? clearanceGapShow : null}
                   vertices={result?.vertices ?? null}
                   faceColors={weldFaceColors(doc, result?.bodies, doc.faceColors)}
@@ -4824,3 +4828,13 @@ function thumbnail(dataUrl: string): Promise<string> {
   });
 }
 
+/**
+ * Překryv 3D okna pohybové studie: stopa bodu a osa motoru se šipkou směru a popiskem (vlna 22, bod 10) – stejná data dostane
+ * WebGL i softwarový náhled (měřicí překryv), takže osa je vidět i bez WebGL.
+ */
+function motionOverlay(trace: Vec3[] | null, hl: { lines: [Vec3, Vec3][]; label: { pos: Vec3; text: string } | null } | null) {
+  if (!trace && !hl) return null;
+  const lines: [Vec3, Vec3][] = [...(trace ? trace.slice(1).map((p, i) => [trace[i], p] as [Vec3, Vec3]) : []), ...(hl?.lines ?? [])];
+  const points: Vec3[] = trace ? [trace[trace.length - 1]] : [];
+  return { points, lines, labels: hl?.label ? [hl.label] : [] };
+}

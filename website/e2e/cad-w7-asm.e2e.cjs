@@ -126,6 +126,7 @@ sestava vazba závěs "Kolo2" Ø8,2 "Držák" Ø8`);
   await p.locator('button', { hasText: 'Pohybová studie' }).first().click();
   const mp = p.locator('[data-motion-panel]');
   await mp.waitFor({ timeout: 8000 });
+  await mp.locator('[data-motor-new]').click(); // vlna 22, M3: formulář motoru otevře „+ Nový motor“
   const opts = await mp.locator('[data-motor-mate] option').allInnerTexts();
   const hingeOpt = opts.find((o) => /Závěs · Kolo1 → Držák/.test(o));
   ok(!!hingeOpt && opts.length >= 4, 'rotační motor nabízí vazby Závěs / Souosost: ' + opts.join(' | '));
@@ -278,7 +279,7 @@ sestava vazba vačka "Zdvihátko" -Y "Vačka" válcová Ø40`);
     await ep.locator('[data-mate-confirm]').click(); await e.waitForTimeout(1500);
     await e.locator('button', { hasText: studyTxt }).first().click();
     const emp = e.locator('[data-motion-panel]'); await emp.waitFor({ timeout: 8000 });
-    await emp.locator('[data-motor-add]').click(); await emp.locator('[data-motor]').first().waitFor({ timeout: 5000 });
+    await emp.locator('[data-motor-new]').click(); await emp.locator('[data-motor-add]').click(); await emp.locator('[data-motor]').first().waitFor({ timeout: 5000 });
     await emp.locator('[data-motion-run]').click(); await emp.locator('[data-motion-result]').waitFor({ timeout: 120000 });
     const elog = await run(e, 'motion status\nassembly mates');
     await e.screenshot({ path: S + 'w7-asm-' + lang + '.png' });

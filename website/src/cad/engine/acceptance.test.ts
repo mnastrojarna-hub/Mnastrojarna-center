@@ -154,8 +154,9 @@ describe("pohybová studie: tuhé skupiny a jeden souhrnný řádek", () => {
     const kv = motionKv(study(), { steps: 10, of: 10, thread: 30, real: 2, firstReal: 1 });
     // vlna 22, bod 9: motor (průběh, začátek > konec, směr) vždy na KONCI řádku – směr a konec i ve stručném protokolu
     // vlna 22, bod 2: úroveň simulace na KONCI řádku (level=kin – výsledek bez úrovně je kinematika); dosavadní pole beze změny
-    expect(kv).toBe("motion steps=9 t=2 motors=1 conflicts=0 travel=50mm:3,20mm:2 static=2 rot=1 clash.steps=10/10 thread=30 real=2 first.real=1 m1=range:167>117:- level=kin");
-    expect(motionKv(study(), null)).toBe("motion steps=9 t=2 motors=1 conflicts=0 travel=50mm:3,20mm:2 static=2 rot=1 m1=range:167>117:- level=kin");
+    // vlna 22, M3: tuhé skupiny (počet:osy±Δ) na KONCI řádku – stejné skupiny jako travel=
+    expect(kv).toBe("motion steps=9 t=2 motors=1 conflicts=0 travel=50mm:3,20mm:2 static=2 rot=1 clash.steps=10/10 thread=30 real=2 first.real=1 m1=range:167>117:- level=kin groups=3:z-50,2:z-20");
+    expect(motionKv(study(), null)).toBe("motion steps=9 t=2 motors=1 conflicts=0 travel=50mm:3,20mm:2 static=2 rot=1 m1=range:167>117:- level=kin groups=3:z-50,2:z-20");
     expect(GRAMMAR.measure.test(`= L390 asm "${ASM.name}" ${kv}`)).toBe(true);
   });
 });

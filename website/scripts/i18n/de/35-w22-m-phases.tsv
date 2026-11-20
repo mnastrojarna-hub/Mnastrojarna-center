@@ -1,0 +1,159 @@
+# vlna 22, balík M, etapa 3: fáze studie (úseky motoru, okna, podmínky), motory v panelu (nový / upravit, dosah, konflikt), tuhé skupiny
+ (nejblíž {0})	 (am nächsten {0})
+ (tuhá skupina – stejný pohyb)	 (starre Gruppe – gleiche Bewegung)
+ (tuhá skupina – zámek / pevné vazby)	 (starre Gruppe – Sperre / starre Verknüpfungen)
+ a další	 und weitere
+ stojí: {0} ({1}{2})	 stehen: {0} ({1}{2})
+ · na konci zpět ve výchozí poloze	 · am Ende zurück in der Ausgangslage
+ · na konci {0}	 · am Ende {0}
+ · natáčí se {0}°	 · dreht sich {0}°
+ · okno {0}–{1} s	 · Fenster {0}–{1} s
+ · začne s fází „{0}“	 · beginnt mit Phase „{0}“
+ – motorů, které s ní začínaly: {0} (začnou od začátku studie)	 – Antriebe, die mit ihr begannen: {0} (sie beginnen jetzt am Studienanfang)
+ – spolu s ním kvůli pevné vazbě (zámku): {0}{1}	 – mit ihm zusammen wegen einer starren Verknüpfung (Sperre): {0}{1}
+(od začátku)	(ab Beginn)
+(vyberte)	(auswählen)
++ Nová fáze	+ Neue Phase
++ Nový motor	+ Neuer Antrieb
++ další úsek / návratový zdvih (klíčové polohy)	+ weiterer Abschnitt / Rückhub (Stützpunkte)
++ návrat na začátek	+ Rückkehr zum Anfang
++ {0} díl	+ {0} Teil
++ {0} díly	+ {0} Teile
++ {0} dílů	+ {0} Teile
++ úsek	+ Abschnitt
+Bez fází: jedna časová osa pro všechny motory. Fáze rozdělí cyklus (nájezd, sevření, střih, návrat) a od svého začátku zapnou / potlačí vazby nebo změní režim.	Ohne Phasen: eine Zeitachse für alle Antriebe. Phasen teilen den Zyklus (Anfahren, Klemmen, Schneiden, Rückhub) und aktivieren / unterdrücken ab ihrem Beginn Verknüpfungen oder ändern den Modus.
+Detail po dílech (jinak tuhé skupiny)	Detail je Teil (sonst starre Gruppen)
+Díly spojené pevnou vazbou (zámkem) se pohybují společně s řízeným dílem – motor nedávejte každému zvlášť.	Teile, die durch eine starre Verknüpfung (Sperre) verbunden sind, bewegen sich mit dem angetriebenen Teil – nicht jedem einen eigenen Antrieb geben.
+Fáze studie	Studienphasen
+Fáze studie: {0}	Studienphasen: {0}
+Fáze studie: žádné – pohyb fáze "Nájezd" · pohyb fáze "Sevření" při vazba "ZDVIH" <= 40 …	Studienphasen: keine – bewegung phase "Anfahren" · bewegung phase "Klemmen" wenn verknüpfung "HUB" <= 40 …
+Fáze {0}	Phase {0}
+Fáze {0} „{1}“: kroky {2} · t = {3}–{4} s · začátek: {5} · {6} · {7}	Phase {0} „{1}“: Schritte {2} · t = {3}–{4} s · Beginn: {5} · {6} · {7}
+Fáze {0} „{1}“: t = {2}–{3} s · kroky {4}–{5} – klik = první krok fáze	Phase {0} „{1}“: t = {2}–{3} s · Schritte {4}–{5} – Klick = erster Schritt der Phase
+Fáze „{0}“ smazána – motorů, které s ní začínaly: {1} (začnou od začátku studie).	Phase „{0}“ gelöscht – Antriebe, die mit ihr begannen: {1} (sie beginnen jetzt am Studienanfang).
+Fáze „{0}“ už ve studii je.	Phase „{0}“ ist bereits in der Studie.
+Konec okna [s]	Fensterende [s]
+Motor podmínky	Bedingungsantrieb
+Motor {0} na vazbě „{1}“ nahrazen.	Antrieb {0} an Verknüpfung „{1}“ ersetzt.
+Nahradit motor {0}	Antrieb {0} ersetzen
+Navázat úsek za motor {0}	Abschnitt an Antrieb {0} anhängen
+Nový motor	Neuer Antrieb
+Název fáze	Phasenname
+Odebrat úsek	Abschnitt entfernen
+Operátor podmínky	Bedingungsoperator
+Posunout dříve	Früher verschieben
+Posunout později	Später verschieben
+Přidat fázi	Phase hinzufügen
+Režim fáze	Phasenmodus
+Smazat fázi	Phase löschen
+Událost {0}	Ereignis {0}
+Uložit fázi	Phase speichern
+Uložit motor {0}	Antrieb {0} speichern
+Upravit motor {0}	Antrieb {0} bearbeiten
+Vazba podmínky	Bedingungsverknüpfung
+Vazba „{0}“ už má motor {1} – uložením ho nahradíte. Další pohyb na téže vazbě zapište jako navazující úsek, nebo motoru dejte jiné časové okno / fázi.	Verknüpfung „{0}“ hat bereits Antrieb {1} – Speichern ersetzt ihn. Weitere Bewegung an derselben Verknüpfung als Folgeabschnitt schreiben oder dem Antrieb ein anderes Zeitfenster / eine andere Phase geben.
+Vazby od začátku fáze (zapnout / potlačit)	Verknüpfungen ab Phasenbeginn (aktivieren / unterdrücken)
+Zapnutá vazba zachytí polohu dílů v okamžiku začátku fáze (zámek drží díly tak, jak právě jsou).	Eine aktivierte Verknüpfung übernimmt die Lage der Teile zum Phasenbeginn (eine Sperre hält die Teile so, wie sie gerade stehen).
+Začne s fází	Beginnt mit Phase
+Začátek [s]	Beginn [s]
+Začátek fáze	Phasenbeginn
+fáze	Phase
+fáze {0} „{1}“	Phase {0} „{1}“
+fáze {0} „{1}“: dynamika po fázích zatím není – fáze počítá kinematika nebo kvazistatika (dynamika = celá studie bez fází)	Phase {0} „{1}“: Dynamik je Phase gibt es noch nicht – Phasen rechnet Kinematik oder Quasistatik (Dynamik = ganze Studie ohne Phasen)
+fáze {0} „{1}“: motor podmínky ve studii není	Phase {0} „{1}“: der Bedingungsantrieb ist nicht in der Studie
+fáze {0} „{1}“: vazba podmínky v sestavě není	Phase {0} „{1}“: die Bedingungsverknüpfung ist nicht in der Baugruppe
+fáze {0} „{1}“: vazba {2} v sestavě není	Phase {0} „{1}“: Verknüpfung {2} ist nicht in der Baugruppe
+fáze „{0}“ nenastala: podmínka {1} se do konce studie nesplnila (nejbližší hodnota {2}) – upravte podmínku (pohyb fáze N upravit při …) nebo prodlužte pohyb motoru	Phase „{0}“ trat nicht ein: Bedingung {1} bis zum Studienende nicht erfüllt (nächster Wert {2}) – Bedingung anpassen (bewegung phase N bearbeiten wenn …) oder den Antriebsweg verlängern
+fáze „{0}“ už ve studii je – upravit: pohyb fáze "{0}" upravit …	Phase „{0}“ ist bereits in der Studie – bearbeiten: bewegung phase "{0}" bearbeiten …
+fáze „{0}“ ve studii není – fáze: {1}	Phase „{0}“ ist nicht in der Studie – Phasen: {1}
+fáze „{0}“ zapíná / potlačuje vazbu, která ve skriptu není – ve skriptu chybí	Phase „{0}“ aktiviert / unterdrückt eine Verknüpfung, die nicht im Skript ist – fehlt im Skript
+fáze: hodnota podmínky „{0}“ není číslo	Phase: der Bedingungswert „{0}“ ist keine Zahl
+fáze: podmínka potřebuje operátor <= nebo >= a hodnotu – při vazba "ZDVIH" <= 30	Phase: die Bedingung braucht einen Operator <= oder >= und einen Wert – wenn verknüpfung "HUB" <= 30
+fáze: podmínka potřebuje operátor <= nebo >= a hodnotu, ne „{0}“	Phase: die Bedingung braucht einen Operator <= oder >= und einen Wert, nicht „{0}“
+fáze: podmínka – při vazba <N> <= hodnota | při motor <N> >= hodnota | od <T> s	Phase: Bedingung – wenn verknüpfung <N> <= Wert | wenn antrieb <N> >= Wert | ab <T> s
+fáze: při motor <N> <= hodnota	Phase: wenn antrieb <N> <= Wert
+fáze: při vazba <N|"název"> <= hodnota	Phase: wenn verknüpfung <N|"Name"> <= Wert
+fáze: za „vazba“ zadejte číslo nebo název vazby	Phase: nach „verknüpfung“ Nummer oder Name der Verknüpfung angeben
+fáze: zapnout / potlačit vazba <N> – např. zapnout vazba 5	Phase: aktivieren / unterdrücken verknüpfung <N> – z. B. aktivieren verknüpfung 5
+fáze: čas začátku musí být ≥ 0 s	Phase: die Startzeit muss ≥ 0 s sein
+hodnota podmínky	Bedingungswert
+jako studie	wie die Studie
+jedna pohybová studie s fázemi (vlna 22): úseky a klíčové polohy motoru, časové okno, motor začínající s fází, navázání úseků na motor téže vazby (nahrazení motoru jen s ℹ motion.motor-replaced); fáze v pořadí s podmínkou začátku (čas, hodnota vazby / motoru – okamžik zpřesněný mezi kroky), zapnutím / potlačením vazeb (zapnutá vazba zachytí polohu v tom okamžiku) a režimem; protokol po fázích (kroky, čas, úroveň, nesplněné vazby), ⚠ motion.phase-unreached, strojově phases=N/M	eine Bewegungsstudie mit Phasen (Welle 22): Antriebsabschnitte und Stützpunkte, Zeitfenster, Antrieb beginnt mit einer Phase, Anhängen von Abschnitten an den Antrieb derselben Verknüpfung (Ersetzen nur mit ℹ motion.motor-replaced); Phasen in Reihenfolge mit Startbedingung (Zeit, Wert einer Verknüpfung / eines Antriebs – Zeitpunkt zwischen Schritten verfeinert), Aktivieren / Unterdrücken von Verknüpfungen (eine aktivierte Verknüpfung übernimmt die Lage in diesem Moment) und Modus; Protokoll je Phase (Schritte, Zeit, Stufe, nicht erfüllte Verknüpfungen), ⚠ motion.phase-unreached, maschinell phases=N/M
+když hodnota motoru dosáhne	wenn der Antriebswert erreicht
+když hodnota vazby dosáhne	wenn der Verknüpfungswert erreicht
+motor na mezi v {0} krocích	Antrieb an der Grenze in {0} Schritten
+motor {0} ({1})	Antrieb {0} ({1})
+motor {0} na vazbě „{1}“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N	Antrieb {0} an Verknüpfung „{1}“ durch die neue Eingabe ersetzt – ein weiterer Abschnitt danach: bewegung antrieb … anhängen (oder … dann …); Antrieb mit anderem Beginn: fenster T0..T1 / phase N
+motor {0} začíná v {1} s (krok {2}) na {3}, vazba je v tu chvíli na {4} – díl přeskočí o {5}; začátek motoru nastavte na hodnotu v okamžiku začátku	Antrieb {0} beginnt bei {1} s (Schritt {2}) bei {3}, die Verknüpfung steht in diesem Moment bei {4} – das Teil springt um {5}; Antriebsbeginn auf den Wert zum Startzeitpunkt setzen
+motor {0} {1} {2}	Antrieb {0} {1} {2}
+motor: chybí konec prvního úseku – 57,5..27,15 pak 57,5	Antrieb: das Ende des ersten Abschnitts fehlt – 57,5..27,15 dann 57,5
+motor: klíče čas:hodnota aspoň dva – klíče 0:57,5 0,3:40 0,6:27,15	Antrieb: Schlüssel Zeit:Wert, mindestens zwei – schlüssel 0:57,5 0,3:40 0,6:27,15
+motor: klíče čas:hodnota zadávají celý průběh – bez rozsahu, zdvihu a pak	Antrieb: Schlüssel Zeit:Wert geben den ganzen Verlauf vor – ohne Bereich, Hub und dann
+motor: klíčové polohy potřebují aspoň dvě dvojice čas:hodnota – klíče 0:57,5 0,3:40	Antrieb: Stützpunkte brauchen mindestens zwei Paare Zeit:Wert – schlüssel 0:57,5 0,3:40
+motor: navázat jde za rozsah / úseky, ne za „tam a zpět“ ani jízdu bez konce – zadejte motor znovu s pak …	Antrieb: anhängen geht nach einem Bereich / Abschnitten, nicht nach „hin und zurück“ oder Fahrt ohne Ende – Antrieb neu mit dann … eingeben
+motor: navázat za klíčové polohy (klíče t:v) nejde – doplňte klíče	Antrieb: anhängen nach Stützpunkten (schlüssel t:v) geht nicht – Schlüssel ergänzen
+motor: navázat – na vazbě „{0}“ zatím žádný motor není (zadejte ho bez slova navázat)	Antrieb: anhängen – an Verknüpfung „{0}“ ist noch kein Antrieb (ohne das Wort anhängen eingeben)
+motor: navázat – nový úsek začíná na {0}, dosavadní motor končí na {1}; zapište {1}..{2} navázat (nebo bez začátku)	Antrieb: anhängen – der neue Abschnitt beginnt bei {0}, der bisherige Antrieb endet bei {1}; {1}..{2} anhängen schreiben (oder ohne Anfang)
+motor: prodleva musí být kladná [s]	Antrieb: die Verweilzeit muss positiv sein [s]
+motor: první klíčová poloha musí být v čase 0 (začátek motoru) – klíče 0:{0} …	Antrieb: der erste Stützpunkt muss bei Zeit 0 liegen (Antriebsbeginn) – schlüssel 0:{0} …
+motor: všechny úseky končí na začátku {0} – motor by se nepohnul	Antrieb: alle Abschnitte enden am Anfang {0} – der Antrieb würde sich nicht bewegen
+motor: úsek „pak {0}..“ nenavazuje na konec předchozího úseku {1} – zapište pak {1}..{2}	Antrieb: der Abschnitt „dann {0}..“ schließt nicht an das Ende des vorigen Abschnitts {1} an – dann {1}..{2} schreiben
+motor: úseky motoru {0} trvají do {1} s, zadaný čas studie {2} s nestačí – vynechte čas, nebo úseky zkraťte	Antrieb: die Abschnitte von Antrieb {0} dauern bis {1} s, die angegebene Studienzeit {2} s reicht nicht – Zeit weglassen oder Abschnitte kürzen
+motor: úseky „pak“ / „prodleva“ navazují na rozsah – zadejte nejdřív konec prvního úseku (57,5..27,15 pak 57,5) nebo začátek (od 57,5 pak 27,15 čas 0,4)	Antrieb: Abschnitte „dann“ / „verweilen“ setzen einen Bereich fort – zuerst das Ende des ersten Abschnitts (57,5..27,15 dann 57,5) oder den Anfang (von 57,5 dann 27,15 zeit 0,4) angeben
+motor: čas úseku musí být kladný [s]	Antrieb: die Abschnittszeit muss positiv sein [s]
+motor: časové okno od–do [s] musí začít v čase ≥ 0 a skončit později – okno 0,2..0,6	Antrieb: das Zeitfenster von–bis [s] muss bei ≥ 0 beginnen und später enden – fenster 0,2..0,6
+motor: časové okno potřebuje rozsah nebo zdvih – okno 0,2..0,6 s rychlostí bez konce nejde	Antrieb: ein Zeitfenster braucht einen Bereich oder Hub – fenster 0,2..0,6 mit Geschwindigkeit ohne Ende geht nicht
+motor: časy klíčových poloh musí růst – {0} s je dvakrát nebo pozpátku	Antrieb: die Zeiten der Stützpunkte müssen steigen – {0} s ist doppelt oder rückwärts
+motor: „tam a zpět“ nejde spojit s úseky – návrat zapište jako další úsek: … pak <začátek>	Antrieb: „hin und zurück“ lässt sich nicht mit Abschnitten kombinieren – Rückweg als weiteren Abschnitt schreiben: … dann <Anfang>
+motor: „tam a zpět“ nejde spojit s úseky – návrat zapište jako další úsek: … pak {0}	Antrieb: „hin und zurück“ lässt sich nicht mit Abschnitten kombinieren – Rückweg als weiteren Abschnitt schreiben: … dann {0}
+motory: {0}	Antriebe: {0}
+nenastaly: {0}	nicht eingetreten: {0}
+neplatné kroky {0}	ungültige Schritte {0}
+nepohne se (stupeň volnosti drží vazby)	bewegt sich nicht (der Freiheitsgrad wird von Verknüpfungen gehalten)
+nesplněné vazby 0	nicht erfüllte Verknüpfungen 0
+název fáze	Phasenname
+od začátku studie	ab Studienbeginn
+okno	Fenster
+osa otáčení {0}	Drehachse {0}
+pak	dann
+po dojetí motorů předchozí fáze	nach Ende der Antriebe der vorigen Phase
+podmínka fáze „{0}“ míří na vazbu, která ve skriptu není – fáze se zapíše bez podmínky	die Bedingung von Phase „{0}“ verweist auf eine Verknüpfung, die nicht im Skript ist – die Phase wird ohne Bedingung geschrieben
+pohyb fáze "<název>" [při vazba <N> <=|>= <hodnota> | při motor <N> <=|>= <hodnota> | od <T> s] [zapnout vazba <N>] [potlačit vazba <N>] [kinematika|kvazistatika|automaticky] · pohyb fáze <N> upravit|smazat|nahoru|dolů · pohyb fáze	bewegung phase "<Name>" [wenn verknüpfung <N> <=|>= <Wert> | wenn antrieb <N> <=|>= <Wert> | ab <T> s] [aktivieren verknüpfung <N>] [unterdrücken verknüpfung <N>] [kinematik|quasistatik|automatisch] · bewegung phase <N> bearbeiten|löschen|hoch|runter · bewegung phase
+pohyb fáze {0}: upravit | smazat | nahoru | dolů	bewegung phase {0}: bearbeiten | löschen | hoch | runter
+pohyb fáze: neznámá volba „{0}“ – {1}	bewegung phase: unbekannte Option „{0}“ – {1}
+pohyb fáze: zadejte název v uvozovkách – {0}	bewegung phase: Namen in Anführungszeichen angeben – {0}
+pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> | <A>..<B>..<C> | [od <A>] zdvih <Δ> | klíče t:v … [pak <B> [čas T | rychlost V]] [prodleva T] [okno T0..T1] [fáze N] [navázat] [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa "<X>" [bod x y z]] · pohyb fáze "<název>" [při vazba N <=|>= v | od T s] [zapnout|potlačit vazba N] [kinematika|kvazistatika] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav [detail]|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	bewegung antrieb dreh|linear "<Komponente>"|verknüpfung <N> <von>..<bis> | <A>..<B>..<C> | [von <A>] hub <Δ> | schlüssel t:v … [dann <B> [zeit T | geschwindigkeit V]] [verweilen T] [fenster T0..T1] [phase N] [anhängen] [schritt S | schritte N] [zeit T] [u/min R | geschwindigkeit V] [an grenze stopp|fehler] [kollisionen] [spur "<X>" [punkt x y z]] · bewegung phase "<Name>" [wenn verknüpfung N <=|>= v | ab T s] [aktivieren|unterdrücken verknüpfung N] [kinematik|quasistatik] · bewegung kinematik|quasistatik|dynamik|automatisch · bewegung zustand [detail]|starten|abspielen|anhalten|schritt N|export csv|png|webm|löschen
+pohyb událost: zadejte podmínku – při vazba <N> <= hodnota | od <T> s	bewegung ereignis: Bedingung angeben – wenn verknüpfung <N> <= Wert | ab <T> s
+pohání: „{0}“{1}{2}{3}	treibt: „{0}“{1}{2}{3}
+potlačit	unterdrücken
+potlačit {0}	unterdrücken {0}
+potlačit: {0}	unterdrücken: {0}
+prodleva	Verweilzeit
+rychlost úseku	Abschnittsgeschwindigkeit
+rychlostí	mit Geschwindigkeit
+souhrn pohybu po tuhých skupinách (díly se stále stejnou vzájemnou polohou, tolerance místo zaokrouhlení – jedna skupina se nerozpadne): „Horní deska“ + 20 dílů (tuhá skupina): ΔZ −30 mm, stojí N, nesplněné vazby; detail po dílech pohyb detail; strojově groups=21:z-30. Při zadání motoru řádek pohání (řízený díl + díly spojené zámkem, směr osy) a ⚠ motion.motor-conflict, když jiný motor pohání tentýž stupeň volnosti od stejného okamžiku	Bewegungszusammenfassung nach starren Gruppen (Teile mit gleichbleibender relativer Lage, Toleranz statt Rundung – eine Gruppe zerfällt nicht): „Obere Platte“ + 20 Teile (starre Gruppe): ΔZ −30 mm, stehen N, nicht erfüllte Verknüpfungen; Detail je Teil bewegung detail; maschinell groups=21:z-30. Bei Eingabe eines Antriebs eine Zeile treibt (angetriebenes Teil + durch Sperre verbundene Teile, Achsrichtung) und ⚠ motion.motor-conflict, wenn ein anderer Antrieb denselben Freiheitsgrad ab demselben Zeitpunkt treibt
+tentýž díl	dasselbe Teil
+v čase	zur Zeit
+vazba „{0}“ {1} {2}	Verknüpfung „{0}“ {1} {2}
+za čas	in Zeit
+zapnout	aktivieren
+zapnout {0}	aktivieren {0}
+zapnout: {0}	aktivieren: {0}
+{0} a {1} pohánějí tutéž vazbu od stejného okamžiku – výpočet je nesplní oba; navazující úseky zapište jedním motorem (… pak …, navázat), nebo motoru dejte jiné časové okno / fázi	{0} und {1} treiben dieselbe Verknüpfung ab demselben Zeitpunkt – die Berechnung kann nicht beide erfüllen; Folgeabschnitte mit einem Antrieb schreiben (… dann …, anhängen) oder dem Antrieb ein anderes Zeitfenster / eine andere Phase geben
+{0} pohání stejný stupeň volnosti {1} jako {2} – díl nemůže splnit oba motory najednou a výpočet je rozloží (motor na mezi / nesplněné vazby); smažte jeden motor, nebo je rozdělte do fází / časových oken	{0} treibt denselben Freiheitsgrad von {1} wie {2} – das Teil kann nicht beide Antriebe gleichzeitig erfüllen und die Berechnung teilt den Widerspruch auf (Antrieb an der Grenze / nicht erfüllte Verknüpfungen); einen Antrieb löschen oder sie auf Phasen / Zeitfenster aufteilen
+{0} se nemůže pohnout ani jedním směrem – jeho stupeň volnosti drží vazby (zámek, ukotvení, mez); potlačte blokující vazbu nebo zvolte jinou vazbu	{0} kann sich in keine Richtung bewegen – sein Freiheitsgrad wird von Verknüpfungen gehalten (Sperre, Fixierung, Grenze); die blockierende Verknüpfung unterdrücken oder eine andere wählen
+{0}{1} {2} otočení {3}° · úseků {4}	{0}{1} {2} Drehung {3}° · Abschnitte {4}
+{0}{1} {2} zdvih {3} mm · úseků {4}	{0}{1} {2} Hub {3} mm · Abschnitte {4}
+Úsek {0}: čas nebo rychlost	Abschnitt {0}: Zeit oder Geschwindigkeit
+Úseky (klíčové polohy)	Abschnitte (Stützpunkte)
+Čas začátku	Startzeit
+čas fáze	Phasenzeit
+čas úseku	Abschnittszeit
+⚠ fáze {0} „{1}“ nenastala – podmínka {2} do konce studie nesplněna{3}	⚠ Phase {0} „{1}“ trat nicht ein – Bedingung {2} bis zum Studienende nicht erfüllt{3}
+✓ fáze {0}	✓ Phase {0}
+✓ fáze {0} „{1}“ smazána{2}	✓ Phase {0} „{1}“ gelöscht{2}
+✓ fáze „{0}“ je teď {1}. v pořadí	✓ Phase „{0}“ ist jetzt Nr. {1} in der Reihenfolge
+#!dynamic – texty kódů registru (engine/codes.ts motion.phase-unreached, motion.motor-conflict, motion.motor-replaced)
+fáze „{0}“ nenastala: podmínka {1} se do konce studie nesplnila (nejbližší hodnota {2})	Phase „{0}“ trat nicht ein: Bedingung {1} bis zum Studienende nicht erfüllt (nächster Wert {2})
+motor {0} je v konfliktu s motorem {1} – pohánějí tentýž stupeň volnosti od stejného okamžiku	Antrieb {0} steht im Konflikt mit Antrieb {1} – sie treiben denselben Freiheitsgrad ab demselben Zeitpunkt
+motor {0} na vazbě „{1}“ nahrazen novým zadáním	Antrieb {0} an Verknüpfung „{1}“ durch die neue Eingabe ersetzt
