@@ -782,6 +782,8 @@ Na výkresu dílu i sestavy vyberete kóty, poznámky, drsnosti, geometrické to
 - Polohy děr (volba Polohy děr: auto / od hran / souřadnicově / tabulkou děr): auto kótuje polohy od hran; od 12 různých poloh, nebo když se kóty od hran nevejdou, přejde na souřadnicové kóty od levého dolního rohu obrysu (0 v rohu, hodnoty v jedné řadě) a když se nevejdou ani ty, na tabulku děr – žádná poloha díry se nevynechá. Textem kótovat díry tabulka|souřadnicově|řetězově.
 - Tabulka děr je jedna na list, v pohledu, kde jsou díry vidět (i levý, pravý nebo zadní). Každá díra je jeden řádek se značkou, polohou X; Y od levého dolního rohu obrysu pohledu a popisem (závitová díra se zahloubením jako M8 ⌴Ø20), přes 16 řádků ve dvou sloupcích. Polohy uvedené v tabulce se kótami už neopakují; vnější válce (hřídel, osazení) v tabulce nejsou.
 - Kontrola tolerancí: panel Kontrola kót – co chybí a textový příkaz výkres kontrola tolerancí vypíší funkční rozměry, které na listu ještě nemají toleranci.
+- Kontrola kót pro výrobu: panel Kontrola kót ukazuje zvlášť velikosti a polohy prvků výsledného dílu (díry po skupinách s počtem „2×“, kapsy, okna, drážky, obrysy skic) a u každé chybějící položky tlačítko Přidat kótu (navrhne kótu od hrany dílu nebo od základny; textem výkres doplnit kóty). Kóta se k prvku přiřadí podle geometrie, ne podle čísla – jedna „Ø8“ nesplní dvě díry a libovolná „10“ nesplní hloubku díry. Těleso použité jako nástroj (sloučit … odebrat) se nekótuje, kontroluje se výsledný tvar. Panel nikdy neřekne „kompletní“: říká, co zkontroloval, co chybí a co nezkontroloval; chybějící kóty hlásí i protokol a export (⚠ drawing.dims-incomplete).
+- Funkční plochy a základny: pravým tlačítkem na plochu v modelu → Označit jako funkční / Označit jako základnu (textem funkční F7 H7, funkční "Díra 1" ±0,02, základna A F3). Kontrola kót pak u funkčního prvku chce velikost, polohu od základny a toleranci (a předepsaná tolerance musí sedět); přesnou toleranci na rozměru, který funkční není, označí ℹ jako možné přetolerování.
 
 ### Řez: odsazení jako u skici
 
@@ -1563,7 +1565,7 @@ Ve formuláři prvku Závit zvolte Provedení: Kosmetický (jen výkres), Dráž
 
 **Stačí automatické kótování pro výrobní výkres?**
 
-Ne – „Auto + Ø“ je pomocný základ (celkové rozměry, průměry děr, závity). Funkční kóty, tolerance (H8, g6, ±0,1) a drsnosti doplní konstruktér – tolerance z geometrie odvodit nelze. Tlačítko „Kontrola kót“ ve výkresu porovná kóty na listu s historií prvků (u rotačních dílů průměry a délky osazení, závity, drážky, zaoblení; délka průchozího řezu se nenabízí) a vypíše, co chybí; toleranci zapíšete u kóty do pole „přípona“. Poznámka „Nekótované rozměry dle 3D modelu“ se na výkres nedoplňuje sama – zapnete ji v razítku (Poznámka v patičce).
+Ne – „Auto + Ø“ je pomocný základ (celkové rozměry, průměry děr, závity). Funkční kóty, tolerance (H8, g6, ±0,1) a drsnosti doplní konstruktér – tolerance z geometrie odvodit nelze. Tlačítko „Kontrola kót“ ve výkresu porovná kóty na listu s výsledným dílem – velikosti i polohy prvků (u rotačních dílů průměry a délky osazení, závity, drážky, zaoblení; délka průchozího řezu ani pomocné nástrojové těleso se nenabízí) – a vypíše, co chybí a co nezkontrolovalo; toleranci zapíšete u kóty do pole „přípona“. Poznámka „Nekótované rozměry dle 3D modelu“ se na výkres nedoplňuje sama – zapnete ji v razítku (Poznámka v patičce).
 
 **Umí otevřít a upravit výkres DWG nebo DXF jako AutoCAD?**
 

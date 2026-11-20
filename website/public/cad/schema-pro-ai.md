@@ -155,6 +155,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]` | volby aktivního listu výkresu (`výkres list N`; bez něj první list – založí ho, chybí-li) a otevře výkres; **odsazení řezu jako u skici** (podél normály roviny: `řez XZ odsazení 57` = rovina Y = −57 jako `skica XZ odsazení 57`; XY → Z = N, YZ → X = N); rovina mimo těleso = ✗ s rozsahem odsazení, `⚠ Pohledy se v měřítku … nevejdou na list …` při volbách listu; tabulka děr obsahuje jen díry (vnitřní – konkávní – válcové plochy), vnější válce soustruženého dílu (hřídel, osazení) v ní nejsou; jedna díra = jeden řádek (zahloubení nad vrtákem se sloučí: „M8 ⌴Ø20“), bere díry s osou ve směru pohledu shora, a nevidí-li tam žádnou, pohled listu s nejvíc dírami; `výkres stav` vypíše „Tabulka děr (pohled horní, 3): A1 M8 Ø6,8 ⌴Ø20 [20; 80] · …“ (X; Y od levého dolního rohu obrysu pohledu, jako souřadnicové kóty) a díry s jinou osou, které v tabulce nejsou |
 | `kótovat [chytře|celkově|nic] [řetězově|od základny] [funkční 26,5 74,175] [díry tabulka|souřadnicově|řetězově]` | Chytré kóty podle prvků modelu (viz „Výkres a kóty“) – nahradí jen vygenerované kóty; `funkční` = rozměry, které nikdy nebudou pomocné „(…)“; `díry` = polohy děr tabulkou / souřadnicovými kótami / od hran (výchozí auto) |
 | `výkres tolerance <kóta> <tolerance> [pohled <p>]` · `výkres kontrola tolerancí` · `výkres poznámka "…"` · `výkres nepředepsané ISO 2768-mK` · `výkres hrany ISO 13715 …` · `výkres drsnost Ra 3,2` | tolerance ke kótě podle **číselné hodnoty modelu** (`74,175 -0,005`, `Ø40 h6`, `M8 6H`) nebo id (`a12`); kontrola funkčních rozměrů bez tolerance; údaje u razítka |
+| `výkres kontrola kót` · `výkres doplnit kóty [polohy|velikosti|vše|3 5]` · `funkční F7 [H7]` · `funkční "Díra 1" [±0,02]` · `základna A F3` · `funkční [zrušit …]` (EN `drawing check dims`, `drawing complete dims`, `functional`, `functional datum A F3`; DE `zeichnung prüfen maße`, `zeichnung maße ergänzen`, `funktional`, `bezug A F3`) | kontrola kót pro výrobu po položkách (✓ / ◐ / ✗ / – nezkontrolováno, čísla položek): velikosti a polohy prvků výsledného dílu podle geometrie kót, pomocná tělesa se nekótují; doplnění navržených kót; funkční prvky a základny v modelu (velikost, poloha od základny, tolerance) |
 | `výkres stav` | textový stav výkresu: list, měřítko, pohledy, všechny kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo (také `window.mncad.drawingStatus()`) |
 | `měřit F3|E5|V2 [F7|E9|V8|x y z]` · `měřit těleso|díry|válce` · `měřit plocha|hrany <pravidlo>` | měření pro kontrolu modelu (viz „Měření“); také `window.mncad.measure()` |
 | `výkres list 2` · `výkres list nový "Detail"` · `výkres list přejmenovat 2 "…"` · `výkres list smazat 2` · `výkres stav [list N|vše]` | listy výkresu – další příkazy výkresu pracují s vybraným listem (viz „Výkres textem: listy, značky, kóty, export“) |
@@ -2073,8 +2074,22 @@ pixely v 3D okně:
 - Závitové díry (`díra závit M6 hloubka 12`) se na výkrese kótují popisem `M6 ↧12` (s počtem), ne jako Ø jádra; vrták
   jiný než tabulkový (`jádro`, zadaný průměr) má vlastní řádek `Ø6,647 ↧12`, ploché dno poznámku `(ploché dno)`.
 - Nové výkresy mají **Chytré kóty** (kótování podle prvků, viz další kapitola). Tlačítko **Kontrola kót** ve výkresu
-  porovná kóty na listu s historií prvků a vypíše, co chybí; totéž je v `výkres stav`. Tolerance (H8, ±0,1) se píší
-  příkazem `výkres tolerance` nebo u kóty do pole „přípona“.
+  porovná kóty na listu s VÝSLEDNÝM dílem a vypíše, co chybí; totéž je v `výkres stav` a podrobně `výkres kontrola kót`.
+  Tolerance (H8, ±0,1) se píší příkazem `výkres tolerance` nebo u kóty do pole „přípona“.
+- **Kontrola kót pro výrobu** (vlna 22, bod 18): řádek `Kontrola kót: velikosti a/b · polohy c/d – chybí: … · pomocná tělesa
+  (nekótují se): … · tolerance … · nezkontrolováno: …` – nikdy „kompletní“. Očekává se velikost **i poloha** děr (po
+  skupinách stejných děr s počtem `2×` – jedna `Ø8` nesplní dvě díry), odebraných kvádrů a válců (kapsa, okno, drážka) a
+  obrysů skic na základních rovinách; kóta se k prvku přiřadí **podle geometrie** (konce kóty na souřadnici prvku, osa
+  souměrnosti středem prvku, tabulka děr), hloubka díry jen z popisu té díry (`↧10`) nebo z kóty na díře od vstupu.
+  Těleso spotřebované `sloučit … odebrat` (nástroj) se nekótuje – kontroluje se výsledný tvar (okno 30 × 20 a jeho
+  poloha, ne výška nástroje). Chybí-li něco: ⚠ `drawing.dims-incomplete` ve `výkres stav`, na konci běhu a při exportu.
+  `výkres doplnit kóty [polohy|velikosti|vše|3 5]` přidá navržené kóty (od hrany dílu / základny; v GUI „Přidat kótu“).
+- **Funkční prvky a základny** v modelu: `funkční F7 H7` (plocha, změří se), `funkční "Díra 1" ±0,02` (prvek),
+  `základna A F3` / `funkční základna A F3` (rovinná plocha), `funkční` = výpis, `funkční zrušit …` (EN `functional`,
+  `functional datum A F3`, DE `funktional`, `bezug A F3`; GUI: pravé tlačítko na plochu → Označit jako funkční / základnu).
+  Kontrola kót u funkčního prvku chce velikost, polohu **od základny** na téže ose a toleranci na kótě (předepsaná musí
+  sedět) – bez tolerance ⚠ `drawing.tolerance-missing`; přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na rozměru, který funkční
+  není = ℹ `drawing.tol-nonfunctional` (přetolerování). Bez vyznačení: „tolerance neověřeny (funkční prvky nevyznačeny)“.
 - Ukládání a export z **konzole** (`uložit`, `export step`, `výkres export pdf`, `sdílet`) se nikdy neptají – soubor se
   rovnou stáhne. Tlačítka se člověka ptají na místo a název (systémový dialog), v prohlížeči ovládaném automatizací
   (`navigator.webdriver`, `?agent=1`) stahují rovnou; trvale to zapne Nastavení → Soubory (přímé stažení). Pro skripty
@@ -2113,7 +2128,9 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
    dostane ji pohled s víc dírami a druhý souřadnicové kóty. Jedna poloha = jeden řádek („Ø8 ⌴Ø14“, závit „M8“), přes
    16 řádků dva sloupce; překryje-li tabulka na plném listu pohled, protokol to řekne (⚠ → větší list / měřítko auto).
    `kótovat díry souřadnicově|řetězově` tabulku děr listu vypne (polohy by byly dvakrát), `kótovat díry tabulka` ji zapne.
-4. **Kontrola:** `výkres stav` – musí platit „Duplicity: žádné“ a „Kontrola kót: všech … je na listu“. Řádek
+4. **Kontrola:** `výkres stav` – musí platit „Duplicity: žádné“ a „Kontrola kót: velikosti n/n · polohy m/m“ bez „chybí“
+   (a bez ⚠ `drawing.dims-incomplete`); i pak kontrola zná jen rozměry z historie a vyznačené funkční prvky – funkční
+   plochy a základny vyznačte (`funkční …`, `základna …`) a tolerance zkontrolujte (`výkres kontrola kót`). Řádek
    „Vynecháno“ říká proč (např. „zapněte pohled spodní“, „zapněte řez osou“, „nevešlo se“ → `výkres A2` nebo jiné
    měřítko) – opravte a spusťte `kótovat` znovu. Každý chybějící rozměr Kontroly kót má svůj řádek „Vynecháno“:
    šikmá díra / skica ve šikmé rovině → „kótujte v pomocném pohledu … (`výkres pohled pomocný směr dx dy dz`)“, obecný
@@ -2193,7 +2210,7 @@ výkres stav
 
 Hotový výkres ukazuje (přední pohled, osa vodorovně): průměry `M20×1,5`, `Ø30` (vlevo), `Ø40`, `Ø25` (vpravo),
 zápich `Ø17` popisem; řetěz délek `30` · `3` · `(50)` · `15` · `42`, celková délka `140`, délka závitu `25`;
-`1,5×45°`, `2× R1`. Celkem 14 kót, žádná duplicita, Kontrola kót bez chybějících.
+`1,5×45°`, `2× R1`. Celkem 14 kót, žádná duplicita, Kontrola kót bez „chybí“ (tolerance neověřeny, dokud nejsou funkční prvky vyznačené).
 
 ### Příklad B – příruba s roztečnou kružnicí zahloubených děr a středovým otvorem
 
@@ -2512,6 +2529,8 @@ třídí. Nejčastější:
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
 | `drawing.section-legacy` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (`dnes pište: …` v hlášce) |
 | `drawing.tolerance-missing` ⚠ | `výkres kontrola tolerancí`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | `výkres tolerance aN …` |
+| `drawing.dims-incomplete` ⚠ | kontrola kót (bod 18): na listu chybí velikost nebo poloha prvku výsledného dílu (díra, skupina děr s počtem, kapsa / okno, obrys skici) – `výkres stav`, konec běhu, export listu | `výkres doplnit kóty`, `výkres kóta …`, podrobně `výkres kontrola kót` |
+| `drawing.tol-nonfunctional` ℹ | přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na kótě, která nesplňuje žádný vyznačený funkční prvek (přetolerování) | vyznačit prvek `funkční …`, nebo toleranci uvolnit |
 | `drawing.stale` ⚠ | vydaný list (`výkres vydat`) neodpovídá nynější revizi modelu: `výkres stav`, `stav`, konec běhu, který model změnil; export listu se starým písmenem revize a nové vydání se stejným písmenem po změně (v přísném režimu ✗, export se nezapíše) | `výkres vydat B` (nová revize), přehled `výstupy zastaralé` |
 | `param.clamped` ⚠ | hodnota mimo rozsah ořezána (úhel kuželového zahloubení 30–170°, hrot 60–170°, úhel stěny 5–90°) | |
 | `geom.approx` ℹ / `geom.volume-failed` ⚠ | objem ze sítě (velké těleso) / objem se nepodařilo změřit (0) | |
@@ -3338,6 +3357,8 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
+  functional?: FunctionalMark[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */

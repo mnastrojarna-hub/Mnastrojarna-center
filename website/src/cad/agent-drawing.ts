@@ -58,6 +58,10 @@ export type DrawingCmd =
   | { k: "tol"; target: string; tol: string; fit?: boolean; show?: FitShow; view?: ViewRef }
   /** kontrola tolerancí: funkční rozměry (a tolerované rozměry předlohy) bez tolerance na listu */
   | { k: "tolcheck" }
+  /** kontrola kót pro výrobní úplnost: velikosti, polohy, funkční prvky, tolerance (vlna 22, bod 18 – cad/dim-complete.ts) */
+  | { k: "dimcheck" }
+  /** doplnit chybějící kóty podle kontroly kót (GUI „Přidat kótu“): polohy / velikosti / vše, nebo položky číslem z `výkres kontrola kót` */
+  | { k: "dimfill"; what: "all" | "size" | "pos"; only?: number[] }
   /** pomocné pohledy, řezy lomenou čarou, částečné řezy, přerušení, uložení, značky revizí, zóny (cad/agent-drawing-views.ts) */
   | { k: "views"; cmd: ViewsCmd }
   /** údaje u razítka: poznámka, nepředepsané tolerance, hrany, drsnost */
@@ -357,6 +361,8 @@ const SUB: Record<string, DrawingCmd["k"] | "note" | "tolerance" | "edges" | "ro
  */
 export function parseDrawing(tokens: string[], raw?: string): DrawingCmd | null {
   if (!tokens.length) return null;
+  const dck = parseDimCheck(tokens);
+  if (dck) return dck;
   const rt = rawTokens(raw ?? tokens.map((t) => (/\s/.test(t) ? `"${t}"` : t)).join(" "));
   const vw = parseDrawingViews(rt);
   if (vw) return vw.op === "fit-set" ? { k: "tol", target: vw.target, tol: vw.code, fit: true, ...(vw.show ? { show: vw.show } : {}) } : { k: "views", cmd: vw };
@@ -490,6 +496,28 @@ export function rawTokens(line: string): RawTok[] {
 const W = (...w: string[]) => new Set(w);
 /** kontrola (výkres kontrola tolerancí · drawing check tolerances · zeichnung prüfen toleranzen) */
 const CHECK_W = W("kontrola", "kontrolovat", "zkontrolovat", "check", "pruefen", "prufen", "prufung", "pruefung", "kontrolle");
+// kontrola kót / doplnění chybějících kót (vlna 22, bod 18)
+const DIMS_W = W("kot", "koty", "kotu", "dims", "dimensions", "masse", "mase", "bemassung", "bemassungen");
+const FILL_W = W("doplnit", "dopln", "doplnte", "complete", "fill", "erganzen", "ergaenzen", "vervollstandigen");
+const MISSING_W = W("chybejici", "missing", "fehlende");
+const POS_W = W("polohy", "poloha", "position", "positions", "lage", "lagen", "positionen");
+const SIZE_W = W("velikosti", "velikost", "rozmery", "size", "sizes", "grossen", "groessen", "grosse");
+/** `výkres kontrola kót` · `výkres doplnit kóty [polohy|velikosti|vše|1 3 …]` (EN drawing check dims · drawing complete dims / add missing dims, DE zeichnung prüfen maße · zeichnung maße ergänzen) */
+function parseDimCheck(tokens: string[]): DrawingCmd | null {
+  const w = tokens.map(fold);
+  if (w.length === 2 && CHECK_W.has(w[0]) && DIMS_W.has(w[1])) return { k: "dimcheck" };
+  let rest: string[];
+  if ((w[0] === "add" || w[0] === "pridat") && MISSING_W.has(w[1] ?? "") && DIMS_W.has(w[2] ?? "")) rest = w.slice(3);
+  else if (FILL_W.has(w[0]) && DIMS_W.has(w[1] ?? "")) rest = w.slice(2);
+  else if (DIMS_W.has(w[0]) && FILL_W.has(w[1] ?? "")) rest = w.slice(2);
+  else return null;
+  const usage = tr("výkres doplnit kóty [polohy | velikosti | vše | čísla položek z výkres kontrola kót]");
+  if (!rest.length || (rest.length === 1 && ALL_W.has(rest[0]))) return { k: "dimfill", what: "all" };
+  if (rest.length === 1 && POS_W.has(rest[0])) return { k: "dimfill", what: "pos" };
+  if (rest.length === 1 && SIZE_W.has(rest[0])) return { k: "dimfill", what: "size" };
+  if (rest.every((x) => /^\d+$/.test(x))) return { k: "dimfill", what: "all", only: rest.map(Number) };
+  throw new Error(usage);
+}
 const SHEET_W = W("list", "sheet", "blatt");
 const SHEETS_W = W("listy", "sheets", "blatter", "blaetter");
 const NEW_W = W("novy", "nova", "nove", "new", "neu", "neues", "pridat", "add");

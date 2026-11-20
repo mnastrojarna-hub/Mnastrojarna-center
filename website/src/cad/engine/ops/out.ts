@@ -29,6 +29,7 @@ import { runExportJob } from "../export-job";
 import { outputsCmd, recordOutput, warnStaleExport } from "../outputs-ops";
 import { shareContent, shareContentText, shareLinkKv, verifyKv, type ShareContent } from "../share-content";
 import { modelId } from "../../doc-outputs";
+import { sheetWarningCode } from "../sheet-eval";
 
 /* ───────────────────────── zápis do konzole a reportu ───────────────────────── */
 
@@ -208,7 +209,8 @@ async function exportDrawingCmd(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind
     const revStale = ids.some((sid) => { const s = d.drawings?.find((x) => x.id === sid); return !!s?.issued && s.issued.sig !== sig; });
     recordOutput(ctx, { what: "drawing", format: cmd.format, file: f.name, ...(ids.length ? { sheets: ids } : {}), ...(rev ? { rev } : {}), ...(revStale ? { revStale } : {}) });
   }
-  for (const w of p.warnings) e.code("drawing.warning", { text: w.sheet ? `${w.sheet}: ${w.text}` : w.text, indent: "  " });
+  // neúplné kóty listu (bod 18) = ⚠ drawing.dims-incomplete, ostatní varování listu ⚠ drawing.warning
+  for (const w of p.warnings) e.code(sheetWarningCode(w.text) === "drawing.dims-incomplete" ? "drawing.dims-incomplete" : "drawing.warning", { text: w.sheet ? `${w.sheet}: ${w.text}` : w.text, indent: "  " });
 }
 
 /** id listů dokumentu `d` v rozsahu exportu (bez uloženého výkresu žádné; „doc“ = listy dokumentu, výkresy dílů z komponent ne) */

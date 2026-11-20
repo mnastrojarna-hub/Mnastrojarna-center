@@ -42,8 +42,6 @@ Chytré kóty jsou pro díly – u sestavy použijte „kótovat celkově“ a p
 Chytré kóty přegenerovány: {0}{1}	Intelligente Bemaßung neu erzeugt: {0}{1}
 jádro nevrátilo Chytré kóty	der Kern lieferte keine intelligente Bemaßung
 jen celkové (zapečené)	nur Gesamtmaße (fest eingebrannt)
-Kontrola kót: chybí {0} z {1}: {2}	Maßprüfung: {0} von {1} fehlen: {2}
-Kontrola kót: všech {0} očekávaných rozměrů je na listu	Maßprüfung: alle {0} erwarteten Größen sind auf dem Blatt
 Kóty a popisy ({0}, z toho vygenerovaných {1}):	Maße und Beschriftungen ({0}, davon erzeugt {1}):
 kuželové plochy ({0}): úhel a průměry kuželů kótujte ručně	Kegelflächen ({0}): Kegelwinkel und -durchmesser manuell bemaßen
 měřítko {0}	Maßstab {0}

@@ -2259,6 +2259,9 @@ export function CadApp() {
         { id: "dr", label: tr("Úkos"), icon: "draft", tone: "feature", onClick: () => addWithFaces("draft", faces) },
         { id: "sh", label: tr("Skořepina (otevřít plochu)"), icon: "shell", tone: "feature", onClick: () => addWithFaces("shell", faces) },
         { id: "th", label: tr("Zesílit"), icon: "thicken", tone: "feature", onClick: () => addWithFaces("thicken", faces) },
+        // funkční plocha / základna pro kontrolu kót výkresu (vlna 22, bod 18) – text přes engine jako konzole a CLI
+        { id: "fn", label: tr("Označit jako funkční"), icon: "check", tone: "tool", onClick: () => void runAgentRef.current(`funkční F${it.index + 1}`).then((t) => flash(t.split("\n").find((l) => /^[✓✗]/.test(l.trim())) ?? t.split("\n")[0])) },
+        { id: "dt", label: tr("Označit jako základnu"), icon: "axes", tone: "tool", onClick: () => { const used = new Set((doc.functional ?? []).filter((m) => m.kind === "datum").map((m) => m.label)); const L = "ABCDEFGHJKLMNPRSTUVWXYZ".split("").find((x) => !used.has(x)) ?? "Z"; void runAgentRef.current(`funkční základna ${L} F${it.index + 1}`).then((t) => flash(t.split("\n").find((l) => /^[✓✗]/.test(l.trim())) ?? t.split("\n")[0])); } },
         meas,
         props,
         ...COLOR_MENU((c) => setFaceColor(faces, c), tr("Barva plochy")),

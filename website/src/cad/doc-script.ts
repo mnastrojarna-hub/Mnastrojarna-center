@@ -218,6 +218,9 @@ const WORDS = {
   // druh položky kusovníku (vlna 22, bod 19): komponenta `sestava komponenta #k druh …`, díl `druh …`
   supplyComp: ["druh", "kind", "art"],
   supplyPart: ["druh", "supply", "beschaffung"],
+  // funkční prvky a základny (vlna 22, bod 18 – agent-functional.ts)
+  functionalMark: ["funkční", "functional", "funktional"],
+  datumMark: ["základna", "datum", "bezug"],
   sMake: ["vyráběný", "make", "fertigung"],
   sStandard: ["normálie", "standard", "norm"],
   sBuy: ["nakupovaný", "buy", "kauf"],
@@ -1838,10 +1841,28 @@ function emitPart(c: Ctx, doc: CadDoc, name: string) {
     const cq = cf ? scriptQuote(cf.name, true) : null;
     if (cq) c.line(`${c.w("config")} ${c.w("active")} ${cq}`);
   }
+  emitFunctional(c, doc);
   if (doc.bodies?.some((b) => b.color || b.hidden)) c.note(tr("barvy a skrytí těles dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.faceColors && Object.keys(doc.faceColors).length) c.note(tr("barvy ploch dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.underlays && Object.keys(doc.underlays).length) c.note(tr("podklady skic (obrázky / PDF) dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   emitDrawings(c, doc, name);
+}
+
+/** funkční prvky a základny (vlna 22, bod 18): `funkční F7 H7` · `funkční "Díra 1" H7` · `funkční základna A F3` – plocha se při čtení změří znovu */
+function emitFunctional(c: Ctx, doc: CadDoc) {
+  for (const m of doc.functional ?? []) {
+    const tol = m.tol ? ` ${m.tol}` : "";
+    if (m.kind === "datum") {
+      if (m.face && m.label && /^[A-Za-z]$/.test(m.label)) c.line(`${c.w("functionalMark")} ${c.w("datumMark")} ${m.label} F${m.face.index + 1}`);
+      else c.note(tr("základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.label ?? m.id, doc.name));
+      continue;
+    }
+    const f = m.feature ? doc.features.find((x) => x.id === m.feature) : undefined;
+    const q = f ? scriptQuote(f.name, true) : null;
+    if (m.face) c.line(`${c.w("functionalMark")} F${m.face.index + 1}${tol}`);
+    else if (q && !/[\r\n]/.test(tol)) c.line(`${c.w("functionalMark")} ${q}${tol}`);
+    else c.note(tr("funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.id, doc.name));
+  }
 }
 
 /* ───────────────────────── sestava ───────────────────────── */

@@ -279,6 +279,8 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
+  functional?: FunctionalMark[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
@@ -493,6 +495,20 @@ export type DrawingDoc = {
   drawing?: string;
   /** vydání listu (`výkres vydat`): písmeno revize, revize modelu, čas – po změně modelu je list zastaralý (cad/doc-outputs.ts) */
   issued?: IssuedSheet;
+};
+
+/**
+ * Funkční prvek / základna v modelu (bod 18): prvek historie (díra, kapsa…) nebo plocha (index + otisk) se snímkem geometrie
+ * z doby označení (rovina: normála + bod; válec: osa, bod, poloměr). `tol` = předepsaná tolerance (H7, ±0,02), `label` = písmeno základny.
+ */
+export type FunctionalMark = {
+  id: string;
+  kind: "functional" | "datum";
+  label?: string;
+  feature?: string;
+  face?: { index: number; sig?: Sig };
+  geom?: { t: "plane"; n: Vec3; c: Vec3 } | { t: "cyl"; axis: Vec3; c: Vec3; r: number } | { t: "other"; c: Vec3 };
+  tol?: string;
 };
 
 /** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */
