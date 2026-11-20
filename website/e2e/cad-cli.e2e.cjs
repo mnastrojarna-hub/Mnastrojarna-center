@@ -211,7 +211,7 @@ const mem = () => { const m = /MemAvailable:\s+(\d+)/.exec(fs.readFileSync('/pro
   // ── výstupy při ✗ (run=fail) a --no-output-on-error ──
   const o3 = path.join(WORK, 'o3');
   r = await cli(['run', path.join(IN, 'bad.txt'), '--open', path.join(IN, 'plate.mncad'), '--out', o3, '--formats', 'step']);
-  ok(r.code === 1 && /^F step "A\.step" \d+B check=ok run=fail$/m.test(r.out) && fs.existsSync(path.join(o3, 'A.step')), 'nepřísný běh s ✗ zapíše postavený hlavní dokument (díl „A“ ze skriptu), F … check=ok run=fail (STEP znovu načten – B3)');
+  ok(r.code === 1 && /^F step "A\.step" \d+B check=ok run=fail rev=r·[0-9a-f]{6}$/m.test(r.out) && fs.existsSync(path.join(o3, 'A.step')), 'nepřísný běh s ✗ zapíše postavený hlavní dokument (díl „A“ ze skriptu), F … check=ok run=fail rev=r·… (STEP znovu načten – B3; revize modelu – vlna 22 bod 12)');
   const o4 = path.join(WORK, 'o4');
   r = await cli(['run', path.join(IN, 'bad.txt'), '--open', path.join(IN, 'plate.mncad'), '--out', o4, '--formats', 'step', '--no-output-on-error']);
   ok(r.code === 1 && !/^F /m.test(r.out) && !fs.existsSync(path.join(o4, 'A.step')) && !fs.existsSync(path.join(o4, 'Deska 1.step')), '--no-output-on-error: nic se nezapíše');
