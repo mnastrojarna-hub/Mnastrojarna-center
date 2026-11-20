@@ -492,7 +492,22 @@ export type Mate = {
  */
 export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic };
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic } & MotionStudyViews;
+/**
+ * Pracovní prostředí přehrávání (vlna 22, bod 14 – cad/motion-views.ts): uložené pohledy studie (kamera + rovina řezu), aktivní
+ * pohled, nastavení posledního exportu videa (bod 13 – cad/motion-video.ts) a anotací. Jen zobrazení – výsledek studie neovlivní.
+ */
+export type MotionStudyViews = { views?: MotionView[]; /** id aktivního pohledu (přehrávání, export) */ view?: string; video?: MotionVideoSettings; annot?: MotionAnnotSettings };
+/** Uložený pohled studie: kamera (nezávislá na WebGL / softwarovém náhledu) a jedna rovina řezu (null = bez řezu). */
+export type MotionView = { id: string; name: string; camera?: StudyCamera; section?: StudySection | null };
+/** Kamera pohledu: pojmenovaný směr nebo směr od cíle ke kameře, cíl a viditelná výška [mm]; co chybí, doplní přizpůsobení modelu. */
+export type StudyCamera = { view?: "iso" | "front" | "back" | "top" | "bottom" | "left" | "right"; dir?: Vec3; target?: Vec3; height?: number };
+/** Rovina řezu pohledu (shodná se stavem řezu 3D okna, cad/section-plane.ts SectionState). */
+export type StudySection = { axis: "X" | "Y" | "Z"; offset: number; flip: boolean; normal?: Vec3; origin?: Vec3 };
+/** Volby exportu videa / snímků: rychlost (1 = skutečná), FPS, ruční délka [s], pohledy (víc = synchronní dlaždice), anotace. */
+export type MotionVideoSettings = { speed?: number; fps?: number; seconds?: number; views?: string[]; annot?: boolean };
+/** Anotace aktuální polohy (v okně i v exportu): vypnuté, nebo skryté řádky. */
+export type MotionAnnotSettings = { off?: boolean; hide?: ("t" | "step" | "motors" | "clearance" | "cut")[] };
 /**
  * Dynamika pohybové studie (cad/motion-dynamic.ts): integrační krok [s], gravitace (směr; null = vypnutá, chybí = −Z), viskózní tlumení
  * pružin [N·s/mm], součinitel odrazu na dorazech (0–1), ručně zadané hmotnosti komponent [kg] a síly / momenty na vazbách.

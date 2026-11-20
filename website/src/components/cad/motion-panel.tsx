@@ -15,7 +15,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { fmt } from "@/cad/agent-asm";
 import { motionCached, motionRun, type MotionSignal } from "@/cad/asm-agent-kin";
 import type { AsmEnv } from "@/cad/asm-agent";
-import { writeZip } from "@/cad/formats/zip";
 import { cadLocale, tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES } from "@/cad/mates-kin";
@@ -30,6 +29,11 @@ import { cn } from "@/lib/cn";
 import { CadIcon } from "./cad-icons";
 import { Num, Vec } from "./props";
 import { FloatPanel } from "./ui";
+// vlna 22 (body 13–14): lišta přehrávání, uložené pohledy, anotace, export s pevným časováním
+import { findView } from "@/cad/motion-views";
+import { studySpan } from "@/cad/motion-video";
+import { applyStudyView, exportMotion, type ExportHost, type ExportReport } from "./motion-export";
+import { MotionPlayer, type PlayerHost } from "./motion-player";
 
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
@@ -75,8 +79,15 @@ function save(name: string, data: BlobPart, type: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
-const frame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
-const b64ToU8 = (d: string) => Uint8Array.from(atob(d.split(",")[1] ?? ""), (ch) => ch.charCodeAt(0));
+/** kompaktní režim (jen lišta přehrávání) – pamatuje se v prohlížeči */
+const COMPACT_KEY = "mncad.motion.compact";
+const readCompact = () => {
+  try {
+    return localStorage.getItem(COMPACT_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
 
 
 /** stav výsledku pro otisk dokumentu `sig` (starší stav se při vykreslení jiného dokumentu nepoužije ani na jeden snímek) */
@@ -90,23 +101,24 @@ export function MotionPanel({
   env,
   onDoc,
   onClose,
-  snapshot,
-  canvas,
   flash,
   engineBusy,
+  player,
 }: {
   doc: CadDoc;
   env: () => AsmEnv;
   /** změna definice studie (uloží se do sestavy) */
   onDoc: (d: CadDoc) => void;
   onClose: () => void;
-  /** PNG 3D okna (data URL) */
-  snapshot: () => string | null;
-  /** plátno 3D okna (video WebM) */
-  canvas: () => HTMLCanvasElement | null;
+  /** PNG 3D okna (data URL) – od vlny 22 nepoužito (export přes `player`, motion-export.ts) */
+  snapshot?: () => string | null;
+  /** plátno 3D okna – od vlny 22 nepoužito (dřív záznam videa v reálném čase) */
+  canvas?: () => HTMLCanvasElement | null;
   flash: (t: string) => void;
   /** běží běh textových příkazů (dokument běhu se zapisuje až na jeho konci) – pokyny a výpočet panelu na něj počkají */
   engineBusy?: () => boolean;
+  /** okno pro pohledy studie a export snímků (kamera, řez, sejmutí plátna – WebGL i softwarový náhled) */
+  player?: PlayerHost;
 }) {
   const study: MotionStudy = doc.motion ?? defaultStudy();
   const mates = useMemo(() => (doc.mates ?? []).filter((m) => !m.suppressed && (ROTARY_MOTOR_TYPES.has(m.type) || LINEAR_MOTOR_TYPES.has(m.type))), [doc.mates]);
@@ -115,6 +127,18 @@ export function MotionPanel({
   const [loop, setLoop] = useState(!!study.loop);
   const [rec, setRec] = useState<string | null>(null);
   const cancel = useRef(false);
+  const [speed, setSpeed] = useState(1);
+  const [compact, setCompactState] = useState(readCompact);
+  const setCompact = (on: boolean) => {
+    setCompactState(on);
+    try {
+      localStorage.setItem(COMPACT_KEY, on ? "1" : "0");
+    } catch {
+      /* bez úložiště jen pro tuto relaci */
+    }
+  };
+  const [report, setReport] = useState<ExportReport | null>(null);
+  const exportCancel = useRef(false);
   /** otisk dokumentu, který se právě počítá (změní-li se dokument, výpočet zastaralého vstupu se zruší) */
   const computing = useRef<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => newDraft("rotary"));
@@ -213,73 +237,99 @@ export function MotionPanel({
     // dvojí klik během čekání nespustí dva výpočty
     if ((await waitEngine()) && !computing.current) void compute();
   };
-  // přehrávání: krok za dobu studie / počet kroků (nejméně 30 ms), smyčka
+  // přehrávání ve skutečném čase × rychlost (vlna 22, bod 13): krok = poslední krok s časem ≤ uplynulý čas studie; při hustých
+  // krocích se kroky přeskakují – přehrávání se dřív (krok nejméně 30 ms) potichu zpomalovalo
+  const stepRef = useRef(step);
+  stepRef.current = step;
   useEffect(() => {
     if (!playing || !res) return;
-    const dt = Math.max(30, (1000 * study.duration) / Math.max(1, res.steps.length - 1));
-    const t = setInterval(() => {
-      setPos((p) => {
-        const i = p?.res === res ? p.i : 0;
-        if (i + 1 < res.steps.length) return { res, i: i + 1 };
-        if (loop) return { res, i: 0 };
-        setPlay(null);
-        return { res, i };
-      });
-    }, dt);
-    return () => clearInterval(t);
-  }, [playing, res, loop, study.duration]);
-  const exportPng = async (r: MotionResult) => {
-    const files: { name: string; data: Uint8Array }[] = [];
-    for (let i = 0; i < r.steps.length; i++) {
-      setPos({ res: r, i });
-      await frame();
-      const png = snapshot();
-      if (png) files.push({ name: `krok-${String(i).padStart(4, "0")}.png`, data: b64ToU8(png) });
-    }
-    if (!files.length) return flash(tr("Snímek 3D okna se nepodařilo pořídit."));
-    files.push({ name: "studie.csv", data: new TextEncoder().encode(motionCsv(r, doc)) });
-    save(`${doc.name || "sestava"}-pohyb-snimky.zip`, writeZip(files) as BlobPart, "application/zip");
-    flash(tr("Uloženo {0} snímků PNG (ZIP) a tabulka CSV.", files.length - 1));
+    const S = res.steps;
+    const T = studySpan(res, study.duration);
+    let t0 = S[Math.min(stepRef.current, S.length - 1)]?.t ?? 0;
+    if (t0 >= T) t0 = 0;
+    let start = performance.now();
+    let raf = 0;
+    const tickPlay = (now: number) => {
+      let t = t0 + ((now - start) / 1000) * speed;
+      if (t >= T) {
+        if (!loop) {
+          setPos({ res, i: S.length - 1 });
+          setPlay(null);
+          return;
+        }
+        t0 = 0;
+        start = now;
+        t = 0;
+      }
+      let i = 0;
+      while (i + 1 < S.length && S[i + 1].t <= t) i++;
+      if (i !== stepRef.current) setPos({ res, i });
+      raf = requestAnimationFrame(tickPlay);
+    };
+    raf = requestAnimationFrame(tickPlay);
+    return () => cancelAnimationFrame(raf);
+  }, [playing, res, loop, study.duration, speed]);
+  /** poloha kroku ve 3D okně (po exportu se okno vrátí na zobrazený krok) */
+  const showStep = (r: MotionResult, i: number) => {
+    const st = r.steps[i];
+    const trace = r.steps.slice(0, i + 1).flatMap((x) => (x.trace ? [x.trace] : []));
+    motionView.set({ pose: st?.place ?? null, trace: trace.length > 1 ? trace : null, springs: st?.springs ?? null });
   };
-  const exportWebm = async (r: MotionResult) => {
-    const cv = canvas();
-    const Rec = (globalThis as { MediaRecorder?: typeof MediaRecorder }).MediaRecorder;
-    if (!cv || !Rec || !cv.captureStream) return flash(tr("Prohlížeč neumí nahrát video z 3D okna – použijte snímky PNG."));
-    const type = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((t) => Rec.isTypeSupported?.(t)) ?? "video/webm";
-    const fps = Math.max(5, Math.min(30, Math.round((r.steps.length - 1) / Math.max(0.1, study.duration))));
-    const stream = cv.captureStream(fps);
-    const chunks: Blob[] = [];
-    const mr = new Rec(stream, { mimeType: type });
-    mr.ondataavailable = (e) => e.data.size && chunks.push(e.data);
-    const done = new Promise<void>((ok) => (mr.onstop = () => ok()));
-    setRec(tr("Nahrávám video…"));
-    mr.start();
-    for (let i = 0; i < r.steps.length; i++) {
-      setPos({ res: r, i });
-      await new Promise((ok) => setTimeout(ok, 1000 / fps));
+  /**
+   * Snímky PNG / video WebM s pevným časováním (motion-export.ts): bez záznamu obrazovky, délka = délka studie / rychlost
+   * (± 1 snímek), anotace polohy vypálené do obrazu, uložené pohledy (víc = vedle sebe). PNG bez voleb = snímek na krok.
+   */
+  const exportFrames = async (r: MotionResult, kind: "png" | "webm", sig?: MotionSignal["video"]) => {
+    const d = docRef.current;
+    const st = d.motion ?? study;
+    if (!player) return flash(tr("Export snímků potřebuje 3D okno."));
+    // volby z textového příkazu už obsahují uložené volby studie (agent-motion-view.ts mergeVideo) – jinak volby studie
+    const v = sig ?? st.video ?? {};
+    const ids = sig?.views ?? st.video?.views ?? (st.view ? [st.view] : []);
+    const views = ids.flatMap((id) => {
+      const f = findView(st, id);
+      return f ? [f] : [];
+    });
+    const host: ExportHost = {
+      ...player,
+      setPose: (p) => motionView.set({ pose: p.place, trace: p.trace, springs: p.springs }),
+      save,
+      progress: (t) => setRec(t),
+      cancelled: () => exportCancel.current,
+    };
+    exportCancel.current = false;
+    setRec(tr("Připravuji snímky…"));
+    try {
+      const rep = await exportMotion(r, d, { kind, speed: v.speed, fps: v.fps, seconds: v.seconds, perStep: kind === "png" && (sig ? !!sig.perStep : true), views, annot: v.annot !== false && !st.annot?.off, annotSettings: st.annot, name: d.name, csv: motionCsv(r, d) }, host);
+      setReport(rep);
+      flash(rep.text);
+    } finally {
+      setRec(null);
+      if (alive.current) showStep(r, stepRef.current);
     }
-    mr.stop();
-    await done;
-    setRec(null);
-    stream.getTracks().forEach((t) => t.stop());
-    save(`${doc.name || "sestava"}-pohyb.webm`, new Blob(chunks, { type }), "video/webm");
-    flash(tr("Video WebM uloženo ({0} snímků, {1} fps).", r.steps.length, fps));
+  };
+  /** použije uložený pohled studie (kamera a řez okna) */
+  const applyView = (id: string, store: boolean) => {
+    const d = docRef.current;
+    const v = findView(d.motion, id);
+    if (!v) return;
+    if (player) applyStudyView(player, v);
+    if (store && d.motion?.view !== v.id) onDoc({ ...d, motion: { ...(d.motion ?? study), view: v.id } });
   };
   /** export jen z výsledku, který platí pro zobrazený dokument – jinak se nejdřív spočítá */
-  const runExport = async (kind: "csv" | "png" | "webm") => {
+  const runExport = async (kind: "csv" | "png" | "webm", video?: MotionSignal["video"]) => {
     if (!(await waitEngine())) return;
     const d = docRef.current;
     const r = motionCached(d, envRef.current()) ?? (await compute());
     if (!r || motionCached(docRef.current, envRef.current()) !== r) return;
     setPlay(null);
     if (kind === "csv") save(`${d.name || "sestava"}-pohyb.csv`, motionCsv(r, d), "text/csv;charset=utf-8");
-    else if (kind === "png") await exportPng(r);
-    else await exportWebm(r);
+    else await exportFrames(r, kind, video);
   };
   // pokyny z textových příkazů „pohyb přehrát / krok / export“: až po doběhnutí běhu (dokument běhu se zapisuje na jeho konci –
   // dřív panel pokyn zpracoval se STARÝM dokumentem a spočítal a přehrál původní studii, bod 12 zprávy)
-  const handlers = useRef({ compute, runExport });
-  handlers.current = { compute, runExport };
+  const handlers = useRef({ compute, runExport, applyView });
+  handlers.current = { compute, runExport, applyView };
   const draining = useRef(false);
   useEffect(() => {
     let alive = true;
@@ -295,6 +345,8 @@ export function MotionPanel({
           }
           const s = queue.shift()!;
           if (s.stop) setPlay(null);
+          // `pohyb pohled "…"`: dokument s aktivním pohledem už zapsal běh – okno převezme kameru a řez pohledu
+          if (s.view) handlers.current.applyView(s.view, false);
           // tabulku CSV textového příkazu zapisuje engine sám (protokol / soubor) – panel pro ni nic nepočítá
           if (s.play || s.step !== undefined || (s.export && s.export !== "csv")) {
             // výsledek platný pro dokument, který je teď v záložce (běh ho už zapsal); jinak se spočítá pro něj
@@ -309,7 +361,7 @@ export function MotionPanel({
               setPos({ res: r, i: 0 });
               setPlay(r);
             }
-            if (s.export) await handlers.current.runExport(s.export);
+            if (s.export) await handlers.current.runExport(s.export, s.video);
           }
         }
       } finally {
@@ -366,6 +418,9 @@ export function MotionPanel({
   const toLabel = dAbs ? tr("Konec – hodnota vazby") : rot ? tr("Konec – natočení od výchozí polohy") : tr("Konec – posuv od výchozí polohy");
   const time = (ms: number) => new Date(ms).toLocaleTimeString(cadLocale(), { hour: "2-digit", minute: "2-digit" });
   return (
+    <>
+    {/* kompaktní režim (vlna 22, bod 14): jen lišta přehrávání dole ve 3D okně, plný panel skrytý */}
+    {!compact && (
     <FloatPanel title={tr("Pohybová studie")} icon="transform" tone="pattern" width={352} initial={{ x: 12, y: 56 }} onClose={onClose}>
       <div data-motion-panel data-motion-state={state} data-motion-doc={doc.name} data-motion-key={live?.key ?? ""} className="max-h-[70vh] space-y-3 overflow-y-auto p-3 text-[12px]">
         {/* kinematika (motory) / dynamika (síly pružin, gravitace – cad/motion-dynamic.ts) */}
@@ -600,5 +655,32 @@ export function MotionPanel({
         )}
       </div>
     </FloatPanel>
+    )}
+    <MotionPlayer
+      doc={doc}
+      study={study}
+      res={res}
+      state={state}
+      step={step}
+      playing={playing}
+      loop={loop}
+      speed={speed}
+      compact={compact}
+      host={player}
+      busy={rec}
+      report={report}
+      onStep={(i) => res && (setPlay(null), setPos({ res, i }))}
+      onPlay={(on) => res && (on ? (step >= res.steps.length - 1 && setPos({ res, i: 0 }), setPlay(res)) : setPlay(null))}
+      onLoop={setLoop}
+      onSpeed={setSpeed}
+      onCompact={setCompact}
+      onCompute={() => void runCompute()}
+      onStudy={setStudy}
+      onExport={(k) => void runExport(k)}
+      onCancel={() => (exportCancel.current = true)}
+      onApplyView={(id) => applyView(id, true)}
+      onClose={onClose}
+    />
+    </>
   );
 }

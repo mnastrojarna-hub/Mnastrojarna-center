@@ -977,6 +977,32 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
         return true;
       },
       boxPick: (r, crossing) => boxApi.current?.(r, crossing) ?? null,
+      // vlna 22 (body 13–14): snímek videa z náhledu (obraz + překryv se stopou) a kamera uložených pohledů studie
+      frame: () => {
+        const cv = canvas.current;
+        if (!cv || !itemsRef.current.length) return null;
+        if (raf.current) cancelAnimationFrame(raf.current);
+        quality.current = 1;
+        draw();
+        return overlay.current ? [cv, overlay.current] : [cv];
+      },
+      viewState: () => {
+        const el = box.current;
+        const c = cam.current;
+        if (!el || !(c.scale > 0)) return null;
+        return { dir: basisOf(c.angles).dir, target: [...c.center], height: el.clientHeight / c.scale };
+      },
+      setViewState: (v) => {
+        const el = box.current;
+        const l = Math.hypot(v.dir[0], v.dir[1], v.dir[2]);
+        if (!el || !(v.height > 0) || !(l > 0)) return;
+        const z = v.dir[2] / l;
+        // pohled shora / zdola: azimut jako pojmenovaný pohled (+Y nahoru)
+        const az = Math.abs(z) > 0.99999 ? (z > 0 ? -Math.PI / 2 : Math.PI / 2) : Math.atan2(v.dir[1], v.dir[0]);
+        cam.current = { ...cam.current, angles: { az, el: Math.asin(Math.max(-1, Math.min(1, z))) }, center: [v.target[0], v.target[1], v.target[2]], scale: el.clientHeight / v.height, view: "free", fitted: true };
+        setViewName("free");
+        schedule();
+      },
     };
     setSoftView(handle);
     return () => {

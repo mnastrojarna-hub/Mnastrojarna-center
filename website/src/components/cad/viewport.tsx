@@ -74,7 +74,14 @@ export type ViewportHandle = {
   setCamera?: (c: unknown) => void;
   /** výběr oknem / křížením v obdélníku (CSS px 3D okna) podle filtru výběru – bez změny výběru; null = v tomto režimu nejde */
   boxPick?: (rect: BoxRect, crossing: boolean) => SelItem[] | null;
+  /** vlna 22 (body 13–14): vykreslí scénu hned a vrátí plátna k sejmutí snímku videa (WebGL; softwarový náhled + překryv) */
+  frame?: () => HTMLCanvasElement[] | null;
+  /** kamera nezávislá na způsobu kreslení (uložené pohledy pohybové studie): směr od cíle ke kameře, cíl, viditelná výška [mm] */
+  viewState?: () => NeutralCam | null;
+  setViewState?: (c: NeutralCam) => void;
 };
+/** kamera pohledu nezávislá na WebGL / softwarovém náhledu a na perspektivě (cad/motion-views.ts) */
+export type NeutralCam = { dir: Vec3; target: Vec3; height: number };
 
 type Props = {
   mesh: MeshData | null;
@@ -1649,6 +1656,42 @@ export const Viewport = forwardRef<ViewportHandle, Props>(function Viewport(prop
       s.render();
     },
     boxPick: (r, crossing) => (softView.current?.boxPick ? softView.current.boxPick(r, crossing) : (boxApi.current?.(r, crossing) ?? null)),
+    frame: () => {
+      if (softView.current) return softView.current.frame?.() ?? null;
+      const s = S.current;
+      if (!s) return null;
+      s.renderer.render(s.scene, s.camera);
+      return [s.renderer.domElement];
+    },
+    viewState: () => {
+      if (softView.current) return softView.current.viewState?.() ?? null;
+      const s = S.current;
+      if (!s) return null;
+      const t = s.controls.target;
+      const d = s.persp.position.clone().sub(t);
+      const h = 2 * d.length() * Math.tan((s.persp.fov * Math.PI) / 360);
+      d.normalize();
+      return { dir: [d.x, d.y, d.z], target: [t.x, t.y, t.z], height: s.camera === s.orthoCam ? h / Math.max(1e-9, s.orthoCam.zoom) : h };
+    },
+    setViewState: (c: NeutralCam) => {
+      if (softView.current) return softView.current.setViewState?.(c);
+      const s = S.current;
+      if (!s || !(c.height > 0)) return;
+      const d = new THREE.Vector3(...c.dir);
+      if (Math.abs(d.z) > 0.99999 * d.length()) d.y -= 1e-4 * Math.sign(d.z || 1); // pohled shora / zdola (osa nahoru = Z)
+      d.normalize();
+      const dist = c.height / (2 * Math.tan((s.persp.fov * Math.PI) / 360));
+      s.controls.target.set(c.target[0], c.target[1], c.target[2]);
+      s.persp.position.copy(s.controls.target).addScaledVector(d, dist);
+      s.persp.near = dist / 500;
+      s.persp.far = Math.max(dist * 50, s.radius * 100);
+      s.persp.updateProjectionMatrix();
+      s.orthoCam.position.copy(s.persp.position);
+      s.orthoCam.zoom = 1;
+      updateOrthoFrustum();
+      s.controls.update();
+      s.render();
+    },
     /** popisky entit na obrazovce (souřadnice vůči 3D oknu) – pro automatizaci */
     hintList: () => softView.current?.hintList?.() ?? hintsRef.current.map((hh) => ({ id: hh.id, kind: hh.kind, index: hh.index, x: hh.x, y: hh.y, title: hh.title })),
     /** „klikne“ na popisek (syntetické pointer události na plátně – stejná cesta jako myš) */

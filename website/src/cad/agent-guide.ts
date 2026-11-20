@@ -918,6 +918,17 @@ ostatní snímky \`pohyb krok\` / CSV označí „nekontrolováno“. Kinematick
   \`= … motion … mode=dyn bodies=2 spring.max=107N@0.24s stops=2 return=0.375s [drift=…%]\`, \`pohyb export csv\` zapíše soubor se
   sloupci dynamiky a STEP sestavy obsahuje pružiny jako skutečná tělesa v aktuální délce. Jen v aplikaci zůstává panel s grafem,
   přehrání a snímky (\`pohyb přehrát\` ℹ \`ui.no-view\`, \`pohyb export png|webm\` ✗ \`host.app-only\`).
+- Pohledy studie a video s pevným časováním (vlna 22): \`pohyb pohled uložit "Řez pružinami" řez Y 50 kamera přední\` uloží do studie
+  pohled (kamera: pojmenovaný pohled, nebo \`směr dx dy dz cíl x y z výška H\`; řez osou, \`řez normála …\`, nebo \`bez řezu\`),
+  \`pohyb pohled "Řez pružinami"\` ho zvolí pro přehrávání a export (v CLI ℹ \`ui.no-view\`, dokument si volbu pamatuje),
+  \`pohyb pohledy\` vypíše uložené. \`pohyb video rychlost 0,25 fps 30\` (nebo \`délka 5\`, \`pohled "A" "B"\` = synchronní dlaždice,
+  \`anotace vyp\`) uloží volby a vypíše plán \`video 2,6 s = 4 × délka studie 0,65 s · rychlost 0,25× · 30 fps · 78 snímků
+  (tolerance ±1 snímek = ±0,033 s)\` se strojovým řádkem \`= … video seconds=2.6 study=0.65 fps=30 frames=78 speed=0.25 ratio=4\`.
+  \`pohyb export webm|png [tytéž volby]\` exportuje snímky s časovou značkou i/fps (žádný záznam obrazovky): délka videa = délka
+  studie / rychlost ± 1 snímek nezávisle na počtu kroků a rychlosti vykreslení; aplikace soubor zpětně přečte a obraz zkontroluje
+  (✗ když se nemění, ⚠ část snímků). PNG bez voleb = snímek na každý vypočtený krok. Anotace (čas, krok, motory, vůle z kontroly
+  vůle) jsou v okně i vypálené v obraze; \`pohyb anotace vyp\` je vypne. \`window.mncad.motion().video\` vrátí plán
+  \`{ seconds, study, fps, frames, speed, ratio, tol, views, annot, text }\`.
 
 Příklad 1 – střižník: horní deska se 4 kapsami Ø21 hl. 10 dolů 30 mm a zpět, stírací deska na 4 pružinách dosedne na matrici:
 

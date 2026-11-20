@@ -74,8 +74,9 @@ export function subscribeMotionStore(f: () => void): () => void {
 /** definice studie pro otisk: kinematika nezávisí na nastavení dynamiky, přehrávání ve smyčce na výsledek nemá vliv */
 function studyKey(s: MotionStudy | undefined): string {
   if (!s) return "";
-  const { loop: _loop, dyn, ...rest } = s;
-  void _loop;
+  // pohledy, video a anotace (vlna 22, bod 13–14) jsou jen zobrazení – po jejich změně výsledek dál platí
+  const { loop: _loop, dyn, views: _v, view: _a, video: _vi, annot: _an, ...rest } = s;
+  void [_loop, _v, _a, _vi, _an];
   return JSON.stringify(s.mode === "dynamic" ? { ...rest, dyn } : rest);
 }
 const memo = new WeakMap<CadDoc, { sig: string; parts: MotionSigParts }>();

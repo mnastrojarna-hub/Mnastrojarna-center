@@ -1,0 +1,116 @@
+# vlna 22, balík V (body 13 a 14): video s pevným časováním, pohledy studie (kamera + řez), lišta přehrávání, anotace
+  anotace: vypnuté	  annotations: off
+  kamera neuložena – při použití pohledu zůstane kamera okna (v aplikaci tlačítko „Uložit pohled“ uloží i kameru)	  camera not stored – the view keeps the window camera when used (in the app, “Save view” also stores the camera)
+  pohled: „{0}“	  view: “{0}”
+  pohledy: {0}{1}	  views: {0}{1}
+ (min. {0})	 (min. {0})
+ (synchronně vedle sebe)	 (synchronized side by side)
+ bod {0}	 point {0}
+ obráceně	 flipped
+{0} s pevným časováním: {1}	{0} with fixed timing: {1}
+{0}: čekám číslo, ne „{1}“	{0}: expected a number, not “{1}”
+{0}: čekám tři čísla	{0}: expected three numbers
+⚠ obraz se změnil v {0} z {1} snímků s pohybem (zbytek: pohyblivý díl mimo záběr nebo schovaný řezem?)	⚠ the picture changed in {0} of {1} frames with motion (rest: moving part out of view or hidden by the section?)
+✓ aktivní pohled studie „{0}“: {1} · {2} (použije se při přehrávání a exportu)	✓ active study view “{0}”: {1} · {2} (used for playback and export)
+✓ anotace polohy vypnuté	✓ pose annotations off
+✓ anotace polohy zapnuté (čas, krok, motory{0}) – v okně i v exportu PNG / WebM	✓ pose annotations on (time, step, motors{0}) – in the view and in PNG / WebM exports
+✓ pohled studie „{0}“ {1}: {2} · {3}	✓ study view “{0}” {1}: {2} · {3}
+✓ pohled studie „{0}“ odebrán	✓ study view “{0}” removed
+✓ přehrávání a export bez uloženého pohledu (kamera a řez okna)	✓ playback and export without a saved view (window camera and section)
+✗ 3D okno nemá co sejmout (model není zobrazen) – export se nespustil	✗ the 3D view has nothing to capture (model not shown) – export not started
+✗ kodér nevrátil žádný snímek – nic se neuložilo	✗ the encoder returned no frame – nothing was saved
+✗ obraz se mezi snímky nezměnil, přestože se poloha měnila v {0} snímcích – 3D okno se nepřekreslilo, video by bylo nehybné	✗ the picture did not change between frames although the pose changed in {0} frames – the 3D view did not redraw, the video would be frozen
+✗ prohlížeč nevytvořil 2D plátno pro snímky	✗ the browser did not create a 2D canvas for the frames
+✗ Video neuloženo: hotový soubor neodpovídá plánu ({0}) – {1}	✗ Video not saved: the finished file does not match the plan ({0}) – {1}
+Anotace	Annotations
+Anotace polohy v okně a v exportu	Pose annotations in the view and in exports
+Anotace ve videu	Annotations in the video
+cíl	target
+cíl {0}	target {0}
+Délka videa	Video length
+délka videa: kladné číslo v sekundách	video length: a positive number of seconds
+Export se nepodařil: {0}	Export failed: {0}
+Export snímků potřebuje 3D okno.	Exporting frames needs the 3D view.
+Export zrušen.	Export cancelled.
+ℹ poloha se ve studii nemění – všechny snímky ukazují totéž	ℹ the pose does not change in the study – all frames show the same
+kamera {0}	camera {0}
+kamera podle okna	camera as in the window
+kamera: iso | přední | zadní | horní | spodní | levý | pravý	camera: iso | front | back | top | bottom | left | right
+krok {0}/{1}	step {0}/{1}
+Lišta ▾	Bar ▾
+nahrazen	replaced
+Nastavení videa	Video settings
+Nezkontrolováno – pohyb se pro tento stav nepočítal.	Not checked – motion was not computed for this state.
+obraz se mění ve všech {0} snímcích s pohybem ({1} různých snímků)	the picture changes in all {0} frames with motion ({1} distinct frames)
+Odebrat pohled „{0}“	Remove view “{0}”
+okno	window
+Panel ▴	Panel ▴
+pohled „{0}“	view “{0}”
+pohled „{0}“ ve studii není	view “{0}” is not in the study
+pohled „{0}“ ve studii není – uložené: {1}	view “{0}” is not in the study – saved: {1}
+pohled smazat: zadejte název nebo číslo pohledu	view delete: give the view name or number
+Pohled studie	Study view
+pohled studie č. {0} „{1}“ nejde zapsat příkazem pohyb pohled uložit	study view no. {0} “{1}” cannot be written as motion view save
+pohled uložit: zadejte název – pohyb pohled uložit "Řez pružinami" řez Y 50 kamera přední	view save: give a name – motion view save "Spring section" section Y 50 camera front
+Pohled: okno	View: window
+pohled: zadejte název uloženého pohledu v uvozovkách nebo číslo	view: give the name of a saved view in quotes or its number
+pohledy pohybové studie bez motoru se do skriptu nepřenáší	views of a motion study without a motor are not written to the script
+Pohledy studie ({0}), aktivní: {1}	Study views ({0}), active: {1}
+Pohledy studie: žádné – pohyb pohled uložit "<název>" [řez Y 50] [kamera přední]	Study views: none – motion view save "<name>" [section Y 50] [camera front]
+Pohledy ve videu (víc = vedle sebe, synchronně):	Views in the video (several = side by side, synchronized):
+pohledy vše | pohledy vyp	views all | views off
+pohledy: {0}	views: {0}
+pohyb export {0}: neznámá volba „{1}“ – {2}	motion export {0}: unknown option “{1}” – {2}
+pohyb export webm: volba „kroky“ platí jen pro snímky PNG	motion export webm: the option “steps” applies to PNG frames only
+pohyb pohled uložit "<název>" [kamera přední|horní|…] [směr dx dy dz] [cíl x y z] [výška H] [řez X|Y|Z <poloha> [obráceně] | bez řezu] · pohyb pohled "<název>"|okno · pohyb pohledy · pohyb video [rychlost 0,5] [fps 30] [délka 5] [pohled "<A>" …|pohledy vše] [anotace vyp] · pohyb export webm|png [volby videa] · pohyb anotace zap|vyp	motion view save "<name>" [camera front|top|…] [direction dx dy dz] [target x y z] [height H] [section X|Y|Z <position> [flip] | no section] · motion view "<name>"|window · motion views · motion video [speed 0.5] [fps 30] [length 5] [view "<A>" …|views all] [annotations off] · motion export webm|png [video options] · motion annotations on|off
+pohyb pohled uložit: neznámá volba „{0}“ – {1}	motion view save: unknown option “{0}” – {1}
+pohyb pohled: neznámá volba „{0}“ – {1}	motion view: unknown option “{0}” – {1}
+pohyb video: neznámá volba „{0}“ – {1}	motion video: unknown option “{0}” – {1}
+poloha řezu	section position
+Prohlížeč neumí kódovat video – uloženy snímky PNG s časovým plánem (ZIP, příkaz ffmpeg uvnitř): {0}	The browser cannot encode video – PNG frames with the timing plan were saved (ZIP, ffmpeg command inside): {0}
+Připravuji snímky…	Preparing frames…
+ruční délka	manual length
+Rychlost přehrání	Playback speed
+rychlost videa: kladné číslo, např. 1, 0,5 nebo 0,25×	video speed: a positive number, e.g. 1, 0.5 or 0.25×
+řez {0} {1} mm{2}	section {0} {1} mm{2}
+řez normála {0}{1} posun {2} mm{3}	section normal {0}{1} offset {2} mm{3}
+řez: normála nesmí být nulový vektor	section: the normal must not be a zero vector
+řez: osa X, Y nebo Z	section: axis X, Y or Z
+řez: poloha musí být číslo	section: the position must be a number
+řez: X | Y | Z <poloha> nebo řez normála nx ny nz	section: X | Y | Z <position> or section normal nx ny nz
+sestava nemá pohybovou studii – pohyb motor …	the assembly has no motion study – motion motor …
+Skrýt panel studie (jen lišta)	Hide the study panel (bar only)
+směr kamery nesmí být nulový vektor	the camera direction must not be a zero vector
+snímek | čas videa [s] | čas studie [s]	frame | video time [s] | study time [s]
+Snímek {0} z {1}…	Frame {0} of {1}…
+snímek {0}: prohlížeč nevrátil obrázek WebP	frame {0}: the browser did not return a WebP image
+Snímky PNG ({0}) s časovým plánem uloženy (ZIP): {1}	PNG frames ({0}) with the timing plan saved (ZIP): {1}
+Snímky PNG: {0} snímků po vypočtených krocích (t = 0 … {1} s), anotace {2}	PNG frames: {0} frames at the computed steps (t = 0 … {1} s), annotations {2}
+Snímky pohybové studie s pevným časováním (Mnástrojárna CAD)	Motion study frames with fixed timing (Mnástrojárna CAD)
+studie nemá uložené pohledy – pohyb pohled uložit "<název>" …	the study has no saved views – motion view save "<name>" …
+t = {0} / {1} s · krok {2}/{3}	t = {0} / {1} s · step {2}/{3}
+uložen	saved
+Uloží kameru a řez okna jako pohled studie	Saves the window camera and section as a study view
+Uložit pohled	Save view
+Video	Video
+video {0} s = {1} × délka studie {2} s · rychlost {3}× · {4} fps · {5} snímků (tolerance ±1 snímek = ±{6} s)	video {0} s = {1} × study length {2} s · speed {3}× · {4} fps · {5} frames (tolerance ±1 frame = ±{6} s)
+Video neuloženo	Video not saved
+Video studie: {0}	Study video: {0}
+Video WebM uloženo ({0}): {1}; soubor má délku {2} s a {3} snímků	WebM video saved ({0}): {1}; the file is {2} s long with {3} frames
+Video ze snímků: ffmpeg -framerate {0} -i snimek-%04d.png -c:v libvpx-vp9 -pix_fmt yuv420p video.webm	Video from the frames: ffmpeg -framerate {0} -i snimek-%04d.png -c:v libvpx-vp9 -pix_fmt yuv420p video.webm
+video: {0} snímků je moc (nejvýš {1}) – zvyšte rychlost, zkraťte délku nebo snižte FPS	video: {0} frames is too many (at most {1}) – raise the speed, shorten the length or lower the FPS
+video: délka videa musí být kladná [s]	video: the video length must be positive [s]
+video: FPS 1 až 120 (zadáno {0})	video: FPS 1 to 120 (given {0})
+video: rychlost musí být kladná (1 = skutečná, 0,25 = 4× zpomaleně)	video: the speed must be positive (1 = real time, 0.25 = 4× slower)
+video: studie nemá délku – nejdřív pohyb čas T	video: the study has no length – first motion time T
+volby videa odkazují na pohled, který ve studii není – pohledy videa se do skriptu nepřenáší	the video options refer to a view that is not in the study – video views are not written to the script
+volby videa pohybové studie nejde zapsat příkazem pohyb video	the video options of the motion study cannot be written as motion video
+vůle {0} × {1}: {2} mm{3}	clearance {0} × {1}: {2} mm{3}
+vypnuté	off
+Výsledek neplatí – sestava nebo studie se změnila.	The result is not valid – the assembly or study has changed.
+výška {0} mm	height {0} mm
+výška záběru musí být kladná [mm]	the view height must be positive [mm]
+zásah {0}: {1} mm	engagement {0}: {1} mm
+zobrazení pohledu studie	showing the study view
+Zobrazit plný panel studie	Show the full study panel
+pracovní prostředí pohybové studie: uložené pohledy (kamera + rovina řezu) jsou součástí studie a použijí se při přehrávání i exportu; video a snímky PNG s pevným časováním – délka videa = délka studie / rychlost (± 1 snímek), FPS a ruční délka zvlášť, protokol uvádí délku videa a poměr ke studii; víc pohledů = synchronní dlaždice vedle sebe; anotace polohy (čas, krok, motory, vůle z kontroly vůle) v okně i v obrázku; v CLI ✗ host.app-only s časovým plánem; window.mncad.motion().video	motion study workspace: saved views (camera + section plane) are part of the study and are used for playback and export; video and PNG frames with fixed timing – video length = study length / speed (± 1 frame), FPS and manual length separate, the protocol states the video length and its ratio to the study; several views = synchronized tiles side by side; pose annotations (time, step, motors, clearance from the clearance check) in the view and in the image; in the CLI ✗ host.app-only with the timing plan; window.mncad.motion().video

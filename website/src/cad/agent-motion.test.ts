@@ -68,7 +68,8 @@ describe("rozbor: pohyb …", () => {
     expect(op("pohyb přehrát smyčka")).toEqual({ k: "motion", cmd: { op: "play", loop: true } });
     expect(op("pohyb stav")).toEqual({ k: "motion", cmd: { op: "status" } });
     expect(op("motion export csv")).toEqual({ k: "motion", cmd: { op: "export", format: "csv" } });
-    expect(op("pohyb export video")).toEqual({ k: "motion", cmd: { op: "export", format: "webm" } });
+    // vlna 22 (bod 13): export snímků / videa jde přes volby časování (cad/agent-motion-view.ts) – „video“ = webm jako dřív
+    expect(op("pohyb export video")).toEqual({ k: "motion", cmd: { op: "view", cmd: { k: "export", format: "webm", args: {} } } });
     expect(op("pohyb krok 12")).toEqual({ k: "motion", cmd: { op: "step", n: 12 } });
     expect(op("pohyb kroky 48 čas 2 kolize vyp stopa vyp")).toEqual({ k: "motion", cmd: { op: "set", steps: 48, duration: 2, collisions: false, trace: null } });
     expect(op("pohyb motor smazat 1")).toEqual({ k: "motion", cmd: { op: "removeMotor", n: 1 } });

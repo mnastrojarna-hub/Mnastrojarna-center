@@ -81,7 +81,6 @@ motor: vazba číslem nebo názvem – pohyb motor rotační vazba 3 0..360	moto
 Motory	Motors
 motory na vazbách, kroky, kolize, přehrání a export	motors on mates, steps, interference, playback and export
 Načítám plochy, hrany a vrcholy komponenty…	Loading faces, edges and vertices of the component…
-Nahrávám video…	Recording video…
 Nesplněné vazby	Unsatisfied mates
 nesplněno {0}	unsatisfied {0}
 Odebrat motor	Remove motor
@@ -109,7 +108,6 @@ Pokročilé vazby	Advanced mates
 pokročilé vazby jako v panelu sestavy: entita = F12 (plocha), E5 (hrana), V3 (vrchol) nebo pravidlo (+Z, válcová Ø8, koule, kružnice Ø40); Šířka a Závěs berou dvě plochy na straně, Drážka dva konce; meze min / max	advanced mates as in the assembly panel: entity = F12 (face), E5 (edge), V3 (vertex) or a rule (+Z, cylindrical Ø8, sphere, circle Ø40); Width and Hinge take two faces per side, Slot two ends; limits min / max
 poloha {0} mm	position {0} mm
 poměr {0}	ratio {0}
-Prohlížeč neumí nahrát video z 3D okna – použijte snímky PNG.	The browser cannot record video from the 3D view – use PNG frames.
 Přehrát	Play
 Přeskočit	Skip
 Přidat motor	Add motor
@@ -124,7 +122,6 @@ Sestava nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub.	The asse
 Sestava nemá vazbu Závěs, Souosost ani Šroub.	The assembly has no Hinge, Concentric or Screw mate.
 sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu|ozubení|hřeben|šroub|vačka|kardan "A" <plocha|E5|V3> [2. plocha] "B" <plocha> [2. plocha] [rovina "C" <plocha>] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [min N] [max N] [poloha N] [obráceně|levý|vnitřní] [název "…"]	assembly mate perpendicular|tangent|coincident|symmetric|width|path|slot|hinge|lock|limit distance|limit angle|gear|rack|screw|cam|universal "A" <face|E5|V3> [2nd face] "B" <face> [2nd face] [about "C" <face>] [ratio N | teeth z1 z2 | pitch P | travel mm/rev | module m teeth z] [min N] [max N] [position N] [flip|left|internal] [name "…"]
 Smyčka	Loop
-Snímek 3D okna se nepodařilo pořídit.	Could not capture the 3D view.
 Snímky PNG	PNG frames
 Snímky PNG ({0}) se uloží z 3D okna (jen v aplikaci)	PNG frames ({0}) are saved from the 3D view (in the app only)
 stejný smysl otáčení	same direction of rotation
@@ -135,7 +132,6 @@ Stopa Z	Trace Z
 stopa: zadejte komponentu – stopa "Ojnice" [bod x y z] (bod v souřadnicích komponenty)	trace: give a component – trace "Rod" [point x y z] (point in component coordinates)
 stoupání {0} mm	pitch {0} mm
 Tabulka CSV	CSV table
-Uloženo {0} snímků PNG (ZIP) a tabulka CSV.	Saved {0} PNG frames (ZIP) and a CSV table.
 vazba {0} ({1}) nemá hodnotu – hodnotu má Vzdálenost, Úhel, Ozubení (poměr), Šroub (stoupání), Hřeben (mm/ot) a Drážka (poloha)	mate {0} ({1}) has no value – values exist for Distance, Angle, Gears (ratio), Screw (pitch), Rack (mm/rev) and Slot (position)
 vazba {0} ({1}) nemá meze – meze má Mez vzdálenosti a Mez úhlu	mate {0} ({1}) has no limits – limits exist for Distance limit and Angle limit
 Vazba {0}: {1} – klikněte na plochu v modelu nebo vyberte ze seznamu · Esc zruší	Mate {0}: {1} – click a face in the model or pick from the list · Esc cancels
@@ -154,7 +150,6 @@ Vazby splněny ve všech krocích	Mates satisfied in all steps
 vhodné: {0}{1}	suitable: {0}{1}
 Video WebM	WebM video
 Video WebM se nahraje z 3D okna (jen v aplikaci)	WebM video is recorded from the 3D view (in the app only)
-Video WebM uloženo ({0} snímků, {1} fps).	WebM video saved ({0} frames, {1} fps).
 vnitřní dotyk	internal contact
 Všechny entity vazby jsou vybrané – potvrďte vazbu v panelu komponenty.	All entities of the mate are picked – confirm the mate in the component panel.
 Vypočítat pohyb	Compute motion
