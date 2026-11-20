@@ -63,6 +63,37 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     expect(short).toMatch(/^= L\d+ asm "Sestava 6" motion steps=180 .* clash\.steps=2\/181 thread=0 real=1 first\.real=87 clash\.mode=continuous/m);
   }, 300_000);
 
+  it("jádro `clearance`: dráha posuvu najde průchod nože kolíkem v OBOU pořadích dvojice; klouzání po rámu není průnik", async () => {
+    const ws = new MemoryWorkspace();
+    const setup = corpus("74b-clearance-knife-pin").split("\n").filter((l) => !/^(#|pohyb)/.test(l)).join("\n");
+    await runReport(ws, setup, host());
+    const d = ws.present();
+    const id = (n: string) => d.components!.find((c) => c.name === n)!.id;
+    const nuz = d.components!.find((c) => c.name === "Nůž")!;
+    const at = (x: number) => ({ ...nuz.placement, position: [x, 0, 10] as [number, number, number] });
+    const doc17 = { ...d, components: d.components!.map((c) => (c.id === nuz.id ? { ...c, placement: at(97) } : c)) };
+    const r = await kernel.clearance({
+      doc: doc17,
+      poses: [{ [nuz.id]: at(102) }],
+      dist: [{ a: id("Kolík"), b: id("Nůž"), pose: 0 }, { a: id("Kolík"), b: id("Nůž"), pose: 1 }],
+      sweep: [
+        { a: id("Kolík"), b: id("Nůž"), from: 0, to: 1 },
+        { a: id("Nůž"), b: id("Kolík"), from: 0, to: 1 },
+        { a: id("Rám"), b: id("Nůž"), from: 0, to: 1, touch: true },
+        { a: id("Nůž"), b: id("Rám"), from: 0, to: 1, touch: true },
+      ],
+      local: [id("Nůž")],
+    });
+    expect(r.dist!.map((x) => +x.d.toFixed(6))).toEqual([1, 1]); // v krocích 17 a 18 vůle 1 mm
+    expect(r.sweep![0]).toMatchObject({ ok: true, d: 0 });
+    expect(r.sweep![0].pen).toBe(Infinity);
+    expect(r.sweep![1]).toMatchObject({ ok: true, d: 0 });
+    expect(r.sweep![1].pen).toBe(Infinity);
+    expect(r.sweep![2]).toMatchObject({ ok: true, d: 0, pen: 0 }); // nůž klouže po rámu
+    expect(r.sweep![3]).toMatchObject({ ok: true, d: 0, pen: 0 });
+    expect(r.local![id("Nůž")]!.r).toBeCloseTo(Math.hypot(0.5, 20, 5), 6);
+  }, 120_000);
+
   it("74c: střižník ve vedení – vůle 0,01 mm pod limitem 0,05 (⚠ s místem a kroky), `kolize` bez ✓", async () => {
     const { r, short, con } = await run("74c", corpus("74c-clearance-guide"));
     // statická kontrola: žádné ✓ a výslovně „vůle nekontrolována“

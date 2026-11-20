@@ -21,6 +21,7 @@ Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Přidržovač: rozsah pohybu X 0 · Y 0 · Z 25 mm · konec [40; 10; 5]
 Kolize v pohybu: kroků s kolizí 1 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 1 krocích, první v kroku 5
+ kontrolováno spojitě i mezi polohami (6 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 1)
 Vazby splněny ve všech krocích
 ⚠ řádek 5: v pohybu „Deska A“ × „Přidržovač“ od kroku 5 (t = 2 s): kroků 1, dvojic komponent 1, největší průnik 500 mm³ – místo [45; 15; 7,5] v kroku 5
 
@@ -50,19 +51,21 @@ Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Přidržovač: rozsah pohybu X 0 · Y 0 · Z 25 mm · konec [40; 10; 5]
-Kolize: žádné ve všech krocích
+Kolize: žádný průnik v 6 polohách
+ kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 ℹ řádek 6: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: geometrie dílu „Deska A“
 Krok 5 (t = 2 s, motory -5):
  Deska A [0; 0; 0]
  Přidržovač [40; 10; 5]
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
  1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → -5 mm ↓ zdvih 25 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Přidržovač: rozsah pohybu X 0 · Y 0 · Z 25 mm · konec [40; 10; 5]
-Kolize: žádné ve všech krocích
+Kolize: žádný průnik v 6 polohách
+ kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 ✓ Kvádr 1 (box) · přidáno 12000 mm³ · těleso platné
 
@@ -71,7 +74,7 @@ Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 30]
 Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 50 × 40 × 40 mm · objem Σ 13 cm³ · hmotnost Σ 0,102 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích (podrobně pohyb stav)
 === run 4 ===
 ✓ vazba 1 (Vzdálenost „Přidržovač“ F5 → „Deska A“ F6 · 25 mm): hodnota 25 mm · ok
@@ -89,5 +92,5 @@ Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [40; 10; 35]
 Vazby: 1 (1 ok)
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize – pohyb stav
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 50 × 40 × 45 mm · objem Σ 13 cm³ · hmotnost Σ 0,102 kg
-Kolize: žádné (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?) – NEPLATÍ: sestava se od kontroly změnila, spusťte „kolize“ znovu
 Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, bez průniku těles v kontrolovaných krocích, ⚠ upozornění k motorům: 1 (podrobně pohyb stav)

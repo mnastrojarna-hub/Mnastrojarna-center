@@ -1,0 +1,64 @@
+=== run 1 ===
+✓ nový díl „Rám“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Doraz“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Kolík“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Nůž“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ nová sestava „Sestava 6“ – nová záložka
+✓ komponenta „Rám“ vložena do sestavy (ukotvená)
+✓ komponenta „Doraz“ vložena do sestavy (ukotvená)
+✓ komponenta „Kolík“ vložena do sestavy (ukotvená)
+✓ komponenta „Nůž“ vložena do sestavy
+✓ vazba POSUV „Nůž“ F1 → „Doraz“ F2 · 12 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+ Nůž: rozsah pohybu X 180 · Y 0 · Z 0 mm · konec [192; 0; 10]
+Kolize v pohybu: kroků s kolizí 0 z 37 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů jen mezi kroky (nalezeno zjemněním) · mezi kroky (zjemněno) 1×
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vazby splněny ve všech krocích
+⚠ řádek 18: v pohybu „Kolík“ × „Nůž“ mezi kroky 17 a 18 (zjemněno: poloha 17,5, t = 0,972 s, motory 99,5): průnik 19,132 mm³ – v krocích samotných není – místo [100; 20; 15]
+Pohybová studie: motorů 1 · kroků 36 · 2 s · kolize
+ 1. lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+ Nůž: rozsah pohybu X 180 · Y 0 · Z 0 mm · konec [192; 0; 10]
+Kolize v pohybu: kroků s kolizí 0 z 37 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů jen mezi kroky (nalezeno zjemněním) · mezi kroky (zjemněno) 1×
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vazby splněny ve všech krocích
+⚠ řádek 19: v pohybu „Kolík“ × „Nůž“ mezi kroky 17 a 18 (zjemněno: poloha 17,5, t = 0,972 s, motory 99,5): průnik 19,132 mm³ – v krocích samotných není – místo [100; 20; 15]
+Vůle: nesleduje se · bez limitu · kontrola jen v polohách kroků (diskrétně)
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+ Nůž: rozsah pohybu X 180 · Y 0 · Z 0 mm · konec [192; 0; 10]
+Kolize: žádný průnik v 37 polohách
+ kontrolováno jen v 37 polohách (diskrétně, posun mezi polohami až 5 mm) – mezi polohami nekontrolováno (spojitá kontrola vypnuta – pohyb kolize spojitě)
+Vazby splněny ve všech krocích
+ℹ řádek 20: kontrolováno jen v 37 polohách (diskrétně, posun mezi polohami až 5 mm) – mezi polohami nekontrolováno (spojitá kontrola vypnuta – pohyb kolize spojitě)
+Vůle: nesleduje se · bez limitu · kontrola spojitě – zjemnění u kontaktu a kontrola mezi polohami
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+ Nůž: rozsah pohybu X 180 · Y 0 · Z 0 mm · konec [192; 0; 10]
+Kolize v pohybu: kroků s kolizí 0 z 37 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů jen mezi kroky (nalezeno zjemněním) · mezi kroky (zjemněno) 1×
+ kontrolováno spojitě i mezi polohami (37 poloh + 36 mezipoloh ze zjemnění; úseky: dráha posuvu 36)
+Vazby splněny ve všech krocích
+⚠ řádek 21: v pohybu „Kolík“ × „Nůž“ mezi kroky 17 a 18 (zjemněno: poloha 17,5, t = 0,972 s, motory 99,5): průnik 19,132 mm³ – v krocích samotných není – místo [100; 20; 15]
+Pohybová studie: motorů 1 · kroků 180 · 2 s · kolize
+ 1. lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+Pohybová studie: 180 kroků · 2 s · motory: lineární motor · POSUV „Nůž“ → „Doraz“ · hodnota vazby 12 → 192 mm ↑ zdvih 180 mm
+ Nůž: rozsah pohybu X 180 · Y 0 · Z 0 mm · konec [192; 0; 10]
+Kolize v pohybu: kroků s kolizí 2 z 181 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 2 krocích, první v kroku 87
+ kontrolováno spojitě i mezi polohami (181 poloh + 180 mezipoloh ze zjemnění; úseky: dráha posuvu 182, průnik už v poloze 3)
+Vazby splněny ve všech krocích
+⚠ řádek 22: v pohybu „Kolík“ × „Nůž“ od kroku 87 (t = 0,967 s): kroků 2, dvojic komponent 1, největší průnik 15,708 mm³ – místo [99,58; 20; 15] v kroku 87
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Válec 1 (cylinder)
+✓ Kvádr 3 (box)
+
+Dokument: „Sestava 6“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Doraz [-10; 0; 10] ⚓ · Kolík [100; 20; 10] ⚓ · Nůž [12; 0; 10]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 180 · 2 s · kolize – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 210 × 40 × 30 mm · objem Σ 84,46 cm³ · hmotnost Σ 0,663 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 180 kroků, vazby splněny, průnik těles v 2 krocích (podrobně pohyb stav)

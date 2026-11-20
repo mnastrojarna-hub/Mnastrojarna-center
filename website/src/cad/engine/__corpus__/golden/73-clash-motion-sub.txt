@@ -36,6 +36,7 @@ kolize: 2 – šroub v závitu 2, skutečné 0
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · ZDVIH „Horní skupina“ → „Základ“ · hodnota vazby 40 → 45 mm ↑ zdvih 5 mm
  Horní skupina: rozsah pohybu X 0 · Y 0 · Z 5 mm · konec [0; 0; 5]
 Kolize v pohybu: kroků s kolizí 0 z 6 · šroub v závitu 2 dvojic (kroky 0–5) · skutečné: žádné
+ kontrolováno spojitě i mezi polohami (6 poloh + 5 mezipoloh ze zjemnění)
 Vazby splněny ve všech krocích
 ℹ řádek 9: šroub v závitu: 2 dvojic v krocích 0–5
 Krok 2 (t = 0,8 s, motory 42):
@@ -66,6 +67,7 @@ Pohybová studie: 15 kroků · 2 s · motory: lineární motor · ZDVIH „Deska
  Šroub M12: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [20; 30; 77]
  Šroub M12: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [80; 30; 77]
 Kolize v pohybu: kroků s kolizí 7 z 16 · šroub v závitu 2 dvojic (kroky 0–15) · skutečné: 1 dvojic dílů v 7 krocích, první v kroku 9
+ kontrolováno spojitě i mezi polohami (16 poloh + 8 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 7)
 Vazby splněny ve všech krocích
 ℹ řádek 10: šroub v závitu: 2 dvojic v krocích 0–15
 ⚠ řádek 10: v pohybu „Doraz“ × „Šroub M12 [S2]“ od kroku 9 (t = 1,2 s): kroků 7, dvojic komponent 1, největší průnik 1191,793 mm³ – místo [80; 30; 100,5] v kroku 9

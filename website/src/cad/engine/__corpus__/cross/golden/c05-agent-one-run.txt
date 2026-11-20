@@ -9,7 +9,7 @@
 ✓ komponenta „Čep“ vložena do sestavy
 ✓ vazba Souosost „Čep“ F1 → „Deska“ F7: ok · „Čep“ poloha [40; 30; 0]
 ✓ vazba Kontakt „Čep“ F3 → „Deska“ F3: ok · „Čep“ poloha [40; 30; 10]
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 Čep: obálka 10 × 10 × 30 mm (X 35…45, Y 25…35, Z 10…40) · objem 2356,194 mm³ (2,356 cm³) · povrch 1099,557 mm² · hmotnost 0,0185 kg (7,85 g/cm³) · těžiště [40; 30; 25] · ploch 3 · hran 3 · vrcholů 2
 → nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
 → výkres: A3, na šířku, pohledy přední, horní – výsledek po vyhodnocení listu níže
@@ -38,6 +38,6 @@ Dokument: „Uložení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0
 Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]
 Vazby: 2 (2 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === tabs ===
 Deska | Čep | Uložení

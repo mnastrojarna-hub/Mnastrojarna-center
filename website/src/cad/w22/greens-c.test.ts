@@ -22,6 +22,7 @@ import { applyClashPolicy, staticRuleCtx, stepRuleCtx } from "../clash-rules";
 import { entryClashes, faultLeafIds, firstFault, motionClashKv, motionClashSummary, stepHasFault } from "../clash-report";
 import { clearanceSummaryLines } from "../clearance-report";
 import type { ClearancePair, SweepInfo } from "../motion-clearance";
+import { motionSigParts, motionStatusOf, motionStoreOf } from "../motion-cache";
 import { clashTitle, clashTitleClasses } from "../../components/cad/clash-view";
 import { countClasses } from "../clash-class";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "../engine/host";
@@ -115,6 +116,15 @@ describe("vlna 22 C1: žádné falešné zelené u tříd kolizí (bod 5)", () =
     expect(hit.codes.map((c) => c.code)).toContain("clash.real");
     expect(motionClashKv(hit.stats).join(" ")).toMatch(/clash\.between=1 first\.between=0\.5$/);
     expect(firstFault({ steps, collisionsChecked: true, between }, doc)!.between).toEqual([0, 1]);
+    // `stav` (řádek „Pohyb:“): kolize mezi kroky = stav clash, nikdy „bez průniku těles v kontrolovaných krocích“
+    const md = { ...doc, motion: { motors: [{ id: "m", kind: "linear" as const, mate: "x", from: 0, to: 1 }], duration: 1, steps: 2, collisions: true } } as CadDoc;
+    const store = motionStoreOf({});
+    const res = { steps: steps.map((x) => ({ ...x, place: {}, conflicts: [] })), comps: [], motors: md.motion!.motors, collision: null, collisionsChecked: true, conflictSteps: 0, sweep: sw({ contacts: 1 }), between };
+    store.byDoc.set("k", { ...motionSigParts(md), res: res as never, seq: 1, at: 0, doc: "S", comps: 4 });
+    const line = motionStatusOf(store, "k", md)!;
+    expect(line.state).toBe("clash");
+    expect(line.line).toMatch(/průnik těles mezi kroky \(1×, nalezeno zjemněním\)/);
+    expect(line.line).not.toMatch(/bez průniku/);
   });
 
   it("7. statika: `kolize` bez průniku nikdy s ✓ a vždy „vůle nekontrolována“; titulek panelu „Bez průniku“", async () => {

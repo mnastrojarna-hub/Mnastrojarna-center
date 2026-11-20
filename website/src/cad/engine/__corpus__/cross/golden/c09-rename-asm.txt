@@ -19,13 +19,13 @@ Vazby: 2 (2 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 2 ===
-✓ kolize: žádné (2 komponent)
+kolize: žádný průnik (objem nad 0,001 mm³) – 2 komponent · vůle nekontrolována (pohyb vůle "A" "B" min 0,05)
 
 Dokument: „Uložení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]
 Vazby: 2 (2 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === run 3 ===
 ✓ název = Přejmenováno
 
@@ -33,6 +33,6 @@ Dokument: „Přejmenováno“ · sestava · materiál Ocel (7.85 g/cm³) · prv
 Komponenty: Deska [0; 0; 0] ⚓ · Čep [40; 30; 10]
 Vazby: 2 (2 ok)
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 80 × 60 × 40 mm · objem Σ 49,49 cm³ · hmotnost Σ 0,388 kg
-Kolize: žádné (zkontrolováno ?)
+Kolize: žádný průnik · vůle nekontrolována (zkontrolováno ?)
 === tabs ===
 Deska | Čep | Přejmenováno
