@@ -357,10 +357,11 @@ sestava vazba zámek "#30" "900-01-00-01 Základová deska"
 sestava vazba zámek "#31" "900-01-00-01 Základová deska"
 sestava vazba souosost "900-01-00-03 Stírací deska" F11 "#3" Ø24
 sestava vazba souosost "900-01-00-03 Stírací deska" F24 "#6" Ø24
-sestava vazba mez vzdálenosti "900-01-00-03 Stírací deska" F2 "900-01-00-04 Kotevní deska" F5 20..60
-sestava vazba mez vzdálenosti "900-01-00-03 Stírací deska" F5 "900-01-00-02 Matrice" F2 10..200
+sestava vazba mez vzdálenosti "900-01-00-03 Stírací deska" F2 "900-01-00-04 Kotevní deska" F5 20..50
+sestava vazba mez vzdálenosti "900-01-00-03 Stírací deska" F5 "900-01-00-02 Matrice" F2 15..200
+sestava vazba 52 preferovat max
 
-# ── pohyb: horní díl −50 mm, stírací deska dosedne až po 30 mm
+# ── pohyb: horní díl −50 mm, stírací deska jde s kotevní deskou a dosedne na matrici po 21 mm
 pohyb motor lineární vazba 12 167..117 kroky 40
 pohyb kolize
 

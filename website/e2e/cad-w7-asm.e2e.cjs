@@ -141,7 +141,7 @@ sestava vazba závěs "Kolo2" Ø8,2 "Držák" Ø8`);
   await mp.locator('[data-motion-run]').click();
   await mp.locator('[data-motion-result]').waitFor({ timeout: 120000 });
   const sum = await mp.locator('[data-motion-summary]').innerText();
-  ok(/Pohybová studie: 36 kroků/.test(sum) && /Vazby splněny ve všech krocích/.test(sum) && /Kolo2: .* natáčí se/.test(sum), 'výsledek: 36 kroků, vazby splněny, Kolo2 se natáčí\n' + sum.split('\n').slice(0, 3).join(' | '));
+  ok(/Pohybová studie: 36 kroků/.test(sum) && /Vazby splněny ve všech krocích/.test(sum) && /„Kolo2“: Δ 0 mm · natáčí se 180°/.test(sum), 'výsledek: 36 kroků, vazby splněny, Kolo2 se natáčí (vlna 22, M3: souhrn po tuhých skupinách, názvy v uvozovkách)\n' + sum.split('\n').filter((l) => /Pohybová studie|Kolo|Vazby/.test(l)).join(' | '));
   // výřez 3D okna vpravo od panelu studie (změna textu v panelu se nepočítá)
   const cb = await p.locator('main canvas').first().boundingBox();
   const clip = { x: cb.x + 400, y: cb.y, width: cb.width - 400, height: cb.height };

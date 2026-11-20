@@ -234,8 +234,14 @@ export function solveStep<T = unknown>(
           const r0 = t.r();
           return { id: t.id, r: () => t.r().map((v, i) => v - (r0[i] ?? 0)) };
         });
+        const atStop = new Map(poses);
         settle(poses, vars, T.hard, (H) => () => [...vec(H, K)(), ...vec(held2, K)(), ...vec(T.soft)()], { maxIter: it + 60, groups });
         solvePoses(poses, vars, () => [...hard(), ...vec(held2)()], { maxIter: it, groups });
+        // velká síla měkkého členu (pružina u dorazu ~ stovky N) proti konečné váze tvrdých členů: penalizační úloha nemá v nedourčených
+        // stupních volnosti (posuv desky v rovině) dno – deska „ujede“ o desítky metrů s nepatrným náklonem a úklid tvrdé podmínky už
+        // nesplní. Taková poloha není rovnováha, ale numerický artefakt (bod 8: tuhé díly se nesmějí rozjet ani naklonit) → zůstane
+        // poloha zastavení (tvrdé podmínky splněné, motor na dosažené hodnotě, nejmenší změna od posledního platného kroku)
+        if (worst(T.hard) > CONFLICT_TOL || worst(held2) > CONFLICT_TOL) for (const [k, v] of atStop) poses.set(k, v);
       }
       return { status: "stopped", cause: "motor", blocking, short, ...(o.describe ? { info: o.describe(blocking, short) } : {}) };
     }

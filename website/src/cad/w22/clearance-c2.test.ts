@@ -51,14 +51,14 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     // 36 kroků po 5 mm: v krocích samotných průnik není, mezi kroky 17 a 18 ano (dřív „Kolize: žádné ve všech krocích“)
     const m36 = lines(short, /^= L\d+ asm "Sestava 6" motion steps=36 /);
     expect(m36.length).toBe(4); // motor, pohyb stav, diskrétně, spojitě
-    expect(m36[0]).toMatch(/ clash\.steps=0\/37 thread=0 real=1 clash\.mode=continuous clash\.poses=37 clash\.refined=\d+ clash\.maxstep=5mm clash\.between=1 first\.between=17\.\d+$/);
+    expect(m36[0]).toMatch(/ clash\.steps=0\/37 thread=0 real=1 clash\.mode=continuous clash\.poses=37 clash\.refined=\d+ clash\.maxstep=5mm clash\.between=1 first\.between=17\.\d+ m1=range:12>192:\+ level=kin groups=1:x\+180$/); // za poli kolize: průběh motoru, úroveň simulace a tuhé skupiny (balík M)
     expect(short).toMatch(/clash\.real "Sestava 6": v pohybu „Kolík“ × „Nůž“ mezi kroky 17 a 18 \(zjemněno: poloha 17,\d+/);
     expect(con).not.toMatch(/Kolize: žádné ve všech krocích/);
     expect(con).toMatch(/^Kolize v pohybu: kroků s kolizí 0 z 37 .* skutečné: 1 dvojic dílů jen mezi kroky \(nalezeno zjemněním\) · mezi kroky \(zjemněno\) 1×\n kontrolováno spojitě i mezi polohami \(37 poloh \+ \d+ mezipoloh ze zjemnění; úseky: dráha posuvu \d+/m);
     // diskrétně: žádné tvrzení o úsecích mezi polohami, ℹ clash.discrete s posunem 5 mm
     expect(con).toMatch(/Kolize: žádný průnik v 37 polohách\n {1,2}kontrolováno jen v 37 polohách \(diskrétně, posun mezi polohami až 5 mm\) – mezi polohami nekontrolováno \(spojitá kontrola vypnuta/);
     expect(short).toMatch(/clash\.discrete "Sestava 6": kontrolováno jen v 37 polohách \(diskrétně/);
-    expect(short).toMatch(/^= L\d+ asm "Sestava 6" motion steps=36 .* clash\.mode=discrete clash\.poses=37 clash\.refined=0 clash\.maxstep=5mm$/m);
+    expect(short).toMatch(/^= L\d+ asm "Sestava 6" motion steps=36 .* clash\.mode=discrete clash\.poses=37 clash\.refined=0 clash\.maxstep=5mm m1=range:12>192:\+ level=kin groups=1:x\+180$/m);
     // spojitě znovu + 180 kroků: průnik v krocích 87–88, kontrola pořád spojitá
     expect(short).toMatch(/^= L\d+ asm "Sestava 6" motion steps=180 .* clash\.steps=2\/181 thread=0 real=1 first\.real=87 clash\.mode=continuous/m);
   }, 300_000);
@@ -103,7 +103,7 @@ describe("vlna 22 C2: vůle a spojitá kontrola kolizí v pohybu (bod 6)", async
     const w = lines(short, /clash\.clearance/);
     expect(w.length).toBeGreaterThanOrEqual(1);
     expect(w[0]).toMatch(/vůle „Střižník“ × „Vodítko“ 0,01 mm < 0,05 mm v krocích 0–10 \(nejmenší v kroku \d+ \(t = [\d,]+ s\)\) – místo \[/);
-    expect(short).toMatch(/^= L\d+ asm "Sestava 6b" motion steps=10 .* clear\.min=0\.01 clear\.limit=0\.05 clear\.below=11\/11 clear\.at=\d+ clear\.pairs=1$/m);
+    expect(short).toMatch(/^= L\d+ asm "Sestava 6b" motion steps=10 .* clear\.min=0\.01 clear\.limit=0\.05 clear\.below=11\/11 clear\.at=\d+ clear\.pairs=1 groups=1:z-20$/m); // tuhé skupiny (M3) jsou poslední pole řádku
     expect(con).toMatch(/Vůle „Střižník“ × „Vodítko“: nejmenší 0,01 mm v kroku \d+ \(t = [\d,]+ s\) – místo \[[^\]]+\] ↔ \[[^\]]+\] · ⚠ pod limitem 0,05 mm v 11 z 11 poloh \(kroky 0–10\)/);
     // krok: vůle v kroku s body
     expect(con).toMatch(/^ vůle „Střižník“ × „Vodítko“: 0,01 mm ⚠ pod limitem 0,05 mm – \[/m);

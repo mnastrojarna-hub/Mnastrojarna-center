@@ -38,7 +38,7 @@ Kontrola dílu: \`stav\` · \`měřit těleso\` · \`měřit díry\` · \`kontro
 
 ## Pružiny a pohyb
 \`sestava pružina nová d 2 De 20 L0 35 n 6 mezi "D1" Ø21 "K48" spodní\` (na konci „do děr vzoru“ = do všech děr vzoru) · \`sestava pružiny\`
-\`pohyb motor lineární vazba 2 12..20 krok 4 kolize\` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · \`pohyb stav\` · \`pohyb dynamika čas 0,1 gravitace -Z\` · \`pohyb hmotnost "K48" 2,5\` · \`pohyb kinematika\`
+\`pohyb motor lineární vazba 2 20..12 krok 4 kolize\` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · \`pohyb stav\` · \`pohyb dynamika čas 0,1 gravitace -Z\` · \`pohyb hmotnost "K48" 2,5\` · \`pohyb kinematika\`
 Šroub do díry až po dynamice (volný díl by v gravitaci spadl): \`sestava šroub "D1" Ø9\`. Jinde: \`pohyb motor rotační "K48" 0..360 krok 5\`
 
 ## Výkres (záložka dílu)
@@ -84,7 +84,7 @@ Part check: \`status\` · \`measure body\` · \`measure holes\` · \`check\`
 
 ## Springs and motion
 \`assembly spring new d 2 De 20 L0 35 n 6 between "D1" Ø21 "K48" bottom\` (“all holes” at the end = into every hole of the pattern) · \`assembly springs\`
-\`motion motor linear mate 2 12..20 step 4 collisions\` (mate 2 = Distance; no motor on a Contact mate) · \`motion status\` · \`motion dynamics time 0.1 gravity -Z\` · \`motion mass "K48" 2.5\` · \`motion kinematics\`
+\`motion motor linear mate 2 20..12 step 4 collisions\` (mate 2 = Distance; no motor on a Contact mate) · \`motion status\` · \`motion dynamics time 0.1 gravity -Z\` · \`motion mass "K48" 2.5\` · \`motion kinematics\`
 Bolt into a hole only after the dynamics (a free part would fall under gravity): \`assembly bolt "D1" Ø9\`. Elsewhere: \`motion motor rotary "K48" 0..360 step 5\`
 
 ## Drawing (part tab)
@@ -130,7 +130,7 @@ Teil prüfen: \`status\` · \`messen körper\` · \`messen bohrungen\` · \`prü
 
 ## Federn und Bewegung
 \`baugruppe feder neu d 2 De 20 L0 35 n 6 zwischen "D1" Ø21 "K48" unten\` („alle bohrungen“ am Ende = in jede Bohrung des Musters) · \`baugruppe federn\`
-\`bewegung antrieb linear verknüpfung 2 12..20 schritt 4 kollision\` (Verknüpfung 2 = Abstand; kein Antrieb auf Kontakt) · \`bewegung status\` · \`bewegung dynamik zeit 0,1 schwerkraft -Z\` · \`bewegung masse "K48" 2,5\` · \`bewegung kinematik\`
+\`bewegung antrieb linear verknüpfung 2 20..12 schritt 4 kollision\` (Verknüpfung 2 = Abstand; kein Antrieb auf Kontakt) · \`bewegung status\` · \`bewegung dynamik zeit 0,1 schwerkraft -Z\` · \`bewegung masse "K48" 2,5\` · \`bewegung kinematik\`
 Schraube erst nach der Dynamik in die Bohrung (ein freies Teil fiele unter Schwerkraft): \`baugruppe schraube "D1" Ø9\`. Sonst: \`bewegung antrieb dreh "K48" 0..360 schritt 5\`
 
 ## Zeichnung (Registerkarte des Teils)

@@ -24,7 +24,7 @@ Part check: `status` · `measure body` · `measure holes` · `check`
 
 ## Springs and motion
 `assembly spring new d 2 De 20 L0 35 n 6 between "D1" Ø21 "K48" bottom` (“all holes” at the end = into every hole of the pattern) · `assembly springs`
-`motion motor linear mate 2 12..20 step 4 collisions` (mate 2 = Distance; no motor on a Contact mate) · `motion status` · `motion dynamics time 0.1 gravity -Z` · `motion mass "K48" 2.5` · `motion kinematics`
+`motion motor linear mate 2 20..12 step 4 collisions` (mate 2 = Distance; no motor on a Contact mate) · `motion status` · `motion dynamics time 0.1 gravity -Z` · `motion mass "K48" 2.5` · `motion kinematics`
 Bolt into a hole only after the dynamics (a free part would fall under gravity): `assembly bolt "D1" Ø9`. Elsewhere: `motion motor rotary "K48" 0..360 step 5`
 
 ## Drawing (part tab)

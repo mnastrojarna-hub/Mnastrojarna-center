@@ -373,10 +373,18 @@ export function mates() {
 }
 export const DRIVE_MATE = 12;
 export const STROKE = { from: Z.backing - Z.base, to: Z.backing - Z.base - 50, steps: 40 };
-/** distance limits of the stripper: to the holder bottom (it is pushed down once the gap reaches the minimum) and to the die */
-const LIMIT = { holder: [20, 60], die: [10, 200] };
-/** stripper travel during the stroke: the gap stripper top ↔ holder bottom closes freely down to the limit, then pushes */
-export const STRIPPER_TRAVEL = Math.max(0, STROKE.from - STROKE.to - (Z.holder[0] - Z.stripper[1] - LIMIT.holder[0]));
+/**
+ * distance limits of the stripper: to the holder bottom and to the die. The stripper hangs on the holder at the maximum gap
+ * (`preferovat max` – the stripper springs push it away from the holder, like stripper bolts; wave 22, point 2): a stripper
+ * that is only "free inside the limit" is not determined by the mates (⚠ motion.undetermined – a strict run would stop). The
+ * maximum is the gap of the placement, so the preference moves nothing at the static solve. The die limit (15 mm) keeps the stripper
+ * above the guide rails on the die (rail height 12 mm) – it stops before them, no real clash in the motion.
+ */
+const LIMIT = { holder: [20, Z.holder[0] - Z.stripper[1]], die: [15, 200] };
+/** the holder-limit mate (1-based number in `sestava vazby`): the last but one mate */
+export const STRIPPER_HOLDER_MATE = () => mates().length - 1;
+/** stripper travel during the stroke: it goes down with the holder until its gap to the die reaches the die limit, then stays */
+export const STRIPPER_TRAVEL = Math.max(0, Math.min(STROKE.from - STROKE.to, Z.stripper[0] - Z.die - LIMIT.die[0]));
 
 /**
  * parts with their own drawing sheet (one sheet each, in the part document). Every layout is chosen so that a strict run
@@ -414,7 +422,8 @@ export function restScript(faces) {
     });
   const N = NAMES;
   const L = [...header("vazby (zámek skupiny, souosost na sloupky, 2× mez vzdálenosti)"), ...mates().map(sub)];
-  L.push(...header("pohyb: horní díl −50 mm, stírací deska dosedne až po 30 mm"), `pohyb motor lineární vazba ${DRIVE_MATE} ${STROKE.from}..${STROKE.to} kroky ${STROKE.steps}`, "pohyb kolize");
+  L.push(`sestava vazba ${STRIPPER_HOLDER_MATE()} preferovat max`);
+  L.push(...header(`pohyb: horní díl −50 mm, stírací deska jde s kotevní deskou a dosedne na matrici po ${STRIPPER_TRAVEL} mm`), `pohyb motor lineární vazba ${DRIVE_MATE} ${STROKE.from}..${STROKE.to} kroky ${STROKE.steps}`, "pohyb kolize");
   L.push(
     ...header("výkresy: A1 sestava + 3 listy dílů"),
     "výkres A1 pohledy přední,horní,iso",
