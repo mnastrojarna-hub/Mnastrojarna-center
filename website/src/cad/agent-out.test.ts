@@ -214,6 +214,16 @@ describe("kontrola exportu STEP / BREP", () => {
     expect(c.ok).toBe(true);
     expect(c.line).toMatch(/^✓ kontrola BREP: soubor znovu načten jádrem – objem 10,00 mm³/);
   });
+  it("počet těles neznámý není „0 těles“; bez objemu nebo s plochami mimo tělesa ale nikdy „věrná kopie“ (vlna 22, 22c)", () => {
+    const zero = exportCheck({ volume: 0, bbox: box(1, 2, 5) }, { volume: 0, bbox: box(1, 2, 5) }, "BREP");
+    expect(zero.ok).toBe(false);
+    expect(zero.code).toBe("out.check-failed");
+    expect(zero.line).toBe("⚠ kontrola BREP: počet těles v souboru nezjištěn a objem 0 mm³ – objemový model nepotvrzen; export zkontrolujte (stav)");
+    const free = exportCheck({ volume: 10, bbox: box(1, 2, 5), free: 2 }, { volume: 10, bbox: box(1, 2, 5), free: 2 });
+    expect(free.ok).toBe(false);
+    expect(free.line).toMatch(/^⚠ kontrola STEP: počet těles v souboru nezjištěn a ploch mimo tělesa 2 – /);
+    expect(free.line).not.toMatch(/věrná kopie|těles 0/);
+  });
   it("prázdný soubor / soubor bez tělesa", () => {
     const e = exportCheck(model, { solids: 0, volume: 0, bbox: box(0, 0, 0) });
     expect(e.ok).toBe(false);

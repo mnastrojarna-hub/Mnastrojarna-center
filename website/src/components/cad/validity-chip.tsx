@@ -31,7 +31,8 @@ export function ValidityChip({ doc, fast, dark }: { doc: CadDoc; fast: boolean; 
     }
   };
   const state = running === sig ? "running" : !cur ? "fast" : cur.error ? "error" : cur.v?.method === "exact" ? (cur.v.valid ? "exact-ok" : "exact-bad") : "skipped";
-  const cls = `rounded-full px-2 py-0.5 text-[11px] ${state === "exact-bad" || state === "error" ? "bg-brand/15 text-brand-700" : dark ? "bg-white/10 text-white/85" : "bg-ink-700/6 text-ink-700"}`;
+  // pointer-events-auto: řádek čipů nad náhledem je pointer-events-none (klik by jinak dostalo plátno a přesná kontrola by nešla spustit)
+  const cls = `pointer-events-auto rounded-full px-2 py-0.5 text-[11px] ${state === "exact-bad" || state === "error" ? "bg-brand/15 text-brand-700" : dark ? "bg-white/10 text-white/85" : "bg-ink-700/6 text-ink-700"}`;
   const label =
     state === "running"
       ? tr("Přesná kontrola platnosti…")

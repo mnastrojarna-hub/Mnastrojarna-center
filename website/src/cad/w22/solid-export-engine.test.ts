@@ -133,7 +133,8 @@ describe("22c: objemový export bez tělesa – konzole / CLI", () => {
     // C4 platné těleso: přísně projde, F check=ok
     const ok = await cliRun(C4, { strict: true });
     expect(ok.rb.stopped).toBeUndefined();
-    expect(ok.r.protocol).toMatch(/^F step "Deska C\.step" \d+B check=ok$/m);
+    // za check= smějí být jen přídavná pole key=value jiných balíků (D2 rev=r·…; pravidlo řádků D/F: jen připojovat na konec)
+    expect(ok.r.protocol).toMatch(/^F step "Deska C\.step" \d+B check=ok(?: [a-z.]+=\S+)*$/m);
     expect(stepCheckProblems(await stepCheck(ok.files.get("Deska C.step")!.data), { solids: 1 })).toEqual([]);
   });
 });

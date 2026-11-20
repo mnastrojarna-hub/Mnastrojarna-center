@@ -388,4 +388,9 @@ describe("volitelná pole prvků (OPTIONAL_KEYS) odpovídají typu Feature v typ
     const keys = [...new Set([...body.matchAll(/(\w+)\?:/g)].map((m) => m[1]))];
     expect(keys.filter((k) => !OPTIONAL_KEYS.has(k))).toEqual([]);
   });
+  it("nepovinné pole, které prvek zatím nemá, jde nastavit: upravit \"Závit 1\" helix=ano (vlna 22, 22d)", async () => {
+    const doc: CadDoc = { ...emptyDoc("Čep"), features: [{ id: "t1", name: "Závit 1", type: "thread", designation: "M18×1,5", position: [0, 0, 10], axis: "Z", length: 20, modeled: true }] };
+    const r = await run(doc, 'upravit "Závit 1" helix=ano');
+    expect(feat(r.doc, "Závit 1").helix).toBe(true);
+  });
 });

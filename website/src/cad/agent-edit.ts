@@ -646,6 +646,8 @@ export const OPTIONAL_KEYS = new Set(
 for (const k of ["rho", "setbacks"]) OPTIONAL_KEYS.add(k);
 // díra 12. vlny (agent-hole.ts): vrták závitové díry – upravit "Díra 1" tapDrill=minor
 OPTIONAL_KEYS.add("tapDrill");
+// vlna 22 (bod 22d, thread-spec.ts): provedení závitu skutečnou šroubovicí – upravit "Závit 1" helix=ano
+OPTIONAL_KEYS.add("helix");
 // vlna 12 (agent-extr.ts): břit a rohy úkosu vysunutí, výška kolmo na skicu u šikmého směru
 for (const k of ["draftLand", "draftCorners", "normalHeight"]) OPTIONAL_KEYS.add(k);
 // díra 15. vlny (agent-hole.ts): zahloubení závitové díry – upravit "Díra 1" head=counterbore cbDiameter=20 cbDepth=7
