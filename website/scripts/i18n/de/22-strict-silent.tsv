@@ -8,7 +8,6 @@
 ✓ materiál „{0}“ = označení do razítka, třída „{1}“ ({2} g/cm³)	✓ Werkstoff „{0}“ = Bezeichnung für das Schriftfeld, Klasse „{1}“ ({2} g/cm³)
 ✓ přísný režim – první ⚠ nebo ✗ zastaví běh{0}	✓ Strenger Modus – die erste ⚠ oder ✗ hält den Lauf an{0}
 ✓ přísný režim vypnut	✓ Strenger Modus aus
-díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – tato změna se do sestavy nepromítne (vložit znovu, nebo sestava upravit)	Teil „{0}“ wurde in Zeile {1} als Kopie in die Baugruppe eingefügt – diese Änderung erreicht die Baugruppe nicht (erneut einfügen oder Baugruppe bearbeiten)
 hrot vrtáku 60–170° (180 = ploché dno)	Bohrerspitze 60–170° (180 = flacher Grund)
 Kolize v pohybu: kroků s kolizí {0} z {1} · šroub v závitu {2} dvojic{3} · skutečné: {4}	Kollisionen in der Bewegung: Schritte mit Kollision {0} von {1} · Schraube im Gewinde {2} Paare{3} · echte: {4}
 kolize: {0} – šroub v závitu {1}, skutečné {2}	Kollisionen: {0} – Schraube im Gewinde {1}, echte {2}

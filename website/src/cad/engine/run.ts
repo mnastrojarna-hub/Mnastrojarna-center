@@ -150,6 +150,7 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
         const label = opLabel(op);
         const before = rb.entries.length;
         const addedBefore = run.added.length;
+        const docBefore = run.doc; // vlastnosti dílu před operací – změna čísla / materiálu / druhu vloženého dílu = ⚠ (bod 22g)
         hooks.opStart?.(op.line, label);
         const t0 = now();
         try {
@@ -163,11 +164,18 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
         }
         const added = run.added.slice(addedBefore);
         for (const f of added) if (!featureLine.has(f.id)) featureLine.set(f.id, op.line);
-        // 5.2 č. 19: díl změněný po vložení do sestavy – komponenta je kopie, změna se do sestavy nepromítne
+        // 5.2 č. 19 / vlna 22 bod 22g: díl změněný po vložení do sestavy (prvek, číslo, materiál, druh) – komponenta je kopie,
+        // změna se do sestavy sama nepromítne; rada = jedna funkce obnovy `sestava obnovit` (asm-refresh.ts)
         const ins = run.inserted?.get(run.doc.name.trim().toLowerCase());
-        if (ins !== undefined && added.length && run.doc.kind !== "assembly" && !ws.asm.stack.length) {
-          log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – tato změna se do sestavy nepromítne (vložit znovu, nebo sestava upravit)", run.doc.name, ins) });
-          run.inserted!.delete(run.doc.name.trim().toLowerCase());
+        const metaChanged = docBefore === run.doc ? [] : partMetaChange(docBefore, run.doc);
+        if ((added.length || metaChanged.length) && run.doc.kind !== "assembly" && run.doc.kind !== "draft" && !ws.asm.stack.length) {
+          const what = [...(added.length ? [tr("geometrie")] : []), ...metaChanged].join(", ");
+          // vložený tímto během (řádek vložení), jinak díl, jehož kopie je v otevřené sestavě (dřívější běh, konzole, --resume)
+          const asmName = ins === undefined ? asmWithCopy(ws, run.doc.name) : undefined;
+          const once = !rb.entries.some((e) => e.code === "asm.stale-copy" && e.doc === run.doc.name);
+          if (once && ins !== undefined) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit \"{0}\"", run.doc.name, ins, what) });
+          else if (once && asmName) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě „{1}“ jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit \"{0}\"", run.doc.name, asmName, what) });
+          if (ins !== undefined) run.inserted!.delete(run.doc.name.trim().toLowerCase());
         }
         verify.note(added, op.line);
         // dokument, ze kterého běh odešel (nový díl, záložka, normálie), se postaví hned – jeho prvky se neohlásí bez stavby
@@ -314,4 +322,28 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   // po STOP přísného režimu se poslední řádek neprovedl – výpis „=“ se nepíše (konzole stav dokumentu ukáže dál)
   if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, res, asm, stale), { doc: d.name, detail: status });
   return log.text();
+}
+
+/**
+ * Změněné vlastnosti dílu do kusovníku mezi dvěma stavy téhož dílu (číslo, třída a označení materiálu, druh) – jen pro
+ * ⚠ asm.stale-copy u dílu vloženého tímto během (vlna 22, bod 22g). Jiný dokument (přepnutí záložky) = žádná změna.
+ */
+function partMetaChange(a: import("../types").CadDoc, b: import("../types").CadDoc): string[] {
+  if (a.name !== b.name || a.kind !== b.kind) return [];
+  const out: string[] = [];
+  if ((a.props?.number ?? "").trim() !== (b.props?.number ?? "").trim()) out.push(tr("číslo"));
+  if (a.material !== b.material || (a.materialName ?? "").trim() !== (b.materialName ?? "").trim()) out.push(tr("materiál"));
+  if ((a.supply?.kind ?? "") !== (b.supply?.kind ?? "")) out.push(tr("druh"));
+  return out;
+}
+
+/** otevřená sestava, ve které je kopie dílu `name` (komponenta s otiskem / zdrojem téhož názvu) – ⚠ asm.stale-copy (bod 22g) */
+function asmWithCopy(ws: Workspace, name: string): string | undefined {
+  const key = name.trim().toLowerCase();
+  for (const t of ws.tabs()) {
+    if (t.kind !== "assembly") continue;
+    const d = ws.docOf?.(t.id);
+    if (d?.components?.some((c) => c.source.kind === "part" && (c.origin?.part ?? c.source.doc.name).trim().toLowerCase() === key)) return d.name;
+  }
+  return undefined;
 }

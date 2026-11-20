@@ -11,6 +11,7 @@
 import { checkFailed, exportCheck, FORMAT_EXT, outFileName, type ExportCheck, type Export3dFormat, type OutDrawingFormat } from "../agent-out";
 import type { DrawingResult } from "../drawing";
 import { sourceKey } from "../assembly";
+import { docSupply, docSupplyLine, makeIncomplete, supplyOf } from "../bom-model";
 import { embedBlobs, missingBlobFiles } from "../blobs";
 import { docHasContent } from "../draft/doc";
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
@@ -209,6 +210,8 @@ export function documentSheetJobs(d: CadDoc): SheetJob[] {
   const walk = (comps: AsmComponent[], depth: number) => {
     for (const c of comps) {
       if (c.source.kind !== "part" && c.source.kind !== "asm") continue;
+      // výkresy jen vyráběných dílů – normálie a nakupované položky se nepřibalují, ani když výkres mají (bod 19, bom-model.ts)
+      if (c.source.kind === "part" && supplyOf(c).kind !== "make") continue;
       const key = sourceKey(c.source);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -344,7 +347,9 @@ export async function documentDrawingFile(env: DrawEnv, d: CadDoc, format: OutDr
     return { name: `${base}_kusovnik.csv`, mime: OUT_MIME.csv, data: csv, format, warnings: [] };
   }
   const sheets = await documentSheets(env, d);
-  const warnings = sheetWarnings(sheets);
+  // vyráběné díly bez výkresu / čísla – výkresy dílů z komponent jsou jen vyráběné (bod 19)
+  const miss = d.kind === "assembly" ? makeIncomplete(docSupply(d, (c) => sourceKey(c.source))) : [];
+  const warnings = [...sheetWarnings(sheets), ...(miss.length ? [{ sheet: "", text: tr("vyráběnému dílu chybí výkres, číslo nebo označení materiálu: {0}", miss.join(", ")) }] : [])];
   if (format === "pdf") {
     const data = await drawingsToPdf(sheets, await hostPdfFonts(env.fonts), d.name);
     return { name: `${base}.pdf`, mime: OUT_MIME.pdf, data, format, sheets: sheets.length, warnings };
@@ -432,7 +437,21 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "bom.docs" | "bom.make-incomplete"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+
+/**
+ * Úplnost výrobní dokumentace sestavy pro výstupy (vlna 22, bod 19): ℹ souhrn „vyráběné 2 (bez výkresu 1), normálie 2,
+ * nakupované 0“ a ⚠ vyráběné díly bez výkresu nebo čísla – výkresy normálií a nakupovaných položek se nepřibalují.
+ * Díl / sestava bez komponent → nic.
+ */
+export function asmDocNotes(d: CadDoc): OutNote[] {
+  if (d.kind !== "assembly" || !d.components?.length) return [];
+  const s = docSupply(d, (c) => sourceKey(c.source));
+  const out: OutNote[] = [{ code: "bom.docs", args: [docSupplyLine(s)] }];
+  const miss = makeIncomplete(s);
+  if (miss.length) out.push({ code: "bom.make-incomplete", args: [miss.join(", ")] });
+  return out;
+}
 
 /**
  * Jeden výstup `--formats` dokumentu `d` (kap. 3.1, rozhodnutí 15.7): `.mncad`, STEP (znovu načtený a změřený –
@@ -465,6 +484,8 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
     return [];
   }
   const env: DrawEnv = { kernel: host.kernel, ws, ...(host.fonts ? { fonts: host.fonts } : {}), flat: o.flat ?? true, ...(o.hooks ? { hooks: o.hooks } : {}) };
+  // úplnost dokumentace sestavy (ℹ souhrn + ⚠ vyráběné bez výkresu / čísla) – u výkresu a kusovníku; job.ts opakování vynechá
+  for (const n of asmDocNotes(d)) note(n);
   if (fmt === "csv") {
     const csv = await bomCsv(env, d);
     if (!csv) {

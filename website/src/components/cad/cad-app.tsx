@@ -77,6 +77,8 @@ import type { EntityInfo, EntRef, MeasureResult, ShapeSrc } from "@/cad/inspect"
 import { bomOf, dissolveSubassembly, flattenLeaves, invPlacementMatrix, makeSubassembly, matrixToPlacement, mul4, subassemblyPick, treeSelAfterPick } from "./asm-flatten";
 import { measureApi } from "./agent-measure-run";
 import { AsmProps, AsmTree, BomTable, MoldWizard, matePrompt, mateSelection, type PendingMate } from "./asm-panel";
+import { bomNotesOf } from "./asm-supply";
+import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView } from "./motion-panel";
 import { useSpringBetween } from "./springs/spring-between";
@@ -88,7 +90,7 @@ import { stableStep } from "@/cad/engine/files";
 import { formatConsole } from "@/cad/engine/protocol";
 import { checkProtocol, checkRunOptions, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
 import { makeAsmEnv } from "@/cad/engine/asm-env";
-import { presentStatusText } from "@/cad/engine/asm-status";
+import { bomItemOf, presentStatusText } from "@/cad/engine/asm-status";
 import type { EngineHost } from "@/cad/engine/host";
 import type { Workspace } from "@/cad/engine/workspace";
 import { isAutomation } from "@/lib/automation";
@@ -1292,14 +1294,8 @@ export function CadApp() {
   }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid]);
 
   const asmPartInfo = useCallback(
-    (c: AsmComponent) => {
-      const r = asmCache.current.get(sourceKey(c.source));
-      const matId = c.source.kind === "part" ? c.source.doc.material : (c.material ?? "ocel");
-      const mt = MATERIALS.find((x) => x.id === matId);
-      // do kusovníku jde označení materiálu dílu (razítko, např. „TEST – 1.2311“), třída (Ocel) jen když označení chybí
-      const label = c.source.kind === "part" && c.source.doc.materialName?.trim() ? c.source.doc.materialName.trim() : (mt?.label ?? matId).split(" – ")[0];
-      return { material: label, massKg: r?.metrics ? massKg(r.metrics.volume, mt?.density ?? 7.85) : undefined };
-    },
+    // jedna funkce materiálu a hmotnosti pro aplikaci, text i CLI (bom-model.ts – označení, třída v jazyce, normálie = třída pevnosti)
+    (c: AsmComponent) => bomPartInfo(c, asmCache.current.get(sourceKey(c.source))),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [asmVer],
   );
@@ -2755,7 +2751,7 @@ export function CadApp() {
   const mat = MATERIALS.find((m) => m.id === doc.material) ?? MATERIALS[0];
   /** výkres pro textové příkazy a window.mncad.exportDrawing: hmotnost, kusovník a pozice jako ve výkresovém prostředí */
   const drawEnvRef = useRef<DrawingExtras>({});
-  drawEnvRef.current = isAsm ? { massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0), bom: bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })), balloons: balloonItems } : { massKg: result?.metrics ? massKg(result.metrics.volume, mat.density) : undefined };
+  drawEnvRef.current = isAsm ? { massKg: bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0), bom: bom.map(bomItemOf), balloons: balloonItems } : { massKg: result?.metrics ? massKg(result.metrics.volume, mat.density) : undefined };
   const m = result?.metrics;
   const errors = result?.status.filter((s) => !s.ok) ?? [];
   const warnings = result?.status.filter((s) => s.ok && s.warning) ?? [];
@@ -3975,6 +3971,7 @@ export function CadApp() {
                   }}
                   bolting={!!boltPick}
                   onRun={(t) => void runAgentRef.current(t).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))}
+                  partOf={(n) => engineRef.current?.ws.findPart(n) ?? null}
                 />
               </div>
               <div className="flex gap-2 border-t border-[#d5dbe2] p-3">
@@ -4148,6 +4145,8 @@ export function CadApp() {
             </div>
             <BomTable
               rows={bom}
+              notes={bomNotesOf(doc, bom, (n) => engineRef.current?.ws.findPart(n) ?? null)}
+              onRefresh={() => void runAgentRef.current(`sestava obnovit vše`).then((out) => flash(springRunNote(out)), (e) => flash((e as Error).message))}
               onCsv={() => download(`${safeName(doc.name)}_kusovnik.csv`, bomCsv(bom), "text/csv;charset=utf-8")}
               onDrawing={() => {
                 setBomOpen(false);
@@ -4296,7 +4295,7 @@ export function CadApp() {
             }}
             massKg={isAsm ? bom.reduce((sum, r) => sum + (r.massKg ?? 0) * r.qty, 0) : massKg(result!.metrics!.volume, mat.density)}
             materialLabel={isAsm ? tr("dle kusovníku") : doc.materialName?.trim() || mat.label}
-            bom={isAsm ? bom.map((r) => ({ pos: r.pos, name: r.name, number: r.number, qty: r.qty, material: r.material, massKg: r.massKg })) : undefined}
+            bom={isAsm ? bom.map(bomItemOf) : undefined}
             drawings={doc.drawings}
             balloons={balloonItems}
             onDrawingsChange={(d) => liveWith((cur) => ({ ...cur, drawings: d }))}

@@ -29,16 +29,20 @@ Sestava „Hřídel s kotoučem“: komponent 3 · vazby 0
  #3 Kotouč · díl · poloha [0; 0; 60]
 Kusovník „Hřídel s kotoučem“ (plochý): položek 2, kusů 3, hmotnost Σ 0,501 kg
 Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
-1 | Hřídel |  | 1 | Ocel | 0,247
-2 | Kotouč |  | 2 | Hliník | 0,127
+1 | Hřídel |  | 1 | — (třída Ocel) | 0,247
+2 | Kotouč |  | 2 | — (třída Hliník) | 0,127
+⚠ řádek 2: vyráběné díly bez čísla výkresu: Hřídel, Kotouč – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 2: vyráběné díly bez označení materiálu (jen třída): Hřídel, Kotouč – materiál 1.2379 v dílu
 Kusovník „Hřídel s kotoučem“ (plochý): položek 2, kusů 3, hmotnost Σ 0,501 kg
 Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
-1 | Hřídel |  | 1 | Ocel | 0,247
-2 | Kotouč |  | 2 | Hliník | 0,127
-CSV (oddělovač ;):
-Pozice;Název;Číslo výkresu / norma;Ks;Materiál;Hmotnost 1 ks [kg];Hmotnost celkem [kg];Skupina
-1;Hřídel;;1;Ocel;0,247;0,247;
-2;Kotouč;;2;Hliník;0,127;0,254;
+1 | Hřídel |  | 1 | — (třída Ocel) | 0,247
+2 | Kotouč |  | 2 | — (třída Hliník) | 0,127
+CSV (oddělovač ;, desetinná čárka):
+Pozice;Název;Číslo výkresu / norma;Ks;Materiál;Hmotnost 1 ks [kg];Hmotnost celkem [kg];Druh;Norma;Rozměr;Třída / tolerance;Katalogové číslo;Výrobce;Skupina
+1;Hřídel;;1;— (třída Ocel);0,247;0,247;vyráběný;;;;;;
+2;Kotouč;;2;— (třída Hliník);0,127;0,254;vyráběný;;;;;;
+⚠ řádek 3: vyráběné díly bez čísla výkresu: Hřídel, Kotouč – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 3: vyráběné díly bez označení materiálu (jen třída): Hřídel, Kotouč – materiál 1.2379 v dílu
 
 Dokument: „Hřídel s kotoučem“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Hřídel [0; 0; 0] ⚓ · Kotouč [0; 0; 40] · Kotouč [0; 0; 60]

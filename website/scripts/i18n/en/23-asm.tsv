@@ -17,7 +17,6 @@ Nastavit pružinu	Set spring
 nedosedá – vzdálenost ploch {0} mm je větší než volná délka L0 {1} mm (mezera {2} mm)	not seated – the face distance {0} mm is larger than the free length L0 {1} mm (gap {2} mm)
 nedosedá v krocích {0} (mezera max {1} mm)	not seated in steps {0} (gap up to {1} mm)
 otevřený dokument „{0}“ není sestava – nejdřív „nová sestava“ nebo „záložka "…"“	the open document “{0}” is not an assembly – first “new assembly” or “tab "…"”
-plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít, pružina, pružiny	faces, mate, mates, component, remove, duplicate, isolate, hide, show, fix, release, pattern, mirror, bolt, subassembly, dissolve, edit, done, open, spring, springs
 pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)	below the solid length in steps {0} (face distance down to {1} mm)
 pružina „{0}“	spring “{0}”
 pružina „{0}“: délku nešlo určit – dosedací plocha je rovnoběžná s osou pružiny nebo se díl nepostavil	spring “{0}”: length could not be determined – a seat face is parallel to the spring axis or the part did not build
@@ -51,7 +50,6 @@ Stlačuje (B)	Compressed by (B)
 tuhost	rate
 Tuhost c (0 = neuvádět)	Rate c (0 = not given)
 Upravit pružinu	Update spring
-v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …, přezdívka "…"	at x y z, rotation rx ry rz, move dx dy dz, turn X 90, fixed, release, hide, show, color #hex, name "…", number "…", group "…", material …, alias "…"
 vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název, pořadí #3 nebo přezdívka (vložit … jako "K48", sestava komponenta #3 přezdívka "K48"; EN alias, DE als); po přesunu se vazby přepočítají; kusovník sčítá komponenty podle zdroje (dílu) – přejmenování instance řádek nerozdělí	component properties as in the panel (position, rotation, fixed, visibility, description, BOM material); component = name, position #3 or alias (insert … as "K48", assembly component #3 alias "K48"; DE als); mates are recomputed after a move; the BOM counts components by source (part) – renaming an instance does not split the row
 vložit … jako: chybí přezdívka – např. vložit "Šroub" jako "K48"	insert … as: alias missing – e.g. insert "Screw" as "K48"
 vložit: {0}	insert: {0}

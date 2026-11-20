@@ -82,6 +82,9 @@ export const CODES = [
   { code: "insert.name-ignored", level: "warn", key: "název instance „{0}“ se zatím neukládá" },
   // ── sestava, kolize, pohyb (5.2 č. 11, 19, 20, 29, 30, 40; kap. 6.3, 7, 9.2) ──
   { code: "asm.stale-copy", level: "warn", key: "komponenta je kopie dílu – pozdější změny dílu se nepromítnou" },
+  // kusovník a dokumentace podle druhu položky (vlna 22, bod 19 – cad/bom-model.ts)
+  { code: "bom.make-incomplete", level: "warn", key: "vyráběnému dílu chybí výkres, číslo nebo označení materiálu: {0}" },
+  { code: "bom.docs", level: "note", key: "dokumentace: {0}" },
   { code: "asm.depth", level: "warn", key: "podsestavy hlubší než {0} úrovní se vynechají" },
   { code: "asm.faces-truncated", level: "warn", key: "díl „{0}“ má víc než {1} ploch – načteno jen prvních {1}" },
   { code: "asm.kernel-restarted", level: "note", key: "jádro se restartovalo – mezipaměti sestavy vyprázdněny" },

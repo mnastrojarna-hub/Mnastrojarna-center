@@ -265,6 +265,8 @@ export type CadDoc = {
   activeConfig?: string | null;
   /** popisové údaje (razítko výkresu) */
   props?: { number?: string; author?: string; revision?: string; note?: string };
+  /** druh položky kusovníku dílu (vyráběný / normálie / nakupovaný) a údaje normálie / nakupované položky – cad/bom-model.ts */
+  supply?: SupplyInfo;
   /** „part“ (výchozí) = díl z historie prvků; „assembly“ = sestava z komponent; „draft“ = 2D výkres (model v `draft`) */
   kind?: "part" | "assembly" | "draft";
   /** 2D výkres (hladiny, typy čar, entity, bloky, rozvržení) – cad/draft/model.ts */
@@ -351,7 +353,18 @@ export type AsmComponent = {
   alias?: string;
   /** pružina mezi dvěma komponentami: délka podle vzdálenosti dosedacích ploch (cad/asm-spring.ts) */
   spring?: SpringDef;
+  /** druh položky kusovníku na komponentě (přepíše druh dílu) – cad/bom-model.ts `supplyOf` */
+  supply?: SupplyInfo;
+  /** otisk dílu záložky při vložení / `sestava obnovit` – pozdější změna dílu = kopie starší než díl (cad/asm-refresh.ts) */
+  origin?: CopyOrigin;
 };
+
+/** druh položky kusovníku: vyráběný díl (výkres, číslo), normálie (norma), nakupovaný díl (katalog) – vlna 22, bod 19 */
+export type SupplyKind = "make" | "standard" | "buy";
+/** druh a údaje položky kusovníku: norma, rozměr, pevnostní třída / tolerance (normálie), katalogové číslo a výrobce (nákup) */
+export type SupplyInfo = { kind?: SupplyKind; standard?: string; size?: string; grade?: string; catalog?: string; vendor?: string };
+/** stav dílu v okamžiku vložení / obnovení komponenty: název dílu, otisk geometrie (`sourceKey`) a vlastnosti do kusovníku */
+export type CopyOrigin = { part: string; sig: string; number?: string; material: string; materialName?: string; kind?: SupplyKind; /** otisk výkresů dílu */ drw?: string };
 
 /**
  * Pružina v sestavě (cad/asm-spring.ts): komponenta s prvkem Pružina (normálie DIN 2095 nebo vlastní díl) mezi dosedací plochou

@@ -26,7 +26,7 @@ import { parseSpringLine, SPRING_COMMANDS } from "./agent-springs";
 import { springSummary } from "./springs";
 import { paramStatusLines, parseEditLine, type EditOp } from "./agent-edit";
 import { toAxisDef, toDirection } from "./ext/place";
-import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type Vec2, type Vec3 } from "./types";
+import { emptyDoc, uid, type Axis, type BuildResult, type CadDoc, type Feature, type PlaneName, type SketchEntity, type SupplyInfo, type Vec2, type Vec3 } from "./types";
 import { parseApiCommand, type ApiOp, type MncadApiExt } from "./agent-api";
 import { parseShapesLine, shapesSummary } from "./agent-shapes";
 import { holeBottomText, holeDirText, holeDrillText, holeFieldRules, holeHeadText, holePointsText, holePositions, holeTextExtras, holeThreadDrill, holeThreadLenText } from "./agent-hole";
@@ -49,6 +49,7 @@ import { CHECK_COMMANDS, parseCheckLine, type CheckOp } from "./agent-check";
 import { polylineClose, takeCloseWords } from "./poly-close";
 import { CodedParseError, materialClass, parseStrictLine, trackOpts } from "./agent-strict";
 import { literalTokens } from "./agent-quoted";
+import { parseSupplyTokens } from "./bom-model";
 
 export const AGENT_API_VERSION = 1;
 
@@ -92,7 +93,7 @@ export type AgentOp =
   /** kontrola (tabulka dílu / sestavy) a porovnat (se souborem reference) – agent-check.ts, provedení engine/check.ts, compare-text.ts */
   | CheckOp
   | { k: "new"; name: string; assembly: boolean; line: number; /** `znovu` / `nový` za názvem (agent-runs.ts) */ reuse?: NewDocMode }
-  | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string }; line: number }
+  | { k: "meta"; patch: { name?: string; material?: string; materialName?: string; color?: string; /** druh položky kusovníku dílu ({} = výchozí) – bod 19 */ supply?: SupplyInfo }; line: number }
   /**
    * prvek; `fillTop` = souřadnice v ose prvku doplnit na horní plochu tělesa (díra „v x y“ bez z, text); `fillPoints` = u díry
    * s více polohami, které body `points` se doplní (fillHoleTops, agent-hole.ts); `note` = poznámka do protokolu
@@ -173,6 +174,8 @@ syn("assembly", "sestava");
 syn("name", "název", "nazev", "pojmenovat");
 syn("material", "materiál", "material");
 syn("color", "barva", "colour");
+// druh položky kusovníku dílu: vyráběný / normálie / nakupovaný (vlna 22, bod 19 – cad/bom-model.ts)
+syn("supply", "druh", "beschaffung");
 syn("box", "kvádr", "kvadr", "hranol", "deska");
 syn("cylinder", "válec", "valec");
 syn("sphere", "koule", "ball");
@@ -876,6 +879,11 @@ export function parseAgentText(text: string): AgentProgram {
         case "color":
           ops.push({ k: "meta", patch: { color: tokens[0] }, line: no });
           return;
+        case "supply": {
+          // druh nakupovaný [katalog "…"] [výrobce "…"] [rozměr "…"] [třída "…"] · druh auto = výchozí podle původu dílu
+          ops.push({ k: "meta", patch: { supply: parseSupplyTokens(tokens) }, line: no });
+          return;
+        }
         case "extrude": {
           // šikmý směr / sklon, výška kolmo, úkos dovnitř / ven s břitem, ukončení k tělesu / ploše… (agent-extr.ts)
           ops.push({ k: "feature", feature: extrudeFromText(tokens, parseOpts, () => ({ id: uid(), name: named("extrude", nm) })), line: no });
@@ -1721,6 +1729,8 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "sestava pole \"<X>\" N rozteč P [směr X|dx dy dz] · sestava pole \"<X>\" kruhové N [úhel 360] [osa Z|dx dy dz] [v cx cy cz] · sestava zrcadlit \"<X>\" XY|XZ|YZ [odsazení N]", en: "assembly pattern, assembly mirror", de: "baugruppe muster, baugruppe spiegeln", desc: tr("pole komponenty (kopie „X (2)“…) a zrcadlení polohy a natočení komponenty") },
   { cmd: "sestava šroub \"<X>\" <plocha díry> [matice] [bez podložky] [obráceně]", en: "assembly bolt", de: "baugruppe schraube", desc: tr("šroubový spoj do válcové plochy díry (F12 nebo Ø9): šroub ISO 4762 podle průměru díry, délka podle sevřené tloušťky, podložka (výchozí) a matice, vazba Souosost; hlava nahoře, „obráceně“ = na druhém konci díry") },
   { cmd: "sestava podsestava \"<A>\" \"<B>\" … [jako \"název\"] · sestava rozpustit \"<P>\" · sestava upravit \"<X>\" … sestava hotovo · sestava otevřít \"<X>\"", en: "assembly subassembly, assembly dissolve, assembly edit, assembly done, assembly open", de: "baugruppe unterbaugruppe, baugruppe auflösen, baugruppe bearbeiten, baugruppe fertig, baugruppe öffnen", desc: tr("podsestavy (vazby se převedou), úprava dílu v kontextu sestavy – příkazy mezi upravit a hotovo pracují s dílem a změna se propíše do všech stejných komponent; otevřít = kopie v nové záložce") },
+  { cmd: "sestava komponenta \"<X>\" druh vyráběný|normálie|nakupovaný|auto [katalog \"…\"] [výrobce \"…\"] [rozměr \"…\"] [třída \"…\"] · druh nakupovaný [katalog \"…\"] [výrobce \"…\"] (v dílu)", en: "assembly component … kind make|standard|buy|auto catalog vendor size class · supply buy catalog … (part)", de: "baugruppe komponente … art fertigung|norm|kauf|auto katalog hersteller größe klasse · beschaffung kauf katalog … (Teil)", desc: tr("druh položky kusovníku: vyráběný díl (výkres, číslo, označení materiálu), normálie (norma, rozměr, pevnostní třída) nebo nakupovaný díl (katalogové číslo, výrobce); výchozí: normálie z knihovny = normálie, importovaný STEP bez prvků = nakupovaný, vlastní díl = vyráběný; kusovník je v oddílech podle druhu a výkresy se přibalují jen u vyráběných dílů") },
+  { cmd: "sestava obnovit \"<X>\" [\"<Y>\" …] | vše [údaje]", en: "assembly refresh \"X\" | all [props]", de: "baugruppe aktualisieren \"X\" | alle [daten]", desc: tr("komponenta je kopie dílu: převezme díl ze záložky (geometrie, číslo, materiál, druh, výkresy), poloha, vazby a přezdívka zůstanou; „údaje“ = jen číslo, materiál a druh; kusovník, list sestavy a stav hlásí ⚠ asm.stale-copy, dokud je kopie starší než díl") },
   { cmd: "kusovník [strukturovaně] [csv]", en: "bom", de: "stückliste", desc: tr("kusovník otevřené sestavy jako tabulka do protokolu (poz., název, číslo / norma, ks, materiál, hmotnost); strukturovaně = podsestavy s díly; také window.mncad.bom()") },
   { cmd: "rám formy [šířka délka] [deska-a N] [deska-b N] [upínací N] [opěrná N] [rozpěrky N] [šířka-rozpěrek N] [vyhazovací N] [kotevní N] [sloupky Ø] [dutina X Y H | bez dutiny] [materiál …]", en: "moldbase", de: "formaufbau", desc: tr("rám vstřikovací formy jako průvodce (výchozí 296 × 346 mm) – nová záložka se sestavou desek, vedení, šroubů a vyhazovačů") },
   { cmd: "záložky · záložka \"název\"|N · zavřít záložku [\"název\"|N]", en: "tabs, tab, close tab", de: "registerkarten, registerkarte, registerkarte schließen", desc: tr("otevřené dokumenty: výpis, přepnutí (další příkazy pracují s vybranou záložkou), zavření; také window.mncad.tabs(), activateTab(), closeTab()") },

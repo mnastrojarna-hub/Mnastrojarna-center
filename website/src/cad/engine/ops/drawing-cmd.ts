@@ -20,6 +20,7 @@ import { runOf } from "../run-doc";
 import { drawingKv } from "../kv";
 import { drawingMemo, sheetIssue, sheetIssueText, sheetLabel } from "../sheet-eval";
 import { asmHooks, coded, sayKv, type OpHandler } from "./util";
+import { reportStaleCopies } from "../bom-notes";
 
 export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   const r = runOf(ctx);
@@ -31,6 +32,8 @@ export const drawingCmdOp: OpHandler<"drawingCmd"> = async (op, ctx) => {
   r.doc = res.doc;
   r.changed = r.changed || res.changed;
   r.openDrawingAfter = r.openDrawingAfter || res.open;
+  // list sestavy s kusovníkem: kopie dílu starší než díl v záložce = ⚠ s příkazem obnovy (bod 22g, jednou za běh)
+  if (r.doc.kind === "assembly") reportStaleCopies(ctx, r.doc);
   const issues = res.issues ?? [];
   // řádky hlášení (✗ / ⚠ výpočtu listu, ⚠ kontroly tolerancí po rozměrech) – v konzoli je nahradí řádek s kódem níže / na konci bloku
   const issueLines = new Set(issues.map(issueLine));

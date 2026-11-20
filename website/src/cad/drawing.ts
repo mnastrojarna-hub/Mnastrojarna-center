@@ -6,6 +6,7 @@
  * Výstup: geometrie listu (polys/texts) → SVG, DXF (R12, LTYPE/vrstvy) a PDF (src/cad/pdf.ts).
  */
 import { cadLocale, tr } from "./i18n";
+import { bomCsvText, isStrengthClass, kindsIn, supplySection, type BomLine } from "./bom-model";
 import * as r from "replicad";
 import { drawTitleBlock, imageRects, nearestAci, titleBlockSize, type SheetImage, type TitleBlockInfo, type TitleLogo, type TitleTemplate } from "./title-block";
 import type { CadDoc, PlaneName, Vec2, Vec3 } from "./types";
@@ -123,7 +124,8 @@ export type HoleRow = {
   label?: string;
 };
 
-export type BomItem = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; note?: string };
+/** položka kusovníku na listu; druh a údaje normálie / nákupu z cad/bom-model.ts (oddíly a sloupce – vlna 22, bod 19) */
+export type BomItem = { pos: number; name: string; number?: string; qty: number; material?: string; massKg?: number; note?: string } & Pick<BomLine, "kind" | "standard" | "size" | "grade" | "catalog" | "vendor" | "noDesignation">;
 
 export type SheetName = "A4" | "A3" | "A2" | "A1" | "A0";
 export type ViewKey = "front" | "top" | "left" | "right" | "back" | "bottom";
@@ -2678,52 +2680,96 @@ function titleBlock(W: number, H: number, sheet: SheetName, scale: number, proje
 // ---------------------------------------------------------------- kusovník (ISO 7573)
 
 const BOM_ROW = 7;
-/** sloupce: Pozice | Název | Číslo výkresu/normy | Ks | Materiál | Hmotnost (součet = šířka razítka) */
-const BOM_COLS: [string, number][] = [
-  [tr("Poz."), 12],
-  [tr("Název"), 52],
-  [tr("Číslo výkresu / normy"), 40],
-  ["Ks", 12],
-  [tr("Materiál"), 36],
-  [tr("Hmotnost"), 28],
+/**
+ * sloupce (součet = šířka razítka 180 mm): Poz. | Název | Číslo výkresu / normy | Rozměr / kat. č. | Ks | Materiál / třída |
+ * Hmotnost – popisky v jazyce rozhraní v okamžiku kreslení (CLI volí jazyk až po načtení modulu)
+ */
+const bomCols = (): [string, number][] => [
+  [tr("Poz."), 10],
+  [tr("Název"), 46],
+  [tr("Číslo výkresu / normy"), 38],
+  [tr("Rozměr / kat. č."), 26],
+  ["Ks", 10],
+  [tr("Materiál"), 28],
+  [tr("Hmotnost"), 22],
 ];
+/** oddíly kusovníku na listu (záhlaví oddílu jen při dvou a více druzích položek) */
+const bomSections = (bom?: BomItem[]): boolean => !!bom && kindsIn(bom).length > 1;
+const bomHeight = (bom?: BomItem[]) => (bom?.length ? (bom.length + 1 + (bomSections(bom) ? kindsIn(bom).length : 0)) * BOM_ROW : 0);
 
-const bomHeight = (bom?: BomItem[]) => (bom?.length ? (bom.length + 1) * BOM_ROW : 0);
+/** buňky položky podle druhu: normálie = norma | rozměr (+ tolerance, ne pevnostní třída) | třída; nakupovaná = – | katalog */
+function bomCells(it: BomItem): { number: string; size: string } {
+  if (it.kind === "standard") {
+    const tol = it.grade && !isStrengthClass(it.grade) ? it.grade : "";
+    if (it.standard) return { number: it.standard, size: [it.size, tol].filter(Boolean).join(" – ") };
+    return { number: it.number ?? "", size: it.size && it.size !== it.number ? it.size : "" };
+  }
+  if (it.kind === "buy") return { number: it.number && it.number !== it.catalog ? it.number : "", size: it.catalog ?? "" };
+  return { number: it.number ?? "", size: "" };
+}
 
-/** Kusovník nad razítkem: hlavička dole, položky rostou nahoru (poz. 1 nejníže). */
+/** Kusovník nad razítkem: hlavička dole, položky rostou nahoru (poz. 1 nejníže); při více druzích oddíly se záhlavím. */
 function partsList(x: number, yBottom: number, bom: BomItem[], polys: Poly[], texts: DText[]) {
+  const cols = bomCols();
   const items = [...bom].sort((a, b) => a.pos - b.pos);
-  const h = (items.length + 1) * BOM_ROW;
+  // řádky odspodu: záhlaví oddílu (je-li jich víc), položky oddílu, další oddíl …
+  const rows: ({ item: BomItem } | { section: string })[] = [];
+  const sections = bomSections(items);
+  let cur: string | undefined;
+  for (const it of items) {
+    const k = it.kind ?? "make";
+    if (sections && k !== cur) {
+      cur = k;
+      rows.push({ section: supplySection(k) });
+    }
+    rows.push({ item: it });
+  }
+  const h = (rows.length + 1) * BOM_ROW;
   const y0 = yBottom - h;
   rect(polys, x, y0, TB.w, h, "frame", 0.7);
-  for (let i = 1; i <= items.length; i++) {
+  for (let i = 1; i <= rows.length; i++) {
     const yy = y0 + i * BOM_ROW;
     // silná čára nad hlavičkou
-    polys.push({ layer: "title", width: i === items.length ? 0.5 : undefined, pts: [[x, yy], [x + TB.w, yy]] });
+    polys.push({ layer: "title", width: i === rows.length ? 0.5 : undefined, pts: [[x, yy], [x + TB.w, yy]] });
   }
-  let cx = x;
+  // svislé čáry sloupců v hlavičce a v řádcích položek; záhlaví oddílu jde přes celou šířku
   const colX: number[] = [];
-  for (const [, w] of BOM_COLS) {
+  let cx = x;
+  for (const [, w] of cols) {
     colX.push(cx);
     cx += w;
-    if (cx < x + TB.w - 1e-6) polys.push({ layer: "title", pts: [[cx, y0], [cx, yBottom]] });
+    if (cx >= x + TB.w - 1e-6) continue;
+    polys.push({ layer: "title", pts: [[cx, yBottom - BOM_ROW], [cx, yBottom]] });
+    rows.forEach((r, i) => {
+      if ("section" in r) return;
+      const top = yBottom - (i + 2) * BOM_ROW;
+      polys.push({ layer: "title", pts: [[cx, top], [cx, top + BOM_ROW]] });
+    });
   }
-  const cellText = (col: number, rowBottom: number, s: string, bold = false, size = 2.8) => {
-    const [, w] = BOM_COLS[col];
-    const center = col === 0 || col === 3;
+  const cellText = (col: number, rowBottom: number, str0: string, bold = false, size = 2.8) => {
+    const [, w] = cols[col];
+    const center = col === 0 || col === 4;
     const max = Math.floor((w - 2) / (size * 0.52));
-    const str = s.length > max ? s.slice(0, Math.max(1, max - 1)) + "…" : s;
+    const str = str0.length > max ? str0.slice(0, Math.max(1, max - 1)) + "…" : str0;
     texts.push({ x: center ? colX[col] + w / 2 : colX[col] + 1.5, y: rowBottom - 2.2, s: str, size, bold, anchor: center ? "middle" : "start", layer: "text" });
   };
-  BOM_COLS.forEach(([label], i) => cellText(i, yBottom, label, true, 2.5));
-  items.forEach((it, i) => {
+  cols.forEach(([label], i) => cellText(i, yBottom, label, true, 2.5));
+  rows.forEach((r, i) => {
     const rb = yBottom - (i + 1) * BOM_ROW;
+    if ("section" in r) {
+      texts.push({ x: x + 1.5, y: rb - 2.2, s: r.section, size: 2.8, bold: true, anchor: "start", layer: "text" });
+      return;
+    }
+    const it = r.item;
+    const c = bomCells(it);
+    const extra = [it.vendor, it.note].filter(Boolean).join(", ");
     cellText(0, rb, String(it.pos));
-    cellText(1, rb, it.name + (it.note ? ` (${it.note})` : ""));
-    cellText(2, rb, it.number ?? "");
-    cellText(3, rb, fmt(it.qty));
-    cellText(4, rb, it.material ?? "");
-    cellText(5, rb, it.massKg != null ? `${fmt(it.massKg)} kg` : "");
+    cellText(1, rb, it.name + (extra ? ` (${extra})` : ""));
+    cellText(2, rb, c.number);
+    cellText(3, rb, c.size);
+    cellText(4, rb, fmt(it.qty));
+    cellText(5, rb, it.material ?? "");
+    cellText(6, rb, it.massKg != null ? `${fmt(it.massKg)} kg` : "");
   });
 }
 
@@ -3081,16 +3127,12 @@ function balloonsFor(items: BalloonItem[], v: Placed, polys: Poly[], texts: DTex
   pts.forEach((b, i) => place(b, bx, clampY(v.py + i * (2 * R + 3) + R)));
 }
 
-/** Kusovník jako CSV pro Excel (středníky, UTF-8 s BOM, CRLF). */
+/**
+ * Kusovník výkresu jako CSV pro Excel – stejný zapisovač jako kusovník sestavy (bom-model.ts `bomCsvText`): středníky,
+ * UTF-8 s BOM, CRLF, desetinný oddělovač podle jazyka, sloupce druhu / normy / rozměru / třídy / katalogu / výrobce.
+ */
 export function bomToCsv(bom: BomItem[]): string {
-  const q = (v: string | number | undefined) => {
-    const s = v == null ? "" : String(v);
-    return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const num = (n?: number) => (n == null ? "" : String(Math.round(n * 1000) / 1000).replace(".", ","));
-  const rows = [[tr("Pozice"), tr("Název"), tr("Číslo výkresu / normy"), tr("Ks"), tr("Materiál"), tr("Hmotnost [kg]"), tr("Poznámka")].join(";")];
-  for (const it of [...bom].sort((a, b) => a.pos - b.pos)) rows.push([q(it.pos), q(it.name), q(it.number), num(it.qty), q(it.material), num(it.massKg), q(it.note)].join(";"));
-  return "﻿" + rows.join("\r\n") + "\r\n";
+  return bomCsvText(bom);
 }
 
 // ---------------------------------------------------------------- SVG

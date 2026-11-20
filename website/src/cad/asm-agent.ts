@@ -35,6 +35,7 @@ import {
   renameProblem,
   bomPartInfo,
   bomText,
+  bomWarnings,
   componentLines,
   faceLine,
   faceRefText,
@@ -52,6 +53,8 @@ import {
   type TabInfo,
 } from "./agent-asm";
 import { tr } from "./i18n";
+import { csvCaption, supplyWord } from "./bom-model";
+import { copyFieldsText, refreshPlan, staleCopies, staleCopyText } from "./asm-refresh";
 import type { MotionSlot } from "./motion-cache";
 import { applyKinMate, applyMotionCmd, type MotionSignal } from "./asm-agent-kin";
 import { applySpringCmd, refreshSprings } from "./asm-spring-agent";
@@ -114,6 +117,8 @@ export type AsmEnv = {
   onFacesTruncated?: (key: string, limit: number) => void;
   /** výsledky pohybové studie podle dokumentu: úložiště pracovního prostoru a klíč dokumentu, se kterým prostředí pracuje (cad/motion-cache.ts) */
   motion?: MotionSlot;
+  /** díl otevřený v záložce podle názvu (`Workspace.findPart`) – zastaralé kopie a `sestava obnovit` (asm-refresh.ts, bod 22g) */
+  partOf?: (name: string) => CadDoc | null;
 };
 
 export type AsmResult = {
@@ -508,6 +513,25 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
         }
         what.push(tr("materiál {0}", id ? (MATERIALS.find((m) => m.id === id)?.label ?? id) : `„${p.material}“`));
       }
+      if (p.supply) {
+        // druh položky kusovníku na komponentě (přepis druhu dílu); kind null = zpět na výchozí druh (bom-model.ts)
+        const sp = { ...(c.supply ?? {}) };
+        if (p.supply.kind === null) delete sp.kind;
+        else if (p.supply.kind) sp.kind = p.supply.kind;
+        for (const k of ["catalog", "vendor", "size", "grade"] as const) {
+          const v = p.supply[k];
+          if (v === undefined) continue;
+          if (v.trim()) sp[k] = v.trim();
+          else delete sp[k];
+        }
+        if (Object.keys(sp).length) c.supply = sp;
+        else delete c.supply;
+        if (p.supply.kind !== undefined) what.push(p.supply.kind ? tr("druh {0}", supplyWord(p.supply.kind)) : tr("druh výchozí"));
+        if (p.supply.catalog !== undefined) what.push(tr("katalog „{0}“", p.supply.catalog));
+        if (p.supply.vendor !== undefined) what.push(tr("výrobce „{0}“", p.supply.vendor));
+        if (p.supply.size !== undefined) what.push(tr("rozměr „{0}“", p.supply.size));
+        if (p.supply.grade !== undefined) what.push(tr("třída „{0}“", p.supply.grade));
+      }
       if (p.alias !== undefined) {
         // přezdívka instance: odkaz ve vazbách místo #k; kusovník ji nepoužívá
         if (!p.alias.trim()) {
@@ -741,9 +765,14 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       asmOnly();
       const b = await bomData(d, env, cmd.structured);
       log.push(b.text);
-      if (cmd.csv) log.push(tr("CSV (oddělovač ;):"), b.csv.replace(/^﻿/, "").trimEnd());
-      return done(d, false);
+      if (cmd.csv) log.push(csvCaption(), b.csv.replace(/^﻿/, "").trimEnd());
+      // kusovník nikdy tiše neukáže údaje kopie, když díl v záložce má jiné (⚠ asm.stale-copy s příkazem obnovy, bod 22g),
+      // a řekne, co vyráběným dílům chybí (⚠ bom.make-incomplete – číslo, označení materiálu)
+      return done(d, false, { codes: bomCodes(d, b.rows, env) });
     }
+    case "refresh":
+      asmOnly();
+      return refreshCmd(d, cmd, env, log, (doc) => resolve(doc));
     case "moldbase": {
       const p = cmd.params;
       const doc = moldBase(p, cmd.name ?? tr("Rám formy {0}×{1}", p.width, p.length));
@@ -797,6 +826,72 @@ export async function bomData(d: CadDoc, env: AsmEnv, structured: boolean): Prom
   // řádky podle zdroje (pružina = jedna položka v jakékoli délce), hmotnost z tělesa v sestavě (pružina v aktuální délce, jako stav)
   const rows = computeBom(d, (c) => bomPartInfo(c, built.get(sourceKey(springEffective(c).source)) ?? built.get(sourceKey(c.source))), { structured });
   return { rows, text: bomText(rows, d.name, structured), csv: bomCsv(rows) };
+}
+
+/**
+ * Záznamy ⚠ ke kusovníku (text, CLI, `window.mncad.bom`): zastaralé kopie dílů (díl v záložce se od vložení změnil –
+ * `asm.stale-copy` s příkazem `sestava obnovit`) a vyráběné díly bez čísla / bez označení materiálu (`bom.make-incomplete`).
+ */
+export function bomCodes(d: CadDoc, rows: BomRow[], env: Pick<AsmEnv, "partOf">): { code: string; text: string }[] {
+  const out: { code: string; text: string }[] = [];
+  for (const s of staleCopies(d, env.partOf)) out.push({ code: "asm.stale-copy", text: staleCopyText(s) });
+  for (const w of bomWarnings(rows)) out.push({ code: "bom.make-incomplete", text: w });
+  return out;
+}
+
+/**
+ * `sestava obnovit "Deska A" | vše [údaje]` – komponenty převezmou díl ze záložky (asm-refresh.ts `refreshPlan`, jedna funkce
+ * i pro GUI „Obnovit z dílu“). Změněná geometrie: čísla ploch vazeb se převedou podle geometrie jako po `sestava hotovo`,
+ * plocha, kterou nejde najít, se ohlásí (⚠) a vazby se přepočítají.
+ */
+async function refreshCmd(d: CadDoc, cmd: Extract<AsmCmd, { k: "refresh" }>, env: AsmEnv, log: string[], resolve: (doc: CadDoc) => ReturnType<typeof solveAsm>): Promise<AsmResult> {
+  const done = (doc: CadDoc, changed: boolean, extra: Partial<AsmResult> = {}): AsmResult => ({ doc, log, changed, ...extra });
+  if (!env.partOf) throw new Error(tr("sestava obnovit: díly v záložkách nejsou dostupné"));
+  const comps = d.components ?? [];
+  const ids = cmd.comps === "all" ? comps.filter((c) => c.source.kind === "part").map((c) => c.id) : cmd.comps.map((r) => findComp(d, r).id);
+  const plan = refreshPlan(d, ids, env.partOf, { metaOnly: cmd.metaOnly });
+  for (const x of plan.skipped) log.push(tr("ℹ „{0}“ se neobnovuje: {1}", x.name, x.why));
+  const changed = plan.done.filter((x) => x.fields.length || x.geometry);
+  for (const x of plan.done) {
+    if (!x.fields.length && !x.geometry) log.push(tr("✓ komponenta „{0}“ už odpovídá dílu v záložce", x.name));
+    else log.push(tr("✓ komponenta „{0}“ obnovena z dílu ({1}){2}", x.name, copyFieldsText(x.fields) || tr("geometrie"), x.local.length ? tr(" – přepsány úpravy v sestavě: {0}", copyFieldsText(x.local)) : ""));
+    if (x.keptNumber) log.push(tr("  číslo komponenty „{0}“ zadané v sestavě zůstává (sestava komponenta \"{1}\" číslo \"\" ho zruší)", x.keptNumber, x.name));
+  }
+  if (!changed.length) return done(d, false);
+  let doc = plan.doc;
+  // geometrie: čísla ploch vazeb podle geometrie (jako sestava hotovo) – stará a nová kopie dílu
+  const geo = changed.filter((x) => x.geometry).map((x) => x.id);
+  if (geo.length && doc.mates?.length) {
+    const mates = doc.mates.map((m) => ({ ...m, a: { ...m.a }, b: { ...m.b } }));
+    let renumbered = 0;
+    let lost = 0;
+    for (const id of geo) {
+      const oldC = comps.find((c) => c.id === id)!;
+      const newC = doc.components!.find((c) => c.id === id)!;
+      const oldKey = sourceKey(oldC.source);
+      const newKey = sourceKey(newC.source);
+      await env.parts([{ key: oldKey, source: oldC.source }]);
+      const res = (await env.parts([{ key: newKey, source: newC.source }]))[0]?.result ?? null;
+      const fresh = await partFaces(env, newKey, res);
+      for (const m of mates)
+        for (const ref of [m.a, m.b]) {
+          if (ref.compId !== id || ref.leaf || ref.face < 0) continue;
+          const old = await faceInfo(env, oldKey, ref.face);
+          const hit = old ? sameFace(old, fresh.faces) : null;
+          if (hit == null) lost++;
+          else if (hit !== ref.face) {
+            ref.face = hit;
+            renumbered++;
+          }
+        }
+    }
+    doc = { ...doc, mates };
+    if (renumbered) log.push(tr("  plochy vazeb přečíslovány podle geometrie: {0}", renumbered));
+    if (lost) log.push(tr("⚠ plochy vazeb, které po obnově dílu nejde najít: {0} – sestava vazby", lost));
+    const s = await resolve(doc);
+    return done(s.doc, true, { mateStatus: s.status });
+  }
+  return done(doc, true);
 }
 
 /** Šroubový spoj do válcové plochy díry: šroub ISO 4762 + podložka ISO 7089 (+ matice ISO 4032), vazba Souosost – jako v panelu. */

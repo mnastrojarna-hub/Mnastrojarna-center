@@ -3,7 +3,7 @@
 import { tr } from "@/cad/i18n";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cad } from "@/cad/client";
-import { GROUPS, LIBRARY, byGroup, defaults, familyById, loadFavorites, loadLibRecent, pushLibRecent, search, toggleFavorite, type Family, type ParamSchema, type SearchResult, type Values } from "@/cad/library";
+import { GROUPS, LIBRARY, byGroup, defaults, familyById, loadFavorites, makeStandard, loadLibRecent, pushLibRecent, search, toggleFavorite, type Family, type ParamSchema, type SearchResult, type Values } from "@/cad/library";
 import type { BuildResult, CadDoc } from "@/cad/types";
 import { MATERIALS, fmtNum, massKg } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
@@ -72,7 +72,7 @@ export function LibraryDialog({ onInsertPart, onInsertComponent, onClose, isAsse
   // dokument + náhled (debounce 400 ms)
   const made = useMemo<{ doc: CadDoc | null; err: string | null }>(() => {
     try {
-      return { doc: family.make(values), err: null };
+      return { doc: makeStandard(family, values), err: null }; // druh do kusovníku a celé označení (bom-model.ts)
     } catch (e) {
       return { doc: null, err: (e as Error).message };
     }
