@@ -1,6 +1,5 @@
 # Vlna E, balík runs: opakovaný běh (nový díl "A" znovu|nový), řádky D dokumentů běhu, stručný protokol v prohlížeči
 ✓ {0} „{1}“ – znovu použitá záložka z dřívějšího běhu	✓ {0} “{1}” – reused the tab from an earlier run
-opakovaný běh téhož skriptu použije záložku stejného názvu, kterou založil dřívější běh (ℹ doc.reused, obsah nahrazen; platí i pro normálie, otevřít a JSON) – „nový“ = vždy nová záložka, „znovu“ = i otevřený soubor nebo ruční záložka téhož názvu	running the same script again reuses the tab of the same name that an earlier run created (ℹ doc.reused, content replaced; also for standard parts, open and JSON) – “new” = always a new tab, “again” = also an opened file or a manual tab of the same name
 run: neznámý protokol „{0}“ – console, short, full, json	run: unknown protocol “{0}” – console, short, full, json
 # recenze: opakovaný běh normálií, otevřít a JSON; volby window.mncad.run
 ✓ normálie „{0}“ – znovu použitá záložka z dřívějšího běhu	✓ standard part “{0}” – reused the tab from an earlier run

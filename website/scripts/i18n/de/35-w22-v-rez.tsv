@@ -1,4 +1,3 @@
 # Welle 22, Paket V, Etappe V2 (Bericht 20. 11.): Schnittflächen in der Baugruppe
 čela řezu se v drátovém zobrazení nekreslí	Schnittflächen werden im Drahtmodell nicht gezeichnet
 čela řezu: každá komponenta s objemem (barva komponenty, šrafy)	Schnittflächen: jede Komponente mit Volumen (Komponentenfarbe, Schraffur)
-; v sestavě má každá komponenta s objemem čelo řezu v rovině řezu (barva komponenty a šrafy – sousední díly se liší; kolize červeně), i bez WebGL, při přehrávání studie a ve snímcích / videu; čelo se nevybírá; v drátovém zobrazení čela nejsou	; in der Baugruppe erhält jede Komponente mit Volumen eine Schnittfläche in der Schnittebene (Komponentenfarbe und Schraffur – benachbarte Teile unterscheiden sich; Kollisionen rot), auch ohne WebGL, bei der Wiedergabe der Studie und in Bildern / Video; die Schnittfläche ist nicht auswählbar; im Drahtmodell gibt es keine Schnittflächen
