@@ -105,9 +105,10 @@ const part = (name, number, materialName, size) => ({ app: 'mnastrojarna-cad', v
   ok(/Sestava: 4 komponent \(4 dílů/.test(st) && /objem Σ/.test(st) && /hmotnost Σ/.test(st), 'stav sestavy: komponenty, objem, hmotnost (ne „žádné těleso“)\n' + (st.match(/Sestava[^\n]*/) || [''])[0]);
   ok(!/Rozměry: žádné těleso/.test(st) && /Kolize: nezkontrolováno/.test(st), 'stav sestavy bez „žádné těleso“, kolize zatím nekontrolovány');
   log = await run(p, 'kolize');
-  ok(/✓ kolize: žádné \(4 komponent\)/.test(log) || /⚠ kolize: \d+/.test(log), 'příkaz kolize vrátí výsledek do protokolu\n' + (log.match(/kolize[^\n]*/) || [''])[0]);
+  // vlna 22 C2: „žádný průnik … · vůle nekontrolována“ bez ✓ (dřív „✓ kolize: žádné“)
+  ok((/kolize: žádný průnik \(objem nad 0,001 mm³\) – 4 komponent · vůle nekontrolována/.test(log) && !/✓ kolize/.test(log)) || /⚠ kolize: \d+/.test(log), 'příkaz kolize vrátí výsledek do protokolu\n' + (log.match(/kolize[^\n]*/) || [''])[0]);
   st = await status(p);
-  ok(/Kolize: (žádné|\d+ –)[^\n]*zkontrolováno/.test(st), 'stav: řádek Kolize s časem kontroly');
+  ok(/Kolize: (žádný průnik · vůle nekontrolována|\d+ –)[^\n]*zkontrolováno/.test(st), 'stav: řádek Kolize s časem kontroly');
   ok(await p.locator('[data-clash-result]').isVisible(), 'panel Kolize zůstává viditelný i bez kolizí (trvalý výsledek)');
   await p.getByRole('button', { name: 'Sestava', exact: true }).first().click().catch(() => {});
   await p.getByRole('button', { name: 'Kusovník', exact: true }).first().click();

@@ -313,7 +313,8 @@ const browsers = [];
   await runE('kolize');
   ok(await stateE('ok'), 'EN: příkaz kolize na sestavě A → panel ve stavu ok');
   const eOk = await textE();
-  ok(/No interferences ✓/.test(eOk) && /“Sestava A”|„Sestava A“/.test(eOk) && /positions from the document/.test(eOk), `EN: „No interferences ✓“ s hlavičkou (dokument · poloha)\n   ${eOk.replace(/\n/g, ' | ')}`);
+  // vlna 22 C2: bez průniku ≠ bez kolize – panel říká „No intersection · clearance not checked“ a nikde ✓
+  ok(/No intersection · clearance not checked/.test(eOk) && !/✓/.test(eOk) && /“Sestava A”|„Sestava A“/.test(eOk) && /positions from the document/.test(eOk), `EN: „No intersection · clearance not checked“ (bez ✓) s hlavičkou (dokument · poloha)\n   ${eOk.replace(/\n/g, ' | ')}`);
   await runE('sestava komponenta "Přidržovač" v 40 10 5');
   ok(await stateE('stale'), 'EN: po posunu komponenty stav stale');
   const eSt = await textE();

@@ -86,12 +86,12 @@ describe("vlna 22 C1: třídy kolizí všude (bod 5)", async () => {
     const { short, con } = await run(corpus("73-clash-motion-sub"));
     expect(lines(short, /clash\.undetermined/)).toEqual([]);
     expect(short).not.toMatch(/„Horní skupina“ × „Horní skupina“/);
-    expect(short).toMatch(/^= L\d+ asm "Sestava 5S" motion .* clash\.steps=0\/6 thread=2 real=0$/m);
+    expect(short).toMatch(/^= L\d+ asm "Sestava 5S" motion .* clash\.steps=0\/6 thread=2 real=0 clash\.mode=continuous /m); // za poli tříd kolizí následují pole spojitosti (C2) a motoru/úrovně (M)
     expect(con).toMatch(/kolize šroub v závitu: Horní skupina › Deska A × Horní skupina › Šroub M12 \[S1\]/);
     // `stav`: pohyb bez skutečné kolize, ale ne „bez průniku těles“ (šrouby v závitu se protínají); motion=ok, ne clash
     expect(con).toMatch(/^Pohyb: výsledek platí .* bez skutečné kolize v kontrolovaných krocích \(jen šroub v závitu, dotyk nebo pracovní kontakt\)/m);
     expect(short).toMatch(/^= L\d+ status "Sestava 5S" .* motion=ok$/m);
-    expect(short).toMatch(/^= L\d+ asm "Sestava 5M" motion .* clash\.steps=7\/16 thread=2 real=1 first\.real=9$/m);
+    expect(short).toMatch(/^= L\d+ asm "Sestava 5M" motion .* clash\.steps=7\/16 thread=2 real=1 first\.real=9 clash\.mode=continuous /m);
     expect(short).toMatch(/clash\.real "Sestava 5M": v pohybu „Doraz“ × „Šroub M12 \[S2\]“ od kroku 9/);
   }, 240_000);
 
@@ -100,7 +100,7 @@ describe("vlna 22 C1: třídy kolizí všude (bod 5)", async () => {
     const clash = lines(short, /^= L\d+ clash "Střih" total=/);
     expect(clash[0]).toMatch(/total=1 thread=0 underhead=0 real=1 undetermined=0$/); // kontrola bez pravidla
     expect(clash[1]).toMatch(/real=1 undetermined=0$/); // okno kroků staticky neplatí
-    expect(short).toMatch(/^= L\d+ asm "Střih" motion .* clash\.steps=2\/5 thread=0 real=1 first\.real=3 work=1$/m);
+    expect(short).toMatch(/^= L\d+ asm "Střih" motion .* clash\.steps=2\/5 thread=0 real=1 first\.real=3 work=1 clash\.mode=continuous /m); // work= je poslední pole tříd kolizí, pak C2/M
     expect(lines(short, /clash\.work "Střih"/).length).toBeGreaterThanOrEqual(1);
     expect(clash.some((l) => /real=0 undetermined=0 work=1$/.test(l))).toBe(true); // okno hodnoty motoru platí i staticky (26 v 26–24)
     expect(con).toMatch(/r1 pracovní kontakt „Razník“ × „Plech“ při hodnotě vazby „ZDVIH“ 26–24 \(střih\)/);
