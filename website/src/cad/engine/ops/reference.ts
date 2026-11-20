@@ -11,7 +11,8 @@ import type { DrawingMeta, DrawingOptions } from "../../drawing";
 import { tr } from "../../i18n";
 import { matchNames } from "../attachments";
 import type { FileSource } from "../host";
-import { flush, runOf, startDoc } from "../run-doc";
+import { flush, runOf } from "../run-doc";
+import { startRunDoc, type RunDocStart } from "../runs";
 import { coded, say, type OpHandler } from "./util";
 
 const isPdfName = (n: string) => /\.pdf$/i.test(n);
@@ -55,14 +56,16 @@ export const referenceOp: OpHandler<"reference"> = async (op, ctx) => {
     // okno, jako dřívější reference-host vlny 15), v Node (CLI) bez Worker ve vlákně běhu
     load: { ...(host.pdfjs ? { pdfjs: async () => { const p = await host.pdfjs!(); return { lib: p.lib as never, docOptions: p.docOptions }; } } : {}) },
   });
+  let st: RunDocStart | null = null;
   if (res.newDoc) {
     // `předloha otevřít`: předloha jako 2D výkres v nové záložce
     await flush(ctx);
     r.currentBody = null;
-    startDoc(ctx, res.newDoc);
+    st = await startRunDoc(ctx, res.newDoc, { origin: "open" }); // předloha jako 2D výkres – opakovaný běh (engine/runs.ts)
   } else if (res.doc) {
     r.doc = res.doc;
     r.changed = true;
   }
   say(ctx, ...res.log);
+  st?.report();
 };

@@ -6,7 +6,8 @@ import { tr } from "../../i18n";
 import type { CadDoc } from "../../types";
 import { makeAsmEnv } from "../asm-env";
 import { isCode } from "../codes";
-import { docKeyOf, flush, runOf, startDoc } from "../run-doc";
+import { docKeyOf, flush, runOf } from "../run-doc";
+import { startRunDoc, type RunDocStart } from "../runs";
 import { asmHooks, coded, say, sayKv, type OpHandler } from "./util";
 
 export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
@@ -22,10 +23,11 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
   const stack = [...ctx.ws.asm.stack];
   const env = makeAsmEnv(ctx.ws, ctx.host.kernel, { stack, ...asmHooks(ctx) });
   const res = await applyAsmCmd(r.doc, op.cmd, env);
+  let st: RunDocStart | null = null;
   if (res.newTab) {
     await flush(ctx);
     r.currentBody = null;
-    startDoc(ctx, res.doc);
+    st = await startRunDoc(ctx, res.doc, { origin: "new" }); // rám formy / komponenta jako kopie – opakovaný běh (engine/runs.ts)
   } else if (res.switched) {
     r.doc = JSON.parse(JSON.stringify(res.doc)) as CadDoc;
     r.openNew = false;
@@ -52,6 +54,7 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
   // souhrn pohybové studie: jeden strojový řádek `= … motion …` ve stručném protokolu, výpis v plném (zkouška 959)
   if (res.kv) sayKv(ctx, res.kv, ...res.log);
   else say(ctx, ...res.log);
+  st?.report();
   // selhané prvky dílu z `sestava hotovo`: rozhodne smyčka po ověření dílu (jeden ✗ feature.failed, ne dva)
   if (res.failures?.length) (r.partFailures ??= []).push(...res.failures);
   // záznamy s kódem z příkazu sestavy (kolize pohybu podle tříd – asm-agent-kin.ts motionClashLines)

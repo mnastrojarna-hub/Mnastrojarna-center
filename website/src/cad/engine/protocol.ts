@@ -22,7 +22,9 @@
  *
  * Priorita zařazení do rozpočtu: hlavička + Σ + řádek O (odkaz; delší než 200 znaků zkrácený na začátek adresy a délku)
  * vždy > ✗ > ⚠ > F a celý dlouhý řádek O > jednořádkové `=` > D (hlavní dokument a dokumenty s ✗/⚠) > víceřádkové
- * výpisy > ℹ (jen `notes`). Pořadí tisku: hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku,
+ * výpisy > ℹ převzetí záložky (`doc.reused`, `doc.name-taken` – i bez `notes`, víc dokumentů jedním řádkem `×N` –
+ * `mergeTakeovers`) > ostatní ℹ (jen `notes`). Pořadí tisku:
+ * hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku,
  * Σ. Nevejdou-li se všechny řádky F (mnoho souborů), nahradí je jeden souhrnný `F <formát|mixed> "*" <bajty>B files=<n> …`
  * (jednotlivé soubory jsou v `protocol-full.txt` a v JSON `files`).
  * Zařazuje se hladově v pořadí priority (v rámci priority v pořadí tisku): záznam se vypíše, když se vejde i se značkou
@@ -35,7 +37,7 @@
  */
 import type { StrictState } from "./strict";
 import type { CadLang } from "../i18n";
-import { CODE_RE, codeArgs, codeEntry, fallbackCode, type Code, type CodeEntryInit } from "./codes";
+import { CODE_RE, codeArgs, codeDef, codeEntry, fallbackCode, type Code, type CodeEntryInit } from "./codes";
 import { tr } from "../i18n";
 import type { DocSummary, Entry, Level, OpTiming, OutFile, Overflow, RunReport, ShareInfo } from "./protocol-types";
 
@@ -287,6 +289,48 @@ export function mergeSimilar(entries: readonly Entry[]): Entry[] {
   return out;
 }
 
+/**
+ * Souhrnná hláška ℹ převzetí záložek ve stručném protokolu (`mergeTakeovers`) – klíče slovníku; `{0}` = názvy dokumentů.
+ * Počet je ve značce `×N` řádku; nápověda k volbě je před názvy, aby ji zkrácení dlouhého výčtu (`TEXT_MAX`) neodřízlo.
+ */
+const TAKEOVER: Readonly<Record<string, string>> = {
+  "doc.reused": "záložky z dřívějšího běhu použité znovu – obsah nahrazen (volba „nový“ = nová záložka): {0}",
+  "doc.name-taken": "dokumenty v nové záložce vedle otevřené záložky téhož názvu, kterou nezaložil stejný druh příkazu běhu (volba „znovu“ ji převezme): {0}",
+};
+
+/**
+ * Jen pro stručný protokol bez `notes`: ℹ převzetí záložek (`doc.reused`, `doc.name-taken`) z více dokumentů → jeden řádek
+ * `ℹ L1,L3,L5 ×3 doc.reused záložky z dřívějšího běhu použité znovu – …: „Deska“, „Čep“, „S“`. Opakovaný běh nástroje
+ * se 70 díly má 20 takových hlášek po ~200 B – jednotlivě by se do 2 kB vešla jedna a zbytek by skončil v přebytku;
+ * takhle je převzetí vidět vždy jedním řádkem (počet `×N`, názvy od začátku, Σ `reused=<n>`). Plný protokol, JSON
+ * a stručný s `notes` mají dál každou hlášku zvlášť. Pořadí podle prvního výskytu.
+ */
+export function mergeTakeovers(entries: readonly Entry[]): Entry[] {
+  const groups = new Map<string, Entry[]>();
+  for (const e of entries) {
+    if (e.level !== "note" || !e.code || !TAKEOVER[e.code]) continue;
+    const g = groups.get(e.code);
+    if (g) g.push(e);
+    else groups.set(e.code, [e]);
+  }
+  const out: Entry[] = [];
+  const done = new Set<string>();
+  for (const e of entries) {
+    const g = e.level === "note" && e.code ? groups.get(e.code) : undefined;
+    if (!g || g.length < 2) {
+      out.push(e);
+      continue;
+    }
+    if (done.has(e.code!)) continue;
+    done.add(e.code!);
+    const lines = [...new Set(g.flatMap((m) => entryLines(m)))].sort((a, b) => a - b);
+    const count = g.reduce((a, m) => a + (m.count ?? 1), 0);
+    const names = g.map((m) => `„${m.doc ?? ""}“`).join(", ");
+    out.push({ level: "note", code: e.code, line: lines[0] ?? null, ...(lines.length ? { lines } : {}), count, text: tr(TAKEOVER[e.code!], names) });
+  }
+  return out;
+}
+
 /* ───────────────────────── řádky protokolu ───────────────────────── */
 
 /** řádek hlášky ✗/⚠/ℹ (a ✓ v plném protokolu) */
@@ -416,6 +460,8 @@ export function headerLine(r: RunReport): string {
 }
 
 /** souhrnný řádek `Σ` (vždy v protokolu, omezená délka) */
+const countCode = (entries: readonly Entry[], code: Code) => entries.reduce((s, e) => s + (e.code === code ? (e.count ?? 1) : 0), 0);
+
 export function sigmaLine(r: RunReport): string {
   const kv = [`docs=${r.docs.length}`];
   const m = mainDoc(r);
@@ -430,6 +476,12 @@ export function sigmaLine(r: RunReport): string {
     if (m.mass_kg !== undefined) kv.push(`m=${fmtNum(m.mass_kg, 3)}kg`);
   }
   kv.push(`files=${r.files.length}`);
+  // opakovaný běh (engine/runs.ts): převzaté záložky a nové záložky vedle záložky téhož názvu – vždy vidět, i když se
+  // jejich řádky ℹ do rozpočtu nevejdou
+  const reused = countCode(r.entries, "doc.reused");
+  const taken = countCode(r.entries, "doc.name-taken");
+  if (reused) kv.push(`reused=${reused}`);
+  if (taken) kv.push(`name-taken=${taken}`);
   if (r.share) kv.push(`share=${shareMode(r.share)}`);
   if (r.stopped) kv.push(`stop=${locOf(entryLines({ line: r.stopped.line }))}:${CODE_RE.test(r.stopped.code) ? r.stopped.code : "msg.error"}`);
   kv.push(`t=${secs(r.ms)}`);
@@ -448,8 +500,8 @@ export const overflowLine = (n: number, bytes: number) => `… ${n} entries ${by
 export type ShortOptions = { budget?: number; notes?: boolean };
 export type ShortProtocol = { text: string; bytes: number; budget: number; overflow?: Overflow };
 
-/** priorita zařazení (menší = dřív) */
-const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, note: 6 } as const;
+/** priorita zařazení (menší = dřív); `shownNote` = ℹ s `short` v registru kódů (převzetí záložky) – i bez volby `notes` */
+const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, shownNote: 6, note: 7 } as const;
 /** skupina tisku (pořadí řádků) */
 const GROUP = { error: 0, warn: 1, note: 2, measure: 3, doc: 4, file: 5, link: 6 } as const;
 /** `over` = bajty v přebytku, když se záznam nevypíše (jinak `bytes`) – celý řádek O místo zkráceného */
@@ -483,13 +535,15 @@ const lineKey = (e: Entry) => {
 function candidates(r: RunReport, notes: boolean): Item[] {
   const items: Item[] = [];
   const add = (prio: number, group: number, order: number, text: string) => items.push({ prio, group, order, text, bytes: utf8Bytes(text) + 1 });
-  const entries = mergeSimilar(mergeEntries(r.entries));
+  const merged = mergeSimilar(mergeEntries(r.entries));
+  const entries = notes ? merged : mergeTakeovers(merged); // převzetí záložek jedním řádkem (s `notes` každá hláška zvlášť)
   const seq = new Map(entries.map((e, i) => [e, i]));
   const sorted = [...entries].sort((a, b) => lineKey(a) - lineKey(b) || seq.get(a)! - seq.get(b)!);
   sorted.forEach((e, i) => {
     if (e.level === "error") add(PRIO.error, GROUP.error, i, msgLine(e, false));
     else if (e.level === "warn") add(PRIO.warn, GROUP.warn, i, msgLine(e, false));
     else if (e.level === "note" && notes) add(PRIO.note, GROUP.note, i, msgLine(e, false));
+    else if (e.level === "note" && e.code && codeDef(e.code)?.short) add(PRIO.shownNote, GROUP.note, i, msgLine(e, false));
     else if (e.level === "measure") {
       const t = measureText(e);
       add(t.includes("\n") ? PRIO.listing : PRIO.req, GROUP.measure, i, t);

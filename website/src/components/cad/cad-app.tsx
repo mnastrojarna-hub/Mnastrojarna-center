@@ -85,7 +85,7 @@ import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps } fro
 import { runScript } from "@/cad/engine/run";
 import { stableStep } from "@/cad/engine/files";
 import { formatConsole } from "@/cad/engine/protocol";
-import { checkProtocol, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
+import { checkProtocol, checkRunOptions, formatRun, runReport, type RunApiOptions } from "@/cad/engine/run-protocol";
 import { makeAsmEnv } from "@/cad/engine/asm-env";
 import { presentStatusText } from "@/cad/engine/asm-status";
 import type { EngineHost } from "@/cad/engine/host";
@@ -856,7 +856,7 @@ export function CadApp() {
       missing: () => missingKeys(),
       guide: () => AGENT_GUIDE,
       commands: () => AGENT_COMMANDS.map((c) => c.cmd),
-      run: (text, o) => runAgentRef.current(text, o ? { protocol: o.protocol, budget: o.budget, notes: o.notes } : {}),
+      run: async (text, o) => runAgentRef.current(text, checkRunOptions(o)), // volby se kontrolují – překlep / budget mimo rozsah = chyba, ne tichý text konzole
       getDocument: () => JSON.parse(JSON.stringify(histRef.current.present)) as CadDoc,
       setDocument: (doc, o) => runAgentRef.current(typeof doc === "string" ? doc : JSON.stringify(doc), o?.inPlace ? { inPlace: true } : undefined),
       undo: (n) => runAgentRef.current(`zpět ${Math.max(1, Math.floor(Number(n) || 1))}`),
