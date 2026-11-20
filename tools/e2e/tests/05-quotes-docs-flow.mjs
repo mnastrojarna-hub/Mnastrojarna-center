@@ -808,7 +808,7 @@ await T("/quotes: počty chipů = DB, hledání, filtr Neschválená, archiv; kd
   await quoteChip(page, "Otevřené").click();
   // archiv: původní verze Q1 je archivovaná, R2 přijatá
   expect(st.q1 && st.r2, "Q1 + R2 existují");
-  await search.fill(st.q1.number);
+  await search.fill(st.q1.number.replace(/-V1$/, "")); // číslo bez verze najde všechny verze (V1, V2)
   await eventually(async () => expect((await quoteNums(page)).length === 0, "mezi otevřenými nic (R2 přijatá, Q1 archiv)"));
   await quoteMore(page, ["Přijatá", "Archivovaná"]);
   await eventually(async () => {
