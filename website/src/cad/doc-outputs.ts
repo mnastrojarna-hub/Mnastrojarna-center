@@ -326,3 +326,18 @@ export function staleOutputKinds(doc: CadDoc): string[] {
   const id = modelId(doc);
   return [...(staleSheets(doc, id).length ? ["drawing"] : []), ...(staleExports(doc, id).length ? ["export"] : [])];
 }
+
+/* ───────────────────────── skript z dokumentu (doc-script.ts) ───────────────────────── */
+
+const ISSUE_W: readonly [string, string, string] = ["výkres vydat", "drawing issue", "zeichnung freigeben"];
+
+/**
+ * Vydání listu do textového skriptu (doc-script.ts, po kótách listu): vydaný list z nynějšího modelu = `výkres vydat A`
+ * (při přečtení se vydá z přečteného modelu); vydaný list ze starší revize modelu se NEzapíše – vydání by po přečtení
+ * tvrdilo shodu s modelem, kterou původní dokument neměl (poznámka skriptu).
+ */
+export function emitIssue(o: { li: 0 | 1 | 2; line(s: string): void; note(s: string): void }, doc: CadDoc, s: DrawingDoc): void {
+  if (!s.issued || doc.kind === "draft") return;
+  if (sheetState(doc, s) === "current") o.line(`${ISSUE_W[o.li]} ${s.issued.rev}`);
+  else o.note(tr("list „{0}“ byl vydán jako rev. {1} z modelu {2}, který už neodpovídá – vydání se do skriptu nezapisuje (vydejte znovu: výkres vydat {3})", s.name, s.issued.rev, s.issued.modelRev, nextRev(s.issued.rev)));
+}

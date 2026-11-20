@@ -480,4 +480,10 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     de: "zeichnung export pdf dokument · exportieren step base64 · exportieren step link · freigeben speicher oder link",
     desc: tr("„dokument“ = všechny listy všech výkresů a u sestavy i výkresy dílů z komponent (každý díl jednou) v jednom PDF, stejné jako --formats auto v CLI; „base64“ za uložit / export / výkres export / skica export = soubor se nestáhne, obsah jde do protokolu (řádek BASE64, nejvýš 2 MB); „odkaz“ = soubor zašifrovaný v úložišti odkazů, protokol vypíše odkaz na stránku ke stažení; „sdílet úložiště“ = jen krátký odkaz (nedostupné úložiště = ✗), „nebo odkaz“ = jinak dlouhý odkaz s ⚠"),
   },
+  {
+    cmd: "exporty [vymazat] · výstupy [zastaralé] · přepočítat vše",
+    en: "exports [clear] · outputs [stale] · recompute all",
+    de: "exporte [löschen] · ausgaben [veraltet] · alles neu berechnen",
+    desc: tr("záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)"),
+  },
 ];

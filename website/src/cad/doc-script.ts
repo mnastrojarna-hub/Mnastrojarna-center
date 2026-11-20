@@ -33,6 +33,7 @@ import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics } from "./doc-script-asm";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
+import { emitIssue } from "./doc-outputs";
 import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
 import { resolveDatumNames } from "./agent-prim";
@@ -1694,6 +1695,7 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
     }
     // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách) – jen ty, které na listu jsou
     emitGenEdit(c.sheetOut, doc, s, c.genKeys[s.id]);
+    emitIssue(c.sheetOut, doc, s); // vydání listu (vlna 22, bod 20 – doc-outputs.ts)
     const edited = ann.filter((a) => a.auto && ((a.type === "dim" && (a.text !== undefined || /[±+\-]\d|[A-Za-z]\d/.test(a.suffix ?? ""))) || (a.type === "callout" && a.tol) || a.rev || a.tolShow)).length;
     if (edited) {
       c.sum("editedDims", edited);

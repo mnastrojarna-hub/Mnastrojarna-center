@@ -1,0 +1,90 @@
+# vlna 22, balík D, etapa D2 – vydání listu, revize modelu na výkresech a exportech, záznamy exportů, zastaralé výstupy (bod 20)
+ – varování: {0}	 – Warnungen: {0}
+ · do tabulky revizí přidána revize {0} „{1}“	 · Revision {0} „{1}“ zur Revisionstabelle hinzugefügt
+ (přepočítat vše)	 (alles neu berechnen)
+→ list „{0}“ už je vydán jako rev. {1} z modelu {2} – beze změny	→ Blatt „{0}“ ist bereits als Rev. {1} aus Modell {2} freigegeben – unverändert
+→ list „{0}“ vydaný není – není co zrušit	→ Blatt „{0}“ ist nicht freigegeben – nichts zurückzuziehen
+⚠ Vydání: rev. {0} z modelu {1} ({2}) – model je teď {3}: list je ZASTARALÝ – vydejte novou revizi: výkres vydat {4}	⚠ Freigabe: Rev. {0} aus Modell {1} ({2}) – das Modell ist jetzt {3}: das Blatt ist VERALTET – neue Revision freigeben: zeichnung freigeben {4}
+✓ list „{0}“ vydán jako rev. {1} z modelu {2} ({3}){4}	✓ Blatt „{0}“ als Rev. {1} aus Modell {2} freigegeben ({3}){4}
+✓ vydání listu „{0}“ (rev. {1} z modelu {2}) zrušeno – list je rozpracovaný	✓ Freigabe von Blatt „{0}“ (Rev. {1} aus Modell {2}) zurückgezogen – das Blatt ist in Bearbeitung
+✓ záznamy exportů vymazány ({0}) – soubory na disku zůstaly	✓ Exporteinträge gelöscht ({0}) – die Dateien auf der Festplatte bleiben
+exportováno z modelu {0} ({1}), model je teď {2}	aus Modell {0} exportiert ({1}), das Modell ist jetzt {2}
+Exporty ({0}, zastaralých {1}) · model je teď {2}:	Exporte ({0}, veraltet {1}) · das Modell ist jetzt {2}:
+Exporty ({0})	Exporte ({0})
+exporty [vymazat] · výstupy [zastaralé] · přepočítat vše	exporte [löschen] · ausgaben [veraltet] · alles neu berechnen
+Exporty: {0} – všechny z nynější revize modelu (výpis: exporty)	Exporte: {0} – alle aus der aktuellen Modellrevision (Liste: exporte)
+Exporty: {0} z {1} ze starší revize modelu – {2} (výpis: exporty)	Exporte: {0} von {1} aus einer älteren Modellrevision – {2} (Liste: exporte)
+exporty: neznámé „{0}“ – {1}	exporte: unbekannt „{0}“ – {1}
+Exporty: žádné záznamy – zapisuje je export z tohoto dokumentu (export step, výkres export pdf…) · model {0}	Exporte: keine Einträge – ein Export aus diesem Dokument schreibt sie (export step, zeichnung export pdf…) · Modell {0}
+komponenta „{0}“	Komponente „{0}“
+kontrola	Prüfung
+kontrola kolizí	Kollisionsprüfung
+kontrola kolizí znovu (kolize)	Kollisionsprüfung wiederholt (kollision)
+kopie dílů v sestavě obnoveny z dílů (sestava obnovit vše)	Teilekopien in der Baugruppe aus den Teilen aktualisiert (baugruppe aktualisieren alle)
+list „{0}“ byl vydán jako rev. {1} z modelu {2}, který už neodpovídá – vydání se do skriptu nezapisuje (vydejte znovu: výkres vydat {3})	Blatt „{0}“ wurde als Rev. {1} aus Modell {2} freigegeben, das nicht mehr passt – die Freigabe wird nicht ins Skript geschrieben (erneut freigeben: zeichnung freigeben {3})
+list „{0}“ přepočten z modelu {1}{2}	Blatt „{0}“ aus Modell {1} neu berechnet{2}
+list „{0}“ rev. {1}	Blatt „{0}“ Rev. {1}
+list „{0}“ se exportuje s revizí {1}, ale rev. {1} byla vydána z modelu {2} a model je teď {3} – soubor má jiný obsah pod stejným písmenem; nejdřív vydejte novou revizi: výkres vydat {4}	Blatt „{0}“ wird mit Revision {1} exportiert, aber Rev. {1} wurde aus Modell {2} freigegeben und das Modell ist jetzt {3} – die Datei hat unter demselben Buchstaben einen anderen Inhalt; zuerst eine neue Revision freigeben: zeichnung freigeben {4}
+list „{0}“ vydán jako rev. {1} z modelu {2} ({3}), model je teď {4} – vydejte novou revizi: výkres vydat {5}	Blatt „{0}“ als Rev. {1} aus Modell {2} freigegeben ({3}), das Modell ist jetzt {4} – neue Revision freigeben: zeichnung freigeben {5}
+list „{0}“: rev. {1} už byla vydána z modelu {2} a znovu se vydává ze změněného modelu {3} se stejným písmenem – změnu označte novou revizí (výkres vydat {4})	Blatt „{0}“: Rev. {1} wurde bereits aus Modell {2} freigegeben und wird aus dem geänderten Modell {3} mit demselben Buchstaben erneut freigegeben – kennzeichnen Sie die Änderung mit einer neuen Revision (zeichnung freigeben {4})
+List byl vydán z modelu {0} ({1}), model je teď {2}. List ukazuje nynější model – soubor s písmenem {3} by měl jiný obsah než vydaný papír.	Das Blatt wurde aus Modell {0} freigegeben ({1}), das Modell ist jetzt {2}. Das Blatt zeigt das aktuelle Modell – eine Datei mit Buchstabe {3} hätte einen anderen Inhalt als das freigegebene Papier.
+List už je vydán jako rev. {0} z modelu {1}	Das Blatt ist bereits als Rev. {0} aus Modell {1} freigegeben
+List vydán jako rev. {0} z modelu {1}	Blatt als Rev. {0} aus Modell {1} freigegeben
+Listy ({0}):	Blätter ({0}):
+listy {0}	Blätter {0}
+Listy: žádné	Blätter: keine
+měření	Messung
+model {0}	Modell {0}
+Model {0}	Modell {0}
+Model se změnil po vydání rev. {0}	Das Modell hat sich nach der Freigabe von Rev. {0} geändert
+odpovídá modelu	entspricht dem Modell
+pohybová studie	Bewegungsstudie
+pohybová studie znovu (pohyb spustit)	Bewegungsstudie wiederholt (bewegung starten)
+porovnání s referencí	Vergleich mit der Referenz
+první vydání	Erstausgabe
+překryv s předlohou	Überlagerung mit der Vorlage
+přepočítá „Přepočítat vše“	„Alles neu berechnen“ berechnet es neu
+Přepočítat	Neu berechnen
+Přepočítat vše	Alles neu berechnen
+Přepočítat vše – dokument „{0}“, revize modelu {1}:	Alles neu berechnen – Dokument „{0}“, Modellrevision {1}:
+Přepočteno	Neu berechnet
+Přepočteno ({0}):	Neu berechnet ({0}):
+Přepočteno: nic – nebylo co přepočítat	Neu berechnet: nichts – es gab nichts neu zu berechnen
+rev. {0}	Rev. {0}
+Revize modelu: {0}	Modellrevision: {0}
+ručně	manuell
+stav vazeb	Zustand der Verknüpfungen
+stav vazeb přepočítán	Zustand der Verknüpfungen neu berechnet
+úloha {0}	Auftrag {0}
+vydán z modelu {0}, model je teď {1}	aus Modell {0} freigegeben, das Modell ist jetzt {1}
+Vydané listy ({0})	Freigegebene Blätter ({0})
+Vydání listu zrušeno – list je rozpracovaný	Blattfreigabe zurückgezogen – das Blatt ist in Bearbeitung
+Vydání: nevydáno · list z modelu {0} (vydat: výkres vydat {1})	Freigabe: nicht freigegeben · Blatt aus Modell {0} (freigeben: zeichnung freigeben {1})
+Vydání: rev. {0} z modelu {1} ({2}) – odpovídá modelu	Freigabe: Rev. {0} aus Modell {1} ({2}) – entspricht dem Modell
+Vydáno jako rev. {0} z modelu {1} ({2}) – model je teď {3}: list je zastaralý	Als Rev. {0} aus Modell {1} freigegeben ({2}) – das Modell ist jetzt {3}: das Blatt ist veraltet
+Vydáno jako rev. {0} z modelu {1} ({2}) – odpovídá modelu	Als Rev. {0} aus Modell {1} freigegeben ({2}) – entspricht dem Modell
+Vydat list jako rev. {0}	Blatt als Rev. {0} freigeben
+Vydat novou revizi {0}	Neue Revision {0} freigeben
+výkres vydat [<revize>] ["popis změny"] [datum 20.11.2026] [vše] · výkres vydat zrušit [vše] – neznámé „{0}=“	zeichnung freigeben [<Revision>] ["Änderungstext"] [datum 20.11.2026] [alle] · zeichnung freigeben aufheben [alle] – unbekannt „{0}=“
+Výkres: {0}	Zeichnung: {0}
+Výkres: list „{0}“ vydán jako rev. {1} z modelu {2} ({3}) – odpovídá modelu	Zeichnung: Blatt „{0}“ als Rev. {1} aus Modell {2} freigegeben ({3}) – entspricht dem Modell
+výsledek je ze starší revize modelu	das Ergebnis stammt aus einer älteren Modellrevision
+Výstupy · model {0}	Ausgaben · Modell {0}
+Výstupy dokumentu	Ausgaben des Dokuments
+Výstupy dokumentu „{0}“ · revize modelu {1}	Ausgaben des Dokuments „{0}“ · Modellrevision {1}
+výstupy: neznámé „{0}“ – {1}	ausgaben: unbekannt „{0}“ – {1}
+z modelu {0} ({1})	aus Modell {0} ({1})
+Zastaralé ({0})	Veraltet ({0})
+Zastaralé výstupy ({0}) · model je teď {1}:	Veraltete Ausgaben ({0}) · das Modell ist jetzt {1}:
+Zastaralé výstupy: {0}	Veraltete Ausgaben: {0}
+Zastaralé výstupy: žádné – vydané listy, exporty a uložené analýzy odpovídají modelu {0}	Veraltete Ausgaben: keine – freigegebene Blätter, Exporte und gespeicherte Analysen entsprechen Modell {0}
+Zastaralé: žádné	Veraltet: keine
+ZASTARALÝ: model je teď {0}, exportujte znovu: {1}	VERALTET: das Modell ist jetzt {0}, erneut exportieren: {1}
+Zbývá udělat ručně ({0}) – program to sám neudělá:	Bleibt manuell zu tun ({0}) – das Programm macht es nicht selbst:
+Zbývá: nic – vydané listy, exporty a uložené analýzy odpovídají modelu {0}	Bleibt: nichts – freigegebene Blätter, Exporte und gespeicherte Analysen entsprechen Modell {0}
+změna modelu {0} → {1}	Modelländerung {0} → {1}
+Zrušit vydání	Freigabe zurückziehen
+vydání listu: písmeno revize + revize modelu r·… + datum (chybí-li revize v tabulce, přidá se); po změně modelu je vydaný list zastaralý – ⚠ drawing.stale ve výkres stav, stav, na konci běhu, při exportu se stejným písmenem (přísně ✗), řádek D stale=drawing; vydejte novou revizi	Blattfreigabe: Revisionsbuchstabe + Modellrevision r·… + Datum (fehlt die Revision in der Tabelle, wird sie ergänzt); nach einer Modelländerung ist das freigegebene Blatt veraltet – ⚠ drawing.stale in zeichnung status, status, am Laufende, beim Export mit demselben Buchstaben (streng ✗), D-Zeile stale=drawing; neue Revision freigeben
+záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)	Exporteinträge im Dokument (Format, Datei, Modellrevision r·…, Zeit; nach einer Modelländerung ⚠ veraltet mit dem Befehl, der den Export wiederholt); Liste veralteter Ausgaben (freigegebene Blätter, Exporte, Analysen, Teilekopien in der Baugruppe); alles neu berechnen = aktualisiert Teilekopien, Verknüpfungszustand, Kollisionen, Bewegung und Blätter und listet, was ein Mensch tun muss (neue Blattrevision, neuer Export)
+#!dynamic – texty kódů (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+vydaný výkres neodpovídá modelu: {0}	freigegebene Zeichnung entspricht nicht dem Modell: {0}
