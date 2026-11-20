@@ -10,6 +10,7 @@ import { describeFit, fitRows, type FitShow } from "./drawing-fits";
 import { annLabel, agentToSheet, agentToView, findView, resolveAnns, viewToAgent } from "./drawing-marks";
 import type { AuxViewOpt, BrokenOutOpt, CutSectionOpt, ViewBreakOpt } from "./drawing-views";
 import { tr } from "./i18n";
+import { applyGenCmd, genEditText } from "./drawing-gen-agent";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec2 } from "./types";
 
 const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",").replace(/^-/, "−");
@@ -63,6 +64,8 @@ export async function applyViewsCmd(ctx: ViewsCtx, cmd: ViewsCmd): Promise<{ log
   const o = () => opt(ctx.sheet());
   const warnFor = (res: DrawingResult, re: RegExp) => res.warnings.filter((w) => re.test(w));
   switch (cmd.op) {
+    case "gen":
+      return applyGenCmd(ctx, cmd);
     case "aux": {
       const res = await ctx.compute();
       const H = res.sheet.h;
@@ -91,7 +94,8 @@ export async function applyViewsCmd(ctx: ViewsCtx, cmd: ViewsCmd): Promise<{ log
         ...(cmd.face != null ? { face: cmd.face } : {}),
         ...(cmd.dir ? { dir: cmd.dir } : {}),
         ...(cmd.flip ? { flip: true } : {}),
-        ...(cmd.place ? { at: agentToSheet(H, cmd.place) } : {}),
+        // „odshora“ = bod od levého horního rohu (jak je uložen), jinak od levého dolního rohu při dnešní výšce listu
+        ...(cmd.place ? { at: cmd.placeTop ? cmd.place : agentToSheet(H, cmd.place) } : {}),
       };
       if (!how) how = cmd.face != null ? tr("plocha F{0}", cmd.face) : tr("směr {0}", (cmd.dir ?? []).map(fmtN).join(" "));
       setOpts({ aux: [...(o().aux ?? []), entry] });
@@ -113,7 +117,7 @@ export async function applyViewsCmd(ctx: ViewsCtx, cmd: ViewsCmd): Promise<{ log
       const v = findView(res, o(), cmd.parent);
       if (!v.cam) throw new Error(tr("pohled {0} nemá směr promítání", cmd.parent));
       const label = nextViewLetter(o());
-      const entry: CutSectionOpt = { id: uid(), label, parent: v.key, kind: cmd.kind, pts: cmd.pts.map(agentToView), ...(cmd.flip ? { flip: true } : {}), ...(cmd.place ? { at: agentToSheet(res.sheet.h, cmd.place) } : {}) };
+      const entry: CutSectionOpt = { id: uid(), label, parent: v.key, kind: cmd.kind, pts: cmd.pts.map(agentToView), ...(cmd.flip ? { flip: true } : {}), ...(cmd.place ? { at: cmd.placeTop ? cmd.place : agentToSheet(res.sheet.h, cmd.place) } : {}) };
       setOpts({ cuts: [...(o().cuts ?? []), entry] });
       const chk = await ctx.compute();
       const p = chk.extraViews?.find((x) => x.key === `cut:${label}`);
@@ -276,6 +280,8 @@ export function viewsStatusLines(res: DrawingResult, o: Partial<DrawingOptions>,
   const fits = fitRows(annotationGeometry(res, anns).fits);
   if (fits.length || o.fitTable || o.fitShow)
     L.push(tr("Uložení ISO 286 (zobrazení {0}, tabulka {1}): {2}", showName(o.fitShow ?? "dev"), o.fitTable ? tr("ano") : tr("ne"), fits.map((r) => `${r.label} ${r.code} ${r.upper}/${r.lower} (${r.min}…${r.max})`).join(" · ") || "—"));
+  const gen = genEditText(o.genEdit);
+  if (gen) L.push(tr("Vygenerované kóty a pozice upravené: {0} – výkres vygenerované obnovit", gen));
   const marks = anns.filter((a) => a.rev);
   if (res.zones || marks.length) {
     const g = annotationGeometry(res, marks);

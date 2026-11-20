@@ -7,7 +7,7 @@
  *    („M8 ↧12“ + „Ø6,8 ↧16“); bez díry v historii se díra hledá v geometrii (válcová plocha vrtáku závitu).
  * Poloha a osa prvků zadaných odkazem z placements.ts (zapisuje je stavba). Čisté funkce nad výtahem geometrie (bez jádra).
  */
-import { threadByName } from "./defaults";
+import { threadOfFeature } from "./thread-spec";
 import { drillFitsThread, holeKindOf, threadMinorD } from "./hole-spec";
 import type { GAxis, GCyl, PartGeom } from "./drawing-dims-geom";
 import { tr } from "./i18n";
@@ -16,7 +16,6 @@ import type { CadDoc, Feature, Vec3 } from "./types";
 
 type HoleF = Extract<Feature, { type: "hole" }>;
 type CylF = Extract<Feature, { type: "cylinder" }>;
-type ThreadF = Extract<Feature, { type: "thread" }>;
 
 const dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -103,9 +102,11 @@ export function primHoles(doc: CadDoc, g: PartGeom, holes: HoleF[], tol: number)
   }
   // ── vnitřní závit: závitová díra (souosá díra z historie, jinak díra vrtáku v geometrii)
   for (const f of doc.features) {
-    if (f.suppressed || f.type !== "thread" || !f.internal) continue;
-    const th = f as ThreadF;
-    const t = threadByName(th.designation);
+    // vnitřní závit: prvek Závit (kosmetický, drážky, šroubovice) i Tažení po šroubovici s označením – jednotně (thread-spec.ts, 22d)
+    const view = threadOfFeature(f);
+    if (!view || !view.internal) continue;
+    const th = view;
+    const t = view.t;
     const pl = placementOf(th);
     if (!t || !pl) {
       notes.push(tr("{0}: poloha odkazem není vyřešená – popis závitu chybí (přestavte model)", f.name));

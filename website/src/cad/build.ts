@@ -8,8 +8,9 @@ import * as r from "replicad";
 import { DEFAULT_BODY, isNewBodyMode, nextBodyName } from "./bodies";
 import "./fastbox";
 import { MESH_ANGULAR, meshTolerance } from "./fastbool";
-import { checkShape, describeCheck, sameSignature, signatureOf, type ShapeSignature } from "./check";
-import { carryHealth, flagInvalidBody, invalidSince, verifyResult } from "./shape-health";
+import { compositionOf, describeCheck, isValidShape, sameSignature, signatureOf, type ShapeSignature } from "./check";
+import { beginFeatureOps, carryHealth, flagInvalidBody, invalidLeadText, invalidSince, opChainOf, verifyEffectOnly, verifyResult } from "./shape-health";
+import { FEATURE_CHECK_FACES, FINAL_CHECK_FACES, effectOf, resultTypeError, settleBodyChecks, type Composition, type EffectOp } from "./feature-levels";
 import { deleteFaces, offsetFaces, pushPull, ribTool, springSolid, thickenFaces, vertexPositions } from "./direct";
 import { getExt } from "./ext/index";
 import "./feat/index";
@@ -27,7 +28,9 @@ import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
 import { findLoops, nestLoops, shapeSegs, splinePoints, type Loop, type Seg } from "./sketch";
 import { hasTangents } from "./spline-tangent";
 import { sketchSplineEdge } from "./spline-occ";
-import { noteFeatureWarning, takeFeatureInfo, takeFeatureNotes } from "./feature-notes";
+import { noteFeatureWarning, takeFeatureInfo, takeFeatureNoteCode, takeFeatureNotes } from "./feature-notes";
+import { hiddenGrooveText, threadHelixTool } from "./feat/thread-helix";
+import { pitchNote } from "./thread-spec";
 import { draftedExtrusion, planeReach, throughLength, tiltCos, wireBounds } from "./extrude-draft";
 import { profileNote } from "./profile-check";
 import { pathEntities } from "./poly-close";
@@ -384,6 +387,8 @@ function holeHead(f: HoleF): { kind: NonNullable<HoleF["kind"]>; head: HoleHead 
     const t = threadByName(f.thread);
     if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.thread ?? "", tr(THREAD_HINT)));
     d = tapDrillD(t, f.tapDrill, f.diameter); // tabulkový vrták / jádro D1 / zadaný průměr (hole-spec.ts)
+    const pn = pitchNote(t); // stoupání mimo ISO 261 (M18×3) – ⚠, ne ticho (vlna 22, bod 22d)
+    if (pn) noteFeatureWarning(pn, "thread.pitch-nonstandard");
     if (d >= t.d) throw new Error(tr("Vrták závitové díry Ø{0} musí být menší než závit {1} (Ø{2}).", fmtDrill(d), t.name, fmtDrill(t.d)));
     // JSON / starší zápis: průměr, který vypadá jako vrták z výkresu, se bez tapDrill „custom“ nepoužije – ohlásit, ne tiše zahodit
     if ((f.tapDrill ?? "table") === "table" && Math.abs(f.diameter - t.tap) > 5e-4 && Math.abs(f.diameter - t.d) > 5e-4 && drillFitsThread(f.diameter, t))
@@ -514,11 +519,16 @@ export function threadProfile(t: { d: number; pitch: number }, length: number, i
 
 export const THREAD_HINT = "zadejte M2 až M48, hrubé nebo jemné stoupání (např. M18×1,5)";
 
-/** Zjednodušený modelovaný závit: soustava V-drážek (vizuálně i hmotnostně odpovídá závitu). */
-function threadTool(f: Extract<Feature, { type: "thread" }>): Shape {
+/**
+ * Modelovaný závit: soustružené V-drážky (vizuálně i hmotnostně odpovídá závitu), nebo s `helix` skutečná šroubovice
+ * z označení – stejné jádro a stejná čísla jako Tažení po šroubovici s `thread=` (feat/thread-helix.ts `threadHelixTool`).
+ * Hlavní stavba prvku je v feat/refs-more.ts (poloha a osa odkazem); tato cesta slouží nástroji pro pole / zrcadlení.
+ */
+function threadTool(f: Extract<Feature, { type: "thread" }>, body: Shape | null): Shape {
   const t = threadByName(f.designation);
   if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.designation, tr(THREAD_HINT)));
   if (!(f.length > 0)) throw new Error(tr("Délka závitu musí být kladná."));
+  if (f.helix) return threadHelixTool(f, t, body, f.position, axisVec(f.axis));
   return revolved(threadProfile(t, f.length, f.internal), f.axis, f.position);
 }
 
@@ -719,8 +729,11 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
     }
     case "hole":
       return holeTools(f, ctx);
-    case "thread":
-      return f.modeled ? threadTool(f) : null;
+    case "thread": {
+      const pn = pitchNote(threadByName(f.designation)); // stoupání mimo ISO 261 – ⚠ i u kosmetického závitu (22d)
+      if (pn) noteFeatureWarning(pn, "thread.pitch-nonstandard");
+      return f.modeled ? threadTool(f, ctx.body) : null;
+    }
     case "text": {
       if (!f.text.trim()) throw new Error(tr("Zadejte text."));
       if (!(f.height > 0 && f.depth > 0)) throw new Error(tr("Výška písma a hloubka musí být kladné."));
@@ -849,30 +862,45 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
   };
   const shapeOfBody = (name: string): Shape | null => (name === activeName ? body : (others.get(name) ?? null));
   const ctxOf = (): Ctx => ({ sketches, body, features });
+  /** složení tělesa před právě stavěným prvkem (prvek může původní těleso spotřebovat – měří se před stavbou) */
+  let compBefore: Composition | null = null;
   /** Dokončení prvku: kontrola, že se operace projevila a že výsledek je platné objemové těleso → ✓ / ⚠ / ✗. */
   const finish = (f: Feature, next: Shape | null): Shape | null => {
     const info = takeFeatureInfo(); // výsledek prvku (svarový kov) do stavu
     const extra = info ? { info: info.text, ...(info.data ? { data: info.data } : {}) } : {};
     if (next === body || !next) {
-      status.push({ id: f.id, ok: true, ...extra });
+      // prvek bez změny tělesa (kosmetický závit, pomocná geometrie…) může mít hlášku stavitele (nestandardní stoupání – 22d)
+      const early = takeFeatureNotes();
+      const code = takeFeatureNoteCode();
+      status.push(early.length ? { id: f.id, ok: true, warning: early.join(" "), ...(code ? { warnCode: code } : {}), ...extra } : { id: f.id, ok: true, ...extra });
       return next;
     }
     // velký import do prázdného dílu: podpis (objem) a kontrola platnosti by trvaly desítky sekund – podpis se nevytvoří
     if (f.type === "import" && !body && countFaces(next.wrapped, BIG_FACES + 1) > BIG_FACES) {
       bodySig = null;
-      status.push({ id: f.id, ok: true });
+      status.push({ id: f.id, ok: true, body: { ...compositionOf(next), valid: null, why: "approx" } });
       return next;
     }
     let sig = signatureOf(next);
     let warning: string | undefined;
-    if (body && expectsChange(f) && sameSignature(bodySig, sig)) {
+    const changing = expectsChange(f);
+    // úrovně stavu (feature-levels.ts): složení tělesa před prvkem a řetěz booleovských operací prvku (druh, objem nástrojů)
+    const chain = body && changing ? opChainOf(next) : null;
+    const sigBefore = bodySig;
+    if (body && changing && sameSignature(bodySig, sig)) {
       if (f.type === "shell") throw new Error(tr("Skořepinu se nepodařilo vytvořit – jádro vrátilo těleso beze změny. Otevřete jen rovinné plochy (zaoblené plochy jádro otevřít neumí); u zaoblených hran musí být tloušťka stěny menší než poloměr zaoblení, nebo zaoblete až po skořepině."));
       warning = tr("Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.");
     }
+    /** výsledek kontroly platnosti po prvku; `null` = po prvku se nekontrolovalo (velké těleso – až na konci stavby) */
+    let valid: boolean | null = null;
+    let expected: number | undefined;
+    /** prvek těleso nezměnil (shodný podpis, nebo kontrola účinku proti nástroji) */
+    let noEffect = !!warning;
+    const volumes: [number, number] | undefined = body && bodySig && sig ? [bodySig.volume, sig.volume] : undefined;
     // platnost výsledku: jen u prvků, které mění těleso (jinak by se kontrola opakovala zbytečně); velká tělesa se kontrolují až na konci
-    if (expectsChange(f) && sig && sig.faces <= 400) {
+    if (changing && sig && sig.faces <= FEATURE_CHECK_FACES) {
       // síť jako pro zobrazení + kontrola; výsledek s příznakem vady: operace znovu s tolerancí, pak oprava tělesa (shape-health.ts)
-      const v = verifyResult(next, f, body && bodySig ? [bodySig.volume, sig.volume] : undefined, invalidSince(body));
+      const v = verifyResult(next, f, volumes, invalidSince(body));
       if (body && bodySig && !v.check.solids && bodySig.faces > 0) throw new Error(tr("Operace nevrátila objemové těleso ({0}) – jádro selhalo; změňte parametry (dráha se nesmí protínat ani být tečná k povrchu, profil musí být uzavřený a kolmý na dráhu).", describeCheck(v.check)));
       if (v.shape !== next) {
         next = v.shape;
@@ -880,12 +908,48 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
         warning = undefined; // opravená operace se projevila
       }
       if (v.warning && !(v.noEffect && warning)) warning = (warning ? warning + " " : "") + v.warning;
-    } else carryHealth(body, next); // bez kontroly: těleso neplatné už před prvkem takové zůstává
+      noEffect = (noEffect && v.shape === next) || !!v.noEffect;
+      valid = v.check.valid;
+      expected = v.expected;
+    } else {
+      carryHealth(body, next); // bez kontroly platnosti: těleso neplatné už před prvkem takové zůstává
+      if (changing && sig) {
+        // účinek operace proti nástroji se posoudí i u velkého tělesa (22b: nad limit ploch se dřív neposuzoval vůbec)
+        const e = verifyEffectOnly(next, volumes, invalidSince(body));
+        if (e.warning && !(e.noEffect && warning)) warning = (warning ? warning + " " : "") + e.warning;
+        noEffect ||= !!e.noEffect;
+        expected = e.expected;
+      }
+    }
+    // očekávaný typ výsledku: po prvku objemového typu musí zůstat objemové těleso bez nových volných ploch (všechny velikosti)
+    const comp = compositionOf(next);
+    const typeError = resultTypeError(f.type === "ext" ? { ...f, solidExt: !!getExt(f.ext) && getExt(f.ext)!.tab !== "surface" } : f, compBefore, comp);
+    if (typeError) throw new Error(typeError);
     bodySig = sig;
     const notes = takeFeatureNotes(); // přiblížení / nedosažená návaznost ohlášené stavitelem (feature-notes.ts)
+    let warnCode = takeFeatureNoteCode(); // kód hlášky stavitele (thread.tip-tangent …) – protokol ho použije místo feature.warning
     notes.push(profileNote(f, sketches, false)); // vada profilu skici (křížení, mezera, překryv…) – profile-check.ts
     if (notes.some(Boolean)) warning = [warning, ...notes].filter(Boolean).join(" ");
-    status.push(warning ? { id: f.id, ok: true, warning, ...extra } : { id: f.id, ok: true, ...extra });
+    const levels: Pick<FeatureStatus, "effect" | "body"> = { body: { ...comp, valid: changing && sig && sig.faces <= FEATURE_CHECK_FACES ? valid : null, ...(changing && sig && sig.faces <= FEATURE_CHECK_FACES ? {} : { why: changing ? ("feature-faces" as const) : ("feature-none" as const) }) } };
+    const v0 = body ? (sigBefore?.volume ?? NaN) : 0;
+    if (changing && sig && Number.isFinite(sig.volume) && Number.isFinite(v0)) {
+      const op: EffectOp = !body ? "new" : chain?.kind === "Cut" ? "cut" : chain?.kind === "Fuse" ? "add" : chain?.kind === "Common" ? "intersect" : "modify";
+      levels.effect = effectOf(op, sig.volume - v0, op === "cut" || op === "add" ? chain!.tool : undefined, v0);
+      if (expected !== undefined) levels.effect.expected = expected;
+      // malý úběr / přídavek proti velkému nástroji, který přesná kontrola průnikem potvrdila (nebo operace bez příznaku vady), není „žádný“
+      if (levels.effect.level === "none" && !noEffect && Math.abs(levels.effect.dV) > 1e-9 * Math.max(1, Math.abs(v0))) levels.effect.level = op === "modify" || op === "new" || op === "intersect" ? "changed" : "partial";
+      // očekávaný výsledek drážky závitu (22a/22b-H): profil leží 0,15 mm za povrchem ve vzduchu, drážka tedy odebere jen ČÁST
+      // nástroje. Celý nástroj = drážka celá v materiálu (skrytý kanál) – ⚠ i tam, kde sonda feat/thread-helix.ts nic nenašla
+      // (jen jedna operace drážky: s náběhem je v řetězu i výbrus hřbetu a „celý nástroj“ by nic neříkal)
+      const e = levels.effect;
+      const wholeTool = e.level === "full" && e.tool !== undefined && Math.abs(e.dV) <= e.tool * (1 + 1e-3);
+      if (op === "cut" && wholeTool && isThreadGroove(f) && !warnCode?.startsWith("thread.")) {
+        warning = [warning, hiddenGrooveText()].filter(Boolean).join(" ");
+        warnCode = "thread.no-reach";
+      }
+    }
+    const coded = warning && warnCode ? { warnCode } : {};
+    status.push(warning ? { id: f.id, ok: true, warning, ...coded, ...extra, ...levels } : { id: f.id, ok: true, ...extra, ...levels });
     return next;
   };
 
@@ -969,7 +1033,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
   for (let i = start; i < doc.features.length && i <= untilIndex; i++) {
     const { feature: f, warnings: pickWarn, error: pickErr } = picksFor(doc.features[i]);
     if (f.suppressed) {
-      status.push({ id: f.id, ok: true });
+      status.push({ id: f.id, ok: true, suppressed: true }); // nestaví se: stav „potlačen“ (ℹ), ne ✓ (feature-levels.ts)
       if (f.type === "sketch") sketches.set(f.id, f);
       continue;
     }
@@ -979,6 +1043,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     const nStatus = status.length;
     takeFeatureNotes(); // hlášky předchozího (např. neúspěšného) prvku zahodit
     takeFeatureInfo();
+    beginFeatureOps();
     opts.onProgress?.({ index: i, total: doc.features.length, id: f.id, name: f.name, type: f.type, phase: "feature" });
     try {
       if (f.body && f.body !== activeName) {
@@ -993,6 +1058,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
         } else throw new Error(tr("Těleso „{0}“ v dílu není – zvolte existující těleso, nebo operaci „Nové těleso“.", f.body));
       }
       if (pickErr) throw pickErr;
+      compBefore = body ? compositionOf(body) : null;
       let next: Shape | null = body;
       const custom = f.type !== "sketch" && f.type !== "datum" && f.type !== "ext" ? getFeatureBuilder(f.type) : undefined;
       if (custom) {
@@ -1262,6 +1328,12 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
   return { body: all, status, paramErrors, resolved, bodies };
 }
 
+/** Drážka závitu po šroubovici (profil Závit 60°): Tažení po šroubovici s tímto profilem, prvek Závit se šroubovicí. */
+function isThreadGroove(f: Feature): boolean {
+  if (f.type === "thread") return !!f.modeled && !!f.helix;
+  return f.type === "ext" && f.ext === "surf.helixSweep" && f.data?.profile === "thread60" && !(Number(f.data?.leadIn) > 0);
+}
+
 /** Prvky, u kterých se očekává změna tělesa (přidání / odebrání materiálu, úprava tvaru). */
 const CHANGING_TYPES = new Set<string>(["extrude", "revolve", "sweep", "loft", "box", "cylinder", "sphere", "cone", "tube", "hole", "text", "spring", "import", "fillet", "chamfer", "shell", "draft", "split", "pattern", "pushPull", "offsetFace", "deleteFace", "thicken", "rib", "combine", "splitBodies"]);
 function expectsChange(f: Feature): boolean {
@@ -1297,7 +1369,9 @@ export async function buildDoc(doc: CadDoc, opts: { tolerance?: number; onProgre
   const sr = shapeResult(body, { status, paramErrors, t0, tolerance: opts.tolerance, light: opts.light });
   // neplatné těleso, které žádný prvek nehlásí (velká tělesa se po prvcích nekontrolují) → varování prvku, u kterého vada vznikla
   if (sr.metrics?.valid === false) flagInvalidBody(doc.features, status, cachedSteps(doc));
-  const res: DocResult = { ...sr, resolved, bodies: bodyInfos(bodies, bodies.length === 1 ? sr.metrics?.volume : undefined) };
+  // úroveň „konečné těleso“: prvky, po kterých se platnost nekontrolovala, dostanou výsledek závěrečné kontroly (nebo důvod, proč není)
+  const settled = sr.metrics ? settleBodyChecks(status, { valid: sr.metrics.valid, faces: sr.metrics.faces, approx: sr.metrics.approx }, invalidLeadText()) : status;
+  const res: DocResult = { ...sr, status: settled, resolved, bodies: bodyInfos(bodies, bodies.length === 1 ? sr.metrics?.volume : undefined) };
   if (!missingBlobs(doc).length) lastDocResult = { key, res: copyDocResult(res) };
   return res;
 }
@@ -1402,12 +1476,13 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
   // platnost a počet těles – u velmi složitých tvarů (sestavy) se kontrola platnosti vynechá (drahá)
   let valid: boolean | undefined;
   let solids: number | undefined;
+  let free: number | undefined;
   try {
-    const chk = !big && faces.length <= 2000 ? checkShape(body) : null;
-    if (chk) {
-      valid = chk.valid;
-      solids = chk.solids;
-    }
+    // levné i u velkých těles (průchod topologií) – počet těles a volných ploch je znám, i když se platnost nekontroluje
+    const comp = compositionOf(body);
+    solids = comp.solids;
+    free = comp.free;
+    if (!big && faces.length <= FINAL_CHECK_FACES) valid = isValidShape(body);
   } catch {
     /* bez kontroly */
   }
@@ -1417,7 +1492,7 @@ export function shapeResult(body: Shape | null, o: { status?: FeatureStatus[]; p
     body,
     ms: Date.now() - t0,
     mesh: { vertices: m.vertices, normals: m.normals, triangles: m.triangles, faceGroups, lines: m.lines, edgeGroups },
-    metrics: { volume, area, bbox: bb, faces: faces.length, edges: edges.length, valid, solids, ...(big ? { approx: true } : {}), ...(volumeFailed ? { volumeFailed: true } : {}) },
+    metrics: { volume, area, bbox: bb, faces: faces.length, edges: edges.length, valid, solids, ...(free ? { free } : {}), ...(big ? { approx: true } : {}), ...(volumeFailed ? { volumeFailed: true } : {}) },
     vertices: safeVertices(body),
   };
 }

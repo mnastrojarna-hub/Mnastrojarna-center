@@ -24,7 +24,14 @@ export type FaceGeo = {
   nrm?: Vec3[];
 };
 export type GeoProvider = (ref: MateRef) => FaceGeo | null;
-export type MateStatus = "ok" | "conflict" | "missing" | "suppressed";
+/** „lost“ = vazba má ztracenou referenci (plocha po změně dílu neexistuje / je nejednoznačná – vlna 22, bod 20): mimo řešení */
+export type MateStatus = "ok" | "conflict" | "missing" | "suppressed" | "lost";
+/** Strany vazby se ztracenou referencí (cad/mate-remap.ts). */
+export const lostSides = (m: Mate): ("a" | "b" | "c" | "d")[] => (["a", "b", "c", "d"] as const).filter((k) => !!m[k]?.lost);
+/** Má vazba ztracenou referenci? Taková vazba se neřeší (komponenta se nehýbe) a nikdy nemá stav „ok“. */
+export const mateLost = (m: Mate): boolean => !!(m.a.lost || m.b.lost || m.c?.lost || m.d?.lost);
+/** Vazba mimo řešení: potlačená nebo se ztracenou referencí. */
+const mateOff = (m: Mate): boolean => !!m.suppressed || mateLost(m);
 
 export const MATE_LABEL: Record<MateType, string> = {
   mate: "Kontakt",
@@ -187,7 +194,7 @@ export function kinCtx(poses: Map<string, Pose>, geo: GeoProvider, ang?: KinCtx[
 
 /** Komponenty, se kterými může hýbat globální řešič: nepevné komponenty v souvislé skupině vazeb, která obsahuje některou z `seeds`. */
 export function kinCluster(mates: Mate[], seeds: Set<string>, isFixed: (id: string) => boolean): { vars: string[]; mates: Mate[] } {
-  const active = mates.filter((m) => !m.suppressed && m.type !== "fixed");
+  const active = mates.filter((m) => !mateOff(m) && m.type !== "fixed");
   const refsOf = (m: Mate) => [m.a, m.b, m.c, m.d].filter((r): r is MateRef => !!r).map((r) => r.compId);
   const set = new Set(seeds);
   for (let grow = true; grow; ) {
@@ -218,6 +225,7 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
   // vazba Ukotvit = komponenta se chová jako ukotvená i bez příznaku `fixed`; uplatní se dřív, než se určí implicitní kotva (první komponenta)
   for (const m of mates0) {
     if (m.suppressed) status[m.id] = "suppressed";
+    else if (mateLost(m)) status[m.id] = "lost"; // ztracená reference: vazba mimo řešení, komponenty se kvůli ní nehýbou
     else if (m.type === "fixed") {
       const c = byId.get(m.a.compId);
       if (c) c.fixed = true;
@@ -234,14 +242,14 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
     return false;
   };
   // pokročilé a mechanické vazby: výchozí stav stupňů volnosti z aktuálních poloh (jen sestavy, které je mají – původní beze změny)
-  const hasKin = mates0.some((m) => !m.suppressed && isKinMate(m.type));
+  const hasKin = mates0.some((m) => !mateOff(m) && isKinMate(m.type));
   const kgeo = hasKin ? memoGeo(geo) : geo;
   const posesNow = () => new Map(comps.map((c) => [c.id, poseOf(c.placement)] as const));
   let initMates: Mate[] | undefined;
   let mates = mates0;
   if (hasKin) {
     const ctx0 = kinCtx(posesNow(), kgeo);
-    const next = mates0.map((m) => (m.suppressed ? m : initMate(m, ctx0)));
+    const next = mates0.map((m) => (mateOff(m) ? m : initMate(m, ctx0)));
     if (next.some((m, i) => m !== mates0[i])) mates = initMates = next;
   }
   /** projekce jedné pokročilé vazby: pohne jen pohyblivou komponentou (nejmenší změna polohy) */
@@ -266,7 +274,7 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
   };
   for (let pass = 0; pass < passes; pass++) {
     for (const m of mates) {
-      if (m.suppressed || m.type === "fixed") continue;
+      if (mateOff(m) || m.type === "fixed") continue;
       if (isKinMate(m.type)) {
         const aFix = isFixed(m.a.compId);
         const movRef = aFix && !isFixed(m.b.compId) ? m.b : m.a;
@@ -324,7 +332,7 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
   if (hasKin) {
     const poses = posesNow();
     const ctx = kinCtx(poses, kgeo);
-    const seeds = new Set(mates.filter((m) => !m.suppressed && isKinMate(m.type)).flatMap((m) => [m.a, m.b, m.c, m.d].filter((r): r is MateRef => !!r).map((r) => r.compId)));
+    const seeds = new Set(mates.filter((m) => !mateOff(m) && isKinMate(m.type)).flatMap((m) => [m.a, m.b, m.c, m.d].filter((r): r is MateRef => !!r).map((r) => r.compId)));
     const cl = kinCluster(mates, seeds, isFixed);
     const resid = () => cl.mates.flatMap((m) => kinResidual(m, ctx) ?? []);
     const r0 = resid();
@@ -344,7 +352,7 @@ export function solveMates(doc: CadDoc, geo: GeoProvider, anchorId?: string | nu
   // kontrola zbytků po všech průchodech (konflikty)
   const ctxEnd = hasKin ? kinCtx(posesNow(), kgeo) : null;
   for (const m of mates) {
-    if (m.suppressed || m.type === "fixed" || status[m.id] === "missing") continue;
+    if (mateOff(m) || m.type === "fixed" || status[m.id] === "missing") continue;
     if (isKinMate(m.type)) {
       const r = kinResidual(m, ctxEnd!);
       status[m.id] = !r ? "missing" : resNorm(r) > 1e-3 ? "conflict" : "ok";
@@ -475,10 +483,16 @@ export function removeMate(doc: CadDoc, mateId: string): CadDoc {
 }
 
 /** Úprava existující vazby (hodnota, otočení, potlačení, název); potlačení / zapnutí vazby Ukotvit komponentu uvolní / ukotví. */
-export function patchMate(doc: CadDoc, mateId: string, patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name" | "min" | "max">>): CadDoc {
+export function patchMate(doc: CadDoc, mateId: string, patch: Partial<Pick<Mate, "value" | "flip" | "suppressed" | "name" | "min" | "max" | "prefer">>): CadDoc {
   const m = (doc.mates ?? []).find((x) => x.id === mateId);
   if (!m) return doc;
-  const next = { ...doc, mates: (doc.mates ?? []).map((x) => (x.id === mateId ? { ...x, ...patch } : x)) };
+  // `prefer: undefined` = bez preferované strany (klíč se odebere, ne uloží jako undefined)
+  const merged = (x: Mate): Mate => {
+    const y = { ...x, ...patch };
+    if ("prefer" in patch && !patch.prefer) delete y.prefer;
+    return y;
+  };
+  const next = { ...doc, mates: (doc.mates ?? []).map((x) => (x.id === mateId ? merged(x) : x)) };
   return m.type === "fixed" && "suppressed" in patch ? syncFixed(next, m.a.compId) : next;
 }
 

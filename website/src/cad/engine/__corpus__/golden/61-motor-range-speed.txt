@@ -1,0 +1,102 @@
+=== run 1 ===
+✓ nový díl „Rám“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 100000 mm³ · těleso platné
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 100 × 100 × 10 mm (X 0…100, Y 0…100, Z 0…10) · objem 100 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 100000 mm³ · těleso platné – 100 × 100 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Mechanika“ – nová záložka
+✓ komponenta „Rám“ vložena do sestavy (ukotvená)
+✓ komponenta „Deska A“ vložena do sestavy
+✓ vazba ZDVIH „Deska A“ F5 → „Rám“ F6 · 57,5 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Pohybová studie: 36 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
+Vazby splněny ve všech krocích
+Krok 36 (t = 2 s, motory 27,15):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 37,15]
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 36 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 36 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 3 ===
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s (pak stojí do konce studie 3 s)
+Pohybová studie: 6 kroků · 3 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s · 2 s (pak stojí do konce studie 3 s)
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
+Vazby splněny ve všech krocích
+CSV pohybové studie (7 řádků):
+Krok;Čas [s];Motor 1 [mm];Rám X;Rám Y;Rám Z;Rám RX;Rám RY;Rám RZ;Deska A X;Deska A Y;Deska A Z;Deska A RX;Deska A RY;Deska A RZ;Nesplněné vazby
+0;0;57,5;0;0;0;0;0;0;0;0;67,5;0;0;0;0
+1;0,5;49,9125;0;0;0;0;0;0;0;0;59,9125;0;0;0;0
+2;1;42,325;0;0;0;0;0;0;0;0;52,325;0;0;0;0
+3;1,5;34,7375;0;0;0;0;0;0;0;0;44,7375;0;0;0;0
+4;2;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
+5;2,5;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
+6;3;27,15;0;0;0;0;0;0;0;0;37,15;0;0;0;0
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
+Vazby splněny ve všech krocích
+ℹ řádek 4: délka studie změněna z 3 s na 2 s – určuje ji doba jízdy jediného motoru 1 (rozsah × rychlost); jinou délku zadejte pohyb čas T (motor po dojetí stojí)
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 4 ===
+✗ řádek 2: motor: rozsah 30,35 mm rychlostí 15,175 mm/s trvá 2 s, zadaný čas 1 s nestačí – vynechte čas (délka studie bude 2 s), nebo rychlost (motor projede rozsah za 1 s) (skript ze starší verze: dřívější význam – jet od začátku rychlostí bez konce – zapíšete „od A rychlost V“)
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 5 ===
+✗ řádek 1: motor: rychlost -15,175 je záporná, ale rozsah 27,15 → 57,5 mm roste – zadejte kladnou rychlost (směr určuje rozsah), nebo rozsah otočte
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 6 ===
+Pohybová studie: motorů 1 · kroků 4
+ 1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+Pohybová studie: 4 kroků · 1 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm · 15,175 mm/s
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 15,175 mm · konec [0; 0; 52,325]
+Vazby splněny ve všech krocích
+⚠ řádek 1: motor 1 nedojede na konec: 30,35 mm rychlostí 15,175 mm/s trvá 2 s, studie má 1 s – skončí na 42,325 mm; pohyb čas 2
+Krok 4 (t = 1 s, motory 42,325):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 52,325]
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby od 57,5 mm ↓ rychlostí 10 mm/s (bez koncové hodnoty – za 2 s na 37,5 mm)
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby od 57,5 mm ↓ rychlostí 10 mm/s (bez koncové hodnoty – za 2 s na 37,5 mm)
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 20 mm · konec [0; 0; 47,5]
+Vazby splněny ve všech krocích
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 200 cm³ · hmotnost Σ 1,570 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

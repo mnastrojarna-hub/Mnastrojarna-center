@@ -1,0 +1,54 @@
+# Vlna 22, balík A, etapa A2 (bod 20, 22i): ztracené reference vazeb po změně dílu – nikdy tiché připojení na jinou plochu
+ · ztracené reference: {0}	 · verlorene Referenzen: {0}
+— plocha ({0}) —	— Fläche ({0}) —
+{0} {1} dílu „{2}“ ({3}) {4}	{0} {1} des Teils „{2}“ ({3}) {4}
+{0} ztracená reference	{0} verlorene Referenz
+{0}: plocha {1} dílu „{2}“ – {3}	{0}: Fläche {1} des Teils „{2}“ – {3}
+→ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}{5} – stav vazeb níže	→ „{0}“ in die Baugruppe „{1}“ zurückgegeben (Komponenten mit der Änderung: {2}){3}{4}{5} – Verknüpfungsstatus unten
+⚠ vazba {0} ({1}): {2}{3}	⚠ Verknüpfung {0} ({1}): {2}{3}
+Díl se mezitím změnil – klikněte znovu na Zpět do sestavy.	Das Teil wurde inzwischen geändert – klicken Sie erneut auf Zurück zur Baugruppe.
+Díl vrácen do sestavy – POZOR: ztracené reference vazeb: {0}. Vazby jsou mimo řešení a komponenty se kvůli nim nehýbou – opravte je v seznamu vazeb (Vybrat plochu znovu / Smazat vazbu).	Teil in die Baugruppe zurückgegeben – ACHTUNG: verlorene Verknüpfungsreferenzen: {0}. Diese Verknüpfungen sind außerhalb der Lösung und Komponenten bewegen sich ihretwegen nicht – in der Verknüpfungsliste beheben (Fläche neu wählen / Verknüpfung löschen).
+Klikněte na plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou plochu vazby.	Klicken Sie auf eine Fläche der Komponente „{0}“ (oder wählen Sie sie aus der Flächenliste) – sie ersetzt die verlorene Fläche der Verknüpfung.
+Klikněte na plochu v modelu, nebo ji vyberte ze seznamu:	Klicken Sie auf eine Fläche im Modell oder wählen Sie sie aus der Liste:
+načítám plochy…	Flächen werden geladen…
+Návrat do sestavy selhal: {0}	Rückkehr zur Baugruppe fehlgeschlagen: {0}
+nejde ověřit	nicht prüfbar
+není jednoznačná	ist nicht eindeutig
+Nová plocha vazby – komponenta „{0}“	Neue Fläche der Verknüpfung – Komponente „{0}“
+plocha {0} → {1}	Fläche {0} → {1}
+Plocha vazby vybrána znovu (F{0}) – vazba se zase řeší.	Fläche der Verknüpfung neu gewählt (F{0}) – die Verknüpfung wird wieder gelöst.
+po úpravě dílu neexistuje	existiert nach der Teiländerung nicht mehr
+pružina „{0}“ – ztracená dosedací plocha {1} {2}: délka pružiny se z ní nepočítá; zadejte dosedací plochy znovu (sestava pružina "{0}" mezi "A" <plocha> "B" <plocha>)	Feder „{0}“ – verlorene Auflagefläche {1} {2}: die Federlänge wird daraus nicht berechnet; Auflageflächen neu angeben (baugruppe feder "{0}" zwischen "A" <fläche> "B" <fläche>)
+původní geometrie neznámá	ursprüngliche Geometrie unbekannt
+sestava vazba {0} plocha {1} <plocha> | smazat	baugruppe verknüpfung {0} fläche {1} <fläche> | löschen
+táž plocha, nové číslo	dieselbe Fläche, neue Nummer
+táž rovina / osa, plocha změnila velikost	dieselbe Ebene / Achse, die Fläche hat ihre Größe geändert
+vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" | plocha a|b <plocha>	Verknüpfung „{0}“: was tun? wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…" | fläche a|b <fläche>
+vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" | plocha a|b <plocha> (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	Verknüpfung „{0}“: unbekannte Änderung „{1}“ – wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…" | fläche a|b <fläche> (neue Verknüpfung mit der Art beginnen: kontakt, bündig, zentrieren, konzentrisch, abstand, winkel, parallel, fixiert)
+vazba „{0}“: plocha – zadejte stranu a plochu: plocha b F6 | plocha +Z (výpis ploch: sestava plochy "…")	Verknüpfung „{0}“: fläche – Seite und Fläche angeben: fläche b F6 | fläche +Z (Flächenliste: baugruppe flächen "…")
+vazba {0} nemá stranu {1}	Verknüpfung {0} hat keine Seite {1}
+vazba {0}: komponenta „{1}“ nemá {2}	Verknüpfung {0}: Komponente „{1}“ hat kein {2}
+vazba {0}: komponenta strany {1} v sestavě není	Verknüpfung {0}: die Komponente der Seite {1} ist nicht in der Baugruppe
+vazba {0}: strana {1} je {2} – zadejte ji číslem {3}	Verknüpfung {0}: Seite {1} ist {2} – per Nummer angeben {3}
+vazba {0}: žádná ztracená reference – zadejte stranu: sestava vazba {0} plocha a|b <plocha>	Verknüpfung {0}: keine verlorene Referenz – Seite angeben: baugruppe verknüpfung {0} fläche a|b <fläche>
+vazba motoru má ztracenou referenci plochy (díl se změnil) – vyberte plochu znovu: sestava vazby	die Verknüpfung des Motors hat eine verlorene Flächenreferenz (das Teil wurde geändert) – Fläche neu wählen: baugruppe verknüpfungen
+Vyberte plochu komponenty „{0}“ – tuto komponentu vazba spojuje.	Wählen Sie eine Fläche der Komponente „{0}“ – diese Komponente verbindet die Verknüpfung.
+Vybírám plochu…	Fläche wird gewählt…
+Vybrat plochu znovu	Fläche neu wählen
+Ztracená plocha byla rovinná – vyberte rovinnou plochu.	Die verlorene Fläche war eben – wählen Sie eine ebene Fläche.
+Ztracená plocha byla válcová – vyberte válcovou plochu.	Die verlorene Fläche war zylindrisch – wählen Sie eine zylindrische Fläche.
+ztracená reference	verlorene Referenz
+Ztracené reference vazeb: {0}. Plocha, na kterou vazba ukazovala, po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení a komponenty se kvůli ní nehýbou. Vyberte plochu znovu, nebo vazbu smažte.	Verlorene Verknüpfungsreferenzen: {0}. Die Fläche, auf die die Verknüpfung zeigte, existiert nach der Teiländerung nicht mehr oder ist nicht eindeutig – die Verknüpfung ist außerhalb der Lösung und Komponenten bewegen sich ihretwegen nicht. Fläche neu wählen oder Verknüpfung löschen.
+nová plocha strany vazby – oprava ztracené reference: po úpravě dílu v kontextu (sestava hotovo, Zpět do sestavy) se plochy vazeb ověří podle geometrie; plocha, která zmizela nebo jde na víc míst, je ✗ mate.lost a vazba je mimo řešení (komponenta stojí); plocha = F-číslo nebo pravidlo jako u nové vazby, bez strany = ztracená strana	neue Fläche für eine Seite der Verknüpfung – Reparatur einer verlorenen Referenz: nach der Teilbearbeitung im Kontext (baugruppe fertig, Zurück zur Baugruppe) werden die Flächen der Verknüpfungen geometrisch geprüft; eine verschwundene oder mehrdeutige Fläche ist ✗ mate.lost und die Verknüpfung ist außerhalb der Lösung (die Komponente bleibt stehen); Fläche = F-Nummer oder Regel wie bei einer neuen Verknüpfung, ohne Seite = die verlorene Seite
+vazba sestavy č. {0} má ztracenou referenci plochy (po úpravě dílu) – do skriptu se nezapisuje; vyberte plochu znovu (sestava vazba {0} plocha …) a export zopakujte	Baugruppenverknüpfung Nr. {0} hat eine verlorene Flächenreferenz (nach einer Teiländerung) – sie wird nicht ins Skript geschrieben; Fläche neu wählen (baugruppe verknüpfung {0} fläche …) und Export wiederholen
+vyberte plochu znovu (sestava vazba {0} plocha {1} …), nebo vazbu smažte (sestava vazba {0} smazat)	Fläche neu wählen (baugruppe verknüpfung {0} fläche {1} …) oder Verknüpfung löschen (baugruppe verknüpfung {0} löschen)
+#!dynamic – druhy a důvody ztracené reference (tr(LOST_KIND[…]), tr(LOST_WHY[…]) v cad/agent-asm.ts) a texty kódů mate.* (src/cad/engine/codes.ts, tr(def.key))
+hrana – úsečka	Kante – Linie
+hrana – kružnice	Kante – Kreis
+hrana – křivka	Kante – Kurve
+po úpravě dílu odpovídá více plochám – nejde jednoznačně určit	passt nach der Teiländerung zu mehreren Flächen – nicht eindeutig bestimmbar
+po úpravě dílu nejde ověřit (původní geometrie není k dispozici)	nach der Teiländerung nicht prüfbar (die ursprüngliche Geometrie ist nicht verfügbar)
+díl v podsestavě už není	das Teil ist nicht mehr in der Unterbaugruppe
+vazba {0} – ztracená reference {1}: vazba je mimo řešení a komponenty se kvůli ní nehýbou; {2}	Verknüpfung {0} – verlorene Referenz {1}: die Verknüpfung ist außerhalb der Lösung und Komponenten bewegen sich ihretwegen nicht; {2}
+vazba {0}: {1} po úpravě dílu ({2})	Verknüpfung {0}: {1} nach der Teiländerung ({2})
+vazba {0}: ztracená reference {1} znovu nalezena jako {2} – vazba se zase řeší	Verknüpfung {0}: verlorene Referenz {1} wieder gefunden als {2} – die Verknüpfung wird wieder gelöst

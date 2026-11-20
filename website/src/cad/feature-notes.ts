@@ -4,15 +4,24 @@
  * prvku zahodí a po úspěšné stavbě je připojí k varování prvku (⚠ ve stromu, v protokolu i ve `stav`).
  */
 let notes: string[] = [];
+/** kód první hlášky s kódem (vlna 22, bod 22a: `thread.tip-tangent` … – protokol ho použije místo `feature.warning`) */
+let noteCode: string | undefined;
 
-/** ohlásit varování k právě stavěnému prvku */
-export function noteFeatureWarning(text: string) {
+/** ohlásit varování k právě stavěnému prvku; `code` = kód protokolu (engine/codes.ts) místo obecného `feature.warning` */
+export function noteFeatureWarning(text: string, code?: string) {
   if (text && !notes.includes(text)) notes.push(text);
+  if (text && code && !noteCode) noteCode = code;
 }
 /** vybrat (a vyprázdnit) hlášky právě stavěného prvku */
 export function takeFeatureNotes(): string[] {
   const out = notes;
   notes = [];
+  return out;
+}
+/** vybrat (a vyprázdnit) kód hlášek právě stavěného prvku – volat spolu s `takeFeatureNotes` */
+export function takeFeatureNoteCode(): string | undefined {
+  const out = noteCode;
+  noteCode = undefined;
   return out;
 }
 

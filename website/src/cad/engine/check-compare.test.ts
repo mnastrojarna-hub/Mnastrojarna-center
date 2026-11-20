@@ -290,7 +290,7 @@ stav`;
     const r = await runScript(ws, script, hostOf());
     const m = measures(r);
     expect(m[0]).toBe('= L11 clash "Spoj" total=1 thread=1 underhead=0 real=0 undetermined=0');
-    expect(m.find((l) => l.startsWith("= L14 status"))).toMatch(/ clash=1 clash\.stale=1$/);
+    expect(m.find((l) => l.startsWith("= L14 status"))).toMatch(/ clash=1\(thread=\d+,real=\d+(,undetermined=\d+)?\) clash\.stale=1$/); // vlna 22, bod 5: třídy jako v řádku D
     expect(r.console).toMatch(/Kolize: 1 – .* NEPLATÍ: sestava se od kontroly změnila/);
     const rb = new ReportBuilder({ lang: "cs", lines: 14 });
     const d = await summarize(ws.present(), kernel, rb, true, ws, ws.docKey());

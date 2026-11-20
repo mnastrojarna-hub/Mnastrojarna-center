@@ -36,22 +36,25 @@ const DASH: Record<string, number[]> = {
 
 const PT_PER_MM = 72 / 25.4;
 
-export async function drawingToPdf(d: Pick<DrawingResult, "sheet" | "polys" | "texts"> & { title?: string }, fonts?: PdfFonts): Promise<Blob> {
-  return drawingsToPdf([d], d.title, fonts);
+export async function drawingToPdf(d: Pick<DrawingResult, "sheet" | "polys" | "texts"> & { title?: string; info?: PdfInfo }, fonts?: PdfFonts): Promise<Blob> {
+  return drawingsToPdf([d], d.title, fonts, d.info);
 }
+
+/** další údaje Info PDF: předmět a klíčová slova (revize modelu a výkresu – vlna 22, bod 20) */
+export type PdfInfo = { subject?: string; keywords?: string };
 
 type PdfPage = Pick<DrawingResult, "sheet" | "polys" | "texts">;
 type JsPdf = InstanceType<typeof import("jspdf").jsPDF>;
 
 /** Vícestránkové PDF – každý list výkresu jedna stránka ve svém formátu a orientaci (export „Všechny listy“). */
-export async function drawingsToPdf(pages: PdfPage[], title?: string, fonts?: PdfFonts): Promise<Blob> {
+export async function drawingsToPdf(pages: PdfPage[], title?: string, fonts?: PdfFonts, info?: PdfInfo): Promise<Blob> {
   if (!pages.length) throw new Error(tr("Výkres nemá žádný list."));
   const { jsPDF } = await import("jspdf");
   const f = fonts ?? (await loadFonts());
   const fmt = (p: PdfPage) => ({ o: (p.sheet.w >= p.sheet.h ? "landscape" : "portrait") as "landscape" | "portrait", f: [Math.min(p.sheet.w, p.sheet.h), Math.max(p.sheet.w, p.sheet.h)] });
   const first = fmt(pages[0]);
   const pdf = new jsPDF({ orientation: first.o, unit: "mm", format: first.f, compress: true });
-  pdf.setProperties({ title: title ?? tr("Výkres"), creator: "Mnástrojárna CAD", author: "Mnástrojárna s.r.o." });
+  pdf.setProperties({ title: title ?? tr("Výkres"), creator: "Mnástrojárna CAD", author: "Mnástrojárna s.r.o.", ...(info?.subject ? { subject: info.subject } : {}), ...(info?.keywords ? { keywords: info.keywords } : {}) });
   pdf.addFileToVFS("Roboto-Regular.ttf", toBase64(f.regular));
   pdf.addFont("Roboto-Regular.ttf", "Roboto", "normal");
   if (f.bold) {

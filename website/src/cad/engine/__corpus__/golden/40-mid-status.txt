@@ -3,16 +3,16 @@
 → Kvádr 1 (box) přidán – výsledek po výpočtu níže
 Dokument: „Průběžný stav“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 20 × 20 × 20 mm (X 0…20, Y 0…20, Z 0…20) · objem 8 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 20 × 20 × 20 mm, new, roh [0; 0; 0]
+ 1. Kvádr 1 [box, id #] ✓ přidáno 8000 mm³ · těleso platné – 20 × 20 × 20 mm, new, roh [0; 0; 0]
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Válec 1 (cylinder)
+✓ Kvádr 1 (box) · přidáno 8000 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2356,2 mm³ (celý nástroj) · těleso platné
 
 Dokument: „Průběžný stav“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 20 × 20 × 50 mm (X 0…20, Y 0…20, Z 0…50) · objem 10,36 cm³ · ploch 8 · hran 15
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Kvádr 1 [box, id #] ✓ – 20 × 20 × 20 mm, new, roh [0; 0; 0]
- 2. Válec 1 [cylinder, id #] ✓ – Ø10 × 30 mm, add, podstava [10; 10; 20], osa Z
+ 1. Kvádr 1 [box, id #] ✓ přidáno 8000 mm³ · těleso platné – 20 × 20 × 20 mm, new, roh [0; 0; 0]
+ 2. Válec 1 [cylinder, id #] ✓ přidáno 2356,2 mm³ (celý nástroj) · těleso platné – Ø10 × 30 mm, add, podstava [10; 10; 20], osa Z

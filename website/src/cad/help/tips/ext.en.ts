@@ -76,6 +76,21 @@ export default {
     note: "Follows only the outer outline of the face; holes in the face are ignored.",
   },
 
+  // ── Create › Gears ──
+  "gear.wizard": {
+    what: "Gear, rack, chain sprocket or timing pulley from one table – with calculation and live preview.",
+    when: "Whenever you need a gear: module and number of teeth are enough, all other rows have sensible defaults.",
+    steps: ["Click the kind of gear in the gallery (spur, helical, sprocket…).", "Fill in Module mₙ and Number of teeth z – computed dimensions show right below the table.", "Choose Finished wheel / Stock / Teeth into the body and click Create."],
+    cmd: "feature gear.spur m=2 z=24 b=20 bore=20",
+    note: "The gear is one history feature – click it to edit it in the same table; old standard parts stay in the library.",
+  },
+  "gear.pair": {
+    what: "Two meshing gears: computes the centre distance and profile shifts, creates both parts and an assembly with a mate.",
+    when: "A drive between shafts – spur, helical, internal, rack, bevel, worm, chain or belt.",
+    steps: ["Choose the Kind of gear pair and fill in z₁, z₂ (or ratio i) and the module.", "Leave the centre distance at 0 or enter it – shifts x₁, x₂ are distributed automatically.", "Check the result and warnings, click Create gear pair."],
+    note: "The assembly has no frame – both gears are free, tied by a gear mate; in a motion study they turn in the ratio.",
+  },
+
   // ── Surfaces › Surfaces ──
   "surf.extrude": {
     what: "Extrudes a sketch curve (open ones too) into a surface without thickness.",

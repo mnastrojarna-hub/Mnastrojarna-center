@@ -8,12 +8,21 @@
 import type { TabInfo } from "../agent-asm";
 import type { PartFaces } from "../asm-agent";
 import type { Interference } from "../asm-kernel";
-import type { ClashCounts } from "../clash-class";
+import type { ClashCounts, ClashDetail } from "../clash-class";
 import type { MateStatus, PartFace } from "../mates";
 import type { BuildResult, CadDoc } from "../types";
 
 export type DocKey = string;
 export type { TabInfo };
+/**
+ * Původ záložky, kterou založil běh skriptu (opakovaný běh – engine/runs.ts): `new` = dokument vytvořený příkazem běhu
+ * (`nový díl`, `nová sestava`, normálie, rám formy, `2d nový`, sestava z vyhazovačů…), `open` = dokument načtený zvenku
+ * (`otevřít "soubor"`, JSON / `window.mncad.setDocument`, `předloha otevřít`). Opakovaný běh převezme jen záložku téhož
+ * původu – `nový díl "A"` nikdy nepřepíše otevřený soubor „A“.
+ */
+export type RunOrigin = "new" | "open";
+/** druh záložky dokumentu pro opakovaný běh (záložky výkresu sdílí dokument zdrojové záložky) */
+export type RunDocKind = "part" | "assembly" | "draft";
 
 /** mezipaměti sestavy (klientská strana jádra) – platí pro jednu generaci jádra (`generation`) */
 export type AsmCaches = {
@@ -39,8 +48,13 @@ export type AsmCaches = {
       res: Interference[];
       at: string;
       comps?: number;
-      /** třídy kolizí (šroub × závit geometricky, clash-class.ts) */
+      /** třídy kolizí (šroub × závit geometricky, clash-class.ts) – počty po pravidlech dokumentu v době kontroly */
       classes?: ClashCounts;
+      /**
+       * geometrické zařazení dvojic z jádra (pořadí jako `res`; vlna 22, bod 5): panel Kolize, zvýraznění, `stav` a řádek D z něj
+       * počítají výsledné třídy po NYNĚJŠÍCH pravidlech dokumentu (clash-report.ts `entryClashes`); bez něj = nezařazeno
+       */
+      list?: ClashDetail[];
       /** otisk sestavy v době kontroly (`clashSig`) – jiný otisk = výsledek neplatí (sestava se mezitím změnila) */
       sig?: string;
       /** řádek skriptu kontroly (CLI: ℹ `clash.rechecked` na konci běhu) */
@@ -58,7 +72,7 @@ export interface Workspace {
    * Otevře dokument – vždy `normalizeDraftDoc(internBlobs(d))`. Prázdná záložka se znovu použije jen pro úvodní prázdný díl
    * relace (`reuseEmpty`, výchozí true), nikdy pro dokument vytvořený během (5.2 č. 14).
    */
-  openInTab(d: CadDoc, o?: { docId?: string; reuseEmpty?: boolean }): Promise<{ id: DocKey; reused: boolean }>;
+  openInTab(d: CadDoc, o?: { docId?: string; reuseEmpty?: boolean; /** dokument běhu skriptu (`flush`) a jeho původ – opakovaný běh záložku téhož původu použije znovu */ origin?: RunOrigin }): Promise<{ id: DocKey; reused: boolean }>;
   tabs(): TabInfo[];
   activate(id: DocKey): Promise<CadDoc>;
   close(id: DocKey): Promise<CadDoc>;
@@ -91,6 +105,22 @@ export interface Workspace {
    * Nepromítne-li se, vyhodí CodedError `tab.settle-timeout`.
    */
   settle?(): Promise<void>;
+  /* ── opakovaný běh (balík runs – engine/runs.ts): záložky běhů, dokumenty běhu bez přepnutí záložky ── */
+  /** dokument záložky `id` bez přepnutí záložky (souhrny dokumentů – řádky D); neznámá záložka → null */
+  docOf?(id: DocKey): CadDoc | null;
+  /**
+   * záložky dílu / sestavy / 2D výkresu s názvem `name` (bez ohledu na velikost písmen) v pořadí záložek: `origin` = původ,
+   * pokud ji založil běh skriptu (`openInTab({ origin })`, i v dřívější relaci), `claimed` = patří už tomuto běhu (založil
+   * ji nebo převzal `claimTab`)
+   */
+  namedTabs?(name: string, kind: RunDocKind): { id: DocKey; origin?: RunOrigin; claimed: boolean }[];
+  /**
+   * záložku `id` převezme tento běh (opakovaný běh `nový díl "A"`, `normálie …`, `otevřít …`): aktivuje ji a zapamatuje
+   * si nový původ; `findPart` ji pak bere jako dokument běhu
+   */
+  claimTab?(id: DocKey, origin: RunOrigin): Promise<CadDoc>;
+  /** klíče dokumentů (`docKey`), které tento běh založil nebo změnil (`openInTab` / `commit` od `beginRun`) */
+  runDocKeys?(): DocKey[];
 }
 
 /** nejvíc kroků zpět na záložku (jako aplikace: cad-app.tsx `commit`) */

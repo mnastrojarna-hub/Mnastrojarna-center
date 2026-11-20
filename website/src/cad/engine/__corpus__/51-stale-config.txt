@@ -1,0 +1,31 @@
+# vlna 22, bod 1: změna konfigurace – měření dílu a kontrola kolizí sestavy platí jen pro konfiguraci, pro kterou vznikly
+nový díl "Deska K"
+kvádr 60 40 10
+kvádr 10 10 30 v 40 10 10
+konfigurace "Bez výstupku" potlačit "Kvádr 2"
+konfigurace aktivní "Bez výstupku"
+měřit těleso
+stav
+#--- run
+nový díl "Přidržovač"
+kvádr 10 10 10
+nová sestava "Sestava K"
+vložit "Deska K" ukotvit
+vložit "Přidržovač" v 40 10 30
+kolize
+stav
+#--- run
+# jiná konfigurace dílu v sestavě (polohy komponent stejné): kontrola kolizí NEPLATÍ
+sestava upravit "Deska K"
+konfigurace aktivní žádná
+sestava hotovo
+stav
+#--- run
+# nová kontrola: výstupek desky zasahuje do přidržovače
+kolize
+stav
+#--- run
+# díl v záložce: změna konfigurace → měření z dřívější konfigurace NEPLATÍ
+záložka "Deska K"
+konfigurace aktivní žádná
+stav

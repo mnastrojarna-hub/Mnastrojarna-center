@@ -8,7 +8,7 @@ import { faceShort, findComp, fold, pickFace, SPRING_USE, type AsmCmd, type Comp
 import { compFaces, ensureBuilt, geoProvider, leafId, type AsmEnv, type AsmResult } from "./asm-agent";
 import { springGeom, springWorldAxis } from "./asm-spring-geom";
 import { isSpringExt } from "./springs";
-import { applySpringStates, instanceLines, springComps, springLine, springLines, springSeatMates, springState, springStates } from "./asm-spring";
+import { applySpringStates, instanceLines, springComps, springDriftBetween, springLine, springLines, springSeatMates, springState, springStates, type SpringCheck } from "./asm-spring";
 import { tr } from "./i18n";
 import { ensureMateRefs } from "./mate-geo";
 import type { AsmComponent, CadDoc, MateRef, SpringDef, Vec3 } from "./types";
@@ -42,6 +42,18 @@ export async function refreshSprings(doc: CadDoc, env: AsmEnv): Promise<CadDoc> 
   if (doc.kind !== "assembly" || !springComps(doc).length) return doc;
   await ensureSeatGeo(doc, env);
   return applySpringStates(doc, springStates(doc, geoProvider(doc, env)));
+}
+
+/**
+ * Kontrola pružin proti dosedacím plochám (vlna 22, bod 7): dokument s délkami z ploch, rozpory s uloženou délkou (`spring.stale`)
+ * a zda šlo ověřit všechny pružiny (geometrie ploch k dispozici). Dokument `doc` se nemění.
+ */
+export async function springCheckOf(doc: CadDoc, env: AsmEnv): Promise<{ doc: CadDoc; check: SpringCheck } | null> {
+  if (doc.kind !== "assembly" || !springComps(doc).length) return null;
+  await ensureSeatGeo(doc, env);
+  const states = springStates(doc, geoProvider(doc, env));
+  const fixed = applySpringStates(doc, states);
+  return { doc: fixed, check: { checked: states.length === springComps(doc).length, stale: springDriftBetween(doc, fixed) } };
 }
 
 /** Komponenty, kterých se příkaz týká: #k / přezdívka = jedna, název = všechny instance s tímto názvem (6 stejných pružin jedním řádkem). */
@@ -177,7 +189,7 @@ export async function applySpringCmd(d: CadDoc, cmd: Extract<AsmCmd, { k: "sprin
       // stejné pružiny ve stejném stavu jednou „(6×)“, stejný název v různém stavu s #k / přezdívkou
       const items = springComps(doc).map((c) => {
         const s = st.find((x) => x.id === c.id);
-        return { c, text: (ref: string) => (s ? ` ${springLine(s, ref)}` : ` ${tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref)}`) };
+        return { c, text: (ref: string) => (s ? ` ${springLine(s, ref, c.spring?.guided)}` : ` ${tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref)}`) };
       });
       log.push(...instanceLines(doc, items));
     }
@@ -237,8 +249,9 @@ export async function applySpringCmd(d: CadDoc, cmd: Extract<AsmCmd, { k: "sprin
     // tlačná pružina z tabulky: tuhost R z výpočtu (Ln dává model – solidOf)
     const rate = cmd.rate === 0 ? undefined : (cmd.rate ?? old?.rate ?? g.rate);
     if (solid !== undefined && solid >= free) throw new Error(tr("sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm", solid, free));
-    // vedení dírou / kapsou (Pružina mezi díly) zůstává při změně dosedacích ploch, L0, Ln nebo tuhosti
-    const def: SpringDef = { a: a!, b: b!, free, ...(solid !== undefined ? { solid } : {}), ...(rate !== undefined ? { rate } : {}), ...(old?.guided !== undefined ? { guided: old.guided } : {}) };
+    // vedení dírou / kapsou (Pružina mezi díly) zůstává při změně dosedacích ploch, L0, Ln nebo tuhosti; `vedená ano|ne` ho nastaví
+    const guided = cmd.guided ?? old?.guided;
+    const def: SpringDef = { a: a!, b: b!, free, ...(solid !== undefined ? { solid } : {}), ...(rate !== undefined ? { rate } : {}), ...(guided !== undefined ? { guided } : {}) };
     doc = { ...doc, components: (doc.components ?? []).map((x) => (x.id === c.id ? { ...x, spring: def } : x)) };
     if (pick.a || pick.b) picks.push(pick);
   }

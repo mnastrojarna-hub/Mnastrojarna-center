@@ -2,7 +2,8 @@
 import { partComponent } from "../../assembly";
 import { tr } from "../../i18n";
 import { makeFromText } from "../../library";
-import { flush, runOf, startDoc } from "../run-doc";
+import { flush, runOf } from "../run-doc";
+import { startRunDoc } from "../runs";
 import { say, type OpHandler } from "./util";
 
 export const libraryOp: OpHandler<"library"> = async (op, ctx) => {
@@ -16,7 +17,8 @@ export const libraryOp: OpHandler<"library"> = async (op, ctx) => {
   } else {
     await flush(ctx);
     r.currentBody = null;
-    startDoc(ctx, made.doc);
-    say(ctx, tr("✓ normálie „{0}“ – nová záložka", made.result.designation));
+    const st = await startRunDoc(ctx, made.doc, { origin: "new" }); // opakovaný běh: záložka téže normálie z dřívějšího běhu (engine/runs.ts)
+    say(ctx, st.reused ? tr("✓ normálie „{0}“ – znovu použitá záložka z dřívějšího běhu", made.result.designation) : tr("✓ normálie „{0}“ – nová záložka", made.result.designation));
+    st.report();
   }
 };

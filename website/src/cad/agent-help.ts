@@ -4,8 +4,13 @@
  *   prvek nápověda <typ>   · feature help <type>   · element hilfe <typ>   – všechna pole pro `prvek <typ> klíč=hodnota`
  *   nápověda <typ>         · help <type>           · hilfe <typ>           – totéž (typ i slovem příkazu: díra, kužel, pružina…)
  *   prvek nápověda         · help                  · hilfe                 – přehled typů: vlastní textový příkaz a pole jen přes prvek
+ *   nápověda hledat <slova> · help search <words>   · hilfe suchen <wörter> – hledání v návodu pro AI, příkazech a příručce
+ *   nápověda <slova>       · help <words>          · hilfe <wörter>        – totéž, když slovo není typ prvku (help/search.ts)
+ *   nápověda tahák         · help cheatsheet       · hilfe spickzettel     – tahák pro agenty (agent-cheatsheet.ts)
  *
  * Zdroj je jediná tabulka `feature-fields.ts` (svázaná s types.ts) a u rozšíření jejich `ExtParam`. Čisté funkce bez jádra.
+ * Hledání a tahák rozbor jen pozná (`HelpRequest`) – vypíše je operace `info` enginu (engine/ops/info.ts), aby rejstřík
+ * návodu a příručky nebyl v rozboru každého řádku.
  */
 import { tr } from "./i18n";
 import { allExt, type ExtDef } from "./ext/registry";
@@ -15,6 +20,10 @@ import { emptyDoc, type FeatureType } from "./types";
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
 const set = (...w: string[]) => new Set(w.map(fold));
 const HELP = set("nápověda", "napoveda", "help", "hilfe", "?");
+const SEARCH = set("hledat", "hledej", "najdi", "najít", "search", "find", "suchen", "suche", "finden");
+const CHEAT = set("tahák", "tahak", "cheatsheet", "cheat", "cheat-sheet", "spickzettel", "spick", "kurzreferenz");
+/** hledání v nápovědě (`q` = slova) nebo tahák – vypíše engine (engine/ops/info.ts → help/answer.ts) */
+export type HelpRequest = { mode: "search" | "cheat"; q: string };
 /** slova příkazů, která nejsou v synonymech agent.ts (pružina…) → typ */
 const ALIAS: Record<string, FeatureType> = { pruzina: "spring", feder: "spring", spring: "spring", zavit: "thread", gewinde: "thread", rozdelit: "splitBodies", kopie: "copyBody", sloucit: "combine", osa: "datumAxis", bod: "datumPoint", rovina: "datum" };
 
@@ -25,17 +34,37 @@ const show = (v: unknown): string => (v === "" ? "—" : typeof v === "string" ?
 
 /**
  * Řádek `prvek nápověda …` / `nápověda …`: `cmd` = kanonický příkaz z agent.ts, `rest` = text za příkazem.
- * Vrací řádky nápovědy, nebo null (jiný příkaz – např. `prvek cone …`).
+ * Vrací řádky nápovědy, požadavek na hledání / tahák (`HelpRequest`, vypíše ho engine), nebo null (jiný příkaz – např.
+ * `prvek cone …`). `prvek nápověda <neznámé slovo>` zůstává chybou (jen typy), `nápověda <neznámé slovo>` hledá.
  */
-export function parseFeatureHelp(cmd: string, rest: string, ctx: HelpCtx): string[] | null {
+export function parseFeatureHelp(cmd: string, rest: string, ctx: HelpCtx): string[] | HelpRequest | null {
   let text = rest.trim();
-  if (cmd === "feature") {
+  const feature = cmd === "feature";
+  if (feature) {
     const m = /^(\S+)\s*(.*)$/.exec(text);
     if (!m || !HELP.has(fold(m[1]))) return null;
     text = m[2].trim();
   } else if (!HELP.has(fold(cmd))) return null;
   const word = text.replace(/^["„]|["“]$/g, "").trim();
-  return word ? typeHelp(word, ctx) : overview(ctx);
+  if (!word) return overview(ctx);
+  if (!feature) {
+    const req = helpRequest(word, ctx);
+    if (req) return req;
+  }
+  return typeHelp(word, ctx);
+}
+
+/** `nápověda hledat …` / `nápověda tahák` / `nápověda <slova>` (slovo není typ prvku) → požadavek pro engine; jinak null */
+function helpRequest(text: string, ctx: HelpCtx): HelpRequest | null {
+  const m = /^(\S+)\s*(.*)$/.exec(text)!;
+  const first = fold(m[1]);
+  if (SEARCH.has(first)) {
+    const q = m[2].replace(/^["„]|["“]$/g, "").trim();
+    if (!q) throw new Error(tr("nápověda hledat: chybí slova – např. nápověda hledat záložky (EN help search tabs, DE hilfe suchen registerkarten)"));
+    return { mode: "search", q };
+  }
+  if (CHEAT.has(first) && !m[2].trim()) return { mode: "cheat", q: "" };
+  return findHelpTarget(text, ctx) ? null : { mode: "search", q: text };
 }
 
 /** Najde typ prvku nebo rozšíření podle slova (typ, popisek, příkaz CS / EN / DE, id nebo popisek rozšíření). */
@@ -49,7 +78,7 @@ export function findHelpTarget(word: string, ctx: HelpCtx): { type: FeatureType 
 
 function typeHelp(word: string, ctx: HelpCtx): string[] {
   const hit = findHelpTarget(word, ctx);
-  if (!hit) throw new Error(tr("nápověda: neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}", word, ctx.types.join(", "), allExt().filter((d) => !d.action).map((d) => d.ext).join(", ")));
+  if (!hit) throw new Error(tr("nápověda: neznámý typ prvku „{0}“ – typy: {1}; rozšíření: {2}", word, ctx.types.join(", "), allExt().filter((d) => !d.action).map((d) => d.ext).join(", ")) + tr(" · hledání v návodu: nápověda hledat {0}", word));
   if ("ext" in hit) return extHelp(hit.ext);
   const type = hit.type;
   const spec = featureFields()[type];
@@ -61,6 +90,7 @@ function typeHelp(word: string, ctx: HelpCtx): string[] {
   out.push(tr("společná pole: name (název), suppressed (potlačit ano/ne), body (cílové těleso)"));
   out.push(tr("hodnoty: číslo 12,5 · ano/ne · seznam a;b;c · text v uvozovkách · JSON {…} / […]; skici a prvky názvem nebo $last; plochy a hrany indexy od 0 (F3 = 2) nebo pravidlem; „povinné“ pole bez hodnoty skončí chybou při stavbě"));
   if (spec.ex) out.push(tr("příklad: {0}", spec.ex));
+  out.push(tr("v návodu: nápověda hledat {0} · tahák: nápověda tahák", word));
   return out;
 }
 
@@ -103,5 +133,6 @@ function overview(ctx: HelpCtx): string[] {
   for (const g of textGaps()) out.push(` • ${g.type} (${tr(ctx.labels[g.type] ?? g.type)}): ${g.cmd ? tr("text ✓") : tr("bez textového příkazu")} · ${g.missing.length ? tr("jen prvek: {0}", g.missing.join(", ")) : tr("vše textem")}`);
   out.push(tr("rozšíření ({0}): prvek nápověda <id> – např. prvek nápověda sheet.bend", allExt().filter((d) => !d.action).length));
   out.push(tr("společná pole všech prvků: {0}", COMMON_FIELDS.filter((x) => x !== "id" && x !== "type").join(", ")));
+  out.push(tr("hledání v návodu, příkazech a příručce: nápověda hledat <slova> (např. nápověda hledat záložky) · tahák pro agenty: nápověda tahák"));
   return out;
 }

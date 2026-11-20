@@ -1,20 +1,21 @@
 === run 1 ===
 ✓ nový díl „Listy“ – nová záložka
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Válec 1 (cylinder)
+✓ Válec 1 (cylinder) · přidáno 75398,2 mm³ · těleso platné
 
 Dokument: „Listy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 40 × 40 × 60 mm (X -20…20, Y -20…20, Z 0…60) · objem 75,40 cm³ · ploch 3 · hran 3
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø40 × 60 mm, new, podstava [0; 0; 0], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 75398,2 mm³ · těleso platné – Ø40 × 60 mm, new, podstava [0; 0; 0], osa Z
 === run 2 ===
-✓ nový list výkresu „List 1“ (Chytré kóty)
-✓ výkres: A4, na výšku
-✓ razítko: název „Čep“, číslo „MN-001“, kreslil „AI“, revize „A“
-✓ nový list 2 „Detail“ (Chytré kóty) – další příkazy výkresu pracují s ním
-✓ výkres: A4, měřítko 2:1, pohledy přední · list 2 „Detail“
-✓ poznámka: Kalit 58 HRC · list 2 „Detail“
+→ nový list výkresu „List 1“ (Chytré kóty) – výsledek po vyhodnocení listu níže
+→ výkres: A4, na výšku – výsledek po vyhodnocení listu níže
+→ razítko: název „Čep“, číslo „MN-001“, kreslil „AI“, revize „A“ – výsledek po vyhodnocení listu níže
+✓ výkres: list „List 1“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
+→ nový list 2 „Detail“ (Chytré kóty) – další příkazy výkresu pracují s ním – výsledek po vyhodnocení listu níže
+→ výkres: A4, měřítko 2:1, pohledy přední · list 2 „Detail“ – výsledek po vyhodnocení listu níže
+→ poznámka: Kalit 58 HRC · list 2 „Detail“ – výsledek po vyhodnocení listu níže
 Listy (2): 1 „List 1“ A4 · 2 „Detail“ A4 (aktivní)
 Výkres „List 1“ (list 1/2): list A4 na výšku · měřítko 1:1 · pohledy: přední, horní, levý, izometrie · kóty: Chytré kóty (řetězově)
 Listy (2): 1 „List 1“ A4 · 2 „Detail“ A4 (aktivní)
@@ -50,9 +51,10 @@ Nepředepsané tolerance: nezadané – export výkresu dílu je ohlásí; zadej
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
   přední (x = X, y = Z): x −20…20, y 0…60 mm · 2:1 · na listu x 34…114, y 66…186
+✓ výkres: list „Detail“ vyhodnocen bez nálezů (pohledy, řezy, Chytré kóty)
 
 Dokument: „Listy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 40 × 40 × 60 mm (X -20…20, Y -20…20, Z 0…60) · objem 75,40 cm³ · ploch 3 · hran 3
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø40 × 60 mm, new, podstava [0; 0; 0], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 75398,2 mm³ · těleso platné – Ø40 × 60 mm, new, podstava [0; 0; 0], osa Z

@@ -1,0 +1,82 @@
+# vlna 22, balík M, etapa 2: předpětí pružiny (kvazistatika, režim a úroveň studie), pružina po načtení, konflikty vazeb (priorita, motor na mezi, neplatné kroky)
+  polohy komponent beze změny – vazby nelze splnit spolu (kompromis se nezapisuje)	  Komponentenpositionen unverändert – die Verknüpfungen lassen sich nicht gemeinsam erfüllen (kein Kompromiss wird geschrieben)
+  rovnováha pružin a preferovaných stran mezí posunula: {0}	  Federgleichgewicht und bevorzugte Grenzseiten haben verschoben: {0}
+ … a další {0} (pohyb krok {1})	 … und {0} weitere (bewegung schritt {1})
+ (zvoleno automaticky: {0}; jiný režim: pohyb kinematika | kvazistatika | dynamika)	 (automatisch gewählt: {0}; anderer Modus: bewegung kinematik | quasistatisch | dynamik)
+ ⚠ motor stojí na mezi: dosaženo {0} (žádáno {1})	 ⚠ Antrieb steht an einer Grenze: erreicht {0} (verlangt {1})
+ ⚠ NEŘEŠITELNÝ krok – zobrazena poslední platná poloha (krok {0}), žádný kompromis	 ⚠ NICHT LÖSBARER Schritt – die letzte gültige Lage wird gezeigt (Schritt {0}), kein Kompromiss
+„{0}“ (splněno)	„{0}“ (erfüllt)
+„{0}“ {1} (splněno)	„{0}“ {1} (erfüllt)
+„{0}“ {1} (vazba {2})	„{0}“ {1} (Verknüpfung {2})
+„{0}“ {1} místo {2} ({3})	„{0}“ {1} statt {2} ({3})
+„{0}“ odchylka {1}	„{0}“ Abweichung {1}
+(nezjištěno)	(nicht ermittelt)
+{0} {1} – na délce na doraz Ln {2}	{0} {1} – auf Blocklänge Ln {2}
+{0} {1} – na mezi max {2} (doraz)	{0} {1} – an der Grenze max {2} (Anschlag)
+{0} {1} – na mezi min {2} (doraz)	{0} {1} – an der Grenze min {2} (Anschlag)
+{0} {1} < min {2} ({3})	{0} {1} < min {2} ({3})
+{0} {1} > max {2} (+{3})	{0} {1} > max {2} (+{3})
+{0} {1} v mezích ⟨{2}; {3}⟩	{0} {1} innerhalb ⟨{2}; {3}⟩
+{0} + geometrická aproximace	{0} + geometrische Näherung
+{0} vazba {1} ({2}): {3}{4}	{0} Verknüpfung {1} ({2}): {3}{4}
+{0}: geometrie chybí	{0}: Geometrie fehlt
+⚠ vazby splněny ve všech krocích, ale polohu {0} neurčují – zobrazená poloha není fyzikální výsledek (motion.undetermined)	⚠ Verknüpfungen in allen Schritten erfüllt, sie bestimmen aber die Lage von {0} nicht – die gezeigte Lage ist kein physikalisches Ergebnis (motion.undetermined)
+✓ pohybová studie: {0}	✓ Bewegungsstudie: {0}
+animace	Animation
+Automaticky: kvazistatika, když na pohyblivý díl dosedá pružina, jinak kinematika.	Automatisch: Quasistatik, wenn eine Feder an einem beweglichen Teil anliegt, sonst Kinematik.
+bez preferované strany	ohne bevorzugte Seite
+bez pružiny a bez preferované strany zůstává, kde byla – sestava vazba {0} preferovat min|max	ohne Feder und ohne bevorzugte Seite bleibt sie, wo sie war – baugruppe verknüpfung {0} bevorzugen min|max
+délka odvozená z dosedacích ploch (řídí polohy komponent)	Länge aus den Auflageflächen abgeleitet (die Komponentenlagen sind führend)
+doraz pružiny „{0}“ (délka na doraz Ln)	Federanschlag „{0}“ (Blocklänge Ln)
+dynamika	Dynamik
+jen zobrazení (výměna dílů) bez výpočtu poloh	nur Anzeige (Teiletausch) ohne Lageberechnung
+kinematika	Kinematik
+Kinematika i přepočet vazeb drží díl u této meze, když jeho polohu ostatní vazby neurčují (bez pružiny). Pevnou vazbu, ukotvení ani motor nepřebije.	Kinematik und Verknüpfungsberechnung halten das Teil an dieser Grenze, wenn die übrigen Verknüpfungen seine Lage nicht bestimmen (ohne Feder). Feste Verknüpfung, Verankerung und Antrieb haben Vorrang.
+kinematika ji nechává, kde byla (posune ji jen doraz meze) – pružina „{0}“ by ji tlačila: fyzikální poloha = pohyb kvazistatika (nebo sestava vazba {1} preferovat min|max)	die Kinematik lässt sie, wo sie war (nur ein Grenzanschlag verschiebt sie) – Feder „{0}“ würde sie drücken: physikalische Lage = bewegung quasistatisch (oder baugruppe verknüpfung {1} bevorzugen min|max)
+kinematika ji nechává, kde byla (posune ji jen doraz meze), a výsledek závisí na předchozím pohybu – sestava vazba {0} preferovat min|max, nebo pružina a pohyb kvazistatika	die Kinematik lässt sie, wo sie war (nur ein Grenzanschlag verschiebt sie), und das Ergebnis hängt von der vorherigen Bewegung ab – baugruppe verknüpfung {0} bevorzugen min|max, oder eine Feder und bewegung quasistatisch
+konflikt:	Konflikt:
+kvazistatika	Quasistatik
+Kvazistatika	Quasistatik
+motor {0} stojí na mezi v krocích {1}: žádáno {2}, dosaženo {3} – brání: {4}; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly zůstávají fyzikálně (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)	Antrieb {0} steht an einer Grenze in den Schritten {1}: verlangt {2}, erreicht {3} – blockiert durch: {4}; Ursache: der Antrieb verlangt einen Wert, den die harten Bedingungen (Grenzen, Anschläge, feste Verknüpfungen) nicht erlauben – die Teile bleiben physikalisch (Antrieb an Grenze: stopp; ungültige Schritte statt Anhalten: bewegung antrieb … an grenze fehler)
+Motor na mezi	Antrieb an Grenze
+Motor na mezi: stop = stojí na poslední dosažitelné hodnotě · neplatný krok = kroky za mezí se neřeší, zůstane poslední platná poloha	Antrieb an Grenze: stopp = bleibt am letzten erreichbaren Wert · ungültiger Schritt = Schritte jenseits der Grenze werden nicht gelöst, die letzte gültige Lage bleibt
+motor stojí na mezi: {0}	Antrieb steht an der Grenze: {0}
+motor žádá hodnotu, kterou tvrdé podmínky nedovolí (motor na mezi: chyba; zastavení motoru: pohyb motor … na mezi stop)	der Antrieb verlangt einen Wert, den die harten Bedingungen nicht erlauben (Antrieb an Grenze: fehler; Anhalten stattdessen: bewegung antrieb … an grenze stopp)
+motor: na mezi stop | chyba – stop = motor stojí na poslední dosažitelné hodnotě, chyba = kroky za mezí jsou neplatné	Antrieb: an grenze stopp | fehler – stopp = der Antrieb bleibt am letzten erreichbaren Wert, fehler = die Schritte jenseits der Grenze sind ungültig
+na mezi: chyba	an Grenze: Fehler
+na mezi: stop	an Grenze: stopp
+nejbližší dosažitelná hodnota {0} (zadáno {1}) – brání: {2}	nächster erreichbarer Wert {0} (eingegeben {1}) – blockiert durch: {2}
+neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}), žádný kompromis; konflikt: {2}; příčina: {3}	nicht lösbare Schritte {0} – die letzte gültige Lage wird gezeigt (Schritt {1}), kein Kompromiss; Konflikt: {2}; Ursache: {3}
+NEŘEŠITELNÝ krok – zobrazen krok {0}	NICHT LÖSBARER Schritt – Schritt {0} gezeigt
+Neřešitelný krok {0} – zobrazena poslední platná poloha (krok {1})	Nicht lösbarer Schritt {0} – die letzte gültige Lage wird gezeigt (Schritt {1})
+pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa "<X>" [bod x y z]] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	bewegung antrieb dreh|linear "<Komponente>"|verknüpfung <N> <von>..<bis> | [von <A>] hub <Δ> [schritt S | schritte N] [zeit T] [u/min R | geschwindigkeit V] [an grenze stopp|fehler] [kollisionen] [spur "<X>" [punkt x y z]] · bewegung kinematik|quasistatisch|dynamik|automatisch · bewegung status|starten|abspielen|stop|schritt N|export csv|png|webm|löschen
+poloha „{0}“ není vazbami určena (volná v mezi {1}) – {2}	die Lage von „{0}“ ist durch die Verknüpfungen nicht bestimmt (frei innerhalb der Grenze {1}) – {2}
+polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl	Lagen nur aus Verknüpfungen und Antrieben – Federn werden gemessen, drücken aber nicht; ein Teil, dessen Lage die Verknüpfungen nicht bestimmen, bleibt, wo es war
+Preferovaná strana	Bevorzugte Seite
+preferovaná strana {0}	bevorzugte Seite {0}
+preferovat: min | max | ne – strana meze, u které má díl zůstat, když ho vazby neurčují	bevorzugen: min | max | nein – die Seite der Grenze, an der das Teil bleibt, wenn die Verknüpfungen es nicht bestimmen
+preferuje max	bevorzugt max
+preferuje min	bevorzugt min
+pružina „{0}“: uložená délka {1} mm neodpovídá dosedacím plochám ({2} mm) – délka odvozena z ploch; řídí polohy komponent, uložená délka je jen odvozená hodnota	Feder „{0}“: gespeicherte Länge {1} mm passt nicht zu den Auflageflächen ({2} mm) – Länge aus den Flächen abgeleitet; die Komponentenlagen sind führend, die gespeicherte Länge ist nur ein abgeleiteter Wert
+pružina „{0}“: uložená poloha začátku neodpovídá dosedací ploše (posun {1} mm, délka {2} mm) – odvozeno z ploch	Feder „{0}“: die gespeicherte Anfangslage passt nicht zur Auflagefläche (Versatz {1} mm, Länge {2} mm) – aus den Flächen abgeleitet
+přechodový děj s hmotnostmi, gravitací a silami pružin v čase	Übergangsvorgang mit Massen, Schwerkraft und Federkräften über die Zeit
+sestava má pružinu „{0}“ na pohyblivé komponentě	die Baugruppe hat Feder „{0}“ an einer beweglichen Komponente
+sestava nemá pružinu na pohyblivé komponentě	die Baugruppe hat keine Feder an einer beweglichen Komponente
+uložená délka, s dosedacími plochami nezkontrolováno	gespeicherte Länge, nicht mit den Auflageflächen geprüft
+Úroveň simulace: {0} – {1}{2}	Simulationsstufe: {0} – {1}{2}
+v každém kroku rovnováha pružin a kontaktů (meze vazeb, délka pružiny na doraz) – nezávisle na předchozím kroku a směru pohybu	in jedem Schritt Gleichgewicht von Federn und Kontakten (Verknüpfungsgrenzen, Blocklänge der Feder) – unabhängig vom vorherigen Schritt und der Bewegungsrichtung
+vazba {0} ({1}) není mez – preferovanou stranu má Mez vzdálenosti, Mez úhlu a Drážka bez polohy	Verknüpfung {0} ({1}) ist keine Grenze – eine bevorzugte Seite haben Abstandsgrenze, Winkelgrenze und Nut ohne Position
+vazby nelze splnit spolu – polohy komponent zůstaly beze změny (žádný kompromis); {0}	die Verknüpfungen lassen sich nicht gemeinsam erfüllen – Komponentenlagen unverändert (kein Kompromiss); {0}
+Vazby nelze splnit spolu – polohy komponent zůstaly beze změny: {0}	Die Verknüpfungen lassen sich nicht gemeinsam erfüllen – Komponentenlagen unverändert: {0}
+vazby si odporují i bez motoru – opravte nebo potlačte některou z nich (sestava vazba N potlačit | hodnota)	die Verknüpfungen widersprechen sich auch ohne Antrieb – eine davon korrigieren oder unterdrücken (baugruppe verknüpfung N unterdrücken | wert)
+vazby si odporují: {0}	Verknüpfungen widersprechen sich: {0}
+žádná	keine
+Auto	Auto
+délka pružiny v sestavě je odvozená (vlna 22, bod 7): řídí polohy komponent a dosedací plochy, spring.length/offset/seat je jen mezipaměť; po načtení dokumentu (JSON, .mncad, --open, otevřít, aplikace) se délka odvodí z ploch a rozpor s uloženou délkou se ohlásí ⚠ spring.stale (uložená × z ploch) a opraví; stav píše „délka odvozená z dosedacích ploch“, rozpor ⚠ nebo „nezkontrolováno“	die Federlänge in einer Baugruppe ist abgeleitet (Welle 22, Punkt 7): führend sind Komponentenlagen und Auflageflächen, spring.length/offset/seat ist nur ein Zwischenspeicher; nach dem Laden eines Dokuments (JSON, .mncad, --open, öffnen, App) wird die Länge aus den Flächen abgeleitet und ein Widerspruch zur gespeicherten Länge als ⚠ spring.stale (gespeichert × aus den Flächen) gemeldet und korrigiert; status schreibt „Länge aus den Auflageflächen abgeleitet“, ⚠ bei Widerspruch oder „nicht geprüft“
+režim a úroveň pohybové studie (vlna 22): kinematika = polohy jen z vazeb (díl volný v mezi zůstává, kde byl – ⚠ motion.undetermined), kvazistatika = v každém kroku rovnováha pružin a kontaktů (meze, Ln pružiny jako doraz) nezávisle na předchozím kroku a směru, dynamika; automaticky = kvazistatika s pružinou na pohyblivém dílu; úroveň v protokolu (Úroveň simulace: …) a na konci řádku motion (level=kin|quasi|dyn). Tvrdé podmínky (ukotvení, vazby, meze, Ln) mají přednost před motorem: motor na mezi stojí (⚠ motion.motor-limit s blokujícími vazbami a odchylkami) nebo s „na mezi chyba“ jsou kroky neplatné a zůstane poslední platná poloha (⚠ motion.invalid); žádný kompromis s ujetím a naklopením. Preferovaná strana meze drží díl u meze, když ho vazby neurčují (nikdy proti pevné vazbě či motoru); statický přepočet při úpravě dá díly volné v mezi do rovnováhy pružin, konflikt nezapíše kompromis (⚠ mate.conflict s nejbližší dosažitelnou hodnotou)	Modus und Stufe der Bewegungsstudie (Welle 22): Kinematik = Lagen nur aus Verknüpfungen (ein in einer Grenze freies Teil bleibt, wo es war – ⚠ motion.undetermined), Quasistatik = in jedem Schritt Gleichgewicht von Federn und Kontakten (Grenzen, Blocklänge Ln als Anschlag) unabhängig vom vorherigen Schritt und der Richtung, Dynamik; automatisch = Quasistatik mit Feder an einem beweglichen Teil; die Stufe im Protokoll (Simulationsstufe: …) und am Ende der motion-Zeile (level=kin|quasi|dyn). Harte Bedingungen (Verankerung, Verknüpfungen, Grenzen, Ln) haben Vorrang vor dem Antrieb: der Antrieb bleibt an der Grenze stehen (⚠ motion.motor-limit mit blockierenden Verknüpfungen und Abweichungen) oder mit „an grenze fehler“ sind die Schritte ungültig und die letzte gültige Lage bleibt (⚠ motion.invalid); nie ein Kompromiss mit Verschieben und Kippen. Die bevorzugte Seite einer Grenze hält das Teil an der Grenze, wenn die Verknüpfungen es nicht bestimmen (nie gegen eine feste Verknüpfung oder einen Antrieb); die statische Berechnung bei einer Änderung bringt in Grenzen freie Teile ins Federgleichgewicht, ein Konflikt schreibt keinen Kompromiss (⚠ mate.conflict mit dem nächsten erreichbaren Wert)
+#!dynamic – texty kódů registru (engine/codes.ts motion.motor-limit, motion.invalid, motion.undetermined, mate.conflict, spring.stale)
+motor {0} stojí na mezi v krocích {1} – brání: {2}	Antrieb {0} steht an einer Grenze in den Schritten {1} – blockiert durch: {2}
+neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}); konflikt: {2}	nicht lösbare Schritte {0} – die letzte gültige Lage wird gezeigt (Schritt {1}); Konflikt: {2}
+poloha „{0}“ není vazbami určena (volná v mezi {1})	die Lage von „{0}“ ist durch die Verknüpfungen nicht bestimmt (frei innerhalb der Grenze {1})
+vazby nelze splnit spolu – polohy komponent beze změny; {0}	die Verknüpfungen lassen sich nicht gemeinsam erfüllen – Komponentenlagen unverändert; {0}
+pružina „{0}“: uložená délka {1} neodpovídá dosedacím plochám ({2}) – délka odvozena z ploch	Feder „{0}“: gespeicherte Länge {1} passt nicht zu den Auflageflächen ({2}) – Länge aus den Flächen abgeleitet

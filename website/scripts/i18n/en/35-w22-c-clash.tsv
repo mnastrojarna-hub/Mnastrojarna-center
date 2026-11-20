@@ -1,0 +1,78 @@
+# Vlna 22, balík C1 (bod 5): třídy kolizí všude – panel, stav, pohyb, pravidla kolizí, dotyk, místo průniku
+ · dotyk {0} dvojic	 · touch {0} pairs
+ · pracovní kontakt {0} dvojic	 · working contact {0} pairs
+ dotyk: {0}	 touch: {0}
+ pracovní kontakt: {0}	 working contact: {0}
+… a další {0}	… and {0} more
+„{0}“ není podsestava – díl v ní nelze vybrat	“{0}” is not a subassembly – a part inside it cannot be selected
+{0}: čekám rozsah od..do (např. 10..20), ne „{1}“	{0}: expected a range from..to (e.g. 10..20), not “{1}”
+✓ odebráno pravidel kolizí: {0}	✓ interference rules removed: {0}
+✓ pravidlo kolizí {0}	✓ interference rule {0}
+✓ tolerance dotyku {0} mm (průnik tenčí = dotyk, ne kolize)	✓ touch tolerance {0} mm (a thinner overlap = touch, not interference)
+cokoli	anything
+dotyk	touch
+dotyk {0} – přesah {1} mm pod tolerancí {2} mm	touch {0} – overlap {1} mm below the tolerance {2} mm
+dotyk pod tolerancí {0} mm: {1} dvojic	touch below the tolerance {0} mm: {1} pairs
+Je to závit	It is a thread
+Kolize (zkontrolováno {0}): {1} · zobrazeno {2} skupin ({3})	Interference (checked {0}): {1} · {2} groups shown ({3})
+kolize [seznam [skutečné|závit|dotyk|pracovní|vše]] · kolize pravidlo pracovní "A" "B" [kroky 10..20 | pohyb "ZDVIH" 30..27] · kolize pravidlo závit "A" ["B"] · kolize pravidla · kolize pravidlo N smazat · kolize tolerance 0,01	clash [list [real|thread|touch|work|all]] · clash rule work "A" "B" [steps 10..20 | motion "STROKE" 30..27] · clash rule thread "A" ["B"] · clash rules · clash rule N delete · clash tolerance 0.01
+kolize {0} ({1} mm³)	interference {0} ({1} mm³)
+kolize po pravidlech: {0}	interference after the rules: {0}
+kolize pravidlo závit platí vždy – bez kroků a pohybu	clash rule thread always applies – without steps and motion
+kolize pravidlo: druh pracovní nebo závit – {0}	clash rule: kind work or thread – {0}
+kolize pravidlo: chybí komponenta – {0}	clash rule: component missing – {0}
+kolize pravidlo: nečekané „{0}“ – {1}	clash rule: unexpected “{0}” – {1}
+kolize pravidlo: za „pohyb“ název vazby motoru v uvozovkách nebo číslo vazby	clash rule: after “motion” the name of the motor mate in quotes or the mate number
+kolize seznam: neznámá třída „{0}“ – skutečné, nevyhodnotitelné, závit, pod hlavou, dotyk, pracovní, závady, vše	clash list: unknown class “{0}” – real, undetermined, thread, underhead, touch, work, faults, all
+kolize seznam: sestava ještě nebyla zkontrolována – nejdřív „kolize“	clash list: the assembly has not been checked yet – run “clash” first
+kolize tolerance: čekám tloušťku dotyku v mm (např. kolize tolerance 0,01)	clash tolerance: expected the touch thickness in mm (e.g. clash tolerance 0.01)
+kolize: {0} – {1}	interference: {0} – {1}
+kolizi {0} nelze vyhodnotit	interference {0} cannot be evaluated
+místo	location
+nevyhodnotitelné	undetermined
+obálka {0} × {1} × {2} mm	envelope {0} × {1} × {2} mm
+Odebrat pravidlo	Remove rule
+pod hlavou	under head
+pod hlavou šroubu	under the screw head
+pohyb	motion
+pracovní kontakt	working contact
+pracovní kontakt „{0}“ × „{1}“ v krocích {2} (pravidlo {3}), největší průnik {4} mm³	working contact “{0}” × “{1}” in steps {2} (rule {3}), largest overlap {4} mm³
+Pracovní kontakt {0} – mimo okno zůstane skutečnou kolizí.	Working contact {0} – outside the window it stays a real interference.
+pracovní kontakt {0} ({1} mm³) – pravidlo {2}	working contact {0} ({1} mm³) – rule {2}
+Pracovní kontakt…	Working contact…
+Pravidla kolizí ({0}) · dotyk pod {1} mm	Interference rules ({0}) · touch below {1} mm
+Pravidla kolizí ({0}) · tolerance dotyku {1} mm:	Interference rules ({0}) · touch tolerance {1} mm:
+pravidla kolizí s komponentou v podsestavě nebo s vazbou mimo skript se do skriptu nepřenášejí ({0})	interference rules with a component in a subassembly or with a mate outside the script are not carried into the script ({0})
+pravidla kolizí sestavy: pracovní kontakt nástroj × plech v okně operace (kroky studie / hodnota motoru vazby) = ℹ clash.work, mimo okno ⚠ skutečná kolize; závit = šroub v hladké jádrové díře bez prvku závitu je závitový záběr; díl v podsestavě cestou "Skupina/Díl"	assembly interference rules: working contact tool × sheet in the operation window (study steps / motor value of the mate) = ℹ clash.work, outside the window ⚠ real interference; thread = a screw in a plain tap-drill hole without a thread feature is a thread engagement; a part in a subassembly by path "Group/Part"
+Pravidla kolizí: žádná · tolerance dotyku {0} mm – kolize pravidlo pracovní "A" "B" [kroky 10..20]	Interference rules: none · touch tolerance {0} mm – clash rule work "A" "B" [steps 10..20]
+pravidlo kolizí {0} v sestavě není – pravidel: {1}	interference rule {0} does not exist in the assembly – rules: {1}
+pravidlo závit	thread rule
+prstenec pod hlavou šroubu {0}	ring under the screw head {0}
+při hodnotě motoru / vazby	at a motor / mate value
+při hodnotě vazby „{0}“ {1}–{2}	at a value of mate “{0}” {1}–{2}
+skutečná kolize	real interference
+skutečné	real
+šroub Ø{0} v díře Ø{1} bez prvku závitu – zadejte díru se závitem (díra … závit {2}), nebo dvojici označte pravidlem „kolize pravidlo závit“	screw Ø{0} in a hole Ø{1} without a thread feature – enter a tapped hole (hole … thread {2}), or mark the pair with the rule “clash rule thread”
+šroub v závitu	screw in thread
+šroub v závitu {0}	screw in thread {0}
+Tolerance dotyku [mm]	Touch tolerance [mm]
+tolerance dotyku [mm]: průnik tenčí než tolerance (přesah 0,0001 mm) = ℹ clash.touch, ne kolize	touch tolerance [mm]: an overlap thinner than the tolerance (0.0001 mm) = ℹ clash.touch, not an interference
+Třídy kolizí	Interference classes
+Uložit pravidlo	Save rule
+v krocích {0}–{1}	in steps {0}–{1}
+v krocích pohybové studie	in steps of the motion study
+v kroku {0}	in step {0}
+výpis poslední kontroly kolizí po třídách a skupinách (opakované nálezy jednou s počtem a instancemi [S2] / #4, místo průniku a obálka) s filtrem třídy; pravidla dokumentu se uplatní hned	listing of the last interference check by classes and groups (repeated findings once with a count and instances [S2] / #4, location of the overlap and envelope) with a class filter; the document rules apply at once
+vždy	always
+závady	faults
+závit bez prvku	thread without a feature
+Zvolte třídu nahoře – dvojice jsou skryté filtrem.	Choose a class above – the pairs are hidden by the filter.
+nelze vyhodnotit	cannot be evaluated
+skutečné {0}	real {0}
+v místě {0}	at {0}
+bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt)	no real interference in the checked steps (only screw in thread, touch or working contact)
+nevyhodnotitelné {0}	undetermined {0}
+#!dynamic – texty kódů kolizí (src/cad/engine/codes.ts) se překládají za běhu tr(def.key)
+dotyk „{0}“ × „{1}“ (průnik tenčí než tolerance dotyku)	touch “{0}” × “{1}” (overlap thinner than the touch tolerance)
+pracovní kontakt „{0}“ × „{1}“ podle pravidla kolizí	working contact “{0}” × “{1}” by an interference rule
+výpis kolizí platí pro dřívější stav sestavy (zkontrolováno {0}) – spusťte „kolize“ znovu	the interference listing is for an earlier state of the assembly (checked {0}) – run “clash” again

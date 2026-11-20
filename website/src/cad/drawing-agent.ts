@@ -11,6 +11,8 @@ import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLab
 import { linMeaning, type SmartDims, type SmartReport } from "./drawing-dims";
 import { overdeterminedChain, sameSize, toleranceCheck, type ChainMember, type RefTolDim, type TolDim } from "./drawing-functional";
 import { hasDrawnSprings, threadsOfDoc } from "./drawing-doc";
+import { gearTableStatus } from "./drawing-geartable";
+import { gearTablesOf } from "./gears/data";
 import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
 import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
@@ -25,6 +27,7 @@ import { drawingKey, drawingSets, drawingsLine, inDrawing, nextDrawingName, reso
 import type { DrawingExportResult } from "./drawing-export";
 import { issueLine, issuesOf, warningIssue, type DrawingIssue } from "./drawing-issues";
 import { SECTION_AXIS, sectionAt, sectionCoord, sectionStatusText, sectionText } from "./drawing-section";
+import { issueSheet, modelId, nextRev as nextRevOf, sheetIssueLine, sheetState, staleSheetText, withdrawIssue } from "./doc-outputs";
 
 export { annLabel, dimValue, findDims } from "./drawing-marks";
 
@@ -176,6 +179,8 @@ export function sheetMeta(doc: CadDoc, s: DrawingDoc, idx = 0, extras?: DrawingE
     ...(extras?.massKg !== undefined ? { massKg: extras.massKg } : {}),
     ...(extras?.bom?.length && o.bomTable !== false ? { bom: extras.bom } : {}),
     ...(extras?.balloons?.length ? { components: extras.balloons } : {}),
+    // revize modelu do patičky razítka a metadat PDF / DXF (vlna 22, bod 20 – cad/doc-outputs.ts); 2D výkres ji nemá
+    ...(doc.kind !== "draft" ? { modelRev: modelId(doc).rev } : {}),
   };
 }
 
@@ -348,7 +353,9 @@ function titleLines(doc: CadDoc, s: DrawingDoc): string[] {
 
 /** příkazy, u kterých protokol ukáže hlášení výpočtu listu řádkem ✗ / ⚠ (ostatní je vrací jen v `issues`) */
 const ISSUE_LINES = new Set<DrawingCmd["k"]>(["set", "dim", "views"]);
-const ISSUE_KINDS = new Set<DrawingIssue["kind"]>(["section-miss", "section-legacy", "sheet-fit", "view-lost", "hole-table-overlap"]);
+/** kola dílu pro stav výkresu (sestava = žádná) */
+const gearsOf = (doc: CadDoc) => (doc.kind === "assembly" ? [] : gearTablesOf(doc));
+const ISSUE_KINDS = new Set<DrawingIssue["kind"]>(["section-miss", "section-legacy", "sheet-fit", "view-lost", "hole-table-overlap", "gear-table-overlap"]);
 
 /**
  * Provede příkaz výkresu nad dokumentem – nad aktivním listem (`výkres list N`; chybí-li list, založí se první).
@@ -756,6 +763,36 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       put({ ...sheet(), meta: { ...m, revisions: revs } as Record<string, unknown> });
       return done({ changed: true, open: false });
     }
+    case "issue": {
+      // vydání listu (vlna 22, bod 20): písmeno revize + revize modelu + datum; `vše` = všechny listy aktivního výkresu
+      const which = cmd.all ? setSheets(doc, idx) : [idx];
+      let changed = false;
+      for (const i of which) {
+        const s = doc.drawings![i];
+        if (cmd.op === "withdraw") {
+          if (!s.issued) {
+            log.push(tr("→ list „{0}“ vydaný není – není co zrušit", s.name));
+            continue;
+          }
+          doc.drawings![i] = withdrawIssue(s);
+          changed = true;
+          log.push(tr("✓ vydání listu „{0}“ (rev. {1} z modelu {2}) zrušeno – list je rozpracovaný", s.name, s.issued.rev, s.issued.modelRev));
+          continue;
+        }
+        const r = issueSheet(doc, s, { ...(cmd.rev ? { rev: cmd.rev } : {}), ...(cmd.note ? { note: cmd.note } : {}), ...(cmd.date ? { date: cmd.date } : {}) });
+        if (r.unchanged) {
+          log.push(tr("→ list „{0}“ už je vydán jako rev. {1} z modelu {2} – beze změny", s.name, r.rev, r.id.rev));
+          continue;
+        }
+        doc.drawings![i] = r.sheet;
+        changed = true;
+        const row = (r.sheet.meta as Partial<DrawingMeta>).revisions?.find((x) => x.rev.toUpperCase() === r.rev);
+        log.push(tr("✓ list „{0}“ vydán jako rev. {1} z modelu {2} ({3}){4}", s.name, r.rev, r.id.rev, row?.date || today(), r.added ? tr(" · do tabulky revizí přidána revize {0} „{1}“", r.rev, row?.note ?? "") : ""));
+        // totéž písmeno revize po změně modelu: papír rev. A a soubor rev. A by se lišily – ⚠ drawing.stale (přísný režim ✗)
+        if (r.sameRevChanged && r.prev) issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: tr("list „{0}“: rev. {1} už byla vydána z modelu {2} a znovu se vydává ze změněného modelu {3} se stejným písmenem – změnu označte novou revizí (výkres vydat {4})", s.name, r.rev, r.prev.modelRev, r.id.rev, nextRevOf(r.rev)), sheetId: s.id });
+      }
+      return done({ changed, open: false });
+    }
     case "mark": {
       const res = await computeSheet();
       const o = sheetOptions(sheet());
@@ -831,7 +868,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       }
       const res = await computeSheet();
       const H = res.sheet.h;
-      const placeAt = (scale: number, r: number) => (cmd.place ? (((p) => [p[0] - r * scale, p[1] - r * scale])(agentToSheet(H, cmd.place)) as [number, number]) : undefined);
+      // „umístit x y odshora“ = střed od levého horního rohu listu (nezávisí na výšce listu), jinak od levého dolního
+      const placeAt = (scale: number, r: number) => (cmd.place ? (((p) => [p[0] - r * scale, p[1] - r * scale])(cmd.placeTop ? cmd.place : agentToSheet(H, cmd.place)) as [number, number]) : undefined);
       let label: string;
       if (cmd.op === "edit") {
         const i = details.findIndex((d) => d.label === cmd.label);
@@ -970,6 +1008,8 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   // tabulka děr: zapnutá volbou listu, nebo ji zapnuly Chytré kóty (polohy děr tabulkou – B12)
   if (o.holeTable || res.holes?.length) L.push(holeTableLine(res, o));
   if (o.springTable) L.push(res.springTables ? tr("Tabulka pružiny: {0}× nad razítkem (EN ISO 2162-2)", res.springTables) : tr("Tabulka pružiny: v dílu není pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová)"));
+  // tabulka ozubení (drawing-geartable.ts): co je na listu, nebo proč tam není
+  if (o.gearTable) L.push(...(gearsOf(doc).length ? gearTableStatus(gearsOf(doc)) : [tr("Tabulka ozubení: v dílu není žádné kolo – tabulka se nekreslí")]));
   // funkční rozměry, polohy děr a kontrola tolerancí (B8, B12, 5.3)
   const hm = Object.entries(res.smart?.report.holeMode ?? {});
   if (o.dimensions === "smart" && hm.length) L.push(tr("Polohy děr: {0}", hm.map(([k, m]) => `${m === "ordinate" ? tr("souřadnicové kóty od levého dolního rohu") : m === "table" ? tr("tabulka děr") : tr("kóty od hran")} (${VIEW_NAME(k, o)})`).join(" · ")));
@@ -977,6 +1017,8 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const m = s.meta as Partial<DrawingMeta>;
   L.push(tr("U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}", m.tolerance?.trim() || "—", m.edges?.trim() || "—", m.note?.trim() || "—"));
   L.push(...titleLines(doc, doc.drawings![idx]));
+  // vydání listu a revize modelu, ze které list vznikl (vlna 22, bod 20 – cad/doc-outputs.ts)
+  L.push(sheetIssueLine(doc, doc.drawings![idx]));
   if (o.models?.length) L.push(tr("Další modely: {0}", o.models.map((x) => `„${x.name}“ (${VIEW_NAME(x.view)}, ${x.scale === "auto" ? tr("auto") : scaleLabel(x.scale)})`).join(" · ")));
   L.push(...viewsStatusLines(res, o, anns, s.meta as Partial<DrawingMeta>));
   L.push(...viewRangeLines(res, o));
@@ -984,6 +1026,9 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const issues = issuesOf(res);
   // řez mimo těleso: přesný důvod a rozsah odsazení (odznak ve výkresovém prostředí je stručný)
   for (const i of issues) if (i.level === "error") L.push(issueLine(i));
+  // vydaný list ze starší revize modelu → ⚠ drawing.stale na řádku `výkres stav` (bod 20)
+  const sh = doc.drawings![idx];
+  if (sheetState(doc, sh) === "stale") issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: staleSheetText(sh.name, sh.issued!, modelId(doc)) });
   return { text: L.join("\n"), changed, issues };
 }
 

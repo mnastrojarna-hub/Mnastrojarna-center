@@ -5,17 +5,17 @@
 ✓ nový díl „Čep“ – nová záložka
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
 → Válec 2 (cylinder) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Válec 1 (cylinder)
-✓ Válec 2 (cylinder)
+✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 865,9 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2356,2 mm³ · těleso platné
+✓ Válec 2 (cylinder) · přidáno 1005,3 mm³ (celý nástroj) · těleso platné
 
 Dokument: „Čep“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 16 × 16 × 35 mm (X -8…8, Y -8…8, Z 0…35) · objem 3,36 cm³ · ploch 5 · hran 6
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø10 × 30 mm, new, podstava [0; 0; 0], osa Z
- 2. Válec 2 [cylinder, id #] ✓ – Ø16 × 5 mm, add, podstava [0; 0; 30], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 2356,2 mm³ · těleso platné – Ø10 × 30 mm, new, podstava [0; 0; 0], osa Z
+ 2. Válec 2 [cylinder, id #] ✓ přidáno 1005,3 mm³ (celý nástroj) · těleso platné – Ø16 × 5 mm, add, podstava [0; 0; 30], osa Z
 === run 2 ===
 ✓ nová sestava „Čep v desce“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)

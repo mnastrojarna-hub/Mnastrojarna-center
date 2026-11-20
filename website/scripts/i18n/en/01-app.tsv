@@ -301,8 +301,6 @@ Přesun tělesa	Move body
 Přesunout / otočit	Move / rotate
 Přesunout / otočit (gizmo)	Move / rotate (gizmo)
 Přetažený obsah neobsahuje soubor – u Outlooku přetáhněte přílohu, ne text zprávy; případně ji nejdřív uložte na plochu.	The dropped content contains no file – in Outlook drag the attachment, not the message text; or save it to the desktop first.
-Připravuji {0}…	Preparing {0}…
-Připravuji {0}… {1} s – složitá geometrie; prvky s ⚠ (neplatná geometrie) export výrazně zpomalují	Preparing {0}… {1} s – complex geometry; features with ⚠ (invalid geometry) slow the export down considerably
 Přizpůsobit	Fit
 Přímé úpravy	Direct edits
 Přímé úpravy ploch se dělají v dílu – otevřete ho (Upravit díl).	Direct face edits are done in the part – open it (Edit part).

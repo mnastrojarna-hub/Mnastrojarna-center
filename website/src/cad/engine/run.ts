@@ -10,23 +10,27 @@
 import { docStatusText, parseAgentText, type AgentOp } from "../agent";
 import { stripLineComment } from "../agent-comment";
 import { getLang, tr } from "../i18n";
-import { isCancelled } from "../kernel-client";
+import { CadCancelled, isCancelled } from "../kernel-client";
 import type { CadDoc, Feature } from "../types";
 import { fmtNum } from "@/lib/mesh-metrics";
-import { asmStatus, asmStatusOf } from "./asm-status";
+import { asmStatus, asmStatusOf, staleNotes } from "./asm-status";
 import { CodedError, codeDef, codeText, isCode, type Code } from "./codes";
 import { lintOp } from "./lint";
 import { DrawingTracker } from "./drawing-track";
+import { reportStaleSheets } from "./outputs-ops";
 import { StrictState, type StrictMark } from "./strict";
 import { RunVerifier, verifyKey } from "./verify";
+import { freshenRunDoc } from "./spring-fresh";
 import { statusKv } from "./kv";
 import { ConsoleLog } from "./console";
+import { changedFrom, modelSig } from "./accept";
 import { MissingInputError, OutPathError, type EngineHost } from "./host";
 import "./ops";
 import { runEngineOp, type OpCtx } from "./ops/registry";
 import { ReportBuilder } from "./protocol";
 import type { Entry, RunOptions, RunReport } from "./protocol-types";
 import { docKeyOf, flush, runOf, type EngineRun } from "./run-doc";
+import { withValidity } from "./validity-store";
 import { MAX_DEPTH } from "../assembly";
 import type { Workspace } from "./workspace";
 
@@ -42,7 +46,15 @@ export type RunHooks = {
  * `preloaded` = dokumenty, které volající otevřel před skriptem (CLI `--open`): klíč ověření (`<docKey>#part|asm`) a
  * dokument – ověří se stavbou jako JSON na řádku skriptu (✗/⚠ prvků bez řádku), i když běh přejde na jiný dokument.
  */
-export type EngineRunOptions = RunOptions & { hooks?: RunHooks; preloaded?: { key: string; doc: CadDoc }[] };
+export type EngineRunOptions = RunOptions & {
+  hooks?: RunHooks;
+  preloaded?: { key: string; doc: CadDoc }[];
+  /**
+   * zrušení běhu (vlna 22, bod 12 – RunTracker: tlačítko Zrušit konzole, `window.mncad.cancelRun`, `run(text, { signal })`):
+   * kontroluje se před každou operací a před závěrečnou stavbou; zrušený běh skončí jako po Zrušit u výpočtu (✗ run.cancelled)
+   */
+  signal?: AbortSignal;
+};
 
 /** popis operace pro hlášky a časy (`feature:box`, `asm:mate`, `drawingCmd:sheet`) */
 export function opLabel(op: AgentOp): string {
@@ -144,14 +156,24 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
     if (stopOn(pre, 0) || (await strictPreloaded())) {
       /* STOP před během – nic se neprovede */
     } else if (!(prog.errors.length && hooks.stopAfter?.(rb.entries, 0))) {
-      for (const op of prog.ops) {
+      // dokumenty otevřené volajícím (--open): délka pružin z dosedacích ploch, rozpor ⚠ spring.stale (vlna 22, bod 7)
+      const b0 = rb.entries.length;
+      if (o.preloaded?.length) await freshenRunDoc(ctx, null);
+      for (const op of stopOn(rb.entries.slice(b0), 0) ? [] : prog.ops) {
+        if (o.signal?.aborted) throw new CadCancelled(); // zrušený běh: další řádky se neprovedou
         // konec bloku příkazů výkresu (jiný příkaz nebo přepnutí listu): nálezy bloku na jeho řádky
         if (draw.open && (op.k !== "drawingCmd" || op.cmd.k === "sheet") && (await closeBlock())) break;
         const label = opLabel(op);
         const before = rb.entries.length;
         const addedBefore = run.added.length;
+        const docBefore = run.doc; // vlastnosti dílu před operací – změna čísla / materiálu / druhu vloženého dílu = ⚠ (bod 22g)
+        const keyBefore = verifyKey(ctx);
+        // otisk modelu před operací: pozná i změnu na místě (stavba ověřuje jen stav po POSLEDNÍ změně – engine/verify.ts)
+        const sigBefore = GEOMETRY_OPS.has(op.k) ? modelSig(run.doc) : null;
+        run.touched = [];
         hooks.opStart?.(op.line, label);
         const t0 = now();
+        let failed = false;
         try {
           if (!(await runEngineOp(op, ctx))) {
             log.coded(op.line, "host.app-only", { args: [label], doc: run.doc.name });
@@ -159,19 +181,32 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
           }
         } catch (e) {
           if (isCancelled(e)) throw e;
+          failed = true;
           log.error(op.line, errMessage(e), { code: errorCode(e), doc: runOf(ctx).doc.name });
         }
         const added = run.added.slice(addedBefore);
         for (const f of added) if (!featureLine.has(f.id)) featureLine.set(f.id, op.line);
-        // 5.2 č. 19: díl změněný po vložení do sestavy – komponenta je kopie, změna se do sestavy nepromítne
+        // 5.2 č. 19 / vlna 22 bod 22g: díl změněný po vložení do sestavy (prvek, číslo, materiál, druh) – komponenta je kopie,
+        // změna se do sestavy sama nepromítne; rada = jedna funkce obnovy `sestava obnovit` (asm-refresh.ts)
         const ins = run.inserted?.get(run.doc.name.trim().toLowerCase());
-        if (ins !== undefined && added.length && run.doc.kind !== "assembly" && !ws.asm.stack.length) {
-          log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – tato změna se do sestavy nepromítne (vložit znovu, nebo sestava upravit)", run.doc.name, ins) });
-          run.inserted!.delete(run.doc.name.trim().toLowerCase());
+        const metaChanged = docBefore === run.doc ? [] : partMetaChange(docBefore, run.doc);
+        if ((added.length || metaChanged.length) && run.doc.kind !== "assembly" && run.doc.kind !== "draft" && !ws.asm.stack.length) {
+          const what = [...(added.length ? [tr("geometrie")] : []), ...metaChanged].join(", ");
+          // vložený tímto během (řádek vložení), jinak díl, jehož kopie je v otevřené sestavě (dřívější běh, konzole, --resume)
+          const asmName = ins === undefined ? asmWithCopy(ws, run.doc.name) : undefined;
+          const once = !rb.entries.some((e) => e.code === "asm.stale-copy" && e.doc === run.doc.name);
+          if (once && ins !== undefined) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě vložený na řádku {1} jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit \"{0}\"", run.doc.name, ins, what) });
+          else if (once && asmName) log.coded(op.line, "asm.stale-copy", { doc: run.doc.name, text: tr("díl „{0}“ je v sestavě „{1}“ jako kopie – změna ({2}) se do sestavy sama nepromítne; v sestavě: sestava obnovit \"{0}\"", run.doc.name, asmName, what) });
+          if (ins !== undefined) run.inserted!.delete(run.doc.name.trim().toLowerCase());
         }
-        verify.note(added, op.line);
+        // přímo upravené prvky (i ty, které běh sám přidal) a místo v historii, od kterého operace model změnila: výsledek
+        // prvku pak jde na řádek poslední operace, která změnila jeho nebo cokoli před ním (22i)
+        const touched = run.touched?.length ? run.doc.features.filter((f) => run.touched!.includes(f.id) && !added.some((x) => x.id === f.id)) : [];
+        const sameDoc = verifyKey(ctx) === keyBefore;
+        verify.note([...added, ...touched], op.line, sameDoc ? changedFrom(docBefore, run.doc, { names: false }) : null, sameDoc && sigBefore !== null && modelSig(run.doc) !== sigBefore);
         // dokument, ze kterého běh odešel (nový díl, záložka, normálie), se postaví hned – jeho prvky se neohlásí bez stavby
-        if (op.k === "doc") verify.loaded(verifyKey(ctx), run.doc, op.line); // JSON dokument: ověří se jako celek (prvky bez ✓)
+        // JSON dokument / otevřený soubor: ověří se jako celek (prvky bez ✓) a výsledek jde na řádek načtení
+        if (op.k === "doc" || (op.k === "open" && !failed)) verify.loaded(verifyKey(ctx), run.doc, op.line);
         const left = verify.switched();
         if (left) await verify.verifyDoc(left);
         // prvky dílu upraveného v kontextu, které selhaly při `sestava hotovo`: ohlásilo je ověření dílu, jinak řádek operace
@@ -187,6 +222,7 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
         if (stopOn(fresh, op.line)) break;
         if (hooks.stopAfter?.(fresh, op.line)) break;
       }
+      if (o.signal?.aborted) throw new CadCancelled();
       if (draw.open && !rb.stopped) await closeBlock();
       // listy, které běh měnil, v konečném stavu (normální režim jednou na konci, přísný doplní změny po bloku)
       if (!rb.stopped) stopOn(await draw.finish((k) => verify.docOf(k)), null);
@@ -236,6 +272,7 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   const curKey = verifyKey(ctx);
   // závěrečné stavby jsou operace „build“ bez řádku (CLI: hlídač zná operaci, na které vypršel --timeout – ✗ L- run.timeout)
   const hooks = (ctx.opts as EngineRunOptions).hooks ?? {};
+  if ((ctx.opts as EngineRunOptions).signal?.aborted) throw new CadCancelled(); // zrušeno před závěrečnou stavbou
   const tFinal = now();
   hooks.opStart?.(null, "build");
   for (const k of verify.pendingKeys()) if (k !== curKey) await verify.verifyDoc(k);
@@ -267,25 +304,11 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   if (res) {
     // výsledek až po výpočtu: ✓ = platné těleso a operace se projevila, ⚠ = zpracováno s výhradou, ✗ = selhalo; u delších prvků
     // čas výpočtu; prvek bez výsledku stavby = ⚠ feature.unverified (nikdy ✓); prvky jiných dokumentů běhu ohlásil `verify` výš
+    // (prvky, které běh nepřidal – načtený JSON / --open, relace – hlásí jen ⚠/✗: na řádku poslední úpravy, jinak načtení)
     verify.report(curKey, d, res.status, { final: true, took: true });
     if (res.metrics?.approx) log.coded(null, "geom.approx", { doc: d.name });
     if (d.kind === "assembly" && asmDepth(d) > MAX_DEPTH) log.coded(null, "asm.depth", { doc: d.name, args: [MAX_DEPTH] });
     if (res.metrics?.volumeFailed) log.coded(null, "geom.volume-failed", { doc: d.name });
-    const st = new Map(res.status.map((s) => [s.id, s]));
-    const addedIds = new Set(r.added.map((f) => f.id));
-    const bad = d.features.filter((f) => !addedIds.has(f.id) && !verify.isFlagged(f.id) && st.get(f.id)?.ok === false);
-    // prvky, které běh nepřidal (načtený JSON / --open: na řádku načtení, prvky relace bez řádku)
-    const at = verify.loadedLine(curKey);
-    for (const f of bad) {
-      log.tailLine(`✗ ${f.name}: ${st.get(f.id)?.error ?? "chyba stavby"}`);
-      rb.code("feature.failed", { line: at, doc: d.name, args: [f.name, st.get(f.id)?.error ?? ""] });
-    }
-    for (const f of d.features) {
-      const w = st.get(f.id)?.warning;
-      if (at === null || !w || addedIds.has(f.id) || verify.isFlagged(f.id) || st.get(f.id)?.ok === false) continue;
-      log.tailLine(`⚠ ${f.name}: ${w}`);
-      rb.code("feature.warning", { line: at, doc: d.name, args: [f.name, w] });
-    }
     const total = now() - tBuild;
     if (total >= 2000) log.tailLine(tr("Výpočet modelu: {0} s", fmtNum(total / 1000, 1)));
   } else if (verify.pending(curKey).length) {
@@ -294,6 +317,7 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
     log.tailLine(tr("✗ stavba selhala – prvky {0} nebyly ověřeny", names));
     rb.code("build.failed", { doc: d.name, args: [names] });
   }
+  reportStaleSheets(ctx, d, { end: true }); // vydaný list, který změna modelu v běhu zneplatnila – ⚠ drawing.stale (bod 20)
   // přísný režim i po posledním řádku: ✗/⚠ závěrečné stavby (bez řádku = stav na konci skriptu) zastaví – v konzoli
   // prohlížeče stejně jako v CLI (pojistka cli/job.ts se ptá téže funkce)
   if (ranAll) stopOn(rb.entries.slice(beforeFinal), null);
@@ -307,10 +331,36 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   };
   // obálka sestavy přesně (engine/asm-box.ts) – stejně jako `stav` uprostřed skriptu a řádek D v CLI
   const asm = await asmStatus(ws, host.kernel, d, { key: docKeyOf(ctx), onRestart: restarted, onParts: () => host.ui?.partsLoaded?.() });
-  const status = docStatusText(d, res, asm);
+  const stale = staleNotes(ws, d, docKeyOf(ctx)); // měření / porovnání z dřívější revize dokumentu (engine/result-key.ts)
+  const shown = withValidity(ws, docKeyOf(ctx), d, res); // přesná kontrola téže geometrie (kontrola přesně / export – 22a)
+  const status = docStatusText(d, shown, asm, stale);
   log.tailLine("", status);
   // „stav“ jako poslední příkaz: vyžádaný výpis = závěrečný stav (strojová část stejná v cs/en/de, text v `detail`);
   // po STOP přísného režimu se poslední řádek neprovedl – výpis „=“ se nepíše (konzole stav dokumentu ukáže dál)
-  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, res, asm), { doc: d.name, detail: status });
+  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, shown, asm, stale), { doc: d.name, detail: status });
   return log.text();
+}
+
+/**
+ * Změněné vlastnosti dílu do kusovníku mezi dvěma stavy téhož dílu (číslo, třída a označení materiálu, druh) – jen pro
+ * ⚠ asm.stale-copy u dílu vloženého tímto během (vlna 22, bod 22g). Jiný dokument (přepnutí záložky) = žádná změna.
+ */
+function partMetaChange(a: import("../types").CadDoc, b: import("../types").CadDoc): string[] {
+  if (a.name !== b.name || a.kind !== b.kind) return [];
+  const out: string[] = [];
+  if ((a.props?.number ?? "").trim() !== (b.props?.number ?? "").trim()) out.push(tr("číslo"));
+  if (a.material !== b.material || (a.materialName ?? "").trim() !== (b.materialName ?? "").trim()) out.push(tr("materiál"));
+  if ((a.supply?.kind ?? "") !== (b.supply?.kind ?? "")) out.push(tr("druh"));
+  return out;
+}
+
+/** otevřená sestava, ve které je kopie dílu `name` (komponenta s otiskem / zdrojem téhož názvu) – ⚠ asm.stale-copy (bod 22g) */
+function asmWithCopy(ws: Workspace, name: string): string | undefined {
+  const key = name.trim().toLowerCase();
+  for (const t of ws.tabs()) {
+    if (t.kind !== "assembly") continue;
+    const d = ws.docOf?.(t.id);
+    if (d?.components?.some((c) => c.source.kind === "part" && (c.origin?.part ?? c.source.doc.name).trim().toLowerCase() === key)) return d.name;
+  }
+  return undefined;
 }

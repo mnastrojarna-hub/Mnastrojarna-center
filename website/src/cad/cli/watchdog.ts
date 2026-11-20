@@ -21,6 +21,7 @@ import type { Entry, OutFile, RunReport } from "../engine/protocol-types";
 import type { StrictOpt } from "./args";
 import { stopEntry } from "../engine/strict";
 import type { DoneFile, FromJob, JobInit, JobRequest, Mem, SelftestResult, ToJob } from "./job";
+import type { RunStamp } from "../engine/run-queue";
 
 /** počet řádků skriptu (koncový konec řádku netvoří další řádek) */
 export const scriptLines = (text: string): number => (text ? text.replace(/\r?\n$/, "").split(/\r?\n/).length : 0);
@@ -28,16 +29,17 @@ export const scriptLines = (text: string): number => (text ? text.replace(/\r?\n
 /** značka vlákna běhu ve `workerData` (shodně s `JobInit["mncad"]`) */
 export const JOB_TAG: JobInit["mncad"] = "mncad-job";
 
-export type Interruption = "timeout" | "memory" | "crash" | "interrupted";
+/** zásah hlídače; `cancelled` = zrušení úlohy `mncad serve` (`DELETE /run/<id>`, vlna 22 bod 12) */
+export type Interruption = "timeout" | "memory" | "crash" | "interrupted" | "cancelled";
 export type Outcome =
   | { kind: "done"; report: RunReport; files: DoneFile[]; session?: Uint8Array }
   | { kind: Interruption; report: RunReport; detail: string }
   /** vlákno požadavek odmítlo (neplatná relace, nepoužitelná výstupní složka) – chyba souboru, kód 3 */
   | { kind: "failed"; error: string };
 
-export const INTERRUPTION_CODE: Record<Interruption, Code> = { timeout: "run.timeout", memory: "run.memory", crash: "run.crash", interrupted: "run.interrupted" };
+export const INTERRUPTION_CODE: Record<Interruption, Code> = { timeout: "run.timeout", memory: "run.memory", crash: "run.crash", interrupted: "run.interrupted", cancelled: "run.cancelled" };
 /** kód ukončení zásahu hlídače (i `mncad selftest`) */
-export const INTERRUPTION_EXIT: Record<Interruption, number> = { crash: 4, timeout: 5, memory: 6, interrupted: 130 };
+export const INTERRUPTION_EXIT: Record<Interruption, number> = { crash: 4, timeout: 5, memory: 6, interrupted: 130, cancelled: 130 };
 
 /**
  * první záznam, který v přísném režimu (volba běhu `strict`, bez řádků `přísně`) zastaví běh: ⚠/✗ s kódem mimo výjimky
@@ -79,6 +81,9 @@ export function httpStatusFor(o: Outcome): number {
     case "crash":
     case "interrupted":
       return 500;
+    // zrušení požádal klient (`DELETE /run/<id>`) – odpověď je protokol ✗ run.cancelled jako každý jiný běh s ✗
+    case "cancelled":
+      return 200;
   }
 }
 
@@ -86,7 +91,7 @@ export type ThreadEvent =
   | { t: "ready"; ms: number; mem: Mem }
   | { t: "op-start"; line: number | null; op: string; at: number }
   | { t: "op-end"; line: number | null; op: string; ms: number; mem: Mem }
-  | { t: "progress"; op: string; index?: number; total?: number; name?: string }
+  | { t: "progress"; op: string; index?: number; total?: number; name?: string; phase?: string }
   | { t: "dead"; reason: string };
 
 export type ThreadOptions = {
@@ -126,6 +131,8 @@ type Current = {
   inFlight: { line: number | null; op: string; at: number } | null;
   peak: number;
   t0: number;
+  /** identita běhu z vlákna (id + revize vstupu) – i do protokolu přerušeného běhu */
+  run?: RunStamp;
   settle: (o: Outcome) => void;
   timer?: ReturnType<typeof setTimeout>;
 };
@@ -244,7 +251,10 @@ export class JobThread {
         this.checkMem(m.mem);
         break;
       case "progress":
-        this.o.onEvent?.({ t: "progress", op: m.op, index: m.index, total: m.total, name: m.name });
+        this.o.onEvent?.({ t: "progress", op: m.op, index: m.index, total: m.total, name: m.name, ...(m.phase ? { phase: m.phase } : {}) });
+        break;
+      case "run":
+        c.run = m.run;
         break;
       case "done":
         this.lastMem = m.mem;
@@ -283,6 +293,9 @@ export class JobThread {
     const args = kind === "timeout" ? [c.call.timeoutSec] : kind === "memory" ? [this.o.maxMemMB] : kind === "crash" ? [detail] : [];
     rb.code(INTERRUPTION_CODE[kind], { line, args, data: { op: c.inFlight?.op ?? null, detail } });
     rb.memory(c.peak);
+    // identita běhu: zrušený / přerušený běh = „zrušeno“, limit / pád = „chyba“ (vlna 22, bod 12)
+    const runId = c.run?.id ?? c.req.runId;
+    if (runId) rb.run = { id: runId, inputRev: c.run?.inputRev ?? "-", state: kind === "cancelled" || kind === "interrupted" ? "cancelled" : "error" };
     const files = c.files.map((f) => ({ ...f, run: "fail" as const }));
     return rb.finish({ files, ms: Date.now() - c.t0 });
   }
@@ -356,6 +369,11 @@ export class JobThread {
   /** Ctrl+C / SIGTERM */
   interrupt(): Promise<void> {
     return this.kill("interrupted", "SIGINT");
+  }
+
+  /** zrušení běžící úlohy klientem (`mncad serve` `DELETE /run/<id>`): ✗ run.cancelled, vlákno se ukončí */
+  cancel(): Promise<void> {
+    return this.kill("cancelled", "cancel");
   }
 
   /** řádné ukončení volného vlákna */

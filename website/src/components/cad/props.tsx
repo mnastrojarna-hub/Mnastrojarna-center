@@ -18,6 +18,7 @@ import "./forms/index";
 import { getFeatureForm } from "./forms/registry";
 import { HoleBottomField, TapDrillField, TappedHeadField, threadPatch } from "./forms/hole-fields";
 import { ExtrudeDraftFields, ExtrudeHeightCheck } from "./extrude-fields";
+import { currentDocKey, registerFlush, sameNumber } from "./flush-barrier";
 
 // ---------- parametry (proměnné / rovnice) ----------
 
@@ -112,20 +113,55 @@ export function Num({
     if (liveTimer.current != null) window.clearTimeout(liveTimer.current);
     liveTimer.current = null;
   };
-  useEffect(() => cancelLive, []);
+  // rozepsaná hodnota v bariéře (vlna 22, bod 22e – flush-barrier.ts): přepnutí záložky, uložení, export, sdílení i volání
+  // window.mncad ji nejdřív zapíše – do dokumentu, ve kterém se psala; odmontování pole (zavření panelu, OK) ji potvrdí
+  const typedText = useRef(text);
+  const escaped = useRef(false);
+  const pending = useRef<{ off: () => void; owner: string } | null>(null);
+  const commitRef = useRef<(t: string) => void>(() => undefined);
+  const clearPending = () => {
+    pending.current?.off();
+    pending.current = null;
+  };
+  const markPending = () => {
+    if (pending.current) return;
+    const owner = currentDocKey();
+    const off = registerFlush(({ wrongDoc, discard }) => {
+      pending.current = null;
+      cancelLive();
+      // jiný dokument: hodnota se do něj nikdy nezapíše; Storno formuláře: zahodit
+      if (!wrongDoc && !discard) commitRef.current(typedText.current);
+    }, owner || null);
+    pending.current = { off, owner };
+  };
+  useEffect(
+    () => () => {
+      cancelLive();
+      const p = pending.current;
+      if (!p) return;
+      clearPending();
+      if (!p.owner || p.owner === currentDocKey()) commitRef.current(typedText.current);
+    },
+    [],
+  );
   const typed = (t: string) => {
     setText(t);
+    typedText.current = t;
     cancelLive();
+    markPending();
     if (!/^\s*-?\d+(?:[.,]\d+)?\s*$/.test(t)) return;
     liveTimer.current = window.setTimeout(() => {
       liveTimer.current = null;
       const v = clamp(parseFloat(t.replace(",", ".")));
       const cur = latest.current;
-      if (Number.isFinite(v) && cur.shownExpr == null && Math.abs(v - cur.value) > 1e-12) cur.onChange(v);
+      if (!Number.isFinite(v) || cur.shownExpr != null) return;
+      clearPending();
+      if (!sameNumber(v, cur.value)) cur.onChange(v);
     }, 450);
   };
   const commit = (t: string) => {
     cancelLive();
+    clearPending();
     if (!t.trim()) {
       setText(shownExpr ?? String(round4(value)));
       return;
@@ -145,6 +181,8 @@ export function Num({
     try {
       const v = clamp(evalExpr(t));
       setErr(null);
+      // opuštění pole bez změny hodnoty = žádný krok Zpět (jedno pravidlo historie – flush-barrier.ts historyRule)
+      if (stored == null && sameNumber(v, value)) return;
       if (stored != null && ctx && bind) ctx.setBinding(bind, null);
       onChange(v);
     } catch (x) {
@@ -152,6 +190,7 @@ export function Num({
       if (!ctx) setText(String(round4(value)));
     }
   };
+  commitRef.current = commit;
   const unbind = () => {
     if (!bind || !ctx) return;
     ctx.setBinding(bind, null);
@@ -181,12 +220,27 @@ export function Num({
           inputMode={ctx ? "text" : "decimal"}
           spellCheck={false}
           aria-label={label}
-          onChange={(e) => typed(e.target.value)}
-          onBlur={(e) => commit(e.target.value)}
+          onChange={(e) => {
+            escaped.current = false;
+            typed(e.target.value);
+          }}
+          onBlur={(e) => {
+            // Esc: aplikace pak pole opustí (blur) dřív, než React překreslí text – hodnota z DOM by se zapsala
+            if (escaped.current) {
+              escaped.current = false;
+              return;
+            }
+            commit(e.target.value);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter") commit((e.target as HTMLInputElement).value);
             if (e.key === "Escape") {
+              // Esc vrátí původní hodnotu a nic nezapíše – ani pozdější časovač, ani bariéra, ani následné opuštění pole
+              escaped.current = true;
+              cancelLive();
+              clearPending();
               setText(shownExpr ?? String(round4(value)));
+              typedText.current = shownExpr ?? String(round4(value));
               setErr(null);
             }
             if ((e.key === "ArrowUp" || e.key === "ArrowDown") && shownExpr == null) {

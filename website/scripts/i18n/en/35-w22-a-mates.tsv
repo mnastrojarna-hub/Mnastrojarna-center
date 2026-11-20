@@ -1,0 +1,54 @@
+# Vlna 22, balík A, etapa A2 (bod 20, 22i): ztracené reference vazeb po změně dílu – nikdy tiché připojení na jinou plochu
+ · ztracené reference: {0}	 · lost references: {0}
+— plocha ({0}) —	— face ({0}) —
+{0} {1} dílu „{2}“ ({3}) {4}	{0} {1} of part “{2}” ({3}) {4}
+{0} ztracená reference	{0} lost reference
+{0}: plocha {1} dílu „{2}“ – {3}	{0}: face {1} of part “{2}” – {3}
+→ „{0}“ vrácen do sestavy „{1}“ (změnu převzalo komponent: {2}){3}{4}{5} – stav vazeb níže	→ “{0}” returned to assembly “{1}” (components that took the change: {2}){3}{4}{5} – mate status below
+⚠ vazba {0} ({1}): {2}{3}	⚠ mate {0} ({1}): {2}{3}
+Díl se mezitím změnil – klikněte znovu na Zpět do sestavy.	The part has changed in the meantime – click Back to assembly again.
+Díl vrácen do sestavy – POZOR: ztracené reference vazeb: {0}. Vazby jsou mimo řešení a komponenty se kvůli nim nehýbou – opravte je v seznamu vazeb (Vybrat plochu znovu / Smazat vazbu).	Part returned to the assembly – WARNING: lost mate references: {0}. These mates are out of the solve and components do not move because of them – fix them in the mate list (Pick face again / Delete mate).
+Klikněte na plochu komponenty „{0}“ (nebo ji vyberte ze seznamu ploch) – nahradí ztracenou plochu vazby.	Click a face of component “{0}” (or pick it from the face list) – it replaces the lost face of the mate.
+Klikněte na plochu v modelu, nebo ji vyberte ze seznamu:	Click a face in the model, or pick it from the list:
+načítám plochy…	loading faces…
+Návrat do sestavy selhal: {0}	Returning to the assembly failed: {0}
+nejde ověřit	cannot be verified
+není jednoznačná	is ambiguous
+Nová plocha vazby – komponenta „{0}“	New mate face – component “{0}”
+plocha {0} → {1}	face {0} → {1}
+Plocha vazby vybrána znovu (F{0}) – vazba se zase řeší.	Mate face picked again (F{0}) – the mate is solved again.
+po úpravě dílu neexistuje	no longer exists after the part change
+pružina „{0}“ – ztracená dosedací plocha {1} {2}: délka pružiny se z ní nepočítá; zadejte dosedací plochy znovu (sestava pružina "{0}" mezi "A" <plocha> "B" <plocha>)	spring “{0}” – lost seat face {1} {2}: the spring length is not computed from it; enter the seat faces again (assembly spring "{0}" between "A" <face> "B" <face>)
+původní geometrie neznámá	original geometry unknown
+sestava vazba {0} plocha {1} <plocha> | smazat	assembly mate {0} face {1} <face> | delete
+táž plocha, nové číslo	same face, new number
+táž rovina / osa, plocha změnila velikost	same plane / axis, the face changed size
+vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" | plocha a|b <plocha>	mate „{0}“: what to do? value=N | flip | suppress | unsuppress | delete | name "…" | face a|b <face>
+vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" | plocha a|b <plocha> (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	mate „{0}“: unknown change „{1}“ – value=N | flip | suppress | unsuppress | delete | name "…" | face a|b <face> (start a new mate with its type: contact, flush, center, concentric, distance, angle, parallel, fixed)
+vazba „{0}“: plocha – zadejte stranu a plochu: plocha b F6 | plocha +Z (výpis ploch: sestava plochy "…")	mate „{0}“: face – give the side and the face: face b F6 | face +Z (face list: assembly faces "…")
+vazba {0} nemá stranu {1}	mate {0} has no side {1}
+vazba {0}: komponenta „{1}“ nemá {2}	mate {0}: component “{1}” has no {2}
+vazba {0}: komponenta strany {1} v sestavě není	mate {0}: the component of side {1} is not in the assembly
+vazba {0}: strana {1} je {2} – zadejte ji číslem {3}	mate {0}: side {1} is {2} – give it by number {3}
+vazba {0}: žádná ztracená reference – zadejte stranu: sestava vazba {0} plocha a|b <plocha>	mate {0}: no lost reference – give the side: assembly mate {0} face a|b <face>
+vazba motoru má ztracenou referenci plochy (díl se změnil) – vyberte plochu znovu: sestava vazby	the motor's mate has a lost face reference (the part changed) – pick the face again: assembly mates
+Vyberte plochu komponenty „{0}“ – tuto komponentu vazba spojuje.	Pick a face of component “{0}” – this is the component the mate connects.
+Vybírám plochu…	Picking a face…
+Vybrat plochu znovu	Pick face again
+Ztracená plocha byla rovinná – vyberte rovinnou plochu.	The lost face was planar – pick a planar face.
+Ztracená plocha byla válcová – vyberte válcovou plochu.	The lost face was cylindrical – pick a cylindrical face.
+ztracená reference	lost reference
+Ztracené reference vazeb: {0}. Plocha, na kterou vazba ukazovala, po úpravě dílu neexistuje nebo není jednoznačná – vazba je mimo řešení a komponenty se kvůli ní nehýbou. Vyberte plochu znovu, nebo vazbu smažte.	Lost mate references: {0}. The face the mate pointed to no longer exists after the part change or is ambiguous – the mate is out of the solve and components do not move because of it. Pick the face again, or delete the mate.
+nová plocha strany vazby – oprava ztracené reference: po úpravě dílu v kontextu (sestava hotovo, Zpět do sestavy) se plochy vazeb ověří podle geometrie; plocha, která zmizela nebo jde na víc míst, je ✗ mate.lost a vazba je mimo řešení (komponenta stojí); plocha = F-číslo nebo pravidlo jako u nové vazby, bez strany = ztracená strana	new face for one side of a mate – repair of a lost reference: after editing a part in context (assembly done, Back to assembly) the mate faces are checked by geometry; a face that disappeared or matches several places is ✗ mate.lost and the mate is out of the solve (the component stays); face = F number or a rule as for a new mate, without a side = the lost side
+vazba sestavy č. {0} má ztracenou referenci plochy (po úpravě dílu) – do skriptu se nezapisuje; vyberte plochu znovu (sestava vazba {0} plocha …) a export zopakujte	assembly mate no. {0} has a lost face reference (after a part change) – it is not written to the script; pick the face again (assembly mate {0} face …) and repeat the export
+vyberte plochu znovu (sestava vazba {0} plocha {1} …), nebo vazbu smažte (sestava vazba {0} smazat)	pick the face again (assembly mate {0} face {1} …), or delete the mate (assembly mate {0} delete)
+#!dynamic – druhy a důvody ztracené reference (tr(LOST_KIND[…]), tr(LOST_WHY[…]) v cad/agent-asm.ts) a texty kódů mate.* (src/cad/engine/codes.ts, tr(def.key))
+hrana – úsečka	edge – line
+hrana – kružnice	edge – circle
+hrana – křivka	edge – curve
+po úpravě dílu odpovídá více plochám – nejde jednoznačně určit	matches several faces after the part change – cannot be decided
+po úpravě dílu nejde ověřit (původní geometrie není k dispozici)	cannot be verified after the part change (the original geometry is not available)
+díl v podsestavě už není	the part is no longer in the subassembly
+vazba {0} – ztracená reference {1}: vazba je mimo řešení a komponenty se kvůli ní nehýbou; {2}	mate {0} – lost reference {1}: the mate is out of the solve and components do not move because of it; {2}
+vazba {0}: {1} po úpravě dílu ({2})	mate {0}: {1} after the part change ({2})
+vazba {0}: ztracená reference {1} znovu nalezena jako {2} – vazba se zase řeší	mate {0}: lost reference {1} found again as {2} – the mate is solved again

@@ -210,8 +210,8 @@ async function open(b, path) {
     // K2: výkresová kóta – protokol píše „vertikal“ a to samé slovo parser výkresu přijme
     const t1 = String(await p.evaluate(() => window.mncad.run('neues teil Z25\nquader 100 60 20\nzeichnung maß senkrecht ansicht vorne 0 0 0 20')));
     const t2 = String(await p.evaluate(() => window.mncad.run('zeichnung maß vertikal ansicht vorne 100 0 100 20')));
-    ok(/^✓ Maß 20 \(.*vertikal/m.test(t1) && !/^\s*✗/m.test(t1), `K2: protokol svislé kóty: „${(t1.split('\n').find((l) => /Maß 20/.test(l)) || t1).trim().slice(0, 90)}“`);
-    ok(/^✓ Maß 20/m.test(t2) && !/^\s*✗/m.test(t2), `K2: „zeichnung maß vertikal …“ projde: „${(t2.split('\n').find((l) => /Maß/.test(l)) || t2).trim().slice(0, 90)}“`);
+    ok(/^→ Maß 20 \(.*vertikal/m.test(t1) && !/^\s*✗/m.test(t1), `K2: protokol svislé kóty: „${(t1.split('\n').find((l) => /Maß 20/.test(l)) || t1).trim().slice(0, 90)}“`);
+    ok(/^→ Maß 20/m.test(t2) && !/^\s*✗/m.test(t2), `K2: „zeichnung maß vertikal …“ projde: „${(t2.split('\n').find((l) => /Maß/.test(l)) || t2).trim().slice(0, 90)}“`);
     ok(errs.length === 0, `/de/cad bez chyb stránky ${JSON.stringify(errs).slice(0, 200)}`);
     await ctx.close();
   }

@@ -1,5 +1,4 @@
 # Sestava textem pro AI agenty: plochy, vazby, komponenty, pole, šroub, podsestavy, kusovník, rám formy, záložky (balík asm)
-  plochy vazeb přečíslovány podle geometrie: {0}	  Flächen der Verknüpfungen nach Geometrie neu nummeriert: {0}
   pohnuto: {0}	  bewegt: {0}
   vazby pohnuly: {0}	  von Verknüpfungen bewegt: {0}
  – vypsány {0}	 – aufgeführt: {0}
@@ -44,7 +43,6 @@
 {0}plocha {1} komponenty „{2}“ je {3} – vazba potřebuje {4} plochu; {5}	{0}Fläche {1} der Komponente „{2}“ ist {3} – die Verknüpfung braucht eine {4} Fläche; {5}
 ⚠ díl se nepostavil (bez ploch): {0}	⚠ Teil wurde nicht aufgebaut (keine Flächen): {0}
 ⚠ plochu vazby se nepodařilo načíst z jádra – sestava vazby po dostavění dílů vazbu přepočítá	⚠ Fläche der Verknüpfung konnte nicht aus dem Kern geladen werden – baugruppe verknüpfungen berechnet sie nach dem Aufbau der Teile neu
-⚠ plochy vazeb, které po úpravě dílu nejde najít: {0} – sestava vazby	⚠ Flächen von Verknüpfungen, die nach der Teiländerung nicht gefunden werden: {0} – baugruppe verknüpfungen
 ⚠ v sestavě je konflikt vazeb – sestava vazby	⚠ in der Baugruppe gibt es einen Verknüpfungskonflikt – baugruppe verknüpfungen
 ⚠ vazbu nelze splnit spolu s ostatními – sestava vazby (výpis), sestava vazba {0} potlačit|smazat|obráceně	⚠ die Verknüpfung ist mit den anderen nicht erfüllbar – baugruppe verknüpfungen (Liste), baugruppe verknüpfung {0} unterdrücken|löschen|umkehren
 ✓ „{0}“ už má vazbu Ukotvit – beze změny	✓ „{0}“ hat bereits eine Verknüpfung Fixiert – unverändert
@@ -60,7 +58,6 @@
 ✓ pole „{0}“: {1} ks ({2}) – kopie {3}	✓ Muster „{0}“: {1} Stk. ({2}) – Kopien {3}
 ✓ rám formy „{0}“ – nová záložka: komponent {1}, {2}×{3} mm, výška {4} mm (se středicím kroužkem), dutina {5}, materiál {6}	✓ Formaufbau „{0}“ – neue Registerkarte: Komponenten {1}, {2}×{3} mm, Höhe {4} mm (mit Zentrierring), Nest {5}, Werkstoff {6}
 ✓ úprava {0} „{1}“ v kontextu sestavy „{2}“{3} – další příkazy pracují s ním; návrat: sestava hotovo	✓ Bearbeitung {0} „{1}“ im Kontext der Baugruppe „{2}“{3} – weitere Befehle arbeiten damit; zurück: baugruppe fertig
-✓ vazba {0} ({1}): {2}{3}	✓ Verknüpfung {0} ({1}): {2}{3}
 ✓ vazba Ukotvit „{0}“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou	✓ Verknüpfung Fixiert „{0}“ – die Komponente ist fixiert, andere Verknüpfungen bewegen die andere Komponente
 ✓ záložka „{0}“ ({1}) je aktivní – další příkazy pracují s ní	✓ Registerkarte „{0}“ ({1}) ist aktiv – weitere Befehle arbeiten damit
 ✓ záložka „{0}“ už je aktivní	✓ Registerkarte „{0}“ ist bereits aktiv
@@ -69,7 +66,6 @@
 ✓ zrcadlení „{0}“ podle {1}{2} → „{3}“ {4} (zrcadlí se poloha a natočení, geometrie dílu se nezrcadlí)	✓ Spiegelung von „{0}“ an {1}{2} → „{3}“ {4} (Lage und Drehung werden gespiegelt, die Teilgeometrie nicht)
 barva {0}	Farbe {0}
 barva: čekám #rrggbb (např. #e03930), ne „{0}“	Farbe: #rrggbb erwartet (z. B. #e03930), nicht „{0}“
-CSV (oddělovač ;):	CSV (Trennzeichen ;):
 číslo	Nummer
 číslo „{0}“	Nummer „{0}“
 číslo plochy začíná F1	Flächennummern beginnen bei F1
@@ -178,8 +174,6 @@ válcové	zylindrisch
 válcové plochy: {0}	zylindrische Flächen: {0}
 vazba „{0}“ je v sestavě {1}× – zadejte číslo: {2}	Verknüpfung „{0}“ ist {1}× in der Baugruppe – Nummer angeben: {2}
 vazba „{0}“ v sestavě není – vazby: {1}	Verknüpfung „{0}“ ist nicht in der Baugruppe – Verknüpfungen: {1}
-vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název "…"	Verknüpfung „{0}“: was tun? wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…"
-vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název "…" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)	Verknüpfung „{0}“: unbekannte Änderung „{1}“ – wert=N | umkehren | unterdrücken | aktivieren | löschen | name "…" (neue Verknüpfung mit der Art beginnen: kontakt, bündig, zentrieren, konzentrisch, abstand, winkel, parallel, fixiert)
 vazba {0} v sestavě není – vazby: {1}	Verknüpfung {0} ist nicht in der Baugruppe – Verknüpfungen: {1}
 vazba {0}: chybí cílová komponenta B – {1}	Verknüpfung {0}: Zielkomponente B fehlt – {1}
 vazba {0}: chybí komponenta A – {1}	Verknüpfung {0}: Komponente A fehlt – {1}

@@ -1,0 +1,49 @@
+# vlna 22, oprava etapy 1 balíku M (bod 1 – pohyb, bod 9): výsledek pohybové studie po posunu dílu UVNITŘ podsestavy a po změně
+# materiálu dílu v dynamice NEPLATÍ (dřív `motion=ok` a starý souhrn); jediný motor s rozsahem × rychlostí změní dřív zadanou
+# délku studie jen s ℹ motion.duration-set
+nový díl "Deska A"
+kvádr 60 40 10
+nový díl "Přidržovač"
+kvádr 10 10 10
+nový díl "Doraz"
+kvádr 10 10 5
+nový díl "Sloupek"
+kvádr 5 5 5
+#--- run
+nová sestava "Sestava A"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 40 10 30
+vložit "Doraz" v 0 0 50
+vložit "Sloupek" v 20 0 50
+sestava podsestava "Doraz" "Sloupek" jako "Skupina"
+sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20
+pohyb motor lineární vazba 1 20..5 kroky 5 kolize
+#--- run
+# díl „Doraz“ v podsestavě posunut do dráhy přidržovače: stav NEPLATÍ (jmenuje podsestavu), pohyb stav ⚠, pohyb spustit ℹ a průnik
+sestava upravit "Skupina"
+sestava komponenta "Doraz" v 40 10 22
+sestava hotovo
+pohyb stav
+pohyb spustit
+#--- run
+# délka studie: dřív zadané 3 s → doba jízdy 2 s s ℹ (dřív potichu)
+pohyb smazat
+pohyb čas 3
+pohyb motor lineární vazba 1 20..5 rychlost 7,5 kroky 4
+#--- run
+# dynamika: změna materiálu dílu (hmotnost) → výsledek NEPLATÍ
+nový díl "Vodítko"
+válec 10 60
+nová sestava "S1"
+vložit "Deska A" ukotvit
+vložit "Vodítko" v 30 20 -10
+sestava vazba ukotvit "Vodítko"
+vložit "Přidržovač" v 25 15 30
+sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 20 název "ZDVIH"
+pohyb dynamika čas 0,02 krok 0,001 gravitace vyp
+pohyb síla vazba "ZDVIH" 10
+#--- run
+sestava upravit "Přidržovač"
+materiál hliník
+sestava hotovo
+pohyb stav

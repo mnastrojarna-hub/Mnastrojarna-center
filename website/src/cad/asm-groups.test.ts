@@ -75,11 +75,12 @@ describe("skupiny komponent sestavy", () => {
     const a = emptyAssembly("T");
     a.components = [partComponent(emptyDoc("Šroub"), {}, { group: "Standard parts" }), partComponent(emptyDoc("Deska"), {}, { group: "Desky" }), partComponent(emptyDoc("Jiný"), {}, { group: "Vlastní" })];
     const bom = computeBom(a, () => ({}));
-    expect(bom.map((r) => r.group)).toEqual(["Desky", "Standard parts", "Vlastní"]);
+    // vlna 22 (bod 19): oddíly podle druhu – vyráběné (Desky, Vlastní) před normáliemi; v oddílu dál podle skupiny
+    expect(bom.map((r) => r.group)).toEqual(["Desky", "Vlastní", "Standard parts"]);
     const csv = bomCsv(bom).split("\r\n");
     expect(csv[1].endsWith(";Plates")).toBe(true);
-    expect(csv[2].endsWith(";Standard parts")).toBe(true);
-    expect(csv[3].endsWith(";Vlastní")).toBe(true);
+    expect(csv[2].endsWith(";Vlastní")).toBe(true);
+    expect(csv[3].endsWith(";Standard parts")).toBe(true);
     setLang("cs");
     const b = emptyAssembly("T");
     b.components = [partComponent(emptyDoc("Šroub"), {}, { group: "Normálie" }), partComponent(emptyDoc("Deska"), {}, { group: "Desky" })];

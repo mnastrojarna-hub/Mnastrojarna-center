@@ -17,7 +17,6 @@ Nastavit pružinu	Feder festlegen
 nedosedá – vzdálenost ploch {0} mm je větší než volná délka L0 {1} mm (mezera {2} mm)	liegt nicht an – Flächenabstand {0} mm ist größer als die freie Länge L0 {1} mm (Spalt {2} mm)
 nedosedá v krocích {0} (mezera max {1} mm)	liegt nicht an in Schritten {0} (Spalt bis {1} mm)
 otevřený dokument „{0}“ není sestava – nejdřív „nová sestava“ nebo „záložka "…"“	das geöffnete Dokument „{0}“ ist keine Baugruppe – zuerst „neu baugruppe“ oder „registerkarte "…"“
-plochy, vazba, vazby, komponenta, odebrat, duplikovat, izolovat, skrýt, zobrazit, ukotvit, uvolnit, pole, zrcadlit, šroub, podsestava, rozpustit, upravit, hotovo, otevřít, pružina, pružiny	flächen, verknüpfung, verknüpfungen, komponente, entfernen, duplizieren, isolieren, ausblenden, einblenden, fixieren, lösen, muster, spiegeln, schraube, unterbaugruppe, auflösen, bearbeiten, fertig, öffnen, feder, federn
 pod délkou na doraz v krocích {0} (vzdálenost ploch min {1} mm)	unter der Blocklänge in Schritten {0} (Flächenabstand bis {1} mm)
 pružina „{0}“	Feder „{0}“
 pružina „{0}“: délku nešlo určit – dosedací plocha je rovnoběžná s osou pružiny nebo se díl nepostavil	Feder „{0}“: Länge nicht bestimmbar – eine Auflagefläche ist parallel zur Federachse oder das Teil wurde nicht gebaut
@@ -39,7 +38,6 @@ Přezdívka instance (vazby místo #k)	Instanz-Alias (Verknüpfungen statt #k)
 přezdívka nesmí být prázdná	der Alias darf nicht leer sein
 přezdívka nesmí začínat „#“ (to je pořadí komponenty) – např. jako "K48"	der Alias darf nicht mit „#“ beginnen (das ist die Position der Komponente) – z. B. als "K48"
 přezdívku „{0}“ už má komponenta „{1}“ – zvolte jinou	die Komponente „{1}“ hat bereits den Alias „{0}“ – anderen wählen
-sestava pružina "Pružina" mezi "Deska A" [F3] "Deska B" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina "Pružina" odebrat · sestava pružiny	baugruppe feder "Feder" zwischen "Platte A" [F3] "Platte B" [F7] [frei L0] [block Ln] [steifigkeit c] · baugruppe feder "Feder" entfernen · baugruppe federn
 sestava pružina: {0} musí být kladná	baugruppe feder: {0} muss positiv sein
 sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm	baugruppe feder: die Blocklänge {0} mm muss kleiner als die freie Länge {1} mm sein
 sestava pružina: neznámá volba „{0}“ – {1}	baugruppe feder: unbekannte Option „{0}“ – {1}
@@ -52,7 +50,6 @@ Stlačuje (B)	Gedrückt von (B)
 tuhost	Steifigkeit
 Tuhost c (0 = neuvádět)	Steifigkeit c (0 = keine Angabe)
 Upravit pružinu	Feder ändern
-v x y z, otočení rx ry rz, posun dx dy dz, pootočit X 90, ukotvit, uvolnit, skrýt, zobrazit, barva #hex, název "…", číslo "…", skupina "…", materiál …, přezdívka "…"	bei x y z, drehung rx ry rz, versatz dx dy dz, verdrehen X 90, fixieren, lösen, ausblenden, einblenden, farbe #hex, name "…", nummer "…", gruppe "…", werkstoff …, als "…"
 vlastnosti komponenty jako v panelu (poloha, natočení, ukotvení, viditelnost, popis, materiál do kusovníku); komponenta = název, pořadí #3 nebo přezdívka (vložit … jako "K48", sestava komponenta #3 přezdívka "K48"; EN alias, DE als); po přesunu se vazby přepočítají; kusovník sčítá komponenty podle zdroje (dílu) – přejmenování instance řádek nerozdělí	Komponenteneigenschaften wie im Panel (Lage, Drehung, fixiert, Sichtbarkeit, Beschreibung, Stücklisten-Werkstoff); Komponente = Name, Position #3 oder Alias (einfügen … als "K48", baugruppe komponente #3 als "K48"; EN alias); nach dem Verschieben werden Verknüpfungen neu berechnet; die Stückliste zählt Komponenten nach Quelle (Teil) – Umbenennen einer Instanz teilt die Zeile nicht
 vložit … jako: chybí přezdívka – např. vložit "Šroub" jako "K48"	einfügen … als: Alias fehlt – z. B. einfügen "Schraube" als "K48"
 vložit: {0}	einfügen: {0}

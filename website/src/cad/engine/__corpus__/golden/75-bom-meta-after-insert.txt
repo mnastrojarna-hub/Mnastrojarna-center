@@ -1,0 +1,74 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+
+Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 40 × 30 × 10 mm (X 0…40, Y 0…30, Z 0…10) · objem 12 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ – 40 × 30 × 10 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Nástroj“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 60 × 30 mm · objem Σ 132 cm³ · hmotnost Σ 1,036 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 3 ===
+✓ záložka „Deska A“ (díl) je aktivní – další příkazy pracují s ní
+✓ materiál „1.2379“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)
+ℹ řádek 3: materiál „1.2379“ zařazen jako Ocel (7.85 g/cm³)
+⚠ řádek 3: díl „Deska A“ je v sestavě „Nástroj“ jako kopie – změna (materiál) se do sestavy sama nepromítne; v sestavě: sestava obnovit "Deska A"
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ razítko: číslo „DA-001“
+✓ záložka „Nástroj“ (sestava) je aktivní – další příkazy pracují s ní
+Kusovník „Nástroj“ (plochý): položek 2, kusů 2, hmotnost Σ 1,036 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+1 | Deska A |  | 1 | — (třída Ocel) | 0,942
+2 | Přidržovač |  | 1 | — (třída Ocel) | 0,094
+⚠ řádek 6: komponenta „Deska A“ je starší než díl „Deska A“ v záložce (číslo, materiál, výkres) – kusovník a výkres ukazují údaje z vložení; obnovit: sestava obnovit #1
+⚠ řádek 6: vyráběné díly bez čísla výkresu: Deska A, Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 6: vyráběné díly bez označení materiálu (jen třída): Deska A, Přidržovač – materiál 1.2379 v dílu
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 60 × 30 mm · objem Σ 132 cm³ · hmotnost Σ 1,036 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 4 ===
+✓ komponenta „Deska A“ obnovena z dílu (číslo, materiál, výkres)
+Kusovník „Nástroj“ (plochý): položek 2, kusů 2, hmotnost Σ 1,036 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+1 | Deska A | DA-001 | 1 | 1.2379 | 0,942
+2 | Přidržovač |  | 1 | — (třída Ocel) | 0,094
+CSV (oddělovač ;, desetinná čárka):
+Pozice;Název;Číslo výkresu / norma;Ks;Materiál;Hmotnost 1 ks [kg];Hmotnost celkem [kg];Druh;Norma;Rozměr;Třída / tolerance;Katalogové číslo;Výrobce;Skupina
+1;Deska A;DA-001;1;1.2379;0,942;0,942;vyráběný;;;;;;
+2;Přidržovač;;1;— (třída Ocel);0,094;0,094;vyráběný;;;;;;
+⚠ řádek 3: vyráběné díly bez čísla výkresu: Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+⚠ řádek 3: vyráběné díly bez označení materiálu (jen třída): Přidržovač – materiál 1.2379 v dílu
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 60 × 30 mm · objem Σ 132 cm³ · hmotnost Σ 1,036 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+=== run 5 ===
+✓ úprava dílu „Přidržovač“ v kontextu sestavy „Nástroj“ – další příkazy pracují s ním; návrat: sestava hotovo
+✓ materiál „C45“ = označení do razítka, třída „Ocel“ (7.85 g/cm³)
+ℹ řádek 3: materiál „C45“ zařazen jako Ocel (7.85 g/cm³)
+✓ „Přidržovač“ vrácen do sestavy „Nástroj“ (změnu převzalo komponent: 1) · objem dílu 12 cm³
+Kusovník „Nástroj“ (plochý): položek 2, kusů 2, hmotnost Σ 1,036 kg
+Poz. | Název | Číslo / norma | Ks | Materiál | kg/ks
+1 | Deska A | DA-001 | 1 | 1.2379 | 0,942
+2 | Přidržovač |  | 1 | C45 | 0,094
+⚠ řádek 5: vyráběné díly bez čísla výkresu: Přidržovač – číslo: výkres razítko číslo="…" v dílu, nebo sestava komponenta "…" číslo "…"
+
+Dokument: „Nástroj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [10; 10; 20]
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 60 × 30 mm · objem Σ 132 cm³ · hmotnost Σ 1,036 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

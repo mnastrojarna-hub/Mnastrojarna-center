@@ -3,6 +3,7 @@
 > Mnástrojárna s.r.o. je česká nástrojárna (prototypy, náhradní díly do jednoúčelových strojů, nástroje, přípravky, 1–99 ks, konsignace) a autor bezplatného online 3D/2D CADu Mnástrojárna CAD, který běží v prohlížeči na jádru OpenCascade.
 
 ## Mnástrojárna CAD
+- [Tahák pro AI agenty](https://www.mnastrojarna.cz/cad/tahak.md): začněte zde – nejčastější textové příkazy jako hotové řádky (≤ 5 kB; anglicky https://www.mnastrojarna.cz/cad/tahak.en.md, německy https://www.mnastrojarna.cz/cad/tahak.de.md). Hledání v nápovědě: nápověda hledat <slova> v konzoli, mncad help search <slova> v CLI.
 - [Aplikace](https://www.mnastrojarna.cz/cad): spuštění bez instalace a registrace, česky.
 - [Kompletní dokumentace (HTML)](https://www.mnastrojarna.cz/cad/dokumentace): 26 kapitol – ovládání, skica, prvky, plochy, plech, svařence, knihovna normálií, sestavy, výkresy, 2D CAD (DWG/DXF), formáty, sdílení odkazem, nastavení, zkratky, AI agenti a automatizace, FAQ.
 - [Dokumentace jako Markdown](https://www.mnastrojarna.cz/cad/dokumentace.md): stejný obsah v prostém textu pro strojové zpracování.

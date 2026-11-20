@@ -4,7 +4,7 @@
  * aktivní záložku, smí-li). Smlouva B2 po recenzi: dokument dřívějšího běhu se nikdy nepřepíše, `vložit` vidí aktuální díl
  * a název, stav vazeb a kolizí je podle id dokumentu – stejně jako MemoryWorkspace (CLI, serve).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { TabInfo } from "@/cad/agent-asm";
 import { docHasContent, docTabKind } from "@/cad/draft/doc";
 import { memoryFileSink, memoryFileSource, type EngineHost } from "@/cad/engine/host";
@@ -15,7 +15,8 @@ import { runScript } from "@/cad/engine/run";
 import type { Workspace } from "@/cad/engine/workspace";
 import type { MateStatus } from "@/cad/mates";
 import { emptyDoc, uid, type BuildResult, type CadDoc, type ComponentSource } from "@/cad/types";
-import { makeAppWorkspace, type AppPortDeps, type PortTab } from "./engine-port";
+import { makeAppHost, makeAppWorkspace, type AppHostDeps, type AppPortDeps, type PortTab } from "./engine-port";
+import { histStep as stepHist } from "@/cad/agent-edit";
 
 type Hist = PortTab["hist"];
 type Entry = PortTab & { docId: string };
@@ -95,6 +96,8 @@ const kernel = {
   build: async (d: CadDoc) => result(d),
   asmParts: async (parts: { key: string; source: ComponentSource }[]) => parts.map((p) => ({ key: p.key, result: result(p.source.kind === "part" ? p.source.doc : emptyDoc()) })),
   interference: async (d: CadDoc) => (d.name === "A" ? [{ a: d.components![0].id, b: d.components![1].id, volume: 16000 }] : []),
+  // zařazení dvojic (vlna 22, bod 5): bez jádra skutečná kolize – stav pak vypíše instance „Blok #1 × Blok #2“
+  clashDetail: async (_d: CadDoc, pairs: { a: string; b: string; volume: number }[]) => pairs.map((p) => ({ ...p, cls: "real", why: "no-thread" })),
 } as unknown as KernelApi;
 const host: EngineHost = { kernel, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() };
 const titles = (ws: Workspace) => ws.tabs().map((t) => t.title);
@@ -168,7 +171,7 @@ describe("engine-port: stav vazeb a kolizí podle id dokumentu (zrcadlo do zobra
   it("kolize A se nepřenese na B; přejmenování A stav zachová; aplikace = MemoryWorkspace", async () => {
     const r = await both([ASM2, 'záložka "A"\nkolize', 'záložka "B"\nstav', 'záložka "A"\nnázev "A2"\nstav']);
     expect(r.a[2]).toMatch(/^Kolize: nezkontrolováno/m);
-    expect(r.a[3]).toMatch(/^Kolize: 1 – Blok × Blok/m);
+    expect(r.a[3]).toMatch(/^Kolize: 1 – skutečné 1: Blok #1 × Blok #2/m); // vlna 22, bod 5: instance a třída místo „Blok × Blok“
     expect(r.a).toEqual(r.m);
     expect(r.app.shown.clash).toMatchObject({ res: [{ volume: 16000 }] }); // panel Kolize ukazuje poslední kontrolu
   });
@@ -183,6 +186,21 @@ describe("engine-port: stav vazeb a kolizí podle id dokumentu (zrcadlo do zobra
     expect(app.shown.clash).toBeNull();
     expect(ws.asm.mateStatus.get("jiný dokument")).toBeUndefined();
   });
+  it("stav dokumentu jiné (nezobrazené) záložky se do zobrazení nezrcadlí – souhrny běhu (řádky D) počítají i sestavy v pozadí", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(app.deps);
+    await runScript(ws, ASM2, host); // zobrazená je sestava B
+    const keyA = ws.docKey(ws.tabs().find((t) => t.title === "A")!.id);
+    app.shown = {};
+    ws.asm.clash.set(keyA, { res: [], at: "10:00", comps: 2 });
+    ws.asm.mateStatus.set(keyA, { m1: "ok" });
+    expect(app.shown).toEqual({}); // panel Kolize a seznam vazeb sestavy B beze změny
+    expect(ws.asm.clash.get(keyA)).toMatchObject({ comps: 2 }); // stav pod klíčem A uložen
+    ws.asm.clash.set(ws.docKey(), { res: [], at: "11:00", comps: 2 }); // zobrazený dokument se zrcadlí dál
+    expect(app.shown.clash).toEqual({ res: [], at: "11:00", comps: 2 });
+    ws.asm.clash.set("nový dokument běhu bez záložky", { res: [], at: "12:00", comps: 1 }); // záložka teprve vznikne → zrcadlí se
+    expect(app.shown.clash).toEqual({ res: [], at: "12:00", comps: 1 });
+  });
 });
 
 describe("přepnutí záložky, které se nepromítne (5.2 č. 22, balík B4)", () => {
@@ -192,5 +210,249 @@ describe("přepnutí záložky, které se nepromítne (5.2 č. 22, balík B4)", 
     const ws = makeAppWorkspace(deps);
     const r = await runScript(ws, "nový díl A\nkvádr 1 1 1\nnový díl B\nkvádr 2 2 2", host);
     expect(r.entries.filter((e) => e.level === "error").map((e) => `${e.line} ${e.code}`), JSON.stringify(r.entries)).toContain("3 tab.settle-timeout");
+  });
+});
+
+/* ───────── vlna E, balík runs: opakovaný běh a stručný protokol v aplikaci (engine/runs.ts, engine/run-protocol.ts) ───────── */
+const THREE = 'nový díl "Deska"\nkvádr 100 50 10\nnový díl "Čep"\nválec 5 30\nnová sestava "S"\nvložit "Deska" v 0 0 0\nvložit "Čep" v 20 20 10';
+
+describe("aplikace: opakovaný běh téhož skriptu = stejné záložky (jako MemoryWorkspace)", () => {
+  it("3 dokumenty dvakrát → Deska, Čep, S; ℹ doc.reused v konzoli; aplikace = MemoryWorkspace", async () => {
+    const r = await both([THREE, THREE]);
+    expect(titles(r.aws)).toEqual(["Deska", "Čep", "S"]);
+    expect(titles(r.mws)).toEqual(["Deska", "Čep", "S"]);
+    expect(r.a[1]).toMatch(/✓ nová sestava „S“ – znovu použitá záložka z dřívějšího běhu\nℹ řádek 5: záložka „S“ z dřívějšího běhu použita znovu/);
+    expect(r.a).toEqual(r.m);
+    // sestava 2. běhu: dvě komponenty z dílů 2. běhu (findPart bere převzatou záložku jako dokument běhu)
+    expect(r.aws.present().components?.map((c) => c.name)).toEqual(["Deska", "Čep"]);
+  });
+  it("obnovení stránky (nový port nad obnovenými záložkami se stejnými id): záložky běhů z sessionStorage → pořád 3 záložky", async () => {
+    const store = new Map<string, string>();
+    const g = globalThis as { sessionStorage?: unknown };
+    const had = g.sessionStorage;
+    g.sessionStorage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) };
+    try {
+      const app = new FakeApp();
+      await runScript(makeAppWorkspace(app.deps), THREE, host);
+      expect(JSON.parse(store.get("mn-cad-run-tabs") ?? "[]")).toHaveLength(3); // jen id záložek, žádná data dokumentu
+      const r = await runScript(makeAppWorkspace(app.deps), THREE, host); // „po obnovení“: nový port, stejné záložky
+      expect(titles(makeAppWorkspace(app.deps))).toEqual(["Deska", "Čep", "S"]);
+      expect(r.entries.filter((e) => e.code === "doc.reused")).toHaveLength(3);
+      // bez sessionStorage (jiná karta prohlížeče): záložky se nepřevezmou – nová záložka a ℹ doc.name-taken, nikdy tiše
+      store.clear();
+      const r2 = await runScript(makeAppWorkspace(app.deps), 'nový díl "Deska"\nkvádr 1 1 1', host);
+      expect(r2.entries.filter((e) => e.code === "doc.name-taken")).toHaveLength(1);
+    } finally {
+      g.sessionStorage = had;
+    }
+  });
+  it("záložka otevřená mimo běh se nepřepíše (nová záložka + ℹ doc.name-taken); `znovu` ji převezme; `nový` = nová záložka", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(app.deps);
+    app.openDocInTab({ ...emptyDoc("U"), features: [{ id: "u1", name: "Kvádr 1", type: "box", size: [5, 5, 5], position: [0, 0, 0], centered: false, mode: "new" }] as CadDoc["features"] }, {});
+    const r1 = await runScript(ws, 'nový díl "U"\nkvádr 1 1 1', host);
+    expect(titles(ws)).toEqual(["U", "U"]);
+    expect(r1.entries.filter((e) => e.code === "doc.name-taken")).toHaveLength(1);
+    await runScript(ws, 'nový díl "U" nový\nkvádr 1 1 1', host);
+    expect(titles(ws)).toEqual(["U", "U", "U"]);
+    const app2 = new FakeApp();
+    const ws2 = makeAppWorkspace(app2.deps);
+    app2.openDocInTab({ ...emptyDoc("V"), features: [{ id: "v1", name: "Kvádr 1", type: "box", size: [5, 5, 5], position: [0, 0, 0], centered: false, mode: "new" }] as CadDoc["features"] }, {});
+    const r2 = await runScript(ws2, 'nový díl "V" znovu\nkvádr 1 1 1', host);
+    expect(titles(ws2)).toEqual(["V"]);
+    expect(r2.entries.filter((e) => e.code === "doc.reused")).toHaveLength(1);
+    expect(ws2.present().features.map((f) => f.id)).not.toContain("v1");
+  });
+});
+
+describe("aplikace: stručný protokol (window.mncad.run protocol short) = CLI --formats none", async () => {
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const { setHostAssets } = await import("@/cad/host-assets");
+  const { makeKernelClient } = await import("@/cad/kernel-client");
+  const { inProcessTransport } = await import("@/cad/kernel-inprocess");
+  const { engineRun, finishRun } = await import("@/cad/cli/job");
+  const { scriptLines } = await import("@/cad/cli/watchdog");
+  const { ReportBuilder, finalizeReport } = await import("@/cad/engine/protocol");
+  const { formatRun, runReport } = await import("@/cad/engine/run-protocol");
+  const WASM = path.resolve(__dirname, "../../../node_modules/replicad-opencascadejs/dist/replicad_single.wasm");
+  setHostAssets({ font: async (name) => new Uint8Array(fs.readFileSync(path.resolve(__dirname, "../../../public/fonts", name))).buffer });
+  const real = makeKernelClient(inProcessTransport({ locateFile: (file) => (file.endsWith(".wasm") ? WASM : file) }));
+  await real.init();
+  const realHost = (): EngineHost => ({ kernel: real, files: memoryFileSink(), inputs: memoryFileSource({}), now: () => Date.now() });
+  const noHooks = { opStart: () => undefined, opEnd: () => undefined };
+  const cli = async (script: string) => {
+    const ws = new MemoryWorkspace();
+    const h = realHost();
+    const rb = new ReportBuilder({ lang: "cs", lines: scriptLines(script), strict: false });
+    await engineRun(ws, script, h, rb, { strict: false, open: [] }, noHooks);
+    const fin = await finishRun(ws, h, rb, { formats: "none", allDocs: false, noOutputOnError: false, share: false, strict: false }, noHooks);
+    return finalizeReport(rb.finish({ docs: fin.docs, files: [] })).protocol;
+  };
+  const strip = (s: string) => s.replace(/ t=[\d.]+/g, "").replace(/ slow=\S+/g, "").replace(/ mem=\d+MB/g, "");
+  it("skripty 1–3 dokumentů, s chybou, se stavem a kolizemi, prázdná sestava, přísný režim: protokol prohlížeče = CLI", async () => {
+    const scripts = [THREE, `${THREE}\nkolize\nstav`, "nový díl A\nkvádr 10 10 10\nzaoblit 50 hrany svislé\nnový díl B\nválec 5 10", 'nová sestava "E"', 'přísně\nnový díl P\nkvádr 10 10 10\ndíra 3 hloubka 2 v 5 5\nblbost'];
+    for (const script of scripts) {
+      const app = new FakeApp();
+      const web = formatRun(await runReport(makeAppWorkspace(app.deps), script, realHost()), { protocol: "short" });
+      expect(strip(web), script).toBe(strip(await cli(script)));
+      expect(web.length).toBeLessThanOrEqual(2048);
+    }
+  }, 600_000);
+  it("opakovaný běh v aplikaci: řádky D a objemy obou běhů stejné", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(app.deps);
+    const d1 = formatRun(await runReport(ws, THREE, realHost()), { protocol: "full" }).split("\n").filter((l) => l.startsWith("D "));
+    const d2 = formatRun(await runReport(ws, THREE, realHost()), { protocol: "full" }).split("\n").filter((l) => l.startsWith("D "));
+    expect(d1).toHaveLength(3);
+    expect(d1[0]).toBe('D "Deska" part feat=1/0/0 V=50cm3 m=0.392kg bbox=100x50x10 solids=1 valid=1');
+    expect(d2).toEqual(d1);
+    expect(titles(ws)).toEqual(["Deska", "Čep", "S"]);
+  }, 240_000);
+});
+
+/* ───────── zápis se promítne až po vykreslení (React): přepnutí záložky hned po zápisu ho nesmí zahodit ───────── */
+/**
+ * Aplikace jako React: `commit` (setHist s funkcí) a přepnutí záložky (`activateTab`) se ve stavu projeví až „vykreslením“
+ * (`settle`); přepnutí si ale snímek záložek bere hned ze stavu před vykreslením – jako cad-app.tsx `snapshotTabs(histRef)`.
+ */
+function lazyDeps(app: FakeApp): () => AppPortDeps {
+  const queue: (() => void)[] = [];
+  const render = () => {
+    for (const f of queue.splice(0)) f();
+  };
+  return () => ({
+    ...app.deps(),
+    commit: (d) => void queue.push(() => app.commit(d)),
+    activateTab: (id) => {
+      const snap = app.snapshot(); // snímek ze stavu před vykreslením (aktivní záložka s historií z posledního vykreslení)
+      queue.push(() => {
+        const t = snap.find((x) => x.id === id);
+        if (!t) return;
+        app.list = snap;
+        app.hist = t.hist;
+        app.docId = t.docId;
+        app.tabId = id;
+      });
+    },
+    // `zpět` / `znovu`: cad-app.tsx volá setHist ve `flushSync` – čekající zápisy se promítnou a krok proběhne hned
+    histStep: (dir, n) => {
+      render();
+      const step = stepHist(app.hist, dir, n);
+      app.hist = step.hist;
+      return step.moved;
+    },
+    // zavření záložky jako cad-app.tsx `closeTab`: snímek ze stavu před vykreslením, projeví se vykreslením
+    closeTab: (id) => {
+      const all = app.snapshot();
+      queue.push(() => {
+        const idx = all.findIndex((t) => t.id === id);
+        const snap = all.filter((t) => t.id !== id);
+        app.list = snap;
+        if (id === app.tabId && snap.length) {
+          const next = snap[Math.min(Math.max(0, idx - 1), snap.length - 1)];
+          app.hist = next.hist;
+          app.docId = next.docId;
+          app.tabId = next.id;
+        }
+      });
+    },
+    settle: async (ok) => {
+      render();
+      return ok();
+    },
+  });
+}
+const featsOf = (app: FakeApp, title: string) => app.snapshot().find((t) => t.title === title)?.hist.present.features.map((f) => f.type);
+
+describe("zápis do záložky před přepnutím (aplikace vykresluje až po běhu operace)", () => {
+  it("`záložka \"B1\"` hned po úpravě dílu A1 – úprava A1 zůstane (dřív se tiše zahodila)", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(lazyDeps(app));
+    await runScript(ws, 'nový díl "A1"\nkvádr 10 10 10\nnový díl "B1"\nkvádr 5 5 5', host);
+    const r = await runScript(ws, 'záložka "A1"\nválec 5 30\nzáložka "B1"', host);
+    expect(r.counts.errors).toBe(0);
+    expect(featsOf(app, "A1")).toEqual(["box", "cylinder"]);
+    expect(app.hist.present.name).toBe("B1");
+  });
+  it("opakovaný běh se změněným obsahem: převzatá záložka R1 má nový obsah, i když hned následuje další dokument", async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(lazyDeps(app));
+    await runScript(ws, 'nový díl "R1"\nkvádr 10 10 10\nnový díl "R2"\nkvádr 5 5 5', host);
+    const r = await runScript(ws, 'nový díl "R1"\nkvádr 20 20 20\nválec 3 30\nnový díl "R2"\nkvádr 6 6 6\nnová sestava "S"\nvložit "R1"\nvložit "R2"', host);
+    expect(r.counts.errors).toBe(0);
+    expect(titles(ws)).toEqual(["R1", "R2", "S"]);
+    expect(featsOf(app, "R1")).toEqual(["box", "cylinder"]);
+    const box = app.snapshot().find((t) => t.title === "R1")!.hist.present.features[0] as { size: number[] };
+    expect(box.size).toEqual([20, 20, 20]);
+    expect((app.snapshot().find((t) => t.title === "R2")!.hist.present.features[0] as { size: number[] }).size).toEqual([6, 6, 6]);
+  });
+});
+
+/* ───────── recenze vlny E (nález 1): `zpět` / `znovu` a hned přepnutí, nová záložka nebo zavření záložky v témže běhu ───────── */
+describe("zpět / znovu a pak záložka, nový díl nebo zavřít záložku v témže běhu (krok historie je synchronní)", () => {
+  const setup = async () => {
+    const app = new FakeApp();
+    const ws = makeAppWorkspace(lazyDeps(app));
+    await runScript(ws, 'nový díl "W1"\nkvádr 10 10 10\nnový díl "W2"\nkvádr 5 5 5', host);
+    return { app, ws };
+  };
+  const errs = (r: { entries: { level: string; line?: number | null; code?: string }[] }) => r.entries.filter((e) => e.level === "error").map((e) => `${e.line} ${e.code}`);
+  it("`záložka W1`, válec, `zpět`, `záložka W2`, válec → válec ve W2, W1 jen kvádr, žádné ✗ tab.settle-timeout", async () => {
+    const { app, ws } = await setup();
+    const r = await runScript(ws, 'záložka "W1"\nválec 3 30\nzpět\nzáložka "W2"\nválec 2 10', host);
+    expect(errs(r)).toEqual([]);
+    expect(featsOf(app, "W1")).toEqual(["box"]);
+    expect(featsOf(app, "W2")).toEqual(["box", "cylinder"]);
+    expect(app.hist.present.name).toBe("W2");
+  });
+  it("`zpět` a hned `nový díl \"U2\"` → záložka U2 vznikne (dřív ✗ timeout a dokument ztracen)", async () => {
+    const { app, ws } = await setup();
+    const r = await runScript(ws, 'válec 5 20\nzpět\nnový díl "U2"\nkvádr 5 5 5', host);
+    expect(errs(r)).toEqual([]);
+    expect(titles(ws)).toEqual(["W1", "W2", "U2"]);
+    expect(featsOf(app, "W2")).toEqual(["box"]);
+    expect(featsOf(app, "U2")).toEqual(["box"]);
+  });
+  it("`zpět` a hned `zavřít záložku \"W2\"` → W2 zavřená", async () => {
+    const { ws } = await setup();
+    const r = await runScript(ws, 'záložka "W1"\nválec 3 30\nzpět\nzavřít záložku "W2"', host);
+    expect(errs(r)).toEqual([]);
+    expect(titles(ws)).toEqual(["W1"]);
+  });
+  it("`zpět` + `znovu` a pak `záložka` → krok vrácený `znovu` zůstane ve W1", async () => {
+    const { app, ws } = await setup();
+    const r = await runScript(ws, 'záložka "W1"\nválec 3 30\nzpět\nznovu\nzáložka "W2"\nkoule 4', host);
+    expect(errs(r)).toEqual([]);
+    expect(featsOf(app, "W1")).toEqual(["box", "cylinder"]);
+    expect(featsOf(app, "W2")).toEqual(["box", "sphere"]);
+  });
+});
+
+/* ───────── recenze vlny E (nález 4): soubor skriptu v aplikaci = stažení + záznam pro řádek F (SHA-256 jako CLI) ───────── */
+describe("aplikace: FileSink textových příkazů (stažení bez dialogu, záznam souboru pro řádek F)", () => {
+  const data = new TextEncoder().encode("ISO-10303-21;");
+  const sink = () => {
+    const got: { name: string; bytes: number; mime: string }[] = [];
+    const deps = { download: (name: string, d: Uint8Array, mime: string) => void got.push({ name, bytes: d.length, mime }) } as unknown as AppHostDeps;
+    return { got, files: makeAppHost(kernel, () => deps).files };
+  };
+  it("vrátí název, formát, velikost a SHA-256 (JSON `files[].sha256` jako CLI)", async () => {
+    const { got, files } = sink();
+    const f = await files.write({ name: "E.step", format: "step", data, mime: "model/step", doc: "E" });
+    expect(got).toEqual([{ name: "E.step", bytes: data.length, mime: "model/step" }]);
+    expect(f).toMatchObject({ name: "E.step", format: "step", bytes: data.length, doc: "E" });
+    expect(f.sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+  it("stránka bez WebCrypto (http mimo localhost): soubor se stáhne dál, otisk je prázdný – žádná výjimka", async () => {
+    const { got, files } = sink();
+    vi.stubGlobal("crypto", {});
+    try {
+      const f = await files.write({ name: "E.step", format: "step", data, mime: "model/step", doc: "E" });
+      expect(f).toMatchObject({ name: "E.step", bytes: data.length, sha256: "" });
+      expect(got).toHaveLength(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

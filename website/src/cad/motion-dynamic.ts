@@ -28,14 +28,16 @@
  * Jednotky uvnitř: mm, s, kg (síla kg·mm/s² = 10⁻³ N, energie 10⁻⁶ J). Čisté funkce bez jádra (geometrii a hmotnosti dodá volající).
  */
 import { apply3, mul3, type Mat3 } from "./assembly";
+import { isFault } from "./clash-rules";
 import { springComps, springSteps, solidOf } from "./asm-spring";
 import { springRateOf } from "./asm-spring-check";
 import { springGeom, type SpringGeom } from "./asm-spring-geom";
 import { getLang, tr } from "./i18n";
-import { kinCluster, kinCtx, MATE_LABEL, memoGeo, solveMates, type GeoProvider } from "./mates";
+import { kinCluster, kinCtx, MATE_LABEL, mateLost, memoGeo, solveMates, type GeoProvider } from "./mates";
 import { DEG, L, add, cross, dot, expRot, kinResidual, len, pivotOf, placementOf, poseOf, resNorm, rigidGroups, scale, solvePoses, sub, syncGroups, unit, wrap, worldOf, dofValue, type Pose } from "./mates-kin";
 import type { CompInertia, M3, MassSource } from "./motion-mass";
 import { motorProblem, poseDoc, type MotionClashes, type MotionResult, type MotionStep, type MotionTiming } from "./motion";
+import { motorAt as modelMotorAt, motorIsAbsolute } from "./motor-model";
 import type { AsmComponent, CadDoc, Mate, MateRef, MotionDynamic, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** gravitační zrychlení [mm/s²] */
@@ -49,12 +51,12 @@ const V_REST = 1;
 
 export const defaultDyn = (): MotionDynamic => ({ dt: 0.0005 });
 
-/** Hodnota motoru v čase t (spojitě; jako `motorValue` v cad/motion.ts): rozsah od–do, tam a zpět, nebo rychlost. */
+/**
+ * Hodnota motoru v čase t (spojitě; jako `motorValue` v cad/motion.ts): profil motoru z cad/motor-model.ts – rozsah od–do, tam
+ * a zpět, rychlost bez konce, rozsah × rychlost se zastavením na konci.
+ */
 export function motorAt(mo: MotionMotor, t: number, duration: number): number {
-  if (mo.speed !== undefined && Number.isFinite(mo.speed)) return mo.from + (mo.kind === "rotary" ? (mo.speed * 360 * t) / 60 : mo.speed * t);
-  const s = duration > 0 ? Math.min(1, Math.max(0, t / duration)) : 0;
-  if (mo.back) return mo.from + ((mo.to - mo.from) * (1 - Math.cos(2 * Math.PI * s))) / 2;
-  return mo.from + (mo.to - mo.from) * s;
+  return modelMotorAt(mo, t, duration);
 }
 
 /** Těleso dynamické studie: kořen tuhé skupiny a jeho členové, hmotnost [kg], těžiště v souřadnicích kořene, tenzor k těžišti [kg·mm²]. */
@@ -178,9 +180,9 @@ export async function runDynamic(
 
   // 1) výchozí stav: vyřešená sestava (jako kinematická studie)
   const s0 = solveMates(doc, geo);
-  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed);
+  const mates = (s0.mates ?? doc.mates ?? []).filter((m) => !m.suppressed && !mateLost(m)); // ztracená reference = mimo pohyb (bod 20)
   for (const mo of study.motors) {
-    const p = motorProblem(mo, mates);
+    const p = motorProblem(mo, s0.mates ?? doc.mates ?? []); // ztracená reference: vlastní hláška (bod 20)
     if (p) throw new Error(tr("motor {0}: {1}", study.motors.indexOf(mo) + 1, p));
   }
   for (const ld of D.loads ?? []) if (!mates.some((m) => m.id === ld.mate)) throw new Error(tr("síla na vazbě: vazba v sestavě není (smazaná nebo potlačená)"));
@@ -198,7 +200,7 @@ export async function runDynamic(
   // motory (jako v cad/motion.ts): Vzdálenost / Drážka s hodnotou = hodnota vazby, jinak přírůstek stupně volnosti od výchozího stavu
   const motors = study.motors.map((mo) => {
     const m = mates.find((x) => x.id === mo.mate)!;
-    const abs = mo.kind === "linear" && (m.type === "distance" || (m.type === "slot" && m.value !== undefined));
+    const abs = motorIsAbsolute(mo, m);
     const v0 = dofValue(m, mo.kind, ctx);
     if (v0 === null) throw new Error(tr("motor {0}: chybí geometrie vazby „{1}“", study.motors.indexOf(mo) + 1, m.name ?? tr(MATE_LABEL[m.type])));
     return { mo, m, abs, v0, target: 0 };
@@ -758,8 +760,9 @@ export async function runDynamic(
         const a = (timing.clash ??= { pairs: 0, culled: 0, exact: 0, reused: 0, undetermined: 0 });
         for (const k2 of ["pairs", "culled", "exact", "reused", "undetermined"] as const) a[k2] += clashes.stats[k2] ?? 0;
       }
-      row.clashes = clashes.map((c) => ({ a: c.a, b: c.b, volume: c.volume }));
-      if (row.clashes.length && !collision) collision = { ...row.clashes[0], step: row.i, t };
+      row.clashes = clashes.map((c) => ({ ...c })); // i cesty listů (podsestavy), místo a třída (vlna 22, bod 5)
+      const hit = row.clashes.find((c) => isFault(c.cls)); // první SKUTEČNÁ kolize
+      if (hit && !collision) collision = { ...hit, step: row.i, t };
     }
     steps.push(row);
     if (!timing.slowStep || stepMs > timing.slowStep.ms) timing.slowStep = { i: row.i, ms: stepMs };
@@ -935,6 +938,7 @@ export async function runDynamic(
     conflictSteps,
     ...(s0.mates ? { mates: s0.mates } : {}),
     timing,
+    motorInfo: motors.map((x) => ({ abs: x.abs, current: x.abs ? x.v0 : 0 })),
     dynamic: info,
   };
 }

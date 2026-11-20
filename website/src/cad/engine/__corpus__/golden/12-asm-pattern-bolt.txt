@@ -4,15 +4,15 @@
 → Díra 1 (hole) přidán – výsledek po výpočtu níže
 ✓ nový díl „Kolík“ – nová záložka
 → Válec 1 (cylinder) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Díra 1 (hole)
-✓ Válec 1 (cylinder)
+✓ Kvádr 1 (box) · přidáno 48000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 636,2 mm³ (4 % nástroje) · těleso platné
+✓ Válec 1 (cylinder) · přidáno 1005,3 mm³ · těleso platné
 
 Dokument: „Kolík“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 8 × 8 × 20 mm (X -4…4, Y -4…4, Z 0…20) · objem 1,01 cm³ · ploch 3 · hran 3
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Válec 1 [cylinder, id #] ✓ – Ø8 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 1005,3 mm³ · těleso platné – Ø8 × 20 mm, new, podstava [0; 0; 0], osa Z
 === run 2 ===
 ✓ nová sestava „Spoj“ – nová záložka
 ✓ komponenta „Deska“ vložena do sestavy (ukotvená)
@@ -30,10 +30,10 @@ Sestava „Spoj“: komponent 8 · vazby 2 (2 ok)
  #2 Kolík · díl · poloha [60; 30; 10]
  #3 Kolík (2) · díl · poloha [60; 40; 10]
  #4 Kolík (3) · díl · poloha [60; 50; 15] · č. K-3
- #5 Podložka M8 · díl · poloha [20; 15; 10] · č. ISO 7089 – M8 – 200 HV · skupina Normálie
- #6 Šroub M8×25 · díl · poloha [20; 15; 11,6] · č. ISO 4762 – M8×25 – 12.9 · skupina Normálie
- #7 Podložka M8 · díl · poloha [20; 15; 0] · natočení [-180; 0; -180] · č. ISO 7089 – M8 – 200 HV · skupina Normálie
- #8 Matice M8 · díl · poloha [20; 15; -1,6] · natočení [-180; 0; -180] · č. ISO 4032 – M8 – 8 · skupina Normálie
+ #5 Podložka M8 · díl · poloha [20; 15; 10] · č. ISO 7089 – M8 – 200 HV · skupina Normálie · druh normálie
+ #6 Šroub M8×25 · díl · poloha [20; 15; 11,6] · č. ISO 4762 – M8×25 – 12.9 · skupina Normálie · druh normálie
+ #7 Podložka M8 · díl · poloha [20; 15; 0] · natočení [-180; 0; -180] · č. ISO 7089 – M8 – 200 HV · skupina Normálie · druh normálie
+ #8 Matice M8 · díl · poloha [20; 15; -1,6] · natočení [-180; 0; -180] · č. ISO 4032 – M8 – 8 · skupina Normálie · druh normálie
 
 Dokument: „Spoj“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Kolík [60; 30; 10] · Kolík (2) [60; 40; 10] · Kolík (3) [60; 50; 15] · Podložka M8 [20; 15; 10] · Šroub M8×25 [20; 15; 11,6] · Podložka M8 [20; 15; 0] ∠[-180; 0; -180] · Matice M8 [20; 15; -1,6] ∠[-180; 0; -180]

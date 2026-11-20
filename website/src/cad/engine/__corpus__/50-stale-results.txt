@@ -1,0 +1,34 @@
+# vlna 22, bod 1: výsledek kolizí, stav vazeb a měření platí jen pro dokument a stav sestavy, pro který vznikl
+nový díl "Deska"
+kvádr 60 40 10
+nový díl "Přidržovač"
+kvádr 10 10 10
+#--- run
+nová sestava "Sestava A"
+vložit "Deska" ukotvit
+vložit "Přidržovač" v 40 10 30
+sestava vazba vzdálenost "Přidržovač" spodní "Deska" horní hodnota 20
+kolize
+měřit Deska:F6 Přidržovač:F5
+stav
+#--- run
+# jiná sestava: výsledek kolizí ani měření sestavy A se nepřenese (Kolize: nezkontrolováno)
+nová sestava "Sestava B"
+vložit "Deska" ukotvit
+vložit "Přidržovač" v 40 10 5
+stav
+#--- run
+# zpět na A a posun přidržovače do desky: kolize i měření NEPLATÍ, vazba v konfliktu
+záložka "Sestava A"
+sestava ukotvit "Přidržovač"
+sestava komponenta "Přidržovač" v 40 10 5
+stav
+#--- run
+# krok zpět: stav vazeb platí pro vrácený dokument (splněno), ne pro stav před krokem zpět
+zpět
+stav
+#--- run
+# nová kontrola a nové měření: výsledky zase platí
+kolize
+měřit Deska:F6 Přidržovač:F5
+stav

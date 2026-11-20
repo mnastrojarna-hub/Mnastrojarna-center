@@ -1,0 +1,46 @@
+# Vlna E, balík export: převodník dokument → skript zapisuje vše, co agent píše textem (razítko, revize, funkční kóty, díry, pohledy navíc, detaily, řezy, přerušení, uložení, vygenerované kóty, přezdívky, pružiny, dynamika); co nepřenese, ohlásí ℹ a komentářem
+co skript nepřenese ({0}):	was das Skript nicht überträgt ({0}):
+volby listu bez textového příkazu ({0}) – nastavují se jen v JSON dokumentu, skript je nepřenese – list „{1}“ dokumentu „{2}“	Blattoptionen ohne Textbefehl ({0}) – sie werden nur im JSON-Dokument gesetzt, das Skript überträgt sie nicht – Blatt „{1}“ des Dokuments „{2}“
+funkční rozměry / polohy děr Chytrých kót listu „{0}“ nejde zapsat příkazem kótovat	die Funktionsmaße / Bohrungspositionen der intelligenten Bemaßung des Blatts „{0}“ lassen sich mit dem Befehl bemaßen nicht schreiben
+revizi „{0}“ listu „{1}“ nejde zapsat příkazem výkres revize (znak 1–4 písmena / číslice velkými, text na jeden řádek)	die Revision „{0}“ des Blatts „{1}“ lässt sich mit zeichnung revision nicht schreiben (Zeichen aus 1–4 Großbuchstaben / Ziffern, Text auf einer Zeile)
+skrytí trojúhelníků revize „{0}“ listu „{1}“ nejde zapsat	das Ausblenden der Dreiecke der Revision „{0}“ des Blatts „{1}“ lässt sich nicht schreiben
+šablonu razítka „{0}“ listu „{1}“ nejde zapsat	die Schriftfeldvorlage „{0}“ des Blatts „{1}“ lässt sich nicht schreiben
+logo razítka „{0}“ listu „{1}“ je ve skriptu jako data URL – název souboru se nepřenáší	das Schriftfeld-Logo „{0}“ des Blatts „{1}“ steht im Skript als Data-URL – der Dateiname wird nicht übertragen
+logo razítka listu „{0}“ nejde zapsat na řádek skriptu (data URL přes {1} kB) – vložte ho znovu: výkres razítko logo="soubor.png"	das Schriftfeld-Logo des Blatts „{0}“ lässt sich nicht auf eine Skriptzeile schreiben (Data-URL über {1} kB) – fügen Sie es erneut ein: zeichnung schriftfeld logo="datei.png"
+model „{0}“	Modell „{0}“
+model „{0}“ na listu „{1}“ je ze záložky (jiný dokument) – skript ho nepřenese; otevřete dokument a napište výkres model "{0}"	das Modell „{0}“ auf dem Blatt „{1}“ stammt aus einem Tab (anderes Dokument) – das Skript überträgt es nicht; öffnen Sie das Dokument und schreiben Sie zeichnung modell "{0}"
+model „{0}“ na listu „{1}“: komponenta s tímto názvem je v sestavě víckrát nebo chybí – skript vloží první z nich	Modell „{0}“ auf dem Blatt „{1}“: eine Komponente mit diesem Namen ist in der Baugruppe mehrfach oder fehlt – das Skript fügt die erste ein
+pomocný pohled {0}	Hilfsansicht {0}
+zobrazení uložení	Passungsanzeige
+Tabulka uložení	Passungstabelle
+{0} listu „{1}“ nejde zapsat textem – doplňte ho ručně	{0} des Blatts „{1}“ lässt sich nicht als Text schreiben – ergänzen Sie es von Hand
+písmena pomocných pohledů, řezů a detailů listu „{0}“ dostane po přečtení skriptu aplikace znovu – po smazání některých se mohou lišit: {1}	die Buchstaben der Hilfsansichten, Schnitte und Einzelheiten des Blatts „{0}“ vergibt die Anwendung beim Lesen des Skripts neu – nachdem einige gelöscht wurden, können sie abweichen: {1}
+úprava vygenerovaných kót a pozic	Bearbeitung generierter Maße und Positionsnummern
+přezdívku „{0}“ komponenty „{1}“ nejde zapsat na řádek skriptu	der Spitzname „{0}“ der Komponente „{1}“ lässt sich nicht auf eine Skriptzeile schreiben
+pružinu „{0}“	die Feder „{0}“
+{0} sestavy nejde zapsat textem (komponenta mimo skript nebo dosedací plocha v podsestavě) – doplňte ji: sestava pružina	{0} der Baugruppe lässt sich nicht als Text schreiben (Komponente außerhalb des Skripts oder Auflagefläche in einer Unterbaugruppe) – ergänzen Sie sie: baugruppe feder
+nastavení dynamiky pohybové studie nejde zapsat příkazem pohyb dynamika (čas, krok, gravitace, tlumení, odraz, snímky mimo rozsah příkazu)	die Dynamik-Einstellungen der Bewegungsstudie lassen sich mit bewegung dynamik nicht schreiben (Zeit, Schritt, Schwerkraft, Dämpfung, Stoßzahl, Bilder außerhalb des Befehlsbereichs)
+ruční hmotnost komponenty mimo skript (podsestava / import) se do skriptu nepřenáší	eine manuelle Masse einer Komponente außerhalb des Skripts (Unterbaugruppe / Import) wird nicht ins Skript übernommen
+síla / moment na vazbě, která ve skriptu není, se do skriptu nepřenáší	eine Kraft / ein Moment an einer Verknüpfung, die nicht im Skript ist, wird nicht ins Skript übernommen
+# výkres vygenerované … (skrytí / posun kót celkových rozměrů a pozic textem)
+výkres vygenerované · výkres vygenerované skrýt|zobrazit <klíč…> · výkres vygenerované posun <klíč> dx dy · výkres vygenerované obnovit [<klíč…>] – klíče: dim:<pohled>:t|l (kóta celkového rozměru nahoře / vlevo), pos:<číslo> (pozice)	zeichnung generiert · zeichnung generiert ausblenden|einblenden <Schlüssel…> · zeichnung generiert verschieben <Schlüssel> dx dy · zeichnung generiert wiederherstellen [<Schlüssel…>] – Schlüssel: dim:<Ansicht>:t|l (Gesamtmaß oben / links), pos:<Nummer> (Positionsnummer)
+výkres vygenerované posun <klíč> dx dy – jeden klíč a posun v mm listu (y nahoru), např. výkres vygenerované posun pos:3 5 -3	zeichnung generiert verschieben <Schlüssel> dx dy – ein Schlüssel und eine Verschiebung in Blatt-mm (y nach oben), z. B. zeichnung generiert verschieben pos:3 5 -3
+výkres vygenerované: „{0}“ není klíč vygenerovaného objektu – {1}	zeichnung generiert: „{0}“ ist kein Schlüssel eines generierten Objekts – {1}
+výkres vygenerované: neznámé „{0}“ – {1}	zeichnung generiert: unbekannt „{0}“ – {1}
+„{0}“ na listu není – vygenerované objekty listu: {1}	„{0}“ ist nicht auf dem Blatt – generierte Objekte des Blatts: {1}
+žádné (kóty celkových rozměrů jen u voleb kótovat celkově / základní, pozice jen u sestavy s balónky)	keine (Gesamtmaße nur bei bemaßen gesamt / einfach, Positionsnummern nur bei einer Baugruppe mit Positionsnummern)
+{0} (kóta celkového rozměru {1})	{0} (Gesamtmaß {1})
+{0} (pozice)	{0} (Positionsnummer)
+nahoře	oben
+skryté {0}	ausgeblendet {0}
+posunuté {0}	verschoben {0}
+Vygenerované objekty listu: {0}	Generierte Objekte des Blatts: {0}
+Upravené: {0}	Bearbeitet: {0}
+✓ vygenerované skryté: {0}	✓ generiert ausgeblendet: {0}
+✓ vygenerované zobrazené: {0}	✓ generiert eingeblendet: {0}
+✓ vygenerované {0} posunuto: celkem [{1}; {2}] mm listu{3}	✓ generiert {0} verschoben: insgesamt [{1}; {2}] Blatt-mm{3}
+ (kóta jen kolmo k sobě)	 (ein Maß nur senkrecht zu sich selbst)
+✓ vygenerované objekty na výchozím místě ({0} obnoveno)	✓ generierte Objekte an ihrem Standardort ({0} wiederhergestellt)
+✓ vygenerované obnoveno: {0}	✓ generiert wiederhergestellt: {0}
+Vygenerované kóty a pozice upravené: {0} – výkres vygenerované obnovit	Generierte Maße und Positionsnummern bearbeitet: {0} – zeichnung generiert wiederherstellen
+vygenerované kóty celkových rozměrů (dim:<pohled>:t nahoře, :l vlevo) a pozice sestavy (pos:<číslo>) – skrýt, zobrazit, posunout (mm listu, y nahoru; kóta jen kolmo k sobě), obnovit; totéž jako výběr a Delete / tažení ve výkresu (volba listu genEdit)	generierte Gesamtmaße (dim:<Ansicht>:t oben, :l links) und Positionsnummern der Baugruppe (pos:<Nummer>) – ausblenden, einblenden, verschieben (Blatt-mm, y nach oben; ein Maß nur senkrecht zu sich selbst), wiederherstellen; dasselbe wie Auswählen und Entf / Ziehen in der Zeichnung (Blattoption genEdit)

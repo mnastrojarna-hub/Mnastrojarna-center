@@ -7,7 +7,7 @@
 ✓ nová sestava „B“ – nová záložka
 ✓ komponenta „Blok“ vložena do sestavy (ukotvená)
 ✓ komponenta „Blok“ vložena do sestavy
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 64000 mm³ · těleso platné
 
 Dokument: „B“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Blok [0; 0; 0] ⚓ · Blok [100; 0; 0]
@@ -16,12 +16,12 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 === run 2 ===
 ✓ záložka „A“ (sestava) je aktivní – další příkazy pracují s ní
 kolize: 1 – šroub v závitu 0, skutečné 1
-⚠ řádek 2: kolize „Blok“ × „Blok“ (16 000,0 mm³)
+⚠ řádek 2: kolize „Blok #1“ × „Blok #2“ (16 000,0 mm³) – místo [35; 20; 20] · obálka 10 × 40 × 40 mm
 
 Dokument: „A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Blok [0; 0; 0] ⚓ · Blok [30; 0; 0]
 Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 70 × 40 × 40 mm · objem Σ 128 cm³ · hmotnost Σ 1,005 kg
-Kolize: 1 – Blok × Blok (16 000,0 mm³) (zkontrolováno ?)
+Kolize: 1 – skutečné 1: Blok #1 × Blok #2 (16 000,0 mm³) v místě [35; 20; 20] (zkontrolováno ?)
 === run 3 ===
 ✓ záložka „B“ (sestava) je aktivní – další příkazy pracují s ní
 

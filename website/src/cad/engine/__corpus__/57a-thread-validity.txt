@@ -1,0 +1,26 @@
+# vlna 22, bod 22a (a 22b případ H): drážka závitu po šroubovici musí řezat povrch, na kterém závit vzniká – tečná špička,
+# skrytý kanál ve stěně a drážka obrácená ke stěně jen špičkou nejsou ✓, ale ⚠ s kódem a radou; správný vnější i vnitřní
+# závit zůstává ✓. Přesná kontrola platnosti (kontrola přesně) a řádek Geometrie, který říká, která kontrola proběhla.
+# A) vnější závit na válci Ø18 – správně: ✓, kontrola přesně → platné (přesná kontrola), Geometrie „· přesná kontrola“
+nový díl "Deska A"
+válec 18 20
+prvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 mode=cut
+kontrola přesně
+stav
+# C) nastavení z 3. 11.: trubka Ø16,4, radius 9, vnější strana – špička tečná ke stěně díry → ⚠ thread.tip-tangent
+nový díl "Deska C"
+trubka 30 16.4 20
+prvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 mode=cut
+# D) správně: vnitřní závit radius 8,2 v díře Ø16,4 → ✓
+nový díl "Deska D"
+trubka 30 16.4 20
+prvek surf.helixSweep profile=thread60 radius=8.2 depth=0.8 pitch=1.5 turns=12 side=internal mode=cut
+# E) hloubka 0,82: drážka ústí do díry jen špičkou (0,02 mm), zbytek ve stěně → ⚠ thread.wrong-side
+nový díl "Deska E"
+trubka 30 16.4 20
+prvek surf.helixSweep profile=thread60 radius=9 depth=0.82 pitch=1.5 turns=12 mode=cut
+# H) vnitřní strana, ale radius 9 v díře Ø16,4 – drážka celá ve stěně (skrytý kanál) → ⚠ thread.no-reach
+nový díl "Deska H"
+trubka 30 16.4 20
+prvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 side=internal mode=cut
+stav

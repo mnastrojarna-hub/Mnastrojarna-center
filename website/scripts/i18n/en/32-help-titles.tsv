@@ -1,0 +1,88 @@
+# Vlna E – balík help: názvy oddílů návodu pro AI a kapitol příručky ve výsledcích „nápověda hledat …“ (tr(název) za běhu)
+#!dynamic
+Tři cesty, jak CAD ovládat textem	Three ways to drive the CAD by text
+Řádkové příkazy (česky i anglicky, jeden příkaz na řádek, # = komentář)	Line commands (Czech, English or German, one command per line, # = comment)
+Vstup: řádky a JSON lze míchat	Input: lines and JSON can be mixed
+Souřadnice skici ve 3D	Sketch coordinates in 3D
+Profil ze skici textem – uzavřené obrysy	Profile from a text sketch – closed contours
+Vazby a kóty ve skice textem	Sketch constraints and dimensions by text
+Šikmé vysunutí, úkos dovnitř / ven a břit – vysunout …	Oblique extrude, draft in / out and land – extrude …
+Měření – měřit (EN measure, DE messen)	Measuring – measure (CS měřit, DE messen)
+Primitiva – poloha a osa odkazem, pružina	Primitives – position and axis by reference, spring
+Odkazy u rotace, pole, zrcadlení a sražení; hrany a plochy čísly	References for revolve, pattern, mirror and chamfer; edges and faces by number
+Více těles v dílu	Multiple bodies in a part
+Obecný příkaz prvek – všechny typy bez JSON	Generic command feature – every type without JSON
+Zaoblení se setbackem, eliptické zaoblení a úkos s dělicí křivkou	Setback fillet, elliptical fillet and draft with a parting line
+Úpravy existujícího modelu – upravit, potlačit, smazat, přesunout, zpět / znovu, proměnné, konfigurace	Editing an existing model – edit, suppress, delete, move, undo / redo, variables, configurations
+Sestava textem – plochy, vazby, komponenty, kusovník, záložky	Assembly by text – faces, mates, components, BOM, tabs
+Pokročilé a mechanické vazby, pohybová studie – sestava vazba …, pohyb …	Advanced and mechanical mates, motion study – assembly mate …, motion …
+Spline s tečnami, hladké uzavřené šablonování a plochy třídy A	Splines with tangents, smooth closed loft and class-A surfaces
+Průběh a zrušení výpočtu	Progress and cancelling a computation
+Plech – tvářecí nástroje a křížový zlom (plech …, EN sheet …, DE blech …)	Sheet metal – forming tools and cross break (sheet …, CS plech …, DE blech …)
+Svary – koutové, tupé s úpravou, děrové, bodové (svar …, EN weld …, DE schweißnaht … / naht …)	Welds – fillet, butt with edge preparation, plug, spot (weld …, CS svar …, DE schweißnaht … / naht …)
+Pružiny z tabulky – tlačná, tažná, zkrutná, talířová (pružina …, EN spring …, DE feder …)	Springs from the table – compression, extension, torsion, disc (spring …, CS pružina …, DE feder …)
+Příklad – stírací pružiny střižného nástroje (tlačná, broušené konce)	Example – stripper springs of a cutting die (compression, ground ends)
+Příklad – tažná pružina upínky a sloupec talířových pružin	Example – extension spring of a clamp and a disc spring stack
+Příklad – příruba DN50 (6 řádků)	Example – DN50 flange (6 lines)
+Příklad – sedlo pružiny (ploché dno) a závit s vrtákem z výkresu	Example – spring seat (flat bottom) and a thread with the drill from the drawing
+Příklad – deska s drážkou a zahloubenými dírami	Example – plate with a slot and counterbored holes
+2D výkres (2D CAD jako AutoCAD) – 2d …, window.mncad.draft()	2D drawing (2D CAD like AutoCAD) – 2d …, window.mncad.draft()
+JSON (formát .mncad) – přístup ke všemu	JSON (.mncad format) – access to everything
+Výstupy z konzole bez dialogů – uložit, export, výkres, sdílet	Outputs from the console without dialogs – save, export, drawing, share
+Prohlížeč ovládaný automatizací – žádná systémová okna	Browser driven by automation – no system dialogs
+Dokument → textový skript, kontrola tam a zpět	Document → text script, round-trip check
+Soubory, obraz, výstupy a analýzy – API pro agenty	Files, images, outputs and analyses – API for agents
+Modelování myší jako člověk (pro agenty s ovládáním prohlížeče)	Modelling with the mouse like a human (for agents controlling a browser)
+Materiál, výkres a export – co je dobré vědět	Material, drawing and export – good to know
+Výkres a kóty – postup a pravidla pro AI	Drawing and dimensions – procedure and rules for AI
+Postup (vždy v tomto pořadí)	Procedure (always in this order)
+Pravidla Chytrých kót (ČSN EN ISO 129-1) – kontrolní seznam	Smart dimension rules (ISO 129-1) – checklist
+Čemu se vyhnout (anti-vzory)	What to avoid (anti-patterns)
+Příklad A – hřídel s osazením, závitem, sražením, zápichem a zaoblením	Example A – shaft with a shoulder, thread, chamfer, groove and fillet
+Příklad B – příruba s roztečnou kružnicí zahloubených děr a středovým otvorem	Example B – flange with a bolt circle of counterbored holes and a centre bore
+Příklad C – deska se slepými závitovými dírami, průchozími dírami a kapsou	Example C – plate with blind tapped holes, through holes and a pocket
+Příklad F – funkční rozměry, tolerance hodnotou a kontrola tolerancí	Example F – functional sizes, tolerance by value and tolerance check
+Výkres textem: listy, značky, kóty, export	Drawing by text: sheets, symbols, dimensions, export
+Příklad D – druhý list, značky, razítko a export	Example D – second sheet, symbols, title block and export
+Pomocné pohledy, řezy lomenou čarou, přerušení, uložení a revize	Auxiliary views, stepped sections, breaks, fits and revisions
+Příklad E – zalomený řez, uložení, revize se zónou	Example E – stepped section, fit, revision with a zone
+Model nebo výkres podle předlohy – kontrola 1:1 (povinné)	Model or drawing from a reference – 1:1 check (mandatory)
+1. Před modelováním – soupis kót předlohy	1. Before modelling – list the dimensions of the reference
+2. Chybí kóta? Zeptejte se	2. A dimension is missing? Ask
+3. Po dokončení – kontrola 1:1 (vždy, i když vše hlásí ✓)	3. When finished – 1:1 check (always, even when everything reports ✓)
+4. Závěrečná zpráva	4. Final report
+Předloha v dokumentu: DWG / DXF / PDF zákazníka – výtah a kontrola 1:1 textem	Reference in the document: the customer's DWG / DXF / PDF – extraction and 1:1 check by text
+Žádné tiché změny a přísný režim (přísně, EN strict, DE streng)	No silent changes and strict mode (strict, CS přísně, DE streng)
+Stav prvku: ✓ / ⚠ / ✗ – co znamená	Feature status: ✓ / ⚠ / ✗ – what it means
+Závity – jak je zadat správně	Threads – how to enter them correctly
+Zpětná vazba a doporučený postup pro agenta	Feedback and the recommended procedure for an agent
+Omezení	Limitations
+Jeden engine v prohlížeči i bez něj (CLI mncad, HTTP mncad serve)	One engine in the browser and without it (CLI mncad, HTTP mncad serve)
+Výstupy textem – soubory, PDF všech listů, base64, odkazy (aplikace, CLI, HTTP)	Outputs by text – files, PDF of all sheets, base64, links (app, CLI, HTTP)
+Kontrola modelu, porovnání s referencí a třídy kolizí (kontrola, porovnat, kolize)	Model check, comparison with a reference and clash classes (check, compare, clash)
+1. Co je Mnástrojárna CAD	1. What Mnástrojárna CAD is
+2. Rychlý start – první díl za pět minut	2. Quick start – your first part in five minutes
+3. Obrazovka a ovládání	3. Screen and controls
+4. Zadávání hodnot a odkazů na geometrii	4. Entering values and references to geometry
+5. Skica	5. Sketch
+6. Tvorba těles – prvky a jejich možnosti	6. Creating solids – features and their options
+7. Plochy (plošné modelování)	7. Surfaces (surface modelling)
+8. Plech	8. Sheet metal
+9. Svařence a ocelové konstrukce	9. Weldments and steel structures
+10. Knihovna normálií	10. Standard parts library
+11. Sestavy	11. Assemblies
+12. Formařské nástroje	12. Mould tools
+13. Výkresy	13. Drawings
+14. 2D CAD – 2D výkres (DWG / DXF)	14. 2D CAD – 2D drawing (DWG / DXF)
+15. Analýza a měření	15. Analysis and measuring
+16. Proměnné, rovnice a stavy dílu	16. Variables, equations and part configurations
+17. Soubory, import a export	17. Files, import and export
+18. Sdílení odkazem	18. Sharing by link
+19. Nastavení	19. Settings
+20. Klávesové zkratky	20. Keyboard shortcuts
+21. Mobil a dotykové ovládání	21. Mobile and touch control
+22. Pro AI agenty a automatizaci	22. For AI agents and automation
+23. Omezení a poctivé srovnání s desktopovými CADy	23. Limitations and an honest comparison with desktop CADs
+24. Vaše data a soukromí	24. Your data and privacy
+25. Slovníček pojmů	25. Glossary
+26. Historie verzí	26. Version history

@@ -8,6 +8,7 @@ import { tr } from "@/cad/i18n";
 import { useEffect, useState } from "react";
 import { cad } from "@/cad/client";
 import { ALL_THREADS, planeLabel, threadByName } from "@/cad/defaults";
+import { pitchNote, threadGeometryOf } from "@/cad/thread-spec";
 import { AXIS_KINDS, EXTENT_KINDS, NO_EDGE, NO_FACE, NO_REF, fmtVec, isPlaceholder, type AxisDef, type Direction, type Extent, type Ref } from "@/cad/refs";
 import type { Axis, CadDoc, Feature, Vec3 } from "@/cad/types";
 import { cn } from "@/lib/cn";
@@ -243,6 +244,7 @@ registerFeatureForm("spring", ({ f, set, b, mode }) => (
 registerFeatureForm("thread", ({ f, set, b }) => {
   const t = threadByName(f.designation);
   const known = !!t && ALL_THREADS.some((x) => x.name === t.name);
+  const pitchWarn = pitchNote(t); // stoupání mimo ISO 261 (M18×3) – stejná hláška jako ⚠ prvku
   return (
     <>
       <Field label={tr("Závit (ISO metrický – hrubé i jemné stoupání)")}>
@@ -264,9 +266,30 @@ registerFeatureForm("thread", ({ f, set, b }) => {
       <AxisDirField axis={f.axis} dirDef={f.dirDef} set={set} />
       <PositionField label={tr("Začátek závitu (na ose)")} value={f.position} refValue={f.positionRef} bind={b("position")} set={set} />
       <Info>{tr("Tip: začátek = střed kružnice konce válce / díry (⋯ → Střed kružnice), osa = „Podél hrany / osy válce“ s válcovou plochou.")}</Info>
-      <Check label={tr("Modelovat závitové drážky")} value={f.modeled} onChange={(v) => set({ modeled: v })} />
+      {/* jedna cesta k závitu (vlna 22, bod 22d): kosmetický / soustružené drážky / skutečná šroubovice z téhož označení */}
+      <div data-thread-geometry={threadGeometryOf(f)}>
+        <Seg
+          label={tr("Provedení")}
+          value={threadGeometryOf(f)}
+          options={[
+            { v: "cosmetic", l: tr("Kosmetický") },
+            { v: "rings", l: tr("Drážky") },
+            { v: "helix", l: tr("Šroubovice") },
+          ]}
+          onChange={(v) => set({ modeled: v !== "cosmetic", helix: v === "helix" ? true : undefined })}
+        />
+      </div>
+      {pitchWarn && (
+        <span data-thread-pitch-warning className="block text-[11px] text-brand-600">
+          ⚠ {pitchWarn}
+        </span>
+      )}
       <Info>
-        {f.modeled ? tr("Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dává Plochy → Tažení po šroubovici (profil Závit 60°).") : tr("Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese (kružnice válce / jádra díry se kótuje označením). Doporučeno pro výrobní dokumentaci.")}
+        {f.modeled && f.helix
+          ? tr("Skutečná šroubovice (profil 60°) z označení – stejné jádro a čísla jako Tažení po šroubovici se závitem z katalogu. Program ověří, že drážka řeže povrch válce / díry (jinak ⚠).")
+          : f.modeled
+            ? tr("Závit se vymodeluje jako soustružené drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dá volba Šroubovice.")
+            : tr("Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese (kružnice válce / jádra díry se kótuje označením). Doporučeno pro výrobní dokumentaci.")}
         {t && tr(" Jmenovitý Ø {0} mm, stoupání {1} mm{2}.", fmtMm(t.d), fmtMm(t.pitch), f.internal ? tr(", jádro díry Ø {0} mm", fmtMm(t.tap)) : "")}
       </Info>
     </>

@@ -1,0 +1,37 @@
+# vlna 22, bod 5: kolize v pohybu – šrouby v závitu uvnitř podsestavy (dřív ⚠ nevyhodnotitelné „Horní skupina × Horní skupina“)
+# a „kroků s kolizí“ jen se skutečnou kolizí (hlava S2 narazí do dorazu od kroku 9)
+nový díl Základ
+kvádr 120 60 10
+nový díl Deska A
+kvádr 100 60 20
+díra závit M12 hloubka 18 v 20 30
+díra závit M12 hloubka 18 v 80 30
+nový díl Šroub M12
+válec 12 18
+válec 18 12 v 0 0 18
+nový díl Doraz
+kvádr 10 20 10
+#--- run
+nová sestava Sestava 5S
+vložit "Základ" ukotvit
+vložit "Deska A" v 0 0 50
+vložit "Šroub M12" v 20 30 62 jako "S1"
+vložit "Šroub M12" v 80 30 62 jako "S2"
+sestava vazba vzdálenost "Deska A" spodní "Základ" horní hodnota 40 název "ZDVIH"
+sestava podsestava "Deska A" "S1" "S2" jako "Horní skupina"
+kolize
+pohyb motor lineární vazba "ZDVIH" 40..45 kroky 5 kolize
+pohyb krok 2
+stav
+#--- run
+nová sestava Sestava 5M
+vložit "Základ" ukotvit
+vložit "Deska A" v 0 0 50
+vložit "Šroub M12" v 20 30 62 jako "S1"
+vložit "Šroub M12" v 80 30 62 jako "S2"
+vložit "Doraz" v 75 20 100 ukotvit
+sestava vazba zámek "S1" "Deska A"
+sestava vazba zámek "S2" "Deska A"
+sestava vazba vzdálenost "Deska A" spodní "Základ" horní hodnota 40 název "ZDVIH"
+pohyb motor lineární vazba "ZDVIH" 40..55 kroky 15 kolize
+pohyb krok 12

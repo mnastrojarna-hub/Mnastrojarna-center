@@ -13,6 +13,7 @@ import { compInertias } from "@/cad/asm-agent-dyn";
 import { tr } from "@/cad/i18n";
 import { MATE_LABEL } from "@/cad/mates";
 import { defaultDyn } from "@/cad/motion-dynamic";
+import { modeHelp, studyMode } from "@/cad/motion-mode";
 import { dynCharts, isDyn } from "@/cad/motion-dynamic-report";
 import type { MotionResult } from "@/cad/motion";
 import type { CadDoc, MotionDynamic, MotionStudy, Vec3 } from "@/cad/types";
@@ -32,22 +33,41 @@ const GRAV: { id: string; v: Vec3 | null; label: string }[] = [
 const gravId = (g: Vec3 | null | undefined) => (g === undefined ? "-Z" : g === null ? "off" : (GRAV.find((x) => x.v && x.v.every((c, k) => Math.abs(c - g[k]) < 1e-9))?.id ?? "-Z"));
 const cap = "mb-1 text-[10.5px] font-semibold uppercase tracking-wider text-[#4a5664]";
 
-/** Přepínač Kinematika / Dynamika (nahoře v panelu studie). */
-export function MotionModeSwitch({ study, onStudy }: { study: MotionStudy; onStudy: (s: Partial<MotionStudy>) => void }) {
-  const dyn = study.mode === "dynamic";
+/**
+ * Přepínač režimu studie (nahoře v panelu): Kinematika / Kvazistatika / Dynamika (vlna 22, bod 2 – cad/motion-mode.ts). Studie bez
+ * výslovného režimu (automaticky) má zvýrazněný režim, který zvolí výpočet, a tlačítko „Auto“; pod přepínačem jedna věta, co režim počítá.
+ */
+export function MotionModeSwitch({ study, onStudy, doc }: { study: MotionStudy; onStudy: (s: Partial<MotionStudy>) => void; doc?: CadDoc }) {
+  const eff = doc ? studyMode(doc, study) : { mode: study.mode ?? "kinematic", auto: !study.mode };
+  const set = (k: "kinematic" | "quasistatic" | "dynamic" | "auto") =>
+    onStudy(
+      k === "dynamic"
+        ? { mode: "dynamic", dyn: study.dyn ?? defaultDyn(), ...(study.mode !== "dynamic" ? { duration: study.motors.length ? study.duration : 0.5 } : {}) }
+        : { mode: k === "auto" ? undefined : k },
+    );
   return (
-    <div className="flex rounded-md bg-[#eef2f6] p-0.5" data-motion-mode>
-      {(["kin", "dyn"] as const).map((k) => (
-        <button
-          key={k}
-          type="button"
-          data-motion-mode-btn={k}
-          onClick={() => onStudy(k === "dyn" ? { mode: "dynamic", dyn: study.dyn ?? defaultDyn(), ...(study.mode !== "dynamic" ? { duration: study.motors.length ? study.duration : 0.5 } : {}) } : { mode: undefined })}
-          className={cn("flex-1 rounded px-2 py-0.5 text-[11.5px]", (k === "dyn") === dyn ? "bg-white font-semibold shadow-sm" : "text-[#5b6776]")}
-        >
-          {k === "kin" ? tr("Kinematika") : tr("Dynamika")}
-        </button>
-      ))}
+    <div className="space-y-1">
+      <div className="flex rounded-md bg-[#eef2f6] p-0.5" data-motion-mode={study.mode ?? "auto"} data-motion-mode-effective={eff.mode}>
+        {(["kinematic", "quasistatic", "dynamic", "auto"] as const).map((k) => {
+          const on = k === "auto" ? !study.mode : eff.mode === k;
+          return (
+            <button
+              key={k}
+              type="button"
+              data-motion-mode-btn={k === "kinematic" ? "kin" : k === "quasistatic" ? "quasi" : k === "dynamic" ? "dyn" : "auto"}
+              aria-pressed={k === "auto" ? !study.mode : study.mode === k}
+              title={modeHelp(k)}
+              onClick={() => set(k)}
+              className={cn("flex-1 rounded px-1.5 py-0.5 text-[11px]", on ? "bg-white font-semibold shadow-sm" : "text-[#5b6776]", k === "auto" && "max-w-[52px] flex-none")}
+            >
+              {k === "kinematic" ? tr("Kinematika") : k === "quasistatic" ? tr("Kvazistatika") : k === "dynamic" ? tr("Dynamika") : tr("Auto")}
+            </button>
+          );
+        })}
+      </div>
+      <p data-motion-mode-help className="text-[10.5px] leading-snug text-[#6b7785]">
+        {modeHelp(study.mode ?? "auto")}
+      </p>
     </div>
   );
 }

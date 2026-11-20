@@ -1,0 +1,33 @@
+=== run 1 ===
+→ dokument „Deska A“ (2 prvků) – otevře se v nové záložce – výsledek po výpočtu níže
+✗ Zaoblení 1: Zaoblení R15 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
+Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✗ Zaoblení R15 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R15, hrany vše
+=== run 2 ===
+→ dokument „Deska B“ (3 prvků) – otevře se v nové záložce – výsledek po výpočtu níže
+⚠ Kvádr 2: Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry.
+
+Dokument: „Deska B“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ⚠, 0 ✗)
+Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 3,84 cm³ · ploch 26 · hran 56
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✓ úběr 161 mm³ · těleso platné – R2, hrany vše
+ 3. Kvádr 2 [box, id #] ⚠ Prvek těleso nezměnil (objem i počet ploch zůstaly stejné) – nástroj se s tělesem nepřekrývá, leží mimo něj, nebo operace v jádře selhala. Zkontrolujte polohu a rozměry. – 5 × 5 × 5 mm, cut, roh [0; 0; 10]
+=== run 3 ===
+→ dokument „Deska C“ (2 prvků) – otevře se v nové záložce – výsledek po výpočtu níže
+ℹ řádek 2: stav modelu po tomto příkazu se samostatně nestavěl (následovala další změna) – ověřen je až stav po řádku 3
+→ Zaoblení 1: radius 2 → 30 – výsledek po výpočtu níže
+✗ Zaoblení 1 (fillet): Zaoblení R30 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží.
+
+Dokument: „Deska C“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
+Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
+ 2. Zaoblení 1 [fillet, id #] ✗ Zaoblení R30 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R30, hrany vše

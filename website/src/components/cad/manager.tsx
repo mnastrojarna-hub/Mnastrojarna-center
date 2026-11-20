@@ -4,6 +4,8 @@ import { cadLocale, tr } from "@/cad/i18n";
 import { useState } from "react";
 import { featureIcon, featureTone } from "@/cad/defaults";
 import { resolveDoc } from "@/cad/params";
+import { levelsText } from "@/cad/feature-levels";
+import { FeatureStateBadge, FeatureStateNote, featureStateAttrs } from "./feature-state";
 import { uid, type BodyInfo, type CadDoc, type Config, type Feature, type FeatureStatus, type Variable } from "@/cad/types";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
@@ -203,6 +205,8 @@ export function Manager({
                 <div key={f.id}>
                   <div
                     data-feature-row={f.id}
+                    data-feature-name={f.name}
+                    {...featureStateAttrs(st)}
                     data-picked={picked || undefined}
                     className={cn("group flex cursor-default items-center gap-2 rounded px-2 py-[3px] text-[12.5px]", isActive ? "bg-[#dbe7f5] text-[#0b1f33]" : picked ? "bg-[#eaf2fb] text-[#0b1f33] ring-1 ring-inset ring-[#8fb3dc]" : "text-[#26303b] hover:bg-[#edf2f7]", off && "opacity-45")}
                     onClick={() => onSelect(f)}
@@ -230,18 +234,11 @@ export function Manager({
                         }}
                       />
                     ) : (
-                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
-                    )}
-                    {st && !st.ok && (
-                      <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-brand text-[10px] font-bold text-white" title={st.error}>
-                        !
+                      <span className="min-w-0 flex-1 truncate" title={levelsText(st) || undefined}>
+                        {f.name}
                       </span>
                     )}
-                    {st && st.ok && st.warning && (
-                      <span data-feature-warning className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-amber-500 text-[10px] font-bold text-white" title={st.warning}>
-                        ⚠
-                      </span>
-                    )}
+                    <FeatureStateBadge st={st} />
                     <button
                       type="button"
                       title={tr("Nabídka")}
@@ -254,8 +251,7 @@ export function Manager({
                       ⋯
                     </button>
                   </div>
-                  {st && !st.ok && isActive && <p className="mx-2 mb-1 rounded bg-brand/10 px-2 py-1 text-[11px] text-brand-600">{st.error}</p>}
-                  {st && st.ok && st.warning && isActive && <p className="mx-2 mb-1 rounded bg-amber-500/15 px-2 py-1 text-[11px] text-amber-800">{st.warning}</p>}
+                  {isActive && <FeatureStateNote st={st} />}
                 </div>
               );
             })}

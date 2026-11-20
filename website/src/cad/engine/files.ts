@@ -11,6 +11,8 @@
 import { checkFailed, exportCheck, FORMAT_EXT, outFileName, type ExportCheck, type Export3dFormat, type OutDrawingFormat } from "../agent-out";
 import type { DrawingResult } from "../drawing";
 import { sourceKey } from "../assembly";
+import { docSupply, docSupplyLine, makeIncomplete, supplyOf } from "../bom-model";
+import { modelId } from "../doc-outputs";
 import { embedBlobs, missingBlobFiles } from "../blobs";
 import { docHasContent } from "../draft/doc";
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
@@ -24,7 +26,9 @@ import { drawingMemo, issueArgs, sheetLabel, sheetWarningCode } from "./sheet-ev
 import type { EngineHost, FileSink } from "./host";
 import type { KernelApi } from "./kernel";
 import type { OutFile } from "./protocol-types";
+import { projectJson } from "./project-json";
 import type { Workspace } from "./workspace";
+import { exactBeforeExport } from "./validity-store";
 
 /* ───────────────────────── formáty a názvy ───────────────────────── */
 
@@ -100,13 +104,14 @@ export type Produced = {
 /* ───────────────────────── projekt .mncad ───────────────────────── */
 
 /** projekt .mncad: data, kontrola zpětného čtení (počet prvků / komponent) a importy bez dat */
-export function projectFile(d: CadDoc, name: string): Produced & { count: number; asm: boolean; docName: string; lost: string[] } {
+export function projectFile(d: CadDoc, name: string): Produced & { count: number; asm: boolean; docName: string; lost: string[]; modelRev: string } {
   const lost = missingBlobFiles(d);
-  const json = JSON.stringify(embedBlobs(d), null, 1);
+  // revize modelu v souboru (vlna 22, bod 12 – engine/project-json.ts)
+  const { json, modelRev } = projectJson(d);
   const data = new TextEncoder().encode(json);
   const back = JSON.parse(json) as CadDoc;
   const asm = back.kind === "assembly";
-  return { name, mime: OUT_MIME.mncad, data, format: "mncad", warnings: [], count: asm ? (back.components?.length ?? 0) : back.features.length, asm, docName: back.name, lost };
+  return { name, mime: OUT_MIME.mncad, data, format: "mncad", warnings: [], count: asm ? (back.components?.length ?? 0) : back.features.length, asm, docName: back.name, lost, modelRev };
 }
 
 /* ───────────────────────── 3D model a kontrola ───────────────────────── */
@@ -209,6 +214,8 @@ export function documentSheetJobs(d: CadDoc): SheetJob[] {
   const walk = (comps: AsmComponent[], depth: number) => {
     for (const c of comps) {
       if (c.source.kind !== "part" && c.source.kind !== "asm") continue;
+      // výkresy jen vyráběných dílů – normálie a nakupované položky se nepřibalují, ani když výkres mají (bod 19, bom-model.ts)
+      if (c.source.kind === "part" && supplyOf(c).kind !== "make") continue;
       const key = sourceKey(c.source);
       if (seen.has(key)) continue;
       seen.add(key);
@@ -232,6 +239,9 @@ export type DocSheet = {
   /** list v hláškách protokolu: list hlavního dokumentu jako vyhodnocení listu během (sheet-eval.ts `sheetLabel` –
    *  stejný text = táž hláška se neopakuje), výkres dílu z komponenty s názvem dílu */
   issue: string;
+  /** revize modelu listu (díl z komponenty = revize dílu) a písmeno revize listu – metadata PDF / DXF (vlna 22, bod 20) */
+  modelRev?: string;
+  rev?: string;
 };
 
 /**
@@ -291,18 +301,20 @@ async function computeSheets(env: DrawEnv, d: CadDoc, jobs: SheetJob[]): Promise
     const x = await extras(j);
     const s = await renderSheet(j.doc, j.index, compute, x);
     // výkres dílu bez nepředepsaných tolerancí není úplný – export to ohlásí u listu (vlna 15, drawing-export.ts)
-    out.push({ out: s.out, label: j.label, name: s.name, warnings: [...s.warnings, ...generalTolWarnings(j.doc, [s])], lost: s.lost, issue: j.doc === d ? sheetLabel(j.doc, j.index) : j.label });
+    out.push({ out: s.out, label: j.label, name: s.name, warnings: [...s.warnings, ...generalTolWarnings(j.doc, [s])], lost: s.lost, issue: j.doc === d ? sheetLabel(j.doc, j.index) : j.label, ...(s.meta.modelRev ? { modelRev: s.meta.modelRev } : {}), ...(s.meta.revision ? { rev: s.meta.revision } : {}) });
   }
   return out;
 }
 
-/** Vícestránkové PDF listů (jedna stránka na list ve svém formátu a orientaci) s písmy hostitele. */
-export async function drawingsToPdf(sheets: Pick<DocSheet, "out">[], fonts?: PdfFonts, title?: string): Promise<Uint8Array> {
+/** Vícestránkové PDF listů (jedna stránka na list ve svém formátu a orientaci) s písmy hostitele; `modelRev` = revize modelu do Info PDF. */
+export async function drawingsToPdf(sheets: Pick<DocSheet, "out" | "rev">[], fonts?: PdfFonts, title?: string, modelRev?: string): Promise<Uint8Array> {
   const { drawingsToPdf: toPdf } = await import("../pdf");
+  const { pdfInfo } = await import("../drawing-export");
   const blob = await toPdf(
     sheets.map((s) => s.out),
     title,
     fonts,
+    pdfInfo({ modelRev, ...(sheets.length === 1 && sheets[0].rev ? { rev: sheets[0].rev } : {}) }),
   );
   return new Uint8Array(await blob.arrayBuffer());
 }
@@ -344,16 +356,18 @@ export async function documentDrawingFile(env: DrawEnv, d: CadDoc, format: OutDr
     return { name: `${base}_kusovnik.csv`, mime: OUT_MIME.csv, data: csv, format, warnings: [] };
   }
   const sheets = await documentSheets(env, d);
-  const warnings = sheetWarnings(sheets);
+  // vyráběné díly bez výkresu / čísla – výkresy dílů z komponent jsou jen vyráběné (bod 19)
+  const miss = d.kind === "assembly" ? makeIncomplete(docSupply(d, (c) => sourceKey(c.source))) : [];
+  const warnings = [...sheetWarnings(sheets), ...(miss.length ? [{ sheet: "", text: tr("vyráběnému dílu chybí výkres, číslo nebo označení materiálu: {0}", miss.join(", ")) }] : [])];
   if (format === "pdf") {
-    const data = await drawingsToPdf(sheets, await hostPdfFonts(env.fonts), d.name);
+    const data = await drawingsToPdf(sheets, await hostPdfFonts(env.fonts), d.name, modelId(d).rev);
     return { name: `${base}.pdf`, mime: OUT_MIME.pdf, data, format, sheets: sheets.length, warnings };
   }
   const { drawingFileSheets } = await import("../drawing-export");
   const f = await drawingFileSheets(
     sheets.map((s) => ({ out: s.out, name: s.label })),
     format,
-    { base, title: d.name },
+    { base, title: d.name, modelRev: modelId(d).rev },
   );
   // název jako u PDF (`Deska_vykresy.pdf`): jeden list `<základ>.<přípona>`, víc listů `<základ>_<formát>.zip`
   // (drawingFileSheets by k základu přidal „_vykres…“ – „Deska_vykresy_vykres.dxf“)
@@ -432,7 +446,21 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "geom.exact-invalid" | "msg.note" | "bom.docs" | "bom.make-incomplete"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+
+/**
+ * Úplnost výrobní dokumentace sestavy pro výstupy (vlna 22, bod 19): ℹ souhrn „vyráběné 2 (bez výkresu 1), normálie 2,
+ * nakupované 0“ a ⚠ vyráběné díly bez výkresu nebo čísla – výkresy normálií a nakupovaných položek se nepřibalují.
+ * Díl / sestava bez komponent → nic.
+ */
+export function asmDocNotes(d: CadDoc): OutNote[] {
+  if (d.kind !== "assembly" || !d.components?.length) return [];
+  const s = docSupply(d, (c) => sourceKey(c.source));
+  const out: OutNote[] = [{ code: "bom.docs", args: [docSupplyLine(s)] }];
+  const miss = makeIncomplete(s);
+  if (miss.length) out.push({ code: "bom.make-incomplete", args: [miss.join(", ")] });
+  return out;
+}
 
 /**
  * Jeden výstup `--formats` dokumentu `d` (kap. 3.1, rozhodnutí 15.7): `.mncad`, STEP (znovu načtený a změřený –
@@ -440,15 +468,28 @@ export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "draw
  * DXF / DWG / SVG soubor na list), CSV = kusovník sestavy. Názvy podle dokumentu (`Deska 1.step`, `Deska 1 výkres.pdf`).
  * Vrací zapsané soubory; hlášky (varování listů, kontrola STEP, formát jen v aplikaci) předá `note`.
  */
-export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> & { files: FileSink }, ws: Workspace, d: CadDoc, fmt: DocFormat, note: (n: OutNote) => void, o: { flat?: boolean; hooks?: AsmEnvOptions } = {}): Promise<OutFile[]> {
+export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts" | "phase"> & { files: FileSink }, ws: Workspace, d: CadDoc, fmt: DocFormat, note: (n: OutNote) => void, o: { flat?: boolean; hooks?: AsmEnvOptions } = {}): Promise<OutFile[]> {
   const base = d.name.trim() || "model";
   const write = (name: string, mime: string, data: Uint8Array, format: string) => host.files.write({ name, mime, data, doc: d.name, format });
-  if (fmt === "mncad") return [await write(`${base}.mncad`, OUT_MIME.mncad, projectFile(d, "").data, "mncad")];
+  if (fmt === "mncad") {
+    const p = projectFile(d, "");
+    const f = await write(`${base}.mncad`, OUT_MIME.mncad, p.data, "mncad");
+    f.modelRev = p.modelRev; // revize modelu v souboru i v řádku F (vlna 22, bod 12)
+    return [f];
+  }
   if (fmt === "step" || fmt === "stl") {
-    const data = await modelBytes(host.kernel, d, fmt);
-    const f = await write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt);
-    if (fmt === "step") {
-      const c = await verifyExport(host.kernel, d, data, "step");
+    // STEP: přesná kontrola platnosti před exportem (do 400 ploch, vlna 22 bod 22a) – nález ⚠, neproběhlá ℹ
+    const pre = fmt === "step" && "validity" in host.kernel ? await exactBeforeExport(host.kernel, null, undefined, d).catch(() => null) : null;
+    // export jako úloha s fázemi (vlna 22, bod 22h): přestavba, převod, zápis, kontrola STEP zpětným načtením
+    const { runExportJob } = await import("./export-job");
+    const job = await runExportJob(d, fmt, { kernel: host.kernel, phase: (p) => host.phase?.(`out:${fmt}`, p), write: (data) => write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt) }, { check: fmt === "step", verifyFirst: false });
+    const f = job.out;
+    f.modelRev = job.modelRev;
+    f.phases = job.phases;
+    if (pre && pre.level === "warn") note({ code: "geom.exact-invalid", args: [d.name, pre.text] });
+    else if (pre && pre.level === "note") note({ code: "msg.note", text: pre.text, level: "note" });
+    if (job.check) {
+      const c = job.check;
       f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") };
       if (!c.ok) note({ code: "out.check-failed", text: f.check.text, level: Number.isNaN(c.volumeDiffPct) ? "error" : "warn" });
     }
@@ -465,6 +506,8 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
     return [];
   }
   const env: DrawEnv = { kernel: host.kernel, ws, ...(host.fonts ? { fonts: host.fonts } : {}), flat: o.flat ?? true, ...(o.hooks ? { hooks: o.hooks } : {}) };
+  // úplnost dokumentace sestavy (ℹ souhrn + ⚠ vyráběné bez výkresu / čísla) – u výkresu a kusovníku; job.ts opakování vynechá
+  for (const n of asmDocNotes(d)) note(n);
   if (fmt === "csv") {
     const csv = await bomCsv(env, d);
     if (!csv) {
@@ -487,7 +530,7 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
     if (s.lost) note({ code: "drawing.warning", args: [s.issue, tr("Kóty a poznámky bez geometrie: {0}", s.lost)] });
   }
   if (fmt === "pdf") {
-    const data = await drawingsToPdf(sheets, await hostPdfFonts(host.fonts), d.name);
+    const data = await drawingsToPdf(sheets, await hostPdfFonts(host.fonts), d.name, modelId(d).rev);
     const f = await write(tr("{0} výkres", base) + ".pdf", OUT_MIME.pdf, data, "pdf");
     f.sheets = sheets.length;
     return [f];
@@ -495,7 +538,7 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
   const { drawingFile } = await import("../drawing-export");
   const out: OutFile[] = [];
   for (const [i, s] of sheets.entries()) {
-    const r = await drawingFile(s.out, fmt, { base, title: s.label });
+    const r = await drawingFile(s.out, fmt, { base, title: s.label, ...(s.modelRev ? { modelRev: s.modelRev } : {}), ...(s.rev ? { rev: s.rev } : {}) });
     const name = sheets.length > 1 ? tr("{0} výkres {1}", base, i + 1) : tr("{0} výkres", base);
     const f = await write(`${name}.${fmt}`, r.mime, r.data, fmt);
     f.sheets = 1;

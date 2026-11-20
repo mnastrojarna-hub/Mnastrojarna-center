@@ -5,7 +5,7 @@
 ✓ nová sestava „S“ – nová záložka
 ✓ komponenta „B“ vložena do sestavy
 ✗ řádek 7: díl „A“ není mezi otevřenými záložkami – otevřené díly: B
-✓ Kvádr 1 (box)
+✓ Kvádr 1 (box) · přidáno 1 mm³ · těleso platné
 
 Dokument: „S“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: B [0; 0; 0]

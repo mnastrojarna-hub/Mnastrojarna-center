@@ -1,7 +1,7 @@
 /**
  * Textové příkazy výkresu (čistý parser – bez jádra, testovatelný v Node):
  * - `výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,iso] [řez XZ [odsazení N]|ne]
- *   [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]` – volby listu (tabulka VOLBY, další volba = řádek);
+ *   [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [tabulka ozubení ano|ne] [promítání E|A]` – volby listu (tabulka VOLBY, další volba = řádek);
  * - `kótovat [chytře|celkově|nic] [řetězově|od základny]` – (pře)generuje Chytré kóty;
  * - `výkres tolerance <kóta> <tolerance>`, `výkres poznámka "…"`, `výkres nepředepsané ISO 2768-mK`, `výkres hrany …`,
  *   `výkres drsnost Ra 3,2`, `výkres stav [list N|vše]`;
@@ -12,7 +12,7 @@
  */
 import { tr } from "./i18n";
 import type { DrawingOptions, ViewKey, ViewRotation } from "./drawing";
-import { parseDrawingViews, type ViewsCmd } from "./agent-drawing-views";
+import { isPlaceTop, parseDrawingViews, type ViewsCmd } from "./agent-drawing-views";
 import type { FitShow } from "./drawing-fits";
 import { sectionText } from "./drawing-section";
 import type { GdtSymbol, PlaneName, Vec2 } from "./types";
@@ -83,6 +83,11 @@ export type DrawingCmd =
   /** tabulka revizí */
   | { k: "rev"; op: "set"; rev: string; note: string; date?: string; author?: string }
   | { k: "rev"; op: "delete"; rev: string }
+  /**
+   * vydání listu (vlna 22, bod 20 – cad/doc-outputs.ts): `výkres vydat [B] ["popis"] [vše]` zapíše písmeno revize, revizi modelu
+   * a datum; po změně modelu je vydaný list zastaralý (⚠ drawing.stale); `výkres vydat zrušit` vydání zruší
+   */
+  | { k: "issue"; op: "issue" | "withdraw"; rev?: string; note?: string; date?: string; all?: boolean }
   /** značka s odkazem (poznámka, drsnost, GD&T, základna, text); `shift` = posun popisku [mm listu, y nahoru] */
   | { k: "mark"; mark: MarkSpec; target: MarkTarget; shift?: Vec2 }
   /** ruční kóta; `offset` [mm listu], `text` = vlastní text místo hodnoty */
@@ -92,8 +97,9 @@ export type DrawingCmd =
   /** smazání kót / značek: id nebo popisky, „vlastní“ = všechny vlastní, „vše“ = všechny */
   | { k: "del"; targets: string[] | "custom" | "all" }
   /** detailní pohled: nový (střed v mm modelu v rovině pohledu, poloměr, měřítko, umístění středu na listu), úprava, smazání */
-  | { k: "detail"; op: "add"; view: ViewRef; at: Vec2; r: number; scale?: number; place?: Vec2 }
-  | { k: "detail"; op: "edit"; label: string; scale?: number; place?: Vec2 }
+  /** `placeTop` = umístění od levého horního rohu listu (`umístit x y odshora` – agent-drawing-views.ts) */
+  | { k: "detail"; op: "add"; view: ViewRef; at: Vec2; r: number; scale?: number; place?: Vec2; placeTop?: boolean }
+  | { k: "detail"; op: "edit"; label: string; scale?: number; place?: Vec2; placeTop?: boolean }
   | { k: "detail"; op: "delete"; label: string }
   /** další model na listu (komponenta sestavy / otevřená záložka) */
   | { k: "model"; op: "add"; name: string; view?: ViewKey | "iso"; scale?: number | "auto" }
@@ -136,6 +142,16 @@ const SPRING_FULL = ["plne", "plny", "plna", "full", "skutecne", "sroubovice", "
 const ORIENT = ["na", "sirku", "sirka", "landscape", "quer", "querformat", "vysku", "vyska", "portrait", "hoch", "hochformat"];
 /** slovo, kterým začíná další volba (konec výčtu pohledů) */
 const isOptWord = (w: string, next?: string) => VOLBY.some((r) => r.words.includes(fold(w)) && (!r.needs || r.needs(next))) || ORIENT.includes(fold(w)) || /^a[0-4]$/i.test(w);
+
+/** slova tabulky ozubení za „tabulka“ / samostatně */
+const GEAR_WORDS = ["ozubeni", "gear", "gears", "gearing", "verzahnung", "geartable", "verzahnungstabelle"];
+/** `ozubení [ano|ne]` / `gear [table] yes|no` od pozice slova ozubení `i` → počet přečtených slov */
+function gearTableOpt(t: string[], i: number, o: Partial<DrawingOptions>, sum: string[]): number {
+  const table = ["table", "tabelle", "tabulka"].includes(fold(t[i + 1] ?? "")) ? 1 : 0;
+  o.gearTable = bool(t[i + 1 + table], tr("tabulka ozubení"));
+  sum.push(o.gearTable ? tr("tabulka ozubení") : tr("bez tabulky ozubení"));
+  return 2 + table;
+}
 
 /** Volby příkazu „výkres“ – nová volba (např. natočení pohledu, poloviční řez) = nový řádek. */
 export const VOLBY: OptRow[] = [
@@ -238,7 +254,7 @@ export const VOLBY: OptRow[] = [
   },
   {
     words: ["tabulka", "holetable", "bohrungstabelle"],
-    help: () => tr("tabulka děr ano|ne"),
+    help: () => tr("tabulka děr ano|ne · tabulka ozubení ano|ne"),
     read: (t, i, o, sum) => {
       // tabulka údajů pružiny (EN ISO 2162-2): `tabulka pružiny ano|ne` (drawing-springtable.ts)
       if (["pruziny", "pruzin", "pruzina", "springs", "spring", "federn", "feder"].includes(fold(t[i + 1] ?? ""))) {
@@ -246,6 +262,8 @@ export const VOLBY: OptRow[] = [
         sum.push(o.springTable ? tr("tabulka pružiny") : tr("bez tabulky pružiny"));
         return 3;
       }
+      // tabulka ozubení (kola a ozubení, drawing-geartable.ts): „tabulka ozubení ano“
+      if (GEAR_WORDS.includes(fold(t[i + 1] ?? ""))) return gearTableOpt(t, i + 1, o, sum) + 1;
       const two = ["der", "holes"].includes(fold(t[i + 1] ?? ""));
       o.holeTable = bool(t[i + (two ? 2 : 1)], tr("tabulka děr"));
       sum.push(o.holeTable ? tr("tabulka děr") : tr("bez tabulky děr"));
@@ -260,6 +278,13 @@ export const VOLBY: OptRow[] = [
       sum.push(o.springTable ? tr("tabulka pružiny") : tr("bez tabulky pružiny"));
       return 2;
     },
+  },
+  {
+    // EN „gear table yes“, DE „verzahnungstabelle ja“, jedno slovo „geartable“
+    words: ["geartable", "verzahnungstabelle", "gear", "gears", "gearing", "verzahnung"],
+    help: () => tr("tabulka ozubení ano|ne"),
+    read: (t, i, o, sum) => gearTableOpt(t, i, o, sum),
+    needs: (next) => YES.has(fold(next ?? "")) || NO.has(fold(next ?? "")) || ["table", "tabelle", "tabulka"].includes(fold(next ?? "")),
   },
   {
     words: ["otoceni", "rotation", "drehung", "natoceni", "rotate"],
@@ -542,11 +567,12 @@ const PATCH_W: Record<string, keyof AnnPatch> = {
   vyska: "height", height: "height", hohe: "height", hoehe: "height",
   posun: "shift", shift: "shift", move: "shift", verschiebung: "shift", verschieben: "shift",
 };
-const SUBS_MORE: Record<string, "sheet" | "sheets" | "title" | "rev" | "mark" | "mdim" | "edit" | "del" | "detail" | "model"> = {
+const SUBS_MORE: Record<string, "sheet" | "sheets" | "title" | "rev" | "mark" | "mdim" | "edit" | "del" | "detail" | "model" | "issue"> = {
   ...Object.fromEntries([...SHEET_W].map((w) => [w, "sheet" as const])),
   ...Object.fromEntries([...SHEETS_W].map((w) => [w, "sheets" as const])),
   razitko: "title", titleblock: "title", title: "title", schriftfeld: "title",
   revize: "rev", revision: "rev", revisions: "rev", anderung: "rev", aenderung: "rev", anderungen: "rev", revisionen: "rev",
+  vydat: "issue", vydej: "issue", vydani: "issue", issue: "issue", release: "issue", freigeben: "issue", freigabe: "issue",
   znacka: "mark", znacky: "mark", mark: "mark", symbol: "mark", zeichen: "mark",
   kota: "mdim", dim: "mdim", mass: "mdim", bemassung: "mdim",
   upravit: "edit", edit: "edit", bearbeiten: "edit", andern: "edit", aendern: "edit",
@@ -597,6 +623,8 @@ function parseDrawingMore(rt: RawTok[]): DrawingCmd | null {
       return parseTitle(rest);
     case "rev":
       return parseRev(rest);
+    case "issue":
+      return parseIssue(rest);
     case "mark":
       return parseMark(rest);
     case "mdim":
@@ -726,6 +754,29 @@ function parseRev(rt: RawTok[]): DrawingCmd {
     } else note.push(t.s);
   }
   return { k: "rev", op: "set", rev: rev.toUpperCase(), note: note.join(" "), ...(date ? { date } : {}), ...(author ? { author } : {}) };
+}
+
+const WITHDRAW_W = W("zrusit", "zruseni", "cancel", "withdraw", "revoke", "zuruckziehen", "zurueckziehen", "aufheben", "widerrufen");
+/** písmeno / číslo revize (A, B, AB, A1, 01) – ne slovo popisu */
+const REV_RE = /^(?:[A-Za-z]{1,2}\d{0,2}|\d{1,3})$/;
+
+/** `výkres vydat [<revize>] ["popis"] [datum 20.11.2026] [vše] · výkres vydat zrušit [vše]` (EN drawing issue, DE zeichnung freigeben) */
+function parseIssue(rt: RawTok[]): DrawingCmd {
+  const cmd: Extract<DrawingCmd, { k: "issue" }> = { k: "issue", op: "issue" };
+  const note: string[] = [];
+  for (let i = 0; i < rt.length; i++) {
+    const t = rt[i];
+    const k = fold(t.key ?? (t.q ? "" : t.s));
+    if (t.key && (k === "datum" || k === "date")) cmd.date = t.s;
+    else if (!t.q && !t.key && (k === "datum" || k === "date") && rt[i + 1]) cmd.date = rt[++i].s;
+    else if (isKw(t, WITHDRAW_W)) cmd.op = "withdraw";
+    else if (isKw(t, ALL_W)) cmd.all = true;
+    else if (!t.q && !t.key && cmd.rev === undefined && !note.length && REV_RE.test(t.s) && !isKw(t, SHEET_W)) cmd.rev = t.s.toUpperCase();
+    else if (t.key) throw new Error(tr("výkres vydat [<revize>] [\"popis změny\"] [datum 20.11.2026] [vše] · výkres vydat zrušit [vše] – neznámé „{0}=“", t.key));
+    else note.push(t.s);
+  }
+  if (note.length) cmd.note = note.join(" ");
+  return cmd;
 }
 
 /** odkaz na pohled za slovem „pohled“: přední…, iso, řez, detail A, "název modelu"; vrátí pohled a počet tokenů */
@@ -917,6 +968,7 @@ function parseDetail(rt: RawTok[]): DrawingCmd {
   }
   let scale: number | undefined;
   let place: Vec2 | undefined;
+  let placeTop = false;
   let at: Vec2 | undefined;
   let r: number | undefined;
   const opts = (from: number) => {
@@ -929,6 +981,10 @@ function parseDetail(rt: RawTok[]): DrawingCmd {
       } else if (isKw(t, PLACE_W)) {
         place = two(rt, i + 1, tr("umístit"));
         i += 2;
+        if (isPlaceTop(rt[i + 1])) {
+          placeTop = true;
+          i++;
+        }
       } else if (isKw(t, AT_W)) {
         at = two(rt, i + 1, tr("střed detailu"));
         i += 2;
@@ -940,13 +996,13 @@ function parseDetail(rt: RawTok[]): DrawingCmd {
   if (/^[a-z]$/i.test(rt[0].s) && !rt[0].q && !VIEW_WORDS[fold(rt[0].s)]) {
     opts(1);
     if (scale === undefined && !place) throw new Error(usage);
-    return { k: "detail", op: "edit", label: rt[0].s.toUpperCase(), ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}) };
+    return { k: "detail", op: "edit", label: rt[0].s.toUpperCase(), ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}), ...(place && placeTop ? { placeTop } : {}) };
   }
   const [view, n] = viewRef(rt, 0);
   opts(n);
   if (!at) throw new Error(tr("detail: zadejte střed – v x y (mm modelu v rovině pohledu)"));
   if (!(r !== undefined && r > 0)) throw new Error(tr("detail: zadejte poloměr kruhu detailu – poloměr r (mm modelu)"));
-  return { k: "detail", op: "add", view, at, r, ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}) };
+  return { k: "detail", op: "add", view, at, r, ...(scale !== undefined ? { scale } : {}), ...(place ? { place } : {}), ...(place && placeTop ? { placeTop } : {}) };
 }
 
 function parseModel(rt: RawTok[]): DrawingCmd {

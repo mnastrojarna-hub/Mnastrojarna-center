@@ -1,0 +1,20 @@
+# Vlna E – balík help: hledání v nápovědě (nápověda hledat …), tahák (nápověda tahák), mncad help search | cheat
+nápověda hledat: chybí slova – např. nápověda hledat záložky (EN help search tabs, DE hilfe suchen registerkarten)	hilfe suchen: Wörter fehlen – z. B. hilfe suchen registerkarten (EN help search tabs, CS nápověda hledat záložky)
+ · hledání v návodu: nápověda hledat {0}	 · in der Anleitung suchen: hilfe suchen {0}
+v návodu: nápověda hledat {0} · tahák: nápověda tahák	in der Anleitung: hilfe suchen {0} · Spickzettel: hilfe spickzettel
+hledání v návodu, příkazech a příručce: nápověda hledat <slova> (např. nápověda hledat záložky) · tahák pro agenty: nápověda tahák	Suche in Anleitung, Befehlen und Handbuch: hilfe suchen <wörter> (z. B. hilfe suchen registerkarten) · Spickzettel für Agenten: hilfe spickzettel
+Hledání „{0}“ – {1} nejlepších výsledků (návod pro AI, příkazy, příručka):	Suche „{0}“ – {1} beste Treffer (KI-Anleitung, Befehle, Handbuch):
+Hledání „{0}“: nic nenalezeno – zkuste jiné nebo kratší slovo, „nápověda tahák“ (nejčastější příkazy) nebo „prvek nápověda“ (typy prvků).	Suche „{0}“: nichts gefunden – versuchen Sie ein anderes oder kürzeres Wort, „hilfe spickzettel“ (häufigste Befehle) oder „element hilfe“ (Elementtypen).
+návod	Anleitung
+tabulka příkazů	Befehlstabelle
+příručka	Handbuch
+tahák	Spickzettel
+Tahák	Spickzettel
+mncad help cheat = tahák pro agenty (≤ 5 kB) · mncad help search <slova> = hledání v návodu, příkazech a příručce	mncad help cheat = Spickzettel für Agenten (≤ 5 kB) · mncad help search <wörter> = Suche in Anleitung, Befehlen und Handbuch
+hledání v návodu pro AI, v tabulce příkazů a v příručce (bez diakritiky, začátek slova i překlep, česky / anglicky / německy): 5–8 nejlepších oddílů s příkazy a větou, ≤ 1,5 kB, výpis „= L3 help hits=6 q=…“; „nápověda <slova>“ hledá, když slovo není typ prvku; tahák = nejčastější příkazy (≤ 5 kB, /cad/tahak.md, mncad help cheat); v CLI také mncad help search <slova>	Suche in der KI-Anleitung, der Befehlstabelle und im Handbuch (ohne diakritische Zeichen, Wortanfänge und Tippfehler, Deutsch / Englisch / Tschechisch): die 5–8 besten Abschnitte mit Befehlen und einem Satz, ≤ 1,5 kB, Auflistung „= L3 help hits=6 q=…“; „hilfe <wörter>“ sucht, wenn das Wort kein Elementtyp ist; Spickzettel = die häufigsten Befehle (≤ 5 kB, /cad/tahak.de.md, mncad help cheat); im CLI auch mncad help search <wörter>
+… celý tahák ({0} B): mncad help cheat{2} · https://www.mnastrojarna.cz/cad/{1} · plný protokol (--full, --json)	… ganzer Spickzettel ({0} B): mncad help cheat{2} · https://www.mnastrojarna.cz/cad/{1} · volles Protokoll (--full, --json)
+# opravy po recenzi: množné číslo záhlaví, mncad help search bez slov
+Hledání „{0}“ – 1 nejlepší výsledek (návod pro AI, příkazy, příručka):	Suche „{0}“ – 1 bester Treffer (KI-Anleitung, Befehle, Handbuch):
+Hledání „{0}“ – {1} nejlepší výsledky (návod pro AI, příkazy, příručka):	Suche „{0}“ – {1} beste Treffer (KI-Anleitung, Befehle, Handbuch):
+mncad help search: chybí slova – např. mncad help search záložky (hledá v návodu pro AI, v příkazech a v příručce); témata: guide, commands, cheat, search <slova>	mncad help search: Wörter fehlen – z. B. mncad help search registerkarten (durchsucht die KI-Anleitung, die Befehle und das Handbuch); Themen: guide, commands, cheat, search <Wörter>
+česky	Tschechisch

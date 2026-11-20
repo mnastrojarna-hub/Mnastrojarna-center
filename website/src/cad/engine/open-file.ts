@@ -12,6 +12,8 @@ import type { EngineHost } from "./host";
 
 export type OpenedDoc = { doc: CadDoc; file: string; note?: string };
 
+import { stripModelRev } from "./project-json";
+
 const isDocJson = (v: unknown): v is CadDoc => !!v && typeof v === "object" && typeof (v as CadDoc).name === "string" && Array.isArray((v as CadDoc).features);
 const errText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -28,7 +30,7 @@ export async function readDocument(host: Pick<EngineHost, "inputs" | "kernel">, 
       throw new Error(tr("„{0}“ není platný JSON dokumentu: {1}", name, errText(e)));
     }
     if (!isDocJson(raw)) throw new Error(tr("„{0}“ není dokument MN CAD (chybí název nebo prvky)", name));
-    return { doc: internBlobs(raw), file: f.name };
+    return { doc: internBlobs(stripModelRev(raw)), file: f.name }; // revize modelu patří souboru (engine/project-json.ts)
   }
   const file = new File([f.data as BlobPart], f.name.replace(/^.*[\\/]/, ""));
   const res = await prepareImportWith(file, (bytes, fileName) => host.kernel.stepSplit(bytes, fileName));

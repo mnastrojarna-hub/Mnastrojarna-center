@@ -583,7 +583,8 @@ export function drawTitleBlock(a: TitleDrawArgs): TitleBlockInfo {
     fields.push({ key: k, label: fieldLabel(k), value: v, size: 2.5, lines: 1, shrunk: false, small: false, where: "footer" });
   }
   req.push(...(meta.formNotes ?? []));
-  const noteRow = [meta.note?.trim() ?? "", keys.has("sheet") ? "" : tr("List {0}/{1}", meta.sheetIndex ?? 1, meta.sheetCount ?? 1)].filter(Boolean);
+  // revize modelu, ze které list vznikl (vlna 22, bod 20) – na konci řádku poznámky a čísla listu
+  const noteRow = [meta.note?.trim() ?? "", keys.has("sheet") ? "" : tr("List {0}/{1}", meta.sheetIndex ?? 1, meta.sheetCount ?? 1), meta.modelRev ? tr("Model {0}", meta.modelRev) : ""].filter(Boolean);
   const footer = footerLines([req.join(" · "), noteRow.join(" · ")].filter(Boolean), def.w);
   const ny = y - a.above;
   footer.lines.forEach((l, i) => Tx(x, ny - 1.8 - (footer.lines.length - 1 - i) * footer.pitch, l, footer.size));

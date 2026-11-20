@@ -30,9 +30,11 @@ import { perfMark } from "./perf-log";
 import { formNotesOfDoc, springMarksOf } from "./drawing-doc";
 import { hasWelds, weldMarksOf } from "./drawing-welds";
 import { springDrawTables } from "./drawing-springtable";
+import { gearTablesOf } from "./gears/data";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 import { exportStats } from "./export-verify";
+import { validityOfDoc } from "./validity-kernel";
 import type { KernelEnvelope, KernelPost, KernelReqOp, KernelResults } from "./kernel-protocol";
 
 /** Volby načtení jádra: `locateFile` = kde emscripten najde `replicad_single.wasm` (jinak vedle svého modulu / svazku). */
@@ -360,6 +362,9 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
       case "exportStats":
         reply(post, m, await exportStats(m.doc, m.bytes, m.format));
         break;
+      case "validity":
+        reply(post, m, await validityOfDoc(m.doc, m.maxFaces !== undefined ? { maxFaces: m.maxFaces } : {}));
+        break;
       case "drawing": {
         // těleso se přestaví jen při změně geometrie (razítko, název, materiál, poznámky těleso nemění – ty jsou rychlé)
         // závity se kreslí zjednodušeně (kružnice + označení) – modelované šroubovice se pro výkres potlačí (jejich přesná projekce trvá minuty);
@@ -380,6 +385,8 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         // tabulka údajů pružin (EN ISO 2162-2) z prvků spring.* – drawing-springtable.ts; z dokumentu, ne z kopie pro výkres
         // (tam je tlačná pružina z tabulky nahrazená obalem vinutí ISO 2162-1)
         if (m.opts?.springTable && !meta.springData) meta = { ...meta, springData: springDrawTables(m.doc) };
+        // tabulka ozubení kol dílu (čistá data z tabulek kol, bez jádra) – drawing-geartable.ts
+        if (!meta.gears && m.opts?.gearTable && dd.kind !== "assembly") meta = { ...meta, gears: gearTablesOf(m.doc) };
         // osy drátu zjednodušených pružin (poloha odkazem je známá ze stavby výše)
         if (!meta.springs && springs === "simple") {
           const marks = springMarksOf(dd);

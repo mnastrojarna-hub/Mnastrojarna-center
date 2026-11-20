@@ -117,6 +117,11 @@ export type ExtDef = {
   build?: (data: Record<string, unknown>, ctx: ExtBuildCtx) => Promise<Shape | null> | Shape | null;
   /** místo prvku spustí akci v UI (registrovanou v UI registru pod stejným id) – např. export rozvinu */
   action?: boolean;
+  /**
+   * Akce s čistým textovým výstupem (bez UI): engine ji provede sám nad aktivním dokumentem – stejný výpis v aplikaci i v CLI
+   * (`kolo tabulka`). `arg` = argument z textového příkazu; chyba = ✗ řádku.
+   */
+  report?: (doc: CadDoc, arg?: string) => string[];
   /** jen pro sestavy / jen pro díly (výchozí: díly) */
   scope?: "part" | "assembly" | "both";
   /**
@@ -126,8 +131,9 @@ export type ExtDef = {
    */
   legacy?: string;
   /**
-   * Prvek se staví a upravuje jako ostatní, ale nemá vlastní tlačítko na pásu karet, v paletě ani mezi zkratkami – vytváří ho
-   * jiný vstup (např. průvodce Pružina s tabulkou pro `spring.*`).
+   * Prvek je zaregistrovaný (staví se, má formulář, funguje obecný příkaz `prvek <id> …`), ale na pásu karet, v paletě příkazů
+   * ani mezi zkratkami se nenabízí – nabízí ho jiný vstupní bod (průvodce Pružina s tabulkou pro `spring.*`, kola a ozubení:
+   * jedno tlačítko průvodce pro všech 14 druhů).
    */
   hidden?: boolean;
   /**
@@ -147,7 +153,7 @@ export function registerExt(def: ExtDef) {
 }
 export const getExt = (ext: string) => defs.get(ext);
 export const allExt = () => [...defs.values()];
-/** prvky nabízené v UI (pás karet, paleta, zkratky, nápověda) – bez starších duplicit (`legacy`) */
+/** prvky nabízené v UI (pás karet, paleta, zkratky, nápověda) – bez starších duplicit (`legacy`) a skrytých prvků (`hidden`) */
 export const visibleExt = () => allExt().filter((d) => !d.legacy && !d.hidden);
 export const extByTab = (tab: ExtTab) => visibleExt().filter((d) => d.tab === tab).sort((a, b) => (a.order ?? 100) - (b.order ?? 100));
 

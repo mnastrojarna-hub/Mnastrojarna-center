@@ -19,7 +19,8 @@ import { leafByRef } from "../leaf-ref";
 import type { CadDoc } from "../types";
 import { ensureLeaves } from "./asm-status";
 import { kv, num } from "./kv";
-import { runOf } from "./run-doc";
+import { noteResult, resultId } from "./result-key";
+import { docKeyOf, runOf } from "./run-doc";
 import { asmHooks, coded, sayKvAs, type OpCtx, type OpHandler } from "./ops/util";
 
 /**
@@ -114,6 +115,8 @@ export const compareOp: OpHandler<"compare"> = async (op, ctx) => {
   const file = await referenceFile(ctx, cmd.file);
   const opts: CompareOptions = { align: { mode: cmd.align }, tolerance: cmd.tolerance, booleans: "auto", map: cmd.map, ghost: false, regionMeshes: 0 };
   const res = await ctx.host.kernel.compare(doc, file, opts);
+  // porovnání platí pro tuto revizi pracovního dokumentu – po pozdější změně ho `stav` a řádek D označí jako neplatné
+  noteResult(ctx.ws, resultId("compare", docKeyOf(ctx), runOf(ctx).doc, { line: ctx.line ?? null }));
   const ok = compareOk(res, cmd.tolerance);
   const inexact = booleansInexact(res);
   const report = compareReportText(res, { model: label, tolerance: cmd.tolerance }).split("\n");

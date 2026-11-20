@@ -18,6 +18,7 @@
  */
 import { cadLocale, tr } from "./i18n";
 import type { Vec3 } from "./types";
+import { parseOutputsLine, type OutputsCmd } from "./agent-outputs";
 
 export type Export3dFormat = "step" | "stl" | "brep" | "obj" | "glb" | "3mf" | "wrl" | "mncad";
 export type OutDrawingFormat = "pdf" | "dxf" | "dwg" | "svg" | "csv" | "png";
@@ -50,7 +51,9 @@ export type OutCmd =
   /** znovu vypsat poslední odkaz */
   | { kind: "link" }
   /** dokument jako textový skript `.mncad.txt` (cad/doc-script.ts); lang = jazyk klíčových slov (bez hodnoty jazyk rozhraní) */
-  | { kind: "script"; name?: string; lang?: "cs" | "en" | "de"; deliver?: OutDelivery };
+  | { kind: "script"; name?: string; lang?: "cs" | "en" | "de"; deliver?: OutDelivery }
+  /** výstupy dokumentu: záznamy exportů, zastaralé výstupy, přepočítat vše (vlna 22, bod 20 – agent-outputs.ts) */
+  | OutputsCmd;
 export type OutOp = { k: "out"; cmd: OutCmd; line: number };
 
 /* ───────────────────────── slova (CS / EN / DE) ───────────────────────── */
@@ -190,6 +193,9 @@ export function parseOutLine(tokens: string[], quoted: readonly boolean[] = []):
   if (!t.length) return null;
   const h = fold(t[0]);
   const second = fold(t[1] ?? "");
+  // exporty · výstupy [zastaralé] · přepočítat vše (vlna 22, bod 20)
+  const oc = parseOutputsLine(t, tq);
+  if (oc) return oc;
 
   if (SAVE.has(h)) {
     const rest = restOf(t, tq, 1);
@@ -416,7 +422,7 @@ export function checkFailed(label: string, why: string): ExportCheck {
 
 /* ───────────────────────── window.mncad ───────────────────────── */
 /** stažený soubor: název, MIME, velikost, formát, řádky protokolu (jako v konzoli), kontrola STEP / BREP */
-export type OutFileInfo = { name: string; mime: string; bytes: number; format: string; log: string[]; check?: ExportCheck; warning?: string };
+export type OutFileInfo = { name: string; mime: string; bytes: number; format: string; log: string[]; check?: ExportCheck; warning?: string; /** revize modelu souboru (vlna 22, bod 12) */ modelRev?: string };
 export type MncadOutApi = {
   /** uloží projekt .mncad přímo do Stažených (bez dialogu, jako příkaz „uložit [název]“); vrátí název, velikost a protokol */
   save: (name?: string) => Promise<OutFileInfo>;
@@ -473,5 +479,11 @@ export const OUT_COMMANDS: { cmd: string; en: string; de: string; desc: string }
     en: "drawing export pdf document · export step base64 · export step link · share store or link",
     de: "zeichnung export pdf dokument · exportieren step base64 · exportieren step link · freigeben speicher oder link",
     desc: tr("„dokument“ = všechny listy všech výkresů a u sestavy i výkresy dílů z komponent (každý díl jednou) v jednom PDF, stejné jako --formats auto v CLI; „base64“ za uložit / export / výkres export / skica export = soubor se nestáhne, obsah jde do protokolu (řádek BASE64, nejvýš 2 MB); „odkaz“ = soubor zašifrovaný v úložišti odkazů, protokol vypíše odkaz na stránku ke stažení; „sdílet úložiště“ = jen krátký odkaz (nedostupné úložiště = ✗), „nebo odkaz“ = jinak dlouhý odkaz s ⚠"),
+  },
+  {
+    cmd: "exporty [vymazat] · výstupy [zastaralé] · přepočítat vše",
+    en: "exports [clear] · outputs [stale] · recompute all",
+    de: "exporte [löschen] · ausgaben [veraltet] · alles neu berechnen",
+    desc: tr("záznamy exportů v dokumentu (formát, soubor, revize modelu r·…, čas; po změně modelu ⚠ zastaralé s příkazem, který export zopakuje); seznam zastaralých výstupů (vydané listy, exporty, analýzy, kopie dílů v sestavě); přepočítat vše = obnoví kopie dílů, stav vazeb, kolize, pohyb a listy a vypíše, co musí udělat člověk (nová revize listu, nový export)"),
   },
 ];

@@ -1,0 +1,40 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+Kontrola „Deska A“: objem 4,852 cm³ · hmotnost 0,038 kg (hustota 7,85 g/cm³) · obálka 18 × 18 × 20 mm (X -9…9, Y -9…9, Z 0…20) · těles 1 · platné (přesná kontrola)
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
+Rozměry: 18 × 18 × 20 mm (X -9…9, Y -9…9, Z 0…20) · objem 4,85 cm³ · ploch 19 · hran 47
+Geometrie: platná · 1 těleso · přesná kontrola
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 5089,4 mm³ · těleso platné – Ø18 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 2. Tažení po šroubovici [ext, id #] ✓ úběr 237,2 mm³ (70 % nástroje) · těleso platné – 
+✓ nový díl „Deska C“ – nová záložka
+→ Trubka 1 (tube) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska D“ – nová záložka
+→ Trubka 2 (tube) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska E“ – nová záložka
+→ Trubka 3 (tube) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska H“ – nová záložka
+→ Trubka 4 (tube) přidán – výsledek po výpočtu níže
+→ Tažení po šroubovici (ext) přidán – výsledek po výpočtu níže
+✓ Válec 1 (cylinder) · přidáno 5089,4 mm³ · těleso platné
+✓ Tažení po šroubovici (ext) · úběr 237,2 mm³ (70 % nástroje) · těleso platné
+✓ Trubka 1 (tube) · přidáno 9912,4 mm³ · těleso platné
+⚠ Tažení po šroubovici (ext): špička profilu závitu je tečná k povrchu Ø16,4 – drážka do materiálu nezasahuje, vznikne skrytý kanál, ne závit. Závit v díře Ø16,4: zadejte side=internal a radius=8,2 (poloměr povrchu, na kterém závit začíná; hloubka jde do materiálu).
+✓ Trubka 2 (tube) · přidáno 9912,4 mm³ · těleso platné
+✓ Tažení po šroubovici (ext) · úběr 229,9 mm³ (71 % nástroje) · těleso platné
+✓ Trubka 3 (tube) · přidáno 9912,4 mm³ · těleso platné
+⚠ Tažení po šroubovici (ext): drážka závitu ústí do povrchu Ø16,4 jen špičkou (0,021 mm z hloubky 0,82 mm), zbytek leží v materiálu – profil míří na opačnou stranu. Závit v díře Ø16,4: zadejte side=internal a radius=8,2 (poloměr povrchu, na kterém závit začíná; hloubka jde do materiálu).
+✓ Trubka 4 (tube) · přidáno 9912,4 mm³ · těleso platné
+⚠ Tažení po šroubovici (ext): drážka závitu nezasahuje do válcové plochy díry ani válce – leží celá v materiálu (skrytý kanál, ústí jen do čel). Závit v díře Ø16,4: zadejte side=internal a radius=8,2 (poloměr povrchu, na kterém závit začíná; hloubka jde do materiálu).
+
+Dokument: „Deska H“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ⚠, 0 ✗)
+Rozměry: 30 × 30 × 20 mm (X -15…15, Y -15…15, Z 0…20) · objem 9,56 cm³ · ploch 9 · hran 17
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Trubka 4 [tube, id #] ✓ přidáno 9912,4 mm³ · těleso platné – Ø30/Ø16,4 × 20 mm, new, podstava [0; 0; 0], osa Z
+ 2. Tažení po šroubovici [ext, id #] ⚠ drážka závitu nezasahuje do válcové plochy díry ani válce – leží celá v materiálu (skrytý kanál, ústí jen do čel). Závit v díře Ø16,4: zadejte side=internal a radius=8,2 (poloměr povrchu, na kterém závit začíná; hloubka jde do materiálu). –

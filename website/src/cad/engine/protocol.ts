@@ -22,7 +22,9 @@
  *
  * Priorita zařazení do rozpočtu: hlavička + Σ + řádek O (odkaz; delší než 200 znaků zkrácený na začátek adresy a délku)
  * vždy > ✗ > ⚠ > F a celý dlouhý řádek O > jednořádkové `=` > D (hlavní dokument a dokumenty s ✗/⚠) > víceřádkové
- * výpisy > ℹ (jen `notes`). Pořadí tisku: hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku,
+ * výpisy > ℹ převzetí záložky (`doc.reused`, `doc.name-taken` – i bez `notes`, víc dokumentů jedním řádkem `×N` –
+ * `mergeTakeovers`) > ostatní ℹ (jen `notes`). Pořadí tisku:
+ * hlavička, ✗, ⚠, ℹ, =, D, F, O, značka přebytku,
  * Σ. Nevejdou-li se všechny řádky F (mnoho souborů), nahradí je jeden souhrnný `F <formát|mixed> "*" <bajty>B files=<n> …`
  * (jednotlivé soubory jsou v `protocol-full.txt` a v JSON `files`).
  * Zařazuje se hladově v pořadí priority (v rámci priority v pořadí tisku): záznam se vypíše, když se vejde i se značkou
@@ -35,9 +37,10 @@
  */
 import type { StrictState } from "./strict";
 import type { CadLang } from "../i18n";
-import { CODE_RE, codeArgs, codeEntry, fallbackCode, type Code, type CodeEntryInit } from "./codes";
+import { CODE_RE, codeArgs, codeDef, codeEntry, fallbackCode, type Code, type CodeEntryInit } from "./codes";
 import { tr } from "../i18n";
 import type { DocSummary, Entry, Level, OpTiming, OutFile, Overflow, RunReport, ShareInfo } from "./protocol-types";
+import type { RunStamp } from "./run-queue";
 
 export const PROTOCOL_HEAD = "MNCAD/1";
 export const OVERFLOW_FILE = "protocol-full.txt";
@@ -232,10 +235,16 @@ export function mergeEntries(entries: readonly Entry[]): Entry[] {
  */
 const SIMILAR: Readonly<Record<string, { label: string; numbers: boolean }>> = {
   "feature.warning": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.tip-tangent": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.no-reach": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.wrong-side": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.pitch-nonstandard": { label: "{0} prvků: {1} – „{2}“", numbers: false },
   "feature.failed": { label: "{0} prvků: {1} – „{2}“", numbers: false },
   "drawing.warning": { label: "{0} listů: {1} – „{2}“", numbers: true },
 };
 const NUM_RE = /\d+(?:[.,]\d+)*/g;
+/** data záznamu jsou jen úrovně stavu prvku (`data.levels`, engine/verify.ts) – podobné hlášky se slučují i s nimi */
+const onlyLevels = (d: unknown): boolean => !!d && typeof d === "object" && Object.keys(d as object).every((k) => k === "levels");
 
 /**
  * Jen pro stručný protokol (zkouška 959, B6): ⚠/✗ téhož kódu o položkách jednoho dokumentu se stejnou hláškou a jinou
@@ -250,7 +259,7 @@ export function mergeSimilar(entries: readonly Entry[]): Entry[] {
   const at = new Map<string, Group>();
   for (const e of entries) {
     const cfg = e.code ? SIMILAR[e.code] : undefined;
-    const args = cfg && (e.level === "warn" || e.level === "error") && e.data === undefined ? codeArgs(e.code!, e.text) : null;
+    const args = cfg && (e.level === "warn" || e.level === "error") && (e.data === undefined || onlyLevels(e.data)) ? codeArgs(e.code!, e.text) : null;
     if (!cfg || !args || args.length !== 2) continue;
     const msg = cfg.numbers ? args[1].replace(NUM_RE, "N") : args[1];
     const key = [e.level, e.code, e.doc ?? "", entryLines(e).length ? "L" : "-", msg].join("\u0000");
@@ -283,6 +292,48 @@ export function mergeSimilar(entries: readonly Entry[]): Entry[] {
     const msg = g.msgs.size === 1 ? [...g.msgs][0] : g.msg;
     const names = [...g.items].map(([name, nums]) => (g.msgs.size > 1 && nums.length ? `${name}: ${nums.join("; ")}` : name));
     out.push({ ...first, line: lines[0] ?? null, ...(lines.length ? { lines } : {}), count, text: tr(g.label, g.items.size, msg, names.join(", ")) });
+  }
+  return out;
+}
+
+/**
+ * Souhrnná hláška ℹ převzetí záložek ve stručném protokolu (`mergeTakeovers`) – klíče slovníku; `{0}` = názvy dokumentů.
+ * Počet je ve značce `×N` řádku; nápověda k volbě je před názvy, aby ji zkrácení dlouhého výčtu (`TEXT_MAX`) neodřízlo.
+ */
+const TAKEOVER: Readonly<Record<string, string>> = {
+  "doc.reused": "záložky z dřívějšího běhu použité znovu – obsah nahrazen (volba „nový“ = nová záložka): {0}",
+  "doc.name-taken": "dokumenty v nové záložce vedle otevřené záložky téhož názvu, kterou nezaložil stejný druh příkazu běhu (volba „znovu“ ji převezme): {0}",
+};
+
+/**
+ * Jen pro stručný protokol bez `notes`: ℹ převzetí záložek (`doc.reused`, `doc.name-taken`) z více dokumentů → jeden řádek
+ * `ℹ L1,L3,L5 ×3 doc.reused záložky z dřívějšího běhu použité znovu – …: „Deska“, „Čep“, „S“`. Opakovaný běh nástroje
+ * se 70 díly má 20 takových hlášek po ~200 B – jednotlivě by se do 2 kB vešla jedna a zbytek by skončil v přebytku;
+ * takhle je převzetí vidět vždy jedním řádkem (počet `×N`, názvy od začátku, Σ `reused=<n>`). Plný protokol, JSON
+ * a stručný s `notes` mají dál každou hlášku zvlášť. Pořadí podle prvního výskytu.
+ */
+export function mergeTakeovers(entries: readonly Entry[]): Entry[] {
+  const groups = new Map<string, Entry[]>();
+  for (const e of entries) {
+    if (e.level !== "note" || !e.code || !TAKEOVER[e.code]) continue;
+    const g = groups.get(e.code);
+    if (g) g.push(e);
+    else groups.set(e.code, [e]);
+  }
+  const out: Entry[] = [];
+  const done = new Set<string>();
+  for (const e of entries) {
+    const g = e.level === "note" && e.code ? groups.get(e.code) : undefined;
+    if (!g || g.length < 2) {
+      out.push(e);
+      continue;
+    }
+    if (done.has(e.code!)) continue;
+    done.add(e.code!);
+    const lines = [...new Set(g.flatMap((m) => entryLines(m)))].sort((a, b) => a - b);
+    const count = g.reduce((a, m) => a + (m.count ?? 1), 0);
+    const names = g.map((m) => `„${m.doc ?? ""}“`).join(", ");
+    out.push({ level: "note", code: e.code, line: lines[0] ?? null, ...(lines.length ? { lines } : {}), count, text: tr(TAKEOVER[e.code!], names) });
   }
   return out;
 }
@@ -330,11 +381,12 @@ function bboxSize(b: DocSummary["bbox"]): string {
   return s.every((x) => Number.isFinite(x)) ? s.map((x) => fmtNum(x, 2)).join("x") : "-";
 }
 function matesStr(m: NonNullable<DocSummary["mates"]>): string {
-  const extra = (["conflict", "missing", "suppressed"] as const).filter((k) => m[k] > 0).map((k) => `${k}=${m[k]}`);
+  const extra = (["conflict", "missing", "suppressed", "lost"] as const).filter((k) => (m[k] ?? 0) > 0).map((k) => `${k}=${m[k]}`);
   return `${m.ok}/${m.total}${extra.length ? `(${extra.join(",")})` : ""}`;
 }
-const clashD = (c: NonNullable<DocSummary["clashes"]>) => `${c.total}(thread=${c.thread}${c.underhead ? `,underhead=${c.underhead}` : ""},real=${c.real}${c.undetermined ? `,undetermined=${c.undetermined}` : ""})`;
-const clashSigma = (c: NonNullable<DocSummary["clashes"]>) => `thread:${c.thread}${c.underhead ? `,underhead:${c.underhead}` : ""},real:${c.real}${c.undetermined ? `,undetermined:${c.undetermined}` : ""}`;
+// dotyk a pracovní kontakt (vlna 22, bod 5) jen nenulové a na konci – dřívější řádky D beze změny
+const clashD = (c: NonNullable<DocSummary["clashes"]>) => `${c.total}(thread=${c.thread}${c.underhead ? `,underhead=${c.underhead}` : ""},real=${c.real}${c.undetermined ? `,undetermined=${c.undetermined}` : ""}${c.touch ? `,touch=${c.touch}` : ""}${c.work ? `,work=${c.work}` : ""})`;
+const clashSigma = (c: NonNullable<DocSummary["clashes"]>) => `thread:${c.thread}${c.underhead ? `,underhead:${c.underhead}` : ""},real:${c.real}${c.undetermined ? `,undetermined:${c.undetermined}` : ""}${c.touch ? `,touch:${c.touch}` : ""}${c.work ? `,work:${c.work}` : ""}`;
 
 /** strojová část souhrnu dokumentu: `<part|asm|draft> <klíč=hodnota …>` (řádek D, výpis `= … status`) */
 export function docKv(d: DocSummary): string {
@@ -358,6 +410,15 @@ export function docKv(d: DocSummary): string {
   if (d.densityAssumed) kv.push(`rho=${fmtNum(d.density, 3)}`, "rho.assumed=1");
   if (d.exact === false) kv.push("exact=0");
   if (d.sheets) kv.push(`sheets=${d.sheets}`);
+  // konečné těleso dílu (vlna 22): počet těles a výsledek kontroly platnosti – neprovedená kontrola je `unchecked`, ne 1
+  if (d.kind === "part" && d.solids !== undefined) kv.push(`solids=${d.solids}`);
+  if (d.kind === "part" && d.valid !== undefined) kv.push(`valid=${d.valid === null ? "unchecked" : d.valid ? 1 : 0}`);
+  if (d.kind === "part" && typeof d.valid === "boolean" && d.validCheck === "exact") kv.push("vcheck=exact"); // přesná kontrola (bez klíče = rychlá)
+  if (d.kind === "part" && d.free) kv.push(`free=${d.free}`);
+  if (d.features?.unchecked) kv.push(`unchecked=${d.features.unchecked}`);
+  if (d.features?.off) kv.push(`off=${d.features.off}`); // potlačené prvky – nejsou ve `feat=` mezi ✓
+  if (d.rev) kv.push(`rev=${d.rev}`); // revize modelu dokumentu s výkresy / exporty (vlna 22, bod 20 – před `stale=`)
+  if (d.stale?.length) kv.push(`stale=${d.stale.join(",")}`); // uložené výsledky, které konečnému stavu neodpovídají (vlna 22 – vždy na konci)
   return `${kind} ${kv.join(" ") || "-"}`;
 }
 
@@ -370,6 +431,7 @@ export function fileLine(f: OutFile): string {
   if (f.sheets) kv.push(`sheets=${f.sheets}`);
   if (f.check) kv.push(`check=${f.check.ok ? "ok" : "fail"}`);
   if (f.run === "fail") kv.push("run=fail");
+  if (f.modelRev) kv.push(`rev=${/^r·[0-9a-f]{6}$/.test(f.modelRev) ? f.modelRev : token(f.modelRev, "-")}`); // revize modelu souboru (vlna 22, bod 12)
   const bytes = Number.isFinite(f.bytes) ? Math.max(0, Math.round(f.bytes)) : 0;
   return `F ${token(f.format, "bin")} ${quote(f.name)} ${bytes}B${kv.length ? " " + kv.join(" ") : ""}`;
 }
@@ -416,6 +478,8 @@ export function headerLine(r: RunReport): string {
 }
 
 /** souhrnný řádek `Σ` (vždy v protokolu, omezená délka) */
+const countCode = (entries: readonly Entry[], code: Code) => entries.reduce((s, e) => s + (e.code === code ? (e.count ?? 1) : 0), 0);
+
 export function sigmaLine(r: RunReport): string {
   const kv = [`docs=${r.docs.length}`];
   const m = mainDoc(r);
@@ -430,12 +494,20 @@ export function sigmaLine(r: RunReport): string {
     if (m.mass_kg !== undefined) kv.push(`m=${fmtNum(m.mass_kg, 3)}kg`);
   }
   kv.push(`files=${r.files.length}`);
+  // opakovaný běh (engine/runs.ts): převzaté záložky a nové záložky vedle záložky téhož názvu – vždy vidět, i když se
+  // jejich řádky ℹ do rozpočtu nevejdou
+  const reused = countCode(r.entries, "doc.reused");
+  const taken = countCode(r.entries, "doc.name-taken");
+  if (reused) kv.push(`reused=${reused}`);
+  if (taken) kv.push(`name-taken=${taken}`);
   if (r.share) kv.push(`share=${shareMode(r.share)}`);
   if (r.stopped) kv.push(`stop=${locOf(entryLines({ line: r.stopped.line }))}:${CODE_RE.test(r.stopped.code) ? r.stopped.code : "msg.error"}`);
   kv.push(`t=${secs(r.ms)}`);
   const slow = [...(r.timing ?? [])].sort((a, b) => b.ms - a.ms)[0];
   if (slow && slow.ms >= 100) kv.push(`slow=L${nat(slow.line)}:${token(slow.op, "op")}:${secs(slow.ms)}`);
   if (r.peakMB > 0) kv.push(`mem=${Math.round(r.peakMB)}MB`);
+  // identita běhu (vlna 22, bod 12 – engine/run-queue.ts); revize vstupu je v JSON `run.inputRev`
+  if (r.run?.id) kv.push(`run=${/^[A-Za-z0-9_-]{1,64}$/.test(r.run.id) ? r.run.id : token(r.run.id, "-")}`); // id úlohy serve smí mít „-“ a „_“
   return `Σ ${kv.join(" ")}`;
 }
 
@@ -448,12 +520,15 @@ export const overflowLine = (n: number, bytes: number) => `… ${n} entries ${by
 export type ShortOptions = { budget?: number; notes?: boolean };
 export type ShortProtocol = { text: string; bytes: number; budget: number; overflow?: Overflow };
 
-/** priorita zařazení (menší = dřív) */
-const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, note: 6 } as const;
+/** priorita zařazení (menší = dřív); `shownNote` = ℹ s `short` v registru kódů (převzetí záložky) – i bez volby `notes` */
+const PRIO = { error: 0, warn: 1, out: 2, req: 3, doc: 4, listing: 5, shownNote: 6, note: 7 } as const;
 /** skupina tisku (pořadí řádků) */
 const GROUP = { error: 0, warn: 1, note: 2, measure: 3, doc: 4, file: 5, link: 6 } as const;
-/** `over` = bajty v přebytku, když se záznam nevypíše (jinak `bytes`) – celý řádek O místo zkráceného */
-type Item = { prio: number; group: number; order: number; text: string; bytes: number; over?: number };
+/**
+ * `over` = bajty v přebytku, když se záznam nevypíše (jinak `bytes`) – celý řádek O místo zkráceného; `after` = pokračovací
+ * řádky výpisu, které se smějí vypsat jen se svým řádkem `=`
+ */
+type Item = { prio: number; group: number; order: number; text: string; bytes: number; over?: number; after?: Item };
 type Extra = { n: number; b: number };
 
 /**
@@ -482,17 +557,26 @@ const lineKey = (e: Entry) => {
 /** kandidáti stručného protokolu (bez hlavičky a Σ) */
 function candidates(r: RunReport, notes: boolean): Item[] {
   const items: Item[] = [];
-  const add = (prio: number, group: number, order: number, text: string) => items.push({ prio, group, order, text, bytes: utf8Bytes(text) + 1 });
-  const entries = mergeSimilar(mergeEntries(r.entries));
+  const add = (prio: number, group: number, order: number, text: string): Item => {
+    const it: Item = { prio, group, order, text, bytes: utf8Bytes(text) + 1 };
+    items.push(it);
+    return it;
+  };
+  const merged = mergeSimilar(mergeEntries(r.entries));
+  const entries = notes ? merged : mergeTakeovers(merged); // převzetí záložek jedním řádkem (s `notes` každá hláška zvlášť)
   const seq = new Map(entries.map((e, i) => [e, i]));
   const sorted = [...entries].sort((a, b) => lineKey(a) - lineKey(b) || seq.get(a)! - seq.get(b)!);
   sorted.forEach((e, i) => {
     if (e.level === "error") add(PRIO.error, GROUP.error, i, msgLine(e, false));
     else if (e.level === "warn") add(PRIO.warn, GROUP.warn, i, msgLine(e, false));
     else if (e.level === "note" && notes) add(PRIO.note, GROUP.note, i, msgLine(e, false));
+    else if (e.level === "note" && e.code && codeDef(e.code)?.short) add(PRIO.shownNote, GROUP.note, i, msgLine(e, false));
     else if (e.level === "measure") {
       const t = measureText(e);
-      add(t.includes("\n") ? PRIO.listing : PRIO.req, GROUP.measure, i, t);
+      const nl = t.indexOf("\n");
+      // nápověda: strojový řádek `= L<n> help hits=… q="…"` vždy, řádky výsledků jen když se vejdou (víc hledání v běhu)
+      if (nl > 0 && e.code === "help") add(PRIO.listing, GROUP.measure, i + 0.5, t.slice(nl + 1)).after = add(PRIO.req, GROUP.measure, i, t.slice(0, nl));
+      else add(nl > 0 ? PRIO.listing : PRIO.req, GROUP.measure, i, t);
     }
   });
   // D: hlavní dokument vždy, ostatní jen s ✗/⚠ (z výsledků stavby nebo ze záznamů s tímto dokumentem)
@@ -564,6 +648,7 @@ export function shortProtocol(r: RunReport, o: ShortOptions = {}): ShortProtocol
     let restN = list.length + extra.n;
     let restB = list.reduce((s, x) => s + overOf(x), 0) + extra.b;
     for (const it of [...list].sort((a, b) => a.prio - b.prio || a.group - b.group || a.order - b.order)) {
+      if (it.after && !kept.has(it.after)) continue;
       if (used + it.bytes + marker(restN - 1, restB - overOf(it)) > budget) continue;
       kept.add(it);
       used += it.bytes;
@@ -693,6 +778,8 @@ export class ReportBuilder {
   memory(mb: number): void {
     if (Number.isFinite(mb) && mb > this.peak) this.peak = mb;
   }
+  /** identita běhu (`RunReport.run`, Σ `run=`) – nastaví hostitel běhu (prohlížeč: RunTracker, CLI, serve) */
+  run?: RunStamp;
   /** sdílený odkaz z běhu (poslední vyhrává; `finish({ share })` má přednost) */
   setShare(s: ShareInfo): void {
     this.sharedLink = s;
@@ -734,6 +821,7 @@ export class ReportBuilder {
       protocol: "",
     };
     if (this.stoppedAt) r.stopped = this.stoppedAt;
+    if (this.run) r.run = { ...this.run };
     const share = o.share ?? this.sharedLink;
     if (share) r.share = share;
     return r;

@@ -430,6 +430,6 @@ export class Session {
     return this.asmCache.get(sourceKey(c.source))?.metrics?.volume ?? null;
   }
   motion(asm: CadDoc) {
-    return motionCached(asm);
+    return motionCached(asm, this.env());
   }
 }

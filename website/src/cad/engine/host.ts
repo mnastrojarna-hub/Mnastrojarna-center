@@ -75,6 +75,11 @@ export type EngineHost = {
   /** sdílení: základ odkazu a úložiště krátkých odkazů (`null` = jen dlouhý odkaz) */
   share?: { base: string; store: string | null };
   ui?: UiHooks;
+  /**
+   * fáze dlouhého výstupu (vlna 22, bod 22h – engine/export-job.ts): `op` = `export` / `out:step`, `phase` = model | convert |
+   * verify | write; CLI `--progress` je vypíše jménem, prohlížeč je ukáže u běhu (RunTracker)
+   */
+  phase?: (op: string, phase: string) => void;
   limits?: { maxMemMB: number };
   now?: () => number;
 };

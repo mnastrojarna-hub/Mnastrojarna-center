@@ -19,6 +19,7 @@ export function progressLabel(p: CadProgress): string {
   if (p.phase === "mesh") return tr("Počítám síť modelu…");
   if (p.op === "drawing") return tr("Počítám pohledy výkresu…");
   if (p.op === "export") return tr("Připravuji export…");
+  if (p.op === "validity") return tr("Přesná kontrola platnosti…");
   if (p.op === "interference") return tr("Počítám kolize…");
   if (p.op === "clashDetail") return tr("Třídím kolize (šroub v závitu / skutečné)…");
   if (p.op === "asmParts") return tr("Počítám díly sestavy…");

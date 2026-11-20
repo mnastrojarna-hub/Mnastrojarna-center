@@ -1,0 +1,24 @@
+# vlna 22, bod 22d: jedna cesta k závitu – označení i s mezerami (× / x / X, čárka i tečka, CS / EN / DE), stoupání mimo
+# ISO 261 = ⚠ thread.pitch-nonstandard (ne ticho), skutečná šroubovice z označení příkazem závit („šroubovice“) i Tažením
+# po šroubovici s thread= (jeden katalog, jedno jádro).
+nový díl "Čep A"
+válec 18 30
+závit m18 x 1,5 délka 20 v 0 0 10 šroubovice
+stav
+nový díl "Matice A"
+trubka 30 16.5 20
+závit M18×1,5 délka 18 v 0 0 1 vnitřní šroubovice
+nový díl "Matice B"
+trubka 30 16.5 20
+prvek surf.helixSweep profile=thread60 thread=M18 x 1,5 side=internal turns=12 mode=cut
+stav
+nový díl "Deska B"
+kvádr 60 40 20
+díra závit M18 X 1.5 hloubka 15 v 15 20
+díra závit M18×3 hloubka 15 v 45 20
+nový díl "Čep B"
+válec 18 40
+závit M18×3 délka 10
+thread M18 x 1.25 length 10 at 0 0 15
+gewinde M18 x 1,5 länge 10 bei 0 0 28 modellieren
+stav

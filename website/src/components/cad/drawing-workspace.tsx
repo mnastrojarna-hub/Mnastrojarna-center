@@ -13,6 +13,7 @@ import { cad } from "@/cad/client";
 import { internBlobs } from "@/cad/blobs";
 import { angleGeom, annotationGeometry, annotationStatus, annToSheet, defaultDrawingOptions, dimFromPicks, GDT_LABEL, isRadialDim, LAYER_STYLE, pickViewEnt, scaleLabel, sheetToAnn, STANDARD_SCALES, VIEW_LABEL, viewAt, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DimAnn, type DimPick, type DimSel, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type NewDim, type PlacedView, type RevisionItem, type SheetName, type ViewKey, type ViewRotation } from "@/cad/drawing";
 import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
+import { gearTablesOf } from "@/cad/gears/data";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
 import { SmartDimsExtra, TolCheckBlock } from "./drawing-smart-extra";
 import { dimCheck } from "@/cad/dim-check";
@@ -31,6 +32,9 @@ import { genEditCount } from "@/cad/drawing-boxsel";
 import { TitleBlockSection } from "./drawing-title-panel";
 import { inheritTitle } from "@/cad/title-block";
 import { generalTolWarnings } from "@/cad/drawing-export";
+import { registerFlush } from "./flush-barrier";
+import { issueSheet, modelId, staleExportText, withdrawIssue, type ExportInput } from "@/cad/doc-outputs";
+import { IssueBadge, IssueSection, StaleSheetBanner } from "./drawing-issue";
 
 type Props = {
   doc: CadDoc;
@@ -49,11 +53,21 @@ type Props = {
   onPropsChange?: (p: NonNullable<CadDoc["props"]>) => void;
   /** výkresy uložené v dokumentu (volby, razítko, kóty a poznámky) */
   drawings?: DrawingDoc[];
-  onDrawingsChange?: (d: DrawingDoc[]) => void;
+  /**
+   * zápis listů do dokumentu (vlna 22, 22f): `key` = klíč dokumentu, ke kterému změna patří (aplikace ji nikdy nezapíše do
+   * jiného dokumentu), `record: false` = bez kroku historie (první list nového výkresu); jinak je zápis krok Zpět
+   */
+  onDrawingsChange?: (d: DrawingDoc[], o?: { key?: string; record?: boolean }) => void;
+  /** klíč dokumentu (id záložky), jehož výkres se upravuje – rozepsaná změna se zapíše vždy do něj */
+  docKey?: string;
   /** zápis výkresů jako krok historie (založení výkresu – Ctrl+Z ho vrátí); bez zadání onDrawingsChange */
   onDrawingsCommit?: (d: DrawingDoc[]) => void;
   /** komponenty sestavy pro pozice (balónky): světové obalové kvádry */
   balloons?: BalloonItem[];
+  /** export listu do souboru proběhl – záznam exportu do dokumentu (revize modelu, čas; vlna 22, bod 20) */
+  onExported?: (e: ExportInput) => void;
+  /** „Přepočítat“ u zastaralého vydaného listu = text `přepočítat vše` (engine/outputs-ops.ts) */
+  onRecomputeAll?: () => void;
 };
 
 type AnnTool = "dim" | "note" | "roughness" | "gdt" | "datum" | "text" | "detail";
@@ -153,7 +167,9 @@ function loadOpts(): DrawingOptions {
   return NEW_DRAWING_OPTIONS;
 }
 
-export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons }: Props) {
+export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare, onMaterialChange, bom, bbox, onPropsChange, drawings, onDrawingsChange, onDrawingsCommit, balloons, docKey, onExported, onRecomputeAll }: Props) {
+  /** revize modelu, ze které se list počítá (patička razítka, odznak vydání – cad/doc-outputs.ts) */
+  const mid = useMemo(() => (doc.kind !== "draft" ? modelId(doc) : null), [doc]);
   const [opts, setOpts] = useState<DrawingOptions>(NEW_DRAWING_OPTIONS);
   const freshMeta = (): DrawingMeta => ({
     name: doc.name,
@@ -170,6 +186,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   const threads = useMemo(() => threadsOfDoc(doc), [doc.features]);
   /** pružiny (i v komponentách sestavy) se kreslí zjednodušeně podle ISO 2162-1 – volba „plným tvarem“ je jen u výkresu s pružinou */
   const hasSprings = useMemo(() => hasDrawnSprings(doc), [doc]);
+  // kola a ozubení v dílu → přepínač „Tabulka ozubení“ (drawing-geartable.ts)
+  const hasGears = useMemo(() => doc.kind !== "assembly" && gearTablesOf(doc).length > 0, [doc]);
   const [repeatTool, setRepeatTool] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [dwgVer, setDwgVer] = useState<DwgVersion>(() => {
@@ -211,11 +229,13 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     if (!placed) out.push(...tagged);
     return out;
   };
-  /** zápis listů aktivního výkresu do dokumentu */
-  const emit = (next: DrawingDoc[]) => {
+  /** zápis listů aktivního výkresu do dokumentu – do dokumentu, ve kterém změna vznikla (`dirtyKey`), jako krok Zpět */
+  const emit = (next: DrawingDoc[], record = true) => {
     const out = withGroup(next);
     wrote.current = JSON.stringify(out);
-    onDrawingsChange?.(out);
+    const key = dirtyKey.current ?? docKeyRef.current;
+    dirtyKey.current = null;
+    onDrawingsChange?.(out, { ...(key ? { key } : {}), record });
     return out;
   };
   // aktivní list sdílí výkres s textovými příkazy („výkres list 2“ → výkres se otevře / přepne na list 2)
@@ -250,6 +270,16 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     setRename(r);
   };
   const dirty = useRef(false);
+  // rozepsaná změna listu (vlna 22, 22f): dokument, ve kterém vznikla, a registrace v bariéře (flush-barrier.ts) – přepnutí
+  // záložky, otevření jiného dokumentu, uložení, export, sdílení i window.mncad ji nejdřív zapíšou
+  const docKeyRef = useRef(docKey);
+  docKeyRef.current = docKey;
+  const dirtyKey = useRef<string | null>(null);
+  const barrierOff = useRef<(() => void) | null>(null);
+  const unregister = () => {
+    barrierOff.current?.();
+    barrierOff.current = null;
+  };
 
   // načtení listu (při otevření a při přepnutí listu; po změně listu zvenku – textové příkazy „výkres …“, „kótovat“)
   const wrote = useRef(JSON.stringify(drawings ?? null));
@@ -261,9 +291,12 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
       const o = loadOpts();
       setOpts(o);
       // dokument bez výkresu: první list se uloží hned – výkres existuje, jakmile je otevřený (Otevřít výkres ▼, další
-      // Nový výkres = „Výkres 2“), i když se na něm nic nezmění (sestava bez Chytrých kót)
-      if (!all.length && onDrawingsChange) emit([{ ...sheetDoc(), options: o as unknown as Record<string, unknown> }]);
+      // Nový výkres = „Výkres 2“), i když se na něm nic nezmění (sestava bez Chytrých kót); bez kroku historie (Zpět by ho
+      // jen smazal a výkres by ho hned založil znovu)
+      if (!all.length && onDrawingsChange) emit([{ ...sheetDoc(), options: o as unknown as Record<string, unknown> }], false);
     }
+    unregister();
+    dirtyKey.current = null;
     // údaje razítka listu od výchozích – pole předchozího listu (logo, šablona, zákazník …) se do jiného listu nepřenesou
     if (sv?.meta) setMeta(() => ({ ...freshMeta(), ...(sv.meta as Partial<DrawingMeta>), material: materialLabel, massKg }));
     setAnn(sv?.annotations ?? []);
@@ -338,13 +371,36 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     void _c;
     void _si;
     void _sc;
-    return inDrawing({ id: saved?.id ?? uid(), name: sheetName, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann }, group);
+    return inDrawing({ id: saved?.id ?? uid(), name: sheetName, options: { ...opts, section: opts.section } as unknown as Record<string, unknown>, meta: metaRest as unknown as Record<string, unknown>, annotations: ann, ...(saved?.issued ? { issued: saved.issued } : {}) }, group);
+  };
+  /** vydání aktivního listu (`výkres vydat`): písmeno revize + revize modelu + datum, krok historie */
+  const issueNow = (rev?: string) => {
+    const r = issueSheet(doc, sheetDoc(), rev ? { rev } : {});
+    const next = sheets.length ? [...sheets] : [];
+    next[sheetIdx] = r.sheet;
+    const m = r.sheet.meta as Partial<DrawingMeta>;
+    setMeta((x) => ({ ...x, revisions: m.revisions, revision: m.revision }));
+    dirty.current = false;
+    const out = withGroup(next);
+    wrote.current = JSON.stringify(out);
+    (onDrawingsCommit ?? onDrawingsChange)?.(out);
+    flash(r.unchanged ? tr("List už je vydán jako rev. {0} z modelu {1}", r.rev, r.id.rev) : tr("List vydán jako rev. {0} z modelu {1}", r.rev, r.id.rev));
+  };
+  const withdrawNow = () => {
+    const next = sheets.length ? [...sheets] : [];
+    next[sheetIdx] = withdrawIssue(sheetDoc());
+    dirty.current = false;
+    const out = withGroup(next);
+    wrote.current = JSON.stringify(out);
+    (onDrawingsCommit ?? onDrawingsChange)?.(out);
+    flash(tr("Vydání listu zrušeno – list je rozpracovaný"));
   };
   const persistNow = () => {
     if (!onDrawingsChange) return;
     const next = sheets.length ? [...sheets] : [];
     next[sheetIdx] = sheetDoc();
     dirty.current = false;
+    unregister();
     return emit(next);
   };
   const persistRef = useRef(persistNow);
@@ -366,7 +422,19 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ann, opts, meta, sheetName]);
-  const markDirty = () => (dirty.current = true);
+  const markDirty = () => {
+    dirty.current = true;
+    dirtyKey.current ??= docKeyRef.current ?? null;
+    // bariéra: rozepsaný list se zapíše dřív, než se přepne záložka / uloží / exportuje (zápis do `dirtyKey`, nikdy jinam)
+    barrierOff.current ??= registerFlush(
+      () => {
+        barrierOff.current = null;
+        if (dirty.current) persistRef.current(); // bariéra sama běží ve flushSync
+      },
+      dirtyKey.current,
+      "drawing",
+    );
+  };
   const addSheet = () => {
     if (!onDrawingsChange) return;
     const cur = sheets.length ? [...sheets] : [];
@@ -453,7 +521,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     const t = setTimeout(async () => {
       const t0 = performance.now();
       try {
-        const d = await cad.drawing(doc, { ...meta, threads, bom: showBom ? bom : undefined, components: balloons, sheetIndex: sheetIdx + 1, sheetCount: Math.max(1, sheets.length) }, opts);
+        const d = await cad.drawing(doc, { ...meta, threads, bom: showBom ? bom : undefined, components: balloons, sheetIndex: sheetIdx + 1, sheetCount: Math.max(1, sheets.length), ...(mid ? { modelRev: mid.rev } : {}) }, opts);
         if (id !== seq.current) return;
         setRes(d);
         setError(null);
@@ -471,7 +539,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
     markDirty();
     setOpts((o) => ({ ...o, [k]: v }));
   };
-  const setView = (k: ViewKey | "iso", v: boolean) => setOpts((o) => ({ ...o, views: { ...o.views, [k]: v } }));
+  // zaškrtnutí pohledu je změna listu jako formát (dřív bez markDirty – u listu bez Chytrých kót se neuložilo vůbec; 22f)
+  const setView = (k: ViewKey | "iso", v: boolean) => {
+    markDirty();
+    setOpts((o) => ({ ...o, views: { ...o.views, [k]: v } }));
+  };
   const setM = (patch: Partial<DrawingMeta>) => {
     markDirty();
     setMeta((m) => ({ ...m, ...patch }));
@@ -538,9 +610,20 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
    * se uloží a listy výkresu se spočítají v jádře (PDF vícestránkové, DXF / DWG / SVG ZIP s jedním souborem na list)
    */
   const fileOf = async (f: DrawingExportFormat) => {
-    if (!exportAll || f === "csv") return drawingFile(out!, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
+    const revs = { ...(mid ? { modelRev: mid.rev } : {}), ...(meta.revision ? { rev: meta.revision } : {}) };
+    if (!exportAll || f === "csv") return drawingFile(out!, f, { base, title: meta.name, dwgVersion: dwgVer, bom, ...revs });
     const outs = await allSheetsOut();
-    return drawingFileSheets(outs, f, { base, title: meta.name, dwgVersion: dwgVer, bom });
+    return drawingFileSheets(outs, f, { base, title: meta.name, dwgVersion: dwgVer, bom, ...revs });
+  };
+  /** listy exportu (id) */
+  const exportedIds = () => (exportAll ? sheets.map((x) => x.id) : [saved?.id ?? ""]).filter(Boolean);
+  /** záznam exportu do dokumentu (revize modelu, čas) – vlna 22, bod 20 */
+  const noteExport = (format: DrawingExportFormat, file: string) => onExported?.({ what: "drawing", format, file, sheets: exportedIds(), ...(meta.revision ? { rev: meta.revision } : {}) });
+  /** vydaný list ze starší revize modelu: soubor by nesl staré písmeno revize s jiným obsahem → upozornění u exportu */
+  const staleNote = () => {
+    if (!mid) return "";
+    const st = (exportAll ? sheets : saved ? [saved] : []).filter((x) => x.issued && x.issued.sig !== mid.sig);
+    return st.length ? ` · ⚠ ${staleExportText(st[0].name, st[0].issued!, mid)}` : "";
   };
   /** hotové listy aktivního výkresu (aktivní list s rozpracovanými změnami) */
   const allSheetsOut = async () => {
@@ -565,7 +648,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         flash(exportAll ? tr("Generuji PDF (listů: {0})…", sheets.length) : tr("Generuji PDF…"));
         return new Blob([(await fileOf("pdf")).data as BlobPart], { type: "application/pdf" });
       }, "application/pdf");
-      if (saved) flash(tr("PDF uloženo: {0}", saved.name) + tolNote());
+      if (saved) {
+        flash(tr("PDF uloženo: {0}", saved.name) + tolNote() + staleNote());
+        noteExport("pdf", saved.name);
+      }
     } catch (e) {
       flash((e as Error).message || tr("PDF se nepodařilo vytvořit."));
     }
@@ -579,7 +665,10 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         const f = await fileOf("dwg");
         return new Blob([f.data as BlobPart], { type: f.mime });
       }, exportAll ? "application/zip" : "application/acad");
-      if (saved) flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name) + tolNote());
+      if (saved) {
+        flash(tr("DWG {0} uloženo: {1}", dwgVer, saved.name) + tolNote() + staleNote());
+        noteExport("dwg", saved.name);
+      }
     } catch (e) {
       flash((e as Error).message || tr("DWG se nepodařilo vytvořit."));
     }
@@ -587,7 +676,14 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
   /** DXF / SVG / kusovník CSV (textové soubory) */
   const exportText = (f: DrawingExportFormat) => {
     if (!out && f !== "csv") return;
-    void fileOf(f).then((x) => (download(x.name, new Blob([x.data as BlobPart], { type: x.mime }), x.mime), f !== "csv" && tolNote() && flash(tolNote().replace(/^ · /, "")))).catch((e) => flash((e as Error).message));
+    void fileOf(f)
+      .then((x) => {
+        download(x.name, new Blob([x.data as BlobPart], { type: x.mime }), x.mime);
+        noteExport(f, x.name);
+        const note = f !== "csv" ? tolNote() + staleNote() : "";
+        if (note) flash(note.replace(/^ · /, ""));
+      })
+      .catch((e) => flash((e as Error).message));
   };
   /** export dílu bez nepředepsaných tolerancí – upozornění jako u window.mncad.exportDrawing (drawing-export.ts) */
   const tolNote = () => (generalTolWarnings(doc, (exportAll ? sheets.map((x, k) => ({ name: x.name, meta: (k === sheetIdx ? meta : x.meta) as unknown as DrawingMeta })) : [{ name: sheetName, meta }])).length ? tr(" · ⚠ výkres nemá nepředepsané tolerance") : "");
@@ -1064,6 +1160,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
                 {i === sheetIdx ? sheetName : sh.name}
               </button>
             )}
+            <IssueBadge doc={doc} sheet={"issued" in sh ? sh : undefined} mid={mid} />
             {sheets.length > 1 && (
               <button type="button" title={tr("Odstranit list")} onClick={() => removeSheet(i)} className="hidden text-ink-700/40 hover:text-brand group-hover:inline">
                 ×
@@ -1083,8 +1180,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
         </TipBox>
         <span className="ml-auto pb-1 text-[11px] text-ink-700/45">
           {tr("List")}{" "}{sheetIdx + 1}/{Math.max(1, sheets.length)}
+          {mid ? <span data-model-rev={mid.rev}>{" · "}{tr("model {0}", mid.rev)}</span> : null}
         </span>
       </div>
+      {/* vydaný list ze starší revize modelu (vlna 22, bod 20) */}
+      <StaleSheetBanner doc={doc} sheet={saved} mid={mid} onIssue={onDrawingsChange ? issueNow : undefined} onRecompute={onRecomputeAll} />
 
       <div className="flex min-h-0 flex-1">
         {/* nastavení */}
@@ -1273,7 +1373,7 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
           <Section title={tr("Pohledy")}>
             <div className="grid grid-cols-2 gap-1">
               {(["front", "top", "left", "right", "back", "bottom", "iso"] as (ViewKey | "iso")[]).map((k) => (
-                <Check key={k} checked={opts.views[k]} onChange={(v) => setView(k, v)} disabled={k === "front"}>
+                <Check key={k} checked={opts.views[k]} onChange={(v) => setView(k, v)} disabled={k === "front"} data={k}>
                   {tr(VIEW_LABEL[k])}
                 </Check>
               ))}
@@ -1374,6 +1474,11 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             <Check checked={!!opts.springTable} onChange={(v) => set("springTable", v)}>
               {tr("Tabulka údajů pružiny (EN ISO 2162-2)")}
             </Check>
+            {hasGears && (
+              <Check checked={!!opts.gearTable} onChange={(v) => set("gearTable", v)}>
+                {tr("Tabulka ozubení (modul, z, průměry, W, M)")}
+              </Check>
+            )}
           </Section>
 
           <Section title={tr("Detailní pohledy")}>
@@ -1448,6 +1553,8 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
             >
               {tr("+ Přidat revizi")}
             </button>
+            {/* vydání listu: písmeno revize + revize modelu (text `výkres vydat`) */}
+            <IssueSection doc={doc} sheet={sheetDoc()} mid={mid} onIssue={onDrawingsChange ? issueNow : undefined} onWithdraw={onDrawingsChange ? withdrawNow : undefined} />
           </Section>
           <FitsSection opts={opts} set={set} meta={meta} setMeta={setM} />
           <p className="px-4 pb-5 text-[11px] leading-relaxed text-ink-700/45">
@@ -1874,10 +1981,10 @@ function Seg<T extends string>({ value, options, onChange }: { value: T; options
   );
 }
 
-function Check({ checked, onChange, children, disabled }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean }) {
+function Check({ checked, onChange, children, disabled, data }: { checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; disabled?: boolean; /** `data-view-toggle` (e2e) */ data?: string }) {
   return (
     <label className={cn("flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-steel-100", disabled && "cursor-default opacity-60 hover:bg-transparent")}>
-      <input type="checkbox" className="h-3.5 w-3.5 accent-[#E03930]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} />
+      <input type="checkbox" className="h-3.5 w-3.5 accent-[#E03930]" checked={checked} disabled={disabled} onChange={(e) => onChange(e.target.checked)} {...(data ? { "data-view-toggle": data } : {})} />
       <span className="text-[12px]">{children}</span>
     </label>
   );

@@ -11,13 +11,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isMainThread, workerData } from "node:worker_threads";
-import { setLang, tr } from "../i18n";
+import { getLang, setLang, tr } from "../i18n";
 import { finalizeReport, formatFull, OVERFLOW_FILE } from "../engine/protocol";
 import type { RunReport } from "../engine/protocol-types";
 import { parseArgs, usageText, UsageError, type CliArgs, type RunArgs, type SelftestArgs } from "./args";
 import { CliFileSink, prepareOutDir } from "./file-sink";
 import type { JobInit, JobRequest } from "./job";
 import { exitCodeFor, INTERRUPTION_EXIT, JOB_TAG, JobThread, type Outcome, type ThreadEvent } from "./watchdog";
+import { exportPhaseText } from "../engine/export-phases";
 
 export const SESSION_FILE = "session.mncad-ws";
 
@@ -108,7 +109,14 @@ export function jobInit(io: Io, lang: JobInit["lang"], shareStore?: string): Omi
   };
 }
 
-const fmtEvent = (e: ThreadEvent): string | null => {
+/** text pojmenované fáze průběhu: `mesh` = síť modelu, fáze exportu podle engine/export-job.ts */
+export function progressPhaseText(op: string, phase: string): string {
+  if (phase === "mesh") return tr("síť modelu");
+  const fmt = /^(?:out|export):(\w+)$/.exec(op)?.[1] ?? "";
+  return exportPhaseText(phase, fmt);
+}
+
+export const fmtEvent = (e: ThreadEvent): string | null => {
   const loc = (l: number | null) => (l === null ? "L-" : `L${l}`);
   switch (e.t) {
     case "ready":
@@ -118,7 +126,9 @@ const fmtEvent = (e: ThreadEvent): string | null => {
     case "op-end":
       return e.ms >= 1000 ? `${loc(e.line)} ${e.op} ${(e.ms / 1000).toFixed(1)} s (WASM ${e.mem.heapMB} MB, RSS ${e.mem.rssMB} MB)` : null;
     case "progress":
-      return e.total ? `  ${e.op} ${(e.index ?? 0) + 1}/${e.total}${e.name ? ` ${e.name}` : ""}` : null;
+      // pojmenované fáze (vlna 22, bod 22h): síť modelu (dřív „build 3/2“), fáze exportu (přestavba, převod, kontrola, zápis)
+      if (e.phase) return `  ${e.op}: ${progressPhaseText(e.op, e.phase)}`;
+      return e.total ? `  ${e.op} ${Math.min((e.index ?? 0) + 1, e.total)}/${e.total}${e.name ? ` ${e.name}` : ""}` : null;
     case "dead":
       return null;
   }
@@ -203,6 +213,7 @@ async function cmdRun(a: RunArgs, io: Io): Promise<number> {
     out: { kind: "dir", dir: outDir },
     resume,
     saveSession: a.resume !== undefined || a.formats !== "none",
+    runId: "r1", // identita běhu (vlna 22, bod 12): jeden běh na spuštění; Σ run=r1, JSON run.inputRev
   };
   let ticker: ReturnType<typeof setInterval> | undefined;
   let inFlight: { line: number | null; op: string; at: number } | null = null;
@@ -277,7 +288,12 @@ async function cmdHelp(topic: string[], io: Io): Promise<number> {
     io.stdout(AGENT_COMMANDS.map((c) => `${c.cmd}\n    ${c.en} · ${c.de} – ${c.desc}`).join("\n"));
     return 0;
   }
-  throw new UsageError(tr("neznámé téma nápovědy „{0}“ – guide, commands", topic.join(" ")));
+  // tahák a hledání v nápovědě (help/answer.ts – totéž co `nápověda tahák` / `nápověda hledat …` v běhu)
+  const { cliHelpTopic } = await import("../help/cli-help");
+  const out = cliHelpTopic(topic, getLang());
+  if ("error" in out) throw new UsageError(out.error);
+  io.stdout(out.text);
+  return 0;
 }
 
 /** Celý příkaz `mncad …`; vrací kód ukončení (volající ho nastaví do `process.exitCode`). */
