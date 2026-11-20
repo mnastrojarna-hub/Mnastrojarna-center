@@ -1,0 +1,107 @@
+=== run 1 ===
+✓ nový díl „Rám“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Pružina“ – nová záložka
+→ Pružina 1 (spring) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Kvádr 3 (box)
+✓ Pružina 1 (spring)
+
+Dokument: „Pružina“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 20 × 32 mm (X -10…10, Y -10…10, Z -1…31) · objem 1,07 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Pružina 1 [spring, id #] ✓ – Ø18, stoupání 5, závitů 6, drát Ø2 (délka 30 mm), new, začátek [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Mechanika“ – nová záložka
+✓ komponenta „Rám“ vložena do sestavy (ukotvená)
+✓ komponenta „Deska A“ vložena do sestavy
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ komponenta „Pružina“ vložena do sestavy
+✓ vazba ZDVIH „Deska A“ F5 → „Rám“ F6 · 57,5 mm: ok · poloha beze změny
+✓ vazba Mez „Přidržovač“ F6 → „Deska A“ F5 · ⟨5; 25⟩ mm: ok · poloha beze změny
+  vybráno: A F6 rovinná · B F5 rovinná
+✓ vazba Dosed „Přidržovač“ F5 → „Rám“ F6 · ⟨0; 500⟩ mm: ok · poloha beze změny
+  vybráno: A F5 rovinná · B F6 rovinná
+✓ vazba Zámek „Pružina“ → „Přidržovač“: ok · poloha beze změny
+  dosedací plochy pružiny „Pružina“: „Přidržovač“ F6 rovinná +Z → „Deska A“ F5 rovinná −Z
+✓ pružina „Pružina“: délka 25 mm · L0 32 · Ln 14 · stlačení 7 mm · síla 140 N (c 20 N/mm)
+✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Úroveň simulace: kvazistatika – v každém kroku rovnováha pružin a kontaktů (meze vazeb, délka pružiny na doraz) – nezávisle na předchozím kroku a směru pohybu (zvoleno automaticky: sestava má pružinu „Pružina“ na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 24,5 mm · konec [20; 20; 10]
+ Pružina: rozsah pohybu X 0 · Y 0 · Z 24,5 mm · konec [50; 50; 18]
+Vazby splněny ve všech krocích
+ ✓ pružina „Pružina“: délka 25 → 19,15 mm (min 19,15 · L0 32 · Ln 14) · síla 140 → 257 N (max 257 N)
+Krok 6 (t = 1 s, motory 42,325):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 52,325]
+ Přidržovač [20; 20; 19,325]
+ Pružina [50; 50; 27,325]
+Krok 12 (t = 2 s, motory 27,15):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 37,15]
+ Přidržovač [20; 20; 10]
+ Pružina [50; 50; 18]
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5] · Přidržovač [20; 20; 34,5] · Pružina [50; 50; 42,5]
+Vazby: 4 (4 ok)
+Pružiny: „Pružina“ 25 mm (L0 32 · Ln 14) · F 140 N ✓ – délka odvozená z dosedacích ploch (řídí polohy komponent)
+Pohybová studie: motorů 1 · kroků 12 · 2 s – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 229,87 cm³ · hmotnost Σ 1,804 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 3 ===
+✓ vazba 1 (ZDVIH „Deska A“ F5 → „Rám“ F6 · 27,15 mm): hodnota 27,15 mm · ok
+  pohnuto: „Deska A“ poloha [0; 0; 37,15] · „Přidržovač“ poloha [20; 20; 10] · „Pružina“ poloha [50; 50; 18]
+  rovnováha pružin a preferovaných stran mezí posunula: „Přidržovač“ poloha [20; 20; 10] · „Pružina“ poloha [50; 50; 18]
+✓ vazba 1 (ZDVIH „Deska A“ F5 → „Rám“ F6 · 57,5 mm): hodnota 57,5 mm · ok
+  pohnuto: „Deska A“ poloha [0; 0; 67,5] · „Přidržovač“ poloha [20; 20; 34,5] · „Pružina“ poloha [50; 50; 42,5]
+Krok 6 (t = 1 s, motory 42,325):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 52,325]
+ Přidržovač [20; 20; 19,325]
+ Pružina [50; 50; 27,325]
+ℹ řádek 4: pohybová studie přepočítána – uložený výsledek neplatil, od výpočtu se změnilo: geometrie dílu „Pružina“; poloha, ukotvení nebo skrytí komponent
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5] · Přidržovač [20; 20; 34,5] · Pružina [50; 50; 42,5]
+Vazby: 4 (4 ok)
+Pružiny: „Pružina“ 25 mm (L0 32 · Ln 14) · F 140 N ✓ – délka odvozená z dosedacích ploch (řídí polohy komponent)
+Pohybová studie: motorů 1 · kroků 12 · 2 s – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 229,87 cm³ · hmotnost Σ 1,804 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 4 ===
+✓ pohybová studie: kinematika (nastavení dynamiky zůstává pro „pohyb dynamika“)
+Pohybová studie: motorů 1 · kroků 12
+ 1. lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl
+ Deska A: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [0; 0; 37,15]
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 19,35 mm · konec [20; 20; 15,15]
+ Pružina: rozsah pohybu X 0 · Y 0 · Z 19,35 mm · konec [50; 50; 23,15]
+⚠ vazby splněny ve všech krocích, ale polohu „Přidržovač“ neurčují – zobrazená poloha není fyzikální výsledek (motion.undetermined)
+ ✓ pružina „Pružina“: délka 25 → 14 mm (min 14 · L0 32 · Ln 14) · síla 140 → 360 N (max 360 N)
+⚠ řádek 2: poloha „Přidržovač“ není vazbami určena (volná v mezi „Mez“ ⟨5; 25⟩ (vazba 2), „Dosed“ ⟨0; 500⟩ (vazba 3)) – kinematika ji nechává, kde byla (posune ji jen doraz meze) – pružina „Pružina“ by ji tlačila: fyzikální poloha = pohyb kvazistatika (nebo sestava vazba 2 preferovat min|max)
+Krok 6 (t = 1 s, motory 42,325):
+ Rám [0; 0; 0]
+ Deska A [0; 0; 52,325]
+ Přidržovač [20; 20; 30,325]
+ Pružina [50; 50; 38,325]
+
+Dokument: „Mechanika“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Rám [0; 0; 0] ⚓ · Deska A [0; 0; 67,5] · Přidržovač [20; 20; 34,5] · Pružina [50; 50; 42,5]
+Vazby: 4 (4 ok)
+Pružiny: „Pružina“ 25 mm (L0 32 · Ln 14) · F 140 N ✓ – délka odvozená z dosedacích ploch (řídí polohy komponent)
+Pohybová studie: motorů 1 · kroků 12 · 2 s – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 100 × 100 × 77,5 mm · objem Σ 229,87 cm³ · hmotnost Σ 1,804 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

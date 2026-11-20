@@ -276,8 +276,11 @@ export async function runMotion(
     timing.solveMs += now() - tStep;
     // díly volné v mezi (vazby jejich polohu neurčují): jednou na studii v poloze kroku 0
     if (k === 0) undetermined = findUndetermined();
-    // záznam kroku: rozbalené úhly → stav pro další krok
+    // záznam kroku: rozbalené úhly → stav pro další krok (vyhodnocení všech členů v poloze kroku zapíše rozbalené úhly motorů
+    // a mechanických vazeb – Ozubení, Šroub, Hřeben – jako dřívější kontrola zbytků)
     rec = new Map();
+    for (const t of terms.hard) t.r();
+    for (const t of terms.drive) t.r();
     const conflicts = out.status === "ok" ? [] : [...new Set([...out.short.map((id) => (motorOfTerm(id)?.abs ? id : `motor:${motorOfTerm(id)?.mo.id ?? id}`)), ...out.blocking.filter((id) => mateById.get(id)?.type !== "fixed")])];
     const reached = out.status === "stopped" ? motors.map((x) => {
       const v = dofValue(x.m, x.mo.kind, ctx);

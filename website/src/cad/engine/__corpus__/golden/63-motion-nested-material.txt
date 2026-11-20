@@ -27,6 +27,7 @@ Prvky:
 ✓ vazba Vzdálenost „Přidržovač“ F5 → „Deska A“ F6 · 20 mm: ok · poloha beze změny
 ✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
 Kolize: žádné ve všech krocích
 Vazby splněny ve všech krocích
@@ -48,6 +49,7 @@ Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
 Pohybová studie: motorů 1 · kroků 5 · 2 s · kolize
  1. lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
 Pohybová studie: 5 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
 Kolize v pohybu: kroků s kolizí 4 z 6 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 4 krocích, první v kroku 2
 Vazby splněny ve všech krocích
@@ -66,6 +68,7 @@ Pohyb: výsledek platí pro tento stav sestavy – 5 kroků, vazby splněny, pr�
 Pohybová studie: motorů 0 · kroků 36
 ✓ motor 1: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
 Pohybová studie: 4 kroků · 2 s · motory: lineární motor · Vzdálenost „Přidržovač“ → „Deska A“ · hodnota vazby 20 → 5 mm ↓ zdvih 15 mm · 7,5 mm/s
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
  Přidržovač: rozsah pohybu X 0 · Y 0 · Z 15 mm · konec [40; 10; 15]
 Vazby splněny ve všech krocích
 ℹ řádek 4: délka studie změněna z 3 s na 2 s – určuje ji doba jízdy jediného motoru 1 (rozsah × rychlost); jinou délku zadejte pohyb čas T (motor po dojetí stojí)

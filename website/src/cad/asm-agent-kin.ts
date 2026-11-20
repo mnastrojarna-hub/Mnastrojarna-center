@@ -525,7 +525,6 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       if (s.status === "stopped") log.push(tr(" ⚠ motor stojí na mezi: dosaženo {0} (žádáno {1})", (s.reached ?? []).map((v) => fmt(v, 4)).join("; "), s.motors.map((v) => fmt(v, 4)).join("; ")));
       if (s.status === "invalid") log.push(tr(" ⚠ NEŘEŠITELNÝ krok – zobrazena poslední platná poloha (krok {0}), žádný kompromis", s.shows ?? 0));
       for (const x of s.devs ?? []) log.push(`  ${tr("konflikt:")} ${devText(x)}`);
-      if (res.level) log.push(` ${levelLine(res.level)}`);
       return signal(d, log, false, { open: true, step: s.i }, [...codes, ...stepCodes]);
     }
     case "export": {
