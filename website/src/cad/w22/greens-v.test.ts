@@ -4,6 +4,8 @@
  *  - „obraz se mění ve všech … snímcích“ jen když se obraz opravdu měnil s polohou (mrtvé plátno = ✗, část = ⚠);
  *  - video, jehož soubor neodpovídá plánu (délka 2,926 s pro studii 0,65 s, chybějící snímky), kontrola souboru odmítne;
  *  - anotace nikdy nepíší vůli ani hloubku zásahu, které se nepočítaly; „✓“ u pohledu jen když se opravdu uložil.
+ *  - V2 (řez v sestavě): věta „čela řezu“ jen tam, kde okno čela opravdu kreslí (ne v drátovém modelu, ne bez komponent),
+ *    a skořepina bez objemu / tlumená komponenta v softwarovém náhledu čelo nedostane (nic se „nezaslepuje“ naoko).
  */
 import { describe, expect, it } from "vitest";
 import { applyMotionViewCmd } from "../agent-motion-view";
@@ -14,6 +16,7 @@ import { checkFrames, checkText, frameSig, videoPlan } from "../motion-video";
 import { annotRows } from "../motion-views";
 import { emptyDoc, type CadDoc } from "../types";
 import { checkWebm, muxWebm, readWebm } from "../webm-mux";
+import { capStyles, capSummary, softCapStyles } from "../section-cap";
 
 setLang("cs");
 const OK_FRAMES = /obraz se mění ve všech/;
@@ -78,5 +81,24 @@ describe("greens V: anotace a pohledy", () => {
     // bez studie: chyba, ne ✓
     const bare: CadDoc = { ...doc(), motion: undefined };
     await expect(applyMotionViewCmd(bare, { k: "save", name: "A" }, { run: async () => ({ steps: [] }) as unknown as MotionResult })).rejects.toThrow(/nemá pohybovou studii/);
+  });
+});
+
+describe("greens V2: čela řezu v sestavě", () => {
+  const comps = [{ id: "a", color: "#b9c2cc" }, { id: "b", color: "#4678c8", solid: false }, { id: "c", color: "#4678c8", dim: true }];
+  it("„čela řezu“ se neříká v drátovém modelu ani bez komponent", () => {
+    expect(capSummary(3, "wireframe")).not.toMatch(/čela řezu: každá/);
+    expect(capSummary(3, "wireframe")).toMatch(/nekreslí/);
+    expect(capSummary(0, "shadedEdges")).toBe("");
+    expect(capSummary(3, "shadedEdges")).toMatch(/čela řezu: každá komponenta s objemem/);
+  });
+  it("drátový model: žádné čelo; skořepina bez objemu čelo nemá; tlumená v softwarovém náhledu také ne", () => {
+    expect(capStyles(comps, "wireframe").every((s) => s === null)).toBe(true);
+    const gl = capStyles(comps, "shadedEdges");
+    expect(gl[0]).not.toBeNull();
+    expect(gl[1]).toBeNull();
+    expect(gl[2]!.opacity).toBe(0.18); // WebGL: průhledné čelo jako průhledné tělo
+    const soft = softCapStyles(comps, "shadedEdges");
+    expect(soft[2]).toBeNull(); // softwarový náhled kreslí tlumenou komponentu jen v hranách – bez čela
   });
 });
