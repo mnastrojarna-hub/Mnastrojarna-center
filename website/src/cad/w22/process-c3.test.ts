@@ -132,5 +132,36 @@ describe("vlna 22 C3: procesní vrstva – střih a otisk během pohybu (bod 4)"
     const cap = await kernel.process({ ...req, maxOps: 2 });
     expect(cap.approx).toEqual({ contact: 4, computed: 2 });
     expect(cap.steps.filter((s) => s.skipped).length).toBe(2);
+    // fáze 2 kolo 3: dvě operace na TÉMŽE obrobku – kombinovaný stav = sjednocení (druhý střih do téže díry nic nepřidá);
+    // dřív se každá počítala z původního plechu a protokol sčítal 2 × 314,159 mm³
+    const both = await kernel.process({ ...req, others: [{ tool: req.tool, kind: "cut", rels: req.rels }], meshCombined: [1] });
+    const cs = both.combined!;
+    expect(cs.steps).toHaveLength(6);
+    expect(cs.steps[0]).toBe(0);
+    const fin = cs.states[cs.steps[5]];
+    expect(Math.abs(fin.removed - PI_R2_T) / PI_R2_T).toBeLessThan(0.01);
+    expect(fin.volume).toBeCloseTo(6400 - PI_R2_T, 0);
+    expect(fin.scrap).toHaveLength(1);
+    expect(cs.states[1].mesh?.triangles.length).toBeGreaterThan(0);
+    // různé díry: sjednocení = součet, odpad 2 kusy
+    const apart = await kernel.process({ ...req, others: [{ tool: req.tool, kind: "cut", rels: zs.map((z) => relMatrix(P.placement, { position: [30, 30, z], rotation: [0, 0, 0] })) }] });
+    const fa = apart.combined!.states[apart.combined!.steps[5]];
+    expect(Math.abs(fa.removed - 2 * PI_R2_T) / PI_R2_T).toBeLessThan(0.02);
+    expect(fa.scrap).toHaveLength(2);
+  }, 240_000);
+
+  it("74f: dva střihy do téže díry = 314,159 mm³ jednou (dřív removed=628.319 scrap=2); dvě různé díry = součet 392,699 mm³ a 2 kusy odpadu", async () => {
+    const { short, con } = await run("74f", corpus("74f-process-two-ops"));
+    const kv = short.split("\n").filter((l) => /^= L\d+ asm "Lis" motion .* proc=2 /.test(l));
+    expect(kv.length, short).toBeGreaterThanOrEqual(2);
+    const same = / proc=2 removed=([\d.]+) scrap=(\d+)/.exec(kv[0])!;
+    expect(Math.abs(Number(same[1]) - PI_R2_T) / PI_R2_T).toBeLessThan(0.01);
+    expect(same[2]).toBe("1");
+    expect(con).toMatch(/„Plech“: 2 operací, celkem odebráno 314,1\d+ mm³ \(sjednocení – společný objem operací jen jednou; součet operací 628,\d+ mm³\)/);
+    const two = / proc=2 removed=([\d.]+) scrap=(\d+)/.exec(kv[kv.length - 1])!;
+    const want = PI_R2_T + Math.PI * 25; // Ø20 + Ø10 × 1 mm
+    expect(Math.abs(Number(two[1]) - want) / want).toBeLessThan(0.01);
+    expect(two[2]).toBe("2");
+    expect(short).not.toMatch(/motion\.process-failed/);
   }, 240_000);
 });

@@ -1,0 +1,10 @@
+# Vlna 22, fáze 2 kolo 3, balík C: vůle pohyblivých dílů, „vůle nekontrolována“ v souhrnu pohybu, kombinace procesních operací
+ · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)	 · Spiel nicht geprüft (bewegung spiel "A" "B" min 0,05 | bewegung spiel bewegliche min 0,05)
+ „{0}“: {1} operací, odebráno nejméně {2} mm³ – sjednocení operací nespočítáno (součet {3} mm³ by společný objem počítal dvakrát)	 „{0}“: {1} Operationen, entfernt mindestens {2} mm³ – Vereinigung der Operationen nicht berechnet (die Summe {3} mm³ würde das gemeinsame Volumen doppelt zählen)
+ „{0}“: {1} operací, celkem odebráno {2} mm³ (sjednocení – společný objem operací jen jednou; součet operací {3} mm³)	 „{0}“: {1} Operationen, insgesamt entfernt {2} mm³ (Vereinigung – gemeinsames Volumen der Operationen nur einmal; Summe der Operationen {3} mm³)
+odebráno nejméně {0} mm³	entfernt mindestens {0} mm³
+, odebráno nejméně {0} mm³	, entfernt mindestens {0} mm³
+jádro nevrátilo stav obrobku po všech operacích	der Kern lieferte keinen Werkstückzustand nach allen Operationen
+vůle nekontrolována	Spiel nicht geprüft
+Stav výrobku {0}	Werkstückzustand {0}
+Odebráno {0} [mm³]	Entfernt {0} [mm³]

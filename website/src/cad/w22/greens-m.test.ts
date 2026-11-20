@@ -69,7 +69,8 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     expect(motionSummary(motionCached(asked.doc, env)!, asked.doc).join("\n")).not.toContain(GREEN_CLASH);
     const checked = { ...fakeEnv(), interference: async () => [] };
     const ok = await runLines(a.doc, checked, "pohyb motor lineární vazba 1 57,5..27,15 kroky 2 kolize");
-    expect(ok.log).toContain(GREEN_CLASH);
+    // fáze 2 kolo 3 (bod 6): bez sledované vůle řádek pokračuje „ · vůle nekontrolována (…)“ – zelená část zůstává GREEN_CLASH
+    expect(ok.log).toContain(`${GREEN_CLASH} · vůle nekontrolována (pohyb vůle "A" "B" min 0,05 | pohyb vůle pohyblivé min 0,05)`);
     // a po změně dílu ji stav studie nevypíše
     const st = await runLines(resizePart(ok.doc, "Deska A", [50, 100, 10]), checked, "pohyb stav");
     expect(st.log.join("\n")).not.toContain(GREEN_CLASH);

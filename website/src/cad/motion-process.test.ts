@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { setLang } from "./i18n";
-import type { MotionResult, MotionStep } from "./motion";
+import { motionCsv, type MotionResult, type MotionStep } from "./motion";
 import { opPhase, opStart, processCodes, processKv, processLines, processRun, productLines, productStates, relMatrix, scrapOffset, condProblem, processOf, processStatusText, type ProcOpResult } from "./motion-process";
 import type { ProcReq, ProcRes, ProcStep } from "./process-types";
 import type { CadDoc, MotionStudy, ProcessOp } from "./types";
@@ -159,6 +159,35 @@ describe("procesní vrstva – výpočet nad výsledkem (zkušební jádro)", as
     expect(lines.join("\n")).toMatch(/Stav výrobku „Plech“: plný \(kroky 0–9\) → v záběru \(krok 10\) → děrovaný \(kroky 11–16\)/);
     expect(productLines(out, doc, 0)).toEqual([" stav výrobku „Plech“: plný"]);
     expect(processStatusText(out, doc)).toMatch(/geometrická aproximace, ne simulace materiálu\): na konci „Plech“ děrovaný, odebráno 314,159 mm³, odpad 1/);
+  });
+  // fáze 2 kolo 3: dvě operace na TÉMŽE obrobku se nesčítají (dřív removed=628.319 scrap=2 pro druhý střih do téže díry)
+  it("dvě operace na témže obrobku: požadavek nese ostatní operace; bez kombinace z jádra jen dolní mez „+“ a ⚠, nikdy součet", async () => {
+    const two: ProcessOp[] = [{ id: "p1", kind: "cut", tool: "R", target: "P" }, { id: "p2", kind: "cut", tool: "R", target: "P" }];
+    const reqs: ProcReq[] = [];
+    const r = await processRun({ ...doc, motion: { ...doc.motion!, process: two } }, res, { process: fakeKernel(reqs) });
+    expect(reqs[0].others).toBeUndefined(); // první operace sama
+    expect(reqs[1].others).toHaveLength(1); // poslední operace obrobku nese ostatní → kombinovaný stav
+    const kv = processKv(r);
+    expect(kv).toContain("removed=314.159+");
+    expect(kv).not.toContain("removed=628.318");
+    expect(kv).toContain("scrap=1");
+    expect(processCodes(r, doc).map((c) => c.code)).toContain("motion.process-failed");
+    expect(processLines(r, doc).join("\n")).toMatch(/„Plech“: 2 operací, odebráno nejméně 314,159 mm³ – sjednocení operací nespočítáno/);
+    // s kombinací z jádra: stav obrobku po obou operacích (sjednocení)
+    const comb = async (q: ProcReq): Promise<ProcRes> => {
+      const base = await fakeKernel()(q);
+      if (!q.others?.length) return base;
+      return { ...base, combined: { steps: base.steps.map((x) => x.state), states: base.states } };
+    };
+    const c = await processRun({ ...doc, motion: { ...doc.motion!, process: two } }, res, { process: comb });
+    expect(processKv(c)).toEqual(["proc=2", "removed=314.159", "scrap=1", "through=11"]);
+    expect(processCodes(c, doc).map((x) => x.code)).not.toContain("motion.process-failed");
+    expect(processLines(c, doc).join("\n")).toMatch(/„Plech“: 2 operací, celkem odebráno 314,159 mm³ \(sjednocení – společný objem operací jen jednou; součet operací 628,318 mm³\)/);
+    // CSV: stav výrobku a odebraný objem po krocích (dřív CSV procesní vrstvu nemělo)
+    const csv = motionCsv(c, { ...doc, motion: { ...doc.motion!, process: two } }).split("\r\n");
+    expect(csv[0]).toMatch(/;Stav výrobku Plech;Odebráno Plech \[mm³\]$/);
+    expect(csv[1]).toMatch(/;full;0$/);
+    expect(csv[12]).toMatch(/;pierced;314,159$/);
   });
   it("strojová pole na konci řádku a hloubka zásahu v kroku pro anotaci", () => {
     expect(processKv(out)).toEqual(["proc=1", "removed=314.159", "scrap=1", "through=11"]);

@@ -21,6 +21,7 @@ import { groupLines, rigidMotionGroups } from "./motion-groups";
 import { devText, eqResidual, freeLimits, isLimitMate, limitGap, mateDev, mateName, mateTerm, preferTerms, solveStep, springDev, springEnergyTerm, springStopTerm, springTerms, type MateDev, type Term } from "./motion-quasi";
 import type { PoseAt } from "./motion-clearance";
 import { clearanceCsvCells, clearanceCsvHead, clearanceSummaryLines } from "./clearance-report";
+import { processCsvCells, processCsvHead } from "./motion-process";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách, místo průniku, třída – clash-rules.ts) */
@@ -700,7 +701,9 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
   for (const id of springIds) head.push(`${key(id, id)} L [mm]`, `${key(id, id)} F [N]`);
   const clrHead = clearanceCsvHead(res, doc); // vůle sledovaných dvojic na konci řádku (vlna 22, bod 6)
   head.push(...clrHead);
-  const lines = res.steps.map((s) => {
+  const procHead = processCsvHead(res, doc); // procesní vrstva: stav výrobku a odebraný objem (vlna 22, bod 4)
+  head.push(...procHead);
+  const lines = res.steps.map((s, k) => {
     const row = [String(s.i), num(s.t, 6), ...s.motors.map((v) => num(v, 6))];
     for (const c of res.comps) {
       const p = s.place[c.id];
@@ -715,6 +718,7 @@ export function motionCsv(res: MotionResult, doc: CadDoc): string {
       row.push(sp ? num(sp.length, 6) : "", sp?.force !== undefined ? num(sp.force, 3) : "");
     }
     if (clrHead.length) row.push(...clearanceCsvCells(res, s.i));
+    if (procHead.length) row.push(...processCsvCells(res, k));
     return row.map(esc).join(";");
   });
   return "﻿" + [head.map(esc).join(";"), ...lines].join("\r\n") + "\r\n";

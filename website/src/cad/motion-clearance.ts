@@ -237,6 +237,9 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
   const springs = new Set(comps.filter((c) => c.spring).map((c) => c.id));
   const docPl = new Map(comps.map((c) => [c.id, c.placement] as const));
   const ids = comps.map((c) => c.id);
+  /** pořadí dvojice „pohyblivé“ podle pořadí komponent v sestavě (id jsou náhodná – pořadí podle id se lišilo mezi během v Node
+   *  a v prohlížeči: „Střižník × Vodítko“ vs „Vodítko × Střižník“) */
+  const order = new Map(ids.map((id, i) => [id, i] as const));
   const explicit = Array.isArray(cfg.pairs) ? cfg.pairs.filter((p) => docPl.has(p.a) && docPl.has(p.b) && p.a !== p.b) : [];
   const moving = cfg.pairs === "moving";
   /** „pohyblivé“: přesně do limitu + rezervy, dál stačí dolní mez z obálek */
@@ -251,6 +254,9 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
   else if (!kernel) Object.assign(info, { mode: "discrete", why: "no-kernel" } satisfies Partial<SweepInfo>);
   const cc = wantCC && refine && !!kernel;
   let prevSample: Sample | null = null;
+  /** „pohyblivé“: polohy kroků dosud (doplnění řady nově zjištěné dvojice od kroku 0) a dvojice už zjištěné */
+  const stepSamples: { s: Sample; i: number }[] = [];
+  const known = new Map<string, { a: string; b: string }>();
   let clrPoses = 0;
   let clrRefined = 0;
 
@@ -353,7 +359,7 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
     const p = pairs.get(pk);
     const d = s.dist.get(pk);
     if (!p || !d) return;
-    if (step !== null) {
+    if (step !== null && p.series[step] === undefined) {
       p.series[step] = d.d;
       p.pts[step] = d.p1 && d.p2 ? [d.p1, d.p2] : null;
       if (limit !== null && d.d < limit) p.below.push(step);
@@ -522,7 +528,7 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
     const movedSet = new Set(movedIds);
     for (const a of movedIds)
       for (const b of ids) {
-        if (a === b || (movedSet.has(b) && b < a)) continue;
+        if (a === b || (movedSet.has(b) && order.get(b)! < order.get(a)!)) continue;
         if (!moved(s0, s1, a, b) && !(mid && moved(s0, mid, a, b))) continue;
         const ba = pb(a);
         const bb = pb(b);
@@ -531,7 +537,7 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
         const wantCc = cc && !springs.has(a) && !springs.has(b) && g <= 1e-6;
         const wantMv = moving && g <= reach;
         if (!wantCc && !wantMv) continue;
-        const [x, y] = a < b ? [a, b] : [b, a];
+        const [x, y] = order.get(a)! < order.get(b)! ? [a, b] : [b, a];
         const pk = pairKey(x, y);
         const cur = out.get(pk) ?? out.get(pairKey(y, x));
         if (cur) {
@@ -562,12 +568,12 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
         await measure(explicit.map((p) => ({ s: s1, a: p.a, b: p.b, cutoff: Infinity })));
         for (const p of explicit) recordPair(pairKey(p.a, p.b), s1, row.i);
       } else if (local.size === 0) await measure([]);
-      if (prev && (cc || moving || explicit.length) && refine) {
+      if (prev && (cc || moving || (explicit.length && refine))) {
         const s0 = prevSample && prevSample.pos === prev.i ? prevSample : sampleOf(prev);
         // mezipoloha jednou na úsek (obálka dráhy přes ni – pohyb tam a zpět v úseku); dvojice podle obálek dráhy
         const pre = cc ? midOf(s0, s1, poseAt) : null;
         const list = candidates(s0, s1, pre);
-        if (list.length) {
+        if (list.length && refine) {
           const pa: PoseAt | undefined = pre ? (t) => (Math.abs(t - pre.t) < 1e-12 ? { place: pre.place, motors: pre.motors, t: pre.t } : (poseAt?.(t) ?? null)) : poseAt;
           if (pre) {
             // mezipoloha už spočítaná – neplatit ji v rozpočtu dvakrát
@@ -576,11 +582,22 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
           }
           await interval(s0, s1, list, pa, 0, prev.i, row.i);
         }
-        // „pohyblivé“: řada a limit v tomto kroku pro dvojice v dosahu
-        if (moving) for (const x of list) if (x.clr) recordPair(pairKey(x.a, x.b), s1, row.i);
-      } else if (moving && !prev) {
-        /* krok 0: pohyblivé dvojice ještě nejsou známé (určí je první úsek) */
+        // „pohyblivé“ (i bez zjemnění – dřív se dvojice zjišťovaly jen ve větvi zjemnění a „bez zjemnění“ hlásilo „žádná dvojice“
+        // při vůli 0,01 mm): nově zjištěná dvojice se doplní ve všech dosavadních polohách od kroku 0, známé dvojice v každém kroku
+        if (moving) {
+          const fresh = list.filter((x) => x.clr && !known.has(pairKey(x.a, x.b)));
+          for (const x of fresh) known.set(pairKey(x.a, x.b), { a: x.a, b: x.b });
+          if (fresh.length && stepSamples.length) {
+            await measure(stepSamples.flatMap(({ s }) => fresh.map((x) => ({ s, a: x.a, b: x.b, cutoff: reach }))));
+            for (const { s, i } of stepSamples) for (const x of fresh) recordPair(pairKey(x.a, x.b), s, i);
+          }
+        }
       }
+      if (moving && known.size) {
+        await measure([...known.values()].map((x) => ({ s: s1, a: x.a, b: x.b, cutoff: reach })));
+        for (const pk of known.keys()) recordPair(pk, s1, row.i);
+      }
+      if (moving) stepSamples.push({ s: s1, i: row.i });
       prevSample = s1;
     },
     finish(res) {
