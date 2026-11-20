@@ -94,7 +94,8 @@ export async function applyViewsCmd(ctx: ViewsCtx, cmd: ViewsCmd): Promise<{ log
         ...(cmd.face != null ? { face: cmd.face } : {}),
         ...(cmd.dir ? { dir: cmd.dir } : {}),
         ...(cmd.flip ? { flip: true } : {}),
-        ...(cmd.place ? { at: agentToSheet(H, cmd.place) } : {}),
+        // „odshora“ = bod od levého horního rohu (jak je uložen), jinak od levého dolního rohu při dnešní výšce listu
+        ...(cmd.place ? { at: cmd.placeTop ? cmd.place : agentToSheet(H, cmd.place) } : {}),
       };
       if (!how) how = cmd.face != null ? tr("plocha F{0}", cmd.face) : tr("směr {0}", (cmd.dir ?? []).map(fmtN).join(" "));
       setOpts({ aux: [...(o().aux ?? []), entry] });
@@ -116,7 +117,7 @@ export async function applyViewsCmd(ctx: ViewsCtx, cmd: ViewsCmd): Promise<{ log
       const v = findView(res, o(), cmd.parent);
       if (!v.cam) throw new Error(tr("pohled {0} nemá směr promítání", cmd.parent));
       const label = nextViewLetter(o());
-      const entry: CutSectionOpt = { id: uid(), label, parent: v.key, kind: cmd.kind, pts: cmd.pts.map(agentToView), ...(cmd.flip ? { flip: true } : {}), ...(cmd.place ? { at: agentToSheet(res.sheet.h, cmd.place) } : {}) };
+      const entry: CutSectionOpt = { id: uid(), label, parent: v.key, kind: cmd.kind, pts: cmd.pts.map(agentToView), ...(cmd.flip ? { flip: true } : {}), ...(cmd.place ? { at: cmd.placeTop ? cmd.place : agentToSheet(res.sheet.h, cmd.place) } : {}) };
       setOpts({ cuts: [...(o().cuts ?? []), entry] });
       const chk = await ctx.compute();
       const p = chk.extraViews?.find((x) => x.key === `cut:${label}`);

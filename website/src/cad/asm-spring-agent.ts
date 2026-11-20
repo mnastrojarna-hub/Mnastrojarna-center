@@ -177,7 +177,7 @@ export async function applySpringCmd(d: CadDoc, cmd: Extract<AsmCmd, { k: "sprin
       // stejné pružiny ve stejném stavu jednou „(6×)“, stejný název v různém stavu s #k / přezdívkou
       const items = springComps(doc).map((c) => {
         const s = st.find((x) => x.id === c.id);
-        return { c, text: (ref: string) => (s ? ` ${springLine(s, ref)}` : ` ${tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref)}`) };
+        return { c, text: (ref: string) => (s ? ` ${springLine(s, ref, c.spring?.guided)}` : ` ${tr("⚠ pružina „{0}“{1}: délku nešlo určit (chybí geometrie dosedací plochy)", c.name, ref)}`) };
       });
       log.push(...instanceLines(doc, items));
     }

@@ -1,5 +1,5 @@
 /**
- * Převodník dokument → skript (doc-script.ts), část sestavy (vlna E): přezdívky komponent (`vložit "Díl" … jako "K48"`),
+ * Převodník dokument → skript (doc-script.ts), část sestavy (vlna E): přezdívky komponent (`vložit "Díl" … jako "K48"`, jinak `sestava komponenta #k přezdívka "…"`),
  * pružiny mezi díly (`sestava pružina #k mezi #i F3 #j F7 volná L0 blok Ln tuhost c vedená ano|ne` – i pružiny vzniklé
  * „Pružinou mezi díly“ do děr vzoru) a nastavení dynamiky pohybové studie (`pohyb dynamika …`, gravitace libovolným
  * směrem, dynamika uložená u kinematické studie). Každý řádek se přečte rozborem konzole a porovná; co zapsat nejde
@@ -13,6 +13,8 @@ type W3 = readonly [string, string, string];
 const L = (cs: string, en: string, de: string): W3 => [cs, en, de];
 const WD = {
   as: L("jako", "as", "als"),
+  alias: L("přezdívka", "alias", "spitzname"),
+  comp: L("komponenta", "component", "komponente"),
   asm: L("sestava", "assembly", "baugruppe"),
   spring: L("pružina", "spring", "feder"),
   between: L("mezi", "between", "zwischen"),
@@ -47,15 +49,25 @@ const opOf = (line: string): { k: string; cmd?: Rec; alias?: string } | null => 
   }
 };
 
-/** konec řádku `vložit …` s přezdívkou komponenty (` jako "K48"`); `line` = řádek bez přezdívky (kontrola rozborem) */
-export function aliasTail(o: AsmOut, cp: AsmComponent, line: string): string {
+/**
+ * Přezdívka komponenty #k: konec řádku `vložit …` (` jako "K48"`; `line` = řádek bez přezdívky), a když ho rozbor s přezdívkou
+ * nepřečte, část řádku `sestava komponenta #k přezdívka "…"` (`patch`) – tím se přezdívka nastavuje i ručně. Obojí se ověří
+ * rozborem (`read` – v testu jiný rozbor); poznámka jen u přezdívky, kterou na řádek zapsat nejde vůbec (konec řádku v textu).
+ */
+export function aliasScript(o: AsmOut, cp: AsmComponent, line: string, k: number, read: typeof opOf = opOf): { tail: string; patch?: string } {
   const a = cp.alias?.trim();
-  if (!a) return "";
+  if (!a) return { tail: "" };
   const q = o.q(a, true);
-  const t = q ? ` ${w(o, "as")} ${q}` : "";
-  if (q && opOf(line + t)?.alias === a) return t;
+  if (q) {
+    const tail = ` ${w(o, "as")} ${q}`;
+    if (read(line + tail)?.alias === a) return { tail };
+    const patch = `${w(o, "alias")} ${q}`;
+    const op = read(`${w(o, "asm")} ${w(o, "comp")} #${k} ${patch}`);
+    const c = op?.k === "asm" ? (op.cmd as { k?: string; comp?: string; patch?: { alias?: string } } | undefined) : undefined;
+    if (c?.k === "comp" && c.comp === `#${k}` && c.patch?.alias === a) return { tail: "", patch };
+  }
   o.note(tr("přezdívku „{0}“ komponenty „{1}“ nejde zapsat na řádek skriptu", a, cp.name));
-  return "";
+  return { tail: "" };
 }
 
 /**

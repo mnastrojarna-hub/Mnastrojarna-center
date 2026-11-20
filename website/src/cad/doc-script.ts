@@ -31,8 +31,8 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
-import { aliasTail, emitAsmSprings, emitDynamics } from "./doc-script-asm";
-import { dimTail, dimTailOk, emitGenEdit, emitSheetViews, emitTitle, sheetHeight, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, type SheetOut } from "./doc-script-sheet";
+import { aliasScript, emitAsmSprings, emitDynamics } from "./doc-script-asm";
+import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
 import { resolveDatumNames } from "./agent-prim";
@@ -71,8 +71,12 @@ export type DocScriptOptions = {
    * (`freshScriptDoc`); bez nich skript jen upozorní, že se smazané kóty po přečtení vrátí.
    */
   deletedDims?: Record<string, string[]>;
-  /** výška listu (mm) s automatickým formátem podle id listu – převod umístění pohledů a detailů; spočítá ji jádro (`freshScriptDoc`) */
-  sheetHeights?: Record<string, number>;
+  /**
+   * klíče vygenerovaných kót celkových rozměrů a pozic, které na listu jsou (id listu → ["dim:front:t", "pos:1"]) – spočítá je
+   * jádro (`freshScriptDoc`) pro listy s upravenými vygenerovanými objekty; úprava objektu, který na listu není, se nezapíše.
+   * Bez nich převodník vynechá jen klíče, které na listu podle voleb být nemohou, a ohlásí, že zbytek ověří až jádro.
+   */
+  genKeys?: Record<string, string[]>;
   /** poznámky volajícího (co ověřilo jádro) – přidají se k poznámkám převodníku i do komentáře skriptu */
   notes?: string[];
 };
@@ -467,7 +471,7 @@ class Ctx {
   sigs: "drop" | "keep";
   comments: boolean;
   deletedDims: Record<string, string[]>;
-  sheetHeights: Record<string, number>;
+  genKeys: Record<string, string[]>;
   out: string[] = [];
   notes: string[] = [];
   noteSet = new Set<string>();
@@ -483,7 +487,7 @@ class Ctx {
     this.sigs = o.sigs === "drop" ? "drop" : "keep";
     this.comments = o.comments !== false;
     this.deletedDims = o.deletedDims ?? {};
-    this.sheetHeights = o.sheetHeights ?? {};
+    this.genKeys = o.genKeys ?? {};
   }
   /** výstup pro část výkresu (doc-script-sheet.ts) */
   get sheetOut(): SheetOut {
@@ -1582,7 +1586,8 @@ const secNorm = (v: unknown): unknown => (v && typeof v === "object" ? sectionTo
 export const SHEET_UNSUPPORTED = SHEET_JSON_ONLY;
 /** nastavené volby listu, které skript nepřenese (jen JSON, neznámé) – list pak po přečtení vypadá jinak */
 export const sheetUnsupported = (o: Record<string, unknown>): string[] => sheetUnwritable(o);
-function emitDrawings(c: Ctx, doc: CadDoc) {
+/** `name` = název dokumentu ve skriptu (záložka – díl sestavy se může jmenovat jinak než v dokumentu) */
+function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
   const list = doc.drawings ?? [];
   if (!list.length) {
     const pr = doc.props;
@@ -1590,6 +1595,8 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
     return;
   }
   let setName: string | undefined;
+  // stav razítek při čtení skriptu (nový list převezme údaje aktivního, popisové údaje dokumentu) – doc-script-sheet.ts
+  const title = titleState(name);
   list.forEach((s: DrawingDoc, i: number) => {
     const o = (s.options ?? {}) as Rec;
     c.stats.sheets++;
@@ -1603,17 +1610,26 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
         return false;
       }
     };
+    // jak list při čtení vznikne: první list výkresu (údaje razítka z dokumentu), další list (převezme údaje aktivního listu)
+    let how: "new" | "sheet" | "same" = "new";
     if (i > 0) {
       const q = scriptQuote(s.name, true);
       if (s.drawing && s.drawing !== setName) {
         const dq = scriptQuote(s.drawing, true);
         const l = `${c.w("drawing")} ${c.w("drawingNew")} ${dq ?? ""}`.trim();
         if (dq && check(l, (cmd) => cmd.k === "drawings" && cmd.op === "new")) c.line(l);
-        else c.note(tr("další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu", String(s.drawing)));
+        else {
+          how = "same";
+          c.note(tr("další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu", String(s.drawing)));
+        }
       } else {
+        how = "sheet";
         const l = `${c.w("drawing")} ${c.w("sheetNew")} ${q ?? ""}`.trim();
         if (check(l, (cmd) => cmd.k === "sheet" && cmd.op === "new")) c.line(l);
-        else c.note(tr("list „{0}“ se nepodařilo zapsat jako nový list", s.name));
+        else {
+          how = "same";
+          c.note(tr("list „{0}“ se nepodařilo zapsat jako nový list", s.name));
+        }
       }
     }
     setName = s.drawing;
@@ -1631,12 +1647,12 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
       if (q && check(l, (cmd) => cmd.k === "sheet" && cmd.op === "rename" && cmd.name === s.name)) c.line(l);
       else c.note(tr("název listu „{0}“ se nepodařilo zapsat", s.name));
     }
-    // tabulka revizí a razítko se všemi poli, šablonou a logem (doc-script-sheet.ts)
-    emitTitle(c.sheetOut, doc, s);
+    // tabulka revizí a razítko se všemi poli, šablonou a logem – rozdíl proti stavu listu při čtení (doc-script-sheet.ts)
+    emitTitle(c.sheetOut, doc, s, title, how);
     if (typeof o.zones === "boolean") c.line(`${c.w("drawing")} ${c.w("zones")} ${c.yn(o.zones)}`);
     // pohledy navíc (modely, pomocné pohledy, řezy, detaily, částečné řezy, přerušení, uložení) – před kótami, aby je
     // Chytré kóty při přečtení vygenerovaly nad stejným listem jako jádro při exportu (id smazaných kót)
-    emitSheetViews(c.sheetOut, doc, s, sheetHeight(o, c.sheetHeights[s.id]));
+    emitSheetViews(c.sheetOut, doc, s);
     // kóty (funkční rozměry a polohy děr Chytrých kót – doc-script-sheet.ts)
     const ann = Array.isArray(s.annotations) ? s.annotations : [];
     const auto = ann.filter((a) => a.auto).length;
@@ -1664,8 +1680,8 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
         c.sum("smartOffSheets");
       }
     }
-    // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách)
-    emitGenEdit(c.sheetOut, s);
+    // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách) – jen ty, které na listu jsou
+    emitGenEdit(c.sheetOut, doc, s, c.genKeys[s.id]);
     const edited = ann.filter((a) => a.auto && ((a.type === "dim" && (a.text !== undefined || /[±+\-]\d|[A-Za-z]\d/.test(a.suffix ?? ""))) || (a.type === "callout" && a.tol) || a.rev || a.tolShow)).length;
     if (edited) {
       c.sum("editedDims", edited);
@@ -1678,6 +1694,8 @@ function emitDrawings(c: Ctx, doc: CadDoc) {
     const extra = sheetUnwritable(o);
     if (extra.length) c.note(tr("volby listu bez textového příkazu ({0}) – nastavují se jen v JSON dokumentu, skript je nepřenese – list „{1}“ dokumentu „{2}“", extra.join(", "), s.name, doc.name));
   });
+  // popisové údaje dokumentu (číslo, kreslil, revize), které řádky razítek nenastavily stejně jako v dokumentu
+  emitDocProps(c.sheetOut, doc, title);
 }
 
 /* ───────────────────────── díl ───────────────────────── */
@@ -1777,7 +1795,7 @@ function emitPart(c: Ctx, doc: CadDoc, name: string) {
   if (doc.bodies?.some((b) => b.color || b.hidden)) c.note(tr("barvy a skrytí těles dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.faceColors && Object.keys(doc.faceColors).length) c.note(tr("barvy ploch dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.underlays && Object.keys(doc.underlays).length) c.note(tr("podklady skic (obrázky / PDF) dílu „{0}“ se do skriptu nepřenášejí", doc.name));
-  emitDrawings(c, doc);
+  emitDrawings(c, doc, name);
 }
 
 /* ───────────────────────── sestava ───────────────────────── */
@@ -1974,8 +1992,9 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     c.stats.components++;
     const rot = cp.placement.rotation.some((v) => v !== 0) ? ` ${c.w("rotation")} ${vec(cp.placement.rotation)}` : "";
     const ins = `${c.w("insert")} ${scriptQuote(pt.tab, true) ?? `"${pt.tab}"`}${atPart(c, cp.placement.position)}${rot}${cp.fixed ? ` ${c.w("fixed")}` : ""}`;
-    // přezdívka instance (vložit … jako "K48") – doc-script-asm.ts
-    c.line(`${ins}${aliasTail(c.sheetOut, cp, ins)}`);
+    // přezdívka instance (vložit … jako "K48", jinak sestava komponenta #k přezdívka "…") – doc-script-asm.ts
+    const al = aliasScript(c.sheetOut, cp, ins, k);
+    c.line(`${ins}${al.tail}`);
     const patch: string[] = [];
     const qv = (word: WordKey, v: string | undefined) => {
       if (!v) return;
@@ -1989,6 +2008,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     qv("group", cp.group);
     if (cp.color && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(cp.color)) patch.push(`${c.w("color")} ${cp.color.toLowerCase()}`);
     if (cp.hidden) patch.push(c.w("hide"));
+    if (al.patch) patch.push(al.patch);
     if (patch.length) c.line(`${c.w("asm")} ${c.w("comp")} #${k} ${patch.join(" ")}`);
   }
   const mates = doc.mates ?? [];

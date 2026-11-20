@@ -46,6 +46,7 @@ import { parseOpenLine, type OpenOp } from "./agent-open";
 import { CHECK_COMMANDS, parseCheckLine, type CheckOp } from "./agent-check";
 import { polylineClose, takeCloseWords } from "./poly-close";
 import { CodedParseError, materialClass, parseStrictLine, trackOpts } from "./agent-strict";
+import { literalTokens } from "./agent-quoted";
 
 export const AGENT_API_VERSION = 1;
 
@@ -1065,12 +1066,16 @@ export function parseAgentText(text: string): AgentProgram {
         }
         case "insert": {
           // sestava: vložit "Název záložky" [v x y z] [otočení rx ry rz] [ukotvit] [jako "K48"] – přezdívka instance pro vazby místo #k
-          const name = o.strings.join(" ").trim();
+          // text v uvozovkách je doslovný (záložka „D“, přezdívka „H“ – jinak by se četly jako volby průměr / výška): agent-quoted.ts
+          const lit = literalTokens(line);
+          const oi = parseOpts(lit.tokens.slice(1));
+          const name = oi.strings.map(lit.restore).join(" ").trim();
           if (!name) throw new Error(tr("vložit potřebuje název otevřené záložky s dílem: vložit \"Hřídel\" v 0 0 10 [otočení 0 90 0] [ukotvit]"));
-          const rt = o.nums.rotation ?? [];
-          if (o.words.as && !o.words.as.join(" ").trim()) throw new Error(tr("vložit … jako: chybí přezdívka – např. vložit \"Šroub\" jako \"K48\""));
-          const alias = o.words.as?.join(" ").trim();
-          ops.push({ k: "insert", tab: name, at: posOf(o) ?? [0, 0, 0], rotation: [rt[0] ?? 0, rt[1] ?? 0, rt[2] ?? 0], fixed: o.flags.has("fixed"), ...(alias ? { alias } : {}), line: no });
+          const rt = oi.nums.rotation ?? [];
+          const as = oi.words.as?.map(lit.restore);
+          if (as && !as.join(" ").trim()) throw new Error(tr("vložit … jako: chybí přezdívka – např. vložit \"Šroub\" jako \"K48\""));
+          const alias = as?.join(" ").trim();
+          ops.push({ k: "insert", tab: name, at: posOf(oi) ?? [0, 0, 0], rotation: [rt[0] ?? 0, rt[1] ?? 0, rt[2] ?? 0], fixed: oi.flags.has("fixed"), ...(alias ? { alias } : {}), line: no });
           return;
         }
         case "drawing": {

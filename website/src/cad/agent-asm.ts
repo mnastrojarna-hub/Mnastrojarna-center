@@ -589,7 +589,7 @@ const SP = {
   yes: W("ano", "yes", "ja", "true"),
   no: W("ne", "no", "nein", "false"),
 };
-export const SPRING_USE = () => tr("sestava pružina \"Pružina\" mezi \"Deska A\" [F3] \"Deska B\" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina \"Pružina\" odebrat · sestava pružiny");
+export const SPRING_USE = () => tr("sestava pružina \"Pružina\" mezi \"Deska A\" [F3] \"Deska B\" [F7] [volná L0] [blok Ln] [tuhost c] [vedená ano|ne] · sestava pružina \"Pružina\" odebrat · sestava pružiny");
 function parseSpring(c: Cur): AsmCmd {
   // „sestava pružina nápověda“ (bez uvozovek – komponenta „nápověda“ v uvozovkách zůstává komponentou)
   if (c.is(SP.help) && c.i + 1 >= c.tk.length) return { k: "spring", comp: "", help: true };

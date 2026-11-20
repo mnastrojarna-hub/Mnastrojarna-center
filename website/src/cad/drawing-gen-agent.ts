@@ -71,6 +71,9 @@ export async function applyGenCmd(ctx: Ctx, cmd: GenCmd): Promise<{ log: string[
         setGen(undefined);
         return { log: [tr("✓ vygenerované objekty na výchozím místě ({0} obnoveno)", n)], changed: n > 0, open: true };
       }
+      // klíč musí být na listu nebo mezi úpravami (i zastaralý – skrytý / posunutý objekt, který už na listu není, jde takto uklidit)
+      const edited = new Set([...(gen?.off ?? []), ...Object.keys(gen?.move ?? {})]);
+      for (const k of cmd.keys) if (!edited.has(k)) known(k);
       const move = { ...(gen?.move ?? {}) };
       for (const k of cmd.keys) delete move[k];
       setGen({ ...(gen?.off ? { off: gen.off.filter((k) => !cmd.keys.includes(k)) } : {}), ...(Object.keys(move).length ? { move } : {}) });

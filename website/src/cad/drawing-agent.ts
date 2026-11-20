@@ -831,7 +831,8 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       }
       const res = await computeSheet();
       const H = res.sheet.h;
-      const placeAt = (scale: number, r: number) => (cmd.place ? (((p) => [p[0] - r * scale, p[1] - r * scale])(agentToSheet(H, cmd.place)) as [number, number]) : undefined);
+      // „umístit x y odshora“ = střed od levého horního rohu listu (nezávisí na výšce listu), jinak od levého dolního
+      const placeAt = (scale: number, r: number) => (cmd.place ? (((p) => [p[0] - r * scale, p[1] - r * scale])(cmd.placeTop ? cmd.place : agentToSheet(H, cmd.place)) as [number, number]) : undefined);
       let label: string;
       if (cmd.op === "edit") {
         const i = details.findIndex((d) => d.label === cmd.label);

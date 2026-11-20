@@ -9,12 +9,14 @@
  *     entitu jádro nenašlo, si otisky nechá – převodník ho zapíše i s nimi (obecný příkaz / JSON), přesně jako je uložen.
  *  2. SMAZANÉ VYGENEROVANÉ KÓTY listů výkresu (`options.smartOff` = klíče generátoru). Po „kótovat chytře“ by se vrátily;
  *     smazat je jde jen podle id (a3, a8) v seznamu, který generátor vydá – jádro ho spočítá a vrátí id pro `výkres smazat …`.
+ *  3. UPRAVENÉ VYGENEROVANÉ KÓTY CELKOVÝCH ROZMĚRŮ A POZICE (`options.genEdit`). Aplikace drží i úpravu objektu, který už na
+ *     listu není (vypnutý pohled, jiné kóty, odebraná komponenta); příkaz `výkres vygenerované …` takový klíč odmítne. Jádro
+ *     proto spočítá list bez úprav (sestava s kusovníkem a pozicemi – `extras`) a vrátí klíče, které na listu jsou.
  *
  * Bez prohlížeče: jádro se předává jako rozhraní (`cad.pickSigs`, `cad.drawing` v aplikaci; zkušební stroj v testech).
  */
 import { docToScript, sheetUnsupported, type DocScript, type DocScriptOptions, type ScriptLang } from "./doc-script";
-import { sheetHeight } from "./doc-script-sheet";
-import { sheetMeta, sheetOptions } from "./drawing-agent";
+import { sheetMeta, sheetOptions, type DrawingExtras } from "./drawing-agent";
 import type { DrawingMeta, DrawingOptions } from "./drawing";
 import { getLang, tr } from "./i18n";
 import { getPath, pickFieldsOf, pickSigs, withPath } from "./pick-fields";
@@ -24,16 +26,21 @@ import type { CadDoc, Feature } from "./types";
 export type ScriptKernel = {
   /** otisky a aktuální indexy výběru prvku nad dokumentem oříznutým před prvek – `cad.pickSigs` (pick-sigs.ts `stampPicks`) */
   pickSigs: (before: CadDoc, feature: Feature) => Promise<{ feature: Feature; changed: boolean; warnings: string[] } | null>;
-  /** výkres listu s Chytrými kótami – `cad.drawing`; bez něj se smazané vygenerované kóty jen ohlásí */
-  drawing?: (doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions>) => Promise<{ smart?: { annotations: { auto?: string }[] } }>;
+  /** výkres listu s Chytrými kótami a vygenerovanými objekty – `cad.drawing`; bez něj se smazané vygenerované kóty jen ohlásí */
+  drawing?: (doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions>) => Promise<{ smart?: { annotations: { auto?: string }[] }; generated?: { id: string }[] }>;
+  /**
+   * doplňky razítka dokumentu jako ve výkresovém prostředí (kusovník a pozice sestavy – engine `drawExtras`, v aplikaci
+   * stav otevřené sestavy); bez nich list sestavy nemá pozice a jejich úpravy by se braly jako zastaralé
+   */
+  extras?: (doc: CadDoc) => Promise<DrawingExtras> | DrawingExtras;
 };
 export type FreshScriptDoc = {
   /** kopie dokumentu: ověřené výběry mají aktuální čísla a jsou bez otisků */
   doc: CadDoc;
   /** id listu → id smazaných vygenerovaných kót po „kótovat chytře“ (volba `deletedDims` převodníku) */
   deletedDims: Record<string, string[]>;
-  /** id listu s automatickým formátem a umístěnými pohledy → výška listu (mm) – převod „umístit x y“ (volba `sheetHeights`) */
-  sheetHeights: Record<string, number>;
+  /** id listu s upravenými vygenerovanými kótami / pozicemi → klíče, které na listu jsou (volba `genKeys` převodníku) */
+  genKeys: Record<string, string[]>;
   /** co se ověřit nepodařilo */
   notes: string[];
   stats: { /** prvky s otisky */ checked: number; /** prvky, kterým se čísla změnila */ renumbered: number; /** prvky s nenalezenou entitou */ lost: number; /** listy se smazanými kótami */ sheets: number; ms: number };
@@ -117,16 +124,6 @@ async function freshPart(doc: CadDoc, k: ScriptKernel, out: FreshScriptDoc): Pro
     for (let si = 0; si < sheets.length; si++) {
       const s = sheets[si];
       const o = (s.options ?? {}) as Rec;
-      // automatický formát s umístěnými pohledy / detaily: výšku listu zná jen výpočet (umístění se píše od levého dolního rohu)
-      const placed = ["aux", "cuts", "details"].some((k) => Array.isArray(o[k]) && (o[k] as { at?: unknown }[]).some((x) => x?.at));
-      if (placed && sheetHeight(o) === undefined) {
-        try {
-          const res = (await k.drawing(doc, sheetMeta(doc, s, si), sheetOptions(s))) as { sheet?: { h?: number } };
-          if (typeof res.sheet?.h === "number") out.sheetHeights[s.id] = res.sheet.h;
-        } catch {
-          // bez výšky převodník umístění vynechá a ohlásí
-        }
-      }
       const off = Array.isArray(o.smartOff) ? (o.smartOff as unknown[]).filter((x): x is string => typeof x === "string") : [];
       // list s volbami, které skript nepřenese (pomocné pohledy, detaily…), by po přečtení vygeneroval jiný seznam kót → id by neseděla
       if (!off.length || o.dimensions !== "smart" || sheetUnsupported(o).length) continue;
@@ -142,7 +139,29 @@ async function freshPart(doc: CadDoc, k: ScriptKernel, out: FreshScriptDoc): Pro
       }
     }
   }
+  await sheetGenKeys(doc, k, out);
   return next;
+}
+/**
+ * Klíče vygenerovaných kót celkových rozměrů a pozic, které na listu jsou – pro listy s upravenými vygenerovanými objekty
+ * (`genEdit`). List se spočítá BEZ úprav (skrytý objekt ve výpočtu není) a s doplňky razítka dokumentu (pozice sestavy).
+ */
+async function sheetGenKeys(doc: CadDoc, k: ScriptKernel, out: FreshScriptDoc): Promise<void> {
+  if (!k.drawing) return;
+  const sheets = doc.drawings ?? [];
+  let extras: DrawingExtras | undefined;
+  for (let si = 0; si < sheets.length; si++) {
+    const s = sheets[si];
+    const g = (s.options as { genEdit?: { off?: string[]; move?: Record<string, unknown> } } | undefined)?.genEdit;
+    if (!g?.off?.length && !Object.keys(g?.move ?? {}).length) continue;
+    try {
+      extras ??= (await k.extras?.(doc)) ?? {};
+      const res = await k.drawing(doc, sheetMeta(doc, s, si, extras), { ...sheetOptions(s), genEdit: undefined });
+      out.genKeys[s.id] = (res.generated ?? []).map((x) => x.id);
+    } catch (e) {
+      out.notes.push(tr("list „{0}“ dokumentu „{1}“: klíče vygenerovaných kót a pozic se nepodařilo ověřit ({2})", s.name, doc.name, e instanceof Error ? e.message : String(e)));
+    }
+  }
 }
 /** čísla jednotlivých odkazů prvku (plocha / hrana / vrchol) v pořadí průchodu */
 function refIndices(f: Feature): number[] {
@@ -163,10 +182,12 @@ function refIndices(f: Feature): number[] {
  */
 export async function freshScriptDoc(doc: CadDoc, k: ScriptKernel): Promise<FreshScriptDoc> {
   const t0 = Date.now();
-  const out: FreshScriptDoc = { doc, deletedDims: {}, sheetHeights: {}, notes: [], stats: { checked: 0, renumbered: 0, lost: 0, sheets: 0, ms: 0 } };
+  const out: FreshScriptDoc = { doc, deletedDims: {}, genKeys: {}, notes: [], stats: { checked: 0, renumbered: 0, lost: 0, sheets: 0, ms: 0 } };
   const kind = doc.kind ?? "part";
   if (kind === "part") out.doc = await freshPart(doc, k, out);
   else if (kind === "assembly") {
+    // listy sestavy samotné: pozice a kóty celkových rozměrů (díly komponent mají své listy – freshPart)
+    await sheetGenKeys(doc, k, out);
     // stejný díl ve více komponentách (stejný obsah) se ověří jednou
     const done = new Map<string, CadDoc>();
     const comps = [];
@@ -206,6 +227,6 @@ export async function scriptOfDocWith(k: ScriptKernel, doc: CadDoc, opts: Script
   if (opts.sigs === "keep") return docToScript(doc, { ...base, sigs: "keep" });
   const fresh = await freshScriptDoc(doc, k);
   // ověřené výběry jsou v kopii dokumentu bez otisků; co jádro nenašlo, si otisky nechalo a zapíše se s nimi
-  const r = docToScript(fresh.doc, { ...base, sigs: "keep", deletedDims: fresh.deletedDims, sheetHeights: fresh.sheetHeights, notes: fresh.notes });
+  const r = docToScript(fresh.doc, { ...base, sigs: "keep", deletedDims: fresh.deletedDims, genKeys: fresh.genKeys, notes: fresh.notes });
   return { ...r, fresh: fresh.stats };
 }
