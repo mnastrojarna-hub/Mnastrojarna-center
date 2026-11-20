@@ -218,7 +218,7 @@ describe("greens D4 – čitelný výkres sestavy a šablony hlavičky (body 17,
 
   it("16: šablona hlavičky, která neexistuje, = ✗ (ne ✓); logo neexistujícího souboru = ✗", async () => {
     const doc = { id: "d", name: "Deska", kind: "part", features: [], material: "ocel" } as unknown as CadDoc;
-    const cmd = (l: string) => (parseAgentText(l).ops[0] as { cmd: never }).cmd;
+    const cmd = (l: string) => (parseAgentText(l).ops[0] as unknown as { cmd: never }).cmd;
     const no = async () => {
       throw new Error("bez výpočtu");
     };
