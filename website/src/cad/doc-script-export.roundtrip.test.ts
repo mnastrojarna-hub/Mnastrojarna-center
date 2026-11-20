@@ -20,6 +20,7 @@ import { scriptOfDocWith } from "./doc-script-fresh";
 import { SCRIPT_SHEETS } from "./doc-script-sheet";
 import { SCRIPT_DEFAULT_DT } from "./doc-script-asm";
 import { sheetMeta, sheetOptions } from "./drawing-agent";
+import { drawExtras } from "./engine/asm-status";
 import { encodePng, toDataUrl } from "./title-logo";
 import { getLang, setLang } from "./i18n";
 import type { CadDoc } from "./types";
@@ -47,6 +48,8 @@ function sheetCanon(d: CadDoc, i = 0): Rec {
         return rest;
       });
   const m = { ...(s.meta as Rec) };
+  // prázdné pole razítka = pole bez hodnoty (vyprázdněné `zákazník=""` × nikdy nezadané)
+  for (const k of Object.keys(m)) if (m[k] === "") delete m[k];
   const logo = m.logo as Rec | undefined;
   if (logo) m.logo = { w: logo.w, h: logo.h, name: logo.name, trace: logo.trace };
   return round({ name: s.name, options: o, meta: m }) as Rec;
@@ -54,6 +57,8 @@ function sheetCanon(d: CadDoc, i = 0): Rec {
 /** vygenerované kóty listu (klíč popisu díry nese id prvku – po přečtení má prvek nové id) */
 const autoAnns = (d: CadDoc, i = 0) => (d.drawings?.[i]?.annotations ?? []).filter((a) => a.auto).map((a) => `${a.type}:${a.auto!.replace(/^hole:.*/, "hole")}`);
 const docNamed = (ws: MemoryWorkspace, name: string) => ws.listDocs().find((x) => x.title === name)?.doc;
+/** popisové údaje dokumentu (prázdný = nezadaný) */
+const propsCanon = (d: CadDoc) => Object.fromEntries(Object.entries(d.props ?? {}).filter(([, v]) => v));
 
 describe("export skript: vše, co agent píše textem, tam a zpět (vlna E)", async () => {
   const lang0 = getLang();
@@ -73,19 +78,28 @@ describe("export skript: vše, co agent píše textem, tam a zpět (vlna E)", as
       setLang(lang0);
     }
   };
-  const K = { pickSigs: (b: CadDoc, f: CadDoc["features"][number]) => kernel.pickSigs(b, f), drawing: (doc: CadDoc, meta: Parameters<typeof kernel.drawing>[1], o: Parameters<typeof kernel.drawing>[2]) => kernel.drawing(doc, meta, o) };
+  /** jádro pro převod jako u `export skript` (engine/ops/out.ts): doplňky razítka (kusovník a pozice sestavy) z postavených dílů prostoru */
+  const kOf = (ws: MemoryWorkspace) => ({
+    pickSigs: (b: CadDoc, f: CadDoc["features"][number]) => kernel.pickSigs(b, f),
+    drawing: (doc: CadDoc, meta: Parameters<typeof kernel.drawing>[1], o: Parameters<typeof kernel.drawing>[2]) => kernel.drawing(doc, meta, o),
+    extras: (doc: CadDoc) => drawExtras(ws, kernel, doc),
+  });
+  /** skript bez poznámek „# ℹ“ (co první export vynechal, druhý už nemá) */
+  const body = (t: string) => t.replace(/^# ℹ.*\n/gm, "");
   /** postaví dokument textem, převede na skript (jazyk `lang`) a skript spustí znovu */
   async function roundTrip(text: string, name: string, lang: ScriptLang = "cs") {
     const a = await run(text);
     expect(a.errors, "stavba bez ✗").toEqual([]);
     const orig = JSON.parse(JSON.stringify(docNamed(a.ws, name))) as CadDoc;
     expect(orig, name).toBeTruthy();
-    const script = await scriptOfDocWith(K, orig, { lang });
+    const script = await scriptOfDocWith(kOf(a.ws), orig, { lang });
     const b = await run(script.text, lang);
     expect(b.errors, `přečtení skriptu bez ✗\n${script.text}`).toEqual([]);
     const rt = docNamed(b.ws, name)!;
     expect(rt, name).toBeTruthy();
-    return { orig, rt, script, built: a, replay: b };
+    /** druhý export (dokument po přečtení skriptu) dá stejný skript */
+    const sameAgain = async () => expect(body((await scriptOfDocWith(kOf(b.ws), JSON.parse(JSON.stringify(rt)) as CadDoc, { lang })).text)).toBe(body(script.text));
+    return { orig, rt, script, built: a, replay: b, sameAgain };
   }
 
   const PART = `nový díl "Deska"
@@ -168,15 +182,163 @@ výkres detail řez E v ${mid("cut:E")} poloměr 6 měřítko 2:1`, "Deska");
     }
   }, 600_000);
 
-  it("automatický formát listu: umístění převede výška listu spočítaná jádrem; bez jádra poznámka", async () => {
+  it("automatický formát listu: umístění od levého horního rohu (umístit x y odshora) – stejně s jádrem i bez něj", async () => {
     const { orig, rt, script } = await roundTrip(`${PART}\nvýkres pohledy přední,horní\nvýkres detail přední v 20 10 poloměr 8 měřítko 2:1 umístit 40 40`, "Deska");
     expect((orig.drawings![0].options as Rec).sheet ?? "auto").toBe("auto");
-    expect(script.text).toMatch(/^výkres detail přední v 20 10 poloměr 8 měřítko 2:1 umístit 40 40$/m);
+    // list A4 na šířku (210): střed 40 mm od dolního okraje = 170 mm od horního
+    expect(script.text).toMatch(/^výkres detail přední v 20 10 poloměr 8 měřítko 2:1 umístit 40 170 odshora$/m);
     expect(sheetCanon(rt)).toEqual(sheetCanon(orig));
     const pure = docToScript(orig);
-    expect(pure.text).toMatch(/^výkres detail přední v 20 10 poloměr 8 měřítko 2:1$/m);
-    expect(pure.notes.join(" ")).toContain("umístění 1 pohledů / detailů listu „List 1“ s automatickým formátem se bez jádra nezapíše");
-    expect(pure.text).toContain("# ℹ umístění 1 pohledů / detailů");
+    expect(pure.text).toMatch(/^výkres detail přední v 20 10 poloměr 8 měřítko 2:1 umístit 40 170 odshora$/m);
+    expect(pure.notes.filter((n) => /umístění/.test(n))).toEqual([]);
+  }, 300_000);
+
+  /* ───────────── kontrola balíku (nálezy 1–10): každý test bez opravy selže ───────────── */
+  /** skripty zapsané příkazem `export skript` (engine – jádro hostitele, kusovník a pozice sestavy z postavených dílů) */
+  const scriptFiles = (h: ReturnType<typeof host>) => [...h.files.files.values()].filter((f) => f.file.format === "script").map((f) => new TextDecoder().decode(f.data));
+
+  it("kontrola 1: razítko dalšího listu zůstane vlastní – nepřevezme šablonu, číslo, revizi, zákazníka, polotovar, tolerance ani logo listu 1", async () => {
+    const rgba = new Uint8Array(8 * 8 * 4).fill(255);
+    for (let i = 0; i < 8 * 8; i += 3) rgba.set([224, 57, 48, 255], i * 4);
+    const logo = toDataUrl("image/png", await encodePng({ w: 8, h: 8, rgba }));
+    const { orig, rt, script, sameAgain } = await roundTrip(
+      `nový díl "Dva listy"
+kvádr 80 60 10
+výkres A3 pohledy přední,horní
+výkres list nový "Detaily"
+výkres A4 pohledy iso
+výkres list 1
+výkres razítko šablona=nástrojářská číslo="D-7" zákazník="Zákazník G" polotovar="P 10×80×60" logo="${logo}"
+výkres nepředepsané desetinná ±0,2 ±0,1 ±0,02 ±0,01
+výkres revize A "první vydání" datum 3.3.2026`,
+      "Dva listy",
+    );
+    const m2 = rt.drawings![1].meta as Rec;
+    expect([m2.template, m2.number, m2.revision, m2.customer, m2.stock, m2.tolerance, m2.tolTable, m2.logo].map((v) => v || undefined)).toEqual(Array(8).fill(undefined));
+    expect(sheetCanon(rt, 0)).toEqual(sheetCanon(orig, 0));
+    expect(sheetCanon(rt, 1)).toEqual(sheetCanon(orig, 1));
+    expect(propsCanon(rt)).toEqual({ number: "D-7" });
+    expect(propsCanon(rt)).toEqual(propsCanon(orig));
+    expect(script.text).toMatch(/^výkres razítko šablona=iso7200 číslo="" revize="" zákazník="" polotovar="" nepředepsané=""\nvýkres razítko logo=ne$/m);
+    await sameAgain();
+    // list, který razítko listu 1 převzal (vznikl až po něm), ho nese dál a skript ho nepíše dvakrát
+    const inherit = await roundTrip(`nový díl "Dva listy"\nkvádr 80 60 10\nvýkres A3 pohledy přední\nvýkres razítko šablona=kompaktní číslo="D-8" zákazník="Z"\nvýkres list nový "Detaily"\nvýkres A4 pohledy iso\nvýkres razítko projekt="P2"`, "Dva listy");
+    expect(inherit.script.text.split("\n").filter((l) => l.startsWith("výkres razítko"))).toEqual(['výkres razítko šablona=kompaktní číslo="D-8" zákazník="Z"', 'výkres razítko projekt="P2"']);
+    expect(sheetCanon(inherit.rt, 1)).toEqual(sheetCanon(inherit.orig, 1));
+  }, 600_000);
+
+  it("kontrola 2 a 7: automatický formát, který při čtení roste – umístěný řez / detail zůstane na místě (díl i list sestavy), druhý export stejný", async () => {
+    const { orig, rt, script, sameAgain } = await roundTrip(`nový díl "P2"\nkvádr 300 40 30\nválec 60 80 v 150 20 0\nvýkres pohledy přední,horní\nvýkres řez zalomený horní body -10 20 150 20 150 60 310 60 umístit 150 30\nvýkres pohled pomocný přední směr 0,5 0 0,87`, "P2");
+    const at = (d: CadDoc) => (d.drawings![0].options as unknown as { cuts: { at: number[] }[] }).cuts[0].at;
+    expect(at(orig)).toEqual([150, 180]); // A4: 210 − 30; po pomocném pohledu je list A3 (297)
+    expect(script.text).toMatch(/^výkres řez zalomený horní body -10 20 150 20 150 60 310 60 umístit 150 180 odshora$/m);
+    expect(at(rt)).toEqual([150, 180]);
+    expect(sheetCanon(rt)).toEqual(sheetCanon(orig));
+    await sameAgain();
+    const asm = await roundTrip(`nový díl "Kus"\nkvádr 100 40 30\nnová sestava "Asm"\nvložit "Kus" ukotvit\nvložit "Kus" v 0 60 0\nvýkres pohledy přední,horní\nvýkres detail přední v 50 15 poloměr 10 měřítko 2:1 umístit 230 60`, "Asm");
+    expect(asm.script.text).toMatch(/^výkres detail přední v 50 15 poloměr 10 měřítko 2:1 umístit 230 150 odshora$/m);
+    expect(asm.script.notes.filter((n) => /umístění|jádr/.test(n))).toEqual([]);
+    expect(sheetCanon(asm.rt)).toEqual(sheetCanon(asm.orig));
+    await asm.sameAgain();
+  }, 600_000);
+
+  it("kontrola 3: úprava vygenerované kóty / pozice, která už na listu není, se do skriptu nedostane (žádné ✗) a platná zůstane", async () => {
+    const box = `kvádr 100 60 40\nvýkres A3 pohledy přední,horní,levý\nkótovat celkově`;
+    // pohled vypnutý po skrytí jeho kóty
+    const a = await roundTrip(`nový díl "Stale"\n${box}\nvýkres vygenerované skrýt dim:front:t dim:left:t\nvýkres A3 pohledy přední,horní`, "Stale");
+    expect(a.script.text).toMatch(/^výkres vygenerované skrýt dim:front:t$/m);
+    expect(a.script.notes).toContain("úpravy vygenerovaných kót a pozic listu „List 1“, které už na listu nejsou (dim:left:t), skript vynechá");
+    expect((a.rt.drawings![0].options as Rec).genEdit).toEqual({ off: ["dim:front:t"] });
+    await a.sameAgain();
+    // kótovat celkově → skrýt / posun → kótovat chytře: kóty celkových rozměrů na listu nejsou
+    const b = await roundTrip(`nový díl "Stale2"\n${box}\nvýkres vygenerované skrýt dim:front:t\nvýkres vygenerované posun dim:front:l -6 0\nkótovat chytře`, "Stale2");
+    expect(b.script.text).not.toContain("výkres vygenerované");
+    expect(b.script.notes.join(" ")).toContain("které už na listu nejsou (dim:front:t, dim:front:l), skript vynechá");
+    // sestava přes `export skript` (kusovník a pozice z postavených dílů): komponenta odebrána, pak balónky vypnuty
+    const built = await run(`nový díl "A1"\nkvádr 40 40 10\nnový díl "A2"\nválec 10 30\nnový díl "A3"\nkoule 20\nnová sestava "Stale3"\nvložit "A1" ukotvit\nvložit "A2" v 20 20 10\nvložit "A3" v 80 20 10\nvýkres A3 pohledy přední,horní kusovník ano\nkótovat celkově\nvýkres vygenerované skrýt pos:3 pos:1\nvýkres vygenerované posun pos:2 4 4\nsestava odebrat "A3"\nexport skript "g4"\nvýkres balónky ne\nexport skript "g4b"`);
+    expect(built.errors).toEqual([]);
+    const [g4, g4b] = scriptFiles(built.h);
+    expect(g4.split("\n").filter((l) => l.startsWith("výkres vygenerované"))).toEqual(["výkres vygenerované skrýt pos:1", "výkres vygenerované posun pos:2 4 4"]);
+    expect(g4).toMatch(/^# ℹ úpravy vygenerovaných kót a pozic listu „List 1“, které už na listu nejsou \(pos:3\), skript vynechá$/m);
+    expect(g4b).not.toMatch(/^výkres vygenerované/m);
+    for (const [text, edit] of [[g4, { off: ["pos:1"], move: { "pos:2": [4, -4] } }], [g4b, undefined]] as const) {
+      const rep = await run(text);
+      expect(rep.errors, text).toEqual([]);
+      expect((docNamed(rep.ws, "Stale3")!.drawings![0].options as Rec).genEdit).toEqual(edit);
+    }
+    // jádro bez doplňků razítka (bez kusovníku nejsou na listu sestavy pozice): pozice se neberou jako zastaralé – zapíší se
+    // podle voleb listu a poznámka řekne, že ověřené nejsou
+    const asmDoc = JSON.parse(JSON.stringify(docNamed((await run(`nový díl "A1"\nkvádr 40 40 10\nnová sestava "S"\nvložit "A1" ukotvit\nvložit "A1" v 60 0 0\nvýkres A3 pohledy přední,horní\nkótovat celkově\nvýkres vygenerované skrýt pos:1`)).ws, "S"))) as CadDoc;
+    const bare = await scriptOfDocWith({ pickSigs: (bf, f) => kernel.pickSigs(bf, f), drawing: (doc, meta, o) => kernel.drawing(doc, meta, o) }, asmDoc, {});
+    expect(bare.text).toMatch(/^výkres vygenerované skrýt pos:1$/m);
+    expect(bare.notes.join(" ")).toContain("nejsou ověřené jádrem");
+  }, 900_000);
+
+  it("kontrola 4: pomocný pohled / detail z řezu se zapíše až po řezu a s písmenem, které řez při čtení dostane (žádné ✗)", async () => {
+    const head = `nový díl "Pořadí"\nkvádr 120 80 40\nválec 30 60 v 60 40 0 odebrat\nvýkres A1 měřítko 1:1 pohledy přední,horní\nvýkres pohled pomocný přední hrana 0 0 120 40\nvýkres řez zalomený horní body -10 20 60 20 60 60 130 60`;
+    type O = { aux?: { label: string; parent?: string }[]; cuts?: { label: string }[]; details?: { label: string; view: string }[] };
+    const a = await roundTrip(`${head}\nvýkres pohled pomocný smazat B\nvýkres pohled pomocný řez C směr 0,5 0 0,87`, "Pořadí");
+    const oa = a.rt.drawings![0].options as O;
+    expect([(oa.cuts ?? []).map((c) => c.label), (oa.aux ?? []).map((x) => [x.label, x.parent])]).toEqual([["B"], [["C", "cut:B"]]]);
+    expect(a.script.notes.join(" ")).toMatch(/se mohou lišit: C → B, B → C/);
+    await a.sameAgain();
+    const b = await roundTrip(`${head}\nvýkres detail řez C v 60 20 poloměr 12 měřítko 2:1\nvýkres pohled pomocný smazat B`, "Pořadí");
+    const ob = b.rt.drawings![0].options as O;
+    expect([(ob.cuts ?? []).map((c) => c.label), (ob.details ?? []).map((d) => [d.label, d.view])]).toEqual([["B"], [["A", "cut:B"]]]);
+  }, 600_000);
+
+  it("kontrola 5: pohledy, řezy, detaily a přerušení na vypnutém základním pohledu se vynechají s poznámkou (žádné ✗)", async () => {
+    const a = await roundTrip(
+      `nový díl "Zastaralé pohledy"
+kvádr 200 60 40
+válec 20 60 v 100 30 0 odebrat
+výkres A2 měřítko 1:1 pohledy přední,horní,levý
+výkres přerušení levý y od 10 do 30 mezera 4
+výkres řez částečný levý body 10 5 30 5 30 35 10 35 hloubka 20
+výkres detail levý v 30 20 poloměr 8 měřítko 2:1
+výkres pohled pomocný levý směr 0,5 0 0,87
+výkres řez zalomený horní body -10 20 100 20 100 50 210 50
+výkres A2 měřítko 1:1 pohledy přední`,
+      "Zastaralé pohledy",
+    );
+    const o = a.rt.drawings![0].options as Rec;
+    expect(["aux", "cuts", "details", "brokenOut", "breaks"].map((k) => ((o[k] as unknown[] | undefined) ?? []).length)).toEqual([0, 0, 0, 0, 0]);
+    expect(a.script.notes.filter((n) => n.includes("visí na pohledu, který na listu není"))).toHaveLength(5);
+    expect(a.script.text).toMatch(/^# ℹ pomocný pohled B listu „List 1“ visí na pohledu, který na listu není \(levý\)/m);
+  }, 300_000);
+
+  it("kontrola 6: přezdívky a názvy dílů, které rozbor voleb četl jako klíčová slova (D, H, R, V, na, jako, ukotvit …)", async () => {
+    const names = ["D", "H", "L", "N", "R", "V", "na", "jako", "ukotvit", "otočení", "as", "als"];
+    const lines = names.map((a, i) => (i % 2 ? `vložit "Q" v ${20 * i} 0 0 jako "${a}"` : `vložit "Q" v ${20 * i} 0 0\nsestava komponenta #${i + 1} přezdívka "${a}"`));
+    const { rt, script } = await roundTrip(`nový díl "Q"\nkvádr 10 10 10\nnový díl "H"\nkvádr 5 5 5\nnová sestava "AL"\n${lines.join("\n")}\nvložit "H" v 0 50 0 jako "X1"`, "AL");
+    expect(rt.components!.map((c) => c.alias)).toEqual([...names, "X1"]);
+    expect(rt.components!.map((c) => c.name)).toEqual([...names.map(() => "Q"), "H"]);
+    for (const a of names) expect(script.text).toMatch(new RegExp(`^vložit "Q"( v \\d+ 0 0)? jako "${a}"$`, "m"));
+    expect(script.text).toMatch(/^vložit "H" v 0 50 0 jako "X1"$/m);
+    expect(script.notes.filter((n) => /přezdívk/.test(n))).toEqual([]);
+  }, 300_000);
+
+  it("kontrola 8 a 9: výkres vygenerované obnovit ověří klíč; stav pružiny píše vedená / nevedená a nápověda volbu vedená", async () => {
+    const a = await run(`${PART}\nvýkres A3 pohledy přední,horní\nkótovat celkově\nvýkres vygenerované obnovit pos:99`);
+    expect(a.errors.join("\n")).toMatch(/„pos:99“ na listu není – vygenerované objekty listu: dim:front:t/);
+    expect(a.con).not.toMatch(/vygenerované obnoveno: pos:99/);
+    // zastaralou úpravu (pohled mezitím vypnutý) obnovit jde – klíč je mezi úpravami listu
+    const b = await run(`${PART}\nvýkres A3 pohledy přední,horní,levý\nkótovat celkově\nvýkres vygenerované skrýt dim:left:t dim:front:t\nvýkres A3 pohledy přední,horní\nvýkres vygenerované obnovit dim:left:t`);
+    expect(b.errors).toEqual([]);
+    expect((docNamed(b.ws, "Deska")!.drawings![0].options as Rec).genEdit).toEqual({ off: ["dim:front:t"] });
+    const c = await run(`${SPRINGS}\nsestava pružina nová n 6 mezi "Horní deska" Ø21 "Stírací deska" horní do děr vzoru\nsestava pružina #5 vedená ne\nsestava pružiny\nsestava pružina #5 vedená možná`);
+    const sp = c.con.split("\n").filter((l) => /pružina „/.test(l) && /délka/.test(l));
+    expect(sp.filter((l) => / · nevedená( –|$)/.test(l)).length).toBeGreaterThanOrEqual(2); // řádek příkazu vedená ne a řádek #5 ve stavu pružin
+    expect(sp.some((l) => / · vedená( –|$)/.test(l))).toBe(true);
+    expect(c.errors.join("\n")).toMatch(/neznámá volba „možná“.*\[tuhost c\] \[vedená ano\|ne\]/);
+  }, 600_000);
+
+  it("kontrola 10: popisové údaje dokumentu (číslo, kreslil, revize) i s tabulkou revizí", async () => {
+    const { orig, rt, script } = await roundTrip(`${PART}\nvýkres A3 pohledy přední\nvýkres razítko číslo="MN-1" kreslil="AI" revize="C"\nvýkres revize A "první" datum 1.10.2026\nvýkres revize C "třetí" datum 19.11.2026`, "Deska");
+    expect(orig.props).toEqual({ number: "MN-1", author: "AI", revision: "C" });
+    expect(rt.props).toEqual(orig.props);
+    expect(script.text).toMatch(/^výkres razítko číslo="MN-1" kreslil="AI" revize="C"$/m);
+    expect(sheetCanon(rt)).toEqual(sheetCanon(orig));
   }, 300_000);
 
   it("částečné řezy, přerušení, zobrazení úchylek uložení a Tabulka uložení", async () => {

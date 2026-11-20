@@ -15,7 +15,6 @@ zobrazení uložení	fit display
 Tabulka uložení	Fit table
 {0} listu „{1}“ nejde zapsat textem – doplňte ho ručně	{0} of sheet “{1}” cannot be written as text – add it by hand
 písmena pomocných pohledů, řezů a detailů listu „{0}“ dostane po přečtení skriptu aplikace znovu – po smazání některých se mohou lišit: {1}	the letters of auxiliary views, sections and details of sheet “{0}” are assigned again when the script is read – after some were deleted they may differ: {1}
-umístění {0} pohledů / detailů listu „{1}“ s automatickým formátem se bez jádra nezapíše (výšku listu zná jen jádro – export skript v aplikaci a v CLI ho zapíše) – pohledy umístí aplikace sama	the placement of {0} views / details of sheet “{1}” with automatic format is not written without the kernel (only the kernel knows the sheet height – export script in the app and in the CLI writes it) – the app places the views itself
 úprava vygenerovaných kót a pozic	edit of generated dimensions and balloons
 přezdívku „{0}“ komponenty „{1}“ nejde zapsat na řádek skriptu	the alias “{0}” of component “{1}” cannot be written on a script line
 pružinu „{0}“	spring “{0}”

@@ -1,0 +1,10 @@
+# Vlna E, balík export – opravy po kontrole: razítko dalších listů a popisové údaje dokumentu, pohledy na vypnutém pohledu, zastaralé úpravy vygenerovaných kót a pozic, stav pružiny vedená / nevedená
+{0} listu „{1}“ visí na pohledu, který na listu není ({2}) – na listu se nekreslí a skript ho vynechá	{0} of sheet “{1}” hangs on a view that is not on the sheet ({2}) – it is not drawn on the sheet and the script leaves it out
+list „{0}“ dokumentu „{1}“: klíče vygenerovaných kót a pozic se nepodařilo ověřit ({2})	sheet “{0}” of document “{1}”: the keys of generated dimensions and balloons could not be verified ({2})
+nevedená	unguided
+vedená	guided
+popisové údaje dokumentu „{0}“ ({1}) se liší od razítek listů – po přečtení skriptu je dokument ponese podle razítka ({2})	the document properties of “{0}” ({1}) differ from the title blocks of the sheets – after the script is run the document carries them as in the title block ({2})
+revize „{0}“ listu „{1}“ nemá autora – po přečtení skriptu dostane autora z razítka („{2}“)	revision “{0}” of sheet “{1}” has no author – after the script is run it gets the author from the title block (“{2}”)
+sestava pružina "Pružina" mezi "Deska A" [F3] "Deska B" [F7] [volná L0] [blok Ln] [tuhost c] [vedená ano|ne] · sestava pružina "Pružina" odebrat · sestava pružiny	assembly spring "Spring" between "Plate A" [F3] "Plate B" [F7] [free L0] [solid Ln] [rate c] [guided yes|no] · assembly spring "Spring" remove · assembly springs
+úpravy vygenerovaných kót a pozic listu „{0}“ nejsou ověřené jádrem – řádek s klíčem, který na listu není, aplikace při čtení odmítne (export skript v aplikaci a v CLI klíče ověřuje jádrem)	the edits of generated dimensions and balloons of sheet “{0}” are not verified by the kernel – a line with a key that is not on the sheet is rejected when the script is run (export script in the app and in the CLI verifies the keys with the kernel)
+úpravy vygenerovaných kót a pozic listu „{0}“, které už na listu nejsou ({1}), skript vynechá	the script leaves out the edits of generated dimensions and balloons of sheet “{0}” that are no longer on the sheet ({1})

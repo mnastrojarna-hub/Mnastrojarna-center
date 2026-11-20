@@ -15,7 +15,6 @@ zobrazení uložení	Passungsanzeige
 Tabulka uložení	Passungstabelle
 {0} listu „{1}“ nejde zapsat textem – doplňte ho ručně	{0} des Blatts „{1}“ lässt sich nicht als Text schreiben – ergänzen Sie es von Hand
 písmena pomocných pohledů, řezů a detailů listu „{0}“ dostane po přečtení skriptu aplikace znovu – po smazání některých se mohou lišit: {1}	die Buchstaben der Hilfsansichten, Schnitte und Einzelheiten des Blatts „{0}“ vergibt die Anwendung beim Lesen des Skripts neu – nachdem einige gelöscht wurden, können sie abweichen: {1}
-umístění {0} pohledů / detailů listu „{1}“ s automatickým formátem se bez jádra nezapíše (výšku listu zná jen jádro – export skript v aplikaci a v CLI ho zapíše) – pohledy umístí aplikace sama	die Lage von {0} Ansichten / Einzelheiten des Blatts „{1}“ mit automatischem Format wird ohne Kern nicht geschrieben (die Blatthöhe kennt nur der Kern – Export Skript in der Anwendung und im CLI schreibt sie) – die Anwendung platziert die Ansichten selbst
 úprava vygenerovaných kót a pozic	Bearbeitung generierter Maße und Positionsnummern
 přezdívku „{0}“ komponenty „{1}“ nejde zapsat na řádek skriptu	der Spitzname „{0}“ der Komponente „{1}“ lässt sich nicht auf eine Skriptzeile schreiben
 pružinu „{0}“	die Feder „{0}“

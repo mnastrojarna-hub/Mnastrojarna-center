@@ -30,7 +30,8 @@ export type ScriptKernel = {
   drawing?: (doc: CadDoc, meta: DrawingMeta, opts: Partial<DrawingOptions>) => Promise<{ smart?: { annotations: { auto?: string }[] }; generated?: { id: string }[] }>;
   /**
    * doplňky razítka dokumentu jako ve výkresovém prostředí (kusovník a pozice sestavy – engine `drawExtras`, v aplikaci
-   * stav otevřené sestavy); bez nich list sestavy nemá pozice a jejich úpravy by se braly jako zastaralé
+   * stav otevřené sestavy); bez nich by list sestavy neměl pozice, proto se klíče vygenerovaných objektů listů sestavy
+   * bez `extras` neověřují (převodník to ohlásí)
    */
   extras?: (doc: CadDoc) => Promise<DrawingExtras> | DrawingExtras;
 };
@@ -147,7 +148,9 @@ async function freshPart(doc: CadDoc, k: ScriptKernel, out: FreshScriptDoc): Pro
  * (`genEdit`). List se spočítá BEZ úprav (skrytý objekt ve výpočtu není) a s doplňky razítka dokumentu (pozice sestavy).
  */
 async function sheetGenKeys(doc: CadDoc, k: ScriptKernel, out: FreshScriptDoc): Promise<void> {
-  if (!k.drawing) return;
+  // sestava bez doplňků razítka: list by neměl pozice a jejich úpravy by vypadaly jako zastaralé – klíče se pak neověřují
+  // (převodník vynechá jen to, co na listu podle voleb být nemůže, a ohlásí, že klíče ověřené nejsou)
+  if (!k.drawing || (doc.kind === "assembly" && !k.extras)) return;
   const sheets = doc.drawings ?? [];
   let extras: DrawingExtras | undefined;
   for (let si = 0; si < sheets.length; si++) {

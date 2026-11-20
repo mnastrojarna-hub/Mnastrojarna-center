@@ -39,7 +39,6 @@ Přezdívka instance (vazby místo #k)	Instance alias (mates instead of #k)
 přezdívka nesmí být prázdná	the alias must not be empty
 přezdívka nesmí začínat „#“ (to je pořadí komponenty) – např. jako "K48"	the alias must not start with “#” (that is the component position) – e.g. as "K48"
 přezdívku „{0}“ už má komponenta „{1}“ – zvolte jinou	component “{1}” already has the alias “{0}” – choose another one
-sestava pružina "Pružina" mezi "Deska A" [F3] "Deska B" [F7] [volná L0] [blok Ln] [tuhost c] · sestava pružina "Pružina" odebrat · sestava pružiny	assembly spring "Spring" between "Plate A" [F3] "Plate B" [F7] [free L0] [solid Ln] [rate c] · assembly spring "Spring" remove · assembly springs
 sestava pružina: {0} musí být kladná	assembly spring: {0} must be positive
 sestava pružina: délka na doraz {0} mm musí být menší než volná délka {1} mm	assembly spring: the solid length {0} mm must be smaller than the free length {1} mm
 sestava pružina: neznámá volba „{0}“ – {1}	assembly spring: unknown option “{0}” – {1}
