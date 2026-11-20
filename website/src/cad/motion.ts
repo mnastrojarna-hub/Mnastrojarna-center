@@ -479,15 +479,17 @@ export async function runMotion(
    * mezipoloha v čase `tm` pro zjemnění úseku (vlna 22, bod 6): řešič z polohy `seed` (předchozí krok) s motory v čase `tm`, úhly
    * se rozbalují vůči stavu posledního kroku; stav řešiče (polohy, cíle motorů) se pak obnoví. Nesplněné vazby → null.
    */
-  const solveAt = (tm: number, seed: Record<string, Placement>): ReturnType<PoseAt> => {
+  const poseAtTime = (tm: number, seed: Record<string, Placement>): ReturnType<PoseAt> => {
     const keep = new Map(poses);
     const targets = motors.map((x) => x.target);
+    const tKeep = tNow;
+    tNow = tm; // aktivní motory podle času mezipolohy (okna / fáze, vlna 22 bod 3)
     try {
       for (const [id, pl] of Object.entries(seed)) if (poses.has(id)) poses.set(id, poseOf(pl));
       const vals = motors.map((x) => profileAt(x.prof, tm, { k: (tm / duration) * n, n }));
       motors.forEach((x, i) => (x.target = vals[i]));
       // týž krok s prioritou jako krok studie (motion-quasi.ts solveStep, vlna 22 bod 8); mezipoloha jen ze splněného kroku
-      const out = solveStep(poses, vars, terms, { groups, maxIter: 60, atLimit: "error" });
+      const out = solveStep(poses, M.vars, M.terms, { groups: M.groups, maxIter: 60, atLimit: "error" });
       if (out.status !== "ok") return null;
       const place: Record<string, Placement> = {};
       for (const c of comps) {
@@ -499,6 +501,7 @@ export async function runMotion(
       poses.clear();
       for (const [id, P] of keep) poses.set(id, P);
       motors.forEach((x, i) => (x.target = targets[i]));
+      tNow = tKeep;
     }
   };
   for (let k = 0; k <= n; k++) {
@@ -564,7 +567,7 @@ export async function runMotion(
     // vůle a spojitá kontrola úseku (k−1, k) – mezipolohy řešičem (vlna 22, bod 6)
     if (opts.between) {
       const prev = steps[steps.length - 1] ?? null;
-      await opts.between(row, prev, (tm) => solveAt(tm, prev?.place ?? place));
+      await opts.between(row, prev, (tm) => poseAtTime(tm, prev?.place ?? place));
     }
     steps.push(row);
     if (phases.length) {
