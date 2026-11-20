@@ -10,6 +10,7 @@
  * * dokumenty z dřívějších běhů relace, které běh nezměnil, zůstávají bez stavby (`V=-`) – relace se 70 díly nestaví 70×;
  * * prázdný dokument, který běh založil (prázdná sestava, B1), má řádek D vždy; prázdný úvodní díl relace ne.
  */
+import { sheetOverlapsOf } from "./sheet-eval";
 import { flattenLeaves } from "../asm-flatten";
 import { sourceKey } from "../assembly";
 import { clashStale } from "../clash-class";
@@ -79,6 +80,11 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
   if (d.drawings?.length) s.sheets = d.drawings.length;
   // revize modelu u dokumentu s výstupy (listy, záznamy exportů) – řádek D `rev=`, JSON `docs[].rev` (vlna 22, bod 20)
   if (d.kind !== "draft" && (d.drawings?.length || d.outputs?.length)) s.rev = modelId(d).rev;
+  // překryvy na listech (vlna 22, bod 17): jen když vyhodnocení listů v tomto běhu zkontrolovalo všechny listy dokumentu
+  if (d.kind !== "draft" && d.drawings?.length) {
+    const ov = sheetOverlapsOf(d);
+    if (ov !== null) s.overlaps = ov;
+  }
   if (s.kind === "assembly") {
     s.components = d.components?.length ?? 0;
     s.parts = new Set((d.components ?? []).map((c) => sourceKey(c.source))).size;

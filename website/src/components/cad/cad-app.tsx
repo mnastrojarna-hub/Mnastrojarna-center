@@ -1576,9 +1576,19 @@ export function CadApp() {
   // pozice (balónky) pro výkres sestavy: světové obalové kvádry komponent podle řádků kusovníku
   const balloonItems = useMemo(() => {
     if (!isAsm) return undefined;
-    const out: { pos: number; name: string; bbox: [Vec3, Vec3] }[] = [];
+    const out: { pos: number; name: string; bbox: [Vec3, Vec3]; boxes?: [Vec3, Vec3][] }[] = [];
+    const grow = (bb: [Vec3, Vec3] | null, w: Vec3): [Vec3, Vec3] => {
+      if (!bb) return [[...w] as Vec3, [...w] as Vec3];
+      for (let k = 0; k < 3; k++) {
+        bb[0][k] = Math.min(bb[0][k], w[k]);
+        bb[1][k] = Math.max(bb[1][k], w[k]);
+      }
+      return bb;
+    };
     for (const r of bom) {
       let bb: [Vec3, Vec3] | null = null;
+      // obálky jednotlivých výskytů – kotva odkazové čáry pozice na prvním (vlna 22, bod 17)
+      const per = new Map<string, [Vec3, Vec3]>();
       for (const l of leaves) {
         if (!r.ids.includes(l.topId) || l.hidden) continue;
         const m = asmCache.current.get(l.key)?.metrics?.bbox;
@@ -1586,14 +1596,12 @@ export function CadApp() {
         const pl = matrixToPlacement(l.matrix);
         for (const x of [m[0][0], m[1][0]]) for (const y of [m[0][1], m[1][1]]) for (const z of [m[0][2], m[1][2]]) {
           const w = transformPoint(pl, [x, y, z]);
-          if (!bb) bb = [[...w] as Vec3, [...w] as Vec3];
-          else for (let k = 0; k < 3; k++) {
-            bb[0][k] = Math.min(bb[0][k], w[k]);
-            bb[1][k] = Math.max(bb[1][k], w[k]);
-          }
+          bb = grow(bb, w);
+          per.set(l.topId, grow(per.get(l.topId) ?? null, w));
         }
       }
-      if (bb) out.push({ pos: r.pos, name: r.name, bbox: bb });
+      const boxes = r.ids.map((id) => per.get(id)).filter((b): b is [Vec3, Vec3] => !!b);
+      if (bb) out.push({ pos: r.pos, name: r.name, bbox: bb, ...(boxes.length ? { boxes } : {}) });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps

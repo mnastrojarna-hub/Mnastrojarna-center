@@ -5,6 +5,8 @@
  * (tolerance, přípona, text) se podle klíče přenesou.
  * Příkazy pracují s aktivním listem (`výkres list N`, záložka listu ve výkresu) – viz `activeSheet`.
  */
+import { overlapIssueText, sheetOverlaps } from "./drawing-overlaps";
+import { positionLines } from "./drawing-pos-agent";
 import type { DrawingCmd, SheetRef, TitleField } from "./agent-drawing";
 import { VIEW_CS } from "./agent-drawing";
 import { defaultDrawingOptions, holeRowText, isRadialDim, modelViewKey, scaleLabel, STANDARD_SCALES, viewExtent, withAnnotations, type BalloonItem, type BomItem, type DetailView, type DrawingMeta, type DrawingOptions, type DrawingResult, type ModelView, type PlacedView, type RevisionItem } from "./drawing";
@@ -224,6 +226,8 @@ export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOption
         if (o.text !== undefined && o.text !== keep.text) keep.text = o.text;
       }
       if (keep.type === "callout" && o.type === "callout" && o.tol) keep.tol = o.tol;
+      // ruční poloha (odsazení / posun) vygenerované kóty a popisu přežije přegenerování po změně modelu (vlna 22, bod 17)
+      if (o.placed === "user") keepPlacement(keep, o);
       // revize (trojúhelník) a zobrazení úchylek uložení zůstávají u přegenerované kóty
       if (o.rev) keep.rev = o.rev;
       if (o.tolShow) keep.tolShow = o.tolShow;
@@ -240,9 +244,24 @@ export function mergeSmart(ann: DrawingAnnotation[], opts: Partial<DrawingOption
 /** varování listu: ruční úpravy vygenerovaných kót se nepodařilo přiřadit (do protokolu ⚠ drawing.warning) */
 export const lostEditsText = (n: number) => tr("{0} ručních úprav kót se nepodařilo přiřadit – kóty se přegenerovaly bez nich (tolerance, uložení, přípony)", n);
 
-/** vygenerovaná poznámka s úpravou uživatele (tolerance / přípona, vlastní text, revize, zobrazení úchylek) */
+/**
+ * Ruční poloha staré vygenerované kóty / popisu přenesená na novou (vlna 22, bod 17): délková kóta odsazení (znaménko strany
+ * podle nové kóty), průměr / poloměr / úhel směr a odsazení, souřadnicová posun textu, popis koleno. Měřené body jsou nové.
+ */
+function keepPlacement(keep: DrawingAnnotation, o: DrawingAnnotation) {
+  keep.placed = "user";
+  if (keep.type === "dim" && o.type === "dim") {
+    const k = keep as Record<string, unknown>;
+    const q = o as Record<string, unknown>;
+    if (typeof q.offset === "number" && typeof k.offset === "number") k.offset = "ang" in q || (k.offset as number) === 0 ? q.offset : Math.sign(k.offset as number) * Math.abs(q.offset as number);
+    if (typeof q.ang === "number" && "ang" in k) k.ang = q.ang;
+    if (typeof q.jog === "number") k.jog = q.jog;
+  } else if (keep.type === "callout" && o.type === "callout") keep.at = o.at;
+}
+
+/** vygenerovaná poznámka s úpravou uživatele (tolerance / přípona, vlastní text, revize, zobrazení úchylek, ruční poloha) */
 function userEdited(a: DrawingAnnotation): boolean {
-  if (a.rev || a.tolShow) return true;
+  if (a.rev || a.tolShow || a.placed) return true;
   if (a.type === "dim") return !!splitSuffix(a).user.trim() || a.text !== undefined;
   return a.type === "callout" && !!a.tol?.trim();
 }
@@ -636,6 +655,22 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       return done({ changed: true, open: false });
     }
     case "views": {
+      if (cmd.cmd.op === "bomsheet") {
+        // kusovník na samostatném listu (vlna 22, bod 17): tento list ho nekreslí, nový list téhož výkresu jen s kusovníkem
+        if (doc.kind !== "assembly") throw new Error(tr("kusovník na samostatném listu – jen výkres sestavy"));
+        const list = doc.drawings!;
+        const set = setSheets(doc, idx);
+        const has = set.find((k) => (list[k].options as Partial<DrawingOptions>).bomOnly);
+        put({ ...sheet(), options: { ...sheet().options, bomPlace: "sheet", bomTable: true } });
+        if (has === undefined) {
+          const cur = sheet().meta as Partial<DrawingMeta>;
+          const s = newSheet(doc, set.length + 1);
+          list.push(inDrawing({ ...s, name: tr("Kusovník"), options: { ...s.options, bomOnly: true, dimensions: "none" }, meta: { ...inheritTitle(cur), name: cur.name ?? doc.name, number: cur.number ?? "", author: cur.author ?? "", revision: cur.revision ?? "", date: cur.date ?? "", tolerance: cur.tolerance ?? "" } }, drawingKey(sheet())));
+        }
+        const bi = has ?? list.length - 1;
+        log.push(tr("✓ kusovník na samostatném listu {0} – list {1} ho nekreslí (zpět: výkres kusovník nad | sloupce)", sheetName(doc, bi), sheetName(doc, idx)));
+        return done({ changed: true, open: true });
+      }
       const r = await applyViewsCmd({ doc, sheet, put, compute: computeSheet }, cmd.cmd);
       log.push(...r.log);
       return done({ changed: r.changed, open: r.open });
@@ -1048,6 +1083,7 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   // tělesa, funkční prvky; nikdy „všech N“ – sestava: jen celkové rozměry (rozměry dílů patří na výkresy dílů)
   const dc = sheetDimCheck(doc, out, anns, o);
   if (dc) L.push(dimCheckLine(dc));
+  else if (o.bomOnly) L.push(tr("List jen s kusovníkem – pohledy ani kóty nemá"));
   else {
     const chk = dimCheck(doc, bbox, out.texts);
     L.push(tr("Kontrola kót: celkové rozměry {0}/{1} (sestava – rozměry dílů se kontrolují na výkresech dílů)", chk.filter((x) => x.present).length, chk.length));
@@ -1069,6 +1105,9 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   L.push(sheetIssueLine(doc, doc.drawings![idx]));
   if (o.models?.length) L.push(tr("Další modely: {0}", o.models.map((x) => `„${x.name}“ (${VIEW_NAME(x.view)}, ${x.scale === "auto" ? tr("auto") : scaleLabel(x.scale)})`).join(" · ")));
   L.push(...viewsStatusLines(res, o, anns, s.meta as Partial<DrawingMeta>));
+  // pozice po pohledech, kusovník a překryvy celého listu (vlna 22, bod 17 – cad/drawing-overlaps.ts)
+  const ov = sheetOverlaps(out);
+  L.push(...positionLines(res, o, ov));
   L.push(...viewRangeLines(res, o));
   if (res.warnings.length) L.push(tr("Varování výkresu: {0}", res.warnings.join("; ")));
   const issues = issuesOf(res);
@@ -1079,6 +1118,9 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   // vydaný list ze starší revize modelu → ⚠ drawing.stale na řádku `výkres stav` (bod 20)
   const sh = doc.drawings![idx];
   if (sheetState(doc, sh) === "stale") issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: staleSheetText(sh.name, sh.issued!, modelId(doc)) });
+  // překryvy na listu → ⚠ drawing.overlap s počtem a radou na řádku `výkres stav` (bod 17)
+  const ovText = overlapIssueText(ov);
+  if (ovText) issues.push({ level: "warn", code: "drawing.overlap", kind: "sheet-overlap", text: ovText, sheetId: sh.id, data: { total: ov.total, byKind: ov.byKind, crossings: ov.crossings } });
   return { text: L.join("\n"), changed, issues };
 }
 

@@ -11,6 +11,7 @@ import { annLabel, agentToSheet, agentToView, findView, resolveAnns, viewToAgent
 import type { AuxViewOpt, BrokenOutOpt, CutSectionOpt, ViewBreakOpt } from "./drawing-views";
 import { tr } from "./i18n";
 import { applyGenCmd, genEditText } from "./drawing-gen-agent";
+import { applyPosCmd } from "./drawing-pos-agent";
 import { uid, type CadDoc, type DrawingAnnotation, type DrawingDoc, type Vec2 } from "./types";
 
 const fmtN = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",").replace(/^-/, "−");
@@ -66,6 +67,10 @@ export async function applyViewsCmd(ctx: ViewsCtx, cmd: ViewsCmd): Promise<{ log
   switch (cmd.op) {
     case "gen":
       return applyGenCmd(ctx, cmd);
+    case "pos":
+      return applyPosCmd(ctx, cmd);
+    case "bomsheet":
+      throw new Error("bomsheet"); // provede cad/drawing-agent.ts (přidává list)
     case "aux": {
       const res = await ctx.compute();
       const H = res.sheet.h;
