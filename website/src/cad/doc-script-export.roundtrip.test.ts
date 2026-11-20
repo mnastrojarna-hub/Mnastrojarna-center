@@ -465,7 +465,9 @@ sestava vazba mez-vzdálenosti "Stírací deska" spodní "Spodní deska" horní 
     expect(dynamic.script.text).toMatch(/^pohyb dynamika čas 0.02 krok 0.0004 gravitace 0 -0.6 -0.8 tlumení 0.05 odraz 0.2 snímky 40$/m);
     expect(motion(dynamic.rt)).toEqual(motion(dynamic.orig));
     const kin = await roundTrip(`${SPRINGS}\npohyb motor lineární vazba "LIS" 55..50 kroky 4\npohyb dynamika čas 0,02 gravitace +X odraz 0,5\npohyb kinematika`, "Střižník");
-    expect(kin.orig.motion!.mode).toBeUndefined();
+    // vlna 22 (M2): `pohyb kinematika` je výslovný režim (bez volby = automaticky – kvazistatika při pružině na pohyblivém dílu)
+    expect(kin.orig.motion!.mode).toBe("kinematic");
+    expect(kin.rt.motion!.mode).toBe("kinematic");
     expect(kin.script.text).toMatch(/^pohyb dynamika čas 0.02 krok 0.0005 gravitace \+X odraz 0.5\npohyb kinematika$/m);
     expect(motion(kin.rt)).toEqual(motion(kin.orig));
     expect(SCRIPT_DEFAULT_DT).toBe((await import("./motion-dynamic")).defaultDyn().dt);

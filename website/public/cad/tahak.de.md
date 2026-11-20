@@ -24,7 +24,7 @@ Teil prüfen: `status` · `messen körper` · `messen bohrungen` · `prüfen`
 
 ## Federn und Bewegung
 `baugruppe feder neu d 2 De 20 L0 35 n 6 zwischen "D1" Ø21 "K48" unten` („alle bohrungen“ am Ende = in jede Bohrung des Musters) · `baugruppe federn`
-`bewegung antrieb linear verknüpfung 2 12..20 schritt 4 kollision` (Verknüpfung 2 = Abstand; kein Antrieb auf Kontakt) · `bewegung status` · `bewegung dynamik zeit 0,1 schwerkraft -Z` · `bewegung masse "K48" 2,5` · `bewegung kinematik`
+`bewegung antrieb linear verknüpfung 2 20..12 schritt 4 kollision` (Verknüpfung 2 = Abstand; kein Antrieb auf Kontakt) · `bewegung status` · `bewegung dynamik zeit 0,1 schwerkraft -Z` · `bewegung masse "K48" 2,5` · `bewegung kinematik`
 Schraube erst nach der Dynamik in die Bohrung (ein freies Teil fiele unter Schwerkraft): `baugruppe schraube "D1" Ø9`. Sonst: `bewegung antrieb dreh "K48" 0..360 schritt 5`
 
 ## Zeichnung (Registerkarte des Teils)

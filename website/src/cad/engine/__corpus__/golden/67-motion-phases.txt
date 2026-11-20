@@ -53,11 +53,11 @@ Krok 70 (t = 1,39 s, motory 80):
  Horní deska [0; 0; 100]
  Razník [100; 100; 62]
  Přidržovač [140; 140; 52]
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
-✓ Kvádr 3 (box)
-✓ Válec 1 (cylinder)
-✓ Kvádr 4 (box)
+✓ Kvádr 1 (box) · přidáno 800000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 28800 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 800000 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 11938,1 mm³ · těleso platné
+✓ Kvádr 4 (box) · přidáno 16000 mm³ · těleso platné
 
 Dokument: „Cyklus“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska A [0; 0; 0] ⚓ · Plech [40; 40; 20] ⚓ · Horní deska [0; 0; 100] · Razník [100; 100; 62] · Přidržovač [140; 140; 52]

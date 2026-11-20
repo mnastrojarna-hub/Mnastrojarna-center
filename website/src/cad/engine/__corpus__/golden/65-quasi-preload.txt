@@ -7,16 +7,16 @@
 → Kvádr 3 (box) přidán – výsledek po výpočtu níže
 ✓ nový díl „Pružina“ – nová záložka
 → Pružina 1 (spring) přidán – výsledek po výpočtu níže
-✓ Kvádr 1 (box)
-✓ Kvádr 2 (box)
-✓ Kvádr 3 (box)
-✓ Pružina 1 (spring)
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 3 (box) · přidáno 28800 mm³ · těleso platné
+✓ Pružina 1 (spring) · přidáno 1070,1 mm³ · těleso platné
 
 Dokument: „Pružina“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 20 × 20 × 32 mm (X -10…10, Y -10…10, Z -1…31) · objem 1,07 cm³ · ploch 3 · hran 3
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
- 1. Pružina 1 [spring, id #] ✓ – Ø18, stoupání 5, závitů 6, drát Ø2 (délka 30 mm), new, začátek [0; 0; 0], osa Z
+ 1. Pružina 1 [spring, id #] ✓ přidáno 1070,1 mm³ · těleso platné – Ø18, stoupání 5, závitů 6, drát Ø2 (délka 30 mm), new, začátek [0; 0; 0], osa Z
 === run 2 ===
 ✓ nová sestava „Mechanika“ – nová záložka
 ✓ komponenta „Rám“ vložena do sestavy (ukotvená)

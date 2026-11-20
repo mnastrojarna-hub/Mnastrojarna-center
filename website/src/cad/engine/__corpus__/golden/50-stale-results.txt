@@ -38,6 +38,7 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 ✓ komponenta „Přidržovač“: ukotvená
 ✓ komponenta „Přidržovač“: poloha [40; 10; 5]
 ⚠ v sestavě je konflikt vazeb – sestava vazby
+⚠ řádek 4: vazby nelze splnit spolu – polohy komponent zůstaly beze změny (žádný kompromis); vazby si odporují: „Vzdálenost Přidržovač → Deska“ -5 mm místo 20 mm (-25 mm)
 
 Dokument: „Sestava A“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Deska [0; 0; 0] ⚓ · Přidržovač [40; 10; 5] ⚓

@@ -211,7 +211,7 @@ const num = (s) => Number(String(s).replace(',', '.'));
   ].join('\n'));
   ok(/✓ nová pružina „Pružina 2×19,5×41“ 1× .* – zámek ke komponentě „Deska 6 kapes“/.test(log) && /✓ pružina „Pružina 2×19,5×41“: délka 35 mm/.test(log), 'text: nová pružina do kapsy Ø21: ' + line(log, /✓ nová pružina/));
   log = await run('sestava pružina "Pružina 2×19,5×41" mezi "Deska 6 kapes" "Stírací deska" do děr vzoru');
-  ok(/do děr vzoru F\d+(\/F\d+){5} Ø21 komponenty „Deska 6 kapes“: \+5 kopií \(zámek k „Deska 6 kapes“\)/.test(log) && /✓ pružina „Pružina 2×19,5×41“: délka 35 mm · L0 41 · Ln 19 · stlačení 6 mm · síla 24,3 N \(c 4,055 N\/mm\) \(6×\)/.test(log), 'do děr vzoru: 6 pružin jedním příkazem – ' + line(log, /do děr vzoru/) + ' · ' + line(log, /síla 24,3 N .*\(6×\)/));
+  ok(/do děr vzoru F\d+(\/F\d+){5} Ø21 komponenty „Deska 6 kapes“: \+5 kopií \(zámek k „Deska 6 kapes“\)/.test(log) && /✓ pružina „Pružina 2×19,5×41“: délka 35 mm · L0 41 · Ln 19 · stlačení 6 mm · síla 24,3 N \(c 4,055 N\/mm\) · vedená \(6×\)/.test(log), 'do děr vzoru: 6 pružin jedním příkazem, všechny vedené dírou – ' + line(log, /do děr vzoru/) + ' · ' + line(log, /síla 24,3 N .*\(6×\)/));
   d = await p.evaluate(() => window.mncad.getDocument());
   ok(d.components.filter((c) => c.spring).length === 6 && d.mates.filter((m) => m.type === 'lock').length === 6, 'sestava Stírač 6: 6 pružin, 6 zámků');
 

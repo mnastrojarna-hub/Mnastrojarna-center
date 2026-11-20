@@ -31,7 +31,7 @@ Kontrola dílu: `stav` · `měřit těleso` · `měřit díry` · `kontrola`
 
 ### Pružiny a pohyb
 `sestava pružina nová d 2 De 20 L0 35 n 6 mezi "D1" Ø21 "K48" spodní` (na konci „do děr vzoru“ = do všech děr vzoru) · `sestava pružiny`
-`pohyb motor lineární vazba 2 12..20 krok 4 kolize` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · `pohyb stav` · `pohyb dynamika čas 0,1 gravitace -Z` · `pohyb hmotnost "K48" 2,5` · `pohyb kinematika`
+`pohyb motor lineární vazba 2 20..12 krok 4 kolize` (vazba 2 = Vzdálenost; motor nejde na Kontakt) · `pohyb stav` · `pohyb dynamika čas 0,1 gravitace -Z` · `pohyb hmotnost "K48" 2,5` · `pohyb kinematika`
 Šroub do díry až po dynamice (volný díl by v gravitaci spadl): `sestava šroub "D1" Ø9`. Jinde: `pohyb motor rotační "K48" 0..360 krok 5`
 
 ### Výkres (záložka dílu)

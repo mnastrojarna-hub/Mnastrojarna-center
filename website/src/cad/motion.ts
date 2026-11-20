@@ -176,8 +176,10 @@ export async function runMotion(
   // vazby, které některá fáze zapne, smí nést motor i podmínku, i když jsou v dokumentu potlačené
   const enabledLater = new Set(phases.flatMap((p) => p.enable ?? []));
   const usable = allMates.filter((m) => !m.suppressed || enabledLater.has(m.id)).map((m) => (m.suppressed ? { ...m, suppressed: false } : m));
+  // motor na vazbě potlačené v dokumentu (a nezapnuté fází) = „vazba motoru je potlačená“, ne „v sestavě není“ (fáze 2)
+  const forMotors = allMates.map((m) => (m.suppressed && enabledLater.has(m.id) ? { ...m, suppressed: false } : m));
   for (const mo of study.motors) {
-    const p = motorProblem(mo, usable);
+    const p = motorProblem(mo, forMotors);
     if (p) throw new Error(tr("motor {0}: {1}", study.motors.indexOf(mo) + 1, p));
   }
   if (!study.motors.length) throw new Error(tr("pohybová studie nemá žádný motor – přidejte rotační nebo lineární motor"));
@@ -600,7 +602,10 @@ export async function runMotion(
   function findUndetermined(): MotionUndetermined[] {
     const cand = M.mates.filter((m) => isLimitMate(m) && !m.prefer && [m.a, m.b].some((r) => M.moving(r.compId)));
     if (!cand.length) return [];
-    const eq = () => [...M.solvedMates.flatMap((m) => (isLimitMate(m) ? eqResidual(m, ctx) : hardOf(m))), ...driveTerms.flatMap((d) => d.r())];
+    // preferovaná strana meze polohu dílu v jejím směru URČUJE (bod 2) – její hodnota patří k rovnostem; jinak by druhá mez téhož dílu
+    // ve stejném směru (stírací deska visí na kotevní desce a dosedne na matrici) vyšla jako „neurčená“ (fáze 2)
+    const preferred = M.mates.filter((m) => isLimitMate(m) && m.prefer);
+    const eq = () => [...M.solvedMates.flatMap((m) => (isLimitMate(m) ? eqResidual(m, ctx) : hardOf(m))), ...driveTerms.flatMap((d) => d.r()), ...preferred.map((m) => limitGap(m, ctx)?.g ?? 0)];
     const free = new Set(freeLimits(poses, M.vars, eq, cand.map((m) => ({ id: m.id, g: () => limitGap(m, ctx)?.g ?? 0 })), M.groups));
     const by = new Map<string, MotionUndetermined>();
     for (const m of cand) {

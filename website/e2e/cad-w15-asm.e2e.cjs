@@ -113,8 +113,10 @@ const line = (log, re) => (log.split('\n').find((l) => re.test(l)) || '').trim()
   // vlna 22, M3: řádky po dílech jsou detail (pohyb detail); výchozí souhrn = tuhé skupiny
   log = await run('sestava vazba "ZDVIH" hodnota=38\npohyb motor lineární vazba "ZDVIH" 38..16 kroky 11 kolize\npohyb detail', 600000);
   const sumLines = log.split('\n').filter((l) => /rozsah pohybu/.test(l));
-  ok(sumLines.some((l) => /Šroub M6x20/.test(l) && /Z 22 mm/.test(l)) && !sumLines.some((l) => /Šroub M6x20/.test(l) && /natáčí se/.test(l)), 'B11 šrouby 180 0 0 se jen posouvají: ' + (sumLines.find((l) => /Šroub M6x20/.test(l)) || '').trim());
-  ok(/✗ pružina „[^“]+“: délka 38 → 16 mm \(min 16 · L0 44 · Ln 18\) · síla 150 → 700 N \(max 700 N\) – pod délkou na doraz v krocích 11/.test(log), 'pružina v pohybu: ' + line(log, /pružina „[^“]+“: délka 38/));
+  // vlna 22, body 2 a 8 (VĚDOMÁ změna): délka na doraz Ln 18 je tvrdý doraz – motor v kroku 11 stojí na 18 mm (zdvih 20, ne 22 mm);
+  // šrouby se jen posouvají ve Z (dřív se deska bez vedení na dorazu „rozjela“ o stovky metrů – oprava fáze 2)
+  ok(sumLines.some((l) => /Šroub M6x20/.test(l) && /rozsah pohybu X 0(,00\d)? · Y 0(,00\d)? · Z 20(,00\d)? mm/.test(l)) && !sumLines.some((l) => /Šroub M6x20/.test(l) && /natáčí se/.test(l)), 'B11 šrouby 180 0 0 se jen posouvají: ' + (sumLines.find((l) => /Šroub M6x20/.test(l)) || '').trim());
+  ok(/✓ pružina „[^“]+“: délka 38 → 18 mm \(min 18 · L0 44 · Ln 18\) · síla 150 → 650 N \(max 650 N\)/.test(log) && /^⚠ .*motor 1 stojí na mezi v krocích 11 .*dosaženo 18 mm/m.test(log), 'pružina v pohybu: ' + line(log, /pružina „[^“]+“: délka 38/) + ' | ' + line(log, /stojí na mezi/));
   log = await run('pohyb export csv');
   const head = (log.split('\n').find((l) => /^﻿?Krok;/.test(l.trim())) || '').trim();
   ok(/ L \[mm\];[^;]+ F \[N\]$/.test(head), 'CSV studie: sloupce délky a síly pružiny – ' + head.slice(-60));

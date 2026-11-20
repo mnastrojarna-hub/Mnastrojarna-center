@@ -43,6 +43,7 @@ import { findView } from "@/cad/motion-views";
 import { studySpan } from "@/cad/motion-video";
 import { applyStudyView, exportMotion, type ExportHost, type ExportReport } from "./motion-export";
 import { MotionPlayer, type PlayerHost } from "./motion-player";
+import { appRuns } from "./run-host";
 
 /* ───────────────────────── sdílený stav zobrazení (poloha kroku, stopa) a pokyny z textových příkazů ───────────────────────── */
 
@@ -243,8 +244,12 @@ export function MotionPanel({
   docRef.current = doc;
   const envRef = useRef(env);
   envRef.current = env;
-  const busyRef = useRef(engineBusy);
-  busyRef.current = engineBusy;
+  /**
+   * běh textových příkazů probíhá nebo ČEKÁ ve frontě běhů (run-host.ts `appRuns`): `window.mncad.run(…)` běh jen zařadí a engine
+   * začne až v další mikroúloze – klik na „Vypočítat pohyb“ hned po zařazení by jinak spočítal dokument PŘED během (fáze 2, bod 12)
+   */
+  const busyRef = useRef<(() => boolean) | undefined>(undefined);
+  busyRef.current = () => !!engineBusy?.() || appRuns.pending().some((e) => e.kind === "script");
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
