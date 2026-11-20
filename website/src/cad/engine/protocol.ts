@@ -358,6 +358,7 @@ export function docKv(d: DocSummary): string {
   if (d.densityAssumed) kv.push(`rho=${fmtNum(d.density, 3)}`, "rho.assumed=1");
   if (d.exact === false) kv.push("exact=0");
   if (d.sheets) kv.push(`sheets=${d.sheets}`);
+  if (d.stale?.length) kv.push(`stale=${d.stale.join(",")}`); // uložené výsledky, které konečnému stavu neodpovídají (vlna 22 – vždy na konci)
   return `${kind} ${kv.join(" ") || "-"}`;
 }
 

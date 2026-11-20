@@ -6,6 +6,7 @@
  * Uložený výsledek nese otisk sestavy (`clashSig`): když se sestava potom změní, textový stav ho označí jako neplatný a CLI
  * ho na konci běhu přepočítá pro konečný stav (řádek D / Σ nikdy neukáže kolize jiné sestavy, než jaká se odevzdává).
  */
+import { resultId, stampResult } from "../result-key";
 import { classifyClashes, clashKv, clashSig, type ClashCounts, type ClashDetail } from "../../clash-class";
 import { cadLocale, tr } from "../../i18n";
 import { fmtNum } from "@/lib/mesh-metrics";
@@ -49,7 +50,11 @@ export function clashFindings(out: ClashOut, d: CadDoc, list: readonly ClashDeta
 export async function checkClashes(ws: Workspace, kernel: KernelApi, d: CadDoc, key: string, line: number | null): Promise<{ res: Interference[]; list: ClashDetail[]; counts: ClashCounts }> {
   const res = await kernel.interference(d);
   const { list, counts } = await classifyClashes(kernel, d, res);
-  ws.asm.clash.set(key, { res, at: new Date().toLocaleTimeString(cadLocale()), comps: (d.components ?? []).length, classes: counts, sig: clashSig(d), line });
+  // záznam s razítkem, pro co platí (dokument, revize, počet komponent, poloha z dokumentu) – panel Kolize a `stav` (result-key.ts)
+  const at = new Date().toLocaleTimeString(cadLocale());
+  const sig = clashSig(d);
+  const comps = (d.components ?? []).length;
+  ws.asm.clash.set(key, stampResult({ res, at, comps, classes: counts, sig, line }, resultId("clash", key, d, { sig, comps, at, line })));
   return { res, list, counts };
 }
 

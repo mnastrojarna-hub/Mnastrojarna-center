@@ -2561,6 +2561,18 @@ ISO 4762 / ISO 4017 z knihovny i ze šroubového spoje (`sestava šroub`) nemaj�
 se přidá dřík) – v průchozí díře ani na podložce se se sevřeným dílem neprotnou; `clash.underhead` zůstává pro šrouby uložené
 starší verzí a pro vlastní modely.
 
+**Platnost výsledků (žádné falešné zelené):** každý uložený výsledek platí jen pro dokument + revizi geometrie + konfiguraci +
+polohu mechanismu, pro které vznikl – na jinou záložku se nikdy nepřenese. Ve `stav` (řádek `= … status`): `clash=-` =
+sestava kontrolována nebyla, `clash.stale=1` = kontrola je z jiného stavu sestavy; `mates=N/M` je vždy pro nynější stav (po
+kroku zpět nebo změně se stav vazeb přepočítá), `mates.stale=1` + „NEPLATÍ pro polohy v dokumentu“ = polohy komponent
+v dokumentu vazbám neodpovídají (typicky ručně psaný JSON) – uvedený stav platí až po přepočtu a `sestava vazby` to hlásí ⚠;
+`measure.stale=1` / `compare.stale=1` + „Měření: výsledek L12 je pro revizi r·a1b2c3 – NEPLATÍ“ = poslední `měřit` /
+`porovnat` tohoto dokumentu je z dřívější revize, příkaz zopakujte. Řádek `D` končí `stale=clash,mates,motion,measure,compare`
+(jen druhy, které konečnému stavu neodpovídají; JSON `docs[].stale`) – kolize a vazby se před tím přepočítají, zůstává hlavně
+měření a porovnání provedené před poslední změnou. Výsledek bez `stale` (`✓ kolize: žádné`, `ok=1`, `mates=N/N`) tedy
+popisuje právě odevzdávaný stav. V aplikaci totéž: panel Kolize má stavy ok / kolize / neplatí / nezkontrolováno
+(`data-clash-state`) a u výsledku uvádí název sestavy, počet komponent, čas, revizi `r·…` a polohu.
+
 **`porovnat "ref.step" [tolerance 0,05] [zarovnat auto|střed|ne] [díl "A" | sestava] [mapa ne] [přísně]`** (EN `compare`,
 DE `vergleichen`) porovná model se souborem reference (STEP, BREP, STL; sestava STEP jako jedno těleso) – stejný výpočet jako
 okno Porovnat s referencí a `window.mncad.compare`; sestava se porovná jako složené těleso viditelných komponent. Soubor

@@ -1,0 +1,19 @@
+# Vlna 22, balík A (bod 1): platnost výsledků analýz – panel Kolize řízený stavem, stav vazeb, měření, porovnání, textový stav
+{0}: výsledek{1} je pro revizi {2} – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz	{0}: the result{1} is for revision {2} – NOT VALID: the document has changed since, repeat the command
+⚠ polohy v dokumentu vazbám neodpovídají – uvedený stav vazeb platí až po přepočtu, který by posunul: {0}	⚠ the positions in the document do not satisfy the mates – the listed mate status holds only after a re-solve, which would move: {0}
+Kolize: neplatí	Interference: not valid
+Kolize: nezkontrolováno	Interference: not checked
+Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.	The interference check of assembly “{0}” has finished – the result is stored with that assembly; the displayed state has not been checked.
+Neplatí – model se od měření změnil.	Not valid – the model has changed since the measurement.
+Neplatí – sestava se od kontroly změnila.	Not valid – the assembly has changed since the check.
+NEPLATÍ pro polohy v dokumentu: stav je až po přepočtu vazeb, který by komponenty posunul (sestava vazby)	NOT VALID for the positions in the document: the status holds only after a mate re-solve that would move components (assembly mates)
+nepřepočteno – stav vazby pro tento stav sestavy není znám	not re-solved – the mate status for this state of the assembly is unknown
+Nezkontrolováno – pro tuto sestavu kontrola kolizí neproběhla.	Not checked – no interference check has been run for this assembly.
+poloha z dokumentu	positions from the document
+Porovnání s referencí	Comparison with reference
+Poslední kontrola platila pro:	The last check was valid for:
+Stav vazeb neplatí pro tento stav sestavy – polohy komponent vazbám neodpovídají. Přepočítejte vazby.	The mate status is not valid for this state of the assembly – component positions do not satisfy the mates. Re-solve the mates.
+Zkontrolovat kolize	Check interference
+Zkontrolovat znovu	Check again
+Změřit znovu	Measure again
+zobrazený krok pohybové studie	displayed step of the motion study

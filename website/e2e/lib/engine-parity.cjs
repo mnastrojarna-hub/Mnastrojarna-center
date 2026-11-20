@@ -62,6 +62,8 @@ function normalize(text) {
         .replace(/\bid [a-z0-9]{1,9}\]/g, 'id #]')
         .replace(/\bid ([a-z0-9]{1,9})([ ,;)])/g, 'id #$2')
         .replace(/\b(zkontrolováno|checked|geprüft) \d{1,2}:\d{2}(:\d{2})?( ?[AP]M)?/g, '$1 ?')
+        // krátká revize modelu (vlna 22: otisk obsahu včetně náhodných id prvků) – `r·a1b2c3` → `r·?`
+        .replace(/r·[0-9a-f]{6}\b/g, 'r·?')
         .replace(/\b\d{4}-\d{2}-\d{2}\b/g, '????-??-??')
         .replace(/\b\d{1,2}\. ?\d{1,2}\. ?\d{4}\b/g, '?.?.????'),
     )

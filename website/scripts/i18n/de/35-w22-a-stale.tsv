@@ -1,0 +1,19 @@
+# Vlna 22, balík A (bod 1): platnost výsledků analýz – panel Kolize řízený stavem, stav vazeb, měření, porovnání, textový stav
+{0}: výsledek{1} je pro revizi {2} – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz	{0}: das Ergebnis{1} gilt für Revision {2} – UNGÜLTIG: das Dokument wurde seitdem geändert, Befehl wiederholen
+⚠ polohy v dokumentu vazbám neodpovídají – uvedený stav vazeb platí až po přepočtu, který by posunul: {0}	⚠ die Positionen im Dokument erfüllen die Verknüpfungen nicht – der angegebene Status gilt erst nach einer Neuberechnung, die verschieben würde: {0}
+Kolize: neplatí	Kollisionen: ungültig
+Kolize: nezkontrolováno	Kollisionen: nicht geprüft
+Kontrola kolizí sestavy „{0}“ doběhla – výsledek je uložen u ní; zobrazený stav zkontrolován není.	Die Kollisionsprüfung der Baugruppe „{0}“ ist fertig – das Ergebnis ist bei ihr gespeichert; der angezeigte Zustand ist nicht geprüft.
+Neplatí – model se od měření změnil.	Ungültig – das Modell wurde seit der Messung geändert.
+Neplatí – sestava se od kontroly změnila.	Ungültig – die Baugruppe wurde seit der Prüfung geändert.
+NEPLATÍ pro polohy v dokumentu: stav je až po přepočtu vazeb, který by komponenty posunul (sestava vazby)	UNGÜLTIG für die Positionen im Dokument: der Status gilt erst nach einer Neuberechnung, die Komponenten verschieben würde (baugruppe verknüpfungen)
+nepřepočteno – stav vazby pro tento stav sestavy není znám	nicht neu berechnet – der Status der Verknüpfung für diesen Zustand der Baugruppe ist unbekannt
+Nezkontrolováno – pro tuto sestavu kontrola kolizí neproběhla.	Nicht geprüft – für diese Baugruppe wurde keine Kollisionsprüfung ausgeführt.
+poloha z dokumentu	Positionen aus dem Dokument
+Porovnání s referencí	Vergleich mit Referenz
+Poslední kontrola platila pro:	Die letzte Prüfung galt für:
+Stav vazeb neplatí pro tento stav sestavy – polohy komponent vazbám neodpovídají. Přepočítejte vazby.	Der Status der Verknüpfungen gilt nicht für diesen Zustand der Baugruppe – die Positionen erfüllen die Verknüpfungen nicht. Verknüpfungen neu berechnen.
+Zkontrolovat kolize	Kollisionen prüfen
+Zkontrolovat znovu	Erneut prüfen
+Změřit znovu	Erneut messen
+zobrazený krok pohybové studie	angezeigter Schritt der Bewegungsstudie

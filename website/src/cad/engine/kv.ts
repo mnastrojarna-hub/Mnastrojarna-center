@@ -7,7 +7,7 @@
  * Výpisy bez strojových údajů (nápověda, seznam záložek, kusovník…) mají v prvním řádku jen `lines=<n>` a jejich řádky
  * jsou pokračovací řádky výpisu (volný text v jazyce běhu, jako text za kódem u ✗/⚠).
  */
-import type { AsmStatus } from "../agent";
+import type { AsmStatus, StaleNote } from "../agent";
 import { sourceKey } from "../assembly";
 import type { MeasureCyl, MeasureEnt, MeasureReport } from "../measure";
 import type { BuildResult, CadDoc, Vec3 } from "../types";
@@ -180,12 +180,15 @@ export function docSummaryOf(doc: CadDoc, res: BuildResult | null, asm?: AsmStat
  * u sestavy obálka a výsledek poslední kontroly kolizí (`clash=<počet>`, nezkontrolováno `clash=-`, sestava se od kontroly
  * změnila `clash.stale=1`).
  */
-export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus): string {
+export function statusKv(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, stale: readonly StaleNote[] = []): string {
   const base = docKv(docSummaryOf(doc, res, asm));
+  // uložené výsledky z jiné revize dokumentu (engine/result-key.ts): `mates.stale=1`, `measure.stale=1`, `compare.stale=1`
+  const old = kv([["mates.stale", asm?.matesStale ? true : undefined], ...[...new Set(stale.map((n) => n.kind))].map((k): [string, true] => [`${k}.stale`, true])]);
+  const tail = old ? ` ${old}` : "";
   // obálku sestavy má už řádek D (`docKv`); bez obálky `bbox=-`
-  if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined]])}`;
-  if (doc.kind === "draft" || !res?.metrics) return base;
-  return `${base} ${kv([["solids", res.metrics.solids], ["valid", res.metrics.valid], ["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd();
+  if (doc.kind === "assembly") return `${base} ${kv([["bbox", asm?.bbox ? undefined : "-"], ["clash", asm?.clash ? asm.clash.count : "-"], ["clash.stale", asm?.clash?.stale ? true : undefined]])}${tail}`;
+  if (doc.kind === "draft" || !res?.metrics) return `${base}${tail}`;
+  return `${`${base} ${kv([["solids", res.metrics.solids], ["valid", res.metrics.valid], ["bodies", res.bodies && res.bodies.length > 1 ? res.bodies.length : undefined]])}`.trimEnd()}${tail}`;
 }
 
 /** Strojová část výpisů výkresu (`= Ln drawing …`): aktivní list / počet listů, formát, orientace, měřítko. */

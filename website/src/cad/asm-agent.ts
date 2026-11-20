@@ -119,6 +119,11 @@ export type AsmResult = {
   changed: boolean;
   /** stav vazeb po přepočtu (pro seznam vazeb a textový stav) */
   mateStatus?: Record<string, MateStatus>;
+  /**
+   * sestava, kterou `mateStatus` popisuje, liší-li se od `doc`: výpis (`sestava vazby`, `sestava komponenty`) dokument nemění,
+   * ale řešič by komponenty posunul – stav pak platí pro polohy po přepočtu, ne pro dokument (engine/result-key.ts)
+   */
+  mateDoc?: CadDoc;
   /** `doc` je nový dokument do nové záložky (rám formy, otevřená komponenta) */
   newTab?: boolean;
   /** přepnuto na jinou záložku – `doc` je dokument nově aktivní záložky */
@@ -302,6 +307,8 @@ export const movedText = (doc: CadDoc, ids: string[]) =>
     .map((c) => `„${c.name}“ ${posText(c)}`)
     .join(" · ");
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+/** výpis vazeb nad dokumentem, jehož polohy vazbám neodpovídají: stav platí až pro polohy po přepočtu (žádné tiché „ok“) */
+const unsolvedNote = (solved: CadDoc, moved: string[]) => tr("⚠ polohy v dokumentu vazbám neodpovídají – uvedený stav vazeb platí až po přepočtu, který by posunul: {0}", movedText(solved, moved));
 
 /** Provede příkaz sestavy nad dokumentem `d` (kopie – nemění se); vrátí nový dokument, protokol a stav vazeb. */
 export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<AsmResult> {
@@ -316,7 +323,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       asmOnly();
       const s = d.mates?.length ? await resolve(d) : null;
       log.push(...componentLines(d, s?.status));
-      return done(d, false, s ? { mateStatus: s.status } : {});
+      if (s?.moved.length) log.push(unsolvedNote(s.doc, s.moved));
+      return done(d, false, s ? { mateStatus: s.status, ...(s.moved.length ? { mateDoc: s.doc } : {}) } : {});
     }
     case "faces": {
       asmOnly();
@@ -379,7 +387,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       asmOnly();
       const s = d.mates?.length ? await resolve(d) : null;
       log.push(...mateLines(d, s?.status));
-      return done(d, false, s ? { mateStatus: s.status } : {});
+      if (s?.moved.length) log.push(unsolvedNote(s.doc, s.moved));
+      return done(d, false, s ? { mateStatus: s.status, ...(s.moved.length ? { mateDoc: s.doc } : {}) } : {});
     }
     case "mateEdit": {
       asmOnly();
