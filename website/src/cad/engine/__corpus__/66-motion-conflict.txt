@@ -1,0 +1,29 @@
+# vlna 22, bod 8: motor × mez × pevná vzdálenost. Priorita: pevné vazby > motor > preference. Motor dojede na mez
+# (ZDVIH 47,5) a stojí – kroky za mezí „zastaveno“ se sadou bránících vazeb a odchylkami, přidržovač zůstává na 24,5 mm
+# bez bočního ujetí (dřív kompromis s driftem stovek mm a „Vazby splněny“). Statická úprava za mezí: polohy beze změny, ⚠
+# mate.conflict s nejbližší dosažitelnou hodnotou místo ✓.
+nový díl "Rám"
+kvádr 100 100 10
+nový díl "Deska A"
+kvádr 100 100 10
+nový díl "Přidržovač"
+kvádr 60 60 8
+#--- run
+nová sestava "Mechanika"
+vložit "Rám" ukotvit
+vložit "Deska A" v 0 0 67.5
+vložit "Přidržovač" v 0 0 34.5
+sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"
+sestava vazba vzdálenost "Přidržovač" spodní "Rám" horní hodnota 24.5 název "PEVNÁ"
+sestava vazba mez-vzdálenosti "Přidržovač" horní "Deska A" spodní min 5 max 25 název "Mez"
+pohyb motor lineární vazba "ZDVIH" 57.5..27.15 kroky 12
+pohyb krok 7
+pohyb krok 12
+#--- run
+# motor na mezi = chyba: kroky za mezí neplatné – zobrazena poslední platná poloha, ⚠ motion.invalid (žádný kompromis)
+pohyb smazat
+pohyb motor lineární vazba "ZDVIH" 57.5..27.15 kroky 12 na mezi chyba
+pohyb krok 12
+#--- run
+sestava vazba "ZDVIH" hodnota=37.15
+sestava vazby

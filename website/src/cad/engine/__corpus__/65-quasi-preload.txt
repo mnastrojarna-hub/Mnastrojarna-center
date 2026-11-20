@@ -1,0 +1,34 @@
+# vlna 22, bod 2: předpětí pružiny × volný přidržovač. Studie s pružinou na pohyblivé komponentě běží kvazistaticky
+# (automaticky): přidržovač drží pružina na mezi, dokud ho Deska A netlačí – krok 6 na 19,325 mm, krok 12 na 10 mm
+# (dřív kinematika nechala přidržovač ve výchozí poloze 34,5 mm). Úroveň simulace je v každém protokolu.
+nový díl "Rám"
+kvádr 100 100 10
+nový díl "Deska A"
+kvádr 100 100 10
+nový díl "Přidržovač"
+kvádr 60 60 8
+nový díl "Pružina"
+pružina 18 stoupání 5 závity 6 drát 2
+#--- run
+nová sestava "Mechanika"
+vložit "Rám" ukotvit
+vložit "Deska A" v 0 0 67.5
+vložit "Přidržovač" v 20 20 34.5
+vložit "Pružina" v 50 50 42.5
+sestava vazba vzdálenost "Deska A" spodní "Rám" horní hodnota 57.5 název "ZDVIH"
+sestava vazba mez-vzdálenosti "Přidržovač" horní "Deska A" spodní min 5 max 25 název "Mez"
+sestava vazba mez-vzdálenosti "Přidržovač" spodní "Rám" horní min 0 max 500 název "Dosed"
+sestava vazba zámek "Pružina" "Přidržovač"
+sestava pružina "Pružina" mezi "Přidržovač" "Deska A" volná 32 blok 14 tuhost 20
+pohyb motor lineární vazba "ZDVIH" 57.5..27.15 kroky 12
+pohyb krok 6
+pohyb krok 12
+#--- run
+# výsledek nezávisí na předchozím pohybu: deska dolů a zpět → rovnováha pružin vrátí přidržovač, krok 6 znovu 19,325 mm
+sestava vazba "ZDVIH" hodnota=27.15
+sestava vazba "ZDVIH" hodnota=57.5
+pohyb krok 6
+#--- run
+# výslovná kinematika: pružina se nepočítá, poloha přidržovače vazbami neurčená → ⚠ (ne „Vazby splněny“)
+pohyb kinematika
+pohyb krok 6

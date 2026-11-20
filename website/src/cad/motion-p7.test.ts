@@ -263,8 +263,11 @@ describe("P7 – střižný nástroj 57 komponent, pohyb 40 kroků s kolizemi", 
       const sp = spanOf(res, name);
       expect(sp[0] + sp[1], name).toBeLessThan(1e-4); // dřív 808 mm
     }
-    expect(spanOf(res, "Horní deska")[2]).toBeCloseTo(53.333, 3);
-    expect(spanOf(res, "Stírací deska")[2]).toBeCloseTo(16.667, 3);
+    // vlna 22, bod 8 (VĚDOMÁ změna): meze mají přednost před motorem – od kroku 27 motor stojí na mezi (horní deska celkem 40 mm,
+    // stírací deska 10 mm až na matrici); dřív kompromis nejmenších čtverců jel dál skrz meze (53,333 / 16,667 mm)
+    expect(spanOf(res, "Horní deska")[2]).toBeCloseTo(40, 3);
+    expect(spanOf(res, "Stírací deska")[2]).toBeCloseTo(10, 3);
+    expect(res.steps.filter((s) => s.status === "stopped").map((s) => s.i)).toEqual(Array.from({ length: 14 }, (_, i) => 27 + i));
     expect(spanOf(res, "Vodicí sloupek Ø24×160")).toEqual([0, 0, 0]);
     expect(res.timing).toMatchObject({ vars: 36, groups: 2 });
     expect(res.conflictSteps).toBe(14);
@@ -298,14 +301,15 @@ describe("P7 – střižný nástroj 57 komponent, pohyb 40 kroků s kolizemi", 
     expect(col.timing!.clash!.reused).toBeGreaterThan(col.timing!.clash!.exact); // dvojice uvnitř tuhých skupin se znovupoužijí
     // kolize po krocích (šrouby v závitech, kolíky s přesahem, střižníky v matrici a stírací desce podle zdvihu)
     const per = col.steps.map((s) => (s.clashes ?? []).length);
-    expect(per).toEqual([...Array(21).fill(54), ...Array(6).fill(66), ...Array(5).fill(67), ...Array(5).fill(73), ...Array(4).fill(75)]);
+    // vlna 22, bod 8: od kroku 27 mechanismus stojí na mezi – sada kolizí se dál nemění (dřív kompromis jel skrz meze: 67, 73, 75)
+    expect(per).toEqual([...Array(21).fill(54), ...Array(20).fill(66)]);
     expect(col.collision).toMatchObject({ step: 0 });
   }, 300_000);
 
   it(`kroky s kolizemi = plná kontrola (bez mezipaměti dvojic)${FULL ? " – všech 41 kroků" : " – kroky se změnou sady kolizí, krajní a dva beze změny"}`, async () => {
     const per = col.steps.map((s) => (s.clashes ?? []).length);
     const sample = FULL ? col.steps.map((s) => s.i) : [...new Set([0, 1, 10, 40, ...col.steps.filter((s) => s.i > 0 && per[s.i] !== per[s.i - 1]).map((s) => s.i)])].sort((a, b) => a - b);
-    expect(sample.length).toBeGreaterThanOrEqual(FULL ? 41 : 8);
+    expect(sample.length).toBeGreaterThanOrEqual(FULL ? 41 : 5); // vlna 22: mechanismus od kroku 27 stojí na mezi – méně změn sady kolizí
     for (const i of sample) {
       const s = col.steps[i];
       const full = await interference(poseDoc(asmDoc(), s.place), 1e-3, { full: true });

@@ -15,6 +15,7 @@ import type { MateStatus } from "../mates";
 import type { AsmComponent, BuildResult, CadDoc, Vec3 } from "../types";
 import { fmtNum, MATERIALS, massKg } from "@/lib/mesh-metrics";
 import { asmWorldBox } from "./asm-box";
+import { springCheck } from "./spring-fresh";
 import { makeAsmEnv, type AsmEnvOptions } from "./asm-env";
 import type { KernelApi } from "./kernel";
 import { geometrySig, mateStatusState, notedResults, setMateStatus } from "./result-key";
@@ -100,7 +101,9 @@ export async function asmStatus(ws: Workspace, kernel: KernelApi, doc: CadDoc, o
   const key = o.key ?? ws.docKey();
   const all = await ensureLeaves(ws, kernel, doc, o);
   await ensureMateStatus(ws, kernel, doc, key, o);
-  const st = asmStatusOf(ws, doc, key, all);
+  // pružiny: délka ověřená proti dosedacím plochám (vlna 22, bod 7) – řádek „Pružiny:“ ji označí jako odvozenou / rozpor / nezkontrolováno
+  const springs = await springCheck(ws, kernel, doc, o);
+  const st = { ...asmStatusOf(ws, doc, key, all), ...(springs ? { springs } : {}) };
   if (o.quick) return st;
   // obálka přesně z těles listových dílů v jádře (vlna 15, B10 – natočené díly by rohy lokálních obálek zvětšily; engine/asm-box.ts);
   // velké importy ze sítě (`approx`); jádro bez obálky (chyba, starší hostitel) = obálka z lokálních obálek dílů

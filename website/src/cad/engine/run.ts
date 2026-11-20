@@ -19,6 +19,7 @@ import { lintOp } from "./lint";
 import { DrawingTracker } from "./drawing-track";
 import { StrictState, type StrictMark } from "./strict";
 import { RunVerifier, verifyKey } from "./verify";
+import { freshenRunDoc } from "./spring-fresh";
 import { statusKv } from "./kv";
 import { ConsoleLog } from "./console";
 import { MissingInputError, OutPathError, type EngineHost } from "./host";
@@ -144,7 +145,10 @@ export async function runInto(ws: Workspace, text: string, host: EngineHost, rb:
     if (stopOn(pre, 0) || (await strictPreloaded())) {
       /* STOP před během – nic se neprovede */
     } else if (!(prog.errors.length && hooks.stopAfter?.(rb.entries, 0))) {
-      for (const op of prog.ops) {
+      // dokumenty otevřené volajícím (--open): délka pružin z dosedacích ploch, rozpor ⚠ spring.stale (vlna 22, bod 7)
+      const b0 = rb.entries.length;
+      if (o.preloaded?.length) await freshenRunDoc(ctx, null);
+      for (const op of stopOn(rb.entries.slice(b0), 0) ? [] : prog.ops) {
         // konec bloku příkazů výkresu (jiný příkaz nebo přepnutí listu): nálezy bloku na jeho řádky
         if (draw.open && (op.k !== "drawingCmd" || op.cmd.k === "sheet") && (await closeBlock())) break;
         const label = opLabel(op);

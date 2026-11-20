@@ -11,8 +11,10 @@ import { instanceKey, rotMatrix } from "./assembly";
 import { springComps, springMotionLines, springSteps, type SpringStep } from "./asm-spring";
 import { getLang, tr } from "./i18n";
 import { kinCluster, kinCtx, memoGeo, MATE_LABEL, solveMates, type GeoProvider } from "./mates";
-import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, resNorm, rigidGroups, solvePoses, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
+import { DEG, LINEAR_MOTOR_TYPES, ROTARY_MOTOR_TYPES, dofValue, kinResidual, L, pivotOf, placementOf, poseOf, rigidGroups, syncGroups, toWorld, wrap, type Pose } from "./mates-kin";
 import { DEFAULT_STUDY_DURATION, motorIsAbsolute, motorKeys, motorMeaningText, motorNotes, profileAt, type MotorInfo, type MotorNote } from "./motor-model";
+import { levelLine, levelOf, studyMode, type LevelInfo } from "./motion-mode";
+import { devText, eqResidual, freeLimits, isLimitMate, limitGap, mateDev, mateName, mateTerm, preferTerms, solveStep, springDev, springEnergyTerm, springStopTerm, springTerms, type MateDev, type Term } from "./motion-quasi";
 import type { CadDoc, Mate, MotionMotor, MotionStudy, Placement, Vec3 } from "./types";
 
 /** dvojice kolize kroku (a, b = komponenty nejvyšší úrovně; cesty listů v podsestavách – zařazení šroub × závit) */
@@ -57,7 +59,22 @@ export type MotionStep = {
   clashes?: MotionCollision[];
   /** pružiny (cad/asm-spring.ts): délka podle dosedacích ploch v kroku, síla, stav – id komponenty → stav */
   springs?: Record<string, SpringStep>;
+  /**
+   * stav kroku s konfliktem (vlna 22, bod 8; cad/motion-quasi.ts): „stopped“ = motor stojí na mezi (poloha je fyzikální, motor
+   * nedosáhl hodnoty – `reached`), „invalid“ = neřešitelný krok: `place` je poslední platná poloha (krok `shows`), nikdy kompromis
+   */
+  status?: "stopped" | "invalid";
+  /** proč krok neprošel: motor žádá hodnotu za mezí (`motor`), nebo si vazby odporují i bez motoru (`mates`) */
+  cause?: "motor" | "mates";
+  /** dosažené hodnoty motorů (krok, kde motor stojí na mezi) */
+  reached?: number[];
+  /** odchylky konfliktní množiny (vazby, dorazy pružin, motory) v poloze konfliktu – všechny (detail kroku) */
+  devs?: MateDev[];
+  /** neplatný krok: číslo kroku, jehož polohu ukazuje (poslední platný) */
+  shows?: number;
 };
+/** Díl, jehož polohu vazby neurčují (volný v mezi): kinematika ho nechává, kde byl (⚠ motion.undetermined). */
+export type MotionUndetermined = { comp: string; mates: string[]; springs: string[] };
 export type MotionResult = {
   steps: MotionStep[];
   comps: { id: string; name: string }[];
@@ -76,6 +93,10 @@ export type MotionResult = {
    * (`current`; u posuvu / natočení od výchozí polohy 0) – z toho ⚠ `motion.start-jump`, když začátek motoru neodpovídá (bod 11)
    */
   motorInfo?: MotorInfo[];
+  /** úroveň simulace (cad/motion-mode.ts) – vypisuje se v každém protokolu studie */
+  level?: LevelInfo;
+  /** díly volné v mezi (vazbami neurčená poloha) – ⚠ motion.undetermined */
+  undetermined?: MotionUndetermined[];
 };
 
 export const defaultStudy = (): MotionStudy => ({ motors: [], duration: DEFAULT_STUDY_DURATION, steps: 36 });
@@ -154,18 +175,25 @@ export async function runMotion(
     if (v0 === null) throw new Error(tr("motor {0}: chybí geometrie vazby „{1}“", study.motors.indexOf(mo) + 1, m.name ?? tr(MATE_LABEL[m.type])));
     return { mo, m, abs, v0, key: `motor:${mo.id}`, target: 0, prof: motorKeys(mo, duration) };
   });
-  // vazby, jejichž hodnotu motor přepisuje (Vzdálenost, Drážka s polohou) – motor nahradí jejich hodnotu
-  const valueOf = new Map<string, () => number>();
-  for (const x of motors) if (x.abs) valueOf.set(x.m.id, () => x.target);
-  const active = () => mates.map((m) => (valueOf.has(m.id) ? { ...m, value: valueOf.get(m.id)!() } : m));
-  const driveRes = (): number[] =>
-    motors.flatMap((x) => {
-      if (x.abs) return [];
+  // členy kroku s prioritou (cad/motion-quasi.ts): tvrdé = vazby (u vazby, jejíž hodnotu motor přepisuje – Vzdálenost, Drážka
+  // s polohou – jen její orientace, hodnota je pohon) a doraz Ln pružin; pohon = hodnota motoru; měkké = energie pružin (kvazistatika)
+  // a preferovaná strana meze
+  const driven = new Map(motors.filter((x) => x.abs).map((x) => [x.m.id, x] as const));
+  const hardOf = (m: Mate): number[] => {
+    if (!driven.has(m.id)) return kinResidual(m, ctx) ?? [];
+    const v = dofValue(m, "linear", ctx);
+    return kinResidual(v === null ? m : { ...m, value: v }, ctx) ?? [];
+  };
+  const driveTerms: Term[] = motors.map((x) => ({
+    id: x.abs ? x.m.id : x.key,
+    r: () => {
       const v = dofValue(x.m, x.mo.kind, ctx);
-      if (v === null) return [];
+      if (v === null) return [0];
+      if (x.abs) return [v - x.target];
       if (x.mo.kind === "rotary") return [(ctx.ang(x.key, v - x.v0) - x.target / DEG) * L];
       return [v - x.v0 - x.target];
-    });
+    },
+  }));
   const seeds = new Set(mates.flatMap((m) => [m.a, m.b, m.c, m.d].flatMap((r) => (r ? [r.compId] : []))));
   const cl = kinCluster(mates, seeds, isFixed);
   // tuhé skupiny ze zámků: jedna poloha na skupinu (kořen), členové se odvodí – méně neznámých a přesně neměnná vzájemná poloha
@@ -181,38 +209,99 @@ export async function runMotion(
   const groupIds = (root: string) => new Set([root, ...(groups.members.get(root) ?? []).map((m) => m.id)]);
   const vars = [...roots].map((id) => ({ id, pivot: pivotOf(id, cl.mates, ctx, groups.members.get(id)?.length ? groupIds(id) : undefined) }));
   const timing: MotionTiming = { ms: 0, solveMs: 0, collideMs: 0, slowStep: null, vars: vars.length * 6, groups: [...groups.members.values()].filter((m) => m.length).length };
+  // režim a úroveň (cad/motion-mode.ts): kvazistatika = rovnováha pružin v každém kroku; kinematika = jen vazby (+ preference)
+  const mode = studyMode(doc, study);
+  const quasi = mode.mode === "quasistatic";
+  const rootOf = (id: string) => groups.rootOf.get(id) ?? id;
+  const moving = (id: string) => roots.has(rootOf(id));
+  const springs = springTerms(doc, ctx).filter((sp) => sp.seats.some(moving) || moving(sp.id));
+  const solvedMates = mates.filter((m) => !groups.tree.has(m.id)); // zámky kostry skupin jsou splněné z definice
+  const terms = {
+    hard: [...solvedMates.map((m) => mateTerm(m, ctx, () => hardOf(m))), ...springs.filter((sp) => sp.solid !== undefined).map(springStopTerm)],
+    drive: driveTerms,
+    soft: [...(quasi ? springs.map(springEnergyTerm) : []), ...preferTerms(mates, ctx)],
+  };
+  const comp = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  const mateById = new Map(mates.map((m) => [m.id, m] as const));
+  const motorOfTerm = (id: string) => motors.find((x) => (x.abs ? x.m.id : x.key) === id);
+  /** odchylky konfliktní množiny v poloze konfliktu: vazby, dorazy pružin, motory (žádaná × dosažená hodnota) */
+  const devsOf = (ids: string[], short: string[]): MateDev[] => {
+    const out: MateDev[] = [];
+    for (const id of short) {
+      const x = motorOfTerm(id);
+      if (!x) continue;
+      const label = tr("motor {0}", motors.indexOf(x) + 1);
+      const mi = motors.indexOf(x);
+      if (x.abs) out.push({ ...mateDev({ ...x.m, value: x.target }, ctx, `${label}: ${mateName(x.m, comp)}`), id, motor: mi });
+      else {
+        const v = dofValue(x.m, x.mo.kind, ctx);
+        const got = v === null ? NaN : x.mo.kind === "rotary" ? wrap(v - x.v0) * DEG : v - x.v0;
+        out.push({ id, label, kind: "value", value: got, want: x.target, dev: got - x.target, unit: x.mo.kind === "rotary" ? "°" : "mm", motor: mi });
+      }
+    }
+    for (const id of ids) {
+      if (short.includes(id)) continue;
+      const m = mateById.get(id);
+      if (m) out.push(mateDev(m, ctx, mateName(m, comp)));
+      else if (id.startsWith("spring:")) {
+        const sp = springs.find((x) => `spring:${x.id}` === id);
+        if (sp) out.push(springDev(sp, sp.name));
+      }
+    }
+    return out;
+  };
   const steps: MotionStep[] = [];
   let collision: MotionResult["collision"] = null;
   let conflictSteps = 0;
+  let lastValid = 0;
   const trace = study.trace && poses.has(study.trace.compId) ? study.trace : undefined;
   const hasSprings = springComps(doc).length > 0;
+  let undetermined: MotionUndetermined[] = [];
   for (let k = 0; k <= n; k++) {
     if (opts.cancel?.()) break;
     const t = (duration * k) / n;
     const vals = motors.map((x) => profileAt(x.prof, t, { k, n }));
     motors.forEach((x, i) => (x.target = vals[i]));
     const tStep = now();
-    const ms = active();
-    // zámky kostry skupin jsou splněné z definice – řešič je nevyhodnocuje (kontrola konfliktů níže ano)
-    const solved = ms.filter((m) => !groups.tree.has(m.id));
-    const resid = () => [...solved.flatMap((m) => kinResidual(m, ctx) ?? []), ...driveRes()];
-    solvePoses(poses, vars, resid, { maxIter: 60, groups });
-    timing.solveMs += now() - tStep;
-    // záznam kroku: rozbalené úhly → stav pro další krok
-    rec = new Map();
-    const conflicts = ms.filter((m) => m.type !== "fixed" && resNorm(kinResidual(m, ctx)) > 1e-3).map((m) => m.id);
-    driveRes().forEach((r, i) => {
-      if (Math.abs(r) > 1e-3) conflicts.push(`motor:${motors.filter((x) => !x.abs)[i]?.mo.id}`);
+    // krok s prioritou tvrdé ≫ motor ≫ měkké; motor na mezi: stop (stojí) / error (krok neplatný, poslední platná poloha)
+    const out = solveStep(poses, vars, terms, {
+      groups,
+      maxIter: 60,
+      atLimit: (short) => (short.some((id) => motorOfTerm(id)?.mo.atLimit === "error") ? "error" : "stop"),
+      describe: devsOf,
     });
+    timing.solveMs += now() - tStep;
+    // díly volné v mezi (vazby jejich polohu neurčují): jednou na studii v poloze kroku 0
+    if (k === 0) undetermined = findUndetermined();
+    // záznam kroku: rozbalené úhly → stav pro další krok (vyhodnocení všech členů v poloze kroku zapíše rozbalené úhly motorů
+    // a mechanických vazeb – Ozubení, Šroub, Hřeben – jako dřívější kontrola zbytků)
+    rec = new Map();
+    for (const t of terms.hard) t.r();
+    for (const t of terms.drive) t.r();
+    const conflicts = out.status === "ok" ? [] : [...new Set([...out.short.map((id) => (motorOfTerm(id)?.abs ? id : `motor:${motorOfTerm(id)?.mo.id ?? id}`)), ...out.blocking.filter((id) => mateById.get(id)?.type !== "fixed")])];
+    const reached = out.status === "stopped" ? motors.map((x) => {
+      const v = dofValue(x.m, x.mo.kind, ctx);
+      if (v === null) return NaN;
+      if (x.abs) return v;
+      return x.mo.kind === "rotary" ? ctx.ang(x.key, v - x.v0) * DEG : v - x.v0;
+    }) : undefined;
     state = new Map([...state, ...rec]);
     rec = null;
     if (conflicts.length) conflictSteps++;
+    if (out.status !== "invalid") lastValid = k;
     const place: Record<string, Placement> = {};
     for (const c of comps) {
       const P = poses.get(c.id);
       if (P) place[c.id] = placementOf(P);
     }
     const row: MotionStep = { i: k, t, motors: vals, place, conflicts };
+    if (out.status !== "ok") {
+      row.status = out.status;
+      if (out.cause) row.cause = out.cause;
+      if (out.info) row.devs = out.info as MateDev[];
+      if (reached) row.reached = reached;
+      if (out.status === "invalid") row.shows = lastValid;
+    }
     if (trace) row.trace = toWorld(poses.get(trace.compId)!, trace.point);
     // pružiny: délka sleduje vzdálenost dosedacích ploch v poloze kroku (kolize pak s pružinou v této délce)
     if (hasSprings) row.springs = springSteps(poseDoc(doc, place), g);
@@ -234,6 +323,28 @@ export async function runMotion(
     if (!timing.slowStep || stepMs > timing.slowStep.ms) timing.slowStep = { i: k, ms: stepMs };
     opts.onStep?.(k, n, { ms: stepMs, solveMs: stepMs - collideMs, collideMs });
   }
+  /**
+   * Meze, jejichž hodnotu ostatní vazby a motory neurčují (cad/motion-quasi.ts freeLimits) a které neurčuje ani preference, ani –
+   * v kvazistatice – pružina dosedající na tentýž díl (tuhou skupinu): poloha dílu v mezi je jen „kde zůstal“. Seskupeno po dílech.
+   */
+  function findUndetermined(): MotionUndetermined[] {
+    const cand = mates.filter((m) => isLimitMate(m) && !m.prefer && [m.a, m.b].some((r) => moving(r.compId)));
+    if (!cand.length) return [];
+    const eq = () => [...solvedMates.flatMap((m) => (isLimitMate(m) ? eqResidual(m, ctx) : hardOf(m))), ...driveTerms.flatMap((d) => d.r())];
+    const free = new Set(freeLimits(poses, vars, eq, cand.map((m) => ({ id: m.id, g: () => limitGap(m, ctx)?.g ?? 0 })), groups));
+    const by = new Map<string, MotionUndetermined>();
+    for (const m of cand) {
+      if (!free.has(m.id)) continue;
+      const own = moving(m.a.compId) ? m.a.compId : m.b.compId;
+      const root = rootOf(own);
+      const touching = springs.filter((sp) => sp.seats.some((id) => rootOf(id) === root) || rootOf(sp.id) === root);
+      if (quasi && touching.length) continue; // pružina polohu určuje (rovnováha)
+      const u = by.get(root) ?? { comp: own, mates: [], springs: touching.map((sp) => sp.name) };
+      u.mates.push(m.id);
+      by.set(root, u);
+    }
+    return [...by.values()];
+  }
   timing.ms = now() - tStart;
   return {
     steps,
@@ -245,6 +356,8 @@ export async function runMotion(
     ...(s0.mates ? { mates: s0.mates } : {}),
     timing,
     motorInfo: motors.map((x) => ({ abs: x.abs, current: x.abs ? x.v0 : 0 })),
+    level: levelOf(mode),
+    ...(undetermined.length ? { undetermined } : {}),
   };
 }
 
@@ -348,6 +461,8 @@ export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLine
   const last = res.steps[res.steps.length - 1];
   const first = res.steps[0];
   out.push(tr("Pohybová studie: {0} kroků · {1} s · motory: {2}", res.steps.length - 1, txt(last?.t ?? 0, 3), res.motors.map((m) => motorText(m, doc)).join("; ")));
+  // úroveň simulace v každém protokolu studie (vlna 22, bod 2): kinematika × kvazistatika × dynamika
+  if (res.level) out.push(levelLine(res.level));
   if (first && last)
     for (const c of res.comps) {
       const pts = res.steps.map((s) => s.place[c.id]?.position).filter((p): p is Vec3 => !!p);
@@ -366,12 +481,104 @@ export function motionSummary(res: MotionResult, doc: CadDoc, o: { collisionLine
     const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
     out.push(res.collision ? tr("⚠ první kolize v kroku {0} (t = {1} s): „{2}“ × „{3}“ ({4} mm³)", res.collision.step, txt(res.collision.t, 3), nm(res.collision.a), nm(res.collision.b), txt(res.collision.volume, 3)) : tr("Kolize: žádné ve všech krocích"));
   }
-  out.push(res.conflictSteps ? tr("⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)", res.conflictSteps) : tr("Vazby splněny ve všech krocích"));
+  // „Vazby splněny“ jen tam, kde vazby polohu určují: díl volný v mezi (kinematika ho nechává, kde byl) = ⚠, ne výsledek (bod 2)
+  const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  out.push(
+    res.conflictSteps
+      ? tr("⚠ nesplněné vazby v {0} krocích (mechanismus se zasekl nebo motor překročil meze)", res.conflictSteps)
+      : res.undetermined?.length
+        ? tr("⚠ vazby splněny ve všech krocích, ale polohu {0} neurčují – zobrazená poloha není fyzikální výsledek (motion.undetermined)", res.undetermined.map((u) => `„${nm(u.comp)}“`).join(", "))
+        : tr("Vazby splněny ve všech krocích"),
+  );
   if (res.steps.some((s) => s.springs)) out.push(...springMotionLines(doc, res.steps).map((l) => ` ${l}`)); // pružiny: délka, síla, doraz
   const issues = motionIssues(res, doc);
   for (const x of issues.slice(0, 4)) out.push(` ⚠ ${x.code} ${x.text}`);
   if (issues.length > 4) out.push(tr(" … a další úseky s nesplněnými vazbami: {0}", issues.length - 4));
+  // motor na mezi, neřešitelné kroky, vazbami neurčená poloha (body 2 a 8) – protokol textových příkazů je vypíše jako záznamy s kódem
+  if (o.notes !== false) for (const x of motionFindings(res, doc)) out.push(` ⚠ ${x.code} ${x.text}`);
   if (o.notes !== false) for (const x of motionMotorNotes(res, doc)) out.push(` ⚠ ${x.code} ${x.text}`);
+  return out;
+}
+
+/** Nález studie s kódem (vlna 22, body 2 a 8): motor na mezi, neřešitelné kroky, vazbami neurčená poloha. */
+export type MotionFinding = { code: "motion.motor-limit" | "motion.invalid" | "motion.undetermined"; args: string[]; text: string; steps?: [number, number] };
+
+/** nejvýš tolik odchylek v souhrnném řádku (všechny vypíše `pohyb krok N`) */
+const DEV_SUMMARY = 3;
+
+/**
+ * Nálezy studie: ⚠ `motion.motor-limit` (motor stojí na mezi – úsek kroků, žádaná × dosažená hodnota, co brání, příčina), ⚠
+ * `motion.invalid` (neřešitelné kroky – zobrazena poslední platná poloha, konfliktní vazby s odchylkami, příčina) a ⚠
+ * `motion.undetermined` (díl volný v mezi – vazby jeho polohu neurčují). Jeden řádek na souvislý úsek kroků se stejným stavem;
+ * odchylky souhrnně (nejvýš tři), všechny vypíše `pohyb krok N`.
+ */
+export function motionFindings(res: MotionResult, doc: CadDoc): MotionFinding[] {
+  const out: MotionFinding[] = [];
+  const unitOf = (i: number) => (res.motors[i]?.kind === "rotary" ? "°" : " mm");
+  const sec = (v: number) => String(Math.round(v * 1000) / 1000 || 0);
+  const span = (a: MotionStep, b: MotionStep) => (a.i === b.i ? `${a.i} (t = ${sec(a.t)} s)` : `${a.i}–${b.i} (t = ${sec(a.t)}–${sec(b.t)} s)`);
+  const key = (s: MotionStep) => (s.status ? `${s.status}|${s.cause}|${[...s.conflicts].sort().join(",")}` : "");
+  let i = 0;
+  while (i < res.steps.length) {
+    const s0 = res.steps[i];
+    if (!s0.status) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < res.steps.length && key(res.steps[j + 1]) === key(s0)) j++;
+    const s1 = res.steps[j];
+    const devs = s0.devs ?? [];
+    const other = devs.filter((d) => d.motor === undefined);
+    const list = (ds: typeof devs) => (ds.length ? ds.slice(0, DEV_SUMMARY).map(devText).join("; ") + (ds.length > DEV_SUMMARY ? tr(" … a další {0} (pohyb krok {1})", ds.length - DEV_SUMMARY, s0.i) : "") : tr("(nezjištěno)"));
+    const when = span(s0, s1);
+    if (s0.status === "stopped") {
+      const k = res.motors.findIndex((_m, mi) => s0.reached && Math.abs(s0.reached[mi] - s0.motors[mi]) > 1e-3);
+      const mi = k >= 0 ? k : 0;
+      const want = s0.motors[mi] === s1.motors[mi] ? `${txt(s0.motors[mi], 3)}${unitOf(mi)}` : `${txt(s0.motors[mi], 3)} → ${txt(s1.motors[mi], 3)}${unitOf(mi)}`;
+      const got = `${txt(s0.reached?.[mi] ?? NaN, 3)}${unitOf(mi)}`;
+      const args = [String(mi + 1), when, list(other)];
+      out.push({
+        code: "motion.motor-limit",
+        args,
+        steps: [s0.i, s1.i],
+        text: tr("motor {0} stojí na mezi v krocích {1}: žádáno {2}, dosaženo {3} – brání: {4}; příčina: motor žádá hodnotu, kterou tvrdé podmínky (meze, dorazy, pevné vazby) nedovolí – díly zůstávají fyzikálně (motor na mezi: stop; neplatné kroky místo zastavení: pohyb motor … na mezi chyba)", mi + 1, when, want, got, list(other)),
+      });
+    } else {
+      const shows = s0.shows ?? 0;
+      const cause =
+        s0.cause === "mates"
+          ? tr("vazby si odporují i bez motoru – opravte nebo potlačte některou z nich (sestava vazba N potlačit | hodnota)")
+          : tr("motor žádá hodnotu, kterou tvrdé podmínky nedovolí (motor na mezi: chyba; zastavení motoru: pohyb motor … na mezi stop)");
+      out.push({
+        code: "motion.invalid",
+        args: [when, String(shows), list(devs)],
+        steps: [s0.i, s1.i],
+        text: tr("neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}), žádný kompromis; konflikt: {2}; příčina: {3}", when, shows, list(devs), cause),
+      });
+    }
+    i = j + 1;
+  }
+  const mates = res.mates ?? doc.mates ?? [];
+  const nm = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? id;
+  const quasi = res.level?.level === "quasistatic";
+  for (const u of res.undetermined ?? []) {
+    const lim = u.mates
+      .map((id) => mates.find((m) => m.id === id))
+      .filter((m): m is Mate => !!m)
+      .map((m) => {
+        const no = mates.indexOf(m) + 1;
+        const b = `⟨${m.min !== undefined ? txt(m.min, 3) : "−∞"}; ${m.max !== undefined ? txt(m.max, 3) : "∞"}⟩`;
+        return tr("„{0}“ {1} (vazba {2})", m.name ?? tr(MATE_LABEL[m.type]), m.type === "slot" ? "" : b, no).replace("  ", " ");
+      });
+    const firstNo = (mates.findIndex((m) => m.id === u.mates[0]) + 1) || 1;
+    const tail = quasi
+      ? tr("bez pružiny a bez preferované strany zůstává, kde byla – sestava vazba {0} preferovat min|max", firstNo)
+      : u.springs.length
+        ? tr("kinematika ji nechává, kde byla (posune ji jen doraz meze) – pružina „{0}“ by ji tlačila: fyzikální poloha = pohyb kvazistatika (nebo sestava vazba {1} preferovat min|max)", u.springs[0], firstNo)
+        : tr("kinematika ji nechává, kde byla (posune ji jen doraz meze), a výsledek závisí na předchozím pohybu – sestava vazba {0} preferovat min|max, nebo pružina a pohyb kvazistatika", firstNo);
+    out.push({ code: "motion.undetermined", args: [nm(u.comp), lim.join(", ")], text: tr("poloha „{0}“ není vazbami určena (volná v mezi {1}) – {2}", nm(u.comp), lim.join(", "), tail) });
+  }
   return out;
 }
 
@@ -424,6 +631,10 @@ function mateLabel(id: string, res: MotionResult, doc: CadDoc): string {
     const k = res.motors.findIndex((m) => m.id === id.slice(6));
     const m = mates.find((x) => x.id === res.motors[k]?.mate);
     return tr("motor {0}", k + 1) + (m ? `: ${label(m)}` : "");
+  }
+  if (id.startsWith("spring:")) {
+    const c = doc.components?.find((x) => x.id === id.slice(7));
+    return tr("doraz pružiny „{0}“ (délka na doraz Ln)", c?.name ?? id.slice(7));
   }
   const m = mates.find((x) => x.id === id);
   return m ? label(m) : id;

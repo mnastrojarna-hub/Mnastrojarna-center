@@ -10,7 +10,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { setLang } from "./i18n";
 import type { FaceGeo, GeoProvider } from "./mates";
 import { composePose, invertPose, placementOf, poseOf, rigidGroups, solvePoses, type Pose } from "./mates-kin";
-import { motionIssues, motionSummary, runMotion, type MotionResult } from "./motion";
+import { motionFindings, motionIssues, motionSummary, runMotion, type MotionResult } from "./motion";
+import { motionKv } from "./asm-agent-kin";
 import { emptyDoc, type AsmComponent, type CadDoc, type Mate, type MateRef, type Placement, type Vec3 } from "./types";
 
 afterEach(() => setLang("cs"));
@@ -137,7 +138,13 @@ describe("drift řešiče pohybu (P7) – deska vedená dvěma sloupky jen podé
     expect(res.steps[40].place.U.position[2]).toBeCloseTo(175, 6);
     expect(res.steps[40].place.S.position[2]).toBeCloseTo(70, 6); // stírací deska dosedne 20 mm pod kotevní deskou (horní mez)
     for (const id of ["U", "S"]) expect(span(res, id, 0) + span(res, id, 1)).toBeLessThan(1e-6);
-    expect(motionSummary(res, doc).join("\n")).toMatch(/Vazby splněny ve všech krocích/);
+    // vlna 22, bod 2 (vědomá změna): stírací deska S je mezi dvěma mezemi bez pružiny – její polohu vazby neurčují (kinematika ji
+    // jen dotlačí na mez); souhrn proto už neříká holé „Vazby splněny ve všech krocích“, ale ⚠ s motion.undetermined
+    const sum = motionSummary(res, doc).join("\n");
+    expect(sum).toMatch(/⚠ vazby splněny ve všech krocích, ale polohu „S“ neurčují/);
+    expect(sum).not.toMatch(/^Vazby splněny ve všech krocích$/m);
+    expect(res.undetermined).toEqual([{ comp: "S", mates: ["l1", "l2"], springs: [] }]);
+    expect(motionFindings(res, doc).map((x) => x.code)).toEqual(["motion.undetermined"]);
   });
 
   it("kód motion.conflict je stejný v cs/en/de, lokalizovaný je jen popis", async () => {
@@ -252,5 +259,95 @@ describe("tuhé skupiny ze zámků", () => {
     expect(res.timing!.slowStep!.i).toBeGreaterThanOrEqual(0);
     expect(info.map((x) => x.k)).toEqual(Array.from({ length: 11 }, (_, i) => i));
     expect(info.every((x) => x.ms >= 0)).toBe(true);
+  });
+});
+
+/**
+ * Vlna 22, bod 8 – konflikt motor × mez × pevná vzdálenost (repro bodu 8, desky BEZ bočního vedení): od kroku 8 (ZDVIH < 37,5) je
+ * soustava nesplnitelná. Dřív řešič rozložil nesplnitelný požadavek do všech stupňů volnosti – Deska A ujela o 696 mm a naklonila
+ * se o 0,21°, Přidržovač porušil pevnou vzdálenost. Nyní: tvrdé podmínky (pevná vzdálenost, mez) mají přednost, motor stojí na mezi
+ * 37,5 (výchozí „na mezi stop“), nebo jsou kroky neplatné a zůstane poloha kroku 7 („na mezi chyba“) – nikdy ujetí ani naklopení.
+ */
+describe("bod 8 – priorita tvrdých podmínek: motor × mez × pevná vzdálenost", () => {
+  const G8: Geos = {
+    R: { f0: plane([50, 50, 10], Z) },
+    A: { f0: plane([50, 50, 0], NZ) },
+    H: { f0: plane([30, 30, 8], Z), f1: plane([30, 30, 0], NZ) },
+  };
+  const doc8 = (extra: Mate[] = []): CadDoc => ({
+    ...emptyDoc("Mechanika"),
+    kind: "assembly",
+    components: [comp("R", P(), true), comp("A", P([0, 0, 67.5])), comp("H", P([0, 0, 34.5]))],
+    mates: [
+      { id: "zdvih", name: "ZDVIH", type: "distance", a: f("A", 0), b: f("R", 0), value: 57.5 },
+      { id: "pevna", name: "PEVNÁ", type: "distance", a: f("H", 1), b: f("R", 0), value: 24.5 },
+      { id: "mez", name: "Mez", type: "limitDistance", a: f("H", 0), b: f("A", 0), min: 5, max: 25 },
+      ...extra,
+    ],
+  });
+  const st8 = (atLimit?: "stop" | "error") => ({ motors: [{ id: "m", kind: "linear" as const, mate: "zdvih", from: 57.5, to: 27.15, ...(atLimit ? { atLimit } : {}) }], duration: 2, steps: 12 });
+  const still = (res: MotionResult) => {
+    for (const s of res.steps)
+      for (const id of ["A", "H"]) {
+        expect(Math.abs(s.place[id].position[0]) + Math.abs(s.place[id].position[1]), `${id} krok ${s.i} X/Y`).toBeLessThan(1e-6);
+        expect(Math.max(...s.place[id].rotation.map(Math.abs)), `${id} krok ${s.i} natočení`).toBeLessThan(1e-5); // ° (dřív 0,21°)
+      }
+  };
+
+  it("motor na mezi = stop (výchozí): kroky 8–12 motor stojí na 37,5, deska Z 47,5, přidržovač 34,5 – bez ujetí a naklopení", async () => {
+    const d = doc8();
+    const res = await runMotion(d, provider(G8), st8());
+    still(res);
+    expect(res.steps[7].place.A.position[2]).toBeCloseTo(49.795833, 5);
+    expect(res.steps.filter((s) => s.status).map((s) => [s.i, s.status])).toEqual([8, 9, 10, 11, 12].map((i) => [i, "stopped"]));
+    for (const s of res.steps.slice(8)) {
+      expect(s.place.A.position[2]).toBeCloseTo(47.5, 5);
+      expect(s.place.H.position[2]).toBeCloseTo(34.5, 4);
+      expect(s.reached![0]).toBeCloseTo(37.5, 5);
+      // konfliktní množina: motor (ZDVIH) a blokující meze / pevné vazby (stabilní kód motion.conflict po vazbách)
+      expect([...s.conflicts].sort()).toEqual(["mez", "pevna", "zdvih"]);
+      expect(s.devs!.map((x) => x.id).sort()).toEqual(["mez", "pevna", "zdvih"]);
+    }
+    expect(res.conflictSteps).toBe(5);
+    expect(motionIssues(res, d).map((x) => [x.mate, x.steps])).toEqual([
+      ["zdvih", [8, 12]],
+      ["pevna", [8, 12]],
+      ["mez", [8, 12]],
+    ]);
+    const f8 = motionFindings(res, d);
+    expect(f8.map((x) => [x.code, x.steps])).toEqual([["motion.motor-limit", [8, 12]]]);
+    expect(f8[0].text).toMatch(/^motor 1 stojí na mezi v krocích 8–12 \(t = 1\.333–2 s\): žádáno 37,267 → 27,15 mm, dosaženo 37,5 mm – brání: /);
+    expect(f8[0].text).toContain("„Mez H → A“ 5 mm – na mezi min 5 mm (doraz)");
+    expect(f8[0].text).toContain("„PEVNÁ H → R“ 24,5 mm (splněno)");
+    expect(f8[0].text).toMatch(/příčina: motor žádá hodnotu, kterou tvrdé podmínky .* nedovolí/);
+    expect(motionKv(res, null, 2)).toMatch(/ m1=range:57\.5>27\.15:- stopped=5 level=kin$/);
+  });
+
+  it("motor na mezi = chyba: kroky 8–12 neplatné, zobrazena poloha kroku 7 (deska 49,796, přidržovač 34,5), výrazně označeno", async () => {
+    const d = doc8();
+    const res = await runMotion(d, provider(G8), st8("error"));
+    still(res);
+    for (const s of res.steps.slice(8)) {
+      expect(s.status).toBe("invalid");
+      expect(s.shows).toBe(7);
+      expect(s.place).toEqual(res.steps[7].place);
+      expect(s.place.A.position[2]).toBeCloseTo(49.795833, 5);
+      expect(s.place.H.position[2]).toBeCloseTo(34.5, 4);
+    }
+    const f8 = motionFindings(res, d);
+    expect(f8[0].code).toBe("motion.invalid");
+    expect(f8[0].text).toMatch(/^neřešitelné kroky 8–12 \(t = 1\.333–2 s\) – zobrazena poslední platná poloha \(krok 7\), žádný kompromis; konflikt: /);
+    expect(motionKv(res, null, 2)).toMatch(/ invalid=5 level=kin$/);
+  });
+
+  it("vazby si odporují i bez motoru (dvě pevné vzdálenosti): neplatné kroky, příčina = vazby, porušené vazby s odchylkami", async () => {
+    const d = doc8([{ id: "pevna2", name: "PEVNÁ 2", type: "distance", a: f("H", 1), b: f("R", 0), value: 30 }]);
+    const res = await runMotion(d, provider(G8), { ...st8(), steps: 2 });
+    for (const s of res.steps) {
+      expect(s.status).toBe("invalid");
+      expect(s.cause).toBe("mates");
+      expect(s.conflicts).toEqual(expect.arrayContaining(["pevna", "pevna2"]));
+    }
+    expect(motionFindings(res, d)[0].text).toMatch(/příčina: vazby si odporují i bez motoru/);
   });
 });

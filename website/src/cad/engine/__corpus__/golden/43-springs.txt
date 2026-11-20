@@ -75,7 +75,7 @@ Prvky:
 Dokument: „Střižník“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Spodní deska [0; 0; 0] ⚓ · Stírací deska [0; 0; 45] · Horní deska [0; 0; 85] · Pružina 2×19,5×41 [40; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [40; 90; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 90; 95] ∠[-180; 0; -180]
 Vazby: 7 (7 ok)
-Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×)
+Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×) – délka odvozená z dosedacích ploch (řídí polohy komponent)
 Sestava: 7 komponent (7 dílů po rozložení podsestav) · obálka 200 × 120 × 115 mm · objem Σ 1791,39 cm³ · hmotnost Σ 14,062 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 4 ===
@@ -136,7 +136,7 @@ Dynamika: 0,5 s · krok 0,5 ms · 1000 kroků · gravitace −Z · tlumení 0,05
 Dokument: „Střižník“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
 Komponenty: Spodní deska [0; 0; 0] ⚓ · Stírací deska [0; 0; 45] · Horní deska [0; 0; 85] · Pružina 2×19,5×41 [40; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [40; 90; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 30; 95] ∠[-180; 0; -180] · Pružina 2×19,5×41 [160; 90; 95] ∠[-180; 0; -180]
 Vazby: 7 (7 ok)
-Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×)
+Pružiny: „Pružina 2×19,5×41“ 35 mm (L0 41 · Ln 16) · F 30,4 N ✓ (4×) – délka odvozená z dosedacích ploch (řídí polohy komponent)
 Pohybová studie: motorů 1 · kroků 36 · 0,5 s – pohyb stav
 Sestava: 7 komponent (7 dílů po rozložení podsestav) · obálka 200 × 120 × 115 mm · objem Σ 1791,39 cm³ · hmotnost Σ 14,062 kg
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava

@@ -17,7 +17,7 @@ import { MATERIALS, massKg } from "@/lib/mesh-metrics";
 import { defaultMoldBase, type BomRow, type CompPattern, type MoldBaseParams } from "./assembly";
 import { MATE_LABEL, axisLabel, dirLabel, sortFaceRows, type FaceRow, type KinMateType, type MateStatus } from "./mates";
 import { isKinMate } from "./mates-kin";
-import { springStatusLine } from "./asm-spring";
+import { springStatusLine, type SpringCheck } from "./asm-spring";
 import type { MotionCmd } from "./agent-motion";
 import type { AsmComponent, BuildResult, CadDoc, Mate, Vec3 } from "./types";
 
@@ -65,7 +65,7 @@ export type AsmCmd =
       max?: number;
     }
   | { k: "mates" }
-  | { k: "mateEdit"; ref: string; value?: number; flip?: boolean; suppress?: boolean; del?: boolean; name?: string; min?: number; max?: number }
+  | { k: "mateEdit"; ref: string; value?: number; flip?: boolean; suppress?: boolean; del?: boolean; name?: string; min?: number; max?: number; /** preferovaná strana meze (vlna 22, bod 2): min | max | null = žádná */ prefer?: "min" | "max" | null }
   | { k: "comp"; comp: string; patch: CompPatch }
   | { k: "remove"; comps: string[] }
   | { k: "duplicate"; comp: string; offset: Vec3 }
@@ -862,13 +862,26 @@ function parseMate(c: Cur): AsmCmd {
     } else if (c.is(KO.ratio) || c.is(KO.pitch) || c.is(KO.travel) || c.is(KO.pos)) {
       c.i++;
       out.value = c.num(tr("hodnota"));
+    } else if (c.is(PREFER_WORD)) {
+      // preferovaná strana meze: preferovat max | min | ne (EN prefer, DE bevorzugen)
+      c.i++;
+      if (c.is(KO.min) || c.is(KO.max)) {
+        out.prefer = c.is(KO.min) ? "min" : "max";
+        c.i++;
+      } else if (c.is(PREFER_NONE)) {
+        out.prefer = null;
+        c.i++;
+      } else throw new Error(tr("preferovat: min | max | ne – strana meze, u které má díl zůstat, když ho vazby neurčují"));
     } else throw new Error(tr("vazba „{0}“: neznámá úprava „{1}“ – hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\" (novou vazbu začněte druhem: kontakt, zarovnat, vystředit, souosost, vzdálenost, úhel, rovnoběžně, ukotvit)", ref.t, c.peek()!.t));
   }
-  if (out.value === undefined && out.flip === undefined && out.suppress === undefined && !out.del && out.name === undefined && out.min === undefined && out.max === undefined) throw new Error(tr("vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\"", ref.t));
+  if (out.value === undefined && out.flip === undefined && out.suppress === undefined && !out.del && out.name === undefined && out.min === undefined && out.max === undefined && out.prefer === undefined) throw new Error(tr("vazba „{0}“: co s ní? hodnota=N | obráceně | potlačit | zapnout | smazat | název \"…\"", ref.t));
   return out;
 }
 
 const LIMIT_WORD = W("mez", "limit", "grenze", "grenzwert");
+/** preferovaná strana meze (vlna 22, bod 2) */
+const PREFER_WORD = W("preferovat", "preference", "preferovaná", "prefer", "preferred", "bevorzugen", "bevorzugt");
+const PREFER_NONE = W("ne", "žádná", "zadna", "vyp", "none", "no", "off", "keine", "nein", "aus");
 const DIST_WORD = W("vzdálenosti", "vzdálenost", "distance", "abstand", "abstands");
 const ANGLE_WORD = W("úhlu", "úhel", "angle", "winkel", "winkels");
 const AND_WORD = W("a", "and", "und", "&");
@@ -1155,6 +1168,7 @@ export function mateText(doc: CadDoc, m: Mate): string {
   if (m.type === "angle") parts.push(`${fmt(m.value ?? 0)}°`);
   parts.push(...kinMateParts(m, (r) => `${alias(r.compId)}${face(r)}`, (id) => comp(id)?.name ?? "?"));
   if (m.flip) parts.push(m.type === "screw" ? tr("levý závit") : m.type === "gear" ? tr("stejný smysl otáčení") : m.type === "tangent" ? tr("vnitřní dotyk") : tr("obráceně"));
+  if (m.prefer) parts.push(m.prefer === "max" ? tr("preferuje max") : tr("preferuje min")); // vlna 22, bod 2
   if (m.suppressed) parts.push(tr("potlačeno"));
   return parts.join(" · ");
 }
@@ -1223,14 +1237,14 @@ export function componentLines(doc: CadDoc, status?: Record<string, MateStatus>)
 }
 
 /** Řádky stavu sestavy pro `docStatusText`: komponenty s polohou (⚓ = ukotvená) a souhrn vazeb. */
-export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>, matesStale = false): string[] {
+export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>, matesStale = false, springs?: SpringCheck): string[] {
   const comps = doc.components ?? [];
   const MAX = 60;
   const items = comps.slice(0, MAX).map((c) => `${c.name}${c.alias ? ` [${c.alias}]` : ""} ${pt(c.placement.position)}${rotText(c.placement.rotation)}${isFixed(doc, c) ? " ⚓" : ""}${c.hidden ? tr(" (skrytá)") : ""}${c.source.kind === "asm" ? tr(" (podsestava)") : ""}`);
   const out = [tr("Komponenty: {0}", items.join(" · ") || tr("žádné")) + (comps.length > MAX ? tr(" … a dalších {0} (sestava)", comps.length - MAX) : "")];
   // stav vazeb pro jiné polohy, než má dokument (přepočet by komponenty posunul) – nikdy mlčky „ok“ (engine/result-key.ts)
   if (doc.mates?.length) out.push(tr("Vazby: {0}", matesSummary(doc, status)) + (matesStale ? ` – ${tr("NEPLATÍ pro polohy v dokumentu: stav je až po přepočtu vazeb, který by komponenty posunul (sestava vazby)")}` : ""));
-  const sp = springStatusLine(doc); // pružiny: uložená délka, L0, Ln, síla, ✓/⚠/✗
+  const sp = springStatusLine(doc, springs); // pružiny: délka (z ploch / uložená), L0, Ln, síla, ✓/⚠/✗ (vlna 22, bod 7)
   if (sp) out.push(sp);
   const ms = doc.motion;
   if (ms?.motors.length) out.push(tr("Pohybová studie: motorů {0} · kroků {1} · {2} s{3} – pohyb stav", ms.motors.length, ms.steps, fmt(ms.duration, 3), ms.collisions ? tr(" · kolize") : ""));

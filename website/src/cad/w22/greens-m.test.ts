@@ -40,7 +40,7 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     const run = await runLines(changed, env, "pohyb spustit");
     expect(run.log).toContain(GREEN_MATES);
     expect(run.codes.map((c) => c.code)).toEqual(["motion.recomputed"]);
-    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=range:57.5>27.15:-");
+    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=range:57.5>27.15:- level=kin"); // vlna 22, M2: úroveň na konci
     // krok, export i přehrání po další změně také nejdřív přepočítají (ℹ motion.recomputed) – nikdy starý krok
     const again = resizePart(changed, "Rám", [100, 100, 20]);
     const step = await runLines(again, env, "pohyb krok 4");
@@ -125,5 +125,61 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     const short = await runLines(a.doc, env, "pohyb motor lineární vazba 1 57,5..27,15 rychlost 15,175", "pohyb čas 0,5");
     expect(short.codes.map((c) => c.code)).toContain("motion.motor-short");
     expect((await runLines(a.doc, env, "pohyb motor lineární vazba 1 57,5..27,15 kroky 2")).codes).toEqual([]);
+  });
+});
+
+/**
+ * Vlna 22, etapa M2 (body 2, 7, 8) – zelené texty, které se NESMÍ vypsat:
+ * | text | nesmí se vypsat, když |
+ * |---|---|
+ * | „Vazby splněny ve všech krocích“ | poloha dílu je vazbami neurčená (volný v mezi, kinematika), motor stojí na mezi |
+ * | „✓ vazba N (…): hodnota …“ | úprava vazby nejde splnit (konflikt – polohy beze změny, ⚠ mate.conflict) |
+ * | „Pružiny: … ✓“ v `stav` | délka nejde ověřit proti dosedacím plochám (nezkontrolováno), uložená délka plochám neodpovídá |
+ * | „Úroveň simulace: kvazistatika“ | výpočet byl kinematický (výslovně nebo automaticky bez pružiny) |
+ */
+describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
+  it("„Vazby splněny ve všech krocích“ ne, když vazby polohu přidržovače neurčují (volný v mezi, kinematika) – ⚠ motion.undetermined", async () => {
+    const env = fakeEnv();
+    const a = await runLines(press({ holder: true }), env, MATE, 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 25', "pohyb motor lineární vazba 1 57,5..40 kroky 2");
+    expect(a.log.join("\n")).not.toContain(GREEN_MATES);
+    expect(a.log.join("\n")).toMatch(/⚠ vazby splněny ve všech krocích, ale polohu „Přidržovač“ neurčují/);
+    expect(a.codes.map((c) => c.code)).toContain("motion.undetermined");
+    expect(a.kv).toMatch(/ undetermined=1 level=kin$/);
+    // s preferovanou stranou je poloha určená → „Vazby splněny“ smí
+    const b = await runLines(a.doc, env, 'sestava vazba 2 preferovat max', "pohyb spustit");
+    expect(b.log).toContain(GREEN_MATES);
+    expect(b.codes.map((c) => c.code)).not.toContain("motion.undetermined");
+  });
+  it("„Vazby splněny…“ ne, když motor stojí na mezi (pevná vazba přidržovače × mez) – ⚠ motion.motor-limit, bez ujetí", async () => {
+    const env = fakeEnv();
+    const a = await runLines(press({ holder: true }), env, MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 20', 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40', "pohyb motor lineární vazba 1 57,5..27,15 kroky 4");
+    expect(a.log.join("\n")).not.toContain(GREEN_MATES);
+    expect(a.codes.map((c) => c.code)).toContain("motion.motor-limit");
+    expect(a.kv).toMatch(/ stopped=\d+ level=kin$/);
+  });
+  it("„✓ vazba … hodnota“ ne, když úpravu nejde splnit: ⚠, polohy beze změny, ⚠ mate.conflict s nejbližší dosažitelnou hodnotou", async () => {
+    const env = fakeEnv();
+    const a = await runLines(press({ holder: true }), env, MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 20', 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40');
+    const before = a.doc.components!.map((c) => c.placement);
+    const r = await runLines(a.doc, env, 'sestava vazba "ZDVIH" hodnota=30');
+    expect(r.log[0]).toMatch(/^⚠ vazba 1 /);
+    expect(r.log.join("\n")).not.toMatch(/^✓ vazba 1/m);
+    expect(r.doc.components!.map((c) => c.placement)).toEqual(before);
+    const c = r.codes.find((x) => x.code === "mate.conflict")!;
+    expect(c.text).toMatch(/nejbližší dosažitelná hodnota 33 mm \(zadáno 30 mm\) – brání: /);
+  });
+  it("„Pružiny: … ✓“ ne, když délku nešlo ověřit proti plochám, ani když uložená délka plochám neodpovídá", async () => {
+    const { springStatusLine } = await import("../asm-spring");
+    const doc: CadDoc = { ...press(), components: [...press().components!, { id: "s", name: "P", source: { kind: "part", doc: (await import("../library/pins")).compressionSpring.make({ d: 2, D: 18, L: 32, n: 6 }) as CadDoc }, placement: { position: [0, 0, 10], rotation: [0, 0, 0] }, spring: { a: { compId: "rám", face: 1 }, b: { compId: "deska-a", face: 0 }, free: 32, solid: 14, length: 25, offset: 0, seat: 25 } }] };
+    expect(springStatusLine(doc)).toMatch(/✓$/); // bez kontroly dosavadní tvar (jen uložená délka)
+    expect(springStatusLine(doc, { checked: false, stale: [] })).not.toContain("✓");
+    expect(springStatusLine(doc, { checked: true, stale: [{ id: "s", name: "P", stored: 25, derived: 57.5, seat: 57.5, offset: 0 }] })).toMatch(/– ⚠ pružina „P“: uložená délka 25 mm neodpovídá dosedacím plochám \(57,5 mm\)/);
+  });
+  it("„Úroveň simulace: kvazistatika“ ne u kinematického výpočtu", async () => {
+    const env = fakeEnv();
+    const a = await runLines(press(), env, MATE, "pohyb motor lineární vazba 1 57,5..40 kroky 2");
+    expect(a.log.join("\n")).toMatch(/Úroveň simulace: kinematika – .*zvoleno automaticky: sestava nemá pružinu/);
+    expect(a.log.join("\n")).not.toMatch(/Úroveň simulace: kvazistatika/);
+    expect(a.kv).toMatch(/ level=kin$/);
   });
 });

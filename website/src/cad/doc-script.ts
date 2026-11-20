@@ -31,7 +31,7 @@
  */
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
-import { aliasScript, emitAsmSprings, emitDynamics } from "./doc-script-asm";
+import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
@@ -2053,6 +2053,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
       if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
       else if (m.back) l += ` ${c.w("back")}`;
+      l += motorLimitWords(c.sheetOut, m); // vlna 22, bod 8: na mezi chyba
       if (i === 0) {
         // délku studie u rozsahu × rychlost určuje motor (|do − od| / rychlost) – uložená délka jde zvlášť řádkem „pohyb čas“ níže
         l += ` ${c.w("steps")} ${n(mo.steps)}${ranged ? "" : ` ${c.w("time")} ${n(mo.duration)}`}`;
@@ -2067,6 +2068,8 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     if (ranged) c.line(`${c.w("motion")} ${c.w("time")} ${n(mo.duration)}`);
     if (mo.loop) c.note(tr("přehrávání pohybové studie ve smyčce se do skriptu nepřenáší"));
   }
+  // vlna 22, bod 2: preferované strany mezí a režim studie (kinematika / kvazistatika) bez nastavení dynamiky
+  emitStudyExtras(c.sheetOut, mo?.motors.length ? mo : undefined, mates, mateNo);
   // dynamika: ruční hmotnosti, síly na vazbách, zapnutí s nastavením (cad/motion-dynamic.ts)
   if (mo?.dyn) {
     if (!mo.motors.length) c.comment(c.w("cMotion"));

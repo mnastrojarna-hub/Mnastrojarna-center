@@ -9,6 +9,9 @@
 //  4. text v prohlížeči = CLI: přesný příkaz bodu 9 česky, anglicky (/en/cad) a německy (/de/cad) – směr, konec, doba; S2 bodu 11;
 //  6. opravy po kontrole: chyba výpočtu v panelu jen u svého dokumentu, data-motion-verdict (mates-ok × ok), starý dokument
 //     s nepoužitým koncem motoru (⚠ při načtení, převod na rozsah × rychlost), posun dílu uvnitř podsestavy → „stale“.
+//  7. etapa M2 (body 2, 7, 8): přepínač režimu studie (kinematika / kvazistatika / dynamika / auto) a úroveň simulace v panelu,
+//     kvazistatika s předpětím (přidržovač 19,325), ⚠ neurčená poloha v kinematice, pružina po načtení JSON (⚠ spring.stale, 15 mm),
+//     motor na mezi (stopped + odchylky), „na mezi: chyba“ → neplatný krok s rámečkem v 3D, statická úprava za mezí ⚠, preferovaná strana.
 // Spuštění: E2E_BASE=http://localhost:3533 node e2e/cad-w22-m.e2e.cjs [výstupní složka]   (E2E_NOGL=1 = průchod bez WebGL)
 const { chromium } = require('playwright');
 const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process.exitCode = 1; };
@@ -302,6 +305,85 @@ async function open(b, path) {
   log = await run('sestava upravit "Skupina"\nsestava komponenta "Doraz" v 40 10 22\nsestava hotovo\nstav');
   ok((await waitState('stale', 8000)) && /Pohyb: výsledek NEPLATÍ – od výpočtu se změnilo: poloha, ukotvení, skrytí nebo vazby komponent v podsestavě „Skupina“/.test(log), `bod 1: posun dílu uvnitř podsestavy → „stale“ a NEPLATÍ (dřív motion=ok) – ${line(log, /^Pohyb: /).slice(0, 140)}`);
   ok(!GREEN.test(await mp.innerText()), 'podsestava: žádný starý souhrn v panelu');
+
+  // ── 7. etapa M2 (body 2, 7, 8): režim a úroveň studie, kvazistatika s předpětím, motor na mezi, neplatný krok, pružina po načtení ──
+  const warns = [];
+  p.on('console', (m) => { if (m.type() === 'warning') warns.push(m.text()); });
+  await run(['nový díl "Rám M"', 'kvádr 100 100 10', 'nový díl "Deska M"', 'kvádr 100 100 10', 'nový díl "Přidržovač M"', 'kvádr 60 60 8', 'nový díl "Pružina M"', 'pružina 18 stoupání 5 závity 6 drát 2'].join('\n'));
+  log = await run([
+    'nová sestava "Mechanika M2"', 'vložit "Rám M" ukotvit', 'vložit "Deska M" v 0 0 67.5', 'vložit "Přidržovač M" v 20 20 34.5', 'vložit "Pružina M" v 50 50 42.5',
+    'sestava vazba vzdálenost "Deska M" spodní "Rám M" horní hodnota 57.5 název "ZDVIH"',
+    'sestava vazba mez-vzdálenosti "Přidržovač M" horní "Deska M" spodní min 5 max 25 název "Mez"',
+    'sestava vazba mez-vzdálenosti "Přidržovač M" spodní "Rám M" horní min 0 max 500 název "Dosed"',
+    'sestava vazba zámek "Pružina M" "Přidržovač M"',
+    'sestava pružina "Pružina M" mezi "Přidržovač M" "Deska M" volná 32 blok 14 tuhost 20',
+    'pohyb motor lineární vazba "ZDVIH" 57.5..27.15 kroky 12', 'pohyb krok 6',
+  ].join('\n'));
+  // a) bod 2: automaticky kvazistatika (pružina na pohyblivé komponentě) – krok 6 přidržovač 19,325 (dřív 34,5), úroveň v protokolu i panelu
+  ok(/Úroveň simulace: kvazistatika/.test(log) && /Přidržovač M \[20; 20; 19,325\]/.test(log), `bod 2: kvazistatika, krok 6 přidržovač 19,325 – ${line(log, /Přidržovač M \[/)}`);
+  await openPanel();
+  await waitState('ok', 30000);
+  const modeBox = mp.locator('[data-motion-mode]').first();
+  ok((await modeBox.getAttribute('data-motion-mode')) === 'auto' && (await modeBox.getAttribute('data-motion-mode-effective')) === 'quasistatic', `panel: režim auto → kvazistatika (${await modeBox.getAttribute('data-motion-mode-effective')})`);
+  ok((await mp.locator('[data-motion-level]').first().getAttribute('data-motion-level')) === 'quasistatic' && /Úroveň simulace: kvazistatika/.test(await txt('[data-motion-level]')), `panel: úroveň simulace – ${(await txt('[data-motion-level]')).slice(0, 90)}`);
+  // b) přepínač režimu skutečným klikem: kinematika → úroveň kinematika, ⚠ motion.undetermined v panelu (přidržovač vazbami neurčen)
+  await mp.locator('[data-motion-mode-btn="kin"]').click();
+  await p.waitForTimeout(300);
+  ok((await getDoc()).motion?.mode === 'kinematic' && (await mp.locator('[data-motion-level]').first().getAttribute('data-motion-level')) === 'kinematic', 'klik Kinematika: study.mode = kinematic, úroveň kinematika');
+  await mp.locator('button', { hasText: /Vypočítat pohyb/ }).first().click().catch(() => {});
+  await waitState('ok', 30000);
+  ok((await mp.locator('[data-motion-finding="motion.undetermined"]').count()) === 1 && !/^Vazby splněny ve všech krocích$/m.test(await mp.innerText()), 'kinematika: ⚠ poloha přidržovače neurčena (ne holé „Vazby splněny“)');
+  await mp.locator('[data-motion-mode-btn="auto"]').click();
+  await p.waitForTimeout(300);
+  ok(!(await getDoc()).motion?.mode && (await modeBox.getAttribute('data-motion-mode-effective')) === 'quasistatic', 'klik Auto: režim smazán, efektivně kvazistatika');
+  // c) bod 7: externě upravený JSON (Deska o 10 mm níž, ZDVIH 47,5, spring.length 25) → ⚠ spring.stale a délka 15 z ploch
+  const stale = await p.evaluate(() => {
+    const d = window.mncad.getDocument();
+    for (const c of d.components) if (c.name === 'Deska M') c.placement.position[2] = 57.5;
+    for (const m of d.mates) if (m.name === 'ZDVIH') m.value = 47.5;
+    delete d.motion;
+    return JSON.stringify(d);
+  });
+  log = await run(`${stale}\nstav`);
+  const spr = () => getDoc().then((d) => (d.components || []).find((c) => c.name === 'Pružina M')?.spring?.length);
+  ok(/uložená délka 25 mm neodpovídá dosedacím plochám \(15 mm\)/.test(log) && /„Pružina M“ 15 mm .* – délka odvozená z dosedacích ploch/.test(log) && Math.abs((await spr()) - 15) < 1e-3, `bod 7: ⚠ spring.stale a stav 15 mm – ${line(log, /uložená délka/).slice(0, 120)}`);
+  // GUI cesta (setDocument bez skriptu, jako otevření souboru): efekt pružin opraví délku a ohlásí ⚠ (console.warn + flash)
+  await p.evaluate((j) => window.mncad.setDocument(JSON.parse(j)), stale).catch(() => {});
+  await p.waitForTimeout(1500);
+  ok(Math.abs((await spr()) - 15) < 1e-3, `bod 7 GUI: délka pružiny po otevření 15 mm (uloženo 25) – ${await spr()}${warns.some((w) => /spring\.stale/.test(w)) ? ' · console.warn spring.stale' : ''}`);
+  // d) bod 8: pevná vazba + mez × motor – motor na mezi stojí (panel „stopped“ s odchylkami); s „chyba“ neplatný krok a rámeček v 3D
+  log = await run(['nová sestava "Mechanika K"', 'vložit "Rám M" ukotvit', 'vložit "Deska M" v 0 0 67.5', 'vložit "Přidržovač M" v 0 0 34.5',
+    'sestava vazba vzdálenost "Deska M" spodní "Rám M" horní hodnota 57.5 název "ZDVIH"',
+    'sestava vazba vzdálenost "Přidržovač M" spodní "Rám M" horní hodnota 24.5 název "PEVNÁ"',
+    'sestava vazba mez-vzdálenosti "Přidržovač M" horní "Deska M" spodní min 5 max 25 název "Mez"',
+    'pohyb motor lineární vazba "ZDVIH" 57.5..27.15 kroky 12', 'pohyb krok 12'].join('\n'));
+  ok(/motor 1 stojí na mezi v krocích 8–12/.test(log) && /Deska M \[0; 0; 47,5\]/.test(log) && /Přidržovač M \[0; 0; 34,5\]/.test(log), `bod 8: motor stojí na mezi, bez ujetí – ${line(log, /stojí na mezi/).slice(0, 120)}`);
+  await openPanel();
+  await waitState('ok', 30000);
+  const scrub = mp.locator('[data-motion-scrub]');
+  await scrub.fill('12').catch(() => {});
+  await p.waitForTimeout(300);
+  ok((await mp.locator('[data-motion-step-status="stopped"]').count()) === 1 && /na mezi min 5 mm/.test(await txt('[data-motion-step-devs]')) && (await mp.locator('[data-motion-finding="motion.motor-limit"]').count()) === 1, `panel krok 12: motor stojí na mezi + odchylky – ${(await txt('[data-motion-step-devs]')).slice(0, 120)}`);
+  await mp.locator('[data-motor-atlimit]').first().selectOption('error');
+  await p.waitForTimeout(300);
+  ok((await getDoc()).motion?.motors?.[0]?.atLimit === 'error', 'výběr „na mezi: chyba“ zapíše motor.atLimit = error');
+  await mp.locator('button', { hasText: /Vypočítat pohyb/ }).first().click().catch(() => {});
+  await waitState('ok', 30000);
+  await scrub.fill('12').catch(() => {});
+  await p.waitForTimeout(400);
+  const inv = p.locator('[data-motion-invalid]');
+  ok((await mp.locator('[data-motion-step-status="invalid"]').count()) === 1 && (await inv.count()) === 1 && (await inv.getAttribute('data-motion-shows')) === '7', `neplatný krok 12: panel „invalid“, 3D rámeček ukazuje krok ${await inv.getAttribute('data-motion-shows').catch(() => '?')}`);
+  // e) statická úprava za mezí: polohy beze změny, ⚠ (žádné ✓ s kompromisem)
+  const before = JSON.stringify((await getDoc()).components.map((c) => c.placement));
+  log = await run('sestava vazba "ZDVIH" hodnota=37.15');
+  ok(/^⚠ vazba 1 .*konflikt/m.test(log) && /nejbližší dosažitelná hodnota 37,5 mm/.test(log) && JSON.stringify((await getDoc()).components.map((c) => c.placement)) === before, `bod 8 statika: ⚠ konflikt, polohy beze změny – ${line(log, /nejbližší/).slice(0, 120)}`);
+  // f) preferovaná strana meze v panelu sestavy (pole existuje u meze; volba zapíše mate.prefer)
+  const pref = p.locator('[data-mate-prefer]').first();
+  if (await pref.count()) {
+    await pref.selectOption('max');
+    await p.waitForTimeout(300);
+    ok((await getDoc()).mates.some((m) => m.prefer === 'max'), 'panel sestavy: Preferovaná strana max → mate.prefer');
+  } else console.log('info: pole data-mate-prefer není vidět (vazba meze nerozbalená) – preferovaná strana ověřena textem v testech');
   ok(errs.length === 0, 'bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 2).join(' | ') : ''));
 
   // ── EN a DE: stejný příkaz, protokol i panel bez českých zlomků ──
