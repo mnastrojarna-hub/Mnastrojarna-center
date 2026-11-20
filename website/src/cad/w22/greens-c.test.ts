@@ -14,6 +14,12 @@
  *     kontrolou bez nepotvrzených úseků; kolize nalezená mezi kroky „žádný průnik“ vyloučí
  *  7. statika: `kolize` bez ✓ a s „vůle nekontrolována“, titulek panelu „Bez průniku · vůle nekontrolována“ (ne „Bez kolizí ✓“)
  *  8. vůle „limit dodržen v celém pohybu (spojitě …)“ jen bez kroků pod limitem, se zjemněním a bez nepotvrzených úseků
+ *
+ * Vlna 22, bod 4 (C3) – procesní vrstva:
+ *  9. pracovní záběr procesní operace nedá „Kolize: žádný průnik“ (je tam průnik – pracovní kontakt), ani ⚠ clash.real;
+ *     záběr PŘED začátkem operace zůstává ⚠ skutečnou kolizí
+ * 10. úroveň „+ geometrická aproximace“ a věta „není to simulace materiálu“ jsou u každého výsledku s procesní vrstvou; bez spočtené
+ *     procesní vrstvy (jádro bez operace, chyba) žádný stav „děrovaný“ ani „odebráno“ – jen „nespočítáno“ s ⚠
  */
 import { describe, expect, it } from "vitest";
 import { setLang } from "../i18n";
@@ -32,6 +38,10 @@ import { runScript } from "../engine/run";
 import type { KernelApi } from "../engine/kernel";
 import type { AsmComponent, BuildResult, CadDoc, ComponentSource } from "../types";
 import { emptyDoc } from "../types";
+import type { MotionResult } from "../motion";
+import { levelLine } from "../motion-mode";
+import { processCodes, processLines, processOf, processRun, processStatusText } from "../motion-process";
+import type { ProcReq, ProcRes } from "../process-types";
 
 setLang("cs");
 const part = (name: string): CadDoc => ({ ...emptyDoc(name) }) as CadDoc;
@@ -156,5 +166,58 @@ describe("vlna 22 C1: žádné falešné zelené u tříd kolizí (bod 5)", () =
     expect(clearanceSummaryLines(res(pair({ unproven: 1 })) as never, d).join("\n")).not.toMatch(GREEN);
     expect(clearanceSummaryLines(res(pair({})) as never, { ...d, motion: { ...d.motion!, clearance: { ...d.motion!.clearance!, refine: false } } }).join("\n")).not.toMatch(GREEN);
     expect(clearanceSummaryLines({ steps, collisionsChecked: false } as never, d)).toEqual([]); // vůle nespočítána = žádná věta
+  });
+});
+
+describe("vlna 22 C3: žádné falešné zelené v procesní vrstvě (bod 4)", () => {
+  const pdoc = {
+    ...doc,
+    components: [comp("pl", "Plech"), { ...comp("r", "Razník"), placement: { position: [0, 0, 20], rotation: [0, 0, 0] } }],
+    motion: { motors: [{ id: "m", kind: "linear", mate: "z", from: 0, to: 1 }], duration: 1, steps: 2, collisions: true, process: [{ id: "p", kind: "cut", tool: "r", target: "pl", at: { t: 0.5 } }] },
+  } as unknown as CadDoc;
+  // krok 0 bez průniku, krok 1 a 2 razník v plechu (geometricky „skutečná“ kolize z jádra)
+  const res = {
+    steps: [0, 1, 2].map((i) => ({ i, t: i / 2, motors: [i / 2], place: { pl: { position: [0, 0, 0], rotation: [0, 0, 0] }, r: { position: [0, 0, 20 - 10 * i], rotation: [0, 0, 0] } }, conflicts: [], clashes: i ? [det("pl", "r", "real")] : [] })),
+    comps: [],
+    motors: [],
+    collision: null,
+    collisionsChecked: true,
+    conflictSteps: 0,
+    level: { level: "kinematic" },
+  } as unknown as MotionResult;
+  const kernel = async (q: ProcReq): Promise<ProcRes> => ({
+    steps: q.rels.map((m, i) => (m && i >= 1 ? { contact: true, depth: 1, through: i === 2, state: i } : { contact: false, depth: 0, through: false, state: 0 })),
+    states: [{ removed: 0, volume: 100, scrap: [] }, { removed: 50, volume: 50, scrap: [] }, { removed: 50, volume: 50, scrap: [{ volume: 50, center: [0, 0, 0] }] }],
+    dir: [0, 0, -1],
+    thickness: 1,
+    volume0: 100,
+    ms: 0,
+  });
+
+  it("9. pracovní záběr procesu: ani „Kolize: žádný průnik“, ani ⚠ skutečná; před začátkem operace ⚠ zůstává", async () => {
+    const out = await processRun(pdoc, res, { process: kernel });
+    const sum = motionClashSummary(out, pdoc);
+    expect(sum.lines.join("\n")).not.toMatch(/Kolize: žádný průnik|žádné ve všech krocích/);
+    expect(sum.lines[0]).toMatch(/pracovní kontakt 1 dvojic/);
+    expect(sum.codes.map((c) => c.code)).toEqual(["clash.work"]);
+    expect(firstFault(out, pdoc)).toBeNull();
+    // operace začne až v t = 0,7 → krok 1 (t = 0,5) je skutečná kolize
+    const late = await processRun({ ...pdoc, motion: { ...pdoc.motion!, process: [{ id: "p", kind: "cut", tool: "r", target: "pl", at: { t: 0.7 } }] } }, res, { process: kernel });
+    expect(motionClashSummary(late, pdoc).codes.map((c) => c.code)).toEqual(["clash.real", "clash.work"]);
+    expect(stepHasFault(pdoc, late.steps[1])).toBe(true);
+  });
+
+  it("10. úroveň a věta o materiálové simulaci vždy s výsledkem; bez jádra žádný „děrovaný“, jen ⚠ nespočítáno", async () => {
+    const out = await processRun(pdoc, res, { process: kernel });
+    expect(levelLine(out.level!)).toMatch(/^Úroveň simulace: kinematika \+ geometrická aproximace/);
+    expect(processLines(out, pdoc)[0]).toMatch(/není to simulace materiálu/);
+    expect(processStatusText(out, pdoc)).toMatch(/ne simulace materiálu/);
+    // bez procesní vrstvy žádné „+ geometrická aproximace“
+    expect(levelLine(res.level!)).not.toMatch(/geometrická aproximace/);
+    const none = await processRun(pdoc, res, {});
+    expect(processOf(none)!.ops[0].contact).toBeNull();
+    expect(processLines(none, pdoc).join("\n")).not.toMatch(/děrovaný|odebráno|prostřiženo/);
+    expect(processStatusText(none, pdoc)).not.toMatch(/děrovaný|odebráno/);
+    expect(processCodes(none, pdoc).map((c) => c.code)).toContain("motion.process-failed");
   });
 });

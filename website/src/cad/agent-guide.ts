@@ -873,6 +873,22 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   nenastala = ⚠ \`motion.phase-unreached\`; motor fáze, jehož začátek nesedí na hodnotu vazby v okamžiku začátku = ⚠ \`motion.start-jump\`.
   Strojově na konci řádku \`phases=<nastalé>/<všechny>\`, motor s úseky \`m1=keys:80>50>40>37>80:---+\`. Dynamika po fázích zatím není.
   Restart = vždy z dokumentu (studie dokument nemění); fáze a úseky jdou i do převodu dokument → skript.
+- **Procesní vrstva – střih a otisk řízený pohybem (vlna 22, bod 4):** \`pohyb proces střih "Razník" "Plech"\` (EN \`motion process cut\`,
+  DE \`bewegung prozess schnitt\`) – v každém kroku se PŮVODNÍ obrobek protne s nástrojem v poloze kroku, průniky se sčítají (postupný
+  střih), po prostřižení se odebraný materiál oddělí jako **odpad** (\`odpad padá\` – s nástrojem, pak volný pád, výchozí | \`s nástrojem\` |
+  \`zůstane\`); \`pohyb proces ražení "Razník" "Plech" hloubka 0,3\` (EN \`imprint … depth 0.3\`, DE \`prägen … tiefe 0,3\`) = otisk s řízenou
+  hloubkou; \`hloubka\` u střihu = nástřih. Začátek: bez podmínky od dotyku (poloha), \`od 0,5 s\`, \`při motor 1 <= 1\`, \`při vazba "ZDVIH" <= 1\`
+  (vazba poháněná motorem) nebo \`fáze "Střih"\`. \`pohyb proces\` = seznam a výsledek, \`pohyb proces 2 smazat\`, \`pohyb proces smazat\`.
+  Protokol: \`Procesní vrstva: geometrická aproximace – booleovské odebrání …; není to simulace materiálu (žádné síly, otřep, odpružení ani
+  tok materiálu)\`, \`střih 1 „Razník“ → „Plech“: záběr od kroku 19 … · prostřiženo v kroku 21 … · odebráno 314,159 mm³ · hloubka 1 mm · odpad
+  1 ks\`, \`Stav výrobku „Plech“: plný (kroky 0–18) → v záběru (kroky 19–20) → děrovaný (kroky 21–48)\`; úroveň \`kinematika + geometrická
+  aproximace\`, strojově \`level=kin+geo … proc=1 removed=314.159 scrap=1 through=21\` na konci řádku. Pracovní záběr nástroje do obrobku od
+  začátku operace = ℹ \`clash.work\` (pravidlo „proces střih 1“, jeden model s \`kolize pravidlo pracovní\`), nikdy ⚠ clash.real; nástroj,
+  který obrobek nezasáhne = ⚠ \`motion.process-miss\`; neprostřiženo = ℹ \`motion.process-partial\`; strop 48 booleovských operací na
+  operaci = ℹ \`motion.process-approx\`. \`pohyb krok N\` vypíše stav výrobku a hloubku zásahu; \`stav\` stav na konci. Dokument se NEMĚNÍ:
+  krok 0 / restart = plný obrobek (výsledek je odvozený výsledek studie). Obrobek i nástroj = díl (ne podsestava).
+  Zápis události \`pohyb událost při vazba "ZDVIH" <= 1 odeber "Razník" z "Plech"\` = totéž jako střih s podmínkou. \`pohyb úroveň\`
+  (EN \`motion level\`) vypíše úroveň; úroveň se příkazem nevolí (geometrická aproximace = procesní operace).
 - **Motory při definici (bod 10):** po \`pohyb motor …\` řádek \`pohání: „Přidržovač“ + 1 díl – spolu s ním kvůli pevné vazbě (zámku):
   „Šroub M12“ · směr −Z\` (zkušební posun řešičem); druhý motor na tomtéž stupni volnosti = ⚠ \`motion.motor-conflict\` hned při zadání
   (ne až ve výpočtu); motor, kterým nejde pohnout (stupeň volnosti drží vazby), také. Panel: „+ Nový motor“ × „Upravit motor N“

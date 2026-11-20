@@ -93,6 +93,7 @@ import { bomNotesOf } from "./asm-supply";
 import { bomPartInfo } from "@/cad/bom-model";
 import { kinPickFromModel } from "./asm-mates-kin";
 import { MotionPanel, pushMotionSignal, useMotionView, useMotorHighlight } from "./motion-panel";
+import { processView, useProcessMeshVer } from "./process-meshes"; // procesní vrstva: obrobek po střihu / otisku a odpad v kroku (vlna 22, bod 4)
 import { useClearanceGap } from "./motion-clearance-panel"; // úsečka vůle pohybové studie (vlna 22, bod 6)
 import { useSpringBetween } from "./springs/spring-between";
 import { useMateRepick } from "./mate-repick";
@@ -305,6 +306,7 @@ export function CadApp() {
   const clearanceGapShow = useClearanceGap();
   // motor ve formuláři studie (vlna 22, bod 10): poháněné díly zvýrazněné, osa a šipka směru v překryvu (WebGL i bez WebGL)
   const motorHl = useMotorHighlight();
+  const procMeshVer = useProcessMeshVer();
   const [asmStack, setAsmStack] = useState<{ asm: CadDoc; key: string }[]>([]);
   // nastavení, paleta, úvodní obrazovka, formařské nástroje
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -997,7 +999,7 @@ export function CadApp() {
           const bad = out.split("\n").find((l) => l.startsWith("✗"));
           if (bad) throw new Error(bad);
           // změněná studie se do dokumentu promítne až po vykreslení
-          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft|pohled|view|ansicht|video|anotace|annotations|anmerkungen|vůle|vule|clearance|spiel|kollision)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
+          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft|pohled|view|ansicht|video|anotace|annotations|anmerkungen|vůle|vule|clearance|spiel|kollision|proces|process|prozess)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
         }
         const d = histRef.current.present;
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
@@ -1012,7 +1014,9 @@ export function CadApp() {
         const cl = res.collisionsChecked ? cr.motionClashSummary(res, d).stats : null;
         // vůle sledovaných dvojic, spojitost kontroly kolizí a kolize nalezené mezi kroky (vlna 22, bod 6)
         const clr = (await import("@/cad/clearance-report")).clearanceApi(res, d);
-        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr };
+        // procesní vrstva: operace, stav výrobku po krocích, úroveň „geometrická aproximace“ (vlna 22, bod 4)
+        const proc = (await import("@/cad/motion-process")).processApi(res, d);
+        return { steps, summary: studySummary(res, d), collision: cr.firstFault(res, d), ...(cl ? { collisions: cl } : {}), csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}), ...clr, ...(proc ? { process: proc } : {}) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -1436,11 +1440,14 @@ export function CadApp() {
     // zvýraznění kolidujících dílů jen pro PLATNÝ záznam aktivního dokumentu (jiná záložka / změněná sestava = nic)
     // jen závady (skutečné / nevyhodnotitelné) a jen jejich LISTY – šroub v závitu ani celá podsestava nesvítí (vlna 22, bod 5)
     const clashIds = clashValid && clashEntry ? faultLeafIds(entryClashes(clashEntry, doc)) : new Set<string>();
+    // procesní vrstva (vlna 22, bod 4): obrobek ve stavu kroku (po střihu / otisku) a oddělený odpad – jen zobrazení, dokument beze změny
+    const pv = motionShow.proc ? processView(motionShow.proc.res, doc, motionShow.proc.k, motionShow.pose) : null;
     const out: AsmView[] = [];
     for (const l of comps) {
       const r = asmCache.current.get(l.key);
+      const pm = l.id === l.topId ? pv?.replace.get(l.topId) : undefined;
       // pružina v kroku studie má vlastní síť drátu – díl ve volné délce nemusí být v jádře postavený
-      const mesh = l.coil?.mesh ?? r?.mesh;
+      const mesh = pm?.mesh ?? l.coil?.mesh ?? r?.mesh;
       if (!mesh) continue;
       const off = explode && centers.has(l.id) ? explodeOffset(mid, centers.get(l.id)!, explode, "Z") : [0, 0, 0];
       const m = [...l.matrix];
@@ -1451,9 +1458,9 @@ export function CadApp() {
       out.push({
         id: l.id,
         topId: l.topId,
-        key: l.coil?.key ?? l.key, // pružina v kroku studie: síť drátu v aktuální délce (cad/spring-coil-mesh.ts)
+        key: pm?.key ?? l.coil?.key ?? l.key, // pružina v kroku studie: síť drátu v aktuální délce (cad/spring-coil-mesh.ts); obrobek po operaci
         mesh,
-        vertices: l.coil ? undefined : r?.vertices,
+        vertices: l.coil || pm ? undefined : r?.vertices,
         matrix: m,
         color: l.comp.color ?? top?.color ?? "#b9c2cc",
         selected: l.topId === asmSel || l.topId === mate?.compId || !!motorHl?.comps.includes(l.topId),
@@ -1461,9 +1468,11 @@ export function CadApp() {
         solid: !!l.coil || r?.metrics?.solids !== 0, // vlna 22: plochy bez objemu = v řezu bez čela
       });
     }
+    // oddělený odpad procesní operace (s nástrojem / padá / zůstane – cad/motion-process.ts scrapOffset)
+    for (const sc of pv?.scrap ?? []) out.push({ id: sc.id, topId: sc.topId, key: sc.key, mesh: sc.mesh, matrix: sc.matrix, color: "#9c5b3c", solid: true });
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid, doc.clashRules, doc.clashTol, motorHl]);
+  }, [isAsm, leaves, motionLeaves, asmVer, explode, asmSel, mate, clashEntry, clashValid, doc.clashRules, doc.clashTol, motorHl, motionShow.proc, procMeshVer]);
 
   const asmPartInfo = useCallback(
     // jedna funkce materiálu a hmotnosti pro aplikaci, text i CLI (bom-model.ts – označení, třída v jazyce, normálie = třída pevnosti)
@@ -3953,6 +3962,7 @@ export function CadApp() {
             className="relative min-w-0 flex-1 overflow-hidden"
             data-doc-key={docKeyNow}
             data-motor-highlight={isAsm && motorHl ? motorHl.comps.length : undefined}
+            data-process-view={isAsm && motionShow.proc ? asmViews.filter((v) => v.key.startsWith("proc:")).length : undefined}
             data-motor-axis={isAsm && motorHl?.label ? motorHl.label.text : undefined}
             data-compare-map={cmpShown?.colors ? docKeyNow : undefined}
             onPointerDownCapture={(e) => {

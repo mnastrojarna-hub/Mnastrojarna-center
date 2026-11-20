@@ -1,0 +1,111 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+✓ nový díl „Plech“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Razník“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Díra 1 (hole) · úběr 3204,7 mm³ (3 % nástroje) · těleso platné
+✓ Kvádr 2 (box) · přidáno 6400 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 12566,4 mm³ · těleso platné
+
+Dokument: „Razník“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 20 × 20 × 40 mm (X -10…10, Y -10…10, Z 0…40) · objem 12,57 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 1 [cylinder, id #] ✓ přidáno 12566,4 mm³ · těleso platné – Ø20 × 40 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Lis“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Plech“ vložena do sestavy (ukotvená)
+✓ komponenta „Razník“ vložena do sestavy
+✓ vazba Souosost „Razník“ F1 → „Deska A“ F7: ok · poloha beze změny
+✓ vazba ZDVIH „Razník“ F3 → „Deska A“ F3 · 10 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
+ pohání: „Razník“ · směr −Z
+Pohybová studie: 48 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“: ΔZ −12 mm · na konci zpět ve výchozí poloze
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 11 z 49 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 11 krocích, první v kroku 19
+ kontrolováno spojitě i mezi polohami (49 poloh + 46 mezipoloh ze zjemnění; úseky: mez posunu 2, dráha posuvu 10, průnik už v poloze 12)
+Vazby splněny ve všech krocích
+⚠ řádek 7: v pohybu „Plech“ × „Razník“ od kroku 19 (t = 0,792 s): kroků 11, dvojic komponent 1, největší průnik 314,159 mm³ – místo [50; 50; 10,75] v kroku 19
+ℹ procesní operace 1. střih „Razník“ → „Plech“ · do prostřižení · od dotyku nástroje · odpad: s nástrojem, pak padá
+Pohybová studie: 48 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“: ΔZ −12 mm · na konci zpět ve výchozí poloze
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 0 z 49 · šroub v závitu 0 dvojic · skutečné: žádné · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (49 poloh + 46 mezipoloh ze zjemnění; úseky: mez posunu 2, dráha posuvu 10, průnik už v poloze 12)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ střih 1 „Razník“ → „Plech“: záběr od kroku 19 (t = 0,792 s) · prostřiženo v kroku 21 (t = 0,875 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
+Stav výrobku „Plech“: plný (kroky 0–18) → v záběru (kroky 19–20) → děrovaný (kroky 21–48)
+ℹ řádek 8: pracovní kontakt „Plech“ × „Razník“ v krocích 19–29 (pravidlo proces střih 1), největší průnik 314,159 mm³
+Krok 0 (t = 0 s, motory 10):
+ Deska A [0; 0; 0]
+ Plech [10; 10; 10]
+ Razník [50; 50; 20]
+ stav výrobku „Plech“: plný
+Krok 19 (t = 0,7917 s, motory 0,5):
+ Deska A [0; 0; 0]
+ Plech [10; 10; 10]
+ Razník [50; 50; 10,5]
+ pracovní kontakt: Plech × Razník
+ stav výrobku „Plech“: v záběru · odebráno 157,08 mm³ · hloubka 0,5 mm
+ zásah střih 1: 0,5 mm (geometrická aproximace)
+Krok 21 (t = 0,875 s, motory -0,5):
+ Deska A [0; 0; 0]
+ Plech [10; 10; 10]
+ Razník [50; 50; 9,5]
+ pracovní kontakt: Plech × Razník
+ stav výrobku „Plech“: děrovaný · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 oddělen
+ zásah střih 1: 1 mm (geometrická aproximace)
+Krok 48 (t = 2 s, motory 10):
+ Deska A [0; 0; 0]
+ Plech [10; 10; 10]
+ Razník [50; 50; 20]
+ stav výrobku „Plech“: děrovaný · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 oddělen
+ zásah střih 1: 1 mm (geometrická aproximace)
+Procesní operace: 1
+  1. střih „Razník“ → „Plech“ · do prostřižení · od dotyku nástroje · odpad: s nástrojem, pak padá
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ střih 1 „Razník“ → „Plech“: záběr od kroku 19 (t = 0,792 s) · prostřiženo v kroku 21 (t = 0,875 s) · odebráno 314,159 mm³ · hloubka 1 mm · odpad 1 ks, 314,159 mm³ (s nástrojem, pak padá)
+Stav výrobku „Plech“: plný (kroky 0–18) → v záběru (kroky 19–20) → děrovaný (kroky 21–48)
+Dokument: „Lis“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Plech [10; 10; 10] ⚓ · Razník [50; 50; 20]
+Vazby: 2 (2 ok)
+Pohybová studie: motorů 1 · kroků 48 · 2 s · kolize – pohyb stav
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 60 mm · objem Σ 115,76 cm³ · hmotnost Σ 0,909 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 48 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Plech“ děrovaný, odebráno 314,159 mm³, odpad 1 (podrobně pohyb stav)
+✓ procesní operace smazány: 1
+Pohybová studie: 48 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“: ΔZ −12 mm · na konci zpět ve výchozí poloze
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 11 z 49 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 11 krocích, první v kroku 19
+ kontrolováno spojitě i mezi polohami (49 poloh + 46 mezipoloh ze zjemnění; úseky: mez posunu 2, dráha posuvu 10, průnik už v poloze 12)
+Vazby splněny ve všech krocích
+⚠ řádek 15: v pohybu „Plech“ × „Razník“ od kroku 19 (t = 0,792 s): kroků 11, dvojic komponent 1, největší průnik 314,159 mm³ – místo [50; 50; 10,75] v kroku 19
+Pohybová studie: motorů 1 · kroků 48 · 2 s · kolize
+ 1. lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
+Pohybová studie: 48 kroků · 2 s · motory: lineární motor · ZDVIH „Razník“ → „Deska A“ · hodnota vazby 10 → -2 (1 s) → 10 (2 s) mm ↓↑ zdvih 12 mm · úseků 2
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razník“: ΔZ −12 mm · na konci zpět ve výchozí poloze
+ stojí: 2 („Deska A“, „Plech“)
+Kolize v pohybu: kroků s kolizí 11 z 49 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 11 krocích, první v kroku 19
+ kontrolováno spojitě i mezi polohami (49 poloh + 46 mezipoloh ze zjemnění; úseky: mez posunu 2, dráha posuvu 10, průnik už v poloze 12)
+Vazby splněny ve všech krocích
+⚠ řádek 16: v pohybu „Plech“ × „Razník“ od kroku 19 (t = 0,792 s): kroků 11, dvojic komponent 1, největší průnik 314,159 mm³ – místo [50; 50; 10,75] v kroku 19
+
+Dokument: „Lis“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Plech [10; 10; 10] ⚓ · Razník [50; 50; 20]
+Vazby: 2 (2 ok)
+Pohybová studie: motorů 1 · kroků 48 · 2 s · kolize – pohyb stav
+Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 × 60 mm · objem Σ 115,76 cm³ · hmotnost Σ 0,909 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 48 kroků, vazby splněny, průnik těles v 11 krocích (podrobně pohyb stav)

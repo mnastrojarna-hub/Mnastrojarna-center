@@ -18,6 +18,7 @@ import { asmEnvelope, cachedBody, clearInterferenceCache, clearPartCache, findCy
 import { clearCompareCache, compareTransferables, compareWithReference } from "./compare";
 import { clashDetail, clearClashDetailCache } from "./clash-detail";
 import { clearance, clearClearanceCache } from "./clearance-kernel";
+import { clearProcessCache, processOp } from "./process-kernel";
 import { exportShape } from "./formats/export";
 import { entityInfo, measureEntities, shapeFor, vertexPositions, type ShapeSrc } from "./inspect";
 import { measureQuery } from "./measure";
@@ -81,6 +82,7 @@ export function resetKernel(): void {
   clearInterferenceCache();
   clearClashDetailCache();
   clearClearanceCache();
+  clearProcessCache();
   clearDrawingModels();
   try {
     clearCompareCache();
@@ -333,6 +335,9 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
         break;
       case "clearance":
         reply(post, m, await clearance(m.req));
+        break;
+      case "process":
+        reply(post, m, await processOp(m.req));
         break;
       case "compare": {
         // porovnání s referenčním modelem: těleso dokumentu (z mezipaměti stavby) proti souboru STEP / BREP / STL;

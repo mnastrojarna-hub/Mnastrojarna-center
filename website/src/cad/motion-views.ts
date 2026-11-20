@@ -8,6 +8,8 @@
  * směr od cíle ke kameře, cíl a viditelná výška v mm. Pohled zadaný jen jménem („přední“) se přizpůsobí modelu.
  */
 import { getLang, tr } from "./i18n";
+import { isFault } from "./clash-rules";
+import type { ClashClass } from "./clash-class";
 import type { CadDoc, MotionAnnotSettings, MotionStudy, MotionView, StudyCamera, StudySection, Vec3 } from "./types";
 
 export type CamView = NonNullable<StudyCamera["view"]>;
@@ -148,8 +150,11 @@ export function annotRows(pose: AnnotPose, doc: Pick<CadDoc, "mates" | "motion">
   if (cl) for (const c of cl.slice(0, 4)) rows.push({ key: "clearance", text: tr("vůle {0} × {1}: {2} mm{3}", c.a, c.b, n(c.min, 3), c.limit !== undefined ? tr(" (min. {0})", n(c.limit, 3)) : ""), warn: c.limit !== undefined && c.min < c.limit });
   const cut = hide.has("cut") ? null : cutDepthAt(pose.stepData);
   if (cut) for (const c of cut.slice(0, 4)) rows.push({ key: "cut", text: tr("zásah {0}: {1} mm", c.label, n(c.depth, 3)) });
+  // procesní vrstva (C3, vlna 22 bod 4): úroveň výslovně – booleovské odebrání, ne simulace materiálu
+  if (cut) rows.push({ key: "cut", text: tr("geometrická aproximace – ne simulace materiálu") });
   const flags: string[] = [];
-  if (pose.stepData?.clashes?.length) flags.push(tr("kolize"));
+  // jen závada (skutečná / nevyhodnotitelná kolize) – pracovní kontakt procesní operace, šroub v závitu ani dotyk nejsou ⚠ kolize
+  if (pose.stepData?.clashes?.some((c) => isFault((c as { cls?: ClashClass }).cls))) flags.push(tr("kolize"));
   if (pose.stepData?.conflicts?.length) flags.push(tr("nesplněno {0}", pose.stepData.conflicts.length));
   if (flags.length) rows.push({ key: "flags", text: `⚠ ${flags.join(" · ")}`, warn: true });
   if (o.view) rows.push({ key: "view", text: tr("pohled „{0}“", o.view) });

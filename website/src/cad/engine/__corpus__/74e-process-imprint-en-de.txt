@@ -1,0 +1,25 @@
+# vlna 22, bod 4: otisk s řízenou hloubkou (EN příkaz) – razník projde hlouběji, otisk jen 0,3 mm (π·5²·0,3 = 23,562 mm³),
+# bez odpadu, stav „označený“; začátek operace podmínkou motoru; nástroj, který obrobek nezasáhne = ⚠ motion.process-miss;
+# DE výpis a smazání; podmínka vazby bez motoru = chyba s nápovědou
+nový díl Kovadlina
+kvádr 60 60 10
+nový díl Štítek
+kvádr 40 40 2
+nový díl Razidlo
+válec 10 30
+nový díl Kolík
+válec 4 10
+#--- run
+nová sestava Značení
+vložit "Kovadlina" ukotvit
+vložit "Štítek" v 10 10 10 ukotvit
+vložit "Razidlo" v 30 30 13
+vložit "Kolík" v 5 5 30 ukotvit
+sestava vazba vzdálenost "Razidlo" spodní "Kovadlina" horní hodnota 3 název "RAZ"
+pohyb motor lineární vazba "RAZ" 3..1 kroky 8 kolize
+motion process imprint "Razidlo" "Štítek" depth 0.3 when motor 1 <= 2.5
+pohyb krok 8
+bewegung prozess prägen "Kolík" "Štítek" tiefe 0,2
+bewegung prozess liste
+pohyb proces střih "Razidlo" "Štítek" fáze "Neexistuje"
+bewegung prozess 2 löschen

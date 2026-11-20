@@ -1,0 +1,98 @@
+=== run 1 ===
+✓ nový díl „Kovadlina“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Štítek“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Razidlo“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Kolík“ – nová záložka
+→ Válec 2 (cylinder) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 36000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 3200 mm³ · těleso platné
+✓ Válec 1 (cylinder) · přidáno 2356,2 mm³ · těleso platné
+✓ Válec 2 (cylinder) · přidáno 125,7 mm³ · těleso platné
+
+Dokument: „Kolík“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 4 × 4 × 10 mm (X -2…2, Y -2…2, Z 0…10) · objem 0,13 cm³ · ploch 3 · hran 3
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Válec 2 [cylinder, id #] ✓ přidáno 125,7 mm³ · těleso platné – Ø4 × 10 mm, new, podstava [0; 0; 0], osa Z
+=== run 2 ===
+✓ nová sestava „Značení“ – nová záložka
+✓ komponenta „Kovadlina“ vložena do sestavy (ukotvená)
+✓ komponenta „Štítek“ vložena do sestavy (ukotvená)
+✓ komponenta „Razidlo“ vložena do sestavy
+✓ komponenta „Kolík“ vložena do sestavy (ukotvená)
+✓ vazba RAZ „Razidlo“ F3 → „Kovadlina“ F6 · 3 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · RAZ „Razidlo“ → „Kovadlina“ · hodnota vazby 3 → 1 mm ↓ zdvih 2 mm
+ pohání: „Razidlo“ · směr −Z
+Pohybová studie: 8 kroků · 2 s · motory: lineární motor · RAZ „Razidlo“ → „Kovadlina“ · hodnota vazby 3 → 1 mm ↓ zdvih 2 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razidlo“: ΔZ −2 mm
+ stojí: 3 („Kovadlina“, „Štítek“, „Kolík“)
+Kolize v pohybu: kroků s kolizí 4 z 9 · šroub v závitu 0 dvojic · skutečné: 1 dvojic dílů v 4 krocích, první v kroku 5
+ kontrolováno spojitě i mezi polohami (9 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 4)
+Vazby splněny ve všech krocích
+⚠ řádek 7: v pohybu „Razidlo“ × „Štítek“ od kroku 5 (t = 1,25 s): kroků 4, dvojic komponent 1, největší průnik 78,54 mm³ – místo [30; 30; 11,88] v kroku 5
+ℹ procesní operace 1. otisk „Razidlo“ → „Štítek“ · hloubka 0,3 mm · od motor 1 ≤ 2,5
+Pohybová studie: 8 kroků · 2 s · motory: lineární motor · RAZ „Razidlo“ → „Kovadlina“ · hodnota vazby 3 → 1 mm ↓ zdvih 2 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razidlo“: ΔZ −2 mm
+ stojí: 3 („Kovadlina“, „Štítek“, „Kolík“)
+Kolize v pohybu: kroků s kolizí 0 z 9 · šroub v závitu 0 dvojic · skutečné: žádné · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (9 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 4)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ otisk 1 „Razidlo“ → „Štítek“: záběr od kroku 5 (t = 1,25 s) · odebráno 23,562 mm³ · hloubka 0,3 mm
+Stav výrobku „Štítek“: plný (kroky 0–4) → v záběru (kroky 5–8)
+ℹ řádek 8: pracovní kontakt „Razidlo“ × „Štítek“ v krocích 5–8 (pravidlo proces otisk 1), největší průnik 78,54 mm³
+Krok 8 (t = 2 s, motory 1):
+ Kovadlina [0; 0; 0]
+ Štítek [10; 10; 10]
+ Razidlo [30; 30; 11]
+ Kolík [5; 5; 30]
+ pracovní kontakt: Štítek × Razidlo
+ stav výrobku „Štítek“: v záběru · odebráno 23,562 mm³ · hloubka 0,3 mm
+ zásah otisk 1: 0,3 mm (geometrická aproximace)
+ℹ procesní operace 2. otisk „Kolík“ → „Štítek“ · hloubka 0,2 mm · od dotyku nástroje
+Pohybová studie: 8 kroků · 2 s · motory: lineární motor · RAZ „Razidlo“ → „Kovadlina“ · hodnota vazby 3 → 1 mm ↓ zdvih 2 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razidlo“: ΔZ −2 mm
+ stojí: 3 („Kovadlina“, „Štítek“, „Kolík“)
+Kolize v pohybu: kroků s kolizí 0 z 9 · šroub v závitu 0 dvojic · skutečné: žádné · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (9 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 4)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ otisk 1 „Razidlo“ → „Štítek“: záběr od kroku 5 (t = 1,25 s) · odebráno 23,562 mm³ · hloubka 0,3 mm
+ otisk 2 „Kolík“ → „Štítek“: bez záběru – nástroj obrobek nezasáhl, obrobek beze změny
+Stav výrobku „Štítek“: plný (kroky 0–4) → v záběru (kroky 5–8)
+ℹ řádek 10: pracovní kontakt „Razidlo“ × „Štítek“ v krocích 5–8 (pravidlo proces otisk 1), největší průnik 78,54 mm³
+⚠ řádek 10: procesní operace otisk 2: nástroj „Kolík“ obrobek „Štítek“ v okně operace nezasáhl – obrobek beze změny
+Procesní operace: 2
+  1. otisk „Razidlo“ → „Štítek“ · hloubka 0,3 mm · od motor 1 ≤ 2,5
+  2. otisk „Kolík“ → „Štítek“ · hloubka 0,2 mm · od dotyku nástroje
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ otisk 1 „Razidlo“ → „Štítek“: záběr od kroku 5 (t = 1,25 s) · odebráno 23,562 mm³ · hloubka 0,3 mm
+ otisk 2 „Kolík“ → „Štítek“: bez záběru – nástroj obrobek nezasáhl, obrobek beze změny
+Stav výrobku „Štítek“: plný (kroky 0–4) → v záběru (kroky 5–8)
+✗ řádek 12: fáze „Neexistuje“ ve studii není – fáze: žádné
+✓ procesní operace smazána: 2. otisk „Kolík“ → „Štítek“ · hloubka 0,2 mm · od dotyku nástroje
+Pohybová studie: 8 kroků · 2 s · motory: lineární motor · RAZ „Razidlo“ → „Kovadlina“ · hodnota vazby 3 → 1 mm ↓ zdvih 2 mm
+Úroveň simulace: kinematika + geometrická aproximace – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Razidlo“: ΔZ −2 mm
+ stojí: 3 („Kovadlina“, „Štítek“, „Kolík“)
+Kolize v pohybu: kroků s kolizí 0 z 9 · šroub v závitu 0 dvojic · skutečné: žádné · pracovní kontakt 1 dvojic
+ kontrolováno spojitě i mezi polohami (9 poloh + 4 mezipoloh ze zjemnění; úseky: dráha posuvu 1, průnik už v poloze 4)
+Vazby splněny ve všech krocích
+Procesní vrstva: geometrická aproximace – booleovské odebrání objemu nástroje z obrobku; není to simulace materiálu (žádné síly, otřep, odpružení ani tok materiálu)
+ otisk 1 „Razidlo“ → „Štítek“: záběr od kroku 5 (t = 1,25 s) · odebráno 23,562 mm³ · hloubka 0,3 mm
+Stav výrobku „Štítek“: plný (kroky 0–4) → v záběru (kroky 5–8)
+ℹ řádek 13: pracovní kontakt „Razidlo“ × „Štítek“ v krocích 5–8 (pravidlo proces otisk 1), největší průnik 78,54 mm³
+
+Dokument: „Značení“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Kovadlina [0; 0; 0] ⚓ · Štítek [10; 10; 10] ⚓ · Razidlo [30; 30; 13] · Kolík [5; 5; 30] ⚓
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 8 · 2 s · kolize – pohyb stav
+Sestava: 4 komponent (4 dílů po rozložení podsestav) · obálka 60 × 60 × 43 mm · objem Σ 41,68 cm³ · hmotnost Σ 0,327 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 8 kroků, vazby splněny, bez skutečné kolize v kontrolovaných krocích (jen šroub v závitu, dotyk nebo pracovní kontakt), procesní vrstva (geometrická aproximace, ne simulace materiálu): na konci „Štítek“ v záběru, odebráno 23,562 mm³ (podrobně pohyb stav)

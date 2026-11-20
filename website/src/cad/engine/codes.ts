@@ -144,6 +144,11 @@ export const CODES = [
   { code: "motion.phase-unreached", level: "warn", key: "fáze „{0}“ nenastala: podmínka {1} se do konce studie nesplnila (nejbližší hodnota {2})" },
   { code: "motion.motor-conflict", level: "warn", key: "motor {0} je v konfliktu s motorem {1} – pohánějí tentýž stupeň volnosti od stejného okamžiku" },
   { code: "motion.motor-replaced", level: "note", key: "motor {0} na vazbě „{1}“ nahrazen novým zadáním" },
+  // vlna 22, bod 4: procesní vrstva (střih / otisk jako geometrická aproximace – cad/motion-process.ts)
+  { code: "motion.process-miss", level: "warn", key: "procesní operace {0}: nástroj „{1}“ obrobek „{2}“ v okně operace nezasáhl – obrobek beze změny" },
+  { code: "motion.process-partial", level: "note", key: "procesní operace {0}: obrobek „{1}“ neprostřižen – hloubka {2} mm" },
+  { code: "motion.process-approx", level: "note", key: "procesní operace {0}: booleovsky spočítáno {1} z {2} kroků se záběrem (strop výkonu) – mezikroky převzaty" },
+  { code: "motion.process-failed", level: "warn", key: "procesní operace {0}: booleovská operace selhala ({1}) – výsledek jen do posledního platného stavu" },
   { code: "mate.conflict", level: "warn", key: "vazby nelze splnit spolu – polohy komponent beze změny; {0}" },
   // pružina po načtení dokumentu (vlna 22, bod 7): délka se odvozuje z dosedacích ploch – cad/asm-spring.ts springDrift
   { code: "spring.stale", level: "warn", key: "pružina „{0}“: uložená délka {1} neodpovídá dosedacím plochám ({2}) – délka odvozena z ploch" },

@@ -89,6 +89,8 @@ export function makeAsmEnv(ws: Workspace, kernel: KernelApi, o: AsmEnvOptions = 
     clashDetail: (d, pairs) => kernel.clashDetail(d, pairs),
     // vůle a spojitá kontrola pohybu (vlna 22, bod 6); jádro bez operace (zkušební náhrada) = bez kontroly mezi kroky
     ...(typeof kernel.clearance === "function" ? { clearance: (req: Parameters<KernelApi["clearance"]>[0]) => kernel.clearance(req) } : {}),
+    // procesní vrstva pohybové studie (vlna 22, bod 4 – střih / otisk); jádro bez operace = procesní operace se ohlásí jako nespočítané
+    ...(typeof kernel.process === "function" ? { process: (req: Parameters<KernelApi["process"]>[0]) => kernel.process(req) } : {}),
     cylFace: (key, r) => kernel.cylFace(key, r),
     isCone: (key, i) => kernel.inspect({ kind: "comp", key, matrix: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] }, { kind: "face", index: i }).then((e) => e.surface === "CONE", () => false),
     geo: asm.geo,
