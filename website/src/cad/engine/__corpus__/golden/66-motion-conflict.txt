@@ -24,9 +24,11 @@ Prvky:
 ✓ vazba Mez „Přidržovač“ F6 → „Deska A“ F5 · ⟨5; 25⟩ mm: ok · poloha beze změny
   vybráno: A F6 rovinná · B F5 rovinná
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Deska A“ · směr −Z
 Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Deska A: rozsah pohybu X 0 · Y 0 · Z 20 mm · konec [0; 0; 47,5]
+ „Deska A“: ΔZ −20 mm
+ stojí: 2 („Rám“, „Přidržovač“)
 ⚠ nesplněné vazby v 5 krocích (mechanismus se zasekl nebo motor překročil meze)
  ⚠ motion.conflict pohyb porušuje vazbu „ZDVIH Deska A → Rám“ v kroku 8–12 (t = 1.333–2 s)
  ⚠ motion.conflict pohyb porušuje vazbu „PEVNÁ Přidržovač → Rám“ v kroku 8–12 (t = 1.333–2 s)
@@ -56,9 +58,11 @@ Pohyb: výsledek platí pro tento stav sestavy – 12 kroků, nesplněné vazby 
 === run 3 ===
 ✓ pohybová studie smazána
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Deska A“ · směr −Z
 Pohybová studie: 12 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Rám“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Deska A: rozsah pohybu X 0 · Y 0 · Z 17,704 mm · konec [0; 0; 49,796]
+ „Deska A“: ΔZ −17,704 mm
+ stojí: 2 („Rám“, „Přidržovač“)
 ⚠ nesplněné vazby v 5 krocích (mechanismus se zasekl nebo motor překročil meze)
  ⚠ motion.conflict pohyb porušuje vazbu „ZDVIH Deska A → Rám“ v kroku 8–12 (t = 1.333–2 s)
  ⚠ motion.conflict pohyb porušuje vazbu „PEVNÁ Přidržovač → Rám“ v kroku 8–12 (t = 1.333–2 s)

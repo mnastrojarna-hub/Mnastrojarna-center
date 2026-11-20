@@ -896,7 +896,32 @@ polohy komponent (uzavřené smyčky klika–ojnice–píst, převody).
   dokument nezávisle na historii – ZDVIH 27,15 a zpět 57,5 = výchozí poloha; řádek „rovnováha pružin … posunula: …“); při načtení
   a zjišťování stavu se dokument nehýbe. Úprava, kterou nelze splnit, **nezapíše kompromis**: polohy zůstanou, řádek začíná ⚠ (ne ✓)
   a ⚠ `mate.conflict` uvede „nejbližší dosažitelná hodnota 37,5 mm (zadáno 37,15 mm) – brání: …“.
-- `pohyb` / `pohyb stav` – definice a souhrn (rozsah pohybu komponent, kolize po třídách – první skutečná, nesplněné vazby); `pohyb krok 12` – polohy
+- **Jedna studie s fázemi (vlna 22, bod 3)** – nájezd, sevření, střih, značení a návrat v JEDNOM dokumentu:
+  **úseky motoru** `pohyb motor lineární vazba "ZDVIH" 80..50..40..37 rychlost 50 prodleva 0,1 pak 80 rychlost 100` (mezipolohy
+  `A..B..C`, `pak B [čas T | rychlost V]`, `prodleva T`, `od A pak B čas T …`; úseky bez času vyplní okno / zbytek studie stejnou
+  rychlostí), **klíčové polohy** `klíče 0:57,5 0,3:40 0,6:27,15 1:57,5` (čas od začátku motoru), **časové okno** `okno 0,2..0,6` (nebo
+  `od 0,2 s do 0,6 s`), **fáze motoru** `fáze "Návrat"` (motor začne s fází). Na téže vazbě pohání motor, který začal nejpozději;
+  další motor na téže vazbě se stejným začátkem ji **nahradí s ℹ `motion.motor-replaced`**, `navázat` (EN `append`, DE `anhängen`)
+  připojí úseky za dosavadní motor. **Fáze:** `pohyb fáze "Sevření" při vazba "MEZERA" <= 0 potlačit vazba "NESENÍ" zapnout vazba
+  "MEZERA" [kinematika|kvazistatika]` (EN `motion phase "Clamp" when mate … <= 0 suppress mate … enable mate …`, DE `bewegung phase
+  "Klemmen" wenn verknüpfung … <= 0 unterdrücken … aktivieren …`); podmínka `při vazba N <=|>= v` (Vzdálenost = hodnota vazby, jinak
+  posuv od výchozí polohy), `při motor N >= v`, `od T s`; bez podmínky = první fáze od začátku, další po dojetí motorů předchozí fáze.
+  Okamžik podmínky se zpřesní mezi kroky (± 0,001); **zapnutá vazba zachytí polohu v tom okamžiku** (zámek drží díly, jak právě jsou).
+  Podmínka hodnoty je **hrana**: platí-li už v okamžiku začátku předchozí fáze, fáze počká, až přestane platit a znovu začne.
+  `pohyb fáze N upravit|smazat|nahoru|dolů`, `pohyb fáze` = výpis, `pohyb událost při …` = fáze bez názvu. Protokol po fázích:
+  `Fáze 2 „Sevření“: kroky 31–40 · t = 0,6–0,794 s · začátek: vazba „MEZERA“ ≤ 0 · kinematika · nesplněné vazby 0`; fáze, která
+  nenastala = ⚠ `motion.phase-unreached`; motor fáze, jehož začátek nesedí na hodnotu vazby v okamžiku začátku = ⚠ `motion.start-jump`.
+  Strojově na konci řádku `phases=<nastalé>/<všechny>`, motor s úseky `m1=keys:80>50>40>37>80:---+`. Dynamika po fázích zatím není.
+  Restart = vždy z dokumentu (studie dokument nemění); fáze a úseky jdou i do převodu dokument → skript.
+- **Motory při definici (bod 10):** po `pohyb motor …` řádek `pohání: „Přidržovač“ + 1 díl – spolu s ním kvůli pevné vazbě (zámku):
+  „Šroub M12“ · směr −Z` (zkušební posun řešičem); druhý motor na tomtéž stupni volnosti = ⚠ `motion.motor-conflict` hned při zadání
+  (ne až ve výpočtu); motor, kterým nejde pohnout (stupeň volnosti drží vazby), také. Panel: „+ Nový motor“ × „Upravit motor N“
+  (klik na motor v seznamu), řízené díly zvýrazněné a osa se šipkou směru ve 3D okně (i bez WebGL).
+- **Souhrn po tuhých skupinách (bod 15):** výchozí výpis pohybu = jeden řádek na skupinu dílů se stále stejnou vzájemnou polohou
+  (tolerance, žádné „58 + 1“ ze zaokrouhlení): ` „Horní deska“ + 20 dílů (tuhá skupina – zámek / pevné vazby): ΔZ −30 mm`, pak
+  ` stojí: 1 („Deska A“)` a nesplněné vazby; po dílech `pohyb detail` / `pohyb stav detail` (EN `motion detail`). Strojově na konci
+  řádku `groups=21:z-30,1:z-24.75` (počet dílů : osy ± posunutí v kroku největšího vychýlení).
+- `pohyb` / `pohyb stav` – definice a souhrn (pohyb tuhých skupin, kolize po třídách – první skutečná, nesplněné vazby); `pohyb krok 12` – polohy
   v kroku; `pohyb export csv` – tabulka (krok; čas; motory; X Y Z RX RY RZ každé komponenty; stopa; kolize) přímo v protokolu;
   `pohyb přehrát [smyčka]`, `pohyb zastavit`, `pohyb export png|webm` (snímky ZIP / video z 3D okna, jen v aplikaci);
   `pohyb kroky 48 čas 2 kolize vyp`, `pohyb motor smazat 1`, `pohyb smazat`.

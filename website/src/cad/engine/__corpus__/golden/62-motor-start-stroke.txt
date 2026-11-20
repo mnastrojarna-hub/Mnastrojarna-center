@@ -35,25 +35,36 @@ Sestava: 3 komponent (3 dílů po rozložení podsestav) · obálka 100 × 100 �
 Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
 === run 3 ===
 ✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 2 („Deska A“, „Vodítko“)
 Vazby splněny ve všech krocích
 ✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 2 („Deska A“, „Vodítko“)
 Vazby splněny ve všech krocích
+ℹ řádek 4: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
 ✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 2 („Deska A“, „Vodítko“)
 Vazby splněny ve všech krocích
+ℹ řádek 5: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
 ✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 2 („Deska A“, „Vodítko“)
 Vazby splněny ve všech krocích
+ℹ řádek 6: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
 Krok 2 (t = 2 s, motory 27,15):
  Deska A [0; 0; 0]
  Vodítko [50; 50; -20]
@@ -68,10 +79,13 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
 === run 4 ===
 ✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 0 → 30,35 mm ↑ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr +Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 0 → 30,35 mm ↑ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 40,35]
+ „Přidržovač“: ΔZ +30,35 mm
+ stojí: 2 („Deska A“, „Vodítko“)
 Vazby splněny ve všech krocích
+ℹ řádek 2: motor 1 na vazbě „ZDVIH“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
 ⚠ řádek 2: motor 1: začátek 0 mm se liší od aktuální hodnoty vazby „ZDVIH“ 57,5 mm – v kroku 0 díl přeskočí o 57,5 mm; zdvih od aktuální hodnoty: pohyb motor … zdvih Δ
 Krok 0 (t = 0 s, motory 0):
  Deska A [0; 0; 0]
@@ -89,16 +103,21 @@ Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kol
 ✓ motor 1 odebrán
 ✓ vazba 4 (ZDVIH „Přidržovač“ F5 → „Deska A“ F3 · 57,5 mm · potlačeno): potlačena · potlačeno
 ✓ motor 1: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 94,65]
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 2 („Deska A“, „Vodítko“)
 Vazby splněny ve všech krocích
 ⚠ řádek 4: motor 1: začátek 57,5 mm není 0 – u vazby „VEDENÍ“ je hodnota motoru posuv / natočení od výchozí polohy, v kroku 0 díl přeskočí o 57,5 mm; bez skoku: 0..Δ nebo zdvih Δ
 ✓ motor 1: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 0 → -30,35 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · VEDENÍ „Přidržovač“ → „Vodítko“ · posuv od výchozí polohy 0 → -30,35 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [20; 20; 37,15]
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 2 („Deska A“, „Vodítko“)
 Vazby splněny ve všech krocích
+ℹ řádek 5: motor 1 na vazbě „VEDENÍ“ nahrazen novým zadáním – další úsek za ním: pohyb motor … navázat (nebo … pak …); motor s jiným začátkem: okno T0..T1 / fáze N
 Krok 2 (t = 2 s, motory -30,35):
  Deska A [0; 0; 0]
  Vodítko [50; 50; -20]
@@ -119,9 +138,11 @@ Pohyb: výsledek platí pro tento stav sestavy – 2 kroků, vazby splněny, kol
 ✓ vazba Zarovnat „Přidržovač“ F6 → „Deska A“ F6: ok · „Přidržovač“ poloha [40; 20; 67,5]
 ✓ vazba Zarovnat „Přidržovač“ F4 → „Deska A“ F4: ok · „Přidržovač“ poloha [40; 40; 67,5]
 ✓ motor 1: lineární motor · ZDVIH „Deska A“ → „Přidržovač“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm (hodnota vazby je absolutní – nezáleží na tom, že komponenta je B vazby)
+ pohání: „Přidržovač“ · směr −Z
 Pohybová studie: 2 kroků · 2 s · motory: lineární motor · ZDVIH „Deska A“ → „Přidržovač“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
 Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
- Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30,35 mm · konec [40; 40; 37,15]
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 1 („Deska A“)
 Vazby splněny ve všech krocích
 Krok 0 (t = 0 s, motory 57,5):
  Deska A [0; 0; 0]

@@ -41,7 +41,7 @@ describe("zelené texty pohybové studie – kdy se nesmí vypsat", () => {
     const run = await runLines(changed, env, "pohyb spustit");
     expect(run.log).toContain(GREEN_MATES);
     expect(run.codes.map((c) => c.code)).toEqual(["motion.recomputed"]);
-    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=range:57.5>27.15:- level=kin"); // vlna 22, M2: úroveň na konci
+    expect(run.kv).toBe("motion steps=4 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=range:57.5>27.15:- level=kin groups=1:z-30.35"); // vlna 22, M2: úroveň na konci; M3: tuhé skupiny na konci
     // krok, export i přehrání po další změně také nejdřív přepočítají (ℹ motion.recomputed) – nikdy starý krok
     const again = resizePart(changed, "Rám", [100, 100, 20]);
     const step = await runLines(again, env, "pohyb krok 4");
@@ -145,7 +145,7 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     expect(a.log.join("\n")).not.toContain(GREEN_MATES);
     expect(a.log.join("\n")).toMatch(/⚠ vazby splněny ve všech krocích, ale polohu „Přidržovač“ neurčují/);
     expect(a.codes.map((c) => c.code)).toContain("motion.undetermined");
-    expect(a.kv).toMatch(/ undetermined=1 level=kin$/);
+    expect(a.kv).toMatch(/ undetermined=1 level=kin groups=\S+$/); // M3: tuhé skupiny na konci řádku
     // s preferovanou stranou je poloha určená → „Vazby splněny“ smí
     const b = await runLines(a.doc, env, 'sestava vazba 2 preferovat max', "pohyb spustit");
     expect(b.log).toContain(GREEN_MATES);
@@ -156,7 +156,7 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     const a = await runLines(press({ holder: true }), env, MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 20', 'sestava vazba mez-vzdálenosti "Přidržovač" F2 "Deska A" F1 min 5 max 40', "pohyb motor lineární vazba 1 57,5..27,15 kroky 4");
     expect(a.log.join("\n")).not.toContain(GREEN_MATES);
     expect(a.codes.map((c) => c.code)).toContain("motion.motor-limit");
-    expect(a.kv).toMatch(/ stopped=\d+ level=kin$/);
+    expect(a.kv).toMatch(/ stopped=\d+ level=kin groups=\S+$/); // M3: tuhé skupiny na konci řádku
   });
   it("„✓ vazba … hodnota“ ne, když úpravu nejde splnit: ⚠, polohy beze změny, ⚠ mate.conflict s nejbližší dosažitelnou hodnotou", async () => {
     const env = fakeEnv();
@@ -181,6 +181,62 @@ describe("zelené texty etapy M2 – kdy se nesmí vypsat", () => {
     const a = await runLines(press(), env, MATE, "pohyb motor lineární vazba 1 57,5..40 kroky 2");
     expect(a.log.join("\n")).toMatch(/Úroveň simulace: kinematika – .*zvoleno automaticky: sestava nemá pružinu/);
     expect(a.log.join("\n")).not.toMatch(/Úroveň simulace: kvazistatika/);
-    expect(a.kv).toMatch(/ level=kin$/);
+    expect(a.kv).toMatch(/ level=kin groups=\S+$/); // M3: tuhé skupiny na konci řádku
+  });
+});
+
+/**
+ * Etapa M3 (body 3, 10, 15): fáze, motory při definici, tuhé skupiny.
+ *
+ * | text úspěchu | nesmí se vypsat, když |
+ * |---|---|
+ * | „Fáze N „X“: … nesplněné vazby 0“ | fáze nenastala (⚠ motion.phase-unreached), ve fázi jsou nesplněné vazby / motor na mezi |
+ * | `phases=N/N` | některá fáze nenastala (`phases=4/5`) |
+ * | „pohání: „X“ …“ (motor hýbe díly) | motorem nejde pohnout (stupeň volnosti drží vazby) → „nepohne se“ a ⚠ motion.motor-conflict |
+ * | ✓ motor bez varování | druhý motor na tomtéž stupni volnosti (⚠ motion.motor-conflict), motor na téže vazbě nahrazen (ℹ motion.motor-replaced) |
+ * | „na konci zpět ve výchozí poloze“ (skupina) | skupina na konci jinde než na začátku |
+ */
+describe("zelené texty etapy M3 – kdy se nesmí vypsat", () => {
+  const mk3 = (d: CadDoc) => d;
+  it("fáze, která nenastala: žádný řádek „Fáze … nesplněné vazby 0“, ale ⚠; phases=1/2", async () => {
+    const env = fakeEnv();
+    const a = await runLines(mk3(press()), env, MATE, 'pohyb fáze "Dolů"', 'pohyb fáze "Nikdy" při vazba "ZDVIH" <= 1', "pohyb motor lineární vazba 1 57,5..27,15 kroky 4");
+    const txt = a.log.join("\n");
+    expect(txt).toMatch(/Fáze 1 „Dolů“: .* nesplněné vazby 0/);
+    expect(txt).not.toMatch(/Fáze 2 „Nikdy“: .*nesplněné vazby 0/);
+    expect(txt).toMatch(/⚠ fáze 2 „Nikdy“ nenastala/);
+    expect(a.codes.map((c) => c.code)).toContain("motion.phase-unreached");
+    expect(a.kv).toMatch(/ phases=1\/2$/);
+  });
+  it("fáze s nesplněnými vazbami / motorem na mezi: řádek fáze to řekne, ne „nesplněné vazby 0“", async () => {
+    const env = fakeEnv();
+    // od 1 s se zapne pevná vzdálenost desky (zachytí nynější mezeru) – motor dál žádá pohyb → stojí na mezi
+    const a = await runLines(mk3(press({ holder: true })), env, MATE, 'sestava vazba vzdálenost "Přidržovač" F1 "Rám" F2 hodnota 20 název "PEVNÁ"', 'sestava vazba vzdálenost "Deska A" F1 "Přidržovač" F2 hodnota 29.5 název "DRŽ"', 'sestava vazba "DRŽ" potlačit', 'pohyb fáze "Volně"', 'pohyb fáze "Drží" od 1 s zapnout vazba "DRŽ"', "pohyb motor lineární vazba 1 57,5..27,15 kroky 4");
+    const txt = a.log.join("\n");
+    expect(txt).toMatch(/Fáze 1 „Volně“: .*nesplněné vazby 0/);
+    expect(txt).toMatch(/Fáze 2 „Drží“: .*(nesplněné vazby v \d+ krocích|motor na mezi v \d+ krocích)/);
+    expect(txt).not.toMatch(/Fáze 2 „Drží“: .*nesplněné vazby 0$/m);
+    expect(txt).not.toContain(GREEN_MATES);
+  });
+  it("motor, kterým nejde pohnout: „nepohne se“ a ⚠ motion.motor-conflict, žádné „pohání: „…““", async () => {
+    const env = fakeEnv();
+    const a = await runLines(mk3(press()), env, MATE, 'sestava vazba zámek "Deska A" "Rám"', "pohyb motor lineární vazba 1 57,5..27,15 kroky 2");
+    const txt = a.log.join("\n");
+    expect(txt).not.toMatch(/pohání: „/);
+    expect(a.codes.map((c) => c.code)).toContain("motion.motor-conflict");
+  });
+  it("druhý motor na tomtéž stupni volnosti: ✓ motor 2 má vedle sebe ⚠ motion.motor-conflict; nahrazení motoru nikdy potichu", async () => {
+    const env = fakeEnv();
+    const a = await runLines(mk3(press()), env, MATE, 'sestava vazba souosost "Deska A" F3 "Rám" F3 název "OSA"', "pohyb motor lineární vazba 1 57,5..27,15 kroky 2", 'pohyb motor lineární vazba "OSA" 0..-5 kroky 2');
+    expect(a.codes.map((c) => c.code)).toContain("motion.motor-conflict");
+    const b = await runLines(a.doc, env, "pohyb motor lineární vazba 1 57,5..40 kroky 2");
+    expect(b.codes.map((c) => c.code)).toContain("motion.motor-replaced");
+  });
+  it("tuhá skupina: „na konci zpět ve výchozí poloze“ jen když se opravdu vrátila", async () => {
+    const env = fakeEnv();
+    const there = await runLines(mk3(press()), env, MATE, "pohyb motor lineární vazba 1 57,5..27,15 kroky 4");
+    expect(there.log.join("\n")).not.toContain("na konci zpět ve výchozí poloze");
+    const back = await runLines(there.doc, env, "pohyb motor lineární vazba 1 57,5..27,15 tam a zpět kroky 8");
+    expect(back.log.join("\n")).toContain(" „Deska A“: ΔZ −30,35 mm · na konci zpět ve výchozí poloze");
   });
 });

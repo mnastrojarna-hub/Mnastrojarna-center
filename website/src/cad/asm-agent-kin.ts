@@ -508,7 +508,9 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       let invert = false;
       if (cmd.mate !== undefined) mate = findMate(d, cmd.mate);
       else ({ mate, invert } = motorMate(d, findComp(d, cmd.comp!), cmd.kind));
-      const p = motorProblem({ kind: cmd.kind, mate: mate.id }, d.mates ?? []);
+      // vazba potlačená v dokumentu, kterou zapne některá fáze, smí nést motor (pohání ji od začátku té fáze)
+      const enabledLater = new Set((study.phases ?? []).flatMap((ph) => ph.enable ?? []));
+      const p = motorProblem({ kind: cmd.kind, mate: mate.id }, (d.mates ?? []).map((m) => (m.suppressed && enabledLater.has(m.id) ? { ...m, suppressed: false } : m)));
       if (p) throw new Error(tr("motor: {0}", p));
       // význam hodnot: Vzdálenost / Drážka s polohou = hodnota vazby (absolutní – znaménko se NEobrací, ani když je komponenta B vazby:
       // mezera nezávisí na pořadí komponent); ostatní = posuv / natočení od výchozí polohy (zadáno komponentou B → opačné znaménko)

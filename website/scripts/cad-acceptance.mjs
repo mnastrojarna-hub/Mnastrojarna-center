@@ -315,7 +315,11 @@ export function checkMotion(cs, r, exp) {
   if (!check(cs, "motion study: one summary line `= … motion steps=… travel=…` in the short protocol", !!line, line ?? protoLines(r).filter((l) => l.startsWith("= ")).slice(0, 4))) return;
   const travel = /travel=(\S+)/.exec(line)?.[1] ?? "";
   const groups = travel.split(",").filter(Boolean).map((g) => ({ mm: Number(g.split("mm:")[0]), n: Number(g.split(":")[1]) }));
-  note(cs, "motion", { line, groups });
+  // vlna 22, M3: na konci řádku tuhé skupiny `groups=<n>:<osy±Δ>` (stejné skupiny jako travel=, se směrem) a fáze `phases=a/b`
+  const rigid = (/ groups=(\S+)/.exec(line)?.[1] ?? "").split(",").filter(Boolean).map((g) => ({ n: Number(g.split(":")[0]), axes: g.split(":")[1] }));
+  const phases = / phases=(\d+)\/(\d+)/.exec(line);
+  note(cs, "motion", { line, groups, rigid, ...(phases ? { phases: { reached: Number(phases[1]), total: Number(phases[2]) } } : {}) });
+  if (rigid.length) check(cs, "motion: groups= agrees with travel= (same rigid groups, same counts)", rigid.map((g) => g.n).join(",") === groups.map((g) => g.n).join(","), { rigid, groups });
   for (const t of exp?.travel_mm ?? []) check(cs, `motion: a rigid group travels ${t} mm`, groups.some((g) => near(g.mm, t, 0.05)), groups);
 }
 

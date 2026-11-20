@@ -164,6 +164,7 @@ export function deltaText(d: Vec3): string {
 export function groupLines(g: RigidGroups, name: (id: string) => string): string[] {
   const out: string[] = [];
   for (const x of g.moving) {
+    // názvy v uvozovkách „…“ jako ostatní řádky souhrnu (motorText) – ve všech jazycích
     const who = x.n > 1 ? `„${name(x.root)}“ ${plusParts(x.n - 1)}` : `„${name(x.root)}“`;
     const why = x.n > 1 ? (x.locked ? tr(" (tuhá skupina – zámek / pevné vazby)") : tr(" (tuhá skupina – stejný pohyb)")) : "";
     const back = Math.hypot(...x.end) < STILL_MM && x.travel >= STILL_MM ? tr(" · na konci zpět ve výchozí poloze") : Math.hypot(x.end[0] - x.delta[0], x.end[1] - x.delta[1], x.end[2] - x.delta[2]) >= STILL_MM ? tr(" · na konci {0}", deltaText(x.end)) : "";

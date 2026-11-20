@@ -124,7 +124,7 @@ describe("3 – starý dokument s rychlostí a uloženým koncem", () => {
       "motor 1: uložený konec 27,15 mm se nepoužívá – motor jede od 57,5 mm rychlostí 15,175 mm/s bez koncové hodnoty, na konci studie je na 87,85 mm (opačným směrem, než leží konec); dokument ze starší verze – dojet na konec a stát: pohyb motor lineární vazba 1 57,5..27,15 rychlost 15,175 (v panelu Převést na rozsah × rychlost)",
     );
     // stručný protokol: směr a skutečný konec na strojovém řádku
-    expect(r.kv).toMatch(/ m1=open:57\.5>87\.85:\+ level=kin$/); // vlna 22, M2: úroveň simulace na konci řádku
+    expect(r.kv).toMatch(/ m1=open:57\.5>87\.85:\+ level=kin groups=\S+$/); // vlna 22, M2: úroveň simulace na konci řádku
     // verdikt: ne „ok“ ani „mates-ok“
     const { store, key } = slotOf(env);
     expect(motionStatusOf(store, key, legacy)!.state).toBe("warn");
@@ -140,7 +140,7 @@ describe("4 – směr a konec motoru na strojovém řádku", () => {
   it("přesný příkaz zprávy: `m1=ranged:57.5>27.15:-` na konci řádku (dřív řádek bajt po bajtu stejný jako při jízdě opačně)", async () => {
     const env = fakeEnv();
     const r = await runLines(press(), env, MATE, "pohyb motor lineární vazba 1 57.5..27.15 rychlost 15.175");
-    expect(r.kv).toBe("motion steps=36 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=ranged:57.5>27.15:- level=kin"); // M2: úroveň na konci
+    expect(r.kv).toBe("motion steps=36 t=2 motors=1 conflicts=0 travel=30.35mm:1 static=1 m1=ranged:57.5>27.15:- level=kin groups=1:z-30.35"); // M2: úroveň na konci; M3: tuhé skupiny
     // výsledek, který neplatí: definice motorů zůstává na řádku (bez výsledkových polí)
     const st = await runLines({ ...r.doc, motion: { ...r.doc.motion!, steps: 9 } }, env, "pohyb stav");
     expect(st.kv).toBe("motion steps=9 t=2 motors=1 motion.stale=1 m1=ranged:57.5>27.15:-");

@@ -1,0 +1,127 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Plech“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Horní deska“ – nová záložka
+→ Kvádr 3 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Razník“ – nová záložka
+→ Válec 1 (cylinder) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 4 (box) přidán – výsledek po výpočtu níže
+✓ nová sestava „Cyklus“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Plech“ vložena do sestavy
+✓ vazba Ukotvit „Plech“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou
+✓ komponenta „Horní deska“ vložena do sestavy
+✓ komponenta „Razník“ vložena do sestavy
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba ZDVIH „Horní deska“ F5 → „Deska A“ F6 · 80 mm: ok · poloha beze změny
+✓ vazba Zarovnat „Horní deska“ F2 → „Deska A“ F2: ok · poloha beze změny
+✓ vazba Zarovnat „Horní deska“ F4 → „Deska A“ F4: ok · poloha beze změny
+✓ vazba Zámek „Razník“ → „Horní deska“: ok · poloha beze změny
+✓ vazba NESENÍ „Přidržovač“ → „Horní deska“: ok · poloha beze změny
+✓ vazba MEZERA „Přidržovač“ F5 → „Plech“ F6 · 30 mm: ok · poloha beze změny
+✓ vazba 7 (MEZERA „Přidržovač“ F5 → „Plech“ F6 · 30 mm · potlačeno): potlačena · potlačeno
+✓ fáze 1. Nájezd · od začátku studie
+✓ fáze 2. Sevření · vazba „MEZERA“ ≤ 0 · zapnout: 7. MEZERA · potlačit: 6. NESENÍ
+✓ fáze 3. Střih · vazba „ZDVIH“ ≤ 40
+✓ fáze 4. Značení · vazba „ZDVIH“ ≤ 38
+✓ fáze 5. Návrat · vazba „ZDVIH“ ≥ 50 · zapnout: 6. NESENÍ · potlačit: 7. MEZERA
+✓ motor 1: lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
+ pohání: „Horní deska“ + 2 díly – spolu s ním kvůli pevné vazbě (zámku): „Razník“, „Přidržovač“ · směr −Z
+Pohybová studie: 70 kroků · 1,39 s · motory: lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ Fáze 1 „Nájezd“: kroky 0–30 · t = 0–0,596 s · začátek: od začátku studie · kinematika · nesplněné vazby 0
+ Fáze 2 „Sevření“: kroky 31–40 · t = 0,6–0,794 s · začátek: vazba „MEZERA“ ≤ 0 · kinematika · nesplněné vazby 0
+ Fáze 3 „Střih“: kroky 41–42 · t = 0,8–0,834 s · začátek: vazba „ZDVIH“ ≤ 40 · kinematika · nesplněné vazby 0
+ Fáze 4 „Značení“: kroky 43–54 · t = 0,84–1,072 s · začátek: vazba „ZDVIH“ ≤ 38 · kinematika · nesplněné vazby 0
+ Fáze 5 „Návrat“: kroky 55–70 · t = 1,09–1,39 s · začátek: vazba „ZDVIH“ ≥ 50 · kinematika · nesplněné vazby 0
+ „Horní deska“ + 1 díl (tuhá skupina – zámek / pevné vazby): ΔZ −43 mm · na konci zpět ve výchozí poloze
+ „Přidržovač“: ΔZ −30 mm · na konci zpět ve výchozí poloze
+ stojí: 2 („Deska A“, „Plech“)
+Vazby splněny ve všech krocích
+Krok 40 (t = 0,7943 s, motory 40,286):
+ Deska A [0; 0; 0]
+ Plech [40; 40; 20]
+ Horní deska [0; 0; 60,2857]
+ Razník [100; 100; 22,2857]
+ Přidržovač [140; 140; 22]
+Krok 70 (t = 1,39 s, motory 80):
+ Deska A [0; 0; 0]
+ Plech [40; 40; 20]
+ Horní deska [0; 0; 100]
+ Razník [100; 100; 62]
+ Přidržovač [140; 140; 52]
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Kvádr 3 (box)
+✓ Válec 1 (cylinder)
+✓ Kvádr 4 (box)
+
+Dokument: „Cyklus“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Plech [40; 40; 20] ⚓ · Horní deska [0; 0; 100] · Razník [100; 100; 62] · Přidržovač [140; 140; 52]
+Vazby: 7 (6 ok, 1 potlačeno)
+Pohybová studie: motorů 1 · kroků 70 · 1,39 s – pohyb stav
+Sestava: 5 komponent (5 dílů po rozložení podsestav) · obálka 200 × 200 × 120 mm · objem Σ 1656,74 cm³ · hmotnost Σ 13,005 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 70 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)
+=== run 2 ===
+Fáze studie: 5
+  1. Nájezd · od začátku studie
+  2. Sevření · vazba „MEZERA“ ≤ 0 · zapnout: 7. MEZERA · potlačit: 6. NESENÍ
+  3. Střih · vazba „ZDVIH“ ≤ 40
+  4. Značení · vazba „ZDVIH“ ≤ 38
+  5. Návrat · vazba „ZDVIH“ ≥ 50 · zapnout: 6. NESENÍ · potlačit: 7. MEZERA
+Pohybová studie: motorů 1 · kroků 70
+ 1. lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
+Fáze studie: 5
+  1. Nájezd · od začátku studie
+  2. Sevření · vazba „MEZERA“ ≤ 0 · zapnout: 7. MEZERA · potlačit: 6. NESENÍ
+  3. Střih · vazba „ZDVIH“ ≤ 40
+  4. Značení · vazba „ZDVIH“ ≤ 38
+  5. Návrat · vazba „ZDVIH“ ≥ 50 · zapnout: 6. NESENÍ · potlačit: 7. MEZERA
+Pohybová studie: 70 kroků · 1,39 s · motory: lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ Fáze 1 „Nájezd“: kroky 0–30 · t = 0–0,596 s · začátek: od začátku studie · kinematika · nesplněné vazby 0
+ Fáze 2 „Sevření“: kroky 31–40 · t = 0,6–0,794 s · začátek: vazba „MEZERA“ ≤ 0 · kinematika · nesplněné vazby 0
+ Fáze 3 „Střih“: kroky 41–42 · t = 0,8–0,834 s · začátek: vazba „ZDVIH“ ≤ 40 · kinematika · nesplněné vazby 0
+ Fáze 4 „Značení“: kroky 43–54 · t = 0,84–1,072 s · začátek: vazba „ZDVIH“ ≤ 38 · kinematika · nesplněné vazby 0
+ Fáze 5 „Návrat“: kroky 55–70 · t = 1,09–1,39 s · začátek: vazba „ZDVIH“ ≥ 50 · kinematika · nesplněné vazby 0
+ Horní deska: rozsah pohybu X 0 · Y 0 · Z 43 mm · konec [0; 0; 100]
+ Razník: rozsah pohybu X 0 · Y 0 · Z 43 mm · konec [100; 100; 62]
+ Přidržovač: rozsah pohybu X 0 · Y 0 · Z 30 mm · konec [140; 140; 52]
+Vazby splněny ve všech krocích
+Pohybová studie: motorů 1 · kroků 70
+ 1. lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
+Fáze studie: 5
+  1. Nájezd · od začátku studie
+  2. Sevření · vazba „MEZERA“ ≤ 0 · zapnout: 7. MEZERA · potlačit: 6. NESENÍ
+  3. Střih · vazba „ZDVIH“ ≤ 40
+  4. Značení · vazba „ZDVIH“ ≤ 38
+  5. Návrat · vazba „ZDVIH“ ≥ 50 · zapnout: 6. NESENÍ · potlačit: 7. MEZERA
+Pohybová studie: 70 kroků · 1,39 s · motory: lineární motor · ZDVIH „Horní deska“ → „Deska A“ · hodnota vazby 80 → 50 (0,6 s) → 40 (0,8 s) → 37 (0,86 s) → 80 (1,39 s) mm ↓↓↓↑ zdvih 43 mm · úseků 4
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ Fáze 1 „Nájezd“: kroky 0–30 · t = 0–0,596 s · začátek: od začátku studie · kinematika · nesplněné vazby 0
+ Fáze 2 „Sevření“: kroky 31–40 · t = 0,6–0,794 s · začátek: vazba „MEZERA“ ≤ 0 · kinematika · nesplněné vazby 0
+ Fáze 3 „Střih“: kroky 41–42 · t = 0,8–0,834 s · začátek: vazba „ZDVIH“ ≤ 40 · kinematika · nesplněné vazby 0
+ Fáze 4 „Značení“: kroky 43–54 · t = 0,84–1,072 s · začátek: vazba „ZDVIH“ ≤ 38 · kinematika · nesplněné vazby 0
+ Fáze 5 „Návrat“: kroky 55–70 · t = 1,09–1,39 s · začátek: vazba „ZDVIH“ ≥ 50 · kinematika · nesplněné vazby 0
+ „Horní deska“ + 1 díl (tuhá skupina – zámek / pevné vazby): ΔZ −43 mm · na konci zpět ve výchozí poloze
+ „Přidržovač“: ΔZ −30 mm · na konci zpět ve výchozí poloze
+ stojí: 2 („Deska A“, „Plech“)
+Vazby splněny ve všech krocích
+Krok 70 (t = 1,39 s, motory 80):
+ Deska A [0; 0; 0]
+ Plech [40; 40; 20]
+ Horní deska [0; 0; 100]
+ Razník [100; 100; 62]
+ Přidržovač [140; 140; 52]
+
+Dokument: „Cyklus“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Plech [40; 40; 20] ⚓ · Horní deska [0; 0; 100] · Razník [100; 100; 62] · Přidržovač [140; 140; 52]
+Vazby: 7 (6 ok, 1 potlačeno)
+Pohybová studie: motorů 1 · kroků 70 · 1,39 s – pohyb stav
+Sestava: 5 komponent (5 dílů po rozložení podsestav) · obálka 200 × 200 × 120 mm · objem Σ 1656,74 cm³ · hmotnost Σ 13,005 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 70 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

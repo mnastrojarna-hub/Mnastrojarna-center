@@ -381,7 +381,7 @@ export function parseMotionText(line: string): MotionCmd {
     // rozsah / zdvih + rychlost = rozsah × rychlost (dojede na konec a stojí) – dřív se konec potichu zahodil (bod 9 zprávy)
     if (hasEnd && out.speed !== undefined && !out.points && !out.extra) out.ranged = true;
     if (out.points || out.extra) {
-      if (!hasEnd && !(rng && out.extra?.some((g) => Number.isFinite(g.to)))) throw new Error(tr("motor: úseky „pak“ / „prodleva“ navazují na rozsah – zadejte nejdřív konec prvního úseku (57,5..27,15 pak 57,5) nebo začátek (od 57,5 pak 27,15 čas 0,4)"));
+      if (!hasEnd && !((rng || out.append) && out.extra?.some((g) => Number.isFinite(g.to)))) throw new Error(tr("motor: úseky „pak“ / „prodleva“ navazují na rozsah – zadejte nejdřív konec prvního úseku (57,5..27,15 pak 57,5) nebo začátek (od 57,5 pak 27,15 čas 0,4)"));
       if (out.back) throw new Error(tr("motor: „tam a zpět“ nejde spojit s úseky – návrat zapište jako další úsek: … pak <začátek>"));
     }
     return out;

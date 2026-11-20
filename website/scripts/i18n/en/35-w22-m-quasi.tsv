@@ -49,7 +49,6 @@ nejbližší dosažitelná hodnota {0} (zadáno {1}) – brání: {2}	nearest re
 neřešitelné kroky {0} – zobrazena poslední platná poloha (krok {1}), žádný kompromis; konflikt: {2}; příčina: {3}	unsolvable steps {0} – the last valid position is shown (step {1}), no compromise; conflict: {2}; cause: {3}
 NEŘEŠITELNÝ krok – zobrazen krok {0}	UNSOLVABLE step – step {0} shown
 Neřešitelný krok {0} – zobrazena poslední platná poloha (krok {1})	Unsolvable step {0} – the last valid position is shown (step {1})
-pohyb motor rotační|lineární "<komponenta>"|vazba <N> <od>..<do> | [od <A>] zdvih <Δ> [krok S | kroky N] [čas T] [ot/min R | rychlost V] [na mezi stop|chyba] [kolize] [stopa "<X>" [bod x y z]] · pohyb kinematika|kvazistatika|dynamika|automaticky · pohyb stav|spustit|přehrát|zastavit|krok N|export csv|png|webm|smazat	motion motor rotary|linear "<component>"|mate <N> <from>..<to> | [from <A>] stroke <Δ> [step S | steps N] [time T] [rpm R | speed V] [at limit stop|error] [collisions] [trace "<X>" [point x y z]] · motion kinematics|quasistatic|dynamics|auto · motion status|run|play|stop|step N|export csv|png|webm|delete
 poloha „{0}“ není vazbami určena (volná v mezi {1}) – {2}	the position of “{0}” is not determined by the mates (free within limit {1}) – {2}
 polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl	positions from mates and motors only – springs are measured but do not push; a part whose position the mates do not determine stays where it was
 Preferovaná strana	Preferred side
