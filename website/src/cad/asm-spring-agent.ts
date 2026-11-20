@@ -8,7 +8,7 @@ import { faceShort, findComp, fold, pickFace, SPRING_USE, type AsmCmd, type Comp
 import { compFaces, ensureBuilt, geoProvider, leafId, type AsmEnv, type AsmResult } from "./asm-agent";
 import { springGeom, springWorldAxis } from "./asm-spring-geom";
 import { isSpringExt } from "./springs";
-import { applySpringStates, instanceLines, springComps, springLine, springLines, springSeatMates, springState, springStates } from "./asm-spring";
+import { applySpringStates, instanceLines, springComps, springDriftBetween, springLine, springLines, springSeatMates, springState, springStates, type SpringCheck } from "./asm-spring";
 import { tr } from "./i18n";
 import { ensureMateRefs } from "./mate-geo";
 import type { AsmComponent, CadDoc, MateRef, SpringDef, Vec3 } from "./types";
@@ -42,6 +42,18 @@ export async function refreshSprings(doc: CadDoc, env: AsmEnv): Promise<CadDoc> 
   if (doc.kind !== "assembly" || !springComps(doc).length) return doc;
   await ensureSeatGeo(doc, env);
   return applySpringStates(doc, springStates(doc, geoProvider(doc, env)));
+}
+
+/**
+ * Kontrola pružin proti dosedacím plochám (vlna 22, bod 7): dokument s délkami z ploch, rozpory s uloženou délkou (`spring.stale`)
+ * a zda šlo ověřit všechny pružiny (geometrie ploch k dispozici). Dokument `doc` se nemění.
+ */
+export async function springCheckOf(doc: CadDoc, env: AsmEnv): Promise<{ doc: CadDoc; check: SpringCheck } | null> {
+  if (doc.kind !== "assembly" || !springComps(doc).length) return null;
+  await ensureSeatGeo(doc, env);
+  const states = springStates(doc, geoProvider(doc, env));
+  const fixed = applySpringStates(doc, states);
+  return { doc: fixed, check: { checked: states.length === springComps(doc).length, stale: springDriftBetween(doc, fixed) } };
 }
 
 /** Komponenty, kterých se příkaz týká: #k / přezdívka = jedna, název = všechny instance s tímto názvem (6 stejných pružin jedním řádkem). */

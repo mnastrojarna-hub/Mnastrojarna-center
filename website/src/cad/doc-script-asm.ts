@@ -16,6 +16,7 @@ const WD = {
   alias: L("přezdívka", "alias", "spitzname"),
   comp: L("komponenta", "component", "komponente"),
   asm: L("sestava", "assembly", "baugruppe"),
+  mate: L("vazba", "mate", "verknüpfung"),
   spring: L("pružina", "spring", "feder"),
   between: L("mezi", "between", "zwischen"),
   free: L("volná", "free", "frei"),
@@ -27,6 +28,11 @@ const WD = {
   motion: L("pohyb", "motion", "bewegung"),
   dynamics: L("dynamika", "dynamics", "dynamik"),
   kinematics: L("kinematika", "kinematics", "kinematik"),
+  quasistatic: L("kvazistatika", "quasistatic", "quasistatisch"),
+  autoMode: L("automaticky", "auto", "automatisch"),
+  prefer: L("preferovat", "prefer", "bevorzugen"),
+  atLimit: L("na mezi", "at limit", "an grenze"),
+  limitError: L("chyba", "error", "fehler"),
   time: L("čas", "time", "zeit"),
   step: L("krok", "step", "schritt"),
   gravity: L("gravitace", "gravity", "schwerkraft"),
@@ -144,5 +150,27 @@ export function emitDynamics(o: AsmOut, mo: MotionStudy): void {
     return;
   }
   o.line(l);
-  if (!dynamic) o.line(`${w(o, "motion")} ${w(o, "kinematics")}`);
+  // zpět z dynamiky na režim studie, jak je uložený (vlna 22: kinematika / kvazistatika / automaticky)
+  if (!dynamic) o.line(studyModeLine(o, mo));
 }
+
+/** řádek režimu studie (vlna 22, bod 2): `pohyb kinematika | kvazistatika | automaticky` */
+export const studyModeLine = (o: AsmOut, mo: MotionStudy): string => `${w(o, "motion")} ${w(o, mo.mode === "quasistatic" ? "quasistatic" : mo.mode === "kinematic" ? "kinematics" : "autoMode")}`;
+
+/**
+ * Režim studie bez nastavení dynamiky (dynamika ho zapíše za řádkem `pohyb dynamika`), preferované strany mezí a chování motoru na
+ * mezi se zapíší do skriptu (vlna 22, body 2 a 8); `mateNo` = číslo vazby ve skriptu.
+ */
+export function emitStudyExtras(o: AsmOut, mo: MotionStudy | undefined, mates: { id: string; prefer?: "min" | "max" }[], mateNo: Map<string, number>): void {
+  for (const m of mates) {
+    const no = mateNo.get(m.id);
+    if (m.prefer && no !== undefined) o.line(`${w(o, "asm")} ${w(o, "mate")} ${no} ${w(o, "prefer")} ${m.prefer}`);
+  }
+  // s vlastním nastavením dynamiky zapíše režim `emitDynamics` za řádkem `pohyb dynamika`
+  const d = mo?.dyn;
+  const dynLine = !!d && !(d.gravity === undefined && !d.damping && !d.restitution && !d.frames && d.dt === SCRIPT_DEFAULT_DT);
+  if (mo && mo.mode !== "dynamic" && mo.mode !== undefined && !dynLine) o.line(studyModeLine(o, mo));
+}
+
+/** dovětek motoru `na mezi chyba` (výchozí stop se nepíše) */
+export const motorLimitWords = (o: AsmOut, mo: { atLimit?: "stop" | "error" }): string => (mo.atLimit === "error" ? ` ${w(o, "atLimit")} ${w(o, "limitError")}` : "");

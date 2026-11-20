@@ -12,7 +12,8 @@ import { groupKey } from "@/cad/asm-groups";
 import type { MateFaceInfo } from "@/cad/asm-kernel";
 import { MATE_LABEL, hasFixedMate, mateFromPending, measureMateIn, releaseComponent, solveMates, type FaceGeo, type MateStatus } from "@/cad/mates";
 import { ensureMateRefs, entKey, refGeo } from "@/cad/mate-geo";
-import { springComps, springSeatMates, withSprings } from "@/cad/asm-spring";
+import { springComps, springDrift, springDriftText, springSeatMates, withSprings } from "@/cad/asm-spring";
+import { conflictText, solveStatic } from "@/cad/mates-static";
 import { springRunNote } from "./asm-spring-props";
 import { poseDoc } from "@/cad/motion";
 import { bodiesAt } from "@/cad/bodies";
@@ -1390,13 +1391,24 @@ export function CadApp() {
   const ensureMateGeo = (d: CadDoc): Promise<Mate[]> =>
     // i dosedací plochy pružin (pomocné „vazby“ se odříznou) – délka pružin po přepočtu (cad/asm-spring.ts)
     ensureMateRefs([...(d.mates ?? []), ...springSeatMates(d)], (ref) => leafOf(ref, d)?.key ?? null, mateGeo.current, { face: (k, i) => cad.mateFace(k, i), ent: (k, i, e) => cad.mateEnt(k, i, e), cylFace: (k, r) => cad.cylFace(k, r) }).then((m) => m.slice(0, d.mates?.length ?? 0));
-  const resolveMates = async (d: CadDoc, anchorId?: string | null) => {
+  /**
+   * `o.equilibrium` (výchozí ano = úprava): díly volné v mezi do rovnováhy pružin / preferovaných stran mezí; po načtení dokumentu
+   * (efekt níže) ne – dokument se při otevření nehýbe. Konflikt vazeb: kompromis se nezapíše (vlna 22, bod 8; cad/mates-static.ts –
+   * týž řešič jako text `solveAsm`).
+   */
+  const resolveMates = async (d: CadDoc, anchorId?: string | null, o: { equilibrium?: boolean } = {}) => {
     const springs = d.kind === "assembly" && springComps(d).length > 0; // pružiny: délka i bez vazeb a bez pohnutí řešičem
     if (d.kind !== "assembly" || (!d.mates?.length && !springs)) return;
     const key = docId.current; // výsledek patří dokumentu, pro který se počítá – do jiné záložky se nezapíše ani nezobrazí
     const mates = await ensureMateGeo(d);
     const withMates = { ...d, mates };
-    const r = solveMates(withMates, geoProvider(withMates), anchorId);
+    const r = solveStatic(withMates, geoProvider(withMates), anchorId, { equilibrium: o.equilibrium ?? true });
+    if (r.conflict) flash(tr("Vazby nelze splnit spolu – polohy komponent zůstaly beze změny: {0}", conflictText(r.conflict)));
+    // po načtení: rozpor uložené délky pružin s plochami se ohlásí (ne tiše – vlna 22, bod 7); oprava níže (withSprings)
+    if (o.equilibrium === false && springs) {
+      const drift = springDrift(withMates, geoProvider(withMates));
+      if (drift.length) flash(`⚠ ${drift.map(springDriftText).join("; ")}`);
+    }
     if (r.mates) mates.splice(0, mates.length, ...r.mates); // pokročilé vazby: výchozí stav stupňů volnosti se uloží do dokumentu
     const matesChanged = JSON.stringify(mates) !== JSON.stringify(d.mates ?? []);
     const byId = new Map(r.components.map((c) => [c.id, c.placement]));
@@ -1498,9 +1510,29 @@ export function CadApp() {
     if (mateTried.current === k) return;
     mateTried.current = k;
     if (mateState === "stale") void checkMates(doc);
-    else void resolveMates(doc);
+    else void resolveMates(doc, null, { equilibrium: false }); // po načtení: jen vazby, žádná rovnováha (dokument se nehýbe)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asmVer, hasMates, mateSigNow, mateState, docKeyNow, resVer]);
+  // pružiny po načtení / přepnutí záložky (vlna 22, bod 7) – i v sestavě BEZ vazeb: délka se odvodí z dosedacích ploch; rozpor
+  // s uloženou délkou se opraví jedním krokem historie a ohlásí stejnou větou jako text (⚠ spring.stale); každý stav jednou
+  const springTried = useRef("");
+  useEffect(() => {
+    if (!isAsm || engineBusy.current || !springComps(doc).length) return;
+    const k = `${docKeyNow}|${asmVer}|${JSON.stringify((doc.components ?? []).map((c) => [c.id, c.placement, c.spring ?? null]))}`;
+    if (springTried.current === k) return;
+    springTried.current = k;
+    const d = doc;
+    void ensureMateGeo(d).then(() => {
+      if (docId.current !== docKeyNow || histRef.current.present !== d) return;
+      const drift = springDrift(d, geoProvider(d));
+      if (!drift.length) return;
+      commitWith((cur) => (cur === d ? withSprings(cur, geoProvider(cur)) : cur));
+      const text = drift.map(springDriftText).join("; ");
+      flash(`⚠ ${text}`);
+      console.warn(`spring.stale ${text}`);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAsm, doc, asmVer, docKeyNow]);
   // ---------- pole, zrcadlení, šroubový spoj ----------
   const norm3 = (v: Vec3): Vec3 => {
     const l = Math.hypot(...v) || 1;
@@ -3657,6 +3689,12 @@ export function CadApp() {
             }}
             onWheelCapture={() => setHud(null)}
           >
+            {/* neplatný krok pohybové studie (vlna 22, bod 8): 3D ukazuje poslední platnou polohu – výrazně označeno (i bez WebGL) */}
+            {isAsm && motionShow.invalid && (
+              <div data-motion-invalid={motionShow.invalid.step} data-motion-shows={motionShow.invalid.shows} className="pointer-events-none absolute inset-0 z-20 border-4 border-brand">
+                <span className="absolute left-2 top-2 rounded bg-brand px-2 py-0.5 text-[11.5px] font-semibold text-white">{tr("Neřešitelný krok {0} – zobrazena poslední platná poloha (krok {1})", motionShow.invalid.step, motionShow.invalid.shows)}</span>
+              </div>
+            )}
             <div className={cn("absolute inset-0", sketch && "invisible")} style={{ background: bg.css }}>
               <ViewportBoundary resetKey={glKey} onError={(error) => setGlError({ error, probe: probeWebGL() })}>
                 <Viewport

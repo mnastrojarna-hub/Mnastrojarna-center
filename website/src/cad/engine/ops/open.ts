@@ -3,6 +3,7 @@ import { tr } from "../../i18n";
 import { readDocument } from "../open-file";
 import { flush, runOf } from "../run-doc";
 import { startRunDoc } from "../runs";
+import { freshenRunDoc } from "../spring-fresh";
 import { say, type OpHandler } from "./util";
 
 export const openOp: OpHandler<"open"> = async (op, ctx) => {
@@ -14,4 +15,5 @@ export const openOp: OpHandler<"open"> = async (op, ctx) => {
   say(ctx, st.reused ? tr("✓ otevřeno „{0}“ – dokument „{1}“ ve znovu použité záložce z dřívějšího běhu", res.file, res.doc.name) : tr("✓ otevřeno „{0}“ – dokument „{1}“ v nové záložce", res.file, res.doc.name));
   if (res.note) say(ctx, `  ${res.note}`);
   st.report();
+  await freshenRunDoc(ctx, op.line); // pružiny: délka z dosedacích ploch, ⚠ spring.stale (vlna 22, bod 7)
 };

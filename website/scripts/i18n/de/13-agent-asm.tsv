@@ -60,7 +60,6 @@
 ✓ pole „{0}“: {1} ks ({2}) – kopie {3}	✓ Muster „{0}“: {1} Stk. ({2}) – Kopien {3}
 ✓ rám formy „{0}“ – nová záložka: komponent {1}, {2}×{3} mm, výška {4} mm (se středicím kroužkem), dutina {5}, materiál {6}	✓ Formaufbau „{0}“ – neue Registerkarte: Komponenten {1}, {2}×{3} mm, Höhe {4} mm (mit Zentrierring), Nest {5}, Werkstoff {6}
 ✓ úprava {0} „{1}“ v kontextu sestavy „{2}“{3} – další příkazy pracují s ním; návrat: sestava hotovo	✓ Bearbeitung {0} „{1}“ im Kontext der Baugruppe „{2}“{3} – weitere Befehle arbeiten damit; zurück: baugruppe fertig
-✓ vazba {0} ({1}): {2}{3}	✓ Verknüpfung {0} ({1}): {2}{3}
 ✓ vazba Ukotvit „{0}“ – komponenta je ukotvená, ostatní vazby hýbou druhou komponentou	✓ Verknüpfung Fixiert „{0}“ – die Komponente ist fixiert, andere Verknüpfungen bewegen die andere Komponente
 ✓ záložka „{0}“ ({1}) je aktivní – další příkazy pracují s ní	✓ Registerkarte „{0}“ ({1}) ist aktiv – weitere Befehle arbeiten damit
 ✓ záložka „{0}“ už je aktivní	✓ Registerkarte „{0}“ ist bereits aktiv

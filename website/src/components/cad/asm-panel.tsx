@@ -26,7 +26,7 @@ import {
   type PendingMate,
 } from "@/cad/mates";
 import { evalExpr } from "@/cad/params";
-import { uid, type AsmComponent, type CadDoc, type ComponentSource, type MateRef, type PlaneName, type Vec3 } from "@/cad/types";
+import { uid, type AsmComponent, type CadDoc, type ComponentSource, type Mate, type MateRef, type PlaneName, type Vec3 } from "@/cad/types";
 import { MATERIALS, fmtNum } from "@/lib/mesh-metrics";
 import { cn } from "@/lib/cn";
 import { flattenLeaves, matrixToPlacement } from "./asm-flatten";
@@ -220,6 +220,15 @@ function MatesList({ doc, status, state, onCommit, onResolve, onSelect }: { doc:
                 <div className="ml-4 mt-0.5 grid w-[200px] grid-cols-2 gap-1.5" onClick={(e) => e.stopPropagation()} data-mate-limits={m.id}>
                   <Num label={tr("Min")} value={m.min ?? 0} suffix={m.type === "limitAngle" ? "°" : "mm"} onChange={(v) => v !== m.min && onCommit(patchMate(doc, m.id, { min: v }))} />
                   <Num label={tr("Max")} value={m.max ?? 0} suffix={m.type === "limitAngle" ? "°" : "mm"} onChange={(v) => v !== m.max && onCommit(patchMate(doc, m.id, { max: v }))} />
+                  {/* preferovaná strana meze (vlna 22, bod 2): kde díl zůstane, když ho vazby neurčují – nikdy proti pevné vazbě či motoru */}
+                  <label className="col-span-2 flex items-center gap-1.5 text-[11px]" title={tr("Kinematika i přepočet vazeb drží díl u této meze, když jeho polohu ostatní vazby neurčují (bez pružiny). Pevnou vazbu, ukotvení ani motor nepřebije.")}>
+                    <span className="shrink-0 text-[#6b7785]">{tr("Preferovaná strana")}</span>
+                    <select data-mate-prefer={m.id} value={m.prefer ?? ""} onChange={(e) => onCommit(patchMate(doc, m.id, { prefer: (e.target.value || undefined) as Mate["prefer"] }))} className="min-w-0 flex-1 rounded border border-[#cfd6de] bg-white px-1 py-0.5">
+                      <option value="">{tr("žádná")}</option>
+                      <option value="min">min</option>
+                      <option value="max">max</option>
+                    </select>
+                  </label>
                 </div>
               )}
             </div>

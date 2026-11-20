@@ -95,8 +95,8 @@ export async function applyDynCmd(d: CadDoc, cmd: DynCmd, study: MotionStudy, ct
       return done(next, true);
     }
     case "off": {
-      const next: MotionStudy = { ...study };
-      delete next.mode;
+      // výslovná kinematika (vlna 22, bod 2: režim studie – cad/motion-mode.ts); automatický režim = pohyb automaticky
+      const next: MotionStudy = { ...study, mode: "kinematic" };
       log.push(tr("✓ pohybová studie: kinematika (nastavení dynamiky zůstává pro „pohyb dynamika“)"));
       return done(next, !!next.motors.length);
     }
