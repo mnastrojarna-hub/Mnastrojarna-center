@@ -9,7 +9,7 @@
 
 Dokument: „Výkres dílu“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 80 × 50 × 20 mm (X 0…80, Y 0…50, Z 0…20) · objem 76,86 cm³ · ploch 8 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 80000 mm³ · těleso platné – 80 × 50 × 20 mm, new, roh [0; 0; 0]
  2. Díra 1 [hole, id #] ✓ úběr 1570,8 mm³ (8 % nástroje) · těleso platné – Ø10 skrz v [20; 25; 20], osa Z
@@ -44,7 +44,7 @@ Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y 
 
 Dokument: „Výkres dílu“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 80 × 50 × 20 mm (X 0…80, Y 0…50, Z 0…20) · objem 76,86 cm³ · ploch 8 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 80000 mm³ · těleso platné – 80 × 50 × 20 mm, new, roh [0; 0; 0]
  2. Díra 1 [hole, id #] ✓ úběr 1570,8 mm³ (8 % nástroje) · těleso platné – Ø10 skrz v [20; 25; 20], osa Z

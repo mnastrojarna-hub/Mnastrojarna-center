@@ -212,8 +212,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
   | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode; faceSigs?: PickSigs }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
-  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“) */
-  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; positionRef?: Ref; dirDef?: Direction }
+  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“); `helix` (jen s `modeled`) = skutečná šroubovice z označení místo soustružených drážek (vlna 22, bod 22d – thread-spec.ts) */
+  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; helix?: boolean; positionRef?: Ref; dirDef?: Direction }
   /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
   | { type: "ext"; ext: string; data: Record<string, unknown> }
   /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */
@@ -382,7 +382,7 @@ export type SpringDef = {
  * Úrovně stavu (vlna 22, feature-levels.ts): `ok` = prvek vznikl · `effect` = účinek booleovské operace (změna objemu proti
  * nástroji) · `body` = konečné těleso po prvku (počet těles, volné plochy, platnost; `valid: null` = nezkontrolováno).
  */
-export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown>; effect?: import("./feature-levels").FeatureEffect; body?: import("./feature-levels").BodyCheck; /** prvek je potlačený (přímo nebo aktivní konfigurací) – nestavěl se, nemá výsledek (vlna 22: nikdy ✓) */ suppressed?: boolean };
+export type FeatureStatus = { id: string; ok: boolean; error?: string; warning?: string; ms?: number; /** výsledek prvku pro stav (např. svarový kov) */ info?: string; /** strojově čitelný výsledek prvku (např. `weld`) */ data?: Record<string, unknown>; effect?: import("./feature-levels").FeatureEffect; body?: import("./feature-levels").BodyCheck; /** prvek je potlačený (přímo nebo aktivní konfigurací) – nestavěl se, nemá výsledek (vlna 22: nikdy ✓) */ suppressed?: boolean; /** kód ⚠ prvku pro protokol místo obecného `feature.warning` (např. `thread.tip-tangent`, vlna 22 bod 22a) */ warnCode?: string };
 
 export type MeshData = {
   vertices: Float32Array;
@@ -410,6 +410,8 @@ export type BuildResult = {
     valid?: boolean;
     /** počet objemových těles (0 = jen pláště / plochy) */
     solids?: number;
+    /** která kontrola platnosti `valid` určila: rychlá po stavbě (výchozí) nebo přesná (`kontrola přesně`, export – vlna 22, bod 22a) */
+    validCheck?: "fast" | "exact";
     /** počet ploch mimo objemová tělesa (volné plochy, pláště vedle těles) – vlna 22, řádek D `free=N` */
     free?: number;
     /** objem a plocha ze sítě (velké těleso, lehká komponenta) – ℹ geom.approx (5.2 č. 27) */

@@ -15,7 +15,7 @@
 Dokument: „Dvě tělesa“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (4 ✓, 0 ✗) · těles 2
 Tělesa: Těleso 2 (aktivní) 9,36 cm³ · Těleso 1 15,72 cm³
 Rozměry: 70 × 50 × 30 mm (X 0…70, Y -10…40, Z 0…30) · objem 25,08 cm³ · ploch 12 · hran 22
-Geometrie: platná · 2 těles
+Geometrie: platná · 2 těles · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 16000 mm³ · těleso platné – 40 × 40 × 10 mm, new, roh [0; 0; 0]
  2. Válec 1 [cylinder, id #] ✓ přidáno 9424,8 mm³ · těleso platné – Ø20 × 30 mm, new, podstava [60; 0; 0], osa Z

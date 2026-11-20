@@ -121,7 +121,9 @@ describe("úroveň „konečné těleso“ – neprovedená kontrola nikdy není
     expect(list[1].body?.valid).toBeNull(); // uložené stavy stavby se nemění
   });
   it("řádek Geometrie: neprovedená kontrola je „nezkontrolováno“, ne „platná“", () => {
-    expect(geometryText({ valid: true, solids: 1, faces: 6 })).toBe("platná · 1 těleso");
+    // vlna 22 (G2, 22a): řádek říká, která kontrola proběhla – rychlá po stavbě, nebo přesná (kontrola přesně / export)
+    expect(geometryText({ valid: true, solids: 1, faces: 6 })).toBe("platná · 1 těleso · rychlá kontrola");
+    expect(geometryText({ valid: true, solids: 1, faces: 6, validCheck: "exact" })).toBe("platná · 1 těleso · přesná kontrola");
     expect(geometryText({ valid: undefined, solids: 340, faces: 2040 })).toBe("nezkontrolováno (2040 ploch > 2000) · 340 těles");
     expect(geometryText({ valid: undefined, solids: 1, faces: 90_000, approx: true })).toBe("nezkontrolováno (velké těleso, 90000 ploch – měřeno ze sítě, platnost se nekontroluje) · 1 těleso");
     expect(geometryText({ valid: false, solids: 1, faces: 6 })).toMatch(/^NEPLATNÁ/);

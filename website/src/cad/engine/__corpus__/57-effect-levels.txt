@@ -17,8 +17,8 @@ nový díl Deska G
 válec 18 20
 prvek surf.helixSweep profile=thread60 radius=20 depth=0.82 pitch=1.5 turns=12 mode=cut
 stav
-# H) ČEKÁ NA ETAPU G2 (22a): side=internal, r=9 v díře Ø16,4 – drážka celá ve stěně. Dnes ✓ „(celý nástroj)“ = nástroj celý
-# v materiálu; po G2 tu musí být ⚠ thread.no-reach, ne ✓ (viz src/cad/w22/greens-g.test.ts, čekající případ)
+# H) side=internal, r=9 v díře Ø16,4 – drážka celá ve stěně: od etapy G2 (22a) ⚠ thread.no-reach, ne ✓ (dřív ✓ „(celý nástroj)“);
+# E výše od G2 ⚠ thread.wrong-side (drážka ústí do díry jen špičkou) – viz 57a-thread-validity.txt
 nový díl Deska H
 trubka 30 16.4 20
 prvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 side=internal mode=cut

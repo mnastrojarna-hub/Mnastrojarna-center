@@ -10,6 +10,8 @@
 //  1b) načtený dokument (JSON na řádku): načtení = ℹ přijetí, ✗ vadného prvku na řádku načtení, ✓ „dokument … postaven“ až po stavbě
 //  4) anglické rozhraní: stejné kódy, přeložené texty
 //  5) bez WebGL (softwarový náhled, jak zkoušel majitel): protokol = CLI, strom prvků = protokol
+//  6) etapa G2 (22a, 22d): ⚠ thread.tip-tangent / thread.no-reach místo ✓ (prohlížeč = CLI), „m18 x 1,5 … šroubovice“,
+//     kontrola přesně (Geometrie „· přesná kontrola“, D vcheck=exact), formulář Závit (Provedení, ⚠ ISO 261), čip platnosti
 // Spuštění: E2E_BASE=http://localhost:3532 node e2e/cad-w22-g.e2e.cjs <složka pro výstupy>
 const { chromium } = require('playwright');
 const fs = require('fs');
@@ -225,6 +227,45 @@ const start = async (p, url) => {
     ok(nRows.length === 5 && bad.length === 0 && nRows.map((r) => r.state).join(',') === rows.map((r) => r.state).join(','), '5: bez WebGL – strom prvků = protokol (' + nRows.map((r) => r.name + ':' + r.state + (r.effect ? '/' + r.effect : '')).join(', ') + ')');
     await q.screenshot({ path: S + 'w22g-nowebgl-tree.png' });
     await nb.close();
+  }
+
+  // ════════════ 6) etapa G2 (22a, 22d): závity a přesná kontrola platnosti ════════════
+  {
+    // 6a) prohlížeč = CLI: tečná špička / skrytý kanál = ⚠ s kódem (ne ✓), „m18 x 1,5“ i šroubovice z označení, kontrola přesně
+    const THR = 'nový díl "Deska C"\ntrubka 30 16.4 20\nprvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 mode=cut\nnový díl "Deska H"\ntrubka 30 16.4 20\nprvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 side=internal mode=cut\nnový díl "Čep"\nválec 18 30\nzávit m18 x 1,5 délka 20 v 0 0 10 šroubovice\nkontrola přesně\nstav';
+    const tFull = norm(await runFresh(THR, { protocol: 'full' }));
+    const tCli = norm(cli(THR, ['--full']));
+    fs.writeFileSync(S + 'w22g-g2-threads-browser.txt', tFull + '\n');
+    fs.writeFileSync(S + 'w22g-g2-threads-cli.txt', tCli + '\n');
+    ok(tFull === tCli, '6a: závity – plný protokol v prohlížeči = CLI');
+    ok(/^⚠ L3 thread\.tip-tangent "Deska C": /m.test(tFull) && /^⚠ L6 thread\.no-reach "Deska H": /m.test(tFull) && !/^✓ L(3|6) /m.test(tFull), '6a: tečná špička / skrytý kanál = ⚠ s kódem, žádné ✓');
+    ok(!/parse\.error/.test(tFull) && /^✓ L9 Závit 1 \(thread\) · úběr /m.test(tFull) && /skutečná šroubovice/.test(tFull), '6a: „m18 x 1,5 … šroubovice“ = ✓ skutečná šroubovice');
+    ok(/platné \(přesná kontrola\)/.test(tFull) && /Geometrie: platná · 1 těleso · přesná kontrola/.test(tFull) && /^D "Čep" .* valid=1 vcheck=exact$/m.test(norm(await runFresh(THR, { protocol: 'short' }))), '6a: kontrola přesně → „· přesná kontrola“ a vcheck=exact');
+
+    // 6b) GUI: formulář Závit – Provedení kosmetický / drážky / šroubovice (data-thread-geometry), varování ISO 261 (M18×3)
+    const q = await fresh();
+    await q.evaluate((t) => window.mncad.run(t), 'nový díl "Čep B"\nválec 18 30\nzávit M18×3 délka 10 v 0 0 10');
+    await q.waitForFunction(() => document.querySelectorAll('[data-feature-row]').length === 2, null, { timeout: 120000 });
+    await q.getByText('Závit 1', { exact: true }).first().dblclick();
+    await q.waitForSelector('[data-thread-geometry]', { timeout: 30000 });
+    ok((await q.locator('[data-thread-geometry]').getAttribute('data-thread-geometry')) === 'cosmetic' && /není pro M18 v ISO 261/.test((await q.locator('[data-thread-pitch-warning]').textContent().catch(() => '')) || ''), '6b: formulář Závit – kosmetický, ⚠ stoupání mimo ISO 261 ve formuláři');
+    const warnRow = await q.locator('[data-feature-row][data-feature-name="Závit 1"]').getAttribute('data-feature-state');
+    ok(warnRow === 'warn', '6b: strom prvků – M18×3 je ⚠ (ne ✓): ' + warnRow);
+    await q.locator('[data-thread-geometry]').getByText('Šroubovice', { exact: true }).click();
+    await q.waitForFunction(() => document.querySelector('[data-thread-geometry]')?.getAttribute('data-thread-geometry') === 'helix', null, { timeout: 30000 });
+    ok(true, '6b: přepnuto na Šroubovice (data-thread-geometry=helix)');
+    // 6c) stavový řádek: „platné · rychlá kontrola“ → klik → přesná kontrola (data-validity)
+    await q.evaluate((t) => window.mncad.run(t), 'nový díl "Deska V"\nkvádr 40 20 10');
+    await q.waitForSelector('[data-validity]', { timeout: 120000 });
+    ok((await q.locator('[data-validity]').getAttribute('data-validity')) === 'fast' && /rychlá kontrola/.test((await q.locator('[data-validity]').textContent()) || ''), '6c: stavový řádek říká „rychlá kontrola“ (ne jen „platné“)');
+    await q.locator('[data-validity]').click();
+    await q.waitForFunction(() => /^exact-/.test(document.querySelector('[data-validity]')?.getAttribute('data-validity') || ''), null, { timeout: 120000 });
+    ok((await q.locator('[data-validity]').getAttribute('data-validity')) === 'exact-ok' && /přesná kontrola/.test((await q.locator('[data-validity]').textContent()) || ''), '6c: klik → přesná kontrola „platné · přesná kontrola“');
+    await q.evaluate((t) => window.mncad.run(t), 'kvádr 5 5 5 v 0 0 10');
+    await q.waitForFunction(() => document.querySelector('[data-validity]')?.getAttribute('data-validity') === 'fast', null, { timeout: 120000 });
+    ok(true, '6c: po změně modelu se přesný výsledek neukazuje (zpět „rychlá kontrola“)');
+    await q.screenshot({ path: S + 'w22g-g2-validity.png' });
+    await q.context().close();
   }
 
   ok(errs.length === 0, 'bez chyb stránky' + (errs.length ? ': ' + errs.slice(0, 3).join(' | ') : ''));

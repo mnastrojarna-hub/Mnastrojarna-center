@@ -14,7 +14,7 @@
 
 Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
 Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
  2. Zaoblení 2 [fillet, id #] ✗ Zaoblení R15 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R15, hrany 4
@@ -24,7 +24,7 @@ Prvky:
 
 Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
 Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
  2. Zaoblení 2 [fillet, id #] ✗ Zaoblení R30 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R30, hrany 4
@@ -35,7 +35,7 @@ Prvky:
 
 Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 3,97 cm³ · ploch 10 · hran 24
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
  2. Rohy [fillet, id #] ✓ úběr 34,34 mm³ · těleso platné – R2, hrany 4
@@ -46,7 +46,7 @@ Prvky:
 
 Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ✗)
 Rozměry: 3 × 3 × 10 mm (X 0…3, Y 0…3, Z 0…10) · objem 0,09 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 90 mm³ · těleso platné – 3 × 3 × 10 mm, new, roh [0; 0; 0]
  2. Rohy [fillet, id #] ✗ Zaoblení R2 nelze provést – poloměr je pro vybrané hrany příliš velký nebo se zaoblení kříží. – R2, hrany 4
@@ -55,7 +55,7 @@ Prvky:
 
 Dokument: „Plech“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 3 × 3 × 10 mm (X 0…3, Y 0…3, Z 0…10) · objem 0,09 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 90 mm³ · těleso platné – 3 × 3 × 10 mm, new, roh [0; 0; 0]
 === run 6 ===
@@ -71,7 +71,7 @@ Prvky:
 
 Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ℹ potlačeno, 0 ✗)
 Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
  2. Kvádr 2 [box, id #] ℹ (potlačen) – 10 × 10 × 30 mm, add, roh [40; 10; 10]
@@ -86,6 +86,6 @@ Konfigurace: Bez výstupku (aktivní)
 
 Dokument: „Jiný“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 5 × 5 × 5 mm (X 0…5, Y 0…5, Z 0…5) · objem 0,12 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 125 mm³ · těleso platné – 5 × 5 × 5 mm, new, roh [0; 0; 0]

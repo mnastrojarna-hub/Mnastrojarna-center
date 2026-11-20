@@ -5,7 +5,7 @@
 
 Dokument: „Deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 50 × 50 × 10 mm (X 0…50, Y 0…50, Z 0…10) · objem 25 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 25000 mm³ · těleso platné – 50 × 50 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===
@@ -32,7 +32,7 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 
 Dokument: „Deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 50 × 50 × 10 mm (X 0…50, Y 0…50, Z 0…10) · objem 24 cm³ · ploch 10 · hran 24
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 25000 mm³ · těleso platné – 50 × 50 × 10 mm, new, roh [0; 0; 0]
  2. Kvádr 2 [box, id #] ✓ úběr 1000 mm³ (celý nástroj) · těleso platné – 10 × 10 × 10 mm, cut, roh [20; 20; 0]

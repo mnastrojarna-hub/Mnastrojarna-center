@@ -20,7 +20,8 @@ import type { BuildResult, CadDoc } from "../types";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { checkKernelGeneration } from "./asm-env";
 import { asmStatus } from "./asm-status";
-import { codeEntry, type Code, type CodeEntryInit } from "./codes";
+import { codeEntry, featureWarnCode, type Code, type CodeEntryInit } from "./codes";
+import { validityOf } from "./validity-store";
 import type { EngineHost } from "./host";
 import { matesCount } from "./kv";
 import { checkClashes, clashFindings } from "./ops/clash";
@@ -126,13 +127,13 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
     const names = new Map(d.features.map((f) => [f.id, f.name]));
     // výsledek prvku, který už ohlásil běh skriptu (s řádkem prvku), se ze závěrečné stavby neopakuje
     const seen = new Set(rb.entries.map((e) => `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`));
-    const report = (code: "feature.failed" | "feature.warning", args: string[]) => {
+    const report = (code: Code, args: string[]) => {
       const e = codeEntry(code, { doc: d.name, args });
       if (!seen.has(`${e.code}\u0000${e.doc}\u0000${e.text}`)) rb.add(e);
     };
     for (const st of res.status) {
       if (!st.ok) report("feature.failed", [names.get(st.id) ?? st.id, st.error ?? ""]);
-      else if (st.warning) report("feature.warning", [names.get(st.id) ?? st.id, st.warning]);
+      else if (st.warning) report(featureWarnCode(st), [names.get(st.id) ?? st.id, st.warning]);
     }
     for (const pe of res.paramErrors ?? []) rb.code("build.failed", { doc: d.name, args: [pe] });
     // prvek bez kontroly platnosti tělesa se mezi ✓ nepočítá (vlastní počet `unchecked`, feature-levels.ts)
@@ -143,6 +144,13 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
       if (res.metrics.solids !== undefined) s.solids = res.metrics.solids;
       if (res.metrics.free) s.free = res.metrics.free;
       s.valid = res.metrics.valid ?? null;
+      if (typeof s.valid === "boolean") s.validCheck = res.metrics.validCheck ?? "fast";
+      // přesná kontrola pro tuto geometrii (kontrola přesně / export) má přednost před rychlou (engine/validity-store.ts)
+      const exact = ws && key !== undefined ? validityOf(ws, key, d) : undefined;
+      if (exact && exact.valid !== null) {
+        s.valid = exact.valid;
+        s.validCheck = "exact";
+      }
       const mt = MATERIALS.find((m) => m.id === d.material);
       if (mt) {
         s.density = mt.density;
@@ -196,7 +204,7 @@ function reportLeafParts(d: CadDoc, ws: Workspace, rb: ReportBuilder): void {
     for (const st of status) {
       if (st.ok !== false && !st.warning) continue;
       const failed = st.ok === false;
-      const e = codeEntry(failed ? "feature.failed" : "feature.warning", { doc: pd.name || l.comp.name, args: [names.get(st.id) ?? st.id, (failed ? st.error : st.warning) ?? ""] });
+      const e = codeEntry(failed ? "feature.failed" : featureWarnCode(st), { doc: pd.name || l.comp.name, args: [names.get(st.id) ?? st.id, (failed ? st.error : st.warning) ?? ""] });
       const k = `${e.code}\u0000${e.doc ?? ""}\u0000${e.text}`;
       if (seen.has(k)) continue;
       seen.add(k);

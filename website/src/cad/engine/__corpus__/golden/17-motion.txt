@@ -8,7 +8,7 @@
 
 Dokument: „Jezdec“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 20 × 20 × 10 mm (X 0…20, Y 0…20, Z 0…10) · objem 4 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 4000 mm³ · těleso platné – 20 × 20 × 10 mm, new, roh [0; 0; 0]
 === run 2 ===

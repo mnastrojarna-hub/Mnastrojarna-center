@@ -5,7 +5,7 @@
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 27 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
 === run 2 ===
@@ -14,7 +14,7 @@ Prvky:
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 26,34 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
  2. Zaoblení 1 [fillet, id #] ✓ úběr 659,2 mm³ · těleso platné – R3, hrany vše
@@ -24,7 +24,7 @@ Prvky:
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (2 ✓, 1 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 26,34 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
  2. Zaoblení 1 [fillet, id #] ✓ úběr 659,2 mm³ · těleso platné – R3, hrany vše
@@ -34,7 +34,7 @@ Prvky:
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 26,34 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
  2. Zaoblení 1 [fillet, id #] ✓ úběr 659,2 mm³ · těleso platné – R3, hrany vše
@@ -45,6 +45,6 @@ Prvky:
 
 Dokument: „Historie“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 27 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]

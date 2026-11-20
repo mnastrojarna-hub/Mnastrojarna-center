@@ -11,7 +11,7 @@
 
 Dokument: „Prvky JSON“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (4 ✓, 0 ✗)
 Rozměry: 40 × 40 × 30 mm (X -20…20, Y -20…20, Z 0…30) · objem 16,29 cm³ · ploch 9 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: kružnice Ø40
     entity: e1_1 kružnice Ø40 [0; 0]

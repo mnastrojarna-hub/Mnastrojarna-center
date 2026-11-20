@@ -16,7 +16,7 @@ import type { CadDoc, ComponentSource, Feature, FeatureStatus } from "../types";
 import { bodyText, featureState, levelsData, levelsText, uncheckedText, type FeatureState } from "../feature-levels";
 import { fmtNum } from "@/lib/mesh-metrics";
 import { makeAsmEnv } from "./asm-env";
-import { codeText } from "./codes";
+import { codeText, featureWarnCode } from "./codes";
 import type { OpCtx } from "./ops/registry";
 import { asmHooks } from "./ops/util";
 import { docKeyOf } from "./run-doc";
@@ -279,7 +279,7 @@ export class RunVerifier {
     } else if (state === "warn") {
       this.flagged.add(f.id);
       log?.tailLine(`⚠ ${name}: ${s.warning}${took}`);
-      rb.code("feature.warning", { line, doc: doc.name, args: [f.name, s.warning ?? ""], data });
+      rb.code(featureWarnCode(s), { line, doc: doc.name, args: [f.name, s.warning ?? ""], data });
     } else if (state === "off") {
       // potlačený prvek (přímo nebo konfigurací) se nestavěl – žádné ✓ za prvek, který model neobsahuje
       this.flagged.delete(f.id);

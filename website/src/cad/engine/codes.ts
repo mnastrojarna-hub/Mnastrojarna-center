@@ -63,6 +63,12 @@ export const CODES = [
   { code: "build.failed", level: "error", key: "stavba selhala: {0}" },
   { code: "feature.failed", level: "error", key: "prvek „{0}“ se nepostavil: {1}" },
   { code: "feature.warning", level: "warn", key: "prvek „{0}“: {1}" },
+  // závity (vlna 22, body 22a a 22d): ⚠ prvku s vlastním kódem místo feature.warning – přísný režim je umí vynechat jmenovitě
+  // (`přísně kromě thread.pitch-nonstandard`); text = hláška prvku (feat/thread-helix.ts, thread-spec.ts)
+  { code: "thread.tip-tangent", level: "warn", key: "prvek „{0}“: {1}" },
+  { code: "thread.no-reach", level: "warn", key: "prvek „{0}“: {1}" },
+  { code: "thread.wrong-side", level: "warn", key: "prvek „{0}“: {1}" },
+  { code: "thread.pitch-nonstandard", level: "warn", key: "prvek „{0}“: {1}" },
   { code: "feature.unverified", level: "warn", key: "prvek „{0}“ nebyl ověřen stavbou" },
   // prvek vznikl, ale platnost tělesa se po něm nekontrolovala (velké těleso) – nikdy ✓ (vlna 22, úrovně stavu prvku)
   { code: "feature.unchecked", level: "note", key: "prvek „{0}“: {1}" },
@@ -74,6 +80,8 @@ export const CODES = [
   { code: "doc.unchecked", level: "note", key: "dokument „{0}“ postaven: prvků {1}, bez ⚠ a ✗ – {2}" },
   { code: "geom.approx", level: "note", key: "objem a hmotnost jsou přibližné (ze sítě)" },
   { code: "geom.volume-failed", level: "warn", key: "objem se nepodařilo změřit – uvedena 0" },
+  // přesná kontrola platnosti před exportem STEP / BREP našla vadu (vlna 22, bod 22a – validity.ts)
+  { code: "geom.exact-invalid", level: "warn", key: "těleso „{0}“ neprošlo přesnou kontrolou platnosti: {1}" },
   { code: "param.clamped", level: "warn", key: "hodnota {0} upravena na {1} ({2})" },
   { code: "mode.new-body", level: "note", key: "přidání bez tělesa – vytvořeno nové těleso" },
   { code: "json.id-renewed", level: "note", key: "duplicitní id prvku „{0}“ nahrazeno novým" },
@@ -143,6 +151,8 @@ const BY_CODE = new Map<string, CodeDef>(CODES.map((c) => [c.code, c]));
 /** definice kódu (undefined = kód není v registru) */
 export const codeDef = (code: string): CodeDef | undefined => BY_CODE.get(code);
 export const isCode = (code: string): code is Code => BY_CODE.has(code);
+/** kód ⚠ prvku: vlastní kód stavitele (`FeatureStatus.warnCode`, např. thread.tip-tangent), jinak `feature.warning` */
+export const featureWarnCode = (s: { warnCode?: string }): Code => (s.warnCode && isCode(s.warnCode) && BY_CODE.get(s.warnCode)!.level === "warn" ? s.warnCode : "feature.warning");
 
 /** náhradní kód pro záznam úrovně bez vlastního kódu (protokol vyžaduje kód u každého ✗/⚠/ℹ) */
 export const fallbackCode = (level: CodeLevel): Code => (level === "error" ? "msg.error" : level === "warn" ? "msg.warn" : "msg.note");

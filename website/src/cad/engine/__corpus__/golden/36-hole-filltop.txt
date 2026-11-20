@@ -16,7 +16,7 @@
 
 Dokument: „Povrch“ · díl · materiál Ocel (7.85 g/cm³) · prvků 6 (5 ✓, 1 ⚠, 0 ✗)
 Rozměry: 80 × 40 × 30 mm (X 0…80, Y 0…40, Z 0…30) · objem 39,07 cm³ · ploch 39 · hran 104
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 32000 mm³ · těleso platné – 80 × 40 × 10 mm, new, roh [0; 0; 0]
  2. Kvádr 2 [box, id #] ✓ přidáno 8000 mm³ (celý nástroj) · těleso platné – 20 × 20 × 20 mm, add, roh [0; 0; 10]

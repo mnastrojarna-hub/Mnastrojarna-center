@@ -56,6 +56,8 @@ export type DocSummary = {
   free?: number;
   /** díl: platnost tělesa (BRepCheck); `null` = nezkontrolováno (řádek D `valid=unchecked`) */
   valid?: boolean | null;
+  /** díl: kterou kontrolou platnost vznikla – rychlá BRepCheck po stavbě, nebo přesná (řádek D `vcheck=exact`; vlna 22, bod 22a) */
+  validCheck?: "fast" | "exact";
   /**
    * druhy uložených výsledků dokumentu, které pro jeho konečný stav neplatí (řádek D `stale=clash,mates,motion,measure,compare`;
    * engine/result-key.ts `staleResults`) – výsledek vznikl pro jinou revizi geometrie, konfiguraci nebo polohu

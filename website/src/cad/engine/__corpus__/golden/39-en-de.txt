@@ -9,7 +9,7 @@
 
 Dokument: „English“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 40 × 30 × 20 mm (X 0…40, Y 0…30, Z 0…20) · objem 22,39 cm³ · ploch 12 · hran 25
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 40 × 30 × 20 mm, new, roh [0; 0; 0]
  2. Válec 1 [cylinder, id #] ✓ úběr 1570,8 mm³ (80 % nástroje) · těleso platné – Ø10 × 25 mm, cut, podstava [20; 15; 0], osa Z
@@ -25,7 +25,7 @@ Prvky:
 
 Dokument: „Deutsch“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 30 × 30 × 30 mm (X 0…30, Y 0…30, Z 0…30) · objem 25,29 cm³ · ploch 29 · hran 55
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 27000 mm³ · těleso platné – 30 × 30 × 30 mm, new, roh [0; 0; 0]
  2. Díra 1 [hole, id #] ✓ úběr 1508 mm³ (20 % nástroje) · těleso platné – Ø8 skrz v [15; 15; 30], osa Z

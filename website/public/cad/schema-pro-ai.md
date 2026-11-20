@@ -2274,6 +2274,8 @@ třídí. Nejčastější:
 | `clash.thread` ℹ, `clash.underhead` ℹ / `clash.real` ⚠ | `kolize`, `kontrola sestava` i `pohyb … kolize` (v poloze kroku) třídí stejně – geometricky v jádře (oddíl **Kolize šroub × závit** níže): šroub v závitové díře (průnik souosý s dírou v mezikruží díry) / prstenec u vstupu díry / skutečná kolize (i šroub v plném materiálu vedle děr, šroub mimo osu); v pohybu jeden ⚠ za každou dvojici dílů (první krok, počet kroků) | jen `clash.real` řešit; `pohyb krok N` vypíše kolize kroku |
 | `clash.undetermined` ⚠ / `clash.hidden` ℹ | dvojici jádro nevyhodnotilo (booleovská operace selhala) nebo závit má neznámé označení (G 1/4, UNC…) / skryté komponenty se nekontrolují | závit zadat metricky (`závit M10`) |
 | `feature.warning` ⚠ / `feature.failed` ✗ / `feature.unverified` ⚠ | výsledek stavby prvku; prvek bez výsledku stavby **nikdy není ✓** | |
+| `thread.tip-tangent` / `thread.no-reach` / `thread.wrong-side` / `thread.pitch-nonstandard` ⚠ | závit: špička profilu tečná k povrchu, drážka celá v materiálu (skrytý kanál), drážka ústí do povrchu jen špičkou, stoupání mimo ISO 261 – text = hláška prvku | `přísně kromě thread.pitch-nonstandard` |
+| `geom.exact-invalid` ⚠ | přesná kontrola platnosti před exportem STEP / BREP našla vadné plochy | |
 | `op.accepted` ℹ / `op.superseded` ℹ / `feature.unchecked`, `doc.unchecked` ℹ / `feature.built` ℹ / `feature.suppressed` ℹ | příkaz přijat – výsledek přijde až po stavbě modelu / vyhodnocení listu výkresu; stav modelu po příkazu se samostatně nestavěl (následovala další změna – ověřen je až stav po uvedeném řádku); prvek (načtený dokument) vznikl, ale platnost tělesa se po něm nekontrolovala (důvod v textu); prvek vznikl, ale týž příkaz má ⚠/✗ jiného prvku; prvek je potlačený (přímo nebo konfigurací) a nestavěl se – **nic z toho není ✓** | u `feature.unchecked` zkontrolovat díl jinak (menší těleso, export STEP s kontrolou) |
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
 | `drawing.section-legacy` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (`dnes pište: …` v hlášce) |
@@ -2338,6 +2340,13 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
   nekontroluje vůbec (těleso se měří ze sítě). Prvek bez kontroly **není ✓**, ale ℹ `feature.unchecked` s důvodem; řádek D
   a `= status` pak mají `valid=unchecked` (jinak `solids=N valid=1|0`) a prvek se nepočítá do prvního čísla `feat=`
   (✓), ale do `unchecked=N`. Plochy mimo objemová tělesa (volné plochy, pláště vedle tělesa) hlásí `free=N`.
+- Po stavbě proběhne **rychlá** kontrola platnosti (BRepCheck; odchylka hran od ploch jen v několika bodech) – řádek Geometrie
+  ve `stav` končí „· rychlá kontrola“. **Přesnou** kontrolu (odchylka počítaná přesně) spustí `kontrola přesně` (EN `check
+  exact`, DE `prüfen genau`; v aplikaci čip „platné · rychlá kontrola“ ve stavovém řádku) a sama proběhne před exportem
+  STEP / BREP do 400 ploch („✓ těleso: přesná kontrola platnosti … – platné“, vada = ⚠ `geom.exact-invalid`, nad limit ℹ
+  s důvodem). Výsledek platí pro tutéž geometrii: Geometrie pak končí „· přesná kontrola“, řádek D nese `vcheck=exact`
+  (bez klíče = rychlá kontrola), JSON `docs[].validCheck` = `exact` | `fast`. Model se kvůli exportu neupravuje
+  (žádné „opravy tolerancí“) – STEP je přesně model.
 - Potlačený prvek (`potlačit`, nebo potlačený aktivní konfigurací) se nestaví: má ℹ `feature.suppressed` („potlačen – nestaví
   se“), nikdy ✓; ve výpisu `stav` „ℹ (potlačen)“ a počet „N ℹ potlačeno“, v řádku D `off=N` (nepočítá se do `feat=` mezi ✓).
 - Prvek objemového typu (primitiva, vysunutí, díra, zaoblení, pole, prvky rozšíření s operací přidat / odebrat a všechny
@@ -2377,9 +2386,14 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
 
 ## Závity – jak je zadat správně
 
-- Katalogový závit: `závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat]` – hrubé i jemné stoupání
-  (M18×1,5, M10×1,25; jiné stoupání se dopočítá). Bez `modelovat` je kosmetický: geometrie se nemění, na výkrese
-  se kružnice válce (nebo jádra díry u `vnitřní`) kótuje označením. S `modelovat` vzniknou zjednodušené drážky.
+- Katalogový závit: `závit M18×1,5 délka 20 v 0 0 10 [osa Z] [vnitřní] [modelovat | šroubovice]` – hrubé i jemné stoupání
+  (M18×1,5, M10×1,25; označení i s mezerami „m18 x 1,5“, × / x / X, čárka i tečka; CS / EN `thread` / DE `gewinde`).
+  Bez volby je kosmetický: geometrie se nemění, na výkrese se kružnice válce (nebo jádra díry u `vnitřní`) kótuje
+  označením. `modelovat` = zjednodušené soustružené drážky (bez stoupání), `šroubovice` (EN `helix`, DE `schraubenlinie`)
+  = **skutečná šroubovice** z označení – stejné jádro i čísla jako Tažení po šroubovici níže (vnější: povrch Ø d, hloubka
+  0,6134·P; vnitřní: povrch D1/2, hloubka 0,5413·P do stěny, špička na d/2 – díra vrtaná vrtákem závitu Ø16,5 u M18×1,5).
+  Jemné stoupání CAD umí v obou cestách; stoupání mimo řadu ISO 261 (např. M18×3 nebo M18×1,25 – řada M18 je 2,5 / 2 /
+  1,5 / 1) se postaví, ale dostane ⚠ `thread.pitch-nonstandard` (i u díry se závitem a u kosmetického závitu).
 - Díra se závitem: `díra závit M18×1,5 hloubka 20 v x y` – vrták (Ø16,5) se dopočítá z označení; zadaný průměr
   (`díra 16,4 závit M18×1,5 …`) má přednost, `jádro` = D1 podle ISO 965-1 (16,376).
 - Skutečná šroubovice (Plochy → Tažení po šroubovici, JSON `{"type":"ext","ext":"surf.helixSweep","data":{…}}`):
@@ -2388,8 +2402,14 @@ díra 8 v 80 40            # ⚠ hole.depth-default už při rozboru → STOP L5
   volitelně `leadIn` (náběh jako u závitového kalibru: hřbet prvního závitu je od začátku vybroušený až na dno drážky
   a během N otáček se zvedá do plného profilu – drážka sama je plná od začátku).
   Příklad matice M18×1,5 s jádrem Ø16,4: `radius: 8.2, depth: 0.8, pitch: 1.5, turns: 12, side: "internal"`.
+  Závit z katalogu místo čísel: `prvek surf.helixSweep profile=thread60 thread=M18×1,5 side=internal turns=12 mode=cut`
+  (`thread` vyplní poloměr, stoupání a hloubku podle strany – zadané radius / pitch / depth se pak nepoužijí).
   JSON prvku na jednom řádku lze míchat s textovými příkazy (`trubka 42 16,4 30`, další řádek `{"type":"ext",…}`, `stav`).
-  Špička profilu nesmí být tečná k povrchu (např. radius 9 + depth 0,8 u díry Ø16,4) – takový výsledek je ⚠.
+  Program ověří, že drážka řeže povrch, na kterém závit vzniká (body profilu ve 12 místech šroubovice proti tělesu před
+  prvkem): špička tečná k povrchu (radius 9 + depth 0,8 u díry Ø16,4) = ⚠ `thread.tip-tangent`; drážka celá v materiálu
+  (side=internal s radius 9 v díře Ø16,4 – skrytý kanál) = ⚠ `thread.no-reach`; drážka ústí do povrchu jen špičkou
+  (obrácená strana, radius 9 + depth 0,82 u díry Ø16,4) = ⚠ `thread.wrong-side`. Hláška radí side a radius podle nalezeného
+  povrchu. Drážka, která odebrala celý nástroj (žádná část profilu ve vzduchu), je ⚠ `thread.no-reach` vždy.
 - Na **výkrese** se modelované závity kreslí zjednodušeně (ISO 6410): hladký válec / díra s označením „M18×1,5 dl. 18“;
   skutečná šroubovice je jen v 3D a ve STEP (přesná projekce šroubovice by trvala minuty).
 
@@ -2923,8 +2943,8 @@ export type Feature = { id: string; name: string; suppressed?: boolean; body?: s
   /** Zesílení (thicken) vybraných ploch na skořepinu dané tloušťky. */
   | { type: "thicken"; faces: number[]; thickness: number; mode: BoolMode; faceSigs?: PickSigs }
   /** Vnější závit na válcové ploše (kosmetický = jen ve výkrese, modelovaný = šroubovice). */
-  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“) */
-  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; positionRef?: Ref; dirDef?: Direction }
+  /** závit na válci (vnější) nebo v díře (`internal`); `modeled` = drážky v geometrii, jinak kosmetický (jen výkres); označení i s jemným stoupáním („M18×1,5“); `helix` (jen s `modeled`) = skutečná šroubovice z označení místo soustružených drážek (vlna 22, bod 22d – thread-spec.ts) */
+  | { type: "thread"; designation: string; position: Vec3; axis: Axis; length: number; modeled: boolean; internal?: boolean; helix?: boolean; positionRef?: Ref; dirDef?: Direction }
   /** Prvek z modulu rozšíření (plochy, plech, pokročilé modelování…) – definice v `cad/ext/registry.ts`, data podle modulu. */
   | { type: "ext"; ext: string; data: Record<string, unknown> }
   /** Více těles: booleovská operace dvou těles dílu (výsledek do `target`, `tool` se volitelně ponechá). */

@@ -8,7 +8,7 @@
 
 Dokument: „Nový díl“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 3 × 3 × 3 mm (X 0…3, Y 0…3, Z 0…3) · objem 0,03 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 2 [box, id #] ✓ přidáno 27 mm³ · těleso platné – 3 × 3 × 3 mm, new, roh [0; 0; 0]
 === run 2 ===

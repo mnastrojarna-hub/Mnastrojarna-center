@@ -9,7 +9,7 @@
 
 Dokument: „Měření“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45,97 cm³ · ploch 9 · hran 20
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 48000 mm³ · těleso platné – 60 × 40 × 20 mm, new, roh [0; 0; 0]
  2. Díra 1 [hole, id #] ✓ úběr 1021,1 mm³ (72 % nástroje) · těleso platné – Ø10 hloubka 12 v [15; 20; 20], osa Z
@@ -29,7 +29,7 @@ F1 (rovina) ↔ bod [0; 0; 50]: vzdálenost 30 mm · ΔX 0 · ΔY 0 · ΔZ 30 ·
 
 Dokument: „Měření“ · díl · materiál Ocel (7.85 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 60 × 40 × 20 mm (X 0…60, Y 0…40, Z 0…20) · objem 45,97 cm³ · ploch 9 · hran 20
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 48000 mm³ · těleso platné – 60 × 40 × 20 mm, new, roh [0; 0; 0]
  2. Díra 1 [hole, id #] ✓ úběr 1021,1 mm³ (72 % nástroje) · těleso platné – Ø10 hloubka 12 v [15; 20; 20], osa Z

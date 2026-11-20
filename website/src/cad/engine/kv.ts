@@ -170,6 +170,7 @@ export function docSummaryOf(doc: CadDoc, res: BuildResult | null, asm?: AsmStat
     if (res.metrics.solids !== undefined) s.solids = res.metrics.solids;
     if (res.metrics.free) s.free = res.metrics.free;
     s.valid = res.metrics.valid ?? null;
+    if (typeof s.valid === "boolean") s.validCheck = res.metrics.validCheck ?? "fast";
     const mt = MATERIALS.find((m) => m.id === doc.material);
     if (mt) {
       s.density = mt.density;

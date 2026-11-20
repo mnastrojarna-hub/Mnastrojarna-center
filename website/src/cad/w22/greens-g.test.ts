@@ -12,6 +12,9 @@
  *   ✓ dokument … postaven      načtený dokument      – ne bez výsledku stavby, ne při ⚠/✗ prvku, ne při nezkontrolovaném tělese
  *   feat=N/… (počet ✓)         řádek D               – prvek bez kontroly platnosti se mezi ✓ nepočítá (unchecked=N)
  *   ✓ <prvek> u potlačeného    výsledek prvku        – potlačený prvek (přímo / konfigurací) se nestavěl: ℹ feature.suppressed, off=N
+ *   ✓ <závit> (helixSweep)     výsledek prvku        – ne, když drážka povrch neřeže (tečná špička, skrytý kanál – G2, 22a/22b-H)
+ *   „· přesná kontrola“, „platné (přesná kontrola)“, vcheck=exact, „✓ těleso: přesná kontrola …“
+ *                              Geometrie / kontrola / D – ne bez přesné kontroly, ne pro jinou revizi modelu (G2, 22a)
  */
 import { beforeAll, describe, expect, it } from "vitest";
 import { docStatusText } from "../agent";
@@ -177,16 +180,49 @@ describe("řádek D: volné plochy vedle těles (free=N)", () => {
   });
 });
 
-describe("22b – případ H (drážka závitu celá ve stěně): čeká na etapu G2", () => {
-  // Dnes: ✓ s účinkem „(celý nástroj)“ – nástroj závitu je celý v materiálu, drážka do díry neústí. Etapa G2 (22a/22b) přidá
-  // ⚠ thread.no-reach; až bude hotová, tento test „selže“ (it.fails) a nahradí se přímým očekáváním ⚠.
-  it.fails("H nesmí být ✓ (po G2: ⚠ thread.no-reach)", { timeout: 180_000 }, async () => {
+describe("22b – případ H (drážka závitu celá ve stěně) a 22a – tečná špička: žádné ✓ (etapa G2)", () => {
+  // Dřív: ✓ s účinkem „(celý nástroj)“ – nástroj závitu byl celý v materiálu, drážka do díry neústila (it.fails v G1).
+  // Etapa G2: sonda drážky (feat/thread-helix.ts) → ⚠ thread.no-reach; vědomě změněno z it.fails na přímé očekávání.
+  it("H není ✓: ⚠ thread.no-reach „nezasahuje do válcové plochy díry“ na řádku prvku", { timeout: 180_000 }, async () => {
     const r = await runScript(new MemoryWorkspace(), 'nový díl "Deska H"\ntrubka 30 16.4 20\nprvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 side=internal mode=cut', host());
     expect(r.entries.filter((e) => e.line === 3 && e.level === "ok")).toEqual([]);
+    const w = r.entries.find((x) => x.line === 3 && x.code === "thread.no-reach")!;
+    expect(w.level).toBe("warn");
+    expect(w.text).toMatch(/nezasahuje do válcové plochy díry ani válce/);
   });
-  it("H dnes: úroveň účinku říká „celý nástroj“ – vodítko, že drážka leží celá v materiálu", { timeout: 180_000 }, async () => {
-    const r = await runScript(new MemoryWorkspace(), 'nový díl "Deska H"\ntrubka 30 16.4 20\nprvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 side=internal mode=cut', host());
-    const e = r.entries.find((x) => x.line === 3 && x.level === "ok")!;
-    expect(e.text).toMatch(/úběr \d+(,\d+)? mm³ \((celý nástroj|>99 % nástroje)\) · těleso platné/);
+  it("C (tečná špička) není ✓: ⚠ thread.tip-tangent; „Geometrie: platná“ zůstává jen s výhradou ⚠ prvku", { timeout: 180_000 }, async () => {
+    const r = finalizeReport(await runReport(new MemoryWorkspace(), 'nový díl "Deska C"\ntrubka 30 16.4 20\nprvek surf.helixSweep profile=thread60 radius=9 depth=0.8 pitch=1.5 turns=12 mode=cut\nstav', host()), { full: true });
+    expect(r.entries.filter((e) => e.line === 3 && e.level === "ok")).toEqual([]);
+    expect(r.entries.filter((e) => e.line === 3).map((e) => e.code)).toEqual(["op.accepted", "thread.tip-tangent"]);
+    expect(r.full).toMatch(/prvků 2 \(1 ✓, 1 ⚠, 0 ✗\)/);
+    expect(r.protocol).toMatch(/^D "Deska C" part feat=1\/1\/0 /m);
   });
 });
+
+describe("„· přesná kontrola“, „platné (přesná kontrola)“, vcheck=exact, „✓ těleso: přesná kontrola …“", () => {
+  it("bez přesné kontroly se nevypíše nic z toho – řádek Geometrie říká „rychlá kontrola“, řádek D vcheck nemá", () => {
+    expect(geometryText({ valid: true, solids: 1, faces: 6 })).toBe("platná · 1 těleso · rychlá kontrola");
+    expect(geometryText({ valid: true, solids: 1, faces: 6, validCheck: "fast" })).not.toMatch(/přesná/);
+    expect(geometryText({ valid: undefined, solids: 1, faces: 1020, approx: true })).not.toMatch(/kontrola$|přesná|rychlá/);
+    expect(docLine({ ref: "a", name: "Deska A", kind: "part", solids: 1, valid: true, validCheck: "fast" })).toBe('D "Deska A" part V=- bbox=- solids=1 valid=1');
+    expect(docLine({ ref: "a", name: "Deska A", kind: "part", solids: 1, valid: true, validCheck: "exact" })).toBe('D "Deska A" part V=- bbox=- solids=1 valid=1 vcheck=exact');
+    expect(docLine({ ref: "a", name: "Deska A", kind: "part", solids: 1, valid: null, validCheck: "exact" })).toBe('D "Deska A" part V=- bbox=- solids=1 valid=unchecked');
+  });
+  it("přesná kontrola z jiné revize modelu neplatí: po změně stav „· rychlá kontrola“, D bez vcheck", { timeout: 180_000 }, async () => {
+    const r = finalizeReport(await runReport(new MemoryWorkspace(), 'nový díl "Deska A"\nkvádr 40 20 10\nkontrola přesně\nkvádr 5 5 5 v 0 0 10\nstav', host()), { full: true });
+    expect(r.full).toMatch(/platné \(přesná kontrola\)/); // řádek kontroly platil pro model řádku 3
+    expect(r.full).toMatch(/Geometrie: platná · 1 těleso · rychlá kontrola/);
+    expect(r.full).not.toMatch(/Geometrie: [^\n]*přesná kontrola/);
+    expect(r.protocol).not.toMatch(/^D .*vcheck=exact/m);
+  });
+  it("přesná kontrola nešla provést (ploch nad mez): ℹ s důvodem, žádné „platné (přesná kontrola)“ ani vcheck=exact", { timeout: 120_000 }, async () => {
+    const k = { generation: () => 1, build: async (d: CadDoc) => ({ status: d.features.map((f) => ({ id: f.id, ok: true })), mesh: null, metrics: { volume: 4000, area: 1600, bbox: [[0, 0, 0], [20, 20, 10]], faces: 6000, edges: 12, valid: true, solids: 1 }, ms: 1 }), validity: async () => ({ method: "none", valid: null, faces: 6000, solids: 1, badFaces: 0, ms: 1, why: "faces" }), measure: host().kernel.measure };
+    const h = { ...host(), kernel: { ...host().kernel, ...k } as unknown as KernelApi };
+    const r = finalizeReport(await runReport(new MemoryWorkspace(), 'nový díl "Deska A"\nkvádr 20 20 10\nkontrola přesně', h), { full: true });
+    expect(r.full).not.toMatch(/přesná kontrola\)/);
+    expect(r.full).toMatch(/platné \(rychlá kontrola\)/);
+    expect(r.full).toMatch(/ℹ L3 msg\.note .*přesná kontrola platnosti neprovedena \(6000 ploch > 5000\)/);
+    expect(r.full).not.toMatch(/vcheck=exact/);
+  });
+});
+

@@ -53,7 +53,6 @@ Délka zobrazení	Display length
 Globální osa X / Y / Z středem (níže)	Global X / Y / Z axis through the centre (below)
 Globální osa otočení	Global rotation axis
 Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese (kružnice válce / jádra díry se kótuje označením). Doporučeno pro výrobní dokumentaci.	Cosmetic thread: the geometry does not change, the thread appears in the drawing (the cylinder / hole core circle is dimensioned with the designation). Recommended for manufacturing documentation.
-Modelovat závitové drážky	Model the thread grooves
 Neznámé označení – zadejte M2 až M48, volitelně se stoupáním (M18×1,5).	Unknown designation – enter M2 to M48, optionally with pitch (M18×1.5).
 Odsazení od plochy (0 = až k ploše)	Offset from the face (0 = up to the face)
 Osa X (ortogonalizuje se vůči Z)	X axis (orthogonalised against Z)
@@ -100,7 +99,6 @@ Způsob	Method
 Způsoby zadání: vrchol, střed / začátek / konec hrany, střed kružnice, střed plochy, bod v % délky hrany, střed mezi body, mezi body v poměru, odsazený podél hrany, průmět na plochu, průsečík hrany s plochou, počátek, souřadnice, bod skici. Bod pak slouží jako poloha díry, primitiva, střed otáčení…	Ways to define it: vertex, edge midpoint / start / end, circle centre, face centre, point at % of edge length, midpoint between points, between points by ratio, offset along an edge, projection onto a face, edge–face intersection, origin, coordinates, sketch point. The point then serves as a hole position, primitive position, rotation centre…
 Základní rovina + odsazení (níže)	Base plane + offset (below)
 Závit (ISO metrický – hrubé i jemné stoupání)	Thread (ISO metric – coarse and fine pitch)
-Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dává Plochy → Tažení po šroubovici (profil Závit 60°).	The thread is modelled as grooves (simplified, without pitch) – suitable for visualisation and 3D printing. A real helix is made with Surfaces → Helix sweep (Thread 60° profile).
 např. M18×1,5	e.g. M18×1.5
 pomocná osa	datum axis
 pomocná rovina	datum plane

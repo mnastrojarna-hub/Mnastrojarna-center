@@ -19,7 +19,8 @@ import { assertDrawable, bytesToBase64, drawingOutput, hasDrawings, isEmptyDoc, 
 import { sha256Hex } from "../host";
 import { quote } from "../protocol";
 import type { OutFile } from "../protocol-types";
-import { runOf } from "../run-doc";
+import { docKeyOf, runOf } from "../run-doc";
+import { exactBeforeExport } from "../validity-store";
 import { lastShareLink, rememberLink, shareInfo, shareWithPolicy, type LastLink } from "../share-out";
 import { asmHooks, coded, type OpCtx, type OpHandler } from "./util";
 
@@ -114,9 +115,18 @@ async function export3d(ctx: OpCtx, e: Emit, cmd: Extract<OutCmd, { kind: "expor
   if (cmd.format === "mncad") return saveProject(ctx, e, cmd, tr("export MNCAD"));
   const d = runOf(ctx).doc;
   const fmt = cmd.format;
+  // objemový formát: přesná kontrola platnosti před exportem (do 400 ploch sama, jinak řekne, že proběhla jen rychlá – 22a)
+  const pre = (fmt === "step" || fmt === "brep") && cmd.check !== false ? await exactBeforeExport(ctx.host.kernel, ctx.ws, docKeyOf(ctx), d) : null;
   const data = await modelBytes(ctx.host.kernel, d, fmt);
   const name = outFileName(cmd.name, plainName(d.name), FORMAT_EXT[fmt]);
   const f = await deliver(ctx, e, { name, mime: OUT_MIME[fmt], data, format: fmt }, tr("export {0}", fmt.toUpperCase()), formatLabel(fmt), cmd.deliver ?? "file");
+  if (f && pre) {
+    if (pre.level === "ok") {
+      e.console(`  ✓ ${pre.text}`);
+      e.ok(pre.text);
+    } else if (pre.level === "warn") e.code("geom.exact-invalid", { args: [d.name, pre.text], indent: "  " });
+    else e.code("msg.note", { text: pre.text, indent: "  " });
+  }
   if (!f || (fmt !== "step" && fmt !== "brep")) return;
   if (cmd.check === false) {
     e.console(tr("  – kontrola {0} vynechána („bez kontroly“)", fmt.toUpperCase()));

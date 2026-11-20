@@ -4,7 +4,7 @@
 
 Dokument: „Z JSON“ · díl · materiál Hliník (2.7 g/cm³) · prvků 3 (3 ✓, 0 ✗)
 Rozměry: 50 × 30 × 10 mm (X 0…50, Y 0…30, Z 0…10) · objem 14,70 cm³ · ploch 26 · hran 56
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 50×30
     entity: e1_1 obdélník 50×30 [25; 15]

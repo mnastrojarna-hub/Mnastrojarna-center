@@ -28,7 +28,9 @@ import { planeDefLabel, type Extent, type PlaneDef, type Thin } from "./refs";
 import { findLoops, nestLoops, shapeSegs, splinePoints, type Loop, type Seg } from "./sketch";
 import { hasTangents } from "./spline-tangent";
 import { sketchSplineEdge } from "./spline-occ";
-import { noteFeatureWarning, takeFeatureInfo, takeFeatureNotes } from "./feature-notes";
+import { noteFeatureWarning, takeFeatureInfo, takeFeatureNoteCode, takeFeatureNotes } from "./feature-notes";
+import { hiddenGrooveText, threadHelixTool } from "./feat/thread-helix";
+import { pitchNote } from "./thread-spec";
 import { draftedExtrusion, planeReach, throughLength, tiltCos, wireBounds } from "./extrude-draft";
 import { profileNote } from "./profile-check";
 import { pathEntities } from "./poly-close";
@@ -385,6 +387,8 @@ function holeHead(f: HoleF): { kind: NonNullable<HoleF["kind"]>; head: HoleHead 
     const t = threadByName(f.thread);
     if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.thread ?? "", tr(THREAD_HINT)));
     d = tapDrillD(t, f.tapDrill, f.diameter); // tabulkový vrták / jádro D1 / zadaný průměr (hole-spec.ts)
+    const pn = pitchNote(t); // stoupání mimo ISO 261 (M18×3) – ⚠, ne ticho (vlna 22, bod 22d)
+    if (pn) noteFeatureWarning(pn, "thread.pitch-nonstandard");
     if (d >= t.d) throw new Error(tr("Vrták závitové díry Ø{0} musí být menší než závit {1} (Ø{2}).", fmtDrill(d), t.name, fmtDrill(t.d)));
     // JSON / starší zápis: průměr, který vypadá jako vrták z výkresu, se bez tapDrill „custom“ nepoužije – ohlásit, ne tiše zahodit
     if ((f.tapDrill ?? "table") === "table" && Math.abs(f.diameter - t.tap) > 5e-4 && Math.abs(f.diameter - t.d) > 5e-4 && drillFitsThread(f.diameter, t))
@@ -515,11 +519,16 @@ export function threadProfile(t: { d: number; pitch: number }, length: number, i
 
 export const THREAD_HINT = "zadejte M2 až M48, hrubé nebo jemné stoupání (např. M18×1,5)";
 
-/** Zjednodušený modelovaný závit: soustava V-drážek (vizuálně i hmotnostně odpovídá závitu). */
-function threadTool(f: Extract<Feature, { type: "thread" }>): Shape {
+/**
+ * Modelovaný závit: soustružené V-drážky (vizuálně i hmotnostně odpovídá závitu), nebo s `helix` skutečná šroubovice
+ * z označení – stejné jádro a stejná čísla jako Tažení po šroubovici s `thread=` (feat/thread-helix.ts `threadHelixTool`).
+ * Hlavní stavba prvku je v feat/refs-more.ts (poloha a osa odkazem); tato cesta slouží nástroji pro pole / zrcadlení.
+ */
+function threadTool(f: Extract<Feature, { type: "thread" }>, body: Shape | null): Shape {
   const t = threadByName(f.designation);
   if (!t) throw new Error(tr("Neznámý závit „{0}“ – {1}.", f.designation, tr(THREAD_HINT)));
   if (!(f.length > 0)) throw new Error(tr("Délka závitu musí být kladná."));
+  if (f.helix) return threadHelixTool(f, t, body, f.position, axisVec(f.axis));
   return revolved(threadProfile(t, f.length, f.internal), f.axis, f.position);
 }
 
@@ -720,8 +729,11 @@ async function toolOf(f: Feature, ctx: Ctx): Promise<Shape | null> {
     }
     case "hole":
       return holeTools(f, ctx);
-    case "thread":
-      return f.modeled ? threadTool(f) : null;
+    case "thread": {
+      const pn = pitchNote(threadByName(f.designation)); // stoupání mimo ISO 261 – ⚠ i u kosmetického závitu (22d)
+      if (pn) noteFeatureWarning(pn, "thread.pitch-nonstandard");
+      return f.modeled ? threadTool(f, ctx.body) : null;
+    }
     case "text": {
       if (!f.text.trim()) throw new Error(tr("Zadejte text."));
       if (!(f.height > 0 && f.depth > 0)) throw new Error(tr("Výška písma a hloubka musí být kladné."));
@@ -857,7 +869,10 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     const info = takeFeatureInfo(); // výsledek prvku (svarový kov) do stavu
     const extra = info ? { info: info.text, ...(info.data ? { data: info.data } : {}) } : {};
     if (next === body || !next) {
-      status.push({ id: f.id, ok: true, ...extra });
+      // prvek bez změny tělesa (kosmetický závit, pomocná geometrie…) může mít hlášku stavitele (nestandardní stoupání – 22d)
+      const early = takeFeatureNotes();
+      const code = takeFeatureNoteCode();
+      status.push(early.length ? { id: f.id, ok: true, warning: early.join(" "), ...(code ? { warnCode: code } : {}), ...extra } : { id: f.id, ok: true, ...extra });
       return next;
     }
     // velký import do prázdného dílu: podpis (objem) a kontrola platnosti by trvaly desítky sekund – podpis se nevytvoří
@@ -912,6 +927,7 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
     if (typeError) throw new Error(typeError);
     bodySig = sig;
     const notes = takeFeatureNotes(); // přiblížení / nedosažená návaznost ohlášené stavitelem (feature-notes.ts)
+    let warnCode = takeFeatureNoteCode(); // kód hlášky stavitele (thread.tip-tangent …) – protokol ho použije místo feature.warning
     notes.push(profileNote(f, sketches, false)); // vada profilu skici (křížení, mezera, překryv…) – profile-check.ts
     if (notes.some(Boolean)) warning = [warning, ...notes].filter(Boolean).join(" ");
     const levels: Pick<FeatureStatus, "effect" | "body"> = { body: { ...comp, valid: changing && sig && sig.faces <= FEATURE_CHECK_FACES ? valid : null, ...(changing && sig && sig.faces <= FEATURE_CHECK_FACES ? {} : { why: changing ? ("feature-faces" as const) : ("feature-none" as const) }) } };
@@ -922,8 +938,18 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
       if (expected !== undefined) levels.effect.expected = expected;
       // malý úběr / přídavek proti velkému nástroji, který přesná kontrola průnikem potvrdila (nebo operace bez příznaku vady), není „žádný“
       if (levels.effect.level === "none" && !noEffect && Math.abs(levels.effect.dV) > 1e-9 * Math.max(1, Math.abs(v0))) levels.effect.level = op === "modify" || op === "new" || op === "intersect" ? "changed" : "partial";
+      // očekávaný výsledek drážky závitu (22a/22b-H): profil leží 0,15 mm za povrchem ve vzduchu, drážka tedy odebere jen ČÁST
+      // nástroje. Celý nástroj = drážka celá v materiálu (skrytý kanál) – ⚠ i tam, kde sonda feat/thread-helix.ts nic nenašla
+      // (jen jedna operace drážky: s náběhem je v řetězu i výbrus hřbetu a „celý nástroj“ by nic neříkal)
+      const e = levels.effect;
+      const wholeTool = e.level === "full" && e.tool !== undefined && Math.abs(e.dV) <= e.tool * (1 + 1e-3);
+      if (op === "cut" && wholeTool && isThreadGroove(f) && !warnCode?.startsWith("thread.")) {
+        warning = [warning, hiddenGrooveText()].filter(Boolean).join(" ");
+        warnCode = "thread.no-reach";
+      }
     }
-    status.push(warning ? { id: f.id, ok: true, warning, ...extra, ...levels } : { id: f.id, ok: true, ...extra, ...levels });
+    const coded = warning && warnCode ? { warnCode } : {};
+    status.push(warning ? { id: f.id, ok: true, warning, ...coded, ...extra, ...levels } : { id: f.id, ok: true, ...extra, ...levels });
     return next;
   };
 
@@ -1300,6 +1326,12 @@ export async function buildShape(input: CadDoc, untilIndex = Infinity, opts: { p
   const bodies: NamedBody[] = [...(body ? [{ name: activeName, shape: body as Shape }] : []), ...[...others].map(([name, shape]) => ({ name, shape }))];
   const all = bodies.length > 1 ? compoundOf(bodies.map((b) => b.shape)) : (bodies[0]?.shape ?? null);
   return { body: all, status, paramErrors, resolved, bodies };
+}
+
+/** Drážka závitu po šroubovici (profil Závit 60°): Tažení po šroubovici s tímto profilem, prvek Závit se šroubovicí. */
+function isThreadGroove(f: Feature): boolean {
+  if (f.type === "thread") return !!f.modeled && !!f.helix;
+  return f.type === "ext" && f.ext === "surf.helixSweep" && f.data?.profile === "thread60" && !(Number(f.data?.leadIn) > 0);
 }
 
 /** Prvky, u kterých se očekává změna tělesa (přidání / odebrání materiálu, úprava tvaru). */

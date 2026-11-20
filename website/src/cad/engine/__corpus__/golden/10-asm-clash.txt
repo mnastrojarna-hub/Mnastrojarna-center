@@ -5,7 +5,7 @@
 
 Dokument: „Blok“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 40 × 40 × 40 mm (X 0…40, Y 0…40, Z 0…40) · objem 64 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 64000 mm³ · těleso platné – 40 × 40 × 40 mm, new, roh [0; 0; 0]
 === run 2 ===

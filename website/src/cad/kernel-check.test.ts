@@ -99,14 +99,17 @@ describe("závit v díře tažením po šroubovici", () => {
     const step = await res.body!.blobSTEP().arrayBuffer();
     expect(step.byteLength).toBeGreaterThan(10000);
   });
-  it("špička profilu tečná k povrchu (dřívější nastavení z testu) už nevrací tichý úspěch – buď platný řez, nebo ⚠", { timeout: 120000 }, async () => {
+  it("špička profilu tečná k povrchu (nastavení z testu 3. 11.) není tichý ✓, ale vždy ⚠ thread.tip-tangent (vlna 22, bod 22a – dřív stačilo platné těleso)", { timeout: 120000 }, async () => {
     const t = tube();
     const doc = base([t]);
     const thr = ext(doc, "surf.helixSweep", { profile: "thread60", depth: 0.8, radius: 9, pitch: 1.5, turns: 12, position: [0, 0, 5], axis: "Z", mode: "cut" });
     const res = await buildDoc(base([t, thr]));
     const st = statusOf(res, thr);
-    if (st.ok && !st.warning) expect(checkShape(res.body!).valid).toBe(true);
-    else expect((st.error ?? st.warning) ?? "").toMatch(/geometri|nezměnil|objemové/);
+    // těleso je platné (i přesnou metodou), přesto výsledek není závit – drážka je skrytý kanál; ✓ by bylo falešné
+    expect(st.ok).toBe(true);
+    expect(st.warnCode).toBe("thread.tip-tangent");
+    expect(st.warning).toMatch(/špička profilu závitu je tečná k povrchu Ø16,4 – drážka do materiálu nezasahuje/);
+    expect(docStatusText(base([t, thr]), res)).toMatch(/1 ⚠/);
   });
   it("náběh jako u kalibru: drážka plná od začátku, hřbet prvního závitu vybroušený a zvedá se do plného profilu", { timeout: 180000 }, async () => {
     const t = tube();

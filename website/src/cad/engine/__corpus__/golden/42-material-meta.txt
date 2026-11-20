@@ -10,6 +10,6 @@
 
 Dokument: „Meta deska“ · díl · materiál EN AW-6082 (hustota podle: Hliník) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 50 × 50 × 5 mm (X 0…50, Y 0…50, Z 0…5) · objem 12,50 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 12500 mm³ · těleso platné – 50 × 50 × 5 mm, new, roh [0; 0; 0]

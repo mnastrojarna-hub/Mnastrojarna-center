@@ -16,7 +16,7 @@
 
 Dokument: „Prvky“ · díl · materiál Ocel (7.85 g/cm³) · prvků 6 (5 ✓, 1 ✗)
 Rozměry: 120 × 100 × 40 mm (X -60…60, Y -30…70, Z 0…40) · objem 86,83 cm³ · ploch 40 · hran 78
-Geometrie: platná · 7 těles
+Geometrie: platná · 7 těles · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XZ, 1 entit: obdélník 10×40
     entity: e1 obdélník 10×40 [25; 20]
@@ -42,7 +42,7 @@ Prvky:
 Dokument: „Šroubovice“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗) · těles 4
 Tělesa: Těleso 4 (aktivní) 0,52 cm³ · Těleso 1 6,03 cm³ · Těleso 2 0,79 cm³ · Těleso 3 2,75 cm³
 Rozměry: 101 × 56 × 35 mm (X -50…51, Y -11…45, Z -5…30) · objem 10,10 cm³ · ploch 10 · hran 12
-Geometrie: platná · 4 těles
+Geometrie: platná · 4 těles · rychlá kontrola
 Prvky:
  1. Válec 1 [cylinder, id #] ✓ přidáno 6031,9 mm³ · těleso platné – Ø16 × 30 mm, new, podstava [0; 0; 0], osa Z
  2. Závit 1 [thread, id #] ✓ – M16 délka 20 mm, vnější (na válci), kosmetický (jen výkres), začátek [0; 0; 0], osa Z

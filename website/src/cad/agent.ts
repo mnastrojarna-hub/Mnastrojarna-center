@@ -13,6 +13,7 @@ import { featureState, geometryText, levelsText } from "./feature-levels";
 import { getLang, tr } from "./i18n";
 import { MATERIALS } from "@/lib/mesh-metrics";
 import { threadByName, threadLabel } from "./defaults";
+import { mergeThreadText, mergeThreadTokens } from "./thread-spec";
 import { allExt } from "./ext/registry";
 import { parseDimension, parseDrawing, type DrawingCmd } from "./agent-drawing";
 import { asmStatusLines, parseAsmText, type AsmCmd } from "./agent-asm";
@@ -243,6 +244,8 @@ syn("circular", "kruhové", "kruhove", "kruhový", "kruhovy", "dokola", "polar")
 syn("internal", "vnitřní", "vnitrni", "inner");
 syn("clash", "kolize", "kolizní", "kolizni", "collisions", "interference");
 syn("modeled", "modelovat", "modelovaný", "modelovany", "modeled", "modelled");
+// závit skutečnou šroubovicí z označení (vlna 22, bod 22d) – „modelovat“ = soustružené drážky
+syn("helix", "šroubovice", "sroubovice", "šroubovicí", "sroubovici", "šroubovicový", "sroubovicovy", "helical");
 // německá synonyma (rozhraní /de/cad) – kanonická jména jsou anglická, takže anglické příkazy fungují vždy
 syn("new", "neu", "neues", "neuer", "neue");
 syn("part", "teil", "bauteil");
@@ -318,6 +321,7 @@ syn("linear", "reihe", "raster", "gitter");
 syn("circular", "kreisförmig", "kreismuster", "rundum");
 syn("internal", "innen", "innengewinde");
 syn("modeled", "modellieren", "modelliert");
+syn("helix", "schraubenlinie", "wendel", "gewindewendel");
 // ── skica: oblouk, spline; díra: sklon; tělesa; obecný prvek; knihovna; sestava ──
 syn("arc", "oblouk", "bogen", "kreisbogen");
 syn("spline", "křivka", "krivka", "kurve");
@@ -376,7 +380,7 @@ const VIEWS: Record<string, string> = { iso: "iso", izo: "iso", izometrie: "iso"
 /** volby za příkazem: `{klíč: čísla | slova}` + příznaky */
 /** `groups` = čísla číselné volby po jednotlivých výskytech klíčového slova (`v 1 2 v 3 4 5` → at: [[1, 2], [3, 4, 5]]) */
 type Opts = { flags: Set<string>; nums: Record<string, number[]>; words: Record<string, string[]>; free: number[]; strings: string[]; groups?: Record<string, number[][]> };
-const FLAGS = new Set(["fixed", "center", "through", "bothways", "symmetric", "reverse", "cut", "add", "intersect", "newbody", "engrave", "construction", "closed", "keep", "linear", "circular", "internal", "modeled"]);
+const FLAGS = new Set(["fixed", "center", "through", "bothways", "symmetric", "reverse", "cut", "add", "intersect", "newbody", "engrave", "construction", "closed", "keep", "linear", "circular", "internal", "modeled", "helix"]);
 const NUM_OPTS = new Set(["threaddepth", "tilt", "origin", "normal", "xdir", "rotation", "at", "depth", "angle", "draft", "offset", "spacing", "count", "counterbore", "countersink", "height", "radius", "diameter", "sides", "rect-r", "length", "width", "longer", "shorter", "corner"]);
 const WORD_OPTS = new Set(["axis", "direction", "thread", "edges", "open", "name", "material", "color", "body", "as"]);
 function parseOpts(tokens: string[]): Opts {
@@ -540,7 +544,7 @@ function parseGenericFeature(rest: string, named: (type: Feature["type"], name?:
   const m = /^\s*("([^"]*)"|„([^“]*)“|(\S+))\s*(.*)$/.exec(rest);
   if (!m) throw new Error(tr("prvek potřebuje typ: prvek <typ> klíč=hodnota … (typy: {0})", FEATURE_TYPES.join(", ")));
   const word = m[2] ?? m[3] ?? m[4];
-  const pairs = keyValues(m[5] ?? "");
+  const pairs = keyValues(mergeThreadText(m[5] ?? "")); // thread=M18 x 1,5 → jedno slovo (thread-spec.ts)
   const fw = fold(word);
   const base = FEATURE_TYPES.find((t) => fold(t) === fw) ?? (Object.entries(FEATURE_LABEL).find(([, l]) => fold(l) === fw)?.[0] as (typeof FEATURE_TYPES)[number] | undefined);
   const ext = base ? undefined : allExt().find((d) => fold(d.ext) === fw || fold(d.label) === fw);
@@ -826,7 +830,8 @@ export function parseAgentText(text: string): AgentProgram {
         ops.push({ k: "api", cmd: api, line: no });
         return;
       }
-      const tokens = tokenize(line).slice(1);
+      // označení závitu s mezerami („m18 x 1,5“, „M18 ×1.5“) = jedno slovo u závitu a díry (vlna 22, bod 22d – thread-spec.ts)
+      const tokens = cmd === "thread" || cmd === "hole" ? mergeThreadTokens(tokenize(line).slice(1)) : tokenize(line).slice(1);
       // díra: dno ploché, hrot N, jádro / vrták [N], M8 (agent-hole.ts); hodnota názvu / materiálu… zůstane obecnému parseru
       const hx = cmd === "hole" ? holeTextExtras(tokens, (t) => (WORD_OPTS.has(canon(t)) && !["axis", "direction", "thread"].includes(canon(t)) ? "words" : FLAGS.has(canon(t)) || NUM_OPTS.has(canon(t)) || WORD_OPTS.has(canon(t)) ? "key" : null)) : null;
       // sledované volby: co obsluha příkazu nepřečte, je ⚠ parse.unused (5.2 č. 1; jen příkazy čtené z těchto voleb – UNUSED_CHECK)
@@ -1640,6 +1645,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "díra 6,8 skrz v x y zahloubení 20 7 závit M8 · díra závit M8 hloubka 20 kuželové 10 v x y", en: "hole … counterbore 20 7 thread M8", de: "bohrung … senkung 20 7 gewinde M8", desc: tr("závitová díra se zahloubením = zahloubení + vrták + závit (JSON kind tapped + head counterbore | countersink); výkres „M8 skrz“ + „Ø6,8 skrz“ + „⌴ Ø20 ↧7“, stav „M8 skrz (vrták Ø6,8) zahl. Ø20×7“; zahloubení menší než závit = ⚠ ve výsledku stavby; zahloubení i kuželové najednou = chyba; upravit kind=tapped thread=M8 u zahloubené díry zahloubení ponechá (bez něj head=none); starší díra bez head s uloženým zahloubením = ⚠ a poznámka ve stavu") },
   { cmd: "díra závit M8 hloubka 20 [jádro | vrták | vrták 6,7] · díra 6,647 závit M8 … · díra 10 hloubka 12 dno ploché · díra … hrot 120", en: "hole", de: "bohrung", desc: tr("závitová díra: bez průměru = tabulkový vrták (M8 → 6,8, M18×1,5 → 16,5); zadaný průměr má přednost (protokol: vrták zadán ručně); jmenovitý průměr (díra 8 závit M8) = tabulkový vrták s poznámkou; „jádro“ (EN core, DE Kern) = malý průměr D1 podle ISO 965-1 (M8 → 6,647); „vrták N“ (EN drill N, DE Bohrer N) = vlastní vrták. Dno slepé díry: „dno ploché“ (EN flat bottom, DE flacher Grund) – sedlo pružiny, frézované dno – nebo „hrot 118|120|90“ (EN tip, DE Spitze; 60–170°, „hrot 180“ = ploché; také „ploché“, „bez hrotu“, „dno kužel 120“); platí i pro závitovou a zahloubenou díru; volby díry pište před „název“") },
   { cmd: "závit M18×1,5 délka L [v x y z] [osa Z] [vnitřní] [modelovat]", en: "thread", de: "gewinde", desc: tr("závit na válci (vnější) nebo v díře (vnitřní); kosmetický = jen ve výkrese, „modelovat“ = drážky v geometrii") },
+  { cmd: "závit M18×1,5 délka 20 [vnitřní] šroubovice · prvek surf.helixSweep profile=thread60 thread=M18×1,5 side=internal turns=12 mode=cut", en: "thread M18x1.5 length 20 helix", de: "gewinde M18x1,5 länge 20 schraubenlinie", desc: tr("skutečná šroubovice z označení – jedna cesta k závitu: příkaz závit i Tažení po šroubovici s thread= berou poloměr, stoupání a hloubku z téhož katalogu (vnější: válec Ø d, hloubka 0,6134·P; vnitřní: povrch D1/2, špička na d/2); označení i s mezerami (m18 x 1,5, M18 X 1.5); stoupání mimo ISO 261 (M18×3) = ⚠ thread.pitch-nonstandard; drážka, která povrch neřeže, = ⚠ thread.tip-tangent / thread.no-reach / thread.wrong-side") },
   { cmd: "zaoblit R [hrany vše|horní|spodní|svislé|vodorovné|kruhové|rovné|+Z…|E2;E5] [poloměr N] [delší N]", en: "fillet", de: "verrunden", desc: tr("pravidla lze kombinovat (horní kruhové)") },
   { cmd: "zaoblit R hrany <pravidlo> setback S [vrchol V3 S2 | vrchol x y z S2]", en: "fillet R edges … setback S [vertex V3 S2]", de: "verrunden R kanten … rückversatz S [ecke V3 S2]", desc: tr("zaoblení se setbackem: zaoblení skončí S od vrcholu se 3+ hranami, roh uzavře hladká záplata G1 (výchozí S = R)") },
   { cmd: "zaoblit eliptické D1 D2 hrany <pravidlo> [rho 0,5]", en: "fillet elliptical D1 D2 edges … [rho 0.5]", de: "verrunden elliptisch D1 D2 kanten … [rho 0,5]", desc: tr("eliptické / kuželosečkové zaoblení: D1 na horní (první) ploše, D2 na druhé; rho = kuželosečka (0,5 parabola)") },

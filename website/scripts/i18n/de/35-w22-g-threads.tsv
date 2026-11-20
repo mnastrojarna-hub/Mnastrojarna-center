@@ -1,0 +1,51 @@
+# Vlna 22 G2 – závity (22a tečná špička / drážka nezasahuje / obrácená strana, 22d jedna cesta k závitu, ISO 261) a přesná kontrola platnosti
+drážka závitu nezasahuje do válcové plochy díry ani válce – leží celá v materiálu (skrytý kanál, ústí jen do čel). {0}	die Gewinderille erreicht die Zylinderfläche der Bohrung bzw. des Zylinders nicht – sie liegt vollständig im Material (verdeckter Kanal, nur zu den Stirnflächen offen). {0}
+drážka závitu odebrala celý nástroj – leží celá v materiálu a nezasahuje do válcové plochy díry ani válce (skrytý kanál, ne závit); poloměr = povrch, na kterém závit začíná (válec u vnějšího, díra u vnitřního).	die Gewinderille hat das ganze Werkzeug abgetragen – sie liegt vollständig im Material und erreicht die Zylinderfläche der Bohrung bzw. des Zylinders nicht (verdeckter Kanal, kein Gewinde); Radius = Fläche, auf der das Gewinde beginnt (Zylinder bei Außen-, Bohrung bei Innengewinde).
+drážka závitu ústí do povrchu Ø{0} jen špičkou ({1} mm z hloubky {2} mm), zbytek leží v materiálu – profil míří na opačnou stranu. {3}	die Gewinderille öffnet sich zur Fläche Ø{0} nur mit der Spitze ({1} mm von der Tiefe {2} mm), der Rest liegt im Material – das Profil zeigt zur falschen Seite. {3}
+Drážky	Rillen
+jen Závit 60°: označení M18×1,5 / M8 – poloměr, stoupání a hloubku doplní katalog podle strany (vnější: válec Ø d; vnitřní: díra vrtaná vrtákem závitu); prázdné = čísla níže	nur Gewinde 60°: Bezeichnung M18×1,5 / M8 – Radius, Steigung und Tiefe ergänzt der Katalog je nach Seite (außen: Zylinder Ø d; innen: mit dem Kernlochbohrer gebohrte Bohrung); leer = Zahlen unten
+kontrola [díl "A" | sestava | vše] [díry] [polohy] [přesně]	prüfen [teil "A" | baugruppe | alle] [bohrungen] [positionen] [genau]
+Kosmetický	Kosmetisch
+na válci	auf einem Zylinder
+NEPLATNÉ · přesná kontrola ({0} ploch)	UNGÜLTIG · genaue Prüfung ({0} Flächen)
+NEPLATNÉ · rychlá kontrola	UNGÜLTIG · schnelle Prüfung
+platné · přesná kontrola	gültig · genaue Prüfung
+platné · rychlá kontrola	gültig · schnelle Prüfung
+platnost tělesa přesnou metodou BRepCheck (odchylka křivek hran od ploch počítaná přesně, ne v několika bodech) – výpis „platné (přesná kontrola)“ nebo „NEPLATNÉ (přesná kontrola: N z M ploch s vadou)“, strojově valid=1|0 vcheck=exact bad=N; výsledek platí pro tuto geometrii: řádek Geometrie ve stav končí „· přesná kontrola“, řádek D nese vcheck=exact, JSON docs[].validCheck = exact (jinak „· rychlá kontrola“ a fast); nad 5000 ploch se přesná kontrola neprovede (ℹ s důvodem). Před exportem STEP / BREP proběhne sama do 400 ploch	Gültigkeit des Körpers nach der genauen BRepCheck-Methode (Abweichung der Kantenkurven von den Flächen exakt berechnet, nicht an wenigen Punkten) – Ausgabe „gültig (genaue Prüfung)“ oder „UNGÜLTIG (genaue Prüfung: N von M Flächen fehlerhaft)“, maschinell valid=1|0 vcheck=exact bad=N; das Ergebnis gilt für diese Geometrie: die Zeile Geometrie im Status endet mit „· genaue Prüfung“, die Zeile D trägt vcheck=exact, JSON docs[].validCheck = exact (sonst „· schnelle Prüfung“ und fast); über 5000 Flächen wird die genaue Prüfung nicht ausgeführt (ℹ mit Grund). Vor einem STEP-/BREP-Export läuft sie bis 400 Flächen von selbst
+Po stavbě proběhla rychlá kontrola platnosti (BRepCheck). Kliknutím spustíte přesnou kontrolu (odchylka hran od ploch počítaná přesně) – totéž jako „kontrola přesně“ v konzoli.	Nach dem Aufbau lief eine schnelle Gültigkeitsprüfung (BRepCheck). Klicken startet die genaue Prüfung (Abweichung Kante–Fläche exakt berechnet) – dasselbe wie „prüfen genau“ in der Konsole.
+Poloměr musí být poloměr povrchu, na kterém závit začíná (válec u side=external, díra u side=internal); hloubka jde do materiálu.	Der Radius muss der Radius der Fläche sein, auf der das Gewinde beginnt (Zylinder bei side=external, Bohrung bei side=internal); die Tiefe geht ins Material.
+Provedení	Ausführung
+přesná kontrola	genaue Prüfung
+přesná kontrola neprovedena	genaue Prüfung nicht ausgeführt
+přesná kontrola platnosti (BRepCheck přesnou metodou) – NEPLATNÉ: {0} z {1} ploch má vadu (křivka hrany mimo plochu v toleranci, drát nebo orientace) – jiný CAD může těleso odmítnout; opravte prvek, po kterém vada vznikla	genaue Gültigkeitsprüfung (BRepCheck genaue Methode) – UNGÜLTIG: {0} von {1} Flächen fehlerhaft (Kantenkurve außerhalb der Toleranz zur Fläche, Kontur oder Orientierung) – ein anderes CAD kann den Körper ablehnen; korrigieren Sie das Element, nach dem der Fehler entstand
+přesná kontrola platnosti (BRepCheck přesnou metodou) – platné, ploch {0} · {1} s	genaue Gültigkeitsprüfung (BRepCheck genaue Methode) – gültig, {0} Flächen · {1} s
+přesná kontrola platnosti neprovedena – model nemá těleso	genaue Gültigkeitsprüfung nicht ausgeführt – das Modell hat keinen Körper
+přesná kontrola platnosti neprovedena ({0} ploch > {1}) – {2}	genaue Gültigkeitsprüfung nicht ausgeführt ({0} Flächen > {1}) – {2}
+Přesná kontrola platnosti…	Genaue Gültigkeitsprüfung…
+přesná kontrola selhala	genaue Prüfung fehlgeschlagen
+přesná kontrola: {0} z {1} ploch s vadou	genaue Prüfung: {0} von {1} Flächen fehlerhaft
+rychlá kontrola	schnelle Prüfung
+rychlá kontrola neproběhla	schnelle Prüfung lief nicht
+rychlá kontrola: NEPLATNÉ	schnelle Prüfung: UNGÜLTIG
+rychlá kontrola: platné	schnelle Prüfung: gültig
+skutečná šroubovice	echte Schraubenlinie
+Skutečná šroubovice (profil 60°) z označení – stejné jádro a čísla jako Tažení po šroubovici se závitem z katalogu. Program ověří, že drážka řeže povrch válce / díry (jinak ⚠).	Echte Schraubenlinie (Profil 60°) aus der Bezeichnung – derselbe Kern und dieselben Zahlen wie Austragung entlang Schraubenlinie mit Katalog-Gewinde. Das Programm prüft, dass die Rille die Zylinder- / Bohrungsfläche schneidet (sonst ⚠).
+skutečná šroubovice z označení – jedna cesta k závitu: příkaz závit i Tažení po šroubovici s thread= berou poloměr, stoupání a hloubku z téhož katalogu (vnější: válec Ø d, hloubka 0,6134·P; vnitřní: povrch D1/2, špička na d/2); označení i s mezerami (m18 x 1,5, M18 X 1.5); stoupání mimo ISO 261 (M18×3) = ⚠ thread.pitch-nonstandard; drážka, která povrch neřeže, = ⚠ thread.tip-tangent / thread.no-reach / thread.wrong-side	echte Schraubenlinie aus der Bezeichnung – ein Weg zum Gewinde: der Befehl gewinde und Austragung entlang Schraubenlinie mit thread= nehmen Radius, Steigung und Tiefe aus demselben Katalog (außen: Zylinder Ø d, Tiefe 0,6134·P; innen: Fläche D1/2, Spitze auf d/2); Bezeichnung auch mit Leerzeichen (m18 x 1,5, M18 X 1.5); Steigung außerhalb ISO 261 (M18×3) = ⚠ thread.pitch-nonstandard; eine Rille, die die Fläche nicht schneidet, = ⚠ thread.tip-tangent / thread.no-reach / thread.wrong-side
+skutečná šroubovice z označení (s modelovat; jinak soustružené drážky)	echte Schraubenlinie aus der Bezeichnung (mit modellieren; sonst gedrehte Rillen)
+stoupání {0} mm není pro M{1} v ISO 261 (řada: {2}) – závit {3} se postaví, ale je nestandardní (nástroj, kalibr a protikus nejsou běžné).	Steigung {0} mm ist für M{1} nicht in ISO 261 (Reihe: {2}) – das Gewinde {3} wird erstellt, ist aber nicht genormt (Werkzeug, Lehre und Gegenstück sind nicht üblich).
+špička profilu závitu je tečná k povrchu Ø{0} – drážka do materiálu nezasahuje, vznikne skrytý kanál, ne závit. {1}	die Spitze des Gewindeprofils berührt die Fläche Ø{0} tangential – die Rille schneidet nicht ins Material, es entsteht ein verdeckter Kanal, kein Gewinde. {1}
+šroubovice	Schraubenlinie
+těleso: {0}	Körper: {0}
+těleso: {0} – přesně: „kontrola přesně“	Körper: {0} – genau: „prüfen genau“
+v díře	in einer Bohrung
+Vnější závit {0} patří na válec Ø{1} – zkontrolujte průměr válce a polohu závitu.	Das Außengewinde {0} gehört auf einen Zylinder Ø{1} – prüfen Sie den Zylinderdurchmesser und die Lage des Gewindes.
+Vnitřní závit {0} potřebuje díru vrtanou na Ø{1} (vrták závitu) – zkontrolujte průměr díry a polohu závitu.	Das Innengewinde {0} braucht eine auf Ø{1} gebohrte Bohrung (Kernlochbohrer) – prüfen Sie den Bohrungsdurchmesser und die Lage des Gewindes.
+Závit {0} je kratší než jeden profil ({1} mm) – zadejte delší závit.	Das Gewinde {0} ist kürzer als ein Profil ({1} mm) – geben Sie ein längeres Gewinde an.
+Závit {0} Ø{1}: zadejte side={2} a radius={3} (poloměr povrchu, na kterém závit začíná; hloubka jde do materiálu).	Gewinde {0} Ø{1}: geben Sie side={2} und radius={3} an (Radius der Fläche, auf der das Gewinde beginnt; die Tiefe geht ins Material).
+závit M18×1,5 délka L [v x y z | na …] [osa …] [vnitřní] [modelovat | šroubovice]	gewinde M18×1,5 länge L [bei x y z | bei …] [achse …] [innen] [modellieren | schraubenlinie]
+závit M18×1,5 délka L [vnitřní] [modelovat | šroubovice]	gewinde M18×1,5 länge L [innen] [modellieren | schraubenlinie]
+Závit se vymodeluje jako soustružené drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dá volba Šroubovice.	Das Gewinde wird als gedrehte Rillen modelliert (vereinfacht, ohne Steigung) – geeignet für Visualisierung und 3D-Druck. Eine echte Schraubenlinie liefert die Option Schraubenlinie.
+Závit z katalogu	Gewinde aus Katalog
+Šroubovice	Schraubenlinie
+#!dynamic – texty kódů protokolu (src/cad/engine/codes.ts)
+těleso „{0}“ neprošlo přesnou kontrolou platnosti: {1}	Körper „{0}“ hat die genaue Gültigkeitsprüfung nicht bestanden: {1}

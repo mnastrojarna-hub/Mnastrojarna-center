@@ -7,7 +7,7 @@
 
 Dokument: „Plochy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 40 × 40 × 20 mm (X 0…40, Y 0…40, Z 0…20) · objem 31,19 cm³ · ploch 10 · hran 20
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 32000 mm³ · těleso platné – 40 × 40 × 20 mm, new, roh [0; 0; 0]
  2. Zaoblení 1 [fillet, id #] ✓ úběr 810,5 mm³ · těleso platné – R5, hrany 4
@@ -42,7 +42,7 @@ Prvky:
 
 Dokument: „Plochy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 40 × 40 × 20 mm (X 0…40, Y 0…40, Z 0…20) · objem 31,19 cm³ · ploch 10 · hran 20
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 32000 mm³ · těleso platné – 40 × 40 × 20 mm, new, roh [0; 0; 0]
  2. Zaoblení 1 [fillet, id #] ✓ úběr 810,5 mm³ · těleso platné – R5, hrany 4

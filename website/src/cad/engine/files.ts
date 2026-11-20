@@ -25,6 +25,7 @@ import type { EngineHost, FileSink } from "./host";
 import type { KernelApi } from "./kernel";
 import type { OutFile } from "./protocol-types";
 import type { Workspace } from "./workspace";
+import { exactBeforeExport } from "./validity-store";
 
 /* ───────────────────────── formáty a názvy ───────────────────────── */
 
@@ -432,7 +433,7 @@ export type DocFormat = "step" | "stl" | "mncad" | "pdf" | "dxf" | "dwg" | "svg"
 export const hasDrawings = (d: CadDoc): boolean => documentSheetJobs(d).length > 0;
 
 /** hláška pro protokol: kód, argumenty / text, dokument */
-export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
+export type OutNote = { code: "drawing.warning" | "drawing.section-miss" | "drawing.default-sheet" | "host.app-only" | "out.check-failed" | "out.unsupported" | "geom.exact-invalid" | "msg.note"; args?: unknown[]; text?: string; level?: "error" | "warn" | "note" };
 
 /**
  * Jeden výstup `--formats` dokumentu `d` (kap. 3.1, rozhodnutí 15.7): `.mncad`, STEP (znovu načtený a změřený –
@@ -445,8 +446,12 @@ export async function writeDocFormat(host: Pick<EngineHost, "kernel" | "fonts"> 
   const write = (name: string, mime: string, data: Uint8Array, format: string) => host.files.write({ name, mime, data, doc: d.name, format });
   if (fmt === "mncad") return [await write(`${base}.mncad`, OUT_MIME.mncad, projectFile(d, "").data, "mncad")];
   if (fmt === "step" || fmt === "stl") {
+    // STEP: přesná kontrola platnosti před exportem (do 400 ploch, vlna 22 bod 22a) – nález ⚠, neproběhlá ℹ
+    const pre = fmt === "step" && "validity" in host.kernel ? await exactBeforeExport(host.kernel, null, undefined, d).catch(() => null) : null;
     const data = await modelBytes(host.kernel, d, fmt);
     const f = await write(`${base}.${fmt}`, OUT_MIME[fmt], data, fmt);
+    if (pre && pre.level === "warn") note({ code: "geom.exact-invalid", args: [d.name, pre.text] });
+    else if (pre && pre.level === "note") note({ code: "msg.note", text: pre.text, level: "note" });
     if (fmt === "step") {
       const c = await verifyExport(host.kernel, d, data, "step");
       f.check = { ok: c.ok, text: c.line.replace(/^[✓⚠✗]\s*/, "") };

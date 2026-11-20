@@ -2,6 +2,7 @@
 
 import { cadLocale, getLang, langMeta, missingKeys, tr } from "@/cad/i18n";
 import { geometryText } from "@/cad/feature-levels";
+import { ValidityChip } from "./validity-chip";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -3936,6 +3937,8 @@ export function CadApp() {
                     <span data-geom-unchecked title={tr("Geometrie: {0}{1}", geometryText(result!.metrics!), "")}>{tr("platnost nezkontrolována")}</span>
                   </Chip>
                 )}
+                {/* která kontrola platnosti proběhla + přesná kontrola na klik (vlna 22, bod 22a – validity-chip.tsx) */}
+                {!isAsm && !geomBad && typeof result?.metrics?.valid === "boolean" && <ValidityChip doc={doc} fast={result.metrics.valid} dark={bg.dark} />}
                 {geomBad && (
                   <Chip warn>
                     <span data-geom-chip title={tr("Výsledné těleso není platné (sebeprotínající plochy) nebo nemá žádný solid – export STEP může selhat. Opravte prvek označený ⚠ v historii.")}>{result!.metrics!.solids === 0 ? tr("bez objemového tělesa") : tr("neplatná geometrie")}</span>

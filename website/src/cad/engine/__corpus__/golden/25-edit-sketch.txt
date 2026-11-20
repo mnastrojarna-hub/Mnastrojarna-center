@@ -8,7 +8,7 @@
 
 Dokument: „Úprava skici“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 40 × 20 × 5 mm (X -20…20, Y -10…10, Z 0…5) · objem 3,86 cm³ · ploch 8 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 2 entit: obdélník 40×20, kružnice Ø6
     entity: e1 obdélník 40×20 [0; 0] · e2 kružnice Ø6 [10; 0]
@@ -25,7 +25,7 @@ Prvky:
 
 Dokument: „Úprava skici“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 60 × 20 × 5 mm (X -30…30, Y -10…10, Z 0…5) · objem 6 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: obdélník 60×20
     entity: e1 obdélník 60×20 [0; 0]

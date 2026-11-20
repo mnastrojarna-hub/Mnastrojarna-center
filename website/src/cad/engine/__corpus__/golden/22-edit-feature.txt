@@ -11,7 +11,7 @@
 
 Dokument: „Úpravy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (4 ✓, 0 ✗)
 Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 22,96 cm³ · ploch 12 · hran 30
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
  2. Díra 1 [hole, id #] ✓ úběr 502,7 mm³ (5 % nástroje) · těleso platné – Ø8 skrz v [15; 20; 10], osa Z
@@ -36,7 +36,7 @@ Prvky:
 
 Dokument: „Úpravy“ · díl · materiál Ocel (7.85 g/cm³) · prvků 4 (3 ✓, 1 ✗)
 Rozměry: 70 × 40 × 10 mm (X 0…70, Y 0…40, Z 0…10) · objem 26,99 cm³ · ploch 8 · hran 18
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 28000 mm³ · těleso platné – 70 × 40 × 10 mm, new, roh [0; 0; 0]
  2. Levá díra [hole, id #] ✓ úběr 502,7 mm³ (5 % nástroje) · těleso platné – Ø8 skrz v [15; 20; 10], osa Z

@@ -234,6 +234,10 @@ export function mergeEntries(entries: readonly Entry[]): Entry[] {
  */
 const SIMILAR: Readonly<Record<string, { label: string; numbers: boolean }>> = {
   "feature.warning": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.tip-tangent": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.no-reach": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.wrong-side": { label: "{0} prvků: {1} – „{2}“", numbers: false },
+  "thread.pitch-nonstandard": { label: "{0} prvků: {1} – „{2}“", numbers: false },
   "feature.failed": { label: "{0} prvků: {1} – „{2}“", numbers: false },
   "drawing.warning": { label: "{0} listů: {1} – „{2}“", numbers: true },
 };
@@ -407,6 +411,7 @@ export function docKv(d: DocSummary): string {
   // konečné těleso dílu (vlna 22): počet těles a výsledek kontroly platnosti – neprovedená kontrola je `unchecked`, ne 1
   if (d.kind === "part" && d.solids !== undefined) kv.push(`solids=${d.solids}`);
   if (d.kind === "part" && d.valid !== undefined) kv.push(`valid=${d.valid === null ? "unchecked" : d.valid ? 1 : 0}`);
+  if (d.kind === "part" && typeof d.valid === "boolean" && d.validCheck === "exact") kv.push("vcheck=exact"); // přesná kontrola (bez klíče = rychlá)
   if (d.kind === "part" && d.free) kv.push(`free=${d.free}`);
   if (d.features?.unchecked) kv.push(`unchecked=${d.features.unchecked}`);
   if (d.features?.off) kv.push(`off=${d.features.off}`); // potlačené prvky – nejsou ve `feat=` mezi ✓

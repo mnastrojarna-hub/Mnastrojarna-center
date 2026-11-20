@@ -28,6 +28,7 @@ import { runEngineOp, type OpCtx } from "./ops/registry";
 import { ReportBuilder } from "./protocol";
 import type { Entry, RunOptions, RunReport } from "./protocol-types";
 import { docKeyOf, flush, runOf, type EngineRun } from "./run-doc";
+import { withValidity } from "./validity-store";
 import { MAX_DEPTH } from "../assembly";
 import type { Workspace } from "./workspace";
 
@@ -307,10 +308,11 @@ async function finishRun(ctx: OpCtx, featureLine: Map<string, number>, now: () =
   // obálka sestavy přesně (engine/asm-box.ts) – stejně jako `stav` uprostřed skriptu a řádek D v CLI
   const asm = await asmStatus(ws, host.kernel, d, { key: docKeyOf(ctx), onRestart: restarted, onParts: () => host.ui?.partsLoaded?.() });
   const stale = staleNotes(ws, d, docKeyOf(ctx)); // měření / porovnání z dřívější revize dokumentu (engine/result-key.ts)
-  const status = docStatusText(d, res, asm, stale);
+  const shown = withValidity(ws, docKeyOf(ctx), d, res); // přesná kontrola téže geometrie (kontrola přesně / export – 22a)
+  const status = docStatusText(d, shown, asm, stale);
   log.tailLine("", status);
   // „stav“ jako poslední příkaz: vyžádaný výpis = závěrečný stav (strojová část stejná v cs/en/de, text v `detail`);
   // po STOP přísného režimu se poslední řádek neprovedl – výpis „=“ se nepíše (konzole stav dokumentu ukáže dál)
-  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, res, asm, stale), { doc: d.name, detail: status });
+  if (r.lastOp?.k === "status" && ranAll) rb.measure(r.lastOp.line, "status", statusKv(d, shown, asm, stale), { doc: d.name, detail: status });
   return log.text();
 }

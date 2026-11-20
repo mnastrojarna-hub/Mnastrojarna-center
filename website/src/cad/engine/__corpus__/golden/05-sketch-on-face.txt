@@ -15,7 +15,7 @@
 
 Dokument: „Skica na ploše“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (4 ✓, 1 ⚠, 0 ✗)
 Rozměry: 83 × 55 × 23 mm (X 0…83, Y 0…55, Z 0…23) · objem 80,18 cm³ · ploch 12 · hran 28
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 80000 mm³ · těleso platné – 80 × 50 × 20 mm, new, roh [0; 0; 0]
  2. Skica 1 [sketch, id #] ✓ – rovina Plocha 6, 1 entit: kružnice Ø20

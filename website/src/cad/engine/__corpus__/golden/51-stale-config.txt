@@ -12,7 +12,7 @@ Těleso: obálka 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24000
 
 Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (1 ✓, 1 ℹ potlačeno, 0 ✗)
 Rozměry: 60 × 40 × 10 mm (X 0…60, Y 0…40, Z 0…10) · objem 24 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]
  2. Kvádr 2 [box, id #] ℹ (potlačen) – 10 × 10 × 30 mm, add, roh [40; 10; 10]
@@ -55,7 +55,7 @@ Kolize: 1 – Deska K × Přidržovač (1 000,0 mm³) (zkontrolováno ?)
 
 Dokument: „Deska K“ · díl · materiál Ocel (7.85 g/cm³) · prvků 2 (2 ✓, 0 ✗)
 Rozměry: 60 × 40 × 40 mm (X 0…60, Y 0…40, Z 0…40) · objem 27 cm³ · ploch 11 · hran 24
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Měření: výsledek L7 je pro revizi r·? – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 24000 mm³ · těleso platné – 60 × 40 × 10 mm, new, roh [0; 0; 0]

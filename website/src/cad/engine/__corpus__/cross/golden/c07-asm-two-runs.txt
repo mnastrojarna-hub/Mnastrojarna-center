@@ -32,7 +32,7 @@ Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kar
 
 Dokument: „Další“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 5 × 5 × 5 mm (X 0…5, Y 0…5, Z 0…5) · objem 0,12 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 1 [box, id #] ✓ přidáno 125 mm³ · těleso platné – 5 × 5 × 5 mm, new, roh [0; 0; 0]
 === run 4 ===

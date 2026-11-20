@@ -30,7 +30,7 @@ Pružina „Tlačná pružina 1“ – Tlačná pružina (EN 13906-1) · Tlačn�
 
 Dokument: „Pružina z tabulky“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 20 × 20 × 50 mm (X -10…10, Y -10…10, Z 0…50) · objem 1,71 cm³ · ploch 9 · hran 19
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Tlačná pružina 1 [ext, id #] ✓ přidáno 1706,6 mm³ · těleso platné – tlačná d 2 · De 20 · L0 50 · n 8 · R 3,494 N/mm · Ln 20 mm
     → Ln + Sa 23,54 mm · Fn 104,8 N · τn 61 % τzul · vzpěr nevybočí · fe 280 Hz · 13,9 g
@@ -55,7 +55,7 @@ Prvky:
 
 Dokument: „Stírací deska“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
 Rozměry: 200 × 120 × 15 mm (X 0…200, Y 0…120, Z 0…15) · objem 360 cm³ · ploch 6 · hran 12
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Kvádr 3 [box, id #] ✓ přidáno 360000 mm³ · těleso platné – 200 × 120 × 15 mm, new, roh [0; 0; 0]
 === run 3 ===

@@ -53,7 +53,6 @@ Délka zobrazení	Anzeigelänge
 Globální osa X / Y / Z středem (níže)	Globale Achse X / Y / Z durch die Mitte (unten)
 Globální osa otočení	Globale Drehachse
 Kosmetický závit: geometrie se nemění, závit se uvede ve výkrese (kružnice válce / jádra díry se kótuje označením). Doporučeno pro výrobní dokumentaci.	Kosmetisches Gewinde: die Geometrie ändert sich nicht, das Gewinde erscheint in der Zeichnung (der Kreis des Zylinders / Bohrungskerns wird mit der Bezeichnung bemaßt). Empfohlen für Fertigungsunterlagen.
-Modelovat závitové drážky	Gewinderillen modellieren
 Neznámé označení – zadejte M2 až M48, volitelně se stoupáním (M18×1,5).	Unbekannte Bezeichnung – geben Sie M2 bis M48 ein, optional mit Steigung (M18×1,5).
 Odsazení od plochy (0 = až k ploše)	Versatz von der Fläche (0 = bis zur Fläche)
 Osa X (ortogonalizuje se vůči Z)	X-Achse (wird zu Z orthogonalisiert)
@@ -100,7 +99,6 @@ Způsob	Methode
 Způsoby zadání: vrchol, střed / začátek / konec hrany, střed kružnice, střed plochy, bod v % délky hrany, střed mezi body, mezi body v poměru, odsazený podél hrany, průmět na plochu, průsečík hrany s plochou, počátek, souřadnice, bod skici. Bod pak slouží jako poloha díry, primitiva, střed otáčení…	Eingabearten: Eckpunkt, Kantenmitte / -anfang / -ende, Kreismittelpunkt, Flächenmittelpunkt, Punkt bei % der Kantenlänge, Mitte zwischen Punkten, zwischen Punkten im Verhältnis, versetzt entlang einer Kante, Projektion auf eine Fläche, Schnittpunkt Kante–Fläche, Ursprung, Koordinaten, Skizzenpunkt. Der Punkt dient dann als Bohrungsposition, Grundkörperposition, Drehmitte…
 Základní rovina + odsazení (níže)	Grundebene + Versatz (unten)
 Závit (ISO metrický – hrubé i jemné stoupání)	Gewinde (ISO-metrisch – Regel- und Feingewinde)
-Závit se vymodeluje jako drážky (zjednodušeně, bez stoupání) – vhodné pro vizualizaci a 3D tisk. Skutečnou šroubovici dává Plochy → Tažení po šroubovici (profil Závit 60°).	Das Gewinde wird als Rillen modelliert (vereinfacht, ohne Steigung) – geeignet für Visualisierung und 3D-Druck. Eine echte Schraubenlinie liefert Flächen → Austragung entlang Schraubenlinie (Profil Gewinde 60°).
 např. M18×1,5	z. B. M18×1,5
 pomocná osa	Bezugsachse
 pomocná rovina	Bezugsebene

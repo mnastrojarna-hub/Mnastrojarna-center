@@ -4,7 +4,7 @@
 
 Dokument: „Šroub M8×30 ISO 4762“ · díl · materiál Ocel (7.85 g/cm³) · prvků 7 (7 ✓, 0 ✗)
 Rozměry: 13 × 13 × 38 mm (X -6,5…6,5, Y -6,5…6,5, Z -30…8) · objem 2,43 cm³ · ploch 45 · hran 96
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Hlava [cylinder, id #] ✓ přidáno 1061,9 mm³ · těleso platné – Ø13 × 8 mm, new, podstava [0; 0; 0], osa Z
  2. Vnitřní šestihran – profil [sketch, id #] ✓ – rovina XY +4, 1 entit: 6-úhelník

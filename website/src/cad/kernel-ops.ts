@@ -33,6 +33,7 @@ import { springDrawTables } from "./drawing-springtable";
 import { splitStepAssembly } from "./formats/step-assembly";
 import { isFatalKernelError } from "./kernel-errors";
 import { exportStats } from "./export-verify";
+import { validityOfDoc } from "./validity-kernel";
 import type { KernelEnvelope, KernelPost, KernelReqOp, KernelResults } from "./kernel-protocol";
 
 /** Volby načtení jádra: `locateFile` = kde emscripten najde `replicad_single.wasm` (jinak vedle svého modulu / svazku). */
@@ -359,6 +360,9 @@ export async function handleKernel(m: KernelEnvelope, post: KernelPost): Promise
       }
       case "exportStats":
         reply(post, m, await exportStats(m.doc, m.bytes, m.format));
+        break;
+      case "validity":
+        reply(post, m, await validityOfDoc(m.doc, m.maxFaces !== undefined ? { maxFaces: m.maxFaces } : {}));
         break;
       case "drawing": {
         // těleso se přestaví jen při změně geometrie (razítko, název, materiál, poznámky těleso nemění – ty jsou rychlé)

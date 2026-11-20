@@ -19,7 +19,7 @@
 
 Dokument: „Příruba“ · díl · materiál Nerez (7.95 g/cm³) · prvků 7 (6 ✓, 1 ✗)
 Rozměry: 120 × 120 × 40 mm (X -60…60, Y -60…60, Z 0…40) · objem 201,97 cm³ · ploch 13 · hran 25
-Geometrie: platná · 1 těleso
+Geometrie: platná · 1 těleso · rychlá kontrola
 Prvky:
  1. Skica 1 [sketch, id #] ✓ – rovina XY, 1 entit: kružnice Ø120
     entity: e1 kružnice Ø120 [0; 0]

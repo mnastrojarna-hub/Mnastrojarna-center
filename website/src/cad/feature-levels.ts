@@ -230,10 +230,12 @@ export function settleBodyChecks(status: readonly FeatureStatus[], final: FinalC
 }
 
 /** řádek „Geometrie“ textového stavu – kontrola, která se neprovedla, se vypíše jako „nezkontrolováno“ s důvodem */
-export function geometryText(m: { valid?: boolean; solids?: number; faces: number; approx?: boolean }): string {
+export function geometryText(m: { valid?: boolean; solids?: number; faces: number; approx?: boolean; validCheck?: "fast" | "exact" }): string {
   const bodies = m.solids ? ` · ${m.solids === 1 ? tr("1 těleso") : tr("{0} těles", m.solids)}` : "";
+  // která kontrola platnost určila (vlna 22, bod 22a): rychlá po stavbě, nebo přesná (kontrola přesně, export) – na konci řádku
+  const how = ` · ${m.validCheck === "exact" ? tr("přesná kontrola") : tr("rychlá kontrola")}`;
   if (m.solids === 0) return tr("ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid");
-  if (m.valid === false) return tr("NEPLATNÁ (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat; opravte prvek označený ⚠") + bodies;
+  if (m.valid === false) return tr("NEPLATNÁ (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat; opravte prvek označený ⚠") + bodies + how;
   if (m.valid === undefined) return tr("nezkontrolováno ({0})", uncheckedText({ why: m.approx ? "approx" : "final-faces", faces: m.faces })) + bodies;
-  return tr("platná") + bodies;
+  return tr("platná") + bodies + how;
 }
