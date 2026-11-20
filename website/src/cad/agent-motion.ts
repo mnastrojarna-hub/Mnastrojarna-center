@@ -12,6 +12,7 @@
 import { tr } from "./i18n";
 import { AsmCursor, asmIsNum, asmNum, asmTokens, asmWords as W } from "./agent-asm";
 import { backArg, parseDynText, type DynCmd } from "./agent-motion-dyn";
+import { parseMotionViewText, type MotionViewCmd } from "./agent-motion-view";
 import type { Vec3 } from "./types";
 
 export type MotionCmd =
@@ -47,6 +48,8 @@ export type MotionCmd =
   /** režim studie (vlna 22, bod 2): `pohyb kvazistatika` | `pohyb automaticky` (null); `pohyb kinematika` = dynamika vypnuta → kinematika */
   | { op: "mode"; mode: "quasistatic" | null }
   | { op: "dyn"; cmd: DynCmd }
+  /** pohledy studie, časování videa, anotace (vlna 22, body 13–14 – cad/agent-motion-view.ts) */
+  | { op: "view"; cmd: MotionViewCmd }
   | { op: "set"; steps?: number; step?: number; duration?: number; collisions?: boolean; trace?: { comp: string; point?: Vec3 } | null }
   | { op: "run" }
   | { op: "play"; loop?: boolean }
@@ -174,6 +177,8 @@ export function parseMotionText(line: string): MotionCmd {
   // dynamika, hmotnost, síla / moment na vazbě (cad/agent-motion-dyn.ts)
   const dyn = parseDynText(c);
   if (dyn) return { op: "dyn", cmd: dyn };
+  const view = parseMotionViewText(c);
+  if (view) return { op: "view", cmd: view };
   if (c.is(K.motor)) {
     c.i++;
     if (c.is(K.del)) {

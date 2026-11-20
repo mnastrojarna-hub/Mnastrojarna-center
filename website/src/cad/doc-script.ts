@@ -32,6 +32,7 @@
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
+import { emitMotionViews } from "./doc-script-motion-view";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
@@ -2093,6 +2094,9 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
     // čas, krok, gravitace, tlumení, odraz, snímky (i nastavení uložené u kinematické studie) – doc-script-asm.ts
     emitDynamics(c.sheetOut, mo);
   }
+  // pohledy studie (kamera, řez), aktivní pohled, volby videa, anotace – vlna 22 (doc-script-motion-view.ts)
+  if (mo?.motors.length || mo?.dyn) emitMotionViews(c.sheetOut, mo);
+  else if (mo?.views?.length) c.note(tr("pohledy pohybové studie bez motoru se do skriptu nepřenáší"));
   emitDrawings(c, doc);
 }
 

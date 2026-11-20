@@ -1,0 +1,25 @@
+# vlna 22, bod 14: uložené pohledy pohybové studie (kamera + rovina řezu) jsou součástí studie – uloží se do dokumentu, přehrávání
+# a export je použijí; víc pohledů ve videu = synchronní dlaždice; anotace polohy lze vypnout. Výsledek studie na pohledech
+# nezávisí (pohyb stav po uložení pohledu neplatí za změnu studie).
+nový díl "Deska A"
+kvádr 100 100 10
+nový díl "Přidržovač"
+kvádr 60 60 8
+#--- run
+nová sestava "Studie P"
+vložit "Deska A" ukotvit
+vložit "Přidržovač" v 20 20 67,5
+sestava vazba vzdálenost "Přidržovač" spodní "Deska A" horní hodnota 57,5 název "ZDVIH"
+pohyb motor lineární vazba "ZDVIH" 57,5..27,15 kroky 4
+pohyb pohledy
+pohyb pohled uložit "Řez pružinami" řez Y 50 kamera přední
+pohyb pohled uložit "Shora" kamera horní bez řezu
+pohyb pohled uložit "Šikmo" směr 1 -1 1 cíl 50 50 30 výška 160 řez normála 1 0 1 bod 50 0 0 obráceně
+pohyb pohledy
+pohyb video rychlost 0,5 pohled "Řez pružinami" "Shora"
+pohyb anotace vyp
+pohyb pohled smazat "Shora"
+pohyb pohledy
+pohyb video
+pohyb stav
+pohyb pohled uložit "X" řez W 5

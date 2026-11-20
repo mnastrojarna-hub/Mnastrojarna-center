@@ -25,13 +25,14 @@ import { motionSlot, motionState, motionStateOf, runStored } from "./motion-cach
 import { buildMotor, fitDuration, motorCurrent, motorIsAbsolute, motorSpan } from "./motor-model";
 import { fmtNum } from "./engine/protocol";
 import { applyDynCmd, dynamicRun, dynStudyLine } from "./asm-agent-dyn";
+import { applyMotionViewCmd, type MotionVideoSignal } from "./agent-motion-view";
 // kinematická studie beze změny (cad/motion.ts), dynamická navíc s řádky / sloupci dynamiky (vlna 21)
 import { isDyn, studyCsv as motionCsv, studySummary as motionSummary } from "./motion-dynamic-report";
 import type { DynMotionStep } from "./motion-dynamic";
 import { uid, type AsmComponent, type CadDoc, type Mate, type MateRef, type MotionMotor, type MotionStudy, type Vec3 } from "./types";
 
 /** Pokyn pro panel pohybové studie v aplikaci. */
-export type MotionSignal = { play?: boolean; loop?: boolean; stop?: boolean; step?: number; export?: "csv" | "png" | "webm"; open?: boolean };
+export type MotionSignal = { play?: boolean; loop?: boolean; stop?: boolean; step?: number; export?: "csv" | "png" | "webm"; open?: boolean; /** volby exportu (časování, pohledy, anotace) a aktivní pohled ("" = okno) – vlna 22, cad/agent-motion-view.ts */ video?: MotionVideoSignal; view?: string };
 
 /* ───────────────────────── entity komponent ───────────────────────── */
 
@@ -564,6 +565,9 @@ export async function applyMotionCmd(d: CadDoc, cmd: MotionCmd, env: AsmEnv): Pr
       const r = await applyDynCmd(d, cmd.cmd, study, { runLog, lines: studyLines, log });
       return signal(r.doc, r.log, r.changed, r.motion, codes, kv);
     }
+    case "view":
+      // pohledy studie, video s pevným časováním, anotace (vlna 22, body 13–14 – cad/agent-motion-view.ts)
+      return applyMotionViewCmd(d, cmd.cmd, { run: async () => (noteRecompute(d), motionRun(d, env)), codes });
     case "run":
       log.push(...studyLines(d));
       noteRecompute(d);

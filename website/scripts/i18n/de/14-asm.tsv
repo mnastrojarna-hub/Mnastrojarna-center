@@ -81,7 +81,6 @@ motor: vazba číslem nebo názvem – pohyb motor rotační vazba 3 0..360	Antr
 Motory	Antriebe
 motory na vazbách, kroky, kolize, přehrání a export	Antriebe an Verknüpfungen, Schritte, Kollisionen, Wiedergabe und Export
 Načítám plochy, hrany a vrcholy komponenty…	Lade Flächen, Kanten und Eckpunkte der Komponente…
-Nahrávám video…	Nehme Video auf…
 Nesplněné vazby	Nicht erfüllte Verknüpfungen
 nesplněno {0}	nicht erfüllt {0}
 Odebrat motor	Antrieb entfernen
@@ -109,7 +108,6 @@ Pokročilé vazby	Erweiterte Verknüpfungen
 pokročilé vazby jako v panelu sestavy: entita = F12 (plocha), E5 (hrana), V3 (vrchol) nebo pravidlo (+Z, válcová Ø8, koule, kružnice Ø40); Šířka a Závěs berou dvě plochy na straně, Drážka dva konce; meze min / max	erweiterte Verknüpfungen wie im Baugruppenpanel: Entität = F12 (Fläche), E5 (Kante), V3 (Eckpunkt) oder Regel (+Z, zylindrisch Ø8, kugel, kreis Ø40); Breite und Scharnier nehmen zwei Flächen je Seite, Langloch zwei Enden; Grenzen min / max
 poloha {0} mm	Lage {0} mm
 poměr {0}	Übersetzung {0}
-Prohlížeč neumí nahrát video z 3D okna – použijte snímky PNG.	Der Browser kann kein Video aus dem 3D-Fenster aufnehmen – verwenden Sie PNG-Bilder.
 Přehrát	Abspielen
 Přeskočit	Überspringen
 Přidat motor	Antrieb hinzufügen
@@ -124,7 +122,6 @@ Sestava nemá vazbu Vzdálenost, Drážka, Dráha, Souosost ani Šroub.	Die Baug
 Sestava nemá vazbu Závěs, Souosost ani Šroub.	Die Baugruppe hat keine Verknüpfung Scharnier, Konzentrisch oder Schraube.
 sestava vazba kolmo|tečně|shodně|symetricky|šířka|dráha|drážka|závěs|zámek|mez vzdálenosti|mez úhlu|ozubení|hřeben|šroub|vačka|kardan "A" <plocha|E5|V3> [2. plocha] "B" <plocha> [2. plocha] [rovina "C" <plocha>] [poměr N | zuby z1 z2 | stoupání P | dráha mm/ot | modul m zuby z] [min N] [max N] [poloha N] [obráceně|levý|vnitřní] [název "…"]	baugruppe verknüpfung senkrecht|tangential|koinzident|symmetrisch|breite|pfad|langloch|scharnier|sperren|abstandsgrenze|winkelgrenze|zahnrad|zahnstange|schraube|nocken|kardangelenk "A" <Fläche|E5|V3> [2. Fläche] "B" <Fläche> [2. Fläche] [um "C" <Fläche>] [übersetzung N | zähne z1 z2 | steigung P | weg mm/U | modul m zähne z] [min N] [max N] [lage N] [umkehren|links|innen] [name "…"]
 Smyčka	Schleife
-Snímek 3D okna se nepodařilo pořídit.	Das 3D-Fenster konnte nicht aufgenommen werden.
 Snímky PNG	PNG-Bilder
 Snímky PNG ({0}) se uloží z 3D okna (jen v aplikaci)	PNG-Bilder ({0}) werden aus dem 3D-Fenster gespeichert (nur in der Anwendung)
 stejný smysl otáčení	gleicher Drehsinn
@@ -135,7 +132,6 @@ Stopa Z	Spur Z
 stopa: zadejte komponentu – stopa "Ojnice" [bod x y z] (bod v souřadnicích komponenty)	Spur: Komponente angeben – spur "Pleuel" [punkt x y z] (Punkt in Komponentenkoordinaten)
 stoupání {0} mm	Steigung {0} mm
 Tabulka CSV	CSV-Tabelle
-Uloženo {0} snímků PNG (ZIP) a tabulka CSV.	{0} PNG-Bilder (ZIP) und eine CSV-Tabelle gespeichert.
 vazba {0} ({1}) nemá hodnotu – hodnotu má Vzdálenost, Úhel, Ozubení (poměr), Šroub (stoupání), Hřeben (mm/ot) a Drážka (poloha)	Verknüpfung {0} ({1}) hat keinen Wert – Werte haben Abstand, Winkel, Zahnräder (Übersetzung), Schraube (Steigung), Zahnstange (mm/U) und Langloch (Lage)
 vazba {0} ({1}) nemá meze – meze má Mez vzdálenosti a Mez úhlu	Verknüpfung {0} ({1}) hat keine Grenzen – Grenzen haben Abstandsgrenze und Winkelgrenze
 Vazba {0}: {1} – klikněte na plochu v modelu nebo vyberte ze seznamu · Esc zruší	Verknüpfung {0}: {1} – Fläche im Modell anklicken oder aus der Liste wählen · Esc bricht ab
@@ -154,7 +150,6 @@ Vazby splněny ve všech krocích	Verknüpfungen in allen Schritten erfüllt
 vhodné: {0}{1}	geeignet: {0}{1}
 Video WebM	WebM-Video
 Video WebM se nahraje z 3D okna (jen v aplikaci)	WebM-Video wird aus dem 3D-Fenster aufgenommen (nur in der Anwendung)
-Video WebM uloženo ({0} snímků, {1} fps).	WebM-Video gespeichert ({0} Bilder, {1} fps).
 vnitřní dotyk	Innenberührung
 Všechny entity vazby jsou vybrané – potvrďte vazbu v panelu komponenty.	Alle Entitäten der Verknüpfung sind gewählt – Verknüpfung im Komponentenpanel bestätigen.
 Vypočítat pohyb	Bewegung berechnen

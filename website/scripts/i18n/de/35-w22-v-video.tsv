@@ -1,0 +1,116 @@
+# vlna 22, balík V (body 13 a 14): video s pevným časováním, pohledy studie (kamera + řez), lišta přehrávání, anotace
+  anotace: vypnuté	  Anmerkungen: aus
+  kamera neuložena – při použití pohledu zůstane kamera okna (v aplikaci tlačítko „Uložit pohled“ uloží i kameru)	  Kamera nicht gespeichert – beim Verwenden der Ansicht bleibt die Fensterkamera (in der App speichert „Ansicht speichern“ auch die Kamera)
+  pohled: „{0}“	  Ansicht: „{0}“
+  pohledy: {0}{1}	  Ansichten: {0}{1}
+ (min. {0})	 (min. {0})
+ (synchronně vedle sebe)	 (synchron nebeneinander)
+ bod {0}	 Punkt {0}
+ obráceně	 umgekehrt
+{0} s pevným časováním: {1}	{0} mit fester Zeitbasis: {1}
+{0}: čekám číslo, ne „{1}“	{0}: Zahl erwartet, nicht „{1}“
+{0}: čekám tři čísla	{0}: drei Zahlen erwartet
+⚠ obraz se změnil v {0} z {1} snímků s pohybem (zbytek: pohyblivý díl mimo záběr nebo schovaný řezem?)	⚠ das Bild hat sich in {0} von {1} Bildern mit Bewegung geändert (Rest: bewegtes Teil außerhalb des Bildes oder vom Schnitt verdeckt?)
+✓ aktivní pohled studie „{0}“: {1} · {2} (použije se při přehrávání a exportu)	✓ aktive Studienansicht „{0}“: {1} · {2} (für Wiedergabe und Export verwendet)
+✓ anotace polohy vypnuté	✓ Positionsanmerkungen aus
+✓ anotace polohy zapnuté (čas, krok, motory{0}) – v okně i v exportu PNG / WebM	✓ Positionsanmerkungen ein (Zeit, Schritt, Antriebe{0}) – im Fenster und im PNG-/WebM-Export
+✓ pohled studie „{0}“ {1}: {2} · {3}	✓ Studienansicht „{0}“ {1}: {2} · {3}
+✓ pohled studie „{0}“ odebrán	✓ Studienansicht „{0}“ entfernt
+✓ přehrávání a export bez uloženého pohledu (kamera a řez okna)	✓ Wiedergabe und Export ohne gespeicherte Ansicht (Kamera und Schnitt des Fensters)
+✗ 3D okno nemá co sejmout (model není zobrazen) – export se nespustil	✗ das 3D-Fenster hat nichts aufzunehmen (Modell nicht angezeigt) – Export nicht gestartet
+✗ kodér nevrátil žádný snímek – nic se neuložilo	✗ der Encoder lieferte kein Bild – nichts gespeichert
+✗ obraz se mezi snímky nezměnil, přestože se poloha měnila v {0} snímcích – 3D okno se nepřekreslilo, video by bylo nehybné	✗ das Bild hat sich zwischen den Bildern nicht geändert, obwohl sich die Position in {0} Bildern geändert hat – das 3D-Fenster wurde nicht neu gezeichnet, das Video wäre eingefroren
+✗ prohlížeč nevytvořil 2D plátno pro snímky	✗ der Browser hat keine 2D-Zeichenfläche für die Bilder erstellt
+✗ Video neuloženo: hotový soubor neodpovídá plánu ({0}) – {1}	✗ Video nicht gespeichert: die fertige Datei entspricht nicht dem Plan ({0}) – {1}
+Anotace	Anmerkungen
+Anotace polohy v okně a v exportu	Positionsanmerkungen im Fenster und im Export
+Anotace ve videu	Anmerkungen im Video
+cíl	Ziel
+cíl {0}	Ziel {0}
+Délka videa	Videolänge
+délka videa: kladné číslo v sekundách	Videolänge: positive Zahl in Sekunden
+Export se nepodařil: {0}	Export fehlgeschlagen: {0}
+Export snímků potřebuje 3D okno.	Der Bildexport benötigt das 3D-Fenster.
+Export zrušen.	Export abgebrochen.
+ℹ poloha se ve studii nemění – všechny snímky ukazují totéž	ℹ die Position ändert sich in der Studie nicht – alle Bilder zeigen dasselbe
+kamera {0}	Kamera {0}
+kamera podle okna	Kamera wie im Fenster
+kamera: iso | přední | zadní | horní | spodní | levý | pravý	Kamera: iso | vorne | hinten | oben | unten | links | rechts
+krok {0}/{1}	Schritt {0}/{1}
+Lišta ▾	Leiste ▾
+nahrazen	ersetzt
+Nastavení videa	Videoeinstellungen
+Nezkontrolováno – pohyb se pro tento stav nepočítal.	Nicht geprüft – die Bewegung wurde für diesen Zustand nicht berechnet.
+obraz se mění ve všech {0} snímcích s pohybem ({1} různých snímků)	das Bild ändert sich in allen {0} Bildern mit Bewegung ({1} verschiedene Bilder)
+Odebrat pohled „{0}“	Ansicht „{0}“ entfernen
+okno	Fenster
+Panel ▴	Panel ▴
+pohled „{0}“	Ansicht „{0}“
+pohled „{0}“ ve studii není	Ansicht „{0}“ ist nicht in der Studie
+pohled „{0}“ ve studii není – uložené: {1}	Ansicht „{0}“ ist nicht in der Studie – gespeichert: {1}
+pohled smazat: zadejte název nebo číslo pohledu	Ansicht löschen: Name oder Nummer der Ansicht angeben
+Pohled studie	Studienansicht
+pohled studie č. {0} „{1}“ nejde zapsat příkazem pohyb pohled uložit	Studienansicht Nr. {0} „{1}“ kann nicht als bewegung ansicht speichern geschrieben werden
+pohled uložit: zadejte název – pohyb pohled uložit "Řez pružinami" řez Y 50 kamera přední	Ansicht speichern: Namen angeben – bewegung ansicht speichern "Federschnitt" schnitt Y 50 kamera vorne
+Pohled: okno	Ansicht: Fenster
+pohled: zadejte název uloženého pohledu v uvozovkách nebo číslo	Ansicht: Name einer gespeicherten Ansicht in Anführungszeichen oder Nummer angeben
+pohledy pohybové studie bez motoru se do skriptu nepřenáší	Ansichten einer Bewegungsstudie ohne Antrieb werden nicht ins Skript übernommen
+Pohledy studie ({0}), aktivní: {1}	Studienansichten ({0}), aktiv: {1}
+Pohledy studie: žádné – pohyb pohled uložit "<název>" [řez Y 50] [kamera přední]	Studienansichten: keine – bewegung ansicht speichern "<Name>" [schnitt Y 50] [kamera vorne]
+Pohledy ve videu (víc = vedle sebe, synchronně):	Ansichten im Video (mehrere = nebeneinander, synchron):
+pohledy vše | pohledy vyp	ansichten alle | ansichten aus
+pohledy: {0}	Ansichten: {0}
+pohyb export {0}: neznámá volba „{1}“ – {2}	bewegung export {0}: unbekannte Option „{1}“ – {2}
+pohyb export webm: volba „kroky“ platí jen pro snímky PNG	bewegung export webm: die Option „schritte“ gilt nur für PNG-Bilder
+pohyb pohled uložit "<název>" [kamera přední|horní|…] [směr dx dy dz] [cíl x y z] [výška H] [řez X|Y|Z <poloha> [obráceně] | bez řezu] · pohyb pohled "<název>"|okno · pohyb pohledy · pohyb video [rychlost 0,5] [fps 30] [délka 5] [pohled "<A>" …|pohledy vše] [anotace vyp] · pohyb export webm|png [volby videa] · pohyb anotace zap|vyp	bewegung ansicht speichern "<Name>" [kamera vorne|oben|…] [richtung dx dy dz] [ziel x y z] [höhe H] [schnitt X|Y|Z <Lage> [umgekehrt] | ohne schnitt] · bewegung ansicht "<Name>"|fenster · bewegung ansichten · bewegung video [geschwindigkeit 0,5] [fps 30] [länge 5] [ansicht "<A>" …|ansichten alle] [anmerkungen aus] · bewegung export webm|png [Videooptionen] · bewegung anmerkungen ein|aus
+pohyb pohled uložit: neznámá volba „{0}“ – {1}	bewegung ansicht speichern: unbekannte Option „{0}“ – {1}
+pohyb pohled: neznámá volba „{0}“ – {1}	bewegung ansicht: unbekannte Option „{0}“ – {1}
+pohyb video: neznámá volba „{0}“ – {1}	bewegung video: unbekannte Option „{0}“ – {1}
+poloha řezu	Schnittlage
+Prohlížeč neumí kódovat video – uloženy snímky PNG s časovým plánem (ZIP, příkaz ffmpeg uvnitř): {0}	Der Browser kann kein Video kodieren – PNG-Bilder mit Zeitplan gespeichert (ZIP, ffmpeg-Befehl enthalten): {0}
+Připravuji snímky…	Bereite Bilder vor…
+ruční délka	manuelle Länge
+Rychlost přehrání	Wiedergabegeschwindigkeit
+rychlost videa: kladné číslo, např. 1, 0,5 nebo 0,25×	Videogeschwindigkeit: positive Zahl, z. B. 1, 0,5 oder 0,25×
+řez {0} {1} mm{2}	Schnitt {0} {1} mm{2}
+řez normála {0}{1} posun {2} mm{3}	Schnitt Normale {0}{1} Versatz {2} mm{3}
+řez: normála nesmí být nulový vektor	Schnitt: die Normale darf kein Nullvektor sein
+řez: osa X, Y nebo Z	Schnitt: Achse X, Y oder Z
+řez: poloha musí být číslo	Schnitt: die Lage muss eine Zahl sein
+řez: X | Y | Z <poloha> nebo řez normála nx ny nz	Schnitt: X | Y | Z <Lage> oder schnitt normale nx ny nz
+sestava nemá pohybovou studii – pohyb motor …	die Baugruppe hat keine Bewegungsstudie – bewegung antrieb …
+Skrýt panel studie (jen lišta)	Studienpanel ausblenden (nur Leiste)
+směr kamery nesmí být nulový vektor	die Kamerarichtung darf kein Nullvektor sein
+snímek | čas videa [s] | čas studie [s]	Bild | Videozeit [s] | Studienzeit [s]
+Snímek {0} z {1}…	Bild {0} von {1}…
+snímek {0}: prohlížeč nevrátil obrázek WebP	Bild {0}: der Browser lieferte kein WebP-Bild
+Snímky PNG ({0}) s časovým plánem uloženy (ZIP): {1}	PNG-Bilder ({0}) mit Zeitplan gespeichert (ZIP): {1}
+Snímky PNG: {0} snímků po vypočtených krocích (t = 0 … {1} s), anotace {2}	PNG-Bilder: {0} Bilder an den berechneten Schritten (t = 0 … {1} s), Anmerkungen {2}
+Snímky pohybové studie s pevným časováním (Mnástrojárna CAD)	Bilder der Bewegungsstudie mit fester Zeitbasis (Mnástrojárna CAD)
+studie nemá uložené pohledy – pohyb pohled uložit "<název>" …	die Studie hat keine gespeicherten Ansichten – bewegung ansicht speichern "<Name>" …
+t = {0} / {1} s · krok {2}/{3}	t = {0} / {1} s · Schritt {2}/{3}
+uložen	gespeichert
+Uloží kameru a řez okna jako pohled studie	Speichert Kamera und Schnitt des Fensters als Studienansicht
+Uložit pohled	Ansicht speichern
+Video	Video
+video {0} s = {1} × délka studie {2} s · rychlost {3}× · {4} fps · {5} snímků (tolerance ±1 snímek = ±{6} s)	Video {0} s = {1} × Studienlänge {2} s · Geschwindigkeit {3}× · {4} fps · {5} Bilder (Toleranz ±1 Bild = ±{6} s)
+Video neuloženo	Video nicht gespeichert
+Video studie: {0}	Studienvideo: {0}
+Video WebM uloženo ({0}): {1}; soubor má délku {2} s a {3} snímků	WebM-Video gespeichert ({0}): {1}; die Datei ist {2} s lang und hat {3} Bilder
+Video ze snímků: ffmpeg -framerate {0} -i snimek-%04d.png -c:v libvpx-vp9 -pix_fmt yuv420p video.webm	Video aus den Bildern: ffmpeg -framerate {0} -i snimek-%04d.png -c:v libvpx-vp9 -pix_fmt yuv420p video.webm
+video: {0} snímků je moc (nejvýš {1}) – zvyšte rychlost, zkraťte délku nebo snižte FPS	Video: {0} Bilder sind zu viele (höchstens {1}) – Geschwindigkeit erhöhen, Länge kürzen oder FPS senken
+video: délka videa musí být kladná [s]	Video: die Videolänge muss positiv sein [s]
+video: FPS 1 až 120 (zadáno {0})	Video: FPS 1 bis 120 (angegeben {0})
+video: rychlost musí být kladná (1 = skutečná, 0,25 = 4× zpomaleně)	Video: die Geschwindigkeit muss positiv sein (1 = Echtzeit, 0,25 = 4× langsamer)
+video: studie nemá délku – nejdřív pohyb čas T	Video: die Studie hat keine Länge – zuerst bewegung zeit T
+volby videa odkazují na pohled, který ve studii není – pohledy videa se do skriptu nepřenáší	die Videooptionen verweisen auf eine Ansicht, die nicht in der Studie ist – Videoansichten werden nicht ins Skript übernommen
+volby videa pohybové studie nejde zapsat příkazem pohyb video	die Videooptionen der Bewegungsstudie können nicht als bewegung video geschrieben werden
+vůle {0} × {1}: {2} mm{3}	Spiel {0} × {1}: {2} mm{3}
+vypnuté	aus
+Výsledek neplatí – sestava nebo studie se změnila.	Das Ergebnis ist ungültig – Baugruppe oder Studie wurde geändert.
+výška {0} mm	Höhe {0} mm
+výška záběru musí být kladná [mm]	die Bildhöhe muss positiv sein [mm]
+zásah {0}: {1} mm	Eingriff {0}: {1} mm
+zobrazení pohledu studie	Anzeige der Studienansicht
+Zobrazit plný panel studie	Volles Studienpanel anzeigen
+pracovní prostředí pohybové studie: uložené pohledy (kamera + rovina řezu) jsou součástí studie a použijí se při přehrávání i exportu; video a snímky PNG s pevným časováním – délka videa = délka studie / rychlost (± 1 snímek), FPS a ruční délka zvlášť, protokol uvádí délku videa a poměr ke studii; víc pohledů = synchronní dlaždice vedle sebe; anotace polohy (čas, krok, motory, vůle z kontroly vůle) v okně i v obrázku; v CLI ✗ host.app-only s časovým plánem; window.mncad.motion().video	Arbeitsumgebung der Bewegungsstudie: gespeicherte Ansichten (Kamera + Schnittebene) gehören zur Studie und werden bei Wiedergabe und Export verwendet; Video und PNG-Bilder mit fester Zeitbasis – Videolänge = Studienlänge / Geschwindigkeit (± 1 Bild), FPS und manuelle Länge getrennt, das Protokoll nennt Videolänge und Verhältnis zur Studie; mehrere Ansichten = synchrone Kacheln nebeneinander; Positionsanmerkungen (Zeit, Schritt, Antriebe, Spiel aus der Spielprüfung) im Fenster und im Bild; in der CLI ✗ host.app-only mit Zeitplan; window.mncad.motion().video

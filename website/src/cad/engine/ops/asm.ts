@@ -49,6 +49,8 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
     if (ui) ui(res.motion);
     else if (res.motion.export === "csv") await writeMotionCsv(ctx, r.doc, env);
     else if (res.motion.play || res.motion.export === "png" || res.motion.export === "webm") coded(ctx, res.motion.play ? "ui.no-view" : "host.app-only", { args: [res.motion.play ? tr("přehrání pohybu") : tr("export snímků pohybu {0}", res.motion.export!.toUpperCase())] });
+    // aktivní pohled studie se uloží do dokumentu; zobrazit ho (kamera, řez) bez 3D okna nejde (vlna 22, bod 14)
+    else if (res.motion.view) coded(ctx, "ui.no-view", { args: [tr("zobrazení pohledu studie")] });
   }
   if (res.stackChanged) {
     ctx.ws.asm.stack = stack;

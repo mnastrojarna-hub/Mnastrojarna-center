@@ -200,6 +200,8 @@ export function CadApp() {
   const [panels, setPanels] = useState(false);
   const [prefs, setPrefs] = useState<Settings>(loadSettings);
   const [section, setSection] = useState<Section>(null);
+  const sectionRef = useRef<Section>(null); // řez pro export snímků pohybu (vlna 22) – čte se po vykreslení
+  sectionRef.current = section;
   const [showGrid, setShowGrid] = useState(() => loadSettings().showGrid); // z Nastavení (dřív vždy vypnuto)
   const [measure, setMeasure] = useState(false);
   // výběr entit, inspektor, měření
@@ -974,7 +976,7 @@ export function CadApp() {
           const bad = out.split("\n").find((l) => l.startsWith("✗"));
           if (bad) throw new Error(bad);
           // změněná studie se do dokumentu promítne až po vykreslení
-          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
+          if (/^\s*(motor|kroky|čas|kolize|stopa|smazat|steps|time|collisions|trace|delete|antrieb|schritte|zeit|spur|dynamik|kinemati|hmotnost|síla|moment|mass|force|torque|masse|kraft|pohled|view|ansicht|video|anotace|annotations|anmerkungen)/i.test(cmd)) await settleUi(() => JSON.stringify(histRef.current.present.motion ?? null) !== before);
         }
         const d = histRef.current.present;
         if (d.kind !== "assembly") throw new Error(tr("pohyb: otevřený dokument „{0}“ není sestava", d.name));
@@ -982,7 +984,9 @@ export function CadApp() {
         const { studyCsv, studySummary, dynApi } = await import("@/cad/motion-dynamic-report");
         const res = await k.motionRun(d, asmEnvRef.current());
         const nm = (id: string) => d.components?.find((c) => c.id === id)?.name ?? id;
-        return { steps: k.motionTable(d, res), summary: studySummary(res, d), collision: res.collision ? { ...res.collision, a: nm(res.collision.a), b: nm(res.collision.b) } : null, csv: studyCsv(res, d), ...dynApi(res, d) };
+        // časový plán videa s uloženými volbami studie (vlna 22, bod 13 – cad/motion-video.ts)
+        const video = await import("@/cad/motion-video").then((m) => m.videoApi(res, d.motion)).catch(() => null);
+        return { steps: k.motionTable(d, res), summary: studySummary(res, d), collision: res.collision ? { ...res.collision, a: nm(res.collision.a), b: nm(res.collision.b) } : null, csv: studyCsv(res, d), ...dynApi(res, d), ...(video ? { video } : {}) };
       },
       bom: async (opts) => {
         const d = histRef.current.present;
@@ -1424,6 +1428,7 @@ export function CadApp() {
         color: l.comp.color ?? top?.color ?? "#b9c2cc",
         selected: l.topId === asmSel || l.topId === mate?.compId,
         clash: clashIds.has(l.topId) || clashIds.has(l.id),
+        solid: !!l.coil || r?.metrics?.solids !== 0, // vlna 22: plochy bez objemu = v řezu bez čela
       });
     }
     return out;
@@ -4052,7 +4057,7 @@ export function CadApp() {
 
             {/* Řez */}
             {section && !sketch && (
-              <FloatPanel title={tr("Řez modelem")} icon="section" onClose={() => setSection(null)} pos={measure ? "left-3 top-[300px]" : "left-3 top-3"}>
+              <FloatPanel title={tr("Řez modelem")} icon="section" onClose={() => setSection(null)} pos={measure ? "left-3 top-[300px]" : motionOpen && isAsm ? "left-[376px] top-3 max-md:left-3 max-md:top-auto max-md:bottom-[76px]" : "left-3 top-3"} className="max-h-[calc(100%-96px)] overflow-y-auto">
                 <SectionControls section={section} onChange={setSection} mesh={result?.mesh ?? null} assembly={isAsm ? asmViews : undefined} selection={selection} />
               </FloatPanel>
             )}
@@ -4119,7 +4124,25 @@ export function CadApp() {
             {compareOpen && !isAsm && <CompareDialog doc={buildDocView} vp={vp} onView={showCmpView} onClose={() => setCompareOpen(false)} />}
             {isAsm && springPick.dialog}
             {motionOpen && isAsm && (
-              <MotionPanel doc={doc} env={() => asmEnvRef.current()} engineBusy={() => engineBusy.current > 0} onDoc={commit} onClose={() => setMotionOpen(false)} snapshot={() => vp.current?.snapshot() ?? null} canvas={() => document.querySelector<HTMLCanvasElement>("main canvas")} flash={flash} />
+              <MotionPanel
+                doc={doc}
+                env={() => asmEnvRef.current()}
+                engineBusy={() => engineBusy.current > 0}
+                onDoc={commit}
+                onClose={() => setMotionOpen(false)}
+                flash={flash}
+                // vlna 22 (body 13–14): pohledy studie a export snímků – kamera a řez okna, sejmutí plátna 3D okna / softwarového náhledu
+                player={{
+                  camera: () => vp.current?.viewState?.() ?? null,
+                  setCamera: (c) => vp.current?.setViewState?.(c),
+                  setView: (v) => vp.current?.setView(v),
+                  bounds: () => vp.current?.bounds() ?? { center: [0, 0, 0], radius: 100 },
+                  section: () => sectionRef.current,
+                  setSection: (s) => setSection(s),
+                  frame: () => vp.current?.frame?.() ?? null,
+                  background: () => bg.css,
+                }}
+              />
             )}
             {isAsm && explode > 0 && (
               <FloatPanel title={tr("Rozložený pohled")} icon="transform" onClose={() => setExplode(0)}>
