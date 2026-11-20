@@ -40,6 +40,7 @@ import { parseFeatureHelp, type HelpRequest } from "./agent-help";
 import { COMMON_FIELDS, fieldsOf } from "./feature-fields";
 import { gapSummary, parseGapLine } from "./agent-gaps";
 import { OUT_COMMANDS, outTokens, parseOutLine, type MncadOutApi, type OutOp } from "./agent-out";
+import { FUNCTIONAL_COMMAND, parseFunctionalLine, type FunctionalCmd } from "./agent-functional";
 import { stripLineComment } from "./agent-comment";
 import { newDocTail, type NewDocMode } from "./agent-runs";
 import type { RunApiOptions } from "./engine/run-protocol";
@@ -137,6 +138,8 @@ export type AgentOp =
   | { k: "info"; lines: string[]; line: number; help?: HelpRequest }
   /** předloha DWG / DXF / PDF: připojení, stav, výtah, porovnání s modelem, kontrola kót (cad/reference) */
   | { k: "reference"; cmd: RefCmd; line: number }
+  /** funkční prvky a základny v modelu: funkční F7 H7, základna A F3 (vlna 22, bod 18 – agent-functional.ts) */
+  | { k: "functional"; cmd: FunctionalCmd; line: number }
   /** přísný režim od tohoto řádku: `přísně [vyp] [kromě kód,…]` (agent-strict.ts, engine/strict.ts) */
   | { k: "strict"; on: boolean; except?: string[]; line: number };
 /** chyba rozboru řádku; `code` = kód protokolu (engine/codes.ts), jinak `parse.error` */
@@ -692,6 +695,13 @@ export function parseAgentText(text: string): AgentProgram {
       if (chk) {
         endBlock();
         ops.push({ ...chk, line: no } as CheckOp);
+        return;
+      }
+      // funkční prvky a základny: funkční F7 H7 · základna A F3 (vlna 22, bod 18 – agent-functional.ts) – null = jiný příkaz
+      const fn = parseFunctionalLine(line);
+      if (fn) {
+        endBlock();
+        ops.push({ k: "functional", cmd: fn, line: no });
         return;
       }
       // výstupy bez dialogu: uložit, export step…, výkres export pdf…, skica export dxf, sdílet, odkaz (agent-out.ts) – null = jiný příkaz
@@ -1671,6 +1681,7 @@ export const AGENT_COMMANDS: { cmd: string; en: string; de: string; desc: string
   { cmd: "výkres list <N|\"název\"> · výkres list nový [\"název\"] · výkres list přejmenovat [N] \"název\" · výkres list smazat N · výkres listy", en: "drawing sheet 2 / drawing sheet new \"Detail\" / drawing sheet rename 2 \"Main\" / drawing sheet delete 2 / drawing sheets", de: "zeichnung blatt 2 / zeichnung blatt neu \"Detail\" / zeichnung blatt umbenennen 2 \"Haupt\" / zeichnung blatt löschen 2 / zeichnung blätter", desc: tr("listy výkresu: další příkazy výkresu pracují s vybraným listem a výkres se otevře na něm; „výkres list A3“ dál znamená formát") },
   { cmd: "výkres razítko název=\"…\" číslo=\"…\" kreslil=\"…\" revize=\"…\" datum=\"…\" materiál=\"…\" · výkres revize <znak> \"popis\" [datum …] · výkres revize smazat <znak>", en: "drawing titleblock name=\"Flange\" number=\"MN-1\" author=\"AI\" revision=A date=2026-11-13 material=\"1.0503\" / drawing revision B \"new hole\" date 2026-11-13 / drawing revision delete B", de: "zeichnung schriftfeld benennung=\"Flansch\" nummer=\"MN-1\" ersteller=\"AI\" revision=A datum=13.11.2026 werkstoff=\"1.0503\" / zeichnung änderung B \"Bohrung\" datum 13.11.2026 / zeichnung änderung löschen B", desc: tr("razítko listu (číslo, kreslil a revize i do vlastností dokumentu, materiál do označení materiálu) a tabulka revizí") },
   { cmd: "výkres vydat [B] [\"popis změny\"] [vše] · výkres vydat zrušit", en: "drawing issue [B] [\"change\"] [all] / drawing issue cancel", de: "zeichnung freigeben [B] [\"Änderung\"] [alle] / zeichnung freigeben aufheben", desc: tr("vydání listu: písmeno revize + revize modelu r·… + datum (chybí-li revize v tabulce, přidá se); po změně modelu je vydaný list zastaralý – ⚠ drawing.stale ve výkres stav, stav, na konci běhu, při exportu se stejným písmenem (přísně ✗), řádek D stale=drawing; vydejte novou revizi") },
+  { cmd: "výkres kontrola kót · výkres doplnit kóty [polohy|velikosti|vše|1 3 …] · " + FUNCTIONAL_COMMAND.cmd, en: "drawing check dims / drawing complete dims [positions|sizes|all] / " + FUNCTIONAL_COMMAND.en, de: "zeichnung prüfen maße / zeichnung maße ergänzen [lagen|größen|alle] / " + FUNCTIONAL_COMMAND.de, desc: tr("kontrola kót pro výrobu (bod 18): velikosti i polohy prvků výsledného dílu podle geometrie kót (pomocná tělesa sloučit … odebrat se nekótují), díry po skupinách s počtem n×, funkční prvky a základny vyznačené v modelu (velikost, poloha od základny, tolerance; přesná tolerance na nefunkčním rozměru = ℹ drawing.tol-nonfunctional); chybějící = ⚠ drawing.dims-incomplete ve výkres stav, na konci běhu a při exportu; nikdy „kompletní“ – výkres doplnit kóty přidá navržené kóty (jako tlačítko Přidat kótu)") },
   { cmd: "kótovat … funkční 26,5 74,175 · kótovat funkční ne", en: "dimension smart functional 26.5 74.175 / dimension functional no", de: "bemaßen intelligent funktional 26,5 74,175 / bemaßen funktional nein", desc: tr("funkční rozměry (mm modelu, oddělené mezerou nebo středníkem): nikdy nebudou pomocnou kótou v závorce – uzavřený řetěz rozbije jiný článek (jsou-li funkční všechny, celková délka; jsou-li funkční i ta, funkční rozměr bez tolerance); pamatují se u listu, „ne“ je zruší") },
   { cmd: "kótovat … díry tabulka|souřadnicově|řetězově|auto", en: "dimension holes table / dimension holes ordinate / dimension holes chain / dimension holes auto", de: "bemaßen bohrungen tabelle / bemaßen bohrungen koordinaten / bemaßen bohrungen kette / bemaßen bohrungen auto", desc: tr("polohy děr: tabulka děr (X, Y od levého dolního rohu obrysu; v pohledu s dírami – i levém, pravém, zadním; jedna na list), souřadnicové kóty od základny (0 v rohu, hodnoty v jedné řadě, více druhů děr = značky A, B … u děr i v popisu), nebo od hran; auto = od hran, od 12 poloh nebo když se nevejdou souřadnicově, pak tabulka; souřadnicově / řetězově tabulku děr listu vypne, tabulka ji zapne") },
   { cmd: "výkres tolerance <hodnota|id> <tolerance> [pohled <p>]", en: "drawing tolerance 74.175 -0.005 / drawing tolerance a12 h7 / drawing tolerance 40 ±0.1 view top", de: "zeichnung toleranz 74,175 -0,005 / zeichnung toleranz a12 h7 / zeichnung toleranz 40 ±0,1 ansicht oben", desc: tr("kóta se najde číselnou hodnotou modelu (±0,000001; popisky mají až 3 desetinná místa), druhem (Ø40, M8) nebo id (a12 z výkres stav); pohled zúží výběr; desetinná tečka tolerance se na českém listu zapíše čárkou; tolerance na pomocné kótě „(50)“ udělá rozměr funkčním a pomocnou kótou se stane jiný článek (přeurčený řetěz: funkční rozměr bez tolerance; ruční náhradní kóta se odstraní)") },

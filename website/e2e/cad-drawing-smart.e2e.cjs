@@ -64,7 +64,7 @@ const example = (guide, title) => {
   ok(/✓ výkres: A3, na šířku, pohledy přední, levý, iso/.test(log), 'výkres A3 na šířku s pohledy přední, levý, iso');
   ok(/✓ Chytré kóty \(řetězově\): 14 kót a popisů – přední 14/.test(log), 'kótovat: 14 kót v předním pohledu');
   ok(/Duplicity: žádné/.test(log), 'výkres stav: žádné duplicity');
-  ok(/Kontrola kót: všech \d+ očekávaných rozměrů je na listu/.test(log), 'výkres stav: Kontrola kót bez chybějících rozměrů');
+  ok(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/.test(log), 'výkres stav: Kontrola kót bez chybějících rozměrů');
   const want = ['M20×1,5', 'Ø30h6', 'Ø40', 'Ø25', 'Ø17', '30', '3', '(50)', '15', '42', '140', '25', '1,5×45°', '2× R1'];
   const st0 = /přední: (.*)/.exec(log)?.[1] ?? '';
   const parts = st0.split(' · ');
@@ -102,7 +102,7 @@ const example = (guide, title) => {
   const C = example(guide, '### Příklad C');
   const log2 = await run(C);
   fs.writeFileSync(S + 'smart-plate-log.txt', log2);
-  ok(!/^✗/m.test(log2) && /Duplicity: žádné/.test(log2) && /Kontrola kót: všech/.test(log2), 'příklad C: bez chyb, bez duplicit, Kontrola kót bez chybějících');
+  ok(!/^✗/m.test(log2) && /Duplicity: žádné/.test(log2) && /Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/.test(log2), 'příklad C: bez chyb, bez duplicit, Kontrola kót bez chybějících');
   const st = await p.evaluate(() => window.mncad.drawingStatus());
   ok(/4× M8 ↧10 \/ Ø6,8 ↧14/.test(st) && /2× Ø8,5 skrz/.test(st) && /90±0,05/.test(st), 'window.mncad.drawingStatus(): popis díry se značkou hloubky ↧ a tolerance 90±0,05');
   await waitSheet();

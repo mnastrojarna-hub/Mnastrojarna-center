@@ -9,6 +9,7 @@ import { threadByName, threadLabel } from "./defaults";
 import { holeDrillD, holeHeadOf } from "./hole-spec";
 import { placementOf } from "./placements";
 import type { CadDoc, Feature, Vec3 } from "./types";
+import { bodiesAt } from "./bodies";
 
 type Vec2Like = readonly [number, number];
 
@@ -23,7 +24,7 @@ const push = (out: DimExpect[], kind: DimKind, value: number, label: string, sou
   out.push({ kind, value, label, source });
 };
 /** kolikrát se prvek opakuje (pole, která na něj odkazují) */
-function countOf(doc: CadDoc, id: string): number {
+export function countOf(doc: CadDoc, id: string): number {
   let n = 1;
   for (const f of doc.features) {
     if (f.type !== "pattern" || f.suppressed) continue;
@@ -70,8 +71,43 @@ function planeFrame(pl: PlaneLike): { o: Vec3; n: Vec3 } {
   return { o: [0, 0, pl.offset], n: [0, 0, 1] };
 }
 
-/** Očekávané kóty z historie prvků. */
-export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[] {
+/**
+ * Pomocná (nástrojová) tělesa (vlna 22, bod 18): těleso spotřebované `sloučit … odebrat | průnik` bez `ponechat` není součást
+ * výsledného dílu. Jeho prvky se nekótují: u odebrání se kontrolují jako odebrání z dílu (`cut` – výsledný tvar ořezaný obálkou,
+ * např. okno 30 × 20 místo výšky nástroje 40), u průniku a u prvků, které nástroj samy ořezávají, vůbec (`skip`).
+ */
+export type AuxInfo = { cut: Set<string>; skip: Set<string>; bodies: { name: string; op: "cut" | "intersect"; features: string[] }[] };
+export function auxInfo(doc: Pick<CadDoc, "features">): AuxInfo {
+  const out: AuxInfo = { cut: new Set(), skip: new Set(), bodies: [] };
+  const fs = doc.features;
+  if (!fs.some((f) => f.type === "combine" && !f.suppressed)) return out;
+  // těleso, na kterém prvek pracuje (statická simulace historie – bodies.ts)
+  const bodyOf = new Map<string, string>();
+  fs.forEach((f, i) => {
+    if (!f.suppressed && f.type !== "combine") bodyOf.set(f.id, bodiesAt(doc, i + 1).active);
+  });
+  fs.forEach((c, ci) => {
+    if (c.suppressed || c.type !== "combine" || c.keepTool || c.op === "add") return;
+    const tool = c.tool?.trim();
+    if (!tool) return;
+    const feats = fs.slice(0, ci).filter((f) => bodyOf.get(f.id) === tool && !out.cut.has(f.id) && !out.skip.has(f.id));
+    if (!feats.length) return;
+    for (const f of feats) {
+      const mode = "mode" in f ? (f as { mode?: string }).mode : undefined;
+      if (c.op === "cut" && mode !== "cut" && mode !== "intersect") out.cut.add(f.id);
+      else out.skip.add(f.id);
+    }
+    out.bodies.push({ name: tool, op: c.op === "cut" ? "cut" : "intersect", features: feats.map((f) => f.id) });
+  });
+  return out;
+}
+
+/**
+ * Očekávané kóty z historie prvků. `opts.aux` = pomocná tělesa (výchozí z historie – `auxInfo`); `opts.noHoles` = díry vynechat
+ * (kontrola úplnosti je počítá po skupinách s počtem a polohou – cad/dim-complete.ts).
+ */
+export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null, opts: { aux?: AuxInfo; noHoles?: boolean } = {}): DimExpect[] {
+  const aux = opts.aux ?? auxInfo(doc);
   const out: DimExpect[] = [];
   if (bbox) {
     const L = bbox[1][0] - bbox[0][0];
@@ -82,8 +118,10 @@ export function expectedDims(doc: CadDoc, bbox: [Vec3, Vec3] | null): DimExpect[
     push(out, "lin", H, tr("{0} (výška Z)", fmt(H)), tr("celkové rozměry"));
   }
   const sketchUsed = new Set(doc.features.flatMap((f) => ("sketchId" in f && typeof f.sketchId === "string" ? [f.sketchId] : "profileId" in f ? [f.profileId] : [])));
-  for (const f of doc.features as Feature[]) {
-    if (f.suppressed) continue;
+  for (const f0 of doc.features as Feature[]) {
+    if (f0.suppressed || aux.skip.has(f0.id) || (opts.noHoles && f0.type === "hole")) continue;
+    // prvek nástrojového tělesa spotřebovaného odebráním = odebrání z dílu
+    const f = (aux.cut.has(f0.id) && "mode" in f0 ? { ...f0, mode: "cut" } : f0) as Feature;
     const src = f.name;
     switch (f.type) {
       case "hole": {

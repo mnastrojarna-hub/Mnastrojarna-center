@@ -119,6 +119,9 @@ export const CODES = [
   { code: "drawing.section-legacy", level: "warn", key: "starší zápis odsazení řezu vyložen postaru: {0}" },
   { code: "drawing.overlap", level: "warn", key: "překryv na listu {0}: {1}" },
   { code: "drawing.tolerance-missing", level: "warn", key: "kóta {0} nemá toleranci" },
+  // kontrola kót pro výrobní úplnost (vlna 22, bod 18 – cad/dim-complete.ts): chybí velikost / poloha prvku; přetolerování (ℹ)
+  { code: "drawing.dims-incomplete", level: "warn", key: "list {0}: {1}" },
+  { code: "drawing.tol-nonfunctional", level: "note", key: "list {0}: přesná tolerance na rozměru, který není funkční – {1}" },
   // vydaný list ze starší revize modelu (vlna 22, bod 20 – cad/doc-outputs.ts); export se stejným písmenem v přísném režimu ✗
   { code: "drawing.stale", level: "warn", key: "vydaný výkres neodpovídá modelu: {0}" },
   { code: "reference.mismatch", level: "warn", key: "předloha se liší: {0}" },

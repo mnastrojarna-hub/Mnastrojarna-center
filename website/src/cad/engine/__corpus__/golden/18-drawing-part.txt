@@ -28,8 +28,8 @@ Kóty a popisy (5, z toho vygenerovaných 5):
 Poznámky a značky: osa souměrnosti · osa souměrnosti
 Id (výkres upravit / smazat / značka na <id>): a1 osa souměrnosti (horní) · a2 osa souměrnosti (horní) · a3 40 (horní) · a4 2× Ø10 skrz (horní) · a5 80±0,1 (horní) · a6 50 (horní) · a7 20 (přední)
 Duplicity: žádné
-Kontrola kót: všech 4 očekávaných rozměrů je na listu
-Polohy děr: kóty od hran (horní)
+Kontrola kót: velikosti 4/4 · polohy 4/4 · tolerance neověřeny (funkční prvky nevyznačeny)
+Polohy děr: kóty od hran (horní) – na listu 4/4
 U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
 Razítko: název Výkres dílu · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
 Revize: žádné

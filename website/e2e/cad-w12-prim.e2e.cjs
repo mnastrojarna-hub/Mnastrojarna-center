@@ -120,7 +120,7 @@ const BASE = (process.env.E2E_BASE || 'http://localhost:3100').replace(/\/$/, ''
   log = await run('nový díl W12 výkres\nkvádr 60 40 20\nválec 6,8 16 v 15 20 20 osa -Z odebrat\nzávit M8 délka 12 na střed kružnice E10 osa -Z vnitřní');
   await idle();
   log = await run('výkres A3 na šířku pohledy horní,přední\nkótovat\nvýkres stav');
-  ok(/M8 ↧12 \/ Ø6,8 ↧16/.test(log) && /Kontrola kót: všech \d+ očekávaných rozměrů je na listu/.test(log), 'výkres: válec odebrat + vnitřní závit odkazem → „M8 ↧12 / Ø6,8 ↧16“, kontrola kót bez chybějících');
+  ok(/M8 ↧12 \/ Ø6,8 ↧16/.test(log) && /Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/.test(log), 'výkres: válec odebrat + vnitřní závit odkazem → „M8 ↧12 / Ø6,8 ↧16“, kontrola kót bez chybějících');
   // ── příklad z návodu vložený beze změny ──
   const guide = await p.evaluate(() => window.mncad.guide());
   const gi = guide.indexOf('### Primitiva – poloha a osa odkazem');

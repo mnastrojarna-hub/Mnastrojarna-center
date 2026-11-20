@@ -1,0 +1,162 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+→ Sloučení 1 (combine) přidán – výsledek po výpočtu níže
+→ Díra 1 (hole) přidán – výsledek po výpočtu níže
+→ Díra 2 (hole) přidán – výsledek po výpočtu níže
+✓ nový list výkresu „List 1“ (Chytré kóty)
+✓ výkres: A3, na šířku, pohledy přední, horní
+✓ nepředepsané tolerance ISO 2768-mK
+✓ Chytré kóty (řetězově): 8 kót a popisů – horní 7, přední 1 · očekávaných rozměrů 5
+Výkres „List 1“: list A3 na šířku · měřítko 2:1 · pohledy: přední, horní · kóty: Chytré kóty (řetězově)
+Listy (1): 1 „List 1“ A3 (aktivní)
+Kóty a popisy (8, z toho vygenerovaných 8):
+  horní: 20 · 30 · 30 · 70 · 2× Ø8 skrz · 100 · 60
+  přední: 20
+Poznámky a značky: osa souměrnosti · osa souměrnosti
+Id (výkres upravit / smazat / značka na <id>): a1 osa souměrnosti (horní) · a2 osa souměrnosti (horní) · a3 20 (horní) · a4 30 (horní) · a5 30 (horní) · a6 70 (horní) · a7 2× Ø8 skrz (horní) · a8 100 (horní) · a9 60 (horní) · a10 20 (přední)
+Duplicity: žádné
+Kontrola kót: velikosti 6/6 · polohy 6/6 · pomocná tělesa (nekótují se): Nástroj (odebráno) · tolerance neověřeny (funkční prvky nevyznačeny)
+Polohy děr: kóty od hran (horní) – na listu 4/4
+U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
+Razítko: název Deska A · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
+  přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 39…239, y 228…268
+  horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 39…239, y 79…199
+✓ Kvádr 1 (box)
+✓ Kvádr 2 (box)
+✓ Sloučení 1 (combine)
+✓ Díra 1 (hole)
+✓ Díra 2 (hole)
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 105,99 cm³ · ploch 12 · hran 30
+Geometrie: platná · 1 těleso
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ – 30 × 20 × 40 mm, new, roh [35; 20; -10]
+ 3. Sloučení 1 [combine, id #] ✓ – odebrat od „Těleso 1“ − „Nástroj“
+ 4. Díra 1 [hole, id #] ✓ – Ø8 skrz v [15; 15; 20], osa Z
+ 5. Díra 2 [hole, id #] ✓ – Ø8 skrz v [85; 45; 20], osa Z
+=== run 2 ===
+✓ smazáno 10: a1 osa souměrnosti, a2 osa souměrnosti, a3 20, a4 30, a5 30, a6 70, a7 2× Ø8 skrz, a8 100, a9 60, a10 20 – id dalších poznámek se posunula (výkres stav)
+✓ kóta 100 (horní, vodorovně, hrana) · a1
+✓ kóta 60 (horní, svisle, hrana) · a2
+✓ kóta 20 (přední, svisle, hrana) · a3
+✓ kóta 30 (horní, vodorovně, hrana) · a4
+✓ kóta Ø8 (horní, průměr) · a5
+Výkres „List 1“: list A3 na šířku · měřítko 2:1 · pohledy: přední, horní · kóty: Chytré kóty (řetězově)
+Listy (1): 1 „List 1“ A3 (aktivní)
+Kóty a popisy (5, z toho vygenerovaných 0):
+  horní: 100 * · 60 * · 30 * · Ø8 *
+  přední: 20 *
+  (* = vlastní kóta uživatele)
+Id (výkres upravit / smazat / značka na <id>): a1 100 (horní) · a2 60 (horní) · a3 20 (přední) · a4 30 (horní) · a5 Ø8 (horní)
+Duplicity: žádné
+Kontrola kót: velikosti 4/6 · polohy 0/6 – chybí: 20 (Kvádr 2); 2× Ø8 skrz (Díra 1, Díra 2) – na listu 1× z 2×; poloha Kvádr 2 – X 35; poloha Kvádr 2 – Y 20; poloha Díra 1 – X 15; poloha Díra 1 – Y 15; poloha Díra 2 – X 85; poloha Díra 2 – Y 45 · pomocná tělesa (nekótují se): Nástroj (odebráno) · tolerance neověřeny (funkční prvky nevyznačeny)
+Polohy děr: kóty od hran (horní) – na listu 0/4
+U razítka: nepředepsané tolerance ISO 2768-mK · hrany — · poznámka —
+Razítko: název Deska A · číslo — · kreslil — · revize — · datum ?.?.???? · materiál Ocel
+Revize: žádné
+Šablona razítka: ISO 7200 (výchozí) 180×38 mm · promítání ISO E – značka ISO 5456-2 (1. kvadrant, kružnice vpravo)
+Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
+Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
+Razítko bez zkracování textu: všechna pole v nominální velikosti
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
+  přední (x = X, y = Z): x 0…100, y 0…20 mm · 2:1 · na listu x 39…239, y 228…268
+  horní (x = X, y = Y): x 0…100, y 0…60 mm · 2:1 · na listu x 39…239, y 79…199
+⚠ řádek 8: list List 1: kóty neúplné – chybí 8 (velikosti 4/6, polohy 0/6): 20 (Kvádr 2); 2× Ø8 skrz (Díra 1, Díra 2) – na listu 1× z 2×; poloha Kvádr 2 – X 35; poloha Kvádr 2 – Y 20; poloha Díra 1 – X 15; poloha Díra 1 – Y 15; a dalších 2
+✓ výkres PDF: Deska_A_vykres.pdf · 78 kB · výkres PDF – staženo (bez dialogu)
+  ⚠ kóty neúplné – chybí 8 (velikosti 4/6, polohy 0/6): 20 (Kvádr 2); 2× Ø8 skrz (Díra 1, Díra 2) – na listu 1× z 2×; poloha Kvádr 2 – X 35; poloha Kvádr 2 – Y 20; poloha Díra 1 – X 15; poloha Díra 1 – Y 15; a dalších 2
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 105,99 cm³ · ploch 12 · hran 30
+Geometrie: platná · 1 těleso
+Revize modelu: r·?
+Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ – 30 × 20 × 40 mm, new, roh [35; 20; -10]
+ 3. Sloučení 1 [combine, id #] ✓ – odebrat od „Těleso 1“ − „Nástroj“
+ 4. Díra 1 [hole, id #] ✓ – Ø8 skrz v [15; 15; 20], osa Z
+ 5. Díra 2 [hole, id #] ✓ – Ø8 skrz v [85; 45; 20], osa Z
+=== run 3 ===
+✓ doplněno kót: 8 – a6 20 (20) · a7 2× Ø8 (2× Ø8 skrz) · a8 35 (poloha Kvádr 2 – X 35) · a9 20 (poloha Kvádr 2 – Y 20) · a10 15 (poloha Díra 1 – X 15) · a11 15 (poloha Díra 1 – Y 15) · a12 85 (poloha Díra 2 – X 85) · a13 45 (poloha Díra 2 – Y 45)
+Kontrola kót: velikosti 6/6 · polohy 6/6 · pomocná tělesa (nekótují se): Nástroj (odebráno) · tolerance neověřeny (funkční prvky nevyznačeny)
+Kontrola kót: velikosti 6/6 · polohy 6/6 · pomocná tělesa (nekótují se): Nástroj (odebráno) · tolerance neověřeny (funkční prvky nevyznačeny)
+Velikosti:
+  ✓ 1. 100 (délka X) (celkové rozměry)
+  ✓ 2. 60 (šířka Y) (celkové rozměry)
+  ✓ 3. 20 (výška Z) (celkové rozměry)
+  ✓ 4. 30 (Kvádr 2)
+  ✓ 6. 20 (Kvádr 2)
+  ✓ 12. 2× Ø8 skrz (Díra 1, Díra 2)
+Polohy:
+  ✓ 5. poloha Kvádr 2 – X 35
+  ✓ 7. poloha Kvádr 2 – Y 20
+  ✓ 8. poloha Díra 1 – X 15
+  ✓ 9. poloha Díra 1 – Y 15
+  ✓ 10. poloha Díra 2 – X 85
+  ✓ 11. poloha Díra 2 – Y 45
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 105,99 cm³ · ploch 12 · hran 30
+Geometrie: platná · 1 těleso
+Revize modelu: r·?
+Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ – 30 × 20 × 40 mm, new, roh [35; 20; -10]
+ 3. Sloučení 1 [combine, id #] ✓ – odebrat od „Těleso 1“ − „Nástroj“
+ 4. Díra 1 [hole, id #] ✓ – Ø8 skrz v [15; 15; 20], osa Z
+ 5. Díra 2 [hole, id #] ✓ – Ø8 skrz v [85; 45; 20], osa Z
+=== run 4 ===
+✓ funkční Díra 1 · tolerance H7 – kontrola kót chce velikost, polohu a toleranci
+✓ základna A = F1 (rovina, normála -1; 0; 0, bod 0; 30; 10) – polohy funkčních prvků se kontrolují od ní
+Funkční prvky a základny (2):
+  f1 funkční Díra 1 · tolerance H7
+  f2 základna A (F1) · rovina, normála -1; 0; 0, bod 0; 30; 10
+  (geometrie plochy je z doby označení – po změně modelu plochu označte znovu)
+✓ tolerance ±0,01 → 100±0,01 (horní)
+Kontrola kót: velikosti 6/6 · polohy 6/6 · pomocná tělesa (nekótují se): Nástroj (odebráno) · funkční prvky: tolerance 0/3 · přesná tolerance na nefunkčním rozměru: 100 ±0,01
+Velikosti:
+  ✓ 1. 100 (délka X) (celkové rozměry)
+  ✓ 2. 60 (šířka Y) (celkové rozměry)
+  ✓ 3. 20 (výška Z) (celkové rozměry)
+  ✓ 4. 30 (Kvádr 2)
+  ✓ 6. 20 (Kvádr 2)
+  ✓ 12. 2× Ø8 skrz (Díra 1, Díra 2) · funkční, bez tolerance
+Polohy:
+  ✓ 5. poloha Kvádr 2 – X 35
+  ✓ 7. poloha Kvádr 2 – Y 20
+  ✓ 8. poloha Díra 1 – X 15 · funkční, bez tolerance
+  ✓ 9. poloha Díra 1 – Y 15 · funkční, bez tolerance
+  ✓ 10. poloha Díra 2 – X 85
+  ✓ 11. poloha Díra 2 – Y 45
+  ℹ přesná tolerance ±0,01 u kóty 100, která není funkční – je opravdu potřeba?
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.
+⚠ řádek 5: funkční poloha Díra 1 – X 15: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 5: funkční poloha Díra 1 – Y 15: kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+⚠ řádek 5: funkční 2× Ø8 skrz (Díra 1, Díra 2): kóta bez tolerance – výkres tolerance <kóta> <tolerance>
+ℹ řádek 5: list List 1: přesná tolerance na rozměru, který není funkční – 100 ±0,01
+
+Dokument: „Deska A“ · díl · materiál Ocel (7.85 g/cm³) · prvků 5 (5 ✓, 0 ✗)
+Rozměry: 100 × 60 × 20 mm (X 0…100, Y 0…60, Z 0…20) · objem 105,99 cm³ · ploch 12 · hran 30
+Geometrie: platná · 1 těleso
+Revize modelu: r·?
+Exporty: 1 – všechny z nynější revize modelu (výpis: exporty)
+Prvky:
+ 1. Kvádr 1 [box, id #] ✓ – 100 × 60 × 20 mm, new, roh [0; 0; 0]
+ 2. Kvádr 2 [box, id #] ✓ – 30 × 20 × 40 mm, new, roh [35; 20; -10]
+ 3. Sloučení 1 [combine, id #] ✓ – odebrat od „Těleso 1“ − „Nástroj“
+ 4. Díra 1 [hole, id #] ✓ – Ø8 skrz v [15; 15; 20], osa Z
+ 5. Díra 2 [hole, id #] ✓ – Ø8 skrz v [85; 45; 20], osa Z

@@ -18,7 +18,7 @@ Výkres „List 1“: list A3 na šířku · měřítko 1:1 · pohledy: přední
 Listy (1): 1 „List 1“ A3 (aktivní)
 Kóty a popisy (0, z toho vygenerovaných 0):
 Duplicity: žádné
-Kontrola kót: všech 3 očekávaných rozměrů je na listu
+Kontrola kót: celkové rozměry 3/3 (sestava – rozměry dílů se kontrolují na výkresech dílů)
 U razítka: nepředepsané tolerance — · hrany — · poznámka —
 Razítko: název Uložení · číslo — · kreslil — · revize — · datum ?.?.???? · materiál dle kusovníku
 Revize: žádné
@@ -26,6 +26,7 @@ Revize: žádné
 Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotovar, počet kusů, tepelné zpracování, povrchová úprava, tolerance úhlů a sražení: výkres razítko pole="…")
 Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
+Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…80, y 0…40 mm · 1:1 · na listu x 175…255, y 202…242
   horní (x = X, y = Y): x 0…80, y 0…60 mm · 1:1 · na listu x 175…255, y 118…178

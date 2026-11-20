@@ -1,0 +1,98 @@
+# vlna 22, balík D, etapa D3 – kontrola kót pro výrobní úplnost, funkční prvky a základny (bod 18)
+  (geometrie plochy je z doby označení – po změně modelu plochu označte znovu)	  (Flächengeometrie zum Zeitpunkt der Markierung – nach einer Modelländerung die Fläche neu markieren)
+  ℹ přesná tolerance {0} u kóty {1}, která není funkční – je opravdu potřeba?	  ℹ enge Toleranz {0} am Maß {1}, das nicht funktional ist – wird sie wirklich gebraucht?
+ – chybí: {0}	 – fehlt: {0}
+ – na listu {0}/{1}	 – auf dem Blatt {0}/{1}
+ · funkční prvky: tolerance {0}/{1}	 · Funktionselemente: Toleranz {0}/{1}
+ · funkční, bez tolerance	 · funktional, ohne Toleranz
+ · funkční, tolerance {0}	 · funktional, Toleranz {0}
+ · funkční, tolerance {0} ≠ předepsaná {1}	 · funktional, Toleranz {0} ≠ vorgeschrieben {1}
+ · nejde automaticky: {0}	 · automatisch nicht möglich: {0}
+ · nezkontrolováno: {0}	 · nicht geprüft: {0}
+ · pomocná tělesa (nekótují se): {0}	 · Hilfskörper (werden nicht bemaßt): {0}
+ · přesná tolerance na nefunkčním rozměru: {0}	 · enge Toleranz an einem nicht funktionalen Maß: {0}
+ · tolerance {0}	 · Toleranz {0}
+ · tolerance neověřeny (funkční prvky nevyznačeny)	 · Toleranzen nicht geprüft (Funktionselemente nicht markiert)
+ od základny	 vom Bezug
+; a dalších {0}	; und {0} weitere
+! nejde doplnit automaticky: {0} – zadejte kótu sami (výkres kóta …)	! nicht automatisch ergänzbar: {0} – Maß selbst eintragen (zeichnung maß …)
+· chybí {0}	· fehlt {0}
+{0}: co zrušit? – {1}	{0}: was entfernen? – {1}
+✓ doplněno kót: {0} – {1}	✓ Maße ergänzt: {0} – {1}
+✓ funkční {0}{1}{2} – kontrola kót chce velikost, polohu{3} a toleranci	✓ funktional {0}{1}{2} – die Maßprüfung verlangt Größe, Lage{3} und Toleranz
+✓ základna {0} = F{1} ({2}) – polohy funkčních prvků se kontrolují od ní	✓ Bezug {0} = F{1} ({2}) – Lagen der Funktionselemente werden von ihm aus geprüft
+✓ zrušeno {0} – zbývá {1}	✓ entfernt {0} – {1} übrig
+a dalších {0}	und {0} weitere
+funkční 	funktional 
+funkční · bez tolerance	funktional · ohne Toleranz
+funkční · tol. {0}	funktional · Tol. {0}
+funkční · tol. ≠ {0}	funktional · Tol. ≠ {0}
+funkční „{0}“: kontrola kót rozměry prvku typu {1} nezná – označte jeho plochu (funkční F…)	funktional „{0}“: die Maßprüfung kennt die Maße eines Elements vom Typ {1} nicht – markieren Sie seine Fläche (funktional F…)
+funkční {0}: kóta bez tolerance – výkres tolerance <kóta> <tolerance>	funktional {0}: Maß ohne Toleranz – zeichnung toleranz <Maß> <Toleranz>
+funkční {0}: kóta na listu chybí – doplňte ji s tolerancí	funktional {0}: das Maß fehlt auf dem Blatt – mit Toleranz ergänzen
+funkční {0}: plochu nejde zkontrolovat (tvar)	funktional {0}: die Fläche kann nicht geprüft werden (Form)
+funkční {0}: prvek nemá rozměry, které kontrola zná	funktional {0}: das Element hat keine Maße, die die Prüfung kennt
+funkční {0}: šikmá plocha	funktional {0}: schräge Fläche
+funkční {0}: tolerance {1} se liší od předepsané {2}	funktional {0}: Toleranz {1} weicht von der vorgeschriebenen {2} ab
+funkční F7 [H7] · funkční "Díra 1" [±0,02] · základna A F3 · funkční [seznam] · funkční zrušit F7|"Díra 1"|vše · základna zrušit A|vše	funktional F7 [H7] · funktional "Bohrung 1" [±0,02] · bezug A F3 · funktional [liste] · funktional entfernen F7|"Bohrung 1"|alle · bezug entfernen A|alle
+funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu	Funktionselement {0} des Teils „{1}“ lässt sich nicht als Skriptzeile schreiben
+Funkční prvky a základny ({0}):	Funktionselemente und Bezüge ({0}):
+funkční prvky a základny se značí v dílu – otevřete díl (záložka dílu)	Funktionselemente und Bezüge werden im Teil markiert – öffnen Sie das Teil (Teil-Register)
+Funkční prvky a základny: {0} · tolerance {1}/{2}	Funktionselemente und Bezüge: {0} · Toleranz {1}/{2}
+funkční prvky ani základny nejsou vyznačené – funkční F7 [H7] · funkční "Díra 1" · základna A F3 (kontrola kót pak ověří velikost, polohu a toleranci)	keine Funktionselemente oder Bezüge markiert – funktional F7 [H7] · funktional "Bohrung 1" · bezug A F3 (die Maßprüfung prüft dann Größe, Lage und Toleranz)
+funkční: „{0}“ není plocha (F7) ani prvek dílu – prvky: {1}	funktional: „{0}“ ist weder eine Fläche (F7) noch ein Element des Teils – Elemente: {1}
+chybí {0} (velikosti {1}/{2}, polohy {3}/{4}): {5}	{0} fehlen (Größen {1}/{2}, Lagen {3}/{4}): {5}
+ℹ Přesná tolerance na rozměru, který není funkční: {0}	ℹ Enge Toleranz an einem Maß, das nicht funktional ist: {0}
+ℹ žádná kóta nedoplněna	ℹ kein Maß ergänzt
+kontrola kót pro výrobu (bod 18): velikosti i polohy prvků výsledného dílu podle geometrie kót (pomocná tělesa sloučit … odebrat se nekótují), díry po skupinách s počtem n×, funkční prvky a základny vyznačené v modelu (velikost, poloha od základny, tolerance; přesná tolerance na nefunkčním rozměru = ℹ drawing.tol-nonfunctional); chybějící = ⚠ drawing.dims-incomplete ve výkres stav, na konci běhu a při exportu; nikdy „kompletní“ – výkres doplnit kóty přidá navržené kóty (jako tlačítko Přidat kótu)	Maßprüfung für die Fertigung: Größen und Lagen der Elemente des fertigen Teils nach der Geometrie der Maße (Hilfskörper aus vereinigen … abziehen werden nicht bemaßt), Bohrungen in Gruppen mit Anzahl n×, im Modell markierte Funktionselemente und Bezüge (Größe, Lage vom Bezug, Toleranz; enge Toleranz an einem nicht funktionalen Maß = ℹ drawing.tol-nonfunctional); fehlend = ⚠ drawing.dims-incomplete im Zeichnungsstatus, am Laufende und beim Export; nie „vollständig“ – zeichnung maße ergänzen fügt die vorgeschlagenen Maße hinzu (wie die Schaltfläche Maß hinzufügen)
+Kontrola kót: {0}	Maßprüfung: {0}
+Kontrola kót: celkové rozměry {0}/{1} (sestava – rozměry dílů se kontrolují na výkresech dílů)	Maßprüfung: Gesamtmaße {0}/{1} (Baugruppe – Teilemaße werden auf den Teilezeichnungen geprüft)
+kontrola kót: list sestavy – rozměry dílů se kontrolují na výkresech dílů	Maßprüfung: Baugruppenblatt – Teilemaße werden auf den Teilezeichnungen geprüft
+Kontrola zná jen rozměry odvozené z historie modelu a vyznačené funkční prvky – úplnost výrobního výkresu potvrzuje konstruktér.	Die Prüfung kennt nur Maße aus der Modellhistorie und markierte Funktionselemente – die Vollständigkeit der Fertigungszeichnung bestätigt der Konstrukteur.
+kóta polohy není od základny {0}	das Lagemaß ist nicht vom Bezug {0}
+Kótu nejde navrhnout automaticky: {0} – použijte nástroj Kóta	Das Maß kann nicht automatisch vorgeschlagen werden: {0} – Werkzeug Maß verwenden
+kóty zapečené v pohledu – polohu nejde ověřit	Maße in die Ansicht eingebrannt – die Lage kann nicht geprüft werden
+List sestavy – rozměry dílů se kontrolují na výkresech dílů.	Baugruppenblatt – Teilemaße werden auf den Teilezeichnungen geprüft.
+na listu {0}× z {1}×	{0}× von {1}× auf dem Blatt
+Nezkontrolováno: {0}	Nicht geprüft: {0}
+nic ke zrušení: {0} – {1}	nichts zu entfernen: {0} – {1}
+odebráno	abgezogen
+Označit jako funkční	Als funktional markieren
+Označit jako základnu	Als Bezug markieren
+plocha, střed {0}	Fläche, Mitte {0}
+plochu F{0} se nepodařilo změřit	Fläche F{0} konnte nicht gemessen werden
+poloha {0} – {1} {2}	Lage {0} – {1} {2}
+poloha {0} (body zadané odkazem na geometrii)	Lage {0} (Punkte per Geometriebezug)
+poloha {0} (kvádr natočený nebo zadaný odkazem)	Lage {0} (Quader gedreht oder per Bezug)
+poloha {0} (skica v obecné rovině)	Lage {0} (Skizze auf allgemeiner Ebene)
+poloha {0} (šikmá osa díry)	Lage {0} (schräge Bohrungsachse)
+poloha {0} (šikmá osa nebo odkaz)	Lage {0} (schräge Achse oder Bezug)
+poloha obecného obrysu {0} (lomená čára, oblouk, spline)	Lage der allgemeinen Kontur {0} (Polylinie, Bogen, Spline)
+Polohy	Lagen
+polohy {0}/{1}	Lagen {0}/{1}
+polohy nezkontrolovány	Lagen nicht geprüft
+polohy prvků (kóty zapečené v pohledu – přepněte na Chytré kóty nebo vlastní kóty)	Lagen der Elemente (Maße in die Ansicht eingebrannt – auf Intelligente Maße oder eigene Maße umstellen)
+Polohy:	Lagen:
+Pomocná tělesa (nekótují se): {0}	Hilfskörper (werden nicht bemaßt): {0}
+Přidáno kót: {0}{1}	Maße hinzugefügt: {0}{1}
+Přidat kótu	Maß hinzufügen
+Přidat navrženou kótu (od hrany dílu / základny) – upravíte ji v seznamu kót	Vorgeschlagenes Maß hinzufügen (von der Teilkante / vom Bezug) – in der Maßliste bearbeiten
+Přidat všechny navržené kóty ({0})	Alle vorgeschlagenen Maße hinzufügen ({0})
+rovina, normála {0}, bod {1}	Ebene, Normale {0}, Punkt {1}
+Tolerance neověřeny – funkční prvky nejsou vyznačené (pravým tlačítkem na plochu v modelu: Označit jako funkční / základnu; textem funkční F7 H7, základna A F3).	Toleranzen nicht geprüft – Funktionselemente sind nicht markiert (Rechtsklick auf eine Fläche im Modell: Als funktional / Bezug markieren; als Text funktional F7 H7, bezug A F3).
+válec Ø{0}, osa {1}, bod {2}	Zylinder Ø{0}, Achse {1}, Punkt {2}
+Velikosti	Größen
+velikosti {0}/{1}	Größen {0}/{1}
+Velikosti {0}/{1} · polohy {2}/{3}	Größen {0}/{1} · Lagen {2}/{3}
+Velikosti:	Größen:
+výkres doplnit kóty [polohy | velikosti | vše | čísla položek z výkres kontrola kót]	zeichnung maße ergänzen [lagen | größen | alle | Positionsnummern aus zeichnung prüfen maße]
+výkres doplnit kóty: jen u výkresu dílu	zeichnung maße ergänzen: nur bei einer Teilezeichnung
+základna {0} ({1})	Bezug {0} ({1})
+základna {0}: plocha F{1} není rovinná – základnou může být jen rovinná plocha	Bezug {0}: Fläche F{1} ist nicht eben – nur eine ebene Fläche kann Bezug sein
+základna: písmeno a rovinná plocha, např. základna A F3 – {0}	Bezug: Buchstabe und ebene Fläche, z. B. bezug A F3 – {0}
+základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu	Bezug {0} des Teils „{1}“ lässt sich nicht als Skriptzeile schreiben
+žádné polohy k ověření	keine Lagen zu prüfen
+podle textu kóty – poloha popisu neověřena	nach dem Maßtext – Lage der Beschriftung nicht geprüft
+#!dynamic – texty kódů (src/cad/engine/codes.ts) a klíč varování (drawing-issues.ts DIMS_INCOMPLETE_KEY) se překládají za běhu
+kóty neúplné – {0}	Maße unvollständig – {0}
+list {0}: přesná tolerance na rozměru, který není funkční – {1}	Blatt {0}: enge Toleranz an einem Maß, das nicht funktional ist – {1}

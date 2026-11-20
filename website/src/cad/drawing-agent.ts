@@ -13,6 +13,8 @@ import { overdeterminedChain, sameSize, toleranceCheck, type ChainMember, type R
 import { hasDrawnSprings, threadsOfDoc } from "./drawing-doc";
 import { annLabel, annList, agentToSheet, agentToView, dimValue, findDims, findView, makeManualDim, makeMark, outsideFrame, overlappingTexts, patchAnn, resolveAnns, resolveOne, shortId, viewRangeLines, viewToAgent } from "./drawing-marks";
 import { dimCheck } from "./dim-check";
+import { dimCheckDetail, dimCheckLine } from "./dim-complete";
+import { dimCheckIssues, sheetDimCheck, suggestionsFor, withGroupCount } from "./drawing-dimcheck";
 import { fitDeviations, fitSuffix, parseFit } from "./drawing-fits";
 import { applyViewsCmd, viewsStatusLines } from "./drawing-views-agent";
 import { cadLocale, getLang, tr } from "./i18n";
@@ -497,6 +499,51 @@ async function applyCmd(doc0: CadDoc, cmd: DrawingCmd, compute: DrawingCompute, 
       for (const v of o.dimFunctional ?? []) if (!rep.functional?.some((x) => x === v)) issue("other", tr("! funkční rozměr {0}: na listu není délková kóta s touto hodnotou (hodnoty kót: výkres stav)", fmtN3(v)));
       for (const s of rep.skipped) issue("dims-skipped", tr("! vynecháno: {0}", s));
       return done({ changed: true, open: true });
+    }
+    case "dimcheck": {
+      // kontrola kót pro výrobní úplnost po položkách (bod 18): ✓ / ◐ / ✗ / – (nezkontrolováno), čísla pro `výkres doplnit kóty 3 5`
+      const res = await computeSheet();
+      const anns = sheet().annotations;
+      const dc = sheetDimCheck(doc, withAnnotations(res, anns), anns, sheetOptions(sheet()));
+      if (!dc) {
+        log.push(tr("kontrola kót: list sestavy – rozměry dílů se kontrolují na výkresech dílů"));
+        return done({ changed: created, open: false });
+      }
+      log.push(...dimCheckDetail(dc));
+      return done({ changed: created, open: false, issues: dimCheckIssues(dc, { sheetId: sheet().id, withTol: true }) });
+    }
+    case "dimfill": {
+      // doplnit chybějící kóty podle kontroly (= GUI „Přidat kótu“): poloha od hrany dílu / základny, velikost mezi hranami prvku, Ø díry
+      const res = await computeSheet();
+      const o = sheetOptions(sheet());
+      let anns = sheet().annotations;
+      const dc = sheetDimCheck(doc, withAnnotations(res, anns), anns, o);
+      if (!dc) throw new Error(tr("výkres doplnit kóty: jen u výkresu dílu"));
+      const sug = suggestionsFor(dc, doc, res.views, cmd.what).filter((x) => !cmd.only || cmd.only.includes(dc.items.indexOf(x.item) + 1));
+      const added: string[] = [];
+      const failed: string[] = [];
+      const per = new Map<string, number>();
+      for (const { item, dim } of sug) {
+        if (!dim) {
+          failed.push(item.label);
+          continue;
+        }
+        try {
+          const n = per.get(`${dim.view}:${dim.kind}`) ?? 0;
+          per.set(`${dim.view}:${dim.kind}`, n + 1);
+          const ann = withGroupCount(item, makeManualDim(res, o, dim, dim.kind === "diameter" ? 8 : 10 + 7 * n).ann);
+          anns = [...anns, ann];
+          added.push(`${shortId(anns.length - 1)} ${annLabel(res.views, ann)} (${item.label})`);
+        } catch (e) {
+          failed.push(`${item.label} – ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+      if (added.length) put({ ...sheet(), annotations: anns });
+      log.push(added.length ? tr("✓ doplněno kót: {0} – {1}", added.length, added.join(" · ")) : tr("ℹ žádná kóta nedoplněna"));
+      if (failed.length) issue("other", tr("! nejde doplnit automaticky: {0} – zadejte kótu sami (výkres kóta …)", failed.join("; ")));
+      const after = sheetDimCheck(doc, withAnnotations(res, anns), anns, o);
+      if (after) log.push(dimCheckLine(after));
+      return done({ changed: added.length > 0, open: added.length > 0 });
     }
     case "tolcheck": {
       const res = await computeSheet();
@@ -997,16 +1044,23 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   L.push(dup.length ? tr("Duplicity ({0}): {1}", dup.length, dup.map((g) => g.map((a) => `${annLabel(views, a)} (${VIEW_NAME(a.view, o)})`).join(" = ")).join("; ")) : tr("Duplicity: žádné"));
   const out = withAnnotations(res, anns);
   const bbox = docBbox(res);
-  const chk = dimCheck(doc, bbox, out.texts);
-  const miss = chk.filter((x) => !x.present);
-  L.push(miss.length ? tr("Kontrola kót: chybí {0} z {1}: {2}", miss.length, chk.length, miss.map((x) => `${x.label} (${x.source})`).join("; ")) : tr("Kontrola kót: všech {0} očekávaných rozměrů je na listu", chk.length));
+  // kontrola kót pro výrobní úplnost (vlna 22, bod 18 – cad/dim-complete.ts): velikosti i polohy podle geometrie kót, pomocná
+  // tělesa, funkční prvky; nikdy „všech N“ – sestava: jen celkové rozměry (rozměry dílů patří na výkresy dílů)
+  const dc = sheetDimCheck(doc, out, anns, o);
+  if (dc) L.push(dimCheckLine(dc));
+  else {
+    const chk = dimCheck(doc, bbox, out.texts);
+    L.push(tr("Kontrola kót: celkové rozměry {0}/{1} (sestava – rozměry dílů se kontrolují na výkresech dílů)", chk.filter((x) => x.present).length, chk.length));
+  }
   if (res.smart?.report.skipped.length) L.push(tr("Vynecháno (nevešlo se nebo nejde okótovat automaticky): {0}", res.smart.report.skipped.join("; ")));
   // tabulka děr: zapnutá volbou listu, nebo ji zapnuly Chytré kóty (polohy děr tabulkou – B12)
   if (o.holeTable || res.holes?.length) L.push(holeTableLine(res, o));
   if (o.springTable) L.push(res.springTables ? tr("Tabulka pružiny: {0}× nad razítkem (EN ISO 2162-2)", res.springTables) : tr("Tabulka pružiny: v dílu není pružina z tabulky (pružina tlačná | tažná | zkrutná | talířová)"));
   // funkční rozměry, polohy děr a kontrola tolerancí (B8, B12, 5.3)
   const hm = Object.entries(res.smart?.report.holeMode ?? {});
-  if (o.dimensions === "smart" && hm.length) L.push(tr("Polohy děr: {0}", hm.map(([k, m]) => `${m === "ordinate" ? tr("souřadnicové kóty od levého dolního rohu") : m === "table" ? tr("tabulka děr") : tr("kóty od hran")} (${VIEW_NAME(k, o)})`).join(" · ")));
+  // režim generátoru + kolik poloh děr je na listu doopravdy (smazané kóty generátor nevrátí – bod 18)
+  const hp = dc?.items.filter((q) => q.kind === "pos" && q.id.startsWith("holepos:")) ?? [];
+  if (o.dimensions === "smart" && hm.length) L.push(tr("Polohy děr: {0}", hm.map(([k, m]) => `${m === "ordinate" ? tr("souřadnicové kóty od levého dolního rohu") : m === "table" ? tr("tabulka děr") : tr("kóty od hran")} (${VIEW_NAME(k, o)})`).join(" · ")) + (hp.length ? tr(" – na listu {0}/{1}", hp.filter((q) => q.status === "ok").length, hp.length) : ""));
   if (o.dimFunctional?.length) L.push(tr("Funkční rozměry: {0} · {1}", o.dimFunctional.map(fmtN3).join(", "), tolCheckLines(views, anns, o).lines[0].replace(/^[✓⚠] /, "")));
   const m = s.meta as Partial<DrawingMeta>;
   L.push(tr("U razítka: nepředepsané tolerance {0} · hrany {1} · poznámka {2}", m.tolerance?.trim() || "—", m.edges?.trim() || "—", m.note?.trim() || "—"));
@@ -1020,6 +1074,8 @@ async function sheetStatus(doc: CadDoc, idx: number, has: boolean, compute: Draw
   const issues = issuesOf(res);
   // řez mimo těleso: přesný důvod a rozsah odsazení (odznak ve výkresovém prostředí je stručný)
   for (const i of issues) if (i.level === "error") L.push(issueLine(i));
+  // neúplné kóty, funkční prvek bez tolerance, přetolerování (bod 18) → ⚠ / ℹ s kódem na řádku `výkres stav`
+  issues.push(...dimCheckIssues(dc, { sheetId: s.id, withTol: true }));
   // vydaný list ze starší revize modelu → ⚠ drawing.stale na řádku `výkres stav` (bod 20)
   const sh = doc.drawings![idx];
   if (sheetState(doc, sh) === "stale") issues.push({ level: "warn", code: "drawing.stale", kind: "stale", text: staleSheetText(sh.name, sh.issued!, modelId(doc)) });

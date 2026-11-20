@@ -146,7 +146,7 @@ describe("provedení s jádrem", () => {
     // zkrácený pohled = zbylých 100 mm v měřítku listu + mezera 8 mm na listu (měřítko z prvního průchodu)
     const [shown, full] = [m![1], m![2]].map((x) => Number(x.replace(",", ".")));
     expect(shown - full / 3).toBeCloseTo(8, 1);
-    expect(text).toMatch(/Kontrola kót: všech \d+ očekávaných rozměrů je na listu/);
+    expect(text).toMatch(/Kontrola kót: velikosti (\d+)\/\1 · polohy (\d+)\/\2(?! –)/);
     // souřadnice přerušeného pohledu ve stavu: skutečný rozsah 0…300
     expect(text).toMatch(/přední \(x = X, y = Z\): x 0…300/);
     const st = await drawingStatus(doc, computeDrawing);
