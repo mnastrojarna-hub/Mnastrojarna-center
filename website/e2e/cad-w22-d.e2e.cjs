@@ -126,7 +126,8 @@ async function scenario(args, label) {
   // ── D2 (bod 20): vydání listu, zastaralý list, panel Zastaralé výstupy ──
   await openConsole();
   log = await run('nový díl "Deska V"\nkvádr 60 40 10\nvýkres A4\nvýkres nepředepsané ISO 2768-mK\nvýkres vydat\nexport step');
-  ok(/✓ list „List 1“ vydán jako rev\. A z modelu r·[0-9a-f]{6}/.test(log), `${label}: výkres vydat → rev. A z modelu r·…`);
+  // příkaz výkresu je přijatý (→, vlna 22 – 22i), výsledek dá vyhodnocení listu (✓ list vyhodnocen / ⚠ / ✗)
+  ok(/→ list „List 1“ vydán jako rev\. A z modelu r·[0-9a-f]{6}.* – výsledek po vyhodnocení listu níže/.test(log) && /✓ výkres: list „List 1“ vyhodnocen/.test(log) && !/^✗/m.test(log), `${label}: výkres vydat → rev. A z modelu r·…`);
   await closeConsole();
   await p.waitForTimeout(1500);
   const issued = p.locator('[data-sheet-issued="A"]').first();
@@ -240,15 +241,25 @@ async function scenario(args, label) {
   await closeConsole();
   const panel = p.locator('[data-positions-panel]').first();
   await panel.waitFor({ timeout: 60000 }).catch(() => {});
+  // list se v okně výkresu počítá asynchronně (prodleva + jádro): počkat na hotový list, ne číst první snímek panelu
+  await p.waitForFunction(() => document.querySelectorAll('[data-balloon-row]').length === 12 && !!document.querySelector('[data-positions-panel] [data-overlap-count="0"]'), null, { timeout: 90000 }).catch(() => {});
   ok((await panel.locator('[data-overlap-count="0"]').count()) === 1, `${label}: panel Pozice a překryvy – odznak Překryvy: 0`);
   ok((await p.locator('[data-balloon-row]').count()) === 12, `${label}: panel – 12 řádků pozic`);
   await p.locator('[data-balloon-view-select="1"]').first().selectOption('top').catch(() => {});
   await p.waitForFunction(() => document.querySelector('[data-balloon-row="1"]')?.getAttribute('data-balloon-view') === 'top', null, { timeout: 60000 }).catch(() => {});
   ok((await p.locator('[data-balloon-row="1"]').getAttribute('data-balloon-view').catch(() => '')) === 'top', `${label}: pozice 1 → pohled horní (výběrem v panelu)`);
-  await p.locator('[data-balloon-lock="2"]').first().check().catch(() => {});
-  await p.waitForFunction(() => document.querySelector('[data-balloon-row="2"]')?.getAttribute('data-balloon-mode') === 'locked', null, { timeout: 60000 }).catch(() => {});
+  // změna pohledu pozice 1 list přepočítá a panel překreslí – zámek klikat až na hotový panel (12 řádků), případně znovu
+  for (let i = 0; i < 3; i++) {
+    await p.waitForFunction(() => document.querySelectorAll('[data-balloon-row]').length === 12 && !!document.querySelector('[data-positions-panel] [data-overlap-count]:not([data-overlap-count=""])'), null, { timeout: 60000 }).catch(() => {});
+    await p.waitForTimeout(500);
+    await p.locator('[data-balloon-lock="2"]').first().check().catch(() => {});
+    const done = await p.waitForFunction(() => document.querySelector('[data-balloon-row="2"]')?.getAttribute('data-balloon-mode') === 'locked', null, { timeout: 20000 }).then(() => true).catch(() => false);
+    if (done) break;
+  }
   ok((await p.locator('[data-balloon-row="2"]').getAttribute('data-balloon-mode').catch(() => '')) === 'locked', `${label}: zámek pozice 2 v panelu`);
   // tažení balónku 5 myší (výběr ve výkresu – genEdit move)
+  await p.waitForFunction(() => document.querySelectorAll('[data-balloon-row]').length === 12, null, { timeout: 60000 }).catch(() => {});
+  await p.waitForTimeout(800); // list po zámku přepočítán (prodleva okna výkresu)
   const b5 = p.locator('[data-sheet] svg text').filter({ hasText: /^5$/ }).first();
   const bb5 = await b5.boundingBox().catch(() => null);
   if (bb5) {
