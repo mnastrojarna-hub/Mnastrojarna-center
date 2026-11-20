@@ -1223,12 +1223,13 @@ export function componentLines(doc: CadDoc, status?: Record<string, MateStatus>)
 }
 
 /** Řádky stavu sestavy pro `docStatusText`: komponenty s polohou (⚓ = ukotvená) a souhrn vazeb. */
-export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>): string[] {
+export function asmStatusLines(doc: CadDoc, status?: Record<string, MateStatus>, matesStale = false): string[] {
   const comps = doc.components ?? [];
   const MAX = 60;
   const items = comps.slice(0, MAX).map((c) => `${c.name}${c.alias ? ` [${c.alias}]` : ""} ${pt(c.placement.position)}${rotText(c.placement.rotation)}${isFixed(doc, c) ? " ⚓" : ""}${c.hidden ? tr(" (skrytá)") : ""}${c.source.kind === "asm" ? tr(" (podsestava)") : ""}`);
   const out = [tr("Komponenty: {0}", items.join(" · ") || tr("žádné")) + (comps.length > MAX ? tr(" … a dalších {0} (sestava)", comps.length - MAX) : "")];
-  if (doc.mates?.length) out.push(tr("Vazby: {0}", matesSummary(doc, status)));
+  // stav vazeb pro jiné polohy, než má dokument (přepočet by komponenty posunul) – nikdy mlčky „ok“ (engine/result-key.ts)
+  if (doc.mates?.length) out.push(tr("Vazby: {0}", matesSummary(doc, status)) + (matesStale ? ` – ${tr("NEPLATÍ pro polohy v dokumentu: stav je až po přepočtu vazeb, který by komponenty posunul (sestava vazby)")}` : ""));
   const sp = springStatusLine(doc); // pružiny: uložená délka, L0, Ln, síla, ✓/⚠/✗
   if (sp) out.push(sp);
   const ms = doc.motion;

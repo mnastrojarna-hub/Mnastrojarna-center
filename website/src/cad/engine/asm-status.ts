@@ -5,7 +5,7 @@
  * `ensureLeaves` postaví všechny listové díly sestavy dřív, než se z nich počítá stav, kusovník, kolize, kontrola nebo
  * souhrn – bez toho byl objem Σ neznámý (P2: Σ = NaN) podle toho, zda aplikace díly zrovna stihla načíst.
  */
-import { docStatusText, type AsmStatus } from "../agent";
+import { docStatusText, type AsmStatus, type StaleNote } from "../agent";
 import { bomOf, flattenLeaves, matrixToPlacement, type Leaf } from "../asm-flatten";
 import { sourceKey, transformPoint } from "../assembly";
 import { clashStale } from "../clash-class";
@@ -16,6 +16,7 @@ import { fmtNum, MATERIALS, massKg } from "@/lib/mesh-metrics";
 import { asmWorldBox } from "./asm-box";
 import { makeAsmEnv, type AsmEnvOptions } from "./asm-env";
 import type { KernelApi } from "./kernel";
+import { geometrySig, mateStatusState, notedResults, setMateStatus } from "./result-key";
 import type { Workspace } from "./workspace";
 
 /**
@@ -67,19 +68,22 @@ function leavesBox(cache: Map<string, BuildResult>, leaves: Leaf[]): [Vec3, Vec3
 
 /**
  * Stav vazeb sestavy pod klíčem `key`: chybí-li (sestava otevřená z JSON / relace / jiné záložky, vazby přidané mimo
- * textové příkazy) nebo nezná-li některou nepotlačenou vazbu či u ní chybí plocha, vazby se přepočítají (`solveAsm`, jako
- * „sestava vazby“ a efekt aplikace po načtení dílů) – dokument se nemění, uloží se jen stav. Bez vazeb → undefined.
+ * textové příkazy), nezná-li některou nepotlačenou vazbu či u ní chybí plocha, NEBO byl spočítán pro jiný stav sestavy
+ * (jiný otisk – krok zpět, posun komponenty, upravený díl, změněná vazba; engine/result-key.ts), vazby se přepočítají
+ * (`solveAsm`, jako „sestava vazby“ a efekt aplikace po načtení dílů) – dokument se nemění, uloží se jen stav s razítkem
+ * sestavy, kterou popisuje: pohnul-li by řešič komponentami, stav patří polohám po přepočtu a pro dokument dál neplatí
+ * (`mateStatusState` → „stale“, textový stav „NEPLATÍ“). Bez vazeb → undefined.
  */
 export async function ensureMateStatus(ws: Workspace, kernel: KernelApi, doc: CadDoc, key: string, o: AsmEnvOptions = {}): Promise<Record<string, MateStatus> | undefined> {
   const mates = doc.mates ?? [];
   if (doc.kind !== "assembly" || !mates.length) return ws.asm.mateStatus.get(key);
-  const st = ws.asm.mateStatus.get(key);
-  if (st && mates.every((m) => m.suppressed || (st[m.id] !== undefined && st[m.id] !== "missing"))) return st;
+  const { status: st, state } = mateStatusState(ws, key, doc);
+  if (st && state === "ok" && mates.every((m) => m.suppressed || (st[m.id] !== undefined && st[m.id] !== "missing"))) return st;
   try {
     const { solveAsm } = await import("../asm-agent");
     const s = await solveAsm(doc, makeAsmEnv(ws, kernel, o));
-    ws.asm.mateStatus.set(key, s.status);
-    return s.status;
+    // nic se nepohnulo → stav popisuje dokument, jak je (řešič jen doplnil geometrii ploch); jinak polohy po přepočtu
+    return setMateStatus(ws, key, s.moved.length ? s.doc : doc, s.status);
   } catch {
     return st;
   }
@@ -129,7 +133,21 @@ export function asmStatusOf(ws: Workspace, doc: CadDoc, key: string, all: Leaf[]
     massKg: known ? mass : undefined,
     clash: clash ? { count: clash.res.length, pairs: clash.res.map((x) => `${compName(x.a)} × ${compName(x.b)} (${fmtNum(x.volume, 1)} mm³)`), at: clash.at, ...(clashStale(clash, doc) ? { stale: true } : {}) } : null,
     mates: ws.asm.mateStatus.get(key),
+    // stav vazeb spočítaný pro jiný stav sestavy (nebo pro polohy po přepočtu, které dokument nemá) – nikdy jako platný
+    ...((doc.mates ?? []).length && mateStatusState(ws, key, doc).state === "stale" ? { matesStale: true } : {}),
   };
+}
+
+/**
+ * Uložené výsledky dokumentu, které pro jeho nynější geometrii neplatí (měření, porovnání s referencí – `noteResult`):
+ * textový stav je vypíše jako „NEPLATÍ“ a strojová část `measure.stale=1` / `compare.stale=1` (engine/result-key.ts).
+ */
+export function staleNotes(ws: Workspace, doc: CadDoc, key: string): StaleNote[] {
+  if (doc.kind === "draft") return [];
+  const geo = geometrySig(doc);
+  return notedResults(ws, key)
+    .filter((id) => id.sig !== geo)
+    .map((id) => ({ kind: id.kind, rev: id.rev, ...(id.line != null ? { line: id.line } : {}), ...(id.at ? { at: id.at } : {}) }));
 }
 
 /**
@@ -141,7 +159,7 @@ export async function presentStatusText(ws: Workspace, kernel: KernelApi, o: Asm
   const res = d.kind === "draft" ? null : await kernel.build(d).catch(() => null);
   // obálka sestavy přesně – stejně jako příkaz `stav` (asmStatus → engine/asm-box.ts)
   const asm = await asmStatus(ws, kernel, d, { ...o, key: ws.docKey() }).catch(() => undefined);
-  return docStatusText(d, res, asm);
+  return docStatusText(d, res, asm, staleNotes(ws, d, ws.docKey()));
 }
 
 /**

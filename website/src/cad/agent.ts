@@ -1539,10 +1539,19 @@ export type AsmStatus = {
   clash?: { count: number; pairs: string[]; at: string; /** sestava se od kontroly změnila – výsledek neplatí */ stale?: boolean } | null;
   /** stav vazeb z posledního přepočtu (řádek „Vazby:“) */
   mates?: Record<string, MateStatus>;
+  /** stav vazeb nepatří nynějšímu stavu sestavy (polohy v dokumentu jsou jiné než po přepočtu) – nesmí se číst jako „splněno“ */
+  matesStale?: boolean;
+};
+
+/** uložený výsledek (měření, porovnání s referencí), který vznikl pro jinou revizi dokumentu – `stav` ho označí „NEPLATÍ“ */
+export type StaleNote = { kind: string; rev: string; line?: number; at?: string };
+const STALE_NOTE_TEXT: Record<string, () => string> = {
+  measure: () => tr("Měření"),
+  compare: () => tr("Porovnání s referencí"),
 };
 
 /** Textový stav dokumentu – zpětná vazba pro agenta bez obrázku. */
-export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus): string {
+export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmStatus, stale: readonly StaleNote[] = []): string {
   if (doc.kind === "draft") return draftDocStatusText(doc);
   const st = new Map((res?.status ?? []).map((s) => [s.id, s]));
   const okCount = doc.features.filter((f) => st.get(f.id)?.ok !== false).length;
@@ -1559,7 +1568,7 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
     if (m.valid !== undefined || m.solids !== undefined) lines.push(tr("Geometrie: {0}{1}", m.solids === 0 ? tr("ŽÁDNÉ objemové těleso (jen plochy) – export STEP nedá solid") : m.valid === false ? tr("NEPLATNÁ (sebeprotínající nebo neorientovatelné plochy) – export STEP může selhat; opravte prvek označený ⚠") : tr("platná"), m.solids ? ` · ${m.solids === 1 ? tr("1 těleso") : tr("{0} těles", m.solids)}` : ""));
   } else if (res && doc.kind !== "assembly") lines.push(tr("Rozměry: žádné těleso (jen skici / pomocná geometrie)"));
   if (doc.kind === "assembly") {
-    lines.push(...asmStatusLines(doc, asm?.mates)); // komponenty s polohou (⚓ = ukotvená) a souhrn vazeb
+    lines.push(...asmStatusLines(doc, asm?.mates, asm?.matesStale)); // komponenty s polohou (⚓ = ukotvená) a souhrn vazeb
     if (asm) {
       const [a, b] = asm.bbox ?? [null, null];
       lines.push(tr("Sestava: {0} komponent ({1} dílů po rozložení podsestav){2}{3}{4}", asm.components, asm.parts, a && b ? tr(" · obálka {0} × {1} × {2} mm", fmt(b[0] - a[0]), fmt(b[1] - a[1]), fmt(b[2] - a[2])) + (asm.bboxApprox ? tr(" (u {0} velkých importů ze sítě)", asm.bboxApprox) : "") : "", asm.volume != null ? tr(" · objem Σ {0} cm³", fmt(asm.volume / 1000, 2)) : "", asm.massKg != null ? tr(" · hmotnost Σ {0} kg", fmt(asm.massKg, 3)) : ""));
@@ -1569,6 +1578,11 @@ export function docStatusText(doc: CadDoc, res: BuildResult | null, asm?: AsmSta
           : tr("Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava"),
       );
     } else lines.push(tr("Sestava: tělesa komponent se stavějí zvlášť (objem a hmotnost viz kusovník)"));
+  }
+  // uložené výsledky z dřívější revize dokumentu (měření, porovnání s referencí): nikdy mlčky jako platné
+  for (const n of stale) {
+    const what = STALE_NOTE_TEXT[n.kind]?.() ?? n.kind;
+    lines.push(tr("{0}: výsledek{1} je pro revizi {2} – NEPLATÍ: dokument se od té doby změnil, zopakujte příkaz", what, n.line ? ` L${n.line}` : n.at ? ` (${n.at})` : "", n.rev));
   }
   if (doc.features.length) {
     lines.push(tr("Prvky:"));

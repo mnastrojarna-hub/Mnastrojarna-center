@@ -25,6 +25,7 @@ import { matesCount } from "./kv";
 import { checkClashes, clashFindings } from "./ops/clash";
 import type { ReportBuilder } from "./protocol";
 import type { DocSummary } from "./protocol-types";
+import { staleResults } from "./result-key";
 import { docOfTab, runDocKeySet } from "./runs";
 import type { Workspace } from "./workspace";
 
@@ -107,6 +108,7 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
         const cl = ck?.classes;
         if (cl) s.clashes = { total: cl.total, thread: cl.thread, underhead: cl.underhead, real: cl.real, undetermined: cl.undetermined };
         if (cl && s.volume_mm3 !== undefined) s.volume_union_mm3 = s.volume_mm3 - ck!.res.reduce((a, x) => a + x.volume, 0);
+        markStale(s, ws, ckey, d);
       } catch (e) {
         rb.code("build.failed", { doc: d.name, args: [errText(e)] });
         return { summary: s, built: false };
@@ -152,11 +154,21 @@ export async function summarize(d: CadDoc, kernel: EngineHost["kernel"], rb: Rep
     }
     const built = !!res.metrics && error === 0 && !(res.paramErrors?.length);
     if (!built && !error && !(o.cached && !res.metrics && !res.paramErrors?.length)) rb.code("build.failed", { doc: d.name, args: [tr("model nemá těleso")] });
+    if (ws && key !== undefined) markStale(s, ws, key, d);
     return { summary: s, built };
   } catch (e) {
     rb.code("build.failed", { doc: d.name, args: [errText(e)] });
     return { summary: s, built: false };
   }
+}
+
+/**
+ * `stale=` řádku D: uložené výsledky dokumentu (kolize, stav vazeb, pohyb, měření, porovnání), které jeho konečnému stavu
+ * neodpovídají (engine/result-key.ts). Kolize a stav vazeb se před tím přepočítají – zůstanou jen ty, které přepočítat nešly.
+ */
+function markStale(s: DocSummary, ws: Workspace, key: string, d: CadDoc): void {
+  const stale = staleResults(ws, key, d);
+  if (stale.length) s.stale = stale;
 }
 
 /**

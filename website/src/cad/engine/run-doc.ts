@@ -3,6 +3,7 @@
  * chování): zápis rozpracovaného dokumentu (`flush`), příprava prvku (`prepare` – výchozí název, odkazy názvem a `$last`,
  * tělesa, režim, duplicitní id), stavba a topologie přes jádro hostitele.
  */
+import { dropResults } from "./result-key";
 import { bodiesAt, isNewBodyMode, nextBodyName } from "../bodies";
 import { resolveDatumNames } from "../agent-prim";
 import { freeName } from "../agent-edit";
@@ -76,6 +77,7 @@ export function startDoc(ctx: OpCtx, d: CadDoc, o: { openNew?: boolean; origin?:
     const k = ctx.ws.docKey();
     ctx.ws.asm.mateStatus.delete(k);
     ctx.ws.asm.clash.delete(k);
+    dropResults(ctx.ws, k); // měření / porovnání původního dokumentu (engine/result-key.ts)
   }
 }
 

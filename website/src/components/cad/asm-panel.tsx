@@ -51,6 +51,7 @@ export function AsmTree({
   onContext,
   menuFor,
   mateStatus,
+  mateState,
   onResolve,
   picked,
 }: {
@@ -65,6 +66,11 @@ export function AsmTree({
   picked?: readonly string[];
   /** stav trvalých vazeb (z řešiče) */
   mateStatus?: Record<string, MateStatus>;
+  /**
+   * platnost stavu vazeb pro nynější stav sestavy (cad/engine/result-key.ts): „stale“ = sestava se od přepočtu změnila
+   * nebo polohy v dokumentu vazbám neodpovídají → žádná zelená, výzva k přepočtu; „unchecked“ = stav se teprve počítá
+   */
+  mateState?: "ok" | "stale" | "unchecked";
   /** přepočítat vazby */
   onResolve?: () => void;
 }) {
@@ -138,7 +144,7 @@ export function AsmTree({
             ))}
         </div>
       ))}
-      <MatesList doc={doc} status={mateStatus} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} />
+      <MatesList doc={doc} status={mateStatus} state={mateState} onCommit={onCommit} onResolve={onResolve} onSelect={onSelect} />
     </div>
   );
 }
@@ -151,27 +157,34 @@ const STATUS_TITLE: Record<MateStatus, string> = { ok: "splněno", conflict: "ko
  * v poli (číslo i výraz), otočit, potlačit nebo smazat – každá změna jde přes `onCommit`, které sestavu znovu přepočítá.
  * Vazba Ukotvit se týká jedné komponenty; jejím smazáním / potlačením se komponenta uvolní.
  */
-function MatesList({ doc, status, onCommit, onResolve, onSelect }: { doc: CadDoc; status?: Record<string, MateStatus>; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void }) {
+function MatesList({ doc, status, state, onCommit, onResolve, onSelect }: { doc: CadDoc; status?: Record<string, MateStatus>; state?: "ok" | "stale" | "unchecked"; onCommit: (d: CadDoc) => void; onResolve?: () => void; onSelect: (id: string | null) => void }) {
   const mates = doc.mates ?? [];
   const [closed, setClosed] = useState(false);
   const name = (id: string) => doc.components?.find((c) => c.id === id)?.name ?? "?";
   if (!mates.length) return null;
   const conflicts = mates.filter((m) => status?.[m.id] === "conflict").length;
   return (
-    <div className="ml-3 mt-1 border-l border-dashed border-[#cdd5de] pl-1" data-mates-list>
+    <div className="ml-3 mt-1 border-l border-dashed border-[#cdd5de] pl-1" data-mates-list data-mates-state={state ?? "ok"}>
       <button type="button" onClick={() => setClosed((v) => !v)} className="flex w-full items-center gap-1.5 px-1.5 py-[3px] text-left text-[11.5px] font-semibold text-[#4a5664]">
         <CadIcon name={closed ? "chevronRight" : "chevronDown"} className="h-3 w-3" />
         {tr("Vazby")}
         {conflicts > 0 && <span className="rounded bg-brand/10 px-1 text-[10px] text-brand-600">{tr("{0} konflikt", conflicts)}</span>}
         <span className="ml-auto pr-2 font-mono text-[10px] font-normal text-[#8a95a3]">{mates.length}</span>
       </button>
+      {!closed && state === "stale" && (
+        <p data-mates-stale className="ml-3 mr-2 rounded border border-[#f1d9a7] bg-[#fff8e6] px-2 py-1 text-[11px] leading-snug text-[#7a5600]">
+          {tr("Stav vazeb neplatí pro tento stav sestavy – polohy komponent vazbám neodpovídají. Přepočítejte vazby.")}
+        </p>
+      )}
       {!closed &&
         mates.map((m) => {
-          const st = status?.[m.id] ?? (m.suppressed ? "suppressed" : "missing");
+          // bez platného stavu (jiný stav sestavy, stav se počítá) nikdy „splněno“: šedá „nepřepočteno“
+          const known = state === undefined || state === "ok";
+          const st = (known ? status?.[m.id] : undefined) ?? (m.suppressed ? "suppressed" : "missing");
           const valued = mateNeedsValue(m.type);
           const kinValue = !valued && kinHasValue(m.type) ? KIN_SPEC[m.type as keyof typeof KIN_SPEC].params.find((p) => p.key === "value") : undefined;
           return (
-            <div key={m.id} data-mate={m.id} data-mate-type={m.type} className={cn("group ml-3 rounded px-2 py-[3px] text-[12px]", m.suppressed && "opacity-45")} onClick={() => onSelect(m.a.compId)} title={tr(STATUS_TITLE[st])}>
+            <div key={m.id} data-mate={m.id} data-mate-type={m.type} data-mate-status={known ? st : "unknown"} className={cn("group ml-3 rounded px-2 py-[3px] text-[12px]", m.suppressed && "opacity-45")} onClick={() => onSelect(m.a.compId)} title={known ? tr(STATUS_TITLE[st]) : tr("nepřepočteno – stav vazby pro tento stav sestavy není znám")}>
               <div className="flex items-center gap-2">
                 <span className={cn("h-2 w-2 shrink-0 rounded-full", STATUS_DOT[st])} />
                 <span className="min-w-0 flex-1 truncate">

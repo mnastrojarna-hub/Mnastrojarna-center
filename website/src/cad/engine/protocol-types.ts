@@ -49,6 +49,11 @@ export type DocSummary = {
   mates?: { total: number; ok: number; conflict: number; missing: number; suppressed: number };
   clashes?: { total: number; thread: number; real: number; undetermined: number; /** prstenec pod hlavou šroubu (ℹ clash.underhead) */ underhead?: number };
   sheets?: number;
+  /**
+   * druhy uložených výsledků dokumentu, které pro jeho konečný stav neplatí (řádek D `stale=clash,mates,motion,measure,compare`;
+   * engine/result-key.ts `staleResults`) – výsledek vznikl pro jinou revizi geometrie, konfiguraci nebo polohu
+   */
+  stale?: string[];
 };
 
 /** zapsaný soubor (řádek `F`, JSON `files[]`) */

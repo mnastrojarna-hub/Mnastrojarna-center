@@ -2,6 +2,7 @@
  * Sestava textem (cad/agent-asm.ts, provedení cad/asm-agent.ts): vazby, komponenty, pole, šroub, podsestavy, úprava
  * v kontextu, kusovník, rám formy, záložky, pohybová studie. Prostředí sestavy nad `ws` a jádrem (`engine/asm-env.ts`).
  */
+import { setMateStatus } from "../result-key";
 import { tr } from "../../i18n";
 import type { CadDoc } from "../../types";
 import { makeAsmEnv } from "../asm-env";
@@ -38,7 +39,8 @@ export const asmOp: OpHandler<"asm"> = async (op, ctx) => {
     r.doc = res.doc;
     r.changed = r.changed || res.changed;
   }
-  if (res.mateStatus) ctx.ws.asm.mateStatus.set(docKeyOf(ctx), res.mateStatus);
+  // stav vazeb s razítkem sestavy, kterou popisuje (výpis nad nepřepočtenou sestavou = polohy po přepočtu, ne dokument)
+  if (res.mateStatus) setMateStatus(ctx.ws, docKeyOf(ctx), res.mateDoc ?? r.doc, res.mateStatus);
   if (res.motion) {
     // pohybová studie: panel aplikace vyzvedne pokyn (přehrát, krok, export snímků); bez 3D okna: `pohyb export csv` =
     // soubor (FileSink → řádek F), přehrání ℹ ui.no-view, snímky PNG / video ✗ host.app-only

@@ -124,6 +124,12 @@ export function sourceKey(s: ComponentSource, depth = 0): string {
           ? "asm:cycle"
           : "asm:" + JSON.stringify((s.doc.components ?? []).map((c) => [sourceKey(c.source, depth + 1), c.placement, c.hidden ? 1 : 0, ...(c.spring?.length != null ? [c.spring.length, c.spring.offset ?? 0] : [])]))
         : `${s.format}:${s.data.length}:${s.data.slice(0, 2048)}:${s.data.slice(-2048)}`;
+  const [h1, h2] = hashPair(str);
+  return h1.toString(36) + h2.toString(36) + str.length.toString(36);
+}
+
+/** dvojice 32bitových otisků řetězce (FNV) – jediné hashování klíčů obsahu: `sourceKey` i krátká revize modelu (engine/result-key.ts) */
+export function hashPair(str: string): [number, number] {
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
   for (let i = 0; i < str.length; i++) {
@@ -131,7 +137,7 @@ export function sourceKey(s: ComponentSource, depth = 0): string {
     h1 = Math.imul(h1 ^ c, 16777619);
     h2 = Math.imul(h2 ^ c, 2246822519);
   }
-  return (h1 >>> 0).toString(36) + (h2 >>> 0).toString(36) + str.length.toString(36);
+  return [h1 >>> 0, h2 >>> 0];
 }
 
 // ---------------- kusovník ----------------
