@@ -119,15 +119,21 @@ describe("provedení: pohled je součást studie, výsledek studie na něm nezá
     expect(p.log[0]).toContain("113 snímků po vypočtených krocích");
     await expect(run(asm(), "pohyb export webm kroky")).rejects.toThrow(/jen pro snímky PNG/);
   });
-  it("anotace: vypnout / zapnout; řádky anotace bez vůle a zásahu, dokud je nic nepočítá", async () => {
+  it("anotace: vypnout / zapnout; řádky anotace bez vůle a zásahu, dokud je nic nepočítá; vůle z výsledku kontroly vůle (res.clearance)", async () => {
     const off = await run(asm(), "pohyb anotace vyp");
     expect(off.doc.motion!.annot).toEqual({ off: true });
     const on = await run(off.doc, "pohyb anotace zap");
     expect(on.doc.motion!.annot).toBeUndefined();
     const rows = annotRows({ t: 0.325, step: 56, steps: 113, motors: [42.33] }, asm(), { study: 0.65 });
     expect(rows.map((x) => x.text)).toEqual(["t = 0,325 s / 0,65 s", "krok 56/112", "ZDVIH 42,33 mm"]);
-    const withCl = annotRows({ t: 0, step: 0, steps: 2, motors: [57.5], stepData: { clearance: [{ a: "Razník", b: "Plech", min: 0.4, limit: 0.5 }], cut: [{ label: "Razník", depth: 1.2 }] } }, asm());
-    expect(withCl.find((x) => x.key === "clearance")).toMatchObject({ text: "vůle Razník × Plech: 0,4 mm (min. 0,5)", warn: true });
+    // vůle: dřív z vymyšleného `step.clearance` (nikdo ho nezapisoval – v aplikaci se řádek nikdy neukázal); teď z výsledku
+    // kontroly vůle C2 `res.clearance.pairs[].series[krok]` (cad/motion-clearance.ts), jména komponent ze sestavy
+    const part = (id: string, name: string) => ({ id, name, source: { kind: "part", doc: emptyDoc(name) }, placement: { position: [0, 0, 0], rotation: [0, 0, 0] } }) as never;
+    const d = { ...asm({ clearance: { pairs: [{ a: "r", b: "p" }], limit: 0.5 } }), components: [part("r", "Razník"), part("p", "Plech")] };
+    const res = { ...fakeRes(0.65, 1), clearance: { limit: 0.5, moving: false, pairs: [{ a: "r", b: "p", min: { d: 0.4, exact: true, pos: 0, t: 0, motors: [57.5] }, series: [0.4, 0.9], pts: [null, null], below: [0], unproven: 0 }], poses: 2, refined: 0 } };
+    const withCl = annotRows({ t: 0, step: 0, steps: 2, motors: [57.5], stepData: { cut: [{ label: "Razník", depth: 1.2 }] } }, d, { res });
+    expect(withCl.find((x) => x.key === "clearance")).toMatchObject({ text: "⚠ vůle Razník × Plech: 0,4 mm (min. 0,5)", warn: true });
+    expect(annotRows({ t: 0.65, step: 1, steps: 2, motors: [27.15] }, d, { res }).find((x) => x.key === "clearance")).toMatchObject({ text: "vůle Razník × Plech: 0,9 mm (min. 0,5)", warn: false });
     expect(withCl.find((x) => x.key === "cut")?.text).toBe("zásah Razník: 1,2 mm");
   });
   it("EN / DE protokol", async () => {
