@@ -495,8 +495,15 @@ export type Mate = {
  * na `to` rychlostí |speed|, tam motor stojí (doba |to − from| / rychlost). Jediný výklad všech tvarů: cad/motor-model.ts `motorKeys`.
  */
 export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean };
+/**
+ * Vůle a spojitost kontroly v pohybové studii (vlna 22, bod 6 – cad/motion-clearance.ts): `pairs` = sledované dvojice komponent
+ * nejvyšší úrovně (id) nebo „moving“ = pohyblivé vůči ostatním; `limit` [mm] = nejmenší přípustná vůle (pod ní ⚠ clash.clearance);
+ * `refine` = zjemnění kroků u kontaktu a spojitá kontrola kolizí mezi kroky (výchozí zapnuto; false = jen diskrétně v krocích,
+ * výsledek to výslovně uvádí).
+ */
+export type MotionClearance = { pairs?: { a: string; b: string }[] | "moving"; limit?: number; refine?: boolean };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic };
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** „dynamic“ = dynamika (cad/motion-dynamic.ts), jinak kinematika */ mode?: "dynamic"; dyn?: MotionDynamic; /** vůle a spojitá kontrola (vlna 22, bod 6) */ clearance?: MotionClearance };
 /**
  * Dynamika pohybové studie (cad/motion-dynamic.ts): integrační krok [s], gravitace (směr; null = vypnutá, chybí = −Z), viskózní tlumení
  * pružin [N·s/mm], součinitel odrazu na dorazech (0–1), ručně zadané hmotnosti komponent [kg] a síly / momenty na vazbách.

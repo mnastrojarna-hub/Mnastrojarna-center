@@ -10,6 +10,7 @@ import { classifyClashes as classifyGeo, type ClashClass, type ClashPair } from 
 import { motionClashSummary, stepClashReport, type ClashStep, type MotionClashStats } from "./clash-report";
 import { classifyClashes as estimateClashes } from "./clash-thread";
 import type { MotionClashes, MotionResult } from "./motion";
+import { clearanceOf } from "./motion-clearance";
 import type { CadDoc } from "./types";
 
 /** zařazená dvojice kolize kroku */
@@ -66,7 +67,9 @@ async function ensureClassified(res: MotionResult, d: CadDoc, env?: Pick<AsmEnv,
 export async function motionClashLines(res: MotionResult, d: CadDoc, env?: Pick<AsmEnv, "clashDetail">): Promise<{ lines: string[]; codes: NonNullable<AsmResult["codes"]>; stats: MotionClashStats }> {
   const steps = await ensureClassified(res, d, env);
   const every = (res as { dynamic?: { clashEvery?: number } }).dynamic?.clashEvery;
-  return motionClashSummary({ steps, collisionsChecked: res.collisionsChecked }, d, every !== undefined ? { every } : {});
+  // spojitost kontroly a kontakty nalezené mezi kroky (vlna 22, bod 6 – motion-clearance.ts)
+  const { sweep, between } = clearanceOf(res);
+  return motionClashSummary({ steps, collisionsChecked: res.collisionsChecked, ...(sweep ? { sweep } : {}), ...(between ? { between } : {}) }, d, every !== undefined ? { every } : {});
 }
 
 /** kolize kroku pro `pohyb krok N`: řádky (šroub v závitu, pracovní kontakt, dotyk) a ⚠ závady s instancí a místem */

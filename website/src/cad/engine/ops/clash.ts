@@ -84,7 +84,8 @@ export async function checkClashes(ws: Workspace, kernel: KernelApi, d: CadDoc, 
 
 /** souhrnná věta kontroly (dřívější tvar, dotyk / pracovní kontakt jen když nejsou nulové) */
 function clashSummaryText(n: number, comps: number, c: ClashCounts): string {
-  if (!n) return tr("✓ kolize: žádné ({0} komponent)", comps);
+  // žádný průnik není „bez kolizí“ ani „nic nedře“ (vlna 22, bod 6): práh objemu a výslovně nezkontrolovaná vůle, bez ✓
+  if (!n) return tr("kolize: žádný průnik (objem nad 0,001 mm³) – {0} komponent · vůle nekontrolována (pohyb vůle \"A\" \"B\" min 0,05)", comps);
   if (c.touch || c.work) return tr("kolize: {0} – {1}", n, countsText(c));
   return c.underhead || c.undetermined ? tr("kolize: {0} – šroub v závitu {1}, pod hlavou {2}, skutečné {3}, nevyhodnotitelné {4}", n, c.thread, c.underhead, c.real, c.undetermined) : tr("kolize: {0} – šroub v závitu {1}, skutečné {2}", n, c.thread, c.real);
 }

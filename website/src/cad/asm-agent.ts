@@ -82,6 +82,7 @@ import {
 } from "./mates";
 import { uid, type AsmComponent, type BuildResult, type CadDoc, type ComponentSource, type Mate, type MateRef, type Vec3 } from "./types";
 import type { ClashDetail, ClashPair } from "./clash-class";
+import type { ClrReq, ClrRes } from "./clearance-types";
 
 /** Seznam ploch jednoho dílu (souřadnice dílu) – jako seznam ploch v panelu vazby. */
 export type PartFaces = { faces: { face: number; info: PartFace; area?: number }[]; truncated: boolean };
@@ -110,6 +111,8 @@ export type AsmEnv = {
   interference?: (doc: CadDoc) => Promise<{ a: string; b: string; volume: number; aPath?: string[]; bPath?: string[] }[]>;
   /** geometrické zařazení dvojic kolize v jádře (šroub × závit, kap. 6.3 – clash-class.ts) – v pohybu stejné jako `kolize` */
   clashDetail?: (doc: CadDoc, pairs: ClashPair[]) => Promise<ClashDetail[]>;
+  /** vůle mezi komponentami a spojitá kontrola úseku pohybu v jádře (vlna 22, bod 6 – cad/clearance-kernel.ts) */
+  clearance?: (req: ClrReq) => Promise<ClrRes>;
   /** díl má víc ploch, než se načte (`FACE_LIMIT`) – plochy navíc nejdou vybrat pro vazbu (⚠ asm.faces-truncated, 5.2 č. 30) */
   onFacesTruncated?: (key: string, limit: number) => void;
   /** výsledky pohybové studie podle dokumentu: úložiště pracovního prostoru a klíč dokumentu, se kterým prostředí pracuje (cad/motion-cache.ts) */

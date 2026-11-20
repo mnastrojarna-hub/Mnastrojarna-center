@@ -48,6 +48,8 @@ const HOVER: RGB = [245, 158, 11];
 const SEL_CSS = "#e03930";
 const HOVER_CSS = "#f59e0b";
 const SNAP_CSS = "#0284c7";
+/** úsečka vůle nad limitem (vlna 22, bod 6) */
+const GAP_OK_CSS = "#16a34a";
 /** zvýraznění plochy pod kurzorem znamená překreslení celého náhledu – u pomalých modelů (ms na snímek) jen hrany a body */
 const HOVER_FACE_MAX_MS = 60;
 /** index výběru, jehož sestavení trvá déle (ms), se při otáčení / přibližování nestaví na každý pohyb myši – až po zastavení */
@@ -427,6 +429,14 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
       for (const [a, q] of ms.lines) stroke([a, q], SEL_CSS, 1.6);
       for (const p of ms.points) dot(p, SEL_CSS, 3.5);
     }
+    // úsečka vůle pohybové studie (vlna 22, bod 6) – stejná jako ve 3D okně: pod limitem červená, jinak zelená
+    const gp = pp?.gap;
+    if (gp) {
+      const col = gp.below ? SEL_CSS : GAP_OK_CSS;
+      stroke([gp.p1, gp.p2], col, 2.2);
+      dot(gp.p1, col, 3.5);
+      dot(gp.p2, col, 3.5);
+    }
     const lab = labels.current;
     if (lab) {
       const kids = lab.children;
@@ -436,6 +446,11 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
         const [x, y] = P(l.pos);
         node.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -50%)`;
       });
+      const gn = lab.querySelector<HTMLElement>("[data-gap-label]");
+      if (gp && gn) {
+        const [x, y] = P([(gp.p1[0] + gp.p2[0]) / 2, (gp.p1[1] + gp.p2[1]) / 2, (gp.p1[2] + gp.p2[2]) / 2]);
+        gn.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px) translate(-50%, -140%)`;
+      }
     }
   }, []);
   const scheduleOverlay = useCallback(() => {
@@ -555,7 +570,7 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
   useEffect(schedule, [scene.display, secKey, schedule]);
   // hrany a body výběru, body uchopení, kóty měření – jen překryvná vrstva
   const ovKey = [sel.filter((s) => s.kind === "edge" || s.kind === "vertex").map(selKey).join(","), legacy ? (pick?.selectedEdges ?? []).join(",") : "", lhover.edge, hover && (hover.kind === "edge" || hover.kind === "vertex") ? selKey(hover) : "", pick?.snapPoints ? 1 : 0].join("|");
-  useEffect(scheduleOverlay, [ovKey, pick?.measure, scheduleOverlay]);
+  useEffect(scheduleOverlay, [ovKey, pick?.measure, pick?.gap, scheduleOverlay]);
   // popisky entit: zapnutí / vypnutí
   const hintsOn = !!pick?.hints;
   useEffect(() => {
@@ -1006,6 +1021,11 @@ export function SoftViewport({ scene, toolbarExtra, pick }: { scene: SoftScene; 
             {l.text}
           </div>
         ))}
+        {pick?.gap && (
+          <div data-gap-label data-gap-below={pick.gap.below ? "1" : "0"} className={cn("absolute left-0 top-0 whitespace-nowrap rounded border bg-white/95 px-1.5 py-0.5 font-mono text-[11px] font-semibold shadow", pick.gap.below ? "border-brand/50 text-brand-600" : "border-[#16a34a]/50 text-[#166534]")}>
+            {pick.gap.label}
+          </div>
+        )}
       </div>
       {/* popisky entit pro výběr bez trefování (klik na střed popisku = klik na entitu; pointer-events: none) */}
       {hintsOn && hintList.length > 0 && (
