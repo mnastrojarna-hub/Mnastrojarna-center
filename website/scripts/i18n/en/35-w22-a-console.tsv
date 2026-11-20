@@ -1,0 +1,72 @@
+# Vlna 22, balík A, etapa A4 (body 15, 16, 21): konzole (souhrn, historie, filtr, JSON), sdílení textem (obsah, ověření odkazu, useknutý × poškozený), softwarové zobrazení
+  obsah odkazu: {0}	  link content: {0}
+„Ze seznamu…“ ve formuláři prvku – plochy a hrany podle čísla a popisu	“From list…” in the feature form – faces and edges by number and description
+{0} kopií: první „{1}“ {2} … poslední „{3}“ {4} (polohy všech: sestava komponenty)	{0} copies: first “{1}” {2} … last “{3}” {4} (positions of all: assembly components)
+⚠ varování	⚠ warnings
+✗ chyby	✗ errors
+✗ chyby a ⚠ varování	✗ errors and ⚠ warnings
+2D výkres „{0}“ – příloh {1}	2D drawing “{0}” – attachments {1}
+analýzy ploch – zebra, úkosy, tloušťka stěny, křivost	surface analyses – zebra, draft, wall thickness, curvature
+barevná mapa odchylek a úkosů na modelu	colour map of deviations and draft on the model
+bez kopií	no copies
+Bez WebGL náhled nekreslí:	Without WebGL the preview does not draw:
+Co náhled bez WebGL neukáže – a čím to nahradit	What the preview without WebGL does not show – and what to use instead
+číselné výsledky textem („analýza úkosů“, „měřit“)	numeric results as text (“draft analysis”, “measure”)
+díl „{0}“ – prvků {1}, listů výkresu {2}, příloh {3}	part “{0}” – features {1}, drawing sheets {2}, attachments {3}
+díl, vazba, kód, id…	part, mate, code, id…
+dokument v odkazu	document in the link
+duchové – průhledné porovnání s referencí nebo předchozí polohou	ghosts – transparent comparison with a reference or the previous position
+Filtr dokumentu	Document filter
+Filtr textu (díl, vazba, kód chyby, id záznamu)	Text filter (part, mate, error code, entry id)
+Filtr úrovně	Level filter
+gizmo přesunu a otočení komponenty	move and rotate gizmo of a component
+grafika měření a stopa bodu pohybové studie	measurement graphics and the point trace of a motion study
+Historie běhů ({0})	Run history ({0})
+hodnoty v panelu Měření, v panelu Pohyb a textem „měřit“ / „pohyb stav“	values in the Measure panel, the Motion panel and as text “measure” / “motion status”
+hřebeny křivosti a řídicí body ploch třídy A	curvature combs and control points of class-A surfaces
+Je to omezení prohlížeče nebo prostředí, ne chyba modelu: jádro, přepočet, řez, výběr, měření a exporty (i video) běží dál.	This is a limitation of the browser or environment, not a model error: the kernel, recompute, section, selection, measuring and exports (video included) keep working.
+JSON protokolu běhu {0} stažen.	JSON of run {0} downloaded.
+klik v náhledu vybere plochu, hranu nebo vrchol (Ctrl / Shift přidá, tažení = výběr oknem)	a click in the preview selects a face, edge or vertex (Ctrl / Shift adds, drag = window selection)
+mřížka a osy prostoru	grid and space axes
+návaznost ploch textem („analýza návaznosti“, „analýza hřebenu“)	surface continuity as text (“continuity analysis”, “comb analysis”)
+Nesprávné heslo – nebo je odkaz useknutý či změněný (šifrovaný obsah nejde rozlišit; část za #s= má {0} znaků).	Wrong password – or the link is truncated or altered (encrypted content cannot be told apart; the part after #s= has {0} characters).
+odchylky číselně v protokolu „porovnat“	deviations as numbers in the “compare” protocol
+Odkaz je chráněný heslem – ověřte ho s heslem: odkaz ověřit <odkaz> heslo <heslo>.	The link is password protected – verify it with the password: link verify <link> password <password>.
+Odkaz je poškozený – data dokumentu jsou úplná, ale změněná (část za #s= má {0} znaků; změnu mohl udělat program, kterým se odkaz předával). Požádejte odesílatele o nový odkaz.	The link is damaged – the document data are complete but altered (the part after #s= has {0} characters; the program used to pass the link on may have changed it). Ask the sender for a new link.
+Odkaz je useknutý – data dokumentu v něm končí předčasně (část za #s= má {0} znaků). Zkopírujte celý odkaz znovu, nebo požádejte o krátký odkaz s kódem.	The link is truncated – its document data end early (the part after #s= has {0} characters). Copy the whole link again, or ask for a short link with a code.
+Odkaz je useknutý – za #s= chybí data dokumentu ({0} znaků odkazu).	The link is truncated – the document data after #s= are missing ({0} characters of the link).
+odkaz nemá další volby – vypíše poslední sdílený odkaz („odkaz ověřit [odkaz] [heslo X]“ ho ověří); nový vytvoří „sdílet“	link has no options – it prints the last shared link (“link verify [link] [password X]” verifies it); “share” creates a new one
+odkaz ověřit: chybí odkaz – zadejte odkaz nebo kód (odkaz ověřit https://…/s#KÓD), nebo nejdřív „sdílet“	link verify: the link is missing – give a link or code (link verify https://…/s#CODE), or “share” first
+odkaz ověřit: za „{0}“ chybí heslo	link verify: the password is missing after “{0}”
+odkaz se otevře ({0} znaků, {1}, platí do: {2}, {3}): {4}	the link opens ({0} characters, {1}, valid until: {2}, {3}): {4}
+omezení	limitations
+perspektiva – náhled je vždy pravoúhlý	perspective – the preview is always orthographic
+Po běhu ukázat souhrn – stručný protokol MNCAD/1 (stejný jako mncad run v příkazové řádce): hlavička, ✗ / ⚠, řádky D dokumentů a Σ – do 2 kB; plný text konzole je v záložce Detail	Show a summary after the run – the short MNCAD/1 protocol (the same as mncad run on the command line): header, ✗ / ⚠, D lines of the documents and Σ – up to 2 kB; the full console text is in the Detail tab
+pohledy a otáčení fungují	views and rotating work
+poloha číslem v panelu komponenty nebo textem „sestava komponenta …“	position as a number in the component panel or as text “assembly component …”
+pomocné roviny, osy a body	reference planes, axes and points
+průhlednost tělesa	body transparency
+rozměry ukazuje „stav“ a panel Měření	dimensions are shown by “status” and the Measure panel
+řez nebo skrytí komponent	section or hiding components
+sestava „{0}“ – komponent {1}, různých dílů {2}, listů výkresu {3}, příloh {4}	assembly “{0}” – components {1}, distinct parts {2}, drawing sheets {3}, attachments {4}
+seznam v historii prvků, textem „stav“	list in the feature history, as text “status”
+skica se kreslí a upravuje ve 2D editoru skici	a sketch is drawn and edited in the 2D sketch editor
+skici v modelu	sketches in the model
+Softwarové zobrazení – WebGL není dostupné	Software view – WebGL is not available
+Souhrn	Summary
+Souhrn běhu	Run summary
+Stáhne strukturovaný protokol běhu (JSON jako mncad run --json: záznamy se stabilními id, dokumenty, soubory, odkazy, plný protokol)	Downloads the structured run protocol (JSON like mncad run --json: entries with stable ids, documents, files, links, full protocol)
+Stáhnout JSON	Download JSON
+Stručný souhrn (výchozí)	Short summary (default)
+Text není sdílený odkaz Mnástrojárna CAD ani kód odkazu (čeká se …/s#KÓD, …/cad#s=…, …/cad#q=… nebo desetimístný kód).	The text is neither a Mnástrojárna CAD shared link nor a link code (expected …/s#CODE, …/cad#s=…, …/cad#q=… or a ten-character code).
+textem „vyber F3 E2“ nebo window.mncad.select([…])	as text “select F3 E2” or window.mncad.select([…])
+všechny dokumenty	all documents
+Výběr hran a ploch bez 3D okna	Selecting edges and faces without the 3D view
+Výběr hran a ploch bez 3D okna:	Selecting edges and faces without the 3D view:
+výsledek „porovnat“ v protokolu	the “compare” result in the protocol
+Záznamy	Entries
+Žádný záznam neodpovídá filtru.	No entry matches the filter.
+otevře sdílený odkaz jako příjemce a nic nezmění: ✓ s režimem, platností a obsahem (komponenty, díly, listy, přílohy), nebo ✗ s důvodem – useknutý, změněný, heslo, platnost, nenalezen; bez odkazu ověří poslední odkaz běhu	opens a shared link as the recipient would and changes nothing: ✓ with mode, validity and content (components, parts, sheets, attachments), or ✗ with the reason – truncated, altered, password, validity, not found; without a link it verifies the last link of the run
+#!dynamic – texty kódů share.store-off a share.link-broken (src/cad/engine/codes.ts, tr(def.key))
+úložiště krátkých odkazů je vypnuté – dokument je celý v odkazu ({0} znaků)	the short-link store is switched off – the whole document is in the link ({0} characters)
+odkaz se neotevře ({0}): {1}	the link does not open ({0}): {1}

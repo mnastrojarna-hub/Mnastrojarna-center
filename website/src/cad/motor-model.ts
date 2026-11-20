@@ -26,15 +26,15 @@
  * Čisté funkce bez jádra; texty přes `tr()`.
  */
 import { getLang, tr } from "./i18n";
-import type { Mate, MotionMotor, MotionStudy } from "./types";
+import type { Mate, MotionLeg, MotionMotor, MotionStudy } from "./types";
 
 /** klíčový bod motoru: čas [s] a hodnota (mm / °); `ease` = průběh úseku, který v tomto bodě KONČÍ */
 export type MotorKey = { t: number; v: number; ease?: "linear" | "sine" };
 /**
  * úsek zadání: kam (hodnota) a buď za jak dlouho (`time` [s]), nebo jak rychle (`speed` – velikost v jednotkách hodnoty za sekundu,
- * mm/s | °/s); úsek se stejnou hodnotou a časem = prodleva
+ * mm/s | °/s); úsek se stejnou hodnotou a časem = prodleva. Uložený tvar `MotionMotor.legs` (vlna 22, bod 3).
  */
-export type MotorLeg = { to: number; time?: number; speed?: number; ease?: "linear" | "sine" };
+export type MotorLeg = MotionLeg;
 /** úsek profilu mezi dvěma klíči; `rate` = střední rychlost úseku [mm/s | °/s] se znaménkem směru */
 export type MotorSegment = { t0: number; t1: number; v0: number; v1: number; ease: "linear" | "sine"; rate: number };
 export type MotorProfile = {
@@ -95,16 +95,66 @@ export function profileOf(keys: MotorKey[], after: MotorProfile["after"], durati
   return { keys: k, segments, after, atLimit, duration };
 }
 
-/** Profil motoru pro studii délky `duration` [s] – viz tabulka v hlavičce modulu. */
-export function motorKeys(mo: MotionMotor, duration: number): MotorProfile {
+/** víc úseků nebo klíčových poloh (vlna 22, bod 3) – průběh není jeden rozsah */
+export const isPiecewise = (mo: Pick<MotionMotor, "legs" | "keys">): boolean => !!(mo.legs?.length || (mo.keys?.length ?? 0) > 1);
+/**
+ * Začátek motoru [s] ve studii (vlna 22, bod 3): fáze (`phaseStart` – čas, kdy fáze začala; zná ho až výpočet), jinak časové okno
+ * `window.t0`, jinak 0. Před začátkem motor nepohání (vazbu drží motor, který začal dřív, nebo nic).
+ */
+export const motorStartTime = (mo: Pick<MotionMotor, "window">, phaseStart?: number): number => Math.max(0, phaseStart ?? mo.window?.t0 ?? 0);
+
+/**
+ * Úseky bez času i rychlosti vyplní dobu `span` [s] (okno nebo zbytek studie) – úměrně zdvihu, tedy stejnou rychlostí (prodlevy bez
+ * času dostanou podíl jako průměrný úsek); úseky s časem / rychlostí se nemění. Rychlost v jednotkách hodnoty za sekundu.
+ */
+export function fillLegs(start: number, legs: MotorLeg[], span: number): MotorLeg[] {
+  let v = start;
+  let fixed = 0;
+  const free: { i: number; d: number }[] = [];
+  legs.forEach((g, i) => {
+    if (g.time !== undefined) fixed += g.time;
+    else if (g.speed) fixed += Math.abs(g.to - v) / Math.abs(g.speed);
+    else free.push({ i, d: Math.abs(g.to - v) });
+    v = g.to;
+  });
+  if (!free.length) return legs;
+  const rest = Math.max(0, span - fixed);
+  const sum = free.reduce((s, x) => s + x.d, 0);
+  const out = legs.map((g) => ({ ...g }));
+  for (const x of free) out[x.i].time = sum > 1e-12 ? (rest * x.d) / sum : rest / free.length;
+  return out;
+}
+
+/** profil posunutý o `t0` [s]: do `t0` drží první hodnotu, pak průběh */
+function shifted(p: MotorProfile, t0: number): MotorProfile {
+  if (!(t0 > 0)) return p;
+  const keys = [{ t: 0, v: p.keys[0].v }, ...p.keys.map((k) => ({ ...k, t: k.t + t0 }))];
+  return profileOf(keys, p.after, p.duration, p.atLimit);
+}
+
+/**
+ * Profil motoru pro studii délky `duration` [s] – viz tabulka v hlavičce modulu. `start` = začátek motoru [s] (časové okno, fáze –
+ * `motorStartTime`); s oknem `window.t1` vyplní rozsah / úseky bez času dobu okna, jinak zbytek studie.
+ */
+export function motorKeys(mo: MotionMotor, duration: number, start = motorStartTime(mo)): MotorProfile {
   const D = duration > 0 ? duration : 1;
   const hold = { mode: "hold" } as const;
-  if (hasSpeed(mo)) {
-    if (isRanged(mo)) return profileOf(legKeys(mo.from, [{ to: mo.to, speed: motorRate(mo) }]), hold, D);
-    return profileOf(legKeys(mo.from, []), { mode: "run", speed: mo.speed!, rotary: mo.kind === "rotary" }, D);
-  }
-  if (mo.back) return { ...profileOf(legKeys(mo.from, [{ to: mo.to, time: D / 2, ease: "sine" }, { to: mo.from, time: D / 2, ease: "sine" }]), hold, D), back: { from: mo.from, to: mo.to } };
-  return profileOf(legKeys(mo.from, [{ to: mo.to, time: D }]), hold, D);
+  const t0 = Math.max(0, start);
+  const t1 = mo.window?.t1 !== undefined ? Math.max(t0, mo.window.t1) : D;
+  // celá studie bez okna a bez úseků: dřívější tvary beze změny (bitově stejné hodnoty)
+  const whole = t0 === 0 && mo.window?.t1 === undefined;
+  const span = whole ? D : Math.max(1e-9, t1 - t0);
+  let p: MotorProfile;
+  if (mo.keys && mo.keys.length > 1) p = profileOf(mo.keys.map((k) => ({ t: k.t, v: k.v })), hold, D);
+  else if (mo.legs?.length) p = profileOf(legKeys(mo.from, fillLegs(mo.from, mo.legs, span)), hold, D);
+  else if (hasSpeed(mo)) {
+    if (isRanged(mo)) p = profileOf(legKeys(mo.from, [{ to: mo.to, speed: motorRate(mo) }]), hold, D);
+    else p = profileOf(legKeys(mo.from, []), { mode: "run", speed: mo.speed!, rotary: mo.kind === "rotary" }, D);
+  } else if (mo.back) {
+    const legs: MotorLeg[] = [{ to: mo.to, time: span / 2, ease: "sine" }, { to: mo.from, time: span / 2, ease: "sine" }];
+    p = whole ? { ...profileOf(legKeys(mo.from, legs), hold, D), back: { from: mo.from, to: mo.to } } : profileOf(legKeys(mo.from, legs), hold, D);
+  } else p = profileOf(legKeys(mo.from, [{ to: mo.to, time: span }]), hold, D);
+  return shifted(p, t0);
 }
 
 /**
@@ -170,7 +220,11 @@ export type MotorSpan = {
   speed: number;
   /** hodnota na konci studie */
   endAt: number;
-  mode: "range" | "back" | "ranged" | "open";
+  mode: "range" | "back" | "ranged" | "open" | "keys";
+  /** víc úseků / klíčových poloh (`keys`): hodnoty klíčů bez prodlev a časy jejich dosažení [s] (od začátku studie) */
+  values?: { t: number; v: number }[];
+  /** začátek motoru [s] (časové okno; fáze začíná až ve výpočtu – tady 0) */
+  t0: number;
   /** rozsah × rychlost: studie je kratší než jízda – motor na konec nedojede */
   short: boolean;
   /** rozsah × rychlost: po dojetí stojí ještě tolik sekund */
@@ -187,17 +241,28 @@ export function motorSpan(mo: MotionMotor, duration: number): MotorSpan {
   const endAt = profileAt(p, D, { k: 1, n: 1 });
   const sgn = (v: number): -1 | 0 | 1 => (v > 1e-12 ? 1 : v < -1e-12 ? -1 : 0);
   const start = p.keys[0].v;
-  const first = p.segments[0];
+  const t0 = motorStartTime(mo);
+  // první úsek, ve kterém se hodnota mění (okno / fáze: před začátkem motor drží začátek)
+  const first = p.segments.find((g) => g.v1 !== g.v0) ?? p.segments[0];
   if (!first) {
     const speed = p.after.mode === "run" ? p.after.speed : 0;
-    return { start, end: null, stroke: Math.abs(endAt - start), dir: sgn(speed), time: D, speed, endAt, mode: "open", short: false, hold: 0 };
+    return { start, end: null, stroke: Math.abs(endAt - start), dir: sgn(speed), time: D, speed, endAt, mode: "open", t0, short: false, hold: 0 };
+  }
+  if (isPiecewise(mo)) {
+    // klíčové polohy / navazující úseky: zdvih = rozpětí hodnot, směr = první pohyb, konec = poslední klíč
+    const values: { t: number; v: number }[] = [];
+    for (const k of p.keys) if (!values.length || Math.abs(values[values.length - 1].v - k.v) > 1e-12) values.push({ t: k.t, v: k.v });
+    const vs = p.keys.map((k) => k.v);
+    const last = p.keys[p.keys.length - 1];
+    const dir = sgn(first.v1 - first.v0);
+    return { start, end: last.v, stroke: Math.max(...vs) - Math.min(...vs), dir, time: last.t - t0, speed: 0, endAt, mode: "keys", values, t0, short: last.t > D + 1e-9, hold: Math.max(0, D - last.t) };
   }
   const stroke = Math.abs(first.v1 - first.v0);
   const dir = sgn(first.v1 - first.v0);
   const time = first.t1 - first.t0;
   const perUnit = mo.kind === "rotary" ? 6 : 1; // ot/min ↔ °/s
-  if (isRanged(mo)) return { start, end: first.v1, stroke, dir, time, speed: dir * Math.abs(mo.speed!), endAt, mode: "ranged", short: time > D + 1e-9, hold: Math.max(0, D - time) };
-  return { start, end: first.v1, stroke, dir, time, speed: (dir * stroke) / time / perUnit, endAt, mode: mo.back ? "back" : "range", short: false, hold: 0 };
+  if (isRanged(mo)) return { start, end: first.v1, stroke, dir, time, speed: dir * Math.abs(mo.speed!), endAt, mode: "ranged", t0, short: t0 + time > D + 1e-9, hold: Math.max(0, D - t0 - time) };
+  return { start, end: first.v1, stroke, dir, time, speed: (dir * stroke) / time / perUnit, endAt, mode: mo.back ? "back" : "range", t0, short: false, hold: 0 };
 }
 
 /** číslo do textu: desetinná tečka v EN, čárka v CS / DE (jako ostatní řádky protokolu), bez zbytečných nul */
@@ -230,6 +295,15 @@ export function motorRangeText(mo: MotionMotor, duration: number): string {
     const unused = end !== null ? tr(" · uložený konec {0} se nepoužívá", `${n(end)}${rot ? "°" : " mm"}`) : "";
     return txt + unused;
   }
+  // okno / fáze: od kdy motor jede (fázi jmenuje motorText v cad/motion.ts – tady jen čas okna)
+  const win = mo.window ? (mo.window.t1 !== undefined ? tr(" · okno {0}–{1} s", motorNum(s.t0, 3), motorNum(mo.window.t1, 3)) : tr(" · od {0} s", motorNum(s.t0, 3))) : "";
+  if (s.mode === "keys") {
+    const u = rot ? "°" : " mm";
+    const vals = (s.values ?? []).map((k, i) => (i === 0 ? n(k.v) : `${n(k.v)} (${motorNum(k.t, 3)} s)`)).join(" → ");
+    const vs = s.values ?? [];
+    const arrows = vs.slice(1).map((k, i) => motorArrow(mo, k.v > vs[i].v ? 1 : -1)).join("");
+    return (rot ? tr("{0}{1} {2} otočení {3}° · úseků {4}", vals, u, arrows, n(s.stroke), Math.max(0, vs.length - 1)) : tr("{0}{1} {2} zdvih {3} mm · úseků {4}", vals, u, arrows, n(s.stroke), Math.max(0, vs.length - 1))) + win;
+  }
   const arrow = motorArrow(mo, s.dir, s.mode === "back");
   let out: string;
   if (s.mode === "back") out = rot ? tr("{0} → {1} → {0}° {2} otočení {3}° tam a zpět", n(s.start), n(s.end!), arrow, n(s.stroke)) : tr("{0} → {1} → {0} mm {2} zdvih {3} mm tam a zpět", n(s.start), n(s.end!), arrow, n(s.stroke));
@@ -238,7 +312,7 @@ export function motorRangeText(mo: MotionMotor, duration: number): string {
     out += ` · ${speedText(s.speed)} · ${motorNum(s.time, 3)} s`;
     if (s.hold > 1e-9) out += tr(" (pak stojí do konce studie {0} s)", motorNum(duration, 3));
   }
-  return out;
+  return out + win;
 }
 
 /** Význam hodnot motoru slovy s průběhem: „hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm“ / „posuv od výchozí polohy 0 → −30 mm …“. */
@@ -260,6 +334,14 @@ export type MotorInput = {
   stroke?: number;
   speed?: number;
   back?: boolean;
+  /** klíčové polohy rozsahu „57,5..40..27,15“: hodnoty za začátkem (poslední = konec) – vlna 22, bod 3 */
+  points?: number[];
+  /** další úseky za rozsahem (`pak …`, `prodleva …`); rychlost úseku v jednotkách motoru (mm/s, ot/min) */
+  extra?: MotorLeg[];
+  /** klíčové polohy s časem od začátku motoru (`klíče 0:57,5 0,3:40 …`) */
+  keys?: { t: number; v: number }[];
+  window?: { t0?: number; t1?: number };
+  phase?: string;
 };
 
 /**
@@ -269,6 +351,54 @@ export type MotorInput = {
  * rozsahu je chyba). Bez rozsahu i zdvihu: s rychlostí jede od začátku bez konce, bez rychlosti výchozí zdvih +10 mm / +360°.
  */
 export function buildMotor(inp: MotorInput, o: { id: string; mate: string; abs: boolean; current: number; sign?: 1 | -1 }): MotionMotor {
+  const where = { ...(inp.window ? { window: inp.window } : {}), ...(inp.phase ? { phase: inp.phase } : {}) };
+  if (inp.keys?.length || inp.points?.length || inp.extra?.length) return { ...buildPiecewise(inp, o), ...where };
+  return { ...buildRange(inp, o), ...where };
+}
+
+/**
+ * Motor s víc úseky (vlna 22, bod 3): klíčové polohy s časy (`keys`) nebo rozsah s mezipolohami (`points`) a další úseky (`extra`).
+ * Úseky bez času a rychlosti vyplní okno / zbytek studie stejnou rychlostí (`fillLegs`). Uloží se jako `legs` / `keys`, `to` = konec.
+ */
+function buildPiecewise(inp: MotorInput, o: { id: string; mate: string; abs: boolean; current: number; sign?: 1 | -1 }): MotionMotor {
+  const k = o.abs ? 1 : (o.sign ?? 1);
+  const rot = inp.kind === "rotary";
+  const per = rot ? 6 : 1; // ot/min → °/s
+  if (inp.back) throw new Error(tr("motor: „tam a zpět“ nejde spojit s úseky – návrat zapište jako další úsek: … pak {0}", motorNum(inp.from ?? o.current)));
+  if (inp.keys?.length) {
+    const keys = [...inp.keys].sort((a, b) => a.t - b.t);
+    if (keys.length < 2) throw new Error(tr("motor: klíčové polohy potřebují aspoň dvě dvojice čas:hodnota – klíče 0:57,5 0,3:40"));
+    if (Math.abs(keys[0].t) > 1e-12) throw new Error(tr("motor: první klíčová poloha musí být v čase 0 (začátek motoru) – klíče 0:{0} …", motorNum(keys[0].v)));
+    for (let i = 1; i < keys.length; i++) if (keys[i].t <= keys[i - 1].t) throw new Error(tr("motor: časy klíčových poloh musí růst – {0} s je dvakrát nebo pozpátku", motorNum(keys[i].t, 3)));
+    const kk = keys.map((x) => ({ t: x.t, v: k * x.v }));
+    return { id: o.id, kind: inp.kind, mate: o.mate, from: kk[0].v, to: kk[kk.length - 1].v, keys: kk };
+  }
+  const from = inp.from !== undefined ? k * inp.from : o.current;
+  const main: MotorLeg[] = inp.points?.length
+    ? inp.points.map((v) => ({ to: k * v, ...(inp.speed !== undefined ? { speed: Math.abs(inp.speed) * per } : {}) }))
+    : inp.stroke !== undefined
+      ? [{ to: from + k * inp.stroke, ...(inp.speed !== undefined ? { speed: Math.abs(inp.speed) * per } : {}) }]
+      : inp.to !== undefined
+        ? [{ to: k * inp.to, ...(inp.speed !== undefined ? { speed: Math.abs(inp.speed) * per } : {}) }]
+        : [];
+  const extra = (inp.extra ?? []).map((g) => ({ to: k * g.to, ...(g.time !== undefined ? { time: g.time } : {}), ...(g.speed !== undefined ? { speed: Math.abs(g.speed) * per } : {}) }));
+  // prodleva zadaná bez hodnoty (to = NaN) drží předchozí hodnotu
+  const legs: MotorLeg[] = [];
+  let v = from;
+  for (const g of [...main, ...extra]) {
+    const to = Number.isFinite(g.to) ? g.to : v;
+    if (g.speed !== undefined && (!Number.isFinite(g.speed) || g.speed === 0)) throw new Error(tr("motor: rychlost musí být nenulová"));
+    if (g.time !== undefined && !(g.time >= 0)) throw new Error(tr("motor: čas úseku musí být kladný [s]"));
+    legs.push({ ...g, to });
+    v = to;
+  }
+  if (!legs.length) throw new Error(tr("motor: chybí konec prvního úseku – 57,5..27,15 pak 57,5"));
+  if (legs.every((g) => g.to === from)) throw new Error(tr("motor: všechny úseky končí na začátku {0} – motor by se nepohnul", motorNum(from)));
+  return { id: o.id, kind: inp.kind, mate: o.mate, from, to: legs[legs.length - 1].to, legs };
+}
+
+/** Motor s jedním rozsahem (dřívější tvary – rozsah, zdvih, rychlost, rozsah × rychlost, tam a zpět). */
+function buildRange(inp: MotorInput, o: { id: string; mate: string; abs: boolean; current: number; sign?: 1 | -1 }): MotionMotor {
   const k = o.abs ? 1 : (o.sign ?? 1);
   const unit = inp.kind === "rotary" ? "°" : " mm";
   const from = inp.from !== undefined ? k * inp.from : o.current;
@@ -303,9 +433,39 @@ export type MotorNote = { code: "motion.duration-extended" | "motion.duration-se
  * dojetí stojí, simulace běží dál); víc motorů / dynamika → délka se prodlouží na T, je-li kratší (⚠ `motion.duration-extended`),
  * delší zůstane (motor po dojetí stojí). Výslovná délka kratší než T je rozpor – chyba s vysvětlením, nic se nezahodí potichu.
  */
+/**
+ * Doba, kterou motor s víc úseky / klíči potřebuje [s] od začátku studie (začátek okna + úseky s časem / rychlostí, klíče);
+ * null = délku studie neurčuje (úseky bez času vyplní, co zbývá; motor ve fázi začne až ve výpočtu).
+ */
+export function piecewiseNeed(mo: MotionMotor): number | null {
+  if (!isPiecewise(mo) || mo.phase) return null;
+  const t0 = motorStartTime(mo);
+  if (mo.keys && mo.keys.length > 1) return t0 + mo.keys[mo.keys.length - 1].t;
+  let v = mo.from;
+  let T = 0;
+  for (const g of mo.legs ?? []) {
+    if (g.time !== undefined) T += g.time;
+    else if (g.speed) T += Math.abs(g.to - v) / Math.abs(g.speed);
+    else return mo.window?.t1 ?? null;
+    v = g.to;
+  }
+  return t0 + T;
+}
+
 export function fitDuration(study: MotionStudy, index: number, explicit?: number): { duration: number; note?: MotorNote } {
   const mo = study.motors[index];
   const D = explicit ?? study.duration;
+  const need = mo ? piecewiseNeed(mo) : null;
+  if (need !== null) {
+    // úseky s časem / rychlostí: studie musí trvat aspoň do konce posledního úseku (nikdy se nic nezkrátí potichu)
+    if (explicit !== undefined) {
+      if (need > explicit + 1e-9) throw new Error(tr("motor: úseky motoru {0} trvají do {1} s, zadaný čas studie {2} s nestačí – vynechte čas, nebo úseky zkraťte", index + 1, motorNum(need, 3), motorNum(explicit, 3)));
+      return { duration: explicit };
+    }
+    if (study.motors.length === 1 && study.mode !== "dynamic" && Math.abs(study.duration - DEFAULT_STUDY_DURATION) < 1e-9) return { duration: need };
+    if (need > study.duration + 1e-9) return { duration: need, note: { code: "motion.duration-extended", args: [index + 1, motorNum(study.duration, 3), motorNum(need, 3)], text: tr("délka studie prodloužena z {1} s na {2} s – motor {0} potřebuje na svůj rozsah {2} s (ostatní motory s rozsahem bez rychlosti tím zpomalí)", index + 1, motorNum(study.duration, 3), motorNum(need, 3)) } };
+    return { duration: study.duration };
+  }
   if (!mo || !isRanged(mo)) return { duration: D };
   const s = motorSpan(mo, D);
   const unit = mo.kind === "rotary" ? "°" : " mm";
@@ -371,7 +531,8 @@ export function motorNotes(study: Pick<MotionStudy, "motors" | "duration" | "col
     const cur = info?.[i]?.current ?? motorCurrent(mo, m);
     const unit = mo.kind === "rotary" ? "°" : " mm";
     const s = motorSpan(mo, study.duration);
-    const jump = Math.abs(s.start - cur);
+    // motor, který začne později (časové okno, fáze), se proti hodnotě vazby kontroluje až ve výpočtu (motion.start-jump v okamžiku začátku)
+    const jump = mo.phase || motorStartTime(mo) > 0 ? 0 : Math.abs(s.start - cur);
     const u = (v: number) => `${motorNum(v)}${unit}`;
     if (jump > JUMP_EPS)
       out.push({

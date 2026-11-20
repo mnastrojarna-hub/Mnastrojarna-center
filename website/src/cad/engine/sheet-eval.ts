@@ -17,7 +17,7 @@
  * export PDF (CLI `--formats`) téhož listu se nepočítají dvakrát (projekce sestavy trvá desítky sekund).
  */
 import type { DrawingCompute, DrawingExtras } from "../drawing-agent";
-import { SECTION_MISS_BADGE, isTextOfKey, issuesOf, type DrawingIssue } from "../drawing-issues";
+import { DIMS_INCOMPLETE_KEY, SECTION_MISS_BADGE, isTextOfKey, issuesOf, type DrawingIssue } from "../drawing-issues";
 import { tr } from "../i18n";
 import type { CadDoc, DrawingAnnotation } from "../types";
 import { codeText, type Code, type CodeLevel } from "./codes";
@@ -46,6 +46,7 @@ export const clearDrawingMemo = (): void => void (memo = []);
 /** kód varování listu podle textu jádra (drawing.ts) – porovnáním s přeloženým klíčem, stejně v cs/en/de */
 export function sheetWarningCode(text: string): Code {
   if (isTextOfKey(text, SECTION_MISS_BADGE)) return "drawing.section-miss";
+  if (isTextOfKey(text, DIMS_INCOMPLETE_KEY)) return "drawing.dims-incomplete"; // kontrola kót (bod 18)
   return "drawing.warning";
 }
 
@@ -96,7 +97,17 @@ export async function evaluateSheet(doc: CadDoc, idx: number, compute: DrawingCo
   const out: SheetIssue[] = issuesOf(res).map((i) => sheetIssue(i, name));
   const skipped = o.dimensions === "smart" ? (res.smart?.report.skipped ?? []) : [];
   if (skipped.length) out.push({ code: "drawing.warning", sheet: name, text: tr("vynecháno: {0}", skipped.join("; ")) });
+  // kontrola kót pro výrobní úplnost (vlna 22, bod 18): ⚠ drawing.dims-incomplete, ℹ drawing.tol-nonfunctional
+  out.push(...(await dimSheetIssues(doc, s, res, o)).map((i) => sheetIssue(i, name)));
   return out;
+}
+
+/** hlášení kontroly kót listu (poznámky listu se sloučenými Chytrými kótami jako ve `výkres stav`) */
+async function dimSheetIssues(doc: CadDoc, s: NonNullable<CadDoc["drawings"]>[number], res: Awaited<ReturnType<DrawingCompute>>, o: ReturnType<typeof import("../drawing-agent").sheetOptions>): Promise<DrawingIssue[]> {
+  const [{ mergeSmart }, { sheetDimCheck, dimCheckIssues }, { withAnnotations }] = await Promise.all([import("../drawing-agent"), import("../drawing-dimcheck"), import("../drawing")]);
+  let anns = s.annotations;
+  if (o.dimensions === "smart" && res.smart) anns = mergeSmart(anns, o, res.smart)?.annotations ?? anns;
+  return dimCheckIssues(sheetDimCheck(doc, withAnnotations(res, anns), anns, o), { sheetId: s.id });
 }
 
 /**

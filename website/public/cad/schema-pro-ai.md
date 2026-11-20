@@ -155,6 +155,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `výkres [A4|A3|A2|A1|A0] [na šířku|na výšku] [měřítko 1:2|auto] [pohledy přední,horní,levý,pravý,zadní,spodní,iso] [řez XZ|YZ|XY [odsazení N]|ne] [skryté ano|ne] [osy ano|ne] [tabulka děr ano|ne] [promítání E|A]` | volby aktivního listu výkresu (`výkres list N`; bez něj první list – založí ho, chybí-li) a otevře výkres; **odsazení řezu jako u skici** (podél normály roviny: `řez XZ odsazení 57` = rovina Y = −57 jako `skica XZ odsazení 57`; XY → Z = N, YZ → X = N); rovina mimo těleso = ✗ s rozsahem odsazení, `⚠ Pohledy se v měřítku … nevejdou na list …` při volbách listu; tabulka děr obsahuje jen díry (vnitřní – konkávní – válcové plochy), vnější válce soustruženého dílu (hřídel, osazení) v ní nejsou; jedna díra = jeden řádek (zahloubení nad vrtákem se sloučí: „M8 ⌴Ø20“), bere díry s osou ve směru pohledu shora, a nevidí-li tam žádnou, pohled listu s nejvíc dírami; `výkres stav` vypíše „Tabulka děr (pohled horní, 3): A1 M8 Ø6,8 ⌴Ø20 [20; 80] · …“ (X; Y od levého dolního rohu obrysu pohledu, jako souřadnicové kóty) a díry s jinou osou, které v tabulce nejsou |
 | `kótovat [chytře|celkově|nic] [řetězově|od základny] [funkční 26,5 74,175] [díry tabulka|souřadnicově|řetězově]` | Chytré kóty podle prvků modelu (viz „Výkres a kóty“) – nahradí jen vygenerované kóty; `funkční` = rozměry, které nikdy nebudou pomocné „(…)“; `díry` = polohy děr tabulkou / souřadnicovými kótami / od hran (výchozí auto) |
 | `výkres tolerance <kóta> <tolerance> [pohled <p>]` · `výkres kontrola tolerancí` · `výkres poznámka "…"` · `výkres nepředepsané ISO 2768-mK` · `výkres hrany ISO 13715 …` · `výkres drsnost Ra 3,2` | tolerance ke kótě podle **číselné hodnoty modelu** (`74,175 -0,005`, `Ø40 h6`, `M8 6H`) nebo id (`a12`); kontrola funkčních rozměrů bez tolerance; údaje u razítka |
+| `výkres kontrola kót` · `výkres doplnit kóty [polohy|velikosti|vše|3 5]` · `funkční F7 [H7]` · `funkční "Díra 1" [±0,02]` · `základna A F3` · `funkční [zrušit …]` (EN `drawing check dims`, `drawing complete dims`, `functional`, `functional datum A F3`; DE `zeichnung prüfen maße`, `zeichnung maße ergänzen`, `funktional`, `bezug A F3`) | kontrola kót pro výrobu po položkách (✓ / ◐ / ✗ / – nezkontrolováno, čísla položek): velikosti a polohy prvků výsledného dílu podle geometrie kót, pomocná tělesa se nekótují; doplnění navržených kót; funkční prvky a základny v modelu (velikost, poloha od základny, tolerance) |
 | `výkres stav` | textový stav výkresu: list, měřítko, pohledy, všechny kóty po pohledech, duplicity, chybějící rozměry, co se nevešlo (také `window.mncad.drawingStatus()`) |
 | `měřit F3|E5|V2 [F7|E9|V8|x y z]` · `měřit těleso|díry|válce` · `měřit plocha|hrany <pravidlo>` | měření pro kontrolu modelu (viz „Měření“); také `window.mncad.measure()` |
 | `výkres list 2` · `výkres list nový "Detail"` · `výkres list přejmenovat 2 "…"` · `výkres list smazat 2` · `výkres stav [list N|vše]` | listy výkresu – další příkazy výkresu pracují s vybraným listem (viz „Výkres textem: listy, značky, kóty, export“) |
@@ -167,7 +168,7 @@ se ignoruje. Souřadný systém: Z nahoru, XY je půdorys. Počátek je v rohu k
 | `soukolí čelní m 2 z1 20 z2 60 [a 81] [x1 …] [x2 …] [vůle 0,05] [díra1 12] [díra2 20]` · `výkres tabulka ozubení ano|ne` | soukolí: dva díly + sestava s vazbou ozubení ve správném záběru, posunutí z osové vzdálenosti; tabulka ozubení na výkrese |
 | `smazat poslední` · `stav` · `zobraz iso|přední|horní…` · `kolize` · `kolize seznam [třída]` · `kolize pravidlo pracovní "A" "B" [kroky 10..20]` · `kolize tolerance 0,01` | správa; kolize = kontrola průniků komponent sestavy po třídách (viz „Třídy, místo a pravidla kolizí“) |
 | `uložit [název]` · `export step|stl|brep|obj|glb|3mf|wrl|mncad [název]` · `výkres export pdf|dxf|dwg|svg|csv|png [list N|vše] [název]` · `skica export dxf ["Skica 1"]` | výstupy **bez dialogu** – soubor se rovnou stáhne, protokol napíše název, velikost a formát; u STEP / BREP kontrolu „věrná kopie modelu“ (viz „Výstupy z konzole bez dialogů“) |
-| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` · `odkaz` | sdílený odkaz – adresa se vypíše do protokolu na řádek `URL: …`; `odkaz` ji vypíše znovu |
+| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` · `odkaz` · `odkaz ověřit [odkaz] [heslo X]` | sdílený odkaz – konzole vypíše řádek `URL: …`, CLI / JSON výpis `= L<n> link … url=… mode=… exp=… content=…` (každý odkaz běhu) a řádek `O`; `odkaz` ho vypíše znovu, `odkaz ověřit` ho otevře jako příjemce a vypíše režim, platnost a obsah (nebo proč se neotevře) |
 | `upravit` · `potlačit` / `zapnout` · `smazat <prvek>` · `přejmenovat` · `přesunout` · `duplikovat` · `zpět` / `znovu` · `proměnná` · `konfigurace` · `skica "Skica 1"` · `entita` · `kóta k1` · `odsadit` · `promítnout hrany` | úpravy hotového modelu a skici na místě – viz „Úpravy existujícího modelu“ |
 | `zobraz stínovaný|hrany|drátový|skryté|průhledný|přizpůsobit` · `řez X|Y|Z [poloha] [obráceně]` · `řez vyp` | styl 3D okna a řez modelem (viz „Soubory, obraz, výstupy a analýzy“) |
 | `barva plochy F3 [F5 …]|<pravidlo> #rrggbb|výchozí` · `akce <id|popisek>` | barva ploch; akce rozšíření bez prvku (rozvin DXF / SVG, tabulka ohybů, kusovník řezů, tabulka svarů, tloušťka stěn, skica DXF) |
@@ -1774,7 +1775,8 @@ je na jejich řádku.
 | `export step|stl|brep|obj|glb|3mf|wrl|mncad [název] [bez kontroly]` (`export` · `exportieren`) | 3D model; u **STEP a BREP kontrola**: stažený soubor se znovu načte jádrem a porovná s modelem – počet těles, objem (rozdíl v %) a obálka (odchylka v mm); bez sítě, opakovaný export nezměněného modelu ji nepočítá znovu; `bez kontroly` (`no check` · `ohne prüfung`) ji vynechá |
 | `výkres export pdf|dxf|dwg|svg|csv|png [list N|N|vše] [název]` (`drawing export` · `zeichnung export`) | list výkresu (bez listu aktivní; `list 2` i holé `2` = list 2, jen celá čísla od 1; `vše` = každý list zvlášť, `…_list2.pdf`; číselný název souboru: `jako 2`); výkres nejdřív `výkres A3 …` a `kótovat` |
 | `skica export dxf ["Skica 1"] [jako název]` (`sketch export dxf` · `skizze export dxf`) | skica jako DXF (bez názvu otevřená, jinak poslední skica) |
-| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` (`share` · `freigeben` – německé `teilen` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v protokolu na řádku `URL: …`** a zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
+| `sdílet [model|výkres] [dní N|bez omezení] [heslo X] [od "Jméno"]` (`share` · `freigeben` – německé `teilen` je rozdělit tělesa) | sdílený odkaz jako tlačítko Sdílet odkazem (výchozí 10 dní, bez hesla); **adresa je v konzoli prohlížeče na řádku `URL: …`**, ve stručném / plném protokolu a JSON (CLI, `protocol: "short"`) ve výpisu `= L<n> link "<dokument>" url=… mode=… exp=… content=…` a na řádku `O`; zkopíruje se do schránky, když to prohlížeč dovolí (na schránku se nikdy nečeká) |
+| `odkaz ověřit [<odkaz>|<kód>] [heslo X]` (`link verify` · `link prüfen`) | otevře odkaz jako příjemce (stažení z úložiště webu odkazu, dešifrování, kontrola dokumentu a platnosti) a vypíše `✓ odkaz se otevře (…): <obsah>` + `= L<n> link url=… ok=1 mode=… exp=… content=…`, jinak ✗ `share.link-broken` s důvodem `truncated` (useknutý), `corrupt` (změněný), `password`, `expired`, `notfound`, `network`; bez odkazu = poslední odkaz běhu. Kód bez `#` nebo celý odkaz (`#` za mezerou je komentář) |
 | `odkaz` (`link`) | vypíše poslední sdílený odkaz znovu |
 | `exporty [vymazat]` (`exports [clear]` · `exporte [löschen]`) | **záznamy exportů v dokumentu** (vlna 22, bod 20): každý `export …`, `výkres export …`, `skica export dxf` i export tlačítkem zapíše formát, soubor, revizi modelu `r·a1b2c3` a čas; po změně modelu je záznam „⚠ ZASTARALÝ“ s příkazem, který export zopakuje (soubor na disku se sám nepřepisuje); záznamy se ukládají s dokumentem (.mncad, sdílení) |
 | `výstupy [zastaralé]` (`outputs [stale]` · `ausgaben [veraltet]`) · `zastaralé` | přehled výstupů dokumentu: vydání každého listu, exporty a **seznam zastaralých výstupů** – vydané listy ze starší revize modelu, exporty ze starší revize, uložené analýzy, které pro nynější stav neplatí (kolize, stav vazeb, pohyb, měření, porovnání), kopie dílů v sestavě starší než díl; u každé položky příkaz, který ji opraví |
@@ -1795,8 +1797,12 @@ sdílet
 # ✓ sdílený odkaz vytvořen – „Konzola“ (model), platí do: 23. 11. 2026, bez hesla, 1,3 kB v úložišti
 # URL: https://mnastrojarna.cz/s#Ab3kZ9xQ2m
 #   kód k přečtení nebo opsání: Ab3k Z9xQ 2m (36 znaků odkazu)
+#   obsah odkazu: díl „Konzola“ – prvků 5, listů výkresu 1, příloh 0
 #   (zkopírováno do schránky)
 ```
+
+(Text výše je **konzole prohlížeče**. V CLI a ve `window.mncad.run(text, { protocol: "short" })` má každý odkaz výpis
+`= L<n> link …` a poslední odkaz řádek `O` – příklad níže v oddílu „Sdílení“.)
 
 - Kontrola STEP / BREP: `✓ … věrná kopie modelu` = soubor obsahuje totéž těleso (objem do 0,1 %, obálka do 0,01 mm).
   `⚠ kontrola STEP: soubor se od modelu liší – …` napíše, co nesedí (tělesa, objem, obálka) – opravte prvky s ⚠ / ✗
@@ -2032,7 +2038,13 @@ pixely v 3D okně:
 4. Po každém kroku lze stav ověřit textem (`stav` v konzoli nebo `window.mncad.status()`) – není nutné číst
    obrázek.
 5. **Prohlížeč bez WebGL** (headless Chrome bez grafiky, vypnutá akcelerace): místo 3D okna se kreslí **softwarový
-   náhled** (`[data-viewport-fallback="soft"]`, plátno `[data-soft-canvas]`, horní lišta hlásí „3D okno: nedostupné“).
+   náhled** (`[data-viewport-fallback="soft"]`, plátno `[data-soft-canvas]`). Horní lišta hlásí neutrálně (ne jako chybu)
+   **„Softwarové zobrazení – WebGL není dostupné“** (`[data-env-status="soft"]`, klik ukáže omezení) a vedle dál stav
+   jádra a přepočtu (`[data-core-status]`: `loading|ready|busy|stale|error`) – omezení prostředí není chyba modelu.
+   Náhled nekreslí: perspektivu (je pravoúhlý), gizmo přesunu, skici a pomocné roviny v modelu, mřížku, analýzy ploch
+   (zebra, úkosy, tloušťka, křivost), barevnou mapu odchylek, duchy porovnání, grafiku měření a stopu bodu pohybové studie,
+   hřebeny křivosti / řídicí body ploch třídy A a průhlednost – čísla dávají text a panely (`analýza …`, `měřit`,
+   `porovnat`, `pohyb stav`); seznam je pod „Proč nevidím 3D?“ (`[data-soft-limit]`, cad/soft-view.ts).
    Výběr v něm funguje stejně jako ve 3D okně: **klik** vybere plochu (nejbližší ke kameře), hranu (do ~6 px, jen
    viditelnou) nebo vrchol (do ~7 px), **Ctrl / Shift + klik** přidá či odebere, platí filtr výběru (stavový řádek),
    kliknuté hrany a plochy berou formuláře prvků (Zaoblit, Skořepina, „+ aktuální výběr“), skica na ploše, měření,
@@ -2062,8 +2074,22 @@ pixely v 3D okně:
 - Závitové díry (`díra závit M6 hloubka 12`) se na výkrese kótují popisem `M6 ↧12` (s počtem), ne jako Ø jádra; vrták
   jiný než tabulkový (`jádro`, zadaný průměr) má vlastní řádek `Ø6,647 ↧12`, ploché dno poznámku `(ploché dno)`.
 - Nové výkresy mají **Chytré kóty** (kótování podle prvků, viz další kapitola). Tlačítko **Kontrola kót** ve výkresu
-  porovná kóty na listu s historií prvků a vypíše, co chybí; totéž je v `výkres stav`. Tolerance (H8, ±0,1) se píší
-  příkazem `výkres tolerance` nebo u kóty do pole „přípona“.
+  porovná kóty na listu s VÝSLEDNÝM dílem a vypíše, co chybí; totéž je v `výkres stav` a podrobně `výkres kontrola kót`.
+  Tolerance (H8, ±0,1) se píší příkazem `výkres tolerance` nebo u kóty do pole „přípona“.
+- **Kontrola kót pro výrobu** (vlna 22, bod 18): řádek `Kontrola kót: velikosti a/b · polohy c/d – chybí: … · pomocná tělesa
+  (nekótují se): … · tolerance … · nezkontrolováno: …` – nikdy „kompletní“. Očekává se velikost **i poloha** děr (po
+  skupinách stejných děr s počtem `2×` – jedna `Ø8` nesplní dvě díry), odebraných kvádrů a válců (kapsa, okno, drážka) a
+  obrysů skic na základních rovinách; kóta se k prvku přiřadí **podle geometrie** (konce kóty na souřadnici prvku, osa
+  souměrnosti středem prvku, tabulka děr), hloubka díry jen z popisu té díry (`↧10`) nebo z kóty na díře od vstupu.
+  Těleso spotřebované `sloučit … odebrat` (nástroj) se nekótuje – kontroluje se výsledný tvar (okno 30 × 20 a jeho
+  poloha, ne výška nástroje). Chybí-li něco: ⚠ `drawing.dims-incomplete` ve `výkres stav`, na konci běhu a při exportu.
+  `výkres doplnit kóty [polohy|velikosti|vše|3 5]` přidá navržené kóty (od hrany dílu / základny; v GUI „Přidat kótu“).
+- **Funkční prvky a základny** v modelu: `funkční F7 H7` (plocha, změří se), `funkční "Díra 1" ±0,02` (prvek),
+  `základna A F3` / `funkční základna A F3` (rovinná plocha), `funkční` = výpis, `funkční zrušit …` (EN `functional`,
+  `functional datum A F3`, DE `funktional`, `bezug A F3`; GUI: pravé tlačítko na plochu → Označit jako funkční / základnu).
+  Kontrola kót u funkčního prvku chce velikost, polohu **od základny** na téže ose a toleranci na kótě (předepsaná musí
+  sedět) – bez tolerance ⚠ `drawing.tolerance-missing`; přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na rozměru, který funkční
+  není = ℹ `drawing.tol-nonfunctional` (přetolerování). Bez vyznačení: „tolerance neověřeny (funkční prvky nevyznačeny)“.
 - Ukládání a export z **konzole** (`uložit`, `export step`, `výkres export pdf`, `sdílet`) se nikdy neptají – soubor se
   rovnou stáhne. Tlačítka se člověka ptají na místo a název (systémový dialog), v prohlížeči ovládaném automatizací
   (`navigator.webdriver`, `?agent=1`) stahují rovnou; trvale to zapne Nastavení → Soubory (přímé stažení). Pro skripty
@@ -2102,7 +2128,9 @@ právě jednou, kóty stojí v úhledných řadách mimo obrys a díry mají jed
    dostane ji pohled s víc dírami a druhý souřadnicové kóty. Jedna poloha = jeden řádek („Ø8 ⌴Ø14“, závit „M8“), přes
    16 řádků dva sloupce; překryje-li tabulka na plném listu pohled, protokol to řekne (⚠ → větší list / měřítko auto).
    `kótovat díry souřadnicově|řetězově` tabulku děr listu vypne (polohy by byly dvakrát), `kótovat díry tabulka` ji zapne.
-4. **Kontrola:** `výkres stav` – musí platit „Duplicity: žádné“ a „Kontrola kót: všech … je na listu“. Řádek
+4. **Kontrola:** `výkres stav` – musí platit „Duplicity: žádné“ a „Kontrola kót: velikosti n/n · polohy m/m“ bez „chybí“
+   (a bez ⚠ `drawing.dims-incomplete`); i pak kontrola zná jen rozměry z historie a vyznačené funkční prvky – funkční
+   plochy a základny vyznačte (`funkční …`, `základna …`) a tolerance zkontrolujte (`výkres kontrola kót`). Řádek
    „Vynecháno“ říká proč (např. „zapněte pohled spodní“, „zapněte řez osou“, „nevešlo se“ → `výkres A2` nebo jiné
    měřítko) – opravte a spusťte `kótovat` znovu. Každý chybějící rozměr Kontroly kót má svůj řádek „Vynecháno“:
    šikmá díra / skica ve šikmé rovině → „kótujte v pomocném pohledu … (`výkres pohled pomocný směr dx dy dz`)“, obecný
@@ -2182,7 +2210,7 @@ výkres stav
 
 Hotový výkres ukazuje (přední pohled, osa vodorovně): průměry `M20×1,5`, `Ø30` (vlevo), `Ø40`, `Ø25` (vpravo),
 zápich `Ø17` popisem; řetěz délek `30` · `3` · `(50)` · `15` · `42`, celková délka `140`, délka závitu `25`;
-`1,5×45°`, `2× R1`. Celkem 14 kót, žádná duplicita, Kontrola kót bez chybějících.
+`1,5×45°`, `2× R1`. Celkem 14 kót, žádná duplicita, Kontrola kót bez „chybí“ (tolerance neověřeny, dokud nejsou funkční prvky vyznačené).
 
 ### Příklad B – příruba s roztečnou kružnicí zahloubených děr a středovým otvorem
 
@@ -2501,6 +2529,8 @@ třídí. Nejčastější:
 | `drawing.section-miss` ✗ / `drawing.warning`, `drawing.overlap` ⚠ | rovina řezu neprotíná těleso (řez nevznikne) / varování listu (pohledy se v měřítku nevejdou, vynechané Chytré kóty, ztracené ruční úpravy kót) / překryv nebo přesah rámečku popisku, značky či kóty – hlásí se **na konci bloku** příkazů `výkres …` (opravený v témže bloku `výkres upravit … posun=` se nehlásí), na řádku příkazu, který ho způsobil | odsazení řezu, měřítko, formát, `výkres upravit aN posun="dx dy"` |
 | `drawing.section-legacy` ⚠ (přísně ✗) | odsazení řezu ve starším zápisu (souřadnice osy), které dnešní výklad mine – vyloženo postaru | psát odsazení jako u skici (`dnes pište: …` v hlášce) |
 | `drawing.tolerance-missing` ⚠ | `výkres kontrola tolerancí`: funkční rozměr / tolerovaná kóta předlohy bez tolerance (jeden řádek za rozměr) | `výkres tolerance aN …` |
+| `drawing.dims-incomplete` ⚠ | kontrola kót (bod 18): na listu chybí velikost nebo poloha prvku výsledného dílu (díra, skupina děr s počtem, kapsa / okno, obrys skici) – `výkres stav`, konec běhu, export listu | `výkres doplnit kóty`, `výkres kóta …`, podrobně `výkres kontrola kót` |
+| `drawing.tol-nonfunctional` ℹ | přesná tolerance (≤ IT7 / pásmo ≤ 0,05) na kótě, která nesplňuje žádný vyznačený funkční prvek (přetolerování) | vyznačit prvek `funkční …`, nebo toleranci uvolnit |
 | `drawing.stale` ⚠ | vydaný list (`výkres vydat`) neodpovídá nynější revizi modelu: `výkres stav`, `stav`, konec běhu, který model změnil; export listu se starým písmenem revize a nové vydání se stejným písmenem po změně (v přísném režimu ✗, export se nezapíše) | `výkres vydat B` (nová revize), přehled `výstupy zastaralé` |
 | `param.clamped` ⚠ | hodnota mimo rozsah ořezána (úhel kuželového zahloubení 30–170°, hrot 60–170°, úhel stěny 5–90°) | |
 | `geom.approx` ℹ / `geom.volume-failed` ⚠ | objem ze sítě (velké těleso) / objem se nepodařilo změřit (0) | |
@@ -2728,8 +2758,17 @@ Chování, na které se lze spolehnout (v aplikaci i v CLI):
   protokol, `"json"` = RunReport (s `full`), `budget` (celé číslo 1–1048576, jen `short` / `json`) a `notes`
   (true / false, ne u `console`) jako `--budget` / `--notes`, výchozí (`"console"`) = text konzole. Neznámá volba nebo
   hodnota (`protocoll`, `budget: -5`) je chyba, ne tichý jiný výstup. Značka přebytku `… in protocol-full.txt` znamená
-  v prohlížeči: celý protokol vrátí `protocol: "full"`. Konzole Textové příkazy má přepínač **Stručný protokol**
-  (pamatuje si ho).
+  v prohlížeči: celý protokol vrátí `protocol: "full"`. Výchozí `window.mncad.run(text)` vrací dál text konzole
+  (skripty agentů se nemění) – stručný protokol si vyžádejte `{ protocol: "short" }`.
+- **Konzole Textové příkazy (vlna 22):** po běhu ukáže **souhrn** (stručný protokol MNCAD/1, přepínač **Stručný souhrn**
+  je výchozí zapnutý a pamatuje se), **Detail** = plný text konzole (`[data-agent-output]`, i když je souhrn vidět),
+  **Záznamy** = každý záznam s rozbalitelným detailem a **filtrem** (✗ chyby, ⚠ varování, obojí; dokument; text – díl,
+  vazba, kód, id). **Historie běhů**: nový „Provést“ předchozí protokol nepřepíše – seznam „r3 · 12:41:05 · ✓12 ⚠2 ✗1 ·
+  první řádek“ (posledních 20, `[data-run-history-item]`). **Stáhnout JSON** = `mncad-run-r3.json` (jako `--json`
+  s plným protokolem). **Stabilní id záznamů**: každý záznam má v JSON `id` = `L<řádek>.<kód>` (`L36.motion`,
+  `L12.ok#2` pro druhý stejný na řádku, `L-.share.rejected` bez řádku) – opakovaný běh téhož skriptu dá tatáž id;
+  úplná reference je `<run.id>:<id>` (`r3:L36.motion`, `[data-entry-id]`). `sestava pole` vypíše souhrn (počet, první
+  a poslední kopie s polohou), polohy všech kopií `sestava komponenty`.
 - `vložit "Díl"` a `výkres model "Díl"` berou **aktuální** dokument záložky (i změněný v dřívějším běhu) pod jeho
   aktuálním názvem; po `název "B"` už starý název neplatí.
 - Stav sestavy (řádek „Sestava: … obálka, objem Σ, hmotnost Σ“), stav vazeb, kusovník a kolize se počítají z dílů
@@ -2843,6 +2882,46 @@ jde: v aplikaci stažení bez dialogu (Stažené), v CLI do `--out` (řádek `F 
     nevejde, je zkrácený na `O <prvních 64 znaků>…(<délka>chars) exp=… mode=link` – celý je v `protocol-full.txt`
     (počítá se do značky přebytku), v JSON `share.url` a v konzoli (`URL: …`). Krátké odkazy úložiště se nezkracují.
     `odkaz` vypíše poslední odkaz znovu (i řádek O).
+  - **Každý odkaz běhu má vlastní výpis `=`** (vlna 22): `= L<n> link "<dokument>" url=<adresa> mode=self|store|link
+    exp=<YYYY-MM-DD|none> view=model|drawing pw=0|1 bytes=<obsah> chars=<délka odkazu> content=part|asm|draft comp=<komponent>
+    parts=<různých dílů> sheets=<listů výkresu> files=<příloh> [features=<prvků dílu>]` – tři `sdílet` v jednom běhu = tři výpisy
+    s třemi adresami (stručný i plný protokol, JSON `entries[].data` a `shares[]`; `share` = poslední, řádek O). Dlouhý
+    odkaz má ve výpisu `=` zkrácenou adresu `…(<délka>chars)` – celá je v JSON a na řádku O (poslední odkaz) a v plném
+    protokolu (řádek O pro každý odkaz). Konzole prohlížeče vypíše u každého odkazu `URL: …` a `obsah odkazu: …`.
+  - **Úložiště vypnuté** (CLI `--share-store off`, hostitel bez úložiště): dlouhý odkaz s ℹ `share.store-off` („úložiště
+    krátkých odkazů je vypnuté – dokument je celý v odkazu (N znaků)“) – vidět i ve stručném protokolu. Náhradní dlouhý
+    odkaz vede vždy na stránku CADu (`MNCAD_ORIGIN`, jinak https://www.mnastrojarna.cz/cad), nikdy na web nedostupného
+    úložiště z `--share-store`.
+  - **Ověření odkazu textem:** `odkaz ověřit [<odkaz|kód>] [heslo X]` (EN `link verify`, DE `link prüfen`) otevře odkaz
+    jako příjemce a nic nezmění: `✓ odkaz se otevře (288 znaků, dokument v odkazu, platí do: 20. 12. 2026, model): díl
+    „Konzola“ – prvků 1, listů výkresu 0, příloh 0` + `= L<n> link "<dokument>" url=… ok=1 mode=… exp=… chars=… content=…`;
+    nefunkční odkaz = ✗ `share.link-broken` `odkaz se neotevře (<důvod>): <text>` + `= … ok=0 reason=<důvod> chars=…`.
+    Důvody: `truncated` = **useknutý** (data končí předčasně – zkopírujte celý odkaz), `corrupt` = **změněný** (data
+    úplná, ale jiná), `password` (chybí / nesprávné heslo; u šifrovaného dlouhého odkazu nejde useknutí od špatného hesla
+    odlišit – text to řekne), `expired`, `revoked`, `notfound`, `network`, `insecure`, `unrecognized` (text není
+    odkaz ani kód). Odkaz s kódem se ověří u úložiště webu, ze kterého je (`<web>/cad/share/`). Totéž rozlišení ukáže
+    prohlížeč při otevření useknutého odkazu.
+  - Příklad výstupu sdílení (CLI `mncad run skript.txt --share-store off`, stručný protokol; platí pro protokol MNCAD/1
+    a CAD od vlny 22 – 20. 11. 2026, verzi CLI vypíše `mncad --version`; test `share-doc-example.test.ts` porovnává
+    tyto řádky se skutečným výstupem):
+
+```
+# skript:
+nový díl "Konzola"
+kvádr 80 50 12
+sdílet
+sdílet odkazem dní 30
+odkaz ověřit
+# stručný protokol:
+MNCAD/1 OK lines=5 ops=5 err=0 warn=0 note=2 t=0.1
+ℹ L3 share.store-off "Konzola": úložiště krátkých odkazů je vypnuté – dokument je celý v odkazu (288 znaků)
+= L3 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9LboQwEAWvEr11RzIwJKSvMEd…(288chars) mode=link exp=2026-11-30 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
+= L4 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) mode=link exp=2026-12-20 view=model pw=0 bytes=188 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
+= L5 link "Konzola" url=https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBO…(288chars) ok=1 mode=link exp=2026-12-20 chars=288 content=part comp=0 parts=0 sheets=0 files=0 features=1
+D "Konzola" part feat=1/0/0 V=48cm3 m=0.377kg bbox=80x50x12
+O https://www.mnastrojarna.cz/cad#s=1d.RY9BTsQwEAS_gvo8SE5WIWG-wBOiHIZ4FhkltmUb77JRHsNb-BhKLlxL6ir1hgpuCHqP4KZ_7fuX9tJ1Qz8QqtMbGGuwuoBgwwzeIDEe0EsuKXxK8vI8iwWhasoueHBL8LIqGG_BP8IiIKxSNDlZwAjzqbuqlK-kGTxucPZw6sXW4QP_8_r7Y9NTA0L5jgd5D3cQsnsoeBwMdYaadiLEkF0546MhQ2YizOqLJrXgqyxZ6fwBhtcb9mnf_wA exp=2026-12-20 mode=link
+Σ docs=1 V=48cm3 m=0.377kg files=0 share=link t=0.1
+```
   - Tvary odkazu (část za `#` se na server nikdy neposílá):
     `…/cad#q=<id 10 znaků>.<klíč 22 znaků base64url>` – vlastní úložiště, obsah AES-GCM, 128bitový klíč jen v odkazu;
     `…/cad#s=1d.<data>` – data = base64url(deflate-raw(JSON `{"v":1,"exp":<ms|null>,"from"?,"view":"model|drawing","doc":{…}}`)),
@@ -3278,6 +3357,8 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
+  functional?: FunctionalMark[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */

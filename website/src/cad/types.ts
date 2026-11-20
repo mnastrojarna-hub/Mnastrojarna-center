@@ -279,6 +279,8 @@ export type CadDoc = {
   drawings?: DrawingDoc[];
   /** záznamy exportů dokumentu (formát, soubor, revize modelu, čas) – po změně modelu zastaralé (cad/doc-outputs.ts, bod 20) */
   outputs?: ExportRecord[];
+  /** funkční prvky a základny vyznačené v modelu (`funkční F7 H7`, `základna A F3`) – kontrola kót je ověří (cad/dim-complete.ts, bod 18) */
+  functional?: FunctionalMark[];
   /** trvalé vazby sestavy (řeší se při změně polohy komponent) */
   mates?: Mate[];
   /** pohybová studie sestavy (motory, kroky) – cad/motion.ts */
@@ -495,6 +497,20 @@ export type DrawingDoc = {
   issued?: IssuedSheet;
 };
 
+/**
+ * Funkční prvek / základna v modelu (bod 18): prvek historie (díra, kapsa…) nebo plocha (index + otisk) se snímkem geometrie
+ * z doby označení (rovina: normála + bod; válec: osa, bod, poloměr). `tol` = předepsaná tolerance (H7, ±0,02), `label` = písmeno základny.
+ */
+export type FunctionalMark = {
+  id: string;
+  kind: "functional" | "datum";
+  label?: string;
+  feature?: string;
+  face?: { index: number; sig?: Sig };
+  geom?: { t: "plane"; n: Vec3; c: Vec3 } | { t: "cyl"; axis: Vec3; c: Vec3; r: number } | { t: "other"; c: Vec3 };
+  tol?: string;
+};
+
 /** Vydání listu: písmeno revize, revize modelu `r·a1b2c3` (zobrazení), otisk modelu (shoda – cad/doc-outputs.ts `modelId`), čas ISO. */
 export type IssuedSheet = { rev: string; modelRev: string; sig: string; at: string; note?: string };
 /**
@@ -555,7 +571,19 @@ export type Mate = {
  * `ranged` = od `from` rychlostí bez konce (znaménko = směr, `to` se nepoužije); s `ranged` (vlna 22) = rozsah × rychlost: z `from`
  * na `to` rychlostí |speed|, tam motor stojí (doba |to − from| / rychlost). Jediný výklad všech tvarů: cad/motor-model.ts `motorKeys`.
  */
-export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean; /** chování, když hodnotě brání mez / doraz / pevná vazba (vlna 22, bod 8): „stop“ (výchozí) = motor stojí na poslední dosažitelné hodnotě, „error“ = krok je neplatný a zůstává poslední platná poloha */ atLimit?: "stop" | "error" };
+export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string; from: number; to: number; /** rychlost: ot/min (rotační) / mm/s (lineární) */ speed?: number; /** rozsah × rychlost: dojede na `to` a stojí */ ranged?: true; /** tam a zpět: od → do → od sinusově (výstředníkový lis) */ back?: boolean; /** chování, když hodnotě brání mez / doraz / pevná vazba (vlna 22, bod 8): „stop“ (výchozí) = motor stojí na poslední dosažitelné hodnotě, „error“ = krok je neplatný a zůstává poslední platná poloha */ atLimit?: "stop" | "error"; /** navazující úseky za `from` (vlna 22, bod 3): kam + za jak dlouho / jak rychle; `to` = konec posledního úseku */ legs?: MotionLeg[]; /** klíčové polohy s časem [s] od začátku motoru (první = `from` v čase 0) */ keys?: { t: number; v: number }[]; /** časové okno [s] studie: motor začne v `t0`, úseky bez času vyplní okno do `t1` */ window?: { t0?: number; t1?: number }; /** fáze studie (id): motor začne v okamžiku, kdy fáze začne (polohové okno přes podmínku fáze) */ phase?: string };
+/** úsek motoru: kam (hodnota) a za jak dlouho (`time` [s]) nebo jak rychle (`speed`, mm/s | °/s); stejná hodnota s časem = prodleva */
+export type MotionLeg = { to: number; time?: number; speed?: number; ease?: "linear" | "sine" };
+/**
+ * Podmínka fáze studie (vlna 22, bod 3; procesní události C3 použijí tutéž): čas `t` [s] (od začátku studie), hodnota vazby `mate`
+ * (id; Vzdálenost / Drážka s polohou = hodnota vazby, jinak posuv / natočení od výchozí polohy) nebo hodnota motoru `motor` (id).
+ */
+export type MotionCond = { t: number } | { mate: string; op: "<=" | ">="; value: number } | { motor: string; op: "<=" | ">="; value: number };
+/**
+ * Fáze pohybové studie (cad/motion-phases.ts): začne podmínkou `start` (první fáze v t = 0), trvá do začátku další. Od začátku fáze
+ * platí její vazby (`enable` = zapnout – zachytí nynější polohu, `suppress` = potlačit) a režim; motory s `phase` = id začnou s ní.
+ */
+export type MotionPhase = { id: string; name: string; start?: MotionCond; enable?: string[]; suppress?: string[]; mode?: "kinematic" | "quasistatic" | "dynamic" };
 /**
  * Vůle a spojitost kontroly v pohybové studii (vlna 22, bod 6 – cad/motion-clearance.ts): `pairs` = sledované dvojice komponent
  * nejvyšší úrovně (id) nebo „moving“ = pohyblivé vůči ostatním; `limit` [mm] = nejmenší přípustná vůle (pod ní ⚠ clash.clearance);
@@ -564,7 +592,7 @@ export type MotionMotor = { id: string; kind: "rotary" | "linear"; mate: string;
  */
 export type MotionClearance = { pairs?: { a: string; b: string }[] | "moving"; limit?: number; refine?: boolean };
 /** Pohybová studie uložená v sestavě (cad/motion.ts): motory, délka [s], počet kroků, kontrola kolizí, stopa bodu komponenty. */
-export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic; /** vůle a spojitá kontrola (vlna 22, bod 6) */ clearance?: MotionClearance } & MotionStudyViews;
+export type MotionStudy = { motors: MotionMotor[]; duration: number; steps: number; collisions?: boolean; trace?: { compId: string; point: Vec3 }; loop?: boolean; /** režim studie (vlna 22, cad/motion-mode.ts): kinematika (polohy jen z vazeb), kvazistatika (rovnováha pružin a kontaktů v každém kroku), dynamika (cad/motion-dynamic.ts); nezadáno = automaticky (kvazistatika, když pružina dosedá na pohyblivou komponentu, jinak kinematika) */ mode?: "kinematic" | "quasistatic" | "dynamic"; dyn?: MotionDynamic; /** fáze studie v pořadí (vlna 22, bod 3): nájezd, sevření, zdvih, návrat … v jedné časové ose */ phases?: MotionPhase[]; /** vůle a spojitá kontrola (vlna 22, bod 6) */ clearance?: MotionClearance } & MotionStudyViews;
 /**
  * Pracovní prostředí přehrávání (vlna 22, bod 14 – cad/motion-views.ts): uložené pohledy studie (kamera + rovina řezu), aktivní
  * pohled, nastavení posledního exportu videa (bod 13 – cad/motion-video.ts) a anotací. Jen zobrazení – výsledek studie neovlivní.

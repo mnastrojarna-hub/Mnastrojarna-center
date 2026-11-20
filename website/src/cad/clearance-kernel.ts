@@ -183,52 +183,78 @@ function leafDist(a: Leaf, b: Leaf, m: number[]): LocalDist | null {
   }
 }
 
-/** objem tvaru (0 při selhání) */
-function volumeOf(s: unknown): number {
+/**
+ * zmenšení B kolem středu jeho obálky tak, aby se nejvzdálenější bod přiblížil o `ret` [mm] (kopie tvaru – volající smaže);
+ * dotyk ploch (klouzání po ploše, čep v díře bez vůle) tím zmizí, skutečný průnik hlubší než `ret` zůstane
+ */
+function retracted(moved: unknown, box: Box, m: number[], ret: number): unknown | null {
   const oc = r.getOC() as Oc;
-  const props = new oc.GProp_GProps();
-  try {
-    oc.BRepGProp.VolumeProperties(s, props, false, false, false);
-    return Math.abs(props.Mass() as number);
-  } catch {
-    return 0;
-  } finally {
-    props.delete();
-  }
-}
-
-/** objem průniku A ∩ T (T = hranol plochy); selhání booleovské operace = NaN */
-function commonVolume(a: unknown, t: unknown): number {
-  const oc = r.getOC() as Oc;
-  const args = new oc.NCollection_List_TopoDS_Shape();
-  const tools = new oc.NCollection_List_TopoDS_Shape();
-  const op = new oc.BRepAlgoAPI_Common();
-  try {
-    args.Append(a);
-    tools.Append(t);
-    op.SetArguments(args);
-    op.SetTools(tools);
-    op.SetNonDestructive(true);
-    op.Build();
-    if (op.HasErrors() || !op.IsDone()) return NaN;
-    const res = op.Shape();
+  const R = m.slice(0, 9);
+  const t: Vec3 = [m[9], m[10], m[11]];
+  const lc: Vec3 = [(box[0][0] + box[1][0]) / 2, (box[0][1] + box[1][1]) / 2, (box[0][2] + box[1][2]) / 2];
+  const rho = Math.hypot(box[1][0] - lc[0], box[1][1] - lc[1], box[1][2] - lc[2]);
+  if (!(rho > ret * 2)) return null;
+  const c = apR(R, lc);
+  const pc = new oc.gp_Pnt(c[0] + t[0], c[1] + t[1], c[2] + t[2]);
+  const tr = new oc.gp_Trsf();
+  const mk = (() => {
     try {
-      return volumeOf(res);
-    } finally {
-      res.delete();
+      tr.SetScale(pc, 1 - ret / rho);
+      return new oc.BRepBuilderAPI_Transform(moved, tr, true);
+    } catch {
+      return null;
     }
+  })();
+  try {
+    if (!mk || !mk.IsDone()) return null;
+    return mk.Shape();
   } catch {
-    return NaN;
+    return null;
   } finally {
-    op.Clear();
-    op.delete();
-    tools.delete();
-    args.delete();
+    mk?.delete();
+    tr.delete();
+    pc.delete();
   }
 }
 
-/** objem průniku menší než tento = dotyk (stejný práh jako kolize – asm-kernel.ts `interference`) */
-const PEN_TOL = 1e-3;
+/** dotyk ploch bez průniku: zmenšení o tolerance dotyku (C1 – clash-rules.ts, výchozí 0,01 mm) */
+const SLIDE_RET = 0.01;
+
+/** hranoly ploch tvaru posunuté o `v` jako jeden složený tvar (volající smaže compound i `parts`) */
+function prismCompound(shape: unknown, v: Vec3): { comp: { delete(): void }; parts: { delete(): void }[] } | null {
+  const oc = r.getOC() as Oc;
+  const vec = new oc.gp_Vec(v[0], v[1], v[2]);
+  const builder = new oc.TopoDS_Builder();
+  const comp = new oc.TopoDS_Compound();
+  const parts: { delete(): void }[] = [];
+  const exp = new oc.TopExp_Explorer(shape, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
+  try {
+    builder.MakeCompound(comp);
+    for (; exp.More(); exp.Next()) {
+      const mk = new oc.BRepPrimAPI_MakePrism(exp.Current(), vec, false, true);
+      try {
+        if (mk.IsDone()) {
+          const s = mk.Shape();
+          builder.Add(comp, s);
+          parts.push(s);
+        }
+      } catch {
+        /* plocha bez hranolu (degenerovaná) – stačí ostatní */
+      } finally {
+        mk.delete();
+      }
+    }
+    if (!parts.length) {
+      comp.delete();
+      return null;
+    }
+    return { comp, parts };
+  } finally {
+    exp.delete();
+    builder.delete();
+    vec.delete();
+  }
+}
 
 /** první bod hranice tělesa (vrchol), jinak střed obálky – v souřadnicích tělesa */
 function probePoint(body: Shape, box: Box): Vec3 {
@@ -256,76 +282,64 @@ function probePoint(body: Shape, box: Box): Vec3 {
  * ploch B (MakePrism plochy – hranol tělesa jádro neumí spolehlivě) složené do jednoho tvaru; A celé uvnitř dráhy = úsečka
  * z vrcholu A proti směru posuvu protne B. null = výpočet selhal.
  */
-function leafSweep(a: Leaf, b: Leaf, m: number[], v: Vec3): LocalDist | null {
+function leafSweep(a: Leaf, b: Leaf, m: number[], v: Vec3, touching: boolean): LocalDist | null {
   const oc = r.getOC() as Oc;
   const moved = movedShape(b.body, m) as { delete(): void };
-  const vec = new oc.gp_Vec(v[0], v[1], v[2]);
-  const builder = new oc.TopoDS_Builder();
-  const comp = new oc.TopoDS_Compound();
-  const parts: { delete(): void }[] = [];
-  const exp = new oc.TopExp_Explorer(moved, oc.TopAbs_ShapeEnum.TopAbs_FACE, oc.TopAbs_ShapeEnum.TopAbs_SHAPE);
-  try {
-    builder.MakeCompound(comp);
-    let n = 0;
-    for (; exp.More(); exp.Next()) {
-      const mk = new oc.BRepPrimAPI_MakePrism(exp.Current(), vec, false, true);
+  if (touching) {
+    // konce v dotyku: dotyk s dráhou je jistý – rovnou dráha B zmenšeného o toleranci dotyku (viz níže)
+    try {
+      const sh = retracted(moved, b.box, m, SLIDE_RET);
+      if (!sh) return { d: 0, inside: true, pen: Infinity };
+      const pr = prismCompound(sh, v);
       try {
-        if (mk.IsDone()) {
-          const s = mk.Shape();
-          builder.Add(comp, s);
-          parts.push(s);
-          n++;
+        const h2 = pr ? extrema(a.body.wrapped, pr.comp) : null;
+        if (!h2) return null;
+        const slide = h2.d > 1e-7;
+        return { d: 0, inside: !slide, pen: slide ? 0 : Infinity, ...(h2.p1 ? { p1: h2.p1 } : {}), ...(h2.p2 ? { p2: h2.p2 } : {}) };
+      } finally {
+        if (pr) {
+          for (const x of pr.parts) x.delete();
+          pr.comp.delete();
         }
-      } catch {
-        /* plocha bez hranolu (degenerovaná) – stačí ostatní */
-      } finally {
-        mk.delete();
+        (sh as { delete(): void }).delete();
       }
+    } finally {
+      moved.delete();
     }
-    if (!n) return null;
-    const hit = extrema(a.body.wrapped, comp);
+  }
+  const pc = prismCompound(moved, v);
+  try {
+    if (!pc) return null;
+    const hit = extrema(a.body.wrapped, pc.comp);
     if (!hit) return null;
-    if (hit.d <= 1e-9) {
-      // dotyk s dráhou: klouzání po ploše (objem průniku 0) × průchod tělesem – objem A ∩ hranol u hranolů, které se A dotýkají
-      // (hranol plochy rovnoběžné s posuvem je plochý a objem nemá; průnik s B v počáteční poloze hlásí kontrola kroku)
-      let pen = 0;
-      for (const prism of parts) {
-        if (volumeOf(prism) < 1e-9) continue;
-        const near = extrema(a.body.wrapped, prism);
-        if (!near || near.d > 1e-9) continue;
-        const v = commonVolume(a.body.wrapped, prism);
-        if (!Number.isFinite(v)) return { ...hit, pen: Infinity }; // nejde rozhodnout – volající půlí
-        pen += v;
-        if (pen > PEN_TOL) break;
-      }
-      return { ...hit, inside: pen > PEN_TOL, pen };
-    }
-    if (hit.d > 1e-9) {
-      // A celé uvnitř dráhy B: bod hranice A, ze kterého úsečka proti směru posuvu protne B
-      const p = probePoint(a.body, a.box);
-      const p0 = new oc.gp_Pnt(p[0], p[1], p[2]);
-      const p1 = new oc.gp_Pnt(p[0] - v[0], p[1] - v[1], p[2] - v[2]);
-      const mkE = new oc.BRepBuilderAPI_MakeEdge(p0, p1);
-      try {
-        const e = mkE.Edge();
-        const seg = extrema(e, moved);
-        e.delete();
-        if (seg && seg.d < 1e-7) return { d: 0, inside: true, p1: p, p2: p };
-      } catch {
-        /* bez úsečky – výsledek hranolů */
-      } finally {
-        mkE.delete();
-        p0.delete();
-        p1.delete();
-      }
+    // Konce úseku bez dotyku: dotyk s dráhou = kontakt mezi polohami (volající najde polohu půlením). Konce v dotyku (díl klouže
+    // po ploše, čep v díře bez vůle) řeší větev výše: rozhodne dráha B zmenšeného o toleranci dotyku – bez dotyku = jen klouzání
+    // (pen 0), s dotykem = B do A zajede hlouběji (pen ∞). Objem průniku s hranoly ploch se nepoužívá: hranol zakřivené plochy
+    // je pro OCCT „těleso“ s nulovým objemem a průnik s ním vrací nesmysl (sonda S/w22/c/C2/probe/probe2.mjs).
+    if (hit.d <= 1e-9) return { ...hit, pen: Infinity };
+    // A celé uvnitř dráhy B: bod hranice A, ze kterého úsečka proti směru posuvu protne B
+    const p = probePoint(a.body, a.box);
+    const p0 = new oc.gp_Pnt(p[0], p[1], p[2]);
+    const p1 = new oc.gp_Pnt(p[0] - v[0], p[1] - v[1], p[2] - v[2]);
+    const mkE = new oc.BRepBuilderAPI_MakeEdge(p0, p1);
+    try {
+      const e = mkE.Edge();
+      const seg = extrema(e, moved);
+      e.delete();
+      if (seg && seg.d < 1e-7) return { d: 0, inside: true, p1: p, p2: p, pen: Infinity };
+    } catch {
+      /* bez úsečky – výsledek hranolů */
+    } finally {
+      mkE.delete();
+      p0.delete();
+      p1.delete();
     }
     return hit;
   } finally {
-    exp.delete();
-    for (const s of parts) s.delete();
-    comp.delete();
-    builder.delete();
-    vec.delete();
+    if (pc) {
+      for (const s of pc.parts) s.delete();
+      pc.comp.delete();
+    }
     moved.delete();
   }
 }
@@ -434,17 +448,17 @@ export async function clearance(req: ClrReq): Promise<ClrRes> {
           if (c.g > cutoff) break;
           const rel = relOf(c.ma, c.mb);
           const vL = apRT(c.ma.R, vW); // posuv v souřadnicích listu A
-          const key = `${c.la.key}|${c.lb.key}|${rel.key}|${vL.map((x) => Math.round(x * 1e7)).join(",")}`;
+          const key = `${c.la.key}|${c.lb.key}|${rel.key}|${vL.map((x) => Math.round(x * 1e7)).join(",")}|${q.touch ? 1 : 0}`;
           let hit = sweepCache.get(key);
           if (hit === undefined) {
-            const h = leafSweep(c.la, c.lb, rel.m, vL);
+            const h = leafSweep(c.la, c.lb, rel.m, vL, !!q.touch);
             if (!h) return { d: NaN, exact: false, ok: false, v: vW }; // dráhu nešlo spočítat – rozhodne půlení
             hit = h;
             remember(sweepCache, key, hit);
           }
           if (!best || hit.d < best.d || (hit.d <= 1e-9 && (hit.pen ?? 0) > (best.pen ?? 0)))
             best = { d: hit.d, exact: true, ok: true, v: vW, ...(hit.inside ? { inside: true } : {}), ...(hit.pen !== undefined ? { pen: hit.pen } : {}), ...(hit.p1 ? { p1: toWorld(c.ma, hit.p1) } : {}), ...(hit.p2 ? { p2: toWorld(c.ma, hit.p2) } : {}), aPath: c.la.path, bPath: c.lb.path };
-          if (best.d <= 0 && (best.pen ?? Infinity) > PEN_TOL) break;
+          if (best.d <= 0 && (best.pen ?? Infinity) > 1e-3) break; // průchod tělesem – víc není třeba
         }
         return best ?? { d: cand[0]?.g ?? Infinity, exact: false, ok: true, v: vW };
       });

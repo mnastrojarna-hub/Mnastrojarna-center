@@ -33,7 +33,7 @@ import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { clashRulesScript } from "./agent-clash";
 import { clearanceScript } from "./agent-clearance";
 import { stripLineComment } from "./agent-comment";
-import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords } from "./doc-script-asm";
+import { aliasScript, emitAsmSprings, emitDynamics, emitStudyExtras, motorLimitWords, emitPhases, motorIsPiecewise, motorPieceWords, windowWords } from "./doc-script-asm";
 import { emitMotionViews } from "./doc-script-motion-view";
 import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { emitIssue } from "./doc-outputs";
@@ -218,6 +218,9 @@ const WORDS = {
   // druh položky kusovníku (vlna 22, bod 19): komponenta `sestava komponenta #k druh …`, díl `druh …`
   supplyComp: ["druh", "kind", "art"],
   supplyPart: ["druh", "supply", "beschaffung"],
+  // funkční prvky a základny (vlna 22, bod 18 – agent-functional.ts)
+  functionalMark: ["funkční", "functional", "funktional"],
+  datumMark: ["základna", "datum", "bezug"],
   sMake: ["vyráběný", "make", "fertigung"],
   sStandard: ["normálie", "standard", "norm"],
   sBuy: ["nakupovaný", "buy", "kauf"],
@@ -1838,10 +1841,28 @@ function emitPart(c: Ctx, doc: CadDoc, name: string) {
     const cq = cf ? scriptQuote(cf.name, true) : null;
     if (cq) c.line(`${c.w("config")} ${c.w("active")} ${cq}`);
   }
+  emitFunctional(c, doc);
   if (doc.bodies?.some((b) => b.color || b.hidden)) c.note(tr("barvy a skrytí těles dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.faceColors && Object.keys(doc.faceColors).length) c.note(tr("barvy ploch dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   if (doc.underlays && Object.keys(doc.underlays).length) c.note(tr("podklady skic (obrázky / PDF) dílu „{0}“ se do skriptu nepřenášejí", doc.name));
   emitDrawings(c, doc, name);
+}
+
+/** funkční prvky a základny (vlna 22, bod 18): `funkční F7 H7` · `funkční "Díra 1" H7` · `funkční základna A F3` – plocha se při čtení změří znovu */
+function emitFunctional(c: Ctx, doc: CadDoc) {
+  for (const m of doc.functional ?? []) {
+    const tol = m.tol ? ` ${m.tol}` : "";
+    if (m.kind === "datum") {
+      if (m.face && m.label && /^[A-Za-z]$/.test(m.label)) c.line(`${c.w("functionalMark")} ${c.w("datumMark")} ${m.label} F${m.face.index + 1}`);
+      else c.note(tr("základnu {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.label ?? m.id, doc.name));
+      continue;
+    }
+    const f = m.feature ? doc.features.find((x) => x.id === m.feature) : undefined;
+    const q = f ? scriptQuote(f.name, true) : null;
+    if (m.face) c.line(`${c.w("functionalMark")} F${m.face.index + 1}${tol}`);
+    else if (q && !/[\r\n]/.test(tol)) c.line(`${c.w("functionalMark")} ${q}${tol}`);
+    else c.note(tr("funkční prvek {0} dílu „{1}“ nejde zapsat na řádek skriptu", m.id, doc.name));
+  }
 }
 
 /* ───────────────────────── sestava ───────────────────────── */
@@ -2093,9 +2114,11 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
   // pružiny mezi díly (dosedací plochy, L0, Ln, tuhost, vedení) – po vazbách, komponenty už stojí (doc-script-asm.ts)
   emitAsmSprings(c.sheetOut, comps, idx);
   const mo = doc.motion;
+  let phaseLater: string[] = [];
   if (mo?.motors.length) {
     c.comment(c.w("cMotion"));
-    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined);
+    phaseLater = emitPhases(c.sheetOut, mo, mateNo); // fáze před motory (motor se na fázi odkazuje názvem)
+    const ranged = mo.motors.some((m) => m.ranged && m.speed !== undefined) || mo.motors.some(motorIsPiecewise);
     mo.motors.forEach((m, i) => {
       const no = mateNo.get(m.mate);
       if (no === undefined) {
@@ -2108,9 +2131,15 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       const end = open ? unusedEnd(m) : null;
       if (end !== null)
         c.note(tr("motor pohybové studie č. {0}: uložený konec {1} se nepoužíval (motor jede od začátku rychlostí bez konce) – skript ho nezapisuje; dojet na konec a stát = {2}..{1} s rychlostí (rozsah × rychlost)", i + 1, n(end), n(m.from)));
-      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
-      if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
+      // vlna 22, bod 3: úseky / klíčové polohy / okno / fáze motoru (doc-script-asm.ts)
+      const phName = mo.phases?.find((p) => p.id === m.phase)?.name;
+      const piece = motorIsPiecewise(m);
+      let l = `${c.w("motion")} ${c.w("motor")} ${c.w(m.kind === "linear" ? "linear" : "rotary")} ${c.w("mate")} ${no} ${piece ? motorPieceWords(c.sheetOut, m, phName) : open ? `${c.w("motorFrom")} ${n(m.from)}` : `${n(m.from)}..${n(m.to)}`}`;
+      if (piece) {
+        /* rychlosti a časy jsou u úseků */
+      } else if (m.speed !== undefined) l += ` ${c.w(m.kind === "linear" ? "speed" : "rpm")} ${n(m.speed)}`;
       else if (m.back) l += ` ${c.w("back")}`;
+      if (!piece) l += windowWords(c.sheetOut, m, phName);
       l += motorLimitWords(c.sheetOut, m); // vlna 22, bod 8: na mezi chyba
       if (i === 0) {
         // délku studie u rozsahu × rychlost určuje motor (|do − od| / rychlost) – uložená délka jde zvlášť řádkem „pohyb čas“ níže
@@ -2124,6 +2153,7 @@ function emitAssembly(c: Ctx, doc: CadDoc) {
       c.line(l);
     });
     if (ranged) c.line(`${c.w("motion")} ${c.w("time")} ${n(mo.duration)}`);
+    for (const l of phaseLater) c.line(l);
     if (mo.loop) c.note(tr("přehrávání pohybové studie ve smyčce se do skriptu nepřenáší"));
   }
   // vlna 22, bod 2: preferované strany mezí a režim studie (kinematika / kvazistatika) bez nastavení dynamiky

@@ -950,7 +950,7 @@ export function isJsonPrefix(t: string): boolean {
       want = ch === "{" ? "key" : "value";
       continue;
     }
-    const m = /^(?:-?\d+(?:\.\d*)?(?:[eE][+-]?\d*)?|true|false|null|-|t|tr|tru|f|fa|fal|fals|n|nu|nul)/.exec(t.slice(i, i + 40));
+    const m = /^(?:-?\d+(?:\.\d*)?(?:[eE][+-]?\d*)?|true|false|null|tru|tr|t|fals|fal|fa|f|nul|nu|n|-)/.exec(t.slice(i, i + 40));
     if (!m) return false;
     i += m[0].length;
     if (i >= t.length) return true; // číslo nebo literál na samém konci (mohl pokračovat)

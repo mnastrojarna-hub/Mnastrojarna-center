@@ -28,7 +28,6 @@ model	model
 náhled listu PNG	sheet preview PNG
 obálka {0} mm (model {1} mm, odchylka {2} mm)	bounding box {0} mm (model {1} mm, deviation {2} mm)
 objem {0} (model {1}, rozdíl {2} %)	volume {0} (model {1}, difference {2} %)
-odkaz nemá další volby – vypíše poslední sdílený odkaz; nový vytvoří „sdílet“	link has no options – it prints the last shared link; “share” creates a new one
 projekt .mncad se stáhne rovnou (bez dialogu „Uložit jako“); protokol napíše název souboru, velikost a počet prvků; také window.mncad.save(název)	the .mncad project is downloaded directly (no “Save as” dialog); the log shows the file name, size and number of features; also window.mncad.save(name)
 projekt Mnástrojárna CAD (.mncad)	Mnástrojárna CAD project (.mncad)
 s heslem	with password

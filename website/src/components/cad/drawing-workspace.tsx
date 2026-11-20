@@ -16,7 +16,7 @@ import { hasDrawnSprings, threadsOfDoc } from "@/cad/drawing-doc";
 import { gearTablesOf } from "@/cad/gears/data";
 import { sectionAt, sectionText } from "@/cad/drawing-section";
 import { SmartDimsExtra, TolCheckBlock } from "./drawing-smart-extra";
-import { dimCheck } from "@/cad/dim-check";
+import { DimCheckPanel } from "./dim-check-panel";
 import { activeSheet, mergeSmart, NEW_DRAWING_OPTIONS } from "@/cad/drawing-agent";
 import { drawingBase, drawingFile, drawingFileSheets, drawingSheetsOut, type DrawingExportFormat } from "@/cad/drawing-export";
 import { drawingKey, drawingSets, inDrawing, nextDrawingName } from "@/cad/drawing-sets";
@@ -1248,29 +1248,22 @@ export function DrawingWorkspace({ doc, massKg, materialLabel, onClose, onShare,
               <button type="button" onClick={() => setCheckOpen((v) => !v)} className="w-full rounded-md border border-ink-700/15 px-2 py-1 text-[11.5px] hover:bg-steel-100">
                 {checkOpen ? tr("Skrýt kontrolu kót") : tr("Kontrola kót – co chybí")}
               </button>
-              {checkOpen &&
-                (() => {
-                  const items = dimCheck(doc, bbox ?? null, out?.texts ?? []);
-                  const missing = items.filter((i) => !i.present);
-                  return (
-                    <div data-dim-check className="mt-1 rounded-md border border-ink-700/10 bg-steel-100/60 p-2 text-[11px]">
-                      <p className="font-semibold">{missing.length ? tr("Chybí {0} z {1} očekávaných kót", missing.length, items.length) : tr("Všech {0} očekávaných kót je na listu", items.length)}</p>
-                      <TolCheckBlock views={out?.views ?? []} ann={ann} opts={opts} />
-                      {missing.length > 0 && (
-                        <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
-                          {missing.map((m, i) => (
-                            <li key={i} className="flex gap-1">
-                              <span className="text-brand">✗</span>
-                              <span className="min-w-0 flex-1 truncate">{m.label}</span>
-                              <span className="shrink-0 text-ink-700/45">{m.source}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                      <p className="mt-1 leading-snug text-ink-700/55">{tr("Odvozeno z historie prvků – pomocný seznam, ne náhrada kontroly konstruktérem. Chybějící kótu přidáte nástrojem Kóta (2 body + odsazení); toleranci (H8, ±0,1) doplňte u kóty v seznamu do pole „přípona“.")}</p>
-                    </div>
-                  );
-                })()}
+              {checkOpen && (
+                // kontrola kót pro výrobu (vlna 22, bod 18): velikosti / polohy, „Přidat kótu“, funkční prvky – cad/dim-complete.ts
+                <DimCheckPanel
+                  doc={doc}
+                  out={out}
+                  ann={ann}
+                  opts={opts}
+                  flash={flash}
+                  onAdd={(made) => {
+                    setAnn((l) => [...l, ...made]);
+                    markDirty();
+                  }}
+                >
+                  <TolCheckBlock views={out?.views ?? []} ann={ann} opts={opts} />
+                </DimCheckPanel>
+              )}
             </div>
             {ann.length > 0 && (
               <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto">

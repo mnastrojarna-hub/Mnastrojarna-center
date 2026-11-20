@@ -72,7 +72,8 @@ function fakeKernel(shapes: Record<string, Shape>) {
       const B0 = world(q.b, b0) as { lo: Vec3; hi: Vec3 };
       const sw = { lo: [0, 1, 2].map((i) => B0.lo[i] + Math.min(0, v[i])) as Vec3, hi: [0, 1, 2].map((i) => B0.hi[i] + Math.max(0, v[i])) as Vec3 };
       const d = dist(A, sw);
-      return { ...d, ok: true, v, pen: overlap(A, sw) };
+      // jako jádro: konce bez dotyku + dotyk s dráhou = průchod (∞); konce v dotyku = rozhodne „zmenšená dráha“ (zde objem překryvu)
+      return { ...d, ok: true, v, ...(d.d <= 1e-9 ? { pen: q.touch ? overlap(A, sw) : Infinity } : {}) };
     });
     return out;
   };

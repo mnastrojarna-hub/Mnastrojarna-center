@@ -319,11 +319,11 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
       if (d) w.s.dist.set(pairKey(w.a, w.b), d);
     });
   };
-  const sweepOf = async (s0: Sample, s1: Sample, a: string, b: string, cutoff: number) => {
+  const sweepOf = async (s0: Sample, s1: Sample, a: string, b: string, cutoff: number, touch: boolean) => {
     const req: ClrReq = {
       doc: { ...doc, components: (doc.components ?? []).map((c) => (s0.place[c.id] ? { ...c, placement: s0.place[c.id] } : c)) },
       poses: [s1.place],
-      sweep: [{ a, b, from: 0, to: 1, cutoff }],
+      sweep: [{ a, b, from: 0, to: 1, cutoff, ...(touch ? { touch: true } : {}) }],
     };
     return (await kernel!(req)).sweep?.[0] ?? null;
   };
@@ -438,7 +438,7 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
         straight = angleBetween(r0.R, rm.R) < 1e-9 && dev <= Math.max(1e-6, 1e-4 * len(sub(r1.t, r0.t)));
       } else if (straight && !m && poseAt) straight = false; // přímost nejde ověřit – půlit
       if (straight) {
-        const sw = await sweepOf(s0, s1, x.a, x.b, x.clr && !moving ? Infinity : x.clr ? reach : 1e-6);
+        const sw = await sweepOf(s0, s1, x.a, x.b, x.clr && !moving ? Infinity : x.clr ? reach : 1e-6, touching);
         if (sw?.ok && Number.isFinite(sw.d)) {
           if (x.clr && sw.exact && sw.d < Math.min(d0.d, d1.d) - tolC) {
             // menší vůle uvnitř úseku (po přímé dráze): přesná hodnota a body, poloha v úseku neurčena
@@ -448,7 +448,7 @@ export function clearanceTracker(doc: CadDoc, study: Pick<MotionStudy, "clearanc
             if (p && limit !== null && sw.d < limit && !p.below.includes(k1) && !p.below.includes(k0)) p.below.push(k1);
           }
           // bez dotyku dráhy, nebo dotyk bez objemu (klouzání po ploše) = dokázáno; průchod tělesem → najít polohu půlením
-          const pass = sw.d <= 1e-9 && !((sw.pen ?? Infinity) <= 1e-3);
+          const pass = sw.d <= 1e-9 && (sw.pen ?? Infinity) > 1e-3;
           if (!x.cc || !pass) {
             if (x.cc) info.swept++;
             continue;

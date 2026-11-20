@@ -30,5 +30,4 @@ Vybraná plocha není rovinná.	The selected face is not planar.
 Vybraná plocha není rovinná. Vyberte rovinnou plochu tělesa – rovina řezu se na ni položí.	The selected face is not planar. Select a planar face of the body – the section plane will be placed on it.
 Zadejte číslo plochy 1–{0}.	Enter a face number 1–{0}.
 Zadejte tři složky normály oddělené středníkem, např. 1; 0; 1.	Enter the three components of the normal separated by semicolons, e.g. 1; 0; 1.
-Zjednodušený náhled bez WebGL.	Simplified preview without WebGL.
 Zpět k náhledu	Back to the preview

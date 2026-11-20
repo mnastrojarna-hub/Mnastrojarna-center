@@ -39,13 +39,17 @@ export type DrawingIssueKind =
   | "frame"
   /** vydaný list ze starší revize modelu / vydání se stejným písmenem po změně modelu (vlna 22, bod 20 – cad/doc-outputs.ts) */
   | "stale"
+  /** kontrola kót: na listu chybí velikost / poloha prvku výsledného dílu (vlna 22, bod 18 – cad/dim-complete.ts) */
+  | "dims-incomplete"
+  /** přesná tolerance na rozměru, který není funkční (přetolerování; ℹ – vlna 22, bod 18) */
+  | "tol-nonfunctional"
   /** ostatní varování jádra výkresu (text jako odznak) */
   | "other";
 
 export type DrawingIssue = {
-  level: "error" | "warn";
+  level: "error" | "warn" | "note";
   /** kód z registru protokolu (cad/engine/codes.ts) */
-  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.tolerance-missing" | "drawing.stale";
+  code: "drawing.section-miss" | "drawing.warning" | "drawing.overlap" | "drawing.tolerance-missing" | "drawing.stale" | "drawing.dims-incomplete" | "drawing.tol-nonfunctional";
   kind: DrawingIssueKind;
   /** text hlášky (přeložený) */
   text: string;
@@ -68,6 +72,9 @@ export function issuesOf(res: Pick<DrawingResult, "warnings"> & { issues?: Drawi
   return out;
 }
 
+/** varování neúplných kót listu (kontrola kót, bod 18 – cad/drawing-dimcheck.ts) – klíč překladu; export i stav ho poznají podle klíče */
+export const DIMS_INCOMPLETE_KEY = "kóty neúplné – {0}";
+
 /** odznak řezu mimo těleso (drawing.ts) – klíč překladu */
 export const SECTION_MISS_BADGE = "Rovina řezu neprotíná těleso – upravte odsazení.";
 
@@ -81,6 +88,7 @@ export function isTextOfKey(text: string, key: string): boolean {
 
 /** Hlášení z textu varování jádra bez strukturovaného hlášení (export listů): odznak řezu mimo těleso = ✗ drawing.section-miss. */
 export function warningIssue(text: string): DrawingIssue {
+  if (isTextOfKey(text, DIMS_INCOMPLETE_KEY)) return { level: "warn", code: "drawing.dims-incomplete", kind: "dims-incomplete", text };
   return isTextOfKey(text, SECTION_MISS_BADGE) ? { level: "error", code: "drawing.section-miss", kind: "section-miss", text } : { level: "warn", code: "drawing.warning", kind: "other", text };
 }
 
@@ -88,4 +96,4 @@ export function warningIssue(text: string): DrawingIssue {
 export const deferredIssue = (i: Pick<DrawingIssue, "kind">): boolean => i.kind === "overlap" || i.kind === "frame" || i.kind === "dims-skipped";
 
 /** Řádek protokolu příkazu výkresu: „✗ …“ (chyba) / „⚠ …“ (varování). */
-export const issueLine = (i: DrawingIssue) => `${i.level === "error" ? "✗" : "⚠"} ${i.text}`;
+export const issueLine = (i: DrawingIssue) => `${i.level === "error" ? "✗" : i.level === "note" ? "ℹ" : "⚠"} ${i.text}`;
