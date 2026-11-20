@@ -403,6 +403,7 @@ export function docKv(d: DocSummary): string {
     if (d.features) kv.push(`feat=${d.features.ok}/${d.features.warn}/${d.features.error}`);
     kv.push(`V=${volCm3(d.volume_mm3)}`);
     if (d.mass_kg !== undefined) kv.push(`m=${fmtNum(d.mass_kg, 3)}kg`);
+    else if (d.solids === 0) kv.push("m=-"); // bez tělesa hmotnost není (22c)
     kv.push(`bbox=${bboxSize(d.bbox)}`);
   } else if (d.features) kv.push(`feat=${d.features.ok}/${d.features.warn}/${d.features.error}`);
   if (d.densityAssumed) kv.push(`rho=${fmtNum(d.density, 3)}`, "rho.assumed=1");
@@ -488,6 +489,7 @@ export function sigmaLine(r: RunReport): string {
   } else if (m?.kind === "part") {
     kv.push(`V=${volCm3(m.volume_mm3)}`);
     if (m.mass_kg !== undefined) kv.push(`m=${fmtNum(m.mass_kg, 3)}kg`);
+    else if (m.solids === 0) kv.push("m=-");
   }
   kv.push(`files=${r.files.length}`);
   // opakovaný běh (engine/runs.ts): převzaté záložky a nové záložky vedle záložky téhož názvu – vždy vidět, i když se

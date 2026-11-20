@@ -5,6 +5,7 @@
  */
 import * as r from "replicad";
 import { subShapes } from "./fastbox";
+import { compositionOf, solidsVolume } from "./check";
 import { tr } from "./i18n";
 import { entityInfo, measureEntities, vertexPositions, type EntRef, type ShapeSrc } from "./inspect";
 import type { Vec3 } from "./types";
@@ -292,18 +293,20 @@ export function measurePair(sa: Shape, ra: EntRef, la: string, sb: Shape, rb: En
 
 /* ───────────── těleso ───────────── */
 export function measureBody(shape: Shape, label: string, density = 7.85): MeasureBody {
-  const volume = r.measureVolume(shape);
+  const solids = subShapes(shape, "SOLID");
+  const nSolids = solids.length;
+  for (const s of solids) (s as { delete(): void }).delete();
+  // objem, hmotnost a těžiště jen z objemových těles (22c): plocha / skořepina objem nemá; těleso s volnou plochou = jen těleso
+  const free = nSolids ? compositionOf(shape).free : 0;
+  const volume = !nSolids ? 0 : free ? solidsVolume(shape) : r.measureVolume(shape);
   const area = r.measureArea(shape);
   const bb = shape.boundingBox.bounds as [Vec3, Vec3];
   let com: Vec3 | undefined;
   try {
-    com = qv(r.measureShapeVolumeProperties(shape).centerOfMass as Vec3);
+    com = nSolids && !free ? qv(r.measureShapeVolumeProperties(shape).centerOfMass as Vec3) : undefined;
   } catch {
     com = undefined;
   }
-  const solids = subShapes(shape, "SOLID");
-  const nSolids = solids.length;
-  for (const s of solids) (s as { delete(): void }).delete();
   return {
     label,
     bbox: [qv(bb[0]), qv(bb[1])],

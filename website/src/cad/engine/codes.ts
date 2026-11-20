@@ -42,6 +42,9 @@ export const CODES = [
   { code: "share.days-clamped", level: "warn", key: "platnost odkazu zkrácena na {0} dní – úložiště dovolí nejvýš {0} (zadáno {1})" },
   { code: "share.days-unlimited", level: "error", key: "odkaz v úložišti musí mít omezenou platnost 1–{0} dní – zadejte „dní N“, nebo dlouhý odkaz „sdílet odkazem bez omezení“" },
   { code: "out.check-failed", level: "warn", key: "kontrola souboru: {0}" },
+  // objemový export (STEP, BREP, STL, 3MF) bez tělesa / s plochami mimo tělesa – vlna 22, bod 22c (solid-export.ts)
+  { code: "out.no-solid", level: "error", key: "objemový export bez tělesa: {0}" },
+  { code: "out.free-surfaces", level: "warn", key: "objemový export s plochami mimo tělesa: {0}" },
   { code: "out.unsupported", level: "warn", key: "výstup {0} není k dispozici: {1}" },
   { code: "out.too-big", level: "error", key: "soubor „{0}“ má {1} B – jako base64 do protokolu nejvýš {2} B (soubor zapište bez „base64“)" },
   { code: "out.lost-imports", level: "warn", key: "projekt odkazuje na importované soubory bez dat: {0} – tyto prvky se nepostaví" },

@@ -65,6 +65,72 @@ export function compositionOf(shape: r.AnyShape): { solids: number; free: number
 }
 
 /**
+ * Složení tvaru pro objemový export (vlna 22, bod 22c): objemová tělesa, skořepiny (uzavřené), skořepiny mimo tělesa
+ * (volné – i uzavřená skořepina bez „Uzavřít do tělesa“ je volná) a plochy mimo skořepiny. Jen průchod topologií (levné).
+ */
+export type SolidComposition = { solids: number; shells: number; closedShells: number; freeShells: number; freeFaces: number; faces: number };
+
+export function solidComposition(shape: r.AnyShape): SolidComposition {
+  const o = oc() as OC & { BRep_Tool: { IsClosed(s: unknown): boolean } };
+  const E = o.TopAbs_ShapeEnum;
+  const walk = (kind: unknown, avoid: unknown, each?: (s: unknown) => void) => {
+    const ex = new o.TopExp_Explorer();
+    let n = 0;
+    try {
+      ex.Init(shape.wrapped, kind, avoid);
+      for (; ex.More(); ex.Next()) {
+        n++;
+        each?.(ex.Current());
+      }
+    } finally {
+      ex.delete();
+    }
+    return n;
+  };
+  let closedShells = 0;
+  const shells = walk(E.TopAbs_SHELL, E.TopAbs_SHAPE, (s) => {
+    try {
+      if (o.BRep_Tool.IsClosed(s)) closedShells++;
+    } catch {
+      /* bez informace o uzavřenosti */
+    }
+  });
+  return {
+    solids: walk(E.TopAbs_SOLID, E.TopAbs_SHAPE),
+    shells,
+    closedShells,
+    freeShells: walk(E.TopAbs_SHELL, E.TopAbs_SOLID),
+    freeFaces: walk(E.TopAbs_FACE, E.TopAbs_SHELL),
+    faces: walk(E.TopAbs_FACE, E.TopAbs_SHAPE),
+  };
+}
+
+/**
+ * Objem jen objemových těles tvaru (součet přes solidy) – skořepiny a plochy objem nemají (22c: „pseudoobjem“ otevřené
+ * plochy nebo uzavřené skořepiny bez tělesa se do objemu a hmotnosti nepočítá). 0 solidů → 0.
+ */
+export function solidsVolume(shape: r.AnyShape): number {
+  const o = r.getOC() as unknown as OC & { GProp_GProps: new () => { Mass(): number; delete(): void }; BRepGProp: { VolumeProperties(s: unknown, p: unknown, onlyClosed: boolean, skipShared: boolean, useTriangulation: boolean): void } };
+  const ex = new o.TopExp_Explorer();
+  let v = 0;
+  try {
+    ex.Init(shape.wrapped, o.TopAbs_ShapeEnum.TopAbs_SOLID, o.TopAbs_ShapeEnum.TopAbs_SHAPE);
+    for (; ex.More(); ex.Next()) {
+      const gp = new o.GProp_GProps();
+      try {
+        o.BRepGProp.VolumeProperties(ex.Current(), gp, false, false, false);
+        v += Math.abs(gp.Mass());
+      } finally {
+        gp.delete();
+      }
+    }
+  } finally {
+    ex.delete();
+  }
+  return v;
+}
+
+/**
  * Platnost tvaru podle BRepCheck_Analyzer (včetně geometrických kontrol: sebeprotínající dráty, neorientovatelné plochy).
  * `exact` = přesná metoda (vlna 22, bod 22a): odchylka křivky hrany od plochy se počítá přesně (BRepLib_CheckCurveOnSurface),
  * ne v konečném počtu bodů – pomalejší, ale bez ní „platná“ znamená jen „platná rychlou kontrolou“.

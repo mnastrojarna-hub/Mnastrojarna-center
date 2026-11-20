@@ -9,11 +9,19 @@
 import * as r from "replicad";
 import { tr } from "./i18n";
 import { shapeOfDoc } from "./asm-kernel";
-import { countSub } from "./check";
+import { compositionOf, isValidShape, solidComposition, solidsVolume } from "./check";
 import { importBREP } from "./formats/kernel-import";
 import type { CadDoc, Vec3 } from "./types";
 
-export type KernelShapeStats = { solids: number; volume: number; bbox: [Vec3, Vec3] };
+/**
+ * Míry tvaru pro kontrolu exportu: `volume` jen z objemových těles (22c – pseudoobjem skořepin a ploch se nepočítá),
+ * složení (tělesa, skořepiny, uzavřené, volné skořepiny, plochy mimo skořepiny, plochy mimo tělesa) a platnost BRepCheck
+ * (rychlá metoda – přesná vzniká až čtečkou STEP i u platného modelu, viz 22a; přesně jen `kontrola přesně`).
+ */
+export type KernelShapeStats = { solids: number; volume: number; bbox: [Vec3, Vec3]; shells: number; closedShells: number; freeShells: number; freeFaces: number; free: number; valid: boolean | null };
+
+/** nad kolik ploch se platnost souboru při kontrole exportu nekontroluje (drahé) – `valid: null` */
+export const EXPORT_VALID_FACES = 3000;
 
 const free = (s: unknown) => {
   try {
@@ -23,16 +31,19 @@ const free = (s: unknown) => {
   }
 };
 
-/** objem (přesně z B-rep), obálka (přesná – fastbox) a počet objemových těles */
+/** objem těles (přesně z B-rep), obálka (přesná – fastbox), složení a platnost */
 export function shapeStats(s: r.AnyShape): KernelShapeStats {
   let volume = 0;
   try {
-    volume = Math.abs(r.measureVolume(s as r.Shape3D));
+    volume = solidsVolume(s); // jen tělesa – skořepina / plocha objem nemá
   } catch {
-    volume = 0; // otevřené těleso / jen plochy
+    volume = 0;
   }
   const b = (s as r.Shape3D).boundingBox.bounds as [Vec3, Vec3];
-  return { solids: countSub(s, "SOLID"), volume, bbox: [[b[0][0], b[0][1], b[0][2]], [b[1][0], b[1][1], b[1][2]]] };
+  const c = solidComposition(s);
+  const free = compositionOf(s).free;
+  const valid = c.faces <= EXPORT_VALID_FACES ? isValidShape(s) : null;
+  return { solids: c.solids, volume, bbox: [[b[0][0], b[0][1], b[0][2]], [b[1][0], b[1][1], b[1][2]]], shells: c.shells, closedShells: c.closedShells, freeShells: c.freeShells, freeFaces: c.freeFaces, free, valid };
 }
 
 /** Model (díl / sestava) a znovu načtený soubor STEP / BREP – míry pro porovnání (`exportCheck` v agent-out.ts). */
