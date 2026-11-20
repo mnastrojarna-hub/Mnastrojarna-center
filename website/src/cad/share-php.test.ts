@@ -19,7 +19,14 @@ import { blobOf, putBlob } from "./blobs";
 import { createShareLink, deriveShareCode, openErrorText, openShareLink, parseShareHash, resetShareProbe, revokeShare } from "./share";
 import { emptyDoc, type CadDoc } from "./types";
 
-const PHP_OK = spawnSync("php", ["-v"], { stdio: "ignore" }).status === 0;
+/**
+ * PHP pro zkoušky: místní `php`, nebo jiný program z MN_SHARE_PHP – např. `scripts/php-docker.sh` (PHP 5.6 z Dockeru jako
+ * na hostingu: `MN_SHARE_PHP=$PWD/scripts/php-docker.sh npx vitest run src/cad/share-php.test.ts`).
+ */
+const PHP = process.env.MN_SHARE_PHP || "php";
+const PHP_OK = spawnSync(PHP, ["-v"], { stdio: "ignore" }).status === 0;
+/** PHP_VERSION_ID zkoušeného PHP (50640 = 5.6.40); 0 = bez PHP */
+const PHP_ID = PHP_OK ? Number(spawnSync(PHP, ["-r", "echo PHP_VERSION_ID;"], { encoding: "utf8" }).stdout.trim()) || 0 : 0;
 const SCRIPT = path.resolve(__dirname, "../../public/cad/share/index.php");
 /** skript úložiště před vlnou 16 (commit bf91b0b: ?ping v = 1, id přiděluje server) – z gitu; bez gitu / historie null */
 const OLD_SCRIPT = (() => {
@@ -60,7 +67,7 @@ async function startPhp(env: Record<string, string> = {}, script?: Buffer, fakeA
   const router = path.join(root, "router.php");
   if (fakeAddr) fs.writeFileSync(router, "<?php\nif (isset($_SERVER['HTTP_X_TEST_ADDR'])) $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_TEST_ADDR'];\nrequire $_SERVER['DOCUMENT_ROOT'] . '/cad/share/index.php';\n");
   const port = await freePort();
-  const proc = spawn("php", [...phpArgs, "-S", `127.0.0.1:${port}`, "-t", docroot, ...(fakeAddr ? [router] : [])], { env: { ...process.env, ...env }, stdio: "ignore" });
+  const proc = spawn(PHP, [...phpArgs, "-S", `127.0.0.1:${port}`, "-t", docroot, ...(fakeAddr ? [router] : [])], { env: { ...process.env, ...env }, stdio: "ignore" });
   const origin = `http://127.0.0.1:${port}`;
   const base = `${origin}/cad/share/`;
   for (let i = 0; i < 200; i++) {
@@ -115,6 +122,15 @@ describe.skipIf(!PHP_OK)("PHP úložiště /cad/share/ (php -S)", () => {
     expect(res.headers.get("x-powered-by")).toBeNull();
     // v = 2: server přijme id odvozené prohlížečem z kódu odkazu (POST …&id=)
     expect(await res.json()).toEqual({ ok: true, v: 2, max_bytes: 600000, chunk_bytes: 200000, max_days: 90 });
+  });
+
+  it("?diag: verze zkoušeného PHP (i 5.6 – hosting), silný zdroj náhody, data mimo web, nic nezakázáno", async () => {
+    const d = (await (await fetch(A.base + "?diag")).json()) as { ok: boolean; php: string; random: string; storage: string; disabled: string[] };
+    const [maj, min] = d.php.split(".").map(Number);
+    expect(maj * 10000 + min * 100).toBe(Math.floor(PHP_ID / 100) * 100);
+    expect(d).toMatchObject({ ok: true, storage: "outside", disabled: [] });
+    expect(["random_bytes", "openssl", "urandom"]).toContain(d.random);
+    if (PHP_ID < 70000) expect(d.random).toBe("openssl"); // PHP 5.6: openssl_random_pseudo_bytes se zárukou síly
   });
 
   it("nahrání a stažení: id 10 znaků base62, token, blob beze změny, správné hlavičky; data MIMO webový kořen", async () => {
@@ -877,7 +893,8 @@ describe.skipIf(!PHP_OK)("klient ↔ skutečný PHP server: krátký odkaz celou
   }, T);
 });
 
-describe.skipIf(!PHP_OK || !OLD_SCRIPT)("nová aplikace ↔ STARŠÍ skript úložiště na serveru (bf91b0b) – nasazení po částech", () => {
+// starší skript (bf91b0b) potřeboval PHP 7.0+ – na PHP 5.6 se tato sada přeskočí
+describe.skipIf(!PHP_OK || !OLD_SCRIPT || PHP_ID < 70000)("nová aplikace ↔ STARŠÍ skript úložiště na serveru (bf91b0b) – nasazení po částech", () => {
   let O: Srv;
   beforeAll(async () => {
     O = await startPhp({}, OLD_SCRIPT!);
@@ -939,7 +956,9 @@ describe.skipIf(!PHP_OK)("hosting se zakázanými funkcemi PHP (disable_function
     expect(del.status).toBe(200);
     const diag = (await (await fetch(s.base + "?diag")).json()) as { ok: boolean; disabled: string[]; random: string; php: string };
     expect(diag.ok).toBe(true);
-    expect(diag.disabled).toEqual(expect.arrayContaining(["ini_set", "getenv", "flock", "random_bytes"]));
+    // random_bytes je až od PHP 7.0: na PHP 5.6 nechybí kvůli hostingu (náhodu dá openssl se zárukou síly)
+    expect(diag.disabled).toEqual(expect.arrayContaining(["ini_set", "getenv", "flock", ...(PHP_ID >= 70000 ? ["random_bytes"] : [])]));
+    if (PHP_ID < 70000) expect(diag.disabled).not.toContain("random_bytes");
     expect(diag.random).toBe("openssl");
   }, T);
   it("zakázaná nezbytná funkce nebo pád PHP → JSON s důvodem (ne prázdná 500), přímý store.php → 404", async () => {
@@ -950,10 +969,38 @@ describe.skipIf(!PHP_OK)("hosting se zakázanými funkcemi PHP (disable_function
     const b = await startPhp({}, undefined, false, ["-d", "disable_functions=str_split"]);
     const r = await up(b, rnd(1000));
     expect(r.status).toBe(500);
-    const j = (await r.json()) as { error: string; detail: string };
-    expect(j.error).toBe("php_fatal");
-    expect(j.detail).toMatch(/^store\.php:\d+ Error: Call to undefined function .*str_split\(\)/);
-    expect(j.detail).not.toMatch(/\/tmp\//); // bez cest na serveru
+    const j = (await r.json()) as { error: string; detail: string; missing?: string[] };
+    if (PHP_ID >= 80000) {
+      expect(j.error).toBe("php_fatal");
+      expect(j.detail).toMatch(/^store\.php:\d+ Error: Call to undefined function .*str_split\(\)/);
+      expect(j.detail).not.toMatch(/\/tmp\//); // bez cest na serveru
+    } else {
+      // PHP < 8: zakázaná funkce jen varuje a vrátí null – úložiště to pozná (dřív nekonečná smyčka) a řekne kterou
+      expect(j).toMatchObject({ error: "php_functions_disabled", missing: ["str_split"] });
+    }
     expect((await fetch(b.base + "store.php")).status).toBe(404);
+  }, T);
+  it("chyba syntaxe ve store.php (např. kód pro novější PHP na starém hostingu) → JSON php_fatal s místem chyby, ne prázdná 500", async () => {
+    const s = await startPhp();
+    const store = path.join(s.docroot, "cad", "share", "store.php");
+    fs.writeFileSync(store, fs.readFileSync(store, "utf8").replace("function mn_env_int($name, $def)", "$mn_broken = ;\nfunction mn_env_int($name, $def)"));
+    for (const res of [await fetch(s.base + "?ping"), await up(s, rnd(100))]) {
+      expect(res.status).toBe(500);
+      const j = (await res.json()) as { error: string; detail: string; php: string };
+      expect(j.error).toBe("php_fatal");
+      // PHP 7+: ParseError (výjimka zachycená zavaděčem), PHP 5.6: fatální chyba zachycená při ukončení
+      expect(j.detail).toMatch(/^store\.php:\d+ (ParseError: )?syntax error/);
+      expect(j.detail).not.toMatch(/\/tmp\//);
+    }
+  }, T);
+  it("bez silného zdroje náhody (random_bytes, openssl i /dev/urandom nedostupné): tajné hodnoty se NEVYROBÍ slabě – 503 random_unavailable, ?diag random = weak", async () => {
+    // open_basedir jen na dočasnou složku testu → /dev/urandom nejde otevřít
+    const s = await startPhp({}, undefined, false, ["-d", "disable_functions=random_bytes,openssl_random_pseudo_bytes", "-d", `open_basedir=${fs.realpathSync(os.tmpdir())}`]);
+    const diag = (await (await fetch(s.base + "?diag")).json()) as { ok: boolean; random: string; writable: boolean };
+    expect(diag).toMatchObject({ ok: false, random: "weak", writable: true });
+    const r = await up(s, rnd(100));
+    expect(r.status).toBe(503);
+    expect(await r.json()).toEqual({ ok: false, error: "random_unavailable" });
+    expect(fs.readdirSync(s.data).filter((f) => f.endsWith(".json") || f === ".secret")).toEqual([]);
   }, T);
 });

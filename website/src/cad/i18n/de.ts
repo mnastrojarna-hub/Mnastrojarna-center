@@ -3118,6 +3118,7 @@ export const DE: Record<string, string> = {
  "HTTP {0}: hosting zakázal funkce PHP, bez kterých úložiště nejde provozovat: {1}": "HTTP {0}: das Hosting hat PHP-Funktionen gesperrt, ohne die der Speicher nicht laufen kann: {1}",
  "HTTP {0}: chyba PHP {1} – {2}": "HTTP {0}: PHP-{1}-Fehler – {2}",
  "HTTP {0}: PHP {1} na serveru je příliš staré, úložiště potřebuje PHP {2} nebo novější (nastavení hostingu)": "HTTP {0}: PHP {1} auf dem Server ist zu alt, der Speicher braucht PHP {2} oder neuer (Hosting-Einstellungen)",
+ "HTTP {0}: PHP na serveru nemá bezpečný zdroj náhodných čísel (openssl nebo /dev/urandom) – nastavení hostingu": "HTTP {0}: PHP auf dem Server hat keine sichere Zufallsquelle (openssl oder /dev/urandom) – Hosting-Einstellungen",
  "HTTP {0}: server nemůže zapisovat data úložiště (práva ke složce)": "HTTP {0}: der Server kann die Speicherdaten nicht schreiben (Ordnerrechte)",
  "HTTP 404: na serveru chybí skript úložiště (/cad/share/index.php nebyl nahrán)": "HTTP 404: das Speicher-Skript fehlt auf dem Server (/cad/share/index.php wurde nicht hochgeladen)",
  "Hustota": "Dichte",

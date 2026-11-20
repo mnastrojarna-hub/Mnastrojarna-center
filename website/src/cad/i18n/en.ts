@@ -3118,6 +3118,7 @@ export const EN: Record<string, string> = {
  "HTTP {0}: hosting zakázal funkce PHP, bez kterých úložiště nejde provozovat: {1}": "HTTP {0}: the hosting disabled PHP functions the storage cannot run without: {1}",
  "HTTP {0}: chyba PHP {1} – {2}": "HTTP {0}: PHP {1} error – {2}",
  "HTTP {0}: PHP {1} na serveru je příliš staré, úložiště potřebuje PHP {2} nebo novější (nastavení hostingu)": "HTTP {0}: PHP {1} on the server is too old, the storage needs PHP {2} or newer (hosting settings)",
+ "HTTP {0}: PHP na serveru nemá bezpečný zdroj náhodných čísel (openssl nebo /dev/urandom) – nastavení hostingu": "HTTP {0}: PHP on the server has no secure source of random numbers (openssl or /dev/urandom) – hosting settings",
  "HTTP {0}: server nemůže zapisovat data úložiště (práva ke složce)": "HTTP {0}: the server cannot write the storage data (folder permissions)",
  "HTTP 404: na serveru chybí skript úložiště (/cad/share/index.php nebyl nahrán)": "HTTP 404: the storage script is missing on the server (/cad/share/index.php was not uploaded)",
  "Hustota": "Density",

@@ -7,7 +7,7 @@
 // voleb, zneplatnění, vypršení, velký model (importovaný STEP, nahrání po částech), nad limit = srozumitelná chyba,
 // bez úložiště = dlouhý odkaz s vysvětlením, window.mncad.share() → mode "self", mobil.
 // Spuštění: E2E_BASE=http://localhost:3341 node e2e/cad-w8-share.e2e.cjs <složka pro snímky>
-//   (výchozí server http://localhost:3341 – next start nebo next dev, kvůli přesměrování /s → /cad; potřebuje příkaz php ≥ 7.4)
+//   (výchozí server http://localhost:3341 – next start nebo next dev, kvůli přesměrování /s → /cad; potřebuje příkaz php ≥ 5.6; MN_SHARE_PHP=<cesta>/scripts/php-docker.sh = PHP 5.6 z Dockeru)
 const { chromium } = require('playwright');
 const { spawn, execFileSync } = require('child_process');
 const crypto = require('crypto');
@@ -22,6 +22,8 @@ const ok = (c, m) => { console.log((c ? 'ok: ' : 'FAIL: ') + m); if (!c) process
 const BASE = (process.env.E2E_BASE || 'http://localhost:3341').replace(/\/$/, '');
 const CAD = BASE + '/cad';
 const SCRIPT = path.join(__dirname, '..', 'public', 'cad', 'share', 'index.php');
+// PHP úložiště: místní `php`, nebo MN_SHARE_PHP (scripts/php-docker.sh = PHP 5.6 z Dockeru jako na hostingu)
+const PHP = process.env.MN_SHARE_PHP || 'php';
 const GEN = path.join(__dirname, '..', 'scripts', 'gen-big-step.mjs');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -38,7 +40,7 @@ async function startPhp(env = {}) {
   fs.copyFileSync(SCRIPT, path.join(docroot, 'cad', 'share', 'index.php'));
   fs.copyFileSync(path.join(path.dirname(SCRIPT), 'store.php'), path.join(docroot, 'cad', 'share', 'store.php'));
   const port = await freePort();
-  const proc = spawn('php', ['-S', `127.0.0.1:${port}`, '-t', docroot], { env: { ...process.env, ...env }, stdio: 'ignore' });
+  const proc = spawn(PHP, ['-S', `127.0.0.1:${port}`, '-t', docroot], { env: { ...process.env, ...env }, stdio: 'ignore' });
   const origin = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 200; i++) { try { if ((await fetch(origin + '/cad/share/?ping')).ok) break; } catch { /* start */ } await sleep(50); }
   const srv = { origin, root, data: path.join(root, 'cad-share-data'), proc };
