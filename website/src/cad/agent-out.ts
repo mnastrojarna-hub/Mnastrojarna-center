@@ -449,8 +449,14 @@ export function exportCheck(model: ShapeStats, file: ShapeStats, label = "STEP",
     if (!boxOk) why.push(tr("obálka {0} mm (model {1} mm, odchylka {2} mm)", dims, size(model.bbox).map((v) => num(v, 2)).join(" × "), num(bboxDiff, 3)));
     return { ...base, ok: false, level: "warn", code: "out.check-failed", line: tr("⚠ kontrola {0}: soubor se od modelu liší – {1}; zkontrolujte prvky s ⚠ / ✗ (stav) a export zopakujte", label, why.join(", ")) + partsText(parts) };
   }
+  // počet těles souboru nezjištěn (míry bez složení): neznámý počet není „0 těles“. Objem > 0 je jen z těles, takže těleso
+  // v souboru je (✓ bez počtu); objem 0 nebo plochy mimo tělesa objemový model nepotvrzují → ⚠, nikdy „věrná kopie“
+  if (file.solids === undefined) {
+    const why = !(file.volume > 0) ? tr("objem 0 mm³") : freeF ? tr("ploch mimo tělesa {0}", freeF) : "";
+    if (why) return { ...base, ok: false, level: "warn", code: "out.check-failed", line: `⚠ ${tr("kontrola {0}: počet těles v souboru nezjištěn a {1} – objemový model nepotvrzen; export zkontrolujte (stav)", label, why)}` + partsText(parts) };
+  }
   // odpovídá modelu, ale volné skořepiny / plochy vedle těles nejsou objemový model → ⚠ s počty (a jmény komponent)
-  const fv = solidVerdict(statsOf(file), label, "file", parts);
+  const fv = file.solids === undefined ? null : solidVerdict(statsOf(file), label, "file", parts);
   if (fv) return { ...base, ok: false, level: "warn", code: "out.free-surfaces", line: `⚠ ${tr("kontrola {0}: {1}", label, fv.body)}` };
   return {
     ...base,

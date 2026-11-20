@@ -348,13 +348,16 @@ describe("skoro-dotyk se nezaokrouhluje", () => {
     expect(b.metrics!.volume).toBeCloseTo(1816.84, 1);
   });
 
-  it("závit tažený po šroubovici, špička profilu tečná k povrchu trubky: řez se provede (34 886,36 mm³)", { timeout: 180_000 }, async () => {
+  // vlna 22 (bod 22a, G2): řez se provede a těleso je platné (smysl testu z vlny 17), ale tečná špička je skrytý kanál ve stěně –
+  // prvek je ⚠ thread.tip-tangent, ne ✓ (stejný případ jako kernel-check.test.ts „špička profilu tečná k povrchu…“)
+  it("závit tažený po šroubovici, špička profilu tečná k povrchu trubky: řez se provede (34 886,36 mm³), prvek ⚠ thread.tip-tangent", { timeout: 180_000 }, async () => {
     const tube: Feature = { id: id(), name: "Trubka", type: "tube", outer: 42, inner: 16.4, height: 30, position: [0, 0, 0], axis: "Z", mode: "new" };
     const doc: CadDoc = { ...emptyDoc("Test"), features: [tube] };
     const thr = newExtFeature(doc, "surf.helixSweep");
     if (thr.type === "ext") thr.data = { ...thr.data, profile: "thread60", depth: 0.8, radius: 9, pitch: 1.5, turns: 12, position: [0, 0, 5], axis: "Z", mode: "cut" };
     const res = await build({ ...doc, features: [tube, thr] });
-    expect(marks(res)).toBe("✓✓");
+    expect(marks(res)).toBe("✓⚠");
+    expect(res.status[1].warnCode).toBe("thread.tip-tangent");
     expect(res.metrics!.valid).toBe(true);
     expect(res.metrics!.volume).toBeCloseTo(34886.358, 1);
   });

@@ -2662,8 +2662,10 @@ export function CadApp() {
       else flash((e as Error).message);
     }
   };
-  // výsledek kontroly exportu platí jen pro model, ze kterého export vznikl – po změně dokumentu / záložky zmizí
-  useEffect(() => setExportChk(null), [doc]);
+  // výsledek kontroly exportu platí jen pro model, ze kterého export vznikl – po změně modelu / záložky zmizí. Klíčem jsou části
+  // dokumentu, které určují exportovanou geometrii, ne celý dokument: záznam exportu (recordExport, doc.outputs – bod 20) mění
+  // dokument hned po exportu a lišta s výsledkem kontroly by jinak zmizela dřív, než ji uživatel uvidí.
+  useEffect(() => setExportChk(null), [doc.features, doc.components, doc.variables, doc.bindings, doc.configs, doc.activeConfig]);
   /** Data ▸ Export ▸ Textový skript: dokument jako textové příkazy `.mncad.txt` (cad/doc-script.ts) */
   const exportScript = async () => {
     if (!(await waitOutputs(tr("export skriptu")))) return flash(tr("Export skriptu zrušen."));

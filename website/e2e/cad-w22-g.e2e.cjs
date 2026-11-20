@@ -247,8 +247,9 @@ const start = async (p, url) => {
     // 6b) GUI: formulář Závit – Provedení kosmetický / drážky / šroubovice (data-thread-geometry), varování ISO 261 (M18×3)
     const q = await fresh();
     await q.evaluate((t) => window.mncad.run(t), 'nový díl "Čep B"\nválec 18 30\nzávit M18×3 délka 10 v 0 0 10');
-    await q.waitForFunction(() => document.querySelectorAll('[data-feature-row]').length === 2, null, { timeout: 120000 });
-    await q.getByText('Závit 1', { exact: true }).first().dblclick();
+    await q.waitForFunction(() => document.querySelectorAll('[data-feature-row]').length === 2 && ![...document.querySelectorAll('[data-feature-row]')].some((r) => r.getAttribute('data-feature-state') === 'pending'), null, { timeout: 120000 });
+    // formulář prvku otevře JEDEN klik na řádek stromu (manager.tsx onSelect); dvojklik je přejmenování (2. klik formulář zase zavře)
+    await q.locator('[data-feature-row][data-feature-name="Závit 1"]').click();
     await q.waitForSelector('[data-thread-geometry]', { timeout: 30000 });
     ok((await q.locator('[data-thread-geometry]').getAttribute('data-thread-geometry')) === 'cosmetic' && /není pro M18 v ISO 261/.test((await q.locator('[data-thread-pitch-warning]').textContent().catch(() => '')) || ''), '6b: formulář Závit – kosmetický, ⚠ stoupání mimo ISO 261 ve formuláři');
     const warnRow = await q.locator('[data-feature-row][data-feature-name="Závit 1"]').getAttribute('data-feature-state');
@@ -289,7 +290,8 @@ const start = async (p, url) => {
     const cFull = norm(await runFresh(SOLID + '\nexport step', { protocol: 'full' }));
     ok(/^✓ L\d+ kontrola STEP: soubor znovu načten jádrem – těles: 1, .*věrná kopie modelu/m.test(cFull) && !/out\.(no-solid|free-surfaces|check-failed)/.test(cFull), '7a: forma s kanálem po spline (oprava 4. 11.) – platné těleso, „věrná kopie“');
 
-    // 7b) GUI: Soubor ▸ STEP AP214 / STL – stejná hláška jako textový export ([data-export-check])
+    // 7b) GUI: Soubor ▸ STEP AP214 / STL – stejná hláška jako textový export (lišta [data-export-check][data-export-format];
+    // samotné [data-export-check] nesou i položky úloh exportu v run-chip.tsx – data-export-job, balík A3)
     const gc = await b.newContext({ viewport: { width: 1400, height: 860 }, acceptDownloads: true });
     await gc.addInitScript(() => { window.showSaveFilePicker = undefined; });
     const g = await gc.newPage();
@@ -300,8 +302,8 @@ const start = async (p, url) => {
       await g.getByRole('button', { name: 'Soubor', exact: true }).click();
       await g.waitForTimeout(400);
       const [d] = await Promise.all([g.waitForEvent('download', { timeout: 120000 }), g.getByRole('button', { name }).first().click()]);
-      await g.waitForSelector('[data-export-check]', { timeout: 120000 });
-      return { file: d.suggestedFilename(), level: await g.locator('[data-export-check]').getAttribute('data-export-check'), text: ((await g.locator('[data-export-check]').innerText()) || '').replace(/×\s*$/, '').trim() };
+      await g.waitForSelector('[data-export-check][data-export-format]', { timeout: 120000 });
+      return { file: d.suggestedFilename(), level: await g.locator('[data-export-check][data-export-format]').getAttribute('data-export-check'), text: ((await g.locator('[data-export-check][data-export-format]').innerText()) || '').replace(/×\s*$/, '').trim() };
     };
     await g.evaluate((t) => window.mncad.run(t), SHELL);
     await g.waitForFunction(() => document.querySelectorAll('[data-feature-row]').length >= 7 && ![...document.querySelectorAll('[data-feature-row]')].some((r) => r.getAttribute('data-feature-state') === 'pending'), null, { timeout: 120000 });
@@ -313,7 +315,7 @@ const start = async (p, url) => {
     ok(gl.level === 'error' && /STL: model nemá objemové těleso/.test(gl.text), '7b: GUI export STL skořepiny → ✗ model nemá objemové těleso: ' + gl.text.slice(0, 100));
     ok((await g.locator('[data-volume-chip]').getAttribute('data-volume-chip').catch(() => '')) === 'none' && /^V –$/.test(((await g.locator('[data-volume-chip]').innerText().catch(() => '')) || '').trim()), '7b: čip objemu „V –“ u dílu bez tělesa (data-volume-chip=none)');
     await g.evaluate((t) => window.mncad.run(t), FREE);
-    await g.waitForFunction(() => !document.querySelector('[data-export-check]'), null, { timeout: 60000 }).catch(() => {});
+    await g.waitForFunction(() => !document.querySelector('[data-export-check][data-export-format]'), null, { timeout: 60000 }).catch(() => {});
     await g.waitForTimeout(1500);
     const gw = await menuExport(/STEP AP214 \(\.step\)/);
     ok(gw.level === 'warn' && /plochy mimo tělesa/.test(gw.text) && !/věrná kopie/.test(gw.text), '7b: GUI export STEP tělesa s volnou plochou → ⚠: ' + gw.text.slice(0, 100));
