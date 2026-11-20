@@ -80,9 +80,20 @@ const setPos = async (p, text) => {
     const fb = p.locator('[data-viewport-fallback]');
     ok(await fb.isVisible() && (await fb.getAttribute('data-viewport-fallback')) === 'soft', 'A: v 3D okně je softwarový náhled (ne jen chybová obrazovka)');
     ok(await p.locator('[data-soft-canvas]').isVisible(), 'A: plátno náhledu je vidět');
-    ok(/3D okno: nedostupné/.test(await p.locator('header').first().innerText()), 'A: stav v horní liště: 3D okno nedostupné');
+    // vlna 22, bod 21: neutrální stav prostředí „Softwarové zobrazení – WebGL není dostupné“, stav jádra / přepočtu vedle
+    // zůstává vidět (dřív „3D okno: nedostupné (WebGL)“ červeně a stav jádra přebitý)
+    const hdr = await p.locator('header').first().innerText();
+    ok(/Softwarové zobrazení – WebGL není dostupné/.test(hdr) && !/3D okno: nedostupné/.test(hdr), 'A: stav v horní liště: Softwarové zobrazení – WebGL není dostupné (ne „3D okno: nedostupné“)');
+    ok(await p.locator('[data-core-status]').isVisible() && /OCCT|Načítám jádro|Přepočítávám/.test(await p.locator('[data-core-status]').innerText()), 'A: stav jádra a přepočtu je vedle stavu prostředí vidět');
+    ok(!/text-brand/.test((await p.locator('[data-env-status="soft"]').getAttribute('class')) || ''), 'A: stav prostředí neutrálně (ne barvou chyby)');
+    await p.locator('[data-env-status="soft"]').click();
+    await p.locator('[data-viewport-help]').waitFor({ timeout: 5000 });
+    const lim = await p.locator('[data-soft-limit]').evaluateAll((els) => els.map((e) => e.getAttribute('data-soft-limit')));
+    ok(['surface', 'measure', 'ghosts', 'showGrid', 'gizmo', 'sketches'].every((k) => lim.includes(k)) && (await p.locator('[data-soft-pick-alternatives] li').count()) >= 3, `A: klik na stav prostředí ukáže všechna omezení a alternativy výběru (${lim.join(', ')})`);
+    await p.keyboard.press('Escape').catch(() => {});
+    await p.locator('[data-viewport-help]').click({ position: { x: 5, y: 5 } }).catch(() => {});
     const note = await p.locator('[data-soft-note]').innerText();
-    ok(/náhled bez WebGL/.test(note) && /Klik vybere plochu, hranu nebo vrchol/.test(note) && /vyber F3 E2/.test(note) && /window\.mncad\.select/.test(note), 'A: upozornění – zjednodušený náhled, výběr kliknutím, textem „vyber“ a window.mncad.select');
+    ok(/Softwarové zobrazení – WebGL není dostupné/.test(note) && /Klik vybere plochu, hranu nebo vrchol/.test(note) && /vyber F3 E2/.test(note) && /window\.mncad\.select/.test(note), 'A: upozornění – zjednodušený náhled, výběr kliknutím, textem „vyber“ a window.mncad.select');
 
     // prázdný díl → prázdné plátno; po textovém příkazu se model objeví
     await run(p, 'nový díl Náhled');
@@ -316,7 +327,7 @@ const setPos = async (p, text) => {
     await run(p, 'nový díl S WebGL\nkvádr 40 30 20');
     await p.waitForTimeout(2500);
     ok(!(await p.locator('[data-viewport-fallback]').count()) && !(await p.locator('[data-soft-canvas]').count()) && !(await p.locator('[data-soft-why]').count()), 'B: s WebGL se náhled ani tlačítko „Proč nevidím 3D?“ neobjeví');
-    ok(!/3D okno: nedostupné/.test(await p.locator('header').first().innerText()), 'B: horní lišta nehlásí nedostupné 3D okno');
+    ok(!/3D okno: nedostupné|Softwarové zobrazení/.test(await p.locator('header').first().innerText()), 'B: horní lišta nehlásí nedostupné 3D okno ani softwarové zobrazení');
     ok(await p.getByRole('button', { name: 'Přední', exact: true }).first().isVisible() && await p.locator('main svg[aria-hidden]').first().isVisible(), 'B: ViewCube a osový kříž 3D okna jsou vidět');
     let g = await gl(p);
     ok(g && g.n > 20000, `B: 3D okno (WebGL) kreslí model (${g && g.n} pixelů)`);

@@ -6,6 +6,7 @@
  * takže ho lze testovat v Node s náhradním jádrem. Geometrie ploch a řešič vazeb jsou stejné jako v panelu sestavy
  * (seznam ploch: `faceRow` / `sortFaceRows`, vazby: `mateFromPending`, `measureMateIn`, `solveMates`).
  */
+import { copiesText } from "./asm-bulk-text";
 import {
   apply3,
   boltStack,
@@ -859,7 +860,8 @@ export async function applyAsmCmd(d: CadDoc, cmd: AsmCmd, env: AsmEnv): Promise<
       const i = (doc.components ?? []).findIndex((x) => x.id === c.id);
       const copies = (doc.components ?? []).slice(i + 1, i + cmd.pattern.count);
       const p = cmd.pattern;
-      log.push(tr("✓ pole „{0}“: {1} ks ({2}) – kopie {3}", c.name, p.count, p.kind === "linear" ? tr("lineární, rozteč {0} mm, směr {1}", fmt(p.spacing), pt(p.direction, 3)) : tr("kruhové, úhel {0}°, osa {1}, střed {2}", fmt(p.angle), Array.isArray(p.axis) ? pt(p.axis, 3) : p.axis, pt(p.center)), copies.map((x) => `„${x.name}“ ${pt(x.placement.position)}`).join(", ")));
+      // souhrn místo polohy každé kopie (vlna 22, bod 15 – asm-bulk-text.ts); polohy všech vypíše „sestava komponenty“
+      log.push(tr("✓ pole „{0}“: {1} ks ({2}) – kopie {3}", c.name, p.count, p.kind === "linear" ? tr("lineární, rozteč {0} mm, směr {1}", fmt(p.spacing), pt(p.direction, 3)) : tr("kruhové, úhel {0}°, osa {1}, střed {2}", fmt(p.angle), Array.isArray(p.axis) ? pt(p.axis, 3) : p.axis, pt(p.center)), copiesText(copies.map((x) => ({ name: x.name, pos: pt(x.placement.position) })))));
       return done(doc, true);
     }
     case "mirror": {
