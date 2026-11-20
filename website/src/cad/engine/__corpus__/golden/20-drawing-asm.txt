@@ -37,6 +37,10 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Nepředepsané tolerance: nezadané (sestava – nevyžadují se)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Vydání: nevydáno · list z modelu r·? (vydat: výkres vydat A)
+Pozice: 2 (přední 2) · přiřazené ručně 0 · posunuté 0 · zamčené 0 · nevešlo se 0 · křížení odkazů 0
+  přední: 1–2
+Kusovník: 2 řádků · nad razítkem
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 420 × 297):
   přední (x = X, y = Z): x 0…60, y 0…50 mm · 1:1 · na listu x 185…245, y 187…237
   horní (x = X, y = Y): x 0…60, y 0…40 mm · 1:1 · na listu x 185…245, y 123…163

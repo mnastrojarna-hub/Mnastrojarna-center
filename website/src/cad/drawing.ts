@@ -1539,6 +1539,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   const bomPlace = opts.bomPlace ?? "auto";
   const planAbove: BomPlan = !bomRows.length ? { mode: "none", cols: [], h0: 0, hidden: 0 } : bomPlace === "sheet" ? { mode: "sheet", cols: [], h0: BOM_ROW, hidden: 0 } : { mode: "above", cols: [bomRows], h0: bomBlockH(bomRows.length), hidden: 0 };
   let bomPlan: BomPlan = planAbove;
+  const NO_BOM: BomPlan = { mode: "none", cols: [], h0: 0, hidden: 0 };
   let TBH = TB.h + bomPlan.h0 + tablesH;
 
   // --- projekce
@@ -1667,7 +1668,8 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   }
   for (const x of xt.list) extras.push({ v: x.view, pad: { l: 6, t: 14, r: 6, b: 6 }, scale: "auto", name: x.label, xv: x });
   type Arrangement = { ok: boolean; items: Item[]; W: number; H: number; area: Rect; bounds: Rect; fixed: Rect[]; room: number };
-  const arrange = (n: SheetName, s: number, force = false, tbh = tbhFor(n)): Arrangement | null => {
+  const arrange = (n: SheetName, s: number, force = false, bp: BomPlan = bomPlanFor(n), tbhOverride?: number): Arrangement | null => {
+    const tbh = tbhOverride ?? TB.h + bp.h0 + tablesH;
     const [W, H] = sheetDims(n);
     // plocha pro pohledy: rám bez pásu razítka (kóty kolem pohledů do ní patří)
     const area: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M - tbh - 4 };
@@ -1675,7 +1677,6 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
     const fixed: Rect[] = [{ x: W - M - TB.w - 3, y: H - M - tbh - 12, w: TB.w + 3, h: tbh + 12 }];
     if (meta.revisions?.length) fixed.push({ x: W - M - 124 - 3, y: M, w: 127, h: 6 + (meta.revisions.length + 1) * 6 + 3 });
     // další sloupce kusovníku vlevo od razítka (dosedají na spodní rám, výška celého pásu)
-    const bp = bomPlanFor(n);
     if (bp.mode === "columns" && bp.cols.length > 1) fixed.push({ x: W - M - TB.w - (bp.cols.length - 1) * BOM_W - 3, y: H - M - tbh - 3, w: (bp.cols.length - 1) * BOM_W + 3, h: tbh + 3 });
     const frame: Rect = { x: M_LEFT, y: M, w: W - M_LEFT - M, h: H - 2 * M };
     /** mřížka s mezerou 24 + room a okrajem DIM_ROOM + room; `loose` = pohledy smí i vedle razítka (jen ne do něj) */
@@ -1802,7 +1803,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
       const bandA = TB.h + tablesH + planAbove.h0;
       if (bandA > H - 2 * M - 40 || (bandA > 0.4 * (H - 2 * M) && !col.hidden)) p = col;
       else {
-        const sc = (q: BomPlan) => STANDARD_SCALES.find((x) => !!arrange(n, x, false, TB.h + tablesH + q.h0)) ?? 0;
+        const sc = (q: BomPlan) => STANDARD_SCALES.find((x) => !!arrange(n, x, false, q)) ?? 0;
         p = !col.hidden && sc(col) > sc(planAbove) + 1e-12 ? col : planAbove;
       }
     }
@@ -1849,7 +1850,7 @@ export function makeDrawing(shape: r.Shape3D, meta: DrawingMeta, options: Partia
   TBH = tbhFor(sheet);
   // tabulky (kusovník, díry, pružiny) zmenšily pohledy pod 1:20: ⚠ s měřítkem bez nich
   if (opts.scale === "auto" && (bomRows.length || tablesH)) {
-    const free = STANDARD_SCALES.find((x) => !!arrange(sheet, x, false, TB.h)) ?? null;
+    const free = STANDARD_SCALES.find((x) => !!arrange(sheet, x, false, NO_BOM, TB.h)) ?? null;
     if (free != null && scale < free - 1e-12 && scale < 1 / 10 - 1e-12) {
       const t = tr("Pohledy zmenšeny na {0} kvůli kusovníku a tabulkám nad razítkem (bez nich {1}) – zvolte větší formát, kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list)", scaleLabel(scale), scaleLabel(free));
       warnings.push(t);

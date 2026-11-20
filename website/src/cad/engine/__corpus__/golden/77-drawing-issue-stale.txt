@@ -46,6 +46,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 ⚠ Vydání: rev. A z modelu r·? (?.?.????) – model je teď r·?: list je ZASTARALÝ – vydejte novou revizi: výkres vydat B
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
   přední (x = X, y = Z): x 0…30, y 0…10 mm · 1:1 · na listu x 44…74, y 166…176
   horní (x = X, y = Y): x 0…30, y 0…40 mm · 1:1 · na listu x 44…74, y 92…132
@@ -90,6 +91,7 @@ Další pole razítka: — (kontroloval, schválil, zákazník, projekt, polotov
 Nepředepsané tolerance: ISO 2768-mK (délky, úhly a sražení třída m – střední, geometrie K)
 Razítko bez zkracování textu: všechna pole v nominální velikosti
 Vydání: rev. B z modelu r·? (?.?.????) – odpovídá modelu
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů 0
 Souřadnice (pro „pohled … v x y“ a kóty: mm modelu v rovině pohledu, y nahoru; list: mm od levého dolního rohu, 297 × 210):
   přední (x = X, y = Z): x 0…30, y 0…10 mm · 1:1 · na listu x 44…74, y 166…176
   horní (x = X, y = Y): x 0…30, y 0…40 mm · 1:1 · na listu x 44…74, y 92…132
