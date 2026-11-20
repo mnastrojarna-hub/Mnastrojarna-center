@@ -71,7 +71,10 @@ export class DrawingTracker {
       for (const p of pending) {
         if (p.issue.kind === "dims-skipped") continue; // vynechané kóty hlásí vyhodnocení listu (stav po celém bloku)
         const chk = await recheckIssue(d, p.issue, compute, extras);
-        if (chk.present) this.add1(p.line, "drawing.overlap", d.name, codeText("drawing.overlap", chk.sheet, p.issue.text), lines);
+        if (chk.present) {
+          this.add1(p.line, "drawing.overlap", d.name, codeText("drawing.overlap", chk.sheet, p.issue.text), lines);
+          this.noteKnown(p.issue);
+        }
       }
       const { activeSheetIndex } = await import("../drawing-agent");
       const idx = d.kind === "draft" ? -1 : activeSheetIndex(d);
@@ -80,7 +83,7 @@ export class DrawingTracker {
         this.touched.set(`${verifyKey(ctx)}\u0000${sheet.id}`, { key: verifyKey(ctx), sheetId: sheet.id, lines, docName: d.name });
         // list jen s kusovníkem (`výkres kusovník list`, vlna 22 bod 17) se mění s listem sestavy – vyhodnotí se na konci běhu taky
         for (const s of d.drawings ?? []) if ((s.options as { bomOnly?: boolean } | undefined)?.bomOnly && s.id !== sheet.id) this.touched.set(`${verifyKey(ctx)}\u0000${s.id}`, { key: verifyKey(ctx), sheetId: s.id, lines, docName: d.name });
-        if (strict) for (const x of await evaluateSheet(d, idx, compute, extras)) this.addSheet(line, x, d.name, lines);
+        if (strict) for (const x of await evaluateSheet(d, idx, compute, extras, { knownTexts: this.known.get(sheet.id) ?? [] })) this.addSheet(line, x, d.name, lines);
       }
     } catch (e) {
       if (isCancelled(e)) throw e;
@@ -106,7 +109,7 @@ export class DrawingTracker {
       const line = t.lines[t.lines.length - 1];
       try {
         const extras = () => drawExtras(ctx.ws, ctx.host.kernel, d, { ...asmHooks(ctx), flat: ctx.host.ui?.bomFlat?.() ?? true });
-        for (const x of await evaluateSheet(d, idx, compute, extras)) this.addSheet(line, x, d.name, t.lines);
+        for (const x of await evaluateSheet(d, idx, compute, extras, { knownTexts: this.known.get(t.sheetId) ?? [] })) this.addSheet(line, x, d.name, t.lines);
         // 22i: výsledek listu až po vyhodnocení – ✓ jen když list (v konečném stavu) nemá žádný nález na řádcích svého bloku
         if (!rb.entries.some((e) => this.findingOf(e, d.name, t.lines))) this.sheetOk(line, d.name, sheetLabel(d, idx), t.lines);
       } catch (e) {
@@ -115,6 +118,16 @@ export class DrawingTracker {
       }
     }
     return rb.entries.slice(before);
+  }
+
+  /** texty poznámek listu, jejichž překryv / přesah rámečku už protokol ohlásil (id listu → texty) – hlášení listu je neopakuje */
+  private readonly known = new Map<string, Set<string>>();
+  private noteKnown(issue: Pending["issue"]): void {
+    const t = (issue.ann as { text?: string } | undefined)?.text;
+    if (!issue.sheetId || !t) return;
+    const set = this.known.get(issue.sheetId) ?? new Set<string>();
+    set.add(t);
+    this.known.set(issue.sheetId, set);
   }
 
   /** ✗ / ⚠ výkresu (nebo chyba příkazu) dokumentu `doc` na některém z řádků bloku */

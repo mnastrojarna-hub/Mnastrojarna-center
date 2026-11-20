@@ -184,6 +184,21 @@ export function overlapSummary(o: SheetOverlaps): string {
   return `${o.total} (${OVERLAP_KINDS.filter((k) => o.byKind[k]).map((k) => `${overlapKindText(k)} ${o.byKind[k]}`).join(", ")})`;
 }
 
+/**
+ * Překryvy bez textů, které už protokol ohlásil po poznámce (překryv / přesah rámečku poznámky z příkazu výkresu, s id a radou
+ * „výkres upravit aN posun=…“) – táž věc se v hlášení celého listu neopakuje jinými slovy. Počet listu (`overlaps=`) zůstává úplný.
+ */
+export function withoutKnownTexts(o: SheetOverlaps, texts: Iterable<string>): SheetOverlaps {
+  const q = new Set([...texts].filter((t) => t.trim()).map((t) => `„${t}“`));
+  if (!q.size) return o;
+  const known = (h: OverlapHit) => (h.kind === "text-frame" || h.kind === "text-geometry" ? q.has(h.what) : h.kind === "text-text" ? [...q].some((t) => h.what.startsWith(`${t} × `) || h.what.endsWith(` × ${t}`)) : false);
+  const hits = o.hits.filter((h) => !known(h));
+  if (hits.length === o.hits.length) return o;
+  const byKind: Partial<Record<OverlapKind, number>> = {};
+  for (const h of hits) byKind[h.kind] = (byKind[h.kind] ?? 0) + 1;
+  return { ...o, total: hits.length, byKind, hits };
+}
+
 /** text hlášení ⚠ drawing.overlap pro list (null = bez překryvů) */
 export function overlapIssueText(o: SheetOverlaps): string | null {
   if (!o.total) return null;

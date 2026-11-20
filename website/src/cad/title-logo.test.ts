@@ -127,9 +127,14 @@ describe("prepareLogo", () => {
     expect(j.logo.trace).toBeUndefined();
     expect(j.warnings[0]).toMatch(/v DXF \/ DWG jen rámeček/);
   });
-  it("chyby: není data URL, neznámý formát, SVG bez prohlížeče", async () => {
+  it("chyby: není data URL, neznámý formát; SVG bez kreslitelných tvarů bez prohlížeče = jen vektor s upozorněním", async () => {
     await expect(prepareLogo("firma.png")).rejects.toThrow(/čekám data URL/);
     await expect(prepareLogo("data:application/octet-stream;base64,AAECAw==")).rejects.toThrow(/neznámý formát obrázku/);
-    await expect(prepareLogo("data:image/svg+xml,%3Csvg%3E%3C%2Fsvg%3E")).rejects.toThrow(/SVG jde převést jen v prohlížeči/);
+    // vlna 22, bod 22j (D4): SVG se bez prohlížeče převádí z tvarů – prázdné SVG se přijme jen jako vektor, bez náhledu a obrysu,
+    // a řekne to (žádný tichý úspěch); dřív ✗ „SVG jde převést jen v prohlížeči“
+    const empty = await prepareLogo("data:image/svg+xml,%3Csvg%3E%3C%2Fsvg%3E");
+    expect(empty.logo.trace).toBeUndefined();
+    expect(empty.logo.svg).toMatch(/^data:image\/svg\+xml/);
+    expect(empty.warnings).toEqual([expect.stringMatching(/^logo SVG bez kreslitelných tvarů: náhled ani obrys pro DXF\/DWG nejsou/)]);
   });
 });

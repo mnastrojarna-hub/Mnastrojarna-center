@@ -1375,8 +1375,16 @@ export function CadApp() {
   const mateSigNow = useMemo(() => (hasMates ? mateSigOf(doc, docAsmSig) : ""), [hasMates, doc, docAsmSig]);
   const mateRec = hasMates ? engineRef.current!.ws.asm.mateStatus.get(docKeyNow) : undefined;
   /** zastaralé výstupy pro panel „Zastaralé výstupy“ (vlna 22, bod 20): uložené analýzy (A1 `staleResults`) a kopie dílů (D1) */
-  const staleNow = useMemo(() => (doc.kind === "draft" ? [] : staleResults(engineRef.current!.ws, docKeyNow, doc)), [doc, docKeyNow, clashEntry, mateRec, resVer]);
-  const copiesNow = useMemo(() => (isAsm ? staleCopies(doc, (n) => engineRef.current?.ws.findPart(n) ?? null).map((c) => ({ name: c.comp.alias ?? c.comp.name, why: staleCopyText(c) })) : []), [isAsm, doc, asmVer]);
+  // výsledky a díly čte z pracovního prostoru (měnitelný ref) – přepočet spouští změna uloženého výsledku kolizí / vazeb
+  // (`clashEntry`, `mateRec`), čítač výsledků `resVer` a verze sestavy `asmVer`, proto jsou v závislostech i v těle
+  const staleNow = useMemo(() => {
+    void [clashEntry, mateRec, resVer];
+    return doc.kind === "draft" ? [] : staleResults(engineRef.current!.ws, docKeyNow, doc);
+  }, [doc, docKeyNow, clashEntry, mateRec, resVer]);
+  const copiesNow = useMemo(() => {
+    void asmVer;
+    return isAsm ? staleCopies(doc, (n) => engineRef.current?.ws.findPart(n) ?? null).map((c) => ({ name: c.comp.alias ?? c.comp.name, why: staleCopyText(c) })) : [];
+  }, [isAsm, doc, asmVer]);
   const mateState: ResultState = mateRec ? resultState(mateRec, { doc: docKeyNow, sig: mateSigNow }) : "unchecked";
   const mateStatus = mateState === "ok" && mateRec ? mateRec : NO_MATES;
   /** otisk toho, co je teď v 3D okně k měření / mapě / dělicí rovině: díl = naposledy postavená geometrie, sestava = listy a polohy */

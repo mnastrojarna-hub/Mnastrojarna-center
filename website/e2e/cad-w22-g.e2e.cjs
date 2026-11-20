@@ -93,7 +93,8 @@ const start = async (p, url) => {
   fs.writeFileSync(S + 'w22g-edit-short-browser.txt', bShort + '\n');
   fs.writeFileSync(S + 'w22g-edit-short-cli.txt', cShort + '\n');
   ok(bShort === cShort && Buffer.byteLength(bShort, 'utf8') <= 2048, `1: stručný protokol prohlížeč = CLI, ${Buffer.byteLength(bShort, 'utf8')} B ≤ 2048` + (bShort === cShort ? '' : ' – první rozdíl: ' + (bShort.split('\n').find((l, i) => l !== cShort.split('\n')[i]) || '').slice(0, 140)));
-  ok(/^D "Plech" part feat=1\/0\/1 .* sheets=1 solids=1 valid=1$/m.test(bShort), '1: řádek D nese solids= valid=: ' + (linesOf(bShort, /^D /)[0] || ''));
+  // + aditivní pole D z balíku D na konci: rev= (revize modelu, D2) a overlaps= (kontrola překryvů listů, D4)
+  ok(/^D "Plech" part feat=1\/0\/1 .* sheets=1 solids=1 valid=1 rev=r·[0-9a-f]{6} overlaps=0$/m.test(bShort), '1: řádek D nese solids= valid=: ' + (linesOf(bShort, /^D /)[0] || ''));
 
   // 1b) načtený dokument (JSON na řádku – korpus 58-status-load): načtení je přijetí, ✗ vadného prvku na řádku načtení;
   //     dokument bez vady dostane ✓ „postaven“ až po ověřovací stavbě – prohlížeč = CLI

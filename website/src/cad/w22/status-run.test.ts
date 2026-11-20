@@ -256,7 +256,7 @@ describe("protokol: úrovně v JSON, řádek D a rozpočet 2048 B; cs / en / de"
     expect(utf8Bytes(rep.protocol)).toBeLessThanOrEqual(DEFAULT_BUDGET);
     for (const l of rep.protocol.split("\n")) expect(grammarKind(l), l).not.toBeNull();
     const d = rep.protocol.split("\n").find((l) => GRAMMAR.doc.test(l))!;
-    expect(d).toMatch(/^D "Plech" part feat=2\/0\/1 V=3\.87cm3 m=0\.03kg bbox=20x20x10 sheets=1 solids=1 valid=1$/);
+    expect(d).toMatch(/^D "Plech" part feat=2\/0\/1 V=3\.87cm3 m=0\.03kg bbox=20x20x10 sheets=1 solids=1 valid=1 rev=r·[0-9a-f]{6} overlaps=0$/); // + D2 rev=, D4 overlaps= (aditivní pole na konci)
     expect(rep.docs[0]).toMatchObject({ solids: 1, valid: true });
     // ve stručném protokolu nejsou ✓ ani ℹ – jen ✗ na řádcích úpravy a výkresu
     expect(rep.protocol.split("\n").filter((l) => l.startsWith("✗")).map((l) => l.split(" ").slice(1, 3).join(" "))).toEqual(["L5 feature.failed", "L7 drawing.section-miss"]);

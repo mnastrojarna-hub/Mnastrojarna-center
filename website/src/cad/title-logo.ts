@@ -425,7 +425,7 @@ export function traceLogo(r: Raster, maxCols = 160, maxRows = 80): LogoTrace {
 const hasCanvas = () => typeof document !== "undefined" && typeof Image !== "undefined";
 
 /** Obrázek (libovolný formát, který prohlížeč umí) → rastr RGBA (zmenšený) – jen v prohlížeči. */
-export async function rasterInBrowser(src: string, maxW = LOGO_MAX_W, maxH = LOGO_MAX_H): Promise<Raster> {
+export async function rasterInBrowser(src: string, maxW = LOGO_MAX_W, maxH = LOGO_MAX_H, size?: { w: number; h: number }): Promise<Raster> {
   const img = new Image();
   img.decoding = "async";
   img.src = src;
@@ -433,8 +433,9 @@ export async function rasterInBrowser(src: string, maxW = LOGO_MAX_W, maxH = LOG
   let w = img.naturalWidth || img.width || 300;
   let h = img.naturalHeight || img.height || 150;
   const k = Math.min(1, maxW / w, maxH / h);
-  w = Math.max(1, Math.round(w * k));
-  h = Math.max(1, Math.round(h * k));
+  // `size` = pevná velikost rastru (logo SVG: stejná jako bez prohlížeče – vektor se vykreslí do 600 × 300, prohlížeč = CLI)
+  w = size ? size.w : Math.max(1, Math.round(w * k));
+  h = size ? size.h : Math.max(1, Math.round(h * k));
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
@@ -511,7 +512,7 @@ async function prepareSvgLogo(bytes: Uint8Array, nm: { name?: string }, warnings
   const W = Math.max(1, Math.round(doc.w * k));
   const H = Math.max(1, Math.round(doc.h * k));
   let r: Raster | null = null;
-  if (hasCanvas()) r = await rasterInBrowser(svg).catch(() => null);
+  if (hasCanvas()) r = await rasterInBrowser(svg, W, H, { w: W, h: H }).catch(() => null); // stejný rozměr jako `rasterShapes` (CLI)
   if (!r && doc.shapes.length) r = rasterShapes(doc, W, H);
   if (doc.skipped.length && !hasCanvas()) warnings.push(tr("logo SVG: {0} se bez prohlížeče do náhledu a obrysu DXF/DWG nepřenese (vektor v SVG a PDF zůstává)", doc.skipped.join(", ")));
   if (!r) {

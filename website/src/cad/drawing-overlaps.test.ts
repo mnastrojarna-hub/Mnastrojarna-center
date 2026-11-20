@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { DrawingResult, DText, Poly } from "./drawing";
-import { overlapIssueText, overlapSummary, sheetOverlaps } from "./drawing-overlaps";
+import { overlapIssueText, overlapSummary, sheetOverlaps, withoutKnownTexts } from "./drawing-overlaps";
 
 type Sheet = Pick<DrawingResult, "polys" | "texts" | "balloons" | "tables" | "frameRect" | "zones">;
 /** list 420 × 297 s rámem, razítkem, obdélníkem pohledu (viditelné hrany) a kótou nad ním */
@@ -84,5 +84,21 @@ describe("kontrola překryvů listu (bod 17)", () => {
     s.texts.push({ x: 60, y: 6, s: "1", size: 3, anchor: "middle", layer: "text" }); // zóna celá v okraji
     const o = sheetOverlaps(s);
     expect(o.total).toBe(0);
+  });
+});
+
+describe("hlášení listu neopakuje překryv poznámky, který už ohlásil příkaz výkresu (fáze 2, duplicitní ⚠)", () => {
+  it("text přes rám ohlášený u poznámky se z hlášení listu vynechá, jiný zůstane; počet listu je úplný", () => {
+    const s = base();
+    s.texts.push({ x: 405, y: 150, s: "KALIT 58 HRC", size: 5, anchor: "start", layer: "text" }); // přes pravý rám
+    s.texts.push({ x: 15, y: 150, s: "JINÝ", size: 5, anchor: "start", layer: "text" }); // přes levý rám
+    const all = sheetOverlaps(s);
+    expect(all.byKind["text-frame"]).toBe(2);
+    const rest = withoutKnownTexts(all, ["KALIT 58 HRC"]);
+    expect(rest.byKind["text-frame"]).toBe(1);
+    expect(rest.hits.map((h) => h.what)).toEqual(["„JINÝ“"]);
+    expect(overlapIssueText(rest)).toMatch(/^1 překryvů – text × rám 1; např\. „JINÝ“/);
+    expect(overlapIssueText(withoutKnownTexts(all, ["KALIT 58 HRC", "JINÝ"]))).toBeNull();
+    expect(withoutKnownTexts(all, [])).toBe(all);
   });
 });

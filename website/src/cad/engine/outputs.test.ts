@@ -171,6 +171,10 @@ describe("kontrola exportu (kernel.exportStats)", () => {
     const b = await verifyExport(k as never, { ...d, name: "Jiný název" }, new Uint8Array(2), "step");
     expect(b.line).toMatch(/\(model od minulé kontroly beze změny\)$/);
     expect(exportStats).toHaveBeenCalledTimes(1);
+    // záznam exportu v dokumentu (vlna 22 D2 – `outputs` se mění po každém exportu) model nemění → stále z paměti
+    const rec = await verifyExport(k as never, { ...d, outputs: [{ format: "step", file: "Deska.step", modelRev: "r·000000", sig: "x", at: "2026-11-20T10:00:00Z" }] } as never, new Uint8Array(3), "step");
+    expect(rec.line).toMatch(/\(model od minulé kontroly beze změny\)$/);
+    expect(exportStats).toHaveBeenCalledTimes(1);
     await verifyExport(k as never, part("Deska", 31), new Uint8Array(1), "step");
     await verifyExport(k as never, d, new Uint8Array(1), "brep");
     expect(exportStats).toHaveBeenCalledTimes(3);

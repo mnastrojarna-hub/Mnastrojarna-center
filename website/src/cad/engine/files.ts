@@ -131,7 +131,9 @@ const CHECKS_MAX = 4;
  */
 export async function verifyExport(kernel: Pick<KernelApi, "exportStats">, d: CadDoc, bytes: Uint8Array, format: "step" | "brep", parts?: SolidParts): Promise<ExportCheck> {
   const label = format === "step" ? "STEP" : "BREP";
-  const key = `${format}:${JSON.stringify({ ...d, name: "" })}`;
+  // záznamy exportů (`outputs`, vlna 22 D2) mění dokument po každém exportu, model ne – do klíče nepatří (jinak by se
+  // kontrola nezměněného modelu nikdy nepřevzala)
+  const key = `${format}:${JSON.stringify({ ...d, name: "", outputs: undefined })}`;
   const hit = checks.get(key);
   if (hit) return { ...hit, line: `${hit.line}${tr(" (model od minulé kontroly beze změny)")}` };
   try {
