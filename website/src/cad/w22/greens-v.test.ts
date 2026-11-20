@@ -12,7 +12,7 @@ import { applyMotionViewCmd } from "../agent-motion-view";
 import { parseMotionText, type MotionCmd } from "../agent-motion";
 import { setLang } from "../i18n";
 import type { MotionResult } from "../motion";
-import { checkFrames, checkText, frameSig, videoPlan } from "../motion-video";
+import { checkFrames, checkText, combineChecks, frameSig, videoPlan } from "../motion-video";
 import { annotRows } from "../motion-views";
 import { emptyDoc, type CadDoc } from "../types";
 import { checkWebm, muxWebm, readWebm } from "../webm-mux";
@@ -32,6 +32,15 @@ describe("greens V: kontrola obrazu snímků", () => {
     expect(c.verdict).toBe("dead");
     expect(checkText(c)).not.toMatch(OK_FRAMES);
     expect(checkText(c)).toMatch(/^✗/);
+  });
+  it("dva pohledy, jeden nehybný → ⚠ s názvem pohledu, nikdy „mění ve všech“ ani ✓", () => {
+    const live = checkFrames(Array.from({ length: 20 }, (_, i) => ({ pose: `p${i}`, sig: gray(60 + i * 8) })));
+    const dead = checkFrames(Array.from({ length: 20 }, (_, i) => ({ pose: `p${i}`, sig: gray(90) })));
+    expect(live.verdict).toBe("ok");
+    const c = combineChecks([live, dead], ["Řez", "Shora"]);
+    expect(c.verdict).toBe("partial");
+    expect(checkText(c)).not.toMatch(OK_FRAMES);
+    expect(checkText(c)).toMatch(/^⚠.*„Shora“/);
   });
   it("část snímků beze změny obrazu → ⚠, ne úspěch", () => {
     const c = checkFrames([0, 1, 2, 3].map((i) => ({ pose: `p${i}`, sig: gray(i < 2 ? 90 + i * 20 : 110) })));

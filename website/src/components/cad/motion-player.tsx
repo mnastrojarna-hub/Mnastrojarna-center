@@ -303,6 +303,7 @@ export function MotionPlayer({
             data-video-frames={report.plan ? String(report.plan.frames) : ""}
             data-video-file-seconds={report.fileSeconds !== null ? String(report.fileSeconds) : ""}
             data-video-verdict={report.check?.verdict ?? ""}
+            data-video-still={report.check?.still?.join("|") ?? ""}
             data-video-moving={report.check ? String(report.check.moving) : ""}
             data-video-changed={report.check ? String(report.check.changed) : ""}
             data-video-distinct={report.check ? String(report.check.distinct) : ""}

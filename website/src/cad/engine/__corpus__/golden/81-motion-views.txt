@@ -1,0 +1,58 @@
+=== run 1 ===
+✓ nový díl „Deska A“ – nová záložka
+→ Kvádr 1 (box) přidán – výsledek po výpočtu níže
+✓ nový díl „Přidržovač“ – nová záložka
+→ Kvádr 2 (box) přidán – výsledek po výpočtu níže
+✓ Kvádr 1 (box) · přidáno 100000 mm³ · těleso platné
+✓ Kvádr 2 (box) · přidáno 28800 mm³ · těleso platné
+
+Dokument: „Přidržovač“ · díl · materiál Ocel (7.85 g/cm³) · prvků 1 (1 ✓, 0 ✗)
+Rozměry: 60 × 60 × 8 mm (X 0…60, Y 0…60, Z 0…8) · objem 28,80 cm³ · ploch 6 · hran 12
+Geometrie: platná · 1 těleso · rychlá kontrola
+Prvky:
+ 1. Kvádr 2 [box, id #] ✓ přidáno 28800 mm³ · těleso platné – 60 × 60 × 8 mm, new, roh [0; 0; 0]
+=== run 2 ===
+✓ nová sestava „Studie P“ – nová záložka
+✓ komponenta „Deska A“ vložena do sestavy (ukotvená)
+✓ komponenta „Přidržovač“ vložena do sestavy
+✓ vazba ZDVIH „Přidržovač“ F5 → „Deska A“ F6 · 57,5 mm: ok · poloha beze změny
+✓ motor 1: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+ pohání: „Přidržovač“ · směr −Z
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 1 („Deska A“)
+Vazby splněny ve všech krocích
+Pohledy studie: žádné – pohyb pohled uložit "<název>" [řez Y 50] [kamera přední]
+✓ pohled studie „Řez pružinami“ uložen: kamera přední · řez Y 50 mm
+✓ pohled studie „Shora“ uložen: kamera horní · bez řezu
+✓ pohled studie „Šikmo“ uložen: směr 1; -1; 1 · cíl 50; 50; 30 · výška 160 mm · řez normála 1; 0; 1 bod 50; 0; 0 posun 0 mm obráceně
+Pohledy studie (3), aktivní: okno
+  1. „Řez pružinami“ · kamera přední · řez Y 50 mm
+  2. „Shora“ · kamera horní · bez řezu
+  3. „Šikmo“ · směr 1; -1; 1 · cíl 50; 50; 30 · výška 160 mm · řez normála 1; 0; 1 bod 50; 0; 0 posun 0 mm obráceně
+Video studie: video 4 s = 2 × délka studie 2 s · rychlost 0,5× · 30 fps · 120 snímků (tolerance ±1 snímek = ±0,033 s)
+  pohledy: „Řez pružinami“, „Shora“ (synchronně vedle sebe)
+✓ anotace polohy vypnuté
+✓ pohled studie „Shora“ odebrán
+Pohledy studie (2), aktivní: okno
+  1. „Řez pružinami“ · kamera přední · řez Y 50 mm
+  2. „Šikmo“ · směr 1; -1; 1 · cíl 50; 50; 30 · výška 160 mm · řez normála 1; 0; 1 bod 50; 0; 0 posun 0 mm obráceně
+Video studie: video 4 s = 2 × délka studie 2 s · rychlost 0,5× · 30 fps · 120 snímků (tolerance ±1 snímek = ±0,033 s)
+  pohledy: „Řez pružinami“
+Pohybová studie: motorů 1 · kroků 4
+ 1. lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Pohybová studie: 4 kroků · 2 s · motory: lineární motor · ZDVIH „Přidržovač“ → „Deska A“ · hodnota vazby 57,5 → 27,15 mm ↓ zdvih 30,35 mm
+Úroveň simulace: kinematika – polohy jen z vazeb a motorů – pružiny se měří, ale netlačí; díl, kterého polohu vazby neurčují, zůstává, kde byl (zvoleno automaticky: sestava nemá pružinu na pohyblivé komponentě; jiný režim: pohyb kinematika | kvazistatika | dynamika)
+ „Přidržovač“: ΔZ −30,35 mm
+ stojí: 1 („Deska A“)
+Vazby splněny ve všech krocích
+✗ řádek 17: řez: X | Y | Z <poloha> nebo řez normála nx ny nz ← „pohyb pohled uložit "X" řez W 5“
+
+Dokument: „Studie P“ · sestava · materiál Ocel (7.85 g/cm³) · prvků 0 (0 ✓, 0 ✗)
+Komponenty: Deska A [0; 0; 0] ⚓ · Přidržovač [20; 20; 67,5]
+Vazby: 1 (1 ok)
+Pohybová studie: motorů 1 · kroků 4 · 2 s – pohyb stav
+Sestava: 2 komponent (2 dílů po rozložení podsestav) · obálka 100 × 100 × 75,5 mm · objem Σ 128,80 cm³ · hmotnost Σ 1,011 kg
+Kolize: nezkontrolováno – příkaz „kolize“ nebo tlačítko Kolize na kartě Sestava
+Pohyb: výsledek platí pro tento stav sestavy – 4 kroků, vazby splněny, kolize nekontrolovány (podrobně pohyb stav)

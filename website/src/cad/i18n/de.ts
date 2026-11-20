@@ -1004,6 +1004,7 @@ export const DE: Record<string, string> = {
  "⚠ přerušení {0} uloženo, ale: {1}": "⚠ Unterbrechung {0} gespeichert, aber: {1}",
  "⚠ řez {0}–{0} uložen, ale na listu není: {1}": "⚠ Schnitt {0}–{0} gespeichert, aber nicht auf dem Blatt: {1}",
  "⚠ šířky křivek se rozložením ztratily": "⚠ Polylinienbreiten gingen beim Auflösen verloren",
+ "⚠ v pohledu {0} se obraz nezměnil v žádném snímku s pohybem (pohyb ve směru pohledu, nebo pohyblivý díl mimo záběr či schovaný řezem?) – ostatní pohledy pohyb ukazují": "⚠ in der Ansicht {0} hat sich das Bild in keinem Bild mit Bewegung geändert (Bewegung in Blickrichtung, oder bewegtes Teil außerhalb des Bildes bzw. vom Schnitt verdeckt?) – die anderen Ansichten zeigen die Bewegung",
  "⚠ v sestavě je konflikt vazeb – sestava vazby": "⚠ in der Baugruppe gibt es einen Verknüpfungskonflikt – baugruppe verknüpfungen",
  "⚠ varování": "⚠ Warnungen",
  "⚠ vazbu {0} nelze splnit spolu s ostatními – sestava vazby, sestava vazba {1} potlačit|smazat|obráceně": "⚠ Verknüpfung {0} lässt sich nicht zusammen mit den anderen erfüllen – baugruppe verknüpfungen, baugruppe verknüpfung {1} unterdrücken|löschen|umkehren",
