@@ -72,6 +72,7 @@ export async function applyGenCmd(ctx: Ctx, cmd: GenCmd): Promise<{ log: string[
       // zámek = absolutní střed balónku z právě spočítaného listu (vlna 22, bod 17)
       const at = (k: string) => {
         if (cmd.act === "unlock") return null;
+        if (cmd.at) return cmd.at;
         const b = res.balloons?.find((x) => (x.id ?? `pos:${x.pos}`) === k);
         return b ? ([b.x, b.y] as [number, number]) : null;
       };

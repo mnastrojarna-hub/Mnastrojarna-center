@@ -12,7 +12,8 @@ import type { RawTok } from "./agent-drawing";
 import { tr } from "./i18n";
 import type { Vec2 } from "./types";
 
-export type GenCmd = { op: "gen"; act: "list" | "hide" | "show" | "move" | "restore" | "lock" | "unlock"; keys: string[]; d?: Vec2 };
+/** `at` (zamknout): absolutní střed pozice v mm listu od levého HORNÍHO rohu (y dolů – jako uložený zámek; `… odshora`) */
+export type GenCmd = { op: "gen"; act: "list" | "hide" | "show" | "move" | "restore" | "lock" | "unlock"; keys: string[]; d?: Vec2; at?: Vec2 };
 
 const fold = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ß/g, "ss");
 const W = (...w: string[]) => new Set(w);
@@ -24,6 +25,7 @@ const RESTORE_W = W("obnovit", "vratit", "restore", "reset", "wiederherstellen",
 /** zamčení pozice na místě (vlna 22, bod 17): absolutní poloha přežije přepočet; jen pozice pos:<n> */
 const LOCK_W = W("zamknout", "zamkni", "lock", "pin", "sperren", "fixieren");
 const UNLOCK_W = W("odemknout", "odemkni", "unlock", "unpin", "entsperren");
+const TOP_W = W("odshora", "from-top", "fromtop", "von-oben", "vonoben");
 const isNum = (t?: RawTok) => !!t && !t.q && /^[+\-−]?(\d+([.,]\d*)?|[.,]\d+)$/.test(t.s);
 const num = (s: string) => Number(s.replace("−", "-").replace(",", "."));
 /** klíč vygenerovaného objektu: dim:<pohled>:t|l (kóta celkového rozměru; pohled dalšího modelu dim:m:<id>:t), pos:<číslo> (pozice / balónek) */
@@ -43,8 +45,10 @@ export function parseGenText(rt: RawTok[]): GenCmd | null {
   const rest = rt.slice(2);
   const keys: string[] = [];
   const nums: number[] = [];
+  let top = false;
   for (const t of rest) {
-    if (act === "move" && isNum(t)) nums.push(num(t.s));
+    if ((act === "move" || act === "lock") && isNum(t)) nums.push(num(t.s));
+    else if (act === "lock" && !t.q && !t.key && TOP_W.has(fold(t.s))) top = true;
     else if (!t.key && GEN_KEY.test(t.s.trim().toLowerCase())) keys.push(t.s.trim().toLowerCase());
     else throw new Error(tr("výkres vygenerované: „{0}“ není klíč vygenerovaného objektu – {1}", t.key ? `${t.key}=${t.s}` : t.s, GEN_USE()));
   }
@@ -55,6 +59,11 @@ export function parseGenText(rt: RawTok[]): GenCmd | null {
   if ((act === "hide" || act === "show") && !keys.length) throw new Error(GEN_USE());
   if (act === "lock" || act === "unlock") {
     if (!keys.length || keys.some((k) => !k.startsWith("pos:"))) throw new Error(tr("výkres vygenerované zamknout|odemknout pos:<číslo> … – zamknout jde jen pozice (balónky)"));
+    // zámek na zadaném místě: jedna pozice a střed v mm listu od levého horního rohu (`odshora`) – zápis skriptu z dokumentu
+    if (act === "lock" && (nums.length || top)) {
+      if (keys.length !== 1 || nums.length !== 2 || !top) throw new Error(tr("výkres vygenerované zamknout pos:<číslo> x y odshora – jedna pozice a střed v mm listu od levého horního rohu"));
+      return { op: "gen", act, keys, at: [nums[0], nums[1]] };
+    }
   }
   return { op: "gen", act, keys };
 }

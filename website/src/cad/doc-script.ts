@@ -32,7 +32,7 @@
 import { FEATURE_LABEL, parseAgentText, type AgentOp } from "./agent";
 import { stripLineComment } from "./agent-comment";
 import { aliasScript, emitAsmSprings, emitDynamics } from "./doc-script-asm";
-import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
+import { dimTail, dimTailOk, emitDocProps, emitGenEdit, emitPositions, emitSheetViews, emitTitle, sheetLineExtra, sheetUnwritable, SHEET_JSON_ONLY, titleState, type SheetOut } from "./doc-script-sheet";
 import { emitIssue } from "./doc-outputs";
 import { springScriptLine } from "./agent-springs";
 import { freeName, parseValue } from "./agent-edit";
@@ -262,6 +262,9 @@ const WORDS = {
   holeTable: ["tabulka děr", "holetable", "bohrungstabelle"],
   springTable: ["tabulka pružiny", "springtable", "federtabelle"],
   bom: ["kusovník", "bom", "stückliste"],
+  bomAbove: ["nad", "above", "oben"],
+  bomColumns: ["sloupce", "columns", "spalten"],
+  bomAuto: ["auto", "auto", "auto"],
   balloons: ["balónky", "balloons", "positionsnummern"],
   projection: ["promítání", "projection", "projektion"],
   dimension: ["kótovat", "dimension", "bemaßen"],
@@ -272,6 +275,7 @@ const WORDS = {
   chain: ["řetězově", "chain", "kette"],
   baseline: ["od základny", "baseline", "basis"],
   sheetNew: ["list nový", "sheet new", "blatt neu"],
+  sheetSel: ["list", "sheet", "blatt"],
   sheetRename: ["list přejmenovat", "sheet rename", "blatt umbenennen"],
   drawingNew: ["nový", "new", "neu"],
   title: ["razítko", "titleblock", "schriftfeld"],
@@ -1581,7 +1585,11 @@ function sheetLine(c: Ctx, o: Rec): { line: string; keys: string[] } {
     parts.push(`${c.w("rotation")} ${n(o.rotation)}`);
     keys.push("rotation");
   }
-  if (typeof o.bomTable === "boolean") {
+  if (o.bomTable !== false && (o.bomPlace === "above" || o.bomPlace === "columns" || o.bomPlace === "auto")) {
+    // umístění kusovníku (vlna 22, bod 17) – volba zapne i kusovník
+    parts.push(`${c.w("bom")} ${c.w(o.bomPlace === "above" ? "bomAbove" : o.bomPlace === "columns" ? "bomColumns" : "bomAuto")}`);
+    keys.push("bomPlace");
+  } else if (typeof o.bomTable === "boolean") {
     parts.push(`${c.w("bom")} ${c.yn(o.bomTable)}`);
     keys.push("bomTable");
   }
@@ -1638,6 +1646,16 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
           how = "same";
           c.note(tr("další výkres „{0}“ se nepodařilo zapsat – list přibude k prvnímu výkresu", String(s.drawing)));
         }
+      } else if (o.bomOnly && list.slice(0, i).some((p) => p.drawing === s.drawing && (p.options as Rec | undefined)?.bomPlace === "sheet")) {
+        // list jen s kusovníkem vznikl příkazem `výkres kusovník list` u listu sestavy (vlna 22, bod 17): vybrat ho a přejmenovat
+        how = "sheet";
+        const auto = trIn(c.lang, "Kusovník");
+        const sel = `${c.w("drawing")} ${c.w("sheetSel")} ${scriptQuote(auto, true) ?? ""}`;
+        if (check(sel, (cmd) => cmd.k === "sheet" && cmd.op === "select")) c.line(sel);
+        if (s.name !== auto && q) {
+          const l = `${c.w("drawing")} ${c.w("sheetRename")} ${q}`;
+          if (check(l, (cmd) => cmd.k === "sheet" && cmd.op === "rename")) c.line(l);
+        }
       } else {
         how = "sheet";
         const l = `${c.w("drawing")} ${c.w("sheetNew")} ${q ?? ""}`.trim();
@@ -1646,6 +1664,7 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
           how = "same";
           c.note(tr("list „{0}“ se nepodařilo zapsat jako nový list", s.name));
         }
+        if (o.bomOnly) c.note(tr("list jen s kusovníkem „{0}“ vzniká příkazem výkres kusovník list u listu sestavy – zde se zapíše jako běžný list", s.name));
       }
     }
     setName = s.drawing;
@@ -1698,6 +1717,8 @@ function emitDrawings(c: Ctx, doc: CadDoc, name = doc.name) {
     }
     // skryté / posunuté vygenerované kóty celkových rozměrů a pozice (na listu jsou až po kótách) – jen ty, které na listu jsou
     emitGenEdit(c.sheetOut, doc, s, c.genKeys[s.id]);
+    // pozice po pohledech, zámky pozic, kusovník na samostatném listu (vlna 22, bod 17)
+    emitPositions(c.sheetOut, doc, s, c.genKeys[s.id]);
     emitIssue(c.sheetOut, doc, s); // vydání listu (vlna 22, bod 20 – doc-outputs.ts)
     const edited = ann.filter((a) => a.auto && ((a.type === "dim" && (a.text !== undefined || /[±+\-]\d|[A-Za-z]\d/.test(a.suffix ?? ""))) || (a.type === "callout" && a.tol) || a.rev || a.tolShow)).length;
     if (edited) {
