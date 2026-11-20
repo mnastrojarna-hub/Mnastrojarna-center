@@ -1,0 +1,120 @@
+# vlna 22, balík D, etapa D4 – čitelný výkres sestavy (pozice po pohledech, kusovník ve sloupcích / na listu, překryvy, zámek) a šablony hlavičky s logem SVG (body 17, 22j)
+ · ⚠ {0} řádků se nevešlo	 · ⚠ {0} rows did not fit
+ · SVG (vektor v SVG a PDF)	 · SVG (vector in SVG and PDF)
+ · šablona hlavičky „{0}“	 · title block template “{0}”
+ · výchozí pro nové listy	 · default for new sheets
+ (Nastavení)	 (Settings)
+ [výchozí]	 [default]
+— vyberte —	— choose —
+— žádná uložená —	— none saved —
+{0} překryvů – {1}; např. {2} – {3}	{0} overlaps – {1}; e.g. {2} – {3}
+{0} řádků se nevešlo	{0} rows did not fit
+{0} sloupců	{0} columns
+⚠ pozice {0}: přiřazený pohled na listu není – leží u jiného pohledu (zapněte pohled: výkres pohledy … nebo výkres pozice pohled auto {0})	⚠ positions {0}: the assigned view is not on the sheet – they sit at another view (turn the view on: drawing views … or drawing positions view auto {0})
+✓ kusovník na samostatném listu {0} – list {1} ho nekreslí (zpět: výkres kusovník nad | sloupce)	✓ parts list on a separate sheet {0} – sheet {1} does not draw it (back: drawing bom above | columns)
+✓ pozice {0} → pohled {1}	✓ positions {0} → view {1}
+✓ pozice {0} odemčeny – rozmístí se automaticky	✓ positions {0} unlocked – placed automatically
+✓ pozice {0} zamčeny na místě – přepočet ani nové rozmístění ostatních je neposune (výkres pozice odemknout {0})	✓ positions {0} locked in place – neither a recompute nor re-placing the others moves them (drawing positions unlock {0})
+✓ pozice {0}: pohled automaticky	✓ positions {0}: view automatic
+✓ razítko podle šablony hlavičky {0}	✓ title block from template {0}
+✓ šablona hlavičky „{0}“ smazána z dokumentu i z Nastavení (razítka listů zůstávají)	✓ title block template “{0}” deleted from the document and from Settings (the sheets' title blocks stay)
+✓ šablona hlavičky {0} uložena do dokumentu i do Nastavení{1}	✓ title block template {0} saved to the document and to Settings{1}
+✓ vygenerované odemčené: {0}	✓ generated unlocked: {0}
+✓ vygenerované zamčené na místě: {0}	✓ generated locked in place: {0}
+auto ({0})	auto ({0})
+balónek × balónek	balloon × balloon
+balónek × geometrie	balloon × geometry
+balónek × rám	balloon × frame
+balónek × tabulka	balloon × table
+balónek × text	balloon × text
+bez výchozí šablony hlavičky	no default title block template
+firma „{0}“	company “{0}”
+křížení {0}	crossings {0}
+Kusovník ({0} řádků) se na list {1} nevejde ani ve sloupcích – {2} řádků chybí; zvolte větší formát nebo kusovník na samostatném listu (výkres kusovník list)	The parts list ({0} rows) does not fit on sheet {1} even in columns – {2} rows are missing; choose a larger format or a parts list on a separate sheet (drawing bom sheet)
+kusovník ano|ne|nad|sloupce|auto|list	bom yes|no|above|columns|auto|sheet
+kusovník automaticky (nad razítkem, dlouhý ve sloupcích)	parts list automatic (above the title block, a long one in columns)
+kusovník na samostatném listu	parts list on a separate sheet
+kusovník na samostatném listu – jen výkres sestavy	parts list on a separate sheet – assembly drawings only
+kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list) nebo větší formát	parts list in columns or on a separate sheet (drawing bom columns | sheet) or a larger format
+kusovník ve sloupcích vlevo od razítka	parts list in columns left of the title block
+Kusovník: {0} řádků	Parts list: {0} rows
+Kusovník: {0} řádků · {1}{2}	Parts list: {0} rows · {1}{2}
+Kusovník: samostatný list	Parts list: separate sheet
+List jen s kusovníkem – pohledy ani kóty nemá	Sheet with the parts list only – it has no views or dimensions
+list jen s kusovníkem „{0}“ vzniká příkazem výkres kusovník list u listu sestavy – zde se zapíše jako běžný list	the parts-list-only sheet “{0}” is created by drawing bom sheet on the assembly sheet – written here as a normal sheet
+list jen s kusovníkem ({0} sloupců)	sheet with the parts list only ({0} columns)
+List kusovníku: sestava nemá kusovník.	Parts list sheet: the assembly has no parts list.
+list nemá pozice – jen výkres sestavy s balónky (výkres pozice ano)	the sheet has no positions – only an assembly drawing with balloons (drawing balloons yes)
+logo „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“, v CLI složkou --files, nebo zadejte data URL (data:image/png;base64,…); připojené: {1}	logo “{0}”: the file is not attached – attach it with “Attach file…” in the console, with --files in the CLI, or give a data URL (data:image/png;base64,…); attached: {1}
+logo {0}{1}	logo {0}{1}
+logo SVG bez kreslitelných tvarů: náhled ani obrys pro DXF/DWG nejsou – v SVG a PDF zůstane vektor	SVG logo without drawable shapes: no preview or DXF/DWG outline – SVG and PDF keep the vector
+logo SVG: {0} se bez prohlížeče do náhledu a obrysu DXF/DWG nepřenese (vektor v SVG a PDF zůstává)	SVG logo: {0} is not carried into the preview and the DXF/DWG outline without a browser (the vector stays in SVG and PDF)
+logo šablony hlavičky „{0}“ nejde zapsat na řádek skriptu (data URL přes {1} kB) – vložte ho znovu: výkres hlavička uložit "{0}" logo="soubor.svg"	the logo of title block template “{0}” cannot be written on a script line (data URL over {1} kB) – insert it again: drawing title-template save "{0}" logo="file.svg"
+logo: soubor SVG nemá prvek <svg>	logo: the SVG file has no <svg> element
+na samostatném listu	on a separate sheet
+na samostatném listu (výkres kusovník list)	on a separate sheet (drawing bom sheet)
+nad razítkem	above the title block
+název nové šablony	name of the new template
+Název šablony hlavičky	Title block template name
+Nové listy převezmou tuto šablonu (logo, firmu, druh razítka)	New sheets take over this template (logo, company, title block layout)
+odkazová čára × balónek	leader × balloon
+pohled {0} na listu není – zapněte ho (výkres pohledy …)	view {0} is not on the sheet – turn it on (drawing views …)
+Pohled pozice {0}	View of position {0}
+Pohledy se na list {0} nevejdou ani v měřítku {1} – zvolte větší formát, kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list)	The views do not fit on sheet {0} even at scale {1} – choose a larger format, a parts list in columns or on a separate sheet (drawing bom columns | sheet)
+Pohledy zmenšeny na {0} kvůli kusovníku a tabulkám nad razítkem (bez nich {1}) – zvolte větší formát, kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list)	Views reduced to {0} because of the parts list and the tables above the title block (without them {1}) – choose a larger format, a parts list in columns or on a separate sheet (drawing bom columns | sheet)
+pole „{0}“ šablony hlavičky „{1}“ nejde zapsat	field “{0}” of title block template “{1}” cannot be written
+polí {0}	{0} fields
+posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)	move the dimension / note (drawing edit <id> shift="dx dy" | offset=…)
+Pozic {0} · zamčené {1} · nevešlo se {2}	Positions {0} · locked {1} · did not fit {2}
+pozice {0} na listu nejsou – pozice listu: {1}	positions {0} are not on the sheet – sheet positions: {1}
+Pozice a překryvy	Positions and overlaps
+Pozice: — (list nemá pozice – jen výkres sestavy s balónky: výkres pozice ano)	Positions: — (the sheet has no positions – only an assembly drawing with balloons: drawing balloons yes)
+Pozice: {0} ({1}) · přiřazené ručně {2} · posunuté {3} · zamčené {4} · nevešlo se {5} · křížení odkazů {6}	Positions: {0} ({1}) · assigned by hand {2} · moved {3} · locked {4} · did not fit {5} · leader crossings {6}
+Překryvy na listu: {0} – {1}	Overlaps on the sheet: {0} – {1}
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů {0}	Overlaps on the sheet: 0 (checked: balloons, leaders, texts, dimensions, view geometry, tables, frame) · leader crossings {0}
+Překryvy na listu: nezkontrolováno	Overlaps on the sheet: not checked
+Překryvy: {0}	Overlaps: {0}
+Překryvy: 0	Overlaps: 0
+Překryvy: nezkontrolováno	Overlaps: not checked
+přiřazení pozic pohledu	assignment of positions to a view
+Razítko podle šablony hlavičky {0}	Title block from template {0}
+rozdělte pozice do pohledů (výkres pozice pohled horní 13-30), posuňte a zamkněte pozici (výkres vygenerované posun pos:7 dx dy · výkres pozice zamknout 7) nebo zvolte větší formát	split the positions between views (drawing positions view top 13-30), move and lock a position (drawing generated move pos:7 dx dy · drawing positions lock 7) or choose a larger format
+samostatný list	separate sheet
+Šablona hlavičky	Title block template
+šablona hlavičky „{0}“ neexistuje – {1}	title block template “{0}” does not exist – {1}
+šablona hlavičky {0}	title block template {0}
+Šablona hlavičky {0} uložena do dokumentu i do Nastavení{1}	Title block template {0} saved to the document and to Settings{1}
+šablonu hlavičky „{0}“ listu „{1}“ nejde zapsat	title block template “{0}” of sheet “{1}” cannot be written
+šablonu hlavičky „{0}“ nejde zapsat	title block template “{0}” cannot be written
+Šablony hlavičky (logo, firma, druh razítka)	Title block templates (logo, company, layout)
+Šablony hlavičky: v dokumentu {0} · v Nastavení {1} · list: {2}	Title block templates: in the document {0} · in Settings {1} · sheet: {2}
+tabulka × pohled	table × view
+tabulka nepředepsaných tolerancí šablony hlavičky „{0}“ se do skriptu nepřenáší – po přečtení ji zadejte výkres hlavička uložit "{0}" nepředepsané="desetinná …"	the general tolerance table of title block template “{0}” is not carried into the script – after reading enter drawing title-template save "{0}" general="decimals …"
+text × geometrie	text × geometry
+text × rám	text × frame
+text × text	text × text
+Ukázat překryvy na listu	Show overlaps on the sheet
+ukládají se z panelu Razítko ve výkrese nebo příkazem výkres hlavička uložit	saved from the Title block panel in the drawing or with drawing title-template save
+Uložit jako šablonu	Save as template
+Umístění kusovníku	Parts list placement
+ve {0} sloupcích – první nad razítkem, další vlevo od razítka	in {0} columns – the first above the title block, the others left of it
+ve sloupcích vlevo od razítka	in columns left of the title block
+Výchozí šablona hlavičky nových listů	Default title block template of new sheets
+výkres hlavička · výkres hlavička uložit "název" [výchozí] [šablona=… logo="soubor.svg" firma="…" …] · výkres hlavička použít "název" · výkres hlavička smazat "název"	drawing title-template · drawing title-template save "name" [default] [template=… logo="file.svg" company="…" …] · drawing title-template use "name" · drawing title-template delete "name"
+výkres hlavička {0}: chybí název šablony v uvozovkách – {1}	drawing title-template {0}: the template name in quotes is missing – {1}
+výkres hlavička uložit: neznámé „{0}“ – {1}	drawing title-template save: unknown “{0}” – {1}
+výkres hlavička: neznámé „{0}“ – {1}	drawing title-template: unknown “{0}” – {1}
+výkres pozice · výkres pozice pohled přední|horní|levý|pravý|zadní|spodní|izometrie|auto <pozice: 1-12,15 | vše> · výkres pozice zamknout|odemknout <pozice> · výkres kusovník list	drawing positions · drawing positions view front|top|left|right|back|bottom|iso|auto <positions: 1-12,15 | all> · drawing positions lock|unlock <positions> · drawing bom sheet
+výkres pozice pohled: „{0}“ není pohled – přední, horní, levý, pravý, zadní, spodní, izometrie nebo auto	drawing positions view: “{0}” is not a view – front, top, left, right, back, bottom, iso or auto
+výkres pozice: „{0}“ nejsou čísla pozic – např. 1-12,15 nebo vše; {1}	drawing positions: “{0}” are not position numbers – e.g. 1-12,15 or all; {1}
+výkres pozice: neznámé „{0}“ – {1}	drawing positions: unknown “{0}” – {1}
+výkres vygenerované · výkres vygenerované skrýt|zobrazit <klíč…> · výkres vygenerované posun <klíč> dx dy · výkres vygenerované zamknout|odemknout pos:<číslo>… · výkres vygenerované obnovit [<klíč…>] – klíče: dim:<pohled>:t|l (kóta celkového rozměru nahoře / vlevo), pos:<číslo> (pozice)	drawing generated · drawing generated hide|show <key…> · drawing generated move <key> dx dy · drawing generated lock|unlock pos:<number>… · drawing generated restore [<key…>] – keys: dim:<view>:t|l (overall dimension at the top / left), pos:<number> (position)
+výkres vygenerované zamknout pos:<číslo> x y odshora – jedna pozice a střed v mm listu od levého horního rohu	drawing generated lock pos:<number> x y from-top – one position and the centre in sheet mm from the top-left corner
+výkres vygenerované zamknout|odemknout pos:<číslo> … – zamknout jde jen pozice (balónky)	drawing generated lock|unlock pos:<number> … – only positions (balloons) can be locked
+Zamčená pozice zůstane na místě i po přepočtu modelu	A locked position stays in place even after a model recompute
+zamčené {0}	locked {0}
+zámek pozice	position lock
+zamknout	lock
+Zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám	Checked: balloons, leaders, texts, dimensions, view geometry, tables, frame
+pojmenovaná šablona hlavičky (druh razítka, logo PNG nebo SVG jako vektor, firma, kreslil / kontroloval / schválil, nepředepsané tolerance) – v Nastavení i v dokumentu (jde do .mncad, sdílení a skriptu); výchozí šablonu převezmou nové listy; logo názvem souboru i z CLI --files	named title block template (layout, logo PNG or SVG as a vector, company, drawn / checked / approved, general tolerances) – in Settings and in the document (goes into .mncad, sharing and the script); new sheets take over the default template; logo by file name, also from CLI --files
+pozice (balónky) výkresu sestavy po pohledech (ručně, jinak automaticky – co se k hlavnímu pohledu nevejde, přejde k dalšímu), zámek pozice na místě (přežije přepočet), kusovník nad razítkem / ve sloupcích / na samostatném listu; výpis = pozice po pohledech, překryvy a křížení odkazů (kontrola celého listu, ⚠ drawing.overlap)	positions (balloons) of an assembly drawing per view (by hand, otherwise automatic – what does not fit at the main view moves to the next), position lock in place (survives a recompute), parts list above the title block / in columns / on a separate sheet; listing = positions per view, overlaps and leader crossings (check of the whole sheet, ⚠ drawing.overlap)

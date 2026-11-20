@@ -1,0 +1,120 @@
+# vlna 22, balík D, etapa D4 – čitelný výkres sestavy (pozice po pohledech, kusovník ve sloupcích / na listu, překryvy, zámek) a šablony hlavičky s logem SVG (body 17, 22j)
+ · ⚠ {0} řádků se nevešlo	 · ⚠ {0} Zeilen passen nicht
+ · SVG (vektor v SVG a PDF)	 · SVG (Vektor in SVG und PDF)
+ · šablona hlavičky „{0}“	 · Kopfvorlage „{0}“
+ · výchozí pro nové listy	 · Standard für neue Blätter
+ (Nastavení)	 (Einstellungen)
+ [výchozí]	 [Standard]
+— vyberte —	— auswählen —
+— žádná uložená —	— keine gespeichert —
+{0} překryvů – {1}; např. {2} – {3}	{0} Überlappungen – {1}; z. B. {2} – {3}
+{0} řádků se nevešlo	{0} Zeilen passen nicht
+{0} sloupců	{0} Spalten
+⚠ pozice {0}: přiřazený pohled na listu není – leží u jiného pohledu (zapněte pohled: výkres pohledy … nebo výkres pozice pohled auto {0})	⚠ Positionen {0}: die zugewiesene Ansicht ist nicht auf dem Blatt – sie stehen an einer anderen Ansicht (Ansicht einschalten: zeichnung ansichten … oder zeichnung positionen ansicht auto {0})
+✓ kusovník na samostatném listu {0} – list {1} ho nekreslí (zpět: výkres kusovník nad | sloupce)	✓ Stückliste auf eigenem Blatt {0} – Blatt {1} zeichnet sie nicht (zurück: zeichnung stückliste oben | spalten)
+✓ pozice {0} → pohled {1}	✓ Positionen {0} → Ansicht {1}
+✓ pozice {0} odemčeny – rozmístí se automaticky	✓ Positionen {0} entsperrt – werden automatisch platziert
+✓ pozice {0} zamčeny na místě – přepočet ani nové rozmístění ostatních je neposune (výkres pozice odemknout {0})	✓ Positionen {0} an Ort und Stelle gesperrt – weder Neuberechnung noch Neuplatzierung der anderen verschiebt sie (zeichnung positionen entsperren {0})
+✓ pozice {0}: pohled automaticky	✓ Positionen {0}: Ansicht automatisch
+✓ razítko podle šablony hlavičky {0}	✓ Schriftfeld nach Kopfvorlage {0}
+✓ šablona hlavičky „{0}“ smazána z dokumentu i z Nastavení (razítka listů zůstávají)	✓ Kopfvorlage „{0}“ aus Dokument und Einstellungen gelöscht (Schriftfelder der Blätter bleiben)
+✓ šablona hlavičky {0} uložena do dokumentu i do Nastavení{1}	✓ Kopfvorlage {0} im Dokument und in den Einstellungen gespeichert{1}
+✓ vygenerované odemčené: {0}	✓ generiert entsperrt: {0}
+✓ vygenerované zamčené na místě: {0}	✓ generiert an Ort und Stelle gesperrt: {0}
+auto ({0})	auto ({0})
+balónek × balónek	Positionsnummer × Positionsnummer
+balónek × geometrie	Positionsnummer × Geometrie
+balónek × rám	Positionsnummer × Rahmen
+balónek × tabulka	Positionsnummer × Tabelle
+balónek × text	Positionsnummer × Text
+bez výchozí šablony hlavičky	keine Standard-Kopfvorlage
+firma „{0}“	Firma „{0}“
+křížení {0}	Kreuzungen {0}
+Kusovník ({0} řádků) se na list {1} nevejde ani ve sloupcích – {2} řádků chybí; zvolte větší formát nebo kusovník na samostatném listu (výkres kusovník list)	Die Stückliste ({0} Zeilen) passt auch in Spalten nicht auf Blatt {1} – {2} Zeilen fehlen; größeres Format oder Stückliste auf eigenem Blatt wählen (zeichnung stückliste blatt)
+kusovník ano|ne|nad|sloupce|auto|list	stückliste ja|nein|oben|spalten|auto|blatt
+kusovník automaticky (nad razítkem, dlouhý ve sloupcích)	Stückliste automatisch (über dem Schriftfeld, lange in Spalten)
+kusovník na samostatném listu	Stückliste auf eigenem Blatt
+kusovník na samostatném listu – jen výkres sestavy	Stückliste auf eigenem Blatt – nur Baugruppenzeichnung
+kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list) nebo větší formát	Stückliste in Spalten oder auf eigenem Blatt (zeichnung stückliste spalten | blatt) oder größeres Format
+kusovník ve sloupcích vlevo od razítka	Stückliste in Spalten links vom Schriftfeld
+Kusovník: {0} řádků	Stückliste: {0} Zeilen
+Kusovník: {0} řádků · {1}{2}	Stückliste: {0} Zeilen · {1}{2}
+Kusovník: samostatný list	Stückliste: eigenes Blatt
+List jen s kusovníkem – pohledy ani kóty nemá	Blatt nur mit Stückliste – ohne Ansichten und Maße
+list jen s kusovníkem „{0}“ vzniká příkazem výkres kusovník list u listu sestavy – zde se zapíše jako běžný list	das reine Stücklistenblatt „{0}“ entsteht mit zeichnung stückliste blatt am Baugruppenblatt – hier als normales Blatt geschrieben
+list jen s kusovníkem ({0} sloupců)	Blatt nur mit Stückliste ({0} Spalten)
+List kusovníku: sestava nemá kusovník.	Stücklistenblatt: die Baugruppe hat keine Stückliste.
+list nemá pozice – jen výkres sestavy s balónky (výkres pozice ano)	das Blatt hat keine Positionen – nur Baugruppenzeichnung mit Positionsnummern (zeichnung positionen ja)
+logo „{0}“: soubor není připojený – připojte ho v konzoli tlačítkem „Připojit soubor…“, v CLI složkou --files, nebo zadejte data URL (data:image/png;base64,…); připojené: {1}	Logo „{0}“: Datei ist nicht angehängt – in der Konsole mit „Datei anhängen…“, in der CLI mit --files anhängen oder eine Data-URL angeben (data:image/png;base64,…); angehängt: {1}
+logo {0}{1}	Logo {0}{1}
+logo SVG bez kreslitelných tvarů: náhled ani obrys pro DXF/DWG nejsou – v SVG a PDF zůstane vektor	SVG-Logo ohne zeichenbare Formen: keine Vorschau und kein DXF/DWG-Umriss – SVG und PDF behalten den Vektor
+logo SVG: {0} se bez prohlížeče do náhledu a obrysu DXF/DWG nepřenese (vektor v SVG a PDF zůstává)	SVG-Logo: {0} wird ohne Browser nicht in Vorschau und DXF/DWG-Umriss übernommen (Vektor in SVG und PDF bleibt)
+logo šablony hlavičky „{0}“ nejde zapsat na řádek skriptu (data URL přes {1} kB) – vložte ho znovu: výkres hlavička uložit "{0}" logo="soubor.svg"	das Logo der Kopfvorlage „{0}“ passt nicht in eine Skriptzeile (Data-URL über {1} kB) – erneut einfügen: zeichnung kopfvorlage speichern "{0}" logo="datei.svg"
+logo: soubor SVG nemá prvek <svg>	Logo: die SVG-Datei hat kein <svg>-Element
+na samostatném listu	auf eigenem Blatt
+na samostatném listu (výkres kusovník list)	auf eigenem Blatt (zeichnung stückliste blatt)
+nad razítkem	über dem Schriftfeld
+název nové šablony	Name der neuen Vorlage
+Název šablony hlavičky	Name der Kopfvorlage
+Nové listy převezmou tuto šablonu (logo, firmu, druh razítka)	Neue Blätter übernehmen diese Vorlage (Logo, Firma, Schriftfeldart)
+odkazová čára × balónek	Hinweislinie × Positionsnummer
+pohled {0} na listu není – zapněte ho (výkres pohledy …)	Ansicht {0} ist nicht auf dem Blatt – einschalten (zeichnung ansichten …)
+Pohled pozice {0}	Ansicht der Position {0}
+Pohledy se na list {0} nevejdou ani v měřítku {1} – zvolte větší formát, kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list)	Die Ansichten passen auch im Maßstab {1} nicht auf Blatt {0} – größeres Format, Stückliste in Spalten oder auf eigenem Blatt wählen (zeichnung stückliste spalten | blatt)
+Pohledy zmenšeny na {0} kvůli kusovníku a tabulkám nad razítkem (bez nich {1}) – zvolte větší formát, kusovník ve sloupcích nebo na samostatném listu (výkres kusovník sloupce | list)	Ansichten wegen Stückliste und Tabellen über dem Schriftfeld auf {0} verkleinert (ohne sie {1}) – größeres Format, Stückliste in Spalten oder auf eigenem Blatt wählen (zeichnung stückliste spalten | blatt)
+pole „{0}“ šablony hlavičky „{1}“ nejde zapsat	Feld „{0}“ der Kopfvorlage „{1}“ lässt sich nicht schreiben
+polí {0}	{0} Felder
+posuňte kótu / poznámku (výkres upravit <id> posun="dx dy" | odsazení=…)	Maß / Hinweis verschieben (zeichnung bearbeiten <id> verschieben="dx dy" | abstand=…)
+Pozic {0} · zamčené {1} · nevešlo se {2}	Positionen {0} · gesperrt {1} · passten nicht {2}
+pozice {0} na listu nejsou – pozice listu: {1}	Positionen {0} sind nicht auf dem Blatt – Positionen des Blatts: {1}
+Pozice a překryvy	Positionen und Überlappungen
+Pozice: — (list nemá pozice – jen výkres sestavy s balónky: výkres pozice ano)	Positionen: — (das Blatt hat keine Positionen – nur Baugruppenzeichnung mit Positionsnummern: zeichnung positionen ja)
+Pozice: {0} ({1}) · přiřazené ručně {2} · posunuté {3} · zamčené {4} · nevešlo se {5} · křížení odkazů {6}	Positionen: {0} ({1}) · von Hand zugewiesen {2} · verschoben {3} · gesperrt {4} · passten nicht {5} · Kreuzungen der Hinweislinien {6}
+Překryvy na listu: {0} – {1}	Überlappungen auf dem Blatt: {0} – {1}
+Překryvy na listu: 0 (zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám) · křížení odkazů {0}	Überlappungen auf dem Blatt: 0 (geprüft: Positionsnummern, Hinweislinien, Texte, Maße, Ansichtsgeometrie, Tabellen, Rahmen) · Kreuzungen der Hinweislinien {0}
+Překryvy na listu: nezkontrolováno	Überlappungen auf dem Blatt: nicht geprüft
+Překryvy: {0}	Überlappungen: {0}
+Překryvy: 0	Überlappungen: 0
+Překryvy: nezkontrolováno	Überlappungen: nicht geprüft
+přiřazení pozic pohledu	Zuordnung der Positionen zu einer Ansicht
+Razítko podle šablony hlavičky {0}	Schriftfeld nach Kopfvorlage {0}
+rozdělte pozice do pohledů (výkres pozice pohled horní 13-30), posuňte a zamkněte pozici (výkres vygenerované posun pos:7 dx dy · výkres pozice zamknout 7) nebo zvolte větší formát	Positionen auf Ansichten verteilen (zeichnung positionen ansicht oben 13-30), Position verschieben und sperren (zeichnung generiert verschieben pos:7 dx dy · zeichnung positionen sperren 7) oder größeres Format wählen
+samostatný list	eigenes Blatt
+Šablona hlavičky	Kopfvorlage
+šablona hlavičky „{0}“ neexistuje – {1}	Kopfvorlage „{0}“ existiert nicht – {1}
+šablona hlavičky {0}	Kopfvorlage {0}
+Šablona hlavičky {0} uložena do dokumentu i do Nastavení{1}	Kopfvorlage {0} im Dokument und in den Einstellungen gespeichert{1}
+šablonu hlavičky „{0}“ listu „{1}“ nejde zapsat	Kopfvorlage „{0}“ von Blatt „{1}“ lässt sich nicht schreiben
+šablonu hlavičky „{0}“ nejde zapsat	Kopfvorlage „{0}“ lässt sich nicht schreiben
+Šablony hlavičky (logo, firma, druh razítka)	Kopfvorlagen (Logo, Firma, Schriftfeldart)
+Šablony hlavičky: v dokumentu {0} · v Nastavení {1} · list: {2}	Kopfvorlagen: im Dokument {0} · in den Einstellungen {1} · Blatt: {2}
+tabulka × pohled	Tabelle × Ansicht
+tabulka nepředepsaných tolerancí šablony hlavičky „{0}“ se do skriptu nepřenáší – po přečtení ji zadejte výkres hlavička uložit "{0}" nepředepsané="desetinná …"	die Allgemeintoleranz-Tabelle der Kopfvorlage „{0}“ wird nicht ins Skript übernommen – nach dem Einlesen eingeben: zeichnung kopfvorlage speichern "{0}" allgemeintoleranz="dezimal …"
+text × geometrie	Text × Geometrie
+text × rám	Text × Rahmen
+text × text	Text × Text
+Ukázat překryvy na listu	Überlappungen auf dem Blatt zeigen
+ukládají se z panelu Razítko ve výkrese nebo příkazem výkres hlavička uložit	werden im Zeichnungsbereich Schriftfeld oder mit zeichnung kopfvorlage speichern gespeichert
+Uložit jako šablonu	Als Vorlage speichern
+Umístění kusovníku	Lage der Stückliste
+ve {0} sloupcích – první nad razítkem, další vlevo od razítka	in {0} Spalten – die erste über dem Schriftfeld, die weiteren links davon
+ve sloupcích vlevo od razítka	in Spalten links vom Schriftfeld
+Výchozí šablona hlavičky nových listů	Standard-Kopfvorlage neuer Blätter
+výkres hlavička · výkres hlavička uložit "název" [výchozí] [šablona=… logo="soubor.svg" firma="…" …] · výkres hlavička použít "název" · výkres hlavička smazat "název"	zeichnung kopfvorlage · zeichnung kopfvorlage speichern "name" [standard] [vorlage=… logo="datei.svg" unternehmen="…" …] · zeichnung kopfvorlage verwenden "name" · zeichnung kopfvorlage löschen "name"
+výkres hlavička {0}: chybí název šablony v uvozovkách – {1}	zeichnung kopfvorlage {0}: der Vorlagenname in Anführungszeichen fehlt – {1}
+výkres hlavička uložit: neznámé „{0}“ – {1}	zeichnung kopfvorlage speichern: unbekannt „{0}“ – {1}
+výkres hlavička: neznámé „{0}“ – {1}	zeichnung kopfvorlage: unbekannt „{0}“ – {1}
+výkres pozice · výkres pozice pohled přední|horní|levý|pravý|zadní|spodní|izometrie|auto <pozice: 1-12,15 | vše> · výkres pozice zamknout|odemknout <pozice> · výkres kusovník list	zeichnung positionen · zeichnung positionen ansicht vorne|oben|links|rechts|hinten|unten|iso|auto <Positionen: 1-12,15 | alle> · zeichnung positionen sperren|entsperren <Positionen> · zeichnung stückliste blatt
+výkres pozice pohled: „{0}“ není pohled – přední, horní, levý, pravý, zadní, spodní, izometrie nebo auto	zeichnung positionen ansicht: „{0}“ ist keine Ansicht – vorne, oben, links, rechts, hinten, unten, iso oder auto
+výkres pozice: „{0}“ nejsou čísla pozic – např. 1-12,15 nebo vše; {1}	zeichnung positionen: „{0}“ sind keine Positionsnummern – z. B. 1-12,15 oder alle; {1}
+výkres pozice: neznámé „{0}“ – {1}	zeichnung positionen: unbekannt „{0}“ – {1}
+výkres vygenerované · výkres vygenerované skrýt|zobrazit <klíč…> · výkres vygenerované posun <klíč> dx dy · výkres vygenerované zamknout|odemknout pos:<číslo>… · výkres vygenerované obnovit [<klíč…>] – klíče: dim:<pohled>:t|l (kóta celkového rozměru nahoře / vlevo), pos:<číslo> (pozice)	zeichnung generiert · zeichnung generiert ausblenden|einblenden <Schlüssel…> · zeichnung generiert verschieben <Schlüssel> dx dy · zeichnung generiert sperren|entsperren pos:<Nummer>… · zeichnung generiert wiederherstellen [<Schlüssel…>] – Schlüssel: dim:<Ansicht>:t|l (Gesamtmaß oben / links), pos:<Nummer> (Position)
+výkres vygenerované zamknout pos:<číslo> x y odshora – jedna pozice a střed v mm listu od levého horního rohu	zeichnung generiert sperren pos:<Nummer> x y von-oben – eine Position und die Mitte in Blatt-mm von der linken oberen Ecke
+výkres vygenerované zamknout|odemknout pos:<číslo> … – zamknout jde jen pozice (balónky)	zeichnung generiert sperren|entsperren pos:<Nummer> … – sperren lassen sich nur Positionen (Positionsnummern)
+Zamčená pozice zůstane na místě i po přepočtu modelu	Eine gesperrte Position bleibt auch nach Neuberechnung des Modells an ihrem Platz
+zamčené {0}	gesperrt {0}
+zámek pozice	Positionssperre
+zamknout	sperren
+Zkontrolováno: balónky, odkazové čáry, texty, kóty, geometrie pohledů, tabulky, rám	Geprüft: Positionsnummern, Hinweislinien, Texte, Maße, Ansichtsgeometrie, Tabellen, Rahmen
+pojmenovaná šablona hlavičky (druh razítka, logo PNG nebo SVG jako vektor, firma, kreslil / kontroloval / schválil, nepředepsané tolerance) – v Nastavení i v dokumentu (jde do .mncad, sdílení a skriptu); výchozí šablonu převezmou nové listy; logo názvem souboru i z CLI --files	benannte Kopfvorlage (Schriftfeldart, Logo PNG oder SVG als Vektor, Firma, Ersteller / geprüft / genehmigt, Allgemeintoleranzen) – in den Einstellungen und im Dokument (geht in .mncad, Freigabe und Skript); neue Blätter übernehmen die Standardvorlage; Logo per Dateiname, auch aus CLI --files
+pozice (balónky) výkresu sestavy po pohledech (ručně, jinak automaticky – co se k hlavnímu pohledu nevejde, přejde k dalšímu), zámek pozice na místě (přežije přepočet), kusovník nad razítkem / ve sloupcích / na samostatném listu; výpis = pozice po pohledech, překryvy a křížení odkazů (kontrola celého listu, ⚠ drawing.overlap)	Positionen (Positionsnummern) der Baugruppenzeichnung je Ansicht (von Hand, sonst automatisch – was an der Hauptansicht keinen Platz hat, geht zur nächsten), Positionssperre (übersteht Neuberechnung), Stückliste über dem Schriftfeld / in Spalten / auf eigenem Blatt; Ausgabe = Positionen je Ansicht, Überlappungen und Kreuzungen der Hinweislinien (Prüfung des ganzen Blatts, ⚠ drawing.overlap)

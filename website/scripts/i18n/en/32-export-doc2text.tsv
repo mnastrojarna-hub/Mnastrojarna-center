@@ -23,7 +23,6 @@ nastavení dynamiky pohybové studie nejde zapsat příkazem pohyb dynamika (ča
 ruční hmotnost komponenty mimo skript (podsestava / import) se do skriptu nepřenáší	a manual mass of a component outside the script (subassembly / import) is not carried into the script
 síla / moment na vazbě, která ve skriptu není, se do skriptu nepřenáší	a force / torque on a mate that is not in the script is not carried into the script
 # výkres vygenerované … (skrytí / posun kót celkových rozměrů a pozic textem)
-výkres vygenerované · výkres vygenerované skrýt|zobrazit <klíč…> · výkres vygenerované posun <klíč> dx dy · výkres vygenerované obnovit [<klíč…>] – klíče: dim:<pohled>:t|l (kóta celkového rozměru nahoře / vlevo), pos:<číslo> (pozice)	drawing generated · drawing generated hide|show <key…> · drawing generated move <key> dx dy · drawing generated restore [<key…>] – keys: dim:<view>:t|l (overall dimension at the top / on the left), pos:<number> (balloon)
 výkres vygenerované posun <klíč> dx dy – jeden klíč a posun v mm listu (y nahoru), např. výkres vygenerované posun pos:3 5 -3	drawing generated move <key> dx dy – one key and a shift in sheet mm (y up), e.g. drawing generated move pos:3 5 -3
 výkres vygenerované: „{0}“ není klíč vygenerovaného objektu – {1}	drawing generated: “{0}” is not a key of a generated object – {1}
 výkres vygenerované: neznámé „{0}“ – {1}	drawing generated: unknown “{0}” – {1}
